@@ -85,9 +85,12 @@ theorem userretClosed_proof (UT : USERTRAP) (UV : USERVEC) (UR : USERRET) : USER
     -- first resume (forkret), filed as an origin at its own key
     have HRS := urc_resume (hlc := hlc) (GF := GF) UR PT Γ j cpu k m P ksp V M sts gn cs pid sep sc tv hproc
       hctx htier hnoff hsp hav ha0 hsep hgn none (urc_fit_origin cpu P V M sts gn cs pid sep hsep)
+    -- ...its evidence free (NI M2-X1: `NiFitIs.evidNone`)
+    ihave #Hev := NiFitIs.evidNone (hlc := hlc) (GF := GF) _
+      (urc_fit_origin cpu P V M sts gn cs pid sep hsep)
     iapply HRS
     unfold uRcptOpt uClaimFor uClaimForRaw
-    iframe Hw Hc Hclm Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Hslot
+    iframe Hw Hc Hclm Hev Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Hslot
     inext
     iexact HL⟩
 

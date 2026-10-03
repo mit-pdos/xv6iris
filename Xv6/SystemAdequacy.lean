@@ -80,7 +80,11 @@ no table of reset values is trusted (`MachCSL.BootReset`).
    `riscvPowerAdequacy`'s shape; `xv6PowerAdequacyGen` (statement unchanged)
    is it at `True`/`emp` with the hooks wrapped (`powerHook_emp`,
    `uexitHook_emp`, `uenterHook_drop`), and the NI theorem (`NiAdequacy`) at
-   `niFit` and the ledger's claims.
+   `niFit` and the ledger's claims.  (NI M2-X1) It also takes the record's
+   evidence and registration slots `Ue`/`Uet`/`Uea` (`hUreg`, `hUevid`,
+   `hUevidNone`: `NiFitIs`'s three new fields); the system theorem passes
+   `emp` for all three (`powerHook_emp` yields the empty ticket,
+   `uenterHook_drop` drops the evidence).
 -/
 import Xv6.SystemBootEra
 import Xv6.UexecExecMint
@@ -158,16 +162,28 @@ theorem xv6PowerAdequacyGenU (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTree
     (Uf : Option (Nat × Obs) → Obs → Prop) (hUf : ∀ ox e, niFit ox e → Uf ox e)
     (Ucr : CT → Nat → IProp GF) (Ucx : CT → Nat → Obs → IProp GF) (Uco : CT → IProp GF)
     (hUfork : ∀ (c : CT) (i : Nat) (x : Obs), niForkExit x = true → Ucx c i x ⊢@{IProp GF} Uco c)
+    -- THE RECORD'S EVIDENCE AND REGISTRATION (NI M2-X1): `uEvid` (built from
+    -- a citation, `hUevid`, or an origin's fit, `hUevidNone`), `uEraTok` (the
+    -- power-on's registration ticket, shot by `hUreg`) and `uEraAnchor`
+    (Ue : CT → Option (Nat × Obs) → Obs → IProp GF) (HUe : ∀ c ox e, Persistent (Ue c ox e))
+    (Uet : CT → Nat → IProp GF) (Uea : CT → Nat → List GName → IProp GF)
+    (HUea : ∀ c k ns, Persistent (Uea c k ns))
+    (hUreg : ∀ (c : CT) (k : Nat) (ns : List GName), Uet c k ⊢@{IProp GF} |==> Uea c k ns)
+    (hUevid : ∀ (c : CT) (i : Nat) (x e : Obs) (cc : Option (Nat × UIota)), niFitEv (some (i, x)) e cc →
+      niCiteResRaw (Uea c) cc ⊢@{IProp GF} Ue c (some (i, x)) e)
+    (hUevidNone : ∀ (c : CT) (e : Obs), niFit none e → ⊢@{IProp GF} Ue c none e)
     (Pt : GName → CT → IProp GF)
     (Hinit_boot : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs),
       letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart (Ai c) Hinv γgen
-        γstart γreg γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c) Uf (Ucr c) (Ucx c) (Uco c))
+        γstart γreg γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c) Uf (Ucr c) (Ucx c) (Uco c)
+          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c))
       EraInitBoot (hlc := hlc) N appFs appBoot TnnInit c)
     (Happ_echo : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs),
       letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart (Ai c) Hinv γgen
-        γstart γreg γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c) Uf (Ucr c) (Ucx c) (Uco c))
+        γstart γreg γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c) Uf (Ucr c) (Ucx c) (Uco c)
+          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c))
       EraEcho (hlc := hlc) (GF := GF))
     (HPt : ∀ (γobs : GName) (c : CT),
       Clt c ∗ (γobs ↪VAR{.own (1 : Qp).half} ([] : List Obs)) ⊢@{IProp GF} |==> Pt γobs c)
@@ -178,7 +194,7 @@ theorem xv6PowerAdequacyGenU (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTree
           (γobs ↪VAR{.own (1 : Qp).half} (h ++ [powerEv on])) ∗
           (if on then iprop(emp)
            else iprop((Ai c).cons (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗
-             Tnn c (obsBoots h + 1) ∗ Uco c))))
+             Tnn c (obsBoots h + 1) ∗ Uco c ∗ Uet c (obsBoots h + 1)))))
     -- THE RETURN PATH (Rocq `Hback`, SY3-A1 re-cut)
     (Hback : ∀ (γobs : GName) (c : CT) (h : List Obs),
       ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [Obs.powerOn])) ∗
@@ -197,18 +213,20 @@ theorem xv6PowerAdequacyGenU (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTree
           Ucr c h.length ∗ Ucx c h.length e))
     (HuserEnter : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)),
       isUEnter e = true → Uf ox e → (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
-      uClaimForRaw (Ucr c) (Uco c) ox ∗ ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+      uClaimForRaw (Ucr c) (Uco c) ox ∗ Ue c ox e ∗ ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
         |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e]))))
     (Hperm : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs),
       letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart (Ai c) Hinv γgen
-        γstart γreg γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c) Uf (Ucr c) (Ucx c) (Uco c))
+        γstart γreg γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c) Uf (Ucr c) (Ucx c) (Uco c)
+          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c))
       EraPerm (hlc := hlc) (GF := GF))
     (phi : GState → List Obs → Prop)
     (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs) (g' : GState) (h : List Obs),
       @powerInterp hlc GF (xv6FixedGSU N appFs appOkc cov sb.sbLogstart (Ai c) Hinv γgen γstart γreg
-          γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c) Uf (Ucr c) (Ucx c) (Uco c)) g' ∗
+          γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c) Uf (Ucr c) (Ucx c) (Uco c)
+          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c)) g' ∗
         (γobs ↪VAR{.own (1 : Qp).half} h) ∗ ⌜obsWf h g'⌝ ∗
         ▷ xv6Slot N appFs appOkc cov sb.sbLogstart γd γsw γreg γstart c ∗ ▷ Pt γobs c ⊢@{IProp GF}
         ◇ ⌜phi g' h⌝)
@@ -234,7 +252,7 @@ theorem xv6PowerAdequacyGenU (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTree
     (fun c => (Ai c).wild) (fun c k => (Ai c).wild_persistent k) (fun c k => (Ai c).wild_timeless k)
     (fun c => (Ai c).rdwild) (fun c k => (Ai c).rdwild_persistent k)
     (fun c k => (Ai c).rdwild_timeless k)
-    Uf Ucr Ucx Uco HPt Hobs Hback HuserExit HuserEnter
+    Uf Ucr Ucx Uco Ue HUe Uet Uea HUea HPt Hobs Hback HuserExit HuserEnter
     phi Hphi Hgen0 Hpow ?_ n κs t2 g2 hsteps
   intro F Hinv γgen γstart γreg γd γsw γobs γhist c T hF hborn E gen σ hbf hdv hpp
   -- the merge and the runner at the record literal, read off the equations
@@ -243,7 +261,9 @@ theorem xv6PowerAdequacyGenU (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTree
   have hrun := fun k => @Happ_sync_run F c k
   subst hF
   exact xv6BootEra N appFs appBoot Tnn'' TnnInit sb cov (Ai c) Hinv γgen γstart γreg γd γsw γobs
-    γhist c T (Pt γobs c) (Tk c) (Hk c) Uf hUf (Ucr c) (Ucx c) (Uco c) (hUfork c) (Ok c) (Hboot_ok c) appOkc hmerge (Hfound c) hrun
+    γhist c T (Pt γobs c) (Tk c) (Hk c) Uf hUf (Ucr c) (Ucx c) (Uco c) (hUfork c)
+    (Ue c) (HUe c) (Uet c) (Uea c) (HUea c) (hUreg c) (hUevid c) (hUevidNone c)
+    (Ok c) (Hboot_ok c) appOkc hmerge (Hfound c) hrun
     (Hinit_boot Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (Happ_echo Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (Hperm Hinv γgen γstart γreg γd γsw γobs γhist c T)
@@ -360,10 +380,14 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
     -- the system record is blind and mints no filing claims (NI M2-W2d)
     (fun _ _ => True) (fun _ _ _ => trivial)
     (fun _ _ => iprop(emp)) (fun _ _ _ => iprop(emp)) (fun _ => iprop(emp)) (fun _ _ _ _ => .rfl)
+    -- ...and carries no evidence and no registration (NI M2-X1)
+    (fun _ _ _ => iprop(emp)) (fun _ _ _ => inferInstance) (fun _ _ => iprop(emp))
+    (fun _ _ _ => iprop(emp)) (fun _ _ _ => inferInstance) (fun _ _ _ => BIUpdate.intro)
+    (fun _ _ _ _ _ _ => Affine.affine) (fun _ _ _ => .rfl)
     Pt Hinit_boot Happ_echo HPt
     (fun γd γobs c h on dk hs => powerHook_emp on _ _ _ _ _ _ (Hobs γd γobs c h on dk hs)) Hback
     (fun γobs c h e he => uexitHook_emp _ _ _ (HuserExit γobs c h e he))
-    (fun γobs c h e ox he _ hv => uenterHook_drop _ _ _ _ (HuserEnter γobs c h e ox he hv))
+    (fun γobs c h e ox he _ hv => uenterHook_drop _ _ _ _ _ (HuserEnter γobs c h e ox he hv))
     Hperm phi Hphi Hgen0 Hpow Himg n κs t2 g2 hsteps
 
 end gen
@@ -527,7 +551,9 @@ theorem xv6FsAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T g' =>
       xv6TraceHook Unit (fun _ _ _ => iprop(True)) appTrivOkc cov sb.sbLogstart (appIfaceTriv GF)
         Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs) (appTrivTk c) (appTrivHk c) (fun _ _ => True)
-        (fun _ => iprop(emp)) (fun _ _ => iprop(emp)) iprop(emp) g')
+        (fun _ => iprop(emp)) (fun _ _ => iprop(emp)) iprop(emp)
+        (fun _ _ => iprop(emp)) (fun _ _ => inferInstance) (fun _ => iprop(emp)) (fun _ _ => iprop(emp))
+        (fun _ _ => inferInstance) g')
     Hgen0 Hpow Himg n κs t2 g2 hsteps
 
 include hlc GF in

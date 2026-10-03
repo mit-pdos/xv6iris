@@ -276,6 +276,22 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   uClaimR : Nat → IProp GF
   uClaimX : Nat → Obs → IProp GF
   uClaimO : IProp GF
+  /-- THE ENTRY'S EVIDENCE (NI M2-X1, design "M2-X design" §2(d)): a client
+  slot, carried and never read, that the entry permit takes beside the spent
+  claim and hands the entry hook (`hartObsPermit_of_hook`'s `HuserEnter`).
+  Xv6's NI ledger reads it as the round's citation of the era's ledgers (the
+  anchored lower bounds, `NiLedger.niCiteRes`); a record that files nothing
+  takes `emp`.  Persistent: the kernel keeps it while it resumes. -/
+  uEvid : Option (Nat × Obs) → Obs → IProp GF
+  uEvid_persistent : ∀ ox e, Persistent (uEvid ox e)
+  /-- THE ERA'S REGISTRATION (NI M2-X1, finding F1): the power-on hands era
+  `k`'s one-shot registration ticket `uEraTok k` (`powerYield`, `powerBootRes`);
+  the era's boot shoots it at the era's ledger names `ns`, leaving the
+  persistent anchor `uEraAnchor k ns` that every citation carries.  Client
+  slots, carried and never read; `emp` in a record that files nothing. -/
+  uEraTok : Nat → IProp GF
+  uEraAnchor : Nat → List GName → IProp GF
+  uEraAnchor_persistent : ∀ k ns, Persistent (uEraAnchor k ns)
   /-- THE KILL CREDENTIAL (Rocq `riscv_kill_cred`): the ambient price of a
   kill, an application-chosen persistent proposition every party a kill
   touches is handed (the killer, the killed slot's public payload, the trap
@@ -384,6 +400,7 @@ attribute [reducible, instance] MachFixedGS.diskImgG
 attribute [reducible, instance] MachFixedGS.mirrorG
 attribute [instance] MachFixedGS.rxTag_persistent MachFixedGS.rxTag_timeless
 attribute [instance] MachFixedGS.killCred_persistent MachFixedGS.killCred_timeless
+attribute [instance] MachFixedGS.uEvid_persistent MachFixedGS.uEraAnchor_persistent
 attribute [instance] MachFixedGS.consRes_timeless
 attribute [instance] MachFixedGS.wild_persistent MachFixedGS.wild_timeless
 attribute [instance] MachFixedGS.rdwild_persistent MachFixedGS.rdwild_timeless
@@ -1382,6 +1399,12 @@ theorem uExitTok_rcpt (x : Obs) :
   iexists i
   iframe Hr Hc Hx
 
+/-- The entry's evidence (NI M2-X1) at an event equal to another is the
+evidence at the other. -/
+theorem uEvid_eq {ox : Option (Nat × Obs)} {e e' : Obs} (h : e = e') :
+    MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e ⊢ MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e' := by
+  subst h; exact .rfl
+
 /-- **THE CLAIM AN ENTRY SPENDS** (NI M2-W2d): a round citing the exit at `i`
 spends its round claim, an origin the origin ticket. -/
 def uClaimFor (ox : Option (Nat × Obs)) : IProp GF :=
@@ -1391,12 +1414,14 @@ def uClaimFor (ox : Option (Nat × Obs)) : IProp GF :=
 handing back the exit's token (NI M2-W2d: its receipt and the claims minted
 at it); an entry with its justification, the cited receipt and the claim it
 spends (since M2-W2c the only entry arm: the kernel's `sret` carries the
-evidence, `USERRET`). -/
+evidence, `USERRET`), and (NI M2-X1) the entry's evidence
+`MachFixedGS.uEvid ox e`, handed on to the entry hook. -/
 def hartObsPermit : IProp GF := iprop%
   □ ((∀ e : Obs, ⌜isUExit e = true⌝ -∗ hartObsStep e (uExitTok (hlc := hlc) e)) ∧
      (∀ (e : Obs) (ox : Option (Nat × Obs)),
         ⌜isUEnter e = true ∧ MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e⌝ -∗
-        uRcptOpt ox -∗ uClaimFor (hlc := hlc) ox -∗ hartObsStep e emp))
+        uRcptOpt ox -∗ uClaimFor (hlc := hlc) ox -∗ MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e -∗
+        hartObsStep e emp))
 
 instance hartObsPermit_persistent : Persistent (hartObsPermit (hlc := hlc) (GF := GF)) := by
   unfold hartObsPermit; infer_instance
@@ -1412,7 +1437,8 @@ theorem hartObsPermit_exit (e : Obs) (he : isUExit e = true) :
 /-- The evidence-carrying entry arm. -/
 theorem hartObsPermit_enter (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter e = true)
     (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e) :
-    hartObsPermit (hlc := hlc) (GF := GF) ⊢ uRcptOpt ox -∗ uClaimFor (hlc := hlc) ox -∗ hartObsStep e emp := by
+    hartObsPermit (hlc := hlc) (GF := GF) ⊢ uRcptOpt ox -∗ uClaimFor (hlc := hlc) ox -∗
+      MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e -∗ hartObsStep e emp := by
   unfold hartObsPermit
   iintro #H
   icases H with ⟨-, H⟩
@@ -1476,8 +1502,8 @@ the exit hook MINTS the exit's claims, the entry hook is handed the claim
 the entry spends): the exit hook accepts any exit; the entry hook accepts an
 entry given PURE facts only -- its justification `uFit ox e` and, for a
 cited receipt, that the position holds the cited event (the permit validates
-the receipt against the authority itself, so no hook is lent it) -- and the
-spent claim. -/
+the receipt against the authority itself, so no hook is lent it) -- the
+spent claim and (NI M2-X1) the entry's evidence `MachFixedGS.uEvid ox e`. -/
 theorem hartObsPermit_of_hook
     (HuserExit : ∀ (h : List Obs) (e : Obs), isUExit e = true →
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
@@ -1487,7 +1513,7 @@ theorem hartObsPermit_of_hook
     (HuserEnter : ∀ (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)), isUEnter e = true →
       MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e →
       (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
-      uClaimFor (hlc := hlc) (GF := GF) ox ∗
+      uClaimFor (hlc := hlc) (GF := GF) ox ∗ MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e ∗
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
         |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]))) :
     obsInv ⊢@{IProp GF} hartObsPermit := by
@@ -1496,7 +1522,7 @@ theorem hartObsPermit_of_hook
   isplit
   · iintro %e %he
     iapply hartObsStep_of_exitHook e (fun h => HuserExit h e he) $$ Hoinv
-  · iintro %e %ox %⟨he, hf⟩ #Hr Hcl
+  · iintro %e %ox %⟨he, hf⟩ #Hr Hcl #Hev
     unfold hartObsStep
     iintro %h %g %_ Ha
     ihave %hv := uRcptOpt_valid h ox $$ [Ha Hr]
@@ -1507,7 +1533,7 @@ theorem hartObsPermit_of_hook
     imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (hlc := hlc) (GF := GF))
       CoPset.subseteq_top) $$ Hoinv with ⟨HP, Hoclose⟩
     imod HuserEnter h e ox he hf hv $$ [Hcl HP Hhalf] with >⟨HP, Hhalf⟩
-    · iframe Hcl HP Hhalf
+    · iframe Hcl Hev HP Hhalf
     imod Hoclose $$ HP
     imod obsHistAuth_step h (h ++ [e]) (List.prefix_append _ _) $$ Hhist with Hhist
     imodintro
@@ -1548,7 +1574,7 @@ theorem hartObsPermit_triv
     isplitl []
     · iapply hR
     · iapply hX
-  · iintro ⟨-, H⟩
+  · iintro ⟨-, -, H⟩
     iapply Hk h e $$ H
 
 /-! ### The crash-spanning invariant and the swap counter (Rocq `RiscvPtsto`:

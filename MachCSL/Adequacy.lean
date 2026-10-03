@@ -167,7 +167,9 @@ trace predicate `Ptp`, and the application's slots. -/
     (Wd : Nat → IProp GF) (HWd : ∀ k, Persistent (Wd k)) (HWdt : ∀ k, Timeless (Wd k))
     (Rw : Nat → IProp GF) (HRw : ∀ k, Persistent (Rw k)) (HRwt : ∀ k, Timeless (Rw k))
     (Uf : Option (Nat × Obs) → Obs → Prop)
-    (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF) :
+    (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF)
+    (Ue : Option (Nat × Obs) → Obs → IProp GF) (HUe : ∀ ox e, Persistent (Ue ox e))
+    (Uet : Nat → IProp GF) (Uea : Nat → List GName → IProp GF) (HUea : ∀ k ns, Persistent (Uea k ns)) :
     MachFixedGS hlc GF where
   invGS := Hinv
   reg := MachGpreS.reg_pre
@@ -209,6 +211,11 @@ trace predicate `Ptp`, and the application's slots. -/
   uClaimR := Ucr
   uClaimX := Ucx
   uClaimO := Uco
+  uEvid := Ue
+  uEvid_persistent := HUe
+  uEraTok := Uet
+  uEraAnchor := Uea
+  uEraAnchor_persistent := HUea
   diskImgG := MachGpreS.diskImg_pre
   diskName := γdisk
   diskSize := ndisk
@@ -308,6 +315,12 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
     -- (what an exit at a position mints), `uClaimO` (the origin ticket a
     -- power-on mints)
     (Ucr : CT → Nat → IProp GF) (Ucx : CT → Nat → Obs → IProp GF) (Uco : CT → IProp GF)
+    -- THE ENTRY'S EVIDENCE AND THE ERA'S REGISTRATION (NI M2-X1): the
+    -- record's `uEvid` (persistent; handed to the entry hook), `uEraTok` (the
+    -- registration ticket a power-on mints) and `uEraAnchor` (persistent)
+    (Ue : CT → Option (Nat × Obs) → Obs → IProp GF) (HUe : ∀ c ox e, Persistent (Ue c ox e))
+    (Uet : CT → Nat → IProp GF) (Uea : CT → Nat → List GName → IProp GF)
+    (HUea : ∀ c k ns, Persistent (Uea c k ns))
     (HPt : ∀ (γobs : GName) (c : CT),
       Clt c ∗ (γobs ↪VAR{.own (1 : Qp).half} ([] : List Obs)) ⊢@{IProp GF} |==> Pt γobs c)
     (Hobs : ∀ (γdisk γobs : GName) (c : CT) (h : List Obs) (on : Bool) (dk : Nat → BitVec 8),
@@ -317,7 +330,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
           (γobs ↪VAR{.own (1 : Qp).half} (h ++ [powerEv on])) ∗
           (if on then iprop(emp)
            else iprop(Cres c (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗ Tn c (obsBoots h + 1) ∗
-             Uco c))))
+             Uco c ∗ Uet c (obsBoots h + 1)))))
     -- THE RETURN PATH (Rocq SY3-A1 re-cut): the trace slot's second step at
     -- the power-on, at the history the on-arm left, after the crash slot's swap
     (Hback : ∀ (γobs : GName) (c : CT) (h : List Obs),
@@ -331,14 +344,15 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
     -- `HuserExit`/`HuserEnter`, sealed into the wire invariant as the hart's
     -- permit)
     -- (NI M2-W2d: the exit hook mints the exit's claims at `h.length`, the
-    -- entry hook is handed the claim the entry spends)
+    -- entry hook is handed the claim the entry spends; NI M2-X1: and the
+    -- entry's evidence `Ue c ox e`)
     (HuserExit : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs), isUExit e = true →
       ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
         |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e])) ∗
           Ucr c h.length ∗ Ucx c h.length e))
     (HuserEnter : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)),
       isUEnter e = true → Uf ox e → (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
-      uClaimForRaw (Ucr c) (Uco c) ox ∗
+      uClaimForRaw (Ucr c) (Uco c) ox ∗ Ue c ox e ∗
       ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
         |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e]))))
     (phi : GState → List Obs → Prop)
@@ -348,7 +362,8 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
           (Pc γdisk γswap γreg γstart c)
           (Tk c) (Hk c) γobs T (Pt γobs c) γhist
           (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
-          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)) g' ∗
+          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)
+          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c)) g' ∗
         (γobs ↪VAR{.own (1 : Qp).half} h) ∗ ⌜obsWf h g'⌝ ∗
         ▷ Pc γdisk γswap γreg γstart c ∗ ▷ Pt γobs c ⊢@{IProp GF} ◇ ⌜phi g' h⌝)
     (Hgen0 : g.gen = 0) (Hpow : g.pow = false)
@@ -358,7 +373,8 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
           (Tk c) (Hk c)
           γobs T (Pt γobs c) γhist
           (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
-          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c) →
+          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)
+          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c) →
       Born γdisk γswap γreg γstart c →
       ∀ (E : EraGS) (gen : Nat) (σ : MState), bootFacts σ →
         (∃ ds0 : DevStates, σ.devs = ds0.reset) →
@@ -397,7 +413,8 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
     (Tk c) (Hk c)
     γobs T (Pt γobs c) γhist
     (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
-          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c))
+          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)
+          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c))
   unfold adeqBirth
   isplitr
   · ipureintro; rfl
@@ -425,7 +442,8 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       (Pc γdisk γswap γreg γstart c)
           (Tk c) (Hk c) γobs T (Pt γobs c) γhist
       (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
-          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)).withInv Hinv) _
+          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)
+          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c)).withInv Hinv) _
       Ppure (fun dk => Hproj γdisk γswap γreg γstart c dk)
       Mof (Rb c) (Tn c) (Tn' c) (Tn'' c) (fun E gen dk => Hswap γdisk γswap γreg γstart c hborn E gen dk)
       (fun h on dk hs => Hobs γdisk γobs c h on dk hs)
@@ -436,7 +454,8 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
         (Pc γdisk γswap γreg γstart c)
           (Tk c) (Hk c) γobs T (Pt γobs c) γhist
         (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
-          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)).withInv Hinv)
+          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)
+          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c)).withInv Hinv)
         Hinv γgen γstart γreg γdisk γswap γobs γhist c T rfl hborn E gen σ hbf hdv hpp))
     unfold obsInv crashInv
     iframe Hcinv Hoinv
@@ -739,18 +758,30 @@ theorem uexitHook_emp (P : IProp GF) (H H' : IProp GF)
   iframe HP Hh
   isplitl [] <;> iempintro
 
-/-- ...and an entry hook that moves the slot is one handed a claim it drops. -/
-theorem uenterHook_drop (Cl P H H' : IProp GF)
+/-- ...and an entry hook that moves the slot is one handed a claim and (NI
+M2-X1) evidence it drops. -/
+theorem uenterHook_drop (Cl Ev P H H' : IProp GF)
     (Hk : P ∗ H ⊢@{IProp GF} |==> ◇ (P ∗ H')) :
-    Cl ∗ P ∗ H ⊢@{IProp GF} |==> ◇ (P ∗ H') := by
-  iintro ⟨-, HP⟩
+    Cl ∗ Ev ∗ P ∗ H ⊢@{IProp GF} |==> ◇ (P ∗ H') := by
+  iintro ⟨-, -, HP⟩
   iapply Hk $$ HP
 
+/-- ...and an entry hook that spends the claim is one also handed evidence it
+drops (NI M2-X1).  M2-X1 interim: X3 removes this (the NI ledger's entry hook
+files the evidence, `niLedger_enter` taking `niEvid`). -/
+theorem uenterHook_dropEv (Cl Ev P H H' : IProp GF)
+    (Hk : Cl ∗ P ∗ H ⊢@{IProp GF} |==> ◇ (P ∗ H')) :
+    Cl ∗ Ev ∗ P ∗ H ⊢@{IProp GF} |==> ◇ (P ∗ H') := by
+  iintro ⟨Hc, -, HP⟩
+  iapply Hk
+  iframe Hc HP
+
 /-- ...and a power hook that founds the era's claim and turn is one that also
-yields the (empty) origin ticket (NI M2-W2d). -/
+yields the (empty) origin ticket (NI M2-W2d) and the (empty) registration
+ticket (NI M2-X1). -/
 theorem powerHook_emp (on : Bool) (L A B C X Y : IProp GF)
     (Hk : L ⊢@{IProp GF} |==> ◇ (A ∗ B ∗ C ∗ (if on then iprop(emp) else iprop(X ∗ Y)))) :
-    L ⊢@{IProp GF} |==> ◇ (A ∗ B ∗ C ∗ (if on then iprop(emp) else iprop(X ∗ Y ∗ emp))) := by
+    L ⊢@{IProp GF} |==> ◇ (A ∗ B ∗ C ∗ (if on then iprop(emp) else iprop(X ∗ Y ∗ emp ∗ emp))) := by
   iintro HL
   imod Hk $$ HL with HL
   imodintro
@@ -761,6 +792,7 @@ theorem powerHook_emp (on : Bool) (L A B C X Y : IProp GF)
   · simp only [Bool.false_eq_true, ↓reduceIte]
     icases Hy with ⟨Hx, Hy⟩
     iframe Hx Hy
+    isplitl [] <;> iempintro
   · simp only [↓reduceIte]
     iexact Hy
 

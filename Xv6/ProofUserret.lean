@@ -46,6 +46,7 @@ theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitV
     (ox : Option (Nat × Obs))
     (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox (.uEnter cpu (satpOf .kpt P.root) epc (tfGprs ws))) :
     kernelText ∗ kmapStatic ∗ wireInv ∗ uRcptOpt ox ∗ uClaimFor (hlc := hlc) (GF := GF) ox ∗
+    MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox (.uEnter cpu (satpOf .kpt P.root) epc (tfGprs ws)) ∗
     urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P (urPc 0xac#64) R ∗
     tfPageAt P.tfp ws ∗ Register.sepc ↦ᵣ[cpu] epc ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.User
@@ -55,7 +56,7 @@ theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitV
         gprFile cpu (tfResumeGpr0 ws) -∗ Register.sepc ↦ᵣ[cpu] epc -∗ tfPageAt P.tfp ws -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   have hc := urConfOk_sConfOf (GF := GF) P.root ms mdl mepc stc lf P rfl hsm hlf hmdl
-  iintro ⟨#Htext, #HS, #Hwi, #Hrc, Hclm, Hst, Hpage, Hsepc, HΦ⟩
+  iintro ⟨#Htext, #HS, #Hwi, #Hrc, Hclm, #Hev, Hst, Hpage, Hsepc, HΦ⟩
   iapply (userret_li cpu _ P hc R)
   iframe Htext HS Hst
   inext
@@ -87,6 +88,14 @@ theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitV
       rw [hg]
       exact hf))
   iframe Htext HS Hwi Hrc Hclm Hst Hpage Hsepc
+  -- the record's evidence (NI M2-X1), at the same event
+  isplitl []
+  · have hg : gprList ((urLoadSeq urLoadsC ws (urLoadSeq urLoadsB ws (urLoadSeq urLoadsA ws
+          (R.set 10#5 TRAPFRAME)))).set 10#5 (tfW ws (4 + (10#5).toNat))) = tfGprs ws :=
+        (gprList_ext _ (tfResumeGpr0 ws) (fun i hi => urLoadSeq_resume ws (R.set 10#5 TRAPFRAME) i hi)).trans
+          (gprList_tfResumeGpr0 ws)
+    iapply uEvid_eq (e := .uEnter cpu (satpOf .kpt P.root) epc (tfGprs ws)) (by rw [hg] <;> rfl)
+    iexact Hev
   inext
   iintro HmConf Hclock Hpc Hslot Htok HF Hsepc Hpage
   ihave HF := MachCSL.gprFile_ext cpu
@@ -106,7 +115,7 @@ theorem userret_proof : USERRET :=
   simp only at hsie hspie hspp htier ha0
   subst hsie hspie hspp htier
   simp only [userretVa_eq, uservecTvec]
-  iintro ⟨Hk, #Hwi, #Hrc, Hclm, %hf, Hpc, #Hcl, Hsepc, Hsc, Hstv, Hstvec, Hppt, Hpage, HΦ⟩
+  iintro ⟨Hk, #Hwi, #Hrc, Hclm, #Hev, %hf, Hpc, #Hcl, Hsepc, Hsc, Hstv, Hstvec, Hppt, Hpage, HΦ⟩
   icases kctx_image _ _ $$ Hk with ⟨⟨#Htext, _, #HS⟩, Hk⟩
   icases kctx_cases _ _ $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, _, Hcpu, Htok, Hclock, #Hro⟩
   icases kConf_cases cpu KTier.kpt root false true false $$ HConf with
@@ -135,7 +144,7 @@ theorem userret_proof : USERRET :=
   ihave Hum := ukPagesX_bwd K P hwfP M hl $$ HS HD HX
   -- the run under the user table
   iapply (userret_user_run cpu P ms mdl mepc stc lf hsm hlf hspp' hmdl hv (tpPin cpu regs) ws sep ox hf)
-  iframe Htext HS Hwi Hrc Hclm Hst Hpage Hsepc
+  iframe Htext HS Hwi Hrc Hclm Hev Hst Hpage Hsepc
   inext
   iintro HmConf Hclock Hpc Hslot Htok HF Hsepc Hpage
   -- the user machine, repackaged

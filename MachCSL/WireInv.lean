@@ -122,11 +122,12 @@ theorem wireInv_exit (e : Obs) (he : isUExit e = true) :
   iapply wireInv_permit $$ Hw
 
 /-- **An entry's consent**, read off the shared bundle (M2-W2a): the entry
-with its justification `uFit ox e`, the cited receipt and (NI M2-W2d) the
-claim it spends. -/
+with its justification `uFit ox e`, the cited receipt, (NI M2-W2d) the
+claim it spends and (NI M2-X1) its evidence `MachFixedGS.uEvid ox e`. -/
 theorem wireInv_enter (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter e = true)
     (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e) :
-    wireInv (GF := GF) ⊢ uRcptOpt ox -∗ uClaimFor (hlc := hlc) ox -∗ hartObsStep e emp := by
+    wireInv (GF := GF) ⊢ uRcptOpt ox -∗ uClaimFor (hlc := hlc) ox -∗
+      MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e -∗ hartObsStep e emp := by
   iintro #Hw
   iapply hartObsPermit_enter e ox he hf
   iapply wireInv_permit $$ Hw

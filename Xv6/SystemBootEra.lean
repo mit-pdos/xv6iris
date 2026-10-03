@@ -81,7 +81,12 @@ predicate's lend), every hart's `hartWP` and every device's `devWP`.
    `xv6FixedGSU` for any `Uf` accepting the NI filing's evidence (`hUf`) and
    claims whose fork mint is an origin ticket (`hUfork`) -- its `NiFitIs`
    instance: the system theorem passes `True`/`emp`, the NI theorem
-   (`NiAdequacy`) `niFit` and the ledger's claims.
+   (`NiAdequacy`) `niFit` and the ledger's claims.  (NI M2-X1) Likewise the
+   evidence and registration slots `Ue HUe Uet Uea HUea` (`emp` in
+   `xv6FixedGS`), and `xv6BootEra` builds `NiFitIs`'s `reg`/`evid`/`evidNone`
+   from `hUreg`/`hUevid`/`hUevidNone`.  The power-on's registration ticket
+   is dropped by `powerBootRes_unpack` (M2-X1 interim: X2 shoots it in
+   `xv6Era_run`).
 
 Imports only the boot-chain/allocation files and the device invariants.
 -/
@@ -389,14 +394,20 @@ the era). -/
     -- the system record `xv6FixedGS`, `niFit` and the ledger's claims in the
     -- NI theorem's (NI M2-W4)
     (Uf : Option (Nat × Obs) → Obs → Prop) (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF)
-    (Uco : IProp GF) :
+    (Uco : IProp GF)
+    -- the entry's evidence and the era's registration (NI M2-X1's
+    -- `uEvid`/`uEraTok`/`uEraAnchor`): blind (`emp`) in the system record
+    (Ue : Option (Nat × Obs) → Obs → IProp GF) (HUe : ∀ ox e, Persistent (Ue ox e))
+    (Uet : Nat → IProp GF) (Uea : Nat → List GName → IProp GF) (HUea : ∀ k ns, Persistent (Uea k ns)) :
     MachFixedGS hlc GF :=
   Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
     (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco
+    Ue HUe Uet Uea HUea
 
 /-- THE SYSTEM'S RECORD: `xv6FixedGSU` blind -- the enter's justification
 `True` (the kernel's evidence reaches it through `NiFitIs`'s implication,
-NI M2-W2c) and no filing claims (`emp`, NI M2-W2d). -/
+NI M2-W2c), no filing claims (`emp`, NI M2-W2d), and no evidence or
+registration (`emp`, NI M2-X1). -/
 @[reducible] def xv6FixedGS {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (appOkc : CT → N → Prop) (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
     (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs) (Ptp : IProp GF)
@@ -404,6 +415,8 @@ NI M2-W2c) and no filing claims (`emp`, NI M2-W2d). -/
     MachFixedGS hlc GF :=
   xv6FixedGSU N appFs appOkc cov ls Ai Hinv γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp
     (fun _ _ => True) (fun _ => iprop(emp)) (fun _ _ => iprop(emp)) iprop(emp)
+    (fun _ _ => iprop(emp)) (fun _ _ => inferInstance) (fun _ => iprop(emp)) (fun _ _ => iprop(emp))
+    (fun _ _ => inferInstance)
 
 set_option maxHeartbeats 800000 in
 /-- **ONE ERA** (Rocq `SystemAdequacy.xv6_boot_era`): at the machine's record
@@ -426,6 +439,15 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
     (Uf : Option (Nat × Obs) → Obs → Prop) (hUf : ∀ ox e, niFit ox e → Uf ox e)
     (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF)
     (hUfork : ∀ (i : Nat) (x : Obs), niForkExit x = true → Ucx i x ⊢@{IProp GF} Uco)
+    -- THE RECORD'S EVIDENCE AND REGISTRATION (NI M2-X1): any evidence a
+    -- citation and an origin's fit build, any registration the ticket shoots
+    -- (`emp` for the system theorem; the NI ledger's for the NI one)
+    (Ue : Option (Nat × Obs) → Obs → IProp GF) (HUe : ∀ ox e, Persistent (Ue ox e))
+    (Uet : Nat → IProp GF) (Uea : Nat → List GName → IProp GF) (HUea : ∀ k ns, Persistent (Uea k ns))
+    (hUreg : ∀ (k : Nat) (ns : List GName), Uet k ⊢@{IProp GF} |==> Uea k ns)
+    (hUevid : ∀ (i : Nat) (x e : Obs) (cc : Option (Nat × UIota)), niFitEv (some (i, x)) e cc →
+      niCiteResRaw Uea cc ⊢@{IProp GF} Ue (some (i, x)) e)
+    (hUevidNone : ∀ e : Obs, niFit none e → ⊢@{IProp GF} Ue none e)
     -- THE ERA'S RECORD PREDICATE (Rocq `Ok`/`Hbok`, SY3-A1 re-cut), read off
     -- the boot resource, at the era's number
     (Ok : Nat → N → Prop) (Hbok : ∀ (k : Nat) (r : N), appBoot c k r ⊢@{IProp GF} ⌜Ok k r⌝)
@@ -434,24 +456,29 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
     -- THE MERGE (Rocq `Happ_merge`, SY3-K2; its wand lent the started auth at
     -- the era's `gen + 1`, SY3-A1), at the record literal
     (Happ_merge : letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv
-      γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco)
+      γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco
+      Ue HUe Uet Uea HUea)
       ∀ k : Nat, ⊢@{IProp GF} appMergeRaw (hlc := hlc) (appFs c) (Ok (k + 1)) (appOkc c) (Tkp k) k)
     -- THE FOUNDING (Rocq `Hfound`, SY3-A1): the era's sync token out of the
     -- turn, the rest for `<init>`
     (Hfound : ∀ k : Nat, ⊢@{IProp GF} Tn c (k + 1) -∗ |==> (Tkp k ∗ TnInit c (k + 1)))
     -- THE SYNC RUNNER (Rocq `Happ_sync_run`, K3-3), at the record's slots
     (Happ_sync_run : letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv
-      γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco)
+      γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco
+      Ue HUe Uet Uea HUea)
       ∀ k : Nat, ⊢@{IProp GF} appSyncRunRaw (hlc := hlc) (appFs c) (Ok (k + 1)) (appOkc c) (Tkp k)
         (Hkp k))
     (Hinit_boot : letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv γgen
-      γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco)
+      γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco
+      Ue HUe Uet Uea HUea)
       EraInitBoot (hlc := hlc) N appFs appBoot TnInit c)
     (Hecho : letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart
-      γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco)
+      γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco
+      Ue HUe Uet Uea HUea)
       EraEcho (hlc := hlc) (GF := GF))
     (Hperm : letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart
-      γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco)
+      γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco
+      Ue HUe Uet Uea HUea)
       EraPerm (hlc := hlc) (GF := GF))
     (E : EraGS) (gen : Nat) (σ : MState) (hbf : bootFacts σ)
     (hdv : ∃ ds0 : DevStates, σ.devs = ds0.reset)
@@ -459,13 +486,14 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
     (hcovin : fsCovIn cov XV6_DISK_BYTES)
     (hlogsub : ∀ b, logRegion sb.sbLogstart b = true → b ∈ cov) (hls2 : sb.sbLogstart = 2) :
     letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart γreg γd
-      γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco)
+      γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco
+      Ue HUe Uet Uea HUea)
     obsInv ∗ powerBootRes (fun dk => mirrorOf (fsBlocks dk))
         (xv6Lend N appFs appBoot cov sb.sbLogstart c) (Tn c) E gen σ ⊢@{IProp GF} |={⊤}=>
       ([∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) ∗
       ([∗list] d ∈ DevId.all, devWP gen d rootTask (pure ())) := by
   letI F : MachFixedGS hlc GF := xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart γreg γd
-    γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco
+    γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco Ue HUe Uet Uea HUea
   obtain ⟨-, D, hrec, hhwf, -⟩ := hpure
   obtain ⟨ds0, hds⟩ := hdv
   iintro ⟨#Hoinv, Hres⟩
@@ -521,7 +549,7 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   -- fork mint is an origin ticket (NI M2-W2d): `hUf`/`hUfork` (the system
   -- record's `True`/`emp` by `trivial`/`.rfl`, the NI record's by `id` and
   -- `niExitMint_fork`; NI M2-W4)
-  have hNi : @NiFitIs hlc GF M1 := @NiFitIs.mk hlc GF M1 hUf hUfork
+  have hNi : @NiFitIs hlc GF M1 := @NiFitIs.mk hlc GF M1 hUf hUfork hUreg hUevid hUevidNone
   ihave Hout := bootSharedOut_ofEra E gen (fun _ _ => iprop(True)) (procClaim Γ)
     (fun _ => BI.true_intro) (fun cpu => procClaim_idle Γ cpu) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd (diskOf σ.devs) S.fssSb (fsNib S)
     cov (fsRecView (fsBlocks (diskOf σ.devs)) D) (snapSpent S (fsNib S)) $$ Hout

@@ -133,11 +133,13 @@ section unpack
 
 /-- Pull the second-to-last row (the lend `r`), the twelfth (the turn `t`)
 and the thirteenth (the origin ticket `o`, NI M2-W2d) of a right-nested
-chain out to the right. -/
-theorem bs_pull {PROP : Type _} [BI PROP] (a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 t o a12 a13 r c : PROP) :
-    iprop(a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ t ∗ o ∗ a12 ∗ a13 ∗ r ∗ c) ⊢
+chain out to the right, dropping the fourteenth (the era's registration
+ticket `k`, NI M2-X1: M2-X1 interim, X2 hands it to `xv6Era_run`). -/
+theorem bs_pull {PROP : Type _} [BI PROP] [BIAffine PROP]
+    (a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 t o k a12 a13 r c : PROP) :
+    iprop(a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ t ∗ o ∗ k ∗ a12 ∗ a13 ∗ r ∗ c) ⊢
       iprop((a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ a12 ∗ a13 ∗ c) ∗ r ∗ t ∗ o) := by
-  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, Ht, Ho, H12, H13, Hr, Hc⟩
+  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, Ht, Ho, -, H12, H13, Hr, Hc⟩
   iframe Hr Ht Ho H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 Hc
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
@@ -145,14 +147,16 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 /-- **Rocq `power_boot_res_unpack`**: at `Hboot`'s era instance
 (`MachGS.ofEra E gen …`, any claim payload), `powerBootRes`
 is the ambient rows plus the client's lent resource and the era's turn
-(deviation 3).  Pure conversion. -/
+(deviation 3) and the origin ticket; the era's registration ticket (NI
+M2-X1) is dropped (M2-X1 interim: X2 returns it for `xv6Era_run`).  Pure
+conversion. -/
 theorem powerBootRes_unpack (Mof : (Nat → BitVec 8) → LogMirror)
     (Rb : Nat → (Nat → BitVec 8) → IProp GF) (Tn : Nat → IProp GF) (E : EraGS) (gen : Nat)
     (cP : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (σ : MState) :
     powerBootRes Mof Rb Tn E gen σ ⊢
       @powerBootRows hlc GF (MachGS.ofEra E gen cP cI) Mof σ ∗ Rb gen (diskOf σ.devs) ∗
         Tn (gen + 1) ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) :=
-  bs_pull _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+  bs_pull _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 end unpack
 

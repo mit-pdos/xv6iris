@@ -571,13 +571,16 @@ theorem fsTraceHook {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp
     (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs)
     (Ptp : IProp GF) (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
     (Uf : Option (Nat × Obs) → Obs → Prop)
-    (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF) (g' : GState) :
+    (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF)
+    (Ue : Option (Nat × Obs) → Obs → IProp GF) (HUe : ∀ ox e, Persistent (Ue ox e))
+    (Uet : Nat → IProp GF) (Uea : Nat → List GName → IProp GF) (HUea : ∀ k ns, Persistent (Uea k ns))
+    (g' : GState) :
     @powerInterp hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-        (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco) g' ∗
+        (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco Ue HUe Uet Uea HUea) g' ∗
       ▷ xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c ⊢@{IProp GF}
       ◇ ⌜fsBootPure cov ls (diskOf g'.m.devs)⌝ :=
   @diskProjTrace hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-      (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco)
+      (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco Ue HUe Uet Uea HUea)
     XV6_DISK_BYTES γd (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) (fsBootPure cov ls)
     (fun dk => xv6Slot_project N appFs appOkc cov ls γd γsw γreg γstart c dk) rfl rfl g'
 
@@ -590,16 +593,19 @@ theorem xv6TraceHook {CT : Type} (N : Type) (appFs : CT → N → Aview → IPro
     (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs)
     (Ptp : IProp GF) (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
     (Uf : Option (Nat × Obs) → Obs → Prop)
-    (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF) (g' : GState) :
+    (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF)
+    (Ue : Option (Nat × Obs) → Obs → IProp GF) (HUe : ∀ ox e, Persistent (Ue ox e))
+    (Uet : Nat → IProp GF) (Uea : Nat → List GName → IProp GF) (HUea : ∀ k ns, Persistent (Uea k ns))
+    (g' : GState) :
     @powerInterp hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-        (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco) g' ∗
+        (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco Ue HUe Uet Uea HUea) g' ∗
       ▷ xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c ⊢@{IProp GF}
       ◇ ⌜xv6TracePure cov ls g'⌝ := by
   iintro ⟨Hsi, HP⟩
   ihave %hresv := (@powerInterp_mmOk hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd
-    XV6_DISK_BYTES γsw (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco) g')
+    XV6_DISK_BYTES γsw (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco Ue HUe Uet Uea HUea) g')
     $$ Hsi
-  imod fsTraceHook N appFs appOkc cov ls Ai Hinv γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco g'
+  imod fsTraceHook N appFs appOkc cov ls Ai Hinv γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco Ue HUe Uet Uea HUea g'
     $$ [Hsi HP] with %hdisk
   · isplitl [Hsi]
     · iexact Hsi

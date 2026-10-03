@@ -2025,6 +2025,78 @@ no `sorry`; baselines in the same commit when they move).
   - `_exists` is deleted;
   - `uexecRetContF_det` (+ `usysIotaFits_exists`) stays allowlisted, with a new comment.
 
+### M2-X1 as landed (2026-10-03)
+
+Lane `lane/m2x`, one commit: §2(d)'s machine part and §5 row X1. Xv6 stays BLIND (every system root's
+statement, axioms and TCB unchanged; `expected.json` and `baseline.json` untouched).
+
+**The machine.** `MachFixedGS` gains, after `uClaimO`:
+
+    uEvid : Option (Nat × Obs) → Obs → IProp GF
+    uEvid_persistent : ∀ ox e, Persistent (uEvid ox e)
+    uEraTok : Nat → IProp GF
+    uEraAnchor : Nat → List GName → IProp GF
+    uEraAnchor_persistent : ∀ k ns, Persistent (uEraAnchor k ns)
+
+(both persistence fields are instances). The permit's entry arm is
+`⌜isUEnter e = true ∧ MachFixedGS.uFit ox e⌝ -∗ uRcptOpt ox -∗ uClaimFor ox -∗ MachFixedGS.uEvid ox e -∗
+hartObsStep e emp`; `hartObsPermit_enter`/`wireInv_enter` follow; `hartObsPermit_of_hook`'s and `wp_power`'s
+`HuserEnter` are handed `uClaimFor ox ∗ MachFixedGS.uEvid ox e ∗ …`. `powerYield`'s on-arm and `powerBootRes`
+carry `uEraTok` at the era's number after `uClaimO` (`obsBoots h + 1` in the yield, `gen + 1` in
+`powerBootRes`, i.e. `obsBoots (h ++ [.powerOn])`: the design text's `powerEv true` is `.powerOff`, so the
+power-ON event's count is meant). `bootFixedGS`/`AppIface.bootFixedGS` take `Ue HUe Uet Uea HUea` after
+`Uco`; `riscvPowerAdequacy` takes `Ue HUe Uet Uea HUea` (`CT`-indexed) after `Uco`, its `Hobs` on-arm yields
+`… ∗ Uco c ∗ Uet c (obsBoots h + 1)` and its `HuserEnter` is handed `uClaimForRaw (Ucr c) (Uco c) ox ∗ Ue c ox
+e ∗ …`. Wrappers: `uenterHook_drop (Cl Ev P H H')` drops the claim and the evidence; `powerHook_emp` yields
+`X ∗ Y ∗ emp ∗ emp`; new `uEvid_eq` (event congruence) and `uenterHook_dropEv` (interim, below).
+
+**The kernel's law** (`NiLedger`, which now imports `UsysDet` for `UIota`):
+
+    def niFitEv (ox) (e) (c : Option (Nat × UIota)) : Prop := niFit ox e ∧ c = none      -- interim
+    def niCiteResRaw (A : Nat → List GName → IProp GF) : Option (Nat × UIota) → IProp GF
+      | none => emp | some (k, _) => ∃ ns, A k ns                                          -- interim
+    def niCiteRes c := niCiteResRaw MachFixedGS.uEraAnchor c
+    class NiFitIs … where
+      fit … ; fork …
+      reg : ∀ k ns, MachFixedGS.uEraTok k ⊢ |==> MachFixedGS.uEraAnchor k ns
+      evid : ∀ i x e c, niFitEv (some (i, x)) e c → niCiteRes c ⊢ MachFixedGS.uEvid (some (i, x)) e
+      evidNone : ∀ e, niFit none e → ⊢ MachFixedGS.uEvid none e
+
+`niCiteRes` is the design's `<anchor ∗ lbs>` with the lower bounds left out (they are X2's `NiEvid`, which
+needs `[WchG]`-level cameras the class does not have yet); the field's shape is otherwise final.
+`uEvid_of_niFit` (`evid` at `c := none`) is the round's builder until X2.
+
+**The route.** `wp_userret_body` (`USERRET`'s text) gains `MachFixedGS.uEvid ox (.uEnter cpu (satpOf .kpt
+P.root) sep (tfGprs ws))` after `uClaimFor ox`; `ProofUserret.userret_user_run` takes it at the same event and
+re-keys it to the `sret`'s (`uEvid_eq` + `gprList_tfResumeGpr0`); `UserretPt.userret_exit`/`userret_usret`
+take it at their events and hand it to `wireInv_enter`. `urc_resume` takes it (after `uClaimFor ox`);
+`urc_exit` builds it by `uEvid_of_niFit` (`c := none`); `userretClosed_proof` (the origin) by
+`NiFitIs.evidNone`.
+
+**Xv6, blind.** `xv6FixedGSU … Uf Ucr Ucx Uco Ue HUe Uet Uea HUea`; `xv6FixedGS` at `fun _ _ => emp` /
+`fun _ => emp` / `fun _ _ => emp` (all three `emp`: the hooks then need only `Affine`/`BIUpdate.intro`/`.rfl`).
+`xv6BootEra` takes `Ue HUe Uet Uea HUea hUreg hUevid hUevidNone` (stated at the raw families: `Uet k ⊢ |==>
+Uea k ns`, `niFitEv (some (i, x)) e cc → niCiteResRaw Uea cc ⊢ Ue (some (i, x)) e`, `niFit none e → ⊢ Ue none
+e`) and builds `NiFitIs` from them; `xv6PowerAdequacyGenU` takes the same, `CT`-indexed, after `hUfork`, its
+`Hobs`/`HuserEnter` at `riscvPowerAdequacy`'s new shape; `xv6PowerAdequacyGen`'s statement is byte-identical
+(its proof passes the `emp` families). `SystemSlot.fsTraceHook`/`xv6TraceHook` take the five new arguments
+(their call in `xv6FsAdequacy`'s proof passes `emp`). `AppPreGS.preGSAt`'s literal passes `emp`.
+`BootShared.powerBootRes_unpack`'s statement is unchanged: it DROPS the registration ticket (`bs_pull` gains a
+dropped row `k`). The NI record (`NiAdequacy`): `uEvid := ⌜∃ c, niFitEv ox e c⌝` (the pure part of X3's
+`niEvid`; `evid`/`evidNone` by `pure_intro`), `uEraTok`/`uEraAnchor := emp`, the entry hook drops the evidence
+(`uenterHook_dropEv` around `obsLedgerAt_uenterS`), `niLedger_pow` yields `turn ∗ niOriginTicket γ ∗ emp`.
+
+**`M2-X1 interim` markers** (`grep -rn 'M2-X1 interim' Xv6 MachCSL`):
+- for X2: `NiLedger.niFitEv` (the full shape), `NiLedger.niCiteResRaw` (add `niIotaLbs ns ι`),
+  `NiLedger.uEvid_of_niFit` (the citing rounds cite their `(era, ι)`), `BootShared.bs_pull` /
+  `powerBootRes_unpack` (return the ticket for `xv6Era_run`), `SystemBootEra` deviation 6's note;
+- for X3: `NiAdequacy`'s blind evidence/registration arguments (→ `niEvid γe`/`niEraTok γe`/`niEraAnchor
+  γe`), `niLedger_pow`'s `emp` (→ the ticket), `Adequacy.uenterHook_dropEv` (→ `niLedger_enter` files the
+  evidence), the `NiAdequacy` header note.
+
+Gates: full build, `lint.sh`, `tcb.sh` (no change; `expected.json` not updated), `audit.sh` (9 roots PASS,
+baseline unchanged), `run_all.sh`.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

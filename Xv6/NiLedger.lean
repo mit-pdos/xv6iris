@@ -18,7 +18,12 @@ incarnation's first key).
   steps it blind on non-enter events, `niOk_file` files an enter.
 * §4 `NiFitIs`: the Prop class that tells the kernel's proofs (generic in the
   `MachGS` instance) that the record's `uFit` accepts `niFit`'s evidence
-  and (M2-W2d) that a fork ecall's exit claim is an origin ticket.
+  and (M2-W2d) that a fork ecall's exit claim is an origin ticket; (M2-X1)
+  that the power-on's registration ticket shoots to the era's anchor
+  (`reg`), and that the filing's fit at a citation (`niFitEv`, with what the
+  citation shows, `niCiteRes`) or an origin's fit is the record's evidence
+  `uEvid` (`evid`/`evidNone`).  M2-X1 interim: `niFitEv` is `niFit ∧ c =
+  none` and `niCiteRes` shows the anchor only, until X2.
 * §5 (M2-W2d) the one-shot claims: `niForkExit`, the keys, `niOneShot`
   (pure), the tokens, `niClaims` (the authority), `niR γ h := ∃ F, ⌜niOk h
   F⌝ ∗ niClaims γ h F`, and its steps `niR_alloc`/`niR_snoc`/`niR_exit`/
@@ -56,6 +61,7 @@ once as an origin: `niOneShot`, read off `niR` by `niR_pure`.
 PURE but for the class and §5's resources.
 -/
 import Xv6.UhistDefs
+import Xv6.UsysDet
 
 namespace Xv6
 
@@ -354,8 +360,30 @@ theorem niOneShot_file {h : List Obs} {F : List NiEntry} {e : Obs} {fn : NiEntry
 
 /-! ## §4 The kernel's carrier (ruling O2) -/
 
+/-- **THE FILING'S FIT AT A CITATION** (NI M2-X, design §2(d)): the entry's
+evidence `ox`, the entry `e` and the round's citation `c` (an era and the
+ledgers' prefixes `ι` it read, or none).
+M2-X1 interim: X2 removes this (the full shape: one existential over the
+round's witnesses, with `niCiting` / `niDetRow` / `niForkRow` at `c`); until
+then every filing cites nothing. -/
+def niFitEv (ox : Option (Nat × Obs)) (e : Obs) (c : Option (Nat × UIota)) : Prop :=
+  niFit ox e ∧ c = none
+
+/-- **What a citation shows the record**, at a raw anchor family `A`: nothing
+for no citation; era `k`'s registered names for a citation of era `k`.
+M2-X1 interim: X2 adds `niIotaLbs ns ι` (`NiEvid`, the cited prefixes' lower
+bounds at the anchored names) beside `A k ns`. -/
+def niCiteResRaw {GF : BundledGFunctors} (A : Nat → List GName → IProp GF) :
+    Option (Nat × UIota) → IProp GF
+  | none => iprop(emp)
+  | some (k, _) => iprop(∃ ns : List GName, A k ns)
+
 section
 variable {hlc : HasLC}
+
+/-- `niCiteResRaw` at the record's anchor (`MachFixedGS.uEraAnchor`). -/
+def niCiteRes {GF : BundledGFunctors} [MachFixedGS hlc GF] (c : Option (Nat × UIota)) : IProp GF :=
+  niCiteResRaw (MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF)) c
 
 /-- **The record accepts `niFit`'s evidence** (ruling O2's Prop class, as
 `SchedCtx.ClaimIs`; deviation 1: an implication).  The boot instantiates it
@@ -366,10 +394,29 @@ class NiFitIs (GF : BundledGFunctors) [MachGS hlc GF] : Prop where
   ticket (the kernel routes it to the child's park) -/
   fork : ∀ (i : Nat) (x : Obs), niForkExit x = true →
     MachFixedGS.uClaimX (hlc := hlc) (GF := GF) i x ⊢ MachFixedGS.uClaimO (hlc := hlc) (GF := GF)
+  /-- (NI M2-X1, finding F1) the era's registration: its boot shoots the
+  power-on's ticket at the era's ledger names -/
+  reg : ∀ (k : Nat) (ns : List GName),
+    MachFixedGS.uEraTok (hlc := hlc) (GF := GF) k ⊢ |==> MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k ns
+  /-- (NI M2-X1) a round's evidence: the filing's fit at its citation `c`,
+  with what the citation shows (`niCiteRes`), is the record's `uEvid` -/
+  evid : ∀ (i : Nat) (x e : Obs) (c : Option (Nat × UIota)), niFitEv (some (i, x)) e c →
+    niCiteRes (hlc := hlc) (GF := GF) c ⊢ MachFixedGS.uEvid (hlc := hlc) (GF := GF) (some (i, x)) e
+  /-- (NI M2-X1) an origin's evidence is free -/
+  evidNone : ∀ e : Obs, niFit none e → ⊢ MachFixedGS.uEvid (hlc := hlc) (GF := GF) none e
 
 theorem uFit_of_niFit {GF : BundledGFunctors} [MachGS hlc GF] [NiFitIs (hlc := hlc) GF]
     (ox : Option (Nat × Obs)) (e : Obs) (h : niFit ox e) : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e :=
   NiFitIs.fit ox e h
+
+/-- **A round's evidence at no citation** (NI M2-X1): `NiFitIs.evid` at
+`c := none`, from the round's `niFit`.  M2-X1 interim: X2 removes this (the
+citing rounds cite their `(era, ι)`, `urc_exit` building the evidence from
+the anchor and the lower bounds). -/
+theorem uEvid_of_niFit {GF : BundledGFunctors} [MachGS hlc GF] [NiFitIs (hlc := hlc) GF]
+    (i : Nat) (x e : Obs) (h : niFit (some (i, x)) e) :
+    ⊢ MachFixedGS.uEvid (hlc := hlc) (GF := GF) (some (i, x)) e :=
+  (show ⊢ niCiteRes (hlc := hlc) (GF := GF) none from .rfl).trans (NiFitIs.evid i x e none ⟨h, rfl⟩)
 
 theorem uClaimO_of_fork {GF : BundledGFunctors} [MachGS hlc GF] [NiFitIs (hlc := hlc) GF]
     (i : Nat) (x : Obs) (h : niForkExit x = true) :

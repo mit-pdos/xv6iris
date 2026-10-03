@@ -46,7 +46,9 @@ is `m`: the literal `AppIface.bootFixedGS` at the trivial interface and names
   letI : MachFixedGS hlc GF :=
     { AppIface.bootFixedGS (appIfaceTriv GF) (preInvGS P) 0 0 0 0 0 0 iprop(emp)
         (fun _ => iprop(True)) (fun _ Q => Q) 0 [] iprop(emp) 0 (fun _ _ => True)
-        (fun _ => iprop(emp)) (fun _ _ => iprop(emp)) iprop(emp) with
+        (fun _ => iprop(emp)) (fun _ _ => iprop(emp)) iprop(emp)
+        (fun _ _ => iprop(emp)) (fun _ _ => inferInstance) (fun _ => iprop(emp))
+        (fun _ _ => iprop(emp)) (fun _ _ => inferInstance) with
       mono := m }
   { regName := fun _ => 0, heapName := 0, metaName := 0, viewName := fun _ => 0,
     iviewName := fun _ => 0, rviewName := fun _ => 0, topName := 0, authName := 0, resvName := 0,

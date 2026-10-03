@@ -24,7 +24,11 @@ landed").
   slots `roundClaim γ`/`niExitMint γ`/`niOriginTicket γ` (fork law
   `niExitMint_fork`), the trace slot `obsLedgerAt (niLedgerR A c γ)`,
   `phi := xv6NiPhi` (`Hphi` from `obsLedgerAt_phi`, `niR_pure` and
-  `NiTrace.niOk_classLaw`).
+  `NiTrace.niOk_classLaw`).  (NI M2-X1) The record's evidence slot is
+  BLIND for now -- `uEvid := ⌜∃ c, niFitEv ox e c⌝`, dropped by the entry
+  hook (`uenterHook_dropEv`) -- and the registration `emp` (the power hook
+  yields an empty ticket); M2-X1 interim: X3 puts the ledger's `niEvid γe`
+  / `niEraTok γe` / `niEraAnchor γe` there.
 
 The closed instance (`USER` discharged: `ProofUser`) and the two corollaries
 are `LinkNiAdequacy` (only a `Link` file may import a `Proof` file).
@@ -114,7 +118,8 @@ theorem niLedger_pow (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] (c : A.fix
     niLedgerR A c γ h ⊢@{IProp GF} |==> (niLedgerR A c γ (h ++ [powerEv on]) ∗
       (if on then iprop(emp)
        else iprop(A.cons c (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗
-         iprop(A.turn c (obsBoots h + 1) ∗ niOriginTicket γ)))) := by
+         -- M2-X1 interim: X3 mints the era's registration ticket here (`emp`)
+         iprop(A.turn c (obsBoots h + 1) ∗ niOriginTicket γ ∗ emp)))) := by
   unfold niLedgerR
   have hp := AL.al_pow c h on dk hs
   cases on
@@ -124,7 +129,9 @@ theorem niLedger_pow (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] (c : A.fix
     imod niR_powerOn γ h $$ Hn with ⟨Hn, Hi⟩
     imodintro
     iframe HR Hn Hcons Hturn
-    iapply initClaim_ticket $$ Hi
+    isplitl [Hi]
+    · iapply initClaim_ticket $$ Hi
+    · iempintro
   · simp only [↓reduceIte, powerEv] at hp ⊢
     iintro ⟨HR, Hn⟩
     imod hp $$ HR with ⟨HR, -⟩
@@ -264,21 +271,31 @@ theorem xv6NiAppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet 
     niFit (fun _ _ h => h)
     (fun p => roundClaim p.2) (fun p => niExitMint p.2) (fun p => niOriginTicket p.2)
     (fun p i x h => niExitMint_fork p.2 i x h)
+    -- THE NI RECORD'S EVIDENCE AND REGISTRATION, BLIND (NI M2-X1 interim: X3
+    -- replaces them by the ledger's `niEvid γe` / `niEraTok γe` /
+    -- `niEraAnchor γe`): the evidence is the pure fit at some citation, the
+    -- registration `emp`
+    (fun _ ox e => iprop(⌜∃ cc, niFitEv ox e cc⌝)) (fun _ _ _ => inferInstance)
+    (fun _ _ => iprop(emp)) (fun _ _ _ => iprop(emp)) (fun _ _ _ => inferInstance)
+    (fun _ _ _ => BIUpdate.intro)
+    (fun _ _ _ _ cc h => BI.pure_intro ⟨cc, h⟩)
+    (fun _ _ h => BI.pure_intro ⟨none, h, rfl⟩)
     (fun γobs p => obsLedgerAt (niLedgerR A p.1 p.2) γobs)
     ?_
     ?_
     (fun γobs p => obsLedgerAt_alloc_cl (niLedgerR A p.1 p.2) γobs _ (niLedger_R0 A p.1 p.2))
     (fun γd γobs p h on dk hs =>
       obsLedgerAt_step (niLedgerR A p.1 p.2) (A.cons p.1)
-        (fun k => iprop(A.turn p.1 k ∗ niOriginTicket p.2)) (niLedger_pow A p.1 p.2) XV6_DISK_BYTES
+        (fun k => iprop(A.turn p.1 k ∗ niOriginTicket p.2 ∗ emp)) (niLedger_pow A p.1 p.2) XV6_DISK_BYTES
         γd γobs h on dk hs)
     (fun γobs p h => obsLedgerAt_back (niLedgerR A p.1 p.2) _ _ (h ++ [Obs.powerOn])
       (niLedger_back A p.1 p.2 h) γobs)
     -- THE TWO HOOKS: the exit MINTS its claims, the enter is FILED spending one
     (fun γobs p h e he => obsLedgerAt_uexitM (niLedgerR A p.1 p.2) (roundClaim p.2) (niExitMint p.2)
       (niLedger_exit A p.1 p.2) γobs h e he)
-    (fun γobs p h e ox he hf hv => obsLedgerAt_uenterS (niLedgerR A p.1 p.2) niFit (roundClaim p.2)
-      (niOriginTicket p.2) (niLedger_enter A p.1 p.2) γobs h e ox he hf hv)
+    (fun γobs p h e ox he hf hv => uenterHook_dropEv _ _ _ _ _
+      (obsLedgerAt_uenterS (niLedgerR A p.1 p.2) niFit (roundClaim p.2)
+        (niOriginTicket p.2) (niLedger_enter A p.1 p.2) γobs h e ox he hf hv))
     ?_
     xv6NiPhi
     ?_
@@ -287,7 +304,9 @@ theorem xv6NiAppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet 
     have H := AL.al_programs (F := xv6FixedGSU A.names (fun p => A.pred p.1) (fun p => A.okc p.1) cov
         sb.sbLogstart (A.ifc p.1) Hinv γgen γstart γreg γd γsw γobs γhist p T
         (obsLedgerAt (niLedgerR A p.1 p.2) γobs) (A.tk p.1) (A.hk p.1) niFit (roundClaim p.2)
-        (niExitMint p.2) (niOriginTicket p.2))
+        (niExitMint p.2) (niOriginTicket p.2)
+        (fun ox e => iprop(⌜∃ cc, niFitEv ox e cc⌝)) (fun _ _ => inferInstance) (fun _ => iprop(emp))
+        (fun _ _ => iprop(emp)) (fun _ _ => inferInstance))
         p.1 rfl rfl rfl rfl rfl rfl rfl
     intro E gen cP cI _ _ _ _ _ _ r
     exact H E gen cP cI r
@@ -295,7 +314,9 @@ theorem xv6NiAppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet 
     have H := AL.al_echo (F := xv6FixedGSU A.names (fun p => A.pred p.1) (fun p => A.okc p.1) cov
         sb.sbLogstart (A.ifc p.1) Hinv γgen γstart γreg γd γsw γobs γhist p T
         (obsLedgerAt (niLedgerR A p.1 p.2) γobs) (A.tk p.1) (A.hk p.1) niFit (roundClaim p.2)
-        (niExitMint p.2) (niOriginTicket p.2))
+        (niExitMint p.2) (niOriginTicket p.2)
+        (fun ox e => iprop(⌜∃ cc, niFitEv ox e cc⌝)) (fun _ _ => inferInstance) (fun _ => iprop(emp))
+        (fun _ _ => iprop(emp)) (fun _ _ => inferInstance))
         p.1 rfl rfl rfl rfl rfl rfl
     intro E gen cP cI
     exact H E gen cP cI
@@ -304,6 +325,8 @@ theorem xv6NiAppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet 
         sb.sbLogstart (A.ifc p.1) Hinv γgen γstart γreg γd γsw γobs γhist p T
         (obsLedgerAt (niLedgerR A p.1 p.2) γobs) (A.tk p.1) (A.hk p.1) niFit (roundClaim p.2)
         (niExitMint p.2) (niOriginTicket p.2)
+        (fun ox e => iprop(⌜∃ cc, niFitEv ox e cc⌝)) (fun _ _ => inferInstance) (fun _ => iprop(emp))
+        (fun _ _ => iprop(emp)) (fun _ _ => inferInstance)
     intro E gen cP cI Fc i γ hu
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     exact uartObsPermit_ledger i (niLedgerR A p.1 p.2) (A.tag p.1) (A.cons p.1) γ rfl rfl rfl

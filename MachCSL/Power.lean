@@ -349,6 +349,9 @@ def powerBootRes [KernelMap] (Mof : (Nat → BitVec 8) → LogMirror)
   -- THE ERA'S ORIGIN TICKET (NI M2-W2d): the power-on's third yield, the
   -- record's `uClaimO` (initproc's one-shot origin claim), on to `<init>`'s park
   MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
+  -- THE ERA'S REGISTRATION TICKET (NI M2-X1, finding F1): the record's
+  -- `uEraTok` at the era's number, which the era's boot shoots at its names
+  MachFixedGS.uEraTok (hlc := hlc) (GF := GF) (gen + 1) ∗
   (E.mirrorName ↪VAR{.own (1 : Qp).half} (Mof (diskOf σ.devs))) ∗
   swapLb (gen + 1) ∗ Rb gen (diskOf σ.devs) ∗ crashInv
 
@@ -383,11 +386,14 @@ def powerEv (on : Bool) : Obs := if on then .powerOff else .powerOn
 power loss (it starts no era), the era's founded console claim and the
 era's turn `Tn` (Rocq `Hobs`'s on-arm, lane CONS-IO milestone F) at a
 power-on, both at the era number `obsBoots h + 1` of the post-event
-history. -/
+history; beside them (NI M2-W2d) the era's origin ticket and (NI M2-X1) the
+era's registration ticket `uEraTok`, at the same era number
+(`obsBoots (h ++ [.powerOn])`). -/
 def powerYield (Tn : Nat → IProp GF) (on : Bool) (h : List Obs) : IProp GF :=
   if on then iprop(emp)
   else iprop(MachFixedGS.consRes (hlc := hlc) (GF := GF) (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗
-    Tn (obsBoots h + 1) ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF))
+    Tn (obsBoots h + 1) ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
+    MachFixedGS.uEraTok (hlc := hlc) (GF := GF) (obsBoots h + 1))
 
 /-- The power thread is safe, given the client's TRACE HOOK and the boot
 client: at every `PowerOn`, from the boot resources of the fresh era at the
@@ -463,7 +469,8 @@ theorem wp_power [KernelMap]
     -- position holds the cited exit; the permit built from them is sealed
     -- into the wire invariant at every power-on (`hartObsPermit_of_hook`)
     -- (NI M2-W2d: the exit hook MINTS the exit's one-shot claims at its
-    -- position `h.length`; the entry hook is handed the claim it spends)
+    -- position `h.length`; the entry hook is handed the claim it spends;
+    -- NI M2-X1: and the entry's evidence `uEvid ox e`)
     (HuserExit : ∀ (h : List Obs) (e : Obs), isUExit e = true →
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
         |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]) ∗
@@ -472,7 +479,7 @@ theorem wp_power [KernelMap]
     (HuserEnter : ∀ (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)), isUEnter e = true →
       MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e →
       (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
-      uClaimFor (hlc := hlc) (GF := GF) ox ∗
+      uClaimFor (hlc := hlc) (GF := GF) ox ∗ MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e ∗
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
         |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
     (Hboot : ∀ (E : EraGS) (gen : Nat) (σ : MState),
@@ -567,7 +574,7 @@ theorem wp_power [KernelMap]
       CoPset.subseteq_top) $$ Hcinv with ⟨HPc, Hcclose⟩
     imod (Hproj (diskOf g.m.devs)) $$ [Hdisk HPc] with ⟨Hdisk, HPc, %hpure⟩
     · iframe Hdisk HPc
-    icases Hyield with ⟨Hyield, Hturn, Huo⟩
+    icases Hyield with ⟨Hyield, Hturn, Huo, Huet⟩
     -- THE SWAP, LENT THE ERA'S TURN (Rocq sync SY3-A1)
     imod (Hswap ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen
       (diskOf g.m.devs)) $$ [Hreg Hstarted Hstart Hdisk Hmir HPc Hturn]
@@ -621,14 +628,14 @@ theorem wp_power [KernelMap]
       (fun c => g₂.m.regs c Register.sig_seip) (fun c => g₂.m.regs c Register.sig_meip))
       $$ [Hhp Hpins] with #Hwire
     · iframe Hhp Hpins
-    ihave Hres : powerBootRes Mof Rb Tn'' ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf Hyield Hturn Huo Hmir HRb]
+    ihave Hres : powerBootRes Mof Rb Tn'' ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf Hyield Hturn Huo Huet Hmir HRb]
     · unfold powerBootRes genCertAt memCells kmapStaticAt crashInv
       rw [hdk]
       iframe Hmir HRb Hswlb Hcinv
       isplitl [Hkroot]
       · iexists 0#44
         iexact Hkroot
-      iframe Hrc Hpts Hkmap Hkst Hwire Hdf Hyield Hturn Huo
+      iframe Hrc Hpts Hkmap Hkst Hwire Hdf Hyield Hturn Huo Huet
       isplitr [Hctx Hfrags' Hls]
       · isplit
         · iexact Hborn

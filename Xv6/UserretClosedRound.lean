@@ -160,9 +160,12 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
     (((uservecCtx k (tfResumeGpr0 W.tf) V.tf).intrOff true false).withRegs R') 0
     P' ksp V' M' sts' gn cs' pid uepc sc2 tv2 hproc hctx' htier hnoff hsp' hav' ha0 hpc'
     (hVgn.symm.trans hgk.symm) (some (i, x)) hfit
+  -- ...and the record's evidence (NI M2-X1): the round cites nothing yet
+  -- (`c := none`, `NiFitIs.evid`)
+  ihave #Hev := uEvid_of_niFit (hlc := hlc) (GF := GF) i x _ hfit
   iapply HRS
   unfold uRcptOpt uClaimFor uClaimForRaw
-  iframe Hwire Hrc HcR Hcl Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Hslot
+  iframe Hwire Hrc HcR Hev Hcl Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Hslot
   inext
   iexact Hloop
 
