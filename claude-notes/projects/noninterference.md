@@ -1992,6 +1992,8 @@ no `sorry`; baselines in the same commit when they move).
 - X3: 3 files. The content is `niR_enter`'s chain step.
 - X4: 5 files. The pure proofs are short, because `niBelow_pos` does the work.
 
+**RULINGS X-R1…R7 (2026-10-03, coordinator):** R1 the anchor as recommended (two more slots, registration at `xv6Era_run`, the anchor beside `wireInv` into `parkWorld`, no new camera); R2 one existential, `H := niHist F`; R3 AMENDED: `events`/`reading` leave `xv6NiPhi` and `xv6NiTwoRun` as recommended, but the observable-hypothesis form is KEPT as a tenth root `xv6NiTwoRunObs` (the ~10-line pure corollary: equal readings on `h` still give equal outputs) because it is the form checkable on the trace alone; R4 nothing for the allocator beyond registering its name; R5 keep `uFit`; R6 G2b lands in X2, fork stays out of `NiInClass`; R7 `dead_allow` as §3. Order X1 → (X2 ∥ X3) → X4. F3's limit (the histories are ghost witnesses inside `F`; ι is not observable) goes into the as-landed note verbatim.
+
 **RULINGS REQUESTED.**
 - **X-R1 (the anchor, F1).** Recommended: two more `MachFixedGS` slots (`uEraTok`, `uEraAnchor`); the
   registration at `xv6Era_run`; the anchor riding next to `wireInv` into `parkWorld`; no new camera (the
