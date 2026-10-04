@@ -104,6 +104,8 @@ import Xv6.LinkMemset
 import Xv6.KallocEv
 import Xv6.PidEv
 import Xv6.ZombEv
+import Xv6.SlotEv
+import Xv6.SlotLed
 import Xv6.KallocDefs
 import Xv6.PipeNames
 import Xv6.PipeQueue

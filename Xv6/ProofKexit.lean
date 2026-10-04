@@ -1189,7 +1189,7 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
   iintro Hk Hpc Hstate
   -- the mirror follows the cell: RUNNING → ZOMBIE
   iapply wpLoop_bupd
-  imod (pstateWhole_update Γ (procAddr j) RUNNING ZOMBIE) $$ Hwhole with Hwhole
+  imod (pstateWhole_update Γ (procAddr j) RUNNING ZOMBIE (by decide)) $$ Hwhole with Hwhole
   -- THE ZOMBIE LEDGER RECORDS THE EXIT (design ni-zombie-ledger.md D2,
   -- ruling R1), here, at the ZOMBIE store, with BOTH locks held: actor
   -- `procAddr j`, this process's pid, and the status the escrow is keyed at.

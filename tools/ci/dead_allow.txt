@@ -38,3 +38,8 @@ decl Xv6.UIota.poolEmpty
 decl Xv6.UIota.nextPid
 decl Xv6.UIota.zombies
 decl Xv6.UIota.status
+
+# -- the slot-occupancy ledger (NI joint fork lane F1): a window at a prefix is
+#    a window at any extension -- the design's lemma for reading `sFullRcpt`'s
+#    window at a later history; F3 reaches it (or removes this row)
+decl Xv6.sevWindow_mono

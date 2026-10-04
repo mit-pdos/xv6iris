@@ -217,6 +217,9 @@ instance ugfMlZev : MonoListG unionGF Zev := ⟨ugf_slot 123⟩
 instance ugfMlUled : MonoListG unionGF Uled := ⟨ugf_slot 124⟩
 -- WchGpre: the family ledger's zombie column (inherited from `xv6GF`'s slot 125)
 instance ugfZomCol : GhostMapG unionGF Nat (Option (BitVec 32 × Int)) RegMapF := ⟨ugf_slot 125⟩
+-- WchGpre: the slot-occupancy ledger and its column (inherited from `xv6GF`'s slots 126 / 127)
+instance ugfMlSev : MonoListG unionGF Sev := ⟨ugf_slot 126⟩
+instance ugfSlotOcc : GhostMapG unionGF (BitVec 64) Bool AddrMapF := ⟨ugf_slot 127⟩
 
 -- the union's new cameras
 instance ugfEraPins : GhostMapG unionGF Nat EraPins RegMapF := ⟨ugf_slot 95⟩

@@ -142,8 +142,12 @@ original above), whose FOUND arm also carries the pid ledger's RECEIPT of
 the allocation -- `PAlloc act pid` appended right after some history `h`,
 the actor `act` being the hart's proc word, and (NI M2-G2a) `pid` the pid
 the kernel was bound to give after `h` (`PidLock.pidAllocRcpt`: `pid =
-pidPick PIDMAX h`).  The null arm is unchanged: it
-never reached a registration.  `allocprocPostLed_post` drops the receipt. -/
+pidPick PIDMAX h`).  The null arm never reached a registration; since the
+joint fork lane F1 it carries, as a disjunct, the slot-occupancy ledger's
+exhaustion receipt (`SlotLed.sFullRcpt act`: `SFull act k0` appended with
+the scan's window) when the scan found no UNUSED slot, its `True` side on
+the kalloc failures (lane F2 puts the allocator's receipt there).
+`allocprocPostLed_post` drops the receipts. -/
 def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
@@ -151,7 +155,7 @@ def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     IProp GF := iprop%
   (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
       ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗
-    (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗
+    (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗ (True ∨ sFullRcpt act) ∗
     ∃ on' : Option Nat, ⌜on' = on ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
   (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
     pidAllocRcpt act pid ∗
@@ -174,8 +178,8 @@ theorem allocprocPostLed_post {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
     (tk : Bool) (Q : Int → IProp GF) (act : BitVec 64) (r : BitVec 64) :
     allocprocPostLed (GF := GF) Γ γ cpu γk on pav tk Q act r ⊢ allocprocPost Γ γ cpu γk on pav tk Q r := by
   unfold allocprocPostLed allocprocPost
-  iintro (Hnull | ⟨%j, %ch, %pid, %V, %M, %g, -, Hfound⟩)
-  · ileft; iexact Hnull
+  iintro (⟨Hr, Hpav, -, Hav⟩ | ⟨%j, %ch, %pid, %V, %M, %g, -, Hfound⟩)
+  · ileft; iframe Hr Hpav Hav
   · iright
     iexists j, ch, pid, V, M, g
     iexact Hfound

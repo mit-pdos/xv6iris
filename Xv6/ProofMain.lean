@@ -381,7 +381,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   unfold mnProcBoot
   icases Hpb with ⟨Hhart, Hps, Hsf, Hlk, Hrows⟩
   unfold childrenBootRows
-  icases Hrows with ⟨Hchb, Horph, Hpra, Hpled, Htk, Hzled, Hzsa, Hslots⟩
+  icases Hrows with ⟨Hchb, Horph, Hpra, Hpled, Htk, Hzled, Hzsa, Hsla, Hsoa, Hsoe, Hslots⟩
   unfold mnWorldB
   icases Hw with ⟨#Htbl, #Hp0, #Hp1, #Hr0, #Hr1, #Hecho, #Hi0, #Hi1, #Hplic, #Hpe, #Hkml, #Htr, #Hwire,
     #Hanc, #Hcert, #Hseam, #Hcinv⟩
@@ -392,8 +392,11 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   iframe Hk Hpc Hpl Hwl Hraw Hfd Hir Hbs
   iintro %R1 Hk Hpc Hpli Hwli Hready
   -- the proc table's invariant, the nextpid and wait locks
-  ihave Hins := mn_slots_zip Γ pas $$ [$Hready $Hpub $Hhart $Hps $Hsf $Hlk $Hstk $Hslots]
   iapply wpLoop_fupd
+  -- the slot-occupancy ledger's invariant, and each slot's element (NI joint fork lane F1)
+  imod slotLed_alloc (hlc := hlc) ⊤ $$ [$Hsla $Hsoa] with #Hsli
+  ihave Hsoe := soElem_boot (List.range NPROC) $$ [$Hsli $Hsoe]
+  ihave Hins := mn_slots_zip Γ pas $$ [$Hready $Hpub $Hhart $Hps $Hsf $Hlk $Hstk $Hslots $Hsoe]
   imod mn_procsInv hct startedPrimary (k.withRegs R1) Γ t pas hok $$ [$Hk $Hsmap $Hins] with ⟨Hk, #Hpinv⟩
   imod mn_pidWait_born startedPrimary (k.withRegs R1) $$ [$Hk $Hpli $Hwli $Hnp $Hpq $Hpra $Hpled $Hpar $Hchb $Horph $Hzled $Hzsa]
     with ⟨Hk, ⟨%γp, #Hpidl⟩, ⟨%γw, #Hwaitl⟩⟩

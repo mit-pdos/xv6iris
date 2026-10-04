@@ -2781,14 +2781,20 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
       icases procLockRes_elim Γ curCtx (procAddr i) $$ HRp with
         ⟨%st', %ch', HstateW, Hpsl, Hchan, ⟨%kl', %xs', %pid', Hrest⟩, Hslots⟩
       icases (show pstateLock Γ (procAddr i) st' ⊢
-          pstateAtHlf Γ (procAddr i) st' ∗ (if unclaimed st' then pstateAtHlf Γ (procAddr i) st' else emp)
-          from by unfold pstateLock; iintro H; iexact H) $$ Hpsl with ⟨Hpsl1, Hpsl2⟩
+          pstateAtHlf Γ (procAddr i) st' ∗ (if unclaimed st' then pstateAtHlf Γ (procAddr i) st' else emp) ∗
+            soElem (hlc := hlc) (procAddr i) (occBit st')
+          from by unfold pstateLock; iintro H; iexact H) $$ Hpsl with ⟨Hpsl1, Hpsl2, Hpso⟩
       ihave %hst' := kf_pstateAtHlf_agree Γ i hi st' USED $$ [$Hpsl1 $Hkept]
       subst hst'
-      ihave Hwhole := (show pstateAtHlf Γ (procAddr i) USED ∗ pstateAtHlf Γ (procAddr i) USED ⊢
+      ihave Hwhole := (show pstateAtHlf Γ (procAddr i) USED ∗ pstateAtHlf Γ (procAddr i) USED ∗
+          soElem (hlc := hlc) (procAddr i) (occBit USED) ⊢
           pstateWhole Γ (procAddr i) USED from by
             have e := pstateAt_join (GF := GF) Γ (procAddr i) (1:Qp).half (1:Qp).half USED
-            rw [Qp.half_add_half] at e; exact e) $$ [$Hpsl1 $Hkept]
+            rw [Qp.half_add_half] at e
+            unfold pstateWhole
+            iintro ⟨H1, H2, Hs⟩
+            iframe Hs
+            iapply e $$ [$H1 $H2]) $$ [$Hpsl1 $Hkept $Hpso]
       -- c.li a5,3 (RUNNABLE)
       k_step (wp_s_addi cpu _ (KA.«kfork» + 0xfe#64) true 3#12 15#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -2806,7 +2812,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
           unfold pState RUNNABLE; iintro H; iexact H) $$ HstateW
       -- the mirror follows the cell: USED → RUNNABLE
       iapply wpLoop_bupd
-      imod (pstateWhole_update Γ (procAddr i) USED RUNNABLE) $$ Hwhole with Hwhole
+      imod (pstateWhole_update Γ (procAddr i) USED RUNNABLE (by decide)) $$ Hwhole with Hwhole
       imodintro
       ihave Hslots := procSlots_recast Γ curCtx (procAddr i) USED RUNNABLE (by decide) (by decide) (by decide) (by decide) $$ Hslots
       -- split the RUNNABLE whole for release (RUNNABLE is unclaimed: the lock takes both halves)
@@ -3199,7 +3205,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
       icases (show allocprocPostLed Γ γ cpu γk none none false Q (procAddr j) (R2 10#5) ⊢
           (⌜R2 10#5 = 0#64 ∧ (((none : Option Nat) = none ∨ (none : Option Nat) = some 0) ∨
               ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub none g))⌝ ∗
-            (procsAvailAt Γ none false ∨ pavSpent Γ none) ∗
+            (procsAvailAt Γ none false ∨ pavSpent Γ none) ∗ (True ∨ sFullRcpt (procAddr j)) ∗
             ∃ on' : Option Nat, ⌜on' = none ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
           (∃ (i : Nat) (ch : BitVec 64) (pid_c : BitVec 32) (V_c : ProcPriv) (M_c : Nat → List (BitVec 8))
               (gc : Nat),

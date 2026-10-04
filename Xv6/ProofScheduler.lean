@@ -616,7 +616,7 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
     · simp only [if_pos sc_unclaimed_RUNNABLE]
       iempintro
   iapply wpLoop_bupd
-  imod (pstateWhole_update Γ (procAddr n) RUNNABLE RUNNING) $$ [$Hpw] with Hpw
+  imod (pstateWhole_update Γ (procAddr n) RUNNABLE RUNNING (by decide)) $$ [$Hpw] with Hpw
   imod (hart_update Γ n h0 cpu) $$ [$Htag] with Htag
   imodintro
   -- sw s8,24(s1): p->state = RUNNING

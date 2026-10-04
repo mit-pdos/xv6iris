@@ -76,10 +76,18 @@ part 1 is `Xv6/WaitInv.lean`, whose header and deviations apply here.
    one `h` it reads (`famLedAt_tie`, `famLedAt_lookup` (T2), `famLedAt_lb`);
    `famLed_reap` is stated at `famLedAt` and returns the receipt at that `h`;
    `childrenInv_reap`'s pure conjunct adds `gs k = g`.
+11. **The slot-occupancy ledger's boot** (NI joint fork lane F1,
+   `Xv6/SlotLed.lean`): `childrenRes_alloc` mints the history at `[]` and
+   the column (`SlotLed.soRows_alloc`) at the new names `wslName` /
+   `wsoName` (its statement unchanged); `childrenBootRows` hands out the raw
+   authority (`slotLedAuth [] ∗ soAuth []`) and the 64 raw elements at
+   `false`, which main turns into the invariant and the slots' `soElem`s
+   (`SlotLed.slotLed_alloc` / `soElem_boot`).
 
 Imports only definitional files.
 -/
 import Xv6.WaitInv
+import Xv6.SlotLed
 
 namespace Xv6
 
@@ -753,7 +761,8 @@ ni-strong-instance.md §7; Rocq `children_boot_rows`) and its T2 element at
 `none` (main hands it to the slot's UNUSED payload). -/
 def childrenBootRows : IProp GF :=
   iprop(childrenResBoot ∗ orphansOwn ∅ ∗ pidRegAuth ∅ ∗ pidLedAuth [] ∗ tickCnt 0 ∗ zombLedAuth [] ∗
-    zsAuth (fun _ => none) ∗
+    zsAuth (fun _ => none) ∗ slotLedAuth [] ∗ soAuth [] ∗
+    ([∗list] i ∈ List.range NPROC, soOwn (procAddr i) false) ∗
     [∗list] i ∈ List.range NPROC, ∃ γ0 g : GName,
       chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (.own 1) g ∗ actCnt (procAddr i) 0 ∗
         zsElem (procAddr i) none)
@@ -1023,14 +1032,20 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
   imod ghost_map_alloc_empty (GF := GF) (K := Nat) (V := Option (BitVec 32 × Int)) (H := RegMapF)
     with ⟨%γzs, Hzs⟩
   imod zsRows_alloc γzs NPROC (Nat.le_refl _) $$ Hzs with ⟨%Mzs, Hzs, %hzs, Hzrows⟩
+  -- ...and the slot-occupancy ledger (NI joint fork lane F1, deviation 11):
+  -- the history at `[]`, the column with one element per slot at `false`
+  imod MonoList.own_alloc (GF := GF) ([] : List Sev) with ⟨%γsl, Hsl, -⟩
+  imod ghost_map_alloc_empty (GF := GF) (K := BitVec 64) (V := Bool) (H := AddrMapF)
+    with ⟨%γso, Hso⟩
+  imod soRows_alloc γso NPROC (Nat.le_refl _) $$ Hso with ⟨%Mso, Hso, %hso, Horows⟩
   imodintro
   iexists ({ wchName := γ, worphName := γo, wsgName := γsg, wprName := γpr, wipName := γip,
              npidName := γnp, wtkName := γtk, wplName := γpl, wzlName := γzl,
-             wactName := γact, wzsName := γzs } : WchG GF)
+             wactName := γact, wzsName := γzs, wslName := γsl, wsoName := γso } : WchG GF)
   isplitl []
   · ipureintro; rfl
   unfold childrenBoot childrenBootRows childrenResBoot childrenOwnAt orphansOwn pidRegAuth
-    pidLedAuth zombLedAuth initPidTok nextpidPend tickCnt zsAuth
+    pidLedAuth zombLedAuth initPidTok nextpidPend tickCnt zsAuth slotLedAuth soAuth soOwn
   isplitr [Hnp]
   · isplitl [Hip]
     · iexact Hip
@@ -1054,6 +1069,14 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
     · iexists Mzs
       iframe Hzs
       ipureintro; exact hzs.1
+    isplitl [Hsl]
+    · iexact Hsl
+    isplitl [Hso]
+    · iexists Mso
+      iframe Hso
+      ipureintro; exact hso.1
+    isplitl [Horows]
+    · iexact Horows
     ihave Hact := BigSepL.bigSepL_sep_eqv.mpr $$ [Hact Hzrows]
     · isplitl [Hact]
       · iexact Hact

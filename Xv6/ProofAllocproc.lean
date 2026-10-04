@@ -642,7 +642,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 slot's allowances `dormantAllow`.  The FOUND arm carries the pid ledger's
 receipt of the allocation (`PAlloc act pid`, NI-LEDGER-REST; since NI
 M2-G2a `PidLock.pidAllocRcpt`, with the pid `pidPick` of its prefix; the caller's
-`apCont` instantiates `act` at `k.proc`).  `allocproc_proof` mints the descriptor
+`apCont` instantiates `act` at `k.proc`).  The NULL arm carries, as a
+disjunct, the slot-occupancy ledger's exhaustion receipt (`SlotLed.sFullRcpt
+act`, NI joint fork lane F1) when the scan found no UNUSED slot; the kalloc
+failure tails give its `True` side.  `allocproc_proof` mints the descriptor
 ghost out of them (`FdTable.procPriv_null_mint`, Rocq
 `proc_dormant_unused`). -/
 def apPostCells [CurCtx] (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat)
@@ -650,7 +653,7 @@ def apPostCells [CurCtx] (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : O
     IProp GF := iprop%
   (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
       ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗
-    (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗
+    (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗ (True ∨ sFullRcpt act) ∗
     ∃ on' : Option Nat, ⌜on' = on ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
   (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
     pidAllocRcpt act pid ∗
@@ -1564,9 +1567,10 @@ theorem apPidsOk_set (pids : Nat → BitVec 32) (n : Nat) (v : BitVec 32) (hn : 
 section State
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
-/-- The UNUSED lock share is the whole mirror; move it to USED. -/
+/-- The UNUSED lock share is the whole mirror; move it to USED, the slot's
+occupancy element with it (`SOcc j`, NI joint fork lane F1; unlabelled). -/
 theorem ap_pstate_used (Γ : SchedNames) (pa : BitVec 64) :
-    pstateLock (GF := GF) Γ pa UNUSED ⊢ |==> pstateWhole Γ pa USED := by
+    pstateLock (GF := GF) Γ pa UNUSED ⊢ |={⊤}=> pstateWhole Γ pa USED := by
   iintro H
   ihave Hw : pstateWhole (GF := GF) Γ pa UNUSED $$ [H]
   case _ =>
@@ -1575,7 +1579,7 @@ theorem ap_pstate_used (Γ : SchedNames) (pa : BitVec 64) :
     isplitl [H]
     · iexact H
     · iempintro
-  iapply pstateWhole_update Γ pa UNUSED USED $$ Hw
+  iapply pstateWhole_occ Γ pa $$ Hw
 
 end State
 
@@ -2060,7 +2064,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   ihave Hstate := (show wordPointsTo (GF := GF) (pState (procAddr n)) 4 (DFrac.own 1) 1#32 ⊢
       wordPointsTo (GF := GF) (pState (procAddr n)) 4 (DFrac.own 1) USED from by
     unfold USED; iintro H; iexact H) $$ Hstate
-  iapply MachCSL.wpLoop_bupd
+  iapply MachCSL.wpLoop_fupd
   imod ap_pstate_used Γ (procAddr n) $$ Hpl with Hpstw
   imodintro
   -- 0x80001c0e jal kalloc
@@ -2340,6 +2344,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         isplitl [Hpav]
         · -- the token was spent in the pid section
           iright; unfold pavSpent; iframe Hpav; iexact Hshot
+        isplitl []
+        · ileft; itrivial
         iexists none
         isplitl []
         · ipureintro; exact Or.inr rfl
@@ -3054,6 +3060,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           isplitl [Hpav]
           · -- the token was spent in the pid section
             iright; unfold pavSpent; iframe Hpav; iexact Hshot
+          isplitl []
+          · ileft; itrivial
           iexists none
           isplitl []
           · ipureintro; exact Or.inr rfl
@@ -3137,6 +3145,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗ procsAvailAt Γ pav tk ∗
     □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗
     ([∗list] j ∈ List.range n, slotUsed Γ (procAddr j)) ∗
+    slotScan (hlc := hlc) n ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') ∗
     wpNext k.sie k.proc cur (apCont Γ k γk on pav tk Q ke)
@@ -3145,7 +3154,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   | zero =>
     intro n hfuel hn spie spp hsp R hR2 h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27 cur
     have hlast : n + 1 = NPROC := by unfold NPROC at hfuel hn ⊢; omega
-    iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, #Hkw, Hmarks, Hframe, Hlend, HΦ⟩
+    iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, #Hkw, Hmarks, Hsc, Hframe, Hlend, HΦ⟩
     ihave #Hln := procsInv_lookup Γ n hn $$ Hpinv
     iapply (ap_scan_acq AC Γ cur cur k n hn hnoff hK hlq htier spie spp R h9) $$ [- $Hk $Hpc]
     iframe #
@@ -3169,6 +3178,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         (hcs2.2.2.2.2.2.2.2.2.2.1.trans h24) (hcs2.2.2.2.2.2.2.2.2.2.2.1.trans h25)
         (hcs2.2.2.2.2.2.2.2.2.2.2.2.1.trans h26) (hcs2.2.2.2.2.2.2.2.2.2.2.2.2.trans h27)
         ch kl xs pid0 ke)
+      iclear Hsc
       iframe Hk Hpc Hav Hpav Hframe Hlocked Hstate Hpl Hchan Hrest Hslots Harm Hlend HΦ
       iframe #
     · rw [if_neg hst]
@@ -3180,6 +3190,10 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         rw [← hlast]
         iapply ap_marks_snoc Γ n
         iframe Hmarks Hused
+      -- the slot-occupancy ledger: the visit reads the slot occupied (NI joint fork lane F1)
+      iapply wpLoop_fupd
+      imod pstateLock_visit Γ n hn st hst $$ [$Hsc $Hpl] with ⟨Hsc, Hpl⟩
+      imodintro
       iapply (ap_scan_rel RE Γ c2 k n hn hwf hnoff hK hlq htier spie2 spp2 R2 h9' st ch kl xs pid0)
       iframe Hk Hpc Hlocked Hstate Hpl Hchan Hrest Hslots Harm
       iframe #
@@ -3229,6 +3243,17 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           isplitl []
           · ipureintro; exact h10
           · iexact Hk
+        -- the scan found no UNUSED slot: the slot-occupancy ledger records the
+        -- exhaustion with its window (`SFull k.proc k0`, NI joint fork lane F1),
+        -- the actor's ONE permit step (L3's rule)
+        iapply wpLoop_fupd
+        ihave Hsc : slotScan (hlc := hlc) (GF := GF) NPROC $$ [Hsc]
+        · rw [← hlast]; iexact Hsc
+        imod slotLed_full k.proc $$ Hsc with #Hrc
+        icases Hlend with ⟨%k1, %hk1, Hlend⟩
+        imod actLend_step k.proc k1 $$ Hlend with Hlend
+        ihave Hlend := actLend_ret_step k.proc hk1 $$ Hlend
+        imodintro
         ihave Hpost : apPostCells (GF := GF) Γ c8 γk on pav tk Q k.proc (R'' 10#5)
           $$ [Hav Hpav Hmarks]
         case' _ =>
@@ -3249,6 +3274,8 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
               · ipureintro; exact ⟨h10, Or.inl (Or.inr rfl)⟩
               isplitl [Hpav]
               · ileft; iexact Hpav
+              isplitl []
+              · iright; iexact Hrc
               iexists on
               isplitl []
               · ipureintro; exact Or.inl rfl
@@ -3259,6 +3286,8 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
             · ipureintro; exact ⟨h10, Or.inl (Or.inl rfl)⟩
             isplitl [Hpav]
             · ileft; iexact Hpav
+            isplitl []
+            · iright; iexact Hrc
             iexists on
             isplitl []
             · ipureintro; exact Or.inl rfl
@@ -3300,7 +3329,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   | succ fuel ih =>
     intro n hfuel hn spie spp hsp R hR2 h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27 cur
     have hnext : n + 1 < NPROC := by unfold NPROC at hfuel hn ⊢; omega
-    iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, #Hkw, Hmarks, Hframe, Hlend, HΦ⟩
+    iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, #Hkw, Hmarks, Hsc, Hframe, Hlend, HΦ⟩
     ihave #Hln := procsInv_lookup Γ n hn $$ Hpinv
     iapply (ap_scan_acq AC Γ cur cur k n hn hnoff hK hlq htier spie spp R h9) $$ [- $Hk $Hpc]
     iframe #
@@ -3324,6 +3353,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         (hcs2.2.2.2.2.2.2.2.2.2.1.trans h24) (hcs2.2.2.2.2.2.2.2.2.2.2.1.trans h25)
         (hcs2.2.2.2.2.2.2.2.2.2.2.2.1.trans h26) (hcs2.2.2.2.2.2.2.2.2.2.2.2.2.trans h27)
         ch kl xs pid0 ke)
+      iclear Hsc
       iframe Hk Hpc Hav Hpav Hframe Hlocked Hstate Hpl Hchan Hrest Hslots Harm Hlend HΦ
       iframe #
     · rw [if_neg hst]
@@ -3334,6 +3364,10 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       case' _ =>
         iapply ap_marks_snoc Γ n
         iframe Hmarks Hused
+      -- the slot-occupancy ledger: the visit reads the slot occupied (NI joint fork lane F1)
+      iapply wpLoop_fupd
+      imod pstateLock_visit Γ n hn st hst $$ [$Hsc $Hpl] with ⟨Hsc, Hpl⟩
+      imodintro
       iapply (ap_scan_rel RE Γ c2 k n hn hwf hnoff hK hlq htier spie2 spp2 R2 h9' st ch kl xs pid0)
       iframe Hk Hpc Hlocked Hstate Hpl Hchan Hrest Hslots Harm
       iframe #
@@ -3395,7 +3429,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       case h27x =>
         try simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
         exact (hcs3.2.2.2.2.2.2.2.2.2.2.2.2.trans hcs2.2.2.2.2.2.2.2.2.2.2.2.2).trans h27
-      iframe Hk Hpc Hav Hpav Hmarks Hframe Hlend HΦ
+      iframe Hk Hpc Hav Hpav Hmarks Hsc Hframe Hlend HΦ
       iframe #
 
 /-! ## The function -/
@@ -3466,7 +3500,8 @@ theorem allocproc_cells (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSE
   case' _ =>
     simp only [List.range_zero]
     exact BigSepL.bigSepL_nil_intro
-  iframe Hk Hpc Hav Hpav Hmarks Hframe Hlend HΦ
+  ihave Hsc := slotScan_zero (hlc := hlc) (GF := GF)
+  iframe Hk Hpc Hav Hpav Hmarks Hsc Hframe Hlend HΦ
   iframe #
   case hR2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   case h9 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]

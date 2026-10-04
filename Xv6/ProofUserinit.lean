@@ -541,7 +541,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
   ihave Hup := hup $$ Hown Htok Hrows Hused Hpo Hig Hfr Hch Hbun Hrd Hco Hchildr
   imod Hup with ⟨Hown, HprocCtx⟩
   ihave Hk := Hback $$ Hown
-  imod (pstateWhole_update Γ (procAddr j) USED RUNNABLE) $$ Hwhole with Hwhole
+  imod (pstateWhole_update Γ (procAddr j) USED RUNNABLE (by decide)) $$ Hwhole with Hwhole
   imodintro
   ihave Hslots := ui_slots_runnable Γ ξ0 (procAddr j) $$ [$Hused $HprocCtx $Hhart $Hzs]
   icases (pstateWhole_split Γ (procAddr j) RUNNABLE).1 $$ Hwhole with ⟨Hpsl, -⟩

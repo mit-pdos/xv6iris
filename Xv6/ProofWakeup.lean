@@ -114,7 +114,7 @@ theorem wk_lockRes_wake (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (kl xs 
   case' _ =>
     rw [if_pos (by decide : unclaimed SLEEPING)]
     iframe Hg
-  imod pstateWhole_update Γ pa SLEEPING RUNNABLE $$ Hg with Hg
+  imod pstateWhole_update Γ pa SLEEPING RUNNABLE (by decide) $$ Hg with Hg
   imodintro
   ihave Hg := (pstateWhole_split (GF := GF) Γ pa RUNNABLE).mp $$ Hg
   rw [if_pos (by decide : unclaimed RUNNABLE)]

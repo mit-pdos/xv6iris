@@ -35,6 +35,7 @@ process geometry.
 import MachCSL.SwtchCtx
 import Xv6.ProcDefs
 import Xv6.Image
+import Xv6.SlotLed
 
 namespace Xv6
 
@@ -333,14 +334,20 @@ theorem pstateAt_elim (Γ : SchedNames) (j : Nat) (q : Qp) (st : BitVec 32) (hj 
   iexact H
 
 /-- What the lock owns of the mirror: half #1 always (the tie to the cell),
-half #2 exactly on an unclaimed state. -/
+half #2 exactly on an unclaimed state.  ...AND (NI joint fork lane F1) the
+slot's element of the slot-occupancy column at the state's occupancy bit
+(`SlotLed.soElem`, `occBit st`): it rides the mirror, so it moves wherever
+the mirror moves (the lock payload, `procHeldAt`), and the only stores that
+change the bit are the two that cross UNUSED (`pstateWhole_occ`,
+`pstateWhole_vac`). -/
 def pstateLock (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
-  pstateAtHlf Γ pa st ∗ (if unclaimed st then pstateAtHlf Γ pa st else emp)
+  pstateAtHlf Γ pa st ∗ (if unclaimed st then pstateAtHlf Γ pa st else emp) ∗
+  soElem (hlc := hlc) pa (occBit st)
 
 /-- What a lock HOLDER owns of the mirror: the whole variable, at every
-state. -/
-def pstateWhole (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) : IProp GF :=
-  pstateAt Γ pa 1 st
+state, with the slot's occupancy element (NI joint fork lane F1). -/
+def pstateWhole (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
+  pstateAt Γ pa 1 st ∗ soElem (hlc := hlc) pa (occBit st)
 
 /-- **The split at release** (Rocq `pstate_whole_split`): the lock's share
 comes off, and on a claimed state the claimant's half is left over. -/
@@ -376,39 +383,92 @@ theorem pstateWhole_split (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) :
   constructor
   · by_cases hu : unclaimed st
     · rw [if_pos hu, if_pos hu]
-      iintro H
+      iintro ⟨H, Hs⟩
       icases hs $$ H with ⟨H1, H2⟩
-      isplitl [H1 H2]
-      · isplitl [H1]
-        · iexact H1
-        · iexact H2
+      isplitl [H1 H2 Hs]
+      · iframe H1 H2 Hs
       · iempintro
     · rw [if_neg hu, if_neg hu]
-      iintro H
+      iintro ⟨H, Hs⟩
       icases hs $$ H with ⟨H1, H2⟩
-      isplitl [H1]
-      · isplitl [H1]
-        · iexact H1
-        · iempintro
+      isplitl [H1 Hs]
+      · iframe H1 Hs
       · iexact H2
   · by_cases hu : unclaimed st
     · rw [if_pos hu, if_pos hu]
-      iintro ⟨⟨H1, H2⟩, _⟩
+      iintro ⟨⟨H1, H2, Hs⟩, _⟩
+      iframe Hs
       iapply hj $$ [$H1 $H2]
     · rw [if_neg hu, if_neg hu]
-      iintro ⟨⟨H1, _⟩, H2⟩
+      iintro ⟨⟨H1, _, Hs⟩, H2⟩
+      iframe Hs
       iapply hj $$ [$H1 $H2]
 
-/-- The whole mirror moves with no side condition. -/
-theorem pstateWhole_update (Γ : SchedNames) (pa : BitVec 64) (st st' : BitVec 32) :
+/-- The whole mirror moves freely between two states of one occupancy (NI
+joint fork lane F1: the stores that cross UNUSED are `pstateWhole_occ` /
+`pstateWhole_vac`). -/
+theorem pstateWhole_update (Γ : SchedNames) (pa : BitVec 64) (st st' : BitVec 32)
+    (ho : occBit st = occBit st') :
     pstateWhole (GF := GF) Γ pa st ⊢ |==> pstateWhole Γ pa st' := by
   unfold pstateWhole pstateAt pstateOwn
-  iintro ⟨%j, %hj, Hg⟩
+  rw [ho]
+  iintro ⟨⟨%j, %hj, Hg⟩, Hs⟩
   imod ghost_var_update st' _ _ $$ Hg with Hg
   imodintro
+  iframe Hs
   iexists j
   iframe Hg
   ipureintro; exact hj
+
+/-- **ALLOCPROC'S USED STORE** (NI joint fork lane F1): the mirror moves
+UNUSED → USED and the slot's occupancy element flips, appending `SOcc j` to
+the slot-occupancy ledger (`SlotLed.soElem_occ`). -/
+theorem pstateWhole_occ (Γ : SchedNames) (pa : BitVec 64) :
+    pstateWhole (GF := GF) Γ pa UNUSED ⊢ |={⊤}=> pstateWhole Γ pa USED := by
+  unfold pstateWhole pstateAt pstateOwn
+  iintro ⟨⟨%j, %hj, Hg⟩, Hs⟩
+  obtain ⟨hpa, hjn⟩ := hj
+  subst hpa
+  imod ghost_var_update USED _ _ $$ Hg with Hg
+  imod soElem_occ j hjn _ $$ Hs with Hs
+  imodintro
+  rw [occBit_of_ne (by decide : USED ≠ UNUSED)]
+  iframe Hs
+  iexists j
+  iframe Hg
+  ipureintro; exact ⟨rfl, hjn⟩
+
+/-- **FREEPROC'S UNUSED STORE** (NI joint fork lane F1): the mirror moves to
+UNUSED and the slot's occupancy element flips back, appending `SVac j`
+(`SlotLed.soElem_vac`). -/
+theorem pstateWhole_vac (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) :
+    pstateWhole (GF := GF) Γ pa st ⊢ |={⊤}=> pstateWhole Γ pa UNUSED := by
+  unfold pstateWhole pstateAt pstateOwn
+  iintro ⟨⟨%j, %hj, Hg⟩, Hs⟩
+  obtain ⟨hpa, hjn⟩ := hj
+  subst hpa
+  imod ghost_var_update UNUSED _ _ $$ Hg with Hg
+  imod soElem_vac j hjn _ $$ Hs with Hs
+  imodintro
+  rw [occBit_unused]
+  iframe Hs
+  iexists j
+  iframe Hg
+  ipureintro; exact ⟨rfl, hjn⟩
+
+/-- **A SCAN VISIT** (NI joint fork lane F1): the lock's share of an
+occupied slot's mirror reads the slot-occupancy column into the scan's
+accumulator (`SlotLed.slotScan_visit`) and goes back untouched. -/
+theorem pstateLock_visit (Γ : SchedNames) (n : Nat) (hn : n < NPROC) (st : BitVec 32)
+    (hst : st ≠ UNUSED) :
+    slotScan (hlc := hlc) (GF := GF) n ∗ pstateLock Γ (procAddr n) st ⊢
+      |={⊤}=> (slotScan (hlc := hlc) (n + 1) ∗ pstateLock Γ (procAddr n) st) := by
+  unfold pstateLock
+  rw [occBit_of_ne hst]
+  iintro ⟨Hsc, H1, H2, Hs⟩
+  imod slotScan_visit n hn $$ [$Hsc $Hs] with ⟨Hsc, Hs⟩
+  imodintro
+  iframe Hsc H1 H2 Hs
 
 /-! ## THE CLAIM (Rocq `IntrDefs.cpu_claim`) -/
 

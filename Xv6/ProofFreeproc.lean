@@ -617,10 +617,11 @@ theorem fp_tail [X : CurCtx]
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [hR9, pState, KCtx.rget_zero]
   iintro Hk Hpc Hstate
-  -- the slot is UNUSED: the mirror follows the cell
+  -- the slot is UNUSED: the mirror follows the cell, and the slot-occupancy
+  -- ledger records the vacancy (`SVac j`, NI joint fork lane F1; unlabelled)
   ihave Hname := Hclose $$ %(0#8) Hb0
-  iapply wpLoop_bupd
-  imod pstateWhole_update Γ (procAddr j) st UNUSED $$ Hpg with Hpg
+  iapply wpLoop_fupd
+  imod pstateWhole_vac Γ (procAddr j) st $$ Hpg with Hpg
   imodintro
   -- the xstate cell back in its two halves: `p->lock`'s and the UNUSED block's
   icases fp_word4_split' (procAddr j + 44#64) (Qp.half 1) (Qp.half 1) 1 (Qp.half_add_half 1)

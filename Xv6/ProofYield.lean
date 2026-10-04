@@ -193,7 +193,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   iintro Hk Hpc Hstate
   -- the mirror follows the cell
   iapply wpLoop_bupd
-  imod (pstateWhole_update Γ (procAddr j) RUNNING RUNNABLE) $$ Hwhole with Hwhole
+  imod (pstateWhole_update Γ (procAddr j) RUNNING RUNNABLE (by decide)) $$ Hwhole with Hwhole
   imodintro
   -- the slot's T2 element parks with the held lock (NI M2-G1b)
   ihave Hheld := procHeldAt_live_intro Γ ξ0 cpu j RUNNABLE ch kl xs pid (Or.inr (Or.inl rfl))

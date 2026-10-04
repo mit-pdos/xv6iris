@@ -2847,6 +2847,99 @@ RULINGS REQUESTED.**
 
   Alternative: keep `niForkRow` beside `niDetRow` (harmless, redundant; one more conjunct in `niFitEv`).
 
+### Joint fork lane F1 as landed (2026-10-04)
+
+On `lane/fork` (based on `lean` 571386245), one commit. Lane F1 (the slot-occupancy ledger); F2 runs in
+parallel, F3 after both.
+
+**What landed.**
+- **`Xv6/SlotEv.lean`** (new, pure, imports `ProcGeom` only): `Sev := SOcc j | SVac j | SFull act k0`,
+  `occStep`/`occOf` (`occOf_snoc`, `occOf_take_append`, `occOf_take_length`), `sevWindow`, `sevWf`
+  (`sevWf_nil`, `sevWf_snoc`, `_snoc_occ/_vac/_full`), `sevWindow_mono`, and the scan's accumulator
+  `sevScan h k0 n` (`_start`, `_mono`, `_visit`, `_window`). Shapes as §1.
+- **Cameras and names** (`SlotGen` deviation 13): `WchGpre.slG : MonoListG GF Sev` (xv6GF/unionGF slot 126),
+  `WchGpre.soG : GhostMapG GF (BitVec 64) Bool AddrMapF` (slot 127); `WchG.wslName`, `WchG.wsoName`
+  (`xv6GF_wchG` +2 names). Born in `WaitInvTies.childrenRes_alloc` (statement unchanged; the history at `[]`
+  and `SlotLed.soRows_alloc`'s 64 elements at `false`).
+- **`Xv6/SlotLed.lean`** (new): `slotN := ndot nroot "xv6slotled"`, `occBit st := decide (st ≠ UNUSED)`,
+  `slotLedAuth`/`slotLedLb`, `soOwn pa b` (the raw element), `soAuth h` (the column's authority tied to
+  `occOf h` below NPROC), `slotLedBody`, `slotLedInv`, `soElem`, `sFullRcpt`, `slotScan n`; the steps
+  `soElem_occ` (`SOcc j`), `soElem_vac` (`SVac j`), `slotScan_visit`, `slotLed_full` (`SFull act k0`),
+  the boot `slotLed_alloc` / `soElem_boot`.
+
+      def slotLedBody : IProp GF := iprop(∃ h : List Sev, ⌜sevWf h⌝ ∗ slotLedAuth h ∗ soAuth h)
+      def slotLedInv : IProp GF := inv slotN (slotLedBody (GF := GF))
+      def slotLedLb (h : List Sev) : IProp GF := WchG.wslName GF ↪◯ML h
+      def soAuth (h : List Sev) : IProp GF :=
+        iprop(∃ M : AddrMapF Bool, ghost_map_auth (WchG.wsoName GF) (.own 1) M ∗
+          ⌜∀ k < NPROC, get? M (procAddr k) = some (occOf h k)⌝)
+      def soElem (pa : BitVec 64) (b : Bool) : IProp GF := iprop(slotLedInv (hlc := hlc) ∗ soOwn pa b)
+      def sFullRcpt (act : BitVec 64) : IProp GF :=
+        iprop(∃ (h : List Sev) (k0 : Nat), slotLedLb (h ++ [.SFull act k0]) ∗ ⌜sevWindow h k0⌝)
+
+- **The carrier of the element is the STATE MIRROR, not `procHeldAt`'s own conjunct** (deviation 1):
+  `SchedCtx.pstateLock Γ pa st` (the lock payload's share) and `pstateWhole Γ pa st` (the holder's, inside
+  `procHeldAt`) each gain `∗ soElem pa (occBit st)`. The mirror is updated at EVERY state store and only the
+  stores that cross UNUSED change the bit, so the element moves exactly with the state, through the payload,
+  `procHeldAt`, `pSched` and the claims, and no `procSlotsAt` / `procHeldAt` lemma statement moved (G1b's
+  `zsElem` needed carriers across Spec texts; this one rides a resource every one of them already names).
+  `pavSlot` was NOT the right carrier: it is persistent (`slotUsed`) at every non-UNUSED state and is
+  re-made from the marker by the park / running / dispatch lemmas, so an exclusive element there would
+  have moved those statements and needed `procHeldAt` as a second carrier anyway.
+  `pstateWhole_split` keeps its statement; `pstateWhole_update` gains `occBit st = occBit st'` (every caller
+  `by decide`); new `pstateWhole_occ` (UNUSED → USED, `SOcc j`), `pstateWhole_vac` (→ UNUSED, `SVac j`),
+  `pstateLock_visit` (the scan's read).
+- **The appends.** `ap_found`'s USED store: `ap_pstate_used` is now `|={⊤}=>` through `pstateWhole_occ`
+  (unlabelled, no permit step). freeproc's UNUSED store: `pstateWhole_vac` (unlabelled; `wp_freeproc(_led)_body`
+  byte-identical). `ap_scan` carries `slotScan n` (`allocproc_cells` starts it at `slotScan_zero`); each
+  non-UNUSED visit calls `pstateLock_visit` before the release (the first visit fixes `k0` at the ledger's
+  length then); the exhausted arm, in the continuation after the epilogue, calls `slotLed_full k.proc` and
+  takes ONE `actLend_step` on the scan's lend (`actLend_ret_step` back into the `∃ k' ≥ ke` the post
+  already returns). The found arm drops the accumulator.
+- **`allocprocPostLed`'s null arm** gains `∗ (True ∨ sFullRcpt act)` after the regime disjunct (deviation 2:
+  F1 alone has no allocator receipt; F2 replaces `True` by `kNullRcpt γk act`, giving the design's
+  `kNullRcpt γk act ∨ sFullRcpt act`). `apPostCells`' null arm the same; allocproc's two kalloc-failure
+  tails give the `True` side. `allocprocPostLed_post` drops it; `allocprocPost`, `wp_allocproc_body`,
+  `wp_allocproc_led_body`'s text byte-identical. The led kfork's unfolded `show` of the post gains the
+  conjunct (proof only; its null arm is still dropped).
+- **The boot.** `childrenBootRows` gains `slotLedAuth [] ∗ soAuth [] ∗ ([∗list] i ∈ List.range NPROC, soOwn
+  (procAddr i) false)`; `mn_phaseB` allocates the invariant (`slotLed_alloc ⊤`) and pairs the elements
+  (`soElem_boot`) before `mn_slots_zip`, which takes the new big-sep; `mnSlotIn` and `procsInvSlot` gain
+  `soElem (procAddr i) false`, which `procsInv_alloc_slot` puts into the UNUSED payload's `pstateLock`.
+
+**Statements that moved.** Spec: `allocprocPostLed` (null arm). Definitions: `WchGpre`/`WchG` (+2 fields
+each), `xv6GF_wchG` (+2 names), `pstateLock`, `pstateWhole`, `childrenBootRows`, `mnSlotIn`, `procsInvSlot`,
+`apPostCells`. Lemmas: `pstateWhole_update` (+ the occupancy premise), `ap_pstate_used` (bupd → fupd at
+⊤), `ap_scan` (+ `slotScan n`), `mn_slots_zip` (+ the element big-sep). Byte-identical: `allocprocPost`,
+`wp_allocproc_body`, `wp_freeproc(_led)_body`, `procHeldAt`, `procSlotsAt`, `procLockResAt`,
+`childrenRes_alloc`, `bootSharedAlloc`, `bootSharedDev_names`, every kfork / userinit / sys_fork statement.
+
+**Deviations.** (1) the element rides the state mirror (above); the column is keyed by the slot ADDRESS
+(`BitVec 64`): the `Nat`-keyed `Bool` ghost map is FsBlocks' dirty camera (slot 70), and the one-instance
+rule forbids a second; `soAuth h` is an existential map tied to `occOf h` (as `zsAuth`), not a concrete
+`occMap h`. (2) the null arm's lone disjunct is `True ∨ sFullRcpt act` (F2 fills the left side). (3) the
+scan's accumulator is `slotScan n` (`⌜n = 0⌝` until the first visit), the design's `soElem_visit` is
+`slotScan_visit` (+ `pstateLock_visit`); the `SFull` append runs in allocproc's continuation after the
+epilogue (after the last release, as §2 asks).
+
+**Baselines.** `tools/tcb/expected.json`: `Xv6.SlotEv` ENTERS `Xv6.xv6PowerAdequacy`'s trusted base (its
+statement names `WchGpre`, whose new field names `Sev`); no other root moved, nothing entered through a Spec.
+`tools/audit/baseline.json` unchanged (no axiom, no opaque). `tools/ci/dead_allow.txt`: one row,
+`Xv6.sevWindow_mono` ("F3 reaches"); everything else of the lane is reached through allocproc / freeproc /
+the boot.
+
+**What F3 must absorb.**
+- The receipt, verbatim: `sFullRcpt (act : BitVec 64) : IProp GF := iprop(∃ (h : List Sev) (k0 : Nat),
+  slotLedLb (h ++ [.SFull act k0]) ∗ ⌜sevWindow h k0⌝)` (`SlotLed`, `[WchG GF]` only, persistent). It
+  reaches `allocprocPostLed`'s null arm as the right disjunct of `True ∨ sFullRcpt act` (with F2:
+  `kNullRcpt γk act ∨ sFullRcpt act`); `kforkRetLed`/`kforkPostLed`'s −1 arm must carry it from there.
+- The fifth registered name: `WchG.wslName GF`, camera `WchGpre.slG : MonoListG GF Sev`; `slotLedLb h` is
+  `WchG.wslName GF ↪◯ML h`. `niNamesHere`'s fifth entry is `WchG.wslName GF`, and `niIotaLbs` gains the
+  conjunct `((ns.getD 4 0) ↪◯ML ι.sev)` (an `↪◯ML` over `List Sev`, a fourth `lb_own_valid` in
+  `niBelow`/`niJoin`). `NiEvid`'s ambient-camera binder needs `MonoListG GF Sev`, which `[WchGpre GF]`
+  supplies.
+- `sevWf` lives only inside the invariant; F3's honesty note reads it through `sFullRcpt`'s window.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

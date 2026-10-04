@@ -135,12 +135,22 @@ party that threads a lock's gname.
    payload and the slot payloads are stated over `[WchG GF]`).  The map is
    keyed by the slot's ADDRESS as a number (`pa.toNat`): the slot payloads
    that hold the elements are stated at `pa`, not at the index.
+13. **The slot-occupancy ledger (NI joint fork lane F1, no Rocq
+   counterpart).**  Two `WchGpre` fields: the history's camera `MonoListG GF
+   Sev` (`slG`, xv6GF/unionGF slot 126) and the occupancy column's
+   `GhostMapG GF (BitVec 64) Bool AddrMapF` (`soG`, slot 127), at the names
+   `wslName` / `wsoName`.  The column is keyed by the slot's ADDRESS
+   itself, not by `pa.toNat` as deviation 12's: a `Nat`-keyed `Bool` map is
+   `FsBlocks`' dirty-block camera (`GhostMapG GF Nat Bool RegMapF`, slot 70),
+   and the one-instance rule forbids a second.  The ghost itself (the
+   invariant, the element, the receipt) is `Xv6/SlotLed.lean`'s.
 
 Imports only definitional files.
 -/
 import Xv6.ChildTok
 import Xv6.PidEv
 import Xv6.ZombEv
+import Xv6.SlotEv
 
 namespace Xv6
 
@@ -200,11 +210,24 @@ class WchGpre (GF : BundledGFunctors) where
   element sits in the slot's own lock payload (`SchedCtx.procSlotsAt`,
   `ProcDefs.procDormant`), at the canonical name `wzsName` (deviation 12). -/
   [zsG : GhostMapG GF Nat (Option (BitVec 32 × Int)) RegMapF]
+  /-- THE SLOT-OCCUPANCY LEDGER'S CAMERA (NI joint fork lane F1): a
+  mono-list of `SlotEv.Sev`, the history of every USED and UNUSED store
+  across the slot table and every exhausted scan, whose authority lives in
+  an Iris invariant (`SlotLed.slotLedInv`) at the canonical name `wslName`
+  (deviation 13). -/
+  [slG : MonoListG GF Sev]
+  /-- THE SLOT-OCCUPANCY COLUMN (NI joint fork lane F1): a ghost map from a
+  slot's ADDRESS to whether it is occupied, whose authority rides the same
+  invariant tied to the history's `occOf` and whose element rides the slot's
+  state mirror (`SchedCtx.pstateLock` / `pstateWhole`), at the canonical
+  name `wsoName` (deviation 13). -/
+  [soG : GhostMapG GF (BitVec 64) Bool AddrMapF]
 
 attribute [reducible, instance] WchGpre.chG WchGpre.orphG WchGpre.sgenG WchGpre.prG WchGpre.ipidG
 attribute [reducible, instance] WchGpre.plG
 attribute [reducible, instance] WchGpre.zlG
 attribute [reducible, instance] WchGpre.zsG
+attribute [reducible, instance] WchGpre.slG WchGpre.soG
 
 /-- Rocq `wchG`: the cameras and their CANONICAL names (the capacity may be
 assumed by adequacy, the NAMES are minted in the boot fupd and the instance
@@ -248,6 +271,14 @@ class WchG (GF : BundledGFunctors) extends WchGpre GF where
   `zsG` ghost map at this name (`UserChildren.zsAuth` / `zsElem`), born in
   `WaitInvTies.childrenRes_alloc` with one element per slot at `none`. -/
   wzsName : GName
+  /-- THE SLOT-OCCUPANCY LEDGER'S NAME (NI joint fork lane F1): the `slG`
+  mono-list at this name (`SlotLed.slotLedAuth` / `slotLedLb`), born empty
+  in `WaitInvTies.childrenRes_alloc`. -/
+  wslName : GName
+  /-- THE SLOT-OCCUPANCY COLUMN'S NAME (NI joint fork lane F1): the `soG`
+  ghost map at this name (`SlotLed.soAuth` / `soOwn`), born in
+  `WaitInvTies.childrenRes_alloc` with one element per slot at `false`. -/
+  wsoName : GName
 
 /-- AN EIGHTH (Rocq `qeighth`, deviation 2). -/
 abbrev qeighth : Qp := Qp.quarter.half

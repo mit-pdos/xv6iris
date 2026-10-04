@@ -406,7 +406,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     iintro Hk Hpc Hstate
     -- the mirror follows the cell
     iapply wpLoop_bupd
-    imod pstateWhole_update Γ (procAddr j) RUNNING SLEEPING $$ Hpstw with Hpstw
+    imod pstateWhole_update Γ (procAddr j) RUNNING SLEEPING (by decide) $$ Hpstw with Hpstw
     imodintro
     -- jal sched
     k_step (wp_s_jal cpu _ (KA.«sleep» + 0x1c#64) false 2096832#21 1#5 (by decide))

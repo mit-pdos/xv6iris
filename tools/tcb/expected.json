@@ -324,6 +324,7 @@
     "Xv6.PipeNames",
     "Xv6.PtOwn",
     "Xv6.SleepLockGhost",
+    "Xv6.SlotEv",
     "Xv6.SlotGen",
     "Xv6.SpecUser",
     "Xv6.SystemBootEra",
