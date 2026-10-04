@@ -82,8 +82,6 @@ the per-cpu cells, the running token, the kernel table's shared invariant
 Imports only definitional files.
 -/
 import Xv6.SpecPrepareReturn
-import Xv6.UexecWp
-import Xv6.UexecSlot
 import Xv6.NiLedger
 
 namespace Xv6

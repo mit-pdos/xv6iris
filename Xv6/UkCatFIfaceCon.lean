@@ -29,7 +29,6 @@ projections / `pnsKit` / `pnsCon`.  Not reached: the local instances
    is `x[0]? = some b`; `drop c x` is `x.drop c`.
 3. `wcur pn 0` is the landed protocol atom `PipeProto.wcur`.
 -/
-import Xv6.UkCatFIfaceReg
 import Xv6.UkPipesIfaceKit
 import Xv6.HfpPipeClaimsP
 

@@ -43,7 +43,6 @@ Layout of `struct proc` (kernel/proc.h, spinlock = {locked; name; cpu} =
 
 Imports only definitional files.
 -/
-import Xv6.UPtDefs
 import Xv6.KillRow
 import Xv6.WaitInv
 

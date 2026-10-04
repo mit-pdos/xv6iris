@@ -45,6 +45,7 @@ instances of Rocq (ported as Lean instances where a proof needs them).
 import Xv6.UkCatFIfaceCon
 import Xv6.UkCatFIfaceDeps
 import Xv6.UkPipesIfaceReg
+import Xv6.UkCatFIfaceReg
 
 namespace Xv6
 

@@ -40,7 +40,6 @@ the pure facts that carry the process's key across uservec's save walk.
 
 Definitional + pure + small proof-mode lemmas.
 -/
-import Xv6.UexecApply
 import Xv6.UservecDefs
 import Xv6.SpecUsertrap
 

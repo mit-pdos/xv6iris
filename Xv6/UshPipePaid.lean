@@ -25,7 +25,6 @@ contributes.  S2 is the "pipe" message's byte facts.
 4. NOT PORTED (unreached from `union_adequacy_closed`): `ushq_exf_pers0`
    (a Coq instance-priority workaround), `wp_kshr_pipe_arm_paid`.
 -/
-import Xv6.UshDiagLeaf
 import Xv6.PipeDisc
 import Xv6.SpecShPanic
 

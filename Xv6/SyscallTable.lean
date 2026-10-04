@@ -47,6 +47,26 @@ the tail is `SyscallRet`'s).
 import Xv6.SpecSyscall
 import Xv6.SpecSysExec
 import Xv6.SpecSysChroot
+import Xv6.SpecSysOpen
+import Xv6.SpecSysChdir
+import Xv6.SpecSysMknod
+import Xv6.SpecSysUnlink
+import Xv6.SpecSysExit
+import Xv6.SpecSysPipe
+import Xv6.SpecSysRead
+import Xv6.SpecSysKill
+import Xv6.SpecSysFstat
+import Xv6.SpecSysDup
+import Xv6.SpecSysGetpid
+import Xv6.SpecSysSbrk
+import Xv6.SpecSysPause
+import Xv6.SpecSysUptime
+import Xv6.SpecSysWrite
+import Xv6.SpecSysLink
+import Xv6.SpecSysMkdir
+import Xv6.SpecSysClose
+import Xv6.SpecSysSync
+import Xv6.SpecSysSeccomp
 
 namespace Xv6
 

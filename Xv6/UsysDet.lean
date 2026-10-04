@@ -131,9 +131,6 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
    reaped; `usysDetWait`'s middle arm.
 -/
 import Xv6.UexecRound
-import Xv6.KallocEv
-import Xv6.PidEv
-import Xv6.ZombEv
 
 namespace Xv6
 

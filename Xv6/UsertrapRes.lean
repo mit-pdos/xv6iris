@@ -151,7 +151,6 @@ Imports only definitional files.
 import Xv6.SpecUservec
 import Xv6.SpecKernelvec
 import Xv6.WaitLock
-import Xv6.UhistDefs
 
 namespace Xv6
 

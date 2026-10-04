@@ -139,7 +139,6 @@ party that threads a lock's gname.
 Imports only definitional files.
 -/
 import Xv6.ChildTok
-import Xv6.ProcGeom
 import Xv6.PidEv
 import Xv6.ZombEv
 

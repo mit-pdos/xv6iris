@@ -47,9 +47,7 @@ shift `slli a4,a3,3` of the sign-extended number is slot `num`'s offset
 5. The range lemma is stated over `BitVec.ult` (`MachCSL.bcond`'s BLTU);
    Rocq's chain of `bv_swrap` lemmas collapses to one `bv_decide`.
 -/
-import Xv6.UsysMemOk
 import Xv6.KernelData
-import Xv6.ZombEv
 import Xv6.UsysDet
 
 namespace Xv6

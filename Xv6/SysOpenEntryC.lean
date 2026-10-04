@@ -71,8 +71,6 @@ Imports only `SysOpenCreArm` (and through it `SysOpenParts`) and the shared
 call-site file.
 -/
 import Xv6.SysOpenCreArm
-import Xv6.SysfileCalls
-import Xv6.FsAbsOpenFire
 import Xv6.KexecACode
 import Xv6.SysOpenShared
 import Xv6.SysMknodFrame

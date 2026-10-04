@@ -82,7 +82,6 @@ once as an origin: `niOneShot`, read off `niR` by `niR_pure`.
 PURE but for the class and §5's resources.
 -/
 import Xv6.UhistDefs
-import Xv6.UsysDet
 import Xv6.NiEvid
 import Xv6.UexecApply
 

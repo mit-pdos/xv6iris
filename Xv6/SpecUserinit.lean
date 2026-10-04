@@ -109,7 +109,6 @@ is unchanged.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.UexecExecInst
-import Xv6.NiLedger
 import Xv6.SpecIgetroot
 
 namespace Xv6

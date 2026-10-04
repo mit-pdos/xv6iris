@@ -38,7 +38,6 @@ Iris-level, no stepping.
 -/
 import Xv6.UsysDet
 import Xv6.FsCfgDefs
-import Xv6.KallocDefs
 
 namespace Xv6
 

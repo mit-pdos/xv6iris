@@ -39,6 +39,7 @@ after its `destruct k`).
 import Xv6.UshPipesNodeDefs
 import Xv6.UshPipesStageW
 import Xv6.UshPipePaid
+import Xv6.UshDiagLeaf
 
 namespace Xv6
 

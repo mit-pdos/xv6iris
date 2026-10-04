@@ -58,7 +58,6 @@ round resumed.  Everything here is what that re-keying needs:
    `kmapStatic` after `hw_config` (NOT in Rocq: it rides `uvAmb`, SpecUser
    deviation 5).
 -/
-import Xv6.UexecRound
 import Xv6.UsysDet
 
 namespace Xv6

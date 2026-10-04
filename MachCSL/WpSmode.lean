@@ -11,7 +11,6 @@ interrupts disabled -- the regime of early boot (`main` before
 * fetch at `satp = 0` is physical.
 -/
 import MachCSL.WpPmpXv6
-import MachCSL.WpStages
 import MachCSL.SConfPhysDefs
 import MachCSL.ModelFacts
 

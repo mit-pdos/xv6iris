@@ -88,7 +88,6 @@ Imports only definitional and Spec files.
 -/
 import Xv6.UexecExecInst
 import Xv6.UtResFits
-import Xv6.NiLedger
 
 namespace Xv6
 

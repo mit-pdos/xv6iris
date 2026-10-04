@@ -116,7 +116,6 @@ import Xv6.WaitFresh
 import Xv6.SpecKfork
 import Xv6.SpecFreeproc
 import Xv6.SpecSafestrcpy
-import Xv6.UexecApply
 import Xv6.SpecIdup
 import Xv6.SpecFiledup
 import Xv6.ConsoleintrParts

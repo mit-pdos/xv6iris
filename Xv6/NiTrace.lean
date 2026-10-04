@@ -143,7 +143,6 @@ nothing).  Nothing inside the class is a declassified reading.
 PURE: imports `NiLedger` (its pure definitions only) and `UsysDet`.
 -/
 import Xv6.NiLedger
-import Xv6.UsysDet
 
 namespace Xv6
 

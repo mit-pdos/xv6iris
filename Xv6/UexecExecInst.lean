@@ -98,6 +98,8 @@ import Xv6.FsAbsInvFire
 import Xv6.SysExecNe
 import Xv6.SpecSyscall
 import Xv6.PipeReg
+import Xv6.SpecArgfd
+import Xv6.SpecSysMkdir
 
 namespace Xv6
 

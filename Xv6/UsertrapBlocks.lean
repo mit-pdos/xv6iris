@@ -29,6 +29,7 @@ import Xv6.UsertrapParts
 import Xv6.SpecKilled
 import Xv6.UserretDefs
 import Xv6.ProcPrivAcc
+import Xv6.SpecKexit
 
 namespace Xv6
 
