@@ -2792,7 +2792,9 @@ onto the first's disjunct) → F3. Estimates:
   uvmcopy loop's `err` tail (`uvmcopy_err`) and kfork's two −1 tails.
 - **F3:** ~13 files, with the X4/G1e pattern; the content is `usysDet_rows`' fork arm and `niDetRow_fork`.
 
-**RULINGS REQUESTED.**
+****RULINGS JF-R1…R7 (2026-10-04, coordinator, all as recommended):** R1 one decisive allocator receipt (the trapframe's `KAlloc act` on success, the `KNull act` on −1; no window, no count in ι); R2 fork in the class at every key, the kalloc count conceded through H (H already holds every actor's allocator order since M2-X, so this concedes nothing new); R3 §6's slot ledger as refined (`SFull act k0`, `sevWf`, the element in `procHeldAt`, new cameras, the FIFTH registered name); R4 −1 cites `pev = zev = []`, keeps `W.pid`/`W.ch`, γ from `ZFork`; R5 the positive reason `kNull ∨ sFull` on −1; R6 Spec moves IN PLACE on the five failure arms (walk, mappages_any, uvmcreate, proc_pagetable, uvmcopy; `act` in `uvmcreatePost`/`pptPost`; `γk` in the kfork led posts), callers' proofs drop the receipt; R7 the fork clause derived in the resume block from `niDetRow`, `niForkRow` retired, `NiStep` unchanged, fork joins `classReading`. Lanes F1 ∥ F2, then F3.
+
+RULINGS REQUESTED.**
 - **JF-R1 (the allocator component: one decisive event).**
   - Recommended: ι.kev is ONE receipt prefix ending in the round's decisive event: the trapframe's `KAlloc
     act` on success, the `KNull act` on −1. The row reads it (F1, F2).
