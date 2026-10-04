@@ -98,13 +98,21 @@ def ptRep (t : PTree) (L : RegMapF (BitVec 64)) : Prop :=
     ∃ (addr v : BitVec 64), t.walk 2 vpn = some (addr, v) ∧ pteAD w v) ∧
   (∀ vpn : BitVec 27, Iris.Std.PartialMap.get? L vpn.toNat = none → t.walk 2 vpn = none)
 
+/-- **A user-accessible leaf is readable** (NI M2-G4a0): xv6 maps every `U`
+page with `R` (uvmalloc's `PTE_R|PTE_U|xperm`, vmfault's `W|U|R`, uvmcopy's
+copied flags; uvmclear drops `U`).  What lets a byte copyin reads (walkaddr
+tests `V ∧ U` only) be one the permission view sees (`permLeaf` needs `U ∧ R`). -/
+def uLeafR (w : BitVec 64) : Prop := w &&& PTE_U ≠ 0#64 → w &&& PTE_R ≠ 0#64
+
 /-- The pure facts of a live table (Rocq `proc_pt_wf` + `upt_map_wf`): user
 leaves below `TRAPFRAME`, real leaves (`U` may be clear: `uvmclear`'s guard
 page), on valid pages, distinct pages; the trapframe page valid; every user
 leaf pinned (`uLeafPins`: `G = 0`, no NAPOT, `PBMT = 0`, D53); every user
 leaf VALID in the walker's sense (`uwkInv w = false`: Rocq `upt_map_wf`'s
 `pte_valid` -- no `W` without `R`, reserved bits clear -- so no TLB entry
-can cache a leaf whose permission check would hit the model's assert).
+can cache a leaf whose permission check would hit the model's assert);
+every user leaf with `U` READABLE (`uLeafR`, NI M2-G4a0: xv6 maps every `U`
+page with `R`, so what copyin reads the permission view sees).
 (Disjointness of the user pages from the trapframe
 page is enforced by separation-logic ownership, not a pure fact.) -/
 def uptWf (P : UPtd) : Prop :=
@@ -114,7 +122,8 @@ def uptWf (P : UPtd) : Prop :=
     ptePpn w1 = ptePpn w2 → k1 = k2) ∧
   pageValid (pageAddr P.tfp) ∧
   (∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uLeafPins w) ∧
-  (∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uwkInv w = false)
+  (∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uwkInv w = false) ∧
+  (∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uLeafR w)
 
 /-- `mappages`' leaf is pinned when its permission word is. -/
 theorem uLeafPins_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (h : perm &&& ~~~0x3DF#64 = 0#64) :
@@ -168,10 +177,10 @@ end
 new leaf's own facts and that its page is not one of the others'. -/
 theorem uptWf_insert (P : UPtd) (vpn : Nat) (u : BitVec 64) (hwf : uptWf P)
     (hlt : vpn < tfVpn.toNat) (hleaf : isLeafPte u) (hpg : pageValid (pte2pa u)) (hpin : uLeafPins u)
-    (hval : uwkInv u = false)
+    (hval : uwkInv u = false) (hR : uLeafR u)
     (hinj : ∀ k w, Iris.Std.PartialMap.get? P.um k = some w → k ≠ vpn → ptePpn w ≠ ptePpn u) :
     uptWf { P with um := Iris.Std.PartialMap.insert P.um vpn u } := by
-  obtain ⟨w1, w2, w3, w4, w5⟩ := hwf
+  obtain ⟨w1, w2, w3, w4, w5, w6⟩ := hwf
   have hget : ∀ k w, Iris.Std.PartialMap.get? (Iris.Std.PartialMap.insert P.um vpn u) k = some w →
       (k = vpn ∧ w = u) ∨ (k ≠ vpn ∧ Iris.Std.PartialMap.get? P.um k = some w) := by
     intro k w hw
@@ -181,7 +190,7 @@ theorem uptWf_insert (P : UPtd) (vpn : Nat) (u : BitVec 64) (hwf : uptWf P)
       exact Or.inl ⟨rfl, (Option.some.inj hw).symm⟩
     · rw [Iris.Std.get?_insert_ne (fun hh => hk hh.symm)] at hw
       exact Or.inr ⟨hk, hw⟩
-  refine ⟨?_, ?_, w3, ?_, ?_⟩
+  refine ⟨?_, ?_, w3, ?_, ?_, ?_⟩
   · intro k w hw
     rcases hget k w hw with ⟨rfl, rfl⟩ | ⟨-, hw'⟩
     · exact ⟨hlt, hleaf, hpg⟩
@@ -201,6 +210,23 @@ theorem uptWf_insert (P : UPtd) (vpn : Nat) (u : BitVec 64) (hwf : uptWf P)
     rcases hget k w hw with ⟨rfl, rfl⟩ | ⟨-, hw'⟩
     · exact hval
     · exact w5 k w hw'
+  · intro k w hw
+    rcases hget k w hw with ⟨rfl, rfl⟩ | ⟨-, hw'⟩
+    · exact hR
+    · exact w6 k w hw'
+
+/-- `mappages`' leaf is readable-if-user when its permission word is (NI M2-G4a0). -/
+theorem uLeafR_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (h : uLeafR perm) :
+    uLeafR (leafOf ppn perm) := by
+  unfold uLeafR leafOf PTE_U PTE_R at *; revert h; bv_decide
+
+/-- Clearing `U` makes any word readable-if-user (`uvmclear`, NI M2-G4a0). -/
+theorem uLeafR_andNotU (w : BitVec 64) : uLeafR (w &&& ~~~PTE_U) := by
+  unfold uLeafR PTE_U PTE_R; bv_decide
+
+/-- A copy of a leaf's flags (`uvmcopy`) keeps `uLeafR` (NI M2-G4a0). -/
+theorem uLeafR_pteFlags (w : BitVec 64) (h : uLeafR w) : uLeafR (pteFlags w) := by
+  unfold uLeafR pteFlags PTE_U PTE_R at *; revert h; bv_decide
 
 /-- Every user leaf lies below `PGROUNDUP(sz)` (Rocq `um_below`). -/
 def umBelow (sz : BitVec 64) (P : UPtd) : Prop :=

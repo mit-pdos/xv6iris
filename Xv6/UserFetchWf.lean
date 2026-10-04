@@ -11,6 +11,6 @@ projection of it.
 namespace Xv6
 
 theorem uptWf_leavesValid (P : UPtd) (h : uptWf P) : UftLeavesValid P :=
-  h.2.2.2.2
+  h.2.2.2.2.1
 
 end Xv6

@@ -108,7 +108,7 @@ theorem lazyFree_wmapped_iff (P : UPtd) (sz : BitVec 64) (hwf : uptWf P) (hlf : 
   · rintro ⟨vpn, w, j, hget, ⟨-, hU⟩, hW, hj, rfl⟩
     have hk : (vpn * 4096 + j) / 4096 = vpn := by omega
     rw [hk, UserPerm.permOf_mapped _ hget]
-    have h1 := vq_r_of_w w (hwf.2.2.2.2 _ _ hget) hW
+    have h1 := vq_r_of_w w (hwf.2.2.2.2.1 _ _ hget) hW
     have h4 := (vq_bitU w).1 hU
     refine ⟨upermBits w, ?_, (vq_bitW w).1 hW⟩
     simp [permLeaf, h4, h1]

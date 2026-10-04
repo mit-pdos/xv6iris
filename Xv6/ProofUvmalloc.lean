@@ -185,6 +185,10 @@ theorem ua_perm_g (x : BitVec 64) (h : x &&& ~~~0x3CE#64 = 0#64) : (x ||| 18#64)
 valid, Rocq `pte_valid`). -/
 theorem ua_perm_rw (x : BitVec 64) : (x ||| 18#64) &&& 6#64 ≠ 4#64 := by bv_decide
 
+/-- The permission word has `R`, so the leaf is readable-if-user (`uLeafR`, NI M2-G4a0). -/
+theorem ua_perm_r (x : BitVec 64) : uLeafR (x ||| 18#64) := by
+  unfold uLeafR PTE_U PTE_R; bv_decide
+
 theorem ua_sext18 : BitVec.signExtend 64 18#12 = 18#64 := by decide
 
 theorem ua_ret_12ba : jumpPc (KA.«uvmalloc» + 0x3a#64) = (KA.«uvmalloc» + 0x3a#64) := by
@@ -393,7 +397,7 @@ well-formedness of the enlarged space. -/
 theorem ua_grow_pages [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8))
     (vpn : Nat) (r perm : BitVec 64) (hnone : get? P.um vpn = none) (hvalid : pageValid r)
     (hmask : perm &&& ~~~0x3FF#64 = 0#64) (hrwx : perm &&& 0xE#64 ≠ 0#64) (hg : perm &&& 0x20#64 = 0#64)
-    (hrw : perm &&& 6#64 ≠ 4#64)
+    (hrw : perm &&& 6#64 ≠ 4#64) (hR : uLeafR perm)
     (hwf : uptWf P) (hlt : vpn < tfVpn.toNat) :
     iprop(umPages (GF := GF) P M ∗ byteBuf r (DFrac.own 1) (List.replicate 4096 0#8)) ⊢
       iprop(umPages (P.insertLeaf vpn r perm) (viewZero M vpn) ∗
@@ -412,7 +416,7 @@ theorem ua_grow_pages [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8))
   · iapply (umPages_insert P M vpn r perm hnone hvalid hmask)
     iexact H
   · ipureintro
-    exact uptWf_insertLeaf P vpn r perm hwf hlt hvalid hmask hrwx hg hrw hfrne
+    exact uptWf_insertLeaf P vpn r perm hwf hlt hvalid hmask hrwx hg hrw hR hfrne
 
 /-- Assemble a process address space from its tree and pages. -/
 theorem ua_mkProcPtAt [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (hwf : uptWf P) :
@@ -754,7 +758,7 @@ theorem uvma_iter [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
     (perm newsz : BitVec 64) (A np i : Nat) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : uvmallocSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hmask : perm &&& ~~~0x3FF#64 = 0#64) (hrwx : perm &&& 0xE#64 ≠ 0#64) (hg : perm &&& 0x20#64 = 0#64)
-    (hrw : perm &&& 6#64 ≠ 4#64)
+    (hrw : perm &&& 6#64 ≠ 4#64) (hR : uLeafR perm)
     (hA4 : 4096 ∣ A)
     (hbnd : ∀ (Pj : UPtd) (Mj : Nat → List (BitVec 8)) (j : Nat), j < np → uptWf Pj →
       UaInv P M perm (A / 4096) j Pj Mj → A + 4096 * j + 4096 ≤ uvmMaxsz)
@@ -1009,7 +1013,7 @@ theorem uvma_iter [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
       ihave Htr := ptOwnRep_join (Pi.insertLeaf (A / 4096 + i) (R1 10#5) perm).root
         (Pi.insertLeaf (A / 4096 + i) (R1 10#5) perm).leaves _ ⟨hbaseMap, hrepMap⟩ $$ Htree
       -- the new page joins the user pages and keeps the space well-formed
-      ihave Hgrow := ua_grow_pages Pi Mi (A / 4096 + i) (R1 10#5) perm hnone hvalid hmask hrwx hg hrw
+      ihave Hgrow := ua_grow_pages Pi Mi (A / 4096 + i) (R1 10#5) perm hnone hvalid hmask hrwx hg hrw hR
         hwfi hltf $$ [Hpages Hbuf]
       case' _ => iframe
       icases Hgrow with ⟨Hpages, %hwfP'⟩
@@ -1158,7 +1162,7 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
     (perm newsz : BitVec 64) (A np : Nat) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : uvmallocSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hmask : perm &&& ~~~0x3FF#64 = 0#64) (hrwx : perm &&& 0xE#64 ≠ 0#64) (hg : perm &&& 0x20#64 = 0#64)
-    (hrw : perm &&& 6#64 ≠ 4#64)
+    (hrw : perm &&& 6#64 ≠ 4#64) (hR : uLeafR perm)
     (hA4 : 4096 ∣ A)
     (hbnd : ∀ (Pj : UPtd) (Mj : Nat → List (BitVec 8)) (j : Nat), j < np → uptWf Pj →
       UaInv P M perm (A / 4096) j Pj Mj → A + 4096 * j + 4096 ≤ uvmMaxsz)
@@ -1194,7 +1198,7 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
     ihave HP := ua_mkProcPtAt Pi Mi hwfi0 $$ [Htree0 Hpages0]
     case' _ => iframe
     have hbi : A + 4096 * i + 4096 ≤ uvmMaxsz := hbnd Pi Mi i hi hwfi0 hinv
-    iapply (uvma_iter KAL KF MS MA UD k γl γk P M perm newsz A np i ke hnoff hK hlk hmask hrwx hg hrw
+    iapply (uvma_iter KAL KF MS MA UD k γl γk P M perm newsz A np i ke hnoff hK hlk hmask hrwx hg hrw hR
       hA4 hbnd hfree hi Pi Mi hinv spie spp R hregs cur cur (fun _ => rfl))
       $$ [- $Hk $Hpc $Hav $HP $Hsv $Hlend]
     rotate_right 1
@@ -1247,7 +1251,7 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
     have hi : i < np := by omega
     have hnlast : i + 1 < np := by omega
     iintro ⟨Hk, Hpc, #Hlk, Hav, HP, Hsv, Hlend, HΦ⟩
-    iapply (uvma_iter KAL KF MS MA UD k γl γk P M perm newsz A np i ke hnoff hK hlk hmask hrwx hg hrw
+    iapply (uvma_iter KAL KF MS MA UD k γl γk P M perm newsz A np i ke hnoff hK hlk hmask hrwx hg hrw hR
       hA4 hbnd hfree hi Pi Mi hinv spie spp R hregs cur cur (fun _ => rfl))
       $$ [- $Hk $Hpc $Hav $HP $Hsv $Hlend]
     rotate_right 1
@@ -1487,6 +1491,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
       have hrwx : (k.regs 13#5 ||| 18#64) &&& 0xE#64 ≠ 0#64 := ua_perm_rwx (k.regs 13#5)
       have hg : (k.regs 13#5 ||| 18#64) &&& 0x20#64 = 0#64 := ua_perm_g (k.regs 13#5) hperm
       have hrw : (k.regs 13#5 ||| 18#64) &&& 6#64 ≠ 4#64 := ua_perm_rw (k.regs 13#5)
+      have hR : uLeafR (k.regs 13#5 ||| 18#64) := ua_perm_r (k.regs 13#5)
       have hA4 : 4096 ∣ pgRoundUpN (k.regs 11#5).toNat := pgRoundUpN_dvd _
       have hlo : ∀ j, j < uvmaNp (k.regs 11#5) (k.regs 12#5) →
           pgRoundUpN (k.regs 11#5).toNat + 4096 * j < (k.regs 12#5).toNat := by
@@ -1531,7 +1536,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
       rw [ua_pushed_spie_self k 10]
       iapply (uvma_loop KAL KF MS MA UD k γl γk P M (k.regs 13#5 ||| 18#64) (k.regs 12#5)
         (pgRoundUpN (k.regs 11#5).toNat) (uvmaNp (k.regs 11#5) (k.regs 12#5)) ke hnoff hK hlk hmask
-        hrwx hg hrw hA4 ?hbnd hlo hhi hfree (uvmaNp (k.regs 11#5) (k.regs 12#5) - 1) 0 (by omega) P M
+        hrwx hg hrw hR hA4 ?hbnd hlo hhi hfree (uvmaNp (k.regs 11#5) (k.regs 12#5) - 1) 0 (by omega) P M
         (uaInv_zero P M (k.regs 13#5 ||| 18#64) (pgRoundUpN (k.regs 11#5).toNat / 4096))
         k.spie k.spp _ ?hr0 c23) $$ [- $Hk $Hpc $Hav $HP $Hsv $Hlend]
       rotate_right 1

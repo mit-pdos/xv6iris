@@ -224,8 +224,8 @@ theorem leaves_get_run (P : UPtd) (key : Nat) (h : key < tfVpn.toNat) :
 
 /-- A sub-map of a well-formed address space is well formed. -/
 theorem uptWf_delRun (P : UPtd) (v0 n : Nat) (h : uptWf P) : uptWf (P.delRun v0 n) := by
-  obtain ⟨h1, h2, h3, h4, h5⟩ := h
-  refine ⟨?_, ?_, h3, ?_, ?_⟩
+  obtain ⟨h1, h2, h3, h4, h5, h6⟩ := h
+  refine ⟨?_, ?_, h3, ?_, ?_, ?_⟩
   · intro k w hk
     exact h1 k w (delRunL_get_some _ _ _ _ _ hk)
   · intro k1 w1 k2 w2 hk1 hk2
@@ -234,6 +234,8 @@ theorem uptWf_delRun (P : UPtd) (v0 n : Nat) (h : uptWf P) : uptWf (P.delRun v0 
     exact h4 k w (delRunL_get_some _ _ _ _ _ hk)
   · intro k w hk
     exact h5 k w (delRunL_get_some _ _ _ _ _ hk)
+  · intro k w hk
+    exact h6 k w (delRunL_get_some _ _ _ _ _ hk)
 
 /-- Every page of the run lies below the trapframe. -/
 theorem run_key_lt_tf (va : BitVec 64) (n j : Nat) (hj : j < n)

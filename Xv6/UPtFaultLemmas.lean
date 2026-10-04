@@ -242,7 +242,7 @@ theorem uptWf_clearU (P : UPtd) (vpn : Nat) (w : BitVec 64) (hwf : uptWf P)
   obtain ⟨hlt, hleaf, hpg⟩ := hwf.1 vpn w hmap
   refine uptWf_insert P vpn (w &&& ~~~PTE_U) hwf hlt (isLeafPte_andNotU w hleaf)
     (by rw [pte2pa_andNotU]; exact hpg) (uLeafPins_andNotU w (hwf.2.2.2.1 vpn w hmap))
-    (uwkInv_andNotU w (hwf.2.2.2.2 vpn w hmap)) ?_
+    (uwkInv_andNotU w (hwf.2.2.2.2.1 vpn w hmap)) (uLeafR_andNotU w) ?_
   intro k w' hw' hk hq
   rw [ptePpn_andNotU] at hq
   exact hk (hwf.2.1 k w' vpn w hw' hmap hq)
@@ -255,7 +255,8 @@ theorem uptWf_insertLeaf (P : UPtd) (vpn : Nat) (r : BitVec 64) (hwf : uptWf P)
   rw [vmfaultPerm_eq]
   refine uptWf_insert P vpn (leafOf (BitVec.extractLsb' 12 44 r) 0x16#64) hwf hlt
     (uLeaf_isLeafPte _) (by rw [pte2pa_uLeaf r hr]; exact hr) (uLeafPins_uLeaf _ _ (by decide))
-    (uwkInv_uLeaf _ _ (by decide) (by decide) (by decide)) ?_
+    (uwkInv_uLeaf _ _ (by decide) (by decide) (by decide))
+    (uLeafR_uLeaf _ _ (by unfold uLeafR PTE_U PTE_R; decide)) ?_
   intro k w hw _hk hq
   rw [ptePpn_uLeaf] at hq
   refine hfresh k w hw ?_
