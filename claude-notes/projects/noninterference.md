@@ -3555,6 +3555,377 @@ The class: {exit, getpid, uptime, wait at a null status pointer or a lazy-free k
 
 What remains: G4 (console write), G3c (optional: wait's lazy copyout), M3
 
+### M2-G4 design (2026-10-04)
+
+Design pass on `lane/g4` (based on `lean` 3a56ed33a, G3b landed). No code landed. The shapes below were read off
+the tree (`SpecConsolewrite`/`ProofConsolewrite`, `SpecEitherCopyin`/`ProofEitherCopyin`, `SpecCopyin`/
+`ProofCopyin`, `SpecFilewrite`/`FilewriteArms`/`FilewriteCalls`, `SpecSysWrite`, `SyscallArmsFd2.syscall_arm_write`,
+`SpecSyscall`, `SpecUsertrap`, `SyscallDefs`, `UsysMemOk`, `UsysDet`, `UexecApply`, `UserretClosedRows`, `NiLedger`,
+`NiTrace`, `UkWriteLeaf`, `UkRunSysWrite`, `UPtDefs`, `UserPerm`, `VmfaultQuiet`) and the C (`kernel/console.c`,
+`vm.c`, `uart.c`, `sysfile.c`, `proc.c`). They are not shape-checked in Lean. The rulings G4-R1…R7 at the end are
+needed before a lane starts.
+
+**Short version.**
+- **The count is chunked, not byte-at-a-time.** This xv6's `consolewrite` copies 32-byte batches (`char buf[32]`,
+  `either_copyin(buf, 1, src+i, nn)`, `i += nn` only after `uartwrite` took the whole batch). So the answer is `n`
+  when all `n` bytes are readable, and otherwise the START of the 32-byte chunk holding the first unreadable byte:
+  `32 * (d / 32)`. At `lazy = false` that is a function of the key: `consCnt n (uwriteRd π a1 n)`.
+- **copyin DOES fault lazy pages in.** W3's note ("copyin does not fault them") and `UsysDet` §4 are wrong:
+  `copyin` calls `vmfault(pagetable, p->sz, va0, 1)` at a walkaddr miss (`ProofCopyin`, `+0x70 jal vmfault`), which
+  kallocs and maps a zeroed `W|U|R` page below the break. At `lazy = false` it never allocates (`vmfaultQuiet`); at
+  `lazy = true` a null kalloc stops the count at a page the key cannot locate (π gives `upermRw` to a mapped and to
+  a lazily absent page alike, G3's F6). So the class is `lazy = false`, as wait's (G1e).
+- **The kernel must say three more things**, none of which the user tier reads:
+  - copyin's success arm: the bytes read are READABLE (`V ∧ U`) in the table it hands back (`uvaRprefix P'`), today
+    only `umMapped P'` (page present, which includes the non-`U` guard page);
+  - consolewrite's post: the exact count (`consWriteCnt`: the prefix readable, a short count a multiple of 32 whose
+    chunk holds an unreadable byte), relayed by filewrite's and sys_write's posts as a pure conjunct (`fwConsCnt`);
+  - the page table's user leaves are READABLE (`U → R`, a sixth `uptWf` conjunct `uLeafR`). Without it a `U|X`
+    leaf without `R` is read by copyin (walkaddr tests `V ∧ U` only) but is `none` in `permOf` (`permLeaf` needs
+    `U ∧ R`), so the key could not see it. xv6 never makes such a leaf (uvmalloc `PTE_R|PTE_U|xperm`, vmfault
+    `W|U|R`, uvmcopy copies flags, uvmclear drops `U`), but no invariant says so.
+- **The key's image, view, break, lazy bit and descriptors do not move** (`usysMemOk`'s identity branch already says
+  so at write, at every lazy bit: the image is `writerImg`, a faulted page reads zero there too). Only `r` was free.
+  Write joins `usysDetQuiet` (moves nothing but a0); `usysMemOk` stays byte-identical.
+- **The row needs the descriptor table.** The class is "a0 names a WRITABLE CONSOLE descriptor in the key's table"
+  (pipe and inode writes are not functional), and `syscEvRow`/`syscEvOut`/`utEvOut` have no `sts`. Recommended: they
+  gain `sts`, write cites `{boot with act}` at every write ecall (G3's R3 pattern), and the fit carries
+  `r = usysWriteAns W.perm a1 a2`. The SYSCALL and USERTRAP texts move by that one argument.
+- **The step carries `wcon : Option Nat`** (`some (uwriteRd W.perm a1 n)` at a writable console a0, `none`
+  otherwise): the caller's own descriptor table and its own mapping of its own buffer, as `win`.
+- **The UART bytes are outside the theorem.** `NiStep` sees only exit and enter registers; the pushed bytes are
+  `.dev (.uartOut …)` events in `h` between them, attributable to no incarnation. Their content is the key's image
+  at `a1 .. a1 + r` (consolewrite's `consOutChain`), so it is key-functional, but stating it is a separate lane.
+- **Lanes:** G4a0 (`uLeafR` in `uptWf`) → G4a (the count: copyin's prefix, `consWriteCnt`, the relay; kernel only)
+  → G4b (the row, the class, the citation, the step, the law).
+
+**Findings.**
+- **F1 (the C, and what the count is).**
+  - `sys_write`: `argaddr(1,&p); argint(2,&n); if (argfd(0,0,&f) < 0) return -1; return filewrite(f,p,n)`.
+  - `filewrite`: `!writable → -1`; `n < 0 → -1`; `FD_DEVICE` at major `CONSOLE` → `devsw[1].write(1, addr, n)` =
+    `consolewrite`, its answer relayed untouched (`SpecFilewrite.writeConsArms`, `filewriteExtra`'s console arm).
+  - `consolewrite`: `while (i < n) { nn = min(32, n-i); if (either_copyin(buf,1,src+i,nn) == -1) break;
+    uartwrite(0,buf,nn); i += nn; } return i`. `uartwrite` loops until every byte is sent (it sleeps, no
+    `killed` test), so a batch is all-or-nothing.
+  - So every short count is a multiple of 32, and the failing chunk `[i, i+nn)` holds a byte copyin could not read
+    (`ProofConsolewrite.cw_why`: `d = i + e`, `e < nn ≤ 32`). With `d0` the first unreadable byte, the count is
+    `if d0 < n then 32 * (d0 / 32) else n` (`n ≥ 0`), `-1` at `n < 0`. `n = argZ a2 ∈ [-2^31, 2^31)`.
+  - `writeConsShort` today: `∃ d, k ≤ d ∧ d < n ∧ ¬ uvaRmapped P (ua + d)` (the chunk-locality and `k % 32 = 0`
+    are lost), and no arm says the copied prefix was readable. Both are needed to pin the count.
+- **F2 (copyin's readability, and why the success arm must move).**
+  - copyin's page step: `walkaddr` (V ∧ U at the leaf, `walkaddrRet`) or, at 0, `vmfault(…, read=1)`: `va ≥ psz → 0`;
+    `ismapped → 0` (a `V` leaf without `U`, the stack guard); else kalloc, memset, mappages `W|U|R`, or 0 on a null.
+  - `SpecCopyin`'s success arm says `umMapped P' srcva len` (each page PRESENT in `um`). That admits the guard page
+    (present, `U` clear), which copyin can never read. The truth is `uvaRmapped P'` per byte: walkaddr's leaf is `V ∧
+    U`, vmfault's is `W|U|R` (G1e's `co_vu_faultLeaf` for copyout is the same fact). So the success arm gains
+    `uvaRprefix P' srcva len` (twin of `uvaWprefix`), proved in `ProofCopyin`'s page step and relayed by
+    `SpecEitherCopyin`'s user branch.
+  - Readers of `COPYIN`/`EITHER_COPYIN`: `ProofEitherCopyin`, `ProofConsolewrite`, `WriteiDefs`/`WriteiBody`/
+    `WriteiLoop`/`WriteiMain`/`ProofWritei` (writei's user arm), `ProofPipewrite`, `ProofFetchaddr`, `EitherDefs`.
+    The new conjunct goes LAST in the success arm's `⌜⌝`, so their destructurings adapt (proof only); any call-site
+    wrapper that restates the post (`cw_either_copyin`, writei's) moves with it.
+- **F3 (the key reads readability; the `U → R` gap).**
+  - The key's readability: `πReadable π va := (π (va / 4096)).isSome` (`permOf`: a `U ∧ R` leaf, or a lazily live
+    page below `PGROUNDUP(sz)`).
+  - At `lazyFree` and `uptWf`: (⇐) `πReadable → uvaRmapped`: a `U ∧ R` leaf is `V ∧ U` (`isLeafPte`), and the lazy
+    fill is excluded by `lazyFree` (as `UkRunSysWrite.ukText_rmapped`). (⇒) `uvaRmapped → πReadable` needs the leaf's
+    `R`: FALSE for a `V|X|U` leaf without `R`, which `uptWf` admits (`uwkInv` excludes only `W` without `R`).
+  - The stop byte uses (⇐) only (kernel `¬ uvaRmapped P d` → key `¬ πReadable d`); the prefix uses (⇒). So the
+    count is key-functional only with `uLeafR` (every user leaf with `U` has `R`), true of every xv6 path: uvmalloc
+    maps `PTE_R|PTE_U|xperm` (exec via `flags2perm`, eager sbrk `PTE_W`), vmfault `W|U|R`, uvmcopy copies the parent
+    leaf's flags, uvmclear clears `U`, `uvmunmap` deletes. Trampoline/trapframe are not in `um`.
+  - Cheapest home: a sixth `uptWf` conjunct. Its constructors are central (`uptWf_insert`, both `uptWf_insertLeaf`,
+    `uptWf_clearU` ×2, `uptWf_delRun`, `uptWf_empty`, uvmcopy's), so the cost is one premise on the insert lemmas and
+    the destructuring sites (`hwf.2.2.2.2`, five-name `obtain`s), proof only, including a few `Uk*`/`User*` PROOFS
+    (`UkRun`, `UkRunSysDefs`, `UserFetchWf`); no statement but `uptWf`'s text and the insert lemmas' premises moves.
+  - `VmfaultQuiet` gains `lazyFree_rmapped_ext` (the copy's grown table reads nothing new at `lazyFree`, the twin of
+    `lazyFree_wmapped_ext`) and `lazyFree_rmapped_iff` (the bridge, at `uLeafR`).
+- **F4 (the lazy case: OUT).**
+  - At `lazy = true` a lazily absent page in the buffer IS faulted in (F2). Success: the page reads zero, and π
+    already says `upermRw` (readable), so the count is the key's. Failure (a `KNull act` in vmfault's kalloc or in
+    mappages' walk): copyin −1, and the count stops at the chunk holding the first byte of THAT page.
+  - Which page failed is not a function of `(key, ι)`: π gives `upermRw` to a mapped `W|U|R` page and to a lazily
+    absent one, so with two lazily live pages in the buffer the key cannot say where the null struck, and one cited
+    `KNull act` does not say either (G3's F6, the straddling status window). It would also need vmfault's 0 arm to
+    carry a reason (G3's F6: `(⌜¬ vmfaultQuietArm …⌝ -∗ kNullRcpt)`), which F2 of the fork lane did not give it.
+  - So the class is `lazy = false` (G1e's pattern). A lazy console write would need the lazily absent set in the
+    key (a new key component the trace does not carry) or a page index in ι. Not worth it now.
+- **F5 (the key's other components; `usysMemOk` stays byte-identical).**
+  - `usysMemOk`'s write case is the `else` branch: `M' = M ∧ π' = π ∧ szv' = szv ∧ lz' = lz` (`r` free). True at every
+    lazy bit: the key's image is `writerImg`-like (`umemLazy`: a lazily live byte reads 0, as a freshly faulted one),
+    and a faulted `W|U|R` leaf projects to `upermRw`, the lazy fill's own. `usysFdOk`'s `else`: `sts' = sts`;
+    `usysCwdOk`, `utChKept` (only fork/wait), `usysSeccOk`: identity.
+  - So write joins `usysDetQuiet` (getpid, uptime: "moves nothing but a0") and `usysDetRet` gains its answer;
+    `usysDet_of_rows`' quiet arm then serves it, given `r` from the fit.
+  - The user tier never reads `usysMemOk`'s write case: `UkWriteLeaf.uwrite_post_cons`/`uwrite_no_short` read
+    `writeConsArms` off the armed post (`spostAt … 16`, `ukPostRows_holds`), `UkRunSysWrite`/`UkFileIfaceWriteCons`
+    the deposit and the chain. With G4-R1's route `writeConsShort`/`writeConsArms`/`filewriteExtra`/`sysWriteArms`
+    are byte-identical, so no `Uk*`/`Ush*`/`User*` file changes, not even a proof (G4a0's `uptWf` proofs aside).
+- **F6 (the row needs `sts`).**
+  - The console test reads the descriptor table: `syscFdKey a0 sts = .open rb true (.device 1)`. Pipe and inode
+    writes are not functional (other processes' reads; the file system), and a read-only console descriptor answers
+    −1 from `filewrite` but nothing pins it today (`filewriteExtra` is `emp` there), so it stays out.
+  - `syscEvRow`/`syscEvOut`/`utEvOut` take `V V' img img' cs cs' ι`: no `sts` (`ProcPriv` holds `ofile` pointers, the
+    states are `fdFrags V.fdg sts`). `usysMemOk`/`uroundOk` have π and lz but no `sts`; `usysFdOk`/`utFdEcall` have
+    `sts` but no π. So no landed row can carry write's answer without growing.
+  - Route A (recommended): `syscEvRow` + `sts` and a write clause; `syscEvOut`/`utEvOut` + `sts` (the
+    `syscallPost`/`usertrapPost` texts pass the `sts` they already bind); write in `niCiting`, citing `{boot with act}`
+    at every write ecall; the filing (`urc_evRow`) reads it at `sts := W.fd` (the key's table, as `hfde`'s).
+    ~48 mechanical call sites (`syscEvOut_quiet`/`_cite`/`utEvOut_nonecall` in 13 files).
+  - Route B (alternative, getpid's): `SyscRows.write` (last field, `sts` in scope) → a new USERTRAP premise
+    `utWriteEcall` → a new filing row `niWriteRow` in `niFitEv` (as `niPidRow`) → the law. No citation, but three new
+    rows, a second filing path, and the `syscRows_*` builders gain `h16`. USERTRAP's text moves either way.
+- **F7 (the UART output, and what the theorem says).**
+  - `NiStep` holds the exit's and the enter's registers only (`exitView`/`enterView`); `utrace` files rounds at
+    their enters; `NiStep.output` is the enter. The `.dev (.uartOut i b)` events consolewrite's `uartwrite` emits lie
+    in `h` between the round's `uExit` and `uEnter`, interleaved with every other hart's, and carry no pid. The NI
+    ledger frames them (`NiAdequacy`: `niLedgerR … (h ++ [Obs.dev (.uartOut i b)])`). No NI root says anything
+    about them.
+  - Their content is key-functional: `consOutChain (genId+1) (writerImg V.upt M) ua Q 0 n` ties the `j`-th pushed
+    byte to `umemByte (writerImg …) (ua + j)`, and exactly `r` bytes are pushed (`Q r` back). At `lazy = false`
+    that is the key's `W.M` at `a1 .. a1 + r`.
+  - So G4's membership concerns `r` and the key only. An output conclusion ("q's console bytes are a function of q's
+    inputs") needs the bytes ATTRIBUTED to an incarnation, i.e. an export like M2-X's (the filing records the
+    round's pushed run), and their interleaving with other output is the schedule. That is a separate lane (NI-OUT,
+    under M3), not a cheap extra root.
+- **F8 (what console write declassifies: honest scope 10).** In the class (`lazy = false`, a0 a writable console
+  descriptor of the key's table), the answer is DERIVED from the step's inputs: the argument words a1/a2 (in the
+  exit) and `wcon` = the first offset of the caller's buffer its own permission view cannot read. `wcon` is a
+  ghost-key reading riding the step, like `win`: the caller's own descriptor table (the descriptors it opened, dup'd
+  or inherited) and its own mapping of its own buffer. Nothing is cited (`{boot with act}`), so `H` concedes
+  nothing new. Untouched: the kill channel (usertrap's post-syscall `killed`), the UART bytes (F7).
+
+**1. The kernel facts (G4a0, G4a).**
+
+    -- UPtDefs (G4a0)
+    /-- a user-accessible leaf is readable: xv6 maps every `U` page with `R` -/
+    def uLeafR (w : BitVec 64) : Prop := w &&& PTE_U ≠ 0#64 → w &&& PTE_R ≠ 0#64
+    -- uptWf: + (last) `∧ (∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uLeafR w)`
+    -- uptWf_insert / uptWf_insertLeaf: + `(hR : uLeafR u)` / `(hR : uLeafR perm-word)`; clearU/delRun/empty: proof
+    /-- the `d` bytes from `a` are readable (NI M2-G4; `uvaWprefix`'s twin) -/
+    def uvaRprefix (P : UPtd) (a : BitVec 64) (d : Nat) : Prop :=
+      ∀ i, i < d → uvaRmapped P (a + BitVec.ofNat 64 i).toNat
+
+    -- SpecCopyin.wp_copyin_body: the success arm (the -1 arm byte-identical)
+          ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k.regs 13#5).toNat old.length ∧
+              umMapped P' (k.regs 13#5).toNat old.length ∧ uvaRprefix P' (k.regs 13#5) old.length) ∨ …)
+    -- SpecEitherCopyin: the user branch's success arm + `∧ uvaRprefix P' (k.regs 12#5) old.length`
+
+    -- SpecConsolewrite (writeConsShort byte-identical)
+    /-- **consolewrite's count, exactly** (NI M2-G4): every byte before the count was read (readable in the table
+        the call hands back), and a short count is a chunk boundary whose 32-byte chunk holds a byte the entry
+        table cannot read -/
+    def consWriteCnt (P P' : UPtd) (ua : BitVec 64) (n : Int) (i : Nat) : Prop :=
+      uvaRprefix P' ua i ∧
+      ((i : Int) < n → i % 32 = 0 ∧ ∃ d : Nat, i ≤ d ∧ d < i + 32 ∧ (d : Int) < n ∧
+        ¬ uvaRmapped P (ua + BitVec.ofNat 64 d).toNat)
+    -- wp_consolewrite_eb_body's pure: + `∧ consWriteCnt V.upt P' (k.regs 11#5) n i`
+
+    -- SpecFilewrite (writeConsArms, filewriteExtra, filewriteArms byte-identical)
+    /-- the console arm's count, as a pure relay (NI M2-G4) -/
+    def fwConsCnt (st : FdState) (P P' : UPtd) (ua : BitVec 64) (n : Int) (r : BitVec 64) : Prop :=
+      ∀ rb : Bool, st = .open rb true (.device CONSOLE) →
+        (n < 0 → r = -1#64) ∧ (0 ≤ n → ∃ i : Nat, r = BitVec.ofNat 64 i ∧ (i : Int) ≤ n ∧ consWriteCnt P P' ua n i)
+    -- filewritePost's pure: `calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ fwConsCnt st V.upt P' (k.regs 11#5) n (R' 10#5)`
+    -- SpecSysWrite.sysWritePost's pure: + `∧ fwConsCnt (sysFdSt v V.ofile sts) V.upt P' v1 (argZ v2) (R' 10#5)`
+
+    -- VmfaultQuiet
+    theorem lazyFree_rmapped_ext {P P' : UPtd} {sz : BitVec 64} (hext : P.extSz sz P')
+        (hlf : lazyFree P.um sz) {va : Nat} (h : uvaRmapped P' va) : uvaRmapped P va
+    theorem lazyFree_rmapped_iff (P : UPtd) (sz : BitVec 64) (hwf : uptWf P) (hlf : lazyFree P.um sz) (va : Nat) :
+        uvaRmapped P va ↔ (permOf P.um sz.toNat (va / 4096)).isSome      -- (⇒) by uptWf's uLeafR
+
+- `ProofCopyin`: the page step returns walkaddr's `V ∧ U` leaf, or vmfault's fresh `W|U|R` one (the `+0x70`
+  success branch), and the loop threads the prefix across the growing tables (`uvaRmapped_mono`), as G1e's
+  `co_wpre_step`.
+- `ProofConsolewrite`: the loop invariant `cwLoop` gains `uvaRprefix P_i ua i ∧ (i % 32 = 0 ∨ i = n)`; the body extends
+  the prefix by the chunk's (`umMapped` no longer needed for it); `cw_why` returns the chunk-local witness (`d = i +
+  e`, `e < nn ≤ 32`). The exit at `i = n` has no short obligation; the break at the guard has `i % 32 = 0` since
+  `i < n` (a last chunk shorter than 32 ends the loop at `i = n`).
+- `FilewriteArms`/`ProofFilewrite`: the device arm relays consolewrite's `consWriteCnt` and the `n < 0` early −1;
+  every other arm discharges `fwConsCnt` vacuously (the state is not a writable console device). `ProofSysWrite`/
+  `SysWriteParts`: relay at `sysFdSt` (argfd's `none` is `.closed`, vacuous).
+- `SyscallArmsFd2.syscall_arm_write` (G4a): drops the conjunct (proof only).
+
+**2. The row (G4b; `UsysDet`).**
+
+    def USYS_write : Int := 16                                     -- UsysMemOk, beside USYS_read
+    /-- argument 2 as `argint` reads it (`usysRdcount`'s body at a word) -/
+    def usysCntW (a2 : BitVec 64) : Int := (BitVec.extractLsb' 0 32 a2).toInt
+    /-- the descriptor a0 names in the key's table (`SyscallArmsFdDefs.syscFdKey`'s text at the key) -/
+    def usysFdKey (fd : List FdState) (a0 : BitVec 64) : FdState :=
+      let i := (BitVec.extractLsb' 0 32 a0).toInt
+      if 0 ≤ i ∧ i < NOFILE then (fd[i.toNat]?).getD .closed else .closed
+    /-- a0 names a WRITABLE CONSOLE descriptor (major 1 = `CONSOLE`) -/
+    def uwriteCons (fd : List FdState) (a0 : BitVec 64) : Bool :=
+      match usysFdKey fd a0 with
+      | .open _ true (.device mj) => mj == 1
+      | _ => false
+    /-- the key can read the byte: its page is in the permission view -/
+    def πReadable (perm : Nat → Option UPerm) (va : Nat) : Bool := (perm (va / 4096)).isSome
+    /-- the first offset below `m` from `ua` the key cannot read, else `m` -/
+    def uwriteRd (perm : Nat → Option UPerm) (ua : BitVec 64) (m : Nat) : Nat :=
+      ((List.range m).find? fun j => !πReadable perm (ua + BitVec.ofNat 64 j).toNat).getD m
+    /-- consolewrite's count at a non-negative request `n` whose first unreadable offset is `d` -/
+    def consCnt (n d : Nat) : Nat := if d < n then 32 * (d / 32) else n
+    /-- the console write's answer, on the step's readings (the law's form) -/
+    def usysWriteAnsAt (a2 : BitVec 64) (d : Nat) : BitVec 64 :=
+      if usysCntW a2 < 0 then -1#64 else BitVec.ofNat 64 (consCnt (usysCntW a2).toNat d)
+    /-- the step's console reading at a key: `some` (the first unreadable offset) at a writable console a0 -/
+    def uwriteCon (W : Uvis) : Option Nat :=
+      if uwriteCons W.fd (tfW W.tf (tfArgIdx 0)) then
+        some (uwriteRd W.perm (tfW W.tf (tfArgIdx 1)) (usysCntW (tfW W.tf (tfArgIdx 2))).toNat)
+      else none
+    /-- ...and the answer at the key (ONE text for the kernel's cited row and the key's fit) -/
+    def usysWriteAns (perm : Nat → Option UPerm) (a1 a2 : BitVec 64) : BitVec 64 :=
+      usysWriteAnsAt a2 (uwriteRd perm a1 (usysCntW a2).toNat)
+
+    def usysDetQuiet (n : Int) : Prop := n = USYS_getpid ∨ n = USYS_uptime ∨ n = USYS_write
+    def usysDetClass (n : Int) : Prop :=
+      n = USYS_exit ∨ n = USYS_getpid ∨ n = USYS_uptime ∨ n = USYS_wait ∨ n = USYS_fork ∨ n = USYS_sbrk ∨
+        n = USYS_write
+    def usysDetClassAt (n : Int) (a0 : BitVec 64) (lz wc : Bool) : Prop :=
+      usysDetClass n ∧ (n = USYS_wait → a0 = 0#64 ∨ lz = false) ∧ (n = USYS_write → lz = false ∧ wc = true)
+    -- usysDetRet: + `else if n = USYS_write then usysWriteAns W.perm (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2))`
+    --   (before uptime); usysDet: text unchanged (write is quiet); usysDetRet_write
+    def usysIotaFits … :=                                                 -- + the fifth conjunct
+      … ∧ (n = USYS_write → r = usysWriteAns W.perm (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2)))
+    -- usysIotaFits_exists: + `hwr : n ≠ USYS_write`; _of_ev: + the write hypothesis at the class
+    -- usysDet_mem/_rows: the quiet arm (write's r is any word: usysMemOk's else branch); _of_rows: r from the fit
+
+    -- the bridge (pure; UsysDet or VmfaultQuiet)
+    theorem consCnt_of_rd {π : Nat → Option UPerm} {ua : BitVec 64} {n i : Nat}
+        (hpre : ∀ j, j < i → πReadable π (ua + BitVec.ofNat 64 j).toNat)
+        (hle : i ≤ n) (hcut : i < n → i % 32 = 0 ∧ ∃ d, i ≤ d ∧ d < i + 32 ∧ d < n ∧
+          πReadable π (ua + BitVec.ofNat 64 d).toNat = false) :
+        consCnt n (uwriteRd π ua n) = i
+
+- `usysDetClassAt` gains `wc`; every reader passes `uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))`
+  (`niDetRow`, `uexecRet_roundDet`, `usysIotaFits_of_ev`) or the step's `wcon.isSome` (`NiInClass`).
+- `UsysDet` §4's console bullet becomes "RE-ADMITTED BY G4", correcting "copyin does not fault it in" (F2/F4).
+
+**3. The cited row, the citation, the filing (G4b).**
+
+    -- SyscallDefs.syscEvRow: + `(sts : List FdState)` after `cs'`, + a fifth clause, last
+      (syscNum V = USYS_write → V.pvLazy = false → uwriteCons sts (tfW V.tf (tfArgIdx 0)) = true →
+        tfW V'.tf (tfArgIdx 0) = usysWriteAns (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2)))
+    -- SpecSyscall.syscEvOut V M sts V' M' cs cs' gn (+ sts); the quiet disjunct `∧ syscNum V ≠ USYS_write`;
+    --   syscEvOut_quiet + `(h16 : n ≠ 16 := by decide)`; syscallPost passes its `sts`
+    -- SpecUsertrap.utEvOut sc sep V M sts V' M' cs cs' (+ sts); quiet `≠ USYS_write`; usertrapPost passes `sts`
+    -- NiLedger.niCiting: + `∨ uvisNum (uvisRun W) = USYS_write`
+
+- **The arm** (`SyscallArmsFd2.syscall_arm_write`) takes the anchor (`syscallEnv_anchor`) and the post's
+  `fwConsCnt`, and cites `{boot with act}` (`niIotaLbs_act`) at every outcome. The write clause: at `V.pvLazy =
+  false` and a writable console a0 (`sysFdSt_key ha` makes `sysFdSt` the key's `syscFdKey` = `usysFdKey`),
+  `fwConsCnt` gives `r = ofNat i` with `consWriteCnt V.upt P' ua n i` (or `−1` at `n < 0`); `lazyFree_rmapped_ext`
+  moves the prefix from `P'` to `V.upt`, `lazyFree_rmapped_iff` to `permOf V.upt.um V.sz` (both directions:
+  the prefix by `uLeafR`, the stop byte by the fill's exclusion), and `consCnt_of_rd` gives `i = consCnt n (uwriteRd
+  …)`. `procPrivFd_facts` supplies `uptWf V.upt` and `V.pvLazy = false → lazyFree` (already in hand: `htb`).
+- **The filing.** `UserretClosedRows.urc_evRow` gains `hfd : W.fd = sts` (the USERTRAP instance's entry table, as
+  `hfde`) and the fifth conjunct, re-keyed to `uvisRun W` (`urc_a1_run`, an `a2` twin `urc_a2_run`, `hpi`, `hlz`);
+  `urc_niDetRow` passes it to `usysIotaFits_of_ev`; `UserretClosedRound`'s `rcases hcn` gains the fifth case.
+  `UexecApply.uexecRet_roundDet`'s `hcls` at `… (uvisRun W).lazy (uwriteCons (uvisRun W).fd …)`.
+- Arms that build `syscEvRow` by anonymous constructor (`SyscallArmsWait`/`Fork`/`Proc`/`Sbrk`) gain one absurd
+  conjunct (G3's deviation 3); `SyscallArmsFdDefs.syscall_ret_fd` gains `(h16 : n ≠ 16 := by decide)`.
+
+**4. The step and the law (`NiTrace`, G4b).**
+
+    inductive NiStep where
+      | origin (W0 : Uvis) (e : Obs)
+      | round (secc : BitVec 64) (lz : Bool) (win : Nat) (sz : Nat) (wcon : Option Nat) (x e : Obs)
+          (c : Option (Nat × UIota))
+    -- niStepOf: `.round W.secc W.lazy (uwaitWin …) W.sz (uwriteCon W) x e c`
+    -- NiStep.input: `.inr (secc, lz, win, sz, wcon, exitView x, positions)`
+    -- NiStep.obsInput: `.inr (secc, lz, wcon.isSome, exitView x)` (class membership reads it, as lz)
+    def gprsA2 (gs : List (BitVec 64)) : BitVec 64 := gs.getD 11 0#64            -- x12; gprsA2_tfGprs
+    -- niRoundLaw secc lz win sz wcon pid x e c: inside the resume block, + (last)
+          (gprsNum secc xg = USYS_write → lz = false → ∀ d, wcon = some d →
+            gprsA0 eg = usysWriteAnsAt (gprsA2 xg) d)
+    -- NiInClass: `usysDetClassAt (gprsNum secc xg) (gprsA0 xg) lz wcon.isSome`
+    -- niDetRow_write (usysDet_quiet, usysDetRet_write, ukeyEq_bump_a0, gprsA1/A2_tfGprs)
+    -- NiStep.classReading: + `∨ (gprsNum secc xg = USYS_write ∧ lz = false ∧ wcon.isSome)`;
+    --   output_eq_of: binders + wcon, `hans` + write
+
+- The four NI roots' statements are byte-identical (meaning grows through `NiStep`, `usysDetClass`, `niEntryOk`), as
+  at G1e/F3/G3. `xv6NiTwoRun` derives write's equal answers from equal inputs (now including `wcon`); `xv6NiTwoRunObs`
+  reads them as readings (G4-R5).
+- Honest scope 10 (console write) is F8's paragraph; scope 1's class sentence gains write.
+
+**5. The kernel route.**
+
+| Fact (made at) | Carried by | Arm | Key reading |
+|---|---|---|---|
+| the copied prefix is `V ∧ U` (walkaddr's leaf / vmfault's `W\|U\|R`) | copyin success `uvaRprefix P'` → either_copyin → consolewrite's `consWriteCnt` (accumulated over chunks) | `fwConsCnt` → write arm | `lazyFree_rmapped_ext` + `_iff` (`uLeafR`) → `πReadable` before the count |
+| the short chunk's unreadable byte (copyin's −1 reason, chunk-local) and `i % 32 = 0` | consolewrite's `consWriteCnt` | same | `_iff` (⇐) → `¬ πReadable` inside `[i, i+32)` |
+| `n < 0 → −1` (filewrite's early test) | `fwConsCnt` | same | `usysWriteAnsAt`'s first branch |
+| the descriptor is a writable console (`sysFdSt`) | the arm's `sts` (`syscFdAgree`, `sysFdSt_key`) | `syscEvRow` + `sts` | `uwriteCons W.fd a0` (`urc_evRow`'s `hfd`) |
+| `M' = M`, π, sz, lz, fd, cwd, ch, secc unmoved | landed: `usysMemOk`/`usysFdOk` else branches, `utChKept` | — | `usysDetQuiet` |
+
+**6. Lanes** (one `lake` at a time; per-lane gate `lake build Xv6 MachCSL` + `tools/ci/lint.sh` + no `sorry`;
+baselines in the same commit when they move).
+
+| Lane | Content | Files | Statements that move | Gate |
+|---|---|---|---|---|
+| **G4a0 `uLeafR`** | F3: `uLeafR`, `uptWf`'s sixth conjunct, the insert lemmas' premise, every builder/destructuring | `UPtDefs`, `UPtAllocLemmas`, `UPtFaultLemmas`, `VmfaultDefs`, `UPtUnmapLemmas`, `UPtPptLemmas`, `ProofUvmalloc`, `ProofVmfault`, `ProofUvmcopy`, `UserFetchWf`, `UkRun`, `UkRunSysDefs`, `VmfaultQuiet` (proofs), any `Kexec*` builder | `uptWf` (text), `uptWf_insert`/`uptWf_insertLeaf` (+`hR`). Byte-identical: every `Spec*` (they name `uptWf`), every `Uk*`/`Ush*`/`User*` statement | build + lint; `tcb.sh` (no root should move) |
+| **G4a the count** | §1: `uvaRprefix`; copyin's and either_copyin's success prefix; `consWriteCnt` on consolewrite; `fwConsCnt` on filewrite and sys_write; `lazyFree_rmapped_ext/_iff`; the write arm drops it | `UPtDefs`, `SpecCopyin`, `ProofCopyin`, `SpecEitherCopyin`, `ProofEitherCopyin`, `SpecConsolewrite`, `ProofConsolewrite`, `SpecFilewrite`, `FilewriteCalls`, `FilewriteArms`, `ProofFilewrite`, `SpecSysWrite`, `ProofSysWrite`/`SysWriteParts`, `VmfaultQuiet`, readers (proof): `WriteiDefs`/`Body`/`Loop`/`Main`, `ProofWritei`, `ProofPipewrite`, `ProofFetchaddr`, `EitherDefs`, `SyscallArmsFd2` | `COPYIN`, `EITHER_COPYIN`, `CONSOLEWRITE`, `FILEWRITE` (`filewritePost`), `SYSWRITE` (`sysWritePost`), call-site wrappers restating them. Byte-identical: `writeConsShort`, `writeConsArms`, `filewriteExtra`/`Arms`, `sysWriteArms`/`Ret`, `SyscRows`, `SYSCALL`, `USERTRAP`, every `Uk*`/`Ush*`/`User*` file | build + lint; `tcb.sh` (expect none) |
+| **G4b the row, the class, the law** | §2–§4 | `UsysMemOk` (`USYS_write` only), `UsysDet`, `SyscallDefs`, `SpecSyscall`, `SpecUsertrap`, `SyscallArmsFd2`, the arm files passing `sts` (`Chroot`, `Exec`, `FdDefs`, `Fork`, `Path`, `Proc`, `Sbrk`, `Wait`), `SyscallRet`, `UsertrapParts`, `UsertrapSysTail`, `NiLedger`, `UserretClosedRows`, `UserretClosedRound`, `UexecApply`, `NiTrace`, `NiAdequacy`/`LinkNiAdequacy` (proofs), `dead_allow.txt` | `usysDetQuiet`, `usysDetClass`, `usysDetClassAt` (+`wc`), `usysDetRet`, `usysIotaFits`, `_exists`/`_of_ev`, `usysDet_of_rows`, `syscEvRow` (+`sts`), `syscEvOut` (+`sts`), `syscEvOut_quiet`, `utEvOut` (+`sts`), the texts of `SYSCALL` (`syscallPost`) and `USERTRAP` (`usertrapPost`) by that argument, `niCiting`, `niDetRow`, `urc_evRow`, `uexecRet_roundDet`, `NiStep`, `niStepOf`, `input`/`obsInput`, `NiInClass`, `niRoundLaw`, `classReading`, `output_eq_of`. Byte-identical: `usysMemOk`, `uroundOk`, `SyscRows`, `uexecRetF`, every kernel Spec but those G4a moved, every `Uk*`/`Ush*`/`User*` file, the four NI roots | full `run_all.sh` + `reports`; `tcb.sh` (`--update` if `FileDefs`/`ConsoleInvDefs` enter a root's cone through `UsysDet`; `FdState` is already in `UsysMemOk`); `audit.sh` |
+
+Order: G4a0 → G4a → G4b (G4a's arm proof of `fwConsCnt` is independent of G4a0, but G4b's bridge needs both; G4a0
+may be merged into G4a). Estimates:
+- **G4a0:** ~13 files, mechanical: one premise on the insert lemmas (bit-vector facts for `R|U|xperm`, `W|U|R`, the
+  copied flags), ~20 destructuring sites.
+- **G4a:** ~20 files. Content: `ProofCopyin`'s page step returning the leaf's `V ∧ U` (~80 lines, G1e's copyout
+  twin), `ProofConsolewrite`'s loop invariant (prefix and `i % 32`, ~120), the relay through filewrite's three arms
+  and sys_write (~80), the readers' destructurings (~40).
+- **G4b:** ~25 files, ~48 mechanical `sts` call sites. Content: `uwriteRd`'s first-index lemmas and `consCnt_of_rd`
+  (~120 lines), the arm's bridge (~100), `NiStep`'s new field threaded through `NiTrace` (~120, mechanical).
+
+**RULINGS REQUESTED.**
+- **G4-R1 (the count and its Spec route).**
+  - Recommended: the count is `consCnt n (uwriteRd π a1 n)` (the 32-byte chunk boundary below the first unreadable
+    byte, `n` at a whole buffer, `−1` at `n < 0`). The kernel says it in ONE new pure predicate, `consWriteCnt P P'
+    ua n i`, on consolewrite's post, relayed as `fwConsCnt` by filewrite's and sys_write's posts; copyin and
+    either_copyin's success arms gain `uvaRprefix P'`. `writeConsShort`/`writeConsArms` byte-identical, so the
+    user tier is untouched, proofs included.
+  - Alternative (the brief's): strengthen `writeConsShort` in place (chunk-local witness, `k % 32 = 0`). It still
+    needs the prefix beside it (`writeConsArms` has no `P'`). `writeConsShort`'s readers: `ProofConsolewrite`
+    (`cw_why`), `FilewriteCalls` (restates consolewrite's post), `FilewriteArms` (`writeConsArms_of_cursor`), and
+    the user tier's `UkWriteLeaf.uwrite_no_short`, which DESTRUCTS it (its proof adapts; statements byte-identical).
+    More surface for the same row.
+- **G4-R2 (the `U → R` invariant).**
+  - Recommended: `uptWf` gains `uLeafR` as a sixth conjunct (lane G4a0). Every xv6 path satisfies it (F3); without
+    it the prefix cannot be read in π.
+  - Alternative: carry `uLeafR` beside `lazyFree` in the block's `pvLazy = false` claim. Fewer builders know the
+    leaf permission there (exec's and sbrk's rebuilds, fork's copy), so it is not cheaper, and it leaves `uptWf`
+    weaker than the code. Not recommended.
+- **G4-R3 (the class).**
+  - Recommended: `n = USYS_write → lz = false ∧ wc = true` (`usysDetClassAt n a0 lz wc`), `wc` = a0 names a writable
+    console descriptor of the key's table.
+  - Alternative: a lazy console write too. Not functional in `(key, ι)` when a fault's kalloc fails (F4); it would
+    need the lazily absent set in the key or a page index in ι, plus vmfault's 0-arm reason. Not now.
+- **G4-R4 (the row's route).**
+  - Recommended: Route A (F6): `syscEvRow`/`syscEvOut`/`utEvOut` gain `sts`, write cites `{boot with act}` at every
+    write ecall (`niCiting += write`, the quiet disjuncts exclude it), the fit's fifth conjunct. One uniform path
+    (fit → `niDetRow` → the resume block), G3's pattern; SYSCALL and USERTRAP texts move by one argument.
+  - Alternative: Route B, getpid's (`SyscRows.write` → USERTRAP `utWriteEcall` → `niFitEv`'s `niWriteRow`). No
+    citation and SYSCALL byte-identical, but three new rows and a second filing path; USERTRAP moves anyway.
+- **G4-R5 (what rides the step).**
+  - Recommended: ONE field `wcon : Option Nat` (`uwriteCon W`), in `NiStep.input`; `obsInput` gains `wcon.isSome`
+    (class membership reads it, as `lz`); `classReading` takes write's resumed a0 as a reading in the observable
+    form, like sbrk's.
+  - Alternative: two fields `wc : Bool`, `wrd : Nat` (G1e's style; one more binder everywhere), or `obsInput`
+    carries all of `wcon` and the observable form derives write's answer instead of reading it.
+- **G4-R6 (the UART output).**
+  - Recommended: out of G4. Record F7 in honest scope 10: the theorem is silent on `uartOut`; the bytes are the
+    key's image at `a1 .. a1 + r`. An output conclusion is a separate lane (NI-OUT under M3: attributing the pushed
+    run to the incarnation through the filing).
+  - Alternative: none cheap; a `uartOut` equality root needs that export.
+- **G4-R7 (`usysMemOk`).**
+  - Recommended: byte-identical. Its `else` branch already pins `M'`, π, sz and lz at write; `r` comes from the
+    fit (G3-R6's lesson).
+  - Alternative: a write branch in `usysMemOk` carrying `r`. It cannot (no `sts` there), and moving it moves the
+    user tier's table (W3's lesson). Not recommended.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
