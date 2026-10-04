@@ -56,6 +56,14 @@ growproc lends the block's counter to uvmalloc, so the block comes back at
 `V'.updEv k'` with `V.ev ≤ k'` (the lazy and failing paths at `k' = V.ev`);
 `sysSbrkOk` is unchanged.
 
+THE REASON (NI M2-G3a; the spurious `-1` closed): `sysSbrkOk`'s FAILED
+arm holds only at an overrun (`sysSbrkOverrun`: the key's break and `a0`)
+or at an allocating eager grow (`sysSbrkAllocs`), and the post's wand hands
+the `-1` that is not an overrun the decisive null kalloc's receipt
+`kNullRcpt γk k.proc` (growproc's, from uvmalloc's `0` arm).  The success
+arm is unchanged: success needs no receipt (it is the absence of a cited
+`KNull`).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecGrowproc
@@ -80,11 +88,22 @@ def sysSbrkArg (v : BitVec 64) : BitVec 64 := BitVec.signExtend 64 (BitVec.extra
 /-- `t == SBRK_EAGER` (`SBRK_EAGER = 1`, kernel/riscv.h). -/
 def sysSbrkEager (v1 : BitVec 64) : Prop := sysSbrkArg v1 = 1#64
 
+/-- The overrun test both paths make at a non-negative argument
+(growproc's `sz + n > TRAPFRAME` at `+0x36`, the lazy path's
+`addr + n > TRAPFRAME`) (NI M2-G3). -/
+def sysSbrkOverrun (V : ProcPriv) (v0 : BitVec 64) : Prop :=
+  0 ≤ (sysSbrkArg v0).toInt ∧ uvmMaxsz < V.sz.toNat + (sysSbrkArg v0).toInt.toNat
+
+/-- The eager grow runs uvmalloc's loop at least once: the only place
+sbrk allocates (NI M2-G3). -/
+def sysSbrkAllocs (V : ProcPriv) (v0 v1 : BitVec 64) : Prop :=
+  sysSbrkEager v1 ∧ 0 < (sysSbrkArg v0).toInt ∧ 0 < uvmaNp V.sz (V.sz + sysSbrkArg v0)
+
 /-- **What `sys_sbrk` did** (Rocq `sys_sbrk_ok`), with `v0`, `v1` the two
 syscall arguments and `r` the result. -/
 def sysSbrkOk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r : BitVec 64) : Prop :=
-  -- FAILED: nothing moved
-  (r = -1#64 ∧ V' = V ∧ M' = M) ∨
+  -- FAILED: nothing moved, and only for a reason (NI M2-G3)
+  (r = -1#64 ∧ V' = V ∧ M' = M ∧ (sysSbrkOverrun V v0 ∨ sysSbrkAllocs V v0 v1)) ∨
   -- SUCCEEDED: the old size, and one of the two paths ran
   (r = V.sz ∧
     (-- EAGER (t == SBRK_EAGER, or a shrink): growproc's own post at 0
@@ -113,7 +132,8 @@ def wp_sys_sbrk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (k' : Nat),
       ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ ⌜V.ev ≤ k'⌝ ∗
-      procPrivFd γ (procAddr j) pid (V'.updEv k') M') -∗
+      procPrivFd γ (procAddr j) pid (V'.updEv k') M' ∗
+      (⌜R' 10#5 = -1#64 ∧ ¬ sysSbrkOverrun V v0⌝ -∗ kNullRcpt γk k.proc)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

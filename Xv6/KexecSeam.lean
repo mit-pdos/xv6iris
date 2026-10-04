@@ -659,7 +659,14 @@ theorem kxc_call_uvmalloc (UA : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCt
   · ipureintro
     simpa using hcs
   try simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
-  iexact Hres
+  -- (NI M2-G3a) the `0` arm's loop fact and null receipt are dropped here
+  icases Hres with ⟨⟨%h0, HP, -⟩ | Hok⟩
+  · ileft
+    isplitl []
+    · ipureintro; exact h0.1
+    · iexact HP
+  · iright
+    iexact Hok
 
 end CallUvmalloc
 

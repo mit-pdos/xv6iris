@@ -41,21 +41,23 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
 
 ## §4 The rows found NOT functional in (key, ι-prefix), and what they depend on
 
-* **sbrk (12).**  (a) `SpecSysSbrk.sysSbrkOk`'s failure disjunct
-  (`r = -1 ∧ V' = V ∧ M' = M`) is UNCONDITIONAL on every path: the spec
-  licenses a spurious -1 even on the lazy grow and the shrink, whose real
-  outcome is a function of the key alone (the lazy grow fails iff it
-  overruns the user region; the shrink never fails).  Closing that is a
-  `SpecSysSbrk` move.  (b) The EAGER grow runs `uvmalloc`'s loop of
+* **sbrk (12).**  (a) CLOSED BY NI M2-G3a: `SpecSysSbrk.sysSbrkOk`'s
+  failure disjunct was UNCONDITIONAL on every path (a spurious -1 even on
+  the lazy grow and the shrink); it now holds only at an overrun
+  (`sysSbrkOverrun`, the key's break and a0) or an allocating eager grow
+  (`sysSbrkAllocs`).  (b) The EAGER grow runs `uvmalloc`'s loop of
   `kalloc`s -- one per data page AND one per missing page-table page, and
   which interior table pages are missing is a fact of the process's PAGE
   TABLE (what earlier, since-shrunk breaks left behind), which the key
   deliberately does not carry; the kallocs interleave with every other
   actor's under `kmem`, so no single ledger snapshot decides the outcome
   (it is a function of the positions of this round's `Kev`s in the whole
-  history).  (c) The receipts are not there: L3b's call sites drop
-  `kallocPostLed`'s receipt, and neither `growprocOk` nor `sysSbrkOk` carries
-  one.
+  history).  But every kalloc of the loop is fatal when null, so the
+  outcome is ONE decisive event, the round's last kalloc's `KNull act`; the
+  count is conceded through the histories (G3b).  (c) CLOSED BY NI M2-G3a:
+  uvmalloc's `0` arm carries the null kalloc's `kNullRcpt` (from the led
+  kalloc call, or `mappages`' walk), and growproc's and sys_sbrk's posts
+  hand it to a `-1` that is not an overrun (their wands).
 * **fork (1): RE-ADMITTED BY THE JOINT FORK LANE** (F1-F3, design "Joint
   fork lane design (2026-10-04)").  W3 found the pid unexplained (G2 closed
   it: the counter tie and first-ness make it `pidPick` of the cited pid

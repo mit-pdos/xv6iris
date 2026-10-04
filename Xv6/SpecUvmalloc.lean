@@ -18,6 +18,12 @@ the return pc; the proof frames it through for now (no callee takes it
 yet), so it returns at `ke`.  `[WchG GF]` joins the binders (Rocq's
 `!wchG Σ`), the counter's camera.
 
+THE REASON (NI M2-G3a): the `0` arm says the loop ran (`0 < uvmaNp`:
+the run was non-empty) and carries the null kalloc's receipt
+`kNullRcpt γk k.proc` -- every kalloc of the loop (a data page's, or a
+`walk` node's under `mappages`) is fatal, so the `0` is exactly one
+`KNull` of the running proc, the round's last kalloc.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.UPtDefs
@@ -62,7 +68,8 @@ def wp_uvmalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
-    ((⌜R' 10#5 = 0#64⌝ ∗ procPtAt P M) ∨
+    ((⌜R' 10#5 = 0#64 ∧ 0 < uvmaNp (k.regs 11#5) (k.regs 12#5)⌝ ∗ procPtAt P M ∗
+        kNullRcpt γk k.proc) ∨
      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
         ⌜uvmallocOk P P' M M' (k.regs 11#5) (k.regs 12#5) (k.regs 13#5) ∧
           R' 10#5 = (if (k.regs 12#5).toNat < (k.regs 11#5).toNat then k.regs 11#5 else k.regs 12#5)⌝ ∗

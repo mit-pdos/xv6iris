@@ -183,7 +183,7 @@ theorem sbrkArm_shape (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 
     (hok : sysSbrkOk V V' M M' v0 v1 r) :
     V'.tf = V.tf ∧ V'.ofile = V.ofile ∧ V'.fdg = V.fdg ∧ V'.chg = V.chg ∧ V'.cwd = V.cwd ∧
       V'.cwi = V.cwi ∧ V'.gen = V.gen ∧ V'.upt.tfp = V.upt.tfp ∧ V'.kstack = V.kstack ∧ V'.pvSecc = V.pvSecc := by
-  rcases hok with ⟨-, rfl, -⟩ | ⟨-, ⟨-, h0, hpos, hneg⟩ | ⟨-, -, -, hV, -, -⟩⟩
+  rcases hok with ⟨-, rfl, -, -⟩ | ⟨-, ⟨-, h0, hpos, hneg⟩ | ⟨-, -, -, hV, -, -⟩⟩
   · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
   · rcases lt_trichotomy (sysSbrkArg v0).toInt 0 with h | h | h
     · obtain ⟨-, hV, -⟩ := hneg h
@@ -217,7 +217,7 @@ theorem sbrkArm_ok (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r :
     unfold usysSbrkEager sysSbrkEager sysSbrkArg; rw [hv1]
   have hrsz : ∀ x : BitVec 64, x = V.sz → x = BitVec.ofNat 64 V.sz.toNat := by
     intro x hx; rw [hx]; simp
-  rcases hok with ⟨hr, rfl, rfl⟩ | ⟨hr, ⟨-, h0, hpos, hneg⟩ | ⟨hne, hnn, hbd, hV, hle, rfl⟩⟩
+  rcases hok with ⟨hr, rfl, rfl, -⟩ | ⟨hr, ⟨-, h0, hpos, hneg⟩ | ⟨hne, hnn, hbd, hV, hle, rfl⟩⟩
   · exact ⟨⟨sbrkArm_still _ _ _ hlen, fun _ => usysLazyKeep_refl _⟩, Or.inl ⟨hr, rfl⟩⟩
   · rcases lt_trichotomy (sysSbrkArg v0).toInt 0 with h | h | h
     · -- SHRINK
@@ -382,7 +382,8 @@ theorem syscall_arm_sbrk (SS : SYSSBRK)
   iapply hU
   iframe Hk Hkl Hka Hpriv Hpc
   k_next_e
-  iintro %spie2 %spp2 %R2 %- Hk Hpc ⟨%V', %M', %k', %hok, %hk', Hpriv⟩ %hcs
+  -- (NI M2-G3a) the `-1`'s null receipt is dropped here until G3b
+  iintro %spie2 %spp2 %R2 %- Hk Hpc ⟨%V', %M', %k', %hok, %hk', Hpriv, -⟩ %hcs
   obtain ⟨-, -, -, -, -, -, -, htfp, -⟩ := sbrkArm_shape V V' M M' v0 v1 _ hok
   k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
   k_norm_g at hcs
