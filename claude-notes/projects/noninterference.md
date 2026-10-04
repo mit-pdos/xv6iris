@@ -3440,7 +3440,9 @@ Order: G3a → G3b (G3b's arm reads G3a's wand). G3c, if ever, after G3b. Estima
   `uvmdRsz` ↔ `usysSbrkSz` bridge and `usysSbrkImg/Perm_iff`, ~150 lines), the arm's citation (~80), and
   `NiStep`'s new field threaded through `NiTrace` (~100, mechanical).
 
-**RULINGS REQUESTED.**
+****RULINGS G3-R1…R7 (2026-10-04, coordinator, all as recommended):** R1 a −1 from allocation cites the `KNull`, every other outcome cites `{boot with act}` (`¬ ι.kNull` on success; no success arm moves; R5's positive reason is built in since `[]` reads success); R2 sbrk in the class at every key, the kalloc/kfree counts conceded through H; R3 sbrk cites at every sbrk ecall; R4 `NiStep.round` gains `sz` in `input` only (the caller's own break, readable by `sbrk(0)`); R5 in place on `wp_uvmalloc_body`'s 0 arm, `growprocOk`/`wp_growproc_body`, `sysSbrkOk`/`wp_sys_sbrk_body` (exec's `kxc_call_uvmalloc` and the user tier byte-identical); R6 `usysIotaFits` gains `(szv', lz')` and `usysSbrkFitsAt`; R7 wait's lazy copyout NOT in G3 (G3c optional later, single-page windows only). Lanes G3a then G3b, one worktree, two commits.
+
+RULINGS REQUESTED.**
 - **G3-R1 (the allocator component: a cited `KNull` on −1, nothing on success).**
   - Recommended: `usysSbrkFails := overrun ∨ (allocs ∧ ι.kNull)`. Only an allocation −1 cites the decisive
     `KNull act`, and every other outcome cites `{boot with act}`.
