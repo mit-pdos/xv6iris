@@ -111,7 +111,7 @@ fallback (+0x40..+0x56) and the shared epilogue (+0x58..+0x62).
    niNamesHere` out of the park world, the cited prefixes' lower bounds
    `NiEvid.niIotaLbs`, the cited row `SyscallDefs.syscEvRow`), or (F5)
    wait's `-1` for the kill shot (NI M2-G1e: with nothing moved).  `SyscRows` is unchanged; every arm but
-   uptime's, wait's and fork's pays it by `syscEvOut_quiet`.
+   uptime's, wait's, fork's and (NI M2-G3) sbrk's pays it by `syscEvOut_quiet`.
 
 Imports only definitional files and the 22 entries' Spec files (the slot
 check).
@@ -464,7 +464,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- **THE ROUND'S LEDGER EVIDENCE** (NI M2-X2, design "M2-X design" §2(b)):
 the deposit beside the pure rows -- the number cites nothing (not uptime,
-wait or fork); or the arm cites era `k`'s ledgers at `ι` (the era's anchor
+wait, fork or -- NI M2-G3 -- sbrk); or the arm cites era `k`'s ledgers at `ι` (the era's anchor
 at its registered names, the cited prefixes' lower bounds, and the cited row
 `SyscallDefs.syscEvRow`); or (F5) wait answered `-1` for the kill shot,
 which usertrap's resume never takes -- (NI M2-G1e) with nothing moved: the
@@ -473,7 +473,8 @@ byte), so usertrap can cite the boot prefix for it at any status pointer.
 Persistent. -/
 def syscEvOut (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv) (M' : Nat → List (BitVec 8))
     (cs cs' : ExtTreeSet GName compare) (gn : GName) : IProp GF :=
-  iprop(⌜syscNum V ≠ USYS_uptime ∧ syscNum V ≠ USYS_wait ∧ syscNum V ≠ USYS_fork⌝ ∨
+  iprop(⌜syscNum V ≠ USYS_uptime ∧ syscNum V ≠ USYS_wait ∧ syscNum V ≠ USYS_fork ∧
+      syscNum V ≠ USYS_sbrk⌝ ∨
     (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
       niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' ι⌝) ∨
     (⌜syscNum V = USYS_wait ∧ syscA0 V' = -1#64 ∧ cs' = cs ∧ syscImg V' M' = syscImg V M⌝ ∗
@@ -485,18 +486,18 @@ instance syscEvOut_persistent (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' :
   unfold syscEvOut; infer_instance
 
 /-- **The deposit at a number that cites nothing** (NI M2-X2): every arm but
-uptime's, wait's and fork's (the hypotheses default by `decide` at the
-arm's literal number). -/
+uptime's, wait's, fork's and (NI M2-G3) sbrk's (the hypotheses default by
+`decide` at the arm's literal number). -/
 theorem syscEvOut_quiet (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (n : Int)
     (hnum : syscNum V = n) (h14 : n ≠ 14 := by decide) (h3 : n ≠ 3 := by decide)
-    (h1 : n ≠ 1 := by decide) :
+    (h1 : n ≠ 1 := by decide) (h12 : n ≠ 12 := by decide) :
     ⊢ syscEvOut (hlc := hlc) (GF := GF) V M V' M' cs cs' gn := by
   unfold syscEvOut
   ileft
   ipureintro
   rw [hnum]
-  exact ⟨h14, h3, h1⟩
+  exact ⟨h14, h3, h1, h12⟩
 
 /-- **The deposit at a citation** (NI M2-X2). -/
 theorem syscEvOut_cite (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)

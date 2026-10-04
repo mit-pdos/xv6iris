@@ -91,28 +91,44 @@ theorem urc_a0_run (W : Uvis) (V : ProcPriv) (hl : V.tf.length = 36) :
   show tfW (utSysTf (tfW W.tf tfEpcIdx) (urcV0 V W)) (tfArgIdx 0) = _
   rw [urc_sysTf_arg W V hl 0 (by decide), uvisRun_arg W 0 (by decide)]
 
+/-- (NI M2-G3) ...and its argument word 1 (sbrk's `t`). -/
+theorem urc_a1_run (W : Uvis) (V : ProcPriv) (hl : V.tf.length = 36) :
+    tfW (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)).tf (tfArgIdx 1) = tfW (uvisRun W).tf (tfArgIdx 1) := by
+  show tfW (utSysTf (tfW W.tf tfEpcIdx) (urcV0 V W)) (tfArgIdx 1) = _
+  rw [urc_sysTf_arg W V hl 1 (by decide), uvisRun_arg W 1 (by decide)]
+
 /-- **THE CITED ROW, RE-KEYED** (NI M2-X2, next to `urc_skey` / `urc_num`;
 NI M2-G1e): the dispatcher's `syscEvRow` at the record `syscall()` was
 called with, read at the trapped key's run projection and the key the round
 left -- wait's at the key's permission view, status pointer, lazy bit,
 children and image (`hpi`, `hlz`, `hch`, `hM`: the record's `permOf V.upt.um
 V.sz`, `pvLazy`, column and lazy image ARE the key's); (NI joint fork lane
-F3) fork's as `usysForkFitsAt` at the key's children. -/
+F3) fork's as `usysForkFitsAt` at the key's children; (NI M2-G3) sbrk's as
+`usysSbrkFitsAt` at the key's break (`hsz`), argument words and lazy bit. -/
 theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (ι : UIota)
     (hl : V.tf.length = 36) (hch : W.ch = cs) (hsc : W.secc = V.pvSecc)
     (hM : umemLazy V.upt V.sz.toNat Mp = W.M) (hpi : W.perm = permOf V.upt.um V.sz.toNat)
-    (hlz : W.lazy = V.pvLazy)
+    (hsz : W.sz = V.sz.toNat) (hlz : W.lazy = V.pvLazy)
     (hev : syscEvRow (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) V'
       (syscImg (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) Mp) (syscImg V' M') cs cs' ι) :
     (uvisNum (uvisRun W) = USYS_uptime → tfW V'.tf (tfArgIdx 0) = usysUptimeWord ι.ticks) ∧
     (uvisNum (uvisRun W) = USYS_wait → (tfW (uvisRun W).tf (tfArgIdx 0) = 0#64 ∨ (uvisRun W).lazy = false) →
       usysWaitFits (uvisRun W) ι (tfW V'.tf (tfArgIdx 0)) cs' (syscImg V' M')) ∧
-    (uvisNum (uvisRun W) = USYS_fork → usysForkFitsAt (uvisRun W).ch ι (tfW V'.tf (tfArgIdx 0)) cs') := by
+    (uvisNum (uvisRun W) = USYS_fork → usysForkFitsAt (uvisRun W).ch ι (tfW V'.tf (tfArgIdx 0)) cs') ∧
+    (uvisNum (uvisRun W) = USYS_sbrk →
+      usysSbrkFitsAt (uvisRun W).sz (tfW (uvisRun W).tf (tfArgIdx 0)) (tfW (uvisRun W).tf (tfArgIdx 1))
+        (uvisRun W).lazy ι (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy) := by
   have hnum := urc_num_run W V hl hsc
   have ha0 := urc_a0_run W V hl
-  obtain ⟨hu, hw, hf⟩ := hev
-  refine ⟨fun h => hu (hnum.trans h), fun h hcl => ?_, fun h => ?_⟩
+  obtain ⟨hu, hw, hf, hsb⟩ := hev
+  refine ⟨fun h => hu (hnum.trans h), fun h hcl => ?_, fun h => ?_, fun h => ?_⟩
+  rotate_right
+  · have h' := hsb (hnum.trans h)
+    rw [urc_a0_run W V hl, urc_a1_run W V hl] at h'
+    show usysSbrkFitsAt W.sz _ _ W.lazy ι _ _ _
+    rw [hsz, hlz]
+    exact h'
   rotate_left
   · obtain ⟨ha, hok, hnok⟩ := hf (hnum.trans h)
     refine ⟨ha, ?_⟩
@@ -168,10 +184,11 @@ theorem urc_niDetRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
   have hpidrow : sc = uecallScause →
       usysRetPid (uvisNum (uvisRun W)) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0)) W.pid := by
     intro h; rw [← hnr, ← hnum0, hpid]; exact hrp h
-  obtain ⟨hup, hw, hfk⟩ := urc_evRow W V Mp V' M' cs cs' ι hl hch hsc hM hpi hlz hev
+  obtain ⟨hup, hw, hfk, hsb⟩ := urc_evRow W V Mp V' M' cs cs' ι hl hch hsc hM hpi hsz hlz hev
   have hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0))
-      (uvisOf V' M' sts' gn cs' pid).ch (uvisOf V' M' sts' gn cs' pid).M ι :=
-    usysIotaFits_of_ev hcls.2 hup hw hfk
+      (uvisOf V' M' sts' gn cs' pid).ch (uvisOf V' M' sts' gn cs' pid).M (uvisOf V' M' sts' gn cs' pid).sz
+      (uvisOf V' M' sts' gn cs' pid).lazy ι :=
+    usysIotaFits_of_ev hcls.2 hup hw hfk hsb
   exact uexecRet_roundDet sc W (uvisOf V' M' sts' gn cs' pid) ι hlw (hgn.symm ▸ rfl) hpid.symm hchrow hfdrow
     hpidrow hr hsce hcls hfit
 

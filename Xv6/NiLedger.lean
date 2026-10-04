@@ -161,14 +161,16 @@ def niFit : Option (Nat × Obs) → Obs → Prop
         niWaitRow sc W W'
 
 /-- **A round must cite** (NI M2-X2, design §2(d)): an ecall at uptime,
-wait or fork -- the numbers whose answer the kernel read off a ledger. -/
+wait, fork or (NI M2-G3, ruling G3-R3) sbrk -- the numbers whose answer the
+kernel read off a ledger (sbrk's at every call: the boot prefix at the
+actor unless an allocating grow failed). -/
 def niCiting (sc : BitVec 64) (W : Uvis) : Prop :=
   sc = uecallScause ∧ (uvisNum (uvisRun W) = USYS_uptime ∨ uvisNum (uvisRun W) = USYS_wait ∨
-    uvisNum (uvisRun W) = USYS_fork)
+    uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_sbrk)
 
 /-- **M0'S ROW AT THE CITED ι** (NI M2-X2): at an ecall in the private class
 (at the key: NI M2-G1e, with the key's lazy bit; since NI joint fork lane F3
-fork at every key), the key the round resumed IS `usysDet` at the cited
+fork at every key, since NI M2-G3 sbrk at every key), the key the round resumed IS `usysDet` at the cited
 prefix (up to the kernel words, `ukeyEq`). -/
 def niDetRow (sc : BitVec 64) (W W' : Uvis) : Option (Nat × UIota) → Prop
   | some (_, ι) => sc = uecallScause →

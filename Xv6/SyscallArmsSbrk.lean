@@ -23,6 +23,16 @@
 
 The sbrk post's raised event count (permit sweep L1a) reaches the
 dispatcher's ∀-general post through `SyscallRet.SyscRows.updEv`.
+
+THE CITATION (NI M2-G3b, rulings G3-R1/R3): sbrk cites at EVERY ecall.  A
+`-1` that is not an overrun carries sys_sbrk's null receipt (G3a's wand),
+and the arm cites the allocator prefix ending in the actor's `KNull`; every
+other outcome cites the boot prefix at the actor, which reads SUCCESS
+(`¬ ι.kNull`) -- an overrun's `-1` is the key's.  The cited row is
+`UsysDet.usysSbrkFitsAt` at the entry's break, argument words and lazy bit
+(`sbrkArm_fits`, from `sysSbrkOk`: the shrink's `uvmdRsz` is
+`usysSbrkSz`'s, the lazy grow raises the bit, growproc keeps it);
+`syscArmSbrk_ev`.
 -/
 import Xv6.SyscallRet
 
@@ -272,6 +282,141 @@ theorem sbrkArm_ok (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r :
       · exact absurd (heag.1 hg) hne
       · rw [hsz] at hg; omega
 
+/-! ## §2b The cited row (NI M2-G3b) -/
+
+/-- sbrk's argument word, read back through `argint`, is a signed 32-bit
+value. -/
+theorem sbrkArgW_range (a : BitVec 64) :
+    -2 ^ 31 ≤ (sbrkArgW a).toInt ∧ (sbrkArgW a).toInt < 2 ^ 31 := by
+  unfold sbrkArgW
+  rw [BitVec.toInt_signExtend_of_le (by decide)]
+  have h1 := BitVec.toInt_lt (x := BitVec.extractLsb' 0 32 a)
+  have h2 := BitVec.le_toInt (BitVec.extractLsb' 0 32 a)
+  simp only [Nat.reduceSub] at h1 h2
+  omega
+
+/-- A non-negative step from a break in the user region does not wrap. -/
+theorem sbrkArm_sum (a b : BitVec 64) (ha : a.toNat ≤ uvmMaxsz) (hb : 0 ≤ b.toInt) :
+    (a + b).toNat = a.toNat + b.toInt.toNat := by
+  have hc := BitVec.toInt_eq_toNat_cond b
+  have hm : uvmMaxsz < 2 ^ 62 := by decide
+  have hbl := b.isLt
+  rw [BitVec.toNat_add]
+  split at hc
+  · rw [Nat.mod_eq_of_lt (by omega)]; omega
+  · omega
+
+/-- A break in the user region is not the `-1` answer. -/
+theorem sbrkArm_sz_ne (sz : BitVec 64) (hs : sz.toNat ≤ uvmMaxsz) : sz ≠ -1#64 := by
+  intro h
+  rw [h] at hs
+  revert hs
+  unfold uvmMaxsz
+  decide
+
+/-- **The shrink's break** (NI M2-G3b): `uvmdealloc`'s `uvmdRsz` at a
+negative argument is `usysSbrkSz`'s -- `sz + n`, or `sz` itself when the
+64-bit add wraps below 0. -/
+theorem sbrkArm_shrink_sz (sz n : BitVec 64) (hs : sz.toNat ≤ uvmMaxsz) (hn : n.toInt < 0)
+    (hlo : -2 ^ 31 ≤ n.toInt) :
+    ((uvmdRsz sz (sz + n)).toNat : Int) =
+      if 0 ≤ (sz.toNat : Int) + n.toInt then (((sz.toNat : Int) + n.toInt).toNat : Int) else sz.toNat := by
+  have hc := BitVec.toInt_eq_toNat_cond n
+  have hm : uvmMaxsz < 2 ^ 62 := by decide
+  have hadd := BitVec.toNat_add sz n
+  unfold uvmdRsz
+  split at hc <;> split <;> split <;> omega
+
+/-- **sbrk's cited row from its post** (NI M2-G3b): `sysSbrkOk` at a
+citation whose `KNull` reading is exactly "a `-1` that is not an overrun"
+gives `usysSbrkFitsAt` at the entry's break, words and lazy bit -- the
+answer, the break after and the lazy bit after. -/
+theorem sbrkArm_fits (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r : BitVec 64) (ι : UIota)
+    (hok : sysSbrkOk V V' M M' v0 v1 r) (hszb : V.sz.toNat ≤ uvmMaxsz)
+    (hk : ι.kNull ↔ (r = -1#64 ∧ ¬ sysSbrkOverrun V v0)) :
+    usysSbrkFitsAt V.sz.toNat v0 v1 V.pvLazy ι r V'.sz.toNat V'.pvLazy := by
+  have hrg := sbrkArgW_range v0
+  have harg : sysSbrkArg v0 = sbrkArgW v0 := rfl
+  have heag : sysSbrkEager v1 ↔ sbrkEagerW v1 := Iff.rfl
+  have hov : sysSbrkOverrun V v0 ↔ usysSbrkOverrun V.sz.toNat v0 := by
+    unfold sysSbrkOverrun usysSbrkOverrun
+    rw [harg]
+    constructor <;> intro h <;> omega
+  unfold usysSbrkFitsAt usysSbrkAns usysSbrkSz usysSbrkLz
+  rcases hok with ⟨hr, hV, -, hwhy⟩ | ⟨hr, hpath⟩
+  · -- FAILED: an overrun (the key), or an allocating grow with its cited `KNull`
+    have hf : usysSbrkFails V.sz.toNat v0 v1 ι := by
+      by_cases ho : sysSbrkOverrun V v0
+      · exact Or.inl (hov.mp ho)
+      · refine Or.inr ⟨?_, hk.mpr ⟨hr, ho⟩⟩
+        rcases hwhy with h | ⟨he, hp, hnp⟩
+        · exact absurd h ho
+        · have hu := (uvmaNp_pos_iff _ _).mp hnp
+          rw [sbrkArm_sum V.sz _ hszb (by omega)] at hu
+          rw [harg] at hp hu
+          exact ⟨heag.mp he, hp, by omega⟩
+    simp only [hf, if_true, not_true_eq_false, _root_.false_and, if_false]
+    rw [hV]
+    exact ⟨hr, rfl, rfl⟩
+  · -- SUCCEEDED: no overrun, and the boot reading
+    have hnk : ¬ ι.kNull := fun h => sbrkArm_sz_ne V.sz hszb (hr.symm.trans (hk.mp h).1)
+    have hno : ¬ usysSbrkOverrun V.sz.toNat v0 := by
+      intro ho
+      unfold usysSbrkOverrun at ho
+      rw [← harg] at ho
+      rcases hpath with ⟨-, hz, hpos, hneg⟩ | ⟨-, -, hbd, -, -, -⟩
+      · rcases Int.lt_trichotomy (sysSbrkArg v0).toInt 0 with h | h | h
+        · omega
+        · omega
+        · rcases hpos h with ⟨h0, -⟩ | ⟨-, hbd, -, -⟩
+          · exact absurd h0 (by decide)
+          · omega
+      · omega
+    have hnf : ¬ usysSbrkFails V.sz.toNat v0 v1 ι := fun h => h.elim hno (fun h => hnk h.2)
+    simp only [hnf, if_false, not_false_eq_true, _root_.true_and]
+    refine ⟨by rw [hr]; simp, ?_⟩
+    rcases hpath with ⟨hpe, hz, hpos, hneg⟩ | ⟨hne, hnn, hbd, hV, -, -⟩
+    · -- growproc at 0: the shrink, `n = 0`, or the eager grow
+      rcases Int.lt_trichotomy (sysSbrkArg v0).toInt 0 with h | h | h
+      · obtain ⟨-, hV, -⟩ := hneg h
+        have hsz : V'.sz = uvmdRsz V.sz (V.sz + sysSbrkArg v0) := by rw [hV]
+        have hlz : V'.pvLazy = V.pvLazy := by rw [hV]
+        rw [hlz, harg] at *
+        refine ⟨?_, by rw [if_neg (by omega)]⟩
+        have := sbrkArm_shrink_sz V.sz (sbrkArgW v0) hszb h hrg.1
+        rw [← hsz] at this
+        split at this <;> rename_i hc <;> simp only [hc, if_true, if_false] <;> omega
+      · obtain ⟨-, rfl, -⟩ := hz h
+        rw [harg] at h
+        refine ⟨by rw [if_pos (by omega)]; omega, ?_⟩
+        have he : sbrkEagerW v1 := by
+          rcases hpe with he | he
+          · exact heag.mp he
+          · rw [harg] at he; omega
+        rw [if_neg (fun hc => hc.1 he)]
+      · rcases hpos h with ⟨h0, -⟩ | ⟨-, hbd, hV, -⟩
+        · exact absurd h0 (by decide)
+        have hsz : V'.sz = V.sz + sysSbrkArg v0 := by rw [hV]
+        have hlz : V'.pvLazy = V.pvLazy := by rw [hV]
+        have hadd := sbrkArm_sum V.sz (sysSbrkArg v0) hszb (by omega)
+        have he : sbrkEagerW v1 := by
+          rcases hpe with he | he
+          · exact heag.mp he
+          · omega
+        rw [harg] at h hadd
+        refine ⟨?_, by rw [hlz, if_neg (fun hc => hc.1 he)]⟩
+        rw [if_pos (by omega), hsz, harg, hadd]
+        omega
+    · -- the lazy grow: the break rises, the bit is raised
+      have hsz : V'.sz = V.sz + sysSbrkArg v0 := by rw [hV]
+      have hlz : V'.pvLazy = true := by rw [hV]
+      have hadd := sbrkArm_sum V.sz (sysSbrkArg v0) hszb hnn
+      rw [harg] at hnn hadd
+      refine ⟨?_, ?_⟩
+      · rw [if_pos (by omega), hsz, harg, hadd]
+        omega
+      · rw [hlz, if_pos ⟨fun hc => hne (heag.mpr hc), hnn⟩]
+
 /-- **The rows of sbrk's arm** (Rocq `sysc_arm_sbrk`'s premises of
 `sysc_ret_tail`, `sysc_mem_ok_sbrk`): the block back at sys_sbrk's record
 with `a0` stored. -/
@@ -330,6 +475,57 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- **sbrk's citation** (NI M2-G3b, rulings G3-R1/R3): at EVERY sbrk ecall.
+A `-1` that is not an overrun hands over sys_sbrk's null receipt and the
+arm cites the allocator prefix ending in the actor's `KNull`; every other
+outcome cites the boot prefix at the actor (success is the ABSENCE of a
+cited `KNull`; an overrun's `-1` is the key's).  The row is `sbrkArm_fits`
+at the record the call left (`V'`: the answer stored, the break and the
+lazy bit `sysSbrkOk`'s `V2`'s). -/
+theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (V' : ProcPriv)
+    (M' : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (gn : GName) (act : BitVec 64) (ke : Nat)
+    (v0 v1 r : BitVec 64) (hn : syscNum V = 12) (hw0 : tfW V.tf (tfArgIdx 0) = v0)
+    (hw1 : tfW V.tf (tfArgIdx 1) = v1) (hszb : V.sz.toNat ≤ uvmMaxsz)
+    (hok : sysSbrkOk V V2 M M2 v0 v1 r) (ha : syscA0 V' = r) (hsz : V'.sz = V2.sz)
+    (hlz : V'.pvLazy = V2.pvLazy) :
+    MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
+      (⌜r = -1#64 ∧ ¬ sysSbrkOverrun V v0⌝ -∗ kNullRcpt fsReadyKmem act) -∗
+      |==> syscEvOut (hlc := hlc) V M V' M' cs cs gn := by
+  have hrow : ∀ ι : UIota, (ι.kNull ↔ (r = -1#64 ∧ ¬ sysSbrkOverrun V v0)) →
+      syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs ι := by
+    intro ι hk
+    refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
+      fun h' => absurd (hn.symm.trans h') (by decide), fun _ => ?_⟩
+    rw [hw0, hw1, hsz, hlz]
+    show usysSbrkFitsAt _ _ _ _ _ (syscA0 V') _ _
+    rw [ha]
+    exact sbrkArm_fits V V2 M M2 v0 v1 r ι hok hszb hk
+  iintro #Ha Hw
+  by_cases hneg : r = -1#64 ∧ ¬ sysSbrkOverrun V v0
+  · -- the decisive `KNull`: cite it
+    ihave Hk := Hw $$ %hneg
+    unfold kNullRcpt ledReceipt
+    icases Hk with ⟨%hk, #Hk, %-⟩
+    ihave #Hk' := (show ledLb (GF := GF) fsReadyKmem.pend (hk ++ [.KNull act]) ⊢
+        ((niNamesHere (GF := GF)).getD 3 0) ↪◯ML (hk ++ [.KNull act]) from .rfl) $$ Hk
+    imod niIotaLbs_kev (GF := GF) (niNamesHere (GF := GF)) (hk ++ [.KNull act]) act $$ Hk' with #Hl
+    imodintro
+    iapply syscEvOut_cite V M V' M' cs cs gn ke { UIota.boot with kev := hk ++ [.KNull act], act := act }
+      (hrow _ ?_) $$ Ha Hl
+    have hnull : UIota.kNull { UIota.boot with kev := hk ++ [.KNull act], act := act } := by
+      show (hk ++ [Kev.KNull act]).getLast? = some (.KNull act)
+      simp
+    exact ⟨fun _ => hneg, fun _ => hnull⟩
+  · -- every other outcome: the boot prefix at the actor (no `KNull` read)
+    iclear Hw
+    imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
+    imodintro
+    iapply syscEvOut_cite V M V' M' cs cs gn ke { UIota.boot with act := act } (hrow _ ?_) $$ Ha Hl
+    have hnn : ¬ UIota.kNull { UIota.boot with act := act } := by
+      show ¬ ([] : List Kev).getLast? = some (.KNull act)
+      simp
+    exact ⟨fun h => absurd h hnn, fun h => absurd h hneg⟩
+
 set_option maxHeartbeats 4000000 in
 /-- **Arm 12, `sys_sbrk`** (Rocq `sysc_arm_sbrk`; the whole block, D16). -/
 theorem syscall_arm_sbrk (SS : SYSSBRK)
@@ -363,7 +559,7 @@ theorem syscall_arm_sbrk (SS : SYSSBRK)
   have hprocK : (((k.withSpie spie spp).pushed 4).withRegs R).proc = procAddr j := hproc
   have hnoffK : (((k.withSpie spie spp).pushed 4).withRegs R).noff = 0 := hnoff
   icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
-  icases procPrivFd_facts γ (procAddr j) pid V M $$ Hpriv with ⟨Hpriv, %⟨-, hbelow, -, -⟩⟩
+  icases procPrivFd_facts γ (procAddr j) pid V M $$ Hpriv with ⟨Hpriv, %⟨hszb, hbelow, -, -⟩⟩
   icases sbrkArm_pageLen γ (procAddr j) pid V M $$ Hpriv with ⟨Hpriv, %hlen⟩
   obtain ⟨v0, hv0⟩ : ∃ v, V.tf[tfArgIdx 0]? = some v :=
     ⟨_, List.getElem?_eq_getElem (by rw [hl]; decide)⟩
@@ -382,15 +578,27 @@ theorem syscall_arm_sbrk (SS : SYSSBRK)
   iapply hU
   iframe Hk Hkl Hka Hpriv Hpc
   k_next_e
-  -- (NI M2-G3a) the `-1`'s null receipt is dropped here until G3b
-  iintro %spie2 %spp2 %R2 %- Hk Hpc ⟨%V', %M', %k', %hok, %hk', Hpriv, -⟩ %hcs
-  obtain ⟨-, -, -, -, -, -, -, htfp, -⟩ := sbrkArm_shape V V' M M' v0 v1 _ hok
+  iintro %spie2 %spp2 %R2 %- Hk Hpc ⟨%V', %M', %k', %hok, %hk', Hpriv, Hw⟩ %hcs
+  obtain ⟨htf, -, -, -, -, -, -, htfp, -⟩ := sbrkArm_shape V V' M M' v0 v1 _ hok
   k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
   k_norm_g at hcs
   have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
   have hs2' : R2 18#5 = pageAddr V'.upt.tfp := by rw [htfp]; exact hcs.2.2.2.1.trans hs2
   have hrows := syscRows_sbrk V V' M M' sts cs pid v0 v1 (R2 10#5) hn12 (by rw [hl]; decide) hw0 hw1
     hok hlen hbelow
+  -- (NI M2-G3b) the citation, at every sbrk: the `-1`'s null receipt or the
+  -- boot prefix at the actor
+  icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
+  iapply wpLoop_bupd
+  imod syscArmSbrk_ev V V' M M' (syscStore (V'.updEv k') (R2 10#5)) M' cs gn (procAddr j) ke v0 v1 (R2 10#5)
+    hn12 hw0 hw1 hszb hok (syscStore_a0 _ _ (by show tfArgIdx 0 < V'.tf.length; rw [htf, hl]; decide))
+    rfl rfl $$ Hanc [Hw] with #Hev
+  · rw [← hproc]
+    iintro %h
+    iapply Hw
+    ipureintro
+    exact ⟨h.1.trans (by decide), h.2⟩
+  imodintro
   unfold syscallRet syscallAddr at *
   -- the block at sbrk's raised event count (permit sweep L1a): the rows do
   -- not read it (`SyscRows.updEv`)
@@ -405,7 +613,7 @@ theorem syscall_arm_sbrk (SS : SYSSBRK)
   · iapply syscForkOut_ne; rw [hn12]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn12]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hn12
+  · iexact Hev
 
 end
 

@@ -343,7 +343,7 @@ def utEvOut (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) : IProp GF :=
   iprop(⌜sc = uecallScause⌝ -∗
     (⌜syscNum (utSysRec sep V) ≠ USYS_uptime ∧ syscNum (utSysRec sep V) ≠ USYS_wait ∧
-        syscNum (utSysRec sep V) ≠ USYS_fork⌝ ∨
+        syscNum (utSysRec sep V) ≠ USYS_fork ∧ syscNum (utSysRec sep V) ≠ USYS_sbrk⌝ ∨
       (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
         niIotaLbs (niNamesHere (GF := GF)) ι ∗
         ⌜syscEvRow (utSysRec sep V) V' (syscImg (utSysRec sep V) M) (syscImg V' M') cs cs' ι⌝)))

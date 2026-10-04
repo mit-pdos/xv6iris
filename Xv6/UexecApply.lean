@@ -19,7 +19,8 @@ round resumed.  Everything here is what that re-keying needs:
 * §5 THE FUNCTIONAL ROWS (NI M0 / M2-W3, grown by M2-G1d and M2-G1e,
   `UsysDet`): `round_det` -- at a class number AT THE KEY
   (`usysDetClassAt`: wait at a null status pointer or with the key's lazy
-  bit off; fork at every key, NI joint fork lane F3) the round's actual
+  bit off; fork at every key, NI joint fork lane F3; sbrk at every key, NI
+  M2-G3) the round's actual
   resume key IS `usysDet` at the round's
   ι-prefix (`uexecRet_roundDet`, at the ι the round CITES: NI M2-X's
   `UserretClosedRows.urc_niDetRow`; the answer, children set and image fit
@@ -557,7 +558,8 @@ generation and children rows) and the receipt-derived fact `hfit` (uptime's
 count; wait's answer, children set and image at the family ledger's reading
 through the key's status window -- the kernel's window is turned into the
 key's at the arm, `SyscallArmsWait.syscArmWait_win`, so this is pure on the
-keys).  Exit's arm is empty (`uroundOk_exit`).  The equality is the KEY's
+keys; (NI M2-G3) sbrk's answer, break and lazy bit, `usysSbrkFitsAt` at
+the resumed key's `W'.sz`/`W'.lazy`).  Exit's arm is empty (`uroundOk_exit`).  The equality is the KEY's
 (`UsysDet` deviation 3). -/
 theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf.length = 36)
     (hgn : W'.gen = W.gen) (hpidk : W'.pid = W.pid)
@@ -570,13 +572,13 @@ theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf
       W'.lazy W'.secc)
     (hsc : sc = uecallScause)
     (hcls : usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy)
-    (hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW W'.tf (tfArgIdx 0)) W'.ch W'.M ι) :
+    (hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW W'.tf (tfArgIdx 0)) W'.ch W'.M W'.sz W'.lazy ι) :
     ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ι) W' := by
   subst hsc
   rcases uroundOk_ecall hr with ⟨hexec, -, -⟩ | ⟨hnex, r, hb, hm, hc, hs⟩
   · change uvisNum (uvisRun W) = USYS_exec at hexec
     exfalso
-    rcases hcls.1 with h | h | h | h | h <;> rw [h] at hexec <;> exact absurd hexec (by decide)
+    rcases hcls.1 with h | h | h | h | h | h <;> rw [h] at hexec <;> exact absurd hexec (by decide)
   · change uvisNum (uvisRun W) ≠ USYS_exit at hnex
     have hres := usysDetClass_resumes hcls.1 hnex
     obtain ⟨hb1, hb2⟩ := hb
@@ -623,7 +625,8 @@ theorem uexecRetContF_det (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : U
     iintro H %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz' %secc' %hm %hfd %_ %hc %hg %hpid %_ %hs %hch Hsp
     have hup : n = USYS_uptime → usysUptimeRet r := fun hu => by
       subst hu; exact usysMemOk_uptimeRet hm
-    obtain ⟨ι, hfit⟩ := usysIotaFits_exists (W := W) (cs' := cs') (M' := M') hup h3 hf
+    obtain ⟨ι, hfit⟩ := usysIotaFits_exists (W := W) (cs' := cs') (M' := M') (szv' := szv') (lz' := lz')
+      hup h3 hf h12
     obtain ⟨hM, -, -⟩ := usysMemOk_quiet h7 h12 h3 h4 h5 h8 hm
     have hfd' := usysFdOk_quiet hcl hdp hop h4 hfd
     have hc' := usysCwdOk_quiet hcd hc

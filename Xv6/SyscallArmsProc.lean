@@ -137,7 +137,7 @@ theorem syscall_arm_uptime (SU : SYSUPTIME)
   have hev : syscEvRow V (syscStore V (R2 10#5)) (syscImg V M) (syscImg (syscStore V (R2 10#5)) M) cs cs
       { UIota.boot with ticks := nt, act := procAddr j } := by
     refine ⟨fun _ => ?_, fun h => absurd (hn14.symm.trans h) (by decide),
-      fun h => absurd (hn14.symm.trans h) (by decide)⟩
+      fun h => absurd (hn14.symm.trans h) (by decide), fun h => absurd (hn14.symm.trans h) (by decide)⟩
     show syscA0 (syscStore V (R2 10#5)) = _
     rw [syscStore_a0 V _ (by rw [hl]; decide)]; exact hupw
   unfold syscallRet syscallAddr at *

@@ -23,11 +23,13 @@ its observable form, and the strong instance.
   exit's registers through a mask), `NiPos`/`UIota.pos` (a citation's
   POSITIONS: the era, the cited ledger lengths -- the slot ledger's since NI
   joint fork lane F3 --, the tick count, the actor),
-  `NiStep.input` (keys, masks, exits and positions), `usysWaitAns`.
+  `NiStep.input` (keys, masks, exits and positions), `usysWaitAns`, (NI
+  M2-G3) `gprsA1` (sbrk's second argument word).
 * §4 THE CLASS LAW `NiClassLaw`, and `niOk_classLaw` (pure: from `niOk`,
-  the uptime, wait and (NI joint fork lane F3) fork answers read off M0's
-  row at the cited ι, `niDetRow` -- `usysDet_quiet`/`usysDetRet_uptime`/
-  `usysDet_wait`/`usysDet_fork`, `niDetRow_fork`; `niForkRow` is retired).
+  the uptime, wait, (NI joint fork lane F3) fork and (NI M2-G3) sbrk answers
+  read off M0's row at the cited ι, `niDetRow` -- `usysDet_quiet`/
+  `usysDetRet_uptime`/`usysDet_wait`/`usysDet_fork`/`usysDet_sbrk`,
+  `niDetRow_fork`/`niDetRow_sbrk`; `niForkRow` is retired).
 * §5 the chain: `niTraceChain H tr` (every citation of the trace is below
   `H` at its era), `niTraceChain_of` (from `NiLedger.niChain`), and
   `niBelow_pos` (equal-length prefixes of one list are equal: equal
@@ -43,8 +45,9 @@ its observable form, and the strong instance.
 ## Honest scope
 
 1. **The class is {exit, getpid, uptime} (M2-W3), wait at a null status
-   pointer (NI G1d) or of a lazy-free process (NI M2-G1e), and fork at
-   every key (NI joint fork lane F3, ruling JF-R2)**
+   pointer (NI G1d) or of a lazy-free process (NI M2-G1e), fork at
+   every key (NI joint fork lane F3, ruling JF-R2), and sbrk at every key
+   (NI M2-G3, ruling G3-R2; scope 9)**
    (`UsysDet.usysDetClassAt`); every other ecall's enter is UNCONSTRAINED by
    the law, and the two-run corollaries assume the incarnation's ecalls are
    all in the class.  The
@@ -136,6 +139,31 @@ its observable form, and the strong instance.
    The reason is the KERNEL's (it decides which ι the arm may cite and so
    which ι the filing records); the law exported here reads only
    `usysForkAns ι`, which is `-1` at any cited ι that is not `forkOk`.
+9. **sbrk is DERIVED** (NI M2-G3, rulings G3-R1…R7): in the class at every
+   key, its answer is `usysSbrkAns sz a0 a1 ι`, read off M0's row
+   `usysDetSbrk` at the cited ι (`niDetRow_sbrk`).  What it is derived FROM:
+   the caller's own BREAK `sz` (it rides the step, ruling G3-R4: the
+   filing's trapped key's `W.sz`, a ghost-key reading like `lz` -- the
+   caller's own public datum, which `sbrk(0)` reads back at any instant,
+   changing no byte, and which exec's layout and the process's own sbrk
+   calls determine -- so it joins `NiStep.input`, not `obsInput`: whether a
+   round reads depends only on the number) and its two argument words
+   (`a0`, and `a1 = x11` of the exit's registers, `gprsA1`); and, at an
+   allocating eager grow, whether the cited allocator prefix ends in the
+   actor's `KNull` -- by the allocator's tie (`kmemLedger_null`) the pool
+   was empty at the round's decisive kalloc.  Success is the ABSENCE of
+   such a citation: every outcome but an allocation `-1` cites the boot
+   prefix at the actor, and an overrun's `-1` is the key's.  What `H`
+   CONCEDES: every actor's `Kev` order, the round's number of `KAlloc act`
+   included (data pages plus the interior page-table nodes `walk` adds, a
+   function of the page table's interior shape, which the key does not
+   carry), and the shrink's number of `KFree act` (at `lazy = true`, the
+   mapped subset of the cut run).  The cited position is an input (X F4):
+   `0` on every non-allocating outcome and the `KNull`'s on an allocation
+   failure, so "equal positions" includes the outcome -- the same
+   concession as fork's (scope 8).  A page FAULT on a lazy page with an
+   empty pool kills the process in usertrap (a fault round, never resumed):
+   that is the kill channel, untouched here.
 
 getpid's answer is the incarnation's pid (W2d's `niPidRow`: `a0 =
 signExtend 64 W.pid`, and the filing's pid is `W'.pid = W.pid`), so getpid
@@ -143,7 +171,8 @@ reads nothing.  What the two-run hypothesis concedes after M2-X: the
 SCHEDULE (per round, the cited era, ledger lengths, tick count and actor)
 and the HISTORIES (the other actors' pid and family events, and since the
 joint fork lane every actor's allocator order and the slot-occupancy
-timeline, scope 8; ticks carry nothing).  Nothing inside the class is a declassified reading.
+timeline, scope 8 -- since NI M2-G3 including sbrk's kalloc and kfree
+counts, scope 9; ticks carry nothing).  Nothing inside the class is a declassified reading.
 
 ## Deviations from the design text
 
@@ -155,19 +184,23 @@ timeline, scope 8; ticks carry nothing).  Nothing inside the class is a declassi
    (`NiEntry.pid`), which `utrace q` makes `q.2`.
 4. The transparent and bumped shapes are read off `uroundOk` directly
    (`uroundOk_transparent`/`_ecall`, `UsysDet.uroundOk_exit`, W2d's
-   `niPidRow` with `usysRetPid_getpid`); the uptime, wait and (NI joint
-   fork lane F3) fork ANSWERS off M0's row at the cited ι (`niDetRow`).
+   `niPidRow` with `usysRetPid_getpid`); the uptime, wait, (NI joint
+   fork lane F3) fork and (NI M2-G3) sbrk ANSWERS off M0's row at the cited
+   ι (`niDetRow`).
 5. `niFilingAt` (not `niFiling`: `NiLedger` names its filing constructor
    so).
 6. (M2-X4, X-R3 amended) The observable form keeps W4's input without the
    positions (`NiStep.obsInput`, which carries the key's lazy bit since NI
    M2-G1e: whether a wait reads is the class's) and its readings
    (`NiStep.classReading`, `niReadings`: the enter's `a0` at an uptime ecall,
-   a wait ecall in the class or (NI joint fork lane F3) a fork ecall -- the
-   class's ledger-reading rounds); they serve `niTwoRunObs` only.  `NiStep.reads`/`reading`, `traceEvents` and
+   a wait ecall in the class, (NI joint fork lane F3) a fork ecall or (NI
+   M2-G3) an sbrk ecall -- the class's ledger-reading rounds); they serve
+   `niTwoRunObs` only.  `NiStep.reads`/`reading`, `traceEvents` and
    `events` are deleted.
 7. `niTwoRun`'s `hH` is the whole function `niHist F₁ = niHist F₂` (the
    design's per-era generalisation is not taken).
+8. (NI M2-G3) `NiStep.round` gains a fourth key reading, the break `sz`
+   (after `win`, as G1e's `lz`/`win`), not a record of readings.
 
 PURE: imports `NiLedger` (its pure definitions only) and `UsysDet`.
 -/
@@ -214,12 +247,13 @@ theorem niFilingAt_mem {F : List NiEntry} {j : Nat} {f : NiEntry} (hf : niFiling
 filing names, the enter at it) or a ROUND (the trapped key's READINGS --
 its syscall mask `secc`, and (NI M2-G1e, ruling G1e-R1/R2) its lazy bit
 `lz` and wait's status window `win`, `UsysDet.uwaitWin` of its permission
-view at its a0 word: all carried per filing, scope 3 --, the cited exit,
+view at its a0 word, and (NI M2-G3, ruling G3-R4) its break `sz`, the
+caller's own (scope 9): all carried per filing, scope 3 --, the cited exit,
 the enter, and (M2-X4) the round's citation: the era and the ledgers'
 prefixes it read, or none). -/
 inductive NiStep where
   | origin (W0 : Uvis) (e : Obs)
-  | round (secc : BitVec 64) (lz : Bool) (win : Nat) (x e : Obs) (c : Option (Nat × UIota))
+  | round (secc : BitVec 64) (lz : Bool) (win : Nat) (sz : Nat) (x e : Obs) (c : Option (Nat × UIota))
 
 /-- The step a filing reads in `h` (`none` only for a filing `niEntryOk`
 rejects). -/
@@ -227,7 +261,7 @@ def niStepOf (h : List Obs) : NiEntry → Option NiStep
   | .origin j W0 .. => h[j]?.map (NiStep.origin W0)
   | .round i j _ W _ c =>
     match h[i]?, h[j]? with
-    | some x, some e => some (.round W.secc W.lazy (uwaitWin W.perm (tfW W.tf (tfArgIdx 0))) x e c)
+    | some x, some e => some (.round W.secc W.lazy (uwaitWin W.perm (tfW W.tf (tfArgIdx 0))) W.sz x e c)
     | _, _ => none
 
 /-- **`utrace q h F`**: incarnation `q`'s steps, in the order of their
@@ -261,7 +295,7 @@ theorem mem_utrace {q : NiInc} {h : List Obs} {F : List NiEntry} {s : NiStep}
 /-- A step's citation (none at an origin). -/
 def NiStep.cite : NiStep → Option (Nat × UIota)
   | .origin .. => none
-  | .round _ _ _ _ _ c => c
+  | .round _ _ _ _ _ _ c => c
 
 /-- A filing's step carries the filing's citation. -/
 theorem niStepOf_cite {h : List Obs} {f : NiEntry} {s : NiStep} (hs : niStepOf h f = some s) :
@@ -291,6 +325,9 @@ def enterView : Obs → Option (BitVec 64 × List (BitVec 64))
 
 /-- `a0` of a register list `x1..x31`. -/
 def gprsA0 (gs : List (BitVec 64)) : BitVec 64 := gs.getD 9 0#64
+
+/-- `a1` of a register list `x1..x31` (NI M2-G3: sbrk's `t`). -/
+def gprsA1 (gs : List (BitVec 64)) : BitVec 64 := gs.getD 10 0#64
 
 /-- `a0` of an enter (its answer, at a returning ecall). -/
 def enterA0 : Obs → BitVec 64
@@ -322,23 +359,24 @@ def UIota.pos (k : Nat) (ι : UIota) : NiPos :=
 
 /-- The step's INPUT: everything its enter is a function of, by the law,
 given the ledger histories: an origin's first key; a round's key readings
-(mask, and -- NI M2-G1e -- lazy bit and status window), its exit's content
+(mask, and -- NI M2-G1e -- lazy bit and status window, and -- NI M2-G3 --
+the break), its exit's content
 and (M2-X4) its citation's positions. -/
 def NiStep.input :
-    NiStep → Uvis ⊕ (BitVec 64 × Bool × Nat × Option (BitVec 64 × BitVec 64 × List (BitVec 64)) ×
+    NiStep → Uvis ⊕ (BitVec 64 × Bool × Nat × Nat × Option (BitVec 64 × BitVec 64 × List (BitVec 64)) ×
       Option NiPos)
   | .origin W0 _ => .inl W0
-  | .round secc lz win x _ c => .inr (secc, lz, win, exitView x, c.map fun p => p.2.pos p.1)
+  | .round secc lz win sz x _ c => .inr (secc, lz, win, sz, exitView x, c.map fun p => p.2.pos p.1)
 
 /-- The step's OUTPUT: its enter's content. -/
 def NiStep.output : NiStep → Option (BitVec 64 × List (BitVec 64))
   | .origin _ e => enterView e
-  | .round _ _ _ _ e _ => enterView e
+  | .round _ _ _ _ _ e _ => enterView e
 
 /-- A step is an ecall round. -/
 def NiStep.ecall : NiStep → Bool
   | .origin .. => false
-  | .round _ _ _ x _ _ =>
+  | .round _ _ _ _ x _ _ =>
     match exitView x with
     | some (sc, _, _) => decide (sc = uecallScause)
     | none => false
@@ -347,7 +385,7 @@ def NiStep.ecall : NiStep → Bool
 pc. -/
 def NiStep.replays : NiStep → Prop
   | .origin .. => True
-  | .round _ _ _ x e _ => ∃ sc ep xg, exitView x = some (sc, ep, xg) ∧ enterView e = some (retPc ep, xg)
+  | .round _ _ _ _ x e _ => ∃ sc ep xg, exitView x = some (sc, ep, xg) ∧ enterView e = some (retPc ep, xg)
 
 /-! ## §4 THE CLASS LAW -/
 
@@ -364,9 +402,12 @@ three clauses): the exit is an exit, the enter an enter, and
   window `win`; (NI joint fork lane F3) fork's `usysForkAns` at the CITED
   prefix -- `pidPick` of the cited pid prefix when the cited allocator
   prefix ends in the actor's `KAlloc` and the cited slot prefix not in its
-  `SFull`, `-1` otherwise;
+  `SFull`, `-1` otherwise; (NI M2-G3) sbrk's `usysSbrkAns` at the step's
+  break `sz`, the exit's `a0`/`a1` and the CITED prefix -- `-1` at an
+  overrun or an allocating eager grow whose cited allocator prefix ends in
+  the actor's `KNull`, the old break otherwise;
 * every other ecall is unconstrained. -/
-def niRoundLaw (secc : BitVec 64) (lz : Bool) (win : Nat) (pid : BitVec 32) (x e : Obs)
+def niRoundLaw (secc : BitVec 64) (lz : Bool) (win : Nat) (sz : Nat) (pid : BitVec 32) (x e : Obs)
     (c : Option (Nat × UIota)) : Prop :=
   ∃ (sc ep : BitVec 64) (xg : List (BitVec 64)) (pc' : BitVec 64) (eg : List (BitVec 64)),
     exitView x = some (sc, ep, xg) ∧ enterView e = some (pc', eg) ∧
@@ -378,13 +419,15 @@ def niRoundLaw (secc : BitVec 64) (lz : Bool) (win : Nat) (pid : BitVec 32) (x e
       (gprsNum secc xg = USYS_uptime → ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysUptimeWord ι.ticks) ∧
       (gprsNum secc xg = USYS_wait → (gprsA0 xg = 0#64 ∨ lz = false) →
         ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysWaitAns ι win) ∧
-      (gprsNum secc xg = USYS_fork → ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysForkAns ι))
+      (gprsNum secc xg = USYS_fork → ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysForkAns ι) ∧
+      (gprsNum secc xg = USYS_sbrk → ∃ k ι, c = some (k, ι) ∧
+        gprsA0 eg = usysSbrkAns sz (gprsA0 xg) (gprsA1 xg) ι))
 
 /-- One step's law, at the incarnation's pid: an origin's enter is its first
 key's resume; a round obeys `niRoundLaw`. -/
 def NiStep.law (pid : BitVec 32) : NiStep → Prop
   | .origin W0 e => enterView e = some (tfResumePc W0.tf, tfGprs W0.tf)
-  | .round secc lz win x e c => niRoundLaw secc lz win pid x e c
+  | .round secc lz win sz x e c => niRoundLaw secc lz win sz pid x e c
 
 /-- **THE CLASS LAW of incarnation `q`'s trace**: every step obeys its law
 at `q`'s pid. -/
@@ -409,6 +452,12 @@ theorem gprsA0_gprList (m : RegMap) : gprsA0 (gprList m) = m 10#5 := by
 
 theorem gprsA0_tfGprs (tf : List (BitVec 64)) : gprsA0 (tfGprs tf) = tfW tf (tfArgIdx 0) := by
   rw [← gprList_tfResumeGpr0, gprsA0_gprList]; rfl
+
+theorem gprsA1_gprList (m : RegMap) : gprsA1 (gprList m) = m 11#5 := by
+  simp [gprsA1, gprList, gprIdxs]
+
+theorem gprsA1_tfGprs (tf : List (BitVec 64)) : gprsA1 (tfGprs tf) = tfW tf (tfArgIdx 1) := by
+  rw [← gprList_tfResumeGpr0, gprsA1_gprList]; rfl
 
 /-- The run key's effective number is the one read off the exit's
 registers. -/
@@ -468,18 +517,32 @@ theorem niDetRow_fork {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
     (hd : niDetRow sc W W' (some (k, ι))) (hsc : sc = uecallScause) (hf : uvisNum (uvisRun W) = USYS_fork) :
     gprsA0 (tfGprs W'.tf) = usysForkAns ι := by
   have hcls : usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy := by
-    rw [hf]; exact ⟨Or.inr (Or.inr (Or.inr (Or.inr rfl))), fun h => absurd h (by decide)⟩
+    rw [hf]; exact ⟨Or.inr (Or.inr (Or.inr (Or.inr (Or.inl rfl)))), fun h => absurd h (by decide)⟩
   have he := hd hsc hcls
   rw [hf, usysDet_fork] at he
   unfold usysDetFork at he
   exact ukeyEq_bump_a0 he
 
+/-- **M0's row at the cited ι gives sbrk's answer** (NI M2-G3; `usysDet_sbrk`,
+`usysDetSbrk`): at every key, `usysSbrkAns` of the key's break and argument
+words at the cited prefix. -/
+theorem niDetRow_sbrk {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
+    (hd : niDetRow sc W W' (some (k, ι))) (hsc : sc = uecallScause) (hs : uvisNum (uvisRun W) = USYS_sbrk) :
+    gprsA0 (tfGprs W'.tf) =
+      usysSbrkAns (uvisRun W).sz (tfW (uvisRun W).tf (tfArgIdx 0)) (tfW (uvisRun W).tf (tfArgIdx 1)) ι := by
+  have hcls : usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy := by
+    rw [hs]; exact ⟨Or.inr (Or.inr (Or.inr (Or.inr (Or.inr rfl)))), fun h => absurd h (by decide)⟩
+  have he := hd hsc hcls
+  rw [hs, usysDet_sbrk] at he
+  unfold usysDetSbrk at he
+  exact ukeyEq_bump_a0 he
+
 /-- A round whose filing cites exactly at the citing numbers cites at an
-uptime, wait or fork ecall. -/
+uptime, wait, fork or (NI M2-G3) sbrk ecall. -/
 theorem niCiting_some {sc : BitVec 64} {W : Uvis} {c : Option (Nat × UIota)} (hc : niCiting sc W ↔ c.isSome)
     (hsc : sc = uecallScause)
     (hn : uvisNum (uvisRun W) = USYS_uptime ∨ uvisNum (uvisRun W) = USYS_wait ∨
-      uvisNum (uvisRun W) = USYS_fork) :
+      uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_sbrk) :
     ∃ k ι, c = some (k, ι) := by
   have := hc.mp ⟨hsc, hn⟩
   obtain ⟨⟨k, ι⟩, hki⟩ := Option.isSome_iff_exists.mp this
@@ -532,7 +595,7 @@ theorem niStepOf_law {h : List Obs} {f : NiEntry} {s : NiStep} (hf : niEntryOk h
           rw [← gprList_tfResumeGpr0, ← gprList_tfResumeGpr0, hb1, hg0, gprList_set10]
         have ha0 : gprsA0 (tfGprs W'.tf) = r := by
           rw [← gprList_tfResumeGpr0, gprsA0_gprList, hb1]; simp
-        refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+        refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
         · rw [hpc, hb2, hep]
         · rw [ha0, heg]
         · intro hg
@@ -556,8 +619,14 @@ theorem niStepOf_law {h : List Obs} {f : NiEntry} {s : NiStep} (hf : niEntryOk h
           rfl
         · intro hf
           rw [← hrun] at hf
-          obtain ⟨k, ι, rfl⟩ := niCiting_some hcit hsc (Or.inr (Or.inr hf))
+          obtain ⟨k, ι, rfl⟩ := niCiting_some hcit hsc (Or.inr (Or.inr (Or.inl hf)))
           exact ⟨k, ι, rfl, niDetRow_fork hdet hsc hf⟩
+        · intro hsb
+          rw [← hrun] at hsb
+          obtain ⟨k, ι, rfl⟩ := niCiting_some hcit hsc (Or.inr (Or.inr (Or.inr hsb)))
+          refine ⟨k, ι, rfl, (niDetRow_sbrk hdet hsc hsb).trans ?_⟩
+          rw [uvisRun_arg W 0 (by decide), uvisRun_arg W 1 (by decide), gprsA0_tfGprs, gprsA1_tfGprs]
+          rfl
 
 /-- **`niOk_classLaw`: THE LEDGER'S FILING OBEYS THE CLASS LAW** -- pure, at
 every incarnation. -/
@@ -573,12 +642,12 @@ theorem niOk_classLaw {h : List Obs} {F : List NiEntry} (hF : niOk h F) :
 /-- **The trace's citations are below `H`** (M2-X): every citation of era
 `k` at `ι` is below `H k`. -/
 def niTraceChain (H : Nat → UIota) (tr : List NiStep) : Prop :=
-  ∀ secc lz win x e k ι, NiStep.round secc lz win x e (some (k, ι)) ∈ tr → niBelow ι (H k)
+  ∀ secc lz win sz x e k ι, NiStep.round secc lz win sz x e (some (k, ι)) ∈ tr → niBelow ι (H k)
 
 /-- The ledger's chain gives the trace's, at every incarnation. -/
 theorem niTraceChain_of {h : List Obs} {F : List NiEntry} {H : Nat → UIota} (hC : niChain F H) (q : NiInc) :
     niTraceChain H (utrace q h F) := by
-  intro secc lz win x e k ι hs
+  intro secc lz win sz x e k ι hs
   obtain ⟨f, hfF, -, hfs⟩ := mem_utrace hs
   have hc := niStepOf_cite hfs
   exact hC f hfF k ι hc.symm
@@ -606,11 +675,11 @@ theorem NiStep.cite_eq {H : Nat → UIota} {s₁ s₂ : NiStep} (hin : s₁.inpu
   | origin => cases s₂ with
     | origin => rfl
     | round => simp [NiStep.input] at hin
-  | round secc lz win x e c₁ => cases s₂ with
+  | round secc lz win sz x e c₁ => cases s₂ with
     | origin => simp [NiStep.input] at hin
-    | round secc' lz' win' x' e' c₂ =>
+    | round secc' lz' win' sz' x' e' c₂ =>
       simp only [NiStep.input, Sum.inr.injEq, Prod.mk.injEq] at hin
-      obtain ⟨-, -, -, -, hp⟩ := hin
+      obtain ⟨-, -, -, -, -, hp⟩ := hin
       simp only [NiStep.cite] at h₁ h₂ ⊢
       match c₁, c₂, hp with
       | none, none, _ => rfl
@@ -633,28 +702,29 @@ theorem enterA0_of_view {e : Obs} {pc : BitVec 64} {eg : List (BitVec 64)}
   | _ => simp [enterView] at he
 
 /-- Every ecall of the trace is in the class (getpid, uptime, -- NI G1d --
-wait and -- NI joint fork lane F3 -- fork; exit cannot resume), read AT THE
-KEY (`usysDetClassAt`): a wait is in the class iff the exit's `a0`, the
-status pointer, is null or (NI M2-G1e, ruling G1e-R1) the step's key's lazy
-bit is off; a fork always is. -/
+wait, -- NI joint fork lane F3 -- fork and -- NI M2-G3 -- sbrk; exit cannot
+resume), read AT THE KEY (`usysDetClassAt`): a wait is in the class iff the
+exit's `a0`, the status pointer, is null or (NI M2-G1e, ruling G1e-R1) the
+step's key's lazy bit is off; a fork and an sbrk always are. -/
 def NiInClass (tr : List NiStep) : Prop :=
-  ∀ secc lz win x e c, NiStep.round secc lz win x e c ∈ tr → ∀ ep xg,
+  ∀ secc lz win sz x e c, NiStep.round secc lz win sz x e c ∈ tr → ∀ ep xg,
     exitView x = some (uecallScause, ep, xg) → usysDetClassAt (gprsNum secc xg) (gprsA0 xg) lz
 
 /-- **ONE STEP, TWO RUNS, given the answers**: two lawful steps with equal
 exit content and masks (or equal first keys), whose ecall (if any) is in the
-class and whose resumed `a0` agree at uptime, wait and (NI joint fork lane
-F3) fork, have the same output. -/
+class and whose resumed `a0` agree at uptime, wait, (NI joint fork lane
+F3) fork and (NI M2-G3) sbrk, have the same output. -/
 theorem NiStep.output_eq_of {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law pid) (h₂ : s₂.law pid)
     (hin : (∀ W0 e, s₁ = .origin W0 e → ∃ e', s₂ = .origin W0 e') ∧
-      (∀ secc lz win x e c, s₁ = .round secc lz win x e c →
-        ∃ lz' win' x' e' c', s₂ = .round secc lz' win' x' e' c' ∧ exitView x' = exitView x))
-    (hcls : ∀ secc lz win x e c, s₁ = .round secc lz win x e c → ∀ ep xg,
+      (∀ secc lz win sz x e c, s₁ = .round secc lz win sz x e c →
+        ∃ lz' win' sz' x' e' c', s₂ = .round secc lz' win' sz' x' e' c' ∧ exitView x' = exitView x))
+    (hcls : ∀ secc lz win sz x e c, s₁ = .round secc lz win sz x e c → ∀ ep xg,
       exitView x = some (uecallScause, ep, xg) → usysDetClassAt (gprsNum secc xg) (gprsA0 xg) lz)
-    (hans : ∀ secc lz win x e c lz' win' x' e' c' ep xg, s₁ = .round secc lz win x e c →
-      s₂ = .round secc lz' win' x' e' c' →
+    (hans : ∀ secc lz win sz x e c lz' win' sz' x' e' c' ep xg, s₁ = .round secc lz win sz x e c →
+      s₂ = .round secc lz' win' sz' x' e' c' →
       exitView x = some (uecallScause, ep, xg) →
-      (gprsNum secc xg = USYS_uptime ∨ gprsNum secc xg = USYS_wait ∨ gprsNum secc xg = USYS_fork) →
+      (gprsNum secc xg = USYS_uptime ∨ gprsNum secc xg = USYS_wait ∨ gprsNum secc xg = USYS_fork ∨
+        gprsNum secc xg = USYS_sbrk) →
       ∀ pc₁ eg₁ pc₂ eg₂, enterView e = some (pc₁, eg₁) → enterView e' = some (pc₂, eg₂) →
       gprsA0 eg₁ = gprsA0 eg₂) :
     s₁.output = s₂.output := by
@@ -663,8 +733,8 @@ theorem NiStep.output_eq_of {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.
     obtain ⟨e', rfl⟩ := hin.1 W0 e rfl
     simp only [NiStep.law] at h₁ h₂
     simp only [NiStep.output, h₁, h₂]
-  | round secc lz win x e c =>
-    obtain ⟨lz', win', x', e', c', rfl, hxv⟩ := hin.2 secc lz win x e c rfl
+  | round secc lz win sz x e c =>
+    obtain ⟨lz', win', sz', x', e', c', rfl, hxv⟩ := hin.2 secc lz win sz x e c rfl
     obtain ⟨sc, ep, xg, pc₁, eg₁, hx₁, he₁, ht₁, hxt₁, hb₁⟩ := h₁
     obtain ⟨sc', ep', xg', pc₂, eg₂, hx₂, he₂, ht₂, -, hb₂⟩ := h₂
     rw [hxv, hx₁] at hx₂
@@ -674,16 +744,19 @@ theorem NiStep.output_eq_of {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.
     simp only [NiStep.output, he₁, he₂]
     by_cases hsc : sc = uecallScause
     · subst hsc
-      have hc := hcls secc lz win x e c rfl ep xg hx₁
+      have hc := hcls secc lz win sz x e c rfl ep xg hx₁
       have hres : usysDetResumes (gprsNum secc xg) := usysDetClass_resumes hc.1 (hxt₁ rfl)
       obtain ⟨hp₁, hg₁, hpid₁, -⟩ := hb₁ rfl hres
       obtain ⟨hp₂, hg₂, hpid₂, -⟩ := hb₂ rfl hres
       have ha : gprsA0 eg₁ = gprsA0 eg₂ := by
-        rcases hres with (hn | hn) | hn | hn
+        rcases hres with (hn | hn) | hn | hn | hn
         · rw [hpid₁ hn, hpid₂ hn]
-        · exact hans secc lz win x e c lz' win' x' e' c' ep xg rfl rfl hx₁ (Or.inl hn) _ _ _ _ he₁ he₂
-        · exact hans secc lz win x e c lz' win' x' e' c' ep xg rfl rfl hx₁ (Or.inr (Or.inl hn)) _ _ _ _ he₁ he₂
-        · exact hans secc lz win x e c lz' win' x' e' c' ep xg rfl rfl hx₁ (Or.inr (Or.inr hn)) _ _ _ _ he₁ he₂
+        · exact hans secc lz win sz x e c lz' win' sz' x' e' c' ep xg rfl rfl hx₁ (Or.inl hn) _ _ _ _ he₁ he₂
+        · exact hans secc lz win sz x e c lz' win' sz' x' e' c' ep xg rfl rfl hx₁ (Or.inr (Or.inl hn)) _ _ _ _ he₁ he₂
+        · exact hans secc lz win sz x e c lz' win' sz' x' e' c' ep xg rfl rfl hx₁ (Or.inr (Or.inr (Or.inl hn)))
+            _ _ _ _ he₁ he₂
+        · exact hans secc lz win sz x e c lz' win' sz' x' e' c' ep xg rfl rfl hx₁ (Or.inr (Or.inr (Or.inr hn)))
+            _ _ _ _ he₁ he₂
       rw [hp₁, hp₂, hg₁, hg₂, ha]
     · obtain ⟨hp₁, hg₁⟩ := ht₁ hsc
       obtain ⟨hp₂, hg₂⟩ := ht₂ hsc
@@ -691,11 +764,12 @@ theorem NiStep.output_eq_of {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.
 
 /-- **ONE STEP, TWO RUNS** (M2-X4): at equal inputs (positions included) and
 EQUAL CITATIONS, a lawful step whose ecall (if any) is in the class has the
-same output -- uptime's, wait's and (NI joint fork lane F3) fork's answers
-are the law's, at the one cited ι. -/
+same output -- uptime's, wait's, (NI joint fork lane F3) fork's and (NI
+M2-G3) sbrk's (at the one break `sz`, an input) answers are the law's, at
+the one cited ι. -/
 theorem NiStep.output_eq {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law pid) (h₂ : s₂.law pid)
     (hin : s₁.input = s₂.input) (hc : s₁.cite = s₂.cite)
-    (hcls : ∀ secc lz win x e c, s₁ = .round secc lz win x e c → ∀ ep xg,
+    (hcls : ∀ secc lz win sz x e c, s₁ = .round secc lz win sz x e c → ∀ ep xg,
       exitView x = some (uecallScause, ep, xg) → usysDetClassAt (gprsNum secc xg) (gprsA0 xg) lz) :
     s₁.output = s₂.output := by
   refine NiStep.output_eq_of h₁ h₂ ⟨?_, ?_⟩ hcls ?_
@@ -703,14 +777,14 @@ theorem NiStep.output_eq {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law
     cases s₂ with
     | origin W0' e' => simp only [NiStep.input, Sum.inl.injEq] at hin; exact ⟨e', by rw [hin]⟩
     | round => simp [NiStep.input] at hin
-  · intro secc lz win x e c hs; subst hs
+  · intro secc lz win sz x e c hs; subst hs
     cases s₂ with
     | origin => simp [NiStep.input] at hin
-    | round secc' lz' win' x' e' c' =>
+    | round secc' lz' win' sz' x' e' c' =>
       simp only [NiStep.input, Sum.inr.injEq, Prod.mk.injEq] at hin
-      obtain ⟨h1, -, -, h4, -⟩ := hin
-      exact ⟨lz', win', x', e', c', by rw [h1], h4.symm⟩
-  · intro secc lz win x e c lz' win' x' e' c' ep xg hs₁ hs₂ hx hn pc₁ eg₁ pc₂ eg₂ he₁ he₂
+      obtain ⟨h1, -, -, -, h4, -⟩ := hin
+      exact ⟨lz', win', sz', x', e', c', by rw [h1], h4.symm⟩
+  · intro secc lz win sz x e c lz' win' sz' x' e' c' ep xg hs₁ hs₂ hx hn pc₁ eg₁ pc₂ eg₂ he₁ he₂
     subst hs₁ hs₂
     simp only [NiStep.cite] at hc
     subst hc
@@ -722,8 +796,9 @@ theorem NiStep.output_eq {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law
     obtain ⟨-, hin'⟩ := Prod.mk.inj hin'
     obtain ⟨hlz, hin'⟩ := Prod.mk.inj hin'
     obtain ⟨hwin, hin'⟩ := Prod.mk.inj hin'
+    obtain ⟨hsz, hin'⟩ := Prod.mk.inj hin'
     obtain ⟨hxe, -⟩ := Prod.mk.inj hin'
-    subst hlz hwin
+    subst hlz hwin hsz
     rw [hx] at hx₁
     rw [← hxe, hx] at hx₂
     simp only [Option.some.injEq, Prod.mk.injEq] at hx₁ hx₂
@@ -733,15 +808,16 @@ theorem NiStep.output_eq {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law
     simp only [Option.some.injEq, Prod.mk.injEq] at he₁' he₂'
     obtain ⟨rfl, rfl⟩ := he₁'
     obtain ⟨rfl, rfl⟩ := he₂'
-    have hcl := hcls secc lz win x e c rfl ep xg hx
+    have hcl := hcls secc lz win sz x e c rfl ep xg hx
     have hres : usysDetResumes (gprsNum secc xg) := by
-      rcases hn with hn | hn | hn
+      rcases hn with hn | hn | hn | hn
       · exact Or.inl (Or.inr hn)
       · exact Or.inr (Or.inl hn)
-      · exact Or.inr (Or.inr hn)
-    obtain ⟨-, -, -, hu₁, hw₁, hf₁⟩ := hb₁ rfl hres
-    obtain ⟨-, -, -, hu₂, hw₂, hf₂⟩ := hb₂ rfl hres
-    rcases hn with hn | hn | hn
+      · exact Or.inr (Or.inr (Or.inl hn))
+      · exact Or.inr (Or.inr (Or.inr hn))
+    obtain ⟨-, -, -, hu₁, hw₁, hf₁, hs₁⟩ := hb₁ rfl hres
+    obtain ⟨-, -, -, hu₂, hw₂, hf₂, hs₂⟩ := hb₂ rfl hres
+    rcases hn with hn | hn | hn | hn
     · obtain ⟨k, ι, hc₁, ha₁⟩ := hu₁ hn
       obtain ⟨k', ι', hc₂, ha₂⟩ := hu₂ hn
       rw [hc₁] at hc₂; cases hc₂
@@ -753,6 +829,10 @@ theorem NiStep.output_eq {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law
       rw [ha₁, ha₂]
     · obtain ⟨k, ι, hc₁, ha₁⟩ := hf₁ hn
       obtain ⟨k', ι', hc₂, ha₂⟩ := hf₂ hn
+      rw [hc₁] at hc₂; cases hc₂
+      rw [ha₁, ha₂]
+    · obtain ⟨k, ι, hc₁, ha₁⟩ := hs₁ hn
+      obtain ⟨k', ι', hc₂, ha₂⟩ := hs₂ hn
       rw [hc₁] at hc₂; cases hc₂
       rw [ha₁, ha₂]
 
@@ -774,18 +854,18 @@ theorem niTwoRun_trace (q : NiInc) (H : Nat → UIota) : ∀ (tr₁ tr₂ : List
       intro s tr hC k ι hs
       cases s with
       | origin => simp [NiStep.cite] at hs
-      | round secc lz win x e c =>
+      | round secc lz win sz x e c =>
         simp only [NiStep.cite] at hs
         subst hs
-        exact hC secc lz win x e k ι (List.mem_cons_self ..)
+        exact hC secc lz win sz x e k ι (List.mem_cons_self ..)
     have hcite := NiStep.cite_eq hin.1 (hb s₁ tr₁ hC₁) (hb s₂ tr₂ hC₂)
     refine ⟨NiStep.output_eq (h₁ s₁ (List.mem_cons_self ..)) (h₂ s₂ (List.mem_cons_self ..)) hin.1 hcite
-      (fun secc lz win x e c hs => hc secc lz win x e c (hs ▸ List.mem_cons_self ..)), ?_⟩
+      (fun secc lz win sz x e c hs => hc secc lz win sz x e c (hs ▸ List.mem_cons_self ..)), ?_⟩
     exact niTwoRun_trace q H tr₁ tr₂ (fun s hs => h₁ s (List.mem_cons_of_mem _ hs))
       (fun s hs => h₂ s (List.mem_cons_of_mem _ hs))
-      (fun secc lz win x e c hs => hc secc lz win x e c (List.mem_cons_of_mem _ hs))
-      (fun secc lz win x e k ι hs => hC₁ secc lz win x e k ι (List.mem_cons_of_mem _ hs))
-      (fun secc lz win x e k ι hs => hC₂ secc lz win x e k ι (List.mem_cons_of_mem _ hs)) hin.2
+      (fun secc lz win sz x e c hs => hc secc lz win sz x e c (List.mem_cons_of_mem _ hs))
+      (fun secc lz win sz x e k ι hs => hC₁ secc lz win sz x e k ι (List.mem_cons_of_mem _ hs))
+      (fun secc lz win sz x e k ι hs => hC₂ secc lz win sz x e k ι (List.mem_cons_of_mem _ hs)) hin.2
 
 /-- **`niTwoRun`** (M2-X4): two histories with ledger filings whose chains
 hold at their histories, one incarnation `q` whose two traces agree on
@@ -807,25 +887,28 @@ theorem niTwoRun {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk
 positions. -/
 def NiStep.obsInput : NiStep → Uvis ⊕ (BitVec 64 × Bool × Option (BitVec 64 × BitVec 64 × List (BitVec 64)))
   | .origin W0 _ => .inl W0
-  | .round secc lz _ x _ _ => .inr (secc, lz, exitView x)
+  | .round secc lz _ _ x _ _ => .inr (secc, lz, exitView x)
 
 /-- A step's READING (the observable form only): at a class round that
 reads a ledger -- an uptime ecall, a wait ecall at a null status pointer
-or (NI M2-G1e) a lazy-free key, or (NI joint fork lane F3) a fork ecall --
+or (NI M2-G1e) a lazy-free key, (NI joint fork lane F3) a fork ecall or (NI
+M2-G3) an sbrk ecall --
 the enter's `a0`. -/
 def NiStep.classReading : NiStep → Option (BitVec 64)
   | .origin .. => none
-  | .round secc lz _ x e _ =>
+  | .round secc lz _ _ x e _ =>
     match exitView x with
     | some (sc, _, xg) =>
       if sc = uecallScause ∧ (gprsNum secc xg = USYS_uptime ∨
-          (gprsNum secc xg = USYS_wait ∧ (gprsA0 xg = 0#64 ∨ lz = false)) ∨ gprsNum secc xg = USYS_fork)
+          (gprsNum secc xg = USYS_wait ∧ (gprsA0 xg = 0#64 ∨ lz = false)) ∨ gprsNum secc xg = USYS_fork ∨
+          gprsNum secc xg = USYS_sbrk)
       then some (enterA0 e) else none
     | none => none
 
 /-- **`niReadings q h F`**: incarnation `q`'s readings, in order -- the
 answers of its uptime ecalls, its wait ecalls at a null status pointer or a
-lazy-free key and (NI joint fork lane F3) its fork ecalls, read off the
+lazy-free key, (NI joint fork lane F3) its fork ecalls and (NI M2-G3) its
+sbrk ecalls, read off the
 enters in `h`. -/
 def niReadings (q : NiInc) (h : List Obs) (F : List NiEntry) : List (BitVec 64) :=
   (utrace q h F).filterMap NiStep.classReading
@@ -837,9 +920,9 @@ theorem NiStep.classReading_isSome {s₁ s₂ : NiStep} (hin : s₁.obsInput = s
   | origin => cases s₂ with
     | origin => rfl
     | round => simp [NiStep.obsInput] at hin
-  | round secc lz win x e c => cases s₂ with
+  | round secc lz win sz x e c => cases s₂ with
     | origin => simp [NiStep.obsInput] at hin
-    | round secc' lz' win' x' e' c' =>
+    | round secc' lz' win' sz' x' e' c' =>
       simp only [NiStep.obsInput, Sum.inr.injEq, Prod.mk.injEq] at hin
       obtain ⟨rfl, rfl, hx⟩ := hin
       simp only [NiStep.classReading, hx]
@@ -868,31 +951,32 @@ theorem niTwoRunObs_trace (q : NiInc) : ∀ (tr₁ tr₂ : List NiStep), NiClass
     have hl₁ := h₁ s₁ (List.mem_cons_self ..)
     have hl₂ := h₂ s₂ (List.mem_cons_self ..)
     refine ⟨NiStep.output_eq_of hl₁ hl₂ ⟨?_, ?_⟩
-      (fun secc lz win x e c hs => hc secc lz win x e c (hs ▸ List.mem_cons_self ..)) ?_, ?_⟩
+      (fun secc lz win sz x e c hs => hc secc lz win sz x e c (hs ▸ List.mem_cons_self ..)) ?_, ?_⟩
     · intro W0 e hs; subst hs
       cases s₂ with
       | origin W0' e' => simp only [NiStep.obsInput, Sum.inl.injEq] at hin; exact ⟨e', by rw [hin.1]⟩
       | round => simp [NiStep.obsInput] at hin
-    · intro secc lz win x e c hs; subst hs
+    · intro secc lz win sz x e c hs; subst hs
       cases s₂ with
       | origin => simp [NiStep.obsInput] at hin
-      | round secc' lz' win' x' e' c' =>
+      | round secc' lz' win' sz' x' e' c' =>
         simp only [NiStep.obsInput, Sum.inr.injEq, Prod.mk.injEq] at hin
-        exact ⟨lz', win', x', e', c', by rw [hin.1.1], hin.1.2.2.symm⟩
-    · intro secc lz win x e c lz' win' x' e' c' ep xg hs₁ hs₂ hx hn pc₁ eg₁ pc₂ eg₂ he₁ he₂
+        exact ⟨lz', win', sz', x', e', c', by rw [hin.1.1], hin.1.2.2.symm⟩
+    · intro secc lz win sz x e c lz' win' sz' x' e' c' ep xg hs₁ hs₂ hx hn pc₁ eg₁ pc₂ eg₂ he₁ he₂
       subst hs₁ hs₂
       simp only [NiStep.obsInput, Sum.inr.injEq, Prod.mk.injEq] at hin
       obtain ⟨-, hlz, -⟩ := hin.1
       subst hlz
-      have hcl := hc secc lz win x e c (List.mem_cons_self ..) ep xg hx
+      have hcl := hc secc lz win sz x e c (List.mem_cons_self ..) ep xg hx
       have hcond : uecallScause = uecallScause ∧
           (gprsNum secc xg = USYS_uptime ∨ (gprsNum secc xg = USYS_wait ∧ (gprsA0 xg = 0#64 ∨ lz = false)) ∨
-            gprsNum secc xg = USYS_fork) := by
+            gprsNum secc xg = USYS_fork ∨ gprsNum secc xg = USYS_sbrk) := by
         refine ⟨rfl, ?_⟩
-        rcases hn with hn | hn | hn
+        rcases hn with hn | hn | hn | hn
         · exact Or.inl hn
         · exact Or.inr (Or.inl ⟨hn, hcl.2 hn⟩)
-        · exact Or.inr (Or.inr hn)
+        · exact Or.inr (Or.inr (Or.inl hn))
+        · exact Or.inr (Or.inr (Or.inr hn))
       have hx' : exitView x' = some (uecallScause, ep, xg) := by rw [← hin.1.2.2, hx]
       have hr := hrd.1
       simp only [NiStep.classReading, hx, hx'] at hr
@@ -900,7 +984,7 @@ theorem niTwoRunObs_trace (q : NiInc) : ∀ (tr₁ tr₂ : List NiStep), NiClass
       rw [← enterA0_of_view he₁, ← enterA0_of_view he₂, hr]
     · exact niTwoRunObs_trace q tr₁ tr₂ (fun s hs => h₁ s (List.mem_cons_of_mem _ hs))
         (fun s hs => h₂ s (List.mem_cons_of_mem _ hs))
-        (fun secc lz win x e c hs => hc secc lz win x e c (List.mem_cons_of_mem _ hs)) hin.2 hrd.2
+        (fun secc lz win sz x e c hs => hc secc lz win sz x e c (List.mem_cons_of_mem _ hs)) hin.2 hrd.2
 
 /-- **`niTwoRunObs`** (ruling X-R3 amended): two histories with ledger
 filings, one incarnation `q` whose two traces agree on their OBSERVABLE
@@ -934,7 +1018,7 @@ theorem firstKey_of_input {q : NiInc} {h₁ h₂ : List Obs} {F₁ F₂ : List N
 theorem NiStep.replays_of_law {pid : BitVec 32} {s : NiStep} (hl : s.law pid) (hq : s.ecall = false) : s.replays := by
   cases s with
   | origin => trivial
-  | round secc lz win x e c =>
+  | round secc lz win sz x e c =>
     obtain ⟨sc, ep, xg, pc', eg, hx, he, ht, -⟩ := hl
     have hsc : sc ≠ uecallScause := by
       intro h; simp [NiStep.ecall, hx, h] at hq

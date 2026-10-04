@@ -109,7 +109,7 @@ the class with its `round_det` discharge):
 | **M2-G3 sbrk** | `sysSbrkOk`'s −1 only when the pool is empty (growproc/uvmalloc functional in the allocator ledger), and the eager grow's page-table pages as events (`Alloc A vpn`-grained, §3 "concedes more") | `sbrk` |
 | **M2-G4 console write** | the kernel's short count stated at the key's permission view `π` (copyin at the key, not the table) and a write row in the trap contract | console `write` |
 
-- [x] M2-G1 (G1a-e landed; complete with fork re-admitted by the joint fork lane F1-F3, "Joint fork lane F3 as landed" below)  - [x] M2-G2 (G2a-b landed; complete with fork re-admitted by the joint fork lane F1-F3)  - [ ] M2-G3  - [ ] M2-G4  - [x] M2-X (ι export; X1 ba13ce661, X2 2c3f0000b, X3 e864f14ed, X4 "M2-X4 as landed" below: xv6NiPhi carries the chain, uptime/wait derived from usysDet at the cited ι, xv6NiTwoRun at equal ledger histories, xv6NiTwoRunObs the tenth root)
+- [x] M2-G1 (G1a-e landed; complete with fork re-admitted by the joint fork lane F1-F3, "Joint fork lane F3 as landed" below)  - [x] M2-G2 (G2a-b landed; complete with fork re-admitted by the joint fork lane F1-F3)  - [x] M2-G3 (G3a c04d2c467, G3b "M2-G3 as landed" below: sbrk at every key, the break rides the step)  - [ ] M2-G4  - [x] M2-X (ι export; X1 ba13ce661, X2 2c3f0000b, X3 e864f14ed, X4 "M2-X4 as landed" below: xv6NiPhi carries the chain, uptime/wait derived from usysDet at the cited ι, xv6NiTwoRun at equal ledger histories, xv6NiTwoRunObs the tenth root)
 
 Risk register (honest): W1 changes the language and every lifting lemma -- mechanical but wide, and the device
 suite must not notice; W3 is the proof's content and may find a row that cannot be made functional in `(key,
@@ -3487,6 +3487,73 @@ RULINGS REQUESTED.**
     status windows only (F6: a straddling window's stop byte is not key- or ι-functional).
   - Alternative: leave wait at `a0 = 0 ∨ lz = false` for good. This is the cheapest option and it is the
     status quo.
+
+### M2-G3 as landed (2026-10-04)
+
+On `lane/g3`, two commits, rulings G3-R1…R7 as recommended. Sbrk joins the NI class at EVERY key.
+
+**G3a (c04d2c467): the receipts.** The spurious −1 is closed and the decisive `KNull` reaches sys_sbrk's post.
+- `SpecUvmalloc.wp_uvmalloc_body`'s 0 arm (the design's text):
+  `⌜R' 10#5 = 0#64 ∧ 0 < uvmaNp (k.regs 11#5) (k.regs 12#5)⌝ ∗ procPtAt P M ∗ kNullRcpt γk k.proc`.
+  `ProofUvmalloc`: `ua_kalloc_call` is the led call (`uc_kalloc_led_call`, continuation `kRcpt γk k'.proc (R' 10#5)`),
+  `ua_mappages_call` keeps mappages' `-1` wand, `uaOut`'s exit arm and `uvma_loop`'s continuation (a wand keyed on
+  the exit pc) carry `kNullRcpt γk k.proc`; `0 < uvmaNp` is the non-empty-run branch's `hrun`
+  (`UPtDefs.uvmaNp_pos_iff`, new). `uvma_rollA`/`_rollB` are UNCHANGED: the receipt is persistent and rides the
+  intuitionistic context through their continuations (the design threaded it through them).
+- `growprocOk`'s FAILED disjunct gains `∧ (uvmMaxsz < sz.toNat + nz.toNat ∨ 0 < uvmaNp sz (sz + n))`;
+  `wp_growproc_body`'s post gains, last, `(⌜R' 10#5 = -1#64 ∧ V.sz.toNat + (k.regs 10#5).toInt.toNat ≤ uvmMaxsz⌝ -∗
+  kNullRcpt γk k.proc)`. `ProofGrowproc`: the overrun branch refutes the premise (omega), the uvmalloc-0 branch hands
+  the receipt over, the success branches answer 0.
+- `SpecSysSbrk`: `sysSbrkOverrun`, `sysSbrkAllocs` (the design's text), `sysSbrkOk`'s FAILED arm `(r = -1#64 ∧ V' = V ∧
+  M' = M ∧ (sysSbrkOverrun V v0 ∨ sysSbrkAllocs V v0 v1))`, `wp_sys_sbrk_body`'s post gains, last,
+  `(⌜R' 10#5 = -1#64 ∧ ¬ sysSbrkOverrun V v0⌝ -∗ kNullRcpt γk k.proc)`. `ProofSysSbrk`: `sysSbrkPost` gains `γk` and
+  the wand, `sys_sbrk_exit` takes the wand (new `sys_sbrk_exit_ok` at a non-failing outcome), `sys_sbrk_eager` takes
+  the break bound, `sys_sbrk_gp_fail` returns the positive `n` and growproc's reason (a positive `n` is eager, so the
+  reason is `sysSbrkAllocs`).
+- `KexecSeam.kxc_call_uvmalloc`, `SyscallArmsSbrk` (`sbrkArm_shape`/`sbrkArm_ok`, the arm dropping the wand):
+  proof only. Byte-identical: `uvmallocOk`, `kxc_call_uvmalloc`, `syscRows_sbrk`, `SyscRows`, `usysMemOk`,
+  `SYSCALL`, every `Uk*`/`Ush*`/`User*`/`SpecSh*`.
+
+**G3b: the row, the class, the law.**
+- `UsysDet`: `sbrkArgW`, `sbrkEagerW`, `usysSbrkOverrun`, `usysSbrkAllocs`, `usysSbrkFails`, `usysSbrkAns`,
+  `usysSbrkSz`, `usysSbrkLz`, `usysSbrkImgF`/`usysSbrkPermF` (+ `_iff`), `usysDetSbrk`, `usysSbrkFitsAt` (the
+  design's texts; `usysDetSbrk` spells the readings out instead of `let`); `usysDetClass`/`usysDetResumes` +
+  `n = USYS_sbrk`, `usysDetClassAt` text unchanged; `usysDet`/`usysDetRet`'s sbrk branch (`usysDet_sbrk`,
+  `usysDetRet_sbrk`); `usysIotaFits n W r cs' M' szv' lz' ι` with the fourth conjunct; `usysIotaFits_exists` +
+  `hsb : n ≠ USYS_sbrk`, `_of_ev` + `hs`; `usysDet_mem` (text unchanged) / `_rows` / `_of_rows` with the sbrk arm
+  (`usysSbrk_ret_lazy`: the answer is `usysSbrkRet`'s, the bit `usysSbrkLazy`'s; `usysMemOk_lazy` taken off sbrk);
+  `usysDetResumes_ne` loses `n ≠ USYS_sbrk`. §4's sbrk bullet: RE-ADMITTED BY G3.
+- `SyscallDefs.syscEvRow`'s fourth clause (the design's text). `SpecSyscall.syscEvOut`'s and
+  `SpecUsertrap.utEvOut`'s quiet disjuncts gain `≠ USYS_sbrk`; `syscEvOut_quiet` + `(h12 : n ≠ 12 := by decide)`.
+  `SYSCALL`/`USERTRAP` byte-identical.
+- `SyscallArmsSbrk`: `sbrkArm_fits` (from `sysSbrkOk`: the shrink's `uvmdRsz` is `usysSbrkSz`'s,
+  `sbrkArm_shrink_sz`; the lazy grow raises the bit; growproc keeps it) and `syscArmSbrk_ev` (a `-1` that is not an
+  overrun cites `{boot with kev := hk ++ [KNull act], act}` from G3a's wand via `niIotaLbs_kev`; every other outcome
+  cites `{boot with act}`); the arm takes the anchor and the wand and pays `syscEvOut` with the citation.
+- `NiLedger.niCiting` + sbrk. `UserretClosedRows.urc_evRow` + `hsz` and the fourth conjunct (`urc_a1_run`, new);
+  `urc_niDetRow` passes `W'.sz`/`W'.lazy`; `UserretClosedRound`'s `rcases hcn` four cases.
+  `UexecApply.uexecRet_roundDet`'s `hfit` at `… W'.ch W'.M W'.sz W'.lazy ι`.
+- `NiTrace`: `NiStep.round secc lz win sz x e c` (`sz` after `win`), `niStepOf` fills `W.sz`, `NiStep.input`
+  `.inr (secc, lz, win, sz, exitView x, positions)`, `obsInput` unchanged in content; `gprsA1` (+ `_gprList`,
+  `_tfGprs`); `niRoundLaw secc lz win sz pid x e c` with, last in the resume block, `(gprsNum secc xg = USYS_sbrk →
+  ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysSbrkAns sz (gprsA0 xg) (gprsA1 xg) ι)`, derived by `niDetRow_sbrk`;
+  `classReading` admits sbrk; `NiInClass`, `niTraceChain`, `output_eq_of` (binders + `sz`; `hans` + sbrk),
+  `niCiting_some` (+ sbrk). Honest scope 9 (F7's paragraph); deviation 8 (`sz` a fourth field, not a record).
+- The four NI roots' statements are byte-identical (`NiAdequacy`/`LinkNiAdequacy` docs only).
+
+**Deviations.** (1) G3a adds `UPtDefs.uvmaNp_pos_iff` (a lemma; nothing moves). (2) G3a's rollbacks unchanged
+(the persistent receipt rides the intuitionistic context). (3) G3b touches four arm files outside the row's
+list, proof only except one helper: `SyscallArmsWait`/`SyscallArmsFork`/`SyscallArmsProc` build `syscEvRow` by
+anonymous constructor (one more absurd conjunct each), and `SyscallArmsFdDefs.syscall_ret_fd` gains `(h12 : n ≠
+12 := by decide)` (generic in `n`, it calls `syscEvOut_quiet`; `SyscallArmsExec` passes `hne 12`). (4)
+`usysDetSbrk` without `let`.
+
+**Baselines.** `tools/tcb/expected.json`: no root moved in either commit (`UserPerm` did not enter; `KallocDefs`
+already in the cones). `tools/audit/baseline.json` unchanged; no new axiom or opaque. `dead_allow.txt` unchanged.
+
+The class: {exit, getpid, uptime, wait at a null status pointer or a lazy-free key, fork, sbrk}.
+
+What remains: G4 (console write), G3c (optional: wait's lazy copyout), M3
 
 ## Lanes (opened 2026-09-15)
 

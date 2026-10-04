@@ -170,9 +170,12 @@ on success (`forkOk ι`: the cited allocator prefix ends in the actor's
 `ι`'s pid prefix, `ι`'s family prefix ending in the round's `ZFork` of that
 pid at the generation the children column gained; on `-1` a POSITIVE
 reason (ruling JF-R5: the cited allocator prefix ends in the actor's
-`KNull`, or the cited slot prefix in its `SFull`) and the column kept.  The
-records are the dispatch's (`V`/`img` the entry, `V'`/`img'` the record the
-call left). -/
+`KNull`, or the cited slot prefix in its `SFull`) and the column kept;
+sbrk's (NI M2-G3) `UsysDet.usysSbrkFitsAt` at the entry's break, argument
+words and lazy bit -- the answer, the break and the lazy bit after, `-1`
+only at an overrun or at an allocating eager grow whose cited allocator
+prefix ends in the actor's `KNull`.  The records are the dispatch's
+(`V`/`img` the entry, `V'`/`img'` the record the call left). -/
 def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare) (ι : UIota) :
     Prop :=
   (syscNum V = USYS_uptime → tfW V'.tf (tfArgIdx 0) = usysUptimeWord ι.ticks) ∧
@@ -184,7 +187,10 @@ def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName c
     (forkOk ι → (∃ (hz : List Zev) (i : Nat),
         ι.zev = hz ++ [.ZFork ι.act i (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) (usysForkGen ι)]) ∧
       cs' = cs ∪ {usysForkGen ι}) ∧
-    (¬ forkOk ι → (ι.kNull ∨ ι.sFull) ∧ cs' = cs))
+    (¬ forkOk ι → (ι.kNull ∨ ι.sFull) ∧ cs' = cs)) ∧
+  (syscNum V = USYS_sbrk →
+    usysSbrkFitsAt V.sz.toNat (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) V.pvLazy ι
+      (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy)
 
 /-! ## §2 The dispatch table -/
 

@@ -29,11 +29,13 @@ A `Link` file because it consumes `ProofUser` (tools/check_layering.sh).
 ## Honest scope
 
 The class is {exit, getpid, uptime}, wait at a null status pointer or of
-a lazy-free process (NI M2-G1e) and fork at every key (NI joint fork lane
+a lazy-free process (NI M2-G1e), fork at every key (NI joint fork lane
 F3: `NiTrace` scope 8 says what fork's answer is derived from and what the
-histories concede); every filing spent a distinct claim minted before its
-enter (`niOneShot`, W2d); the mask and actor are carried per filing;
-uptime's, wait's and fork's answers are derived from the cited ι, getpid's
+histories concede) and sbrk at every key (NI M2-G3: `NiTrace` scope 9; the
+caller's break rides the step); every filing spent a distinct claim minted
+before its enter (`niOneShot`, W2d); the mask and actor are carried per
+filing; uptime's, wait's, fork's and sbrk's answers are derived from the
+cited ι, getpid's
 is the incarnation's pid (`NiTrace` header).  The filings `F` are existential (O6), and the
 histories `niHist F` are ghost witnesses inside them: ι is not observable
 (F3), which is why the observable form `xv6NiTwoRunObs` is kept beside

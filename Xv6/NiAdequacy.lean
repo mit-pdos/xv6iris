@@ -41,8 +41,9 @@ are `LinkNiAdequacy` (only a `Link` file may import a `Proof` file).
 ## Honest scope (see `NiTrace`'s header for the trace side)
 
 1. The class is {exit, getpid, uptime}, wait at a null status pointer or
-   of a lazy-free process (NI M2-G1e: the key's lazy bit rides the step)
-   and (NI joint fork lane F3) fork at every key; every other ecall's enter
+   of a lazy-free process (NI M2-G1e: the key's lazy bit rides the step),
+   (NI joint fork lane F3) fork at every key and (NI M2-G3) sbrk at every
+   key (the caller's break rides the step); every other ecall's enter
    is free.  The class's meaning grew through `UsysDet.usysDetClass` and
    `UIota` (+ the slot ledger) with every statement here byte-identical.
 2. Origins are honest by W2d's one-shot claims (`niOneShot` in the
@@ -51,11 +52,13 @@ are `LinkNiAdequacy` (only a `Link` file may import a `Proof` file).
    stated (the claim names the parent's fork exit, not the child's key).
 3. The syscall mask and the actor are carried per filing (`NiTrace` scope
    3); getpid's answer is the incarnation's pid (W2d's pid row); uptime's,
-   wait's and (NI joint fork lane F3) fork's answers are DERIVED from the
-   cited ι (`NiTrace` scopes 4, 6, 8: fork's from the pid history, the
-   round's decisive allocator event and the slot ledger's `SFull`, with
-   every actor's allocator order and the slot-occupancy timeline conceded
-   through the histories).
+   wait's, (NI joint fork lane F3) fork's and (NI M2-G3) sbrk's answers are
+   DERIVED from the cited ι (`NiTrace` scopes 4, 6, 8, 9: fork's from the
+   pid history, the round's decisive allocator event and the slot ledger's
+   `SFull`, with every actor's allocator order and the slot-occupancy
+   timeline conceded through the histories; sbrk's from the caller's break
+   and argument words and, at an allocating eager grow, whether the cited
+   allocator prefix ends in the actor's `KNull`).
 4. (NI M2-X4, F3) The histories `niHist F` are ghost witnesses inside the
    existential `F`: ι is not observable (`NiTrace` scope 5); the cited era
    is an input (scope 7).

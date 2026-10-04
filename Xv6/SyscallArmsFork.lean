@@ -173,7 +173,8 @@ theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPr
       | some (.ZFork _ _ _ γ) => γ | _ => 0) = γc
     simp
   refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
-    fun _ => ⟨?_, fun _ => ⟨⟨hz, i, ?_⟩, ?_⟩, fun h' => absurd hok h'⟩⟩
+    fun _ => ⟨?_, fun _ => ⟨⟨hz, i, ?_⟩, ?_⟩, fun h' => absurd hok h'⟩,
+    fun h' => absurd (hn.symm.trans h') (by decide)⟩
   · unfold usysForkAns usysForkPid
     rw [if_pos hok]
     show tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX h))
@@ -214,7 +215,8 @@ theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : Pro
       have h2 : (hk ++ [Kev.KNull act]).getLast? = some (.KAlloc act) := hok
       simp at h2
     refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
-      fun _ => ⟨?_, fun h' => absurd h' hnok, fun _ => ⟨Or.inl hnull, rfl⟩⟩⟩
+      fun _ => ⟨?_, fun h' => absurd h' hnok, fun _ => ⟨Or.inl hnull, rfl⟩⟩,
+      fun h' => absurd (hn.symm.trans h') (by decide)⟩
     unfold usysForkAns
     rw [if_neg hnok]
     exact ha
@@ -231,7 +233,8 @@ theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : Pro
     have hnok : ¬ forkOk { UIota.boot with sev := hs ++ [.SFull act k0], act := act } :=
       fun hok => hok.2 hfull
     refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
-      fun _ => ⟨?_, fun h' => absurd h' hnok, fun _ => ⟨Or.inr hfull, rfl⟩⟩⟩
+      fun _ => ⟨?_, fun h' => absurd h' hnok, fun _ => ⟨Or.inr hfull, rfl⟩⟩,
+      fun h' => absurd (hn.symm.trans h') (by decide)⟩
     unfold usysForkAns
     rw [if_neg hnok]
     exact ha
