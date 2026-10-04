@@ -2494,6 +2494,357 @@ new axiom or opaque.  `dead_allow.txt`: `decl Xv6.lazyFree_wmapped_iff` removed 
 
 What remains: G1f+G2c+G3 (the joint fork lane), G3 (sbrk), G4 (console write), M3
 
+### Joint fork lane design (2026-10-04)
+
+Design pass on `lane/fork` (based on `lean` cb728da4f: M2-X1–X4, G1a–e, G2a–b landed). No code landed. The
+shapes below were read off the tree (`SpecKalloc`, `KallocDefs`, `UvmCallSites`, `SpecWalk`, `SpecMappages`,
+`SpecUvmcreate`, `SpecProcPagetable`, `SpecUvmcopy`/`ProofUvmcopy`, `SpecAllocproc`/`ProofAllocproc`,
+`ProcAvail`, `SchedCtx`, `SpecKfork`, `SyscallArmsFork`, `SyscallDefs`, `UsysDet`, `NiEvid`, `NiLedger`,
+`NiTrace`). They are not shape-checked in Lean. The rulings JF-R1…R7 at the end are needed before a lane
+starts.
+
+**Short version.**
+- **Fork's bit is ONE decisive event, not a window.** Every kalloc on fork's path is fatal when it returns
+  null:
+  - allocproc's trapframe page;
+  - `proc_pagetable`'s pages (uvmcreate's root, `walk`'s interior nodes under the two `mappages`);
+  - uvmcopy's per-page kalloc and its `mappages → walk` nodes.
+
+  xv6 never retries. So the round fails on the allocator exactly when ONE of its kallocs appended `KNull
+  act`, and that event is the round's last kalloc. A success always has the trapframe's `KAlloc act`.
+  - So ι.kev cites a single receipt prefix ENDING in the decisive event: the `KNull` on −1, the
+    trapframe's `KAlloc` on success.
+  - There is no receipt list and no start position. The count of kallocs never enters ι, so `lazy` does not
+    restrict the class (F2).
+- **The slot bit is §6's ledger, confirmed and registered.** `SFull act k0` is appended to an
+  invariant-held slot-occupancy ledger. It carries the window start, so its well-formedness ("every slot was
+  occupied at some position since `k0`") is checkable. The ledger is the FIFTH registered name
+  (`niNamesHere`, `niIotaLbs`, `UIota.sev`).
+- **The row.** `forkOk ι := ι.kev ends in KAlloc ι.act ∧ ¬ ι.sev ends in SFull ι.act …`. On success the key
+  is `bump W (sext pidPick ι.pev) … (W.ch ∪ {γ})`, where `γ` is the cited `ZFork`'s generation. On −1 it is
+  `bump W (-1) …` with `W.ch` kept.
+  - The kernel's cited row adds a POSITIVE reason on −1 (`kNull ∨ sFull`), so the boot prefix can never
+    explain a −1.
+  - Fork joins `usysDetClass` at EVERY key. `niRoundLaw`'s fork clause becomes `gprsA0 eg = usysForkAns ι`
+    inside the resume block. `NiStep` carries nothing new.
+- **The route.**
+  - Today every process-context kalloc drops its receipt in ONE place, `UvmCallSites.uc_kalloc_lend_call`
+    (`kallocPostLed_post`).
+  - F2 adds a keeping twin and moves only the FAILURE arms of walk → mappages_any → uvmcreate →
+    proc_pagetable → uvmcopy. Their other callers drop the new premise, in proof only.
+  - It also moves allocproc's and kfork's LED posts (both arms).
+- **Lanes:** F1 (the slot ledger) ∥ F2 (the allocator receipts) → F3 (the fifth name, the row, the class,
+  the law).
+
+**Findings.**
+- **F1 (every fork kalloc is fatal, and its label is the parent).**
+  - The path, read off the specs:
+    - allocproc's trapframe kalloc (`ap_found` → `ap_kalloc_call`): null → freeproc, return 0;
+    - `proc_pagetable` (`pptPost`'s null arm, ≤ `procPagetableNodes = 3` pages: uvmcreate's root, then
+      `mappages_any` → `walk`'s nodes for the trampoline / trapframe path): null → freeproc, return 0;
+    - uvmcopy (`ProofUvmcopy.uvmcopy_iter`): its own kalloc null → `err`; or `mappages_any` −1 → `kfree(mem)`
+      → `err` (uvmunmap), return −1. kfork then runs freeproc and returns −1.
+  - With `hva` (va < 2^38, every caller's) and `mappagesArgs`' no-remap premise, walk's `r = 0` and
+    mappages' `-1` happen ONLY on a null kalloc. So "−1 by allocation" ⇔ "some kalloc of the round appended
+    `KNull act`", and that event is the round's last kalloc.
+  - The label is `k.proc` (`SpecKalloc` deviation 1: the hart's `c->proc` word). Every callee inherits it
+    from kfork's `KCtx`, inside walk and uvmcopy too, and allocproc's `acquire(&np->lock)` does not change
+    it. So every kalloc of the round, including the CHILD's table pages, is labelled with the PARENT's slot
+    `procAddr j` = `ι.act` (G2b's `kf_postLed_act` already re-keys the actor of `PAlloc` the same way).
+- **F2 (the window shape is not provable; the count is not needed).**
+  - A window `[kev0, |ι.kev|)` with "no `KNull act` in it" would need to know that every `act`-labelled
+    event in the window is this round's.
+  - The kmem ledger has no per-actor ownership: `actCnt` is not tied to the history. So absence is not
+    provable without new ghost state.
+  - The decisive-event shape needs no window and no count:
+    - on success, the trapframe's `KAlloc act` (always made, before uvmcopy);
+    - on −1, the `KNull act`.
+  - uvmcopy's count (one kalloc per MAPPED page plus the child's table pages; at `lazy = true` the mapped set
+    is not in the key, UsysDet §4) therefore never enters ι.
+  - It DOES enter `H`: the number of `KAlloc act` events between the cited positions is the history's.
+    Under "equal histories" the count is conceded, not derived (F6). So the class needs no `lz` condition
+    (JF-R2).
+- **F3 (L3b's drop is one helper; the moves are the failure arms).**
+  - `uc_kalloc_lend_call` is the only process-context kalloc rule (callers: `ProofWalk`, `ProofUvmcreate`,
+    `ProofAllocproc` via `ap_kalloc_call`, `ProofUvmcopy`, `ProofUvmalloc`, `ProofVmfault`, `ProofPipealloc`;
+    the boot's `ProofKvmmake`/`ProofProcMapstacks` use the plain `uc_kalloc_call` at `k.proc = 0`). It drops `kallocPostLed`'s receipt. A twin `uc_kalloc_led_call` keeps it.
+  - The moves, all in the receipt's direction (persistent, so callers that don't need it drop it):
+
+    | Statement | Arm | Gains | Callers that drop it (proof only) |
+    |---|---|---|---|
+    | `SpecWalk.wp_walk_body` | `R' 10 = 0` | `kNullRcpt γk k.proc` | — (only `ProofMappages`) |
+    | `SpecMappages.wp_mappages_any_body` | `-1` | `kNullRcpt γk k.proc` | `VmfaultDefs`, `ProofUvmalloc`, `ProofMappages` (`wp_mappages`, `ProofKvmmap` byte-identical) |
+    | `SpecUvmcreate.uvmcreatePost` (+`act`) | null | `kNullRcpt γk act` | — (`ProcPagetableDefs`) |
+    | `SpecProcPagetable.pptPost` (+`act`) | null | `kNullRcpt γk act` | `KexecB` (exec) |
+    | `SpecUvmcopy.wp_uvmcopy_body` | `-1` | `kNullRcpt γk k.proc` | — (`ProofKfork`) |
+    | `SpecAllocproc.allocprocPostLed` | found / null | `kAllocRcpt γk act` / `kNullRcpt γk act ∨ sFullRcpt act` | — (landed `allocprocPost` byte-identical) |
+    | `SpecKfork.kforkRetLed`, `kforkPostLed` (+`γk`) | success / −1 | `kAllocRcpt γk (procAddr j)` / `kNullRcpt … ∨ sFullRcpt …` | — (landed `kforkRet` byte-identical) |
+
+  - The `+γk` on `kforkPostLed` moves the TEXT of `KFORK.wp_kfork_led_eb` and `SYSFORK.wp_sys_fork_led_eb`.
+    Both are led fields, reached only by the fork arm.
+  - The cheaper option is that the arm reads `fsReadyKmem` directly. But kfork's `γk` is a parameter, so
+    the receipt must be stated at it.
+- **F4 (the slot bit needs §6's invariant, and the anchor).**
+  - G1 F2 stands: allocproc's scan holds only one `p->lock` at a time, so "all slots were occupied" is a
+    property of 64 instants.
+  - No landed ledger can be snapshotted at a visit:
+    - the pid ledger is in `pid_lock`'s payload;
+    - the family ledger is in `wait_lock`'s;
+    - `slotUsed` is a persistent "ever allocated" marker, not occupancy.
+  - So §6's invariant-held ledger is the only honest source. It is confirmed with two refinements:
+    - (i) `SFull act k0` records the window's start, so the wf `sevWf` is a pure property of the history.
+      Without `k0` the window could be the whole era, where it is vacuous.
+    - (ii) The occupancy element rides `procHeldAt` keyed by `isUnused st` (G1b's `zsElem` precedent), so
+      the two flips are at the two state stores: allocproc's `USED` store (`SOcc j`) and freeproc's `UNUSED`
+      store (`SVac j`). Every other holder (kwait, kexit, sched, kfork) frames it untouched.
+  - It must be REGISTERED. An unanchored mono-list would let a proof mint a fresh ledger holding `SFull`
+    and explain any −1: X F1's disguise.
+- **F5 (the pid and the children on −1; nothing to cite).**
+  - A −1 after a slot was found leaves `PAlloc act pid; PFree act pid` in the pid ledger (allocproc's
+    freeproc tail, or kfork's after uvmcopy). The COUNTER has advanced (`nextStep` on `PAlloc`; `PFree` does
+    not roll it back).
+  - The −1 key does not read `pev`. It keeps `W.pid` (the caller's own) and `W.ch`:
+    - `kforkRet`'s −1 arm gives back `chFrag … csP`;
+    - `syscArmFork_out`'s left arm gives `cs' = cs`.
+  - So −1 cites `pev := []`. On success, `γ` needs nothing beyond the `ZFork` receipt's `γc`. Freshness
+    (`γc ∉ cs`) is not read by `W.ch ∪ {γ}`, and the `ZFork`'s pid field is pinned to `pidPick ι.pev` by
+    `syscEvRow` as today.
+- **F6 (what fork declassifies: honesty).** Inside the equal-histories hypothesis, fork's answer is derived
+  from:
+  - the pid history at the cited position: the global allocation count since boot mod `PIDMAX` and the
+    live pids just past the counter, now including the pids FAILED forks consumed;
+  - the allocator event at the cited position (by the tie, `KAlloc` at `p` ⇔ `¬ poolEmpty p`): whether the
+    pool was empty at the round's decisive kalloc;
+  - the slot ledger: `SFull` at the cited position, which by `sevWf` happened only after every slot was
+    occupied at some instant of the round's scan window.
+
+  What `H` concedes:
+  - every actor's `Kev` order, including the number of the round's own `KAlloc`s, which at `lazy = true`
+    reflects the parent's mapped-set size;
+  - the global slot-occupancy timeline (`SOcc`/`SVac`, unlabelled, with slot indices);
+  - the scan outcomes.
+
+  The cited positions are inputs (X F4). Which kalloc is cited depends on the outcome (the first kalloc on
+  success, the decisive one on −1), so "equal positions" includes it. The positive-reason clause (JF-R5)
+  rules out the free boot prefix as an explanation.
+
+**1. The vocabulary (pure; new `Xv6/SlotEv.lean`, `UsysDet` grows).**
+
+    -- Xv6/SlotEv.lean
+    inductive Sev where
+      | SOcc (j : Nat)                         -- allocproc's USED store at slot j (unlabelled: PAlloc names the actor)
+      | SVac (j : Nat)                         -- freeproc's UNUSED store at slot j (unlabelled: PFree names it)
+      | SFull (act : BitVec 64) (k0 : Nat)     -- allocproc's scan found no UNUSED slot; its window began at k0
+      deriving DecidableEq, Repr
+    def occStep (o : Nat → Bool) : Sev → Nat → Bool
+      | .SOcc j => fun i => if i = j then true else o i
+      | .SVac j => fun i => if i = j then false else o i
+      | .SFull _ _ => o
+    def occOf (h : List Sev) : Nat → Bool := h.foldl occStep (fun _ => false)
+    def sevWindow (h : List Sev) (k0 : Nat) : Prop :=
+      ∀ i, i < NPROC → ∃ k, k0 ≤ k ∧ k ≤ h.length ∧ occOf (h.take k) i = true
+    def sevWf (h : List Sev) : Prop := ∀ p act k0, p ++ [.SFull act k0] <+: h → sevWindow p k0
+    -- sevWf_nil, sevWf_snoc_occ/_vac (SOcc/SVac keep it), sevWf_snoc_full (from the window), sevWindow_mono
+
+    -- Xv6/UsysDet.lean
+    structure UIota where
+      kev : List Kev; pev : List Pev; zev : List Zev; ticks : Nat; act : BitVec 64
+      sev : List Sev := []                     -- NEW, last (the slot ledger's prefix)
+    def UIota.kOk   (ι : UIota) : Prop := ι.kev.getLast? = some (.KAlloc ι.act)
+    def UIota.kNull (ι : UIota) : Prop := ι.kev.getLast? = some (.KNull ι.act)
+    def UIota.sFull (ι : UIota) : Prop := ∃ k0, ι.sev.getLast? = some (.SFull ι.act k0)
+    /-- fork succeeded: the cited allocator event is the actor's own successful kalloc and the cited slot
+        event is not the actor's exhaustion -/
+    def forkOk (ι : UIota) : Prop := ι.kOk ∧ ¬ ι.sFull
+    def usysForkPid (ι : UIota) : BitVec 64 := BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX ι.pev))
+    def usysForkAns (ι : UIota) : BitVec 64 := if forkOk ι then usysForkPid ι else -1#64
+    def usysForkGen (ι : UIota) : GName :=
+      match ι.zev.getLast? with | some (.ZFork _ _ _ γ) => γ | _ => 0
+    def usysDetFork (W : Uvis) (ι : UIota) : Uvis :=
+      if forkOk ι then
+        bump W (usysForkPid ι) W.M W.perm W.sz W.fd W.cwd W.gen (W.ch ∪ {usysForkGen ι}) W.lazy W.secc
+      else bump W (-1#64) W.M W.perm W.sz W.fd W.cwd W.gen W.ch W.lazy W.secc
+    def usysDetClass (n : Int) : Prop :=
+      n = USYS_exit ∨ n = USYS_getpid ∨ n = USYS_uptime ∨ n = USYS_wait ∨ n = USYS_fork   -- + fork
+    -- usysDetClassAt: text unchanged (fork at every key); usysDetResumes: + `∨ n = USYS_fork`
+    def usysDet (n : Int) (W : Uvis) (ι : UIota) : Uvis :=
+      if n = USYS_wait then usysDetWait W ι
+      else if n = USYS_fork then usysDetFork W ι
+      else if usysDetQuiet n then bump W (usysDetRet n W ι) W.M W.perm W.sz W.fd W.cwd W.gen W.ch W.lazy W.secc
+      else W
+    -- usysDetRet: + `if n = USYS_fork then usysForkAns ι`
+    def usysForkFitsAt (ch : ExtTreeSet GName compare) (ι : UIota) (r : BitVec 64)
+        (cs' : ExtTreeSet GName compare) : Prop :=
+      r = usysForkAns ι ∧ cs' = (if forkOk ι then ch ∪ {usysForkGen ι} else ch)
+    -- usysIotaFits: + `(n = USYS_fork → usysForkFitsAt W.ch ι r cs')`; usysIotaFits_exists: + `hfk : n ≠ USYS_fork`
+    -- PidEv: pidPick_range : 0 < pidmax → 1 ≤ pidPick pidmax h ∧ pidPick pidmax h ≤ pidmax  (usysDet_mem's fork arm)
+
+Note: the success test reads the EVENT, which is G1-R1's "the outcome IS the event", as `ZFork` and `SFull`
+do. Its semantics is the allocator's tie (`kmemLedger_alloc`/`_null`): `KAlloc` is appended only at a
+`¬ poolEmpty` prefix and `KNull` only at a `poolEmpty` one. The receipts carry the latter
+(`kNullRcpt`/`kAllocRcpt` below), and the honesty note states it. `UIota.poolEmpty` (dead_allow) is deleted.
+
+**2. The ghost (F1 and F2 lanes).**
+
+    -- KallocDefs (beside ledReceipt), persistent
+    def kNullRcpt  (γk : KmemNames) (act : BitVec 64) : IProp GF := ∃ h, ledReceipt γk h (.KNull act) ∗ ⌜poolEmpty h⌝
+    def kAllocRcpt (γk : KmemNames) (act : BitVec 64) : IProp GF := ∃ h, ledReceipt γk h (.KAlloc act) ∗ ⌜¬ poolEmpty h⌝
+    -- UvmCallSites: uc_kalloc_led_call = uc_kalloc_lend_call with `kallocPostLed γk on k'.proc (R' 10)` kept
+
+    -- SlotGen: WchGpre + [slG : MonoListG GF Sev] + [soG : GhostMapG GF Nat Bool RegMapF];
+    --          WchG + wslName (the slot ledger) + wsoName (the occupancy column)
+    -- SchedCtx (or a new SlotLed.lean below it):
+    def slotN : Namespace := ndot nroot "xv6slotled"
+    def slotLedInv : IProp GF :=
+      inv slotN (∃ h, ⌜sevWf h⌝ ∗ WchG.wslName GF ↪●ML h ∗ ghost_map_auth (WchG.wsoName GF) 1 (occMap h))
+    def soElem (pa : BitVec 64) (b : Bool) : IProp GF := slotLedInv ∗ WchG.wsoName GF ↪◯MAP[pa.toNat] b
+    def slotLedLb (h : List Sev) : IProp GF := WchG.wslName GF ↪◯ML h
+    def sFullRcpt (act : BitVec 64) : IProp GF := ∃ h k0, slotLedLb (h ++ [.SFull act k0]) ∗ ⌜sevWindow h k0⌝
+    -- procHeldAt: + `soElem (procAddr j) (!isUnused st)` (definition; statements naming it byte-identical)
+    -- steps: soElem_visit (b = true ⊢ |={⊤}=> ∃ h, slotLedLb h ∗ ⌜occOf h j⌝), soElem_occ (false → true, SOcc),
+    --        soElem_vac (true → false, SVac), slotLed_full (lbs' window ⊢ |={⊤}=> sFullRcpt act), slotLed_alloc (boot)
+
+- **The scan.** `ap_scan` opens the invariant once at entry: a timeless fupd, no step, giving `k0 :=
+  |h_start|`. Its induction carries `∃ h, slotLedLb h ∗ ⌜k0 ≤ |h| ∧ ∀ i < n, ∃ k, k0 ≤ k ≤ |h| ∧ occOf
+  (h.take k) i⌝`, next to the landed `slotUsed` list.
+  - Each non-UNUSED visit calls `soElem_visit` and joins the result with `MonoList.lb_own_valid`.
+  - The exhausted arm, after the last release, appends `SFull k.proc k0` (`slotLed_full`) and takes the one
+    lend step (L3's rule, as `ZFork`). The `∃ k' ≥ ke` return absorbs it.
+- **The found arm.** `ap_found` flips the element (`SOcc j`) at the USED store and keeps the trapframe
+  kalloc's receipt (`uc_kalloc_led_call`) as `kAllocRcpt`, or, on null, `kNullRcpt` into the null arm.
+  `proc_pagetable`'s null arm hands its `kNullRcpt` through.
+- **freeproc** flips at its UNUSED store (`SVac j`). Its statement is byte-identical, because the element
+  is inside `procHeld`.
+- **The boot.** `childrenRes_alloc` (or its neighbour) mints `wslName` at `[]`, `wsoName` with NPROC elements
+  at `false`, and the invariant. The elements go into the slots' UNUSED blocks exactly as G1b's `zsElem`
+  did. `procsAvail` is unchanged: the counted regime still refutes the null arm at userinit.
+- **allocprocPostLed's null arm** gains the IProp disjunct `kNullRcpt γk act ∨ sFullRcpt act`. Its pure
+  part, `pav` / `availZero`, is byte-identical. Userinit refutes the whole arm as today.
+
+**3. The cited row, the arm, the filing.**
+
+    -- SyscallDefs.syscEvRow, the fork clause REPLACED
+      (syscNum V = USYS_fork →
+        tfW V'.tf (tfArgIdx 0) = usysForkAns ι ∧
+        (forkOk ι → (∃ (hz : List Zev) (i : Nat), ι.zev = hz ++ [.ZFork ι.act i
+            (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) (usysForkGen ι)]) ∧ cs' = cs ∪ {usysForkGen ι}) ∧
+        (¬ forkOk ι → (ι.kNull ∨ ι.sFull) ∧ cs' = cs))                 -- THE POSITIVE REASON (JF-R5)
+
+    -- NiEvid
+    def niNamesHere [WchG GF] [Fscfg] : List GName :=
+      [WchG.wtkName GF, WchG.wplName GF, WchG.wzlName GF, fsReadyKmem.pend, WchG.wslName GF]
+    def niIotaLbs (ns) (ι) := … ∗ ((ns.getD 3 0) ↪◯ML ι.kev) ∗ ((ns.getD 4 0) ↪◯ML ι.sev)
+    -- niBelow/niJoin/niIotaLbs_compat/_join/_boot/_mk gain the sev conjunct (a fourth lb_own_valid)
+    -- NiTrace: NiPos + `sev : Nat` (last), UIota.pos + `ι.sev.length`, niBelow_pos + sev
+
+- **The arm.**
+  - `syscArmFork_ev` (success) cites `{boot with kev := hk ++ [KAlloc act], pev := h, zev := hz ++ [ZFork …],
+    act}` from `kAllocRcpt` (the receipt IS the lower bound at `fsReadyKmem.pend`; `γk` is the env's
+    `fsReadyKmem`, `syscallEnv_kmem`).
+  - `syscArmFork_evNeg` (−1) cites `{boot with kev := hk ++ [KNull act], act}` or `{boot with sev := hs ++
+    [SFull act k0], act}`. It no longer cites `UIota.boot`.
+  - Both prove `syscEvRow`'s fork clause by unfolding `forkOk` on the cited lists. On success `¬ sFull`
+    holds because `sev = []`. The kernel never cites a stale `SFull` (honest by construction, not by the
+    row).
+- **The filing.**
+  - `urc_evRow` re-keys the fork clause to `usysForkFitsAt W.ch ι (tfW W'.tf …) W'.ch` (`hch` as wait's).
+  - `usysIotaFits_of_ev` gains it.
+  - `uexecRet_roundDet`'s `hcls` admits fork, and `usysDet_rows`/`_of_rows`/`_mem` gain the fork arm
+    (`pidPick_range` for `usysMemOk`'s `[1, PIDMAX]` branch).
+  - `urc_niDetRow` then covers fork.
+  - `niForkRow` is RETIRED from `niFitEv`/`niEntryOk` (subsumed by `niDetRow` at the class), together with
+    `urc_niForkRow`.
+- **The law** (`NiTrace`): the out-of-block fork conjunct is deleted. Inside the resume block:
+
+      (gprsNum secc xg = USYS_fork → ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysForkAns ι)
+
+  derived by a new `niDetRow_fork` (`usysDet_fork`, `ukeyEq_bump_a0`), as `niDetRow_wait`.
+  - `NiInClass` is unchanged in text: its meaning grows through `usysDetClassAt`.
+  - `NiStep` gains nothing: fork's answer reads only ι, so no key fact rides the step (unlike G1e's
+    `lz`/`win`).
+  - `NiStep.classReading` reads fork's resumed `a0` too, so `xv6NiTwoRunObs`'s hypothesis covers it.
+  - The four NI roots' statements are byte-identical.
+
+**4. The kernel route.**
+
+| Receipt (made at) | Carried by | Arm | ι component |
+|---|---|---|---|
+| `kNullRcpt γk act` (a null kalloc: walk / uvmcreate / allocproc's trapframe / uvmcopy) | walk 0-arm → `mappages_any` −1 → `pptPost` null / uvmcopy −1 → `allocprocPostLed` null / `kforkRetLed` −1 → `SYSFORK` led | `syscArmFork_evNeg` | `kev := h ++ [KNull act]` (`ι.kNull`) |
+| `sFullRcpt act` (`ap_scan`'s exhausted arm) | `allocprocPostLed` null → `kforkRetLed` −1 | `syscArmFork_evNeg` | `sev := h ++ [SFull act k0]` (`ι.sFull`) |
+| `kAllocRcpt γk act` (`ap_found`'s trapframe kalloc) | `allocprocPostLed` found → `kforkRetLed` success | `syscArmFork_ev` | `kev := h ++ [KAlloc act]` (`ι.kOk`) |
+| `pidAllocRcpt act rv` (landed, G2a) | as landed (G2b) | `syscArmFork_ev` | `pev := h` (`pidPick`) |
+| `zombReceipt hz (ZFork act i rv γc)` (landed, G1b) | as landed (G2b) | `syscArmFork_ev` | `zev := hz ++ [ZFork …]` (`usysForkGen`) |
+
+**5. Lanes** (one `lake` at a time; per-lane gate `lake build Xv6 MachCSL` + `tools/ci/lint.sh` + no `sorry`;
+baselines in the same commit when they move).
+
+| Lane | Content | Files | Statements that move | Gate |
+|---|---|---|---|---|
+| **F1 the slot ledger** | §1's `SlotEv` (pure) + §2's cameras, names, invariant, element, the four steps; `ap_scan`'s lb chain and the `SFull` append (+1 lend step); `ap_found`'s `SOcc`; freeproc's `SVac`; the boot mint and the elements; `allocprocPostLed`'s null arm `∨ sFullRcpt` (as F2's disjunct if F2 landed first, else a lone IProp disjunct F2 extends) | `SlotEv` (new), `SlotGen`, `SchedCtx` (or new `SlotLed`), `ProcDefs`, `ProcsInvAlloc`, `WaitInvTies`, `MainKvm`/`ProofMain` (boot), `ProofAllocproc`, `SpecAllocproc`, `ProofFreeproc`, xv6GF/unionGF, `NiAdequacy` (ambient `WchGpre`) | `WchGpre`/`WchG` (fields); `procHeldAt` (definition; every statement naming it byte-identical); `allocprocPostLed` | FULL `run_all.sh` (camera change, G1b's ~1000-file rebuild); `tcb.sh` (no root moves yet) |
+| **F2 the allocator receipts** | `kNullRcpt`/`kAllocRcpt`; `uc_kalloc_led_call`; the five failure arms (F3's table) and their proofs; allocproc's found arm (`kAllocRcpt`) and null arm (`kNullRcpt`); `kforkRetLed`/`kforkPostLed` (+`γk`, both arms); kfork's −1 tails carry the receipt through freeproc/release | `KallocDefs`, `UvmCallSites`, `SpecWalk`/`ProofWalk`, `SpecMappages`/`ProofMappages` (+`ProofKvmmap` if `wp_mappages` re-derives), `SpecUvmcreate`/`ProofUvmcreate`, `ProcPagetableDefs`/`SpecProcPagetable`/`ProofProcPagetable`, `KexecB`, `VmfaultDefs`, `ProofUvmalloc`, `SpecUvmcopy`/`ProofUvmcopy`, `SpecAllocproc`/`ProofAllocproc`, `SpecKfork`/`ProofKfork`, `SpecSysFork`/`ProofSysFork`, `LinkKfork`/`LinkSysFork` | `WALK`, `MAPPAGES_ANY`, `UVMCREATE` (via `uvmcreatePost` + `act`), `PROC_PAGETABLE` (via `pptPost` + `act`), `UVMCOPY`; `allocprocPostLed`; `KFORK.wp_kfork_led_eb`, `SYSFORK.wp_sys_fork_led_eb` (+`γk`). Byte-identical: `wp_mappages_body`, `wp_uvmalloc`, `wp_vmfault`, `kexec`, `allocprocPost`, `wp_allocproc_body`, `kforkRet`, every landed (unled) field | build + lint; `kNullRcpt`/`kAllocRcpt` unreached past the arm until F3 (dead_allow rows, removed by F3) |
+| **F3 the row, the fifth name, the law** | §1's `UsysDet` growth (`UIota.sev`, `forkOk`, `usysForkAns`, `usysDetFork`, the class, `usysIotaFits`, `_mem`/`_rows`/`_of_rows`, `pidPick_range`), §3: `niNamesHere`/`niIotaLbs` five, `syscEvRow`'s fork clause, the two arm citations, `urc_evRow`/`urc_niDetRow` at fork, `niForkRow` retired, `NiPos.sev`, `niRoundLaw`'s fork clause, `niDetRow_fork`, `classReading`; `dead_allow` (`UIota.poolEmpty` deleted; F2's rows off); `expected.json` (`SlotEv` enters the NI roots) | `UsysDet`, `PidEv`, `UexecApply`, `NiEvid`, `SyscallDefs`, `SyscallArmsFork`, `UserretClosedRows`, `NiLedger`, `NiTrace`, `NiAdequacy`/`LinkNiAdequacy` (proofs), `tools/ci/dead_allow.txt`, `tools/tcb/expected.json` | `UIota` (+`sev`), `usysDetClass`, `usysDet`, `syscEvRow` (fork clause; `SYSCALL`'s text names it, byte-identical), `niIotaLbs`/`niNamesHere` (definitions; `syscEvOut`, `parkWorld`, `xv6Era_run` texts byte-identical), `niFitEv`/`niEntryOk` (−`niForkRow`), `NiPos`, `niRoundLaw`. The four NI roots byte-identical (meaning grows) | full `run_all.sh` + `reports`; `tcb.sh --update` (NI roots: `SlotEv`); `audit.sh` |
+
+Order: F1 ∥ F2 (disjoint but for `SpecAllocproc`/`ProofAllocproc`'s null arm, where the second to land rebases
+onto the first's disjunct) → F3. Estimates:
+- **F1:** ~18 files, one full rebuild. The content is `ap_scan`'s chain (~150 lines) and the pure `sevWf` steps
+  (~80 lines); the boot is G1b-mechanical.
+- **F2:** ~25 files, mechanical. The content is threading one persistent receipt through walk's recursion, the
+  uvmcopy loop's `err` tail (`uvmcopy_err`) and kfork's two −1 tails.
+- **F3:** ~13 files, with the X4/G1e pattern; the content is `usysDet_rows`' fork arm and `niDetRow_fork`.
+
+**RULINGS REQUESTED.**
+- **JF-R1 (the allocator component: one decisive event).**
+  - Recommended: ι.kev is ONE receipt prefix ending in the round's decisive event: the trapframe's `KAlloc
+    act` on success, the `KNull act` on −1. The row reads it (F1, F2).
+  - Alternative (canonical position): cite the round's LAST kalloc on success too. That costs `Option`
+    receipts on the SUCCESS arms of walk, mappages_any, uvmcreate, proc_pagetable and uvmcopy (+5 statement
+    moves and the merge through uvmcopy's loop) for no change in the theorem (F6: positions are inputs
+    either way).
+  - Not available: a window `[kev0, |kev|)` with "no `KNull act`", which is unprovable without per-actor
+    ownership in the kmem ledger (F2).
+- **JF-R2 (the class at fork).**
+  - Recommended: fork at EVERY key. The kalloc count never enters ι. It sits in `H`, conceded under equal
+    histories, with F6's paragraph.
+  - Cheapest alternative: `n = USYS_fork → lz = false` (G1e's pattern, through `usysDetClassAt`; no new
+    step field, since `lz` already rides it). There the count is a function of the key, so `H` concedes
+    less, but lazy forks leave the class.
+- **JF-R3 (the slot ledger).**
+  - Recommended: §6 confirmed, with `SFull act k0` and `sevWf` in the invariant.
+  - The element rides `procHeldAt` (G1b's precedent), so the flips are at allocproc's USED and freeproc's
+    UNUSED stores.
+  - New cameras (`slG`, `soG`), with ONE full rebuild. It is registered as the FIFTH name (F4), in F3.
+  - Cheapest alternative: an anchored invariant-held `SFull`-only ledger (no occupancy column, no element,
+    no window): F1's files shrink to `SlotGen`, the boot, `ProofAllocproc`'s exhausted arm and
+    `SpecAllocproc`. But `SFull` is then an unconstrained outcome bit inside `H`, which is §2's oracle at
+    one bit. Not recommended.
+- **JF-R4 (pid and children on −1).** Recommended:
+  - −1 cites `pev := []` and `zev := []`;
+  - the −1 key keeps `W.pid` and `W.ch` (F5);
+  - the success `γ` is the cited `ZFork`'s, with nothing more.
+
+  The honesty note says that a failed fork past the scan still advances the counter. Alternative: also cite
+  the −1's `PFree` (no content).
+- **JF-R5 (the positive reason).** Recommended: `syscEvRow`'s fork clause demands `ι.kNull ∨ ι.sFull` on −1
+  (and `forkOk` demands `ι.kOk` on success), so neither the boot prefix nor an empty citation can explain
+  either answer. The cheaper alternative, `forkOk` alone, is sound for the two-run theorem but lets the
+  kernel explain every −1 by `kev := []` (`getLast? [] = none`), which leaks the bit through the cited
+  position.
+- **JF-R6 (the Spec moves).** Recommended:
+  - in place on the five FAILURE arms (the receipt is persistent, so callers drop it in proof only);
+  - `act` added to `uvmcreatePost`/`pptPost`;
+  - `γk` added to `kforkRetLed`/`kforkPostLed`, which moves the two led field texts.
+
+  Alternative: led twins (a second field in `WALK`, `MAPPAGES_ANY`, `UVMCREATE`, `PROC_PAGETABLE`,
+  `UVMCOPY`), which keep every landed text but double five contracts. A side benefit of in place: sbrk's
+  `uvmalloc` and `vmfault` gain the `KNull` reason for free (G3 sbrk, and G1e's lazy copyout).
+- **JF-R7 (the law and the filing).** Recommended:
+  - fork's clause moves into the resume block as `gprsA0 eg = usysForkAns ι`, derived from `niDetRow`;
+  - `niForkRow` is retired;
+  - `NiStep` is unchanged;
+  - `classReading` gains fork.
+
+  Alternative: keep `niForkRow` beside `niDetRow` (harmless, redundant; one more conjunct in `niFitEv`).
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
