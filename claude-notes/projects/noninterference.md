@@ -3082,6 +3082,410 @@ exported law reads only `usysForkAns ι` (NiTrace scope 8 says so).
 
 What remains: G3 (sbrk), G4 (console write), M3.
 
+### M2-G3 design (2026-10-04)
+
+Design pass on `lane/g3` (based on `lean` 462330a5e: the joint fork lane F1–F3 landed). No code landed. The
+shapes below were read off the tree (`SpecSysSbrk`/`ProofSysSbrk`, `SpecGrowproc`/`ProofGrowproc`,
+`SpecUvmalloc`/`ProofUvmalloc`, `KexecSeam`, `UPtDefs`, `UserPerm`, `SpecVmfault`, `SpecCopyout`,
+`SyscallArmsSbrk`, `UsysMemOk`/`UsysMemOkSpec`, `SyscallDefs`, `SpecSyscall`, `SpecUsertrap`, `UsysDet`,
+`UexecApply`, `UserretClosedRows`/`Round`, `NiLedger`, `NiTrace`, `UkRunSysSbrk`). They are not
+shape-checked in Lean. The rulings G3-R1…R7 at the end are needed before a lane starts.
+
+**Short version.**
+- **sbrk's −1 has two honest reasons, and the spec licenses a third that does not exist.**
+  - The OVERRUN test `sz + n > TRAPFRAME` at `n ≥ 0`: growproc's at `+0x36` (before uvmalloc), and the lazy
+    path's own. It reads only the key (`W.sz`, the argument word).
+  - A NULL KALLOC inside the eager grow's `uvmalloc` loop. Every kalloc there is fatal (rollback, return 0,
+    growproc −1, sbrk −1), and xv6 never retries. So, as in fork's F1, the outcome is ONE decisive event, the
+    `KNull act` that is the round's last kalloc.
+  - Today `sysSbrkOk`'s FAILED disjunct is unconditional (the spurious −1). The move makes it
+    `overrun ∨ allocs` (pure) and carries `kNullRcpt γk k.proc` on the −1 that is not an overrun. It goes in
+    place on three Specs: uvmalloc's 0 arm, growproc's −1 arm and sys_sbrk's −1 arm.
+- **The key pins everything else.**
+  - The image and the permission view are functions of the two breaks (`usysSbrkImg`/`usysSbrkPerm`).
+  - The new break and the lazy bit are functions of `(W.sz, a0, a1)` and the failure bit.
+  - The interior page-table pages are not in `UPtd` (`root`, `tfp`, `um` only), so they never reach the key.
+    They change only the NUMBER of kallocs (and the shrink's kfrees), which `H` concedes (JF-R2's pattern).
+- **The row.** `usysSbrkFails sz a0 a1 ι := overrun ∨ (allocs ∧ ι.kNull)`. The answer is `-1` or the OLD
+  break `W.sz`.
+  - Success is the ABSENCE of a cited `KNull`, so non-allocating outcomes cite `{boot with act}`.
+  - A −1 can only be explained positively (overrun, or a cited `KNull`), so JF-R5's reason is built into
+    the answer function.
+  - sbrk joins `usysDetClass` at EVERY key and cites at every sbrk (`niCiting += sbrk`; the quiet disjuncts
+    of `syscEvOut`/`utEvOut` exclude sbrk).
+- **The law needs the break.** The success answer `W.sz` is a ghost-key reading, not in the trace, so `sz`
+  rides `NiStep.round` (G1e's `lz`/`win` pattern): the caller's own break, which `sbrk(0)` reads back at any
+  time.
+  - The law clause is `gprsA0 eg = usysSbrkAns sz (gprsA0 xg) (gprsA1 xg) ι` inside the resume block.
+  - `classReading` admits sbrk.
+- **Lanes:** G3a (the receipts, three Spec moves, kernel only) → G3b (the row, the class, the citation, the
+  step's `sz`, the law). G3c (wait's lazy copyout, single-page status windows only) is optional and
+  separate, and is NOT recommended for G3.
+
+**Findings.**
+- **F1 (the three paths, read off `sys_sbrk`'s code and `sysSbrkOk`).** `sys_sbrk` takes growproc when
+  `t == SBRK_EAGER || n < 0` and the lazy path otherwise (`n ≥ 0`, not eager).
+  - (i) SHRINK (`n < 0`, either `t`): growproc → `uvmdealloc`, which never fails. The new break is `uvmdRsz
+    sz (sz + n)`: `sz + n` when `0 ≤ sz + n`, and `sz` itself when the 64-bit add wraps below 0
+    (`uvmdealloc`'s `newsz ≥ oldsz` no-op). The table loses `delRun`, the lazy bit is kept, and the kfrees
+    (`KFree act`, one per MAPPED page of the cut run) are counted by the page table, not by the key, at
+    `lazy = true`.
+  - (ii) LAZY GROW (`n ≥ 0`, not eager): −1 iff `sz + n > TRAPFRAME` (`uvmMaxsz = 2^38 − 8192 = TRAPFRAME`,
+    `sys_sbrk_trapframe_toNat`). The wrap test `addr + n < addr` is dead (ProofSysSbrk deviation 3).
+    Otherwise `sz += n`, `pvLazy := true` and nothing is allocated. Quirk: `sbrk(0)` lazily RAISES the lazy
+    bit; that is key-functional.
+  - (iii) EAGER GROW (`t == 1`, `n ≥ 0`): `n = 0` is growproc's no-op. At `n > 0` growproc tests the same
+    overrun (`bltu a5,a2` at `+0x36`, `ProofGrowproc`'s header) BEFORE `uvmalloc`, so the −1 from the bound
+    is key-functional and allocates nothing.
+    - `uvmalloc` itself has no MAXVA test: its `hnew` premise is discharged by growproc's test.
+    - The loop runs `uvmaNp sz (sz + n)` times. That is 0 exactly when `sz + n ≤ PGROUNDUP(sz)`
+      (`uvmaNp`: `0 < uvmaNp o n ↔ pgRoundUpN o < n`), and then no kalloc happens.
+    - Each turn does kalloc (null → `uvma_rollA`: uvmdealloc, return 0) then mappages (−1 → `uvma_rollB`:
+      kfree, uvmdealloc, return 0). Since F2, mappages_any's −1 carries `kNullRcpt` (walk's null node; with
+      `va < uvmMaxsz < 2^38` and `hfree`'s no-remap there is no other −1).
+    - So the eager −1 that is not an overrun happens iff ONE kalloc of the loop appended `KNull k.proc`, and
+      that is the round's last kalloc. Only kfrees follow it.
+  - The label: growproc and uvmalloc inherit `k.proc = procAddr j` (`hproc`) through every call, inside
+    `walk` too, so the cited event is `KNull ι.act`.
+- **F2 (the citation is the decisive `KNull`; success needs none).**
+  - On −1 by allocation the arm cites `kev := h ++ [KNull act]`.
+  - On success, fork needed `kOk` because its row is `forkOk := kOk ∧ …`, so at `[]` the row reads −1 and
+    JF-R5 had to forbid that. sbrk's row is the other way round: `usysSbrkFails` reads −1 only from
+    `overrun` (key) or `allocs ∧ kNull` (key ∧ a cited `KNull`). So the default (`{boot with act}`) reads
+    SUCCESS, and a −1 cannot be explained by an empty citation.
+  - Reading `¬ kNull` on success therefore needs NO success receipt. `uvmalloc`'s success arm,
+    `wp_growproc_body`'s and `wp_sys_sbrk_body`'s success arms stay byte-identical.
+  - The zero-page eager grow (`uvmaNp = 0`) is `¬ allocs`, so it is key-functional and the arm cites boot.
+  - Two premises the arm must show:
+    - `¬ overrun` on success: from the success arms' `sz + n ≤ uvmMaxsz` and, at `n ≤ 0`, from the block's
+      `V.sz.toNat ≤ uvmMaxsz` (`procPrivFd_facts`);
+    - `allocs` on the −1 that is not an overrun: from the new pure conjunct `0 < uvmaNp` on uvmalloc's 0 arm
+      (the loop ran).
+  - The count of kallocs (data pages plus the interior nodes `walk` adds) never enters ι.
+- **F3 (what the key already pins; confirmed, with two gaps the fit closes).**
+  - At the key (`usysMemOk`'s sbrk branch): `usysSbrkImg M M' szv szv'` and `usysSbrkPerm π π' szv szv'` are
+    EQUATIONS for `M'`/`π'` given `szv'`, so they are functions of the two breaks.
+    - The eager grow's leaves are `W|R|U`, so `permLeaf` gives `upermRw`, the same as the lazy fill.
+    - The physical page `r` of each leaf is in `um` but not in `permOf`'s image.
+  - `uvmallocOk` constrains only `um` and `M`. The interior PTree nodes live inside `procPtAt`'s
+    existential, not in `UPtd` (root, tfp, um). So the KEY outcome of an eager success does not depend on
+    which interior nodes existed, and only the kalloc COUNT does. That count is conceded through `H`
+    (JF-R2).
+    - A `lazy = false` restriction would NOT make the count key-functional either: `uvmdealloc` never frees
+      interior nodes, so the interior shape remembers every earlier break.
+  - Two gaps in the relational row, which the cited fit must carry (`usysMemOk` stays byte-identical, per
+    W3's lesson):
+    - `usysSbrkRet` pins `szv'` only on −1 and at `n ≥ 0`. At the SHRINK `szv'` is free (it is `uvmdRsz`:
+      `sz + n`, or `sz` when that is negative).
+    - `usysSbrkLazy` pins `lz'` only as `lz = false → lz' = false` on the eager and shrink arms. On the lazy
+      grow it says nothing, and the truth is `true`.
+  - So `usysIotaFits` gains `(szv', lz')` parameters and an sbrk conjunct (`usysSbrkFitsAt`). The kernel
+    proves it from `sysSbrkOk`, which pins `V'` exactly on every arm.
+- **F4 (closing the spurious −1: the readers, and why the user tier is untouched).**
+  - Readers of `sysSbrkOk`: `ProofSysSbrk` (proves it), `SyscallArmsSbrk` (`sbrkArm_shape`/`sbrkArm_ok`/
+    `syscRows_sbrk`: they destructure the FAILED arm, so this is a proof edit; their statements are
+    unchanged).
+  - Readers of `growprocOk`: `ProofGrowproc` (`gp_ok_same` builds the −1 arm), `ProofSysSbrk`
+    (`sys_sbrk_gp_fail/_ok`), `SpecSysSbrk` (by name).
+  - Readers of `wp_uvmalloc_body`: `ProofUvmalloc`, `ProofGrowproc`, and EXEC's
+    `KexecSeam.kxc_call_uvmalloc`. That rule restates the post in its own statement with the 0 arm
+    `⌜R' 10#5 = 0#64⌝ ∗ procPtAt P M`, so the statement stays byte-identical and the proof drops the new
+    conjuncts (the exec `KexecB*`/`KexecC*` files see only `kxc_call_uvmalloc`). `uvmallocOk` is unchanged
+    (so `LazyFree`, `KexecB2/B3/Built/CSetup` are untouched).
+  - THE USER TIER does not read any of the three. The chain is: `sysSbrkOk` → `sbrkArm_ok` (a HYPOTHESIS
+    strengthened, conclusion unchanged) → `syscMemOk`'s sbrk branch and `SyscRows.sbrk` (`usysSbrkRet`) →
+    `UsysMemOkSpec.syscMemOk_usys_sbrk` → `usysMemOk`'s sbrk branch → `uexecRetContF`.
+    - `UkRunSysSbrk.wp_uk_ecall_sbrk` consumes only `usysMemOk`'s sbrk branch through `uexecRet_retK`. Its
+      failure arm (`r = -1`, `usz N.s sz`) is what a user program must handle anyway.
+    - `UshmSbrkHolds`, `SpecShSbrk`, `SpecShSysSbrk` and `ProofShSysSbrk` read only `usysSbrkArg` and that
+      leaf.
+    - So every `Uk*`/`Ush*`/`User*`/`SpecSh*` statement is byte-identical: the kernel's row gets stronger,
+      the user table does not move.
+- **F5 (the answer is the old break, which is not in the trace).**
+  - The law reads `gprsA0 eg` against the trapped registers `xg` and the citation. `xg` carries both
+    arguments (a0 = `gprsA0 xg`, a1 = x11 = `xg.getD 10`), but the success value `W.sz` and the overrun /
+    allocs tests need the BREAK. The break is a key field, like `lz`.
+  - So the step carries it: `NiStep.round` gains `sz : Nat` (filled with `W.sz` by `niStepOf`), and it joins
+    `NiStep.input`.
+  - It is the caller's own public datum: the process can read it at any instant by `sbrk(0)` (which answers
+    exactly `W.sz` and changes no byte), and it is determined by exec's layout and the process's own sbrk
+    calls.
+  - `obsInput` does not need it: sbrk is in the class at every key, so whether a round reads depends only on
+    the number, and `classReading` takes sbrk's resumed a0 as a reading.
+- **F6 (the lazy copyout at wait, G3b in the brief and G3c here: feasible only for single-page windows).**
+  - `vmfault`'s 0 arm has no reason: it is shared by the quiet arms (`va ≥ sz`, or already mapped) and the
+    allocating arm's null. F2's `vf_mappages_call` drops the wand.
+  - Threading `(⌜¬ vmfaultQuietArm P sz va⌝ -∗ kNullRcpt γk k.proc)` onto the 0 arm (as in G3a) lets
+    copyout's −1 reason gain "the stop byte is lazily absent (`va < sz`, unmapped in `P`) ∧ `kNullRcpt`".
+    The alternative disjunct is "not writable in the entry view".
+  - But the KEY cannot say WHICH page of a straddling window was absent. `permOf` gives `upermRw` both to a
+    lazily absent page below `PGROUNDUP(sz)` and to a faulted-in `W|U|R` leaf. So when both status pages are
+    lazily live, a null on the first page stops at `d = 0` and a null on the second at `d = 4096 − a0 %
+    4096`. One `KNull act` does not distinguish the two, and the image prefix `usysWr … (take d)` is part of
+    the key equality.
+  - For a window inside ONE page (`a0 % 4096 ≤ 4092`) the stop byte is `if ι.kNull then 0 else uwaitWin π
+    a0`. Faulted-in pages are zero in the lazy view already (`viewFaulted` = `umemGrow`'s zeros), so the
+    copied prefix is pinned.
+  - Cost: ~18 files (vmfault's Spec and three proofs plus usertrap's fault arm dropping; copyout's reason;
+    kwait's `waitWhyLed`; `syscWaitRow`/`syscEvRow`'s wait premise; `usysDetClassAt` gaining the page
+    condition; the kernel→key window move WITHOUT `lazyFree`; NiTrace's wait class text). The value is
+    small: wait with a non-null status pointer in a lazy process. Recommend a separate optional lane after
+    G3b, not part of G3.
+- **F7 (what sbrk declassifies: honesty, NiTrace scope 9).** Inside the equal-histories hypothesis, sbrk's
+  answer is derived from:
+  - the caller's own break (riding the step) and its two argument words;
+  - at an allocating eager grow, whether the cited allocator prefix ends in the actor's `KNull`. By the tie
+    (`kmemLedger_null`), the pool was empty at the round's decisive kalloc. Success is the absence of such a
+    citation.
+
+  What `H` concedes:
+  - every actor's `Kev` order, including the round's number of `KAlloc act` (data pages plus interior
+    nodes, a function of the page table's interior shape, which the key does not carry);
+  - the shrink's number of `KFree act` (at `lazy = true`, the mapped subset of the cut run).
+
+  The cited position is an input (X F4). It is `0` on every non-allocating outcome and the `KNull`'s on an
+  allocation failure, so "equal positions" includes the outcome. This is the same concession as fork's
+  F6.
+
+  A page FAULT on a lazy page with an empty pool kills the process in usertrap (a fault round, never
+  resumed). That is the kill channel, untouched here.
+
+**1. The Spec moves (G3a; in place, JF-R6's pattern).**
+
+    -- SpecUvmalloc.wp_uvmalloc_body: the 0 arm (the success arm byte-identical)
+        ((⌜R' 10#5 = 0#64 ∧ 0 < uvmaNp (k.regs 11#5) (k.regs 12#5)⌝ ∗ procPtAt P M ∗ kNullRcpt γk k.proc) ∨
+         (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)), …as landed…))
+
+    -- SpecGrowproc.growprocOk: the 0 < nz arm's FAILED disjunct (the rest byte-identical)
+      (0 < nz → ((r = -1#64 ∧ V' = V ∧ M' = M ∧
+          (uvmMaxsz < sz.toNat + nz.toNat ∨ 0 < uvmaNp sz (sz + n))) ∨
+        (r = 0#64 ∧ (sz.toNat + nz.toNat) ≤ uvmMaxsz ∧ …as landed…)))
+    -- SpecGrowproc.wp_growproc_body: the post's existential gains, last,
+        ∗ (⌜R' 10#5 = -1#64 ∧ V.sz.toNat + (k.regs 10#5).toInt.toNat ≤ uvmMaxsz⌝ -∗ kNullRcpt γk k.proc)
+
+    -- SpecSysSbrk
+    /-- the overrun test both paths make at a non-negative argument (growproc's `sz + n > TRAPFRAME`
+        at +0x36, the lazy path's `addr + n > TRAPFRAME`) -/
+    def sysSbrkOverrun (V : ProcPriv) (v0 : BitVec 64) : Prop :=
+      0 ≤ (sysSbrkArg v0).toInt ∧ uvmMaxsz < V.sz.toNat + (sysSbrkArg v0).toInt.toNat
+    /-- the eager grow runs uvmalloc's loop at least once: the only place sbrk allocates -/
+    def sysSbrkAllocs (V : ProcPriv) (v0 v1 : BitVec 64) : Prop :=
+      sysSbrkEager v1 ∧ 0 < (sysSbrkArg v0).toInt ∧ 0 < uvmaNp V.sz (V.sz + sysSbrkArg v0)
+    def sysSbrkOk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r : BitVec 64) : Prop :=
+      -- FAILED: nothing moved, and only for a reason (NI M2-G3)
+      (r = -1#64 ∧ V' = V ∧ M' = M ∧ (sysSbrkOverrun V v0 ∨ sysSbrkAllocs V v0 v1)) ∨
+      (r = V.sz ∧ …SUCCEEDED as landed…)
+    -- wp_sys_sbrk_body: the post's existential gains, last,
+        ∗ (⌜R' 10#5 = -1#64 ∧ ¬ sysSbrkOverrun V v0⌝ -∗ kNullRcpt γk k.proc)
+
+- The receipts are wands keyed on the failure answer, as `wp_mappages_any_body`'s. `kNullRcpt` is
+  persistent, so the wand is too, and callers that do not need it drop it. `k.proc` is the hart's
+  `c->proc`, which `hproc` names `procAddr j`.
+- `ProofUvmalloc`:
+  - `ua_kalloc_call` switches to `uc_kalloc_led_call` (its continuation gains `kRcpt γk k'.proc (R' 10#5)`,
+    and `kRcpt_null` at the null);
+  - `ua_mappages_call` keeps the `-1` wand (F2's `-` gone);
+  - `uvma_rollA`/`uvma_rollB` take `kNullRcpt γk k.proc` and frame it through `kfree`/`uvmdealloc`;
+  - `uaOut`'s exit arm (`pcv = …+0x78`) gains `∗ kNullRcpt γk k.proc`, and `uvma_loop` its `i < np`;
+  - `0 < uvmaNp` at the 0 arm is `uvma_loop`'s `i < np` at the exit (the loop ran).
+- `ProofGrowproc`:
+  - the overrun branch (`+0x76`) refutes the wand's premise by the `bltu`;
+  - the uvmalloc-0 branch (`+0x7a`) hands uvmalloc's receipt through `gp_epi`;
+  - the success branches answer 0, not −1.
+- `ProofSysSbrk`:
+  - the lazy −1 branches are overruns (the wand's premise is refuted);
+  - growproc's −1 is either an overrun (it maps to `sysSbrkOverrun` through `sys_sbrk_sum`) or carries the
+    receipt.
+- `SyscallArmsSbrk` (G3a: proof only): `sbrkArm_shape`/`sbrkArm_ok` destructure one more conjunct, and the
+  arm drops the wand (`-`) until G3b.
+
+**2. The row (G3b; `UsysDet`).**
+
+    /-- sbrk's argument, at a word, as the kernel reads it back (`usysSbrkArg`'s and `sysSbrkArg`'s body) -/
+    def sbrkArgW (a : BitVec 64) : BitVec 64 := BitVec.signExtend 64 (BitVec.extractLsb' 0 32 a)
+    def sbrkEagerW (a1 : BitVec 64) : Prop := sbrkArgW a1 = 1#64
+    /-- the overrun test, at the key's break -/
+    def usysSbrkOverrun (sz : Nat) (a0 : BitVec 64) : Prop :=
+      0 ≤ (sbrkArgW a0).toInt ∧ (uvmMaxsz : Int) < sz + (sbrkArgW a0).toInt
+    /-- the eager grow allocates: `0 < uvmaNp sz (sz + n)` ⇔ the new break passes `PGROUNDUP(sz)` -/
+    def usysSbrkAllocs (sz : Nat) (a0 a1 : BitVec 64) : Prop :=
+      sbrkEagerW a1 ∧ 0 < (sbrkArgW a0).toInt ∧ (pgRoundUpN sz : Int) < sz + (sbrkArgW a0).toInt
+    /-- sbrk fails: an overrun (the key), or an allocating eager grow whose cited allocator prefix ends in
+        the actor's `KNull` (the decisive event) -/
+    def usysSbrkFails (sz : Nat) (a0 a1 : BitVec 64) (ι : UIota) : Prop :=
+      usysSbrkOverrun sz a0 ∨ (usysSbrkAllocs sz a0 a1 ∧ ι.kNull)
+    def usysSbrkAns (sz : Nat) (a0 a1 : BitVec 64) (ι : UIota) : BitVec 64 :=
+      if usysSbrkFails sz a0 a1 ι then -1#64 else BitVec.ofNat 64 sz
+    /-- the break after: kept on failure; `sz + n` otherwise, or `sz` at a shrink past 0 (`uvmdRsz`) -/
+    def usysSbrkSz (sz : Nat) (a0 a1 : BitVec 64) (ι : UIota) : Nat :=
+      if usysSbrkFails sz a0 a1 ι then sz
+      else if 0 ≤ (sz : Int) + (sbrkArgW a0).toInt then ((sz : Int) + (sbrkArgW a0).toInt).toNat else sz
+    /-- the lazy bit after: RAISED by a successful lazy call (`n ≥ 0`, not eager; `sbrk(0)` included) -/
+    def usysSbrkLz (sz : Nat) (a0 a1 : BitVec 64) (lz : Bool) (ι : UIota) : Bool :=
+      if ¬ usysSbrkFails sz a0 a1 ι ∧ ¬ sbrkEagerW a1 ∧ 0 ≤ (sbrkArgW a0).toInt then true else lz
+    /-- `usysSbrkImg`/`usysSbrkPerm`'s right-hand sides as functions (UsysMemOk byte-identical) -/
+    def usysSbrkImgF (M : ElfMem) (szv szv' : Nat) : ElfMem :=
+      if szv ≤ szv' then umemGrow M szv' else umemDel M (pgRoundUpN szv') (pgRoundUpN szv - pgRoundUpN szv')
+    def usysSbrkPermF (π : Nat → Option UPerm) (szv szv' : Nat) : Nat → Option UPerm :=
+      if szv ≤ szv' then fun k => match π k with
+        | some q => some q
+        | none => if k * 4096 < pgRoundUpN szv' ∧ ¬ k * 4096 < pgRoundUpN szv then some upermRw else none
+      else fun k => if k * 4096 < pgRoundUpN szv' then π k else none
+    -- usysSbrkImg_iff : usysSbrkImg M M' a b ↔ M' = usysSbrkImgF M a b   (and _Perm_iff), by unfolding
+    def usysDetSbrk (W : Uvis) (ι : UIota) : Uvis :=
+      let a0 := tfW W.tf (tfArgIdx 0); let a1 := tfW W.tf (tfArgIdx 1)
+      let sz' := usysSbrkSz W.sz a0 a1 ι
+      bump W (usysSbrkAns W.sz a0 a1 ι) (usysSbrkImgF W.M W.sz sz') (usysSbrkPermF W.perm W.sz sz') sz'
+        W.fd W.cwd W.gen W.ch (usysSbrkLz W.sz a0 a1 W.lazy ι) W.secc
+    /-- ONE text for the kernel's cited row and the key's fit (G1e's pattern) -/
+    def usysSbrkFitsAt (sz : Nat) (a0 a1 : BitVec 64) (lz : Bool) (ι : UIota) (r : BitVec 64) (sz' : Nat)
+        (lz' : Bool) : Prop :=
+      r = usysSbrkAns sz a0 a1 ι ∧ sz' = usysSbrkSz sz a0 a1 ι ∧ lz' = usysSbrkLz sz a0 a1 lz ι
+
+    def usysDetClass (n : Int) : Prop :=
+      n = USYS_exit ∨ n = USYS_getpid ∨ n = USYS_uptime ∨ n = USYS_wait ∨ n = USYS_fork ∨ n = USYS_sbrk
+    -- usysDetClassAt: text unchanged (sbrk at every key); usysDetResumes: + `∨ n = USYS_sbrk`
+    -- usysDet: + `else if n = USYS_sbrk then usysDetSbrk W ι` (after fork); usysDet_sbrk
+    -- usysDetRet: + `else if n = USYS_sbrk then usysSbrkAns W.sz (tfW W.tf (tfArgIdx 0)) (tfW W.tf (tfArgIdx 1)) ι`
+    def usysIotaFits (n : Int) (W : Uvis) (r : BitVec 64) (cs' : Std.ExtTreeSet GName compare) (M' : ElfMem)
+        (szv' : Nat) (lz' : Bool) (ι : UIota) : Prop :=                                -- + szv' lz'
+      (n = USYS_uptime → r = usysUptimeWord ι.ticks) ∧ (n = USYS_wait → usysWaitFits W ι r cs' M') ∧
+        (n = USYS_fork → usysForkFitsAt W.ch ι r cs') ∧
+        (n = USYS_sbrk → usysSbrkFitsAt W.sz (tfW W.tf (tfArgIdx 0)) (tfW W.tf (tfArgIdx 1)) W.lazy ι r szv' lz')
+    -- usysIotaFits_exists: + `hsb : n ≠ USYS_sbrk` (the relational row cannot supply the shrink's break or
+    --   the lazy bit; sbrk's prefix is always the CITED one); usysIotaFits_of_ev: + `hs`
+    -- usysDet_mem: the sbrk arm (usysSbrkImg/Perm by `_iff`; usysSbrkRet: −1 keeps the break, success is
+    --   `ofNat W.sz` and `sz + n` at n ≥ 0 because ¬ overrun; usysSbrkLazy: the lazy grow is ¬eager ∧ sz' ≥ sz)
+    -- usysDet_of_rows: the sbrk arm (M', π' from the rows at szv', szv'/lz'/r from the fit); `usysMemOk_lazy
+    --   h12` is now taken off sbrk; usysDetResumes_ne loses `n ≠ USYS_sbrk`
+
+- `usysDet_mem`'s failure arm needs `umemGrow W.M W.sz` as the image at an unmoved break. That is what the
+  relational row says (`usysSbrkImg … szv szv`; UkRunSysSbrk deviation 2), so `usysDetSbrk` uses
+  `usysSbrkImgF W.M W.sz sz'` on every arm rather than `W.M`.
+- `usysSbrkPermF π sz sz = π` (`usysSbrkPermF_same`), by funext.
+
+**3. The cited row, the citation, the filing.**
+
+    -- SyscallDefs.syscEvRow: + a fourth clause, last
+      (syscNum V = USYS_sbrk →
+        usysSbrkFitsAt V.sz.toNat (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) V.pvLazy ι
+          (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy)
+    -- SpecSyscall.syscEvOut / SpecUsertrap.utEvOut: the quiet disjunct gains `∧ syscNum V ≠ USYS_sbrk`
+    --   (`syscNum (utSysRec sep V) ≠ USYS_sbrk`); syscEvOut_quiet + `(h12 : n ≠ 12 := by decide)`
+    -- NiLedger
+    def niCiting (sc : BitVec 64) (W : Uvis) : Prop :=
+      sc = uecallScause ∧ (uvisNum (uvisRun W) = USYS_uptime ∨ uvisNum (uvisRun W) = USYS_wait ∨
+        uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_sbrk)
+
+- **The arm** (`SyscallArmsSbrk.syscall_arm_sbrk`) takes the anchor (`syscallEnv_anchor`) and the post's
+  wand. A new `syscArmSbrk_ev` decides by cases:
+  - `R' 10 = -1 ∧ ¬ sysSbrkOverrun V v0` → the wand's `kNullRcpt fsReadyKmem (procAddr j)` → cite `{boot
+    with kev := hk ++ [KNull act], act}` (`niIotaLbs_kev`, as `syscArmFork_evNeg`). `sysSbrkOk`'s FAILED arm
+    gives `sysSbrkAllocs`, so `usysSbrkFails` holds by its right disjunct.
+  - Otherwise → cite `{boot with act}` (`niIotaLbs_act`). `ι.kNull` is false at `[]`, and the answer is −1
+    only by an overrun, or `V.sz` with `¬ overrun`.
+  - In both cases `V'.sz`/`V'.pvLazy` come off `sysSbrkOk`'s arm: `uvmdRsz` ↔ `usysSbrkSz`'s shrink branch
+    (`sbrkArm_add_toNat` and the 64-bit wrap); the lazy arm's `pvLazy := true`; growproc keeps the bit.
+- `syscRows_sbrk` is byte-identical.
+- **The filing.**
+  - `UserretClosedRows.urc_evRow` gains `hsz : W.sz = V.sz.toNat` and the fourth conjunct, re-keying the
+    entry record to `uvisRun W` (`urc_a0_run`, an `a1` twin `urc_a1_run`, `hlz`).
+  - `urc_niDetRow` passes `W'.sz`/`W'.lazy` (`uvisOf V' …` fields) to `usysIotaFits_of_ev`.
+  - `UserretClosedRound`'s `rcases hcn` gains the fourth case (proof).
+  - `UexecApply.uexecRet_roundDet`'s `hfit` reads `usysIotaFits … W'.ch W'.M W'.sz W'.lazy ι` (its text
+    moves by those two arguments); `hcls` admits sbrk through the definitions.
+
+**4. The step and the law (`NiTrace`).**
+
+    inductive NiStep where
+      | origin (W0 : Uvis) (e : Obs)
+      | round (secc : BitVec 64) (lz : Bool) (win : Nat) (sz : Nat) (x e : Obs) (c : Option (Nat × UIota))
+    -- niStepOf: `.round W.secc W.lazy (uwaitWin W.perm (tfW W.tf (tfArgIdx 0))) W.sz x e c`
+    -- NiStep.input: `.inr (secc, lz, win, sz, exitView x, positions)`; NiStep.obsInput unchanged in content
+    def gprsA1 (gs : List (BitVec 64)) : BitVec 64 := gs.getD 10 0#64          -- x11; gprsA1_tfGprs
+    -- niRoundLaw secc lz win sz pid x e c: inside the resume block, + (last)
+          (gprsNum secc xg = USYS_sbrk → ∃ k ι, c = some (k, ι) ∧
+            gprsA0 eg = usysSbrkAns sz (gprsA0 xg) (gprsA1 xg) ι)
+    -- niDetRow_sbrk (usysDet_sbrk, ukeyEq_bump_a0, gprsA0/gprsA1_tfGprs, uvisRun's sz = W.sz)
+    -- NiStep.classReading: + `∨ gprsNum secc xg = USYS_sbrk`; output_eq_of's `hans`: + sbrk
+    -- NiInClass, NiStep.law, output_eq_of: binders + sz (texts move, as G1e's did for lz/win)
+
+- The four NI roots' statements are byte-identical (their meaning grows through `NiStep`, `usysDetClass` and
+  `niEntryOk`), as at G1e and F3. `xv6NiTwoRun` derives sbrk's equal answers from equal inputs (now
+  including `sz`) and equal cited prefixes. `xv6NiTwoRunObs` reads them as readings.
+- Honest scope 9 (sbrk) is F7's paragraph. `UsysDet` §4's sbrk bullet becomes "RE-ADMITTED BY G3".
+
+**5. The kernel route.**
+
+| Receipt / fact (made at) | Carried by | Arm | ι component |
+|---|---|---|---|
+| `kNullRcpt γk act` (uvmalloc's data-page kalloc null, or a `walk` node's under `mappages_any`) | `uvma_rollA`/`_rollB` → uvmalloc 0 arm → growproc −1 wand → sys_sbrk −1 wand | `syscArmSbrk_ev` (−1, ¬overrun) | `kev := h ++ [KNull act]` (`ι.kNull`) |
+| overrun (pure, the key's break and a0) | `sysSbrkOk` FAILED `sysSbrkOverrun` | `syscArmSbrk_ev` (−1, overrun) | `{boot with act}` |
+| `sysSbrkAllocs` on a non-overrun −1 (pure, `0 < uvmaNp` from uvmalloc's 0 arm) | `growprocOk` → `sysSbrkOk` FAILED | `syscArmSbrk_ev` | (read by `usysSbrkFails`) |
+| success, shrink, lazy grow, zero-page eager grow (pure) | `sysSbrkOk` SUCCEEDED | `syscArmSbrk_ev` | `{boot with act}` (`¬ ι.kNull`) |
+
+**6. Lanes** (one `lake` at a time; per-lane gate `lake build Xv6 MachCSL` + `tools/ci/lint.sh` + no `sorry`;
+baselines in the same commit when they move).
+
+| Lane | Content | Files | Statements that move | Gate |
+|---|---|---|---|---|
+| **G3a the receipts** | §1: uvmalloc's 0 arm (`0 < uvmaNp`, `kNullRcpt`), the loop's two rollbacks and exit arm; growprocOk's −1 condition and growproc's wand; `sysSbrkOverrun`/`sysSbrkAllocs`, sysSbrkOk's FAILED condition and sys_sbrk's wand; exec's `kxc_call_uvmalloc` and the sbrk arm drop (proof only) | `SpecUvmalloc`, `ProofUvmalloc`, `KexecSeam` (proof), `SpecGrowproc`, `ProofGrowproc`, `SpecSysSbrk`, `ProofSysSbrk`, `SyscallArmsSbrk` (proof), `UsysDet` (§4 comment only) | `UVMALLOC` (`wp_uvmalloc_body`), `growprocOk`, `GROWPROC` (`wp_growproc_body`), `sysSbrkOk`, `SYSSBRK` (`wp_sys_sbrk_body`). Byte-identical: `uvmallocOk`, `kxc_call_uvmalloc`, every kexec Spec, `syscRows_sbrk`, `SyscRows`, `syscMemOk`, `usysMemOk`, `SYSCALL`, every `Uk*`/`Ush*`/`User*`/`SpecSh*` | build + lint; `tcb.sh` (no root should move: `kNullRcpt` is already in `KallocDefs`); the wand is unread past the arm until G3b (no dead_allow row: the Spec texts name it) |
+| **G3b the row, the class, the law** | §2 (`UsysDet` growth), §3 (`syscEvRow`'s sbrk clause, the two quiet disjuncts, `niCiting`, the arm's citation, `urc_evRow`/`urc_niDetRow`, `uexecRet_roundDet`'s fit), §4 (`NiStep.sz`, `gprsA1`, the law clause, `niDetRow_sbrk`, `classReading`, honest scope 9) | `UsysDet`, `SyscallDefs`, `SpecSyscall`, `SpecUsertrap`, `SyscallArmsSbrk`, `UsertrapSysTail` (proof, if the quiet disjunct is destructured), `NiLedger`, `UserretClosedRows`, `UserretClosedRound` (proof), `UexecApply`, `NiTrace`, `NiAdequacy`/`LinkNiAdequacy` (proofs), `tools/ci/dead_allow.txt` | `usysDetClass`, `usysDetResumes`, `usysDet`, `usysDetRet`, `usysIotaFits` (+`szv' lz'`), `usysIotaFits_exists`/`_of_ev`, `usysDet_mem`/`_of_rows`, `usysDetResumes_ne`, `syscEvRow`, `syscEvOut`, `syscEvOut_quiet`, `utEvOut`, `niCiting`, `urc_evRow`, `uexecRet_roundDet` (its `hfit`), `NiStep`, `niStepOf`, `NiStep.input`, `NiInClass`, `niRoundLaw`, `NiStep.law`, `classReading`, `output_eq_of`. Byte-identical: `SYSCALL`, `USERTRAP`, `USERRET`, `USER`, `SyscRows`, `usysMemOk`, `uexecRetF`, every kernel Spec but those G3a moved, every `Uk*`/`Ush*`/`User*` file, the four NI roots | full `run_all.sh` + `reports`; `tcb.sh` (expect no root to move: `UsysDet` already imports `UPtDefs`/`UsysMemOk`; `--update` if `UserPerm` enters through `usysSbrkPermF`); `audit.sh` |
+| **G3c (optional) wait's lazy copyout** | F6: vmfault's 0 arm `(⌜¬ vmfaultQuietArm …⌝ -∗ kNullRcpt)`; copyout's −1 reason gains the lazily-absent ∧ `kNullRcpt` disjunct; kwait's `waitWhyLed`; the wait class at `a0 = 0 ∨ lz = false ∨ a0 % 4096 ≤ 4092`; the row at `d = if ι.kNull then 0 else uwaitWin` | `SpecVmfault`, `ProofVmfault`, `VmfaultDefs`, `ProofCopyin`/`ProofCopyinstr`/`ProofUsertrap`/`UsertrapArmsD0` (proof), `SpecCopyout`, `ProofCopyout`, `UserChildren`, `SpecKwait`/`ProofKwait`, `SyscallDefs`, `SyscallArmsWait`, `UsysDet`, `UserretClosedRows`, `NiTrace` | `VMFAULT`, `wp_copyout_body`, `waitWhyLed`, `syscWaitRow`, `syscEvRow`'s wait premise, `usysDetClassAt`, `usysWaitFitsAt`, `NiInClass`/`niRoundLaw`/`classReading`'s wait text | full `run_all.sh`; NOT recommended for G3 |
+
+Order: G3a → G3b (G3b's arm reads G3a's wand). G3c, if ever, after G3b. Estimates:
+- **G3a:** ~9 files and mechanical. The content is `ProofUvmalloc`'s two rollbacks and the exit arm (~120
+  lines), plus growproc's two −1 branches and sys_sbrk's eager −1 (~60 lines).
+- **G3b:** ~14 files with the F3/G1e pattern. The content is `usysDet_mem`/`_of_rows`' sbrk arm (the shrink's
+  `uvmdRsz` ↔ `usysSbrkSz` bridge and `usysSbrkImg/Perm_iff`, ~150 lines), the arm's citation (~80), and
+  `NiStep`'s new field threaded through `NiTrace` (~100, mechanical).
+
+**RULINGS REQUESTED.**
+- **G3-R1 (the allocator component: a cited `KNull` on −1, nothing on success).**
+  - Recommended: `usysSbrkFails := overrun ∨ (allocs ∧ ι.kNull)`. Only an allocation −1 cites the decisive
+    `KNull act`, and every other outcome cites `{boot with act}`.
+  - The positive reason (JF-R5) is built into the answer: no empty citation reads −1 (F2). No success arm
+    moves.
+  - Alternative: fork's symmetric shape (`ι.kOk` on an allocating success, citing the first data page's
+    `KAlloc act`). It costs a success receipt `0 < uvmaNp → kAllocRcpt` on `wp_uvmalloc_body`,
+    `wp_growproc_body` and `wp_sys_sbrk_body` (+3 statement moves and a loop-invariant conjunct) for no
+    change in the theorem: positions are inputs either way.
+- **G3-R2 (the class at sbrk).**
+  - Recommended: sbrk at EVERY key; the kalloc / kfree counts are conceded through `H` (JF-R2; F3: `lazy =
+    false` would not even make the count key-functional, since interior nodes persist across shrinks).
+  - Cheapest alternative: allocating eager grows OUT (`n = USYS_sbrk → ¬ usysSbrkAllocs`). G3a then shrinks to
+    `sysSbrkOk`'s pure FAILED condition alone, with no receipts and no uvmalloc or growproc text moving
+    (`growprocOk`'s −1 condition still moves). But `usysDetClassAt` would have to read `W.sz` and a1, so its
+    signature, `NiInClass` and `obsInput` all move, and eager sbrk leaves the class.
+- **G3-R3 (when sbrk cites).**
+  - Recommended: at EVERY sbrk ecall (`niCiting += sbrk`, the quiet disjuncts exclude sbrk), with
+    `{boot with act}` at non-allocating outcomes.
+  - Alternative: cite only at `usysSbrkAllocs`. `niCiting` and the two quiet disjuncts would then read the
+    break and both words; this is more text for the same theorem.
+- **G3-R4 (the break rides the step).**
+  - Recommended: `NiStep.round` gains `sz : Nat` (after `win`), filled with `W.sz`, in `NiStep.input`
+    only. It is the caller's own break (F5), a ghost-key reading like `lz`.
+  - Alternative: derive `sz` from the trace (the origin's `W0.sz` plus the incarnation's earlier sbrk
+    answers). That needs a trace-level invariant over every round's break and is far more work. Not
+    recommended.
+- **G3-R5 (the Spec moves).**
+  - Recommended: in place (R6's pattern) on `wp_uvmalloc_body`'s 0 arm, `growprocOk`'s −1 condition and
+    `wp_growproc_body`'s wand, `sysSbrkOk`'s FAILED condition and `wp_sys_sbrk_body`'s wand. Exec drops the
+    receipt in proof (`kxc_call_uvmalloc` byte-identical), and the user tier reads none of them (F4).
+  - Alternative: led twins (`UVMALLOC`/`GROWPROC`/`SYSSBRK` second fields). They keep the landed texts but
+    double three contracts, and they leave the spurious −1 in the landed `sysSbrkOk`.
+- **G3-R6 (the fit carries the break and the lazy bit).**
+  - Recommended: `usysIotaFits` gains `(szv' lz')` and the sbrk conjunct (`usysSbrkFitsAt`, one text for the
+    kernel and the key). `uexecRet_roundDet`'s `hfit` text moves by those two arguments, and
+    `usysIotaFits_exists` is stated off sbrk.
+  - Alternative: strengthen `usysMemOk`'s sbrk row (pin the shrink's break and `lz'`). That moves the user
+    tier's table and every `Uk*` reader (W3's lesson). Not recommended.
+- **G3-R7 (wait's lazy copyout).**
+  - Recommended: NOT in G3. If wanted, it is a separate optional lane G3c after G3b, admitting single-page
+    status windows only (F6: a straddling window's stop byte is not key- or ι-functional).
+  - Alternative: leave wait at `a0 = 0 ∨ lz = false` for good. This is the cheapest option and it is the
+    status quo.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
