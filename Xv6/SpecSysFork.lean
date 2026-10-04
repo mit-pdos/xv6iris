@@ -113,7 +113,8 @@ def wp_sys_fork_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 
 /-- **WP of the LED `sys_fork()`** (NI M2-G2b): kfork's led twin forwarded,
 the post `kforkPostLed` (its success arm carries the pid ledger's and the
-family ledger's receipts). -/
+family ledger's receipts; NI joint fork lane F2: and the allocator ledger's
+decisive receipt on both arms, at `γk`). -/
 def wp_sys_fork_led_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -134,7 +135,7 @@ def wp_sys_fork_led_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗ firstDone (hlc := hlc) ∗
   kforkPark (hlc := hlc) (SG := SG) Γ V M stsP Q Rc ∗
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗ chFrag V.chg (procAddr j) csP ∗
-  wpNext k.sie k.proc cpu (kforkPostLed k γ j pid V M stsP Q csP Rc)
+  wpNext k.sie k.proc cpu (kforkPostLed k γ γk j pid V M stsP Q csP Rc)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `sys_fork`. -/

@@ -23,8 +23,14 @@ no lower (`∃ k' ≥ ke`) right after the return pc; `kalloc` does not take it
 yet (L3b), so the proof frames it.  `[WchG GF]` joins its binders.  The
 non-allocating contract calls no allocator and takes nothing.
 
+THE NULL RECEIPT (NI joint fork lane F2; design "Joint fork lane design"
+F3): with `alloc = 1` and `va < 2^38` the walk returns `0` only when a
+`kalloc` it made returned null, so the `0` arm carries that call's
+persistent receipt `kNullRcpt γk k.proc` (`KallocDefs`), as the wand
+`⌜R' 10 = 0⌝ -∗ kNullRcpt γk k.proc`; callers that do not cite it drop it.
+
 Deviations from Rocq: L3a, no Rocq counterpart (Rocq's `wp_walk` takes no
-lend).
+lend); the null receipt (F2), no Rocq counterpart.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -63,6 +69,7 @@ def wp_walk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     ptreeOwn 2 (DFrac.own 1) (t.fill 2 (vpnOf (k.regs 11#5)) fresh).1 -∗
     kallocAvail γk (availSub on fresh.length) -∗
+    (⌜R' 10#5 = 0#64⌝ -∗ kNullRcpt γk k.proc) -∗
     ⌜calleeSaved k.regs R' ∧
       (t.fill 2 (vpnOf (k.regs 11#5)) fresh).2 = [] ∧
       fresh.Nodup ∧ (∀ b ∈ fresh, pageValid (pageAddr b) ∧ b ∉ t.pages 2) ∧

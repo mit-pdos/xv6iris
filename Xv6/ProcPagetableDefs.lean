@@ -83,7 +83,7 @@ theorem pp_uvmcreate_call [WchG GF] (UC : UVMCREATE) [CurCtx] (c : CPU) (k' : KC
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
-      uvmcreatePost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
+      uvmcreatePost γk on k'.proc (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := UC.wp_uvmcreate (hlc := hlc) (GF := GF) c k' γl γk on ke hnoff hK hlk
   unfold wp_uvmcreate_body at h
@@ -110,6 +110,7 @@ theorem pp_mappages_call [WchG GF] (MP : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : 
       ptreeOwn 2 (DFrac.own 1)
         (t.mapRun (vpnOf (k'.regs 11#5)) (BitVec.extractLsb' 12 44 (k'.regs 13#5)) perm n fresh).1 -∗
       kallocAvail γk (availSub on fresh.length) -∗
+      (⌜R' 10#5 = -1#64⌝ -∗ kNullRcpt γk k'.proc) -∗
       ⌜calleeSaved k'.regs R' ∧
         (t.mapRun (vpnOf (k'.regs 11#5)) (BitVec.extractLsb' 12 44 (k'.regs 13#5)) perm n fresh).2.1 = [] ∧
         fresh.Nodup ∧ (∀ b ∈ fresh, pageValid (pageAddr b) ∧ b ∉ t.pages 2) ∧

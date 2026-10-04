@@ -28,6 +28,13 @@ k.proc ke` and hand it back at a count no lower (`∃ k' ≥ ke`) right after
 the return pc; `walk`/`kalloc` do not take it yet, so the proof frames it.
 `[WchG GF]` joins the binders (Rocq's `!wchG Σ`).
 
+THE NULL RECEIPT (NI joint fork lane F2; design "Joint fork lane design"
+F3): under `mappagesArgs`' no-remap premise the general contract returns
+`-1` only when a `walk` failed, i.e. when a `kalloc` it made returned
+null; its `-1` arm carries that call's persistent receipt (`⌜R' 10 = -1⌝
+-∗ kNullRcpt γk k.proc`).  The counted contract, which refutes `-1`, is
+unchanged.
+
 Deviations from Rocq: Rocq states ONE contract (`wp_mappages_sconf`, at an
 arbitrary `on`); Lean keeps its two (the uncounted `MAPPAGES_ANY` and the
 counted corollary `MAPPAGES`), both take the lend.
@@ -78,6 +85,7 @@ def wp_mappages_any_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     ptreeOwn 2 (DFrac.own 1)
       (t.mapRun (vpnOf (k.regs 11#5)) (BitVec.extractLsb' 12 44 (k.regs 13#5)) perm n fresh).1 -∗
     kallocAvail γk (availSub on fresh.length) -∗
+    (⌜R' 10#5 = -1#64⌝ -∗ kNullRcpt γk k.proc) -∗
     ⌜calleeSaved k.regs R' ∧
       (t.mapRun (vpnOf (k.regs 11#5)) (BitVec.extractLsb' 12 44 (k.regs 13#5)) perm n fresh).2.1 = [] ∧
       fresh.Nodup ∧ (∀ b ∈ fresh, pageValid (pageAddr b) ∧ b ∉ t.pages 2) ∧

@@ -269,6 +269,50 @@ theorem kmemLedger_free (γk : KmemNames) (n : Nat) (act : BitVec 64) :
   · iexists h
     iexact Hb
 
+/-! ## The allocator receipts (NI joint fork lane F2)
+
+The two persistent receipts a kalloc's caller keeps (design "Joint fork
+lane design" §2): the call's event at the end of a ledger prefix, and the
+allocator's tie read at that prefix (`kmemLedger_alloc`/`_null`).  The
+pure reading a cited `UIota` makes is that the LAST event of the prefix
+`h ++ [e]` is `e`: `KNull act` (the pool was empty at `h`) or `KAlloc act`
+(it was not). -/
+
+/-- A null `kalloc` by `act`: its `KNull act` closes a ledger prefix at
+which the pool was empty. -/
+def kNullRcpt (γk : KmemNames) (act : BitVec 64) : IProp GF := iprop%
+  ∃ h, ledReceipt γk h (.KNull act) ∗ ⌜poolEmpty h⌝
+
+/-- A successful `kalloc` by `act`: its `KAlloc act` closes a ledger prefix
+at which the pool was not empty. -/
+def kAllocRcpt (γk : KmemNames) (act : BitVec 64) : IProp GF := iprop%
+  ∃ h, ledReceipt γk h (.KAlloc act) ∗ ⌜¬ poolEmpty h⌝
+
+instance kNullRcpt_persistent (γk : KmemNames) (act : BitVec 64) :
+    Persistent (kNullRcpt (GF := GF) γk act) := by
+  unfold kNullRcpt; infer_instance
+
+instance kAllocRcpt_persistent (γk : KmemNames) (act : BitVec 64) :
+    Persistent (kAllocRcpt (GF := GF) γk act) := by
+  unfold kAllocRcpt; infer_instance
+
+/-- The receipt of a `kalloc` by `act` that returned `r`: the null receipt
+at `r = 0`, the allocation receipt otherwise. -/
+def kRcpt (γk : KmemNames) (act r : BitVec 64) : IProp GF :=
+  if r = 0#64 then kNullRcpt γk act else kAllocRcpt γk act
+
+instance kRcpt_persistent (γk : KmemNames) (act r : BitVec 64) :
+    Persistent (kRcpt (GF := GF) γk act r) := by
+  unfold kRcpt; split <;> infer_instance
+
+theorem kRcpt_null (γk : KmemNames) (act r : BitVec 64) (hr : r = 0#64) :
+    kRcpt (GF := GF) γk act r = kNullRcpt γk act := by
+  unfold kRcpt; rw [if_pos hr]
+
+theorem kRcpt_page (γk : KmemNames) (act r : BitVec 64) (hr : r ≠ 0#64) :
+    kRcpt (GF := GF) γk act r = kAllocRcpt γk act := by
+  unfold kRcpt; rw [if_neg hr]
+
 /-! ## The allocator's authority -/
 
 /-- The allocator's side of the count: its half while the count is

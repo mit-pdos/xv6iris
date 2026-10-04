@@ -2940,6 +2940,78 @@ the boot.
   supplies.
 - `sevWf` lives only inside the invariant; F3's honesty note reads it through `sFullRcpt`'s window.
 
+### Joint fork lane F2 as landed (2026-10-04)
+
+Lane F2 (the allocator receipts reach fork) landed on `lane/f2`. Nothing is ticked: F3 consumes it.
+
+- **The receipts** (`KallocDefs`, persistent):
+  - `kNullRcpt γk act := ∃ h, ledReceipt γk h (.KNull act) ∗ ⌜poolEmpty h⌝`;
+  - `kAllocRcpt γk act := ∃ h, ledReceipt γk h (.KAlloc act) ∗ ⌜¬ poolEmpty h⌝`;
+  - `kRcpt γk act r := if r = 0#64 then kNullRcpt γk act else kAllocRcpt γk act` (the led call's post;
+    `kRcpt_null`/`kRcpt_page` unfold it).
+
+  Their pure part, as `UIota.kNull`/`kOk` read it: `ledReceipt γk h e = γk.pend ↪◯ML (h ++ [e])`, so the
+  cited prefix is `h ++ [KNull act]` / `h ++ [KAlloc act]`, whose LAST event is the call's (the
+  `getLast?` F3's row reads). `poolEmpty h` is the allocator tie read at `h` (`kmemLedger_null`/`_alloc`),
+  carried for the honesty note; F3's row need not read it.
+- **The call.** `UvmCallSites.uc_kalloc_led_call` is `uc_kalloc_lend_call` whose continuation also takes
+  `kRcpt γk k'.proc (R' 10#5)` (via `kallocPostLed_rcpt : kallocPostLed ⊢ kallocPost ∗ kRcpt`).
+  `uc_kalloc_lend_call` is now its corollary (statement byte-identical). Switched to the led call:
+  `ProofWalk.walk_alloc`, `ProofUvmcreate`, `ProofUvmcopy.uvmcopy_iter`, `ProofAllocproc.ap_kalloc_call`.
+  Not switched (no fork route): `ProofUvmalloc`, `ProofVmfault`, `ProofPipealloc`.
+- **The five failure arms, in place (R6):**
+  - `wp_walk_body`: `(⌜R' 10#5 = 0#64⌝ -∗ kNullRcpt γk k.proc)` before the pure post;
+  - `wp_mappages_any_body`: `(⌜R' 10#5 = -1#64⌝ -∗ kNullRcpt γk k.proc)` before the pure post;
+  - `uvmcreatePost γk on act r`: the null arm `⌜r = 0 ∧ availZero on⌝ ∗ kallocAvail γk on ∗ kNullRcpt γk act`
+    (`wp_uvmcreate_body` at `act := k.proc`);
+  - `pptPost γk on act tfp r`: the null arm `… ∗ kallocAvail γk none ∗ kNullRcpt γk act`
+    (`wp_proc_pagetable_body` at `act := k.proc`);
+  - `wp_uvmcopy_body`: the `-1` arm `⌜R' 10#5 = -1#64⌝ ∗ procPtAt Pnew Mnew ∗ kNullRcpt γk k.proc`.
+
+  The walk and mappages arms are pure, so their receipt is a wand keyed on the failure answer. Inside the
+  proofs, mappages' and uvmcopy's loops key it on the failure exit pc instead.
+- **What propagated** (design JF-R6 expected sbrk's `uvmalloc` and `vmfault` to get the reason "for
+  free"): it did NOT. Both reach `mappages_any` through a local call rule (`ProofUvmalloc.ua_mappages_call`,
+  `VmfaultDefs.vf_mappages_call`) whose statement is unchanged and whose proof drops the wand. Their
+  contracts gain nothing; G3 can thread it (one wand per rule plus their −1 arms) when it needs it. exec
+  (`KexecB.kxcB_call_ppt`) gains `act := k.proc` in its `pptPost` text and drops the receipt.
+- **`allocprocPostLed`** (the pure parts are `allocprocPost`'s, which is byte-identical):
+  - FOUND: `pidAllocRcpt act pid ∗ kAllocRcpt γk act ∗ ⌜…⌝ ∗ …`. The cited `KAlloc` is the TRAPFRAME
+    kalloc: allocproc's first kalloc (`ap_found`, after the pid section, before `proc_pagetable`),
+    labelled `k.proc`;
+  - NULL: `⌜…⌝ ∗ (procsAvailAt ∨ pavSpent) ∗ (kNullRcpt γk act ∨ sFullRcpt act) ∗ ∃ on', …`. The left
+    disjunct comes from the trapframe kalloc's null (`ap_found`'s tail 1) or `pptPost`'s null (tail 2).
+    The right disjunct is F1's scan exhaustion (`ap_scan`). F2 was rebased onto F1 (e1b66d9b7). F1 had
+    `(True ∨ sFullRcpt act)` with the kalloc tails proving `True`; F2 put `kNullRcpt γk act` in that place
+    and proves it at both tails. `kforkRetLed`'s −1 arm and `ProofKfork.kf_postLed_reason` read the same
+    disjunction at `procAddr j`.
+- **`kforkRetLed γ γk j pid V M stsP Q csP Rc rv`** (`kforkPostLed k γ γk j …`; `KFORK.wp_kfork_led_eb`'s
+  and `SYSFORK.wp_sys_fork_led_eb`'s texts at `γk`), verbatim:
+
+      (∃ k' : Nat, ⌜V.ev ≤ k'⌝ ∗ procPrivFd γ (procAddr j) pid (V.updEv k') M) ∗ fdFrags V.fdg stsP ∗
+      ((⌜rv = -1#32⌝ ∗ chFrag V.chg (procAddr j) csP ∗ Rc ∗
+          (kNullRcpt γk (procAddr j) ∨ sFullRcpt (procAddr j))) ∨
+       (∃ γc : GName, ⌜1 ≤ rv.toNat ∧ rv.toNat ≤ PIDMAX⌝ ∗ ⌜γc ∉ csP⌝ ∗ childTok γc rv Q ∗
+          chFrag V.chg (procAddr j) (csP ∪ {γc}) ∗
+          pidAllocRcpt (procAddr j) rv ∗
+          kAllocRcpt γk (procAddr j) ∗
+          ∃ (hz : List Zev) (i : Nat), zombReceipt hz (.ZFork (procAddr j) i rv γc)))
+
+  On −1 the left disjunct comes from allocproc's null arm (`ProofKfork.kf_postLed_reason`) or uvmcopy's
+  −1, and the persistent receipt survives `freeproc`/`release`. The success arm's `kAllocRcpt` rides
+  `kfOfileΨ` (which gains `γk`) to `kf_epilogue'`, as G2b's pid receipt does. `kforkRet`,
+  `wp_kfork_eb_body`, `wp_sys_fork_eb_body` and `SYSCALL` are byte-identical; `kforkRetLed_ret` gains
+  `γk`.
+- **What F3 absorbs:**
+  - `syscArmFork_ev` (success) cites `kev := h ++ [KAlloc (procAddr j)]` from the success arm's
+    `kAllocRcpt` (at `γk = fsReadyKmem`; `SyscallArmsFork` passes `fsReadyKmem` already);
+  - `syscArmFork_evNeg` cites `kev := h ++ [KNull (procAddr j)]` from the left disjunct, or
+    `sev` from `sFullRcpt`;
+  - `SyscallArmsFork`'s `icases Hret` currently drops both (`-`): a proof-only edit, the one F2 change in
+    an F3 file;
+  - `tools/ci/dead_allow.txt`: no rows were needed. `kNullRcpt`/`kAllocRcpt` are reached through the
+    `KFORK`/`SYSFORK` texts, which the syscall arm cites.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

@@ -170,21 +170,35 @@ M2-X2): `kforkRet` whose success arm also carries, at the SAME generation
 caller's slot `procAddr j`, and the pid `pidPick` of the prefix before it)
 and the family ledger's RECEIPT of the parent store (`zombReceipt hz (ZFork
 (procAddr j) i rv γc)`, `ProofKfork.kf_wait_fork`).  Both receipts are
-persistent; `kforkRetLed_ret` drops them. -/
+persistent; `kforkRetLed_ret` drops them.
+
+(NI joint fork lane F2, design "Joint fork lane design" §4) THE ALLOCATOR'S
+DECISIVE RECEIPT, at the allocator names `γk`: the success arm carries the
+trapframe `kalloc`'s `kAllocRcpt γk (procAddr j)`, the `-1` arm its reason,
+the null `kalloc`'s `kNullRcpt γk (procAddr j)` (allocproc's trapframe or
+`proc_pagetable` page, or uvmcopy's page or `walk` node) or the scan's
+exhaustion (F1's `sFullRcpt (procAddr j)`). -/
 def kforkRetLed {hlc : HasLC} {GF : BundledGFunctors}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (γ : FileNames) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (stsP : List FdState) (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF)
     (rv : BitVec 32) : IProp GF := iprop%
   (∃ k' : Nat, ⌜V.ev ≤ k'⌝ ∗ procPrivFd γ (procAddr j) pid (V.updEv k') M) ∗ fdFrags V.fdg stsP ∗
-  ((⌜rv = -1#32⌝ ∗ chFrag V.chg (procAddr j) csP ∗ Rc) ∨
+  ((⌜rv = -1#32⌝ ∗ chFrag V.chg (procAddr j) csP ∗ Rc ∗
+      -- THE REASON (NI joint fork lanes F2 / F1): the null `kalloc`'s
+      -- receipt (allocproc's or uvmcopy's), or allocproc's scan exhaustion
+      (kNullRcpt γk (procAddr j) ∨ sFullRcpt (procAddr j))) ∨
    (∃ γc : GName, ⌜1 ≤ rv.toNat ∧ rv.toNat ≤ PIDMAX⌝ ∗ ⌜γc ∉ csP⌝ ∗ childTok γc rv Q ∗
       chFrag V.chg (procAddr j) (csP ∪ {γc}) ∗
       -- THE TWO RECEIPTS (NI M2-G2b)
-      pidAllocRcpt (procAddr j) rv ∗ ∃ (hz : List Zev) (i : Nat), zombReceipt hz (.ZFork (procAddr j) i rv γc)))
+      pidAllocRcpt (procAddr j) rv ∗
+      -- THE TRAPFRAME `kalloc`'S RECEIPT (NI joint fork lane F2): allocproc's
+      -- first `kalloc`, `KAlloc (procAddr j)`
+      kAllocRcpt γk (procAddr j) ∗
+      ∃ (hz : List Zev) (i : Nat), zombReceipt hz (.ZFork (procAddr j) i rv γc)))
 
 /-- The landed answer is the led one with the receipts dropped. -/
 theorem kforkRetLed_ret {hlc : HasLC} {GF : BundledGFunctors}
@@ -192,14 +206,14 @@ theorem kforkRetLed_ret {hlc : HasLC} {GF : BundledGFunctors}
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (γ : FileNames) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (stsP : List FdState) (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF)
     (rv : BitVec 32) :
-    kforkRetLed γ j pid V M stsP Q csP Rc rv ⊢ kforkRet γ j pid V M stsP Q csP Rc rv := by
+    kforkRetLed γ γk j pid V M stsP Q csP Rc rv ⊢ kforkRet γ j pid V M stsP Q csP Rc rv := by
   unfold kforkRetLed kforkRet
-  iintro ⟨H1, H2, (H3 | ⟨%γc, %h1, %h2, Ht, Hc, -, -⟩)⟩
+  iintro ⟨H1, H2, (⟨Hr, Hc, HR, -⟩ | ⟨%γc, %h1, %h2, Ht, Hc, -, -, -⟩)⟩
   · iframe H1 H2
-    ileft; iexact H3
+    ileft; iframe Hr Hc HR
   · iframe H1 H2
     iright
     iexists γc
@@ -287,10 +301,10 @@ def kforkPostLed {hlc : HasLC} {GF : BundledGFunctors}
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (stsP : List FdState) (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF) :
-    CPU → IProp GF :=
-  kforkPostB k (kforkRetLed γ j pid V M stsP Q csP Rc)
+    (k : KCtx) (γ : FileNames) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (stsP : List FdState) (Q : Int → IProp GF) (csP : ExtTreeSet GName compare)
+    (Rc : IProp GF) : CPU → IProp GF :=
+  kforkPostB k (kforkRetLed γ γk j pid V M stsP Q csP Rc)
 
 /-- **WP of `kfork`, at either entry `SIE`** (Rocq `wp_kfork_sconf_body`:
 `cpu_own lvl eb pme b lks` in and out, crossing `wp_next b`).  `kfork` does
@@ -346,7 +360,7 @@ def wp_kfork_led_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗ firstDone (hlc := hlc) ∗
   kforkPark (hlc := hlc) (SG := SG) Γ V M stsP Q Rc ∗
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗ chFrag V.chg (procAddr j) csP ∗
-  wpNext k.sie k.proc cpu (kforkPostLed k γ j pid V M stsP Q csP Rc)
+  wpNext k.sie k.proc cpu (kforkPostLed k γ γk j pid V M stsP Q csP Rc)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `kfork`. -/

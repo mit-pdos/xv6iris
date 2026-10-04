@@ -143,10 +143,14 @@ the allocation -- `PAlloc act pid` appended right after some history `h`,
 the actor `act` being the hart's proc word, and (NI M2-G2a) `pid` the pid
 the kernel was bound to give after `h` (`PidLock.pidAllocRcpt`: `pid =
 pidPick PIDMAX h`).  The null arm never reached a registration; since the
-joint fork lane F1 it carries, as a disjunct, the slot-occupancy ledger's
+joint fork lane F1 it carries, as its reason, the slot-occupancy ledger's
 exhaustion receipt (`SlotLed.sFullRcpt act`: `SFull act k0` appended with
-the scan's window) when the scan found no UNUSED slot, its `True` side on
-the kalloc failures (lane F2 puts the allocator's receipt there).
+the scan's window) when the scan found no UNUSED slot, and (NI joint fork
+lane F2) the null `kalloc`'s receipt (`kNullRcpt γk act`, the trapframe's or
+`proc_pagetable`'s) on the allocator failures.  (F2) The FOUND arm also
+carries the allocator ledger's receipt of the trapframe `kalloc`
+(`kAllocRcpt γk act`: the round's first `kalloc`, labelled by the actor).
+Its pure parts are `allocprocPost`'s.
 `allocprocPostLed_post` drops the receipts. -/
 def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
@@ -155,10 +159,17 @@ def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     IProp GF := iprop%
   (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
       ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗
-    (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗ (True ∨ sFullRcpt act) ∗
+    (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗
+    -- THE NULL ARM'S REASON (NI joint fork lanes F2 / F1): the null
+    -- `kalloc`'s receipt (the trapframe's, or `proc_pagetable`'s), or the
+    -- scan's exhaustion
+    (kNullRcpt γk act ∨ sFullRcpt act) ∗
     ∃ on' : Option Nat, ⌜on' = on ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
   (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
     pidAllocRcpt act pid ∗
+    -- THE TRAPFRAME `kalloc`'S RECEIPT (NI joint fork lane F2): the round's
+    -- first allocator event, `KAlloc act`
+    kAllocRcpt γk act ∗
     ⌜r = procAddr j ∧ j < NPROC ∧ 1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ allocprocPriv V ∧ g ≤ procPagetableNodes + 1 ∧
       (if pavBoot pav tk then pid.toNat = 1 else pid.toNat ≠ 1)⌝ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ pavSpent Γ (pavDec pav) ∗
@@ -178,8 +189,8 @@ theorem allocprocPostLed_post {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
     (tk : Bool) (Q : Int → IProp GF) (act : BitVec 64) (r : BitVec 64) :
     allocprocPostLed (GF := GF) Γ γ cpu γk on pav tk Q act r ⊢ allocprocPost Γ γ cpu γk on pav tk Q r := by
   unfold allocprocPostLed allocprocPost
-  iintro (⟨Hr, Hpav, -, Hav⟩ | ⟨%j, %ch, %pid, %V, %M, %g, -, Hfound⟩)
-  · ileft; iframe Hr Hpav Hav
+  iintro (⟨Hp, Hpav, -, Hon⟩ | ⟨%j, %ch, %pid, %V, %M, %g, -, -, Hfound⟩)
+  · ileft; iframe Hp Hpav Hon
   · iright
     iexists j, ch, pid, V, M, g
     iexact Hfound

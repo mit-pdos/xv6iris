@@ -311,7 +311,15 @@ theorem vf_mappages_call [WchG GF] (MA : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : 
     hargs hperm hmask hrwx hwf hnd hpg
   unfold wp_mappages_any_body at h
   simp only [mappagesAddr] at h
-  exact h
+  iintro ⟨Hk, Hpc, #Hlk, Ht, Hav, Hl, Hnext⟩
+  iapply h
+  iframe Hk Hpc Hlk Ht Hav Hl
+  -- (NI joint fork lane F2) the `-1` arm's null receipt is dropped here
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %cc H %spie %spp %R' %fresh %hs Hk Hpc Hl Ht Hav - %hp
+  iapply H $$ %spie %spp %R' %fresh %hs Hk Hpc Hl Ht Hav
+  ipureintro
+  exact hp
 
 end
 

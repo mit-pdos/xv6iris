@@ -283,7 +283,7 @@ theorem kxcB_call_ppt (PPT : PROC_PAGETABLE) (Γ : SchedNames) (cpu : CPU) (k : 
       (∃ kb : Nat, ⌜ke ≤ kb⌝ ∗ actLend k.proc kb) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       wordPointsTo (pTrapframe pa) 8 dq tf -∗
-      pptPost fsReadyKmem none (BitVec.extractLsb' 12 44 tf) (R' 10#5) -∗ wpLoop c)
+      pptPost fsReadyKmem none k.proc (BitVec.extractLsb' 12 44 tf) (R' 10#5) -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : procPagetableSlots ≤ k.avail - 68 := by
     have : procPagetableSlots = 40 := rfl

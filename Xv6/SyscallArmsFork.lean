@@ -261,7 +261,8 @@ theorem syscall_arm_fork (SF : SYSFORK)
     fun W hW => syscStore_a0 W _ (by rw [hW, hl]; decide)
   -- the era's anchor, for the citation (NI M2-X2)
   icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
-  icases Hret with (⟨%hrv, Hch, Hlend⟩ | ⟨%γc, %hr, %hf, Htok, Hch, #Hrc, #Hzr⟩)
+  -- (NI joint fork lane F2) the allocator receipts are dropped here until F3
+  icases Hret with (⟨%hrv, Hch, Hlend, -⟩ | ⟨%γc, %hr, %hf, Htok, Hch, #Hrc, -, #Hzr⟩)
   · have hrows := syscRows_fork V M sts cs cs pid (R2 10#5) hn1 (by rw [hl]; decide)
       (by rw [ha0]; exact syscArmFork_ans rv hans)
     iapply wpLoop_bupd

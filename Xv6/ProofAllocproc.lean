@@ -6,7 +6,10 @@ and `freeproc`.
 THE LED FORM IS THE PROOF (NI-LEDGER-REST W2, Rocq 8043e4cdd): `ap_found`
 appends `PAlloc k.proc pid` to the pid ledger at the register's insert
 (`PidLock.pidLedger_alloc`, beside `ap_pid_mint`) and the cells-level post
-`apPostCells` (now taking the actor) carries the receipt in its found arm;
+`apPostCells` (now taking the actor) carries the receipt in its found arm
+(and, NI joint fork lane F2, the trapframe `kalloc`'s `kAllocRcpt` beside
+it; the null arm the null `kalloc`'s `kNullRcpt`, or `True` at the scan's
+exhaustion, F1's slot);
 `allocproc_led_proof` is `wp_allocproc_led_body`, and `allocproc_proof`'s
 landed field drops the receipt (`allocproc_cont_led`).
 
@@ -653,10 +656,11 @@ def apPostCells [CurCtx] (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : O
     IProp GF := iprop%
   (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
       ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗
-    (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗ (True ∨ sFullRcpt act) ∗
+    (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗
+    (kNullRcpt γk act ∨ sFullRcpt act) ∗
     ∃ on' : Option Nat, ⌜on' = on ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
   (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
-    pidAllocRcpt act pid ∗
+    pidAllocRcpt act pid ∗ kAllocRcpt γk act ∗
     ⌜r = procAddr j ∧ j < NPROC ∧ 1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ allocprocPriv V ∧ g ≤ procPagetableNodes + 1 ∧
       (if pavBoot pav tk then pid.toNat = 1 else pid.toNat ≠ 1)⌝ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ pavSpent Γ (pavDec pav) ∗
@@ -1426,7 +1430,8 @@ section Calls
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `kalloc`'s led contract at its call site (address folded), at a lend
-(permit sweep L3b): the lend back stepped. -/
+(permit sweep L3b): the lend back stepped; the call's receipt kept (NI
+joint fork lane F2). -/
 theorem ap_kalloc_call (KAL : KALLOC) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
     (on : Option Nat) (ke : Nat) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail)
     (hlk' : "kmem" ∉ k'.locks) :
@@ -1436,9 +1441,10 @@ theorem ap_kalloc_call (KAL : KALLOC) (c : CPU) (k' : KCtx) (γl : GName) (γk :
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       actLend k'.proc (ke + 1) -∗
-      kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
+      kallocPost γk on (R' 10#5) -∗ kRcpt γk k'.proc (R' 10#5) -∗
+      ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c :=
-  uc_kalloc_lend_call KAL c k' γl γk on ke hnoff' hK' hlk'
+  uc_kalloc_led_call KAL c k' γl γk on ke hnoff' hK' hlk'
 
 /-- `proc_pagetable`'s contract at its call site (address folded). -/
 theorem ap_pp_call (PP : PROC_PAGETABLE) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
@@ -1452,7 +1458,7 @@ theorem ap_pp_call (PP : PROC_PAGETABLE) (c : CPU) (k' : KCtx) (γl : GName) (γ
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (∃ k2 : Nat, ⌜ke ≤ k2⌝ ∗ actLend k'.proc k2) -∗
       wordPointsTo (pTrapframe (k'.regs 10#5)) 8 dq tf -∗
-      pptPost γk on (BitVec.extractLsb' 12 44 tf) (R' 10#5) -∗
+      pptPost γk on k'.proc (BitVec.extractLsb' 12 44 tf) (R' 10#5) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := PP.wp_proc_pagetable (hlc := hlc) (GF := GF) c k' γl γk on tf dq ke hnoff' hK' hlk' htf htfv
@@ -2090,7 +2096,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     · exact hlk h2
   -- past kalloc
   iapply wpNext_off_intro
-  iintro %spie4 %spp4 %Rk %hsp4 Hk Hpc Hlend HkallocPost %hcsk
+  iintro %spie4 %spp4 %Rk %hsp4 Hk Hpc Hlend HkallocPost #Hkr %hcsk
   k_norm [ap_ret_b80]
   -- the lend comes back stepped
   ihave Hlend := actLend_ret_step k.proc hk0 $$ Hlend
@@ -2127,6 +2133,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       from by unfold kallocPost; iintro H; iexact H) $$ HkallocPost with
     ⟨⟨%⟨hr0, havz⟩, Hav⟩ | ⟨%hpv, Hpage, Hav⟩⟩
   · -- kalloc failed (a0 = trapframe = 0): failure tail 1
+    -- the null `kalloc`'s receipt (NI joint fork lane F2)
+    rw [kRcpt_null γk _ (Rk 10#5) hr0]
     -- why the `0`: the page allocator, not the proc table
     have hfail : ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g) :=
       ⟨0, by omega, by rw [Xv6.availSub_zero]; exact havz⟩
@@ -2345,7 +2353,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         · -- the token was spent in the pid section
           iright; unfold pavSpent; iframe Hpav; iexact Hshot
         isplitl []
-        · ileft; itrivial
+        · ileft; iexact Hkr
         iexists none
         isplitl []
         · ipureintro; exact Or.inr rfl
@@ -2405,6 +2413,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         hcs3.2.2.2.2.2.2.2.2.2.2.2.2, h27]
   
   · -- kalloc succeeded: a0 = trapframe page, pageValid
+    -- the trapframe `kalloc`'s receipt (NI joint fork lane F2)
+    rw [kRcpt_page γk _ (Rk 10#5) (ap_page_ne_zero _ hpv)]
     have hRk10ne : Rk 10#5 ≠ 0#64 := ap_page_ne_zero _ hpv
     have htf0 : Rk 10#5 &&& 0xfff#64 = 0#64 := hpv.1
     -- 0x80001c16 c.beqz a0 (NOT taken)
@@ -2457,14 +2467,14 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hRpp9, ap_pPagetable]
     iintro Hk Hpc Hpagetable
     -- split pptPost
-    icases (show pptPost γk (availDec on) (BitVec.extractLsb' 12 44 (Rk 10#5)) (Rpp 10#5) ⊢
+    icases (show pptPost γk (availDec on) k.proc (BitVec.extractLsb' 12 44 (Rk 10#5)) (Rpp 10#5) ⊢
         (∃ (root : BitVec 44) (Mpp : Nat → List (BitVec 8)),
           ⌜Rpp 10#5 = pageAddr root⌝ ∗ procPtAt ⟨root, BitVec.extractLsb' 12 44 (Rk 10#5), ∅⟩ Mpp ∗
             kallocAvail γk (availSub (availDec on) procPagetableNodes)) ∨
         (⌜Rpp 10#5 = 0#64 ∧ ∃ nn, nn ≤ procPagetableNodes ∧ availZero (availSub (availDec on) nn)⌝ ∗
-          kallocAvail γk none)
+          kallocAvail γk none ∗ kNullRcpt γk k.proc)
         from by unfold pptPost; iintro H; iexact H) $$ Hpppost with
-      ⟨⟨%root, %Mpp, %hroot, Hppt, Havpp⟩ | ⟨%⟨hr0pp, hppz⟩, Havn⟩⟩
+      ⟨⟨%root, %Mpp, %hroot, Hppt, Havpp⟩ | ⟨%⟨hr0pp, hppz⟩, Havn, #Hpn⟩⟩
     · -- left: proc_pagetable succeeded
       -- the returned root is a valid, non-null page (Rocq derives this in
       -- the caller from ptree_own; here from procPtAt's ptRep), so the
@@ -2740,6 +2750,9 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
             -- the pid ledger's receipt, out of the pid section
             isplitl []
             · iexact Hrcpt
+            -- the trapframe `kalloc`'s receipt (NI joint fork lane F2)
+            isplitl []
+            · iexact Hkr
             isplitl []
             · ipureintro
               refine ⟨h10, hn, hpidlo, hpidhi, ⟨?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, hside⟩
@@ -3061,7 +3074,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           · -- the token was spent in the pid section
             iright; unfold pavSpent; iframe Hpav; iexact Hshot
           isplitl []
-          · ileft; itrivial
+          · ileft; iexact Hpn
           iexists none
           isplitl []
           · ipureintro; exact Or.inr rfl
@@ -3553,7 +3566,7 @@ theorem allocproc_led_proof (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : M
       (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k.locks)) ∗
         sieArm cpu' k.sie k.proc)) from .rfl) $$ Hk
   iapply wpLoop_bupd
-  icases Hpost with (Hnull | ⟨%j, %ch, %pid, %V, %M, %g, #Hrcpt, %hpure, Hheld, Hhart, #Hused, Hsp, Hpriv, Hal,
+  icases Hpost with (Hnull | ⟨%j, %ch, %pid, %V, %M, %g, #Hrcpt, #Hka, %hpure, Hheld, Hhart, #Hused, Hsp, Hpriv, Hal,
     Hzs, Hrow, Hgn, Hsg, Hpr, Hxs, Hstk, Hkav⟩)
   · imodintro
     iapply HK $$ %spie %spp %R' %hs Hk Hpc Hl [Hnull] %hcs
@@ -3567,7 +3580,7 @@ theorem allocproc_led_proof (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : M
     unfold allocprocPostLed
     iright
     iexists j, ch, pid, { V with fdg := γd }, M, g
-    iframe Hrcpt Hheld Hhart Hused Hsp Hnc Hctx Hfr Hfs Hir Hbs Hrow Hgn Hsg Hpr Hxs Hstk Hkav
+    iframe Hrcpt Hka Hheld Hhart Hused Hsp Hnc Hctx Hfr Hfs Hir Hbs Hrow Hgn Hsg Hpr Hxs Hstk Hkav
     ipureintro
     exact hpure
 

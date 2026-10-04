@@ -146,7 +146,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
   unfold uvmcreatePost
-  icases HPost with ⟨⟨%hz, Hav⟩ | ⟨%b, %hb, Htree, Hav⟩⟩
+  icases HPost with ⟨⟨%hz, Hav, #Hn⟩ | ⟨%b, %hb, Htree, Hav⟩⟩
   · -- `uvmcreate` failed: return 0 at once
     obtain ⟨hz0, hzero⟩ := hz
     k_step_gen (wp_s_branch c5 _ (KA.«proc_pagetable» + 0x14#64) true 56#13 10#5 0#5 (by decide) bop.BEQ)
@@ -174,7 +174,8 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
         · ipureintro
           refine ⟨hpost.1, 0, by unfold procPagetableNodes; omega, ?_⟩
           rw [Xv6.availSub_zero]; exact hzero
-        · iexact Hav
+        · iframe Hav
+          iexact Hn
       · ipureintro; exact hpost.2
     case hR2a =>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact a2
@@ -243,7 +244,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
     case hnd2 => exact hrep0.2.1
     case hpg2 => exact hrep0.2.2.1
     iapply wpNext_intro_pin
-    iintro %c15 %hp15 %spie2 %spp2 %R2 %fresh1 %hsp2 Hk Hpc ⟨%k1, %hk1, Hlend⟩ Htree Hav %hres2
+    iintro %c15 %hp15 %spie2 %spp2 %R2 %fresh1 %hsp2 Hk Hpc ⟨%k1, %hk1, Hlend⟩ Htree Hav Hrc %hres2
     k_norm_g [pp_ret_19e0, vpnOf_tramp, trampPpn_eq, MachCSL.KCtx.withSpie_twice]
     k_norm_g [vpnOf_tramp, trampPpn_eq] at hres2
     obtain ⟨hcs2, hsup2, hnd1, hfr1, hr2⟩ := hres2
@@ -256,6 +257,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
           ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))))))))))
     rcases hr2 with ⟨hz2, hfull2⟩ | ⟨hm1, hlt1, hz1⟩
     · -- the trampoline is mapped: map the trapframe next
+      iclear Hrc
       obtain ⟨hcomp1, hlen1, htree1⟩ := mapRun_one_eq _ _ _ _ _ hsup2 hfull2
       have hlen1' : fresh1.length = 2 := by rw [hlen1, MachCSL.PTree.zeroNode_missingOn]
       rw [hlen1']
@@ -327,7 +329,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
       case hnd5 => exact hrep1.2.1
       case hpg5 => exact hrep1.2.2.1
       iapply wpNext_intro_pin
-      iintro %c25 %hp25 %spie3 %spp3 %R3 %fresh2 %hsp3 Hk Hpc ⟨%k2, %hk2, Hlend⟩ Htree Hav %hres3
+      iintro %c25 %hp25 %spie3 %spp3 %R3 %fresh2 %hsp3 Hk Hpc ⟨%k2, %hk2, Hlend⟩ Htree Hav Hrc %hres3
       k_norm_g [pp_ret_19fa, vpnOf_tf, MachCSL.KCtx.withSpie_twice]
       k_norm_g [vpnOf_tf] at hres3
       obtain ⟨hcs3, hsup3, hnd2, hfr2, hr3⟩ := hres3
@@ -343,6 +345,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
          ((hsp3 h).2.trans ((hsp2 h).2.trans (hsp1 h).2))⟩
       rcases hr3 with ⟨hz3, hfull3⟩ | ⟨hm2, hlt2, hz2'⟩
       · -- both fixed pages are mapped: the space is built
+        iclear Hrc
         obtain ⟨hcomp2, hlen2, htree2⟩ := mapRun_one_eq _ _ _ _ _ hsup3 hfull3
         have hlen2' : fresh2.length = 0 := by rw [hlen2, hmiss2]
         rw [hlen2', avail_after_pp]
@@ -404,6 +407,8 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
               | exact (d27.trans (b27.trans a27))
       · -- the trapframe mapping failed: unmap the trampoline, then free
         obtain ⟨hlen2, htree2⟩ := mapRun_one_fail _ _ _ _ _ hsup3 hlt2
+        ihave Hn := Hrc $$ %hm2
+        icases Hn with #Hn
         have hlen2' : fresh2.length = 0 := by rw [hmiss2] at hlen2; omega
         rw [hlen2', avail_after_pp] at hz2'
         have hrep2 : ptRep (((PTree.zeroNode b).mapRun trampVpn trampPpn 10#64 1 fresh1).1.mapRun tfVpn (BitVec.extractLsb' 12 44 tf) 6#64 1 fresh2).1 (insert ∅ trampVpn.toNat trampLeaf) := by
@@ -518,7 +523,8 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
             isplitl []
             · ipureintro
               exact ⟨hpost.1, 3, by omega, hz2'⟩
-            · iexact Hav
+            · iframe Hav
+              iexact Hn
           · ipureintro; exact hpost.2
         case hR2d =>
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -542,6 +548,8 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
               | exact (f27.trans (e27.trans (d27.trans (b27.trans a27))))
     · -- the trampoline mapping failed: free the table that was built
       obtain ⟨hlen1, htree1⟩ := mapRun_one_fail _ _ _ _ _ hsup2 hlt1
+      ihave Hn := Hrc $$ %hm1
+      icases Hn with #Hn
       have hrep1 : ptRep ((PTree.zeroNode b).mapRun trampVpn trampPpn 10#64 1 fresh1).1 ∅ := by
         rw [htree1]; exact ptRep_fill _ _ _ _ hrep0 hnd1 hfr1
       have hbase1 : ((PTree.zeroNode b).mapRun trampVpn trampPpn 10#64 1 fresh1).1.base = b := by
@@ -617,7 +625,8 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
             refine ⟨hpost.1, 1 + fresh1.length, by unfold procPagetableNodes; omega, ?_⟩
             rw [← Xv6.availSub_availSub, ← availDec_eq]
             exact hz1
-          · iexact Hav
+          · iframe Hav
+            iexact Hn
         · ipureintro; exact hpost.2
       case hR2b =>
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]

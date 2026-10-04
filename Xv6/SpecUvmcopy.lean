@@ -9,6 +9,11 @@ THE LEND (permit sweep L1a, Rocq f344a089a): `actLend k.proc ke` in, `∃ k'
 ≥ ke` back right after the return pc, framed through by the proof for now;
 `[WchG GF]` joins the binders (Rocq's `!wchG Σ`).
 
+THE NULL RECEIPT (NI joint fork lane F2; design "Joint fork lane design"
+F3): `-1` comes only from a null `kalloc` (the page's own, or a `walk`
+node's under `mappages`), so the `-1` arm carries that call's persistent
+receipt `kNullRcpt γk k.proc`.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.Image
@@ -49,7 +54,7 @@ def wp_uvmcopy_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     procPtAt Pold Mold -∗
-    ((⌜R' 10#5 = -1#64⌝ ∗ procPtAt Pnew Mnew) ∨
+    ((⌜R' 10#5 = -1#64⌝ ∗ procPtAt Pnew Mnew ∗ kNullRcpt γk k.proc) ∨
      (∃ (Pnew' : UPtd) (Mnew' : Nat → List (BitVec 8)),
         ⌜R' 10#5 = 0#64 ∧ uvmcopyOk Pold Pnew Pnew' Mold Mnew Mnew' (uvmNp (k.regs 12#5))⌝ ∗
         procPtAt Pnew' Mnew')) -∗

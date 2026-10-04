@@ -163,7 +163,7 @@ theorem sys_fork_proof (KF : KFORK) : SYSFORK :=
       hj hproc hK hnoff htier => by
     unfold wp_sys_fork_led_eb_body kforkPostLed
     exact sys_fork_kforkB (GF := GF) Γ γw γp γl γk γft γ j pid V M stsP Q csP Rc
-      (kforkRetLed γ j pid V M stsP Q csP Rc)
+      (kforkRetLed γ γk j pid V M stsP Q csP Rc)
       (fun c k' hpr hKf hn ht => by
         have h := KF.wp_kfork_led_eb (hlc := hlc) (GF := GF) Γ c k' γw γp γl γk γft γ j pid V M stsP Q csP
           Rc hj hpr hKf hn ht
