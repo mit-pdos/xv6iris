@@ -3880,7 +3880,9 @@ may be merged into G4a). Estimates:
 - **G4b:** ~25 files, ~48 mechanical `sts` call sites. Content: `uwriteRd`'s first-index lemmas and `consCnt_of_rd`
   (~120 lines), the arm's bridge (~100), `NiStep`'s new field threaded through `NiTrace` (~120, mechanical).
 
-**RULINGS REQUESTED.**
+****RULINGS G4-R1…R7 (2026-10-04, coordinator, all as recommended):** R1 the sibling predicates `consWriteCnt`/`fwConsCnt` beside a byte-identical `writeConsShort`/`writeConsArms` (the user tier untouched); R2 `uLeafR` as `uptWf`'s sixth conjunct (xv6 never makes a `U` leaf without `R`; the invariant should say so); R3 the class at `lz = false ∧ wc = true` (`usysDetClassAt … lz wc`); R4 Route A (`sts` into `syscEvRow`/`syscEvOut`/`utEvOut`, write cites `{boot with act}` at every write; `SYSCALL`/`USERTRAP` texts move by the one argument, as X2 moved them); R5 one step field `wcon : Option Nat` in `input`, `wcon.isSome` in `obsInput`, write a reading in the observable form; R6 the UART output is OUT of G4 — F7 recorded as honest scope 10, left for an NI-OUT lane under M3; R7 `usysMemOk` byte-identical. Also: `UsysDet` §4's "copyin does not fault them" is WRONG (it does, via `vmfault(read=1)`); G4b corrects it. Lanes G4a0 → G4a → G4b, one worktree, three commits.
+
+RULINGS REQUESTED.**
 - **G4-R1 (the count and its Spec route).**
   - Recommended: the count is `consCnt n (uwriteRd π a1 n)` (the 32-byte chunk boundary below the first unreadable
     byte, `n` at a whole buffer, `−1` at `n < 0`). The kernel says it in ONE new pure predicate, `consWriteCnt P P'
