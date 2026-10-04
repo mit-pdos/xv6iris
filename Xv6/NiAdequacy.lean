@@ -40,16 +40,22 @@ are `LinkNiAdequacy` (only a `Link` file may import a `Proof` file).
 
 ## Honest scope (see `NiTrace`'s header for the trace side)
 
-1. The class is {exit, getpid, uptime} and wait at a null status pointer or
-   of a lazy-free process (NI M2-G1e: the key's lazy bit rides the step);
-   every other ecall's enter is free but for fork's pid on success.
+1. The class is {exit, getpid, uptime}, wait at a null status pointer or
+   of a lazy-free process (NI M2-G1e: the key's lazy bit rides the step)
+   and (NI joint fork lane F3) fork at every key; every other ecall's enter
+   is free.  The class's meaning grew through `UsysDet.usysDetClass` and
+   `UIota` (+ the slot ledger) with every statement here byte-identical.
 2. Origins are honest by W2d's one-shot claims (`niOneShot` in the
    conclusion): the filing's origin claims are fork exits' or power-ons',
    each spent once.  That an origin's FIRST KEY is the forked child's is not
    stated (the claim names the parent's fork exit, not the child's key).
 3. The syscall mask and the actor are carried per filing (`NiTrace` scope
-   3); getpid's answer is the incarnation's pid (W2d's pid row); uptime's
-   and wait's answers are DERIVED from the cited ι (`NiTrace` scopes 4, 6).
+   3); getpid's answer is the incarnation's pid (W2d's pid row); uptime's,
+   wait's and (NI joint fork lane F3) fork's answers are DERIVED from the
+   cited ι (`NiTrace` scopes 4, 6, 8: fork's from the pid history, the
+   round's decisive allocator event and the slot ledger's `SFull`, with
+   every actor's allocator order and the slot-occupancy timeline conceded
+   through the histories).
 4. (NI M2-X4, F3) The histories `niHist F` are ghost witnesses inside the
    existential `F`: ι is not observable (`NiTrace` scope 5); the cited era
    is an input (scope 7).
@@ -69,8 +75,8 @@ set_option linter.unusedSectionVars false
 /-- **THE NI CONCLUSION** of a run ending at history `h`: the ledger's filing
 of `h` exists, it is one-shot (W2d), (NI M2-X4) its citations are prefixes
 of ONE history per (era, ledger), `niHist F` (the chain), and every
-incarnation's trace obeys the class law (whose uptime and wait answers are
-M0's row at the cited ι). -/
+incarnation's trace obeys the class law (whose uptime, wait and -- NI joint
+fork lane F3 -- fork answers are M0's row at the cited ι). -/
 def xv6NiPhi (_ : GState) (h : List Obs) : Prop :=
   ∃ F, niOk h F ∧ niOneShot h F ∧ niChain F (niHist F) ∧ ∀ q, NiClassLaw q (utrace q h F)
 

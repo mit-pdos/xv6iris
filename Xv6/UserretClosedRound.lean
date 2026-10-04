@@ -15,8 +15,9 @@ back (the kernel obligation `ukb`'s body), through
                           design/ni-uhist.md D5, Rocq 5634a3874)
     the evidence          (NI M2-X2) usertrap's `utEvOut`: at a citing number
                           the round cites its era and prefix, M0's row at
-                          it (`urc_niDetRow`, `uexecRet_roundDet`) and
-                          fork's pid (`urc_niForkRow`); `NiFitIs.evid`
+                          it (`urc_niDetRow`, `uexecRet_roundDet`; fork's
+                          answer among it since NI joint fork lane F3);
+                          `NiFitIs.evid`
     the resume            UserretClosedResume.urc_resume (userret, steps C/D)
 
 back to the next round, under the loop hypothesis `▷ urcLoop`.
@@ -167,8 +168,8 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
   -- ...and THE RECORD'S EVIDENCE (NI M2-X2): at a citing number (uptime,
   -- wait, fork at the ecall) the round cites the era and prefix usertrap's
   -- post carries (`utEvOut`), with M0's row at it (`urc_niDetRow`:
-  -- `uexecRet_roundDet` at the cited ι) and fork's pid (`urc_niForkRow`);
-  -- elsewhere it cites nothing
+  -- `uexecRet_roundDet` at the cited ι, fork's answer among it since NI
+  -- joint fork lane F3); elsewhere it cites nothing
   have hnum := urc_num_run W V hl hsc
   ihave #Hev : MachFixedGS.uEvid (hlc := hlc) (GF := GF) (some (i, x))
       (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf)) $$ [Heo]
@@ -191,8 +192,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
             niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
             ⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩,
             urc_niDetRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hlw hM hpi hsz hcw hgn hch hpid hlz hsc
-              hround hchk hfde hrp hev,
-            urc_niForkRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hch hsc hev⟩
+              hround hchk hfde hrp hev⟩
         iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ (some (ke, ι)) hfe
         unfold niCiteRes niCiteResRaw
         iexists (niNamesHere (GF := GF))
@@ -202,7 +202,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
           urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm,
           urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp,
           niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
-          ⟨fun h => absurd h hcit, fun h => absurd h (by simp)⟩, trivial, trivial⟩
+          ⟨fun h => absurd h hcit, fun h => absurd h (by simp)⟩, trivial⟩
       iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ none hfe
       unfold niCiteRes niCiteResRaw
       iempintro

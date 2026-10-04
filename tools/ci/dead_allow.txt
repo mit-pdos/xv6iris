@@ -28,18 +28,3 @@ decl Xv6.Spin
 #    is reached only when a program proof takes the det arm -- keep it until
 #    one does (claude-notes/projects/noninterference.md, "M2-X design" §3)
 decl Xv6.uexecRetContF_det
-
-# -- the ledgers' other readings at a round's ι-prefix (NI M0 / M2-W3):
-#    `round_det`'s class reads only the tick count and (wait) `zLowest`; the
-#    allocator's, the pid counter's and the zombie set / statuses are the
-#    readings the lanes that re-admit sbrk (G3) and fork (the joint lane
-#    G1f+G2c+G3) will state their rows in -- remove each row with its lane
-decl Xv6.UIota.poolEmpty
-decl Xv6.UIota.nextPid
-decl Xv6.UIota.zombies
-decl Xv6.UIota.status
-
-# -- the slot-occupancy ledger (NI joint fork lane F1): a window at a prefix is
-#    a window at any extension -- the design's lemma for reading `sFullRcpt`'s
-#    window at a later history; F3 reaches it (or removes this row)
-decl Xv6.sevWindow_mono

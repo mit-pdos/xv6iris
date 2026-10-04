@@ -78,16 +78,6 @@ def sevWindow (h : List Sev) (k0 : Nat) : Prop :=
 /-- Every exhaustion in `h` was appended with its window. -/
 def sevWf (h : List Sev) : Prop := ∀ p act k0, p ++ [.SFull act k0] <+: h → sevWindow p k0
 
-/-- A window at a prefix is a window at any extension. -/
-theorem sevWindow_mono {h h' : List Sev} {k0 : Nat} (hp : h <+: h') (hw : sevWindow h k0) :
-    sevWindow h' k0 := by
-  obtain ⟨t, rfl⟩ := hp
-  intro i hi
-  obtain ⟨k, h0, hk, ho⟩ := hw i hi
-  refine ⟨k, h0, ?_, ?_⟩
-  · rw [List.length_append]; omega
-  · rw [occOf_take_append h t hk]; exact ho
-
 theorem sevWf_nil : sevWf [] := by
   intro p act k0 hp
   have := hp.length_le

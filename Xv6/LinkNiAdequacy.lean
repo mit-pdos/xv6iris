@@ -16,7 +16,8 @@ booted, `fs.img` on its disk) -- and its pure corollaries over runs.
   masks, exit contents and cited positions) and EQUAL LEDGER HISTORIES
   (`niHist F₁ = niHist F₂`), the incarnation's ecalls in the class, give
   equal enters (getpid's answer is the incarnation's pid, part of `q`;
-  uptime's and wait's are derived from the cited ι).
+  uptime's, wait's and -- NI joint fork lane F3 -- fork's are derived from
+  the cited ι).
 * **`xv6NiTwoRunObs`** (NI M2-X4, ruling X-R3 amended): the observable
   form -- equal keys, masks and exits and equal readings (`niReadings`)
   give equal enters.
@@ -27,12 +28,13 @@ A `Link` file because it consumes `ProofUser` (tools/check_layering.sh).
 
 ## Honest scope
 
-The class is {exit, getpid, uptime} and wait at a null status pointer or of
-a lazy-free process (NI M2-G1e);
-every filing spent a distinct claim minted before its enter (`niOneShot`,
-W2d); the mask and actor are carried per filing; uptime's and wait's
-answers are derived from the cited ι, getpid's is the incarnation's pid
-(`NiTrace` header).  The filings `F` are existential (O6), and the
+The class is {exit, getpid, uptime}, wait at a null status pointer or of
+a lazy-free process (NI M2-G1e) and fork at every key (NI joint fork lane
+F3: `NiTrace` scope 8 says what fork's answer is derived from and what the
+histories concede); every filing spent a distinct claim minted before its
+enter (`niOneShot`, W2d); the mask and actor are carried per filing;
+uptime's, wait's and fork's answers are derived from the cited ι, getpid's
+is the incarnation's pid (`NiTrace` header).  The filings `F` are existential (O6), and the
 histories `niHist F` are ghost witnesses inside them: ι is not observable
 (F3), which is why the observable form `xv6NiTwoRunObs` is kept beside
 `xv6NiTwoRun`; the cited era is an input (F6).  The corollaries hold at the
@@ -87,8 +89,9 @@ theorem xv6NiTwoRun {hlc : HasLC}
 amended): two runs from booting machines; at the one-shot filings their
 ledgers witness, an incarnation `q` whose ecalls (in run 1) are in the
 class, with equal observable inputs (keys, masks, lazy bits, exits) and
-equal READINGS (`niReadings`: its uptime answers and its wait answers in
-the class, read off the enters) in the two runs, has equal enters.  The same
+equal READINGS (`niReadings`: its uptime answers, its wait answers in the
+class and -- NI joint fork lane F3 -- its fork answers, read off the
+enters) in the two runs, has equal enters.  The same
 law as `xv6NiTwoRun`'s; the hypothesis is checkable on the trace. -/
 theorem xv6NiTwoRunObs {hlc : HasLC}
     (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)

@@ -109,7 +109,7 @@ the class with its `round_det` discharge):
 | **M2-G3 sbrk** | `sysSbrkOk`'s −1 only when the pool is empty (growproc/uvmalloc functional in the allocator ledger), and the eager grow's page-table pages as events (`Alloc A vpn`-grained, §3 "concedes more") | `sbrk` |
 | **M2-G4 console write** | the kernel's short count stated at the key's permission view `π` (copyin at the key, not the table) and a write row in the trap contract | console `write` |
 
-- [ ] M2-G1 (DESIGNED 2026-10-03, "M2-G1 design" below; awaiting rulings G1-R1..R6)  - [ ] M2-G2 (DESIGNED 2026-10-03, "M2-G2 design" below; awaiting rulings G2-R1..R5)  - [ ] M2-G3  - [ ] M2-G4  - [x] M2-X (ι export; X1 ba13ce661, X2 2c3f0000b, X3 e864f14ed, X4 "M2-X4 as landed" below: xv6NiPhi carries the chain, uptime/wait derived from usysDet at the cited ι, xv6NiTwoRun at equal ledger histories, xv6NiTwoRunObs the tenth root)
+- [x] M2-G1 (G1a-e landed; complete with fork re-admitted by the joint fork lane F1-F3, "Joint fork lane F3 as landed" below)  - [x] M2-G2 (G2a-b landed; complete with fork re-admitted by the joint fork lane F1-F3)  - [ ] M2-G3  - [ ] M2-G4  - [x] M2-X (ι export; X1 ba13ce661, X2 2c3f0000b, X3 e864f14ed, X4 "M2-X4 as landed" below: xv6NiPhi carries the chain, uptime/wait derived from usysDet at the cited ι, xv6NiTwoRun at equal ledger histories, xv6NiTwoRunObs the tenth root)
 
 Risk register (honest): W1 changes the language and every lifting lemma -- mechanical but wide, and the device
 suite must not notice; W3 is the proof's content and may find a row that cannot be made functional in `(key,
@@ -3011,6 +3011,76 @@ Lane F2 (the allocator receipts reach fork) landed on `lane/f2`. Nothing is tick
     an F3 file;
   - `tools/ci/dead_allow.txt`: no rows were needed. `kNullRcpt`/`kAllocRcpt` are reached through the
     `KFORK`/`SYSFORK` texts, which the syscall arm cites.
+
+### Joint fork lane F3 as landed (2026-10-04)
+
+On `lane/fork` (after F1 e1b66d9b7 and F2 4cc8ddcee), one commit. Fork joins the NI class at EVERY key
+(JF-R2); rulings JF-R1…R7 as recommended.
+
+**What landed.**
+- **`UsysDet`** (imports `SlotEv`): `UIota.sev : List Sev := []` (sixth field, last; `UIota.boot :=
+  ⟨[], [], [], 0, 0#64, []⟩`); `UIota.kOk`/`kNull` (`ι.kev.getLast? = some (.KAlloc/.KNull ι.act)`),
+  `UIota.sFull` (`∃ k0, ι.sev.getLast? = some (.SFull ι.act k0)`, decidable through `sevFullB`/`sFull_iff`);
+  `forkOk ι := ι.kOk ∧ ¬ ι.sFull`; `usysForkPid`, `usysForkAns ι := if forkOk ι then usysForkPid ι else -1`,
+  `usysForkGen` (the last `ZFork`'s generation); `usysDetFork W ι := bump W (usysForkAns ι) W.M W.perm W.sz
+  W.fd W.cwd W.gen (if forkOk ι then W.ch ∪ {usysForkGen ι} else W.ch) W.lazy W.secc`; `usysDetClass +
+  n = USYS_fork`, `usysDetResumes + ∨ n = USYS_fork`, `usysDetClassAt` text unchanged; `usysDet`'s fork
+  branch (`usysDet_fork`), `usysDetRet`'s (`usysDetRet_fork`); `usysForkFitsAt ch ι r cs'` and
+  `usysIotaFits`' third conjunct; `usysIotaFits_exists` (+`n ≠ fork`), `usysIotaFits_of_ev` (+ fork's fit);
+  `usysDet_mem`/`_rows`/`_of_rows` with the fork arm (fd row quiet: xv6 copies the table into the child,
+  the parent keeps `W.fd`; `_rows`' children conjunct and `_of_rows`' `hch` now exclude wait AND fork).
+  `UIota.poolEmpty`/`nextPid`/`zombies`/`status` DELETED (no lane reads them: F2's receipts read the
+  allocator's own `poolEmpty`, G3/G4 read none of them).
+- **`NiEvid`**: `niNamesHere` has FIVE names (`… , fsReadyKmem.pend, WchG.wslName GF`); `niIotaLbs`' fifth
+  conjunct `((ns.getD 4 0) ↪◯ML ι.sev)`; `niBelow` (+`ι.sev <+: H.sev`, last), `niJoin` (+`niLonger` of
+  `sev`), `niBelow_join` (+`hs`), `niIotaLbs_compat` (four `lb_own_valid`s), `_join`, `_boot`, `_mk`, `_ticks`,
+  `_zev`; new `niIotaLbs_lists`, `_pzk` (success), `_kev` (−1 by KNull), `_sev` (−1 by SFull); `_pz` deleted.
+- **`SyscallDefs.syscEvRow`'s fork clause** (the design's text):
+  `syscNum V = USYS_fork → tfW V'.tf (tfArgIdx 0) = usysForkAns ι ∧ (forkOk ι → (∃ hz i, ι.zev = hz ++
+  [.ZFork ι.act i (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) (usysForkGen ι)]) ∧ cs' = cs ∪ {usysForkGen ι}) ∧
+  (¬ forkOk ι → (ι.kNull ∨ ι.sFull) ∧ cs' = cs)`.
+- **`SyscallArmsFork`**: `syscArmFork_ev` takes `kAllocRcpt fsReadyKmem act` and cites `{boot with pev := h,
+  zev := hz ++ [ZFork …], kev := hk ++ [KAlloc act], act}`; `syscArmFork_evNeg` takes `kNullRcpt
+  fsReadyKmem act ∨ sFullRcpt act` and cites `{boot with kev := hk ++ [KNull act], act}` or `{boot with sev :=
+  hs ++ [SFull act k0], act}` -- `UIota.boot` is no longer cited at fork; the arm's `icases Hret` keeps both
+  receipts (F2's `-` gone).
+- **`syscEvOut` / `utEvOut`: text unchanged.** The quiet disjunct already EXCLUDED fork (`syscNum V ≠
+  USYS_fork`); that conjunct is what keeps fork citing, so it stays. `ut_evOut_of`'s kill disjunct proof is
+  unchanged (fork's clause is still an implication from the number).
+- **`NiLedger`**: `niForkRow` RETIRED (from `niFitEv`, `niEntryOk`; `niEntryOk_snoc`, `niFiling_ok`,
+  `niOk_cite_le` re-destructured); `niCiting` already covered fork; `niDetRow` covers fork through the class.
+  `UserretClosedRows.urc_niForkRow` deleted; `urc_evRow`'s third conjunct is `usysForkFitsAt (uvisRun W).ch ι
+  (tfW V'.tf a0) cs'`; `urc_niDetRow` passes it to `usysIotaFits_of_ev`.
+- **`NiTrace`**: `NiPos` + `sev : Nat` (last), `UIota.pos` + `ι.sev.length`, `niBelow_pos` + sev;
+  `niRoundLaw`'s out-of-block fork clause deleted, the resume block gains `(gprsNum secc xg = USYS_fork →
+  ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysForkAns ι)`, derived by `niDetRow_fork` (`usysDet_fork`,
+  `ukeyEq_bump_a0`); `NiStep.classReading` admits fork; `output_eq_of`'s `hans` covers fork. `NiInClass`,
+  `NiStep` byte-identical. Honest scope 1 rewritten, scope 8 (fork) added (F6's paragraph).
+- **`SlotEv`**: `sevWindow_mono` deleted (unreached; `sFullRcpt`'s window is read only by the honesty note).
+
+**Statements that moved** (all sanctioned): `UIota`, `usysDetClass`, `usysDetResumes`, `usysDet`,
+`usysDetRet`, `usysIotaFits`, `syscEvRow`, `niNamesHere`, `niIotaLbs`, `niBelow`, `niJoin`, `niFitEv`,
+`niEntryOk`, `NiPos`, `UIota.pos`, `niRoundLaw`, `NiStep.classReading`; lemmas `usysDetResumes_ne` (−fork),
+`usysDet_mem` (+`hfr`), `usysDet_rows`/`_of_rows` (children excludes fork), `usysIotaFits_exists`/`_of_ev`,
+`niBelow_join`, `niIotaLbs_compat`/`_mk`, `syscArmFork_ev`/`_evNeg`, `urc_evRow`, `NiStep.output_eq_of`.
+`uexecRet_roundDet`'s TEXT is unchanged (its `hcls`/`hfit` grow through the definitions). Byte-identical:
+`SYSCALL`, `USERTRAP`, `USERRET`, `USER`, `SyscRows`, `syscEvOut`, `utEvOut`, `NiStep`, `NiInClass`, every
+kernel Spec, and the four NI roots (meaning grows through `UIota`/`niEntryOk`).
+
+**Deviations.** (1) `usysDet_mem`'s fork arm takes the answer's range as a premise (`hfr`, as wait's `hwr`)
+instead of the design's `pidPick_range`: `pidPick`'s unreachable fallback is `nextOf h`, which is NOT
+range-bounded on an arbitrary history (a `PAlloc` of a pid > PIDMAX steps it past), so the lemma as designed
+is false; `PidEv` untouched. (2) `usysDetFork` is one bump at `usysForkAns ι` with an `if forkOk` children set
+(the design's two-bump `if`; equal). (3) Five `niIotaLbs_*` assembly helpers instead of the design's
+`niIotaLbs_mk` alone. (4) The −1 reason is the KERNEL row's (it constrains which ι the arm may cite); the
+exported law reads only `usysForkAns ι` (NiTrace scope 8 says so).
+
+**Baselines.** `tools/tcb/expected.json`: `Xv6.SlotEv` ENTERS the trusted base of `xv6NiAdequacy`,
+`xv6NiTwoRun`, `xv6NiTwoRunObs`, `xv6NiStrongInstance` (through `UIota.sev`); no other root moved.
+`tools/audit/baseline.json` unchanged. `tools/ci/dead_allow.txt`: the four `UIota.*` reading rows and
+`sevWindow_mono`'s row removed (definitions deleted); the only NI row left is `uexecRetContF_det` (as was).
+
+What remains: G3 (sbrk), G4 (console write), M3.
 
 ## Lanes (opened 2026-09-15)
 

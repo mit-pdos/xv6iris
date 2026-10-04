@@ -164,9 +164,13 @@ at a null status pointer or a lazy-free process (NI M2-G1e), the family
 ledger's reading `zLowest ι.zev ι.act` through the status window the
 entry's permission view gives (`UsysDet.usysWaitFitsAt` at `permOf V.upt.um
 V.sz`: the reap, the window's prefix with nothing reaped, or `-1` with
-nothing moved); fork's, on success, the pid
-`pidPick` of `ι`'s pid prefix, and `ι`'s family prefix ends in the round's
-`ZFork` of that pid at the generation the children column gained.  The
+nothing moved); fork's (NI joint fork lane F3) `UsysDet.usysForkAns ι` --
+on success (`forkOk ι`: the cited allocator prefix ends in the actor's
+`KAlloc`, the cited slot prefix not in its `SFull`) the pid `pidPick` of
+`ι`'s pid prefix, `ι`'s family prefix ending in the round's `ZFork` of that
+pid at the generation the children column gained; on `-1` a POSITIVE
+reason (ruling JF-R5: the cited allocator prefix ends in the actor's
+`KNull`, or the cited slot prefix in its `SFull`) and the column kept.  The
 records are the dispatch's (`V`/`img` the entry, `V'`/`img'` the record the
 call left). -/
 def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare) (ι : UIota) :
@@ -175,10 +179,12 @@ def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName c
   (syscNum V = USYS_wait → (tfW V.tf (tfArgIdx 0) = 0#64 ∨ V.pvLazy = false) →
     usysWaitFitsAt (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 0)) cs img ι (tfW V'.tf (tfArgIdx 0))
       cs' img') ∧
-  (syscNum V = USYS_fork → tfW V'.tf (tfArgIdx 0) ≠ -1#64 →
-    tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) ∧
-    ∃ (hz : List Zev) (i : Nat) (γ : GName),
-      ι.zev = hz ++ [.ZFork ι.act i (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) γ] ∧ cs' = cs ∪ {γ})
+  (syscNum V = USYS_fork →
+    tfW V'.tf (tfArgIdx 0) = usysForkAns ι ∧
+    (forkOk ι → (∃ (hz : List Zev) (i : Nat),
+        ι.zev = hz ++ [.ZFork ι.act i (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) (usysForkGen ι)]) ∧
+      cs' = cs ∪ {usysForkGen ι}) ∧
+    (¬ forkOk ι → (ι.kNull ∨ ι.sFull) ∧ cs' = cs))
 
 /-! ## §2 The dispatch table -/
 
