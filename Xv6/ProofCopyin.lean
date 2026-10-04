@@ -234,10 +234,35 @@ def ciKeep (R R2 : RegMap) : Prop :=
 def ciPost (psz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (A : Nat) (old : List (BitVec 8))
     (P' : UPtd) (bs' : List (BitVec 8)) (r : BitVec 64) : Prop :=
   P.extSz psz P' ∧
-    ((r = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) A old.length ∧ umMapped P' A old.length) ∨
+    ((r = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) A old.length ∧ umMapped P' A old.length ∧
+        (∀ i, i < old.length → uvaRmapped P' (A + i))) ∨
      (r = -1#64 ∧ (∃ e, e ≤ old.length ∧
         bs' = umemRead (viewFaulted P P' M) A e ++ old.drop e) ∧
       ∃ e, e < old.length ∧ A + e < 2 ^ 64 ∧ ¬ uvaRmapped P (A + e)))
+
+/-- vmfault's fresh leaf passes walkaddr's `V ∧ U` (NI M2-G4). -/
+theorem ci_vu_faultLeaf (r : BitVec 64) :
+    pteVU (leafOf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) := by
+  unfold pteVU leafOf PTE_V PTE_U PTE_W PTE_R
+  constructor <;> bv_decide
+
+/-- The bytes one page's chunk read are readable (NI M2-G4): the chunk lies
+on the page whose leaf `w` passed walkaddr's `V ∧ U`. -/
+theorem ci_rpre_step (P2 : UPtd) (A d n : Nat) (w : BitVec 64)
+    (hum : get? P2.um ((A + d) / 4096) = some w) (hvu : pteVU w)
+    (hfit : (A + d) % 4096 + n ≤ 4096) (hpre : ∀ i, i < d → uvaRmapped P2 (A + i)) :
+    ∀ i, i < d + n → uvaRmapped P2 (A + i) := by
+  intro i hi
+  by_cases h : i < d
+  · exact hpre i h
+  · exact ⟨(A + d) / 4096, w, (A + d) % 4096 + (i - d), hum, hvu, by omega, by omega⟩
+
+/-- A readable byte of a valid table is below `2 ^ 64`. -/
+theorem ci_rmapped_lt {P : UPtd} (hwf : uptWf P) {x : Nat} (h : uvaRmapped P x) : x < 2 ^ 64 := by
+  obtain ⟨vpn, w, j, hl, -, hj, hxe⟩ := h
+  have hk : vpn < tfVpn.toNat := (hwf.1 _ _ hl).1
+  rw [Xv6.tfVpn_toNat] at hk
+  omega
 
 /-! ## One page: `walkaddr`, and `vmfault` when it is not mapped -/
 
@@ -277,7 +302,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
       byteBuf dst0 (DFrac.own 1) (umemRead (viewFaulted P P2 M) A d ++ old.drop d) -∗
       ⌜ciKeep R R2 ∧ P.extSz psz P2 ∧ P1.ext P2 ∧
         ((pcv = (KA.«copyin» + 0x7c#64) ∧ R2 10#5 = -1#64 ∧ ¬ uvaRmapped P (A + d)) ∨
-         (pcv = (KA.«copyin» + 0x30#64) ∧ get? P2.um ((A + d) / 4096) = some w ∧
+         (pcv = (KA.«copyin» + 0x30#64) ∧ get? P2.um ((A + d) / 4096) = some w ∧ pteVU w ∧
           R2 10#5 = pte2pa w ∧ R2 19#5 = BitVec.ofNat 64 ((A + d) / 4096 * 4096) ∧
           (A + d) / 4096 * 4096 < 2 ^ 38))⌝ -∗
       wpLoop cpu'))
@@ -433,7 +458,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
       iapply HΦ' $$ %spie2 %spp2 %_ %(P1.insertLeaf ((A + d) / 4096) r (PTE_W ||| PTE_U ||| PTE_R))
         %(leafOf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) %_ %hsp3' Hk Hpc Hlend HP Hdst
       ipureintro
-      refine ⟨?_, hext2, UMemL.ext_insertLeaf P1 _ r _ hnone, Or.inr ⟨rfl, UMemL.insertLeaf_get _ _ _ _, ?_, ?_, hlt38⟩⟩
+      refine ⟨?_, hext2, UMemL.ext_insertLeaf P1 _ r _ hnone, Or.inr ⟨rfl, UMemL.insertLeaf_get _ _ _ _, ci_vu_faultLeaf r, ?_, ?_, hlt38⟩⟩
       · simp only [ciKeep, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         exact ⟨f2.trans e2, f18.trans e18, f20.trans e20, f21.trans e21, f22.trans e22,
           f23.trans e23, f24.trans e24, f25.trans e25, f26.trans e26, f27.trans e27⟩
@@ -458,7 +483,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
       (fun h => (hp6 h).trans (hpinA h)) $$ HΦ
     iapply HΦ' $$ %spie %spp %_ %P1 %w %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend HP Hdst
     ipureintro
-    refine ⟨?_, hext1, UMemL.ext_refl P1, Or.inr ⟨rfl, hum, ?_, ?_, hva0lt⟩⟩
+    refine ⟨?_, hext1, UMemL.ext_refl P1, Or.inr ⟨rfl, hum, hvu, ?_, ?_, hva0lt⟩⟩
     · simp only [ciKeep, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       exact ⟨e2, e18, e20, e21, e22, e23, e24, e25, e26, e27⟩
     · exact hpa
@@ -482,6 +507,7 @@ theorem ci_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     (hA64 : A + d < 2 ^ 64) (hmax : (A + d) / 4096 * 4096 < 2 ^ 38)
     (P2 : UPtd) (w : BitVec 64) (hext2 : P.extSz psz P2)
     (hum : get? P2.um ((A + d) / 4096) = some w) (hMap : umMapped P2 A d)
+    (hvu : pteVU w) (hpre : ∀ i, i < d → uvaRmapped P2 (A + i))
     (spie spp : Bool) (R : RegMap) (hsp : R 2#5 = sp)
     (h9 : R 9#5 = BitVec.ofNat 64 n)
     (h10 : R 10#5 = pte2pa w)
@@ -505,7 +531,7 @@ theorem ci_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
         ((pcv = (KA.«copyin» + 0x7c#64) ∧ ciPost psz P M A old P3 bs' (R2 10#5) ∧ R2 27#5 = s11) ∨
          (pcv = (KA.«copyin» + 0x5a#64) ∧ d < d2 ∧ d2 < old.length ∧ P.extSz psz P3 ∧
           bs' = umemRead (viewFaulted P P3 M) A d2 ++ old.drop d2 ∧ umMapped P3 A d2 ∧
-          A + d2 ≤ 2 ^ 38 ∧ (A + d2) % 4096 = 0 ∧
+          (∀ i, i < d2 → uvaRmapped P3 (A + i)) ∧ A + d2 ≤ 2 ^ 38 ∧ (A + d2) % 4096 = 0 ∧
           R2 23#5 = pageAddr P.root ∧ R2 25#5 = psz ∧
           R2 18#5 = BitVec.ofNat 64 (A + d2) ∧ R2 21#5 = dst0 + BitVec.ofNat 64 d2 ∧
           R2 20#5 = BitVec.ofNat 64 (old.length - d2) ∧ R2 22#5 = 4096#64 ∧
@@ -515,6 +541,7 @@ theorem ci_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
   have hAd : A + d = (A + d) / 4096 * 4096 + (A + d) % 4096 := by omega
   have hMapC : umMapped P2 A (d + n) :=
     UMemL.umMapped_append hMap (UMemL.umMapped_page hfit (by rw [hum]; rfl))
+  have hpreC : ∀ i, i < d + n → uvaRmapped P2 (A + i) := ci_rpre_step P2 A d n w hum hvu hfit hpre
   have hcslen : (umemRead (viewFaulted P P2 M) (A + d) n).length = n := UMemL.umemRead_length _ _ _
   have htkd : (umemRead (viewFaulted P P2 M) A d).length = d := UMemL.umemRead_length _ _ _
   have hbuftake : (umemRead (viewFaulted P P2 M) A d ++ old.drop d).take d
@@ -640,7 +667,7 @@ theorem ci_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans (hpinA h)))))) $$ HΦ
     iapply HΦ' $$ %spie %spp %_ %P2 %_ %(d + n) %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP Hdst
     ipureintro
-    refine ⟨?_, Or.inl ⟨rfl, ⟨hext2, Or.inl ⟨?_, ?_, hfull ▸ hMapC⟩⟩, ?_⟩⟩
+    refine ⟨?_, Or.inl ⟨rfl, ⟨hext2, Or.inl ⟨?_, ?_, hfull ▸ hMapC, hfull ▸ hpreC⟩⟩, ?_⟩⟩
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       exact (g2.trans hsp : _)
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -660,7 +687,7 @@ theorem ci_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       ((hp8 h).trans ((hp7 h).trans (hpinA h))))) $$ HΦ
     iapply HΦ' $$ %spie %spp %_ %P2 %_ %(d + n) %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP Hdst
     ipureintro
-    refine ⟨?_, Or.inr ⟨rfl, by omega, by omega, hext2, rfl, hMapC, by omega, by omega, ?_, ?_, ?_, ?_,
+    refine ⟨?_, Or.inr ⟨rfl, by omega, by omega, hext2, rfl, hMapC, hpreC, by omega, by omega, ?_, ?_, ?_, ?_,
       ?_, ?_, ?_, ?_, ?_⟩⟩
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       exact (g2.trans hsp : _)
@@ -700,6 +727,7 @@ theorem ci_nsel (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     (hA64 : A + d < 2 ^ 64) (hmax : (A + d) / 4096 * 4096 < 2 ^ 38)
     (P2 : UPtd) (w : BitVec 64) (hext2 : P.extSz psz P2)
     (hum : get? P2.um ((A + d) / 4096) = some w) (hMap : umMapped P2 A d)
+    (hvu : pteVU w) (hpre : ∀ i, i < d → uvaRmapped P2 (A + i))
     (spie spp : Bool) (R : RegMap) (hsp : R 2#5 = sp)
     (h10 : R 10#5 = pte2pa w)
     (h18 : R 18#5 = BitVec.ofNat 64 (A + d))
@@ -722,7 +750,7 @@ theorem ci_nsel (MM : MEMMOVE) [Xv6G GF] [CurCtx]
         ((pcv = (KA.«copyin» + 0x7c#64) ∧ ciPost psz P M A old P3 bs' (R2 10#5) ∧ R2 27#5 = s11) ∨
          (pcv = (KA.«copyin» + 0x5a#64) ∧ d < d2 ∧ d2 < old.length ∧ P.extSz psz P3 ∧
           bs' = umemRead (viewFaulted P P3 M) A d2 ++ old.drop d2 ∧ umMapped P3 A d2 ∧
-          A + d2 ≤ 2 ^ 38 ∧ (A + d2) % 4096 = 0 ∧
+          (∀ i, i < d2 → uvaRmapped P3 (A + i)) ∧ A + d2 ≤ 2 ^ 38 ∧ (A + d2) % 4096 = 0 ∧
           R2 23#5 = pageAddr P.root ∧ R2 25#5 = psz ∧
           R2 18#5 = BitVec.ofNat 64 (A + d2) ∧ R2 21#5 = dst0 + BitVec.ofNat 64 d2 ∧
           R2 20#5 = BitVec.ofNat 64 (old.length - d2) ∧ R2 22#5 = 4096#64 ∧
@@ -748,7 +776,7 @@ theorem ci_nsel (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     iintro Hk Hpc
     ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
     iapply (ci_move MM k P M old A dst0 psz sp s11 hK d (4096 - (A + d) % 4096) hd hlen'
-      (by omega) hge (by omega) (Or.inl rfl) hA64 hmax P2 w hext2 hum hMap spie spp _
+      (by omega) hge (by omega) (Or.inl rfl) hA64 hmax P2 w hext2 hum hMap hvu hpre spie spp _
       ?hsp' ?h9' ?h10' ?h18' ?h19' ?h20' ?h21' ?h22' ?h23' ?h24' ?h25' ?h26' ?h27' _)
       $$ [- $Hk $Hpc $HP $Hdst]
     rotate_right 1
@@ -779,7 +807,7 @@ theorem ci_nsel (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp4 h).trans ((hp3 h).trans
       ((hp2 h).trans (hp1 h)))) $$ HΦ
     iapply (ci_move MM k P M old A dst0 psz sp s11 hK d (old.length - d) hd hlen'
-      (by omega) (by omega) (by omega) (Or.inr rfl) hA64 hmax P2 w hext2 hum hMap spie spp _
+      (by omega) (by omega) (by omega) (Or.inr rfl) hA64 hmax P2 w hext2 hum hMap hvu hpre spie spp _
       ?hsp2' ?h92' ?h102' ?h182' ?h192' ?h202' ?h212' ?h222' ?h232' ?h242' ?h252' ?h262' ?h272' _)
       $$ [- $Hk $Hpc $HP $Hdst]
     rotate_right 1
@@ -812,6 +840,7 @@ theorem ci_iter (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
     (d : Nat) (hd : d < old.length) (hA64 : A + d < 2 ^ 64)
     (hcur : d = 0 ∨ (A + d) % 4096 = 0)
     (P1 : UPtd) (hext1 : P.extSz psz P1) (hMap : umMapped P1 A d)
+    (hpre : ∀ i, i < d → uvaRmapped P1 (A + i))
     (spie spp : Bool) (R : RegMap) (hsp : R 2#5 = sp)
     (h18 : R 18#5 = BitVec.ofNat 64 (A + d)) (h20 : R 20#5 = BitVec.ofNat 64 (old.length - d))
     (h21 : R 21#5 = dst0 + BitVec.ofNat 64 d) (h22 : R 22#5 = 4096#64)
@@ -832,7 +861,7 @@ theorem ci_iter (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
         ((pcv = (KA.«copyin» + 0x7c#64) ∧ ciPost psz P M A old P3 bs' (R2 10#5) ∧ R2 27#5 = s11) ∨
          (pcv = (KA.«copyin» + 0x5a#64) ∧ d < d2 ∧ d2 < old.length ∧ P.extSz psz P3 ∧
           bs' = umemRead (viewFaulted P P3 M) A d2 ++ old.drop d2 ∧ umMapped P3 A d2 ∧
-          A + d2 ≤ 2 ^ 38 ∧ (A + d2) % 4096 = 0 ∧
+          (∀ i, i < d2 → uvaRmapped P3 (A + i)) ∧ A + d2 ≤ 2 ^ 38 ∧ (A + d2) % 4096 = 0 ∧
           R2 23#5 = pageAddr P.root ∧ R2 25#5 = psz ∧
           R2 18#5 = BitVec.ofNat 64 (A + d2) ∧ R2 21#5 = dst0 + BitVec.ofNat 64 d2 ∧
           R2 20#5 = BitVec.ofNat 64 (old.length - d2) ∧ R2 22#5 = 4096#64 ∧
@@ -848,7 +877,7 @@ theorem ci_iter (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
   iintro %c %hp %spie2 %spp2 %R2 %P2 %w %pcv %hsp2 Hk Hpc Hlend HP Hdst %hpost
   obtain ⟨hkeep, hext2, hext12, hcase⟩ := hpost
   obtain ⟨j2, j18, j20, j21, j22, j23, j24, j25, j26, j27⟩ := hkeep
-  rcases hcase with ⟨hpcv, hm1⟩ | ⟨hpcv, hum, h10', h19', hmax'⟩
+  rcases hcase with ⟨hpcv, hm1⟩ | ⟨hpcv, hum, hvu, h10', h19', hmax'⟩
   · subst hpcv
     ihave HΦ' := wpNext_at _ _ _ c _ hp $$ HΦ
     iapply HΦ' $$ %spie2 %spp2 %R2 %P2 %_ %d %_ %hsp2 Hk Hpc Hlend HP Hdst
@@ -858,7 +887,8 @@ theorem ci_iter (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
   · subst hpcv
     ihave HΦ := wpNext_shift _ _ _ _ _ hp $$ HΦ
     iapply (ci_nsel MM k P M old A dst0 psz sp s11 hK d hd hlen' hA64 hmax' P2 w hext2 hum
-      (UMemL.umMapped_ext hext12 hMap) spie2 spp2 R2 (j2.trans hsp) h10' (j18.trans h18) h19' (j20.trans h20) (j21.trans h21)
+      (UMemL.umMapped_ext hext12 hMap) hvu (fun i hi => UMemL.uvaRmapped_mono hext12 (hpre i hi))
+      spie2 spp2 R2 (j2.trans hsp) h10' (j18.trans h18) h19' (j20.trans h20) (j21.trans h21)
       (j22.trans h22) (j23.trans h23) (j24.trans h24) (j25.trans h25) (j26.trans h26)
       (j27.trans h27) c)
       $$ [- $Hk $Hpc $HP $Hdst]
@@ -884,6 +914,7 @@ theorem ci_loop (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
     ∀ (d : Nat) (_ : old.length - d ≤ fuel) (_ : d < old.length) (_ : A + d < 2 ^ 64)
       (_ : d = 0 ∨ (A + d) % 4096 = 0)
       (P1 : UPtd) (_ : P.extSz psz P1) (_ : umMapped P1 A d)
+      (_ : ∀ i, i < d → uvaRmapped P1 (A + i))
       (spie spp : Bool) (R : RegMap) (_ : R 2#5 = sp)
       (_ : R 18#5 = BitVec.ofNat 64 (A + d)) (_ : R 20#5 = BitVec.ofNat 64 (old.length - d))
       (_ : R 21#5 = dst0 + BitVec.ofNat 64 d) (_ : R 22#5 = 4096#64)
@@ -904,13 +935,13 @@ theorem ci_loop (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
     ⊢ wpLoop (GF := GF) cur := by
   induction fuel with
   | zero =>
-    intro d hf hd _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    intro d hf hd _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     exact absurd hf (by omega)
   | succ fuel ih =>
-    intro d hf hd hA64 hcur P1 hext1 hMap spie spp R hsp h18 h20 h21 h22 h23 h24 h25 h26 h27 cur
+    intro d hf hd hA64 hcur P1 hext1 hMap hpre spie spp R hsp h18 h20 h21 h22 h23 h24 h25 h26 h27 cur
     iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hdst, Hlend, HΦ⟩
     iapply (ci_iter WA VF MM k γl γk P M old A dst0 psz sp s11 hnoff hK hlk hsz hlen'
-      d hd hA64 hcur P1 hext1 hMap spie spp R hsp h18 h20 h21 h22 h23 h24 h25 h26 h27 cur ke)
+      d hd hA64 hcur P1 hext1 hMap hpre spie spp R hsp h18 h20 h21 h22 h23 h24 h25 h26 h27 cur ke)
       $$ [- $Hk $Hpc $HP $Hdst]
     rotate_right 1
     iframe #
@@ -918,7 +949,7 @@ theorem ci_loop (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
     iapply wpNext_intro_pin
     iintro %c %hp %spie2 %spp2 %R2 %P2 %bs2 %d2 %pcv %hsp2 Hk Hpc Hlend HP Hdst %hpost
     obtain ⟨hs2, hcase⟩ := hpost
-    rcases hcase with ⟨hpcv, hres⟩ | ⟨hpcv, hlt2, hd2, hext2, hbs2, hmap2, hle2, hmod2, e23, e25, e18,
+    rcases hcase with ⟨hpcv, hres⟩ | ⟨hpcv, hlt2, hd2, hext2, hbs2, hmap2, hpre2, hle2, hmod2, e23, e25, e18,
       e21, e20, e22, e24, e26, e27⟩
     · subst hpcv
       ihave HΦ' := wpNext_at _ _ _ c _ hp $$ HΦ
@@ -928,7 +959,7 @@ theorem ci_loop (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
     · subst hpcv
       subst hbs2
       ihave HΦ := wpNext_shift _ _ _ _ _ hp $$ HΦ
-      iapply (ih d2 (by omega) hd2 (by omega) (Or.inr hmod2) P2 hext2 hmap2 spie2 spp2 R2 hs2
+      iapply (ih d2 (by omega) hd2 (by omega) (Or.inr hmod2) P2 hext2 hmap2 hpre2 spie2 spp2 R2 hs2
         e18 e20 e21 e22 e23 e24 e25 e26 e27 c) $$ [- $Hk $Hpc $HP $Hdst]
       rotate_right 1
       iframe #
@@ -976,10 +1007,11 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
     · iexists P, old
       isplitr [HP Hdst]
       · ipureintro
-        refine ⟨UMemL.extSz_refl _ P, Or.inl ⟨?_, ?_, ?_⟩⟩
+        refine ⟨UMemL.extSz_refl _ P, Or.inl ⟨?_, ?_, ?_, ?_⟩⟩
         · simp only [RegMap.set_apply, KCtx.rget_zero, BitVec.reduceEq, ite_true, ite_false]
         · rw [UMemL.viewFaulted_self, hnil, Xv6.UMemL.umemRead_zero, hbs]
         · rw [hnil]; exact UMemL.umMapped_zero P _
+        · intro i hi; rw [hnil] at hi; exact absurd hi (Nat.not_lt_zero _)
       · isplitl [HP]
         · rw [UMemL.viewFaulted_self]; iexact HP
         · iexact Hdst
@@ -1045,7 +1077,7 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
       (k.regs 11#5) (k.regs 2#5 + 0xFFFFFFFFFFFFFFA0#64) (k.regs 27#5)
       hnoff hK hlk hsz hlen' ke old.length
       0 (by omega) (by omega) (by simpa using (k.regs 13#5).isLt)
-      (Or.inl rfl) P (UMemL.extSz_refl _ P) (UMemL.umMapped_zero P _) k.spie k.spp _
+      (Or.inl rfl) P (UMemL.extSz_refl _ P) (UMemL.umMapped_zero P _) (fun i hi => absurd hi (Nat.not_lt_zero _)) k.spie k.spp _
       ?hsp0 ?h18' ?h20' ?h21' ?h22' ?h23' ?h24' ?h25' ?h26' ?h27' c10) $$ [- $Hk $Hpc]
     rotate_right 1
     rw [UMemL.viewFaulted_self, List.drop_zero, Xv6.UMemL.umemRead_zero, List.nil_append]
@@ -1081,6 +1113,7 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
     iintro %c12 %hp12 Hk Hpc
     k_norm_g
     ihave HΦ' := wpNext_at _ _ _ c12 _ (fun h => (hp12 h).trans ((hp11 h).trans (hpinA h))) $$ HΦ
+    icases UMemL.procPtAt_wf _ _ $$ HP with ⟨HP, %hwf3⟩
     iapply HΦ' $$ %spie2 %spp2 %_ %hsp2 Hk Hpc Hlend [HP Hdst]
     · iexists P3, bs'
       isplitr [HP Hdst]
@@ -1088,8 +1121,12 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
         obtain ⟨he, hr⟩ := hcip
         refine ⟨he, ?_⟩
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-        rcases hr with h | ⟨h1, h2, e, hel, heA, hn⟩
-        · exact Or.inl h
+        rcases hr with ⟨h0, hbs, hmp, hpe⟩ | ⟨h1, h2, e, hel, heA, hn⟩
+        · -- the read prefix at the wrapped cursor (NI M2-G4)
+          refine Or.inl ⟨h0, hbs, hmp, fun i hi => ?_⟩
+          have hlt := ci_rmapped_lt hwf3 (hpe i hi)
+          rw [Xv6.paAddToNat' _ _ hlt]
+          exact hpe i hi
         · refine Or.inr ⟨h1, h2, e, hel, ?_⟩
           rwa [Xv6.paAddToNat' _ _ heA]
       · isplitl [HP]

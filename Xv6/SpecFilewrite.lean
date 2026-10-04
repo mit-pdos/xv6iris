@@ -448,6 +448,16 @@ def writeConsArms (P : UPtd) (ua : BitVec 64) (Q : Nat → IProp GF) (n : Int) (
     (∃ k : Nat, ⌜r = BitVec.ofInt 64 (k : Int) ∧ (k : Int) < n ∧ writeConsShort P ua k n⌝ ∗ Q k) ∨
     ⌜r = -1#64 ∧ n < 0⌝)
 
+/-- **The console arm's count, as a pure relay** (NI M2-G4, ruling G4-R1:
+a sibling of `writeConsArms`, which stays byte-identical): at a writable
+console descriptor, `-1` at a negative request, else consolewrite's count
+`i` with its `consWriteCnt` (the prefix readable at the table handed back,
+a short count the chunk holding a byte the entry table cannot read).
+Vacuous at every other state. -/
+def fwConsCnt (st : FdState) (P P' : UPtd) (ua : BitVec 64) (n : Int) (r : BitVec 64) : Prop :=
+  ∀ rb : Bool, st = .open rb true (.device CONSOLE) →
+    (n < 0 → r = -1#64) ∧ (0 ≤ n → ∃ i : Nat, r = BitVec.ofNat 64 i ∧ (i : Int) ≤ n ∧ consWriteCnt P P' ua n i)
+
 /-- Rocq `write_cons_arms_ret`. -/
 theorem writeConsArms_ret (P : UPtd) (ua : BitVec 64) (Q : Nat → IProp GF) (n : Int) (r : BitVec 64) :
     writeConsArms P ua Q n r ⊢ ⌜filewriteRet n r⌝ := by
@@ -712,12 +722,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 of Rocq's `wp_filewrite_sconf_body`): the registers, the complement, the
 reference unchanged, the block at the grown descriptor (deviation 6), the
 environment's output, and the armed output keyed on the state at the
-return value `R' 10#5`. -/
+return value `R' 10#5`.  (NI M2-G4) The pure part also relays the console
+arm's exact count (`fwConsCnt`), beside the byte-identical arms. -/
 def filewritePost (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) (q : Qp)
     (st : FdState) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
-    ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P'⌝ -∗
+    ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ fwConsCnt st V.upt P' (k.regs 11#5) n (R' 10#5)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     fileRef γ fk q st -∗

@@ -69,7 +69,8 @@ theorem swr_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     (hK6 : 6 ≤ k.avail) (hr : swrRegs k R)
     (hsome : argFd v V.ofile = some (fd0, fnode kk)) (hfv : V.ofile[fd0]? = some (fnode kk))
     (hkk : kk < NFILE) (hst : st ≠ .closed) (hsts : sts[fd0]? = some st)
-    (hext : V.upt.extSz V.sz P') (kv : Nat) (hkv : V.ev ≤ kv) :
+    (hext : V.upt.extSz V.sz P') (hcnt : fwConsCnt st V.upt P' v1 (argZ v2) (R 10#5))
+    (kv : Nat) (hkv : V.ev ≤ kv) :
     kctx cpu (((k.withSpie spie spp).pushed 6).withRegs R) ∗
     pcIs cpu (KA.«sys_write» + 0x40#64) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) ∗
@@ -98,7 +99,9 @@ theorem swr_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
   iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   unfold sysWritePost
   iapply HΦ $$ %c' %spie %spp %R' %P' %kv [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfr Hfso [Harms]
-  · ipureintro; exact ⟨hcs, hext⟩
+  · ipureintro
+    refine ⟨hcs, hext, ?_⟩
+    rw [sysFdSt_some v V.ofile sts fd0 (fnode kk) st hsome hsts, h10]; exact hcnt
   · iapply (procPrivFd_split γ (procAddr j) pid { V.updEv kv with upt := P' } (viewFaulted V.upt P' M)).2
     iframe Hcore Howe
   · rw [h10]; iexact Harms
@@ -182,14 +185,16 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   -- ===== back from filewrite (at any hart) =====
   iintro %cpu
   unfold filewritePost
-  iintro %spie3 %spp3 %R3 %P' %kv %⟨hcs3, hext⟩ Hk Hpc Hte Hce Href %hkv Hcore Henvo Harms
+  iintro %spie3 %spp3 %R3 %P' %kv %⟨hcs3, hext, hcnt⟩ Hk Hpc Hte Hce Href %hkv Hcore Henvo Harms
   k_norm_g [swr_ret_40, h11, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr5 : swrRegs k R3 := by
     refine swrRegs_cs _ _ _ ?_ hcs3
     repeat (refine swrRegs_set _ _ _ _ ?_ (by decide))
     exact hr
   iapply (swr_ok_back cpu k γ j pid V M sts v v1 v2 γl γu Q Qe spie3 spp3 R3 fd0 kk (fnode kk) q st P'
-      wn hK6 hr5 hsome hfv hkk hst hsts0 hext kv hkv)
+      wn hK6 hr5 hsome hfv hkk hst hsts0 hext
+      (by simpa only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, h11] using hcnt)
+      kv hkv)
     $$ [$Hk $Hpc $Hra $Hs0 $Hcells $Hte $Hce $Hcore $Howe $Href $Hauth $Hfr $Henvo $Henvb $Harms
       $HΦ]
 
@@ -303,7 +308,9 @@ theorem swr_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
   iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   unfold sysWritePost
   iapply HΦ $$ %c' %spie %spp %R' %V.upt %V.ev [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) [Hcore Howe] Hfr [Hfs] []
-  · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _⟩
+  · ipureintro
+    refine ⟨hcs, UMemL.extSz_refl _ _, fun _ h => ?_⟩
+    rw [sysFdSt_none v V.ofile sts hnone] at h; cases h
   · rw [UMemL.viewFaulted_self]
     iapply (procPrivFd_split γ (procAddr j) pid { V with upt := V.upt } M).2
     iframe Hcore Howe

@@ -370,7 +370,8 @@ theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := 
     procPrivExt (procAddr j) pid V V.upt M ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (i : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ R' 10#5 = BitVec.ofNat 64 i ∧
-        (i : Int) ≤ max 0 n ∧ ((i : Int) < n → writeConsShort V.upt (k'.regs 11#5) i n)⌝ -∗
+        (i : Int) ≤ max 0 n ∧ ((i : Int) < n → writeConsShort V.upt (k'.regs 11#5) i n) ∧
+        consWriteCnt V.upt P' (k'.regs 11#5) n i⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
       procPrivExtEv (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗ Q i -∗ wpLoop c')

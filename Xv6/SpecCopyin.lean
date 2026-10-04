@@ -7,7 +7,9 @@ fault).  The mirror of `copyout`.  copyin needs 50 slots.
 
 The success arm also says WHICH PAGES the bytes lie on: every page of the
 `len` bytes read is mapped in the returned table (`umMapped P' srcva len`,
-as `COPYINSTR` says of its string).  It is what puts the read at the entry
+as `COPYINSTR` says of its string), and (NI M2-G4) every byte read is
+READABLE there (`uvaRprefix P' srcva len`: walkaddr's `V ∧ U` leaf or
+vmfault's fresh `W|U|R` one).  It is what puts the read at the entry
 image with every lazy page zeroed (`UMemLazy.umemRead_viewLazy`), Rocq's
 single reading `us_M` (Rocq's `copyin` keeps the image fixed: its `vmfault`
 preserves the view, the Lean one zeroes a page when it is faulted in).
@@ -58,7 +60,7 @@ def wp_copyin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
     (∃ (P' : UPtd) (bs' : List (BitVec 8)),
       ⌜P.extSz (k.regs 11#5) P' ∧
         ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k.regs 13#5).toNat old.length ∧
-            umMapped P' (k.regs 13#5).toNat old.length) ∨
+            umMapped P' (k.regs 13#5).toNat old.length ∧ uvaRprefix P' (k.regs 13#5) old.length) ∨
          (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
             bs' = umemRead (viewFaulted P P' M) (k.regs 13#5).toNat d ++ old.drop d) ∧
           ∃ e, e < old.length ∧ ¬ uvaRmapped P (k.regs 13#5 + BitVec.ofNat 64 e).toNat))⌝ ∗

@@ -144,6 +144,53 @@ theorem lazyFree_wmapped_ext {P P' : UPtd} {sz : BitVec 64} (hext : P.extSz sz P
     rw [hP] at hs
     cases hs
 
+theorem vq_bitR (w : BitVec 64) : w &&& PTE_R ≠ 0#64 ↔ pteBit w 1 = true := by
+  unfold PTE_R pteBit; bv_decide
+
+/-- **At `lazyFree` the copy's grown table reads nothing new** (NI M2-G4;
+`lazyFree_wmapped_ext`'s twin): a byte readable in a table `P'` that `P`
+grew into under the size `sz` is readable at `P`. -/
+theorem lazyFree_rmapped_ext {P P' : UPtd} {sz : BitVec 64} (hext : P.extSz sz P')
+    (hlf : lazyFree P.um sz) {va : Nat} (h : uvaRmapped P' va) : uvaRmapped P va := by
+  obtain ⟨vpn, w, j, hl, hvu, hj, hva⟩ := h
+  cases hP : Iris.Std.PartialMap.get? P.um vpn with
+  | some w0 =>
+    have h2 := hext.1.2.2 vpn w0 hP
+    rw [hl] at h2
+    cases h2
+    exact ⟨vpn, w, j, hP, hvu, hj, hva⟩
+  | none =>
+    have hlt := hext.2.1 vpn w hP hl
+    have hs := hlf vpn (by unfold pgRoundUpN; omega)
+    rw [hP] at hs
+    cases hs
+
+/-- **AT `lazyFree` THE ENTRY TABLE AND THE KEY AGREE ON READABILITY** (NI
+M2-G4; `lazyFree_wmapped_iff`'s twin): copyin's readability at `va` per the
+table `P` (`uvaRmapped`: walkaddr's `V ∧ U`) is the key's projection
+`permOf P.um sz` being present at `va`'s page.  (⇒) needs the leaf's `R`:
+`uptWf`'s `uLeafR` (NI M2-G4a0); (⇐) needs no lazy fill: `lazyFree`. -/
+theorem lazyFree_rmapped_iff (P : UPtd) (sz : BitVec 64) (hwf : uptWf P) (hlf : lazyFree P.um sz)
+    (va : Nat) :
+    uvaRmapped P va ↔ (permOf P.um sz.toNat (va / 4096)).isSome := by
+  constructor
+  · rintro ⟨vpn, w, j, hget, ⟨-, hU⟩, hj, rfl⟩
+    have hk : (vpn * 4096 + j) / 4096 = vpn := by omega
+    rw [hk, UserPerm.permOf_mapped _ hget]
+    have hR := (vq_bitR w).1 (hwf.2.2.2.2.2 _ _ hget hU)
+    have h4 := (vq_bitU w).1 hU
+    simp [permLeaf, h4, hR]
+  · intro hs
+    obtain ⟨q, hq⟩ := Option.isSome_iff_exists.mp hs
+    obtain ⟨w, hget, hl⟩ := UserPerm.permOf_lazyFree hlf hq
+    unfold permLeaf at hl
+    split at hl
+    · rename_i hb
+      simp only [Bool.and_eq_true] at hb
+      exact ⟨va / 4096, w, va % 4096, hget, ⟨(hwf.1 _ _ hget).2.1.1, (vq_bitU w).2 hb.1⟩,
+        Nat.mod_lt _ (by decide), (Nat.div_add_mod' va 4096).symm⟩
+    · cases hl
+
 end F4
 
 end Xv6

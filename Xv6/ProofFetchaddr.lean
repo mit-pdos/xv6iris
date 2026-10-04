@@ -491,7 +491,7 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
           refine ⟨hpost.1, Or.inr ⟨hok, ?_⟩⟩
           simp only [RegMap.set_apply, ite_true]
           rw [fetchaddr_snez_negw _ hr2]
-          rcases hpost.2 with ⟨h0, hb', hm⟩ | ⟨h1, _⟩
+          rcases hpost.2 with ⟨h0, hb', hm, -⟩ | ⟨h1, _⟩
           · exact Or.inl ⟨h0, by rw [hb', UMemL.umemRead_viewLazy M hpost.1 hm]⟩
           · exact Or.inr (by rw [h1]; decide)
         isplitl []

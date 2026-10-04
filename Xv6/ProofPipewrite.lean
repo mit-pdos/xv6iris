@@ -339,7 +339,7 @@ theorem pw_copyin (CI : COPYIN) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemN
       (∃ (P' : UPtd) (bs' : List (BitVec 8)),
         ⌜P.extSz (k'.regs 11#5) P' ∧
           ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat old.length ∧
-              umMapped P' (k'.regs 13#5).toNat old.length) ∨
+              umMapped P' (k'.regs 13#5).toNat old.length ∧ uvaRprefix P' (k'.regs 13#5) old.length) ∨
            (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
               bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat d ++ old.drop d) ∧
             ∃ e, e < old.length ∧ ¬ uvaRmapped P (k'.regs 13#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
@@ -1637,7 +1637,7 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
       simpa [BitVec.add_comm] using this
   have hmapC : RC 10#5 = 0#64 → umMapped P2 (k.regs 11#5 + BitVec.ofNat 64 m).toNat 1 := by
     intro h1
-    rcases hpost with ⟨-, -, hmp⟩ | ⟨h1', -⟩
+    rcases hpost with ⟨-, -, hmp, -⟩ | ⟨h1', -⟩
     · simpa [BitVec.add_comm] using hmp
     · rw [h1] at h1'; exact absurd h1' (by decide)
   replace hpost := hpost.imp (fun h => And.intro h.1 h.2.1) (fun h => And.intro h.1 h.2.1)

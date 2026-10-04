@@ -371,8 +371,12 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
     iapply HΦ $$ %cpu %k.spie %k.spp %_ %V.upt [] Hk Hpc Hte Hce Href Hpriv Henv []
     · ipureintro
-      refine ⟨?_, UMemL.extSz_refl _ _⟩
-      simp [calleeSaved, RegMap.set_apply]
+      refine ⟨?_, UMemL.extSz_refl _ _, fun rb hst => ?_⟩
+      · simp [calleeSaved, RegMap.set_apply]
+      · -- (NI M2-G4) an unwritable descriptor is not a writable console
+        subst hst
+        obtain ⟨-, hw', -⟩ := hok
+        rw [hw] at hw'; exact absurd hw' (by decide)
     · unfold filewriteArms
       isplitr
       · ipureintro; simp only [RegMap.set_apply]; exact filewriteRet_m1 n

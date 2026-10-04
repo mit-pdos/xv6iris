@@ -187,7 +187,7 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
         ⌜P.extSz V.sz Q ∧
           ((R3 10#5 = 0#64 ∧
               cs = umemRead (viewFaulted P Q M) (k.regs 12#5).toNat old.length ∧
-              (k.regs 12#5).toNat + old.length < 2 ^ 64) ∨
+              (k.regs 12#5).toNat + old.length < 2 ^ 64 ∧ uvaRprefix Q (k.regs 12#5) old.length) ∨
            (R3 10#5 = 18446744073709551615#64 ∧ (∃ d, d ≤ old.length ∧
               cs = umemRead (viewFaulted P Q M) (k.regs 12#5).toNat d ++ old.drop d) ∧
             ∃ e, e < old.length ∧ ¬ uvaRmapped P (k.regs 12#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
@@ -199,7 +199,7 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
       iexists kc
       isplitl []
       · ipureintro; rw [x10]; exact ⟨hpost.1, hpost.2.imp
-        (fun h => ⟨h.1, h.2.1, UMemL.umMapped_nowrap hwf' h.2.2 (BitVec.isLt _)⟩) id⟩
+        (fun h => ⟨h.1, h.2.1, UMemL.umMapped_nowrap hwf' h.2.2.1 (BitVec.isLt _), h.2.2.2⟩) id⟩
       isplitl []
       · ipureintro; exact hkc
       · isplitl [Hsz Hpg Hspace Hrest]

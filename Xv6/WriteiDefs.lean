@@ -388,7 +388,7 @@ theorem writei_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : G
     iexists P', bs', kc
     iframe Hpriv Hold
     ipureintro
-    exact ⟨hpost, Nat.le_trans hkv hkc⟩
+    exact ⟨⟨hpost.1, hpost.2.imp (fun h => ⟨h.1, h.2.1, h.2.2.1⟩) id⟩, Nat.le_trans hkv hkc⟩
 
 end
 

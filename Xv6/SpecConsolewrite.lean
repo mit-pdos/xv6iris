@@ -28,7 +28,12 @@ the caller gets `Q i` back.  A SHORT count carries its reason
 (`writeConsShort`, Rocq lane TRAP-ROWS T1): the loop's one break is
 `either_copyin(...) == -1`, so some byte at or after `i` and before `n` is
 on a page the kernel could not read through, stated at the ENTRY table
-`V.upt` (the rounds' tables only grow: `UMemL.uvaRmapped_mono`).
+`V.upt` (the rounds' tables only grow: `UMemL.uvaRmapped_mono`).  THE
+COUNT, EXACTLY (NI M2-G4, `consWriteCnt`, beside it): the bytes before the
+count were read and are readable in the table the call hands back, and a
+short count is a multiple of 32 whose chunk `[i, i+32)` holds the byte the
+entry table cannot read -- so the count is the chunk boundary below the
+first unreadable byte.
 
 The running thread is proc `j` with a user source (`user_src != 0`, the
 only caller being `filewrite`); its private view `M` may fault pages in
@@ -96,6 +101,15 @@ is existential and not the cursor: the chunk the break fired in is up to 32
 bytes wide and copyin walks it a page at a time. -/
 def writeConsShort (P : UPtd) (ua : BitVec 64) (k : Nat) (n : Int) : Prop :=
   ∃ d : Nat, k ≤ d ∧ (d : Int) < n ∧ ¬ uvaRmapped P (ua + BitVec.ofNat 64 d).toNat
+
+/-- **consolewrite's count, exactly** (NI M2-G4): every byte before the
+count was read (readable in the table the call hands back), and a short
+count is a chunk boundary whose 32-byte chunk holds a byte the entry table
+cannot read. -/
+def consWriteCnt (P P' : UPtd) (ua : BitVec 64) (n : Int) (i : Nat) : Prop :=
+  uvaRprefix P' ua i ∧
+  ((i : Int) < n → i % 32 = 0 ∧ ∃ d : Nat, i ≤ d ∧ d < i + 32 ∧ (d : Int) < n ∧
+    ¬ uvaRmapped P (ua + BitVec.ofNat 64 d).toNat)
 
 section ConsOutChain
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -193,7 +207,8 @@ def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (i : Nat)
       (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ R' 10#5 = BitVec.ofNat 64 i ∧
-      (i : Int) ≤ max 0 n ∧ ((i : Int) < n → writeConsShort V.upt (k.regs 11#5) i n)⌝ -∗
+      (i : Int) ≤ max 0 n ∧ ((i : Int) < n → writeConsShort V.upt (k.regs 11#5) i n) ∧
+      consWriteCnt V.upt P' (k.regs 11#5) n i⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     -- THE EVENT COUNTER (permit sweep L1b): the copy loop lends the

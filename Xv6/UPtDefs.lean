@@ -324,6 +324,15 @@ prefix is writable in the table the copy hands back. -/
 def uvaWprefix (P : UPtd) (a : BitVec 64) (d : Nat) : Prop :=
   ∀ i, i < d → uvaWmapped P (a + BitVec.ofNat 64 i).toNat
 
+/-- **The `d` bytes from `a` are readable** (NI M2-G4; `uvaWprefix`'s
+twin): every byte of the run passes `uvaRmapped` at `P`, at the WRAPPED
+address `a + i` (copyin's cursor).  What `SpecCopyin`'s success arm says of
+the bytes the copy read: each page is copied only after walkaddr's `V ∧ U`
+(or vmfault's fresh `W|U|R` leaf), so the read run is readable in the table
+the copy hands back. -/
+def uvaRprefix (P : UPtd) (a : BitVec 64) (d : Nat) : Prop :=
+  ∀ i, i < d → uvaRmapped P (a + BitVec.ofNat 64 i).toNat
+
 /-- The view with page `k` zeroed. -/
 def viewZero (M : Nat → List (BitVec 8)) (k : Nat) : Nat → List (BitVec 8) :=
   fun k' => if k' = k then List.replicate 4096 0#8 else M k'

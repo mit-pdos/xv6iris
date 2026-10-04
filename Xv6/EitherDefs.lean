@@ -417,7 +417,7 @@ theorem ec_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName
       (∃ (P' : UPtd) (bs' : List (BitVec 8)),
         ⌜P.extSz (k'.regs 11#5) P' ∧
           ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat old.length ∧
-              umMapped P' (k'.regs 13#5).toNat old.length) ∨
+              umMapped P' (k'.regs 13#5).toNat old.length ∧ uvaRprefix P' (k'.regs 13#5) old.length) ∨
            (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
               bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat d ++ old.drop d) ∧
             ∃ e, e < old.length ∧ ¬ uvaRmapped P (k'.regs 13#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
