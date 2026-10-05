@@ -5841,6 +5841,8 @@ permissions) is new `Xv6/UkVals.lean`; `ukeyEq`/`ukeyEq_symm` moved from `UexecA
 
 ### M3 ustep U-2b as landed (2026-10-05)
 
+**Coordinator acceptance (2026-10-05):** deviation 1 accepted — the key history is the TRAP LOOP's own resource (`urcRut` parks `uhistAt Wr`, `urc_round` carries it around usertrap), born at the incarnation's first resume; the residue's existential name could not be tied to the parked `Wr`. The seven modules entering the NI roots' TCB (`Ustep`, `UkVals`, `DecodeBridge`, `UTrap`, `Instr`, `ProcDefs`, `UserExec`) are the pure step and the decode layer it reads: expected. Deviation 4 (gaps and one-history-per-incarnation not visible to the ledger) is U-3's to settle: derive from the filings if the kernel's one-append-per-exit can be read purely, else take `NiGapFree` as a hypothesis beside `NiOneOrigin` and record it as an honest scope.
+
 Lane U-2b on `lane/ustep`: the per-process key chain reaches the filing.  The twelve roots' statements are
 byte-identical (no root file touched; `xv6NiAdequacy`'s text unchanged, its φ grows); `SYSCALL`/`USERTRAP`/
 `USERRET`/`USER`/`USERRET_CLOSED`/`UK_LEAVES`, `ukbF`, `NiStep`, `NiStep.input` untouched.  TCB: the six NI roots
