@@ -6510,6 +6510,8 @@ Risks:
   `procPagetableNodes + 1 < nb`; `ProofMain`'s chain from `kinitPages` gives the exact value.
 - (R4) The new `MachCSL` CSR rule is a machine-layer addition, and the device suite must not notice it.
 
+**RULINGS Q-R1…R10 (2026-10-05):** **Q-R1 OWNER DECISION: (a)** — a fork branch `verified-quota` = b72cbac1 + ONE commit (the 34 lines: `MAXUSZ` = 768 KiB on the break in `sys_sbrk` and `kexec`, `NPIPE` = 50 as a C counter in `pipealloc`/`pipeclose`, `w_scounteren(0)` in `plicinithart`); the pin (the dump headers `Xv6/KernelImage.lean`/`MachCSL/KernelElf.lean` and the README) moves to that commit; the attribution clone in `tools/ci/run_all.sh` is retargeted; each upstream bump rebases the commit; pushing the kernel branch to a remote is the owner's. Coordinator, all as recommended: R2 a uniform constant quota (no key field); R3 768 KiB / `NPIPE` 50; R4 the pipe cap as a C counter; R5 bundle `scounteren`; R6 defer the kill check, reject pid and slot quotas; R7 the credits in `ptOwnRep`, the slots and `npipelock`'s payload; R8 a new root `xv6NiDetQ` at the same `xv6NiPhi`; R9 rows changed in place; R10 Q-0 → Q-1 → Q-2 → Q-3. The `.eh_frame` trap goes into the bump playbook with Q-0.
+
 **RULINGS REQUESTED (Q-R1…Q-R10).**
 - **Q-R1 (OWNER DECISION) Does the owner want a kernel-source change at all (a fork of the pin / an upstream
   commit on `verified` / `chroot`), given the relayout cost (≈ 1.0 BE for the channel, ≈ 0.05 BE at every
