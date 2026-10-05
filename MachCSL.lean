@@ -30,6 +30,9 @@ import MachCSL.SimpAttr
 import MachCSL.ModelFacts
 import MachCSL.SailHooks
 import MachCSL.Tactics
+import MachCSL.StdppSet
+import MachCSL.StdppMap
+import MachCSL.SetSolver
 import MachCSL.Platform
 import MachCSL.PlatformFacts
 import MachCSL.Boot
