@@ -87,8 +87,9 @@ theorem fwr_arm_neg (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl :
   ihave Henv := filewrite_env_out_of_env γl γu st $$ Henv
   unfold fwrK
   ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] Hk Hpc Hte Hce Href Hpriv Henv [Hin]
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv [Hin]
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _, fun _ _ => ⟨fun _ => ha0, fun h => absurd h (by omega)⟩⟩
+  · iapply fwConsOut_neg; exact ha0
   · unfold filewriteArms
     rw [ha0]
     isplitr
@@ -162,8 +163,9 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
   ihave Henv := filewrite_env_out_of_env γl γu _ $$ Henv
   unfold fwrK
   ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] Hk Hpc Hte Hce Href Hpriv Henv [Hin]
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv [Hin]
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _, fun _ h => by cases h⟩
+  · iapply fwConsOut_off; intro _ h; cases h
   · -- the chain at the writer's table, at EITHER mode (Rocq L2: the
     -- zero-trip exit pays at the file's mode too)
     ihave Hc := fwr_in_zero rb i γo om (writerImg V.upt M) (k.regs 11#5) Q Qe pmv szv lzv V.upt htb $$ Hin
@@ -268,8 +270,9 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   ihave Href := filerw_ref_close γ fk q (.open rb true (.pipe γp)) C $$ [Htok Hfields Hpay]
   · iframe
   unfold fwrK
-  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] Hk Hpc Hte Hce Href Hpriv [] [Hpost]
+  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] [] Hk Hpc Hte Hce Href Hpriv [] [Hpost]
   · ipureintro; exact ⟨hcs, hext, fun _ h => by cases h⟩
+  · iapply fwConsOut_off; intro _ h; cases h
   · unfold filewriteEnvOut; iempintro
   · unfold filewriteArms
     rw [h10']
@@ -349,8 +352,9 @@ theorem fwr_dev_m1 (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : 
   · iframe
   unfold fwrK
   ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] Hk Hpc Hte Hce Href Hpriv [] [Hin]
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv [] [Hin]
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _, fun _ h => absurd (by cases h; rfl) hnc⟩
+  · iapply fwConsOut_neg; exact ha0
   · unfold filewriteEnvOut; iexact Henv
   · unfold filewriteArms
     rw [ha0]
@@ -517,7 +521,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   case cuser => k_norm_g; decide
   case cn => k_norm_g; exact h12
   -- ===== back from consolewrite =====
-  iintro %cpu %spie1 %spp1 %R1 %P' %i %⟨hcs1, hext, hret, hi, hwhy, hcnt⟩ Hk Hpc Hte Hce Hpriv HQ
+  iintro %cpu %spie1 %spp1 %R1 %P' %i %⟨hcs1, hext, hret, hi, hwhy, hcnt⟩ #HO Hk Hpc Hte Hce Hpriv HQ
   k_norm_g [fwr_ret_88, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr1 : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) R1 := by
@@ -538,9 +542,10 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   · iframe
   have hin : (i : Int) ≤ n := by omega
   unfold fwrK
-  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] Hk Hpc Hte Hce Href Hpriv [] [HQ]
+  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] [] Hk Hpc Hte Hce Href Hpriv [] [HQ]
   · ipureintro
     exact ⟨hcs, hext, fun _ _ => ⟨fun h => absurd h (by omega), fun _ => ⟨i, by rw [h10', hret], hin, hcnt⟩⟩⟩
+  · iapply fwConsOut_cons _ _ _ _ _ i (by rw [h10', hret]); iexact HO
   · unfold filewriteEnvOut; iexact Henv
   · unfold filewriteArms
     rw [h10', hret]

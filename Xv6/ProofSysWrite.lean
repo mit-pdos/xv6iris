@@ -82,10 +82,11 @@ theorem swr_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ fdFrags V.fdg sts ∗
     filewriteEnvOut γl γu st ∗ (filewriteEnvOut γl γu st -∗ filewriteFsOut (GF := GF)) ∗
     filewriteArms (hlc := hlc) V.gen V.upt st (argZ v2) (writerImg V.upt M) v1 Q Qe (R 10#5) ∗
-    (∀ c : CPU, sysWritePost k γ j pid V M sts v v1 v2 Q Qe c)
+    fwConsOut st γu (writerImg V.upt M) v1 (R 10#5) ∗
+    (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hra, Hs0, Hcells, Hte, Hce, Hcore, Howe, Href, Hauth, Hfr, Henvo, Henvb, Harms,
-    HΦ⟩
+    #HO, HΦ⟩
   ihave Hfso := Henvb $$ Henvo
   ihave Howe := procOfilesOwe_repay γ V.fdg (procAddr j) V.ofile [] fd0 kk q st (by simp) hfv hkk hst
     $$ [Howe Href Hauth]
@@ -98,10 +99,11 @@ theorem swr_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
   iframe
   iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   unfold sysWritePost
-  iapply HΦ $$ %c' %spie %spp %R' %P' %kv [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfr Hfso [Harms]
+  iapply HΦ $$ %c' %spie %spp %R' %P' %kv [] [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfr Hfso [Harms]
   · ipureintro
     refine ⟨hcs, hext, ?_⟩
     rw [sysFdSt_some v V.ofile sts fd0 (fnode kk) st hsome hsts, h10]; exact hcnt
+  · rw [sysFdSt_some v V.ofile sts fd0 (fnode kk) st hsome hsts, h10]; iexact HO
   · iapply (procPrivFd_split γ (procAddr j) pid { V.updEv kv with upt := P' } (viewFaulted V.upt P' M)).2
     iframe Hcore Howe
   · rw [h10]; iexact Harms
@@ -131,7 +133,7 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv (hlc := hlc) ∗
     sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
-    (∀ c : CPU, sysWritePost k γ j pid V M sts v v1 v2 Q Qe c)
+    (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK110 := hK
   rw [sysWriteSlots_eq] at hK110
@@ -185,7 +187,7 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   -- ===== back from filewrite (at any hart) =====
   iintro %cpu
   unfold filewritePost
-  iintro %spie3 %spp3 %R3 %P' %kv %⟨hcs3, hext, hcnt⟩ Hk Hpc Hte Hce Href %hkv Hcore Henvo Harms
+  iintro %spie3 %spp3 %R3 %P' %kv %⟨hcs3, hext, hcnt⟩ #HO Hk Hpc Hte Hce Href %hkv Hcore Henvo Harms
   k_norm_g [swr_ret_40, h11, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr5 : swrRegs k R3 := by
     refine swrRegs_cs _ _ _ ?_ hcs3
@@ -196,7 +198,7 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
       (by simpa only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, h11] using hcnt)
       kv hkv)
     $$ [$Hk $Hpc $Hra $Hs0 $Hcells $Hte $Hce $Hcore $Howe $Href $Hauth $Hfr $Henvo $Henvb $Harms
-      $HΦ]
+      $HO $HΦ]
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x28 .. +0x38`, argfd SUCCEEDED** (`a0 = 0`): `mv a5,a0`, the
@@ -220,7 +222,7 @@ theorem swr_ok_loads (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv (hlc := hlc) ∗
     sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
-    (∀ c : CPU, sysWritePost k γ j pid V M sts v v1 v2 Q Qe c)
+    (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Henv, Hra, Hs0, Hcells, Hte, Hce, Hcore, Howe, Hfr, Hfs, Hin, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -269,7 +271,7 @@ set_option maxHeartbeats 8000000 in
 `li a0,-1`, `bltz` taken straight to the epilogue; the frame closed, the
 WHOLE block joined back, the input dropped (its key is `closed`). -/
 theorem swr_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64) (γu : UartNames)
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (spie spp : Bool) (R : RegMap) (wf : BitVec 64) (wn : BitVec 32)
     (wp : BitVec 64) (hK6 : 6 ≤ k.avail) (hr : swrRegs k R) (h10 : R 10#5 = 0xFFFFFFFFFFFFFFFF#64)
     (hnone : argFd v V.ofile = none) :
@@ -282,7 +284,7 @@ theorem swr_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv (hlc := hlc) ∗
-    (∀ c : CPU, sysWritePost k γ j pid V M sts v v1 v2 Q Qe c)
+    (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hra, Hs0, Hcells, Hte, Hce, Hcore, Howe, Hfr, Hfs, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -307,10 +309,12 @@ theorem swr_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
   iframe
   iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   unfold sysWritePost
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt %V.ev [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) [Hcore Howe] Hfr [Hfs] []
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt %V.ev [] [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) [Hcore Howe] Hfr [Hfs] []
   · ipureintro
     refine ⟨hcs, UMemL.extSz_refl _ _, fun _ h => ?_⟩
     rw [sysFdSt_none v V.ofile sts hnone] at h; cases h
+  · rw [sysFdSt_none v V.ofile sts hnone]
+    iapply fwConsOut_off; intro _ h; cases h
   · rw [UMemL.viewFaulted_self]
     iapply (procPrivFd_split γ (procAddr j) pid { V with upt := V.upt } M).2
     iframe Hcore Howe
@@ -340,7 +344,7 @@ theorem swr_argfd_call (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs 
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv (hlc := hlc) ∗
     sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
-    (∀ c : CPU, sysWritePost k γ j pid V M sts v v1 v2 Q Qe c)
+    (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK110 := hK
   rw [sysWriteSlots_eq] at hK110
@@ -387,7 +391,7 @@ theorem swr_argfd_call (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs 
   unfold argfdPost
   icases Hpost with ⟨⟨%⟨h10, hnone⟩, -, Hf⟩ | ⟨%fd0, %fv, %⟨h10, hsome⟩, -, Hf⟩⟩
   · -- NO SUCH DESCRIPTOR
-    iapply (swr_fail_arm cpu k γ j pid V M sts v v1 v2 Q Qe spie2 spp2 R2 _ _ _ hK6 hr2 h10 hnone)
+    iapply (swr_fail_arm cpu k γ j pid V M sts v v1 v2 γu Q Qe spie2 spp2 R2 _ _ _ hK6 hr2 h10 hnone)
       $$ [$Hk $Hpc $Hra $Hs0 $Hte $Hce $Hcore $Howe $Hfr $Hfs $HΦ Hf Hlo Hn Hp Hu]
     unfold swrCells
     iframe Hf Hlo Hn Hp Hu
@@ -424,7 +428,7 @@ theorem swr_argint_call (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedN
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv (hlc := hlc) ∗
     sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
-    (∀ c : CPU, sysWritePost k γ j pid V M sts v v1 v2 Q Qe c)
+    (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK110 := hK
   rw [sysWriteSlots_eq] at hK110
@@ -500,7 +504,7 @@ theorem sys_write_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE
   have ht0 : curTier = KTier.kpt := hct.symm.trans htier
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- THE CONTRACT'S CONTINUATION, hart-free
-  ihave HΦ : (∀ c : CPU, sysWritePost k γ j pid V M sts v v1 v2 Q Qe c) $$ [Hnext]
+  ihave HΦ : (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c) $$ [Hnext]
   · iintro %c
     iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
   icases (procPrivFd_split γ (procAddr j) pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩

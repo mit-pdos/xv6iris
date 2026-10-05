@@ -458,6 +458,38 @@ def fwConsCnt (st : FdState) (P P' : UPtd) (ua : BitVec 64) (n : Int) (r : BitVe
   ∀ rb : Bool, st = .open rb true (.device CONSOLE) →
     (n < 0 → r = -1#64) ∧ (0 ≤ n → ∃ i : Nat, r = BitVec.ofNat 64 i ∧ (i : Int) ≤ n ∧ consWriteCnt P P' ua n i)
 
+/-- **The console arm's pushed run, relayed** (NI M3 NI-OUT): vacuous off a writable console descriptor,
+empty at the −1 answer, else consolewrite's run at its positions (`consOutAt`). -/
+def fwConsOut (st : FdState) (γu : UartNames) (M : Nat → List (BitVec 8)) (ua r : BitVec 64) : IProp GF :=
+  iprop(⌜∀ rb, st ≠ .open rb true (.device CONSOLE)⌝ ∨ ⌜r = -1#64⌝ ∨
+    ∃ i : Nat, ⌜r = BitVec.ofNat 64 i⌝ ∗ consOutAt γu M ua i)
+
+instance fwConsOut_persistent (st : FdState) (γu : UartNames) (M : Nat → List (BitVec 8)) (ua r : BitVec 64) :
+    Persistent (fwConsOut (GF := GF) st γu M ua r) := by
+  unfold fwConsOut; infer_instance
+
+/-- every state but a writable console descriptor relays nothing -/
+theorem fwConsOut_off (st : FdState) (γu : UartNames) (M : Nat → List (BitVec 8)) (ua r : BitVec 64)
+    (h : ∀ rb, st ≠ .open rb true (.device CONSOLE)) : ⊢ fwConsOut (GF := GF) st γu M ua r := by
+  unfold fwConsOut
+  ileft; ipureintro; exact h
+
+/-- the −1 answer relays nothing -/
+theorem fwConsOut_neg (st : FdState) (γu : UartNames) (M : Nat → List (BitVec 8)) (ua r : BitVec 64)
+    (h : r = -1#64) : ⊢ fwConsOut (GF := GF) st γu M ua r := by
+  unfold fwConsOut
+  iright; ileft; ipureintro; exact h
+
+/-- consolewrite's run, relayed at its count -/
+theorem fwConsOut_cons (st : FdState) (γu : UartNames) (M : Nat → List (BitVec 8)) (ua r : BitVec 64) (i : Nat)
+    (h : r = BitVec.ofNat 64 i) : consOutAt (GF := GF) γu M ua i ⊢ fwConsOut st γu M ua r := by
+  unfold fwConsOut
+  iintro #H
+  iright; iright
+  iexists i
+  iframe H
+  ipureintro; exact h
+
 /-- Rocq `write_cons_arms_ret`. -/
 theorem writeConsArms_ret (P : UPtd) (ua : BitVec 64) (Q : Nat → IProp GF) (n : Int) (r : BitVec 64) :
     writeConsArms P ua Q n r ⊢ ⌜filewriteRet n r⌝ := by
@@ -723,12 +755,14 @@ of Rocq's `wp_filewrite_sconf_body`): the registers, the complement, the
 reference unchanged, the block at the grown descriptor (deviation 6), the
 environment's output, and the armed output keyed on the state at the
 return value `R' 10#5`.  (NI M2-G4) The pure part also relays the console
-arm's exact count (`fwConsCnt`), beside the byte-identical arms. -/
+arm's exact count (`fwConsCnt`), beside the byte-identical arms; (NI M3
+NI-OUT) and the console arm's pushed run at its positions (`fwConsOut`). -/
 def filewritePost (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) (q : Qp)
     (st : FdState) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ fwConsCnt st V.upt P' (k.regs 11#5) n (R' 10#5)⌝ -∗
+    fwConsOut st γu (writerImg V.upt M) (k.regs 11#5) (R' 10#5) -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     fileRef γ fk q st -∗

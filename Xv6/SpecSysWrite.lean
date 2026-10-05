@@ -164,13 +164,16 @@ Rocq's `wp_sys_write_sconf_body`): the registers, the complement, the WHOLE
 block back at filewrite's extended descriptor, the descriptor bundle
 unchanged, the fs environment's output, and the armed output.  (NI M2-G4)
 The pure part relays filewrite's console count (`fwConsCnt`) at the
-descriptor argument 0 names (`argfd`'s `none` is `.closed`: vacuous). -/
-def sysWritePost (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+descriptor argument 0 names (`argfd`'s `none` is `.closed`: vacuous); (NI M3
+NI-OUT) so does `fwConsOut`, the console arm's pushed run at its positions
+in the port `γu`'s accepted stream. -/
+def sysWritePost (k : KCtx) (γ : FileNames) (γu : UartNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64) (Q : Nat → IProp GF)
     (Qe : Nat → PipeSt → IProp GF) (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧
       fwConsCnt (sysFdSt v V.ofile sts) V.upt P' v1 (argZ v2) (R' 10#5)⌝ -∗
+    fwConsOut (sysFdSt v V.ofile sts) γu (writerImg V.upt M) v1 (R' 10#5) -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     -- THE EVENT COUNTER (permit sweep L1b): filewrite's copies take the
@@ -216,7 +219,7 @@ def wp_sys_write_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- THE CALLER'S INPUT, keyed on the descriptor argument 0 names
   sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
   -- THE CROSSING IS THE LITERAL `true`: filewrite parks
-  wpNext true k.proc cpu (sysWritePost k γ j pid V M sts v v1 v2 Q Qe)
+  wpNext true k.proc cpu (sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `sys_write` (Rocq's `Module Type SYSWRITE`). -/

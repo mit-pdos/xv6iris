@@ -202,6 +202,103 @@ theorem uartSentSub_nil (γ : UartNames) (bs : List (BitVec 8)) :
   iframe H
   ipureintro; exact List.nil_sublist tr
 
+/-- **THE RUN, AT ITS POSITIONS** (NI M3 NI-OUT): the bytes `cs` were accepted by the port, in order, at the
+    strictly increasing indices `ps` of its stream, every one at or after the end of `L0` -/
+def uartSentRun (γ : UartNames) (L0 : List (BitVec 8)) (ps : List Nat) (cs : List (BitVec 8)) : IProp GF :=
+  iprop(∃ L : List (BitVec 8), uartSent γ L ∗
+    ⌜L0 <+: L ∧ ps.map (fun p => L[p]?) = cs.map some ∧ ps.Pairwise (· < ·) ∧ ∀ p ∈ ps, L0.length ≤ p⌝)
+
+instance uartSentRun_persistent (γ : UartNames) (L0 : List (BitVec 8)) (ps : List Nat) (cs : List (BitVec 8)) :
+    Persistent (uartSentRun (GF := GF) γ L0 ps cs) := by
+  unfold uartSentRun; infer_instance
+
+end
+
+/-- `uartSentRun`'s pure part, at its stream `L` -/
+def sentRunAt (L0 L : List (BitVec 8)) (ps : List Nat) (cs : List (BitVec 8)) : Prop :=
+  L0 <+: L ∧ ps.map (fun p => L[p]?) = cs.map some ∧ ps.Pairwise (· < ·) ∧ ∀ p ∈ ps, L0.length ≤ p
+
+theorem sentRunAt_lt {L0 L : List (BitVec 8)} {ps : List Nat} {cs : List (BitVec 8)}
+    (h : sentRunAt L0 L ps cs) : ∀ p ∈ ps, p < L.length := by
+  intro p hp
+  have hm : (fun p => L[p]?) p ∈ cs.map some := h.2.1 ▸ List.mem_map_of_mem hp
+  obtain ⟨c, -, hc⟩ := List.mem_map.1 hm
+  exact (List.getElem?_eq_some_iff.1 hc.symm).1
+
+theorem sentRunAt_nil (L0 : List (BitVec 8)) : sentRunAt L0 L0 [] [] :=
+  ⟨List.prefix_refl L0, rfl, List.Pairwise.nil, fun _ h => absurd h (List.not_mem_nil)⟩
+
+/-- two runs chain: the second's `L0` is the first's stream -/
+theorem sentRunAt_app {L0 L L' : List (BitVec 8)} {ps ps2 : List Nat} {cs cs2 : List (BitVec 8)}
+    (h1 : sentRunAt L0 L ps cs) (h2 : sentRunAt L L' ps2 cs2) :
+    sentRunAt L0 L' (ps ++ ps2) (cs ++ cs2) := by
+  have hlt := sentRunAt_lt h1
+  refine ⟨h1.1.trans h2.1, ?_, ?_, ?_⟩
+  · rw [List.map_append, List.map_append, ← h1.2.1, ← h2.2.1]
+    congr 1
+    apply List.map_congr_left
+    intro p hp
+    have hp' := hlt p hp
+    rw [List.getElem?_eq_getElem hp']
+    exact Iris.MonoList.prefix_getElem? h2.1 (List.getElem?_eq_getElem hp')
+  · refine List.pairwise_append.2 ⟨h1.2.2.1, h2.2.2.1, ?_⟩
+    intro a ha b hb
+    exact Nat.lt_of_lt_of_le (hlt a ha) (h2.2.2.2 b hb)
+  · intro p hp
+    rcases List.mem_append.1 hp with hp | hp
+    · exact h1.2.2.2 p hp
+    · exact Nat.le_trans h1.1.length_le (h2.2.2.2 p hp)
+
+/-- one more byte, accepted at the end of a stream that extends the run's -/
+theorem sentRunAt_snoc {L0 L l : List (BitVec 8)} {ps : List Nat} {cs : List (BitVec 8)} (b : BitVec 8)
+    (h : sentRunAt L0 L ps cs) (hl : L <+: l) :
+    sentRunAt L0 (l ++ [b]) (ps ++ [l.length]) (cs ++ [b]) := by
+  refine sentRunAt_app h ⟨hl.trans (List.prefix_append l [b]), ?_, List.pairwise_singleton _ _, ?_⟩
+  · simp
+  · intro p hp
+    rw [List.mem_singleton.1 hp]; exact hl.length_le
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+
+theorem uartSentRun_intro (γ : UartNames) (L0 L : List (BitVec 8)) (ps : List Nat) (cs : List (BitVec 8))
+    (h : sentRunAt L0 L ps cs) : uartSent (GF := GF) γ L ⊢ uartSentRun γ L0 ps cs := by
+  unfold uartSentRun
+  iintro #H
+  iexists L
+  iframe H
+  ipureintro; exact h
+
+theorem uartSentRun_elim (γ : UartNames) (L0 : List (BitVec 8)) (ps : List Nat) (cs : List (BitVec 8)) :
+    uartSentRun (GF := GF) γ L0 ps cs ⊢ ∃ L, uartSent γ L ∗ ⌜sentRunAt L0 L ps cs⌝ := by
+  unfold uartSentRun
+  iintro ⟨%L, #H, %h⟩
+  iexists L
+  iframe H
+  ipureintro; exact h
+
+/-- the empty run, at a stream bound already held -/
+theorem uartSentRun_nil (γ : UartNames) (L0 : List (BitVec 8)) :
+    uartSent (GF := GF) γ L0 ⊢ uartSentRun γ L0 [] [] :=
+  uartSentRun_intro γ L0 L0 [] [] (sentRunAt_nil L0)
+
+/-- the runs of two chunks chain (the second started at the first's stream) -/
+theorem uartSentRun_app (γ : UartNames) (L0 L : List (BitVec 8)) (ps ps2 : List Nat) (cs cs2 : List (BitVec 8))
+    (h : sentRunAt L0 L ps cs) :
+    uartSentRun (GF := GF) γ L ps2 cs2 ⊢ uartSentRun γ L0 (ps ++ ps2) (cs ++ cs2) := by
+  iintro H
+  icases uartSentRun_elim γ L ps2 cs2 $$ H with ⟨%L', #H, %h2⟩
+  iapply uartSentRun_intro γ L0 L' _ _ (sentRunAt_app h h2)
+  iexact H
+
+/-- the empty stream's lower bound, from any sublist witness -/
+theorem uartSent_nil_of_sub (γ : UartNames) (bs : List (BitVec 8)) :
+    uartSentSub (GF := GF) γ bs ⊢ uartSent γ [] := by
+  unfold uartSentSub uartSent
+  iintro ⟨%tr, #H, %_⟩
+  iapply MonoList.lb_own_le γ.acc [] (List.nil_prefix (l := tr))
+  iexact H
+
 /-- The transmitter's half of the trace: the `tx_lock`'s resource. -/
 def txRes (γ : UartNames) : IProp GF := iprop% ∃ l : List (BitVec 8), γ.tx ↪VAR{.own (1 : Qp).half} l
 

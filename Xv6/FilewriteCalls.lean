@@ -372,6 +372,7 @@ theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := 
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ R' 10#5 = BitVec.ofNat 64 i ∧
         (i : Int) ≤ max 0 n ∧ ((i : Int) < n → writeConsShort V.upt (k'.regs 11#5) i n) ∧
         consWriteCnt V.upt P' (k'.regs 11#5) n i⌝ -∗
+      consOutAt γu (writerImg V.upt M) (k'.regs 11#5) i -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
       procPrivExtEv (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗ Q i -∗ wpLoop c')
@@ -385,10 +386,10 @@ theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := 
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hport Hch Hkl Hav Hpriv
   iapply wpNext_intro
-  iintro %c' %spie %spp %R' %P' %i %kv %hp Hk Hpc Hte Hce %hkv Hpriv HQ
+  iintro %c' %spie %spp %R' %P' %i %kv %hp HO Hk Hpc Hte Hce %hkv Hpriv HQ
   ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid (V.updEv kv) P' (viewFaulted V.upt P' M)).1 $$ Hpriv
   ihave Hpriv := procPrivExtEv_intro _ _ _ _ _ kv hkv $$ Hpriv
-  iapply HK $$ %c' %spie %spp %R' %P' %i %hp Hk Hpc Hte Hce Hpriv HQ
+  iapply HK $$ %c' %spie %spp %R' %P' %i %hp HO Hk Hpc Hte Hce Hpriv HQ
 
 end
 

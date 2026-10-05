@@ -92,6 +92,7 @@ def fwrK (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) 
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) : IProp GF :=
   iprop(∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ fwConsCnt st V.upt P' (k.regs 11#5) n (R' 10#5)⌝ -∗
+    fwConsOut st γu (writerImg V.upt M) (k.regs 11#5) (R' 10#5) -∗
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     fileRef γ fk q st -∗ procPrivExtEv (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗
@@ -218,8 +219,9 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     simp only [h10, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpriv := fwr_priv_backEv (procAddr A.j) A.pid A.V P A.M hext.1 $$ Hpriv
   unfold fwrK
-  iapply HΦ $$ %c' %spie %spp %R' %P [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
+  iapply HΦ $$ %c' %spie %spp %R' %P [] [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
   · ipureintro; exact ⟨hcs, hext, fun _ h => by cases h⟩
+  · iapply fwConsOut_off; intro _ h; cases h
   · iapply (filewrite_env_out_inode (GF := GF) A.γul A.γuu A.rb true A.i A.γo A.om)
     unfold filewriteFsOut; iexact Hbs
   · unfold filewriteArms
@@ -293,8 +295,9 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     simp only [h10, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; decide
   ihave Hpriv := fwr_priv_backEv (procAddr A.j) A.pid A.V P A.M hext.1 $$ Hpriv
   unfold fwrK
-  iapply HΦ $$ %c' %spie %spp %R' %P [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
+  iapply HΦ $$ %c' %spie %spp %R' %P [] [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
   · ipureintro; exact ⟨hcs, hext, fun _ h => by cases h⟩
+  · iapply fwConsOut_off; intro _ h; cases h
   · iapply (filewrite_env_out_inode (GF := GF) A.γul A.γuu A.rb true A.i A.γo A.om)
     unfold filewriteFsOut; iexact Hbs
   · unfold filewriteArms

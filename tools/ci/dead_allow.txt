@@ -28,3 +28,7 @@ decl Xv6.Spin
 #    is reached only when a program proof takes the det arm -- keep it until
 #    one does (claude-notes/projects/noninterference.md, "M2-X design" §3)
 decl Xv6.uexecRetContF_det
+
+# -- NI M3 NI-OUT interim (OUT-1): the writer's image read as the key's lazy
+#    image, byte for byte; OUT-2 reaches it (the write arm's sixth row clause)
+decl Xv6.umemByte_writerImg_lazy    # OUT-2 reaches

@@ -33,7 +33,10 @@ COUNT, EXACTLY (NI M2-G4, `consWriteCnt`, beside it): the bytes before the
 count were read and are readable in the table the call hands back, and a
 short count is a multiple of 32 whose chunk `[i, i+32)` holds the byte the
 entry table cannot read -- so the count is the chunk boundary below the
-first unreadable byte.
+first unreadable byte.  THE BYTES' POSITIONS (NI M3 NI-OUT, `consOutAt`):
+the writer's image at `src .. src + i` was accepted by the console port, in
+order, at strictly increasing indices of its stream (each chunk's
+`uartwrite` run, chained).
 
 The running thread is proc `j` with a user source (`user_src != 0`, the
 only caller being `filewrite`); its private view `M` may fault pages in
@@ -181,6 +184,26 @@ theorem consOutChain_of_licence (k : Nat) (M : Nat → List (BitVec 8)) (ua : Bi
     iapply outLink_of_licence k b _ $$ Hlic
     iapply ih $$ Hlic
 
+/-- **THE RUN CONSOLEWRITE PUSHED, AT ITS POSITIONS** (NI M3 NI-OUT): the writer's image at `ua .. ua + i`,
+    accepted in order at strictly increasing indices of the port's stream -/
+def consOutAt (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i : Nat) : IProp GF :=
+  iprop(∃ ps : List Nat, uartSentRun γ [] ps
+    ((List.range i).map fun j => umemByte M (ua + BitVec.ofNat 64 j).toNat))
+
+instance consOutAt_persistent (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i : Nat) :
+    Persistent (consOutAt (GF := GF) γ M ua i) := by
+  unfold consOutAt; infer_instance
+
+/-- nothing pushed yet -/
+theorem consOutAt_zero (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) :
+    uartSent (GF := GF) γ [] ⊢ consOutAt γ M ua 0 := by
+  unfold consOutAt
+  iintro #H
+  iexists []
+  simp only [List.range_zero, List.map_nil]
+  iapply uartSentRun_nil γ []
+  iexact H
+
 end ConsOutChain
 
 /-- **WP of `consolewrite`, at either entry `SIE`** (Rocq
@@ -209,6 +232,7 @@ def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ R' 10#5 = BitVec.ofNat 64 i ∧
       (i : Int) ≤ max 0 n ∧ ((i : Int) < n → writeConsShort V.upt (k.regs 11#5) i n) ∧
       consWriteCnt V.upt P' (k.regs 11#5) n i⌝ -∗
+    consOutAt γ (writerImg V.upt M) (k.regs 11#5) i -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     -- THE EVENT COUNTER (permit sweep L1b): the copy loop lends the

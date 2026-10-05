@@ -541,6 +541,46 @@ theorem cw_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : GName
   simp only [eitherCopyinAddr] at h
   exact h
 
+/-- the image's run grows by a chunk read at the cursor -/
+theorem cw_run_snoc (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i nn : Nat) (bs : List (BitVec 8))
+    (hlen : bs.length = nn)
+    (hat : ∀ (d : Nat) (c : BitVec 8), bs[d]? = some c →
+      umemByte M (ua + BitVec.ofNat 64 (i + d)).toNat = c) :
+    (List.range (nn + i)).map (fun j => umemByte M (ua + BitVec.ofNat 64 j).toNat) =
+      (List.range i).map (fun j => umemByte M (ua + BitVec.ofNat 64 j).toNat) ++ bs := by
+  rw [Nat.add_comm, List.range_add, List.map_append, List.map_map]
+  congr 1
+  apply List.ext_getElem (by simp [hlen])
+  intro d h1 h2
+  simp only [List.getElem_map, List.getElem_range, Function.comp]
+  exact hat d _ (List.getElem?_eq_getElem h2)
+
+/-- consolewrite's run, opened at its stream -/
+theorem consOutAt_elim (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i : Nat) :
+    consOutAt (GF := GF) γ M ua i ⊢ ∃ ps L, uartSent γ L ∗
+      ⌜sentRunAt [] L ps ((List.range i).map fun j => umemByte M (ua + BitVec.ofNat 64 j).toNat)⌝ := by
+  unfold consOutAt
+  iintro ⟨%ps, H⟩
+  icases uartSentRun_elim γ [] ps _ $$ H with ⟨%L, #H, %h⟩
+  iexists ps, L
+  iframe H
+  ipureintro; exact h
+
+/-- ...and grown by the chunk `uartwrite` pushed from that stream -/
+theorem consOutAt_snoc (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i nn : Nat)
+    (bs : List (BitVec 8)) (ps : List Nat) (L : List (BitVec 8))
+    (hL : sentRunAt [] L ps ((List.range i).map fun j => umemByte M (ua + BitVec.ofNat 64 j).toNat))
+    (hlen : bs.length = nn)
+    (hat : ∀ (d : Nat) (c : BitVec 8), bs[d]? = some c →
+      umemByte M (ua + BitVec.ofNat 64 (i + d)).toNat = c) :
+    (∃ ps2, uartSentRun (GF := GF) γ L ps2 bs) ⊢ consOutAt γ M ua (nn + i) := by
+  unfold consOutAt
+  iintro ⟨%ps2, H⟩
+  iexists (ps ++ ps2)
+  rw [cw_run_snoc M ua i nn bs hlen hat]
+  iapply uartSentRun_app γ [] L ps ps2 _ bs hL
+  iexact H
+
 /-- `uartwrite(0, buf, nn)` at consolewrite's call site, at its eb contract
 (the complement at a named index `s` and proc `p`): the chunk's OUTPUT
 CHAIN (peeled off the caller's `consOutChain`) in, its payload back.  The
@@ -548,37 +588,37 @@ sublist witness `uartwrite`'s landed contract still threads is minted from
 the port's invariant (`uartInv_sentSub`; Rocq retired the receipt). -/
 theorem cw_uartwrite (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γ : UartNames) (j : Nat)
-    (cs : List (BitVec 8)) (nn : Nat) (s : Bool) (p : BitVec 64) (Φ : IProp GF)
+    (L0 cs : List (BitVec 8)) (nn : Nat) (s : Bool) (p : BitVec 64) (Φ : IProp GF)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : uartwriteSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hid : k'.regs 10#5 = 0#64)
     (hn : k'.regs 12#5 = BitVec.ofNat 64 nn) (hn' : nn < 2 ^ 31) (hcs : cs.length = nn)
     (hs : k'.sie = s) (hp : k'.proc = p) :
     kctx c k' ∗ pcIs c KA.«uartwrite» ∗ procsInv Γ ∗
     trapCsrsExt c s ∗ cpuClaimExt c s p ∗
-    uartPort .uart0 γl γ ∗ byteBuf (k'.regs 11#5) (DFrac.own 1) cs ∗
+    uartPort .uart0 γl γ ∗ uartSent γ L0 ∗ byteBuf (k'.regs 11#5) (DFrac.own 1) cs ∗
     outChain .uart0 (genId (hlc := hlc) (GF := GF) + 1) cs Φ ∗
     wpNext true p c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s p -∗
-      byteBuf (k'.regs 11#5) (DFrac.own 1) cs -∗ Φ -∗ wpLoop cpu'))
+      byteBuf (k'.regs 11#5) (DFrac.own 1) cs -∗ (∃ ps, uartSentRun γ L0 ps cs) -∗ Φ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
-  have h := UW.wp_uartwrite_eb (hlc := hlc) (GF := GF) Γ c k' .uart0 γl γ j [] cs (DFrac.own 1) nn
+  have h := UW.wp_uartwrite_eb (hlc := hlc) (GF := GF) Γ c k' .uart0 γl γ j [] L0 cs (DFrac.own 1) nn
     Φ hj hproc hK hnoff htier hid hn hn' hcs
   unfold wp_uartwrite_eb_body at h
   simp only [uartwriteAddr] at h
-  iintro ⟨Hk, Hpc, HΓ, Hte, Hce, #Hport, Hbuf, Hch, HΦ⟩
+  iintro ⟨Hk, Hpc, HΓ, Hte, Hce, #Hport, #HL0, Hbuf, Hch, HΦ⟩
   iapply wpLoop_fupd
   ihave #Hinv : uartInv .uart0 γ $$ [Hport]
   · unfold uartPort; icases Hport with ⟨#H1, -⟩; iexact H1
   imod uartInv_sentSub .uart0 γ $$ Hinv with #Hsub
   imodintro
   iapply h
-  iframe Hk Hpc HΓ Hte Hce Hport Hsub Hbuf Hch
+  iframe Hk Hpc HΓ Hte Hce Hport Hsub HL0 Hbuf Hch
   iapply wpNext_mono $$ HΦ
-  iintro %cpu' HK %spie %spp %R' %hcs' H1 H2 H3 H4 H5 _ H7
-  iapply HK $$ %spie %spp %R' %hcs' H1 H2 H3 H4 H5 H7
+  iintro %cpu' HK %spie %spp %R' %hcs' H1 H2 H3 H4 H5 _ H6 H7
+  iapply HK $$ %spie %spp %R' %hcs' H1 H2 H3 H4 H5 H6 H7
 
 end
 
@@ -613,12 +653,13 @@ theorem cwFix_cs (k : KCtx) (N : Nat) (R R' : RegMap) (h : cwFix k N R)
     c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
 
 /-- The caller's continuation (the spec's, named). -/
-def cwPost (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+def cwPost (k : KCtx) (γ : UartNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (n : Int) (Q : Nat → IProp GF) : CPU → IProp GF :=
   fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (i : Nat) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ R' 10#5 = BitVec.ofNat 64 i ∧
       (i : Int) ≤ max 0 n ∧ ((i : Int) < n → writeConsShort V.upt (k.regs 11#5) i n) ∧
       consWriteCnt V.upt P' (k.regs 11#5) n i⌝ -∗
+    consOutAt γ (writerImg V.upt M) (k.regs 11#5) i -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     ⌜V.ev ≤ k'⌝ -∗
@@ -627,10 +668,10 @@ def cwPost (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → Li
 
 /-- The whole-function continuation at any hart (the process is real, so the
 `wpNext true` pin is vacuous). -/
-theorem cw_post_at (cpu c : CPU) (k : KCtx) (j : Nat)
+theorem cw_post_at (cpu c : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j) :
-    wpNext true k.proc cpu (cwPost (GF := GF) k j pid V M n Q) ⊢ cwPost k j pid V M n Q c := by
+    wpNext true k.proc cpu (cwPost (GF := GF) k γ j pid V M n Q) ⊢ cwPost k γ j pid V M n Q c := by
   iintro H
   iapply wpNext_at true k.proc cpu c _
     (fun h => h.elim (fun h => absurd h (by decide))
@@ -671,7 +712,7 @@ set_option maxHeartbeats 4000000 in
 /-- **consolewrite's epilogue** at `+0x98`: `mv a0,s1`, restore `ra`/`s0`/`s1`,
 pop, return; deliver the count and the caller's cursor at it to the
 caller's continuation at this hart. -/
-theorem cw_epi (c0 cpu : CPU) (k : KCtx) (j : Nat)
+theorem cw_epi (c0 cpu : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF)
     (P' : UPtd) (hj : j < NPROC) (hkproc : k.proc = procAddr j) (hK : 16 ≤ k.avail)
     (spie spp : Bool) (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFF80#64)
@@ -689,9 +730,10 @@ theorem cw_epi (c0 cpu : CPU) (k : KCtx) (j : Nat)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
       procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P' } (writerImg V.upt M)) ∗ Q i ∗
-    wpNext true k.proc c0 (cwPost k j pid V M n Q)
+    consOutAt γ (writerImg V.upt M) (k.regs 11#5) i ∗
+    wpNext true k.proc c0 (cwPost k γ j pid V M n Q)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, ⟨%kv, %hkv, Hpriv⟩, HQ, Hnext⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, ⟨%kv, %hkv, Hpriv⟩, HQ, #HO, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step_e (wp_s_add cpu _ (KA.«consolewrite» + 0x98#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -708,10 +750,10 @@ theorem cw_epi (c0 cpu : CPU) (k : KCtx) (j : Nat)
   inext
   k_next_e
   iintro Hk Hpc
-  ihave HK := cw_post_at c0 cpu k j pid V M n Q hj hkproc $$ Hnext
+  ihave HK := cw_post_at c0 cpu k γ j pid V M n Q hj hkproc $$ Hnext
   ihave Hpriv := cw_priv_back curCtx (procAddr j) pid (V.updEv kv) P' M $$ Hpriv
   unfold cwPost
-  iapply HK $$ %spie %spp %_ %P' %i %kv [] Hk Hpc Hte Hce %hkv Hpriv HQ
+  iapply HK $$ %spie %spp %_ %P' %i %kv [] HO Hk Hpc Hte Hce %hkv Hpriv HQ
   ipureintro
   refine ⟨?_, hext, ?_, hin, hwhy, hcnt⟩
   · unfold calleeSaved
@@ -769,7 +811,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 set_option maxHeartbeats 4000000 in
 /-- At `+0x98` with the frame in pieces: close it and return. -/
-theorem cw_finish (c0 cpu : CPU) (k : KCtx) (j : Nat)
+theorem cw_finish (c0 cpu : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF)
     (P' : UPtd) (hj : j < NPROC) (hkproc : k.proc = procAddr j) (hK : 16 ≤ k.avail)
     (hal : (k.regs 2#5 + 0xFFFFFFFFFFFFFF80#64).toNat % 8 = 0)
@@ -793,15 +835,16 @@ theorem cw_finish (c0 cpu : CPU) (k : KCtx) (j : Nat)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
       procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P' } (writerImg V.upt M)) ∗ Q i ∗
-    wpNext true k.proc c0 (cwPost k j pid V M n Q)
+    consOutAt γ (writerImg V.upt M) (k.regs 11#5) i ∗
+    wpNext true k.proc c0 (cwPost k γ j pid V M n Q)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hra, Hs0, Hs1, Hsp9, Hbuf, Hte, Hce, Hpriv, HQ, Hnext⟩
+  iintro ⟨Hk, Hpc, Hra, Hs0, Hs1, Hsp9, Hbuf, Hte, Hce, Hpriv, HQ, #HO, Hnext⟩
   icases cw_buf_close _ buf hbuf hal $$ Hbuf with ⟨Hw0, Hw1, Hw2, Hw3⟩
   ihave Hframe := cw_frame_intro (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
     $$ [Hra Hs0 Hs1 Hsp9 Hw0 Hw1 Hw2 Hw3]
   case' _ => iframe
-  iapply (cw_epi c0 cpu k j pid V M n Q P' hj hkproc hK spie spp R hR2 h18 h19 h20 h21
-    h22 h23 h24 h25 h26 h27 i hrv hin hwhy hcnt hext) $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hpriv $HQ $Hnext]
+  iapply (cw_epi c0 cpu k γ j pid V M n Q P' hj hkproc hK spie spp R hR2 h18 h19 h20 h21
+    h22 h23 h24 h25 h26 h27 i hrv hin hwhy hcnt hext) $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hpriv $HQ $HO $Hnext]
 
 end
 
@@ -813,7 +856,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- What re-entering the guard needs: the pins, the count in `s1`, the
 extended process block at the writer's image, the chain's residue, the frame in pieces, and the
 caller's continuation. -/
-def cwLoopInv (cpu : CPU) (k : KCtx) (j : Nat)
+def cwLoopInv (cpu : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (N : Nat) :
     IProp GF := iprop(
   ∀ (c : CPU) (a b : Bool) (R : RegMap) (i : Nat) (P : UPtd) (buf : List (BitVec 8)),
@@ -822,6 +865,7 @@ def cwLoopInv (cpu : CPU) (k : KCtx) (j : Nat)
     kctx c (((k.withSpie a b).pushed 16).withRegs R) -∗
     pcIs c (KA.«consolewrite» + 0x60#64) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) -∗
+    consOutAt γ (writerImg V.upt M) (k.regs 11#5) i -∗
     (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
       procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) -∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) -∗
@@ -830,17 +874,18 @@ def cwLoopInv (cpu : CPU) (k : KCtx) (j : Nat)
     cwSaved (k.regs 2#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) -∗
     byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFF80#64) (DFrac.own 1) buf -∗
-    wpNext true k.proc cpu (cwPost k j pid V M n Q) -∗ wpLoop c)
+    wpNext true k.proc cpu (cwPost k γ j pid V M n Q) -∗ wpLoop c)
 
-theorem cwLoopInv_elim (cpu : CPU) (k : KCtx) (j : Nat)
+theorem cwLoopInv_elim (cpu : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (N : Nat) :
-    cwLoopInv (GF := GF) cpu k j pid V M n Q N ⊢
+    cwLoopInv (GF := GF) cpu k γ j pid V M n Q N ⊢
     ∀ (c : CPU) (a b : Bool) (R : RegMap) (i : Nat) (P : UPtd) (buf : List (BitVec 8)),
       ⌜cwFix k N R ∧ R 9#5 = BitVec.ofNat 64 i ∧ i < N ∧ V.upt.extSz V.sz P ∧ buf.length = 32 ∧
       uvaRprefix P (k.regs 11#5) i ∧ i % 32 = 0⌝ -∗
       kctx c (((k.withSpie a b).pushed 16).withRegs R) -∗
       pcIs c (KA.«consolewrite» + 0x60#64) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) -∗
+    consOutAt γ (writerImg V.upt M) (k.regs 11#5) i -∗
       (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
       procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) -∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) -∗
@@ -849,10 +894,10 @@ theorem cwLoopInv_elim (cpu : CPU) (k : KCtx) (j : Nat)
       cwSaved (k.regs 2#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
         (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) -∗
       byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFF80#64) (DFrac.own 1) buf -∗
-      wpNext true k.proc cpu (cwPost k j pid V M n Q) -∗ wpLoop c := by
+      wpNext true k.proc cpu (cwPost k γ j pid V M n Q) -∗ wpLoop c := by
   unfold cwLoopInv; iintro H; iexact H
 
-theorem cwLoopInv_intro (cpu : CPU) (k : KCtx) (j : Nat)
+theorem cwLoopInv_intro (cpu : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (N : Nat) :
     (∀ (c : CPU) (a b : Bool) (R : RegMap) (i : Nat) (P : UPtd) (buf : List (BitVec 8)),
       ⌜cwFix k N R ∧ R 9#5 = BitVec.ofNat 64 i ∧ i < N ∧ V.upt.extSz V.sz P ∧ buf.length = 32 ∧
@@ -860,6 +905,7 @@ theorem cwLoopInv_intro (cpu : CPU) (k : KCtx) (j : Nat)
       kctx c (((k.withSpie a b).pushed 16).withRegs R) -∗
       pcIs c (KA.«consolewrite» + 0x60#64) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) -∗
+    consOutAt γ (writerImg V.upt M) (k.regs 11#5) i -∗
       (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
       procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) -∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) -∗
@@ -868,8 +914,8 @@ theorem cwLoopInv_intro (cpu : CPU) (k : KCtx) (j : Nat)
       cwSaved (k.regs 2#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
         (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) -∗
       byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFF80#64) (DFrac.own 1) buf -∗
-      wpNext true k.proc cpu (cwPost k j pid V M n Q) -∗ wpLoop c) ⊢
-    cwLoopInv (GF := GF) cpu k j pid V M n Q N := by
+      wpNext true k.proc cpu (cwPost k γ j pid V M n Q) -∗ wpLoop c) ⊢
+    cwLoopInv (GF := GF) cpu k γ j pid V M n Q N := by
   unfold cwLoopInv; iintro H; iexact H
 
 end
@@ -878,15 +924,16 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 /-- The loop hypothesis as a rule (so the register map can be inferred). -/
-theorem cwLoopInv_use (cpu c : CPU) (k : KCtx) (j : Nat)
+theorem cwLoopInv_use (cpu c : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (N : Nat)
     (a b : Bool) (R : RegMap) (i : Nat) (P : UPtd) (buf : List (BitVec 8))
     (h : cwFix k N R ∧ R 9#5 = BitVec.ofNat 64 i ∧ i < N ∧ V.upt.extSz V.sz P ∧ buf.length = 32 ∧
       uvaRprefix P (k.regs 11#5) i ∧ i % 32 = 0) :
-    cwLoopInv cpu k j pid V M n Q N ∗
+    cwLoopInv cpu k γ j pid V M n Q N ∗
     kctx c (((k.withSpie a b).pushed 16).withRegs R) ∗
     pcIs c (KA.«consolewrite» + 0x60#64) ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) ∗
+    consOutAt γ (writerImg V.upt M) (k.regs 11#5) i ∗
     (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
       procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) ∗
@@ -895,11 +942,11 @@ theorem cwLoopInv_use (cpu c : CPU) (k : KCtx) (j : Nat)
     cwSaved (k.regs 2#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) ∗
     byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFF80#64) (DFrac.own 1) buf ∗
-    wpNext true k.proc cpu (cwPost k j pid V M n Q)
+    wpNext true k.proc cpu (cwPost k γ j pid V M n Q)
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨IH, Hk, Hpc, Hte, Hce, Hsent, Hpriv, Hra, Hs0, Hs1, Hsv, Hbuf, Hnext⟩
-  ihave IH' := cwLoopInv_elim cpu k j pid V M n Q N $$ IH
-  iapply IH' $$ %c %a %b %R %i %P %buf [] Hk Hpc Hte Hce Hsent Hpriv Hra Hs0 Hs1 Hsv
+  iintro ⟨IH, Hk, Hpc, Hte, Hce, Hsent, HO, Hpriv, Hra, Hs0, Hs1, Hsv, Hbuf, Hnext⟩
+  ihave IH' := cwLoopInv_elim cpu k γ j pid V M n Q N $$ IH
+  iapply IH' $$ %c %a %b %R %i %P %buf [] Hk Hpc Hte Hce Hsent HO Hpriv Hra Hs0 Hs1 Hsv
     Hbuf Hnext
   ipureintro; exact h
 
@@ -932,6 +979,7 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     procsInv Γ ∗ uartPort .uart0 γl γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) ∗
+    consOutAt γ (writerImg V.upt M) (k.regs 11#5) i ∗
     (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
       procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) ∗
@@ -940,12 +988,12 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     cwSaved (k.regs 2#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) ∗
     byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFF80#64) (DFrac.own 1) buf ∗
-    wpNext true k.proc c0 (cwPost k j pid V M n Q) ∗
-    cwLoopInv c0 k j pid V M n Q N
+    wpNext true k.proc c0 (cwPost k γ j pid V M n Q) ∗
+    cwLoopInv c0 k γ j pid V M n Q N
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
-  iintro ⟨Hk, Hpc, #Hpinv, #Hport, #Hkl, #Hav, Hte, Hce, Hch, Hpriv, Hra, Hs0, Hs1, Hsv,
+  iintro ⟨Hk, Hpc, #Hpinv, #Hport, #Hkl, #Hav, Hte, Hce, Hch, #HO, Hpriv, Hra, Hs0, Hs1, Hsv,
     Hbuf, Hnext, IH⟩
   icases kctx_tier cpu _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := by
@@ -1053,7 +1101,7 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     iintro %cpu Hk Hpc Hsp9 Hte Hce
     k_norm_g
     ihave HQ := consOutChain_cursor _ _ _ Q i (N - i) $$ Hch
-    iapply (cw_finish c0 cpu k j pid V M n Q P2 hj hkproc hK16 hal spieC sppC _
+    iapply (cw_finish c0 cpu k γ j pid V M n Q P2 hj hkproc hK16 hal spieC sppC _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact q2)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
@@ -1074,7 +1122,7 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
             (by rw [htk] at hwhyC; simpa only [BitVec.add_assoc] using hwhyC)⟩⟩
         (UMemL.extSz_trans hext hext2) (bs' ++ buf.drop nn)
         (by rw [List.length_append, hbs', List.length_drop, hbuf]; omega))
-      $$ [- $Hk $Hpc $Hra $Hs0 $Hs1 $Hsp9 $Hbuf $Hte $Hce $HQ $Hpriv $Hnext]
+      $$ [- $Hk $Hpc $Hra $Hs0 $Hs1 $Hsp9 $Hbuf $Hte $Hce $HQ $HO $Hpriv $Hnext]
   case inl =>
     -- the copy succeeded: `uartwrite(0, buf, nn)`
     k_step_e (wp_s_branch cpu _ (KA.«consolewrite» + 0x4a#64) false 60#13 10#5 24#5 (by decide) bop.BEQ)
@@ -1092,12 +1140,13 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     k_step_e (wp_s_jal cpu _ (KA.«consolewrite» + 0x54#64) false 2036#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cw_br_uartwrite]
     iintro Hk Hpc
+    have hat := cw_at (writerImg V.upt M) (k.regs 11#5) _ i nn (by first | rfl | simp only [h9, g23] | skip)
+        (by rw [htk] at hnwC; exact hnwC) bs' (by rw [hbsE, htk])
     ihave Hch := consOutChain_run (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5)
-      Q bs' i (N - i) (by omega)
-      (cw_at (writerImg V.upt M) (k.regs 11#5) _ i nn (by first | rfl | simp only [h9, g23] | skip)
-        (by rw [htk] at hnwC; exact hnwC) bs' (by rw [hbsE, htk])) $$ Hch
+      Q bs' i (N - i) (by omega) hat $$ Hch
+    icases consOutAt_elim γ (writerImg V.upt M) (k.regs 11#5) i $$ HO with ⟨%psO, %LO, #HLO, %hLO⟩
     rw [hbs', show i + nn = nn + i by omega, show N - i - nn = N - (nn + i) by omega]
-    iapply (cw_uartwrite UW Γ cpu _ γl γ j bs' nn k.sie k.proc
+    iapply (cw_uartwrite UW Γ cpu _ γl γ j LO bs' nn k.sie k.proc
         (consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q (nn + i)
           (N - (nn + i))) hj ?hpU ?hKU ?hnU ?htU
         ?hidU ?hnnU ?hn'U hbs' ?hsU ?hppU) $$ [- $Hk $Hpc $Hte $Hce $Hch]
@@ -1119,7 +1168,8 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     case hnnU => k_norm_g; try rw [h19C]
     case hn'U => try omega
     iapply wpNext_intro_pin
-    iintro %cpu %hpin2 %spieU %sppU %RU %hcsU Hk Hpc Hte Hce Hb1 Hch
+    iintro %cpu %hpin2 %spieU %sppU %RU %hcsU Hk Hpc Hte Hce Hb1 Hrun2 Hch
+    ihave #HO2 := consOutAt_snoc γ (writerImg V.upt M) (k.regs 11#5) i nn bs' psO LO hLO hbs' hat $$ Hrun2
     k_norm_g [cw_ctx_collapse, cw_spie_pushed]
     have hfixU : cwFix k N RU := cwFix_cs k N _ RU
       (by unfold cwFix at hfixC ⊢
@@ -1168,7 +1218,7 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
       ihave HQ := consOutChain_cursor _ _ _ Q (nn + i) (N - (nn + i)) $$ Hch
-      iapply (cw_finish c0 cpu k j pid V M n Q P2 hj hkproc hK16 hal spieU sppU _
+      iapply (cw_finish c0 cpu k γ j pid V M n Q P2 hj hkproc hK16 hal spieU sppU _
           (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p2)
           (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
           (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
@@ -1183,15 +1233,15 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
           (nn + i) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; rw [← ofNat64_add])
           (by omega) (fun h => absurd h (by omega)) ⟨hpre', fun h => absurd h (by omega)⟩
           (UMemL.extSz_trans hext hext2) (bs' ++ buf.drop nn) hbuf')
-        $$ [- $Hk $Hpc $Hra $Hs0 $Hs1 $Hsp9 $Hbuf $Hte $Hce $HQ $Hpriv $Hnext]
+        $$ [- $Hk $Hpc $Hra $Hs0 $Hs1 $Hsp9 $Hbuf $Hte $Hce $HQ $HO2 $Hpriv $Hnext]
     · -- more to write: back to the guard
       k_step_e (wp_s_branch cpu _ (KA.«consolewrite» + 0x5c#64) false 18#13 9#5 20#5 (by decide) bop.BGE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [p20, cw_bge_add nn i N (by omega) (by omega), decide_eq_false hdone]
       iintro Hk Hpc
-      ihave IH' := cwLoopInv_elim c0 k j pid V M n Q N $$ IH
+      ihave IH' := cwLoopInv_elim c0 k γ j pid V M n Q N $$ IH
       iapply IH' $$ %cpu %spieU %sppU %(RU.set 9#5 (BitVec.ofNat 64 nn + BitVec.ofNat 64 i)) %(nn + i) %P2
-        %(bs' ++ buf.drop nn) [] Hk Hpc Hte Hce Hch Hpriv Hra Hs0 Hs1 Hsv
+        %(bs' ++ buf.drop nn) [] Hk Hpc Hte Hce Hch HO2 Hpriv Hra Hs0 Hs1 Hsv
         Hbuf Hnext
       ipureintro
       refine ⟨?_, ?_, by omega, UMemL.extSz_trans hext hext2, hbuf', hpre',
@@ -1220,11 +1270,11 @@ theorem cw_loop (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     (hN : N < 2 ^ 31) (hNn : (N : Int) ≤ max 0 n) (hnN : n ≤ (N : Int)) :
     procsInv (GF := GF) Γ -∗ uartPort .uart0 γl γ -∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) -∗ kallocAvail γk none -∗
-    cwLoopInv c0 k j pid V M n Q N := by
+    cwLoopInv c0 k γ j pid V M n Q N := by
   iintro #Hpinv #Hport #Hkl #Hav
   iloeb as IH
   iapply cwLoopInv_intro
-  iintro %cpu %a %b %R %i %P %buf %⟨hfix, h9, hiN, hext, hbuf, hpre, hmod⟩ Hk Hpc Hte Hce Hch Hpriv
+  iintro %cpu %a %b %R %i %P %buf %⟨hfix, h9, hiN, hext, hbuf, hpre, hmod⟩ Hk Hpc Hte Hce Hch #HO Hpriv
     Hra Hs0 Hs1 Hsv Hbuf Hnext
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨g2, g8, g20, g21, g22, g23, g24, g25, g26, g27⟩ := id hfix
@@ -1250,7 +1300,7 @@ theorem cw_loop (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true])
         (by omega) (by omega) (by omega) hext buf hbuf hpre hmod (Or.inr (by omega)))
-      $$ [- $Hk $Hpc $Hte $Hce $Hch $Hpriv $Hra $Hs0 $Hs1 $Hsv $Hbuf $Hnext $IH]
+      $$ [- $Hk $Hpc $Hte $Hce $Hch $HO $Hpriv $Hra $Hs0 $Hs1 $Hsv $Hbuf $Hnext $IH]
     iframe #
   · -- a full chunk: nn = 32
     k_step_e (wp_s_branch cpu _ (KA.«consolewrite» + 0x66#64) false 8146#13 25#5 15#5 (by decide) bop.BGE)
@@ -1271,7 +1321,7 @@ theorem cw_loop (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true])
         (by omega) (by omega) (by omega) hext buf hbuf hpre hmod (Or.inl rfl))
-      $$ [- $Hk $Hpc $Hte $Hce $Hch $Hpriv $Hra $Hs0 $Hs1 $Hsv $Hbuf $Hnext $IH]
+      $$ [- $Hk $Hpc $Hte $Hce $Hch $HO $Hpriv $Hra $Hs0 $Hs1 $Hsv $Hbuf $Hnext $IH]
     iframe #
 
 end
@@ -1290,8 +1340,16 @@ theorem consolewrite_proof (EC : EITHER_COPYIN) (UW : UARTWRITE) : CONSOLEWRITE 
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   have hK16 : 16 ≤ k.avail := by unfold consolewriteSlots eitherCopyinSlots at hK; omega
-  ihave HΦ : wpNext true k.proc cpu (cwPost k j pid V M n Q) $$ [HΦ]
+  ihave HΦ : wpNext true k.proc cpu (cwPost k γ j pid V M n Q) $$ [HΦ]
   · unfold cwPost; iexact HΦ
+  -- nothing pushed yet (NI M3 NI-OUT): the empty run, at the stream's empty bound
+  iapply wpLoop_fupd
+  ihave #Hinv : uartInv .uart0 γ $$ [Hport]
+  · unfold uartPort; icases Hport with ⟨#H1, -⟩; iexact H1
+  imod uartInv_sentSub .uart0 γ $$ Hinv with #Hsub0
+  ihave #HO := consOutAt_zero γ (writerImg V.upt M) (k.regs 11#5) $$ [Hsub0]
+  · iapply uartSent_nil_of_sub γ []; iexact Hsub0
+  imodintro
   ihave Hpriv := pw_bare_to_ext curCtx (procAddr j) pid V M $$ Hpriv
   ihave Hpriv := cw_priv_img curCtx (procAddr j) pid V M $$ Hpriv
   ihave Hpriv : (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
@@ -1325,10 +1383,10 @@ theorem consolewrite_proof (EC : EITHER_COPYIN) (UW : UARTWRITE) : CONSOLEWRITE 
     ihave HQ := consOutChain_cursor _ _ _ Q 0 _ $$ Hch
     ihave HΦ := wpNext_shift true k.proc _ cpu _ (fun h => h.elim (fun h => absurd h (by decide))
       (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ HΦ
-    iapply (cw_epi cpu cpu k j pid V M n Q V.upt hj hproc hK16 k.spie k.spp _
+    iapply (cw_epi cpu cpu k γ j pid V M n Q V.upt hj hproc hK16 k.spie k.spp _
         ?hR2E ?e18 ?e19 ?e20 ?e21 ?e22 ?e23 ?e24 ?e25 ?e26 ?e27 0 ?hrvE (by omega) (fun h => absurd h (by omega))
         ⟨fun d hd => absurd hd (Nat.not_lt_zero _), fun h => absurd h (by omega)⟩ (UMemL.extSz_refl _ _))
-      $$ [- $Hk $Hpc $Hframe $Hte $Hce $HQ $Hpriv $HΦ]
+      $$ [- $Hk $Hpc $Hframe $Hte $Hce $HQ $HO $Hpriv $HΦ]
     case hR2E => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     case e18 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
     case e19 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
@@ -1401,8 +1459,8 @@ theorem consolewrite_proof (EC : EITHER_COPYIN) (UW : UARTWRITE) : CONSOLEWRITE 
     ihave Hch : consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q 0
       (N - 0) $$ [Hch]
     · rw [hnN, Nat.sub_zero]; simp only [Int.toNat_natCast]; iexact Hch
-    iapply (cwLoopInv_use cpu cpu k j pid V M n Q N k.spie k.spp _ 0 V.upt buf ?hentry)
-      $$ [- $IH $Hk $Hpc $Hte $Hce $Hch $Hpriv $Hra $Hs0 $Hs1 $Hsv $Hbuf $HΦ]
+    iapply (cwLoopInv_use cpu cpu k γ j pid V M n Q N k.spie k.spp _ 0 V.upt buf ?hentry)
+      $$ [- $IH $Hk $Hpc $Hte $Hce $Hch $HO $Hpriv $Hra $Hs0 $Hs1 $Hsv $Hbuf $HΦ]
     case hentry =>
       refine ⟨?_, ?_, by omega, UMemL.extSz_refl _ _, hbuf, fun d hd => absurd hd (Nat.not_lt_zero _),
         Nat.zero_mod 32⟩

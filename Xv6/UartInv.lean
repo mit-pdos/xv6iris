@@ -580,6 +580,84 @@ theorem thr_write_au (i : UartId) (γ : UartNames) (l bs : List (BitVec 8)) (b :
   rw [hacc] at hbs
   exact hbs.append_right [b]
 
+/-- a lower bound of the accepted trace is a prefix of it -/
+theorem sentAuth_sent_prefix (γ : UartNames) (u : UartState) (L0 : List (BitVec 8)) :
+    sentAuth (GF := GF) γ u ∗ uartSent γ L0 ⊢ ⌜L0 <+: Uart.acc u⌝ ∗ sentAuth γ u := by
+  unfold sentAuth uartSent
+  iintro ⟨H1, #H2⟩
+  ihave %h := MonoList.auth_lb_own_valid γ.acc _ (Uart.acc u) L0 $$ H1 H2
+  iframe H1
+  ipureintro; exact h.2
+
+/-- `thr_write_au` with a prior lower bound `uartSent γ L0` of the accepted trace (NI M3 NI-OUT): the token's
+trace `l` extends it, so the byte lands at index `l.length ≥ L0.length` of the stream. -/
+theorem thr_write_au_at (i : UartId) (γ : UartNames) (l bs L0 : List (BitVec 8)) (b : BitVec 8) (Φ : IProp GF) :
+    uartInv i γ ∗ txOwn γ l ∗ outLb γ l ∗ dlabOff γ ∗ uartSentSub γ bs ∗ uartSent γ L0 ∗ storeOb i γ b Φ ⊢@{IProp GF}
+      devWriteAU (.uart i) 0 1 b
+        iprop(txOwn γ (l ++ [b]) ∗ uartSent γ (l ++ [b]) ∗ uartSentSub γ (bs ++ [b]) ∗ ⌜L0 <+: l⌝ ∗ Φ) := by
+  unfold uartInv devInvR devWriteAU storeOb
+  iintro ⟨#Hinv, Htok, #Hlb, #Hoff, #Hsub, #HL0, Hob⟩
+  iinv Hinv with Hbody Hclose
+  icases Hbody with ⟨%u, >Hfrag, >HB⟩
+  icases uartBody_parts i γ u $$ HB with ⟨Hsent, Hout, Htx, Hdlab, Hcol, Hcl⟩
+  icases txOwn_agree γ u l $$ [Htx Htok] with ⟨%hacc, Htx, Htok⟩
+  · iframe
+  icases uartSentSub_sub γ u bs $$ [Hsent Hsub] with ⟨%hbs, Hsent⟩
+  · iframe Hsent; iexact Hsub
+  icases sentAuth_sent_prefix γ u L0 $$ [Hsent HL0] with ⟨%hL0, Hsent⟩
+  · iframe Hsent; iexact HL0
+  have hL0l : L0 <+: l := hacc ▸ hL0
+  icases outLb_prefix γ u l $$ [Hout Hlb] with ⟨%hpre, Hout⟩
+  · iframe Hout; iexact Hlb
+  icases dlabOff_agree γ u $$ [Hdlab Hoff] with ⟨%hdlab, Hdlab⟩
+  · iframe Hdlab; iexact Hoff
+  have htx : u.tx = [] := tx_nil_of_out_prefix u l hacc hpre
+  have hroom : u.tx.length < Uart.fifoDepth := by rw [htx]; decide
+  have hwr := write_thr u b hdlab hroom
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  iexists u
+  iframe Hfrag
+  isplit
+  · ipureintro; exact Option.isSome_iff_exists.2 ⟨_, hwr⟩
+  inext
+  iintro %u' %hwr' Hfrag
+  have hwr'' : Uart.writeN u 0 1 b = some u' := hwr'
+  rw [hwr] at hwr''
+  obtain rfl := Option.some.inj hwr''
+  have hacc' := acc_thr u b
+  rw [hacc] at hacc'
+  imod (sentAuth_append γ u _ b (acc_thr u b)) $$ Hsent with ⟨Hsent, #Hsentlb⟩
+  imod (txOwn_update γ u l (l ++ [b]) hacc) $$ [Htx Htok] with Hup
+  · iframe
+  icases Hup $$ %_ %hacc' with ⟨Htx, Htok⟩
+  imod Hmask
+  imod Hob $$ %u %({ u with tx := u.tx ++ [b], thri := false }) %⟨rfl, rfl, rfl, rfl, acc_thr u b, rfl⟩
+    Hout Hcol Hcl with ⟨Hout, Hcol, Hcl, HΦ⟩
+  ihave Hc := Hclose $$ [Hfrag Hsent Hout Htx Hdlab Hcol Hcl]
+  case' _ =>
+    inext
+    iexists { u with tx := u.tx ++ [b], thri := false }
+    iframe Hfrag
+    iapply uartBody_intro i γ { u with tx := u.tx ++ [b], thri := false }
+    rw [outAuth_thr, dlabAuth_thr]
+    iframe Hsent Htx Hout Hdlab Hcol Hcl
+  imod Hc
+  imodintro
+  rw [hacc']
+  iframe Htok HΦ
+  isplit
+  · iexact Hsentlb
+  isplit
+  · unfold uartSentSub
+    iexists (l ++ [b])
+    isplit
+    · iexact Hsentlb
+    ipureintro
+    rw [hacc] at hbs
+    exact hbs.append_right [b]
+  ipureintro; exact hL0l
+
 /-- Reading ISR: nothing the ghosts track moves (the transmit latch may drop). -/
 theorem isr_read_au (i : UartId) (γ : UartNames) :
     uartInv i γ ⊢@{IProp GF} devReadAU (.uart i) 2 1 (fun _ => emp) := by

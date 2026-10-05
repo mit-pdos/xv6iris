@@ -35,6 +35,19 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
+/-- (NI M3 NI-OUT, F3) the writer's image and the key's lazy image agree byte for byte, at every lazy bit:
+a mapped page reads `M` in both, an unmapped one reads zero at the writer's image and `0` or nothing at the
+key's. -/
+theorem umemByte_writerImg_lazy (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) (va : Nat) :
+    umemByte (writerImg P M) va = (umemLazy P sz M va).getD 0#8 := by
+  unfold umemByte writerImg umemLazy
+  by_cases h : (Iris.Std.PartialMap.get? P.um (va / 4096)).isSome
+  · simp only [h, if_true]
+  · simp only [h, if_false, Bool.false_eq_true]
+    have hlt : va % 4096 < 4096 := Nat.mod_lt _ (by decide)
+    rw [List.getElem?_replicate, if_pos hlt]
+    split <;> rfl
+
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 set_option linter.unusedSimpArgs false
@@ -261,7 +274,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
   iframe Hk Hpc Hpi Hte Hce Hpe Hpriv Hfr Hkl Hka Hfs Hdev Hin
   k_next_e
   unfold sysWritePost
-  iintro %spie2 %spp2 %R2 %P' %k' %⟨hcs, hext, hcnt⟩ Hk Hpc Hte Hce %hk' Hpriv Hfr Hbs Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %⟨hcs, hext, hcnt⟩ - Hk Hpc Hte Hce %hk' Hpriv Hfr Hbs Harms
   -- the block at the callee's raised event count (permit sweep L1b): the
   -- rows do not read it (`SyscRows.updEv`)
   ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) ⊢
