@@ -4429,6 +4429,68 @@ receipt; OUT-3 needs OUT-2's row). One worktree, three commits. Estimates:
     where `uwriteCntOf r = usysWriteCnt a2 d`.
   - Alternative: guard the row with `pvLazy = false` like the fifth clause. That saves nothing and states less.
 
+### M3 NI-OUT as landed (2026-10-05)
+
+On `lane/m3out`, three commits (OUT-1 f2cd78f37, OUT-2 69264ac77, OUT-3: this note's commit), rulings
+OUT-R1…R9 as recommended. A class console write's UART bytes are attributed to the incarnation by
+ACCEPTED-STREAM index through the filing's citation; equal out-inputs push equal runs (`xv6NiOut`, the eleventh
+root).
+
+**OUT-1 (the receipt).** `UartTrace.uartSentRun` (the design's text) with its pure part `sentRunAt` and
+`_nil/_app/_snoc/_intro/_elim`, `uartSent_nil_of_sub`; `UartInv.thr_write_au_at` (+`sentAuth_sent_prefix`;
+`thr_write_au` byte-identical). `UARTWRITE` moved (binder `L0`, pre `uartSent γ L0`, post `∃ ps, uartSentRun γ L0
+ps cs`, both bodies; the loop carries the run). `CONSOLEWRITE` moved: `consOutAt` (the design's text), the
+continuation gains `consOutAt γ (writerImg V.upt M) (k.regs 11#5) i -∗` after the ⌜⌝; each chunk's uartwrite
+starts at the run's stream (`consOutAt_elim`/`_snoc`, `cw_run_snoc`). `FILEWRITE` moved: `fwConsOut` (the
+design's text) in `filewritePost` and `fwrK` (`fwConsOut_off/_neg/_cons`). `SYSWRITE` moved: `sysWritePost` + `γu`
+(after `γ`) and `fwConsOut (sysFdSt …) γu (writerImg V.upt M) v1 (R' 10#5)`. Byte-identical: the user tier,
+`uartputc_sync`/`consputc`/`prputc`, the UART permits, `writeConsArms`, `fwConsCnt`, `SyscRows`, `SYSCALL`,
+`USERTRAP`. Deviation: `umemByte_writerImg_lazy` lives in `SyscallArmsFd2` (UMemImg does not import UserExec's
+`umemLazy`; importing it would only add an edge).
+
+**OUT-2 (the citation and the filing).** `UsysDet`: `UIota.cacc`/`cpos` (defaulted, last), `UIota.boot` + `[],
+[]`, `UIota.led`, `uimgByte`, `uwriteRun`, `uwriteCntOf`, `usysWriteCnt`, `uwriteOut`, `usysOutAt` (the design's
+texts), `uwriteCntOf_ansAt` (+`consCnt_le`, `usysCntW_lt`). `NiEvid`: `niNamesHere` + `fscUart.acc`;
+`niIotaLbs` + `((ns.getD 5 0) ↪◯ML ι.cacc)` -- the camera is `Xv6G.monoListG`, the same instance `uartSent`
+resolves (the arm's `uartSent fscUart L` IS the sixth conjunct after `rw` of `niNamesHere.getD 5 0`), no
+diamond; `niBelow` + `ι.cacc <+: H.cacc`, `niJoin` + `niLonger H.cacc ι.cacc` and `H.cpos`; every `niIotaLbs_*`
+one more conjunct, new `niIotaLbs_cacc`. The chain state (`niChainSt`, `niEra_lbs`, `niHist`, `niR_*`) followed
+untouched (written generically over `niIotaLbs`/`niJoin`); only `niBelow_refl/_trans/_boot`, `niJoin_below` and
+`niChainSt_file`'s `niBelow_join` call re-destructured. `parkWorld` (body) and `SpecUserinit.userinitPark` pin
+`⌜γ0 = fscUart⌝`; `ProofMain`'s phases B/C take SpecMain's `hties` pin (`hU`); `syscallEnv_devswAt` replaced
+`syscallEnv_devsw` (unreached after the arm moved: deleted, not kept as a corollary). `syscEvRow`'s sixth clause
+(the design's text); the fork/wait/sbrk/uptime/kill rows one absurd conjunct. The arm: `syscArmWrite_ev` (off a
+writable console or at −1 the boot prefix at the actor; else `consOutAt_take` to the answer's count `r.toNat` --
+consOutAt's `i` is unbounded, `r = ofNat i` -- then `{boot with act, cacc := L, cpos := ps}`), `uwriteCons_key`,
+`usysOutAt_nil`, `uwriteRun_writerImg` (+ `sentRunAt_take`, `consOutAt_take`; `consOutAt_elim` moved from
+ProofConsolewrite to SpecConsolewrite). `NiLedger.niOutRow` (the design's text) in `niFitEv`/`niEntryOk`;
+`urc_evRow` + the sixth conjunct, `urc_niOutRow`; `UserretClosedRound` files it. FORCED EARLY (the design put
+them in OUT-3): `niBelow_pos`/`NiStep.cite_eq` conclude at `.led`, `NiStep.output_eq` takes `.led` -- with `cacc`
+in `niBelow` the positions no longer determine ι. Byte-identical: `SYSCALL`, `USERTRAP`, `syscEvOut`, `utEvOut`,
+`uEvid`, `NiEntry`, `NiFitIs`, `NiStep`, the four NI roots.
+
+**OUT-3 (the step, the law, the root).** `NiStep.round … wcon (wout : List (BitVec 8)) x e c`; `niStepOf` fills
+`uwriteOut W`; `NiStep.input`'s value unchanged (its pattern skips `wout`), `obsInput` likewise. `niRoundLaw …
+wcon wout pid x e c`, write clause `… → gprsA0 eg = usysWriteAnsAt (gprsA2 xg) d ∧ ∃ k ι, c = some (k, ι) ∧
+usysOutAt ι wout`, derived in `niStepOf_law` from `niOutRow` at the answer's count (`uwriteCntOf_ansAt`). §7:
+`NiStep.wout`, `outClass`, `outBytes`, `outInput` (the design's texts), `outBytes_of_law` (stated with
+`s.wout`), `outClass_of_outInput`, `filterMap_of_map_some`, `niOutput`, `niOut_trace`, `niOut`. `niHistLed`;
+`niBelow_pos` takes two histories with one ledger part (`hH : H₁.led = H₂.led`), `cite_eq` / `niTwoRun_trace`
+two histories (`∀ k, (H₁ k).led = (H₂ k).led`), `niTwoRun`/`xv6NiTwoRun`'s `hH : niHistLed F₁ = niHistLed F₂`
+(sanctioned, R3). `xv6NiOut` (the design's statement verbatim) with `#print axioms`. Honest scope 10 rewritten,
+deviation 10 added. Byte-identical: `xv6NiAdequacy`, `xv6NiTwoRunObs`, `xv6NiStrongInstance`, `NiStep.input`'s
+value, `NiInClass`'s meaning (its binder list gained `wout`).
+
+**Baselines.** `tools/tcb/expected.json`: no module set, axiom or opaque moved in any commit; OUT-3 adds
+`Xv6.xv6NiOut`, whose module set is exactly `xv6NiTwoRun`'s (42 files; `UartTrace` enters no cone). Def counts:
+`xv6NiTwoRun` 684 → 688 (`niHistLed`, `UIota.led`, the step's run vocabulary), the other three NI roots +2.
+`tools/audit/baseline.json` + `xv6NiOut` (the same three axioms and three opaques; 11 roots PASS).
+`tools/ci/roots.txt` 10 → 11. `dead_allow.txt`: interim rows added by OUT-1 (`umemByte_writerImg_lazy`) and OUT-2
+(`uwriteOut`, `uwriteCntOf_ansAt`) all removed by OUT-3.
+
+What remains in M3: the no-kill corollary, families, ustep, quotas, private files; OUT-4 (stream ↔ wire) optional;
+G3c optional
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
@@ -4828,6 +4890,8 @@ kalloc nondeterminism comes from".  The considered answer:
   statement through a pure observation on `gmem` at the proc table, which
   gives reachability but no two-run corollary.
 **M3 ORDER (2026-10-05, owner: "go ahead with the proposed order"):** NI-OUT (the console bytes attributed to the incarnation through the filing) → the no-`kill` corollary → process families as partitions → arbitrary low code (`ustep`) → kernel changes (quotas) and the theorem that they close a channel → private files. Power cycles are covered by M2-X's per-era ledgers. Each lane gets a design pass with coordinator rulings before its code lands, as G1–G4 did.
+
+NI-OUT landed; next: the no-kill corollary
 
 - **M3 — extensions**, independent: arbitrary low code (`ustep`, §4);
   process FAMILIES as partitions (pipes and `wait` order become

@@ -28,8 +28,3 @@ decl Xv6.Spin
 #    is reached only when a program proof takes the det arm -- keep it until
 #    one does (claude-notes/projects/noninterference.md, "M2-X design" §3)
 decl Xv6.uexecRetContF_det
-
-# -- NI M3 NI-OUT interim (OUT-2): the step's buffer reading and the count it
-#    is read to; OUT-3 reaches them (niStepOf's `wout`, the law's write clause)
-decl Xv6.uwriteOut                  # OUT-3 reaches
-decl Xv6.uwriteCntOf_ansAt          # OUT-3 reaches

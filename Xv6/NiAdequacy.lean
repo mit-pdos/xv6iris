@@ -45,7 +45,9 @@ are `LinkNiAdequacy` (only a `Link` file may import a `Proof` file).
    (NI joint fork lane F3) fork at every key, (NI M2-G3) sbrk at every
    key (the caller's break rides the step) and (NI M2-G4) the console write
    at a lazy-free key on a writable console descriptor (its readable-prefix
-   reading `wcon` rides the step; the UART bytes are outside, `NiTrace`
+   reading `wcon` rides the step; NI M3 NI-OUT: its UART bytes are
+   attributed by accepted-stream index through the citation -- the console
+   stream is the sixth anchored name, `niOutRow` files the run --, `NiTrace`
    scope 10); every other ecall's enter is free.  The class's meaning grew through `UsysDet.usysDetClass` and
    `UIota` (+ the slot ledger) with every statement here byte-identical.
 2. Origins are honest by W2d's one-shot claims (`niOneShot` in the

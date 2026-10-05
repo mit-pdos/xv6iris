@@ -139,8 +139,9 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
   cannot locate (π gives `upermRw` to a mapped and to a lazily absent page
   alike), so a LAZY console write stays OUT (ruling G4-R3).  Pipe and inode
   writes stay out (other processes' reads; the file system), as does a
-  read-only console descriptor.  The UART bytes are outside the theorem
-  (`NiTrace` scope 10).
+  read-only console descriptor.  (NI M3 NI-OUT) The UART bytes are
+  attributed by accepted-stream index (`UIota.cacc`/`cpos`, `usysOutAt`,
+  the run `uwriteRun` of the key's image; `NiTrace` scope 10).
 
 ## Deviations from Rocq
 

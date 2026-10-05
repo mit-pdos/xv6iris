@@ -14,7 +14,8 @@ booted, `fs.img` on its disk) -- and its pure corollaries over runs.
 * **`xv6NiTwoRun`** (NI M2-X4): two runs, each from such a machine; per
   incarnation, equal inputs (first key, later origins' keys, per-round
   masks, exit contents and cited positions) and EQUAL LEDGER HISTORIES
-  (`niHist F₁ = niHist F₂`), the incarnation's ecalls in the class, give
+  (`niHistLed F₁ = niHistLed F₂`, the ledger part: NI M3 NI-OUT), the
+  incarnation's ecalls in the class, give
   equal enters (getpid's answer is the incarnation's pid, part of `q`;
   uptime's, wait's and -- NI joint fork lane F3 -- fork's are derived from
   the cited ι).
@@ -23,6 +24,11 @@ booted, `fs.img` on its disk) -- and its pure corollaries over runs.
   give equal enters.
 * **`xv6NiStrongInstance`**: in one run, every incarnation's enters before
   its first ecall replay its exits (T's `utRoundQuiet` at the trace).
+* **`xv6NiOut`** (NI M3 NI-OUT): two runs; per incarnation, equal
+  out-inputs (masks, lazy bits, console readings, THE CALLER'S OWN BUFFER
+  RUNS and exits) push equal attributed console runs (`niOutput`: the
+  bytes at each class console write's cited indices of its era's console
+  accepted stream, `NiTrace` §7).
 
 A `Link` file because it consumes `ProofUser` (tools/check_layering.sh).
 
@@ -34,7 +40,9 @@ F3: `NiTrace` scope 8 says what fork's answer is derived from and what the
 histories concede), sbrk at every key (NI M2-G3: `NiTrace` scope 9; the
 caller's break rides the step) and the console write at a lazy-free key on
 a writable console descriptor (NI M2-G4: `NiTrace` scope 10; the caller's
-readable-prefix reading rides the step, the UART bytes are outside); every
+readable-prefix reading rides the step; NI M3 NI-OUT: the UART bytes are
+attributed by accepted-stream index through the citation, `NiTrace` scope
+10, `xv6NiOut`); every
 filing spent a distinct claim minted
 before its enter (`niOneShot`, W2d); the mask and actor are carried per
 filing; uptime's, wait's, fork's and sbrk's answers are derived from the
@@ -72,8 +80,9 @@ the filings their ledgers witness -- each one-shot, each with its citations
 below its canonical histories `niHist F` -- an incarnation `q` whose ecalls
 (in run 1) are in the class, with equal inputs (keys, masks -- NI M2-G1e:
 and each round's key's lazy bit and wait status window --, exits and the
-cited POSITIONS) in the two runs and EQUAL LEDGER HISTORIES, has equal
-enters. -/
+cited POSITIONS) in the two runs and EQUAL LEDGER HISTORIES (NI M3 NI-OUT,
+ruling OUT-R3: the ledger part `niHistLed`, never the console stream), has
+equal enters. -/
 theorem xv6NiTwoRun {hlc : HasLC}
     (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
     (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
@@ -84,7 +93,7 @@ theorem xv6NiTwoRun {hlc : HasLC}
       niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ ∀ q : NiInc,
       NiInClass (utrace q κs₁ F₁) →
       (utrace q κs₁ F₁).map NiStep.input = (utrace q κs₂ F₂).map NiStep.input →
-      niHist F₁ = niHist F₂ →
+      niHistLed F₁ = niHistLed F₂ →
       (utrace q κs₁ F₁).map NiStep.output = (utrace q κs₂ F₂).map NiStep.output := by
   obtain ⟨-, F₁, hF₁, h1₁, hC₁, -⟩ := xv6NiAdequacy (hlc := hlc) g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
   obtain ⟨-, F₂, hF₂, h1₂, hC₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
@@ -113,6 +122,29 @@ theorem xv6NiTwoRunObs {hlc : HasLC}
   obtain ⟨-, F₂, hF₂, h1₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
   exact ⟨F₁, F₂, hF₁, h1₁, hF₂, h1₂, fun q hc hin hrd => niTwoRunObs hF₁ hF₂ q hc hin hrd⟩
 
+/-- **THE CONSOLE BYTES ARE A FUNCTION OF THE CALLER'S INPUTS** (NI M3
+NI-OUT, ruling OUT-R5): two runs from booting machines; at the one-shot
+filings their ledgers witness, each with its citations below its canonical
+histories, an incarnation `q` whose two traces agree on their OUT-INPUTS
+(per round: the mask, the lazy bit, the console reading, the caller's own
+buffer run and the exit's content) pushes equal attributed console runs --
+the bytes each of its class console writes put at its cited indices of its
+era's console accepted stream.  No histories, no positions, no class
+hypothesis. -/
+theorem xv6NiOut {hlc : HasLC}
+    (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
+    (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
+    (n₁ n₂ : Nat) (κs₁ κs₂ : List Obs) (t₁ t₂ : List Expr) (g₁' g₂' : GState)
+    (hsteps₁ : ([Expr.power], g₁) -<κs₁>->ₜₚ^[n₁] (t₁, g₁'))
+    (hsteps₂ : ([Expr.power], g₂) -<κs₂>->ₜₚ^[n₂] (t₂, g₂')) :
+    ∃ F₁ F₂, niOk κs₁ F₁ ∧ niOneShot κs₁ F₁ ∧ niChain F₁ (niHist F₁) ∧
+      niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ ∀ q : NiInc,
+      (utrace q κs₁ F₁).map NiStep.outInput = (utrace q κs₂ F₂).map NiStep.outInput →
+      niOutput q κs₁ F₁ = niOutput q κs₂ F₂ := by
+  obtain ⟨-, F₁, hF₁, h1₁, hC₁, -⟩ := xv6NiAdequacy (hlc := hlc) g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
+  obtain ⟨-, F₂, hF₂, h1₂, hC₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
+  exact ⟨F₁, F₂, hF₁, h1₁, hC₁, hF₂, h1₂, hC₂, fun q hin => niOut hF₁ hF₂ q hin⟩
+
 /-- **THE STRONG INSTANCE**: in a run from a booting machine, at the filing
 its ledger witnesses, every incarnation's steps before its first ecall
 replay their exits (`NiTrace.niStrongInstance`; T's
@@ -131,3 +163,4 @@ end Xv6
 #print axioms Xv6.xv6NiTwoRun
 #print axioms Xv6.xv6NiTwoRunObs
 #print axioms Xv6.xv6NiStrongInstance
+#print axioms Xv6.xv6NiOut
