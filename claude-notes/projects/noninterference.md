@@ -7650,6 +7650,8 @@ kalloc nondeterminism comes from".  The considered answer:
   equals `M`).  Fallback if the hart-arm cost is refused: a final-state
   statement through a pure observation on `gmem` at the proc table, which
   gives reachability but no two-run corollary.
+**BRANCHES (2026-10-05, owner: "branch the lean branch into lean-quota at the point xv6 split into verified-quota"):** `lean` stays the proof of UPSTREAM xv6 (`b72cbac1`, the tip of `verified`/`chroot`) and ends at aef7dd5e8 (the quotas design and rulings notes; `origin/lean` is there). `lean-quota` branches from it at Q-0 (f755c293f) and is the proof of the quota kernel `verified-quota` c1fd3cc7; everything from Q-0 on (Q-0..Q-3, private files FS-L..) lives there, and the NI campaign continues on `lean-quota`. The two trees differ in the image dumps, the five reshaped kernel functions, the credits (Q-1), the sbrk/fork rows (Q-2) and the roots `xv6NiDetQ` and later; an upstream bump is taken on `lean` first and then rebased onto `lean-quota` with the one kernel commit (Q-0's playbook §2a).
+
 **M3 ORDER (2026-10-05, owner: "go ahead with the proposed order"):** NI-OUT (the console bytes attributed to the incarnation through the filing) → the no-`kill` corollary → process families as partitions → arbitrary low code (`ustep`) → kernel changes (quotas) and the theorem that they close a channel → private files. Power cycles are covered by M2-X's per-era ledgers. Each lane gets a design pass with coordinator rulings before its code lands, as G1–G4 did.
 
 NI-OUT landed; next: the no-kill corollary
