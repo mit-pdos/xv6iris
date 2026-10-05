@@ -4491,6 +4491,303 @@ value, `NiInClass`'s meaning (its binder list gained `wout`).
 What remains in M3: the no-kill corollary, families, ustep, quotas, private files; OUT-4 (stream ↔ wire) optional;
 G3c optional
 
+### M3 no-kill design (2026-10-05)
+
+Design pass on `lane/nokill` (based on `lean` 332223d1d, NI-OUT landed). No code landed. The shapes below were read
+off the tree (`SpecKkill`/`ProofKkill`, `SpecSysKill`, `SpecSetkilled`, `SpecKilled`, `KillRow`, `ChildTok`,
+`UsertrapParts`/`UsertrapSys`/`UsertrapTailA6`/`UsertrapSysTail`, `SpecKexit`/`ProofKexit`, `ZombEv`, `PidEv`,
+`PidLock`, `SlotLed`, `SpecSysPause`, `SpecConsoleread`, `SpecPiperead`/`SpecPipewrite`, `UserChildren`,
+`UexecRet.uexecLiveOk`, `UsysMemOk`, `UsysDet`, `SyscallArmsProc`, `NiEvid`, `NiLedger`, `NiTrace`,
+`LinkNiAdequacy`) and the C (`proc.c` `kkill`/`setkilled`/`killed`/`freeproc`/`allocproc`, `trap.c`, `sysproc.c`,
+`console.c`, `pipe.c`, and every `sleep()` site). They are not shape-checked in Lean. The rulings K-R1…R6 at the end
+are needed before a lane starts.
+
+**Short version.**
+- **In a safety-only theorem the kill is a TRUNCATION, and nothing more reaches the victim.** The flag is monotone
+  while the incarnation lives, and usertrap reads it at +0x90 (before `syscall()`), at +0xa6 (after it) and at
+  +0xea (the device arm). So every round that saw the flag, or whose kernel work overlapped the store, dies in
+  `kexit(-1)` and is never filed. No resumed round has an answer that depends on the flag: the "(c) rows" of
+  sub-question 4 are EMPTY (F4). A killed incarnation's trace is a prefix of what it would have been.
+- **"Nobody killed q" buys nothing in this framework (F2, F5).** The death is not in `h`: a killed q's last event
+  is a `uExit` with no `uEnter`, exactly like a q that is blocked, descheduled, or still in its round when `h`
+  ends. In the family ledger a kill-death is `ZExit act pid (-1) ip` with `act` = the DYING process, the same
+  event as `exit(-1)` and as a fault death. A no-kill hypothesis therefore cannot strengthen a prefix-closed
+  conclusion, and the death cannot be cited by a filing (filings are per ENTER; the death has none).
+- **The honest corollary is the PREFIX form of the two-run theorem (K3, the cheapest lane, pure).**
+  `xv6NiPrefix`: if q's inputs in run 1 are a PREFIX of its inputs in run 2 and run 1's ledger histories are
+  below run 2's, then q's enters in run 1 are a prefix of its enters in run 2. A kill (or any other truncation)
+  can only cut q's trace; it never changes a step q took. It strictly generalises `xv6NiTwoRun` (equal inputs and
+  equal histories are the two-sided case), and it needs no kill vocabulary at all. Without kill events, a killed
+  run cut at q's last enter has histories below any run that agrees with its past: the kill leaves no ledger
+  trace until q's own `ZExit`, which comes after q's last enter.
+- **The other directions reach observers only through `H`, which `hH` already concedes (F3).** HIGH kills LOW:
+  LOW cannot observe its own death. LOW's parent sees `ZExit … (-1)` in `H.zev` (indistinguishable from
+  `exit(-1)`). Every later effect (the reap's `PFree`, the slot's `SVac`, the freed pages' `KFree`s) is an `H`
+  event. LOW kills HIGH: an integrity violation by xv6's design (no permission check). The prefix corollary says
+  that violation is availability-only (HIGH's completed steps are unaffected). Attribution (naming the killer)
+  cannot reach the victim's export, because the death is unfiled.
+- **Two cheap class extensions fall out, and one expensive one.**
+  - K1, `pause` joins the class at answer 0: sys_pause returns −1 ONLY when killed, so a resumed pause returned 0.
+    This is consoleread's T2 / `UtReadWhy` route.
+  - K2, `kill` joins the class: the KILLER's answer, 0 iff some slot held the pid at its scan visit. This is a
+    64-instant property (JF F4 again), so it needs an inv-held ledger with a window event. It is joint-fork-lane
+    sized. Recommended deferred to the families lane, where the kill event has a consumer (the cross-partition
+    flow).
+- **Lanes:** K3 (the prefix corollary + honest scope 11, pure; the twelfth root) → K1 (pause) → K2 (kill as a
+  cited event; deferred). K2's attribution of the DEATH (a killer field on `ZExit`) is NOT recommended (F6).
+
+**Findings.**
+- **F1 (what kkill holds, and where a kill ledger could live: sub-question 1).**
+  - `kkill(pid)` refuses 0, then visits the 64 slots holding ONE `p->lock` at a time. At a match it stores
+    `p->killed = 1` (`KillRow.killPaid_kill`: the credential `□ killCred` re-closes the row, firing the
+    generation's one-shot `killRow_fire`; a second kill finds the shot already fired), wakes a SLEEPING target
+    (`state := RUNNABLE`), and returns 0. Otherwise it returns −1.
+  - No lock covers the scan. The pid ledger is `pid_lock`'s payload (`PidLock.pidLedger`), the family ledger is
+    `wait_lock`'s, and kkill holds neither. So **`sys_kill`'s answer is NOT `liveOf ι.pev` at any cited prefix**:
+    allocations and frees interleave with the scan. A 0 has a one-instant witness (slot j held the pid at its
+    visit). A −1 is "no slot held the pid at ITS visit", a property of 64 instants, exactly allocproc's `SFull`
+    (joint fork lane F4).
+  - The only ledger shape that can carry it is the slot ledger's: an Iris invariant (`slotLedInv`, namespace
+    `slotN`) with a per-slot column element in each `p->lock` payload. That is ONE invariant that every visit
+    can open.
+  - The column needs the occupant's PID, not just the occupancy bit. Under `p->lock` a slot is either UNUSED with
+    pid 0 or occupied with a fixed nonzero pid (allocproc's `allocpid; state = USED` and freeproc's `pid = 0 …
+    state = UNUSED` both run inside the caller's `p->lock` hold, so no visit sees the gap). So `SOcc j` can carry
+    the pid (`SOcc j p`), and the column's value becomes `Option (BitVec 32)`.
+  - The kill events: `SKill act j p` (the flag store, under the target's `p->lock`, opening `slotLedInv`) and
+    `SKillMiss act k0 p` (the exhausted scan, with `sevWf`'s window: every slot's visit read a column value
+    `≠ some p` inside `[k0, |h|)`).
+  - **A seventh anchored name is NOT needed if the events go into the slot ledger** (already registered, the
+    fifth name). The cost: fork's cited slot POSITIONS then count kill events and pid-carrying occupancies. That
+    is schedule, already conceded (scope 8); it is no new content. A separate kill ledger (seventh name, a new
+    `UIota.kil` field, `niIotaLbs`/`niBelow`/`niJoin` + a conjunct, OUT-2's plumbing again) keeps fork's
+    positions as they are, at roughly the OUT-2 surface (K-R3).
+- **F2 (the killed side cannot cite its killer in the NI export: sub-questions 1, 2).**
+  - `killShot γ = ∃ gk, genShotn γ gk ∗ shotDone gk` is an agreement on the UNIT `ShotVal.shot` (camera
+    `KshotR`, xv6GF slot 67, SHARED with the pipes' `roPending`/`roDone`, `PipeProto` deviation 2). It records
+    THAT the flag was set, not who set it or when. Making it carry the killer would need a new camera, or a
+    persistent receipt in `killRow`'s nonzero arm (`killWhy gn`, readable at +0xa6 through `wp_killed_r`'s
+    `Rout`). The second is feasible: `killRow`'s paid arm and `killRow_shot`/`_shot_nz`/`_take` move; `kkill`,
+    `setkilled` (both sides) and every `killPaidAt` builder move with them.
+  - **But nothing would consume it.** The dying round's last event is a `uExit` whose round never resumes, so it
+    has no `uEnter` and no filing (`niR_enter` files enters; exits are blind, `niR_snoc`). A
+    `killedBy : Option (Nat × UIota)` field "on the incarnation's final filed step" would sit on the last
+    RESUMED round, which is by F4 never a kill round. The law "the last filed step is a kill-exit iff a kill is
+    cited" is therefore unreachable: the kill-exit is never a filed step.
+  - The only place a death is recorded is the family ledger's `ZExit act pid xs ip`, appended by kexit under
+    `wait_lock` with `act` = the dying process (`ProofKexit`: `ZExit (procAddr j) pid (xstateOf status) ip`).
+    usertrap's kill path calls `kexit(-1)`, `sys_exit` calls `kexit(status)`. **A kill-death, a fault-death
+    (`setkilled` self, then the same `kexit(-1)`) and `exit(-1)` are the SAME event.** Only a kill ledger (F1)
+    distinguishes a kill, and only for the KILLER's view.
+  - Putting the cause on `ZExit` (`ZExit act pid xs ip why`) would let the PARENT's wait cite "my child was
+    killed". It would need a cross-ledger tie (`why`'s position in the kill ledger, appended under a different
+    lock/invariant), which no pure fold can check. And it makes `H.zev` finer, so `xv6NiTwoRun`'s `hH` gets
+    STRONGER and the theorem weaker. Not recommended (F6).
+- **F3 (the two directions: sub-question 3).**
+  - *Integrity (LOW kills HIGH).* xv6 has no permission check, so integrity NI is false by design. The flow is
+    availability only, and K3 says exactly that: HIGH's trace in the killed run is a prefix of its trace in a run
+    that agrees on its past. With K2, LOW's kill is an actor-labelled event (`SKill act j p`) in `H` whenever
+    LOW's kill round is filed: attributed, as an audit fact, not prevented. Preventing it is the M3
+    kernel-changes item (a `kill` permission check, §3's "quotas … a `kill` permission check").
+  - *Secrecy (HIGH kills LOW).* LOW's own trace only stops; it observes nothing. Other low observers read the
+    death through ledgers only:
+    - the parent's wait: `ZExit … (-1)` in `H.zev`;
+    - fork's `pidPick` after the reap's `PFree` (`H.pev`);
+    - the slot timeline's `SVac` (`H.sev`);
+    - the dying process's `KFree`s (`H.kev`);
+    - with K2, a `kill(pid)` probe answering −1 (`SKillMiss`, `H.sev`).
+
+    Every one is an `H` event, which `hH : niHistLed F₁ = niHistLed F₂` assumes equal. **So the existing two-run
+    theorem is already honest about the secrecy direction**: the flow is a difference in `H`, which it
+    concedes. Kill-as-event (K2) makes the KILLER's own answer honest (derived, not unconstrained) and labels the
+    cause in `H`. It declassifies, per kill round, the pid occupancy at the scan's visits (the slot timeline with
+    pids, as fork's `SFull` declassifies occupancy) and the kill's position in the ledger order (the same honesty
+    as allocation).
+- **F4 (every row the flag changes: sub-question 4).** Monotone flag + the +0x90/+0xa6/+0xea checks ⇒ no resumed
+  round's answer depends on the flag. Row by row:
+
+| Row (C site) | What the flag does | Lean today | Category |
+|---|---|---|---|
+| usertrap +0x90, before `syscall()` | `killed` → `kexit(-1)`; the syscall never runs | `UsertrapSys.ut90_head` | (a) never resumes |
+| usertrap +0xa6, after `syscall()` | `killed` → `kexit(-1)` | `UsertrapTailA6`, reading form `utKillRead`/`ut_kill_lend` | (a) never resumes: the refutation every kill disjunct uses |
+| usertrap +0xea, device arm (timer/device interrupt round) | `killed` → `kexit(-1)` | `UsertrapArms` `UT_EA` | (a) never resumes (a killed q's trace can end at an INTERRUPT exit) |
+| usertrap +0x56 unexpected scause; vmfault failure (falls into it) | `setkilled(p)` (self, `killOwed ∗ takenAt`) then +0xa6 | `UsertrapArms56`, `SpecSetkilled` `self = true` | (a) never resumes (the fault death; same `ZExit … (-1)`) |
+| `kwait`: `if (!havekids \|\| killed(p)) return -1` | −1 | `waitWhyLed`'s kill reason (`d = 0`), `syscEvOut`'s F5 disjunct (`cs' = cs`, image kept, G1e), refuted at `ut_evOut_of` | (a), in the class with a kill disjunct that never resumes |
+| `sys_pause`: `if (killed) return -1` in the tick loop | −1 (its ONLY −1: `n < 0` is clamped to 0) | `SYSPAUSE` post `0 ∨ −1`, no reason relayed; out of the class | (b) today; **(a) after K1** (pause joins at answer 0) |
+| `consoleread`: `if (killed) return -1` in the wait loop | −1 | post `⌜r = -1⌝ -∗ killShot V.gen` (T2), refuted at resume via `UtReadWhy` (`uexecLiveOk`'s read clause) | (a), refuted already; read is out of the NI class (input) |
+| `piperead` (empty pipe, writer open) | −1 | reason `killShot V.gen ∗ □ killCred` relayed | (b) out of the class, (a) semantics, reason already relayed for a future pipe lane |
+| `pipewrite` (`readopen == 0 \|\| killed`) | −1 | reason relayed (`killShot ∗ □ killCred`) | (b) as piperead; a resumed −1 is `readopen == 0` or a copyin failure, never the kill |
+| kkill's wakeup at sleeplock / log `begin_op`·`end_op` / `uartwrite` / virtio (`sleep()` loops that do not read `killed`) | a spurious wakeup: the loop re-tests its condition and sleeps again | nothing to state | no row: no answer changes; the round dies at +0xa6 if the flag is set |
+| `sys_kill`'s own answer (0/−1) | depends on the PID OCCUPANCY at the scan's visits, not on any flag | `SYSKILL` post `0 ∨ −1`; out of the class | (b) today; K2 makes it a cited event |
+| `freeproc`: `p->killed = 0` | resets the flag of a DEAD slot (under `p->lock`, UNUSED next) | `killFree` arm | not a row (no incarnation is live there) |
+
+  **Category (c) — a resumed round whose answer depends on the flag — is EMPTY.** That is the precise sense in
+  which the kill channel is a truncation channel.
+- **F5 (the pure corollary on the existing theorems: sub-question 5).**
+  - `niNoKill q h F` cannot be stated. The filing records no kill fact, and every filed round is a non-kill round
+    by F4, unconditionally. So "no filed round of q is a kill-arm round" is TRUE OF EVERY RUN, and as a
+    hypothesis it adds nothing.
+  - What the existing roots lack is the TWO-RUN statement at UNEQUAL lengths. `niTwoRun_trace` is a step-wise
+    induction whose hypotheses (`NiClassLaw`, `niTraceChain`, `NiInClass`) are all `∀ s ∈ tr`, so they are
+    closed under `List.take`. The prefix form follows in ~40 lines:
+    - instantiate at `tr₂.take tr₁.length`;
+    - lift run 1's chain to a history whose ledger part is run 2's: `H' k := { H₂ k with cacc := (H₁ k).cacc }`,
+      `niBelow_trans` on the ledger part, the console part from `H₁`; `(H' k).led = (H₂ k).led` because `.led`
+      erases `cacc`/`cpos`.
+  - This is the honest "no-kill corollary": it says that a kill cannot change anything but WHERE q's trace stops,
+    and it needs no kill vocabulary. Recommended (K3).
+- **F6 (what is NOT worth it).**
+  - The killer's identity on the DEATH (F2): unreachable in the export (unfiled), it would weaken `xv6NiTwoRun`
+    through a finer `H.zev`, and it needs a cross-ledger tie.
+  - A no-kill HYPOTHESIS on any root (F5): vacuous in safety.
+  - A liveness reading ("if nobody kills q, q's trace continues"): out of the framework (adequacy gives
+    invariants over prefixes), and false anyway under an unfair scheduler.
+
+**Proposed definitions (verbatim; K3).**
+
+    -- Xv6/NiTrace.lean, new §8 (NI M3 no-kill K3): THE PREFIX FORM
+    /-- Run 1's ledger histories are below run 2's, per era (the ledger part: the console stream is not compared,
+    ruling OUT-R3). -/
+    def niHistLe (H₁ H₂ : Nat → UIota) : Prop := ∀ k, niBelow (H₁ k).led (H₂ k).led
+
+    /-- **`niTwoRunPrefix`, the trace form**: a lawful trace whose inputs are a PREFIX of another's, whose
+    citations are below a history that is below the other's, the first's ecalls in the class: its outputs are a
+    prefix of the other's.  A truncation (a kill, a power cut, a schedule that never resumes q) cuts the trace and
+    changes no step. -/
+    theorem niTwoRunPrefix_trace (q : NiInc) (H₁ H₂ : Nat → UIota) (hH : niHistLe H₁ H₂)
+        (tr₁ tr₂ : List NiStep) (h₁ : NiClassLaw q tr₁) (h₂ : NiClassLaw q tr₂) (hc : NiInClass tr₁)
+        (hC₁ : niTraceChain H₁ tr₁) (hC₂ : niTraceChain H₂ tr₂)
+        (hin : tr₁.map NiStep.input <+: tr₂.map NiStep.input) :
+        tr₁.map NiStep.output <+: tr₂.map NiStep.output
+
+    theorem niTwoRunPrefix {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk h₁ F₁)
+        (hC₁ : niChain F₁ (niHist F₁)) (hF₂ : niOk h₂ F₂) (hC₂ : niChain F₂ (niHist F₂)) (q : NiInc)
+        (hcls : NiInClass (utrace q h₁ F₁))
+        (hin : (utrace q h₁ F₁).map NiStep.input <+: (utrace q h₂ F₂).map NiStep.input)
+        (hH : ∀ k, niBelow (niHistLed F₁ k) (niHistLed F₂ k)) :
+        (utrace q h₁ F₁).map NiStep.output <+: (utrace q h₂ F₂).map NiStep.output
+
+    -- Xv6/LinkNiAdequacy.lean: THE TWELFTH ROOT (the no-kill corollary)
+    theorem xv6NiPrefix {hlc : HasLC}
+        (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
+        (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
+        (n₁ n₂ : Nat) (κs₁ κs₂ : List Obs) (t₁ t₂ : List Expr) (g₁' g₂' : GState)
+        (hsteps₁ : ([Expr.power], g₁) -<κs₁>->ₜₚ^[n₁] (t₁, g₁'))
+        (hsteps₂ : ([Expr.power], g₂) -<κs₂>->ₜₚ^[n₂] (t₂, g₂')) :
+        ∃ F₁ F₂, niOk κs₁ F₁ ∧ niOneShot κs₁ F₁ ∧ niChain F₁ (niHist F₁) ∧
+          niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ ∀ q : NiInc,
+          NiInClass (utrace q κs₁ F₁) →
+          (utrace q κs₁ F₁).map NiStep.input <+: (utrace q κs₂ F₂).map NiStep.input →
+          (∀ k, niBelow (niHistLed F₁ k) (niHistLed F₂ k)) →
+          (utrace q κs₁ F₁).map NiStep.output <+: (utrace q κs₂ F₂).map NiStep.output
+
+`xv6NiTwoRun` stays byte-identical. It is the two-sided instance (equal lists are mutual prefixes; equal
+histories are below each other, `niBelow_refl`), but re-deriving it is not proposed, because its proof is already
+3 lines.
+
+**Proposed definitions (K1, pause).**
+
+    -- Xv6/UsysMemOk.lean
+    def USYS_pause : Int := 13
+    -- Xv6/UexecRet.lean: uexecLiveOk gains a third clause (what a resume proves by its survival)
+      ∧ (n = USYS_pause → r = 0#64)
+    -- Xv6/UsertrapParts.lean: the reason, a hypothesis like UtReadWhy, discharged at the instance
+    def UtPauseWhy : Prop :=
+      ∀ (X : Uvis → IProp GF) (f : sfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
+        (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
+        r ≠ 0#64 → spostAt X USYS_pause f W r M' fdv' cw' cs' ⊢
+          □ killShot W.gen ∗ spostAt X USYS_pause f W r M' fdv' cw' cs'
+    -- Xv6/SpecSysPause.lean: the post's answer gains its reason (consoleread T2's shape)
+      ⌜calleeSaved k.regs R' ∧ (R' 10#5 = 0#64 ∨ R' 10#5 = -1#64)⌝ -∗ (⌜R' 10#5 = -1#64⌝ -∗ killShot gn) -∗ …
+    -- Xv6/UsysDet.lean
+    def usysDetQuiet (n : Int) : Prop := n = USYS_getpid ∨ n = USYS_uptime ∨ n = USYS_write ∨ n = USYS_pause
+    -- usysDetRet: `else if n = USYS_pause then 0#64`; usysDetClass + `n = USYS_pause`
+    -- Xv6/NiTrace.lean, niRoundLaw: one clause beside getpid's
+      (gprsNum secc xg = USYS_pause → gprsA0 eg = 0#64) ∧
+
+**Proposed definitions (K2, kill as a cited event; sketch for the ruling, not for this lane's start).**
+
+    -- Xv6/SlotEv.lean (if K-R3 = the slot ledger)
+    | SOcc (j : Nat) (pid : BitVec 32)                 -- allocproc's USED store, the pid allocpid stored
+    | SKill (act : BitVec 64) (j : Nat) (pid : BitVec 32)   -- kkill's flag store at slot j (the kill event)
+    | SKillMiss (act : BitVec 64) (k0 : Nat) (pid : BitVec 32)  -- kkill's exhausted scan, window from k0
+    def pidColOf (h : List Sev) (k : Nat) : Option (BitVec 32)   -- the occupant's pid; occOf h k = (pidColOf h k).isSome
+    -- sevWf: an SKillMiss act k0 p at |h| has, per slot i < NPROC, a position in [k0, |h|) where pidColOf ≠ some p
+    -- Xv6/UsysMemOk.lean
+    def USYS_kill : Int := 6
+    -- Xv6/UsysDet.lean: the killer's answer is read off the cited slot prefix
+    def usysKillAns (a0 : BitVec 64) (ι : UIota) : BitVec 64 :=
+      if ∃ k0, ι.sev.getLast? = some (.SKillMiss ι.act k0 (usysKillPid a0)) then -1#64 else 0#64
+    -- Xv6/SyscallDefs.lean, syscEvRow: the kernel's positive reason (JF-R5's shape)
+      (syscNum V = USYS_kill → (syscA0 V' = 0#64 → ∃ hs j, ι.sev = hs ++ [.SKill ι.act j (usysKillPid …)]) ∧
+                               (syscA0 V' = -1#64 → ∃ hs k0, ι.sev = hs ++ [.SKillMiss ι.act k0 (usysKillPid …)]))
+
+`usysKillPid a0` is `argint`'s 32-bit read of word 0. `kkill(0)`'s −1 is the key's (no citation, boot prefix).
+
+**The route table.**
+
+| What | Producer | Carrier | Consumer | Moves |
+|---|---|---|---|---|
+| truncation-only (K3) | none (pure) | `utrace` at two runs | `niTwoRunPrefix`, `xv6NiPrefix` | NiTrace §8 (new), LinkNiAdequacy (new root); every existing statement byte-identical |
+| pause's −1 reason (K1) | `ProofSysPause` (`wp_killed_r` with the block's lent pid quarter and registration eighth, consoleread's T2) | `SYSPAUSE` post → `spostAt` (`UtPauseWhy` at the instance) | usertrap's zero flag (`ut_kill_lend`) → `utLiveOut` / `uexecLiveOk`'s pause clause → `urc_exit` | `SYSPAUSE` text (pre lends the block's rows, post the reason), `uexecLiveOk` (+1 clause, 8 files call it; `uexecLiveOk_ne` +1 hyp), `UsysDet` (quiet/class/Ret), `niRoundLaw` (+1 clause) |
+| the kill events (K2) | `ProofKkill` (scan accumulator `killScan n`, as `slotScan`; `SKill` at the flag store, `SKillMiss` at exhaustion) | `SYSKILL` led post (`∃ h, slotLedLb h ∗ ⌜…⌝`) → `syscall_arm_kill` cites `{boot with sev := h, act}` → `syscEvOut`'s second disjunct (the route is unchanged) | `syscEvRow`'s kill clause → `niFitEv` → law's kill clause `gprsA0 eg = usysKillAns (gprsA0 xg) ι` | `SlotEv`/`SlotLed` (`SOcc` + pid, column `Option (BitVec 32)`, `sevWf`), `pstateLock`'s element (at the occupant's pid), `ProofAllocproc`/`ProofFreeproc` (the pid at `SOcc`), `KKILL`/`SYSKILL` texts, `syscEvRow`, `UsysDet`, `NiTrace` law, fork's slot readings (`occOf` via `.isSome`) |
+| the killer on the death | — | — | — | NOT proposed (F2/F6) |
+
+**§Lanes.**
+
+| Lane | Content | Files | Moved statements | Byte-identical | Gate | Estimate | TCB |
+|---|---|---|---|---|---|---|---|
+| **K3** (first; the corollary proper) | `niHistLe`, `niTwoRunPrefix_trace`, `niTwoRunPrefix`, the root `xv6NiPrefix`; honest scope 11 "the kill channel" in NiTrace's header (F4's table in short; the "(c) is empty" fact; the death is unfiled and `ZExit … (-1)` is exit(-1)'s event; the secrecy direction through `H`); scopes 9/10's "untouched" sentences point at scope 11 | `NiTrace`, `LinkNiAdequacy`; `tools/ci/roots.txt` 11 → 12, `tools/audit/baseline.json` + `xv6NiPrefix`, `tools/tcb/expected.json` + `Xv6.xv6NiPrefix` | none | all eleven roots, every kernel and NI statement | build + lint + audit (12 roots PASS) | ~120 lines Lean, ½ day | `xv6NiPrefix`'s module set = `xv6NiTwoRun`'s (42 files); def count `xv6NiTwoRun`'s + 1 (`niHistLe`); same three axioms, three opaques |
+| **K1** (pause joins the class) | the reason relayed (F4 row), `uexecLiveOk`'s pause clause, `UtPauseWhy` + its discharge (`UtReadWhyXv6.utReadWhy_xv6`'s sibling), pause in `usysDetQuiet`/`usysDetClass`/`usysDetRet`, the law's clause | `SpecSysPause`/`ProofSysPause`, `SyscallArmsProc` (`syscall_arm_pause`), `UexecRet`, `UsertrapParts` (+ the seal's discharge), `UsertrapSysLive`, `UsysMemOk`, `UsysDet`, `NiTrace` | `SYSPAUSE`, `uexecLiveOk`, `usysDetQuiet`/`Class`/`Ret` (definitions), `niRoundLaw` (one clause), honest scope 1 (the class) | `SYSCALL`, `USERTRAP`, `syscEvOut`, `utEvOut`, `NiEntry`, `NiStep`, the roots' statements | build + lint + audit | ~400–600 lines, 1 commit | no module set moves (all in the cone); def counts +0/+1 |
+| **K2** (kill as a cited event; DEFERRED, K-R2) | K2a the slot ledger with pids and the two kill events (`sevWf` windows), allocproc/freeproc; K2b `kkill`'s scan accumulator and the led `KKILL`/`SYSKILL`; K2c `syscEvRow`'s kill clause, `usysKillAns`, the class + kill, the law | `SlotEv`, `SlotLed`, `SchedCtx` (`pstateLock`'s element), `ProofAllocproc`, `ProofFreeproc`, `SpecKkill`/`ProofKkill`, `SpecSysKill`/`ProofSysKill`, `SyscallArmsProc`, `SyscallDefs`, `UsysDet`, `NiTrace` | `KKILL`, `SYSKILL`, the slot ledger's vocabulary and column, `syscEvRow`, the class | `SYSCALL`, `USERTRAP`, `NiEntry`, `uEvid`, the anchor (slot ledger route) | build + lint + audit | joint fork lane F1–F3 scale: ~2500–3500 lines, 3 commits | `SlotEv`/`SlotLed` are already in the cone; no new name (K-R3 = slot ledger) |
+
+**RULINGS REQUESTED.**
+- **K-R1 (what "the no-kill corollary" is).**
+  - Recommended: the PREFIX form (`xv6NiPrefix`, K3). Truncation-only is the strongest honest statement in a
+    safety framework. It needs no kill hypothesis (F5: "nobody killed q" is vacuous over prefixes), and it
+    strictly generalises `xv6NiTwoRun`.
+  - Alternative: a kill-hypothesis root over a kill ledger (`no SKill _ _ pid_q` in `H`). It needs K2 first and
+    concludes nothing beyond the prefix form.
+  - Cheapest: no root, honest scope 11 only (a header paragraph recording F4: the (c) rows are empty and the kill
+    is a truncation). Zero Lean.
+- **K-R2 (kill as a cited event, `sys_kill` in the class).**
+  - Recommended: DEFER K2 to the families-as-partitions lane. There the kill event has a consumer (the
+    cross-partition flow, which a partition-level statement must attribute or forbid) and the killer's answer
+    joins the class as a declassified probe of the pid occupancy. Until then `kill` stays outside the class
+    (`xv6NiTwoRun` already assumes q's ecalls are all in the class, so q calling kill is covered by "outside").
+  - Alternative: K2 now (joint-fork-lane scale). Do it if the owner wants q to be allowed to call kill before
+    families.
+- **K-R3 (if K2: where the kill events live).**
+  - Recommended: the SLOT ledger (`SOcc j pid`, `SKill`, `SKillMiss`). It is already an inv-held, registered,
+    windowed ledger whose column is in the lock payload kkill holds, so there is no seventh name. Fork's slot
+    positions then count kill events (schedule; scope 8's concession, no new content).
+  - Alternative: a separate kill ledger as the seventh anchored name. Fork's positions are unchanged, at OUT-2's
+    plumbing again (a `UIota` field, `niIotaLbs`/`niBelow`/`niJoin` conjuncts, the anchor list).
+- **K-R4 (the killed side's receipt).**
+  - Recommended: NO. Neither `killShot` nor `killRow` gains the killer, and `ZExit` gains no cause. The death is
+    unfiled (F2), so nothing in the export reads it. A cause on `ZExit` makes `H.zev` finer (it weakens
+    `xv6NiTwoRun`) and needs a cross-ledger tie.
+  - Alternative: `killWhy gn` in `killRow`'s nonzero arm (persistent, no new camera; `KshotR` is shared with the
+    pipes and stays) and a `why` field on `ZExit`, for an audit lemma "every kill-death of a cited family prefix
+    has its `SKill`". Cheapest form of the alternative: record in scope 11 that a kill-death, a fault-death and
+    `exit(-1)` are one family event.
+- **K-R5 (K1: pause in the class).**
+  - Recommended: yes, K1 after K3. sys_pause's only −1 is the kill (`n < 0` is clamped), so a resumed pause
+    answered 0. The reason route is consoleread's landed T2/`UtReadWhy` route. The elapsed ticks are schedule and
+    are not exported (no citation; uptime already exports the tick order).
+  - Alternative: also cite the tick count at return (`ι.ticks ≥ t0 + n`). That needs the start count, a second
+    `tickLb` and a two-point citation. Not worth it.
+  - Cheapest: leave pause outside and record it as an (a)-row-to-be in scope 11.
+- **K-R6 (the root's histories hypothesis).**
+  - Recommended: `∀ k, niBelow (niHistLed F₁ k) (niHistLed F₂ k)` (run 1's ledger part below run 2's, per era).
+    It compares ledger parts only (OUT-R3), and it holds when run 1 is a killed run cut at q's last enter and
+    run 2 agrees with its past. Without K2 the kill leaves no ledger event before q's own `ZExit`.
+  - Alternative: equal histories (as `xv6NiTwoRun`). That cannot compare a killed run with an unkilled one,
+    whose histories diverge after the kill.
+  - Note: with K2 the kill event `SKill … pid_q` can enter run 1's `H` before q's last enter, when the killer's
+    round is filed first. So the victim's prefix corollary needs run 1 cut earlier. This is the one place where
+    kill-as-event COSTS the victim (F3).
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
