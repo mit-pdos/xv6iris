@@ -176,7 +176,7 @@ def sysOpenCreateK (k' : KCtx) (se : Bool) (pj : BitVec 64) (plen : Nat) (pfun :
      else
       iprop(⌜R' 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
         creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat minor.toNat Nm Nd P Pmiss
-          Farm Fdots Fun Fok Fex (bview plen pfun))) -∗
+          Farm Fdots Fun Fok Fex (bview plen pfun) pj)) -∗
     wpLoop c)
 
 set_option maxHeartbeats 16000000 in
@@ -271,7 +271,7 @@ theorem sys_open_ec_fail (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCt
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     logOp icfgLog u ∗ bslots 3 ∗ irefSlots A.ns ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
     creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti T_FILE_w.toNat 0 0 (nparNm (sysOpenIm A) A.v.toNat) (fun _ => True) A.P A.Pmiss Farm
-      (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok Fex pl ∗
+      (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok Fex pl k.proc ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom (crePermit (hlc := hlc) (fsGammaL fscFs) pl A.P Farm Fok Fex)
       A.Ft ∗
@@ -307,8 +307,9 @@ theorem sys_open_ec_fail (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCt
   iframe Hblk Hfr
   isplitr
   · ipureintro; exact hr
+  rw [← hS.hproc]
   iapply (creFailToOpen (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom 0 0
-    A.P A.Pmiss Farm (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok Fex A.Fo A.Ft pl hpl)
+    A.P A.Pmiss Farm (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok Fex A.Fo A.Ft pl hpl k.proc)
     $$ Hcf Hoc Htc
 
 /-! ## The two flavours into the join -/

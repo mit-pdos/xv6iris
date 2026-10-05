@@ -194,6 +194,9 @@ structure WiSizeOk [Fscfg] (A : WiArgs) (src : BitVec 64) (tot : Nat) (bm' : Blk
   distFull : tot = A.n → dist = 0
   distKer : A.user = false → dist = 0
   why : 0 < dist → wrFailWhy A.V.upt src A.n
+  /-- (NI M3 FS-0) a short stop with no disturbed tail is bmap's `0`: the
+  block the next chunk needed is still unmapped -/
+  full : tot < A.n → dist = 0 → (blkmapGet bm' ((A.off + tot) / BSIZE)).toNat = 0
   range : ∀ k, fileByte data' k =
     if A.off ≤ k ∧ k < A.off + tot then wrote (k - A.off)
     else if A.off + tot ≤ k ∧ k < A.off + tot + dist then dstb (k - (A.off + tot))

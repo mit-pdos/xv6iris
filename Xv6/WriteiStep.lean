@@ -116,7 +116,7 @@ theorem writei_exit_bmap {A : WiArgs} {src : BitVec 64} {W tot : Nat} {bmI : Blk
     {Sb2 : List Nat} {fbn : Nat}
     (h : WiBm A src W tot bmI dataI wroteI PI nI SI bm2 data2 (uX + 1) Sb2 fbn)
     (hrng : A.off + A.n ≤ MAXFILE * BSIZE) (hoffle : A.off ≤ A.dn.diSize.toNat)
-    (hfbnlt : fbn < MAXFILE) :
+    (hfbnlt : fbn < MAXFILE) (hz : (blkmapGet bm2 ((A.off + tot) / BSIZE)).toNat = 0) :
     WiSizeOk A src tot bm2 data2 wroteI 0 wroteI PI uX Sb2 := by
   have lp := h.lp
   have hinv := writei_inv2 h
@@ -135,6 +135,7 @@ theorem writei_exit_bmap {A : WiArgs} {src : BitVec 64} {W tot : Nat} {bmI : Blk
     distFull := fun _ => rfl
     distKer := fun _ => rfl
     why := fun h => absurd h (Nat.lt_irrefl 0)
+    full := fun _ _ => hz
     range := by
       intro k
       rw [writei_bmap_data bmI dataI data2 fbn lp.holes hfbnlt h.dep k]
@@ -348,6 +349,7 @@ theorem writei_exit_ok {A : WiArgs} {src : BitVec 64} {W tot : Nat} {bmI : Blkma
     distFull := fun _ => rfl
     distKer := fun _ => rfl
     why := fun h => absurd h (Nat.lt_irrefl 0)
+    full := fun ht _ => absurd ht (by omega)
     range := by
       intro k
       have hr := writei_range_step A.data data2 A.off tot fbn o c wroteI (by omega) hlen hdm
@@ -426,6 +428,7 @@ theorem writei_exit_fail {A : WiArgs} {src : BitVec 64} {W tot : Nat} {bmI : Blk
     distFull := fun ht => absurd ht (by have := lp.totlt; omega)
     distKer := fun hk => absurd (hk.symm.trans hu) (by decide)
     why := fun _ => wrFailWhy_shift A.V.upt src (by omega) (wrFailWhy_entry lp.ext.1 (hch.why rfl))
+    full := fun _ hd => absurd hd (by omega)
     range := by
       intro k
       have hr := writei_range_fail A.data data2 A.off tot fbn o c wroteI (by omega) hlen hdm

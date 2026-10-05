@@ -74,9 +74,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 def sysMkdirFail (A : SysMkdirArgs GF) : IProp GF := iprop(
   mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
     A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex ∨
-    ∃ pl : List (BitVec 8),
+    ∃ (pl : List (BitVec 8)) (act : BitVec 64),
       creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Pmiss A.Farm A.Fdots
-        A.Fun A.Fok A.Fex pl)
+        A.Fun A.Fok A.Fex pl act)
 
 /-- ret -1: the block closed at the grown page table. -/
 theorem sys_mkdir_out_fail (A : SysMkdirArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz A.V.sz P2) :

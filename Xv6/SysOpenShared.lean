@@ -208,12 +208,15 @@ theorem sys_open_arm_fail (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
     (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) (pl : List (BitVec 8))
-    (i : Nat) (n : FsNode) (hpl : argPathOf Mim pv pl) (hr : r = 0xFFFFFFFFFFFFFFFF#64) :
+    (i : Nat) (n : FsNode) (hpl : argPathOf Mim pv pl) (hr : r = 0xFFFFFFFFFFFFFFFF#64)
+    (w : OpenWhy) :
     procPrivFd (GF := GF) γ pa pid VW MW ⊢ fdFrags VW.fdg sts -∗ fdSlot -∗
       curKept vom P (pathElems pl).length i -∗ sysOpenObs Fo i n -∗
       plainTruncKept (hlc := hlc) Γ vom pl P i Ft -∗
+      -- (NI M3 FS-0) ...AND WHY
+      openWhyRcpt γfs pa w -∗
       openArmsPlain (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r := by
-  iintro Hpriv Hfrag Hfds HP Hobs Htc
+  iintro Hpriv Hfrag Hfds HP Hobs Htc Hw
   unfold openArmsPlain openPostFailPlain sysOpenObs
   icases Hobs with ⟨%av, %hav, HΦ⟩
   iframe Hfds
@@ -228,9 +231,11 @@ theorem sys_open_arm_fail (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames)
   iright
   iexists i
   iframe HP Htc
-  iexists av, absRow n
-  iframe HΦ
-  ipureintro; exact hav
+  isplitr [Hw]
+  · iexists av, absRow n
+    iframe HΦ
+    ipureintro; exact hav
+  · iexists w; iexact Hw
 
 /-- Rocq `so_arm_dead`: the WALK-DEAD arm (ARM B): nothing was observed, the
 era refund comes back with both commits. -/
@@ -447,15 +452,17 @@ refilled by the unit the tail's iput released, and the armed post fed
 theorem sys_open_fail_ret (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (nsj : Nat)
     (pl : List (BitVec 8)) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (hct : curTier = KTier.kpt)
-    (hns : nsj + 1 = A.ns) (hP2 : A.V.upt.extSz A.V.sz P2) :
+    (hns : nsj + 1 = A.ns) (hP2 : A.V.upt.extSz A.V.sz P2) (w : OpenWhy) :
     (wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid -∗
         procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2)) ∗
       irefSlots nsj ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
       sysOpenResidue (hlc := hlc) A pl inum dn bm data ∗
+      -- (NI M3 FS-0) the tail's reason
+      openWhyRcpt fscFs (procAddr A.j) w ∗
       (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') ⊢
     sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
       bslots 3 ∗ irefSlot)) := by
-  iintro ⟨Hpback, Hisl, Hfds, Hfrags, Hres, Hpost⟩
+  iintro ⟨Hpback, Hisl, Hfds, Hfrags, Hres, Hw, Hpost⟩
   unfold sysOpenRet
   iintro %c' %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid, Hbs, Hiru⟩
   ihave Hpriv := Hpback $$ Hpid
@@ -469,8 +476,8 @@ theorem sys_open_fail_ret (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (nsj : Nat
   iapply Hpost $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hisl
   iapply (sys_open_arm_fail (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) (R' 10#5)
-      pl inum.toNat (eraNode dn bm data) hpl hr)
-    $$ Hpriv Hfrags Hfds HP Hobs Htc
+      pl inum.toNat (eraNode dn bm data) hpl hr w)
+    $$ Hpriv Hfrags Hfds HP Hobs Htc Hw
 
 end
 

@@ -191,6 +191,14 @@ def dl16Post (bmapstart : Nat) (dinum : BitVec 32) (inodestart : Nat)
     (0 < tot → wiTgtBlk bm' (16 * k0) ∈ Sb' ∧ IBLOCK dinum inodestart ∈ Sb' ∧
       (bmapAlloced bm bm' (16 * k0 / BSIZE) = true → bmapstart ∈ Sb'))
 
+/-- (NI M3 FS-0) WHY AN APPEND FAILED, the two `a0 = -1 ∧ tot < 16` corners of
+the append arm told apart: the directory is FULL (writei's own `-1`, the
+slot past `MAXFILE` blocks) or the disk is OUT OF BLOCKS (writei's short
+count: the slot's block is still unmapped in the returned map -- writei's
+`full`, `SpecBalloc`'s live arm relayed through bmap). -/
+def dlFullWhy (bm' : Blkmap) (off : Nat) : Prop :=
+  MAXFILE * BSIZE < off + 16 ∨ (blkmapGet bm' (off / BSIZE)).toNat = 0
+
 /-- **THE PURE POSTCONDITION** (deviation 6): one field per Rocq conjunct of
 `wp_dirlink_gen_body`'s continuation, in Rocq's order.  `k0` is the append
 slot `dirSlot data (dirNrec size)`, `s` the canonical name `bname 14 fn`. -/
@@ -231,6 +239,9 @@ structure DirlinkOut [Fscfg] [Icfg] (bm : Blkmap) (data : Nat → List (BitVec 8
             dirSlot data (dirNrec dn.diSize.toNat)]!
           else fileByte data x) ∧
         ((a0 = 0#64 ∧ tot = 16) ∨ (a0 = -1#64 ∧ tot < 16))
+  /-- (NI M3 FS-0) ...AND A FAILED APPEND HAS ITS REASON (`dlFullWhy`) -/
+  full : found = false → a0 ≠ 0#64 →
+    dlFullWhy bm' (16 * dirSlot data (dirNrec dn.diSize.toNat))
 
 /-! ## The contract -/
 

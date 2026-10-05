@@ -462,13 +462,29 @@ it carries it at the plain surface's kept family, whose refund the tag rides
 theorem sys_open_cr_res_of_fail (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (i0 : Nat)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    openPostFailPlain (hlc := hlc) Γ γfs rt cw Mim pv vom (sysOpenCrP i0) sysOpenCrPm Fo Ft ⊢
+    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (act : BitVec 64) :
+    openPostFailPlain (hlc := hlc) Γ γfs rt cw Mim pv vom (sysOpenCrP i0) sysOpenCrPm Fo Ft act ⊢
       (pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∨
           ∃ (i : Nat) (av : Aview) (a : Anode), ⌜arowAt av i a⌝ ∗ Fo.pfRecv av i a) ∗
-        openTruncAt (hlc := hlc) Γ vom i0 Ft := by
+        openTruncAt (hlc := hlc) Γ vom i0 Ft ∗
+        -- (NI M3 FS-0) the late failure's reason; the plain post's first two
+        -- arms (argstr, the walk) are not the create tail's -- it runs no walk
+        -- -- and read as `refused`
+        ∃ w : OpenWhy, openWhyRcpt γfs act w := by
   unfold openPostFailPlain
-  iintro (Hpre | ⟨%pl, -, (⟨-, Hoc, Htc⟩ | ⟨%i, HP, Hobs, Htc⟩)⟩)
+  iintro (Hpre | ⟨%pl, -, (⟨-, Hoc, Htc⟩ | ⟨%i, HP, Hobs, Htc, Hw⟩)⟩)
+  rotate_left 2
+  · icases plainTruncKept_pure (hlc := hlc) Γ vom pl (sysOpenCrP i0) (fun x => x = i0) i Ft
+      (fun k d => sysOpenCrP_tag i0 k d) $$ HP Htc with ⟨%hii, Htc⟩
+    ihave Htc := plainTruncKept_forget (hlc := hlc) Γ vom pl (sysOpenCrP i0) i Ft $$ Htc
+    icases Hobs with ⟨%av, %a, %hav, HPhi⟩
+    have hii' : i = i0 := hii
+    rw [hii'] at hav ⊢
+    iframe Htc Hw
+    iright
+    iexists i0, av, a
+    iframe HPhi
+    ipureintro; exact hav
   · unfold openAuPlainAt
     icases Hpre with ⟨-, Hoc, Htc⟩
     ihave Hk := sys_open_cr_term_arg (GF := GF) Mim pv vom i0
@@ -476,24 +492,17 @@ theorem sys_open_cr_res_of_fail (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : 
       $$ Htc Hk
     ihave Htc := openTruncAt_kept_forget (hlc := hlc) Γ vom _ i0 Ft $$ Htc
     iframe Htc
-    ileft; iexact Hoc
+    isplitl [Hoc]
+    · ileft; iexact Hoc
+    · iexists OpenWhy.refused; unfold openWhyRcpt; iempintro
   · ihave Hk := sys_open_cr_term_at (GF := GF) pl vom i0
     ihave Htc := openTruncAt_of_permit (hlc := hlc) Γ vom (truncTermAt pl (sysOpenCrP i0)) i0 Ft
       $$ Htc Hk
     ihave Htc := openTruncAt_kept_forget (hlc := hlc) Γ vom _ i0 Ft $$ Htc
     iframe Htc
-    ileft; iexact Hoc
-  · icases plainTruncKept_pure (hlc := hlc) Γ vom pl (sysOpenCrP i0) (fun x => x = i0) i Ft
-      (fun k d => sysOpenCrP_tag i0 k d) $$ HP Htc with ⟨%hii, Htc⟩
-    ihave Htc := plainTruncKept_forget (hlc := hlc) Γ vom pl (sysOpenCrP i0) i Ft $$ Htc
-    icases Hobs with ⟨%av, %a, %hav, HPhi⟩
-    have hii' : i = i0 := hii
-    rw [hii'] at hav ⊢
-    iframe Htc
-    iright
-    iexists i0, av, a
-    iframe HPhi
-    ipureintro; exact hav
+    isplitl [Hoc]
+    · ileft; iexact Hoc
+    · iexists OpenWhy.refused; unfold openWhyRcpt; iempintro
 
 /-! ## 5.  RECOVERING THE DESCRIPTOR FROM THE PLAIN OK -/
 
@@ -620,7 +629,7 @@ theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsN
   iintro HR ⟨(⟨%hr, Hpriv, Hfrag, Hf⟩ | Hok), Hslot⟩
   · -- every post-walk failure sits BEFORE the itrunc, so the caller's piece
     -- comes home unfired, keyed at the created child (arm (a))
-    icases sys_open_cr_res_of_fail (hlc := hlc) Γ γfs rt cw i0 Mim pv vom _ _ $$ Hf with ⟨-, Htc⟩
+    icases sys_open_cr_res_of_fail (hlc := hlc) Γ γfs rt cw i0 Mim pv vom _ _ pa $$ Hf with ⟨-, Htc, Hw⟩
     ihave Htc := (show openTruncAt (hlc := hlc) (GF := GF) Γ vom i0
         (sysOpenCrFt (hlc := hlc) Γ pl P Farm Fok Fex i0 Ft) ⊢
       creTruncKept (hlc := hlc) Γ vom pl P Farm Fok Fex i0 Ft from .rfl) $$ Htc
@@ -641,7 +650,7 @@ theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsN
     iframe HP
     ileft
     iexists av, i0, nm, ents, nl
-    iframe HΦ Hdl Hoc Htc Hun
+    iframe HΦ Hdl Hoc Htc Hun Hw
     ipureintro; exact ⟨hl, hpre, hib⟩
   · ihave ⟨Htr, Hfd⟩ := sys_open_cr_ok_fresh (hlc := hlc) omo Γ i0 [] nl0 Ft
       (sysOpenCrFt (hlc := hlc) Γ pl P Farm Fok Fex i0 Ft) rfl γ pa pid Mim pv vom sts VW MW r
@@ -681,7 +690,7 @@ theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : Fs
         Ft sts VW MW r := by
   unfold openArmsPlain openArmsCreate
   iintro HR ⟨(⟨%hr, Hpriv, Hfrag, Hf⟩ | Hok), Hslot⟩
-  · icases sys_open_cr_res_of_fail (hlc := hlc) Γ γfs rt cw i0 Mim pv vom _ _ $$ Hf with ⟨Hob, Htc⟩
+  · icases sys_open_cr_res_of_fail (hlc := hlc) Γ γfs rt cw i0 Mim pv vom _ _ pa $$ Hf with ⟨Hob, Htc, Hw⟩
     ihave Htc := (show openTruncAt (hlc := hlc) (GF := GF) Γ vom i0
         (sysOpenCrFtEx (hlc := hlc) Γ pl P Farm Fex i0 Ft) ⊢
       creTruncKeptEx (hlc := hlc) Γ vom pl P Farm Fex i0 Ft from .rfl) $$ Htc
@@ -704,7 +713,7 @@ theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : Fs
     iframe HP
     iright; ileft
     iexists av, i0, nm, ents, nl
-    iframe HΦ Hac Hcl
+    iframe HΦ Hac Hcl Hw
     isplitr
     · ipureintro; exact hl
     isplitr

@@ -349,7 +349,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
   iframe Hk Hpc Hpi Hte Hce Hpe Hpriv Hfr Hkl Hka Hfs Hdev Hin
   k_next_e
   unfold sysWritePost
-  iintro %spie2 %spp2 %R2 %P' %k' %⟨hcs, hext, hcnt⟩ #HO Hk Hpc Hte Hce %hk' Hpriv Hfr Hbs Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %⟨hcs, hext, hcnt⟩ #HO Hk Hpc Hte Hce %hk' Hpriv Hfr Hbs Harms -
   -- the block at the callee's raised event count (permit sweep L1b): the
   -- rows do not read it (`SyscRows.updEv`)
   ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) ⊢

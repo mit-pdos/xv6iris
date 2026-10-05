@@ -1029,7 +1029,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
       inodeRefShortGenlo kd (qd.half + qd.half) qd.half icfgDev dind gd lo') $$ [Hkeep]
   · iexists lo', tl'; iframe Hfl' Hkeep; ipureintro; exact hle'
   obtain ⟨hcs2, hout⟩ := hp2
-  obtain ⟨hspend, hsub', hw16, hfsp, hcapp, hsizedp, harms⟩ := hout
+  obtain ⟨hspend, hsub', hw16, hfsp, hcapp, hsizedp, harms, hdlfull⟩ := hout
   k_norm_g [create_ret_dc]
   ihave Hpb := Hback $$ Hpid Hrt Hrh
   icases Hpb with ⟨Hpid, Hpw, Hbw⟩
@@ -1108,6 +1108,8 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
         Hsi Hss Hsb Hbare Hbw Hpath Hbs Hisl Hop Htx HP Hdlk Hdots Hun HFok Hpost
   · -- ======== ARM FAIL's non-directory entry: the append fell short ========
     have htot0 : tot = 0 := by rcases hatom with h | h <;> omega
+    -- (NI M3 FS-0) the append's reason
+    have hdlw := hdlfull rfl (by rw [ha0m]; decide)
     -- +0xdc  bltz a0 : TAKEN, to +0x146
     k_step_e (wp_s_branch cpu _ (KA.«create» + 0xdc#64) false 106#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0m, create_bltz_m1, MachCSL.bltz_m1]
@@ -1117,7 +1119,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
     iapply Hfb $$ %cpu %spie2 %spp2 %R2 %kd %qd %gd %γil %γisl %dind %dn %bm %data %nf %tl %t
       %kslot %q %g %gil %gisl %lo %tl0 %cinum %dnc %bmc %datc %bm' %data' %dn' %dn' %tot %n' %Sb'
       %hR2 %htdir %hkd %hdib %htyd %hnl0 %hiok %hdok %hddix %hduq %hrl %hkslot %hcpos %hcinb
-      %hfresh %hrlc %htyc %hciok %hcdok %htot0 %hwf' %hholes' %haddr' %hsz31' %hcov' %(hcapp hszb)
+      %hfresh %hrlc %htyc %hciok %hcdok %htot0 %hdlw %hwf' %hholes' %haddr' %hsz31' %hcov' %(hcapp hszb)
       %(hsizedp hiok.2.2.2.2.2.2) %hdn' %rfl %hrng %(fun x hx => hsub' x (hsb3 x hx))
       %(hsub' _ hib3) %⟨by omega, hn'u⟩ %(Or.inl hn'4) %hal
       Hk Hpc Hte Hce Hframe Hnm Htl Hslk Hsl [Hdep] Hoff Hdev Hinum Hval Hdl Hdi Hmeta Hmap Hblk Htop
@@ -1647,8 +1649,11 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
     · ipureintro
       rw [ha0f]; simp [RegMap.set_apply, f19, s19]
     iframe Hlt
+    -- (NI M3 FS-0) ARM A-FAIL's reason: ialloc found no free inode
     iapply (create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat
-      minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat) $$ HP Hdlk Hcre
+      minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat k.proc
+      (.full .inodes)) $$ HP Hdlk Hcre []
+    iapply creWhyRcpt_intro
   | true =>
     -- ===== THE INODE WAS CLAIMED, LOCKED AND FILLED -- control at +0xb4 =====
     simp only [if_true]

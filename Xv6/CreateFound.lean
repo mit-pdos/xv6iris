@@ -649,7 +649,7 @@ theorem createFound_exit_fail (cpu : CPU) (k : KCtx) (A : CreateFoundArgs)
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     irefSlots m ∗ logOpS icfgLog u' Sb' ∗ logTx icfgLog ∗
     creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
-      F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) ∗
+      F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) k.proc ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
   unfold createFoundFr createFoundOwe
@@ -807,9 +807,11 @@ theorem createFound_armG (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     (by kctx_ext) $$ Hk
   ihave Hsl := irefSlots_combine 1 1 $$ [$Hs1 Hslot]
   · iapply (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl); iexact Hslot
+  -- (NI M3 FS-0) the reason: the parent's link count
   ihave Hcf := create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
     A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) dind.toNat
-    $$ HP Hdl Hcre
+    k.proc .nlink $$ HP Hdl Hcre []
+  · unfold creWhyRcpt; iempintro
   have hns := hS.hns
   unfold createIrefSlots at hns
   iapply (createFound_exit_fail cpu k A F spie1 spp1 (R1.set 18#5 0#64) v3 nf tl (1 + 1) n2 Sb2
@@ -897,9 +899,11 @@ theorem createFound_armG2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     (by kctx_ext) $$ Hk
   ihave Hsl := irefSlots_combine 1 1 $$ [$Hs1 Hslot]
   · iapply (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl); iexact Hslot
+  -- (NI M3 FS-0) the reason: the parent's link count
   ihave Hcf := create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
     A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) dind.toNat
-    $$ HP Hdl Hcre
+    k.proc .nlink $$ HP Hdl Hcre []
+  · unfold creWhyRcpt; iempintro
   have hns := hS.hns
   unfold createIrefSlots at hns
   iapply (createFound_exit_fail cpu k A F spie1 spp1 (R1.set 18#5 0#64) v3 nf tl (1 + 1) n2 Sb2
@@ -938,7 +942,7 @@ theorem createFound_armN (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : Creat
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hcf := create_fail_of_dead (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
     A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun)
-    $$ Hdead Hdl Hcre
+    k.proc $$ Hdead Hdl Hcre
   -- +0x22  beqz a0 TAKEN
   k_step_e (wp_s_branch cpu _ (KA.«create» + 0x22#64) false 318#13 10#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero]
@@ -986,7 +990,7 @@ theorem createFound_fbad (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     irefSlots 1 ∗ logOpS icfgLog n2 Sb2 ∗
     creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
-      F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) ∗
+      F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) k.proc ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r18, r20, r21, r22, r19, r23, r24, r25, r26, r27⟩ := hR
@@ -1176,7 +1180,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
       iclear Hsel
       ihave Hcf := create_fail_of_seen (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat
         A.major.toNat A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex
-        (bview A.plen A.pfun) dind.toNat (bname 14 nf) cexv hlast $$ HP Hex Hcre
+        (bview A.plen A.pfun) dind.toNat (bname 14 nf) cexv hlast k.proc $$ HP Hex Hcre
       iapply (createFound_fbad IUP Γ cpu k A F hS spie spp _ v3 dpv nf tl kc qc gc loc tlc cinum
         dnc bmc γil γisl n2 Sb2 ?hr7 hkc hcnib hle hal htl hn hsub hn2)
       rotate_left 1
@@ -1189,7 +1193,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     iclear Hsel
     ihave Hcf := create_fail_of_seen (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat
       A.major.toNat A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex
-      (bview A.plen A.pfun) dind.toNat (bname 14 nf) cexv hlast $$ HP Hex Hcre
+      (bview A.plen A.pfun) dind.toNat (bname 14 nf) cexv hlast k.proc $$ HP Hex Hcre
     iapply (createFound_fbad IUP Γ cpu k A F hS spie spp _ v3 dpv nf tl kc qc gc loc tlc cinum
       dnc bmc γil γisl n2 Sb2 hr5 hkc hcnib hle hal htl hn hsub hn2)
     iframe Hk Hpc Hfr Hte Hce Hlk Hload Hsi Hsb Howe Hpid Hbs Hs1 Hop Hcf Hpost

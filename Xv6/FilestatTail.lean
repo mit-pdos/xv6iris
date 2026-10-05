@@ -76,7 +76,7 @@ empty. -/
 theorem filestat_err (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk : Nat)
     (v2 v3 v9 : BitVec 64) (γ : FileNames) (q : Qp) (st : FdState) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (hK : 10 ≤ k.avail)
-    (hr : fstatRegs k fk (k.regs 18#5) (k.regs 19#5) R) :
+    (hr : fstatRegs k fk (k.regs 18#5) (k.regs 19#5) R) (hnst : ¬ fstatStInode st) :
     kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗
     pcIs cpu (KA.«filestat» + 0x62#64) ∗
     fstatFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) v2 v3 (k.regs 20#5) v9 ∗
@@ -106,7 +106,8 @@ theorem filestat_err (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk :
   unfold fstatK
   iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce Href %(Nat.le_refl V.ev) Hpriv Henv
   ipureintro
-  refine ⟨hcs, ?_, UMemL.extSz_refl _ _, Nat.zero_le _, UMemL.umemWrote_refl _ _ _⟩
+  refine ⟨hcs, ?_, UMemL.extSz_refl _ _, Nat.zero_le _, UMemL.umemWrote_refl _ _ _,
+    ⟨fun h => absurd h hnst, fun _ => rfl⟩⟩
   right
   rw [h10]
 

@@ -214,15 +214,8 @@ end
 
 /-! ## The stat buffer (Rocq `ProofFilestatParts.v`) -/
 
-/-- The 24 bytes copyout sends: stati's five fields and the hole, in
-`struct stat`'s order (4/4/2/2/4/8). -/
-def fstatBytes (dev ino : BitVec 32) (ty nl : BitVec 16) (h : BitVec 32) (sz : BitVec 64) :
-    List (BitVec 8) :=
-  wordToBytes4 dev ++ (wordToBytes4 ino ++ (halfBytes ty ++ (halfBytes nl ++
-    (wordToBytes4 h ++ wordToBytes sz))))
-
-@[simp] theorem fstatBytes_length (dev ino : BitVec 32) (ty nl : BitVec 16) (h : BitVec 32)
-    (sz : BitVec 64) : (fstatBytes dev ino ty nl h sz).length = 24 := rfl
+-- `fstatBytes` / `fstatBytes_length` moved to `SpecFilestat` (NI M3 FS-0: the
+-- post names the bytes)
 
 theorem fstat_al (a : BitVec 64) (hal : a.toNat % 8 = 0) (m d : Nat) (hm : m < 64)
     (hd : d = 2 ∨ d = 4 ∨ d = 8) (hmd : m % d = 0) : (a + BitVec.ofNat 64 m).toNat % d = 0 := by
@@ -544,7 +537,8 @@ def fstatK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (pa : 
   iprop(∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8))
       (d : Nat) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ filestatRet (R' 10#5) ∧ V.upt.extSz V.sz P' ∧ d ≤ 24 ∧
-      umemWrote V.upt M (k.regs 11#5) d P' M'⌝ -∗
+      umemWrote V.upt M (k.regs 11#5) d P' M' ∧
+      filestatNamed st V.upt M (k.regs 11#5) d P' M'⌝ -∗
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     fileRef γ fk q st -∗ ⌜V.ev ≤ k'⌝ -∗ procPrivExt pa pid (V.updEv k') P' M' -∗

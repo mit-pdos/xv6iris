@@ -328,7 +328,7 @@ set_option maxHeartbeats 16000000 in
 the fire (`fwr_fire`), the cell re-formed at the word the `sw` left
 (`offResident_of`) and parked (`protoReadPark`), and the checked-out bundle
 rebuilt at writei's record (`icMkLoaded`). -/
-theorem fwr_post_ghost (om : OffMode) (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (C : FContent)
+theorem fwr_post_ghost (act : BitVec 64) (om : OffMode) (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (C : FContent)
     (m : StampMap Nat) (T0 Tr : Nat) (inum : BitVec 32) (γo : GName) (P : UPtd) (n : Int)
     (Mimg : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (t p c : Nat)
     (dn dn' dn0' : Dinode) (bm bm' : Blkmap) (data data' : Nat → List (BitVec 8)) (v : BitVec 32)
@@ -363,7 +363,12 @@ theorem fwr_post_ghost (om : OffMode) (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : 
       |={⊤}=> ownCtx cpu curCtx ∗ offFd fk q γb γo C ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
         icLoaded fscFs fscIreg fscCov fscLogst ik inum dn' bm' ∗
         ((⌜tot = c⌝ ∗ fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
-         (⌜tot < c⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
+         (⌜tot < c⌝ ∗
+           -- (NI M3 FS-0) THE SHORT CHUNK'S REASON: writei's own `-1` (the
+           -- file at MAXFILE), a disturbed tail (an unmapped source byte), or
+           -- neither -- bmap's out-of-blocks `0`
+           (∃ w : FwWhy, fwWhyRcpt fscFs act P ua n w) ∗
+           ∃ x : Nat, ⌜x ≤ 1⌝ ∗
            fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p x)) := by
   have hloc : InodeLocal inum.toNat (eraNode dn' bm' data') :=
     inodeLocal_ofOkRec inum.toNat fscCov fscLogst dn' bm' data' hok' hrl'
@@ -398,7 +403,21 @@ theorem fwr_post_ghost (om : OffMode) (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : 
     (dirOrphanClean_not_dir dn0' data' hnd') (dirUniq_not_dir dn0' data' hnd')
     $$ Hdl Hdi Hmeta Haddrs Hind Hblk Htop
   imodintro
-  iframe Hrun Hoffd Hrows Hload Hst
+  iframe Hrun Hoffd Hrows Hload
+  icases Hst with (Hf | ⟨%hs, Hx⟩)
+  · ileft; iexact Hf
+  · iright
+    isplitr
+    · ipureintro; exact hs
+    isplitl []
+    · by_cases hm : a0 = -1#64
+      · iexists FwWhy.max; unfold fwWhyRcpt; iempintro
+      · by_cases hd : 0 < dist
+        · iexists FwWhy.src; unfold fwWhyRcpt; ipureintro; exact hwhy hd
+        · -- writei's short count at no tail: bmap's out-of-blocks `0`
+          -- (`WriteiOut.full`); the verdict as given
+          iexists FwWhy.full; unfold fwWhyRcpt; iapply fsFullRcpt_intro
+    · iexact Hx
 
 end Held
 

@@ -249,8 +249,10 @@ theorem sys_open_alloc_fail_ret_f (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (n
   iapply Hpost $$ %spie' %spp' %R' %P2 %k2 %hcs %hP2 %hk2 Hk Hpc Hte Hce Hbs Hisl
   iapply (sys_open_arm_fail (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts ((sysOpenV2 A P2).updEv k2)
-      (sysOpenM2 A P2) (R' 10#5) pl inum.toNat (eraNode dn bm data) hpl hr)
-    $$ Hpriv Hfrags Hfds HP Hobs Htc
+      (sysOpenM2 A P2) (R' 10#5) pl inum.toNat (eraNode dn bm data) hpl hr .nofile)
+    $$ Hpriv Hfrags Hfds HP Hobs Htc []
+  -- (NI M3 FS-0) ARM F-FAIL: fdalloc found the process's own table full
+  unfold openWhyRcpt; iempintro
 
 /-! ## +0x74 .. +0x84 and +0x140 .. +0x14c: the descriptor's TYPE -/
 
@@ -599,8 +601,11 @@ theorem sys_open_alloc (FA : FILEALLOC) (FD : FDALLOC) (Γ : SchedNames) [ClaimI
       %tlc %kk %s %g %inum %dn %bm %u %⟨hkk, hinb, hle, hiu⟩ %(sysOpenPins_s2 k R1 _ _ _ _ hp1)
       %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hlk Hload Hkeep Hpid Hbs Hop
       [Hpback Hisl Hfds Hfrags Hres Hpost]
-    iapply sys_open_fail_ret k A P2 nsj pl inum dn bm data hct hE.1 hE.2
+    -- (NI M3 FS-0) ARM E-FAIL: filealloc found the open-file table full
+    ihave Hw := openWhyRcpt_intro (GF := GF) fscFs (procAddr A.j) .full
+    iapply sys_open_fail_ret k A P2 nsj pl inum dn bm data hct hE.1 hE.2 .full
     iframe
+    try iexact Hw
   · -- ---- a fresh, untyped slot ----
     -- +0x64 c.mv s2,a0
     k_step_e (wp_s_add cpu _ (KA.«sys_open» + 0x64#64) true 18#5 0#5 10#5 (by decide))

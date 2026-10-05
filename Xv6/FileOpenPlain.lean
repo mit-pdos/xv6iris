@@ -126,7 +126,7 @@ theorem fileOpenRecv_file (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (o
   have _hres := fPin_resolves i bs N s rt cw pl hN hsN hel hst
   unfold openReceiptPlain curKept
   simp only [htr, Bool.false_eq_true, ↓reduceIte]
-  iintro (⟨%hr, %hfd, Hfail⟩ | ⟨%pl', %av, %j, %hpath', HP, Harm⟩)
+  iintro (⟨%hr, %hfd, %_act, Hfail⟩ | ⟨%pl', %av, %j, %hpath', HP, Harm⟩)
   · ihave Hc : iprop(|={⊤}=> ((fdq r q1 s ∗ fdq r q2 s) ∨ fileTaint (hlc := hlc) c)) $$ [Hfail]
     · unfold openPostFailPlain
       icases Hfail with (Hpre | ⟨%pl'', %_hpath'', Hr2⟩)

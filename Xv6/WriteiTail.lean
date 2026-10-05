@@ -132,6 +132,7 @@ theorem writei_out_join (A : WiArgs) (src : BitVec 64) (tot : Nat) (bm' : Blkmap
     distFull := hS.distFull
     distKer := hS.distKer
     why := hS.why
+    full := fun _ ht hd => hS.full ht hd
     range := hS.range
     ker := hS.ker
     usr := hS.usr

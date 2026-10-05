@@ -165,12 +165,12 @@ theorem filestat_main (MP : MYPROC) (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO
     iintro Hk Hpc
     have hst : fstatStInode st := hC.1 hin
     icases filestat_pay_carve γ fk q C st hin $$ Hpay with ⟨%ik, %inum, %s, %g, %ty, %lo, %tl,
-      %⟨hip, hik, hnib, hle⟩, #Hfl, #Hshot, Hshr, Hback⟩
+      %⟨hip, hik, hnib, hle⟩, %hinum, #Hfl, #Hshot, Hshr, Hback⟩
     ihave Henv := filestat_env_in st hst $$ Henv
     unfold filestatFsEnv
     icases Henv with ⟨#Hfs, Hbs⟩
     iapply (filestat_lock IL ST IU CO Γ cpu k spie1 spp1 _ fk v2 v3 v9 γ q st C j pid V M γkl γk
-        ik s g ty lo tl inum hK hj hproc hnoff hlocks htier hst hip hik hnib hle ?hr2 ?h10)
+        ik s g ty lo tl inum hK hj hproc hnoff hlocks htier hst hip hik hnib hle ?hr2 ?h10 hinum)
       $$ [- $Hk $Hpc]
     rotate_right 1
     case hr2 =>
@@ -191,7 +191,8 @@ theorem filestat_main (MP : MYPROC) (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO
     ihave Href := fstat_ref_close γ fk q st C $$ [Htok Hfields Hpay]
     · iframe
     ihave Henv := filestat_env_out_of_env st $$ Henv
-    iapply (filestat_err cpu k spie1 spp1 _ fk v2 v3 v9 γ q st (procAddr j) pid V M hK10 ?hr2e)
+    iapply (filestat_err cpu k spie1 spp1 _ fk v2 v3 v9 γ q st (procAddr j) pid V M hK10 ?hr2e
+      (fun h => hin (hC.2 h)))
       $$ [- $Hk $Hpc]
     rotate_right 1
     case hr2e =>

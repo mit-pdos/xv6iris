@@ -81,7 +81,7 @@ def sysMkdirCreateK (k' : KCtx) (se : Bool) (pj : BitVec 64) (plen : Nat) (pfun 
      else
       iprop(⌜R' 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
         creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat minor.toNat Nm Nd P Pmiss
-          Farm Fdots Fun Fok Fex (bview plen pfun))) -∗
+          Farm Fdots Fun Fok Fex (bview plen pfun) pj)) -∗
     wpLoop c)
 
 set_option maxHeartbeats 16000000 in

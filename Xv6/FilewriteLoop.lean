@@ -160,7 +160,8 @@ theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q
     procPrivExtEv (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     ((⌜tot = c⌝ ∗ fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q (t + c)
         (p + 1) 0) ∨
-     (⌜tot < c⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
+     (⌜tot < c⌝ ∗ (∃ w : FwWhy, fwWhyRcpt fscFs k.proc A.V.upt (k.regs 11#5) A.n w) ∗
+        ∃ x : Nat, ⌜x ≤ 1⌝ ∗
         fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x)) ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
@@ -172,7 +173,7 @@ theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
   iintro ⟨Hk, Hpc, Hte, Hce, Hframe, #Henv, Href, Hpriv, Hbs, Hst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases Hst with (⟨%hfull, Hst⟩ | ⟨%hshort, ⟨%x, %hx, Hst⟩⟩)
+  icases Hst with (⟨%hfull, Hst⟩ | ⟨%hshort, Hwhy, ⟨%x, %hx, Hst⟩⟩)
   · -- ============ THE FULL CHUNK: fall to +0xcc ============
     have ha : a0 = BitVec.ofNat 64 c := by
       rcases ha0 with ⟨-, h⟩ | h
@@ -393,7 +394,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   ihave Hst : fwrSt (hlc := hlc) A.om (fsGammaL fscFs) inum.toNat A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0
     $$ [Hst]
   · rw [← hi]; iexact Hst
-  imod fwr_post_ghost A.om cpu ik A.fk A.q γb C m T0 Tr inum A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p
+  imod fwr_post_ghost k.proc A.om cpu ik A.fk A.q γb C m T0 Tr inum A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p
     (fwrChunk A.n.toNat t) dn dn' dn0' bm bm' data data' v tot dist wrote dstb a0 hip hik hq htn htie
     hcpos (fwrChunk_wchunkAt A.n t p htn htie) hout.w16at htyF hty' hnl' hok.2.2.2.2.2.1 hout.holes hok.2.2.2.2.1 hcap htotc hout.distLe
     hout.distFull hwhy hout.range harms hchunk hok' hrl' hnd' hdn0
@@ -432,7 +433,8 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   · iframe
   ihave Hst : ((⌜tot = fwrChunk A.n.toNat t⌝ ∗ fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img
         (k.regs 11#5) Q (t + fwrChunk A.n.toNat t) (p + 1) 0) ∨
-      (⌜tot < fwrChunk A.n.toNat t⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
+      (⌜tot < fwrChunk A.n.toNat t⌝ ∗ (∃ w : FwWhy, fwWhyRcpt fscFs k.proc A.V.upt (k.regs 11#5) A.n w) ∗
+        ∃ x : Nat, ⌜x ≤ 1⌝ ∗
         fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x)) $$ [Hst]
   · rw [hi]; iexact Hst
   -- +0xc8 .. : the tests

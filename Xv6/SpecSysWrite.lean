@@ -183,6 +183,8 @@ def sysWritePost (k : KCtx) (γ : FileNames) (γu : UartNames) (j : Nat) (pid : 
     fdFrags V.fdg sts -∗
     filewriteFsOut -∗
     sysWriteArms (hlc := hlc) V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe (R' 10#5) -∗
+    -- (NI M3 FS-0) ...AND WHY a writable inode's `-1` (filewrite's `fwWhyAt`)
+    fwWhyAt fscFs k.proc (sysFdSt v V.ofile sts) V.upt v1 (argZ v2) (R' 10#5) -∗
     wpLoop cpu')
 
 end

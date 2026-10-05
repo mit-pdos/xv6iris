@@ -184,7 +184,7 @@ theorem syscall_arm_fstat (SF : SYSFSTAT)
   iframe Hk Hpc Hpi Hte Hce Hpe Hpriv Hkl Hka Hfs
   k_next_e
   unfold sysFstatPost
-  iintro %spie2 %spp2 %R2 %P' %M1 %d %k' %⟨hcs, hret, hext, hd, hw⟩ Hk Hpc Hte Hce %hk' Hpriv Hb1
+  iintro %spie2 %spp2 %R2 %P' %M1 %d %k' %⟨hcs, hret, hext, hd, hw, -⟩ Hk Hpc Hte Hce %hk' Hpriv Hb1
   -- the block at filestat's raised event count (permit sweep L1b): the rows
   -- do not read it (`SyscRows.updEv`)
   ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid { V.updEv k' with upt := P' } M1 ⊢

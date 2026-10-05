@@ -98,10 +98,29 @@ theorem dirlink_out_append [Fscfg] [Icfg] (bm bm' : Blkmap) (data data' : Nat �
     rcases hwiok with ⟨_, h, _⟩ | ⟨_, h, _⟩
     · exact h
     · omega
+  have hfull : (if a0 = 16#64 then 0#64 else 0xFFFFFFFFFFFFFFFF#64) ≠ 0#64 →
+      dlFullWhy bm' (16 * dirSlot data (dirNrec dn.diSize.toNat)) := by
+    intro hne
+    unfold dlFullWhy
+    rcases hout.arms with ⟨_, h2, _⟩ | ⟨h1, _, _, _, _⟩
+    · left; rcases h2 with h | h
+      · omega
+      · exact h
+    · right
+      have h16 : a0 ≠ 16#64 := fun e => hne (by rw [if_pos e])
+      have ht16 : tot ≠ 16 := fun e => h16 (by rw [h1, e])
+      have ht0 : tot = 0 := by
+        rcases hout.w16at hb with h | h
+        · exact h
+        · exact absurd h ht16
+      have hm1 : a0 ≠ -1#64 := by rw [h1, ht0]; decide
+      have := hout.full hm1 (by omega) rfl
+      rw [ht0, Nat.add_zero] at this
+      exact this
   refine { spend := ⟨by unfold dirlinkUnits; omega, hsp.2⟩, sub := hout.sub,
            w16 := fun _ => ⟨hout.w16any hb, hout.w16at hb, fun hpos => (hout.w16 hpos hb).2⟩,
            foundSpend := fun h => absurd h (by decide), cap := hout.cap, sized := hout.sized,
-           arms := ?_ }
+           arms := ?_, full := fun _ hne => hfull hne }
   rw [if_neg (by decide)]
   refine ⟨hnone, hout.wf, hout.holes, hout.addrs, hout.size31, hout.covers, ?_, ?_, htot, ?_, ?_⟩
   · rcases hwiok with ⟨_, _, h, _⟩ | ⟨_, h0, hb', _, hd, _⟩

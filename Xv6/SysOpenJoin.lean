@@ -159,8 +159,11 @@ theorem sys_open_join (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) (hS : Sy
       case hp =>
         repeat (refine sysOpenPins_set _ _ _ _ _ _ _ ?_ (by decide))
         exact hpins
-      iapply sys_open_fail_ret k A P2 nsj pl inum dn bm data hct hE.1 hE.2
+      -- (NI M3 FS-0) the node's type or the mode refused it
+      ihave Hw := openWhyRcpt_intro (GF := GF) fscFs (procAddr A.j) .refused
+      iapply sys_open_fail_ret k A P2 nsj pl inum dn bm data hct hE.1 hE.2 .refused
       iframe
+      try iexact Hw
     · -- ---- the major is a legal device index: ITEM (6), PAID ----
       have hd2 : decide (9 < dn.diMajor.toNat) = false := by simp [hout]
       k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0x5a#64) false 188#13 15#5 14#5 (by decide)

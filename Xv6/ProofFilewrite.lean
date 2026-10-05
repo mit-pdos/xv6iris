@@ -326,13 +326,13 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
   icases Hpg with ⟨Hft, HQ, Hxs, Hgen⟩
   ihave HΦG : fwrKG (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe $$ [Hnext Hcwd Hrtr Hft HQ Hxs Hsp]
   · unfold fwrKG fwrK filewritePost
-    iintro Hgen %c %spie %spp %R' %P' %hp HO Hk Hpc Hte Hce Href Hpriv Henv Harms
+    iintro Hgen %c %spie %spp %R' %P' %hp HO Hk Hpc Hte Hce Href Hpriv Henv Harms Hwhy
     icases procPrivExtEv_elim _ _ _ _ _ $$ Hpriv with ⟨%kv, %hkv, Hpriv⟩
     ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
     ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid (V.updEv kv) P' _).2 $$ [Hpriv Hcwd Hrtr Hft HQ Hxs Hgen Hsp]
     · unfold procGenAt
       iframe
-    iapply HK $$ %spie %spp %R' %P' %kv %hp HO Hk Hpc Hte Hce Href %hkv Hpriv Henv Harms
+    iapply HK $$ %spie %spp %R' %P' %kv %hp HO Hk Hpc Hte Hce Href %hkv Hpriv Henv Harms Hwhy
   -- the reference, taken apart
   icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, omC, γpC, hok⟩, Htok, Hfields, Hpay⟩
   icases fwr_fields_writable fk q C $$ Hfields with ⟨Hw, Hfw⟩
@@ -369,7 +369,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     ihave HΦ := fwrKG_elim $$ HΦG Hgen
     unfold fwrK
     ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-    iapply HΦ $$ %cpu %k.spie %k.spp %_ %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv []
+    iapply HΦ $$ %cpu %k.spie %k.spp %_ %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv [] []
     · ipureintro
       refine ⟨?_, UMemL.extSz_refl _ _, fun rb hst => ?_⟩
       · simp [calleeSaved, RegMap.set_apply]
@@ -382,6 +382,12 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
       isplitr
       · ipureintro; simp only [RegMap.set_apply]; exact filewriteRet_m1 n
       iapply filewriteExtra_unwritable _ _ inumC γoC omC γpC C st n _ _ Q Qe _ hok hw
+    · -- (NI M3 FS-0) an unwritable descriptor has no writable-inode reason
+      iapply fwWhyAt_other
+      intro rb i γo om hst
+      subst hst
+      obtain ⟨-, hw', -⟩ := hok
+      rw [hw] at hw'; exact absurd hw' (by decide)
   -- +0x04  beqz a5 : falls (a writable descriptor)
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 4#64) false 310#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.namex_beqz_byte, decide_eq_false hw]

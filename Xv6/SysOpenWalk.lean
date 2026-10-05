@@ -223,8 +223,11 @@ theorem sys_open_walk_tested (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
       case hp =>
         repeat (refine sysOpenPins_set _ _ _ _ _ _ _ ?_ (by decide))
         exact hpins
-      iapply sys_open_fail_ret k A P2 nsj pl inum dn bm data hct hE.1 hE.2
+      -- (NI M3 FS-0) the node's type or the mode refused it
+      ihave Hw := openWhyRcpt_intro (GF := GF) fscFs (procAddr A.j) .refused
+      iapply sys_open_fail_ret k A P2 nsj pl inum dn bm data hct hE.1 hE.2 .refused
       iframe
+      try iexact Hw
 
 /-! ## +0xe4: namei came back -/
 

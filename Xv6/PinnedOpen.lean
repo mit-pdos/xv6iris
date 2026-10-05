@@ -294,7 +294,7 @@ theorem pinned_open_dead_lin (γfs : FsNames) (T K : IProp GF) (omo : OffMode) (
       iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜fdv' = sts⌝ ∗ K) ∨ T) := by
   have hlen : (pathElems pl).length ≠ 0 := fun hz => hne (List.eq_nil_of_length_eq_zero hz)
   unfold openReceiptPlain
-  iintro (⟨%hr, %hfd, Hfail⟩ | ⟨%pl', %av, %i, %hpath', HP, Harm⟩)
+  iintro (⟨%hr, %hfd, %_act, Hfail⟩ | ⟨%pl', %av, %i, %hpath', HP, Harm⟩)
   · unfold openPostFailPlain
     icases Hfail with (Hpre | ⟨%pl'', %hpath'', Hr2⟩)
     · unfold openAuPlainAt
@@ -309,7 +309,7 @@ theorem pinned_open_dead_lin (γfs : FsNames) (T K : IProp GF) (omo : OffMode) (
       · imodintro
         iright; iexact HT
     · rw [argPathOf_uniq M pv pl'' pl hpath'' hpath]
-      icases Hr2 with (⟨Hde, -, -⟩ | ⟨%i, HP, -, Ht⟩)
+      icases Hr2 with (⟨Hde, -, -⟩ | ⟨%i, HP, -, Ht, -⟩)
       · unfold nameiWalkDeadEra
         icases Hde with ⟨%k, %d, %hk, Harm⟩
         ihave Hc : iprop(K ∨ T) $$ [Harm]

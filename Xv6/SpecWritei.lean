@@ -49,7 +49,10 @@ five conditionally-saved registers.
   size cap and `Xv6.inodeSized`.
 * A SHORT WRITE IS A NORMAL RETURN: only the up-front checks answer `-1`,
   and that arm reports why (and hands everything back untouched); the
-  writing arm reports the EOF guard it passed, `off ≤ size`.
+  writing arm reports the EOF guard it passed, `off ≤ size`.  (NI M3 FS-0)
+  A short count has its reason: a failed copy's disturbed tail (`why`), or
+  bmap's out-of-blocks `0` -- the next chunk's block still unmapped
+  (`full`).
 * SIZE AND FLUSH: `ip->size` is raised to the advanced offset and iupdate
   runs on every returning path (`n = 0` included); the region's stale
   record `dn0` comes back as `dn' = wiDinode dn bm' off tot` on the writing
@@ -279,6 +282,12 @@ structure WriteiOut (cov : ExtTreeSet Nat compare) (logst bmapstart : Nat)
   usable form.  A caller whose source run is readable-mapped refutes it
   (`wrFailWhy_refute`): then nothing unnamed reached the file. -/
   why : 0 < dist → wrFailWhy V.upt src n
+  /-- (NI M3 FS-0) ...AND A SHORT COUNT WITH NO DISTURBED TAIL HAS ITS REASON
+  TOO: it is bmap's `0` (balloc found no free block, `SpecBalloc`'s live
+  out-of-blocks arm), so the block the next chunk needed is still UNMAPPED
+  in the returned map.  With `why` the two short stops are told apart: a
+  failed copy always leaves a nonempty tail, an exhausted disk none. -/
+  full : a0 ≠ -1#64 → tot < n → dist = 0 → (blkmapGet bm' ((off + tot) / BSIZE)).toNat = 0
   /-- THE RANGE CLAUSE -/
   range : ∀ k, fileByte data' k =
     if off ≤ k ∧ k < off + tot then wrote (k - off)

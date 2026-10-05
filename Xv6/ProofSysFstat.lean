@@ -88,7 +88,7 @@ theorem sfs_fail_exit (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : B
   iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) Hblk
   · ipureintro
     refine ⟨hcs, Or.inl ⟨h10'.trans h10, hnone⟩, UMemL.extSz_refl _ _, Nat.zero_le _,
-      UMemL.umemWrote_refl _ _ _⟩
+      UMemL.umemWrote_refl _ _ _, ⟨.closed, fun h => absurd h id, fun _ => rfl⟩⟩
   · iapply filestat_fs_env_out $$ Henv
 
 set_option maxHeartbeats 8000000 in
@@ -102,6 +102,7 @@ theorem sfs_ok_exit (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     (hsome : argFd v V.ofile = some (fd0, fnode kk)) (hfv : V.ofile[fd0]? = some (fnode kk))
     (hkk : kk < NFILE) (hst : st ≠ .closed)
     (hext : V.upt.extSz V.sz P') (hd : d ≤ 24) (hwin : umemWrote V.upt M v1 d P' M')
+    (hnamed : filestatNamed st V.upt M v1 d P' M')
     (kv : Nat) (hkv : V.ev ≤ kv) :
     kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗
     pcIs cpu (KA.«sys_fstat» + 0x32#64) ∗ frame4s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
@@ -122,7 +123,7 @@ theorem sfs_ok_exit (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
   unfold sysFstatPost
   iapply HΦ $$ %c' %spie %spp %R' %P' %M' %d %kv [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfso
   · ipureintro
-    exact ⟨hcs, Or.inr ⟨fd0, fnode kk, hsome, h10 ▸ hret⟩, hext, hd, hwin⟩
+    exact ⟨hcs, Or.inr ⟨fd0, fnode kk, hsome, h10 ▸ hret⟩, hext, hd, hwin, ⟨st, hnamed⟩⟩
   · iapply (procPrivFd_split γ (procAddr j) pid { V.updEv kv with upt := P' } M').2
     iframe Hcore Howe
 
@@ -180,6 +181,7 @@ theorem sfs_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     (hsome : argFd v V.ofile = some (fd0, fnode kk)) (hfv : V.ofile[fd0]? = some (fnode kk))
     (hkk : kk < NFILE) (hst : st ≠ .closed)
     (hext : V.upt.extSz V.sz P') (hd : d ≤ 24) (hwin : umemWrote V.upt M v1 d P' M')
+    (hnamed : filestatNamed st V.upt M v1 d P' M')
     (kv : Nat) (hkv : V.ev ≤ kv) :
     kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗
     pcIs cpu (KA.«sys_fstat» + 0x32#64) ∗
@@ -199,7 +201,7 @@ theorem sfs_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
   ihave Hframe := sfs_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) _ _ $$ [Hra Hs0 Hcf Hcs]
   · iframe
   iapply (sfs_ok_exit cpu k γ j pid V M v v1 spie spp R fd0 kk q st P' M' d hK4 hr hret hsome hfv
-      hkk hst hext hd hwin kv hkv)
+      hkk hst hext hd hwin hnamed kv hkv)
     $$ [$Hk $Hpc $Hframe $Hte $Hce $Hcore $Howe $Href $Hauth $Hfso $HΦ]
 
 set_option maxHeartbeats 16000000 in
@@ -256,16 +258,17 @@ theorem sfs_ok_jal (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
   -- ===== back from filestat (at any hart) =====
   iintro %cpu
   unfold filestatPost
-  iintro %spie3 %spp3 %R3 %P' %M' %d %kv %⟨hcs3, hret, hext, hd, hwin⟩ Hk Hpc Hte Hce Href %hkv Hpriv
+  iintro %spie3 %spp3 %R3 %P' %M' %d %kv %⟨hcs3, hret, hext, hd, hwin, hnamed⟩ Hk Hpc Hte Hce Href %hkv Hpriv
     Henvo
   k_norm_g [sfs_ret_32, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   k_norm_g [h11] at hwin
+  k_norm_g [h11] at hnamed
   have hr5 : sfsRegs k R3 := by
     refine sfsRegs_cs _ _ _ ?_ hcs3
     repeat (refine sfsRegs_set _ _ _ _ ?_ (by decide))
     exact hr
   iapply (sfs_ok_back cpu k γ j pid V M v v1 spie3 spp3 R3 fd0 kk q st P' M' d hK4 hr5 hret hsome
-      hfv hkk hst hext hd hwin kv hkv)
+      hfv hkk hst hext hd hwin hnamed kv hkv)
     $$ [$Hk $Hpc $Hra $Hs0 $Hcf $Hcs $Hte $Hce $Hpriv $Howe $Href $Hauth $Henvo $Henvb $HΦ]
 
 set_option maxHeartbeats 16000000 in

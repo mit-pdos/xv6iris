@@ -1014,6 +1014,7 @@ theorem createMkdir_exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hsub : ∀ x ∈ Sb, x ∈ Sb4) (hmem : IBLOCK cinum icfgIst ∈ Sb4) (hn4 : iputUnits ≤ n4 ∧ n4 ≤ u)
     (hor : iputUnits + 1 ≤ n4 ∨ fscBmapstart ∈ Sb4)
     (hal : (createBuf (k.regs 2#5)).toNat % 8 = 0 ∧ tl.length = 2)
+    (w : CreWhy) (hw : creDlWhy w)
     (hFM : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
       createFailMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex) :
@@ -1076,10 +1077,10 @@ theorem createMkdir_exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   · rw [hkc.hty]; iexact Hcshot
   unfold createFailMkdirBody
   iapply HF $$ %c %spie %spp %R %kd %qd %gd %γil %γisl %dind %nf %tl %t %kslot %q %g %gil %gisl
-    %lo %tl0 %cinum %dp %bmp %datap %dc %bmc %datc %n4 %Sb4 %hR %htd %hpar.hkd %hpar.hdib
+    %lo %tl0 %cinum %dp %bmp %datap %dc %bmc %datc %n4 %Sb4 %w %hR %htd %hpar.hkd %hpar.hdib
     %hpar.hty %hpar.hnl0 %hpar.hiok %hpar.hdok %hpar.hddix %hpar.hduq %hpar.hrl %hkid.hk
     %⟨hkid.hpos, hkid.hlt⟩ %hkid.hnib %hkc.hty %hkc.hmj %hkc.hmn %hkc.hnl %hkc.hiok %hkc.hrl
-    %hkc.hdok %hkc.hduq %hkc.hdots %hsub %hmem %hn4 %hor %hal Hk Hpc Hte Hce Hframe Hnm Htl
+    %hkc.hdok %hkc.hduq %hkc.hdots %hsub %hmem %hn4 %hor %hal %hw Hk Hpc Hte Hce Hframe Hnm Htl
     Hslk Hsl Hdep Hoff Hdev Hinum Hval Hdl Hdi Hmeta Hmap Hblk Htop Hshotp Hfrz Hkp Hru
     Hcslk Hcsl Hcdep Hcoff Hcdev Hcinum Hcval Hcdi Hcmeta Hcmap Hcblk Hctop Hcshotc Hcfrz %hlec
     Hcfl Hckp Hcru Hpile Hsbn Hsi Hss Hsb Hbare Hbarew Hpath Hbs Hisl Hop Hdirty HP Hdlk Harm
@@ -1803,7 +1804,8 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex cpu spie1 spp1 R1 kd qd gd γil γisl dind
       nf tl t kslot q g gil gisl lo tl0 cinum dp3 bm3 dat3 dc2 bm2 dat2 n6 Sb6 hS.hns hR1 htd hfp
       hkid ⟨hdd.hty, hdd.hmj, hdd.hmn, hdd.hnl, hdd.hiok, hdd.hrl, hdd.hdok, hdd.hduq, hdd.hdots⟩
-      hsub6 (hout.sub _ hmem5) ⟨hip6, hn6u⟩ (Or.inr hbm6) hal hFM)
+      hsub6 (hout.sub _ hmem5) ⟨hip6, hn6u⟩ (Or.inr hbm6) hal
+      (creWhyOfDl (16 * dirSlot data (dirNrec dn.diSize.toNat))) (creWhyOfDl_dl _) hFM)
     iframe Henv Hk Hpc Hte Hce Hnm Hsi Hss Hsb Hpid Hbs Hslot Hop Hdep Hdev Hinum Hval Hdl Hdi
       Hmeta Hmap Hblk Htop Hcdep Hcdev Hcinum Hcval Hcdi Hcmeta Hcmap Hcblk Hctop Hpile Hdirty
       Harm Hacre Hkeep
@@ -2215,7 +2217,8 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
       ⟨hpar.hkd, hpar.hdib, hpar.hty, hpar.hnl0, hpar.hiok, hpar.hdok, hpar.hddix, hpar.hduq,
         hpar.hrl⟩
       hkid ⟨hty2, hmj2, hmn2, hnl2, hiok2, hrl2, hdok2, hduq2, hdots2⟩
-      hsub5 hmem5 ⟨by unfold iputUnits; omega, hn5u⟩ (Or.inl (by unfold iputUnits; omega)) hal hFM)
+      hsub5 hmem5 ⟨by unfold iputUnits; omega, hn5u⟩ (Or.inl (by unfold iputUnits; omega)) hal
+      (creWhyOfDl (16 * dirSlot dat1 (dirNrec dc1.diSize.toNat))) (creWhyOfDl_dl _) hFM)
     iframe Henv Hk Hpc Hte Hce Hnm Hsi Hss Hsb Hpid Hbs Hslot Hop Hdep Hdev Hinum Hval Hdl Hdi
       Hmeta Hmap Hblk Htop Hcdep Hcdev Hcinum Hcval Hcdi Hcmeta Hcmap Hcblk Hctop Hpile Hdirty
       Harm Hacre Hkeep
@@ -2501,7 +2504,9 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
       nf tl t kslot q g gil gisl lo tl0 cinum dn bm data dc1 bm1 dat1 n4 Sb4 hS.hns hR1 htd
       ⟨hkd, hdib, htydir, hnl0, hiok, hdok, hddix, hduq, hrl⟩
       hkid ⟨hty1, hmj1, hmn1, hnl1, hiok1, hrl1, hdok1, hduq1, hdots1⟩
-      hsub4 hmem4 ⟨by unfold iputUnits at hip4 ⊢; omega, hn4u⟩ (Or.inl hip4) hal hFM)
+      hsub4 hmem4 ⟨by unfold iputUnits at hip4 ⊢; omega, hn4u⟩ (Or.inl hip4) hal
+      (creWhyOfDl (16 * dirSlot datc (dirNrec (createSetf dnc major minor 1#16).diSize.toNat)))
+      (creWhyOfDl_dl _) hFM)
     iframe Henv Hk Hpc Hte Hce Hnm Hsi Hss Hsb Hpid Hbs Hslot Hop Hdep Hdev Hinum Hval Hdl Hdi
       Hmeta Hmap Hblk Htop Hcdep Hcdev Hcinum Hcval Hcdi Hcmeta Hcmap Hcblk Hctop Hpile Hdirty
       Harm Hdotsx Hacre Hkeep

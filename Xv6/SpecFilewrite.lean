@@ -186,6 +186,7 @@ import Xv6.SpecConsolewrite
 import Xv6.ConsoleInvDefs
 import Xv6.FsAbsWriteFire
 import Xv6.UserPerm
+import Xv6.FsLedger
 
 namespace Xv6
 
@@ -422,6 +423,68 @@ theorem writeArmsAt_neg_held (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : 
   · ipureintro; exact ubytesAt_nil M ua
   simp only [List.length_nil, Nat.add_zero, Nat.zero_sub, awriteChainAt_0]
   iexact Hc
+
+/-! ### (NI M3 FS-0) WHY a writable inode's write answered `-1`
+
+The sign guard (`n < 0`), or a SHORT CHUNK, whose reason writei relays
+(F7 (b), ruling FS-R5): an unmapped source byte (`src`: writei's disturbed
+tail, `wrFailWhy` at the writer's table), the file at `MAXFILE` blocks
+(`max`: writei's own `-1`; its rows compute it from the file's size and the
+offset), or the disk out of blocks (`full`: writei's short count at an
+unmapped block -- `SpecWritei.WriteiOut.full`, balloc's live arm relayed
+through bmap -- carried as `fsFullRcpt .blocks`). -/
+
+inductive FwWhy where
+  | src
+  | max
+  | full
+  deriving DecidableEq
+
+/-- what a short chunk's reason carries -/
+def fwWhyRcpt (γfs : FsNames) (act : BitVec 64) (P : UPtd) (ua : BitVec 64) (n : Int) :
+    FwWhy → IProp GF
+  | .src => iprop(⌜wrFailWhy P ua n.toNat⌝)
+  | .max => iprop(emp)
+  | .full => fsFullRcpt γfs act .blocks
+
+instance fwWhyRcpt_persistent (γfs : FsNames) (act : BitVec 64) (P : UPtd) (ua : BitVec 64) (n : Int)
+    (w : FwWhy) : Persistent (fwWhyRcpt (GF := GF) γfs act P ua n w) := by
+  cases w <;> unfold fwWhyRcpt <;> infer_instance
+
+/-- the post's reason row: at a writable inode descriptor, a `-1` is the
+sign guard's or a short chunk's -/
+def fwWhyAt (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd) (ua : BitVec 64) (n : Int)
+    (r : BitVec 64) : IProp GF :=
+  match st with
+  | .open _ true (.inode _ _ _) =>
+    iprop(⌜r = -1#64⌝ -∗ ⌜n < 0⌝ ∨ ∃ w : FwWhy, fwWhyRcpt γfs act P ua n w)
+  | _ => iprop(emp)
+
+theorem fwWhyAt_ne (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd) (ua : BitVec 64)
+    (n : Int) (r : BitVec 64) (h : r ≠ -1#64) : ⊢@{IProp GF} fwWhyAt γfs act st P ua n r := by
+  unfold fwWhyAt
+  rcases st with _ | ⟨rb, _ | _, _ | ⟨i, γo, om⟩ | mj⟩ <;> try iempintro
+  iintro %hr; exact absurd hr h
+
+theorem fwWhyAt_neg (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd) (ua : BitVec 64)
+    (n : Int) (r : BitVec 64) (hn : n < 0) : ⊢@{IProp GF} fwWhyAt γfs act st P ua n r := by
+  unfold fwWhyAt
+  rcases st with _ | ⟨rb, _ | _, _ | ⟨i, γo, om⟩ | mj⟩ <;> try iempintro
+  iintro -; ileft; ipureintro; exact hn
+
+theorem fwWhyAt_other (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd) (ua : BitVec 64)
+    (n : Int) (r : BitVec 64) (h : ∀ (rb : Bool) (i : Nat) (γo : GName) (om : OffMode),
+      st ≠ .open rb true (.inode i γo om)) : ⊢@{IProp GF} fwWhyAt γfs act st P ua n r := by
+  unfold fwWhyAt
+  rcases st with _ | ⟨rb, _ | _, _ | ⟨i, γo, om⟩ | mj⟩ <;> try iempintro
+  exact absurd rfl (h rb i γo om)
+
+theorem fwWhyAt_why (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd) (ua : BitVec 64)
+    (n : Int) (r : BitVec 64) (w : FwWhy) :
+    fwWhyRcpt (GF := GF) γfs act P ua n w ⊢ fwWhyAt γfs act st P ua n r := by
+  unfold fwWhyAt
+  rcases st with _ | ⟨rb, _ | _, _ | ⟨i, γo, om⟩ | mj⟩ <;> try (iintro -; iempintro)
+  iintro Hw -; iright; iexists w; iexact Hw
 
 end Arms
 
@@ -772,6 +835,8 @@ def filewritePost (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (f
     procPrivCoreNoctxAt curCtx (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
     filewriteEnvOut γl γu st -∗
     filewriteArms (hlc := hlc) V.gen V.upt st n (writerImg V.upt M) (k.regs 11#5) Q Qe (R' 10#5) -∗
+    -- (NI M3 FS-0) ...AND WHY a writable inode's `-1`
+    fwWhyAt fscFs k.proc st V.upt (k.regs 11#5) n (R' 10#5) -∗
     wpLoop cpu')
 
 end Post

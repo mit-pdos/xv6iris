@@ -156,7 +156,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
       iprop(⌜R 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
         creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti T_DEVICE_w.toNat (devArg A.v1)
           (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P A.Pmiss A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok
-          A.Fex pl))
+          A.Fex pl k.proc))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hlow, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Harm⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -171,7 +171,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     iintro Hk Hpc
     ihave Hop := logOpS_op icfgLog u' Sb' $$ Hop Htx
     ihave Hcf := creFailArms_dev (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti (devArg A.v1) (devArg A.v2)
-      (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P A.Pmiss A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl $$ Hcf
+      (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P A.Pmiss A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl k.proc $$ Hcf
     ihave Hfail : mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
         A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok
         A.Fex $$ [Hcf]
@@ -181,7 +181,10 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
       isplitr
       · ipureintro; exact hpl
       · unfold creChildUnfiredNd creChildUnfiredNdp
-        iexact Hcf
+        -- (NI M3 FS-0) mknod is outside the class: create's reason is dropped here
+        icases Hcf with (Hl | ⟨%d, HP, Hac, Hex, Hcl, -⟩)
+        · ileft; iexact Hl
+        · iright; iexists d; iframe HP Hac Hex Hcl
     ihave Hir := (show irefSlots (GF := GF) ns' ⊢ irefSlots A.ns from by rw [hns]) $$ Hir
     iapply (sys_mknod_tail_58 EO Γ cpu k A P2 spie spp _ u' hj hproc hK hnoff htier hct hpins hal hP2)
       $$ [$Hk $Hpc $Hcells $Hbuf $Hlow $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hfail]

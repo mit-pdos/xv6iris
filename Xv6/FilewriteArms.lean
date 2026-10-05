@@ -87,7 +87,7 @@ theorem fwr_arm_neg (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl :
   ihave Henv := filewrite_env_out_of_env γl γu st $$ Henv
   unfold fwrK
   ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv [Hin]
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv [Hin] []
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _, fun _ _ => ⟨fun _ => ha0, fun h => absurd h (by omega)⟩⟩
   · iapply fwConsOut_neg; exact ha0
   · unfold filewriteArms
@@ -95,6 +95,8 @@ theorem fwr_arm_neg (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl :
     isplitr
     · ipureintro; exact filewriteRet_m1 n
     iapply filewriteExtra_neg (pmv := pmv) (szv := szv) (lzv := lzv) _ _ st n _ _ Q Qe hneg htb $$ Hin
+  · -- (NI M3 FS-0) the sign guard's -1
+    iapply fwWhyAt_neg; exact hneg
 
 /-- THE INODE ARM'S INPUT AT A ZERO COUNT, at either mode: the chain at
 the kernel's table (at a held row the client-advanced chain converts down,
@@ -163,7 +165,7 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
   ihave Henv := filewrite_env_out_of_env γl γu _ $$ Henv
   unfold fwrK
   ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv [Hin]
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv [Hin] []
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _, fun _ h => by cases h⟩
   · iapply fwConsOut_off; intro _ h; cases h
   · -- the chain at the writer's table, at EITHER mode (Rocq L2: the
@@ -185,6 +187,8 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
     isplitr
     · ipureintro; exact ubytesAt_nil _ _
     iexact Hc
+  · -- (NI M3 FS-0) the answer is 0, not -1
+    iapply fwWhyAt_ne; rw [ha0]; decide
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x5c .. +0x62`: THE PIPE ARM** (Rocq's `+0x54 .. +0x5a`):
@@ -270,7 +274,7 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   ihave Href := filerw_ref_close γ fk q (.open rb true (.pipe γp)) C $$ [Htok Hfields Hpay]
   · iframe
   unfold fwrK
-  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] [] Hk Hpc Hte Hce Href Hpriv [] [Hpost]
+  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] [] Hk Hpc Hte Hce Href Hpriv [] [Hpost] []
   · ipureintro; exact ⟨hcs, hext, fun _ h => by cases h⟩
   · iapply fwConsOut_off; intro _ h; cases h
   · unfold filewriteEnvOut; iempintro
@@ -281,6 +285,7 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     iapply filewriteExtra_pipe
     try rw [h11]
     iexact Hpost
+  · iapply fwWhyAt_other; intro _ _ _ _ h; cases h
 
 /-! ## The FD_DEVICE arm's readings -/
 
@@ -352,7 +357,7 @@ theorem fwr_dev_m1 (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : 
   · iframe
   unfold fwrK
   ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv [] [Hin]
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv [] [Hin] []
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _, fun _ h => absurd (by cases h; rfl) hnc⟩
   · iapply fwConsOut_neg; exact ha0
   · unfold filewriteEnvOut; iexact Henv
@@ -361,6 +366,7 @@ theorem fwr_dev_m1 (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : 
     isplitr
     · ipureintro; exact filewriteRet_m1 n
     iapply filewriteExtra_dev_drop (pmv := pmv) (szv := szv) (lzv := lzv) _ _ rb mj hnc n _ _ Q Qe _ $$ Hin
+  · iapply fwWhyAt_other; intro _ _ _ _ h; cases h
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x64 .. +0x88`: THE FD_DEVICE ARM** (Rocq's `+0x5c .. +0x80`):
@@ -542,7 +548,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   · iframe
   have hin : (i : Int) ≤ n := by omega
   unfold fwrK
-  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] [] Hk Hpc Hte Hce Href Hpriv [] [HQ]
+  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] [] Hk Hpc Hte Hce Href Hpriv [] [HQ] []
   · ipureintro
     exact ⟨hcs, hext, fun _ _ => ⟨fun h => absurd h (by omega), fun _ => ⟨i, by rw [h10', hret], hin, hcnt⟩⟩⟩
   · iapply fwConsOut_cons _ _ _ _ _ i (by rw [h10', hret]); iexact HO
@@ -554,6 +560,8 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     isplitr
     · ipureintro; exact hr
     iapply filewriteExtra_cons _ _ rb n _ _ Q Qe _ $$ H
+  · -- (NI M3 FS-0) a device row: no inode reason
+    iapply fwWhyAt_other; intro _ _ _ _ h; cases h
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0x102 .. +0x116`: THE ELSE ARM** (Rocq's `fw_panic`): the six lazy

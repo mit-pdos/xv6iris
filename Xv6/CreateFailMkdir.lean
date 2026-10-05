@@ -290,9 +290,9 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   unfold createFailMkdirBody
   iintro #Henv %cpu %spie %spp %R %kd %qd %gd %γil %γisl %dind %nf %tl %t %kslot %q %g %gil %gisl
-    %lo %tl0 %cinum %dp %bmp %datap %dc %bmc %datc %n4 %Sb4
+    %lo %tl0 %cinum %dp %bmp %datap %dc %bmc %datc %n4 %Sb4 %w
   iintro %hR %htd %hkd %hdib %hdty %hdnl %hdiok %hddk %hddix %hduq %hdrl %hks %hcpos %hcnib
-    %hcty %hcmaj %hcmin %hcnl %hciok %hcrl %hcdok %hcduq %hcdots %hsb4 %hmem4 %hn4 %hledge %hal
+    %hcty %hcmaj %hcmin %hcnl %hciok %hcrl %hcdok %hcduq %hcdots %hsb4 %hmem4 %hn4 %hledge %hal %hw
   iintro Hk Hpc Hte Hce Hframe Hnm Htl #Hslkd Hsld Hdepd Hoffd Hdevd Hinumd Hvald Hdlnk Hdiat
     Hmeta Hmap Hblocks Htop #Hshotd Hfrzd Hkeepd Hrud #Hslkc Hslc Hdepc Hoffc Hdevc Hinumc Hvalc
     Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hshotc Hfrzc %hlek #Hflk Hkeepc Hruc Htoks Hsbn Hsbi Hsbs
@@ -485,7 +485,9 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   -- mkdir's `fail:` payout: the do-then-undo PAIR, the dots as the entry brought them
   ihave Hcf := create_fail_of_pair (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat
     minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat cinum.toNat
-    $$ HP Hdlk Hacre Hdots Hunr
+    k.proc w $$ HP Hdlk Hacre Hdots Hunr []
+  · -- (NI M3 FS-0) the failing entry's reason
+    iapply creWhyRcpt_intro
   have hns' : (if false = true then 1 + 1 + (ns - 2) + 1 = ns else 1 + 1 + (ns - 2) = ns) := by
     have := hS.hns; unfold createIrefSlots at this; simp; omega
   have hled : (∀ x ∈ Sb, x ∈ Sb6) ∧ n6 ≤ u ∧ (false = true → iputUnits ≤ n6) :=

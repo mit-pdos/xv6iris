@@ -403,7 +403,8 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     (Sb5 : List Nat) (hR2 : createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R2)
     (hkd : kd < NINODE) (hdib : dind.toNat < 16 * icfgNib) (hipn5 : iputUnits ≤ n5)
     (hsb5 : ∀ x ∈ Sb, x ∈ Sb5) (hn5 : n5 ≤ u)
-    (hal : (createBuf (k.regs 2#5)).toNat % 8 = 0 ∧ tl.length = 2) :
+    (hal : (createBuf (k.regs 2#5)).toNat % 8 = 0 ∧ tl.length = 2)
+    (w : CreWhy) (hw : creDlWhy w) :
     kctx cpu (((k.withSpie spie2 spp2).pushed 10).withRegs R2) ∗
     pcIs cpu (KA.«create» + 0x156#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
@@ -521,8 +522,10 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
   -- ARM FAIL: the do-then-undo PAIR, the cursor and the observation home
   ihave Hcf := create_fail_of_pair (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat
     minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat cinum.toNat
-    $$ HPpar Hdlkc Hacre [Hdots] Hunr
+    k.proc w $$ HPpar Hdlkc Hacre [Hdots] Hunr []
   · iright; iexact Hdots
+  · -- (NI M3 FS-0) the entry's dirlink failed: `w` is its reason
+    iapply creWhyRcpt_intro
   unfold irefSlot
   ihave Hisl := irefSlots_combine 1 (ns - 2) $$ [Hisl2 Hislr]
   · iframe
@@ -568,7 +571,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   iintro %cpu %spie %spp %R %kd %qd %gd %γil %γisl %dind %dn %bm %data %nf %tl %t %kslot %q %g
     %gil %gisl %lo %tl0 %cinum %dnc %bmc %datc %bmp %datap %dnp %dn0p %tot %n4 %Sb4
   iintro %hR %htd %hkd %hdib %htydir %hnl0 %hiok %hdok %hddix %hduq %hrl %hks %hcpos %hcnib
-    %hfresh %hrlc %htyc %hciok %hcdok %htot %hwf' %hholes' %haddr' %hsz31' %hcov' %hszcap'
+    %hfresh %hrlc %htyc %hciok %hcdok %htot %hdlw %hwf' %hholes' %haddr' %hsz31' %hcov' %hszcap'
     %hsized' %hdn' %hdn0p %hrng %hsb4 %hmem4 %hn4 %hledge %hal
   iintro Hk Hpc Hte Hce Hframe Hnb14 Hnb2 Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid Hdlnk
     Hdiat Hmeta Hmap Hblocks Htop Hshotl Hfrzl Hkeep Hrud Hslkc Hcslkd Hcdep Hoffrc Hcidev
@@ -704,7 +707,9 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   iapply (createFail_parent_tail IUP Γ cpu k γl pd pav pu j γkl γk plen pfun ty major minor γ pid
       V M u Sb ns dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex hS spie2 spp2 R2 kd qd gd
       γil γisl dind dnp bmp nf tl t kslot cinum n5 Sb5 hR2 hkd hdib hipn5
-      (Xv6.namex_sub_trans _ _ _ (Xv6.namex_sub_trans _ _ _ hsb4 (create_sub_cons Sb4 _)) hsb5) (by omega) hal)
+      (Xv6.namex_sub_trans _ _ _ (Xv6.namex_sub_trans _ _ _ hsb4 (create_sub_cons Sb4 _)) hsb5) (by omega) hal
+      (creWhyOfDl (16 * dirSlot data (dirNrec dn.diSize.toNat)))
+      (creWhyOfDl_dl _))
   iframe Hk Hpc Hte Hce Hframe Hnb14 Hnb2 Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid Hload
     Hshotl Hfrzl Hkeep Hrud Hsbb Hsbi Hpid Hbsl Hop Hisl1 Htq1 Htx Hbareback Hback Hsbn Hsbs
     Hpath Hislr HPpar Hdlkc Hdots Hacre Hunr Hcont

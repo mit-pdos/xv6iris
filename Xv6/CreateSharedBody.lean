@@ -423,19 +423,23 @@ theorem create_fail_of_cursor (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) 
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
-    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (pl : List (BitVec 8)) (d : Nat) :
+    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (pl : List (BitVec 8)) (d : Nat)
+    (act : BitVec 64) (w : CreWhy) :
     P (nparElems pl).length d ⊢
       pfAt (dlookupCommitAt Γ appE) Fex -∗
       creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
-      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
+      creWhyRcpt γfs act w -∗
+      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl act := by
   unfold creFailArms creCommits
-  iintro HP Hdl ⟨Ha, Hd, Hu, Hac⟩
+  iintro HP Hdl ⟨Ha, Hd, Hu, Hac⟩ Hw
   iright
   iexists d
   iframe HP Hac
   isplitl [Hdl]
   · iright; iexact Hdl
+  isplitl [Ha Hd Hu]
   · ileft; iframe Ha Hd Hu
+  · iexists w; iexact Hw
 
 /-- ARM N: the walk died (Rocq's `cr_fail_of_dead`); `npDead_to_mknod`
 splits a death strictly inside the parent prefix from one at the parent's
@@ -445,18 +449,21 @@ theorem create_fail_of_dead (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (t
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
-    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (pl : List (BitVec 8)) :
+    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (pl : List (BitVec 8))
+    (act : BitVec 64) :
     npDead (hlc := hlc) rt γfs P Pmiss pl ⊢
       pfAt (dlookupCommitAt Γ appE) Fex -∗
       creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
-      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
+      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl act := by
   iintro Hdead Hdl Hcre
   icases npDead_to_mknod (hlc := hlc) rt γfs P Pmiss pl $$ Hdead with (Hd | ⟨%dpar, HPd⟩)
   · unfold creFailArms
     ileft
     iframe Hd Hdl Hcre
-  · iapply (create_fail_of_cursor Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl dpar)
-      $$ HPd Hdl Hcre
+  · -- (NI M3 FS-0) the death at the parent's own level: the path names `/`
+    iapply (create_fail_of_cursor Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl dpar
+      act .root) $$ HPd Hdl Hcre
+    unfold creWhyRcpt; iempintro
 
 /-- ARM F-BAD: the name WAS there, so the observation fired and nothing
 else did (Rocq's `cr_fail_of_seen`). -/
@@ -466,11 +473,12 @@ theorem create_fail_of_seen (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (t
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (pl : List (BitVec 8))
-    (d : Nat) (nm : Fname) (i : Nat) (hlast : (pathElems pl).getLast? = some nm) :
+    (d : Nat) (nm : Fname) (i : Nat) (hlast : (pathElems pl).getLast? = some nm)
+    (act : BitVec 64) :
     P (nparElems pl).length d ⊢
       creExFired Fex d nm i -∗
       creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
-      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
+      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl act := by
   unfold creFailArms creCommits
   iintro HP Hex ⟨Ha, Hd, Hu, Hac⟩
   iright
@@ -481,7 +489,9 @@ theorem create_fail_of_seen (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (t
     iexists nm, i
     iframe Hex
     ipureintro; exact hlast
+  isplitl [Ha Hd Hu]
   · ileft; iframe Ha Hd Hu
+  · iexists CreWhy.seen; unfold creWhyRcpt; iempintro
 
 /-- ARM FAIL and mkdir's three `fail:` entries: the row appeared and
 disappeared, the parent leg never fired (Rocq's `cr_fail_of_pair`, ruling
@@ -492,23 +502,26 @@ theorem create_fail_of_pair (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (t
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (pl : List (BitVec 8))
-    (d i : Nat) :
+    (d i : Nat) (act : BitVec 64) (w : CreWhy) :
     P (nparElems pl).length d ⊢
       pfAt (dlookupCommitAt Γ appE) Fex -∗
       pfAt (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild tyz ma mi) Nm (P (nparElems pl).length) Farm) Fok -∗
       ((∃ full : Bool, creDotsFired Fdots i d full) ∨ creDotsLeg (hlc := hlc) Γ tyz Fdots) -∗
       creUnarmFired Fun i -∗
-      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
+      creWhyRcpt γfs act w -∗
+      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl act := by
   unfold creFailArms
-  iintro HP Hdl Hac Hd Hu
+  iintro HP Hdl Hac Hd Hu Hw
   iright
   iexists d
   iframe HP Hac
   isplitl [Hdl]
   · iright; iexact Hdl
+  isplitl [Hd Hu]
   · iright
     iexists i
     iframe Hd Hu
+  · iexists w; iexact Hw
 
 /-- ARM F-OK: the name was already there; every commit comes home and the
 payout is the observation (Rocq's `cr_ok_of_found`). -/
@@ -868,6 +881,8 @@ def createFailBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major m
     ⌜inodeOk fscCov fscLogst dnc bmc datc⌝ -∗ ⌜dirOk icfgNib dnc datc⌝ -∗
     -- WHAT THE FAILING `dirlink(dp,name)` AT +0xd8 LEFT
     ⌜tot = 0⌝ -∗
+    -- (NI M3 FS-0) ...AND WHY IT FAILED (`DirlinkOut.full`)
+    ⌜dlFullWhy bm' (16 * dirSlot data (dirNrec dn.diSize.toNat))⌝ -∗
     ⌜blkmapWf fscCov fscLogst bm'⌝ -∗ ⌜blkHolesZero bm' data'⌝ -∗
     ⌜dn'.diAddrs = bmCells bm'⌝ -∗ ⌜dn'.diSize.toNat < 2 ^ 31⌝ -∗
     ⌜bmCovers bm' dn'.diSize.toNat⌝ -∗ ⌜dn'.diSize.toNat ≤ MAXFILE * BSIZE⌝ -∗
@@ -981,7 +996,8 @@ def createFailMkdirBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8)
       (nf : Nat → BitVec 8) (tl : List (BitVec 8)) (t : Nat)
       (kslot : Nat) (q : Qp) (g gil gisl : GName) (lo tl0 : Nat) (cinum : BitVec 32)
       (dp : Dinode) (bmp : Blkmap) (datap : Nat → List (BitVec 8))
-      (dc : Dinode) (bmc : Blkmap) (datc : Nat → List (BitVec 8)) (n4 : Nat) (Sb4 : List Nat),
+      (dc : Dinode) (bmc : Blkmap) (datc : Nat → List (BitVec 8)) (n4 : Nat) (Sb4 : List Nat)
+      (w : CreWhy),
     ⌜createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R⌝ -∗
     ⌜ty = T_DIR⌝ -∗
     -- THE PARENT, ALREADY RE-PARKED
@@ -1003,6 +1019,8 @@ def createFailMkdirBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8)
     ⌜iputUnits ≤ n4 ∧ n4 ≤ u⌝ -∗
     ⌜iputUnits + 1 ≤ n4 ∨ fscBmapstart ∈ Sb4⌝ -∗
     ⌜(createBuf (k.regs 2#5)).toNat % 8 = 0 ∧ tl.length = 2⌝ -∗
+    -- (NI M3 FS-0) why the failing entry's dirlink failed
+    ⌜creDlWhy w⌝ -∗
     -- the machine
     kctx c (((k.withSpie spie spp).pushed 10).withRegs R) -∗ pcIs c (KA.«create» + 0x146#64) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗

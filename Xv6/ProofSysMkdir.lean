@@ -100,7 +100,7 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
      else
       iprop(⌜R 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
         creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Pmiss
-          A.Farm A.Fdots A.Fun A.Fok A.Fex (bview pl.length (sysfilePfun pl))))
+          A.Farm A.Fdots A.Fun A.Fok A.Fex (bview pl.length (sysfilePfun pl)) (procAddr A.j)))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Harm⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -119,7 +119,7 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     ihave Hfail : sysMkdirFail (hlc := hlc) A $$ [Hfail]
     · unfold sysMkdirFail
       iright
-      iexists bview pl.length (sysfilePfun pl)
+      iexists bview pl.length (sysfilePfun pl), procAddr A.j
       iexact Hfail
     iapply (sys_mkdir_tail_40 EO Γ cpu k A P2 spie spp R u' hj hproc hK hnoff htier hct hpins hal hP2)
       $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hfail]

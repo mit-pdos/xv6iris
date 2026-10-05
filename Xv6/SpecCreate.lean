@@ -96,6 +96,7 @@ Imports only definitional files and callee `Spec*` files.
 import Xv6.CreateDefs
 import Xv6.FsAbsMknodFire
 import Xv6.FdTable
+import Xv6.FsLedger
 
 namespace Xv6
 
@@ -140,6 +141,44 @@ def creOkArms (Γ : FsViewNames GF) (tyz ma mi : Nat) (Nm : Fname → Prop) (Nd 
      else
       iprop(creExFired Fex d nm i ∗ creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok)))
 
+/-- (NI M3 FS-0) **WHY create GAVE UP once the walk reached the parent**
+(F7 (c), ruling FS-R5): every failure arm past the walk is one of these.
+`nlink` -- the parent's link count is zero (`sysfile.c:269`) or, at a
+directory child, at `NLINK_MAX`; `seen` -- the name was there with the wrong
+type (ARM F-BAD: the observation fired); `root` -- the walk ended at the
+parent's own level (the path names `/`); `dirFull` -- an entry's `dirlink`
+found the directory with no free slot below `MAXFILE` blocks
+(`SpecDirlink.dlFullWhy`'s left disjunct); `full why` -- a global table was
+exhausted: `.inodes` (ialloc found no free dinode, ARM A-FAIL), `.blocks`
+(an entry's `dirlink` found no free block: writei's `full`, relayed). -/
+inductive CreWhy where
+  | nlink
+  | seen
+  | root
+  | dirFull
+  | full (why : FsFull)
+  deriving DecidableEq
+
+/-- (NI M3 FS-0) what a reason carries: an exhaustion its receipt
+(`FsLedger.fsFullRcpt`, the verdict as given), the others nothing beyond
+their tag (their rows compute them). -/
+def creWhyRcpt (γfs : FsNames) (act : BitVec 64) : CreWhy → IProp GF
+  | .full why => fsFullRcpt γfs act why
+  | _ => iprop(emp)
+
+/-- an entry's `dirlink` failure, as a reason (`SpecDirlink.dlFullWhy` read
+at create's level) -/
+def creDlWhy (w : CreWhy) : Prop := w = .dirFull ∨ w = .full .blocks
+
+/-- ...and which one, off the failed append's slot (`SpecDirlink.dlFullWhy`:
+past `MAXFILE` blocks the directory is full, else the slot's block is still
+unmapped) -/
+def creWhyOfDl (off : Nat) : CreWhy :=
+  if MAXFILE * BSIZE < off + 16 then .dirFull else .full .blocks
+
+theorem creWhyOfDl_dl (off : Nat) : creDlWhy (creWhyOfDl off) := by
+  unfold creWhyOfDl creDlWhy; split <;> simp
+
 /-- **ARM N, and ARMS G / F-BAD / A-FAIL / FAIL / mkdir's three `fail:`
 entries** (Rocq's `cre_fail_arms`).  ARM N: the walk died before create saw
 a parent, so the death receipt comes home and every commit is whole.  The
@@ -153,7 +192,7 @@ def creFailArms (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (tyz ma mi : N
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (pl : List (BitVec 8)) : IProp GF :=
+    (pl : List (BitVec 8)) (act : BitVec 64) : IProp GF :=
   iprop((nparWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗
       pfAt (dlookupCommitAt Γ appE) Fex ∗
       creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok) ∨
@@ -167,7 +206,18 @@ def creFailArms (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (tyz ma mi : N
           pfAt (aunarmOfArmNd (hlc := hlc) Γ appE Nd Farm) Fun) ∨
         (∃ i : Nat,
           ((∃ full : Bool, creDotsFired Fdots i d full) ∨ creDotsLeg (hlc := hlc) Γ tyz Fdots) ∗
-          creUnarmFired Fun i))))
+          creUnarmFired Fun i)) ∗
+      -- (NI M3 FS-0) ...AND WHY (`CreWhy`, F7 (c))
+      ∃ w : CreWhy, creWhyRcpt γfs act w))
+
+/-- (NI M3 FS-0) a reason whose verdict is not an exhaustion carries nothing;
+FS-0 makes the exhaustion receipt from nothing too (`fsFullRcpt_intro`;
+FS-1 appends it at the site instead) -/
+theorem creWhyRcpt_intro (γfs : FsNames) (act : BitVec 64) (w : CreWhy) :
+    ⊢@{IProp GF} creWhyRcpt γfs act w := by
+  cases w with
+  | full why => exact fsFullRcpt_intro γfs act why
+  | _ => unfold creWhyRcpt; iempintro
 
 /-! ### The two pinned readings of the arms (Rocq :812–1028)
 
@@ -210,8 +260,8 @@ theorem creFailArms_dev (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (ma mi
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (pl : List (BitVec 8)) :
-    creFailArms (hlc := hlc) Γ γfs rt T_DEVICE_w.toNat ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl ⊢
+    (pl : List (BitVec 8)) (act : BitVec 64) :
+    creFailArms (hlc := hlc) Γ γfs rt T_DEVICE_w.toNat ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl act ⊢
       (nparWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗
           pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.ADev ma mi) Nm (P (nparElems pl).length) Farm) Fok ∗
           pfAt (dlookupCommitAt Γ appE) Fex ∗
@@ -227,15 +277,16 @@ theorem creFailArms_dev (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (ma mi
             Fex.pfRecv av d nm i) ∨
           pfAt (dlookupCommitAt Γ appE) Fex) ∗
         (creChildUnfiredNdp (hlc := hlc) Γ (.ADev ma mi) Nd Farm Fun ∨
-          ∃ i : Nat, creChildPair Farm Fun i)) := by
+          ∃ i : Nat, creChildPair Farm Fun i) ∗
+        ∃ w : CreWhy, creWhyRcpt γfs act w) := by
   unfold creFailArms creCommits creChildUnfiredNdp creChildPair acreCommitAtNm
   simp only [creC0_dev, creChild_dev_fun]
-  iintro (⟨Hd, Hdl, Harm, -, Hun, Hac⟩ | ⟨%d, HP, Hex, Hac, Hlegs⟩)
+  iintro (⟨Hd, Hdl, Harm, -, Hun, Hac⟩ | ⟨%d, HP, Hex, Hac, Hlegs, Hwhy⟩)
   · ileft
     iframe Hd Hdl Hac Harm Hun
   · iright
     iexists d
-    iframe HP Hac
+    iframe HP Hac Hwhy
     isplitl [Hex]
     · icases Hex with (⟨%nm, %i, %hlast, Hf⟩ | Hdl)
       · ileft
@@ -311,8 +362,8 @@ theorem creFailArms_file (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (ma m
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (pl : List (BitVec 8)) :
-    creFailArms (hlc := hlc) Γ γfs rt T_FILE_w.toNat ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl ⊢
+    (pl : List (BitVec 8)) (act : BitVec 64) :
+    creFailArms (hlc := hlc) Γ γfs rt T_FILE_w.toNat ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl act ⊢
       (nparWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗
           pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) Nm (P (nparElems pl).length) Farm) Fok ∗
           pfAt (dlookupCommitAt Γ appE) Fex ∗
@@ -328,15 +379,16 @@ theorem creFailArms_file (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (ma m
             Fex.pfRecv av d nm i) ∨
           pfAt (dlookupCommitAt Γ appE) Fex) ∗
         (creChildUnfiredNdp (hlc := hlc) Γ (.AFile []) Nd Farm Fun ∨
-          ∃ i : Nat, creChildPair Farm Fun i)) := by
+          ∃ i : Nat, creChildPair Farm Fun i) ∗
+        ∃ w : CreWhy, creWhyRcpt γfs act w) := by
   unfold creFailArms creCommits creChildUnfiredNdp creChildPair acreCommitAtNm
   simp only [creC0_file, creChild_file_fun]
-  iintro (⟨Hd, Hdl, Harm, -, Hun, Hac⟩ | ⟨%d, HP, Hex, Hac, Hlegs⟩)
+  iintro (⟨Hd, Hdl, Harm, -, Hun, Hac⟩ | ⟨%d, HP, Hex, Hac, Hlegs, Hwhy⟩)
   · ileft
     iframe Hd Hdl Hac Harm Hun
   · iright
     iexists d
-    iframe HP Hac
+    iframe HP Hac Hwhy
     isplitl [Hex]
     · icases Hex with (⟨%nm, %i, %hlast, Hf⟩ | Hdl)
       · ileft
@@ -418,7 +470,7 @@ def createPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor
       -- ARMS N / G / the NLINK_MAX gate / F-BAD / A-FAIL / FAIL: a0 = 0, nothing held
       iprop(⌜R' 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
         creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat minor.toNat Nm Nd P Pmiss
-          Farm Fdots Fun Fok Fex (bview plen pfun))) -∗
+          Farm Fdots Fun Fok Fex (bview plen pfun) k.proc)) -∗
     wpLoop cpu')
 
 end Post

@@ -139,6 +139,7 @@ Imports only definitional files and callee `Spec*` files.
 import Xv6.SpecIlock
 import Xv6.FilePay
 import Xv6.FdTable
+import MachCSL.ByteWord2
 
 namespace Xv6
 
@@ -186,6 +187,58 @@ theorem fstatHasInode_st (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : 
   | closed => simp [fdTypeCode, FD_NONE, FD_INODE, FD_DEVICE]
   | «open» r w t =>
     cases t <;> simp [fdTypeCode, FD_PIPE, FD_INODE, FD_DEVICE]
+
+/-! ## (NI M3 FS-0) THE 24 BYTES, NAMED
+
+`stati` fills the four fields of `struct stat` from the locked in-core inode
+-- `ip->dev`, `ip->inum`, `ip->type`, `ip->nlink`, `ip->size` -- and
+copyout sends the whole 24-byte local.  So the bytes are a FUNCTION of the
+descriptor's inode number and the record the inode lock held (F7 (a),
+ruling FS-R5), BUT FOR the four-byte alignment hole (bytes 12..15): stati
+never writes it, so it carries whatever filestat's stack frame held there.
+The hole is existential in the post: a channel of stale kernel stack bytes,
+recorded (not closed) here. -/
+
+/-- The 24 bytes copyout sends: stati's five fields and the hole, in
+`struct stat`'s order (4/4/2/2/4/8). -/
+def fstatBytes (dev ino : BitVec 32) (ty nl : BitVec 16) (h : BitVec 32) (sz : BitVec 64) :
+    List (BitVec 8) :=
+  wordToBytes4 dev ++ (wordToBytes4 ino ++ (halfBytes ty ++ (halfBytes nl ++
+    (wordToBytes4 h ++ wordToBytes sz))))
+
+@[simp] theorem fstatBytes_length (dev ino : BitVec 32) (ty nl : BitVec 16) (h : BitVec 32)
+    (sz : BitVec 64) : (fstatBytes dev ino ty nl h sz).length = 24 := rfl
+
+/-- (NI M3 FS-0) the stat of inode `inum` at record `dn`, the hole `h`. -/
+def fstatRun [Icfg] (inum : BitVec 32) (dn : Dinode) (h : BitVec 32) : List (BitVec 8) :=
+  fstatBytes icfgDev inum dn.diType dn.diNlink h (BitVec.setWidth 64 dn.diSize)
+
+/-- (NI M3 FS-0) the descriptor's own inode number, where the key holds it
+(`FdType.inode i _ _`; a device row does not name its inode). -/
+def fdInumIs (st : FdState) (inum : BitVec 32) : Prop :=
+  match st with
+  | .open _ _ (.inode i _ _) => i = inum.toNat
+  | _ => True
+
+theorem fdInumIs_ok (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent)
+    (st : FdState) (h : fdstateOk inum γo om γp C st) : fdInumIs st inum := by
+  cases st with
+  | closed => trivial
+  | «open» r w t =>
+    cases t with
+    | inode n g m => exact h.2.2.2.1
+    | pipe _ => trivial
+    | device _ => trivial
+
+/-- (NI M3 FS-0) **WHAT fstat WROTE, NAMED**: on the inode/device arm the
+window's `d` bytes are the first `d` of `fstatRun inum dn h` -- the
+descriptor's inode, the record the lock held, the hole. -/
+def filestatNamed [Icfg] (st : FdState) (P0 : UPtd) (M : Nat → List (BitVec 8)) (a : BitVec 64)
+    (d : Nat) (P' : UPtd) (M' : Nat → List (BitVec 8)) : Prop :=
+  (fstatStInode st → ∃ (inum : BitVec 32) (dn : Dinode) (h : BitVec 32),
+    fdInumIs st inum ∧ M' = umemWrite (viewFaulted P0 P' M) a.toNat ((fstatRun inum dn h).take d)) ∧
+  -- ...and on the type-error arm nothing at all
+  (¬ fstatStInode st → d = 0)
 
 section Env
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -300,6 +353,7 @@ theorem filestat_pay_carve (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (
     filePaySt (GF := GF) γ fk q C st ⊢
       ∃ (ik : Nat) (inum : BitVec 32) (s : Qp) (g : GName) (ty : BitVec 16) (lo tl : Nat),
         ⌜C.ip = ientry ik ∧ ik < NINODE ∧ inum.toNat < 16 * icfgNib ∧ lo ≤ tl⌝ ∗
+        ⌜fdInumIs st inum⌝ ∗
         credFloor lo tl ∗ ityShot g ty ∗
         inodeShrGenlo ik s icfgDev inum g lo ∗
         (inodeShrGenlo ik s icfgDev inum g lo -∗ filePaySt γ fk q C st) := by
@@ -312,6 +366,8 @@ theorem filestat_pay_carve (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (
   iexists ik, pn.inum, qpMul q pn.iq, pn.ig, ty, lo, tl
   isplitr
   · ipureintro; exact ⟨hv, hk, hnib, hle⟩
+  isplitr
+  · ipureintro; exact fdInumIs_ok _ _ _ _ C st hok
   iframe Hfl Hshot Hshr
   iintro Hshr
   iexists pn
@@ -342,14 +398,18 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- **THE CONTRACT'S CONTINUATION, NAMED** (the `wp_next true pj (…)` body
 of Rocq's `wp_filestat_sconf_body`): the registers, the return value, the
 complement, the reference unchanged, the block at copyout's grown
-descriptor with a window of `d ≤ 24` bytes written at `addr = a1`, and the
+descriptor with a window of `d ≤ 24` bytes written at `addr = a1` --
+(NI M3 FS-0) the first `d` of the stat of the descriptor's inode at the
+record its lock held, the hole aside (`filestatNamed`) -- and the
 environment's output. -/
 def filestatPost (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat)
       (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ filestatRet (R' 10#5) ∧ V.upt.extSz V.sz P' ∧ d ≤ 24 ∧
-      umemWrote V.upt M (k.regs 11#5) d P' M'⌝ -∗
+      umemWrote V.upt M (k.regs 11#5) d P' M' ∧
+      -- (NI M3 FS-0) ...AND WHICH BYTES
+      filestatNamed st V.upt M (k.regs 11#5) d P' M'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     fileRef γ fk q st -∗

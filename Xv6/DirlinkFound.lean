@@ -207,7 +207,8 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       sized := id
       arms := by
         rw [if_pos rfl]
-        exact ⟨harm, rfl, rfl, rfl, rfl, rfl, rfl⟩ }
+        exact ⟨harm, rfl, rfl, rfl, rfl, rfl, rfl⟩
+      full := fun h => absurd h (by decide) }
   iapply (dirlink_tail cpu k spie1 spp1 _ v1 v3 v4 bs
       (by have := hs.hK; unfold dirlinkSlots at this; omega) hs.hal ?t2 ?t9 ?t19 ?t20 ?t23 ?t24
       ?t25 ?t26 ?t27)

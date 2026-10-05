@@ -327,6 +327,7 @@ theorem writei_iter_head (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h0, writei_beq00]
     iintro Hk Hpc
     have hS := writei_exit_bmap hWB hrng hoffle hfbnlt
+      (by first | exact hz | (rw [← hWB.hfbn]; exact hz))
     iapply (writei_size IU Γ cpu k spie1 spp1 _ A hA tot bm2 data2 wroteI 0 wroteI PI uX Sb2
         hS ?s2 ?s21 ?s18 ?s19)
     all_goals try (iframe; done)

@@ -56,7 +56,9 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
     (hK : filestatSlots ≤ k.avail) (hproc : k.proc = procAddr j) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (hst : fstatStInode st)
     (hal : (fstatBufAddr (k.regs 2#5)).toNat % 8 = 0)
-    (hr : fstatRegs k fk (procAddr j) (fstatBufAddr (k.regs 2#5)) R) :
+    (hr : fstatRegs k fk (procAddr j) (fstatBufAddr (k.regs 2#5)) R)
+    (hnamed : ∃ (inum : BitVec 32) (dn : Dinode),
+      fdInumIs st inum ∧ fstatBytes dev ino ty nl h sz = fstatRun inum dn h) :
     kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗
     pcIs cpu (KA.«filestat» + 0x3c#64) ∗
     fstatFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
@@ -168,12 +170,18 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
   rcases hw with ⟨h10, hM, hmap⟩ | ⟨h10, d, hd, hM, hmap⟩
   · iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %24 %kc [] Hk Hpc Hte Hce Href %hkc Hpriv Henv
     ipureintro
-    refine ⟨hcs', Or.inl (hR.trans h10), hext, Nat.le_refl _, ⟨_, fstatBytes_length _ _ _ _ _ _, hM, hmap⟩⟩
+    obtain ⟨inum, dn, hin, hrun⟩ := hnamed
+    refine ⟨hcs', Or.inl (hR.trans h10), hext, Nat.le_refl _, ⟨_, fstatBytes_length _ _ _ _ _ _, hM, hmap⟩,
+      ⟨fun _ => ⟨inum, dn, h, hin, ?_⟩, fun hn => absurd hst hn⟩⟩
+    rw [← hrun, List.take_of_length_le (by rw [fstatBytes_length]; exact Nat.le_refl _)]; exact hM
   · iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d %kc [] Hk Hpc Hte Hce Href %hkc Hpriv Henv
     have hd' : d < 24 := hd
     ipureintro
-    refine ⟨hcs', Or.inr (hR.trans h10), hext, Nat.le_of_lt hd', ⟨_, ?_, hM, hmap⟩⟩
-    rw [List.length_take, fstatBytes_length]; omega
+    obtain ⟨inum, dn, hin, hrun⟩ := hnamed
+    refine ⟨hcs', Or.inr (hR.trans h10), hext, Nat.le_of_lt hd', ⟨_, ?_, hM, hmap⟩,
+      ⟨fun _ => ⟨inum, dn, h, hin, ?_⟩, fun hn => absurd hst hn⟩⟩
+    · rw [List.length_take, fstatBytes_length]; omega
+    · rw [← hrun]; exact hM
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x2a .. +0x3a`: `&st`, stati, iunlock** (Rocq's `+0x2a .. +0x38`
@@ -188,7 +196,7 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
     (hK : filestatSlots ≤ k.avail) (hproc : k.proc = procAddr j) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hst : fstatStInode st)
     (hip : C.ip = ientry ik) (hik : ik < NINODE) (hle : lo ≤ tl)
-    (hr : fstatRegs k fk (procAddr j) (k.regs 19#5) R) :
+    (hr : fstatRegs k fk (procAddr j) (k.regs 19#5) R) (hinum : fdInumIs st inum) :
     kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗
     pcIs cpu (KA.«filestat» + 0x2a#64) ∗
     fstatFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
@@ -295,7 +303,7 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
     exact hr1
   iapply (filestat_copy CO c2 k spie2 spp2 R2 fk v9 γ q st j pid V M γkl γk icfgDev inum
       dn.diType dn.diNlink (BitVec.setWidth 64 dn.diSize) h0
-      (by rw [filestatSlots_eq]; exact hK) hproc hnoff hlocks hst hal hr2)
+      (by rw [filestatSlots_eq]; exact hK) hproc hnoff hlocks hst hal hr2 ⟨inum, dn, hinum, rfl⟩)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
@@ -318,7 +326,8 @@ theorem filestat_lock (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (�
     (hnoff : k.noff = 0) (hlocks : k.locks = []) (htier : k.tier = KTier.kpt)
     (hst : fstatStInode st) (hip : C.ip = ientry ik) (hik : ik < NINODE)
     (hnib : inum.toNat < 16 * icfgNib) (hle : lo ≤ tl)
-    (hr : fstatRegs k fk (k.regs 18#5) (k.regs 19#5) R) (h10 : R 10#5 = procAddr j) :
+    (hr : fstatRegs k fk (k.regs 18#5) (k.regs 19#5) R) (h10 : R 10#5 = procAddr j)
+    (hinum : fdInumIs st inum) :
     kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗
     pcIs cpu (KA.«filestat» + 0x1e#64) ∗
     fstatFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) v2 v3 (k.regs 20#5) v9 ∗
@@ -391,7 +400,7 @@ theorem filestat_lock (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (�
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h10] <;>
       first | assumption | rfl
   iapply (filestat_stat ST IU CO Γ c1 k spie1 spp1 R1 fk v9 γ q st C j pid V M γkl γk ik s g lo
-      tl inum dn bm γil γisl hK hproc hnoff hlocks htier hst hip hik hle hr1) $$ [- $Hk $Hpc]
+      tl inum dn bm γil γisl hK hproc hnoff hlocks htier hst hip hik hle hr1 hinum) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe

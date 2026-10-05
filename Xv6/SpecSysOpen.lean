@@ -246,6 +246,33 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
+/-! ### 2e'.  (NI M3 FS-0) WHY open FAILED PAST THE WALK (F7 (d), ruling FS-R5) -/
+
+/-- why open answered `-1` on a node the walk found: the node's type or the
+mode refused it (`refused`: a directory opened writable, a device past
+`NDEV`, or -- on the create side -- the name found with the wrong type;
+computed from the observed row), the process's own table was full
+(`nofile`: fdalloc found no closed slot, `NOFILE`; the key's own table), or
+the system's open-file table was (`full`: filealloc at `NFILE`, the verdict
+carried as `fsFullRcpt act .files`). -/
+inductive OpenWhy where
+  | refused
+  | nofile
+  | full
+  deriving DecidableEq
+
+/-- what a reason carries (`CreWhy`'s convention). -/
+def openWhyRcpt (γfs : FsNames) (act : BitVec 64) : OpenWhy → IProp GF
+  | .full => fsFullRcpt γfs act .files
+  | _ => iprop(emp)
+
+/-- FS-0 makes the receipt from nothing (FS-1 appends it at the site). -/
+theorem openWhyRcpt_intro (γfs : FsNames) (act : BitVec 64) (w : OpenWhy) :
+    ⊢@{IProp GF} openWhyRcpt γfs act w := by
+  cases w with
+  | full => exact fsFullRcpt_intro γfs act .files
+  | _ => unfold openWhyRcpt; iempintro
+
 /-! ### 2f.  The PLAIN arms -/
 
 /-- ret = fd (Rocq's `open_post_ok_plain`): the walk completed at `i`
@@ -299,7 +326,7 @@ post-walk failure sits inside the child's lock window. -/
 def openPostFailPlain (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
+    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (act : BitVec 64) : IProp GF :=
   iprop(openAuPlainAt (hlc := hlc) Γ γfs rt cw Mim pv vom P Pmiss Fo Ft ∨
     (∃ pl : List (BitVec 8),
       ⌜argPathOf Mim pv pl⌝ ∗
@@ -312,7 +339,9 @@ def openPostFailPlain (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
           -- the piece is KEYED once the walk has an inode: the permit was paid
           -- where what pays it was in hand, and the cursor that paid it rides
           -- its refund
-          plainTruncKept (hlc := hlc) Γ vom pl P i Ft))))
+          plainTruncKept (hlc := hlc) Γ vom pl P i Ft ∗
+          -- (NI M3 FS-0) ...AND WHY
+          ∃ w : OpenWhy, openWhyRcpt γfs act w))))
 
 /-- THE ARMED DISJUNCTION the continuation receives on the plain side,
 keyed on a0 (Rocq's `open_arms_plain`), with the landed post's fd-side
@@ -325,7 +354,7 @@ def openArmsPlain (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw 
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) :
     IProp GF :=
   iprop(((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ procPrivFd γ pa pid VW MW ∗ fdFrags VW.fdg sts ∗
-        openPostFailPlain Γ γfs rt cw Mim pv vom P Pmiss Fo Ft) ∨
+        openPostFailPlain Γ γfs rt cw Mim pv vom P Pmiss Fo Ft pa) ∨
       openPostOkPlain omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r) ∗
     fdSlot)
 
@@ -403,7 +432,7 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
+    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (act : BitVec 64) : IProp GF :=
   iprop(openAuCreateAt (hlc := hlc) Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft ∨
     (∃ pl : List (BitVec 8),
       ⌜argPathOf Mim pv pl⌝ ∗
@@ -427,7 +456,9 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
               -- the truncate never ran (itrunc is past fdalloc), so its piece
               -- comes home KEYED at the created child
               creTruncKept (hlc := hlc) Γ vom pl P Farm Fok Fex i Ft ∗
-              pfAt (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun) ∨
+              pfAt (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun ∗
+              -- (NI M3 FS-0) why open failed past the fresh node
+              ∃ w : OpenWhy, openWhyRcpt γfs act w) ∨
            -- (b) the name existed (found DIR, a bad found-device major, or
            -- table full past a good found node)
            (∃ (av : Aview) (i : Nat) (nm : Fname) (ents : Std.ExtTreeMap Fname Nat compare)
@@ -441,7 +472,10 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
               -- TRUNCATING open they travel with the truncate's own piece
               creFailKept (hlc := hlc) Γ vom pl P Farm Fun Fok Fex i Ft ∗
               (pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∨
-                ∃ (av' : Aview) (a : Anode), ⌜arowAt av' i a⌝ ∗ Fo.pfRecv av' i a)) ∨
+                ∃ (av' : Aview) (a : Anode), ⌜arowAt av' i a⌝ ∗ Fo.pfRecv av' i a) ∗
+              -- (NI M3 FS-0) why: the found node refused (create's F-BAD, a
+              -- directory, a bad major) or a table full past it
+              ∃ w : OpenWhy, openWhyRcpt γfs act w) ∨
            -- (c) nothing observed: the nlink guard, out of inodes, dirlink
            -- failure, "/"
            (pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
@@ -452,7 +486,9 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
              -- the piece is the one the caller handed in
              openTruncPiece (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) Ft ∗
              (creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨
-               ∃ ic : Nat, creChildPair Farm Fun ic)))))))
+               ∃ ic : Nat, creChildPair Farm Fun ic) ∗
+             -- (NI M3 FS-0) ...SPLIT BY REASON: create's own (`CreWhy`)
+             ∃ w : CreWhy, creWhyRcpt γfs act w))))))
 
 /-- Rocq's `open_arms_create`. -/
 def openArmsCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (γ : FileNames)
@@ -465,7 +501,7 @@ def openArmsCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) :
     IProp GF :=
   iprop(((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ procPrivFd γ pa pid VW MW ∗ fdFrags VW.fdg sts ∗
-        openPostFailCreate Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft) ∨
+        openPostFailCreate Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft pa) ∨
       openPostOkCreate omo Γ γ pa pid Mim pv vom P Farm Fun Fok Fex Fo Ft sts VW MW r) ∗
     fdSlot)
 
@@ -510,7 +546,7 @@ def openReceiptPlain (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt 
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (r : BitVec 64) (fdv' : List FdState) : IProp GF :=
   iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜fdv' = sts⌝ ∗
-      openPostFailPlain Γ γfs rt cw Mim pv vom P Pmiss Fo Ft) ∨
+      ∃ act : BitVec 64, openPostFailPlain Γ γfs rt cw Mim pv vom P Pmiss Fo Ft act) ∨
     (∃ (pl : List (BitVec 8)) (av : Aview) (i : Nat),
       ⌜argPathOf Mim pv pl⌝ ∗
       curKept vom P (pathElems pl).length i ∗
@@ -546,7 +582,7 @@ def openReceiptCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (r : BitVec 64) (fdv' : List FdState) : IProp GF :=
   iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜fdv' = sts⌝ ∗
-      openPostFailCreate Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft) ∨
+      ∃ act : BitVec 64, openPostFailCreate Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft act) ∨
     (∃ (pl : List (BitVec 8)) (d i : Nat) (nm : Fname),
       ⌜argPathOf Mim pv pl⌝ ∗ ⌜(pathElems pl).getLast? = some nm⌝ ∗
       curKept vom P (nparElems pl).length d ∗
@@ -863,17 +899,17 @@ theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
-    (pl : List (BitVec 8)) (hpl : argPathOf Mim pv pl) :
+    (pl : List (BitVec 8)) (hpl : argPathOf Mim pv pl) (act : BitVec 64) :
     creFailArms (hlc := hlc) Γ γfs rt T_FILE_w.toNat ma mi (nparNm Mim pv) (fun _ => True) P Pmiss Farm
-      Fdots Fun Fok Fex pl ⊢
+      Fdots Fun Fok Fex pl act ⊢
       pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗
       -- the piece at the ONE-PATH permit, which is how the create entry holds
       -- it once argstr has answered
       openTruncPiece (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) Ft -∗
-      openPostFailCreate Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft := by
+      openPostFailCreate Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft act := by
   iintro Hcf Ho Ht
   ihave Hcf := creFailArms_file Γ γfs rt ma mi (nparNm Mim pv) (fun _ => True) P Pmiss Farm Fdots Fun Fok
-    Fex pl $$ Hcf
+    Fex pl act $$ Hcf
   unfold openPostFailCreate
   iright
   iexists pl
@@ -886,7 +922,8 @@ theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
       (fun _ => trivial) $$ Hcl
     ileft
     iframe Hd Hac Hdl Ho Ht Hcl
-  · ihave Hcl : iprop(creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨
+  · icases Hcl with ⟨Hcl, %w, Hw⟩
+    ihave Hcl : iprop(creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨
         ∃ ic : Nat, creChildPair Farm Fun ic) $$ [Hcl]
     · icases Hcl with (Hu | Hp)
       · ileft
@@ -913,10 +950,14 @@ theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
       · ipureintro; exact hrow
       isplitr
       · ipureintro; exact hent
-      ileft; iexact Ho
+      isplitl [Ho]
+      · ileft; iexact Ho
+      -- (NI M3 FS-0) create's F-BAD: the found node refused
+      iexists OpenWhy.refused; unfold openWhyRcpt; iempintro
     · -- (c): nothing observed
       iright; iright
       iframe Hac Hdl Ho Ht Hcl
+      iexists w; iexact Hw
 
 end Arms
 

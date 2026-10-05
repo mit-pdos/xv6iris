@@ -192,12 +192,13 @@ theorem fileLegs_pay (c : FileFixed) (r : FileAppNames) (jo : Option Nat) (n : N
 /-- THE FAILURE FOLD, PAID (Rocq `file_open_create_fail_pay`). -/
 theorem fileOpenCreateFail_pay (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (rt cw : Nat)
-    (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (htr : omTrunc vom = true) :
+    (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (htr : omTrunc vom = true)
+    (act : BitVec 64) :
     ⊢@{IProp GF} openPostFailCreate (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom
         (fun (_ : Nat) (d : Nat) => iprop(⌜d = ROOTINO⌝)) (fun _ _ => iprop(True))
         (fileArmFam (hlc := hlc) c r jo s g np) (fileUnarmFam (hlc := hlc) c r s g np)
         (fileCreFam (hlc := hlc) c r jo N s g np) (fileDlkFam (hlc := hlc) c r n s g)
-        (fileOdlkFam (hlc := hlc) c r n s g) (fileTruncFam (hlc := hlc) c r N s np) -∗
+        (fileOdlkFam (hlc := hlc) c r n s g) (fileTruncFam (hlc := hlc) c r N s np) act -∗
       fileEscPay (hlc := hlc) c r N s g np := by
   unfold openPostFailCreate openAuCreateAt
   iintro (⟨-, -, -, -, -, Hch⟩ | ⟨%pl0, -, Hr⟩)
@@ -206,8 +207,8 @@ theorem fileOpenCreateFail_pay (γfs : FsNames) (c : FileFixed) (r : FileAppName
   · icases Hr with (⟨-, -, -, -, -, Hch⟩ | ⟨%d, -, Hc⟩)
     · iapply (fileLegs_pay (hlc := hlc) c r jo n N s g np _) $$ [Hch]
       ileft; iexact Hch
-    · icases Hc with (⟨%av, %i, %nm, %ents, %nl, -, -, -, -, -, -, Hkept, -⟩
-        | ⟨%av, %i, %nm, %ents, %nl, -, -, -, -, -, Hfk, -⟩ | ⟨-, -, -, -, Hlegs⟩)
+    · icases Hc with (⟨%av, %i, %nm, %ents, %nl, -, -, -, -, -, -, Hkept, -, -⟩
+        | ⟨%av, %i, %nm, %ents, %nl, -, -, -, -, -, Hfk, -, -⟩ | ⟨-, -, -, -, Hlegs, -⟩)
       · iapply (fileKept_pay (hlc := hlc) c r jo n N s g np γfs vom pl0 i htr) $$ Hkept
       · unfold creFailKept
         simp only [htr, ↓reduceIte]
@@ -238,9 +239,9 @@ theorem fileOpenCreate_recv (γfs : FsNames) (c : FileFixed) (omo : OffMode) (r 
           fileOpenFdK (hlc := hlc) omo c r N s np ty)) := by
   unfold openReceiptCreate
   simp only [htr, ↓reduceIte]
-  iintro #Hinv #Hwit (⟨%hr, %hfd, Hf⟩ | ⟨%pl0, %d, %i, %nm, %hpath0, %_hl0, -, Hrest⟩)
+  iintro #Hinv #Hwit (⟨%hr, %hfd, %act, Hf⟩ | ⟨%pl0, %d, %i, %nm, %hpath0, %_hl0, -, Hrest⟩)
   · imod (fileEscPay_home (hlc := hlc) γfs c r n N s g np E hE heq) $$ Hinv Hwit [Hf] with Hpay
-    · iapply (fileOpenCreateFail_pay (hlc := hlc) γfs c r jo n N s g np rt cw M pv vom htr) $$ Hf
+    · iapply (fileOpenCreateFail_pay (hlc := hlc) γfs c r jo n N s g np rt cw M pv vom htr act) $$ Hf
     imodintro
     ileft
     iframe Hpay

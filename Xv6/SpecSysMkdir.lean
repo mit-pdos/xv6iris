@@ -226,8 +226,9 @@ def mkdirArms (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
       creOkArms (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) P Farm Fdots Fun Fok Fex pl true i) ∨
     (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗
       (mkdirAuAt (hlc := hlc) Γ γfs rt cw M pv P Pmiss Farm Fdots Fun Fok Fex ∨
-        ∃ pl : List (BitVec 8),
-          creFailArms (hlc := hlc) Γ γfs rt T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) P Pmiss Farm Fdots Fun Fok Fex pl)))
+        -- (NI M3 FS-0) create's failure fold carries its reason at the caller
+        ∃ (pl : List (BitVec 8)) (act : BitVec 64),
+          creFailArms (hlc := hlc) Γ γfs rt T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) P Pmiss Farm Fdots Fun Fok Fex pl act)))
 
 /-- The return blanket, read off the arms. -/
 theorem mkdirArms_ret (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
