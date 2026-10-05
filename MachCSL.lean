@@ -247,3 +247,6 @@ import MachCSL.URunXSwp
 import MachCSL.UkfWalk
 import MachCSL.BvLemmas
 import MachCSL.OwnAllocSame
+import MachCSL.Rel
+import MachCSL.QpLemmas
+import MachCSL.FinToSet
