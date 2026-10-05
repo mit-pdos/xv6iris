@@ -78,6 +78,12 @@ def niBelow (ι H : UIota) : Prop :=
   ι.pev <+: H.pev ∧ ι.zev <+: H.zev ∧ ι.kev <+: H.kev ∧ ι.ticks ≤ H.ticks ∧ ι.sev <+: H.sev ∧
     ι.cacc <+: H.cacc
 
+/-- (NI M3 quotas Q-3) **`niBelow` without the allocator's conjunct**: ι's
+pid, family and slot prefixes and console stream are prefixes of H's, its
+count at most H's; the allocator ledgers are not compared. -/
+def niBelowQ (ι H : UIota) : Prop :=
+  ι.pev <+: H.pev ∧ ι.zev <+: H.zev ∧ ι.ticks ≤ H.ticks ∧ ι.sev <+: H.sev ∧ ι.cacc <+: H.cacc
+
 /-- **The join**: the longer list per ledger, the larger count; H's actor. -/
 def niJoin (H ι : UIota) : UIota :=
   ⟨niLonger H.kev ι.kev, niLonger H.pev ι.pev, niLonger H.zev ι.zev, max H.ticks ι.ticks, H.act,

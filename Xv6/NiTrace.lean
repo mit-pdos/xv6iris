@@ -66,7 +66,9 @@ its observable form, and the strong instance.
   through the transparent rounds, `niKeyRow_det` at the ecall) and
   `niTwoRunDet`: from EQUAL FIRST KEYS, the positions a prefix and the
   ledger histories below, the skeleton's views and console runs are a
-  prefix.
+  prefix; (NI M3 quotas Q-3) `niTwoRunDetQ`, the same without the
+  allocator (`NiStep.detInQ`, `NiEvid.niBelowQ`; scope 14), both instances
+  of `niTwoRunDetBy` (`NiDetReading`: the schedule and the erasure).
 
 ## Honest scope
 
@@ -347,6 +349,38 @@ its observable form, and the strong instance.
    the chain passes through them (`Ustep.ulands_transparent`).  The
    console output is compared per SKELETON step (`outBytes`), not as
    `niOutput`, which also lists the transparent rounds' empty runs.
+14. **The allocator** (NI M3 quotas Q-0…Q-3, rulings Q-R1…R10; §10,
+   `niTwoRunDetQ`, the root `xv6NiDetQ`).  WHAT THE QUOTA KERNEL BUYS: the
+   allocator order leaves BOTH hypotheses of the determinism theorem --
+   the histories compare by `niBelowQ` (no allocator conjunct) and the
+   cited positions by `NiStep.detInQ` (the cited allocator length erased).
+   Every actor's `Kev` order, the round's own kalloc and kfree counts
+   included, is no longer conceded: sbrk's `-1` is the key's quota
+   overrun, fork's `-1` is the cited `SFull` alone (scopes 8, 9), and a
+   lazy fault within the break always resumes (the truncation through the
+   pool is gone; the prefix form does not show it).  The closure is in the
+   rows, not the filing: `UsysDet.usysDet_ledQ` (M0's row at `ι` is its
+   row at `ι.ledQ`, `ι`'s ledger part without the allocator) holds on the
+   quota kernel and FAILS on b72cbac1, whose sbrk read `ι.kNull` and fork
+   `ι.kOk`; the induction is `xv6NiDet`'s, abstracted over the schedule and
+   the erasure (`NiDetReading`, `niTwoRunDetBy`), and `xv6NiPhi` and the
+   thirteen earlier roots are byte-identical (`xv6NiDet` still true, now
+   weaker).  WHAT IT COSTS: 34 kernel lines in 6 files (`MAXUSZ` = 768 KiB
+   on the break in `sys_sbrk` and `kexec`, `NPIPE` = 50 live pipe buffers,
+   `scounteren = 0`), as ONE commit on a fork of the pin (`verified-quota` =
+   b72cbac1 + c1fd3cc7, ruling Q-R1), re-applied at every upstream bump; the
+   page credits (`KcredDefs.pageCredit`, Q-1) in the VM ring, the slots and
+   the pipe lock.  User-visible: sbrk refuses growth past 768 KiB, exec an
+   image ending past 760 KiB, `pipe()` the 51st live pipe -- the last two
+   are NEW GLOBAL READINGS outside the class (pipes are parked; exec is out).
+   WHAT REMAINS in the hypotheses: the pid order (`pev`: fork's pid is
+   `pidPick`), slot occupancy (`sev`: fork's `-1`), the ticks (uptime), the
+   family ledger (`zev`: wait), the console stream (`cacc`), the schedule
+   (positions), the regime, one origin, no gaps.  Pid and slot quotas were
+   REJECTED as not minimal (ruling Q-R6: each needs a `struct proc` field
+   and a key field; parent-relative pids change the user API).  The sizing
+   `64 * slotShare + NPIPE ≤ freePagesAfterBoot` is a proved arithmetic fact
+   about this image (`QuotaFit.totalFits`), not an assumption.
 
 getpid's answer is the incarnation's pid (W2d's `niPidRow`: `a0 =
 signExtend 64 W.pid`, and the filing's pid is `W'.pid = W.pid`), so getpid
@@ -591,6 +625,9 @@ structure NiPos where
 /-- The positions of a citation of era `k` at `ι`. -/
 def UIota.pos (k : Nat) (ι : UIota) : NiPos :=
   ⟨k, ι.kev.length, ι.pev.length, ι.zev.length, ι.ticks, ι.act, ι.sev.length⟩
+
+/-- (NI M3 quotas Q-3) A position without the cited allocator length. -/
+def NiPos.noKev (p : NiPos) : NiPos := { p with kev := 0 }
 
 /-- The step's INPUT: everything its enter is a function of, by the law,
 given the ledger histories: an origin's first key; a round's key readings
@@ -977,6 +1014,27 @@ theorem niBelow_pos {ι₁ ι₂ H₁ H₂ : UIota} {k : Nat} (h₁ : niBelow ι
   cases ι₁; cases ι₂
   simp only [UIota.led, UIota.mk.injEq, and_true] at *
   exact ⟨pre k1 k2 hk, pre p1 p2 hpv, pre z1 z2 hz, ht, ha, pre s1 s2 hs⟩
+
+/-- (NI M3 quotas Q-3) **Equal kev-free positions below one kev-free history
+are one kev-free ledger part** (`niBelow_pos` without the allocator). -/
+theorem niBelow_posQ {ι₁ ι₂ H₁ H₂ : UIota} {k : Nat} (h₁ : niBelow ι₁ H₁) (h₂ : niBelow ι₂ H₂)
+    (hH : H₁.ledQ = H₂.ledQ) (hp : (ι₁.pos k).noKev = (ι₂.pos k).noKev) : ι₁.ledQ = ι₂.ledQ := by
+  have pre : ∀ {α : Type} {a b c : List α}, a <+: c → b <+: c → a.length = b.length → a = b :=
+    fun ha hb hl => (List.prefix_of_prefix_length_le ha hb (Nat.le_of_eq hl)).eq_of_length hl
+  have hHp : H₁.pev = H₂.pev := by
+    have h := congrArg UIota.pev hH; exact h
+  have hHz : H₁.zev = H₂.zev := by
+    have h := congrArg UIota.zev hH; exact h
+  have hHs : H₁.sev = H₂.sev := by
+    have h := congrArg UIota.sev hH; exact h
+  simp only [UIota.pos, NiPos.noKev, NiPos.mk.injEq, true_and] at hp
+  obtain ⟨hpv, hz, ht, ha, hs⟩ := hp
+  obtain ⟨p1, z1, -, -, s1, -⟩ := h₁
+  obtain ⟨p2, z2, -, -, s2, -⟩ := h₂
+  rw [hHp] at p1; rw [hHz] at z1; rw [hHs] at s1
+  cases ι₁; cases ι₂
+  simp only [UIota.ledQ, UIota.led, UIota.mk.injEq, and_true, true_and] at *
+  exact ⟨pre p1 p2 hpv, pre z1 z2 hz, ht, ha, pre s1 s2 hs⟩
 
 /-- Two steps with equal inputs whose citations are below one `H` cite the
 same era and LEDGER PART (NI M3 NI-OUT: `UIota.led`, the console stream and
@@ -1853,6 +1911,21 @@ def NiStep.skel (s : NiStep) : Bool :=
 origin and at a round that cites nothing. -/
 def NiStep.detIn (s : NiStep) : Option NiPos := s.cite.map fun p => p.2.pos p.1
 
+/-- (NI M3 quotas Q-3) **A skeleton step's cited positions without the cited
+allocator length**: `xv6NiDetQ`'s schedule. -/
+def NiStep.detInQ (s : NiStep) : Option NiPos := s.detIn.map NiPos.noKev
+
+/-- (NI M3 quotas Q-3) A step's cited positions as some reading `ps` of
+(era, prefix) gives them -- `detIn` and `detInQ` are two instances. -/
+def NiStep.detBy (ps : Nat → UIota → NiPos) (s : NiStep) : Option NiPos := s.cite.map fun p => ps p.1 p.2
+
+theorem NiStep.detIn_eq_detBy : NiStep.detIn = NiStep.detBy (fun k ι => ι.pos k) := rfl
+
+theorem NiStep.detInQ_eq_detBy : NiStep.detInQ = NiStep.detBy (fun k ι => (ι.pos k).noKev) := by
+  funext s
+  unfold NiStep.detInQ NiStep.detIn NiStep.detBy
+  rw [Option.map_map]; rfl
+
 /-- An exit's cause, the pc it would resume at (`retPc` of the trapped epc:
 what the key reads, `tfResumePc`) and `x1..x31`. -/
 def exitViewPc : Obs → Option (BitVec 64 × BitVec 64 × List (BitVec 64))
@@ -1930,8 +2003,10 @@ def NiEntry.skel : NiEntry → Bool
   | .origin .. => true
   | .round _ _ sc .. => decide (sc = uecallScause)
 
-/-- A filing's cited positions. -/
-def NiEntry.citePos (f : NiEntry) : Option NiPos := f.cite.map fun p => p.2.pos p.1
+/-- A filing's cited positions, as a reading `ps` of (era, prefix) gives them
+(NI M3 quotas Q-3: `ps` the positions, or the positions without the
+allocator length). -/
+def NiEntry.citeBy (ps : Nat → UIota → NiPos) (f : NiEntry) : Option NiPos := f.cite.map fun p => ps p.1 p.2
 
 /-- `niKeyRow`'s class premise, at a trapped key. -/
 def niClassKey (W : Uvis) : Prop :=
@@ -1979,9 +2054,9 @@ theorem niStepOf_skel {h : List Obs} {f : NiEntry} {s : NiStep} (hf : niEntryOk 
     subst hs
     rfl
 
-theorem niStepOf_detIn {h : List Obs} {f : NiEntry} {s : NiStep} (hs : niStepOf h f = some s) :
-    s.detIn = f.citePos := by
-  unfold NiStep.detIn NiEntry.citePos; rw [niStepOf_cite hs]
+theorem niStepOf_detBy (ps : Nat → UIota → NiPos) {h : List Obs} {f : NiEntry} {s : NiStep}
+    (hs : niStepOf h f = some s) : s.detBy ps = f.citeBy ps := by
+  unfold NiStep.detBy NiEntry.citeBy; rw [niStepOf_cite hs]
 
 /-- The skeleton of the steps is the steps of the skeleton filings. -/
 theorem filter_skel_filterMap {h : List Obs} :
@@ -2051,8 +2126,9 @@ theorem niClassKey_congr {W₁ W₂ : Uvis} (h : ukeyEq W₁ W₂) (hc : niClass
 /-- M0's row at one ledger part: `usysDet` reads no console stream. -/
 theorem usysDet_led (n : Int) (W : Uvis) (ι : UIota) : usysDet n W ι.led = usysDet n W ι := rfl
 
-theorem getD_led {c₁ c₂ : Option (Nat × UIota)} (hc : c₁.map (fun p => p.2.led) = c₂.map (fun p => p.2.led)) :
-    ((c₁.map Prod.snd).getD UIota.boot).led = ((c₂.map Prod.snd).getD UIota.boot).led := by
+theorem getD_erase (E : UIota → UIota) {c₁ c₂ : Option (Nat × UIota)}
+    (hc : c₁.map (fun p => E p.2) = c₂.map (fun p => E p.2)) :
+    E ((c₁.map Prod.snd).getD UIota.boot) = E ((c₂.map Prod.snd).getD UIota.boot) := by
   cases c₁ with
   | none => cases c₂ with
     | none => rfl
@@ -2062,17 +2138,21 @@ theorem getD_led {c₁ c₂ : Option (Nat × UIota)} (hc : c₁.map (fun p => p.
     | some p₂ => exact Option.some.inj hc
 
 /-- **THE RESUME KEY IS DETERMINED**: at equal trapped keys in the class and
-citations with one ledger part, the left keys `niKeyRow` pins agree. -/
-theorem niKeyRow_det {W₁ W₂ W₁' W₂' : Uvis} {c₁ c₂ : Option (Nat × UIota)} (hW : ukeyEq W₁ W₂)
+citations with one erased part `E` -- an erasure M0's row does not see
+(`hE`: the ledger part `UIota.led`, `usysDet_led`, or -- NI M3 quotas Q-3 --
+the ledger part without the allocator `UIota.ledQ`, `usysDet_ledQ`) -- the
+left keys `niKeyRow` pins agree. -/
+theorem niKeyRow_det (E : UIota → UIota) (hE : ∀ n W ι, usysDet n W (E ι) = usysDet n W ι)
+    {W₁ W₂ W₁' W₂' : Uvis} {c₁ c₂ : Option (Nat × UIota)} (hW : ukeyEq W₁ W₂)
     (hk₁ : niKeyRow uecallScause W₁ W₁' c₁) (hk₂ : niKeyRow uecallScause W₂ W₂' c₂) (hcl : niClassKey W₁)
-    (hc : c₁.map (fun p => p.2.led) = c₂.map (fun p => p.2.led)) : ukeyEq W₁' W₂' := by
+    (hc : c₁.map (fun p => E p.2) = c₂.map (fun p => E p.2)) : ukeyEq W₁' W₂' := by
   have hr := uvisRun_congr hW
   have e₁ := hk₁.2 rfl hcl
   have e₂ := hk₂.2 rfl (niClassKey_congr hW hcl)
   rw [← hr] at e₂
   have hd : usysDet (uvisNum (uvisRun W₁)) (uvisRun W₁) ((c₁.map Prod.snd).getD UIota.boot) =
       usysDet (uvisNum (uvisRun W₁)) (uvisRun W₁) ((c₂.map Prod.snd).getD UIota.boot) := by
-    rw [← usysDet_led _ _ ((c₁.map Prod.snd).getD UIota.boot), getD_led hc, usysDet_led]
+    rw [← hE _ _ ((c₁.map Prod.snd).getD UIota.boot), getD_erase E hc, hE]
   rw [hd] at e₁
   exact Ustep.ukeyEq_trans (ukeyEq_symm e₁) e₂
 
@@ -2149,25 +2229,60 @@ theorem reachK_transparent {R C W W' : Uvis} {sc : BitVec 64} (hns : ¬ Ustep.us
   obtain ⟨V, hV, hVW⟩ := Ustep.ulands_transparent hns (ulands_reachK hC hl)
   exact ⟨V, hV, Ustep.ukeyEq_trans hVW hk⟩
 
-/-- Equal positions below histories with one ledger part: one ledger part. -/
-theorem citePos_led {H₁ H₂ : Nat → UIota} (hH : ∀ k, (H₁ k).led = (H₂ k).led) {c₁ c₂ : Option (Nat × UIota)}
+/-- **THE DETERMINISM's READING OF A CITATION** (NI M3 quotas Q-3: the
+schedule `ps` and the erasure `E` abstracted so `xv6NiDet` and `xv6NiDetQ`
+share one induction): `ps` reads the era back (`hera`), and equal readings
+of two citations below histories with one erased part are one erased part
+(`hP`: `niBelow_pos` at the positions and `UIota.led`, `niBelow_posQ` at the
+kev-free positions and `UIota.ledQ`); `E` is invisible to M0's row (`hE`). -/
+structure NiDetReading where
+  ps : Nat → UIota → NiPos
+  E : UIota → UIota
+  hera : ∀ k ι, (ps k ι).era = k
+  hE : ∀ n W ι, usysDet n W (E ι) = usysDet n W ι
+  hP : ∀ {ι₁ ι₂ H₁ H₂ : UIota} {k : Nat}, niBelow ι₁ H₁ → niBelow ι₂ H₂ → E H₁ = E H₂ →
+    ps k ι₁ = ps k ι₂ → E ι₁ = E ι₂
+
+/-- `xv6NiDet`'s reading: the positions and the ledger part. -/
+def niDetLed : NiDetReading where
+  ps k ι := ι.pos k
+  E := UIota.led
+  hera _ _ := rfl
+  hE := fun n W ι => usysDet_led n W ι
+  hP := fun h₁ h₂ hH hp => niBelow_pos h₁ h₂ hH hp
+
+/-- (NI M3 quotas Q-3) `xv6NiDetQ`'s reading: the positions without the
+allocator length and the ledger part without the allocator. -/
+def niDetLedQ : NiDetReading where
+  ps k ι := (ι.pos k).noKev
+  E := UIota.ledQ
+  hera _ _ := rfl
+  hE := fun n W ι => (usysDet_ledQ n W ι).symm
+  hP := fun h₁ h₂ hH hp => niBelow_posQ h₁ h₂ hH hp
+
+/-- Equal readings below histories with one erased part: one erased part. -/
+theorem citeBy_erase (D : NiDetReading) {H₁ H₂ : Nat → UIota} (hH : ∀ k, D.E (H₁ k) = D.E (H₂ k))
+    {c₁ c₂ : Option (Nat × UIota)}
     (h₁ : ∀ k ι, c₁ = some (k, ι) → niBelow ι (H₁ k)) (h₂ : ∀ k ι, c₂ = some (k, ι) → niBelow ι (H₂ k))
-    (hp : c₁.map (fun p => p.2.pos p.1) = c₂.map (fun p => p.2.pos p.1)) :
-    c₁.map (fun p => p.2.led) = c₂.map (fun p => p.2.led) := by
+    (hp : c₁.map (fun p => D.ps p.1 p.2) = c₂.map (fun p => D.ps p.1 p.2)) :
+    c₁.map (fun p => D.E p.2) = c₂.map (fun p => D.E p.2) := by
   match c₁, c₂, hp with
   | none, none, _ => rfl
   | none, some _, hp => simp at hp
   | some _, none, hp => simp at hp
   | some (k₁, ι₁), some (k₂, ι₂), hp =>
     simp only [Option.map_some, Option.some.injEq] at hp ⊢
-    have hk : k₁ = k₂ := congrArg NiPos.era hp
+    have hk : k₁ = k₂ := by
+      have := congrArg NiPos.era hp
+      rwa [D.hera, D.hera] at this
     subst hk
-    exact niBelow_pos (h₁ k₁ ι₁ rfl) (h₂ k₁ ι₂ rfl) (hH k₁) hp
+    exact D.hP (h₁ k₁ ι₁ rfl) (h₂ k₁ ι₂ rfl) (hH k₁) hp
 
 /-- **THE INDUCTION** (by fuel): two runs of rounds from resumed keys `R₁ ≅ R₂`
 (at running keys reachable from them), run 1 never stuck and in the class:
 run 1's skeleton filings pair with a prefix of run 2's. -/
-theorem niDet_runs {h₁ h₂ : List Obs} {H₁ H₂ : Nat → UIota} (hH : ∀ k, (H₁ k).led = (H₂ k).led) :
+theorem niDet_runs (D : NiDetReading) {h₁ h₂ : List Obs} {H₁ H₂ : Nat → UIota}
+    (hH : ∀ k, D.E (H₁ k) = D.E (H₂ k)) :
     ∀ (n : Nat) (rs₁ rs₂ : List NiEntry) (R₁ R₂ C₁ C₂ : Uvis), rs₁.length + rs₂.length ≤ n →
     ukeyEq R₁ R₂ → ¬ Ustep.ustuckFrom R₁ → Ustep.ureachK R₁ C₁ → Ustep.ureachK R₂ C₂ →
     niRunFrom C₁ rs₁ → niRunFrom C₂ rs₂ →
@@ -2175,7 +2290,7 @@ theorem niDet_runs {h₁ h₂ : List Obs} {H₁ H₂ : Nat → UIota} (hH : ∀ 
     (∀ f ∈ rs₁, ¬ Ustep.ustuckFrom f.resumeKey) → (∀ f ∈ rs₁, f.inClass) →
     (∀ f ∈ rs₁, ∀ k ι, f.cite = some (k, ι) → niBelow ι (H₁ k)) →
     (∀ f ∈ rs₂, ∀ k ι, f.cite = some (k, ι) → niBelow ι (H₂ k)) →
-    (rs₁.filter NiEntry.skel).map NiEntry.citePos <+: (rs₂.filter NiEntry.skel).map NiEntry.citePos →
+    (rs₁.filter NiEntry.skel).map (NiEntry.citeBy D.ps) <+: (rs₂.filter NiEntry.skel).map (NiEntry.citeBy D.ps) →
     ∃ l, l <+: rs₂.filter NiEntry.skel ∧ List.Forall₂ (niDetPair h₁ h₂) (rs₁.filter NiEntry.skel) l := by
   intro n
   induction n with
@@ -2217,8 +2332,9 @@ theorem niDet_runs {h₁ h₂ : List Obs} {H₁ H₂ : Nat → UIota} (hH : ∀ 
             obtain ⟨hp, hpos'⟩ := hpos
             have hW : ukeyEq W W₂ :=
               Ustep.ulands_det_congr hR hns (ulands_reachK hC₁ hu) (ulands_reachK hC₂ hu₂)
-            have hc := citePos_led hH (hb₁ _ (List.mem_cons_self ..)) (hb₂ _ (List.mem_cons_self ..)) hp
-            have hW' : ukeyEq W' W₂' := niKeyRow_det hW hkr hkr₂ (hcl _ (List.mem_cons_self ..) rfl) hc
+            have hc := citeBy_erase D hH (hb₁ _ (List.mem_cons_self ..)) (hb₂ _ (List.mem_cons_self ..)) hp
+            have hW' : ukeyEq W' W₂' :=
+              niKeyRow_det D.E D.hE hW hkr hkr₂ (hcl _ (List.mem_cons_self ..) rfl) hc
             obtain ⟨l, hl, hF⟩ := ih rs₁' rs₂' W' W₂' W' W₂' (by simp at hn; omega) hW'
               (hst _ (List.mem_cons_self ..)) (Ustep.ureachK_of_ukeyEq (Ustep.ukeyEq_refl _))
               (Ustep.ureachK_of_ukeyEq (Ustep.ukeyEq_refl _)) hr₁.2 hr₂.2 (tl hok₁) (tl₂ hok₂) (tl hst) (tl hcl)
@@ -2315,24 +2431,25 @@ theorem firstKey_origin {q : NiInc} {h : List Obs} {F : List NiEntry} (hF : niOk
 
 /-! ### The determinism theorem, pure -/
 
-/-- **`niTwoRunDet`** (NI M3 U-3, rulings U-R6/U-R8): two histories with ledger
-filings whose chains hold at their histories and whose key histories are
-chains (`niUserChain`), one incarnation `q` with ONE key history and one
-origin, filed without gaps, in both runs (`NiOneOrigin`, `NiGapFree`), its
-ecalls in run 1 in the class and no stuck key reachable from any of its
-resumed keys in run 1 (`NiNoStuck`, the regime), EQUAL FIRST KEYS, the cited
-positions of its skeleton (the schedule) a prefix, and run 1's ledger
-histories below run 2's: its ECALL SKELETON's views -- exits and enters -- in
-run 1 are a prefix of run 2's, and so are the console runs its skeleton
-pushes.  No mask, no key reading, no exit is an input. -/
-theorem niTwoRunDet {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk h₁ F₁)
-    (hC₁ : niChain F₁ (niHist F₁)) (hU₁ : niUserChain F₁) (hF₂ : niOk h₂ F₂) (hC₂ : niChain F₂ (niHist F₂))
+/-- **THE DETERMINISM, GENERIC IN THE READING** (NI M3 U-3's `niTwoRunDet`,
+abstracted by NI M3 quotas Q-3 over the schedule `D.ps` and the erasure
+`D.E`): two histories with ledger filings whose key histories are chains
+(`niUserChain`), run 2's citations below its history, run 1's below some
+`H₁` whose erased part is run 2's history's, one incarnation `q` with ONE
+key history and one origin, filed without gaps, in both runs, its ecalls in
+run 1 in the class and no stuck key reachable from any of its resumed keys
+in run 1, EQUAL FIRST KEYS and the `D.ps`-readings of its skeleton's
+citations a prefix: its ECALL SKELETON's views and console runs in run 1 are
+a prefix of run 2's.  `niTwoRunDet` and `niTwoRunDetQ` are its instances. -/
+theorem niTwoRunDetBy (D : NiDetReading) {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk h₁ F₁)
+    (hU₁ : niUserChain F₁) (hF₂ : niOk h₂ F₂) (hC₂ : niChain F₂ (niHist F₂))
     (hU₂ : niUserChain F₂) (q : NiInc) (ho₁ : NiOneOrigin q h₁ F₁) (ho₂ : NiOneOrigin q h₂ F₂)
     (hg₁ : NiGapFree q h₁ F₁) (hg₂ : NiGapFree q h₂ F₂) (hcls : NiInClass (utrace q h₁ F₁))
     (hns : NiNoStuck q h₁ F₁) (hk : firstKey q h₁ F₁ = firstKey q h₂ F₂)
-    (hpos : ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.detIn <+:
-      ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.detIn)
-    (hH : ∀ k, niBelow (niHistLed F₁ k) (niHistLed F₂ k)) :
+    (hpos : ((utrace q h₁ F₁).filter NiStep.skel).map (NiStep.detBy D.ps) <+:
+      ((utrace q h₂ F₂).filter NiStep.skel).map (NiStep.detBy D.ps))
+    (H₁ : Nat → UIota) (hb : ∀ f ∈ F₁, ∀ k ι, f.cite = some (k, ι) → niBelow ι (H₁ k))
+    (hH : ∀ k, D.E (H₁ k) = D.E (niHist F₂ k)) :
     ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.view <+:
         ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.view ∧
       ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.outBytes <+:
@@ -2354,24 +2471,18 @@ theorem niTwoRunDet {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : n
           (uwriteOut W) x e c ∈ utrace q h₁ F₁ := by
         rw [utrace_filings]; exact List.mem_filterMap.mpr ⟨_, hf, hs⟩
       exact niClassKey_of hxf hsc (hcls _ _ _ _ _ _ _ _ _ hmem)
-  -- run 1's chain, lifted: run 2's ledger part, run 1's console stream (`niTwoRunPrefix_trace`)
-  let H' : Nat → UIota := fun k => { niHist F₂ k with cacc := (niHist F₁ k).cacc }
-  have hH' : ∀ k, (H' k).led = (niHist F₂ k).led := fun _ => rfl
-  have hb₁ : ∀ f ∈ ufilings q h₁ F₁, ∀ k ι, f.cite = some (k, ι) → niBelow ι (H' k) := by
-    intro f hf k ι hc
-    obtain ⟨p1, z1, k1, t1, s1, c1⟩ := hC₁ f (mem_ufilings hf).1 k ι hc
-    obtain ⟨p2, z2, k2, t2, s2, -⟩ := hH k
-    exact ⟨p1.trans p2, z1.trans z2, k1.trans k2, Nat.le_trans t1 t2, s1.trans s2, c1⟩
+  have hb₁ : ∀ f ∈ ufilings q h₁ F₁, ∀ k ι, f.cite = some (k, ι) → niBelow ι (H₁ k) :=
+    fun f hf k ι hc => hb f (mem_ufilings hf).1 k ι hc
   have hb₂ : ∀ f ∈ ufilings q h₂ F₂, ∀ k ι, f.cite = some (k, ι) → niBelow ι (niHist F₂ k) :=
     fun f hf k ι hc => hC₂ f (mem_ufilings hf).1 k ι hc
   rw [utrace_filings, filter_skel_filterMap _ hv₁, utrace_filings, filter_skel_filterMap _ hv₂] at hpos ⊢
-  rw [filterMap_map_eq _ _ NiEntry.citePos _ (fun f hf => by
+  rw [filterMap_map_eq _ _ (NiEntry.citeBy D.ps) _ (fun f hf => by
         obtain ⟨s, hs⟩ := niStepOf_some (hv₁ f ((List.mem_filter.mp hf).1))
-        exact ⟨s, hs, niStepOf_detIn hs⟩),
-      filterMap_map_eq _ _ NiEntry.citePos _ (fun f hf => by
+        exact ⟨s, hs, niStepOf_detBy D.ps hs⟩),
+      filterMap_map_eq _ _ (NiEntry.citeBy D.ps) _ (fun f hf => by
         obtain ⟨s, hs⟩ := niStepOf_some (hv₂ f ((List.mem_filter.mp hf).1))
-        exact ⟨s, hs, niStepOf_detIn hs⟩)] at hpos
-  have hrest := niDet_runs (h₁ := h₁) (h₂ := h₂) hH'
+        exact ⟨s, hs, niStepOf_detBy D.ps hs⟩)] at hpos
+  have hrest := niDet_runs D (h₁ := h₁) (h₂ := h₂) hH
   rcases niRun_of hU₁ ho₁ hg₁ with hL₁ | ⟨j₁, W0, p₁, γ₁, rs₁, hL₁, hr₁⟩
   · rw [hL₁]; exact ⟨List.nil_prefix, List.nil_prefix⟩
   rcases niRun_of hU₂ ho₂ hg₂ with hL₂ | ⟨j₂, W0₂, p₂, γ₂, rs₂, hL₂, hr₂⟩
@@ -2415,5 +2526,67 @@ theorem niTwoRunDet {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : n
     exact (hl'.filterMap _).map _
   · rw [forall₂_filterMap_map _ _ NiStep.outBytes (fun a b hab s₁ s₂ h₁ h₂ => (hab s₁ s₂ h₁ h₂).2) hP' hA hB]
     exact (hl'.filterMap _).map _
+
+
+/-- **`niTwoRunDet`** (NI M3 U-3, rulings U-R6/U-R8): two histories with ledger
+filings whose chains hold at their histories and whose key histories are
+chains (`niUserChain`), one incarnation `q` with ONE key history and one
+origin, filed without gaps, in both runs (`NiOneOrigin`, `NiGapFree`), its
+ecalls in run 1 in the class and no stuck key reachable from any of its
+resumed keys in run 1 (`NiNoStuck`, the regime), EQUAL FIRST KEYS, the cited
+positions of its skeleton (the schedule) a prefix, and run 1's ledger
+histories below run 2's: its ECALL SKELETON's views -- exits and enters -- in
+run 1 are a prefix of run 2's, and so are the console runs its skeleton
+pushes.  No mask, no key reading, no exit is an input.  (NI M3 quotas Q-3:
+`niTwoRunDetBy` at the positions and the ledger part, `niDetLed`.) -/
+theorem niTwoRunDet {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk h₁ F₁)
+    (hC₁ : niChain F₁ (niHist F₁)) (hU₁ : niUserChain F₁) (hF₂ : niOk h₂ F₂) (hC₂ : niChain F₂ (niHist F₂))
+    (hU₂ : niUserChain F₂) (q : NiInc) (ho₁ : NiOneOrigin q h₁ F₁) (ho₂ : NiOneOrigin q h₂ F₂)
+    (hg₁ : NiGapFree q h₁ F₁) (hg₂ : NiGapFree q h₂ F₂) (hcls : NiInClass (utrace q h₁ F₁))
+    (hns : NiNoStuck q h₁ F₁) (hk : firstKey q h₁ F₁ = firstKey q h₂ F₂)
+    (hpos : ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.detIn <+:
+      ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.detIn)
+    (hH : ∀ k, niBelow (niHistLed F₁ k) (niHistLed F₂ k)) :
+    ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.view <+:
+        ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.view ∧
+      ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.outBytes <+:
+        ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.outBytes := by
+  -- run 1's chain, lifted: run 2's ledger part, run 1's console stream (`niTwoRunPrefix_trace`)
+  refine niTwoRunDetBy niDetLed hF₁ hU₁ hF₂ hC₂ hU₂ q ho₁ ho₂ hg₁ hg₂ hcls hns hk
+    (by rw [NiStep.detIn_eq_detBy] at hpos; exact hpos)
+    (fun k => { niHist F₂ k with cacc := (niHist F₁ k).cacc }) ?_ (fun _ => rfl)
+  intro f hf k ι hc
+  obtain ⟨p1, z1, k1, t1, s1, c1⟩ := hC₁ f hf k ι hc
+  obtain ⟨p2, z2, k2, t2, s2, -⟩ := hH k
+  exact ⟨p1.trans p2, z1.trans z2, k1.trans k2, Nat.le_trans t1 t2, s1.trans s2, c1⟩
+
+/-- **`niTwoRunDetQ`** (NI M3 quotas Q-3, design "M3 quotas design
+(2026-10-05)"): `niTwoRunDet` WITHOUT THE ALLOCATOR -- the cited positions
+compared without their allocator length (`NiStep.detInQ`) and the histories
+by `niBelowQ` (no allocator conjunct).  On the quota kernel no class row
+reads the allocator ledger (`UsysDet.usysDet_ledQ`), so `niTwoRunDetBy` at
+the kev-free positions and the ledger part without the allocator
+(`niDetLedQ`) gives it; run 1's citations are lifted to run 2's history
+with run 1's own allocator ledger and console stream. -/
+theorem niTwoRunDetQ {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk h₁ F₁)
+    (hC₁ : niChain F₁ (niHist F₁)) (hU₁ : niUserChain F₁) (hF₂ : niOk h₂ F₂) (hC₂ : niChain F₂ (niHist F₂))
+    (hU₂ : niUserChain F₂) (q : NiInc) (ho₁ : NiOneOrigin q h₁ F₁) (ho₂ : NiOneOrigin q h₂ F₂)
+    (hg₁ : NiGapFree q h₁ F₁) (hg₂ : NiGapFree q h₂ F₂) (hcls : NiInClass (utrace q h₁ F₁))
+    (hns : NiNoStuck q h₁ F₁) (hk : firstKey q h₁ F₁ = firstKey q h₂ F₂)
+    (hpos : ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.detInQ <+:
+      ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.detInQ)
+    (hH : ∀ k, niBelowQ (niHistLed F₁ k) (niHistLed F₂ k)) :
+    ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.view <+:
+        ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.view ∧
+      ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.outBytes <+:
+        ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.outBytes := by
+  -- run 1's chain, lifted: run 2's ledger part, run 1's allocator ledger and console stream
+  refine niTwoRunDetBy niDetLedQ hF₁ hU₁ hF₂ hC₂ hU₂ q ho₁ ho₂ hg₁ hg₂ hcls hns hk
+    (by rw [NiStep.detInQ_eq_detBy] at hpos; exact hpos)
+    (fun k => { niHist F₂ k with kev := (niHist F₁ k).kev, cacc := (niHist F₁ k).cacc }) ?_ (fun _ => rfl)
+  intro f hf k ι hc
+  obtain ⟨p1, z1, k1, t1, s1, c1⟩ := hC₁ f hf k ι hc
+  obtain ⟨p2, z2, t2, s2, -⟩ := hH k
+  exact ⟨p1.trans p2, z1.trans z2, k1, Nat.le_trans t1 t2, s1.trans s2, c1⟩
 
 end Xv6

@@ -42,6 +42,13 @@ booted, `fs.img` on its disk) -- and its pure corollaries over runs.
   2's: the skeleton's exits and enters, and the console runs its writes
   push, are a prefix.  Exits, masks and the key readings are DERIVED, not
   inputs (`NiTrace` scope 13).
+* **`xv6NiDetQ`** (NI M3 quotas Q-3, rulings Q-R8/R9; the fourteenth root):
+  `xv6NiDet` WITHOUT THE ALLOCATOR -- the cited positions compared without
+  their allocator length (`NiStep.detInQ`) and the histories by `niBelowQ`
+  (no allocator conjunct), at the SAME `xv6NiPhi`.  On the quota kernel
+  (`verified-quota`) no class row reads the allocator ledger
+  (`UsysDet.usysDet_ledQ`), so the allocator order leaves both hypotheses
+  (`NiTrace` scope 14).
 
 A `Link` file because it consumes `ProofUser` (tools/check_layering.sh).
 
@@ -222,6 +229,34 @@ theorem xv6NiDet {hlc : HasLC}
     fun q ho₁ ho₂ hg₁ hg₂ hc hns hk hpos hH =>
       niTwoRunDet hF₁ hC₁ hU₁ hF₂ hC₂ hU₂ q ho₁ ho₂ hg₁ hg₂ hc hns hk hpos hH⟩
 
+/-- **(NI M3 quotas) The allocator channel is closed**: `xv6NiDet` WITHOUT the allocator -- neither its
+history (`niBelowQ`) nor its positions (`detInQ`).  An incarnation's ecall skeleton and console output
+are a prefix of the other run's whatever every actor allocated and freed. -/
+theorem xv6NiDetQ {hlc : HasLC}
+    (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
+    (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
+    (n₁ n₂ : Nat) (κs₁ κs₂ : List Obs) (t₁ t₂ : List Expr) (g₁' g₂' : GState)
+    (hsteps₁ : ([Expr.power], g₁) -<κs₁>->ₜₚ^[n₁] (t₁, g₁'))
+    (hsteps₂ : ([Expr.power], g₂) -<κs₂>->ₜₚ^[n₂] (t₂, g₂')) :
+    ∃ F₁ F₂, niOk κs₁ F₁ ∧ niOneShot κs₁ F₁ ∧ niChain F₁ (niHist F₁) ∧ niUserChain F₁ ∧
+      niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ niUserChain F₂ ∧ ∀ q : NiInc,
+      NiOneOrigin q κs₁ F₁ → NiOneOrigin q κs₂ F₂ →
+      NiGapFree q κs₁ F₁ → NiGapFree q κs₂ F₂ →
+      NiInClass (utrace q κs₁ F₁) → NiNoStuck q κs₁ F₁ →
+      firstKey q κs₁ F₁ = firstKey q κs₂ F₂ →
+      ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.detInQ <+:
+        ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.detInQ →
+      (∀ k, niBelowQ (niHistLed F₁ k) (niHistLed F₂ k)) →
+      ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.view <+:
+          ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.view ∧
+        ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.outBytes <+:
+          ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.outBytes := by
+  obtain ⟨-, F₁, hF₁, h1₁, hC₁, hU₁, -⟩ := xv6NiAdequacy (hlc := hlc) g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
+  obtain ⟨-, F₂, hF₂, h1₂, hC₂, hU₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
+  exact ⟨F₁, F₂, hF₁, h1₁, hC₁, hU₁, hF₂, h1₂, hC₂, hU₂,
+    fun q ho₁ ho₂ hg₁ hg₂ hc hns hk hpos hH =>
+      niTwoRunDetQ hF₁ hC₁ hU₁ hF₂ hC₂ hU₂ q ho₁ ho₂ hg₁ hg₂ hc hns hk hpos hH⟩
+
 /-- **THE STRONG INSTANCE**: in a run from a booting machine, at the filing
 its ledger witnesses, every incarnation's steps before its first ecall
 replay their exits (`NiTrace.niStrongInstance`; T's
@@ -243,3 +278,4 @@ end Xv6
 #print axioms Xv6.xv6NiOut
 #print axioms Xv6.xv6NiPrefix
 #print axioms Xv6.xv6NiDet
+#print axioms Xv6.xv6NiDetQ

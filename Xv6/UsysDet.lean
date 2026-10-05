@@ -234,6 +234,10 @@ def UIota.boot : UIota := ⟨[], [], [], 0, 0#64, [], [], []⟩
 /-- the ledger part (what every answer reads) -/
 def UIota.led (ι : UIota) : UIota := { ι with cacc := [], cpos := [] }
 
+/-- (NI M3 quotas Q-3) **The ledger part without the allocator**: what every
+answer reads on the quota kernel (`usysDet_ledQ`). -/
+def UIota.ledQ (ι : UIota) : UIota := { ι.led with kev := [] }
+
 instance : Inhabited UIota := ⟨UIota.boot⟩
 
 /-- **The family ledger's reading at the actor** (NI G1d): the lowest zombie
@@ -781,6 +785,31 @@ theorem usysDetRet_fork (W : Uvis) (ι : UIota) : usysDetRet USYS_fork W ι = us
 theorem usysDetRet_sbrk (W : Uvis) (ι : UIota) :
     usysDetRet USYS_sbrk W ι = usysSbrkAns W.sz (tfW W.tf (tfArgIdx 0)) (tfW W.tf (tfArgIdx 1)) ι := by
   unfold usysDetRet; rw [if_neg (by decide), if_neg (by decide), if_pos rfl]
+
+/-- **THE CLOSURE** (NI M3 quotas Q-3, design "M3 quotas design (2026-10-05)"):
+no class row reads the allocator ledger -- M0's row at `ι` is its row at
+`ι`'s ledger part without the allocator.  Per member: wait reads the family
+ledger at the actor (`zLowest ι.zev ι.act`); fork the pid prefix, the family
+prefix's last `ZFork` and the slot prefix's `SFull` (`forkOk ι := ¬ ι.sFull`,
+NI M3 quotas Q-2); sbrk the key alone (`usysSbrkFails` is the quota overrun,
+Q-2); uptime the tick count; getpid, pause and the console write the key
+alone.  FALSE on b72cbac1, whose sbrk read `ι.kNull` and fork `ι.kOk`. -/
+theorem usysDet_ledQ (n : Int) (W : Uvis) (ι : UIota) : usysDet n W ι = usysDet n W ι.ledQ := by
+  unfold usysDet
+  by_cases hw : n = USYS_wait
+  · -- wait: the family ledger at the actor
+    rw [if_pos hw, if_pos hw]; rfl
+  rw [if_neg hw, if_neg hw]
+  by_cases hf : n = USYS_fork
+  · -- fork: the pid prefix, the last `ZFork`, the slot prefix's `SFull`
+    rw [if_pos hf, if_pos hf]; rfl
+  rw [if_neg hf, if_neg hf]
+  by_cases hs : n = USYS_sbrk
+  · -- sbrk: the key alone
+    rw [if_pos hs, if_pos hs]; rfl
+  rw [if_neg hs, if_neg hs]
+  -- the quiet members (getpid, uptime's tick count, the console write, pause) and the rest
+  rfl
 
 /-- **wait's fit, at the key's readings** (NI G1d; NI M2-G1e): the answer
 `r`, the children set `cs'` and the image `M'` are the ones the family

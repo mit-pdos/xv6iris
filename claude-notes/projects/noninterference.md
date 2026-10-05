@@ -6714,6 +6714,86 @@ Lane `lane/quota`, one commit on Q-0 (f755c293f).  Nothing ticked.
   (`usysSbrkFails`' `allocs ∧ kNull`), vmfault, fork and sys_exec are kept in the Specs and never
   produced: Q-2 re-cuts those rows.
 
+### M3 quotas as landed (2026-10-05)
+
+Lane `lane/quota`, Q-2 (7a25da7ee) and Q-3 (the commit after it) on Q-1 (391a8b1ef).  Nothing ticked.
+The allocator channel is CLOSED: `xv6NiDetQ`, the fourteenth root.
+
+**Q-2: the rows without the allocator** (ruling Q-R9: in place).  At every credited site the null
+arm was already refuted by Q-1; Q-2 deleted the arms no proof produced, so the kernel rows and the NI
+rows say it.
+- `SpecUvmalloc.wp_uvmalloc_body`: the `0` arm (G3a's `⌜R' 10 = 0 ∧ 0 < uvmaNp⌝ ∗ procPtAt P M ∗
+  kNullRcpt γk k.proc`) deleted; the post is the success alone.  `ProofUvmalloc`: `uaOut`'s null exit,
+  `uvma_loop`'s exit disjunct and wand, `ua_res_zero`, `uaExit` deleted.  `KexecSeam.kxc_call_uvmalloc`
+  keeps its statement (exec's `⌜R' 10 = 0⌝ ∗ procPtAt P M` arm, now unproduced); its proof always takes
+  the success arm.
+- `SpecGrowproc.growprocOk`'s FAILED disjunct: `(r = -1 ∧ V' = V ∧ M' = M ∧ uvmMaxsz < sz + nz)` (the
+  `TRAPFRAME` test alone, itself dead under `hq`); the post's `kNullRcpt` wand deleted.
+- `SpecSysSbrk.sysSbrkOk`'s FAILED arm: `(r = -1#64 ∧ V' = V ∧ M' = M ∧ sysSbrkOverrun V v0)`;
+  `sysSbrkAllocs` and the post's wand deleted.  `ProofSysSbrk`: the eager path's growproc `-1` is
+  REFUTED (its only `-1` is the `TRAPFRAME` overrun, and the quota test passed); `sys_sbrk_exit_ok`
+  merged into `sys_sbrk_exit`.
+- `SpecUvmcopy`: the `-1` arm (F2's `⌜-1⌝ ∗ procPtAt Pnew Mnew ∗ kNullRcpt`) deleted (not in the
+  brief's list, but `kforkRetLed`'s `-1` arm could not lose `kNullRcpt` while uvmcopy's could produce
+  it); `ProofUvmcopy`'s err tail (`uvmcopy_err`, `uc_uvmunmap_call`, `uc_procPtAt_view`) deleted.
+- `SpecAllocproc.allocprocPostLed`'s null arm: `sFullRcpt act` (was `kNullRcpt γk act ∨ sFullRcpt
+  act`); `ProofAllocproc.apPostCells` likewise (its two kalloc null tails were refuted since Q-1).
+- `SpecKfork.kforkRetLed`'s `-1` arm: `⌜rv = -1⌝ ∗ chFrag … ∗ Rc ∗ sFullRcpt (procAddr j)`;
+  `ProofKfork`'s uvmcopy-failure tail (freeproc + release + `return -1`) deleted.  The success arm still
+  carries the trapframe's `kAllocRcpt` (produced, read by no row: the allocator ledger stays registered,
+  X3).  `KFORK`/`SYSFORK`'s led fields move through the definitions.
+- `UsysDet`: `usysSbrkFails sz a0 _a1 _ι := usysSbrkOverrun sz a0` (G3's signature kept);
+  `forkOk ι := ¬ ι.sFull`; `usysSbrkAllocs`, `UIota.kOk`/`kNull` deleted.
+- `SyscallDefs.syscEvRow`'s fork clause: `… ∧ (¬ forkOk ι → ι.sFull ∧ cs' = cs)`; its sbrk clause
+  (`usysSbrkFitsAt`) is text-unchanged and now reads no ledger.
+- Arms: `syscArmSbrk_ev` cites `{boot with act}` at EVERY sbrk (G3-R3 kept, so `niCiting` is
+  untouched); `syscArmFork_ev` cites `{boot with pev, zev, act}` (`NiEvid.niIotaLbs_pz`; `_pzk`, `_kev`
+  deleted) and no longer takes `kAllocRcpt`; `syscArmFork_evNeg` takes `sFullRcpt act` only.
+  `niDetRow_sbrk`/`niDetRow_fork`: text unchanged.
+- `NiTrace` scopes 8 and 9 rewritten: fork declassifies the pid history and `SFull` only; sbrk's answer
+  is key-functional; the allocator order is observed by neither; the lazy-fault kill on an empty pool is
+  unreachable (wait's and write's lazy classes NOT re-cut: optional Q-4).
+
+**Q-3: the root.**
+- `UsysDet`: `def UIota.ledQ (ι : UIota) : UIota := { ι.led with kev := [] }`;
+  `theorem usysDet_ledQ (n : Int) (W : Uvis) (ι : UIota) : usysDet n W ι = usysDet n W ι.ledQ`
+  (per member: wait, fork, sbrk, then the quiet members -- each branch `rfl`, the rows read no `kev`).
+- `NiEvid`: `def niBelowQ (ι H : UIota) : Prop := ι.pev <+: H.pev ∧ ι.zev <+: H.zev ∧ ι.ticks ≤
+  H.ticks ∧ ι.sev <+: H.sev ∧ ι.cacc <+: H.cacc`.
+- `NiTrace`: `NiPos.noKev`, `NiStep.detInQ (s) := s.detIn.map NiPos.noKev`, `niBelow_posQ`.  THE
+  INDUCTION IS SHARED, not duplicated: `NiDetReading` (a schedule `ps`, an erasure `E` M0's row does not
+  see, the era read back, the positions-below lemma), its instances `niDetLed` (positions, `UIota.led`)
+  and `niDetLedQ` (kev-free positions, `UIota.ledQ`); `niKeyRow_det`, `citeBy_erase` (was
+  `citePos_led`), `getD_erase` (was `getD_led`), `niDet_runs` take the reading; `niTwoRunDetBy` is
+  `niTwoRunDet`'s old proof at a reading; `niTwoRunDet` (statement byte-identical) and `niTwoRunDetQ`
+  are its instances (run 1's citations lifted to run 2's history with run 1's console stream, and for Q
+  run 1's allocator ledger too).  `NiEntry.citePos`/`niStepOf_detIn` became `citeBy ps`/`niStepOf_detBy`.
+- `LinkNiAdequacy.xv6NiDetQ` (the design's statement verbatim; `xv6NiDet`'s binders and adequacy
+  premises, the SAME `xv6NiPhi`), `#print axioms`; `tools/ci/roots.txt`, `tools/audit/baseline.json` (the
+  same three axioms and three opaques as every root), `tools/tcb/expected.json` (`tcb.sh --update`: one
+  new entry, its module set `xv6NiDet`'s; no existing entry moved).
+- Honest scope 14 (`NiTrace`): what the quota kernel buys, costs, and leaves (the pid, tick, family,
+  slot and console histories; pid and slot quotas rejected as not minimal, Q-R6).
+
+**Deleted as unreached** (the dead-code policy; the report shows no new unreached declaration): G3a's
+receipt route (uvmalloc's `0` arm and loop exit, growproc's and sys_sbrk's wands, `sysSbrkAllocs`,
+`usysSbrkAllocs`, `UPtDefs.uvmaNp_pos_iff`, `sys_sbrk_exit_ok`, `sys_sbrk_sz_ne`, `sys_sbrk_bltz_pos`,
+`sbrkArm_sz_ne`), the fork lane's `kNullRcpt` on `kforkRetLed`/`allocprocPostLed` with uvmcopy's `-1` arm
+and err tail (`uvmcopy_err`, `uc_uvmunmap_call`, `uc_procPtAt_view`, `uc_ret_1432`, `uc_srli12`,
+`uc_vpnOf_zero`, `UPtCopy.ucInv_delRun`/`delRunL_get_ge`/`delRunL_get_lt`) and kfork's failure tail
+(`kf_freeproc`, `kf_pay_unused`, `kf_slots_unused_intro`, `kf_procPtAt_valids`, `kf_page_ne_zero`,
+`kf_blt_neg1`, `kf_blt_max`, `kf_br_uvmfail`, `kf_j_failtail`, `kfork_br_fffffffffffffdf8`), the `KNull`
+citations (`niIotaLbs_kev`, `niIotaLbs_pzk` → `niIotaLbs_pz`), `UIota.kOk`/`kNull`.  KEPT: `UIota.kev`
+(the allocator ledger is still registered, X3; `niIotaLbs` keeps its conjunct), `kNullRcpt` itself (walk,
+mappages, uvmcreate, proc_pagetable still name it), the success arms' `kAllocRcpt`, exec's `0` arm in
+`kxc_call_uvmalloc`.  `dead_allow.txt` unchanged.
+
+**Deviations.** (1) uvmcopy's `-1` arm deleted too (above).  (2) `usysDet_ledQ` closes by `rfl` per
+branch (the rows read no `kev` definitionally).  (3) `niTwoRunDet`'s proof generalised
+(`niTwoRunDetBy`) rather than duplicated, as the brief preferred; its statement is unchanged.
+
+What remains in M3: private files; later optional: Q-4 (wait/write at lazy keys), Q-5 (the clock), U-4 totality, FAM-1b, K2 sys_kill, dup/close, pipes, OUT-4, G3c
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
@@ -7130,7 +7210,9 @@ ustep landed (U-1..U-3; U-4 totality later); next: quotas
 
 quotas DESIGNED (2026-10-05, "M3 quotas design" above: the break quota + pipe cap + `scounteren`, one commit on a fork of the pin; `xv6NiDetQ` without the allocator; ≈ 1.0 BE); awaiting the OWNER's Q-R1 and rulings Q-R2…R10
 
-What remains in M3: quotas (a kernel change and the theorem that it closes a channel), private files; later optional: U-4 totality, FAM-1b, K2 sys_kill, dup/close, pipes, OUT-4, G3c
+quotas landed (Q-0..Q-3; Q-4/Q-5 optional); next: private files
+
+What remains in M3: private files; later optional: Q-4 (wait/write at lazy keys), Q-5 (the clock), U-4 totality, FAM-1b, K2 sys_kill, dup/close, pipes, OUT-4, G3c
 
 - **M3 — extensions**, independent: arbitrary low code (`ustep`, §4);
   process FAMILIES as partitions (pipes and `wait` order become
