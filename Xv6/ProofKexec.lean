@@ -152,9 +152,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 `tf_page_length`). -/
 theorem kxau_tf_len (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢ ⌜V.tf.length = 36⌝ ∗ procPrivFd γ pa pid V M := by
+    procPrivFdRes (GF := GF) ptW γ pa pid V M ⊢ ⌜V.tf.length = 36⌝ ∗ procPrivFdRes ptW γ pa pid V M := by
   iintro H
-  icases procPrivFd_tf γ pa pid V M $$ H with ⟨Hc, Ht, Hback⟩
+  icases procPrivFdRes_tf ptW γ pa pid V M $$ H with ⟨Hc, Ht, Hback⟩
   unfold tfPageAt
   icases Ht with ⟨%hl, Ht⟩
   isplitr

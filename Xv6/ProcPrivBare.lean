@@ -45,16 +45,18 @@ def procFieldsNoOfile (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF :=
 /-- `procPrivNoctxAt` minus the descriptor array: Rocq `proc_priv_bare` plus
 the lazy claim -- the block's cwd-free, fd-free part -- and, LAST, the slot's
 event counter at the record's `ev` (Rocq G', design ni-strong-instance.md
-§7.2).  It is what the
+§7.2).  THE BREAK IS WITHIN THE QUOTA (NI M3 quotas Q-1, in place of `≤
+uvmMaxsz`): `sz ≤ uQuota` -- `sys_sbrk`'s and `kexec`'s refusals keep it, and
+`vmfault` reads it (a lazy page below the break is a quota page).  It is what the
 sub-file-layer callees that never touch the working directory are stated
 over (`fetchstr`, `argstr`), and the first half of the core (`FdTable`). -/
-def procPrivBareAt [WchG GF] (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+def procPrivBareAt [Xv6G GF] [WchG GF] (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
+  ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧
     V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
   @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
   @procFieldsNoOfile hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V ∗
-  @procPtAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt M ∗
+  @procPtAt hlc GF _ _ _ ⟨ξ, KTier.kpt⟩ V.upt M ∗
   @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
   actCnt pa V.ev
@@ -67,7 +69,7 @@ theorem procFieldsNoOfile_updEv (X : CurCtx) (pa : BitVec 64) (dq : DFrac) (V : 
 /-- **The counter, lent out of the bare block and taken back at any count**
 (Rocq `proc_priv_bare_ev_acc`, G'): `updEv` is a ghost write, no cell
 moves. -/
-theorem procPrivBareAt_evAcc [WchG GF] (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+theorem procPrivBareAt_evAcc [Xv6G GF] [WchG GF] (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivBareAt (GF := GF) ξ pa pid V M ⊢
       actCnt pa V.ev ∗ (∀ k : Nat, actCnt pa k -∗ procPrivBareAt ξ pa pid (V.updEv k) M) := by

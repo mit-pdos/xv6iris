@@ -173,16 +173,16 @@ the old size phase D frees the old table at), with the block's size bound,
 at the ambient context once its tier is pinned (`kxc_priv_pid`'s shape). -/
 theorem kxcC_priv_sz [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
+    procPrivFdRes (GF := GF) 0 γ pa pid V M ⊢
       ⌜V.sz.toNat ≤ uvmMaxsz⌝ ∗ wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
-      (wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz -∗ procPrivFd γ pa pid V M) := by
+      (wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz -∗ procPrivFdRes 0 γ pa pid V M) := by
   obtain ⟨ξ, t⟩ := X
   simp only at hct
   subst hct
-  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
+  unfold procPrivFdRes procPrivCoreResAt procPrivBareAt procFieldsNoOfile
   iintro ⟨⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩, Hof⟩
   isplitl []
-  · ipureintro; exact hf.1
+  · ipureintro; exact Nat.le_trans hf.1 uQuota_le_uvmMaxsz
   iframe Hs
   iintro Hs
   iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hcw Hof Hev
@@ -497,7 +497,7 @@ theorem kxcC_call_copyout (Γ : SchedNames) (CO : COPYOUT) (cpu : CPU) (k : KCtx
     (hret : jumpPc (X + 4#64) = X + 4#64) (P : UPtd) (M : Nat → List (BitVec 8))
     (dqs : DFrac) (bs : List (BitVec 8)) (src : BitVec 64) (ke : Nat)
     (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0) (hsrc : R 13#5 = src)
-    (hroot : R 10#5 = pageAddr P.root) (hsz : (R 11#5).toNat ≤ 2 ^ 38)
+    (hroot : R 10#5 = pageAddr P.root) (hsz : (R 11#5).toNat ≤ uQuota)
     (hlen : R 14#5 = BitVec.ofNat 64 bs.length) (hlen' : bs.length < 2 ^ 63) :
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗

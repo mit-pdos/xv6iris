@@ -11,7 +11,7 @@ zero node in (`PTree.fill`), and it bails out to the shared epilogue with
 
 THE LEND (permit sweep L3a/L3b, no Rocq counterpart): the allocating
 contract takes it and threads it (L3b): `walk_alloc` passes the count in
-hand to `kalloc` (`uc_kalloc_lend_call`), which steps it; `walk_descend`
+hand to `kalloc` (`uc_kalloc_pay_call`), which steps it; `walk_descend`
 carries `∃ k' ≥ ke` out of both arms; `walk_proof` lends the first descent
 `ke`, the second the count the first returned, and frames the final count
 into the caller's continuation at the exit (`walkPostL_frame`).  The
@@ -266,12 +266,12 @@ theorem walk_br_fffffffffffffd6a : KA.«walk» + 0xfffffffffffffd6a#64 = KA.«me
 theorem walk_br_fffffffffffffbd0 : KA.«walk» + 0xfffffffffffffbd0#64 = KA.«kalloc» := by decide
 
 theorem walk_alloc [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
-    (cpu : CPU) (kb : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat)
+    (cpu : CPU) (kb : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (m : Nat) (ke : Nat)
     (hnoff : kb.noff + 1 < 2 ^ 31) (hK : 14 ≤ kb.avail) (hlk : "kmem" ∉ kb.locks)
     (R : RegMap) (pe : BitVec 64) (h18 : R 18#5 = pe) (h22 : R 22#5 = 1#64) (Res1 Res2 Res3 Res4 : IProp GF) :
     kctx cpu (kb.withRegs R) ∗ pcIs cpu (KA.«walk» + 0x72#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    wordPointsTo pe 8 (DFrac.own 1) 0#64 ∗ kallocAvail γk on ∗ Res1 ∗ Res2 ∗ Res3 ∗ Res4 ∗
+    wordPointsTo pe 8 (DFrac.own 1) 0#64 ∗ kPay γk on (m + 1) ∗ Res1 ∗ Res2 ∗ Res3 ∗ Res4 ∗
     actLend kb.proc ke ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (b : BitVec 44),
       ⌜kb.sie = false → spie = kb.spie ∧ spp = kb.spp⌝ -∗
@@ -279,13 +279,13 @@ theorem walk_alloc [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
       Res1 -∗ Res2 -∗ Res3 -∗ Res4 -∗ actLend kb.proc (ke + 1) -∗
       wordPointsTo pe 8 (DFrac.own 1) (kPtr b) -∗
       nodeOwn (DFrac.own 1) (PTree.zeroNode b) -∗
-      kallocAvail γk (availDec on) -∗
+      kPay γk (availDec on) m -∗
       ⌜pageValid (pageAddr b) ∧ R' 9#5 = pageAddr b ∧ walkPres R R'⌝ -∗ wpLoop cpu')) ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜kb.sie = false → spie = kb.spie ∧ spp = kb.spp⌝ -∗
       kctx cpu' ((kb.withSpie spie spp).withRegs R') -∗ pcIs cpu' (KA.«walk» + 0x52#64) -∗
       Res1 -∗ Res2 -∗ Res3 -∗ Res4 -∗ actLend kb.proc (ke + 1) -∗
-      wordPointsTo pe 8 (DFrac.own 1) 0#64 -∗ kallocAvail γk on -∗ kNullRcpt γk kb.proc -∗
+      wordPointsTo pe 8 (DFrac.own 1) 0#64 -∗ kPay γk on (m + 1) -∗ kNullRcpt γk kb.proc -∗
       ⌜R' 10#5 = 0#64 ∧ availZero on ∧ walkPres R R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hlk, Hpe, Hav, HR1, HR2, HR3, HR4, Hl, Hok, Hbad⟩
@@ -298,7 +298,7 @@ theorem walk_alloc [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
   k_step_gen (wp_s_jal c1 _ (KA.«walk» + 0x76#64) false 2095962#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [walk_br_fffffffffffffbd0] next c2 hp2
   iintro Hk Hpc
-  iapply (uc_kalloc_led_call KAL c2 _ γl γk on ke ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
+  iapply (uc_kalloc_pay_call KAL c2 _ γl γk on m ke ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -321,7 +321,7 @@ theorem walk_alloc [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
   unfold calleeSaved at hcs
   k_norm_g at hcs
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs
-  unfold kallocPost
+  unfold kallocPayPost
   icases HPost with ⟨⟨%hz, Hav⟩ | ⟨%hvalid, Hbuf, Hav⟩⟩
   · -- kalloc failed
     obtain ⟨hr0, hzero⟩ := hz
@@ -445,7 +445,7 @@ theorem walk_descend [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
     (h20 : R 20#5 = BitVec.ofNat 64 sh) (h22 : R 22#5 = 1#64) (Res1 Res2 Res3 : IProp GF) :
     kctx cpu (kb.withRegs R) ∗ pcIs cpu (KA.«walk» + 0x26#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    ptreeOwn (lvl+1) (DFrac.own 1) t ∗ kallocAvail γk on ∗ Res1 ∗ Res2 ∗ Res3 ∗
+    ptreeOwn (lvl+1) (DFrac.own 1) t ∗ kPay γk on (t.missingOn (lvl+1) (vpnOf va)) ∗ Res1 ∗ Res2 ∗ Res3 ∗
     actLend kb.proc ke ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
         (fresh : List (BitVec 44)) (u c : PTree),
@@ -455,16 +455,17 @@ theorem walk_descend [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
       ptreeOwn lvl (DFrac.own 1) c -∗
       (∀ c' : PTree, ptreeOwn lvl (DFrac.own 1) c' -∗
           ptreeOwn (lvl+1) (DFrac.own 1) (u.setKid i c')) -∗
-      kallocAvail γk (availSub on fresh.length) -∗
+      kPay γk (availSub on fresh.length) (c.missingOn lvl (vpnOf va)) -∗
       ⌜(∀ fr : List (BitVec 44), t.fill (lvl+1) (vpnOf va) (fresh ++ fr)
            = (u.setKid i (c.fill lvl (vpnOf va) fr).1, (c.fill lvl (vpnOf va) fr).2)) ∧
+        t.missingOn (lvl+1) (vpnOf va) = fresh.length + c.missingOn lvl (vpnOf va) ∧
         c.wfU lvl ∧ (∀ b ∈ fresh, pageValid (pageAddr b)) ∧
         R' 9#5 = pageAddr c.base ∧ walkPres R R'⌝ -∗ wpLoop cpu')) ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜kb.sie = false → spie = kb.spie ∧ spp = kb.spp⌝ -∗
       kctx cpu' ((kb.withSpie spie spp).withRegs R') -∗ pcIs cpu' (KA.«walk» + 0x52#64) -∗
       Res1 -∗ Res2 -∗ Res3 -∗ (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend kb.proc k') -∗
-      ptreeOwn (lvl+1) (DFrac.own 1) t -∗ kallocAvail γk on -∗ kNullRcpt γk kb.proc -∗
+      ptreeOwn (lvl+1) (DFrac.own 1) t -∗ kPay γk on (t.missingOn (lvl+1) (vpnOf va)) -∗ kNullRcpt γk kb.proc -∗
       ⌜t.kids i = none ∧ R' 10#5 = 0#64 ∧ availZero on ∧ walkPres R R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, HR1, HR2, HR3, Hl, Hok, Hbad⟩
@@ -513,15 +514,18 @@ theorem walk_descend [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
     ihave Hok := wpNext_at _ _ _ c9 _ hpin $$ Hok
     ihave Hcl := Hcl $$ Hw
     ihave Hk := MachCSL.kctx_self c9 kb _ $$ Hk
-    ihave Hav : kallocAvail (GF := GF) γk (availSub on ([] : List (BitVec 44)).length) $$ [Hav]
+    have hmo : t.missingOn (lvl+1) (vpnOf va) = c.missingOn lvl (vpnOf va) := by
+      simp only [PTree.missingOn, ← hi, hk]
+    ihave Hav : kPay (GF := GF) γk (availSub on ([] : List (BitVec 44)).length)
+        (c.missingOn lvl (vpnOf va)) $$ [Hav]
     case' _ =>
-      rw [List.length_nil, Xv6.availSub_zero]
+      rw [List.length_nil, Xv6.availSub_zero, ← hmo]
       iexact Hav
     ihave Hl := actLend_ret_intro kb.proc ke $$ Hl
     iapply Hok $$ %kb.spie %kb.spp %_ %([] : List (BitVec 44)) %t %c
       %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HR1 HR2 HR3 Hl Hc Hcl Hav
     ipureintro
-    refine ⟨?_, hcwf, by simp, by simp, ?_⟩
+    refine ⟨?_, by simp [hmo], hcwf, by simp, by simp, ?_⟩
     · intro fr
       simp only [List.nil_append, PTree.fill, ← hi, hk]
     · exact ⟨by simp [RegMap.set_apply], by simp [RegMap.set_apply], by simp [RegMap.set_apply],
@@ -549,7 +553,9 @@ theorem walk_descend [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
         ((hp2 h).trans (hp1 h))))))
     ihave Hok := wpNext_shift _ _ _ _ _ hpin7 $$ Hok
     ihave Hbad := wpNext_shift _ _ _ _ _ hpin7 $$ Hbad
-    iapply (walk_alloc KAL MS c7 kb γl γk on ke hnoff hK hlk _ (pteAddr t.base i) ?hh18 ?hh22
+    have hmo : t.missingOn (lvl+1) (vpnOf va) = lvl + 1 := by
+      simp only [PTree.missingOn, ← hi, hk]
+    iapply (walk_alloc KAL MS c7 kb γl γk on lvl ke hnoff hK hlk _ (pteAddr t.base i) ?hh18 ?hh22
       iprop(∀ (v : BitVec 64) (oc : Option PTree),
         wordPointsTo (pteAddr t.base i) 8 (DFrac.own 1) v -∗ kidOwnO lvl (DFrac.own 1) oc -∗
         ptreeOwn (lvl+1) (DFrac.own 1) (setKidO (t.setEnt i v) i oc))
@@ -557,7 +563,9 @@ theorem walk_descend [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
     rotate_right 1
     iframe #
     iframe Hw
-    iframe Hav
+    isplitl [Hav]
+    · rw [hmo]
+      iexact Hav
     case hh18 => simp [RegMap.set_apply]
     case hh22 => simp [RegMap.set_apply, h22]
     isplitl [Hcl]
@@ -582,9 +590,11 @@ theorem walk_descend [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
         iapply (ptreeOwn_zeroNode lvl (DFrac.own 1) b)
         iexact Hnode
       ihave Htree := Hcl $$ %(kPtr b) %(some (PTree.zeroNode b)) Hptr Hnode2
-      ihave Hav : kallocAvail (GF := GF) γk (availSub on ([b] : List (BitVec 44)).length) $$ [Hav]
+      ihave Hav : kPay (GF := GF) γk (availSub on ([b] : List (BitVec 44)).length)
+          ((PTree.zeroNode b).missingOn lvl (vpnOf va)) $$ [Hav]
       case' _ =>
-        rw [show (([b] : List (BitVec 44)).length) = 1 from rfl, availSub_one]
+        rw [show (([b] : List (BitVec 44)).length) = 1 from rfl, availSub_one,
+          PTree.zeroNode_missingOn]
         iexact Hav
       icases ptreeOwn_kid_acc lvl (DFrac.own 1) (setKidO (t.setEnt i (kPtr b)) i
         (some (PTree.zeroNode b))) i (PTree.zeroNode b) (by simp [setKidO, PTree.setKid])
@@ -593,7 +603,8 @@ theorem walk_descend [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
         %(setKidO (t.setEnt i (kPtr b)) i (some (PTree.zeroNode b)))
         %(PTree.zeroNode b) %hsp Hk Hpc HR1 HR2 HR3 Hl Hc Hcl2 Hav
       ipureintro
-      refine ⟨?_, PTree.zeroNode_wfU b lvl, ?_, h9', ?_⟩
+      refine ⟨?_, by rw [hmo, PTree.zeroNode_missingOn]; simp [Nat.add_comm],
+        PTree.zeroNode_wfU b lvl, ?_, h9', ?_⟩
       · intro fr
         simp only [List.cons_append, List.nil_append, PTree.fill, ← hi, hk, setKidO,
           PTree.setKid_setKid]
@@ -621,6 +632,7 @@ theorem walk_descend [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
         iempintro
       ihave Htree := Hcl $$ %(0#64 : BitVec 64) %(none : Option PTree) Hptr Hemp
       ihave Htree := hconv $$ Htree
+      rw [hmo]
       iapply H $$ %spie %spp %R' %hsp Hk Hpc HR1 HR2 HR3 Hl Htree Hav Hrc
       ipureintro
       refine ⟨trivial, h10', hz, ?_⟩
@@ -649,13 +661,13 @@ theorem w_mem_pages_fill (t : PTree) (vpn : BitVec 27) (fr : List (BitVec 44))
   exact List.mem_append.1 (hperm.mem_iff.1 hb)
 
 /-- `walk`'s postcondition, exactly as `wp_walk_body` states it. -/
-def walkPost [Xv6G GF] [CurCtx] (k : KCtx) (γk : KmemNames) (on : Option Nat) (t : PTree)
+def walkPost [Xv6G GF] [WchG GF] [CurCtx] (k : KCtx) (γk : KmemNames) (on : Option Nat) (t : PTree)
     (cpu' : CPU) : IProp GF := iprop%
   ∀ spie : Bool, ∀ spp : Bool, ∀ (R' : RegMap) (fresh : List (BitVec 44)),
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     ptreeOwn 2 (DFrac.own 1) (t.fill 2 (vpnOf (k.regs 11#5)) fresh).1 -∗
-    kallocAvail γk (availSub on fresh.length) -∗
+    kPay γk (availSub on fresh.length) (t.missingOn 2 (vpnOf (k.regs 11#5)) - fresh.length) -∗
     (⌜R' 10#5 = 0#64⌝ -∗ kNullRcpt γk k.proc) -∗
     ⌜calleeSaved k.regs R' ∧
       (t.fill 2 (vpnOf (k.regs 11#5)) fresh).2 = [] ∧
@@ -673,7 +685,7 @@ def walkPostL [Xv6G GF] [WchG GF] [CurCtx] (k : KCtx) (γk : KmemNames) (on : Op
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     ptreeOwn 2 (DFrac.own 1) (t.fill 2 (vpnOf (k.regs 11#5)) fresh).1 -∗
-    kallocAvail γk (availSub on fresh.length) -∗
+    kPay γk (availSub on fresh.length) (t.missingOn 2 (vpnOf (k.regs 11#5)) - fresh.length) -∗
     (⌜R' 10#5 = 0#64⌝ -∗ kNullRcpt γk k.proc) -∗
     ⌜calleeSaved k.regs R' ∧
       (t.fill 2 (vpnOf (k.regs 11#5)) fresh).2 = [] ∧
@@ -696,7 +708,7 @@ theorem walkPostL_frame [Xv6G GF] [WchG GF] [CurCtx] (sie : Bool) (p : BitVec 64
 set_option maxHeartbeats 4000000 in
 /-- From `0x80001000` with the frame: the epilogue and the caller's
 continuation. -/
-theorem walk_exit [Xv6G GF] [CurCtx]
+theorem walk_exit [Xv6G GF] [WchG GF] [CurCtx]
     (cpu c : CPU) (k : KCtx) (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hK : 8 ≤ k.avail)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64)
@@ -711,7 +723,7 @@ theorem walk_exit [Xv6G GF] [CurCtx]
     frame8 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) ∗
     ptreeOwn 2 (DFrac.own 1) (t.fill 2 (vpnOf (k.regs 11#5)) fresh).1 ∗
-    kallocAvail γk (availSub on fresh.length) ∗
+    kPay γk (availSub on fresh.length) (t.missingOn 2 (vpnOf (k.regs 11#5)) - fresh.length) ∗
     (⌜R 10#5 = 0#64⌝ -∗ kNullRcpt γk k.proc) ∗
     wpNext k.sie k.proc cpu (walkPost k γk on t)
     ⊢ wpLoop (GF := GF) c := by
@@ -824,7 +836,7 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
   · -- the descent reached the level-1 node
     iapply wpNext_intro_pin
     iintro %ca %hpa %spie1 %spp1 %R1 %fresh1 %u2 %c1 %hsp1 Hk Hpc Hframe Hnext _ ⟨%k1, %hk1, Hl1⟩ Hc1 Hcl2 Hav %hf1
-    obtain ⟨hfill1, hwf1, hval1, h9a, hpres1⟩ := hf1
+    obtain ⟨hfill1, hmo1, hwf1, hval1, h9a, hpres1⟩ := hf1
     obtain ⟨p2, p8, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpres1
     have hpina : k.sie = false ∨ k.proc = 0#64 → ca = cpu := fun h => (hpa h).trans (hpin9 h)
     k_step_gen (wp_s_addiw ca _ (KA.«walk» + 0x40#64) true 4087#12 20#5 20#5 (by decide))
@@ -870,7 +882,7 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
       ihave Hl := actLend_ret_congr (p' := k.proc) (by simp) k1 $$ Hl
       ihave Hl := actLend_ret_weaken k.proc hk1 $$ Hl
       ihave Hnext := walkPostL_frame _ _ _ _ _ _ _ _ $$ Hnext Hl
-      obtain ⟨hfill2', hwf0, hval2, h9b, hpres2⟩ := hf2
+      obtain ⟨hfill2', hmo2, hwf0, hval2, h9b, hpres2⟩ := hf2
       obtain ⟨q2, q8, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := hpres2
       have hpind : k.sie = false ∨ k.proc = 0#64 → cd = cpu := fun h => (hpd h).trans (hpinc h)
       k_step_gen (wp_s_addiw cd _ (KA.«walk» + 0x40#64) true 4087#12 20#5 20#5 (by decide))
@@ -940,9 +952,16 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
         rw [hfillt]
         iapply Hcl2 $$ %(u1.setKid (vpnIdx (vpnOf (k.regs 11#5)) 1) c0)
         iapply Hcl1 $$ %c0 Hc0
-      ihave Hav2 : kallocAvail (GF := GF) γk (availSub on (fresh1 ++ fresh2).length) $$ [Hav]
+      ihave Hav2 : kPay (GF := GF) γk (availSub on (fresh1 ++ fresh2).length)
+          (t.missingOn 2 (vpnOf (k.regs 11#5)) - (fresh1 ++ fresh2).length) $$ [Hav]
       case' _ =>
-        rw [List.length_append, ← Xv6.availSub_availSub]
+        have hm0 : t.missingOn 2 (vpnOf (k.regs 11#5)) - (fresh1 ++ fresh2).length
+            = c0.missingOn 0 (vpnOf (k.regs 11#5)) := by
+          have e1 : t.missingOn 2 (vpnOf (k.regs 11#5)) = _ := hmo1
+          have e2 : c1.missingOn 1 (vpnOf (k.regs 11#5)) = _ := hmo2
+          have e0 : c0.missingOn 0 (vpnOf (k.regs 11#5)) = 0 := rfl
+          rw [e1, e2, e0, List.length_append]; omega
+        rw [hm0, List.length_append, ← Xv6.availSub_availSub]
         iexact Hav
       iapply (walk_exit cpu cj k hpinj (by omega) spie2 spp2
         (fun h => ⟨(hsp2 h).1.trans (hsp1 h).1, (hsp2 h).2.trans (hsp1 h).2⟩) _
@@ -980,6 +999,12 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
     · -- the level-1 pointer was missing and `kalloc` failed
       iapply wpNext_intro_pin
       iintro %cd %hpd %spie2 %spp2 %R2 %hsp2 Hk Hpc Hframe Hnext Hcl2 Hl Hc1 Hav #Hrc %hf2
+      ihave Hav : kPay (GF := GF) γk (availSub on fresh1.length)
+          (t.missingOn 2 (vpnOf (k.regs 11#5)) - fresh1.length) $$ [Hav]
+      case' _ =>
+        have e1 : t.missingOn 2 (vpnOf (k.regs 11#5)) = _ := hmo1
+        rw [e1, Nat.add_sub_cancel_left]
+        iexact Hav
       ihave Hl := actLend_ret_congr (p' := k.proc) (by simp) k1 $$ Hl
       ihave Hl := actLend_ret_weaken k.proc hk1 $$ Hl
       ihave Hnext := walkPostL_frame _ _ _ _ _ _ _ _ $$ Hnext Hl
@@ -1031,9 +1056,10 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
     case' _ =>
       rw [hfill0]
       iexact Htree
-    ihave Hav2 : kallocAvail (GF := GF) γk (availSub on ([] : List (BitVec 44)).length) $$ [Hav]
+    ihave Hav2 : kPay (GF := GF) γk (availSub on ([] : List (BitVec 44)).length)
+        (t.missingOn 2 (vpnOf (k.regs 11#5)) - ([] : List (BitVec 44)).length) $$ [Hav]
     case' _ =>
-      rw [List.length_nil, Xv6.availSub_zero]
+      rw [List.length_nil, Xv6.availSub_zero, Nat.sub_zero]
       iexact Hav
     iapply (walk_exit cpu ca k hpina (by omega) spie1 spp1 hsp1 R1 (by simp [RegMap.set_apply, p2])
       (by simp [RegMap.set_apply, p23]) (by simp [RegMap.set_apply, p24])

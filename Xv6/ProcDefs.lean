@@ -236,9 +236,9 @@ slot's event counter at the record's `ev` (`SlotGen.actCnt`, Rocq G': the
 bare block's last conjunct, design ni-strong-instance.md §7), as in
 `ProcPrivBare.procPrivBareAt`, of which this is the cells-and-array form
 (`FdTable.procPriv_bare_split`). -/
-def procPriv [WchG GF] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+def procPriv [Xv6G GF] [WchG GF] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     IProp GF := iprop%
-  ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
+  ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧
     V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
   wordPointsTo (pPid pa) 4 pidPriv pid ∗
   procFields pa (DFrac.own 1) V ∗
@@ -253,16 +253,24 @@ def procPriv [WchG GF] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Na
 `proc_dormant`): its whole kernel stack (the 512 slots below `kstack +
 PGSIZE`: nobody runs on it), and at ZOMBIE the address space and the
 trapframe page, which `wait` reaps; at UNUSED `pagetable`, `trapframe`,
-`sz` and `pid` are zero. -/
-def dormantSpace (st : BitVec 32) (V : ProcPriv) (pid : BitVec 32) : IProp GF :=
+`sz` and `pid` are zero.
+
+THE SLOT'S SHARE (NI M3 quotas Q-1, design "M3 quotas" R7, in place): an
+UNUSED slot holds its whole share of RAM in credits (`slotShare`: the
+trapframe, the live table's weight, the live process's spare), which
+allocproc takes and freeproc returns; a ZOMBIE holds the live process's
+spare (`procSpare`) beside its table (whose weight rides `procPtAt`) and
+its trapframe page. -/
+def dormantSpace [Xv6G GF] [WchG GF] (st : BitVec 32) (V : ProcPriv) (pid : BitVec 32) : IProp GF :=
   if st = UNUSED then
     iprop(⌜V.pagetable = 0#64 ∧ V.trapframe = 0#64 ∧ V.sz = 0#64 ∧ pid = 0#32⌝ ∗
-      stackOwn (V.kstack + 4096#64) 512)
+      stackOwn (V.kstack + 4096#64) 512 ∗ pageCredit slotShare)
   else
     iprop(∃ M : Nat → List (BitVec 8),
       ⌜V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp ∧
         umBelow V.sz V.upt⌝ ∗
-      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ stackOwn (V.kstack + 4096#64) 512)
+      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ stackOwn (V.kstack + 4096#64) 512 ∗
+      pageCredit procSpare)
 
 section Dormant
 variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -411,7 +419,8 @@ def procDormantNofd (pa : BitVec 64) : IProp GF := iprop%
 (Rocq `ProcInv.proc_dormant_prestk`): procinit's output per slot, beside
 the `p->kstack` cell it just wrote. -/
 def procDormantPrestk (pa : BitVec 64) : IProp GF := iprop%
-  procDormantNofd pa ∗ fdSlots (NOFILE + FDSPARE) ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3
+  procDormantNofd pa ∗ fdSlots (NOFILE + FDSPARE) ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 ∗
+    pageCredit slotShare
 
 /-- **The seal** (Rocq `proc_dormant_prestk_seal`): the pre-stack block, the
 `p->kstack` cell procinit wrote (Lean's block owns it; Rocq's `is_kstack`),
@@ -425,7 +434,7 @@ theorem procDormantPrestk_seal (pa : BitVec 64) (ks : BitVec 64) (γ0 g : GName)
       stackOwn (ks + 4096#64) 512 ∗ chFrag γ0 pa ∅ ∗ slotGen pa (DFrac.own 1) g ∗ actCnt pa 0 ⊢
       procDormant pa UNUSED := by
   unfold procDormantPrestk procDormantNofd procDormant
-  iintro ⟨⟨⟨%V, %pid, %hV, Hpid, Hf, ⟨%xsv, Hxs⟩⟩, Hfd, Hir, Hbs⟩, Hks, Hstk, Hch, Hsg, Hev⟩
+  iintro ⟨⟨⟨%V, %pid, %hV, Hpid, Hf, ⟨%xsv, Hxs⟩⟩, Hfd, Hir, Hbs, Hcr⟩, Hks, Hstk, Hch, Hsg, Hev⟩
   obtain ⟨hof, hcwd, hroot, hlz, hpg, htf, hsz, hpid⟩ := hV
   isplitl []
   · ipureintro; exact Or.inl rfl
@@ -459,7 +468,7 @@ theorem procDormantPrestk_seal (pa : BitVec 64) (ks : BitVec 64) (γ0 g : GName)
     iframe Hxs
   unfold dormantSpace
   rw [if_pos rfl]
-  iframe Hstk
+  iframe Hstk Hcr
   ipureintro; exact ⟨hpg, htf, hsz, hpid⟩
 
 end Dormant

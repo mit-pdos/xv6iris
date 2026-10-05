@@ -255,7 +255,7 @@ theorem syscall_arm_read (SR : SYSREAD)
   have hl0 : tfArgIdx 0 < V.tf.length := by rw [hl]; decide
   icases syscFd_pageLen hct γ (procAddr j) pid _ M1 $$ Hpriv with ⟨%hpl, Hpriv⟩
   icases procPrivFd_facts γ (procAddr j) pid _ M1 $$ Hpriv with ⟨Hpriv, %hfacts⟩
-  obtain ⟨bs, hbl, himg⟩ := syscImg_wrote V.upt P' V.sz M M1 _ d hext hw hpl hfacts.1 hfacts.2.1
+  obtain ⟨bs, hbl, himg⟩ := syscImg_wrote V.upt P' V.sz M M1 _ d hext hw hpl (Nat.le_trans hfacts.1 uQuota_le_uvmMaxsz) hfacts.2.1
   have hmem : syscMemOk V (syscStore { V with upt := P' } (R2 10#5)) (syscImg V M)
       (syscImg (syscStore { V with upt := P' } (R2 10#5)) M1) := by
     unfold syscMemOk
@@ -529,7 +529,7 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
     procPrivFd γ (procAddr j) pid (({ V with ofile := V.ofile, upt := P' } : ProcPriv).updEv k') M1 from .rfl) $$ Hpriv
     icases syscFd_pageLen hct γ (procAddr j) pid _ M1 $$ Hpriv with ⟨%hpl, Hpriv⟩
     icases procPrivFd_facts γ (procAddr j) pid _ M1 $$ Hpriv with ⟨Hpriv, %hfacts⟩
-    have himg := syscImg_wrote_at V.upt P' V.sz M M1 _ _ hext heq hm hpl hfacts.1 hfacts.2.1
+    have himg := syscImg_wrote_at V.upt P' V.sz M M1 _ _ hext heq hm hpl (Nat.le_trans hfacts.1 uQuota_le_uvmMaxsz) hfacts.2.1
     have hmem : syscMemOk V (syscStore { V with ofile := V.ofile, upt := P' } (R2 10#5)) (syscImg V M)
         (syscImg (syscStore { V with ofile := V.ofile, upt := P' } (R2 10#5)) M1) := by
       unfold syscMemOk
@@ -563,7 +563,7 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
     procPrivFd γ (procAddr j) pid (({ V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } : ProcPriv).updEv k') M1 from .rfl) $$ Hpriv
     icases syscFd_pageLen hct γ (procAddr j) pid _ M1 $$ Hpriv with ⟨%hpl, Hpriv⟩
     icases procPrivFd_facts γ (procAddr j) pid _ M1 $$ Hpriv with ⟨Hpriv, %hfacts⟩
-    have himg := syscImg_wrote_at V.upt P' V.sz M M1 _ _ hext heq hm hpl hfacts.1 hfacts.2.1
+    have himg := syscImg_wrote_at V.upt P' V.sz M M1 _ _ hext heq hm hpl (Nat.le_trans hfacts.1 uQuota_le_uvmMaxsz) hfacts.2.1
     have hmem : syscMemOk V (syscStore { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } (R2 10#5)) (syscImg V M)
         (syscImg (syscStore { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } (R2 10#5)) M1) := by
       unfold syscMemOk

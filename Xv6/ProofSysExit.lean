@@ -79,7 +79,8 @@ theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : kexitSlots ≤ k'.avail)
     (hs : k'.sie = s) (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt)
-    (hsp : k'.regs 2#5 = sp) (hav : trapRes k'.sie + k'.avail = n) (hst : xstateOf (k'.regs 10#5) = st) :
+    (hsp : k'.regs 2#5 = sp) (hav : trapRes k'.sie + k'.avail = n) (hst : xstateOf (k'.regs 10#5) = st)
+    (hsealed : on = none) :
     kctx c k' ∗ pcIs c KA.«kexit» ∗ procsInv Γ ∗
     trapCsrsExt c s ∗ cpuClaimExt c s (procAddr j) ∗
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
@@ -95,7 +96,7 @@ theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   subst hs
   subst hst
   have h := KX.wp_kexit_eb (hlc := hlc) (GF := GF) Γ c k' γw γl γ γkl γk on j pid V M ip cs sts Q
-    hj hproc hK hnoff htier
+    hj hproc hK hnoff htier hsealed
   unfold wp_kexit_eb_body at h
   simp only [kexitAddr, KCtx.sp, hsp, hav, hproc] at h
   exact h
@@ -168,7 +169,7 @@ set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γl γ γkl γk on j pid V M ip v cs sts Q
-      hj hproc hv hK hnoff htier => by
+      hj hproc hv hK hnoff htier hsealed => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_exit_eb_body
@@ -189,7 +190,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
   -- the trapframe pointer and page, out of the block
   icases (procPrivFd_split γ (procAddr j) pid V M).1 $$ Hblk with ⟨Hcore, Hofs⟩
   icases (show procPrivCoreNoctxAt (GF := GF) curCtx (procAddr j) pid V M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
+      ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
         V.trapframe = pageAddr V.upt.tfp⌝ ∗
       wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
       (wordPointsTo (pKstack (procAddr j)) 8 (DFrac.own 1) V.kstack ∗
@@ -202,7 +203,8 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
        wordPointsTo (pRoot (procAddr j)) 8 (DFrac.own 1) V.root) ∗
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
       actCnt (procAddr j) V.ev ∗
-      (cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ procGenAt curCtx (procAddr j) pid V.gen)
+      (cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ procGenAt curCtx (procAddr j) pid V.gen ∗
+        pageCredit procSpare)
       from by unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile; iintro ⟨⟨H1, H2, H3, H4, H5, H6, H8⟩, H7⟩; iframe) $$ Hcore
     with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, HPt, HTf, %hlz, Hev, Hcwr⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ⊢
@@ -266,7 +268,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
     case' _ => iframe
     iapply (sysx_kexit KX Γ cpu _ γw γl γ γkl γk on j pid V M ip cs sts Q (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
         (trapRes k.sie + k.avail - 4) k.sie (xstateOf v)
-        hj ?hpr ?hKx ?hs ?hn2 ?ht ?hsp ?hav ?hst)
+        hj ?hpr ?hKx ?hs ?hn2 ?ht ?hsp ?hav ?hst hsealed)
       $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hwl $Hinit $Hft $Hpe $Hkl $Hav $Hrdy $Hbs $Hfsp $Hirs $Hblk $Hfr $Hcp
           $Hch $Hmy $Hpay $Hcloser]
     case hpr => k_norm_g; exact hproc

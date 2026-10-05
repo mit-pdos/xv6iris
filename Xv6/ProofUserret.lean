@@ -106,10 +106,30 @@ theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitV
 
 end
 
+/-- **The address space, opened at its page count** (NI M3 Q-1): the tree
+with its shape facts at `{ P with np := n }`, the pages, and the table's
+credits, parked as `uptCred` beside the user machine. -/
+theorem userret_ppt_open {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+    (P : UPtd) (M : Nat → List (BitVec 8)) :
+    procPtAt (GF := GF) P M ⊢ ∃ n : Nat, ⌜uptWf P⌝ ∗ uptFrame { P with np := n } ∗ umPages P M ∗
+      uptCred { P with np := n } := by
+  iintro H
+  icases UPt.procPtAt_cases P M $$ H with ⟨%hw, Ho, Hum⟩
+  icases UPt.ptOwnRep_cases _ _ $$ Ho with ⟨%t, %⟨hb, hr⟩, Ht, Hr⟩
+  icases (UPt.ptRest_cred t P (t.pages 2).length rfl).1 $$ Hr with ⟨%hs, Hc⟩
+  iexists (t.pages 2).length
+  iframe Hum Hc
+  isplitl []
+  · ipureintro; exact hw
+  unfold uptFrame
+  iexists t
+  iframe Ht
+  ipureintro; exact ⟨hb, hr, hs, rfl⟩
+
 set_option maxHeartbeats 4000000 in
 /-- **userret meets its specification.** -/
 theorem userret_proof : USERRET :=
-  ⟨fun {hlc GF} _ _ cpu k P M ws sep sc tv ox hsie hspie hspp htier ha0 => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k P M ws sep sc tv ox hsie hspie hspp htier ha0 => by
   unfold wp_userret_body userretPost
   obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
   simp only at hsie hspie hspp htier ha0
@@ -127,34 +147,34 @@ theorem userret_proof : USERRET :=
   simp only [transSlotAt]
   icases Htrans with ⟨%htc, Hkpt⟩
   icases userret_kptSlot_on cpu root $$ Hkpt with ⟨#Hon, Hkpt⟩
-  unfold procPtAt
-  icases Hppt with ⟨%hwfP, Hfr, Hum⟩
+  icases userret_ppt_open P M $$ Hppt with ⟨%n, %hwfP, Hfr, Hum, Hcred⟩
+  ihave Hum := (umPages_np P n M).2 $$ Hum
   have hv : pageValid (pageAddr P.tfp) := hwfP.2.2.1
   -- the pages, the text half as physical bytes for the mint
-  icases umPages_split P hwfP M $$ HS Hum with ⟨%hl, HD, HT⟩
+  icases umPages_split { P with np := n } hwfP M $$ HS Hum with ⟨%hl, HD, HT⟩
   -- the switch (its fence.i stamps the text: UserExec deviation 7)
-  iapply (userret_entry cpu root P ms mdl mepc stc lf hsm hlf hmdl (tpPin cpu regs) (userret_a0_get cpu regs _ ha0)
+  iapply (userret_entry cpu root { P with np := n } ms mdl mepc stc lf hsm hlf hmdl (tpPin cpu regs) (userret_a0_get cpu regs _ ha0)
     (ubOwnA curCtx (ukTextBytes P.um M)) (fun K => ukOwnX curCtx K (ukTextBytes P.um M))
     (by unfold ubOwnA ukOwnX; exact ifenceStep_stamp cpu curCtx (ukTextBytes P.um M)))
   iframe Htext HS Hcl HmConf Hclock Hpc Hkpt Htok HF HT
   isplitl [Hfr]
-  · unfold uptFrame; unfold ptOwnRep at *; iexact Hfr
+  · iexact Hfr
   inext
   iintro Hst ⟨%K, #HK, HX⟩
-  ihave Hum := ukPagesX_bwd K P hwfP M hl $$ HS HD HX
+  ihave Hum := ukPagesX_bwd K { P with np := n } hwfP M hl $$ HS HD HX
   -- the run under the user table
-  iapply (userret_user_run cpu P ms mdl mepc stc lf hsm hlf hspp' hmdl hv (tpPin cpu regs) ws sep ox hf)
+  iapply (userret_user_run cpu { P with np := n } ms mdl mepc stc lf hsm hlf hspp' hmdl hv (tpPin cpu regs) ws sep ox hf)
   iframe Htext HS Hwi Hrc Hclm Hev Hst Hpage Hsepc
   inext
   iintro HmConf Hclock Hpc Hslot Htok HF Hsepc Hpage
   -- the user machine, repackaged
-  ihave HU := userret_user_state cpu P M ms mdl mepc stc (sep &&& 0xFFFFFFFFFFFFFFFE#64) sep sc tv lf hmdl
+  ihave HU := userret_user_state cpu { P with np := n } M ms mdl mepc stc (sep &&& 0xFFFFFFFFFFFFFFFE#64) sep sc tv lf hmdl
     (tfResumeGpr0 ws) hwfP hlf K $$ [HmConf Hclock Hpc HF Hsepc Hsc Hstv Hstvec Hslot HK Hum]
   · iframe
     iexact HK
   icases HU with ⟨HU, Hpt, Hcfg⟩
   iapply HΦ $$ %(userretUcfg mdl hmdl) %(sretMs ms)
-    %⟨userretUcfg_loopOk mdl hmdl P hwfP, userMstatusOk_sretMs ms hsm hspie'⟩ HU Hpt Hcfg Hpage
+    %⟨userretUcfg_loopOk mdl hmdl P hwfP, userMstatusOk_sretMs ms hsm hspie'⟩ HU %n Hpt Hcred Hcfg Hpage
   unfold userretLeft
   iframe Hstack Hcpu Htok Hro
   isplit

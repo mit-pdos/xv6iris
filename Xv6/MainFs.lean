@@ -504,7 +504,7 @@ theorem mn_userinit (UI : USERINIT) [Fscfg] [Icfg] [FileG GF] [CurCtx]
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hproc : k.proc = 0#64)
     (hK : userinitSlots ≤ k.avail)
     (γp γft : GName) (γ : FileNames) (γw γtk : GName) (nb np : Nat)
-    (hnb : procPagetableNodes + 1 < nb) (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV) (hnib0 : 0 < icfgNib) :
+    (hnb : credTotal + procPagetableNodes + 1 ≤ nb) (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV) (hnib0 : 0 < icfgNib) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 158#64) ∗ procsInv Γ ∗
     isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗
     kallocAvail fsReadyKmem (some nb) ∗ procsAvailAt Γ (some (np + 1)) true ∗

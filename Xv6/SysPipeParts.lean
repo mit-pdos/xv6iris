@@ -280,7 +280,8 @@ theorem sys_pipe_pipealloc (PA : PIPEALLOC) (Γ : SchedNames) [ClaimIs (hlc := h
     (k' : KCtx) (γl : GName) (γ : FileNames)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (v0 v1 : BitVec 64) (pidv : BitVec 32) (dqp : DFrac)
     (ke : Nat) (s : Bool) (hs : k'.sie = s) (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hK : pipeallocSlots ≤ k'.avail) (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
+    (hK : pipeallocSlots ≤ k'.avail) (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
+    (hsealed : on = none) :
     kctx c k' ∗ pcIs c KA.«pipealloc» ∗ trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     isFtable γl γ ∗ panicEnv ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
@@ -297,6 +298,7 @@ theorem sys_pipe_pipealloc (PA : PIPEALLOC) (Γ : SchedNames) [ClaimIs (hlc := h
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
   have h := PA.wp_pipealloc_eb (hlc := hlc) (GF := GF) Γ c k' γl γ γkl γk on v0 v1 pidv dqp ke hK hnoff htier
+    hsealed
   unfold wp_pipealloc_eb_body at h
   simp only [pipeallocAddr] at h
   iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, #Hkl, Hav, Hu0, Hu1, Hc0, Hc1, Hpid, Hir, Hlend, Hnext⟩
@@ -324,7 +326,7 @@ theorem sys_pipe_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk
     (P : UPtd) (M : Nat → List (BitVec 8)) (bs : List (BitVec 8)) (ke : Nat) (p : BitVec 64)
     (hp : k'.proc = p)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 52 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
-    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
+    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ uQuota)
     (hlen : k'.regs 14#5 = BitVec.ofNat 64 bs.length) (hlen' : bs.length < 2 ^ 63) :
     kctx c k' ∗ pcIs c KA.«copyout» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ procPtAt P M ∗ byteBuf (k'.regs 13#5) (DFrac.own 1) bs ∗ actLend p ke ∗
@@ -440,7 +442,7 @@ theorem sys_pipe_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
   have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk 1 (.open r w (.pipe γp)) 0 γkl γk none
-    pidv dqp Φc ke hK hnoff htier ha0
+    pidv dqp Φc ke hK hnoff htier ha0 rfl
   unfold wp_fileclose_eb_body at h
   simp only [filecloseAddr] at h
   iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, #Hpi, #Hkl, #Hav, Hcpay, Hlend, Hnext⟩
@@ -594,7 +596,8 @@ cwd reference, the root reference and the generation row. -/
 def sysPipeCoreRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop%
   @ecRest hlc GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V V.upt ∗
   @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
-  @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗ procGenAt curCtx pa pid V.gen
+  @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗ procGenAt curCtx pa pid V.gen ∗
+  pageCredit procSpare
 
 /-- The rest's event counter, LENT (permit sweep L1b, Rocq
 `proc_priv_core_copy_ev`): for a copyout, the rest comes back at whatever
@@ -635,11 +638,11 @@ theorem sys_pipe_core_tf (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : 
 
 theorem sys_pipe_core_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
+      ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
          V.trapframe = pageAddr V.upt.tfp⌝ ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ sysPipeCoreRest pa pid V := by
+      @procPtAt hlc GF _ _ _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ sysPipeCoreRest pa pid V := by
   unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile sysPipeCoreRest ecRest
   iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩
   iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hcw Hev
@@ -650,11 +653,11 @@ theorem sys_pipe_core_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M
 /-- Close at the grown space. -/
 theorem sys_pipe_core_ext (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) (hext : V.upt.extSz V.sz P')
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
+    (hf : V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
       V.trapframe = pageAddr V.upt.tfp) :
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-    @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' ∗ sysPipeCoreRest pa pid V ⊢
+    @procPtAt hlc GF _ _ _ ⟨curCtx, KTier.kpt⟩ P' M' ∗ sysPipeCoreRest pa pid V ⊢
       procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } M' := by
   unfold procPrivCoreNoctxAt procPrivBareAt sysPipeCoreRest ecRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]

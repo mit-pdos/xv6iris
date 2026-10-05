@@ -65,7 +65,7 @@ open LeanRV64D
 /-! ## One free entry, as the image leaves it -/
 
 section raw
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
 
 /-- **The pipe-buffer counter, raw** (NI M3 quotas Q-0; `NpipeDefs`): its
 never-`initlock`ed lock as two fresh words (the `.bss` zeros, at position 0,
@@ -365,16 +365,18 @@ theorem bootCarve_wordCell0 (pa : PAddr) (A n : Nat) (hpa : pa = BitVec.ofNat 64
 
 /-- **`npipelock` and `npipe`, carved** (NI M3 quotas Q-0): the lock's two
 words (`locked` at `+0`, `cpu` at `+16`; the name word is never read) as
-fresh history cells, and the counter cell at the running context. -/
-theorem bootCarve_npipe [CurCtx] :
+fresh history cells, and the counter cell at the running context -- with
+(NI M3 quotas Q-1) the pipe share at the count `0`. -/
+theorem bootCarve_npipe [Xv6G GF] [WchG GF] [CurCtx] :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«npipelock» (MachCSL.KernelSyms.«npipelock» + 24) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«npipe» (MachCSL.KernelSyms.«npipe» + 4) -∗
+      npipeShare 0 -∗
       npipeBootRaw := by
   have hL : MachCSL.KernelSyms.«npipelock» = 0x800239d0 := rfl
   have hN : MachCSL.KernelSyms.«npipe» = 0x8000a41c := rfl
   rw [hL, hN]
-  iintro #Hk Hl Hn
+  iintro #Hk Hl Hn Hsh
   icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x800239d0 (0x800239d0 + 4) (0x800239d0 + 24)
     (by omega) (by omega)).1 $$ Hl with ⟨H0, Hl⟩
   icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x800239d0 + 4) (0x800239d0 + 16) (0x800239d0 + 24)
@@ -394,7 +396,9 @@ theorem bootCarve_npipe [CurCtx] :
     · iapply keyAt_0
   · unfold npipeResAt
     iexists 0#32
-    iexact Hn
+    iframe Hn
+    rw [show (0#32 : BitVec 32).toNat = 0 from rfl]
+    iexact Hsh
 
 end carve
 

@@ -180,21 +180,24 @@ theorem sys_exec_kfree [WchG GF] (KF : KFREE) (cpu : CPU) (k' : KCtx) (se : Bool
     actLend pj kc ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ actLend pj (kc + 1) -∗ wpLoop c)
+      trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ actLend pj (kc + 1) -∗ pageCredit 1 -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
-  have h := KF.wp_kfree_led (hlc := hlc) (GF := GF) cpu k' γl γk none kc (by rw [hnoff]; decide) hK hlk hp
-  unfold wp_kfree_led_body at h
+  -- (NI M3 quotas Q-1) the CREDITED kfree: the page's credit back
+  have h := KF.wp_kfree_cred (hlc := hlc) (GF := GF) cpu k' γl γk kc (by rw [hnoff]; decide) hK hlk hp
+  unfold wp_kfree_cred_body at h
   simp only [kfreeAddr] at h
   iintro ⟨Hk, Hpc, Hte, Hce, Hlk, Hpg, Hav, Hl, HK⟩
   iapply h
   iframe Hk Hpc Hlk Hpg Hav Hl
   iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc Hl - %hcs
+  iintro %c %hpin %spie %spp %R' %- Hk Hpc Hl Hpost %hcs
+  unfold kfreePostCred
+  icases Hpost with ⟨-, H1⟩
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hl
+  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hl H1
 
 end Kfree
 
@@ -217,12 +220,14 @@ theorem sysExecEnv_kmem (Γ : SchedNames) (A : SysExecArgs) :
 
 /-- The free loop's continuation (the `∀ c'` of `sysExecFreeBody`, at the
 symbolic exits `pe` / `p + 14`). -/
-abbrev sysExecFreeK (k : KCtx) (R : RegMap) (p pe : BitVec 64) (ke : Nat) : IProp GF :=
+abbrev sysExecFreeK (k : KCtx) (R : RegMap) (p pe : BitVec 64) (ke : Nat) (n : Nat) : IProp GF :=
   iprop(∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (pcx : BitVec 64),
     ⌜pcx = pe ∨ pcx = p + 14#64⌝ -∗ ⌜sysExecKeepS1 R R'⌝ -∗
     kctx c' (((k.withSpie spie' spp').pushed 60).withRegs R') -∗ pcIs c' pcx -∗
     trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
-    (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗ sysExecArgvFree (k.regs 2#5) -∗
+    (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
+    -- the freed pages' credits (NI M3 quotas Q-1)
+    pageCredit n -∗ sysExecArgvFree (k.regs 2#5) -∗
     wpLoop c')
 
 set_option maxHeartbeats 8000000 in
@@ -239,9 +244,12 @@ theorem sys_exec_free_exit (k : KCtx) (p pe : BitVec 64) (ci : BitVec 13)
     kctx c (((k.withSpie spie spp).pushed 60).withRegs R) ∗ pcIs c p ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗ sysExecArgvFrom (k.regs 2#5) t t pg ∗
     (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) ∗
-    sysExecFreeK (hlc := hlc) k R p pe ke
+    sysExecFreeK (hlc := hlc) k R p pe ke 0
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hte, Hce, Harr, Hl, HΦ⟩
+  iapply wpLoop_bupd
+  imod pageCredit_zero (GF := GF) with H0
+  imodintro
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   unfold sysExecArgvFrom
   icases Harr with ⟨%ws, ⟨%hl, %hws⟩, Harr⟩
@@ -257,7 +265,7 @@ theorem sys_exec_free_exit (k : KCtx) (p pe : BitVec 64) (ci : BitVec 13)
   iintro Hk Hpc
   ihave Harr := Hback $$ %0#64 Hcell
   ihave Harr := sysExecFree_arr_free (GF := GF) (k.regs 2#5) ws t 0#64 hl $$ Harr
-  iapply HΦ $$ %cpu %spie %spp %_ %pe %(Or.inl rfl) %(sysExecKeepS1_set10 R 0#64) Hk Hpc Hte Hce Hl Harr
+  iapply HΦ $$ %cpu %spie %spp %_ %pe %(Or.inl rfl) %(sysExecKeepS1_set10 R 0#64) Hk Hpc Hte Hce Hl H0 Harr
 
 set_option maxHeartbeats 16000000 in
 /-- **THE FREE LOOP at a symbolic base** (Rocq `sx_free_loop`): the five
@@ -285,7 +293,7 @@ theorem sys_exec_free_gen (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExec
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysExecEnv (hlc := hlc) Γ A -∗
       sysExecArgvFrom (k.regs 2#5) m t pg -∗ sysExecPages pg afun m t -∗
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
-      sysExecFreeK (hlc := hlc) k R p pe ke -∗
+      sysExecFreeK (hlc := hlc) k R p pe ke (t - m) -∗
       wpLoop c := by
   obtain ⟨hK60, -, -, -, -, -, hK14, -⟩ := sys_exec_K _ hS.hK
   intro W
@@ -294,6 +302,7 @@ theorem sys_exec_free_gen (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExec
     iintro %c %spie %spp %R %pg %afun %m %t %ke %⟨hW, hmt, hm, ht, -, hR9, -⟩ Hk Hpc Hte Hce - Harr - Hl HΦ
     have e : m = t := by omega
     subst e
+    rw [Nat.sub_self]
     iapply (sys_exec_free_exit k p pe ci hce hi0 hi2 c spie spp R pg m hm hR9 ke)
     iframe
   | succ W ih =>
@@ -301,6 +310,7 @@ theorem sys_exec_free_gen (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExec
       Harr Hpgs Hl HΦ
     by_cases e : m = t
     · subst e
+      rw [Nat.sub_self]
       iapply (sys_exec_free_exit k p pe ci hce hi0 hi2 c spie spp R pg m hm hR9 ke)
       iframe
     -- ---- a live page: free it and go round ----
@@ -340,7 +350,7 @@ theorem sys_exec_free_gen (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExec
     case hKf => k_norm_g; omega
     case hlk => rw [hlocks]; simp
     case hp => k_norm_g; exact hpv
-    iintro %cpu %spie2 %spp2 %R2 %hcs Hk Hpc Hte Hce Hl
+    iintro %cpu %spie2 %spp2 %R2 %hcs Hk Hpc Hte Hce Hl H1
     -- the lend comes back stepped
     ihave Hl := actLend_ret_step k.proc hk1 $$ Hl
     k_norm_g [hret, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, KCtx.withSpie_withRegs]
@@ -360,7 +370,8 @@ theorem sys_exec_free_gen (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExec
         with [c20, hR20, sysExecFree_bne (k.regs 2#5) m hm, hd]
       iintro Hk Hpc
       ihave Harr := sysExecFree_arr_free (GF := GF) (k.regs 2#5) ws m (pg m) hl $$ Harr
-      iapply HΦ $$ %cpu %spie2 %spp2 %_ %(p + 14#64) %(Or.inr rfl) %hkeep Hk Hpc Hte Hce Hl Harr
+      ihave H1 := pageCredit_congr 1 (t - m) (by omega) $$ H1
+      iapply HΦ $$ %cpu %spie2 %spp2 %_ %(p + 14#64) %(Or.inr rfl) %hkeep Hk Hpc Hte Hce Hl H1 Harr
     · -- the BACK EDGE
       have hd : decide (m + 1 ≠ 32) = true := by simp [hend]
       k_step_e (wp_s_branch cpu _ (p + 10#64) false 8182#13 9#5 20#5 (by decide) bop.BNE)
@@ -375,9 +386,12 @@ theorem sys_exec_free_gen (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExec
           exact sysExecFree_cursor _ _
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
           exact c20.trans hR20
-      iintro %c' %spie' %spp' %R' %pcx %hpcx %hk' Hk Hpc Hte Hce Hl Harr
+      iintro %c' %spie' %spp' %R' %pcx %hpcx %hk' Hk Hpc Hte Hce Hl Hn Harr
+      ihave Hn := pageCredit_join (t - (m + 1)) 1 $$ [Hn H1]
+      · iframe
+      ihave Hn := pageCredit_congr _ (t - m) (by omega) $$ Hn
       iapply HΦ $$ %c' %spie' %spp' %R' %pcx %hpcx %(sysExecKeepS1_trans _ _ _ hkeep hk') Hk Hpc Hte
-        Hce Hl Harr
+        Hce Hl Hn Harr
 
 /-! ## §5.  THE TWO INSTANCES -/
 

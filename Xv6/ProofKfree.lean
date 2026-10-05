@@ -75,7 +75,7 @@ theorem kf_align8 (p : BitVec 64) (h : pageValid p) : p.toNat % 8 = 0 := by
 theorem kf_c4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = BitVec.ofNat 64 4096 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-- The lock payload, opened at the caller's own context. -/
 theorem kf_kmemRes_elim [CurCtx] (γk : KmemNames) :
@@ -228,8 +228,9 @@ theorem kfree_cont_led {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   exact hcs
 
 theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [CurCtx]
-    (cpu c : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat)
+    [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+    (cpu c : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (T Post : IProp GF)
+    (hinc : ∀ n : Nat, T ∗ kmemAuth γk n ⊢ |==> (kmemAuth γk (n + 1) ∗ Post))
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hp : pageValid (k.regs 10#5))
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu)
@@ -240,11 +241,11 @@ theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFun
     kctx c ((k.pushed 4).withRegs R) ∗ pcIs c (KA.«kfree» + 0x36#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     byteBuf (k.regs 10#5) (DFrac.own 1) (List.replicate 4096 1#8) ∗
-    kallocAvail γk on ∗ frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
+    T ∗ frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      kfreePostLed γk on k.proc -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
+      Post -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   simp only [kmemLockAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hbuf, Hav, Hframe, Hnext⟩
@@ -299,7 +300,7 @@ theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFun
   subst e85
   -- the page is on the list: the count goes up
   iapply wpLoop_bupd
-  imod (kmemAuth_inc γk pages.length on k.proc) $$ [Hav Hauth] with ⟨%hagree, Hav, Hauth, %hled, #Hrcpt⟩
+  imod (hinc pages.length) $$ [Hav Hauth] with ⟨Hauth, Hav⟩
   case' _ => iframe
   imodintro
   ihave HR := kf_kmemRes_intro γk (k.regs 10#5) head pages hp $$ [Hfl Hw Hrest Hchain Hauth]
@@ -355,14 +356,7 @@ theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFun
   k_norm_g
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
   iintro %c12 HΦ Hk Hpc
-  ihave Hpost : kfreePostLed (GF := GF) γk on k.proc $$ [Hav]
-  case' _ =>
-    unfold kfreePostLed
-    iexists hled
-    isplitl []
-    · iexact Hrcpt
-    iexact Hav
-  iapply HΦ $$ %spie %spp %_ %hsp Hk Hpc Hpost
+  iapply HΦ $$ %spie %spp %_ %hsp Hk Hpc Hav
   ipureintro
   unfold calleeSaved
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -387,18 +381,20 @@ set_option maxHeartbeats 4000000 in
 /-- THE LED FORM is the proof (Rocq `wp_kfree_led_sconf`); the landed
 `wp_kfree` follows as a corollary in `kfree_proof`.  The actor of the
 ledger's event is `k.proc`, the `cpu_own` proc word (design D3). -/
-theorem kfree_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
+theorem kfree_core (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
     {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat) hnoff hK hlk hp :
-    wp_kfree_led_body (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk hp := by
-  unfold wp_kfree_led_body
-  simp only [kfreeAddr]
-  iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hl, Hnext⟩
-  -- the lend: the event costs one count, stepped here and given back
-  iapply wpLoop_bupd
-  imod (actLend_step k.proc ke) $$ Hl with Hl
-  imodintro
-  ihave Hnext := actLend_cont_give _ _ _ _ _ _ _ _ _ $$ Hnext Hl
+    (γl : GName) (γk : KmemNames) (T Post : IProp GF)
+    (hinc : ∀ n : Nat, T ∗ kmemAuth γk n ⊢ |==> (kmemAuth γk (n + 1) ∗ Post))
+    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
+    (hp : pageValid (k.regs 10#5)) :
+    kctx cpu k ∗ pcIs cpu KA.«kfree» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    pageOwn (k.regs 10#5) ∗ T ∗
+    wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      Post -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) cpu := by
+  iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   -- prologue
@@ -484,10 +480,98 @@ theorem kfree_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
   k_norm_g at hcs2
   obtain ⟨⟨h2_2, h2_8, h2_9, h2_18, h2_19, h2_20, h2_21, h2_22, h2_23, h2_24, h2_25, h2_26, h2_27⟩, h2_10⟩ := hcs2
   have hpin : k.sie = false ∨ k.proc = 0#64 → c17 = cpu := fun h => (hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h)))))))))))))))))
-  iapply (kfree_tail AC RE cpu c17 k γl γk on hwf hnoff hK hlk hp hpin
+  iapply (kfree_tail AC RE cpu c17 k γl γk T Post hinc hwf hnoff hK hlk hp hpin
     R2 h2_2 h2_9 ⟨h2_19, h2_20, h2_21, h2_22, h2_23, h2_24, h2_25, h2_26, h2_27⟩)
   iframe #
   iframe
+
+section forms
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+
+/-- The led push (Rocq `kmem_avail_inc`): the count up, the `KFree` receipt. -/
+theorem kfree_inc_led (γk : KmemNames) (on : Option Nat) (act : BitVec 64) (n : Nat) :
+    kallocAvail (GF := GF) γk on ∗ kmemAuth γk n ⊢ |==> (kmemAuth γk (n + 1) ∗ kfreePostLed γk on act) := by
+  iintro ⟨Hav, Hauth⟩
+  imod (kmemAuth_inc γk n on act) $$ [Hav Hauth] with ⟨-, Hav, Hauth, %hled, #Hrcpt⟩
+  · iframe
+  imodintro
+  iframe Hauth
+  unfold kfreePostLed
+  iexists hled
+  iframe Hrcpt Hav
+
+/-- The landed push (the receipt dropped): `kfree_free`'s post. -/
+theorem kfree_inc_plain (γk : KmemNames) (on : Option Nat) (act : BitVec 64) (n : Nat) :
+    kallocAvail (GF := GF) γk on ∗ kmemAuth γk n ⊢
+      |==> (kmemAuth γk (n + 1) ∗ kallocAvail γk (availInc on)) := by
+  iintro ⟨Hav, Hauth⟩
+  imod (kmemAuth_inc γk n on act) $$ [Hav Hauth] with ⟨-, Hav, Hauth, -⟩
+  · iframe
+  imodintro
+  iframe Hauth Hav
+
+/-- The credited push: the count up, the `KFree` receipt, the credit back. -/
+theorem kfree_inc_cred (γk : KmemNames) (act : BitVec 64) (n : Nat) :
+    kallocAvail (GF := GF) γk none ∗ kmemAuth γk n ⊢ |==> (kmemAuth γk (n + 1) ∗ kfreePostCred γk act) := by
+  iintro ⟨#Hav, Hauth⟩
+  imod (kmemAuth_incCred γk n act) $$ [Hav Hauth] with ⟨Hauth, Hf, %hled, #Hrcpt⟩
+  · iframe Hav Hauth
+  imodintro
+  iframe Hauth
+  unfold kfreePostCred kfreePostLed
+  iframe Hf
+  iexists hled
+  iframe Hrcpt
+  rw [availInc_none]
+  iexact Hav
+
+/-- The credited free-form push: the count up, the credit back. -/
+theorem kfree_inc_freecred (γk : KmemNames) (act : BitVec 64) (n : Nat) :
+    kallocAvail (GF := GF) γk none ∗ kmemAuth γk n ⊢
+      |==> (kmemAuth γk (n + 1) ∗ (kallocAvail γk none ∗ pageCredit 1)) := by
+  iintro ⟨#Hav, Hauth⟩
+  imod (kmemAuth_incCred γk n act) $$ [Hav Hauth] with ⟨Hauth, Hf, -⟩
+  · iframe Hav Hauth
+  imodintro
+  iframe Hauth Hf Hav
+
+end forms
+
+set_option maxHeartbeats 1000000 in
+/-- THE LED FORM (Rocq `wp_kfree_led_sconf`): the lend stepped at entry,
+then the core. -/
+theorem kfree_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat) hnoff hK hlk hp :
+    wp_kfree_led_body (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk hp := by
+  unfold wp_kfree_led_body
+  simp only [kfreeAddr]
+  iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hl, Hnext⟩
+  -- the lend: the event costs one count, stepped here and given back
+  iapply wpLoop_bupd
+  imod (actLend_step k.proc ke) $$ Hl with Hl
+  imodintro
+  ihave Hnext := actLend_cont_give _ _ _ _ _ _ _ _ _ $$ Hnext Hl
+  iapply (kfree_core AC RE MS cpu k γl γk (kallocAvail γk on) (kfreePostLed γk on k.proc)
+    (kfree_inc_led γk on k.proc) hnoff hK hlk hp)
+  iframe Hk Hpc Hlk Hpage Hav Hnext
+
+set_option maxHeartbeats 1000000 in
+/-- THE CREDITED FORM (NI M3 quotas Q-1). -/
+theorem kfree_cred_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (ke : Nat) hnoff hK hlk hp :
+    wp_kfree_cred_body (hlc := hlc) (GF := GF) cpu k γl γk ke hnoff hK hlk hp := by
+  unfold wp_kfree_cred_body
+  simp only [kfreeAddr]
+  iintro ⟨Hk, Hpc, #Hlk, Hpage, #Hav, Hl, Hnext⟩
+  iapply wpLoop_bupd
+  imod (actLend_step k.proc ke) $$ Hl with Hl
+  imodintro
+  ihave Hnext := actLend_cont_give _ _ _ _ _ _ _ _ _ $$ Hnext Hl
+  iapply (kfree_core AC RE MS cpu k γl γk (kallocAvail γk none) (kfreePostCred γk k.proc)
+    (kfree_inc_cred γk k.proc) hnoff hK hlk hp)
+  iframe Hk Hpc Hlk Hpage Hav Hnext
 
 /-- The proved `kfree` interface: the led form, and the landed contract at
 the boot (`hp0`) as its corollary (the lend from `actLend_of_zero`, the
@@ -512,21 +596,26 @@ theorem kfree_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KFREE :=
     ipureintro
     exact hcs,
    fun {hlc GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk hp =>
-    kfree_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk hp⟩
+    kfree_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk hp,
+   fun {hlc GF} _ _ _ _ cpu k γl γk ke hnoff hK hlk hp =>
+    kfree_cred_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk ke hnoff hK hlk hp⟩
 
 set_option maxHeartbeats 4000000 in
-theorem kfree_free_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET_FREE) : KFREE_FREE :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk hp => by
-  unfold wp_kfree_free_body
-  simp only [kfreeAddr]
-  iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hl, Hnext⟩
-  -- the lend: the event costs one count, stepped here and given back
-  iapply wpLoop_bupd
-  imod (actLend_step k.proc ke) $$ Hl with Hl
-  imodintro
-  ihave Hnext := actLend_cont_give _ _ _ _ _ _ _ _ _ $$ Hnext Hl
-  -- the shared tail proves the led post; this contract drops the receipt
-  ihave Hnext := kfree_cont_led cpu k γk on $$ Hnext
+/-- The free form's walk, over the client's token (NI M3 quotas Q-1). -/
+theorem kfree_free_core (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET_FREE)
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (T Post : IProp GF)
+    (hinc : ∀ n : Nat, T ∗ kmemAuth γk n ⊢ |==> (kmemAuth γk (n + 1) ∗ Post))
+    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
+    (hp : pageValid (k.regs 10#5)) :
+    kctx cpu k ∗ pcIs cpu KA.«kfree» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+    pageFree (k.regs 10#5) ∗ T ∗
+    wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      Post -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) cpu := by
+  iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   -- prologue
@@ -612,9 +701,39 @@ theorem kfree_free_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET_FREE) : KFRE
   k_norm_g at hcs2
   obtain ⟨⟨h2_2, h2_8, h2_9, h2_18, h2_19, h2_20, h2_21, h2_22, h2_23, h2_24, h2_25, h2_26, h2_27⟩, h2_10⟩ := hcs2
   have hpin : k.sie = false ∨ k.proc = 0#64 → c17 = cpu := fun h => (hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h)))))))))))))))))
-  iapply (kfree_tail AC RE cpu c17 k γl γk on hwf hnoff hK hlk hp hpin
+  iapply (kfree_tail AC RE cpu c17 k γl γk T Post hinc hwf hnoff hK hlk hp hpin
     R2 h2_2 h2_9 ⟨h2_19, h2_20, h2_21, h2_22, h2_23, h2_24, h2_25, h2_26, h2_27⟩)
   iframe #
-  iframe⟩
+  iframe
+
+set_option maxHeartbeats 1000000 in
+theorem kfree_free_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET_FREE) : KFREE_FREE :=
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk hp => by
+    unfold wp_kfree_free_body
+    simp only [kfreeAddr]
+    iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hl, Hnext⟩
+    -- the lend: the event costs one count, stepped here and given back
+    iapply wpLoop_bupd
+    imod (actLend_step k.proc ke) $$ Hl with Hl
+    imodintro
+    ihave Hnext := actLend_cont_give _ _ _ _ _ _ _ _ _ $$ Hnext Hl
+    iapply (kfree_free_core AC RE MS cpu k γl γk (kallocAvail γk on) (kallocAvail γk (availInc on))
+      (kfree_inc_plain γk on k.proc) hnoff hK hlk hp)
+    iframe Hk Hpc Hlk Hpage Hav Hnext,
+   fun {hlc GF} _ _ _ _ cpu k γl γk ke hnoff hK hlk hp => by
+    unfold wp_kfree_free_cred_body
+    simp only [kfreeAddr]
+    iintro ⟨Hk, Hpc, #Hlk, Hpage, #Hav, Hl, Hnext⟩
+    iapply wpLoop_bupd
+    imod (actLend_step k.proc ke) $$ Hl with Hl
+    imodintro
+    ihave Hnext := actLend_cont_give _ _ _ _ _ _ _ _ _ $$ Hnext Hl
+    iapply (kfree_free_core AC RE MS cpu k γl γk (kallocAvail γk none) iprop(kallocAvail γk none ∗ pageCredit 1)
+      (kfree_inc_freecred γk k.proc) hnoff hK hlk hp)
+    iframe Hk Hpc Hlk Hpage Hav
+    iapply wpNext_mono _ _ _ _ _ $$ Hnext
+    iintro %c H %spie %spp %R' %hs Hk Hpc ⟨Ha, Hf⟩ %hcs
+    iapply H $$ %spie %spp %R' %hs Hk Hpc Ha Hf
+    ipureintro; exact hcs⟩
 
 end Xv6

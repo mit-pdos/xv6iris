@@ -152,7 +152,7 @@ def uservecKWords (cpu : CPU) (k : KCtx) (ws : List (BitVec 64)) : Prop :=
   tfW ws 0 = satpOf KTier.kpt k.root ∧ tfW ws 1 = k.sp ∧ tfW ws 2 = usertrapPc ∧ tfW ws 4 = hartId cpu
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-- **What uservec hands usertrap** (the continuation, at usertrap's
 entry): the kernel context, the pc, the raw trap cells, `stvec` at
@@ -174,19 +174,19 @@ end
 /-- **WP of `uservec`** (Rocq `wp_uservec_pt_body`, deviation 1): entered
 at the trapped user machine, with the kernel context's remainder and the
 trapframe page, it reaches usertrap's entry. -/
-def wp_uservec_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_uservec_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (k : KCtx) (sz : Nat) (M : ElfMem)
     (ws : List (BitVec 64)) (ms sc tv sep : BitVec 64) (g : RegMap)
     (hloop : loopOk C P) (hsie : k.sie = false) (htier : k.tier = KTier.kpt)
     (hkw : uservecKWords cpu k ws) : Prop :=
   hwConfig cpu ∗ userTrapFrameAtm cpu C P Rut sz M ms sc tv sep g ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
-  tfPageAt P.tfp ws ∗ userretLeft cpu k ∗
+  tfPageAt P.tfp ws ∗ userretLeft cpu k ∗ uptCred P ∗
   ▷ uservecPost cpu k P Rut sz M ws g sep sc tv
   ⊢ wpLoop (GF := GF) cpu
 
 /-- **Rocq `Module Type USERVEC`**. -/
 structure USERVEC : Prop where
-  wp_uservec : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_uservec : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (k : KCtx) (sz : Nat) (M : ElfMem)
     (ws : List (BitVec 64)) (ms sc tv sep : BitVec 64) (g : RegMap) hloop hsie htier hkw,
     wp_uservec_body (hlc := hlc) (GF := GF) cpu C P Rut k sz M ws ms sc tv sep g hloop hsie htier hkw

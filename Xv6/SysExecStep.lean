@@ -140,7 +140,7 @@ theorem sys_exec_step_str (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx) (A : SysE
     (hunz : u ≠ 0#64) (hpv : pageValid p) (h11 : R 11#5 = p) :
     kctx cpu (((k.withSpie spie spp).pushed 60).withRegs R) ∗ pcIs cpu (sysExecAddr + 0x7c#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
+    procPrivFdRes (ptW + (execArgPages - (i + 1))) A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
     sysExecCarry k pl rest ∗ wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) A.v1 ∗
     wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) u ∗
     sysExecArgvArr (k.regs 2#5) (sysExecArgvL (sysExecUpd pg i p) (i + 1)) ∗
@@ -169,7 +169,7 @@ theorem sys_exec_step_str (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx) (A : SysE
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_fetchstr]
   iintro Hk Hpc
   ihave #Hrdy := sysExecEnv_ready Γ A $$ Henv
-  icases sysfile_blk_bare_ev A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) $$ Hblk
+  icases sysExec_blk_bare_ev (ptW + (execArgPages - (i + 1))) A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) $$ Hblk
     with ⟨Hbare, Hclose⟩
   iapply (sys_exec_fetchstr FS cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) (procAddr A.j) A.pid
       (sysExecV2 A P kv) (sysExecM2 A P) (List.replicate 4096 5#8) ?gpr ?gt ?gn ?gK ?gmx (by rw [List.length_replicate]; decide))
@@ -197,9 +197,9 @@ theorem sys_exec_step_str (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx) (A : SysE
   ihave Hblk := Hclose $$ %P2 %(viewFaulted P P2 (sysExecM2 A P)) %kv2 Hbare
   -- fetchstr lent the block's counter (permit sweep L1b): the record it
   -- handed back
-  ihave Hblk := (show procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid
+  ihave Hblk := (show procPrivFdRes (GF := GF) (ptW + (execArgPages - (i + 1))) A.γ (procAddr A.j) A.pid
       { (sysExecV2 A P kv).updEv kv2 with upt := P2 } (viewFaulted P P2 (sysExecM2 A P)) ⊢
-    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P2 kv2) (viewFaulted P P2 (sysExecM2 A P))
+    procPrivFdRes (ptW + (execArgPages - (i + 1))) A.γ (procAddr A.j) A.pid (sysExecV2 A P2 kv2) (viewFaulted P P2 (sysExecM2 A P))
     from .rfl) $$ Hblk
   rw [hvf] at *
   rw [sysExec_viewLazy_faulted A.V P A.M hext] at hret
@@ -311,7 +311,7 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
     (hunz : u ≠ 0#64) :
     kctx cpu (((k.withSpie spie spp).pushed 60).withRegs R) ∗ pcIs cpu (sysExecAddr + 0x70#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
+    procPrivFdRes (ptW + (execArgPages - i)) A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
     sysExecCarry k pl rest ∗ wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) A.v1 ∗
     wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) u ∗
     sysExecArgvArr (k.regs 2#5) (sysExecArgvL pg i) ∗ sysExecPages pg afun 0 i ∗
@@ -329,12 +329,15 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
   iintro Hk Hpc
   -- the block's counter, lent to kalloc (permit sweep L3b): the event costs
   -- one count, and the block comes back at the raised record
-  icases procPrivFd_evAcc A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) $$ Hblk
-    with ⟨Hcnt, Hblk⟩
+  -- this page's credit, out of the block's spare (NI M3 quotas Q-1)
+  icases sysExec_blk_take1 A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) i hi $$ Hblk
+    with ⟨Hblk, Hc1⟩
+  icases procPrivFdRes_evAcc (ptW + (execArgPages - (i + 1))) A.γ (procAddr A.j) A.pid (sysExecV2 A P kv)
+    (sysExecM2 A P) $$ Hblk with ⟨Hcnt, Hblk⟩
   icases actLend_borrow (procAddr A.j) kv $$ Hcnt with ⟨Hl, Hlb⟩
   ihave Hl := actLend_congr hS.hproc.symm kv $$ Hl
   iapply (sys_exec_kalloc KL cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) ?gn ?gK kv)
-    $$ [- $Hk $Hpc $Hte $Hce $Hl]
+    $$ [- $Hk $Hpc $Hte $Hce $Hl $Hc1]
   rotate_right 1
   k_norm_g [sys_exec_ret_74]
   iframe
@@ -345,9 +348,10 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
   ihave Hl := actLend_congr hS.hproc (kv + 1) $$ Hl
   icases Hlb $$ %(kv + 1) %(Nat.le_succ kv) Hl with ⟨%kv1, %hkv1, Hcnt⟩
   ihave Hblk := Hblk $$ %kv1 Hcnt
-  ihave Hblk := (show procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid
+  ihave Hblk := (show procPrivFdRes (GF := GF) (ptW + (execArgPages - (i + 1))) A.γ (procAddr A.j) A.pid
       ((sysExecV2 A P kv).updEv kv1) (sysExecM2 A P) ⊢
-    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv1) (sysExecM2 A P) from .rfl) $$ Hblk
+    procPrivFdRes (ptW + (execArgPages - (i + 1))) A.γ (procAddr A.j) A.pid (sysExecV2 A P kv1)
+      (sysExecM2 A P) from .rfl) $$ Hblk
   have hkv' : A.V.ev ≤ kv1 := Nat.le_trans hkv hkv1
   k_norm_g [sys_exec_ret_74, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 : sysExecLoopPins k R1 i := by
@@ -371,24 +375,9 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
     sysExecPins_set _ _ _ _ _ _ _ _ _ _ _ hp1 (by decide)
   unfold kallocPost
   icases Hpost with (⟨%hr, -⟩ | ⟨%hpv, Hpage, -⟩)
-  · -- ===== kalloc answered 0: bad:, argv[i] still memset's zero =====
-    have hr0 : R1 10#5 = 0#64 := hr.1
-    rw [hr0, sysExecArgvL_set0]
-    k_step_e (wp_s_branch cpu _ (KA.«sys_exec» + 0x7a#64) true 24#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr0, MachCSL.beqz_zero]
-    iintro Hk Hpc
-    unfold sysExecStepOut
-    iapply HΦ $$ %cpu %spie1 %spp1 %_ %P %kv1 %i %pg %alen %afun %uvf
-    iright
-    iright
-    unfold sysExecBadSt
-    simp only [sysExecAddr]
-    iframe Hk Hpc Hte Hce Hblk Hcarry H59 Harr Hpgs
-    isplitr
-    · ipureintro
-      exact ⟨by omega, hext, hkv', sysExecOk_pgOk _ _ _ _ hok, sysExecLoopPins_bad k _ _ hp2, hal⟩
-    iexists u
-    iexact H60
+  · -- ===== kalloc answered 0: unreachable (NI M3 quotas Q-1): the call
+    -- was credited, past the seal it always finds a page =====
+    exact absurd hr.2 (by simp [availZero])
   · -- ===== a page: on to fetchstr =====
     have hnz : R1 10#5 ≠ 0#64 := PtRun.pageValid_ne_zero _ hpv
     rw [sysExecArgvL_set]
@@ -445,7 +434,7 @@ theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : Sched
   k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x62#64) false 2085386#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_fetchaddr]
   iintro Hk Hpc
-  icases sysfile_blk_bare_ev A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) $$ Hblk
+  icases sysExec_blk_bare_ev (ptW + (execArgPages - i)) A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) $$ Hblk
     with ⟨Hext, Hclose⟩
   ihave Hext := (procPrivExt_conv hct' (procAddr A.j) A.pid (A.V.updEv kv) P (sysExecM2 A P)).1 $$ Hext
   iapply (sys_exec_fetchaddr FA cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j A.pid (A.V.updEv kv) P
@@ -474,9 +463,9 @@ theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : Sched
   -- fetchaddr lent the block's counter (permit sweep L1b): the record it
   -- handed back
   ihave Hblk := Hclose $$ %P2 %(viewFaulted P P2 (sysExecM2 A P)) %kv2 Hext
-  ihave Hblk := (show procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid
+  ihave Hblk := (show procPrivFdRes (GF := GF) (ptW + (execArgPages - i)) A.γ (procAddr A.j) A.pid
       { (sysExecV2 A P kv).updEv kv2 with upt := P2 } (viewFaulted P P2 (sysExecM2 A P)) ⊢
-    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P2 kv2) (viewFaulted P P2 (sysExecM2 A P))
+    procPrivFdRes (ptW + (execArgPages - i)) A.γ (procAddr A.j) A.pid (sysExecV2 A P2 kv2) (viewFaulted P P2 (sysExecM2 A P))
     from .rfl) $$ Hblk
   rw [hvf]
   rw [sysExec_viewLazy_faulted A.V P A.M hext, sys_exec_uargv_i A.v1 i hi] at hans

@@ -599,11 +599,11 @@ the block's resources. -/
 theorem procFieldsNoctx_pvLazy (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) (b : Bool) :
     procFieldsNoctx (GF := GF) pa dq { V with pvLazy := b } = procFieldsNoctx pa dq V := rfl
 
-theorem dormantSpace_pvLazy (st : BitVec 32) (V : ProcPriv) (b : Bool) (pid : BitVec 32) :
+theorem dormantSpace_pvLazy [Xv6G GF] [WchG GF] (st : BitVec 32) (V : ProcPriv) (b : Bool) (pid : BitVec 32) :
     dormantSpace (GF := GF) st { V with pvLazy := b } pid = dormantSpace st V pid := rfl
 
 /-- `dormantSpace` does not look at the saved context. -/
-theorem dormantSpace_context (st : BitVec 32) (V : ProcPriv) (vs : List (BitVec 64))
+theorem dormantSpace_context [Xv6G GF] [WchG GF] (st : BitVec 32) (V : ProcPriv) (vs : List (BitVec 64))
     (pid : BitVec 32) :
     dormantSpace (GF := GF) st { V with context := vs } pid = dormantSpace st V pid := rfl
 
@@ -821,15 +821,15 @@ instance instCtxMorphUmPages (tier : KTier) (P : UPtd) (M : Nat → List (BitVec
       (instCtxMorphConst _) (instCtxMorphByteBuf _ _ _ _))
 
 instance instCtxMorphPtOwnRep (tier : KTier) (root : BitVec 44) (L : RegMapF (BitVec 64)) :
-    CtxMorph (GF := GF) (fun ξ => @ptOwnRep hlc GF _ ⟨ξ, tier⟩ root L) :=
+    CtxMorph (GF := GF) (fun ξ => @ptOwnRep hlc GF _ _ _ ⟨ξ, tier⟩ root L) :=
   @instCtxMorphExists hlc GF _ _
     (fun (t : PTree) ξ => iprop(⌜t.base = root ∧ ptRep t L⌝ ∗
-      @ptreeOwn hlc GF _ ⟨ξ, tier⟩ 2 (DFrac.own 1) t))
+      @ptreeOwn hlc GF _ ⟨ξ, tier⟩ 2 (DFrac.own 1) t ∗ ptRest t L))
     (fun t => @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜t.base = root ∧ ptRep t L⌝)) _
-      (instCtxMorphConst _) (instCtxMorphPtreeOwn _ _ _ _))
+      (instCtxMorphConst _) (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphPtreeOwn _ _ _ _) (instCtxMorphConst _)))
 
 instance instCtxMorphProcPtAt (tier : KTier) (P : UPtd) (M : Nat → List (BitVec 8)) :
-    CtxMorph (GF := GF) (fun ξ => @procPtAt hlc GF _ ⟨ξ, tier⟩ P M) :=
+    CtxMorph (GF := GF) (fun ξ => @procPtAt hlc GF _ _ _ ⟨ξ, tier⟩ P M) :=
   @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜uptWf P⌝)) _ (instCtxMorphConst _)
     (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphPtOwnRep _ _ _) (instCtxMorphUmPages _ _ _))
 
@@ -847,17 +847,18 @@ instance instCtxMorphTfPageAt (tier : KTier) (tfp : BitVec 44) (ws : List (BitVe
           (instCtxMorphConst _) (instCtxMorphByteBuf _ _ _ _))))
 
 instance instCtxMorphDormantSpace (tier : KTier) (st : BitVec 32) (V : ProcPriv) (pid : BitVec 32) :
-    CtxMorph (GF := GF) (fun ξ => @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid) := by
+    CtxMorph (GF := GF) (fun ξ => @dormantSpace hlc GF _ ⟨ξ, tier⟩ _ _ st V pid) := by
   unfold dormantSpace
   by_cases h : st = UNUSED
   · simp only [if_pos h]
-    exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (MachCSL.instCtxMorphStackOwn _ _ _)
+    exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep hlc GF _ _ _ (MachCSL.instCtxMorphStackOwn _ _ _) (instCtxMorphConst _))
   · simp only [if_neg h]
     exact @instCtxMorphExists hlc GF _ _ _
       (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
         (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcPtAt _ _ _)
           (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphTfPageAt _ _ _)
-            (MachCSL.instCtxMorphStackOwn _ _ _))))
+            (@instCtxMorphSep hlc GF _ _ _ (MachCSL.instCtxMorphStackOwn _ _ _) (instCtxMorphConst _)))))
 
 instance instCtxMorphProcFieldsNoctx (tier : KTier) (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) :
     CtxMorph (GF := GF) (fun ξ => @procFieldsNoctx hlc GF _ ⟨ξ, tier⟩ pa dq V) :=
@@ -884,7 +885,7 @@ instance instCtxMorphProcDormantNoctx (tier : KTier) (pa : BitVec 64) (st : BitV
         (∃ xsv : BitVec 32, @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pXstate pa) 4 xsHalf xsv ∗
           (if st = ZOMBIE then exitTok V.gen pid (xstateVal xsv) ∗ zsElem pa (some (pid, xstateVal xsv))
         else iprop(emp))) ∗
-        @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid))
+        @dormantSpace hlc GF _ ⟨ξ, tier⟩ _ _ st V pid))
       (fun _ => @instCtxMorphExists hlc GF _ _ _
         (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
           (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
@@ -909,11 +910,11 @@ record's `ev` (`SlotGen.actCnt`, the bare block's, Rocq G', design
 ni-strong-instance.md §7.2). -/
 def procPrivNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
+  ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧
     V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
   @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
   @procFieldsNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V ∗
-  @procPtAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt M ∗
+  @procPtAt hlc GF _ _ _ ⟨ξ, KTier.kpt⟩ V.upt M ∗
   @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
   actCnt pa V.ev
@@ -979,7 +980,7 @@ instance instCtxMorphProcDormant (tier : KTier) (pa : BitVec 64) (st : BitVec 32
         (∃ xsv : BitVec 32, @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pXstate pa) 4 xsHalf xsv ∗
           (if st = ZOMBIE then exitTok V.gen pid (xstateVal xsv) ∗ zsElem pa (some (pid, xstateVal xsv))
         else iprop(emp))) ∗
-        @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid))
+        @dormantSpace hlc GF _ ⟨ξ, tier⟩ _ _ st V pid))
       (fun _ => @instCtxMorphExists hlc GF _ _ _
         (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
           (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)

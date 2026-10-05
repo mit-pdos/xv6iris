@@ -321,7 +321,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
     (k : KCtx) (γl : GName) (γk : KmemNames)
     (P : UPtd) (M : Nat → List (BitVec 8)) (bs : List (BitVec 8)) (A : Nat) (psz : BitVec 64)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 52 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
-    (hsz : psz.toNat ≤ 2 ^ 38)
+    (hsz : psz.toNat ≤ uQuota)
     (d : Nat) (hd : d ≤ bs.length) (hA64 : A + d < 2 ^ 64)
     (hcur : d = 0 ∨ (A + d) % 4096 = 0)
     (P1 : UPtd) (hext1 : P.extSz psz P1) (hmap1 : umMapped P1 A d)
@@ -346,6 +346,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
           R2 19#5 = pte2pa w ∧ R2 9#5 = BitVec.ofNat 64 ((A + d) / 4096 * 4096) ∧
           (A + d) / 4096 * 4096 < 2 ^ 38))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
+  have hsz38 : psz.toNat ≤ 2 ^ 38 := Nat.le_trans hsz (by unfold uQuota; omega)
   have htk : (bs.take d).length = d := by rw [List.length_take]; omega
   -- `k_norm` splits `BitVec.ofNat 64 (A + d)`, so state the fold on the split form.
   have hva0 : BitVec.ofNat 64 A + BitVec.ofNat 64 d &&& 0xFFFFFFFFFFFFF000#64
@@ -375,7 +376,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
     k_step_gen (wp_s_jal c4 _ (KA.«copyout» + 0x60#64) false 2095654#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [copyout_br_fffffffffffffa86] next c5 hp5
     iintro Hk Hpc
-    icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf1, ⟨%t1, %ht1, Htree⟩, Hum⟩
+    icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf1, ⟨%t1, %ht1, Htree, Hrest⟩, Hum⟩
     iapply (co_walkaddr_call WA c5 _ (DFrac.own 1) t1 P1.leaves ?hKa ?hro ht1.2) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
@@ -396,7 +397,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
     simp only [walkaddrRet, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, hvpn,
       BitVec.toNat_ofNat] at hret2
     ihave HP := UMemL.procPtAt_intro' (GF := GF) P1
-      (umemWrite (viewFaulted P P1 M) A (bs.take d)) t1 ht1 hwf1 $$ [Htree Hum]
+      (umemWrite (viewFaulted P P1 M) A (bs.take d)) t1 ht1 hwf1 $$ [Htree Hrest Hum]
     case' _ => iframe
     -- c.mv s3,a0
     k_step_gen (wp_s_add c6 _ (KA.«copyout» + 0x64#64) true 19#5 0#5 10#5 (by decide))
@@ -564,7 +565,7 @@ theorem copyout_br_fffffffffffff7b6 : KA.«copyout» + 0xfffffffffffff7b6#64 = K
 set_option maxHeartbeats 4000000 in
 /-- From `0x800015f8` with the chunk size `n` in `s2`: `memmove` of the
 chunk into the page, the cursors stepped, and the loop test. -/
-theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
+theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [WchG GF] [CurCtx]
     (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8)) (bs : List (BitVec 8)) (A : Nat)
     (src0 : BitVec 64) (dqs : DFrac) (psz : BitVec 64) (sp : BitVec 64)
     (hK : 52 ≤ k.avail)
@@ -632,7 +633,7 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     UMemL.umMapped_append hmap (UMemL.umMapped_page hfit (by rw [hum]; rfl))
   iintro ⟨Hk, Hpc, HP, Hsrc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf2, ⟨%t2, %ht2, Htree⟩, Hum⟩
+  icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf2, ⟨%t2, %ht2, Htree, Hrest⟩, Hum⟩
   icases UMemL.umPages_upd P2 (umemWrite (viewFaulted P P2 M) A (bs.take d))
     (umemWrite (umemWrite (viewFaulted P P2 M) A (bs.take d)) (A + d) ((bs.drop d).take n))
     ((A + d) / 4096) w hum
@@ -698,7 +699,7 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
   ihave Hum := Hclose $$ %(by rw [UMemL.umemWrite_length]; exact hpglen) Hpg
   ihave HP := UMemL.procPtAt_intro' (GF := GF) P2
     (umemWrite (umemWrite (viewFaulted P P2 M) A (bs.take d)) (A + d) ((bs.drop d).take n))
-    t2 ht2 hwf2 $$ [Htree Hum]
+    t2 ht2 hwf2 $$ [Htree Hrest Hum]
   case' _ => iframe
   rw [hM3]
   -- sub s5,s5,s2 ; c.add s6,s2 ; add s4,s1,s8 ; beq s5,zero
@@ -786,7 +787,7 @@ theorem copyout_br_fffffffffffff9ec : KA.«copyout» + 0xfffffffffffff9ec#64 = K
 set_option maxHeartbeats 4000000 in
 /-- From `0x8000163a`: `walk` to the page's entry, the `PTE_W` test, and
 the chunk size, then the copy. -/
-theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
+theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [WchG GF] [CurCtx]
     (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8)) (bs : List (BitVec 8)) (A : Nat)
     (src0 : BitVec 64) (dqs : DFrac) (psz : BitVec 64) (sp : BitVec 64)
     (hK : 52 ≤ k.avail)
@@ -827,7 +828,7 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
   have hnval := co_nval A d hA64
   iintro ⟨Hk, Hpc, HP, Hsrc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf2, ⟨%t2, %ht2, Htree⟩, Hum⟩
+  icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf2, ⟨%t2, %ht2, Htree, Hrest⟩, Hum⟩
   -- c.li a2,0 ; c.mv a1,s1 ; c.mv a0,s7 ; jal walk
   k_step_gen (wp_s_addi cur _ (KA.«copyout» + 0x78#64) true 0#12 12#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_zero] next c1 hp1
@@ -879,7 +880,7 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
   ihave Htree := Hclose $$ %(t2.entAt 2 (vpnOf (BitVec.ofNat 64 ((A + d) / 4096 * 4096)))) Hcell
   rw [UMemL.setLeaf_self]
   ihave HP := UMemL.procPtAt_intro' (GF := GF) P2
-    (umemWrite (viewFaulted P P2 M) A (bs.take d)) t2 ht2 hwf2 $$ [Htree Hum]
+    (umemWrite (viewFaulted P P2 M) A (bs.take d)) t2 ht2 hwf2 $$ [Htree Hrest Hum]
   case' _ => iframe
   have hWeq : t2.entAt 2 (vpnOf (BitVec.ofNat 64 ((A + d) / 4096 * 4096))) &&& 4#64
       = w &&& 4#64 := by
@@ -1012,7 +1013,7 @@ theorem copyout_iter (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
     (P : UPtd) (M : Nat → List (BitVec 8)) (bs : List (BitVec 8)) (A : Nat)
     (src0 : BitVec 64) (dqs : DFrac) (psz : BitVec 64) (sp : BitVec 64)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 52 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
-    (hsz : psz.toNat ≤ 2 ^ 38) (hlen' : bs.length < 2 ^ 63)
+    (hsz : psz.toNat ≤ uQuota) (hlen' : bs.length < 2 ^ 63)
     (d : Nat) (hd : d < bs.length) (hA64 : A + d < 2 ^ 64)
     (hcur : d = 0 ∨ (A + d) % 4096 = 0)
     (P1 : UPtd) (hext1 : P.extSz psz P1) (hmap1 : umMapped P1 A d)
@@ -1044,6 +1045,7 @@ theorem copyout_iter (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
           R2 26#5 = 0xFFFFFFFFFFFFF000#64 ∧ R2 25#5 = 0x3FFFFFFFFF#64 ∧
           R2 24#5 = 4096#64))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
+  have hsz38 : psz.toNat ≤ 2 ^ 38 := Nat.le_trans hsz (by unfold uQuota; omega)
   iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hsrc, Hlend, HΦ⟩
   iapply (copyout_page WA VF k γl γk P M bs A psz hnoff hK hlk hsz d (by omega) hA64 hcur P1
     hext1 hmap1 hpre1 spie spp R h23 h27 h20 h26 h25 cur (byteBuf src0 dqs bs) ke) $$ [- $Hk $Hpc]
@@ -1085,7 +1087,7 @@ theorem copyout_loop (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
     (P : UPtd) (M : Nat → List (BitVec 8)) (bs : List (BitVec 8)) (A : Nat)
     (src0 : BitVec 64) (dqs : DFrac) (psz : BitVec 64) (sp : BitVec 64)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 52 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
-    (hsz : psz.toNat ≤ 2 ^ 38) (hlen' : bs.length < 2 ^ 63) (ke : Nat) (fuel : Nat) :
+    (hsz : psz.toNat ≤ uQuota) (hlen' : bs.length < 2 ^ 63) (ke : Nat) (fuel : Nat) :
     ∀ (d : Nat) (_ : bs.length - d ≤ fuel) (_ : d < bs.length) (_ : A + d < 2 ^ 64)
       (_ : d = 0 ∨ (A + d) % 4096 = 0)
       (P1 : UPtd) (_ : P.extSz psz P1) (_ : umMapped P1 A d) (_ : ∀ i, i < d → uvaWmapped P1 (A + i))
@@ -1107,6 +1109,7 @@ theorem copyout_loop (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
       procPtAt P3 M3 -∗ byteBuf src0 dqs bs -∗
       ⌜R2 2#5 = sp ∧ coPost psz P M A bs P3 M3 (R2 10#5)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
+  have hsz38 : psz.toNat ≤ 2 ^ 38 := Nat.le_trans hsz (by unfold uQuota; omega)
   induction fuel with
   | zero =>
     intro d hf hd _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _

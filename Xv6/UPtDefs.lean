@@ -36,6 +36,9 @@ of every process, the memory quota `sys_sbrk` enforces (`lui a4,0xc0` at `sys_sb
 `kexec` enforces less the stack's two pages. -/
 def uQuota : Nat := 192 * 4096
 
+/-- The quota is below `TRAPFRAME`. -/
+theorem uQuota_le_uvmMaxsz : uQuota ≤ uvmMaxsz := by unfold uQuota uvmMaxsz; decide
+
 def PTE_V : BitVec 64 := 1#64
 def PTE_R : BitVec 64 := 2#64
 def PTE_W : BitVec 64 := 4#64
@@ -80,11 +83,16 @@ theorem uvmaNp_pos_iff (oldsz newsz : BitVec 64) :
 /-! ## The description of a user address space -/
 
 /-- A user page table: its root page, its trapframe page, and the user
-leaves (keyed by `vpn.toNat`). -/
+leaves (keyed by `vpn.toNat`).  NI M3 Q-1: `np`, the table's page count as
+the user tier sees it -- the kernel side ignores it (`procPtAt` reads only
+`root`/`tfp`/`um`); `userPtInv` pins the tree's page count to it, so the
+table's credits, parked beside the user machine at `ptW - np - leaves`
+(`uptCred`), fit the tree uservec hands back. -/
 structure UPtd where
   root : BitVec 44
   tfp : BitVec 44
   um : RegMapF (BitVec 64)
+  np : Nat := 0
 
 /-- The leaf of the trapframe mapping (`R|W`) and of the trampoline (`R|X`). -/
 def tfLeaf (tfp : BitVec 44) : BitVec 64 := leafOf tfp (PTE_R ||| PTE_W)
@@ -93,6 +101,9 @@ def trampLeaf : BitVec 64 := leafOf trampPpn (PTE_R ||| PTE_X)
 /-- All leaves of the table: the user leaves plus the two fixed ones. -/
 def UPtd.leaves (P : UPtd) : RegMapF (BitVec 64) :=
   Iris.Std.PartialMap.insert (Iris.Std.PartialMap.insert P.um tfVpn.toNat (tfLeaf P.tfp)) trampVpn.toNat trampLeaf
+
+/-- The leaves do not read the page count (NI M3 Q-1). -/
+theorem UPtd.leaves_np (P : UPtd) (n : Nat) : ({ P with np := n } : UPtd).leaves = P.leaves := rfl
 
 /-- The tree `t` represents the leaf map `L` (Rocq `pt_rep0`): every leaf
 of `L` is what the walk finds (up to `A`/`D`), nothing else is mapped. -/
@@ -257,6 +268,37 @@ def delRunL (L : RegMapF (BitVec 64)) (vpn0 n : Nat) : RegMapF (BitVec 64) :=
 /-- `P` with the `n` leaves from `vpn0` removed (`uvmunmap`). -/
 def UPtd.delRun (P : UPtd) (vpn0 n : Nat) : UPtd := { P with um := delRunL P.um vpn0 n }
 
+/-! ## The quota table (NI M3 quotas Q-1)
+
+A table below the quota has the SHAPE of `PTree.shapeQ` (its interior pages
+lie on two paths: the user region's, root index 0 then 0, and the top
+pages', root index 255 then 511), every user leaf below `uQpages`
+(`uLeafRegion`), and holds its WEIGHT `ptW` as pages plus credits
+(`ptOwnRep`). -/
+
+/-- **The quota shape**: children only on the paths of `[0, 2 MiB)` (root
+index 0, then 0) and of the two top pages (root index 255, then 511). -/
+def _root_.MachCSL.PTree.shapeQ (t : PTree) : Prop :=
+  (∀ i, (t.kids i).isSome → i = 0#9 ∨ i = 255#9) ∧
+  (∀ c, t.kids 0#9 = some c → ∀ i, (c.kids i).isSome → i = 0#9) ∧
+  (∀ c, t.kids 255#9 = some c → ∀ i, (c.kids i).isSome → i = 511#9)
+
+/-- A vpn a quota table may map: a user page below the quota, or one of the
+two top pages. -/
+def vpnQ (vpn : BitVec 27) : Prop :=
+  vpn.toNat < uQpages ∨ vpn = tfVpn ∨ vpn = trampVpn
+
+/-- **Every user leaf below the quota**: a leaf map's keys are user pages
+below `uQpages` or the two top pages. -/
+def uLeafRegion (L : RegMapF (BitVec 64)) : Prop :=
+  ∀ k w, Iris.Std.PartialMap.get? L k = some w → k < uQpages ∨ k = tfVpn.toNat ∨ k = trampVpn.toNat
+
+/-- **The user leaves** of a leaf map: its keys below the quota (the two top
+pages are not counted -- the trapframe page is the slot's, the trampoline
+the kernel's). -/
+def uLeafCnt (L : RegMapF (BitVec 64)) : Nat :=
+  ((List.range uQpages).filter fun k => (Iris.Std.PartialMap.get? L k).isSome).length
+
 /-- No leaf at level 0 anywhere (what `freewalk` requires). -/
 def _root_.MachCSL.PTree.noLeaves : Nat → PTree → Prop
   | 0, t => ∀ i, t.ents i = 0#64
@@ -269,14 +311,47 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 def umPages (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   [∗map] k ↦ w ∈ P.um, ⌜(M k).length = 4096⌝ ∗ byteBuf (pte2pa w) (DFrac.own 1) (M k)
 
-/-- The tree of the table, owned, representing the leaf map `L`. -/
+/-- The pages do not read the page count (NI M3 Q-1). -/
+theorem umPages_np (P : UPtd) (n : Nat) (M : Nat → List (BitVec 8)) :
+    umPages (GF := GF) { P with np := n } M ⊣⊢ umPages P M := .rfl
+
+end
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+
+/-- **The quota part of an owned table** (NI M3 quotas Q-1): the shape,
+every user leaf below the quota, and the unspent weight in credits.
+`UPtReserve` moves it across a mapping (`ptRest_reserveUser`), `UPtLemmas`
+across an unmapping (`ptRest_unmapUser`, ...). -/
+def ptRest (t : PTree) (L : RegMapF (BitVec 64)) : IProp GF := iprop%
+  ⌜t.shapeQ ∧ uLeafRegion L⌝ ∗ pageCredit (ptW - (t.pages 2).length - uLeafCnt L)
+
+/-- **The table's credits across user mode** (NI M3 Q-1): `ptRest` at the
+page count the user tier's descriptor records (`P.np`). -/
+def uptCred (P : UPtd) : IProp GF := iprop%
+  ⌜uLeafRegion P.leaves⌝ ∗ pageCredit (ptW - P.np - uLeafCnt P.leaves)
+
+/-- The tree of the table, owned, representing the leaf map `L`.
+
+THE QUOTA TABLE (NI M3 quotas Q-1, design "M3 quotas" R7, in place): the
+tree has the quota shape, every user leaf lies below the quota, and the
+table holds its WEIGHT `ptW` as pages plus credits -- the credits for the
+pages it does not yet own, `ptW - (interior pages) - (user leaves)`
+(`KcredDefs.pageCredit`).  A table never runs the pool dry: every page it
+may still take is reserved. -/
 def ptOwnRep (root : BitVec 44) (L : RegMapF (BitVec 64)) : IProp GF := iprop%
-  ∃ t : PTree, ⌜t.base = root ∧ ptRep t L⌝ ∗ ptreeOwn 2 (DFrac.own 1) t
+  ∃ t : PTree, ⌜t.base = root ∧ ptRep t L⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗ ptRest t L
 
 /-- **A process's address space**: the facts, the tree, the user pages
 (`procPt` in `Xv6/ProcDefs.lean` is this at the process's fields). -/
 def procPtAt (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   ⌜uptWf P⌝ ∗ ptOwnRep P.root P.leaves ∗ umPages P M
+
+end
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 /-- The number of mapped leaves in `[vpn0, vpn0 + n)` (what `uvmunmap` frees). -/
 def UPtd.mappedIn (P : UPtd) (vpn0 n : Nat) : Nat :=

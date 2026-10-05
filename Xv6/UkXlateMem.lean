@@ -95,7 +95,8 @@ theorem ukm_setLeaf (h : UkMem P t mm T) (vpn : BitVec 27) (addr w v : BitVec 64
   have ha : ubTreeAddrs 2 (t.setLeaf 2 vpn v) = ubTreeAddrs 2 t :=
     ubTreeAddrs_shape 2 t _ (ubSameShape_setLeaf 2 t vpn v)
   refine ⟨⟨(ubSameShape_setLeaf 2 t vpn v).1.trans h.root, hrep, h.wf, by rw [ha]; exact h.nodup,
-    fun a => by rw [bmWrite_isSome mm addr 8 v (by decide) ho a, ha]; exact h.dom a, h.domT, ?_⟩, ?_⟩
+    fun a => by rw [bmWrite_isSome mm addr 8 v (by decide) ho a, ha]; exact h.dom a, h.domT, ?_,
+    PTree.shapeQ_setLeaf t vpn v h.sq, by rw [PTree.pages_setLeaf]; exact h.np⟩, ?_⟩
   · intro p hp
     obtain ⟨e, he, hpe⟩ := List.mem_flatMap.1 hp
     obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hpe

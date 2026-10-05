@@ -63,7 +63,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
 
 /-- **The block of the CURRENTLY RUNNING thread** (`FdTable.procPrivBareAt`
 at the ambient context, Rocq `proc_priv_bare` + the lazy claim): no context
@@ -74,7 +74,7 @@ pipewrite, consoleread, consolewrite, fetchaddr, filestat) carries at least
 this. -/
 def procPrivRun (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
+  ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧
     V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
   wordPointsTo (pPid pa) 4 pidPriv pid ∗
   procFieldsNoOfile pa (DFrac.own 1) V ∗
@@ -88,7 +88,7 @@ table the lazy pages `vmfault` filled in under `copyout`/`copyin` grew
 to): `procPrivRun` with the table named explicitly (bare, like it). -/
 def procPrivExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) : IProp GF := iprop%
-  ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P' ∧
+  ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz P' ∧
     V.pagetable = pageAddr P'.root ∧ V.trapframe = pageAddr P'.tfp⌝ ∗
   wordPointsTo (pPid pa) 4 pidPriv pid ∗
   procFieldsNoOfile pa (DFrac.own 1) V ∗
@@ -100,7 +100,7 @@ def procPrivExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
 /-- ... and, at the kernel-page-table context, `procPrivBareAt` there. -/
 theorem procPrivExt_eq (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) :
-    @procPrivExt hlc GF _ ⟨ξ, KTier.kpt⟩ _ pa pid V P' M' =
+    @procPrivExt hlc GF _ _ _ ⟨ξ, KTier.kpt⟩ pa pid V P' M' =
       procPrivBareAt (GF := GF) ξ pa pid { V with upt := P' } M' := rfl
 
 /-- The block, at its own descriptor. -/
@@ -164,7 +164,7 @@ end
 /-- At the kernel-page-table tier the contracts' bare block
 (`procPrivBareAt curCtx`, Rocq `proc_priv_bare` + the lazy claim) IS the
 ambient `procPrivExt` (by `rfl` once the ambient context is taken apart). -/
-theorem procPrivExt_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
+theorem procPrivExt_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8)) :
     procPrivBareAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢ procPrivExt pa pid V P M := by
   obtain ⟨ξ, t⟩ := X
@@ -173,7 +173,7 @@ theorem procPrivExt_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   exact .rfl
 
 /-- ... at the block's own descriptor. -/
-theorem procPrivExt_conv0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
+theorem procPrivExt_conv0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivBareAt (GF := GF) curCtx pa pid V M ⊣⊢ procPrivExt pa pid V V.upt M := by
   obtain ⟨ξ, t⟩ := X
@@ -405,7 +405,7 @@ formerly also ProofFetchaddr's `fetchaddr_copyin_call`). -/
 theorem ec_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
     (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (ke : Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 50 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
-    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
+    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ uQuota)
     (hlen : k'.regs 14#5 = BitVec.ofNat 64 old.length) (hlen' : old.length < 2 ^ 63) :
     kctx c k' ∗ pcIs c KA.«copyin» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ procPtAt P M ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) old ∗
@@ -449,7 +449,7 @@ def ecRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
 theorem ec_priv_split [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) :
     procPrivExt (GF := GF) pa pid V P M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P.root ∧
+      ⌜V.sz.toNat ≤ uQuota ∧ V.pagetable = pageAddr P.root ∧
          V.trapframe = pageAddr P.tfp ∧ umBelow V.sz P⌝ ∗
       wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
       wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
@@ -462,7 +462,7 @@ theorem ec_priv_split [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
 
 theorem ec_priv_close [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P P' : UPtd)
     (M' : Nat → List (BitVec 8)) (hext : P.extSz V.sz P')
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P.root ∧
+    (hf : V.sz.toNat ≤ uQuota ∧ V.pagetable = pageAddr P.root ∧
       V.trapframe = pageAddr P.tfp ∧ umBelow V.sz P) :
     wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
     wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗

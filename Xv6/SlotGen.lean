@@ -144,6 +144,16 @@ party that threads a lock's gname.
    `FsBlocks`' dirty-block camera (`GhostMapG GF Nat Bool RegMapF`, slot 70),
    and the one-instance rule forbids a second.  The ghost itself (the
    invariant, the element, the receipt) is `Xv6/SlotLed.lean`'s.
+14. **The page credits (NI M3 quotas Q-1, no Rocq counterpart).**  Two
+   names, NO camera: `wkcName` (the page-credit supply, `KcredDefs.pageCredit`
+   / `credAuth`) and `wnpName` (the pipe tickets, `KcredDefs.npTicket` /
+   `npTicketAuth`), both over the shared `Xv6G.authUfracG` camera
+   (`Auth (Option UFrac)`, `IrefSlots`' and the sleeplock counter's), born in
+   `WaitInvTies.childrenRes_alloc`.  The credits need a CANONICAL name: they
+   live in predicates with no allocator names in scope (`UPtDefs.ptOwnRep`,
+   `SchedCtx.pavSlot`, `NpipeDefs.npipeResAt`), and `WchG` is the one
+   name-bearing class those contexts share (design "M3 quotas" spelled the
+   credit `kCredit fsReadyKmem`, which needs `[Fscfg]` where it is absent).
 
 Imports only definitional files.
 -/
@@ -279,6 +289,17 @@ class WchG (GF : BundledGFunctors) extends WchGpre GF where
   ghost map at this name (`SlotLed.soAuth` / `soOwn`), born in
   `WaitInvTies.childrenRes_alloc` with one element per slot at `false`. -/
   wsoName : GName
+  /-- THE PAGE-CREDIT SUPPLY'S NAME (NI M3 quotas Q-1, deviation 14): the
+  `Auth (Option UFrac)` ghost at this name counts the pages reserved against
+  the free pool (`KcredDefs.credAuth` in `kmem.lock`'s payload, the
+  `pageCredit` fragments in the page tables, the slots and the pipe lock),
+  born in `WaitInvTies.childrenRes_alloc` at `credTotal`. -/
+  wkcName : GName
+  /-- THE PIPE TICKETS' NAME (NI M3 quotas Q-1, deviation 14): the
+  `Auth (Option UFrac)` ghost at this name counts the live pipe buffers
+  (`KcredDefs.npTicketAuth` in `npipelock`'s payload, one `npTicket 1` per
+  live pipe), born in `WaitInvTies.childrenRes_alloc` at `0`. -/
+  wnpName : GName
 
 /-- AN EIGHTH (Rocq `qeighth`, deviation 2). -/
 abbrev qeighth : Qp := Qp.quarter.half

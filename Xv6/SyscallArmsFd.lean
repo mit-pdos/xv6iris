@@ -194,7 +194,7 @@ theorem syscall_arm_fstat (SF : SYSFSTAT)
   have hl0 : tfArgIdx 0 < V.tf.length := by rw [hl]; decide
   icases syscFd_pageLen hct γ (procAddr j) pid _ M1 $$ Hpriv with ⟨%hpl, Hpriv⟩
   icases procPrivFd_facts γ (procAddr j) pid _ M1 $$ Hpriv with ⟨Hpriv, %hfacts⟩
-  obtain ⟨bs, hbl, himg⟩ := syscImg_wrote V.upt P' V.sz M M1 _ d hext hw hpl hfacts.1 hfacts.2.1
+  obtain ⟨bs, hbl, himg⟩ := syscImg_wrote V.upt P' V.sz M M1 _ d hext hw hpl (Nat.le_trans hfacts.1 uQuota_le_uvmMaxsz) hfacts.2.1
   have hmem : syscMemOk V (syscStore { V with upt := P' } (R2 10#5)) (syscImg V M)
       (syscImg (syscStore { V with upt := P' } (R2 10#5)) M1) := by
     unfold syscMemOk
@@ -255,7 +255,7 @@ theorem syscall_arm_close (SC : SYSCLOSE)
       k_norm_g; have := syscallSlots_val; omega) $$ Hk with ⟨%hsp, Hk⟩
   have hC := SC.wp_sys_close_eb (hlc := hlc) (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     γft γ (procAddr j) pid V M sts (tfW V.tf (tfArgIdx 0)) j fscKalloc fsReadyKmem none Pc
-    (syscArg V hl 0 (by decide)) ?hp ?ht hsp ?hn ?hK
+    (syscArg V hl 0 (by decide)) ?hp ?ht hsp ?hn ?hK rfl
   case hp => k_norm_g; exact hproc
   case ht => k_norm_g; exact htier
   case hn => simp only [KCtx.withRegs_noff, KCtx.pushed_noff, KCtx.withSpie_noff]; exact hnoff

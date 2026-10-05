@@ -366,14 +366,24 @@ def namexEraClose (k : KCtx) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List 
     wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) V.root -∗ inodeHeldAt V.root V.rti -∗
     procPrivCoreNoctxAt curCtx k.proc pid V M)
 
-/-- THE NAMEI SIDE's continuation, in row form. -/
+/-- The core's closing wand at any spare (NI M3 quotas Q-1). -/
+def namexEraCloseR (k : KCtx) (r : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    IProp GF :=
+  iprop(wordPointsTo (pPid k.proc) 4 pidPriv pid -∗
+    wordPointsTo (pCwd k.proc) 8 (DFrac.own 1) V.cwd -∗
+    inodeHeldAt V.cwd V.cwi -∗
+    wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) V.root -∗ inodeHeldAt V.root V.rti -∗
+    procPrivCoreResAt r curCtx k.proc pid V M)
+
+/-- THE NAMEI SIDE's continuation, in row form (NI M3 quotas Q-1: the core
+at any spare `r`). -/
 theorem namexEra_post_of_spec (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (cpu : CPU)
+    (r : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (cpu : CPU)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (hnp : A.npar = false)
     (hrows : NamexEraRows A pid V) :
     wpNext true k.proc cpu
-        (namexEraPost k A.plen A.pfun A.n A.Sb P Pmiss pid V M A.dqb A.dqs A.dqpv) ∗
-      namexEraClose k pid V M ⊢
+        (namexEraPost k A.plen A.pfun A.n A.Sb P Pmiss r pid V M A.dqb A.dqs A.dqpv) ∗
+      namexEraCloseR k r pid V M ⊢
     ∀ c : CPU, namexEraPostR (GF := GF) k A P Pmiss c := by
   obtain ⟨hpid, hcwd, hcwi, hdqp, hdqc, hroot, hrti, hdqr⟩ := hrows
   iintro ⟨H, Hcl⟩ %c
@@ -383,7 +393,7 @@ theorem namexEra_post_of_spec (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat 
   unfold namexEraOut namexKeep namexPath
   icases Hout with ⟨⟨Hsb, Hsi, Hpid, Hcwd, Hcwr, Hrtc, Hrtr⟩, Hpath, Hnm, Hbs, %hf, Hop, Htx, Harm⟩
   rw [hpid, hcwd, hcwi, hdqp, hdqc, hroot, hrti, hdqr]
-  unfold namexEraClose
+  unfold namexEraCloseR
   ihave Hcore := Hcl $$ Hpid Hcwd Hcwr Hrtc Hrtr
   unfold namexEraPost
   iapply H $$ %spie %spp %R' %n' %Sb' %ok %nf %ipv %w %hcs Hk Hpc Hte Hce Hsb Hsi Hcore Hpath

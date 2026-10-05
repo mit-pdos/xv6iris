@@ -367,7 +367,7 @@ theorem uk_userPtInvX_open [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bi
         uxTextOwn curCtx K (ukTextAddrs P.um) T ∗ iviewLb cpu K := by
   iintro #HS H
   unfold userPtInvX
-  icases H with ⟨Hs, Hp, %hwf, %t, %⟨hb, hrep⟩, Ho, ⟨%tlb, Htlb, %htlb⟩, %K, #HK, Hum⟩
+  icases H with ⟨Hs, Hp, %hwf, %t, %⟨hb, hrep, hsq, hnp⟩, Ho, ⟨%tlb, Htlb, %htlb⟩, %K, #HK, Hum⟩
   ihave HT := ubTree_own_fwd 2 t hrep.2.2.1 $$ HS Ho
   icases ukPagesX_fwd K P hwf M $$ HS Hum with ⟨%hl, HD, HX⟩
   ihave HA := (ubOwnA_app curCtx (ubTreeBytes 2 t) (ukDataBytes P.um M)).2 $$ [HT HD]
@@ -390,7 +390,7 @@ theorem uk_userPtInvX_open [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bi
     intro a; rw [ubLookup_isSome, hfT]
   have hmem : UkMem P t (ubLookup (ubTreeBytes 2 t ++ ukDataBytes P.um M)) (ubLookup (ukTextBytes P.um M)) :=
     ⟨hb, hrep, hwf, hnd3, hdom, hdomT,
-      fun p hp => ubLookup_mem _ hndA p (List.mem_append_left _ hp)⟩
+      fun p hp => ubLookup_mem _ hndA p (List.mem_append_left _ hp), hsq, hnp⟩
   have hview : ∀ k w, get? P.um k = some w →
       ukView P.um (ubLookup (ubTreeBytes 2 t ++ ukDataBytes P.um M)) (ubLookup (ukTextBytes P.um M)) k = M k :=
     ukView_lookup P.um M _ _ hl (fun p hp => ubLookup_mem _ hndA p (List.mem_append_right _ hp))
@@ -452,7 +452,7 @@ theorem uk_userPtInvX_close [CurCtx] (cpu : CPU) (P : UPtd) (D : List PAddr) (t'
   iexists t'
   iframe HT
   isplitr
-  · ipureintro; exact ⟨hm'.root, hm'.rep⟩
+  · ipureintro; exact ⟨hm'.root, hm'.rep, hm'.sq, hm'.np⟩
   isplitl [Htlb]
   · iexists tlb'
     iframe Htlb

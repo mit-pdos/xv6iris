@@ -114,40 +114,47 @@ theorem urc_resume (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames →
   · ipureintro; exact uFit_of_niFit ox _ hfit
   inext
   unfold userretPost
-  iintro %C %ms %⟨hlo, hms⟩ HU Hpt Hcfg Htf Hleft
+  iintro %C %ms %⟨hlo, hms⟩ HU %n Hpt Hcred Hcfg Htf Hleft
   icases userretLeft_top cpu k ksp m hsp hav $$ [Hleft Hgap] with ⟨Hleft, %hstk⟩
   · iframe Hleft Hgap
-  have hpins : UrcPins j V.sz.toNat V.fdg V.cwi gn V.pvLazy V.pvSecc (k.pop m) ksp V :=
+  -- NI M3 Q-1: the user tier runs at the page count userret read (`{ P with np := n }`);
+  -- the kernel record's descriptor is re-keyed to it
+  have hpins : UrcPins j V.sz.toNat V.fdg V.cwi gn V.pvLazy V.pvSecc (k.pop m) ksp
+      { V with upt := { P with np := n } } :=
     ⟨by simp [hsie], by simp [htier], by simp [hnoff], by simp [hproc], hstk, rfl, rfl, rfl, hgn.symm, rfl,
       rfl⟩
   ihave Hrut : iprop(urcRut (hlc := hlc) PT Γ j cpu V.sz.toNat V.fdg V.cwi gn cs pid V.pvLazy V.pvSecc
-      (uvisOf V M sts gn cs pid) P) $$ [Hleft Htf Hclose Huh]
+      (uvisOf V M sts gn cs pid) { P with np := n }) $$ [Hleft Htf Hclose Huh Hcred]
   · unfold urcRut
-    iexists k.pop m, ksp, V
-    iframe Hleft Htf Hclose Huh
-    ipureintro; exact hpins
-  ihave Hptm := urc_ptm cpu P M V.sz.toNat $$ Hpt
+    iexists k.pop m, ksp, { V with upt := { P with np := n } }
+    iframe Hleft Htf Huh Hcred
+    isplitl []
+    · ipureintro; exact hpins
+    iintro %sts' Hfr
+    iapply (usertrapResAt_np PT Γ j cpu P ksp V sts' cs pid n)
+    iapply Hclose $$ Hfr
+  ihave Hptm := urc_ptm cpu { P with np := n } M V.sz.toNat $$ Hpt
   -- the obligation at THE KEY RESUMED (NI M3 U-2a)
-  ihave Hk : iprop(▷ ukb (hlc := hlc) cpu C P (fdFrags V.fdg)
+  ihave Hk : iprop(▷ ukb (hlc := hlc) cpu C { P with np := n } (fdFrags V.fdg)
       (urcRut PT Γ j cpu V.sz.toNat V.fdg V.cwi gn cs pid V.pvLazy V.pvSecc (uvisOf V M sts gn cs pid))
       (uvisOf V M sts gn cs pid)) $$ [Hloop Hhw]
-  · iapply (show ▷ urcLoop (hlc := hlc) PT Γ j ∗ hwConfig cpu ⊢ ▷ ukb (hlc := hlc) cpu C P (fdFrags V.fdg)
+  · iapply (show ▷ urcLoop (hlc := hlc) PT Γ j ∗ hwConfig cpu ⊢ ▷ ukb (hlc := hlc) cpu C { P with np := n }
+        (fdFrags V.fdg)
         (urcRut PT Γ j cpu V.sz.toNat V.fdg V.cwi gn cs pid V.pvLazy V.pvSecc (uvisOf V M sts gn cs pid))
         (uvisOf V M sts gn cs pid) from
-      urcLoop_ukb PT Γ j cpu C P V.fdg (uvisOf V M sts gn cs pid) hlo
+      urcLoop_ukb PT Γ j cpu C { P with np := n } V.fdg (uvisOf V M sts gn cs pid) hlo
         (show permOf V.upt.um V.sz.toNat = permOf P.um V.sz.toNat by rw [hVP]))
     iframe Hloop Hhw
   rw [urc_jump_retPc]
   have hlf : V.pvLazy = false → lazyFree P.um (BitVec.ofNat 64 V.sz.toNat) := by
     intro h; rw [BitVec.ofNat_toNat, BitVec.setWidth_eq]; exact hlzf h
   subst hVP
-  iapply (uslot_applyLoop cpu C V.upt (fdFrags V.fdg)
+  iapply (uslot_applyLoop cpu C { V.upt with np := n } (fdFrags V.fdg)
     (urcRut (hlc := hlc) PT Γ j cpu V.sz.toNat V.fdg V.cwi gn cs pid V.pvLazy V.pvSecc (uvisOf V M sts gn cs pid))
     (urcRut_acc PT Γ j cpu V.sz.toNat V.fdg V.cwi gn cs pid V.pvLazy V.pvSecc (uvisOf V M sts gn cs pid))
-    V.sz.toNat sts V.cwi gn cs pid V.pvLazy V.pvSecc (uvisOf V M sts gn cs pid) (umemLazy V.upt V.sz.toNat M)
+    V.sz.toNat sts V.cwi gn cs pid V.pvLazy V.pvSecc (uvisOf V M sts gn cs pid) (umemLazy { V.upt with np := n } V.sz.toNat M)
     (tfResumeGpr0 V.tf) ms sc tv sep (retPc sep) hlo (uszOk_of_maxsz hszb) hms rfl rfl rfl rfl rfl rfl rfl
     rfl rfl rfl hlf rfl hsep.symm) $$ Hslot Hhw Hks Hwire HU Hptm Hfrag Hcfg Hrut Hk
-
 end
 
 end Xv6

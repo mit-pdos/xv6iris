@@ -72,7 +72,7 @@ theorem namexEra_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL :
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (P Pmiss : Nat → Nat → IProp GF) (r : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (dqb dqs dqpv : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : namexSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
@@ -87,7 +87,7 @@ theorem namexEra_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL :
     (ha1 : k.regs 11#5 = 0#64)
     (hpd : descPageRw pd) :
     wp_namex_era_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun nfun
-      n Sb P Pmiss pid V M dqb dqs dqpv
+      n Sb P Pmiss r pid V M dqb dqs dqpv
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud ha1 hpd := by
   unfold wp_namex_era_eb_body
   let A : NamexArgs := ⟨γl, pd, pav, pu, j, γkl, γk, plen, pfun, false, n, Sb, pid, V.cwd, V.cwi,
@@ -105,10 +105,10 @@ theorem namexEra_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL :
       hroot := hroot, hnib0 := hnib0, hgeom := hgeom, hbg := hbg, hbel := hbel, hireg := hireg,
       hnn := hnn, hterm := hterm, hplen := hplen, hnpar := ha1, hpd := hpd }
   -- THE PROCESS BLOCK'S CORE, AS THE WALK'S FIVE ROWS
-  icases namexEra_core_rows5 hct k.proc pid V M $$ Hcore with ⟨Hpid, Hcwd, Hcwr, Hrtc, Hrtr, Hcl⟩
-  ihave Hcl : namexEraClose (GF := GF) k pid V M $$ [Hcl]
-  · unfold namexEraClose; iexact Hcl
-  ihave Hnext := namexEra_post_of_spec k A P Pmiss pid V M cpu hj hproc rfl
+  icases namexEra_core_rows5R hct r k.proc pid V M $$ Hcore with ⟨Hpid, Hcwd, Hcwr, Hrtc, Hrtr, Hcl⟩
+  ihave Hcl : namexEraCloseR (GF := GF) k r pid V M $$ [Hcl]
+  · unfold namexEraCloseR; iexact Hcl
+  ihave Hnext := namexEra_post_of_spec k A P Pmiss r pid V M cpu hj hproc rfl
     ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ $$ [$Hnext $Hcl]
   -- THE DEFERRED START, at the record
   ihave Hst := namexEraStart_ex A P Pmiss rfl $$ Hstart
@@ -140,10 +140,10 @@ end
 Iunlockput Dirlookup Iput`). -/
 theorem namexEra_proof (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL : ILOCK)
     (IU : IUNLOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (IP : IPUT) : NAMEX_ERA :=
-  ⟨fun Γ _ cpu k γl pd pav pu j γkl γk plen pfun nfun n Sb P Pmiss pid V M dqb dqs dqpv
+  ⟨fun Γ _ cpu k γl pd pav pu j γkl γk plen pfun nfun n Sb P Pmiss r pid V M dqb dqs dqpv
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud ha1 hpd =>
   namexEra_main MP ID IG MM IL IU IUP DL IP Γ cpu k γl pd pav pu j γkl γk plen pfun nfun n Sb
-    P Pmiss pid V M dqb dqs dqpv hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn
+    P Pmiss r pid V M dqb dqs dqpv hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn
     hterm hplen hbud ha1 hpd⟩
 
 end Xv6

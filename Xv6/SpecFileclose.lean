@@ -425,7 +425,7 @@ def wp_fileclose_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat)
     (pidv : BitVec 32) (dqp : DFrac) (Φc : IProp GF) (ke : Nat)
     (hK : filecloseSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
-    (ha0 : k.regs 10#5 = fnode kk) : Prop :=
+    (ha0 : k.regs 10#5 = fnode kk) (hsealed : on = none) : Prop :=
   kctx cpu k ∗ pcIs cpu filecloseAddr ∗
   -- THE TRAP-CSR COMPLEMENT, ON EVERY ARM
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
@@ -463,8 +463,8 @@ structure FILECLOSE : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat) (pidv : BitVec 32) (dqp : DFrac)
-    (Φc : IProp GF) (ke : Nat) hK hnoff htier ha0,
+    (Φc : IProp GF) (ke : Nat) hK hnoff htier ha0 hsealed,
     wp_fileclose_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ kk q st j γkl γk on pidv dqp Φc ke
-      hK hnoff htier ha0
+      hK hnoff htier ha0 hsealed
 
 end Xv6

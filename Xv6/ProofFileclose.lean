@@ -65,7 +65,7 @@ set_option maxHeartbeats 16000000 in
 theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP)
     (IP : IPUT) (EO : END_OP) : FILECLOSE := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ kk q st j γkl γk on pidv dqp
-      Φc ke hK hnoff htier ha0 => by
+      Φc ke hK hnoff htier ha0 hsealed => by
   unfold wp_fileclose_eb_body
   simp only [filecloseAddr]
   iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, Henv, Hcpay, Hlend, Hnext⟩
@@ -183,7 +183,7 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
     rw [hlast] at hok'
     icases fileRest_join γ kk s t id q q' C C' pn st hlast $$ [Hrest Hf Hp] with ⟨%pn2, %hok2, Hf, Ht, Hc⟩
     · iframe
-    iapply (fc_last RE PC BO IP EO Γ cpu c k γl γ j γkl γk on pidv dqp kk st q Φc ke C pn2 _ nx Ls hwf hK
+    iapply (fc_last RE PC BO IP EO Γ cpu c k γl γ j γkl γk on hsealed pidv dqp kk st q Φc ke C pn2 _ nx Ls hwf hK
         hnoff hlocks htier hok2 spie spp hpin _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h9)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact b2)

@@ -103,7 +103,7 @@ def diskInitGhosts {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 
 /-- **WP of `virtio_disk_init`.**  The invariant is DEAD on entry (the
 device was never programmed); `c0` is the configuration the tracker holds. -/
-def wp_virtio_disk_init_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+def wp_virtio_disk_init_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [DiskG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γkl : GName) (γk : KmemNames) (nb : Nat) (c0 : VirtioCfg)
     (vlock : BitVec 32) (vname vcpu pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8))
     (hsie : k.sie = false) (hK : virtioDiskInitSlots ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)

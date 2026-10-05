@@ -52,7 +52,7 @@ def kinitPages : Nat := 32732
 def kmemNameAddr : BitVec 64 := KStr.«kmem»
 
 /-- The specification of `kinit`. -/
-def wp_kinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_kinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (vlock : BitVec 32) (vname vcpu : BitVec 64)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 22 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hp0 : k.proc = 0#64) : Prop :=

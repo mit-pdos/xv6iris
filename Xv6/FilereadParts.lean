@@ -413,7 +413,7 @@ theorem frd_st_inode (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : Pipe
 /-! ## 6.  The block, at the ambient form -/
 
 section Block
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
 
 /-- EVERY MAPPED PAGE OF THE BLOCK'S VIEW IS FULL (deviation 2; Rocq's
 `proc_pt_dom`): `UMemL.procPtAt_pageLen`, read through the block. -/

@@ -6631,6 +6631,89 @@ Lane `lane/quota`, one commit on `lean` aef7dd5e8.  Nothing ticked.
   stays raised); the scounteren pin (`= 0` after `plicinithart`) is Q-5's (`clockCells` holds it at
   some value).
 
+### M3 quotas Q-1 as landed (2026-10-05)
+
+Lane `lane/quota`, one commit on Q-0 (f755c293f).  Nothing ticked.
+
+- **The credit.** `KcredDefs.pageCredit n := iOwn (WchG.wkcName GF) (◯ natUfrac n)`, authority
+  `credAuth c` (`●`), on the existing `Auth (Option UFrac)` camera at two new canonical `WchG` names
+  (`wkcName`, `wnpName`; no new camera, `γk`-agnostic).  Split/join/take, `credAuth_bound/spend/mint`.
+  Pipe tickets `npTicket`/`npTicketAuth` (on `wnpName`) bound `npipe` from below at pipeclose.
+- **The pool invariant** (`KallocDefs.kmemCnt γk n`, the kmem lock's payload count):
+  `(cnt ½ n ∗ credAuth credTotal) ∨ (pend discard ∗ ∃ c, credAuth c ∗ ⌜c ≤ n⌝)` -- the tracked epoch
+  (boot) and the sealed one (`kallocAvail γk none`, which now records the discarded count `N` with
+  `credTotal ≤ N`; `kallocAvail_mint` replaces `kallocAvail_seal`).  An UNCREDITED pop after the seal
+  would break `c ≤ n`: the uncredited kalloc forms take `hon : on ≠ none` (`availZero on := on = some 0`).
+- **The credited contracts.** `SpecKalloc.wp_kalloc_cred_body` (field `wp_kalloc_cred`):
+  `kallocAvail γk none ∗ pageCredit 1 ∗ actLend k.proc ke` in; the continuation gets
+  `actLend (ke+1) -∗ kallocPostCred γk k.proc (R' 10) -∗ ⌜calleeSaved⌝ -∗ wpLoop`, where
+  `kallocPostCred := ⌜r ≠ 0#64 ∧ pageValid r⌝ ∗ byteBuf r (own 1) (replicate 4096 5#8) ∗ kAllocRcpt`
+  (never null; the receipt kept).  `SpecKfree.wp_kfree_cred` / `wp_kfree_free_cred`: the page's
+  credit comes back.  Call-site forms: `UvmCallSites.kPay γk on m` (`kallocAvail` plus, sealed, the
+  credits), `uc_kalloc_pay_call` (out: `kallocPayPost`, `kallocPayPost_none_ne`).
+- **The share arithmetic** (`QuotaDefs`, `UPtShape`, `QuotaFit`; all `decide`/`omega`):
+  `uQpages = 192` (768 KiB / 4 KiB), `ptNodesMax = 1 + 2 + 2 = 5`
+  (`PTree.pages_le_of_shapeQ (t) (h : t.shapeQ) : (t.pages 2).length ≤ ptNodesMax`: kids only at the
+  root's 0/255, then 0/511), `ptW = ptNodesMax + uQpages = 197`, `execArgPages = 32`,
+  `slotShare = 1 + 2 * ptW + execArgPages = 427` (= trapframe + live table + `procSpare = ptW +
+  execArgPages = 229`, exec's new table and argv), `NPIPE = 50`,
+  `credTotal = NPROC * slotShare + NPIPE = 64 * 427 + 50 = 27378`;
+  `freePagesAfterBoot = kinitPages − kvmmakeCount − 3 = 32732 − 166 − 3 = 32563`;
+  `totalFits : NPROC * slotShare + NPIPE ≤ freePagesAfterBoot`, `userinit_nb_fits : credTotal +
+  procPagetableNodes + 1 ≤ freePagesAfterBoot`.
+- **Where the credits live.** The table: `ptOwnRep`/`procPtAt` carry `ptRest t L := ⌜t.shapeQ ∧
+  uLeafRegion L⌝ ∗ pageCredit (ptW − (t.pages 2).length − uLeafCnt L)` (the table's weight 197 as
+  pages + credits).  The slots: UNUSED `dormantSpace`/`procDormantPrestk` hold `pageCredit slotShare`,
+  ZOMBIE holds `procSpare`; the live block's core carries `pageCredit procSpare`
+  (`procPrivCoreResAt r`, `procPrivFdRes r`); allocproc takes the share, freeproc gives it back.
+  The npipe lock: `npipeShare n := ⌜n ≤ NPIPE⌝ ∗ pageCredit (NPIPE − n) ∗ npTicketAuth n`.  Minted at
+  power-on (`childrenRes_alloc` → `credBoot`) and routed: `credAuth` to the kmem payload,
+  `NPROC * slotShare` through procinit to the dormant slots, `NPIPE` and the tickets to npipe.
+- **THE USER TIER (`UPtd.np`, coordinator ruling, option 2).** `ptRest` depends on the tree, and the
+  user tier's `userPtInv` hides the tree behind `∃ t` (the residue `Rut : UPtd → IProp` cannot name
+  it; `ptRep` allows empty interior nodes, so neither `shapeQ` nor the page count follows from the
+  leaves), so a trap round trip would lose the credits.  `UPtd` gains `np : Nat := 0` (the kernel
+  ignores it: `procPtAt`/`umPages`/`leaves` read `root`/`tfp`/`um`), and `userPtInv`/`userPtInvX`
+  (and `uptSlot`, `pt2Win`, `uptFrame`) state `⌜… ∧ t.shapeQ ∧ (t.pages 2).length = P.np⌝` in the
+  tree's pure conjunct; `UbSameShape`/`UbMemWf`/`UkMem` carry the two facts across user steps (an
+  A/D write-back keeps both).  `userretPost` hands `∀ n, userPtInvX cpu { P with np := n } M -∗
+  uptCred { P with np := n } -∗ …` (`uptCred P := ⌜uLeafRegion P.leaves⌝ ∗ pageCredit (ptW − P.np −
+  uLeafCnt P.leaves)`); the closed loop parks it in `urcRut` and re-keys the kernel record
+  (`usertrapResAt_np`); `wp_uservec_body` takes `uptCred P` and returns `procPtAt P Mp`
+  (`UPt.ptRest_of_cred`).  TCB: 0 module-set moves; `UPtDefs`' reached declarations gain
+  `PTree.shapeQ` (and `UPtd` its field); `SpecUser`/`userProof` text unchanged.
+- **Every moved Spec.**
+  - payment `kPay`: `SpecWalk` (`missingOn`), `SpecMappages` (`missingRun`), `SpecUvmcreate`
+    (`kPay γk on 1`), `SpecProcPagetable` (`kPay γk on procPagetableNodes ∗ pageCredit (ptW −
+    procPagetableNodes)`, `hcnt : ∀ x, on = some x → procPagetableNodes ≤ x`, the result literal
+    `⟨root, tfp, ∅, 0⟩`);
+  - the quota bound: `SpecUvmalloc` (`hq : (k.regs 12#5).toNat ≤ uQuota`), `SpecGrowproc` (`hq`),
+    `SpecVmfault`/`SpecCopyin`/`SpecCopyout`/`SpecCopyinstr` (`hsz ≤ uQuota`);
+  - credits back: `SpecUvmunmap` raw (`hup : uQpages ≤ vpn`), `SpecFreewalk` (`pageCredit
+    (t.pages lvl).length -∗`), `SpecUvmfree`/`SpecProcFreepagetable` (`pageCredit ptW -∗`),
+    `SpecFreeproc.freeprocIn` (`pageCredit (procSpare + tf? + pt?)`);
+  - the slots and boot: `SpecAllocproc` (`hcnt … procPagetableNodes + 2 ≤ x`), `SpecProcinit` and
+    `SpecMain.mainGlobalsRaw` (`pageCredit (NPROC * slotShare)`), `SpecUserinit` (`hnb : credTotal +
+    procPagetableNodes + 1 ≤ nb`), `SpecKexec` (`procPrivFdRes ptW`);
+  - sealed: `hsealed : on = none` on `SpecPipeclose`, `SpecPipealloc`, `SpecFileclose`, `SpecKexit`,
+    `SpecSysExit`, `SpecSysClose`;
+  - the spare generic: `SpecNameiEra`, `SpecNamexEra` (`(r : Nat)`, `procPrivCoreResAt r`);
+  - the user tier: `SpecUserret` (`userretPost` as above), `SpecUservec` (`uptCred P`);
+  - new fields: `SpecKalloc` (`wp_kalloc_cred`), `SpecKfree` (`wp_kfree_cred`, `wp_kfree_free_cred`);
+    the uncredited forms gain `hon`;
+  - instance binders only (`[WchG GF]`): `SpecUvmclear`, `SpecFreerange`, `SpecKinit`,
+    `SpecVirtioDiskInit`, `SpecMain.mainLocksRaw`.
+- **Dead code.** The refuted failure tails went: uvmalloc's rollbacks (`uvma_rollA`/`_rollB` and
+  their helpers), allocproc's and proc_pagetable's null tails, uvmcopy's/vmfault's kfree tails, the
+  uncredited lend forms (`uc_kalloc_lend_call`/`uc_kfree_lend_call`), the spare-0 accessors
+  `procPrivFd_*` (now `procPrivFdRes_*`).
+- **What Q-2 absorbs.** At every credited site the null arm is refutable: `wp_kalloc_cred`'s post has
+  `r ≠ 0`, `kallocPayPost_none_ne`, and `availZero none = False` makes the null arms of walk,
+  mappages, uvmcreate, proc_pagetable and allocproc (whose null arm reduces to the full table)
+  unsatisfiable once sealed.  The landed `kNullRcpt` arms of uvmalloc, growproc, sbrk
+  (`usysSbrkFails`' `allocs ∧ kNull`), vmfault, fork and sys_exec are kept in the Specs and never
+  produced: Q-2 re-cuts those rows.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

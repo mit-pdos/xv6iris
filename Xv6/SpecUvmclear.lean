@@ -19,7 +19,7 @@ def uvmclearAddr : BitVec 64 := KA.«uvmclear»
 def UPtd.clearU (P : UPtd) (vpn : Nat) (w : BitVec 64) : UPtd :=
   { P with um := Iris.Std.PartialMap.insert P.um vpn (w &&& ~~~PTE_U) }
 
-def wp_uvmclear_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_uvmclear_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8)) (w : BitVec 64)
     (hK : 10 ≤ k.avail) (hroot : k.regs 10#5 = pageAddr P.root) (hva : (k.regs 11#5).toNat < 2 ^ 38)
     (hmap : Iris.Std.PartialMap.get? P.um (vpnOf (k.regs 11#5)).toNat = some w) : Prop :=
@@ -31,7 +31,7 @@ def wp_uvmclear_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   ⊢ wpLoop (GF := GF) cpu
 
 structure UVMCLEAR : Prop where
-  wp_uvmclear : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_uvmclear : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (P : UPtd) (M : Nat → List (BitVec 8)) (w : BitVec 64) hK hroot hva hmap,
     wp_uvmclear_body (hlc := hlc) (GF := GF) cpu k P M w hK hroot hva hmap
 

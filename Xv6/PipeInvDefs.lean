@@ -403,7 +403,7 @@ end
 /-! ## The page bytes, the lock payload, the dead state -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [KernelGeom] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [KernelGeom] [CurCtx]
 
 /-- `pi->data[0..PIPESIZE)`, contents tracked, over an EXPLICIT context. -/
 def pipeDataAt (ξ : CtxId) (pi : BitVec 64) (bs : List (BitVec 8)) : IProp GF := iprop%
@@ -418,11 +418,15 @@ instance instCtxMorphPipeDataAt (pi : BitVec 64) (bs : List (BitVec 8)) :
 
 /-- The bytes of the page that `struct pipe` does not name: the 4 padding
 bytes inside `struct spinlock`, and everything past `sizeof(struct pipe)`.
-No code touches them; held only so the page can go back to kfree. -/
+No code touches them; held only so the page can go back to kfree.  ...AND
+(NI M3 quotas Q-1) the buffer's ticket (`KcredDefs.npTicket`): `pipealloc`
+counted the buffer in `npipe` and minted it, `pipeclose`'s freeing arm takes
+it out with the page and spends it at `npipe--`. -/
 def pipeSlack (pi : BitVec 64) : IProp GF := iprop%
   (∃ b1 : List (BitVec 8), ⌜b1.length = 4⌝ ∗ byteBuf (pi + 4#64) (DFrac.own 1) b1) ∗
   (∃ b2 : List (BitVec 8), ⌜b2.length = pipePgbytes - pipeSizeof⌝ ∗
-     byteBuf (pi + BitVec.ofNat 64 pipeSizeof) (DFrac.own 1) b2)
+     byteBuf (pi + BitVec.ofNat 64 pipeSizeof) (DFrac.own 1) b2) ∗
+  npTicket 1
 
 instance pipeSlack_timeless (pi : BitVec 64) : Timeless (pipeSlack (GF := GF) pi) := by
   unfold pipeSlack byteBuf; infer_instance
@@ -431,7 +435,7 @@ instance pipeSlack_timeless (pi : BitVec 64) : Timeless (pipeSlack (GF := GF) pi
 payload carries, so that the payload is a transport family (Rocq's
 `pipe_slack` is `byte_any`, context-free; FileMorph deviation 1). -/
 abbrev pipeSlackAt (ξ : CtxId) (pi : BitVec 64) : IProp GF :=
-  @pipeSlack hlc GF _ ⟨ξ, curTier⟩ pi
+  @pipeSlack hlc GF _ _ _ ⟨ξ, curTier⟩ pi
 
 instance instCtxMorphPipeSlackAt (pi : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => pipeSlackAt ξ pi) := by
@@ -440,7 +444,8 @@ instance instCtxMorphPipeSlackAt (pi : BitVec 64) :
   · refine @instCtxMorphExists _ _ _ _ _ (fun b1 => ?_)
     refine @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) ?_
     exact ctxMorph_bigSepL b1 _ (fun _ _ => instCtxMorphWordAt _ _ _ _ _)
-  · refine @instCtxMorphExists _ _ _ _ _ (fun b2 => ?_)
+  · refine @instCtxMorphSep _ _ _ _ _ ?_ (instCtxMorphConst _)
+    refine @instCtxMorphExists _ _ _ _ _ (fun b2 => ?_)
     refine @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) ?_
     exact ctxMorph_bigSepL b2 _ (fun _ _ => instCtxMorphWordAt _ _ _ _ _)
 

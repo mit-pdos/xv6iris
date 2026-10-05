@@ -71,7 +71,10 @@ def bsdNameRows [WchG GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] (Γ : SchedN
   ([∗list] i ∈ List.range NPROC, lockFreeTok (hlc := hlc) (Γ.lock i)) ∗
   fdSlots (NPROC * (NOFILE + FDSPARE)) ∗
   irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗ irefSlots NFILE ∗ irefSlots IREFBOOT ∗ irefSlotsAuth ∗
-  bslots (NPROC * 3) ∗ bslots mainBslotsFs
+  bslots (NPROC * 3) ∗ bslots mainBslotsFs ∗
+  -- the power-on credits (NI M3 quotas Q-1, `KcredDefs.credBoot`): the
+  -- authority (to the allocator), the slots' shares, the pipe lock's share
+  credAuth credTotal ∗ pageCredit (NPROC * slotShare) ∗ pageCredit NPIPE ∗ npTicketAuth 0
 
 /-- The bio supply's two shares (the rest is dropped, deviation 3). -/
 theorem bsd_bslots_split [BioslotG GF] :
@@ -117,7 +120,7 @@ theorem bootSharedDev_names :
       bsdNameRows (hlc := hlc) Γ γc γl0 γl1 γt := by
   iintro
   imod procBootAlloc (hlc := hlc) (GF := GF) startedPrimary with ⟨%Γ, Hrows⟩
-  imod childrenRes_alloc (GF := GF) (fun a b ha hb h => procAddr_inj ha hb h) with ⟨%W, %hW, Hch, Hnp⟩
+  imod childrenRes_alloc (GF := GF) (fun a b ha hb h => procAddr_inj ha hb h) with ⟨%W, %hW, Hch, Hnp, Hcb⟩
   imod lockGhostAlloc (hlc := hlc) (GF := GF) with ⟨%γc, Hc⟩
   imod lockGhostAlloc (hlc := hlc) (GF := GF) with ⟨%γl0, Hl0⟩
   imod lockGhostAlloc (hlc := hlc) (GF := GF) with ⟨%γl1, Hl1⟩
@@ -132,12 +135,16 @@ theorem bootSharedDev_names :
   icases Hp with ⟨Hh, Hs, Hav, Hf, Hpl⟩
   icases bsd_bslots_split $$ Hbs with ⟨Hb1, Hb2⟩
   icases bsd_irefSlots_split $$ Hir with ⟨Hi1, Hi2, Hi3⟩
+  unfold credBoot
+  icases Hcb with ⟨Hca, Hcr, Hnt⟩
+  ihave Hcr := pageCredit_congr (GF := GF) credTotal (NPROC * slotShare + NPIPE) rfl $$ Hcr
+  icases pageCredit_split (GF := GF) (NPROC * slotShare) NPIPE $$ Hcr with ⟨Hcs, Hcp⟩
   imodintro
   iexists Γ, W, HFd, HBs, HIr, γc, γl0, γl1, γt
   isplitl []
   · ipureintro; exact hW
   unfold bsdNameRows
-  iframe Hh Hs Hav Hf Hch Hc Hl0 Hl1 Ht Hpl Hfd Hi1 Hi2 Hi3 Hia Hb1 Hb2
+  iframe Hh Hs Hav Hf Hch Hc Hl0 Hl1 Ht Hpl Hfd Hi1 Hi2 Hi3 Hia Hb1 Hb2 Hca Hcs Hcp Hnt
 
 end names
 

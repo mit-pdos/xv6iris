@@ -38,6 +38,7 @@ import Xv6.MainKvm
 import Xv6.MainTrap
 import Xv6.MainStarted
 import Xv6.FsCfgSnapFirst
+import Xv6.QuotaFit
 
 namespace Xv6
 
@@ -274,7 +275,7 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
     iexact Hdev
   -- +0x9e  userinit
   iapply (mn_userinit UI Γ γ0 γ1 γc γl0 γl1 γd γdl γt startedPrimary k R4 hsie hnoff hlocks htier hproc
-    hsl.2.2.2.1 γp γft γf γw γt (kinitPages - kvmmakeCount - 3) (NPROC - 1) (by decide) hroot hnib0)
+    hsl.2.2.2.1 γp γft γf γw γt (kinitPages - kvmmakeCount - 3) (NPROC - 1) userinit_nb_fits hroot hnib0)
   iframe Hk Hpc Hpinv Hkml Hpl Hav Hinit Hfw Hfbp Hffs Hipt Hrows Hireg Hpe Hft Hpark
   isplitl [Hpav]
   · iapply (show procsAvailAt (GF := GF) Γ (some NPROC) true ⊢ procsAvailAt Γ (some (NPROC - 1 + 1)) true
@@ -313,6 +314,7 @@ def mnKptB [Y : CurCtx] (cn : ConsNames) : IProp GF := iprop%
   ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
   parentsResAt curCtx ∗
   fdSlots (NPROC * (NOFILE + FDSPARE)) ∗ irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗ bslots (NPROC * 3) ∗
+  pageCredit (NPROC * slotShare) ∗
   ticksResAt curCtx ∗ consResAt cn curCtx ∗ consCleanTok cn ∗
   wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32
 
@@ -380,7 +382,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
     Hgh, Hcells, Hpav, Hipt, Hbundle, Hrdr, Hco, Hinv, Hprim, Hrec, Hbare, Hcsrs, Hfree⟩
   unfold mnKptB
   icases HB with ⟨Hpl, Hwl, #Ht0, #Ht16, ⟨%tvl, %tvn, %tvc, Htw, Htn, Htc⟩, Hraw, Hpub, Hpq, Hpar, Hfd, Hir,
-    Hbs, Htres, Hcres, Hclean, Hnp⟩
+    Hbs, Hcr, Htres, Hcres, Hclean, Hnp⟩
   unfold mnProcBoot
   icases Hpb with ⟨Hhart, Hps, Hsf, Hlk, Hrows⟩
   unfold childrenBootRows
@@ -392,7 +394,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
     unfold mainSlots schedulerSlots kvFrameSlots at hK; omega
   -- +0x7a  procinit
   iapply (mn_procinit PR startedPrimary k R0 hsie hsl.1)
-  iframe Hk Hpc Hpl Hwl Hraw Hfd Hir Hbs
+  iframe Hk Hpc Hpl Hwl Hraw Hfd Hir Hbs Hcr
   iintro %R1 Hk Hpc Hpli Hwli Hready
   -- the proc table's invariant, the nextpid and wait locks
   iapply wpLoop_fupd
@@ -446,9 +448,9 @@ theorem mn_splitKpt [Y : CurCtx] (cn : ConsNames) :
     ⊢ mnKptB (GF := GF) cn ∗ mnKptFs ∗ consReader cn 0 := by
   unfold mainLocksRaw mainGlobalsRaw mnKptB mnKptFs
   iintro ⟨⟨Hpl, Hwl, #Ht0, #Ht16, Ht, Hbl, Hil, Hfl, Hnpr⟩,
-    ⟨Hraw, Hpub, Hpq, Hpar, Hfd, Hir, Hfent, Hirf, Hbs, Hinit, Htres, Hhead, Hbin, Hbss, Hsin, Hient,
+    ⟨Hraw, Hpub, Hpq, Hpar, Hfd, Hir, Hfent, Hirf, Hbs, Hcr, Hinit, Htres, Hhead, Hbin, Hbss, Hsin, Hient,
       Hcres, Hrdr, Hcl⟩, Hsb, Hlog, Hfw, Hnp⟩
-  iframe Hpl Hwl Ht0 Ht16 Ht Hraw Hpub Hpq Hpar Hfd Hir Hbs Htres Hcres Hcl Hnp
+  iframe Hpl Hwl Ht0 Ht16 Ht Hraw Hpub Hpq Hpar Hfd Hir Hbs Hcr Htres Hcres Hcl Hnp
   iframe Hbl Hhead Hbin Hbss Hil Hsin Hient Hfl Hfent Hirf Hnpr Hinit Hsb Hlog Hfw Hrdr
 
 theorem mn_mainSlots_ge : 114 ≤ mainSlots := by

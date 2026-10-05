@@ -129,15 +129,15 @@ cwd cell + reference (namei's), LENT out of the whole block at the ambient
 context once its tier is pinned, and put back unchanged. -/
 theorem kxcA_priv_rows [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
+    procPrivFdRes (GF := GF) ptW γ pa pid V M ⊢
       wordPointsTo (pPid pa) 4 pidPriv pid ∗ wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
       inodeHeldAt V.cwd V.cwi ∗
       (wordPointsTo (pPid pa) 4 pidPriv pid -∗ wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd -∗
-        inodeHeldAt V.cwd V.cwi -∗ procPrivFd γ pa pid V M) := by
+        inodeHeldAt V.cwd V.cwi -∗ procPrivFdRes ptW γ pa pid V M) := by
   obtain ⟨ξ, t⟩ := X
   simp only at hct
   subst hct
-  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt
+  unfold procPrivFdRes procPrivCoreResAt procPrivBareAt procFieldsNoOfile cwdRefAt
   iintro ⟨⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hg⟩, Hof⟩
   iframe Hpid Hcwd Hc Hev
   iintro Hpid Hcwd Hc
@@ -526,7 +526,7 @@ theorem kxcA_tests_r (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
     kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
     logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗
-    procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗
+    procPrivFdRes ptW A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗
     kxcFrameA6x (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 10#5)
       (k.regs 11#5) (k.regs 20#5) (rdDelivered data olds 0 tot) ∗
     Rr dnf bmf data ∗
@@ -701,7 +701,7 @@ theorem kxc_a2_r (IL : ILOCK) (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP)
     Hpriv, Hbufs, Hfr⟩, #Hfab, Hor, Hconv, Hex, #Hkw, HK⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
-  icases kxc_priv_pid (hct.symm.trans (by k_norm_g; exact htier)) A.γ k.proc A.pidv A.V A.M $$ Hpriv
+  icases kxc_priv_pidR (hct.symm.trans (by k_norm_g; exact htier)) A.γ k.proc A.pidv A.V A.M $$ Hpriv
     with ⟨Hpid, Hpriv⟩
   unfold inodeHeldAt
   icases Hheld with ⟨%kk, %q, %inum, %hipv, %hkk, %hnib, %hpos, %hzi, Href⟩

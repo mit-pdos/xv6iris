@@ -112,7 +112,7 @@ theorem syscall_arm_exit (SX : SYSEXIT)
     (UexecSG.sexitPay f) hj hprocK hv
     (by k_norm_g; have : sysExitSlots + 4 ≤ syscallSlots := by decide
         omega)
-    hnoffK (by k_norm_g; exact htier)
+    hnoffK (by k_norm_g; exact htier) rfl
   unfold wp_sys_exit_eb_body at hU
   have hsp : (((k.withSpie spie spp).pushed 4).withRegs R).sp = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 :=
     hpins.1

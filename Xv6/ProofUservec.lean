@@ -129,7 +129,7 @@ end
 set_option maxHeartbeats 4000000 in
 /-- **uservec meets its specification.** -/
 theorem uservec_proof : USERVEC :=
-  ⟨fun {hlc GF} _ _ cpu C P Rut k sz M ws ms sc tv sep g hloop hsie htier hkw => by
+  ⟨fun {hlc GF} _ _ _ _ cpu C P Rut k sz M ws ms sc tv sep g hloop hsie htier hkw => by
   unfold wp_uservec_body uservecPost userretLeft
   obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
   simp only at hsie htier
@@ -139,7 +139,7 @@ theorem uservec_proof : USERVEC :=
   simp only [KCtx.sp] at hk0 hk1
   have hmdl : 0x220#64 &&& ~~~C.mideleg = 0#64 := by have h := C.mm; rw [hmie] at h; exact h
   have hv : pageValid (pageAddr P.tfp) := hwfP.2.2.1
-  iintro ⟨#Hhw, Hfr, #Hcl, Hpage, ⟨%⟨hkwf, htc⟩, Hstack, Hcpu, Htok, #Hon, #Hro⟩, HΦ⟩
+  iintro ⟨#Hhw, Hfr, #Hcl, Hpage, ⟨%⟨hkwf, htc⟩, Hstack, Hcpu, Htok, #Hon, #Hro⟩, Hcred, HΦ⟩
   icases uservec_frame_open cpu C P Rut sz M ms sc tv sep g hdq hmie hmed $$ [Hhw Hfr] with
     ⟨%mepc, %stc, %lf, %Mp, %⟨⟨hsm, hsr⟩, hM, hlf⟩, HmConf, Hclock, Hpc, HF, Hsep, Hsc, Hstv, Hstvec, %hwf, Hslot, Hum, HR,
       Hrc⟩
@@ -205,10 +205,15 @@ theorem uservec_proof : USERVEC :=
       iexact Hss
     · iexact Hro
   rw [hpc]
-  iapply HΦ $$ %Mp %hM Hkc Hpc Hsep Hsc Hstv [Hstvec] [Hfr Hum] Hpage HR Hrc
+  iapply HΦ $$ %Mp %hM Hkc Hpc Hsep Hsc Hstv [Hstvec] [Hfr Hum Hcred] Hpage HR Hrc
   · unfold uservecTvec; iexact Hstvec
-  · unfold procPtAt uptFrame ptOwnRep
-    iframe Hfr Hum
-    ipureintro; exact hwf⟩
+  · -- the table's credits come back from the residue (NI M3 Q-1)
+    unfold uptFrame
+    icases Hfr with ⟨%t, %⟨hb, hr, hs, hn⟩, Ht⟩
+    ihave Hrest := UPt.ptRest_of_cred t P hs hn $$ Hcred
+    iapply (UPt.procPtAt_intro P Mp hwf)
+    iframe Hum
+    iapply (UPt.ptOwnRep_intro P.root P.leaves t hb hr)
+    iframe Ht Hrest⟩
 
 end Xv6

@@ -42,7 +42,7 @@ symbolic base (`sys_exec_reload`, Rocq `sx_reload`), used at +0x0a6,
    Permit sweep L1b: the bad tail returns `⌜A.V.ev ≤ kv⌝` with the block at
    `sysExecV2 A P kv` (`SysExecParts` deviation 9).
 6. Permit sweep L3b (no Rocq counterpart, `SysExecParts` deviation 10):
-   bad: lends the block's counter to its free loop (`procPrivFd_evAcc` +
+   bad: lends the block's counter to its free loop (`procPrivFdRes_evAcc` +
    `actLend_borrow`) and returns the block at the raised count `kv'`; the
    success tail takes the lend the break borrowed and hands it back raised.
 
@@ -221,8 +221,8 @@ theorem sys_exec_bad_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : S
   ihave Harr := sysExecArgvFrom_intro (GF := GF) (k.regs 2#5) pg t $$ Harr
   -- the block's counter, lent to the free loop (permit sweep L3b): each
   -- kfree steps it, and the block comes back at the raised record
-  icases procPrivFd_evAcc A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) $$ Hblk
-    with ⟨Hcnt, Hblk⟩
+  icases procPrivFdRes_evAcc (ptW + (execArgPages - t)) A.γ (procAddr A.j) A.pid (sysExecV2 A P kv)
+    (sysExecM2 A P) $$ Hblk with ⟨Hcnt, Hblk⟩
   icases actLend_borrow (procAddr A.j) kv $$ Hcnt with ⟨Hl, Hlb⟩
   ihave Hl := actLend_congr hS.hproc.symm kv $$ Hl
   -- +0x96 THE FREE LOOP, from the array's start
@@ -231,10 +231,14 @@ theorem sys_exec_bad_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : S
     refine ⟨by omega, by omega, ht, hpg, ?_, ?_⟩
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; rw [a9, sysExecTails_at0]
     · simp only [RegMap.set_apply, ite_true]
-  iintro %c2 %spie2 %spp2 %R2 %pcx %hpcx %hkeep Hk Hpc Hte Hce ⟨%k1, %hk1, Hl⟩ Harr
+  iintro %c2 %spie2 %spp2 %R2 %pcx %hpcx %hkeep Hk Hpc Hte Hce ⟨%k1, %hk1, Hl⟩ Hcr Harr
   ihave Hl := actLend_congr hS.hproc k1 $$ Hl
   icases Hlb $$ %k1 %hk1 Hl with ⟨%kv1, %hkv1, Hcnt⟩
   ihave Hblk := Hblk $$ %kv1 Hcnt
+  -- the freed pages' credits back: the whole block (NI M3 quotas Q-1)
+  ihave Hblk := sysExec_blk_whole A.γ (procAddr A.j) A.pid ((sysExecV2 A P kv).updEv kv1) (sysExecM2 A P)
+    t ht $$ [Hblk Hcr]
+  · rw [Nat.sub_zero]; iframe
   ihave Hblk := (show procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid
       ((sysExecV2 A P kv).updEv kv1) (sysExecM2 A P) ⊢
     procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv1) (sysExecM2 A P) from .rfl) $$ Hblk
@@ -325,7 +329,8 @@ theorem sys_exec_succ_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : 
     refine ⟨by omega, by omega, ht, hpg, ?_, ?_⟩
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; rw [a9, sysExecTails_at0]
     · simp only [RegMap.set_apply, ite_true]
-  iintro %c2 %spie2 %spp2 %R2 %pcx %hpcx %hkeep Hk Hpc Hte Hce Hl Harr
+  iintro %c2 %spie2 %spp2 %R2 %pcx %hpcx %hkeep Hk Hpc Hte Hce Hl Hcr Harr
+  ihave Hcr := pageCredit_congr (t - 0) t (Nat.sub_zero t) $$ Hcr
   obtain ⟨k2, k8, k18, k19, k20, k21, k22, k23, k24, k25, k26, k27⟩ := hkeep
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at k2 k8 k18 k24 k25 k26 k27
   have hq := sys_exec_succ_pc pcx hpcx
@@ -362,7 +367,7 @@ theorem sys_exec_succ_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : 
     hpins hal)
   iframe
   iintro %c4 %R4 %⟨hcs, h10⟩ Hk Hpc Hte Hce
-  iapply HΦ $$ %c4 %spie2 %spp2 %R4 %⟨hcs, h10.trans ha0⟩ Hk Hpc Hte Hce Hl
+  iapply HΦ $$ %c4 %spie2 %spp2 %R4 %⟨hcs, h10.trans ha0⟩ Hk Hpc Hte Hce Hl Hcr
 
 end Tails
 

@@ -155,13 +155,13 @@ process's table owned and representing its leaves, and the hart's TLB
 consistent with the two. -/
 def pt2Win [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) : IProp GF := iprop%
   ∃ (tk : PTree) (M : RegMapF (BitVec 64)), kptOn tk M ∗ ⌜tk.base = kroot⌝ ∗
-    ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
+    ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves ∧ t.shapeQ ∧ (t.pages 2).length = P.np⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
       ∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜tlbOk2 tk t tlb⌝
 
 /-- The process's table, parked outside the translation state (what
 `procPtAt` owns while the kernel table is installed: Rocq `pt_frame`). -/
 def uptFrame [CurCtx] (P : UPtd) : IProp GF := iprop%
-  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t
+  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves ∧ t.shapeQ ∧ (t.pages 2).length = P.np⌝ ∗ ptreeOwn 2 (DFrac.own 1) t
 
 /-- **Entering the window at userret's `csrw satp`** (Rocq
 `tlb_inv_pt2_kprev_enter`): the kernel slot's TLB becomes the window's. -/
@@ -273,7 +273,7 @@ theorem pt2Trans [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (kroot root : Bit
   unfold paOf
   iintro ⟨HmConf, ⟨Hwin, #Hcl, #HS, Htok⟩, HΦ⟩
   unfold pt2Win
-  icases Hwin with ⟨%tk, %M, #Hkpt, %hkb, %t, %⟨hbase, hrep⟩, Ho, %tlb, Htlb, %htlb⟩
+  icases Hwin with ⟨%tk, %M, #Hkpt, %hkb, %t, %⟨hbase, hrep, hq⟩, Ho, %tlb, Htlb, %htlb⟩
   icases kptOn_kmapAt tk M (vpnOf va) _ $$ [Hkpt Hcl] with %⟨addrk, ppnk, permk, heqk, hmapsk⟩
   · iframe Hkpt Hcl
   obtain ⟨rfl, rfl⟩ := kLeaf_inj heqk
@@ -403,7 +403,8 @@ theorem pt2Trans [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (kroot root : Bit
     iframe Ho
     isplit
     · ipureintro
-      exact ⟨by rw [PTree.base_setLeaf, hbase], uptPtRep_setLeaf t P.leaves hrep (vpnOf va) _ ppn perm a d a' d' hw⟩
+      exact ⟨by rw [PTree.base_setLeaf, hbase], uptPtRep_setLeaf t P.leaves hrep (vpnOf va) _ ppn perm a d a' d' hw,
+        PTree.shapeQ_setLeaf t _ _ hq.1, by rw [PTree.pages_setLeaf]; exact hq.2⟩
     iexists tlb'
     iframe Htlb
     ipureintro; exact htlb'

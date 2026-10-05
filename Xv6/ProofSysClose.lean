@@ -127,7 +127,7 @@ theorem sc_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     (Φc : IProp GF) (ke : Nat)
     (s : Bool) (hs : k'.sie = s) (pj : BitVec 64) (hpj : k'.proc = pj)
     (hK : filecloseSlots ≤ k'.avail) (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
-    (ha0 : k'.regs 10#5 = fnode kk) :
+    (ha0 : k'.regs 10#5 = fnode kk) (hsealed : on = none) :
     kctx c k' ∗ pcIs c KA.«fileclose» ∗ trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     isFtable γl γ ∗ panicEnv ∗ fileRef γ kk q st ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ irefSlot ∗
@@ -144,7 +144,7 @@ theorem sc_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
   have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk q st j γkl γk on pidv dqp
-    Φc ke hK hnoff htier ha0
+    Φc ke hK hnoff htier ha0 hsealed
   unfold wp_fileclose_eb_body at h
   simp only [filecloseAddr] at h
   exact h
@@ -286,7 +286,7 @@ set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γl γ pa pid V M sts v j γkl γk on Φc
-      hv hproc htier hsp hnoff hK => by
+      hv hproc htier hsp hnoff hK hsealed => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_close_eb_body
@@ -483,7 +483,7 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     ihave Hcpay := (show filecloseCpay (hlc := hlc) (GF := GF) (sysFdSt v V.ofile sts) Φc ⊢
         filecloseCpay st Φc from by rw [hkey]) $$ Hcpay
     iapply (sc_fileclose FC Γ c17 _ γl γ kk q st j γkl γk on pid pidPriv Φc V.ev k.sie (by k_norm_g) k.proc
-        (by k_norm_g) ?hK2 ?hn2 ?ht2 ?ha2)
+        (by k_norm_g) ?hK2 ?hn2 ?ht2 ?ha2 hsealed)
       $$ [- $Hk $Hpc $Hte $Hce $Hft $Hpe $Href $Hpid $Hir $Henv $Hcpay $Hlend]
     rotate_right 1
     k_norm_g [sc_ret_4e64]

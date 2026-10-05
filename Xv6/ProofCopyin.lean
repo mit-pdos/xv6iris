@@ -280,7 +280,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
     (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (A : Nat)
     (dst0 : BitVec 64) (psz : BitVec 64)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 50 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
-    (hsz : psz.toNat ≤ 2 ^ 38)
+    (hsz : psz.toNat ≤ uQuota)
     (d : Nat) (hd : d ≤ old.length) (hA64 : A + d < 2 ^ 64)
     (hcur : d = 0 ∨ (A + d) % 4096 = 0)
     (P1 : UPtd) (hext1 : P.extSz psz P1)
@@ -307,6 +307,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
           (A + d) / 4096 * 4096 < 2 ^ 38))⌝ -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
+  have hsz38 : psz.toNat ≤ 2 ^ 38 := Nat.le_trans hsz (by unfold uQuota; omega)
   -- `k_norm` splits `BitVec.ofNat 64 (A + d)`, so state the fold on the split form.
   have hva0 : BitVec.ofNat 64 A + BitVec.ofNat 64 d &&& 0xFFFFFFFFFFFFF000#64
       = BitVec.ofNat 64 ((A + d) / 4096 * 4096) := by
@@ -331,7 +332,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
   k_step_gen (wp_s_jal c3 _ (KA.«copyin» + 0x62#64) false 2095454#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [copyin_br_fffffffffffff9c0] next c4 hp4
   iintro Hk Hpc
-  icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf1, ⟨%t1, %ht1, Htree⟩, Hum⟩
+  icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf1, ⟨%t1, %ht1, Htree, Hrest⟩, Hum⟩
   iapply (co_walkaddr_call WA c4 _ (DFrac.own 1) t1 P1.leaves ?hKa ?hro ht1.2) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
@@ -346,7 +347,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
   obtain ⟨hcs2, hret2⟩ := hpost2
   simp only [calleeSaved, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hcs2
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
-  ihave HP := UMemL.procPtAt_intro' (GF := GF) P1 (viewFaulted P P1 M) t1 ht1 hwf1 $$ [Htree Hum]
+  ihave HP := UMemL.procPtAt_intro' (GF := GF) P1 (viewFaulted P P1 M) t1 ht1 hwf1 $$ [Htree Hrest Hum]
   case' _ => iframe
   by_cases hz : R2 10#5 = 0#64
   · -- not mapped: vmfault
@@ -497,7 +498,7 @@ chunk out of the page and into the kernel buffer, the cursors stepped, and
 the loop test. -/
 theorem copyin_br_fffffffffffff6f0 : KA.«copyin» + 0xfffffffffffff6f0#64 = KA.«memmove» := by decide
 
-theorem ci_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
+theorem ci_move (MM : MEMMOVE) [Xv6G GF] [WchG GF] [CurCtx]
     (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (A : Nat)
     (dst0 : BitVec 64) (psz : BitVec 64) (sp : BitVec 64) (s11 : BitVec 64)
     (hK : 50 ≤ k.avail)
@@ -570,7 +571,7 @@ theorem ci_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     rw [← List.append_assoc, ← UMemL.umemRead_append]
   iintro ⟨Hk, Hpc, HP, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf2, ⟨%t2, %ht2, Htree⟩, Hum2⟩
+  icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf2, ⟨%t2, %ht2, Htree, Hrest⟩, Hum2⟩
   icases UMemL.umPages_acc P2 (viewFaulted P P2 M) ((A + d) / 4096) w hum $$ Hum2
     with ⟨%hpglen, Hpg, Hclose⟩
   have hcs_in : umemRead (viewFaulted P P2 M) (A + d) n
@@ -626,7 +627,7 @@ theorem ci_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       = viewFaulted P P2 M ((A + d) / 4096) from by
     rw [hcs_in, ← List.drop_drop, List.take_append_drop, List.take_append_drop]]
   ihave Hum2 := Hclose $$ %hpglen Hpg
-  ihave HP := UMemL.procPtAt_intro' (GF := GF) P2 (viewFaulted P P2 M) t2 ht2 hwf2 $$ [Htree Hum2]
+  ihave HP := UMemL.procPtAt_intro' (GF := GF) P2 (viewFaulted P P2 M) t2 ht2 hwf2 $$ [Htree Hrest Hum2]
   case' _ => iframe
   ihave Hdst := UMemL.byteBuf_join_td dst0 (DFrac.own 1)
     (umemRead (viewFaulted P P2 M) A d ++ old.drop d)
@@ -719,7 +720,7 @@ theorem ci_n0 (a : Nat) (ha : a < 2 ^ 64) :
 set_option maxHeartbeats 4000000 in
 /-- From `0x800016b8` with the page resolved (`a0 = pa0`): compute
 `n = min(PGSIZE - off, len)` and enter `ci_move`. -/
-theorem ci_nsel (MM : MEMMOVE) [Xv6G GF] [CurCtx]
+theorem ci_nsel (MM : MEMMOVE) [Xv6G GF] [WchG GF] [CurCtx]
     (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (A : Nat)
     (dst0 : BitVec 64) (psz : BitVec 64) (sp : BitVec 64) (s11 : BitVec 64)
     (hK : 50 ≤ k.avail)
@@ -836,7 +837,7 @@ theorem ci_iter (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
     (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (A : Nat)
     (dst0 : BitVec 64) (psz : BitVec 64) (sp : BitVec 64) (s11 : BitVec 64)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 50 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
-    (hsz : psz.toNat ≤ 2 ^ 38) (hlen' : old.length < 2 ^ 63)
+    (hsz : psz.toNat ≤ uQuota) (hlen' : old.length < 2 ^ 63)
     (d : Nat) (hd : d < old.length) (hA64 : A + d < 2 ^ 64)
     (hcur : d = 0 ∨ (A + d) % 4096 = 0)
     (P1 : UPtd) (hext1 : P.extSz psz P1) (hMap : umMapped P1 A d)
@@ -867,6 +868,7 @@ theorem ci_iter (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
           R2 20#5 = BitVec.ofNat 64 (old.length - d2) ∧ R2 22#5 = 4096#64 ∧
           R2 24#5 = 0xFFFFFFFFFFFFF000#64 ∧ R2 26#5 = 1#64 ∧ R2 27#5 = s11))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
+  have hsz38 : psz.toNat ≤ 2 ^ 38 := Nat.le_trans hsz (by unfold uQuota; omega)
   iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hdst, Hlend, HΦ⟩
   iapply (ci_page WA VF k γl γk P M old A dst0 psz hnoff hK hlk hsz d (by omega) hA64 hcur P1
     hext1 spie spp R h23 h25 h18 h24 h26 cur ke) $$ [- $Hk $Hpc]
@@ -910,7 +912,7 @@ theorem ci_loop (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
     (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (A : Nat)
     (dst0 : BitVec 64) (psz : BitVec 64) (sp : BitVec 64) (s11 : BitVec 64)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 50 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
-    (hsz : psz.toNat ≤ 2 ^ 38) (hlen' : old.length < 2 ^ 63) (ke : Nat) (fuel : Nat) :
+    (hsz : psz.toNat ≤ uQuota) (hlen' : old.length < 2 ^ 63) (ke : Nat) (fuel : Nat) :
     ∀ (d : Nat) (_ : old.length - d ≤ fuel) (_ : d < old.length) (_ : A + d < 2 ^ 64)
       (_ : d = 0 ∨ (A + d) % 4096 = 0)
       (P1 : UPtd) (_ : P.extSz psz P1) (_ : umMapped P1 A d)
@@ -933,6 +935,7 @@ theorem ci_loop (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
       procPtAt P3 (viewFaulted P P3 M) -∗ byteBuf dst0 (DFrac.own 1) bs' -∗
       ⌜R2 2#5 = sp ∧ ciPost psz P M A old P3 bs' (R2 10#5) ∧ R2 27#5 = s11⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
+  have hsz38 : psz.toNat ≤ 2 ^ 38 := Nat.le_trans hsz (by unfold uQuota; omega)
   induction fuel with
   | zero =>
     intro d hf hd _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _

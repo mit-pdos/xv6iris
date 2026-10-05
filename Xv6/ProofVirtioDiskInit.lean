@@ -202,13 +202,13 @@ unchanged), at the boot (`hp0`, permit sweep L3b). -/
 theorem vdi_kalloc_call [WchG GF] (KAL : KALLOC) [CurCtx] (c : CPU) (k' : KCtx) (hsie : k'.sie = false)
     (γl : GName) (γk : KmemNames) (on : Option Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
-    (hp0 : k'.proc = 0#64) :
+    (hp0 : k'.proc = 0#64) (hon : on ≠ none) :
     kctx c k' ∗ pcIs c KA.«kalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk on ∗
     (∀ R' : RegMap, kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk hp0
+  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk hp0 hon
   unfold wp_kalloc_body at h
   simp only [kallocAddr] at h
   iintro ⟨Hk, Hpc, #Hl, Hav, HΦ⟩
@@ -1159,9 +1159,9 @@ theorem vdi_beqz_page (p : BitVec 64) (h : pageValid p) : bcond bop.BEQ p 0#64 =
 
 /-- `kalloc` cannot fail while the count is at least one. -/
 theorem vdi_avail_pos (m : Nat) (hm : 0 < m) : ¬ availZero (some m) := by
-  rintro (h | h)
-  · exact absurd h (by simp)
-  · injection h with h; omega
+  intro h
+  unfold availZero at h
+  injection h with h; omega
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
@@ -1197,7 +1197,7 @@ theorem vdi_alloc [WchG GF] (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
   k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xbe#64) false 2076958#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_jal_kalloc]
   iintro Hk Hpc
-  iapply (vdi_kalloc_call KAL cpu _ ?hs1 γkl γk (some nb) ?hn1 ?hK1 ?hl1 ?hz1) $$ [- $Hk $Hpc]
+  iapply (vdi_kalloc_call KAL cpu _ ?hs1 γkl γk (some nb) ?hn1 ?hK1 ?hl1 ?hz1 (by simp)) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
   iframe #
@@ -1232,7 +1232,7 @@ theorem vdi_alloc [WchG GF] (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
   k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xcc#64) false 2076944#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_jal_kalloc]
   iintro Hk Hpc
-  iapply (vdi_kalloc_call KAL cpu _ ?hs2 γkl γk (some (nb - 1)) ?hn2 ?hK2 ?hl2 ?hz2) $$ [- $Hk $Hpc]
+  iapply (vdi_kalloc_call KAL cpu _ ?hs2 γkl γk (some (nb - 1)) ?hn2 ?hK2 ?hl2 ?hz2 (by simp)) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
   iframe #
@@ -1260,7 +1260,7 @@ theorem vdi_alloc [WchG GF] (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
   k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xd2#64) false 2076938#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_jal_kalloc]
   iintro Hk Hpc
-  iapply (vdi_kalloc_call KAL cpu _ ?hs3 γkl γk (some (nb - 1 - 1)) ?hn3 ?hK3 ?hl3 ?hz3)
+  iapply (vdi_kalloc_call KAL cpu _ ?hs3 γkl γk (some (nb - 1 - 1)) ?hn3 ?hK3 ?hl3 ?hz3 (by simp))
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm

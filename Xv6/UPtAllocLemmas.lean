@@ -307,44 +307,6 @@ theorem uptWf_insertLeaf (P : UPtd) (vpn : Nat) (r : BitVec 64) (perm : BitVec 6
 
 /-! ## The run of keys `uvmdealloc` removes -/
 
-theorem delRunL_get_mem (L : RegMapF (BitVec 64)) (v0 n j : Nat) (hj : j < n) :
-    get? (delRunL L v0 n) (v0 + j) = none := by
-  induction n with
-  | zero => omega
-  | succ n ih =>
-    rw [Xv6.delRunL_succ]
-    by_cases he : j = n
-    · subst he; rw [get?_delete_eq rfl]
-    · rw [get?_delete_ne (by omega)]; exact ih (by omega)
-
-theorem delRunL_get_out (L : RegMapF (BitVec 64)) (v0 n x : Nat)
-    (h : ∀ j, j < n → x ≠ v0 + j) : get? (delRunL L v0 n) x = get? L x := by
-  induction n with
-  | zero => rfl
-  | succ n ih =>
-    rw [Xv6.delRunL_succ, get?_delete_ne (fun he => h n (by omega) he.symm)]
-    exact ih (fun j hj => h j (by omega))
-
-theorem UPtd.ext' {P Q : UPtd} (h1 : P.root = Q.root) (h2 : P.tfp = Q.tfp) (h3 : P.um = Q.um) :
-    P = Q := by
-  cases P; cases Q; simp_all
-
-/-- The rollback: the run `uvmalloc` added, removed again. -/
-theorem delRun_eq (P Q : UPtd) (vpn0 i : Nat)
-    (hroot : Q.root = P.root) (htfp : Q.tfp = P.tfp)
-    (hout : ∀ x, (∀ j, j < i → x ≠ vpn0 + j) → get? Q.um x = get? P.um x)
-    (hnone : ∀ j, j < i → get? P.um (vpn0 + j) = none) :
-    Q.delRun vpn0 i = P := by
-  refine UPtd.ext' hroot htfp (equiv_iff_eq.mp ?_)
-  intro x
-  show get? (delRunL Q.um vpn0 i) x = get? P.um x
-  by_cases hx : ∃ j, j < i ∧ x = vpn0 + j
-  · obtain ⟨j, hj, rfl⟩ := hx
-    rw [delRunL_get_mem _ _ _ _ hj, hnone j hj]
-  · have hx' : ∀ j, j < i → x ≠ vpn0 + j := fun j hj he => hx ⟨j, hj, he⟩
-    rw [delRunL_get_out _ _ _ _ hx']
-    exact hout x hx'
-
 /-! ## Alignment -/
 
 theorem toNat_mod8 (x : BitVec 64) (h : BitVec.extractLsb' 0 3 x = 0#3) : x.toNat % 8 = 0 := by
@@ -366,7 +328,7 @@ theorem viewZero_ne (M : Nat → List (BitVec 8)) (k k' : Nat) (h : k' ≠ k) :
 /-! ## `umPages` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
 
 /-- Two exclusive buffers of at least a word cannot start at the same
 aligned address. -/
@@ -415,15 +377,6 @@ theorem umPages_fresh' (P : UPtd) (M : Nat → List (BitVec 8)) (r : BitVec 64)
     isplitl []
     · ipureintro; exact h
     · iexact H
-
-/-- The user pages only depend on the view at the mapped page numbers. -/
-theorem umPages_view_eq (P : UPtd) (M M' : Nat → List (BitVec 8))
-    (h : ∀ k w, get? P.um k = some w → M k = M' k) :
-    umPages (GF := GF) P M = umPages P M' := by
-  unfold umPages
-  refine BigSepM.bigSepM_eq ?_
-  intro k x hk
-  rw [h k x hk]
 
 /-- The page just mapped joins the user pages, at the zeroed view. -/
 theorem umPages_insert (P : UPtd) (M : Nat → List (BitVec 8)) (vpn : Nat) (r perm : BitVec 64)
@@ -484,10 +437,11 @@ structure UaInv (P : UPtd) (M : Nat → List (BitVec 8)) (perm : BitVec 64) (vpn
   inn : ∀ j, j < i → (∃ r : BitVec 64, pageValid r ∧
           get? Pi.um (vpn0 + j) = some (leafOf (BitVec.extractLsb' 12 44 r) perm)) ∧
         Mi (vpn0 + j) = List.replicate 4096 0#8
+  np : Pi.np = P.np
 
 theorem uaInv_zero (P : UPtd) (M : Nat → List (BitVec 8)) (perm : BitVec 64) (vpn0 : Nat) :
     UaInv P M perm vpn0 0 P M :=
-  ⟨rfl, rfl, fun _ _ => ⟨rfl, rfl⟩, fun j hj => absurd hj (by omega)⟩
+  ⟨rfl, rfl, fun _ _ => ⟨rfl, rfl⟩, fun j hj => absurd hj (by omega), rfl⟩
 
 /-- The page number just past the mapped prefix is still unmapped. -/
 theorem uaInv_none (P : UPtd) (M : Nat → List (BitVec 8)) (perm : BitVec 64) (vpn0 i : Nat)
@@ -500,7 +454,7 @@ theorem uaInv_step (P : UPtd) (M : Nat → List (BitVec 8)) (perm : BitVec 64) (
     (Pi : UPtd) (Mi : Nat → List (BitVec 8)) (hinv : UaInv P M perm vpn0 i Pi Mi)
     (r : BitVec 64) (hr : pageValid r) :
     UaInv P M perm vpn0 (i + 1) (Pi.insertLeaf (vpn0 + i) r perm) (viewZero Mi (vpn0 + i)) := by
-  refine ⟨hinv.root, hinv.tfp, ?_, ?_⟩
+  refine ⟨hinv.root, hinv.tfp, ?_, ?_, hinv.np⟩
   · intro x hx
     have hne : x ≠ vpn0 + i := hx i (by omega)
     refine ⟨?_, ?_⟩
@@ -522,47 +476,12 @@ theorem uaInv_step (P : UPtd) (M : Nat → List (BitVec 8)) (perm : BitVec 64) (
         rw [get?_insert_ne (fun hh => hne hh.symm)]; exact hg
       · rw [viewZero_ne _ _ _ hne]; exact hm
 
-/-- The rollback undoes the run exactly. -/
-theorem uaInv_delRun (P : UPtd) (M : Nat → List (BitVec 8)) (perm : BitVec 64) (vpn0 i : Nat)
-    (Pi : UPtd) (Mi : Nat → List (BitVec 8)) (hinv : UaInv P M perm vpn0 i Pi Mi)
-    (hfree : ∀ j, j < i → get? P.um (vpn0 + j) = none) : Pi.delRun vpn0 i = P :=
-  delRun_eq P Pi vpn0 i hinv.root hinv.tfp (fun x hx => (hinv.out x hx).1) hfree
-
-/-- The view only changed at the run, which `P` does not map. -/
-theorem uaInv_view (P : UPtd) (M : Nat → List (BitVec 8)) (perm : BitVec 64) (vpn0 i : Nat)
-    (Pi : UPtd) (Mi : Nat → List (BitVec 8)) (hinv : UaInv P M perm vpn0 i Pi Mi)
-    (hfree : ∀ j, j < i → get? P.um (vpn0 + j) = none) :
-    ∀ x w, get? P.um x = some w → Mi x = M x := by
-  intro x w hx
-  refine (hinv.out x ?_).2
-  intro j hj he
-  rw [he, hfree j hj] at hx
-  exact absurd hx (by simp)
-
 /-! ## `uvmdealloc`'s arithmetic on the run -/
-
-theorem uvmdVpn0_run' (y : BitVec 64) (A : Nat) (hy : y.toNat = A) (h4 : 4096 ∣ A) :
-    pgRoundUpN y.toNat / 4096 = A / 4096 := by
-  rw [hy]
-  obtain ⟨q, rfl⟩ := h4
-  rw [pgRoundUpN_mul]
-
-theorem uvmdNp_run' (x y : BitVec 64) (A i : Nat) (hx : x.toNat = A + 4096 * i)
-    (hy : y.toNat = A) (h4 : 4096 ∣ A) : uvmdNp x y = i := by
-  obtain ⟨q, rfl⟩ := h4
-  unfold uvmdNp
-  rw [hx, hy]
-  by_cases h0 : i = 0
-  · subst h0; rw [if_neg (by omega)]
-  · rw [if_pos (by omega),
-      show 4096 * q + 4096 * i = 4096 * (q + i) from by omega,
-      pgRoundUpN_mul, pgRoundUpN_mul]
-    omega
 
 /-! ## The space at a different view -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
 
 theorem procPtAt_split (P : UPtd) (M : Nat → List (BitVec 8)) :
     procPtAt (GF := GF) P M ⊢
@@ -575,24 +494,18 @@ theorem procPtAt_join (P : UPtd) (M : Nat → List (BitVec 8)) :
 
 theorem ptOwnRep_split (root : BitVec 44) (L : RegMapF (BitVec 64)) :
     ptOwnRep (GF := GF) root L ⊢
-      iprop(∃ t : PTree, ⌜t.base = root ∧ ptRep t L⌝ ∗ ptreeOwn 2 (DFrac.own 1) t) := by
+      iprop(∃ t : PTree, ⌜t.base = root ∧ ptRep t L⌝ ∗ (ptreeOwn 2 (DFrac.own 1) t ∗ ptRest t L)) := by
   unfold ptOwnRep; iintro H; iexact H
 
 theorem ptOwnRep_join (root : BitVec 44) (L : RegMapF (BitVec 64)) (t : PTree)
     (h : t.base = root ∧ ptRep t L) :
-    ptreeOwn (GF := GF) 2 (DFrac.own 1) t ⊢ ptOwnRep root L := by
+    iprop(ptreeOwn (GF := GF) 2 (DFrac.own 1) t ∗ ptRest t L) ⊢ ptOwnRep root L := by
   unfold ptOwnRep
   iintro H
   iexists t
   isplitl []
   · ipureintro; exact h
   · iexact H
-
-theorem procPtAt_view_eq (P : UPtd) (M M' : Nat → List (BitVec 8))
-    (h : ∀ k w, get? P.um k = some w → M k = M' k) :
-    procPtAt (GF := GF) P M = procPtAt P M' := by
-  unfold procPtAt
-  rw [umPages_view_eq P M M' h]
 
 end
 

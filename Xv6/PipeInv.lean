@@ -188,7 +188,7 @@ end
 /-! ## The page reassembly -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [KernelGeom] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [KernelGeom] [CurCtx]
 
 /-- One byte of an in-RAM window is in RAM. -/
 theorem inRam_byte (p : BitVec 64) (n j : Nat) (hj : j < n) (h : inRam p n) :
@@ -219,12 +219,13 @@ theorem bytesFree_snoc_at (a : BitVec 64) (L1 L2 : List (BitVec 8)) (off : Nat) 
 /-- **THE PAGE REASSEMBLY** (the Lean port of Rocq `pipe_bytes_page_own`).
 The two reclaimed lock words plus `pipeBytes pi`, with the page's identity
 claims from `is_pipe`, make the whole page a visibility-free `pageFree pi`
-for `kfree`. -/
+for `kfree`, and (NI M3 quotas Q-1) hands out the pipe's ticket (`pipeSlack`'s
+last conjunct) for `npipeShare_give`. -/
 theorem pipeBytes_pageFree (pi : BitVec 64) (hok : lockAddrOk pi) :
     kmapId (GF := GF) pi -∗ kmapId (pi + 16#64) -∗
     (∃ Hs : Nat → Hist, histBytes pi 4 (fun _ => DFrac.own 1) Hs) -∗
     (∃ Hs : Nat → Hist, histBytes (pi + 16#64) 8 (fun _ => DFrac.own 1) Hs) -∗
-    pipeBytes pi -∗ pageFree pi := by
+    pipeBytes pi -∗ pageFree pi ∗ npTicket 1 := by
   obtain ⟨hR4, hpi4, hR16, hpi16⟩ := hok
   -- pi is 8-aligned (pi+16 is)
   have hpi8 : pi.toNat % 8 = 0 := by
@@ -249,7 +250,7 @@ theorem pipeBytes_pageFree (pi : BitVec 64) (hok : lockAddrOk pi) :
   -- open pipeBytes
   simp only [wordAtN_cur]
   icases Hbytes with ⟨%vname, %nr, %nw, %ro, %wo, %bs, Hnm, Hnr, Hnw, Hro, Hwo, %hbslen, Hdat, Hslack⟩
-  icases Hslack with ⟨⟨%b1, %hb1, Hslack1⟩, ⟨%b2, %hb2, Hslack2⟩⟩
+  icases Hslack with ⟨⟨%b1, %hb1, Hslack1⟩, ⟨%b2, %hb2, Hslack2⟩, Htk⟩
   -- field addresses
   have e_nr : aPnread pi = pi + 536#64 := by unfold aPnread poffOf; congr 1
   have e_nw : aPnwrite pi = pi + 540#64 := by unfold aPnwrite poffOf; congr 1
@@ -291,6 +292,10 @@ theorem pipeBytes_pageFree (pi : BitVec 64) (hok : lockAddrOk pi) :
   ihave P3 := bytesFree_cong (pi + 16#64) (pi + BitVec.ofNat 64 16) (List.replicate 8 0#8) (by rfl) $$ P3
   ihave P4 := bytesFree_cong (pi + BitVec.ofNat 64 pipeDataOff) (pi + BitVec.ofNat 64 24) bs (by rfl) $$ P4
   ihave P9 := bytesFree_cong (pi + BitVec.ofNat 64 pipeSizeof) (pi + BitVec.ofNat 64 552) b2 (by rfl) $$ P9
+  -- the pipe ticket goes out beside the page (NI M3 quotas Q-1)
+  isplitr [Htk]
+  rotate_left
+  · iexact Htk
   -- assemble
   unfold pageFree
   iexists (((((((((List.replicate 4 0#8 ++ b1) ++ wordToBytes vname) ++ List.replicate 8 0#8) ++ bs)

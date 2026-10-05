@@ -295,7 +295,7 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
   clear hp1 hp2 hp3 hp4 hp5 hp6 hp7 hp8 hp9 hp10
   have hpa : R1 10#5 = procAddr j := h10.trans hproc
   icases ec_priv_split (procAddr j) pid V P M $$ Hpriv with ⟨%hf, Hsz, Hpg, Hspace, Hrest⟩
-  have hszb : V.sz.toNat ≤ uvmMaxsz := hf.1
+  have hszb : V.sz.toNat ≤ uvmMaxsz := Nat.le_trans hf.1 uQuota_le_uvmMaxsz
   k_step_gen (wp_s_ld c10 _ (KA.«fetchaddr» + 0x14#64) true 72#12 11#5 10#5 (by decide) (by decide)
       (DFrac.own 1) V.sz)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

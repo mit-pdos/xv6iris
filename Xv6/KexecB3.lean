@@ -77,7 +77,7 @@ Rocq's header, in short:
    `kxc_type_read(_ne)` / `kxc_and4095_*` / `kxc_w32_bit` / `kxc_wrap_sum`
    / `kxc_le8_unsigned` are `Nat` / `BitVec` rows here (`kxcB3_*`).
 6. **The permit sweep L1a (Rocq f344a089a, `ProofKexecB3.v`).**  uvmalloc
-   takes the block's counter (`ProcPrivAcc.procPrivFd_evLend`), so after a
+   takes the block's counter (`ProcPrivAcc.procPrivFdRes_evLend`), so after a
    segment the rest of the run is at a later record: the two downstream
    continuations `kxcK1a4` / `kxcKB` quantify it (`∀ V1, ⌜evAfter A.V
    V1⌝ -∗ …` at `{ A with V := V1 }`, Rocq's `∀ U', ⌜ev_after U U'⌝`), the
@@ -149,6 +149,15 @@ theorem kxcB3_quota (m v : Nat) (hm : m < 2 ^ 64) (hv : v < 2 ^ 64) (hnw : ¬ 2 
   rw [hs, h]
   simp only [decide_eq_decide]
   show 778240 < m + v ↔ 778240 < v + m
+  omega
+
+/-- (NI M3 quotas Q-1) Past the quota test the segment's top is within the
+quota (uvmalloc's `hq`). -/
+theorem kxcB3_quota_le (m v : Nat) (hm : m < 2 ^ 64) (hv : v < 2 ^ 64) (hnw : ¬ 2 ^ 64 ≤ v + m)
+    (hq : ¬ uQuota - 2 * 4096 < v + m) :
+    (BitVec.ofNat 64 m + BitVec.ofNat 64 v).toNat ≤ uQuota := by
+  rw [BitVec.toNat_add, BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hm,
+    Nat.mod_eq_of_lt hv, Nat.mod_eq_of_lt (by omega)]
   omega
 
 theorem kxcB3_leAt8 (g : List (BitVec 8)) (o : Nat) : (BitVec.ofNat 64 (leAt g o 8)).toNat = leAt g o 8 := by
@@ -508,6 +517,8 @@ def kxcAt11a (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
   ⌜kf < NINODE ∧ inumf.toNat < 16 * icfgNib ∧ iputUnits ≤ n2 ∧
     (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0 ∧ ef.length = 64 ∧ w67 = 4095#64⌝ ∗
   ⌜i < ehPhnum ef ∧ P.tfp = A.V.upt.tfp ∧ umBelow szv P ∧ lazyFree P.um szv ∧
+    -- THE QUOTA (NI M3 quotas Q-1)
+    szv.toNat ≤ uQuota - 2 * 4096 ∧
     (kxbWalkOk (kxcFb data dnf) ef → kxbAt (kxcFb data dnf) ef (i + 1) szv.toNat (umemGet P Mi)) ∧
     (kxbWalkOk (kxcFb data dnf) ef → kxbPermLeaves (kxcFb data dnf) ef (i + 1) P.um)⌝ ∗
   kctx c (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs c (KA.«kexec» + 0x11a#64) ∗
@@ -535,7 +546,7 @@ theorem kxc_incr (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → P
   iintro ⟨⟨%hr, %hs, %hl, Hk, Hpc, Hte, Hce, Hres⟩, Hcl, H1a4, HB⟩
   obtain ⟨h2, h8, h18, h20, h21, h22, h25, h26, h27⟩ := hr
   obtain ⟨hkf, hnib, hn2, hal, hlen, h67⟩ := hs
-  obtain ⟨hi, htfp, hbelow, hcov, hat, hperm⟩ := hl
+  obtain ⟨hi, htfp, hbelow, hcov, hszq, hat, hperm⟩ := hl
   have hpn := ehPhnum_bound ef
   unfold kxcResB
   icases Hres with ⟨Hop, Hlog, Hirs, Hbs, Hpt, Hpriv, Hbufs, He, Hfr⟩
@@ -597,7 +608,7 @@ theorem kxc_incr (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → P
     isplitr
     · ipureintro; exact ⟨hkf, hnib, hn2, hal, hlen⟩
     ipureintro
-    refine ⟨htfp, hbelow, hcov, fun hw => (KexecBuilt.kxbAt_done hw hn (hat hw)).1,
+    refine ⟨htfp, hbelow, hcov, hszq, fun hw => (KexecBuilt.kxbAt_done hw hn (hat hw)).1,
       fun hw => (KexecBuilt.kxbAt_done hw hn (hat hw)).2,
       fun hw => KexecBuilt.kxbPermLeaves_done hw hn (hperm hw)⟩
   · have hbr : bcond bop.BGE (BitVec.ofNat 64 i + 1#64) (BitVec.setWidth 64 (BitVec.ofNat 16 (leAt ef 56 2)))
@@ -623,7 +634,7 @@ theorem kxc_incr (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → P
     isplitr
     · ipureintro; exact ⟨hkf, hnib, hn2, hal, hlen, h67⟩
     ipureintro
-    exact ⟨by omega, htfp, hbelow, hcov, hat, hperm⟩
+    exact ⟨by omega, htfp, hbelow, hcov, hszq, hat, hperm⟩
 
 /-! ## +0x14c .. +0x19c: THE HEADER TESTS, uvmalloc, AND THE LOAD -/
 
@@ -640,6 +651,8 @@ def kxcAt14c (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
   ⌜kf < NINODE ∧ inumf.toNat < 16 * icfgNib ∧ iputUnits ≤ n2 ∧
     (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0 ∧ ef.length = 64 ∧ w67 = 4095#64⌝ ∗
   ⌜i < ehPhnum ef ∧ P.tfp = A.V.upt.tfp ∧ umBelow szv P ∧ lazyFree P.um szv ∧
+    -- THE QUOTA (NI M3 quotas Q-1)
+    szv.toNat ≤ uQuota - 2 * 4096 ∧
     (kxbWalkOk (kxcFb data dnf) ef → kxbAt (kxcFb data dnf) ef i szv.toNat (umemGet P Mi)) ∧
     (kxbWalkOk (kxcFb data dnf) ef → kxbPermLeaves (kxcFb data dnf) ef i P.um) ∧
     (∀ j, j < 56 → g[j]! = (kxcFb data dnf)[kxbPhoff ef i + j]!) ∧ phType g = 1⌝ ∗
@@ -648,7 +661,7 @@ def kxcAt14c (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
   kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
   logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗
   procPtAt P Mi ∗
-  procPrivFd A.γ k.proc A.pidv A.V A.M ∗
+  procPrivFdRes 0 A.γ k.proc A.pidv A.V A.M ∗
   kxcBufs k A ∗
   byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
   kxcFramePh (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 10#5)
@@ -682,7 +695,7 @@ theorem kxcB3_stub (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
     kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
     logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗ procPtAt P Mi ∗
-    procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗
+    procPrivFdRes 0 A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗
     byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
     kxcFramePh (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 10#5)
       (k.regs 11#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5)
@@ -739,7 +752,7 @@ theorem kxcB3_load (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) 
     (hs : kf < NINODE ∧ inumf.toNat < 16 * icfgNib ∧ iputUnits ≤ n2 ∧
       (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0 ∧ ef.length = 64)
     (hi : i < ehPhnum ef) (htfp : P'.tfp = A.V.upt.tfp) (hbelow : umBelow sz1 P')
-    (hcov : lazyFree P'.um sz1) (hmem : leAt g 32 8 ≤ leAt g 40 8)
+    (hcov : lazyFree P'.um sz1) (hszq : sz1.toNat ≤ uQuota - 2 * 4096) (hmem : leAt g 32 8 ≤ leAt g 40 8)
     (hnew : leAt g 16 8 + leAt g 40 8 ≤ sz1.toNat) (hva : leAt g 16 8 % 4096 = 0)
     (hrows : ∀ Mo : Nat → List (BitVec 8),
       KexecBuilt.loadWin (kxcFb data dnf) (leAt g 8 4) (leAt g 16 8) (leAt g 32 4) (umemGet P' Mo) →
@@ -751,7 +764,7 @@ theorem kxcB3_load (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) 
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
     kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
     logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗ procPtAt P' M' ∗
-    procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗
+    procPrivFdRes 0 A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗
     byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
     kxcFramePh (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 10#5)
       (k.regs 11#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5)
@@ -818,7 +831,7 @@ theorem kxcB3_load (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) 
       isplitr
       · ipureintro; exact ⟨hkf, hnib, hn2, hal, hlen, rfl⟩
       ipureintro
-      exact ⟨hi, htfp, hbelow, hcov, hr.1, hr.2⟩
+      exact ⟨hi, htfp, hbelow, hcov, hszq, hr.1, hr.2⟩
     iframe
   have hbr : bcond bop.BEQ (BitVec.signExtend 64 (BitVec.ofNat 32 (leAt g 32 4))) 0#64 = false := by
     rw [kxcB2_beq]
@@ -913,7 +926,7 @@ theorem kxcB3_load (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) 
     isplitr
     · ipureintro; exact ⟨hkf, hnib, hn2, hal, hlen, rfl⟩
     ipureintro
-    exact ⟨hi, htfp, hbelow, hcov, hr.1, hr.2⟩
+    exact ⟨hi, htfp, hbelow, hcov, hszq, hr.1, hr.2⟩
   iframe
 
 set_option maxHeartbeats 32000000 in
@@ -945,7 +958,7 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
     Hcl, H1a4, HB⟩
   obtain ⟨h2, h8, h18, h20, h21, h22, h25, h26, h27⟩ := hr
   obtain ⟨hkf, hnib, hn2, hal, hlen, h67⟩ := hs
-  obtain ⟨hi, htfp, hbelow, hcov, hat, hperm, hag, hty⟩ := hl
+  obtain ⟨hi, htfp, hbelow, hcov, hszq, hat, hperm, hag, hty⟩ := hl
   subst h67
   icases kxcB2_open_size A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf $$ Hop
     with ⟨%hsz, Hop⟩
@@ -1158,12 +1171,14 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   iintro Hk Hpc
   -- +0x17c  jal uvmalloc, the block's event counter lent to it (permit
   -- sweep L1a, Rocq `proc_priv_ev_lend`)
-  icases procPrivFd_evLend A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
+  icases procPrivFdRes_evLend 0 A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
   iapply (kxcB2_call_uvmalloc UV Γ cpu k A spie spp _ (KA.«kexec» + 0x184#64) 2082760#21 kxcB3_br_uvma
       kxcB3_ret_17c P Mi A.V.ev hK hnoff (by simp [RegMap.set_apply, a22])
       (by simpa [RegMap.set_apply, a18] using hbelow) (by simpa [RegMap.set_apply, a18] using hcov)
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hf2p];
-          exact flags2permRet_permOk _))
+          exact flags2permRet_permOk _)
+      (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, a9]
+          exact kxcB3_quota_le _ _ (hb8 _) (hb8 _) hwr hq))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
@@ -1262,7 +1277,11 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
       gyf loyf tlyf inumf dnf bmf
       data gilf gislf n2 ef P' M' i (R2 10#5) g hqfm hK hnoff htier hj hproc
       ⟨b2, b8, b20, b21, by rw [b22, hroot'], b25, b26, b27⟩
-      ⟨hkf, hnib, hn2, hal, hlen⟩ hi htfp' hbelow' hcov' (by omega) hnew1 hva
+      ⟨hkf, hnib, hn2, hal, hlen⟩ hi htfp' hbelow' hcov'
+      (by by_cases hlt : newsz.toNat < szv.toNat
+          · rw [hret, if_pos hlt]; exact hszq
+          · rw [hret, if_neg hlt]; omega)
+      (by omega) hnew1 hva
       (fun Mo hwin hout => kxcB3_rows_load (f := kxcFb data dnf) (Mo := Mo) hi hag hty hflen hat hperm
         hbelow hcov hplen hok rfl hnw hret hva hwin hout))
     $$ [$Hk $Hpc $Hte $Hce $Hfab $Hop $Hlog $Hirs $Hbs $Hpt $Hpriv $Hbufs $He $Hfr $Hcl $H1a4 $HB]
@@ -1319,10 +1338,10 @@ theorem kxc_ph_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT)
     Hcl, H1a4, HB⟩
   obtain ⟨h2, h8, h18, h20, h21, h22, h25, h26, h27, h13⟩ := hr
   obtain ⟨hkf, hnib, hn2, hal, hlen, h67⟩ := hs
-  obtain ⟨hi, htfp, hbelow, hcov, hat, hperm⟩ := hl
+  obtain ⟨hi, htfp, hbelow, hcov, hszq, hat, hperm⟩ := hl
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
-  icases kxc_priv_pid (hct.symm.trans (by k_norm_g; exact htier)) A.γ k.proc A.pidv A.V A.M $$ Hpriv
+  icases kxc_priv_pidR (hct.symm.trans (by k_norm_g; exact htier)) A.γ k.proc A.pidv A.V A.M $$ Hpriv
     with ⟨Hpid, Hpriv⟩
   icases kxcB2_open_size A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf $$ Hop
     with ⟨%hsz, Hop⟩
@@ -1463,7 +1482,7 @@ theorem kxc_ph_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT)
       isplitr
       · ipureintro; exact ⟨hkf, hnib, hn2, hal, hlen, h67⟩
       ipureintro
-      exact ⟨hi, htfp, hbelow, hcov, hat, hperm, hag, hty⟩
+      exact ⟨hi, htfp, hbelow, hcov, hszq, hat, hperm, hag, hty⟩
     iframe
     iframe #
   · have hbr : bcond bop.BNE (BitVec.signExtend 64 (BitVec.ofNat 32 (leAt (rdBytes data (kxbPhoff ef i) 56) 0 4)))
@@ -1491,7 +1510,7 @@ theorem kxc_ph_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT)
       isplitr
       · ipureintro; exact ⟨hkf, hnib, hn2, hal, hlen, h67⟩
       ipureintro
-      exact ⟨hi, htfp, hbelow, hcov, hrows.1, hrows.2⟩
+      exact ⟨hi, htfp, hbelow, hcov, hszq, hrows.1, hrows.2⟩
     iframe
 
 set_option maxHeartbeats 4000000 in
@@ -1599,7 +1618,7 @@ theorem kxc_seam1a2 (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) �
   · ipureintro; exact hs
   ipureintro
   obtain ⟨htfp, hb, hc, r1, r2, r3⟩ := hl
-  exact ⟨htfp, hb, hc, r1, r2, r3⟩
+  exact ⟨htfp, hb, hc, Nat.zero_le _, r1, r2, r3⟩
 
 set_option maxHeartbeats 16000000 in
 /-- **Rocq `kxc_close`: +0x1a4 .. +0x1ad, the inode closed** (`c.mv a0,s4 ;
@@ -1630,7 +1649,7 @@ theorem kxc_close (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
   obtain ⟨hkf, hnib, hn2, hal, hlen⟩ := hs
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
-  icases kxc_priv_pid (hct.symm.trans (by k_norm_g; exact htier)) A.γ k.proc A.pidv A.V A.M $$ Hpriv
+  icases kxc_priv_pidR (hct.symm.trans (by k_norm_g; exact htier)) A.γ k.proc A.pidv A.V A.M $$ Hpriv
     with ⟨Hpid, Hpriv⟩
   -- +0x1a4  c.mv a0,s4
   k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1ac#64) true 10#5 0#5 20#5 (by decide))

@@ -59,7 +59,7 @@ a STAGE file (no `Proof` prefix).
 3. **The failure plug.**  Rocq takes `QF KfNoMem`; so does this lemma.
    The frozen `kxc_bad_1d6` relays `∃ c, QF c`.
    **Permit sweep L1a (Rocq f344a089a, `ProofKexecC.v`)**: uvmalloc takes
-   the block's event counter (`ProcPrivAcc.procPrivFd_evLend`); the rest of
+   the block's event counter (`ProcPrivAcc.procPrivFdRes_evLend`); the rest of
    phase C runs at the moved record `{ A with V := V1 }`, so `kxc_c_setup`'s
    continuation quantifies it (`∀ V1, ⌜evAfter A.V V1⌝ -∗ …`, Rocq's `∀ U',
    ⌜ev_after U U'⌝`), the closer converted (`kexecCloser_after`).
@@ -132,10 +132,11 @@ theorem kxcC_base2 (n : Nat) (h : n ≤ uvmMaxsz) :
   rw [← BitVec.ofNat_add]
 
 /-- What the setup publishes about the stack top. -/
-theorem kxcC_facts (szv : BitVec 64) (hpg : pgRoundUpN szv.toNat ≤ uvmMaxsz) {e : BitVec 64}
+theorem kxcC_facts (szv : BitVec 64) (hpg : pgRoundUpN szv.toNat ≤ uvmMaxsz)
+    (hpq : pgRoundUpN szv.toNat + 8192 ≤ uQuota) {e : BitVec 64}
     {ef : List (BitVec 8)} (hal : e.toNat % 8 = 0) (hl : ef.length = 64) :
     8192 ≤ (8192#64 + BitVec.ofNat 64 (pgRoundUpN szv.toNat)).toNat ∧
-      (8192#64 + BitVec.ofNat 64 (pgRoundUpN szv.toNat)).toNat ≤ 2 ^ 38 ∧
+      (8192#64 + BitVec.ofNat 64 (pgRoundUpN szv.toNat)).toNat ≤ uQuota ∧
       (8192#64 + BitVec.ofNat 64 (pgRoundUpN szv.toNat)).toNat % 4096 = 0 ∧
       e.toNat % 8 = 0 ∧ ef.length = 64 := by
   obtain ⟨q, hq⟩ := UPtAlloc.pgRoundUpN_dvd szv.toNat
@@ -231,7 +232,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
     (h18 : R 18#5 = 8192#64 + BitVec.ofNat 64 (pgRoundUpN szv.toNat))
     (h19 : R 19#5 = k.proc) (h21 : R 21#5 = A.V.sz) (h22 : R 22#5 = pageAddr P.root)
     (h27 : R 27#5 = k.regs 27#5)
-    (hpg : pgRoundUpN szv.toNat ≤ uvmMaxsz)
+    (hpg : pgRoundUpN szv.toNat ≤ uvmMaxsz) (hpq : pgRoundUpN szv.toNat + 8192 ≤ uQuota)
     (hok : uvmallocOk P P' Mi M' (BitVec.ofNat 64 (pgRoundUpN szv.toNat))
       (8192#64 + BitVec.ofNat 64 (pgRoundUpN szv.toNat)) 4#64)
     (hal : (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0) (hl : ef.length = 64)
@@ -241,14 +242,14 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
     (hperm : kxbWalkOk fb ef → kxbPermSegs fb P.um) :
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x1fe#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    irefSlots 2 ∗ bslots 3 ∗ procPtAt P' M' ∗ procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗
+    irefSlots 2 ∗ bslots 3 ∗ procPtAt P' M' ∗ procPrivFdRes 0 A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗
     byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
     kxcFrameBk k (k.regs 11#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
         (sz1 : BitVec 64),
-      ⌜8192 ≤ sz1.toNat ∧ sz1.toNat ≤ 2 ^ 38 ∧ sz1.toNat % 4096 = 0 ∧
+      ⌜8192 ≤ sz1.toNat ∧ sz1.toNat ≤ uQuota ∧ sz1.toNat % 4096 = 0 ∧
         (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0 ∧ ef.length = 64⌝ -∗
       (kxcAt21a k A c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
           (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo A.V.sz sz1
@@ -338,7 +339,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
   obtain ⟨r1, r2, r3, r4, r5⟩ := kxcC_setup_rows A.alen A.V.upt.tfp _ ev hpg hok hv htfp hbelow hcov
     himg hszr hperm
   have hbase := kxcC_base2 _ hpg
-  have hfacts := kxcC_facts szv hpg hal hl
+  have hfacts := kxcC_facts szv hpg hpq hal hl
   ihave Hfr := kxcC_frameB_C0 (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
       (k.regs 18#5) (k.regs 10#5) (k.regs 11#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67
@@ -365,7 +366,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
       [] [-Hcl] Hcl
     · ipureintro; exact hfacts
     iright
-    ihave Hpriv := procPrivFd_evAfter_of _ _ _ _ _ $$ Hpriv
+    ihave Hpriv := procPrivFdRes_evAfter_of 0 _ _ _ _ _ $$ Hpriv
     unfold kxcAt272 kxcCRes kxcBufs
     iframe Hk Hte Hce Hirs Hbs Hpt Hpriv Hpath Hargv Hstrs Helf Hfr
     isplitr
@@ -399,7 +400,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
       [] [-Hcl] Hcl
     · ipureintro; exact hfacts
     ileft
-    ihave Hpriv := procPrivFd_evAfter_of _ _ _ _ _ $$ Hpriv
+    ihave Hpriv := procPrivFdRes_evAfter_of 0 _ _ _ _ _ $$ Hpriv
     unfold kxcAt21a kxcCRes kxcBufs
     iframe Hk Hte Hce Hirs Hbs Hpt Hpriv Hpath Hargv Hstrs Helf Hfr
     isplitr
@@ -432,7 +433,7 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
     (∀ V1 : ProcPriv, ⌜evAfter A.V V1⌝ -∗
       ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
         (sz1 : BitVec 64),
-      ⌜8192 ≤ sz1.toNat ∧ sz1.toNat ≤ 2 ^ 38 ∧ sz1.toNat % 4096 = 0 ∧
+      ⌜8192 ≤ sz1.toNat ∧ sz1.toNat ≤ uQuota ∧ sz1.toNat % 4096 = 0 ∧
         (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0 ∧ ef.length = 64⌝ -∗
       (kxcAt21a k { A with V := V1 } c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5)
           (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo
@@ -446,7 +447,10 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
   iintro ⟨⟨%hR, %hA, %hI, Hk, Hpc, Hte, Hce, Hirs, Hbs, Hpt, Hpriv, Hbufs, Helf, Hfr⟩, #Hfab, Hcl, HK⟩
   obtain ⟨h2, h8, h18, h22, h27⟩ := hR
   obtain ⟨hal, hl⟩ := hA
-  obtain ⟨htfp, hbelow, hcov, himg, hszr, hperm⟩ := hI
+  obtain ⟨htfp, hbelow, hcov, hszq, himg, hszr, hperm⟩ := hI
+  -- the stack's two pages fit under the quota (NI M3 quotas Q-1)
+  have hpq : pgRoundUpN szv.toNat + 8192 ≤ uQuota := by
+    unfold pgRoundUpN; unfold uQuota at hszq ⊢; omega
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
   have hct' : curTier = KTier.kpt := hct.symm.trans (by k_norm_g; exact htier)
@@ -524,9 +528,9 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
     intro j hj; rw [hs8n, hpgi] at hj; exact hcov j hj
   -- +0x1ce  jal uvmalloc, the block's event counter lent to it (permit
   -- sweep L1a, Rocq `proc_priv_ev_lend`)
-  icases procPrivFd_evLend A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
+  icases procPrivFdRes_evLend 0 A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
   iapply (kxc_call_uvmalloc UA Γ cpu k A spie1 spp1 _ (KA.«kexec» + 0x1d6#64) 2082678#21
-      kxcC_br_uvmalloc kxcC_ret_1ce P Mi A.V.ev hK hnoff ?ur ?uo ?un ?up ?uf)
+      kxcC_br_uvmalloc kxcC_ret_1ce P Mi A.V.ev hK hnoff ?ur ?uo ?un ?up ?uf ?uq)
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend]
   case ur => simp [RegMap.set_apply]
   case uo => simp only [RegMap.set_apply]; simp [hs8n, hpg]
@@ -537,6 +541,9 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
     simp only [RegMap.set_apply] at hi ⊢
     simp at hi ⊢
     exact kxc_um_free_above _ _ P hb8 i hi
+  case uq =>
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    rw [kxcC_sz1 _ hpg]; exact hpq
 
   · isplitr
     · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
@@ -591,7 +598,7 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
       iintro Hk Hpc
       iapply (kxcC_setup_ok UC Q QF cpu k { A with V := A.V.updEv kv } spie2 spp2 _ w13 w67 fb ef P P' Mi
           M' szv hK ?g2 ?g8 ?g10
-          ?g18 ?g19 ?g21 ?g22 ?g27 hpg hok hal hl htfp hbelow hcov himg hszr hperm)
+          ?g18 ?g19 ?g21 ?g22 ?g27 hpg hpq hok hal hl htfp hbelow hcov himg hszr hperm)
         $$ [$Hk $Hpc $Hte $Hce $Hirs $Hbs $Hpt $Hpriv $Hbufs $Helf $Hfr $Hcl $HK]
       case g2 => simp [RegMap.set_apply, b2]
       case g8 => simp [RegMap.set_apply, b8]

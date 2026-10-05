@@ -67,7 +67,7 @@ theorem ub_userPtInv_open [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bit
         ubPtRegs cpu P tlb ∗ (ubFrame curCtx (ubUAddrs P t)).B mm := by
   iintro #HS H
   unfold userPtInv
-  icases H with ⟨Hs, Hp, %hwf, %t, %⟨hb, hrep⟩, Ho, ⟨%tlb, Htlb, %htlb⟩, Hum⟩
+  icases H with ⟨Hs, Hp, %hwf, %t, %⟨hb, hrep, hsq, hnp⟩, Ho, ⟨%tlb, Htlb, %htlb⟩, Hum⟩
   ihave HT := ubTree_own_fwd 2 t hrep.2.2.1 $$ HS Ho
   icases ubData_own_fwd P hwf M $$ HS Hum with ⟨%hl, HD⟩
   ihave HA := (ubOwnA_app curCtx (ubTreeBytes 2 t) (ubDataBytes P.um M)).2 $$ [HT HD]
@@ -79,7 +79,7 @@ theorem ub_userPtInv_open [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bit
     intro a; rw [ubLookup_isSome, hfst]
   have hwf' : UbMemWf P t (ubLookup (ubTreeBytes 2 t ++ ubDataBytes P.um M)) :=
     ⟨hb, hrep, hwf, hfst ▸ hnd, hdom,
-      fun p hp => ubLookup_mem _ hnd p (List.mem_append_left _ hp)⟩
+      fun p hp => ubLookup_mem _ hnd p (List.mem_append_left _ hp), hsq, hnp⟩
   ihave HO := ubOwn_eq curCtx _ _ _ hfst $$ HO
   ihave HB := ubFrame_intro curCtx (ubUAddrs P t) _ hdom $$ HO
   iexists t, tlb, ubLookup (ubTreeBytes 2 t ++ ubDataBytes P.um M)
@@ -117,7 +117,7 @@ theorem ub_userPtInv_close [CurCtx] (cpu : CPU) (P : UPtd) (t t' : PTree) (mm mm
   iexists t'
   iframe HT
   isplitr
-  · ipureintro; exact ⟨hwf'.root, hs.rep⟩
+  · ipureintro; exact ⟨hwf'.root, hs.rep, hwf'.sq, hwf'.np⟩
   iexists tlb'
   iframe Htlb
   ipureintro; exact htlb

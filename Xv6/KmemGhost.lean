@@ -21,17 +21,18 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-- Fresh allocator ghosts: the client tracks a count of `0`, the allocator
-holds its half and the empty ledger. -/
-theorem kmemGhost_alloc : ⊢@{IProp GF} |==> ∃ γk : KmemNames, kallocAvail γk (some 0) ∗ kmemAuth γk 0 := by
+holds its half, the credit authority and the empty ledger. -/
+theorem kmemGhost_alloc :
+    credAuth (GF := GF) credTotal ⊢ |==> ∃ γk : KmemNames, kallocAvail γk (some 0) ∗ kmemAuth γk 0 := by
   have halloc : ⊢@{IProp GF} |==> ∃ γ : GName, (γ ↪VAR ()) ∗ (γ ↪●ML ([] : List Kev)) :=
     MachCSL.iOwn_alloc_same_name (GF := GF) (F1 := GhostVarF Unit)
       (F2 := constOF (MonoList (DiscreteO Kev))) Xv6G.kallocLedSlot
       (DFracAgree.mk (.own 1) ⟨()⟩) (MonoList.auth (.own 1) (([] : List Kev).map DiscreteO.mk))
       (DFracAgree.mk_valid.mpr DFrac.valid_own_one) (MonoList.auth_valid _)
-  iintro
+  iintro Hca
   imod halloc with ⟨%γp, Hp, Hl⟩
   imod ghost_var_alloc (0 : Nat) with ⟨%γc, Hc⟩
   imodintro
@@ -43,8 +44,8 @@ theorem kmemGhost_alloc : ⊢@{IProp GF} |==> ∃ γk : KmemNames, kallocAvail �
   icases hs $$ Hc with ⟨Hc1, Hc2⟩
   isplitl [Hp Hc1]
   · iframe
-  isplitl [Hc2]
-  · ileft; iexact Hc2
+  isplitl [Hc2 Hca]
+  · ileft; iframe Hc2 Hca
   iexists ([] : List Kev)
   isplitl [Hl]
   · iexact Hl

@@ -49,7 +49,7 @@ def wp_copyin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (old : List (BitVec 8)) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 50 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
-    (hroot : k.regs 10#5 = pageAddr P.root) (hsz : (k.regs 11#5).toNat ≤ 2 ^ 38)
+    (hroot : k.regs 10#5 = pageAddr P.root) (hsz : (k.regs 11#5).toNat ≤ uQuota)
     (hlen : k.regs 14#5 = BitVec.ofNat 64 old.length) (hlen' : old.length < 2 ^ 63) : Prop :=
   kctx cpu k ∗ pcIs cpu copyinAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPtAt P M ∗ byteBuf (k.regs 12#5) (DFrac.own 1) old ∗ actLend k.proc ke ∗

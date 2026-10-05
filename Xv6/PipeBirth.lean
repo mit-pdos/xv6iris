@@ -27,7 +27,7 @@ set_option linter.unusedSimpArgs false
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [KernelGeom] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [KernelGeom] [CurCtx]
 
 /-! ## Four bytes as a word (the inverse of `MachCSL.wordPointsTo_to_bytes4`) -/
 
@@ -173,10 +173,11 @@ private theorem data_intro (pi : BitVec 64) :
 
 private theorem slack_intro (pi : BitVec 64) :
     byteBuf (GF := GF) (pi + BitVec.ofNat 64 4) (DFrac.own 1) (List.replicate 4 5#8) ∗
-      byteBuf (pi + BitVec.ofNat 64 552) (DFrac.own 1) (List.replicate 3544 5#8) ⊢
+      byteBuf (pi + BitVec.ofNat 64 552) (DFrac.own 1) (List.replicate 3544 5#8) ∗ npTicket 1 ⊢
     pipeSlack pi := by
   unfold pipeSlack pipeSizeof pipePgbytes
-  iintro ⟨H1, H2⟩
+  iintro ⟨H1, H2, Htk⟩
+  iframe Htk
   isplitl [H1]
   · iexists (List.replicate 4 5#8)
     isplitr [H1]
@@ -187,9 +188,10 @@ private theorem slack_intro (pi : BitVec 64) :
     · ipureintro; simp only [List.length_replicate]
     · iexact H2
 
-/-- **The carve**: the page `kalloc` returns becomes `struct pipe`'s cells. -/
+/-- **The carve**: the page `kalloc` returns becomes `struct pipe`'s cells
+(and, NI M3 quotas Q-1, the pipe's ticket goes into its slack). -/
 theorem pageOwn_pipeRaw (pi : BitVec 64) (hpv : pageValid pi) :
-    byteBuf (GF := GF) pi (DFrac.own 1) (List.replicate 4096 5#8) ⊢
+    byteBuf (GF := GF) pi (DFrac.own 1) (List.replicate 4096 5#8) ∗ npTicket 1 ⊢
       (∃ v : BitVec 32, wordPointsTo pi 4 (DFrac.own 1) v) ∗
       (∃ v : BitVec 64, wordPointsTo (pi + 8#64) 8 (DFrac.own 1) v) ∗
       (∃ v : BitVec 64, wordPointsTo (pi + 16#64) 8 (DFrac.own 1) v) ∗
@@ -214,7 +216,7 @@ theorem pageOwn_pipeRaw (pi : BitVec 64) (hpv : pageValid pi) :
   have e_wo : aPopen pi true = pi + 548#64 := by
     unfold aPopen poffOf; simp only [if_true]; congr 1
   rw [e_nr, e_nw, e_ro, e_wo]
-  iintro H
+  iintro ⟨H, Htk⟩
   icases bb_cut0 pi 5#8 4 4092 4096 rfl $$ H with ⟨Hlk, H⟩
   icases bb_cut pi 5#8 4 4 4088 4092 8 rfl rfl $$ H with ⟨Hs1, H⟩
   icases bb_cut pi 5#8 8 8 4080 4088 16 rfl rfl $$ H with ⟨Hnm, H⟩
@@ -238,8 +240,8 @@ theorem pageOwn_pipeRaw (pi : BitVec 64) (hpv : pageValid pi) :
   ihave Hwo := word4_of_bytes (pi + BitVec.ofNat 64 548) (DFrac.own 1) (List.replicate 4 5#8)
     (by simp) (hal4 548 (by decide)) $$ Hwo
   ihave Hdat := data_intro pi $$ Hdat
-  ihave Hslack := slack_intro pi $$ [Hs1 Hs2]
-  · iframe Hs1 Hs2
+  ihave Hslack := slack_intro pi $$ [Hs1 Hs2 Htk]
+  · iframe Hs1 Hs2 Htk
   iframe Hlk Hnm Hcpu Hnr Hnw Hro Hwo Hdat Hslack
 
 /-! ## The pipe's ghost names -/

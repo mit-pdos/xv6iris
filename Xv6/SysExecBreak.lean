@@ -60,7 +60,7 @@ builds its congruence proof over the whole context).
    deviation 9).
 7. Permit sweep L3b (no Rocq counterpart): the success tail's free loop
    steps the counter, so the break lends it out of the block kexec
-   returned (`ProcPrivAcc.procPrivFd_evLend`) and hands the continuation the
+   returned (`ProcPrivAcc.procPrivFdRes_evLend`) and hands the continuation the
    block at the raised record `V''` (`evAfter V' V''`), kexec's arms moved
    there by `execArms_evAfter` (the success arm does not read the count).
 
@@ -234,7 +234,7 @@ theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     (h10 : k'.regs 10#5 = sysExecPath sp0) (h11 : k'.regs 11#5 = sysExecArgv sp0) :
     kctx cpu k' ∗ pcIs cpu KA.«kexec» ∗ trapCsrsExt cpu se ∗ cpuClaimExt cpu se (procAddr A.j) ∗
     sysExecEnv (hlc := hlc) Γ A ∗
-    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
+    procPrivFdRes ptW A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
     byteBuf (sysExecPath sp0) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) ∗
     kxcArgv (sysExecArgv sp0) (sysExecKA A P kv pl i pg alen afun) ∗
     sysExecPages pg afun 0 i ∗ bslots 3 ∗ irefSlots 2 ∗ myPay U.gn U.Q ∗
@@ -246,7 +246,7 @@ theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
         U.sts U.gn U.cs A.pid (sysExecV2 A P kv) (sysExecM2 A P) V' M' (R' 10#5) -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se (procAddr A.j) -∗
-      procPrivFd A.γ (procAddr A.j) A.pid V' M' -∗
+      procPrivFdRes ptW A.γ (procAddr A.j) A.pid V' M' -∗
       byteBuf (sysExecPath sp0) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) -∗
       kxcArgv (sysExecArgv sp0) (sysExecKA A P kv pl i pg alen afun) -∗
       sysExecPages pg afun 0 i -∗ bslots 3 -∗ irefSlots 2 -∗ wpLoop c)
@@ -395,6 +395,10 @@ theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     ⟨Hargv, Hhi⟩
   ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie k.proc ⊢ cpuClaimExt cpu k.sie (procAddr A.j) by
     rw [hS.hproc]) $$ Hce
+  -- kexec is handed the block at the table's share; the argument pages'
+  -- credits not spent ride beside (NI M3 quotas Q-1)
+  icases (procPrivFdRes_split ptW (execArgPages - i) A.γ (procAddr A.j) A.pid (sysExecV2 A P kv)
+    (sysExecM2 A P)).1 $$ Hblk with ⟨Hblk, Hcrs⟩
   iapply (sys_exec_kexec KX Γ cpu _ k.sie ?hs A U ?hpj P kv pl i pg alen afun (k.regs 2#5) ?hKx ?hno ?hti
       hS.hj hpath.1 hi hok ?h10 ?h11) $$ [- $Hk $Hpc $Hte $Hce $Hblk $Hpath $Hargv $Hpgs $Hbs $Hir $Hpay $Hau]
   rotate_right 1
@@ -419,15 +423,22 @@ theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   · iframe
   -- the counter of the block kexec returned, lent to the success tail's free
   -- loop (permit sweep L3b): each kfree steps it
-  icases procPrivFd_evLend A.γ (procAddr A.j) A.pid V' M' $$ Hblk with ⟨Hl, Hblk⟩
+  icases procPrivFdRes_evLend ptW A.γ (procAddr A.j) A.pid V' M' $$ Hblk with ⟨Hl, Hblk⟩
   ihave Hl := actLend_congr hS.hproc.symm V'.ev $$ Hl
   -- +0xce THE SUCCESS TAIL
   iapply hsucc $$ %c2 %spie2 %spp2 %R2 %i %pg %afun %pl %rest %(R2 10#5) %V'.ev
     %⟨Nat.le_of_lt hi, sysExecOk_pgOk pg alen afun i hok, sysExecLoopPins_bad k R2 i hpins2, rfl, hal⟩
     Hk Hpc Hte Hce Henv Hcarry H59 H60 Harr Hpgs Hl
-  iintro %c3 %spie3 %spp3 %R3 %⟨hcs3, h10⟩ Hk Hpc Hte Hce ⟨%k1, %hk1, Hl⟩
+  iintro %c3 %spie3 %spp3 %R3 %⟨hcs3, h10⟩ Hk Hpc Hte Hce ⟨%k1, %hk1, Hl⟩ Hci
   ihave Hl := actLend_congr hS.hproc k1 $$ Hl
   icases Hblk $$ %k1 %hk1 Hl with ⟨%V'', %hV'', Hblk⟩
+  -- the whole block again: the spare kexec kept, the pages' credits back
+  ihave Hblk := (procPrivFdRes_split ptW (execArgPages - i) A.γ (procAddr A.j) A.pid V'' M').2
+    $$ [Hblk Hcrs]
+  · iframe
+  ihave Hblk := sysExec_blk_whole A.γ (procAddr A.j) A.pid V'' M' i (by unfold execArgPages; omega)
+    $$ [Hblk Hci]
+  · iframe
   ihave Harms := execArms_evAfter hV'' $$ Harms
   iapply HΦ $$ %c3 %spie3 %spp3 %R3 %V'' %M' %hcs3 %hargs %hext %hkv [Harms] Hk Hpc Hte Hce Hbs Hir Hblk
   rw [h10]

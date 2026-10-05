@@ -911,6 +911,46 @@ theorem sysExecCarry_rest (k : KCtx) (pl rest : List (BitVec 8)) (w59 : BitVec 6
   iexists w59
   iexact H59
 
+/-- **The block's spare at the fill loop** (NI M3 quotas Q-1): the loop holds
+the block at `ptW + (execArgPages - i)`, the argument pages' credits not yet
+spent; at the head of the loop it is the whole block. -/
+theorem sysExec_blk_loop0 (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢ procPrivFdRes (ptW + (execArgPages - 0)) γ pa pid V M := by
+  rw [procPrivFd_res]
+  exact .rfl
+
+/-- ...and back, at the whole spare. -/
+theorem sysExec_blk_whole (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (t : Nat) (ht : t ≤ execArgPages) :
+    procPrivFdRes (GF := GF) (ptW + (execArgPages - t)) γ pa pid V M ∗ pageCredit t ⊢
+      procPrivFd γ pa pid V M := by
+  rw [procPrivFd_res]
+  refine .trans (procPrivFdRes_split (GF := GF) (ptW + (execArgPages - t)) t γ pa pid V M).2 ?_
+  rw [show ptW + (execArgPages - t) + t = procSpare by unfold procSpare; omega]
+
+/-- One argument page's credit, out of the loop's block (`i < execArgPages`). -/
+theorem sysExec_blk_take1 (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (i : Nat) (hi : i < execArgPages) :
+    procPrivFdRes (GF := GF) (ptW + (execArgPages - i)) γ pa pid V M ⊢
+      procPrivFdRes (ptW + (execArgPages - (i + 1))) γ pa pid V M ∗ pageCredit 1 := by
+  rw [show ptW + (execArgPages - i) = ptW + (execArgPages - (i + 1)) + 1 by omega]
+  exact (procPrivFdRes_split _ 1 γ pa pid V M).1
+
+/-- The bare block out of the block at any spare (`SysfileCalls.sysfile_blk_bare_ev`). -/
+theorem sysExec_blk_bare_ev (r : Nat) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFdRes (GF := GF) r γ pa pid V M ⊢
+      procPrivBareAt curCtx pa pid V M ∗
+      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)) (kv : Nat),
+        procPrivBareAt curCtx pa pid { V.updEv kv with upt := P' } M' -∗
+        procPrivFdRes r γ pa pid { V.updEv kv with upt := P' } M') := by
+  unfold procPrivFdRes procPrivCoreResAt
+  iintro ⟨⟨Hb, Hc⟩, Ho⟩
+  iframe Hb
+  iintro %P' %M' %kv Hb
+  iframe
+
 /-- **THE LOOP HEAD'S STATE** (Rocq `sx_body`), at `pc`: the loop's pure
 bookkeeping, the machine at the frame, the complement, the block at the
 table the copy-ins grew, the carry, `uargv` (= `A.v1`, deviation 6) and the
@@ -924,7 +964,7 @@ def sysExecLoopSt (k : KCtx) (A : SysExecArgs) (spie spp : Bool) (R : RegMap) (P
       (k.regs 2#5).toNat % 8 = 0⌝ ∗
     kctx c (((k.withSpie spie spp).pushed 60).withRegs R) ∗ pcIs c pc ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
-    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
+    procPrivFdRes (ptW + (execArgPages - i)) A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
     sysExecCarry k pl rest ∗ wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) A.v1 ∗
     (∃ w : BitVec 64, wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) w) ∗
     sysExecArgvArr (k.regs 2#5) (sysExecArgvL pg i) ∗ sysExecPages pg afun 0 i)
@@ -939,7 +979,7 @@ def sysExecBadSt (k : KCtx) (A : SysExecArgs) (spie spp : Bool) (R : RegMap) (P 
       (k.regs 2#5).toNat % 8 = 0⌝ ∗
     kctx c (((k.withSpie spie spp).pushed 60).withRegs R) ∗ pcIs c (sysExecAddr + 0x92#64) ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
-    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
+    procPrivFdRes (ptW + (execArgPages - t)) A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
     sysExecCarry k pl rest ∗ wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) A.v1 ∗
     (∃ w : BitVec 64, wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) w) ∗
     sysExecArgvArr (k.regs 2#5) (sysExecArgvL pg t) ∗ sysExecPages pg afun 0 t)
@@ -1136,7 +1176,9 @@ def sysExecFreeBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (base ea : Bi
       ⌜pcx = sysExecAddr + ea ∨ pcx = sysExecAddr + base + 14#64⌝ -∗ ⌜sysExecKeepS1 R R'⌝ -∗
       kctx c' (((k.withSpie spie' spp').pushed 60).withRegs R') -∗ pcIs c' pcx -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
-      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗ sysExecArgvFree (k.regs 2#5) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
+      -- each kfree is credited (NI M3 quotas Q-1): the pages' credits back
+      pageCredit (t - m) -∗ sysExecArgvFree (k.regs 2#5) -∗
       wpLoop c') -∗
     wpLoop c)
 
@@ -1178,7 +1220,9 @@ def sysExecSuccTailBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp G
     (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = rv⌝ -∗
       kctx c' ((k.withSpie spie' spp').withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
-      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗ wpLoop c') -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
+      -- the argument pages' credits back (NI M3 quotas Q-1)
+      pageCredit t -∗ wpLoop c') -∗
     wpLoop c)
 
 /-- **THE BREAK, +0x0b6 .. +0x0cc, THE CALL TO kexec, AND THE SUCCESS TAIL**
@@ -1273,6 +1317,8 @@ theorem sys_exec_compose (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : C
       Hsp H10 Hpb Hargv H59 H60
     iapply hsetup $$ %c1 %spie %spp %R %⟨hpins, hal⟩ Hk Hpc Hte Hce Hsp Hargv
     iintro %c2 %R2 %hp2 Hk Hpc Hte Hce Hsp Harr
+    -- the argument pages' credits, the block's spare beyond `ptW` (NI M3 quotas Q-1)
+    ihave Hblk := sysExec_blk_loop0 A.γ (procAddr A.j) A.pid (sysExecV2 A P' kv) (sysExecM2 A P') $$ Hblk
     iapply hloop $$ %c2 %spie %spp %R2 %P' %kv %0 %(fun _ => 0#64) %(fun _ => 0) %(fun _ _ => 0#8)
       %(fun _ => 0#64) %pl %rest [Hk Hpc Hte Hce Hblk Hrs Hsp H10 Hpb H59 H60 Harr] Henv
     · unfold sysExecLoopSt sysExecCarry sysExecPages

@@ -27,7 +27,7 @@ REFUTING `allocproc`'s failure arm.  The `r = 0` arm reports both reasons
 it can fire: no free slot (`pav = none ∨ pav = some 0`, refuted by the
 counted regime `procsAvail Γ (some (np + 1))`) and an empty page allocator
 (`availZero (availSub (some nb) g)` for some `g ≤ procPagetableNodes + 1`,
-refuted by `hnb : procPagetableNodes + 1 < nb`).  Both are PURE, so the arm
+refuted by `hnb : credTotal + procPagetableNodes + 1 ≤ nb`).  Both are PURE, so the arm
 dies on its `⌜..⌝` alone.
 
 `igetroot()` and `idup(p->root)` run while `p->lock` is HELD; both never
@@ -272,7 +272,8 @@ theorem ui_allocproc (AP : ALLOCPROC) (Γ : SchedNames) (γ : FileNames) (c : CP
     (γl γp : GName) (γk : KmemNames) (on pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
     (hnoff : k'.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k'.avail)
     (hlk : "kmem" ∉ k'.locks) (hlp : "nextpid" ∉ k'.locks) (hlq : "proc" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) (hp0 : k'.proc = 0#64) :
+    (htier : k'.tier = KTier.kpt) (hp0 : k'.proc = 0#64)
+    (hcnt : ∀ x, on = some x → procPagetableNodes + 2 ≤ x) :
     kctx c k' ∗ pcIs c KA.«allocproc» ∗ procsInv Γ ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗
     kallocAvail γk on ∗ procsAvailAt Γ pav tk ∗
@@ -286,7 +287,7 @@ theorem ui_allocproc (AP : ALLOCPROC) (Γ : SchedNames) (γ : FileNames) (c : CP
       allocprocPost Γ γ cpu' γk on pav tk Q (R' 10#5) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AP.wp_allocproc (hlc := hlc) (GF := GF) Γ γ c k' γl γp γk on pav tk Q 0 hnoff hK hlk hlp hlq htier
+  have h := AP.wp_allocproc (hlc := hlc) (GF := GF) Γ γ c k' γl γp γk on pav tk Q 0 hnoff hK hlk hlp hlq htier hcnt
   unfold wp_allocproc_body at h
   simp only [allocprocAddr] at h
   iintro ⟨Hk, Hpc, #Hpi, #Hkm, #Hpl, Hav, Hpav, #HKw, Hnext⟩
@@ -420,7 +421,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
     (hlocks : kf.locks = ["proc"]) (htier : kf.tier = KTier.kpt) (hK : 10 ≤ kf.avail) :
     kctx cpu kf ∗ pcIs cpu (KA.«userinit» + 0x24#64) ∗ procsInv Γ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ zsElem (procAddr j) none ∗ slotUsed Γ (procAddr j) ∗
-    procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗ liveAllow ∗
+    procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗ pageCredit procSpare ∗ liveAllow ∗
     chFrag V.chg (procAddr j) ∅ ∗
     inodeHeldAt (kf.regs 10#5) ROOTINO ∗ inodeHeldAt V.root ROOTINO ∗ uiBootRows (procAddr j) pid V.gen ∗
     ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
@@ -433,7 +434,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
   obtain ⟨ξ0, t0⟩ := X
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
-  iintro ⟨Hk, Hpc, #Hpinv, Hheld, Hhart, Hzs, #Hused, Hpriv, Hstack, Hal, Hch, Hcref, Hrref, Hgen, Hfds, Hkeys, Hpk,
+  iintro ⟨Hk, Hpc, #Hpinv, Hheld, Hhart, Hzs, #Hused, Hpriv, Hstack, Hcr, Hal, Hch, Hcref, Hrref, Hgen, Hfds, Hkeys, Hpk,
     #Hpe, #Hinitp, Hcont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #HlkI := procsInv_lookup Γ j hj $$ Hpinv
@@ -517,12 +518,12 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
   icases Hgen with ⟨Hfb, Hkq, #Hmp, Hgh, Hxs⟩
   ihave Hchildr : parkChild (hlc := hlc) ξ0 ⟨γft, γ, γw, Γ, j, procAddr j, pid⟩ (List.replicate 12 0#64)
       { V with cwd := kf.regs 10#5, pvSecc := seccAll, cwi := ROOTINO, rti := ROOTINO, fdg := V.fdg } M false
-      $$ [Hctxc Hbare Hofs Hcwr Hrtr Hfb Hkq Hgh Hxs Hfsp Hirs]
+      $$ [Hctxc Hbare Hofs Hcwr Hrtr Hfb Hkq Hgh Hxs Hfsp Hirs Hcr]
   · unfold parkChild parkBlock parkBootBlock UtNames.pj
     simp only [Bool.false_eq_true, ↓reduceIte]
     rw [show (parkForkretPc :: (V.kstack + 4096#64) :: List.replicate 12 0#64) = V.context from by
       rw [hctx]; rfl]
-    iframe Hctxc Hbare Hofs Hcwr Hrtr Hfb Hkq Hgh Hxs Hfsp Hirs
+    iframe Hctxc Hbare Hofs Hcwr Hrtr Hfb Hkq Hgh Hxs Hfsp Hirs Hcr
     iexact Hmp
   ihave #Htok := FP.park_token_intro (hlc := hlc) (GF := GF) Γ
   icases kctx_token_acc cpu _ $$ Hk with ⟨Hown, Hback⟩
@@ -636,7 +637,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (IR : IGETROOT) (ID : IDUP) (FP :
     itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
     irefSlot ∗ irefSlot ∗ liveAllow ∗ chFrag V.chg (procAddr j) ∅ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ zsElem (procAddr j) none ∗ slotUsed Γ (procAddr j) ∗
-    procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗
+    procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗ pageCredit procSpare ∗
     uiBootRows (procAddr j) pid V.gen ∗
     ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
     ([∗list] i ∈ List.range NOFILE, fdStAt V.fdg i (.own 1) .closed) ∗
@@ -650,7 +651,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (IR : IGETROOT) (ID : IDUP) (FP :
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
   iintro ⟨Hk, Hpc, #Hpinv, ⟨%w0, Hinit⟩, #Hit, #Hiti, #Hireg, #Hpe, Hir1, Hir2, Hal, Hch, Hheld, Hhart,
-    Hzs, #Hused, Hpriv, Hstack, Hgen, Hfds, Hkeys, Hpk, Hcont⟩
+    Hzs, #Hused, Hpriv, Hstack, Hcr, Hgen, Hfds, Hkeys, Hpk, Hcont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv s1,a0 : s1 = p
   k_step (wp_s_add cpu _ (KA.«userinit» + 0xe#64) true 9#5 0#5 10#5 (by decide))
@@ -741,7 +742,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (IR : IGETROOT) (ID : IDUP) (FP :
       inodeHeldAt ({ V with root := ipv } : ProcPriv).root ROOTINO from by rw [hipv]) $$ HrP
   iapply (ui_finish RE FP Γ γw γtk γp γft cpu (kb.withRegs R4) j ch γ pid { V with root := ipv } M hj rfl
       hctx hof hs1 ?hsie2 ?hnoff2 ?hintena2 ?hlocks2 ?htier2 ?hK2)
-    $$ [- $Hk $Hpc $Hpinv $Hheld $Hhart $Hzs $Hused $Hpriv $Hstack $Hal $Hch $Hcref $Hrref $Hgen $Hfds $Hkeys $Hpk
+    $$ [- $Hk $Hpc $Hpinv $Hheld $Hhart $Hzs $Hused $Hpriv $Hstack $Hcr $Hal $Hch $Hcref $Hrref $Hgen $Hfds $Hkeys $Hpk
       $Hpe $Hinitp]
   rotate_right 1
   · iintro %R5 Hk Hpc %hcs5
@@ -842,7 +843,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (IR : IGETROOT) (ID : IDU
   -- killer pays for it (Rocq: `Q := fun _ => True`, the wand by `done`)
   ihave #HKw := ui_killw (hlc := hlc) (GF := GF)
   iapply (ui_allocproc AP Γ γ cpu _ fscKalloc γp fsReadyKmem (some nb) (some (np + 1)) true (fun _ => iprop(True))
-      ?hna ?hKa ?hlka ?hlpa ?hlqa ?hta ?hp0a) $$ [- $Hk $Hpc]
+      ?hna ?hKa ?hlka ?hlpa ?hlqa ?hta ?hp0a ?hca) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
   iframe Hkav Hpav HKw
@@ -854,6 +855,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (IR : IGETROOT) (ID : IDU
   case hlqa => k_norm_g; exact hlq
   case hta => k_norm_g; exact htier
   case hp0a => k_norm_g; exact hproc
+  case hca => intro x hx; cases hx; have hc0 : 0 < credTotal := (by decide); omega
   k_norm
   iapply wpNext_off_intro
   iintro %spie %spp %R2 %hsp Hkd Hpc Hpost %hcs2
@@ -866,10 +868,9 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (IR : IGETROOT) (ID : IDU
       · exact absurd h (by simp)
       · exact absurd h (by simp)
       · rw [show availSub (some nb) gg = some (nb - gg) from rfl] at hz
-        rcases hz with h | h
-        · exact absurd h (by simp)
-        · have hnz : nb - gg = 0 := Option.some.inj h
-          omega)
+        have hnz : nb - gg = 0 := Option.some.inj hz
+        have hc0 : 0 < credTotal := by decide
+        omega)
   icases Hsucc with
     ⟨%j, %ch, %pid, %V, %M, %g, %hfacts, Hheld, Hhart, #Hused, Hpav, Hnc, Hctx0, Hfr0, Hfs0, Hir0, Hbs0,
       Hch, Hgn, Hsg, Hpr, Hxs, Hstack, Hkav⟩
@@ -878,7 +879,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (IR : IGETROOT) (ID : IDU
   -- null table opened into the raw cells, the units and the keys at `closed`,
   -- which the block's table is rebuilt from at the publish (`ui_block`)
   icases procPrivNocwd_null_open rfl γ (procAddr j) pid V M hVp.1
-    $$ [$Hnc $Hctx0 $Hfr0 $Hfs0 $Hir0 $Hbs0] with ⟨Hpriv, Hal, Hkeys, Hzs⟩
+    $$ [$Hnc $Hctx0 $Hfr0 $Hfs0 $Hir0 $Hbs0] with ⟨Hpriv, Hal, Hkeys, Hzs, Hcr⟩
   -- <INIT>'S PID IS THE LITERAL 1: the ledger's boot-era token pinned it
   -- (`pavBoot`)
   have hp1 : pid.toNat = 1 := by simpa [pavBoot] using hboot
@@ -912,7 +913,8 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (IR : IGETROOT) (ID : IDU
   -- counted draw on this hart, and the sealed count is the token's row
   ihave Hkav := (show kallocAvail (GF := GF) fsReadyKmem (availSub (some nb) g) ⊢
       kallocAvail fsReadyKmem (some (nb - g)) from .rfl) $$ Hkav
-  imod kallocAvail_seal fsReadyKmem (nb - g) $$ Hkav with #Hkav
+  -- (NI M3 quotas Q-1) THE MINT: the credits fit what is left
+  imod kallocAvail_mint fsReadyKmem (nb - g) (by omega) $$ Hkav with #Hkav
   -- ...WHICH COMPLETES THE BOOT TOKEN (Rocq `first_boot`)
   ihave Hfb := firstBoot_intro (hlc := hlc) (GF := GF) $$ Hfw Hfbp Hkav Hffs
   -- THE BOOT MODE'S GENERATION ROWS: the boot deposit rides the park as its
@@ -954,7 +956,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (IR : IGETROOT) (ID : IDU
   k_norm [ui_ret_bee]
   iapply (ui_publish RE IR ID FP Γ γw γtk γp γft cpu _ j ch γ 1#32 V M hj rfl hVp.2.2.2.2.2 hVp.1
       ?ha0 ?hsie2 ?hnoff2 ?hintena2 ?hlocks2 ?htier2 ?hK2 hroot hnib0)
-    $$ [- $Hk $Hpc $Hpinv $Hinit $Hit $Hiti $Hireg $Hpe $Hir1 $Hir2 $Hal $Hch $Hheld $Hhart $Hzs $Hused $Hpriv $Hstack
+    $$ [- $Hk $Hpc $Hpinv $Hinit $Hit $Hiti $Hireg $Hpe $Hir1 $Hir2 $Hal $Hch $Hheld $Hhart $Hzs $Hused $Hpriv $Hstack $Hcr
       $Hgen $Hfds $Hkeys $Hpk]
   rotate_right 1
   · iintro %R5 Hk Hpc %hcs5 #Hinitp

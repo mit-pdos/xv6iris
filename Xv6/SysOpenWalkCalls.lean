@@ -185,16 +185,18 @@ theorem sys_open_namei_era (NI : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := h
   icases fsReady_sb_four $$ Hrdy with ⟨-, #Hsi, -, #Hsb⟩
   ihave #Hbmi := fsReady_bitmap $$ Hrdy
   have h := NI.wp_namei_era_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu j fscKalloc
-    fsReadyKmem plen pfun n Sb P Pmiss pid V M DFrac.discard DFrac.discard (DFrac.own 1)
+    fsReadyKmem plen pfun n Sb P Pmiss procSpare pid V M DFrac.discard DFrac.discard (DFrac.own 1)
     hj hproc hK hnoff htier hg.fgoRootdev hg.fgoNibPos hg.fgoLog hg.fgoBitmap
     hg.fgoCovBelow hg.fgoIreg hnn hterm hplen hbud hpd
   unfold wp_namei_era_eb_body at h
+  simp only [← procPrivCoreNoctxAt_res] at h
   iapply h
   iframe Hk Hpc Hte Hce Hcore Hpath Hbs Hir Hop Htx Hst
   iframe #
   iapply wpNext_intro_pin
   iintro %c %_
   unfold nameiEraPost
+  simp only [← procPrivCoreNoctxAt_res]
   iintro %spie %spp %R' %n' %Sb' %ok %ipv %w %hcs Hk Hpc Hte Hce - - Hcore Hpath Hbs %hf Hop Htx Harm
   unfold sysOpenNameiK
   iapply HK $$ %c %spie %spp %R' %n' %Sb' %ok %ipv %w [] Hk Hpc Hte Hce Hcore Hpath Hbs Hop Htx Harm

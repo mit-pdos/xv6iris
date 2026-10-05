@@ -158,7 +158,7 @@ def wp_userinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (hnoff : k.noff + 2 < 2 ^ 31) (hnoff0 : k.noff = 0) (hK : userinitSlots ≤ k.avail)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hproc : k.proc = 0#64)
-    (hsie : k.sie = false) (hnb : procPagetableNodes + 1 < nb)
+    (hsie : k.sie = false) (hnb : credTotal + procPagetableNodes + 1 ≤ nb)
     (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV) (hnib0 : 0 < icfgNib) : Prop :=
   kctx cpu k ∗ pcIs cpu userinitAddr ∗ procsInv Γ ∗
   isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗

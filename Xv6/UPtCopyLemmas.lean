@@ -285,22 +285,23 @@ def ucInv (Pold Pnew P : UPtd) (i : Nat) : Prop :=
   (∀ k, ¬ k < i → get? P.um k = get? Pnew.um k) ∧
   (∀ j, j < i → match get? Pold.um j with
      | none => get? P.um j = none
-     | some w => ∃ ppn : BitVec 44, get? P.um j = some (leafOf ppn (pteFlags w)))
+     | some w => ∃ ppn : BitVec 44, get? P.um j = some (leafOf ppn (pteFlags w))) ∧
+  P.np = Pnew.np
 
 theorem ucInv_zero (Pold Pnew : UPtd) : ucInv Pold Pnew Pnew 0 :=
-  ⟨rfl, rfl, fun _ _ => rfl, fun _ h => absurd h (by omega)⟩
+  ⟨rfl, rfl, fun _ _ => rfl, fun _ h => absurd h (by omega), rfl⟩
 
 /-- One page copied (or skipped). -/
 theorem ucInv_step {Pold Pnew P P' : UPtd} {i n : Nat} (h : ucInv Pold Pnew P i)
     (hi : i < n) (hfree : ∀ j, j < n → get? Pnew.um j = none)
-    (hroot : P'.root = P.root) (htfp : P'.tfp = P.tfp)
+    (hroot : P'.root = P.root) (htfp : P'.tfp = P.tfp) (hnp : P'.np = P.np)
     (hother : ∀ k, k ≠ i → get? P'.um k = get? P.um k)
     (hhere : match get? Pold.um i with
       | none => get? P'.um i = none
       | some w => ∃ ppn : BitVec 44, get? P'.um i = some (leafOf ppn (pteFlags w))) :
     ucInv Pold Pnew P' (i + 1) := by
-  obtain ⟨hr, ht, hout, hin⟩ := h
-  refine ⟨hroot.trans hr, htfp.trans ht, ?_, ?_⟩
+  obtain ⟨hr, ht, hout, hin, hn⟩ := h
+  refine ⟨hroot.trans hr, htfp.trans ht, ?_, ?_, hnp.trans hn⟩
   · intro k hk
     rw [hother k (by omega)]
     exact hout k (by omega)
@@ -314,7 +315,7 @@ theorem ucInv_step {Pold Pnew P P' : UPtd} {i n : Nat} (h : ucInv Pold Pnew P i)
 theorem ucInv_delRun {Pold Pnew P : UPtd} {i n : Nat} (h : ucInv Pold Pnew P i)
     (hin : i ≤ n) (hfree : ∀ j, j < n → get? Pnew.um j = none) :
     P.delRun 0 i = Pnew := by
-  obtain ⟨hr, ht, hout, -⟩ := h
+  obtain ⟨hr, ht, hout, -, hn⟩ := h
   have hum : delRunL P.um 0 i = Pnew.um := by
     refine equiv_iff_eq.mp ?_
     intro j
@@ -325,12 +326,12 @@ theorem ucInv_delRun {Pold Pnew P : UPtd} {i n : Nat} (h : ucInv Pold Pnew P i)
   unfold UPtd.delRun
   cases P; cases Pnew
   simp only [UPtd.mk.injEq] at *
-  exact ⟨hr, ht, hum⟩
+  exact ⟨hr, ht, hum, hn⟩
 
 /-! ## Resources -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-- Two whole pages at the same address cannot both be owned. -/
 theorem byteBuf_excl [CurCtx] (a : BitVec 64) (bs bs' : List (BitVec 8))
@@ -409,7 +410,7 @@ theorem umPages_fresh [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (p : Bit
 theorem procPtAt_cases [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) :
     procPtAt (GF := GF) P M ⊢
       iprop(∃ t : PTree, ⌜uptWf P ∧ t.base = P.root ∧ ptRep t P.leaves⌝ ∗
-        ptreeOwn 2 (DFrac.own 1) t ∗ umPages P M) := by
+        (ptreeOwn 2 (DFrac.own 1) t ∗ ptRest t P.leaves) ∗ umPages P M) := by
   unfold procPtAt ptOwnRep
   iintro ⟨%hwf, ⟨%t, %ht, Htree⟩, Hpages⟩
   iexists t
@@ -422,7 +423,7 @@ theorem procPtAt_cases [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) :
 /-- Pack a process's address space. -/
 theorem procPtAt_intro [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (t : PTree)
     (hwf : uptWf P) (hb : t.base = P.root) (hr : ptRep t P.leaves) :
-    iprop(ptreeOwn (GF := GF) 2 (DFrac.own 1) t ∗ umPages P M) ⊢ procPtAt P M := by
+    iprop((ptreeOwn (GF := GF) 2 (DFrac.own 1) t ∗ ptRest t P.leaves) ∗ umPages P M) ⊢ procPtAt P M := by
   unfold procPtAt ptOwnRep
   iintro ⟨Htree, Hpages⟩
   isplitl []

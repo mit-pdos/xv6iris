@@ -79,7 +79,7 @@ theorem proc_freepagetable_proof (UM : UVMUNMAP) (UF : UVMFREE) : PROC_FREEPAGET
   k_step_gen (wp_s_jal c8 _ (KA.«proc_freepagetable» + 0x1c#64) false 2094972#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_freepagetable_br_fffffffffffff798] next c9 hp9
   iintro Hk Hpc
-  iapply (pp_uvmunmap_call UM c9 _ P.root P.leaves 1 ?hK1 ?hr1 ?ha1 ?hn1 ?hg1 ?hf1 ke)
+  iapply (pp_uvmunmap_call UM c9 _ P.root P.leaves 1 ?hK1 ?hr1 ?ha1 ?hn1 ?hg1 ?hf1 ?hu1 ke)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
@@ -91,6 +91,7 @@ theorem proc_freepagetable_proof (UM : UVMUNMAP) (UF : UVMFREE) : PROC_FREEPAGET
   case hn1 => k_norm_g
   case hg1 => k_norm_g; decide
   case hf1 => k_norm_g
+  case hu1 => k_norm_g; decide
   iapply wpNext_intro_pin
   iintro %c10 %hp10 %R1 Hk Hpc ⟨%k1, %hk1, Hlend⟩ HT %hcs1
   k_norm_g [pp_ret_1a56, vpnOf_tramp_toNat, delRunL_one]
@@ -120,7 +121,7 @@ theorem proc_freepagetable_proof (UM : UVMUNMAP) (UF : UVMFREE) : PROC_FREEPAGET
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_freepagetable_br_fffffffffffff798] next c17 hp17
   iintro Hk Hpc
   iapply (pp_uvmunmap_call UM c17 _ P.root (delete P.leaves trampVpn.toNat) 1
-    ?hK2 ?hr2 ?ha2 ?hn2 ?hg2 ?hf2 k1) $$ [- $Hk $Hpc]
+    ?hK2 ?hr2 ?ha2 ?hn2 ?hg2 ?hf2 ?hu2 k1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe HT Hlend
@@ -131,6 +132,7 @@ theorem proc_freepagetable_proof (UM : UVMUNMAP) (UF : UVMFREE) : PROC_FREEPAGET
   case hn2 => k_norm_g
   case hg2 => k_norm_g; decide
   case hf2 => k_norm_g
+  case hu2 => k_norm_g; decide
   iapply wpNext_intro_pin
   iintro %c18 %hp18 %R2 Hk Hpc ⟨%k2, %hk2, Hlend⟩ HT %hcs2
   k_norm_g [pp_ret_1a68, vpnOf_tf_toNat, delRunL_one, leaves_delete_tramp_tf P hwf]
@@ -161,7 +163,7 @@ theorem proc_freepagetable_proof (UM : UVMUNMAP) (UF : UVMFREE) : PROC_FREEPAGET
   case hw3 => exact hwf
   case hb3 => k_norm_g; rw [b18, a18]; exact hbelow
   iapply wpNext_intro_pin
-  iintro %c22 %hp22 %spie %spp %R3 %hsp Hk Hpc Hlend %hcs3
+  iintro %c22 %hp22 %spie %spp %R3 %hsp Hk Hpc Hlend Hcr %hcs3
   ihave Hlend := actLend_ret_weaken _ (Nat.le_trans hk1 hk2) $$ Hlend
   k_norm_g [pp_ret_1a70]
   unfold calleeSaved at hcs3
@@ -191,7 +193,7 @@ theorem proc_freepagetable_proof (UM : UVMUNMAP) (UF : UVMFREE) : PROC_FREEPAGET
   ihave HΦ := wpNext_shift _ _ _ _ _ hpinF $$ HΦ
   iapply wpNext_mono _ _ _ _ _ $$ HΦ
   iintro %c23 HΦ Hk Hpc
-  iapply HΦ $$ %spie %spp %_ %hsp Hk Hpc Hlend
+  iapply HΦ $$ %spie %spp %_ %hsp Hk Hpc Hlend Hcr
   ipureintro
   unfold calleeSaved
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>

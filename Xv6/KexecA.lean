@@ -203,7 +203,7 @@ theorem kxcA_call_namei_era (NE : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := 
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPrivCoreNoctxAt curCtx k.proc A.pidv A.V A.M ∗
+    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPrivCoreResAt ptW curCtx k.proc A.pidv A.V A.M ∗
     byteBuf (k.regs 10#5) A.dqpv (bview (A.plen + 1) A.pfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog MAXOPBLOCKS ∗
     exStart (hlc := hlc) fscFs A.V.rti A.V.cwi P Pmiss (bview A.plen A.pfun) ∗
@@ -211,7 +211,7 @@ theorem kxcA_call_namei_era (NE : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := 
       ⌜calleeSaved (R.set 1#5 (X + 4#64)) R' ∧ (ok = true → iputUnits ≤ n')⌝ -∗
       kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (X + 4#64) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
-      procPrivCoreNoctxAt curCtx k.proc A.pidv A.V A.M -∗
+      procPrivCoreResAt ptW curCtx k.proc A.pidv A.V A.M -∗
       byteBuf (k.regs 10#5) A.dqpv (bview (A.plen + 1) A.pfun) -∗
       bslots 3 -∗ logOp icfgLog n' -∗
       (if ok then
@@ -242,7 +242,7 @@ theorem kxcA_call_namei_era (NE : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := 
   iintro Hk Hpc
   have h := NE.wp_namei_era_eb (hlc := hlc) (GF := GF) Γ cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) γbl pd pav pu A.j
-    fscKalloc fsReadyKmem A.plen A.pfun MAXOPBLOCKS Sb P Pmiss A.pidv A.V A.M
+    fscKalloc fsReadyKmem A.plen A.pfun MAXOPBLOCKS Sb P Pmiss ptW A.pidv A.V A.M
     DFrac.discard DFrac.discard A.dqpv hj (by k_norm_g; exact hproc) (by k_norm_g; exact hK')
     (by k_norm_g; exact hnoff) (by k_norm_g; exact htier) hg.fgoRootdev hg.fgoNibPos hg.fgoLog
     hg.fgoBitmap hg.fgoCovBelow hg.fgoIreg hnn hterm hplen (kxcA_walkNeed _) hpd
@@ -304,7 +304,7 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
     (hplen : A.plen < 2 ^ 31) :
     kctx cpu k ∗ pcIs cpu KA.«kexec» ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
-    procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
+    procPrivFdRes ptW A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
     exStart (hlc := hlc) fscFs A.V.rti A.V.cwi P Pmiss (bview A.plen A.pfun) ∗ AU ∗
     (nameiWalkDeadEra (hlc := hlc) fscFs A.V.rti P Pmiss (bview A.plen A.pfun) ∗ AU -∗ FAIL) ∗
     (∀ c' : CPU, KEX c') ∗
@@ -353,7 +353,7 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
   have e18 : R2 18#5 = k.regs 10#5 := by rw [b18, a18, hR18]
   -- the block, whole again, then as `core ∗ ofiles` for the era walk
   ihave Hpriv := Hpriv $$ Hpid Hcwd Hcwr
-  unfold procPrivFd
+  unfold procPrivFdRes
   icases Hpriv with ⟨Hcore, Hof⟩
   -- +0x02c  jal namei  (THE ERA WALK)
   unfold kxcBufs
@@ -366,8 +366,8 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
   iintro %cpu %spie3 %spp3 %R3 %n1 %ok %ipv %⟨hcs3, hn1⟩ Hk Hpc Hte Hce Hcore Hpath Hbs Hlog Harm
   k_norm_g
-  ihave Hpriv : procPrivFd A.γ k.proc A.pidv A.V A.M $$ [Hcore Hof]
-  · unfold procPrivFd; iframe
+  ihave Hpriv : procPrivFdRes ptW A.γ k.proc A.pidv A.V A.M $$ [Hcore Hof]
+  · unfold procPrivFdRes; iframe
   obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs3
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at c2 c8 c9 c18 c19 c20 c21 c22 c23 c24 c25 c26 c27
   have f2 : R3 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFDE0#64 := by rw [c2, b2, a2, hR2]
@@ -411,7 +411,7 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
     iintro Hk Hpc
     -- +0x088  jal end_op
     icases kctx_tier _ _ $$ Hk with ⟨%hct', Hk⟩
-    icases kxc_priv_pid (hct'.symm.trans (by k_norm_g; exact htier)) A.γ k.proc A.pidv A.V A.M
+    icases kxc_priv_pidR (hct'.symm.trans (by k_norm_g; exact htier)) A.γ k.proc A.pidv A.V A.M
       $$ Hpriv with ⟨Hpid, Hpriv⟩
     iapply (kxc_call_endop EO Γ cpu k A spie3 spp3 R3 (KA.«kexec» + 0x88#64) 2094158#21 kxcA_br_eo_88
         kxcA_ret_8c n1 hK hnoff htier hj hproc) $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hlog $Hpid]
@@ -484,7 +484,7 @@ theorem kxc_phaseA_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fo ∗
     pfAt (fun S => execSlotPre S Qpay (P (pathElems (bview A.plen A.pfun)).length) Fo.pfRecv A.V.cwi A.V.pvSecc
       A.na A.alen A.afun sts cs A.pidv) Fs ∗
-    procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
+    procPrivFdRes ptW A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
     (∀ c' : CPU, KEX c') ∗
     □ (∀ c : CPU, KEX c -∗
         execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Qpay P Pmiss Fo

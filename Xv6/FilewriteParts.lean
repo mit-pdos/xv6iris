@@ -389,7 +389,7 @@ theorem fwr_cs_epi (k : KCtx) (fk : Nat) (n : Int) (R : RegMap)
 `procPtAt_congr`) -- shared with consolewrite's chain. -/
 
 section Block
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
 
 theorem fwr_priv_congr (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M M' : Nat → List (BitVec 8))

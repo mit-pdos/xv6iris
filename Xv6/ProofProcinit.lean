@@ -819,22 +819,25 @@ theorem pi_claims (i : Nat) :
 
 /-- **The route** (Rocq `proc_dormant_prestk_intro`, per slot): the cells
 procinit wrote, the claims, the fd-slot-free block and one share of each
-supply make `procReady`. -/
+supply (and, NI M3 quotas Q-1, one slot's page credits) make `procReady`. -/
 theorem pi_route :
     ([∗list] i ∈ List.range NPROC, procFieldsOut (GF := GF) i) ∗
     ([∗list] i ∈ List.range NPROC, kmapId (GF := GF) (procAddr i) ∗ kmapId (procAddr i + 16#64)) ∗
     ([∗list] i ∈ List.range NPROC, procDormantNofd (GF := GF) (procAddr i)) ∗
     fdSlots (GF := GF) (NPROC * (NOFILE + FDSPARE)) ∗
     irefSlots (GF := GF) (NPROC * (IREFHOME + IREFSPARE)) ∗
-    bslots (GF := GF) (NPROC * 3) ⊢
+    bslots (GF := GF) (NPROC * 3) ∗ pageCredit (GF := GF) (NPROC * slotShare) ⊢
     [∗list] i ∈ List.range NPROC, procReady (GF := GF) i := by
-  iintro ⟨Ho, Hc, Hd, Hf, Hr, Hb⟩
+  iintro ⟨Ho, Hc, Hd, Hf, Hr, Hb, Hcr⟩
   ihave Hf := pi_supply_split (fun n => fdSlots (GF := GF) n) (fun a b => fdSlots_split a b)
     (NOFILE + FDSPARE) NPROC $$ Hf
   ihave Hr := pi_supply_split (fun n => irefSlots (GF := GF) n) (fun a b => (irefSlots_op a b).1)
     (IREFHOME + IREFSPARE) NPROC $$ Hr
   ihave Hb := pi_supply_split (fun n => bslots (GF := GF) n) (fun a b => bslots_split a b)
     3 NPROC $$ Hb
+  ihave Hcr := pi_supply_split (fun n => pageCredit (GF := GF) n) (fun a b => pageCredit_split a b)
+    slotShare NPROC $$ Hcr
+  ihave Hb := BigSepL.bigSepL_sep_eqv.2 $$ [$Hb $Hcr]
   ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [$Hr $Hb]
   ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [$Hf $H]
   ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [$Hd $H]
@@ -842,8 +845,8 @@ theorem pi_route :
   ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [$Ho $H]
   iapply BigSepL.bigSepL_mono_of_forall (fun {_ i} => by
     unfold procReady procDormantPrestk
-    iintro ⟨Ho, ⟨Hc1, Hc2⟩, Hd, Hf, Hr, Hb⟩
-    iframe Ho Hc1 Hc2 Hd Hf Hr Hb) $$ H
+    iintro ⟨Ho, ⟨Hc1, Hc2⟩, Hd, Hf, Hr, Hb, Hcr⟩
+    iframe Ho Hc1 Hc2 Hd Hf Hr Hb Hcr) $$ H
 
 end Route
 
@@ -856,7 +859,7 @@ theorem procinit_proof (IL : INITLOCK) : PROCINIT :=
   have h := procinit_cells IL (hlc := hlc) (GF := GF) cpu k hK
   unfold procinitCellsBody at h
   unfold wp_procinit_body
-  iintro ⟨Hk, Hpc, Hpid, Hwait, Hraw, Hf, Hr, Hb, HΦ⟩
+  iintro ⟨Hk, Hpc, Hpid, Hwait, Hraw, Hf, Hr, Hb, Hcr, HΦ⟩
   ihave Hraw := (show ([∗list] i ∈ List.range NPROC, procRaw (GF := GF) i) ⊢
       [∗list] i ∈ List.range NPROC, iprop(procFieldsIn (GF := GF) i ∗ procDormantNofd (procAddr i))
     from .rfl) $$ Hraw
@@ -871,9 +874,9 @@ theorem procinit_proof (IL : INITLOCK) : PROCINIT :=
   iintro %cpu' HK %R' Hk Hpc Hp Hw Hout %hcs
   ihave Hout := (show ([∗list] i ∈ List.range 64, procFieldsOut (GF := GF) i) ⊢
       [∗list] i ∈ List.range NPROC, procFieldsOut (GF := GF) i from .rfl) $$ Hout
-  iapply HK $$ %R' Hk Hpc Hp Hw [Hout Hc Hd Hf Hr Hb]
+  iapply HK $$ %R' Hk Hpc Hp Hw [Hout Hc Hd Hf Hr Hb Hcr]
   · iapply pi_route
-    iframe Hout Hc Hd Hf Hr Hb
+    iframe Hout Hc Hd Hf Hr Hb Hcr
   ipureintro; exact hcs⟩
 
 end Xv6

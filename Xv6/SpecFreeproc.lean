@@ -73,7 +73,12 @@ pointer it is handed and which the pagetable arm, when absent, cannot
 supply.  The slot's children row (`chFrag V.chg pa ∅`, Rocq `fp_rest`'s
 `ch_frag`) passes through into the UNUSED block, at `∅`, and so does the
 slot's event counter at the block's `ev` (`actCnt pa V.ev`, Rocq G's
-`fp_rest`, design ni-strong-instance.md §7). -/
+`fp_rest`, design ni-strong-instance.md §7).  (NI M3 quotas Q-1) The
+UNUSED block it rebuilds holds the slot's whole share (`slotShare`):
+the trapframe page's credit and the table's weight come back from the
+credited frees, and the rest arrives here -- the live process's spare, and
+the share of a page or a table the slot never got
+(`procSpare + [no trapframe] + [no table] · ptW`). -/
 def freeprocIn (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.root = 0#64⌝ ∗
   wordPointsTo (pPid pa) 4 pidPriv pid ∗ procFields pa (DFrac.own 1) V ∗
@@ -81,7 +86,8 @@ def freeprocIn (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → Li
   (if V.trapframe = 0#64 then emp else
     ⌜V.trapframe = pageAddr V.upt.tfp ∧ pageValid V.trapframe⌝ ∗ tfPageAt V.upt.tfp V.tf) ∗
   (if V.pagetable = 0#64 then emp else
-    ⌜V.pagetable = pageAddr V.upt.root ∧ V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt⌝ ∗ procPtAt V.upt M)
+    ⌜V.pagetable = pageAddr V.upt.root ∧ V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt⌝ ∗ procPtAt V.upt M) ∗
+  pageCredit (procSpare + (if V.trapframe = 0#64 then 1 else 0) + (if V.pagetable = 0#64 then ptW else 0))
 
 /-- **The incarnation's two exclusive ghosts, both WHOLE, and the slot's half
 of `p->xstate`** (Rocq `wp_freeproc_sconf_body`'s `slot_gen pa (DfracOwn 1)

@@ -188,7 +188,7 @@ def mainLocksBare : IProp GF := iprop%
 trapinit's premise), `bcache`, `itable`, `ftable`, and (NI M3 quotas Q-0) the
 never-`initlock`ed `npipelock` with its counter (`FileBoot.npipeBootRaw`).  The
 vdisk lock rides `diskInitCells`. -/
-def mainLocksRaw : IProp GF := iprop%
+def mainLocksRaw [Xv6G GF] [WchG GF] : IProp GF := iprop%
   mainLkRaw pidLockAddr ∗ mainLkRaw waitLockAddr ∗
   kmapId tickslockAddr ∗ kmapId (tickslockAddr + 16#64) ∗
   (∃ (vl : BitVec 32) (vn vc : BitVec 64),
@@ -248,7 +248,7 @@ def mainGlobalsRaw (cn : ConsNames) : IProp GF := iprop%
   irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗
   ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗
   irefSlots NFILE ∗
-  bslots (NPROC * 3) ∗
+  bslots (NPROC * 3) ∗ pageCredit (NPROC * slotShare) ∗
   (∃ v0 : BitVec 64, wordPointsTo initprocAddr 8 (DFrac.own 1) v0) ∗
   ticksResAt curCtx ∗
   (∃ (vhp vhn : BitVec 64), wordPointsTo (bcacheHeadAddr + 72#64) 8 (DFrac.own 1) vhp ∗

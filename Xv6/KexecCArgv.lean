@@ -366,7 +366,7 @@ theorem kxcC_argv_tail (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     (ci : Nat)
     (hqf : QF .noMem) (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hnul : A.afun ci (A.alen ci) = 0#8) (hna : A.na < MAXARG) (hcna : ci < A.na)
-    (hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ 2 ^ 38)
+    (hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ uQuota)
     (hal : (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0) (hl : ef.length = 64)
     (h2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFDE0#64) (h8 : R 8#5 = k.regs 2#5)
     (h9 : R 9#5 = BitVec.ofNat 64 ci) (h18 : R 18#5 = sz1) (h19 : R 19#5 = k.proc)
@@ -517,7 +517,7 @@ theorem kxc_argv_step (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
     (hqf : QF .noMem) (hqfa : kxcArgsFitQF QF fb ef A.alen A.na)
     (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hargs : kxcArgsOk A) (hna : A.na < MAXARG) (hcna : ci < A.na)
-    (hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ 2 ^ 38)
+    (hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ uQuota)
     (hal : (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0) (hl : ef.length = 64) :
     kxcAt21a k A cpu spie spp R (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P Mi oldsz sz1
@@ -674,7 +674,7 @@ theorem kxc_argv_step (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
   ihave Hs := (kxcC_cstr_of (A.avf ci) A.dqas (A.alen ci) (A.afun ci) hnul hnz).2 $$ Hs
   -- the block's event counter, lent to copyout (permit sweep L1b)
   icases Hpriv with ⟨%V1, %hV1, Hpriv⟩
-  icases procPrivFd_evLend A.γ k.proc A.pidv V1 A.M $$ Hpriv with ⟨Hlend, Hpback⟩
+  icases procPrivFdRes_evLend 0 A.γ k.proc A.pidv V1 A.M $$ Hpriv with ⟨Hlend, Hpback⟩
   iapply (kxcC_call_copyout Γ CO cpu k A spie spp _ (KA.«kexec» + 0x24e#64) 2083218#21 kxcC_br_copyout1
       kxcC_ret_246 P Mi A.dqas (bview (A.alen ci + 1) (A.afun ci)) (A.avf ci) V1.ev hK hnoff
       (by simp [RegMap.set_apply]) (by simp [RegMap.set_apply]) (by simp [RegMap.set_apply]; omega)
@@ -684,7 +684,7 @@ theorem kxc_argv_step (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
   iintro %c3 %spie3 %spp3 %R3 %P' %M' %⟨hcs3, hext, hret⟩ Hk Hpc Hte Hce ⟨%k1, %hk1, Hlend⟩ Hs Hpt
   icases Hpback $$ %k1 %hk1 Hlend with ⟨%V2, %hV2, Hpriv⟩
-  ihave Hpriv : (∃ V3 : ProcPriv, ⌜evAfter A.V V3⌝ ∗ procPrivFd A.γ k.proc A.pidv V3 A.M) $$ [Hpriv]
+  ihave Hpriv : (∃ V3 : ProcPriv, ⌜evAfter A.V V3⌝ ∗ procPrivFdRes 0 A.γ k.proc A.pidv V3 A.M) $$ [Hpriv]
   · iexists V2; iframe Hpriv; ipureintro; exact evAfter_trans hV1 hV2
   let cpu := c3
   k_norm_g
@@ -742,7 +742,7 @@ theorem kxc_argv_loop (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
     (hqf : QF .noMem) (hqfa : kxcArgsFitQF QF fb ef A.alen A.na)
     (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hargs : kxcArgsOk A) (hna : A.na < MAXARG) (havf : A.avf A.na = 0#64)
-    (hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ 2 ^ 38)
+    (hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ uQuota)
     (hal : (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0) (hl : ef.length = 64) :
     ∀ (W ci : Nat) (cpu : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (Mi : Nat → List (BitVec 8)),
     A.na - ci ≤ W → ci < A.na →

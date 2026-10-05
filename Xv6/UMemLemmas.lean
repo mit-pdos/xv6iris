@@ -276,7 +276,7 @@ theorem umemStr_of_nul (M : Nat → List (BitVec 8)) (va max d : Nat) (hd : d < 
 /-! ## Opening a user page -/
 
 section res
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
 
 /-- Open the bytes of one mapped page, with a wand that takes them back at
 a view that agrees with the old one everywhere else. -/
@@ -363,7 +363,7 @@ theorem byteBuf_join_td (a : BitVec 64) (dq : DFrac) (l c : List (BitVec 8)) (i 
 /-- `procPtAt`, spelled out. -/
 theorem procPtAt_elim (P : UPtd) (M : Nat → List (BitVec 8)) :
     procPtAt (GF := GF) P M ⊢ ⌜uptWf P⌝ ∗
-      (∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t) ∗
+      (∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗ ptRest t P.leaves) ∗
       umPages P M := by
   unfold procPtAt ptOwnRep; iintro H; iexact H
 
@@ -380,12 +380,12 @@ theorem procPtAt_wf (P : UPtd) (M : Nat → List (BitVec 8)) :
 
 theorem procPtAt_intro (P : UPtd) (M : Nat → List (BitVec 8)) :
     iprop(⌜uptWf P⌝ ∗ (∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗
-        ptreeOwn 2 (DFrac.own 1) t) ∗ umPages P M) ⊢ procPtAt (GF := GF) P M := by
+        ptreeOwn 2 (DFrac.own 1) t ∗ ptRest t P.leaves) ∗ umPages P M) ⊢ procPtAt (GF := GF) P M := by
   unfold procPtAt ptOwnRep; iintro H; iexact H
 
 theorem procPtAt_intro' (P : UPtd) (M : Nat → List (BitVec 8)) (t : PTree)
     (h : t.base = P.root ∧ ptRep t P.leaves) (hwf : uptWf P) :
-    iprop(ptreeOwn 2 (DFrac.own 1) t ∗ umPages (GF := GF) P M) ⊢ procPtAt P M := by
+    iprop((ptreeOwn 2 (DFrac.own 1) t ∗ ptRest t P.leaves) ∗ umPages (GF := GF) P M) ⊢ procPtAt P M := by
   unfold procPtAt ptOwnRep
   iintro ⟨Ht, Hu⟩
   isplitr [Ht Hu]

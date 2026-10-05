@@ -76,7 +76,7 @@ a STAGE file (no `Proof` prefix).  Rocq's header, in short:
 11. **The permit sweep L1a (Rocq f344a089a)**: `kxc_call_uvmalloc` takes the
    lend `actLend k.proc ke` and hands back `∃ k2 ≥ ke` (uvmalloc's L1a
    contract); the two callers lend the block's counter
-   (`ProcPrivAcc.procPrivFd_evLend`).
+   (`ProcPrivAcc.procPrivFdRes_evLend`).
 -/
 import Xv6.KexecTail
 import Xv6.KexecBuilt
@@ -385,7 +385,7 @@ def kxcAt1a2 (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
   kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
   logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗
   procPtAt P Mi ∗
-  procPrivFd A.γ k.proc A.pidv A.V A.M ∗
+  procPrivFdRes 0 A.γ k.proc A.pidv A.V A.M ∗
   kxcBufs k A ∗
   byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
   kxcFrameBk k (k.regs 11#5) w5 w6 w7 w8 w9 w10 w11 w12 w13 w67
@@ -406,6 +406,9 @@ def kxcAt12c (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
     (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0 ∧ ef.length = 64 ∧ w67 = 4095#64⌝ ∗
   -- THE LOOP INVARIANT
   ⌜i < ehPhnum ef ∧ P.tfp = A.V.upt.tfp ∧ umBelow szv P ∧ lazyFree P.um szv ∧
+    -- THE QUOTA (NI M3 quotas Q-1): kexec's refusal keeps every segment's top
+    -- two pages below `MAXUSZ`
+    szv.toNat ≤ uQuota - 2 * 4096 ∧
     -- THE IMAGE INVARIANT (S3c), conditional on the walk's own guard
     (kxbWalkOk (kxcFb data dnf) ef → kxbAt (kxcFb data dnf) ef i szv.toNat (umemGet P Mi)) ∧
     -- THE PERMISSION INVARIANT (S6), on the LEAF map
@@ -415,7 +418,7 @@ def kxcAt12c (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
   kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
   logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗
   procPtAt P Mi ∗
-  procPrivFd A.γ k.proc A.pidv A.V A.M ∗
+  procPrivFdRes 0 A.γ k.proc A.pidv A.V A.M ∗
   kxcBufs k A ∗
   byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
   kxcFrameBk k (k.regs 11#5) w5 w6 w7 w8 w9 w10 w11 w12 w13 w67
@@ -433,6 +436,9 @@ def kxcAt1a4 (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
   ⌜kf < NINODE ∧ inumf.toNat < 16 * icfgNib ∧ iputUnits ≤ n2 ∧
     (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0 ∧ ef.length = 64⌝ ∗
   ⌜P.tfp = A.V.upt.tfp ∧ umBelow szv P ∧ lazyFree P.um szv ∧
+    -- THE QUOTA (NI M3 quotas Q-1): kexec's refusal keeps every segment's top
+    -- two pages below `MAXUSZ`
+    szv.toNat ≤ uQuota - 2 * 4096 ∧
     -- THE PHDR LOOP'S INVARIANT, CONVERTED (S3d: `KexecBuilt.kxbAt_done`)
     (kxbWalkOk (kxcFb data dnf) ef → uimgSub (elfImage (kxcFb data dnf)) (umemGet P Mi)) ∧
     (kxbWalkOk (kxcFb data dnf) ef →
@@ -443,7 +449,7 @@ def kxcAt1a4 (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
   kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
   logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗
   procPtAt P Mi ∗
-  procPrivFd A.γ k.proc A.pidv A.V A.M ∗
+  procPrivFdRes 0 A.γ k.proc A.pidv A.V A.M ∗
   kxcBufs k A ∗
   byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
   kxcFrameBk k (k.regs 11#5) w5 w6 w7 w8 w9 w10 w11 w12 w13 w67
@@ -459,6 +465,9 @@ def kxcAt1ae (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
     R 22#5 = pageAddr P.root ∧ R 27#5 = sv11⌝ ∗
   ⌜(kxcElfBuf (k.regs 2#5)).toNat % 8 = 0 ∧ ef.length = 64⌝ ∗
   ⌜P.tfp = A.V.upt.tfp ∧ umBelow szv P ∧ lazyFree P.um szv ∧
+    -- THE QUOTA (NI M3 quotas Q-1): kexec's refusal keeps every segment's top
+    -- two pages below `MAXUSZ`
+    szv.toNat ≤ uQuota - 2 * 4096 ∧
     (kxbWalkOk fb ef → uimgSub (elfImage fb) (umemGet P Mi)) ∧
     (kxbWalkOk fb ef → szv.toNat = KexecBuilt.kexecSzAfter (elfLoads fb)) ∧
     (kxbWalkOk fb ef → kxbPermSegs fb P.um)⌝ ∗
@@ -466,7 +475,7 @@ def kxcAt1ae (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
   trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
   irefSlots 2 ∗ bslots 3 ∗
   procPtAt P Mi ∗
-  procPrivFd A.γ k.proc A.pidv A.V A.M ∗
+  procPrivFdRes 0 A.γ k.proc A.pidv A.V A.M ∗
   kxcBufs k A ∗
   byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
   kxcFrameBk k (k.regs 11#5) w5 w6 w7 w8 w9 w10 w11 w12 w13 w67
@@ -482,7 +491,7 @@ def kxcCRes (k : KCtx) (A : KexecArgs) (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : Bit
     IProp GF := iprop%
   irefSlots 2 ∗ bslots 3 ∗
   procPtAt P Mi ∗
-  (∃ V1 : ProcPriv, ⌜evAfter A.V V1⌝ ∗ procPrivFd A.γ k.proc A.pidv V1 A.M) ∗
+  (∃ V1 : ProcPriv, ⌜evAfter A.V V1⌝ ∗ procPrivFdRes 0 A.γ k.proc A.pidv V1 A.M) ∗
   kxcBufs k A ∗
   byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
   kxcFrameC (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 10#5)
@@ -551,7 +560,7 @@ def kxcDRes (k : KCtx) (A : KexecArgs) (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : Bit
     (ef : List (BitVec 8)) (P : UPtd) (Mi : Nat → List (BitVec 8)) (ci : Nat) : IProp GF := iprop%
   irefSlots 2 ∗ bslots 3 ∗
   procPtAt P Mi ∗
-  procPrivFd A.γ k.proc A.pidv A.V A.M ∗
+  procPrivFdRes 0 A.γ k.proc A.pidv A.V A.M ∗
   kxcBufs k A ∗
   byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
   kxcFrameBk k (k.regs 11#5 + BitVec.ofNat 64 (8 * ci)) w5 w6 w7 w8 w9 w10 w11 w12 w13 w67
@@ -606,7 +615,8 @@ theorem kxc_call_uvmalloc (UA : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCt
     (hnew : (R 12#5).toNat ≤ uvmMaxsz ∨ lazyFree P.um (R 11#5))
     (hperm : R 13#5 &&& ~~~0x3CE#64 = 0#64)
     (hfree : ∀ i, i < uvmaNp (R 11#5) (R 12#5) →
-      pgRoundUpN (R 11#5).toNat + 4096 * i + 4096 ≤ uvmMaxsz → get? P.um (uvmaVpn0 (R 11#5) + i) = none) :
+      pgRoundUpN (R 11#5).toNat + 4096 * i + 4096 ≤ uvmMaxsz → get? P.um (uvmaVpn0 (R 11#5) + i) = none)
+    (hq : (R 12#5).toNat ≤ uQuota) :
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
@@ -641,6 +651,7 @@ theorem kxc_call_uvmalloc (UA : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCt
     (by k_norm_g; simp [RegMap.set_apply, hroot]) (by k_norm_g; simpa [RegMap.set_apply] using hold)
     (by k_norm_g; simpa [RegMap.set_apply] using hnew) (by k_norm_g; simpa [RegMap.set_apply] using hperm)
     (by k_norm_g; simpa [RegMap.set_apply] using hfree)
+    (by k_norm_g; simpa [RegMap.set_apply] using hq)
   unfold wp_uvmalloc_body at h
   simp only [uvmallocAddr] at h
   iapply h

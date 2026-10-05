@@ -69,6 +69,8 @@ structure UkMem (P : UPtd) (t : PTree) (mm T : BMap) : Prop where
   dom : ∀ a, (mm a).isSome = true ↔ a ∈ ubTreeAddrs 2 t ++ ukDataAddrs P.um
   domT : ∀ a, (T a).isSome = true ↔ a ∈ ukTextAddrs P.um
   tree : ∀ p ∈ ubTreeBytes 2 t, mm p.1 = some p.2
+  sq : t.shapeQ
+  np : (t.pages 2).length = P.np
 
 /-- **An engine machine** (Rocq `uv_pre`'s pure half): a user machine at the
 loop's configuration (ACTIVE, privilege User, a user `mstatus`), over the

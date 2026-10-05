@@ -36,7 +36,7 @@ header, in short (every clause that is about content is kept):
    landed `kexecOk`'s, i.e. it carries KexecDefs deviation 4's two
    Lean-only rows (`kstack`, `context`).
 2. **PROCESS-LAYER (flagged): Rocq's `U' : ustate` is the Lean pair
-   `(V', M')`** (`procPrivFd γ pa pid V' M'` holds the pair; KexecBuilt §9's
+   `(V', M')`** (`procPrivFdRes ptW γ pa pid V' M'` holds the pair; KexecBuilt §9's
    reading).  So the closer's plug `Q` is
    `BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop` (Rocq
    `mword 64 → ustate → Prop`), and the failure plug's `us_M U' = us_M U`
@@ -47,7 +47,7 @@ header, in short (every clause that is about content is kept):
    crossing, as namei's post); `trap_csrs_ext`/`cpu_claim_ext` are
    `trapCsrsExt cpu' k.sie`/`cpuClaimExt cpu' k.sie k.proc` (eb-generic,
    D5); `proc_priv gf pj pidv U'` is Rocq's WHOLE block, C0's
-   `procPrivFd A.γ k.proc A.pidv V' M'` (D16).
+   `procPrivFdRes ptW A.γ k.proc A.pidv V' M'` (D16).
 4. **CLEANUP (checked): the closer drops Rocq's
    `sb_bmapstart ↦{dqb}`, `sb_inodestart ↦{dqs}` and `kalloc_env` rows.**
    kexec's contract carries `KexecDefs.fsFabric`, whose `fsReady` holds the
@@ -243,7 +243,7 @@ def kexecCloser (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Pr
       A.na A.alen⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivFd A.γ k.proc A.pidv V' M' -∗
+    procPrivFdRes ptW A.γ k.proc A.pidv V' M' -∗
     kxcBufs k A -∗
     bslots 3 -∗ irefSlots 2 -∗ wpLoop cpu')
 

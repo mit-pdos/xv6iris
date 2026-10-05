@@ -81,7 +81,7 @@ def wp_sys_exit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hv : V.tf[tfArgIdx 0]? = some v)
     (hK : sysExitSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
-    (htier : k.tier = KTier.kpt) : Prop :=
+    (htier : k.tier = KTier.kpt) (hsealed : on = none) : Prop :=
   kctx cpu k ∗ pcIs cpu sysExitAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
@@ -107,7 +107,7 @@ def wp_sys_exit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     (M : Nat → List (BitVec 8)) (ip v : BitVec 64) (cs : ExtTreeSet GName compare) (sts : List FdState) (Q : Int → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hv : V.tf[tfArgIdx 0]? = some v)
     (hK : sysExitSlots ≤ k.avail) (hnoff : k.noff = 0)
-    (htier : k.tier = KTier.kpt) : Prop :=
+    (htier : k.tier = KTier.kpt) (hsealed : on = none) : Prop :=
   kctx cpu k ∗ pcIs cpu sysExitAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
@@ -131,8 +131,8 @@ structure SYSEXIT : Prop where
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip v : BitVec 64) (cs : ExtTreeSet GName compare) (sts : List FdState) (Q : Int → IProp GF)
-    hj hproc hv hK hnoff htier,
+    hj hproc hv hK hnoff htier hsealed,
     wp_sys_exit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip v cs sts Q
-      hj hproc hv hK hnoff htier
+      hj hproc hv hK hnoff htier hsealed
 
 end Xv6

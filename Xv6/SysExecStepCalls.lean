@@ -214,26 +214,34 @@ receipt dropped). -/
 theorem sys_exec_kalloc (KL : KALLOC) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se)
     (pj : BitVec 64) (hpj : k'.proc = pj) (hnoff : k'.noff = 0) (hK : 14 ≤ k'.avail) (kc : Nat) :
     kctx cpu k' ∗ pcIs cpu KA.«kalloc» ∗ trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗
-    fsReady (hlc := hlc) ∗ actLend pj kc ∗
+    fsReady (hlc := hlc) ∗ actLend pj kc ∗ pageCredit 1 ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ actLend pj (kc + 1) -∗
       kallocPost fsReadyKmem none (R' 10#5) -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
-  iintro ⟨Hk, Hpc, Hte, Hce, #Hrdy, Hl, HK⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, #Hrdy, Hl, Hcr, HK⟩
   icases sysfile_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
   icases fsReady_kmem $$ Hrdy with ⟨#Hkl, #Hav⟩
-  have h := KL.wp_kalloc_led (hlc := hlc) (GF := GF) cpu k' fscKalloc fsReadyKmem none kc
+  -- (NI M3 quotas Q-1) the CREDITED kalloc: one of the argument pages' credits
+  have h := KL.wp_kalloc_cred (hlc := hlc) (GF := GF) cpu k' fscKalloc fsReadyKmem kc
     (by rw [hnoff]; omega) hK (by rw [hlocks]; simp)
-  unfold wp_kalloc_led_body at h
+  unfold wp_kalloc_cred_body at h
   simp only [kallocAddr] at h
   iapply h
-  iframe Hk Hpc Hl
+  iframe Hk Hpc Hl Hcr
   iframe #
   iapply wpNext_intro_pin
   iintro %c %hpin %spie %spp %R' %- Hk Hpc Hl Hpost %hcs
-  ihave Hpost := kallocPostLed_post fsReadyKmem none k'.proc (R' 10#5) $$ Hpost
+  ihave Hpost : kallocPost fsReadyKmem none (R' 10#5) $$ [Hpost]
+  · unfold kallocPostCred kallocPost
+    icases Hpost with ⟨%hr, Hb, -⟩
+    iright
+    iframe Hb
+    isplitl []
+    · ipureintro; exact hr.2
+    · simp only [availDec_none]; iexact Hav
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce

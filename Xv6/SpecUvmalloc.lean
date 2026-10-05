@@ -24,6 +24,11 @@ the run was non-empty) and carries the null kalloc's receipt
 `walk` node's under `mappages`) is fatal, so the `0` is exactly one
 `KNull` of the running proc, the round's last kalloc.
 
+THE QUOTA (NI M3 quotas Q-1): the new break is within the quota (`hq`;
+`sys_sbrk`'s and `kexec`'s refusals), so every page of the run is a quota
+page, and the table's own credits (`ptOwnRep`) pay for the data pages and
+the walks' nodes: the `0` arm is unreachable (kept, Q-2 re-cuts it).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.UPtDefs
@@ -61,7 +66,8 @@ def wp_uvmalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (hperm : k.regs 13#5 &&& ~~~0x3CE#64 = 0#64)
     (hfree : ∀ i, i < uvmaNp (k.regs 11#5) (k.regs 12#5) →
       pgRoundUpN (k.regs 11#5).toNat + 4096 * i + 4096 ≤ uvmMaxsz →
-      Iris.Std.PartialMap.get? P.um (uvmaVpn0 (k.regs 11#5) + i) = none) : Prop :=
+      Iris.Std.PartialMap.get? P.um (uvmaVpn0 (k.regs 11#5) + i) = none)
+    (hq : (k.regs 12#5).toNat ≤ uQuota) : Prop :=
   kctx cpu k ∗ pcIs cpu uvmallocAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPtAt P M ∗ actLend k.proc ke ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -79,7 +85,7 @@ def wp_uvmalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 
 structure UVMALLOC : Prop where
   wp_uvmalloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat) hnoff hK hlk hroot hold hnew hperm hfree,
-    wp_uvmalloc_body (hlc := hlc) (GF := GF) cpu k γl γk P M ke hnoff hK hlk hroot hold hnew hperm hfree
+    (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat) hnoff hK hlk hroot hold hnew hperm hfree hq,
+    wp_uvmalloc_body (hlc := hlc) (GF := GF) cpu k γl γk P M ke hnoff hK hlk hroot hold hnew hperm hfree hq
 
 end Xv6

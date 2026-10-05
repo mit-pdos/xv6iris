@@ -88,6 +88,7 @@ Imports only definitional files.
 -/
 import Xv6.WaitInv
 import Xv6.SlotLed
+import Xv6.KcredDefs
 
 namespace Xv6
 
@@ -993,10 +994,10 @@ at junk) and the pid counter's boot-era token (WHOLE) -- and the INSTANCE
 that names them (deviation 4), over the ambient cameras (NI M2-X2: the
 instance's `WchGpre` IS the ambient one, so the ledgers' lower bounds a
 citation carries are at the cameras the NI record reads). -/
-theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
+theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF] [Xv6G GF]
     (hinj : ∀ a b, a < NPROC → b < NPROC → procAddr a = procAddr b → a = b) :
     ⊢@{IProp GF} |==> ∃ W : WchG GF, ⌜W.toWchGpre = (inferInstance : WchGpre GF)⌝ ∗
-      @childrenBoot hlc GF _ W ∗ @nextpidPend GF W := by
+      @childrenBoot hlc GF _ W ∗ @nextpidPend GF W ∗ @credBoot GF _ W := by
   imod ghost_map_alloc_empty (GF := GF) (K := GName) (V := BitVec 64 × ExtTreeSet GName compare)
     (H := RegMapF) with ⟨%γ, Ha⟩
   imod chRows_alloc γ NPROC $$ Ha with ⟨%m, Ha, %hm, Hrows⟩
@@ -1038,15 +1039,21 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
   imod ghost_map_alloc_empty (GF := GF) (K := BitVec 64) (V := Bool) (H := AddrMapF)
     with ⟨%γso, Hso⟩
   imod soRows_alloc γso NPROC (Nat.le_refl _) $$ Hso with ⟨%Mso, Hso, %hso, Horows⟩
+  -- ...and (NI M3 quotas Q-1) the page credits at `credTotal` and the pipe
+  -- tickets at `0` (SlotGen deviation 14)
+  imod credSupply_alloc (GF := GF) with ⟨%γkc, Hka, Hkf⟩
+  imod npTickets_alloc (GF := GF) with ⟨%γnt, Hnt⟩
   imodintro
   iexists ({ wchName := γ, worphName := γo, wsgName := γsg, wprName := γpr, wipName := γip,
              npidName := γnp, wtkName := γtk, wplName := γpl, wzlName := γzl,
-             wactName := γact, wzsName := γzs, wslName := γsl, wsoName := γso } : WchG GF)
+             wactName := γact, wzsName := γzs, wslName := γsl, wsoName := γso,
+             wkcName := γkc, wnpName := γnt } : WchG GF)
   isplitl []
   · ipureintro; rfl
   unfold childrenBoot childrenBootRows childrenResBoot childrenOwnAt orphansOwn pidRegAuth
     pidLedAuth zombLedAuth initPidTok nextpidPend tickCnt zsAuth slotLedAuth soAuth soOwn
-  isplitr [Hnp]
+    credBoot credAuth pageCredit npTicketAuth
+  isplitr [Hnp Hka Hkf Hnt]
   · isplitl [Hip]
     · iexact Hip
     isplitl [Ha]
@@ -1101,7 +1108,7 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
     isplitl [Ha]
     · iexact Ha
     · iexact Hz
-  · iexact Hnp
+  · iframe Hnp Hka Hkf Hnt
 
 end WaitInvBoot
 

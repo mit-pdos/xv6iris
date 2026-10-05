@@ -239,7 +239,7 @@ the view `M`), with the table's pure facts. -/
 def userPtInv [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   Register.satp ↦ᵣ[cpu] satpOf .kpt P.root ∗ userPmp cpu ∗
   ⌜uptWf P⌝ ∗
-  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
+  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves ∧ t.shapeQ ∧ (t.pages 2).length = P.np⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
     (∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜utlbOk t tlb⌝) ∗
     umPages P M
 
@@ -268,7 +268,7 @@ text pages stamped at some `K` the hart's instruction view has passed. -/
 def userPtInvX [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   Register.satp ↦ᵣ[cpu] satpOf .kpt P.root ∗ userPmp cpu ∗
   ⌜uptWf P⌝ ∗
-  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
+  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves ∧ t.shapeQ ∧ (t.pages 2).length = P.np⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
     (∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜utlbOk t tlb⌝) ∗
     ∃ K : Nat, iviewLb cpu K ∗ umPagesX K P M
 

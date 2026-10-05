@@ -198,7 +198,30 @@ def urcRut (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU
   fun p => iprop(∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz secc k ksp V⌝ ∗
     userretLeft cpu k ∗ tfPageAt p.tfp V.tf ∗
     (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt (hlc := hlc) PT Γ j cpu p ksp V sts' cs pid) ∗
-    uhistAt Wr)
+    uhistAt Wr ∗
+    -- NI M3 Q-1: the table's credits, at the page count the user tier sees
+    uptCred p)
+
+/-- **The residue at the user tier's page count** (NI M3 Q-1): the kernel
+record's descriptor re-keyed to `{ P with np := n }`; nothing the residue
+owns reads the count. -/
+theorem usertrapResAt_np (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU) (P : UPtd)
+    (ksp : BitVec 64) (V : ProcPriv) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32)
+    (n : Nat) :
+    usertrapResAt (hlc := hlc) (GF := GF) PT Γ j cpu P ksp V sts cs pid ⊢
+      usertrapResAt PT Γ j cpu { P with np := n } ksp { V with upt := { P with np := n } } sts cs pid := by
+  unfold usertrapResAt utResBare
+  iintro ⟨%N, %⟨hup, hk, hN⟩, #Ht, Hc, Hcaps, Hown⟩
+  subst hup
+  have e1 : utTfk (GF := GF) cpu ksp { V with upt := { V.upt with np := n } } = utTfk cpu ksp V := rfl
+  have e2 : utOwnBare (utSysEnvAt (hlc := hlc) (GF := GF) PT Γ j) N { V with upt := { V.upt with np := n } } sts cs pid =
+      utOwnBare (utSysEnvAt PT Γ j) N V sts cs pid := rfl
+  iexists N
+  rw [e1, e2]
+  isplitl []
+  · ipureintro; exact ⟨rfl, hk, hN⟩
+  iframe Hc Hcaps Hown
+  iexact Ht
 
 /-- **Rocq `Rut_at_acc`**: the running token, borrowed. -/
 theorem urcRut_acc (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU) (sz : Nat)
@@ -207,11 +230,11 @@ theorem urcRut_acc (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (c
     urcRut PT Γ j cpu sz γfd cw gn cs pid lz secc Wr p ⊢
       ctxToken cpu ∗ (ctxToken cpu -∗ urcRut PT Γ j cpu sz γfd cw gn cs pid lz secc Wr p) := by
   unfold urcRut userretLeft
-  iintro ⟨%k, %ksp, %V, %hp, ⟨%hw, Hs, Hc, Ht, #Hk, #Hro⟩, Htf, Hcl, Huh⟩
+  iintro ⟨%k, %ksp, %V, %hp, ⟨%hw, Hs, Hc, Ht, #Hk, #Hro⟩, Htf, Hcl, Huh, Hcr⟩
   iframe Ht
   iintro Ht
   iexists k, ksp, V
-  iframe Hs Hc Ht Hk Hro Htf Hcl Huh
+  iframe Hs Hc Ht Hk Hro Htf Hcl Huh Hcr
   isplitr
   · ipureintro; exact hp
   · ipureintro; exact hw

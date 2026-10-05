@@ -209,11 +209,12 @@ theorem mn_procinit (PR : PROCINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
     mainLkRaw pidLockAddr ∗ mainLkRaw waitLockAddr ∗
     ([∗list] i ∈ List.range NPROC, procRaw i) ∗
     fdSlots (NPROC * (NOFILE + FDSPARE)) ∗ irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗ bslots (NPROC * 3) ∗
+    pageCredit (NPROC * slotShare) ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 126#64) -∗
       lockInited pidLockAddr nextpidNameAddr -∗ lockInited waitLockAddr waitLockNameAddr -∗
       ([∗list] i ∈ List.range NPROC, procReady i) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hpl, Hwl, Hraw, Hfd, Hir, Hbs, HΦ⟩
+  iintro ⟨Hk, Hpc, Hpl, Hwl, Hraw, Hfd, Hir, Hbs, Hcr, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_jal cpu _ (KA.«main» + 122#64) false 2384#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_7a]
@@ -224,7 +225,7 @@ theorem mn_procinit (PR : PROCINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
   simp only [procinitAddr] at hpi
   iapply hpi
   unfold mainLkRaw
-  iframe Hk Hpc Hpl Hwl Hraw Hfd Hir Hbs
+  iframe Hk Hpc Hpl Hwl Hraw Hfd Hir Hbs Hcr
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %R' Hk Hpc Hpid Hwait Hready %_

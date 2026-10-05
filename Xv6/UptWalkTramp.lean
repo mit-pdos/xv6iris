@@ -42,7 +42,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 cells, which ride the configuration cells while the kernel runs): the tree,
 owned and representing the leaves, and the hart's TLB, sound for it. -/
 def uptSlot [CurCtx] (cpu : CPU) (P : UPtd) : IProp GF := iprop%
-  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
+  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves ∧ t.shapeQ ∧ (t.pages 2).length = P.np⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
     ∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜utlbOk t tlb⌝
 
 /-- `userPtInv` is the slot, the translation cells and the user pages. -/
@@ -174,7 +174,7 @@ theorem uptTransSpec [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (P : UPtd)
   unfold paOf
   iintro ⟨HmConf, ⟨Hslot, #HS, Htok⟩, HΦ⟩
   unfold uptSlot
-  icases Hslot with ⟨%t, %⟨hbase, hrep⟩, Ho, %tlb, Htlb, %htlb⟩
+  icases Hslot with ⟨%t, %⟨hbase, hrep, hsq, hnp⟩, Ho, %tlb, Htlb, %htlb⟩
   obtain ⟨c1, c0, a, d, hw, hk2, he2, hk1, he1, he0, hp1, hp0⟩ :=
     uptWalk_leaf t P.leaves hrep (vpnOf va) ppn perm hl
   have hpv := hrep.2.2.1
@@ -207,7 +207,8 @@ theorem uptTransSpec [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (P : UPtd)
     iframe Ho
     isplit
     · ipureintro
-      exact ⟨by rw [PTree.base_setLeaf, hbase], uptPtRep_setLeaf t P.leaves hrep (vpnOf va) _ ppn perm a d a' d' hw⟩
+      exact ⟨by rw [PTree.base_setLeaf, hbase], uptPtRep_setLeaf t P.leaves hrep (vpnOf va) _ ppn perm a d a' d' hw,
+        PTree.shapeQ_setLeaf t _ _ hsq, by rw [PTree.pages_setLeaf]; exact hnp⟩
     iexists tlb'
     iframe Htlb
     ipureintro

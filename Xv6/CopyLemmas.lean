@@ -110,7 +110,7 @@ theorem co_walkaddr_call (WA : WALKADDR) [Xv6G GF] [CurCtx]
 theorem co_vmfault_call (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
     (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : vmfaultSlots ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
-    (hroot' : k'.regs 10#5 = pageAddr P.root) (hsz' : (k'.regs 11#5).toNat ≤ 2 ^ 38) (ke : Nat) :
+    (hroot' : k'.regs 10#5 = pageAddr P.root) (hsz' : (k'.regs 11#5).toNat ≤ uQuota) (ke : Nat) :
     kctx c k' ∗ pcIs c KA.«vmfault» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ procPtAt P M ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,

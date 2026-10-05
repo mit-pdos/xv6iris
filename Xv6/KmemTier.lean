@@ -58,7 +58,7 @@ theorem kt_kmapClass_page (p : BitVec 64) (hp : pageValid p) (off : Nat) (hoff :
     · omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-- A context word travels to the kernel table (the kernel tier pins
 nothing). -/
@@ -160,7 +160,7 @@ theorem kt_freelist_class : kmapClass (vpnOf kmemFreelistAddr).toNat = some .rw 
 /-- **The allocator's payload, at the two tiers** (the two directions of
 the equivalence `isLock_payIff` takes). -/
 theorem kt_kmemRes_toKpt (X : CurCtx) (γk : KmemNames) (ξ : CtxId) :
-    @kmemRes hlc GF _ _ X γk ξ ⊢ @kmemRes hlc GF _ _ X.toKpt γk ξ := by
+    @kmemRes hlc GF _ _ _ X γk ξ ⊢ @kmemRes hlc GF _ _ _ X.toKpt γk ξ := by
   unfold kmemRes
   iintro ⟨%head, %pages, Hw, Hc, Ha⟩
   iexists head, pages
@@ -170,7 +170,7 @@ theorem kt_kmemRes_toKpt (X : CurCtx) (γk : KmemNames) (ξ : CtxId) :
   · iapply kt_chainAt_toKpt X ξ pages head $$ Hc
 
 theorem kt_kmemRes_ofKpt (X : CurCtx) (hX : X.curTier = KTier.bare) (γk : KmemNames) (ξ : CtxId) :
-    kmapStatic (GF := GF) ⊢ @kmemRes hlc GF _ _ X.toKpt γk ξ -∗ @kmemRes hlc GF _ _ X γk ξ := by
+    kmapStatic (GF := GF) ⊢ @kmemRes hlc GF _ _ _ X.toKpt γk ξ -∗ @kmemRes hlc GF _ _ _ X γk ξ := by
   unfold kmemRes
   iintro #HS ⟨%head, %pages, Hw, Hc, Ha⟩
   iexists head, pages
@@ -183,19 +183,19 @@ theorem kt_kmemRes_ofKpt (X : CurCtx) (hX : X.curTier = KTier.bare) (γk : KmemN
 switch over the Bare reading, held after it at the kernel one. -/
 theorem kt_isLock_kmem_toKpt [KernelGeom] (X : CurCtx) (hX : X.curTier = KTier.bare) (γl : GName)
     (γk : KmemNames) :
-    kmapStatic (GF := GF) ⊢ @isLock hlc GF _ _ X γl kmemLockAddr "kmem" (@kmemRes hlc GF _ _ X γk) -∗
-      @isLock hlc GF _ _ X.toKpt γl kmemLockAddr "kmem" (@kmemRes hlc GF _ _ X.toKpt γk) := by
+    kmapStatic (GF := GF) ⊢ @isLock hlc GF _ _ X γl kmemLockAddr "kmem" (@kmemRes hlc GF _ _ _ X γk) -∗
+      @isLock hlc GF _ _ X.toKpt γl kmemLockAddr "kmem" (@kmemRes hlc GF _ _ _ X.toKpt γk) := by
   iintro #HS #Hl
-  iapply (@isLock_payIff hlc GF _ _ X.toKpt γl kmemLockAddr "kmem" (@kmemRes hlc GF _ _ X γk)
-    (@kmemRes hlc GF _ _ X.toKpt γk))
+  iapply (@isLock_payIff hlc GF _ _ X.toKpt γl kmemLockAddr "kmem" (@kmemRes hlc GF _ _ _ X γk)
+    (@kmemRes hlc GF _ _ _ X.toKpt γk))
   · imodintro
     iintro %ξ H
     iapply kt_kmemRes_toKpt X γk ξ $$ H
   · imodintro
     iintro %ξ H
     iapply kt_kmemRes_ofKpt X hX γk ξ $$ HS H
-  · iapply (show @isLock hlc GF _ _ X γl kmemLockAddr "kmem" (@kmemRes hlc GF _ _ X γk) ⊢
-        @isLock hlc GF _ _ X.toKpt γl kmemLockAddr "kmem" (@kmemRes hlc GF _ _ X γk) from .rfl) $$ Hl
+  · iapply (show @isLock hlc GF _ _ X γl kmemLockAddr "kmem" (@kmemRes hlc GF _ _ _ X γk) ⊢
+        @isLock hlc GF _ _ X.toKpt γl kmemLockAddr "kmem" (@kmemRes hlc GF _ _ _ X γk) from .rfl) $$ Hl
 
 end
 

@@ -410,12 +410,14 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
       -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
       eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
+      -- THE CREDIT AUTHORITY (NI M3 quotas Q-1), into the allocator's payload
+      credAuth credTotal -∗
       |={E}=> ∃ (I : Icfg) (F : Fscfg),
         fsCfgSnapPost (hlc := hlc) I F dk S.fssSb nib cov γd γv cnm (snapSpent S nib) Pb Xexc := by
   -- the WAL's own row (b): every block of the committed view is whole
   have hdf : dblkFull (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) := fun b bs h => by
     rw [← snapRestrict_val Pb _ b bs h]; exact hlPb b
-  iintro Hdisk Hclaim #Hdurl Hstok Hsnap
+  iintro Hdisk Hclaim #Hdurl Hstok Hsnap Hca
   -- THE TIE IS A READING
   ihave %hok := fsSnap_readOk gsn gln gtn _ S hdf $$ Hsnap
   -- 1. the log's gnames
@@ -459,7 +461,7 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
   imod (lockGhostAlloc (GF := GF)) with ⟨%gkm, Hkmlk⟩
   imod (lockGhostAlloc (GF := GF)) with ⟨%gdl, Hdllk⟩
   imod (lockGhostAlloc (GF := GF)) with ⟨%gpr, Hprlk⟩
-  imod (kmemGhost_alloc (GF := GF)) with ⟨%γk, Hkav, Hkauth⟩
+  imod (kmemGhost_alloc (GF := GF)) $$ Hca with ⟨%γk, Hkav, Hkauth⟩
   imod (icNamesAlloc (GF := GF) (fun _ => ((0 : BitVec 32), (0 : BitVec 32))))
     with ⟨%cn, Htok, Hdep, Hgid⟩
   imodintro
@@ -550,6 +552,8 @@ theorem fsCfgAllocSnap_wf (mk : GName → GName → KmemNames → UartNames → 
       -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
       eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
+      -- THE CREDIT AUTHORITY (NI M3 quotas Q-1), into the allocator's payload
+      credAuth credTotal -∗
       |={E}=> ∃ (I : Icfg) (F : Fscfg),
         fsCfgSnapPost (hlc := hlc) I F dk S.fssSb nib cov γd γv cnm (snapSpent S nib) Pb
           (hdrWset (fsBlocks dk) S.fssSb.sbLogstart) := by
@@ -594,6 +598,8 @@ theorem fsCfgAllocSnap [CurCtx]
       -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
       eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
+      -- THE CREDIT AUTHORITY (NI M3 quotas Q-1), into the allocator's payload
+      credAuth credTotal -∗
       |={E}=> ∃ (I : Icfg) (F : Fscfg),
         fsCfgSnapPost (hlc := hlc) I F dk S.fssSb nib cov γd γv cnm (snapSpent S nib) Pb
           (hdrWset (fsBlocks dk) S.fssSb.sbLogstart) :=

@@ -29,8 +29,15 @@ F3): with `alloc = 1` and `va < 2^38` the walk returns `0` only when a
 persistent receipt `kNullRcpt γk k.proc` (`KallocDefs`), as the wand
 `⌜R' 10 = 0⌝ -∗ kNullRcpt γk k.proc`; callers that do not cite it drop it.
 
+THE PAYMENT (NI M3 quotas Q-1): the allocating contract takes `kPay γk on
+m` for the `m = t.missingOn 2 vpn` nodes the walk may create -- the tracked
+count at the boot, the sealed count and `m` credits past it -- and hands
+back the payment for the rest; past the seal every node is paid for, so
+`availZero` refutes the `0` arm (`R' 10 = 0 → availZero …`).
+
 Deviations from Rocq: L3a, no Rocq counterpart (Rocq's `wp_walk` takes no
-lend); the null receipt (F2), no Rocq counterpart.
+lend); the null receipt (F2), no Rocq counterpart; the payment (NI M3
+quotas Q-1), no Rocq counterpart.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -62,13 +69,13 @@ def wp_walk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     (halloc : k.regs 12#5 = 1#64) (hwf : t.wfU 2) (hnd : t.pagesNodup 2)
     (hpg : ∀ b ∈ t.pages 2, pageValid (pageAddr b)) : Prop :=
   kctx cpu k ∗ pcIs cpu walkAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-  ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗ actLend k.proc ke ∗
+  ptreeOwn 2 (DFrac.own 1) t ∗ kPay γk on (t.missingOn 2 (vpnOf (k.regs 11#5))) ∗ actLend k.proc ke ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ (R' : RegMap) (fresh : List (BitVec 44)),
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     ptreeOwn 2 (DFrac.own 1) (t.fill 2 (vpnOf (k.regs 11#5)) fresh).1 -∗
-    kallocAvail γk (availSub on fresh.length) -∗
+    kPay γk (availSub on fresh.length) (t.missingOn 2 (vpnOf (k.regs 11#5)) - fresh.length) -∗
     (⌜R' 10#5 = 0#64⌝ -∗ kNullRcpt γk k.proc) -∗
     ⌜calleeSaved k.regs R' ∧
       (t.fill 2 (vpnOf (k.regs 11#5)) fresh).2 = [] ∧

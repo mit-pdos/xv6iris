@@ -226,7 +226,7 @@ cell), given what `b` claims at the new break. -/
 def sysSbrkBack (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   ∀ (v : BitVec 64) (b : Bool),
-    ⌜v.toNat ≤ uvmMaxsz ∧ umBelow v V.upt ∧ (b = false → lazyFree V.upt.um v)⌝ -∗
+    ⌜v.toNat ≤ uQuota ∧ umBelow v V.upt ∧ (b = false → lazyFree V.upt.um v)⌝ -∗
     (wordPointsTo (pSz pa) 8 (DFrac.own 1) v ∗
       wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
       tfPageAt V.upt.tfp V.tf) -∗
@@ -237,7 +237,7 @@ two `argint` calls), with its pure row and the closing wand. -/
 theorem sys_sbrk_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
+      ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧
         V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
       ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
       wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
@@ -447,7 +447,8 @@ theorem sys_sbrk_growproc (GP : GROWPROC) (c : CPU) (k' : KCtx) (γl : GName) (�
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hj : j < NPROC) (hproc : k'.proc = procAddr j)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : growprocSlots ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) :
+    (htier : k'.tier = KTier.kpt)
+    (hq : 0 < (k'.regs 10#5).toInt → V.sz.toNat + (k'.regs 10#5).toInt.toNat ≤ uQuota) :
     kctx c k' ∗ pcIs c KA.«growproc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ procPrivFd γ (procAddr j) pid V M ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -460,7 +461,7 @@ theorem sys_sbrk_growproc (GP : GROWPROC) (c : CPU) (k' : KCtx) (γl : GName) (�
           kNullRcpt γk k'.proc)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := GP.wp_growproc (hlc := hlc) (GF := GF) c k' γl γk γ j pid V M hj hproc hnoff hK hlk htier
+  have h := GP.wp_growproc (hlc := hlc) (GF := GF) c k' γl γk γ j pid V M hj hproc hnoff hK hlk htier hq
   unfold wp_growproc_body at h
   simp only [growprocAddr] at h
   exact h
@@ -499,7 +500,7 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [sys_sbrk_br_growproc] next c2 hp2
   iintro Hk Hpc
   ihave HΦ := wpNext_shift _ _ _ _ _ hp2 $$ HΦ
-  iapply (sys_sbrk_growproc GP c2 _ γl γk γ j pid V M hj ?hpr ?hn ?hKg ?hl ?ht) $$ [- $Hk $Hpc]
+  iapply (sys_sbrk_growproc GP c2 _ γl γk γ j pid V M hj ?hpr ?hn ?hKg ?hl ?ht ?hqg) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sys_sbrk_ret_60, sys_sbrk_arg_def, h10]
   iframe Hav Hpv
@@ -509,6 +510,11 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
   case hKg => k_norm_g; unfold sysSbrkSlots at hK; omega
   case hl => k_norm_g; exact hlk
   case ht => k_norm_g; exact htier
+  case hqg =>
+    k_norm_g [sys_sbrk_arg_def, h10]
+    intro hpos
+    unfold sysSbrkOverrun at hnq
+    omega
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hres %hcs2
   k_norm_g [sys_sbrk_ret_60, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs, sys_sbrk_arg_def, h10]
@@ -596,7 +602,7 @@ theorem sys_sbrk_lazy (MP : MYPROC) (c : CPU) (k : KCtx) (γl : GName) (γk : Km
     (R : RegMap) (hpins : sysSbrkPins k R) (h9 : R 9#5 = V.sz) (h10 : R 10#5 = sysSbrkArg v0)
     (w32 w48 : BitVec 64) (hal : (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64).toNat % 8 = 0)
     (hnot : ¬ sysSbrkEager v1) (hneg : ¬ (sysSbrkArg v0).toInt < 0) (hnq : ¬ sysSbrkOverrun V v0)
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
+    (hf : V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧
       V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp) :
     kctx c (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs c (KA.«sys_sbrk» + 0x46#64) ∗
     sysSbrkFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w32 w48
@@ -617,7 +623,7 @@ theorem sys_sbrk_lazy (MP : MYPROC) (c : CPU) (k : KCtx) (γl : GName) (γk : Km
   unfold sysSbrkFrame
   icases Hframe with ⟨F0, F1, F2, F3, Fn, Ft, F5⟩
   obtain ⟨hnlt, hnint⟩ := sys_sbrk_arg_nonneg v0 (by omega)
-  obtain ⟨hsum1, hsum2⟩ := sys_sbrk_sum V.sz (sysSbrkArg v0) hf.1 hnlt
+  obtain ⟨hsum1, hsum2⟩ := sys_sbrk_sum V.sz (sysSbrkArg v0) (Nat.le_trans hf.1 uQuota_le_uvmMaxsz) hnlt
   -- c.add a0,a0,s1 ; a5 = TRAPFRAME
   k_step_gen (wp_s_add c _ (KA.«sys_sbrk» + 0x46#64) true 10#5 10#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [KCtx.rget_eq, h9, h10] next c3 hp3
@@ -699,7 +705,7 @@ theorem sys_sbrk_lazy (MP : MYPROC) (c : CPU) (k : KCtx) (γl : GName) (γk : Km
   -- claim is vacuous
   unfold sysSbrkBack
   ihave Hpv := Hback $$ %(V.sz + sysSbrkArg v0) %true
-    %⟨by omega, Xv6.UPt.umBelow_mono V.sz _ V.upt hle hf.2.1, fun h => absurd h (by decide)⟩
+    %⟨by unfold sysSbrkOverrun at hnq; omega, Xv6.UPt.umBelow_mono V.sz _ V.upt hle hf.2.1, fun h => absurd h (by decide)⟩
     [Hsz Htf Htp]
   case' _ => iframe
   ihave Hframe := sys_sbrk_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w32 w48
@@ -722,7 +728,7 @@ theorem sys_sbrk_lazy (MP : MYPROC) (c : CPU) (k : KCtx) (γl : GName) (γk : Km
     exact hoko
   case hno =>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, e9, h9]
-    exact fun h => sys_sbrk_sz_ne V.sz hf.1 h.1
+    exact fun h => sys_sbrk_sz_ne V.sz (Nat.le_trans hf.1 uQuota_le_uvmMaxsz) h.1
 
 /-! ## The mode tests (`+0x38`): `t == SBRK_EAGER || n < 0` goes eager (`+0x68`), else lazy (`+0x46`) -/
 
@@ -736,7 +742,7 @@ theorem sys_sbrk_mode (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
     (R : RegMap) (hpins : sysSbrkPins k R) (h9 : R 9#5 = V.sz) (h10 : R 10#5 = sysSbrkArg v0)
     (w32 w48 : BitVec 64) (hal : (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64).toNat % 8 = 0)
     (hnq : ¬ sysSbrkOverrun V v0)
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
+    (hf : V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧
       V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp)
     (hlz : V.pvLazy = false → lazyFree V.upt.um V.sz) :
     kctx c (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs c (KA.«sys_sbrk» + 0x38#64) ∗
@@ -781,7 +787,7 @@ theorem sys_sbrk_mode (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
     case' _ => iframe
     ihave Hpv := sys_sbrk_priv_same γ (procAddr j) pid V M $$ Hpv
     iapply (sys_sbrk_eager GP c3 k γl γk γ j pid V M v0 v1 hj hproc hnoff hK hlk htier spie spp hsp _
-      ?hpe ?h9e ?h10e w32 w48 (BitVec.extractLsb' 0 32 v1) hal (Or.inl heager) hf.1 hnq)
+      ?hpe ?h9e ?h10e w32 w48 (BitVec.extractLsb' 0 32 v1) hal (Or.inl heager) (Nat.le_trans hf.1 uQuota_le_uvmMaxsz) hnq)
     all_goals first | (unfold sysSbrkFrame; iframe; iframe #; done) | skip
     case hpe => exact hpins' _ _
     case h9e => exact h9' _ _
@@ -808,7 +814,7 @@ theorem sys_sbrk_mode (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
       case' _ => iframe
       ihave Hpv := sys_sbrk_priv_same γ (procAddr j) pid V M $$ Hpv
       iapply (sys_sbrk_eager GP c5 k γl γk γ j pid V M v0 v1 hj hproc hnoff hK hlk htier spie spp hsp _
-        ?hpe ?h9e ?h10e w32 w48 (BitVec.extractLsb' 0 32 v1) hal (Or.inr hneg) hf.1 hnq)
+        ?hpe ?h9e ?h10e w32 w48 (BitVec.extractLsb' 0 32 v1) hal (Or.inr hneg) (Nat.le_trans hf.1 uQuota_le_uvmMaxsz) hnq)
       all_goals first | (unfold sysSbrkFrame; iframe; iframe #; done) | skip
       case hpe => exact hpins' _ _
       case h9e => exact h9' _ _
@@ -992,7 +998,7 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
       with [KCtx.rget_eq, sys_sbrk_blez_neg (sysSbrkArg v0) (by omega)] next c14 hp14
     iintro Hk Hpc
     obtain ⟨hnlt, hnint⟩ := sys_sbrk_arg_nonneg v0 (by omega)
-    obtain ⟨hsum1, hsum2⟩ := sys_sbrk_sum V.sz (sysSbrkArg v0) hf.1 hnlt
+    obtain ⟨hsum1, hsum2⟩ := sys_sbrk_sum V.sz (sysSbrkArg v0) (Nat.le_trans hf.1 uQuota_le_uvmMaxsz) hnlt
     -- add a5,a0,s1 ; lui a4,0xc0 ; bltu a4,a5 -> +0x7c   (the quota)
     k_step_gen (wp_s_add c14 _ (KA.«sys_sbrk» + 0x2c#64) false 15#5 10#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, RegMap.set_apply] next c15 hp15

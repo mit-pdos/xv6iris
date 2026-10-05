@@ -291,7 +291,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
   -- the core, opened
   icases (procPrivCoreNoctxAt_bare curCtx pa pid V M).1 $$ Hcore with ⟨Hcore, Hcw⟩
   icases (show procPrivBareAt (GF := GF) curCtx pa pid V M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
+      ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
         V.trapframe = pageAddr V.upt.tfp⌝ ∗
       wordPointsTo (pPid pa) 4 pidPriv pid ∗
       (wordPointsTo (pKstack pa) 8 (DFrac.own 1) V.kstack ∗

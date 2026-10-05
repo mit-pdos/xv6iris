@@ -394,11 +394,11 @@ theorem pw_ch_carve (sp : BitVec 64) (w : BitVec 64) :
 theorem pw_privExt_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M' : Nat → List (BitVec 8)) :
     procPrivBareAt (GF := GF) curCtx pa pid { V with upt := P } M' ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P ∧ V.pagetable = pageAddr P.root ∧
+      ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz P ∧ V.pagetable = pageAddr P.root ∧
         V.trapframe = pageAddr P.tfp⌝ ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P M' ∗ @ecRest hlc GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V P := by
+      @procPtAt hlc GF _ _ _ ⟨curCtx, KTier.kpt⟩ P M' ∗ @ecRest hlc GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V P := by
   unfold procPrivBareAt ecRest procFieldsNoOfile
   iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hcwd, Hnm, Hsc, Hrt⟩, Hspace, Htfp⟩
   isplitl []
@@ -407,11 +407,11 @@ theorem pw_privExt_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : 
 
 theorem pw_privExt_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P P' : UPtd)
     (M'' : Nat → List (BitVec 8)) (hext : P.extSz V.sz P')
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P ∧ V.pagetable = pageAddr P.root ∧
+    (hf : V.sz.toNat ≤ uQuota ∧ umBelow V.sz P ∧ V.pagetable = pageAddr P.root ∧
       V.trapframe = pageAddr P.tfp) :
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-    @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M'' ∗ @ecRest hlc GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V P ⊢
+    @procPtAt hlc GF _ _ _ ⟨curCtx, KTier.kpt⟩ P' M'' ∗ @ecRest hlc GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V P ⊢
       procPrivBareAt (GF := GF) curCtx pa pid { V with upt := P' } M'' := by
   unfold procPrivBareAt ecRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]

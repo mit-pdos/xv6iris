@@ -63,6 +63,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
     [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu cr : CPU) (k : KCtx)
     (γ : FileNames) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat)
+    (hsealed : on = none)
     (pidv : BitVec 32) (dqp : DFrac) (st : FdState) (q : Qp) (Φc : IProp GF) (ke : Nat) (C : FContent)
     (pn : FPNames) (spie spp : Bool) (R R4 : RegMap)
     (hK : filecloseSlots ≤ k.avail) (hnoff : k.noff = 0) (hlocks : k.locks = [])
@@ -255,7 +256,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_438] next c5 hp5
       iintro Hk Hpc
       icases fcRest_pipe pn C hty $$ Hc with ⟨#Hpipe, Hpr, Hir⟩
-      iapply (fc_pipeclose PC Γ c5 _ pn.lock pn.pipe (fcWbool C) γkl γk on Φc ke k.proc ?hpP ?hw ?hnp ?hKp
+      iapply (fc_pipeclose PC Γ c5 _ pn.lock pn.pipe (fcWbool C) γkl γk on hsealed Φc ke k.proc ?hpP ?hw ?hnp ?hKp
           ?hpp ?hpr ?hkp ?hnpp ?htp)
         $$ [- $Hk $Hpc $Hav $Hlend]
       rotate_right 1
@@ -334,6 +335,7 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO 
     [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx)
     (γl : GName) (γ : FileNames) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat)
+    (hsealed : on = none)
     (pidv : BitVec 32) (dqp : DFrac)
     (kk : Nat) (st : FdState) (q : Qp) (Φc : IProp GF) (ke : Nat) (C : FContent) (pn : FPNames)
     (M : RegMapF (Nat × Qp)) (nx : Nat)
@@ -504,7 +506,7 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO 
   k_norm_g at hcs4
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs4
   have hpinr : k.sie = false ∨ k.proc = 0#64 → cr = cpu := fun h => (hpr h).trans (hpin h)
-  iapply (fc_disp PC BO IP EO Γ cpu cr k γ j γkl γk on pidv dqp st q Φc ke C pn spie spp R R4 hK hnoff hlocks
+  iapply (fc_disp PC BO IP EO Γ cpu cr k γ j γkl γk on hsealed pidv dqp st q Φc ke C pn spie spp R R4 hK hnoff hlocks
       htier hok2 hpinr hR2 hpins e2 e18 e19 e20 e21 e22 e23 e24 e25 e26 e27)
     $$ [$Hk $Hpc $Hra $Hs0 $Hs1 $Hc0 $Hc32 $Hc24 $Hc16 $Hc8 $Hfd $Hte $Hce $Hpe $Hpid $Henv $Hcpay
       $Hlend $Hnext $Hc]

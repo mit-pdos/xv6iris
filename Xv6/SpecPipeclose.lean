@@ -75,7 +75,7 @@ def wp_pipeclose_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : pipecloseSlots ≤ k.avail)
     (hpipe : "pipe" ∉ k.locks) (hproc : "proc" ∉ k.locks) (hkmem : "kmem" ∉ k.locks)
     (hnpipe : "npipe" ∉ k.locks)
-    (htier : k.tier = KTier.kpt) : Prop :=
+    (htier : k.tier = KTier.kpt) (hsealed : on = none) : Prop :=
   kctx cpu k ∗ pcIs cpu pipecloseAddr ∗
   isPipe γl γp (k.regs 10#5) ∗ pipeRef γp w 1 ∗
   -- THE CLOSE STEP OF THE BYTE QUEUE: a close link, or the taint
@@ -99,8 +99,8 @@ structure PIPECLOSE : Prop where
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φ : IProp GF) (ke : Nat)
-    hw hnoff hK hpipe hproc hkmem hnpipe htier,
+    hw hnoff hK hpipe hproc hkmem hnpipe htier hsealed,
     wp_pipeclose_body (hlc := hlc) (GF := GF) Γ cpu k γl γp w γkl γk on Φ ke
-      hw hnoff hK hpipe hproc hkmem hnpipe htier
+      hw hnoff hK hpipe hproc hkmem hnpipe htier hsealed
 
 end Xv6

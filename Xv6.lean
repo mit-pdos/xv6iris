@@ -107,6 +107,8 @@ import Xv6.ZombEv
 import Xv6.SlotEv
 import Xv6.SlotLed
 import Xv6.KallocDefs
+import Xv6.QuotaDefs
+import Xv6.KcredDefs
 import Xv6.PipeNames
 import Xv6.PipeQueue
 import Xv6.PipeInvDefs
@@ -205,6 +207,7 @@ import Xv6.SpecScheduler
 import Xv6.ProofScheduler
 import Xv6.LinkScheduler
 import Xv6.UPtDefs
+import Xv6.UPtShape
 import Xv6.SpecUvmcreate
 import Xv6.SpecWalkaddr
 import Xv6.SpecIsmapped
@@ -228,6 +231,7 @@ import Xv6.SpecUvmcopy
 import Xv6.UPtFaultLemmas
 
 import Xv6.UPtLemmas
+import Xv6.UPtReserve
 import Xv6.PidLock
 import Xv6.SpecProcPagetable
 import Xv6.SpecProcFreepagetable
@@ -300,6 +304,7 @@ import Xv6.SpecHoldingsleep
 import Xv6.SpecProcdump
 import Xv6.SpecKfork
 import Xv6.SpecUserinit
+import Xv6.QuotaFit
 import Xv6.EitherDefs
 import Xv6.SpecEitherCopyout
 import Xv6.SpecEitherCopyin

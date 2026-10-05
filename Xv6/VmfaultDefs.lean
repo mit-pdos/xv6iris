@@ -52,17 +52,10 @@ theorem vf_ret_14e4 : jumpPc (KA.«vmfault» + 0x4c#64) = (KA.«vmfault» + 0x4c
 theorem vf_ret_14f2 : jumpPc (KA.«vmfault» + 0x5a#64) = (KA.«vmfault» + 0x5a#64) := by
   decide
 
-theorem vf_ret_1502 : jumpPc (KA.«vmfault» + 0x6a#64) = (KA.«vmfault» + 0x6a#64) := by
-  decide
-
 /-- A `beqz` on a value known to be nonzero. -/
 theorem vf_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
   rw [if_neg (by simp only [bcond, beq_iff_eq]; exact fun hc => h hc)]
-
-theorem vf_bne_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
-    (if bcond bop.BNE x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
 
 /-- `UPtFault`'s `uptWf` lemma at `UPtd.clearU` (the same record). -/
 theorem vf_uptWf_clearU (P : UPtd) (vpn : Nat) (w : BitVec 64) (hwf : uptWf P)
@@ -136,7 +129,7 @@ theorem vf_round_bound (va : BitVec 64) (h : va.toNat < 2 ^ 38) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-- The exit context at the caller's own interrupt state. -/
 theorem vf_kctx_withSpie_self [CurCtx] [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx)
@@ -218,7 +211,7 @@ theorem vmfault_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegM
 
 set_option maxHeartbeats 1000000 in
 /-- The user pages of `UPtd.clearU`. -/
-theorem vf_umPages_clearU [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (vpn : Nat)
+theorem vf_umPages_clearU [WchG GF] [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (vpn : Nat)
     (w : BitVec 64) (hmap : Iris.Std.PartialMap.get? P.um vpn = some w) :
     umPages (GF := GF) P M ⊢ umPages (P.clearU vpn w) M :=
   UPtFault.umPages_clearU P M vpn w hmap
@@ -241,22 +234,6 @@ theorem vf_ismapped_call (IM : ISMAPPED) [CurCtx] (c : CPU) (k' : KCtx) (dq : DF
   unfold wp_ismapped_body at h
   simp only [ismappedAddr] at h
   exact h
-
-set_option maxHeartbeats 1000000 in
-/-- `kfree`'s led contract at its entry address, at a lend (permit sweep
-L3b): the lend back stepped. -/
-theorem vf_kfree_call [WchG GF] (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (on : Option Nat) (ke : Nat) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail)
-    (hlk : "kmem" ∉ k'.locks) (hp : pageValid (k'.regs 10#5)) :
-    kctx c k' ∗ pcIs c KA.«kfree» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    pageOwn (k'.regs 10#5) ∗ kallocAvail γk on ∗ actLend k'.proc ke ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      actLend k'.proc (ke + 1) -∗
-      kallocAvail γk (availInc on) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c :=
-  uc_kfree_lend_call KF c k' γl γk on ke hnoff hK hlk hp
 
 set_option maxHeartbeats 1000000 in
 /-- `memset`'s contract at its entry address. -/
@@ -286,7 +263,7 @@ theorem vf_mappages_call [WchG GF] (MA : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : 
     (hrwx : perm &&& 0xE#64 ≠ 0#64) (hwf : t.wfU 2) (hnd : t.pagesNodup 2)
     (hpg : ∀ b ∈ t.pages 2, pageValid (pageAddr b)) (ke : Nat) :
     kctx c k' ∗ pcIs c KA.«mappages» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗ actLend k'.proc ke ∗
+    ptreeOwn 2 (DFrac.own 1) t ∗ kPay γk on (t.missingRun (vpnOf (k'.regs 11#5)) n) ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool,
       ∀ (R' : RegMap) (fresh : List (BitVec 44)),
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -294,7 +271,7 @@ theorem vf_mappages_call [WchG GF] (MA : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : 
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       ptreeOwn 2 (DFrac.own 1)
         (t.mapRun (vpnOf (k'.regs 11#5)) (BitVec.extractLsb' 12 44 (k'.regs 13#5)) perm n fresh).1 -∗
-      kallocAvail γk (availSub on fresh.length) -∗
+      kPay γk (availSub on fresh.length) (t.missingRun (vpnOf (k'.regs 11#5)) n - fresh.length) -∗
       ⌜calleeSaved k'.regs R' ∧
         (t.mapRun (vpnOf (k'.regs 11#5)) (BitVec.extractLsb' 12 44 (k'.regs 13#5)) perm n fresh).2.1
           = [] ∧

@@ -185,24 +185,25 @@ end tree
 
 /-- **Rocq `pt_same_shape`** (deviation 3): the same root and the same node
 pages; the entry WORDS are free.  What an A/D write-back keeps. -/
-def UbSameShape (lvl : Nat) (t t' : PTree) : Prop := t'.base = t.base ∧ t'.pages lvl = t.pages lvl
+def UbSameShape (lvl : Nat) (t t' : PTree) : Prop :=
+  t'.base = t.base ∧ t'.pages lvl = t.pages lvl ∧ (lvl = 2 → t.shapeQ → t'.shapeQ)
 
-theorem ubSameShape_refl (lvl : Nat) (t : PTree) : UbSameShape lvl t t := ⟨rfl, rfl⟩
+theorem ubSameShape_refl (lvl : Nat) (t : PTree) : UbSameShape lvl t t := ⟨rfl, rfl, fun _ h => h⟩
 
 theorem ubSameShape_trans (lvl : Nat) (t₁ t₂ t₃ : PTree) (h₁ : UbSameShape lvl t₁ t₂)
     (h₂ : UbSameShape lvl t₂ t₃) : UbSameShape lvl t₁ t₃ :=
-  ⟨h₂.1.trans h₁.1, h₂.2.trans h₁.2⟩
+  ⟨h₂.1.trans h₁.1, h₂.2.1.trans h₁.2.1, fun hl h => h₂.2.2 hl (h₁.2.2 hl h)⟩
 
 /-- The write-back of a walk's leaf keeps the shape. -/
 theorem ubSameShape_setLeaf (lvl : Nat) (t : PTree) (vpn : BitVec 27) (v : BitVec 64) :
     UbSameShape lvl t (t.setLeaf lvl vpn v) :=
-  ⟨PTree.base_setLeaf lvl t vpn v, PTree.pages_setLeaf lvl t vpn v⟩
+  ⟨PTree.base_setLeaf lvl t vpn v, PTree.pages_setLeaf lvl t vpn v, fun hl h => by subst hl; exact PTree.shapeQ_setLeaf t vpn v h⟩
 
 /-- Same-shaped trees have the same byte addresses (Rocq
 `ptree_bytes_dom_shape`). -/
 theorem ubTreeAddrs_shape (lvl : Nat) (t t' : PTree) (h : UbSameShape lvl t t') :
     ubTreeAddrs lvl t' = ubTreeAddrs lvl t := by
-  unfold ubTreeAddrs; rw [h.2]
+  unfold ubTreeAddrs; rw [h.2.1]
 
 /-! ## §3 The data pages -/
 
@@ -383,6 +384,8 @@ structure UbMemWf (P : UPtd) (t : PTree) (mm : BMap) : Prop where
   nodup : (ubUAddrs P t).Nodup
   dom : ∀ a, (mm a).isSome = true ↔ a ∈ ubUAddrs P t
   tree : ∀ p ∈ ubTreeBytes 2 t, mm p.1 = some p.2
+  sq : t.shapeQ
+  np : (t.pages 2).length = P.np
 
 /-- **Rocq `u_mem_step`**: what a user cycle may do to the owned map --
 the data bytes arbitrary at the same domain, the tree moved to a
@@ -397,7 +400,8 @@ structure UbMemStep (P : UPtd) (t t' : PTree) (mm mm' : BMap) : Prop where
 theorem ubMemStep_wf (P : UPtd) (t t' : PTree) (mm mm' : BMap) (hwf : UbMemWf P t mm)
     (hs : UbMemStep P t t' mm mm') : UbMemWf P t' mm' := by
   have ha : ubUAddrs P t' = ubUAddrs P t := by unfold ubUAddrs; rw [ubTreeAddrs_shape 2 t t' hs.shape]
-  refine ⟨hs.shape.1.trans hwf.root, hs.rep, hwf.wf, by rw [ha]; exact hwf.nodup, fun a => ?_, hs.tree⟩
+  refine ⟨hs.shape.1.trans hwf.root, hs.rep, hwf.wf, by rw [ha]; exact hwf.nodup, fun a => ?_, hs.tree,
+    hs.shape.2.2 rfl hwf.sq, by rw [hs.shape.2.1]; exact hwf.np⟩
   rw [hs.dom a, ha]; exact hwf.dom a
 
 /-- Rocq `u_mem_step_refl`. -/

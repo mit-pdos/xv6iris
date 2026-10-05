@@ -312,23 +312,27 @@ theorem bootShared_kptRows [CurCtx] (cn : ConsNames) :
       consGhostsBoot cn -∗
       fdSlots (NPROC * (NOFILE + FDSPARE)) -∗ irefSlots (NPROC * (IREFHOME + IREFSPARE)) -∗
       irefSlots NFILE -∗ bslots (NPROC * 3) -∗
+      -- the slots' and the pipe lock's page credits (NI M3 quotas Q-1)
+      pageCredit (NPROC * slotShare) -∗ pageCredit NPIPE -∗ npTicketAuth 0 -∗
       mainLocksRaw ∗ mainGlobalsRaw cn ∗ mainSbRaw ∗ mainLogRaw ∗
       wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗ wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32 ∗
       (∃ (vl : BitVec 32) (vn vc pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)),
         diskInitCells vl vn vc pd0 pav0 pu0 free0) := by
-  iintro #Hk Hpr Hi Ht Hring H1 H2 Hpl Hwl Htl Hbc Hsb Hit Hlog Hft Hdk Hnl Hnc Hg Hfd Hir Hirf Hbs
+  iintro #Hk Hpr Hi Ht Hring H1 H2 Hpl Hwl Htl Hbc Hsb Hit Hlog Hft Hdk Hnl Hnc Hg Hfd Hir Hirf Hbs Hcs Hcp Hnt
   ihave HR := bootCarveProc_rows (GF := GF) cn $$ Hk Hpr Hi Ht Hring Hg
   ihave HF := bootCarveProc_first (GF := GF) $$ Hk H1
   ihave HN := bootCarveProc_nextpid (GF := GF) $$ Hk H2
   icases bootCarveFs_bcache (GF := GF) curCtx $$ Hk Hbc with ⟨Hbl, Hhd, Hbi, Hbd⟩
   icases bootCarveFs_itable (GF := GF) $$ Hk Hit with ⟨Hil, Hsl, Hie⟩
   icases bootCarve_ftable (GF := GF) curCtx $$ Hk Hft with ⟨Hfl, Hfe⟩
-  ihave Hnp := bootCarve_npipe (GF := GF) $$ Hk Hnl Hnc
+  ihave Hsh := npipeShare_boot (GF := GF) $$ [Hcp Hnt]
+  · iframe Hcp Hnt
+  ihave Hnp := bootCarve_npipe (GF := GF) $$ Hk Hnl Hnc Hsh
   ihave HL := bootCarveFs_mainLocksRaw (GF := GF) $$ Hk Hpl Hwl Htl Hbl Hil Hfl Hnp
   ihave HS := bootCarveFs_sb (GF := GF) $$ Hk Hsb
   ihave HLg := bootCarveFs_log (GF := GF) $$ Hk Hlog
   ihave HD := bootCarveFs_diskEx (GF := GF) $$ Hk Hdk
-  ihave HG := bootCarveProc_mainGlobalsRaw (GF := GF) cn $$ HR Hfd Hir Hfe Hirf Hbs Hhd Hbi Hbd Hsl Hie
+  ihave HG := bootCarveProc_mainGlobalsRaw (GF := GF) cn $$ HR Hfd Hir Hfe Hirf Hbs Hcs Hhd Hbi Hbd Hsl Hie
   iframe HL HG HS HLg HF HN HD
 
 end carveRows
@@ -575,15 +579,17 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   unfold bsdDevRows
   icases Hdv with ⟨%hcn, %hcne, #Hi0, #Hi1, #Hpl, #Hdi, #Hcc, Hm0, Hm1, Hg, Hcfg, Hgh, Hroot, Hblk⟩
   unfold bsdNameRows
-  icases Hn with ⟨Hh, Hs, Hav, Hsf, Hchb, Htc, Htl0, Htl1, Htt, Hlks, Hfd, Hi1, Hi2, Hi3, Hia, Hb1, Hb2⟩
+  icases Hn with ⟨Hh, Hs, Hav, Hsf, Hchb, Htc, Htl0, Htl1, Htt, Hlks, Hfd, Hi1, Hi2, Hi3, Hia, Hb1, Hb2,
+    Hca, Hcs, Hcp, Hnt⟩
   -- the kernel-tier rows
   have hK := (letI : CurCtx := (bootSharedX ξ0).toKpt; bootShared_kptRows (GF := GF) cn)
   ihave HK := hK $$ Hkst W1 W2 W3 W4 W5 W6 W7 W8 W9 W10 W11 W12 W13 W14 W15 W16 W17 Hg Hfd Hi1 Hi2 Hb1
+    Hcs Hcp Hnt
   icases HK with ⟨HLr, HGr, HSb, HLog, HF, HNp, HDk⟩
   -- the file system
   have hF := (letI : CurCtx := bootSharedX ξ0; bootSharedFs (hlc := hlc) (GF := GF) γ0 γd cn
     (diskOf ds0.reset) ndisk S sb cov nib gsn gln gtn Pb hwf)
-  imod hF $$ Hblk Happ Hdurl Hstok Hsnap Hmir Hsw Hi3 Hia Hb2 Hcert Hcinv
+  imod hF $$ Hblk Happ Hdurl Hstok Hsnap Hmir Hsw Hi3 Hia Hb2 Hcert Hcinv Hca
     with ⟨%I, %F, Hfs⟩
   unfold bsfRows
   icases Hfs with ⟨Hsup, Hmb, Hib, Hiau, Hbs, -, #Hcs, -⟩

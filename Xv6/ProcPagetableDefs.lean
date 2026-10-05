@@ -55,18 +55,6 @@ theorem pp_ret_19e0 : jumpPc (KA.«proc_pagetable» + 0x2e#64) = (KA.«proc_page
 theorem pp_ret_19fa : jumpPc (KA.«proc_pagetable» + 0x48#64) = (KA.«proc_pagetable» + 0x48#64) := by
   decide
 
-/-- `ret` out of `uvmfree` on the first failure tail. -/
-theorem pp_ret_1a14 : jumpPc (KA.«proc_pagetable» + 0x62#64) = (KA.«proc_pagetable» + 0x62#64) := by
-  decide
-
-/-- `ret` out of `uvmunmap` on the second failure tail. -/
-theorem pp_ret_1a2a : jumpPc (KA.«proc_pagetable» + 0x78#64) = (KA.«proc_pagetable» + 0x78#64) := by
-  decide
-
-/-- `ret` out of `uvmfree` on the second failure tail. -/
-theorem pp_ret_1a32 : jumpPc (KA.«proc_pagetable» + 0x80#64) = (KA.«proc_pagetable» + 0x80#64) := by
-  decide
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
@@ -78,7 +66,7 @@ theorem pp_uvmcreate_call [WchG GF] (UC : UVMCREATE) [CurCtx] (c : CPU) (k' : KC
     (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : uvmcreateSlots ≤ k'.avail) (hlk : "kmem" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«uvmcreate» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk on ∗ actLend k'.proc ke ∗
+    kPay γk on 1 ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -101,7 +89,7 @@ theorem pp_mappages_call [WchG GF] (MP : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : 
     (hrwx : perm &&& 0xE#64 ≠ 0#64) (hwf : t.wfU 2) (hnd : t.pagesNodup 2)
     (hpg : ∀ b ∈ t.pages 2, pageValid (pageAddr b)) (ke : Nat) :
     kctx c k' ∗ pcIs c KA.«mappages» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗ actLend k'.proc ke ∗
+    ptreeOwn 2 (DFrac.own 1) t ∗ kPay γk on (t.missingRun (vpnOf (k'.regs 11#5)) n) ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool,
       ∀ (R' : RegMap) (fresh : List (BitVec 44)),
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -109,7 +97,7 @@ theorem pp_mappages_call [WchG GF] (MP : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : 
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       ptreeOwn 2 (DFrac.own 1)
         (t.mapRun (vpnOf (k'.regs 11#5)) (BitVec.extractLsb' 12 44 (k'.regs 13#5)) perm n fresh).1 -∗
-      kallocAvail γk (availSub on fresh.length) -∗
+      kPay γk (availSub on fresh.length) (t.missingRun (vpnOf (k'.regs 11#5)) n - fresh.length) -∗
       (⌜R' 10#5 = -1#64⌝ -∗ kNullRcpt γk k'.proc) -∗
       ⌜calleeSaved k'.regs R' ∧
         (t.mapRun (vpnOf (k'.regs 11#5)) (BitVec.extractLsb' 12 44 (k'.regs 13#5)) perm n fresh).2.1 = [] ∧
@@ -134,7 +122,7 @@ theorem pp_uvmunmap_call [WchG GF] (UM : UVMUNMAP) [CurCtx] (c : CPU) (k' : KCtx
     (hK : uvmunmapSlots ≤ k'.avail) (hroot : k'.regs 10#5 = pageAddr root)
     (hal : k'.regs 11#5 &&& 0xfff#64 = 0#64) (hn : k'.regs 12#5 = BitVec.ofNat 64 n)
     (hrange : (k'.regs 11#5).toNat + 4096 * n ≤ 2 ^ 38) (hfree : k'.regs 13#5 = 0#64)
-    (ke : Nat) :
+    (hup : uQpages ≤ (vpnOf (k'.regs 11#5)).toNat) (ke : Nat) :
     kctx c k' ∗ pcIs c KA.«uvmunmap» ∗ ptOwnRep root L ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -142,7 +130,7 @@ theorem pp_uvmunmap_call [WchG GF] (UM : UVMUNMAP) [CurCtx] (c : CPU) (k' : KCtx
       ptOwnRep root (delRunL L (vpnOf (k'.regs 11#5)).toNat n) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := UM.wp_uvmunmap_raw (hlc := hlc) (GF := GF) c k' root L n ke hK hroot hal hn hrange hfree
+  have h := UM.wp_uvmunmap_raw (hlc := hlc) (GF := GF) c k' root L n ke hK hroot hal hn hrange hfree hup
   unfold wp_uvmunmap_raw_body at h
   simp only [uvmunmapAddr] at h
   exact h
@@ -160,6 +148,7 @@ theorem pp_uvmfree_call [WchG GF] (UF : UVMFREE) [CurCtx] (c : CPU) (k' : KCtx)
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
+      pageCredit ptW -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := UF.wp_uvmfree (hlc := hlc) (GF := GF) c k' γl γk P M ke hnoff hK hlk hroot hsz hwf hbelow

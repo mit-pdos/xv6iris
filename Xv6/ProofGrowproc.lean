@@ -97,14 +97,14 @@ the kernel-page-table context, which at `curTier = kpt` is the ambient one. -/
 theorem gp_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
+      ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧
         V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
       ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
       wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
       wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
       procPtAt V.upt M ∗ actCnt pa V.ev ∗
       (∀ (v : BitVec 64) (P' : UPtd) (M' : Nat → List (BitVec 8)) (kc : Nat),
-        ⌜v.toNat ≤ uvmMaxsz ∧ umBelow v P' ∧ P'.root = V.upt.root ∧ P'.tfp = V.upt.tfp ∧
+        ⌜v.toNat ≤ uQuota ∧ umBelow v P' ∧ P'.root = V.upt.root ∧ P'.tfp = V.upt.tfp ∧
           (V.pvLazy = false → lazyFree P'.um v)⌝ -∗
         (wordPointsTo (pSz pa) 8 (DFrac.own 1) v ∗
           wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗ procPtAt P' M') -∗
@@ -381,7 +381,7 @@ theorem growproc_br_fffffffffffffcc8 : KA.«growproc» + 0xfffffffffffffcc8#64 =
 
 set_option maxHeartbeats 4000000 in
 theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPROC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γl γk γ j pid V M hj hproc hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γl γk γ j pid V M hj hproc hnoff hK hlk htier hq => by
   unfold wp_growproc_body
   simp only [growprocAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hpv, HΦ⟩
@@ -390,6 +390,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
   have htc : curTier = KTier.kpt := by rw [← hct]; exact htier
   icases gp_priv_elim htc γ (procAddr j) pid V M $$ Hpv with
     ⟨%⟨hszb, hbelow, hroot, htfb⟩, %hlz0, Hsz, Hpt, HP, Hcnt, Hback⟩
+  have hszbM : V.sz.toNat ≤ uvmMaxsz := Nat.le_trans hszb uQuota_le_uvmMaxsz
   -- THE EVENT COUNTER (permit sweep L1a), carried at a count at least
   -- `V.ev`: the grow arm lends it to uvmalloc, every arm hands it to the exit
   ihave Hcnt : iprop(∃ kc : Nat, ⌜V.ev ≤ kc⌝ ∗ actCnt (GF := GF) (procAddr j) kc) $$ [Hcnt]
@@ -415,7 +416,8 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       (hroot' : k'.regs 10#5 = pageAddr P.root) (hold' : (k'.regs 11#5).toNat ≤ uvmMaxsz)
       (hnew' : (k'.regs 12#5).toNat ≤ uvmMaxsz) (hperm' : k'.regs 13#5 &&& ~~~0x3CE#64 = 0#64)
       (hfree' : ∀ i, i < uvmaNp (k'.regs 11#5) (k'.regs 12#5) →
-        Iris.Std.PartialMap.get? P.um (uvmaVpn0 (k'.regs 11#5) + i) = none),
+        Iris.Std.PartialMap.get? P.um (uvmaVpn0 (k'.regs 11#5) + i) = none)
+      (hq' : (k'.regs 12#5).toNat ≤ uQuota),
       kctx cc k' ∗ pcIs cc KA.«uvmalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
       kallocAvail γk none ∗ procPtAt P M' ∗ actLend k'.proc ke ∗
       wpNext k'.sie k'.proc cc (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -431,9 +433,9 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
             procPtAt P' M'')) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cc := by
-    intro cc k' P M' ke hnoff' hK' hlk' hroot' hold' hnew' hperm' hfree'
+    intro cc k' P M' ke hnoff' hK' hlk' hroot' hold' hnew' hperm' hfree' hq'
     have h := UA.wp_uvmalloc (hlc := hlc) (GF := GF) cc k' γl γk P M' ke hnoff' hK' hlk' hroot'
-      hold' (Or.inl hnew') hperm' (fun i hi _ => hfree' i hi)
+      hold' (Or.inl hnew') hperm' (fun i hi _ => hfree' i hi) hq'
     unfold wp_uvmalloc_body at h
     simp only [uvmallocAddr] at h
     exact h
@@ -501,9 +503,10 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
     have hnnat : 0 < (k.regs 10#5).toNat ∧ (k.regs 10#5).toNat < 2 ^ 63 := by
       have h2 := BitVec.toInt_eq_toNat_cond (k.regs 10#5); omega
     have hsum : (k.regs 10#5 + V.sz).toNat = (k.regs 10#5).toNat + V.sz.toNat := by
-      rw [BitVec.toNat_add, Nat.mod_eq_of_lt (by unfold uvmMaxsz at hszb; omega)]
+      rw [BitVec.toNat_add, Nat.mod_eq_of_lt (by unfold uvmMaxsz at hszbM; omega)]
     have hnint : (k.regs 10#5).toInt.toNat = (k.regs 10#5).toNat := by
       have h2 := BitVec.toInt_eq_toNat_cond (k.regs 10#5); omega
+    have hqv := hq hnpos
     k_step_gen (wp_s_branch0 c6 _ (KA.«growproc» + 0x16#64) false 50#13 9#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [KCtx.rget_eq, d9, bge0_neg _ hnpos] next c7 hp7
@@ -601,7 +604,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       ihave Hcnt : actCnt (GF := GF) k.proc kc0 $$ [Hcnt]
       · rw [hproc]; iexact Hcnt
       icases actLend_borrow k.proc kc0 $$ Hcnt with ⟨Hlend, Hlback⟩
-      iapply (hua c15 _ V.upt M kc0 ?hnU ?hKU ?hlU ?hrU ?hoU ?hwU ?hpU ?hfU) $$ [- $Hk $Hpc]
+      iapply (hua c15 _ V.upt M kc0 ?hnU ?hKU ?hlU ?hrU ?hoU ?hwU ?hpU ?hfU ?hqU) $$ [- $Hk $Hpc]
       rotate_right 1
       k_norm_g
       iframe #
@@ -610,7 +613,8 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       case hKU => k_norm_g; unfold growprocSlots at hK; unfold uvmallocSlots; omega
       case hlU => k_norm_g; exact hlk
       case hrU => k_norm_g; exact hroot
-      case hoU => k_norm_g; exact hszb
+      case hoU => k_norm_g; exact hszbM
+      case hqU => k_norm_g; omega
       case hwU => k_norm_g; omega
       case hpU => k_norm_g
       case hfU =>
@@ -826,7 +830,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       case hKD => k_norm_g; unfold growprocSlots at hK; unfold uvmdeallocSlots; omega
       case hlD => k_norm_g; exact hlk
       case hrD => k_norm_g; exact hroot
-      case hoD => k_norm_g; exact hszb
+      case hoD => k_norm_g; exact hszbM
       iapply wpNext_intro_pin
       iintro %c12 %hp12 %spie2 %spp2 %R2 %hsp2 Hk Hpc ⟨%kc1, %hkc1, Hlend⟩ HP %hpostD
       k_norm_g [gp_ret_c72, MachCSL.KCtx.withSpie_twice]

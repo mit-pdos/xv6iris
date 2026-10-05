@@ -404,7 +404,7 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) (pid0 : BitVec 32) :
   icases Hxs with ⟨%xsv, Hxs, Hesc⟩
   rw [if_pos rfl]
   icases Hesc with ⟨Hesc, Hzs⟩
-  icases Hspace with ⟨%M, %⟨hpt, htf, humb⟩, Hpt, Htf, Hstack⟩
+  icases Hspace with ⟨%M, %⟨hpt, htf, humb⟩, Hpt, Htf, Hstack, Hcr⟩
   icases procPtAt_cases V.upt M $$ Hpt with ⟨%hwf, HptO, Hum⟩
   have htfv : pageValid (pageAddr V.upt.tfp) := hwf.2.2.1
   ihave Hpt := procPtAt_intro V.upt M hwf $$ [HptO Hum]
@@ -416,12 +416,13 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) (pid0 : BitVec 32) :
   have hptne : V.pagetable ≠ 0#64 := by rw [hpt]; exact Xv6.PtRun.pageValid_ne_zero _ hrootv
   iframe Hq
   iexists V, M
-  isplitl [Hpid Hfields Hal Hch Hev Hstack Htf Hpt]
+  isplitl [Hpid Hfields Hal Hch Hev Hstack Htf Hpt Hcr]
   · unfold freeprocIn
-    rw [if_neg htfne, if_neg hptne]
+    rw [if_neg htfne, if_neg hptne, if_neg htfne, if_neg hptne]
     isplitl []
     · ipureintro; exact ⟨hof, hcwd, hroot⟩
-    iframe Hpid Hfields Hal Hch Hev Hstack
+    ihave Hcr := pageCredit_congr procSpare (procSpare + 0 + 0) rfl $$ Hcr
+    iframe Hpid Hfields Hal Hch Hev Hstack Hcr
     isplitl [Htf]
     · isplitl []
       · ipureintro; exact ⟨htf, by rw [htf]; exact htfv⟩
@@ -879,16 +880,16 @@ so these cells are `copyout`'s. -/
 theorem kw_priv_copy_ev (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
+      ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
          V.trapframe = pageAddr V.upt.tfp⌝ ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ actCnt pa V.ev ∗
+      @procPtAt hlc GF _ _ _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ actCnt pa V.ev ∗
       (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)) (k' : Nat),
         ⌜V.upt.extSz V.sz P'⌝ -∗
         (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
           @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-          @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M') -∗
+          @procPtAt hlc GF _ _ _ ⟨curCtx, KTier.kpt⟩ P' M') -∗
         actCnt pa k' -∗
         procPrivNoctxAt curCtx pa pid { V.updEv k' with upt := P' } M') := by
   unfold procPrivNoctxAt procFieldsNoctx
@@ -983,7 +984,7 @@ theorem kw_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk : Kme
     (ke : Nat) (p : BitVec 64) (hp : k'.proc = p)
     (src dst : BitVec 64) (hsrc : k'.regs 13#5 = src) (hdst : k'.regs 12#5 = dst)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 52 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
-    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
+    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ uQuota)
     (hlen : k'.regs 14#5 = BitVec.ofNat 64 bs.length) (hlen' : bs.length < 2 ^ 63) :
     kctx c k' ∗ pcIs c KA.«copyout» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ procPtAt P M ∗
@@ -1896,7 +1897,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     case hclk => k_norm_g; rw [hkhlocks]; decide
     case hcroot => k_norm_g; exact hpf.2.2.1
     case hcsz =>
-      k_norm_g; have h := hpf.1; unfold uvmMaxsz at h; omega
+      k_norm_g; have h := hpf.1; omega
     case hclen => k_norm_g; rw [xstateBytes_length]
     case hclen' => rw [xstateBytes_length]; omega
 

@@ -21,7 +21,7 @@ THE LEND (permit sweep L1a, Rocq f344a089a; threaded by L2, Rocq
 the failure tail's `uvmunmap`, each return's bound composed back to `ke`.
 Since L3b (no Rocq counterpart) `kalloc` and the mappages-failure arm's
 `kfree` take the count in hand too and step it (`uc_kalloc_led_call`,
-`uc_kfree_call` over `uc_kfree_lend_call`).
+the credited `kfree`).
 -/
 import Xv6.SpecUvmcopy
 import Xv6.SpecMemmove
@@ -32,6 +32,7 @@ import Xv6.CodeTactics
 import Xv6.UvmCallSites
 import Xv6.ByteCursor
 import Xv6.UvmallocDefs
+import Xv6.UPtReserve
 import Xv6.WalkaddrDefs
 import MachCSL.BvLemmas
 
@@ -56,8 +57,6 @@ theorem uc_ret_13fc : jumpPc (KA.«uvmcopy» + 0x44#64) = (KA.«uvmcopy» + 0x44
 theorem uc_ret_140c : jumpPc (KA.«uvmcopy» + 0x54#64) = (KA.«uvmcopy» + 0x54#64) := by
   decide
 theorem uc_ret_141c : jumpPc (KA.«uvmcopy» + 0x64#64) = (KA.«uvmcopy» + 0x64#64) := by
-  decide
-theorem uc_ret_1424 : jumpPc (KA.«uvmcopy» + 0x6c#64) = (KA.«uvmcopy» + 0x6c#64) := by
   decide
 theorem uc_ret_1432 : jumpPc (KA.«uvmcopy» + 0x7a#64) = (KA.«uvmcopy» + 0x7a#64) := by
   decide
@@ -158,7 +157,7 @@ theorem ucKeptL_of_ucKept {R R' : RegMap} (h : ucKept R R') : ucKeptL R R' :=
 theorem uc_inv_ok {Pold Pnew P : UPtd} {Mold Mnew : Nat → List (BitVec 8)} {n : Nat}
     (h : UPtCopy.ucInv Pold Pnew P n) (hfree : ∀ j, j < n → get? Pnew.um j = none) :
     uvmcopyOk Pold Pnew P Mold Mnew (UPtCopy.ucView Mold Mnew n) n := by
-  obtain ⟨hr, ht, hout, hin⟩ := h
+  obtain ⟨hr, ht, hout, hin, -⟩ := h
   refine ⟨⟨hr, ht, ?_⟩, ?_, ?_⟩
   · intro k w hw
     by_cases hk : k < n
@@ -175,25 +174,9 @@ theorem uc_inv_ok {Pold Pnew P : UPtd} {Mold Mnew : Nat → List (BitVec 8)} {n 
       exact ⟨hb, by unfold UPtCopy.ucView; rw [if_pos hi]⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## The callees, at their entry addresses -/
-
-set_option maxHeartbeats 1000000 in
-/-- `kfree`'s led contract, at a lend (permit sweep L3b): the lend back
-stepped. -/
-theorem uc_kfree_call [WchG GF] (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (on : Option Nat) (ke : Nat) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail)
-    (hlk' : "kmem" ∉ k'.locks) (hp' : pageValid (k'.regs 10#5)) :
-    kctx c k' ∗ pcIs c KA.«kfree» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    pageOwn (k'.regs 10#5) ∗ kallocAvail γk on ∗ actLend k'.proc ke ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      actLend k'.proc (ke + 1) -∗
-      kallocAvail γk (availInc on) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c :=
-  uc_kfree_lend_call KF c k' γl γk on ke hnoff' hK' hlk' hp'
 
 set_option maxHeartbeats 1000000 in
 theorem uc_memmove_call (MM : MEMMOVE) [CurCtx] (c : CPU) (k' : KCtx)
@@ -222,7 +205,7 @@ theorem uc_mappages_call [WchG GF] (MA : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : 
     (hrwx' : perm &&& 0xE#64 ≠ 0#64) (hwf' : t'.wfU 2) (hnd' : t'.pagesNodup 2)
     (hpg' : ∀ b ∈ t'.pages 2, pageValid (pageAddr b)) (ke : Nat) :
     kctx c k' ∗ pcIs c KA.«mappages» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    ptreeOwn 2 (DFrac.own 1) t' ∗ kallocAvail γk on ∗ actLend k'.proc ke ∗
+    ptreeOwn 2 (DFrac.own 1) t' ∗ kPay γk on (t'.missingRun (vpnOf (k'.regs 11#5)) m) ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool,
       ∀ (R' : RegMap) (fresh : List (BitVec 44)),
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -230,7 +213,7 @@ theorem uc_mappages_call [WchG GF] (MA : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : 
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       ptreeOwn 2 (DFrac.own 1)
         (t'.mapRun (vpnOf (k'.regs 11#5)) (BitVec.extractLsb' 12 44 (k'.regs 13#5)) perm m fresh).1 -∗
-      kallocAvail γk (availSub on fresh.length) -∗
+      kPay γk (availSub on fresh.length) (t'.missingRun (vpnOf (k'.regs 11#5)) m - fresh.length) -∗
       (⌜R' 10#5 = -1#64⌝ -∗ kNullRcpt γk k'.proc) -∗
       ⌜calleeSaved k'.regs R' ∧
         (t'.mapRun (vpnOf (k'.regs 11#5)) (BitVec.extractLsb' 12 44 (k'.regs 13#5))
@@ -624,7 +607,7 @@ theorem uc_setLeaf_entAt_self : ∀ (lvl : Nat) (t : PTree) (vpn : BitVec 27),
 theorem uc_pte2pa_shift (x : BitVec 64) : (x >>> 10) <<< 12 = pte2pa x := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-- Open the bytes of one mapped page, with the length up front. -/
 theorem uc_umPages_acc [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (k : Nat) (w : BitVec 64)
@@ -644,18 +627,15 @@ theorem uc_umPages_acc [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (k : Na
       · ipureintro; exact hlen
       · iexact Hb
 
-/-- The freshness fact about the page `kalloc` returned, kept: it is none of
-the pages already mapped. -/
-theorem uc_fresh_facts [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8))
+/-- The fresh page's facts on the user pages alone (the table opened). -/
+theorem uc_fresh_facts_um [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8))
     (p : BitVec 64) (bs : List (BitVec 8)) (hbs : 8 ≤ bs.length) (hal : p.toNat % 8 = 0) :
-    iprop(procPtAt (GF := GF) P M ∗ byteBuf p (DFrac.own 1) bs) ⊢
+    iprop(umPages (GF := GF) P M ∗ byteBuf p (DFrac.own 1) bs) ⊢
       iprop(⌜∀ k w, get? P.um k = some w → pte2pa w ≠ p⌝ ∗
-        procPtAt P M ∗ byteBuf p (DFrac.own 1) bs) := by
-  have hB : iprop(procPtAt (GF := GF) P M ∗ byteBuf p (DFrac.own 1) bs) ⊢
+        umPages P M ∗ byteBuf p (DFrac.own 1) bs) := by
+  have hB : iprop(umPages (GF := GF) P M ∗ byteBuf p (DFrac.own 1) bs) ⊢
       ⌜∀ k w, get? P.um k = some w → pte2pa w ≠ p⌝ := by
-    iintro ⟨Hp, Hb⟩
-    unfold procPtAt
-    icases Hp with ⟨%_, _, Hum⟩
+    iintro ⟨Hum, Hb⟩
     iapply (UPtCopy.umPages_fresh P M p bs hbs hal)
     isplitl [Hum]
     · iexact Hum
@@ -665,14 +645,6 @@ theorem uc_fresh_facts [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8))
   isplitl []
   · ipureintro; exact hb
   · iexact H
-
-set_option maxHeartbeats 4000000 in
-/-- One iteration of the copy loop, from the body's head at `0x80001490`:
-`walk(old, i, 0)`, and if the parent has a page there, `kalloc` + `memmove`
-+ `mappages(new, i, PGSIZE, mem, flags)`.  It leaves either at the loop's
-`continue` (`(KernelSyms.«uvmcopy» + 0x24)`, the child grown by at most this page) or at `err`
-(`(KernelSyms.«uvmcopy» + 0x6c)`, the child untouched). -/
-theorem uvmcopy_br_fffffffffffff630 : KA.«uvmcopy» + 0xfffffffffffff630#64 = KA.«kfree» := by decide
 
 theorem uvmcopy_br_fffffffffffffc1c : KA.«uvmcopy» + 0xfffffffffffffc1c#64 = KA.«mappages» := by decide
 
@@ -708,6 +680,7 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
          (pcv = (KA.«uvmcopy» + 0x6c#64) ∧ P' = P))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hold, Hchild, Hlend, HΦ⟩
+  icases UPt.procPtAt_region Pold Mold $$ Hold with ⟨%hregO, Hold⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hmaxv : uvmMaxsz = 274877898752 := uc_uvmMaxsz
   have hn26 : n ≤ 67108862 := by omega
@@ -721,7 +694,7 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
   have hPleaves : get? P.leaves i = none := by
     rw [UPtCopy.leaves_get P i hne_tf hne_tr]; exact hPum
   -- the parent's table
-  icases UPtCopy.procPtAt_cases Pold Mold $$ Hold with ⟨%told, %htold, Htreeo, Hpageso⟩
+  icases UPtCopy.procPtAt_cases Pold Mold $$ Hold with ⟨%told, %htold, ⟨Htreeo, Hresto⟩, Hpageso⟩
   obtain ⟨hwfo, hbaseo, hrepo⟩ := htold
   -- c.li a2,0 ; c.mv a1,s1 ; c.mv a0,s6 ; jal walk
   k_step_gen (wp_s_addi cur _ (KA.«uvmcopy» + 0x2a#64) true 0#12 12#5 0#5 (by decide))
@@ -770,7 +743,7 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
     k_step_gen (wp_s_branch c5 _ (KA.«uvmcopy» + 0x34#64) true 8176#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_zero _ hz] next c6 hp6
     iintro Hk Hpc
-    ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hpageso]
+    ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hresto Hpageso]
     case' _ => iframe
     have hpin6 : k.sie = false ∨ k.proc = 0#64 → c6 = cur := fun h => (hp6 h).trans (hpin4 h)
     ihave HΦ' := wpNext_at _ _ _ c6 _ hpin6 $$ HΦ
@@ -781,7 +754,7 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
       decide
     ipureintro
     refine ⟨ucKept_of_calleeSaved hcs', Or.inl ⟨rfl, ?_⟩⟩
-    exact UPtCopy.ucInv_step hinv hi hfree rfl rfl (fun _ _ => rfl) (by simp only [holdum]; exact hPum)
+    exact UPtCopy.ucInv_step hinv hi hfree rfl rfl rfl (fun _ _ => rfl) (by simp only [holdum]; exact hPum)
   · -- the path is complete: read the entry
     have hcomp : told.complete 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) := by
       rcases hret with ⟨h0, -⟩ | ⟨hc, -⟩
@@ -821,7 +794,7 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hv1, MachCSL.beq_zero _ rfl]
         next c9 hp9
       iintro Hk Hpc
-      ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hpageso]
+      ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hresto Hpageso]
       case' _ => iframe
       have hpin9 : k.sie = false ∨ k.proc = 0#64 → c9 = cur := fun h =>
         (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans (hpin4 h))))
@@ -836,7 +809,7 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
       · refine ucKept_trans (ucKept_of_calleeSaved hcs') ?_
         unfold ucKept
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, and_true, true_and]
-      · exact UPtCopy.ucInv_step hinv hi hfree rfl rfl (fun _ _ => rfl)
+      · exact UPtCopy.ucInv_step hinv hi hfree rfl rfl rfl (fun _ _ => rfl)
           (by simp only [holdum]; exact hPum)
     · -- the parent has a page here: copy it
       have hentne : told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) ≠ 0#64 := by
@@ -867,6 +840,23 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
         UPtCopy.pteFlags_rwx hleafw hAD
       have hpaw : pte2pa (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))) = pte2pa w :=
         UPtCopy.pteAD_pte2pa hAD
+      -- the child's page and nodes, paid out of its table's credits (NI M3 quotas Q-1):
+      -- the parent's leaf is a quota leaf, so the child's is too
+      have hqi : i < uQpages := by
+        rcases hregO i w hwl with h | h | h
+        · exact h
+        · exact absurd h hne_tf
+        · exact absurd h hne_tr
+      icases UPtCopy.procPtAt_cases P (UPtCopy.ucView Mold Mnew n) $$ Hchild
+        with ⟨%tchild, %htchild, ⟨Htreec, Hrestc⟩, Hpagesc⟩
+      obtain ⟨hwfc, hbasec, hrepc⟩ := htchild
+      icases UPt.ptRest_reserveUser tchild P.leaves (vpnOf (BitVec.ofNat 64 (4096 * i)))
+        (by rw [hvpni]; exact hqi) (by rw [hvpni]; exact hPleaves) $$ Hrestc with ⟨Hcr, Hrw⟩
+      ihave Hcr := pageCredit_congr _
+        (1 + tchild.missingOn 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))) (by omega) $$ Hcr
+      icases pageCredit_split 1 (tchild.missingOn 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))) $$ Hcr
+        with ⟨Hc1, Hcm⟩
+      icases Hav with #Hav
       -- c.beqz a5 (not taken) ; jal kalloc
       k_step_gen (wp_s_branch c8 _ (KA.«uvmcopy» + 0x3e#64) true 8166#13 15#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uc_beq_ne _ hv1] next c9 hp9
@@ -875,11 +865,13 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmcopy_br_fffffffffffff718] next c10 hp10
       iintro Hk Hpc
       icases Hlend with ⟨%k2, %hk2, Hlend⟩
-      iapply (uc_kalloc_led_call KAL c10 _ γl γk none k2 ?hnk ?hKk ?hlkk) $$ [- $Hk $Hpc]
+      iapply (uc_kalloc_pay_call KAL c10 _ γl γk none 0 k2 ?hnk ?hKk ?hlkk) $$ [- $Hk $Hpc]
       rotate_right 1
       k_norm_g
       iframe #
-      iframe Hav Hlend
+      iframe Hlend
+      isplitl [Hc1]
+      · unfold kPay kCredOn; iframe #; iexact Hc1
       case hnk => k_norm_g; omega
       case hKk => k_norm_g; omega
       case hlkk => k_norm_g; exact hlk
@@ -904,325 +896,244 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
         obtain ⟨-, -, -, -, f19, -⟩ := hcs2
         rw [f19]
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-      unfold kallocPost
-      icases Hkp with ⟨⟨%hz0, Hav⟩ | ⟨%hpv, Hmem, Hav⟩⟩
-      · -- `kalloc` failed: `err`
-        k_step_gen (wp_s_add c11 _ (KA.«uvmcopy» + 0x44#64) true 18#5 0#5 10#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
-        iintro Hk Hpc
-        k_step_gen (wp_s_branch c12 _ (KA.«uvmcopy» + 0x46#64) true 38#13 10#5 0#5 (by decide) bop.BEQ)
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-          with [MachCSL.beq_zero _ hz0.1] next c13 hp13
-        iintro Hk Hpc
-        ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hpageso]
-        case' _ => iframe
-        have hpin13 : k.sie = false ∨ k.proc = 0#64 → c13 = cur := fun h =>
-          (hp13 h).trans ((hp12 h).trans (hpin10 h))
-        ihave HΦ' := wpNext_at _ _ _ c13 _ hpin13 $$ HΦ
-        rw [kRcpt_null γk _ (R3 10#5) hz0.1]
-        iapply HΦ' $$ %spie2 %spp2 %_ %P %_ %hsp2 Hk Hpc Hlend Hav Hold Hchild []
-        · -- the null `kalloc`'s receipt
-          iintro -
-          iexact Hrc
-        ipureintro
-        refine ⟨?_, Or.inr ⟨rfl, rfl⟩⟩
-        refine ucKept_trans hkept3 ?_
+      icases kallocPayPost_none_ne γk 0 _ $$ Hkp with ⟨%hpv, Hmem, -⟩
+      -- the page: `memmove` then `mappages`
+      have hmemne : R3 10#5 ≠ 0#64 := PtRun.pageValid_ne_zero _ hpv
+      have hmemal : R3 10#5 &&& 0xfff#64 = 0#64 := hpv.1
+      have hmemtop : (R3 10#5).toNat < 2281701376 := by
+        have h2 : (R3 10#5).toNat < (physTop : BitVec 64).toNat := by
+          have := hpv.2.2
+          rw [BitVec.ult, decide_eq_true_eq] at this
+          exact this
+        simp only [physTop, BitVec.toNat_ofNat] at h2
+        omega
+      have hmemlt : (R3 10#5).toNat < 2 ^ 56 := by omega
+      k_step_gen (wp_s_add c11 _ (KA.«uvmcopy» + 0x44#64) true 18#5 0#5 10#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
+      iintro Hk Hpc
+      k_step_gen (wp_s_branch c12 _ (KA.«uvmcopy» + 0x46#64) true 38#13 10#5 0#5 (by decide) bop.BEQ)
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        with [uc_beq_ne _ hmemne] next c13 hp13
+      iintro Hk Hpc
+      k_step_gen (wp_s_srli c13 _ (KA.«uvmcopy» + 0x48#64) false 10#6 11#5 19#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g19] next c14 hp14
+      iintro Hk Hpc
+      k_step_gen (wp_s_add c14 _ (KA.«uvmcopy» + 0x4c#64) true 12#5 0#5 20#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g20] next c15 hp15
+      iintro Hk Hpc
+      k_step_gen (wp_s_slli c15 _ (KA.«uvmcopy» + 0x4e#64) true 12#6 11#5 11#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        with [uc_pte2pa_shift, hpaw] next c16 hp16
+      iintro Hk Hpc
+      k_step_gen (wp_s_jal c16 _ (KA.«uvmcopy» + 0x50#64) false 2095298#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmcopy_br_fffffffffffff912] next c17 hp17
+      iintro Hk Hpc
+      icases uc_umPages_acc Pold Mold i w hw $$ Hpageso with ⟨%hlen, Hsrc, Hclosep⟩
+      iapply (uc_memmove_call MM c17 _ (Mold i) (List.replicate 4096 5#8) 4096 (DFrac.own 1)
+        ?hKm ?hnm (by omega) hlen (List.length_replicate ..)) $$ [- $Hk $Hpc]
+      rotate_right 1
+      k_norm_g
+      iframe Hsrc Hmem
+      case hKm => k_norm_g; omega
+      case hnm => k_norm_g
+      iapply wpNext_intro_pin
+      iintro %c18 %hp18 %R4 Hk Hpc Hsrc Hdst %hcs3
+      k_norm_g [uc_ret_140c]
+      obtain ⟨hcsm, -⟩ := hcs3
+      have hkept4 : ucKept R3 R4 := by
         unfold ucKept
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, _root_.and_true,
-          _root_.true_and]
-      · -- the page: `memmove` then `mappages`
-        rw [Xv6.availDec_none]
-        have hmemne : R3 10#5 ≠ 0#64 := PtRun.pageValid_ne_zero _ hpv
-        have hmemal : R3 10#5 &&& 0xfff#64 = 0#64 := hpv.1
-        have hmemtop : (R3 10#5).toNat < 2281701376 := by
-          have h2 : (R3 10#5).toNat < (physTop : BitVec 64).toNat := by
-            have := hpv.2.2
-            rw [BitVec.ult, decide_eq_true_eq] at this
-            exact this
-          simp only [physTop, BitVec.toNat_ofNat] at h2
-          omega
-        have hmemlt : (R3 10#5).toNat < 2 ^ 56 := by omega
-        k_step_gen (wp_s_add c11 _ (KA.«uvmcopy» + 0x44#64) true 18#5 0#5 10#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
-        iintro Hk Hpc
-        k_step_gen (wp_s_branch c12 _ (KA.«uvmcopy» + 0x46#64) true 38#13 10#5 0#5 (by decide) bop.BEQ)
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-          with [uc_beq_ne _ hmemne] next c13 hp13
-        iintro Hk Hpc
-        k_step_gen (wp_s_srli c13 _ (KA.«uvmcopy» + 0x48#64) false 10#6 11#5 19#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g19] next c14 hp14
-        iintro Hk Hpc
-        k_step_gen (wp_s_add c14 _ (KA.«uvmcopy» + 0x4c#64) true 12#5 0#5 20#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g20] next c15 hp15
-        iintro Hk Hpc
-        k_step_gen (wp_s_slli c15 _ (KA.«uvmcopy» + 0x4e#64) true 12#6 11#5 11#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-          with [uc_pte2pa_shift, hpaw] next c16 hp16
-        iintro Hk Hpc
-        k_step_gen (wp_s_jal c16 _ (KA.«uvmcopy» + 0x50#64) false 2095298#21 1#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmcopy_br_fffffffffffff912] next c17 hp17
-        iintro Hk Hpc
-        icases uc_umPages_acc Pold Mold i w hw $$ Hpageso with ⟨%hlen, Hsrc, Hclosep⟩
-        iapply (uc_memmove_call MM c17 _ (Mold i) (List.replicate 4096 5#8) 4096 (DFrac.own 1)
-          ?hKm ?hnm (by omega) hlen (List.length_replicate ..)) $$ [- $Hk $Hpc]
-        rotate_right 1
+        obtain ⟨m2, m8, m9, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27⟩ := hcsm
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true,
+          ite_false] at m2 m8 m9 m20 m21 m22 m23 m24 m25 m26 m27
+        exact ⟨m2, m8, m9, m20, m21, m22, m23, m24, m25, m26, m27⟩
+      have q9 : R4 9#5 = BitVec.ofNat 64 (4096 * i) := by rw [hkept4.2.2.1, g9]
+      have q20 : R4 20#5 = 4096#64 := by rw [hkept4.2.2.2.1, g20]
+      have q23 : R4 23#5 = pageAddr Pnew.root := by rw [hkept4.2.2.2.2.2.2.1, g23]
+      have q19 : R4 19#5 = told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) := by
+        obtain ⟨-, -, -, -, m19, -⟩ := hcsm
+        rw [m19]
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
+        exact g19
+      have q18 : R4 18#5 = R3 10#5 := by
+        obtain ⟨-, -, -, m18, -⟩ := hcsm
+        rw [m18]
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
+      ihave Hpageso := Hclosep $$ Hsrc
+      icases uc_fresh_facts_um P (UPtCopy.ucView Mold Mnew n) (R3 10#5) (Mold i) (by omega)
+        (UPtCopy.toNat_mod8 _ hmemal) $$ [Hpagesc Hdst] with ⟨%hfresh, Hpagesc, Hdst⟩
+      case' _ => iframe
+      have hchildwalk : tchild.walk 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) = none :=
+        hrepc.2.2.2.2 _ (by rw [hvpni]; exact hPleaves)
+      -- andi a4,s3,1023 ; c.mv a3,s2 ; c.mv a2,s4 ; c.mv a1,s1 ; c.mv a0,s7 ; jal mappages
+      k_step_gen (wp_s_andi c18 _ (KA.«uvmcopy» + 0x54#64) false 1023#12 14#5 19#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+        with [q19, uc_andi1023] next c19 hp19
+      iintro Hk Hpc
+      k_step_gen (wp_s_add c19 _ (KA.«uvmcopy» + 0x58#64) true 13#5 0#5 18#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [q18] next c20 hp20
+      iintro Hk Hpc
+      k_step_gen (wp_s_add c20 _ (KA.«uvmcopy» + 0x5a#64) true 12#5 0#5 20#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [q20] next c21 hp21
+      iintro Hk Hpc
+      k_step_gen (wp_s_add c21 _ (KA.«uvmcopy» + 0x5c#64) true 11#5 0#5 9#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [q9] next c22 hp22
+      iintro Hk Hpc
+      k_step_gen (wp_s_add c22 _ (KA.«uvmcopy» + 0x5e#64) true 10#5 0#5 23#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [q23] next c23 hp23
+      iintro Hk Hpc
+      k_step_gen (wp_s_jal c23 _ (KA.«uvmcopy» + 0x60#64) false 2096060#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmcopy_br_fffffffffffffc1c] next c24 hp24
+      iintro Hk Hpc
+      icases Hlend with ⟨%k1, %hk1, Hlend⟩
+      iapply (uc_mappages_call MA c24 _ γl γk none tchild 1
+        (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))))
+        ?hnp ?hKp ?hlkp ?hrop ?hargsp ?hpermp (UPtCopy.pteFlags_mask _) hflagsrwx
+        hrepc.1 hrepc.2.1 hrepc.2.2.1 k1) $$ [- $Hk $Hpc]
+      rotate_right 1
+      k_norm_g
+      iframe #
+      iframe Htreec Hlend
+      isplitl [Hcm]
+      · unfold kPay kCredOn; iframe #
+        iapply pageCredit_congr _ _ ?_ $$ Hcm
+        rw [Xv6.missingRun_one]
+      case hnp => k_norm_g; omega
+      case hKp => k_norm_g; omega
+      case hlkp => k_norm_g; exact hlk
+      case hrop => k_norm_g; rw [hbasec, hinv.1]
+      case hpermp => k_norm_g; rfl
+      case hargsp =>
         k_norm_g
-        iframe Hsrc Hmem
-        case hKm => k_norm_g; omega
-        case hnm => k_norm_g
-        iapply wpNext_intro_pin
-        iintro %c18 %hp18 %R4 Hk Hpc Hsrc Hdst %hcs3
-        k_norm_g [uc_ret_140c]
-        obtain ⟨hcsm, -⟩ := hcs3
-        have hkept4 : ucKept R3 R4 := by
-          unfold ucKept
-          obtain ⟨m2, m8, m9, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27⟩ := hcsm
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true,
-            ite_false] at m2 m8 m9 m20 m21 m22 m23 m24 m25 m26 m27
-          exact ⟨m2, m8, m9, m20, m21, m22, m23, m24, m25, m26, m27⟩
-        have q9 : R4 9#5 = BitVec.ofNat 64 (4096 * i) := by rw [hkept4.2.2.1, g9]
-        have q20 : R4 20#5 = 4096#64 := by rw [hkept4.2.2.2.1, g20]
-        have q23 : R4 23#5 = pageAddr Pnew.root := by rw [hkept4.2.2.2.2.2.2.1, g23]
-        have q19 : R4 19#5 = told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) := by
-          obtain ⟨-, -, -, -, m19, -⟩ := hcsm
-          rw [m19]
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-          exact g19
-        have q18 : R4 18#5 = R3 10#5 := by
-          obtain ⟨-, -, -, m18, -⟩ := hcsm
-          rw [m18]
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-        ihave Hpageso := Hclosep $$ Hsrc
-        icases uc_fresh_facts P (UPtCopy.ucView Mold Mnew n) (R3 10#5) (Mold i) (by omega)
-          (UPtCopy.toNat_mod8 _ hmemal) $$ [Hchild Hdst] with ⟨%hfresh, Hchild, Hdst⟩
+        refine ⟨uc_aligned i, hmemal, uc_ofNat_4096.symm, le_refl 1, ?_, ?_, ?_⟩
+        · rw [hivt]; omega
+        · omega
+        · intro j hj
+          have hj0 : j = 0 := by omega
+          subst hj0
+          simpa using hchildwalk
+      iapply wpNext_intro_pin
+      iintro %c25 %hp25 %spie3 %spp3 %R5 %fresh %hsp3 Hk Hpc Hlend Htreec - Hrc2 %hpost2
+      ihave Hlend := actLend_ret_weaken _ hk1 $$ Hlend
+      have hpin13 : k.sie = false ∨ k.proc = 0#64 → c13 = cur := fun h =>
+        (hp13 h).trans ((hp12 h).trans (hpin10 h))
+      have hpin15 : k.sie = false ∨ k.proc = 0#64 → c15 = cur := fun h =>
+        (hp15 h).trans ((hp14 h).trans (hpin13 h))
+      have hpin17 : k.sie = false ∨ k.proc = 0#64 → c17 = cur := fun h =>
+        (hp17 h).trans ((hp16 h).trans (hpin15 h))
+      have hpin19 : k.sie = false ∨ k.proc = 0#64 → c19 = cur := fun h =>
+        (hp19 h).trans ((hp18 h).trans (hpin17 h))
+      have hpin21 : k.sie = false ∨ k.proc = 0#64 → c21 = cur := fun h =>
+        (hp21 h).trans ((hp20 h).trans (hpin19 h))
+      have hpin23 : k.sie = false ∨ k.proc = 0#64 → c23 = cur := fun h =>
+        (hp23 h).trans ((hp22 h).trans (hpin21 h))
+      have hpin25 : k.sie = false ∨ k.proc = 0#64 → c25 = cur := fun h =>
+        (hp25 h).trans ((hp24 h).trans (hpin23 h))
+      k_norm_g [MachCSL.KCtx.withSpie_twice, uc_ret_141c, uc_availSub_none]
+      obtain ⟨hcs4, hsup, hfrnd, hfrpg, harm⟩ := hpost2
+      have hkept5 : ucKept R4 R5 := by
+        unfold ucKept
+        obtain ⟨p2, p8, p9, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hcs4
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true,
+          ite_false] at p2 p8 p9 p20 p21 p22 p23 p24 p25 p26 p27
+        exact ⟨p2, p8, p9, p20, p21, p22, p23, p24, p25, p26, p27⟩
+      have r18 : R5 18#5 = R3 10#5 := by
+        obtain ⟨-, -, -, p18, -⟩ := hcs4
+        rw [p18]
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
+        exact q18
+      have hsp' : k.sie = false → spie3 = spie ∧ spp3 = spp := by
+        intro h
+        obtain ⟨e1, e2⟩ := hsp3 h
+        rw [e1, e2]
+        exact hsp2 h
+      have hviewi : UPtCopy.ucView Mold Mnew n i = Mold i := by
+        unfold UPtCopy.ucView; rw [if_pos hi]
+      have hleafpa : pte2pa (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) = R3 10#5 :=
+        UPtCopy.pte2pa_leafOf _ _ hmemal hmemlt (UPtCopy.pteFlags_mask w)
+      have hleafppn : ptePpn (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) = BitVec.extractLsb' 12 44 (R3 10#5) :=
+        UPtCopy.ptePpn_leafOf _ _ (UPtCopy.pteFlags_mask w)
+      rcases harm with ⟨h0, hcount⟩ | ⟨hm1, hlt1, hzm⟩
+      · -- the page is mapped: the child grows by it
+        have hcomp2 : (tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.complete 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) := by
+          by_cases hc : (tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.complete 2
+              (vpnOf (BitVec.ofNat 64 (4096 * i)))
+          · exact hc
+          · rw [uc_mapRun_one, if_neg hc] at hcount
+            simp at hcount
+        have hlenF : fresh.length = tchild.missingOn 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) := by
+          have h2 := PtRun.mapRun_len_full 1 tchild _ _ _ fresh (Prod.ext hsup hcount)
+          simpa [PTree.missingRun] using h2
+        rw [uc_mapRun_one, if_pos hcomp2]
+        have hrep2 : ptRep ((tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.setLeaf 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))
+            (leafOf (BitVec.extractLsb' 12 44 (R3 10#5))
+              (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))))))
+            (insert P.leaves (vpnOf (BitVec.ofNat 64 (4096 * i))).toNat
+              (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w))) :=
+          UPtCopy.ptRep_setLeaf_insert _ _ _
+            (UPtCopy.ptRep_fill _ fresh hrepc hfrnd hfrpg) hcomp2
+            (by rw [hvpni]; exact hPleaves) (UPtCopy.pteAD_leafOf _ hAD)
+            (UPtCopy.leafOf_isLeafPte _ _ hflagsrwx)
+        rw [hvpni] at hrep2
+        have hwf2 : uptWf { P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } := by
+          refine uptWf_insert P i _ hwfc (by rw [Xv6.tfVpn_toNat]; omega)
+            (UPtCopy.leafOf_isLeafPte _ _ (uc_pteFlags_rwx_self hleafw)) ?_ ?_ ?_ ?_ ?_
+          · rw [hleafpa]; exact hpv
+          · exact uLeafPins_uLeaf _ _ (pteFlags_pinMask w (hwfo.2.2.2.1 i w hw))
+          · exact uwkInv_uLeaf_pteFlags _ w (hwfo.2.2.2.2.1 i w hw)
+          · exact uLeafR_uLeaf _ _ (uLeafR_pteFlags w (hwfo.2.2.2.2.2 i w hw))
+          · intro j w' hj _ hq
+            refine hfresh j w' hj ?_
+            rw [← hleafpa]
+            exact UPtCopy.pte2pa_eq_of_ppn w' _ (hwfc.1 j w' hj).2.2
+              (by rw [hleafpa]; exact hpv) hq
+        have hb2 : ((tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.setLeaf 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))
+            (leafOf (BitVec.extractLsb' 12 44 (R3 10#5))
+              (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))))))).base = ({ P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } : UPtd).root := by
+          rw [PTree.base_setLeaf, MachCSL.PTree.base_fill]; exact hbasec
+        have hr2 : ptRep ((tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.setLeaf 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))
+            (leafOf (BitVec.extractLsb' 12 44 (R3 10#5))
+              (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))))))) ({ P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } : UPtd).leaves := by
+          rw [UPtCopy.leaves_insert P i _ hne_tf hne_tr]; exact hrep2
+        ihave Hrestc := Hrw $$ %fresh
+          %(leafOf (BitVec.extractLsb' 12 44 (R3 10#5))
+            (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))))))
+          %(leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) %hlenF
+        ihave Hrestc := UPt.ptRest_congr _ _
+          ({ P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } : UPtd).leaves
+          (fun x => by rw [UPtCopy.leaves_insert P i _ hne_tf hne_tr, hvpni]) $$ Hrestc
+        ihave Hpagesc := UPtCopy.umPages_insert P (UPtCopy.ucView Mold Mnew n) i
+          (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) hPum $$ [Hdst Hpagesc]
+        case' _ =>
+          rw [hleafpa, hviewi]
+          isplitl []
+          · ipureintro; exact hlen
+          · iframe
+        ihave Hchild := UPtCopy.procPtAt_intro { P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } (UPtCopy.ucView Mold Mnew n) _ hwf2 hb2 hr2
+          $$ [Htreec Hrestc Hpagesc]
         case' _ => iframe
-        icases UPtCopy.procPtAt_cases P (UPtCopy.ucView Mold Mnew n) $$ Hchild
-          with ⟨%tchild, %htchild, Htreec, Hpagesc⟩
-        obtain ⟨hwfc, hbasec, hrepc⟩ := htchild
-        have hchildwalk : tchild.walk 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) = none :=
-          hrepc.2.2.2.2 _ (by rw [hvpni]; exact hPleaves)
-        -- andi a4,s3,1023 ; c.mv a3,s2 ; c.mv a2,s4 ; c.mv a1,s1 ; c.mv a0,s7 ; jal mappages
-        k_step_gen (wp_s_andi c18 _ (KA.«uvmcopy» + 0x54#64) false 1023#12 14#5 19#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-          with [q19, uc_andi1023] next c19 hp19
+        ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hresto Hpageso]
+        case' _ => iframe
+        k_step_gen (wp_s_branch c25 _ (KA.«uvmcopy» + 0x64#64) true 8128#13 10#5 0#5 (by decide) bop.BEQ)
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c26 hp26
         iintro Hk Hpc
-        k_step_gen (wp_s_add c19 _ (KA.«uvmcopy» + 0x58#64) true 13#5 0#5 18#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [q18] next c20 hp20
-        iintro Hk Hpc
-        k_step_gen (wp_s_add c20 _ (KA.«uvmcopy» + 0x5a#64) true 12#5 0#5 20#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [q20] next c21 hp21
-        iintro Hk Hpc
-        k_step_gen (wp_s_add c21 _ (KA.«uvmcopy» + 0x5c#64) true 11#5 0#5 9#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [q9] next c22 hp22
-        iintro Hk Hpc
-        k_step_gen (wp_s_add c22 _ (KA.«uvmcopy» + 0x5e#64) true 10#5 0#5 23#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [q23] next c23 hp23
-        iintro Hk Hpc
-        k_step_gen (wp_s_jal c23 _ (KA.«uvmcopy» + 0x60#64) false 2096060#21 1#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmcopy_br_fffffffffffffc1c] next c24 hp24
-        iintro Hk Hpc
-        icases Hlend with ⟨%k1, %hk1, Hlend⟩
-        iapply (uc_mappages_call MA c24 _ γl γk none tchild 1
-          (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))))
-          ?hnp ?hKp ?hlkp ?hrop ?hargsp ?hpermp (UPtCopy.pteFlags_mask _) hflagsrwx
-          hrepc.1 hrepc.2.1 hrepc.2.2.1 k1) $$ [- $Hk $Hpc]
-        rotate_right 1
-        k_norm_g
-        iframe #
-        iframe Htreec Hav Hlend
-        case hnp => k_norm_g; omega
-        case hKp => k_norm_g; omega
-        case hlkp => k_norm_g; exact hlk
-        case hrop => k_norm_g; rw [hbasec, hinv.1]
-        case hpermp => k_norm_g; rfl
-        case hargsp =>
-          k_norm_g
-          refine ⟨uc_aligned i, hmemal, uc_ofNat_4096.symm, le_refl 1, ?_, ?_, ?_⟩
-          · rw [hivt]; omega
-          · omega
-          · intro j hj
-            have hj0 : j = 0 := by omega
-            subst hj0
-            simpa using hchildwalk
-        iapply wpNext_intro_pin
-        iintro %c25 %hp25 %spie3 %spp3 %R5 %fresh %hsp3 Hk Hpc Hlend Htreec Hav Hrc2 %hpost2
-        ihave Hlend := actLend_ret_weaken _ hk1 $$ Hlend
-        have hpin13 : k.sie = false ∨ k.proc = 0#64 → c13 = cur := fun h =>
-          (hp13 h).trans ((hp12 h).trans (hpin10 h))
-        have hpin15 : k.sie = false ∨ k.proc = 0#64 → c15 = cur := fun h =>
-          (hp15 h).trans ((hp14 h).trans (hpin13 h))
-        have hpin17 : k.sie = false ∨ k.proc = 0#64 → c17 = cur := fun h =>
-          (hp17 h).trans ((hp16 h).trans (hpin15 h))
-        have hpin19 : k.sie = false ∨ k.proc = 0#64 → c19 = cur := fun h =>
-          (hp19 h).trans ((hp18 h).trans (hpin17 h))
-        have hpin21 : k.sie = false ∨ k.proc = 0#64 → c21 = cur := fun h =>
-          (hp21 h).trans ((hp20 h).trans (hpin19 h))
-        have hpin23 : k.sie = false ∨ k.proc = 0#64 → c23 = cur := fun h =>
-          (hp23 h).trans ((hp22 h).trans (hpin21 h))
-        have hpin25 : k.sie = false ∨ k.proc = 0#64 → c25 = cur := fun h =>
-          (hp25 h).trans ((hp24 h).trans (hpin23 h))
-        k_norm_g [MachCSL.KCtx.withSpie_twice, uc_ret_141c, uc_availSub_none]
-        obtain ⟨hcs4, hsup, hfrnd, hfrpg, harm⟩ := hpost2
-        have hkept5 : ucKept R4 R5 := by
-          unfold ucKept
-          obtain ⟨p2, p8, p9, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hcs4
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true,
-            ite_false] at p2 p8 p9 p20 p21 p22 p23 p24 p25 p26 p27
-          exact ⟨p2, p8, p9, p20, p21, p22, p23, p24, p25, p26, p27⟩
-        have r18 : R5 18#5 = R3 10#5 := by
-          obtain ⟨-, -, -, p18, -⟩ := hcs4
-          rw [p18]
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-          exact q18
-        have hsp' : k.sie = false → spie3 = spie ∧ spp3 = spp := by
-          intro h
-          obtain ⟨e1, e2⟩ := hsp3 h
-          rw [e1, e2]
-          exact hsp2 h
-        have hviewi : UPtCopy.ucView Mold Mnew n i = Mold i := by
-          unfold UPtCopy.ucView; rw [if_pos hi]
-        have hleafpa : pte2pa (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) = R3 10#5 :=
-          UPtCopy.pte2pa_leafOf _ _ hmemal hmemlt (UPtCopy.pteFlags_mask w)
-        have hleafppn : ptePpn (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) = BitVec.extractLsb' 12 44 (R3 10#5) :=
-          UPtCopy.ptePpn_leafOf _ _ (UPtCopy.pteFlags_mask w)
-        rcases harm with ⟨h0, hcount⟩ | ⟨hm1, hlt1, -⟩
-        · -- the page is mapped: the child grows by it
-          have hcomp2 : (tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.complete 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) := by
-            by_cases hc : (tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.complete 2
-                (vpnOf (BitVec.ofNat 64 (4096 * i)))
-            · exact hc
-            · rw [uc_mapRun_one, if_neg hc] at hcount
-              simp at hcount
-          rw [uc_mapRun_one, if_pos hcomp2]
-          have hrep2 : ptRep ((tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.setLeaf 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))
-              (leafOf (BitVec.extractLsb' 12 44 (R3 10#5))
-                (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))))))
-              (insert P.leaves (vpnOf (BitVec.ofNat 64 (4096 * i))).toNat
-                (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w))) :=
-            UPtCopy.ptRep_setLeaf_insert _ _ _
-              (UPtCopy.ptRep_fill _ fresh hrepc hfrnd hfrpg) hcomp2
-              (by rw [hvpni]; exact hPleaves) (UPtCopy.pteAD_leafOf _ hAD)
-              (UPtCopy.leafOf_isLeafPte _ _ hflagsrwx)
-          rw [hvpni] at hrep2
-          have hwf2 : uptWf { P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } := by
-            refine uptWf_insert P i _ hwfc (by rw [Xv6.tfVpn_toNat]; omega)
-              (UPtCopy.leafOf_isLeafPte _ _ (uc_pteFlags_rwx_self hleafw)) ?_ ?_ ?_ ?_ ?_
-            · rw [hleafpa]; exact hpv
-            · exact uLeafPins_uLeaf _ _ (pteFlags_pinMask w (hwfo.2.2.2.1 i w hw))
-            · exact uwkInv_uLeaf_pteFlags _ w (hwfo.2.2.2.2.1 i w hw)
-            · exact uLeafR_uLeaf _ _ (uLeafR_pteFlags w (hwfo.2.2.2.2.2 i w hw))
-            · intro j w' hj _ hq
-              refine hfresh j w' hj ?_
-              rw [← hleafpa]
-              exact UPtCopy.pte2pa_eq_of_ppn w' _ (hwfc.1 j w' hj).2.2
-                (by rw [hleafpa]; exact hpv) hq
-          have hb2 : ((tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.setLeaf 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))
-              (leafOf (BitVec.extractLsb' 12 44 (R3 10#5))
-                (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))))))).base = ({ P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } : UPtd).root := by
-            rw [PTree.base_setLeaf, MachCSL.PTree.base_fill]; exact hbasec
-          have hr2 : ptRep ((tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.setLeaf 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))
-              (leafOf (BitVec.extractLsb' 12 44 (R3 10#5))
-                (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))))))) ({ P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } : UPtd).leaves := by
-            rw [UPtCopy.leaves_insert P i _ hne_tf hne_tr]; exact hrep2
-          ihave Hpagesc := UPtCopy.umPages_insert P (UPtCopy.ucView Mold Mnew n) i
-            (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) hPum $$ [Hdst Hpagesc]
-          case' _ =>
-            rw [hleafpa, hviewi]
-            isplitl []
-            · ipureintro; exact hlen
-            · iframe
-          ihave Hchild := UPtCopy.procPtAt_intro { P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } (UPtCopy.ucView Mold Mnew n) _ hwf2 hb2 hr2
-            $$ [Htreec Hpagesc]
-          case' _ => iframe
-          ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hpageso]
-          case' _ => iframe
-          k_step_gen (wp_s_branch c25 _ (KA.«uvmcopy» + 0x64#64) true 8128#13 10#5 0#5 (by decide) bop.BEQ)
-            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c26 hp26
-          iintro Hk Hpc
-          k_norm_g [MachCSL.beq_zero _ h0]
-          have hpin26 : k.sie = false ∨ k.proc = 0#64 → c26 = cur := fun h =>
-            (hp26 h).trans (hpin25 h)
-          ihave HΦ' := wpNext_at _ _ _ c26 _ hpin26 $$ HΦ
-          iclear Hrc2
-          iapply HΦ' $$ %spie3 %spp3 %_ %{ P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } %_ %hsp' Hk Hpc Hlend Hav Hold Hchild []
-          · iintro %hpc
-            exfalso
-            revert hpc
-            decide
-          ipureintro
-          refine ⟨ucKept_trans hkept3 (ucKept_trans hkept4 hkept5), Or.inl ⟨rfl, ?_⟩⟩
-          refine UPtCopy.ucInv_step hinv hi hfree rfl rfl
-            (fun j hj => get?_insert_ne (fun hc => hj hc.symm)) ?_
-          rw [hw]
-          exact ⟨_, get?_insert_eq rfl⟩
-        · -- `mappages` failed: free the page and go to `err`
-          ihave Hn := Hrc2 $$ %hm1
-          icases Hn with #Hn
-          have hnc : ¬ (tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.complete 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) := by
-            intro hc
-            rw [uc_mapRun_one, if_pos hc] at hlt1
-            simp at hlt1
-          rw [uc_mapRun_one, if_neg hnc]
-          have hbf : (tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.base = P.root := by
-            rw [MachCSL.PTree.base_fill]; exact hbasec
-          have hrf : ptRep (tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1 P.leaves :=
-            UPtCopy.ptRep_fill _ fresh hrepc hfrnd hfrpg
-          k_step_gen (wp_s_branch c25 _ (KA.«uvmcopy» + 0x64#64) true 8128#13 10#5 0#5 (by decide) bop.BEQ)
-            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c26 hp26
-          iintro Hk Hpc
-          k_norm_g [uc_beq_ne _ (show R5 10#5 ≠ 0#64 by rw [hm1]; decide)]
-          k_step_gen (wp_s_add c26 _ (KA.«uvmcopy» + 0x66#64) true 10#5 0#5 18#5 (by decide))
-            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18] next c27 hp27
-          iintro Hk Hpc
-          k_step_gen (wp_s_jal c27 _ (KA.«uvmcopy» + 0x68#64) false 2094536#21 1#5 (by decide))
-            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmcopy_br_fffffffffffff630] next c28 hp28
-          iintro Hk Hpc
-          ihave Hown : pageOwn (R3 10#5) $$ [Hdst]
-          case' _ =>
-            unfold pageOwn
-            iexists (Mold i)
-            isplitl []
-            · ipureintro; exact hlen
-            · iexact Hdst
-          icases Hlend with ⟨%k3, %hk3, Hlend⟩
-          iapply (uc_kfree_call KF c28 _ γl γk none k3 ?hnf ?hKf ?hlkf ?hpf) $$ [- $Hk $Hpc]
-          rotate_right 1
-          k_norm_g
-          iframe #
-          iframe Hown Hav Hlend
-          case hnf => k_norm_g; omega
-          case hKf => k_norm_g; omega
-          case hlkf => k_norm_g; exact hlk
-          case hpf => k_norm_g; exact hpv
-          iapply wpNext_intro_pin
-          iintro %c29 %hp29 %spie4 %spp4 %R6 %hsp4 Hk Hpc Hlend Hav %hcs5
-          ihave Hlend := actLend_ret_step _ hk3 $$ Hlend
-          have hpin29 : k.sie = false ∨ k.proc = 0#64 → c29 = cur := fun h =>
-            (hp29 h).trans ((hp28 h).trans ((hp27 h).trans ((hp26 h).trans (hpin25 h))))
-          k_norm_g [MachCSL.KCtx.withSpie_twice, uc_ret_1424, Xv6.availInc_none]
-          ihave Hchild := UPtCopy.procPtAt_intro P (UPtCopy.ucView Mold Mnew n) _ hwfc hbf hrf
-            $$ [Htreec Hpagesc]
-          case' _ => iframe
-          ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hpageso]
-          case' _ => iframe
-          have hsp'' : k.sie = false → spie4 = spie ∧ spp4 = spp := by
-            intro h
-            obtain ⟨e1, e2⟩ := hsp4 h
-            rw [e1, e2]
-            exact hsp' h
-          ihave HΦ' := wpNext_at _ _ _ c29 _ hpin29 $$ HΦ
-          iapply HΦ' $$ %spie4 %spp4 %_ %P %_ %hsp'' Hk Hpc Hlend Hav Hold Hchild []
-          · -- the failed `mappages`' null receipt
-            iintro -
-            iexact Hn
-          ipureintro
-          refine ⟨?_, Or.inr ⟨rfl, rfl⟩⟩
-          refine ucKept_trans hkept3 (ucKept_trans hkept4 (ucKept_trans hkept5 ?_))
-          unfold ucKept
-          obtain ⟨u2, u8, u9, u18, u19, u20, u21, u22, u23, u24, u25, u26, u27⟩ := hcs5
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true,
-            ite_false] at u2 u8 u9 u20 u21 u22 u23 u24 u25 u26 u27
-          exact ⟨u2, u8, u9, u20, u21, u22, u23, u24, u25, u26, u27⟩
+        k_norm_g [MachCSL.beq_zero _ h0]
+        have hpin26 : k.sie = false ∨ k.proc = 0#64 → c26 = cur := fun h =>
+          (hp26 h).trans (hpin25 h)
+        ihave HΦ' := wpNext_at _ _ _ c26 _ hpin26 $$ HΦ
+        iclear Hrc2
+        iapply HΦ' $$ %spie3 %spp3 %_ %{ P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } %_ %hsp' Hk Hpc Hlend Hav Hold Hchild []
+        · iintro %hpc
+          exfalso
+          revert hpc
+          decide
+        ipureintro
+        refine ⟨ucKept_trans hkept3 (ucKept_trans hkept4 hkept5), Or.inl ⟨rfl, ?_⟩⟩
+        refine UPtCopy.ucInv_step hinv hi hfree rfl rfl rfl
+          (fun j hj => get?_insert_ne (fun hc => hj hc.symm)) ?_
+        rw [hw]
+        exact ⟨_, get?_insert_eq rfl⟩
+      · -- `mappages` failed: refuted (its supply was paid, so no `-1` past the seal)
+        exact absurd hzm (by simp [availZero, availSub])
 
 /-! ## The loop -/
 

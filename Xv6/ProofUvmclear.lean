@@ -7,6 +7,7 @@ arithmetic facts and the `walk` call rule are in `Xv6/VmfaultDefs.lean`.
 -/
 import Xv6.VmfaultDefs
 import Xv6.WalkaddrDefs
+import Xv6.UPtLemmas
 
 namespace Xv6
 
@@ -28,11 +29,11 @@ theorem uvmclear_br_fffffffffffffaae : KA.«uvmclear» + 0xfffffffffffffaae#64 =
 
 set_option maxHeartbeats 4000000 in
 theorem uvmclear_proof (W : WALK_NOALLOC) : UVMCLEAR :=
-  ⟨fun {hlc GF} _ _ _ cpu k P M w hK hroot hva hmap => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k P M w hK hroot hva hmap => by
   unfold wp_uvmclear_body
   simp only [uvmclearAddr]
   iintro ⟨Hk, Hpc, Hpt, HΦ⟩
-  icases UPtFault.procPtAt_open P M $$ Hpt with ⟨%t, %hfacts, Htree, Hum⟩
+  icases UPtFault.procPtAt_open P M $$ Hpt with ⟨%t, %hfacts, ⟨Htree, Hrest⟩, Hum⟩
   obtain ⟨hwf, hbase, hrep⟩ := hfacts
   -- the leaf is in the whole map too
   have hlt : (vpnOf (k.regs 11#5)).toNat < tfVpn.toNat := (hwf.1 _ _ hmap).1
@@ -121,10 +122,20 @@ theorem uvmclear_proof (W : WALK_NOALLOC) : UVMCLEAR :=
     exact UPtFault.ptRep_setLeaf t P.leaves _ _ _ hrep hcomp hv
       (UPtFault.pteAD_andNotU w _ hpteAD)
   ihave Hum := vf_umPages_clearU P M (vpnOf (k.regs 11#5)).toNat w hmap $$ Hum
+  -- the quota part: same pages, same shape, same keys
+  ihave Hrest := UPt.ptRest_keys t (t.setLeaf 2 (vpnOf (k.regs 11#5))
+      (t.entAt 2 (vpnOf (k.regs 11#5)) &&& ~~~PTE_U)) P.leaves
+      (P.clearU (vpnOf (k.regs 11#5)).toNat w).leaves (by rw [PTree.pages_setLeaf])
+      (PTree.shapeQ_setLeaf _ _ _) (fun kk => by
+        rw [vf_leaves_clearU P _ w hlt kk]
+        by_cases e : kk = (vpnOf (k.regs 11#5)).toNat
+        · subst e
+          rw [Iris.Std.LawfulPartialMap.get?_insert_eq rfl, hmapL]; rfl
+        · rw [Iris.Std.LawfulPartialMap.get?_insert_ne (fun h => e h.symm)]) $$ Hrest
   ihave Hpt := UPtFault.procPtAt_close (P.clearU (vpnOf (k.regs 11#5)).toNat w) M _
     (vf_uptWf_clearU P _ w hwf hmap) (by rw [PTree.base_setLeaf]; exact hbase) hrep'
-      $$ [Htree Hum]
-  case' _ => iframe Htree Hum
+      $$ [Htree Hrest Hum]
+  case' _ => iframe Htree Hum Hrest
   -- the epilogue
   have hpin8 : k.sie = false ∨ k.proc = 0#64 → c8 = cpu := fun h =>
     (hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans (hpin3 h)))))

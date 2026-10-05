@@ -19,6 +19,11 @@ Deviations from Rocq: Rocq has four forms (`_mem`, `_live`, `_bare`,
 form over a raw table; `_free` = `_mem`, whose `_live` variant has no Lean
 twin; `_bare`).  All three take the lend, as all four do in Rocq.
 
+THE CREDITS (NI M3 quotas Q-1): the freeing forms free at the sealed count
+and put each freed page's credit back into the table (`ptOwnRep`'s unspent
+weight grows by the leaves removed); the raw form frees nothing, so it is
+stated above the quota (`hup`: the two top pages, which count no credit).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
@@ -40,7 +45,8 @@ def wp_uvmunmap_raw_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (cpu : CPU) (k : KCtx) (root : BitVec 44) (L : RegMapF (BitVec 64)) (n : Nat) (ke : Nat)
     (hK : uvmunmapSlots ≤ k.avail) (hroot : k.regs 10#5 = pageAddr root)
     (hal : k.regs 11#5 &&& 0xfff#64 = 0#64) (hn : k.regs 12#5 = BitVec.ofNat 64 n)
-    (hrange : (k.regs 11#5).toNat + 4096 * n ≤ 2 ^ 38) (hfree : k.regs 13#5 = 0#64) : Prop :=
+    (hrange : (k.regs 11#5).toNat + 4096 * n ≤ 2 ^ 38) (hfree : k.regs 13#5 = 0#64)
+    (hup : uQpages ≤ (vpnOf (k.regs 11#5)).toNat) : Prop :=
   kctx cpu k ∗ pcIs cpu uvmunmapAddr ∗ ptOwnRep root L ∗ actLend k.proc ke ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -99,8 +105,8 @@ def wp_uvmunmap_bare_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 
 structure UVMUNMAP : Prop where
   wp_uvmunmap_raw : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (root : BitVec 44) (L : RegMapF (BitVec 64)) (n : Nat) (ke : Nat) hK hroot hal hn hrange hfree,
-    wp_uvmunmap_raw_body (hlc := hlc) (GF := GF) cpu k root L n ke hK hroot hal hn hrange hfree
+    (root : BitVec 44) (L : RegMapF (BitVec 64)) (n : Nat) (ke : Nat) hK hroot hal hn hrange hfree hup,
+    wp_uvmunmap_raw_body (hlc := hlc) (GF := GF) cpu k root L n ke hK hroot hal hn hrange hfree hup
   wp_uvmunmap_free : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (n : Nat) (ke : Nat) hnoff hK hlk hroot hal hn hrange hfree,
     wp_uvmunmap_free_body (hlc := hlc) (GF := GF) cpu k γl γk P M n ke hnoff hK hlk hroot hal hn hrange hfree

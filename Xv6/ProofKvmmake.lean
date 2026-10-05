@@ -772,7 +772,7 @@ theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPS
   k_step_gen (wp_s_jal c1 _ (KA.«kvmmake» + 0xa#64) false 2095636#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_fffffffffffffa1e] next c2 hp2
   iintro Hk Hpc
-  iapply (Xv6.uc_kalloc_call KAL c2 _ γl γk (some nb) ?hn1 ?hK1 ?hl1 ?hz1) $$ [- $Hk $Hpc]
+  iapply (Xv6.uc_kalloc_call KAL c2 _ γl γk (some nb) ?hn1 ?hK1 ?hl1 ?hz1 (by simp)) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -792,10 +792,9 @@ theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPS
   unfold kallocPost
   icases HPost with ⟨⟨%hz, Hav⟩ | ⟨%hvalid, Hbuf, Hav⟩⟩
   · obtain ⟨-, hzero⟩ := hz
-    rcases hzero with h | h
-    · exact absurd h (by simp)
-    · injection h with h
-      exact absurd hcount (by unfold kvmmakeCount kvmmakeNodes; omega)
+    unfold availZero at hzero
+    injection hzero with h
+    exact absurd hcount (by unfold kvmmakeCount kvmmakeNodes; omega)
   -- c.mv s1,a0
   k_step_gen (wp_s_add c3 _ (KA.«kvmmake» + 0xe#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4

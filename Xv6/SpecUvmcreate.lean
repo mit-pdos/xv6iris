@@ -35,16 +35,16 @@ def uvmcreateSlots : Nat := 18
 
 /-- `0` with the count dry and the null `kalloc`'s receipt (labelled by the
 actor `act`, NI joint fork lane F2), or an empty root node one page down. -/
-def uvmcreatePost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def uvmcreatePost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (γk : KmemNames) (on : Option Nat) (act r : BitVec 64) : IProp GF := iprop%
-  (⌜r = 0#64 ∧ availZero on⌝ ∗ kallocAvail γk on ∗ kNullRcpt γk act) ∨
+  (⌜r = 0#64 ∧ availZero on⌝ ∗ kPay γk on 1 ∗ kNullRcpt γk act) ∨
   (∃ b : BitVec 44, ⌜r = pageAddr b ∧ pageValid (pageAddr b)⌝ ∗
-    ptreeOwn 2 (DFrac.own 1) (PTree.zeroNode b) ∗ kallocAvail γk (availDec on))
+    ptreeOwn 2 (DFrac.own 1) (PTree.zeroNode b) ∗ kPay γk (availDec on) 0)
 
 def wp_uvmcreate_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : uvmcreateSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks) : Prop :=
-  kctx cpu k ∗ pcIs cpu uvmcreateAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗ actLend k.proc ke ∗
+  kctx cpu k ∗ pcIs cpu uvmcreateAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kPay γk on 1 ∗ actLend k.proc ke ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗

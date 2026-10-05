@@ -28,11 +28,6 @@ theorem bltz_zero {α : Type _} (x : BitVec 64) (h : x = 0#64) (p q : α) :
     (if bcond bop.BLT x 0#64 then p else q) = q := by
   subst h; rw [if_neg (by decide)]
 
-/-- `bltz` on a result known to be `-1`: taken. -/
-theorem bltz_neg_one {α : Type _} (x : BitVec 64) (h : x = -1#64) (p q : α) :
-    (if bcond bop.BLT x 0#64 then p else q) = p := by
-  subst h; rw [if_pos (by decide)]
-
 /-! ## Immediates -/
 
 theorem u20_1 : BitVec.signExtend 64 (1#20 ++ 0#12) = 0x1000#64 := by decide
@@ -52,9 +47,6 @@ theorem perm_rx : (PTE_R ||| PTE_X) = 10#64 := by decide
 theorem perm_rw : (PTE_R ||| PTE_W) = 6#64 := by decide
 
 /-! ## The allocator count -/
-
-theorem availDec_eq (on : Option Nat) : availDec on = availSub on 1 := by
-  cases on <;> rfl
 
 /-! ## `ptRep` -/
 
@@ -189,7 +181,7 @@ theorem tf_tramp_idx1 : vpnIdx tfVpn 1 = vpnIdx trampVpn 1 := by decide
 them, are the leaf map of the empty space. -/
 theorem leaves_of_empty (root tfp : BitVec 44) :
     insert (insert (∅ : RegMapF (BitVec 64)) trampVpn.toNat trampLeaf) tfVpn.toNat (tfLeaf tfp)
-      = (UPtd.mk root tfp ∅).leaves := by
+      = (UPtd.mk root tfp ∅ 0).leaves := by
   unfold UPtd.leaves
   refine equiv_iff_eq.mp ?_
   intro j
@@ -206,7 +198,7 @@ theorem leaves_of_empty (root tfp : BitVec 44) :
 /-- The empty space is well formed as soon as its trapframe page is a real
 page. -/
 theorem uptWf_empty (root tfp : BitVec 44) (h : pageValid (pageAddr tfp)) :
-    uptWf (UPtd.mk root tfp ∅) := by
+    uptWf (UPtd.mk root tfp ∅ 0) := by
   refine ⟨?_, ?_, h, ?_, ?_, ?_⟩
   · intro k w hk; rw [get?_empty] at hk; exact absurd hk (by simp)
   · intro k1 w1 k2 w2 hk; rw [get?_empty] at hk; exact absurd hk (by simp)
@@ -215,22 +207,12 @@ theorem uptWf_empty (root tfp : BitVec 44) (h : pageValid (pageAddr tfp)) :
   · intro k w hk; rw [get?_empty] at hk; exact absurd hk (by simp)
 
 theorem umBelow_empty (sz : BitVec 64) (root tfp : BitVec 44) :
-    umBelow sz (UPtd.mk root tfp ∅) := by
+    umBelow sz (UPtd.mk root tfp ∅ 0) := by
   intro k w hk; rw [get?_empty] at hk; exact absurd hk (by simp)
 
 /-! ## Deleting one key -/
 
 theorem delRunL_one (L : RegMapF (BitVec 64)) (v : Nat) : delRunL L v 1 = delete L v := rfl
-
-/-- The trampoline leaf deleted from a table that has only it. -/
-theorem delete_tramp_empty :
-    delete (insert (∅ : RegMapF (BitVec 64)) trampVpn.toNat trampLeaf) trampVpn.toNat
-      = (∅ : RegMapF (BitVec 64)) := by
-  refine equiv_iff_eq.mp ?_
-  intro j
-  by_cases hj : j = trampVpn.toNat
-  · subst hj; rw [get?_delete_eq rfl, get?_empty]
-  · rw [get?_delete_ne (fun hh => hj hh.symm), get?_insert_ne (fun hh => hj hh.symm)]
 
 /-- The physical address of a real page, as `mappages` needs it. -/
 theorem pageValid_pa_bound (p : BitVec 64) (h : pageValid p) : p.toNat + 4096 < 2 ^ 56 := by

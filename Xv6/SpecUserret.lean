@@ -114,12 +114,14 @@ config record `C` the loop runs at, the user `mstatus` `ms`, the per-step
 cells at the resume pc `sep &&& ~1` with the restored file, the installed
 user table over the pages at `M`, the config cells, the trapframe page
 (unchanged), and the context's remainder. -/
-def userretPost [CurCtx] (cpu : CPU) (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8))
+def userretPost [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8))
     (ws : List (BitVec 64)) (sep sc tv : BitVec 64) : IProp GF := iprop%
   ∀ (C : UCfg) (ms : BitVec 64), ⌜loopOk C P ∧ userMstatusOk ms⌝ -∗
     uRegs cpu (HartState.HART_ACTIVE ()) ms sc tv sep
       (sep &&& 0xFFFFFFFFFFFFFFFE#64) (sep &&& 0xFFFFFFFFFFFFFFFE#64) (tfResumeGpr0 ws) -∗
-    userPtInvX cpu P M -∗ userCfg cpu C -∗ tfPageAt P.tfp ws -∗ userretLeft cpu k -∗ wpLoop cpu
+    -- NI M3 Q-1: the user table at its page count `n`, the table's credits beside it
+    ∀ n : Nat, userPtInvX cpu { P with np := n } M -∗ uptCred { P with np := n } -∗
+    userCfg cpu C -∗ tfPageAt P.tfp ws -∗ userretLeft cpu k -∗ wpLoop cpu
 
 end
 
@@ -135,7 +137,7 @@ the record's evidence (NI M2-X1: `MachFixedGS.uEvid ox`, persistent, handed to
 the entry hook) and the justification `uFit ox` of exactly the event the
 `sret` emits -- the user `satp`, the resume `sepc`, the restored registers
 `tfGprs ws` (`NiLedger`). -/
-def wp_userret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_userret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8)) (ws : List (BitVec 64))
     (sep sc tv : BitVec 64) (ox : Option (Nat × Obs))
     (hsie : k.sie = false) (hspie : k.spie = true) (hspp : k.spp = false) (htier : k.tier = KTier.kpt)
@@ -153,7 +155,7 @@ def wp_userret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 
 /-- **Rocq `Module Type USERRET`**. -/
 structure USERRET : Prop where
-  wp_userret : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_userret : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8)) (ws : List (BitVec 64))
     (sep sc tv : BitVec 64) (ox : Option (Nat × Obs)) hsie hspie hspp htier ha0,
     wp_userret_body (hlc := hlc) (GF := GF) cpu k P M ws sep sc tv ox hsie hspie hspp htier ha0

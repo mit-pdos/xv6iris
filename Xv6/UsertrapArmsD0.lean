@@ -86,7 +86,7 @@ set_option maxHeartbeats 1000000 in
 theorem utD0_vmfault [WchG GF] (VM : VMFAULT) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd)
     (M : Nat → List (BitVec 8)) (hsie : k'.sie = false) (hnoff : k'.noff + 1 < 2 ^ 31)
     (hK : vmfaultSlots ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
-    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38) (ke : Nat) :
+    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ uQuota) (ke : Nat) :
     kctx c k' ∗ pcIs c KA.«vmfault» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPtAt P M ∗ actLend k'.proc ke ∗
     (∀ R' : RegMap, kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗

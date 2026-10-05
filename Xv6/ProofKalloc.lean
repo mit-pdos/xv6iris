@@ -87,39 +87,6 @@ theorem ka_al8 (p : BitVec 64) (h : p &&& 0xfff#64 = 0#64) : p.toNat % 8 = 0 := 
   simp only [BitVec.extractLsb'_toNat, Nat.shiftRight_zero, BitVec.toNat_ofNat, Nat.reducePow] at h8'
   omega
 
-/-! ## Curried forms of the allocator's ghost steps -/
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
-
-/-- `kmemAuth_agree`, curried. -/
-theorem kmemAuth_agree' (γk : KmemNames) (n : Nat) (on : Option Nat) :
-    kallocAvail (GF := GF) γk on ⊢ kmemAuth γk n -∗
-      (⌜∀ m, on = some m → m = n⌝ ∗ kallocAvail γk on ∗ kmemAuth γk n) := by
-  iintro H1 H2
-  iapply (kmemAuth_agree γk n on)
-  iframe
-
-/-- `kmemAuth_dec`, curried. -/
-theorem kmemAuth_dec' (γk : KmemNames) (n : Nat) (on : Option Nat) (act : BitVec 64) :
-    kallocAvail (GF := GF) γk on ⊢ kmemAuth γk (n + 1) -∗
-      |==> (⌜∀ m, on = some m → m = n + 1⌝ ∗ kallocAvail γk (availDec on) ∗ kmemAuth γk n ∗
-        ∃ h, ledReceipt γk h (.KAlloc act) ∗ ⌜¬ poolEmpty h⌝) := by
-  iintro H1 H2
-  iapply (kmemAuth_dec γk n on act)
-  iframe
-
-/-- `kmemAuth_null`, curried. -/
-theorem kmemAuth_null' (γk : KmemNames) (on : Option Nat) (act : BitVec 64) :
-    kallocAvail (GF := GF) γk on ⊢ kmemAuth γk 0 -∗
-      |==> (kallocAvail γk on ∗ kmemAuth γk 0 ∗
-        ∃ h, ledReceipt γk h (.KNull act) ∗ ⌜poolEmpty h⌝) := by
-  iintro H1 H2
-  iapply (kmemAuth_null γk on act)
-  iframe
-
-end
-
 /-- Assembling `calleeSaved` for the tail lemmas out of the `s2`..`s11`
 equalities (`sp`, `s0`, `s1` are the restored ones). -/
 theorem ka_calleeSaved_mk (KR R : RegMap)
@@ -282,21 +249,28 @@ theorem kalloc_br_1197a : KA.«kalloc» + 0x1197a#64 = kmemFreelistAddr := by de
 theorem kalloc_br_11962 : KA.«kalloc» + 0x11962#64 = kmemLockAddr := by decide
 
 set_option maxHeartbeats 4000000 in
-/-- THE LED FORM is the proof (Rocq `wp_kalloc_led_sconf`); the landed
-`wp_kalloc` follows as a corollary in `kalloc_proof`.  The actor of the
-ledger's event is `k.proc`, the `cpu_own` proc word (design D3). -/
-theorem kalloc_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
+/-- THE PROOF, over the client's token (NI M3 quotas Q-1: one walk of the
+code for the three forms).  `T` is what the caller hands the allocator --
+a tracked count (`kallocAvail γk on`, `on ≠ none`), or the sealed count and
+one credit -- and `Post r` what it gets back; `hnull` is the empty pool's
+ghost step (refuted for a credited call), `hpage` the pop's.  The led form,
+the boot form and the credited form instantiate it (the led form was the
+proof, Rocq `wp_kalloc_led_sconf`). -/
+theorem kalloc_core (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
     {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat) hnoff hK hlk :
-    wp_kalloc_led_body (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk := by
-  unfold wp_kalloc_led_body
-  simp only [kallocAddr]
-  iintro ⟨Hk, Hpc, #Hlk, Hav, Hl, Hnext⟩
-  -- the lend: the event costs one count, stepped here and given back
-  iapply wpLoop_bupd
-  imod (actLend_step k.proc ke) $$ Hl with Hl
-  imodintro
-  ihave Hnext := actLend_cont_give _ _ _ _ _ _ _ _ _ $$ Hnext Hl
+    (γl : GName) (γk : KmemNames) (T : IProp GF) (Post : BitVec 64 → IProp GF)
+    (hnull : T ∗ kmemAuth γk 0 ⊢ |==> (kmemAuth γk 0 ∗ Post 0#64))
+    (hpage : ∀ (n : Nat) (pg : BitVec 64), pg ≠ 0#64 → pageValid pg →
+      T ∗ kmemAuth γk (n + 1) ⊢
+        |==> (kmemAuth γk n ∗ (byteBuf pg (DFrac.own 1) (List.replicate 4096 5#8) -∗ Post pg)))
+    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "kmem" ∉ k.locks) :
+    kctx cpu k ∗ pcIs cpu KA.«kalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ T ∗
+    wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      Post (R' 10#5) -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) cpu := by
+  iintro ⟨Hk, Hpc, #Hlk, Hav, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hK4 : 4 ≤ k.avail := by omega
@@ -394,14 +368,10 @@ theorem kalloc_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
     k_step (wp_s_jal c _ (KA.«kalloc» + 0x54#64) false 270#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [kalloc_br_162]
     iintro Hk Hpc
-    icases kmemAuth_agree' γk _ on $$ Hav Hauth with ⟨%hagree, Hav, Hauth⟩
-    have hz : availZero on := by
-      cases on with
-      | none => exact Or.inl rfl
-      | some m => exact Or.inr (congrArg some (hagree m rfl))
-    -- the ledger: append the actor's `KNull`; the history was empty
+    -- the empty pool's ghost step (the ledger's `KNull`, or a credit's refutation)
     iapply wpLoop_bupd
-    imod kmemAuth_null' γk on k.proc $$ Hav Hauth with ⟨Hav, Hauth, %hled, #Hrcpt, %hemp⟩
+    imod hnull $$ [Hav Hauth] with ⟨Hauth, HPost⟩
+    · iframe Hav Hauth
     imodintro
     ihave HRnew : kmemRes (GF := GF) γk curCtx $$ [Hfl Hauth]
     case' _ =>
@@ -449,20 +419,10 @@ theorem kalloc_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
     ihave Hnext := wpNext_shift _ _ _ _ _ hpinA $$ Hnext
     iapply wpNext_mono _ _ _ _ _ $$ Hnext
     iintro %cc H %R'' Hk Hpc %hfacts
-    ihave HPost : kallocPostLed (GF := GF) γk on k.proc (R'' 10#5) $$ [Hav]
+    ihave HPost : Post (R'' 10#5) $$ [HPost]
     case' _ =>
-      unfold kallocPostLed
-      iexists hled
-      rw [hfacts.1, kevOf_null]
-      isplitl []
-      · iexact Hrcpt
-      isplitl []
-      · ipureintro; exact ⟨fun _ => hemp, fun _ => rfl⟩
-      unfold kallocPost
-      ileft
-      isplitl []
-      · ipureintro; exact ⟨rfl, hz⟩
-      iexact Hav
+      rw [hfacts.1]
+      iexact HPost
     iapply H $$ %spie %spp %R'' %hsp Hk Hpc HPost
     ipureintro
     exact hfacts.2
@@ -499,7 +459,8 @@ theorem kalloc_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
     -- one page fewer
     simp only [List.length_cons]
     iapply wpLoop_bupd
-    imod kmemAuth_dec' γk ps.length on k.proc $$ Hav Hauth with ⟨%_, Hav, Hauth, %hled, #Hrcpt, %hnemp⟩
+    imod hpage ps.length pg (Xv6.PtRun.pageValid_ne_zero pg hvalid) hvalid $$ [Hav Hauth] with ⟨Hauth, HPw⟩
+    · iframe Hav Hauth
     imodintro
     ihave HRnew : kmemRes (GF := GF) γk curCtx $$ [Hfl Hchain Hauth]
     case' _ =>
@@ -551,32 +512,146 @@ theorem kalloc_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
     ihave Hnext := wpNext_shift _ _ _ _ _ hpinB $$ Hnext
     iapply wpNext_mono _ _ _ _ _ $$ Hnext
     iintro %cc H %R'' Hk Hpc Hbuf %hfacts
-    have hpg0 : pg ≠ 0#64 := Xv6.PtRun.pageValid_ne_zero pg hvalid
-    ihave HPost : kallocPostLed (GF := GF) γk on k.proc (R'' 10#5) $$ [Hav Hbuf]
+    ihave HPost : Post (R'' 10#5) $$ [HPw Hbuf]
     case' _ =>
       rw [hfacts.1]
-      unfold kallocPostLed
-      iexists hled
-      rw [kevOf_page _ _ hpg0]
-      isplitl []
-      · iexact Hrcpt
-      isplitl []
-      · ipureintro; exact ⟨fun h => absurd h hpg0, fun h => absurd h hnemp⟩
-      unfold kallocPost
-      iright
-      isplitl []
-      · ipureintro; exact hvalid
-      iframe
+      iapply HPw $$ Hbuf
     iapply H $$ %spie %spp %R'' %hsp Hk Hpc HPost
     ipureintro
     exact hfacts.2
 
-/-- The proved `kalloc` interface: the led form, and the landed contract at
-the boot (`hp0`) as its corollary (the lend from `actLend_of_zero`, the
-stepped lend and the receipt dropped, `kallocPostLed_post`). -/
+section forms
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+
+/-- The tracked count's empty-pool step: the ledger's `KNull`, the count
+at `0` (`availZero`: the tracked count read `0`). -/
+theorem kalloc_null_led (γk : KmemNames) (on : Option Nat) (act : BitVec 64) (hon : on ≠ none) :
+    kallocAvail (GF := GF) γk on ∗ kmemAuth γk 0 ⊢
+      |==> (kmemAuth γk 0 ∗ kallocPostLed γk on act 0#64) := by
+  iintro ⟨Hav, Hauth⟩
+  icases kmemAuth_agree γk 0 on $$ [Hav Hauth] with ⟨%hagree, Hav, Hauth⟩
+  · iframe Hav Hauth
+  have hz : availZero on := by
+    cases on with
+    | none => exact absurd rfl hon
+    | some m => exact congrArg some (hagree m rfl)
+  imod kmemAuth_null γk on act $$ [Hav Hauth] with ⟨Hav, Hauth, %hled, #Hrcpt, %hemp⟩
+  · iframe Hav Hauth
+  imodintro
+  iframe Hauth
+  unfold kallocPostLed
+  iexists hled
+  rw [kevOf_null]
+  isplitl []
+  · iexact Hrcpt
+  isplitl []
+  · ipureintro; exact ⟨fun _ => hemp, fun _ => rfl⟩
+  unfold kallocPost
+  ileft
+  isplitl []
+  · ipureintro; exact ⟨rfl, hz⟩
+  iexact Hav
+
+/-- The tracked count's pop: the ledger's `KAlloc`, the count down. -/
+theorem kalloc_page_led (γk : KmemNames) (on : Option Nat) (act : BitVec 64) (hon : on ≠ none)
+    (n : Nat) (pg : BitVec 64) (hpg0 : pg ≠ 0#64) (hvalid : pageValid pg) :
+    kallocAvail (GF := GF) γk on ∗ kmemAuth γk (n + 1) ⊢
+      |==> (kmemAuth γk n ∗ (byteBuf pg (DFrac.own 1) (List.replicate 4096 5#8) -∗
+        kallocPostLed γk on act pg)) := by
+  iintro ⟨Hav, Hauth⟩
+  imod kmemAuth_dec γk n on act hon $$ [Hav Hauth] with ⟨%_, Hav, Hauth, %hled, #Hrcpt, %hnemp⟩
+  · iframe Hav Hauth
+  imodintro
+  iframe Hauth
+  iintro Hbuf
+  unfold kallocPostLed
+  iexists hled
+  rw [kevOf_page _ _ hpg0]
+  isplitl []
+  · iexact Hrcpt
+  isplitl []
+  · ipureintro; exact ⟨fun h => absurd h hpg0, fun h => absurd h hnemp⟩
+  unfold kallocPost
+  iright
+  isplitl []
+  · ipureintro; exact hvalid
+  iframe
+
+/-- A credited call never meets the empty pool. -/
+theorem kalloc_null_cred (γk : KmemNames) (act : BitVec 64) :
+    (kallocAvail (GF := GF) γk none ∗ pageCredit 1) ∗ kmemAuth γk 0 ⊢
+      |==> (kmemAuth γk 0 ∗ kallocPostCred γk act 0#64) := by
+  iintro ⟨⟨Hav, Hf⟩, Hauth⟩
+  ihave %h := kmemAuth_cred_pos γk 0 $$ [Hav Hf Hauth]
+  · iframe
+  omega
+
+/-- The credited pop: the credit spent, the page out. -/
+theorem kalloc_page_cred (γk : KmemNames) (act : BitVec 64)
+    (n : Nat) (pg : BitVec 64) (hpg0 : pg ≠ 0#64) (hvalid : pageValid pg) :
+    (kallocAvail (GF := GF) γk none ∗ pageCredit 1) ∗ kmemAuth γk (n + 1) ⊢
+      |==> (kmemAuth γk n ∗ (byteBuf pg (DFrac.own 1) (List.replicate 4096 5#8) -∗
+        kallocPostCred γk act pg)) := by
+  iintro ⟨⟨Hav, Hf⟩, Hauth⟩
+  imod kmemAuth_decCred γk n act $$ [Hav Hf Hauth] with ⟨Hauth, %hled, #Hrcpt, %hnemp⟩
+  · iframe
+  imodintro
+  iframe Hauth
+  iintro Hbuf
+  unfold kallocPostCred
+  isplitl []
+  · ipureintro; exact ⟨hpg0, hvalid⟩
+  iframe Hbuf
+  unfold kAllocRcpt
+  iexists hled
+  iframe Hrcpt
+  ipureintro; exact hnemp
+
+end forms
+
+set_option maxHeartbeats 1000000 in
+/-- THE LED FORM (Rocq `wp_kalloc_led_sconf`), at a tracked count: the lend
+stepped at entry, then the core. -/
+theorem kalloc_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat) hnoff hK hlk hon :
+    wp_kalloc_led_body (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk hon := by
+  unfold wp_kalloc_led_body
+  simp only [kallocAddr]
+  iintro ⟨Hk, Hpc, #Hlk, Hav, Hl, Hnext⟩
+  -- the lend: the event costs one count, stepped here and given back
+  iapply wpLoop_bupd
+  imod (actLend_step k.proc ke) $$ Hl with Hl
+  imodintro
+  ihave Hnext := actLend_cont_give _ _ _ _ _ _ _ _ _ $$ Hnext Hl
+  iapply (kalloc_core AC RE MS cpu k γl γk (kallocAvail γk on) (kallocPostLed γk on k.proc)
+    (kalloc_null_led γk on k.proc hon) (kalloc_page_led γk on k.proc hon) hnoff hK hlk)
+  iframe Hk Hpc Hlk Hav Hnext
+
+set_option maxHeartbeats 1000000 in
+/-- THE CREDITED FORM (NI M3 quotas Q-1): the lend stepped at entry, then the
+core at the sealed count and one credit. -/
+theorem kalloc_cred_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (ke : Nat) hnoff hK hlk :
+    wp_kalloc_cred_body (hlc := hlc) (GF := GF) cpu k γl γk ke hnoff hK hlk := by
+  unfold wp_kalloc_cred_body
+  simp only [kallocAddr]
+  iintro ⟨Hk, Hpc, #Hlk, #Hav, Hf, Hl, Hnext⟩
+  iapply wpLoop_bupd
+  imod (actLend_step k.proc ke) $$ Hl with Hl
+  imodintro
+  ihave Hnext := actLend_cont_give _ _ _ _ _ _ _ _ _ $$ Hnext Hl
+  iapply (kalloc_core AC RE MS cpu k γl γk iprop(kallocAvail γk none ∗ pageCredit 1)
+    (kallocPostCred γk k.proc) (kalloc_null_cred γk k.proc) (kalloc_page_cred γk k.proc) hnoff hK hlk)
+  iframe Hk Hpc Hlk Hav Hf Hnext
+
+/-- The proved `kalloc` interface: the led form, the landed contract at the
+boot (`hp0`) as its corollary (the lend from `actLend_of_zero`, the stepped
+lend and the receipt dropped, `kallocPostLed_post`), and the credited form. -/
 theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on hnoff hK hlk hp0 => by
-    have h := kalloc_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on 0 hnoff hK hlk
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on hnoff hK hlk hp0 hon => by
+    have h := kalloc_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on 0 hnoff hK hlk hon
     unfold wp_kalloc_led_body at h
     unfold wp_kalloc_body
     iintro ⟨Hk, Hpc, #Hlk, Hav, Hnext⟩
@@ -592,7 +667,9 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
     iapply H $$ %spie %spp %R' %hs Hk Hpc Hpost
     ipureintro
     exact hcs,
-   fun {hlc GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk =>
-    kalloc_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk⟩
+   fun {hlc GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk hon =>
+    kalloc_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk hon,
+   fun {hlc GF} _ _ _ _ cpu k γl γk ke hnoff hK hlk =>
+    kalloc_cred_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk ke hnoff hK hlk⟩
 
 end Xv6

@@ -55,7 +55,7 @@ theorem ukm_store_mem {P : UPtd} {t : PTree} {mm T : BMap} (hm : UkMem P t mm T)
     rw [bmOwned_iff]
     intro j hj
     exact (hm.dom _).2 (List.mem_append_right _ (hmem j hj))
-  refine ⟨hm.root, hm.rep, hm.wf, hm.nodup, fun a => ?_, hm.domT, ?_⟩
+  refine ⟨hm.root, hm.rep, hm.wf, hm.nodup, fun a => ?_, hm.domT, ?_, hm.sq, hm.np⟩
   · rw [bmWrite_isSome mm _ n v (by omega) ho a]; exact hm.dom a
   · intro p hp
     rw [bmWrite_other]

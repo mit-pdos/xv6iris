@@ -120,7 +120,7 @@ theorem filerw_offadd (v : BitVec 32) (tot : Nat) (h : v.toNat + tot < 2 ^ 31) :
 /-! ## The block -/
 
 section Block
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
 
 /-- The pid cell out of the block and back (Rocq's
 `proc_priv_core_bare_acc`, lent around each of begin_op, ilock, iunlock,
@@ -171,7 +171,8 @@ theorem filerw_core_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (M : Nat → List (BitVec 8)) :
     procPrivCoreNoctxAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢
       procPrivExt pa pid V P M ∗
-        (cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ procGenAt curCtx pa pid V.gen) := by
+        (cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ procGenAt curCtx pa pid V.gen ∗
+          pageCredit procSpare) := by
   obtain ⟨ξ, t⟩ := X
   simp only at h
   subst h

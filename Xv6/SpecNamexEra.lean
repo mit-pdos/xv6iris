@@ -96,7 +96,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 `namexPost` at `npar = false` with the process block for the rows and the
 two arms replaced by the trace's. -/
 def namexEraPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
-    (P Pmiss : Nat → Nat → IProp GF) (pid : BitVec 32) (V : ProcPriv)
+    (P Pmiss : Nat → Nat → IProp GF) (r : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (dqb dqs dqpv : DFrac) (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (ok : Bool)
       (nf : Nat → BitVec 8) (ipv : BitVec 64) (w : Bool),
@@ -106,7 +106,7 @@ def namexEraPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb
     -- EVERYTHING LOANED COMES BACK
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-    procPrivCoreNoctxAt curCtx k.proc pid V M -∗
+    procPrivCoreResAt r curCtx k.proc pid V M -∗
     byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) -∗
     -- the name buffer, at an UNSPECIFIED naming function
     byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) -∗
@@ -141,7 +141,7 @@ def wp_namex_era_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (P Pmiss : Nat → Nat → IProp GF) (r : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (dqb dqs dqpv : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : namexSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
@@ -170,8 +170,8 @@ def wp_namex_era_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
   -- ---- THE PROCESS BLOCK's core: Rocq's `proc_priv_bare ∗ inode_held_at
-  -- (pv_cwd) (pv_cwi)` (header) ----
-  procPrivCoreNoctxAt curCtx k.proc pid V M ∗
+  -- (pv_cwd) (pv_cwi)` (header); NI M3 quotas Q-1: at any spare `r` ----
+  procPrivCoreResAt r curCtx k.proc pid V M ∗
   byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) ∗
   byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nfun) ∗
   bslots 3 ∗
@@ -180,7 +180,7 @@ def wp_namex_era_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- ---- THE TRACE (ONE premise, DEFERRED IN THE START) ----
   exStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
   -- THE CROSSING IS THE LITERAL `true`: namex parks
-  wpNext true k.proc cpu (namexEraPost k plen pfun n Sb P Pmiss pid V M dqb dqs dqpv)
+  wpNext true k.proc cpu (namexEraPost k plen pfun n Sb P Pmiss r pid V M dqb dqs dqpv)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface (Rocq's `Module Type NAMEX_ERA`). -/
@@ -193,11 +193,11 @@ structure NAMEX_ERA : Prop where
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (P Pmiss : Nat → Nat → IProp GF) (r : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (dqb dqs dqpv : DFrac)
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud ha1 hpd,
     wp_namex_era_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun nfun
-      n Sb P Pmiss pid V M dqb dqs dqpv
+      n Sb P Pmiss r pid V M dqb dqs dqpv
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud ha1 hpd
 
 /-! ## THE BLOCK AS THE PLAIN WALK'S ROWS
@@ -255,6 +255,33 @@ theorem namexEra_core_rows5 [X : CurCtx] (hct : X.curTier = KTier.kpt) (pa : Bit
   simp only at hct
   subst hct
   unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt rootRefAt
+  iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩
+  iframe Hpid Hcwd Hc Hrt Hr Hev
+  iintro Hpid Hcwd Hc Hrt Hr
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
+/-- **...at any spare** (NI M3 quotas Q-1): `namexEra_core_rows5` at the
+core `procPrivCoreResAt r` (`kexec` walks at the table's share). -/
+theorem namexEra_core_rows5R [X : CurCtx] (hct : X.curTier = KTier.kpt) (r : Nat) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivCoreResAt (GF := GF) r curCtx pa pid V M ⊢
+      wordPointsTo (pPid pa) 4 pidPriv pid ∗
+      wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
+      inodeHeldAt V.cwd V.cwi ∗
+      wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      inodeHeldAt V.root V.rti ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗
+        wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd -∗
+        inodeHeldAt V.cwd V.cwi -∗
+        wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root -∗
+        inodeHeldAt V.root V.rti -∗ procPrivCoreResAt r curCtx pa pid V M) := by
+  obtain ⟨c, t⟩ := X
+  simp only at hct
+  subst hct
+  unfold procPrivCoreResAt procPrivBareAt procFieldsNoOfile cwdRefAt rootRefAt
   iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩
   iframe Hpid Hcwd Hc Hrt Hr Hev
   iintro Hpid Hcwd Hc Hrt Hr

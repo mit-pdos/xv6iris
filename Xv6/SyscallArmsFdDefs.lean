@@ -227,8 +227,8 @@ theorem syscFd_pageLen (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec
   iintro H
   icases procPrivFd_copy γ pa pid V M $$ H with ⟨-, -, Hpt, -⟩
   obtain ⟨ξ, t⟩ := (inferInstance : CurCtx)
-  ihave %h := (show @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ⊢ ⌜umPageLen V.upt M⌝ from
-    (@UMemL.procPtAt_pageLen hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M).trans sep_elim_left) $$ Hpt
+  ihave %h := (show @procPtAt hlc GF _ _ _ ⟨curCtx, KTier.kpt⟩ V.upt M ⊢ ⌜umPageLen V.upt M⌝ from
+    (@UMemL.procPtAt_pageLen hlc GF _ _ _ ⟨curCtx, KTier.kpt⟩ V.upt M).trans sep_elim_left) $$ Hpt
   ipureintro; exact h
 
 end Agree

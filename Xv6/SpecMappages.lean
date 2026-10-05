@@ -35,6 +35,11 @@ null; its `-1` arm carries that call's persistent receipt (`⌜R' 10 = -1⌝
 -∗ kNullRcpt γk k.proc`).  The counted contract, which refutes `-1`, is
 unchanged.
 
+THE PAYMENT (NI M3 quotas Q-1): the general contract takes `kPay γk on m`
+for the `m = t.missingRun vpn n` nodes the run may create and hands back the
+payment for the rest (`SpecWalk`'s); past the seal `availZero` refutes the
+`-1` arm.
+
 Deviations from Rocq: Rocq states ONE contract (`wp_mappages_sconf`, at an
 arbitrary `on`); Lean keeps its two (the uncounted `MAPPAGES_ANY` and the
 counted corollary `MAPPAGES`), both take the lend.
@@ -77,14 +82,14 @@ def wp_mappages_any_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (hwf : t.wfU 2) (hnd : t.pagesNodup 2)
     (hpg : ∀ b ∈ t.pages 2, pageValid (pageAddr b)) : Prop :=
   kctx cpu k ∗ pcIs cpu mappagesAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-  ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗ actLend k.proc ke ∗
+  ptreeOwn 2 (DFrac.own 1) t ∗ kPay γk on (t.missingRun (vpnOf (k.regs 11#5)) n) ∗ actLend k.proc ke ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ (R' : RegMap) (fresh : List (BitVec 44)),
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     ptreeOwn 2 (DFrac.own 1)
       (t.mapRun (vpnOf (k.regs 11#5)) (BitVec.extractLsb' 12 44 (k.regs 13#5)) perm n fresh).1 -∗
-    kallocAvail γk (availSub on fresh.length) -∗
+    kPay γk (availSub on fresh.length) (t.missingRun (vpnOf (k.regs 11#5)) n - fresh.length) -∗
     (⌜R' 10#5 = -1#64⌝ -∗ kNullRcpt γk k.proc) -∗
     ⌜calleeSaved k.regs R' ∧
       (t.mapRun (vpnOf (k.regs 11#5)) (BitVec.extractLsb' 12 44 (k.regs 13#5)) perm n fresh).2.1 = [] ∧

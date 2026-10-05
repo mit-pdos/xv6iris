@@ -124,12 +124,15 @@ block with its descriptor array, the cwd reference and the root reference
 (chroot, right after it, as in the core), `firstBoot`'s rows,
 the incarnation's pair at the trivial payload (`<init>` has no parent),
 the two quarters and the slot's half of `p->xstate` -- `procGenAt` minus its
-token, split, at the parker-chosen context. -/
+token, split, at the parker-chosen context -- and (NI M3 quotas Q-1, LAST)
+the core's spare credits (`procSpare`, `FdTable.procPrivCoreNoctxAt`), which
+forkret's boot arm rejoins into `procPrivFd`. -/
 def parkBootBlock [CurCtx] (N : UtNames) (V : ProcPriv) (M : Nat → List (BitVec 8)) : IProp GF :=
   iprop(procPrivBareAt curCtx N.pj N.pid V M ∗ procOfiles N.f V.fdg N.pj V.ofile ∗
     cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ firstBoot (hlc := hlc) ∗
     genKq V.gen N.pj N.pid (fun _ => iprop(True)) ∗ myPay V.gen (fun _ => iprop(True)) ∗
-    genHalvesPriv N.pj N.pid V.gen ∗ (∃ xsv : BitVec 32, wordPointsTo (pXstate N.pj) 4 xsHalf xsv))
+    genHalvesPriv N.pj N.pid V.gen ∗ (∃ xsv : BitVec 32, wordPointsTo (pXstate N.pj) 4 xsHalf xsv) ∗
+    pageCredit procSpare)
 
 /-- **THE BLOCK AT THE MODE** (Rocq `park_child`'s `if steady`): whole on the
 steady mode, split on the boot mode. -/

@@ -26,6 +26,7 @@ import Xv6.SpecFreewalk
 import Xv6.UPtFreeLemmas
 import Xv6.CodeTactics
 import Xv6.UvmallocDefs
+import Xv6.UPtLemmas
 
 namespace Xv6
 
@@ -59,6 +60,12 @@ theorem uf_vpn0 : (vpnOf (0#64)).toNat = 0 := by decide
 
 theorem uf_one_ne_zero : (1#64 : BitVec 64) ≠ 0#64 := by decide
 
+open Iris.Std.PartialMap Iris.Std.LawfulPartialMap in
+/-- An empty leaf map counts no user leaf. -/
+theorem uf_uLeafCnt_empty : uLeafCnt (∅ : RegMapF (BitVec 64)) = 0 := by
+  unfold uLeafCnt
+  simp [get?_empty]
+
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
@@ -78,6 +85,7 @@ theorem uf_freewalk_call [WchG GF] (FW : FREEWALK) [CurCtx] (c : CPU) (k' : KCtx
       ⌜k'.sie = false → spie' = k'.spie ∧ spp' = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
+      pageCredit (t.pages 2).length -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := FW.wp_freewalk (hlc := hlc) (GF := GF) c k' γl γk 2 t ke (by omega) hnoff' hK' hlk'
@@ -193,12 +201,17 @@ theorem uvmfree_tail [WchG GF] (FW : FREEWALK) [CurCtx] (cpu cur : CPU) (k : KCt
       ⌜k.sie = false → spie' = k.spie ∧ spp' = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
+      pageCredit ptW -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   unfold ptOwnRep
   iintro ⟨Hk, Hpc, #Hlk, #Hav, Htree, Hframe, ⟨%k1, %hk1, Hlend⟩, HΦ⟩
-  icases Htree with ⟨%t, ⟨%hbase, %hrep⟩, Htree⟩
+  icases Htree with ⟨%t, ⟨%hbase, %hrep⟩, Htree, Hrest⟩
   subst hbase
+  have hcnt : uLeafCnt L = 0 := by rw [hL]; exact uf_uLeafCnt_empty
+  icases (UPt.ptRest_unfold t L).1 $$ Hrest with ⟨%⟨hshq, -⟩, Hrest⟩
+  have hfit := ptW_fits t L hshq
+  rw [hcnt, Nat.sub_zero]
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv a0,s1
   k_step_gen (wp_s_add cur _ (KA.«uvmfree» + 0xe#64) true 10#5 0#5 9#5 (by decide))
@@ -219,7 +232,19 @@ theorem uvmfree_tail [WchG GF] (FW : FREEWALK) [CurCtx] (cpu cur : CPU) (k : KCt
   case hl => k_norm_g; exact hlk
   case hrt => k_norm_g
   iapply wpNext_intro_pin
-  iintro %c3 %hp3 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend %hcs2
+  iintro %c3 %hp3 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hcf %hcs2
+  ihave Hcr := pageCredit_join _ _ $$ [Hrest Hcf]
+  · iframe
+  ihave Hcr := pageCredit_congr _ ptW (by omega) $$ Hcr
+  ihave HΦ : wpNext (GF := GF) k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie' = k.spie ∧ spp' = k.spp⌝ -∗
+      kctx cpu' ((k.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
+      ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')) $$ [HΦ Hcr]
+  · iapply wpNext_mono _ _ _ _ _ $$ HΦ
+    iintro %c' H %spie' %spp' %R' %hs Hk Hpc Hl %hcs
+    iapply H $$ %spie' %spp' %R' %hs Hk Hpc Hl Hcr
+    ipureintro; exact hcs
   ihave Hlend := actLend_ret_weaken _ hk1 $$ Hlend
   -- the epilogue calls nothing: the lend is framed into the continuation
   ihave HΦ := actLend_cont_frame_ret _ _ _ _ _ _ _ _ _ $$ HΦ Hlend

@@ -221,7 +221,7 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   have hK4 : 4 ≤ k.avail := by unfold sysWaitSlots kwaitSlots at hK; omega
   -- the trapframe pointer and page, out of the block
   icases (show procPrivNoctxAt (GF := GF) curCtx (procAddr j) pid V M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
+      ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
         V.trapframe = pageAddr V.upt.tfp⌝ ∗
       wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
       (wordPointsTo (pKstack (procAddr j)) 8 (DFrac.own 1) V.kstack ∗

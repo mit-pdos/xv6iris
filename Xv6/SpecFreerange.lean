@@ -56,7 +56,7 @@ def freerangeArgs (start stop : BitVec 64) (base : BitVec 64) (n : Nat) : Prop :
 
 /-- The specification of `freerange`, as a proposition over the ambient
 kernel context. -/
-def wp_freerange_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_freerange_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (base : BitVec 64) (n : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 20 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hargs : freerangeArgs (k.regs 10#5) (k.regs 11#5) base n) (hp0 : k.proc = 0#64) : Prop :=

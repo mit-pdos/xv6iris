@@ -21,7 +21,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## `ismapped` -/
 
@@ -119,7 +119,7 @@ theorem ismapped_proof (W : WALK_NOALLOC) : ISMAPPED :=
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [wa_beq_ne _ hz] next c5 hp5
     iintro Hk Hpc
-    icases UPtWalkaddr.ptreeOwn_read_leaf 2 dq t (vpnOf (k.regs 11#5)) hcomp $$ Htree
+    icases UPtWalkaddr.ptreeOwn_read_leaf (GF := GF) 2 dq t (vpnOf (k.regs 11#5)) hcomp $$ Htree
       with ⟨Hcell, Hclose⟩
     k_step_gen (wp_s_ld c5 _ (KA.«ismapped» + 0x10#64) true 0#12 10#5 10#5 (by decide) (by decide) dq
         (t.entAt 2 (vpnOf (k.regs 11#5))))

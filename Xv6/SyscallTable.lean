@@ -39,7 +39,7 @@ read off it, and FREEZES THE ARM INTERFACE:
    rewriting `hnum`.
 4. Rocq's `sysc_trap_ext_true` / `sysc_claim_ext_true` (the complement is
    `emp` at `true`) have no use: D32 carries the complement at `k.sie`.
-5. `sysc_tfp_valid` is the landed `ProcPrivAcc.procPrivFd_tfpValid`.
+5. `sysc_tfp_valid` is the landed `ProcPrivAcc.procPrivFdRes_tfpValid`.
 
 Definitional + address facts; no `wp` stepping (the head is ProofSyscall's,
 the tail is `SyscallRet`'s).

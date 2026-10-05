@@ -21,7 +21,7 @@ it is ported.
 ## THE PROCESS BLOCK -- FLAG
 
 As `SpecNamexEra`: Rocq's `proc_priv_bare ∗ inode_held_at (pv_cwd) (pv_cwi)`
-is the core `procPrivCoreNoctxAt curCtx k.proc pid V M`, in and out; the
+is the core `procPrivCoreResAt r curCtx k.proc pid V M`, in and out; the
 trace is `exStart fscFs V.rti V.cwi P Pmiss (bview plen pfun)`.
 
 ## DEVIATIONS from Rocq
@@ -58,7 +58,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- **THE CONTRACT'S CONTINUATION, NAMED** (Rocq `wp_namei_era_body`'s):
 `namexEraPost` without the name buffer. -/
 def nameiEraPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
-    (P Pmiss : Nat → Nat → IProp GF) (pid : BitVec 32) (V : ProcPriv)
+    (P Pmiss : Nat → Nat → IProp GF) (r : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (dqb dqs dqpv : DFrac) (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (ok : Bool)
       (ipv : BitVec 64) (w : Bool),
@@ -68,7 +68,7 @@ def nameiEraPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb
     -- EVERYTHING LOANED COMES BACK
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-    procPrivCoreNoctxAt curCtx k.proc pid V M -∗
+    procPrivCoreResAt r curCtx k.proc pid V M -∗
     byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) -∗
     bslots 3 -∗
     -- THE SET ONLY GROWS; THE PAID-BITMAP REPORT; THE PRICED INTERVAL
@@ -100,7 +100,7 @@ def wp_namei_era_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (P Pmiss : Nat → Nat → IProp GF) (r : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (dqb dqs dqpv : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : nameiSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
@@ -126,7 +126,7 @@ def wp_namei_era_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
   wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
-  procPrivCoreNoctxAt curCtx k.proc pid V M ∗
+  procPrivCoreResAt r curCtx k.proc pid V M ∗
   byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) ∗
   bslots 3 ∗
   irefSlots 2 ∗
@@ -134,7 +134,7 @@ def wp_namei_era_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- ---- THE TRACE (ONE premise, DEFERRED IN THE START) ----
   exStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
   -- THE CROSSING IS THE LITERAL `true`: namei parks (through namex)
-  wpNext true k.proc cpu (nameiEraPost k plen pfun n Sb P Pmiss pid V M dqb dqs dqpv)
+  wpNext true k.proc cpu (nameiEraPost k plen pfun n Sb P Pmiss r pid V M dqb dqs dqpv)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface (Rocq's `Module Type NAMEI_ERA`). -/
@@ -147,11 +147,11 @@ structure NAMEI_ERA : Prop where
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (P Pmiss : Nat → Nat → IProp GF) (r : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (dqb dqs dqpv : DFrac)
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd,
     wp_namei_era_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun
-      n Sb P Pmiss pid V M dqb dqs dqpv
+      n Sb P Pmiss r pid V M dqb dqs dqpv
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd
 
 end Xv6

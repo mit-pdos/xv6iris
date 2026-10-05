@@ -328,7 +328,7 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     (ci : Nat)
     (hqf : QF .noMem) (hqfa : kxcArgsFitQF QF fb ef A.alen A.na)
     (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
-    (hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ 2 ^ 38)
+    (hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ uQuota)
     (hal : (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0) (hl : ef.length = 64) :
     kxcAt272 k A cpu spie spp R (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P Mi oldsz sz1
@@ -445,7 +445,7 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
       byteBuf (kxcUstackBuf (k.regs 2#5)) (DFrac.own 1)
         (kxcVecBytes (fun j => BitVec.ofInt 64 (kxcSp (sz1.toNat : Int) A.alen (j + 1))) ci) from .rfl) $$ Hv
   -- +0x294  jal copyout, the block's event counter lent to it (permit sweep L1b)
-  icases procPrivFd_evLend A.γ k.proc A.pidv V1 A.M $$ Hpriv with ⟨Hlend, Hpback⟩
+  icases procPrivFdRes_evLend 0 A.γ k.proc A.pidv V1 A.M $$ Hpriv with ⟨Hlend, Hpback⟩
   iapply (kxcC_call_copyout Γ CO cpu k A spie spp _ (KA.«kexec» + 0x29c#64) 2083140#21 kxcC_br_copyout2
       kxcC_ret_294 P Mi (DFrac.own 1)
       (kxcVecBytes (fun j => BitVec.ofInt 64 (kxcSp (sz1.toNat : Int) A.alen (j + 1))) ci)
@@ -545,7 +545,7 @@ theorem kxc_phaseC (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN) (
   -- phase C's uvmalloc moved the block's event count (permit sweep L1a): the
   -- rest of the phase runs at the record it came back at
   iintro %V1 %hV1 %c %spie' %spp' %R' %P' %Mo %sz1 %⟨h8192, h38, -, hal, hl⟩ Hs Hcl
-  have hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ 2 ^ 38 := ⟨h8192, h38⟩
+  have hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ uQuota := ⟨h8192, h38⟩
   -- the close, as the continuation both entries share; phase D goes on at the
   -- record the copyouts raised the block to (permit sweep L1b)
   ihave #Hclose : (□ ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))

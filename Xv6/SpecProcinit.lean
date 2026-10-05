@@ -119,7 +119,7 @@ def wp_procinit_body (cpu : CPU) (k : KCtx) (hK : 10 ≤ k.avail) : Prop :=
   ([∗list] i ∈ List.range NPROC, procRaw i) ∗
   fdSlots (NPROC * (NOFILE + FDSPARE)) ∗
   irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗
-  bslots (NPROC * 3) ∗
+  bslots (NPROC * 3) ∗ pageCredit (NPROC * slotShare) ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     lockInited pidLockAddr nextpidNameAddr -∗ lockInited waitLockAddr waitLockNameAddr -∗

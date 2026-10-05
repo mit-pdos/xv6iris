@@ -177,7 +177,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (hz0 : V.ofile[fd0]? = some 0#64) (hz1 : V.ofile[fd1]? = some 0#64) (hne : fd0 ≠ fd1)
     (l : List Nat) (hfrees : fdFrees V.ofile = fd0 :: fd1 :: l)
     (P1 : UPtd) (M1 : Nat → List (BitVec 8)) (hext1 : V.upt.extSz V.sz P1)
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp)
+    (hf : V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp)
     (hr1 : (R 10#5 = 0#64 ∧ M1 = umemWrite (viewFaulted V.upt P1 M) v.toNat (sysPipeFdBytes fd0) ∧
         umMapped P1 v.toNat (sysPipeFdBytes fd0).length) ∨
       (R 10#5 = -1#64 ∧ ∃ d, d < (sysPipeFdBytes fd0).length ∧
@@ -196,7 +196,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     pipeQfrag γp.pnQueue pst0 ∗
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-    @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P1 M1 ∗ sysPipeCoreRest pa pid V ∗
+    @procPtAt hlc GF _ _ _ ⟨curCtx, KTier.kpt⟩ P1 M1 ∗ sysPipeCoreRest pa pid V ∗
     procOfilesOwe γ V.fdg pa ((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1)) [fd1, fd0] ∗
     fdSlot ∗ fdStAuth V.fdg fd0 .closed ∗ fdSlot ∗ fdStAuth V.fdg fd1 .closed ∗ fdFrags V.fdg sts ∗
     sysPipeTurn cpu k γ V.fdg pa pid V M sts v
@@ -254,7 +254,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     case hKc => k_norm_g; rw [sysPipeSlots_eq] at hK; omega
     case hl => k_norm_g; exact hkmem
     case hroot => k_norm_g; rw [hf.2.2.1, hext1.1.1]
-    case hsz => k_norm_g; have := hf.1; unfold uvmMaxsz at this; omega
+    case hsz => k_norm_g; first | exact hf.1 | (have := hf.1; omega)
     case hlen => k_norm_g; rfl
     iapply wpNext_intro_pin
     iintro %c9 %hp9 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hb1 ⟨%P2, %M2, %⟨hext2, hr2⟩, Hpt⟩ %hcs2
@@ -415,7 +415,7 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     case hKc => k_norm_g; rw [sysPipeSlots_eq] at hK; omega
     case hl => k_norm_g; exact hkmem
     case hroot => k_norm_g; exact hf.2.2.1
-    case hsz => k_norm_g; have := hf.1; unfold uvmMaxsz at this; omega
+    case hsz => k_norm_g; first | exact hf.1 | (have := hf.1; omega)
     case hlen => k_norm_g; rfl
     iapply wpNext_intro_pin
     iintro %c9 %hp9 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hb0 ⟨%P1, %M1, %⟨hext1, hr1⟩, Hpt⟩ %hcs2

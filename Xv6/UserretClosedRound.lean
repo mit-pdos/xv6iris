@@ -76,7 +76,7 @@ theorem urcRut_open (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (
       ∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz secc k ksp V⌝ ∗
         userretLeft cpu k ∗ tfPageAt p.tfp V.tf ∗
         (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt (hlc := hlc) PT Γ j cpu p ksp V sts' cs pid) ∗
-        uhistAt Wr :=
+        uhistAt Wr ∗ uptCred p :=
   .rfl
 
 /-- The kernel table's invariant, copied out of the parked context. -/
@@ -269,7 +269,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   icases urc_frame_rut h C pt _ sz W.M ms sc stv (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) $$ Htm with
     ⟨Hfr, Hrut⟩
   icases urcRut_open PT Γ j h sz γfd cw gn cs pid lz secc Wr pt $$ Hrut with
-    ⟨%k, %ksp, %V, %hp, Hleft, Htf, Hclose, Huh⟩
+    ⟨%k, %ksp, %V, %hp, Hleft, Htf, Hclose, Huh, Hcred⟩
   obtain ⟨hsie, htier, hnoff, hproc, ⟨hksp, hkav⟩, hVsz, hVfdg, hVcwi, hVgen, hVlz, hVsc⟩ := hp
   -- the residue, at the view the process handed back
   ihave Hres := Hclose $$ %W.fd Hfrag
@@ -289,7 +289,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
     (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) hlo hsie htier hkw
   unfold wp_uservec_body uservecPost at HUV
   iapply HUV
-  iframe Hhw Hfr Hcl Htf Hleft
+  iframe Hhw Hfr Hcl Htf Hleft Hcred
   inext
   iintro %Mp %hM Hk Hpc Hsep Hsc Hstv Hstvec Hppt Htf - Htok
   -- THE EXIT'S TOKEN, back from uservec (NI M2-W2d): the receipt the filing

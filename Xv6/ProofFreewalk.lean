@@ -19,7 +19,7 @@ THE LEND (permit sweep L3a, no Rocq counterpart): carried by the loop
 (`freewalk_iter` / `freewalk_loop` take and return `∃ k1 ≥ ke`), passed to
 each recursive call (`fw_rec_call`, the induction hypothesis at the count in
 hand), its returned bound composed back to `ke`; at the tail it is lent to
-`kfree` (L3b, `fw_kfree_call` over `uc_kfree_lend_call`), which steps it,
+`kfree` (L3b, `fw_kfree_call`, credited), which steps it,
 and the stepped lend is framed into the continuation
 (`SlotGen.actLend_cont_frame_step`).
 -/
@@ -89,6 +89,48 @@ theorem fw_branch_last {α : Type _} (b : BitVec 44) (i : Nat) (hi : i < 512) (p
       simp only [BitVec.toNat_ofNat, Nat.reducePow] at h2
       omega
     rw [if_neg he, if_neg (by simp only [bcond, beq_iff_eq]; exact hb)]
+
+/-! ## The credit count (NI M3 quotas Q-1)
+
+Each freed node hands its credit back; the loop holds the credits of the
+subtrees freed so far (`fwCnt`), the tail adds the node's own. -/
+
+/-- The pages hanging off entry `j`. -/
+def fwKid : Nat → PTree → BitVec 9 → Nat
+  | 0, _, _ => 0
+  | l+1, t, j => match t.kids j with | some c => (c.pages l).length | none => 0
+
+/-- The pages hanging off the first `i` entries. -/
+def fwCnt (lvl : Nat) (t : PTree) (i : Nat) : Nat := ((allIdx.take i).map (fwKid lvl t)).sum
+
+theorem fwCnt_zero (lvl : Nat) (t : PTree) : fwCnt lvl t 0 = 0 := by simp [fwCnt]
+
+theorem fwCnt_succ (lvl : Nat) (t : PTree) (i : Nat) (hi : i < 512) :
+    fwCnt lvl t (i + 1) = fwCnt lvl t i + fwKid lvl t (BitVec.ofNat 9 i) := by
+  simp only [fwCnt, allIdx_take_snoc i hi, List.map_append, List.sum_append, List.map_cons,
+    List.map_nil, List.sum_cons, List.sum_nil, Nat.add_zero]
+
+theorem fwCnt_all (lvl : Nat) (t : PTree) : (t.pages lvl).length = fwCnt lvl t 512 + 1 := by
+  cases lvl with
+  | zero =>
+    have hz : ∀ l : List (BitVec 9), (l.map (fun _ => (0 : Nat))).sum = 0 := by
+      intro l; induction l <;> simp_all
+    have h0 : fwCnt 0 t 512 = 0 := hz _
+    simp [PTree.pages, h0]
+  | succ l =>
+    simp only [PTree.pages, List.length_cons, fwCnt, allIdx_take_all, List.length_flatMap]
+    congr 2
+    refine List.map_congr_left (fun j _ => ?_)
+    simp only [fwKid]
+    cases t.kids j <;> rfl
+
+theorem fwKid_none (lvl : Nat) (t : PTree) (j : BitVec 9) (h : t.kids j = none) :
+    fwKid lvl t j = 0 := by
+  cases lvl <;> simp [fwKid, h]
+
+theorem fwKid_some (l : Nat) (t u : PTree) (j : BitVec 9) (h : t.kids j = some u) :
+    fwKid (l + 1) t j = (u.pages l).length := by
+  simp [fwKid, h]
 
 /-! ## The contract, as a level-indexed proposition -/
 
@@ -162,9 +204,30 @@ theorem fw_kfree_call [WchG GF] (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
       ⌜k'.sie = false → spie' = k'.spie ∧ spp' = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       actLend k'.proc (ke + 1) -∗
-      kallocAvail γk (availInc none) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c :=
-  uc_kfree_lend_call KF c k' γl γk none ke hnoff' hK' hlk' hp
+      kallocAvail γk none -∗ pageCredit 1 -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  have h := KF.wp_kfree_cred (hlc := hlc) (GF := GF) c k' γl γk ke hnoff' hK' hlk' hp
+  unfold wp_kfree_cred_body at h
+  simp only [kfreeAddr] at h
+  iintro ⟨Hk, Hpc, #Hlk, Hpg, Hav, Hl, Hnext⟩
+  iapply h
+  iframe Hk Hpc Hlk Hpg Hav Hl
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %cc H %spie %spp %R' %hs Hk Hpc Hl Hpost %hcs
+  unfold kfreePostCred
+  icases Hpost with ⟨Hpost, H1⟩
+  ihave Hav := kfreePostLed_avail γk none k'.proc $$ Hpost
+  rw [Xv6.availInc_none]
+  iapply H $$ %spie %spp %R' %hs Hk Hpc Hl Hav H1
+  ipureintro; exact hcs
+
+/-- A zero credit, for free. -/
+theorem fw_with_zero [WchG GF] (c : CPU) : (pageCredit (GF := GF) 0 -∗ wpLoop c) ⊢ wpLoop (GF := GF) c := by
+  iintro H
+  iapply wpLoop_bupd
+  imod (pageCredit_zero (GF := GF)) with Hz
+  imodintro
+  iapply H $$ Hz
 
 set_option maxHeartbeats 1000000 in
 /-- The induction hypothesis at `freewalk`'s entry address, as a rule. -/
@@ -180,6 +243,7 @@ theorem fw_rec_call [WchG GF] (l' : Nat) (FW : FwAt l') [CurCtx] (c : CPU) (k' :
       ⌜k'.sie = false → spie' = k'.spie ∧ spp' = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
+      pageCredit (u.pages l').length -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := FW.wp_fw (hlc := hlc) (GF := GF) c k' γl γk u ke hlvl' hnoff' hK' hlk' hroot' hwf' hnd' hpg' hnl'
@@ -267,19 +331,20 @@ theorem freewalk_tail [WchG GF] (KF : KFREE) [CurCtx] (cpu cur : CPU) (k : KCtx)
     (h19 : R 19#5 = pageAddr t.base)
     (h20 : R 20#5 = k.regs 20#5) (h21 : R 21#5 = k.regs 21#5) (h22 : R 22#5 = k.regs 22#5)
     (h23 : R 23#5 = k.regs 23#5) (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5)
-    (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5) (v5 : BitVec 64) :
+    (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5) (v5 : BitVec 64) (m : Nat) :
     kctx cur (((k.pushed 6).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«freewalk» + 0x48#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     pageOwn (pageAddr t.base) ∗
     fwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) v5 ∗
-    (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) ∗
+    (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) ∗ pageCredit m ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie' = k.spie ∧ spp' = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
+      pageCredit (m + 1) -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
-  iintro ⟨Hk, Hpc, #Hlk, #Hav, Hpage, Hframe, ⟨%k1, %hk1, Hlend⟩, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, #Hav, Hpage, Hframe, ⟨%k1, %hk1, Hlend⟩, Hcr, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv a0,s3 : the page
   k_step_gen (wp_s_add cur _ (KA.«freewalk» + 0x48#64) true 10#5 0#5 19#5 (by decide))
@@ -299,7 +364,18 @@ theorem freewalk_tail [WchG GF] (KF : KFREE) [CurCtx] (cpu cur : CPU) (k : KCtx)
   case hl => k_norm_g; exact hlk
   case hpvg => k_norm_g; exact hpv
   iapply wpNext_intro_pin
-  iintro %c3 %hp3 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hav2 %hcs2
+  iintro %c3 %hp3 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hav2 H1 %hcs2
+  ihave Hcr := pageCredit_join m 1 $$ [Hcr H1]
+  · iframe
+  ihave HΦ : wpNext (GF := GF) k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie' = k.spie ∧ spp' = k.spp⌝ -∗
+      kctx cpu' ((k.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
+      ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')) $$ [HΦ Hcr]
+  · iapply wpNext_mono _ _ _ _ _ $$ HΦ
+    iintro %c' H %spie' %spp' %R' %hs Hk Hpc Hl %hcs
+    iapply H $$ %spie' %spp' %R' %hs Hk Hpc Hl Hcr
+    ipureintro; exact hcs
   -- the lend comes back stepped: framed into the exit
   ihave HΦ := actLend_cont_frame_step _ _ _ _ hk1 _ _ _ _ $$ HΦ Hlend
   k_norm_g [MachCSL.KCtx.withSpie_twice, fw_ret_1378]
@@ -396,14 +472,18 @@ theorem freewalk_iter [WchG GF] [CurCtx] (lvl : Nat) (t : PTree)
       pcIs cpu' (if i + 1 = 512 then (KA.«freewalk» + 0x48#64) else (KA.«freewalk» + 0x2a#64)) -∗
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
       wordPointsTo (pageAddr t.base + BitVec.ofNat 64 (8 * i)) 8 (DFrac.own 1) 0#64 -∗
+      pageCredit (fwKid lvl t (BitVec.ofNat 9 i)) -∗
       ⌜fwSaved R R2 ∧ R2 9#5 = pageAddr t.base + BitVec.ofNat 64 (8 * (i + 1))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   iintro ⟨Hk, Hpc, #Hlk, #Hav, Hw, Hkid, Hlend, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   by_cases hz : t.ents (BitVec.ofNat 9 i) = 0#64
   · -- an invalid entry: skipped
-    rw [kidsAt_none lvl t _ (fw_kids_none lvl t _ hwf hz), hz]
+    rw [kidsAt_none lvl t _ (fw_kids_none lvl t _ hwf hz),
+      fwKid_none lvl t _ (fw_kids_none lvl t _ hwf hz), hz]
     iclear Hkid
+    iapply fw_with_zero
+    iintro Hz
     k_step_gen (wp_s_ld cur _ (KA.«freewalk» + 0x2a#64) true 0#12 15#5 9#5 (by decide) (by decide)
         (DFrac.own 1) 0#64)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c1 hp1
@@ -422,7 +502,7 @@ theorem freewalk_iter [WchG GF] [CurCtx] (lvl : Nat) (t : PTree)
     · iapply wpNext_intro_pin
       iintro %c4 %hp4 %spie3 %spp3 %R3 %hsp3 Hk Hpc %hsaved3
       ihave HΦ' := wpNext_at _ _ _ c4 _ hp4 $$ HΦ
-      iapply HΦ' $$ %spie3 %spp3 %R3 %hsp3 Hk Hpc Hlend Hw
+      iapply HΦ' $$ %spie3 %spp3 %R3 %hsp3 Hk Hpc Hlend Hw Hz
       ipureintro
       refine ⟨fwSaved_trans ?_ hsaved3.1, hsaved3.2⟩
       simp only [fwSaved, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -432,7 +512,7 @@ theorem freewalk_iter [WchG GF] [CurCtx] (lvl : Nat) (t : PTree)
     case g18 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h18
   · -- a pointer entry: free the subtree, then clear it
     obtain ⟨l', u, rfl, hkid, hent, hcwf, hcnl⟩ := nonzero_kid lvl t hwf hnl _ hz
-    rw [kidsAt_some l' t u _ hkid, hent]
+    rw [kidsAt_some l' t u _ hkid, fwKid_some l' t u _ hkid, hent]
     icases ptreeOwn_pagesNodup' l' u $$ Hkid with ⟨%hnd2, Hkid⟩
     have hupg : ∀ b ∈ u.pages l', pageValid (pageAddr b) :=
       fun b hb => hpg b (MachCSL.kid_mem_pages l' t u _ hkid b hb)
@@ -477,7 +557,7 @@ theorem freewalk_iter [WchG GF] [CurCtx] (lvl : Nat) (t : PTree)
     case hlk2 => k_norm_g; exact hlk
     case hroot2 => k_norm_g
     iapply wpNext_intro_pin
-    iintro %c9 %hp9 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend %hcs2
+    iintro %c9 %hp9 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hcr %hcs2
     ihave Hlend := actLend_ret_weaken _ hk1 $$ Hlend
     k_norm_g [MachCSL.KCtx.withSpie_twice, fw_ret_136c]
     unfold calleeSaved at hcs2
@@ -504,7 +584,7 @@ theorem freewalk_iter [WchG GF] [CurCtx] (lvl : Nat) (t : PTree)
       obtain ⟨g1, g2⟩ := hsp3 h
       rw [g1, g2]
       exact hsp2 h
-    iapply HΦ' $$ %spie3 %spp3 %R3 %hsp' Hk Hpc Hlend Hw
+    iapply HΦ' $$ %spie3 %spp3 %R3 %hsp' Hk Hpc Hlend Hw Hcr
     ipureintro
     exact ⟨fwSaved_trans (fwSaved_of_calleeSaved
       ⟨e2, e8, e9.trans h9.symm, e18.trans h18.symm, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩)
@@ -534,11 +614,12 @@ theorem freewalk_loop [WchG GF] (KF : KFREE) [CurCtx] (lvl : Nat) (t : PTree)
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     fwDone t.base i ∗ fwTodo lvl t i ∗
     fwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) v5 ∗
-    (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) ∗
+    (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) ∗ pageCredit (fwCnt lvl t i) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie' = k.spie ∧ spp' = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
+      pageCredit (t.pages lvl).length -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   induction fuel with
@@ -546,13 +627,18 @@ theorem freewalk_loop [WchG GF] (KF : KFREE) [CurCtx] (lvl : Nat) (t : PTree)
     intro i hc spie spp hsp R h2 h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27 v5 cur
     have hi : i < 512 := by omega
     have hlast : i + 1 = 512 := by omega
-    iintro ⟨Hk, Hpc, #Hlk, #Hav, Hdone, Htodo, Hframe, Hlend, HΦ⟩
+    iintro ⟨Hk, Hpc, #Hlk, #Hav, Hdone, Htodo, Hframe, Hlend, Hcr, HΦ⟩
     icases fwTodo_cons' lvl t i hi $$ Htodo with ⟨⟨Hw, Hkid⟩, Htodo⟩
     iapply (freewalk_iter lvl t hlvl hwf hnl hpg hrec k γl γk hnoff hK hlk ke i hi spie spp R
       h9 h18 cur) $$ [- $Hk $Hpc $Hw $Hkid $Hlend]
     iframe #
     iapply wpNext_intro_pin
-    iintro %c1 %hp1 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hw %hsaved
+    iintro %c1 %hp1 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hw Hc1 %hsaved
+    ihave Hcr := pageCredit_join (fwCnt lvl t i) (fwKid lvl t (BitVec.ofNat 9 i)) $$ [Hcr Hc1]
+    · iframe
+    ihave Hcr := pageCredit_congr _ (fwCnt lvl t 512)
+      (by rw [← hlast, fwCnt_succ lvl t i hi]) $$ Hcr
+    rw [fwCnt_all lvl t]
     rw [if_pos hlast]
     ihave Hdone := fwDone_snoc' t.base i hi $$ [Hdone Hw]
     case' _ => iframe
@@ -564,7 +650,7 @@ theorem freewalk_loop [WchG GF] (KF : KFREE) [CurCtx] (lvl : Nat) (t : PTree)
     -- the lend: passed to the tail, which lends it to `kfree`
     iapply (freewalk_tail KF cur c1 k γl γk t ke hp1 hnoff ?hK20 hlk
       (hpg t.base (base_mem_pages lvl t)) spie2 spp2 ?hsp' R2 ?g2 ?g19 ?g20 ?g21 ?g22 ?g23
-      ?g24 ?g25 ?g26 ?g27 v5) $$ [- $Hk $Hpc $Hpage $Hframe $Hlend $HΦ]
+      ?g24 ?g25 ?g26 ?g27 v5 (fwCnt lvl t 512)) $$ [- $Hk $Hpc $Hpage $Hframe $Hlend $Hcr $HΦ]
     rotate_right 1
     iframe #
     case hK20 => simp only [freewalkSlots] at hK; omega
@@ -583,13 +669,16 @@ theorem freewalk_loop [WchG GF] (KF : KFREE) [CurCtx] (lvl : Nat) (t : PTree)
     intro i hc spie spp hsp R h2 h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27 v5 cur
     have hi : i < 512 := by omega
     have hne : ¬ (i + 1 = 512) := by omega
-    iintro ⟨Hk, Hpc, #Hlk, #Hav, Hdone, Htodo, Hframe, Hlend, HΦ⟩
+    iintro ⟨Hk, Hpc, #Hlk, #Hav, Hdone, Htodo, Hframe, Hlend, Hcr, HΦ⟩
     icases fwTodo_cons' lvl t i hi $$ Htodo with ⟨⟨Hw, Hkid⟩, Htodo⟩
     iapply (freewalk_iter lvl t hlvl hwf hnl hpg hrec k γl γk hnoff hK hlk ke i hi spie spp R
       h9 h18 cur) $$ [- $Hk $Hpc $Hw $Hkid $Hlend]
     iframe #
     iapply wpNext_intro_pin
-    iintro %c1 %hp1 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hw %hsaved
+    iintro %c1 %hp1 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hw Hc1 %hsaved
+    ihave Hcr := pageCredit_join (fwCnt lvl t i) (fwKid lvl t (BitVec.ofNat 9 i)) $$ [Hcr Hc1]
+    · iframe
+    ihave Hcr := pageCredit_congr _ (fwCnt lvl t (i + 1)) (fwCnt_succ lvl t i hi).symm $$ Hcr
     rw [if_neg hne]
     ihave Hdone := fwDone_snoc' t.base i hi $$ [Hdone Hw]
     case' _ => iframe
@@ -598,7 +687,7 @@ theorem freewalk_loop [WchG GF] (KF : KFREE) [CurCtx] (lvl : Nat) (t : PTree)
     iapply (ih (i + 1) (by omega) spie2 spp2 ?hsp2' R2 (s2.trans h2) hsaved.2
       (s18.trans h18) (s19.trans h19) (s20.trans h20) (s21.trans h21) (s22.trans h22)
       (s23.trans h23) (s24.trans h24) (s25.trans h25) (s26.trans h26) (s27.trans h27) v5 c1)
-      $$ [- $Hk $Hpc $Hdone $Htodo $Hframe $Hlend $HΦ]
+      $$ [- $Hk $Hpc $Hdone $Htodo $Hframe $Hlend $Hcr $HΦ]
     rotate_right 1
     iframe #
     case hsp2' => intro h; obtain ⟨g1, g2⟩ := hsp2 h; rw [g1, g2]; exact hsp h
@@ -669,9 +758,12 @@ theorem freewalk_body (KF : KFREE) (lvl : Nat) (hrec : ∀ l', lvl = l' + 1 → 
       ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))
   ihave HΦ := wpNext_shift _ _ _ _ _ hpin12 $$ HΦ
   rw [Xv6.ua_pushed_spie_self k 6]
+  iapply fw_with_zero
+  iintro Hcr
+  ihave Hcr := pageCredit_congr 0 (fwCnt lvl t 0) (fwCnt_zero lvl t).symm $$ Hcr
   iapply (freewalk_loop KF lvl t hlvl hwf hnl hpg hrec k γl γk hnoff hK hlk ke 511
     0 (by omega) k.spie k.spp (fun _ => ⟨rfl, rfl⟩) _ ?e2 ?e9 ?e18 ?e19 ?e20 ?e21 ?e22 ?e23
-    ?e24 ?e25 ?e26 ?e27 w5 c12) $$ [- $Hk $Hpc $Hdone $Htodo $Hframe $Hlend $HΦ]
+    ?e24 ?e25 ?e26 ?e27 w5 c12) $$ [- $Hk $Hpc $Hdone $Htodo $Hframe $Hlend $Hcr $HΦ]
   rotate_right 1
   iframe #
   case e2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]

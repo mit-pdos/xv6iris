@@ -189,6 +189,11 @@ theorem fkr_kexec_call [CurCtx] (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := 
   subst hav8
   unfold initBootPath
   iintro ⟨Hk, Hpc, Hte, Hce, #Hfab, Hpv, Hbuf, Hbuf2, Hw0, Hw1, Hbs, Hir, #Hmp, Hau, Hcont⟩
+  -- kexec is handed the block at the table's share; the argument pages'
+  -- credits (no page is allocated: `/init`'s argv is static) ride beside
+  -- (NI M3 quotas Q-1)
+  rw [procPrivFd_res, show procSpare = ptW + execArgPages from rfl] at *
+  icases (procPrivFdRes_split ptW execArgPages γ pa pid V M).1 $$ Hpv with ⟨Hpv, Hcrs⟩
   iapply h
   iframe Hk Hpc Hte Hce Hfab Hpv Hbs Hir Hmp Hau
   isplitl [Hw0 Hw1 Hbuf Hbuf2]
@@ -202,6 +207,10 @@ theorem fkr_kexec_call [CurCtx] (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := 
   iapply wpNext_intro
   iintro %c' %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hpv ⟨-, Hav, -⟩ Hbs Hir
   icases (fkr_argv_two av γ j pid V M pd pav pu).1 $$ Hav with ⟨Hw0, Hw1⟩
+  ihave Hpv := (procPrivFdRes_split ptW execArgPages γ pa pid V' M').2 $$ [Hpv Hcrs]
+  · iframe
+  ihave Hpv := (show procPrivFdRes (GF := GF) (ptW + execArgPages) γ pa pid V' M' ⊢
+      procPrivFd γ pa pid V' M' from by rw [procPrivFd_res]; exact .rfl) $$ Hpv
   iapply Hcont $$ %c' %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hpv Hw0 Hw1
 
 /-- The block's trapframe pointer and its `a0` word, out and back at any

@@ -272,7 +272,7 @@ theorem sys_open_tails_fileclose_none (FC : FILECLOSE) (Γ : SchedNames) [ClaimI
   -- an untyped file pays no close link (Rocq `fileclose_cpay_none`)
   ihave Hcpay := filecloseCpay_none (hlc := hlc) (GF := GF) iprop(emp)
   iapply (fileclose_call FC Γ cpu k' A.γl A.γ kf 1 .closed A.j 0 ⟨0, 0⟩ none A.pid pidPriv iprop(emp)
-    ke se hs (procAddr A.j) hpj hK hnoff htier ha0)
+    ke se hs (procAddr A.j) hpj hK hnoff htier ha0 rfl)
   iframe Hk Hpc Hte Hce Hft Hpe Hf Hpid Hiru Henvf Hcpay Hlend
   iapply wpNext_intro_pin
   iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hlend Hte Hce Hpid Hfd Hiru - -

@@ -89,7 +89,7 @@ theorem uvmcreate_proof (KAL : KALLOC) (MS : MEMSET) : UVMCREATE :=
   k_step_gen (wp_s_jal c1 _ (KA.«uvmcreate» + 0xa#64) false 2095418#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmcreate_br_fffffffffffff944] next c2 hp2
   iintro Hk Hpc
-  iapply (uc_kalloc_led_call KAL c2 _ γl γk on ke ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
+  iapply (uc_kalloc_pay_call KAL c2 _ γl γk on 0 ke ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -110,7 +110,7 @@ theorem uvmcreate_proof (KAL : KALLOC) (MS : MEMSET) : UVMCREATE :=
   k_step_gen (wp_s_add c3 _ (KA.«uvmcreate» + 0xe#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
-  unfold kallocPost
+  unfold kallocPayPost
   icases HPost with ⟨⟨%hz, Hav⟩ | ⟨%hvalid, Hbuf, Hav⟩⟩
   · -- `kalloc` failed: `a0 = 0`, straight to the exit
     obtain ⟨hz0, hzero⟩ := hz

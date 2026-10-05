@@ -53,6 +53,7 @@ the number but not the list.  The ghost steps (`kmemAuth_dec`,
    from `kmemAuth_inc` before it).
 -/
 import Xv6.UartTrace
+import Xv6.KcredDefs
 import MachCSL.BytesFree
 
 namespace Xv6
@@ -84,8 +85,12 @@ structure KmemNames where
 /-- The client's knowledge of the number of free pages after an operation. -/
 def availInc (on : Option Nat) : Option Nat := on.map (· + 1)
 def availDec (on : Option Nat) : Option Nat := on.map (· - 1)
-/-- Whether the allocator may answer `0`. -/
-def availZero (on : Option Nat) : Prop := on = none ∨ on = some 0
+/-- Whether the allocator may answer `0`: only a TRACKED count at zero.  (NI
+M3 quotas Q-1, in place: a sealed count -- `none` -- never answers `0`,
+since past the seal every `kalloc` is credited, `SpecKalloc.wp_kalloc_cred`;
+the uncredited forms take only a tracked count, `hon`.  Before Q-1 this was
+`on = none ∨ on = some 0`.) -/
+def availZero (on : Option Nat) : Prop := on = some 0
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -168,25 +173,39 @@ instance instCtxMorphChainAt [CurCtx] (ps : List (BitVec 64)) (head : BitVec 64)
 
 /-! ## The availability ghost -/
 
-/-- The client's knowledge of the free count. -/
+/-- The client's knowledge of the free count.  SEALED (`none`, NI M3 quotas
+Q-1, in place): the seal's token AND THE RECORD of the count it sealed --
+the client's half of the count, discarded at `N`, with `credTotal ≤ N` --
+which is what lets the allocator take up the credits at its next call
+(`kmemCnt`'s switch). -/
 def kallocAvail (γk : KmemNames) : Option Nat → IProp GF
   | some n => iprop((γk.pend ↪VAR ()) ∗ (γk.cnt ↪VAR{.own (1 : Qp).half} n))
-  | none => iprop(γk.pend ↪VAR{.discard} ())
+  | none => iprop((γk.pend ↪VAR{.discard} ()) ∗
+      ∃ N : Nat, (γk.cnt ↪VAR{.discard} N) ∗ ⌜credTotal ≤ N⌝)
 
 theorem kallocAvail_some (γk : KmemNames) (n : Nat) :
     kallocAvail (GF := GF) γk (some n) = iprop((γk.pend ↪VAR ()) ∗ (γk.cnt ↪VAR{.own (1 : Qp).half} n)) := rfl
 theorem kallocAvail_none (γk : KmemNames) :
-    kallocAvail (GF := GF) γk none = iprop(γk.pend ↪VAR{.discard} ()) := rfl
+    kallocAvail (GF := GF) γk none = iprop((γk.pend ↪VAR{.discard} ()) ∗
+      ∃ N : Nat, (γk.cnt ↪VAR{.discard} N) ∗ ⌜credTotal ≤ N⌝) := rfl
 
 instance kallocAvail_none_persistent (γk : KmemNames) : Persistent (kallocAvail (GF := GF) γk none) := by
   unfold kallocAvail; infer_instance
 
-/-- Forgetting the count. -/
-theorem kallocAvail_seal (γk : KmemNames) (n : Nat) :
+/-- **THE MINT** (NI M3 quotas Q-1; formerly `kallocAvail_seal`, which
+forgot the count unconditionally): the count is sealed when the pool holds
+every credit's page -- the record keeps the count it sealed at. -/
+theorem kallocAvail_mint (γk : KmemNames) (n : Nat) (h : credTotal ≤ n) :
     kallocAvail (GF := GF) γk (some n) ⊢ |==> kallocAvail γk none := by
   rw [kallocAvail_some, kallocAvail_none]
-  iintro ⟨Hp, _⟩
-  iapply ghost_var_persist $$ Hp
+  iintro ⟨Hp, Hc⟩
+  imod ghost_var_persist $$ Hp with Hp
+  imod ghost_var_persist $$ Hc with Hc
+  imodintro
+  iframe Hp
+  iexists n
+  iframe Hc
+  ipureintro; exact h
 
 /-! ## The event ledger (NI-LEDGER-KALLOC; deviation 1 for its name) -/
 
@@ -313,13 +332,27 @@ theorem kRcpt_page (γk : KmemNames) (act r : BitVec 64) (hr : r ≠ 0#64) :
     kRcpt (GF := GF) γk act r = kAllocRcpt γk act := by
   unfold kRcpt; rw [if_neg hr]
 
+end
+
 /-! ## The allocator's authority -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-- The allocator's side of the count: its half while the count is
 tracked, or the knowledge that it has been sealed (deviation 2: the former
-body of `kmemAuth`). -/
+body of `kmemAuth`).
+
+THE CREDITS (NI M3 quotas Q-1, in place): BOTH arms hold the credit
+authority (`KcredDefs.credAuth`).  While the count is tracked it is the
+power-on supply `credTotal`, unconstrained (the boot draws pages the
+credits do not cover); once sealed, the outstanding credits are bounded by
+the free count, `c ≤ n` -- what makes a credited `kalloc` find a page.
+The switch happens at the first call that shows the sealed token, whose
+record says the count was `≥ credTotal` when sealed. -/
 def kmemCnt (γk : KmemNames) (n : Nat) : IProp GF := iprop%
-  (γk.cnt ↪VAR{.own (1 : Qp).half} n) ∨ (γk.pend ↪VAR{.discard} ())
+  ((γk.cnt ↪VAR{.own (1 : Qp).half} n) ∗ credAuth credTotal) ∨
+  ((γk.pend ↪VAR{.discard} ()) ∗ ∃ c : Nat, credAuth c ∗ ⌜c ≤ n⌝)
 
 /-- The allocator's authority: the count's side and, in BOTH epochs, the
 event ledger with the tie (Rocq `kmem_avail_auth`). -/
@@ -340,24 +373,54 @@ instance instCtxMorphKmemRes [CurCtx] (γk : KmemNames) : CtxMorph (GF := GF) (k
       (fun _ => @instCtxMorphSep hlc GF _ _ _ inferInstance
         (@instCtxMorphSep hlc GF _ _ _ inferInstance (instCtxMorphConst _))))
 
+/-- The tracked half and the full seal token cannot meet the sealed arm. -/
+theorem kmem_pend_excl (γk : KmemNames) :
+    (γk.pend ↪VAR ()) ∗ (γk.pend ↪VAR{.discard} ()) ⊢@{IProp GF} False := by
+  iintro ⟨Hp, Hs⟩
+  ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ Hp Hs
+  exact absurd hv.1 (by simp [DFrac.valid_own_op_discard])
+
+/-- **THE SWITCH**: a sealed client meets the allocator's side at some
+count; afterwards the side is in its sealed arm, whatever arm it was in. -/
+theorem kmemCnt_sealed (γk : KmemNames) (n : Nat) :
+    kallocAvail (GF := GF) γk none ∗ kmemCnt γk n ⊢
+      (γk.pend ↪VAR{.discard} ()) ∗ ∃ c : Nat, credAuth c ∗ ⌜c ≤ n⌝ := by
+  rw [kallocAvail_none]
+  unfold kmemCnt
+  iintro ⟨⟨#Hs, %N, #Hr, %hN⟩, (⟨Hc, Ha⟩ | ⟨-, Hrest⟩)⟩
+  · ihave %hNn := ghost_var_agree _ _ _ _ _ $$ Hr Hc
+    subst hNn
+    iframe Hs
+    iexists credTotal
+    iframe Ha
+    ipureintro; exact hN
+  · iframe Hs Hrest
+
 /-- The client's count agrees with the allocator's, and the pair steps together. -/
 theorem kmemCnt_inc (γk : KmemNames) (n : Nat) (on : Option Nat) :
     kallocAvail (GF := GF) γk on ∗ kmemCnt γk n ⊢
       |==> (⌜∀ m, on = some m → m = n⌝ ∗ kallocAvail γk (availInc on) ∗ kmemCnt γk (n + 1)) := by
   cases on with
   | none =>
-    simp only [availInc, Option.map, kallocAvail_none, kmemCnt]
-    iintro ⟨#Hs, _⟩
+    simp only [availInc, Option.map]
+    iintro ⟨#Hav, Hc⟩
+    ihave ⟨Hs, %c, Ha, %hc⟩ := kmemCnt_sealed γk n $$ [Hav Hc]
+    · iframe Hav Hc
     imodintro
     isplitl []
     · ipureintro; intro m h; cases h
     isplitl []
-    · iexact Hs
-    iright; iexact Hs
+    · iexact Hav
+    unfold kmemCnt
+    iright
+    iframe Hs
+    iexists c
+    iframe Ha
+    ipureintro; omega
   | some m =>
     simp only [availInc, Option.map, kallocAvail_some, kmemCnt]
     iintro ⟨⟨Hp, Hc⟩, Ha⟩
-    icases Ha with ⟨Hc' | #Hs⟩
+    icases Ha with (⟨Hc', Hca⟩ | ⟨#Hs, -⟩)
     · ihave %hmn := ghost_var_agree _ _ _ _ _ $$ Hc Hc'
       subst hmn
       imod ghost_var_update_halves (m + 1) _ _ _ $$ Hc Hc' with ⟨Hc, Hc'⟩
@@ -366,27 +429,22 @@ theorem kmemCnt_inc (γk : KmemNames) (n : Nat) (on : Option Nat) :
       · ipureintro; intro m' h; cases h; rfl
       isplitl [Hp Hc]
       · iframe
-      ileft; iexact Hc'
-    · ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ Hp Hs
-      exact absurd hv.1 (by simp [DFrac.valid_own_op_discard])
+      ileft; iframe Hc' Hca
+    · iexfalso
+      iapply kmem_pend_excl γk $$ [Hp Hs]
+      iframe Hp Hs
 
-theorem kmemCnt_dec (γk : KmemNames) (n : Nat) (on : Option Nat) :
+/-- The tracked count steps down (the UNCREDITED pop, at a tracked count
+only: `hon`, NI M3 quotas Q-1). -/
+theorem kmemCnt_dec (γk : KmemNames) (n : Nat) (on : Option Nat) (hon : on ≠ none) :
     kallocAvail (GF := GF) γk on ∗ kmemCnt γk (n + 1) ⊢
       |==> (⌜∀ m, on = some m → m = n + 1⌝ ∗ kallocAvail γk (availDec on) ∗ kmemCnt γk n) := by
   cases on with
-  | none =>
-    simp only [availDec, Option.map, kallocAvail_none, kmemCnt]
-    iintro ⟨#Hs, _⟩
-    imodintro
-    isplitl []
-    · ipureintro; intro m h; cases h
-    isplitl []
-    · iexact Hs
-    iright; iexact Hs
+  | none => exact absurd rfl hon
   | some m =>
     simp only [availDec, Option.map, kallocAvail_some, kmemCnt]
     iintro ⟨⟨Hp, Hc⟩, Ha⟩
-    icases Ha with ⟨Hc' | #Hs⟩
+    icases Ha with (⟨Hc', Hca⟩ | ⟨#Hs, -⟩)
     · ihave %hmn := ghost_var_agree _ _ _ _ _ $$ Hc Hc'
       subst hmn
       imod ghost_var_update_halves n _ _ _ $$ Hc Hc' with ⟨Hc, Hc'⟩
@@ -395,9 +453,10 @@ theorem kmemCnt_dec (γk : KmemNames) (n : Nat) (on : Option Nat) :
       · ipureintro; intro m' h; cases h; rfl
       isplitl [Hp Hc]
       · simp only [Nat.add_sub_cancel]; iframe
-      ileft; iexact Hc'
-    · ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ Hp Hs
-      exact absurd hv.1 (by simp [DFrac.valid_own_op_discard])
+      ileft; iframe Hc' Hca
+    · iexfalso
+      iapply kmem_pend_excl γk $$ [Hp Hs]
+      iframe Hp Hs
 
 /-- The client's count, if tracked, is the allocator's. -/
 theorem kmemCnt_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
@@ -412,16 +471,60 @@ theorem kmemCnt_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
   | some m =>
     simp only [kallocAvail_some, kmemCnt]
     iintro ⟨⟨Hp, Hc⟩, Ha⟩
-    icases Ha with ⟨Hc' | #Hs⟩
+    icases Ha with (⟨Hc', Hca⟩ | ⟨#Hs, Hrest⟩)
     · ihave %hmn := ghost_var_agree _ _ _ _ _ $$ Hc Hc'
       subst hmn
       isplitl []
       · ipureintro; intro m' h; cases h; rfl
       isplitl [Hp Hc]
       · iframe
-      ileft; iexact Hc'
-    · ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ Hp Hs
-      exact absurd hv.1 (by simp [DFrac.valid_own_op_discard])
+      ileft; iframe Hc' Hca
+    · iexfalso
+      iapply kmem_pend_excl γk $$ [Hp Hs]
+      iframe Hp Hs
+
+/-- **A CREDITED CALL FINDS A PAGE** (NI M3 quotas Q-1): a sealed client
+holding a credit meets a positive count. -/
+theorem kmemCnt_cred_pos (γk : KmemNames) (n : Nat) :
+    kallocAvail (GF := GF) γk none ∗ pageCredit 1 ∗ kmemCnt γk n ⊢ ⌜0 < n⌝ := by
+  iintro ⟨Hav, Hf, Hc⟩
+  ihave ⟨-, %c, Ha, %hc⟩ := kmemCnt_sealed γk n $$ [Hav Hc]
+  · iframe Hav Hc
+  ihave %h1 := credAuth_bound c 1 $$ [Ha Hf]
+  · iframe Ha Hf
+  ipureintro; omega
+
+/-- The CREDITED pop: the credit comes back to the authority. -/
+theorem kmemCnt_decCred (γk : KmemNames) (n : Nat) :
+    kallocAvail (GF := GF) γk none ∗ pageCredit 1 ∗ kmemCnt γk (n + 1) ⊢ |==> kmemCnt γk n := by
+  iintro ⟨Hav, Hf, Hc⟩
+  ihave ⟨Hs, %c, Ha, %hc⟩ := kmemCnt_sealed γk (n + 1) $$ [Hav Hc]
+  · iframe Hav Hc
+  imod credAuth_spend c 1 $$ [Ha Hf] with ⟨%h1, Ha⟩
+  · iframe Ha Hf
+  imodintro
+  unfold kmemCnt
+  iright
+  iframe Hs
+  iexists c - 1
+  iframe Ha
+  ipureintro; omega
+
+/-- The CREDITED push: the page's credit is minted back. -/
+theorem kmemCnt_incCred (γk : KmemNames) (n : Nat) :
+    kallocAvail (GF := GF) γk none ∗ kmemCnt γk n ⊢ |==> (kmemCnt γk (n + 1) ∗ pageCredit 1) := by
+  iintro ⟨Hav, Hc⟩
+  ihave ⟨Hs, %c, Ha, %hc⟩ := kmemCnt_sealed γk n $$ [Hav Hc]
+  · iframe Hav Hc
+  imod credAuth_mint c 1 $$ Ha with ⟨Ha, Hf⟩
+  imodintro
+  iframe Hf
+  unfold kmemCnt
+  iright
+  iframe Hs
+  iexists c + 1
+  iframe Ha
+  ipureintro; omega
 
 /-- `kfree`'s ghost step (Rocq `kmem_avail_inc`): the client's count agrees
 with the allocator's, the pair steps up, and the actor's `KFree` is
@@ -441,14 +544,14 @@ theorem kmemAuth_inc (γk : KmemNames) (n : Nat) (on : Option Nat) (act : BitVec
 
 /-- `kalloc`'s ghost step (Rocq `kmem_avail_dec`): pop one page off the
 count and append the actor's `KAlloc`; the history at the call was
-nonempty. -/
-theorem kmemAuth_dec (γk : KmemNames) (n : Nat) (on : Option Nat) (act : BitVec 64) :
+nonempty.  At a tracked count only (`hon`, NI M3 quotas Q-1). -/
+theorem kmemAuth_dec (γk : KmemNames) (n : Nat) (on : Option Nat) (act : BitVec 64) (hon : on ≠ none) :
     kallocAvail (GF := GF) γk on ∗ kmemAuth γk (n + 1) ⊢
       |==> (⌜∀ m, on = some m → m = n + 1⌝ ∗ kallocAvail γk (availDec on) ∗ kmemAuth γk n ∗
         ∃ h, ledReceipt γk h (.KAlloc act) ∗ ⌜¬ poolEmpty h⌝) := by
   unfold kmemAuth
   iintro ⟨Hav, Hc, Hl⟩
-  imod kmemCnt_dec γk n on $$ [$Hav $Hc] with ⟨%hag, Hav, Hc⟩
+  imod kmemCnt_dec γk n on hon $$ [$Hav $Hc] with ⟨%hag, Hav, Hc⟩
   imod kmemLedger_alloc γk n act $$ Hl with ⟨Hl, Hr⟩
   imodintro
   isplitl []
@@ -477,6 +580,95 @@ theorem kmemAuth_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
   icases kmemCnt_agree γk n on $$ [$Hav $Hc] with ⟨%hag, Hav, Hc⟩
   isplitl []
   · ipureintro; exact hag
+  iframe
+
+/-! ## The payment (NI M3 quotas Q-1)
+
+A function generic in the count (`walk`, `mappages`, `uvmcreate`, ...) is
+called at the boot with a tracked count and past the seal with credits.
+`kPay γk on m` is what it hands the allocator for `m` pages: the count's
+token and, at the sealed count, `m` credits. -/
+
+/-- The credits a payment carries: none at a tracked count. -/
+def kCredOn : Option Nat → Nat → IProp GF
+  | some _, _ => iprop(emp)
+  | none, m => pageCredit m
+
+/-- **The payment for `m` pages.** -/
+def kPay (γk : KmemNames) (on : Option Nat) (m : Nat) : IProp GF := iprop%
+  kallocAvail γk on ∗ kCredOn on m
+
+theorem kCredOn_some (n m : Nat) : kCredOn (GF := GF) (some n) m = iprop(emp) := rfl
+theorem kCredOn_none (m : Nat) : kCredOn (GF := GF) none m = pageCredit m := rfl
+
+theorem kCredOn_op (on : Option Nat) (a b : Nat) :
+    kCredOn (GF := GF) on (a + b) ⊣⊢ kCredOn on a ∗ kCredOn on b := by
+  cases on with
+  | some n =>
+    simp only [kCredOn_some]
+    exact (BI.emp_sep (PROP := IProp GF)).symm
+  | none => exact pageCredit_op a b
+
+theorem kPay_split (γk : KmemNames) (on : Option Nat) (a b : Nat) :
+    kPay (GF := GF) γk on (a + b) ⊢ kPay γk on a ∗ kCredOn on b := by
+  unfold kPay
+  iintro ⟨Hav, Hc⟩
+  icases (kCredOn_op on a b).1 $$ Hc with ⟨Ha, Hb⟩
+  iframe
+
+theorem kPay_join (γk : KmemNames) (on : Option Nat) (a b : Nat) :
+    kPay (GF := GF) γk on a ∗ kCredOn on b ⊢ kPay γk on (a + b) := by
+  unfold kPay
+  iintro ⟨⟨Hav, Ha⟩, Hb⟩
+  iframe Hav
+  iapply (kCredOn_op on a b).2
+  iframe
+
+theorem kPay_congr (γk : KmemNames) (on : Option Nat) (a b : Nat) (h : a = b) :
+    kPay (GF := GF) γk on a ⊢ kPay γk on b := by subst h; exact .rfl
+
+theorem kCredOn_availDec (on : Option Nat) (m : Nat) :
+    kCredOn (GF := GF) (availDec on) m = kCredOn on m := by cases on <;> rfl
+
+/-- A tracked payment is the count's token. -/
+theorem kPay_some (γk : KmemNames) (n m : Nat) :
+    kPay (GF := GF) γk (some n) m ⊣⊢ kallocAvail γk (some n) := by
+  unfold kPay
+  simp only [kCredOn_some]
+  exact BI.sep_emp
+
+/-- **A credited `kalloc` never meets an empty pool** (NI M3 quotas Q-1). -/
+theorem kmemAuth_cred_pos (γk : KmemNames) (n : Nat) :
+    kallocAvail (GF := GF) γk none ∗ pageCredit 1 ∗ kmemAuth γk n ⊢ ⌜0 < n⌝ := by
+  unfold kmemAuth
+  iintro ⟨Hav, Hf, Hc, -⟩
+  iapply kmemCnt_cred_pos γk n $$ [Hav Hf Hc]
+  iframe
+
+/-- The CREDITED `kalloc`'s ghost step: the pop and the `KAlloc`, the credit
+spent. -/
+theorem kmemAuth_decCred (γk : KmemNames) (n : Nat) (act : BitVec 64) :
+    kallocAvail (GF := GF) γk none ∗ pageCredit 1 ∗ kmemAuth γk (n + 1) ⊢
+      |==> (kmemAuth γk n ∗ ∃ h, ledReceipt γk h (.KAlloc act) ∗ ⌜¬ poolEmpty h⌝) := by
+  unfold kmemAuth
+  iintro ⟨Hav, Hf, Hc, Hl⟩
+  imod kmemCnt_decCred γk n $$ [Hav Hf Hc] with Hc
+  · iframe
+  imod kmemLedger_alloc γk n act $$ Hl with ⟨Hl, Hr⟩
+  imodintro
+  iframe
+
+/-- The CREDITED `kfree`'s ghost step: the push, the `KFree`, and the
+page's credit back. -/
+theorem kmemAuth_incCred (γk : KmemNames) (n : Nat) (act : BitVec 64) :
+    kallocAvail (GF := GF) γk none ∗ kmemAuth γk n ⊢
+      |==> (kmemAuth γk (n + 1) ∗ pageCredit 1 ∗ ∃ h, ledReceipt γk h (.KFree act)) := by
+  unfold kmemAuth
+  iintro ⟨#Hav, Hc, Hl⟩
+  imod kmemCnt_incCred γk n $$ [Hav Hc] with ⟨Hc, Hf⟩
+  · iframe Hav Hc
+  imod kmemLedger_free γk n act $$ Hl with ⟨Hl, Hr⟩
+  imodintro
   iframe
 end
 

@@ -262,6 +262,7 @@ theorem fclose_core_take [Icfg] [CurCtx] (E : CoPset) (kk : Nat) (pn : FPNames) 
 /-- `pipeclose`'s contract at fileclose's call site. -/
 theorem fc_pipeclose [CurCtx] (PC : PIPECLOSE) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool) (γkl : GName) (γk : KmemNames) (on : Option Nat)
+    (hsealed : on = none)
     (Φ : IProp GF) (ke : Nat) (p : BitVec 64) (hp : k'.proc = p) (hw : w = decide (k'.regs 11#5 ≠ 0#64))
     (hnoff : k'.noff + 2 < 2 ^ 31) (hK : pipecloseSlots ≤ k'.avail)
     (hpipe : "pipe" ∉ k'.locks) (hproc : "proc" ∉ k'.locks) (hkmem : "kmem" ∉ k'.locks)
@@ -282,7 +283,7 @@ theorem fc_pipeclose [CurCtx] (PC : PIPECLOSE) (Γ : SchedNames) (c : CPU) (k' :
     ⊢ wpLoop (GF := GF) c := by
   subst hp
   have h := PC.wp_pipeclose (hlc := hlc) (GF := GF) Γ c k' γl γp w γkl γk on Φ ke hw hnoff hK hpipe hproc hkmem
-    hnpipe htier
+    hnpipe htier hsealed
   unfold wp_pipeclose_body at h
   simp only [pipecloseAddr] at h
   exact h

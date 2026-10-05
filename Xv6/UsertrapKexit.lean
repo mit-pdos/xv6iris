@@ -51,7 +51,7 @@ theorem usertrap_kexit_proof [ClaimIs (hlc := hlc) GF Γ] (KE : KEXIT) : UT_KEXI
     rw [kexitSlots_eq]; unfold trapRes kvFrameSlots at hav; split at hav <;> omega
   have hproc : kx.proc = procAddr A.j := hpr.trans hok.hproc
   have hU := fun Q => KE.wp_kexit_eb (hlc := hlc) (GF := GF) Γ cpu kx A.N.w A.N.ft A.N.f fscKalloc
-    fsReadyKmem none A.j A.pid V2 M2 A.N.ip cs2 sts2 Q hok.hj hproc hK hnoff htier
+    fsReadyKmem none A.j A.pid V2 M2 A.N.ip cs2 sts2 Q hok.hj hproc hK hnoff htier rfl
   unfold wp_kexit_eb_body at hU
   have hpj : A.N.pj = procAddr A.j := hok.pj
   have hcl : ∀ n, stackOwn (GF := GF) kx.sp n = stackOwn (A.ksp + 0xFFFFFFFFFFFFFFE0#64) n := by

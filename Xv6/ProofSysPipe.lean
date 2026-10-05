@@ -155,7 +155,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   ihave Hpid := (show @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ⊢
       wordPointsTo (pPid pa) 4 pidPriv pid from .rfl) $$ Hpid
   iapply (sys_pipe_pipealloc PA Γ c11 _ γl γ γkl γk none rf wf pid pidPriv V.ev k.sie (by k_norm_g) pa
-      (by k_norm_g; exact hproc) ?hKp ?hnp ?ht)
+      (by k_norm_g; exact hproc) ?hKp ?hnp ?ht rfl)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sys_pipe_ret_26, p8', sys_pipe_a48, sys_pipe_a56]

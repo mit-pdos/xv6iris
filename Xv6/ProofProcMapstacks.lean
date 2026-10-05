@@ -320,7 +320,7 @@ theorem pms_iter (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
   k_step_gen (wp_s_jal cur _ (KA.«proc_mapstacks» + 0x4c#64) false 2093880#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_mapstacks_br_fffffffffffff384] next c1 hp1
   iintro Hk Hpc
-  iapply (Xv6.uc_kalloc_call KAL c1 _ γl γk (some (nb - i - fr.length)) ?hn ?hKa ?hl ?hz) $$ [- $Hk $Hpc]
+  iapply (Xv6.uc_kalloc_call KAL c1 _ γl γk (some (nb - i - fr.length)) ?hn ?hKa ?hl ?hz (by simp)) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -349,11 +349,9 @@ theorem pms_iter (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
   icases HPost with ⟨⟨%hz, Hav⟩ | ⟨%hvalid, Hbuf, Hav⟩⟩
   · -- `kalloc` cannot fail: the caller's count is not zero
     exfalso
-    obtain ⟨-, hzero⟩ := hz
-    rcases hzero with hzz | hzz
-    · exact absurd hzz (by simp)
-    · have hm : nb - i - fr.length = 0 := by injection hzz
-      omega
+    obtain ⟨-, hzz⟩ := hz
+    have hm : nb - i - fr.length = 0 := by unfold availZero at hzz; injection hzz
+    omega
   · -- the page `kalloc` gave
     have hne0 : R2 10#5 ≠ 0#64 := Xv6.PtRun.pageValid_ne_zero _ hvalid
     have hpa : pageAddr (BitVec.extractLsb' 12 44 (R2 10#5)) = R2 10#5 :=

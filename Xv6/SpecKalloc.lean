@@ -46,6 +46,16 @@ the led one).
    the ledger append: the counter is exclusive ghost state, so the two are
    indistinguishable to every client; the post states the stepped count.
 
+THE CREDITS (NI M3 quotas Q-1; design "M3 quotas", R7): a third field,
+`wp_kalloc_cred`, at the SEALED count with one `pageCredit` in, returns a
+page and never `0` (`kallocPostCred`): the credit authority in the payload
+is bounded by the free count (`KallocDefs.kmemCnt`), so the credited call
+finds the free list nonempty.  The uncredited forms MOVE: both take
+`hon : on ≠ none` (a tracked count, the boot's) -- an uncredited `kalloc`
+past the seal could take a reserved page, and the payload's bound `c ≤ n`
+would not survive it, so no contract may offer one.  Every post-boot call
+site is credited (the design's F3).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
@@ -71,10 +81,10 @@ def kallocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [
 /-- The specification of `kalloc`, as a proposition over the ambient
 kernel context, AT THE BOOT (`hp0 : k.proc = 0`, permit sweep L3b): with no
 actor there is no lend to step.  A corollary of the led form. -/
-def wp_kalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_kalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
-    (hp0 : k.proc = 0#64) : Prop :=
+    (hp0 : k.proc = 0#64) (hon : on ≠ none) : Prop :=
   kctx cpu k ∗ pcIs cpu kallocAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
   kallocAvail γk on ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -112,7 +122,8 @@ THE LEND (permit sweep L3b): `actLend k.proc ke` in, `actLend k.proc (ke +
 1)` out right after the return pc -- the event costs one count. -/
 def wp_kalloc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat)
-    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "kmem" ∉ k.locks) : Prop :=
+    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
+    (hon : on ≠ none) : Prop :=
   kctx cpu k ∗ pcIs cpu kallocAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
   kallocAvail γk on ∗ actLend k.proc ke ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -122,14 +133,41 @@ def wp_kalloc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     kallocPostLed γk on k.proc (R' 10#5) -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-/-- The interface of `kalloc`: the landed contract and (Rocq's second
-`Parameter` of `KALLOC`) its led form. -/
+/-- **THE CREDITED POST** (NI M3 quotas Q-1): a page, never `0` -- the
+credit reserved it -- filled with `5`s, and the call's `KAlloc` receipt. -/
+def kallocPostCred {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+    (γk : KmemNames) (act r : BitVec 64) : IProp GF := iprop%
+  ⌜r ≠ 0#64 ∧ pageValid r⌝ ∗ byteBuf r (DFrac.own 1) (List.replicate 4096 5#8) ∗ kAllocRcpt γk act
+
+/-- **THE CREDITED FORM** of `kalloc`'s specification (NI M3 quotas Q-1): at
+the SEALED count, the led form with one page credit in (`KcredDefs`), and
+the post `kallocPostCred` -- the call returns a page.  Every `kalloc` past
+the boot's seal is credited: the uncredited forms take a tracked count only
+(`hon`). -/
+def wp_kalloc_cred_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (ke : Nat)
+    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "kmem" ∉ k.locks) : Prop :=
+  kctx cpu k ∗ pcIs cpu kallocAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
+  kallocAvail γk none ∗ pageCredit 1 ∗ actLend k.proc ke ∗
+  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    actLend k.proc (ke + 1) -∗
+    kallocPostCred γk k.proc (R' 10#5) -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `kalloc`: the landed contract, (Rocq's second
+`Parameter` of `KALLOC`) its led form, and (NI M3 quotas Q-1) the credited
+form. -/
 structure KALLOC : Prop where
   wp_kalloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γk : KmemNames) (on : Option Nat) hnoff hK hlk hp0,
-    wp_kalloc_body (hlc := hlc) (GF := GF) cpu k γl γk on hnoff hK hlk hp0
+    (γl : GName) (γk : KmemNames) (on : Option Nat) hnoff hK hlk hp0 hon,
+    wp_kalloc_body (hlc := hlc) (GF := GF) cpu k γl γk on hnoff hK hlk hp0 hon
   wp_kalloc_led : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat) hnoff hK hlk,
-    wp_kalloc_led_body (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk
+    (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat) hnoff hK hlk hon,
+    wp_kalloc_led_body (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk hon
+  wp_kalloc_cred : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (ke : Nat) hnoff hK hlk,
+    wp_kalloc_cred_body (hlc := hlc) (GF := GF) cpu k γl γk ke hnoff hK hlk
 
 end Xv6

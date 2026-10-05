@@ -448,7 +448,7 @@ theorem sbrkArm_pageLen (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V :
     procPrivFd (GF := GF) γ pa pid V M ⊢ procPrivFd γ pa pid V M ∗ ⌜umPageLen V.upt M⌝ := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt
   iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
-  icases @UMemL.procPtAt_pageLen hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M $$ Hpt with ⟨%hpl, Hpt⟩
+  icases @UMemL.procPtAt_pageLen hlc GF _ _ _ ⟨curCtx, KTier.kpt⟩ V.upt M $$ Hpt with ⟨%hpl, Hpt⟩
   isplitl [Hpid Hf Hpt Htfp Hc Ho Hev]
   · iframe Hpid Hf Hpt Htfp Hc Ho Hev
     isplitl []
@@ -583,7 +583,7 @@ theorem syscall_arm_sbrk (SS : SYSSBRK)
   icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
   iapply wpLoop_bupd
   imod syscArmSbrk_ev V V' M M' sts (syscStore (V'.updEv k') (R2 10#5)) M' cs gn (procAddr j) ke v0 v1 (R2 10#5)
-    hn12 hw0 hw1 hszb hok (syscStore_a0 _ _ (by show tfArgIdx 0 < V'.tf.length; rw [htf, hl]; decide))
+    hn12 hw0 hw1 (Nat.le_trans hszb uQuota_le_uvmMaxsz) hok (syscStore_a0 _ _ (by show tfArgIdx 0 < V'.tf.length; rw [htf, hl]; decide))
     rfl rfl $$ Hanc [Hw] with #Hev
   · rw [← hproc]
     iintro %h

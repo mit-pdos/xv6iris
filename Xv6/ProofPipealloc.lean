@@ -54,7 +54,13 @@ page count never leaves.
 
 THE LEND (permit sweep L1b, a pass-through `paLend`): since L3b (no Rocq
 counterpart) `kalloc` takes the count in hand and steps it (`pa_kalloc`, the
-led form over `UvmCallSites.uc_kalloc_lend_call`).
+led form over `UvmCallSites.uc_kalloc_pay_call`).
+
+THE PIPE SHARE (NI M3 quotas Q-1): below the cap, `npipeShare_take` under
+`npipelock` hands out one page credit and the buffer's ticket; `kalloc` is
+PAID (`pa_kalloc` over `uc_kalloc_pay_call`, the credit dropped at a tracked
+count, `pa_pay`), and the ticket rides into the new pipe's `pipeSlack`
+(`pageOwn_pipeRaw`).  On the null arm both are dropped.
 -/
 import Xv6.SpecPipealloc
 import Xv6.SpecFilealloc
@@ -241,19 +247,81 @@ theorem pa_filealloc (FA : FILEALLOC) (c : CPU) (k' : KCtx) (γl : GName) (γ : 
   simp only [fileallocAddr] at h
   exact h
 
-/-- `kalloc`'s led contract, at a lend (permit sweep L3b): the lend back
-stepped. -/
+/-- The share's bound, read (NI M3 quotas Q-1). -/
+theorem pa_share_bound (n : Nat) :
+    npipeShare (GF := GF) n ⊢ ⌜n ≤ NPIPE⌝ ∗ npipeShare n := by
+  unfold npipeShare
+  iintro ⟨%h, H⟩
+  isplitr
+  · ipureintro; exact h
+  isplitr
+  · ipureintro; exact h
+  iexact H
+
+/-- Below the cap (`blt` not taken), there is room. -/
+theorem pa_room (n0 : BitVec 32) (hle : n0.toNat ≤ NPIPE) (hcap : ¬ 49 < n0.toInt) :
+    n0.toNat < NPIPE := by
+  rw [BitVec.toInt_eq_toNat_cond] at hcap
+  unfold NPIPE at *
+  split at hcap <;> omega
+
+/-- The counted buffer's store (`c.addiw a5,a5,1 ; sw`) reads `n0 + 1`. -/
+theorem pa_succ_val (n0 : BitVec 32) (h : n0.toNat < NPIPE) :
+    (BitVec.extractLsb' 0 32 (BitVec.signExtend 64
+      (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 n0 + 1#64)))).toNat = n0.toNat + 1 := by
+  have e : BitVec.extractLsb' 0 32 (BitVec.signExtend 64
+      (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 n0 + 1#64))) = n0 + 1#32 := by bv_decide
+  rw [e, BitVec.toNat_add]
+  unfold NPIPE at h
+  simp only [BitVec.toNat_ofNat]
+  omega
+
+/-- ...and so carries the share at `n0 + 1`. -/
+theorem pa_share_succ (n0 : BitVec 32) (h : n0.toNat < NPIPE) :
+    npipeShare (GF := GF) (n0.toNat + 1) ⊢
+      npipeShare (BitVec.extractLsb' 0 32 (BitVec.signExtend 64
+        (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 n0 + 1#64)))).toNat := by
+  rw [pa_succ_val n0 h]
+
+/-- The pipe's page payment (NI M3 quotas Q-1): the count and, past the seal,
+the credit `npipeShare_take` handed out (at a tracked count it is dropped). -/
+theorem pa_pay (γk : KmemNames) (on : Option Nat) :
+    kallocAvail (GF := GF) γk on ∗ pageCredit 1 ⊢ kPay γk on 1 := by
+  cases on with
+  | some n =>
+    iintro ⟨Hav, -⟩
+    iapply (kPay_some γk n 1).2 $$ Hav
+  | none =>
+    unfold kPay
+    iintro ⟨Hav, Hc⟩
+    rw [kCredOn_none]
+    iframe Hav Hc
+
+/-- `kalloc`'s PAID contract, at a lend (permit sweep L3b; NI M3 quotas Q-1):
+the payment for one page in, the lend back stepped, the count's post out
+(the credit spent or, on the null arm, dropped; the receipt dropped). -/
 theorem pa_kalloc (KAL : KALLOC) (c : CPU) (k' : KCtx) (γkl : GName) (γk : KmemNames) (on : Option Nat)
     (ke : Nat) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«kalloc» ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk on ∗ actLend k'.proc ke ∗
+    kPay γk on 1 ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       actLend k'.proc (ke + 1) -∗
       kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c :=
-  uc_kalloc_lend_call KAL c k' γkl γk on ke hnoff hK hlk
+    ⊢ wpLoop (GF := GF) c := by
+  iintro ⟨Hk, Hpc, #Hlk, Hpay, Hl, Hnext⟩
+  iapply (uc_kalloc_pay_call KAL c k' γkl γk on 0 ke hnoff hK hlk)
+  iframe Hk Hpc Hlk Hl
+  isplitl [Hpay]
+  · iapply kPay_congr γk on 1 (0 + 1) rfl $$ Hpay
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %cc H %spie %spp %R' %hs Hk Hpc Hl Hpost - %hcs
+  iapply H $$ %spie %spp %R' %hs Hk Hpc Hl [Hpost] %hcs
+  unfold kallocPayPost kallocPost kPay
+  icases Hpost with (⟨%h, Hav, -⟩ | ⟨%hpv, Hb, Hav, -⟩)
+  · ileft; iframe Hav; ipureintro; exact h
+  · iright; iframe Hb Hav; ipureintro; exact hpv
 
 theorem pa_initlock (IL : INITLOCK) (c : CPU) (k' : KCtx) (vlock : BitVec 32) (vname vcpu : BitVec 64)
     (hK : 2 ≤ k'.avail) :
@@ -289,8 +357,9 @@ theorem pa_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, ⟨%k1, %hk1, Hlend⟩, Hnext⟩
-  have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk 1 .closed 0 γkl γk on pidv dqp
-    iprop(emp) k1 hK hnoff htier ha0
+  -- an untyped file takes no page count: fileclose runs at the sealed one
+  have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk 1 .closed 0 γkl γk none pidv dqp
+    iprop(emp) k1 hK hnoff htier ha0 rfl
   unfold wp_fileclose_eb_body at h
   simp only [filecloseAddr] at h
   iapply h
@@ -690,6 +759,7 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     (w2 : BitVec 64) :
     kctx c (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs c (KA.«pipealloc» + 0x66#64) ∗
     (∃ γn : GName, isNpipe γn) ∗ kallocAvail γk (availDec on) ∗ byteBuf pi (DFrac.own 1) (List.replicate 4096 5#8) ∗
+    npTicket 1 ∗
     wordPointsTo (k.regs 10#5) 8 (DFrac.own 1) (fnode k0) ∗ wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) (fnode k1) ∗
     fileRef γ k0 1 .closed ∗ fileRef γ k1 1 .closed ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) ∗
@@ -702,7 +772,7 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗ paLend k.proc ke ∗
     wpNext true k.proc cpu (paCont k γ γk on pidv dqp ke)
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Hnp, Hav, Hpage, Hc0, Hc1, Href0, Href1, Hra, Hs0, Hs1, Hs2, Hsp3, Hsp4, Hte, Hce,
+  iintro ⟨Hk, Hpc, #Hnp, Hav, Hpage, Htk, Hc0, Hc1, Href0, Href1, Hra, Hs0, Hs1, Hs2, Hsp3, Hsp4, Hte, Hce,
     Hpid, Hir, Hlend, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
@@ -720,7 +790,9 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   -- the page, carved ; the four words
-  icases pageOwn_pipeRaw pi hpv $$ Hpage with
+  ihave Hpage := pageOwn_pipeRaw pi hpv $$ [Hpage Htk]
+  · iframe Hpage Htk
+  icases Hpage with
     ⟨⟨%vl, Hlk⟩, ⟨%vn, Hnm⟩, ⟨%vc, Hcpu⟩, ⟨%vnr, Hnr⟩, ⟨%vnw, Hnw⟩, ⟨%vro, Hro⟩, ⟨%vwo, Hwo⟩, ⟨%bs, %hbs, Hdat⟩, Hslack⟩
   ihave Hro := (show wordPointsTo (GF := GF) (aPopen pi false) 4 (DFrac.own 1) vro ⊢
       wordPointsTo (pi + BitVec.signExtend 64 544#12) 4 (DFrac.own 1) vro from by rw [pw_addr_ro']) $$ Hro
@@ -1002,7 +1074,7 @@ set_option maxHeartbeats 32000000 in
 theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FILECLOSE)
     (AC : ACQUIRE) (RE : RELEASE) : PIPEALLOC := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ γkl γk on v0 v1 pidv dqp
-      ke hK hnoff htier => by
+      ke hK hnoff htier _hsealed => by
   unfold wp_pipealloc_eb_body
   simp only [pipeallocAddr]
   iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, #Hkl, Hav, Hfd1, Hfd2, Hc0, Hc1, Hpid, Hir, Hlend, Hnext⟩
@@ -1178,7 +1250,8 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
       unfold calleeSaved at hcsA
       k_norm_g at hcsA
       obtain ⟨g2, g8, g9, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩ := hcsA
-      icases npipeRes_elim $$ Hpay with ⟨%n0, Hcnt⟩
+      icases npipeRes_elim $$ Hpay with ⟨%n0, Hcnt, Hsh⟩
+      icases pa_share_bound n0.toNat $$ Hsh with ⟨%hle, Hsh⟩
       -- auipc a5,0x6 ; lw a5,-564(a5) ; li a4,49 ; blt a4,a5
       k_step_gen (wp_s_auipc c17 _ (KA.«pipealloc» + 0x36#64) false 6#20 15#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_u_6] next c18 hp18
@@ -1204,7 +1277,8 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
         k_step_gen (wp_s_branch c20 _ (KA.«pipealloc» + 0x42#64) false 134#13 14#5 15#5 (by decide) bop.BLT)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_cap_blt, hcap, decide_true, decide_false] next c21 hp21
         iintro Hk Hpc
-        ihave Hpay := npipeRes_intro n0 $$ Hcnt
+        ihave Hpay := npipeRes_intro n0 $$ [Hcnt Hsh]
+        · iframe Hcnt Hsh
         k_step_gen (wp_s_auipc c21 _ (KA.«pipealloc» + 0xc8#64) false 31#20 10#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_u_1f] next c22 hp22
         iintro Hk Hpc
@@ -1281,7 +1355,13 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
         k_step_gen (wp_s_sw c24 _ (KA.«pipealloc» + 0x4e#64) false 3512#12 14#5 15#5 (by decide) n0)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_npipe_addr] next c25 hp25
         iintro Hk Hpc Hcnt
-        ihave Hpay := npipeRes_intro _ $$ Hcnt
+        -- (NI M3 quotas Q-1) the share pays the buffer's page and mints its ticket
+        iapply wpLoop_bupd
+        imod npipeShare_take n0.toNat (pa_room n0 hle hcap) $$ Hsh with ⟨Hsh, Hcr, Htk⟩
+        imodintro
+        ihave Hpay := npipeRes_intro _ $$ [Hcnt Hsh]
+        · iframe Hcnt
+          iapply (pa_share_succ n0 (pa_room n0 hle hcap)) $$ Hsh
         k_step_gen (wp_s_auipc c25 _ (KA.«pipealloc» + 0x52#64) false 31#20 10#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_u_1f] next c26 hp26
         iintro Hk Hpc
@@ -1328,6 +1408,8 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipealloc_br_ffffffffffffc564] next c30 hp30
         iintro Hk Hpc
         icases Hlend with ⟨%k4, %hk4, Hlend⟩
+        ihave Hav := pa_pay γk on $$ [Hav Hcr]
+        · iframe Hav Hcr
         iapply (pa_kalloc KAL c30 _ γkl γk on k4 ?hn4 ?hK4 ?hl4) $$ [- $Hk $Hpc $Hav]
         rotate_right 1
         k_norm_g [pa_ret_62]
@@ -1427,7 +1509,7 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
                     | exact f26.trans (e26.trans (g26.trans p26))
                     | exact f27.trans (e27.trans (g27.trans p27)))
               w2')
-            $$ [$Hk $Hpc $Hav $Hpage $Hc0 $Hc1 $Href0 $Href1 $Hra $Hs0 $Hs1 $Hs2 $Hsp3 $Hsp4 $Hte $Hce
+            $$ [$Hk $Hpc $Hav $Hpage $Htk $Hc0 $Hc1 $Href0 $Href1 $Hra $Hs0 $Hs1 $Hs2 $Hsp3 $Hsp4 $Hte $Hce
               $Hpid $Hir $Hlend $Hnext]
           iexists γn; iexact Hnl⟩
 

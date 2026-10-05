@@ -67,7 +67,8 @@ def bsfRows [Fscfg] [Icfg] (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat)
 image, the application's claim / transport / guest seam, and the durable
 snapshot become `fsBootSupply` at the minted records; beside it, the
 mirror half and the swap receipt are `logMirrorBorn`, the seam is
-forgotten to `fsCrashSeam`, and the slot shares and `genCert` are carried. -/
+forgotten to `fsCrashSeam`, and the slot shares and `genCert` are carried.
+(NI M3 quotas Q-1) The credit authority goes to the allocator's payload. -/
 theorem bootSharedFs [CurCtx] (γ0 : UartNames) (γd : DiskNames) (cn : ConsNames)
     (dk : Nat → BitVec 8) (ndisk : Nat) (S : FsStateRec) (sb : FsSb) (cov : ExtTreeSet Nat compare)
     (nib : Nat) (gsn gln gtn : GName) (Pb : Nat → List (BitVec 8))
@@ -81,13 +82,14 @@ theorem bootSharedFs [CurCtx] (γ0 : UartNames) (γd : DiskNames) (cn : ConsName
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       irefSlots IREFBOOT -∗ irefSlotsAuth -∗ bslots mainBslotsFs -∗ genCert -∗
       crashInv (hlc := hlc) (GF := GF) -∗
+      credAuth credTotal -∗
       |={⊤}=> ∃ (I : Icfg) (F : Fscfg),
         bsfRows (hlc := hlc) dk sb nib cov γ0 γd cn (snapSpent S nib) Pb := by
   have hsb : sb = S.fssSb := hwf.1
   subst hsb
-  iintro Hblk Happ #Hdurl Hstok Hsnap Hmir #Hsw Hib Hia Hbs #Hcert #Hcinv
+  iintro Hblk Happ #Hdurl Hstok Hsnap Hmir #Hsw Hib Hia Hbs #Hcert #Hcinv Hca
   imod fsCfgAllocSnap (hlc := hlc) (GF := GF) ⊤ γ0 γd cn dk ndisk S cov nib gsn gln gtn Pb hwf
-    $$ Hblk Happ Hdurl Hstok Hsnap with ⟨%I, %F, Hsup⟩
+    $$ Hblk Happ Hdurl Hstok Hsnap Hca with ⟨%I, %F, Hsup⟩
   ihave #Hs := appDurLaws_seam (hlc := hlc) (GF := GF) cov S.fssSb.sbLogstart $$ Hdurl
   imodintro
   iexists I, F

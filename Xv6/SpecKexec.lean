@@ -322,7 +322,7 @@ def kexecK (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp GF)) (sts : 
       A.alen A.afun sts gn cs A.pidv A.V A.M V' M' (R' 10#5) -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivFd A.γ k.proc A.pidv V' M' -∗
+    procPrivFdRes ptW A.γ k.proc A.pidv V' M' -∗
     kxcBufs k A -∗
     bslots 3 -∗ irefSlots 2 -∗ wpLoop cpu')
 
@@ -351,7 +351,7 @@ def wp_kexec_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   kctx cpu k ∗ pcIs cpu KA.«kexec» ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
-  procPrivFd A.γ k.proc A.pidv A.V A.M ∗
+  procPrivFdRes ptW A.γ k.proc A.pidv A.V A.M ∗
   kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
   -- ---- THE BUNDLE (the one addition to the premise list): the pay fact
   -- and the AU ----

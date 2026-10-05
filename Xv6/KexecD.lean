@@ -24,7 +24,7 @@ behind.  What is left is the commit itself --
 The process block (Rocq `proc_priv`, Lean `procPrivFd`, D16) is opened three
 times, as in Rocq: the trapframe words for the `a1` write
 (`procPrivFd_tfUpd`, Rocq's no-op `proc_priv_newspace` close), the name
-(`procPrivFd_name`), and the address-space SWAP (`procPrivFd_newspace`)
+(`procPrivFd_name`), and the address-space SWAP (`procPrivFdRes_newspace`)
 around the commit's stores; the closed record is Rocq's `upd_exec`.
 
 ## Deviations from Rocq
@@ -171,52 +171,52 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 theorem kxd_tfUpd [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
+    procPrivFdRes (GF := GF) 0 γ pa pid V M ⊢
       wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
       tfPageAt V.upt.tfp V.tf ∗
       (∀ ws' : List (BitVec 64),
         wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) -∗
-        tfPageAt V.upt.tfp ws' -∗ procPrivFd γ pa pid { V with tf := ws' } M) := by
+        tfPageAt V.upt.tfp ws' -∗ procPrivFdRes 0 γ pa pid { V with tf := ws' } M) := by
   obtain ⟨ξ, t⟩ := X
   simp only at hct
   subst hct
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
-  exact procPrivFd_tfUpd γ pa pid V M
+  exact procPrivFdRes_tfUpd 0 γ pa pid V M
 
 theorem kxd_name [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
+    procPrivFdRes (GF := GF) 0 γ pa pid V M ⊢
       ⌜V.name.length = PNAMELEN⌝ ∗ pnameCells pa (DFrac.own 1) V.name ∗
       (∀ ns : List (BitVec 8), ⌜ns.length = PNAMELEN⌝ -∗ pnameCells pa (DFrac.own 1) ns -∗
-        procPrivFd γ pa pid { V with name := ns } M) := by
+        procPrivFdRes 0 γ pa pid { V with name := ns } M) := by
   obtain ⟨ξ, t⟩ := X
   simp only at hct
   subst hct
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
-  exact procPrivFd_name γ pa pid V M
+  exact procPrivFdRes_name 0 γ pa pid V M
 
 theorem kxd_newspace [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz⌝ ∗ ⌜umBelow V.sz V.upt⌝ ∗
+    procPrivFdRes (GF := GF) 0 γ pa pid V M ⊢
+      ⌜V.sz.toNat ≤ uQuota⌝ ∗ ⌜umBelow V.sz V.upt⌝ ∗
       wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
       wordPointsTo (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) ∗
       wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗
       (∀ (P' : UPtd) (szv : BitVec 64) (ws' : List (BitVec 64)) (M' : Nat → List (BitVec 8)) (b : Bool),
-        ⌜P'.tfp = V.upt.tfp⌝ -∗ ⌜szv.toNat ≤ uvmMaxsz⌝ -∗ ⌜umBelow szv P'⌝ -∗
+        ⌜P'.tfp = V.upt.tfp⌝ -∗ ⌜szv.toNat ≤ uQuota⌝ -∗ ⌜umBelow szv P'⌝ -∗
         ⌜b = false → lazyFree P'.um szv⌝ -∗
         wordPointsTo (pSz pa) 8 (DFrac.own 1) szv -∗
         wordPointsTo (pPagetable pa) 8 (DFrac.own 1) (pageAddr P'.root) -∗
         wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr P'.tfp) -∗
         procPtAt P' M' -∗ tfPageAt P'.tfp ws' -∗
-        procPrivFd γ pa pid
+        procPrivFdRes 0 γ pa pid
           { V with upt := P', tf := ws', sz := szv, pvLazy := b, pagetable := pageAddr P'.root } M') := by
   obtain ⟨ξ, t⟩ := X
   simp only at hct
   subst hct
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
-  exact procPrivFd_newspace γ pa pid V M
+  exact procPrivFdRes_newspace 0 γ pa pid V M
 
 end Tier
 
@@ -456,14 +456,14 @@ theorem kxd_commit1 (SS : SAFESTRCPY_SRC) (cpu : CPU) (k : KCtx) (A : KexecArgs)
     (hterm : A.pfun A.plen = 0#8) :
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x2d6#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procPrivFd A.γ k.proc A.pidv V A.M ∗
+    procPrivFdRes 0 A.γ k.proc A.pidv V A.M ∗
     byteBuf (k.regs 10#5) A.dqpv (bview (A.plen + 1) A.pfun) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFDF0#64) 8 (DFrac.own 1) (k.regs 10#5 + BitVec.ofNat 64 q) ∗
     (∀ (c : CPU) (R' : RegMap) (ns : List (BitVec 8)),
       ⌜calleeSaved R R' ∧ ns.length = PNAMELEN⌝ -∗
       kctx c (((k.withSpie spie spp).pushed 68).withRegs R') -∗ pcIs c (KA.«kexec» + 0x2e4#64) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
-      procPrivFd A.γ k.proc A.pidv { V with name := ns } A.M -∗
+      procPrivFdRes 0 A.γ k.proc A.pidv { V with name := ns } A.M -∗
       byteBuf (k.regs 10#5) A.dqpv (bview (A.plen + 1) A.pfun) -∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFDF0#64) 8 (DFrac.own 1) (k.regs 10#5 + BitVec.ofNat 64 q) -∗
       wpLoop c)
@@ -526,7 +526,7 @@ abbrev kxdV3 (V : ProcPriv) (P : UPtd) (sz1 : BitVec 64) (ws : List (BitVec 64))
 set_option maxHeartbeats 16000000 in
 /-- **+0x2dc .. +0x2fc: THE SWAP** (Rocq `kxd_commit`, its middle): read the
 OLD table, install the new table and size, `epc = elf.entry`, `sp`, close the
-block at the new space (`procPrivFd_newspace`, the lazy bit written
+block at the new space (`procPrivFdRes_newspace`, the lazy bit written
 `false`: exec's image is eager), and free the old table at the old size. -/
 theorem kxd_commit2 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (A : KexecArgs) (spie spp : Bool) (R : RegMap) (V : ProcPriv) (ef : List (BitVec 8)) (P : UPtd)
@@ -539,14 +539,14 @@ theorem kxd_commit2 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k 
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x2e4#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
-    procPrivFd A.γ k.proc A.pidv V A.M ∗ procPtAt P Mi ∗
+    procPrivFdRes 0 A.γ k.proc A.pidv V A.M ∗ procPtAt P Mi ∗
     byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap), ⌜calleeSaved R R'⌝ -∗
       kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (KA.«kexec» + 0x308#64) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       (∀ V3 : ProcPriv,
         ⌜evAfter (kxdV3 V P sz1 ((V.tf.set tfEpcIdx (kxqEntry ef)).set kxcTfSpIdx spv)) V3⌝ -∗
-        procPrivFd A.γ k.proc A.pidv V3 Mi -∗
+        procPrivFdRes ptW A.γ k.proc A.pidv V3 Mi -∗
         byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef -∗ wpLoop c))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Hfab, Hpriv, Hpt, Helf, HK⟩
@@ -554,7 +554,10 @@ theorem kxd_commit2 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k 
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
   have hct' : curTier = KTier.kpt := hct.symm.trans (by k_norm_g; exact htier)
   icases UMemL.procPtAt_wf P Mi $$ Hpt with ⟨Hpt, %hwf⟩
-  have hmax : sz1.toNat ≤ uvmMaxsz := Xv6.UmCovered.lazyFree_maxsz P sz1 hwf hcov
+  -- the new size is within the quota (NI M3 quotas Q-1): the new table is
+  -- covered below it and its user leaves lie below `uQpages`
+  icases UPt.procPtAt_region P Mi $$ Hpt with ⟨%hreg, Hpt⟩
+  have hmax : sz1.toNat ≤ uQuota := kxc_lazyFree_quota_sz P sz1 hreg hcov
   icases kxd_newspace hct' A.γ k.proc A.pidv V A.M $$ Hpriv
     with ⟨%hszo, %hbo, Hsz, Hpg, Htf, Hpto, Htfp, Hback⟩
   simp only [pSz, pPagetable, pTrapframe]
@@ -626,18 +629,22 @@ theorem kxd_commit2 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k 
   -- +0x2fc  jal proc_freepagetable(old table, oldsz), the NEW block's event
   -- counter lent to the frees of the old space (permit sweep L1a, Rocq
   -- `proc_priv_ev_lend` at the swap's record)
-  icases procPrivFd_evLend A.γ k.proc A.pidv
+  icases procPrivFdRes_evLend 0 A.γ k.proc A.pidv
       (kxdV3 V P sz1 ((V.tf.set tfEpcIdx (kxqEntry ef)).set kxcTfSpIdx spv)) Mi $$ Hpriv
     with ⟨Hlend, Hpback⟩
   iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x304#64) 2084322#21 kxd_br_pfp
       kxd_ret_pfp V.upt A.M (kxdV3 V P sz1 ((V.tf.set tfEpcIdx (kxqEntry ef)).set kxcTfSpIdx spv)).ev
-      hK hnoff (by simp [RegMap.set_apply]) (by simpa [RegMap.set_apply] using hszo)
+      hK hnoff (by simp [RegMap.set_apply])
+      (by simpa [RegMap.set_apply] using Nat.le_trans hszo uQuota_le_uvmMaxsz)
       (by simpa [RegMap.set_apply] using hbo))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpto $Hlend]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
-  iintro %c %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%kl, %hkl, Hlend⟩
+  iintro %c %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%kl, %hkl, Hlend⟩ Hcr
   icases Hpback $$ %kl %hkl Hlend with ⟨%V3, %hV3, Hpriv⟩
+  -- the OLD table's weight, back into the block (NI M3 quotas Q-1)
+  ihave Hpriv := procPrivFdRes_join0 ptW A.γ k.proc A.pidv V3 Mi $$ [Hpriv Hcr]
+  · iframe
   k_norm_g
   iapply HK $$ %c %spie' %spp' %R' [] Hk Hpc Hte Hce %V3 %hV3 Hpriv Helf
   ipureintro
@@ -658,7 +665,7 @@ theorem kxd_exit (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → P
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x72#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     kxcFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
-    procPrivFd A.γ k.proc A.pidv V' M' ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
+    procPrivFdRes ptW A.γ k.proc A.pidv V' M' ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
     (∀ c' : CPU, kexecCloser Q QF k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hcs := kxc_calleeSaved_epi k.regs R (hkeep _ (by decide)) (hkeep _ (by decide))
@@ -707,7 +714,7 @@ theorem kxd_commit3 (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) �
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) (k.regs 26#5) w13 w67 ∗
     byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
-    procPrivFd A.γ k.proc A.pidv V' M' ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
+    procPrivFdRes ptW A.γ k.proc A.pidv V' M' ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
     (∀ c' : CPU, kexecCloser Q QF k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK68 : 68 ≤ k.avail := by rw [kxc_slots_val] at hK; omega
@@ -859,7 +866,7 @@ theorem kxd_commit (SS : SAFESTRCPY_SRC) (PFP : PROC_FREEPAGETABLE) (Γ : SchedN
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
     irefSlots 2 ∗ bslots 3 ∗ procPtAt P Mi ∗
-    procPrivFd A.γ k.proc A.pidv (kxdV1 A.V (kxdSpv sz1 A.alen A.na)) A.M ∗
+    procPrivFdRes 0 A.γ k.proc A.pidv (kxdV1 A.V (kxdSpv sz1 A.alen A.na)) A.M ∗
     kxcBufs k A ∗ byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
     kxcFrameB (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 10#5 + BitVec.ofNat 64 q) (k.regs 11#5 + BitVec.ofNat 64 (8 * A.na))

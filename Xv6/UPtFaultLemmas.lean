@@ -316,7 +316,7 @@ theorem pageValid_mod8 (r : BitVec 64) (h : pageValid r) : r.toNat % 8 = 0 := by
 /-! ## `umPages` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
 
 /-- Two exclusive buffers of at least a word cannot start at the same
 aligned address. -/
@@ -421,7 +421,7 @@ theorem umPages_clearU (P : UPtd) (M : Nat → List (BitVec 8)) (vpn : Nat) (w :
 theorem procPtAt_open (P : UPtd) (M : Nat → List (BitVec 8)) :
     procPtAt (GF := GF) P M ⊢
       iprop(∃ t : PTree, ⌜uptWf P ∧ t.base = P.root ∧ ptRep t P.leaves⌝ ∗
-        ptreeOwn 2 (DFrac.own 1) t ∗ umPages P M) := by
+        (ptreeOwn 2 (DFrac.own 1) t ∗ ptRest t P.leaves) ∗ umPages P M) := by
   unfold procPtAt ptOwnRep
   iintro ⟨%hwf, ⟨%t, %hbr, Ht⟩, Hum⟩
   iexists t
@@ -431,7 +431,7 @@ theorem procPtAt_open (P : UPtd) (M : Nat → List (BitVec 8)) :
 
 theorem procPtAt_close (P : UPtd) (M : Nat → List (BitVec 8)) (t : PTree)
     (hwf : uptWf P) (hb : t.base = P.root) (hr : ptRep t P.leaves) :
-    iprop(ptreeOwn (GF := GF) 2 (DFrac.own 1) t ∗ umPages P M) ⊢ procPtAt P M := by
+    iprop((ptreeOwn (GF := GF) 2 (DFrac.own 1) t ∗ ptRest t P.leaves) ∗ umPages P M) ⊢ procPtAt P M := by
   unfold procPtAt ptOwnRep
   iintro ⟨Ht, Hum⟩
   isplitl []

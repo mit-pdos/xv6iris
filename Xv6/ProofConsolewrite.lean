@@ -678,7 +678,7 @@ theorem cw_priv_back (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPr
   isplitr
   · ipureintro; exact hf
   isplitl [Hpt]
-  · iapply (@procPtAt_congr hlc GF _ ⟨ξ, KTier.kpt⟩ P' _ _
+  · iapply (@procPtAt_congr hlc GF _ _ _ ⟨ξ, KTier.kpt⟩ P' _ _
       (fun kp w hk => writerImg_back V.upt P' M kp w hk)) $$ Hpt
   · ipureintro; exact hlz
 
@@ -693,7 +693,7 @@ theorem cw_priv_img (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPri
   isplitr
   · ipureintro; exact hf
   isplitl [Hpt]
-  · iapply (@procPtAt_congr hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt _ _
+  · iapply (@procPtAt_congr hlc GF _ _ _ ⟨ξ, KTier.kpt⟩ V.upt _ _
       (fun kp w hk => writerImg_mapped V.upt M kp w hk)) $$ Hpt
   · ipureintro; exact hlz
 

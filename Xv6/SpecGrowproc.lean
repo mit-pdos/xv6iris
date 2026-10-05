@@ -27,6 +27,10 @@ TRAPFRAME`, the test at `+0x36`, before uvmalloc) or an allocating grow
 (`0 < uvmaNp`: uvmalloc's loop ran); the post's wand hands uvmalloc's null
 receipt to a `-1` that is not an overrun.
 
+THE QUOTA (NI M3 quotas Q-1): a grow stays within the quota (`hq`:
+`sys_sbrk` calls growproc only past its quota test), so the block's `sz ≤
+uQuota` holds after it and uvmalloc's run is paid out of the table's credits.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.FdTable
@@ -61,7 +65,8 @@ def wp_growproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (M : Nat → List (BitVec 8))
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : growprocSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
-    (htier : k.tier = KTier.kpt) : Prop :=
+    (htier : k.tier = KTier.kpt)
+    (hq : 0 < (k.regs 10#5).toInt → V.sz.toNat + (k.regs 10#5).toInt.toNat ≤ uQuota) : Prop :=
   kctx cpu k ∗ pcIs cpu growprocAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivFd γ (procAddr j) pid V M ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -81,7 +86,7 @@ structure GROWPROC : Prop where
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    hj hproc hnoff hK hlk htier,
-    wp_growproc_body (hlc := hlc) (GF := GF) cpu k γl γk γ j pid V M hj hproc hnoff hK hlk htier
+    hj hproc hnoff hK hlk htier hq,
+    wp_growproc_body (hlc := hlc) (GF := GF) cpu k γl γk γ j pid V M hj hproc hnoff hK hlk htier hq
 
 end Xv6

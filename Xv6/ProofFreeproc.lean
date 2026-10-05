@@ -16,7 +16,7 @@ contract's shape, filled by `fpContLedL_fill` once the lend is back) and
 handed to proc_freepagetable on the pagetable arm (`fp_after_tf`); the
 restated call `fp_freepagetable` takes it.  Since L3b (no Rocq counterpart)
 the trapframe arm's `kfree` takes it first and steps it (`fp_kfree`, the led
-form over `UvmCallSites.uc_kfree_lend_call`).
+form, credited).
 
 THE PID APPEND COSTS ONE COUNT (permit sweep L3c; deviation: no Rocq
 counterpart, Rocq never landed L3): the lend now rides beside `fpContLedL`
@@ -396,7 +396,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- The private cells `freeproc` never writes (the name buffer is written
 once, in its last stretch, so it rides here as a parameter). -/
-def fpKeep [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (BitVec 8)) : IProp GF := iprop%
+def fpKeep [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (BitVec 8)) (c : Nat) : IProp GF := iprop%
   wordPointsTo (pKstack pa) 8 (DFrac.own 1) V.kstack ∗
   contextCells pa (DFrac.own 1) V.context ∗
   ofileCells pa (DFrac.own 1) V.ofile ∗
@@ -405,7 +405,20 @@ def fpKeep [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (BitVec 8)) : IPr
   wordPointsTo (pSecc pa) 8 (DFrac.own 1) V.pvSecc ∗
   wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗
   dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗
-  stackOwn (V.kstack + 4096#64) 512
+  stackOwn (V.kstack + 4096#64) 512 ∗ pageCredit c
+
+/-- The kept bundle's credits move by their number (NI M3 quotas Q-1). -/
+theorem fpKeep_congr [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (BitVec 8)) (c c' : Nat)
+    (h : c = c') : fpKeep (GF := GF) pa V nm c ⊢ fpKeep pa V nm c' := by subst h; exact .rfl
+
+/-- A credit freed on the way joins the kept bundle (NI M3 quotas Q-1). -/
+theorem fpKeep_add [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (BitVec 8)) (c d : Nat) :
+    fpKeep (GF := GF) pa V nm c ∗ pageCredit d ⊢ fpKeep pa V nm (c + d) := by
+  unfold fpKeep
+  iintro ⟨⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, Hc⟩, Hd⟩
+  iframe H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11
+  iapply pageCredit_join $$ [Hc Hd]
+  iframe
 
 /-- The lock-protected cells other than `pid` (`procPub` minus its pid
 quarter). -/
@@ -445,11 +458,11 @@ theorem fp_dormant_intro [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (Bi
     wordPointsTo (pSz pa) 8 (DFrac.own 1) 0#64 ∗
     wordPointsTo (pPagetable pa) 8 (DFrac.own 1) 0#64 ∗
     wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) 0#64 ∗
-    fpKeep pa V nm ∗ slotGen pa (.own 1) g ∗ wordPointsTo (pXstate pa) 4 xsHalf 0#32
+    fpKeep pa V nm slotShare ∗ slotGen pa (.own 1) g ∗ wordPointsTo (pXstate pa) 4 xsHalf 0#32
     ⊢ procDormant pa UNUSED := by
   have hUZ : ¬ (UNUSED = ZOMBIE) := by decide
   unfold fpKeep procDormant procFields pnameCells dormantSpace
-  iintro ⟨Hpid, Hsz, Hpt, Htf, ⟨Hks, Hctx, Hof, Hcwd, Hnm, Hsc, Hrt, Hal, Hch, Hev, Hst⟩, Hsg, Hxs⟩
+  iintro ⟨Hpid, Hsz, Hpt, Htf, ⟨Hks, Hctx, Hof, Hcwd, Hnm, Hsc, Hrt, Hal, Hch, Hev, Hst, Hcr⟩, Hsg, Hxs⟩
   isplitl []
   · ipureintro; exact Or.inl rfl
   -- the zeroed block is at the lazy bit SET (Rocq freeproc's dormant block:
@@ -464,7 +477,7 @@ theorem fp_dormant_intro [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (Bi
     refine ⟨hof, hcwd, hroot, ?_, rfl⟩
     simp only [uvmMaxsz]
     decide
-  iframe Hpid Hks Hsz Hpt Htf Hctx Hof Hcwd Hsc Hrt Hal Hch Hev Hst Hsg
+  iframe Hpid Hks Hsz Hpt Htf Hctx Hof Hcwd Hsc Hrt Hal Hch Hev Hst Hsg Hcr
   isplitl [Hnm]
   · isplitl []
     · ipureintro; exact hnm
@@ -573,7 +586,7 @@ theorem fp_tail [X : CurCtx]
     wordPointsTo (pSz (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
     wordPointsTo (pPagetable (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
     wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
-    fpKeep (procAddr j) V nm ∗ slotGen (procAddr j) (.own 1) g ∗ fpCont Γ cpu k j
+    fpKeep (procAddr j) V nm slotShare ∗ slotGen (procAddr j) (.own 1) g ∗ fpCont Γ cpu k j
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
@@ -582,7 +595,7 @@ theorem fp_tail [X : CurCtx]
     | b :: l, _ => exact ⟨b, l, rfl⟩
   unfold fpKeep fpPub fpCont
   iintro ⟨Hk, Hpc, Hframe, Hlocked, Hpg, ⟨Hstate, Hchan, Hkilled, Hxstate⟩,
-    Hpub, Hpriv, Hsz, Hpt, Htf, ⟨Hks, Hctx, Hof, Hcwd, Hname, Hsc, Hrt, Hal, Hch, Hstack⟩, Hsg, HPhi⟩
+    Hpub, Hpriv, Hsz, Hpt, Htf, ⟨Hks, Hctx, Hof, Hcwd, Hname, Hsc, Hrt, Hal, Hch, Hstack, Hcr⟩, Hsg, HPhi⟩
   icases kctx_tier cpu _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := by
     have h := hct.symm
@@ -636,7 +649,7 @@ theorem fp_tail [X : CurCtx]
     iapply (killPaid_zero _ _ _ rfl rfl)
   ihave Hdorm := fp_dormant_intro (procAddr j) V (0#8 :: nm') g hof hcwd hroot
       (fp_pnameWf_zero (b0 :: nm') hnm)
-    $$ [Hpriv Hsz Hpt Htf Hks Hctx Hof Hcwd Hname Hsc Hrt Hal Hch Hstack Hsg Hxs2]
+    $$ [Hpriv Hsz Hpt Htf Hks Hctx Hof Hcwd Hname Hsc Hrt Hal Hch Hstack Hcr Hsg Hxs2]
   case' _ => unfold fpKeep pName pXstate xsHalf; iframe
   -- the epilogue
   obtain ⟨hR2, hR8, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hkept
@@ -755,7 +768,7 @@ theorem fp_pid (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
     wordPointsTo (pSz (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
     wordPointsTo (pPagetable (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
     wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
-    fpKeep (procAddr j) V nm ∗ fpGhost (procAddr j) pidb kl pid g ∗
+    fpKeep (procAddr j) V nm slotShare ∗ fpGhost (procAddr j) pidb kl pid g ∗
     (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') ∗ fpContLedL Γ cpu k j pid ke
     ⊢ wpLoop (GF := GF) cpu := by
   simp only [pidLockAddr]
@@ -854,27 +867,40 @@ theorem fp_pid (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
 
 /-! ## The entry: prologue, `kfree`, `proc_freepagetable` -/
 
-/-- `kfree`'s led contract at its call site (address folded), at a lend
-(permit sweep L3b): the lend back stepped. -/
+set_option maxHeartbeats 1000000 in
+/-- `kfree`'s CREDITED contract at its call site (address folded), at a lend
+(permit sweep L3b; NI M3 quotas Q-1): the lend back stepped, the page's
+credit back. -/
 theorem fp_kfree (KF : KFREE) [CurCtx]
-    (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat)
+    (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (ke : Nat)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
     (hp' : pageValid (k'.regs 10#5)) :
     kctx c k' ∗ pcIs c KA.«kfree» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    pageOwn (k'.regs 10#5) ∗ kallocAvail γk on ∗ actLend k'.proc ke ∗
+    pageOwn (k'.regs 10#5) ∗ kallocAvail γk none ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       actLend k'.proc (ke + 1) -∗
-      kallocAvail γk (availInc on) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c :=
-  uc_kfree_lend_call KF c k' γl γk on ke hnoff' hK' hlk' hp'
-
-/-- `availInc none = none`, at the resource level. -/
-theorem fp_avail_reduce [CurCtx] (γk : KmemNames) :
-    kallocAvail (GF := GF) γk (availInc none) ⊢ kallocAvail γk none := by
-  show kallocAvail γk none ⊢ kallocAvail γk none
-  iintro H; iexact H
+      kallocAvail γk none -∗ pageCredit 1 -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  have h := KF.wp_kfree_cred (hlc := hlc) (GF := GF) c k' γl γk ke hnoff' hK' hlk' hp'
+  unfold wp_kfree_cred_body at h
+  simp only [kfreeAddr] at h
+  iintro ⟨Hk, Hpc, #Hlk, Hpage, #Hav, Hl, Hnext⟩
+  iapply h
+  isplitl [Hk]; · iexact Hk
+  isplitl [Hpc]; · iexact Hpc
+  isplitl []; · iexact Hlk
+  isplitl [Hpage]; · iexact Hpage
+  isplitl []; · iexact Hav
+  isplitl [Hl]; · iexact Hl
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %cc H %spie %spp %R' %hs Hk Hpc Hl Hpost %hcs
+  unfold kfreePostCred
+  icases Hpost with ⟨-, H1⟩
+  iapply H $$ %spie %spp %R' %hs Hk Hpc Hl [] H1
+  · iexact Hav
+  ipureintro; exact hcs
 
 /-- `proc_freepagetable`'s contract at its call site (address folded). -/
 theorem fp_freepagetable (PFP : PROC_FREEPAGETABLE) [CurCtx]
@@ -888,6 +914,7 @@ theorem fp_freepagetable (PFP : PROC_FREEPAGETABLE) [CurCtx]
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (∃ k2 : Nat, ⌜ke ≤ k2⌝ ∗ actLend k'.proc k2) -∗
+      pageCredit ptW -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := PFP.wp_proc_freepagetable (hlc := hlc) (GF := GF) c k' γl γk P M ke hnoff' hK' hlk' hroot' hsz' hbelow'
@@ -944,7 +971,7 @@ theorem fp_after_pt (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
     wordPointsTo (pSz (procAddr j)) 8 (DFrac.own 1) szv ∗
     wordPointsTo (pPagetable (procAddr j)) 8 (DFrac.own 1) ptv ∗
     wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
-    fpKeep (procAddr j) V nm ∗ fpGhost (procAddr j) pidb kl pid g ∗
+    fpKeep (procAddr j) V nm slotShare ∗ fpGhost (procAddr j) pidb kl pid g ∗
     (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') ∗ fpContLedL Γ cpu k j pid ke
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, #Hlk, Hlocked, Hpg, Hpub, Hpub4, Hpriv, Hsz, Hpt, Htf, Hkeep, Hgh, Hlend, HPhi⟩
@@ -994,7 +1021,8 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
     (if V.pagetable = 0#64 then emp else
       ⌜V.pagetable = pageAddr V.upt.root ∧ V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt⌝ ∗
         procPtAt V.upt M) ∗
-    fpKeep (procAddr j) V nm ∗ fpGhost (procAddr j) pidb kl pid g ∗
+    fpKeep (procAddr j) V nm (procSpare + 1 + (if V.pagetable = 0#64 then ptW else 0)) ∗
+    fpGhost (procAddr j) pidb kl pid g ∗
     (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') ∗ fpContLedL Γ cpu k j pid ke
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, #Hlkk, Hav, #Hlkp, Hlocked, Hpg, Hpub, Hpub4, Hpriv, Hsz, Hpt, Htf,
@@ -1018,6 +1046,8 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [fp_beq_taken V.pagetable hpt0]
     iintro Hk Hpc
+    ihave Hkeep := fpKeep_congr _ _ _ _ slotShare
+      (by rw [if_pos hpt0, slotShare_split]; omega) $$ Hkeep
     -- nothing was lent on this arm: the lend rides on as it came, to the pid append
     iapply (fp_after_pt AC RE Γ cpu k γp j hj ke st ch kl xs pid pidb V.pagetable V.sz V nm g hof hcwd hroot
       hnm hwf hsie hnoff hK hlp htier (R.set 10#5 V.pagetable)
@@ -1061,8 +1091,13 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
     case hbel => k_norm; exact hpta.2.2
     -- past proc_freepagetable
     iapply wpNext_off_intro
-    iintro %spie %spp %R' %hsp Hk Hpc ⟨%k2, %hk2, Hlend⟩ %hcs
+    iintro %spie %spp %R' %hsp Hk Hpc ⟨%k2, %hk2, Hlend⟩ Hcr %hcs
     obtain ⟨rfl, rfl⟩ := hsp trivial
+    -- the table's weight back into the kept credits (NI M3 quotas Q-1)
+    ihave Hkeep := fpKeep_add _ _ _ _ ptW $$ [Hkeep Hcr]
+    · iframe
+    ihave Hkeep := fpKeep_congr _ _ _ _ slotShare
+      (by rw [if_neg hpt0, slotShare_split]; omega) $$ Hkeep
     have hself : (k.pushed 4).withSpie k.spie k.spp = k.pushed 4 :=
       KCtx.withSpie_self' (k.pushed 4) k.spie k.spp rfl rfl
     have hret : jumpPc (KA.«freeproc» + 0x22#64) = (KA.«freeproc» + 0x22#64) := fp_ret_a9e
@@ -1106,7 +1141,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
     unfold freeprocIn freeprocGen procFields pnameCells
     iintro ⟨Hk, Hpc, #Hlkk, Hav, #Hlkp, Hheld,
       ⟨%hpure, Hpriv, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, ⟨%hpnwf, Hnamebuf⟩, Hsc, Hrt⟩, Hal, Hch, Hev, Hstack, Htfarm,
-        Hptarm⟩, ⟨Hsg, Hrr, %xsv, Hxsb⟩, Hlend, HPhi0⟩
+        Hptarm, Hcr⟩, ⟨Hsg, Hrr, %xsv, Hxsb⟩, Hlend, HPhi0⟩
     obtain ⟨hof, hcwd, hroot⟩ := hpure
     have hnm : V.name.length = PNAMELEN := hpnwf.1
     icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
@@ -1137,7 +1172,9 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
     case' _ => unfold fpGhost; iframe
     ihave Hpub : fpPub (procAddr j) st ch kl xs $$ [Hstate Hchan Hkilled Hxstate]
     case' _ => unfold fpPub; iframe
-    ihave Hkeep : fpKeep (procAddr j) V V.name $$ [Hks Hctx Hof Hcwd Hnamebuf Hsc Hrt Hal Hch Hev Hstack]
+    ihave Hkeep : fpKeep (procAddr j) V V.name
+        (procSpare + (if V.trapframe = 0#64 then 1 else 0) + (if V.pagetable = 0#64 then ptW else 0))
+      $$ [Hks Hctx Hof Hcwd Hnamebuf Hsc Hrt Hal Hch Hev Hstack Hcr]
     case' _ => unfold fpKeep; iframe
     ihave HPhi := wpNext_at k.sie k.proc cpu cpu _ (fun _ => rfl) $$ HPhi0
     -- the prologue
@@ -1165,6 +1202,8 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
         with [fp_beq_taken V.trapframe htf]
       iintro Hk Hpc
       iclear Htfarm
+      ihave Hkeep := fpKeep_congr _ _ _ _ (procSpare + 1 + (if V.pagetable = 0#64 then ptW else 0))
+        (by rw [if_pos htf]) $$ Hkeep
       iapply (fp_after_tf KF PFP AC RE Γ cpu k γl γp γk j hj st ch kl xs pid pidb V.trapframe V M
         V.name g hof hcwd hroot hnm hwf hsie hnoff hK hlk hlp htier ke
         ((((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 8#5 (k.regs 2#5)).set 9#5
@@ -1196,7 +1235,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
         rw [htfa.1]
         iapply (fp_tfPage_pageOwn V.upt.tfp V.tf)
         iexact Htfpage
-      iapply (fp_kfree (on := none) KF cpu _ γl γk ke ?hn ?hKk ?hlkk ?hpv) $$ [- $Hk $Hpc $Hav]
+      iapply (fp_kfree KF cpu _ γl γk ke ?hn ?hKk ?hlkk ?hpv) $$ [- $Hk $Hpc $Hav]
       rotate_right 1
       k_norm
       iframe Hlkk Hpage Hlend
@@ -1206,10 +1245,13 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
       case hpv => k_norm; exact htfa.2
       -- past kfree
       iapply wpNext_off_intro
-      iintro %spie %spp %R' %hsp Hk Hpc Hlend Hav0 %hcs
+      iintro %spie %spp %R' %hsp Hk Hpc Hlend Hav H1 %hcs
       obtain ⟨rfl, rfl⟩ := hsp trivial
-      ihave Hav : kallocAvail γk none $$ [Hav0]
-      case' _ => iapply fp_avail_reduce; iexact Hav0
+      -- the trapframe page's credit into the kept credits (NI M3 quotas Q-1)
+      ihave Hkeep := fpKeep_add _ _ _ _ 1 $$ [Hkeep H1]
+      · iframe
+      ihave Hkeep := fpKeep_congr _ _ _ _ (procSpare + 1 + (if V.pagetable = 0#64 then ptW else 0))
+        (by rw [if_neg htf]; omega) $$ Hkeep
       have hself : (k.pushed 4).withSpie k.spie k.spp = k.pushed 4 :=
         KCtx.withSpie_self' (k.pushed 4) k.spie k.spp rfl rfl
       have hret : jumpPc (KA.«freeproc» + 0x14#64) = (KA.«freeproc» + 0x14#64) := fp_ret_a90

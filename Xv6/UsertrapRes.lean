@@ -382,9 +382,11 @@ execution.  At the kernel tier of the ambient context, as `procPrivFd`
 states it.  It keeps the slot's event counter (`actCnt pa V.ev`, after the
 lazy claim -- the bare block's, Rocq G's `proc_priv_nopt` conjunct, design
 ni-strong-instance.md §7): the residue parks with the permit.  The root's
-reference rides right after the cwd's, as in the core (chroot). -/
+reference rides right after the cwd's, as in the core (chroot).  (NI M3
+quotas Q-1) The break is within the quota, and the live process's spare
+credits park after the generation row, as in the core. -/
 def utBlock (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop%
-  ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
+  ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧
     V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
   @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V ∗
@@ -392,24 +394,24 @@ def utBlock (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) :
   actCnt pa V.ev ∗
   @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
   @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
-  procGenAt curCtx pa pid V.gen ∗
+  procGenAt curCtx pa pid V.gen ∗ pageCredit procSpare ∗
   procOfiles γ V.fdg pa V.ofile
 
 /-- **Rocq `proc_priv_split_pt` + `proc_priv_tf_open`**: the block is the
 parked part, the address space and the trapframe page. -/
 theorem utBlock_join (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
-    utBlock (GF := GF) γ pa pid V ∗ @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
+    utBlock (GF := GF) γ pa pid V ∗ @procPtAt hlc GF _ _ _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊣⊢ procPrivFd γ pa pid V M := by
   unfold utBlock procPrivFd procPrivCoreNoctxAt procPrivBareAt
   constructor
-  · iintro ⟨⟨%h, Hpid, Hf, %hlz, Hev, Hc, Hr, Hg, Ho⟩, Hpt, Htf⟩
-    iframe Hpid Hf Hc Hr Hg Ho Hpt Htf Hev
+  · iintro ⟨⟨%h, Hpid, Hf, %hlz, Hev, Hc, Hr, Hg, Hcr, Ho⟩, Hpt, Htf⟩
+    iframe Hpid Hf Hc Hr Hg Hcr Ho Hpt Htf Hev
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
-  · iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htf, %hlz, Hev⟩, Hc, Hr, Hg⟩, Ho⟩
-    iframe Hpid Hf Hc Hr Hg Ho Hpt Htf Hev
+  · iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htf, %hlz, Hev⟩, Hc, Hr, Hg, Hcr⟩, Ho⟩
+    iframe Hpid Hf Hc Hr Hg Hcr Ho Hpt Htf Hev
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
@@ -474,7 +476,7 @@ def utOwnBare (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : Pro
 /-- **Rocq `ut_own_pt_close` / `ut_own_pt_open`** (and the trapframe's). -/
 theorem utOwnBare_join (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) :
-    utOwnBare (GF := GF) Rsys N V sts cs pid ∗ @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
+    utOwnBare (GF := GF) Rsys N V sts cs pid ∗ @procPtAt hlc GF _ _ _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊣⊢ utOwn Rsys N V M sts cs pid := by
   have hj := utBlock_join (GF := GF) N.f N.pj pid V M
   unfold utOwnBare utOwn
@@ -625,7 +627,7 @@ theorem utResBare_sz (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) (P 
   · iexists N
     iframe Htfk Hcl Hcaps Hb Hfd Hir Hbl Hrest
     ipureintro; exact ⟨hN, hb⟩
-  · ipureintro; exact hb.1
+  · ipureintro; exact Nat.le_trans hb.1 uQuota_le_uvmMaxsz
 
 /-- **Rocq `ut_res_bare_lazy`**: what the lazy bit claims, at the
 residue's own table (kept). -/

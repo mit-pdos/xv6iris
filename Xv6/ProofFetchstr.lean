@@ -78,7 +78,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 theorem fetchstr_priv_split [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivBareAt (GF := GF) ξ pa pid V M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
+      ⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
         V.trapframe = pageAddr V.upt.tfp⌝ ∗
       wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
       wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
@@ -92,7 +92,7 @@ theorem fetchstr_priv_split [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt
 
 theorem fetchstr_priv_close [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (P P' : UPtd) (M' : Nat → List (BitVec 8)) (hext : P.extSz V.sz P')
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P ∧ V.pagetable = pageAddr P.root ∧
+    (hf : V.sz.toNat ≤ uQuota ∧ umBelow V.sz P ∧ V.pagetable = pageAddr P.root ∧
       V.trapframe = pageAddr P.tfp) :
     wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
     wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
@@ -100,7 +100,7 @@ theorem fetchstr_priv_close [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt
       procPrivBareAt (GF := GF) ξ pa pid { V with upt := P' } M' := by
   subst hX
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
-  show _ ⊢ iprop(⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P' ∧ V.pagetable = pageAddr P'.root ∧
+  show _ ⊢ iprop(⌜V.sz.toNat ≤ uQuota ∧ umBelow V.sz P' ∧ V.pagetable = pageAddr P'.root ∧
       V.trapframe = pageAddr P'.tfp⌝ ∗ wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFieldsNoOfile pa (DFrac.own 1) V ∗ procPtAt P' M' ∗ tfPageAt P'.tfp V.tf ∗
     ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝ ∗ actCnt pa V.ev)
@@ -134,7 +134,7 @@ set_option maxHeartbeats 1000000 in
 theorem fetchstr_copyinstr (CI : COPYINSTR) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
     (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (ke : Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 50 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
-    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
+    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ uQuota)
     (hmax : k'.regs 14#5 = BitVec.ofNat 64 old.length) (hmax' : old.length < 2 ^ 63) :
     kctx c k' ∗ pcIs c KA.«copyinstr» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ procPtAt P M ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) old ∗
@@ -413,7 +413,7 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
   case hKC => k_norm_g; omega
   case hlC => k_norm_g; exact hlk
   case hrC => k_norm_g; exact hfacts.2.2.1
-  case hszC => k_norm_g; unfold uvmMaxsz at hfacts; omega
+  case hszC => k_norm_g; exact hfacts.1
   case hmC => k_norm_g [e18]; exact hmax
   case hm'C => omega
   k_norm_g [fetchstr_ret_26]

@@ -206,7 +206,7 @@ def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
     (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) (ke : Nat)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
-    (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
+    (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) (hcnt : ∀ x, on = some x → procPagetableNodes + 2 ≤ x) : Prop :=
   kctx cpu k ∗ pcIs cpu allocprocAddr ∗ procsInv Γ ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗
   procsAvailAt Γ pav tk ∗ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗
@@ -231,7 +231,7 @@ def wp_allocproc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
     (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) (ke : Nat)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
-    (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
+    (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) (hcnt : ∀ x, on = some x → procPagetableNodes + 2 ≤ x) : Prop :=
   kctx cpu k ∗ pcIs cpu allocprocAddr ∗ procsInv Γ ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗
   procsAvailAt Γ pav tk ∗ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗
@@ -253,12 +253,12 @@ structure ALLOCPROC : Prop where
   wp_allocproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx] (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
-    (ke : Nat) hnoff hK hlk hlp hlq htier,
-    wp_allocproc_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q ke hnoff hK hlk hlp hlq htier
+    (ke : Nat) hnoff hK hlk hlp hlq htier hcnt,
+    wp_allocproc_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q ke hnoff hK hlk hlp hlq htier hcnt
   wp_allocproc_led : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx] (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
-    (ke : Nat) hnoff hK hlk hlp hlq htier,
-    wp_allocproc_led_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q ke hnoff hK hlk hlp hlq htier
+    (ke : Nat) hnoff hK hlk hlp hlq htier hcnt,
+    wp_allocproc_led_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q ke hnoff hK hlk hlp hlq htier hcnt
 
 end Xv6

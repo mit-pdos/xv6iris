@@ -60,7 +60,7 @@ theorem nameiEra_main (NE : NAMEX_ERA)
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (P Pmiss : Nat → Nat → IProp GF) (r : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (dqb dqs dqpv : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : nameiSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
@@ -74,7 +74,7 @@ theorem nameiEra_main (NE : NAMEX_ERA)
     (hbud : walkNeed (pathElems (bview plen pfun)).length ≤ n)
     (hpd : descPageRw pd) :
     wp_namei_era_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun
-      n Sb P Pmiss pid V M dqb dqs dqpv
+      n Sb P Pmiss r pid V M dqb dqs dqpv
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd := by
   unfold wp_namei_era_eb_body
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
@@ -82,7 +82,7 @@ theorem nameiEra_main (NE : NAMEX_ERA)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 := nameiEra_slots_4 _ hK
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave HΦ : ∀ c : CPU, nameiEraPost k plen pfun n Sb P Pmiss pid V M dqb dqs dqpv c
+  ihave HΦ : ∀ c : CPU, nameiEraPost k plen pfun n Sb P Pmiss r pid V M dqb dqs dqpv c
     $$ [Hnext]
   · iintro %c
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
@@ -118,7 +118,7 @@ theorem nameiEra_main (NE : NAMEX_ERA)
     ((k.pushed 4).withRegs
       (((((k.regs.set (2#5) (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set (8#5) (k.regs 2#5)).set (12#5)
         (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 11#5 0#64).set (1#5) (KA.«namei» + 18#64)))
-    γl pd pav pu j γkl γk plen pfun nfun n Sb P Pmiss pid V M dqb dqs dqpv
+    γl pd pav pu j γkl γk plen pfun nfun n Sb P Pmiss r pid V M dqb dqs dqpv
     hj hproc (by show namexSlots ≤ k.avail - 4; exact nameiEra_slots_namex _ hK)
     hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud
     (by simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true,
@@ -197,9 +197,9 @@ end
 /-- `namei`'s era proof, from namex's era interface (Rocq's `NameiEraProof`
 functor over `NamexEra`). -/
 theorem nameiEra_proof (NE : NAMEX_ERA) : NAMEI_ERA :=
-  ⟨fun Γ _ cpu k γl pd pav pu j γkl γk plen pfun n Sb P Pmiss pid V M dqb dqs dqpv
+  ⟨fun Γ _ cpu k γl pd pav pu j γkl γk plen pfun n Sb P Pmiss r pid V M dqb dqs dqpv
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd =>
-  nameiEra_main NE Γ cpu k γl pd pav pu j γkl γk plen pfun n Sb P Pmiss pid V M dqb dqs dqpv
+  nameiEra_main NE Γ cpu k γl pd pav pu j γkl γk plen pfun n Sb P Pmiss r pid V M dqb dqs dqpv
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd⟩
 
 end Xv6

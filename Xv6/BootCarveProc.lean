@@ -124,7 +124,7 @@ def bcpSlot [CurCtx] (i : Nat) : IProp GF := iprop%
 /-- The dormant block's record at boot: every cell zero, the lazy bit set,
 the ghost names junk (deviation 4). -/
 def bcpBootPriv : ProcPriv :=
-  { kstack := 0#64, sz := 0#64, pagetable := 0#64, trapframe := 0#64, upt := UPtd.mk 0#44 0#44 ∅,
+  { kstack := 0#64, sz := 0#64, pagetable := 0#64, trapframe := 0#64, upt := UPtd.mk 0#44 0#44 ∅ 0,
     tf := [], context := List.replicate 14 0#64, ofile := List.replicate NOFILE 0#64, fdg := 0,
     cwd := 0#64, name := List.replicate PNAMELEN 0#8, cwi := 0, gen := 0, chg := 0, pvLazy := true, pvSecc := 0#64,
     ev := 0, root := 0#64, rti := 0 }
@@ -809,7 +809,8 @@ theorem bootCarveProc_rows [CurCtx] (cn : ConsNames) :
   iframe H1 H2 H3 H4 Hi Ht Hc1 Hc2 Hc3
 
 /-- **`mainGlobalsRaw`, assembled** in SpecMain's row order: this file's
-rows (`bcpProcRows`) among the slot supplies' shares (SA-5's mints), the
+rows (`bcpProcRows`) among the slot supplies' shares (SA-5's mints) and the
+slots' page credits (NI M3 quotas Q-1), the
 file table's entries (FileBoot) and the bcache / itable rows
 (BootCarveFs). -/
 theorem bootCarveProc_mainGlobalsRaw [CurCtx] (cn : ConsNames) :
@@ -819,6 +820,7 @@ theorem bootCarveProc_mainGlobalsRaw [CurCtx] (cn : ConsNames) :
       ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) -∗
       irefSlots NFILE -∗
       bslots (NPROC * 3) -∗
+      pageCredit (NPROC * slotShare) -∗
       (∃ (vhp vhn : BitVec 64), wordPointsTo (bcacheHeadAddr + 72#64) 8 (DFrac.own 1) vhp ∗
         wordPointsTo (bcacheHeadAddr + 80#64) 8 (DFrac.own 1) vhn) -∗
       ([∗list] i ∈ List.range NBUF, bufIn i) -∗
@@ -827,8 +829,8 @@ theorem bootCarveProc_mainGlobalsRaw [CurCtx] (cn : ConsNames) :
       ([∗list] k ∈ List.range NINODE, ientryRaw k) -∗
       mainGlobalsRaw cn := by
   unfold bcpProcRows mainGlobalsRaw
-  iintro ⟨H1, H2, H3, H4, Hi, Ht, Hc1, Hc2, Hc3⟩ Hfd Hir Hfe Hirf Hbs Hhd Hbi Hbd Hsl Hie
-  iframe H1 H2 H3 H4 Hfd Hir Hfe Hirf Hbs Hi Ht Hhd Hbi Hbd Hsl Hie Hc1 Hc2 Hc3
+  iintro ⟨H1, H2, H3, H4, Hi, Ht, Hc1, Hc2, Hc3⟩ Hfd Hir Hfe Hirf Hbs Hcs Hhd Hbi Hbd Hsl Hie
+  iframe H1 H2 H3 H4 Hfd Hir Hfe Hirf Hbs Hcs Hi Ht Hhd Hbi Hbd Hsl Hie Hc1 Hc2 Hc3
 
 end rows
 

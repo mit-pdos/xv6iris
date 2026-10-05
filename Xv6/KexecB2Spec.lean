@@ -376,7 +376,7 @@ def kxcResB (k : KCtx) (A : KexecArgs)
   kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
   logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗
   procPtAt P Mi ∗
-  procPrivFd A.γ k.proc A.pidv A.V A.M ∗
+  procPrivFdRes 0 A.γ k.proc A.pidv A.V A.M ∗
   kxcBufs k A ∗
   byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
   kxcFrameBp (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 10#5)

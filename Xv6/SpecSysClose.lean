@@ -96,7 +96,7 @@ def wp_sys_close_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : C
     (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φc : IProp GF)
     (hv : V.tf[tfArgIdx 0]? = some v) (hproc : k.proc = pa) (htier : k.tier = KTier.kpt)
     (hsp : 48 ≤ (k.regs 2#5).toNat)
-    (hnoff : k.noff = 0) (hK : sysCloseSlots ≤ k.avail) : Prop :=
+    (hnoff : k.noff = 0) (hK : sysCloseSlots ≤ k.avail) (hsealed : on = none) : Prop :=
   kctx cpu k ∗ pcIs cpu sysCloseAddr ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isFtable γl γ ∗ panicEnv ∗
@@ -120,8 +120,8 @@ structure SYSCLOSE : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φc : IProp GF)
-    hv hproc htier hsp hnoff hK,
+    hv hproc htier hsp hnoff hK hsealed,
     wp_sys_close_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ pa pid V M sts v j γkl γk on Φc
-      hv hproc htier hsp hnoff hK
+      hv hproc htier hsp hnoff hK hsealed
 
 end Xv6

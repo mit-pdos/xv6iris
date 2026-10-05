@@ -10,7 +10,8 @@ The shared home of the definitional side of wave U2: every `Proof*` file
 of the user-memory functions may draw on it, and none of them is imported
 here.
 -/
-import Xv6.UPtDefs
+import Xv6.UPtShape
+import Xv6.PtOwnLemmas
 
 namespace Xv6.UPt
 
@@ -206,22 +207,138 @@ theorem umPages_insert [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (k : Na
       (⌜(M k).length = 4096⌝ ∗ byteBuf (pte2pa w) (DFrac.own 1) (M k)) ∗ umPages P M :=
   BigSepM.bigSepM_insert (Φ := umPageAt (GF := GF) M) hk
 
-/-! ### `ptOwnRep` and `procPtAt` -/
+end
+
+/-! ### `ptOwnRep` and `procPtAt`
+
+(NI M3 quotas Q-1) An owned table is its tree, its representation facts,
+and its QUOTA PART `ptRest t L` -- the shape, the user leaves below the
+quota, the unspent weight in credits.  A function that reads the table
+frames `ptRest` through; one that maps or unmaps a page moves it by the
+transitions below (`ptRest_unmapUser`, `ptRest_unmapTop`; a mapping's is
+`UPtReserve.ptRest_reserveUser`), which pay or take the page's and the
+interior pages' credits. -/
+
+section Quota
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+
+instance ptRest_timeless (t : PTree) (L : RegMapF (BitVec 64)) : Timeless (ptRest (GF := GF) t L) := by
+  unfold ptRest; infer_instance
+
+theorem ptRest_unfold (t : PTree) (L : RegMapF (BitVec 64)) :
+    ptRest (GF := GF) t L ⊣⊢ ⌜t.shapeQ ∧ uLeafRegion L⌝ ∗ pageCredit (ptW - (t.pages 2).length - uLeafCnt L) :=
+  .rfl
 
 theorem ptOwnRep_cases [CurCtx] (root : BitVec 44) (L : RegMapF (BitVec 64)) :
     ptOwnRep (GF := GF) root L ⊢
-      ∃ t : PTree, ⌜t.base = root ∧ ptRep t L⌝ ∗ ptreeOwn 2 (DFrac.own 1) t := by
+      ∃ t : PTree, ⌜t.base = root ∧ ptRep t L⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗ ptRest t L := by
   unfold ptOwnRep; iintro H; iexact H
 
 theorem ptOwnRep_intro [CurCtx] (root : BitVec 44) (L : RegMapF (BitVec 64)) (t : PTree)
     (hb : t.base = root) (hr : ptRep t L) :
-    ptreeOwn (GF := GF) 2 (DFrac.own 1) t ⊢ ptOwnRep root L := by
+    ptreeOwn (GF := GF) 2 (DFrac.own 1) t ∗ ptRest t L ⊢ ptOwnRep root L := by
   unfold ptOwnRep
   iintro H
   iexists t
   isplitl []
   · ipureintro; exact ⟨hb, hr⟩
   iexact H
+
+/-- The quota part only reads the user keys. -/
+theorem ptRest_congr (t : PTree) (L L' : RegMapF (BitVec 64)) (he : ∀ k, get? L' k = get? L k) :
+    ptRest (GF := GF) t L ⊢ ptRest t L' := by
+  unfold ptRest
+  iintro ⟨%⟨hs, hreg⟩, Hc⟩
+  have hc : uLeafCnt L' = uLeafCnt L := uLeafCnt_congr _ _ (fun k _ => by rw [he])
+  rw [hc]
+  iframe Hc
+  ipureintro
+  exact ⟨hs, fun k w hk => hreg k w (by rw [← he]; exact hk)⟩
+
+/-- The arithmetic of a mapping: the credits for `f` interior pages and
+`d` data pages come out of the unspent weight. -/
+theorem ptRest_take (t t' : PTree) (L L' : RegMapF (BitVec 64)) (f d : Nat)
+    (hp : (t'.pages 2).length = (t.pages 2).length + f) (hl : uLeafCnt L' = uLeafCnt L + d)
+    (hs' : t'.shapeQ) (hreg' : uLeafRegion L') :
+    ptRest (GF := GF) t L ⊢ pageCredit (f + d) ∗ ptRest t' L' := by
+  unfold ptRest
+  iintro ⟨-, Hc⟩
+  have hfit := ptW_fits t' L' hs'
+  icases pageCredit_take (ptW - (t.pages 2).length - uLeafCnt L) (f + d) (by omega) $$ Hc with ⟨Hfd, Hc⟩
+  iframe Hfd
+  isplitl []
+  · ipureintro; exact ⟨hs', hreg'⟩
+  iapply pageCredit_congr (ptW - (t.pages 2).length - uLeafCnt L - (f + d))
+    (ptW - (t'.pages 2).length - uLeafCnt L') (by omega) $$ Hc
+
+/-- The arithmetic of an unmapping: the freed pages' credits go back. -/
+theorem ptRest_give (t t' : PTree) (L L' : RegMapF (BitVec 64)) (f d : Nat)
+    (hp : (t.pages 2).length = (t'.pages 2).length + f) (hl : uLeafCnt L = uLeafCnt L' + d)
+    (hs' : t'.shapeQ) (hreg' : uLeafRegion L') :
+    ptRest (GF := GF) t L ∗ pageCredit (f + d) ⊢ ptRest t' L' := by
+  unfold ptRest
+  iintro ⟨⟨%⟨hs, -⟩, Hc⟩, Hfd⟩
+  have hfit := ptW_fits t L hs
+  isplitl []
+  · ipureintro; exact ⟨hs', hreg'⟩
+  iapply pageCredit_congr (ptW - (t.pages 2).length - uLeafCnt L + (f + d))
+    (ptW - (t'.pages 2).length - uLeafCnt L') (by omega)
+  iapply pageCredit_join $$ [Hc Hfd]
+  iframe
+
+/-- **UNMAPPING A USER PAGE** (`uvmunmap` with `do_free`): the freed data
+page's credit goes back into the table. -/
+theorem ptRest_unmapUser (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27) (v : BitVec 64)
+    (hq : vpn.toNat < uQpages) (hs : (get? L vpn.toNat).isSome) :
+    ptRest (GF := GF) t L ∗ pageCredit 1 ⊢ ptRest (t.setLeaf 2 vpn v) (delete L vpn.toNat) := by
+  iintro ⟨H, H1⟩
+  icases (ptRest_unfold t L).1 $$ H with ⟨%⟨hsh, hreg⟩, Hc⟩
+  iapply ptRest_give t _ L _ 0 1 (by rw [PTree.pages_setLeaf]; rfl)
+    (by rw [← uLeafCnt_delete L vpn.toNat hq hs])
+    (PTree.shapeQ_setLeaf t vpn v hsh) (uLeafRegion_delete L vpn.toNat hreg)
+  isplitl [Hc]
+  · iapply (ptRest_unfold t L).2; iframe Hc; ipureintro; exact ⟨hsh, hreg⟩
+  iapply pageCredit_congr 1 (0 + 1) rfl $$ H1
+
+/-- **UNMAPPING A NON-USER PAGE** (`proc_freepagetable`'s trampoline and
+trapframe, `do_free = 0`): nothing to give back. -/
+theorem ptRest_unmapTop (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27) (v : BitVec 64)
+    (hk : uQpages ≤ vpn.toNat ∨ get? L vpn.toNat = none) :
+    ptRest (GF := GF) t L ⊢ ptRest (t.setLeaf 2 vpn v) (delete L vpn.toNat) := by
+  iintro H
+  icases (ptRest_unfold t L).1 $$ H with ⟨%⟨hsh, hreg⟩, Hc⟩
+  iapply (ptRest_unfold _ _).2
+  rw [PTree.pages_setLeaf, uLeafCnt_delete_same L vpn.toNat hk]
+  iframe Hc
+  ipureintro
+  exact ⟨PTree.shapeQ_setLeaf t vpn v hsh, uLeafRegion_delete L vpn.toNat hreg⟩
+
+/-- **THE CREDITS ACROSS USER MODE** (NI M3 Q-1): a table's `ptRest` is the
+shape fact and `uptCred` at the descriptor recording its page count. -/
+theorem ptRest_cred (t : PTree) (P : UPtd) (n : Nat) (h : (t.pages 2).length = n) :
+    ptRest (GF := GF) t P.leaves ⊣⊢ ⌜t.shapeQ⌝ ∗ uptCred { P with np := n } := by
+  unfold ptRest uptCred
+  simp only [UPtd.leaves_np]
+  rw [h]
+  constructor
+  · iintro ⟨%⟨hs, hr⟩, Hc⟩
+    isplitl []
+    · ipureintro; exact hs
+    iframe Hc
+    ipureintro; exact hr
+  · iintro ⟨%hs, %hr, Hc⟩
+    iframe Hc
+    ipureintro; exact ⟨hs, hr⟩
+
+/-- The way back (uservec): the credits at a descriptor recording the
+tree's page count, with the tree's shape, are its `ptRest`. -/
+theorem ptRest_of_cred (t : PTree) (P : UPtd) (hs : t.shapeQ) (h : (t.pages 2).length = P.np) :
+    uptCred (GF := GF) P ⊢ ptRest t P.leaves := by
+  unfold ptRest uptCred
+  rw [h]
+  iintro ⟨%hr, Hc⟩
+  iframe Hc
+  ipureintro; exact ⟨hs, hr⟩
 
 theorem procPtAt_cases [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) :
     procPtAt (GF := GF) P M ⊢ ⌜uptWf P⌝ ∗ ptOwnRep P.root P.leaves ∗ umPages P M := by
@@ -245,18 +362,56 @@ theorem procPtAt_root_valid [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) :
     procPtAt (GF := GF) P M ⊢ ⌜pageValid (pageAddr P.root)⌝ ∗ procPtAt P M := by
   iintro H
   icases procPtAt_cases P M $$ H with ⟨%hwf, HptO, Hum⟩
-  icases ptOwnRep_cases P.root P.leaves $$ HptO with ⟨%t, %⟨hb, hr⟩, Htree⟩
+  icases ptOwnRep_cases P.root P.leaves $$ HptO with ⟨%t, %⟨hb, hr⟩, Htree, Hrest⟩
   have hbase : t.base ∈ t.pages 2 := by
     simp only [PTree.pages, List.mem_cons, true_or]
   have hpv : pageValid (pageAddr P.root) := by
     rw [← hb]; exact ptRep_pages_valid hr t.base hbase
-  isplitr [Htree Hum]
+  isplitr [Htree Hum Hrest]
   · ipureintro; exact hpv
   · iapply procPtAt_intro P M hwf
-    isplitl [Htree]
-    · iapply ptOwnRep_intro P.root P.leaves t hb hr; iexact Htree
+    isplitl [Htree Hrest]
+    · iapply ptOwnRep_intro P.root P.leaves t hb hr; iframe
     · iexact Hum
 
-end
+/-- **The user leaves of a live space are below the quota** (NI M3 quotas
+Q-1): what `uvmcopy` reads off the parent to map the child's leaves. -/
+theorem procPtAt_region [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) :
+    procPtAt (GF := GF) P M ⊢ ⌜uLeafRegion P.leaves⌝ ∗ procPtAt P M := by
+  iintro H
+  icases procPtAt_cases P M $$ H with ⟨%hwf, HptO, Hum⟩
+  icases ptOwnRep_cases P.root P.leaves $$ HptO with ⟨%t, %⟨hb, hr⟩, Htree, Hrest⟩
+  unfold ptRest
+  icases Hrest with ⟨%⟨hs, hreg⟩, Hc⟩
+  isplitr [Htree Hum Hc]
+  · ipureintro; exact hreg
+  · iapply procPtAt_intro P M hwf
+    isplitl [Htree Hc]
+    · iapply ptOwnRep_intro P.root P.leaves t hb hr
+      iframe Htree
+      unfold ptRest
+      iframe Hc
+      ipureintro; exact ⟨hs, hreg⟩
+    · iexact Hum
+
+/-- **THE KEYS ONLY** (NI M3 quotas Q-1): the quota part reads the tree's
+page count and shape and the leaf map's keys, so a rewrite that keeps the
+pages, the shape and the keys (`uvmclear`'s `PTE_U` clear) keeps it. -/
+theorem ptRest_keys (t t' : PTree) (L L' : RegMapF (BitVec 64))
+    (hp : (t'.pages 2).length = (t.pages 2).length) (hs : t.shapeQ → t'.shapeQ)
+    (hk : ∀ k, (get? L' k).isSome = (get? L k).isSome) :
+    ptRest (GF := GF) t L ⊢ ptRest t' L' := by
+  unfold ptRest
+  iintro ⟨%⟨hsh, hreg⟩, Hc⟩
+  have hc : uLeafCnt L' = uLeafCnt L := uLeafCnt_congr _ _ (fun k _ => hk k)
+  rw [hc, hp]
+  iframe Hc
+  ipureintro
+  refine ⟨hs hsh, fun k w hw => ?_⟩
+  have h1 : (get? L k).isSome := by rw [← hk k, hw]; rfl
+  obtain ⟨w', hw'⟩ := Option.isSome_iff_exists.mp h1
+  exact hreg k w' hw'
+
+end Quota
 
 end Xv6.UPt

@@ -27,6 +27,7 @@ which the cursor loop threads unchanged; at each freed page
 import Xv6.SpecUvmunmap
 import Xv6.UvmCallSites
 import Xv6.UPtUnmapLemmas
+import Xv6.UPtLemmas
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8
 import Xv6.UvmallocDefs
@@ -128,7 +129,7 @@ theorem unKept_trans {R R' R'' : RegMap} (h : unKept R R') (h' : unKept R' R'') 
     h'.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## The allocator and the lend -/
 
@@ -191,21 +192,41 @@ theorem unFrame_join [CurCtx] (sp v0 v1 v2 v3 v4 v5 v6 v7 : BitVec 64) :
 /-! ## The calls -/
 
 set_option maxHeartbeats 1000000 in
-/-- `kfree`'s LED contract at its entry address, as a rule, at a lend
-(permit sweep L3b): the lend back stepped. -/
+/-- `kfree`'s CREDITED contract at its entry address, as a rule, at a lend
+(permit sweep L3b; NI M3 quotas Q-1): the lend back stepped and the page's
+credit handed back. -/
 theorem un_kfree_call [WchG GF] (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
-    (γl : GName) (γk : KmemNames) (on' : Option Nat) (ke : Nat)
+    (γl : GName) (γk : KmemNames) (ke : Nat)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
     (hp : pageValid (k'.regs 10#5)) :
     kctx c k' ∗ pcIs c KA.«kfree» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    pageOwn (k'.regs 10#5) ∗ kallocAvail γk on' ∗ actLend k'.proc ke ∗
+    pageOwn (k'.regs 10#5) ∗ kallocAvail γk none ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie' = k'.spie ∧ spp' = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       actLend k'.proc (ke + 1) -∗
-      kallocAvail γk (availInc on') -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c :=
-  uc_kfree_lend_call KF c k' γl γk on' ke hnoff' hK' hlk' hp
+      kallocAvail γk none -∗ pageCredit 1 -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  have h := KF.wp_kfree_cred (hlc := hlc) (GF := GF) c k' γl γk ke hnoff' hK' hlk' hp
+  unfold wp_kfree_cred_body at h
+  simp only [kfreeAddr] at h
+  iintro ⟨Hk, Hpc, #Hlk, Hpg, Hav, Hl, Hnext⟩
+  iapply h
+  iframe Hk Hpc Hlk Hpg Hav Hl
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %cc H %spie %spp %R' %hs Hk Hpc Hl Hpost %hcs
+  unfold kfreePostCred
+  icases Hpost with ⟨Hpost, H1⟩
+  ihave Hav := kfreePostLed_avail γk none k'.proc $$ Hpost
+  rw [Xv6.availInc_none]
+  iapply H $$ %spie %spp %R' %hs Hk Hpc Hl Hav H1
+  ipureintro; exact hcs
+
+/-- The credit a freeing step hands back: one page at `do_free`, none
+otherwise (NI M3 quotas Q-1). -/
+def unCred [WchG GF] : Bool → IProp GF
+  | true => pageCredit 1
+  | false => iprop(emp)
 
 /-! ## The epilogue -/
 
@@ -342,7 +363,7 @@ theorem uvmunmap_free_page [WchG GF] (KF : KFREE) [CurCtx]
       ⌜k.sie = false ∨ df = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 8).withSpie spie2 spp2).withRegs R2) -∗
       pcIs cpu' (KA.«uvmunmap» + 0x46#64) -∗
-      umMap (delete Qm key) M -∗ unFreeL df γl γk k.proc ke -∗ Res -∗
+      umMap (delete Qm key) M -∗ unFreeL df γl γk k.proc ke -∗ Res -∗ unCred df -∗
       ⌜calleeSaved R R2⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   iintro ⟨Hk, Hpc, Hum, Hfree, HRes, HΦ⟩
@@ -356,7 +377,8 @@ theorem uvmunmap_free_page [WchG GF] (KF : KFREE) [CurCtx]
     iintro Hk Hpc
     rw [delete_id Qm key (hQ0 rfl)]
     ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
-    iapply HΦ' $$ %spie %spp %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hum Hfree HRes
+    iapply HΦ' $$ %spie %spp %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hum Hfree HRes []
+    · unfold unCred; iempintro
     ipureintro
     exact calleeSaved_refl R
   | true =>
@@ -379,7 +401,7 @@ theorem uvmunmap_free_page [WchG GF] (KF : KFREE) [CurCtx]
     k_step_gen (wp_s_jal c3 _ (KA.«uvmunmap» + 0x70#64) false 2095046#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmunmap_br_fffffffffffff836] next c4 hp4
     iintro Hk Hpc
-    iapply (un_kfree_call KF c4 _ γl γk none k1 ?hn ?hKa ?hl ?hpv2) $$ [- $Hk $Hpc]
+    iapply (un_kfree_call KF c4 _ γl γk k1 ?hn ?hKa ?hl ?hpv2) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
     iframe #
@@ -389,7 +411,7 @@ theorem uvmunmap_free_page [WchG GF] (KF : KFREE) [CurCtx]
     case hl => k_norm_g; exact hlk rfl
     case hpv2 => k_norm_g; exact hpv rfl
     iapply wpNext_intro_pin
-    iintro %c5 %hp5 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hl Hav %hcs2
+    iintro %c5 %hp5 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hl Hav H1 %hcs2
     k_norm_g [MachCSL.KCtx.withSpie_twice, un_ret_1226, Xv6.availInc_none]
     ihave Hl := actLend_ret_step k.proc hk1 $$ Hl
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext2, Hk⟩
@@ -416,7 +438,8 @@ theorem uvmunmap_free_page [WchG GF] (KF : KFREE) [CurCtx]
       isplitr [Hav]
       · iexact HLk
       · iexact Hav
-    iapply HΦ' $$ %spie2 %spp2 %R2 %hsp' Hk Hpc Hum Hfree2 HRes
+    iapply HΦ' $$ %spie2 %spp2 %R2 %hsp' Hk Hpc Hum Hfree2 HRes [H1]
+    · unfold unCred; iexact H1
     ipureintro
     exact hcs'
 
@@ -442,16 +465,16 @@ theorem unCell_join [CurCtx] (t : PTree) (vi : BitVec 27) :
         ptreeOwn 2 (DFrac.own 1) (t.setLeaf 2 vi v))) ⊢ unCell (GF := GF) t vi := by
   unfold unCell; iintro H; iexact H
 
-/-- The caller's view of the tree, opened. -/
+/-- The caller's view of the tree, opened (the quota part beside it). -/
 theorem ptOwnRep_elim [CurCtx] (root : BitVec 44) (L : RegMapF (BitVec 64)) :
     ptOwnRep (GF := GF) root L ⊢
-      iprop(∃ t : PTree, ⌜t.base = root ∧ ptRep t L⌝ ∗ ptreeOwn 2 (DFrac.own 1) t) := by
+      iprop(∃ t : PTree, ⌜t.base = root ∧ ptRep t L⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗ ptRest t L) := by
   unfold ptOwnRep; iintro H; iexact H
 
 /-- Rebuild the caller's view of the tree. -/
 theorem ptOwnRep_intro [CurCtx] (root : BitVec 44) (L : RegMapF (BitVec 64)) (t : PTree)
     (hb : t.base = root) (hrep : ptRep t L) :
-    ptreeOwn (GF := GF) 2 (DFrac.own 1) t ⊢ ptOwnRep root L := by
+    ptreeOwn (GF := GF) 2 (DFrac.own 1) t ∗ ptRest t L ⊢ ptOwnRep root L := by
   unfold ptOwnRep
   iintro H
   iexists t
@@ -479,6 +502,7 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) [WchG GF] (KF : KFREE) [CurCtx]
     (hQ1 : df = true → get? Qm vi.toNat = get? Lm vi.toNat)
     (hQ0 : df = false → get? Qm vi.toNat = none)
     (hQV : ∀ w, get? Qm vi.toNat = some w → pageValid (pte2pa w))
+    (hkt : df = true → vi.toNat < tfVpn.toNat) (hku : df = false → uQpages ≤ vi.toNat)
     (hdf : df = true → k.regs 13#5 ≠ 0#64) (hdf0 : df = false → k.regs 13#5 = 0#64)
     (spie spp : Bool) (R : RegMap)
     (h18 : R 18#5 = va + BitVec.ofNat 64 (4096 * i))
@@ -497,7 +521,7 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) [WchG GF] (KF : KFREE) [CurCtx]
       ⌜unKept R R2 ∧ R2 18#5 = va + BitVec.ofNat 64 (4096 * (i + 1))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   iintro ⟨Hk, Hpc, Htree, Hum, Hfree, HΦ⟩
-  icases ptOwnRep_elim root Lm $$ Htree with ⟨%t, %htf, Hpt⟩
+  icases ptOwnRep_elim root Lm $$ Htree with ⟨%t, %htf, Hpt, Hrest⟩
   obtain ⟨htb, hrep⟩ := htf
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hva : (va + BitVec.ofNat 64 (4096 * i)).toNat < 2 ^ 38 := by
@@ -560,7 +584,8 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) [WchG GF] (KF : KFREE) [CurCtx]
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [MachCSL.beq_zero _ hz] next c7 hp7
     iintro Hk Hpc
-    ihave Htree := ptOwnRep_intro root Lm t htb hrep $$ Hpt
+    ihave Htree := ptOwnRep_intro root Lm t htb hrep $$ [Hpt Hrest]
+    case' _ => iframe
     iapply (uvmunmap_tail k va n i hi hr spie spp _ ?g18 ?g19 ?g22 _ _ _ c7)
       $$ [- $Hk $Hpc $Htree $Hum $Hfree]
     rotate_right 1
@@ -619,7 +644,8 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) [WchG GF] (KF : KFREE) [CurCtx]
       iintro Hk Hpc
       ihave Hpt := Hclose $$ %(t.entAt 2 vi) Hcell
       rw [setLeaf_entAt_self 2 t vi]
-      ihave Htree := ptOwnRep_intro root Lm t htb hrep $$ Hpt
+      ihave Htree := ptOwnRep_intro root Lm t htb hrep $$ [Hpt Hrest]
+      case' _ => iframe
       iapply (uvmunmap_tail k va n i hi hr spie spp _ ?j18 ?j19 ?j22 _ _ _ c10)
         $$ [- $Hk $Hpc $Htree $Hum $Hfree]
       rotate_right 1
@@ -653,12 +679,31 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) [WchG GF] (KF : KFREE) [CurCtx]
       iintro Hk Hpc
       ihave HCell := unCell_join t vi $$ [Hcell Hclose]
       case' _ => iframe
+      icases (UPt.ptRest_unfold t Lm).1 $$ Hrest with ⟨%⟨hshq, hreg⟩, Hrest⟩
+      ihave Hrest := (UPt.ptRest_unfold t Lm).2 $$ [Hrest]
+      · iframe Hrest; ipureintro; exact ⟨hshq, hreg⟩
       iapply (uvmunmap_free_page KF k df γl γk ke Qm M vi.toNat w (t.entAt 2 vi) hnoff hK hlk
         ?q1 hQ0 hp2 ?qv hdf hdf0 spie spp _ ?q15 ?q21 (unCell t vi) c10)
         $$ [- $Hk $Hpc $Hum $Hfree $HCell]
       rotate_right 1
       · iapply wpNext_intro_pin
-        iintro %c11 %hp11 %spie2 %spp2 %R3 %hsp3 Hk Hpc Hum Hfree HCell %hcs3
+        iintro %c11 %hp11 %spie2 %spp2 %R3 %hsp3 Hk Hpc Hum Hfree HCell HCr %hcs3
+        ihave Hrest : ptRest (GF := GF) (t.setLeaf 2 vi 0#64) (delete Lm vi.toNat) $$ [Hrest HCr]
+        case' _ =>
+          cases df with
+          | true =>
+            have hq : vi.toNat < uQpages := by
+              have ht := hkt rfl
+              rcases hreg _ _ hw with h | h | h
+              · exact h
+              · rw [h] at ht; exact absurd ht (Nat.lt_irrefl _)
+              · rw [h] at ht; exact absurd ht (by decide)
+            iapply UPt.ptRest_unmapUser t Lm vi 0#64 hq (by rw [hw]; rfl)
+            iframe Hrest
+            unfold unCred
+            iexact HCr
+          | false =>
+            iapply UPt.ptRest_unmapTop t Lm vi 0#64 (Or.inl (hku rfl)) $$ Hrest
         icases unCell_split t vi $$ HCell with ⟨Hcell, Hclose⟩
         obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs3
         have h9' : R3 9#5 = pteAddr (t.slot 2 vi).1 (vpnIdx vi 0) := by
@@ -669,7 +714,8 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) [WchG GF] (KF : KFREE) [CurCtx]
         iintro Hk Hpc Hcell
         ihave Hpt := Hclose $$ %(0#64) Hcell
         ihave Htree := ptOwnRep_intro root (delete Lm vi.toNat) (t.setLeaf 2 vi 0#64)
-          (by rw [PTree.base_setLeaf]; exact htb) (ptRep_setLeaf_zero vi hrep hcomp) $$ Hpt
+          (by rw [PTree.base_setLeaf]; exact htb) (ptRep_setLeaf_zero vi hrep hcomp) $$ [Hpt Hrest]
+        case' _ => iframe
         have h18'' : R3 18#5 = va + BitVec.ofNat 64 (4096 * i) := by
           rw [f18]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h18'
         have h19'' : R3 19#5 = BitVec.ofNat 64 (4096 * n) + va := by
@@ -727,6 +773,8 @@ theorem uvmunmap_loop (W : WALK_NOALLOC) [WchG GF] (KF : KFREE) [CurCtx]
     (hQ1 : df = true → ∀ j, j < n → get? Q (vpn0 + j) = get? L (vpn0 + j))
     (hQ0 : df = false → ∀ j, j < n → get? Q (vpn0 + j) = none)
     (hQV : ∀ j, j < n → ∀ w, get? Q (vpn0 + j) = some w → pageValid (pte2pa w))
+    (hkt : df = true → ∀ j, j < n → vpn0 + j < tfVpn.toNat)
+    (hku : df = false → ∀ j, j < n → uQpages ≤ vpn0 + j)
     (hdf : df = true → k.regs 13#5 ≠ 0#64) (hdf0 : df = false → k.regs 13#5 = 0#64)
     (fuel : Nat) :
     ∀ (i : Nat) (_ : n - i = fuel + 1) (spie spp : Bool)
@@ -761,6 +809,7 @@ theorem uvmunmap_loop (W : WALK_NOALLOC) [WchG GF] (KF : KFREE) [CurCtx]
         = delRunL Q vpn0 n := by rw [hkey, ← Xv6.delRunL_succ, hlast]
     iintro ⟨Hk, Hpc, Htree, Hum, Hfree, Hframe, HΦ⟩
     iapply (uvmunmap_iter W KF k df γl γk ke root _ _ M va n hnoff hK hlk hr i hi _ rfl ?a1 ?a0 ?av
+      (fun hb => by rw [hkey]; exact hkt hb i hi) (fun hb => by rw [hkey]; exact hku hb i hi)
       hdf hdf0 spie spp R h18 h19 h20 h21 h22 cur) $$ [- $Hk $Hpc $Htree $Hum $Hfree]
     rotate_right 1
     · iapply wpNext_intro_pin
@@ -828,6 +877,7 @@ theorem uvmunmap_loop (W : WALK_NOALLOC) [WchG GF] (KF : KFREE) [CurCtx]
         = delRunL Q vpn0 (i + 1) := by rw [hkey, ← Xv6.delRunL_succ]
     iintro ⟨Hk, Hpc, Htree, Hum, Hfree, Hframe, HΦ⟩
     iapply (uvmunmap_iter W KF k df γl γk ke root _ _ M va n hnoff hK hlk hr i hi _ rfl ?b1 ?b0 ?bv
+      (fun hb => by rw [hkey]; exact hkt hb i hi) (fun hb => by rw [hkey]; exact hku hb i hi)
       hdf hdf0 spie spp R h18 h19 h20 h21 h22 cur) $$ [- $Hk $Hpc $Htree $Hum $Hfree]
     rotate_right 1
     · iapply wpNext_intro_pin
@@ -885,7 +935,9 @@ theorem uvmunmap_gen [WchG GF] (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
       get? Q ((vpnOf (k.regs 11#5)).toNat + j) = get? L ((vpnOf (k.regs 11#5)).toNat + j))
     (hQ0 : df = false → ∀ j, j < n → get? Q ((vpnOf (k.regs 11#5)).toNat + j) = none)
     (hQV : ∀ j, j < n → ∀ w, get? Q ((vpnOf (k.regs 11#5)).toNat + j) = some w →
-      pageValid (pte2pa w)) :
+      pageValid (pte2pa w))
+    (hkt : df = true → ∀ j, j < n → (vpnOf (k.regs 11#5)).toNat + j < tfVpn.toNat)
+    (hku : df = false → ∀ j, j < n → uQpages ≤ (vpnOf (k.regs 11#5)).toNat + j) :
     kctx cpu k ∗ pcIs cpu uvmunmapAddr ∗ ptOwnRep root L ∗ umMap Q M ∗ unFreeL df γl γk k.proc ke ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜k.sie = false ∨ df = false → spie = k.spie ∧ spp = k.spp⌝ -∗
@@ -1006,7 +1058,7 @@ theorem uvmunmap_gen [WchG GF] (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
       (hp20 h).trans ((hp19 h).trans (hpin18 h))) $$ HΦ
     rw [Xv6.ua_pushed_spie_self k 8]
     iapply (uvmunmap_loop W KF k df γl γk ke root L Q M (k.regs 11#5) n
-      ((vpnOf (k.regs 11#5)).toNat) rfl hnoff hK hlk hr hQ1 hQ0 hQV hdf hdf0 (n - 1)
+      ((vpnOf (k.regs 11#5)).toNat) rfl hnoff hK hlk hr hQ1 hQ0 hQV hkt hku hdf hdf0 (n - 1)
       0 (by omega) k.spie k.spp (fun _ => ⟨rfl, rfl⟩) _ ?g2 ?g18 ?g19 ?g20 ?g21 ?g22
       ?g23 ?g24 ?g25 ?g26 ?g27 c20) $$ [- $Hk $Hpc $Hframe $HΦ]
     rotate_right 1
@@ -1031,7 +1083,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem uvmunmap_proof (W : WALK_NOALLOC) (KF : KFREE) : UVMUNMAP where
-  wp_uvmunmap_raw := fun {hlc GF} _ _ _ _ cpu k root L n ke hK hroot hal hn hrange hfree => by
+  wp_uvmunmap_raw := fun {hlc GF} _ _ _ _ cpu k root L n ke hK hroot hal hn hrange hfree hup => by
     unfold wp_uvmunmap_raw_body
     iintro ⟨Hk, Hpc, Htree, Hlend, HΦ⟩
     ihave Hum : umMap (∅ : RegMapF (BitVec 64)) (fun _ => ([] : List (BitVec 8))) $$ []
@@ -1042,7 +1094,7 @@ theorem uvmunmap_proof (W : WALK_NOALLOC) (KF : KFREE) : UVMUNMAP where
     case' _ => iframe
     iapply (uvmunmap_gen W KF cpu k false 0 ⟨0, 0⟩ ke root L ∅ (fun _ => []) n
       (by simp) hK (by simp) hroot hal hn hrange (by simp) (fun _ => hfree)
-      (by simp) ?hq0 ?hqv) $$ [- $Hk $Hpc $Htree $Hum $Hfree]
+      (by simp) ?hq0 ?hqv (by simp) (fun _ j _ => by omega)) $$ [- $Hk $Hpc $Htree $Hum $Hfree]
     rotate_right 1
     · iapply wpNext_mono _ _ _ _ _ $$ HΦ
       iintro %c' HΦ %spie %spp %R' %hsp Hk Hpc Htree Hum Hfree %hcs
@@ -1077,7 +1129,7 @@ theorem uvmunmap_proof (W : WALK_NOALLOC) (KF : KFREE) : UVMUNMAP where
       simp only [uvmMaxsz] at hrange; omega
     iapply (uvmunmap_gen W KF cpu k true γl γk ke P.root P.leaves P.um M n
       (fun _ => hnoff) hK (fun _ => hlk) hroot hal hn hr38 (fun _ => hfree) (by simp)
-      ?hq1 (by simp) ?hqv) $$ [- $Hk $Hpc $Htree $Hum $Hfree]
+      ?hq1 (by simp) ?hqv (fun _ => hlt) (by simp)) $$ [- $Hk $Hpc $Htree $Hum $Hfree]
     rotate_right 1
     · iapply wpNext_mono _ _ _ _ _ $$ HΦ
       iintro %c' HΦ %spie %spp %R' %hsp Hk Hpc Htree Hum Hfree %hcs
@@ -1127,7 +1179,9 @@ theorem uvmunmap_bare_proof (W : WALK_NOALLOC) (KF : KFREE) : UVMUNMAP_BARE wher
       simp only [uvmMaxsz] at hrange; omega
     iapply (uvmunmap_gen W KF cpu k true γl γk ke P.root P.um P.um M n
       (fun _ => hnoff) hK (fun _ => hlk) hroot hal hn hr38 (fun _ => hfree) (by simp)
-      (by intro _ j _; rfl) (by simp) ?hqv) $$ [- $Hk $Hpc $Htree $Hum $Hfree]
+      (by intro _ j _; rfl) (by simp) ?hqv
+      (fun _ j hj => run_key_lt_tf (k.regs 11#5) n j hj hrange) (by simp))
+      $$ [- $Hk $Hpc $Htree $Hum $Hfree]
     rotate_right 1
     · iapply wpNext_mono _ _ _ _ _ $$ HΦ
       iintro %c' HΦ %spie %spp %R' %hsp Hk Hpc Htree Hum Hfree %hcs

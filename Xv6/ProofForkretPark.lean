@@ -150,7 +150,9 @@ instance fkp_parkBlock_morph (steady : Bool) (N : UtNames) (V : ProcPriv) (M : N
     refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
     refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
     refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-    exact @instCtxMorphExists hlc GF _ _ _ (fun _ => instCtxMorphWordAt _ _ _ _ _)
+    refine @instCtxMorphSep hlc GF _ _ _
+      (@instCtxMorphExists hlc GF _ _ _ (fun _ => instCtxMorphWordAt _ _ _ _ _)) ?_
+    exact instCtxMorphConst _
   · unfold parkBlock
     simp only [↓reduceIte]
     exact procPrivFd_morph _ _ _ _ _

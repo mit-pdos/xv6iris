@@ -103,7 +103,7 @@ def wp_pipealloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (v0 v1 : BitVec 64)
     (pidv : BitVec 32) (dqp : DFrac) (ke : Nat)
-    (hK : pipeallocSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) : Prop :=
+    (hK : pipeallocSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hsealed : on = none) : Prop :=
   kctx cpu k ∗ pcIs cpu pipeallocAddr ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isFtable γl γ ∗ panicEnv ∗
@@ -132,7 +132,7 @@ structure PIPEALLOC : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (v0 v1 : BitVec 64)
-    (pidv : BitVec 32) (dqp : DFrac) (ke : Nat) hK hnoff htier,
-    wp_pipealloc_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γkl γk on v0 v1 pidv dqp ke hK hnoff htier
+    (pidv : BitVec 32) (dqp : DFrac) (ke : Nat) hK hnoff htier hsealed,
+    wp_pipealloc_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γkl γk on v0 v1 pidv dqp ke hK hnoff htier hsealed
 
 end Xv6
