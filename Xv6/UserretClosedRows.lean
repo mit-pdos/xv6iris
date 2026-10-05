@@ -131,10 +131,12 @@ theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' :
     (uvisNum (uvisRun W) = USYS_write → (uvisRun W).lazy = false →
       uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)) = true →
       tfW V'.tf (tfArgIdx 0) =
-        usysWriteAns (uvisRun W).perm (tfW (uvisRun W).tf (tfArgIdx 1)) (tfW (uvisRun W).tf (tfArgIdx 2))) := by
+        usysWriteAns (uvisRun W).perm (tfW (uvisRun W).tf (tfArgIdx 1)) (tfW (uvisRun W).tf (tfArgIdx 2))) ∧
+    (uvisNum (uvisRun W) = USYS_write → uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)) = true →
+      usysOutAt ι (uwriteRun (uvisRun W).M (tfW (uvisRun W).tf (tfArgIdx 1)) (uwriteCntOf (tfW V'.tf (tfArgIdx 0))))) := by
   have hnum := urc_num_run W V hl hsc
   have ha0 := urc_a0_run W V hl
-  obtain ⟨hu, hw, hf, hsb, hwr⟩ := hev
+  obtain ⟨hu, hw, hf, hsb, hwr, hout⟩ := hev
   have hS : uvisNum (uvisRun W) = USYS_sbrk →
       usysSbrkFitsAt (uvisRun W).sz (tfW (uvisRun W).tf (tfArgIdx 0)) (tfW (uvisRun W).tf (tfArgIdx 1))
         (uvisRun W).lazy ι (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy := by
@@ -178,7 +180,33 @@ theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' :
     show tfW V'.tf (tfArgIdx 0) = usysWriteAns W.perm _ _
     rw [hpi]
     exact h'
-  exact ⟨fun h => hu (hnum.trans h), hWt, hF, hS, hWr⟩
+  -- (NI M3 NI-OUT) the pushed run at the cited stream, at the key's image
+  have hO : uvisNum (uvisRun W) = USYS_write → uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)) = true →
+      usysOutAt ι (uwriteRun (uvisRun W).M (tfW (uvisRun W).tf (tfArgIdx 1))
+        (uwriteCntOf (tfW V'.tf (tfArgIdx 0)))) := by
+    intro h hcons
+    have hcons' : uwriteCons sts (tfW (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)).tf (tfArgIdx 0)) = true := by
+      rw [ha0, ← hfd]; exact hcons
+    have h' := hout (hnum.trans h) hcons'
+    rw [urc_a1_run W V hl] at h'
+    show usysOutAt ι (uwriteRun W.M _ _)
+    rw [← hM]
+    exact h'
+  exact ⟨fun h => hu (hnum.trans h), hWt, hF, hS, hWr, hO⟩
+
+/-- **THE PUSHED RUN AT THE CITED STREAM, FILED** (NI M3 NI-OUT): the round's
+`niOutRow` at its citation, off the re-keyed cited row (`urc_evRow`'s sixth
+conjunct). -/
+theorem urc_niOutRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (sc : BitVec 64)
+    (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (sts' : List FdState) (gn : GName)
+    (cs cs' : ExtTreeSet GName compare) (pid : BitVec 32) (k : Nat) (ι : UIota)
+    (hl : V.tf.length = 36) (hM : umemLazy V.upt V.sz.toNat Mp = W.M) (hpi : W.perm = permOf V.upt.um V.sz.toNat)
+    (hsz : W.sz = V.sz.toNat) (hch : W.ch = cs) (hlz : W.lazy = V.pvLazy) (hsc : W.secc = V.pvSecc)
+    (hev : syscEvRow (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) V'
+      (syscImg (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) Mp) (syscImg V' M') cs cs' W.fd ι) :
+    niOutRow sc W (uvisOf V' M' sts' gn cs' pid) (some (k, ι)) := by
+  intro _ hw hcons
+  exact (urc_evRow W V Mp V' M' cs cs' W.fd ι hl hch hsc hM hpi hsz hlz rfl hev).2.2.2.2.2 hw hcons
 
 /-- **M0's ROW AT THE CITED ι** (NI M2-X2; fork's answer among it since NI
 joint fork lane F3): `uexecRet_roundDet` at the cited prefix, from usertrap's rows (`utChKept`, `utFdEcall`, `utRetPid`), the
@@ -217,7 +245,7 @@ theorem urc_niDetRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
   have hpidrow : sc = uecallScause →
       usysRetPid (uvisNum (uvisRun W)) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0)) W.pid := by
     intro h; rw [← hnr, ← hnum0, hpid]; exact hrp h
-  obtain ⟨hup, hw, hfk, hsb, hwr⟩ := urc_evRow W V Mp V' M' cs cs' W.fd ι hl hch hsc hM hpi hsz hlz rfl hev
+  obtain ⟨hup, hw, hfk, hsb, hwr, -⟩ := urc_evRow W V Mp V' M' cs cs' W.fd ι hl hch hsc hM hpi hsz hlz rfl hev
   have hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0))
       (uvisOf V' M' sts' gn cs' pid).ch (uvisOf V' M' sts' gn cs' pid).M (uvisOf V' M' sts' gn cs' pid).sz
       (uvisOf V' M' sts' gn cs' pid).lazy ι :=

@@ -193,7 +193,7 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
     (dk : Nat → BitVec 8) (sb : FsSb) (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8))
     (hg : FsGeomOk) (hpures : firstFsinitPures dk sb Pb) (hcov0 : (0 : Nat) ∉ fscCov)
     (hnib0 : 0 < icfgNib) (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV)
-    (hγd : fscDisk = γd) (hdl : fscDlock = γdl)
+    (hU : fscUart = γ0) (hγd : fscDisk = γd) (hdl : fscDlock = γdl)
     (γw γp : GName) (γi : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀ ξ, Persistent (P ξ)] [CtxMorph P]
     (γpr : GName) (rootAddr : BitVec 64) (t : PTree) (M : RegMapF (BitVec 64))
     (hhi : BitVec.extractLsb' 56 8 rootAddr = 0#8) (hrt : t.base = BitVec.extractLsb' 12 44 rootAddr) :
@@ -267,6 +267,8 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
   · unfold userinitPark
     iframe Hwl Htl Hcready Hwire Hanc Htr Hbundle Hrdr Hco
     iexists γ0, γ1, γc, γl0, γl1, γt, pd, pav, pu
+    isplitr
+    · ipureintro; exact hU.symm
     rw [hγd, hdl]
     iexact Hdev
   -- +0x9e  userinit
@@ -350,7 +352,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
     (dk : Nat → BitVec 8) (sb : FsSb) (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8))
     (hg : FsGeomOk) (hpures : firstFsinitPures dk sb Pb) (hcov0 : (0 : Nat) ∉ fscCov)
     (hnib0 : 0 < icfgNib) (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV)
-    (hγd : fscDisk = γd) (hdl : fscDlock = γdl)
+    (hU : fscUart = γ0) (hγd : fscDisk = γd) (hdl : fscDlock = γdl)
     (γi : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀ ξ, Persistent (P ξ)] [CtxMorph P]
     (γpr : GName) (rootAddr : BitVec 64) (t : PTree) (M : RegMapF (BitVec 64))
     (hhi : BitVec.extractLsb' 56 8 rootAddr = 0#8) (hrt : t.base = BitVec.extractLsb' 12 44 rootAddr)
@@ -418,7 +420,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   iintro %R4 Hk Hpc
   -- Phase C
   iapply (mn_phaseC BI II FI VD UI SCH KV ξ hY Γ γ0 γ1 γc γl0 γl1 γd γdl γt k R4 hsie hK hnoff hlocks
-    hproc htier c0 hdead dk sb Rspent Pb hg hpures hcov0 hnib0 hroot hγd hdl γw γp γi ξd P γpr rootAddr t M
+    hproc htier c0 hdead dk sb Rspent Pb hg hpures hcov0 hnib0 hroot hU hγd hdl γw γp γi ξd P γpr rootAddr t M
     hhi hrt)
   iframe Hk Hpc Hfs Hboot Hav Hdinv Hcc Hcfg Hgh Hcells Hpav Hipt Hbundle Hrdr Hco Hinv Hprim Hrec Hbare Hstv
     Hcsrs Hfree
@@ -599,7 +601,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   iapply (mn_phaseB PR TI TIH PLI PLIH BI II FI VD UI SCH KVE ξ (Y := ⟨ξ, KTier.kpt⟩) rfl Γ γ0 γ1 γc γl0 γl1
     γd γdl γt ((k.pushed 2).toKpt t.base) R9 (by simp [hsie]) (by simp; omega) (by simp [hnoff])
     (by simp [hlocks]) (by simp [hproc]) (by simp) fscCons hcn hcne rfl c0 hdead dk sb Rspent Pb hg hpures
-    hcov0 hnib0 hdev hγd hdl γi ξd P fscPrintk (pageAddr t.base) t (kvmMapT pas) (mn_pageAddr_hi t.base)
+    hcov0 hnib0 hdev hU hγd hdl γi ξd P fscPrintk (pageAddr t.base) t (kvmMapT pas) (mn_pageAddr_hi t.base)
     (Xv6.kxc_tfp_extract t.base).symm pas hok)
   iframe Hk Hpc HB Hγt Hγc Hcfr Hstk Hsmap HW Hstv HFs Hkav Hdinv Hcrash Hcfg Hgh Hcells Hpav Hipt
     Hbundle Hrdr Hco Hinv Hprim Hrec Hbare Hcsrs Hfree

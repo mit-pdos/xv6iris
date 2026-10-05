@@ -249,6 +249,12 @@ theorem sentRunAt_app {L0 L L' : List (BitVec 8)} {ps ps2 : List Nat} {cs cs2 : 
     · exact h1.2.2.2 p hp
     · exact Nat.le_trans h1.1.length_le (h2.2.2.2 p hp)
 
+/-- a run's first `j` bytes are a run, at the same stream -/
+theorem sentRunAt_take {L0 L : List (BitVec 8)} {ps : List Nat} {cs : List (BitVec 8)}
+    (h : sentRunAt L0 L ps cs) (j : Nat) : sentRunAt L0 L (ps.take j) (cs.take j) :=
+  ⟨h.1, by rw [List.map_take, h.2.1, List.map_take], List.Pairwise.sublist (List.take_sublist _ _) h.2.2.1,
+    fun p hp => h.2.2.2 p (List.mem_of_mem_take hp)⟩
+
 /-- one more byte, accepted at the end of a stream that extends the run's -/
 theorem sentRunAt_snoc {L0 L l : List (BitVec 8)} {ps : List Nat} {cs : List (BitVec 8)} (b : BitVec 8)
     (h : sentRunAt L0 L ps cs) (hl : L <+: l) :

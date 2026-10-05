@@ -740,25 +740,28 @@ theorem niTraceChain_of {h : List Obs} {F : List NiEntry} {H : Nat → UIota} (h
   have hc := niStepOf_cite hfs
   exact hC f hfF k ι hc.symm
 
-/-- **Equal positions below one history are one ι**: equal-length prefixes
-of one list are equal; the tick count and actor are positions. -/
+/-- **Equal positions below one history are one ledger part**: equal-length
+prefixes of one list are equal; the tick count and actor are positions.
+(NI M3 NI-OUT) The console stream and the run's indices are not positions:
+the conclusion is at the ledger part `UIota.led`. -/
 theorem niBelow_pos {ι₁ ι₂ H : UIota} {k : Nat} (h₁ : niBelow ι₁ H) (h₂ : niBelow ι₂ H)
-    (hp : ι₁.pos k = ι₂.pos k) : ι₁ = ι₂ := by
+    (hp : ι₁.pos k = ι₂.pos k) : ι₁.led = ι₂.led := by
   have pre : ∀ {α : Type} {a b c : List α}, a <+: c → b <+: c → a.length = b.length → a = b :=
     fun ha hb hl => (List.prefix_of_prefix_length_le ha hb (Nat.le_of_eq hl)).eq_of_length hl
   simp only [UIota.pos, NiPos.mk.injEq, true_and] at hp
   obtain ⟨hk, hpv, hz, ht, ha, hs⟩ := hp
-  obtain ⟨p1, z1, k1, -, s1⟩ := h₁
-  obtain ⟨p2, z2, k2, -, s2⟩ := h₂
+  obtain ⟨p1, z1, k1, -, s1, -⟩ := h₁
+  obtain ⟨p2, z2, k2, -, s2, -⟩ := h₂
   cases ι₁; cases ι₂
-  simp only [UIota.mk.injEq] at *
+  simp only [UIota.led, UIota.mk.injEq, and_true] at *
   exact ⟨pre k1 k2 hk, pre p1 p2 hpv, pre z1 z2 hz, ht, ha, pre s1 s2 hs⟩
 
 /-- Two steps with equal inputs whose citations are below one `H` cite the
-same ι. -/
+same era and LEDGER PART (NI M3 NI-OUT: `UIota.led`, the console stream and
+the run's indices erased -- what every answer reads). -/
 theorem NiStep.cite_eq {H : Nat → UIota} {s₁ s₂ : NiStep} (hin : s₁.input = s₂.input)
     (h₁ : ∀ k ι, s₁.cite = some (k, ι) → niBelow ι (H k)) (h₂ : ∀ k ι, s₂.cite = some (k, ι) → niBelow ι (H k)) :
-    s₁.cite = s₂.cite := by
+    s₁.cite.map (fun p => (p.1, p.2.led)) = s₂.cite.map (fun p => (p.1, p.2.led)) := by
   cases s₁ with
   | origin => cases s₂ with
     | origin => rfl
@@ -777,6 +780,7 @@ theorem NiStep.cite_eq {H : Nat → UIota} {s₁ s₂ : NiStep} (hin : s₁.inpu
         simp only [Option.map_some, Option.some.injEq] at hp
         have hk : k₁ = k₂ := congrArg NiPos.era hp
         subst hk
+        simp only [Option.map_some]
         rw [niBelow_pos (h₁ k₁ ι₁ rfl) (h₂ k₁ ι₂ rfl) hp]
 
 /-! ## §6 The pure corollaries -/
@@ -858,7 +862,8 @@ same output -- uptime's, wait's, (NI joint fork lane F3) fork's and (NI
 M2-G3) sbrk's (at the one break `sz`, an input) answers are the law's, at
 the one cited ι. -/
 theorem NiStep.output_eq {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law pid) (h₂ : s₂.law pid)
-    (hin : s₁.input = s₂.input) (hc : s₁.cite = s₂.cite)
+    (hin : s₁.input = s₂.input)
+    (hc : s₁.cite.map (fun p => (p.1, p.2.led)) = s₂.cite.map (fun p => (p.1, p.2.led)))
     (hcls : ∀ secc lz win sz wcon x e c, s₁ = .round secc lz win sz wcon x e c → ∀ ep xg,
       exitView x = some (uecallScause, ep, xg) → usysDetClassAt (gprsNum secc xg) (gprsA0 xg) lz wcon.isSome) :
     s₁.output = s₂.output := by
@@ -877,7 +882,11 @@ theorem NiStep.output_eq {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law
   · intro secc lz win sz wcon x e c lz' win' sz' wcon' x' e' c' ep xg hs₁ hs₂ hx hn pc₁ eg₁ pc₂ eg₂ he₁ he₂
     subst hs₁ hs₂
     simp only [NiStep.cite] at hc
-    subst hc
+    have hled : ∀ {k k' ι ι'}, c = some (k, ι) → c' = some (k', ι') → ι.led = ι'.led := by
+      intro k k' ι ι' h1 h2
+      rw [h1, h2] at hc
+      simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hc
+      exact hc.2
     have hl₁ := h₁; have hl₂ := h₂
     obtain ⟨sc, ep₁, xg₁, pc₁', eg₁', hx₁, he₁', -, -, hb₁⟩ := hl₁
     obtain ⟨sc', ep₂, xg₂, pc₂', eg₂', hx₂, he₂', -, -, hb₂⟩ := hl₂
@@ -912,21 +921,29 @@ theorem NiStep.output_eq {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law
     rcases hn with hn | hn | hn | hn | hn
     · obtain ⟨k, ι, hc₁, ha₁⟩ := hu₁ hn
       obtain ⟨k', ι', hc₂, ha₂⟩ := hu₂ hn
-      rw [hc₁] at hc₂; cases hc₂
+      have hl := hled hc₁ hc₂
       rw [ha₁, ha₂]
+      show usysUptimeWord ι.led.ticks = usysUptimeWord ι'.led.ticks
+      rw [hl]
     · have hnull := hcl.2.1 hn
       obtain ⟨k, ι, hc₁, ha₁⟩ := hw₁ hn hnull
       obtain ⟨k', ι', hc₂, ha₂⟩ := hw₂ hn hnull
-      rw [hc₁] at hc₂; cases hc₂
+      have hl := hled hc₁ hc₂
       rw [ha₁, ha₂]
+      show usysWaitAns ι.led win = usysWaitAns ι'.led win
+      rw [hl]
     · obtain ⟨k, ι, hc₁, ha₁⟩ := hf₁ hn
       obtain ⟨k', ι', hc₂, ha₂⟩ := hf₂ hn
-      rw [hc₁] at hc₂; cases hc₂
+      have hl := hled hc₁ hc₂
       rw [ha₁, ha₂]
+      show usysForkAns ι.led = usysForkAns ι'.led
+      rw [hl]
     · obtain ⟨k, ι, hc₁, ha₁⟩ := hs₁ hn
       obtain ⟨k', ι', hc₂, ha₂⟩ := hs₂ hn
-      rw [hc₁] at hc₂; cases hc₂
+      have hl := hled hc₁ hc₂
       rw [ha₁, ha₂]
+      show usysSbrkAns sz (gprsA0 xg) (gprsA1 xg) ι.led = usysSbrkAns sz (gprsA0 xg) (gprsA1 xg) ι'.led
+      rw [hl]
     · -- (NI M2-G4) the console write: the class gives the lazy bit off and
       -- the reading present; both laws answer at the one reading
       obtain ⟨hlzf, hsome⟩ := hcl.2.2 hn

@@ -66,10 +66,10 @@ hands kfork the token out of `syscallEnv_token` (`SpecKfork.kforkPark`).
    `devintr_caps_any` members + `uart1_caps` are Lean's `devintrCaps`
    (plicInv, both ports' `uartInited`/`uartPort`/`uartRxWord`/`uartRxCaps`,
    `diskCaps`, the ticks lock, `procsInv`) at existential port/lock names --
-   Rocq pins the console's port at the ambient `fsc_uart`; Lean's
-   `consoleReadyApp` already carries the ambient `fscCons` row, so the pin
-   is not needed by any consumer (the write arm takes `filewriteDevsw γl γu`
-   at any names).  The disk rows are at the ambient `fscDisk`/`fscDlock`.
+   Rocq pins the console's port at the ambient `fsc_uart`, and so does
+   Lean since NI M3 NI-OUT (ruling OUT-R7: `⌜γ0 = fscUart⌝`, proved by the
+   boot's `hties`): the write arm's run receipts must be at the era's sixth
+   anchored name (`syscallEnv_devswAt`).  The disk rows are at the ambient `fscDisk`/`fscDlock`.
    `wire_inv` is `wireInv`; the trampoline claim is `kmapAt trampVpn (kLeaf
    trampPpn .rx 0 0)` (UserretEntryPt's `urTrampCl`); Rocq's `∃ ip,
    initproc ↦□ ip ∗ init_gen ip 1` is `∃ ip, initIdentCell curCtx ip ∗
@@ -80,9 +80,11 @@ hands kfork the token out of `syscallEnv_token` (`SpecKfork.kforkPark`).
 6. **Rocq's `syscall_env_fsabs(_keep)` are dropped**: FirstTok deviation 1
    (no application layer, `first_done` has no `fsabs_env`).
 7. **`syscall_env_uart_base0` / `syscall_env_txlock` are one projection,
-   `syscallEnv_devsw`** (Lean's `filewriteDevsw γl γu` = `uartPort .uart0 γl
-   γu ∗ devswTable` is the row the write arm hands filewrite; `uartPort`
-   carries the base word and the transmit lock).
+   `syscallEnv_devswAt`** (Lean's `filewriteDevsw γl fscUart` = `uartPort
+   .uart0 γl fscUart ∗ devswTable` is the row the write arm hands filewrite;
+   `uartPort` carries the base word and the transmit lock; NI M3 NI-OUT: at
+   the era's console name, the existential-name form `syscallEnv_devsw` is
+   gone, unreached).
 8. The per-callee env builders Rocq keeps in Vocab (`sysc_fileread_env`,
    `sysc_filestat_env`, `sysc_fclose_pipe_env`, `sysc_fclose_fs_env`,
    `sysc_filewrite_env`, `sysc_fs_fabric`) are here, at the Lean callee
@@ -159,7 +161,7 @@ ticks lock and the ring pages are existential (a child's record may name
 them fresh). -/
 def parkWorld (Γ : SchedNames) : IProp GF :=
   iprop((∃ (γ0 γ1 : UartNames) (γc γl0 γl1 γt : GName) (pd pav pu : BitVec 64),
-      devintrCaps Γ γ0 γ1 γc γl0 γl1 fscDisk fscDlock γt pd pav pu) ∗
+      ⌜γ0 = fscUart⌝ ∗ devintrCaps Γ γ0 γ1 γc γl0 γl1 fscDisk fscDlock γt pd pav pu) ∗
     consoleReadyApp ∗ syscPidLock ∗ procsAvailAt Γ none false ∗
     wireInv ∗
     -- THE ERA'S ANCHOR (NI M2-X2): the ledger names its boot registered
@@ -314,14 +316,18 @@ theorem syscallEnv_kmem : syscallEnv (hlc := hlc) PT Γ γ ⊢
 
 /-- **Rocq `syscall_env_txlock` / `_uart_base0`** (deviation 7): the write
 column -- the console port's bundle out of the park world's `devintrCaps`
-and consoleinit's table out of `consoleReadyApp`. -/
-theorem syscallEnv_devsw : syscallEnv (hlc := hlc) PT Γ γ ⊢
-    ∃ (γl : GName) (γu : UartNames), filewriteDevsw γl γu := by
+and consoleinit's table out of `consoleReadyApp` -- AT THE ERA'S CONSOLE
+NAME (NI M3 NI-OUT, ruling OUT-R7): the park world pins the console port at
+`fscUart`, so the write arm's run receipts are at the era's sixth anchored
+name. -/
+theorem syscallEnv_devswAt : syscallEnv (hlc := hlc) PT Γ γ ⊢
+    ∃ γl : GName, filewriteDevsw γl fscUart := by
   unfold syscallEnv parkWorld devintrCaps
-  iintro ⟨-, #Hcons, -, -, ⟨⟨%γ0, %γ1, %γc, %γl0, %γl1, %γt, %pd, %pav, %pu,
+  iintro ⟨-, #Hcons, -, -, ⟨⟨%γ0, %γ1, %γc, %γl0, %γl1, %γt, %pd, %pav, %pu, %hu,
     -, -, -, #Hp0, -⟩, -⟩, -⟩
   ihave #Htbl := consoleReadyApp_devsw $$ Hcons
-  iexists γl0, γ0
+  iexists γl0
+  subst hu
   unfold filewriteDevsw
   iframe Hp0 Htbl
 

@@ -194,6 +194,31 @@ instance consOutAt_persistent (γ : UartNames) (M : Nat → List (BitVec 8)) (ua
     Persistent (consOutAt (GF := GF) γ M ua i) := by
   unfold consOutAt; infer_instance
 
+/-- consolewrite's run, opened at its stream -/
+theorem consOutAt_elim (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i : Nat) :
+    consOutAt (GF := GF) γ M ua i ⊢ ∃ ps L, uartSent γ L ∗
+      ⌜sentRunAt [] L ps ((List.range i).map fun j => umemByte M (ua + BitVec.ofNat 64 j).toNat)⌝ := by
+  unfold consOutAt
+  iintro ⟨%ps, H⟩
+  icases uartSentRun_elim γ [] ps _ $$ H with ⟨%L, #H, %h⟩
+  iexists ps, L
+  iframe H
+  ipureintro; exact h
+
+/-- a pushed run's first `j` bytes were pushed -/
+theorem consOutAt_take (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i j : Nat) (hj : j ≤ i) :
+    consOutAt (GF := GF) γ M ua i ⊢ consOutAt γ M ua j := by
+  iintro H
+  icases consOutAt_elim γ M ua i $$ H with ⟨%ps, %L, #H, %h⟩
+  unfold consOutAt
+  iexists ps.take j
+  have e : ((List.range i).map fun x => umemByte M (ua + BitVec.ofNat 64 x).toNat).take j =
+      (List.range j).map fun x => umemByte M (ua + BitVec.ofNat 64 x).toNat := by
+    rw [← List.map_take, List.take_range, Nat.min_eq_left hj]
+  rw [← e]
+  iapply uartSentRun_intro γ [] L _ _ (sentRunAt_take h j)
+  iexact H
+
 /-- nothing pushed yet -/
 theorem consOutAt_zero (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) :
     uartSent (GF := GF) γ [] ⊢ consOutAt γ M ua 0 := by

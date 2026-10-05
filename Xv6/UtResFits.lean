@@ -152,7 +152,7 @@ theorem handlerEnvAt_of_parkRows [Xc : CurCtx] (hT : curTier = KTier.kpt) (Γ : 
     (f : FileNames) (ip : BitVec 64) :
     parkGlobals (GF := GF) Γ w ft f ip ∗ utSysParkRows Γ ⊢ handlerEnvAt (hlc := hlc) Γ curCtx := by
   unfold parkGlobals utSysParkRows parkWorld
-  iintro ⟨⟨#Hp, -⟩, ⟨%γtk, -, ⟨%γ0, %γ1, %γc, %γl0, %γl1, %γt, %pd, %pav, %pu, #Hc⟩, -⟩⟩
+  iintro ⟨⟨#Hp, -⟩, ⟨%γtk, -, ⟨%γ0, %γ1, %γc, %γl0, %γl1, %γt, %pd, %pav, %pu, %-, #Hc⟩, -⟩⟩
   iapply handlerEnvAt_of_caps' Γ γ0 γ1 γc γl0 γl1 fscDisk fscDlock γt pd pav pu hT
   iframe Hp Hc
 

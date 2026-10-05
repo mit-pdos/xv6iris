@@ -178,7 +178,10 @@ prefix ends in the actor's `KNull`; the console write's (NI M2-G4, ruling
 G4-R4), at a lazy-free entry whose argument 0 names a writable console
 descriptor of the entry's table `sts`, `UsysDet.usysWriteAns` at the entry's
 permission view and argument words 1 and 2 (it reads no ledger: the boot
-prefix is cited).  The records are the dispatch's (`V`/`img` the entry,
+prefix is cited); and (NI M3 NI-OUT, ruling OUT-R9) at EVERY lazy bit on a
+writable console descriptor, THE PUSHED RUN AT THE CITED STREAM:
+`UsysDet.usysOutAt ι` of the entry image's bytes at argument word 1, as many
+as the resumed `a0` says were pushed.  The records are the dispatch's (`V`/`img` the entry,
 `V'`/`img'` the record the call left; `sts` the entry's descriptor states). -/
 def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare)
     (sts : List FdState) (ι : UIota) : Prop :=
@@ -197,7 +200,9 @@ def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName c
       (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy) ∧
   (syscNum V = USYS_write → V.pvLazy = false → uwriteCons sts (tfW V.tf (tfArgIdx 0)) = true →
     tfW V'.tf (tfArgIdx 0) =
-      usysWriteAns (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2)))
+      usysWriteAns (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))) ∧
+  (syscNum V = USYS_write → uwriteCons sts (tfW V.tf (tfArgIdx 0)) = true →
+    usysOutAt ι (uwriteRun img (tfW V.tf (tfArgIdx 1)) (uwriteCntOf (tfW V'.tf (tfArgIdx 0)))))
 
 /-! ## §2 The dispatch table -/
 

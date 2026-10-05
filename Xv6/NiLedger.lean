@@ -25,7 +25,8 @@ incarnation's first key).
   `uEvid` (`evid`/`evidNone`).  (M2-X2) `niFitEv` is `niFit`'s round arm
   at one set of witnesses with the citation's rows (`niCiting`,
   `niDetRow`: M0's `usysDet` at the cited prefix -- since NI joint fork
-  lane F3 fork's answer too, `niForkRow` retired), and
+  lane F3 fork's answer too, `niForkRow` retired; NI M3 NI-OUT `niOutRow`:
+  a console write's pushed run at the cited console stream), and
   `niCiteRes` shows the era's anchor and the cited prefixes' lower bounds
   (`NiEvid.niIotaLbs`).
 * §5 (M2-W2d) the one-shot claims: `niForkExit`, the keys, `niOneShot`
@@ -181,6 +182,14 @@ def niDetRow (sc : BitVec 64) (W W' : Uvis) : Option (Nat × UIota) → Prop
       ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ι) W'
   | none => True
 
+/-- **THE PUSHED RUN AT THE CITED STREAM** (NI M3 NI-OUT): at a console write the round's citation holds the
+    trapped key's bytes at `a1 .. a1 + (the resumed count)` -/
+def niOutRow (sc : BitVec 64) (W W' : Uvis) : Option (Nat × UIota) → Prop
+  | some (_, ι) => sc = uecallScause → uvisNum (uvisRun W) = USYS_write →
+      uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)) = true →
+      usysOutAt ι (uwriteRun (uvisRun W).M (tfW (uvisRun W).tf (tfArgIdx 1)) (uwriteCntOf (tfW W'.tf (tfArgIdx 0))))
+  | none => True
+
 /-- **THE FILING'S FIT AT A CITATION** (NI M2-X, design §2(d), finding F2):
 the entry's evidence `ox`, the entry `e` and the round's citation `c` (an
 era and the ledgers' prefixes `ι` it read, or none).  An origin cites
@@ -192,7 +201,7 @@ def niFitEv : Option (Nat × Obs) → Obs → Option (Nat × UIota) → Prop
   | some (_, x), e, c => ∃ (sc : BitVec 64) (W W' : Uvis),
       exitFits x sc W ∧ enterFits e W' ∧ roundOkKeys sc W W' ∧ W'.pid = W.pid ∧
       niPidRow sc W W' ∧ niWaitRow sc W W' ∧ (niCiting sc W ↔ c.isSome) ∧
-      niDetRow sc W W' c
+      niDetRow sc W W' c ∧ niOutRow sc W W' c
 
 /-! ## §3 The filing -/
 
@@ -223,7 +232,7 @@ def niEntryOk (h : List Obs) : NiEntry → Prop
   | .round i j sc W W' cite => i < j ∧ (∃ x, h[i]? = some x ∧ exitFits x sc W) ∧
       (∃ e, h[j]? = some e ∧ enterFits e W') ∧ roundOkKeys sc W W' ∧ W'.pid = W.pid ∧
       niPidRow sc W W' ∧ niWaitRow sc W W' ∧
-      (niCiting sc W ↔ cite.isSome) ∧ niDetRow sc W W' cite ∧
+      (niCiting sc W ↔ cite.isSome) ∧ niDetRow sc W W' cite ∧ niOutRow sc W W' cite ∧
       (∀ k ι, cite = some (k, ι) → k ≤ obsBoots (h.take j))
 
 /-- **THE LEDGER'S FACT**: every filing is valid, and every enter in `h` is
@@ -253,11 +262,11 @@ theorem niEntryOk_snoc {h : List Obs} {f : NiEntry} (e : Obs) (hf : niEntryOk h 
     obtain ⟨e', he', hfit⟩ := hf
     exact ⟨e', by rw [List.getElem?_append_left hlt']; exact he', hfit⟩
   | round i j sc W W' c =>
-    obtain ⟨hij, ⟨x, hx, hxf⟩, ⟨e', he', hef⟩, hr, hp, hq, hw, hci, hd, hb⟩ := hf
+    obtain ⟨hij, ⟨x, hx, hxf⟩, ⟨e', he', hef⟩, hr, hp, hq, hw, hci, hd, ho, hb⟩ := hf
     have hlt' : j < h.length := hlt
     have htk : (h ++ [e]).take j = h.take j := List.take_append_of_le_length (by omega)
     exact ⟨hij, ⟨x, by rw [List.getElem?_append_left (by omega)]; exact hx, hxf⟩,
-      ⟨e', by rw [List.getElem?_append_left hlt']; exact he', hef⟩, hr, hp, hq, hw, hci, hd,
+      ⟨e', by rw [List.getElem?_append_left hlt']; exact he', hef⟩, hr, hp, hq, hw, hci, hd, ho,
       by rw [htk]; exact hb⟩
 
 /-- The new last position reads the appended event. -/
@@ -313,10 +322,10 @@ theorem niFiling_ok {h : List Obs} {e : Obs} {ox : Option (Nat × Obs)} {c : Opt
     exact ⟨W0, 0#64, W0, W0, ⟨e, hlast, hW0⟩, rfl⟩
   | some ix =>
     obtain ⟨i, x⟩ := ix
-    obtain ⟨sc, W, W', hx, hen, hr, hp, hq, hw, hci, hd⟩ := hfit
+    obtain ⟨sc, W, W', hx, hen, hr, hp, hq, hw, hci, hd, ho⟩ := hfit
     obtain ⟨hi, hxi⟩ := hrc i x rfl
     refine ⟨W, sc, W, W', ⟨hi, ⟨x, by rw [List.getElem?_append_left hi]; exact hxi, hx⟩,
-      ⟨e, hlast, hen⟩, hr, hp, hq, hw, hci, hd, fun k ι hk => ?_⟩, rfl⟩
+      ⟨e, hlast, hen⟩, hr, hp, hq, hw, hci, hd, ho, fun k ι hk => ?_⟩, rfl⟩
     show k ≤ obsBoots ((h ++ [e]).take h.length)
     rw [List.take_left]
     exact hcb k ι hk
@@ -615,14 +624,15 @@ theorem niNamesCode_inj : ∀ {a b : List GName}, niNamesCode a = niNamesCode b 
     rw [niNamesCode_inj hc]
 
 theorem niBelow_refl (ι : UIota) : niBelow ι ι :=
-  ⟨List.prefix_refl _, List.prefix_refl _, List.prefix_refl _, Nat.le_refl _, List.prefix_refl _⟩
+  ⟨List.prefix_refl _, List.prefix_refl _, List.prefix_refl _, Nat.le_refl _, List.prefix_refl _,
+    List.prefix_refl _⟩
 
 theorem niBelow_trans {a b c : UIota} (h₁ : niBelow a b) (h₂ : niBelow b c) : niBelow a c :=
   ⟨h₁.1.trans h₂.1, h₁.2.1.trans h₂.2.1, h₁.2.2.1.trans h₂.2.2.1, Nat.le_trans h₁.2.2.2.1 h₂.2.2.2.1,
-    h₁.2.2.2.2.trans h₂.2.2.2.2⟩
+    h₁.2.2.2.2.1.trans h₂.2.2.2.2.1, h₁.2.2.2.2.2.trans h₂.2.2.2.2.2⟩
 
 theorem niBelow_boot (B : UIota) : niBelow UIota.boot B := by
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩ <;> simp [UIota.boot]
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp [UIota.boot]
 
 theorem niLonger_le {α : Type _} {a b c : List α} (ha : a <+: c) (hb : b <+: c) : niLonger a b <+: c := by
   unfold niLonger
@@ -635,9 +645,11 @@ theorem niJoin_below {H ι B : UIota} (hH : niBelow H B) (hι : niBelow ι B) :
     niBelow (niJoin H ι) B ∧ niBelow H (niJoin H ι) ∧ niBelow ι (niJoin H ι) := by
   have hc := niBelow_join (List.prefix_or_prefix_of_prefix hH.1 hι.1)
     (List.prefix_or_prefix_of_prefix hH.2.1 hι.2.1) (List.prefix_or_prefix_of_prefix hH.2.2.1 hι.2.2.1)
-    (List.prefix_or_prefix_of_prefix hH.2.2.2.2 hι.2.2.2.2)
+    (List.prefix_or_prefix_of_prefix hH.2.2.2.2.1 hι.2.2.2.2.1)
+    (List.prefix_or_prefix_of_prefix hH.2.2.2.2.2 hι.2.2.2.2.2)
   exact ⟨⟨niLonger_le hH.1 hι.1, niLonger_le hH.2.1 hι.2.1, niLonger_le hH.2.2.1 hι.2.2.1,
-    Nat.max_le.mpr ⟨hH.2.2.2.1, hι.2.2.2.1⟩, niLonger_le hH.2.2.2.2 hι.2.2.2.2⟩, hc.2, hc.1⟩
+    Nat.max_le.mpr ⟨hH.2.2.2.1, hι.2.2.2.1⟩, niLonger_le hH.2.2.2.2.1 hι.2.2.2.2.1,
+    niLonger_le hH.2.2.2.2.2 hι.2.2.2.2.2⟩, hc.2, hc.1⟩
 
 /-- **THE CHAIN**: every citation of era `k` the filing records is below
 `H k` (each cited prefix a prefix of `H k`'s, each cited count at most its). -/
@@ -718,7 +730,7 @@ theorem niOk_cite_le {h : List Obs} {F : List NiEntry} (hF : niOk h F) :
   cases f with
   | origin j W0 p => exact nomatch hc
   | round i j sc W W' c =>
-    obtain ⟨-, -, -, -, -, -, -, -, -, hb⟩ := hv
+    obtain ⟨-, -, -, -, -, -, -, -, -, -, hb⟩ := hv
     exact Nat.le_trans (hb k ι hc) (obsBoots_take_le h j)
 
 /-! ## §7 THE ERA'S REGISTRATION AND THE CHAIN, AS RESOURCES (NI M2-X3)
@@ -1019,7 +1031,7 @@ theorem niChainSt_file (γe : GName) (h : List Obs) (e : Obs) (F : List NiEntry)
       · iexact Hv
       · iexact Hold
     icases niIotaLbs_compat ns (Hc k) ι $$ HlbO Hlb with %hcp
-    have hjb := niBelow_join hcp.1 hcp.2.1 hcp.2.2.1 hcp.2.2.2
+    have hjb := niBelow_join hcp.1 hcp.2.1 hcp.2.2.1 hcp.2.2.2.1 hcp.2.2.2.2
     ihave #Hj := niIotaLbs_join ns (Hc k) ι $$ HlbO Hlb
     icases Hj with ⟨#Hj, -⟩
     imodintro

@@ -135,8 +135,9 @@ def userinitPark {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) (γw γtk : GName) : IProp GF := iprop%
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ isTickslock γtk ∗ consoleReadyApp ∗
+  -- (NI M3 NI-OUT) the console port at the era's name
   (∃ (γ0 γ1 : UartNames) (γc γl0 γl1 γt : GName) (pd pav pu : BitVec 64),
-    devintrCaps Γ γ0 γ1 γc γl0 γl1 fscDisk fscDlock γt pd pav pu) ∗
+    ⌜γ0 = fscUart⌝ ∗ devintrCaps Γ γ0 γ1 γc γl0 γl1 fscDisk fscDlock γt pd pav pu) ∗
   wireInv ∗
   -- THE ERA'S ANCHOR (NI M2-X2): registered at the era's boot, on to the
   -- park world every process's syscall environment carries

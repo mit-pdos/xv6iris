@@ -15,13 +15,17 @@ vocabulary is `SyscallArmsFdDefs`; dup, fstat and close are `SyscallArmsFd`.
   the window at argument 1 (`syscImg_wrote`), read's answer
   (`syscReadRet_of`).  The armed post is paid by the deposit's out-wand.
 * write (16): the deposit (`SyscDepWrite`), filewrite's fs row with the
-  dispatch's whole `bslots 3`, the write column (`syscallEnv_devsw`).
+  dispatch's whole `bslots 3`, the write column (`syscallEnv_devswAt`, at
+  the era's console name since NI M3 NI-OUT).
   Rows: the image unmoved (`syscImg_faulted`).  The armed post is paid by
   the deposit's out-wand.  (NI M2-G4) The arm cites the boot prefix at
-  every write (`syscArmWrite_ev`): at a lazy-free entry on a writable
-  console descriptor, sys_write's `fwConsCnt` is the key's answer
-  (`syscArmWrite_ans`: `lazyFree_rmapped_ext`/`_iff` and
-  `UsysDet.consCnt_of_rd`).
+  every write: at a lazy-free entry on a writable console descriptor,
+  sys_write's `fwConsCnt` is the key's answer (`syscArmWrite_ans`:
+  `lazyFree_rmapped_ext`/`_iff` and `UsysDet.consCnt_of_rd`).  (NI M3
+  NI-OUT) At a writable console's count the citation also carries the
+  console stream's prefix and the run's indices in it (`syscArmWrite_ev`,
+  from filewrite's relayed `fwConsOut` at the era's console name), so the
+  row's sixth clause holds at every lazy bit (`umemByte_writerImg_lazy`).
 
 Permit sweep L1b: read, write and pipe hand the block back at a raised count
 (the copy ring's lend); the arms relay it through `SyscallRet.SyscRows.updEv`
@@ -58,6 +62,25 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- a writable console at the key IS one at the dispatch's lookup -/
+theorem uwriteCons_key {sts : List FdState} {a0 : BitVec 64} (hcons : uwriteCons sts a0 = true) :
+    ∃ rb, syscFdKey a0 sts = .open rb true (.device CONSOLE) := by
+  have hkey : usysFdKey sts a0 = syscFdKey a0 sts := rfl
+  unfold uwriteCons at hcons
+  rw [hkey] at hcons
+  revert hcons
+  rcases syscFdKey a0 sts with _ | ⟨rb, wb, t⟩
+  · intro h; cases h
+  · cases wb
+    · intro h; cases h
+    · rcases t with _ | _ | mj
+      · intro h; cases h
+      · intro h; cases h
+      · intro h
+        have : mj = 1 := by simpa using h
+        subst this
+        exact ⟨rb, rfl⟩
+
 /-- **The console count IS the key's** (NI M2-G4): at a lazy-free entry
 table whose descriptor argument 0 names a writable console, sys_write's
 relayed count (`fwConsCnt`, at the table `P'` the copies handed back) is
@@ -69,22 +92,7 @@ theorem syscArmWrite_ans (P P' : UPtd) (sz : BitVec 64) (sts : List FdState) (a0
     (hwf : uptWf P) (hlf : lazyFree P.um sz) (hext : P.extSz sz P')
     (hcons : uwriteCons sts a0 = true) (hcnt : fwConsCnt (syscFdKey a0 sts) P P' a1 (argZ a2) r) :
     r = usysWriteAns (permOf P.um sz.toNat) a1 a2 := by
-  have hkey : usysFdKey sts a0 = syscFdKey a0 sts := rfl
-  obtain ⟨rb, hst⟩ : ∃ rb, syscFdKey a0 sts = .open rb true (.device CONSOLE) := by
-    unfold uwriteCons at hcons
-    rw [hkey] at hcons
-    revert hcons
-    rcases syscFdKey a0 sts with _ | ⟨rb, wb, t⟩
-    · intro h; cases h
-    · cases wb
-      · intro h; cases h
-      · rcases t with _ | _ | mj
-        · intro h; cases h
-        · intro h; cases h
-        · intro h
-          have : mj = 1 := by simpa using h
-          subst this
-          exact ⟨rb, rfl⟩
+  obtain ⟨rb, hst⟩ := uwriteCons_key hcons
   obtain ⟨hneg, hpos⟩ := hcnt rb hst
   have hn : argZ a2 = usysCntW a2 := rfl
   unfold usysWriteAns usysWriteAnsAt
@@ -105,6 +113,73 @@ theorem syscArmWrite_ans (P P' : UPtd) (sz : BitVec 64) (sts : List FdState) (a0
       cases hrd : πReadable (permOf P.um sz.toNat) (a1 + BitVec.ofNat 64 d).toNat with
       | false => rfl
       | true => exact absurd ((hiff _).mpr hrd) hbad
+
+/-- the writer's image run IS the key's image run (F3) -/
+theorem uwriteRun_writerImg (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) (a : BitVec 64) (j : Nat) :
+    (List.range j).map (fun x => umemByte (writerImg P M) (a + BitVec.ofNat 64 x).toNat) =
+      uwriteRun (umemLazy P sz M) a j := by
+  unfold uwriteRun uimgByte
+  apply List.map_congr_left
+  intro x _
+  exact umemByte_writerImg_lazy P sz M _
+
+/-- an answer that pushed nothing is attributed at any citation with no indices -/
+theorem usysOutAt_nil (ι : UIota) (hp : ι.cpos = []) (img : ElfMem) (a : BitVec 64) :
+    usysOutAt ι (uwriteRun img a (uwriteCntOf (-1#64))) := by
+  unfold usysOutAt uwriteCntOf uwriteRun
+  rw [hp, if_pos rfl]
+  exact ⟨rfl, List.Pairwise.nil⟩
+
+/-- **THE WRITE ARM'S CITATION** (NI M3 NI-OUT): off a writable console, or at
+the −1 answer, the boot prefix at the actor; else the console stream's prefix
+`L` and the run's indices `ps` in it (`consOutAt` at the era's console name),
+the run read at the key's image (`uwriteRun_writerImg`) to the answer's
+count. -/
+theorem syscArmWrite_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8))
+    (sts : List FdState) (a0 a1 r act : BitVec 64) :
+    fwConsOut (GF := GF) (syscFdKey a0 sts) fscUart (writerImg P M) a1 r ⊢
+      |==> ∃ ι : UIota, niIotaLbs (niNamesHere (GF := GF)) ι ∗
+        ⌜uwriteCons sts a0 = true → usysOutAt ι (uwriteRun (umemLazy P sz M) a1 (uwriteCntOf r))⌝ := by
+  unfold fwConsOut
+  iintro (%hoff | %hm1 | ⟨%i, %hi, #HO⟩)
+  · imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
+    imodintro
+    iexists { UIota.boot with act := act }
+    iframe Hl
+    ipureintro
+    intro hcons
+    obtain ⟨rb, hst⟩ := uwriteCons_key hcons
+    exact absurd hst (hoff rb)
+  · imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
+    imodintro
+    iexists { UIota.boot with act := act }
+    iframe Hl
+    ipureintro
+    intro _
+    rw [hm1]; exact usysOutAt_nil _ rfl _ _
+  · by_cases hr : r = -1#64
+    · imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
+      imodintro
+      iexists { UIota.boot with act := act }
+      iframe Hl
+      ipureintro
+      intro _
+      rw [hr]; exact usysOutAt_nil _ rfl _ _
+    · have hj : r.toNat ≤ i := by rw [hi, BitVec.toNat_ofNat]; exact Nat.mod_le _ _
+      ihave #HO' := consOutAt_take fscUart (writerImg P M) a1 i r.toNat hj $$ HO
+      icases consOutAt_elim fscUart (writerImg P M) a1 r.toNat $$ HO' with ⟨%ps, %L, #HL, %hL⟩
+      ihave #Hc : (niNamesHere (GF := GF)).getD 5 0 ↪◯ML L $$ [HL]
+      · rw [show (niNamesHere (GF := GF)).getD 5 0 = fscUart.acc from rfl]
+        unfold uartSent; iexact HL
+      imod niIotaLbs_cacc (GF := GF) (niNamesHere (GF := GF)) L ps act $$ Hc with #Hl
+      imodintro
+      iexists { UIota.boot with act := act, cacc := L, cpos := ps }
+      iframe Hl
+      ipureintro
+      intro _
+      have hc : uwriteCntOf r = r.toNat := by unfold uwriteCntOf; rw [if_neg hr]
+      rw [hc, ← uwriteRun_writerImg P sz M a1 r.toNat]
+      exact ⟨hL.2.1, hL.2.2.1⟩
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 5, `sys_read`** (Rocq `sysc_arm_read`). -/
@@ -236,7 +311,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
   icases hDW f V M sts gn cs pid $$ Hsi with ⟨%Q, %Qe, Hin, Hout⟩
   icases syscallEnv_kmem PT Γ γ $$ Henv with ⟨#Hkl, #Hka⟩
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
-  icases syscallEnv_devsw PT Γ γ $$ Henv with ⟨%γl, %γu, #Hdev⟩
+  icases syscallEnv_devswAt PT Γ γ $$ Henv with ⟨%γl, #Hdev⟩
   ihave Hfs := syscallEnv_filewriteFsEnv PT Γ γ $$ Henv Hbs
   icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
   have hct : curTier = KTier.kpt := by rw [← hti]; exact htier
@@ -258,7 +333,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
     unfold sysWriteIn; rw [sysFdSt_key ha]) $$ Hin
   have hWr := SW.wp_sys_write_eb (hlc := hlc) (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     γ j pid V M sts (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))
-    fscKalloc fsReadyKmem γl γu Q Qe (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
+    fscKalloc fsReadyKmem γl fscUart Q Qe (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
     (syscArg V hl 0 (by decide)) (syscArg V hl 1 (by decide)) (syscArg V hl 2 (by decide))
     ?hK hj ?hp ?hn ?ht htb
   case hp => k_norm_g; exact hproc
@@ -274,7 +349,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
   iframe Hk Hpc Hpi Hte Hce Hpe Hpriv Hfr Hkl Hka Hfs Hdev Hin
   k_next_e
   unfold sysWritePost
-  iintro %spie2 %spp2 %R2 %P' %k' %⟨hcs, hext, hcnt⟩ - Hk Hpc Hte Hce %hk' Hpriv Hfr Hbs Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %⟨hcs, hext, hcnt⟩ #HO Hk Hpc Hte Hce %hk' Hpriv Hfr Hbs Harms
   -- the block at the callee's raised event count (permit sweep L1b): the
   -- rows do not read it (`SyscRows.updEv`)
   ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) ⊢
@@ -311,20 +386,26 @@ theorem syscall_arm_write (SW : SYSWRITE)
   ihave Hsp := Hout $$ %(R2 10#5) %⟨hfr, hfacts.2.2.2, hfacts.2.2.1⟩ Hx
   unfold filewriteFsOut
   unfold syscallRet syscallAddr at *
-  -- (NI M2-G4) the citation, at every write: the boot prefix at the actor;
-  -- the write clause at a lazy-free entry on a writable console descriptor
-  have hrow : syscEvRow V (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (syscImg V M)
-      (syscImg (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M))
-      cs cs sts { UIota.boot with act := procAddr j } := by
-    refine ⟨fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
-      fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
-      fun _ hlz hcons => ?_⟩
-    rw [show tfW (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)).tf (tfArgIdx 0) = R2 10#5
-      from syscStore_a0 _ _ hl0]
-    exact syscArmWrite_ans V.upt P' V.sz sts _ _ _ _ hfacts.2.2.2 (hfacts.2.2.1 hlz) hext hcons hcnt
+  -- (NI M2-G4) the citation, at every write: the boot prefix at the actor --
+  -- (NI M3 NI-OUT) with the console stream's prefix and the run's indices at
+  -- a writable console's count (`syscArmWrite_ev`); the write clause at a
+  -- lazy-free entry on a writable console descriptor, the run at every lazy bit
   icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
   iapply wpLoop_bupd
-  imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) (procAddr j) with #Hl
+  imod syscArmWrite_ev (GF := GF) V.upt V.sz.toNat M sts (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1))
+    (R2 10#5) (procAddr j) $$ HO with ⟨%ι, #Hl, %hsix⟩
+  have hrow : syscEvRow V (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (syscImg V M)
+      (syscImg (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M))
+      cs cs sts ι := by
+    have ha0' : tfW (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)).tf (tfArgIdx 0) = R2 10#5 :=
+      syscStore_a0 _ _ hl0
+    refine ⟨fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
+      fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
+      fun _ hlz hcons => ?_, fun _ hcons => ?_⟩
+    · rw [ha0']
+      exact syscArmWrite_ans V.upt P' V.sz sts _ _ _ _ hfacts.2.2.2 (hfacts.2.2.1 hlz) hext hcons hcnt
+    · rw [ha0']
+      exact hsix hcons
   imodintro
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts
     (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M) cs cs V.gen ke

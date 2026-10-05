@@ -122,7 +122,8 @@ instance fkp_utSysParkRows_morph (Γ : SchedNames) :
     refine @instCtxMorphExists hlc GF _ _ _ (fun _ => ?_)
     refine @instCtxMorphExists hlc GF _ _ _ (fun _ => ?_)
     refine @instCtxMorphExists hlc GF _ _ _ (fun _ => ?_)
-    exact instCtxMorphDevintrCaps _ _ _ _ _ _ _ _ _ _ _ _
+    -- (NI M3 NI-OUT) the console port's pin: context-free
+    exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphDevintrCaps _ _ _ _ _ _ _ _ _ _ _ _)
   refine @instCtxMorphSep hlc GF _ _ _ ?_ ?_
   · refine @instCtxMorphSep hlc GF _ _ _ ?_ (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl))
     exact @instCtxMorphExists hlc GF _ _ _ (fun γc => consoleInv_morph KTier.kpt _ _ _)

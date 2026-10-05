@@ -194,7 +194,8 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
             niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
             ⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩,
             urc_niDetRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hlw hM hpi hsz hcw hgn hch hpid hlz hsc
-              hround hchk hfde hrp hev⟩
+              hround hchk hfde hrp hev,
+            urc_niOutRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hM hpi hsz hch hlz hsc hev⟩
         iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ (some (ke, ι)) hfe
         unfold niCiteRes niCiteResRaw
         iexists (niNamesHere (GF := GF))
@@ -204,7 +205,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
           urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm,
           urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp,
           niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
-          ⟨fun h => absurd h hcit, fun h => absurd h (by simp)⟩, trivial⟩
+          ⟨fun h => absurd h hcit, fun h => absurd h (by simp)⟩, trivial, trivial⟩
       iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ none hfe
       unfold niCiteRes niCiteResRaw
       iempintro

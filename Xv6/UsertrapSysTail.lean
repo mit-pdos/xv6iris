@@ -71,7 +71,7 @@ theorem ut_evOut_of (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8
     ipureintro
     refine ⟨fun h => absurd (hw.symm.trans h) (by decide), fun _ _ => ?_,
       fun h => absurd (hw.symm.trans h) (by decide), fun h => absurd (hw.symm.trans h) (by decide),
-      fun h => absurd (hw.symm.trans h) (by decide)⟩
+      fun h => absurd (hw.symm.trans h) (by decide), fun h => absurd (hw.symm.trans h) (by decide)⟩
     show usysWaitFitsAt _ _ _ _ { UIota.boot with act := act } _ _ _
     unfold usysWaitFitsAt UIota.reap
     dsimp only [UIota.boot]

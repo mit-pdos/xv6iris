@@ -555,17 +555,6 @@ theorem cw_run_snoc (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i nn : Nat) 
   simp only [List.getElem_map, List.getElem_range, Function.comp]
   exact hat d _ (List.getElem?_eq_getElem h2)
 
-/-- consolewrite's run, opened at its stream -/
-theorem consOutAt_elim (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i : Nat) :
-    consOutAt (GF := GF) γ M ua i ⊢ ∃ ps L, uartSent γ L ∗
-      ⌜sentRunAt [] L ps ((List.range i).map fun j => umemByte M (ua + BitVec.ofNat 64 j).toNat)⌝ := by
-  unfold consOutAt
-  iintro ⟨%ps, H⟩
-  icases uartSentRun_elim γ [] ps _ $$ H with ⟨%L, #H, %h⟩
-  iexists ps, L
-  iframe H
-  ipureintro; exact h
-
 /-- ...and grown by the chunk `uartwrite` pushed from that stream -/
 theorem consOutAt_snoc (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i nn : Nat)
     (bs : List (BitVec 8)) (ps : List Nat) (L : List (BitVec 8))

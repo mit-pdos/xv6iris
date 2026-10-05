@@ -174,7 +174,8 @@ theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     simp
   refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
     fun _ => ⟨?_, fun _ => ⟨⟨hz, i, ?_⟩, ?_⟩, fun h' => absurd hok h'⟩,
-    fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide)⟩
+    fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
+    fun h' => absurd (hn.symm.trans h') (by decide)⟩
   · unfold usysForkAns usysForkPid
     rw [if_pos hok]
     show tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX h))
@@ -216,7 +217,8 @@ theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : Li
       simp at h2
     refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
       fun _ => ⟨?_, fun h' => absurd h' hnok, fun _ => ⟨Or.inl hnull, rfl⟩⟩,
-      fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide)⟩
+      fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
+      fun h' => absurd (hn.symm.trans h') (by decide)⟩
     unfold usysForkAns
     rw [if_neg hnok]
     exact ha
@@ -234,7 +236,8 @@ theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : Li
       fun hok => hok.2 hfull
     refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
       fun _ => ⟨?_, fun h' => absurd h' hnok, fun _ => ⟨Or.inr hfull, rfl⟩⟩,
-      fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide)⟩
+      fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
+      fun h' => absurd (hn.symm.trans h') (by decide)⟩
     unfold usysForkAns
     rw [if_neg hnok]
     exact ha

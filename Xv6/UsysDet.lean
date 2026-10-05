@@ -214,9 +214,16 @@ structure UIota where
   /-- (NI joint fork lane F3) the slot-occupancy ledger (`SlotLed.slotLedLb`'s
   list): fork's exhaustion `SFull act k0` closes the cited prefix -/
   sev : List Sev := []
+  /-- (NI M3 NI-OUT) a prefix of the era's CONSOLE ACCEPTED STREAM (`UartTrace.uartSent` at `fscUart`) -/
+  cacc : List (BitVec 8) := []
+  /-- (NI M3 NI-OUT) the round's pushed bytes' indices in it -- the round's own, like `act` -/
+  cpos : List Nat := []
 
 /-- The empty prefix (the boot's). -/
-def UIota.boot : UIota := ⟨[], [], [], 0, 0#64, []⟩
+def UIota.boot : UIota := ⟨[], [], [], 0, 0#64, [], [], []⟩
+
+/-- the ledger part (what every answer reads) -/
+def UIota.led (ι : UIota) : UIota := { ι with cacc := [], cpos := [] }
 
 instance : Inhabited UIota := ⟨UIota.boot⟩
 
@@ -460,6 +467,56 @@ def uwriteCon (W : Uvis) : Option Nat :=
 /-- ...and the answer at the key (ONE text for the kernel's cited row and the key's fit) -/
 def usysWriteAns (perm : Nat → Option UPerm) (a1 a2 : BitVec 64) : BitVec 64 :=
   usysWriteAnsAt a2 (uwriteRd perm a1 (usysCntW a2).toNat)
+
+/-! ### The console write's pushed run (NI M3 NI-OUT) -/
+
+/-- the key's byte (`umemByte`'s twin on an `ElfMem`) -/
+def uimgByte (M : ElfMem) (va : Nat) : BitVec 8 := (M va).getD 0#8
+
+/-- the `n` bytes of the key's image from `a` -/
+def uwriteRun (M : ElfMem) (a : BitVec 64) (n : Nat) : List (BitVec 8) :=
+  (List.range n).map fun j => uimgByte M (a + BitVec.ofNat 64 j).toNat
+
+/-- how many bytes an answer says were pushed (−1: none) -/
+def uwriteCntOf (r : BitVec 64) : Nat := if r = -1#64 then 0 else r.toNat
+
+/-- ...on the step's readings -/
+def usysWriteCnt (a2 : BitVec 64) (d : Nat) : Nat :=
+  if usysCntW a2 < 0 then 0 else consCnt (usysCntW a2).toNat d
+
+/-- the step's buffer reading: the run a class console write pushes (`[]` elsewhere) -/
+def uwriteOut (W : Uvis) : List (BitVec 8) :=
+  match uwriteCon W with
+  | some d => uwriteRun W.M (tfW W.tf (tfArgIdx 1)) (usysWriteCnt (tfW W.tf (tfArgIdx 2)) d)
+  | none => []
+
+/-- **THE ATTRIBUTION**: the cited stream holds `run` at the cited, strictly increasing indices -/
+def usysOutAt (ι : UIota) (run : List (BitVec 8)) : Prop :=
+  ι.cpos.map (fun p => ι.cacc[p]?) = run.map some ∧ ι.cpos.Pairwise (· < ·)
+
+theorem consCnt_le (n d : Nat) : consCnt n d ≤ n := by
+  unfold consCnt; split <;> omega
+
+theorem usysCntW_lt (a2 : BitVec 64) : usysCntW a2 < 2 ^ 31 := by
+  unfold usysCntW
+  have := BitVec.toInt_lt (x := BitVec.extractLsb' 0 32 a2)
+  simpa using this
+
+/-- the count an answer says, at the law's answer, is the step's count -/
+theorem uwriteCntOf_ansAt (a2 : BitVec 64) (d : Nat) : uwriteCntOf (usysWriteAnsAt a2 d) = usysWriteCnt a2 d := by
+  unfold uwriteCntOf usysWriteAnsAt usysWriteCnt
+  by_cases h : usysCntW a2 < 0
+  · simp only [h, if_true]
+  · simp only [h, if_false]
+    have hc := consCnt_le (usysCntW a2).toNat d
+    have hw := usysCntW_lt a2
+    have hlt : consCnt (usysCntW a2).toNat d < 2 ^ 31 := by omega
+    have hne : BitVec.ofNat 64 (consCnt (usysCntW a2).toNat d) ≠ -1#64 := by
+      intro he
+      have := congrArg BitVec.toNat he
+      rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)] at this
+      simp at this; omega
+    rw [if_neg hne, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]
 
 /-- The first index of a range a predicate holds at, read as a cut: it is at
 most the range's length, the predicate fails below it, and holds at it when
