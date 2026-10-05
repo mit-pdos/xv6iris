@@ -529,14 +529,11 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
   have hup := parkToken_park (hlc := hlc) (GF := GF) (SG := uexecSGXv6) cpu ξ0 ⟨γft, γ, γw, Γ, j, procAddr j, pid⟩
     (List.replicate 12 0#64) { V with cwd := kf.regs 10#5, pvSecc := seccAll, cwi := ROOTINO, rti := ROOTINO, fdg := V.fdg } M
     (List.replicate NOFILE FdState.closed) ∅ hj (by simp)
-  -- THE INCARNATION'S KEY HISTORY (design/ni-uhist.md D2), born empty at its
-  -- park and carried by `parkOwn` (UsertrapRes deviation 11)
-  imod (uhistAuth_alloc (GF := GF)) with ⟨%γuh, Huh⟩
-  ihave Hpo : parkOwn (GF := GF) $$ [Hbs Huh]
+  -- the park's bcache slots (NI M3 U-2b: the incarnation's key history is
+  -- born at its first resume, `ProofUserretClosed.userretClosed_proof`)
+  ihave Hpo : parkOwn (GF := GF) $$ [Hbs]
   · unfold parkOwn
-    iframe Hbs
-    iexists γuh
-    iexact Huh
+    iexact Hbs
   dsimp only [UtNames.pj, utParkCaps] at hup
   ihave Hup := hup $$ Hown Htok Hrows Hused Hpo Hig Hfr Hch Hbun Hrd Hco Hchildr
   imod Hup with ⟨Hown, HprocCtx⟩

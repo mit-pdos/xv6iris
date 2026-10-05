@@ -11,8 +11,9 @@ the pure facts that carry the process's key across uservec's save walk.
   closer, at pinned size / descriptor name / cwd / generation / lazy bit
   (Rocq's five pins), plus the context facts the next uservec / usertrap
   call needs (`sie = false`, the kernel tier, depth 0, the running slot, the
-  whole-page stack).  `urcRut_acc` is the token accessor every U-mode leaf
-  takes (Rocq `Rut_at_acc`).
+  whole-page stack), and (NI M3 U-2b) the key history at the resumed key
+  (`UhistDefs.uhistAt Wr`, `urcRut`'s last argument).  `urcRut_acc` is the
+  token accessor every U-mode leaf takes (Rocq `Rut_at_acc`).
 * `urcLoop` -- Rocq `stvec_handler_loop`'s conclusion, one `□` over every
   hart, config, table and key reading: the kernel obligation `ukb` a slot's
   bundle carries, at the parked residue.  ProofUserretClosed proves it by
@@ -188,26 +189,29 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- **Rocq `Rut_at`**: the kernel-side bundle parked across user execution,
 minus the descriptor fragments -- the context's remainder, the trapframe
-page and the residue's closer, at the pins. -/
+page and the residue's closer, at the pins -- and (NI M3 U-2b) THE KEY
+HISTORY AT THE RESUMED KEY `Wr` (`uhistAt Wr`: its tail is `Wr`, exactly;
+the next round appends `(sc, Wr, W, W')` to it). -/
 def urcRut (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU) (sz : Nat) (γfd : GName)
     (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool)
-    (secc : BitVec 64) : UPtd → IProp GF :=
+    (secc : BitVec 64) (Wr : Uvis) : UPtd → IProp GF :=
   fun p => iprop(∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz secc k ksp V⌝ ∗
     userretLeft cpu k ∗ tfPageAt p.tfp V.tf ∗
-    (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt (hlc := hlc) PT Γ j cpu p ksp V sts' cs pid))
+    (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt (hlc := hlc) PT Γ j cpu p ksp V sts' cs pid) ∗
+    uhistAt Wr)
 
 /-- **Rocq `Rut_at_acc`**: the running token, borrowed. -/
 theorem urcRut_acc (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU) (sz : Nat)
     (γfd : GName) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool)
-    (secc : BitVec 64) (p : UPtd) :
-    urcRut PT Γ j cpu sz γfd cw gn cs pid lz secc p ⊢
-      ctxToken cpu ∗ (ctxToken cpu -∗ urcRut PT Γ j cpu sz γfd cw gn cs pid lz secc p) := by
+    (secc : BitVec 64) (Wr : Uvis) (p : UPtd) :
+    urcRut PT Γ j cpu sz γfd cw gn cs pid lz secc Wr p ⊢
+      ctxToken cpu ∗ (ctxToken cpu -∗ urcRut PT Γ j cpu sz γfd cw gn cs pid lz secc Wr p) := by
   unfold urcRut userretLeft
-  iintro ⟨%k, %ksp, %V, %hp, ⟨%hw, Hs, Hc, Ht, #Hk, #Hro⟩, Htf, Hcl⟩
+  iintro ⟨%k, %ksp, %V, %hp, ⟨%hw, Hs, Hc, Ht, #Hk, #Hro⟩, Htf, Hcl, Huh⟩
   iframe Ht
   iintro Ht
   iexists k, ksp, V
-  iframe Hs Hc Ht Hk Hro Htf Hcl
+  iframe Hs Hc Ht Hk Hro Htf Hcl Huh
   isplitr
   · ipureintro; exact hp
   · ipureintro; exact hw
@@ -220,7 +224,7 @@ def urcLoop (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) : IProp G
   iprop(□ ∀ (h : CPU) (C : UCfg) (pt : UPtd) (γfd : GName) (Wr : Uvis),
     ⌜loopOk C pt⌝ -∗ ⌜Wr.perm = permOf pt.um Wr.sz⌝ -∗ hwConfig h -∗
     ukb (hlc := hlc) h C pt (fdFrags γfd)
-      (urcRut PT Γ j h Wr.sz γfd Wr.cwd Wr.gen Wr.ch Wr.pid Wr.lazy Wr.secc) Wr)
+      (urcRut PT Γ j h Wr.sz γfd Wr.cwd Wr.gen Wr.ch Wr.pid Wr.lazy Wr.secc Wr) Wr)
 
 instance urcLoop_persistent (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) :
     Persistent (urcLoop (hlc := hlc) (GF := GF) PT Γ j) := by

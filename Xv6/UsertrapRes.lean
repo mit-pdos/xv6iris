@@ -132,19 +132,19 @@ av⌝` inside the residue; here it is the context's `avail`.
    has no Lean object.
 10. `ut_epc_exists` / `ut_tf_length` are one lemma, `utOwn_tfLen` (the block's
     trapframe page pins 36 words).
-11. **The key history (NI-LEDGER-REST, Rocq 5634a3874) is named
-    existentially, not by a `UtNames` field.**  Rocq adds `un_uh` to
-    `ut_names` and puts `uhist_auth (un_uh N) []` in `park_own N`; Lean's
-    `parkOwn` takes no names record, and giving it one would move the park's
-    landed statements (`utParkIntroBody`, `ParkCap.parkChan`,
-    `parkCloser_of_chan`, `parkToken_park` / `_steady`).  So the row is
-    `UhistDefs.uhistRow := ∃ γ, uhistOwn γ` (last in `utOwn` / `utOwnNm` /
-    `utOwnBare`), `parkOwn := bslots 3 ∗ ∃ γ, uhistAuth γ []`, and the
-    accessor `utResBare_uhist_acc` names `γ` existentially -- exactly the
-    shape of Rocq's `usertrap_res_bare_uhist_acc`, whose `γ` is existential
-    too because the residue closes over `N`.  No observer can tell the two
-    apart: the residue is `∃ N` in both.  No other statement in this file
-    moves.
+11. **The key history (NI-LEDGER-REST, Rocq 5634a3874) is NOT in the
+    residue** (NI M3 U-2b).  Rocq adds `un_uh` to `ut_names`, puts
+    `uhist_auth (un_uh N) []` in `park_own N` and borrows it with
+    `usertrap_res_bare_uhist_acc`.  Lean held it as an existential row
+    (`∃ γ, uhistOwn γ`, last in `utOwn` / `utOwnNm` / `utOwnBare`) until U-2b,
+    whose chain invariant (each round resumed at the previous round's left
+    key, exactly) needs the trap loop to know WHICH history it appends to
+    across usertrap -- an existential name inside the residue cannot be
+    linked to the key the loop parked.  The history is now the trap loop's
+    own (`UhistDefs.uhistAt`, parked in `UserretClosedDefs.urcRut`, framed
+    through usertrap by `UserretClosedRound.urc_round`), born at the
+    incarnation's first resume (`ProofUserretClosed.userretClosed_proof`);
+    `parkOwn` is the bcache slots alone.
 
 Imports only definitional files.
 -/
@@ -422,10 +422,7 @@ def utOwn (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPri
     (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) : IProp GF := iprop(
   bslots 3 ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-  procPrivFd N.f N.pj pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg N.pj cs ∗ Rsys N pid ∗
-  -- THE KEY HISTORY (design/ni-uhist.md D3), beside the block for the
-  -- fragments' reason; no index of the residue moves with it
-  uhistRow)
+  procPrivFd N.f N.pj pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg N.pj cs ∗ Rsys N pid)
 
 /-- **Rocq `ut_own_nm`**: THE RESIDUE WITHOUT THE INCARNATION'S MARKER
 (Rocq lane PQ-C, design/pipe.md "The exit path").  A process that kills
@@ -438,7 +435,7 @@ def utOwnNm (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcP
     (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) : IProp GF := iprop(
   bslots 3 ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-  procPrivUnmarked N.f N.pj pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg N.pj cs ∗ Rsys N pid ∗ uhistRow)
+  procPrivUnmarked N.f N.pj pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg N.pj cs ∗ Rsys N pid)
 
 /-- **Rocq `ut_own_unmark`**. -/
 theorem utOwn_unmark (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
@@ -446,11 +443,11 @@ theorem utOwn_unmark (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (
     utOwn (GF := GF) Rsys N V M sts cs pid ⊣⊢ utOwnNm Rsys N V M sts cs pid ∗ takenAt V.gen := by
   unfold utOwn utOwnNm
   constructor
-  · iintro ⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, Hsy, Huh⟩
+  · iintro ⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, Hsy⟩
     icases (procPrivFd_unmark N.f N.pj pid V M).1 $$ Hpv with ⟨Hpv, Ht⟩
-    iframe Hb Hfd Hir Hpv Hfr Hch Hsy Huh Ht
-  · iintro ⟨⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, Hsy, Huh⟩, Ht⟩
-    iframe Hb Hfd Hir Hfr Hch Hsy Huh
+    iframe Hb Hfd Hir Hpv Hfr Hch Hsy Ht
+  · iintro ⟨⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, Hsy⟩, Ht⟩
+    iframe Hb Hfd Hir Hfr Hch Hsy
     iapply (procPrivFd_unmark N.f N.pj pid V M).2
     iframe Hpv Ht
 
@@ -463,18 +460,16 @@ theorem utOwnNm_priv (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (
         procPrivUnmarked N.f N.pj pid V' M' -∗ fdFrags V'.fdg sts' -∗ chFrag V'.chg N.pj cs' -∗
         Rsys N pid -∗ utOwnNm Rsys N V' M' sts' cs' pid) := by
   unfold utOwnNm
-  iintro ⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, Hsy, Huh⟩
+  iintro ⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, Hsy⟩
   iframe Hpv Hfr Hch Hsy
   iintro %V' %M' %sts' %cs' Hpv Hfr Hch Hsy
-  iframe Hb Hfd Hir Hpv Hfr Hch Hsy Huh
+  iframe Hb Hfd Hir Hpv Hfr Hch Hsy
 
 /-- **Rocq `ut_own_nopt`** (with the trapframe page out, deviation 1). -/
 def utOwnBare (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
     (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) : IProp GF := iprop(
   bslots 3 ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-  utBlock N.f N.pj pid V ∗ fdFrags V.fdg sts ∗ chFrag V.chg N.pj cs ∗ Rsys N pid ∗
-  -- ...and the key history, `utOwn`'s last row
-  uhistRow)
+  utBlock N.f N.pj pid V ∗ fdFrags V.fdg sts ∗ chFrag V.chg N.pj cs ∗ Rsys N pid)
 
 /-- **Rocq `ut_own_pt_close` / `ut_own_pt_open`** (and the trapframe's). -/
 theorem utOwnBare_join (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
@@ -484,13 +479,13 @@ theorem utOwnBare_join (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames)
   have hj := utBlock_join (GF := GF) N.f N.pj pid V M
   unfold utOwnBare utOwn
   constructor
-  · iintro ⟨⟨Hb, Hfd, Hir, Hbl, Hfr, Hch, Hsy, Huh⟩, Hpt, Htf⟩
+  · iintro ⟨⟨Hb, Hfd, Hir, Hbl, Hfr, Hch, Hsy⟩, Hpt, Htf⟩
     ihave Hpv := hj.1 $$ [Hbl Hpt Htf]
     · iframe Hbl Hpt Htf
-    iframe Hb Hfd Hir Hpv Hfr Hch Hsy Huh
-  · iintro ⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, Hsy, Huh⟩
+    iframe Hb Hfd Hir Hpv Hfr Hch Hsy
+  · iintro ⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, Hsy⟩
     icases hj.2 $$ Hpv with ⟨Hbl, Hpt, Htf⟩
-    iframe Hb Hfd Hir Hbl Hfr Hch Hsy Huh Hpt Htf
+    iframe Hb Hfd Hir Hbl Hfr Hch Hsy Hpt Htf
 
 /-- **Rocq `ut_own_priv`**: the block, the fragments, the children row and
 the syscall environment borrowed together, and taken back at a MOVED record
@@ -503,10 +498,10 @@ theorem utOwn_priv (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V 
         procPrivFd N.f N.pj pid V' M' -∗ fdFrags V'.fdg sts' -∗ chFrag V'.chg N.pj cs' -∗ Rsys N pid -∗
         utOwn Rsys N V' M' sts' cs' pid) := by
   unfold utOwn
-  iintro ⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, Hsy, Huh⟩
+  iintro ⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, Hsy⟩
   iframe Hpv Hfr Hch Hsy
   iintro %V' %M' %sts' %cs' Hpv Hfr Hch Hsy
-  iframe Hb Hfd Hir Hpv Hfr Hch Hsy Huh
+  iframe Hb Hfd Hir Hpv Hfr Hch Hsy
 
 /-- **Rocq `ut_epc_exists` / `ut_tf_length`** (deviation 10): the
 trapframe is 36 words, so `p->trapframe->epc` exists (prepare_return's
@@ -515,8 +510,8 @@ theorem utOwn_tfLen (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V
     (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) :
     utOwn (GF := GF) Rsys N V M sts cs pid ⊢ utOwn Rsys N V M sts cs pid ∗ ⌜V.tf.length = 36⌝ := by
   unfold utOwn procPrivFd procPrivCoreNoctxAt procPrivBareAt tfPageAt
-  iintro ⟨Hb, Hfd, Hir, ⟨⟨⟨%h, Hpid, Hf, Hpt, ⟨%hl, Hw, Hbs⟩, %hlz, Hev⟩, Hc, Hg⟩, Ho⟩, Hfr, Hch, Hsy, Huh⟩
-  iframe Hb Hfd Hir Hpid Hf Hpt Hw Hbs Hc Hg Ho Hfr Hch Hsy Huh Hev
+  iintro ⟨Hb, Hfd, Hir, ⟨⟨⟨%h, Hpid, Hf, Hpt, ⟨%hl, Hw, Hbs⟩, %hlz, Hev⟩, Hc, Hg⟩, Ho⟩, Hfr, Hch, Hsy⟩
+  iframe Hb Hfd Hir Hpid Hf Hpt Hw Hbs Hc Hg Ho Hfr Hch Hsy Hev
   ipureintro
   exact ⟨⟨h, hl, hlz⟩, hl⟩
 
@@ -655,53 +650,11 @@ theorem utResBare_fd_open (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF
       fdFrags V.fdg sts ∗
       (∀ sts' : List FdState, fdFrags V.fdg sts' -∗ utResBare cpu Rsys P ksp V sts' cs pid) := by
   unfold utResBare utOwnBare
-  iintro ⟨%N, %hN, #Htfk, Hcl, #Hcaps, Hb, Hfd, Hir, Hbl, Hfr, Hch, Hsy, Huh⟩
+  iintro ⟨%N, %hN, #Htfk, Hcl, #Hcaps, Hb, Hfd, Hir, Hbl, Hfr, Hch, Hsy⟩
   iframe Hfr
   iintro %sts' Hfr
   iexists N
-  iframe Htfk Hcl Hcaps Hb Hfd Hir Hbl Hfr Hch Hsy Huh
-  ipureintro; exact hN
-
-/-- **Rocq `ut_own_nopt_uhist`**: THE KEY HISTORY, BORROWED OUT OF THE
-REDUCED ENVIRONMENT and handed back at any lawful history
-(design/ni-uhist.md D4/D5), at its own (existential, deviation 11) name. -/
-theorem utOwnBare_uhist (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
-    (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) :
-    utOwnBare (GF := GF) Rsys N V sts cs pid ⊢
-      ∃ (γ : GName) (h : List Uround), uhistAuth γ h ∗ ⌜uhistWf h⌝ ∗
-        (∀ h' : List Uround, uhistAuth γ h' -∗ ⌜uhistWf h'⌝ -∗ utOwnBare Rsys N V sts cs pid) := by
-  unfold utOwnBare uhistRow uhistOwn
-  iintro ⟨Hb, Hfd, Hir, Hbl, Hfr, Hch, Hsy, %γ, %h, Huh, %hwf⟩
-  iexists γ, h
-  iframe Huh
-  isplitl []
-  · ipureintro; exact hwf
-  iintro %h' Huh %hwf'
-  iframe Hb Hfd Hir Hbl Hfr Hch Hsy
-  iexists γ, h'
-  iframe Huh
-  ipureintro; exact hwf'
-
-/-- **Rocq `ut_res_bare_uhist_acc`**: the same out of the residue; the name
-is the residue's own, existential in it, so the accessor names it only
-through the closer, which re-packs the same names record. -/
-theorem utResBare_uhist_acc (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) (P : UPtd) (ksp : BitVec 64)
-    (V : ProcPriv) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) :
-    utResBare (GF := GF) cpu Rsys P ksp V sts cs pid ⊢
-      ∃ (γ : GName) (h : List Uround), uhistAuth γ h ∗ ⌜uhistWf h⌝ ∗
-        (∀ h' : List Uround, uhistAuth γ h' -∗ ⌜uhistWf h'⌝ -∗ utResBare cpu Rsys P ksp V sts cs pid) := by
-  have ha := utOwnBare_uhist (GF := GF) Rsys
-  unfold utResBare
-  iintro ⟨%N, %hN, #Htfk, Hcl, #Hcaps, Hown⟩
-  icases ha N V sts cs pid $$ Hown with ⟨%γ, %h, Huh, %hwf, Hback⟩
-  iexists γ, h
-  iframe Huh
-  isplitl []
-  · ipureintro; exact hwf
-  iintro %h' Huh %hwf'
-  ihave Hown := Hback $$ %h' Huh %hwf'
-  iexists N
-  iframe Htfk Hcl Hcaps Hown
+  iframe Htfk Hcl Hcaps Hb Hfd Hir Hbl Hfr Hch Hsy
   ipureintro; exact hN
 
 end Env
@@ -727,7 +680,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 (Rocq's `initproc` share is persistent here, deviation 4): the bcache slots
 and the incarnation's key history, born empty at its park (at its own name,
 deviation 11). -/
-def parkOwn : IProp GF := iprop(bslots 3 ∗ ∃ γ : GName, uhistAuth γ [])
+def parkOwn : IProp GF := iprop(bslots 3)
 
 /-- **Rocq `ut_park_caps`** (deviation 8): the parker's context-free row. -/
 def utParkCaps (N : UtNames) : IProp GF := initGen N.ip 1#32
@@ -811,16 +764,10 @@ theorem utResBare_park (Rsys : CurCtx → UtNames → BitVec 32 → IProp GF) (W
   ihave #Hcaps := utCaps_of_park N $$ [Hig Hglob Hdone Henv]
   · iframe Hig Hglob Hdone Henv
   unfold parkOwn
-  icases Hpo with ⟨Hbs, %γh, Huh⟩
-  -- the history, born empty at the park
-  ihave Huh := uhistOwn_nil γh $$ Huh
-  unfold utResBare utOwnBare uhistRow
+  unfold utResBare utOwnBare
   iexists N
-  iframe Htfk Hcl Hcaps Hbs Hfd Hir Hbl Hfr Hch Hsy
-  isplitl []
-  · ipureintro; exact ⟨hP, rfl, hwf⟩
-  iexists γh
-  iexact Huh
+  iframe Htfk Hcl Hcaps Hpo Hfd Hir Hbl Hfr Hch Hsy
+  ipureintro; exact ⟨hP, rfl, hwf⟩
 
 end Park
 

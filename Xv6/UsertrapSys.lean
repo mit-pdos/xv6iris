@@ -143,10 +143,9 @@ theorem ut90_call [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ
       procPrivFd A.N.f (procAddr A.j) A.pid (utSysRec A.sep A.V) A.M ∗ fdFrags A.V.fdg A.sts ∗
       chFrag A.V.chg (procAddr A.j) A.cs ∗
       syscSysIn (hlc := hlc) A.f (utSysRec A.sep A.V) A.M A.sts A.gn A.cs A.pid ∗
-      syscForkIn (hlc := hlc) A.f (utSysRec A.sep A.V) A.M A.sts ∗ syscPayIn A.f (utSysRec A.sep A.V) ∗
-      uhistRow
+      syscForkIn (hlc := hlc) A.f (utSysRec A.sep A.V) A.M A.sts ∗ syscPayIn A.f (utSysRec A.sep A.V)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hframe, #Hcaps, #Hpay, Hkont, Hbs, Hfd, Hir, Henv, Hpriv, Hfrag, Hch, Hsi, Hfi, Hpi, Huh⟩
+  iintro ⟨Hk, Hpc, Hframe, #Hcaps, #Hpay, Hkont, Hbs, Hfd, Hir, Henv, Hpriv, Hfrag, Hch, Hsi, Hfi, Hpi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hav : A.k.avail = 512 := hok.havail
   -- +0xa2  jal syscall
@@ -181,7 +180,7 @@ theorem ut90_call [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ
         refine utPins_calleeSaved A _ R' ?_ hcs
         exact utPins_set A R 1#5 _ hpins (by decide) (by decide) (by decide)
       iapply (ut90_tail PT Γ hW hP HA A hok hsc hb c spie spp R' V2 M2 sts2 cs2 hpins' hrows)
-      iframe Hk Hpc Hframe Hte Hce Hpay Hkont Hbs Hfd Hir Henv Hpriv Hfrag Hch Hxo Hso Hfo Hwo Heo Hcaps Huh
+      iframe Hk Hpc Hframe Hte Hce Hpay Hkont Hbs Hfd Hir Henv Hpriv Hfrag Hch Hxo Hso Hfo Hwo Heo Hcaps
     · -- the dying conjunct: the stack from syscall's entry sp up to the page top
       unfold syscallCloser
       have e1 : ((A.k.intrOn.pushed 4).withRegs (R.set 1#5 (KA.«usertrap» + 0xa6#64))).sp =
@@ -245,7 +244,7 @@ theorem ut90_bump [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ
   · unfold utPay; rw [hok.hgn]; iexact Hmy
   -- the block's trapframe
   unfold utOwn utRsys utSysEnvAt
-  icases Hown with ⟨Hbs, Hfd, Hir, Hpriv, Hfrag, Hch, ⟨-, Henv⟩, Huh⟩
+  icases Hown with ⟨Hbs, Hfd, Hir, Hpriv, Hfrag, Hch, ⟨-, Henv⟩⟩
   rw [hok.pj, hok.hΓ]
   icases procPrivFd_facts _ _ _ _ _ $$ Hpriv with ⟨Hpriv, %hf⟩
   have hb : umBelow A.V.sz A.V.upt := hf.2.1
@@ -299,7 +298,7 @@ theorem ut90_bump [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ
       utPins_set A _ 15#5 _ (utPins_set A _ 15#5 _ (utPins_set A R 14#5 _ hpins (by decide) (by decide)
         (by decide)) (by decide) (by decide) (by decide)) (by decide) (by decide) (by decide)
     iapply (ut90_call PT Γ SY hPT0 hW hP HA A hok hsc hb cpu _ hpins')
-    iframe Hk Hpc Hframe Hcaps Hpay Hkont Hbs Hfd Hir Henv Hpriv Hfrag Hch Hsi Hfi Hpi Huh
+    iframe Hk Hpc Hframe Hcaps Hpay Hkont Hbs Hfd Hir Henv Hpriv Hfrag Hch Hsi Hfi Hpi
   all_goals first
     | (k_norm_g; done)
     | (k_norm_g; exact hsie)

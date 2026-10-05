@@ -357,14 +357,17 @@ open MachCSL Std
 
 The constructors of `NiEntry` are matched only in `NiEntry.pid` and
 `niStepOf` below, and in `niStepOf_law`'s two arms; each pattern ends in
-`..`, which absorbs W2d's origin field `p` (the spent claim's position) and
-(M2-X3) a round's citation where it is not read. -/
+`..`, which absorbs W2d's origin field `p` (the spent claim's position),
+(M2-X3) a round's citation where it is not read and (NI M3 U-2b) the key
+history's name and index; a round's resumed key `Wr` (NI M3 U-2b, before
+the trapped key) is not read here.  `NiOneOrigin` (ruling U-R6) is U-3's
+hypothesis. -/
 
 /-- The pid a filing names: the origin's first key's, a round's resumed key's
 (= its trapped key's, `niEntryOk`'s pid tie). -/
 def NiEntry.pid : NiEntry → BitVec 32
   | .origin _ W0 .. => W0.pid
-  | .round _ _ _ _ W' .. => W'.pid
+  | .round _ _ _ _ _ W' .. => W'.pid
 
 /-- **An incarnation**: an era (the boot count) and a pid.  Pids are not
 reused within an era (`nextpid` only grows; wrap-around is M2-G2's tie) and
@@ -383,6 +386,20 @@ def inc (h : List Obs) (F : List NiEntry) (j : Nat) : Option NiInc := (niFilingA
 
 theorem niFilingAt_mem {F : List NiEntry} {j : Nat} {f : NiEntry} (hf : niFilingAt F j = some f) : f ∈ F :=
   List.mem_of_find?_eq_some hf
+
+/-- An origin filing. -/
+def NiEntry.isOrigin : NiEntry → Bool
+  | .origin .. => true
+  | .round .. => false
+
+/-- **ONE ORIGIN** (NI M3 U-2b, ruling U-R6, finding F8: a pid reused within an
+era makes `utrace q` two processes' steps): incarnation `q`'s filings cite ONE
+key history (`NiEntry.uh`, the history its origin registered) and at most one
+of them is an origin.  Stated on the filing alone; U-3's `xv6NiDet` takes it
+per run. -/
+def NiOneOrigin (q : NiInc) (h : List Obs) (F : List NiEntry) : Prop :=
+  ∃ γ : Iris.GName, (∀ f ∈ F, incOf h f = q → f.uh = γ) ∧
+    ∀ f₁ ∈ F, ∀ f₂ ∈ F, incOf h f₁ = q → incOf h f₂ = q → f₁.isOrigin = true → f₂.isOrigin = true → f₁ = f₂
 
 /-! ## §2 The trace of an incarnation -/
 
@@ -403,7 +420,7 @@ inductive NiStep where
 rejects). -/
 def niStepOf (h : List Obs) : NiEntry → Option NiStep
   | .origin j W0 .. => h[j]?.map (NiStep.origin W0)
-  | .round i j _ W _ c =>
+  | .round i j _ _ W _ c .. =>
     match h[i]?, h[j]? with
     | some x, some e =>
       some (.round W.secc W.lazy (uwaitWin W.perm (tfW W.tf (tfArgIdx 0))) W.sz (uwriteCon W) (uwriteOut W) x e c)
@@ -446,11 +463,11 @@ def NiStep.cite : NiStep → Option (Nat × UIota)
 theorem niStepOf_cite {h : List Obs} {f : NiEntry} {s : NiStep} (hs : niStepOf h f = some s) :
     s.cite = f.cite := by
   match f, hs with
-  | .origin j W0 _, hs =>
+  | .origin j W0 _ _, hs =>
     simp only [niStepOf] at hs
     obtain ⟨e, -, rfl⟩ := Option.map_eq_some_iff.mp hs
     rfl
-  | .round i j _ W _ c, hs =>
+  | .round i j _ _ W _ c _ _, hs =>
     simp only [niStepOf] at hs
     split at hs
     · cases hs; rfl
@@ -739,7 +756,7 @@ theorem niStepOf_law {h : List Obs} {f : NiEntry} {s : NiStep} (hf : niEntryOk h
     subst hs
     show enterView _ = _
     simp only [enterView, hpc]
-  | .round i j sc W W' c, hf, hs =>
+  | .round i j sc _ W W' c _ _, hf, hs =>
     obtain ⟨-, ⟨x, hx, cpu, sa, rfl⟩, ⟨e, he, cpu', sa', ep', rfl, hpc⟩, hr, hpid, hprow, -, hcit, hdet,
       hout, -⟩ := hf
     simp only [niStepOf, hx, he, Option.some.injEq] at hs
@@ -1516,7 +1533,7 @@ def NiFamActs (r : BitVec 32) (tr : List NiStep) : Prop :=
 
 /-- the filings' tree: a filed successful fork round names (parent, child) -/
 def niForkChild (h : List Obs) : NiEntry → Option (NiInc × NiInc)
-  | f@(.round _ j _ W _ (some (_, ι))) =>
+  | f@(.round _ j _ _ W _ (some (_, ι)) _ _) =>
     if uvisNum (uvisRun W) = USYS_fork ∧ forkOk ι then
       some (incOf h f, (obsBoots (h.take j), BitVec.ofNat 32 (pidPick PIDMAX ι.pev)))
     else none

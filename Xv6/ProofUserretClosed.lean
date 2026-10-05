@@ -43,7 +43,7 @@ theorem urcLoop_of (P : IProp GF) [Persistent P] (PT : SchedNames → IProp GF) 
     (H : ∀ (h : CPU) (C : UCfg) (pt : UPtd) (γfd : GName) (Wr : Uvis),
       loopOk C pt → Wr.perm = permOf pt.um Wr.sz →
       P ∗ hwConfig h ⊢ ukb (hlc := hlc) h C pt (fdFrags γfd)
-        (urcRut PT Γ j h Wr.sz γfd Wr.cwd Wr.gen Wr.ch Wr.pid Wr.lazy Wr.secc) Wr) :
+        (urcRut PT Γ j h Wr.sz γfd Wr.cwd Wr.gen Wr.ch Wr.pid Wr.lazy Wr.secc Wr) Wr) :
     P ⊢ urcLoop (hlc := hlc) PT Γ j := by
   unfold urcLoop
   iintro #HP
@@ -85,12 +85,27 @@ theorem userretClosed_proof (UT : USERTRAP) (UV : USERVEC) (UR : USERRET) : USER
     -- first resume (forkret), filed as an origin at its own key
     have HRS := urc_resume (hlc := hlc) (GF := GF) UR PT Γ j cpu k m P ksp V M sts gn cs pid sep sc tv hproc
       hctx htier hnoff hsp hav ha0 hsep hgn none (urc_fit_origin cpu P V M sts gn cs pid sep hsep)
-    -- ...its evidence free (NI M2-X1: `NiFitIs.evidNone`)
-    ihave #Hev := NiFitIs.evidNone (hlc := hlc) (GF := GF) _
-      (urc_fit_origin cpu P V M sts gn cs pid sep hsep)
+    -- THE INCARNATION'S KEY HISTORY (NI M3 U-2b, design/ni-uhist.md D2): born
+    -- here, empty, at its start key -- the key this first resume resumes
+    iapply wpLoop_bupd
+    imod (uhistAuth_alloc (GF := GF) (uvisOf V M sts gn cs pid)) with ⟨%γh, Huh, #Hulb⟩
+    -- ...its evidence (NI M2-X1: `NiFitIs.evidNone`; NI M3 U-2b: the
+    -- history's registration, its lower bound at the start key)
+    have hfo : niFitEv none (.uEnter cpu (satpOf KTier.kpt P.root) sep (tfGprs V.tf)) none
+        (γh, uvisOf V M sts gn cs pid, []) :=
+      ⟨rfl, rfl, cpu, _, sep, rfl, hsep⟩
+    ihave #Hev := NiFitIs.evidNone (hlc := hlc) (GF := GF) _ _ hfo $$ [Hulb]
+    · unfold niUhRes; iexact Hulb
+    ihave Huh : uhistAt (GF := GF) (uvisOf V M sts gn cs pid) $$ [Huh]
+    · unfold uhistAt
+      iexists γh, uvisOf V M sts gn cs pid, []
+      iframe Huh
+      ipureintro
+      exact ⟨uhistWf_nil, trivial, rfl⟩
+    imodintro
     iapply HRS
     unfold uRcptOpt uClaimFor uClaimForRaw
-    iframe Hw Hc Hclm Hev Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Hslot
+    iframe Hw Hc Hclm Hev Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Huh Hslot
     inext
     iexact HL⟩
 

@@ -2535,14 +2535,11 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
   iapply wpLoop_bupd
   have hup := parkToken_park_steady (hlc := hlc) (SG := SG) cpu ξ0 ⟨γft, γ, γw, Γ, i, ip, pid_c⟩
     (List.replicate 12 0#64) (kfChildV V V_c Pnew' Cf (Rid 10#5) (Rid2 10#5) bs' γdC) Mnew' stsP ∅ hi (by simp)
-  -- THE INCARNATION'S KEY HISTORY (design/ni-uhist.md D2), born empty at its
-  -- park and carried by `parkOwn` (UsertrapRes deviation 11)
-  imod (uhistAuth_alloc (GF := GF)) with ⟨%γuh, Huh⟩
-  ihave Hpo : parkOwn (GF := GF) $$ [Hbs Huh]
+  -- the park's bcache slots (NI M3 U-2b: the incarnation's key history is
+  -- born at its first resume, `ProofUserretClosed.userretClosed_proof`)
+  ihave Hpo : parkOwn (GF := GF) $$ [Hbs]
   · unfold parkOwn
-    iframe Hbs
-    iexists γuh
-    iexact Huh
+    iexact Hbs
   dsimp only [UtNames.pj, utParkCaps] at hup
   ihave Hup := hup $$ Hown Htokp Hrows Hused Hpo Hig HcFr Hcch Hsl Hco Hchildr
   imod Hup with ⟨Hown, HprocCtx⟩

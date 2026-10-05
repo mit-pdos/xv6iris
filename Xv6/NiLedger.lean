@@ -13,7 +13,8 @@ incarnation's first key).
   of an entry's evidence (`MachFixedGS.uFit`'s Xv6 reading, ruling O2),
   with the round's getpid row (`niPidRow`, M2-W2d) and wait row
   (`niWaitRow`, NI G1d: the answer's shape, carried by the round).
-* §3 `NiEntry`, `niOk h F` (every filing is valid in `h`, every enter in `h`
+* §3 `NiEntry` (NI M3 U-2b: an origin names its key history, a round its
+  resumed key, history and index), `niOk h F` (every filing is valid in `h`, every enter in `h`
   is filed once): the ledger's pure fact (ruling O6: `∃ F`); `niOk_snoc`
   steps it blind on non-enter events, `niOk_file` files an enter.
 * §4 `NiFitIs`: the Prop class that tells the kernel's proofs (generic in the
@@ -35,6 +36,12 @@ incarnation's first key).
   (`NiEntry.cite`); `niChain F H` (every citation of era `k` below `H k`),
   `niHist F` (the join of `F`'s citations per era, ruling X-R2) and
   `niHist_below` (any chain makes `niHist F` one).
+* §6b (NI M3 U-2b) THE KEY CHAIN, pure: a filing names the key history
+  it cites (`NiEntry.uh`; a round its index `k` and its resumed key `Wr`),
+  its user part is `niUserRow` (`Ustep.ulands Wr sc W`), its resume key is
+  pinned whole by `niKeyRow` (F6), and `niUserChain F` (every history the
+  filing cites is ONE chain from its origin's start key) is read off the
+  per-history state's invariant `niUhInv`.
 * §7 (NI M2-X3) the era registration and the chain as resources: the NI
   record's `niEraTok`/`niEraAnchor`/`niEvid`, the chain state `niChainSt`,
   `niR γ γe h := ∃ F, ⌜niOk h F⌝ ∗ niClaims γ h F ∗ niChainSt γe h F`, and
@@ -80,6 +87,20 @@ once as an origin: `niOneShot`, read off `niR` by `niR_pure`.
 5. (NI M2-X3) `niChainSt_file` yields the registration bound first and the
    new state as `∀ fn, ⌜fn.cite = c⌝ -∗ …`, since the filing `fn` is built
    from that bound.
+
+6. (NI M3 U-2b) The key history is REGISTERED through the evidence, not by a
+   separate ledger key (the design's `niUhKey`): the origin arm of `niEvid`
+   names the history and its start key (`niUhRes`: its lower bound at the
+   start key, empty), and the filing records them (`NiEntry.origin … γ`).
+   Per history the ledger keeps the LONGEST cited lower bound (`niUhSt`,
+   `niHist`'s construction); two lower bounds at one name share the start
+   key and are prefix-comparable (`UhistDefs.uhistLb_agree`), so every
+   citation is read against one chain.  What persistent lower bounds cannot
+   show, and `niUserChain` therefore does not state: that every entry of the
+   chain is FILED (no gap), and that the filings of one incarnation cite one
+   history -- the kernel makes both true (one append per round, one history
+   per incarnation), the ledger cannot see it; U-3 takes the second as
+   `NiTrace.NiOneOrigin`.
 
 PURE but for the class and §5's resources.
 -/
@@ -196,18 +217,46 @@ def niOutRow (sc : BitVec 64) (W W' : Uvis) : Option (Nat × UIota) → Prop
       usysOutAt ι (uwriteRun (uvisRun W).M (tfW (uvisRun W).tf (tfArgIdx 1)) (uwriteCntOf (tfW W'.tf (tfArgIdx 0))))
   | none => True
 
+/-- **THE USER'S PART OF A ROUND** (NI M3 U-2b, design (d)): the trapped
+key is where the pure user run from the RESUMED key may trap
+(`Ustep.ulands`: reachable from `Wr` by `ustep`, at an ecall only where
+the instruction is the ecall -- or a `stuck` point is reachable). -/
+def niUserRow (Wr : Uvis) (sc : BitVec 64) (W : Uvis) : Prop := Ustep.ulands Wr sc W
+
+/-- **THE RESUME KEY, PINNED WHOLE** (NI M3 U-2b, design (d), finding F6): off
+the ecall (an interrupt, a served fault) the round resumes the trapped key
+itself (up to the kernel words, `ukeyEq`); at an ecall in the private class
+it resumes `usysDet` at the cited prefix -- `UIota.boot` at a number that
+cites nothing (getpid, pause): `niDetRow` extended to every class member.
+The class premise is `niDetRow`'s. -/
+def niKeyRow (sc : BitVec 64) (W W' : Uvis) (c : Option (Nat × UIota)) : Prop :=
+  (sc ≠ uecallScause → ukeyEq W W') ∧
+  (sc = uecallScause →
+    usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
+      (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) →
+    ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ((c.map Prod.snd).getD UIota.boot)) W')
+
+/-- **A key-history citation** (NI M3 U-2b): the history's ghost name, its
+start key and the rounds a lower bound shows (`niUhRes`). -/
+abbrev NiUh : Type := GName × Uvis × List Uround
+
 /-- **THE FILING'S FIT AT A CITATION** (NI M2-X, design §2(d), finding F2):
-the entry's evidence `ox`, the entry `e` and the round's citation `c` (an
-era and the ledgers' prefixes `ι` it read, or none).  An origin cites
-nothing; a round is `niFit`'s round arm at ONE set of witnesses, citing
-exactly at the citing numbers (`niCiting`), with M0's row at the cited
-prefix (fork's answer among them since NI joint fork lane F3). -/
-def niFitEv : Option (Nat × Obs) → Obs → Option (Nat × UIota) → Prop
-  | none, e, c => c = none ∧ ∃ W0, enterFits e W0
-  | some (_, x), e, c => ∃ (sc : BitVec 64) (W W' : Uvis),
+the entry's evidence `ox`, the entry `e`, the round's citation `c` (an
+era and the ledgers' prefixes `ι` it read, or none) and (NI M3 U-2b) the
+key-history citation `u`.  An origin cites no era, and its history is at
+its start key, empty -- the key the enter fits; a round is `niFit`'s round
+arm at ONE set of witnesses, citing exactly at the citing numbers
+(`niCiting`), with M0's row at the cited prefix (fork's answer among them
+since NI joint fork lane F3), the resume key pinned whole (`niKeyRow`),
+and its history ending in THIS round `(sc, Wr, W, W')`, chained from its
+start key (`uhistChain`: its user part `niUserRow`). -/
+def niFitEv : Option (Nat × Obs) → Obs → Option (Nat × UIota) → NiUh → Prop
+  | none, e, c, u => c = none ∧ u.2.2 = [] ∧ enterFits e u.2.1
+  | some (_, x), e, c, u => ∃ (sc : BitVec 64) (Wr W W' : Uvis) (hp : List Uround),
       exitFits x sc W ∧ enterFits e W' ∧ roundOkKeys sc W W' ∧ W'.pid = W.pid ∧
       niPidRow sc W W' ∧ niWaitRow sc W W' ∧ (niCiting sc W ↔ c.isSome) ∧
-      niDetRow sc W W' c ∧ niOutRow sc W W' c
+      niDetRow sc W W' c ∧ niOutRow sc W W' c ∧ niKeyRow sc W W' c ∧
+      u.2.2 = hp ++ [(sc, Wr, W, W')] ∧ uhistChain u.2.1 u.2.2
 
 /-! ## §3 The filing -/
 
@@ -217,29 +266,53 @@ exit, or the power-on (initproc) -- or a round from the exit at `i` to the
 enter at `j`, with (NI M2-X3) the round's CITATION `cite`: the era and the
 ledgers' prefixes it read (`niFitEv`'s `c`), or none. -/
 inductive NiEntry where
-  | origin (j : Nat) (W0 : Uvis) (p : Nat)
-  | round (i j : Nat) (sc : BitVec 64) (W W' : Uvis) (cite : Option (Nat × UIota))
+  | origin (j : Nat) (W0 : Uvis) (p : Nat) (γ : GName)
+  | round (i j : Nat) (sc : BitVec 64) (Wr W W' : Uvis) (cite : Option (Nat × UIota)) (γ : GName) (k : Nat)
 
 /-- The enter a filing files. -/
 def NiEntry.j : NiEntry → Nat
-  | .origin j _ _ => j
-  | .round _ j _ _ _ _ => j
+  | .origin j .. => j
+  | .round _ j .. => j
 
 /-- The citation a filing records (NI M2-X3): a round's, none for an origin. -/
 def NiEntry.cite : NiEntry → Option (Nat × UIota)
   | .origin .. => none
-  | .round _ _ _ _ _ c => c
+  | .round _ _ _ _ _ _ c _ _ => c
+
+/-- The key history a filing cites (NI M3 U-2b): the origin's (its
+registration) or the round's. -/
+def NiEntry.uh : NiEntry → GName
+  | .origin _ _ _ γ => γ
+  | .round _ _ _ _ _ _ _ γ _ => γ
+
+/-- **A filing read against a history** `(W0, H)` (NI M3 U-2b): an origin
+is at its start key, a round is its entry `k`. -/
+def niUhFits : NiEntry → Uvis → List Uround → Prop
+  | .origin _ W _ _, W0, _ => W = W0
+  | .round _ _ sc Wr W W' _ _ k, _, H => H[k]? = some (sc, Wr, W, W')
+
+/-- **THE KEY CHAIN, ACROSS THE FILING** (NI M3 U-2b, design (d), ruling
+U-R3): every history a filing cites is ONE chain `H` from ONE start key
+`W0` -- its origin's first key, and each round citing it at index `k` is
+`H`'s entry `k`, whose resumed key is the previous entry's left key (`W0`
+first) and whose trapped key the pure user run from it lands at
+(`uhistChain`). -/
+def niUserChain (F : List NiEntry) : Prop :=
+  ∀ γ : GName, ∃ (W0 : Uvis) (H : List Uround), uhistChain W0 H ∧
+    (∀ j W p, NiEntry.origin j W p γ ∈ F → W = W0) ∧
+    (∀ i j sc Wr W W' c k, NiEntry.round i j sc Wr W W' c γ k ∈ F → H[k]? = some (sc, Wr, W, W'))
 
 /-- One filing is valid in history `h`.  (NI M2-X3) A round cites exactly at
 the citing numbers, its key is M0's row at the cited prefix,
 and the cited era was registered before the enter (F6: `≤`, not `=`). -/
 def niEntryOk (h : List Obs) : NiEntry → Prop
-  | .origin j W0 _ => ∃ e, h[j]? = some e ∧ enterFits e W0
-  | .round i j sc W W' cite => i < j ∧ (∃ x, h[i]? = some x ∧ exitFits x sc W) ∧
+  | .origin j W0 _ _ => ∃ e, h[j]? = some e ∧ enterFits e W0
+  | .round i j sc Wr W W' cite _ _ => i < j ∧ (∃ x, h[i]? = some x ∧ exitFits x sc W) ∧
       (∃ e, h[j]? = some e ∧ enterFits e W') ∧ roundOkKeys sc W W' ∧ W'.pid = W.pid ∧
       niPidRow sc W W' ∧ niWaitRow sc W W' ∧
       (niCiting sc W ↔ cite.isSome) ∧ niDetRow sc W W' cite ∧ niOutRow sc W W' cite ∧
-      (∀ k ι, cite = some (k, ι) → k ≤ obsBoots (h.take j))
+      (∀ k ι, cite = some (k, ι) → k ≤ obsBoots (h.take j)) ∧
+      niUserRow Wr sc W ∧ niKeyRow sc W W' cite
 
 /-- **THE LEDGER'S FACT**: every filing is valid, and every enter in `h` is
 filed exactly once (`∃!`, spelled out). -/
@@ -251,10 +324,10 @@ def niOk (h : List Obs) (F : List NiEntry) : Prop :=
 /-- A valid filing names a position of the history. -/
 theorem niEntryOk_lt {h : List Obs} {f : NiEntry} (hf : niEntryOk h f) : f.j < h.length := by
   cases f with
-  | origin j W0 p =>
+  | origin j W0 p γ =>
     obtain ⟨e, he, -⟩ := hf
     exact (List.getElem?_eq_some_iff.mp he).1
-  | round i j sc W W' c =>
+  | round i j sc Wr W W' c γ k =>
     obtain ⟨-, -, ⟨e, he, -⟩, -⟩ := hf
     exact (List.getElem?_eq_some_iff.mp he).1
 
@@ -263,17 +336,17 @@ theorem niEntryOk_snoc {h : List Obs} {f : NiEntry} (e : Obs) (hf : niEntryOk h 
     niEntryOk (h ++ [e]) f := by
   have hlt := niEntryOk_lt hf
   cases f with
-  | origin j W0 p =>
+  | origin j W0 p γ =>
     have hlt' : j < h.length := hlt
     obtain ⟨e', he', hfit⟩ := hf
     exact ⟨e', by rw [List.getElem?_append_left hlt']; exact he', hfit⟩
-  | round i j sc W W' c =>
-    obtain ⟨hij, ⟨x, hx, hxf⟩, ⟨e', he', hef⟩, hr, hp, hq, hw, hci, hd, ho, hb⟩ := hf
+  | round i j sc Wr W W' c γ k =>
+    obtain ⟨hij, ⟨x, hx, hxf⟩, ⟨e', he', hef⟩, hr, hp, hq, hw, hci, hd, ho, hb, hu, hk⟩ := hf
     have hlt' : j < h.length := hlt
     have htk : (h ++ [e]).take j = h.take j := List.take_append_of_le_length (by omega)
     exact ⟨hij, ⟨x, by rw [List.getElem?_append_left (by omega)]; exact hx, hxf⟩,
       ⟨e', by rw [List.getElem?_append_left hlt']; exact he', hef⟩, hr, hp, hq, hw, hci, hd, ho,
-      by rw [htk]; exact hb⟩
+      by rw [htk]; exact hb, hu, hk⟩
 
 /-- The new last position reads the appended event. -/
 theorem niLast {h : List Obs} {e e' : Obs} {j : Nat} (hj : (h ++ [e])[j]? = some e')
@@ -307,34 +380,39 @@ cites is known): at position `h.length`, a round citing the exit at `i`
 (NI M2-X3: with the evidence's citation `c`) or an origin spending the claim
 at `p`. -/
 def niFiling (h : List Obs) (ox : Option (Nat × Obs)) (W0 : Uvis) (p : Nat) (sc : BitVec 64)
-    (W W' : Uvis) (c : Option (Nat × UIota)) : NiEntry :=
+    (Wr W W' : Uvis) (c : Option (Nat × UIota)) (γ : GName) (k : Nat) : NiEntry :=
   match ox with
-  | none => .origin h.length W0 p
-  | some (i, _) => .round i h.length sc W W' c
+  | none => .origin h.length W0 p γ
+  | some (i, _) => .round i h.length sc Wr W W' c γ k
 
 /-- **An enter's evidence is a valid filing** at the new position (NI M2-X3:
 filed from the evidence's witnesses, `niFitEv`, F2; the cited era registered
 by now, `hcb`). -/
 theorem niFiling_ok {h : List Obs} {e : Obs} {ox : Option (Nat × Obs)} {c : Option (Nat × UIota)}
-    (hfit : niFitEv ox e c)
+    {u : NiUh} (hfit : niFitEv ox e c u)
     (hrc : ∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x)
     (hcb : ∀ k ι, c = some (k, ι) → k ≤ obsBoots h) (p : Nat) :
-    ∃ (W0 : Uvis) (sc : BitVec 64) (W W' : Uvis),
-      niEntryOk (h ++ [e]) (niFiling h ox W0 p sc W W' c) ∧ (niFiling h ox W0 p sc W W' c).cite = c := by
+    ∃ (W0 : Uvis) (sc : BitVec 64) (Wr W W' : Uvis) (k : Nat),
+      niEntryOk (h ++ [e]) (niFiling h ox W0 p sc Wr W W' c u.1 k) ∧
+      (niFiling h ox W0 p sc Wr W W' c u.1 k).cite = c ∧ (niFiling h ox W0 p sc Wr W W' c u.1 k).uh = u.1 ∧
+      niUhFits (niFiling h ox W0 p sc Wr W W' c u.1 k) u.2.1 u.2.2 := by
   have hlast : (h ++ [e])[h.length]? = some e := by simp
   cases ox with
   | none =>
-    obtain ⟨rfl, W0, hW0⟩ := hfit
-    exact ⟨W0, 0#64, W0, W0, ⟨e, hlast, hW0⟩, rfl⟩
+    obtain ⟨rfl, -, hW0⟩ := hfit
+    exact ⟨u.2.1, 0#64, u.2.1, u.2.1, u.2.1, 0, ⟨e, hlast, hW0⟩, rfl, rfl, rfl⟩
   | some ix =>
     obtain ⟨i, x⟩ := ix
-    obtain ⟨sc, W, W', hx, hen, hr, hp, hq, hw, hci, hd, ho⟩ := hfit
+    obtain ⟨sc, Wr, W, W', hp, hx, hen, hr, hpd, hq, hw, hci, hd, ho, hk, hu, hch⟩ := hfit
     obtain ⟨hi, hxi⟩ := hrc i x rfl
-    refine ⟨W, sc, W, W', ⟨hi, ⟨x, by rw [List.getElem?_append_left hi]; exact hxi, hx⟩,
-      ⟨e, hlast, hen⟩, hr, hp, hq, hw, hci, hd, ho, fun k ι hk => ?_⟩, rfl⟩
-    show k ≤ obsBoots ((h ++ [e]).take h.length)
-    rw [List.take_left]
-    exact hcb k ι hk
+    have hl := (uhistChain_last (hu ▸ hch)).2
+    refine ⟨W, sc, Wr, W, W', hp.length, ⟨hi, ⟨x, by rw [List.getElem?_append_left hi]; exact hxi, hx⟩,
+      ⟨e, hlast, hen⟩, hr, hpd, hq, hw, hci, hd, ho, fun k ι hk => ?_, hl, hk⟩, rfl, rfl, ?_⟩
+    · show k ≤ obsBoots ((h ++ [e]).take h.length)
+      rw [List.take_left]
+      exact hcb k ι hk
+    · show u.2.2[hp.length]? = some (sc, Wr, W, W')
+      rw [hu]; simp
 
 /-- **Filing one more enter** (the coverage half): a valid filing of the new
 last position extends the filing. -/
@@ -362,11 +440,11 @@ theorem niOk_file {h : List Obs} {F : List NiEntry} {e : Obs} {fn : NiEntry}
 /-- **An enter is filed** at its evidence: a round citing the exit at `i`
 (which the history holds there), or an origin. -/
 theorem niOk_enter {h : List Obs} {F : List NiEntry} {e : Obs} {ox : Option (Nat × Obs)}
-    {c : Option (Nat × UIota)} (_he : isUEnter e = true) (hfit : niFitEv ox e c)
+    {c : Option (Nat × UIota)} {u : NiUh} (_he : isUEnter e = true) (hfit : niFitEv ox e c u)
     (hrc : ∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x)
     (hcb : ∀ k ι, c = some (k, ι) → k ≤ obsBoots h)
     (hF : niOk h F) : ∃ F', niOk (h ++ [e]) F' := by
-  obtain ⟨W0, sc, W, W', hfn, -⟩ := niFiling_ok hfit hrc hcb 0
+  obtain ⟨W0, sc, Wr, W, W', k, hfn, -⟩ := niFiling_ok hfit hrc hcb 0
   refine ⟨_, niOk_file ?_ hfn hF⟩
   cases ox with
   | none => rfl
@@ -406,8 +484,8 @@ theorem niForkExit_of_fits {x : Obs} {sc : BitVec 64} {W : Uvis} (hx : exitFits 
 /-- **The claim a filing spent**, as a key: a round's at `2 i` (the exit it
 cites), an origin's at `2 p + 1` (the fork exit or power-on it names). -/
 def NiEntry.key : NiEntry → Nat
-  | .origin _ _ p => 2 * p + 1
-  | .round i _ _ _ _ _ => 2 * i
+  | .origin _ _ p _ => 2 * p + 1
+  | .round i .. => 2 * i
 
 /-- **A key minted in `h`**: a round claim at an exit, an origin claim at a
 fork exit or a power-on. -/
@@ -465,6 +543,13 @@ def niCiteResRaw {GF : BundledGFunctors} [MonoNatG GF] [Xv6G GF] [WchGpre GF]
   | none => iprop(emp)
   | some (k, ι) => iprop(∃ ns : List GName, A k ns ∗ niIotaLbs ns ι)
 
+/-- **What a key-history citation shows** (NI M3 U-2b): the lower bound of
+the history at its name, start key and rounds. -/
+def niUhRes {GF : BundledGFunctors} [Xv6G GF] (u : NiUh) : IProp GF := uhistLb u.1 u.2.1 u.2.2
+
+instance niUhRes_persistent {GF : BundledGFunctors} [Xv6G GF] (u : NiUh) : Persistent (niUhRes (GF := GF) u) := by
+  unfold niUhRes; infer_instance
+
 /-- `niCiteResRaw` at the record's anchor (`MachFixedGS.uEraAnchor`). -/
 def niCiteRes {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF] [WchGpre GF]
     (c : Option (Nat × UIota)) : IProp GF :=
@@ -485,12 +570,15 @@ class NiFitIs (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [WchGpre GF] : P
   power-on's ticket at the era's ledger names -/
   reg : ∀ (k : Nat) (ns : List GName),
     MachFixedGS.uEraTok (hlc := hlc) (GF := GF) k ⊢ |==> MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k ns
-  /-- (NI M2-X1) a round's evidence: the filing's fit at its citation `c`,
-  with what the citation shows (`niCiteRes`), is the record's `uEvid` -/
-  evid : ∀ (i : Nat) (x e : Obs) (c : Option (Nat × UIota)), niFitEv (some (i, x)) e c →
-    niCiteRes (hlc := hlc) (GF := GF) c ⊢ MachFixedGS.uEvid (hlc := hlc) (GF := GF) (some (i, x)) e
-  /-- (NI M2-X1) an origin's evidence is free -/
-  evidNone : ∀ e : Obs, niFit none e → ⊢ MachFixedGS.uEvid (hlc := hlc) (GF := GF) none e
+  /-- (NI M2-X1) a round's evidence: the filing's fit at its citation `c`
+  and (NI M3 U-2b) key-history citation `u`, with what they show
+  (`niCiteRes`, `niUhRes`), is the record's `uEvid` -/
+  evid : ∀ (i : Nat) (x e : Obs) (c : Option (Nat × UIota)) (u : NiUh), niFitEv (some (i, x)) e c u →
+    niCiteRes (hlc := hlc) (GF := GF) c ∗ niUhRes u ⊢ MachFixedGS.uEvid (hlc := hlc) (GF := GF) (some (i, x)) e
+  /-- (NI M2-X1) an origin's evidence: (NI M3 U-2b) its key history's
+  registration, the history at its start key -/
+  evidNone : ∀ (e : Obs) (u : NiUh), niFitEv none e none u →
+    niUhRes u ⊢ MachFixedGS.uEvid (hlc := hlc) (GF := GF) none e
 
 theorem uFit_of_niFit {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchGpre GF] [NiFitIs (hlc := hlc) GF]
     (ox : Option (Nat × Obs)) (e : Obs) (h : niFit ox e) : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e :=
@@ -734,10 +822,121 @@ theorem niOk_cite_le {h : List Obs} {F : List NiEntry} (hF : niOk h F) :
   intro f hf k ι hc
   have hv := hF.1 f hf
   cases f with
-  | origin j W0 p => exact nomatch hc
-  | round i j sc W W' c =>
-    obtain ⟨-, -, -, -, -, -, -, -, -, -, hb⟩ := hv
+  | origin j W0 p γ => exact nomatch hc
+  | round i j sc Wr W W' c γ k' =>
+    obtain ⟨-, -, -, -, -, -, -, -, -, -, hb, -⟩ := hv
     exact Nat.le_trans (hb k ι hc) (obsBoots_take_le h j)
+
+/-! ## §6b THE KEY CHAIN, PURE (NI M3 U-2b)
+
+Per key history `γ` the filing cites, the longest history cited so far
+`U γ = some (W0, H)`: a chain (`uhistChain W0 H`), and every filing citing
+`γ` read against it (`niUhFits`).  `niUhInv_file` steps it by one filing
+whose citation is prefix-comparable with `H` at the same start key (what
+`MonoList.lb_own_valid` gives at the history's name); `niUserChain_of_inv`
+reads `niUserChain` off it. -/
+
+/-- The per-history state's pure invariant. -/
+def niUhInv (F : List NiEntry) (U : GName → Option (Uvis × List Uround)) : Prop :=
+  ∀ γ, (U γ = none → ∀ f ∈ F, f.uh ≠ γ) ∧
+    ∀ W0 H, U γ = some (W0, H) → uhistChain W0 H ∧ ∀ f ∈ F, f.uh = γ → niUhFits f W0 H
+
+theorem niUhFits_mono {f : NiEntry} {W0 : Uvis} {H H' : List Uround} (hp : H <+: H')
+    (hf : niUhFits f W0 H) : niUhFits f W0 H' := by
+  cases f with
+  | origin j W p γ => exact hf
+  | round i j sc Wr W W' c γ k =>
+    obtain ⟨t, rfl⟩ := hp
+    show (H ++ t)[k]? = some (sc, Wr, W, W')
+    have hk : k < H.length := (List.getElem?_eq_some_iff.mp hf).1
+    rw [List.getElem?_append_left hk]; exact hf
+
+/-- The longer of two comparable histories. -/
+def niUhLonger (H hu : List Uround) : List Uround := if hu.length ≤ H.length then H else hu
+
+theorem niUhLonger_prefix {H hu : List Uround} (hc : H <+: hu ∨ hu <+: H) :
+    H <+: niUhLonger H hu ∧ hu <+: niUhLonger H hu := by
+  unfold niUhLonger
+  split
+  · rename_i hl
+    refine ⟨List.prefix_refl _, ?_⟩
+    rcases hc with hc | hc
+    · exact List.prefix_of_prefix_length_le (List.prefix_refl hu) hc hl
+    · exact hc
+  · rename_i hl
+    refine ⟨?_, List.prefix_refl _⟩
+    rcases hc with hc | hc
+    · exact hc
+    · exact absurd hc.length_le hl
+
+/-- The state after filing `fn` citing `γ` at `(W0, hu)`. -/
+def niUhNext (U : GName → Option (Uvis × List Uround)) (γ : GName) (W0 : Uvis) (hu : List Uround) :
+    GName → Option (Uvis × List Uround) :=
+  fun γ' => if γ' = γ then
+    (match U γ with
+     | some (_, H) => some (W0, niUhLonger H hu)
+     | none => some (W0, hu))
+    else U γ'
+
+/-- **One filing steps the per-history state.** -/
+theorem niUhInv_file {F : List NiEntry} {U : GName → Option (Uvis × List Uround)} {fn : NiEntry}
+    {γ : GName} {W0 : Uvis} {hu : List Uround} (hinv : niUhInv F U) (hch : uhistChain W0 hu)
+    (hfn : fn.uh = γ) (hfit : niUhFits fn W0 hu)
+    (hag : ∀ W0' H, U γ = some (W0', H) → W0' = W0 ∧ (H <+: hu ∨ hu <+: H)) :
+    niUhInv (F ++ [fn]) (niUhNext U γ W0 hu) := by
+  intro γ'
+  unfold niUhNext
+  by_cases hγ : γ' = γ
+  · subst hγ
+    simp only [↓reduceIte]
+    cases hU : U γ' with
+    | none =>
+      refine ⟨fun h => (nomatch h), fun W0' H h => ?_⟩
+      simp only [Option.some.injEq, Prod.mk.injEq] at h
+      obtain ⟨rfl, rfl⟩ := h
+      refine ⟨hch, fun f hf hfu => ?_⟩
+      rcases List.mem_append.mp hf with hf | hf
+      · exact absurd hfu ((hinv γ').1 hU f hf)
+      · rw [List.mem_singleton.mp hf]; exact hfit
+    | some p =>
+      obtain ⟨W0o, Ho⟩ := p
+      obtain ⟨rfl, hc⟩ := hag W0o Ho hU
+      obtain ⟨hch0, hfo⟩ := (hinv γ').2 W0o Ho hU
+      obtain ⟨hp1, hp2⟩ := niUhLonger_prefix hc
+      refine ⟨fun h => (nomatch h), fun W0' H h => ?_⟩
+      simp only [Option.some.injEq, Prod.mk.injEq] at h
+      obtain ⟨rfl, rfl⟩ := h
+      refine ⟨?_, fun f hf hfu => ?_⟩
+      · unfold niUhLonger; split
+        · exact hch0
+        · exact hch
+      · rcases List.mem_append.mp hf with hf | hf
+        · exact niUhFits_mono hp1 (hfo f hf hfu)
+        · rw [List.mem_singleton.mp hf]; exact niUhFits_mono hp2 hfit
+  · simp only [if_neg hγ]
+    refine ⟨fun h f hf => ?_, fun W0' H h => ?_⟩
+    · rcases List.mem_append.mp hf with hf | hf
+      · exact (hinv γ').1 h f hf
+      · rw [List.mem_singleton.mp hf, hfn]; exact fun h' => hγ h'.symm
+    · obtain ⟨hc, hfo⟩ := (hinv γ').2 W0' H h
+      refine ⟨hc, fun f hf hfu => ?_⟩
+      rcases List.mem_append.mp hf with hf | hf
+      · exact hfo f hf hfu
+      · rw [List.mem_singleton.mp hf, hfn] at hfu; exact absurd hfu.symm hγ
+
+/-- **The chain, read off the state.** -/
+theorem niUserChain_of_inv {F : List NiEntry} {U : GName → Option (Uvis × List Uround)}
+    (hinv : niUhInv F U) : niUserChain F := by
+  intro γ
+  cases hU : U γ with
+  | none =>
+    refine ⟨default, [], trivial, fun j W p hm => ?_, fun i j sc Wr W W' c k hm => ?_⟩
+    · exact absurd rfl ((hinv γ).1 hU _ hm)
+    · exact absurd rfl ((hinv γ).1 hU _ hm)
+  | some p =>
+    obtain ⟨W0, H⟩ := p
+    obtain ⟨hch, hfo⟩ := (hinv γ).2 W0 H hU
+    exact ⟨W0, H, hch, fun j W p hm => hfo _ hm rfl, fun i j sc Wr W W' c k hm => hfo _ hm rfl⟩
 
 /-! ## §7 THE ERA'S REGISTRATION AND THE CHAIN, AS RESOURCES (NI M2-X3)
 
@@ -794,50 +993,48 @@ instance niCiteResRaw_persistent (A : Nat → List GName → IProp GF) [∀ k ns
   | none => simp only [niCiteResRaw]; infer_instance
   | some p => obtain ⟨k, ι⟩ := p; simp only [niCiteResRaw]; infer_instance
 
-/-- **THE EVIDENCE** (the NI record's `uEvid`): an origin's fit, or the
-filing's fit at the round's citation `c` with what the citation shows -- the
-era's anchor and the cited prefixes' lower bounds at the anchored names. -/
-def niEvid (γe : GName) : Option (Nat × Obs) → Obs → IProp GF
-  | none, e => iprop(⌜niFit none e⌝)
-  | some ix, e => iprop(∃ c : Option (Nat × UIota), ⌜niFitEv (some ix) e c⌝ ∗ niCiteResRaw (niEraAnchor γe) c)
+/-- **THE EVIDENCE** (the NI record's `uEvid`): the filing's fit at the
+round's citation `c` (none for an origin) and (NI M3 U-2b) its key-history
+citation `u`, with what they show -- the era's anchor and the cited
+prefixes' lower bounds at the anchored names, and the history's lower
+bound. -/
+def niEvid (γe : GName) (ox : Option (Nat × Obs)) (e : Obs) : IProp GF :=
+  iprop(∃ (c : Option (Nat × UIota)) (u : NiUh), ⌜niFitEv ox e c u⌝ ∗
+    niCiteResRaw (niEraAnchor γe) c ∗ niUhRes u)
 
 instance niEvid_persistent (γe : GName) (ox : Option (Nat × Obs)) (e : Obs) :
     Persistent (niEvid (GF := GF) γe ox e) := by
-  cases ox <;> simp only [niEvid] <;> infer_instance
+  unfold niEvid; infer_instance
 
 /-- The NI record's `NiFitIs.evid`: by definition. -/
-theorem niEvid_cite (γe : GName) (i : Nat) (x e : Obs) (c : Option (Nat × UIota))
-    (hfit : niFitEv (some (i, x)) e c) :
-    niCiteResRaw (niEraAnchor (GF := GF) γe) c ⊢ niEvid γe (some (i, x)) e := by
-  simp only [niEvid]
-  iintro #H
-  iexists c
+theorem niEvid_cite (γe : GName) (i : Nat) (x e : Obs) (c : Option (Nat × UIota)) (u : NiUh)
+    (hfit : niFitEv (some (i, x)) e c u) :
+    niCiteResRaw (niEraAnchor (GF := GF) γe) c ∗ niUhRes u ⊢ niEvid γe (some (i, x)) e := by
+  unfold niEvid
+  iintro ⟨#H, #Hu⟩
+  iexists c, u
   isplitl []
   · ipureintro; exact hfit
-  · iexact H
+  iframe H Hu
 
 /-- The NI record's `NiFitIs.evidNone`. -/
-theorem niEvid_none (γe : GName) (e : Obs) (hfit : niFit none e) : ⊢@{IProp GF} niEvid γe none e := by
-  simp only [niEvid]
-  ipureintro
-  exact hfit
+theorem niEvid_none (γe : GName) (e : Obs) (u : NiUh) (hfit : niFitEv none e none u) :
+    niUhRes u ⊢@{IProp GF} niEvid γe none e := by
+  unfold niEvid
+  iintro #Hu
+  iexists none, u
+  isplitl []
+  · ipureintro; exact hfit
+  isplitl []
+  · simp only [niCiteResRaw]; iempintro
+  · iexact Hu
 
-/-- The evidence opened: a citation, the fit at it, what it shows. -/
+/-- The evidence opened: a citation, a key-history citation, the fit at
+them, what they show. -/
 theorem niEvid_open (γe : GName) (ox : Option (Nat × Obs)) (e : Obs) :
     niEvid (GF := GF) γe ox e ⊢
-      ∃ c : Option (Nat × UIota), ⌜niFitEv ox e c⌝ ∗ niCiteResRaw (niEraAnchor γe) c := by
-  cases ox with
-  | none =>
-    simp only [niEvid]
-    iintro %hf
-    iexists none
-    isplitl []
-    · ipureintro; exact ⟨rfl, hf⟩
-    · simp only [niCiteResRaw]; iempintro
-  | some ix =>
-    simp only [niEvid]
-    iintro H
-    iexact H
+      ∃ (c : Option (Nat × UIota)) (u : NiUh), ⌜niFitEv ox e c u⌝ ∗
+        niCiteResRaw (niEraAnchor γe) c ∗ niUhRes u := .rfl
 
 /-- **THE CHAIN STATE** of era registrations and citations: the authority
 over the era keys (exactly the registered `niPair k γs`, `T k = some γs`),
@@ -1090,11 +1287,97 @@ theorem niChainSt_file (γe : GName) (h : List Obs) (e : Obs) (F : List NiEntry)
           simp only [Option.some.injEq, Prod.mk.injEq] at hc
           exact absurd hc.1.symm hk
 
+/-- **THE KEY-HISTORY STATE** (NI M3 U-2b, design (d), the M2-X pattern):
+per history the filing cites, the longest cited history, with its lower
+bound at the history's name -- registered by its origin filing (`niEvid`'s
+origin arm names the history and its start key), every round's citation
+comparable with it -- and the pure invariant `niUhInv`. -/
+def niUhSt (F : List NiEntry) : IProp GF :=
+  iprop(∃ U : GName → Option (Uvis × List Uround),
+    (□ ∀ (γ : GName) (W0 : Uvis) (H : List Uround), ⌜U γ = some (W0, H)⌝ -∗ uhistLb γ W0 H) ∗
+    ⌜niUhInv F U⌝)
+
+instance niUhSt_timeless (F : List NiEntry) : Timeless (niUhSt (GF := GF) F) := by
+  unfold niUhSt; infer_instance
+
+theorem niUhSt_nil : ⊢@{IProp GF} niUhSt [] := by
+  unfold niUhSt
+  iexists (fun _ => none)
+  isplitl []
+  · imodintro
+    iintro %γ %W0 %H %h
+    exact nomatch h
+  · ipureintro
+    exact fun γ => ⟨fun _ f hf => absurd hf List.not_mem_nil, fun W0 H h => nomatch h⟩
+
+/-- **THE KEY-HISTORY STEP** (`niR_enter`'s): a filing citing history `γ` at
+`(W0, hu)` with the citation's lower bound, chained (`uhistChain W0 hu`) and
+read against its own citation, is comparable with the longest cited
+history (`uhistLb_agree`), and the state moves to the longer. -/
+theorem niUhSt_file (F : List NiEntry) (fn : NiEntry) (γ : GName) (W0 : Uvis) (hu : List Uround)
+    (hch : uhistChain W0 hu) (hfn : fn.uh = γ) (hfit : niUhFits fn W0 hu) :
+    uhistLb (GF := GF) γ W0 hu ∗ niUhSt F ⊢ niUhSt (F ++ [fn]) := by
+  unfold niUhSt
+  iintro ⟨#Hn, %U, #Hlbs, %hinv⟩
+  -- the cited history, comparable with the longest cited one at its name
+  ihave %hag : ⌜∀ W0' H, U γ = some (W0', H) → W0' = W0 ∧ (H <+: hu ∨ hu <+: H)⌝ $$ []
+  · cases hU : U γ with
+    | none => ipureintro; intro W0' H h; exact nomatch h
+    | some p =>
+      obtain ⟨W0o, Ho⟩ := p
+      ihave #Ho := Hlbs $$ %γ %W0o %Ho %hU
+      ihave %hc := uhistLb_agree γ W0o W0 Ho hu $$ [Ho Hn]
+      · iframe Ho Hn
+      ipureintro
+      intro W0' H h
+      simp only [Option.some.injEq, Prod.mk.injEq] at h
+      obtain ⟨rfl, rfl⟩ := h
+      exact hc
+  iexists niUhNext U γ W0 hu
+  isplitl []
+  · imodintro
+    iintro %γ' %W0' %H' %hU'
+    unfold niUhNext at hU'
+    by_cases hγ : γ' = γ
+    · subst hγ
+      simp only [↓reduceIte] at hU'
+      cases hU : U γ' with
+      | none =>
+        rw [hU] at hU'
+        simp only [Option.some.injEq, Prod.mk.injEq] at hU'
+        obtain ⟨rfl, rfl⟩ := hU'
+        iexact Hn
+      | some p =>
+        obtain ⟨W0o, Ho⟩ := p
+        rw [hU] at hU'
+        simp only [Option.some.injEq, Prod.mk.injEq] at hU'
+        obtain ⟨rfl, rfl⟩ := hU'
+        obtain ⟨hw, -⟩ := hag W0o Ho hU
+        unfold niUhLonger
+        split
+        · subst hw
+          iapply Hlbs
+          ipureintro; exact hU
+        · iexact Hn
+    · simp only [if_neg hγ] at hU'
+      iapply Hlbs
+      ipureintro; exact hU'
+  · ipureintro
+    exact niUhInv_file hinv hch hfn hfit hag
+
+/-- The pure invariant out of the state. -/
+theorem niUhSt_pure (F : List NiEntry) : niUhSt (GF := GF) F ⊢ ⌜niUserChain F⌝ := by
+  unfold niUhSt
+  iintro ⟨%U, -, %hinv⟩
+  ipureintro
+  exact niUserChain_of_inv hinv
+
 /-- **THE LEDGER** (ruling O6: the filing is part of the run's witness;
 M2-W2d: with the claim authority at `γ`; NI M2-X3: with the chain state of
-the era registrations and citations at `γe`). -/
+the era registrations and citations at `γe`; NI M3 U-2b: with the
+key-history state). -/
 def niR (γ γe : GName) (h : List Obs) : IProp GF :=
-  iprop(∃ F, ⌜niOk h F⌝ ∗ niClaims γ h F ∗ niChainSt γe h F)
+  iprop(∃ F, ⌜niOk h F⌝ ∗ niClaims γ h F ∗ niChainSt γe h F ∗ niUhSt F)
 
 instance niClaims_timeless (γ : GName) (h : List Obs) (F : List NiEntry) :
     Timeless (niClaims (GF := GF) γ h F) := by
@@ -1104,20 +1387,23 @@ instance niR_timeless (γ γe : GName) (h : List Obs) : Timeless (niR (GF := GF)
   unfold niR; infer_instance
 
 /-- **What W4 reads at the end of the trace**: the filing, that it is
-one-shot, and (NI M2-X3) that its citations chain below the histories
-`niHist F` (every citation of an era a prefix of one history). -/
+one-shot, (NI M2-X3) that its citations chain below the histories
+`niHist F` (every citation of an era a prefix of one history), and (NI M3
+U-2b) that every key history it cites is one chain (`niUserChain`). -/
 theorem niR_pure (γ γe : GName) (h : List Obs) :
-    niR (GF := GF) γ γe h ⊢ ⌜∃ F, niOk h F ∧ niOneShot h F ∧ niChain F (niHist F)⌝ := by
+    niR (GF := GF) γ γe h ⊢ ⌜∃ F, niOk h F ∧ niOneShot h F ∧ niChain F (niHist F) ∧ niUserChain F⌝ := by
   unfold niR niClaims niChainSt
-  iintro ⟨%F, %hF, ⟨%m, -, %⟨h1, -⟩⟩, ⟨%T, %Hc, %m', -, -, -, %hch⟩⟩
+  iintro ⟨%F, %hF, ⟨%m, -, %⟨h1, -⟩⟩, ⟨%T, %Hc, %m', -, -, -, %hch⟩, Hu⟩
+  ihave %hu := niUhSt_pure F $$ Hu
   ipureintro
-  exact ⟨F, hF, h1, niHist_below hch⟩
+  exact ⟨F, hF, h1, niHist_below hch, hu⟩
 
 /-- **The birth**: a fresh claim authority and chain state, at the empty
 history. -/
 theorem niR_alloc : ⊢@{IProp GF} |==> ∃ γ γe, niR γ γe [] := by
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := Unit) (H := RegMapF)) with ⟨%γ, Ha⟩
   imod niChainSt_alloc (GF := GF) with ⟨%γe, Hch⟩
+  ihave Hu := niUhSt_nil (GF := GF)
   imodintro
   iexists γ
   iexists γe
@@ -1125,7 +1411,7 @@ theorem niR_alloc : ⊢@{IProp GF} |==> ∃ γ γe, niR γ γe [] := by
   iexists []
   isplitr
   · ipureintro; exact niOk_nil
-  iframe Hch
+  iframe Hch Hu
   iexists ∅
   iframe Ha
   ipureintro
@@ -1138,7 +1424,7 @@ theorem niR_alloc : ⊢@{IProp GF} |==> ∃ γ γe, niR γ γe [] := by
 theorem niR_snoc (γ γe : GName) (h : List Obs) (e : Obs) (he : isUEnter e = false) :
     niR (GF := GF) γ γe h ⊢ niR γ γe (h ++ [e]) := by
   unfold niR niClaims
-  iintro ⟨%F, %hF, ⟨%m, Ha, %⟨h1, hm⟩⟩, Hch⟩
+  iintro ⟨%F, %hF, ⟨%m, Ha, %⟨h1, hm⟩⟩, Hch, Hu⟩
   iexists F
   isplitr
   · ipureintro; exact niOk_snoc he hF
@@ -1147,7 +1433,8 @@ theorem niR_snoc (γ γe : GName) (h : List Obs) (e : Obs) (he : isUEnter e = fa
     iframe Ha
     ipureintro
     exact ⟨niOneShot_snoc e h1, fun k hk => ⟨niKeyOk_snoc e (hm k hk).1, (hm k hk).2⟩⟩
-  · iapply niChainSt_snoc γe h e F $$ Hch
+  iframe Hu
+  iapply niChainSt_snoc γe h e F $$ Hch
 
 /-- **`niR_exit`, THE MINT**: an exit at position `h.length` mints its round
 claim and, at a fork exit, the child's origin claim. -/
@@ -1157,7 +1444,7 @@ theorem niR_exit (γ γe : GName) (h : List Obs) (e : Obs) (he : isUExit e = tru
   have hne : isUEnter e = false := by
     cases e <;> simp_all [isUExit, isUEnter]
   unfold niR niClaims
-  iintro ⟨%F, %hF, ⟨%m, Ha, %⟨h1, hm⟩⟩, Hch⟩
+  iintro ⟨%F, %hF, ⟨%m, Ha, %⟨h1, hm⟩⟩, Hch, Hu⟩
   ihave Hch := niChainSt_snoc γe h e F $$ Hch
   have hfr0 : get? m (2 * h.length) = none := niClaims_fresh hm _ (by omega)
   imod ghost_map_insert (2 * h.length) () hfr0 $$ Ha with ⟨Ha, Hr⟩
@@ -1177,11 +1464,11 @@ theorem niR_exit (γ γe : GName) (h : List Obs) (e : Obs) (he : isUExit e = tru
   · imodintro
     unfold niExitMint
     simp only [hfk, Bool.false_eq_true, ↓reduceIte]
-    isplitl [Ha Hch]
+    isplitl [Ha Hch Hu]
     · iexists F
       isplitr
       · ipureintro; exact niOk_snoc hne hF
-      iframe Hch
+      iframe Hch Hu
       iexists insert m (2 * h.length) ()
       iframe Ha
       ipureintro
@@ -1195,11 +1482,11 @@ theorem niR_exit (γ γe : GName) (h : List Obs) (e : Obs) (he : isUExit e = tru
     imodintro
     unfold niExitMint
     simp only [hfk, ↓reduceIte]
-    isplitl [Ha Hch]
+    isplitl [Ha Hch Hu]
     · iexists F
       isplitr
       · ipureintro; exact niOk_snoc hne hF
-      iframe Hch
+      iframe Hch Hu
       iexists insert (insert m (2 * h.length) ()) (2 * h.length + 1) ()
       iframe Ha
       ipureintro
@@ -1221,16 +1508,16 @@ theorem niR_powerOn (γ γe : GName) (h : List Obs) :
     niR (GF := GF) γ γe h ⊢
       |==> (niR γ γe (h ++ [.powerOn]) ∗ initClaim γ h.length ∗ niEraTok γe (obsBoots h + 1)) := by
   unfold niR niClaims
-  iintro ⟨%F, %hF, ⟨%m, Ha, %⟨h1, hm⟩⟩, Hch⟩
+  iintro ⟨%F, %hF, ⟨%m, Ha, %⟨h1, hm⟩⟩, Hch, Hu⟩
   imod niChainSt_powerOn γe h F hF $$ Hch with ⟨Hch, Htok⟩
   have hfr : get? m (2 * h.length + 1) = none := niClaims_fresh hm _ (by omega)
   imod ghost_map_insert (2 * h.length + 1) () hfr $$ Ha with ⟨Ha, Hi⟩
   imodintro
-  isplitl [Ha Hch]
+  isplitl [Ha Hch Hu]
   · iexists F
     isplitr
     · ipureintro; exact niOk_snoc rfl hF
-    iframe Hch
+    iframe Hch Hu
     iexists insert m (2 * h.length + 1) ()
     iframe Ha
     ipureintro
@@ -1256,16 +1543,16 @@ theorem niR_enter (γ γe : GName) (h : List Obs) (e : Obs) (ox : Option (Nat ×
     (hrc : ∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) :
     niSpend (GF := GF) γ ox ∗ niEvid γe ox e ∗ niR γ γe h ⊢ |==> niR γ γe (h ++ [e]) := by
   iintro ⟨Hc, Hev, Hn⟩
-  ihave ⟨%c, %hfe, #Hcr⟩ := niEvid_open γe ox e $$ Hev
+  ihave ⟨%c, %u, %hfe, #Hcr, #Hur⟩ := niEvid_open γe ox e $$ Hev
   unfold niR niClaims niSpend
-  icases Hn with ⟨%F, %hF, ⟨%m, Ha, %⟨h1, hm⟩⟩, Hch⟩
+  icases Hn with ⟨%F, %hF, ⟨%m, Ha, %⟨h1, hm⟩⟩, Hch, Hu⟩
   imod niChainSt_file γe h e F c $$ [Hch] with ⟨%hcb, Hch⟩
   · isplitl []
     · iexact Hcr
     · iexact Hch
   -- the claim's key, out of the token
-  ihave Hk : (∃ k : Nat, ⌜∀ (W0 : Uvis) (sc : BitVec 64) (W W' : Uvis),
-      (niFiling h ox W0 (k / 2) sc W W' c).key = k⌝ ∗ γ ↪◯MAP[k] ()) $$ [Hc]
+  ihave Hk : (∃ k : Nat, ⌜∀ (W0 : Uvis) (sc : BitVec 64) (Wr W W' : Uvis) (n : Nat),
+      (niFiling h ox W0 (k / 2) sc Wr W W' c u.1 n).key = k⌝ ∗ γ ↪◯MAP[k] ()) $$ [Hc]
   · cases ox with
     | none =>
       unfold uClaimForRaw niOriginTicket
@@ -1273,7 +1560,7 @@ theorem niR_enter (γ γe : GName) (h : List Obs) (e : Obs) (ox : Option (Nat ×
       iexists 2 * p + 1
       iframe Hc
       ipureintro
-      intro W0 sc W W'
+      intro W0 sc Wr W W' n
       show 2 * ((2 * p + 1) / 2) + 1 = 2 * p + 1
       omega
     | some ix =>
@@ -1282,19 +1569,30 @@ theorem niR_enter (γ γe : GName) (h : List Obs) (e : Obs) (ox : Option (Nat ×
       iexists 2 * i
       iframe Hc
       ipureintro
-      intro W0 sc W W'
+      intro W0 sc Wr W W' n
       rfl
   icases Hk with ⟨%k, %hkey, Hk⟩
   ihave %hlk := ghost_map_lookup $$ Ha Hk
   obtain ⟨hkok, hkfresh⟩ := hm k hlk
   imod ghost_map_delete k () $$ Ha Hk with Ha
-  obtain ⟨W0, sc, W, W', hfn, hcite⟩ := niFiling_ok hfe hrc hcb (k / 2)
-  have hj : (niFiling h ox W0 (k / 2) sc W W' c).j = h.length := by
+  obtain ⟨W0, sc, Wr, W, W', n, hfn, hcite, huh, hufit⟩ := niFiling_ok hfe hrc hcb (k / 2)
+  have hj : (niFiling h ox W0 (k / 2) sc Wr W W' c u.1 n).j = h.length := by
     cases ox with
     | none => rfl
     | some ix => obtain ⟨i, x⟩ := ix; rfl
+  -- the key history's citation is a chain (the evidence's)
+  have huch : uhistChain u.2.1 u.2.2 := by
+    cases ox with
+    | none => obtain ⟨-, hnil, -⟩ := hfe; rw [hnil]; trivial
+    | some ix =>
+      obtain ⟨i, x⟩ := ix
+      obtain ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, hch⟩ := hfe
+      exact hch
+  ihave Hu := niUhSt_file F (niFiling h ox W0 (k / 2) sc Wr W W' c u.1 n) u.1 u.2.1 u.2.2 huch huh hufit
+    $$ [Hur Hu]
+  · unfold niUhRes; iframe Hur Hu
   imodintro
-  iexists F ++ [niFiling h ox W0 (k / 2) sc W W' c]
+  iexists F ++ [niFiling h ox W0 (k / 2) sc Wr W W' c u.1 n]
   isplitr
   · ipureintro; exact niOk_file hj hfn hF
   isplitl [Ha]
@@ -1312,9 +1610,10 @@ theorem niR_enter (γ γe : GName) (h : List Obs) (e : Obs) (ox : Option (Nat ×
       · simp only [List.map_cons, List.map_nil, List.mem_singleton] at hin
         rw [hkey] at hin
         exact hkk hin.symm
-  · iapply Hch
-    ipureintro
-    exact hcite
+  iframe Hu
+  iapply Hch
+  ipureintro
+  exact hcite
 
 end chain
 

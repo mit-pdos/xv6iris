@@ -456,9 +456,9 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
     (Ue : Option (Nat × Obs) → Obs → IProp GF) (HUe : ∀ ox e, Persistent (Ue ox e))
     (Uet : Nat → IProp GF) (Uea : Nat → List GName → IProp GF) (HUea : ∀ k ns, Persistent (Uea k ns))
     (hUreg : ∀ (k : Nat) (ns : List GName), Uet k ⊢@{IProp GF} |==> Uea k ns)
-    (hUevid : ∀ (i : Nat) (x e : Obs) (cc : Option (Nat × UIota)), niFitEv (some (i, x)) e cc →
-      niCiteResRaw Uea cc ⊢@{IProp GF} Ue (some (i, x)) e)
-    (hUevidNone : ∀ e : Obs, niFit none e → ⊢@{IProp GF} Ue none e)
+    (hUevid : ∀ (i : Nat) (x e : Obs) (cc : Option (Nat × UIota)) (u : NiUh), niFitEv (some (i, x)) e cc u →
+      niCiteResRaw Uea cc ∗ niUhRes u ⊢@{IProp GF} Ue (some (i, x)) e)
+    (hUevidNone : ∀ (e : Obs) (u : NiUh), niFitEv none e none u → niUhRes u ⊢@{IProp GF} Ue none e)
     -- THE ERA'S RECORD PREDICATE (Rocq `Ok`/`Hbok`, SY3-A1 re-cut), read off
     -- the boot resource, at the era's number
     (Ok : Nat → N → Prop) (Hbok : ∀ (k : Nat) (r : N), appBoot c k r ⊢@{IProp GF} ⌜Ok k r⌝)

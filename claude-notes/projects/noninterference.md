@@ -5839,6 +5839,108 @@ permissions) is new `Xv6/UkVals.lean`; `ukeyEq`/`ukeyEq_symm` moved from `UexecA
 4. The fallback is chosen PER KEY at each slot (each resume, each engine retire's post slot): once inside
    `USER`'s loop it runs to the next trap, which pays `ulands` by `ustuckFrom`.
 
+### M3 ustep U-2b as landed (2026-10-05)
+
+Lane U-2b on `lane/ustep`: the per-process key chain reaches the filing.  The twelve roots' statements are
+byte-identical (no root file touched; `xv6NiAdequacy`'s text unchanged, its φ grows); `SYSCALL`/`USERTRAP`/
+`USERRET`/`USER`/`USERRET_CLOSED`/`UK_LEAVES`, `ukbF`, `NiStep`, `NiStep.input` untouched.  TCB: the six NI roots
+gain `Xv6.Ustep`, `Xv6.UkVals`, `MachCSL.DecodeBridge`, `MachCSL.UTrap`, `MachCSL.Instr`, `Xv6.ProcDefs`,
+`Xv6.UserExec` (statement cone, via `niEntryOk`'s `niUserRow` and φ's `niUserChain` → `Ustep.ulands`); no non-NI
+root moved; `audit.sh` unchanged (12 PASS, no new axiom/opaque).
+
+**The chain carrier (`UhistDefs`).**
+- `Uround := BitVec 64 × Uvis × Uvis × Uvis` (`sc, Wr, W, W'`); `uhistWf` reads `(sc, W, W')`.
+- `uhistTail W0 h` (the last `W'`, or `W0`); `uhistChain W0 : List Uround → Prop` (`[] => True`, `e :: h => e.Wr =
+  W0 ∧ Ustep.ulands e.Wr e.sc e.W ∧ uhistChain e.W' h`); `uhistChain_snoc`, `uhistChain_last`.
+- The ghost carries the start key at the head of the encoded mono-list: `uhistAuth γ W0 h`, `uhistLb γ W0 h`
+  (`γ ↪●/◯ML (enc W0 :: h.map enc)`); `uhistLb_agree` (one start key, prefix-comparable rounds);
+  `uhistAuth_alloc W0` returns the authority and its first lower bound.
+- `uhistAt Wr := ∃ γ W0 h, uhistAuth γ W0 h ∗ ⌜uhistWf h ∧ uhistChain W0 h ∧ uhistTail W0 h = Wr⌝`.
+
+**Where it lives (deviation 1, the one structural move).**  The history LEFT THE RESIDUE: `utOwn`/`utOwnNm`/
+`utOwnBare` lose `uhistRow`, `parkOwn := bslots 3`, `utOwnBare_uhist`/`utResBare_uhist_acc`/
+`usertrapResAt_uhist_acc`/`uhistRow`/`uhistOwn` are gone, kfork/userinit no longer allocate.  Reason: the residue
+names the history existentially (UsertrapRes deviation 11), so across usertrap the loop cannot know that the
+history it appends to is the one whose tail is the `Wr` it parked -- the exact `Wr = previous W'` link is
+unprovable through an `∃ γ` inside `usertrapResAt`.  Now the trap loop owns it: `urcRut … Wr` (new last
+argument) parks `uhistAt Wr` beside the residue's closer; `urc_round` takes it out with the obligation's
+`⌜ulands Wr sc W⌝` (no longer `%_`) and frames it through usertrap into `urc_exit`, which appends
+`(sc, Wr, W, W')` (`uhistChain_snoc`) and hands `uhistAt W'` to `urc_resume` (new premise), which parks it
+again.  The history is BORN at the incarnation's first resume (`userretClosed_proof`: `uhistAuth_alloc` at
+`uvisOf V M sts gn cs pid`, the key the origin files) -- per incarnation; exec keeps it (a round).
+
+**The filing (`NiLedger`).**
+
+    def niUserRow (Wr : Uvis) (sc : BitVec 64) (W : Uvis) : Prop := Ustep.ulands Wr sc W
+    def niKeyRow (sc : BitVec 64) (W W' : Uvis) (c : Option (Nat × UIota)) : Prop :=
+      (sc ≠ uecallScause → ukeyEq W W') ∧
+      (sc = uecallScause →
+        usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
+          (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) →
+        ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ((c.map Prod.snd).getD UIota.boot)) W')
+    abbrev NiUh : Type := GName × Uvis × List Uround          -- a key-history citation: name, start key, rounds
+    inductive NiEntry where
+      | origin (j : Nat) (W0 : Uvis) (p : Nat) (γ : GName)
+      | round (i j : Nat) (sc : BitVec 64) (Wr W W' : Uvis) (cite : Option (Nat × UIota)) (γ : GName) (k : Nat)
+    def niUserChain (F : List NiEntry) : Prop :=
+      ∀ γ : GName, ∃ (W0 : Uvis) (H : List Uround), uhistChain W0 H ∧
+        (∀ j W p, NiEntry.origin j W p γ ∈ F → W = W0) ∧
+        (∀ i j sc Wr W W' c k, NiEntry.round i j sc Wr W W' c γ k ∈ F → H[k]? = some (sc, Wr, W, W'))
+
+- `niEntryOk`'s round arm ends `… ∧ (∀ k ι, cite = some (k, ι) → k ≤ obsBoots (h.take j)) ∧ niUserRow Wr sc W
+  ∧ niKeyRow sc W W' cite` (appended LAST: earlier `obtain` patterns ending in `-` are unchanged).
+- `niFitEv ox e c u` gains the citation `u : NiUh`: origin `c = none ∧ u.2.2 = [] ∧ enterFits e u.2.1`; round
+  `∃ sc Wr W W' hp, … ∧ niKeyRow sc W W' c ∧ u.2.2 = hp ++ [(sc, Wr, W, W')] ∧ uhistChain u.2.1 u.2.2`.
+- `niUhRes u := uhistLb u.1 u.2.1 u.2.2`; `NiFitIs.evid : niFitEv (some (i,x)) e c u → niCiteRes c ∗ niUhRes u ⊢
+  uEvid …`, `NiFitIs.evidNone : niFitEv none e none u → niUhRes u ⊢ uEvid none e` (so `SystemBootEra`'s and
+  `SystemAdequacy.xv6PowerAdequacyGenU`'s `hUevid`/`hUevidNone` hypotheses move; the system record discharges
+  both by `Affine.affine`).  `niEvid γe ox e := ∃ c u, ⌜niFitEv ox e c u⌝ ∗ niCiteResRaw (niEraAnchor γe) c ∗
+  niUhRes u` (one arm for both).
+- **Registration** (deviation 2): through `uEvid`'s ORIGIN ARM, not a separate `niUhKey`: the origin's evidence
+  carries `uhistLb γ W0 []` with `enterFits e W0`; the filing records `.origin j W0 p γ`.  The ledger keeps per
+  history the LONGEST cited lower bound (`niUhSt F := ∃ U, □ (∀ γ W0 H, ⌜U γ = some (W0, H)⌝ -∗ uhistLb γ W0 H) ∗
+  ⌜niUhInv F U⌝`, `niHist`'s construction); `niR := ∃ F, ⌜niOk h F⌝ ∗ niClaims γ h F ∗ niChainSt γe h F ∗
+  niUhSt F`; `niUhSt_file` (`niR_enter`) compares the new citation with the stored one (`uhistLb_agree`) and
+  keeps the longer; `niR_pure` returns `niUserChain F`.
+- **Producers** (`UserretClosedRows`): `urc_keyTransparent` (off the ecall: the round relation's transparent arm,
+  `utFdKept`, `utChKept`, gen/pid) and `urc_keyBoot` (a class ecall that cites nothing: `uexecRet_roundDet` at
+  `UIota.boot`, the fit's citing clauses vacuous, pause's by `urc_pauseRow`); at a citing number `niKeyRow`'s
+  second half IS `niDetRow`.
+- **φ**: `xv6NiPhi g h := ∃ F, niOk h F ∧ niOneShot h F ∧ niChain F (niHist F) ∧ niUserChain F ∧ ∀ q, NiClassLaw
+  q (utrace q h F)` (`niUserChain` before the `∀ q`, so `LinkNiAdequacy`'s `obtain`s are unchanged).
+
+**The one-origin predicate (`NiTrace`, ruling U-R6), stated on the filing:**
+
+    def NiEntry.isOrigin : NiEntry → Bool
+    def NiOneOrigin (q : NiInc) (h : List Obs) (F : List NiEntry) : Prop :=
+      ∃ γ : Iris.GName, (∀ f ∈ F, incOf h f = q → f.uh = γ) ∧
+        ∀ f₁ ∈ F, ∀ f₂ ∈ F, incOf h f₁ = q → incOf h f₂ = q → f₁.isOrigin = true → f₂.isOrigin = true → f₁ = f₂
+
+**Deviations from the design text.**
+1. The history is the trap loop's (above), not residue-held; born at the first resume, not at kfork/userinit
+   (the birth key IS the origin's filed key; the design's "fork child's `W0` is its child key" holds by the
+   origin filing).
+2. Registration through the origin evidence (no `niUhKey`): lower bounds at one name already share the start key.
+3. `niKeyRow`'s class premise is `niDetRow`'s landed spelling (`(uvisRun W).lazy`, `uwriteCons …`), not
+   `W.lazy`/`(uwriteCon W).isSome`.
+4. `niUserChain` states what persistent lower bounds give: one chain per cited history, each round at its index,
+   the origin at its start key.  It does NOT state that every chain entry is FILED (no gaps) nor that one
+   incarnation's filings cite one history: the kernel makes both true, the ledger cannot see them (an evidence is
+   persistent).  `NiOneOrigin` therefore names the history as part of the hypothesis.
+5. `NiFitIs.evid`/`evidNone` (and the two system-theorem hypotheses that build them) take the citation `u`.
+
+**What U-3 must absorb.**
+- The shapes above: `NiEntry.round i j sc Wr W W' cite γ k` (`Wr` BEFORE `W`: a `..` pattern counting
+  positions shifts), `niUserChain F`, `niKeyRow sc W W' cite` (in `niEntryOk`, last conjunct), `NiOneOrigin q h F`.
+- Gaps: two consecutive γ-filings of `utrace q` at indices `k`, `k'` are linked by `niUserChain` only if
+  `k' = k + 1`, and nothing in the ledger orders the indices by position; U-3 either finds a derivation or takes
+  "consecutive filings are consecutive entries" into its hypothesis (ghost, like `NiOneOrigin`'s γ) -- deciding
+  which is U-3's first task.
+- Dead (informational) until U-3: `Ustep.ulands_det(_congr)`, `ulands_transparent`, `ulands_trans`,
+  `ulands_here`, `ureach_linear`, `ureach_congr`, `ustuckFrom_congr`, `ustuckFrom_of_reach`, `ukeyEq_trans`,
+  `ustoreFaultScause_ne`; `NiOneOrigin`, `NiEntry.isOrigin`.  `dead_allow`: `module Xv6.Ustep` is off (reached
+  through `niEntryOk`); `module Xv6.UstepEcho` stays (no root and no test target reaches it until U-3 cites it).
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

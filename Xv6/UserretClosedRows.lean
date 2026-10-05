@@ -271,6 +271,87 @@ theorem urc_niDetRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
   exact uexecRet_roundDet sc W (uvisOf V' M' sts' gn cs' pid) ι hlw (hgn.symm ▸ rfl) hpid.symm hchrow hfdrow
     hpidrow hr hsce hcls hfit
 
+/-- **THE TRANSPARENT ROUND KEEPS THE KEY** (NI M3 U-2b, `niKeyRow`'s first
+half, finding F6): off the ecall the round resumes the trapped key itself,
+up to the kernel words -- the round relation's transparent arm (resume
+registers and pc, image, permissions, break, cwd, lazy bit, mask) and
+usertrap's descriptor and children rows (`utFdKept`, `utChKept`); the
+generation and pid are the loop's. -/
+theorem urc_keyTransparent (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (sc : BitVec 64)
+    (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (sts' : List FdState) (gn : GName)
+    (cs cs' : ExtTreeSet GName compare) (pid : BitVec 32)
+    (hl : V.tf.length = 36)
+    (hM : umemLazy V.upt V.sz.toNat Mp = W.M) (hpi : W.perm = permOf V.upt.um V.sz.toNat)
+    (hsz : W.sz = V.sz.toNat) (hcw : W.cwd = V.cwi) (hgn : W.gen = gn) (hch : W.ch = cs)
+    (hpid : W.pid = pid) (hlz : W.lazy = V.pvLazy) (hsc : W.secc = V.pvSecc)
+    (hround : utRound (tfW W.tf tfEpcIdx) sc (urcV0 V W) Mp V' M')
+    (hfdk : utFdKept sc W.fd sts') (hchk : utChKept sc V.pvSecc (urcV0 V W).tf cs cs')
+    (hne : sc ≠ uecallScause) :
+    ukeyEq W (uvisOf V' M' sts' gn cs' pid) := by
+  have hr := urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround
+  unfold roundOkKeys at hr
+  obtain ⟨⟨hi1, hi2⟩, hM', hπ, hsz', hcw', hlz', hsc'⟩ := uroundOk_transparent hne hr
+  have hg0 : tfResumeGpr0 (tfOf (tfResumeGpr0 W.tf) (retPc (tfW W.tf tfEpcIdx))) = tfResumeGpr0 W.tf :=
+    tfOf_resumeGpr _ _ (tfResumeGpr0_x0 W.tf)
+  have hp0 : tfResumePc (tfOf (tfResumeGpr0 W.tf) (retPc (tfW W.tf tfEpcIdx))) = tfResumePc W.tf := by
+    unfold tfResumePc; rw [tfOf_epc, retPc_idem]
+  have hcs : cs' = cs := hchk (fun h => hne h.1)
+  refine ⟨(hi1.trans hg0).symm, (hi2.trans hp0).symm, hM'.symm, hπ.symm, hsz'.symm, (hfdk hne).symm,
+    hcw'.symm, hgn, ?_, hpid, hlz'.symm, hsc'.symm⟩
+  show W.ch = cs'
+  rw [hcs, hch]
+
+/-- **M0'S ROW AT A NUMBER THAT CITES NOTHING** (NI M3 U-2b, `niKeyRow`'s
+second half off the citing numbers: getpid, pause): `uexecRet_roundDet` at
+`UIota.boot` -- the fit's citing clauses are vacuous there, pause's is the
+live row's (`urc_pauseRow`). -/
+theorem urc_keyBoot (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (sc : BitVec 64)
+    (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (sts' : List FdState) (gn : GName)
+    (cs cs' : ExtTreeSet GName compare) (pid : BitVec 32)
+    (hl : V.tf.length = 36) (hlw : W.tf.length = 36)
+    (hM : umemLazy V.upt V.sz.toNat Mp = W.M) (hpi : W.perm = permOf V.upt.um V.sz.toNat)
+    (hsz : W.sz = V.sz.toNat) (hcw : W.cwd = V.cwi) (hgn : W.gen = gn) (hch : W.ch = cs)
+    (hpid : W.pid = pid) (hlz : W.lazy = V.pvLazy) (hsc : W.secc = V.pvSecc)
+    (hround : utRound (tfW W.tf tfEpcIdx) sc (urcV0 V W) Mp V' M')
+    (hchk : utChKept sc V.pvSecc (urcV0 V W).tf cs cs')
+    (hfde : utFdEcall sc V.pvSecc (urcV0 V W).tf V'.tf W.fd sts')
+    (hrp : utRetPid sc V.pvSecc (urcV0 V W).tf V'.tf pid)
+    (hlive : utLiveOut sc V.pvSecc (utProTf (tfW W.tf tfEpcIdx) (urcV0 V W)) W.fd (tfW V'.tf (tfArgIdx 0))
+      cs')
+    (hcit : ¬ niCiting sc W) (hsce : sc = uecallScause)
+    (hcls : usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
+      (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)))) :
+    ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) UIota.boot) (uvisOf V' M' sts' gn cs' pid) := by
+  have hnum0 : usysEff V.pvSecc (urcV0 V W).tf = usysEff W.secc (uvisRun W).tf := by
+    rw [← hsc]; exact usysEff_numCong _ _ _ ((urc_num_entry W V hl).trans (uvisRun_num W).symm)
+  have hnr : usysEff W.secc (uvisRun W).tf = uvisNum (uvisRun W) := rfl
+  have ha0 : tfW (urcV0 V W).tf (tfArgIdx 0) = tfW (uvisRun W).tf (tfArgIdx 0) := by
+    have h1 : tfW (utSysTf (tfW W.tf tfEpcIdx) (urcV0 V W)) (tfArgIdx 0) = tfW (urcV0 V W).tf (tfArgIdx 0) := by
+      unfold utSysTf; exact tfW_set_ne _ _ _ _ (by decide)
+    rw [← h1, urc_sysTf_arg W V hl 0 (by decide), uvisRun_arg W 0 (by decide)]
+  have hr := urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround
+  have hchrow : ¬ (sc = uecallScause ∧ (uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_wait)) →
+      (uvisOf V' M' sts' gn cs' pid).ch = W.ch := by
+    intro h; show cs' = W.ch; rw [hchk (by rw [hnum0, hnr]; exact h), hch]
+  have hfdrow : sc = uecallScause →
+      usysFdOk (uvisNum (uvisRun W)) (uvisRun W).tf (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0)) W.fd
+        (uvisOf V' M' sts' gn cs' pid).fd := by
+    intro h; rw [← hnr, ← hnum0]; exact usysFdOk_argCong ha0 (hfde h)
+  have hpidrow : sc = uecallScause →
+      usysRetPid (uvisNum (uvisRun W)) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0)) W.pid := by
+    intro h; rw [← hnr, ← hnum0, hpid]; exact hrp h
+  have hn : ¬ (uvisNum (uvisRun W) = USYS_uptime ∨ uvisNum (uvisRun W) = USYS_wait ∨
+      uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_sbrk ∨ uvisNum (uvisRun W) = USYS_write) :=
+    fun h => hcit ⟨hsce, h⟩
+  have hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0))
+      (uvisOf V' M' sts' gn cs' pid).ch (uvisOf V' M' sts' gn cs' pid).M (uvisOf V' M' sts' gn cs' pid).sz
+      (uvisOf V' M' sts' gn cs' pid).lazy UIota.boot :=
+    ⟨fun h => absurd (Or.inl h) hn, fun h => absurd (Or.inr (Or.inl h)) hn,
+      fun h => absurd (Or.inr (Or.inr (Or.inl h))) hn, fun h => absurd (Or.inr (Or.inr (Or.inr (Or.inl h)))) hn,
+      fun h => absurd (Or.inr (Or.inr (Or.inr (Or.inr h)))) hn, urc_pauseRow W V sc V' cs' hl hsc hlive hsce⟩
+  exact uexecRet_roundDet sc W (uvisOf V' M' sts' gn cs' pid) UIota.boot hlw (hgn.symm ▸ rfl) hpid.symm hchrow
+    hfdrow hpidrow hr hsce hcls hfit
+
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]

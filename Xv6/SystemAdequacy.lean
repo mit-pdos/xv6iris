@@ -169,9 +169,9 @@ theorem xv6PowerAdequacyGenU (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTree
     (Uet : CT → Nat → IProp GF) (Uea : CT → Nat → List GName → IProp GF)
     (HUea : ∀ c k ns, Persistent (Uea c k ns))
     (hUreg : ∀ (c : CT) (k : Nat) (ns : List GName), Uet c k ⊢@{IProp GF} |==> Uea c k ns)
-    (hUevid : ∀ (c : CT) (i : Nat) (x e : Obs) (cc : Option (Nat × UIota)), niFitEv (some (i, x)) e cc →
-      niCiteResRaw (Uea c) cc ⊢@{IProp GF} Ue c (some (i, x)) e)
-    (hUevidNone : ∀ (c : CT) (e : Obs), niFit none e → ⊢@{IProp GF} Ue c none e)
+    (hUevid : ∀ (c : CT) (i : Nat) (x e : Obs) (cc : Option (Nat × UIota)) (u : NiUh),
+      niFitEv (some (i, x)) e cc u → niCiteResRaw (Uea c) cc ∗ niUhRes u ⊢@{IProp GF} Ue c (some (i, x)) e)
+    (hUevidNone : ∀ (c : CT) (e : Obs) (u : NiUh), niFitEv none e none u → niUhRes u ⊢@{IProp GF} Ue c none e)
     (Pt : GName → CT → IProp GF)
     (Hinit_boot : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs),
@@ -383,7 +383,7 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
     -- ...and carries no evidence and no registration (NI M2-X1)
     (fun _ _ _ => iprop(emp)) (fun _ _ _ => inferInstance) (fun _ _ => iprop(emp))
     (fun _ _ _ => iprop(emp)) (fun _ _ _ => inferInstance) (fun _ _ _ => BIUpdate.intro)
-    (fun _ _ _ _ _ _ => Affine.affine) (fun _ _ _ => .rfl)
+    (fun _ _ _ _ _ _ _ => Affine.affine) (fun _ _ _ _ => Affine.affine)
     Pt Hinit_boot Happ_echo HPt
     (fun γd γobs c h on dk hs => powerHook_emp on _ _ _ _ _ _ (Hobs γd γobs c h on dk hs)) Hback
     (fun γobs c h e he => uexitHook_emp _ _ _ (HuserExit γobs c h e he))

@@ -43,10 +43,10 @@ the fit check.
    residue must name the era's table and the slot (SpecUsertrap
    deviation 2).  Hence `usertrapResAt` / `usertrapResRunAt` /
    `usertrapResAt_park`.
-6. **One implementation, no seals** of the key history's accessor
-   (`usertrapResAt_uhist_acc`; Rocq 5634a3874 adds
-   `usertrap_res_bare_uhist_acc` to `USERTRAP_RES`, its two implementations
-   and four seal files): Lean has no module type to fit (deviation 1).
+6. **No key-history accessor** (Rocq 5634a3874 adds
+   `usertrap_res_bare_uhist_acc` to `USERTRAP_RES`): since NI M3 U-2b the
+   history is not in the residue (UsertrapRes deviation 11); the trap loop
+   carries it (`UhistDefs.uhistAt`).
 
 Imports only definitional files.
 -/
@@ -128,16 +128,6 @@ theorem usertrapResAt_fd_open :
       fdFrags V.fdg sts ∗
       (∀ sts' : List FdState, fdFrags V.fdg sts' -∗ usertrapResAt PT Γ j cpu P ksp V sts' cs pid) :=
   utResBare_fd_open cpu _ P ksp V sts cs pid
-
-/-- **Rocq `usertrap_res_bare_uhist_acc`** (UsertrapRes
-`utResBare_uhist_acc`): the per-process key history, borrowed out of the
-residue at its own name and handed back at any lawful history.  The trap
-loop appends one round per trip (`UserretClosedRound.urc_exit`). -/
-theorem usertrapResAt_uhist_acc :
-    usertrapResAt (GF := GF) PT Γ j cpu P ksp V sts cs pid ⊢
-      ∃ (γ : GName) (h : List Uround), uhistAuth γ h ∗ ⌜uhistWf h⌝ ∗
-        (∀ h' : List Uround, uhistAuth γ h' -∗ ⌜uhistWf h'⌝ -∗ usertrapResAt PT Γ j cpu P ksp V sts cs pid) :=
-  utResBare_uhist_acc cpu _ P ksp V sts cs pid
 
 end Res
 

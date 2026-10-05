@@ -13,11 +13,9 @@ guarded out rows (`utOuts`; exec's failure arm at `ws := V2.tf`), turns the
 dispatcher's rows into the round's (`ut_rows_of_sysc`), reads the live row's
 reason off the answers (`ut_sys_live`) and hands everything to `UT_A6`.
 
-The per-process key history (`UhistDefs.uhistRow`, `utOwn`'s last row since
-Rocq 5634a3874) does not go through the dispatch: `ut90_bump` takes it out of
-`utOwn`, `ut90_call` keeps it beside `syscall()`'s contract, and `ut90_tail`
-takes it as its LAST premise row and puts it back into `utOwn` (Rocq: the
-8-way destruct passes it to the rebuild, in one proof).
+The per-process key history is not in the residue (NI M3 U-2b, UsertrapRes
+deviation 11): the trap loop carries it around usertrap (Rocq 5634a3874's
+`utOwn` row, passed through the 8-way destruct, has no Lean counterpart).
 
 Proof-mode, no instruction stepping.
 -/
@@ -122,8 +120,7 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA :
         (syscImg V2 M2) sts2 V2.cwi cs2 ∗
       syscForkOut A.f (utSysRec A.sep A.V) (syscA0 V2) A.cs cs2 ∗
       syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid ∗
-      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M A.sts V2 M2 A.cs cs2 A.gn ∗
-      uhistRow
+      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M A.sts V2 M2 A.cs cs2 A.gn
     ⊢ wpLoop (GF := GF) cpu := by
   have hr0 : UtRows0 A V2 M2 sts2 cs2 := ut_rows_of_sysc A V2 M2 sts2 cs2 hok.hlen hok.hP hb hsc hrows
   have hbase : utBase A.k (A.k.intrOn.withSpie a b) :=
@@ -132,7 +129,7 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA :
   have hchg : V2.chg = (utSysRec A.sep A.V).chg := hrows.chg
   have hpj : A.N.pj = procAddr A.j := hok.pj
   iintro ⟨Hk, Hpc, Hfr, Hte, Hce, #Hcaps, #Hpay, Hkont, Hbs, Hfd, Hir, Henv, Hpriv, Hfrag, Hch,
-    Hxo, Hso, Hfo, Hwo, #Heo, Huh⟩
+    Hxo, Hso, Hfo, Hwo, #Heo⟩
   icases ut_sys_live hW hP A V2 M2 sts2 cs2 hsc hok.hgn $$ [Hso Hwo] with ⟨#Hwhy, Hso, Hwo⟩
   · iframe Hso Hwo
   -- THE ROUND'S LEDGER EVIDENCE (NI M2-X2), at usertrap's post: the era's
@@ -144,10 +141,10 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA :
   ihave Houts := ut90_outs A V2 M2 sts2 cs2 $$ [Hxo Hso Hfo Hwo Hev]
   · iframe Hxo Hso Hfo Hwo Hev
   ihave Hown : utOwn (utRsys (hlc := hlc) PT Γ A) A.N V2 M2 sts2 cs2 A.pid $$
-    [Hbs Hfd Hir Henv Hpriv Hfrag Hch Huh]
+    [Hbs Hfd Hir Henv Hpriv Hfrag Hch]
   · unfold utOwn utRsys utSysEnvAt
     rw [hpj, hfdg, hchg, hok.hΓ]
-    iframe Hbs Hfd Hir Henv Hpriv Hfrag Hch Huh
+    iframe Hbs Hfd Hir Henv Hpriv Hfrag Hch
     ipureintro; exact ⟨rfl, hok.hNj⟩
   ihave Hown := ut_a6_res_left _ _ _ _ _ _ _ A.gn $$ Hown
   iapply (HA A cpu _ R' V2 M2 sts2 cs2 hok hbase hpins hr0)
