@@ -1,3 +1,6 @@
+import Weak.WeakMem
+import Weak.WeakPromise
+import Weak.WeakPromiseFact
 import Weak.WeakView
 import Weak.WeakVProp
 
