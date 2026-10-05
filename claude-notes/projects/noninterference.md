@@ -5234,6 +5234,72 @@ hypothesis, not a replacement.
 - **FAM-R6 (`dup`/`close`).** Recommended: recorded only (F6). They are own-key rows needing an fd-table key
   reading, a per-incarnation lane independent of families. It can be scheduled with `ustep` or quotas.
 
+### M3 families as landed (2026-10-05): FAM-1a only; FAM-1b blocked
+
+Lane `lane/fam`, one commit (FAM-1a).  FAM-1b is NOT landed: R3's amended plan (1a+1b together) could not
+be met, so FAM-1a carries interim `dead_allow.txt` rows (`decl Xv6.niTwoRunFam`, `decl Xv6.niForkChild`,
+"FAM-1b reaches").  No statement moved; the twelve roots, every kernel and NI statement are byte-identical.
+
+**`ZombEv` §4.**  `zSlotOf`, `zFamStep`/`zFamOf`, `zActIn`, `zevInStep`/`zevIn`, `famStepR`/`famOfR`/
+`zLowestR` verbatim.  `zevIn_snoc`, `zevIn_prefix`, `zFamOf_snoc`, `famOfR_snoc`, `zSlotOf_procAddr`/`_some`,
+`zevSnocInd` (right induction: core has no `List.reverseRecOn`).  THE READING LEMMA, as designed:
+
+    theorem zLowest_zevIn (r : BitVec 32) (h : List Zev) (a : BitVec 64) (hwf : zevWf h)
+        (ha : (zSlotOf a).any (zFamOf r h) = true) : zLowest h a = zLowestR (zevIn r h) a
+
+by the fold invariant `FInv I F G M` (F = `famOf h`, G = `famOfR (zevIn r h)`, M = `zFamOf r h`): (J) at
+every member address the two readings agree on its children, their zombie column and generation; (P1)
+init's slot is never a member, (P7) nor a zombie; (P5) a zombie has no children; (P6) a member's children
+are members; (P3) a non-member, non-init address has no child in G.  Steps `FInv_fork/_exit/_reap`,
+`FInv_boot`, `FInv_of`; the scan congruence `zScan_congr`.
+
+**Deviation 1 (the well-formedness).**  The design's `zevStepOk` does NOT make the lemma true.  A 4-slot
+Python model of the ledger (random well-formed histories, every member actor, every root pid) found
+counterexamples to the design's set: (a) an outsider's exit whose `ip` is a member's address reparents
+children to the member in `famOf` only; (b) a live but unplaced actor's fork leaves a child pointing at a
+slot a member is later placed in; (c) a fork into an unparented zombie slot keeps the zombie column
+(`famStep`'s ZFork, G1a deviation 5).  The landed set, each clause needed (dropping any one has a model
+counterexample) and no counterexample found in 180k histories:
+
+    def zevStepOk (I : BitVec 64) (h : List Zev) : Zev → Prop
+      | .ZFork act j _ _ => j < NPROC ∧ (famOf h j).par = 0#64 ∧ (famOf h j).zomb = none ∧ procAddr j ≠ I ∧
+          (∀ k < NPROC, (famOf h k).par ≠ procAddr j) ∧
+          ∃ s < NPROC, s ≠ j ∧ procAddr s = act ∧ (famOf h s).zomb = none
+      | .ZExit act _ _ ip => ip = I ∧ ip ≠ act
+      | .ZReap act j _ => j < NPROC ∧ (famOf h j).par = act ∧ (famOf h j).zomb ≠ none
+    def zevWfAt (I : BitVec 64) (h : List Zev) : Prop := ∀ p e, p ++ [e] <+: h → zevStepOk I p e
+    def zevWf (h : List Zev) : Prop := ∃ I, zevWfAt I h
+
+(`I` is init's address; `s ≠ j` is used by the proof, not by the model.)
+
+**`NiTrace` §9.**  `UIota.famLed`, `UIota.famPos`, `NiStep.famInput`, `niForkChild` verbatim;
+`niBelow_famPos`, `NiStep.cite_eq_fam`, `UIota.reap_famLed`, `NiStep.output_eq_fam`, `niTwoRunFam_trace`,
+`niTwoRunFam` (binders as designed, conditional on `∀ k, zevWf (niHist Fᵢ k).zev`).  **Deviation 2
+(`NiFamActs`).**  The design's "every citing step acts from a member's slot" fails at every trace with an
+uptime, sbrk or console-write round (they cite the EMPTY family prefix, where nobody is a member), so the
+theorem would be vacuous there; `NiFamActs r tr` is stated at the WAIT rounds (exit in `ecall`, effective
+number wait), the only reader of the family ledger.  Honest scope 12 ("Families") in the header.
+
+**Why FAM-1b is blocked.**  Of the landed `zevStepOk`, the kernel has in hand at the append sites:
+- kwait's `ZReap`: all three clauses (`zLowest`'s fact);
+- kexit's `ZExit`: `ip ≠ act` (`p ≠ initproc`); `ip = I` needs the payload to tie its `I` to the
+  `initproc` cell (`initIdentCell ξ I`: a ξ-dependent conjunct, so `famLed` or `waitInvResAt`'s body
+  restated, `waitInvResAt_morph` rebuilt) -- feasible;
+- kfork's `ZFork` (`kf_wait_fork`, under `wait_lock`): `j < NPROC`, `par = 0` (T1 + `childrenInv_no_entry`),
+  `procAddr j ≠ I` (the child's `slotGen` 3/4 + init's discarded one + `pid_c ≠ 1`), `s ≠ j` -- but NOT
+  (i) the target's zombie column `none`, (ii) "nobody's parent is the target", (iii) the forking parent's
+  own zombie column `none`.  (i) needs the child's T2 element and (ii) its empty row `chFrag … ∅`; both are
+  in hand only BEFORE `release(&np->lock)`, where they go into np's USED payload and the park record, and
+  the parent store runs after it, under `wait_lock` (G1a deviation 5's situation).  (iii) needs the
+  parent's element, which sits in its RUNNING lock payload (`procHeldAt`), never held during fork.
+  Pure substitutes do not exist: (i) would follow from "an exiting slot is parented" (kexit has no fact
+  about its own parent cell), (ii)/(iii) from "a forking actor is placed" (likewise).  Closing them is a
+  ghost restructure outside the lane's sanctioned moves -- e.g. a per-slot liveness token carried through
+  allocproc / kfork / kexit / kwait / freeproc / userinit and held by the `wait_lock` payload for zombie
+  slots, or a fractional T2 element so kfork keeps a share across `release(&np->lock)`.  Needs a ruling.
+
+Gates: full build, `lint.sh` (12 roots), `tcb.sh` (unchanged), `audit.sh` (12 PASS), `run_all.sh`.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
@@ -5637,6 +5703,10 @@ kalloc nondeterminism comes from".  The considered answer:
 NI-OUT landed; next: the no-kill corollary
 
 no-kill landed (K3 + K1; K2 deferred to families); next: families
+
+families: FAM-1a landed (pure: `zLowest_zevIn`, `niTwoRunFam` conditional on `zevWf`); FAM-1b blocked at kfork's parent store (needs a ruling, see "M3 families as landed"); next: that ruling, or ustep
+
+What remains in M3: FAM-1b (the kernel export of `zevWf`, the thirteenth root), ustep (arbitrary low code), quotas, private files; later optional: K2 sys_kill, dup/close, pipes (FAM-3), OUT-4, G3c
 
 - **M3 — extensions**, independent: arbitrary low code (`ustep`, §4);
   process FAMILIES as partitions (pipes and `wait` order become

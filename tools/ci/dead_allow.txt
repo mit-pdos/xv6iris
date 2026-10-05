@@ -28,3 +28,11 @@ decl Xv6.Spin
 #    is reached only when a program proof takes the det arm -- keep it until
 #    one does (claude-notes/projects/noninterference.md, "M2-X design" §3)
 decl Xv6.uexecRetContF_det
+
+# -- NI M3 FAM-1a (claude-notes/projects/noninterference.md, "M3 families
+#    as landed"): the family form is pure and conditional on `zevWf`; FAM-1b
+#    reaches it (the thirteenth root `xv6NiFam`), and is not landed (its
+#    kernel export is blocked at kfork's parent store).  Remove these rows
+#    when FAM-1b lands.
+decl Xv6.niTwoRunFam             # FAM-1b reaches (xv6NiFam); reaches zLowest_zevIn and the §9 family form
+decl Xv6.niForkChild             # FAM-1b reaches (the filings' tree, FAM-R2's derived reading, via niForkZRow)

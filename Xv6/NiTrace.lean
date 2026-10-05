@@ -258,6 +258,32 @@ its observable form, and the strong instance.
    a cited slot-ledger event; then a kill event can enter run 1's `H`
    before the victim's last enter, so the victim's prefix needs run 1 cut
    earlier (ruling K-R6's caveat).
+12. **Families** (NI M3 FAM-1a, rulings FAM-R1…R6; §9, `niTwoRunFam`):
+   the family partition MOSTLY RE-STATES WHAT `H` ALREADY CONCEDES.  A
+   member's fork, exit and reap are co-recorded in the GLOBAL ledgers
+   (`PAlloc`/`SOcc`/`KAlloc` beside `ZFork`, `PFree`/`SVac`/`KFree`s beside
+   `ZReap`), and `pev`, `kev`, `sev` and the ticks stay global (`pidPick`
+   reads the whole pid history; the allocator and the slot scan are shared),
+   so the family form restricts only the FAMILY LEDGER: other families'
+   `ZExit` timing and the zev positions their events occupy drop out of the
+   hypotheses.  The new content is one pure lemma, `zLowest_zevIn`: WAIT
+   READS ONLY THE FAMILY'S OWN EVENTS (on a well-formed ledger, `zevWf`;
+   membership by lineage through `ZFork`, so an orphan reparented to init
+   stays in its family and init's reap of it drops out).  The statement is
+   PER MEMBER: the merged order of the members' enters is the scheduler's,
+   and WHICH CHILD EXITS FIRST IS STILL THE SCHEDULE -- the restricted
+   history (statuses, exit order up to slot order, the placement of the
+   family's children) is a hypothesis, never derived from the members'
+   traces.  An outsider's kill of a member is NOT a truncation at the family
+   level (contrast scope 11): the victim's `ZExit … (-1)` is the member's own
+   event, inside `zevIn`, and changes the other members' wait answers; the
+   family theorem concedes it through the restricted history.  Pipes are
+   parked (FAM-3): the kernel keeps no untaintable pipe record to cite.
+   `niTwoRunFam` is CONDITIONAL on `zevWf` of the eras' family ledgers:
+   exporting it from the kernel (FAM-1b) needs, at kfork's parent store, the
+   child slot's zombie column, its row and the forking parent's own zombie
+   column, which the `wait_lock` payload does not hold there (design notes,
+   "M3 families as landed").
 
 getpid's answer is the incarnation's pid (W2d's `niPidRow`: `a0 =
 signExtend 64 W.pid`, and the filing's pid is `W'.pid = W.pid`), so getpid
@@ -313,6 +339,11 @@ counts, scope 9; ticks carry nothing).  Nothing inside the class is a declassifi
    `niBelow_pos`/`NiStep.cite_eq`/`output_eq` are at the ledger part
    `UIota.led` and `niTwoRun_trace` takes two histories with one ledger
    part (landed with OUT-2 for `.led`, OUT-3 for the two histories).
+11. (NI M3 FAM-1a) `NiFamActs` is stated at the trace's WAIT rounds, not
+   at every citing step (the design's): uptime's, sbrk's and the console
+   write's citations cite the empty family prefix, where nobody is a
+   member, so the design's premise would make `niTwoRunFam` vacuous at
+   every trace with such a round.
 
 PURE: imports `NiLedger` (its pure definitions only) and `UsysDet`.
 -/
@@ -1452,5 +1483,260 @@ theorem niTwoRunPrefix {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ 
     (utrace q h₁ F₁).map NiStep.output <+: (utrace q h₂ F₂).map NiStep.output :=
   niTwoRunPrefix_trace q (niHist F₁) (niHist F₂) hH _ _ (niOk_classLaw hF₁ q) (niOk_classLaw hF₂ q) hcls
     (niTraceChain_of hC₁ q) (niTraceChain_of hC₂ q) hin
+
+/-! ## §9 The family form (NI M3 FAM-1a, rulings FAM-R1/R2; scope 12)
+
+PER MEMBER (FAM-R1): incarnation `q`'s two traces, with the zev position of every citation counted in the
+family's restricted history (`NiStep.famInput`), the eras' family-restricted ledger parts equal
+(`UIota.famLed`), and every wait of `q` acting from a member's slot of its cited prefix in both runs
+(`NiFamActs`), have equal outputs -- conditional on the eras' family ledgers being well-formed (`zevWf`;
+FAM-1b would discharge it from the kernel, and is not landed: see the design notes). -/
+
+/-- An era's ledger part with the family ledger restricted to the family's own events. -/
+def UIota.famLed (r : BitVec 32) (ι : UIota) : UIota := { ι.led with zev := zevIn r ι.zev }
+
+/-- A citation's positions with the family ledger's counted in the restricted history. -/
+def UIota.famPos (r : BitVec 32) (k : Nat) (ι : UIota) : NiPos := { ι.pos k with zev := (zevIn r ι.zev).length }
+
+/-- The step's input, family form: `NiStep.input` with `famPos` for `pos`. -/
+def NiStep.famInput (r : BitVec 32) :
+    NiStep → Uvis ⊕ (BitVec 64 × Bool × Nat × Nat × Option Nat ×
+      Option (BitVec 64 × BitVec 64 × List (BitVec 64)) × Option NiPos)
+  | .origin W0 _ => .inl W0
+  | .round secc lz win sz wcon _ x _ c => .inr (secc, lz, win, sz, wcon, exitView x, c.map fun p => p.2.famPos r p.1)
+
+/-- Every WAIT of the trace acts from a member's slot of its cited prefix.  (Deviation from the design's
+"every citing step": uptime's, sbrk's and the console write's citations cite the empty family prefix, where
+nobody is a member, so the design's premise would fail at every trace with such a round; wait is the only
+reader of the family ledger.) -/
+def NiFamActs (r : BitVec 32) (tr : List NiStep) : Prop :=
+  ∀ secc lz win sz wcon wout x e k ι, NiStep.round secc lz win sz wcon wout x e (some (k, ι)) ∈ tr →
+    ∀ ep xg, exitView x = some (uecallScause, ep, xg) → gprsNum secc xg = USYS_wait →
+      (zSlotOf ι.act).any (zFamOf r ι.zev) = true
+
+/-- the filings' tree: a filed successful fork round names (parent, child) -/
+def niForkChild (h : List Obs) : NiEntry → Option (NiInc × NiInc)
+  | f@(.round _ j _ W _ (some (_, ι))) =>
+    if uvisNum (uvisRun W) = USYS_fork ∧ forkOk ι then
+      some (incOf h f, (obsBoots (h.take j), BitVec.ofNat 32 (pidPick PIDMAX ι.pev)))
+    else none
+  | _ => none
+
+/-- Equal family positions below histories with one family part are one family part. -/
+theorem niBelow_famPos {r : BitVec 32} {ι₁ ι₂ H₁ H₂ : UIota} {k : Nat} (h₁ : niBelow ι₁ H₁)
+    (h₂ : niBelow ι₂ H₂) (hH : H₁.famLed r = H₂.famLed r) (hp : ι₁.famPos r k = ι₂.famPos r k) :
+    ι₁.famLed r = ι₂.famLed r := by
+  have pre : ∀ {α : Type} {a b c : List α}, a <+: c → b <+: c → a.length = b.length → a = b :=
+    fun ha hb hl => (List.prefix_of_prefix_length_le ha hb (Nat.le_of_eq hl)).eq_of_length hl
+  have hHp : H₁.pev = H₂.pev := by
+    have h := congrArg UIota.pev hH; exact h
+  have hHz : zevIn r H₁.zev = zevIn r H₂.zev := by
+    have h := congrArg UIota.zev hH; exact h
+  have hHk : H₁.kev = H₂.kev := by
+    have h := congrArg UIota.kev hH; exact h
+  have hHs : H₁.sev = H₂.sev := by
+    have h := congrArg UIota.sev hH; exact h
+  simp only [UIota.famPos, UIota.pos, NiPos.mk.injEq, true_and] at hp
+  obtain ⟨hk, hpv, hz, ht, ha, hs⟩ := hp
+  obtain ⟨p1, z1, k1, -, s1, -⟩ := h₁
+  obtain ⟨p2, z2, k2, -, s2, -⟩ := h₂
+  have z1' := zevIn_prefix r z1
+  have z2' := zevIn_prefix r z2
+  rw [hHp] at p1; rw [hHz] at z1'; rw [hHk] at k1; rw [hHs] at s1
+  cases ι₁; cases ι₂
+  simp only [UIota.famLed, UIota.led, UIota.mk.injEq, and_true] at *
+  exact ⟨pre k1 k2 hk, pre p1 p2 hpv, pre z1' z2' hz, ht, ha, pre s1 s2 hs⟩
+
+/-- Two steps with equal family inputs whose citations are below histories with one family part cite the
+same era and family part. -/
+theorem NiStep.cite_eq_fam {r : BitVec 32} {H₁ H₂ : Nat → UIota} {s₁ s₂ : NiStep}
+    (hin : s₁.famInput r = s₂.famInput r) (hH : ∀ k, (H₁ k).famLed r = (H₂ k).famLed r)
+    (h₁ : ∀ k ι, s₁.cite = some (k, ι) → niBelow ι (H₁ k)) (h₂ : ∀ k ι, s₂.cite = some (k, ι) → niBelow ι (H₂ k)) :
+    s₁.cite.map (fun p => (p.1, p.2.famLed r)) = s₂.cite.map (fun p => (p.1, p.2.famLed r)) := by
+  cases s₁ with
+  | origin => cases s₂ with
+    | origin => rfl
+    | round => simp [NiStep.famInput] at hin
+  | round secc lz win sz wcon wout x e c₁ => cases s₂ with
+    | origin => simp [NiStep.famInput] at hin
+    | round secc' lz' win' sz' wcon' wout' x' e' c₂ =>
+      simp only [NiStep.famInput, Sum.inr.injEq, Prod.mk.injEq] at hin
+      obtain ⟨-, -, -, -, -, -, hp⟩ := hin
+      simp only [NiStep.cite] at h₁ h₂ ⊢
+      match c₁, c₂, hp with
+      | none, none, _ => rfl
+      | none, some _, hp => simp at hp
+      | some _, none, hp => simp at hp
+      | some (k₁, ι₁), some (k₂, ι₂), hp =>
+        simp only [Option.map_some, Option.some.injEq] at hp
+        have hk : k₁ = k₂ := congrArg NiPos.era hp
+        subst hk
+        simp only [Option.map_some]
+        rw [niBelow_famPos (h₁ k₁ ι₁ rfl) (h₂ k₁ ι₂ rfl) (hH k₁) hp]
+
+/-- **Wait's reading is the family part's** at a member's slot of a well-formed prefix. -/
+theorem UIota.reap_famLed {r : BitVec 32} {ι : UIota} (hw : zevWf ι.zev)
+    (hm : (zSlotOf ι.act).any (zFamOf r ι.zev) = true) :
+    ι.reap = zLowestR (ι.famLed r).zev (ι.famLed r).act :=
+  zLowest_zevIn r ι.zev ι.act hw hm
+
+/-- **ONE STEP, TWO RUNS, family form**: `NiStep.output_eq` at equal family inputs and equal family parts of
+the citations; wait's answer through `zLowest_zevIn` at both runs' (member, well-formed) citations. -/
+theorem NiStep.output_eq_fam {r : BitVec 32} {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law pid)
+    (h₂ : s₂.law pid) (hin : s₁.famInput r = s₂.famInput r)
+    (hc : s₁.cite.map (fun p => (p.1, p.2.famLed r)) = s₂.cite.map (fun p => (p.1, p.2.famLed r)))
+    (hcls : ∀ secc lz win sz wcon wout x e c, s₁ = .round secc lz win sz wcon wout x e c → ∀ ep xg,
+      exitView x = some (uecallScause, ep, xg) → usysDetClassAt (gprsNum secc xg) (gprsA0 xg) lz wcon.isSome)
+    (hw₁ : ∀ k ι, s₁.cite = some (k, ι) → zevWf ι.zev) (hw₂ : ∀ k ι, s₂.cite = some (k, ι) → zevWf ι.zev)
+    (hm₁ : NiFamActs r [s₁]) (hm₂ : NiFamActs r [s₂]) :
+    s₁.output = s₂.output := by
+  refine NiStep.output_eq_of h₁ h₂ ⟨?_, ?_⟩ hcls ?_
+  · intro W0 e hs; subst hs
+    cases s₂ with
+    | origin W0' e' => simp only [NiStep.famInput, Sum.inl.injEq] at hin; exact ⟨e', by rw [hin]⟩
+    | round => simp [NiStep.famInput] at hin
+  · intro secc lz win sz wcon wout x e c hs; subst hs
+    cases s₂ with
+    | origin => simp [NiStep.famInput] at hin
+    | round secc' lz' win' sz' wcon' wout' x' e' c' =>
+      simp only [NiStep.famInput, Sum.inr.injEq, Prod.mk.injEq] at hin
+      obtain ⟨h1, -, -, -, -, h4, -⟩ := hin
+      exact ⟨lz', win', sz', wcon', wout', x', e', c', by rw [h1], h4.symm⟩
+  · intro secc lz win sz wcon wout x e c lz' win' sz' wcon' wout' x' e' c' ep xg hs₁ hs₂ hx hn pc₁ eg₁ pc₂ eg₂ he₁ he₂
+    subst hs₁ hs₂
+    simp only [NiStep.cite] at hc hw₁ hw₂
+    have hfl : ∀ {k k' ι ι'}, c = some (k, ι) → c' = some (k', ι') → ι.famLed r = ι'.famLed r := by
+      intro k k' ι ι' h1 h2
+      rw [h1, h2] at hc
+      simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hc
+      exact hc.2
+    have hl₁ := h₁; have hl₂ := h₂
+    obtain ⟨sc, ep₁, xg₁, pc₁', eg₁', hx₁, he₁', -, -, hb₁⟩ := hl₁
+    obtain ⟨sc', ep₂, xg₂, pc₂', eg₂', hx₂, he₂', -, -, hb₂⟩ := hl₂
+    simp only [NiStep.famInput] at hin
+    have hin' := Sum.inr.inj hin
+    obtain ⟨-, hin'⟩ := Prod.mk.inj hin'
+    obtain ⟨hlz, hin'⟩ := Prod.mk.inj hin'
+    obtain ⟨hwin, hin'⟩ := Prod.mk.inj hin'
+    obtain ⟨hsz, hin'⟩ := Prod.mk.inj hin'
+    obtain ⟨hwcon, hin'⟩ := Prod.mk.inj hin'
+    obtain ⟨hxe, -⟩ := Prod.mk.inj hin'
+    subst hlz hwin hsz hwcon
+    have hx' : exitView x' = some (uecallScause, ep, xg) := by rw [← hxe, hx]
+    rw [hx] at hx₁
+    rw [hx'] at hx₂
+    simp only [Option.some.injEq, Prod.mk.injEq] at hx₁ hx₂
+    obtain ⟨rfl, rfl, rfl⟩ := hx₁
+    obtain ⟨rfl, rfl, rfl⟩ := hx₂
+    rw [he₁] at he₁'; rw [he₂] at he₂'
+    simp only [Option.some.injEq, Prod.mk.injEq] at he₁' he₂'
+    obtain ⟨rfl, rfl⟩ := he₁'
+    obtain ⟨rfl, rfl⟩ := he₂'
+    have hcl := hcls secc lz win sz wcon wout x e c rfl ep xg hx
+    have hres : usysDetResumes (gprsNum secc xg) := by
+      rcases hn with hn | hn | hn | hn | hn
+      · exact Or.inl (Or.inr (Or.inl hn))
+      · exact Or.inr (Or.inl hn)
+      · exact Or.inr (Or.inr (Or.inl hn))
+      · exact Or.inr (Or.inr (Or.inr hn))
+      · exact Or.inl (Or.inr (Or.inr (Or.inl hn)))
+    obtain ⟨-, -, -, -, hu₁, hwt₁, hf₁, hs₁, hwr₁⟩ := hb₁ rfl hres
+    obtain ⟨-, -, -, -, hu₂, hwt₂, hf₂, hs₂, hwr₂⟩ := hb₂ rfl hres
+    rcases hn with hn | hn | hn | hn | hn
+    · obtain ⟨k, ι, hc₁, ha₁⟩ := hu₁ hn
+      obtain ⟨k', ι', hc₂, ha₂⟩ := hu₂ hn
+      have hl := hfl hc₁ hc₂
+      rw [ha₁, ha₂]
+      show usysUptimeWord (ι.famLed r).ticks = usysUptimeWord (ι'.famLed r).ticks
+      rw [hl]
+    · have hnull := hcl.2.1 hn
+      obtain ⟨k, ι, hc₁, ha₁⟩ := hwt₁ hn hnull
+      obtain ⟨k', ι', hc₂, ha₂⟩ := hwt₂ hn hnull
+      have hl := hfl hc₁ hc₂
+      subst hc₁ hc₂
+      have hr₁ := UIota.reap_famLed (hw₁ k ι rfl)
+        (hm₁ secc lz win sz wcon wout x e k ι (List.mem_singleton_self _) ep xg hx hn)
+      have hr₂ := UIota.reap_famLed (hw₂ k' ι' rfl)
+        (hm₂ secc lz win sz wcon wout' x' e' k' ι' (List.mem_singleton_self _) ep xg hx' hn)
+      have hreap : ι.reap = ι'.reap := by rw [hr₁, hr₂, hl]
+      rw [ha₁, ha₂]
+      unfold usysWaitAns
+      rw [hreap]
+    · obtain ⟨k, ι, hc₁, ha₁⟩ := hf₁ hn
+      obtain ⟨k', ι', hc₂, ha₂⟩ := hf₂ hn
+      have hl := hfl hc₁ hc₂
+      rw [ha₁, ha₂]
+      show usysForkAns (ι.famLed r) = usysForkAns (ι'.famLed r)
+      rw [hl]
+    · obtain ⟨k, ι, hc₁, ha₁⟩ := hs₁ hn
+      obtain ⟨k', ι', hc₂, ha₂⟩ := hs₂ hn
+      have hl := hfl hc₁ hc₂
+      rw [ha₁, ha₂]
+      show usysSbrkAns sz (gprsA0 xg) (gprsA1 xg) (ι.famLed r) = usysSbrkAns sz (gprsA0 xg) (gprsA1 xg) (ι'.famLed r)
+      rw [hl]
+    · obtain ⟨hlzf, hsome⟩ := hcl.2.2 hn
+      obtain ⟨d, hd⟩ := Option.isSome_iff_exists.mp hsome
+      rw [(hwr₁ hn hlzf d hd).1, (hwr₂ hn hlzf d hd).1]
+
+/-- **`niTwoRunFam`, the trace form**: `niTwoRun_trace` with family inputs, histories with one family part
+(well-formed family ledgers), and every wait of both traces acting from a member's slot. -/
+theorem niTwoRunFam_trace (r : BitVec 32) (q : NiInc) (H₁ H₂ : Nat → UIota)
+    (hH : ∀ k, (H₁ k).famLed r = (H₂ k).famLed r)
+    (hw₁ : ∀ k, zevWf (H₁ k).zev) (hw₂ : ∀ k, zevWf (H₂ k).zev) :
+    ∀ (tr₁ tr₂ : List NiStep),
+    NiClassLaw q tr₁ → NiClassLaw q tr₂ → NiInClass tr₁ → niTraceChain H₁ tr₁ → niTraceChain H₂ tr₂ →
+    NiFamActs r tr₁ → NiFamActs r tr₂ →
+    tr₁.map (NiStep.famInput r) = tr₂.map (NiStep.famInput r) →
+    tr₁.map NiStep.output = tr₂.map NiStep.output
+  | [], [], _, _, _, _, _, _, _, _ => rfl
+  | [], _ :: _, _, _, _, _, _, _, _, hin => by simp at hin
+  | _ :: _, [], _, _, _, _, _, _, _, hin => by simp at hin
+  | s₁ :: tr₁, s₂ :: tr₂, h₁, h₂, hc, hC₁, hC₂, hm₁, hm₂, hin => by
+    simp only [List.map_cons, List.cons.injEq] at hin ⊢
+    have hb : ∀ (H : Nat → UIota) (s : NiStep) (tr : List NiStep), niTraceChain H (s :: tr) →
+        ∀ k ι, s.cite = some (k, ι) → niBelow ι (H k) := by
+      intro H s tr hC k ι hs
+      cases s with
+      | origin => simp [NiStep.cite] at hs
+      | round secc lz win sz wcon wout x e c =>
+        simp only [NiStep.cite] at hs
+        subst hs
+        exact hC secc lz win sz wcon wout x e k ι (List.mem_cons_self ..)
+    have hwf : ∀ (H : Nat → UIota), (∀ k, zevWf (H k).zev) → ∀ (s : NiStep) (tr : List NiStep),
+        niTraceChain H (s :: tr) → ∀ k ι, s.cite = some (k, ι) → zevWf ι.zev :=
+      fun H hw s tr hC k ι hs => zevWf_prefix (hb H s tr hC k ι hs).2.1 (hw k)
+    have hhd : ∀ (s : NiStep) (tr : List NiStep), NiFamActs r (s :: tr) → NiFamActs r [s] :=
+      fun s tr hm secc lz win sz wcon wout x e k ι hs =>
+        hm secc lz win sz wcon wout x e k ι (List.mem_cons.mpr (Or.inl (List.mem_singleton.mp hs)))
+    have htl : ∀ (s : NiStep) (tr : List NiStep), NiFamActs r (s :: tr) → NiFamActs r tr :=
+      fun s tr hm secc lz win sz wcon wout x e k ι hs =>
+        hm secc lz win sz wcon wout x e k ι (List.mem_cons_of_mem _ hs)
+    have hcite := NiStep.cite_eq_fam hin.1 hH (hb H₁ s₁ tr₁ hC₁) (hb H₂ s₂ tr₂ hC₂)
+    refine ⟨NiStep.output_eq_fam (h₁ s₁ (List.mem_cons_self ..)) (h₂ s₂ (List.mem_cons_self ..)) hin.1 hcite
+      (fun secc lz win sz wcon wout x e c hs => hc secc lz win sz wcon wout x e c (hs ▸ List.mem_cons_self ..))
+      (hwf H₁ hw₁ s₁ tr₁ hC₁) (hwf H₂ hw₂ s₂ tr₂ hC₂) (hhd s₁ tr₁ hm₁) (hhd s₂ tr₂ hm₂), ?_⟩
+    exact niTwoRunFam_trace r q H₁ H₂ hH hw₁ hw₂ tr₁ tr₂ (fun s hs => h₁ s (List.mem_cons_of_mem _ hs))
+      (fun s hs => h₂ s (List.mem_cons_of_mem _ hs))
+      (fun secc lz win sz wcon wout x e c hs => hc secc lz win sz wcon wout x e c (List.mem_cons_of_mem _ hs))
+      (fun secc lz win sz wcon wout x e k ι hs => hC₁ secc lz win sz wcon wout x e k ι (List.mem_cons_of_mem _ hs))
+      (fun secc lz win sz wcon wout x e k ι hs => hC₂ secc lz win sz wcon wout x e k ι (List.mem_cons_of_mem _ hs))
+      (htl s₁ tr₁ hm₁) (htl s₂ tr₂ hm₂) hin.2
+
+/-- **`niTwoRunFam`** (NI M3 FAM-1a, rulings FAM-R1/R2; scope 12): two histories with ledger filings whose
+chains hold, incarnation `q` whose two traces agree on their FAMILY inputs (the zev position counted in the
+family's own events), `q`'s ecalls (in run 1) in the class, every wait of `q` acting from a member's slot
+of its cited prefix in both runs, and EQUAL FAMILY-RESTRICTED LEDGER HISTORIES: `q`'s enters agree.
+Conditional on well-formed family ledgers (`zevWf`; FAM-1b, not landed, would discharge it). -/
+theorem niTwoRunFam {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk h₁ F₁) (hC₁ : niChain F₁ (niHist F₁))
+    (hF₂ : niOk h₂ F₂) (hC₂ : niChain F₂ (niHist F₂))
+    (hw₁ : ∀ k, zevWf (niHist F₁ k).zev) (hw₂ : ∀ k, zevWf (niHist F₂ k).zev)
+    (r : BitVec 32) (q : NiInc) (hcls : NiInClass (utrace q h₁ F₁))
+    (hfam₁ : NiFamActs r (utrace q h₁ F₁)) (hfam₂ : NiFamActs r (utrace q h₂ F₂))
+    (hin : (utrace q h₁ F₁).map (NiStep.famInput r) = (utrace q h₂ F₂).map (NiStep.famInput r))
+    (hH : ∀ k, (niHist F₁ k).famLed r = (niHist F₂ k).famLed r) :
+    (utrace q h₁ F₁).map NiStep.output = (utrace q h₂ F₂).map NiStep.output :=
+  niTwoRunFam_trace r q (niHist F₁) (niHist F₂) hH hw₁ hw₂ _ _ (niOk_classLaw hF₁ q) (niOk_classLaw hF₂ q)
+    hcls (niTraceChain_of hC₁ q) (niTraceChain_of hC₂ q) hfam₁ hfam₂ hin
+
 
 end Xv6
