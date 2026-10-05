@@ -4419,6 +4419,8 @@ kalloc nondeterminism comes from".  The considered answer:
   equals `M`).  Fallback if the hart-arm cost is refused: a final-state
   statement through a pure observation on `gmem` at the proc table, which
   gives reachability but no two-run corollary.
+**M3 ORDER (2026-10-05, owner: "go ahead with the proposed order"):** NI-OUT (the console bytes attributed to the incarnation through the filing) → the no-`kill` corollary → process families as partitions → arbitrary low code (`ustep`) → kernel changes (quotas) and the theorem that they close a channel → private files. Power cycles are covered by M2-X's per-era ledgers. Each lane gets a design pass with coordinator rulings before its code lands, as G1–G4 did.
+
 - **M3 — extensions**, independent: arbitrary low code (`ustep`, §4);
   process FAMILIES as partitions (pipes and `wait` order become
   family-internal event positions; `UkFork`'s two-continuation leaf already
