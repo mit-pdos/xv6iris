@@ -82,17 +82,17 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 set_option linter.unusedSimpArgs false
 
-theorem kxcC_br_myproc : KA.«kexec» + 0x1ae#64 + BitVec.signExtend 64 2084446#21 = KA.«myproc» := by
+theorem kxcC_br_myproc : KA.«kexec» + 0x1b6#64 + BitVec.signExtend 64 2084324#21 = KA.«myproc» := by
   decide
-theorem kxcC_ret_1ae : jumpPc (KA.«kexec» + 0x1ae#64 + 4#64) = KA.«kexec» + 0x1ae#64 + 4#64 := by
+theorem kxcC_ret_1ae : jumpPc (KA.«kexec» + 0x1b6#64 + 4#64) = KA.«kexec» + 0x1b6#64 + 4#64 := by
   decide
-theorem kxcC_br_uvmalloc : KA.«kexec» + 0x1ce#64 + BitVec.signExtend 64 2082800#21 = KA.«uvmalloc» := by
+theorem kxcC_br_uvmalloc : KA.«kexec» + 0x1d6#64 + BitVec.signExtend 64 2082678#21 = KA.«uvmalloc» := by
   decide
-theorem kxcC_ret_1ce : jumpPc (KA.«kexec» + 0x1ce#64 + 4#64) = KA.«kexec» + 0x1ce#64 + 4#64 := by
+theorem kxcC_ret_1ce : jumpPc (KA.«kexec» + 0x1d6#64 + 4#64) = KA.«kexec» + 0x1d6#64 + 4#64 := by
   decide
-theorem kxcC_br_uvmclear : KA.«kexec» + 0x1fc#64 + BitVec.signExtend 64 2083220#21 = KA.«uvmclear» := by
+theorem kxcC_br_uvmclear : KA.«kexec» + 0x204#64 + BitVec.signExtend 64 2083098#21 = KA.«uvmclear» := by
   decide
-theorem kxcC_ret_1fc : jumpPc (KA.«kexec» + 0x1fc#64 + 4#64) = KA.«kexec» + 0x1fc#64 + 4#64 := by
+theorem kxcC_ret_1fc : jumpPc (KA.«kexec» + 0x204#64 + 4#64) = KA.«kexec» + 0x204#64 + 4#64 := by
   decide
 
 /-- The guard page's address: `lui a1,0xffffe ; add a1,a1,a0` at `a0 = s + 8192`. -/
@@ -239,7 +239,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
     (himg : kxbWalkOk fb ef → uimgSub (elfImage fb) (umemGet P Mi))
     (hszr : kxbWalkOk fb ef → szv.toNat = KexecBuilt.kexecSzAfter (elfLoads fb))
     (hperm : kxbWalkOk fb ef → kxbPermSegs fb P.um) :
-    kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x1f6#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x1fe#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     irefSlots 2 ∗ bslots 3 ∗ procPtAt P' M' ∗ procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗
     byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
@@ -272,17 +272,17 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
   iintro ⟨Hk, Hpc, Hte, Hce, Hirs, Hbs, Hpt, Hpriv, Hbufs, Helf, Hfr, Hcl, HK⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x1f6  c.lui a1,0xffffe ; +0x1f8  c.add a1,a0 ; +0x1fa  c.mv a0,s6
-  k_step_e (wp_s_lui cpu _ (KA.«kexec» + 0x1f6#64) true 1048574#20 11#5 (by decide))
+  k_step_e (wp_s_lui cpu _ (KA.«kexec» + 0x1fe#64) true 1048574#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1f8#64) true 11#5 11#5 10#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x200#64) true 11#5 11#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, kxcC_guard]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1fa#64) true 10#5 0#5 22#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x202#64) true 10#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22]
   iintro Hk Hpc
   -- +0x1fc  jal uvmclear
-  iapply (kxcC_call_uvmclear UC cpu k spie spp _ (KA.«kexec» + 0x1fc#64) 2083220#21 kxcC_br_uvmclear
+  iapply (kxcC_call_uvmclear UC cpu k spie spp _ (KA.«kexec» + 0x204#64) 2083098#21 kxcC_br_uvmclear
       kxcC_ret_1fc P' M' _ hK ?cr ?cv ?cm)
     $$ [- $Hk $Hpc $Hte $Hce $Hpt]
   case cr => simp [RegMap.set_apply, hok.1.1]
@@ -306,17 +306,17 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
   rw [h22] at a22
   rw [h27] at a27
   -- +0x200 / +0x204  s4 = sz1 - 4096
-  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x200#64) false 2048#12 20#5 18#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x208#64) false 2048#12 20#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a18]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x204#64) false 2048#12 20#5 20#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x20c#64) false 2048#12 20#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x208  ld a5,-512(s0) : argv
   unfold kxcFrameBk kxcFrameB
   icases Hfr with ⟨F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, F13, Fu, Fp, F64, F65, F66, F67,
     F68⟩
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x208#64) false 3584#12 15#5 8#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x210#64) false 3584#12 15#5 8#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 11#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a8]
   iintro Hk Hpc F64
@@ -326,7 +326,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
   icases kxcC_argv_acc (k.regs 11#5) A 0 (Nat.zero_le _) $$ Hargv with ⟨Ha0, Hargv⟩
   ihave Ha0 := kxcC_addr_eq (show k.regs 11#5 + BitVec.ofNat 64 (8 * 0) = k.regs 11#5 by simp) 8 _ _
     $$ Ha0
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x20c#64) true 0#12 10#5 15#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x214#64) true 0#12 10#5 15#5 (by decide) (by decide)
       A.dqa (A.avf 0))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Ha0
@@ -348,17 +348,17 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
   -- +0x20e  c.beqz a0,+0x2b6
   by_cases h0 : A.avf 0 = 0#64
   · have hbr : bcond bop.BEQ (A.avf 0) 0#64 = true := by simp [bcond, h0]
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x20e#64) true 168#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x216#64) true 168#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
     iintro Hk Hpc
     -- +0x2b6  c.mv s8,s2 ; +0x2b8  c.li s1,0 ; +0x2ba  c.j +0x268
-    k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x2b6#64) true 24#5 0#5 18#5 (by decide))
+    k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x2be#64) true 24#5 0#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a18]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x2b8#64) true 0#12 9#5 0#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x2c0#64) true 0#12 9#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x2ba#64) true 2097070#21)
+    k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x2c2#64) true 2097070#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     iapply HK $$ %cpu %spie %spp %_ %_ %M' %(8192#64 + BitVec.ofNat 64 (pgRoundUpN szv.toNat))
@@ -382,17 +382,17 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
     · ipureintro; exact ⟨KexecBuilt.kx_str_at_0 _ _ _ _, r4, r5⟩
     iexact Hpc
   · have hbr : bcond bop.BEQ (A.avf 0) 0#64 = false := by simp [bcond, h0]
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x20e#64) true 168#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x216#64) true 168#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
     iintro Hk Hpc
     -- +0x210  c.mv s8,s2 ; +0x212  c.li s1,0 ; +0x214  addi s7,s0,-368
-    k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x210#64) true 24#5 0#5 18#5 (by decide))
+    k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x218#64) true 24#5 0#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a18]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x212#64) true 0#12 9#5 0#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x21a#64) true 0#12 9#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x214#64) false 3728#12 23#5 8#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x21c#64) false 3728#12 23#5 8#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a8]
     iintro Hk Hpc
     iapply HK $$ %cpu %spie %spp %_ %_ %M' %(8192#64 + BitVec.ofNat 64 (pgRoundUpN szv.toNat))
@@ -454,7 +454,7 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
   have hpg := kxcC_pgru_le_maxsz hwf hcov
   have hszv : szv.toNat ≤ uvmMaxsz := le_trans (UPtAlloc.pgRoundUpN_ge _) hpg
   -- +0x1ae  jal myproc
-  iapply (kxcC_call_myproc MP cpu k spie spp R (KA.«kexec» + 0x1ae#64) 2084446#21 kxcC_br_myproc
+  iapply (kxcC_call_myproc MP cpu k spie spp R (KA.«kexec» + 0x1b6#64) 2084324#21 kxcC_br_myproc
       kxcC_ret_1ae hK hnoff)
     $$ [- $Hk $Hpc $Hte $Hce]
   isplitr
@@ -470,30 +470,30 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
   rw [h22] at a22
   rw [h27] at a27
   -- +0x1b2  c.mv s3,a0
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1b2#64) true 19#5 0#5 10#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1ba#64) true 19#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a10]
   iintro Hk Hpc
   -- +0x1b4  ld s5,72(a0)
   icases kxcC_priv_sz hct' A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨%hVsz, Hsz, Hpriv⟩
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1b4#64) false 72#12 21#5 10#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1bc#64) false 72#12 21#5 10#5 (by decide) (by decide)
       (DFrac.own 1) A.V.sz)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a10, Xv6.sz_off]
   iintro Hk Hpc Hsz
   ihave Hpriv := Hpriv $$ Hsz
   -- +0x1b8 .. +0x1c0  s8 = PGROUNDUP(sz)
-  k_step_e (wp_s_lui cpu _ (KA.«kexec» + 0x1b8#64) true 1#20 24#5 (by decide))
+  k_step_e (wp_s_lui cpu _ (KA.«kexec» + 0x1c0#64) true 1#20 24#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x1ba#64) true 4095#12 24#5 24#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x1c2#64) true 4095#12 24#5 24#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1bc#64) true 24#5 24#5 18#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1c4#64) true 24#5 24#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a18]
   iintro Hk Hpc
-  k_step_e (wp_s_lui cpu _ (KA.«kexec» + 0x1be#64) true 1048575#20 15#5 (by decide))
+  k_step_e (wp_s_lui cpu _ (KA.«kexec» + 0x1c6#64) true 1048575#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_and cpu _ (KA.«kexec» + 0x1c0#64) false 24#5 24#5 15#5 (by decide))
+  k_step_e (wp_s_and cpu _ (KA.«kexec» + 0x1c8#64) false 24#5 24#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hs8 : 4095#64 + szv &&& 18446744073709547520#64 = BitVec.ofNat 64 (pgRoundUpN szv.toNat) := by
@@ -503,19 +503,19 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
   have hs8n : (BitVec.ofNat 64 (pgRoundUpN szv.toNat)).toNat = pgRoundUpN szv.toNat := by
     rw [BitVec.toNat_ofNat]; unfold uvmMaxsz at hpg; omega
   -- +0x1c4 .. +0x1cc  the arguments
-  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x1c4#64) true 4#12 13#5 0#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x1cc#64) true 4#12 13#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_lui cpu _ (KA.«kexec» + 0x1c6#64) true 2#20 12#5 (by decide))
+  k_step_e (wp_s_lui cpu _ (KA.«kexec» + 0x1ce#64) true 2#20 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1c8#64) true 12#5 12#5 24#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1d0#64) true 12#5 12#5 24#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs8]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1ca#64) true 11#5 0#5 24#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1d2#64) true 11#5 0#5 24#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs8]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1cc#64) true 10#5 0#5 22#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1d4#64) true 10#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a22]
   iintro Hk Hpc
   have hpgi : pgRoundUpN (pgRoundUpN szv.toNat) = pgRoundUpN szv.toNat := UPtAlloc.pgRoundUpN_idem _
@@ -525,7 +525,7 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
   -- +0x1ce  jal uvmalloc, the block's event counter lent to it (permit
   -- sweep L1a, Rocq `proc_priv_ev_lend`)
   icases procPrivFd_evLend A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
-  iapply (kxc_call_uvmalloc UA Γ cpu k A spie1 spp1 _ (KA.«kexec» + 0x1ce#64) 2082800#21
+  iapply (kxc_call_uvmalloc UA Γ cpu k A spie1 spp1 _ (KA.«kexec» + 0x1d6#64) 2082678#21
       kxcC_br_uvmalloc kxcC_ret_1ce P Mi A.V.ev hK hnoff ?ur ?uo ?un ?up ?uf)
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend]
   case ur => simp [RegMap.set_apply]
@@ -559,12 +559,12 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
     rw [a22] at b22
     rw [a27] at b27
     -- +0x1d2  c.mv s2,a0
-    k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1d2#64) true 18#5 0#5 10#5 (by decide))
+    k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1da#64) true 18#5 0#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     icases Hres with (⟨%h0, Hpt⟩ | ⟨%P', %M', %⟨hok, h10⟩, Hpt⟩)
     · -- ===== uvmalloc FAILED: +0x1d4 falls through to the shared -1 tail =====
-      k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x1d4#64) true 34#13 10#5 0#5 (by decide) bop.BNE)
+      k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x1dc#64) true 34#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h0, MachCSL.bcond_bne_zero]
       iintro Hk Hpc
       ihave Hfr := kxcFrameB_at (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
@@ -586,7 +586,7 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
         first | exact this | (simp only [BitVec.toNat_ofNat] at this; exact this)
       clear h10
       have h10 := h10'
-      k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x1d4#64) true 34#13 10#5 0#5 (by decide) bop.BNE)
+      k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x1dc#64) true 34#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, kxcC_sz1_bne _ hpg]
       iintro Hk Hpc
       iapply (kxcC_setup_ok UC Q QF cpu k { A with V := A.V.updEv kv } spie2 spp2 _ w13 w67 fb ef P P' Mi

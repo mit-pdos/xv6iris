@@ -6,6 +6,7 @@ Specification of `sys_sbrk` (kernel/sysproc.c; Rocq SpecSysSbrk.v):
       argint(0, &n);
       argint(1, &t);
       addr = myproc()->sz;
+      if (n > 0 && addr + n > MAXUSZ) return -1;   // the quota (verified-quota)
       if (t == SBRK_EAGER || n < 0) {
         if (growproc(n) < 0) return -1;
       } else {
@@ -60,9 +61,17 @@ THE REASON (NI M2-G3a; the spurious `-1` closed): `sysSbrkOk`'s FAILED
 arm holds only at an overrun (`sysSbrkOverrun`: the key's break and `a0`)
 or at an allocating eager grow (`sysSbrkAllocs`), and the post's wand hands
 the `-1` that is not an overrun the decisive null kalloc's receipt
-`kNullRcpt γk k.proc` (growproc's, from uvmalloc's `0` arm).  The success
-arm is unchanged: success needs no receipt (it is the absence of a cited
-`KNull`).
+`kNullRcpt γk k.proc` (growproc's, from uvmalloc's `0` arm).  Success
+needs no receipt (it is the absence of a cited `KNull`).
+
+THE QUOTA (NI M3 quotas, Q-0; the kernel is `verified-quota`): the overrun
+is now the C's own first test, `n > 0 && addr + n > MAXUSZ`
+(`sysSbrkOverrun` at `uQuota`, in place).  It subsumes G3's overrun at
+`TRAPFRAME` (a positive `n` past `TRAPFRAME` is past `MAXUSZ`, and `n = 0`
+never overruns a break `≤ uvmMaxsz`), so the FAILED arm's text is G3's;
+growproc's `TRAPFRAME` test and the lazy path's two range tests are dead
+behind it.  The SUCCEEDED arm gains `¬ sysSbrkOverrun V v0` (the test
+passed): pure in the key, which is what lets the row read the quota.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -88,11 +97,11 @@ def sysSbrkArg (v : BitVec 64) : BitVec 64 := BitVec.signExtend 64 (BitVec.extra
 /-- `t == SBRK_EAGER` (`SBRK_EAGER = 1`, kernel/riscv.h). -/
 def sysSbrkEager (v1 : BitVec 64) : Prop := sysSbrkArg v1 = 1#64
 
-/-- The overrun test both paths make at a non-negative argument
-(growproc's `sz + n > TRAPFRAME` at `+0x36`, the lazy path's
-`addr + n > TRAPFRAME`) (NI M2-G3). -/
+/-- **The quota test** `n > 0 && addr + n > MAXUSZ` (`+0x28`..`+0x34`, before
+either path; NI M3 quotas Q-0, in place of G3's `TRAPFRAME` overrun, which
+it subsumes). -/
 def sysSbrkOverrun (V : ProcPriv) (v0 : BitVec 64) : Prop :=
-  0 ≤ (sysSbrkArg v0).toInt ∧ uvmMaxsz < V.sz.toNat + (sysSbrkArg v0).toInt.toNat
+  0 < (sysSbrkArg v0).toInt ∧ uQuota < V.sz.toNat + (sysSbrkArg v0).toInt.toNat
 
 /-- The eager grow runs uvmalloc's loop at least once: the only place
 sbrk allocates (NI M2-G3). -/
@@ -104,8 +113,8 @@ syscall arguments and `r` the result. -/
 def sysSbrkOk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r : BitVec 64) : Prop :=
   -- FAILED: nothing moved, and only for a reason (NI M2-G3)
   (r = -1#64 ∧ V' = V ∧ M' = M ∧ (sysSbrkOverrun V v0 ∨ sysSbrkAllocs V v0 v1)) ∨
-  -- SUCCEEDED: the old size, and one of the two paths ran
-  (r = V.sz ∧
+  -- SUCCEEDED: the old size, within the quota, and one of the two paths ran
+  (r = V.sz ∧ ¬ sysSbrkOverrun V v0 ∧
     (-- EAGER (t == SBRK_EAGER, or a shrink): growproc's own post at 0
      ((sysSbrkEager v1 ∨ (sysSbrkArg v0).toInt < 0) ∧ growprocOk V V' M M' (sysSbrkArg v0) 0#64) ∨
      -- LAZY: the size alone moves, inside the user region, without wrapping

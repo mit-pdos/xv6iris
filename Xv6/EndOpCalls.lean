@@ -356,10 +356,10 @@ theorem eo_fast (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) [ClaimIs (hlc := 
   k_step (wp_s_auipc cpu _ (KA.«end_op» + 0x7a#64) false 0x1f#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«end_op» + 0x7e#64) false 2478#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«end_op» + 0x7e#64) false 2462#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_log]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x82#64) false 2089238#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x82#64) false 2089222#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_wk]
   iintro Hk Hpc
   iapply (eo_wk WK Γ cpu _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
@@ -400,10 +400,10 @@ theorem eo_fast (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) [ClaimIs (hlc := 
   k_step (wp_s_auipc cpu _ (KA.«end_op» + 0x86#64) false 0x1f#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«end_op» + 0x8a#64) false 2466#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«end_op» + 0x8a#64) false 2450#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_log]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x8e#64) false 2084266#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x8e#64) false 2084250#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_rel]
   iintro Hk Hpc
   iapply (eo_re RE cpu _ γ γb γfs cov ls dev ?ha0r ?hsr ?hnr ?hKr k.sie ?hrr ?hor)

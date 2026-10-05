@@ -31,6 +31,10 @@ def tfVpn : BitVec 27 := 0x3fffffe#27
 def trampPpn : BitVec 44 := 0x80006#44
 /-- The largest process size (`TRAPFRAME`). -/
 def uvmMaxsz : Nat := 2 ^ 38 - 8192
+/-- (NI M3 quotas, Q-0) `MAXUSZ` (kernel/param.h of `verified-quota`): the largest break
+of every process, the memory quota `sys_sbrk` enforces (`lui a4,0xc0` at `sys_sbrk+0x30`) and
+`kexec` enforces less the stack's two pages. -/
+def uQuota : Nat := 192 * 4096
 
 def PTE_V : BitVec 64 := 1#64
 def PTE_R : BitVec 64 := 2#64

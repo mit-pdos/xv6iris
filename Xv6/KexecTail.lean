@@ -792,10 +792,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-theorem kxc_br_iup_66 : KA.«kexec» + 0x66#64 + BitVec.signExtend 64 2091984#21 = KA.«iunlockput» := by
+theorem kxc_br_iup_66 : KA.«kexec» + 0x66#64 + BitVec.signExtend 64 2091886#21 = KA.«iunlockput» := by
   decide
 theorem kxc_ret_66 : jumpPc (KA.«kexec» + 0x66#64 + 4#64) = KA.«kexec» + 0x66#64 + 4#64 := by decide
-theorem kxc_br_eo_6a : KA.«kexec» + 0x6a#64 + BitVec.signExtend 64 2094286#21 = KA.«end_op» := by
+theorem kxc_br_eo_6a : KA.«kexec» + 0x6a#64 + BitVec.signExtend 64 2094188#21 = KA.«end_op» := by
   decide
 theorem kxc_ret_6a : jumpPc (KA.«kexec» + 0x6a#64 + 4#64) = KA.«kexec» + 0x6a#64 + 4#64 := by decide
 
@@ -836,7 +836,7 @@ theorem kxc_bad64 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20]
   iintro Hk Hpc
   -- +0x066  jal iunlockput
-  iapply (kxc_call_iup IUP Γ cpu k A spie spp _ (KA.«kexec» + 0x66#64) 2091984#21 kxc_br_iup_66
+  iapply (kxc_call_iup IUP Γ cpu k A spie spp _ (KA.«kexec» + 0x66#64) 2091886#21 kxc_br_iup_66
       kxc_ret_66 kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 hK hnoff htier hj hproc hkf
       hnib hn2 (by simp [RegMap.set_apply, h20]))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hop $Hlog $Hbs $Hpid]
@@ -845,7 +845,7 @@ theorem kxc_bad64 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
   iintro %c1 %spie1 %spp1 %R1 %n3 %⟨hcs1, hn3a, hn3b⟩ Hk Hpc Hte Hce Hpid Hbs Hlog Hslot
   k_norm_g
   -- +0x06a  jal end_op
-  iapply (kxc_call_endop EO Γ c1 k A spie1 spp1 R1 (KA.«kexec» + 0x6a#64) 2094286#21 kxc_br_eo_6a
+  iapply (kxc_call_endop EO Γ c1 k A spie1 spp1 R1 (KA.«kexec» + 0x6a#64) 2094188#21 kxc_br_eo_6a
       kxc_ret_6a n3 hK hnoff htier hj hproc)
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hlog $Hpid]
   isplitr
@@ -957,9 +957,9 @@ theorem kxc_call_pfp (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k
   ipureintro
   simpa using hcs
 
-theorem kxc_br_pfp_1da : KA.«kexec» + 0x1da#64 + BitVec.signExtend 64 2084734#21 =
+theorem kxc_br_pfp_1da : KA.«kexec» + 0x1e2#64 + BitVec.signExtend 64 2084612#21 =
     KA.«proc_freepagetable» := by decide
-theorem kxc_ret_1da : jumpPc (KA.«kexec» + 0x1da#64 + 4#64) = KA.«kexec» + 0x1da#64 + 4#64 := by
+theorem kxc_ret_1da : jumpPc (KA.«kexec» + 0x1e2#64 + 4#64) = KA.«kexec» + 0x1e2#64 + 4#64 := by
   decide
 
 set_option maxHeartbeats 16000000 in
@@ -980,7 +980,7 @@ theorem kxc_bad_1d6 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     (h2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFDE0#64) (h24 : R 24#5 = szf)
     (h22 : R 22#5 = pageAddr P.root) (h27 : R 27#5 = k.regs 27#5)
     (hbelow : umBelow szf P) (hcov : lazyFree P.um szf) :
-    kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x1d6#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x1de#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPtAt P Mi ∗
     procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
@@ -995,16 +995,16 @@ theorem kxc_bad_1d6 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   have hsz : szf.toNat ≤ uvmMaxsz := UmCovered.lazyFree_maxsz P szf hwf hcov
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x1d6  c.mv a1,s8 ; +0x1d8  c.mv a0,s6
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1d6#64) true 11#5 0#5 24#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1de#64) true 11#5 0#5 24#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h24]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1d8#64) true 10#5 0#5 22#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1e0#64) true 10#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22]
   iintro Hk Hpc
   -- +0x1da  jal proc_freepagetable, the block's event counter lent to the
   -- frees (permit sweep L1a, Rocq `proc_priv_ev_lend`)
   icases procPrivFd_evLend A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
-  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x1da#64) 2084734#21 kxc_br_pfp_1da
+  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x1e2#64) 2084612#21 kxc_br_pfp_1da
       kxc_ret_1da P Mi A.V.ev hK hnoff (by simp [RegMap.set_apply, h22]) (by simpa [RegMap.set_apply, h24] using hsz)
       (by simpa [RegMap.set_apply, h24] using hbelow))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend]
@@ -1021,46 +1021,46 @@ theorem kxc_bad_1d6 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at a2 a27
   have e2 : R1 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFDE0#64 := by rw [a2, h2]
   -- +0x1de  c.li a0,-1
-  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x1de#64) true 4095#12 10#5 0#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x1e6#64) true 4095#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1e0 .. +0x1ee  reload s3..s10 from slots 5..12
   unfold kxcFrameAt
   icases Hfr with ⟨F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, F13, Fr⟩
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1e0#64) true 504#12 19#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1e8#64) true 504#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 19#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F5
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1e2#64) true 496#12 20#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1ea#64) true 496#12 20#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 20#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F6
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1e4#64) true 488#12 21#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1ec#64) true 488#12 21#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 21#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F7
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1e6#64) true 480#12 22#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1ee#64) true 480#12 22#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 22#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F8
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1e8#64) true 472#12 23#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1f0#64) true 472#12 23#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 23#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F9
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1ea#64) true 464#12 24#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1f2#64) true 464#12 24#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 24#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F10
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1ec#64) true 456#12 25#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1f4#64) true 456#12 25#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 25#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F11
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1ee#64) true 448#12 26#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1f6#64) true 448#12 26#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 26#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F12
   -- +0x1f0  c.j +0x72
-  k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x1f0#64) true 2096770#21)
+  k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x1f8#64) true 2096762#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hfr := kxcFrameAt_weaken (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)

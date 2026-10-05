@@ -142,7 +142,7 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
   k_step_e (wp_s_add cpu _ (KA.«sys_unlink» + 0x110#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x112#64) false 2090196#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x112#64) false 2090090#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_readi]
   iintro Hk Hpc
   icases (show suAny (GF := GF) (sysUnlinkDel (k.regs 2#5)) 16 ⊢ ∃ bs : List (BitVec 8),
@@ -748,7 +748,7 @@ theorem sys_unlink_w3 (IL : ILOCK) (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) 
     $$ [Hsl Hdep Hoffr Hdev Hinum Hval Hfrz Hkeep Hru0]
   · unfold sysUnlinkLkAt; iframe; iframe #
   -- +0x74  jal ilock(ip)
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x74#64) false 2089368#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x74#64) false 2089262#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_ilock]
   iintro Hk Hpc
   icases (show sysUnlinkOpen (GF := GF) kd dinum dnd bmd datd ⊢ ⌜dirOk icfgNib dnd datd⌝ ∗

@@ -89,10 +89,10 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Constants -/
 
-theorem sys_open_tails_br_end_op : sysOpenAddr + 0xffffffffffffebe2#64 = KA.«end_op» := by decide
-theorem sys_open_tails_br_iunlockput : sysOpenAddr + 0xffffffffffffe2e0#64 = KA.«iunlockput» := by decide
-theorem sys_open_tails_br_iunlock : sysOpenAddr + 0xffffffffffffe13a#64 = KA.«iunlock» := by decide
-theorem sys_open_tails_br_fileclose : sysOpenAddr + 0xfffffffffffff010#64 = KA.«fileclose» := by decide
+theorem sys_open_tails_br_end_op : sysOpenAddr + 0xffffffffffffeb78#64 = KA.«end_op» := by decide
+theorem sys_open_tails_br_iunlockput : sysOpenAddr + 0xffffffffffffe276#64 = KA.«iunlockput» := by decide
+theorem sys_open_tails_br_iunlock : sysOpenAddr + 0xffffffffffffe0d0#64 = KA.«iunlock» := by decide
+theorem sys_open_tails_br_fileclose : sysOpenAddr + 0xffffffffffffefa6#64 = KA.«fileclose» := by decide
 
 theorem sys_open_tails_ret_d6 : jumpPc (sysOpenAddr + 0xd6#64) = sysOpenAddr + 0xd6#64 := by decide
 theorem sys_open_tails_ret_110 : jumpPc (sysOpenAddr + 0x110#64) = sysOpenAddr + 0x110#64 := by decide
@@ -292,7 +292,7 @@ theorem sys_open_tail_a (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨-, -, -, -, -, hKe, -⟩ := sys_open_K _ hS.hK
   -- +0xd2  jal end_op
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0xd2#64) false 2091792#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0xd2#64) false 2091686#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_end_op]
   iintro Hk Hpc
   iapply (sys_open_tails_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A u hS.hj hS.hproc
@@ -349,7 +349,7 @@ theorem sys_open_tail_b (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨-, -, -, -, -, hKe, -⟩ := sys_open_K _ hS.hK
   -- +0x10c  jal end_op
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x10c#64) false 2091734#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x10c#64) false 2091628#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_end_op]
   iintro Hk Hpc
   iapply (sys_open_tails_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A u hS.hj hS.hproc
@@ -413,7 +413,7 @@ theorem sys_open_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- 0xfe  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0xfe#64) false 2089442#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0xfe#64) false 2089336#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_open_tails_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A γil γisl loc tlc
@@ -430,7 +430,7 @@ theorem sys_open_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
   -- 0x102  jal end_op
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x102#64) false 2091744#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x102#64) false 2091638#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_end_op]
   iintro Hk Hpc
   iapply (sys_open_tails_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A n' hS.hj hS.hproc
@@ -491,7 +491,7 @@ theorem sys_open_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- 0x118  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x118#64) false 2089416#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x118#64) false 2089310#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_open_tails_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A γil γisl loc tlc
@@ -508,7 +508,7 @@ theorem sys_open_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
   -- 0x11c  jal end_op
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x11c#64) false 2091718#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x11c#64) false 2091612#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_end_op]
   iintro Hk Hpc
   iapply (sys_open_tails_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A n' hS.hj hS.hproc
@@ -573,7 +573,7 @@ theorem sys_open_tail_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0x130  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x130#64) false 2089392#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x130#64) false 2089286#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_open_tails_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A γil γisl loc tlc
@@ -590,7 +590,7 @@ theorem sys_open_tail_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
   -- +0x134  jal end_op
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x134#64) false 2091694#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x134#64) false 2091588#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_end_op]
   iintro Hk Hpc
   iapply (sys_open_tails_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A n' hS.hj hS.hproc
@@ -663,7 +663,7 @@ theorem sys_open_tail_f (IUP : IUNLOCKPUT) (EO : END_OP) (FC : FILECLOSE) (Γ : 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.2.1]
   iintro Hk Hpc
   -- +0x128  jal fileclose
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x128#64) false 2092776#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x128#64) false 2092670#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_fileclose]
   iintro Hk Hpc
   iapply (sys_open_tails_fileclose_none FC Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A kf A.V.ev
@@ -724,7 +724,7 @@ theorem sys_open_tail_s (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0xba  jal iunlock
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0xba#64) false 2089088#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0xba#64) false 2088982#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_iunlock]
   iintro Hk Hpc
   iapply (sys_open_tails_iunlock IU Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A γil γisl loc tlc
@@ -742,7 +742,7 @@ theorem sys_open_tail_s (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs 
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
   ihave Hop := logOpb_op icfgLog u $$ Hop Htx
   -- +0xbe  jal end_op
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0xbe#64) false 2091812#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0xbe#64) false 2091706#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_end_op]
   iintro Hk Hpc
   iapply (sys_open_tails_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A u hS.hj hS.hproc

@@ -80,22 +80,22 @@ set_option linter.unusedSimpArgs false
 
 /-! ## The branch targets and return addresses of phase A's calls -/
 
-theorem kxcA_br_myproc : KA.«kexec» + 0x20#64 + BitVec.signExtend 64 2084844#21 = KA.«myproc» := by
+theorem kxcA_br_myproc : KA.«kexec» + 0x20#64 + BitVec.signExtend 64 2084730#21 = KA.«myproc» := by
   decide
 theorem kxcA_ret_24 : jumpPc (KA.«kexec» + 0x20#64 + 4#64) = KA.«kexec» + 0x20#64 + 4#64 := by decide
-theorem kxcA_br_beginop : KA.«kexec» + 0x26#64 + BitVec.signExtend 64 2094214#21 = KA.«begin_op» := by
+theorem kxcA_br_beginop : KA.«kexec» + 0x26#64 + BitVec.signExtend 64 2094116#21 = KA.«begin_op» := by
   decide
 theorem kxcA_ret_2a : jumpPc (KA.«kexec» + 0x26#64 + 4#64) = KA.«kexec» + 0x26#64 + 4#64 := by decide
-theorem kxcA_br_namei : KA.«kexec» + 0x2c#64 + BitVec.signExtend 64 2093706#21 = KA.«namei» := by
+theorem kxcA_br_namei : KA.«kexec» + 0x2c#64 + BitVec.signExtend 64 2093608#21 = KA.«namei» := by
   decide
 theorem kxcA_ret_30 : jumpPc (KA.«kexec» + 0x2c#64 + 4#64) = KA.«kexec» + 0x2c#64 + 4#64 := by decide
-theorem kxcA_br_ilock : KA.«kexec» + 0x36#64 + BitVec.signExtend 64 2091436#21 = KA.«ilock» := by
+theorem kxcA_br_ilock : KA.«kexec» + 0x36#64 + BitVec.signExtend 64 2091338#21 = KA.«ilock» := by
   decide
 theorem kxcA_ret_3a : jumpPc (KA.«kexec» + 0x36#64 + 4#64) = KA.«kexec» + 0x36#64 + 4#64 := by decide
-theorem kxcA_br_readi : KA.«kexec» + 0x48#64 + BitVec.signExtend 64 2092404#21 = KA.«readi» := by
+theorem kxcA_br_readi : KA.«kexec» + 0x48#64 + BitVec.signExtend 64 2092306#21 = KA.«readi» := by
   decide
 theorem kxcA_ret_4c : jumpPc (KA.«kexec» + 0x48#64 + 4#64) = KA.«kexec» + 0x48#64 + 4#64 := by decide
-theorem kxcA_br_eo_88 : KA.«kexec» + 0x88#64 + BitVec.signExtend 64 2094256#21 = KA.«end_op» := by
+theorem kxcA_br_eo_88 : KA.«kexec» + 0x88#64 + BitVec.signExtend 64 2094158#21 = KA.«end_op» := by
   decide
 theorem kxcA_ret_8c : jumpPc (KA.«kexec» + 0x88#64 + 4#64) = KA.«kexec» + 0x88#64 + 4#64 := by decide
 
@@ -721,7 +721,7 @@ theorem kxc_a2_r (IL : ILOCK) (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP)
   unfold logOp
   icases Hlog with ⟨Hlog, Htx⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hbs2⟩
-  iapply (kxcA_call_ilock IL Γ cpu k A spie spp _ (KA.«kexec» + 0x36#64) 2091436#21 kxcA_br_ilock
+  iapply (kxcA_call_ilock IL Γ cpu k A spie spp _ (KA.«kexec» + 0x36#64) 2091338#21 kxcA_br_ilock
       kxcA_ret_3a hK hnoff htier hj hproc kk q inum hkk hnib (by simp [RegMap.set_apply, h10, hipv]))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpid $Href $Hb1 $Htx]
   isplitr
@@ -757,7 +757,7 @@ theorem kxc_a2_r (IL : ILOCK) (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x048  jal readi
-  iapply (kxcA_call_readi RD Γ cpu k A spie1 spp1 _ (KA.«kexec» + 0x48#64) 2092404#21 kxcA_br_readi
+  iapply (kxcA_call_readi RD Γ cpu k A spie1 spp1 _ (KA.«kexec» + 0x48#64) 2092306#21 kxcA_br_readi
       kxcA_ret_4c hK hnoff htier hj hproc kk q.half q.half g lo tl inum dn bm data gil gisl bs hbl
       (kxcElfBuf (k.regs 2#5)) ?r2 ?r0 ?r1 ?r3 ?r4)
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpid $Hop $Hbuf $Hb1]

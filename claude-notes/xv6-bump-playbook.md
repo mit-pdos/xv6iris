@@ -252,6 +252,44 @@ tell that it is benign is that the addresses are a rearrangement of the same
 multiset of sizes, and the `UNALIGNED` sweep stays empty throughout because no
 function's own body changed. Their `.rodata` message strings permute with them.
 
+### 2a. A source change of your own: measure it from the symbol tables, and watch `.eh_frame`
+
+(NI M3 quotas Q-0, 2026-10-05: `verified-quota` = b72cbac1 + one 34-line commit.)
+First reproduce the pinned ELF byte for byte (`make kernel/kernel` at the pin, md5
+against `MachCSL/KernelElf.lean`'s header) — then apply the change and measure, never
+estimate: `nm -n -S` of both ELFs, group the text symbols by delta, and diff each
+resized function's disassembly (`difflib` over the normalised instruction stream gives
+the `--intervals` lines).  Q-0's measurement: 86 of 197 text symbols moved or resized
+(`sys_sbrk` resized in place; `+16` from `sys_pause`, `+76` from `pipeclose`, `+114`
+from `pipewrite`, `+122` from `argfd`; `kernelvec`'s alignment absorbed 10 bytes,
+`+112`, then `+118` from `plic_claim`); five functions changed shape (`sys_sbrk`,
+`pipealloc`, `pipeclose`, `kexec`, `plicinithart`); `.rodata` did not move; data only
+`disk` and `end` (`+24`), plus two NEW `.bss` symbols.
+
+- **THE `.eh_frame` TRAP.**  `.eh_frame` sits between `.rodata` and `.data`.  A new
+  function (a new FDE), or a reshape that changes a function's CFI (a new saved
+  register), grows it, and EVERY `.data`/`.bss` symbol moves: a whole-kernel data
+  relayout.  Check `objdump -h`'s `.eh_frame` SIZE before accepting a spelling (its
+  BYTES change anyway: the FDEs hold pc-relative pointers to moved functions).  Q-0's
+  rejected spellings each grew it (a separate `kexec` test: +0x18, data +32; two
+  `file.c` helpers: +0x60, data +96; the kill check under `wait_lock`: +0x10, data +16).
+- **`.rodata` can keep its addresses and change its CONTENT**: `syscalls[]` is a
+  `.rodata` table of `sys_*` pointers, so every moved handler rewrites a word.  The
+  re-dump carries it (`KernelData.lean`); a proof reading the table by value would not.
+- **A new `.bss` variable can fill a padding gap** (`npipe` landed in the 4 bytes after
+  `ticks`), and **a loop bound folded as `&next_symbol` changes its LABEL**:
+  `filealloc`'s `&ftable.file[NFILE]` was `<disk>` and became `<npipelock>`.  The
+  `--symbolic` pass mapped that fold by `disk`'s delta (wrong): fix such folds by hand
+  (`FileInv.fnode_end`, `ProofFilealloc.fa_end_*`) and give every new `.bss` symbol a
+  window in the carve (`BootCarveProc.bcpBssWindows`), or it is silently dropped.
+- **A static inline added to a SHARED header moves the user programs' DWARF** (`riscv.h`
+  is included by `usertests.c`): `_usertests`' debug line table changed, so `fs.img`
+  (which holds the whole ELF) changed although no user code did.  Re-dump `fs.img`
+  (`tools/dump_fs_image.py`) with the kernel; the seven verified user images stayed
+  byte-identical.
+- **Recheck every jal whose return address is an insertion point** (§3's rule): Q-0's
+  `pipeclose` `kfree` return `+0x5c` was mapped to `+0x82`.
+
 ## 3. The relayout (the cheap 90%)
 
 On the Lean tree the relayout is `tools/rebase_kernel.py` (literal pass, `--fixup`, `--symbolic`, all with one `--intervals` file for the reshaped functions): `notes/design/kernel-rebase-pipeline.md`.

@@ -31,9 +31,11 @@ everywhere downstream, Rocq's route:
     `kConf` (Rocq's `sconf` holds none of them);
   * the xv6 PMP check depends only on entry 0 (`MachCSL.pmpEnt0Ok`), and the
     M-mode `csrw pmpaddr0`/`pmpcfg0` rules hold at any all-off table;
-  * `mcountinhibit`, `minstretcfg`, `mcyclecfg`, `scounteren`:
+  * `mcountinhibit`, `minstretcfg`, `mcyclecfg`:
     `MachCSL.hwConfig` holds them at existential values (`HwCounters`, Rocq
-    `counter_caps`); a user counter read may retire (Rocq `u_csr_readable`);
+    `counter_caps`); `scounteren` (which the kernel writes since NI M3 quotas
+    Q-0) is a `clockCells` cell at some value; a user counter read may retire
+    (Rocq `u_csr_readable`);
   * `sig_meip`, `sig_seip`: no consumer reads their reset value.
 -/
 import MachCSL.BootInitModel

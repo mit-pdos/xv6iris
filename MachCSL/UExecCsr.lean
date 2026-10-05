@@ -10,7 +10,7 @@ Rocq `UserCsr.v` (`exec_doCSR_U`/`goodmb_doCSR_U`,
 **The outcome at xv6's configuration: Illegal, or a retiring counter read**
 (Rocq `exec_doCSR_U`'s disjunction).  The counter enables `mcounteren`/
 `scounteren` are GENERIC (as in Rocq: `start()` leaves `mcounteren` at
-`garbage | TM`, nothing writes `scounteren`).  A READ of a counter
+`garbage | TM`; `scounteren` is a clock cell at some value, NI M3 Q-0).  A READ of a counter
 (`cycle`/`time`/`instret`/`hpmcounter3..31`, Rocq `u_csr_readable`, the only
 CSRs whose privilege bits admit User and whose extension is live) whose two
 enable bits are set RETIRES, writing the counter into `rd`

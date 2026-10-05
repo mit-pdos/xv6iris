@@ -44,13 +44,13 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-theorem mn_br_8e : KA.«main» + 7526#64 = KA.«binit» := by decide
+theorem mn_br_8e : KA.«main» + 7542#64 = KA.«binit» := by decide
 theorem mn_ret_92 : jumpPc (KA.«main» + 146#64) = KA.«main» + 146#64 := by decide
-theorem mn_br_92 : KA.«main» + 8892#64 = KA.«iinit» := by decide
+theorem mn_br_92 : KA.«main» + 8908#64 = KA.«iinit» := by decide
 theorem mn_ret_96 : jumpPc (KA.«main» + 150#64) = KA.«main» + 150#64 := by decide
-theorem mn_br_96 : KA.«main» + 13120#64 = KA.«fileinit» := by decide
+theorem mn_br_96 : KA.«main» + 13136#64 = KA.«fileinit» := by decide
 theorem mn_ret_9a : jumpPc (KA.«main» + 154#64) = KA.«main» + 154#64 := by decide
-theorem mn_br_9a : KA.«main» + 19038#64 = KA.«virtio_disk_init» := by decide
+theorem mn_br_9a : KA.«main» + 19156#64 = KA.«virtio_disk_init» := by decide
 theorem mn_ret_9e : jumpPc (KA.«main» + 158#64) = KA.«main» + 158#64 := by decide
 theorem mn_br_9e : KA.«main» + 3492#64 = KA.«userinit» := by decide
 theorem mn_ret_a2 : jumpPc (KA.«main» + 162#64) = KA.«main» + 162#64 := by decide
@@ -91,7 +91,7 @@ theorem mn_binit (BI : BINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hin := (show ([∗list] i ∈ List.range NBUF, bufIn (GF := GF) i) ⊢
     [∗list] i ∈ List.range 30, bufIn i from .rfl) $$ Hin
-  k_step (wp_s_jal cpu _ (KA.«main» + 142#64) false 7384#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 142#64) false 7400#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_8e]
   iintro Hk Hpc
   have hbi := BI.wp_binit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 146#64)))
@@ -179,7 +179,7 @@ theorem mn_iinit (II : IINIT) [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hin := (show ([∗list] i ∈ List.range NINODE, sleepLockIn (GF := GF) (inodeAddr i)) ⊢
     [∗list] i ∈ List.range 50, sleepLockIn (inodeAddr i) from .rfl) $$ Hin
-  k_step (wp_s_jal cpu _ (KA.«main» + 146#64) false 8746#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 146#64) false 8762#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_92]
   iintro Hk Hpc
   have hii := II.wp_iinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 150#64)))
@@ -234,6 +234,13 @@ theorem mn_ftable_kmap [CurCtx] :
   · iapply kmapStatic_rw ftableAddr (by decide) $$ HS
   · iapply kmapStatic_rw (ftableAddr + 16#64) (by decide) $$ HS
 
+theorem mn_npipe_kmap [CurCtx] :
+    kmapStatic (GF := GF) ⊢ kmapId npipelockAddr ∗ kmapId (npipelockAddr + 16#64) := by
+  iintro #HS
+  isplit
+  · iapply kmapStatic_rw npipelockAddr (by decide) $$ HS
+  · iapply kmapStatic_rw (npipelockAddr + 16#64) (by decide) $$ HS
+
 set_option maxHeartbeats 4000000 in
 /-- **+0x96 → +0x9a**: `fileinit()`, then the open-file table is born
 (`FileBoot.fileBoot_isFtable`: Rocq `ftable_res_boot` + `newlock` at
@@ -242,13 +249,14 @@ theorem mn_fileinit (FI : FILEINIT) [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0 :
     (hsie : k.sie = false) (hK : 4 ≤ k.avail) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 150#64) ∗
     mainLkRaw ftableLockAddr ∗ ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗ irefSlots NFILE ∗
+    npipeBootRaw ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 154#64) -∗
       (∃ (γft : GName) (γ : FileNames), isFtable γft γ) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   unfold mainLkRaw
-  iintro ⟨Hk, Hpc, ⟨%vl, %vn, %vc, Hlw⟩, Hraw, Hir, HΦ⟩
+  iintro ⟨Hk, Hpc, ⟨%vl, %vn, %vc, Hlw⟩, Hraw, Hir, Hnp, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step (wp_s_jal cpu _ (KA.«main» + 150#64) false 12970#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 150#64) false 12986#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_96]
   iintro Hk Hpc
   have hfi := FI.wp_fileinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 154#64)))
@@ -263,8 +271,9 @@ theorem mn_fileinit (FI : FILEINIT) [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0 :
   simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_9a]
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases mn_ftable_kmap $$ HS with ⟨#Hf0, #Hf16⟩
+  icases mn_npipe_kmap $$ HS with ⟨#Hn0, #Hn16⟩
   iapply wpLoop_fupd
-  imod fileBoot_isFtable cpu (k.withRegs R') $$ [$Hk $Hli $Hf0 $Hf16 $Hraw $Hir] with ⟨Hk, -, Hft⟩
+  imod fileBoot_isFtable cpu (k.withRegs R') $$ [$Hk $Hli $Hf0 $Hf16 $Hraw $Hir $Hnp $Hn0 $Hn16] with ⟨Hk, -, Hft⟩
   imodintro
   iapply HΦ $$ %R' Hk Hpc Hft
 
@@ -296,7 +305,7 @@ theorem mn_virtio (VD : VIRTIO_DISK_INIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : 
   iintro ⟨Hk, Hpc, #Hkml, Hav, #Hdinv, #Hcc, Hcfg, Hgh, ⟨%vl, %vn, %vc, %pd0, %pav0, %pu0, %free0, Hcells⟩,
     Hlf, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step (wp_s_jal cpu _ (KA.«main» + 154#64) false 18884#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 154#64) false 19002#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_9a]
   iintro Hk Hpc
   have hvd := VD.wp_virtio_disk_init (hlc := hlc) (GF := GF) cpu

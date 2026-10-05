@@ -40,8 +40,8 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Constants -/
 
-theorem ssc_br_argaddr : KA.«sys_seccomp» + 0xfffffffffffffd4c#64 = KA.«argaddr» := by decide
-theorem ssc_br_myproc : KA.«sys_seccomp» + 0xffffffffffffed76#64 = KA.«myproc» := by decide
+theorem ssc_br_argaddr : KA.«sys_seccomp» + 0xfffffffffffffd3c#64 = KA.«argaddr» := by decide
+theorem ssc_br_myproc : KA.«sys_seccomp» + 0xffffffffffffed66#64 = KA.«myproc» := by decide
 theorem ssc_ret_12 : jumpPc (KA.«sys_seccomp» + 0x12#64) = KA.«sys_seccomp» + 0x12#64 := by decide
 theorem ssc_ret_16 : jumpPc (KA.«sys_seccomp» + 0x16#64) = KA.«sys_seccomp» + 0x16#64 := by decide
 
@@ -125,7 +125,7 @@ theorem sys_seccomp_proof (AA : ARGADDR) (MP : MYPROC) : SYSSECCOMP :=
   k_step_gen (wp_s_addi c2 _ (KA.«sys_seccomp» + 0xc#64) true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c3 _ (KA.«sys_seccomp» + 0xe#64) false 2096446#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c3 _ (KA.«sys_seccomp» + 0xe#64) false 2096430#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssc_br_argaddr] next c4 hp4
   iintro Hk Hpc
   iapply (sysfile_argaddr_wp AA c4 _ 0 V.upt.tfp V.tf v0 w1 (DFrac.own (1 : Qp).half.half) (by decide) ?ha0
@@ -148,7 +148,7 @@ theorem sys_seccomp_proof (AA : ARGADDR) (MP : MYPROC) : SYSSECCOMP :=
       wordPointsTo (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) from by
     rw [hproc]) $$ Htfp
   ihave Hpriv := Htfback $$ Htfp Htf
-  k_step_gen (wp_s_jal c5 _ (KA.«sys_seccomp» + 0x12#64) false 2092388#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c5 _ (KA.«sys_seccomp» + 0x12#64) false 2092372#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssc_br_myproc] next c6 hp6
   iintro Hk Hpc
   iapply (ssc_myproc MP c6 _ ?hnm ?hKm) $$ [- $Hk $Hpc]

@@ -185,15 +185,16 @@ def mainLocksBare : IProp GF := iprop%
 
 /-- **The spinlocks brought up AFTER the switch, raw** (the rest of Rocq
 `main_locks_raw`): `pid_lock`, `wait_lock`, `tickslock` (spelled as
-trapinit's premise), `bcache`, `itable`, `ftable`.  The vdisk lock rides
-`diskInitCells`. -/
+trapinit's premise), `bcache`, `itable`, `ftable`, and (NI M3 quotas Q-0) the
+never-`initlock`ed `npipelock` with its counter (`FileBoot.npipeBootRaw`).  The
+vdisk lock rides `diskInitCells`. -/
 def mainLocksRaw : IProp GF := iprop%
   mainLkRaw pidLockAddr ∗ mainLkRaw waitLockAddr ∗
   kmapId tickslockAddr ∗ kmapId (tickslockAddr + 16#64) ∗
   (∃ (vl : BitVec 32) (vn vc : BitVec 64),
     wordPointsTo tickslockAddr 4 (DFrac.own 1) vl ∗ wordPointsTo (tickslockAddr + 8#64) 8 (DFrac.own 1) vn ∗
     wordPointsTo (tickslockAddr + 16#64) 8 (DFrac.own 1) vc) ∗
-  mainLkRaw bcacheLockAddr ∗ mainLkRaw itableLockAddr ∗ mainLkRaw ftableLockAddr
+  mainLkRaw bcacheLockAddr ∗ mainLkRaw itableLockAddr ∗ mainLkRaw ftableLockAddr ∗ npipeBootRaw
 
 /-- **The 32 dead `.bss` bytes of the static superblock** (Rocq
 `main_sb_raw`, in `FirstTok.firstFsinit`'s `byteBuf` spelling): fsinit's

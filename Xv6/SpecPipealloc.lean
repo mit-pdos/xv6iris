@@ -5,6 +5,10 @@ The interface of `pipealloc` (Rocq SpecPipealloc.v).
       struct pipe *pi = 0;
       *f0 = *f1 = 0;
       if ((*f0 = filealloc()) == 0 || (*f1 = filealloc()) == 0) goto bad;
+      acquire(&npipelock);                          // the quota's pipe cap
+      if (npipe >= NPIPE) { release(&npipelock); goto bad; }
+      npipe++;
+      release(&npipelock);
       if ((pi = (struct pipe*)kalloc()) == 0) goto bad;
       pi->readopen = 1; pi->writeopen = 1; pi->nwrite = 0; pi->nread = 0;
       initlock(&pi->lock, "pipe");
@@ -29,6 +33,14 @@ out INSIDE their files: `FdState.open true false (.pipe γp)` is the read end an
 cells).  On the bad paths the two `struct file *` cells are NOT restored,
 so failure promises the cells back with unspecified contents, both fd
 units back, and the page count untouched.
+
+THE PIPE CAP (NI M3 quotas Q-0; kernel `verified-quota`): `NPIPE = 50`
+buffers at once, counted in `npipe` under `npipelock` (`NpipeDefs`; the
+lock's handle rides `isFtable`).  Its refusal is one more `-1` arm, with the
+page count untouched and both files closed: the failure arm below, which names
+no reason, already covers it, so the contract's text does not move.  (A
+`kalloc` that fails after the count leaves it raised -- the C leak the design
+records; Q-0's payload is the counter at any value.)
 
 pipealloc holds no lock across a call; its callees are push/pop balanced.
 Since `fileclose` returns hart-generically (its crossing is `true`), so does

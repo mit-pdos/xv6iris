@@ -41,9 +41,9 @@ theorem mn_br_7e : KA.«main» + 5714#64 = KA.«trapinit» := by decide
 theorem mn_ret_82 : jumpPc (KA.«main» + 130#64) = KA.«main» + 130#64 := by decide
 theorem mn_br_82 : KA.«main» + 5750#64 = KA.«trapinithart» := by decide
 theorem mn_ret_86 : jumpPc (KA.«main» + 134#64) = KA.«main» + 134#64 := by decide
-theorem mn_br_86 : KA.«main» + 18768#64 = KA.«plicinit» := by decide
+theorem mn_br_86 : KA.«main» + 18880#64 = KA.«plicinit» := by decide
 theorem mn_ret_8a : jumpPc (KA.«main» + 138#64) = KA.«main» + 138#64 := by decide
-theorem mn_br_8a : KA.«main» + 18796#64 = KA.«plicinithart» := by decide
+theorem mn_br_8a : KA.«main» + 18908#64 = KA.«plicinithart» := by decide
 theorem mn_ret_8e : jumpPc (KA.«main» + 142#64) = KA.«main» + 142#64 := by decide
 
 section
@@ -120,7 +120,7 @@ theorem mn_plic (PI : PLICINIT) (PIH : PLICINITHART) [CurCtx] (cpu : CPU) (k : K
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hplic, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step (wp_s_jal cpu _ (KA.«main» + 134#64) false 18634#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 134#64) false 18746#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_86]
   iintro Hk Hpc
   have hpi := PI.wp_plicinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 138#64)))
@@ -131,7 +131,7 @@ theorem mn_plic (PI : PLICINIT) (PIH : PLICINITHART) [CurCtx] (cpu : CPU) (k : K
   iframe Hk Hpc Hplic
   iintro %R1 Hk Hpc _
   simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_8a]
-  k_step (wp_s_jal cpu _ (KA.«main» + 138#64) false 18658#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 138#64) false 18770#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_8a]
   iintro Hk Hpc
   have hpih := PIH.wp_plicinithart (hlc := hlc) (GF := GF) cpu (k.withRegs (R1.set 1#5 (KA.«main» + 142#64)))

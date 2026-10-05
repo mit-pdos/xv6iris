@@ -88,7 +88,7 @@ theorem sys_link_tail_b (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   unfold sysLinkRows
   icases Hrows with ⟨Hpid, Hcwd, Hcwr⟩
   -- +0xbc  jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xbc#64) false 2092490#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xbc#64) false 2092384#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_end_op]
   iintro Hk Hpc
   iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j u A.pid pidPriv hj ?ep ?eK
@@ -180,7 +180,7 @@ theorem sys_link_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0xc8  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xc8#64) false 2090172#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xc8#64) false 2090066#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_link_iunlockput_sconf IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γil γisl
@@ -200,7 +200,7 @@ theorem sys_link_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
     hcs1
   -- +0xcc  jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xcc#64) false 2092474#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xcc#64) false 2092368#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_end_op]
   iintro Hk Hpc
   iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j n' A.pid pidPriv hj ?ep ?eK
@@ -277,7 +277,7 @@ theorem sys_link_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0xc8  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xd8#64) false 2090156#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xd8#64) false 2090050#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_link_iunlockput_sconf IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γil γisl
@@ -297,7 +297,7 @@ theorem sys_link_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
     hcs1
   -- +0xcc  jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xdc#64) false 2092458#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xdc#64) false 2092352#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_end_op]
   iintro Hk Hpc
   iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j n' A.pid pidPriv hj ?ep ?eK
@@ -398,7 +398,7 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0xf6  jal ilock
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xf6#64) false 2089530#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xf6#64) false 2089424#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_ilock]
   iintro Hk Hpc
   iapply (sys_link_ilock IL Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γil γisl kk q.half
@@ -485,7 +485,7 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.1]
   iintro Hk Hpc
   -- +0x106  jal iupdate
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x106#64) false 2089334#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x106#64) false 2089228#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iupdate]
   iintro Hk Hpc
   ihave Htok := (show FsStateLink.linkTok (GF := GF) (fsGammaL fscFs) (inum.toNat : Int) uty ⊢
@@ -541,7 +541,7 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp2.2.2.1]
   iintro Hk Hpc
   -- +0x10c  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x10c#64) false 2090104#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x10c#64) false 2089998#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iunlockput]
   iintro Hk Hpc
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
@@ -566,7 +566,7 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R2 _ _ 10#5 _ hp2 (by decide)) (Or.inl rfl))
     hcs3
   -- +0x110  jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x110#64) false 2092406#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x110#64) false 2092300#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_end_op]
   iintro Hk Hpc
   iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j n' A.pid pidPriv hj ?ep ?eK
@@ -655,7 +655,7 @@ theorem sys_link_tail_e2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.2.1]
   iintro Hk Hpc
   -- +0xe8  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xe8#64) false 2090140#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xe8#64) false 2090034#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_link_iunlockput_gen IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γil γisl
@@ -715,7 +715,7 @@ theorem sys_link_tail_f (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hl
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.2.1]
   iintro Hk Hpc
   -- +0xe8  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xf0#64) false 2090132#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xf0#64) false 2090026#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_link_iunlockput_gen IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γil γisl

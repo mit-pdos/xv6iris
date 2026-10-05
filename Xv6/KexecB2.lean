@@ -92,15 +92,15 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Branch targets and return addresses -/
 
-theorem kxcB2_br_pfp : KA.«kexec» + 0x324#64 + BitVec.signExtend 64 2084404#21 =
+theorem kxcB2_br_pfp : KA.«kexec» + 0x32c#64 + BitVec.signExtend 64 2084282#21 =
     KA.«proc_freepagetable» := by decide
-theorem kxcB2_ret_324 : jumpPc (KA.«kexec» + 0x324#64 + 4#64) = KA.«kexec» + 0x324#64 + 4#64 := by
+theorem kxcB2_ret_324 : jumpPc (KA.«kexec» + 0x32c#64 + 4#64) = KA.«kexec» + 0x32c#64 + 4#64 := by
   decide
-theorem kxcB2_br_walk : KA.«kexec» + 0x100#64 + BitVec.signExtend 64 2082264#21 = KA.«walkaddr» := by
+theorem kxcB2_br_walk : KA.«kexec» + 0x100#64 + BitVec.signExtend 64 2082150#21 = KA.«walkaddr» := by
   decide
 theorem kxcB2_ret_100 : jumpPc (KA.«kexec» + 0x100#64 + 4#64) = KA.«kexec» + 0x100#64 + 4#64 := by
   decide
-theorem kxcB2_br_readi_e6 : KA.«kexec» + 0xe6#64 + BitVec.signExtend 64 2092246#21 = KA.«readi» := by
+theorem kxcB2_br_readi_e6 : KA.«kexec» + 0xe6#64 + BitVec.signExtend 64 2092148#21 = KA.«readi» := by
   decide
 theorem kxcB2_ret_e6 : jumpPc (KA.«kexec» + 0xe6#64 + 4#64) = KA.«kexec» + 0xe6#64 + 4#64 := by
   decide
@@ -359,7 +359,7 @@ theorem kxc_bad31e (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (
     (h2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFDE0#64) (h8 : R 8#5 = k.regs 2#5)
     (h20 : R 20#5 = ientry kf) (h22 : R 22#5 = pageAddr P.root)
     (hbelow : umBelow szf P) (hcov : lazyFree P.um szf) :
-    kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x31e#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x326#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
     kxcResB k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w63 szf w67 ef P Mi ∗
@@ -375,18 +375,18 @@ theorem kxc_bad31e (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (
   icases Hfr with ⟨F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, F13, Fu, Fp, F63, F64, F65,
     F66, F67, F68⟩
   -- +0x31e  ld a1,-520(s0)
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x31e#64) false 3576#12 11#5 8#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x326#64) false 3576#12 11#5 8#5 (by decide) (by decide)
       (DFrac.own 1) szf)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8]
   iintro Hk Hpc F65
   -- +0x322  c.mv a0,s6
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x322#64) true 10#5 0#5 22#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x32a#64) true 10#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22]
   iintro Hk Hpc
   -- +0x324  jal proc_freepagetable, the block's event counter lent to the
   -- frees (permit sweep L1a, Rocq `proc_priv_ev_lend`)
   icases procPrivFd_evLend A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
-  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x324#64) 2084404#21 kxcB2_br_pfp
+  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x32c#64) 2084282#21 kxcB2_br_pfp
       kxcB2_ret_324 P Mi A.V.ev hK hnoff (by simp [RegMap.set_apply, h22]) (by simpa [RegMap.set_apply] using hsz)
       (by simpa [RegMap.set_apply] using hbelow))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend]
@@ -403,40 +403,40 @@ theorem kxc_bad31e (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at a2 a20
   have e2 : R1 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFDE0#64 := by rw [a2, h2]
   -- +0x328 .. +0x336  reload s3, s5..s11 from slots 5, 7..13
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x328#64) true 504#12 19#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x330#64) true 504#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 19#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F5
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x32a#64) true 488#12 21#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x332#64) true 488#12 21#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 21#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F7
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x32c#64) true 480#12 22#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x334#64) true 480#12 22#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 22#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F8
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x32e#64) true 472#12 23#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x336#64) true 472#12 23#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 23#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F9
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x330#64) true 464#12 24#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x338#64) true 464#12 24#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 24#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F10
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x332#64) true 456#12 25#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x33a#64) true 456#12 25#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 25#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F11
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x334#64) true 448#12 26#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x33c#64) true 448#12 26#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 26#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F12
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x336#64) true 440#12 27#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x33e#64) true 440#12 27#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 27#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
   iintro Hk Hpc F13
   -- +0x338  c.j +0x64
-  k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x338#64) true 2096428#21)
+  k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x340#64) true 2096420#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hfr := kxcFrameBp_A6 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
@@ -465,7 +465,7 @@ def kxcB2MsgStr : List (BitVec 8) :=
     0x72#8, 0x65#8, 0x73#8, 0x73#8, 0x20#8, 0x73#8, 0x68#8, 0x6f#8, 0x75#8, 0x6c#8, 0x64#8, 0x20#8,
     0x65#8, 0x78#8, 0x69#8, 0x73#8, 0x74#8]
 
-theorem kxcB2_br_panic : KA.«kexec» + 0xd6#64 + BitVec.signExtend 64 2080242#21 = KA.«panic» := by
+theorem kxcB2_br_panic : KA.«kexec» + 0xd6#64 + BitVec.signExtend 64 2080128#21 = KA.«panic» := by
   decide
 
 section Panic
@@ -641,7 +641,7 @@ theorem kxcB2_ls_da (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FR
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x0e6  jal readi
-  iapply (kxcB2_call_readi RD Γ cpu k A spie spp _ (KA.«kexec» + 0xe6#64) 2092246#21 kxcB2_br_readi_e6
+  iapply (kxcB2_call_readi RD Γ cpu k A spie spp _ (KA.«kexec» + 0xe6#64) 2092148#21 kxcB2_br_readi_e6
       kxcB2_ret_e6 hK hnoff htier hj hproc kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf
       (po + ii) nn hpoii hnn1 ((Mi kv).take nn) holds (pte2pa w) ?r2 ?r0 ?r1 ?r3 ?r4)
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpid $Hop $Hpg $Hb1]
@@ -672,7 +672,7 @@ theorem kxcB2_ls_da (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FR
   · subst hfull
     have hbr : bcond bop.BNE (kxcSx32 tot) (BitVec.ofNat 64 tot) = false := by
       rw [kxcB2_bne]; simp [hsnn]
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0xea#64) false 564#13 18#5 10#5 (by decide) bop.BNE)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0xea#64) false 572#13 18#5 10#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a18, h10', hbr]
     iintro Hk Hpc
     have hin : po + ii + tot ≤ dnf.diSize.toNat := kxcB2_rd_full dnf.diSize (po + ii) tot hnn0 htot.symm
@@ -750,7 +750,7 @@ theorem kxcB2_ls_da (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FR
       have := congrArg BitVec.toNat he
       simp only [BitVec.toNat_ofNat] at this
       omega
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0xea#64) false 564#13 18#5 10#5 (by decide) bop.BNE)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0xea#64) false 572#13 18#5 10#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a18, h10', hbr]
     iintro Hk Hpc
     ihave Hpt := Hback $$ %(rdDelivered data ((Mi kv).take nn) (po + ii) tot) %hdlen Hpg Hrest
@@ -761,8 +761,8 @@ theorem kxcB2_ls_da (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FR
     unfold kxcResB
     iframe
 
-theorem kxcB2_msg_addr : KA.«kexec» + 0x2c58#64 = KStr.«loadseg: address should exist» := by decide
-theorem kxcB2_br_panic' : KA.«kexec» + 0xffffffffffffbec8#64 = KA.«panic» := by decide
+theorem kxcB2_msg_addr : KA.«kexec» + 0x2be6#64 = KStr.«loadseg: address should exist» := by decide
+theorem kxcB2_br_panic' : KA.«kexec» + 0xffffffffffffbe56#64 = KA.«panic» := by decide
 
 /-- `bgeu s9,a5` with `s9 = PGSIZE` and `a5` the ABI word `filesz - i`. -/
 theorem kxcB2_bgeu4096 (d : Nat) (h : d < 2 ^ 32) :
@@ -844,7 +844,7 @@ theorem kxcB2_ls_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPU
   icases Hres with ⟨Hop, Hlog, Hirs, Hbs, Hpt, Hpriv, Hbufs, He, Hfr⟩
   icases UPtAlloc.procPtAt_split P Mi $$ Hpt with ⟨%hwf, Hrep, Hum⟩
   icases UPtAlloc.ptOwnRep_split _ _ $$ Hrep with ⟨%t, %⟨htb, hrep⟩, Ht⟩
-  iapply (kxcB2_call_walkaddr WA cpu k spie spp _ (KA.«kexec» + 0x100#64) 2082264#21 kxcB2_br_walk
+  iapply (kxcB2_call_walkaddr WA cpu k spie spp _ (KA.«kexec» + 0x100#64) 2082150#21 kxcB2_br_walk
       kxcB2_ret_100 t P.leaves hK (by simp [RegMap.set_apply, h22, htb]) hrep)
     $$ [- $Hk $Hpc $Hte $Hce $Ht]
   isplitr
@@ -895,10 +895,10 @@ theorem kxcB2_ls_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPU
     k_step_e (wp_s_auipc cpu _ (KA.«kexec» + 0xce#64) false 3#20 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0xd2#64) false 2954#12 10#5 10#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0xd2#64) false 2840#12 10#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kxcB2_msg_addr]
     iintro Hk Hpc
-    k_step_e (wp_s_jal cpu _ (KA.«kexec» + 0xd6#64) false 2080242#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«kexec» + 0xd6#64) false 2080128#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kxcB2_br_panic, kxcB2_br_panic']
     iintro Hk Hpc
     iapply (kxcB2_panic PA cpu _ ?paddr ?pK ?pnoff ?ppr ?puart) $$ [- $Hk $Hpc]

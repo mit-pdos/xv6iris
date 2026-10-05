@@ -399,9 +399,9 @@ theorem wh_br_bread : KA.«write_head» + 0xfffffffffffff04a#64 = KA.«bread» :
 theorem wh_br_bwrite : KA.«write_head» + 0xfffffffffffff120#64 = KA.«bwrite» := by decide
 theorem wh_br_brelse : KA.«write_head» + 0xfffffffffffff152#64 = KA.«brelse» := by decide
 
-theorem wh_log_addr : KA.«write_head» + 0x1ec60#64 = logAddr := by
+theorem wh_log_addr : KA.«write_head» + 0x1ec50#64 = logAddr := by
   unfold logAddr; decide
-theorem wh_lhb0 : KA.«write_head» + 0x1ec90#64 = lhBlock 0 := by
+theorem wh_lhb0 : KA.«write_head» + 0x1ec80#64 = lhBlock 0 := by
   unfold lhBlock logAddr; decide
 
 /-! ## The three callees, at their call sites -/
@@ -682,7 +682,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
   k_step_e (wp_s_auipc cpu _ (KA.«write_head» + 0xc#64) false 0x1f#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x10#64) false 3156#12 18#5 18#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x10#64) false 3140#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wh_log_addr]
   iintro Hk Hpc
   -- +0x14 lw a1,24(s2) ; +0x18 lw a0,36(s2)
@@ -809,7 +809,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
     k_step_e (wp_s_auipc cpu _ (KA.«write_head» + 0x2c#64) false 0x1f#20 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x30#64) false 3172#12 14#5 14#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x30#64) false 3156#12 14#5 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wh_lhb0]
     iintro Hk Hpc
     -- +0x34 c.mv a5,a0 ; +0x36 c.slli a2,a2,2 ; +0x38 c.add a2,a2,a0

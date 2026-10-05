@@ -2,7 +2,7 @@
 MachCSL: **the hart's read-only hardware configuration** (Rocq
 `RiscvFetchExec.hw_config`, with the frozen cells Rocq spreads over
 `MinstretInv.minstret_res` (`mcountinhibit`/`minstretcfg`), `counter_caps`
-(`scounteren`/`mhpmcounter`) and `UserExec.user_cfg` (`senvcfg`,
+(`mhpmcounter`; its `scounteren` is in `clockCells` since NI M3 Q-0) and `UserExec.user_cfg` (`senvcfg`,
 `mstateen0`/`sstateen0`) gathered into the one bundle).
 
 `hwConfig cpu` holds, PERSISTENTLY (`↦ᵣ□`), every configuration register of
@@ -11,7 +11,7 @@ fetch/decode/translation paths read (`misa`, `mseccfg`, `pma_regions`,
 `htif_tohost_base`), the landing-pad state `elp` (only ever re-written with
 its own value, by the trap's `reset_elp`), the environment/state-enable pins
 a U-mode CSR access reads (`senvcfg`, `mstateen0`, `sstateen0`), and the
-counter configuration (`scounteren`, and the four cells the cycle reads:
+counter configuration (the four cells the cycle reads:
 `mcountinhibit`, `minstretcfg`, `mcyclecfg`, `mhpmcounter`).  The pinned
 values (`hwVal`) are the values a run of the boot program derives
 (`MachCSL.resetValRun`).  The counter
@@ -20,9 +20,14 @@ cells are EXISTENTIAL (`HwCounters`, Rocq `counter_caps` +
 so they hold power-on garbage, and the rules are
 generic in them -- a read is answered at an arbitrary value
 (`swp_readReg_hwAny_bind`), so the minstret/mcycle increment flags are
-symbolic, and `scounteren` (Rocq `counter_caps`' `scen`) is symbolic too: a
-user `rdcycle`/`rdtime`/`rdinstret`/`rdhpmcounter` may RETIRE (Rocq
-`UserCsr.u_csr_readable`, `MachCSL.UExecCsr`).
+symbolic.
+
+(NI M3 quotas Q-0) `scounteren` (Rocq `counter_caps`' `scen`) WAS a frozen
+existential cell here; the `verified-quota` kernel writes it (`0`, in
+`plicinithart`), so it now rides `clockCells` as a hart-carried cell at some
+value, and a user `rdcycle`/`rdtime`/`rdinstret`/`rdhpmcounter` is still
+generic in it (it may RETIRE: Rocq `UserCsr.u_csr_readable`,
+`MachCSL.UExecCsr`).
 
 It is minted once per hart, from the reset register file, by persisting
 those cells (`Xv6.BootConfig.mBoot_of_cells`), and every configuration
@@ -64,20 +69,17 @@ structure HwCounters where
   mic : BitVec 64
   mcc : BitVec 64
   hpm : Vector (BitVec 64) 32
-  /-- `scounteren` (Rocq `counter_caps`' `scen`): nothing writes it, so it
-  holds power-on garbage. -/
-  scen : BitVec 32
 
 /-- The frozen counter registers, read at an ARBITRARY value. -/
 def hwAny (r : Register) : Bool :=
   match r with
-  | .mcountinhibit | .minstretcfg | .mcyclecfg | .scounteren => true
+  | .mcountinhibit | .minstretcfg | .mcyclecfg => true
   | _ => false
 
 /-- The registers of `hwConfig` (the pinned ones and the existential
-counter cells; `scounteren`, existential, keeps its historical slot). -/
+counter cells; `scounteren` left it for `clockCells` at NI M3 quotas Q-0). -/
 def hwRegs : List Register :=
-  [.misa, .mseccfg, .pma_regions, .htif_tohost_base, .elp, .senvcfg, .scounteren, .mstateen0,
+  [.misa, .mseccfg, .pma_regions, .htif_tohost_base, .elp, .senvcfg, .mstateen0,
    .sstateen0, .mcountinhibit, .minstretcfg, .mcyclecfg, .mhpmcounter]
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -100,8 +102,7 @@ def hwConfig (cpu : CPU) : IProp GF := iprop%
   Register.sstateen0 ↦ᵣ[cpu]□ 0#32 ∗
   ∃ ctr : HwCounters,
     Register.mcountinhibit ↦ᵣ[cpu]□ ctr.mci ∗ Register.minstretcfg ↦ᵣ[cpu]□ ctr.mic ∗
-    Register.mcyclecfg ↦ᵣ[cpu]□ ctr.mcc ∗ Register.mhpmcounter ↦ᵣ[cpu]□ ctr.hpm ∗
-    Register.scounteren ↦ᵣ[cpu]□ ctr.scen
+    Register.mcyclecfg ↦ᵣ[cpu]□ ctr.mcc ∗ Register.mhpmcounter ↦ᵣ[cpu]□ ctr.hpm
 
 instance hwConfig_persistent (cpu : CPU) : Persistent (hwConfig (GF := GF) cpu) := by
   unfold hwConfig; infer_instance
@@ -122,8 +123,7 @@ theorem hwConfig_reg (cpu : CPU) (r : Register) (v : RegisterType r) (h : hwVal 
 theorem hwConfig_counters (cpu : CPU) :
     hwConfig (GF := GF) cpu ⊢ ∃ ctr : HwCounters,
       Register.mcountinhibit ↦ᵣ[cpu]□ ctr.mci ∗ Register.minstretcfg ↦ᵣ[cpu]□ ctr.mic ∗
-      Register.mcyclecfg ↦ᵣ[cpu]□ ctr.mcc ∗ Register.mhpmcounter ↦ᵣ[cpu]□ ctr.hpm ∗
-      Register.scounteren ↦ᵣ[cpu]□ ctr.scen := by
+      Register.mcyclecfg ↦ᵣ[cpu]□ ctr.mcc ∗ Register.mhpmcounter ↦ᵣ[cpu]□ ctr.hpm := by
   unfold hwConfig
   iintro ⟨-, -, -, -, -, -, -, -, H⟩
   iexact H
@@ -132,12 +132,11 @@ theorem hwConfig_counters (cpu : CPU) :
 theorem hwConfig_any (cpu : CPU) (r : Register) (h : hwAny r = true) :
     hwConfig (GF := GF) cpu ⊢ ∃ v : RegisterType r, r ↦ᵣ[cpu]□ v := by
   iintro #H
-  icases hwConfig_counters cpu $$ H with ⟨%ctr, #H1, #H2, #H3, -, #H4⟩
+  icases hwConfig_counters cpu $$ H with ⟨%ctr, #H1, #H2, #H3, -⟩
   unfold hwAny at h
   split at h <;> simp only [reduceCtorEq] at h
   all_goals first
     | (iexists ctr.mci; iexact H1) | (iexists ctr.mic; iexact H2) | (iexists ctr.mcc; iexact H3)
-    | (iexists ctr.scen; iexact H4)
 
 /-- **Mint the bundle** (Rocq `hw_config_intro`): the pinned cells at their
 reset values and the counter cells at ANY values, persisted. -/
@@ -148,7 +147,6 @@ theorem hwConfig_intro (cpu : CPU) (ctr : HwCounters) :
     Register.htif_tohost_base ↦ᵣ[cpu] none ∗
     Register.elp ↦ᵣ[cpu] 0#1 ∗
     Register.senvcfg ↦ᵣ[cpu] 0#64 ∗
-    Register.scounteren ↦ᵣ[cpu] ctr.scen ∗
     Register.mstateen0 ↦ᵣ[cpu] 0#64 ∗
     Register.sstateen0 ↦ᵣ[cpu] 0#32 ∗
     Register.mcountinhibit ↦ᵣ[cpu] ctr.mci ∗
@@ -156,14 +154,13 @@ theorem hwConfig_intro (cpu : CPU) (ctr : HwCounters) :
     Register.mcyclecfg ↦ᵣ[cpu] ctr.mcc ∗
     Register.mhpmcounter ↦ᵣ[cpu] ctr.hpm ⊢@{IProp GF} |==> hwConfig cpu := by
   unfold hwConfig regPointsTo regPointsToAt
-  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13⟩
+  iintro ⟨H1, H2, H3, H4, H5, H6, H8, H9, H10, H11, H12, H13⟩
   imod ghost_map_elem_persist _ _ _ _ $$ H1 with #H1
   imod ghost_map_elem_persist _ _ _ _ $$ H2 with #H2
   imod ghost_map_elem_persist _ _ _ _ $$ H3 with #H3
   imod ghost_map_elem_persist _ _ _ _ $$ H4 with #H4
   imod ghost_map_elem_persist _ _ _ _ $$ H5 with #H5
   imod ghost_map_elem_persist _ _ _ _ $$ H6 with #H6
-  imod ghost_map_elem_persist _ _ _ _ $$ H7 with #H7
   imod ghost_map_elem_persist _ _ _ _ $$ H8 with #H8
   imod ghost_map_elem_persist _ _ _ _ $$ H9 with #H9
   imod ghost_map_elem_persist _ _ _ _ $$ H10 with #H10
@@ -174,7 +171,6 @@ theorem hwConfig_intro (cpu : CPU) (ctr : HwCounters) :
   iframe H1 H2 H3 H4 H5 H6 H8 H9
   iexists ctr
   iframe H10 H11 H12 H13
-  iexact H7
 
 /-! ## The rules -/
 

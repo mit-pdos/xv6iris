@@ -193,7 +193,7 @@ theorem sbrkArm_shape (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 
     (hok : sysSbrkOk V V' M M' v0 v1 r) :
     V'.tf = V.tf ∧ V'.ofile = V.ofile ∧ V'.fdg = V.fdg ∧ V'.chg = V.chg ∧ V'.cwd = V.cwd ∧
       V'.cwi = V.cwi ∧ V'.gen = V.gen ∧ V'.upt.tfp = V.upt.tfp ∧ V'.kstack = V.kstack ∧ V'.pvSecc = V.pvSecc := by
-  rcases hok with ⟨-, rfl, -, -⟩ | ⟨-, ⟨-, h0, hpos, hneg⟩ | ⟨-, -, -, hV, -, -⟩⟩
+  rcases hok with ⟨-, rfl, -, -⟩ | ⟨-, -, ⟨-, h0, hpos, hneg⟩ | ⟨-, -, -, hV, -, -⟩⟩
   · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
   · rcases lt_trichotomy (sysSbrkArg v0).toInt 0 with h | h | h
     · obtain ⟨-, hV, -⟩ := hneg h
@@ -227,7 +227,7 @@ theorem sbrkArm_ok (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r :
     unfold usysSbrkEager sysSbrkEager sysSbrkArg; rw [hv1]
   have hrsz : ∀ x : BitVec 64, x = V.sz → x = BitVec.ofNat 64 V.sz.toNat := by
     intro x hx; rw [hx]; simp
-  rcases hok with ⟨hr, rfl, rfl, -⟩ | ⟨hr, ⟨-, h0, hpos, hneg⟩ | ⟨hne, hnn, hbd, hV, hle, rfl⟩⟩
+  rcases hok with ⟨hr, rfl, rfl, -⟩ | ⟨hr, -, ⟨-, h0, hpos, hneg⟩ | ⟨hne, hnn, hbd, hV, hle, rfl⟩⟩
   · exact ⟨⟨sbrkArm_still _ _ _ hlen, fun _ => usysLazyKeep_refl _⟩, Or.inl ⟨hr, rfl⟩⟩
   · rcases lt_trichotomy (sysSbrkArg v0).toInt 0 with h | h | h
     · -- SHRINK
@@ -360,18 +360,9 @@ theorem sbrkArm_fits (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r
     exact ⟨hr, rfl, rfl⟩
   · -- SUCCEEDED: no overrun, and the boot reading
     have hnk : ¬ ι.kNull := fun h => sbrkArm_sz_ne V.sz hszb (hr.symm.trans (hk.mp h).1)
-    have hno : ¬ usysSbrkOverrun V.sz.toNat v0 := by
-      intro ho
-      unfold usysSbrkOverrun at ho
-      rw [← harg] at ho
-      rcases hpath with ⟨-, hz, hpos, hneg⟩ | ⟨-, -, hbd, -, -, -⟩
-      · rcases Int.lt_trichotomy (sysSbrkArg v0).toInt 0 with h | h | h
-        · omega
-        · omega
-        · rcases hpos h with ⟨h0, -⟩ | ⟨-, hbd, -, -⟩
-          · exact absurd h0 (by decide)
-          · omega
-      · omega
+    -- the quota test passed (NI M3 quotas Q-0: the SUCCEEDED arm says so)
+    obtain ⟨hnq, hpath⟩ := hpath
+    have hno : ¬ usysSbrkOverrun V.sz.toNat v0 := fun ho => hnq (hov.mpr ho)
     have hnf : ¬ usysSbrkFails V.sz.toNat v0 v1 ι := fun h => h.elim hno (fun h => hnk h.2)
     simp only [hnf, if_false, not_false_eq_true, _root_.true_and]
     refine ⟨by rw [hr]; simp, ?_⟩

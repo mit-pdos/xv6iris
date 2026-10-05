@@ -15,8 +15,9 @@ A port of Rocq `ProofKexecB3.v` (`iris/ProofKexecB3.v`:
      +0x13e  bne a0,s11,+0x31a              short -> [bad:]
      +0x142  lw a5,-488(s0) ; c.li a4,1 ; bne a5,a4,+0x11a     not PT_LOAD
      +0x14c  ld s1,-448(s0) ; ld a5,-456(s0) ; bltu s1,a5,+0x33a   memsz < filesz
-     +0x158  ld a5,-472(s0) ; c.add s1,s1,a5 ; bltu s1,a5,+0x340  vaddr + memsz wraps
-     +0x162  ld a4,-536(s0) ; c.and a5,a5,a4 ; bnez a5,+0x346     vaddr not aligned
+     +0x158  ld a5,-472(s0) ; c.add s1,s1,a5 ; bltu s1,a5,+0x348  vaddr + memsz wraps
+     +0x162  lui a4,0xbe ; bltu a4,s1,+0x348   past MAXUSZ - 2 pages (the quota, Q-0: `.noMem`)
+     +0x16a  ld a4,-536(s0) ; c.and a5,a5,a4 ; bnez a5,+0x34e     vaddr not aligned
      +0x16c  lw a0,-484(s0) ; jal flags2perm
      +0x174  c.mv a3,a0 ; c.mv a2,s1 ; c.mv a1,s2 ; c.mv a0,s6 ; jal uvmalloc
      +0x180  sd a0,-520(s0) ; beqz a0,+0x34c                  uvmalloc failed
@@ -134,6 +135,21 @@ theorem kxcB3_wrap (m v : Nat) (hm : m < 2 ^ 64) (hv : v < 2 ^ 64) :
     simp [this, h] <;> omega
   · have : (m + v) % 2 ^ 64 = m + v := by omega
     simp [this, h] <;> omega
+
+/-- (NI M3 quotas Q-0) `kexec`'s quota test `vaddr + memsz > MAXUSZ - 2 pages` (`lui a4,0xbe ;
+bltu a4,s1` at `+0x162`), on a sum that did not wrap. -/
+theorem kxcB3_quota (m v : Nat) (hm : m < 2 ^ 64) (hv : v < 2 ^ 64) (hnw : ¬ 2 ^ 64 ≤ v + m) :
+    bcond bop.BLTU 778240#64 (BitVec.ofNat 64 m + BitVec.ofNat 64 v) =
+      decide (uQuota - 2 * 4096 < v + m) := by
+  rw [kxcB2_bltu]
+  have h : uQuota - 2 * 4096 = 778240 := by decide
+  have hs : (BitVec.ofNat 64 m + BitVec.ofNat 64 v).toNat = m + v := by
+    rw [BitVec.toNat_add, BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hm,
+      Nat.mod_eq_of_lt hv, Nat.mod_eq_of_lt (by omega)]
+  rw [hs, h]
+  simp only [decide_eq_decide]
+  show 778240 < m + v ↔ 778240 < v + m
+  omega
 
 theorem kxcB3_leAt8 (g : List (BitVec 8)) (o : Nat) : (BitVec.ofNat 64 (leAt g o 8)).toNat = leAt g o 8 := by
   rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (leAt_bound_lit g o 8 _ rfl)]
@@ -555,11 +571,11 @@ theorem kxc_incr (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → P
   · have hbr : bcond bop.BGE (BitVec.ofNat 64 i + 1#64) (BitVec.setWidth 64 (BitVec.ofNat 16 (leAt ef 56 2)))
         = true := by
       rw [ei, kxc_phnum_word, kxcB3_bge_small _ _ (by omega) (by omega)]; exact decide_eq_true hlast
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x128#64) false 122#13 26#5 15#5 (by decide) bop.BGE)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x128#64) false 130#13 26#5 15#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
     iintro Hk Hpc
     -- +0x1a2  c.ldsp s11,440(sp)
-    k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1a2#64) true 440#12 27#5 2#5 (by decide) (by decide)
+    k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1aa#64) true 440#12 27#5 2#5 (by decide) (by decide)
         (DFrac.own 1) (k.regs 27#5))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2]
     iintro Hk Hpc F13
@@ -587,7 +603,7 @@ theorem kxc_incr (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → P
   · have hbr : bcond bop.BGE (BitVec.ofNat 64 i + 1#64) (BitVec.setWidth 64 (BitVec.ofNat 16 (leAt ef 56 2)))
         = false := by
       rw [ei, kxc_phnum_word, kxcB3_bge_small _ _ (by omega) (by omega)]; exact decide_eq_false hlast
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x128#64) false 122#13 26#5 15#5 (by decide) bop.BGE)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x128#64) false 130#13 26#5 15#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
     iintro Hk Hpc
     ihave Hfr := kxcFrameB_of_Bp (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
@@ -651,7 +667,7 @@ theorem kxcB3_stub (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (
     (bmf : Blkmap) (data : Nat → List (BitVec 8)) (gilf gislf : GName) (n2 : Nat)
     (w63 w65 w67 : BitVec 64) (ef : List (BitVec 8)) (P : UPtd) (Mi : Nat → List (BitVec 8))
     (szv : BitVec 64) (g : List (BitVec 8)) (X : BitVec 64) (jimm : BitVec 21)
-    (hX : X + 4#64 + BitVec.signExtend 64 jimm = KA.«kexec» + 0x31e#64)
+    (hX : X + 4#64 + BitVec.signExtend 64 jimm = KA.«kexec» + 0x326#64)
     (hqf : ∃ c, QF c) (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j)
     (hkf : kf < NINODE) (hnib : inumf.toNat < 16 * icfgNib) (hn2 : iputUnits ≤ n2)
@@ -694,12 +710,12 @@ theorem kxcB3_stub (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (
   unfold kxcResB
   iframe
 
-theorem kxcB3_br_f2p : KA.«kexec» + 0x170#64 + BitVec.signExtend 64 2096752#21 = KA.«flags2perm» := by
+theorem kxcB3_br_f2p : KA.«kexec» + 0x178#64 + BitVec.signExtend 64 2096744#21 = KA.«flags2perm» := by
   decide
-theorem kxcB3_ret_170 : jumpPc (KA.«kexec» + 0x170#64 + 4#64) = KA.«kexec» + 0x170#64 + 4#64 := by decide
-theorem kxcB3_br_uvma : KA.«kexec» + 0x17c#64 + BitVec.signExtend 64 2082882#21 = KA.«uvmalloc» := by
+theorem kxcB3_ret_170 : jumpPc (KA.«kexec» + 0x178#64 + 4#64) = KA.«kexec» + 0x178#64 + 4#64 := by decide
+theorem kxcB3_br_uvma : KA.«kexec» + 0x184#64 + BitVec.signExtend 64 2082760#21 = KA.«uvmalloc» := by
   decide
-theorem kxcB3_ret_17c : jumpPc (KA.«kexec» + 0x17c#64 + 4#64) = KA.«kexec» + 0x17c#64 + 4#64 := by decide
+theorem kxcB3_ret_17c : jumpPc (KA.«kexec» + 0x184#64 + 4#64) = KA.«kexec» + 0x184#64 + 4#64 := by decide
 
 set_option maxHeartbeats 32000000 in
 /-- **+0x188 .. +0x1a0 and the loadseg loop's exit (+0x116)**: after a
@@ -730,7 +746,7 @@ theorem kxcB3_load (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) 
       KexecBuilt.loadOut (leAt g 16 8) (leAt g 32 4) (umemGet P' M') (umemGet P' Mo) →
       (kxbWalkOk (kxcFb data dnf) ef → kxbAt (kxcFb data dnf) ef (i + 1) sz1.toNat (umemGet P' Mo)) ∧
       (kxbWalkOk (kxcFb data dnf) ef → kxbPermLeaves (kxcFb data dnf) ef (i + 1) P'.um)) :
-    kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x188#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x190#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
     kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
@@ -764,7 +780,7 @@ theorem kxcB3_load (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) 
     (kxcB2_ph_align _ hphal 32 (by omega) 4 (Or.inl rfl))
   rw [hoffs.2.2.2.2.1] at hw32
   icases hw32 $$ Hg with ⟨Hw, Hgb⟩
-  k_step_e (wp_s_lw cpu _ (KA.«kexec» + 0x188#64) false 3640#12 19#5 8#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«kexec» + 0x190#64) false 3640#12 19#5 8#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 (leAt g 32 4)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8]
   iintro Hk Hpc Hw
@@ -773,15 +789,15 @@ theorem kxcB3_load (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) 
   by_cases hfz0 : leAt g 32 4 = 0
   · have hbr : bcond bop.BEQ (BitVec.signExtend 64 (BitVec.ofNat 32 (leAt g 32 4))) 0#64 = true := by
       rw [hfz0]; decide
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x18c#64) false 16#13 19#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x194#64) false 16#13 19#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
     iintro Hk Hpc
     -- +0x19c  ld s2,-520(s0) ; +0x1a0  c.j +0x11a
-    k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x19c#64) false 3576#12 18#5 8#5 (by decide) (by decide)
+    k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1a4#64) false 3576#12 18#5 8#5 (by decide) (by decide)
         (DFrac.own 1) sz1)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8]
     iintro Hk Hpc F65
-    k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x1a0#64) true 2097018#21)
+    k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x1a8#64) true 2097010#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     have hr := hrows M' (by rw [hfz0]; exact KexecBuilt.loadWin_0 _ _ _ _) (KexecBuilt.loadOut_refl _ _ _)
@@ -810,7 +826,7 @@ theorem kxcB3_load (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) 
     intro he
     apply hfz0
     exact kxcB2_sx32_inj _ 0 (hb4 _) (by omega) (by rw [show kxcSx32 0 = 0#64 by decide]; exact he)
-  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x18c#64) false 16#13 19#5 0#5 (by decide) bop.BEQ)
+  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x194#64) false 16#13 19#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
   iintro Hk Hpc
   -- +0x190  ld s8,-472(s0)   vaddr
@@ -818,7 +834,7 @@ theorem kxcB3_load (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) 
     (kxcB2_ph_align _ hphal 16 (by omega) 8 (Or.inr ⟨rfl, by omega⟩))
   rw [hoffs.2.2.2.1] at hw16
   icases hw16 $$ Hg with ⟨Hw, Hgb⟩
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x190#64) false 3624#12 24#5 8#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x198#64) false 3624#12 24#5 8#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 64 (leAt g 16 8)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8]
   iintro Hk Hpc Hw
@@ -828,16 +844,16 @@ theorem kxcB3_load (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) 
     (kxcB2_ph_align _ hphal 8 (by omega) 4 (Or.inl rfl))
   rw [hoffs.2.2.1] at hw8
   icases hw8 $$ Hg with ⟨Hw, Hgb⟩
-  k_step_e (wp_s_lw cpu _ (KA.«kexec» + 0x194#64) false 3616#12 23#5 8#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«kexec» + 0x19c#64) false 3616#12 23#5 8#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 (leAt g 8 4)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8]
   iintro Hk Hpc Hw
   ihave Hg := Hgb $$ Hw
   -- +0x198  c.li s1,0 ; +0x19a  c.j +0x0f6
-  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x198#64) true 0#12 9#5 0#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x1a0#64) true 0#12 9#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x19a#64) true 2096988#21)
+  k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x1a2#64) true 2096980#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hfr := Hfb $$ %sz1 Hg F65 F67
@@ -968,12 +984,12 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   by_cases hms : leAt g 40 8 < leAt g 32 8
   · have hbr : bcond bop.BLTU (BitVec.ofNat 64 (leAt g 40 8)) (BitVec.ofNat 64 (leAt g 32 8)) = true := by
       rw [kxcB2_bltu, kxcB3_leAt8, kxcB3_leAt8]; exact decide_eq_true hms
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x154#64) false 486#13 9#5 15#5 (by decide) bop.BLTU)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x154#64) false 494#13 9#5 15#5 (by decide) bop.BLTU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
     iintro Hk Hpc
     ihave Hfr := Hfb $$ %w65 Hg F65 F67
     iapply (kxcB3_stub IUP EO PFP Γ Q QF cpu k A spie spp _ kf qf sf gyf loyf tlyf inumf dnf bmf data
-      gilf gislf n2 (kxcOff ef i) w65 4095#64 ef P Mi szv g (KA.«kexec» + 0x33a#64) 2097120#21 (by decide)
+      gilf gislf n2 (kxcOff ef i) w65 4095#64 ef P Mi szv g (KA.«kexec» + 0x342#64) 2097120#21 (by decide)
       ⟨_, hqfl (kxcB3_notld hi hag hty (by omega))⟩ hK hnoff htier hj hproc hkf hnib hn2 hal hlen
       hbelow hcov)
     isplitr
@@ -988,7 +1004,7 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
     iframe #
   have hbr : bcond bop.BLTU (BitVec.ofNat 64 (leAt g 40 8)) (BitVec.ofNat 64 (leAt g 32 8)) = false := by
     rw [kxcB2_bltu, kxcB3_leAt8, kxcB3_leAt8]; exact decide_eq_false hms
-  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x154#64) false 486#13 9#5 15#5 (by decide) bop.BLTU)
+  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x154#64) false 494#13 9#5 15#5 (by decide) bop.BLTU)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
   iintro Hk Hpc
   -- +0x158  ld a5,-472(s0)   vaddr
@@ -1009,12 +1025,12 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   · have hbr : bcond bop.BLTU (BitVec.ofNat 64 (leAt g 40 8) + BitVec.ofNat 64 (leAt g 16 8))
         (BitVec.ofNat 64 (leAt g 16 8)) = true := by
       rw [kxcB3_wrap _ _ (hb8 _) (hb8 _)]; exact decide_eq_true hwr
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x15e#64) false 482#13 9#5 15#5 (by decide) bop.BLTU)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x15e#64) false 490#13 9#5 15#5 (by decide) bop.BLTU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
     iintro Hk Hpc
     ihave Hfr := Hfb $$ %w65 Hg F65 F67
     iapply (kxcB3_stub IUP EO PFP Γ Q QF cpu k A spie spp _ kf qf sf gyf loyf tlyf inumf dnf bmf data
-      gilf gislf n2 (kxcOff ef i) w65 4095#64 ef P Mi szv g (KA.«kexec» + 0x340#64) 2097114#21 (by decide)
+      gilf gislf n2 (kxcOff ef i) w65 4095#64 ef P Mi szv g (KA.«kexec» + 0x348#64) 2097114#21 (by decide)
       ⟨_, hqfl (kxcB3_notld hi hag hty (by omega))⟩ hK hnoff htier hj hproc hkf hnib hn2 hal hlen
       hbelow hcov)
     isplitr
@@ -1030,15 +1046,47 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   have hbr : bcond bop.BLTU (BitVec.ofNat 64 (leAt g 40 8) + BitVec.ofNat 64 (leAt g 16 8))
       (BitVec.ofNat 64 (leAt g 16 8)) = false := by
     rw [kxcB3_wrap _ _ (hb8 _) (hb8 _)]; exact decide_eq_false hwr
-  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x15e#64) false 482#13 9#5 15#5 (by decide) bop.BLTU)
+  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x15e#64) false 490#13 9#5 15#5 (by decide) bop.BLTU)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
   iintro Hk Hpc
-  -- +0x162  ld a4,-536(s0) ; +0x166  c.and a5,a5,a4 ; +0x168  bnez a5,+0x346   alignment
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x162#64) false 3560#12 14#5 8#5 (by decide) (by decide)
+  -- +0x162  lui a4,0xbe ; +0x166  bltu a4,s1,+0x348   THE QUOTA (verified-quota): the segment
+  -- ends past `MAXUSZ - 2 pages`; the refusal files under `.noMem` (after the magic test)
+  k_step_e (wp_s_lui cpu _ (KA.«kexec» + 0x162#64) false 190#20 14#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  by_cases hq : uQuota - 2 * 4096 < leAt g 16 8 + leAt g 40 8
+  · have hbr : bcond bop.BLTU 778240#64
+        (BitVec.ofNat 64 (leAt g 40 8) + BitVec.ofNat 64 (leAt g 16 8)) = true := by
+      rw [kxcB3_quota _ _ (hb8 _) (hb8 _) hwr]; exact decide_eq_true hq
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x166#64) false 482#13 14#5 9#5 (by decide) bop.BLTU)
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
+    iintro Hk Hpc
+    ihave Hfr := Hfb $$ %w65 Hg F65 F67
+    iapply (kxcB3_stub IUP EO PFP Γ Q QF cpu k A spie spp _ kf qf sf gyf loyf tlyf inumf dnf bmf data
+      gilf gislf n2 (kxcOff ef i) w65 4095#64 ef P Mi szv g (KA.«kexec» + 0x348#64) 2097114#21 (by decide)
+      ⟨_, hqfm⟩ hK hnoff htier hj hproc hkf hnib hn2 hal hlen hbelow hcov)
+    isplitr
+    · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
+    isplitr
+    · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
+    isplitl [Hk]
+    · iexact Hk
+    isplitr
+    · ipureintro; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact ⟨h2, h8, h18, h20, h22⟩
+    iframe
+    iframe #
+  have hbr : bcond bop.BLTU 778240#64
+      (BitVec.ofNat 64 (leAt g 40 8) + BitVec.ofNat 64 (leAt g 16 8)) = false := by
+    rw [kxcB3_quota _ _ (hb8 _) (hb8 _) hwr]; exact decide_eq_false hq
+  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x166#64) false 482#13 14#5 9#5 (by decide) bop.BLTU)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
+  iintro Hk Hpc
+  -- +0x16a  ld a4,-536(s0) ; +0x16e  c.and a5,a5,a4 ; +0x170  bnez a5,+0x34e   alignment
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x16a#64) false 3560#12 14#5 8#5 (by decide) (by decide)
       (DFrac.own 1) 4095#64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8]
   iintro Hk Hpc F67
-  k_step_e (wp_s_and cpu _ (KA.«kexec» + 0x166#64) true 15#5 15#5 14#5 (by decide))
+  k_step_e (wp_s_and cpu _ (KA.«kexec» + 0x16e#64) true 15#5 15#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hand : (BitVec.ofNat 64 (leAt g 16 8) &&& 4095#64).toNat = leAt g 16 8 % 4096 := by
@@ -1048,12 +1096,12 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   · have hbr : bcond bop.BNE (BitVec.ofNat 64 (leAt g 16 8) &&& 4095#64) 0#64 = true := by
       rw [kxcB2_bne]; simp only [ne_eq, decide_eq_true_eq]
       intro he; apply hva; rw [← hand, he]; rfl
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x168#64) false 478#13 15#5 0#5 (by decide) bop.BNE)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x170#64) false 478#13 15#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
     iintro Hk Hpc
     ihave Hfr := Hfb $$ %w65 Hg F65 F67
     iapply (kxcB3_stub IUP EO PFP Γ Q QF cpu k A spie spp _ kf qf sf gyf loyf tlyf inumf dnf bmf data
-      gilf gislf n2 (kxcOff ef i) w65 4095#64 ef P Mi szv g (KA.«kexec» + 0x346#64) 2097108#21 (by decide)
+      gilf gislf n2 (kxcOff ef i) w65 4095#64 ef P Mi szv g (KA.«kexec» + 0x34e#64) 2097108#21 (by decide)
       ⟨_, hqfl (kxcB3_notld hi hag hty (by omega))⟩ hK hnoff htier hj hproc hkf hnib hn2 hal hlen
       hbelow hcov)
     isplitr
@@ -1069,7 +1117,7 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   have hbr : bcond bop.BNE (BitVec.ofNat 64 (leAt g 16 8) &&& 4095#64) 0#64 = false := by
     rw [kxcB2_bne]; simp only [ne_eq, decide_eq_false_iff_not, Decidable.not_not]
     apply BitVec.eq_of_toNat_eq; rw [hand, hva]; rfl
-  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x168#64) false 478#13 15#5 0#5 (by decide) bop.BNE)
+  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x170#64) false 478#13 15#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
   iintro Hk Hpc
   -- +0x16c  lw a0,-484(s0)   flags
@@ -1077,13 +1125,13 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
     (kxcB2_ph_align _ hphal 4 (by omega) 4 (Or.inl rfl))
   rw [hoffs.2.1] at hw4
   icases hw4 $$ Hg with ⟨Hw, Hgb⟩
-  k_step_e (wp_s_lw cpu _ (KA.«kexec» + 0x16c#64) false 3612#12 10#5 8#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«kexec» + 0x174#64) false 3612#12 10#5 8#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 (leAt g 4 4)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8]
   iintro Hk Hpc Hw
   ihave Hg := Hgb $$ Hw
   -- +0x170  jal flags2perm
-  iapply (kxcB2_call_f2p F2P cpu k spie spp _ (KA.«kexec» + 0x170#64) 2096752#21 kxcB3_br_f2p
+  iapply (kxcB2_call_f2p F2P cpu k spie spp _ (KA.«kexec» + 0x178#64) 2096744#21 kxcB3_br_f2p
       kxcB3_ret_170 hK)
     $$ [- $Hk $Hpc $Hte $Hce]
   isplitr
@@ -1096,22 +1144,22 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   rw [h2] at a2; rw [h8] at a8; rw [h18] at a18; rw [h20] at a20; rw [h21] at a21; rw [h22] at a22
   rw [h25] at a25; rw [h26] at a26; rw [h27] at a27
   -- +0x174 .. +0x17a  the four argument moves
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x174#64) true 13#5 0#5 10#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x17c#64) true 13#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x176#64) true 12#5 0#5 9#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x17e#64) true 12#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x178#64) true 11#5 0#5 18#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x180#64) true 11#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x17a#64) true 10#5 0#5 22#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x182#64) true 10#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x17c  jal uvmalloc, the block's event counter lent to it (permit
   -- sweep L1a, Rocq `proc_priv_ev_lend`)
   icases procPrivFd_evLend A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
-  iapply (kxcB2_call_uvmalloc UV Γ cpu k A spie spp _ (KA.«kexec» + 0x17c#64) 2082882#21 kxcB3_br_uvma
+  iapply (kxcB2_call_uvmalloc UV Γ cpu k A spie spp _ (KA.«kexec» + 0x184#64) 2082760#21 kxcB3_br_uvma
       kxcB3_ret_17c P Mi A.V.ev hK hnoff (by simp [RegMap.set_apply, a22])
       (by simpa [RegMap.set_apply, a18] using hbelow) (by simpa [RegMap.set_apply, a18] using hcov)
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hf2p];
@@ -1138,18 +1186,18 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   rw [a2] at b2; rw [a8] at b8; rw [a18] at b18; rw [a20] at b20; rw [a21] at b21; rw [a22] at b22
   rw [a25] at b25; rw [a26] at b26; rw [a27] at b27
   -- +0x180  sd a0,-520(s0)
-  k_step_e (wp_s_sd cpu _ (KA.«kexec» + 0x180#64) false 3576#12 8#5 10#5 (by decide) w65)
+  k_step_e (wp_s_sd cpu _ (KA.«kexec» + 0x188#64) false 3576#12 8#5 10#5 (by decide) w65)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b8]
   iintro Hk Hpc F65
   icases Hres with ⟨⟨%hr0, Hpt⟩ | ⟨%P', %M', %⟨hok, hret⟩, Hpt⟩⟩
   · -- ---- uvmalloc FAILED: +0x184 beqz taken, the +0x34c stub (cause: no memory) ----
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x184#64) false 456#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x18c#64) false 456#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr0, MachCSL.beqz_zero]
     iintro Hk Hpc
     ihave Hfr := Hfb $$ %(0#64) Hg F65 F67
     iapply (kxcB3_stub IUP EO PFP Γ Q QF cpu k { A with V := A.V.updEv kv } spie2 spp2 _ kf qf sf gyf
       loyf tlyf inumf dnf bmf data
-      gilf gislf n2 (kxcOff ef i) 0#64 4095#64 ef P Mi szv g (KA.«kexec» + 0x34c#64) 2097102#21
+      gilf gislf n2 (kxcOff ef i) 0#64 4095#64 ef P Mi szv g (KA.«kexec» + 0x354#64) 2097102#21
       (by decide) ⟨_, hqfm⟩ hK hnoff htier hj hproc hkf hnib hn2 hal hlen hbelow hcov)
     isplitr
     · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
@@ -1182,14 +1230,14 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
         have h1 : szv.toNat = 0 := by omega
         rw [hz]
         exact BitVec.eq_of_toNat_eq (by rw [h1]; rfl)
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x184#64) false 456#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x18c#64) false 456#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz, MachCSL.beqz_zero]
     iintro Hk Hpc
     rw [hsz0] at hbelow' hcov'
     ihave Hfr := Hfb $$ %(0#64) Hg F65 F67
     iapply (kxcB3_stub IUP EO PFP Γ Q QF cpu k { A with V := A.V.updEv kv } spie2 spp2 _ kf qf sf gyf
       loyf tlyf inumf dnf bmf data
-      gilf gislf n2 (kxcOff ef i) 0#64 4095#64 ef P' M' szv g (KA.«kexec» + 0x34c#64) 2097102#21
+      gilf gislf n2 (kxcOff ef i) 0#64 4095#64 ef P' M' szv g (KA.«kexec» + 0x354#64) 2097102#21
       (by decide) ⟨_, hqfm⟩ hK hnoff htier hj hproc hkf hnib hn2 hal hlen hbelow' hcov')
     isplitr
     · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
@@ -1202,7 +1250,7 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
     iframe
     iframe #
   have hbr : bcond bop.BEQ (R2 10#5) 0#64 = false := by rw [kxcB2_beq]; simpa using hz
-  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x184#64) false 456#13 10#5 0#5 (by decide) bop.BEQ)
+  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x18c#64) false 456#13 10#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbr]
   iintro Hk Hpc
   have hnew1 : leAt g 16 8 + leAt g 40 8 ≤ (R2 10#5).toNat := by
@@ -1219,7 +1267,7 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
         hbelow hcov hplen hok rfl hnw hret hva hwin hout))
     $$ [$Hk $Hpc $Hte $Hce $Hfab $Hop $Hlog $Hirs $Hbs $Hpt $Hpriv $Hbufs $He $Hfr $Hcl $H1a4 $HB]
 
-theorem kxcB3_br_readi : KA.«kexec» + 0x13a#64 + BitVec.signExtend 64 2092162#21 = KA.«readi» := by
+theorem kxcB3_br_readi : KA.«kexec» + 0x13a#64 + BitVec.signExtend 64 2092064#21 = KA.«readi» := by
   decide
 theorem kxcB3_ret_13a : jumpPc (KA.«kexec» + 0x13a#64 + 4#64) = KA.«kexec» + 0x13a#64 + 4#64 := by decide
 
@@ -1303,7 +1351,7 @@ theorem kxc_ph_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x13a  jal readi   (the header, 56 bytes at off)
-  iapply (kxcB2_call_readi RD Γ cpu k A spie spp _ (KA.«kexec» + 0x13a#64) 2092162#21 kxcB3_br_readi
+  iapply (kxcB2_call_readi RD Γ cpu k A spie spp _ (KA.«kexec» + 0x13a#64) 2092064#21 kxcB3_br_readi
       kxcB3_ret_13a hK hnoff htier hj hproc kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf
       (kxbPhoff ef i) 56 (Nat.mod_lt _ (by decide)) (by omega) g0 hg0 (kxcPhBuf (k.regs 2#5))
       ?r2 ?r0 ?r1 ?r3 ?r4)
@@ -1339,7 +1387,7 @@ theorem kxc_ph_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT)
       have := congrArg BitVec.toNat he
       simp only [BitVec.toNat_ofNat] at this
       omega
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x13e#64) false 476#13 10#5 27#5 (by decide) bop.BNE)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x13e#64) false 484#13 10#5 27#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10', a27, hbr]
     iintro Hk Hpc
     icases kxcFramePh_acc (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
@@ -1348,7 +1396,7 @@ theorem kxc_ph_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT)
         (rdDelivered data g0 (kxbPhoff ef i) tot)
       $$ Hfr with ⟨%-, Hg, F65, F67, Hfb⟩
     -- +0x31a  sd s2,-520(s0)
-    k_step_e (wp_s_sd cpu _ (KA.«kexec» + 0x31a#64) false 3576#12 8#5 18#5 (by decide) w65)
+    k_step_e (wp_s_sd cpu _ (KA.«kexec» + 0x322#64) false 3576#12 8#5 18#5 (by decide) w65)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a8, a18]
     iintro Hk Hpc F65
     ihave Hfr := Hfb $$ %szv Hg F65 F67
@@ -1365,7 +1413,7 @@ theorem kxc_ph_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT)
     iframe
   subst hfull
   have hbr : bcond bop.BNE (BitVec.ofNat 64 56) 56#64 = false := by decide
-  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x13e#64) false 476#13 10#5 27#5 (by decide) bop.BNE)
+  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x13e#64) false 484#13 10#5 27#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10', a27, hbr]
   iintro Hk Hpc
   have hin : kxbPhoff ef i + 56 ≤ dnf.diSize.toNat := kxcB2_rd_full dnf.diSize _ 56 (by decide) htot.symm
@@ -1503,12 +1551,12 @@ theorem kxc_phdr (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (E
 
 /-! ## THE TWO PATHS THAT CLOSE THE INODE, AND PHASE B2 WHOLE -/
 
-theorem kxcB3_br_iup : KA.«kexec» + 0x1a6#64 + BitVec.signExtend 64 2091664#21 = KA.«iunlockput» := by
+theorem kxcB3_br_iup : KA.«kexec» + 0x1ae#64 + BitVec.signExtend 64 2091558#21 = KA.«iunlockput» := by
   decide
-theorem kxcB3_ret_1a6 : jumpPc (KA.«kexec» + 0x1a6#64 + 4#64) = KA.«kexec» + 0x1a6#64 + 4#64 := by decide
-theorem kxcB3_br_eo : KA.«kexec» + 0x1aa#64 + BitVec.signExtend 64 2093966#21 = KA.«end_op» := by
+theorem kxcB3_ret_1a6 : jumpPc (KA.«kexec» + 0x1ae#64 + 4#64) = KA.«kexec» + 0x1ae#64 + 4#64 := by decide
+theorem kxcB3_br_eo : KA.«kexec» + 0x1b2#64 + BitVec.signExtend 64 2093860#21 = KA.«end_op» := by
   decide
-theorem kxcB3_ret_1aa : jumpPc (KA.«kexec» + 0x1aa#64 + 4#64) = KA.«kexec» + 0x1aa#64 + 4#64 := by decide
+theorem kxcB3_ret_1aa : jumpPc (KA.«kexec» + 0x1b2#64 + 4#64) = KA.«kexec» + 0x1b2#64 + 4#64 := by decide
 
 set_option maxHeartbeats 16000000 in
 /-- **Rocq `kxc_seam1a2`: +0x1f2 .. +0x1f4, the `elf.phnum = 0` path joins
@@ -1534,10 +1582,10 @@ theorem kxc_seam1a2 (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) �
   have h27 : R 27#5 = k.regs 27#5 := hkeep _ (by decide)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x1f2  c.li s2,0 ; +0x1f4  c.j +0x1a4
-  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x1f2#64) true 0#12 18#5 0#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x1fa#64) true 0#12 18#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x1f4#64) true 2097072#21)
+  k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x1fc#64) true 2097072#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   iapply HK $$ %cpu %spie %spp %_ [- Hcl] Hcl
@@ -1585,11 +1633,11 @@ theorem kxc_close (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
   icases kxc_priv_pid (hct.symm.trans (by k_norm_g; exact htier)) A.γ k.proc A.pidv A.V A.M $$ Hpriv
     with ⟨Hpid, Hpriv⟩
   -- +0x1a4  c.mv a0,s4
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1a4#64) true 10#5 0#5 20#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1ac#64) true 10#5 0#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1a6  jal iunlockput
-  iapply (kxc_call_iup IUP Γ cpu k A spie spp _ (KA.«kexec» + 0x1a6#64) 2091664#21 kxcB3_br_iup
+  iapply (kxc_call_iup IUP Γ cpu k A spie spp _ (KA.«kexec» + 0x1ae#64) 2091558#21 kxcB3_br_iup
       kxcB3_ret_1a6 kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 hK hnoff htier hj hproc hkf
       hnib hn2 (by simp [RegMap.set_apply, h20]))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hop $Hlog $Hbs $Hpid]
@@ -1598,7 +1646,7 @@ theorem kxc_close (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
   iintro %c1 %spie1 %spp1 %R1 %n3 %⟨hcs1, -, -⟩ Hk Hpc Hte Hce Hpid Hbs Hlog Hslot
   k_norm_g
   -- +0x1aa  jal end_op
-  iapply (kxc_call_endop EO Γ c1 k A spie1 spp1 R1 (KA.«kexec» + 0x1aa#64) 2093966#21 kxcB3_br_eo
+  iapply (kxc_call_endop EO Γ c1 k A spie1 spp1 R1 (KA.«kexec» + 0x1b2#64) 2093860#21 kxcB3_br_eo
       kxcB3_ret_1aa n3 hK hnoff htier hj hproc)
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hlog $Hpid]
   isplitr

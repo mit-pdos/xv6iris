@@ -164,7 +164,7 @@ theorem kxcB_rows_12c (fb ef : List (BitVec 8)) (um : RegMapF (BitVec 64)) (Mv :
     (kxbWalkOk fb ef → kxbPermLeaves fb ef 0 um) := by
   refine ⟨fun _ => ⟨rfl, fun p hp => by cases hp⟩, fun _ => KexecBuilt.kxbPermLeaves_0 fb ef um⟩
 
-theorem kxcB_br_ppt : KA.«kexec» + 0x94#64 + BitVec.signExtend 64 2084928#21 =
+theorem kxcB_br_ppt : KA.«kexec» + 0x94#64 + BitVec.signExtend 64 2084814#21 =
     KA.«proc_pagetable» := by decide
 theorem kxcB_ret_94 : jumpPc (KA.«kexec» + 0x94#64 + 4#64) = KA.«kexec» + 0x94#64 + 4#64 := by
   decide
@@ -363,7 +363,7 @@ theorem kxcB_skip (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → 
   icases Hfr with ⟨F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, F13, Fu, Fp, F64, F65, F66, F67, F68⟩
   have hbr : bcond bop.BEQ (BitVec.setWidth 64 (BitVec.ofNat 16 (leAt ef 56 2))) 0#64 = true := by
     rw [kxcB_phnum_beqz]; simp [h0]
-  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0xae#64) false 324#13 15#5 0#5 (by decide) bop.BEQ)
+  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0xae#64) false 332#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a15, hbr]
   iintro Hk Hpc
   iapply H1a2 $$ %cpu %spie %spp %_ %(UPtd.mk root (BitVec.extractLsb' 12 44 (pageAddr A.V.upt.tfp)) ∅)
@@ -561,7 +561,7 @@ theorem kxcB_setup (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) →
   icases Hfr with ⟨F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, F13, Fu, Fp, F64, F65, F66, F67, F68⟩
   have hbr : bcond bop.BEQ (BitVec.setWidth 64 (BitVec.ofNat 16 (leAt ef 56 2))) 0#64 = false := by
     rw [kxcB_phnum_beqz]; simp [h0]
-  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0xae#64) false 324#13 15#5 0#5 (by decide) bop.BEQ)
+  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0xae#64) false 332#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a15, hbr]
   iintro Hk Hpc
   -- +0x0b2  c.sdsp s11,440(sp)
@@ -625,16 +625,16 @@ theorem kxcB_fail (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a10]
   iintro Hk Hpc
   -- +0x09a  beqz a0 TAKEN
-  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x9a#64) false 636#13 10#5 0#5 (by decide) bop.BEQ)
+  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x9a#64) false 644#13 10#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a10, MachCSL.beqz_zero]
   iintro Hk Hpc
   -- +0x316  c.ldsp s6,480(sp)
-  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x316#64) true 480#12 22#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x31e#64) true 480#12 22#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 22#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a2]
   iintro Hk Hpc F8
   -- +0x318  c.j +0x64
-  k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x318#64) true 2096460#21)
+  k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x320#64) true 2096452#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hfr := kxcFrameA6x_fold (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
@@ -869,7 +869,7 @@ theorem kxcB_ok (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Pr
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a10]
   iintro Hk Hpc
   -- +0x09a  beqz a0 NOT taken
-  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x9a#64) false 636#13 10#5 0#5 (by decide) bop.BEQ)
+  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x9a#64) false 644#13 10#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a10, kxcB_root_beqz root hrv]
   iintro Hk Hpc
   iapply (kxcB_spills Q QF cpu k A spie spp _ kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
@@ -947,7 +947,7 @@ theorem kxc_b1 (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (Γ : Sch
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
   -- +0x094  jal proc_pagetable
-  iapply (kxcB_call_ppt PPT Γ cpu k A spie spp _ (KA.«kexec» + 0x94#64) 2084928#21 kxcB_br_ppt
+  iapply (kxcB_call_ppt PPT Γ cpu k A spie spp _ (KA.«kexec» + 0x94#64) 2084814#21 kxcB_br_ppt
       kxcB_ret_94 k.proc (pageAddr A.V.upt.tfp) _ hK hnoff (by simp [RegMap.set_apply])
       (kxc_tf_align _) htfv A.V.ev)
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Htf $Hlend]

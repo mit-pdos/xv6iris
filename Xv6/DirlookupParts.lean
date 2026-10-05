@@ -67,9 +67,9 @@ theorem dirlookup_br_readi : KA.«dirlookup» + 0xFFFFFFFFFFFFFDF2#64 = KA.«rea
 theorem dirlookup_br_namecmp : KA.«dirlookup» + 0xFFFFFFFFFFFFFFEA#64 = KA.«namecmp» := by
   decide
 theorem dirlookup_br_iget : KA.«dirlookup» + 0xFFFFFFFFFFFFF67A#64 = KA.«iget» := by decide
-theorem dirlookup_br_panic : KA.«dirlookup» + 0xffffffffffffcefe#64 = KA.«panic» := by decide
+theorem dirlookup_br_panic : KA.«dirlookup» + 0xffffffffffffceee#64 = KA.«panic» := by decide
 
-theorem dirlookup_br_myproc : KA.«dirlookup» + 0xFFFFFFFFFFFFE042#64 = KA.«myproc» := by decide
+theorem dirlookup_br_myproc : KA.«dirlookup» + 0xFFFFFFFFFFFFE032#64 = KA.«myproc» := by decide
 theorem dirlookup_br_idup : KA.«dirlookup» + 0xFFFFFFFFFFFFF9E2#64 = KA.«idup» := by decide
 
 theorem dirlookup_ret_a8 : jumpPc (KA.«dirlookup» + 0xa8#64) = KA.«dirlookup» + 0xa8#64 := by
@@ -86,10 +86,10 @@ theorem dirlookup_ret_82 : jumpPc (KA.«dirlookup» + 0x82#64) = KA.«dirlookup�
   decide
 
 /-- `auipc a0,0x4` + `addi a0,a0,-1246` at `+0x84`: the panic literal. -/
-theorem dirlookup_msg_addr : KA.«dirlookup» + 0x3ba6#64 = KStr.«dirlookup read» := by decide
+theorem dirlookup_msg_addr : KA.«dirlookup» + 0x3b96#64 = KStr.«dirlookup read» := by decide
 
 /-- `auipc a1,0x4` + `addi a1,a1,-1230` at `+0x6c`: fs.c's `".."` literal. -/
-theorem dirlookup_dotdot_addr : KA.«dirlookup» + 0x3b9e#64 = KStr.«..» := by decide
+theorem dirlookup_dotdot_addr : KA.«dirlookup» + 0x3b8e#64 = KStr.«..» := by decide
 
 /-- The fourteen bytes namecmp reads at `".."` (Rocq `dlk_dotdot_list`):
 the literal, its NUL, the padding, and the head of the next string. -/

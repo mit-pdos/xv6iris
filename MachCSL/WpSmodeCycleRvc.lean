@@ -35,7 +35,7 @@ theorem wpLoop_s_rvc [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root : 
     ⊢ wpLoop cpu := by
   have hp' : Privilege.Supervisor = Privilege.Machine ∨ Privilege.Supervisor = Privilege.Supervisor := Or.inr rfl
   iintro ⟨HmConf, Hclock, Hpc, HT, HR, HP, HΦ⟩
-  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
+  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, %sc, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip, Hscounteren⟩ :=
     clockCells_cases _ $$ Hclock
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
   iapply wpLoop_restart
@@ -82,10 +82,10 @@ theorem wpLoop_s_rvc [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root : 
     swp_run 10
     conf_intro HmConf
     iapply swp_bind
-    iapply (hexec _ _ _)
+    iapply (hexec _ _ _ _)
     iframe
     inext
-    iintro HmConf HPC HnextPC ⟨⟨HT, HQ⟩, %ip', %mt', Hmip, Hmtime⟩
+    iintro HmConf HPC HnextPC ⟨⟨HT, HQ⟩, %ip', %mt', %sc', Hmip, Hmtime, Hscounteren⟩
     conf_cases HmConf
     cycle_retire_t
   · cycle_trap ipw

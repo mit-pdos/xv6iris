@@ -33,6 +33,12 @@ at entry they are on at exit with `SPIE`/`SPP` pinned by whatever trap ran,
 and the continuation is at whichever hart the thread landed on.  It runs at
 the kernel page table (`.kpt`), which `wakeup`/`procsInv` and `isPipe` need.
 
+THE PIPE-BUFFER COUNTER (NI M3 quotas Q-0; kernel `verified-quota`): after
+the freeing arm's `kfree`, `pipeclose` takes `npipelock` and decrements
+`npipe` (`NpipeDefs`).  The lock's handle rides `isPipe`, so the one new
+premise is that the caller does not hold it (`hnpipe`).  The post does not
+move: Q-0's payload is the counter at some value.
+
 THE LEND (permit sweep L1b, Rocq b69bd0fab; design ni-strong-instance.md
 §7): the closer's event-counter lend `actLend k.proc ke` (for kfree) goes in
 and comes back at a count no lower (`∃ k' ≥ ke`) right after the return pc;
@@ -68,6 +74,7 @@ def wp_pipeclose_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     (hw : w = decide (k.regs 11#5 ≠ 0#64))
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : pipecloseSlots ≤ k.avail)
     (hpipe : "pipe" ∉ k.locks) (hproc : "proc" ∉ k.locks) (hkmem : "kmem" ∉ k.locks)
+    (hnpipe : "npipe" ∉ k.locks)
     (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu pipecloseAddr ∗
   isPipe γl γp (k.regs 10#5) ∗ pipeRef γp w 1 ∗
@@ -92,8 +99,8 @@ structure PIPECLOSE : Prop where
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φ : IProp GF) (ke : Nat)
-    hw hnoff hK hpipe hproc hkmem htier,
+    hw hnoff hK hpipe hproc hkmem hnpipe htier,
     wp_pipeclose_body (hlc := hlc) (GF := GF) Γ cpu k γl γp w γkl γk on Φ ke
-      hw hnoff hK hpipe hproc hkmem htier
+      hw hnoff hK hpipe hproc hkmem hnpipe htier
 
 end Xv6

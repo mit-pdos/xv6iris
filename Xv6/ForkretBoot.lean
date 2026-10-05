@@ -50,7 +50,7 @@ set_option linter.unusedSimpArgs false
 
 theorem fkr_rootdev : (1#64 : BitVec 64) = BitVec.signExtend 64 (BitVec.ofNat 32 ROOTDEV) := by
   unfold ROOTDEV; decide
-theorem fkr_br_fsinit : KA.«forkret» + 7392#64 = KA.«fsinit» := by decide
+theorem fkr_br_fsinit : KA.«forkret» + 7408#64 = KA.«fsinit» := by decide
 theorem fkr_ret24 : jumpPc (KA.«forkret» + 0x24#64) = KA.«forkret» + 0x24#64 := by decide
 
 /-- `FkrAfter` survives a call: the callee-saved `sp`/`s0`/`s1` come back,
@@ -178,7 +178,7 @@ theorem fkr_boot_fsinit [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs (hlc :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero] next c1 hp1
   iintro Hk Hpc
   -- +0x20  jal fsinit
-  k_step_gen (wp_s_jal c1 _ (KA.«forkret» + 0x20#64) false 7360#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ (KA.«forkret» + 0x20#64) false 7376#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fkr_br_fsinit] next c2 hp2
   iintro Hk Hpc
   simp only [KCtx.setReg_sie, KCtx.setReg_proc, hs, hp] at hp1 hp2

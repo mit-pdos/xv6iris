@@ -143,7 +143,7 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   unfold swrEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hkl, #Hav, #Hdev⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step_e (wp_s_jal cpu _ (KA.«sys_write» + 0x3c#64) false 2094388#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_write» + 0x3c#64) false 2094282#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_write_br_filewrite]
   iintro Hk Hpc
   -- LEND fd0's reference out of the array (Rocq `proc_priv_lend`)
@@ -443,7 +443,7 @@ theorem swr_argint_call (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedN
   k_step_e (wp_s_addi cpu _ (KA.«sys_write» + 0x16#64) true 2#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [swr_li2]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_write» + 0x18#64) false 2087362#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_write» + 0x18#64) false 2087240#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_write_br_argint]
   iintro Hk Hpc
   icases sysfile_core_tf ht0 (procAddr j) pid V M $$ Hcore with ⟨%htf, Htf, Htfp, Hcorew⟩
@@ -530,7 +530,7 @@ theorem sys_write_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE
   k_step_e (wp_s_addi cpu _ (KA.«sys_write» + 0xc#64) true 1#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.ci_li_one]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_write» + 0xe#64) false 2087400#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_write» + 0xe#64) false 2087278#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_write_br_argaddr]
   iintro Hk Hpc
   icases sysfile_core_tf ht0 (procAddr j) pid V M $$ Hcore with ⟨%htf, Htf, Htfp, Hcorew⟩

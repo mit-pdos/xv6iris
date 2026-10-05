@@ -16,12 +16,13 @@ import Xv6.LinkMemset
 namespace Xv6
 
 theorem Pipeclose (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
-    (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) : PIPECLOSE :=
-  pipeclose_proof Acq Wk Rel RelC Kf
+    (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (Ac : ACQUIRE) (Re : RELEASE) : PIPECLOSE :=
+  pipeclose_proof Acq Wk Rel RelC Kf Ac Re
 
 /-- `pipeclose` CLOSED at the lock / allocator variants it takes (as
 `LinkSyscall.Syscall` closes it). -/
 theorem PipecloseClosed : PIPECLOSE :=
   Pipeclose AcquireGen Wakeup ReleaseRefute ReleaseCancel (KfreeFree Acquire Release MemsetFree)
+    Acquire Release
 
 end Xv6

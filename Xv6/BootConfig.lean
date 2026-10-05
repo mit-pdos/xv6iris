@@ -172,8 +172,9 @@ the ones the boot program leaves at their power-on garbage (`medeleg`, `mepc`,
 only `pmpAllOff`), which `mBoot` takes at the file's own values
 (`MachCSL.BootGarb`) -- and the frozen ones are
 persisted into `MachCSL.hwConfig` (the counter cells `mcountinhibit`,
-`minstretcfg`, `mcyclecfg`, `mhpmcounter`, `scounteren` at the file's own values, which the
-boot program leaves arbitrary: `MachCSL.HwCounters`). -/
+`minstretcfg`, `mcyclecfg`, `mhpmcounter` at the file's own values, which the
+boot program leaves arbitrary: `MachCSL.HwCounters`; `scounteren`, which the
+`verified-quota` kernel writes, is a clock cell since NI M3 quotas Q-0). -/
 theorem mBoot_of_cells (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu f) :
     ([∗list] r ∈ bootConfRegs, regPointsTo (GF := GF) cpu r (DFrac.own 1) (f r)) ⊢
       |==> mBoot cpu (DFrac.own 1) := by
@@ -196,9 +197,9 @@ theorem mBoot_of_cells (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu f) :
     Iris.Algebra.BigOpL.bigOpL_nil, e1, e2, e3, e4, e5, e9,
     h1, h2, h3, h4, h5, h6, h11, h12]
   iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14,
-    M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, -⟩
-  imod hwConfig_intro cpu ⟨f .mcountinhibit, f .minstretcfg, f .mcyclecfg, f .mhpmcounter, f .scounteren⟩
-    $$ [M1 M2 M3 M4 M5 M6 M7 M8 M9 M10 M11 M12 M13] with #Hhw
+    M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, -⟩
+  imod hwConfig_intro cpu ⟨f .mcountinhibit, f .minstretcfg, f .mcyclecfg, f .mhpmcounter⟩
+    $$ [M1 M2 M3 M4 M5 M6 M7 M8 M9 M10 M11 M12] with #Hhw
   · iframe
   imodintro
   iexists ⟨f .medeleg, f .mepc, f .satp, f .stimecmp, f .mcounteren, f .mtimecmp, f .pmpcfg_n, f .pmpaddr_n, e13⟩

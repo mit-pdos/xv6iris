@@ -54,8 +54,8 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 set_option linter.unusedSimpArgs false
 
-theorem sys_exec_head_br_argaddr : KA.«sys_exec» + 0xffffffffffffd38e#64 = KA.«argaddr» := by decide
-theorem sys_exec_head_br_argstr : KA.«sys_exec» + 0xffffffffffffd3aa#64 = KA.«argstr» := by decide
+theorem sys_exec_head_br_argaddr : KA.«sys_exec» + 0xffffffffffffd314#64 = KA.«argaddr» := by decide
+theorem sys_exec_head_br_argstr : KA.«sys_exec» + 0xffffffffffffd330#64 = KA.«argstr» := by decide
 theorem sys_exec_head_ret_12 : jumpPc (KA.«sys_exec» + 0x12#64) = KA.«sys_exec» + 0x12#64 := by decide
 theorem sys_exec_head_ret_20 : jumpPc (KA.«sys_exec» + 0x20#64) = KA.«sys_exec» + 0x20#64 := by decide
 
@@ -216,7 +216,7 @@ theorem sys_exec_head_str (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) (A : SysExe
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1c  jal argstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x1c#64) false 2085774#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x1c#64) false 2085652#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_head_br_argstr]
   iintro Hk Hpc
   icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
@@ -284,7 +284,7 @@ theorem sys_exec_head (AA : ARGADDR) (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x0e  jal argaddr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0xe#64) false 2085760#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0xe#64) false 2085638#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_head_br_argaddr]
   iintro Hk Hpc
   icases (procPrivFd_split A.γ (procAddr A.j) A.pid A.V A.M).1 $$ Hblk with ⟨Hcore, Howe⟩

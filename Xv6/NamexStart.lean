@@ -181,7 +181,7 @@ theorem namex_rel (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) 
   icases (namexKeep_open k A).1 $$ Hkeep with ⟨Hsb, Hsi, Hpid, Hcwd, Hcwr, Hrtc, Hrtr⟩
   ihave Hcwd := (namex_cwd_cell k.proc A.dqc A.cwdv).1 $$ Hcwd
   -- +0x2e  jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x2e#64) false 2088740#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x2e#64) false 2088724#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_myproc]
   iintro Hk Hpc
   have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu
@@ -283,7 +283,7 @@ theorem namex_abs (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) 
   icases (namexKeep_open k A).1 $$ Hkeep with ⟨Hsb, Hsi, Hpid, Hcwd, Hcwr, Hrtc, Hrtr⟩
   ihave Hrtc := (namex_root_cell k.proc A.dqr A.rootv).1 $$ Hrtc
   -- +0x48  jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x48#64) false 2088714#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x48#64) false 2088698#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_myproc]
   iintro Hk Hpc
   have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu

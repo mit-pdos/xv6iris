@@ -380,7 +380,7 @@ def kxcAt1a2 (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
     (kxbWalkOk (kxcFb data dnf) ef → uimgSub (elfImage (kxcFb data dnf)) (umemGet P Mi)) ∧
     (kxbWalkOk (kxcFb data dnf) ef → 0 = KexecBuilt.kexecSzAfter (elfLoads (kxcFb data dnf))) ∧
     (kxbWalkOk (kxcFb data dnf) ef → kxbPermSegs (kxcFb data dnf) P.um)⌝ ∗
-  kctx c (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs c (KA.«kexec» + 0x1f2#64) ∗
+  kctx c (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs c (KA.«kexec» + 0x1fa#64) ∗
   trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
   kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
   logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗
@@ -438,7 +438,7 @@ def kxcAt1a4 (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
     (kxbWalkOk (kxcFb data dnf) ef →
       szv.toNat = KexecBuilt.kexecSzAfter (elfLoads (kxcFb data dnf))) ∧
     (kxbWalkOk (kxcFb data dnf) ef → kxbPermSegs (kxcFb data dnf) P.um)⌝ ∗
-  kctx c (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs c (KA.«kexec» + 0x1a4#64) ∗
+  kctx c (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs c (KA.«kexec» + 0x1ac#64) ∗
   trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
   kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
   logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗
@@ -462,7 +462,7 @@ def kxcAt1ae (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
     (kxbWalkOk fb ef → uimgSub (elfImage fb) (umemGet P Mi)) ∧
     (kxbWalkOk fb ef → szv.toNat = KexecBuilt.kexecSzAfter (elfLoads fb)) ∧
     (kxbWalkOk fb ef → kxbPermSegs fb P.um)⌝ ∗
-  kctx c (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs c (KA.«kexec» + 0x1ae#64) ∗
+  kctx c (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs c (KA.«kexec» + 0x1b6#64) ∗
   trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
   irefSlots 2 ∗ bslots 3 ∗
   procPtAt P Mi ∗
@@ -518,7 +518,7 @@ def kxcAt21a (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
   ⌜kxStrAt (sz1.toNat : Int) A.alen A.afun ci (umemGet P Mi) ∧
     kxZeroExcept (sz1.toNat : Int) (KexecBuilt.kxbStrZone (sz1.toNat : Int) A.alen ci) (umemGet P Mi) ∧
     kxcImgRows fb ef P sz1 (umemGet P Mi)⌝ ∗
-  kctx c (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs c (KA.«kexec» + 0x218#64) ∗
+  kctx c (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs c (KA.«kexec» + 0x220#64) ∗
   trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
   kxcCRes k A w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi ci sz1
 
@@ -539,7 +539,7 @@ def kxcAt272 (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
   ⌜kxStrAt (sz1.toNat : Int) A.alen A.afun ci (umemGet P Mi) ∧
     kxZeroExcept (sz1.toNat : Int) (KexecBuilt.kxbStrZone (sz1.toNat : Int) A.alen ci) (umemGet P Mi) ∧
     kxcImgRows fb ef P sz1 (umemGet P Mi)⌝ ∗
-  kctx c (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs c (KA.«kexec» + 0x268#64) ∗
+  kctx c (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs c (KA.«kexec» + 0x270#64) ∗
   trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
   kxcCRes k A w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi ci sz1
 
@@ -575,7 +575,7 @@ def kxcAt2a6 (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
   ⌜kexecArgsAt (sz1.toNat : Int) A.alen ci A.afun (umemGet P Mi) ∧
     kxZeroExcept (sz1.toNat : Int) (kexecArgAddr (sz1.toNat : Int) A.alen ci) (umemGet P Mi) ∧
     kxcImgRows fb ef P sz1 (umemGet P Mi)⌝ ∗
-  kctx c (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs c (KA.«kexec» + 0x29c#64) ∗
+  kctx c (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs c (KA.«kexec» + 0x2a4#64) ∗
   trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
   kxcDRes k A w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi ci
 

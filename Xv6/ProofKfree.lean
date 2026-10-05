@@ -38,7 +38,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-- `&end`, folded out of `auipc a5,0x23; addi a5,a5,-1132`. -/
 theorem kf_end_addr :
-    KA.«kfree» + 0x2307a#64 = KA.«end» := by
+    KA.«kfree» + 0x23092#64 = KA.«end» := by
   decide
 
 /-- `&kmem`, folded out of `auipc s2,0x12; addi s2,s2,-1734`. -/
@@ -381,7 +381,7 @@ theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFun
 
 theorem kfree_br_282 : KA.«kfree» + 0x282#64 = KA.«memset» := by decide
 
-theorem kfree_br_2307a : KA.«kfree» + 0x2307a#64 = KA.«end» := by decide
+theorem kfree_br_23092 : KA.«kfree» + 0x23092#64 = KA.«end» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- THE LED FORM is the proof (Rocq `wp_kfree_led_sconf`); the landed
@@ -413,8 +413,8 @@ theorem kfree_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
   k_step_gen (wp_s_auipc c1 _ (KA.«kfree» + 0xc#64) false 35#20 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ (KA.«kfree» + 0x10#64) false 110#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [kfree_br_2307a, kf_end_addr] next c3 hp3
+  k_step_gen (wp_s_addi c2 _ (KA.«kfree» + 0x10#64) false 134#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    $$ [- $Hk $Hpc] with [kfree_br_23092, kf_end_addr] next c3 hp3
   iintro Hk Hpc
   -- sltu a4,a0,a5
   k_step_gen (wp_s_sltu c3 _ (KA.«kfree» + 0x14#64) false 14#5 10#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
@@ -541,8 +541,8 @@ theorem kfree_free_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET_FREE) : KFRE
   k_step_gen (wp_s_auipc c1 _ (KA.«kfree» + 0xc#64) false 35#20 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ (KA.«kfree» + 0x10#64) false 110#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [kfree_br_2307a, kf_end_addr] next c3 hp3
+  k_step_gen (wp_s_addi c2 _ (KA.«kfree» + 0x10#64) false 134#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    $$ [- $Hk $Hpc] with [kfree_br_23092, kf_end_addr] next c3 hp3
   iintro Hk Hpc
   -- sltu a4,a0,a5
   k_step_gen (wp_s_sltu c3 _ (KA.«kfree» + 0x14#64) false 14#5 10#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext

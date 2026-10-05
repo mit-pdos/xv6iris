@@ -375,7 +375,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
   ihave Hdev := (show wordPointsTo (GF := GF) (ientry kd) 4 dqd icfgDev ⊢
     wordPointsTo (iDev (ientry kd)) 4 dqd icfgDev by rw [hdev0]) $$ Hdev
   -- +0xa8  jal ialloc
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0xa8#64) false 2089942#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0xa8#64) false 2089836#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_ialloc]
   iintro Hk Hpc
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
@@ -462,7 +462,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
       with [ha0, create_beqz_ientry kslot hkk]
     iintro Hk Hpc
     -- +0xb0  jal ilock
-    k_step_e (wp_s_jal cpu _ (KA.«create» + 0xb0#64) false 2090302#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«create» + 0xb0#64) false 2090196#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_ilock]
     iintro Hk Hpc
     iapply (create_ilock_claim IL Γ cpu _ j γl pd pav pu ty kslot q inum t qt qc pidv dqp dqs hj

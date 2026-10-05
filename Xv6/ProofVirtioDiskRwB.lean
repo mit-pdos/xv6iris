@@ -339,7 +339,7 @@ theorem vdrw_iter (cpu : CPU) (K : KCtx) (γ : DiskNames) (pd pav pu : BitVec 64
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_rw» + 0x5e#64) false 0x1e#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x62#64) false 3710#12 14#5 14#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x62#64) false 3616#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw2_disk_addr]
   iintro Hk Hpc
   -- li a5,0
@@ -531,10 +531,10 @@ theorem vdrw_park (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_rw» + 0x94#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie k]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x98#64) false 3680#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x98#64) false 3586#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie k, vdrw2_free0_addr]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0x9c#64) false 2081860#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0x9c#64) false 2081742#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [vdrwK_sie k, vdrw2_br_sleep_prepare]
   iintro Hk Hpc
@@ -562,10 +562,10 @@ theorem vdrw_park (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_rw» + 0xa0#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie k]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0xa4#64) false 3940#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0xa4#64) false 3846#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie k, vdrw2_lock_addr]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0xa8#64) false 2076996#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0xa8#64) false 2076878#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie k, vdrw2_br_release]
   iintro Hk Hpc
   -- the release takes back the arm the acquire paid out; the complement stays
@@ -594,7 +594,7 @@ theorem vdrw_park (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP
   have hR2 : vdrwRegs k R2 (sectorOf bno) :=
     vdrwRegs_pin k R1 R2 _ hR1 (vdrwPin_of_calleeSaved R1 R2 (by k_norm_g at hcs2; exact hcs2))
   -- jal sleep, at the caller's index
-  k_step_e (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0xac#64) false 2081904#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0xac#64) false 2081786#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw2_br_sleep]
   iintro Hk Hpc
   iapply (vdrw5_sl SL Γ cpu _ jp k.sie k.proc hjp ?hp3 ?hK3 ?hn3 ?ht3 ?hs3 ?hpp3)
@@ -617,10 +617,10 @@ theorem vdrw_park (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP
   k_step_e (wp_s_auipc cpu _ (KA.«virtio_disk_rw» + 0xb0#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0xb4#64) false 3924#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0xb4#64) false 3830#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw2_lock_addr]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0xb8#64) false 2076844#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0xb8#64) false 2076726#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw2_br_acquire]
   iintro Hk Hpc
   iapply (vdrw_ac AC cpu _ γ γl pd pav pu ?ha0q ?hnq ?hKq ?hsq) $$ [- $Hk $Hpc]

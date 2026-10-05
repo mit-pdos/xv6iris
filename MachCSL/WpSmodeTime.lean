@@ -118,13 +118,13 @@ set_option maxHeartbeats 4000000 in
 moved. -/
 theorem execSpecF_csrr_time (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
     (hcnt : BitVec.extractLsb' 1 1 c.mcounteren = 1#1)
-    (pc npc₀ : BitVec 64) (rd : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap) (t : BitVec 64) :
+    (pc npc₀ : BitVec 64) (rd : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap) (t : BitVec 64) (sc : BitVec 32) :
     execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
       (instruction.CSRReg (0xC01#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) pc npc₀ npc₀
-      iprop(gprFile cpu R ∗ Register.mtime ↦ᵣ[cpu] t)
-      iprop(gprFile cpu (RegMap.set R rd t) ∗ Register.mtime ↦ᵣ[cpu] t) := by
+      iprop(gprFile cpu R ∗ Register.mtime ↦ᵣ[cpu] t ∗ Register.scounteren ↦ᵣ[cpu] sc)
+      iprop(gprFile cpu (RegMap.set R rd t) ∗ Register.mtime ↦ᵣ[cpu] t ∗ Register.scounteren ↦ᵣ[cpu] sc) := by
   intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Hmtime⟩, HΦ⟩
+  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Hmtime, Hscounteren⟩, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
@@ -138,8 +138,8 @@ theorem execSpecF_csrr_time (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhy
   iintro HF
   swp_run 10
   conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC [HF Hmtime]
-  iframe HF Hmtime
+  iapply HΦ $$ HmConf HPC HnextPC [HF Hmtime Hscounteren]
+  iframe HF Hmtime Hscounteren
 
 set_option maxHeartbeats 4000000 in
 /-- `csrw stimecmp, rs1` in supervisor mode with `mcounteren.TM` and
@@ -194,10 +194,10 @@ theorem execSpecClkPP.frameL {cpu : CPU} {dq : DFrac} {p : Privilege} {c : MConf
     {ast : instruction} {pc npc₀ npc : BitVec 64} {P Q : IProp GF}
     (h : execSpecClkPP cpu dq p c p' c' ast pc npc₀ npc P Q) (F : IProp GF) :
     execSpecClkPP cpu dq p c p' c' ast pc npc₀ npc iprop(F ∗ P) iprop(F ∗ Q) := by
-  intro ip mt Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨⟨HF, HP⟩, Hmip, Hmtime⟩, HΦ⟩
-  iapply (h ip mt Φ)
-  iframe HmConf HPC HnextPC HP Hmip Hmtime
+  intro ip mt sc Φ
+  iintro ⟨HmConf, HPC, HnextPC, ⟨⟨HF, HP⟩, Hmip, Hmtime, Hscounteren⟩, HΦ⟩
+  iapply (h ip mt sc Φ)
+  iframe HmConf HPC HnextPC HP Hmip Hmtime Hscounteren
   inext
   iintro HmConf HPC HnextPC ⟨HQ, Hcl⟩
   iapply HΦ $$ HmConf HPC HnextPC [HF HQ Hcl]
@@ -213,18 +213,18 @@ theorem execSpecClk_csrr_time (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfP
     execSpecClkPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
       (instruction.CSRReg (0xC01#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) pc npc₀ npc₀
       (gprFile cpu R) iprop(∃ t : BitVec 64, gprFile cpu (RegMap.set R rd t)) := by
-  intro ip mt Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Hmip, Hmtime⟩, HΦ⟩
-  iapply (execSpecF_csrr_time cpu c sie hok hcnt pc npc₀ rd hrd R mt Φ)
-  iframe HmConf HPC HnextPC HF Hmtime
+  intro ip mt sc Φ
+  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Hmip, Hmtime, Hscounteren⟩, HΦ⟩
+  iapply (execSpecF_csrr_time cpu c sie hok hcnt pc npc₀ rd hrd R mt sc Φ)
+  iframe HmConf HPC HnextPC HF Hmtime Hscounteren
   inext
-  iintro HmConf HPC HnextPC ⟨HF, Hmtime⟩
-  iapply HΦ $$ HmConf HPC HnextPC [HF Hmip Hmtime]
+  iintro HmConf HPC HnextPC ⟨HF, Hmtime, Hscounteren⟩
+  iapply HΦ $$ HmConf HPC HnextPC [HF Hmip Hmtime Hscounteren]
   isplitl [HF]
   · iexists mt
     iexact HF
-  · iexists ip, mt
-    iframe Hmip Hmtime
+  · iexists ip, mt, sc
+    iframe Hmip Hmtime Hscounteren
 
 /-- `csrw stimecmp, rs1` as a clock-lending stage. -/
 theorem execSpecClk_csrw_stimecmp (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
@@ -234,17 +234,17 @@ theorem execSpecClk_csrw_stimecmp (cpu : CPU) (c : MConf) (sie : Bool) (hok : SC
       { c with stimecmp := RegMap.get R rs1 }
       (instruction.CSRReg (0x14D#12, regidx.Regidx rs1, regidx.Regidx 0#5, csrop.CSRRW)) pc npc₀ npc₀
       (gprFile cpu R) (gprFile cpu R) := by
-  intro ip mt Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Hmip, Hmtime⟩, HΦ⟩
+  intro ip mt sc Φ
+  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Hmip, Hmtime, Hscounteren⟩, HΦ⟩
   iapply (execSpecF_csrw_stimecmp cpu c sie hok hcnt hmenv pc npc₀ rs1 R mt ip Φ)
   iframe HmConf HPC HnextPC HF Hmtime Hmip
   inext
   iintro HmConf HPC HnextPC ⟨HF, Hmtime, %ip', Hmip⟩
-  iapply HΦ $$ HmConf HPC HnextPC [HF Hmip Hmtime]
+  iapply HΦ $$ HmConf HPC HnextPC [HF Hmip Hmtime Hscounteren]
   isplitl [HF]
   · iexact HF
-  · iexists ip', mt
-    iframe Hmip Hmtime
+  · iexists ip', mt, sc
+    iframe Hmip Hmtime Hscounteren
 
 /-! ## The rules -/
 

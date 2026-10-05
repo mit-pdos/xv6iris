@@ -326,7 +326,7 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
   ihave Hk := kctx_eq_mono cpu _ (((k.withSpie k.spie k.spp).pushed 68).withRegs R)
     (by kctx_ext) $$ Hk
   -- +0x020  jal myproc
-  iapply (kxcA_call_myproc MP cpu k k.spie k.spp R (KA.«kexec» + 0x20#64) 2084844#21 kxcA_br_myproc
+  iapply (kxcA_call_myproc MP cpu k k.spie k.spp R (KA.«kexec» + 0x20#64) 2084730#21 kxcA_br_myproc
       kxcA_ret_24 hK hnoff) $$ [- $Hk $Hpc $Hte $Hce]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
@@ -337,7 +337,7 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h1a0]
   iintro Hk Hpc
   -- +0x026  jal begin_op
-  iapply (kxcA_call_beginop BO Γ cpu k A spie1 spp1 _ (KA.«kexec» + 0x26#64) 2094214#21
+  iapply (kxcA_call_beginop BO Γ cpu k A spie1 spp1 _ (KA.«kexec» + 0x26#64) 2094116#21
       kxcA_br_beginop kxcA_ret_2a hK hnoff htier hj hproc) $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpid]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
@@ -358,7 +358,7 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
   -- +0x02c  jal namei  (THE ERA WALK)
   unfold kxcBufs
   icases Hbufs with ⟨Hpath, Hargv, Hargs⟩
-  iapply (kxcA_call_namei_era NE Γ cpu k A spie2 spp2 _ (KA.«kexec» + 0x2c#64) 2093706#21
+  iapply (kxcA_call_namei_era NE Γ cpu k A spie2 spp2 _ (KA.«kexec» + 0x2c#64) 2093608#21
       kxcA_br_namei kxcA_ret_30 P Pmiss hK hnoff htier hj hproc hnn hterm hplen
       (by simp [RegMap.set_apply, e18]))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hcore $Hpath $Hbs $Hirs $Hlog $Hstart]
@@ -413,7 +413,7 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
     icases kctx_tier _ _ $$ Hk with ⟨%hct', Hk⟩
     icases kxc_priv_pid (hct'.symm.trans (by k_norm_g; exact htier)) A.γ k.proc A.pidv A.V A.M
       $$ Hpriv with ⟨Hpid, Hpriv⟩
-    iapply (kxc_call_endop EO Γ cpu k A spie3 spp3 R3 (KA.«kexec» + 0x88#64) 2094256#21 kxcA_br_eo_88
+    iapply (kxc_call_endop EO Γ cpu k A spie3 spp3 R3 (KA.«kexec» + 0x88#64) 2094158#21 kxcA_br_eo_88
         kxcA_ret_8c n1 hK hnoff htier hj hproc) $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hlog $Hpid]
     isplitr
     · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext

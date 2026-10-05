@@ -157,7 +157,7 @@ theorem kinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
 
 theorem kinit_br_ffffffffffffffb8 : KA.«kinit» + 0xffffffffffffffb8#64 = KA.«freerange» := by decide
 
-theorem kinit_br_22fc6 : KA.«kinit» + 0x22fc6#64 = KA.«end» := by decide
+theorem kinit_br_22fde : KA.«kinit» + 0x22fde#64 = KA.«end» := by decide
 
 theorem kinit_br_8e : KA.«kinit» + 0x8e#64 = KA.«initlock» := by decide
 
@@ -239,8 +239,8 @@ theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   k_step_gen (wp_s_auipc c9 _ (KA.«kinit» + 0x20#64) false 0x23#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ki_u23] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c10 _ (KA.«kinit» + 0x24#64) false 4006#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kinit_br_22fc6] next c11 hp11
+  k_step_gen (wp_s_addi c10 _ (KA.«kinit» + 0x24#64) false 4030#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kinit_br_22fde] next c11 hp11
   iintro Hk Hpc
   -- jal ra, freerange
   k_step_gen (wp_s_jal c11 _ (KA.«kinit» + 0x28#64) false 2097040#21 1#5 (by decide))

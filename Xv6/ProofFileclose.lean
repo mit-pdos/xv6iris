@@ -77,7 +77,7 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
   have hlk : "ftable" ∉ k.locks := by rw [hlocks]; exact List.not_mem_nil
   have hfilt := fa_filter_ftable k.locks hlk
   ihave #Hlk := (show isFtable (GF := GF) γl γ ⊢ isLock γl ftableAddr "ftable" (ftableResAt γ) from by
-    unfold isFtable; iintro H; iexact H) $$ Hft
+    unfold isFtable; iintro ⟨H, -⟩; iexact H) $$ Hft
   -- the prologue ; c.mv s1,a0
   iapply (wp_prologue8s1_gen cpu k KA.«fileclose» hK8)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -93,11 +93,11 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
   k_step_gen (wp_s_auipc c2 _ (KA.«fileclose» + 0xc#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c3 _ (KA.«fileclose» + 0x10#64) false 1846#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_1e742, fc_lock_416a] next c4 hp4
+  k_step_gen (wp_s_addi c3 _ (KA.«fileclose» + 0x10#64) false 1830#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_1e732, fc_lock_416a] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c4 _ (KA.«fileclose» + 0x14#64) false 2083182#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_ffffffffffffc982] next c5 hp5
+  k_step_gen (wp_s_jal c4 _ (KA.«fileclose» + 0x14#64) false 2083166#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_ffffffffffffc972] next c5 hp5
   iintro Hk Hpc
   iapply (fa_acquire AC c5 _ γl γ ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -230,11 +230,11 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
     k_step (wp_s_auipc c _ (KA.«fileclose» + 0x82#64) false 0x1e#20 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_addi c _ (KA.«fileclose» + 0x86#64) false 1728#12 10#5 10#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_1e742, fc_lock_41e0]
+    k_step (wp_s_addi c _ (KA.«fileclose» + 0x86#64) false 1712#12 10#5 10#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_1e732, fc_lock_41e0]
     iintro Hk Hpc
-    k_step (wp_s_jal c _ (KA.«fileclose» + 0x8a#64) false 2083200#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_ffffffffffffca0a]
+    k_step (wp_s_jal c _ (KA.«fileclose» + 0x8a#64) false 2083184#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_ffffffffffffc9fa]
     iintro Hk Hpc
     iapply (fa_release RE c _ γl γ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]
     rotate_right 1

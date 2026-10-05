@@ -65,10 +65,10 @@ def fsinitCrashPure [Fscfg] (L : BlockMap) (M : LogMirror) (bsSb : List (BitVec 
 
 /-- `auipc aX,0x1d ; addi/lw aX,…(aX)` at `+0x1e`, `+0x30`, `+0x44` all land
 on `&sb`. -/
-theorem fsinit_sb_addr : KA.«fsinit» + 0x1d77a#64 = KA.«sb» := by decide
+theorem fsinit_sb_addr : KA.«fsinit» + 0x1d76a#64 = KA.«sb» := by decide
 
 theorem fsinit_br_bread : KA.«fsinit» + 0xFFFFFFFFFFFFF62C#64 = KA.«bread» := by decide
-theorem fsinit_br_memmove : KA.«fsinit» + 0xffffffffffffd6ea#64 = KA.«memmove» := by decide
+theorem fsinit_br_memmove : KA.«fsinit» + 0xffffffffffffd6da#64 = KA.«memmove» := by decide
 theorem fsinit_br_brelse : KA.«fsinit» + 0xFFFFFFFFFFFFF734#64 = KA.«brelse» := by decide
 theorem fsinit_br_initlog : KA.«fsinit» + 0x70c#64 = KA.«initlog» := by decide
 theorem fsinit_br_ireclaim : KA.«fsinit» + 0xFFFFFFFFFFFFFF38#64 = KA.«ireclaim» := by decide

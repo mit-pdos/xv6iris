@@ -104,13 +104,13 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
   k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0x42#64) false 0x1f#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0x46#64) false 2534#12 9#5 9#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0x46#64) false 2518#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_log]
   iintro Hk Hpc
   k_step_e (wp_s_add cpu _ (KA.«end_op» + 0x4a#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x4c#64) false 2084196#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x4c#64) false 2084180#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_acq]
   iintro Hk Hpc
   iapply (eo_ac AC cpu _ γ γb γfs cov ls dev ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -240,7 +240,7 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [eoK_sie, KCtx.rget_zero, p9]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x5c#64) false 2089276#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x5c#64) false 2089260#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_wk]
   iintro Hk Hpc
   iapply (eo_wk WK Γ cpu _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
@@ -282,7 +282,7 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [eoK_sie, KCtx.rget_zero, u9]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x62#64) false 2084310#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x62#64) false 2084294#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_rel]
   iintro Hk Hpc
   iapply (eo_re RE cpu _ γ γb γfs cov ls dev ?ha0r ?hsr ?hnr ?hKr k.sie ?hrr ?hor)

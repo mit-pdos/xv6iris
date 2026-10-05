@@ -20,10 +20,13 @@ right after `fileinit` returns the zeroed lock words: `NFILE` raw entries plus
   `fileBoot_ftableRes` (Rocq `ftable_res_boot`).
 * `fileBoot_isFtable`: `ftable_res_boot` plus `newlock`, as ProofMain.v does
   it at `main+0x9a`, from `fileinit`'s output (`lockInited`).
+* (NI M3 quotas Q-0) `npipeBootRaw` / `bootCarve_npipe`: the pipe-buffer
+  counter's never-`initlock`ed lock and its cell, minted beside the table's
+  by `fileBoot_isFtable` (`isFtable` carries the handle).
 * `.bss` carve: `bootCarve_fileEntry` (Rocq `boot_file_entry`),
   `bootCarve_fileEntries` (Rocq `boot_file_entries`), and `bootCarve_ftable`,
   which carves the WHOLE `ftable` symbol (`[ftable, ftable + 0xfb8)`, which
-  ends exactly at `<disk>`) into its lock words and the `NFILE` entries.
+  ends exactly at `<npipelock>`) into its lock words and the `NFILE` entries.
   The last one is Lean-only; see deviation 4.
 
 ## Deviations from Rocq
@@ -63,6 +66,12 @@ open LeanRV64D
 
 section raw
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+
+/-- **The pipe-buffer counter, raw** (NI M3 quotas Q-0; `NpipeDefs`): its
+never-`initlock`ed lock as two fresh words (the `.bss` zeros, at position 0,
+`bootCarve_npipe`) and the counter cell.  `fileBoot_isFtable` mints the lock
+beside the table's. -/
+def npipeBootRaw : IProp GF := iprop% lkFresh npipelockAddr ∗ npipeResAt curCtx
 
 /-- **One free `struct file`, raw** (Rocq `fentry_raw`): `type` is `FD_NONE`,
 `ref` and `off` are zero, and the other five fields are existential. -/
@@ -183,22 +192,29 @@ the raw entries at the running context, and the table's iref share. -/
 theorem fileBoot_isFtable [KernelImage GF] {lent : Bool} (cpu : CPU) (kc : KCtx) :
     kctxL lent cpu kc ∗ lockInited ftableLockAddr ftableNameAddr ∗
       kmapId ftableAddr ∗ kmapId (ftableAddr + 16#64) ∗
-      ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗ irefSlots NFILE
+      ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗ irefSlots NFILE ∗
+      npipeBootRaw ∗ kmapId npipelockAddr ∗ kmapId (npipelockAddr + 16#64)
     ⊢ |={⊤}=> (kctxL (GF := GF) lent cpu kc ∗
       wordPointsTo (ftableLockAddr + 8#64) 8 (DFrac.own 1) ftableNameAddr ∗
       ∃ (γl : GName) (γ : FileNames), isFtable γl γ) := by
-  unfold lockInited
+  unfold lockInited npipeBootRaw
   rw [show ftableLockAddr = ftableAddr from rfl]
-  iintro ⟨Hk, ⟨Hnm, Hf⟩, #H1, #H2, Hraw, Hir⟩
+  iintro ⟨Hk, ⟨Hnm, Hf⟩, #H1, #H2, Hraw, Hir, ⟨Hnf, Hnr⟩, #Hn1, #Hn2⟩
   imod fileBoot_ftableRes $$ [Hraw Hir] with ⟨%γ, Hres⟩
   · iframe Hraw Hir
   imod kctx_newlock cpu kc ftableAddr "ftable" (ftableResAt γ) $$ [Hk Hres Hf] with ⟨Hk, %γl, #Hl⟩
   · iframe Hk Hres Hf H1 H2
+  -- (NI M3 quotas Q-0) the pipe-buffer counter's lock, from its zero words
+  imod kctx_newlock cpu kc npipelockAddr "npipe" npipeResAt $$ [Hk Hnr Hnf] with ⟨Hk, %γn, #Hn⟩
+  · iframe Hk Hnr Hnf Hn1 Hn2
   imodintro
   iframe Hk Hnm
   iexists γl, γ
   unfold isFtable
-  iexact Hl
+  iframe Hl
+  iexists γn
+  unfold isNpipe
+  iexact Hn
 
 end mint
 
@@ -230,7 +246,7 @@ theorem bootCarve_fileEntry [CurCtx] (ξ : CtxId) (k : Nat)
   have hB := fileB_val k
   have hkN : k < 100 := hk
   have hlo : 0x8000a400 ≤ fileB k := by omega
-  have hend : fileB k + 40 ≤ 0x80023b10 := by omega
+  have hend : fileB k + 40 ≤ 0x80023b28 := by omega
   have hal : fileB k % 8 = 0 := by omega
   clear hB hkN
   generalize fileB k = B at *
@@ -287,7 +303,7 @@ theorem bootCarve_fileEntry [CurCtx] (ξ : CtxId) (k : Nat)
   · iexists _; iexact Hmj
 
 /-- **The `NFILE` entries, carved** (Rocq `boot_file_entries`): the array
-`[ftable + 24, <disk>)`, one `fentryRaw` per slot, which is what
+`[ftable + 24, <npipelock>)`, one `fentryRaw` per slot, which is what
 `fileBoot_ftableRes` takes. -/
 theorem bootCarve_fileEntries [CurCtx] (ξ : CtxId) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) (fileB 0) (fileB 0 + 40 * NFILE) -∗
@@ -304,7 +320,7 @@ theorem bootCarve_fileEntries [CurCtx] (ξ : CtxId) :
 
 /-- **The whole `ftable` symbol, carved** (Rocq `main_locks_raw`'s ftable
 row plus `boot_file_entries`, deviation 4): `[ftable, ftable + 0xfb8)`,
-which ends exactly at `<disk>`, is `fileinit`'s lock words and the
+which ends exactly at `<npipelock>`, is `fileinit`'s lock words and the
 `NFILE` raw entries. -/
 theorem bootCarve_ftable [CurCtx] (ξ : CtxId) :
     kmapStatic (GF := GF) ⊢
@@ -323,6 +339,62 @@ theorem bootCarve_ftable [CurCtx] (ξ : CtxId) :
   iapply bootCarve_fileEntries ξ $$ Hk
   rw [h0, hN]
   iexact H
+
+/-! ## The pipe-buffer counter's `.bss` (NI M3 quotas Q-0) -/
+
+/-- A zero `.bss` word as a FRESH history cell at position 0
+(`BootShared.bootShared_startedCell`'s shape, at any `.bss` word). -/
+theorem bootCarve_wordCell0 (pa : PAddr) (A n : Nat) (hpa : pa = BitVec.ofNat 64 A)
+    (hlo : 0x8000a400 ≤ A) (hhi : A + n ≤ 0x80023b28) :
+    bootRan (GF := GF) (imgFlat bootImage) A (A + n) ⊢ wordCell pa n 0 0 [] := by
+  have hA : bcInRam A n := by unfold bcInRam ramBase ramEnd; omega
+  refine (bootImg_run (GF := GF) bootImage A n (fun _ => 0#8) hA (fun j hj => ?_)).trans ?_
+  · have := bc_addr_toNat A j (by omega)
+    exact bootImage_wf.bss _ (by rw [this, bc_bss_val]; omega) (by rw [this, bc_end_val]; omega)
+  refine .trans ?_ (wordCell_of_fresh pa n 0 (fun _ => 0))
+  rw [hpa]
+  unfold histBytes
+  apply BigSepL.bigSepL_mono
+  intro k j hj
+  have e : nthByte (0 : BitVec (8 * n)) j = 0#8 := by
+    simp only [nthByte]
+    apply BitVec.eq_of_toNat_eq
+    simp
+  simp only [e]
+  exact .rfl
+
+/-- **`npipelock` and `npipe`, carved** (NI M3 quotas Q-0): the lock's two
+words (`locked` at `+0`, `cpu` at `+16`; the name word is never read) as
+fresh history cells, and the counter cell at the running context. -/
+theorem bootCarve_npipe [CurCtx] :
+    kmapStatic (GF := GF) ⊢
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«npipelock» (MachCSL.KernelSyms.«npipelock» + 24) -∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«npipe» (MachCSL.KernelSyms.«npipe» + 4) -∗
+      npipeBootRaw := by
+  have hL : MachCSL.KernelSyms.«npipelock» = 0x800239d0 := rfl
+  have hN : MachCSL.KernelSyms.«npipe» = 0x8000a41c := rfl
+  rw [hL, hN]
+  iintro #Hk Hl Hn
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x800239d0 (0x800239d0 + 4) (0x800239d0 + 24)
+    (by omega) (by omega)).1 $$ Hl with ⟨H0, Hl⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x800239d0 + 4) (0x800239d0 + 16) (0x800239d0 + 24)
+    (by omega) (by omega)).1 $$ Hl with ⟨-, H16⟩
+  ihave H0 := bootCarve_wordCell0 npipelockAddr 0x800239d0 4 rfl (by omega) (by omega) $$ H0
+  ihave H16 := bootCarve_wordCell0 (npipelockAddr + 16#64) (0x800239d0 + 16) 8 (by decide) (by omega)
+    (by omega) $$ H16
+  ihave Hn := bootBss_cellAt (GF := GF) curCtx npipeAddr 4 0x8000a41c (0x8000a41c + 4) rfl rfl
+    (by rw [bc_bss_val]; omega) (by rw [bc_end_val]; omega) (by omega) $$ Hk Hn
+  unfold npipeBootRaw
+  isplitl [H0 H16]
+  · iapply lkFresh_intro npipelockAddr (by unfold lockAddrOk; decide) 0 0
+    iframe H0 H16
+    unfold lkFloor
+    isplit
+    · iapply keyAt_0
+    · iapply keyAt_0
+  · unfold npipeResAt
+    iexists 0#32
+    iexact Hn
 
 end carve
 

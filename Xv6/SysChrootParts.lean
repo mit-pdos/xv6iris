@@ -51,15 +51,15 @@ set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
-theorem sys_chroot_br_myproc : KA.«sys_chroot» + 0xffffffffffffc438#64 = KA.«myproc» := by decide
-theorem sys_chroot_br_begin_op : KA.«sys_chroot» + 0xffffffffffffe8d8#64 = KA.«begin_op» := by decide
-theorem sys_chroot_br_argstr : KA.«sys_chroot» + 0xffffffffffffd42a#64 = KA.«argstr» := by decide
-theorem sys_chroot_br_namei : KA.«sys_chroot» + 0xffffffffffffe6e2#64 = KA.«namei» := by decide
-theorem sys_chroot_br_ilock : KA.«sys_chroot» + 0xffffffffffffde0e#64 = KA.«ilock» := by decide
-theorem sys_chroot_br_iunlock : KA.«sys_chroot» + 0xffffffffffffdebc#64 = KA.«iunlock» := by decide
-theorem sys_chroot_br_iput : KA.«sys_chroot» + 0xffffffffffffdf90#64 = KA.«iput» := by decide
-theorem sys_chroot_br_end_op : KA.«sys_chroot» + 0xffffffffffffe964#64 = KA.«end_op» := by decide
-theorem sys_chroot_br_iunlockput : KA.«sys_chroot» + 0xffffffffffffe062#64 = KA.«iunlockput» := by
+theorem sys_chroot_br_myproc : KA.«sys_chroot» + 0xffffffffffffc3be#64 = KA.«myproc» := by decide
+theorem sys_chroot_br_begin_op : KA.«sys_chroot» + 0xffffffffffffe86e#64 = KA.«begin_op» := by decide
+theorem sys_chroot_br_argstr : KA.«sys_chroot» + 0xffffffffffffd3b0#64 = KA.«argstr» := by decide
+theorem sys_chroot_br_namei : KA.«sys_chroot» + 0xffffffffffffe678#64 = KA.«namei» := by decide
+theorem sys_chroot_br_ilock : KA.«sys_chroot» + 0xffffffffffffdda4#64 = KA.«ilock» := by decide
+theorem sys_chroot_br_iunlock : KA.«sys_chroot» + 0xffffffffffffde52#64 = KA.«iunlock» := by decide
+theorem sys_chroot_br_iput : KA.«sys_chroot» + 0xffffffffffffdf26#64 = KA.«iput» := by decide
+theorem sys_chroot_br_end_op : KA.«sys_chroot» + 0xffffffffffffe8fa#64 = KA.«end_op» := by decide
+theorem sys_chroot_br_iunlockput : KA.«sys_chroot» + 0xffffffffffffdff8#64 = KA.«iunlockput» := by
   decide
 
 theorem sys_chroot_ret_0e : jumpPc (KA.«sys_chroot» + 0xe#64) = KA.«sys_chroot» + 0xe#64 := by decide
@@ -387,7 +387,7 @@ theorem sys_chroot_tail_68 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   unfold sysChrootRows
   icases Hrows with ⟨Hpid, Hrt, Hrtr⟩
   -- +0x68  jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x68#64) false 2091260#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x68#64) false 2091154#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chroot_br_end_op]
   iintro Hk Hpc
   iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
@@ -457,7 +457,7 @@ theorem sys_chroot_tail_70 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [C
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0x72  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x72#64) false 2088944#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x72#64) false 2088838#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chroot_br_iunlockput]
   iintro Hk Hpc
   iapply (sysfile_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) (procAddr A.j)
@@ -478,7 +478,7 @@ theorem sys_chroot_tail_70 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [C
     (sysChdirPins_set k _ _ _ 1#5 _ (sysChdirPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
     hcs1
   -- +0x76  jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x76#64) false 2091246#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x76#64) false 2091140#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chroot_br_end_op]
   iintro Hk Hpc
   iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
@@ -566,7 +566,7 @@ theorem sys_chroot_tail_swap (IP : IPUT) (EO : END_OP) (Γ : SchedNames) [ClaimI
     with [hpins.2.2.2.1, sys_chroot_proot, sys_chroot_proot']
   iintro Hk Hpc Hrt
   -- +0x4c  jal iput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x4c#64) false 2088772#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x4c#64) false 2088666#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chroot_br_iput]
   iintro Hk Hpc
   iapply (sys_chdir_iput IP Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
@@ -585,7 +585,7 @@ theorem sys_chroot_tail_swap (IP : IPUT) (EO : END_OP) (Γ : SchedNames) [ClaimI
     (sysChdirPins_set k _ _ _ 1#5 _ (sysChdirPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
     hcs1
   -- +0x50  jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x50#64) false 2091284#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x50#64) false 2091178#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chroot_br_end_op]
   iintro Hk Hpc
   iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
@@ -668,7 +668,7 @@ theorem sys_chroot_tail_ok (IU : IUNLOCK) (IP : IPUT) (EO : END_OP) (Γ : SchedN
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0x44  jal iunlock
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x44#64) false 2088568#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x44#64) false 2088462#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chroot_br_iunlock]
   iintro Hk Hpc
   iapply (sys_chdir_iunlock IU Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)

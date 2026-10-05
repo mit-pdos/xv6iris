@@ -15,7 +15,9 @@ given `cpuid`'s interface.
  +0x24  0c2017b7   lui   a5,0xc201
  +0x28  97aa       add   a5,a5,a0        a5 = PLIC + 0x201000 + 0x2000*hart
  +0x2a  0007a023   sw    zero,0(a5)      *PLIC_SPRIORITY(hart) = 0
- +0x2e  60a2 6402 0141 8082   epilogue
+ +0x2e  4781       li    a5,0
+ +0x30  10679073   csrw  scounteren,a5   (NI M3 quotas Q-0; `wp_s_csrw_scounteren`)
+ +0x34  60a2 6402 0141 8082   epilogue
 ```
 
 Interrupts are off, so the hart cannot move between `cpuid`'s answer and
@@ -26,6 +28,7 @@ offsets, eight closed cases).
 import Xv6.SpecPlicinithart
 import Xv6.PlicPlanExtra
 import Xv6.CodeTactics
+import MachCSL.WpSmodeScounteren
 
 namespace Xv6
 
@@ -35,13 +38,14 @@ open LeanRV64D
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-- The call `jal cpuid` at `+0x08`. -/
-theorem ph_cpuid_br : KA.«plicinithart» + 0xffffffffffffc10e#64 = KA.«cpuid» := by decide
+theorem ph_cpuid_br : KA.«plicinithart» + 0xffffffffffffc09e#64 = KA.«cpuid» := by decide
 
 /-- The return address of that call. -/
 theorem ph_jump_0c : jumpPc (KA.«plicinithart» + 0xc#64) = KA.«plicinithart» + 0xc#64 := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+
 
 /-- `cpuid`'s contract at the call site (interrupts off). -/
 theorem ph_call_cpuid (CI : CPUID) [CurCtx] (cpu : CPU) (k' : KCtx)
@@ -75,7 +79,7 @@ theorem plicinithart_proof (CI : CPUID) : PLICINITHART :=
   inext
   iintro Hk Hpc Hframe
   -- +0x08  jal cpuid
-  k_step (wp_s_jal cpu _ (KA.«plicinithart» + 0x8#64) false 2081030#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«plicinithart» + 0x8#64) false 2080918#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ph_cpuid_br]
   iintro Hk Hpc
   iapply (ph_call_cpuid CI cpu _ ?hs2 ?hK2) $$ [- $Hk $Hpc]
@@ -137,8 +141,16 @@ theorem plicinithart_proof (CI : CPUID) : PLICINITHART :=
   case hth =>
     k_norm [hid2, plic_shift13 cpu]
     exact plic_sthresh_addr cpu
+  -- +0x2e  li a5,0 ; +0x30  csrw scounteren,a5   (NI M3 quotas Q-0: the cell is one of
+  -- `clockCells`, at some value, so the context comes back unchanged)
+  k_step (wp_s_addi cpu _ (KA.«plicinithart» + 0x2e#64) true 0#12 15#5 0#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  k_step (wp_s_csrw_scounteren cpu _ (by simpa using hsie) (KA.«plicinithart» + 0x30#64) false 15#5)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
   -- epilogue
-  iapply (wp_epilogue2 cpu k hsie (KA.«plicinithart» + 0x2e#64)
+  iapply (wp_epilogue2 cpu k hsie (KA.«plicinithart» + 0x34#64)
       (by unfold plicinithartSlots at hK; omega) _ ?hR2 (k.regs 1#5) (k.regs 8#5))
     $$ [- $Hk $Hpc $Hframe]
   rotate_right 1

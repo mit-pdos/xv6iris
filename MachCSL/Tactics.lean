@@ -262,7 +262,7 @@ the persistent `hwConfig` bundle at an EXISTENTIAL value, so a read is
 answered at an arbitrary value. -/
 def isHwAnyReg (r : Lean.Expr) : Bool :=
   [``LeanRV64D.Register.mcountinhibit, ``LeanRV64D.Register.minstretcfg,
-   ``LeanRV64D.Register.mcyclecfg, ``LeanRV64D.Register.scounteren].any r.isConstOf
+   ``LeanRV64D.Register.mcyclecfg].any r.isConstOf
 
 /-- Name for the cell hypothesis of register `r`. -/
 def regHypName (r : Lean.Expr) : Name :=

@@ -77,9 +77,11 @@ at the kernel tier, from context to context. -/
 instance isFtable_morph (γl : GName) (γ : FileNames) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; isFtable (GF := GF) γl γ) := by
   unfold isFtable
-  exact ctxMorph_congr (R' := fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩;
-      isLock (GF := GF) γl ftableAddr "ftable" (letI : CurCtx := ⟨default, KTier.kpt⟩; ftableResAt (GF := GF) γ))
-    (fun ξ => by amb_tier_rfl) (instCtxMorphIsLock _ _ _ _ _)
+  refine @instCtxMorphSep hlc GF _ _ _ ?_ ?_
+  · exact ctxMorph_congr (R' := fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩;
+        isLock (GF := GF) γl ftableAddr "ftable" (letI : CurCtx := ⟨default, KTier.kpt⟩; ftableResAt (GF := GF) γ))
+      (fun ξ => by amb_tier_rfl) (instCtxMorphIsLock _ _ _ _ _)
+  · exact @instCtxMorphExists hlc GF _ _ _ (fun γn => instCtxMorphIsNpipe KTier.kpt γn)
 
 end
 

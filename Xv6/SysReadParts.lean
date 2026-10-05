@@ -32,10 +32,10 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Constants -/
 
-theorem srd_br_argaddr : KA.«sys_read» + 0xffffffffffffda3e#64 = KA.«argaddr» := by decide
-theorem srd_br_argint : KA.«sys_read» + 0xffffffffffffda22#64 = KA.«argint» := by decide
+theorem srd_br_argaddr : KA.«sys_read» + 0xffffffffffffd9c4#64 = KA.«argaddr» := by decide
+theorem srd_br_argint : KA.«sys_read» + 0xffffffffffffd9a8#64 = KA.«argint» := by decide
 theorem srd_br_argfd : KA.«sys_read» + 0xfffffffffffffdb6#64 = KA.«argfd» := by decide
-theorem srd_br_fileread : KA.«sys_read» + 0xfffffffffffff4ea#64 = KA.«fileread» := by decide
+theorem srd_br_fileread : KA.«sys_read» + 0xfffffffffffff480#64 = KA.«fileread» := by decide
 
 theorem srd_ret_12 : jumpPc (KA.«sys_read» + 0x12#64) = (KA.«sys_read» + 0x12#64) := by decide
 theorem srd_ret_1c : jumpPc (KA.«sys_read» + 0x1c#64) = (KA.«sys_read» + 0x1c#64) := by decide

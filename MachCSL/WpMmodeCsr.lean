@@ -522,17 +522,17 @@ theorem execSpec_csrr_mcounteren (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀
 set_option maxHeartbeats 4000000 in
 /-- `rdtime rd` (`csrr rd, time`): reads `mtime`. -/
 theorem execSpec_csrr_time (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (rd : BitVec 5)
-    (hrd : rd ≠ 0#5) (v t : BitVec 64) :
+    (hrd : rd ≠ 0#5) (v t : BitVec 64) (sc : BitVec 32) :
     execSpec (GF := GF) cpu dq c c
       (instruction.CSRReg (0xC01#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) pc npc₀ npc₀
-      iprop(gpr cpu rd (DFrac.own 1) v ∗ Register.mtime ↦ᵣ[cpu] t)
-      iprop(gpr cpu rd (DFrac.own 1) t ∗ Register.mtime ↦ᵣ[cpu] t) := by
+      iprop(gpr cpu rd (DFrac.own 1) v ∗ Register.mtime ↦ᵣ[cpu] t ∗ Register.scounteren ↦ᵣ[cpu] sc)
+      iprop(gpr cpu rd (DFrac.own 1) t ∗ Register.mtime ↦ᵣ[cpu] t ∗ Register.scounteren ↦ᵣ[cpu] sc) := by
   intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hmtime⟩, HΦ⟩
+  iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hmtime, Hscounteren⟩, HΦ⟩
   mconf_cases HmConf
   csrr_exec hrd
   mconf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC [Hrd Hmtime]
+  iapply HΦ $$ HmConf HPC HnextPC [Hrd Hmtime Hscounteren]
   iframe
 
 /-! ### The `wpLoop` rules -/
@@ -634,16 +634,16 @@ theorem wp_m_csrw_stimecmp (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c)
       (instruction.CSRReg (0x14D#12, regidx.Regidx rs1, regidx.Regidx 0#5, csrop.CSRRW))
       pc (pc + instrLen is_rvc) (pc + instrLen is_rvc)
       (gpr cpu rs1 (DFrac.own 1) v) (gpr cpu rs1 (DFrac.own 1) v) := by
-    intro ip mt Φ
+    intro ip mt sc Φ
     have h := execSpec_csrw_stimecmp cpu c pc (pc + instrLen is_rvc) rs1 hrs1 v ip mt hstce Φ
-    iintro ⟨HmConf, HPC, HnextPC, ⟨Hrs1, Hmip, Hmtime⟩, HΦ⟩
+    iintro ⟨HmConf, HPC, HnextPC, ⟨Hrs1, Hmip, Hmtime, Hscounteren⟩, HΦ⟩
     iapply h
     iframe
     inext
     iintro HmConf HPC HnextPC ⟨Hrs1, ⟨%ip', Hmip⟩, Hmtime⟩
-    iapply HΦ $$ HmConf HPC HnextPC [Hrs1 Hmip Hmtime]
+    iapply HΦ $$ HmConf HPC HnextPC [Hrs1 Hmip Hmtime Hscounteren]
     iframe
-    try (iexists ip', mt; iframe)
+    try (iexists ip', mt, sc; iframe)
   iintro ⟨HI, HmConf, Hclock, Hpc, Hrs1, HΦ⟩
   iapply wpLoop_m_instrClk cpu (DFrac.own 1) c Privilege.Machine (Or.inl rfl) _ hok pc _ is_rvc _ _ _ hexec
   iframe
@@ -723,17 +723,17 @@ theorem wp_m_csrr_time (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF 
       (instruction.CSRReg (0xC01#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS))
       pc (pc + instrLen is_rvc) (pc + instrLen is_rvc)
       (gpr cpu rd (DFrac.own 1) v) iprop(∃ t : BitVec 64, gpr cpu rd (DFrac.own 1) t) := by
-    intro ip mt Φ
-    have h := execSpec_csrr_time cpu dq c pc (pc + instrLen is_rvc) rd hrd v mt Φ
-    iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hmip, Hmtime⟩, HΦ⟩
+    intro ip mt sc Φ
+    have h := execSpec_csrr_time cpu dq c pc (pc + instrLen is_rvc) rd hrd v mt sc Φ
+    iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hmip, Hmtime, Hscounteren⟩, HΦ⟩
     iapply h
     iframe
     inext
-    iintro HmConf HPC HnextPC ⟨Hrd, Hmtime⟩
-    iapply HΦ $$ HmConf HPC HnextPC [Hrd Hmip Hmtime]
+    iintro HmConf HPC HnextPC ⟨Hrd, Hmtime, Hscounteren⟩
+    iapply HΦ $$ HmConf HPC HnextPC [Hrd Hmip Hmtime Hscounteren]
     isplitl [Hrd]
     · iexists mt; iframe
-    · iexists ip, mt; iframe
+    · iexists ip, mt, sc; iframe
   iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, HΦ⟩
   iapply wpLoop_m_instrClk cpu dq c Privilege.Machine (Or.inl rfl) c hok pc _ is_rvc _ _ _ hexec
   iframe

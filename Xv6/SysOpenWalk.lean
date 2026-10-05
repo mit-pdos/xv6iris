@@ -336,7 +336,7 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, hd]
   iintro Hk Hpc
   -- ===== +0xe8 jal ilock =====
-  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0xe8#64) false 2088868#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0xe8#64) false 2088762#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_walk_br_ilock]
   iintro Hk Hpc
   -- ---- the reference namei made, taken apart and its share NAMED ----
@@ -438,7 +438,7 @@ theorem sys_open_entry_n (NI : NAMEI_ERA) (IL : ILOCK) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.1]
   iintro Hk Hpc
   -- ===== +0xe0 jal namei =====
-  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0xe0#64) false 2091136#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0xe0#64) false 2091030#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_walk_br_namei]
   iintro Hk Hpc
   -- ---- the buffer cut at the fetched string, the block at its core ----

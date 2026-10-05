@@ -77,12 +77,12 @@ theorem bc_buf_bounds (i : Nat) (hi : i < NBUF) :
   omega
 
 theorem bc_bss_val : MachCSL.KernelSyms.«_bss» = 0x8000a400 := rfl
-theorem bc_end_val : MachCSL.KernelSyms.«end» = 0x80023b10 := rfl
+theorem bc_end_val : MachCSL.KernelSyms.«end» = 0x80023b28 := rfl
 
 /-- A `.bss` cell at a named address, as the ambient `wordPointsTo`. -/
 theorem bootBss_wordAt [CurCtx]
     (va : PAddr) (n A hi : Nat) (hva : va.toNat = A) (hhi : hi = A + n)
-    (hlo : 0x8000a400 ≤ A) (hend : A + n ≤ 0x80023b10) (hal : A % n = 0) (hn : 0 < n := by decide) :
+    (hlo : 0x8000a400 ≤ A) (hend : A + n ≤ 0x80023b28) (hal : A % n = 0) (hn : 0 < n := by decide) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A hi -∗ wordPointsTo va n (DFrac.own 1) 0#(8 * n) :=
   bootBss_cellAt curCtx va n A hi hva hhi (by rw [bc_bss_val]; exact hlo)
     (by rw [bc_end_val]; exact hend) hal hn
@@ -165,7 +165,7 @@ theorem bootCarve_buf [CurCtx] (ξ : CtxId) (i : Nat) (hi : i < NBUF) :
 /-- A static lock's three words at zero, with its two identity claims (the
 input shape `initlock`'s callers pass as `lockWords`). -/
 theorem bootCarve_lockWords [CurCtx] (lk : PAddr) (L : Nat)
-    (hlk : lk.toNat = L) (hlo : 0x8000a400 ≤ L) (hend : L + 24 ≤ 0x80023b10) (hal : L % 8 = 0) :
+    (hlk : lk.toNat = L) (hlo : 0x8000a400 ≤ L) (hend : L + 24 ≤ 0x80023b28) (hal : L % 8 = 0) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) L (L + 24) -∗ lockWords lk 0#32 0#64 0#64 := by
   have h8 : (lk + 8#64).toNat = L + 8 := bc_toNat_add _ 8 _ hlk (by omega)
   have h16 : (lk + 16#64).toNat = L + 16 := bc_toNat_add _ 16 _ hlk (by omega)

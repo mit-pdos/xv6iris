@@ -21,7 +21,7 @@ body, factored as whole lemmas (all checked, zero `sorry`):
   * `pc_release`   -- `RELEASE_GEN` (the non-freeing arm).
   * `pc_release_cancel` -- `RELEASE_CANCEL` (the freeing arm).
   * `pc_kfree`     -- `KFREE_FREE` over the reclaimed page.
-  * `pc_epi`       -- the epilogue at `+0x36` (`0x80004708`): reload
+  * `pc_epi`       -- the epilogue at `+0x36` (`0x80004754`): reload
                       `ra/s0/s1/s2`, pop the 4-slot frame, `ret`, delivering
                       the page-count disjunction to the caller; via
                       `wp_epilogue4s2_gen` at whichever hart release/kfree
@@ -53,7 +53,9 @@ The disassembly the body walks (kernel image, `KernelSyms.pipeclose = KernelSyms
     458a: mv a0,s1; jal release                         -- NON-FREEING release  (+0x30)
     4590: ld ra/s0/s1/s2; addi sp,32; ret               -- pc_epi              (+0x36)
     459c: sw zero,544(s1); addi a0,s1,540; jal wakeup; j 457e   -- close read end (+0x42)
-    45aa: mv a0,s1; jal release; mv a0,s1; jal kfree; j 4590    -- FREEING path  (+0x50)
+    45aa: mv a0,s1; jal release; mv a0,s1; jal kfree           -- FREEING path  (+0x50)
+    +0x5c: acquire(&npipelock); npipe--; release(&npipelock); j +0x36
+                                         -- NI M3 quotas Q-0 (`verified-quota`): pc_npipe
 
 The critical-section ghost steps (all in `Xv6/PipeInvDefs.lean`): the flag
 store spends this end with `pipeEndstate_shut` (yielding `pipeShut γp w`); the
@@ -259,7 +261,7 @@ theorem pc_kfree (KF : KFREE_FREE) (c : CPU) (k' : KCtx)
   exact h
 
 set_option maxHeartbeats 4000000 in
-/-- **pipeclose's epilogue** at `0x80004708` (`+0x36`): restore `ra/s0/s1/s2`,
+/-- **pipeclose's epilogue** at `0x80004754` (`+0x36`): restore `ra/s0/s1/s2`,
 pop the 4-slot frame, return; deliver the page-count disjunction to the caller.
 Reached from a hart `cE` release/kfree quantify over, pinned to the entry hart
 `cpu` by `hpin`. -/
@@ -353,10 +355,10 @@ theorem pc_licence (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
 /-! ## The non-freeing arm: `mv a0,s1; jal release`, then the epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- From `0x80004702` (the other end is still open): put the lock down
+/-- From `0x8000474e` (the other end is still open): put the lock down
 normally (`RELEASE_REFUTE`, depositing the payload) and return with the page
 count untouched. -/
-theorem pipeclose_br_ffffffffffffc60e : KA.«pipeclose» + 0xffffffffffffc60e#64 = KA.«release» := by decide
+theorem pipeclose_br_ffffffffffffc5c2 : KA.«pipeclose» + 0xffffffffffffc5c2#64 = KA.«release» := by decide
 
 theorem pc_nonfree (Rel : RELEASE_REFUTE) (cpu c : CPU) (k : KCtx)
     (γl : GName) (γp : PipeNames) (pi : BitVec 64) (γk : KmemNames) (on : Option Nat) (ke : Nat)
@@ -391,8 +393,8 @@ theorem pc_nonfree (Rel : RELEASE_REFUTE) (cpu c : CPU) (k : KCtx)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR9]
   iintro Hk Hpc
   -- jal release
-  k_step (wp_s_jal c _ (KA.«pipeclose» + 0x32#64) false 2082268#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_ffffffffffffc60e]
+  k_step (wp_s_jal c _ (KA.«pipeclose» + 0x32#64) false 2082192#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_ffffffffffffc5c2]
   iintro Hk Hpc
   iapply (pc_release Rel c _ γl γp pi ?hsr ?hnr ?hKr k.sie ?hrr ?hor ?ha0)
     $$ [- $Hk $Hpc $Hlocked $HR]
@@ -431,21 +433,230 @@ theorem pc_nonfree (Rel : RELEASE_REFUTE) (cpu c : CPU) (k : KCtx)
   · ileft; iexact Hav
   iexact HPhi
 
+/-! ## The pipe-buffer counter (NI M3 quotas Q-0): `npipe--` under `npipelock` -/
+
+theorem pc_u_1f : BitVec.signExtend 64 (31#20 ++ 0#12) = 0x1f000#64 := by decide
+theorem pc_u_6 : BitVec.signExtend 64 (6#20 ++ 0#12) = 0x6000#64 := by decide
+/-- `&npipelock`, folded out of either `auipc a0,0x1f; addi a0,a0,<off>` pair
+(`+0x5c`/`+0x60` and `+0x76`/`+0x7a`). -/
+theorem pc_npipelock_addr : KA.«pipeclose» + 0x1f2b2#64 = npipelockAddr := by
+  unfold npipelockAddr; decide
+/-- `&npipe`, folded out of `auipc a4,0x6; addi a4,a4,-874`. -/
+theorem pc_npipe_addr : KA.«pipeclose» + 0x5cfe#64 = npipeAddr := by
+  unfold npipeAddr; decide
+theorem pc_npipe_addr0 : npipeAddr + BitVec.signExtend 64 0#12 = npipeAddr := by
+  unfold npipeAddr; decide
+theorem pipeclose_br_npacq : KA.«pipeclose» + 0xffffffffffffc53a#64 = KA.«acquire» := by decide
+theorem pipeclose_br_nprel : KA.«pipeclose» + 0xffffffffffffc5c2#64 = KA.«release» := by decide
+theorem pc_ret_npacq : jumpPc (KA.«pipeclose» + 0x68#64) = KA.«pipeclose» + 0x68#64 := by decide
+theorem pc_ret_nprel : jumpPc (KA.«pipeclose» + 0x82#64) = KA.«pipeclose» + 0x82#64 := by decide
+
+/-- `"npipe"` leaves the held set. -/
+theorem pc_filter_npipe (l : List String) (h : "npipe" ∉ l) :
+    ("npipe" :: l).filter (fun x => x ≠ "npipe") = l := by
+  simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
+  exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+
+set_option maxHeartbeats 1000000 in
+/-- `acquire(&npipelock)`'s contract at the call site. -/
+theorem pc_npacquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γn : GName)
+    (ha0 : k'.regs 10#5 = npipelockAddr)
+    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 10 ≤ k'.avail) (hs : "npipe" ∉ k'.locks) :
+    kctx c k' ∗ pcIs c KA.«acquire» ∗ isNpipe γn ∗
+    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
+      kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("npipe" :: k'.locks)) -∗
+      pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
+      locked γn cpu' -∗ npipeResAt curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
+      sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γn "npipe" npipeResAt hnoff hK hs
+  unfold wp_acquire_body at h
+  simp only [acquireAddr] at h
+  rw [ha0] at h
+  unfold isNpipe
+  exact h
+
+set_option maxHeartbeats 1000000 in
+/-- `release(&npipelock)`'s contract at the call site. -/
+theorem pc_nprelease (RE : RELEASE) (c : CPU) (k' : KCtx) (γn : GName)
+    (ha0 : k'.regs 10#5 = npipelockAddr)
+    (hsie : k'.sie = false) (hnoff : 1 ≤ k'.noff) (hK : 10 ≤ k'.avail)
+    (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
+    (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
+    kctx c k' ∗ pcIs c KA.«release» ∗ isNpipe γn ∗
+    locked γn c ∗ npipeResAt curCtx ∗ popArm c k' reen ∗
+    wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
+      kctx cpu' (((k'.popExit reen).withRegs R').withLocks
+        (k'.locks.filter (fun x => x ≠ "npipe"))) -∗
+      pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γn "npipe" npipeResAt hsie hnoff hK reen
+    hreen hon
+  unfold wp_release_body at h
+  simp only [releaseAddr] at h
+  rw [ha0] at h
+  unfold isNpipe
+  exact h
+
+set_option maxHeartbeats 8000000 in
+/-- **The counter's decrement** (NI M3 quotas Q-0), from `+0x5c` (kfree's
+return): `acquire(&npipelock)`, `npipe--` (`c.lw`/`c.addiw`/`c.sw` through
+`a4 = &npipe`), `release(&npipelock)`, then `c.j +0x36` and the epilogue.
+The counter is the payload's existential (Q-0), so the store is free. -/
+theorem pc_npipe (AC : ACQUIRE) (RE : RELEASE) (cpu cE : CPU) (k : KCtx) (γk : KmemNames)
+    (on : Option Nat) (γn : GName)
+    (hwf : k.wf) (hnoff : k.noff + 2 < 2 ^ 31) (hK : pipecloseSlots ≤ k.avail)
+    (hnpipe : "npipe" ∉ k.locks)
+    (hpin : k.sie = false ∨ k.proc = 0#64 → cE = cpu)
+    (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
+    (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
+    (h19 : R 19#5 = k.regs 19#5) (h20 : R 20#5 = k.regs 20#5) (h21 : R 21#5 = k.regs 21#5)
+    (h22 : R 22#5 = k.regs 22#5) (h23 : R 23#5 = k.regs 23#5) (h24 : R 24#5 = k.regs 24#5)
+    (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5) :
+    kctx cE (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cE (KA.«pipeclose» + 0x5c#64) ∗
+    frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
+    isNpipe γn ∗
+    (kallocAvail γk on ∨ kallocAvail γk (availInc on)) ∗
+    wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie2 = k.spie ∧ spp2 = k.spp⌝ -∗
+      kctx cpu' ((k.withSpie spie2 spp2).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      ⌜calleeSaved k.regs R'⌝ -∗ (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) cE := by
+  iintro ⟨Hk, Hpc, Hframe, #Hnl, Hav, Hnext⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  have hK4 : 4 ≤ k.avail := by unfold pipecloseSlots at hK; omega
+  have hwf' : (k.withSpie spie spp).wf := hwf
+  -- auipc a0,0x1f ; addi a0,a0,598 ; jal acquire
+  k_step_gen (wp_s_auipc cE _ (KA.«pipeclose» + 0x5c#64) false 31#20 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_u_1f] next c1 hp1
+  iintro Hk Hpc
+  k_step_gen (wp_s_addi c1 _ (KA.«pipeclose» + 0x60#64) false 598#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_npipelock_addr] next c2 hp2
+  iintro Hk Hpc
+  k_step_gen (wp_s_jal c2 _ (KA.«pipeclose» + 0x64#64) false 2082006#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_npacq] next c3 hp3
+  iintro Hk Hpc
+  iapply (pc_npacquire AC c3 _ γn ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
+  rotate_right 1
+  k_norm_g [pc_ret_npacq]
+  iframe #
+  case ha0 => k_norm_g
+  case hna => k_norm_g; omega
+  case hKa => k_norm_g; unfold pipecloseSlots at hK; omega
+  case hla => k_norm_g; exact hnpipe
+  -- past acquire: interrupts off, the counter cell in hand
+  iapply wpNext_intro_pin
+  iintro %c5 %hp5 %spie' %spp' %R1 %hsp' Hk Hpc %hcs1 Hlocked Hpay _ Harm
+  k_norm_g [KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, hK4, pc_ret_npacq]
+  unfold calleeSaved at hcs1
+  k_norm_g at hcs1
+  obtain ⟨g2, g8, g9, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩ := hcs1
+  icases npipeRes_elim $$ Hpay with ⟨%n0, Hcnt⟩
+  -- auipc a4,0x6 ; addi a4,a4,-874 ; c.lw a5,0(a4) ; c.addiw a5,a5,-1 ; c.sw a5,0(a4)
+  k_step_gen (wp_s_auipc c5 _ (KA.«pipeclose» + 0x68#64) false 6#20 14#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_u_6] next c6 hp6
+  iintro Hk Hpc
+  k_step_gen (wp_s_addi c6 _ (KA.«pipeclose» + 0x6c#64) false 3222#12 14#5 14#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_npipe_addr] next c7 hp7
+  iintro Hk Hpc
+  k_step_gen (wp_s_lw c7 _ (KA.«pipeclose» + 0x70#64) true 0#12 15#5 14#5
+      (by decide) (by decide) (DFrac.own 1) n0)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_npipe_addr0] next c8 hp8
+  iintro Hk Hpc Hcnt
+  k_step_gen (wp_s_addiw c8 _ (KA.«pipeclose» + 0x72#64) true 4095#12 15#5 15#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
+  iintro Hk Hpc
+  k_step_gen (wp_s_sw c9 _ (KA.«pipeclose» + 0x74#64) true 0#12 14#5 15#5 (by decide) n0)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_npipe_addr0] next c10 hp10
+  iintro Hk Hpc Hcnt
+  ihave Hpay := npipeRes_intro _ $$ Hcnt
+  -- auipc a0,0x1f ; addi a0,a0,572 ; jal release
+  k_step_gen (wp_s_auipc c10 _ (KA.«pipeclose» + 0x76#64) false 31#20 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_u_1f] next c11 hp11
+  iintro Hk Hpc
+  k_step_gen (wp_s_addi c11 _ (KA.«pipeclose» + 0x7a#64) false 572#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_npipelock_addr] next c12 hp12
+  iintro Hk Hpc
+  k_step_gen (wp_s_jal c12 _ (KA.«pipeclose» + 0x7e#64) false 2082116#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_nprel] next c13 hp13
+  iintro Hk Hpc
+  have e135 : c13 = c5 :=
+    (hp13 (Or.inl rfl)).trans ((hp12 (Or.inl rfl)).trans ((hp11 (Or.inl rfl)).trans
+      ((hp10 (Or.inl rfl)).trans ((hp9 (Or.inl rfl)).trans ((hp8 (Or.inl rfl)).trans
+        ((hp7 (Or.inl rfl)).trans (hp6 (Or.inl rfl))))))))
+  subst e135
+  iapply (pc_nprelease RE _ _ γn ?ha0r ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
+    $$ [- $Hk $Hpc $Hlocked $Hpay]
+  rotate_right 1
+  k_norm_g [MachCSL.withLocks_self', pc_filter_npipe k.locks hnpipe,
+    KCtx.pushOffAt_popExit (k.withSpie spie spp) spie' spp' hwf', pc_ret_nprel]
+  iframe #
+  case ha0r => k_norm_g
+  case hsr => k_norm_g
+  case hnr => k_norm_g; omega
+  case hKr => k_norm_g; unfold pipecloseSlots at hK; omega
+  case hrr => k_norm_g; exact KCtx.reen_of_wf (k.withSpie spie spp) hwf'
+  case hor =>
+    k_norm_g
+    intro h
+    obtain ⟨-, -, -, ht⟩ := hwf.2.2.1 h
+    refine ⟨ht, ?_⟩
+    rw [h]
+    simp only [trapRes, kvFrameSlots, ite_true]
+    unfold pipecloseSlots at hK; omega
+  isplitl [Harm]
+  · iapply (popArm_sie _ k _ (by k_norm_g)) $$ Harm
+  -- past release: `c.j +0x36`, the epilogue
+  have hpe : ((k.withSpie spie spp).pushOffAt spie' spp').popExit k.sie =
+      (k.withSpie spie spp).withSpie spie' spp' :=
+    KCtx.pushOffAt_popExit (k.withSpie spie spp) spie' spp' hwf'
+  iapply wpNext_intro_pin
+  iintro %c14 %hp14 %R3 Hk Hpc %hcs3
+  k_norm_g [pc_ret_nprel, hpe, MachCSL.KCtx.withSpie_twice, MachCSL.withLocks_self']
+  unfold calleeSaved at hcs3
+  k_norm_g at hcs3
+  obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs3
+  k_step_gen (wp_s_j c14 _ (KA.«pipeclose» + 0x82#64) true 2097076#21)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
+  iintro Hk Hpc
+  have hpin15 : k.sie = false ∨ k.proc = 0#64 → c15 = cpu := fun h =>
+    (hp15 h).trans ((hp14 h).trans ((hp5 h).trans ((hp3 h).trans ((hp2 h).trans
+      ((hp1 h).trans (hpin h))))))
+  k_norm_g at hsp'
+  have hsp'' : k.sie = false → spie' = k.spie ∧ spp' = k.spp := by
+    intro h
+    obtain ⟨a, b⟩ := hsp' h
+    obtain ⟨a', b'⟩ := hsp h
+    exact ⟨a.trans a', b.trans b'⟩
+  iapply (pc_epi cpu c15 k γk on hpin15 hK4 spie' spp' hsp'' R3 (d2.trans (g2.trans hR2))
+    (d19.trans (g19.trans h19)) (d20.trans (g20.trans h20)) (d21.trans (g21.trans h21))
+    (d22.trans (g22.trans h22)) (d23.trans (g23.trans h23)) (d24.trans (g24.trans h24))
+    (d25.trans (g25.trans h25)) (d26.trans (g26.trans h26)) (d27.trans (g27.trans h27)))
+    $$ [- $Hk $Hpc $Hframe]
+  iframe Hav
+  iexact Hnext
+
+end
+
 /-! ## The freeing arm: destroy the lock, reassemble the page, kfree it -/
 
 set_option maxHeartbeats 8000000 in
-/-- From `0x80004722` (both ends closed): `mv a0,s1; jal release` DESTROYS
+/-- From `0x8000476e` (both ends closed): `mv a0,s1; jal release` DESTROYS
 the lock (`RELEASE_CANCEL` with the `pipeRes_dead` licence, both receipts in
 hand), handing back the two lock words and `pipeBytes`; `mv a0,s1; jal kfree`
 frees the reassembled page (`pipeBytes_pageFree`, `KFREE_FREE`); `j 0x4590`
 reaches the epilogue with the page count incremented. -/
-theorem pipeclose_br_ffffffffffffc3c4 : KA.«pipeclose» + 0xffffffffffffc3c4#64 = KA.«kfree» := by decide
+theorem pipeclose_br_ffffffffffffc378 : KA.«pipeclose» + 0xffffffffffffc378#64 = KA.«kfree» := by decide
 
-theorem pc_free (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (cpu c : CPU) (k : KCtx)
+theorem pc_free (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (Ac : ACQUIRE) (Re : RELEASE) (cpu c : CPU) (k : KCtx)
     (γl : GName) (γp : PipeNames) (pi : BitVec 64) (γkl : GName) (γk : KmemNames) (on : Option Nat)
-    (ke : Nat)
+    (ke : Nat) (γn : GName)
     (hwf : k.wf) (hnoff : k.noff + 2 < 2 ^ 31) (hK : pipecloseSlots ≤ k.avail)
-    (hpipe : "pipe" ∉ k.locks) (hkmem : "kmem" ∉ k.locks)
+    (hpipe : "pipe" ∉ k.locks) (hkmem : "kmem" ∉ k.locks) (hnpipe : "npipe" ∉ k.locks)
     (hok : lockAddrOk pi) (hpv : pageValid pi)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu)
@@ -460,7 +671,7 @@ theorem pc_free (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (cpu c : CPU) (k : KCt
     pipeShut γp false ∗ pipeShut γp true ∗
     locked γl c ∗ pipeResAt γp pi curCtx ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
-    isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗ sieArm c k.sie k.proc ∗ actLend k.proc ke ∗
+    isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ isNpipe γn ∗ kallocAvail γk on ∗ sieArm c k.sie k.proc ∗ actLend k.proc ke ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie2 = k.spie ∧ spp2 = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie2 spp2).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -468,7 +679,7 @@ theorem pc_free (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (cpu c : CPU) (k : KCt
       ⌜calleeSaved k.regs R'⌝ -∗
       (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Hopen, #Hm1, #Hm2, #Hs0, #Hs1, Hlocked, HR, Hframe, #Hkl, Hav, Harm, Hlend, HPhi⟩
+  iintro ⟨Hk, Hpc, #Hopen, #Hm1, #Hm2, #Hs0, #Hs1, Hlocked, HR, Hframe, #Hkl, #Hnl, Hav, Harm, Hlend, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold pipecloseSlots at hK; omega
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
@@ -477,8 +688,8 @@ theorem pc_free (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (cpu c : CPU) (k : KCt
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR9]
   iintro Hk Hpc
   -- jal release (the DESTROYING one)
-  k_step (wp_s_jal c _ (KA.«pipeclose» + 0x52#64) false 2082236#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_ffffffffffffc60e]
+  k_step (wp_s_jal c _ (KA.«pipeclose» + 0x52#64) false 2082160#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_ffffffffffffc5c2]
   iintro Hk Hpc
   ihave Hlic := pc_licence γl γp pi $$ Hs0 Hs1
   iapply (pc_release_cancel RelC c _ γl γp pi (lockedCore_dead γl γp c)
@@ -517,8 +728,8 @@ theorem pc_free (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (cpu c : CPU) (k : KCt
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e9, hR9] next c6 hp6
   iintro Hk Hpc
   -- jal kfree
-  k_step_gen (wp_s_jal c6 _ (KA.«pipeclose» + 0x58#64) false 2081644#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_ffffffffffffc3c4] next c7 hp7
+  k_step_gen (wp_s_jal c6 _ (KA.«pipeclose» + 0x58#64) false 2081568#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_ffffffffffffc378] next c7 hp7
   iintro Hk Hpc
   iapply (pc_kfree Kf c7 _ γkl γk on ke ?hnk ?hKk ?hlk ?hpk) $$ [- $Hk $Hpc $Hav]
   rotate_right 1
@@ -539,21 +750,22 @@ theorem pc_free (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (cpu c : CPU) (k : KCt
   unfold calleeSaved at hcs5
   k_norm_g at hcs5
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs5
-  k_step_gen (wp_s_j cF _ (KA.«pipeclose» + 0x5c#64) true 2097114#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next cG hpG
-  iintro Hk Hpc
-  have hpinG : k.sie = false ∨ k.proc = 0#64 → cG = cpu := fun h =>
-    (hpG h).trans ((hpF h).trans ((hp7 h).trans ((hp6 h).trans (hpin5 h))))
+  have hpinF : k.sie = false ∨ k.proc = 0#64 → cF = cpu := fun h =>
+    (hpF h).trans ((hp7 h).trans ((hp6 h).trans (hpin5 h)))
   have hsp3' : k.sie = false → spie3 = k.spie ∧ spp3 = k.spp := by
     intro h
     obtain ⟨a, b⟩ := hsp3 h
     obtain ⟨a', b'⟩ := hsp h
     exact ⟨a.trans a', b.trans b'⟩
-  iapply (pc_epi cpu cG k γk on hpinG hK4 spie3 spp3 hsp3' R5 (f2.trans (e2.trans hR2))
+  -- (NI M3 quotas Q-0) `npipe--` under `npipelock`, then the epilogue
+  iapply (pc_npipe Ac Re cpu cF k γk on γn hwf hnoff hK hnpipe hpinF spie3 spp3 hsp3' R5
+    (f2.trans (e2.trans hR2))
     (f19.trans (e19.trans h19)) (f20.trans (e20.trans h20)) (f21.trans (e21.trans h21))
     (f22.trans (e22.trans h22)) (f23.trans (e23.trans h23)) (f24.trans (e24.trans h24))
     (f25.trans (e25.trans h25)) (f26.trans (e26.trans h26)) (f27.trans (e27.trans h27)))
     $$ [- $Hk $Hpc $Hframe]
+  isplitr
+  · iexact Hnl
   isplitl [Hav]
   · iright; iexact Hav
   iexact HPhi
@@ -599,12 +811,12 @@ set_option maxHeartbeats 8000000 in
 bnez a5,458a; lw a5,548(s1); beqz a5,45aa` -- if either flag is still open,
 `pc_nonfree`; if both read 0, both ends' receipts fall out of the closed
 endstates (`pipeEndstate_closed`) and `pc_free` reclaims the page. -/
-theorem pc_tail (Rel : RELEASE_REFUTE) (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE)
+theorem pc_tail (Rel : RELEASE_REFUTE) (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (Ac : ACQUIRE) (Re : RELEASE)
     (cpu c : CPU) (k : KCtx)
     (γl : GName) (γp : PipeNames) (pi : BitVec 64) (γkl : GName) (γk : KmemNames) (on : Option Nat)
-    (ke : Nat)
+    (ke : Nat) (γn : GName)
     (hwf : k.wf) (hnoff : k.noff + 2 < 2 ^ 31) (hK : pipecloseSlots ≤ k.avail)
-    (hpipe : "pipe" ∉ k.locks) (hkmem : "kmem" ∉ k.locks)
+    (hpipe : "pipe" ∉ k.locks) (hkmem : "kmem" ∉ k.locks) (hnpipe : "npipe" ∉ k.locks)
     (hok : lockAddrOk pi) (hpv : pageValid pi)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu)
@@ -618,7 +830,7 @@ theorem pc_tail (Rel : RELEASE_REFUTE) (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE)
     kmapId pi ∗ kmapId (pi + 16#64) ∗
     locked γl c ∗ pipeResAt γp pi curCtx ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
-    isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗ sieArm c k.sie k.proc ∗ actLend k.proc ke ∗
+    isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ isNpipe γn ∗ kallocAvail γk on ∗ sieArm c k.sie k.proc ∗ actLend k.proc ke ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie2 = k.spie ∧ spp2 = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie2 spp2).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -626,7 +838,7 @@ theorem pc_tail (Rel : RELEASE_REFUTE) (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE)
       ⌜calleeSaved k.regs R'⌝ -∗
       (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Hopen, #Hm1, #Hm2, Hlocked, HR, Hframe, #Hkl, Hav, Harm, Hlend, HPhi⟩
+  iintro ⟨Hk, Hpc, #Hopen, #Hm1, #Hm2, Hlocked, HR, Hframe, #Hkl, #Hnl, Hav, Harm, Hlend, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
   icases Xv6.pw_res_elim γp pi $$ HR with ⟨%nr, %nw, %ro, %wo, %vname, %bs, Hname, Hnr, Hnw, Hro, Hwo, Hst0, Hst1, %hcnt, %hlen, Hdat, Hslack, Hq⟩
@@ -706,7 +918,7 @@ theorem pc_tail (Rel : RELEASE_REFUTE) (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE)
       ihave HR := Xv6.pw_res_intro γp pi nr nw ro wo vname bs hcnt hlen
         $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
       case' _ => iframe
-      iapply (pc_free RelC Kf cpu c k γl γp pi γkl γk on ke hwf hnoff hK hpipe hkmem hok hpv spie spp hsp hpin ((R2.set 15#5 (BitVec.signExtend 64 ro)).set 15#5 (BitVec.signExtend 64 wo))
+      iapply (pc_free RelC Kf Ac Re cpu c k γl γp pi γkl γk on ke γn hwf hnoff hK hpipe hkmem hnpipe hok hpv spie spp hsp hpin ((R2.set 15#5 (BitVec.signExtend 64 ro)).set 15#5 (BitVec.signExtend 64 wo))
           (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR9)
           (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR2)
           (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h19)
@@ -725,17 +937,18 @@ end
 
 /-! ## pipeclose -/
 
-theorem pipeclose_br_ffffffffffffd96e : KA.«pipeclose» + 0xffffffffffffd96e#64 = KA.«wakeup» := by decide
+theorem pipeclose_br_ffffffffffffd922 : KA.«pipeclose» + 0xffffffffffffd922#64 = KA.«wakeup» := by decide
 
-theorem pipeclose_br_ffffffffffffc586 : KA.«pipeclose» + 0xffffffffffffc586#64 = KA.«acquire» := by decide
+theorem pipeclose_br_ffffffffffffc53a : KA.«pipeclose» + 0xffffffffffffc53a#64 = KA.«acquire» := by decide
 
 set_option maxHeartbeats 8000000 in
 theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
-    (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) : PIPECLOSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp w γkl γk on Φ ke hw hnoff hK hpipe hproc hkmem htier => by
+    (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (Ac : ACQUIRE) (Re : RELEASE) : PIPECLOSE := ⟨
+  fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp w γkl γk on Φ ke hw hnoff hK hpipe hproc hkmem hnpipe htier => by
   unfold wp_pipeclose_body
   simp only [pipecloseAddr]
   iintro ⟨Hk, Hpc, #Hpipe, Href, Hcpay, #Hkl, Hav, Hlend, #Hpinv, HPhi⟩
+  icases isPipe_npipe γl γp _ $$ Hpipe with ⟨%γn, #Hnl⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave %hok := isPipe_valid γl γp _ $$ Hpipe
@@ -759,8 +972,8 @@ theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
   -- jal acquire
-  k_step_gen (wp_s_jal c3 _ (KA.«pipeclose» + 0x10#64) false 2082166#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_ffffffffffffc586] next c4 hp4
+  k_step_gen (wp_s_jal c3 _ (KA.«pipeclose» + 0x10#64) false 2082090#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_ffffffffffffc53a] next c4 hp4
   iintro Hk Hpc
   iapply (pc_acquire Acq c4 _ γl γp (k.regs 10#5) w ?hna ?hKa ?hla ?ha0) $$ [- $Hk $Hpc $Href]
   rotate_right 1
@@ -811,8 +1024,8 @@ theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     k_step (wp_s_addi c _ (KA.«pipeclose» + 0x1c#64) false 536#12 10#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b9]
     iintro Hk Hpc
-    k_step (wp_s_jal c _ (KA.«pipeclose» + 0x20#64) false 2087246#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_ffffffffffffd96e]
+    k_step (wp_s_jal c _ (KA.«pipeclose» + 0x20#64) false 2087170#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_ffffffffffffd922]
     iintro Hk Hpc
     iapply (pc_wakeup Wk Γ c _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
     rotate_right 1
@@ -837,7 +1050,7 @@ theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     unfold calleeSaved at hcs3
     k_norm_g at hcs3
     obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs3
-    iapply (pc_tail Rel RelC Kf cpu _ k γl γp (k.regs 10#5) γkl γk on ke hwf hnoff hK hpipe hkmem hok hpv
+    iapply (pc_tail Rel RelC Kf Ac Re cpu _ k γl γp (k.regs 10#5) γkl γk on ke γn hwf hnoff hK hpipe hkmem hnpipe hok hpv
         spie spp hsp (fun h => (hp6 (Or.inl rfl)).trans (hpin5 h)) R3 (d9.trans b9) (d2.trans b2) (d19.trans b19) (d20.trans b20)
         (d21.trans b21) (d22.trans b22) (d23.trans b23) (d24.trans b24) (d25.trans b25)
         (d26.trans b26) (d27.trans b27))
@@ -872,8 +1085,8 @@ theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     k_step (wp_s_addi c _ (KA.«pipeclose» + 0x46#64) false 540#12 10#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b9]
     iintro Hk Hpc
-    k_step (wp_s_jal c _ (KA.«pipeclose» + 0x4a#64) false 2087204#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_ffffffffffffd96e]
+    k_step (wp_s_jal c _ (KA.«pipeclose» + 0x4a#64) false 2087128#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipeclose_br_ffffffffffffd922]
     iintro Hk Hpc
     iapply (pc_wakeup Wk Γ c _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
     rotate_right 1
@@ -901,7 +1114,7 @@ theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     k_step (wp_s_j _ _ (KA.«pipeclose» + 0x4e#64) true 2097110#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    iapply (pc_tail Rel RelC Kf cpu _ k γl γp (k.regs 10#5) γkl γk on ke hwf hnoff hK hpipe hkmem hok hpv
+    iapply (pc_tail Rel RelC Kf Ac Re cpu _ k γl γp (k.regs 10#5) γkl γk on ke γn hwf hnoff hK hpipe hkmem hnpipe hok hpv
         spie spp hsp (fun h => (hp6 (Or.inl rfl)).trans (hpin5 h)) R3 (d9.trans b9) (d2.trans b2) (d19.trans b19) (d20.trans b20)
         (d21.trans b21) (d22.trans b22) (d23.trans b23) (d24.trans b24) (d25.trans b25)
         (d26.trans b26) (d27.trans b27))

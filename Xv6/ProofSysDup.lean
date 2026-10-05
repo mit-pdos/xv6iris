@@ -219,7 +219,7 @@ end
 
 /-! ## The function -/
 
-theorem sys_dup_br_fffffffffffff3c8 : KA.«sys_dup» + 0xfffffffffffff3c8#64 = KA.«filedup» := by decide
+theorem sys_dup_br_fffffffffffff35e : KA.«sys_dup» + 0xfffffffffffff35e#64 = KA.«filedup» := by decide
 
 theorem sys_dup_br_fffffffffffffe5c : KA.«sys_dup» + 0xfffffffffffffe5c#64 = KA.«fdalloc» := by decide
 
@@ -445,8 +445,8 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
       k_step_gen (wp_s_add c17 _ (KA.«sys_dup» + 0x30#64) true 10#5 0#5 9#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
       iintro Hk Hpc
-      k_step_gen (wp_s_jal c18 _ (KA.«sys_dup» + 0x32#64) false 2093974#21 1#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_dup_br_fffffffffffff3c8] next c19 hp19
+      k_step_gen (wp_s_jal c18 _ (KA.«sys_dup» + 0x32#64) false 2093868#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_dup_br_fffffffffffff35e] next c19 hp19
       iintro Hk Hpc
       iapply (sd_filedup FU c19 _ γl γ kk q st ?hn2 ?hK2 ?hlk2 ?ha2) $$ [- $Hk $Hpc $Hfd $Href]
       rotate_right 1

@@ -78,7 +78,7 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Constants -/
 
-theorem sys_open_alloc_br_filealloc : KA.«sys_open» + 0xffffffffffffef6c#64 = KA.«filealloc» := by
+theorem sys_open_alloc_br_filealloc : KA.«sys_open» + 0xffffffffffffef02#64 = KA.«filealloc» := by
   decide
 theorem sys_open_alloc_br_fdalloc : KA.«sys_open» + 0xfffffffffffffa5e#64 = KA.«fdalloc» := by
   decide
@@ -564,7 +564,7 @@ theorem sys_open_alloc (FA : FILEALLOC) (FD : FDALLOC) (Γ : SchedNames) [ClaimI
     with [hpins.1, Xv6.sys_open_tails_sp160, Xv6.sys_open_tails_sp160', hpins.2.2.2.1]
   iintro Hk Hpc H4
   -- ===== +0x60 jal filealloc =====
-  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x60#64) false 2092812#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x60#64) false 2092706#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_alloc_br_filealloc]
   iintro Hk Hpc
   iapply (sys_open_alloc_filealloc FA Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A ?aK ?an)

@@ -25,17 +25,17 @@ theorem br_ret_20 : jumpPc (KA.«brelse» + 0x20#64) = (KA.«brelse» + 0x20#64)
 theorem br_ret_2c : jumpPc (KA.«brelse» + 0x2c#64) = (KA.«brelse» + 0x2c#64) := by decide
 theorem br_ret_6c : jumpPc (KA.«brelse» + 0x6c#64) = (KA.«brelse» + 0x6c#64) := by decide
 
-theorem br_lock : KA.«brelse» + 0x15986#64 = bcacheLockAddr := by
+theorem br_lock : KA.«brelse» + 0x15976#64 = bcacheLockAddr := by
   unfold bcacheLockAddr; decide
 theorem br_br_hold : KA.«brelse» + 0x1402#64 = KA.«holdingsleep» := by decide
 theorem br_br_relsleep : KA.«brelse» + 0x13ca#64 = KA.«releasesleep» := by decide
-theorem br_br_acq : KA.«brelse» + 0xffffffffffffde96#64 = KA.«acquire» := by decide
-theorem br_br_rel : KA.«brelse» + 0xffffffffffffdf1e#64 = KA.«release» := by decide
+theorem br_br_acq : KA.«brelse» + 0xffffffffffffde86#64 = KA.«acquire» := by decide
+theorem br_br_rel : KA.«brelse» + 0xffffffffffffdf0e#64 = KA.«release» := by decide
 theorem br_bnz_tgt : KA.«brelse» + 0x32#64 + BitVec.signExtend 64 46#13 = KA.«brelse» + 0x60#64 := by
   decide
-theorem br_headnext : KA.«brelse» + 0x1dc3e#64 = bNext bhead := by
+theorem br_headnext : KA.«brelse» + 0x1dc2e#64 = bNext bhead := by
   unfold bNext bhead bcacheHeadAddr; decide
-theorem br_headaddr : KA.«brelse» + 0x1dbee#64 = bhead := by
+theorem br_headaddr : KA.«brelse» + 0x1dbde#64 = bhead := by
   unfold bhead bcacheHeadAddr; decide
 
 section
@@ -143,10 +143,10 @@ theorem br_tail (RE : RELEASE_HOOK) (cpu c : CPU) (k : KCtx) (γl : GName) (γ :
   k_step (wp_s_auipc c _ (KA.«brelse» + 0x60#64) false 0x16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«brelse» + 0x64#64) false 2342#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«brelse» + 0x64#64) false 2326#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [br_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«brelse» + 0x68#64) false 2088630#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«brelse» + 0x68#64) false 2088614#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [br_br_rel]
   iintro Hk Hpc
   iapply (bc_release_hook RE c _ γl γ V tl ?ra ?rs ?rn ?rK k.sie ?rr ?ro)
@@ -314,10 +314,10 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
   k_step_gen (wp_s_auipc c10 _ (KA.«brelse» + 0x20#64) false 0x16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c11 _ (KA.«brelse» + 0x24#64) false 2406#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c11 _ (KA.«brelse» + 0x24#64) false 2390#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [br_lock] next c12 hp12
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c12 _ (KA.«brelse» + 0x28#64) false 2088558#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c12 _ (KA.«brelse» + 0x28#64) false 2088542#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [br_br_acq] next c13 hp13
   iintro Hk Hpc
   iapply (bc_acquire AC c13 _ γl γ V ?aa ?an ?aK ?al) $$ [- $Hk $Hpc]
@@ -480,7 +480,7 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
     k_step (wp_s_auipc c _ (KA.«brelse» + 0x3e#64) false 0x1e#20 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hwr]
     iintro Hk Hpc
-    k_step (wp_s_addi c _ (KA.«brelse» + 0x42#64) false 2376#12 15#5 15#5 (by decide))
+    k_step (wp_s_addi c _ (KA.«brelse» + 0x42#64) false 2360#12 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hwr]
     iintro Hk Hpc
     k_step (wp_s_ld c _ (KA.«brelse» + 0x46#64) false 696#12 14#5 15#5 (by decide) (by decide)
@@ -495,7 +495,7 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
     k_step (wp_s_auipc c _ (KA.«brelse» + 0x4c#64) false 0x1e#20 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hwr]
     iintro Hk Hpc
-    k_step (wp_s_addi c _ (KA.«brelse» + 0x50#64) false 2978#12 14#5 14#5 (by decide))
+    k_step (wp_s_addi c _ (KA.«brelse» + 0x50#64) false 2962#12 14#5 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hwr, br_headaddr]
     iintro Hk Hpc
     k_step (wp_s_sd c _ (KA.«brelse» + 0x54#64) true 72#12 9#5 14#5 (by decide)

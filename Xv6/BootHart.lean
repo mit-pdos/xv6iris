@@ -101,11 +101,12 @@ theorem bootStack_rw (cpu : CPU) (i : Nat) (hi : i < bootStackSlots) :
 /-! ## §2 The M-mode precondition, out of one hart's reset residue -/
 
 /-- The registers `Xv6.bootEntryPre` takes out of the reset file: the
-configuration cells, `mhartid`, the clock cells, the program counter, and the
+configuration cells, `mhartid`, the clock cells (`scounteren` among them since NI
+M3 quotas Q-0), the program counter, and the
 eight GPRs `_entry`/`start` touch. -/
 def bootEntryRegs : List Register :=
   bootConfRegs ++
-  [.mhartid, .minstret_increment, .minstret, .mcycle, .mtime, .mip, .PC, .nextPC,
+  [.mhartid, .minstret_increment, .minstret, .mcycle, .mtime, .mip, .scounteren, .PC, .nextPC,
    .x1, .x2, .x4, .x8, .x10, .x11, .x14, .x15]
 
 /-- What is taken after `Xv6.bootEntryPre`: its registers and the two wire
@@ -117,8 +118,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- The part of `Xv6.bootEntryPre` past the configuration cells. -/
 theorem bootEntry_rest_cells (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu f) :
-    ([∗list] r ∈ [Register.mhartid, .minstret_increment, .minstret, .mcycle, .mtime, .mip, .PC,
-        .nextPC, .x1, .x2, .x4, .x8, .x10, .x11, .x14, .x15],
+    ([∗list] r ∈ [Register.mhartid, .minstret_increment, .minstret, .mcycle, .mtime, .mip, .scounteren,
+        .PC, .nextPC, .x1, .x2, .x4, .x8, .x10, .x11, .x14, .x15],
         regPointsTo (GF := GF) cpu r (DFrac.own 1) (f r)) ⊢
       Register.mhartid ↦ᵣ[cpu] hartId cpu ∗ clockCells cpu ∗ pcIs cpu KA.«_entry» ∗
       Register.x1 ↦ᵣ[cpu] f .x1 ∗ Register.x2 ↦ᵣ[cpu] f .x2 ∗ Register.x4 ↦ᵣ[cpu] f .x4 ∗
@@ -131,9 +132,9 @@ theorem bootEntry_rest_cells (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu 
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, eh, ep, en]
   unfold clockCells pcIs hartId
   rw [entry_sym_addr]
-  iintro ⟨Hh, Hmi, Hms, Hmc, Hmt, Hmp, Hpc, Hnpc, H1, H2, H4, H8, H10, H11, H14, H15, -⟩
+  iintro ⟨Hh, Hmi, Hms, Hmc, Hmt, Hmp, Hsc, Hpc, Hnpc, H1, H2, H4, H8, H10, H11, H14, H15, -⟩
   iframe Hh Hpc Hnpc H1 H2 H4 H8 H10 H11 H14 H15
-  iexists (f .minstret_increment), (f .minstret), (f .mcycle), (f .mtime), (f .mip)
+  iexists (f .minstret_increment), (f .minstret), (f .mcycle), (f .mtime), (f .mip), (f .scounteren)
   iframe
 
 /-- **THE REGISTER SIDE OF THE BOOT PATH, out of the reset file** (Rocq

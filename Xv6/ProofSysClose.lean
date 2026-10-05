@@ -276,9 +276,9 @@ end
 
 /-! ## The function -/
 
-theorem sys_close_br_fffffffffffff332 : KA.«sys_close» + 0xfffffffffffff332#64 = KA.«fileclose» := by decide
+theorem sys_close_br_fffffffffffff2c8 : KA.«sys_close» + 0xfffffffffffff2c8#64 = KA.«fileclose» := by decide
 
-theorem sys_close_br_ffffffffffffc9d8 : KA.«sys_close» + 0xffffffffffffc9d8#64 = KA.«myproc» := by decide
+theorem sys_close_br_ffffffffffffc95e : KA.«sys_close» + 0xffffffffffffc95e#64 = KA.«myproc» := by decide
 
 theorem sys_close_br_fffffffffffffd26 : KA.«sys_close» + 0xfffffffffffffd26#64 = KA.«argfd» := by decide
 
@@ -406,8 +406,8 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     k_step_gen (wp_s_branch c7 _ (KA.«sys_close» + 0x18#64) false 34#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, sc_bltz_0] next c8 hp8
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c8 _ (KA.«sys_close» + 0x1c#64) false 2083260#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_close_br_ffffffffffffc9d8] next c9 hp9
+    k_step_gen (wp_s_jal c8 _ (KA.«sys_close» + 0x1c#64) false 2083138#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_close_br_ffffffffffffc95e] next c9 hp9
     iintro Hk Hpc
     iapply (sc_myproc MP c9 _ ?hnm ?hKm) $$ [- $Hk $Hpc]
     rotate_right 1
@@ -462,8 +462,8 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     k_step_gen (wp_s_ld c15 _ (KA.«sys_close» + 0x30#64) false 4064#12 10#5 8#5 (by decide) (by decide) (DFrac.own 1) (fnode kk))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d8', Xv6.sfs_st_addr] next c16 hp16
     iintro Hk Hpc Hcf
-    k_step_gen (wp_s_jal c16 _ (KA.«sys_close» + 0x34#64) false 2093822#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_close_br_fffffffffffff332] next c17 hp17
+    k_step_gen (wp_s_jal c16 _ (KA.«sys_close» + 0x34#64) false 2093716#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_close_br_fffffffffffff2c8] next c17 hp17
     iintro Hk Hpc
     have hpin17 : k.sie = false ∨ k.proc = 0#64 → c17 = cpu := fun h =>
       (hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans

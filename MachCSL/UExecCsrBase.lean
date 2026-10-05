@@ -18,8 +18,8 @@ some csr's walk fail) are `uxrReads`:
 * `mstatus` (only through the F / vector gates of `fflags`/`frm`/`fcsr` and the
   vector CSRs, where it is SYMBOLIC: the user frame's `mstatus`, with `FS = 0`);
 * `mcounteren`, `scounteren` (the counter enables, SYMBOLIC: Rocq keeps them
-  generic, `counter_caps`; `start()` leaves `mcounteren` at `garbage | TM` and
-  nothing writes `scounteren`), read only by the counter class
+  generic, `counter_caps`; `start()` leaves `mcounteren` at `garbage | TM`;
+  `scounteren` is a clock cell at some value since NI M3 quotas Q-0), read only by the counter class
   (`UExecCsrCnt`), and the counters a retiring read returns (`mcycle`,
   `mtime`, `minstret`, `mhpmcounter`).
 

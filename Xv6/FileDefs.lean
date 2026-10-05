@@ -82,6 +82,7 @@ import Xv6.IcacheHeld
 import Xv6.OffBox
 import Xv6.DirView
 import Xv6.FsImg
+import Xv6.NpipeDefs
 
 namespace Xv6
 
@@ -565,9 +566,23 @@ def ftableResAt (γ : FileNames) (ξ : CtxId) : IProp GF := iprop%
 -- The three transports (`fileRestAt`, `fslotAt`, `ftableResAt`) need the
 -- payload's (`FileMorph.fileCore_morph`): they are in `Xv6/FtableMorph.lean`.
 
-/-- The table (persistent): the lock over its resource, and the fd supply. -/
-def isFtable (γl : GName) (γ : FileNames) : IProp GF :=
-  isLock γl ftableAddr "ftable" (ftableResAt γ)
+/-- The table (persistent): the lock over its resource, and the fd supply.
+(NI M3 quotas Q-0) It also carries the pipe-buffer counter's lock
+(`NpipeDefs.isNpipe`): `pipealloc` takes the table, and `pipeclose` is reached
+only through `fileclose`, which takes it too, so the handle rides here and no
+caller's contract gains a premise. -/
+def isFtable (γl : GName) (γ : FileNames) : IProp GF := iprop%
+  isLock γl ftableAddr "ftable" (ftableResAt γ) ∗ ∃ γn : GName, isNpipe γn
+
+/-- The table's own lock, off the handle. -/
+theorem isFtable_lock (γl : GName) (γ : FileNames) :
+    isFtable (GF := GF) γl γ ⊢ isLock γl ftableAddr "ftable" (ftableResAt γ) := by
+  unfold isFtable; iintro ⟨H, -⟩; iexact H
+
+/-- The pipe-buffer counter's lock, off the handle. -/
+theorem isFtable_npipe (γl : GName) (γ : FileNames) :
+    isFtable (GF := GF) γl γ ⊢ iprop(∃ γn : GName, isNpipe γn) := by
+  unfold isFtable; iintro ⟨-, H⟩; iexact H
 
 instance isFtable_persistent (γl : GName) (γ : FileNames) : Persistent (isFtable (GF := GF) γl γ) := by
   unfold isFtable; infer_instance

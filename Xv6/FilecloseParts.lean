@@ -44,17 +44,17 @@ theorem fc_ret_ae : jumpPc (KA.«fileclose» + 0xae#64) = (KA.«fileclose» + 0x
 theorem fc_ret_b4 : jumpPc (KA.«fileclose» + 0xb4#64) = (KA.«fileclose» + 0xb4#64) := by decide
 theorem fc_ret_b8 : jumpPc (KA.«fileclose» + 0xb8#64) = (KA.«fileclose» + 0xb8#64) := by decide
 
-theorem fc_lock_416a : KA.«fileclose» + 0x1e742#64 = ftableAddr := by
+theorem fc_lock_416a : KA.«fileclose» + 0x1e732#64 = ftableAddr := by
   unfold ftableAddr; decide
-theorem fc_lock_41a6 : KA.«fileclose» + 0x1e742#64 = ftableAddr := by
+theorem fc_lock_41a6 : KA.«fileclose» + 0x1e732#64 = ftableAddr := by
   unfold ftableAddr; decide
-theorem fc_lock_41e0 : KA.«fileclose» + 0x1e742#64 = ftableAddr := by
+theorem fc_lock_41e0 : KA.«fileclose» + 0x1e732#64 = ftableAddr := by
   unfold ftableAddr; decide
 
-theorem fileclose_br_3fc : KA.«fileclose» + 0x3fc#64 = KA.«pipeclose» := by decide
-theorem fileclose_br_ffffffffffffca0a : KA.«fileclose» + 0xffffffffffffca0a#64 = KA.«release» := by decide
-theorem fileclose_br_ffffffffffffc982 : KA.«fileclose» + 0xffffffffffffc982#64 = KA.«acquire» := by decide
-theorem fileclose_br_1e742 : KA.«fileclose» + 0x1e742#64 = ftableAddr := by decide
+theorem fileclose_br_438 : KA.«fileclose» + 0x438#64 = KA.«pipeclose» := by decide
+theorem fileclose_br_ffffffffffffc9fa : KA.«fileclose» + 0xffffffffffffc9fa#64 = KA.«release» := by decide
+theorem fileclose_br_ffffffffffffc972 : KA.«fileclose» + 0xffffffffffffc972#64 = KA.«acquire» := by decide
+theorem fileclose_br_1e732 : KA.«fileclose» + 0x1e732#64 = ftableAddr := by decide
 theorem fileclose_br_begin_op : KA.«fileclose» + 0xfffffffffffffb46#64 = KA.«begin_op» := by decide
 theorem fileclose_br_iput : KA.«fileclose» + 0xfffffffffffff1fe#64 = KA.«iput» := by decide
 theorem fileclose_br_end_op : KA.«fileclose» + 0xfffffffffffffbd2#64 = KA.«end_op» := by decide
@@ -265,6 +265,7 @@ theorem fc_pipeclose [CurCtx] (PC : PIPECLOSE) (Γ : SchedNames) (c : CPU) (k' :
     (Φ : IProp GF) (ke : Nat) (p : BitVec 64) (hp : k'.proc = p) (hw : w = decide (k'.regs 11#5 ≠ 0#64))
     (hnoff : k'.noff + 2 < 2 ^ 31) (hK : pipecloseSlots ≤ k'.avail)
     (hpipe : "pipe" ∉ k'.locks) (hproc : "proc" ∉ k'.locks) (hkmem : "kmem" ∉ k'.locks)
+    (hnpipe : "npipe" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«pipeclose» ∗
     isPipe γl γp (k'.regs 10#5) ∗ pipeRef γp w 1 ∗
@@ -280,7 +281,8 @@ theorem fc_pipeclose [CurCtx] (PC : PIPECLOSE) (Γ : SchedNames) (c : CPU) (k' :
       pipeCpost (hlc := hlc) γp.pnQueue w Φ true -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hp
-  have h := PC.wp_pipeclose (hlc := hlc) (GF := GF) Γ c k' γl γp w γkl γk on Φ ke hw hnoff hK hpipe hproc hkmem htier
+  have h := PC.wp_pipeclose (hlc := hlc) (GF := GF) Γ c k' γl γp w γkl γk on Φ ke hw hnoff hK hpipe hproc hkmem
+    hnpipe htier
   unfold wp_pipeclose_body at h
   simp only [pipecloseAddr] at h
   exact h

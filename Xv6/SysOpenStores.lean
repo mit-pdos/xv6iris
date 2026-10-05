@@ -66,7 +66,7 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Constants -/
 
-theorem sys_open_stores_br_itrunc : KA.«sys_open» + 0xffffffffffffe17a#64 = KA.«itrunc» := by decide
+theorem sys_open_stores_br_itrunc : KA.«sys_open» + 0xffffffffffffe110#64 = KA.«itrunc» := by decide
 theorem sys_open_stores_ret_154 :
     jumpPc (KA.«sys_open» + 0x154#64) = KA.«sys_open» + 0x154#64 := by decide
 
@@ -339,7 +339,7 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- ===== +0x150 jal itrunc =====
-  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x150#64) false 2089002#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x150#64) false 2088896#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_stores_br_itrunc]
   iintro Hk Hpc
   -- the locked record, opened whole for the one callee that rewrites it

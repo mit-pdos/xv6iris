@@ -328,7 +328,7 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : N
   iintro Hk Hpc Hcell
   ihave Howe := Hcl $$ Hcell
   by_cases hv0 : v = 0#64
-  · -- null: the branch is taken to 0x80004d56, the install arm
+  · -- null: the branch is taken to 0x80004dd0, the install arm
     subst hv0
     k_step_gen (wp_s_branch c1 _ (KA.«fdalloc» + 0x1c#64) true 22#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beqz_zero] next c2 hp2
@@ -350,7 +350,7 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : N
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, Xv6.dsOff0, fda_add0'] next c6 hp6
     iintro Hk Hpc Hcell
     ihave Howe := Hw $$ Hcell
-    -- c.j 0x80004d4c
+    -- c.j 0x80004dc6
     k_step_gen (wp_s_j c6 _ (KA.«fdalloc» + 0x3e#64) true 2097130#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
     iintro Hk Hpc
@@ -427,7 +427,7 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : N
           0xFFFFFFFFFFFFFFFF#64
           (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]))
         $$ [- $Hk $Hpc $Hframe $Hpost $Hnext]
-    · -- more descriptors: the branch is taken back to 0x80004d3e
+    · -- more descriptors: the branch is taken back to 0x80004db8
       have hnext16 : fd + 1 < 16 := by unfold NOFILE at hfd hlast; omega
       k_step_gen (wp_s_branch c4 _ (KA.«fdalloc» + 0x22#64) false 8184#13 10#5 13#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -485,7 +485,7 @@ end
 
 /-! ## fdalloc -/
 
-theorem fdalloc_br_ffffffffffffcc58 : KA.«fdalloc» + 0xffffffffffffcc58#64 = KA.«myproc» := by decide
+theorem fdalloc_br_ffffffffffffcbde : KA.«fdalloc» + 0xffffffffffffcbde#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 16000000 in
 theorem fdalloc_proof (MP : MYPROC) : FDALLOC := ⟨
@@ -507,8 +507,8 @@ theorem fdalloc_proof (MP : MYPROC) : FDALLOC := ⟨
   k_step_gen (wp_s_add c1 _ (KA.«fdalloc» + 0xa#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c2 _ (KA.«fdalloc» + 0xc#64) false 2083916#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fdalloc_br_ffffffffffffcc58] next c3 hp3
+  k_step_gen (wp_s_jal c2 _ (KA.«fdalloc» + 0xc#64) false 2083794#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fdalloc_br_ffffffffffffcbde] next c3 hp3
   iintro Hk Hpc
   iapply (fda_myproc MP c3 _ ?hnm ?hKm) $$ [- $Hk $Hpc]
   rotate_right 1

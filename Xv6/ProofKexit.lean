@@ -347,7 +347,7 @@ theorem kx_core_lend (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat 
   · ipureintro; exact hf
   · ipureintro; exact hlz
 
-theorem kexit_br_21da : KA.«kexit» + 0x21da#64 = KA.«fileclose» := by decide
+theorem kexit_br_21ea : KA.«kexit» + 0x21ea#64 = KA.«fileclose» := by decide
 
 /-- The loop's exit continuation: control at `begin_op`'s call site, every
 descriptor null (Rocq `kx_loop`'s `Hqexit`). -/
@@ -477,9 +477,9 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       icases BigSepL.bigSepL_insert_acc (Φ := fun (_ : Nat) (st : FdState) =>
           filecloseCpay (hlc := hlc) (GF := GF) st iprop(emp)) hrow $$ Hcps with ⟨Hcpay, Hcpback⟩
       -- jal fileclose
-      k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x42#64) false 8600#21 1#5 (by decide))
+      k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x42#64) false 8616#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [kexit_br_21da, KCtx.setReg_sie, KCtx.setReg_proc]
+        with [kexit_br_21ea, KCtx.setReg_sie, KCtx.setReg_proc]
       iintro Hk Hpc
       -- THE PID CELL, LENT out of the core ; THE ENVIRONMENT the state selects
       -- the pid cell and the block's event counter, lent (permit sweep L1b)
@@ -781,11 +781,11 @@ theorem kexit_br_ffffffffffffffaa : KA.«kexit» + 0xffffffffffffffaa#64 = KA.«
 
 theorem kexit_br_ffffffffffffeb5c : KA.«kexit» + 0xffffffffffffeb5c#64 = KA.«acquire» := by decide
 
-theorem kexit_br_1dac : KA.«kexit» + 0x1dac#64 = KA.«end_op» := by decide
+theorem kexit_br_1dbc : KA.«kexit» + 0x1dbc#64 = KA.«end_op» := by decide
 
-theorem kexit_br_13d8 : KA.«kexit» + 0x13d8#64 = KA.«iput» := by decide
+theorem kexit_br_13e8 : KA.«kexit» + 0x13e8#64 = KA.«iput» := by decide
 
-theorem kexit_br_1d20 : KA.«kexit» + 0x1d20#64 = KA.«begin_op» := by decide
+theorem kexit_br_1d30 : KA.«kexit» + 0x1d30#64 = KA.«begin_op» := by decide
 
 theorem kexit_br_1041c : KA.«kexit» + 0x1041c#64 = KA.«wait_lock» := by decide
 
@@ -877,8 +877,8 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
   icases procPrivAcc_split ξ0 (pPid (procAddr j)) 4 (1 : Qp).half pid $$ [Hpid] with ⟨Hpid, Hpidk⟩
   · unfold pidPriv; iexact Hpid
   -- jal begin_op
-  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x60#64) false 7360#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1d20, KCtx.setReg_sie, KCtx.setReg_proc]
+  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x60#64) false 7376#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1d30, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
   have hf1 : kxFrame (k.setReg 1#5 (KA.«kexit» + 0x64#64)) j k.sie status spval availval :=
     kx_setReg_frame k j status spval 1#5 _ hf (by decide) (by decide) (by decide) (by decide)
@@ -903,8 +903,8 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
       (R1.set 10#5 V.root)) j k.sie status spval availval :=
     kx_setReg_frame _ j status spval 10#5 V.root hf1 (by decide) (by decide) (by decide) (by decide)
   -- jal iput
-  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x68#64) false 4976#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_13d8, KCtx.setReg_sie, KCtx.setReg_proc]
+  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x68#64) false 4992#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_13e8, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
   have hf1b : kxFrame (((k.setReg 1#5 (KA.«kexit» + 0x64#64)).withSpie spie1 spp1).withRegs
       ((R1.set 10#5 V.root).set 1#5 (KA.«kexit» + 0x6c#64))) j k.sie status spval availval :=
@@ -924,8 +924,8 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
   ihave Hpc := (kx_pcIs_jump cpu _ (R1.set 10#5 V.root) (KA.«kexit» + 0x6c#64) (by decide)) $$ Hpc
   have hf2 := kxFrame_cross hf1b spie2 spp2 R2 hcs2
   -- jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x6c#64) false 7488#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1dac, KCtx.setReg_sie, KCtx.setReg_proc]
+  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x6c#64) false 7504#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1dbc, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
   have hf2a := kx_setReg_frame _ j status spval 1#5 (KA.«kexit» + 0x70#64) hf2
     (by decide) (by decide) (by decide) (by decide)
@@ -1430,8 +1430,8 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   icases procPrivAcc_split ξ0 (pPid (procAddr j)) 4 (1 : Qp).half pid $$ [Hpid] with ⟨Hpid, Hpidk⟩
   · unfold pidPriv; iexact Hpid
   -- jal begin_op
-  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x4c#64) false 7380#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1d20, KCtx.setReg_sie, KCtx.setReg_proc]
+  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x4c#64) false 7396#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1d30, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
   have hf1 : kxFrame (k.setReg 1#5 (KA.«kexit» + 0x50#64)) j k.sie status spval availval :=
     kx_setReg_frame k j status spval 1#5 _ hf (by decide) (by decide) (by decide) (by decide)
@@ -1456,8 +1456,8 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
       (R1.set 10#5 V.cwd)) j k.sie status spval availval :=
     kx_setReg_frame _ j status spval 10#5 V.cwd hf1 (by decide) (by decide) (by decide) (by decide)
   -- jal iput
-  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x54#64) false 4996#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_13d8, KCtx.setReg_sie, KCtx.setReg_proc]
+  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x54#64) false 5012#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_13e8, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
   have hf1b : kxFrame (((k.setReg 1#5 (KA.«kexit» + 0x50#64)).withSpie spie1 spp1).withRegs
       ((R1.set 10#5 V.cwd).set 1#5 (KA.«kexit» + 0x58#64))) j k.sie status spval availval :=
@@ -1477,8 +1477,8 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   ihave Hpc := (kx_pcIs_jump cpu _ (R1.set 10#5 V.cwd) (KA.«kexit» + 0x58#64) (by decide)) $$ Hpc
   have hf2 := kxFrame_cross hf1b spie2 spp2 R2 hcs2
   -- jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x58#64) false 7508#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1dac, KCtx.setReg_sie, KCtx.setReg_proc]
+  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x58#64) false 7524#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1dbc, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
   have hf2a := kx_setReg_frame _ j status spval 1#5 (KA.«kexit» + 0x5c#64) hf2
     (by decide) (by decide) (by decide) (by decide)

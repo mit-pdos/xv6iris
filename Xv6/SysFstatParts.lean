@@ -35,9 +35,9 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Constants -/
 
-theorem sys_fstat_br_argaddr : KA.«sys_fstat» + 0xffffffffffffd96a#64 = KA.«argaddr» := by decide
+theorem sys_fstat_br_argaddr : KA.«sys_fstat» + 0xffffffffffffd8f0#64 = KA.«argaddr» := by decide
 theorem sys_fstat_br_argfd : KA.«sys_fstat» + 0xfffffffffffffce2#64 = KA.«argfd» := by decide
-theorem sys_fstat_br_filestat : KA.«sys_fstat» + 0xfffffffffffff3b0#64 = KA.«filestat» := by decide
+theorem sys_fstat_br_filestat : KA.«sys_fstat» + 0xfffffffffffff346#64 = KA.«filestat» := by decide
 
 theorem sfs_ret_12 : jumpPc (KA.«sys_fstat» + 0x12#64) = (KA.«sys_fstat» + 0x12#64) := by decide
 theorem sfs_ret_1e : jumpPc (KA.«sys_fstat» + 0x1e#64) = (KA.«sys_fstat» + 0x1e#64) := by decide

@@ -196,9 +196,13 @@ step_tcb() { tools/ci/tcb.sh; }
 
 step_reports() {
   # Source-file attribution for the coverage report: best effort, never
-  # built, and the numbers do not depend on it (tools/ci/reports.sh).
+  # built, and the numbers do not depend on it (tools/ci/reports.sh).  The
+  # images are pinned at `verified-quota` (b72cbac1 + the NI M3 quota commit,
+  # the dump headers); until that branch is published, fall back to its
+  # parent `verified` (the same files, 34 lines apart).
   if [ ! -d xv6-riscv ]; then
-    timeout 60 git clone -q --depth 1 --branch verified https://github.com/mit-pdos/xv6-riscv xv6-riscv \
+    timeout 60 git clone -q --depth 1 --branch verified-quota https://github.com/mit-pdos/xv6-riscv xv6-riscv \
+      || timeout 60 git clone -q --depth 1 --branch verified https://github.com/mit-pdos/xv6-riscv xv6-riscv \
       || echo "reports: no xv6-riscv checkout (no network?); functions will not be attributed to source files"
   fi
   if [ -s "$BUILD_LOG" ]; then tools/ci/reports.sh "$BUILD_LOG"; else tools/ci/reports.sh; fi

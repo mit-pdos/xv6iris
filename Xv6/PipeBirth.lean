@@ -274,12 +274,12 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi) (vname : BitVe
     wordPointsTo (pipeLockName pi) 8 (DFrac.own 1) vname ∗
     wordPointsTo (aPnread pi) 4 (DFrac.own 1) 0#32 ∗ wordPointsTo (aPnwrite pi) 4 (DFrac.own 1) 0#32 ∗
     wordPointsTo (aPopen pi false) 4 (DFrac.own 1) 1#32 ∗ wordPointsTo (aPopen pi true) 4 (DFrac.own 1) 1#32 ∗
-    pipeDataAt curCtx pi bs ∗ pipeSlack pi
+    pipeDataAt curCtx pi bs ∗ pipeSlack pi ∗ (∃ γn : GName, isNpipe γn)
     ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ (γl : GName) (γp : PipeNames),
         isPipe γl γp pi ∗ pipeRef γp false 1 ∗ pipeRef γp true 1 ∗ pipeQfrag γp.pnQueue pst0) := by
   unfold lkFresh
   iintro ⟨#Hcl, #Hcl', Hrun, ⟨%hok, ⟨%lo, %lc, Hw, #Hflo, Hc, #Hflc⟩⟩,
-    Hnm, Hnr, Hnw, Hro, Hwo, Hdat, Hslack⟩
+    Hnm, Hnr, Hnw, Hro, Hwo, Hdat, Hslack, #Hnp⟩
   imod pipe_ends_alloc with ⟨%γp, Hf0, Hf1, Hm0, Hm1, Hqa, Hqf⟩
   ihave Hst0 := pipeEndstate_open_intro γp false 1#32 pflag_one_open $$ Hm0
   ihave Hst1 := pipeEndstate_open_intro γp true 1#32 pflag_one_open $$ Hm1
@@ -338,6 +338,8 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi) (vname : BitVe
     · iexact Hcl
     isplit
     · iexact Hcl'
+    isplit
+    · iexact Hnp
     iexists lo, lc
     isplit
     · iexact Hinv
@@ -355,17 +357,17 @@ theorem kctx_newPipe [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) (pi :
     wordPointsTo (pipeLockName pi) 8 (DFrac.own 1) vname ∗
     wordPointsTo (aPnread pi) 4 (DFrac.own 1) 0#32 ∗ wordPointsTo (aPnwrite pi) 4 (DFrac.own 1) 0#32 ∗
     wordPointsTo (aPopen pi false) 4 (DFrac.own 1) 1#32 ∗ wordPointsTo (aPopen pi true) 4 (DFrac.own 1) 1#32 ∗
-    pipeDataAt curCtx pi bs ∗ pipeSlack pi
+    pipeDataAt curCtx pi bs ∗ pipeSlack pi ∗ (∃ γn : GName, isNpipe γn)
     ⊢ |={⊤}=> (kctxL lent cpu k ∗ ∃ (γl : GName) (γp : PipeNames),
         isPipe γl γp pi ∗ pipeRef γp false 1 ∗ pipeRef γp true 1 ∗ pipeQfrag γp.pnQueue pst0) := by
-  iintro ⟨Hk, #Hcl, #Hcl', Hfresh, Hnm, Hnr, Hnw, Hropen, Hwopen, Hdat, Hslack⟩
+  iintro ⟨Hk, #Hcl, #Hcl', Hfresh, Hnm, Hnr, Hnw, Hropen, Hwopen, Hdat, Hslack, #Hnp⟩
   icases kctx_cases cpu k $$ Hk with
     ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
   imod newPipe cpu pi hpv vname bs hlen ⊤
     $$ [Hctx Hfresh Hnm Hnr Hnw Hropen Hwopen Hdat Hslack]
     with ⟨Hctx, ⟨%γl, %γp, #Hpipe, Hr0, Hr1, Hqf⟩⟩
-  · iframe Hcl Hcl' Hctx Hfresh Hnm Hnr Hnw Hropen Hwopen Hdat Hslack
+  · iframe Hcl Hcl' Hctx Hfresh Hnm Hnr Hnw Hropen Hwopen Hdat Hslack Hnp
   imodintro
   isplitl [HConf HF Hstack Htrans Harm Hcpu Hctx Hfrag Hclock]
   · iapply kctx_intro' cpu k hwf

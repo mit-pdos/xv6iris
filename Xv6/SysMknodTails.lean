@@ -49,13 +49,13 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Constants -/
 
-theorem sys_mknod_br_begin_op : KA.«sys_mknod» + 0xffffffffffffe9b8#64 = KA.«begin_op» := by decide
-theorem sys_mknod_br_argint : KA.«sys_mknod» + 0xffffffffffffd4d2#64 = KA.«argint» := by decide
-theorem sys_mknod_br_argstr : KA.«sys_mknod» + 0xffffffffffffd50a#64 = KA.«argstr» := by decide
+theorem sys_mknod_br_begin_op : KA.«sys_mknod» + 0xffffffffffffe94e#64 = KA.«begin_op» := by decide
+theorem sys_mknod_br_argint : KA.«sys_mknod» + 0xffffffffffffd458#64 = KA.«argint» := by decide
+theorem sys_mknod_br_argstr : KA.«sys_mknod» + 0xffffffffffffd490#64 = KA.«argstr» := by decide
 theorem sys_mknod_br_create : KA.«sys_mknod» + 0xfffffffffffff900#64 = KA.«create» := by decide
-theorem sys_mknod_br_iunlockput : KA.«sys_mknod» + 0xffffffffffffe142#64 = KA.«iunlockput» := by
+theorem sys_mknod_br_iunlockput : KA.«sys_mknod» + 0xffffffffffffe0d8#64 = KA.«iunlockput» := by
   decide
-theorem sys_mknod_br_end_op : KA.«sys_mknod» + 0xffffffffffffea44#64 = KA.«end_op» := by decide
+theorem sys_mknod_br_end_op : KA.«sys_mknod» + 0xffffffffffffe9da#64 = KA.«end_op» := by decide
 
 theorem sys_mknod_ret_0c : jumpPc (KA.«sys_mknod» + 0xc#64) = KA.«sys_mknod» + 0xc#64 := by decide
 theorem sys_mknod_ret_16 : jumpPc (KA.«sys_mknod» + 0x16#64) = KA.«sys_mknod» + 0x16#64 := by decide
@@ -137,7 +137,7 @@ theorem sys_mknod_tail_58 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   obtain ⟨-, -, -, hKe, -, -⟩ := sys_mknod_K _ hK
   icases sys_mknod_pid hct _ _ _ _ _ $$ Hblk with ⟨Hpid, Hback⟩
   -- +0x58  jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x58#64) false 2091500#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x58#64) false 2091394#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_end_op]
   iintro Hk Hpc
   iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
@@ -210,7 +210,7 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   ihave Hop := logOpS_opb icfgLog n Sb $$ Hop
   icases sys_mknod_pid hct _ _ _ _ _ $$ Hblk with ⟨Hpid, Hback⟩
   -- +0x46  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x46#64) false 2089212#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x46#64) false 2089106#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_iunlockput]
   iintro Hk Hpc
   iapply (sysfile_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) (procAddr A.j)
@@ -229,7 +229,7 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   k_norm_g [sys_mknod_ret_4a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysMknodPins_cs k _ R1 (sysMknodPins_set k R 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x4a  jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x4a#64) false 2091514#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x4a#64) false 2091408#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_end_op]
   iintro Hk Hpc
   iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)

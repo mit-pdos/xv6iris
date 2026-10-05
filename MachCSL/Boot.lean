@@ -24,14 +24,22 @@ def pcIs (cpu : CPU) (pc : BitVec 64) : IProp GF := iprop%
 counter, the clock, the interrupt-pending bits the clock tick refreshes), owned
 at *some* value: the clock-tick choice at each cycle boundary is
 nondeterministic, and code that does not depend on them is specified
-value-agnostically. -/
+value-agnostically.
+
+(NI M3 quotas Q-0, kernel `verified-quota`) The S-mode counter-enable
+`scounteren` rides here too, at some value: `plicinithart` writes it (`0`)
+on every hart, so it is no longer a frozen cell of `hwConfig`; the hart
+carries it everywhere it carries the clock (the kernel context, the user
+frame, boot), and the `rdtime` stages and its write take it from the clock
+cells lent to the execute stage. -/
 def clockCells (cpu : CPU) : IProp GF := iprop%
-  ∃ (mi : Bool) (minstret mcycle mtime mip : BitVec 64),
+  ∃ (mi : Bool) (minstret mcycle mtime mip : BitVec 64) (sc : BitVec 32),
     Register.minstret_increment ↦ᵣ[cpu] mi ∗
     Register.minstret ↦ᵣ[cpu] minstret ∗
     Register.mcycle ↦ᵣ[cpu] mcycle ∗
     Register.mtime ↦ᵣ[cpu] mtime ∗
-    Register.mip ↦ᵣ[cpu] mip
+    Register.mip ↦ᵣ[cpu] mip ∗
+    Register.scounteren ↦ᵣ[cpu] sc
 
 theorem pcIs_neg (cpu : CPU) (p : Prop) [Decidable p] (a b : BitVec 64) (h : ¬p) :
     pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu b := by rw [if_neg h]

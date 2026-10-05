@@ -4,8 +4,9 @@ MachCSL: the CSR family at User privilege, part 3 -- the COUNTER CLASS
 branch, `exec_read_CSR_cycle_u`/`_time_u`/`_instret_u`/`exec_read_CSR_hpm`).
 
 The counter enables `mcounteren`/`scounteren` are GENERIC (Rocq keeps them
-symbolic; `start()` leaves `mcounteren` at `garbage | TM`, nothing writes
-`scounteren`, `MachCSL.HwCounters`), so the numbers whose check reads them
+symbolic; `start()` leaves `mcounteren` at `garbage | TM`, and `scounteren`
+is a clock cell at some value, `MachCSL.clockCells` -- the `verified-quota`
+kernel writes it `0` but no pin carries that yet, NI M3 quotas Q-5), so the numbers whose check reads them
 cannot be closed by a table walk (the model branches on their bits).  They are
 the 64 numbers `csr[11:5] ∈ {0b1100000, 0b1100100}`:
 

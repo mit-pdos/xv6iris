@@ -872,7 +872,7 @@ theorem kf_ofile_ro_acc [CurCtx] (pa : BitVec 64) (L : List (BitVec 64)) (idx : 
   rw [← hbig]
   iapply Hb $$ %x Hc
 
-theorem kfork_br_257a : KA.«kfork» + 0x257a#64 = KA.«filedup» := by decide
+theorem kfork_br_258a : KA.«kfork» + 0x258a#64 = KA.«filedup» := by decide
 
 /-! ## The descriptor table, split at its cells
 
@@ -1188,9 +1188,9 @@ theorem kf_ofile_copy [CurCtx] (FD : FILEDUP) (Γ : SchedNames) (jp jc : Nat)
       · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
       iintro Hk Hpc
       -- jal filedup
-      k_step (wp_s_jal cpu _ (KA.«kfork» + 0x9a#64) false 9440#21 1#5 (by decide))
+      k_step (wp_s_jal cpu _ (KA.«kfork» + 0x9a#64) false 9456#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [kfork_br_257a, KCtx.setReg_sie, KCtx.setReg_proc]
+        with [kfork_br_258a, KCtx.setReg_sie, KCtx.setReg_proc]
       iintro Hk Hpc
       -- filedup(a0): the reference halved, the child's unit spent
       iapply (kf_filedup FD cpu ((k.setReg 10#5 (fnode kk)).setReg 1#5 (KA.«kfork» + 0x9e#64)) γft γ kk q st'
@@ -2097,7 +2097,7 @@ theorem kfork_br_ffffffffffffefca : KA.«kfork» + 0xffffffffffffefca#64 = KA.«
 
 theorem kfork_br_fffffffffffff156 : KA.«kfork» + 0xfffffffffffff156#64 = KA.«safestrcpy» := by decide
 
-theorem kfork_br_1606 : KA.«kfork» + 0x1606#64 = KA.«idup» := by decide
+theorem kfork_br_1616 : KA.«kfork» + 0x1616#64 = KA.«idup» := by decide
 
 /-- The `initproc` pair, off the park world (a persistent copy). -/
 theorem kf_park_ip [CurCtx] (Γ : SchedNames) :
@@ -2234,9 +2234,9 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
   k_step (wp_s_ld cpu k' (KA.«kfork» + 0xa4#64) false 336#12 10#5 21#5 (by decide) (by decide) (DFrac.own 1) V.cwd)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, h21', hsie', hp']
   iintro Hk Hpc Hcwd_p
-  -- jal idup (0x80001dbe -> 0x8000331c), ra := 0x80001dc2
-  k_step (wp_s_jal cpu _ (KA.«kfork» + 0xa8#64) false 5470#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kfork_br_1606, KCtx.setReg_sie, KCtx.setReg_proc, hsie', hp']
+  -- jal idup (0x80001dbe -> 0x8000332c), ra := 0x80001dc2
+  k_step (wp_s_jal cpu _ (KA.«kfork» + 0xa8#64) false 5486#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kfork_br_1616, KCtx.setReg_sie, KCtx.setReg_proc, hsie', hp']
   iintro Hk Hpc
   iapply (kf_idup ID cpu ((k'.setReg 10#5 V.cwd).setReg 1#5 (KA.«kfork» + 0xac#64)) kkc V.cwi
       (by simp only [KCtx.setReg_sie]; exact hsie')
@@ -2289,10 +2289,10 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_withRegs', KCtx.withRegs_sie, KCtx.setReg_sie, hsie', KCtx.withRegs_proc, KCtx.setReg_proc, hp', hRid21]
   iintro Hk Hpc Hrt_p
-  -- jal idup (0x80001dca -> 0x8000331c), ra := 0x80001dce
-  k_step (wp_s_jal cpu _ (KA.«kfork» + 0xb4#64) false 5458#21 1#5 (by decide))
+  -- jal idup (0x80001dca -> 0x8000332c), ra := 0x80001dce
+  k_step (wp_s_jal cpu _ (KA.«kfork» + 0xb4#64) false 5474#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [kfork_br_1606, KCtx.setReg_sie, KCtx.withRegs_sie, KCtx.setReg_proc, KCtx.withRegs_proc, hsie', hp']
+    with [kfork_br_1616, KCtx.setReg_sie, KCtx.withRegs_sie, KCtx.setReg_proc, KCtx.withRegs_proc, hsie', hp']
   iintro Hk Hpc
   iapply (kf_idup ID cpu (((k'.setReg 10#5 V.cwd).setReg 1#5 (KA.«kfork» + 0xac#64)).withRegs ((Rid.set 10#5 V.root).set 1#5 (KA.«kfork» + 0xb8#64))) kkr V.rti
       (by simp only [KCtx.setReg_sie, KCtx.withRegs_sie]; exact hsie')

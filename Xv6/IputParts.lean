@@ -58,15 +58,15 @@ set_option linter.unusedSimpArgs false
 /-! ## Constants the code computes -/
 
 /-- Every `auipc a0,0x1d ; addi a0,a0,…` pair resolves to `&itable`. -/
-theorem iput_lock : KA.«iput» + 0x1d954#64 = itableLock := by
+theorem iput_lock : KA.«iput» + 0x1d944#64 = itableLock := by
   unfold itableLock; decide
 
 /-- `auipc a1,0x1d ; lw a1,1082(a1)` at +0x9c reads `sb.inodestart`. -/
-theorem iput_sbi : KA.«iput» + 0x1d94c#64 = sbInodestart := by
+theorem iput_sbi : KA.«iput» + 0x1d93c#64 = sbInodestart := by
   unfold sbInodestart; decide
 
-theorem iput_br_acquire : KA.«iput» + 0xffffffffffffd784#64 = KA.«acquire» := by decide
-theorem iput_br_release : KA.«iput» + 0xffffffffffffd80c#64 = KA.«release» := by decide
+theorem iput_br_acquire : KA.«iput» + 0xffffffffffffd774#64 = KA.«acquire» := by decide
+theorem iput_br_release : KA.«iput» + 0xffffffffffffd7fc#64 = KA.«release» := by decide
 theorem iput_br_acquiresleep : KA.«iput» + 0xc64#64 = KA.«acquiresleep» := by decide
 theorem iput_br_itrunc : KA.«iput» + 0xffffffffffffff6c#64 = KA.«itrunc» := by decide
 theorem iput_br_releasesleep : KA.«iput» + 0xcb8#64 = KA.«releasesleep» := by decide

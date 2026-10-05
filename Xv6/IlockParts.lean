@@ -48,9 +48,9 @@ set_option linter.unusedSimpArgs false
 
 theorem il_br_acq : KA.«ilock» + 0xde6#64 = KA.«acquiresleep» := by decide
 theorem ilk_br_bread : KA.«ilock» + 0xfffffffffffff968#64 = KA.«bread» := by decide
-theorem il_br_memmove : KA.«ilock» + 0xffffffffffffda26#64 = KA.«memmove» := by decide
+theorem il_br_memmove : KA.«ilock» + 0xffffffffffffda16#64 = KA.«memmove» := by decide
 theorem ilk_br_brelse : KA.«ilock» + 0xfffffffffffffa70#64 = KA.«brelse» := by decide
-theorem il_br_panic : KA.«ilock» + 0xffffffffffffd4e6#64 = KA.«panic» := by decide
+theorem il_br_panic : KA.«ilock» + 0xffffffffffffd4d6#64 = KA.«panic» := by decide
 theorem il_t_valid : KA.«ilock» + 0x1c#64 + BitVec.signExtend 64 26#13 = KA.«ilock» + 0x36#64 := by
   decide
 
@@ -60,9 +60,9 @@ theorem il_ret_8e : jumpPc (KA.«ilock» + 0x8e#64) = KA.«ilock» + 0x8e#64 := 
 theorem il_ret_94 : jumpPc (KA.«ilock» + 0x94#64) = KA.«ilock» + 0x94#64 := by decide
 
 /-- `auipc a1,0x1d` + `lw a1,1562(a1)`: `sb.inodestart`. -/
-theorem il_sb_addr : KA.«ilock» + 0x1dace#64 = sbInodestart := by decide
+theorem il_sb_addr : KA.«ilock» + 0x1dabe#64 = sbInodestart := by decide
 /-- `auipc a0,0x4` + `addi a0,a0,222`: the panic literal. -/
-theorem il_msg_addr : KA.«ilock» + 0x411e#64 = KStr.«ilock: no type» := by decide
+theorem il_msg_addr : KA.«ilock» + 0x410e#64 = KStr.«ilock: no type» := by decide
 
 /-! ## The guards' readings
 

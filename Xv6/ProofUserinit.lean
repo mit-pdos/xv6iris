@@ -600,9 +600,9 @@ theorem ui_calleeSaved_trans {R R' R'' : RegMap} (h1 : calleeSaved R R') (h2 : c
     h2.2.2.2.2.2.2.2.2.2.2.2.1.trans h1.2.2.2.2.2.2.2.2.2.2.2.1,
     h2.2.2.2.2.2.2.2.2.2.2.2.2.trans h1.2.2.2.2.2.2.2.2.2.2.2.2⟩
 
-theorem userinit_br_1fe6 : KA.«userinit» + 0x1fe6#64 = KA.«igetroot» := by decide
+theorem userinit_br_1ff6 : KA.«userinit» + 0x1ff6#64 = KA.«igetroot» := by decide
 
-theorem userinit_br_16aa : KA.«userinit» + 0x16aa#64 = KA.«idup» := by decide
+theorem userinit_br_16ba : KA.«userinit» + 0x16ba#64 = KA.«idup» := by decide
 
 /-- A held reference, opened at its slot (idup's `a0`). -/
 theorem ui_held_open [CurCtx] (v : BitVec 64) (z : Nat) :
@@ -671,10 +671,10 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (IR : IGETROOT) (ID : IDUP) (FP :
   iapply wpLoop_bupd
   imod (initprocIs_publish (procAddr j)) $$ Hinit with #Hinitp
   imodintro
-  -- jal igetroot (0x80001c8a -> 0x80003c58), ra := 0x80001c8e
-  k_step (wp_s_jal cpu _ (KA.«userinit» + 0x18#64) false 8142#21 1#5 (by decide))
+  -- jal igetroot (0x80001c8a -> 0x80003c68), ra := 0x80001c8e
+  k_step (wp_s_jal cpu _ (KA.«userinit» + 0x18#64) false 8158#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [userinit_br_1fe6, KCtx.rget_eq, KCtx.setReg_eq_withRegs]
+    with [userinit_br_1ff6, KCtx.rget_eq, KCtx.setReg_eq_withRegs]
   iintro Hk Hpc
   iapply (ui_igetroot IR cpu _ ?hsn ?hKn ?hnn hroot hnib0 ?hin ?hpn ?hun)
     $$ [- $Hk $Hpc $Hit $Hiti $Hireg $Hpe $Hir1]
@@ -708,10 +708,10 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (IR : IGETROOT) (ID : IDUP) (FP :
       wordPointsTo (pRoot (procAddr j)) 8 (DFrac.own 1) ipv
       from by rw [hip]; unfold pRoot; iintro H; iexact H) $$ Hrt
   ihave Hpriv := Hback $$ %ipv Hrt
-  -- jal idup (0x80001c92 -> 0x8000331c), ra := 0x80001c96: a0 is still the root
-  k_step (wp_s_jal cpu _ (KA.«userinit» + 0x20#64) false 5770#21 1#5 (by decide))
+  -- jal idup (0x80001c92 -> 0x8000332c), ra := 0x80001c96: a0 is still the root
+  k_step (wp_s_jal cpu _ (KA.«userinit» + 0x20#64) false 5786#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [userinit_br_16aa, KCtx.rget_eq, KCtx.setReg_eq_withRegs]
+    with [userinit_br_16ba, KCtx.rget_eq, KCtx.setReg_eq_withRegs]
   iintro Hk Hpc
   icases ui_held_open ipv ROOTINO $$ Hrref with ⟨%kr, %⟨hipv, hkr⟩, Hrref⟩
   have hKid : idupSlots ≤ igetrootSlots := by decide

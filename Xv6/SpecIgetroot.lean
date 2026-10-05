@@ -4,7 +4,7 @@ contract.  A port of Rocq `SpecIgetroot.v` (branch `chroot/bump`).
 
     struct inode* igetroot(void) { return iget(ROOTDEV, ROOTINO); }
 
-`KA.«igetroot»` = 0x80003c58, 0x18 bytes / ten instructions:
+`KA.«igetroot»` = 0x80003c68, 0x18 bytes / ten instructions:
 
     +0x00  c.addi sp,sp,-16          (2-slot frame)
     +0x02  c.sdsp ra,8(sp)

@@ -503,15 +503,15 @@ end seams
 /-! ## Addresses and constants of the `alloc3_desc` region -/
 
 /-- `&disk`, out of `auipc a4,0x1e; addi a4,a4,-1298` at `+0x5e`. -/
-theorem vdrw2_disk_addr : KA.«virtio_disk_rw» + 0x1dedc#64 = KA.«disk» := by decide
+theorem vdrw2_disk_addr : KA.«virtio_disk_rw» + 0x1de7e#64 = KA.«disk» := by decide
 
 /-- `&disk.vdisk_lock`, out of the two `auipc/addi` pairs at `+0xa0` and
 `+0xb0`. -/
-theorem vdrw2_lock_addr : KA.«virtio_disk_rw» + 0x1e004#64 = aVdiskLock := by
+theorem vdrw2_lock_addr : KA.«virtio_disk_rw» + 0x1dfa6#64 = aVdiskLock := by
   unfold aVdiskLock diskAddr dOffLock; decide
 
 /-- `&disk.free[0]`, the sleep channel, out of `auipc/addi` at `+0x94`. -/
-theorem vdrw2_free0_addr : KA.«virtio_disk_rw» + 0x1def4#64 = aFree 0 := by
+theorem vdrw2_free0_addr : KA.«virtio_disk_rw» + 0x1de96#64 = aFree 0 := by
   unfold aFree diskAddr dOffFree; decide
 
 theorem aFree0_nz : aFree 0 ≠ 0#64 := by unfold aFree diskAddr dOffFree; decide
@@ -535,10 +535,10 @@ theorem vdrw2_disk_succ (j : Nat) :
 /-- The four `jal` targets of the retry path. -/
 theorem vdrw2_br_free_desc : KA.«virtio_disk_rw» + 0xfffffffffffffdc2#64 = KA.«free_desc» := by decide
 theorem vdrw2_br_sleep_prepare :
-    KA.«virtio_disk_rw» + 0xffffffffffffc4e0#64 = KA.«sleep_prepare» := by decide
-theorem vdrw2_br_release : KA.«virtio_disk_rw» + 0xffffffffffffb1ec#64 = KA.«release» := by decide
-theorem vdrw2_br_sleep : KA.«virtio_disk_rw» + 0xffffffffffffc51c#64 = KA.«sleep» := by decide
-theorem vdrw2_br_acquire : KA.«virtio_disk_rw» + 0xffffffffffffb164#64 = KA.«acquire» := by decide
+    KA.«virtio_disk_rw» + 0xffffffffffffc46a#64 = KA.«sleep_prepare» := by decide
+theorem vdrw2_br_release : KA.«virtio_disk_rw» + 0xffffffffffffb176#64 = KA.«release» := by decide
+theorem vdrw2_br_sleep : KA.«virtio_disk_rw» + 0xffffffffffffc4a6#64 = KA.«sleep» := by decide
+theorem vdrw2_br_acquire : KA.«virtio_disk_rw» + 0xffffffffffffb0ee#64 = KA.«acquire» := by decide
 
 /-- The six `jal` return addresses. -/
 theorem vdrw2_ret_86 : jumpPc (KA.«virtio_disk_rw» + 0x86#64) = KA.«virtio_disk_rw» + 0x86#64 := by decide

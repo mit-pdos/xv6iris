@@ -41,27 +41,29 @@ abbrev execSpecP (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege) (c' : MCo
     (pc npc₀ npc : BitVec 64) (P Q : IProp GF) : Prop :=
   execSpecPP cpu dq Privilege.Machine c p' c' ast pc npc₀ npc P Q
 
-/-- The execute stage with the clock cells (`mip`, `mtime`) at its disposal
-(for `rdtime` and the timer-compare writes); they come back at some value. -/
+/-- The execute stage with the clock cells (`mip`, `mtime`, and -- NI M3
+quotas Q-0 -- `scounteren`) at its disposal (for `rdtime`, the timer-compare
+writes and the counter-enable write); they come back at some value. -/
 def execSpecClk (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege) (c' : MConf) (ast : instruction)
     (pc npc₀ npc : BitVec 64) (P Q : IProp GF) : Prop :=
-  ∀ ip mt : BitVec 64, execSpecP cpu dq c p' c' ast pc npc₀ npc
-    iprop(P ∗ Register.mip ↦ᵣ[cpu] ip ∗ Register.mtime ↦ᵣ[cpu] mt)
-    iprop(Q ∗ ∃ ip' mt' : BitVec 64, Register.mip ↦ᵣ[cpu] ip' ∗ Register.mtime ↦ᵣ[cpu] mt')
+  ∀ (ip mt : BitVec 64) (sc : BitVec 32), execSpecP cpu dq c p' c' ast pc npc₀ npc
+    iprop(P ∗ Register.mip ↦ᵣ[cpu] ip ∗ Register.mtime ↦ᵣ[cpu] mt ∗ Register.scounteren ↦ᵣ[cpu] sc)
+    iprop(Q ∗ ∃ (ip' mt' : BitVec 64) (sc' : BitVec 32), Register.mip ↦ᵣ[cpu] ip' ∗
+      Register.mtime ↦ᵣ[cpu] mt' ∗ Register.scounteren ↦ᵣ[cpu] sc')
 
 /-- An execute stage that ignores the clock cells passes them through. -/
 theorem execSpecP.clk {cpu : CPU} {dq : DFrac} {c : MConf} {p' : Privilege} {c' : MConf}
     {ast : instruction} {pc npc₀ npc : BitVec 64} {P Q : IProp GF}
     (h : execSpecP cpu dq c p' c' ast pc npc₀ npc P Q) : execSpecClk cpu dq c p' c' ast pc npc₀ npc P Q := by
-  intro ip mt Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨HP, Hmip, Hmtime⟩, HΦ⟩
+  intro ip mt sc Φ
+  iintro ⟨HmConf, HPC, HnextPC, ⟨HP, Hmip, Hmtime, Hscounteren⟩, HΦ⟩
   iapply (h Φ)
   iframe
   inext
   iintro HmConf HPC HnextPC HQ
-  iapply HΦ $$ HmConf HPC HnextPC [HQ Hmip Hmtime]
+  iapply HΦ $$ HmConf HPC HnextPC [HQ Hmip Hmtime Hscounteren]
   iframe
-  try (iexists ip, mt; iframe)
+  try (iexists ip, mt, sc; iframe)
 
 /-- `execSpecP` staying in machine mode. -/
 abbrev execSpec (cpu : CPU) (dq : DFrac) (c c' : MConf) (ast : instruction) (pc npc₀ npc : BitVec 64)
@@ -70,25 +72,27 @@ abbrev execSpec (cpu : CPU) (dq : DFrac) (c c' : MConf) (ast : instruction) (pc 
 
 theorem clockCells_cases (cpu : CPU) :
     clockCells (GF := GF) cpu ⊢
-    ∃ (mi : Bool) (minstret mcycle mtime mip : BitVec 64),
+    ∃ (mi : Bool) (minstret mcycle mtime mip : BitVec 64) (sc : BitVec 32),
       Register.minstret_increment ↦ᵣ[cpu] mi ∗
       Register.minstret ↦ᵣ[cpu] minstret ∗
       Register.mcycle ↦ᵣ[cpu] mcycle ∗
       Register.mtime ↦ᵣ[cpu] mtime ∗
-      Register.mip ↦ᵣ[cpu] mip := by
+      Register.mip ↦ᵣ[cpu] mip ∗
+      Register.scounteren ↦ᵣ[cpu] sc := by
   unfold clockCells; exact .rfl
 
 /-- `clockCells` reassembled from its cells, curried: by name, no `iframe`
 search. -/
-theorem clockCells_introW (cpu : CPU) (mi : Bool) (minstret mcycle mtime mip : BitVec 64) :
+theorem clockCells_introW (cpu : CPU) (mi : Bool) (minstret mcycle mtime mip : BitVec 64) (sc : BitVec 32) :
     ⊢ Register.minstret_increment ↦ᵣ[cpu] mi -∗
     Register.minstret ↦ᵣ[cpu] minstret -∗
     Register.mcycle ↦ᵣ[cpu] mcycle -∗
     Register.mtime ↦ᵣ[cpu] mtime -∗
-    Register.mip ↦ᵣ[cpu] mip -∗ clockCells (GF := GF) cpu := by
-  iintro H1 H2 H3 H4 H5
+    Register.mip ↦ᵣ[cpu] mip -∗
+    Register.scounteren ↦ᵣ[cpu] sc -∗ clockCells (GF := GF) cpu := by
+  iintro H1 H2 H3 H4 H5 H6
   unfold clockCells
-  iexists mi, minstret, mcycle, mtime, mip
+  iexists mi, minstret, mcycle, mtime, mip, sc
   iframe
 
 theorem pcIs_cases (cpu : CPU) (pc : BitVec 64) :

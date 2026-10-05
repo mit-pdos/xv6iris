@@ -8,7 +8,7 @@ writes.
 
 The walk is `SysUnlinkW1/W2/W3/W5F/W5D` over `SysUnlinkShared` (not yet
 written); the contract is `SpecSysUnlink` (after C0).  THE LEAN IMAGE
-(`KA.«sys_unlink»` = 0x80005146, 384 B), whose offsets every lemma below
+(`KA.«sys_unlink»` = 0x800051c0, 384 B), whose offsets every lemma below
 uses (never Rocq's comments):
     +0x12 `jal argstr` (path at s0-208) / +0x16 `bltz`; +0x1c `jal begin_op`;
     +0x28 `jal nameiparent` (name at s0-80) / +0x2e `beqz`; +0x30 `jal ilock`;
@@ -79,25 +79,25 @@ open MachCSL LeanRV64D
 
 /-! ## Call targets and return addresses -/
 
-theorem sys_unlink_br_argstr : KA.«sys_unlink» + 0xffffffffffffd828#64 = KA.«argstr» := by decide
+theorem sys_unlink_br_argstr : KA.«sys_unlink» + 0xffffffffffffd7ae#64 = KA.«argstr» := by decide
 theorem sys_unlink_br_begin_op :
-    KA.«sys_unlink» + 0xffffffffffffecd6#64 = KA.«begin_op» := by decide
+    KA.«sys_unlink» + 0xffffffffffffec6c#64 = KA.«begin_op» := by decide
 theorem sys_unlink_br_nameiparent :
-    KA.«sys_unlink» + 0xffffffffffffeafa#64 = KA.«nameiparent» := by decide
-theorem sys_unlink_br_ilock : KA.«sys_unlink» + 0xffffffffffffe20c#64 = KA.«ilock» := by decide
+    KA.«sys_unlink» + 0xffffffffffffea90#64 = KA.«nameiparent» := by decide
+theorem sys_unlink_br_ilock : KA.«sys_unlink» + 0xffffffffffffe1a2#64 = KA.«ilock» := by decide
 theorem sys_unlink_br_namecmp :
-    KA.«sys_unlink» + 0xffffffffffffe7de#64 = KA.«namecmp» := by decide
+    KA.«sys_unlink» + 0xffffffffffffe774#64 = KA.«namecmp» := by decide
 theorem sys_unlink_br_dirlookup :
-    KA.«sys_unlink» + 0xffffffffffffe7f4#64 = KA.«dirlookup» := by decide
-theorem sys_unlink_br_memset : KA.«sys_unlink» + 0xffffffffffffbbd2#64 = KA.«memset» := by decide
-theorem sys_unlink_br_writei : KA.«sys_unlink» + 0xffffffffffffe6d8#64 = KA.«writei» := by decide
+    KA.«sys_unlink» + 0xffffffffffffe78a#64 = KA.«dirlookup» := by decide
+theorem sys_unlink_br_memset : KA.«sys_unlink» + 0xffffffffffffbb58#64 = KA.«memset» := by decide
+theorem sys_unlink_br_writei : KA.«sys_unlink» + 0xffffffffffffe66e#64 = KA.«writei» := by decide
 theorem sys_unlink_br_iunlockput :
-    KA.«sys_unlink» + 0xffffffffffffe460#64 = KA.«iunlockput» := by decide
+    KA.«sys_unlink» + 0xffffffffffffe3f6#64 = KA.«iunlockput» := by decide
 theorem sys_unlink_br_iupdate :
-    KA.«sys_unlink» + 0xffffffffffffe158#64 = KA.«iupdate» := by decide
-theorem sys_unlink_br_end_op : KA.«sys_unlink» + 0xffffffffffffed62#64 = KA.«end_op» := by decide
-theorem sys_unlink_br_panic : KA.«sys_unlink» + 0xffffffffffffb6f2#64 = KA.«panic» := by decide
-theorem sys_unlink_br_readi : KA.«sys_unlink» + 0xffffffffffffe5e6#64 = KA.«readi» := by decide
+    KA.«sys_unlink» + 0xffffffffffffe0ee#64 = KA.«iupdate» := by decide
+theorem sys_unlink_br_end_op : KA.«sys_unlink» + 0xffffffffffffecf8#64 = KA.«end_op» := by decide
+theorem sys_unlink_br_panic : KA.«sys_unlink» + 0xffffffffffffb678#64 = KA.«panic» := by decide
+theorem sys_unlink_br_readi : KA.«sys_unlink» + 0xffffffffffffe57c#64 = KA.«readi» := by decide
 
 theorem sys_unlink_ret_16 :
     jumpPc (KA.«sys_unlink» + 0x16#64) = KA.«sys_unlink» + 0x16#64 := by decide

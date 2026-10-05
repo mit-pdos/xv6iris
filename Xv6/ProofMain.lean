@@ -136,6 +136,7 @@ def mnKptFs [Y : CurCtx] : IProp GF := iprop%
   mainLkRaw itableLockAddr ∗ ([∗list] i ∈ List.range NINODE, sleepLockIn (inodeAddr i)) ∗
   ([∗list] k ∈ List.range NINODE, ientryRaw k) ∗
   mainLkRaw ftableLockAddr ∗ ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗ irefSlots NFILE ∗
+  npipeBootRaw ∗
   (∃ v0 : BitVec 64, wordPointsTo initprocAddr 8 (DFrac.own 1) v0) ∗
   mainSbRaw ∗ mainLogRaw ∗ wordPointsTo firstAddr 4 (DFrac.own 1) 1#32
 
@@ -214,7 +215,7 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
   iintro ⟨Hk, Hpc, Hfs, Hboot, #Hw, Hav, #Hdinv, #Hcc, Hcfg, Hgh, Hcells, Hpav, Hipt, Hbundle, Hrdr, Hco,
     #Hinv, Hprim, #Hrec, #Hbare, Hstv, Hcsrs, Hfree⟩
   unfold mnKptFs
-  icases Hfs with ⟨Hblk, Hhead, Hbin, Hbss, Hilk, Hsin, Hraw, Hflk, Hfent, Hirf, Hinit, Hsb, Hlog, Hfw⟩
+  icases Hfs with ⟨Hblk, Hhead, Hbin, Hbss, Hilk, Hsin, Hraw, Hflk, Hfent, Hirf, Hnpr, Hinit, Hsb, Hlog, Hfw⟩
   unfold mnFsBoot
   icases Hboot with ⟨⟨⟨%γbl, Hbio⟩, Hpool⟩, Hikit, Hdlf, Hkit2, Hoffa, Hmir, Hirb, Hira, Hbs⟩
   icases fsKitFsinitGhost_ireg (fsBlocks dk) Rspent Pb _ $$ Hkit2 with ⟨#Hireg, Hkit2⟩
@@ -239,7 +240,7 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
   iintro %R2 Hk Hpc #Hrows
   -- +0x96  fileinit, and the open-file table
   iapply (mn_fileinit FI startedPrimary k R2 hsie hsl.2.1)
-  iframe Hk Hpc Hflk Hfent Hirf
+  iframe Hk Hpc Hflk Hfent Hirf Hnpr
   iintro %R3 Hk Hpc ⟨%γft, %γf, #Hft⟩
   -- +0x9a  virtio_disk_init, and the vdisk lock
   iapply (mn_virtio VD startedPrimary k R3 hsie hsl.2.2.1 hnoff hlocks hproc γd fscKalloc γdl fsReadyKmem
@@ -444,11 +445,11 @@ theorem mn_splitKpt [Y : CurCtx] (cn : ConsNames) :
     wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗ wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32
     ⊢ mnKptB (GF := GF) cn ∗ mnKptFs ∗ consReader cn 0 := by
   unfold mainLocksRaw mainGlobalsRaw mnKptB mnKptFs
-  iintro ⟨⟨Hpl, Hwl, #Ht0, #Ht16, Ht, Hbl, Hil, Hfl⟩,
+  iintro ⟨⟨Hpl, Hwl, #Ht0, #Ht16, Ht, Hbl, Hil, Hfl, Hnpr⟩,
     ⟨Hraw, Hpub, Hpq, Hpar, Hfd, Hir, Hfent, Hirf, Hbs, Hinit, Htres, Hhead, Hbin, Hbss, Hsin, Hient,
       Hcres, Hrdr, Hcl⟩, Hsb, Hlog, Hfw, Hnp⟩
   iframe Hpl Hwl Ht0 Ht16 Ht Hraw Hpub Hpq Hpar Hfd Hir Hbs Htres Hcres Hcl Hnp
-  iframe Hbl Hhead Hbin Hbss Hil Hsin Hient Hfl Hfent Hirf Hinit Hsb Hlog Hfw Hrdr
+  iframe Hbl Hhead Hbin Hbss Hil Hsin Hient Hfl Hfent Hirf Hnpr Hinit Hsb Hlog Hfw Hrdr
 
 theorem mn_mainSlots_ge : 114 ≤ mainSlots := by
   unfold mainSlots schedulerSlots kvFrameSlots; omega

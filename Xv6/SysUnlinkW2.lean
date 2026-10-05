@@ -242,7 +242,7 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0x68  jal dirlookup
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x68#64) false 2090892#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x68#64) false 2090786#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_dirlookup]
   iintro Hk Hpc
   icases sys_unlink_open kd dinum dnd bmd $$ Hload with ⟨%datd, Hopen⟩
@@ -425,7 +425,7 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
     #Hty, Hru⟩
   subst hiL hv
   -- +0x30  jal ilock
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x30#64) false 2089436#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x30#64) false 2089330#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_ilock]
   iintro Hk Hpc
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
@@ -456,13 +456,13 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
   k_step_e (wp_s_auipc cpu _ (KA.«sys_unlink» + 0x34#64) false 2#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x38#64) false 1134#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x38#64) false 1012#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x3c#64) false 4016#12 10#5 8#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x40#64) false 2090910#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x40#64) false 2090804#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_namecmp]
   iintro Hk Hpc
   ihave Hdot1 := (show byteBuf (GF := GF) KStr.«.» DFrac.discard sysUnlinkDotList ⊢
@@ -505,13 +505,13 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
   k_step_e (wp_s_auipc cpu _ (KA.«sys_unlink» + 0x48#64) false 2#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x4c#64) false 842#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x4c#64) false 720#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x50#64) false 4016#12 10#5 8#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp2.2.1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x54#64) false 2090890#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x54#64) false 2090784#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_namecmp]
   iintro Hk Hpc
   ihave Hdotdot1 := (show byteBuf (GF := GF) KStr.«..» DFrac.discard sysUnlinkDotdotList ⊢

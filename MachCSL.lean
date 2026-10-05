@@ -147,6 +147,7 @@ import MachCSL.WpWire
 import MachCSL.WpDevDmaStepV
 import MachCSL.WpDevDisk
 import MachCSL.WpSmodeTime
+import MachCSL.WpSmodeScounteren
 import MachCSL.WpDmaCtx2
 import MachCSL.WpSmodeFrame12b
 import MachCSL.WpSmodeLh

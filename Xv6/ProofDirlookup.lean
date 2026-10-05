@@ -141,7 +141,7 @@ theorem dirlookup_self (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (ID 
   k_step_e (wp_s_auipc cpu _ (KA.«dirlookup» + 0x6c#64) false 4#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«dirlookup» + 0x70#64) false 2866#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«dirlookup» + 0x70#64) false 2850#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x74  c.mv a0,s5 ; +0x76  jal namecmp
@@ -287,7 +287,7 @@ theorem dirlookup_selftest (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) 
   iintro ⟨Hk, Hpc, Hframe, Hde, Hte, Hce, Hkeep, Hin, #Henv, Hshr, Hru, Hrc, Hrr, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x22  jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«dirlookup» + 0x22#64) false 2088992#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«dirlookup» + 0x22#64) false 2088976#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dirlookup_br_myproc]
   iintro Hk Hpc
   have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu

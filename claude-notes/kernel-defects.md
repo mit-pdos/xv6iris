@@ -11,6 +11,31 @@ every proof naming an address moves. The procedure and the gate that must pass
 first are in [`durable-notes.md`](durable-notes.md) §"Changing the kernel
 SOURCE".
 
+## The verified kernel is NOT upstream xv6: `verified-quota` (NI M3 quotas, 2026-10-05)
+
+The Lean tree's images are pinned at `verified-quota` = b72cbac1 (the tip of
+`mit-pdos/xv6-riscv` `verified`) + ONE commit (owner ruling Q-R1 (a); design
+`projects/noninterference.md` "M3 quotas design"): 34 C lines in 6 files, not a
+defect fix but a change of behaviour that closes the allocator channel.
+
+- `param.h`: `MAXUSZ (192 * 4096)` (768 KiB) and `NPIPE (NFILE / 2)` (50).
+- `sys_sbrk`: `if (n > 0 && addr + n > MAXUSZ) return -1;` before either path
+  (the quota on the break, pure in the key).
+- `kexec`: a segment ending past `MAXUSZ - (USERSTACK + 1) * PGSIZE` is refused,
+  merged into the existing wrap test (`goto bad`).
+- `pipe.c`: `npipe` under a zero-initialised, never-`initlock`ed `npipelock`;
+  `pipealloc` refuses the 51st live pipe buffer (before its `kalloc`),
+  `pipeclose` uncounts after its `kfree`.  A `kalloc` that fails after the count
+  leaks one count (recorded, not fixed: the fix needs a saved register that may
+  move `.eh_frame`; unreachable once Q-1's credits make a credited `kalloc`
+  total).
+- `riscv.h` / `plic.c`: `w_scounteren(0)` at the end of `plicinithart`, so a
+  user `rdcycle`/`rdtime`/`rdinstret` traps (usertrap kills it).
+
+User-visible: sbrk past 768 KiB, an exec image ending past 760 KiB and the 51st
+live pipe fail; usertests' big-memory cases would fail (nothing here runs them).
+Every upstream bump rebases the one commit (about 0.05 BE).
+
 ## How to tell a kernel defect from a spec problem
 
 **The tell is scaffolding.**

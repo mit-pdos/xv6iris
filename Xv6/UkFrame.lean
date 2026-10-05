@@ -50,15 +50,15 @@ theorem uk_regs_open (cpu : CPU) (C : UCfg) (P : UPtd) (m : RegMap) (pc : BitVec
   iintro ⟨#Hhw, Hregs, Hg, Hpc, Hcfg, Hr⟩
   unfold uvRegs clockCells
   icases Hregs with ⟨%ms, %sc, %stv, %sep, %hms, Hhs, Hpr, Hms, Hsc, Hstv, Hsep,
-    ⟨%mi, %mst, %cy, %ti, %ip, Hmi, Hmst, Hcy, Hti, Hip⟩⟩
+    ⟨%mi, %mst, %cy, %ti, %ip, %scn, Hmi, Hmst, Hcy, Hti, Hip, Hscn⟩⟩
   unfold pcIs
   icases Hpc with ⟨Hpc, Hnpc⟩
   unfold userCfg userHwCells
   icases Hcfg with ⟨Hstvec, Hmie, Hmdl, Hmedl, Hmenv, %mc, %mtc, %htm, Hmcen, Hmtc, %mepc, %stc, Hmepc, Hstc⟩
   unfold ubPtRegs userPmp
   icases Hr with ⟨Hsatp, ⟨%cfg, %paddr, %h0, Hpcfg, Hpaddr⟩, Htlb⟩
-  icases hwConfig_counters cpu $$ Hhw with ⟨%ctr, #Hmci, #Hmic, #Hmcc, #Hhpm, #Hscen⟩
-  iexists (⟨.HART_ACTIVE (), ms, sc, stv, sep, pc, pc, m, mi, mst, cy, ti, ip, tlb, stc, ctr,
+  icases hwConfig_counters cpu $$ Hhw with ⟨%ctr, #Hmci, #Hmic, #Hmcc, #Hhpm⟩
+  iexists (⟨.HART_ACTIVE (), ms, sc, stv, sep, pc, pc, m, mi, mst, cy, ti, ip, scn, tlb, stc, ctr,
     ⟨mc, mtc, cfg, paddr⟩⟩ : UfVals)
   isplitr
   · ipureintro
@@ -69,7 +69,7 @@ theorem uk_regs_open (cpu : CPU) (C : UCfg) (P : UPtd) (m : RegMap) (pc : BitVec
     · iapply (uf_trapRw_cells cpu (ufFile C P _)).2
       dsimp only [ufFile]
       iframe
-    isplitl [Hhs Hmi Hmst Hcy Hti Hip Htlb]
+    isplitl [Hhs Hmi Hmst Hcy Hti Hip Hscn Htlb]
     · iapply (uf_rwNamed_cells cpu (ufFile C P _)).2
       dsimp only [ufFile]
       iframe
@@ -88,7 +88,6 @@ theorem uk_regs_open (cpu : CPU) (C : UCfg) (P : UPtd) (m : RegMap) (pc : BitVec
       iframe Hhw
       dsimp only [ufFile]
       iframe Hmci Hmic Hmcc Hhpm
-      iexact Hscen
   · unfold ufAside
     iexists mepc
     iexact Hmepc
@@ -105,7 +104,7 @@ theorem uk_regs_close (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (m' : RegM
   iintro ⟨HF, Ha⟩
   icases (uf_F_split cpu C f).1 $$ HF with ⟨H1, H2, H3, H4, H5, -⟩
   icases (uf_trapRw_cells cpu f).1 $$ H1 with ⟨Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, -⟩
-  icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Htlb, -⟩
+  icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Hscn, Htlb, -⟩
   ihave Hg := (uf_gprFile_cells cpu f).2 $$ H3
   ihave Hg := MachCSL.gprFile_ext cpu (uxaXget f) m' (fun i hi => ukRegs_ne f m' hg i hi) $$ Hg
   icases (uf_cfgRo_cells cpu C.dqc f).1 $$ H4 with ⟨Hstvec, Hmedl, Hmie, Hmdl, Hmenv, -⟩
@@ -114,7 +113,7 @@ theorem uk_regs_close (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (m' : RegM
   unfold ufAside
   icases Ha with ⟨%mepc, Hmepc⟩
   unfold uvRegs clockCells pcIs userCfg userHwCells ubPtRegs userPmp
-  isplitl [Hhs Hpr Hms Hsc Hstv Hsep Hmi Hmst Hcy Hti Hip]
+  isplitl [Hhs Hpr Hms Hsc Hstv Hsep Hmi Hmst Hcy Hti Hip Hscn]
   · iexists f .mstatus, f .scause, f .stval, f .sepc
     isplitr
     · ipureintro; exact hms
@@ -148,7 +147,7 @@ theorem uk_regs_close_trap (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile)
   iintro ⟨HF, Ha⟩
   icases (uf_F_split cpu C f).1 $$ HF with ⟨H1, H2, H3, H4, H5, -⟩
   icases (uf_trapRw_cells cpu f).1 $$ H1 with ⟨Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, -⟩
-  icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Htlb, -⟩
+  icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Hscn, Htlb, -⟩
   ihave Hg := (uf_gprFile_cells cpu f).2 $$ H3
   icases (uf_cfgRo_cells cpu C.dqc f).1 $$ H4 with ⟨Hstvec, Hmedl, Hmie, Hmdl, Hmenv, -⟩
   icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, -⟩
@@ -157,8 +156,8 @@ theorem uk_regs_close_trap (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile)
   icases Ha with ⟨%mepc, Hmepc⟩
   unfold clockCells pcIs userCfg userHwCells ubPtRegs userPmp
   iframe Hhs Hpr Hms Hsc Hstv Hsep Hpc Hnpc Hg Hstvec Hmie Hmdl Hmedl Hmenv Hsatp Htlb
-  isplitl [Hmi Hmst Hcy Hti Hip]
-  · iexists f .minstret_increment, f .minstret, f .mcycle, f .mtime, f .mip
+  isplitl [Hmi Hmst Hcy Hti Hip Hscn]
+  · iexists f .minstret_increment, f .minstret, f .mcycle, f .mtime, f .mip, f .scounteren
     iframe
   isplitl [Hmcen Hmtc Hmepc Hstc]
   · iexists f .mcounteren, f .mtimecmp

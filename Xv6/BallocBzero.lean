@@ -26,7 +26,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 theorem ba_br_bread : KA.«balloc» + 0xFFFFFFFFFFFFFE0C#64 = KA.«bread» := by decide
-theorem ba_br_memset : KA.«balloc» + 0xffffffffffffde6a#64 = KA.«memset» := by decide
+theorem ba_br_memset : KA.«balloc» + 0xffffffffffffde5a#64 = KA.«memset» := by decide
 theorem ba_br_logwrite : KA.«balloc» + 0x111c#64 = KA.«log_write» := by decide
 theorem ba_ret_54 : jumpPc (KA.«balloc» + 0x54#64) = KA.«balloc» + 0x54#64 := by decide
 theorem ba_ret_64 : jumpPc (KA.«balloc» + 0x64#64) = KA.«balloc» + 0x64#64 := by decide
@@ -99,7 +99,7 @@ theorem ba_bzero_fill (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0kk]
   iintro Hk Hpc
   -- +0x60  jal memset
-  k_step_e (wp_s_jal cpu _ (KA.«balloc» + 0x60#64) false 2088458#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«balloc» + 0x60#64) false 2088442#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_memset]
   iintro Hk Hpc
   iapply (memset_zero_call MS cpu _ bs2 (aBufData (bnode kk2)) BSIZE (by unfold BSIZE; omega)

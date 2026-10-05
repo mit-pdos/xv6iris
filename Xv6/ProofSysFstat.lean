@@ -233,7 +233,7 @@ theorem sfs_ok_jal (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
   obtain ⟨hfd0, hfv, hnz, hz⟩ := argFd_lookup v V.ofile fd0 fv hsome
   iintro ⟨Hk, Hpc, #Hpi, #Hpe, #Hkl, #Hav, Hra, Hs0, Hcf, Hcs, Hte, Hce, Hcore, Howe, Henv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step_e (wp_s_jal cpu _ (KA.«sys_fstat» + 0x2e#64) false 2093954#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_fstat» + 0x2e#64) false 2093848#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_fstat_br_filestat]
   iintro Hk Hpc
   -- LEND fd0's reference out of the array (Rocq `proc_priv_lend`)
@@ -444,7 +444,7 @@ theorem sys_fstat_main (AA : ARGADDR) (AF : ARGFD) (FS : FILESTAT)
   k_step_e (wp_s_addi cpu _ (KA.«sys_fstat» + 0xc#64) true 1#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.ci_li_one]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_fstat» + 0xe#64) false 2087260#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_fstat» + 0xe#64) false 2087138#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_fstat_br_argaddr]
   iintro Hk Hpc
   icases sysfile_core_tf ht0 (procAddr j) pid V M $$ Hcore with ⟨%htf, Htf, Htfp, Hcorew⟩

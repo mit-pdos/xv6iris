@@ -31,6 +31,7 @@ step it (`PipeQstep`), paid by the caller's links or the taint.
 -/
 import MachCSL.KCtxMove
 import Xv6.PipeQueue
+import Xv6.NpipeDefs
 
 namespace Xv6
 
@@ -557,6 +558,9 @@ Persistent, so every holder of either end shares it.  Built via
 to open it is a resource (a reference, or the lock token). -/
 def isPipe (γl : GName) (γp : PipeNames) (pi : BitVec 64) : IProp GF := iprop%
   ⌜lockAddrOk pi⌝ ∗ ⌜pageValid pi⌝ ∗ kmapId pi ∗ kmapId (pi + 16#64) ∗
+  -- (NI M3 quotas Q-0) the pipe-buffer counter's lock, which `pipeclose`
+  -- takes after its `kfree` (`NpipeDefs`; `pipealloc` copies it off `isFtable`)
+  (∃ γn : GName, isNpipe γn) ∗
   ∃ lo lc : Nat,
     inv lockN (iprop(lockBody γl pi "pipe" (pipeResAt γp pi) lo lc ∨ pipeDead γl γp)) ∗
     lkFloor curCtx lo ∗ lkFloor curCtx lc
@@ -584,13 +588,20 @@ theorem isPipe_kmaps (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
   iintro ⟨_, _, #H1, #H2, _⟩
   iframe H1 H2
 
+/-- (NI M3 quotas Q-0) The pipe-buffer counter's lock, off the pipe. -/
+theorem isPipe_npipe (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
+    isPipe (GF := GF) γl γp pi -∗ ∃ γn : GName, isNpipe γn := by
+  unfold isPipe
+  iintro ⟨_, _, _, _, #H, _⟩
+  iexact H
+
 /-- What acquire / holding / release take.  The credential is left to the
 caller: a reference for acquire, the holder token for release. -/
 theorem isPipe_openable (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
     isPipe (GF := GF) γl γp pi -∗
     lockOpenable γl pi "pipe" (pipeResAt γp pi) (pipeDead γl γp) := by
   unfold isPipe
-  iintro ⟨%hok, %_, #Hm1, #Hm2, %lo, %lc, #Hinv, #Hflo, #Hflc⟩
+  iintro ⟨%hok, %_, #Hm1, #Hm2, _, %lo, %lc, #Hinv, #Hflo, #Hflc⟩
   iapply (lockOpenable_of_dead γl pi "pipe" (pipeResAt γp pi) (pipeDead γl γp) lo lc hok)
     $$ Hm1 Hm2 Hinv Hflo Hflc
 

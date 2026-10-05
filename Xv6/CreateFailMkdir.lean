@@ -318,7 +318,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR.2.2.2.2.1]
   iintro Hk Hpc
   -- ===== +0x14c  jal iupdate : THE UNLINK FLUSH =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x14c#64) false 2089966#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x14c#64) false 2089860#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iupdate]
   iintro Hk Hpc
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
@@ -363,7 +363,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR1.2.2.2.2.1]
   iintro Hk Hpc
   -- ===== +0x152  jal iunlockput(ip) : THE PUT THAT FREES =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x152#64) false 2090736#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x152#64) false 2090630#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   ihave Hbs := bslots_cons 2 $$ [Hb1 Hb2]
@@ -413,7 +413,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2.2.2.1]
   iintro Hk Hpc
   -- ===== +0x158  jal iunlockput(dp) =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x158#64) false 2090730#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x158#64) false 2090624#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   -- THE PARENT NEEDS NO RE-PARK: it re-closes at the record it was handed

@@ -30,29 +30,29 @@ set_option linter.unusedSimpArgs false
 /-! ## Constants the code computes -/
 
 /-- `&bcache.lock`, from all three `auipc a0,0x15 ; addi a0,a0,_` pairs. -/
-theorem bd_lock : KA.«bread» + 0x15a8e#64 = bcacheLockAddr := by
+theorem bd_lock : KA.«bread» + 0x15a7e#64 = bcacheLockAddr := by
   unfold bcacheLockAddr; decide
 
 /-- `&bcache.head`, from both `auipc a5,0x1e ; addi a5,a5,_` pairs. -/
-theorem bd_head : KA.«bread» + 0x1dcf6#64 = bhead := by
+theorem bd_head : KA.«bread» + 0x1dce6#64 = bhead := by
   unfold bhead bcacheHeadAddr; decide
 
 /-- `&bcache.head.next`, the forward scan's first load. -/
-theorem bd_hnext : KA.«bread» + 0x1dd46#64 = bNext bhead := by
+theorem bd_hnext : KA.«bread» + 0x1dd36#64 = bNext bhead := by
   unfold bNext bhead bcacheHeadAddr; decide
 
 /-- `&bcache.head.prev`, the backward scan's first load. -/
-theorem bd_hprev : KA.«bread» + 0x1dd3e#64 = bPrev bhead := by
+theorem bd_hprev : KA.«bread» + 0x1dd2e#64 = bPrev bhead := by
   unfold bPrev bhead bcacheHeadAddr; decide
 
 /-- The `"bget: no buffers"` literal. -/
-theorem bd_msg : KA.«bread» + 0x4706#64 = KStr.«bget: no buffers» := by decide
+theorem bd_msg : KA.«bread» + 0x46f6#64 = KStr.«bget: no buffers» := by decide
 
-theorem bd_br_acq : KA.«bread» + 0xffffffffffffdf9e#64 = KA.«acquire» := by decide
-theorem bd_br_rel : KA.«bread» + 0xffffffffffffe026#64 = KA.«release» := by decide
+theorem bd_br_acq : KA.«bread» + 0xffffffffffffdf8e#64 = KA.«acquire» := by decide
+theorem bd_br_rel : KA.«bread» + 0xffffffffffffe016#64 = KA.«release» := by decide
 theorem bd_br_aslp : KA.«bread» + 0x147e#64 = KA.«acquiresleep» := by decide
-theorem bd_br_panic : KA.«bread» + 0xffffffffffffdb7e#64 = KA.«panic» := by decide
-theorem bd_br_vdr : KA.«bread» + 0x2e3a#64 = KA.«virtio_disk_rw» := by decide
+theorem bd_br_panic : KA.«bread» + 0xffffffffffffdb6e#64 = KA.«panic» := by decide
+theorem bd_br_vdr : KA.«bread» + 0x2ea0#64 = KA.«virtio_disk_rw» := by decide
 
 theorem bd_ret_1e : jumpPc (KA.«bread» + 0x1e#64) = (KA.«bread» + 0x1e#64) := by decide
 theorem bd_ret_5a : jumpPc (KA.«bread» + 0x5a#64) = (KA.«bread» + 0x5a#64) := by decide

@@ -6,7 +6,7 @@ cluster, the `++` / `--` clusters, and the record either flush writes.
 
 The walk is `SysLinkWalkA` / `SysLinkWalkB` / `ProofSysLink` (not yet
 written); the contract is `SpecSysLink` (after C0).  THE LEAN IMAGE
-(`KA.«sys_link»` = 0x80005022, 292 B), whose offsets every lemma below
+(`KA.«sys_link»` = 0x8000509c, 292 B), whose offsets every lemma below
 uses (never Rocq's comments):
     +0x00 `addi sp,sp,-304` ... +0x12/+0x26 `jal argstr` (old at s0-304,
     new at s0-176), +0x18/+0x2c `bltz`, +0x32 `jal begin_op`, +0x3a `jal
@@ -83,19 +83,19 @@ open MachCSL LeanRV64D
 
 /-! ## Call targets and return addresses -/
 
-theorem sys_link_br_argstr : KA.«sys_link» + 0xffffffffffffd94c#64 = KA.«argstr» := by decide
-theorem sys_link_br_begin_op : KA.«sys_link» + 0xffffffffffffedfa#64 = KA.«begin_op» := by decide
-theorem sys_link_br_namei : KA.«sys_link» + 0xffffffffffffec04#64 = KA.«namei» := by decide
-theorem sys_link_br_ilock : KA.«sys_link» + 0xffffffffffffe330#64 = KA.«ilock» := by decide
-theorem sys_link_br_iupdate : KA.«sys_link» + 0xffffffffffffe27c#64 = KA.«iupdate» := by decide
-theorem sys_link_br_iunlock : KA.«sys_link» + 0xffffffffffffe3de#64 = KA.«iunlock» := by decide
+theorem sys_link_br_argstr : KA.«sys_link» + 0xffffffffffffd8d2#64 = KA.«argstr» := by decide
+theorem sys_link_br_begin_op : KA.«sys_link» + 0xffffffffffffed90#64 = KA.«begin_op» := by decide
+theorem sys_link_br_namei : KA.«sys_link» + 0xffffffffffffeb9a#64 = KA.«namei» := by decide
+theorem sys_link_br_ilock : KA.«sys_link» + 0xffffffffffffe2c6#64 = KA.«ilock» := by decide
+theorem sys_link_br_iupdate : KA.«sys_link» + 0xffffffffffffe212#64 = KA.«iupdate» := by decide
+theorem sys_link_br_iunlock : KA.«sys_link» + 0xffffffffffffe374#64 = KA.«iunlock» := by decide
 theorem sys_link_br_nameiparent :
-    KA.«sys_link» + 0xffffffffffffec1e#64 = KA.«nameiparent» := by decide
-theorem sys_link_br_dirlink : KA.«sys_link» + 0xffffffffffffeb5a#64 = KA.«dirlink» := by decide
+    KA.«sys_link» + 0xffffffffffffebb4#64 = KA.«nameiparent» := by decide
+theorem sys_link_br_dirlink : KA.«sys_link» + 0xffffffffffffeaf0#64 = KA.«dirlink» := by decide
 theorem sys_link_br_iunlockput :
-    KA.«sys_link» + 0xffffffffffffe584#64 = KA.«iunlockput» := by decide
-theorem sys_link_br_iput : KA.«sys_link» + 0xffffffffffffe4b2#64 = KA.«iput» := by decide
-theorem sys_link_br_end_op : KA.«sys_link» + 0xffffffffffffee86#64 = KA.«end_op» := by decide
+    KA.«sys_link» + 0xffffffffffffe51a#64 = KA.«iunlockput» := by decide
+theorem sys_link_br_iput : KA.«sys_link» + 0xffffffffffffe448#64 = KA.«iput» := by decide
+theorem sys_link_br_end_op : KA.«sys_link» + 0xffffffffffffee1c#64 = KA.«end_op» := by decide
 
 theorem sys_link_ret_16 : jumpPc (KA.«sys_link» + 0x16#64) = KA.«sys_link» + 0x16#64 := by decide
 theorem sys_link_ret_2a : jumpPc (KA.«sys_link» + 0x2a#64) = KA.«sys_link» + 0x2a#64 := by decide

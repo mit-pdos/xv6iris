@@ -93,7 +93,7 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
     ⊢ wpLoop cpu := by
   iintro ⟨HmConf, Hclock, HPC, HnextPC, HF, HΦ⟩
   iloeb as IH
-  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
+  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, %sc, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip, Hscounteren⟩ :=
     clockCells_cases _ $$ Hclock
   iapply wpLoop_restart
   iintro %tick
@@ -120,7 +120,7 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
       cases tick
       · swp_run 10
         conf_intro HmConf
-        ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+        ihave Hclock := clockCells_introW _ _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Hscounteren
         ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
         iapply HΦ $$ HmConf Hclock Hpc HF
       · swp_run 5
@@ -129,7 +129,7 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
         iframe
         inext
         iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-        ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+        ihave Hclock := clockCells_introW _ _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Hscounteren
         ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
         iapply HΦ $$ HmConf Hclock Hpc HF
   · -- still parked: a no-op step, the pc does not move; Löb
@@ -137,7 +137,7 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
     cases tick
     · swp_run 10
       confhs_intro HmConf
-      ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+      ihave Hclock := clockCells_introW _ _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Hscounteren
       iapply IH $$ HmConf Hclock HPC HnextPC HF HΦ
     · swp_run 5
       confhs_intro HmConf
@@ -145,7 +145,7 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
       iframe
       inext
       iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-      ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+      ihave Hclock := clockCells_introW _ _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Hscounteren
       iapply IH $$ HmConf Hclock HPC HnextPC HF HΦ
 
 /-! ## The `wfi` cycle -/
@@ -170,7 +170,7 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
   have hp' : Privilege.Supervisor = Privilege.Machine ∨ Privilege.Supervisor = Privilege.Supervisor := Or.inr rfl
   have hsie : BitVec.extractLsb' 1 1 c.mstatus = 0#1 := hok.phys.2.1.1
   iintro ⟨HmConf, Hclock, Hpc, HT, HR, HΦ⟩
-  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
+  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, %sc, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip, Hscounteren⟩ :=
     clockCells_cases _ $$ Hclock
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
   iapply wpLoop_restart
@@ -225,7 +225,7 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
   cases tick
   · swp_run 10
     confhs_intro HmConf
-    ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+    ihave Hclock := clockCells_introW _ _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Hscounteren
     iapply (wpLoop_wait_wfi cpu Privilege.Supervisor hp' c w pc (pc + 4#64)
       iprop(transTok cpu tier root ∗ R))
     iframe HmConf Hclock HPC HnextPC HT HR Hcont
@@ -235,7 +235,7 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
     iframe
     inext
     iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-    ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+    ihave Hclock := clockCells_introW _ _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Hscounteren
     iapply (wpLoop_wait_wfi cpu Privilege.Supervisor hp' c w pc (pc + 4#64)
       iprop(transTok cpu tier root ∗ R))
     iframe HmConf Hclock HPC HnextPC HT HR Hcont

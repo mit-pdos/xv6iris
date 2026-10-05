@@ -21,7 +21,7 @@ of Rocq `SpecSysChroot.v` (branch `chroot/bump`).
       return 0;
     }
 
-`KA.«sys_chroot»` = 0x80005544, 128 bytes / 45 instructions: sys_chdir's
+`KA.«sys_chroot»` = 0x800055be, 128 bytes / 45 instructions: sys_chdir's
 image instruction for instruction, the two `p->cwd` displacements (336)
 reading 344 (`p->root`).  The same TWENTY-slot frame: ra @ `sp0-8`, s0 @
 `sp0-16`, s1 @ `sp0-24` (the inode, saved late), s2 @ `sp0-32` (the proc),

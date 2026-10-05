@@ -69,9 +69,9 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Constants -/
 
-theorem sys_open_br_argint : KA.«sys_open» + 0xffffffffffffd670#64 = KA.«argint» := by decide
-theorem sys_open_br_argstr : KA.«sys_open» + 0xffffffffffffd6a8#64 = KA.«argstr» := by decide
-theorem sys_open_br_begin_op : KA.«sys_open» + 0xffffffffffffeb56#64 = KA.«begin_op» := by decide
+theorem sys_open_br_argint : KA.«sys_open» + 0xffffffffffffd5f6#64 = KA.«argint» := by decide
+theorem sys_open_br_argstr : KA.«sys_open» + 0xffffffffffffd62e#64 = KA.«argstr» := by decide
+theorem sys_open_br_begin_op : KA.«sys_open» + 0xffffffffffffeaec#64 = KA.«begin_op» := by decide
 
 theorem sys_open_ret_12 : jumpPc (KA.«sys_open» + 0x12#64) = KA.«sys_open» + 0x12#64 := by decide
 theorem sys_open_ret_20 : jumpPc (KA.«sys_open» + 0x20#64) = KA.«sys_open» + 0x20#64 := by decide
@@ -259,7 +259,7 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.1, hpins.2.2.1]
     iintro Hk Hpc H3
     -- +0x2a  jal begin_op
-    k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x2a#64) false 2091820#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x2a#64) false 2091714#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_br_begin_op]
     iintro Hk Hpc
     icases Xv6.sys_mknod_pid hct _ _ _ _ _ $$ Hblk with ⟨Hpid, Hback⟩
@@ -388,7 +388,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x0e  jal argint
-  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0xe#64) false 2086498#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0xe#64) false 2086376#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_br_argint]
   iintro Hk Hpc
   icases sysOpenCells_om _ _ _ _ _ _ _ _ _ _ $$ Hcells with ⟨Hom, Hcback⟩
@@ -436,7 +436,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1c  jal argstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x1c#64) false 2086540#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x1c#64) false 2086418#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_br_argstr]
   iintro Hk Hpc
   icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩

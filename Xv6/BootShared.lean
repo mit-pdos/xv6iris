@@ -307,6 +307,8 @@ theorem bootShared_kptRows [CurCtx] (cn : ConsNames) :
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«log» (MachCSL.KernelSyms.«log» + 168) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ftable» (MachCSL.KernelSyms.«ftable» + 0xfb8) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 0x140) -∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«npipelock» (MachCSL.KernelSyms.«npipelock» + 24) -∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«npipe» (MachCSL.KernelSyms.«npipe» + 4) -∗
       consGhostsBoot cn -∗
       fdSlots (NPROC * (NOFILE + FDSPARE)) -∗ irefSlots (NPROC * (IREFHOME + IREFSPARE)) -∗
       irefSlots NFILE -∗ bslots (NPROC * 3) -∗
@@ -314,14 +316,15 @@ theorem bootShared_kptRows [CurCtx] (cn : ConsNames) :
       wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗ wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32 ∗
       (∃ (vl : BitVec 32) (vn vc pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)),
         diskInitCells vl vn vc pd0 pav0 pu0 free0) := by
-  iintro #Hk Hpr Hi Ht Hring H1 H2 Hpl Hwl Htl Hbc Hsb Hit Hlog Hft Hdk Hg Hfd Hir Hirf Hbs
+  iintro #Hk Hpr Hi Ht Hring H1 H2 Hpl Hwl Htl Hbc Hsb Hit Hlog Hft Hdk Hnl Hnc Hg Hfd Hir Hirf Hbs
   ihave HR := bootCarveProc_rows (GF := GF) cn $$ Hk Hpr Hi Ht Hring Hg
   ihave HF := bootCarveProc_first (GF := GF) $$ Hk H1
   ihave HN := bootCarveProc_nextpid (GF := GF) $$ Hk H2
   icases bootCarveFs_bcache (GF := GF) curCtx $$ Hk Hbc with ⟨Hbl, Hhd, Hbi, Hbd⟩
   icases bootCarveFs_itable (GF := GF) $$ Hk Hit with ⟨Hil, Hsl, Hie⟩
   icases bootCarve_ftable (GF := GF) curCtx $$ Hk Hft with ⟨Hfl, Hfe⟩
-  ihave HL := bootCarveFs_mainLocksRaw (GF := GF) $$ Hk Hpl Hwl Htl Hbl Hil Hfl
+  ihave Hnp := bootCarve_npipe (GF := GF) $$ Hk Hnl Hnc
+  ihave HL := bootCarveFs_mainLocksRaw (GF := GF) $$ Hk Hpl Hwl Htl Hbl Hil Hfl Hnp
   ihave HS := bootCarveFs_sb (GF := GF) $$ Hk Hsb
   ihave HLg := bootCarveFs_log (GF := GF) $$ Hk Hlog
   ihave HD := bootCarveFs_diskEx (GF := GF) $$ Hk Hdk
@@ -355,7 +358,9 @@ def bsKptWin : IProp GF := iprop%
   bootRan (imgFlat bootImage) MachCSL.KernelSyms.«itable» (MachCSL.KernelSyms.«itable» + 0x1aa8) ∗
   bootRan (imgFlat bootImage) MachCSL.KernelSyms.«log» (MachCSL.KernelSyms.«log» + 168) ∗
   bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ftable» (MachCSL.KernelSyms.«ftable» + 0xfb8) ∗
-  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 0x140)
+  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 0x140) ∗
+  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«npipelock» (MachCSL.KernelSyms.«npipelock» + 24) ∗
+  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«npipe» (MachCSL.KernelSyms.«npipe» + 4)
 
 /-- **What the carve hands on** (Rocq `boot_bss_carve` + `main_data_raw` +
 the image steps): the read-only image, the boot hart's token and bundle,
@@ -388,8 +393,8 @@ theorem bootShared_carve (σ : MState) (hbf : bootFacts σ) :
     ⟨#Htx, #Hd, #Hg, Hw1, Hw2, Hu0, Hu1, Hbss, Hfree⟩
   · iframe Hk Hmem
   icases bcpBssWindows (GF := GF) (imgFlat bootImage) $$ Hbss with
-    ⟨Hst, Hkp, Hip, Htk, Hs0, Hc, Hring, Hpr, Hkm, Hkm2, Hpl, Hwl, Hcpus, Hproc, Htl, Hbc, Hsb, Hit,
-      Hlog, Hdv, Hft, Hdk⟩
+    ⟨Hst, Hkp, Hip, Htk, Hnc, Hs0, Hc, Hring, Hpr, Hkm, Hkm2, Hpl, Hwl, Hcpus, Hproc, Htl, Hbc, Hsb, Hit,
+      Hlog, Hdv, Hft, Hnl, Hdk⟩
   imod bootShared_harts σ hbf $$ [] Ht Hr Hl Hs0 Hcpus with Hh
   · iframe Hk Hg
   icases bootShared_peel _ $$ Hh with ⟨⟨⟨%ξ0, Ht0⟩, Hb0⟩, Hrest⟩
@@ -400,7 +405,7 @@ theorem bootShared_carve (σ : MState) (hbf : bootFacts σ) :
   iexists ξ0
   unfold bsCarveOut bsKptWin
   iframe Htx Hd Ht0 Hb0 Hrest HL HG HU0 HU1 HP Hproc Hip Htk Hring Hw1 Hw2 Hpl Hwl Htl Hbc Hsb Hit
-    Hlog Hft Hdk Hsc
+    Hlog Hft Hdk Hnl Hnc Hsc
 
 end carveAll
 
@@ -562,7 +567,7 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   · iframe Hkst Hmem Htoks Hregs Hlocks
   unfold bsCarveOut bsKptWin
   icases Hc with ⟨#Htx, #Hd, Ht0, Hb0, Hrest, HL, HG, HU0, HU1, HP, ⟨W1, W2, W3, W4, W5, W6, W7, W8,
-    W9, W10, W11, W12, W13, W14, W15⟩, Hsc⟩
+    W9, W10, W11, W12, W13, W14, W15, W16, W17⟩, Hsc⟩
   -- the devices
   imod bootSharedDev_devs (hlc := hlc) (GF := GF) (bootSharedX ξ0) ds0 (ndisk / BSIZE) $$
     [Hdevs Hch HU0 HU1] with ⟨%γ0, %γ1, %cn, %γd, Hdv⟩
@@ -573,7 +578,7 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   icases Hn with ⟨Hh, Hs, Hav, Hsf, Hchb, Htc, Htl0, Htl1, Htt, Hlks, Hfd, Hi1, Hi2, Hi3, Hia, Hb1, Hb2⟩
   -- the kernel-tier rows
   have hK := (letI : CurCtx := (bootSharedX ξ0).toKpt; bootShared_kptRows (GF := GF) cn)
-  ihave HK := hK $$ Hkst W1 W2 W3 W4 W5 W6 W7 W8 W9 W10 W11 W12 W13 W14 W15 Hg Hfd Hi1 Hi2 Hb1
+  ihave HK := hK $$ Hkst W1 W2 W3 W4 W5 W6 W7 W8 W9 W10 W11 W12 W13 W14 W15 W16 W17 Hg Hfd Hi1 Hi2 Hb1
   icases HK with ⟨HLr, HGr, HSb, HLog, HF, HNp, HDk⟩
   -- the file system
   have hF := (letI : CurCtx := bootSharedX ξ0; bootSharedFs (hlc := hlc) (GF := GF) γ0 γd cn

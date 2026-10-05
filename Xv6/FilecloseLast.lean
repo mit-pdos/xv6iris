@@ -251,12 +251,12 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
       k_step_gen (wp_s_add c3 _ (KA.«fileclose» + 0x9a#64) true 10#5 0#5 20#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
       iintro Hk Hpc
-      k_step_gen (wp_s_jal c4 _ (KA.«fileclose» + 0x9c#64) false 864#21 1#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_3fc] next c5 hp5
+      k_step_gen (wp_s_jal c4 _ (KA.«fileclose» + 0x9c#64) false 924#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_438] next c5 hp5
       iintro Hk Hpc
       icases fcRest_pipe pn C hty $$ Hc with ⟨#Hpipe, Hpr, Hir⟩
       iapply (fc_pipeclose PC Γ c5 _ pn.lock pn.pipe (fcWbool C) γkl γk on Φc ke k.proc ?hpP ?hw ?hnp ?hKp
-          ?hpp ?hpr ?hkp ?htp)
+          ?hpp ?hpr ?hkp ?hnpp ?htp)
         $$ [- $Hk $Hpc $Hav $Hlend]
       rotate_right 1
       k_norm_g [fc_ret_41fe, e20]
@@ -269,6 +269,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
       case hpp => k_norm_g; rw [hlocks]; exact List.not_mem_nil
       case hpr => k_norm_g; rw [hlocks]; exact List.not_mem_nil
       case hkp => k_norm_g; rw [hlocks]; exact List.not_mem_nil
+      case hnpp => k_norm_g; rw [hlocks]; exact List.not_mem_nil
       case htp => k_norm_g; exact htier
       -- past pipeclose: restore s2..s5 ; j 41ec
       iapply wpNext_intro_pin
@@ -471,11 +472,11 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO 
   k_step (wp_s_auipc c _ (KA.«fileclose» + 0x48#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«fileclose» + 0x4c#64) false 1786#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_1e742, fc_lock_41a6]
+  k_step (wp_s_addi c _ (KA.«fileclose» + 0x4c#64) false 1770#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_1e732, fc_lock_41a6]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«fileclose» + 0x50#64) false 2083258#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_ffffffffffffca0a]
+  k_step (wp_s_jal c _ (KA.«fileclose» + 0x50#64) false 2083242#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_ffffffffffffc9fa]
   iintro Hk Hpc
   iapply (fa_release RE c _ γl γ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]
   rotate_right 1

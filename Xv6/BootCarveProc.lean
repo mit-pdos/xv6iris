@@ -80,7 +80,7 @@ the addresses `f j`, as the `replicate`-indexed big-op the proc block's
 rows are stated in. -/
 theorem bcpZeroRun [CurCtx] (w : Nat) (hw : 0 < w)
     (f : Nat → PAddr) (A : Nat) (hlo : 0x8000a400 ≤ A) (hal : A % w = 0) :
-    ∀ n : Nat, (∀ j, j < n → (f j).toNat = A + w * j) → A + w * n ≤ 0x80023b10 →
+    ∀ n : Nat, (∀ j, j < n → (f j).toNat = A + w * j) → A + w * n ≤ 0x80023b28 →
       kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A (A + w * n) -∗
         [∗list] j ↦ v ∈ List.replicate n (0#(8 * w)), wordPointsTo (f j) w (DFrac.own 1) v
   | 0, _, _ => by
@@ -136,7 +136,7 @@ theorem bcp_pnameWf_zero : pnameWf (List.replicate PNAMELEN 0#8) :=
 def bcpProc (i : Nat) : Nat := MachCSL.KernelSyms.«proc» + 376 * i
 
 theorem bcp_proc_bounds (i : Nat) (hi : i < NPROC) :
-    0x8000a400 ≤ bcpProc i ∧ bcpProc i + 376 ≤ 0x80023b10 ∧ bcpProc i % 8 = 0 := by
+    0x8000a400 ≤ bcpProc i ∧ bcpProc i + 376 ≤ 0x80023b28 ∧ bcpProc i % 8 = 0 := by
   unfold bcpProc NPROC at *
   simp only [MachCSL.KernelSyms.«proc»]
   omega
@@ -696,13 +696,15 @@ beside its lock).  The windows are the ones the carves take:
 `bootCarveProc_*` (this file), `BootCarveHart.bootCarve_harts`
 (`stack0`, `cpus`), `BootCarveFs` (`pid_lock`, `wait_lock`, `tickslock`,
 `bcache`, `sb`, `itable`, `log`, `disk`), `FileBoot.bootCarve_ftable`
-(`ftable`); `started` is the handover's cell. -/
+(`ftable`), `FileBoot.bootCarve_npipe` (`npipe`, `npipelock`: NI M3 quotas Q-0);
+`started` is the handover's cell. -/
 theorem bcpBssWindows (m : MemF Hist) :
     bootRan (GF := GF) m MachCSL.KernelSyms.«_bss» MachCSL.KernelSyms.«end» ⊢
       bootRan m MachCSL.KernelSyms.«started» (MachCSL.KernelSyms.«started» + 4) ∗
       bootRan m MachCSL.KernelSyms.«kernel_pagetable» (MachCSL.KernelSyms.«kernel_pagetable» + 8) ∗
       bootRan m MachCSL.KernelSyms.«initproc» (MachCSL.KernelSyms.«initproc» + 8) ∗
       bootRan m MachCSL.KernelSyms.«ticks» (MachCSL.KernelSyms.«ticks» + 4) ∗
+      bootRan m MachCSL.KernelSyms.«npipe» (MachCSL.KernelSyms.«npipe» + 4) ∗
       bootRan m MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) ∗
       bootRan m MachCSL.KernelSyms.«cons» (MachCSL.KernelSyms.«cons» + 24) ∗
       bootRan m (MachCSL.KernelSyms.«cons» + 24) (MachCSL.KernelSyms.«cons» + 164) ∗
@@ -720,12 +722,14 @@ theorem bcpBssWindows (m : MemF Hist) :
       bootRan m MachCSL.KernelSyms.«log» (MachCSL.KernelSyms.«log» + 168) ∗
       bootRan m MachCSL.KernelSyms.«devsw» (MachCSL.KernelSyms.«devsw» + 16 * 10) ∗
       bootRan m MachCSL.KernelSyms.«ftable» (MachCSL.KernelSyms.«ftable» + 0xfb8) ∗
+      bootRan m MachCSL.KernelSyms.«npipelock» (MachCSL.KernelSyms.«npipelock» + 24) ∗
       bootRan m MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 0x140) := by
   iintro H
   icases bcp_take m _ MachCSL.KernelSyms.«started» (MachCSL.KernelSyms.«started» + 4) _ (by decide) (by decide) (by decide) $$ H with ⟨H0, H⟩
   icases bcp_take m _ MachCSL.KernelSyms.«kernel_pagetable» (MachCSL.KernelSyms.«kernel_pagetable» + 8) _ (by decide) (by decide) (by decide) $$ H with ⟨H1, H⟩
   icases bcp_take m _ MachCSL.KernelSyms.«initproc» (MachCSL.KernelSyms.«initproc» + 8) _ (by decide) (by decide) (by decide) $$ H with ⟨H2, H⟩
   icases bcp_take m _ MachCSL.KernelSyms.«ticks» (MachCSL.KernelSyms.«ticks» + 4) _ (by decide) (by decide) (by decide) $$ H with ⟨H3, H⟩
+  icases bcp_take m _ MachCSL.KernelSyms.«npipe» (MachCSL.KernelSyms.«npipe» + 4) _ (by decide) (by decide) (by decide) $$ H with ⟨H3n, H⟩
   icases bcp_take m _ MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) _ (by decide) (by decide) (by decide) $$ H with ⟨H4, H⟩
   icases bcp_take m _ MachCSL.KernelSyms.«cons» (MachCSL.KernelSyms.«cons» + 24) _ (by decide) (by decide) (by decide) $$ H with ⟨H5, H⟩
   icases bcp_take m _ (MachCSL.KernelSyms.«cons» + 24) (MachCSL.KernelSyms.«cons» + 164) _ (by decide) (by decide) (by decide) $$ H with ⟨H6, H⟩
@@ -743,8 +747,9 @@ theorem bcpBssWindows (m : MemF Hist) :
   icases bcp_take m _ MachCSL.KernelSyms.«log» (MachCSL.KernelSyms.«log» + 168) _ (by decide) (by decide) (by decide) $$ H with ⟨H18, H⟩
   icases bcp_take m _ MachCSL.KernelSyms.«devsw» (MachCSL.KernelSyms.«devsw» + 16 * 10) _ (by decide) (by decide) (by decide) $$ H with ⟨H19, H⟩
   icases bcp_take m _ MachCSL.KernelSyms.«ftable» (MachCSL.KernelSyms.«ftable» + 0xfb8) _ (by decide) (by decide) (by decide) $$ H with ⟨H20, H⟩
+  icases bcp_take m _ MachCSL.KernelSyms.«npipelock» (MachCSL.KernelSyms.«npipelock» + 24) _ (by decide) (by decide) (by decide) $$ H with ⟨H20n, H⟩
   icases bcp_take m _ MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 0x140) _ (by decide) (by decide) (by decide) $$ H with ⟨H21, -⟩
-  iframe H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21
+  iframe H0 H1 H2 H3 H3n H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H20n H21
 
 /-- **`.data`, cut** (the `.data` half of Rocq `boot_bss_carve` /
 `main_data_raw`): the part below the GOT (`BootCarveHart.bootCarve_gotRo`

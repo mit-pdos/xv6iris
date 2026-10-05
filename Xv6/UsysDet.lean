@@ -613,10 +613,11 @@ def sbrkEagerW (a1 : BitVec 64) : Prop := sbrkArgW a1 = 1#64
 
 instance (a1 : BitVec 64) : Decidable (sbrkEagerW a1) := by unfold sbrkEagerW; infer_instance
 
-/-- **The overrun test**, at the key's break: both paths refuse a
-non-negative argument that carries the break past `TRAPFRAME`. -/
+/-- **The overrun test**, at the key's break: the quota (NI M3 quotas Q-0,
+`verified-quota`'s `n > 0 && addr + n > MAXUSZ`, before either path) refuses a
+positive argument that carries the break past `uQuota`. -/
 def usysSbrkOverrun (sz : Nat) (a0 : BitVec 64) : Prop :=
-  0 ≤ (sbrkArgW a0).toInt ∧ (uvmMaxsz : Int) < sz + (sbrkArgW a0).toInt
+  0 < (sbrkArgW a0).toInt ∧ (uQuota : Int) < sz + (sbrkArgW a0).toInt
 
 instance (sz : Nat) (a0 : BitVec 64) : Decidable (usysSbrkOverrun sz a0) := by
   unfold usysSbrkOverrun; infer_instance

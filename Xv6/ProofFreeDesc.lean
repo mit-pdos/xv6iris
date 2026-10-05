@@ -44,15 +44,15 @@ set_option linter.unusedVariables false
 theorem fd_u_1e : BitVec.signExtend 64 (0x1e#20 ++ 0#12) = 0x1e000#64 := by decide
 
 /-- Both `auipc`/`addi` pairs of `&disk`. -/
-theorem fd_disk_addr : KA.«free_desc» + 0x1e11a#64 = KA.«disk» := by decide
+theorem fd_disk_addr : KA.«free_desc» + 0x1e0bc#64 = KA.«disk» := by decide
 
 /-- `&disk.free[0]`, the wakeup channel. -/
-theorem fd_free0_addr : KA.«free_desc» + 0x1e132#64 = aFree 0 := by
+theorem fd_free0_addr : KA.«free_desc» + 0x1e0d4#64 = aFree 0 := by
   unfold aFree diskAddr dOffFree
   decide
 
 
-theorem fd_br_wakeup : KA.«free_desc» + 0xffffffffffffc78a#64 = KA.«wakeup» := by decide
+theorem fd_br_wakeup : KA.«free_desc» + 0xffffffffffffc714#64 = KA.«wakeup» := by decide
 
 /-- The context comes back from `wakeup` with `SPIE`/`SPP` unchanged. -/
 theorem fd_withSpie (k : KCtx) (m : Nat) : (k.pushed m).withSpie k.spie k.spp = k.pushed m := rfl
@@ -160,7 +160,7 @@ theorem free_desc_proof (WK : WAKEUP) : FREE_DESC :=
   k_step (wp_s_auipc cpu _ (KA.«free_desc» + 0xe#64) false 0x1e#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fd_u_1e]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«free_desc» + 0x12#64) false 268#12 15#5 15#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«free_desc» + 0x12#64) false 174#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fd_disk_addr]
   iintro Hk Hpc
   k_step (wp_s_add cpu _ (KA.«free_desc» + 0x16#64) true 15#5 15#5 10#5 (by decide))
@@ -186,7 +186,7 @@ theorem free_desc_proof (WK : WAKEUP) : FREE_DESC :=
   k_step (wp_s_auipc cpu _ (KA.«free_desc» + 0x22#64) false 0x1e#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fd_u_1e]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«free_desc» + 0x26#64) false 248#12 15#5 15#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«free_desc» + 0x26#64) false 154#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fd_disk_addr]
   iintro Hk Hpc
   -- ld a4,0(a5) ; add a4,a4,a3 ; sd zero,0(a4)
@@ -243,10 +243,10 @@ theorem free_desc_proof (WK : WAKEUP) : FREE_DESC :=
   k_step (wp_s_auipc cpu _ (KA.«free_desc» + 0x4a#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fd_u_1e]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«free_desc» + 0x4e#64) false 232#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«free_desc» + 0x4e#64) false 138#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fd_free0_addr]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«free_desc» + 0x52#64) false 2082616#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«free_desc» + 0x52#64) false 2082498#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fd_br_wakeup]
   iintro Hk Hpc
   iapply (fd_wakeup WK Γ cpu _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]

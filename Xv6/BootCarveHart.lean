@@ -176,7 +176,7 @@ theorem bhRan_down (m : MemF Hist) :
 /-- **A `.bss` physical word at its zero** (Rocq `boot_cran_cell8_bss` at
 the M-mode tier). -/
 theorem bh_pword0 [CurCtx] (A : Nat)
-    (hlo : 0x8000a400 ≤ A) (hhi : A + 8 ≤ 0x80023b10) (hal : A % 8 = 0) :
+    (hlo : 0x8000a400 ≤ A) (hhi : A + 8 ≤ 0x80023b28) (hal : A % 8 = 0) :
     bootRan (GF := GF) (imgFlat bootImage) A (A + 8) ⊢ pwordPointsTo (BitVec.ofNat 64 A) 8 (DFrac.own 1) 0#64 := by
   have hA : bcInRam A 8 := by unfold bcInRam ramBase ramEnd; omega
   refine .trans ?_ (pwordPointsTo_intro _ 8 _ _ (bcInRam_inRam hA) (by rw [bc_ofNat_toNat hA]; exact hal))
@@ -211,7 +211,7 @@ theorem bh_slot_addr (c : CPU) (i : Nat) (hi : i < 508) :
 
 /-- The words below a `.bss` top `T`, at the hart's context, top-down. -/
 theorem bh_stack_rest [CurCtx] (n T : Nat)
-    (hlo : 0x8000a400 + 8 * n ≤ T) (hhi : T ≤ 0x80023b10) (hal : T % 8 = 0) :
+    (hlo : 0x8000a400 + 8 * n ≤ T) (hhi : T ≤ 0x80023b28) (hal : T % 8 = 0) :
     bootRan (GF := GF) (imgFlat bootImage) (T - 8 * n) T ⊢
       [∗list] i ∈ List.range n,
         ∃ w : BitVec 64, pwordPointsTo (BitVec.ofNat 64 (T - 8 * (i + 1))) 8 (DFrac.own 1) w := by

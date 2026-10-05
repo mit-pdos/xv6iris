@@ -36,23 +36,24 @@ def fetchSpecS (cpu : CPU) (dq : DFrac) (c : MConf) (pc : BitVec 64) (T R : IPro
 retire stage needs after it). -/
 def execSpecClkPP (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (p' : Privilege) (c' : MConf)
     (ast : instruction) (pc npc₀ npc : BitVec 64) (P Q : IProp GF) : Prop :=
-  ∀ ip mt : BitVec 64, execSpecPP cpu dq p c p' c' ast pc npc₀ npc
-    iprop(P ∗ Register.mip ↦ᵣ[cpu] ip ∗ Register.mtime ↦ᵣ[cpu] mt)
-    iprop(Q ∗ ∃ ip' mt' : BitVec 64, Register.mip ↦ᵣ[cpu] ip' ∗ Register.mtime ↦ᵣ[cpu] mt')
+  ∀ (ip mt : BitVec 64) (sc : BitVec 32), execSpecPP cpu dq p c p' c' ast pc npc₀ npc
+    iprop(P ∗ Register.mip ↦ᵣ[cpu] ip ∗ Register.mtime ↦ᵣ[cpu] mt ∗ Register.scounteren ↦ᵣ[cpu] sc)
+    iprop(Q ∗ ∃ (ip' mt' : BitVec 64) (sc' : BitVec 32), Register.mip ↦ᵣ[cpu] ip' ∗
+      Register.mtime ↦ᵣ[cpu] mt' ∗ Register.scounteren ↦ᵣ[cpu] sc')
 
 theorem execSpecPP.clk {cpu : CPU} {dq : DFrac} {p : Privilege} {c : MConf} {p' : Privilege} {c' : MConf}
     {ast : instruction} {pc npc₀ npc : BitVec 64} {P Q : IProp GF}
     (h : execSpecPP cpu dq p c p' c' ast pc npc₀ npc P Q) :
     execSpecClkPP cpu dq p c p' c' ast pc npc₀ npc P Q := by
-  intro ip mt Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨HP, Hmip, Hmtime⟩, HΦ⟩
+  intro ip mt sc Φ
+  iintro ⟨HmConf, HPC, HnextPC, ⟨HP, Hmip, Hmtime, Hscounteren⟩, HΦ⟩
   iapply (h Φ)
   iframe HmConf HPC HnextPC HP
   inext
   iintro HmConf HPC HnextPC HQ
-  iapply HΦ $$ HmConf HPC HnextPC [HQ Hmip Hmtime]
+  iapply HΦ $$ HmConf HPC HnextPC [HQ Hmip Hmtime Hscounteren]
   iframe HQ
-  iexists ip, mt
+  iexists ip, mt, sc
   iframe
 
 /-- A frame on the left of an execute stage's resources. -/
@@ -98,7 +99,7 @@ macro "cycle_retire_t" : tactic =>
                all_goals
                  swp_run 10
                  conf_intro HmConf
-                 ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                 ihave Hclock := clockCells_introW _ _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Hscounteren
                  ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HΦ $$ HmConf Hclock Hpc HT HR HQ
              · swp_run 40
@@ -110,7 +111,7 @@ macro "cycle_retire_t" : tactic =>
                  iframe
                  inext
                  iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-                 ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                 ihave Hclock := clockCells_introW _ _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Hscounteren
                  ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HΦ $$ HmConf Hclock Hpc HT HR HQ))
 
@@ -124,7 +125,7 @@ macro "cycle_retire_trap" : tactic =>
                all_goals
                  swp_run 10
                  conf_intro HmConf
-                 ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                 ihave Hclock := clockCells_introW _ _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Hscounteren
                  ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HK $$ %_ %hsc HmConf Hclock Hpc HT HP Hcsrs Hstv
              · swp_run 40
@@ -136,7 +137,7 @@ macro "cycle_retire_trap" : tactic =>
                  iframe
                  inext
                  iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-                 ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                 ihave Hclock := clockCells_introW _ _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Hscounteren
                  ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HK $$ %_ %hsc HmConf Hclock Hpc HT HP Hcsrs Hstv))
 

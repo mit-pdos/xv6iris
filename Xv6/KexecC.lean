@@ -228,9 +228,9 @@ theorem kxcC_vec_rows {fb ef : List (BitVec 8)} {P P' : UPtd} {Mi M' : Nat → L
 
 /-! ## §3 THE CLOSE (Rocq `kxc_c_close`) -/
 
-theorem kxcC_br_copyout2 : KA.«kexec» + 0x294#64 + BitVec.signExtend 64 2083262#21 = KA.«copyout» := by
+theorem kxcC_br_copyout2 : KA.«kexec» + 0x29c#64 + BitVec.signExtend 64 2083140#21 = KA.«copyout» := by
   decide
-theorem kxcC_ret_294 : jumpPc (KA.«kexec» + 0x294#64 + 4#64) = KA.«kexec» + 0x294#64 + 4#64 := by
+theorem kxcC_ret_294 : jumpPc (KA.«kexec» + 0x29c#64 + 4#64) = KA.«kexec» + 0x29c#64 + 4#64 := by
   decide
 
 theorem kxcC_vec_sp (top : Int) (len : Nat → Nat) (c : Nat)
@@ -355,31 +355,31 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   obtain ⟨hstr, hzero, himg⟩ := hI
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x268 .. +0x272  ustack[ci] = 0
-  k_step_e (wp_s_slli cpu _ (KA.«kexec» + 0x268#64) false 3#6 15#5 9#5 (by decide))
+  k_step_e (wp_s_slli cpu _ (KA.«kexec» + 0x270#64) false 3#6 15#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x26c#64) false 3984#12 15#5 15#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x274#64) false 3984#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x270#64) true 15#5 15#5 8#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x278#64) true 15#5 15#5 8#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8]
   iintro Hk Hpc
   have hc33 : ci < 33 := by omega
   icases kxcC_ustack_take (k.regs 2#5) ci hc33 $$ Fu with ⟨Fu, %wold, Fc⟩
-  k_step_e (wp_s_sd cpu _ (KA.«kexec» + 0x272#64) false 3840#12 15#5 0#5 (by decide) wold)
+  k_step_e (wp_s_sd cpu _ (KA.«kexec» + 0x27a#64) false 3840#12 15#5 0#5 (by decide) wold)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kxcC_slot0 _ ci (by omega)]
   iintro Hk Hpc Fc
   -- +0x276 .. +0x280  sp = round16(sp - 8*(ci+1))
-  k_step_e (wp_s_slli cpu _ (KA.«kexec» + 0x276#64) false 3#6 14#5 9#5 (by decide))
+  k_step_e (wp_s_slli cpu _ (KA.«kexec» + 0x27e#64) false 3#6 14#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x27a#64) true 8#12 14#5 14#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x282#64) true 8#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_sub cpu _ (KA.«kexec» + 0x27c#64) false 23#5 24#5 14#5 (by decide))
+  k_step_e (wp_s_sub cpu _ (KA.«kexec» + 0x284#64) false 23#5 24#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h24]
   iintro Hk Hpc
-  k_step_e (wp_s_andi cpu _ (KA.«kexec» + 0x280#64) false 4080#12 23#5 23#5 (by decide))
+  k_step_e (wp_s_andi cpu _ (KA.«kexec» + 0x288#64) false 4080#12 23#5 23#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hsptop := kxcSp_le_top (sz1.toNat : Int) A.alen ci
@@ -389,10 +389,10 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   have hbr := kxcC_bltu_bcond (kxcSpFinal (sz1.toNat : Int) A.alen ci) ((sz1.toNat : Int) - 4096)
     hfin0 (by omega) (by omega) (by omega)
   -- +0x284  c.mv s8,s2 ; +0x286  bltu s7,s4,+0x1d6
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x284#64) true 24#5 0#5 18#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x28c#64) true 24#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18]
   iintro Hk Hpc
-  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x286#64) false 8016#13 23#5 20#5 (by decide) bop.BLTU)
+  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x28e#64) false 8016#13 23#5 20#5 (by decide) bop.BLTU)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hvsp, h20, hbr]
   iintro Hk Hpc
   by_cases hov : kxcSpFinal (sz1.toNat : Int) A.alen ci < (sz1.toNat : Int) - 4096
@@ -421,16 +421,16 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   have hfin : (sz1.toNat : Int) - 4096 ≤ kxcSpFinal (sz1.toNat : Int) A.alen ci := by omega
   have hub := kxcC_ub_align (k.regs 2#5) hal
   -- +0x28a  addi a3,s0,-368 ; the copyout's arguments
-  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x28a#64) false 3728#12 13#5 8#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x292#64) false 3728#12 13#5 8#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x28e#64) true 12#5 0#5 23#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x296#64) true 12#5 0#5 23#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hvsp]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x290#64) true 11#5 0#5 18#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x298#64) true 11#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x292#64) true 10#5 0#5 22#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x29a#64) true 10#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22]
   iintro Hk Hpc
   -- the vector's bytes
@@ -446,7 +446,7 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
         (kxcVecBytes (fun j => BitVec.ofInt 64 (kxcSp (sz1.toNat : Int) A.alen (j + 1))) ci) from .rfl) $$ Hv
   -- +0x294  jal copyout, the block's event counter lent to it (permit sweep L1b)
   icases procPrivFd_evLend A.γ k.proc A.pidv V1 A.M $$ Hpriv with ⟨Hlend, Hpback⟩
-  iapply (kxcC_call_copyout Γ CO cpu k A spie spp _ (KA.«kexec» + 0x294#64) 2083262#21 kxcC_br_copyout2
+  iapply (kxcC_call_copyout Γ CO cpu k A spie spp _ (KA.«kexec» + 0x29c#64) 2083140#21 kxcC_br_copyout2
       kxcC_ret_294 P Mi (DFrac.own 1)
       (kxcVecBytes (fun j => BitVec.ofInt 64 (kxcSp (sz1.toNat : Int) A.alen (j + 1))) ci)
       (kxcUstackBuf (k.regs 2#5)) V1.ev hK hnoff ?c13 ?c10 ?c11 ?c14 (by rw [kxcVecBytes_length]; omega))
@@ -478,7 +478,7 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   rcases hret with ⟨h10, hM⟩ | h10
   rotate_left
   · -- ===== copyout FAILED: +0x298 taken, the -1 tail =====
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x298#64) false 7998#13 10#5 0#5 (by decide) bop.BLT)
+    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x2a0#64) false 7998#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, kxcC_blt_m1, kxcC_blt_m1']
     iintro Hk Hpc
     ihave Hfr := kxcFrameB_at (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
@@ -491,7 +491,7 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
         (LazyFree.lazyFree_extSz hext hcov))
       $$ [$Hk $Hpc $Hte $Hce $Hfab $Hpt $Hpriv $Hbufs $Hbs $Hirs $Hfr $Hcl]
   -- ===== copyout SUCCEEDED: +0x29c, phase D's entry =====
-  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x298#64) false 7998#13 10#5 0#5 (by decide) bop.BLT)
+  k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x2a0#64) false 7998#13 10#5 0#5 (by decide) bop.BLT)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, kxcC_blt_0]
   iintro Hk Hpc
   have hdst := kxcC_toNat_ofInt (kxcSpFinal (sz1.toNat : Int) A.alen ci) hfin0 (by omega)

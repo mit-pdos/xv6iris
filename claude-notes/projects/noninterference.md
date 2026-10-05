@@ -6572,6 +6572,65 @@ Risks:
 - **Q-R10 (order).** Recommended: Q-0 → Q-1 → Q-2 → Q-3 in one worktree; Q-4 and Q-5 optional afterwards.
   U-4L (`ustep` at lazy keys) is recorded as unlocked by Q-1.
 
+### M3 quotas Q-0 as landed (2026-10-05)
+
+Lane `lane/quota`, one commit on `lean` aef7dd5e8.  Nothing ticked.
+
+- **The kernel.** `verified-quota` = b72cbac1 + ONE commit
+  `c1fd3cc71ae3a78f7ef6b9bba36e254e8f6ecfe8` ("quota: a constant break quota (MAXUSZ), a pipe-buffer
+  cap (NPIPE), scounteren = 0 (verified-quota)"; author kaashoek; 6 files, +34/−1, the design's patch
+  verbatim).  It lives in the worktree's gitignored `xv6-riscv/`; pushing it to a remote is the
+  owner's.  Reproduction first: b72cbac1 rebuilt to md5 `50784a3e…` (the header's), `check-gen
+  --only kernel` ok.  Quota ELF md5 `710adf1e5d0961bf32b8123165d71ce7`.
+- **The measured shift (as designed):** 86 of 197 text symbols moved or resized.
+
+  | delta | symbols | resized |
+  |---|---|---|
+  | +0 | `sys_sbrk` | 0x78→0x88 |
+  | +16 | 54: `sys_pause` .. `pipealloc` | `pipealloc` 0xc8→0x104 |
+  | +76 | `pipeclose` | 0x5e→0x84 |
+  | +114 | 4: `pipewrite` .. `kexec` | `kexec` 0x35a→0x362 |
+  | +122 | 17: `argfd` .. `sys_pipe` | |
+  | +112 | 3: `kernelvec` .. `plicinithart` | `plicinithart` 0x36→0x3c |
+  | +118 | 6: `plic_claim` .. `virtio_disk_intr` | |
+
+  Data: `disk`/`end` +24; NEW `.bss` `npipe` (0x8000a41c, the gap after `ticks`) and `npipelock`
+  (0x800239d0).  `.rodata` and `.eh_frame` keep address and SIZE (0x858, 0x2b24); NOT byte-identical
+  as the design said: `.rodata` content moves (`syscalls[]` holds the moved `sys_*` pointers) and
+  `.eh_frame` content moves (pc-relative FDEs).  `.data`/`.got` byte-identical.  `fs.img` DID change
+  (md5 `81df3e02…`): `riscv.h`'s new inline moves `_usertests`' DWARF line table (code identical);
+  the seven verified user images are byte-identical (headers keep b72cbac1).
+- **The relayout:** `tools/rebase_kernel.py` literal + `--fixup` + `--symbolic`, one intervals file
+  (`sys_sbrk:+0x24:x,+0x48:+0x10,+0x58:x,+0x5c:+0xc,+0x70:+0x10`; `pipealloc` by intervals;
+  `pipeclose:+0x5c:+0x26`; `kexec:+0x162:+0x8`; `plicinithart:+0x2e:+0x6`), 191 files.  By hand:
+  `filealloc`'s end fold (`<disk>` became `<npipelock>`: `FileInv.fnode_end`), `SysExecFree`'s two
+  argument-list jal immediates, `pipeclose`'s kfree return address (an insertion point).
+- **The five shapes.**
+  - `sys_sbrk`: gcc rewrote +0x24..+0x58 (quota test first, the mode tests reordered, `n` kept in
+    `a0`).  `sysSbrkOverrun` (and `UsysDet.usysSbrkOverrun`) is the quota test IN PLACE:
+    `0 < n ∧ uQuota < sz + n` (`UPtDefs.uQuota = 192 * 4096`); it subsumes G3's `TRAPFRAME` overrun.
+    `sysSbrkOk`'s FAILED arm text is G3's (`overrun ∨ allocs`); the SUCCEEDED arm gains
+    `¬ sysSbrkOverrun V v0`.  `usysSbrkFails` is unchanged (`overrun ∨ (allocs ∧ kNull)`) until Q-2.
+  - `kexec`: the merged test is two instructions at +0x162; the refusal pays `QF .noMem`
+    (`KexecB3.kxcB3_quota`); `ExecFailCause` does not move.
+  - `pipealloc`/`pipeclose`: `npipelock` (`NpipeDefs.isNpipe`, payload `npipeResAt`: the counter
+    cell at SOME value) rides `isFtable` and `isPipe`; minted at boot from the zero words
+    (`FileBoot.bootCarve_npipe`, `fileBoot_isFtable`; `SpecMain.mainLocksRaw` gains `npipeBootRaw`).
+    `pipealloc`'s contract text does not move (the cap refusal is its reason-free `-1` arm);
+    `pipeclose`'s gains `"npipe" ∉ k.locks`.  `ProofPipealloc` rewritten for the new registers
+    (`s2` = `f1`, `s3` = the page, `s4` = 1); `pipeclose`'s `pc_npipe` after the kfree.
+  - `plicinithart`: `li a5,0 ; csrw scounteren,a5` by the new `MachCSL/WpSmodeScounteren.
+    wp_s_csrw_scounteren` (derived from `write_CSR 0x106`; context unchanged).  RULING (coordinator,
+    option A): `scounteren` left the frozen `hwConfig`/`HwCounters` for `MachCSL.clockCells` (one
+    more cell at some value, carried by `kctx`, the user frame's `ufRwNamed`, boot's
+    `bootEntryRegs`); `execSpecClk`/`execSpecClkPP` lend it with `mip`/`mtime`; the S/M `rdtime`
+    facts take it.  No root/interface text moved.
+- **What Q-1 absorbs:** `sysSbrkOk`'s SUCCEEDED `¬ overrun` and the dead TRAPFRAME arms; the cap arm
+  (no reason recorded in `pipeallocPost`); `npipeResAt` is the bare counter -- Q-1 adds
+  `kCredit (NPIPE − npipe)` and the bound, and must fix or carry the kalloc-failure leak (the count
+  stays raised); the scounteren pin (`= 0` after `plicinithart`) is Q-5's (`clockCells` holds it at
+  some value).
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

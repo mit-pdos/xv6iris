@@ -85,7 +85,7 @@ theorem Syscall : SYSCALL_XV6 :=
   let KFK := Kfork Myproc AC RE AL (Uvmcopy WalkNoalloc KAL KF Memmove MA UM) FP Safestrcpy
   syscall_proof Myproc Printk
     (SysFork KFK) SysExitClosed (SysWait AA (Kwait Myproc AC RE CO FP Killed SP SL))
-    (SysPipe Myproc AA (Pipealloc (Filealloc AC RE) KAL Initlock FC) (Fdalloc Myproc) CO FC)
+    (SysPipe Myproc AA (Pipealloc (Filealloc AC RE) KAL Initlock FC AC RE) (Fdalloc Myproc) CO FC)
     SysReadClosed (SysKill AI Kkill) SysExecClosed SysFstatClosed SysChdirClosed
     (SysDup AF (Fdalloc Myproc) (Filedup AC RE)) SysGetpid
     (SysSbrk AI Myproc (Growproc Myproc (Uvmalloc KAL KF MS MA UM) (Uvmdealloc UM)))

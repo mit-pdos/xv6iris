@@ -7,6 +7,7 @@ void plicinithart(void) {
   int hart = cpuid();
   *(uint32*)PLIC_SENABLE(hart) = (1 << UART0_IRQ) | (1 << UART1_IRQ) | (1 << VIRTIO0_IRQ);
   *(uint32*)PLIC_SPRIORITY(hart) = 0;
+  w_scounteren(0);   // verified-quota (NI M3 quotas Q-0): user counter reads trap
 }
 ```
 

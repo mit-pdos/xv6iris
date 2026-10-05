@@ -195,7 +195,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   icases icSleeplocks_lookup fscIc kk hkk $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   -- +0x42  jal ilock (ip): the write arm
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x42#64) false 2089710#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x42#64) false 2089604#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_ilock]
   iintro Hk Hpc
   iapply (sys_link_ilock IL Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γil γisl kk q.half
@@ -347,7 +347,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.1]
   iintro Hk Hpc
   -- +0x66  jal iupdate -- THE MINT
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x66#64) false 2089494#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x66#64) false 2089388#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iupdate]
   iintro Hk Hpc
   have hn1' : n1 = (n1 - 1) + 1 := by omega
@@ -423,7 +423,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp4.2.2.1]
   iintro Hk Hpc
   -- +0x6c  jal iunlock
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x6c#64) false 2089842#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x6c#64) false 2089736#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iunlock]
   iintro Hk Hpc
   iapply (sys_link_iunlock IUN Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γil γisl kk q.half
@@ -449,7 +449,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x78  jal nameiparent
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x78#64) false 2091942#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x78#64) false 2091836#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_nameiparent]
   iintro Hk Hpc
   icases sys_link_name_open (k.regs 2#5) $$ Hnm with ⟨%nfun, Hnm⟩
@@ -593,7 +593,7 @@ theorem sys_link_walk_ns (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (IU : IUPDATE
     $$ [Hra Hs0 H3 H4]
   · unfold sysLinkCells; iframe
   -- +0x32  jal begin_op
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x32#64) false 2092488#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x32#64) false 2092382#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_begin_op]
   iintro Hk Hpc
   iapply (sysfile_begin_op BO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j A.pid pidPriv hj ?bp ?bK
@@ -615,7 +615,7 @@ theorem sys_link_walk_ns (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (IU : IUPDATE
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x3a  jal namei
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x3a#64) false 2091978#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x3a#64) false 2091872#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_namei]
   iintro Hk Hpc
   icases sys_link_path_lend _ plen1 pfun1 $$ Hold with ⟨Hpath, Hpathw⟩
@@ -728,7 +728,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x12  jal argstr (0, old)
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x12#64) false 2087226#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x12#64) false 2087104#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_argstr]
   iintro Hk Hpc
   icases (show sysfileAny (GF := GF) (sysLinkOld (k.regs 2#5)) 128 ⊢ ∃ bs : List (BitVec 8),
@@ -798,7 +798,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x26  jal argstr (1, new)
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x26#64) false 2087206#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x26#64) false 2087084#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_argstr]
   iintro Hk Hpc
   icases (show sysfileAny (GF := GF) (sysLinkNew (k.regs 2#5)) 128 ⊢ ∃ bs : List (BitVec 8),

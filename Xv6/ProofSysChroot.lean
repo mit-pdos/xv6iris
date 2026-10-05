@@ -225,7 +225,7 @@ theorem sys_chroot_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKP
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, hd]
   iintro Hk Hpc
   -- +0x34  jal ilock
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x34#64) false 2088410#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x34#64) false 2088304#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chroot_br_ilock]
   iintro Hk Hpc
   -- THE REFERENCE namei MADE, taken apart
@@ -323,7 +323,7 @@ theorem sys_chroot_fetched (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.1, sys_chdir_buf_addr]
     iintro Hk Hpc
     -- +0x2c  jal namei
-    k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x2c#64) false 2090678#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x2c#64) false 2090572#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chroot_br_namei]
     iintro Hk Hpc
     icases sysfile_buf_split _ pl' _ $$ Hbuf with ⟨Hp, Hrest⟩
@@ -415,7 +415,7 @@ theorem sys_chroot_args (AS : ARGSTR) (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1e  jal argstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x1e#64) false 2085900#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x1e#64) false 2085778#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chroot_br_argstr]
   iintro Hk Hpc
   icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
@@ -505,7 +505,7 @@ theorem sys_chroot_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI)
         ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFF60#64)).set 8#5 (k.regs 2#5))) from .rfl) $$ Hk
   have hp0 := sys_chroot_pins_entry k
   -- +0x0a  jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0xa#64) false 2081838#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0xa#64) false 2081716#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chroot_br_myproc]
   iintro Hk Hpc
   have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)
@@ -528,7 +528,7 @@ theorem sys_chroot_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x10  jal begin_op
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x10#64) false 2091208#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0x10#64) false 2091102#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chroot_br_begin_op]
   iintro Hk Hpc
   icases sys_chroot_rootpid hct _ _ _ _ _ $$ Hblk with ⟨Hrows, Hhole⟩
