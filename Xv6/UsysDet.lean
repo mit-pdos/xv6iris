@@ -169,7 +169,6 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
    `if forkOk` (the design's two bumps under one `if`; equal).
 -/
 import Xv6.UexecRound
-import Xv6.SlotEv
 
 namespace Xv6
 

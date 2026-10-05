@@ -58,9 +58,7 @@ slots are sealed.
 
 Imports only definitional files.
 -/
-import Xv6.SlotEv
 import Xv6.SlotGen
-import MachCSL.Resources
 
 namespace Xv6
 
