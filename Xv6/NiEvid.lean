@@ -199,30 +199,19 @@ theorem niIotaLbs_zev (ns : List GName) (h : List Zev) (a : BitVec 64) :
   iapply niIotaLbs_lists
   iframe H1 Hz H3 H4 H5
 
-/-- The evidence of a successful fork (NI joint fork lane F3): the pid,
-family and allocator prefixes, the slot ledger at `[]`. -/
-theorem niIotaLbs_pzk (ns : List GName) (hp : List Pev) (hz : List Zev) (hk : List Kev) (a : BitVec 64) :
-    ((ns.getD 1 0) ↪◯ML hp) ∗ ((ns.getD 2 0) ↪◯ML hz) ∗ ((ns.getD 3 0) ↪◯ML hk) ⊢@{IProp GF}
-      |==> niIotaLbs ns { UIota.boot with pev := hp, zev := hz, kev := hk, act := a } := by
-  show _ ⊢ |==> niIotaLbs ns ⟨hk, hp, hz, 0, a, [], [], []⟩
-  iintro ⟨#Hp, #Hz, #Hk⟩
+/-- The evidence of a successful fork (NI joint fork lane F3; NI M3 quotas
+Q-2: the allocator prefix is no longer cited): the pid and family prefixes,
+the other ledgers at `[]` / `0`. -/
+theorem niIotaLbs_pz (ns : List GName) (hp : List Pev) (hz : List Zev) (a : BitVec 64) :
+    ((ns.getD 1 0) ↪◯ML hp) ∗ ((ns.getD 2 0) ↪◯ML hz) ⊢@{IProp GF}
+      |==> niIotaLbs ns { UIota.boot with pev := hp, zev := hz, act := a } := by
+  show _ ⊢ |==> niIotaLbs ns ⟨[], hp, hz, 0, a, [], [], []⟩
+  iintro ⟨#Hp, #Hz⟩
+  imod MonoList.lb_own_nil (GF := GF) (α := Kev) (ns.getD 3 0) with #H3
   imod MonoList.lb_own_nil (GF := GF) (α := Sev) (ns.getD 4 0) with #H4
   imod MonoList.lb_own_nil (GF := GF) (α := BitVec 8) (ns.getD 5 0) with #H5
   iapply niIotaLbs_lists
-  iframe Hp Hz Hk H4 H5
-
-/-- The evidence of a fork that failed on the allocator (NI joint fork lane
-F3): the allocator prefix, the other ledgers at `[]` / `0`. -/
-theorem niIotaLbs_kev (ns : List GName) (hk : List Kev) (a : BitVec 64) :
-    ((ns.getD 3 0) ↪◯ML hk) ⊢@{IProp GF} |==> niIotaLbs ns { UIota.boot with kev := hk, act := a } := by
-  show _ ⊢ |==> niIotaLbs ns ⟨hk, [], [], 0, a, [], [], []⟩
-  iintro #Hk
-  imod MonoList.lb_own_nil (GF := GF) (α := Pev) (ns.getD 1 0) with #H1
-  imod MonoList.lb_own_nil (GF := GF) (α := Zev) (ns.getD 2 0) with #H2
-  imod MonoList.lb_own_nil (GF := GF) (α := Sev) (ns.getD 4 0) with #H4
-  imod MonoList.lb_own_nil (GF := GF) (α := BitVec 8) (ns.getD 5 0) with #H5
-  iapply niIotaLbs_lists
-  iframe H1 H2 Hk H4 H5
+  iframe Hp Hz H3 H4 H5
 
 /-- The evidence of a fork that failed on the slot scan (NI joint fork lane
 F3): the slot prefix, the other ledgers at `[]` / `0`. -/

@@ -252,24 +252,6 @@ theorem ptRep_setLeaf_insert {t : PTree} {L : RegMapF (BitVec 64)} (vpn : BitVec
 
 /-! ## `delRunL`: the rollback -/
 
-theorem delRunL_get_ge (L : RegMapF (BitVec 64)) (i j : Nat) (h : i ≤ j) :
-    get? (delRunL L 0 i) j = get? L j := by
-  induction i with
-  | zero => rfl
-  | succ i ih =>
-    rw [Xv6.delRunL_succ, get?_delete_ne (by omega), ih (by omega)]
-
-theorem delRunL_get_lt (L : RegMapF (BitVec 64)) (i j : Nat) (h : j < i) :
-    get? (delRunL L 0 i) j = none := by
-  induction i with
-  | zero => omega
-  | succ i ih =>
-    rw [Xv6.delRunL_succ]
-    by_cases he : j = i
-    · rw [get?_delete_eq (by omega)]
-    · rw [get?_delete_ne (by omega)]
-      exact ih (by omega)
-
 /-! ## The child's map along the copy -/
 
 /-- The child's view after the run: the parent's bytes below the run, its
@@ -310,23 +292,6 @@ theorem ucInv_step {Pold Pnew P P' : UPtd} {i n : Nat} (h : ucInv Pold Pnew P i)
     · subst he; exact hhere
     · rw [hother j he]
       exact hin j (by omega)
-
-/-- The rollback: deleting the prefix `[0, i)` restores the child exactly. -/
-theorem ucInv_delRun {Pold Pnew P : UPtd} {i n : Nat} (h : ucInv Pold Pnew P i)
-    (hin : i ≤ n) (hfree : ∀ j, j < n → get? Pnew.um j = none) :
-    P.delRun 0 i = Pnew := by
-  obtain ⟨hr, ht, hout, -, hn⟩ := h
-  have hum : delRunL P.um 0 i = Pnew.um := by
-    refine equiv_iff_eq.mp ?_
-    intro j
-    by_cases hj : j < i
-    · rw [delRunL_get_lt P.um i j hj, (hfree j (by omega)).symm]
-    · rw [delRunL_get_ge P.um i j (by omega)]
-      exact hout j hj
-  unfold UPtd.delRun
-  cases P; cases Pnew
-  simp only [UPtd.mk.injEq] at *
-  exact ⟨hr, ht, hum, hn⟩
 
 /-! ## Resources -/
 

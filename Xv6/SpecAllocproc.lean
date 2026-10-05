@@ -145,9 +145,11 @@ the kernel was bound to give after `h` (`PidLock.pidAllocRcpt`: `pid =
 pidPick PIDMAX h`).  The null arm never reached a registration; since the
 joint fork lane F1 it carries, as its reason, the slot-occupancy ledger's
 exhaustion receipt (`SlotLed.sFullRcpt act`: `SFull act k0` appended with
-the scan's window) when the scan found no UNUSED slot, and (NI joint fork
-lane F2) the null `kalloc`'s receipt (`kNullRcpt γk act`, the trapframe's or
-`proc_pagetable`'s) on the allocator failures.  (F2) The FOUND arm also
+the scan's window) when the scan found no UNUSED slot -- its ONLY reason
+since NI M3 quotas Q-2: the joint fork lane F2's other disjunct, the null
+`kalloc`'s receipt (`kNullRcpt γk act`, the trapframe's or
+`proc_pagetable`'s), is gone -- once sealed both kallocs are paid out of
+the slot's share and never null (Q-1).  (F2) The FOUND arm also
 carries the allocator ledger's receipt of the trapframe `kalloc`
 (`kAllocRcpt γk act`: the round's first `kalloc`, labelled by the actor).
 Its pure parts are `allocprocPost`'s.
@@ -160,10 +162,9 @@ def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
       ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗
     (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗
-    -- THE NULL ARM'S REASON (NI joint fork lanes F2 / F1): the null
-    -- `kalloc`'s receipt (the trapframe's, or `proc_pagetable`'s), or the
-    -- scan's exhaustion
-    (kNullRcpt γk act ∨ sFullRcpt act) ∗
+    -- THE NULL ARM'S REASON (NI joint fork lane F1; NI M3 quotas Q-2): the
+    -- scan's exhaustion (the null `kalloc`'s receipt left with the credits)
+    sFullRcpt act ∗
     ∃ on' : Option Nat, ⌜on' = on ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
   (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
     pidAllocRcpt act pid ∗

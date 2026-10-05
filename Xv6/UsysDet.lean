@@ -12,8 +12,8 @@ be made one today.
   ledger's `Sev` list), the tick ledger's count and (G1d) the round's
   actor, the caller's slot address, with the readings the rows are
   functional in (the count, `zLowest` at the actor, and fork's: the LAST
-  cited allocator and slot events `kOk`/`kNull`/`sFull`, `pidPick` of the
-  pid prefix, the last `ZFork`'s generation).  These are the ledgers'
+  cited slot event `sFull` -- NI M3 quotas Q-2: no allocator event any
+  more --, `pidPick` of the pid prefix, the last `ZFork`'s generation).  These are the ledgers'
   contents and the caller's own placement, never another process's
   outcome.
 * §2 THE PRIVATE CLASS and `usysDet n W ι`: exit (no resume), getpid (the
@@ -21,12 +21,12 @@ be made one today.
   ledger's lowest zombie child of the caller, `zLowest ι.zev ι.act`, through
   the key's STATUS WINDOW `uwaitWin`, NI M2-G1e) and (NI joint fork lane F3)
   fork (`usysForkAns ι`: `pidPick` of the cited pid prefix when the cited
-  allocator prefix ends in the actor's `KAlloc` and the cited slot prefix
-  not in its `SFull`, else `-1`; the children set grown by the cited
-  `ZFork`'s generation on success) and (NI M2-G3) sbrk (`usysSbrkAns`: `-1`
-  at an overrun or at an allocating eager grow whose cited allocator prefix
-  ends in the actor's `KNull`, else the old break; the break, image, view
-  and lazy bit after as the key's functions, `usysDetSbrk`) and (NI M2-G4)
+  slot prefix does not end in the actor's `SFull`, else `-1` -- NI M3
+  quotas Q-2: the allocator no longer decides it; the children set grown by
+  the cited `ZFork`'s generation on success) and (NI M2-G3) sbrk
+  (`usysSbrkAns`: `-1` at the key's quota overrun -- NI M3 quotas Q-2: the
+  allocator no longer decides it --, else the old break; the break, image,
+  view and lazy bit after as the key's functions, `usysDetSbrk`) and (NI M2-G4)
   the console write (`usysWriteAns`: the request at a whole readable
   buffer, else the start of the 32-byte chunk holding the first byte the
   key's permission view cannot read, `-1` at a negative request; nothing
@@ -55,16 +55,16 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
 
 * **sbrk (12): RE-ADMITTED BY G3** (NI M2-G3a/b, design "M2-G3 design
   (2026-10-04)", rulings G3-R1…R7): in the class at EVERY key
-  (`usysDetSbrk`).  The row: `-1` iff an overrun (the key's break and a0)
-  or an allocating eager grow whose cited allocator prefix ends in the
-  actor's `KNull` (`usysSbrkFails`); otherwise the old break, the break
+  (`usysDetSbrk`).  The row (NI M3 quotas Q-2, on the `verified-quota`
+  kernel): `-1` iff the key's quota overrun (the key's break and a0,
+  `usysSbrkFails`), a function of the KEY ALONE; otherwise the old break, the break
   moved by the argument (or kept at a shrink past 0), the lazy bit raised
   by a successful lazy call; image and view the landed row's equations at
   the two breaks.  What W3 found, as closed: (a) CLOSED BY NI M2-G3a: `SpecSysSbrk.sysSbrkOk`'s
   failure disjunct was UNCONDITIONAL on every path (a spurious -1 even on
   the lazy grow and the shrink); it now holds only at an overrun
   (`sysSbrkOverrun`, the key's break and a0) or an allocating eager grow
-  (`sysSbrkAllocs`).  (b) The EAGER grow runs `uvmalloc`'s loop of
+  (G3a's `sysSbrkAllocs`, deleted by NI M3 quotas Q-2: (d)).  (b) The EAGER grow runs `uvmalloc`'s loop of
   `kalloc`s -- one per data page AND one per missing page-table page, and
   which interior table pages are missing is a fact of the process's PAGE
   TABLE (what earlier, since-shrunk breaks left behind), which the key
@@ -77,7 +77,12 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
   uvmalloc's `0` arm carries the null kalloc's `kNullRcpt` (from the led
   kalloc call, or `mappages`' walk), and growproc's and sys_sbrk's posts
   hand it to a `-1` that is not an overrun (their wands); G3b's arm cites
-  it (`SyscallArmsSbrk.syscArmSbrk_ev`).
+  it (`SyscallArmsSbrk.syscArmSbrk_ev`).  (d) CLOSED BY NI M3 quotas
+  Q-2: on the quota kernel the eager grow's uvmalloc is paid out of the
+  table's credits (Q-1), so it never meets a null kalloc; (b)'s decisive
+  `KNull` and (c)'s receipt left the row, the kernel row
+  (`SpecSysSbrk.sysSbrkOk`) and the arm: the allocator order is no longer
+  read by sbrk at all.
 * **fork (1): RE-ADMITTED BY THE JOINT FORK LANE** (F1-F3, design "Joint
   fork lane design (2026-10-04)").  W3 found the pid unexplained (G2 closed
   it: the counter tie and first-ness make it `pidPick` of the cited pid
@@ -85,12 +90,13 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
   kallocs of allocproc and uvmcopy.  Every kalloc on fork's path is fatal
   when null and labelled with the parent's slot, so the round's outcome is
   ONE decisive allocator event (ruling JF-R1): the trapframe's `KAlloc act`
-  on success, the failing `KNull act` on `-1` (`KallocDefs.kAllocRcpt` /
-  `kNullRcpt`, carried by `kforkRetLed`); slot exhaustion is the slot
-  ledger's `SFull act k0` (`SlotLed.sFullRcpt`, with its scan window).  The
-  number of the round's kallocs (one per mapped page at `lazy = true`, not
-  in the key) never enters ι: it is conceded through the histories
-  (`NiTrace` scope 8).
+  on success, the failing `KNull act` on `-1`; slot exhaustion is the slot
+  ledger's `SFull act k0` (`SlotLed.sFullRcpt`, with its scan window).
+  CLOSED BY NI M3 quotas Q-2: on the quota kernel every kalloc on fork's
+  path is credited (the slot's share, the child table's weight; Q-1) and
+  never null, so fork's `-1` is `SFull` ALONE and the allocator event
+  left the row (`forkOk ι := ¬ ι.sFull`) and the citation; the number of
+  the round's kallocs is no longer read either (`NiTrace` scope 8).
 * **wait (3): RE-ADMITTED BY G1** (the family ledger, G1a-c).  W3 found the
   slot-placement channel: kwait reaps the zombie child in the LOWEST PROC
   SLOT.  G1 records the placement where the family sees it (kfork's parent
@@ -167,10 +173,10 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
    and the filing proves the row at the CITED ι (`usysIotaFits_of_ev`:
    the re-keyed `SyscallDefs.syscEvRow` IS the fit; `UserretClosedRows.
    urc_niDetRow`).  W4 reads both answers as READINGS (O5, G1-R5) until X4.
-   (NI joint fork lane F3) ι for fork is the decisive allocator prefix, the
-   pid prefix and the family prefix ending in the `ZFork` on success, the
-   allocator prefix ending in the `KNull` or the slot prefix ending in the
-   `SFull` on `-1` (`SyscallArmsFork.syscArmFork_ev`/`_evNeg`).
+   (NI joint fork lane F3) ι for fork is the pid prefix and the family
+   prefix ending in the `ZFork` on success, the slot prefix ending in the
+   `SFull` on `-1` (`SyscallArmsFork.syscArmFork_ev`/`_evNeg`; NI M3 quotas
+   Q-2: the allocator prefix is no longer cited).
 5. **The class at wait is `a0 = 0 ∨ lazy = false`** (G1-R4 as designed,
    narrowed by G1d to `a0 = 0` and re-admitted by NI M2-G1e, ruling
    G1e-R1): the class predicate takes the a0 WORD and the key's LAZY BIT
@@ -243,28 +249,18 @@ theorem zLowest_nil (a : BitVec 64) : zLowest [] a = none := by
     have := ((zLowest_spec _ _ _ _ _ _).1 h).2.2.1
     simp [famOf_nil, ZSlot.empty] at this
 
-/-! ### Fork's readings (NI joint fork lane F3)
+/-! ### Fork's readings (NI joint fork lane F3; NI M3 quotas Q-2)
 
 Fork's outcome IS the cited event (G1-R1's "the outcome is the event", as
-`ZFork` and `SFull` are): the allocator prefix ends in the round's DECISIVE
-kalloc -- the trapframe's `KAlloc act` on success, the `KNull act` that
-failed the round on `-1` (ruling JF-R1) -- and the slot prefix ends in the
-actor's `SFull` when the scan found no free slot.  The allocator's tie
-(`KallocDefs.kmemLedger_alloc`/`_null`) is what makes the event the pool's
-state: `KAlloc` is appended only at a `¬ poolEmpty` prefix, `KNull` only at
-a `poolEmpty` one (the receipts `kAllocRcpt`/`kNullRcpt` carry it). -/
-
-/-- The cited allocator prefix ends in the actor's successful kalloc. -/
-def UIota.kOk (ι : UIota) : Prop := ι.kev.getLast? = some (.KAlloc ι.act)
-
-/-- The cited allocator prefix ends in the actor's NULL kalloc. -/
-def UIota.kNull (ι : UIota) : Prop := ι.kev.getLast? = some (.KNull ι.act)
+`ZFork` and `SFull` are): the slot prefix ends in the actor's `SFull` when
+the scan found no free slot.  On b72cbac1 the allocator prefix's last event
+(the trapframe's `KAlloc act`, or the `KNull act` that failed the round)
+decided it too (ruling JF-R1); on the quota kernel every kalloc on fork's
+path is credited and never null (NI M3 quotas Q-1), so Q-2 deleted the
+allocator readings `UIota.kOk`/`kNull`: no row reads `ι.kev`. -/
 
 /-- The cited slot prefix ends in the actor's exhaustion. -/
 def UIota.sFull (ι : UIota) : Prop := ∃ k0 : Nat, ι.sev.getLast? = some (.SFull ι.act k0)
-
-instance (ι : UIota) : Decidable ι.kOk := by unfold UIota.kOk; infer_instance
-instance (ι : UIota) : Decidable ι.kNull := by unfold UIota.kNull; infer_instance
 
 /-- The exhaustion test, as a Bool reading of the last event. -/
 def sevFullB (a : BitVec 64) : Option Sev → Bool
@@ -287,10 +283,10 @@ theorem UIota.sFull_iff (ι : UIota) : ι.sFull ↔ sevFullB ι.act ι.sev.getLa
 
 instance (ι : UIota) : Decidable ι.sFull := decidable_of_iff _ (UIota.sFull_iff ι).symm
 
-/-- **Fork succeeded** at the cited prefix: the cited allocator event is the
-actor's own successful kalloc, and the cited slot event is not the actor's
-exhaustion. -/
-def forkOk (ι : UIota) : Prop := ι.kOk ∧ ¬ ι.sFull
+/-- **Fork succeeded** at the cited prefix: the cited slot event is not the
+actor's exhaustion (NI M3 quotas Q-2: the allocator conjunct `ι.kOk` is
+gone -- a credited kalloc is never null). -/
+def forkOk (ι : UIota) : Prop := ¬ ι.sFull
 
 instance (ι : UIota) : Decidable (forkOk ι) := by unfold forkOk; infer_instance
 
@@ -597,11 +593,11 @@ theorem consCnt_of_rd {π : Nat → Option UPerm} {ua : BitVec 64} {n i : Nat}
 /-! ### sbrk's readings (NI M2-G3)
 
 sbrk's outcome is a function of the key -- the break `W.sz`, the two
-argument words, the lazy bit -- and ONE cited event: the eager grow's
-uvmalloc loop treats every null kalloc as fatal, so an allocating grow
-fails iff the cited allocator prefix ends in the actor's `KNull` (the
-round's decisive kalloc; ruling G3-R1).  Success is the ABSENCE of such a
-citation, so every other outcome cites the boot prefix at the actor. -/
+argument words, the lazy bit.  On b72cbac1 an allocating eager grow also
+read ONE cited event, the round's decisive `KNull` (ruling G3-R1); on the
+quota kernel (NI M3 quotas Q-2) the eager grow is paid out of the table's
+credits and never fails, so the `-1` is the key's quota overrun alone and
+the arm cites the boot prefix at the actor at every sbrk (G3-R3). -/
 
 /-- sbrk's argument, at a word, as the kernel reads it back (`argint`'s
 narrowing and the `lw`'s sign extension: `usysSbrkArg`'s and
@@ -622,18 +618,13 @@ def usysSbrkOverrun (sz : Nat) (a0 : BitVec 64) : Prop :=
 instance (sz : Nat) (a0 : BitVec 64) : Decidable (usysSbrkOverrun sz a0) := by
   unfold usysSbrkOverrun; infer_instance
 
-/-- **The eager grow allocates**: `0 < uvmaNp sz (sz + n)` ⇔ the new break
-passes `PGROUNDUP(sz)` (`UPtDefs.uvmaNp_pos_iff`). -/
-def usysSbrkAllocs (sz : Nat) (a0 a1 : BitVec 64) : Prop :=
-  sbrkEagerW a1 ∧ 0 < (sbrkArgW a0).toInt ∧ (pgRoundUpN sz : Int) < sz + (sbrkArgW a0).toInt
-
-instance (sz : Nat) (a0 a1 : BitVec 64) : Decidable (usysSbrkAllocs sz a0 a1) := by
-  unfold usysSbrkAllocs; infer_instance
-
-/-- **sbrk fails**: an overrun (the key), or an allocating eager grow whose
-cited allocator prefix ends in the actor's `KNull` (the decisive event). -/
-def usysSbrkFails (sz : Nat) (a0 a1 : BitVec 64) (ι : UIota) : Prop :=
-  usysSbrkOverrun sz a0 ∨ (usysSbrkAllocs sz a0 a1 ∧ ι.kNull)
+/-- **sbrk fails**: the quota overrun, a function of the key alone (NI M3
+quotas Q-2: G3's second disjunct, an allocating eager grow whose cited
+allocator prefix ends in the actor's `KNull`, is gone -- a credited eager
+grow within the quota never sees a null kalloc).  The signature is G3's
+(ruling Q-R9: in place, every caller untouched). -/
+def usysSbrkFails (sz : Nat) (a0 _a1 : BitVec 64) (_ι : UIota) : Prop :=
+  usysSbrkOverrun sz a0
 
 instance (sz : Nat) (a0 a1 : BitVec 64) (ι : UIota) : Decidable (usysSbrkFails sz a0 a1 ι) := by
   unfold usysSbrkFails; infer_instance

@@ -8,8 +8,8 @@ appends `PAlloc k.proc pid` to the pid ledger at the register's insert
 (`PidLock.pidLedger_alloc`, beside `ap_pid_mint`) and the cells-level post
 `apPostCells` (now taking the actor) carries the receipt in its found arm
 (and, NI joint fork lane F2, the trapframe `kalloc`'s `kAllocRcpt` beside
-it; the null arm the null `kalloc`'s `kNullRcpt`, or `True` at the scan's
-exhaustion, F1's slot);
+it; the null arm the scan's exhaustion, F1's slot -- NI M3 quotas Q-2
+dropped F2's null-`kalloc` disjunct, whose producers Q-1 refuted);
 `allocproc_led_proof` is `wp_allocproc_led_body`, and `allocproc_proof`'s
 landed field drops the receipt (`allocproc_cont_led`).
 
@@ -643,8 +643,9 @@ receipt of the allocation (`PAlloc act pid`, NI-LEDGER-REST; since NI
 M2-G2a `PidLock.pidAllocRcpt`, with the pid `pidPick` of its prefix; the caller's
 `apCont` instantiates `act` at `k.proc`).  The NULL arm carries, as a
 disjunct, the slot-occupancy ledger's exhaustion receipt (`SlotLed.sFullRcpt
-act`, NI joint fork lane F1) when the scan found no UNUSED slot; the kalloc
-failure tails give its `True` side.  `allocproc_proof` mints the descriptor
+act`, NI joint fork lane F1) when the scan found no UNUSED slot, its only
+reason (NI M3 quotas Q-2: the kalloc failure tails are refuted, Q-1).
+`allocproc_proof` mints the descriptor
 ghost out of them (`FdTable.procPriv_null_mint`, Rocq
 `proc_dormant_unused`). -/
 def apPostCells [CurCtx] (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat)
@@ -653,7 +654,7 @@ def apPostCells [CurCtx] (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : O
   (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
       ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗
     (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗
-    (kNullRcpt γk act ∨ sFullRcpt act) ∗
+    sFullRcpt act ∗
     ∃ on' : Option Nat, ⌜on' = on ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
   (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
     pidAllocRcpt act pid ∗ kAllocRcpt γk act ∗
@@ -2711,7 +2712,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
               isplitl [Hpav]
               · ileft; iexact Hpav
               isplitl []
-              · iright; iexact Hrc
+              · iexact Hrc
               iexists on
               isplitl []
               · ipureintro; exact Or.inl rfl
@@ -2723,7 +2724,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
             isplitl [Hpav]
             · ileft; iexact Hpav
             isplitl []
-            · iright; iexact Hrc
+            · iexact Hrc
             iexists on
             isplitl []
             · ipureintro; exact Or.inl rfl

@@ -104,11 +104,6 @@ theorem sys_sbrk_beq_pos {α : Type _} (x y : BitVec 64) (h : x = y) (p q : α) 
 theorem sys_sbrk_beq_neg {α : Type _} (x y : BitVec 64) (h : x ≠ y) (p q : α) :
     (if bcond bop.BEQ x y then p else q) = q := by
   rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
-theorem sys_sbrk_bltz_pos {α : Type _} (x : BitVec 64) (h : x.toInt < 0) (p q : α) :
-    (if bcond bop.BLT x 0#64 then p else q) = p := by
-  refine if_pos ?_
-  simp only [bcond, BitVec.slt, decide_eq_true_eq]
-  simpa using h
 theorem sys_sbrk_bltz_neg {α : Type _} (x : BitVec 64) (h : ¬ x.toInt < 0) (p q : α) :
     (if bcond bop.BLT x 0#64 then p else q) = q := by
   refine if_neg ?_
@@ -175,12 +170,11 @@ theorem sys_sbrk_sum (sz n : BitVec 64) (hsz : sz.toNat ≤ uvmMaxsz) (hn : n.to
 /-! ## The shapes of the result -/
 
 /-- `growproc` returned something negative: it was its `-1` at a positive
-`n`, nothing moved, and the reason (NI M2-G3a: an overrun or an allocating
-grow). -/
+`n`, nothing moved, and the reason (NI M3 quotas Q-2: its `TRAPFRAME`
+overrun alone). -/
 theorem sys_sbrk_gp_fail (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (n r : BitVec 64)
     (hok : growprocOk V V' M M' n r) (hr : r.toInt < 0) :
-    r = -1#64 ∧ V' = V ∧ M' = M ∧ 0 < n.toInt ∧
-      (uvmMaxsz < V.sz.toNat + n.toInt.toNat ∨ 0 < uvmaNp V.sz (V.sz + n)) := by
+    r = -1#64 ∧ V' = V ∧ M' = M ∧ 0 < n.toInt ∧ uvmMaxsz < V.sz.toNat + n.toInt.toNat := by
   obtain ⟨hz, hp, hn⟩ := hok
   have h0 : r ≠ 0#64 := by intro h; subst h; simp at hr
   rcases Int.lt_trichotomy n.toInt 0 with h | h | h
@@ -189,14 +183,6 @@ theorem sys_sbrk_gp_fail (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (n r
   · rcases hp h with h' | h'
     · exact ⟨h'.1, h'.2.1, h'.2.2.1, h, h'.2.2.2⟩
     · exact absurd h'.1 h0
-
-/-- A break inside the user region is not the `-1` answer. -/
-theorem sys_sbrk_sz_ne (sz : BitVec 64) (hs : sz.toNat ≤ uvmMaxsz) : sz ≠ -1#64 := by
-  intro h
-  rw [h] at hs
-  revert hs
-  unfold uvmMaxsz
-  decide
 
 /-- `growproc` returned something non-negative: it was its `0`. -/
 theorem sys_sbrk_gp_ok (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (n r : BitVec 64)
@@ -319,8 +305,7 @@ def sysSbrkPost (γ : FileNames) (γk : KmemNames) (k : KCtx) (j : Nat) (pid : B
   kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
   (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (k' : Nat),
     ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ ⌜V.ev ≤ k'⌝ ∗
-    procPrivFd γ (procAddr j) pid (V'.updEv k') M' ∗
-    (⌜R' 10#5 = -1#64 ∧ ¬ sysSbrkOverrun V v0⌝ -∗ kNullRcpt γk k.proc)) -∗
+    procPrivFd γ (procAddr j) pid (V'.updEv k') M') -∗
   ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')
 
 /-- `s0`/`s2..s11` and the frame pointer, pinned to the entry map
@@ -342,10 +327,9 @@ theorem sys_sbrk_exit (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (γ : FileNames)
     kctx c (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs c (KA.«sys_sbrk» + 0x70#64) ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     procPrivFd γ (procAddr j) pid (V'.updEv kc) M' ∗
-    (⌜R 9#5 = -1#64 ∧ ¬ sysSbrkOverrun V v0⌝ -∗ kNullRcpt γk k.proc) ∗
     wpNext k.sie k.proc c (sysSbrkPost γ γk k j pid V M v0 v1)
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Hframe, Hpv, Hw, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hpv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   obtain ⟨a2, a8, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := hpins
   -- c.mv a0,s1
@@ -367,7 +351,7 @@ theorem sys_sbrk_exit (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (γ : FileNames)
   iapply wpNext_mono _ _ _ _ _ $$ HΦ
   iintro %c' HΦ Hk Hpc
   unfold sysSbrkPost
-  iapply HΦ $$ %spie %spp %_ %hsp Hk Hpc [Hpv Hw]
+  iapply HΦ $$ %spie %spp %_ %hsp Hk Hpc [Hpv]
   · iexists V', M', kc
     isplitl []
     · ipureintro
@@ -375,37 +359,11 @@ theorem sys_sbrk_exit (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (γ : FileNames)
       exact hok
     isplitl []
     · ipureintro; exact hkc
-    isplitl [Hpv]
     · iexact Hpv
-    · iintro %h
-      iapply Hw
-      ipureintro
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h
-      exact h
   · ipureintro
     unfold calleeSaved
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     exact ⟨trivial, trivial, trivial, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩
-
-/-- The join point at an outcome that is not a `-1` short of an overrun:
-the post's receipt is not asked. -/
-theorem sys_sbrk_exit_ok (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (γ : FileNames) (γk : KmemNames)
-    (j : Nat) (pid : BitVec 32)
-    (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 : BitVec 64)
-    (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
-    (R : RegMap) (hpins : sysSbrkPins k R) (hok : sysSbrkOk V V' M M' v0 v1 (R 9#5))
-    (hno : ¬ (R 9#5 = -1#64 ∧ ¬ sysSbrkOverrun V v0))
-    (kc : Nat) (hkc : V.ev ≤ kc) :
-    kctx c (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs c (KA.«sys_sbrk» + 0x70#64) ∗
-    frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    procPrivFd γ (procAddr j) pid (V'.updEv kc) M' ∗
-    wpNext k.sie k.proc c (sysSbrkPost γ γk k j pid V M v0 v1)
-    ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Hframe, Hpv, HΦ⟩
-  iapply (sys_sbrk_exit c k hK γ γk j pid V V' M M' v0 v1 spie spp hsp R hpins hok kc hkc)
-  iframe
-  iintro %h
-  exact absurd h hno
 
 /-! ## The callees -/
 
@@ -456,9 +414,7 @@ theorem sys_sbrk_growproc (GP : GROWPROC) (c : CPU) (k' : KCtx) (γl : GName) (�
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (k2 : Nat),
         ⌜growprocOk V V' M M' (k'.regs 10#5) (R' 10#5)⌝ ∗ ⌜V.ev ≤ k2⌝ ∗
-        procPrivFd γ (procAddr j) pid (V'.updEv k2) M' ∗
-        (⌜R' 10#5 = -1#64 ∧ V.sz.toNat + (k'.regs 10#5).toInt.toNat ≤ uvmMaxsz⌝ -∗
-          kNullRcpt γk k'.proc)) -∗
+        procPrivFd γ (procAddr j) pid (V'.updEv k2) M') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := GP.wp_growproc (hlc := hlc) (GF := GF) c k' γl γk γ j pid V M hj hproc hnoff hK hlk htier hq
@@ -477,7 +433,7 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (R : RegMap) (hpins : sysSbrkPins k R) (h9 : R 9#5 = V.sz) (h10 : R 10#5 = sysSbrkArg v0)
     (w32 w48 : BitVec 64) (t : BitVec 32) (hal : (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64).toNat % 8 = 0)
-    (hpath : sysSbrkEager v1 ∨ (sysSbrkArg v0).toInt < 0) (hszb : V.sz.toNat ≤ uvmMaxsz)
+    (hpath : sysSbrkEager v1 ∨ (sysSbrkArg v0).toInt < 0)
     (hnq : ¬ sysSbrkOverrun V v0) :
     kctx c (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs c (KA.«sys_sbrk» + 0x68#64) ∗
     sysSbrkFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w32 w48
@@ -524,7 +480,7 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
-  icases Hres with ⟨%V', %M', %kc, %hgp, %hkc, Hpv, Hgw⟩
+  icases Hres with ⟨%V', %M', %kc, %hgp, %hkc, Hpv⟩
   have hpins2 : sysSbrkPins k R2 := ⟨e2.trans a2, e8.trans a8, e18.trans a18, e19.trans a19,
     e20.trans a20, e21.trans a21, e22.trans a22, e23.trans a23, e24.trans a24, e25.trans a25,
     e26.trans a26, e27.trans a27⟩
@@ -533,44 +489,12 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
   case' _ => unfold sysSbrkFrame; iframe
   by_cases hneg : (R2 10#5).toInt < 0
   case pos =>
-    -- growproc failed: s1 = -1
-    obtain ⟨hr, hV, hM, hpos, hwhy⟩ := sys_sbrk_gp_fail V V' M M' _ _ hgp hneg
-    k_step_gen (wp_s_branch c3 _ (KA.«sys_sbrk» + 0x6c#64) false 20#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [KCtx.rget_eq, sys_sbrk_bltz_pos _ hneg] next c4 hp4
-    iintro Hk Hpc
-    k_step_gen (wp_s_addi c4 _ (KA.«sys_sbrk» + 0x80#64) true 4095#12 9#5 0#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] next c5 hp5
-    iintro Hk Hpc
-    k_step_gen (wp_s_j c5 _ (KA.«sys_sbrk» + 0x82#64) true 2097134#21)
-      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] next c6 hp6
-    iintro Hk Hpc
-    ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp6 h).trans ((hp5 h).trans (hp4 h))) $$ HΦ
-    have hpe : sysSbrkPins k (R2.set 9#5 0xFFFFFFFFFFFFFFFF#64) := by
-      obtain ⟨b2, b8, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hpins2
-      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;> assumption
-    -- the reason (NI M2-G3a): an overrun, or an allocating eager grow (a positive `n` is eager)
-    have heg : sysSbrkEager v1 := hpath.resolve_right (by omega)
-    have hoke : sysSbrkOk V V' M M' v0 v1 ((R2.set 9#5 0xFFFFFFFFFFFFFFFF#64) 9#5) := by
-      left
-      refine ⟨?_, hV, hM, ?_⟩
-      · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-        decide
-      · rcases hwhy with h | h
-        · exact Or.inl ⟨by omega, by omega⟩
-        · exact Or.inr ⟨heg, hpos, h⟩
-    -- the `-1` that is not an overrun: growproc's receipt
-    ihave Hw : iprop(⌜(R2.set 9#5 0xFFFFFFFFFFFFFFFF#64) 9#5 = -1#64 ∧ ¬ sysSbrkOverrun V v0⌝ -∗
-        kNullRcpt (GF := GF) γk k.proc) $$ [Hgw]
-    · iintro %h
-      iapply Hgw
-      ipureintro
-      refine ⟨hr, ?_⟩
-      exact Classical.byContradiction fun hc => h.2 ⟨by omega, by omega⟩
-    iapply (sys_sbrk_exit c6 k hK6 γ γk j pid V V' M M' v0 v1 spie2 spp2 hspf _ hpe hoke kc hkc)
-
-    iframe
+    -- growproc failed: refuted (NI M3 quotas Q-2) -- its only `-1` is its
+    -- `TRAPFRAME` overrun, and the quota test already passed
+    obtain ⟨-, -, -, hpos, hbig⟩ := sys_sbrk_gp_fail V V' M M' _ _ hgp hneg
+    exfalso
+    unfold sysSbrkOverrun at hnq
+    omega
   case neg =>
     -- growproc succeeded: s1 is still the old size
     k_step_gen (wp_s_branch c3 _ (KA.«sys_sbrk» + 0x6c#64) false 20#13 10#5 0#5 (by decide) bop.BLT)
@@ -580,10 +504,6 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
     ihave HΦ := wpNext_shift _ _ _ _ _ hp4 $$ HΦ
     have hoko : sysSbrkOk V V' M M' v0 v1 (R2 9#5) :=
       Or.inr ⟨e9.trans h9, hnq, Or.inl ⟨hpath, sys_sbrk_gp_ok V V' M M' _ _ hgp hneg⟩⟩
-    iclear Hgw
-    ihave Hw : iprop(⌜R2 9#5 = -1#64 ∧ ¬ sysSbrkOverrun V v0⌝ -∗ kNullRcpt (GF := GF) γk k.proc) $$ []
-    · iintro %h
-      exact absurd ((e9.trans h9).symm.trans h.1) (sys_sbrk_sz_ne V.sz hszb)
     iapply (sys_sbrk_exit c4 k hK6 γ γk j pid V V' M M' v0 v1 spie2 spp2 hspf R2 hpins2 hoko kc hkc)
 
     iframe
@@ -713,8 +633,8 @@ theorem sys_sbrk_lazy (MP : MYPROC) (c : CPU) (k : KCtx) (γl : GName) (γk : Km
   case' _ => unfold sysSbrkFrame; iframe
   have hoko : sysSbrkOk V { V with sz := V.sz + sysSbrkArg v0, pvLazy := true } M M v0 v1 V.sz :=
     Or.inr ⟨rfl, hnq, Or.inr ⟨hnot, by omega, by omega, rfl, hle, rfl⟩⟩
-  iapply (sys_sbrk_exit_ok c15 k hK6 γ γk j pid V { V with sz := V.sz + sysSbrkArg v0, pvLazy := true } M M v0 v1 spie2 spp2 hspf
-    _ ?hpo ?hko ?hno V.ev (Nat.le_refl _))
+  iapply (sys_sbrk_exit c15 k hK6 γ γk j pid V { V with sz := V.sz + sysSbrkArg v0, pvLazy := true } M M v0 v1 spie2 spp2 hspf
+    _ ?hpo ?hko V.ev (Nat.le_refl _))
   all_goals first | (iframe; done) | skip
   case hpo =>
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -726,9 +646,6 @@ theorem sys_sbrk_lazy (MP : MYPROC) (c : CPU) (k : KCtx) (γl : GName) (γk : Km
   case hko =>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, e9, h9]
     exact hoko
-  case hno =>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, e9, h9]
-    exact fun h => sys_sbrk_sz_ne V.sz (Nat.le_trans hf.1 uQuota_le_uvmMaxsz) h.1
 
 /-! ## The mode tests (`+0x38`): `t == SBRK_EAGER || n < 0` goes eager (`+0x68`), else lazy (`+0x46`) -/
 
@@ -787,7 +704,7 @@ theorem sys_sbrk_mode (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
     case' _ => iframe
     ihave Hpv := sys_sbrk_priv_same γ (procAddr j) pid V M $$ Hpv
     iapply (sys_sbrk_eager GP c3 k γl γk γ j pid V M v0 v1 hj hproc hnoff hK hlk htier spie spp hsp _
-      ?hpe ?h9e ?h10e w32 w48 (BitVec.extractLsb' 0 32 v1) hal (Or.inl heager) (Nat.le_trans hf.1 uQuota_le_uvmMaxsz) hnq)
+      ?hpe ?h9e ?h10e w32 w48 (BitVec.extractLsb' 0 32 v1) hal (Or.inl heager) hnq)
     all_goals first | (unfold sysSbrkFrame; iframe; iframe #; done) | skip
     case hpe => exact hpins' _ _
     case h9e => exact h9' _ _
@@ -814,7 +731,7 @@ theorem sys_sbrk_mode (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
       case' _ => iframe
       ihave Hpv := sys_sbrk_priv_same γ (procAddr j) pid V M $$ Hpv
       iapply (sys_sbrk_eager GP c5 k γl γk γ j pid V M v0 v1 hj hproc hnoff hK hlk htier spie spp hsp _
-        ?hpe ?h9e ?h10e w32 w48 (BitVec.extractLsb' 0 32 v1) hal (Or.inr hneg) (Nat.le_trans hf.1 uQuota_le_uvmMaxsz) hnq)
+        ?hpe ?h9e ?h10e w32 w48 (BitVec.extractLsb' 0 32 v1) hal (Or.inr hneg) hnq)
       all_goals first | (unfold sysSbrkFrame; iframe; iframe #; done) | skip
       case hpe => exact hpins' _ _
       case h9e => exact h9' _ _
@@ -840,8 +757,7 @@ theorem sysSbrkPost_of_spec (γ : FileNames) (γk : KmemNames) (cpu : CPU) (k : 
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (k' : Nat),
         ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ ⌜V.ev ≤ k'⌝ ∗
-        procPrivFd γ (procAddr j) pid (V'.updEv k') M' ∗
-        (⌜R' 10#5 = -1#64 ∧ ¬ sysSbrkOverrun V v0⌝ -∗ kNullRcpt γk k.proc)) -∗
+        procPrivFd γ (procAddr j) pid (V'.updEv k') M') -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpNext (GF := GF) k.sie k.proc cpu (sysSbrkPost γ γk k j pid V M v0 v1) := by
   unfold sysSbrkPost; iintro H; iexact H
@@ -1034,7 +950,7 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
       ihave Hframe := sys_sbrk_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w32 w48
         (BitVec.extractLsb' 0 32 v0) (BitVec.extractLsb' 0 32 v1) hal $$ [F0 F1 F2 F3 Fn Ft F5]
       case' _ => unfold sysSbrkFrame; iframe
-      iapply (sys_sbrk_exit_ok c19 k hK6 γ γk j pid V V M M v0 v1 spie3 spp3 hspf _ ?hpe ?hoke ?hno
+      iapply (sys_sbrk_exit c19 k hK6 γ γk j pid V V M M v0 v1 spie3 spp3 hspf _ ?hpe ?hoke
         V.ev (Nat.le_refl _))
       all_goals first | (iframe; done) | skip
       case hpe =>
@@ -1043,10 +959,9 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;> assumption
       case hoke =>
         left
-        refine ⟨?_, rfl, rfl, Or.inl hq⟩
+        refine ⟨?_, rfl, rfl, hq⟩
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         decide
-      case hno => exact fun h => h.2 hq
     case neg =>
       have hbig : ¬ uQuota < (sysSbrkArg v0 + V.sz).toNat := by
         unfold sysSbrkOverrun at hq

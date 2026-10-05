@@ -4,9 +4,11 @@ interfaces of `kalloc`, `kfree`, `memset`, `mappages` (the uncounted
 contract) and `uvmdealloc` (for the rollback).
 
 `uvmalloc(pt, oldsz, newsz, xperm)` maps one page per turn of its loop:
-`kalloc`, `memset` to zero, then `mappages` of the single page.  A failure
-of either frees what the turn allocated (`kfree`) and rolls the run back
-with `uvmdealloc`, returning `0`.
+`kalloc`, `memset` to zero, then `mappages` of the single page.  In C a
+failure of either frees what the turn allocated (`kfree`) and rolls the run
+back with `uvmdealloc`, returning `0`; under the quota credits (NI M3 quotas
+Q-1) neither fails, and Q-2 deleted the null exit from the loop's
+statements and the contract.
 
 THE LEND (permit sweep L1a, Rocq f344a089a; threaded by L2, Rocq
 78f9234b8): carried by the loop (`uvma_iter` / `uvma_loop` / the two
@@ -286,12 +288,6 @@ def uaRegs (k : KCtx) (R : RegMap) (newsz : BitVec 64) (root : BitVec 44) (perm 
   R 21#5 = pageAddr root ∧ R 22#5 = perm ∧ (R 23#5).toNat = A ∧
   R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
-/-- What the exit at `0x800013a6` has restored. -/
-def uaExit (k : KCtx) (R : RegMap) : Prop :=
-  R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFB0#64 ∧ R 9#5 = k.regs 9#5 ∧ R 19#5 = k.regs 19#5 ∧
-  R 22#5 = k.regs 22#5 ∧ R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧
-  R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
-
 /-- The three slots the loop saves `s1`, `s3`, `s6` in. -/
 def uaSaved [CurCtx] (sp s1 s3 s6 : BitVec 64) : IProp GF := iprop%
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) s1 ∗
@@ -409,23 +405,20 @@ theorem uaRegs_set (k : KCtx) (R : RegMap) (newsz : BitVec 64) (root : BitVec 44
       | (rw [if_neg (fun hh => j26 hh.symm)]; exact g26)
       | (rw [if_neg (fun hh => j27 hh.symm)]; exact g27)
 
-/-- What one iteration of the loop leaves behind. -/
+/-- What one iteration of the loop leaves behind: the page mapped (NI M3
+quotas Q-2: the null exit, unreachable under the credits, is gone). -/
 def uaOut [CurCtx] (k : KCtx) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (perm newsz : BitVec 64) (A i : Nat) (R2 : RegMap) (pcv : BitVec 64) : IProp GF := iprop%
-  (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+  ∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
       ⌜pcv = (KA.«uvmalloc» + 0x56#64) ∧ UaInv P M perm (A / 4096) (i + 1) P' M' ∧
-        uaRegs k R2 newsz P.root perm A i⌝ ∗ procPtAt P' M' ∗ kallocAvail γk none) ∨
-  (⌜pcv = (KA.«uvmalloc» + 0x78#64) ∧ uaExit k R2 ∧ R2 10#5 = 0#64⌝ ∗ procPtAt P M ∗
-    kNullRcpt γk k.proc)
+        uaRegs k R2 newsz P.root perm A i⌝ ∗ procPtAt P' M' ∗ kallocAvail γk none
 
 theorem uaOut_elim [CurCtx] (k : KCtx) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (perm newsz : BitVec 64) (A i : Nat) (R2 : RegMap) (pcv : BitVec 64) :
     uaOut (GF := GF) k γk P M perm newsz A i R2 pcv ⊢
-      iprop((∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+      iprop(∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
           ⌜pcv = (KA.«uvmalloc» + 0x56#64) ∧ UaInv P M perm (A / 4096) (i + 1) P' M' ∧
-            uaRegs k R2 newsz P.root perm A i⌝ ∗ procPtAt P' M' ∗ kallocAvail γk none) ∨
-        (⌜pcv = (KA.«uvmalloc» + 0x78#64) ∧ uaExit k R2 ∧ R2 10#5 = 0#64⌝ ∗ procPtAt P M ∗
-          kNullRcpt γk k.proc)) := by
+            uaRegs k R2 newsz P.root perm A i⌝ ∗ procPtAt P' M' ∗ kallocAvail γk none) := by
   unfold uaOut; iintro H; iexact H
 
 theorem uaOut_cont [CurCtx] (k : KCtx) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
@@ -437,7 +430,6 @@ theorem uaOut_cont [CurCtx] (k : KCtx) (γk : KmemNames) (P : UPtd) (M : Nat →
       uaOut k γk P M perm newsz A i R2 pcv := by
   unfold uaOut
   iintro ⟨H1, H2⟩
-  ileft
   iexists P'
   iexists M'
   isplitl []
@@ -452,8 +444,8 @@ theorem uaOut_cont [CurCtx] (k : KCtx) (γk : KmemNames) (P : UPtd) (M : Nat →
 
 set_option maxHeartbeats 4000000 in
 /-- The body at `0x80001364`: `kalloc`, `memset 0`, `mappages` of one page.
-Either the page is mapped (and the loop goes on at `(KernelSyms.«uvmalloc» + 0x56)`) or the
-space is rolled back and `0` returned (at the epilogue). -/
+The page is mapped and the loop goes on at `(KernelSyms.«uvmalloc» + 0x56)` (the
+credited `kalloc` is never null, the paid `mappages` never fails). -/
 theorem uvmalloc_br_fffffffffffffd54 : KA.«uvmalloc» + 0xfffffffffffffd54#64 = KA.«mappages» := by decide
 
 theorem uvmalloc_br_fffffffffffff9ea : KA.«uvmalloc» + 0xfffffffffffff9ea#64 = KA.«memset» := by decide
@@ -755,15 +747,12 @@ theorem uvma_iter [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
 
 /-- The result when the space is untouched: the right disjunct with
 `P' = P`, `M' = M`. -/
-theorem ua_res_id [CurCtx] (γk : KmemNames) (act : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8))
+theorem ua_res_id [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8))
     (oldsz newsz xperm v r : BitVec 64)
     (hok : uvmallocOk P P M M oldsz newsz xperm) (hv : v = r) :
-    procPtAt (GF := GF) P M ⊢ iprop((⌜v = 0#64 ∧ 0 < uvmaNp oldsz newsz⌝ ∗ procPtAt P M ∗
-        kNullRcpt γk act) ∨
-      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        ⌜uvmallocOk P P' M M' oldsz newsz xperm ∧ v = r⌝ ∗ procPtAt P' M')) := by
+    procPtAt (GF := GF) P M ⊢ iprop(∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+        ⌜uvmallocOk P P' M M' oldsz newsz xperm ∧ v = r⌝ ∗ procPtAt P' M') := by
   iintro H
-  iright
   iexists P
   iexists M
   isplitl []
@@ -771,36 +760,17 @@ theorem ua_res_id [CurCtx] (γk : KmemNames) (act : BitVec 64) (P : UPtd) (M : N
   · iexact H
 
 /-- The success result: the space grew to `P''`. -/
-theorem ua_res_ok [CurCtx] (γk : KmemNames) (act : BitVec 64) (P P'' : UPtd)
+theorem ua_res_ok [CurCtx] (P P'' : UPtd)
     (M M'' : Nat → List (BitVec 8)) (oldsz newsz xperm v r : BitVec 64)
     (hok : uvmallocOk P P'' M M'' oldsz newsz xperm) (hv : v = r) :
-    procPtAt (GF := GF) P'' M'' ⊢ iprop((⌜v = 0#64 ∧ 0 < uvmaNp oldsz newsz⌝ ∗ procPtAt P M ∗
-        kNullRcpt γk act) ∨
-      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        ⌜uvmallocOk P P' M M' oldsz newsz xperm ∧ v = r⌝ ∗ procPtAt P' M')) := by
+    procPtAt (GF := GF) P'' M'' ⊢ iprop(∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+        ⌜uvmallocOk P P' M M' oldsz newsz xperm ∧ v = r⌝ ∗ procPtAt P' M') := by
   iintro H
-  iright
   iexists P''
   iexists M''
   isplitl []
   · ipureintro; exact ⟨hok, hv⟩
   · iexact H
-
-/-- The failure result: `0` returned, the space unchanged, the loop ran
-and its null kalloc's receipt (NI M2-G3a). -/
-theorem ua_res_zero [CurCtx] (γk : KmemNames) (act : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8))
-    (oldsz newsz xperm v r : BitVec 64) (hv : v = 0#64) (hnp : 0 < uvmaNp oldsz newsz) :
-    iprop(procPtAt (GF := GF) P M ∗ kNullRcpt γk act) ⊢
-      iprop((⌜v = 0#64 ∧ 0 < uvmaNp oldsz newsz⌝ ∗ procPtAt P M ∗ kNullRcpt γk act) ∨
-      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        ⌜uvmallocOk P P' M M' oldsz newsz xperm ∧ v = r⌝ ∗ procPtAt P' M')) := by
-  iintro ⟨H, Hn⟩
-  ileft
-  isplitl []
-  · ipureintro; exact ⟨hv, hnp⟩
-  · isplitl [H]
-    · iexact H
-    · iexact Hn
 
 /-- Nothing mapped: `uvmallocOk` holds with the space unchanged. -/
 theorem ua_ok_id (P : UPtd) (M : Nat → List (BitVec 8)) (oldsz newsz xperm : BitVec 64)
@@ -834,8 +804,7 @@ theorem uaRegs_add (k : KCtx) (R : RegMap) (newsz : BitVec 64) (root : BitVec 44
 
 set_option maxHeartbeats 4000000 in
 /-- The loop from the body's head at `0x80001364` with `i` pages behind it:
-it runs to `(KernelSyms.«uvmalloc» + 0x5c)` (all `np` pages mapped) or stops at the epilogue
-`(KernelSyms.«uvmalloc» + 0x78)` with the space rolled back and `0` returned. -/
+it runs to `(KernelSyms.«uvmalloc» + 0x5c)` with all `np` pages mapped. -/
 theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
     (UD : UVMDEALLOC) [CurCtx]
     (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
@@ -862,10 +831,8 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
       uaSaved (k.regs 2#5) (k.regs 9#5) (k.regs 19#5) (k.regs 22#5) -∗
       procPtAt P'' M'' -∗
-      (⌜pcv = (KA.«uvmalloc» + 0x78#64)⌝ -∗ kNullRcpt γk k.proc) -∗
-      ⌜(pcv = (KA.«uvmalloc» + 0x5c#64) ∧ UaInv P M perm (A / 4096) np P'' M'' ∧
-          uaRegs k R2 newsz P.root perm A np) ∨
-        (pcv = (KA.«uvmalloc» + 0x78#64) ∧ P'' = P ∧ M'' = M ∧ uaExit k R2 ∧ R2 10#5 = 0#64)⌝ -∗ wpLoop cpu'))
+      ⌜pcv = (KA.«uvmalloc» + 0x5c#64) ∧ UaInv P M perm (A / 4096) np P'' M'' ∧
+          uaRegs k R2 newsz P.root perm A np⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   have hmax : uvmMaxsz < 2 ^ 38 := by unfold uvmMaxsz; omega
   induction fuel with
@@ -886,7 +853,7 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
     iapply wpNext_intro_pin
     iintro %c1 %hp1 %spie2 %spp2 %R2 %pcv %hsp2 Hk Hpc Hlend Hsv Hout
     icases uaOut_elim k γk P M perm newsz A i R2 pcv $$ Hout
-      with ⟨⟨%Pc, %Mc, %hcont, HP', Hav⟩ | ⟨%hexit, HP, #Hn⟩⟩
+      with ⟨%Pc, %Mc, %hcont, HP', Hav⟩
     · -- one page mapped, and it was the last one
       obtain ⟨hpcd, hinv', hregs'⟩ := hcont
       subst hpcd
@@ -908,24 +875,11 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
       have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cur := fun h =>
         (hp3 h).trans ((hp2 h).trans (hp1 h))
       ihave HΦ' := wpNext_at _ _ _ c3 _ hpin3 $$ HΦ
-      iapply HΦ' $$ %spie2 %spp2 %_ %Pc %Mc %(KA.«uvmalloc» + 0x5c#64) %hsp2 Hk Hpc Hlend Hsv HP' []
-      · iintro %hpc
-        exfalso
-        revert hpc
-        decide
+      iapply HΦ' $$ %spie2 %spp2 %_ %Pc %Mc %(KA.«uvmalloc» + 0x5c#64) %hsp2 Hk Hpc Hlend Hsv HP'
       ipureintro
-      refine Or.inl ⟨rfl, ?_, ?_⟩
+      refine ⟨rfl, ?_, ?_⟩
       · rw [← hlast]; exact hinv'
       · rw [← hlast]; exact uaRegs_add k R2 newsz P.root perm A i hregs' hb64
-    · -- rolled back
-      obtain ⟨hpcf, hx, h10⟩ := hexit
-      subst hpcf
-      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
-      iapply HΦ' $$ %spie2 %spp2 %R2 %P %M %(KA.«uvmalloc» + 0x78#64) %hsp2 Hk Hpc Hlend Hsv HP []
-      · iintro -
-        iexact Hn
-      ipureintro
-      exact Or.inr ⟨rfl, rfl, rfl, hx, h10⟩
   | succ fuel ih =>
     intro i hc Pi Mi hinv spie spp R hregs cur
     have hi : i < np := by omega
@@ -939,7 +893,7 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
     iapply wpNext_intro_pin
     iintro %c1 %hp1 %spie2 %spp2 %R2 %pcv %hsp2 Hk Hpc Hlend Hsv Hout
     icases uaOut_elim k γk P M perm newsz A i R2 pcv $$ Hout
-      with ⟨⟨%Pc, %Mc, %hcont, HP', Hav⟩ | ⟨%hexit, HP, #Hn⟩⟩
+      with ⟨%Pc, %Mc, %hcont, HP', Hav⟩
     · -- one page mapped, keep looping
       obtain ⟨hpcd, hinv', hregs'⟩ := hcont
       subst hpcd
@@ -968,23 +922,14 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
       rotate_right 1
       · iframe #
         iapply wpNext_mono _ _ _ _ _ $$ HΦ
-        iintro %c4 HΦ %spie3 %spp3 %R3 %P3 %M3 %pcv3 %hsp3 Hk Hpc Hlend Hsv HP3 Hw3 %hpost3
+        iintro %c4 HΦ %spie3 %spp3 %R3 %P3 %M3 %pcv3 %hsp3 Hk Hpc Hlend Hsv HP3 %hpost3
         have hsp' : k.sie = false → spie3 = spie ∧ spp3 = spp := by
           intro h
           obtain ⟨e1, e2⟩ := hsp3 h
           rw [e1, e2]; exact hsp2 h
-        iapply HΦ $$ %spie3 %spp3 %R3 %P3 %M3 %pcv3 %hsp' Hk Hpc Hlend Hsv HP3 Hw3
+        iapply HΦ $$ %spie3 %spp3 %R3 %P3 %M3 %pcv3 %hsp' Hk Hpc Hlend Hsv HP3
         ipureintro
         exact hpost3
-    · -- rolled back
-      obtain ⟨hpcf, hx, h10⟩ := hexit
-      subst hpcf
-      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
-      iapply HΦ' $$ %spie2 %spp2 %R2 %P %M %(KA.«uvmalloc» + 0x78#64) %hsp2 Hk Hpc Hlend Hsv HP []
-      · iintro -
-        iexact Hn
-      ipureintro
-      exact Or.inr ⟨rfl, rfl, rfl, hx, h10⟩
 
 set_option maxHeartbeats 4000000 in
 theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
@@ -1043,7 +988,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
       unfold calleeSaved
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-    ihave Hres := ua_res_id γk k.proc P M (k.regs 11#5) (k.regs 12#5) (k.regs 13#5)
+    ihave Hres := ua_res_id P M (k.regs 11#5) (k.regs 12#5) (k.regs 13#5)
       (k.regs.set 10#5 (k.regs 11#5) 10#5)
       (if (k.regs 12#5).toNat < (k.regs 11#5).toNat then k.regs 11#5 else k.regs 12#5)
       (ua_ok_id P M _ _ _ hnp)
@@ -1148,7 +1093,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
       rotate_right 1
       · iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %cX HΦ %R' Hk Hpc HP %hpost
-        ihave Hres := ua_res_id γk k.proc P M (k.regs 11#5) (k.regs 12#5) (k.regs 13#5) (R' 10#5)
+        ihave Hres := ua_res_id P M (k.regs 11#5) (k.regs 12#5) (k.regs 13#5) (R' 10#5)
           (if (k.regs 12#5).toNat < (k.regs 11#5).toNat then k.regs 11#5 else k.regs 12#5)
           (ua_ok_id P M _ _ _ hnp)
           (by rw [hpost.2]
@@ -1222,12 +1167,11 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
       rotate_right 1
       · iframe #
         iapply wpNext_intro_pin
-        iintro %cE %hpE %spie2 %spp2 %R2 %P'' %M'' %pcv %hsp2 Hk Hpc Hlend Hsv HP'' Hw %hpost
+        iintro %cE %hpE %spie2 %spp2 %R2 %P'' %M'' %pcv %hsp2 Hk Hpc Hlend Hsv HP'' %hpost
         have hpinE : k.sie = false ∨ k.proc = 0#64 → cE = cpu := fun h => (hpE h).trans (hpinB h)
-        rcases hpost with ⟨hpcd, hinv_np, hregs_np⟩ | ⟨hpcf, hPP, hMM, hexit, h10⟩
+        obtain ⟨hpcd, hinv_np, hregs_np⟩ := hpost
         · -- success: restore `s1`/`s3`/`s6`, jump to the epilogue, return `newsz`
           subst hpcd
-          iclear Hw
           obtain ⟨e2, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hregs_np
           icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
           icases uaSaved_split _ _ _ _ $$ Hsv with ⟨C2, C4, C7⟩
@@ -1262,7 +1206,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
           rotate_right 1
           · iapply wpNext_mono _ _ _ _ _ $$ HΦ
             iintro %cX HΦ %R' Hk Hpc HPr %hpost'
-            ihave Hres := ua_res_ok γk k.proc P P'' M M'' (k.regs 11#5) (k.regs 12#5) (k.regs 13#5)
+            ihave Hres := ua_res_ok P P'' M M'' (k.regs 11#5) (k.regs 12#5) (k.regs 13#5)
               (R' 10#5)
               (if (k.regs 12#5).toNat < (k.regs 11#5).toNat then k.regs 11#5 else k.regs 12#5)
               (uaInv_ok P P'' M M'' (k.regs 13#5 ||| 18#64) (k.regs 11#5) (k.regs 12#5)
@@ -1279,29 +1223,6 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
           case f25 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact e25
           case f26 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact e26
           case f27 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact e27
-        · -- failure: the space was rolled back, `0` returned
-          subst hpcf
-          subst P''
-          subst M''
-          ihave Hn := Hw $$ %rfl
-          icases Hn with #Hn
-          obtain ⟨x2, x9, x19, x22, x24, x25, x26, x27⟩ := hexit
-          icases uaSaved_split _ _ _ _ $$ Hsv with ⟨C2, C4, C7⟩
-          ihave Hframe := uaFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
-            (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) w9
-            $$ [F0 F1 C2 F3 C4 F5 F6 C7 F8 F9]
-          case' _ => iframe
-          iapply (uvma_epi cpu cE k hpinE hK10 spie2 spp2 hsp2 R2 x2 x9 x19 x22 x24 x25 x26 x27
-            (k.regs 9#5) (k.regs 19#5) (k.regs 22#5) w9 (procPtAt P M))
-            $$ [- $Hk $Hpc $Hframe $HP'']
-          rotate_right 1
-          · iapply wpNext_mono _ _ _ _ _ $$ HΦ
-            iintro %cX HΦ %R' Hk Hpc HPr %hpost'
-            ihave Hres := ua_res_zero γk k.proc P M (k.regs 11#5) (k.regs 12#5) (k.regs 13#5) (R' 10#5)
-              (if (k.regs 12#5).toNat < (k.regs 11#5).toNat then k.regs 11#5 else k.regs 12#5)
-              (by rw [hpost'.2, h10]) ((uvmaNp_pos_iff _ _).mpr hrun) $$ [HPr]
-            case' _ => isplitl [HPr]; iexact HPr; iexact Hn
-            iapply HΦ $$ %spie2 %spp2 %R' %hsp2 Hk Hpc Hlend Hres %hpost'.1
       case hbnd =>
         intro Pj Mj j hj hwfj hinvj
         rcases hnew with hnew | hcov

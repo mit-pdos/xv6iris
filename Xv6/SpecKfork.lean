@@ -174,10 +174,13 @@ persistent; `kforkRetLed_ret` drops them.
 
 (NI joint fork lane F2, design "Joint fork lane design" §4) THE ALLOCATOR'S
 DECISIVE RECEIPT, at the allocator names `γk`: the success arm carries the
-trapframe `kalloc`'s `kAllocRcpt γk (procAddr j)`, the `-1` arm its reason,
-the null `kalloc`'s `kNullRcpt γk (procAddr j)` (allocproc's trapframe or
-`proc_pagetable` page, or uvmcopy's page or `walk` node) or the scan's
-exhaustion (F1's `sFullRcpt (procAddr j)`). -/
+trapframe `kalloc`'s `kAllocRcpt γk (procAddr j)` (read by no NI row since
+NI M3 quotas Q-2), the `-1` arm its reason, the scan's exhaustion (F1's
+`sFullRcpt (procAddr j)`) -- ALONE since NI M3 quotas Q-2: F2's other
+disjunct, the null `kalloc`'s `kNullRcpt γk (procAddr j)` (allocproc's
+trapframe or `proc_pagetable` page, or uvmcopy's page or `walk` node), is
+gone, every such kalloc being paid out of the slot's share or the child
+table's weight (Q-1). -/
 def kforkRetLed {hlc : HasLC} {GF : BundledGFunctors}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -188,9 +191,9 @@ def kforkRetLed {hlc : HasLC} {GF : BundledGFunctors}
     (rv : BitVec 32) : IProp GF := iprop%
   (∃ k' : Nat, ⌜V.ev ≤ k'⌝ ∗ procPrivFd γ (procAddr j) pid (V.updEv k') M) ∗ fdFrags V.fdg stsP ∗
   ((⌜rv = -1#32⌝ ∗ chFrag V.chg (procAddr j) csP ∗ Rc ∗
-      -- THE REASON (NI joint fork lanes F2 / F1): the null `kalloc`'s
-      -- receipt (allocproc's or uvmcopy's), or allocproc's scan exhaustion
-      (kNullRcpt γk (procAddr j) ∨ sFullRcpt (procAddr j))) ∨
+      -- THE REASON (NI joint fork lane F1; NI M3 quotas Q-2): allocproc's
+      -- scan exhaustion
+      sFullRcpt (procAddr j)) ∨
    (∃ γc : GName, ⌜1 ≤ rv.toNat ∧ rv.toNat ≤ PIDMAX⌝ ∗ ⌜γc ∉ csP⌝ ∗ childTok γc rv Q ∗
       chFrag V.chg (procAddr j) (csP ∪ {γc}) ∗
       -- THE TWO RECEIPTS (NI M2-G2b)

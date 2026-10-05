@@ -24,11 +24,11 @@
 The sbrk post's raised event count (permit sweep L1a) reaches the
 dispatcher's ∀-general post through `SyscallRet.SyscRows.updEv`.
 
-THE CITATION (NI M2-G3b, rulings G3-R1/R3): sbrk cites at EVERY ecall.  A
-`-1` that is not an overrun carries sys_sbrk's null receipt (G3a's wand),
-and the arm cites the allocator prefix ending in the actor's `KNull`; every
-other outcome cites the boot prefix at the actor, which reads SUCCESS
-(`¬ ι.kNull`) -- an overrun's `-1` is the key's.  The cited row is
+THE CITATION (NI M2-G3b, rulings G3-R1/R3; NI M3 quotas Q-2): sbrk cites at
+EVERY ecall, and on the quota kernel always the boot prefix at the actor:
+its `-1` is the key's quota overrun alone (`sysSbrkOk`'s FAILED arm), so
+there is no allocator event to cite (G3's `KNull` citation of a `-1` that
+is not an overrun, from G3a's null receipt, is gone).  The cited row is
 `UsysDet.usysSbrkFitsAt` at the entry's break, argument words and lazy bit
 (`sbrkArm_fits`, from `sysSbrkOk`: the shrink's `uvmdRsz` is
 `usysSbrkSz`'s, the lazy grow raises the bit, growproc keeps it);
@@ -306,14 +306,6 @@ theorem sbrkArm_sum (a b : BitVec 64) (ha : a.toNat ≤ uvmMaxsz) (hb : 0 ≤ b.
   · rw [Nat.mod_eq_of_lt (by omega)]; omega
   · omega
 
-/-- A break in the user region is not the `-1` answer. -/
-theorem sbrkArm_sz_ne (sz : BitVec 64) (hs : sz.toNat ≤ uvmMaxsz) : sz ≠ -1#64 := by
-  intro h
-  rw [h] at hs
-  revert hs
-  unfold uvmMaxsz
-  decide
-
 /-- **The shrink's break** (NI M2-G3b): `uvmdealloc`'s `uvmdRsz` at a
 negative argument is `usysSbrkSz`'s -- `sz + n`, or `sz` itself when the
 64-bit add wraps below 0. -/
@@ -327,13 +319,12 @@ theorem sbrkArm_shrink_sz (sz n : BitVec 64) (hs : sz.toNat ≤ uvmMaxsz) (hn : 
   unfold uvmdRsz
   split at hc <;> split <;> split <;> omega
 
-/-- **sbrk's cited row from its post** (NI M2-G3b): `sysSbrkOk` at a
-citation whose `KNull` reading is exactly "a `-1` that is not an overrun"
-gives `usysSbrkFitsAt` at the entry's break, words and lazy bit -- the
-answer, the break after and the lazy bit after. -/
+/-- **sbrk's cited row from its post** (NI M2-G3b; NI M3 quotas Q-2: at
+EVERY citation -- the row reads no ledger): `sysSbrkOk` gives
+`usysSbrkFitsAt` at the entry's break, words and lazy bit -- the answer, the
+break after and the lazy bit after. -/
 theorem sbrkArm_fits (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r : BitVec 64) (ι : UIota)
-    (hok : sysSbrkOk V V' M M' v0 v1 r) (hszb : V.sz.toNat ≤ uvmMaxsz)
-    (hk : ι.kNull ↔ (r = -1#64 ∧ ¬ sysSbrkOverrun V v0)) :
+    (hok : sysSbrkOk V V' M M' v0 v1 r) (hszb : V.sz.toNat ≤ uvmMaxsz) :
     usysSbrkFitsAt V.sz.toNat v0 v1 V.pvLazy ι r V'.sz.toNat V'.pvLazy := by
   have hrg := sbrkArgW_range v0
   have harg : sysSbrkArg v0 = sbrkArgW v0 := rfl
@@ -344,26 +335,14 @@ theorem sbrkArm_fits (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r
     constructor <;> intro h <;> omega
   unfold usysSbrkFitsAt usysSbrkAns usysSbrkSz usysSbrkLz
   rcases hok with ⟨hr, hV, -, hwhy⟩ | ⟨hr, hpath⟩
-  · -- FAILED: an overrun (the key), or an allocating grow with its cited `KNull`
-    have hf : usysSbrkFails V.sz.toNat v0 v1 ι := by
-      by_cases ho : sysSbrkOverrun V v0
-      · exact Or.inl (hov.mp ho)
-      · refine Or.inr ⟨?_, hk.mpr ⟨hr, ho⟩⟩
-        rcases hwhy with h | ⟨he, hp, hnp⟩
-        · exact absurd h ho
-        · have hu := (uvmaNp_pos_iff _ _).mp hnp
-          rw [sbrkArm_sum V.sz _ hszb (by omega)] at hu
-          rw [harg] at hp hu
-          exact ⟨heag.mp he, hp, by omega⟩
+  · -- FAILED: the quota overrun (the key)
+    have hf : usysSbrkFails V.sz.toNat v0 v1 ι := hov.mp hwhy
     simp only [hf, if_true, not_true_eq_false, _root_.false_and, if_false]
     rw [hV]
     exact ⟨hr, rfl, rfl⟩
-  · -- SUCCEEDED: no overrun, and the boot reading
-    have hnk : ¬ ι.kNull := fun h => sbrkArm_sz_ne V.sz hszb (hr.symm.trans (hk.mp h).1)
-    -- the quota test passed (NI M3 quotas Q-0: the SUCCEEDED arm says so)
+  · -- SUCCEEDED: the quota test passed (NI M3 quotas Q-0: the SUCCEEDED arm says so)
     obtain ⟨hnq, hpath⟩ := hpath
-    have hno : ¬ usysSbrkOverrun V.sz.toNat v0 := fun ho => hnq (hov.mpr ho)
-    have hnf : ¬ usysSbrkFails V.sz.toNat v0 v1 ι := fun h => h.elim hno (fun h => hnk h.2)
+    have hnf : ¬ usysSbrkFails V.sz.toNat v0 v1 ι := fun ho => hnq (hov.mpr ho)
     simp only [hnf, if_false, not_false_eq_true, _root_.true_and]
     refine ⟨by rw [hr]; simp, ?_⟩
     rcases hpath with ⟨hpe, hz, hpos, hneg⟩ | ⟨hne, hnn, hbd, hV, -, -⟩
@@ -466,13 +445,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- **sbrk's citation** (NI M2-G3b, rulings G3-R1/R3): at EVERY sbrk ecall.
-A `-1` that is not an overrun hands over sys_sbrk's null receipt and the
-arm cites the allocator prefix ending in the actor's `KNull`; every other
-outcome cites the boot prefix at the actor (success is the ABSENCE of a
-cited `KNull`; an overrun's `-1` is the key's).  The row is `sbrkArm_fits`
-at the record the call left (`V'`: the answer stored, the break and the
-lazy bit `sysSbrkOk`'s `V2`'s). -/
+/-- **sbrk's citation** (NI M2-G3b, rulings G3-R1/R3; NI M3 quotas Q-2): at
+EVERY sbrk ecall, the boot prefix at the actor -- the row reads no ledger
+(a `-1` is the key's quota overrun).  The row is `sbrkArm_fits` at the
+record the call left (`V'`: the answer stored, the break and the lazy bit
+`sysSbrkOk`'s `V2`'s). -/
 theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (gn : GName) (act : BitVec 64) (ke : Nat)
     (v0 v1 r : BitVec 64) (hn : syscNum V = 12) (hw0 : tfW V.tf (tfArgIdx 0) = v0)
@@ -480,43 +457,20 @@ theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (sts :
     (hok : sysSbrkOk V V2 M M2 v0 v1 r) (ha : syscA0 V' = r) (hsz : V'.sz = V2.sz)
     (hlz : V'.pvLazy = V2.pvLazy) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
-      (⌜r = -1#64 ∧ ¬ sysSbrkOverrun V v0⌝ -∗ kNullRcpt fsReadyKmem act) -∗
       |==> syscEvOut (hlc := hlc) V M sts V' M' cs cs gn := by
-  have hrow : ∀ ι : UIota, (ι.kNull ↔ (r = -1#64 ∧ ¬ sysSbrkOverrun V v0)) →
-      syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs sts ι := by
-    intro ι hk
+  have hrow : ∀ ι : UIota, syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs sts ι := by
+    intro ι
     refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
       fun h' => absurd (hn.symm.trans h') (by decide), fun _ => ?_,
       fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide)⟩
     rw [hw0, hw1, hsz, hlz]
     show usysSbrkFitsAt _ _ _ _ _ (syscA0 V') _ _
     rw [ha]
-    exact sbrkArm_fits V V2 M M2 v0 v1 r ι hok hszb hk
-  iintro #Ha Hw
-  by_cases hneg : r = -1#64 ∧ ¬ sysSbrkOverrun V v0
-  · -- the decisive `KNull`: cite it
-    ihave Hk := Hw $$ %hneg
-    unfold kNullRcpt ledReceipt
-    icases Hk with ⟨%hk, #Hk, %-⟩
-    ihave #Hk' := (show ledLb (GF := GF) fsReadyKmem.pend (hk ++ [.KNull act]) ⊢
-        ((niNamesHere (GF := GF)).getD 3 0) ↪◯ML (hk ++ [.KNull act]) from .rfl) $$ Hk
-    imod niIotaLbs_kev (GF := GF) (niNamesHere (GF := GF)) (hk ++ [.KNull act]) act $$ Hk' with #Hl
-    imodintro
-    iapply syscEvOut_cite V M sts V' M' cs cs gn ke { UIota.boot with kev := hk ++ [.KNull act], act := act }
-      (hrow _ ?_) $$ Ha Hl
-    have hnull : UIota.kNull { UIota.boot with kev := hk ++ [.KNull act], act := act } := by
-      show (hk ++ [Kev.KNull act]).getLast? = some (.KNull act)
-      simp
-    exact ⟨fun _ => hneg, fun _ => hnull⟩
-  · -- every other outcome: the boot prefix at the actor (no `KNull` read)
-    iclear Hw
-    imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
-    imodintro
-    iapply syscEvOut_cite V M sts V' M' cs cs gn ke { UIota.boot with act := act } (hrow _ ?_) $$ Ha Hl
-    have hnn : ¬ UIota.kNull { UIota.boot with act := act } := by
-      show ¬ ([] : List Kev).getLast? = some (.KNull act)
-      simp
-    exact ⟨fun h => absurd h hnn, fun h => absurd h hneg⟩
+    exact sbrkArm_fits V V2 M M2 v0 v1 r ι hok hszb
+  iintro #Ha
+  imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
+  imodintro
+  iapply syscEvOut_cite V M sts V' M' cs cs gn ke { UIota.boot with act := act } (hrow _) $$ Ha Hl
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 12, `sys_sbrk`** (Rocq `sysc_arm_sbrk`; the whole block, D16). -/
@@ -570,7 +524,7 @@ theorem syscall_arm_sbrk (SS : SYSSBRK)
   iapply hU
   iframe Hk Hkl Hka Hpriv Hpc
   k_next_e
-  iintro %spie2 %spp2 %R2 %- Hk Hpc ⟨%V', %M', %k', %hok, %hk', Hpriv, Hw⟩ %hcs
+  iintro %spie2 %spp2 %R2 %- Hk Hpc ⟨%V', %M', %k', %hok, %hk', Hpriv⟩ %hcs
   obtain ⟨htf, -, -, -, -, -, -, htfp, -⟩ := sbrkArm_shape V V' M M' v0 v1 _ hok
   k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
   k_norm_g at hcs
@@ -578,18 +532,13 @@ theorem syscall_arm_sbrk (SS : SYSSBRK)
   have hs2' : R2 18#5 = pageAddr V'.upt.tfp := by rw [htfp]; exact hcs.2.2.2.1.trans hs2
   have hrows := syscRows_sbrk V V' M M' sts cs pid v0 v1 (R2 10#5) hn12 (by rw [hl]; decide) hw0 hw1
     hok hlen hbelow
-  -- (NI M2-G3b) the citation, at every sbrk: the `-1`'s null receipt or the
-  -- boot prefix at the actor
+  -- (NI M2-G3b; NI M3 quotas Q-2) the citation, at every sbrk: the boot
+  -- prefix at the actor
   icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
   iapply wpLoop_bupd
   imod syscArmSbrk_ev V V' M M' sts (syscStore (V'.updEv k') (R2 10#5)) M' cs gn (procAddr j) ke v0 v1 (R2 10#5)
     hn12 hw0 hw1 (Nat.le_trans hszb uQuota_le_uvmMaxsz) hok (syscStore_a0 _ _ (by show tfArgIdx 0 < V'.tf.length; rw [htf, hl]; decide))
-    rfl rfl $$ Hanc [Hw] with #Hev
-  · rw [← hproc]
-    iintro %h
-    iapply Hw
-    ipureintro
-    exact ⟨h.1.trans (by decide), h.2⟩
+    rfl rfl $$ Hanc with #Hev
   imodintro
   unfold syscallRet syscallAddr at *
   -- the block at sbrk's raised event count (permit sweep L1a): the rows do

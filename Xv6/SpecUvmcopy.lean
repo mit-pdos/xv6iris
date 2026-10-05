@@ -1,18 +1,20 @@
 /-
 Specification of `uvmcopy` (kernel/vm.c): the parent's mapped pages below
 `sz` copied into fresh pages mapped at the same vpns with the same flags
-in the child's table (which has none of them yet); `-1` when the
-allocator runs dry, the child's prefix unmapped again (uncounted mode).
-Needs 42 slots.
+in the child's table (which has none of them yet).  In C, `-1` when the
+allocator runs dry, the child's prefix unmapped again; under the quota
+credits that never happens (below).  Needs 42 slots.
 
 THE LEND (permit sweep L1a, Rocq f344a089a): `actLend k.proc ke` in, `∃ k'
 ≥ ke` back right after the return pc, framed through by the proof for now;
 `[WchG GF]` joins the binders (Rocq's `!wchG Σ`).
 
-THE NULL RECEIPT (NI joint fork lane F2; design "Joint fork lane design"
-F3): `-1` comes only from a null `kalloc` (the page's own, or a `walk`
-node's under `mappages`), so the `-1` arm carries that call's persistent
-receipt `kNullRcpt γk k.proc`.
+THE QUOTA (NI M3 quotas Q-1/Q-2): `-1` comes only from a null `kalloc`
+(the page's own, or a `walk` node's under `mappages`); every such kalloc is
+paid out of the child table's credits (`ptOwnRep`'s weight: the parent's
+leaves are quota leaves), so it is never null.  Q-2 deleted the `-1` arm
+(the joint fork lane F2's `⌜-1⌝ ∗ procPtAt Pnew Mnew ∗ kNullRcpt γk k.proc`,
+which no proof produced once the credits were in): the post is the copy.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -54,10 +56,9 @@ def wp_uvmcopy_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     procPtAt Pold Mold -∗
-    ((⌜R' 10#5 = -1#64⌝ ∗ procPtAt Pnew Mnew ∗ kNullRcpt γk k.proc) ∨
-     (∃ (Pnew' : UPtd) (Mnew' : Nat → List (BitVec 8)),
+    (∃ (Pnew' : UPtd) (Mnew' : Nat → List (BitVec 8)),
         ⌜R' 10#5 = 0#64 ∧ uvmcopyOk Pold Pnew Pnew' Mold Mnew Mnew' (uvmNp (k.regs 12#5))⌝ ∗
-        procPtAt Pnew' Mnew')) -∗
+        procPtAt Pnew' Mnew') -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

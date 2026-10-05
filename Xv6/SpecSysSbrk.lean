@@ -57,12 +57,14 @@ growproc lends the block's counter to uvmalloc, so the block comes back at
 `V'.updEv k'` with `V.ev ≤ k'` (the lazy and failing paths at `k' = V.ev`);
 `sysSbrkOk` is unchanged.
 
-THE REASON (NI M2-G3a; the spurious `-1` closed): `sysSbrkOk`'s FAILED
-arm holds only at an overrun (`sysSbrkOverrun`: the key's break and `a0`)
-or at an allocating eager grow (`sysSbrkAllocs`), and the post's wand hands
-the `-1` that is not an overrun the decisive null kalloc's receipt
-`kNullRcpt γk k.proc` (growproc's, from uvmalloc's `0` arm).  Success
-needs no receipt (it is the absence of a cited `KNull`).
+THE REASON (NI M2-G3a; the spurious `-1` closed; cut by NI M3 quotas Q-2):
+`sysSbrkOk`'s FAILED arm holds only at the quota overrun (`sysSbrkOverrun`:
+the key's break and `a0`).  G3a's second reason, an allocating eager grow
+whose uvmalloc met a null `kalloc` (`sysSbrkAllocs`, with the post's wand
+handing that `-1` growproc's `kNullRcpt`), is gone: past the quota test the
+eager grow's uvmalloc is paid out of the table's credits and never fails
+(Q-1), and growproc's own `-1` (its `TRAPFRAME` test) is refuted by the same
+quota test, so a `-1` IS the overrun.
 
 THE QUOTA (NI M3 quotas, Q-0; the kernel is `verified-quota`): the overrun
 is now the C's own first test, `n > 0 && addr + n > MAXUSZ`
@@ -103,16 +105,11 @@ it subsumes). -/
 def sysSbrkOverrun (V : ProcPriv) (v0 : BitVec 64) : Prop :=
   0 < (sysSbrkArg v0).toInt ∧ uQuota < V.sz.toNat + (sysSbrkArg v0).toInt.toNat
 
-/-- The eager grow runs uvmalloc's loop at least once: the only place
-sbrk allocates (NI M2-G3). -/
-def sysSbrkAllocs (V : ProcPriv) (v0 v1 : BitVec 64) : Prop :=
-  sysSbrkEager v1 ∧ 0 < (sysSbrkArg v0).toInt ∧ 0 < uvmaNp V.sz (V.sz + sysSbrkArg v0)
-
 /-- **What `sys_sbrk` did** (Rocq `sys_sbrk_ok`), with `v0`, `v1` the two
 syscall arguments and `r` the result. -/
 def sysSbrkOk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r : BitVec 64) : Prop :=
-  -- FAILED: nothing moved, and only for a reason (NI M2-G3)
-  (r = -1#64 ∧ V' = V ∧ M' = M ∧ (sysSbrkOverrun V v0 ∨ sysSbrkAllocs V v0 v1)) ∨
+  -- FAILED: nothing moved, and only at the quota overrun (NI M2-G3; NI M3 quotas Q-2)
+  (r = -1#64 ∧ V' = V ∧ M' = M ∧ sysSbrkOverrun V v0) ∨
   -- SUCCEEDED: the old size, within the quota, and one of the two paths ran
   (r = V.sz ∧ ¬ sysSbrkOverrun V v0 ∧
     (-- EAGER (t == SBRK_EAGER, or a shrink): growproc's own post at 0
@@ -141,8 +138,7 @@ def wp_sys_sbrk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (k' : Nat),
       ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ ⌜V.ev ≤ k'⌝ ∗
-      procPrivFd γ (procAddr j) pid (V'.updEv k') M' ∗
-      (⌜R' 10#5 = -1#64 ∧ ¬ sysSbrkOverrun V v0⌝ -∗ kNullRcpt γk k.proc)) -∗
+      procPrivFd γ (procAddr j) pid (V'.updEv k') M') -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

@@ -61,11 +61,10 @@ are `LinkNiAdequacy` (only a `Link` file may import a `Proof` file).
    3); getpid's answer is the incarnation's pid (W2d's pid row); uptime's,
    wait's, (NI joint fork lane F3) fork's and (NI M2-G3) sbrk's answers are
    DERIVED from the cited ι (`NiTrace` scopes 4, 6, 8, 9: fork's from the
-   pid history, the round's decisive allocator event and the slot ledger's
-   `SFull`, with every actor's allocator order and the slot-occupancy
-   timeline conceded through the histories; sbrk's from the caller's break
-   and argument words and, at an allocating eager grow, whether the cited
-   allocator prefix ends in the actor's `KNull`).
+   pid history and the slot ledger's `SFull`, the slot-occupancy timeline
+   conceded through the histories; sbrk's from the caller's break and
+   argument words alone -- NI M3 quotas Q-2: on the quota kernel neither
+   reads the allocator; the statements here are byte-identical).
 4. (NI M2-X4, F3) The histories `niHist F` are ghost witnesses inside the
    existential `F`: ι is not observable (`NiTrace` scope 5); the cited era
    is an input (scope 7).

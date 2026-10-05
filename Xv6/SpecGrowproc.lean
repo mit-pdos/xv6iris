@@ -1,7 +1,6 @@
 /-
 Specification of `growproc` (kernel/proc.c): the running process's size
-grown (`uvmalloc`, refused above `TRAPFRAME` or when the allocator is
-dry, `-1`) or shrunk (`uvmdealloc`), `p->sz` updated.  Uncounted; needs
+grown (`uvmalloc`, refused above `TRAPFRAME`, `-1`) or shrunk (`uvmdealloc`), `p->sz` updated.  Uncounted; needs
 46 slots (4 + `uvmalloc`'s 42).
 
 The block is Rocq's whole `ProcInv.proc_priv`, `FdTable.procPrivFd γ`
@@ -22,14 +21,15 @@ left at -- the post's record is `V'.updEv k'` with `V.ev ≤ k'` (Rocq: `∀ k',
 ⌜pv_ev ≤ k'⌝ -∗ proc_priv (upd_ev … k')`, the continuation's premise; here
 the post's existential).  `growprocOk` itself is unchanged.
 
-THE REASON (NI M2-G3a): `growprocOk`'s `-1` is an overrun (`sz + n >
-TRAPFRAME`, the test at `+0x36`, before uvmalloc) or an allocating grow
-(`0 < uvmaNp`: uvmalloc's loop ran); the post's wand hands uvmalloc's null
-receipt to a `-1` that is not an overrun.
+THE REASON (NI M2-G3a, cut by NI M3 quotas Q-2): `growprocOk`'s `-1` is the
+overrun (`sz + n > TRAPFRAME`, the test at `+0x36`, before uvmalloc) ALONE.
 
 THE QUOTA (NI M3 quotas Q-1): a grow stays within the quota (`hq`:
 `sys_sbrk` calls growproc only past its quota test), so the block's `sz ≤
 uQuota` holds after it and uvmalloc's run is paid out of the table's credits.
+So uvmalloc never answers `0` (Q-2 deleted that arm), and G3a's allocating
+`-1` (`0 < uvmaNp`) and its null receipt (the post's wand) are gone: the
+overrun is dead too under `hq` (`uQuota < uvmMaxsz`), kept as the C's test.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -49,8 +49,7 @@ def growprocOk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (n r : BitVec 
   let sz := V.sz
   let nz : Int := n.toInt
   (nz = 0 → r = 0#64 ∧ V' = V ∧ M' = M) ∧
-  (0 < nz → ((r = -1#64 ∧ V' = V ∧ M' = M ∧
-      (uvmMaxsz < sz.toNat + nz.toNat ∨ 0 < uvmaNp sz (sz + n))) ∨
+  (0 < nz → ((r = -1#64 ∧ V' = V ∧ M' = M ∧ uvmMaxsz < sz.toNat + nz.toNat) ∨
     (r = 0#64 ∧ (sz.toNat + nz.toNat) ≤ uvmMaxsz ∧
       V' = { V with sz := sz + n, upt := V'.upt } ∧ uvmallocOk V.upt V'.upt M M' sz (sz + n) PTE_W))) ∧
   (nz < 0 → r = 0#64 ∧
@@ -74,9 +73,7 @@ def wp_growproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (k' : Nat),
       ⌜growprocOk V V' M M' (k.regs 10#5) (R' 10#5)⌝ ∗ ⌜V.ev ≤ k'⌝ ∗
-      procPrivFd γ (procAddr j) pid (V'.updEv k') M' ∗
-      (⌜R' 10#5 = -1#64 ∧ V.sz.toNat + (k.regs 10#5).toInt.toNat ≤ uvmMaxsz⌝ -∗
-        kNullRcpt γk k.proc)) -∗
+      procPrivFd γ (procAddr j) pid (V'.updEv k') M') -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

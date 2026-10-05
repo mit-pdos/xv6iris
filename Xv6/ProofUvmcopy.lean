@@ -8,20 +8,20 @@ frame and the loop over the parent's pages, by induction on the pages left.
 Each iteration walks the parent's table (`walk(old, i, 0)`), skips an
 incomplete path or an invalid entry, and otherwise allocates a page, copies
 the parent's 4096 bytes into it (`memmove`) and maps it into the child at
-the parent's own flags (`mappages` with `n = 1`).  A failed `kalloc`, or a
-`mappages` that could not complete a path, jumps to `err`, which unmaps the
-child's prefix `[0, i)` -- exactly the pages the loop had mapped -- and
-returns `-1`.
+the parent's own flags (`mappages` with `n = 1`).  In C a failed `kalloc`,
+or a `mappages` that could not complete a path, jumps to `err`, which unmaps
+the child's prefix `[0, i)` and returns `-1`; under the quota credits (NI M3
+quotas Q-1) neither happens -- the page and the walk's nodes are paid out of
+the child table's credits -- and Q-2 deleted the `err` tail's proof
+(`uvmcopy_err`, `uc_uvmunmap_call`) with the contract's `-1` arm.
 
 Every premise of the contract is discharged here.
 
 THE LEND (permit sweep L1a, Rocq f344a089a; threaded by L2, Rocq
-78f9234b8): carried by the loop (`uvmcopy_iter` / `uvmcopy_loop` /
-`uvmcopy_err` take and return `∃ k1 ≥ ke`) and passed to `mappages` and to
-the failure tail's `uvmunmap`, each return's bound composed back to `ke`.
-Since L3b (no Rocq counterpart) `kalloc` and the mappages-failure arm's
-`kfree` take the count in hand too and step it (`uc_kalloc_led_call`,
-the credited `kfree`).
+78f9234b8): carried by the loop (`uvmcopy_iter` / `uvmcopy_loop` take and
+return `∃ k1 ≥ ke`) and passed to `mappages`, each return's bound composed
+back to `ke`.  Since L3b (no Rocq counterpart) `kalloc` takes the count in
+hand too and steps it (`uc_kalloc_led_call`).
 -/
 import Xv6.SpecUvmcopy
 import Xv6.SpecMemmove
@@ -57,8 +57,6 @@ theorem uc_ret_13fc : jumpPc (KA.«uvmcopy» + 0x44#64) = (KA.«uvmcopy» + 0x44
 theorem uc_ret_140c : jumpPc (KA.«uvmcopy» + 0x54#64) = (KA.«uvmcopy» + 0x54#64) := by
   decide
 theorem uc_ret_141c : jumpPc (KA.«uvmcopy» + 0x64#64) = (KA.«uvmcopy» + 0x64#64) := by
-  decide
-theorem uc_ret_1432 : jumpPc (KA.«uvmcopy» + 0x7a#64) = (KA.«uvmcopy» + 0x7a#64) := by
   decide
 
 /-- `c.lui s4,0x1` is `4096`. -/
@@ -96,15 +94,6 @@ theorem uc_vpnOf (i : Nat) (h : 4096 * i < 2 ^ 38) :
   have h12 : (4096 * i) / 2 ^ 12 = i := by omega
   rw [h12]
   exact Nat.mod_eq_of_lt (by omega)
-
-/-- The `a2 = i` of the `uvmunmap` call (`i / PGSIZE`). -/
-theorem uc_srli12 (i : Nat) (h : 4096 * i < 2 ^ 64) :
-    (BitVec.ofNat 64 (4096 * i)) >>> 12 = BitVec.ofNat 64 i := by
-  apply BitVec.eq_of_toNat_eq
-  have hv : (BitVec.ofNat 64 (4096 * i)).toNat = 4096 * i := Xv6.bcOfNatToNat _ (by omega)
-  simp only [BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow, hv, BitVec.toNat_ofNat,
-    Nat.reducePow]
-  omega
 
 theorem uc_ofNat_4096 : BitVec.ofNat 64 (4096 * 1) = 4096#64 := by decide
 
@@ -231,29 +220,6 @@ theorem uc_mappages_call [WchG GF] (MA : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : 
     hroot' hargs' hperm' hmask' hrwx' hwf' hnd' hpg'
   unfold wp_mappages_any_body at h
   simp only [mappagesAddr] at h
-  exact h
-
-set_option maxHeartbeats 1000000 in
-theorem uc_uvmunmap_call [WchG GF] (UM : UVMUNMAP) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName)
-    (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (m : Nat)
-    (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : uvmunmapSlots ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
-    (hroot' : k'.regs 10#5 = pageAddr P.root) (hal' : k'.regs 11#5 &&& 0xfff#64 = 0#64)
-    (hn' : k'.regs 12#5 = BitVec.ofNat 64 m)
-    (hrange' : (k'.regs 11#5).toNat + 4096 * m ≤ uvmMaxsz) (hfree' : k'.regs 13#5 ≠ 0#64)
-    (ke : Nat) :
-    kctx c k' ∗ pcIs c KA.«uvmunmap» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk none ∗ procPtAt P M ∗ actLend k'.proc ke ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
-      procPtAt (P.delRun (vpnOf (k'.regs 11#5)).toNat m) M -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := UM.wp_uvmunmap_free (hlc := hlc) (GF := GF) c k' γl γk P M m ke hnoff' hK' hlk' hroot'
-    hal' hn' hrange' hfree'
-  unfold wp_uvmunmap_free_body at h
-  simp only [uvmunmapAddr] at h
   exact h
 
 /-! ## The frame -/
@@ -383,28 +349,6 @@ theorem uvmcopy_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (Q : IProp GF)
 
 /-! ## The `err` block -/
 
-/-- The view only matters on the pages the child maps, and below the run it
-maps nothing to begin with. -/
-theorem uc_procPtAt_view [CurCtx] (Pnew : UPtd) (Mold Mnew : Nat → List (BitVec 8)) (n : Nat)
-    (hfree : ∀ j, j < n → get? Pnew.um j = none) :
-    procPtAt (GF := GF) Pnew (UPtCopy.ucView Mold Mnew n) ⊢ procPtAt Pnew Mnew := by
-  have hpure : ∀ k w, get? Pnew.um k = some w → UPtCopy.ucView Mold Mnew n k = Mnew k := by
-    intro k w hw
-    have hk : ¬ k < n := by
-      intro hc
-      rw [hfree k hc] at hw
-      exact absurd hw (by simp)
-    unfold UPtCopy.ucView
-    rw [if_neg hk]
-  unfold procPtAt
-  iintro ⟨%hwf, Ht, Hp⟩
-  isplitl []
-  · ipureintro; exact hwf
-  · isplitl [Ht]
-    · iexact Ht
-    · iapply (UPtCopy.umPages_congr Pnew (UPtCopy.ucView Mold Mnew n) Mnew hpure)
-      iexact Hp
-
 /-- The same, the other way round. -/
 theorem uc_procPtAt_view' [CurCtx] (Pnew : UPtd) (Mold Mnew : Nat → List (BitVec 8)) (n : Nat)
     (hfree : ∀ j, j < n → get? Pnew.um j = none) :
@@ -430,134 +374,7 @@ theorem uc_procPtAt_view' [CurCtx] (Pnew : UPtd) (Mold Mnew : Nat → List (BitV
 theorem uc_setReg_as (k : KCtx) (i : BitVec 5) (v : BitVec 64) :
     k.setReg i v = (k.withSpie k.spie k.spp).withRegs (k.regs.set i v) := rfl
 
-theorem uc_vpnOf_zero : (vpnOf (0#64)).toNat = 0 := by decide
-
 set_option maxHeartbeats 4000000 in
-/-- The `err` block at `0x800014d2`: `uvmunmap(new, 0, i / PGSIZE, 1)` gives
-the child back exactly as it was (the prefix `[0, i)` is precisely what the
-loop had mapped, and it was unmapped before), then `return -1`. -/
-theorem uvmcopy_br_fffffffffffffdfa : KA.«uvmcopy» + 0xfffffffffffffdfa#64 = KA.«uvmunmap» := by decide
-
-theorem uvmcopy_err [WchG GF] (UM : UVMUNMAP) [CurCtx] (cpu cur : CPU) (k : KCtx) (γl : GName)
-    (γk : KmemNames) (Pold Pnew P : UPtd) (Mold Mnew : Nat → List (BitVec 8)) (n i : Nat) (ke : Nat)
-    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 42 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
-    (hmax : 4096 * n ≤ uvmMaxsz) (hi : i ≤ n)
-    (hfree : ∀ j, j < n → get? Pnew.um j = none)
-    (hinv : UPtCopy.ucInv Pold Pnew P i)
-    (hpin : k.sie = false ∨ k.proc = 0#64 → cur = cpu)
-    (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
-    (R : RegMap) (h9 : R 9#5 = BitVec.ofNat 64 (4096 * i)) (h23 : R 23#5 = pageAddr Pnew.root)
-    (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFB0#64)
-    (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5)
-    (h27 : R 27#5 = k.regs 27#5) (w9 : BitVec 64) :
-    kctx cur (((k.pushed 10).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«uvmcopy» + 0x6c#64) ∗
-    isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    ucFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
-      (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) w9 ∗
-    procPtAt Pold Mold ∗ procPtAt P (UPtCopy.ucView Mold Mnew n) ∗ (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) ∗
-    wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
-      ⌜k.sie = false → spie' = k.spie ∧ spp' = k.spp⌝ -∗
-      kctx cpu' ((k.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
-      procPtAt Pold Mold -∗ procPtAt Pnew Mnew -∗
-      ⌜calleeSaved k.regs R' ∧ R' 10#5 = -1#64⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) cur := by
-  iintro ⟨Hk, Hpc, #Hlk, Hav, Hframe, Hold, Hchild, ⟨%k1, %hk1, Hlend⟩, HΦ⟩
-  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  have hi64 : 4096 * i < 2 ^ 64 := by
-    have : uvmMaxsz = 274877898752 := by unfold uvmMaxsz; decide
-    have : 4096 * i ≤ 4096 * n := by omega
-    omega
-  -- c.li a3,1 ; srli a2,s1,0xc ; c.li a1,0 ; c.mv a0,s7 ; jal uvmunmap
-  k_step_gen (wp_s_addi cur _ (KA.«uvmcopy» + 0x6c#64) true 1#12 13#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
-  iintro Hk Hpc
-  k_step_gen (wp_s_srli c1 _ (KA.«uvmcopy» + 0x6e#64) false 12#6 12#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [h9, uc_srli12 i hi64] next c2 hp2
-  iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ (KA.«uvmcopy» + 0x72#64) true 0#12 11#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
-  iintro Hk Hpc
-  k_step_gen (wp_s_add c3 _ (KA.«uvmcopy» + 0x74#64) true 10#5 0#5 23#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h23] next c4 hp4
-  iintro Hk Hpc
-  k_step_gen (wp_s_jal c4 _ (KA.«uvmcopy» + 0x76#64) false 2096516#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmcopy_br_fffffffffffffdfa] next c5 hp5
-  iintro Hk Hpc
-  iapply (uc_uvmunmap_call UM c5 _ γl γk P (UPtCopy.ucView Mold Mnew n) i ?hn ?hKa ?hl ?hro
-    ?hal ?hnn ?hra ?hfr k1) $$ [- $Hk $Hpc]
-  rotate_right 1
-  k_norm_g
-  iframe #
-  iframe Hav Hchild Hlend
-  case hn => k_norm_g; omega
-  case hKa => k_norm_g; unfold uvmunmapSlots; omega
-  case hl => k_norm_g; exact hlk
-  case hro => k_norm_g; rw [hinv.1]
-  case hal => k_norm_g
-  case hnn => k_norm_g
-  case hra => k_norm_g; omega
-  case hfr => k_norm_g; decide
-  iapply wpNext_intro_pin
-  iintro %c6 %hp6 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hchild %hcs
-  ihave Hlend := actLend_ret_weaken _ hk1 $$ Hlend
-  have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = cur :=
-    fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
-  k_norm_g [MachCSL.KCtx.withSpie_twice, uc_ret_1432]
-  -- the child is back to `Pnew`
-  have hdel0 : P.delRun (vpnOf (0#64)).toNat i = Pnew := by
-    rw [uc_vpnOf_zero]; exact UPtCopy.ucInv_delRun hinv hi hfree
-  rw [hdel0]
-  ihave Hchild := uc_procPtAt_view Pnew Mold Mnew n hfree $$ Hchild
-  -- c.li a0,-1 ; c.j the epilogue
-  icases kctx_kernelText _ _ $$ Hk with ⟨#HT2, Hk⟩
-  k_step_gen (wp_s_addi c6 _ (KA.«uvmcopy» + 0x7a#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) HT2 $$ [- $Hk $Hpc] next c7 hp7
-  iintro Hk Hpc
-  k_step_gen (wp_s_j c7 _ (KA.«uvmcopy» + 0x7c#64) true 4#21)
-    from (text_instr _ _ _ _ rfl rfl) HT2 $$ [- $Hk $Hpc] next c8 hp8
-  iintro Hk Hpc
-  have hpin8 : k.sie = false ∨ k.proc = 0#64 → c8 = cpu := fun h =>
-    (hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hpin5 h).trans (hpin h))))
-  have hcs2 : calleeSaved R R2 := by
-    unfold calleeSaved at hcs ⊢
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hcs
-    exact hcs
-  have hsp' : k.sie = false → spie2 = k.spie ∧ spp2 = k.spp := by
-    intro h
-    obtain ⟨e1, e2⟩ := hsp2 h
-    rw [e1, e2]
-    exact hsp h
-  ihave HQ : iprop(procPtAt Pold Mold ∗ procPtAt Pnew Mnew) $$ [Hold Hchild]
-  case' _ => iframe
-  iapply (uvmcopy_epi cpu c8 k iprop(procPtAt Pold Mold ∗ procPtAt Pnew Mnew) hpin8 ?hK10
-    spie2 spp2 hsp' _ ?hR2' ?h24' ?h25' ?h26' ?h27' w9) $$ [- $Hk $Hpc $Hframe $HQ]
-  rotate_right 1
-  · iapply wpNext_mono _ _ _ _ _ $$ HΦ
-    iintro %cX HΦ %spie3 %spp3 %R3 %hsp3 Hk Hpc ⟨Hold, Hchild⟩ %hpure
-    iapply HΦ $$ %spie3 %spp3 %R3 %hsp3 Hk Hpc Hlend Hold Hchild
-    ipureintro
-    refine ⟨hpure.1, ?_⟩
-    rw [hpure.2]
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-  case hK10 => omega
-  case hR2' =>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-    rw [hcs2.1, hR2]
-  case h24' =>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-    rw [hcs2.2.2.2.2.2.2.2.2.2.1, h24]
-  case h25' =>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-    rw [hcs2.2.2.2.2.2.2.2.2.2.2.1, h25]
-  case h26' =>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-    rw [hcs2.2.2.2.2.2.2.2.2.2.2.2.1, h26]
-  case h27' =>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-    rw [hcs2.2.2.2.2.2.2.2.2.2.2.2.2, h27]
-
 end
 
 /-! ## One iteration -/
@@ -674,10 +491,8 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
       kctx cpu' (((k.pushed 10).withSpie spie2 spp2).withRegs R2) -∗ pcIs cpu' pcv -∗
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
       kallocAvail γk none -∗ procPtAt Pold Mold -∗ procPtAt P' (UPtCopy.ucView Mold Mnew n) -∗
-      (⌜pcv = (KA.«uvmcopy» + 0x6c#64)⌝ -∗ kNullRcpt γk k.proc) -∗
-      ⌜ucKept R R2 ∧
-        ((pcv = (KA.«uvmcopy» + 0x24#64) ∧ UPtCopy.ucInv Pold Pnew P' (i + 1)) ∨
-         (pcv = (KA.«uvmcopy» + 0x6c#64) ∧ P' = P))⌝ -∗ wpLoop cpu'))
+      ⌜ucKept R R2 ∧ (pcv = (KA.«uvmcopy» + 0x24#64) ∧ UPtCopy.ucInv Pold Pnew P' (i + 1))⌝ -∗
+        wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hold, Hchild, Hlend, HΦ⟩
   icases UPt.procPtAt_region Pold Mold $$ Hold with ⟨%hregO, Hold⟩
@@ -747,13 +562,9 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
     case' _ => iframe
     have hpin6 : k.sie = false ∨ k.proc = 0#64 → c6 = cur := fun h => (hp6 h).trans (hpin4 h)
     ihave HΦ' := wpNext_at _ _ _ c6 _ hpin6 $$ HΦ
-    iapply HΦ' $$ %spie %spp %_ %P %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend Hav Hold Hchild []
-    · iintro %hpc
-      exfalso
-      revert hpc
-      decide
+    iapply HΦ' $$ %spie %spp %_ %P %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend Hav Hold Hchild
     ipureintro
-    refine ⟨ucKept_of_calleeSaved hcs', Or.inl ⟨rfl, ?_⟩⟩
+    refine ⟨ucKept_of_calleeSaved hcs', ⟨rfl, ?_⟩⟩
     exact UPtCopy.ucInv_step hinv hi hfree rfl rfl rfl (fun _ _ => rfl) (by simp only [holdum]; exact hPum)
   · -- the path is complete: read the entry
     have hcomp : told.complete 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) := by
@@ -799,13 +610,9 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
       have hpin9 : k.sie = false ∨ k.proc = 0#64 → c9 = cur := fun h =>
         (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans (hpin4 h))))
       ihave HΦ' := wpNext_at _ _ _ c9 _ hpin9 $$ HΦ
-      iapply HΦ' $$ %spie %spp %_ %P %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend Hav Hold Hchild []
-      · iintro %hpc
-        exfalso
-        revert hpc
-        decide
+      iapply HΦ' $$ %spie %spp %_ %P %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend Hav Hold Hchild
       ipureintro
-      refine ⟨?_, Or.inl ⟨rfl, ?_⟩⟩
+      refine ⟨?_, ⟨rfl, ?_⟩⟩
       · refine ucKept_trans (ucKept_of_calleeSaved hcs') ?_
         unfold ucKept
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, and_true, true_and]
@@ -1121,13 +928,9 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
           (hp26 h).trans (hpin25 h)
         ihave HΦ' := wpNext_at _ _ _ c26 _ hpin26 $$ HΦ
         iclear Hrc2
-        iapply HΦ' $$ %spie3 %spp3 %_ %{ P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } %_ %hsp' Hk Hpc Hlend Hav Hold Hchild []
-        · iintro %hpc
-          exfalso
-          revert hpc
-          decide
+        iapply HΦ' $$ %spie3 %spp3 %_ %{ P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } %_ %hsp' Hk Hpc Hlend Hav Hold Hchild
         ipureintro
-        refine ⟨ucKept_trans hkept3 (ucKept_trans hkept4 hkept5), Or.inl ⟨rfl, ?_⟩⟩
+        refine ⟨ucKept_trans hkept3 (ucKept_trans hkept4 hkept5), ⟨rfl, ?_⟩⟩
         refine UPtCopy.ucInv_step hinv hi hfree rfl rfl rfl
           (fun j hj => get?_insert_ne (fun hc => hj hc.symm)) ?_
         rw [hw]
@@ -1162,11 +965,8 @@ theorem uvmcopy_loop [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
       kctx cpu' (((k.pushed 10).withSpie spie2 spp2).withRegs R2) -∗ pcIs cpu' pcv -∗
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
       kallocAvail γk none -∗ procPtAt Pold Mold -∗ procPtAt P' (UPtCopy.ucView Mold Mnew n) -∗
-      (⌜pcv = (KA.«uvmcopy» + 0x6c#64)⌝ -∗ kNullRcpt γk k.proc) -∗
-      ⌜ucKeptL R R2 ∧
-        ((pcv = (KA.«uvmcopy» + 0x7e#64) ∧ UPtCopy.ucInv Pold Pnew P' n) ∨
-         (pcv = (KA.«uvmcopy» + 0x6c#64) ∧ ∃ j, j ≤ n ∧ UPtCopy.ucInv Pold Pnew P' j ∧
-            R2 9#5 = BitVec.ofNat 64 (4096 * j)))⌝ -∗ wpLoop cpu'))
+      ⌜ucKeptL R R2 ∧ (pcv = (KA.«uvmcopy» + 0x7e#64) ∧ UPtCopy.ucInv Pold Pnew P' n)⌝ -∗
+        wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   induction fuel with
   | zero =>
@@ -1179,49 +979,35 @@ theorem uvmcopy_loop [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
     rotate_right 1
     iframe #
     iapply wpNext_intro_pin
-    iintro %c1 %hp1 %spie2 %spp2 %R2 %P' %pcv %hsp2 Hk Hpc Hlend Hav Hold Hchild Hrc %hpost
+    iintro %c1 %hp1 %spie2 %spp2 %R2 %P' %pcv %hsp2 Hk Hpc Hlend Hav Hold Hchild %hpost
     obtain ⟨hkept, hrest⟩ := hpost
-    rcases hrest with ⟨hpc, hinv'⟩ | ⟨hpc, hPP⟩
-    case inr =>
-      subst hpc
-      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
-      iapply HΦ' $$ %spie2 %spp2 %_ %P' %_ %hsp2 Hk Hpc Hlend Hav Hold Hchild Hrc
-      ipureintro
-      refine ⟨ucKeptL_of_ucKept hkept, Or.inr ⟨rfl, i, by omega, ?_, ?_⟩⟩
-      · rw [hPP]; exact hinv
-      · rw [hkept.2.2.1, h9]
-    case inl =>
-      subst hpc
-      icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-      have g9 : R2 9#5 = BitVec.ofNat 64 (4096 * i) := by rw [hkept.2.2.1, h9]
-      have g20 : R2 20#5 = 4096#64 := by rw [hkept.2.2.2.1, h20]
-      have g21 : R2 21#5 = sz := by rw [hkept.2.2.2.2.1, h21]
-      k_step_gen (wp_s_add c1 _ (KA.«uvmcopy» + 0x24#64) true 9#5 9#5 20#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [g9, g20, uc_page_add i] next c2 hp2
-      iintro Hk Hpc
-      k_step_gen (wp_s_branch c2 _ (KA.«uvmcopy» + 0x26#64) false 88#13 9#5 21#5 (by decide) bop.BGEU)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
-      iintro Hk Hpc
-      k_norm_g [g21, uc_bgeu_test sz n (i + 1) hn hsz (by omega), if_pos hlast]
-      have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = c1 := fun h =>
-        (hp3 h).trans (hp2 h)
-      have hpin3' : k.sie = false ∨ k.proc = 0#64 → c3 = cur := fun h =>
-        (hpin3 h).trans (hp1 h)
-      ihave HΦ' := wpNext_at _ _ _ c3 _ hpin3' $$ HΦ
-      iclear Hrc
-      iapply HΦ' $$ %spie2 %spp2 %_ %P' %_ %hsp2 Hk Hpc Hlend Hav Hold Hchild []
-      · iintro %hpc
-        exfalso
-        revert hpc
-        decide
-      ipureintro
-      refine ⟨?_, Or.inl ⟨rfl, ?_⟩⟩
-      · refine ucKeptL_trans (ucKeptL_of_ucKept hkept) ?_
-        unfold ucKeptL
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, _root_.and_true,
-          _root_.true_and]
-      · rw [← hlast]; exact hinv'
+    obtain ⟨hpc, hinv'⟩ := hrest
+    subst hpc
+    icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+    have g9 : R2 9#5 = BitVec.ofNat 64 (4096 * i) := by rw [hkept.2.2.1, h9]
+    have g20 : R2 20#5 = 4096#64 := by rw [hkept.2.2.2.1, h20]
+    have g21 : R2 21#5 = sz := by rw [hkept.2.2.2.2.1, h21]
+    k_step_gen (wp_s_add c1 _ (KA.«uvmcopy» + 0x24#64) true 9#5 9#5 20#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      with [g9, g20, uc_page_add i] next c2 hp2
+    iintro Hk Hpc
+    k_step_gen (wp_s_branch c2 _ (KA.«uvmcopy» + 0x26#64) false 88#13 9#5 21#5 (by decide) bop.BGEU)
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
+    iintro Hk Hpc
+    k_norm_g [g21, uc_bgeu_test sz n (i + 1) hn hsz (by omega), if_pos hlast]
+    have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = c1 := fun h =>
+      (hp3 h).trans (hp2 h)
+    have hpin3' : k.sie = false ∨ k.proc = 0#64 → c3 = cur := fun h =>
+      (hpin3 h).trans (hp1 h)
+    ihave HΦ' := wpNext_at _ _ _ c3 _ hpin3' $$ HΦ
+    iapply HΦ' $$ %spie2 %spp2 %_ %P' %_ %hsp2 Hk Hpc Hlend Hav Hold Hchild
+    ipureintro
+    refine ⟨?_, ⟨rfl, ?_⟩⟩
+    · refine ucKeptL_trans (ucKeptL_of_ucKept hkept) ?_
+      unfold ucKeptL
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, _root_.and_true,
+        _root_.true_and]
+    · rw [← hlast]; exact hinv'
   | succ fuel ih =>
     intro i hc P hinv spie spp R h9 h20 h21 h22 h23 cur
     have hi : i < n := by omega
@@ -1232,63 +1018,53 @@ theorem uvmcopy_loop [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
     rotate_right 1
     iframe #
     iapply wpNext_intro_pin
-    iintro %c1 %hp1 %spie2 %spp2 %R2 %P' %pcv %hsp2 Hk Hpc Hlend Hav Hold Hchild Hrc %hpost
+    iintro %c1 %hp1 %spie2 %spp2 %R2 %P' %pcv %hsp2 Hk Hpc Hlend Hav Hold Hchild %hpost
     obtain ⟨hkept, hrest⟩ := hpost
-    rcases hrest with ⟨hpc, hinv'⟩ | ⟨hpc, hPP⟩
-    case inr =>
-      subst hpc
-      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
-      iapply HΦ' $$ %spie2 %spp2 %_ %P' %_ %hsp2 Hk Hpc Hlend Hav Hold Hchild Hrc
+    obtain ⟨hpc, hinv'⟩ := hrest
+    subst hpc
+    icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+    have g9 : R2 9#5 = BitVec.ofNat 64 (4096 * i) := by rw [hkept.2.2.1, h9]
+    have g20 : R2 20#5 = 4096#64 := by rw [hkept.2.2.2.1, h20]
+    have g21 : R2 21#5 = sz := by rw [hkept.2.2.2.2.1, h21]
+    k_step_gen (wp_s_add c1 _ (KA.«uvmcopy» + 0x24#64) true 9#5 9#5 20#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      with [g9, g20, uc_page_add i] next c2 hp2
+    iintro Hk Hpc
+    k_step_gen (wp_s_branch c2 _ (KA.«uvmcopy» + 0x26#64) false 88#13 9#5 21#5 (by decide) bop.BGEU)
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
+    iintro Hk Hpc
+    k_norm_g [g21, uc_bgeu_test sz n (i + 1) hn hsz (by omega), if_neg hlast]
+    have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cur := fun h =>
+      (hp3 h).trans ((hp2 h).trans (hp1 h))
+    ihave HΦ := wpNext_shift _ _ _ _ _ hpin3 $$ HΦ
+    iapply (ih (i + 1) (by omega) P' hinv' spie2 spp2 _ ?g9' ?g20' ?g21' ?g22' ?g23' c3)
+      $$ [- $Hk $Hpc $Hav $Hold $Hchild $Hlend]
+    rotate_right 1
+    · iframe #
+      iapply wpNext_mono _ _ _ _ _ $$ HΦ
+      iintro %c4 HΦ %spie3 %spp3 %R3 %P3 %pcv3 %hsp3 Hk Hpc Hlend Hav Hold Hchild %hpost3
+      obtain ⟨hkept3, hrest3⟩ := hpost3
+      have hsp' : k.sie = false → spie3 = spie ∧ spp3 = spp := by
+        intro h
+        obtain ⟨e1, e2⟩ := hsp3 h
+        rw [e1, e2]
+        exact hsp2 h
+      iapply HΦ $$ %spie3 %spp3 %R3 %P3 %pcv3 %hsp' Hk Hpc Hlend Hav Hold Hchild
       ipureintro
-      refine ⟨ucKeptL_of_ucKept hkept, Or.inr ⟨rfl, i, by omega, ?_, ?_⟩⟩
-      · rw [hPP]; exact hinv
-      · rw [hkept.2.2.1, h9]
-    case inl =>
-      subst hpc
-      icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-      have g9 : R2 9#5 = BitVec.ofNat 64 (4096 * i) := by rw [hkept.2.2.1, h9]
-      have g20 : R2 20#5 = 4096#64 := by rw [hkept.2.2.2.1, h20]
-      have g21 : R2 21#5 = sz := by rw [hkept.2.2.2.2.1, h21]
-      k_step_gen (wp_s_add c1 _ (KA.«uvmcopy» + 0x24#64) true 9#5 9#5 20#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [g9, g20, uc_page_add i] next c2 hp2
-      iintro Hk Hpc
-      k_step_gen (wp_s_branch c2 _ (KA.«uvmcopy» + 0x26#64) false 88#13 9#5 21#5 (by decide) bop.BGEU)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
-      iintro Hk Hpc
-      k_norm_g [g21, uc_bgeu_test sz n (i + 1) hn hsz (by omega), if_neg hlast]
-      have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cur := fun h =>
-        (hp3 h).trans ((hp2 h).trans (hp1 h))
-      ihave HΦ := wpNext_shift _ _ _ _ _ hpin3 $$ HΦ
-      iclear Hrc
-      iapply (ih (i + 1) (by omega) P' hinv' spie2 spp2 _ ?g9' ?g20' ?g21' ?g22' ?g23' c3)
-        $$ [- $Hk $Hpc $Hav $Hold $Hchild $Hlend]
-      rotate_right 1
-      · iframe #
-        iapply wpNext_mono _ _ _ _ _ $$ HΦ
-        iintro %c4 HΦ %spie3 %spp3 %R3 %P3 %pcv3 %hsp3 Hk Hpc Hlend Hav Hold Hchild Hrc3 %hpost3
-        obtain ⟨hkept3, hrest3⟩ := hpost3
-        have hsp' : k.sie = false → spie3 = spie ∧ spp3 = spp := by
-          intro h
-          obtain ⟨e1, e2⟩ := hsp3 h
-          rw [e1, e2]
-          exact hsp2 h
-        iapply HΦ $$ %spie3 %spp3 %R3 %P3 %pcv3 %hsp' Hk Hpc Hlend Hav Hold Hchild Hrc3
-        ipureintro
-        refine ⟨?_, hrest3⟩
-        refine ucKeptL_trans (ucKeptL_of_ucKept hkept) (ucKeptL_trans ?_ hkept3)
-        unfold ucKeptL
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, _root_.and_true,
-          _root_.true_and]
-      case g9' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-      case g20' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact g20
-      case g21' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact g21
-      case g22' =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-        rw [hkept.2.2.2.2.2.1, h22]
-      case g23' =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-        rw [hkept.2.2.2.2.2.2.1, h23]
+      refine ⟨?_, hrest3⟩
+      refine ucKeptL_trans (ucKeptL_of_ucKept hkept) (ucKeptL_trans ?_ hkept3)
+      unfold ucKeptL
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, _root_.and_true,
+        _root_.true_and]
+    case g9' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
+    case g20' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact g20
+    case g21' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact g21
+    case g22' =>
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
+      rw [hkept.2.2.2.2.2.1, h22]
+    case g23' =>
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
+      rw [hkept.2.2.2.2.2.2.1, h23]
 
 /-! ## The function -/
 
@@ -1331,8 +1107,7 @@ theorem uvmcopy_proof (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMO
       simp only [BitVec.reduceEq, ite_true, ite_false, RegMap.set_apply]
     rw [hra]
     iapply HΦ' $$ %k.spie %k.spp %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend Hold [Hchild]
-    · iright
-      iexists Pnew, Mnew
+    · iexists Pnew, Mnew
       isplitl []
       · ipureintro
         refine ⟨by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
@@ -1426,7 +1201,7 @@ theorem uvmcopy_proof (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMO
     rotate_right 1
     · iframe #
       iapply wpNext_intro_pin
-      iintro %cE %hpE %spie2 %spp2 %R2 %P' %pcv %hsp2 Hk Hpc Hlend Hav Hold Hchild Hrc %hpost
+      iintro %cE %hpE %spie2 %spp2 %R2 %P' %pcv %hsp2 Hk Hpc Hlend Hav Hold Hchild %hpost
       obtain ⟨hkept, hrest⟩ := hpost
       have hk2 : R2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFB0#64 := by
         have h := hkept.1
@@ -1457,62 +1232,38 @@ theorem uvmcopy_proof (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMO
         (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) w9
         $$ [F0 F1 F2 F3 F4 F5 F6 F7 F8 F9]
       case' _ => iframe
-      rcases hrest with ⟨hpc, hinvn⟩ | ⟨hpc, j, hjn, hinvj, hj9⟩
-      case inl =>
-        subst hpc
-        iclear Hrc
-        k_step_gen (wp_s_addi cE _ (KA.«uvmcopy» + 0x7e#64) true 0#12 10#5 0#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) HT2 $$ [- $Hk $Hpc] next cF hpF
-        iintro Hk Hpc
-        have hpinF : k.sie = false ∨ k.proc = 0#64 → cF = cpu := fun h =>
-          (hpF h).trans ((hpE h).trans (hpin18 h))
-        ihave HQ : iprop(procPtAt Pold Mold ∗ procPtAt P' (UPtCopy.ucView Mold Mnew
-          (uvmNp (k.regs 12#5)))) $$ [Hold Hchild]
-        case' _ => iframe
-        iapply (uvmcopy_epi cpu cF k iprop(procPtAt Pold Mold ∗ procPtAt P'
-            (UPtCopy.ucView Mold Mnew (uvmNp (k.regs 12#5)))) hpinF hK10 spie2 spp2 hsp2 _
-            ?hR2' ?h24' ?h25' ?h26' ?h27' w9) $$ [- $Hk $Hpc $Hframe $HQ]
-        rotate_right 1
-        · iapply wpNext_mono _ _ _ _ _ $$ HΦ
-          iintro %cX HΦ %spie3 %spp3 %R3 %hsp3 Hk Hpc HQ2 %hpure
-          icases HQ2 with ⟨Hold, Hchild⟩
-          iapply HΦ $$ %spie3 %spp3 %R3 %hsp3 Hk Hpc Hlend Hold [Hchild]
-          · iright
-            iexists P', (UPtCopy.ucView Mold Mnew (uvmNp (k.regs 12#5)))
-            isplitl []
-            · ipureintro
-              refine ⟨?_, uc_inv_ok hinvn hfree⟩
-              rw [hpure.2]
-              simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-            · iexact Hchild
-          · ipureintro
-            exact hpure.1
-        case hR2' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hk2
-        case h24' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hk24
-        case h25' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hk25
-        case h26' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hk26
-        case h27' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hk27
-      case inr =>
-        subst hpc
-        ihave Hn := Hrc $$ %rfl
-        icases Hn with #Hn
-        have hpinE : k.sie = false ∨ k.proc = 0#64 → cE = cpu := fun h =>
-          (hpE h).trans (hpin18 h)
-        iapply (uvmcopy_err UM cpu cE k γl γk Pold Pnew P' Mold Mnew (uvmNp (k.regs 12#5)) j ke
-          hnoff hK hlk hmax hjn hfree hinvj hpinE spie2 spp2 hsp2 _ hj9 hk23 hk2 hk24 hk25 hk26
-          hk27 w9) $$ [- $Hk $Hpc $Hav $Hframe $Hold $Hchild $Hlend]
-        rotate_right 1
-        iframe #
-        iapply wpNext_mono _ _ _ _ _ $$ HΦ
-        iintro %cX HΦ %spie3 %spp3 %R3 %hsp3 Hk Hpc Hlend Hold Hchild %hpure
+      obtain ⟨hpc, hinvn⟩ := hrest
+      subst hpc
+      k_step_gen (wp_s_addi cE _ (KA.«uvmcopy» + 0x7e#64) true 0#12 10#5 0#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) HT2 $$ [- $Hk $Hpc] next cF hpF
+      iintro Hk Hpc
+      have hpinF : k.sie = false ∨ k.proc = 0#64 → cF = cpu := fun h =>
+        (hpF h).trans ((hpE h).trans (hpin18 h))
+      ihave HQ : iprop(procPtAt Pold Mold ∗ procPtAt P' (UPtCopy.ucView Mold Mnew
+        (uvmNp (k.regs 12#5)))) $$ [Hold Hchild]
+      case' _ => iframe
+      iapply (uvmcopy_epi cpu cF k iprop(procPtAt Pold Mold ∗ procPtAt P'
+          (UPtCopy.ucView Mold Mnew (uvmNp (k.regs 12#5)))) hpinF hK10 spie2 spp2 hsp2 _
+          ?hR2' ?h24' ?h25' ?h26' ?h27' w9) $$ [- $Hk $Hpc $Hframe $HQ]
+      rotate_right 1
+      · iapply wpNext_mono _ _ _ _ _ $$ HΦ
+        iintro %cX HΦ %spie3 %spp3 %R3 %hsp3 Hk Hpc HQ2 %hpure
+        icases HQ2 with ⟨Hold, Hchild⟩
         iapply HΦ $$ %spie3 %spp3 %R3 %hsp3 Hk Hpc Hlend Hold [Hchild]
-        · ileft
+        · iexists P', (UPtCopy.ucView Mold Mnew (uvmNp (k.regs 12#5)))
           isplitl []
-          · ipureintro; exact hpure.2
-          · iframe Hchild
-            iexact Hn
+          · ipureintro
+            refine ⟨?_, uc_inv_ok hinvn hfree⟩
+            rw [hpure.2]
+            simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
+          · iexact Hchild
         · ipureintro
           exact hpure.1
+      case hR2' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hk2
+      case h24' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hk24
+      case h25' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hk25
+      case h26' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hk26
+      case h27' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact hk27
     case l9 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
     case l20 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
     case l21 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]

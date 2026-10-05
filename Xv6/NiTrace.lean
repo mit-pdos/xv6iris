@@ -143,58 +143,69 @@ its observable form, and the strong instance.
    incarnation's era is not exported (no hook sees the generation).  The
    chain is keyed by the cited era, which `NiStep.input` carries, so
    nothing depends on the equality.
-8. **fork is DERIVED** (NI joint fork lane F3, rulings JF-R1…R7): in the
-   class at every key, its answer is `usysForkAns ι`, read off M0's row
-   `usysDetFork` at the cited ι (`niDetRow_fork`).  What it is derived
-   FROM: the pid history at the cited position (`pidPick`: the global
-   allocation count since boot mod `PIDMAX` and the live pids just past the
-   counter, the pids FAILED forks consumed included -- a fork that fails
-   after the scan found a slot still advances the counter, `PAlloc; PFree`);
-   the allocator event at the cited position (the round's DECISIVE kalloc:
-   by the allocator's tie, `KAlloc` there iff the pool was not empty at it);
-   the slot ledger's `SFull` at the cited position, which the ledger's
-   invariant (`sevWf`, read through `SlotLed.sFullRcpt`'s window) allows
-   only after every slot was occupied at some instant of the round's scan
-   window.  What `H` CONCEDES: every actor's allocator order, the number of
-   this round's own `KAlloc`s included (one per page the parent has mapped,
-   plus the child's table pages -- at `lazy = true` a function of the
-   mapped set the key does not carry, ruling JF-R2); the global
-   slot-occupancy timeline (`SOcc`/`SVac`, unlabelled, with slot indices)
-   and the scan outcomes.  WHICH kalloc is cited depends on the outcome
-   (the trapframe's `KAlloc` on success, the failing `KNull` on `-1`), so
-   "equal positions" includes it.  The kernel's cited row demands a
-   POSITIVE reason on `-1` (`SyscallDefs.syscEvRow`: the cited allocator
-   prefix ends in the actor's `KNull` or the slot prefix in its `SFull`,
-   ruling JF-R5), so neither the free boot prefix nor an empty citation can
-   explain a `-1`; on success the cited `ZFork`'s generation is the child's.
-   The reason is the KERNEL's (it decides which ι the arm may cite and so
-   which ι the filing records); the law exported here reads only
-   `usysForkAns ι`, which is `-1` at any cited ι that is not `forkOk`.
-9. **sbrk is DERIVED** (NI M2-G3, rulings G3-R1…R7): in the class at every
-   key, its answer is `usysSbrkAns sz a0 a1 ι`, read off M0's row
-   `usysDetSbrk` at the cited ι (`niDetRow_sbrk`).  What it is derived FROM:
-   the caller's own BREAK `sz` (it rides the step, ruling G3-R4: the
-   filing's trapped key's `W.sz`, a ghost-key reading like `lz` -- the
-   caller's own public datum, which `sbrk(0)` reads back at any instant,
-   changing no byte, and which exec's layout and the process's own sbrk
-   calls determine -- so it joins `NiStep.input`, not `obsInput`: whether a
-   round reads depends only on the number) and its two argument words
-   (`a0`, and `a1 = x11` of the exit's registers, `gprsA1`); and, at an
-   allocating eager grow, whether the cited allocator prefix ends in the
-   actor's `KNull` -- by the allocator's tie (`kmemLedger_null`) the pool
-   was empty at the round's decisive kalloc.  Success is the ABSENCE of
-   such a citation: every outcome but an allocation `-1` cites the boot
-   prefix at the actor, and an overrun's `-1` is the key's.  What `H`
-   CONCEDES: every actor's `Kev` order, the round's number of `KAlloc act`
-   included (data pages plus the interior page-table nodes `walk` adds, a
+8. **fork is DERIVED** (NI joint fork lane F3, rulings JF-R1…R7; re-cut by
+   NI M3 quotas Q-2 on the `verified-quota` kernel): in the class at every
+   key, its answer is `usysForkAns ι`, read off M0's row `usysDetFork` at the
+   cited ι (`niDetRow_fork`).  What it is derived FROM: the pid history at
+   the cited position (`pidPick`: the global allocation count since boot mod
+   `PIDMAX` and the live pids just past the counter, the pids FAILED forks
+   consumed included -- a fork that fails after the scan found a slot still
+   advances the counter, `PAlloc; PFree`) and the slot ledger's `SFull` at
+   the cited position, which the ledger's invariant (`sevWf`, read through
+   `SlotLed.sFullRcpt`'s window) allows only after every slot was occupied at
+   some instant of the round's scan window.  `forkOk ι := ¬ ι.sFull`: fork
+   DECLASSIFIES THE PID HISTORY AND `SFull` ONLY.  What `H` CONCEDES: the
+   global slot-occupancy timeline (`SOcc`/`SVac`, unlabelled, with slot
+   indices), the scan outcomes and the other actors' pid events.  The kernel's
+   cited row demands a POSITIVE reason on `-1` (`SyscallDefs.syscEvRow`: the
+   cited slot prefix ends in the actor's `SFull`, ruling JF-R5), so neither
+   the free boot prefix nor an empty citation can explain a `-1`; on success
+   the cited `ZFork`'s generation is the child's.  The reason is the KERNEL's
+   (it decides which ι the arm may cite and so which ι the filing records);
+   the law exported here reads only `usysForkAns ι`, which is `-1` at any
+   cited ι that is not `forkOk`.  THE ALLOCATOR IS NO LONGER OBSERVED (NI M3
+   quotas Q-2): on b72cbac1 the round's decisive kalloc decided the outcome
+   (the trapframe's `KAlloc` on success, a failing `KNull` on `-1`, ruling
+   JF-R1), so `H` conceded every actor's allocator order and the number of
+   this round's own `KAlloc`s (one per page the parent has mapped, plus the
+   child's table pages -- at `lazy = true` a function of the mapped set the
+   key does not carry); on the quota kernel every kalloc on fork's path is
+   paid out of a credit (the slot's share, the child table's weight; Q-1) and
+   is never null, so the allocator event left the row (`forkOk`), the kernel
+   row (`kforkRetLed`'s `-1` arm: `sFullRcpt` alone) and the citation.  The
+   allocator's prefix still rides the citation's positions (`NiPos.kev`, `0`
+   at every fork citation) and the history hypothesis of the roots before
+   `xv6NiDetQ`; `UsysDet.usysDet_ledQ` says no class row reads it (scope 14).
+9. **sbrk is DERIVED** (NI M2-G3, rulings G3-R1…R7; re-cut by NI M3 quotas
+   Q-2): in the class at every key, its answer is `usysSbrkAns sz a0 a1 ι`,
+   read off M0's row `usysDetSbrk` at the cited ι (`niDetRow_sbrk`).  What it
+   is derived FROM: the caller's own BREAK `sz` (it rides the step, ruling
+   G3-R4: the filing's trapped key's `W.sz`, a ghost-key reading like `lz` --
+   the caller's own public datum, which `sbrk(0)` reads back at any instant,
+   changing no byte, and which exec's layout and the process's own sbrk calls
+   determine -- so it joins `NiStep.input`, not `obsInput`: whether a round
+   reads depends only on the number) and its two argument words (`a0`, and
+   `a1 = x11` of the exit's registers, `gprsA1`).  NOTHING ELSE: on the quota
+   kernel the `-1` is the key's quota overrun (`0 < n ∧ MAXUSZ < sz + n`,
+   `usysSbrkFails`) -- the answer is KEY-FUNCTIONAL, and the cited ι is the
+   boot prefix at the actor at every sbrk (G3-R3's "cite at every sbrk"
+   kept, so `niCiting` is unchanged).  THE ALLOCATOR IS NO LONGER OBSERVED (NI
+   M3 quotas Q-2): on b72cbac1 an allocating eager grow failed iff the cited
+   allocator prefix ended in the actor's `KNull` (the round's decisive
+   kalloc), so `H` conceded every actor's `Kev` order, the round's number of
+   `KAlloc act` (data pages plus the interior page-table nodes `walk` adds, a
    function of the page table's interior shape, which the key does not
-   carry), and the shrink's number of `KFree act` (at `lazy = true`, the
-   mapped subset of the cut run).  The cited position is an input (X F4):
-   `0` on every non-allocating outcome and the `KNull`'s on an allocation
-   failure, so "equal positions" includes the outcome -- the same
-   concession as fork's (scope 8).  A page FAULT on a lazy page with an
-   empty pool kills the process in usertrap (a fault round, never resumed):
-   that is the kill channel, a truncation (scope 11).
+   carry) and the shrink's `KFree act` count, and the cited position was
+   `0` or the `KNull`'s; on the quota kernel the eager grow's uvmalloc is
+   paid out of the table's credits (`ptOwnRep`'s weight, Q-1) and never
+   fails, so the `KNull` left the row, the kernel row (`sysSbrkOk`'s FAILED
+   arm: the overrun alone) and the citation.  A page FAULT on a lazy page
+   below the break was a kill on an empty pool (a fault round, never
+   resumed: the kill channel, a truncation, scope 11); on the quota kernel
+   vmfault's kalloc is credited by the table's weight, so that kill arm is
+   UNREACHABLE -- a lazy fault within the break always resumes (the prefix
+   form cannot display it; wait's and write's lazy classes are not re-cut
+   here: optional lane Q-4).
 10. **the console write is DERIVED** (NI M2-G4, rulings G4-R1…R7): in the
    class (`lazy = false`, a0 a writable console descriptor of the key's
    table), its answer is `usysWriteAnsAt a2 d` -- the request at a whole
@@ -344,9 +355,11 @@ clause, from usertrap's live row), so pause reads nothing either -- its
 answer is not a reading (`classReading` is unchanged).  What the two-run hypothesis concedes after M2-X: the
 SCHEDULE (per round, the cited era, ledger lengths, tick count and actor)
 and the HISTORIES (the other actors' pid and family events, and since the
-joint fork lane every actor's allocator order and the slot-occupancy
-timeline, scope 8 -- since NI M2-G3 including sbrk's kalloc and kfree
-counts, scope 9; ticks carry nothing).  Nothing inside the class is a declassified reading.
+joint fork lane the slot-occupancy timeline, scope 8; ticks carry nothing).
+The allocator order (every actor's, fork's and sbrk's own kalloc and kfree
+counts among them) was conceded from the joint fork lane and NI M2-G3 until
+NI M3 quotas Q-2: on the quota kernel no class row reads it (scopes 8, 9;
+`UsysDet.usysDet_ledQ`), and `xv6NiDetQ` drops it (scope 14).  Nothing inside the class is a declassified reading.
 
 ## Deviations from the design text
 
@@ -622,12 +635,12 @@ three clauses): the exit is an exit, the enter an enter, and
   CITED tick count; wait's at a null status pointer or (NI M2-G1e) with the
   key's lazy bit off, `usysWaitAns` at the CITED prefix and the key's status
   window `win`; (NI joint fork lane F3) fork's `usysForkAns` at the CITED
-  prefix -- `pidPick` of the cited pid prefix when the cited allocator
-  prefix ends in the actor's `KAlloc` and the cited slot prefix not in its
-  `SFull`, `-1` otherwise; (NI M2-G3) sbrk's `usysSbrkAns` at the step's
-  break `sz`, the exit's `a0`/`a1` and the CITED prefix -- `-1` at an
-  overrun or an allocating eager grow whose cited allocator prefix ends in
-  the actor's `KNull`, the old break otherwise; (NI M3 no-kill K1) pause's
+  prefix -- `pidPick` of the cited pid prefix when the cited slot prefix
+  does not end in the actor's `SFull`, `-1` otherwise (NI M3 quotas Q-2: no
+  allocator reading); (NI M2-G3) sbrk's `usysSbrkAns` at the step's break
+  `sz`, the exit's `a0`/`a1` and the CITED prefix -- `-1` at the key's quota
+  overrun (NI M3 quotas Q-2: a function of the key), the old break
+  otherwise; (NI M3 no-kill K1) pause's
   `0` (its only `-1` is the kill, which never resumes: scope 11);
 * every other ecall is unconstrained. -/
 def niRoundLaw (secc : BitVec 64) (lz : Bool) (win : Nat) (sz : Nat) (wcon : Option Nat)

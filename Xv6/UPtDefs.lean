@@ -74,12 +74,6 @@ def uvmdNp (oldsz newsz : BitVec 64) : Nat :=
 /-- What `uvmdealloc` returns (`uvmd_rsz`). -/
 def uvmdRsz (oldsz newsz : BitVec 64) : BitVec 64 := if newsz.toNat < oldsz.toNat then newsz else oldsz
 
-/-- `uvmalloc`'s loop runs iff the new break passes `PGROUNDUP(oldsz)` (NI M2-G3). -/
-theorem uvmaNp_pos_iff (oldsz newsz : BitVec 64) :
-    0 < uvmaNp oldsz newsz ↔ pgRoundUpN oldsz.toNat < newsz.toNat := by
-  unfold uvmaNp
-  split <;> omega
-
 /-! ## The description of a user address space -/
 
 /-- A user page table: its root page, its trapframe page, and the user

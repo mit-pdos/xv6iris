@@ -165,16 +165,16 @@ ledger's reading `zLowest ι.zev ι.act` through the status window the
 entry's permission view gives (`UsysDet.usysWaitFitsAt` at `permOf V.upt.um
 V.sz`: the reap, the window's prefix with nothing reaped, or `-1` with
 nothing moved); fork's (NI joint fork lane F3) `UsysDet.usysForkAns ι` --
-on success (`forkOk ι`: the cited allocator prefix ends in the actor's
-`KAlloc`, the cited slot prefix not in its `SFull`) the pid `pidPick` of
-`ι`'s pid prefix, `ι`'s family prefix ending in the round's `ZFork` of that
-pid at the generation the children column gained; on `-1` a POSITIVE
-reason (ruling JF-R5: the cited allocator prefix ends in the actor's
-`KNull`, or the cited slot prefix in its `SFull`) and the column kept;
-sbrk's (NI M2-G3) `UsysDet.usysSbrkFitsAt` at the entry's break, argument
-words and lazy bit -- the answer, the break and the lazy bit after, `-1`
-only at an overrun or at an allocating eager grow whose cited allocator
-prefix ends in the actor's `KNull`; the console write's (NI M2-G4, ruling
+on success (`forkOk ι`: the cited slot prefix does not end in the actor's
+`SFull`) the pid `pidPick` of `ι`'s pid prefix, `ι`'s family prefix ending
+in the round's `ZFork` of that pid at the generation the children column
+gained; on `-1` a POSITIVE reason (ruling JF-R5; NI M3 quotas Q-2: the
+cited slot prefix ends in the actor's `SFull` -- the allocator's `KNull`
+is gone, a credited kalloc is never null) and the column kept; sbrk's (NI
+M2-G3) `UsysDet.usysSbrkFitsAt` at the entry's break, argument words and
+lazy bit -- the answer, the break and the lazy bit after, `-1` only at the
+key's quota overrun (NI M3 quotas Q-2: it reads no ledger; the boot prefix
+is cited at every sbrk); the console write's (NI M2-G4, ruling
 G4-R4), at a lazy-free entry whose argument 0 names a writable console
 descriptor of the entry's table `sts`, `UsysDet.usysWriteAns` at the entry's
 permission view and argument words 1 and 2 (it reads no ledger: the boot
@@ -194,7 +194,7 @@ def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName c
     (forkOk ι → (∃ (hz : List Zev) (i : Nat),
         ι.zev = hz ++ [.ZFork ι.act i (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) (usysForkGen ι)]) ∧
       cs' = cs ∪ {usysForkGen ι}) ∧
-    (¬ forkOk ι → (ι.kNull ∨ ι.sFull) ∧ cs' = cs)) ∧
+    (¬ forkOk ι → ι.sFull ∧ cs' = cs)) ∧
   (syscNum V = USYS_sbrk →
     usysSbrkFitsAt V.sz.toNat (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) V.pvLazy ι
       (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy) ∧

@@ -48,10 +48,9 @@ THE PLAN (reverse-engineered; see the report accompanying this file):
       `kallocAvail (availSub none g) = none`.  Save `s4 = np` (store
       `s4@16`).
 * `uvmcopy` (`SpecUvmcopy`) over Pold (peeled from the parent) and Pnew
-  (peeled from the child's `procPriv`): case on the result.
-    - `-1` -> `freeproc(np)` + `release(&np->lock)` + `return -1`.  The
-      `freeprocIn` premise comes from the child's block (files empty, cwd
-      0 -- allocprocPriv); `procHeld` at USED.
+  (peeled from the child's `procPriv`): it answers `0` (NI M3 quotas Q-2:
+  its `-1` arm and the `freeproc(np); release; return -1` tail's proof are
+  gone -- the copy is paid out of the child table's credits, Q-1):
     - `0`  -> Pnew' copied; store `s2@32, s3@24`; `s1 = &p->ofile`,
       `s2 = &np->ofile`, `s3 = &p->name` (`(KernelSyms.«kfork» + 0x30)-f8`).
 * `np->sz = p->sz` (`(KernelSyms.«kfork» + 0x34)-b6`).
@@ -103,9 +102,9 @@ Study `ProofYield.lean` (lock acquire/release + held-half agreement),
 
 THE LEND (permit sweep L1a, Rocq f344a089a, `ProofKforkB1/B6/Main`): the
 parent's counter, out of its open cells (`SchedCtx.procPrivNoctxAt_evAcc`,
-then the peeled `Hev_p`), is lent to allocproc, uvmcopy and the undoing
-freeproc in turn (`kf_lend_out` / `kf_lend_back` at the call context's
-proc word, `kf_freeproc` and the local `huv` taking it), and the parent's
+then the peeled `Hev_p`), is lent to allocproc and uvmcopy in turn
+(`kf_lend_out` / `kf_lend_back` at the call context's proc word, the local
+`huv` taking it; NI M3 quotas Q-2 deleted the undoing freeproc's), and the parent's
 block closes at `V.updEv kc` -- `kforkRet`'s `∃ k' ≥ V.ev`.  The publish
 `kf_publish` takes the count `kev` its frame `kfOfileΨ` now carries.  Rocq
 converts the CALLER's exit to the moved record (`kfork_post_ev` /
@@ -202,14 +201,8 @@ immediate exactly as `wp_s_branch`/`wp_s_j` take it (`BitVec 13` / `BitVec
 /-- `beq a0,zero,0x80001e2c` at `0x80001d2c` (allocproc failed). -/
 theorem kf_br_allocfail : (KA.«kfork» + 0x16#64) + BitVec.signExtend 64 (264#13) = (KA.«kfork» + 0x11e#64) := by decide
 
-/-- `blt a0,zero,0x80001d92` at `0x80001d42` (uvmcopy failed). -/
-theorem kf_br_uvmfail : (KA.«kfork» + 0x2c#64) + BitVec.signExtend 64 (80#13) = (KA.«kfork» + 0x7c#64) := by decide
-
 /-- `c.j 0x80001dac` at `0x80001d90` (into the ofile loop). -/
 theorem kf_j_intoof : (KA.«kfork» + 0x7a#64) + BitVec.signExtend 64 (28#21) = (KA.«kfork» + 0x96#64) := by decide
-
-/-- `c.j 0x80001e1e` at `0x80001da2` (uvmcopy-fail tail to the epilogue). -/
-theorem kf_j_failtail : (KA.«kfork» + 0x8c#64) + BitVec.signExtend 64 (132#21) = (KA.«kfork» + 0x110#64) := by decide
 
 /-- `c.j 0x80001e1e` at `0x80001e2e` (allocproc-fail tail to the epilogue). -/
 theorem kf_j_allocfail : (KA.«kfork» + 0x120#64) + BitVec.signExtend 64 (-16#21) = (KA.«kfork» + 0x110#64) := by decide
@@ -1865,15 +1858,8 @@ theorem kf_epilogue' [CurCtx] (j : Nat) (B : BitVec 32 → IProp GF)
 
 /-! ## Callee wrappers and lock-payload rebuilds for the two `uvmcopy` arms -/
 
-/-- `blt a0,zero` taken on `a0 = -1`. -/
-theorem kf_blt_neg1 : bcond bop.BLT (-1#64) 0#64 = true := by decide
-theorem kf_blt_max : bcond bop.BLT 18446744073709551615#64 0#64 = true := by decide
 /-- `blt a0,zero` falls through on `a0 = 0`. -/
 theorem kf_blt_zero : bcond bop.BLT 0#64 0#64 = false := by decide
-
-/-- A valid page is non-null. -/
-theorem kf_page_ne_zero (p : BitVec 64) (h : pageValid p) : p ≠ 0#64 := by
-  intro he; subst he; exact h.2.1 (by decide)
 
 /-- The frame `kfork` carries through the `ofile` copy loop: the 8 stack
 slots, the arm allocproc's acquire paid out (given back at the release of
@@ -1931,49 +1917,6 @@ def kfOfileΨ [CurCtx] (cpu : CPU) (k : KCtx) (Γ : SchedNames) [ClaimIs (hlc :=
   -- THE TRAPFRAME `kalloc`'S RECEIPT (NI joint fork lane F2), likewise
   kAllocRcpt γk (procAddr j)
 
-/-- Both the root and the trapframe page of an owned user space are valid,
-handed back beside the space (needed to take `freeprocIn`'s non-`emp` arms). -/
-theorem kf_procPtAt_valids [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) :
-    procPtAt (GF := GF) P M ⊢
-      ⌜pageValid (pageAddr P.root) ∧ pageValid (pageAddr P.tfp)⌝ ∗ procPtAt P M := by
-  iintro H
-  icases procPtAt_root_valid P M $$ H with ⟨%hroot, H⟩
-  icases (show procPtAt (GF := GF) P M ⊢ ⌜uptWf P⌝ ∗ procPtAt P M from by
-      unfold procPtAt
-      iintro ⟨%hwf, H1, H2⟩
-      isplitl []
-      · ipureintro; exact hwf
-      · isplitl []
-        · ipureintro; exact hwf
-        · iframe H1 H2) $$ H with ⟨%hwf, H⟩
-  isplitl []
-  · ipureintro; exact ⟨hroot, hwf.2.2.1⟩
-  · iexact H
-
-/-- `freeproc` at its entry (folded to `0x80001b0e`). -/
-theorem kf_freeproc [CurCtx] (FP : FREEPROC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γl γp : GName)
-    (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (g : GName) (hj : j < NPROC) (hp : k'.regs 10#5 = procAddr j)
-    (hst : st = USED ∨ st = ZOMBIE) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : freeprocSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hlk : "kmem" ∉ k'.locks) (hlp : "nextpid" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) (ke : Nat) (pa : BitVec 64) (hpa : k'.proc = pa) :
-    kctx c k' ∗ pcIs c KA.«freeproc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk none ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗
-    procHeld Γ c j st ch ∗ freeprocIn (procAddr j) pid V M ∗ freeprocGen (procAddr j) pid g ∗
-    actLend pa ke ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      (∃ k2 : Nat, ⌜ke ≤ k2⌝ ∗ actLend pa k2) -∗
-      procHeld Γ cpu' j UNUSED 0#64 -∗ procDormant (procAddr j) UNUSED -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpa
-  have h := FP.wp_freeproc (hlc := hlc) (GF := GF) Γ c k' γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier
-  unfold wp_freeproc_body at h
-  simp only [freeprocAddr] at h
-  exact h
-
 set_option maxHeartbeats 1000000 in
 /-- THE PARENT'S LEND, at the call context's proc word (permit sweep L1a):
 the counter goes out as the lend at any `p` the context names as the
@@ -2004,40 +1947,6 @@ theorem kf_rel_at [CurCtx] (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : GName) (lk
   unfold wp_release_body at h
   simp only [releaseAddr] at h
   exact h
-
-/-- Rebuild an UNUSED slot from `freeproc`'s output and the hart tag. -/
-theorem kf_slots_unused_intro [CurCtx] (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
-    slotUsed Γ pa ∗ @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ∗
-      zsElem pa none ⊢
-      procSlotsAt (GF := GF) Γ ξl pa UNUSED := by
-  unfold procSlotsAt
-  rw [if_neg (by decide : ¬ needsCtx UNUSED), if_neg (by decide : ¬ isRunning UNUSED),
-    if_pos (by decide : invDormant UNUSED), if_pos (by decide : notRunning UNUSED),
-    if_neg (by decide : ¬ UNUSED = ZOMBIE)]
-  iintro ⟨Hu, Hd, Hh, Hz⟩
-  isplitl []
-  · iempintro
-  isplitl []
-  · iempintro
-  iframe Hd Hh Hz
-  iapply pavSlot_unused_of_used Γ pa $$ Hu
-
-/-- `freeproc`'s output plus the hart tag reassemble the UNUSED lock payload. -/
-theorem kf_pay_unused [CurCtx] (Γ : SchedNames) (ξl : CtxId) (j : Nat) (c : CPU) :
-    slotUsed Γ (procAddr j) ∗ procHeldAt (GF := GF) Γ ξl c j UNUSED 0#64 ∗
-    @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ (procAddr j) UNUSED ∗ hartAtAny Γ (procAddr j) ∗
-      zsElem (procAddr j) none ⊢
-      @locked hlc GF _ ⟨ξl, KTier.kpt⟩ (Γ.lock j) c ∗ procLockResAt Γ ξl (procAddr j) := by
-  iintro ⟨Hused, Hheld, Hdorm, Hhart, Hzs⟩
-  icases procHeldAt_cases Γ ξl c j UNUSED 0#64 (by decide) $$ Hheld with
-    ⟨Hlocked, Hpg, %kl, %xs, %pid, Hstate, Hchan, Hrest⟩
-  icases (pstateWhole_split Γ (procAddr j) UNUSED).1 $$ Hpg with ⟨Hpl, _⟩
-  ihave Hslots := kf_slots_unused_intro Γ ξl (procAddr j) $$ [$Hused $Hdorm $Hhart $Hzs]
-  isplitl [Hlocked]
-  · iexact Hlocked
-  iapply procLockRes_intro Γ ξl (procAddr j) UNUSED 0#64 kl xs pid
-  unfold procPubRest
-  iframe Hstate Hpl Hchan Hslots Hrest
 
 /-- `uvmcopyOk` carries the parent's `umBelow` to the copied child table:
 every leaf `Pnew'` has came from a parent leaf below `sz` (the fresh child
@@ -3006,21 +2915,19 @@ theorem kf_postLed_act {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   rw [h]
 
 /-- allocproc's led null arm, read at a `0` answer: its reason (NI joint
-fork lane F2), the null `kalloc`'s receipt or the scan's exhaustion; the
-found arm is refuted (`procAddr` is nonzero). -/
+fork lane F1), the scan's exhaustion (NI M3 quotas Q-2: the null `kalloc`'s
+receipt is gone); the found arm is refuted (`procAddr` is nonzero). -/
 theorem kf_postLed_reason {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (c : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
     (tk : Bool) (Q : Int → IProp GF) (a : BitVec 64) (r : BitVec 64) (hr : r = 0#64) :
-    allocprocPostLed (GF := GF) Γ γ c γk on pav tk Q a r ⊢ kNullRcpt γk a ∨ sFullRcpt a := by
+    allocprocPostLed (GF := GF) Γ γ c γk on pav tk Q a r ⊢ sFullRcpt a := by
   unfold allocprocPostLed
   iintro (⟨-, -, H, -⟩ | ⟨%j, %ch, %pid, %V, %M, %g, -, -, %hp, -⟩)
   · iexact H
   · exfalso
     exact procAddr_nonzero hp.2.1 (hp.1.symm.trans hr)
-
-theorem kfork_br_fffffffffffffdf8 : KA.«kfork» + 0xfffffffffffffdf8#64 = KA.«freeproc» := by decide
 
 theorem kfork_br_fffffffffffff750 : KA.«kfork» + 0xfffffffffffff750#64 = KA.«uvmcopy» := by decide
 
@@ -3032,9 +2939,10 @@ set_option maxHeartbeats 8000000 in
 /-- **THE LED `kfork`** (NI M2-G2b): the proof, on allocproc's led twin, with
 the pid receipt and `kf_wait_fork`'s family receipt kept to the success
 epilogue (`kforkRetLed`).  (NI joint fork lane F2) allocproc's trapframe
-`kAllocRcpt` rides beside the pid receipt (`kfOfileΨ`); the `-1` tails keep
-the null reason -- allocproc's (`kf_postLed_reason`) or uvmcopy's
-`kNullRcpt` -- persistent past `freeproc` and `release`. -/
+`kAllocRcpt` rides beside the pid receipt (`kfOfileΨ`); the `-1` tail keeps
+allocproc's reason (`kf_postLed_reason`: the scan's `SFull`, NI M3 quotas
+Q-2) -- persistent past `release`.  (Q-2) uvmcopy's `-1` tail is gone: the
+copy is paid out of the child table's credits and never fails. -/
 theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
     (UV : UVMCOPY) (FP : FREEPROC) (FD : FILEDUP) (ID : IDUP) (SS : SAFESTRCPY)
     {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -3230,7 +3138,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
           (⌜R2 10#5 = 0#64 ∧ (((none : Option Nat) = none ∨ (none : Option Nat) = some 0) ∨
               ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub none g))⌝ ∗
             (procsAvailAt Γ none false ∨ pavSpent Γ none) ∗
-            (kNullRcpt γk (procAddr j) ∨ sFullRcpt (procAddr j)) ∗
+            sFullRcpt (procAddr j) ∗
             ∃ on' : Option Nat, ⌜on' = none ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
           (∃ (i : Nat) (ch : BitVec 64) (pid_c : BitVec 32) (V_c : ProcPriv) (M_c : Nat → List (BitVec 8))
               (gc : Nat),
@@ -3356,10 +3264,9 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
             (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
               (∃ k2 : Nat, ⌜ke ≤ k2⌝ ∗ actLend (procAddr j) k2) -∗
               procPtAt V.upt M -∗
-              ((⌜R' 10#5 = -1#64⌝ ∗ procPtAt V_c.upt M_c ∗ kNullRcpt γk (procAddr j)) ∨
-               (∃ (Pnew' : UPtd) (Mnew' : Nat → List (BitVec 8)),
+              (∃ (Pnew' : UPtd) (Mnew' : Nat → List (BitVec 8)),
                   ⌜R' 10#5 = 0#64 ∧ uvmcopyOk V.upt V_c.upt Pnew' M M_c Mnew' (uvmNp (k'.regs 12#5))⌝ ∗
-                  procPtAt Pnew' Mnew')) -∗
+                  procPtAt Pnew' Mnew') -∗
               ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu)
           ⊢ wpLoop (GF := GF) cpu := by
         intro k' hsie' hnoff' hK' hlk' hold' hnew' hsz' hfree' ke hpr'
@@ -3403,216 +3310,9 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
         intro ii _; exact hcum ii
       iintro %R3 Hk Hpc ⟨%k2, %hk2, Hl2⟩ HPt_p Hudisj %hcs3
       ihave Hev_p := actLend_back (GF := GF) (procAddr j) k2 (procAddr_nonzero hj) $$ Hl2
-      icases Hudisj with (⟨%hm1, HPt_c, #Hun⟩ | ⟨%Pnew', %Mnew', %⟨h0uv, hok⟩, HPtn'⟩)
-      · -- uvmcopy failed: freeproc + release + return -1
-        -- rebuild the child's freeproc input from the peeled cells (`HPt_c` came back from uvmcopy)
-        ihave Hfin : freeprocIn (procAddr i) pid_c V_c M_c
-          $$ [Hpid_c Hks_c Hsz_c Hpg_c Htf_c Hctx_c Hof_c Hcwd_c Hname_c Hsc_c Hrt_c Hcal Hcch Hev_c Hcstack HTf_c HPt_c Hcsp]
-        case' _ =>
-          icases kf_procPtAt_valids V_c.upt M_c $$ HPt_c with ⟨%hvalids_c, HPt_c⟩
-          have htfne_c : V_c.trapframe ≠ 0#64 := by rw [hVcb.2.2.2]; exact kf_page_ne_zero _ hvalids_c.2
-          have hptne_c : V_c.pagetable ≠ 0#64 := by rw [hVcb.2.2.1]; exact kf_page_ne_zero _ hvalids_c.1
-          unfold freeprocIn
-          rw [if_neg htfne_c, if_neg hptne_c, if_neg htfne_c, if_neg hptne_c]
-          isplitl []
-          · ipureintro; exact ⟨hcof, hccwd, hcroot⟩
-          isplitl [Hpid_c]
-          · iexact Hpid_c
-          isplitl [Hks_c Hsz_c Hpg_c Htf_c Hctx_c Hof_c Hcwd_c Hname_c Hsc_c Hrt_c]
-          · unfold procFields pPagetable; iframe Hks_c Hsz_c Hpg_c Htf_c Hctx_c Hof_c Hcwd_c Hname_c Hsc_c Hrt_c
-          isplitl [Hcal]
-          · iexact Hcal
-          isplitl [Hcch]
-          · iexact Hcch
-          isplitl [Hev_c]
-          · iexact Hev_c
-          isplitl [Hcstack]
-          · iexact Hcstack
-          isplitl [HTf_c]
-          · isplitl []
-            · ipureintro; refine ⟨hVcb.2.2.2, ?_⟩; rw [hVcb.2.2.2]; exact hvalids_c.2
-            · iexact HTf_c
-          · isplitl [HPt_c]
-            · isplitl []
-              · ipureintro; exact ⟨hVcb.2.2.1, Nat.le_trans hVcb.1 uQuota_le_uvmMaxsz, hVcb.2.1⟩
-              · iexact HPt_c
-            · iapply pageCredit_congr procSpare (procSpare + 0 + 0) rfl $$ Hcsp
-        have hjcaa : jumpPc (KA.«kfork» + 0x2c#64) = (KA.«kfork» + 0x2c#64) := by decide
-        k_norm [hjcaa]
-        unfold calleeSaved at hcs3
-        k_norm [KCtx.setReg_regs, RegMap.set_apply, KCtx.withRegs_regs] at hcs3
-        obtain ⟨c3_2, c3_8, c3_9, c3_18, c3_19, c3_20, c3_21, c3_22, c3_23, c3_24, c3_25, c3_26, c3_27⟩ := hcs3
-        -- blt a0,zero,0x80001d92 (taken: a0 = R3 10 = -1)
-        k_step (wp_s_branch cpu _ (KA.«kfork» + 0x2c#64) false 80#13 10#5 0#5 (by decide) bop.BLT)
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-          with [hm1, kf_blt_neg1, kf_blt_max, kf_br_uvmfail]
-        iintro Hk Hpc
-        -- c.mv a0,s3 : a0 = np = procAddr i
-        k_step (wp_s_add cpu _ (KA.«kfork» + 0x7c#64) true 10#5 0#5 19#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, c3_19, KCtx.rget_zero]
-        iintro Hk Hpc
-        -- jal freeproc (0x80001d94 -> 0x80001b0e), ra := 0x80001d98
-        k_step (wp_s_jal cpu _ (KA.«kfork» + 0x7e#64) false 2096506#21 1#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kfork_br_fffffffffffffdf8]
-        iintro Hk Hpc
-        -- the incarnation dies here: its two exclusive ghosts WHOLE and the
-        -- slot's xstate half go to freeproc (`freeprocGen`, at the minted
-        -- generation); allocproc's `genNew` (the parent's quarter among it) is dropped
-        ihave Hfgen : freeprocGen (procAddr i) pid_c V_c.gen $$ [Hsgw Hprr Hxs]
-        case' _ => unfold freeprocGen; iframe Hsgw Hprr Hxs
-        -- the parent's counter, lent to the undoing freeproc (permit sweep L1a):
-        -- the forking process is the actor of the child's release
-        ihave Hl3 := actLend_of_cnt (GF := GF) (procAddr j) k2 $$ Hev_p
-        iapply (kf_freeproc FP Γ cpu _ γl γp γk i USED ch pid_c V_c M_c V_c.gen hi ?hfp (Or.inl rfl)
-          ?hfnoff ?hfK ?hfsie ?hflk ?hflp ?hftier k2 (procAddr j) ?hfpa)
-          $$ [- $Hk $Hpc $Hkm $Hcav $Hpl $Hheld $Hfin $Hfgen $Hl3]
-        rotate_right 1
-        · k_norm_g
-          iapply wpNext_off_intro
-          iintro %spie4 %spp4 %R4 %hsp4 Hk Hpc ⟨%k3, %hk3, Hl3⟩ Hheld2 Hdormu %hcs4
-          ihave Hev_p := actLend_back (GF := GF) (procAddr j) k3 (procAddr_nonzero hj) $$ Hl3
-          obtain ⟨rfl, rfl⟩ := hsp4 trivial
-          have hjd00 : jumpPc (KA.«kfork» + 0x82#64) = (KA.«kfork» + 0x82#64) := by decide
-          k_norm_g [hjd00]
-          icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-          unfold calleeSaved at hcs4
-          k_norm_g at hcs4
-          obtain ⟨d4_2, d4_8, d4_9, d4_18, d4_19, d4_20, d4_21, d4_22, d4_23, d4_24, d4_25, d4_26, d4_27⟩ := hcs4
-          -- c.mv a0,s3 : a0 = np = procAddr i
-          k_step (wp_s_add cpu _ (KA.«kfork» + 0x82#64) true 10#5 0#5 19#5 (by decide))
-            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, d4_19, KCtx.rget_zero]
-          iintro Hk Hpc
-          -- jal release (0x80001d9a -> 0x80000ce0), ra := 0x80001d9e
-          k_step (wp_s_jal cpu _ (KA.«kfork» + 0x84#64) false 2092870#21 1#5 (by decide))
-            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kfork_br_ffffffffffffefca]
-          iintro Hk Hpc
-          -- reassemble the UNUSED lock payload from freeproc's output + the hart tag kept aside
-          ihave #HlkN := procsInv_lookup Γ i hi $$ Hpinv
-          ihave Hunused : (@locked hlc GF _ ⟨ξ0, KTier.kpt⟩ (Γ.lock i) cpu ∗
-              procLockResAt Γ ξ0 (procAddr i)) $$ [Hheld2 Hdormu Hhart Hczs]
-          case' _ => iapply kf_pay_unused Γ ξ0 i cpu; iframe Hused Hheld2 Hdormu Hhart Hczs
-          icases Hunused with ⟨Hlocked, Hlockres⟩
-          ihave Hlockres := (show procLockResAt Γ ξ0 (procAddr i) ⊢ procLockPay Γ i curCtx
-            from by unfold procLockPay; iintro H; iexact H) $$ Hlockres
-          iapply (kf_rel_at RE cpu _ (Γ.lock i) (procAddr i) ?haddr "proc" (procLockPay Γ i)
-            ?hrs ?hrn ?hrK k.sie ?hrr ?hro) $$ [- $Hk $Hpc $HlkN $Hlocked $Hlockres]
-          rotate_right 1
-          · isplitl [Harm0]
-            · iapply (popArm_sie cpu k _ ?hpa0) $$ Harm0
-              case hpa0 => k_norm_g
-            k_norm_g [hlocks]
-            kf_next cpu [KCtx.withRegs_sie]
-            iintro %R5 Hk Hpc %hcs5
-            have hjd06 : jumpPc (KA.«kfork» + 0x88#64) = (KA.«kfork» + 0x88#64) := by decide
-            k_norm_g [hjd06]
-            icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-            unfold calleeSaved at hcs5
-            k_norm_g at hcs5
-            obtain ⟨e5_2, e5_8, e5_9, e5_18, e5_19, e5_20, e5_21, e5_22, e5_23, e5_24, e5_25, e5_26, e5_27⟩ := hcs5
-            have h19 : R2 19#5 = k.regs 19#5 := b2_19.trans a1_19
-            have hsp5 : R5 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 := by
-              rw [e5_2, d4_2, c3_2]; exact hR2sp
-            -- collapse the s3 slot's address (`hR2sp`-form) to the epilogue's literal
-            have haddrD0 : (k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 + BitVec.signExtend 64 24#12 : BitVec 64)
-                = k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64 := by
-              rw [show (BitVec.signExtend 64 24#12 : BitVec 64) = 24#64 from by decide]; bv_omega_g
-            ihave Fs4 : wordPointsTo (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (R2 19#5) $$ [Fs4]
-            case' _ => rw [← haddrD0]; iexact Fs4
-            -- c.li s1,-1 (0x80001d9e)
-            kf_gstep cpu (wp_s_addi cpu _ (KA.«kfork» + 0x88#64) true 4095#12 9#5 0#5 (by decide))
-              $$ [- $Hk $Hpc] with [KCtx.rget_zero]
-            iintro Hk Hpc
-            -- c.ldsp s4,16(sp) (0x80001da0): restore s4 from the frame slot
-            kf_gstep cpu (wp_s_ld cpu _ (KA.«kfork» + 0x8a#64) true 24#12 19#5 2#5 (by decide) (by decide) (DFrac.own 1) (R2 19#5))
-              $$ [- $Hk $Hpc]
-              with [KCtx.rget_eq, hsp5, haddrD0]
-            iintro Hk Hpc Fs4
-            -- c.j 0x80001e1e (0x80001da2)
-            kf_gstep cpu (wp_s_j cpu _ (KA.«kfork» + 0x8c#64) true 132#21)
-              $$ [- $Hk $Hpc] with [kf_j_failtail]
-            iintro Hk Hpc
-            -- the balanced allocproc-push / release-pop, back to the prologue frame
-            ihave Hk := kctx_eq_mono cpu _ (((k.withSpie spie4 spp4).pushed 8).withRegs
-                ((((R5.set 9#5 18446744073709551615#64).set 19#5 (R2 19#5)))))
-              (by cases hks : k.sie <;> kctx_ext [hks, hlocks, hnoff, hintena, trapRes, kvFrameSlots]) $$ Hk
-            -- reassemble the parent block (unchanged) for the epilogue
-            ihave Hpriv : procPrivNoctxAt curCtx (procAddr j) pid (V.updEv k3) M
-              $$ [Hpid_p Hks_p Hsz_p Hpg_p Htf_p Hof_p Hcwd_p Hname_p Hsc_p Hrt_p HPt_p HTf_p Hev_p]
-            case' _ =>
-              unfold procPrivNoctxAt procFieldsNoctx pSz pPagetable
-              isplitl []
-              · ipureintro; exact hVb
-              iframe Hpid_p Hks_p Hsz_p Hpg_p Htf_p Hof_p Hcwd_p Hname_p Hsc_p Hrt_p HPt_p HTf_p Hev_p
-              ipureintro; exact hlzP
-            -- the four existential frame slots the epilogue restores
-            ihave F3e : (∃ w : BitVec 64, wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w) $$ [F3]
-            case' _ => iexists w3; iexact F3
-            ihave F5e : (∃ w : BitVec 64, wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) w) $$ [F5]
-            case' _ => iexists w5; iexact F5
-            ihave Fs4e : (∃ w : BitVec 64, wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) w) $$ [Fs4]
-            case' _ => iexists (R2 19#5); iexact Fs4
-            ihave F7e : (∃ w : BitVec 64, wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) w) $$ [F7]
-            case' _ => iexists w7; iexact F7
-            ihave HB := kf_parent_close γ (procAddr j) pid (V.updEv k3) M stsP rfl $$ [Hpriv Hcwr Hrtr HgP Hpays Hfr]
-            · iframe
-            ihave HB : kforkRetLed γ γk j pid V M stsP Q csP Rc (-1#32) $$ [HB Hrowp Hpark]
-            case' _ =>
-              unfold kforkRetLed
-              icases HB with ⟨HB1, HB2⟩
-              iframe HB2
-              isplitl [HB1]
-              · iexists k3
-                iframe HB1
-                ipureintro; omega
-              ileft
-              isplitl []
-              · ipureintro; rfl
-              iframe Hrowp
-              -- THE LEND IS REFUNDED (no child was built)
-              isplitl [Hpark]
-              · unfold kforkPark
-                icases Hpark with ⟨-, -, -, HRc, -, -⟩
-                iexact HRc
-              -- uvmcopy's null receipt (NI joint fork lane F2)
-              ileft; iexact Hun
-            ihave Hcl := (show wpNext (GF := GF) k.sie k.proc cpu (kforkPostLed k γ γk j pid V M stsP Q csP Rc) ⊢
-          wpNext k.sie k.proc cpu (kforkPostB k (kforkRetLed γ γk j pid V M stsP Q csP Rc)) from .rfl) $$ Hcl
-            iapply (kf_epilogue j (kforkRetLed γ γk j pid V M stsP Q csP Rc) cpu k spie4 spp4 hj hproc htier ?hK8e
-              ((R5.set 9#5 18446744073709551615#64).set 19#5 (R2 19#5)) ?hR2e (-1#32) ?h9e (Or.inl rfl) ?hcse)
-              $$ [- $Hk $Hpc $F0 $F1 $F2 $F3e $F5e $Fs4e $F6 $F7e $HB $Hcl]
-            rotate_right 1
-            case hK8e => unfold kforkSlots allocprocSlots at hK; omega
-            case hR2e => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hsp5
-            case h9e => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; decide
-            case hcse =>
-              intro r hr
-              rcases hr with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl
-              · simp only [RegMap.set_apply]; exact e5_18.trans (d4_18.trans (c3_18.trans (b2_18.trans a1_18)))
-              · simp only [RegMap.set_apply]; exact h19
-              · simp only [RegMap.set_apply]; exact e5_20.trans (d4_20.trans (c3_20.trans (b2_20.trans a1_20)))
-              · simp only [RegMap.set_apply]; exact e5_22.trans (d4_22.trans (c3_22.trans (b2_22.trans a1_22)))
-              · simp only [RegMap.set_apply]; exact e5_23.trans (d4_23.trans (c3_23.trans (b2_23.trans a1_23)))
-              · simp only [RegMap.set_apply]; exact e5_24.trans (d4_24.trans (c3_24.trans (b2_24.trans a1_24)))
-              · simp only [RegMap.set_apply]; exact e5_25.trans (d4_25.trans (c3_25.trans (b2_25.trans a1_25)))
-              · simp only [RegMap.set_apply]; exact e5_26.trans (d4_26.trans (c3_26.trans (b2_26.trans a1_26)))
-              · simp only [RegMap.set_apply]; exact e5_27.trans (d4_27.trans (c3_27.trans (b2_27.trans a1_27)))
-          case haddr => k_norm_g [d4_19]; exact c3_19
-          case hrs => k_norm_g
-          case hrn => k_norm_g; omega
-          case hrK => k_norm_g; unfold kforkSlots allocprocSlots at hK; omega
-          case hrr => k_norm_g; simp [hintena, hnoff]
-          case hro =>
-            intro hon
-            refine ⟨by k_norm_g [htier], ?_⟩
-            k_norm_g [hon]; simp [trapRes, kvFrameSlots, hon]; unfold kforkSlots allocprocSlots at hK; omega
-        case hfp => k_norm_g
-        case hfnoff => k_norm_g; omega
-        case hfK => k_norm_g; unfold freeprocSlots; unfold kforkSlots allocprocSlots at hK; omega
-        case hfsie => k_norm_g
-        case hflk => k_norm_g [hlocks]; decide
-        case hflp => k_norm_g [hlocks]; decide
-        case hftier => k_norm_g [htier]
-        case hfpa => k_norm_g [KCtx.setReg_proc]; exact hproc
+      -- (NI M3 quotas Q-2) uvmcopy never fails: its kallocs are paid out of
+      -- the child table's credits
+      icases Hudisj with ⟨%Pnew', %Mnew', %⟨h0uv, hok⟩, HPtn'⟩
       · -- uvmcopy succeeded (child space grown to `Pnew'`/`Mnew'`)
         have hjcaa : jumpPc (KA.«kfork» + 0x2c#64) = (KA.«kfork» + 0x2c#64) := by decide
         k_norm [hjcaa]
