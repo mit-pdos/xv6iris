@@ -14,3 +14,4 @@ Xv6.xv6NiTwoRun               # NI M2-W4 / M2-X4: its two-run corollary, at equa
 Xv6.xv6NiTwoRunObs            # NI M2-X4 (ruling X-R3 amended): the two-run corollary's observable form
 Xv6.xv6NiStrongInstance       # NI M2-W4: its strong instance (enters before the first ecall replay exits)
 Xv6.xv6NiOut                  # NI M3 NI-OUT: equal out-inputs (the caller's own buffers among them) push equal attributed console runs
+Xv6.xv6NiPrefix               # NI M3 no-kill K3: the prefix form of the two-run theorem (inputs a prefix, ledger histories below -> enters a prefix; a kill only truncates)

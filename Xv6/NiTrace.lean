@@ -50,6 +50,10 @@ its observable form, and the strong instance.
   `outInput`, `outBytes_of_law` (the unary content: the attributed bytes
   ARE the step's buffer run `wout`), `niOutput`, and `niOut` (equal
   out-inputs push equal attributed runs).
+* §8 (NI M3 no-kill K3) the prefix form: `niHistLe` (run 1's ledger
+  histories below run 2's, per era), `niTwoRunPrefix` (inputs a PREFIX and
+  ledger histories below give enters a prefix: a truncation -- a kill --
+  cuts the trace and changes no step; scope 11).
 
 ## Honest scope
 
@@ -174,7 +178,7 @@ its observable form, and the strong instance.
    failure, so "equal positions" includes the outcome -- the same
    concession as fork's (scope 8).  A page FAULT on a lazy page with an
    empty pool kills the process in usertrap (a fault round, never resumed):
-   that is the kill channel, untouched here.
+   that is the kill channel, a truncation (scope 11).
 10. **the console write is DERIVED** (NI M2-G4, rulings G4-R1…R7): in the
    class (`lazy = false`, a0 a writable console descriptor of the key's
    table), its answer is `usysWriteAnsAt a2 d` -- the request at a whole
@@ -191,8 +195,8 @@ its observable form, and the strong instance.
    as the lazy bit).  The answer cites nothing of the ledgers (the boot
    prefix at the actor), so `H`'s ledger part concedes nothing new.  A lazy
    console write is OUT: a page copyin faults in can fail on a null kalloc
-   at a page the key cannot locate.  Untouched: the kill channel (usertrap's
-   post-syscall `killed`).
+   at a page the key cannot locate.  The kill channel (usertrap's
+   post-syscall `killed`) is a truncation (scope 11).
    THE UART BYTES (NI M3 NI-OUT, rulings OUT-R1…R9) are ATTRIBUTED BY
    ACCEPTED-STREAM INDEX, through the citation: a class console write's
    round cites `ι.cacc`, a prefix of its era's console ACCEPTED stream
@@ -219,6 +223,35 @@ its observable form, and the strong instance.
    writer's bytes in the stream (no filing cites them).  `xv6NiTwoRun`'s
    history hypothesis compares the LEDGER part only (`niHistLed`), so it
    never assumes equal console streams (ruling OUT-R3).
+11. **The kill channel is a TRUNCATION** (NI M3 no-kill, rulings
+   K-R1…R6): a kill only cuts the victim's trace short.  The flag is
+   monotone while the incarnation lives, and usertrap reads it before
+   `syscall()` (+0x90), after it (+0xa6) and in the device arm (+0xea), so
+   every round that saw the flag, or whose kernel work overlapped the
+   store, dies in `kexit(-1)` and is never filed: NO RESUMED ROUND'S ANSWER
+   DEPENDS ON THE FLAG (wait's and consoleread's kill `-1` are refuted at
+   the resume; the `sleep()` loops that do not read the flag re-sleep).  A
+   killed incarnation's trace is therefore a prefix of what it would have
+   been, which `niTwoRunPrefix` states with no kill vocabulary: inputs a
+   prefix and ledger histories below (`niHistLe`) give enters a prefix.
+   "Nobody killed q" adds nothing: the death is not in `h` (a killed q's
+   last event is a `uExit` with no `uEnter`, exactly like a q that is
+   blocked, descheduled or still in its round when `h` ends) and it is
+   never filed, so no filing can cite it.  A kill-death, a fault-death
+   (`setkilled` self, then the same `kexit(-1)`) and `exit(-1)` are ONE
+   family event, `ZExit act pid (-1) ip` with `act` the dying process; no
+   receipt names the killer (ruling K-R4).  Other observers see a kill only
+   through `H` (the parent's wait reads `ZExit … (-1)`, fork's pid pick
+   follows the reap's `PFree`, the slot timeline's `SVac`, the freed pages'
+   `KFree`s), which the two-run hypotheses already concede.  LOW killing
+   HIGH is an integrity break by xv6's design (no permission check); the
+   prefix form says it is availability only -- HIGH's completed steps are
+   unaffected.  `sys_kill`'s own answer (`0` iff some slot held the pid at
+   its scan visit, a 64-instant property of the pid occupancy) is OUTSIDE
+   the class until the families lane (ruling K-R2), where the kill becomes
+   a cited slot-ledger event; then a kill event can enter run 1's `H`
+   before the victim's last enter, so the victim's prefix needs run 1 cut
+   earlier (ruling K-R6's caveat).
 
 getpid's answer is the incarnation's pid (W2d's `niPidRow`: `a0 =
 signExtend 64 W.pid`, and the filing's pid is `W'.pid = W.pid`), so getpid
@@ -1347,5 +1380,60 @@ theorem niOut {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk h�
     (hin : (utrace q h₁ F₁).map NiStep.outInput = (utrace q h₂ F₂).map NiStep.outInput) :
     niOutput q h₁ F₁ = niOutput q h₂ F₂ :=
   niOut_trace q _ _ (niOk_classLaw hF₁ q) (niOk_classLaw hF₂ q) hin
+
+
+/-! ## §8 The prefix form (NI M3 no-kill K3, rulings K-R1, K-R6)
+
+A truncation -- a kill, a power cut, a schedule that never resumes `q` --
+cuts an incarnation's trace and changes no step it took (scope 11). -/
+
+/-- Run 1's ledger histories are below run 2's, per era (the ledger part: the console stream is not compared,
+ruling OUT-R3). -/
+def niHistLe (H₁ H₂ : Nat → UIota) : Prop := ∀ k, niBelow (H₁ k).led (H₂ k).led
+
+/-- **`niTwoRunPrefix`, the trace form**: a lawful trace whose inputs are a PREFIX of another's, whose
+citations are below a history that is below the other's, the first's ecalls in the class: its outputs are a
+prefix of the other's.  A truncation (a kill, a power cut, a schedule that never resumes q) cuts the trace and
+changes no step.  `niTwoRun_trace` at the other trace's first `|tr₁|` steps (every hypothesis is over the
+trace's members, so it survives `List.take`), with run 1's chain lifted to the history whose ledger part is run
+2's and whose console stream is run 1's. -/
+theorem niTwoRunPrefix_trace (q : NiInc) (H₁ H₂ : Nat → UIota) (hH : niHistLe H₁ H₂)
+    (tr₁ tr₂ : List NiStep) (h₁ : NiClassLaw q tr₁) (h₂ : NiClassLaw q tr₂) (hc : NiInClass tr₁)
+    (hC₁ : niTraceChain H₁ tr₁) (hC₂ : niTraceChain H₂ tr₂)
+    (hin : tr₁.map NiStep.input <+: tr₂.map NiStep.input) :
+    tr₁.map NiStep.output <+: tr₂.map NiStep.output := by
+  -- run 1's chain, lifted: run 2's ledger part, run 1's console stream
+  let H' : Nat → UIota := fun k => { H₂ k with cacc := (H₁ k).cacc }
+  have hH' : ∀ k, (H' k).led = (H₂ k).led := fun _ => rfl
+  have hC' : niTraceChain H' tr₁ := by
+    intro secc lz win sz wcon wout x e k ι hs
+    obtain ⟨p1, z1, k1, t1, s1, c1⟩ := hC₁ secc lz win sz wcon wout x e k ι hs
+    obtain ⟨p2, z2, k2, t2, s2, -⟩ := hH k
+    exact ⟨p1.trans p2, z1.trans z2, k1.trans k2, Nat.le_trans t1 t2, s1.trans s2, c1⟩
+  -- run 2 cut at run 1's length
+  have hin' : tr₁.map NiStep.input = (tr₂.take tr₁.length).map NiStep.input := by
+    rw [List.map_take]
+    have := List.prefix_iff_eq_take.mp hin
+    rw [List.length_map] at this
+    exact this
+  have hout := niTwoRun_trace q H' H₂ hH' tr₁ (tr₂.take tr₁.length) h₁
+    (fun s hs => h₂ s (List.mem_of_mem_take hs)) hc hC'
+    (fun secc lz win sz wcon wout x e k ι hs => hC₂ secc lz win sz wcon wout x e k ι (List.mem_of_mem_take hs)) hin'
+  rw [hout, List.map_take]
+  exact List.take_prefix _ _
+
+/-- **`niTwoRunPrefix`** (NI M3 no-kill K3, rulings K-R1, K-R6): two histories with ledger filings, one
+incarnation `q` whose inputs in run 1 are a PREFIX of its inputs in run 2, its ecalls (in run 1) in the class,
+and run 1's ledger histories below run 2's, per era (`niHistLed`, never the console stream): `q`'s enters in run
+1 are a prefix of its enters in run 2.  It generalises `niTwoRun` (equal inputs and equal ledger histories are
+the two-sided case) and needs no kill vocabulary (scope 11). -/
+theorem niTwoRunPrefix {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk h₁ F₁)
+    (hC₁ : niChain F₁ (niHist F₁)) (hF₂ : niOk h₂ F₂) (hC₂ : niChain F₂ (niHist F₂)) (q : NiInc)
+    (hcls : NiInClass (utrace q h₁ F₁))
+    (hin : (utrace q h₁ F₁).map NiStep.input <+: (utrace q h₂ F₂).map NiStep.input)
+    (hH : ∀ k, niBelow (niHistLed F₁ k) (niHistLed F₂ k)) :
+    (utrace q h₁ F₁).map NiStep.output <+: (utrace q h₂ F₂).map NiStep.output :=
+  niTwoRunPrefix_trace q (niHist F₁) (niHist F₂) hH _ _ (niOk_classLaw hF₁ q) (niOk_classLaw hF₂ q) hcls
+    (niTraceChain_of hC₁ q) (niTraceChain_of hC₂ q) hin
 
 end Xv6

@@ -29,6 +29,11 @@ booted, `fs.img` on its disk) -- and its pure corollaries over runs.
   RUNS and exits) push equal attributed console runs (`niOutput`: the
   bytes at each class console write's cited indices of its era's console
   accepted stream, `NiTrace` §7).
+* **`xv6NiPrefix`** (NI M3 no-kill K3, rulings K-R1, K-R6): two runs;
+  per incarnation, inputs in run 1 a PREFIX of its inputs in run 2 and run
+  1's ledger histories below run 2's, its ecalls in the class, give enters
+  a prefix -- a kill (any truncation) only cuts the trace short
+  (`NiTrace` scope 11).
 
 A `Link` file because it consumes `ProofUser` (tools/check_layering.sh).
 
@@ -145,6 +150,32 @@ theorem xv6NiOut {hlc : HasLC}
   obtain ⟨-, F₂, hF₂, h1₂, hC₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
   exact ⟨F₁, F₂, hF₁, h1₁, hC₁, hF₂, h1₂, hC₂, fun q hin => niOut hF₁ hF₂ q hin⟩
 
+/-- **THE PREFIX FORM, THE NO-KILL COROLLARY** (NI M3 no-kill K3, rulings
+K-R1, K-R6): two runs from booting machines; at the one-shot filings their
+ledgers witness, each with its citations below its canonical histories, an
+incarnation `q` whose ecalls (in run 1) are in the class, whose inputs in
+run 1 are a PREFIX of its inputs in run 2, and whose run-1 ledger
+histories are below run 2's per era (the ledger part `niHistLed`, never
+the console stream), has run-1 enters a prefix of its run-2 enters.  A
+kill (or any other truncation) can only cut `q`'s trace; it never changes
+a step `q` took (`NiTrace` scope 11).  `xv6NiTwoRun` is the two-sided
+case. -/
+theorem xv6NiPrefix {hlc : HasLC}
+    (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
+    (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
+    (n₁ n₂ : Nat) (κs₁ κs₂ : List Obs) (t₁ t₂ : List Expr) (g₁' g₂' : GState)
+    (hsteps₁ : ([Expr.power], g₁) -<κs₁>->ₜₚ^[n₁] (t₁, g₁'))
+    (hsteps₂ : ([Expr.power], g₂) -<κs₂>->ₜₚ^[n₂] (t₂, g₂')) :
+    ∃ F₁ F₂, niOk κs₁ F₁ ∧ niOneShot κs₁ F₁ ∧ niChain F₁ (niHist F₁) ∧
+      niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ ∀ q : NiInc,
+      NiInClass (utrace q κs₁ F₁) →
+      (utrace q κs₁ F₁).map NiStep.input <+: (utrace q κs₂ F₂).map NiStep.input →
+      (∀ k, niBelow (niHistLed F₁ k) (niHistLed F₂ k)) →
+      (utrace q κs₁ F₁).map NiStep.output <+: (utrace q κs₂ F₂).map NiStep.output := by
+  obtain ⟨-, F₁, hF₁, h1₁, hC₁, -⟩ := xv6NiAdequacy (hlc := hlc) g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
+  obtain ⟨-, F₂, hF₂, h1₂, hC₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
+  exact ⟨F₁, F₂, hF₁, h1₁, hC₁, hF₂, h1₂, hC₂, fun q hc hin hH => niTwoRunPrefix hF₁ hC₁ hF₂ hC₂ q hc hin hH⟩
+
 /-- **THE STRONG INSTANCE**: in a run from a booting machine, at the filing
 its ledger witnesses, every incarnation's steps before its first ecall
 replay their exits (`NiTrace.niStrongInstance`; T's
@@ -164,3 +195,4 @@ end Xv6
 #print axioms Xv6.xv6NiTwoRunObs
 #print axioms Xv6.xv6NiStrongInstance
 #print axioms Xv6.xv6NiOut
+#print axioms Xv6.xv6NiPrefix
