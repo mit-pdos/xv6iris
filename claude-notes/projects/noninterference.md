@@ -5654,6 +5654,100 @@ cwd gen ch pid lazy secc`) are carried unchanged.
     derived form in `xv6NiDet`'s second conjunct.
   - Alternative: weaken `xv6NiOut`'s hypothesis to `xv6NiDet`'s, which moves a landed root.
 
+### M3 ustep U-1 as landed (2026-10-05)
+
+Lane U-1 on `lane/ustep`. Two new modules, `Xv6/Ustep.lean` (533 lines) and `Xv6/UstepEcho.lean` (98
+lines). No existing statement moved. Both modules are reached by no root (`dead_allow` rows "ustep U-2/U-3
+reaches"); `tcb.sh` and `audit.sh` are unchanged.
+
+**What landed.**
+- `UOut` (`run W | trap sc | stuck`), the design's verbatim `ustepTo`, `ureach`, `ustuckFrom` and `ulands`.
+- `ustep W` checks the class gate `uclassOk W` (`lazy = false ∧ secc = seccAll`), fetches with
+  `ufetch W.perm W.M (tfResumePc W.tf)`, then dispatches the decoded instruction through `uexec` at
+  `m := tfResumeGpr0 W.tf`. A retire is `uretire`, landing at `uvisNext W M' m' pc' := uvisOfRun m' pc' M' W.perm W.sz W.fd …
+  W.secc`, which is the key the engine's `ukc` continuation is at.
+- `ufetch` is `UkInstr` read as a function:
+  - pc even, a text page (`upermAt π pc = some ⟨true, false⟩`), and the halfword's bytes present;
+  - if `isRVC h`: the 4-aligned case needs bytes `pc+2`/`pc+3`. Decode with `runRead udrefU
+    (ext_decode_compressed h)`, then match `execute i₀` against `.pure (.ExecuteAs i)`, as
+    `UserTextDecode.utextDecodeWith` does;
+  - otherwise: `UkInstr.hi` (a 2-mod-4 pc: `pc+2` does not wrap and is on a text page), 4 bytes present,
+    `isRVC (low16 w) = false`, and `runRead udrefU (ext_decode w)`.
+  - A W+X page, a non-X page or an unmapped page is `none`, so `stuck`.
+- Determinism lemmas:
+  - `ustep_congr`, stated as EQUALITY: `ukeyEq W₁ W₂ → ustep W₁ = ustep W₂`;
+  - `ustepTo_det`, `ureach_trans`, `ureach_head`, `ureach_halt`, `ureach_linear` (the run is a chain);
+  - `ureach_congr`, `ustuckFrom_congr`;
+  - `ulands_det` (the design's `ulands_ecall_unique`): `¬ ustuckFrom Wr → ulands Wr uecallScause W₁ →
+    ulands Wr uecallScause W₂ → ukeyEq W₁ W₂`;
+  - `ulands_det_congr`, the two-run step U-3 needs: `ukeyEq Wr₁ Wr₂ → ¬ ustuckFrom Wr₁ → …`;
+  - `ulands_transparent`, `ulands_trans`, `ulands_here`.
+- The bounded run `utrapWithin n W` and its certificate `utrapWithin_sound`: the trapping key is reachable, it
+  traps, and `¬ ustuckFrom W`.
+- Bridges for U-2a: `uloadPerm_iff`, `ustorePerm_iff`, `ustoreDeniedPerm_iff`, `uwidth_eq_some` / `uwidth_of`,
+  `ustoreFaultScause_ne`.
+- **Anti-vacuity** (`UstepEcho.echo_ustep_ecall`). The test key is exec's layout for `echo hi`:
+  - the dumped R-X segment on an X-only page 0, a W .bss page, no guard page, and a W stack page holding argv;
+  - `sp = 0x3fd0`, `a0 = 2`, `a1 = 0x3fd8`, `pc = start = 0x7c`.
+  - The run goes `start → main → strlen("hi") → write`, and the first trap is `ecall` at `uecallScause` with
+    `a7 = 16`, `a0 = 1`, `a1 = 0x3ff8`, `a2 = 2`. No reachable key is `stuck`.
+  - It is proved by one kernel evaluation, `decide +kernel` of `(utrapWithin 200 entryKey).map readTrap = some
+    (8, 16, 1, 0x3ff8, 2)`, which takes about 1 s. Between 50 and 70 steps; checked negatively in a scratch
+    file.
+  - It covers 12 of the 17 families: itype, rtype, rtypew, addiw, shiftiop, utype, jal, jalr, btype, load, store
+    and ecall.
+
+**Per family: the value function and the leaf it mirrors.** Every post copies the leaf's `ukStep … M' m' pc'`.
+Each premise is a `Bool` test, and wherever the test fails the result is `stuck`.
+
+| Family | `ustep` arm | Leaf (`SpecUkLeaves`) | post `(M', m', pc')` | not covered → |
+|---|---|---|---|---|
+| rtype | `ustepRtype` | `wpUkRtypeBody` | `M`, `ukWr m rd (ukRtypeVal op m[rs1] m[rs2])`, `pc+len` | — |
+| itype | `ustepItype` | `wpUkItypeBody` | `ukItypeVal op m[rs1] imm` | — |
+| shiftiop | `ustepShiftiop` | `wpUkShiftiopBody` | `ukShiftiopVal` | — |
+| rtypew | `ustepRtypew` | `wpUkRtypewBody` | `ukRtypewVal` | — |
+| addiw | `ustepAddiw` | `wpUkAddiwBody` | `ukAddiwVal` | — |
+| shiftiwop | `ustepShiftiwop` | `wpUkShiftiwopBody` | `ukShiftiwopVal` | — |
+| utype | `ustepUtype` | `wpUkUtypeBody` | `ukUtypeVal op pc imm` | — |
+| div | `ustepDiv` | `wpUkDivBody` | `ukDivVal u` | — |
+| rem | `ustepRem` | `wpUkRemBody` | `ukRemVal u` | — |
+| jal | `ustepJal` | `wpUkJalBody` | `ukWr m rd (pc+len)`, `pc + sext imm` | odd target → `stuck` |
+| jalr | `ustepJalr` | `wpUkJalrBody` | `ukWr m rd (pc+len)`, `retPc (m[rs1] + sext imm)` | — |
+| btype | `ustepBtype` | `wpUkBtypeBody` | `m`, taken ? `pc + sext imm` : `pc+len` | taken odd target → `stuck` |
+| load, load_text | `ustepLoad` | `wpUkLoadBody`, `wpUkLoadTextBody` | `ukWr m rd (extend_value u (uMWord M va k))` | width ∉ {1,2,4,8}, page neither W nor text, misaligned, a byte absent → `stuck` |
+| store | `ustepStore` | `wpUkStoreBody` | `uMStore M va k m[rs2]`, `m`, `pc+len` | — |
+| store_denied | `ustepStore` | `wpUkStoreDeniedBody` | `trap ustoreFaultScause` (E_SAMO_Page_Fault, 15) | unmapped / misaligned / bad width → `stuck` |
+| ecall | `ustepEcall` | `wpUkEcallBody` | `trap uecallScause` (full word only) | — |
+| everything else (`mul`, AMO, LR/SC, CSR incl. counters, fences, ebreak, …) | `uexec`'s `_` arm | — | `stuck` | U-R5, U-R7, U-4 |
+
+**Deviations from the design text.**
+1. `ustep_congr` is an equality, not `UOut.rel ukeyEq`.
+2. The explicit class gate `uclassOk` (lazy-free, `seccAll`). The engine is stated only there, and U-2a's fallback
+   needs `stuck` wherever the engine does not run. U-4 drops it.
+3. No separate `UstepVal.lean`. The value functions are `SpecUkLeaves`' own (`ukRtypeVal` …), imported, not
+   copied, so U-2a's agreement is by unfolding.
+4. **The namespace `Xv6.Ustep`.** Everything is written `Ustep.ustep`, `Ustep.ulands`, and so on: the plain name
+   `Xv6.ustep` already belongs to UnionDisc's file-level step (Rocq's name), and `Xv6.urun` to UkRun. The
+   retiring helper is therefore `uretire`.
+5. `Ustep` imports `SpecUkLeaves`, the interface that holds those value functions, plus `UexecApply` (`ukeyEq`,
+   `uvisRun`) and `MachCSL.UTrap`. It imports no `Proof*`/`Uk*` file.
+
+**What U-2a must prove (`UkUstep.lean`), per family.** From the leaf's premises at a key `W` with
+`m = tfResumeGpr0 W.tf`, `pc = tfResumePc W.tf`, `W.M = M`, `W.perm = π`, `W.lazy = false`, `W.secc = seccAll`:
+- the fetch bridge, once for all families: `UkInstr π M pc isRvc i → ufetch π M pc = some (isRvc, i)`.
+  - It needs `uMWord`'s bytes against `uMBytes` (`nthByte`), and `isRVC` of the low half.
+  - It needs the RVC expansion's uniqueness: `execute i₀ = pure (.ExecuteAs i)` decides the match.
+  - It needs the decode's uniqueness: `runRead` is a function, and the leaf's `b` is free.
+- then, per family, `leaf premises ⊢ ustep W = uretire W M' m' pc'` (or `= .trap sc` for ecall and store_denied).
+  Each follows by `unfold ustep uexec ustepX` with the fetch bridge and the `Bool` bridges (`uloadPerm_iff`,
+  `ustorePerm_iff`, `ustoreDeniedPerm_iff`, `uwidth_of`, `uaccessOk` from `ukAccessOk`).
+- the CONVERSE, needed by the det generic mint (a non-`stuck` key must have a leaf):
+  `ustep W = .run W' ∨ ustep W = .trap sc → ∃ isRvc i, UkInstr … ∧ (the family's premises)`. It reads `ufetch`'s
+  `some` back into `UkInstr`, by the same byte lemmas, and the `Bool` bridges backwards. The engine's `hFX` then
+  comes from the family's `UkExec*` fact.
+- the round trip `tfResumePc (uvisNext W M' m' pc').tf = pc'` (`tfOf_resumePc`, pc' even: `+len`, the jal/btype
+  premise, `retPc`) and `tfResumeGpr0 … = m'` (`tfOf_resumeGpr`, `ukWr` keeps `x0 = 0`).
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

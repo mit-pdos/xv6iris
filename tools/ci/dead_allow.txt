@@ -36,3 +36,11 @@ decl Xv6.uexecRetContF_det
 #    when FAM-1b lands.
 decl Xv6.niTwoRunFam             # FAM-1b reaches (xv6NiFam); reaches zLowest_zevIn and the §9 family form
 decl Xv6.niForkChild             # FAM-1b reaches (the filings' tree, FAM-R2's derived reading, via niForkZRow)
+
+# -- NI M3 U-1 (claude-notes/projects/noninterference.md, "M3 ustep U-1 as
+#    landed"): the pure user step and its determinism lemmas are reached by
+#    no root until U-2a (the engine's agreement, `ulands` in `ukbF`) and U-3
+#    (`xv6NiDet`).  Remove the first row when U-3 lands; the second is the
+#    anti-vacuity check (echo's text runs to its ecall), a result in its own right.
+module Xv6.Ustep                 # ustep U-2/U-3 reaches
+module Xv6.UstepEcho             # ustep U-2/U-3 reaches (anti-vacuity: echo runs to its ecall under ustep)

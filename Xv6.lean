@@ -2103,3 +2103,5 @@ import Xv6.UshURoundSync
 import Xv6.SpecSpin
 import Xv6.ProofSpin
 import Xv6.LinkSpin
+import Xv6.Ustep
+import Xv6.UstepEcho
