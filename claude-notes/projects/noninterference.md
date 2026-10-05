@@ -7176,6 +7176,76 @@ Risks:
   FS-2a → FS-2b → FS-3/4; FS-2c optional afterwards.
 
 
+### M3 private files FS-L as landed (2026-10-05)
+
+On `lane/pfiles`, one commit (rulings FS-R4, R6, R10). close and dup join the NI class at EVERY key; their
+answers are functions of the caller's own descriptor table, which rides the step as two readings.
+
+**The kernel.** `SpecSysClose`/`SpecSysDup` UNCHANGED: their `-1` arms already carry the reason
+(`argFd v V.ofile = none`; dup's `fdFrees V.ofile = []`), so F7(d) had nothing to pin in the Spec.
+`UsysMemOk.usysFdOk`'s close row: the `r.toNat ≠ 0` branch is now `r = -1#64 ∧ sts' = sts` (was `sts' = sts`);
+producers `SyscallArmsFdDefs.syscClose_fd_none` and `UexecSecc.seccRowsFdOk` (proof lines). dup's row unchanged.
+NOT strengthened further: the row cannot say "`r = 0` → the row is open" or exclude dup's success arm at a
+negative descriptor (`sts[(usysArgfd tf).toNat]?` reads slot 0 there) without moving `UkRunSysClose.uk_close_row`
+/ `UkRunSysFd`'s destructurings; so the answers reach the fit through the CITED row instead (deviation 1).
+Every `Uk*`/`User*` file, `SYSCALL`, `USERTRAP`, `SyscRows` byte-identical.
+
+**The rows (`UsysDet`).** `usysFdAt fd a0` (the row at the narrowed a0, `none` at a negative index or off the
+table), `fdRowOpen`, `usysCloseAns wf := if fdRowOpen wf then 0 else -1`, `usysDupAns wf ws` (`ofNat k` at an
+open row and `ws = some k`, else `-1`), `usysCloseFd`/`usysDupFd` (the tables), `usysDetClose`/`usysDetDup`;
+`usysDetResumes`/`usysDetClass` + close, dup; `usysDetClassAt` text unchanged; `usysDetRet`'s two branches
+(after pause), `usysDet`'s two branches (after the quiet one); `usysIotaFits` + `(n = USYS_close → r =
+usysCloseAns (usysFdAt W.fd a0)) ∧ (n = USYS_dup → W.fd.length = NOFILE ∧ r = usysDupAns (usysFdAt W.fd a0)
+(fdLowestClosed W.fd))`; `_exists` + `hcl hdp : n ≠ …`, `_of_ev` + the two clauses; `usysDet_mem`, `_rows`
+(+ `hlen : n = USYS_dup → W.fd.length = NOFILE`), `_of_rows` (via `usysCloseFd_ok/_of`, `usysDupFd_ok/_of`:
+dup's needs the length, a slot number below `NOFILE` is never the `-1` word, `ofNat_ne_m1`);
+`usysDetResumes_ne` loses close/dup; `usysDet_ledQ` unchanged in text (the new branches read no ι).
+
+**The citation.** close/dup CITE the boot prefix at the caller's slot (`NiLedger.niCiting` + close, dup), as
+sbrk/write: `SyscallDefs.syscEvRow` + `(syscNum V = USYS_close → a0' = usysCloseAns (usysFdAt sts a0)) ∧
+(syscNum V = USYS_dup → sts.length = NOFILE ∧ a0' = usysDupAns (usysFdAt sts a0) (fdLowestClosed sts))`;
+`syscEvOut`'s/`utEvOut`'s quiet disjunct + `≠ USYS_close ∧ ≠ USYS_dup`, `syscEvOut_quiet` + `h21 h10`
+(default `decide`), `syscall_ret_fd` likewise; `SyscallArmsFdDefs.syscClose_evRow`/`syscDup_evRow` (from the
+Spec arms and `syscFdAgree`: `fdRowOpen_argFd_none/_some`, `fdFrees_leastClosed`, `fdFrees_nil_lowest`) and
+`syscall_ret_fd_boot` (anchor, `niIotaLbs_act`, `syscEvOut_cite`); the arms (`SyscallArmsFd`) pay through it.
+The other arms' `syscEvRow` tuples gain two absurd conjuncts (fork, wait ×3, sbrk, uptime, write, and
+`UsertrapSysTail.ut_evOut_of`'s kill disjunct); `SyscallArmsExec` passes `hne 21`/`hne 10`.
+`UserretClosedRows.urc_evRow` + the two clauses at the key, `urc_niDetRow` passes them, `urc_keyBoot`'s
+non-citing list + close, dup; `UserretClosedRound` seven cases; `UexecApply` follows.
+
+**The trace (`NiTrace`).** `NiStep.round secc lz win sz wcon wout (wfd : Option FdState) (wslot : Option Nat)
+x e c`, `niStepOf` filling `usysFdAt W.fd (tfW W.tf (tfArgIdx 0))` and `fdLowestClosed W.fd`; `NiStep.input`
+and `famInput` `.inr (secc, lz, win, sz, wcon, wfd, wslot, exitView x, positions)`; `obsInput`/`outInput`
+unchanged in value; `niRoundLaw … wout wfd wslot pid x e c` with, last in the resume block,
+`(gprsNum secc xg = USYS_close → gprsA0 eg = usysCloseAns wfd) ∧ (gprsNum secc xg = USYS_dup → gprsA0 eg =
+usysDupAns wfd wslot)`, derived by `niDetRow_close`/`niDetRow_dup`; `niCiting_some` + close, dup;
+`output_eq_of`'s `hans` + close, dup; `output_eq`/`output_eq_fam` answer them at the one `wfd`/`wslot`;
+`classReading` + `∨ gprsNum = USYS_close ∨ gprsNum = USYS_dup` (the observable form does not carry the
+readings, so the answers are readings there). Honest scope 15 "the fd table is the caller's own"; scope 1's
+class; deviation 13. The fourteen roots' statements byte-identical (`NiAdequacy`/`LinkNiAdequacy` header docs).
+
+**What FS-0/FS-1 absorb.** The step reading is `wfd : Option FdState := usysFdAt W.fd (tfW W.tf (tfArgIdx 0))`
+(R6's field: FS-2 reads `.open _ _ (.inode i γo om)` off it; `usysFdAt` decodes argfd's way at a non-negative
+index, so an out-of-table descriptor is `none`) plus `wslot : Option Nat := fdLowestClosed W.fd` (FS-2b's open
+answers it too); R6's `rt`/`fout` come after `wslot`. The pinned `-1` arms: `usysFdOk`'s close `-1`, and the
+cited row's close/dup answers (`syscEvRow`'s last two clauses); dup's `usysFdOk` row is unchanged. close's
+iput (a last close freeing an orphan) stays the file system's: FS-1's `free` event, not read by close's row.
+
+**Deviations.** (1) close/dup CITE (the boot prefix), unlike pause: the answers must reach the fit, and
+`usysFdOk` cannot carry them without moving user-tier proofs (above); `niKeyRow` then pins the resumed table
+through `usysDet` with no new row. (2) Two readings, not R6's one (`wslot` beside `wfd`). (3) dup's fit carries
+the table's length `NOFILE` (from `syscFdAgree`), which `usysDet_rows` takes as `hlen`. (4) `classReading`
+admits both (close too, for uniformity: `obsInput` has no `wfd`).
+
+**Baselines.** `tools/tcb/expected.json`: no module set moved (`tcb.sh` passes without `--update`); the eight NI
+roots reach the eight new `UsysDet` definitions and `UsysMemOk.fdLowestClosed`, no non-NI root reaches any.
+`tools/audit/baseline.json` unchanged (14 PASS; no axiom or opaque). `dead_allow.txt` unchanged.
+
+The class: {exit, getpid, uptime, wait at a null status pointer or a lazy-free key, fork, sbrk, the console
+write at a lazy-free key on a writable console descriptor, pause, close, dup}.
+
+What remains in M3 private files: FS-0 + FS-1 (one worktree), FS-2a, FS-2b, FS-3/4; FS-2c optional.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

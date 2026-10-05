@@ -181,7 +181,10 @@ permission view and argument words 1 and 2 (it reads no ledger: the boot
 prefix is cited); and (NI M3 NI-OUT, ruling OUT-R9) at EVERY lazy bit on a
 writable console descriptor, THE PUSHED RUN AT THE CITED STREAM:
 `UsysDet.usysOutAt ι` of the entry image's bytes at argument word 1, as many
-as the resumed `a0` says were pushed.  The records are the dispatch's (`V`/`img` the entry,
+as the resumed `a0` says were pushed; and (NI M3 FS-L) close's and dup's, at every
+key, `UsysDet.usysCloseAns`/`usysDupAns` at the entry table's row at argument 0
+(dup's at its lowest closed slot, with the table's length `NOFILE`): they
+read no ledger, the boot prefix is cited.  The records are the dispatch's (`V`/`img` the entry,
 `V'`/`img'` the record the call left; `sts` the entry's descriptor states). -/
 def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare)
     (sts : List FdState) (ι : UIota) : Prop :=
@@ -202,7 +205,10 @@ def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName c
     tfW V'.tf (tfArgIdx 0) =
       usysWriteAns (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))) ∧
   (syscNum V = USYS_write → uwriteCons sts (tfW V.tf (tfArgIdx 0)) = true →
-    usysOutAt ι (uwriteRun img (tfW V.tf (tfArgIdx 1)) (uwriteCntOf (tfW V'.tf (tfArgIdx 0)))))
+    usysOutAt ι (uwriteRun img (tfW V.tf (tfArgIdx 1)) (uwriteCntOf (tfW V'.tf (tfArgIdx 0))))) ∧
+  (syscNum V = USYS_close → tfW V'.tf (tfArgIdx 0) = usysCloseAns (usysFdAt sts (tfW V.tf (tfArgIdx 0)))) ∧
+  (syscNum V = USYS_dup → sts.length = NOFILE ∧
+    tfW V'.tf (tfArgIdx 0) = usysDupAns (usysFdAt sts (tfW V.tf (tfArgIdx 0))) (fdLowestClosed sts))
 
 /-! ## §2 The dispatch table -/
 

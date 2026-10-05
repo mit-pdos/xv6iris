@@ -10,7 +10,9 @@ laws, `syscall_ret_fd`) is `SyscallArmsFdDefs`; pipe, read and write are
 * dup (10, sie form, D31 adapter): `isFtable` off the environment,
   `"ftable" ∉ locks` from the context's depth-0 well-formedness, `hsp` off
   the context's own stack region (`syscKctx_sp`).  Rows: the fd row
-  (`syscDup_fd_*`), everything else kept; quiet on the syscall channel.
+  (`syscDup_fd_*`), everything else kept; quiet on the syscall channel;
+  (NI M3 FS-L) the boot prefix cited with the entry table's answer
+  (`syscDup_evRow`, `syscall_ret_fd_boot`).
 * fstat (8): `filestatFsEnv` from the environment and one `bslot` of the
   dispatch's three, the allocator off `fsReady`.  Rows: the image window
   (`syscImg_wrote`, at most 24 bytes at argument 1), the table grown
@@ -18,7 +20,8 @@ laws, `syscall_ret_fd`) is `SyscallArmsFdDefs`; pipe, read and write are
 * close (21): fileclose's two bundles from the environment (the fs one
   takes the dispatch's `bslots 3` and comes back with them), the iref loan
   out of `IREFSPARE`.  Rows: the fd row (`syscClose_fd_*`); the syscall
-  channel pays through `SyscDepClose`.
+  channel pays through `SyscDepClose`; (NI M3 FS-L) the boot prefix cited
+  with the entry table's answer (`syscClose_evRow`).
 
 Permit sweep L1b: fstat and close hand the block back at a raised count
 (filestat's copyout, fileclose's pipeclose); the arms relay it through
@@ -109,9 +112,10 @@ theorem syscall_arm_dup (SD : SYSDUP)
     have hrows := syscRows_ofile V M sts sts cs pid V.ofile (R2 10#5) 10 hn10 (by decide)
       (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
       hl0 hfd
-    iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
-      { V with ofile := V.ofile } M sts cs hj hproc hK htier hpins2 hs2' hrows 10 hn10
-      (by decide) (by decide) (by decide))
+    iapply (syscall_ret_fd_boot PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
+      { V with ofile := V.ofile } M sts hj hproc hK htier hpins2 hs2' hrows 10 hn10
+      (by decide) (by decide) (by decide)
+      (syscDup_evRow V _ M M sts cs _ (R2 10#5) hn10 ha hl0 (Or.inl ⟨hr, hnone⟩)))
     iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
     iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 10 hn10 (by decide)
   · have hfd := syscDup_fd_full V sts hn10 ha hfull
@@ -119,9 +123,10 @@ theorem syscall_arm_dup (SD : SYSDUP)
     have hrows := syscRows_ofile V M sts sts cs pid V.ofile (R2 10#5) 10 hn10 (by decide)
       (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
       hl0 hfd
-    iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
-      { V with ofile := V.ofile } M sts cs hj hproc hK htier hpins2 hs2' hrows 10 hn10
-      (by decide) (by decide) (by decide))
+    iapply (syscall_ret_fd_boot PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
+      { V with ofile := V.ofile } M sts hj hproc hK htier hpins2 hs2' hrows 10 hn10
+      (by decide) (by decide) (by decide)
+      (syscDup_evRow V _ M M sts cs _ (R2 10#5) hn10 ha hl0 (Or.inr (Or.inl ⟨hr, ⟨fd0, fv, hsome⟩, hfull⟩))))
     iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
     iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 10 hn10 (by decide)
   · have hfd := syscDup_fd_ok V sts hn10 ha fd0 fd1 fv l hsome hfr
@@ -129,9 +134,11 @@ theorem syscall_arm_dup (SD : SYSDUP)
     have hrows := syscRows_ofile V M sts _ cs pid (V.ofile.set fd1 fv) (R2 10#5) 10 hn10 (by decide)
       (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
       hl0 hfd
-    iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
-      { V with ofile := V.ofile.set fd1 fv } M _ cs hj hproc hK htier hpins2 hs2' hrows 10 hn10
-      (by decide) (by decide) (by decide))
+    iapply (syscall_ret_fd_boot PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
+      { V with ofile := V.ofile.set fd1 fv } M _ hj hproc hK htier hpins2 hs2' hrows 10 hn10
+      (by decide) (by decide) (by decide)
+      (syscDup_evRow V _ M M sts cs _ (R2 10#5) hn10 ha hl0
+        (Or.inr (Or.inr ⟨fd0, fd1, fv, l, hr, hsome, hfr⟩))))
     iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
     iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ _ _ cs 10 hn10 (by decide)
 
@@ -302,9 +309,10 @@ theorem syscall_arm_close (SC : SYSCLOSE)
     ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid (V.updEv k') M ⊢
       procPrivFd γ (procAddr j) pid (({ V with ofile := V.ofile } : ProcPriv).updEv k') M from .rfl)
       $$ Hpriv
-    iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
-      (({ V with ofile := V.ofile } : ProcPriv).updEv k') M sts cs hj hproc hK htier hpins2 hs2'
-      (hrows.updEv k') 21 hn21 (by decide) (by decide) (by decide))
+    iapply (syscall_ret_fd_boot PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
+      (({ V with ofile := V.ofile } : ProcPriv).updEv k') M sts hj hproc hK htier hpins2 hs2'
+      (hrows.updEv k') 21 hn21 (by decide) (by decide) (by decide)
+      (syscClose_evRow V _ M M sts cs _ (R2 10#5) hn21 ha hl0 (Or.inl ⟨hr, hnone⟩)))
     iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
     iapply (syscSysOut_ret f V M sts gn cs pid (({ V with ofile := V.ofile } : ProcPriv).updEv k') M
       (R2 10#5) (syscImg V M)
@@ -320,9 +328,10 @@ theorem syscall_arm_close (SC : SYSCLOSE)
         { V.updEv k' with ofile := (V.updEv k').ofile.set fd 0#64 } M ⊢
       procPrivFd γ (procAddr j) pid (({ V with ofile := V.ofile.set fd 0#64 } : ProcPriv).updEv k') M
       from .rfl) $$ Hpriv
-    iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
-      (({ V with ofile := V.ofile.set fd 0#64 } : ProcPriv).updEv k') M _ cs hj hproc hK htier hpins2
-      hs2' (hrows.updEv k') 21 hn21 (by decide) (by decide) (by decide))
+    iapply (syscall_ret_fd_boot PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
+      (({ V with ofile := V.ofile.set fd 0#64 } : ProcPriv).updEv k') M _ hj hproc hK htier hpins2
+      hs2' (hrows.updEv k') 21 hn21 (by decide) (by decide) (by decide)
+      (syscClose_evRow V _ M M sts cs _ (R2 10#5) hn21 ha hl0 (Or.inr ⟨hr, fd, fv, hsome⟩)))
     iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
     iapply (syscSysOut_ret f V M sts gn cs pid
       (({ V with ofile := V.ofile.set fd 0#64 } : ProcPriv).updEv k') M (R2 10#5)

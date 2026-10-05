@@ -561,7 +561,8 @@ key's at the arm, `SyscallArmsWait.syscArmWait_win`, so this is pure on the
 keys; (NI M2-G3) sbrk's answer, break and lazy bit, `usysSbrkFitsAt` at
 the resumed key's `W'.sz`/`W'.lazy`; NI M2-G4: the console write's
 answer at the key's permission view, the class read at the key's lazy bit
-and `uwriteCons` of its table).  Exit's arm is empty (`uroundOk_exit`).  The equality is the KEY's
+and `uwriteCons` of its table; NI M3 FS-L: close's and dup's answers at the
+key's table).  Exit's arm is empty (`uroundOk_exit`).  The equality is the KEY's
 (`UsysDet` deviation 3). -/
 theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf.length = 36)
     (hgn : W'.gen = W.gen) (hpidk : W'.pid = W.pid)
@@ -581,7 +582,8 @@ theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf
   rcases uroundOk_ecall hr with ⟨hexec, -, -⟩ | ⟨hnex, r, hb, hm, hc, hs⟩
   · change uvisNum (uvisRun W) = USYS_exec at hexec
     exfalso
-    rcases hcls.1 with h | h | h | h | h | h | h | h <;> rw [h] at hexec <;> exact absurd hexec (by decide)
+    rcases hcls.1 with h | h | h | h | h | h | h | h | h | h <;> rw [h] at hexec <;>
+      exact absurd hexec (by decide)
   · change uvisNum (uvisRun W) ≠ USYS_exit at hnex
     have hres := usysDetClass_resumes hcls.1 hnex
     obtain ⟨hb1, hb2⟩ := hb
@@ -622,6 +624,7 @@ theorem uexecRetContF_det (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : U
     iintro H %ι Hsp
     have hm := usysDet_mem W ι (usysDetQuiet_resumes h) (fun hw => absurd hw h3) (fun hk => absurd hk hf)
     obtain ⟨hfd, hp, hc, hg, hpid, hs, hch, -⟩ := usysDet_rows W ι (usysDetQuiet_resumes h)
+      (fun hd => absurd hd hdp)
     have hch := hch h3 hf
     rw [usysDet_quiet W ι h] at hm hfd hp hc hg hs hch ⊢
     iapply H $$ %(usysDetRet n W ι) %W.M %W.perm %W.sz %W.fd %W.cwd %W.gen %W.ch %W.lazy %W.secc
@@ -632,7 +635,7 @@ theorem uexecRetContF_det (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : U
     have hup : n = USYS_uptime → usysUptimeRet r := fun hu => by
       subst hu; exact usysMemOk_uptimeRet hm
     obtain ⟨ι, hfit⟩ := usysIotaFits_exists (W := W) (cs' := cs') (M' := M') (szv' := szv') (lz' := lz')
-      hup h3 hf h12 hw hlv.2.2
+      hup h3 hf h12 hw hlv.2.2 hcl hdp
     obtain ⟨hM, -, -⟩ := usysMemOk_quiet h7 h12 h3 h4 h5 h8 hm
     have hfd' := usysFdOk_quiet hcl hdp hop h4 hfd
     have hc' := usysCwdOk_quiet hcd hc

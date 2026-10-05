@@ -401,7 +401,8 @@ theorem syscall_arm_write (SW : SYSWRITE)
       syscStore_a0 _ _ hl0
     refine ⟨fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
       fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
-      fun _ hlz hcons => ?_, fun _ hcons => ?_⟩
+      fun _ hlz hcons => ?_, fun _ hcons => ?_, fun h => absurd (hn16.symm.trans h) (by decide),
+      fun h => absurd (hn16.symm.trans h) (by decide)⟩
     · rw [ha0']
       exact syscArmWrite_ans V.upt P' V.sz sts _ _ _ _ hfacts.2.2.2 (hfacts.2.2.1 hlz) hext hcons hcnt
     · rw [ha0']

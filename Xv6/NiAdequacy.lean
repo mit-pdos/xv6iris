@@ -51,7 +51,8 @@ are `LinkNiAdequacy` (only a `Link` file may import a `Proof` file).
    reading `wcon` rides the step; NI M3 NI-OUT: its UART bytes are
    attributed by accepted-stream index through the citation -- the console
    stream is the sixth anchored name, `niOutRow` files the run --, `NiTrace`
-   scope 10); every other ecall's enter is free.  The class's meaning grew through `UsysDet.usysDetClass` and
+   scope 10), (NI M3 no-kill K1) pause and (NI M3 FS-L) close and dup at
+   every key (`NiTrace` scopes 11, 15); every other ecall's enter is free.  The class's meaning grew through `UsysDet.usysDetClass` and
    `UIota` (+ the slot ledger) with every statement here byte-identical.
 2. Origins are honest by W2d's one-shot claims (`niOneShot` in the
    conclusion): the filing's origin claims are fork exits' or power-ons',

@@ -226,7 +226,7 @@ theorem seccRowsFdOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64) (sts sts'
     · subst h1
       iapply seccRowsInsert sts _ .closed $$ Hr
       unfold seccRow; ipureintro; trivial
-    · subst h1; iexact Hr
+    · rw [h1.2]; iexact Hr
   rw [if_neg hc] at h
   by_cases hd : n = USYS_dup
   · rw [if_pos hd] at h

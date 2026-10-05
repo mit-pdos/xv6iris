@@ -193,10 +193,12 @@ wait, fork, (NI M2-G3, ruling G3-R3) sbrk or (NI M2-G4, ruling G4-R4) the
 console write -- the numbers whose answer the kernel read off a ledger
 (sbrk's at every call: the boot prefix at the actor unless an allocating
 grow failed) or whose cited row carries the key's answer (write's: the boot
-prefix at every write). -/
+prefix at every write; NI M3 FS-L, close's and dup's: the boot prefix at
+every call, the answer the entry table's). -/
 def niCiting (sc : BitVec 64) (W : Uvis) : Prop :=
   sc = uecallScause ∧ (uvisNum (uvisRun W) = USYS_uptime ∨ uvisNum (uvisRun W) = USYS_wait ∨
-    uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_sbrk ∨ uvisNum (uvisRun W) = USYS_write)
+    uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_sbrk ∨ uvisNum (uvisRun W) = USYS_write ∨
+    uvisNum (uvisRun W) = USYS_close ∨ uvisNum (uvisRun W) = USYS_dup)
 
 /-- **M0'S ROW AT THE CITED ι** (NI M2-X2): at an ecall in the private class
 (at the key: NI M2-G1e, with the key's lazy bit; since NI joint fork lane F3

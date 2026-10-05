@@ -63,7 +63,9 @@ a writable console descriptor (NI M2-G4: `NiTrace` scope 10; the caller's
 readable-prefix reading rides the step; NI M3 NI-OUT: the UART bytes are
 attributed by accepted-stream index through the citation, `NiTrace` scope
 10, `xv6NiOut`) and pause at every key (NI M3 no-kill K1: answer `0`, its
-kill `-1` never resumes, `NiTrace` scope 11); every
+kill `-1` never resumes, `NiTrace` scope 11) and close and dup at every key
+(NI M3 FS-L: answers of the caller's own descriptor table, whose readings
+ride the step, `NiTrace` scope 15); every
 filing spent a distinct claim minted
 before its enter (`niOneShot`, W2d); the mask and actor are carried per
 filing; uptime's, wait's, fork's and sbrk's answers are derived from the

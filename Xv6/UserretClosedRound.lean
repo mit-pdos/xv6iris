@@ -184,7 +184,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
     P' ksp V' M' sts' gn cs' pid uepc sc2 tv2 hproc hctx' htier hnoff hsp' hav' ha0 hpc'
     (hVgn.symm.trans hgk.symm) (some (i, x)) hfit
   -- ...and THE RECORD'S EVIDENCE (NI M2-X2): at a citing number (uptime,
-  -- wait, fork, NI M2-G3 sbrk, NI M2-G4 write, at the ecall) the round cites the era and prefix usertrap's
+  -- wait, fork, NI M2-G3 sbrk, NI M2-G4 write, NI M3 FS-L close and dup, at the ecall) the round cites the era and prefix usertrap's
   -- post carries (`utEvOut`), with M0's row at it (`urc_niDetRow`:
   -- `uexecRet_roundDet` at the cited ι, fork's answer among it since NI
   -- joint fork lane F3); elsewhere it cites nothing
@@ -201,12 +201,14 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
       icases Heo with (%hq | ⟨%ke, %ι, #Hanc, #Hl, %hev⟩)
       · exfalso
         rw [hnum] at hq
-        rcases hcn with h | h | h | h | h
+        rcases hcn with h | h | h | h | h | h | h
         · exact hq.1 h
         · exact hq.2.1 h
         · exact hq.2.2.1 h
         · exact hq.2.2.2.1 h
-        · exact hq.2.2.2.2 h
+        · exact hq.2.2.2.2.1 h
+        · exact hq.2.2.2.2.2.1 h
+        · exact hq.2.2.2.2.2.2 h
       · have hdet := urc_niDetRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hlw hM hpi hsz hcw hgn hch hpid hlz
           hsc hround hchk hfde hrp hlive hev
         have hfe : niFitEv (some (i, x)) (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf))

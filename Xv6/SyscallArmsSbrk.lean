@@ -462,6 +462,7 @@ theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (sts :
     intro ι
     refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
       fun h' => absurd (hn.symm.trans h') (by decide), fun _ => ?_,
+      fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
       fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide)⟩
     rw [hw0, hw1, hsz, hlz]
     show usysSbrkFitsAt _ _ _ _ _ (syscA0 V') _ _

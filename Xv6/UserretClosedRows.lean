@@ -113,7 +113,9 @@ F3) fork's as `usysForkFitsAt` at the key's children; (NI M2-G3) sbrk's as
 `usysSbrkFitsAt` at the key's break (`hsz`), argument words and lazy bit;
 (NI M2-G4) the console write's as `usysWriteAns` at the key's permission
 view and argument words, at a lazy-free key whose descriptor table (`hfd`:
-the dispatch's entry states ARE the key's table) names a writable console. -/
+the dispatch's entry states ARE the key's table) names a writable console;
+(NI M3 FS-L) close's and dup's as `usysCloseAns`/`usysDupAns` at the key's
+table. -/
 theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (sts : List FdState) (ι : UIota)
     (hl : V.tf.length = 36) (hch : W.ch = cs) (hsc : W.secc = V.pvSecc)
@@ -133,10 +135,30 @@ theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' :
       tfW V'.tf (tfArgIdx 0) =
         usysWriteAns (uvisRun W).perm (tfW (uvisRun W).tf (tfArgIdx 1)) (tfW (uvisRun W).tf (tfArgIdx 2))) ∧
     (uvisNum (uvisRun W) = USYS_write → uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)) = true →
-      usysOutAt ι (uwriteRun (uvisRun W).M (tfW (uvisRun W).tf (tfArgIdx 1)) (uwriteCntOf (tfW V'.tf (tfArgIdx 0))))) := by
+      usysOutAt ι (uwriteRun (uvisRun W).M (tfW (uvisRun W).tf (tfArgIdx 1)) (uwriteCntOf (tfW V'.tf (tfArgIdx 0))))) ∧
+    (uvisNum (uvisRun W) = USYS_close →
+      tfW V'.tf (tfArgIdx 0) = usysCloseAns (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)))) ∧
+    (uvisNum (uvisRun W) = USYS_dup → (uvisRun W).fd.length = NOFILE ∧
+      tfW V'.tf (tfArgIdx 0) =
+        usysDupAns (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) (fdLowestClosed (uvisRun W).fd)) := by
   have hnum := urc_num_run W V hl hsc
   have ha0 := urc_a0_run W V hl
-  obtain ⟨hu, hw, hf, hsb, hwr, hout⟩ := hev
+  obtain ⟨hu, hw, hf, hsb, hwr, hout, hcl, hdp⟩ := hev
+  have hC : uvisNum (uvisRun W) = USYS_close →
+      tfW V'.tf (tfArgIdx 0) = usysCloseAns (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) := by
+    intro h
+    have h' := hcl (hnum.trans h)
+    rw [ha0] at h'
+    show _ = usysCloseAns (usysFdAt W.fd _)
+    rw [hfd]; exact h'
+  have hD : uvisNum (uvisRun W) = USYS_dup → (uvisRun W).fd.length = NOFILE ∧
+      tfW V'.tf (tfArgIdx 0) =
+        usysDupAns (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) (fdLowestClosed (uvisRun W).fd) := by
+    intro h
+    have h' := hdp (hnum.trans h)
+    rw [ha0] at h'
+    show W.fd.length = NOFILE ∧ _ = usysDupAns (usysFdAt W.fd _) (fdLowestClosed W.fd)
+    rw [hfd]; exact h'
   have hS : uvisNum (uvisRun W) = USYS_sbrk →
       usysSbrkFitsAt (uvisRun W).sz (tfW (uvisRun W).tf (tfArgIdx 0)) (tfW (uvisRun W).tf (tfArgIdx 1))
         (uvisRun W).lazy ι (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy := by
@@ -192,7 +214,7 @@ theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' :
     show usysOutAt ι (uwriteRun W.M _ _)
     rw [← hM]
     exact h'
-  exact ⟨fun h => hu (hnum.trans h), hWt, hF, hS, hWr, hO⟩
+  exact ⟨fun h => hu (hnum.trans h), hWt, hF, hS, hWr, hO, hC, hD⟩
 
 /-- **THE PUSHED RUN AT THE CITED STREAM, FILED** (NI M3 NI-OUT): the round's
 `niOutRow` at its citation, off the re-keyed cited row (`urc_evRow`'s sixth
@@ -206,7 +228,7 @@ theorem urc_niOutRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
       (syscImg (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) Mp) (syscImg V' M') cs cs' W.fd ι) :
     niOutRow sc W (uvisOf V' M' sts' gn cs' pid) (some (k, ι)) := by
   intro _ hw hcons
-  exact (urc_evRow W V Mp V' M' cs cs' W.fd ι hl hch hsc hM hpi hsz hlz rfl hev).2.2.2.2.2 hw hcons
+  exact (urc_evRow W V Mp V' M' cs cs' W.fd ι hl hch hsc hM hpi hsz hlz rfl hev).2.2.2.2.2.1 hw hcons
 
 /-- **pause's answer at the trapped key's run frame** (NI M3 no-kill K1):
 usertrap's live row (`UexecRet.uexecLiveOk`'s pause clause) read at the
@@ -263,11 +285,13 @@ theorem urc_niDetRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
   have hpidrow : sc = uecallScause →
       usysRetPid (uvisNum (uvisRun W)) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0)) W.pid := by
     intro h; rw [← hnr, ← hnum0, hpid]; exact hrp h
-  obtain ⟨hup, hw, hfk, hsb, hwr, -⟩ := urc_evRow W V Mp V' M' cs cs' W.fd ι hl hch hsc hM hpi hsz hlz rfl hev
+  obtain ⟨hup, hw, hfk, hsb, hwr, -, hcl, hdp⟩ :=
+    urc_evRow W V Mp V' M' cs cs' W.fd ι hl hch hsc hM hpi hsz hlz rfl hev
   have hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0))
       (uvisOf V' M' sts' gn cs' pid).ch (uvisOf V' M' sts' gn cs' pid).M (uvisOf V' M' sts' gn cs' pid).sz
       (uvisOf V' M' sts' gn cs' pid).lazy ι :=
     usysIotaFits_of_ev hcls.2.1 hup hw hfk hsb hcls.2.2 hwr (urc_pauseRow W V sc V' cs' hl hsc hlive hsce)
+      hcl hdp
   exact uexecRet_roundDet sc W (uvisOf V' M' sts' gn cs' pid) ι hlw (hgn.symm ▸ rfl) hpid.symm hchrow hfdrow
     hpidrow hr hsce hcls hfit
 
@@ -341,14 +365,18 @@ theorem urc_keyBoot (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (sc
       usysRetPid (uvisNum (uvisRun W)) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0)) W.pid := by
     intro h; rw [← hnr, ← hnum0, hpid]; exact hrp h
   have hn : ¬ (uvisNum (uvisRun W) = USYS_uptime ∨ uvisNum (uvisRun W) = USYS_wait ∨
-      uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_sbrk ∨ uvisNum (uvisRun W) = USYS_write) :=
+      uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_sbrk ∨ uvisNum (uvisRun W) = USYS_write ∨
+      uvisNum (uvisRun W) = USYS_close ∨ uvisNum (uvisRun W) = USYS_dup) :=
     fun h => hcit ⟨hsce, h⟩
   have hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0))
       (uvisOf V' M' sts' gn cs' pid).ch (uvisOf V' M' sts' gn cs' pid).M (uvisOf V' M' sts' gn cs' pid).sz
       (uvisOf V' M' sts' gn cs' pid).lazy UIota.boot :=
     ⟨fun h => absurd (Or.inl h) hn, fun h => absurd (Or.inr (Or.inl h)) hn,
       fun h => absurd (Or.inr (Or.inr (Or.inl h))) hn, fun h => absurd (Or.inr (Or.inr (Or.inr (Or.inl h)))) hn,
-      fun h => absurd (Or.inr (Or.inr (Or.inr (Or.inr h)))) hn, urc_pauseRow W V sc V' cs' hl hsc hlive hsce⟩
+      fun h => absurd (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl h))))) hn,
+      urc_pauseRow W V sc V' cs' hl hsc hlive hsce,
+      fun h => absurd (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl h)))))) hn,
+      fun h => absurd (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr h)))))) hn⟩
   exact uexecRet_roundDet sc W (uvisOf V' M' sts' gn cs' pid) UIota.boot hlw (hgn.symm ▸ rfl) hpid.symm hchrow
     hfdrow hpidrow hr hsce hcls hfit
 

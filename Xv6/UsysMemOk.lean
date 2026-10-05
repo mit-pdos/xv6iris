@@ -453,7 +453,9 @@ def usysRetIs (r : BitVec 64) (fd : Nat) : Prop := r = BitVec.ofNat 64 fd
 move one or two slots, every other entry leaves the table alone. -/
 def usysFdOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64) (sts sts' : List FdState) : Prop :=
   if n = USYS_close then
-    (if r.toNat = 0 then sts' = sts.set (usysArgfd tf).toNat .closed else sts' = sts) ∧
+    -- (NI M3 FS-L) a close that did not answer 0 answered -1 and moved nothing
+    -- (`SpecSysClose.sysClosePost`'s first arm: argfd said no)
+    (if r.toNat = 0 then sts' = sts.set (usysArgfd tf).toNat .closed else r = -1#64 ∧ sts' = sts) ∧
     -- closing an OPEN descriptor cannot fail
     (∀ (fd : Nat) (st : FdState), usysArgfd tf = fd → sts[fd]? = some st → st ≠ .closed → r.toNat = 0)
   else if n = USYS_dup then

@@ -530,7 +530,7 @@ theorem syscClose_fd_none (V : ProcPriv) (sts : List FdState) (hnum : syscNum V 
     syscFdOk V 0xFFFFFFFFFFFFFFFF#64 sts sts := by
   unfold syscFdOk usysFdOk
   rw [hnum, if_pos (by decide)]
-  refine ⟨by rw [if_neg (by decide)], ?_⟩
+  refine ⟨by rw [if_neg (by decide)]; exact ⟨syscM1, rfl⟩, ?_⟩
   intro fd st hz hst hne
   exact absurd (argFd_none_closed ha _ hnone fd st hz hst) hne
 
@@ -571,6 +571,79 @@ theorem syscPipe_fd_ok (V : ProcPriv) (sts : List FdState) (hnum : syscNum V = 4
     if_pos (by decide)]
   obtain ⟨h0, h1⟩ := syscPipe_least V sts ha fd0 fd1 l γp hfr
   exact ⟨fd0, fd1, γp, hne, h0, h1, rfl⟩
+
+/-! ### close's and dup's cited rows (NI M3 FS-L)
+
+The answer is the entry table's (`UsysDet.usysCloseAns`/`usysDupAns` at the
+row argument 0 names, `usysFdAt`): under the agreement, argfd's `none` is a
+row that is not open and its `some` an open one; fdalloc's first free cell
+is the table's lowest closed slot. -/
+
+/-- argfd said no: the row argument 0 names is not open. -/
+theorem fdRowOpen_argFd_none {fs : List (BitVec 64)} {sts : List FdState} (ha : syscFdAgree fs sts)
+    {v : BitVec 64} (h : argFd v fs = none) : fdRowOpen (usysFdAt sts v) = false := by
+  unfold usysFdAt
+  split
+  · rename_i hz
+    cases hs : sts[(BitVec.extractLsb' 0 32 v).toInt.toNat]? with
+    | none => rfl
+    | some st =>
+      have hc := argFd_none_closed ha v h _ st (show argZ v = _ by unfold argZ; omega) hs
+      subst hc; rfl
+  · rfl
+
+/-- argfd said yes: the row argument 0 names is open. -/
+theorem fdRowOpen_argFd_some {fs : List (BitVec 64)} {sts : List FdState} (ha : syscFdAgree fs sts)
+    {v : BitVec 64} {fd : Nat} {fv : BitVec 64} (h : argFd v fs = some (fd, fv)) :
+    fdRowOpen (usysFdAt sts v) = true := by
+  obtain ⟨st, hst, hne⟩ := argFd_some_open ha v fd fv h
+  obtain ⟨-, -, -, hz⟩ := argFd_lookup v fs fd fv h
+  rw [usysFdAt_atW (k := fd) hz, hst]
+  exact fdRowOpen_some.mpr hne
+
+/-- **close's cited row** (NI M3 FS-L): either arm of `sysClosePost` answers
+`usysCloseAns` at the entry table. -/
+theorem syscClose_evRow (V V1 : ProcPriv) (M M1 : Nat → List (BitVec 8)) (sts : List FdState)
+    (cs : ExtTreeSet GName compare) (ι : UIota) (r : BitVec 64) (hnum : syscNum V = 21)
+    (ha : syscFdAgree V.ofile sts) (hl : tfArgIdx 0 < V1.tf.length)
+    (hans : (r = 0xFFFFFFFFFFFFFFFF#64 ∧ argFd (tfW V.tf (tfArgIdx 0)) V.ofile = none) ∨
+      (r = 0#64 ∧ ∃ fd fv, argFd (tfW V.tf (tfArgIdx 0)) V.ofile = some (fd, fv))) :
+    syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts ι := by
+  have ha0 : tfW (syscStore V1 r).tf (tfArgIdx 0) = r := syscStore_a0 _ _ hl
+  have hne : ∀ k : Int, k ≠ 21 → syscNum V ≠ k := fun k hk h => hk (h.symm.trans hnum)
+  refine ⟨fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)), fun _ => ?_,
+    fun h => absurd h (hne _ (by decide))⟩
+  rw [ha0]
+  unfold usysCloseAns
+  rcases hans with ⟨rfl, hn⟩ | ⟨rfl, fd, fv, hs⟩
+  · rw [fdRowOpen_argFd_none ha hn]; rfl
+  · rw [fdRowOpen_argFd_some ha hs]; rfl
+
+/-- **dup's cited row** (NI M3 FS-L): each arm of `sysDupPost` answers
+`usysDupAns` at the entry table, whose length is `NOFILE`. -/
+theorem syscDup_evRow (V V1 : ProcPriv) (M M1 : Nat → List (BitVec 8)) (sts : List FdState)
+    (cs : ExtTreeSet GName compare) (ι : UIota) (r : BitVec 64) (hnum : syscNum V = 10)
+    (ha : syscFdAgree V.ofile sts) (hl : tfArgIdx 0 < V1.tf.length)
+    (hans : (r = 0xFFFFFFFFFFFFFFFF#64 ∧ argFd (tfW V.tf (tfArgIdx 0)) V.ofile = none) ∨
+      (r = 0xFFFFFFFFFFFFFFFF#64 ∧ (∃ fd fv, argFd (tfW V.tf (tfArgIdx 0)) V.ofile = some (fd, fv)) ∧
+        fdFrees V.ofile = []) ∨
+      (∃ fd0 fd1 fv l, r = BitVec.ofNat 64 fd1 ∧ argFd (tfW V.tf (tfArgIdx 0)) V.ofile = some (fd0, fv) ∧
+        fdFrees V.ofile = fd1 :: l)) :
+    syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts ι := by
+  have ha0 : tfW (syscStore V1 r).tf (tfArgIdx 0) = r := syscStore_a0 _ _ hl
+  have hne : ∀ k : Int, k ≠ 10 → syscNum V ≠ k := fun k hk h => hk (h.symm.trans hnum)
+  refine ⟨fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun _ => ⟨ha.2.1, ?_⟩⟩
+  rw [ha0]
+  unfold usysDupAns
+  rcases hans with ⟨rfl, hn⟩ | ⟨rfl, ⟨fd, fv, hs⟩, hfull⟩ | ⟨fd0, fd1, fv, l, rfl, hs, hfr⟩
+  · rw [fdRowOpen_argFd_none ha hn]; rfl
+  · rw [fdRowOpen_argFd_some ha hs, fdFrees_nil_lowest ha hfull]; rfl
+  · rw [fdRowOpen_argFd_some ha hs, show fdLowestClosed sts = some fd1 from fdFrees_leastClosed ha hfr]
 
 /-! ## §7 The return tail with the three foreign channels answered -/
 
@@ -628,7 +701,8 @@ theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
     (htier : k.tier = KTier.kpt) (hpins : syscPins k R) (hs2 : R 18#5 = pageAddr V1.upt.tfp)
     (hrows : SyscRows V M (syscStore V1 (R 10#5)) M1 sts sts' cs cs' pid)
     (n : Int) (hn : syscNum V = n) (h1 : n ≠ 1) (h3 : n ≠ 3) (h7 : n ≠ 7)
-    (h14 : n ≠ 14 := by decide) (h12 : n ≠ 12 := by decide) (h16 : n ≠ 16 := by decide) :
+    (h14 : n ≠ 14 := by decide) (h12 : n ≠ 12 := by decide) (h16 : n ≠ 16 := by decide)
+    (h21 : n ≠ 21 := by decide) (h10 : n ≠ 10 := by decide) :
     kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x46#64) ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
@@ -643,7 +717,44 @@ theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie spp R γ j pid V M sts gn cs ip f V1 M1 sts' cs'
     hj hproc hK htier hpins hs2 hrows n hn h1 h3 h7)
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hso Hnext
-  iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn h14 h3 h1 h12 h16
+  iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn h14 h3 h1 h12 h16 h21 h10
+
+set_option maxHeartbeats 4000000 in
+/-- **`syscall_ret_fd` at a number that cites the boot prefix** (NI M3 FS-L:
+close and dup, whose cited row reads the entry table only): the era's
+anchor off the environment, the boot prefix at the caller's slot
+(`NiEvid.niIotaLbs_act`), the cited row supplied by the arm. -/
+theorem syscall_ret_fd_boot (PT : SchedNames → IProp GF) (Γ : SchedNames)
+    (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γ : FileNames) (j : Nat)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
+    (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
+    (V1 : ProcPriv) (M1 : Nat → List (BitVec 8)) (sts' : List FdState)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : syscallSlots ≤ k.avail)
+    (htier : k.tier = KTier.kpt) (hpins : syscPins k R) (hs2 : R 18#5 = pageAddr V1.upt.tfp)
+    (hrows : SyscRows V M (syscStore V1 (R 10#5)) M1 sts sts' cs cs pid)
+    (n : Int) (hn : syscNum V = n) (h1 : n ≠ 1) (h3 : n ≠ 3) (h7 : n ≠ 7)
+    (hrow : syscEvRow V (syscStore V1 (R 10#5)) (syscImg V M) (syscImg (syscStore V1 (R 10#5)) M1) cs cs sts
+      { UIota.boot with act := procAddr j }) :
+    kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x46#64) ∗
+    frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+    bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
+    syscallEnv (hlc := hlc) PT Γ γ ∗
+    procPrivFd γ (procAddr j) pid V1 M1 ∗ fdFrags V.fdg sts' ∗ chFrag V.chg (procAddr j) cs ∗
+    syscSysOut (hlc := hlc) f V M sts gn cs pid (syscA0 (syscStore V1 (R 10#5)))
+      (syscImg (syscStore V1 (R 10#5)) M1) sts' V1.cwi cs ∗
+    wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f)
+    ⊢ wpLoop (GF := GF) cpu := by
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hbs, Hip, Hfd, Hir, Henv, Hpriv, Hfr, Hch, Hso, Hnext⟩
+  icases syscallEnv_anchor_keep PT Γ γ $$ Henv with ⟨⟨%ke, #Hanc⟩, Henv⟩
+  iapply wpLoop_bupd
+  imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) (procAddr j) with #Hl
+  imodintro
+  ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts (syscStore V1 (R 10#5)) M1 cs cs gn ke
+    _ hrow $$ Hanc Hl
+  iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie spp R γ j pid V M sts gn cs ip f V1 M1 sts' cs
+    hj hproc hK htier hpins hs2 hrows n hn h1 h3 h7)
+  iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hso Hnext Hev
 
 /-- **The syscall channel, paid from the armed post at the stored `a0`**
 (Rocq `sysc_sys_out_at` at the record after the tail's store). -/
