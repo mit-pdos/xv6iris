@@ -5604,6 +5604,8 @@ cwd gen ch pid lazy secc`) are carried unchanged.
   move (their statements never unfold `ukbF`); `tcb.sh` decides.
 - Order: U-1 → U-2 → U-3, then U-4 at will. FAM-1b (deferred behind this lane) is independent of all four.
 
+**RULINGS U-R1…R9 (2026-10-05, coordinator, all as recommended; owner: "go ahead with ustep"):** R1 GO, in stages U-1 → U-2 → U-3 at the engine's current 17-family class, U-4 later ("defer, verified programs are covered" is not available: no landed root covers any program's computation — recorded); R2 per-family value functions (the SpecUkLeaves convention); R3 the `ukbF` move with `USER` untouched (`USERRET_CLOSED`/`UK_LEAVES` texts byte-identical, their meaning grows; `xv6NiPhi` gains `niUserChain`) — the one seam statement that moves, flagged to the owner in the report; the machine-level enter token rejected; R4 `uhist` with its start key and chain invariant as the carrier; R5 counter CSRs are `stuck`, and §3's "rdtime/rdcycle are not channels" is CORRECTED (`scounteren` is power-on garbage on the Lean machine: F7); R6 `utrace q` plus a one-origin hypothesis (PID reuse, F8); R7 SC is `stuck`; R8 the theorem compares the ecall skeleton (origin + ecall rounds; transparent rounds' timing is not a function of the key, F5); R9 `xv6NiOut` byte-identical, the derived output lives in `xv6NiDet`. U-2 is split into U-2a (the `ukbF` move, the engine's landing, the `stuck` fallback, the engine-based mint) and U-2b (the `uhist` chain, `niUserRow`/`niKeyRow`, the registration, `niUserChain` into φ).
+
 **RULINGS REQUESTED.**
 - **U-R1 (go or defer).**
   - Recommend: GO, staged at the engine's 17-family class (U-1..U-3), U-4 later.
