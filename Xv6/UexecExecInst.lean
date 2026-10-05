@@ -543,6 +543,9 @@ def xv6Spost (_X : Uvis → IProp GF) (n : Int) (f : Xfam GF) (W : Uvis) (r : Bi
   -- sync (22): the hook's `Q`, fired at a ghost commit covering every change
   -- linearised before the call (`SpecSysSync`)
   else if n = 22 then qOpt f.syOQ
+  -- pause (13, NI M3 no-kill K1): its answer is 0, or the incarnation was
+  -- killed (`SpecSysPause`'s reason; `UsertrapParts.UtPauseWhy`)
+  else if n = USYS_pause then iprop(⌜r = 0#64⌝ ∨ killShot W.gen)
   else iprop(emp)
 
 /-! ### Non-expansiveness, the key congruence, monotonicity -/
@@ -917,7 +920,8 @@ theorem syscSpostEmp_xv6 : SyscSpostEmp (GF := GF) := by
   have h7 : n ≠ USYS_exec := fun h => hno (by simp [h, USYS_exec])
   rw [if_neg h7, if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
     if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (show ¬ n = USYS_pipe by unfold USYS_pipe; omega), if_neg (by omega), if_neg (by omega)]
+    if_neg (show ¬ n = USYS_pipe by unfold USYS_pipe; omega), if_neg (by omega), if_neg (by omega),
+    if_neg (show ¬ n = USYS_pause by unfold USYS_pause; omega)]
   exact .rfl
 
 /-- pipe's out row (Rocq `spost_at_pipe_intro`): the receipt -- on
@@ -985,6 +989,19 @@ theorem spostAt_sync_intro_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) 
     qOpt f.syOQ ⊢ @UexecSG.spostAt GF _ uexecSGXv6 X 22 f W r M' fdv' cw' cs' := by
   show _ ⊢ xv6Spost (hlc := hlc) X 22 f W r M' fdv' cw' cs'
   unfold xv6Spost USYS_exec USYS_pipe
+  simp only [Int.reduceEq, if_false, if_true]
+  exact .rfl
+
+/-- **pause's post IS its answer's reason** (NI M3 no-kill K1): post 13 is
+`⌜r = 0⌝ ∨ killShot W.gen` -- the arm pays it from `SYSPAUSE`'s reason
+(`SyscallArmsProc.SyscOutPause`), usertrap reads it back
+(`UtReadWhyXv6.utPauseWhy_xv6`). -/
+theorem spostAt_pause_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64)
+    (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
+    @UexecSG.spostAt GF _ uexecSGXv6 X USYS_pause f W r M' fdv' cw' cs' ⊣⊢
+      iprop(⌜r = 0#64⌝ ∨ killShot (GF := GF) W.gen) := by
+  show xv6Spost (hlc := hlc) X USYS_pause f W r M' fdv' cw' cs' ⊣⊢ _
+  unfold xv6Spost USYS_exec USYS_pipe USYS_pause
   simp only [Int.reduceEq, if_false, if_true]
   exact .rfl
 

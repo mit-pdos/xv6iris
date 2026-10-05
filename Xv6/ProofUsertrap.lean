@@ -50,7 +50,7 @@ theorem usertrap_proof (SY : SYSCALL_XV6) (PK : PRINTK) (MP : MYPROC) (KI : KILL
     have H56 := usertrap_56_proof PT Γ PK SK
       (fun X f W => sbundleAt_exit_elim_xv6 (hlc := hlc) X f W) HA6
     have HD0 := usertrap_d0_proof PT Γ VM HA6 H56
-    have H90 : UT_90 PT Γ := usertrap_90_proof PT Γ KI SY rfl utReadWhy_xv6 HA6 HK
+    have H90 : UT_90 PT Γ := usertrap_90_proof PT Γ KI SY rfl utReadWhy_xv6 utPauseWhy_xv6 HA6 HK
     have HD := usertrap_dispatch_proof PT Γ DI KV H90 HEA HD0 H56
     exact usertrap_open MP PT Γ HD cpu k j P ksp V M sts gn cs pid sep sc tv f Wk hj hproc hctx
       htier hnoff hstk hgn⟩

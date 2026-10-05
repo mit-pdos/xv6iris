@@ -90,7 +90,7 @@ theorem syscall_proof (MP : MYPROC) (PK : PRINTK)
           hproc hK hnoff htier hgn h hpins hs1 hs2 hra)
         (fun h => syscall_arm_sbrk SSB PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc
           hK hnoff htier hgn h hpins hs1 hs2 hra)
-        (fun h => syscall_arm_pause SPS PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj
+        (fun h => syscall_arm_pause SPS syscOutPause_holds PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj
           hproc hK hnoff htier hgn h hpins hs1 hs2 hra)
         (fun h => syscall_arm_uptime SUP PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj
           hproc hK hnoff htier hgn h hpins hs1 hs2 hra)

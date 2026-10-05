@@ -53,6 +53,19 @@ theorem utReadWhy_xv6 : UtReadWhy (GF := GF) (SG := uexecSGXv6 (hlc := hlc)) := 
   ipureintro
   exact ⟨h1, h1b, h2, h3, h4, h5⟩
 
+/-- **pause's reason at the instance** (NI M3 no-kill K1): usertrap's
+`UtPauseWhy` -- post 13 is `⌜r = 0⌝ ∨ killShot W.gen`
+(`UexecExecInst.spostAt_pause_xv6`), so a nonzero answer is the shot. -/
+theorem utPauseWhy_xv6 : UtPauseWhy (GF := GF) (SG := uexecSGXv6 (hlc := hlc)) := by
+  intro X f W r M' fdv' cw' cs' hr
+  refine (spostAt_pause_xv6 (hlc := hlc) X f W r M' fdv' cw' cs').1.trans ?_
+  iintro (%h0 | #Hs)
+  · exact absurd h0 hr
+  · isplitl []
+    · imodintro; iexact Hs
+    · iapply (spostAt_pause_xv6 (hlc := hlc) X f W r M' fdv' cw' cs').2
+      iright; iexact Hs
+
 end
 
 end Xv6

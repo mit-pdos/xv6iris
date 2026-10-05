@@ -42,6 +42,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 theorem syscDepKill_holds : SyscDepKill (hlc := hlc) (GF := GF) :=
   fun f W => syscDepKill_xv6 (hlc := hlc) _ f W
 
+/-- **`SyscOutPause`** at the instance (NI M3 no-kill K1): post 13 is the
+answer's reason. -/
+theorem syscOutPause_holds : SyscOutPause (hlc := hlc) (GF := GF) :=
+  fun f W r M' fdv' cw' cs' => (spostAt_pause_xv6 (hlc := hlc) _ f W r M' fdv' cw' cs').2
+
 /-- **`SyscDepChdir`** at the instance. -/
 theorem syscDepChdir_holds : SyscDepChdir (hlc := hlc) (GF := GF) := by
   intro f W

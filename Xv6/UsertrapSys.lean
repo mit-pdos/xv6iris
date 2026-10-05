@@ -134,7 +134,7 @@ set_option maxHeartbeats 4000000 in
 conjunct the continuation (`ut90_tail`), its right the stack closer. -/
 theorem ut90_call [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ] (SY : SYSCALL_XV6)
     (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
-    (hW : UtReadWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A : UtArgs GF)
+    (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A : UtArgs GF)
     (hok : UtOk Γ A) (hsc : A.sc = uecallScause) (hb : umBelow A.V.sz A.V.upt)
     (cpu : CPU) (R : RegMap) (hpins : utPins A R) :
     kctx cpu ((A.k.intrOn.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0xa2#64) ∗ utFrame A ∗
@@ -180,7 +180,7 @@ theorem ut90_call [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ
       have hpins' : utPins A R' := by
         refine utPins_calleeSaved A _ R' ?_ hcs
         exact utPins_set A R 1#5 _ hpins (by decide) (by decide) (by decide)
-      iapply (ut90_tail PT Γ hW HA A hok hsc hb c spie spp R' V2 M2 sts2 cs2 hpins' hrows)
+      iapply (ut90_tail PT Γ hW hP HA A hok hsc hb c spie spp R' V2 M2 sts2 cs2 hpins' hrows)
       iframe Hk Hpc Hframe Hte Hce Hpay Hkont Hbs Hfd Hir Henv Hpriv Hfrag Hch Hxo Hso Hfo Hwo Heo Hcaps Huh
     · -- the dying conjunct: the stack from syscall's entry sp up to the page top
       unfold syscallCloser
@@ -212,7 +212,7 @@ set_option maxHeartbeats 4000000 in
 `ut90_call`. -/
 theorem ut90_bump [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ] (SY : SYSCALL_XV6)
     (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
-    (hW : UtReadWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A : UtArgs GF)
+    (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A : UtArgs GF)
     (hok : UtOk Γ A) (hsc : A.sc = uecallScause) (cpu : CPU) (R : RegMap) (hpins : utPins A R) :
     kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0x96#64) ∗ utFrame A ∗
       trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
@@ -298,7 +298,7 @@ theorem ut90_bump [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ
         15#5 (tfW (utProTf A.sep A.V) 3 + 4#64)) :=
       utPins_set A _ 15#5 _ (utPins_set A _ 15#5 _ (utPins_set A R 14#5 _ hpins (by decide) (by decide)
         (by decide)) (by decide) (by decide) (by decide)) (by decide) (by decide) (by decide)
-    iapply (ut90_call PT Γ SY hPT0 hW HA A hok hsc hb cpu _ hpins')
+    iapply (ut90_call PT Γ SY hPT0 hW hP HA A hok hsc hb cpu _ hpins')
     iframe Hk Hpc Hframe Hcaps Hpay Hkont Hbs Hfd Hir Henv Hpriv Hfrag Hch Hsi Hfi Hpi Huh
   all_goals first
     | (k_norm_g; done)
@@ -325,7 +325,7 @@ set_option maxHeartbeats 4000000 in
 then +0x96 (`ut90_bump`) or the kexit dead end at +0xc8. -/
 theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ] (SY : SYSCALL_XV6)
     (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
-    (hW : UtReadWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (HK : UT_KEXIT (hlc := hlc) PT Γ)
+    (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (HK : UT_KEXIT (hlc := hlc) PT Γ)
     (A : UtArgs GF) (hok : UtOk Γ A) (hsc : A.sc = uecallScause) (cpu : CPU) (R : RegMap)
     (kl : BitVec 32) (hpins : utPins A R) (h10 : R 10#5 = BitVec.signExtend 64 kl) :
     kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0x94#64) ∗ utFrame A ∗
@@ -345,7 +345,7 @@ theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF �
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x94#64) true 52#13 10#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, ut_bne_sext0, MachCSL.bne_eq]
     iintro Hk Hpc
-    iapply (ut90_bump PT Γ SY hPT0 hW HA A hok hsc cpu R hpins)
+    iapply (ut90_bump PT Γ SY hPT0 hW hP HA A hok hsc cpu R hpins)
     iframe Hk Hpc Hframe Hte Hce Hcaps Hown Hsi Hfi Hpi Hkont
   · -- +0x94  c.bnez a0 : taken
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x94#64) true 52#13 10#5 0#5 (by decide) bop.BNE)
@@ -388,7 +388,7 @@ theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF �
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `ut_90`** (at `UT_90A`, the header's deviation). -/
 theorem usertrap_90_proof [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED)
-    (SY : SYSCALL_XV6) (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)) (hW : UtReadWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ)
+    (SY : SYSCALL_XV6) (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)) (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ)
     (HK : UT_KEXIT (hlc := hlc) PT Γ) : UT_90A (hlc := hlc) PT Γ := by
   intro A cpu R hok hpins h10 hsc
   have hsie : A.k.sie = false := hok.hctx.1
@@ -431,7 +431,7 @@ theorem usertrap_90_proof [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hl
     · rw [hok.pj]; iexact Hpriv
     have hpins' : utPins A R' :=
       utPins_calleeSaved A _ R' (utPins_set A R 1#5 _ hpins (by decide) (by decide) (by decide)) hcs
-    iapply (ut90_after PT Γ SY hPT0 hW HA HK A hok hsc cpu R' kl hpins' h10')
+    iapply (ut90_after PT Γ SY hPT0 hW hP HA HK A hok hsc cpu R' kl hpins' h10')
     iframe Hk Hpc Hframe Hte Hce Hcaps Hown Hsi Hfi Hpi Hkont Hrd
   all_goals first
     | (k_norm_g; done)

@@ -4790,6 +4790,56 @@ histories are below each other, `niBelow_refl`), but re-deriving it is not propo
     round is filed first. So the victim's prefix corollary needs run 1 cut earlier. This is the one place where
     kill-as-event COSTS the victim (F3).
 
+### M3 no-kill as landed (2026-10-05)
+
+On `lane/nokill`, two commits (K3 15c1ce17d, K1: this note's commit), rulings K-R1…R6 as recommended. A kill only
+cuts the victim's trace short (honest scope 11); `xv6NiPrefix` is the twelfth root; pause joins the class at answer
+`0`. K2 (`sys_kill` as a cited slot-ledger event) is deferred to the families lane (K-R2).
+
+**K3 (the prefix corollary).** `NiTrace` §8: `niHistLe` (the design's text), `niTwoRunPrefix_trace` (the design's
+statement; `niTwoRun_trace` at `tr₂.take |tr₁|`, run 1's chain lifted to `fun k => { H₂ k with cacc := (H₁ k).cacc }`
+whose ledger part is run 2's by `rfl`), `niTwoRunPrefix` (the design's statement). `LinkNiAdequacy.xv6NiPrefix` (the
+design's statement verbatim, binders exactly `xv6NiTwoRun`'s) with `#print axioms`. Honest scope 11 "the kill channel
+is a truncation" (F1–F4 in short: no resumed round's answer depends on the flag; "nobody killed q" adds nothing; a
+kill-death, a fault-death and `exit(-1)` are one family event and no receipt names the killer; other observers see a
+kill only through `H`; LOW killing HIGH is availability only; `sys_kill`'s own answer outside the class until
+families, with K-R6's caveat); scopes 9/10's "untouched" sentences point at it. Byte-identical: the eleven existing
+roots, `niTwoRun`, `niTwoRun_trace`. Baselines: `roots.txt` 11 → 12; audit + `xv6NiPrefix` (same three axioms and
+three opaques, 12 PASS); tcb + `Xv6.xv6NiPrefix`, module set, axioms and opaques exactly `xv6NiTwoRun`'s (42 files).
+Deviation: the def count is `xv6NiTwoRun`'s (688), not +1 -- `niHistLe` is not in the root's statement, which states
+`niBelow` per era directly (ruling K-R6's text).
+
+**K1 (pause joins the class).** `UsysMemOk.USYS_pause := 13`. `SYSPAUSE` (both bodies) moved: binders `pid gn` after
+`j`; the pre LENDS `wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗ genHalvesPriv (procAddr j) pid gn`; the post gains
+`(⌜R' 10#5 = -1#64⌝ -∗ killShot gn) -∗` after the ⌜⌝ (whose text, `0#64 ∨ 0xFFFFFFFFFFFFFFFF#64`, is kept) and hands
+both rows back. `ProofSysPause`: the rows ride the hart-free continuation (`spPostAll` is now `∃ pid gn, rows ∗ ∀ c,
+spPost … pid gn c`, so no loop-invariant or block signature moved); the loop's `killed(myproc())` is the reading form
+`sp_killed_r` (consoleread's `cr_killed`); its nonzero branch is the only way to `sp_retm1` (the `n < 0` arm is the
+clamp, which rejoins the `0` path), and carries the shot to the exit (`spPostAllK … -1`); `spPostAll_ret0` at the `0`
+exit. The route: `ProcPrivAcc.procPrivFd_tfGen` (+ `SyscallArmsProc.syscArmProc_tfGen`) lends the pid half and
+generation row beside the trapframe cells; `syscall_arm_pause` pays post 13 from the reason through a new hypothesis
+`SyscOutPause` (`(⌜r = 0⌝ ∨ killShot W.gen) ⊢ spostAt … USYS_pause …`), discharged by
+`UexecExecLaws.syscOutPause_holds`; the instance's post 13 is `⌜r = 0#64⌝ ∨ killShot W.gen` (`xv6Spost`'s new last
+branch, `spostAt_pause_xv6`), so `SpecSyscall.syscNumNofs` excludes 13. `UsertrapParts.UtPauseWhy` (the design's text)
+is discharged by `UtReadWhyXv6.utPauseWhy_xv6`; `ut_sys_live` reads it (`r ≠ 0` gives `□ killShot`, refuted at +0xa6 as
+read's) and is threaded with `hP` through `ut90_tail`/`ut90_call`/`ut90_bump`/`ut90_after`/`usertrap_90_proof`.
+`uexecLiveOk` + `∧ (n = USYS_pause → r = 0#64)` (`uexecLiveOk_ne` + `hp : n ≠ USYS_pause`); its user-tier users'
+STATEMENTS are byte-identical (one proof line in `UkRunSysWait`: `hlive.2` → `hlive.2.1`). `UsysDet`: pause in
+`usysDetQuiet` and `usysDetClass`, `usysDetRet`'s `else if n = USYS_pause then 0#64` (before the pid fallback),
+`usysDetRet_pause`; `usysIotaFits` + `(n = USYS_pause → r = 0#64)` (`usysIotaFits_exists`/`_of_ev` + `hpz`);
+`usysDet_mem/_rows/_of_rows` one more case. `niRoundLaw` + `(gprsNum secc xg = USYS_pause → gprsA0 eg = 0#64)` after
+getpid's; `output_eq_of` answers pause by both laws' `0`. Byte-identical: `SYSCALL`, `USERTRAP`, `syscEvOut`,
+`utEvOut`, `NiStep`, `NiInClass`, `NiStep.input`, `classReading`, the twelve roots. Deviation (forced): the design's
+`niDetRow_pause via usysDet_quiet` cannot fire -- pause does not cite (`niCiting`), and `niDetRow sc W W' none` is
+`True` -- so pause's `0` rides the filing's `NiLedger.niPidRow` (getpid's row, now "the two class members that resume
+and cite nothing": `usysRetPid … ∧ (… = USYS_pause → a0 = 0)`), produced by `UserretClosedRows.urc_pauseRow` off
+usertrap's live row (`urc_niPidRow` and `urc_niDetRow` + `hlive`). Dead code: `KILLED.wp_killed` and `wp_killed_body`
+(pause was the last number-only caller) deleted. No module set, axiom or opaque moved; NI def counts +1
+(`USYS_pause`).
+
+What remains in M3: families (incl. K2 sys_kill as a slot-ledger event), ustep, quotas, private files; OUT-4 optional;
+G3c optional
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
@@ -5191,6 +5241,8 @@ kalloc nondeterminism comes from".  The considered answer:
 **M3 ORDER (2026-10-05, owner: "go ahead with the proposed order"):** NI-OUT (the console bytes attributed to the incarnation through the filing) → the no-`kill` corollary → process families as partitions → arbitrary low code (`ustep`) → kernel changes (quotas) and the theorem that they close a channel → private files. Power cycles are covered by M2-X's per-era ledgers. Each lane gets a design pass with coordinator rulings before its code lands, as G1–G4 did.
 
 NI-OUT landed; next: the no-kill corollary
+
+no-kill landed (K3 + K1; K2 deferred to families); next: families
 
 - **M3 — extensions**, independent: arbitrary low code (`ustep`, §4);
   process FAMILIES as partitions (pipes and `wait` order become

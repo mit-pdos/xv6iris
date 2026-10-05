@@ -45,6 +45,23 @@ theorem syscArmProc_tf [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames)
   subst hct
   exact hacc
 
+/-- **pause's cells** (NI M3 no-kill K1): the raw trapframe cells as
+`syscArmProc_tf`, and the pid half and generation row `killed()`'s reading
+borrows (`ProcPrivAcc.procPrivFd_tfGen`), at the ambient kernel context. -/
+theorem syscArmProc_tfGen [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      wordPointsTo (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) ∗
+      tfPageAt V.upt.tfp V.tf ∗ wordPointsTo (pPid pa) 4 pidPriv pid ∗ genHalvesPriv pa pid V.gen ∗
+      (wordPointsTo (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) -∗
+        tfPageAt V.upt.tfp V.tf -∗ wordPointsTo (pPid pa) 4 pidPriv pid -∗ genHalvesPriv pa pid V.gen -∗
+        procPrivFd γ pa pid V M) := by
+  have hacc := procPrivFd_tfGen (GF := GF) γ pa pid V M
+  obtain ⟨ξ, t⟩ := X
+  simp only at hct
+  subst hct
+  exact hacc
+
 /-- **sync's pid quarter** (Rocq `proc_priv_cwd_pid`, the cwd handed straight
 back): `p->pid` at a quarter, at the ambient kernel context. -/
 theorem syscArmProc_pid [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
@@ -304,10 +321,21 @@ theorem syscall_arm_kill
   · iapply syscWaitOut_ne; rw [hnN]; decide
   · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hnN
 
+/-- **pause's out row** (NI M3 no-kill K1): post 13 is paid by the answer's
+reason -- `0`, or the incarnation's kill shot (`SYSPAUSE`'s post).
+`UexecExecInst.spostAt_pause_xv6` proves it for `uexecSGXv6`. -/
+def SyscOutPause : Prop :=
+  ∀ (f : UexecSG.sfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
+    (cs' : ExtTreeSet GName compare),
+    (⌜r = 0#64⌝ ∨ killShot (GF := GF) W.gen) ⊢
+      UexecSG.spostAt (uslot (hlc := hlc)) USYS_pause f W r M' fdv' cw' cs'
+
 set_option maxHeartbeats 4000000 in
-/-- **Arm 13, `sys_pause`** (Rocq `sysc_arm_pause`; the raw trapframe cells). -/
+/-- **Arm 13, `sys_pause`** (Rocq `sysc_arm_pause`; the raw trapframe cells;
+NI M3 no-kill K1: the pid half and generation row lent to `killed()`'s
+reading, and the post paid by the answer's reason, `SyscOutPause`). -/
 theorem syscall_arm_pause
-    (SP : SYSPAUSE)
+    (SP : SYSPAUSE) (hout : SyscOutPause (hlc := hlc) (GF := GF))
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
     [ClaimIs (hlc := hlc) GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
@@ -342,9 +370,9 @@ theorem syscall_arm_pause
   icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
   obtain ⟨v, hv⟩ : ∃ v, V.tf[tfArgIdx 0]? = some v :=
     ⟨_, List.getElem?_eq_getElem (by rw [hl]; decide)⟩
-  icases syscArmProc_tf hct γ (procAddr j) pid V M $$ Hpriv with ⟨Htp, Htf, Hback⟩
+  icases syscArmProc_tfGen hct γ (procAddr j) pid V M $$ Hpriv with ⟨Htp, Htf, Hpid, Hgen, Hback⟩
   have hU := SP.wp_sys_pause_eb (hlc := hlc) (GF := GF) Γ cpu
-    (((k.withSpie spie spp).pushed 4).withRegs R) γt j
+    (((k.withSpie spie spp).pushed 4).withRegs R) γt j pid V.gen
     V.upt.tfp V.tf v (DFrac.own (1 : Qp).half.half) hj hprocK hv
     (by k_norm_g; have : sysPauseSlots + 4 ≤ syscallSlots := by decide
         omega)
@@ -355,13 +383,18 @@ theorem syscall_arm_pause
   iapply hU
   ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie k.proc ⊢ cpuClaimExt cpu k.sie (procAddr j)
     from by rw [hproc]) $$ Hce
-  iframe Hk Hpi Hte Hce Ht Htp Htf Hpc
+  iframe Hk Hpi Hte Hce Ht Htp Htf Hpc Hpid Hgen
   iapply wpNext_intro_pin
   iintro %cpu %-
-  iintro %spie2 %spp2 %R2 %⟨hcs, ha0⟩ Hk Hpc Hte Hce Htp Htf
+  iintro %spie2 %spp2 %R2 %⟨hcs, ha0⟩ Hwhy Hk Hpc Hte Hce Htp Htf Hpid Hgen
   ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie (procAddr j) ⊢ cpuClaimExt cpu k.sie k.proc
     from by rw [hproc]) $$ Hce
-  ihave Hpriv := Hback $$ Htp Htf
+  ihave Hpriv := Hback $$ Htp Htf Hpid Hgen
+  -- THE ANSWER'S REASON (NI M3 no-kill K1): `0`, or the kill shot
+  ihave Hans : (⌜R2 10#5 = 0#64⌝ ∨ killShot (GF := GF) gn) $$ [Hwhy]
+  · rcases ha0 with h0 | hm1
+    · ileft; ipureintro; exact h0
+    · iright; rw [hgn]; iapply Hwhy; ipureintro; rw [hm1]; decide
   k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
   k_norm_g at hcs
   have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
@@ -375,8 +408,13 @@ theorem syscall_arm_pause
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
   isplitr
   · iapply syscExecOut_ne; rw [hnN]; decide
-  isplitr
-  · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 13 hnN (by decide)
+  isplitl [Hans]
+  · iapply syscSysOut_at f V M sts gn cs pid _ _ sts _ cs USYS_pause hnN (by decide) (by decide)
+    iapply (hout f _ _ _ _ _ _)
+    rw [syscStore_a0 V (R2 10#5) (by rw [hl]; decide)]
+    iapply (show iprop(⌜R2 10#5 = 0#64⌝ ∨ killShot (GF := GF) gn) ⊢
+      iprop(⌜R2 10#5 = 0#64⌝ ∨ killShot (GF := GF) (uvisOf V M sts gn cs pid).gen) from .rfl)
+    iexact Hans
   isplitr
   · iapply syscForkOut_ne; rw [hnN]; decide
   isplitr

@@ -27,6 +27,7 @@ its observable form, and the strong instance.
   M2-G3) `gprsA1` (sbrk's second argument word), (NI M2-G4) `gprsA2`
   (write's count word).
 * §4 THE CLASS LAW `NiClassLaw`, and `niOk_classLaw` (pure: from `niOk`,
+  (NI M3 no-kill K1) pause's `0` off the filing's `niPidRow`, and
   the uptime, wait, (NI joint fork lane F3) fork, (NI M2-G3) sbrk and (NI
   M2-G4) console write (`niDetRow_write`) answers
   read off M0's row at the cited ι, `niDetRow` -- `usysDet_quiet`/
@@ -62,7 +63,10 @@ its observable form, and the strong instance.
    every key (NI joint fork lane F3, ruling JF-R2), sbrk at every key
    (NI M2-G3, ruling G3-R2; scope 9), and the console write at a lazy-free
    key whose argument 0 names a writable console descriptor of its table
-   (NI M2-G4, ruling G4-R3; scope 10)**
+   (NI M2-G4, ruling G4-R3; scope 10), and pause at every key (NI M3
+   no-kill K1, ruling K-R5: its answer is `0` -- its only `-1` is the
+   kill, which never resumes, scope 11; the elapsed ticks are schedule and
+   are not exported)**
    (`UsysDet.usysDetClassAt`); every other ecall's enter is UNCONSTRAINED by
    the law, and the two-run corollaries assume the incarnation's ecalls are
    all in the class.  The
@@ -229,8 +233,10 @@ its observable form, and the strong instance.
    `syscall()` (+0x90), after it (+0xa6) and in the device arm (+0xea), so
    every round that saw the flag, or whose kernel work overlapped the
    store, dies in `kexit(-1)` and is never filed: NO RESUMED ROUND'S ANSWER
-   DEPENDS ON THE FLAG (wait's and consoleread's kill `-1` are refuted at
-   the resume; the `sleep()` loops that do not read the flag re-sleep).  A
+   DEPENDS ON THE FLAG (wait's, consoleread's and -- NI M3 no-kill K1 --
+   pause's kill `-1` are refuted at the resume: pause's `SYSPAUSE` reason
+   reaches usertrap as `UtPauseWhy`, so pause joins the class at answer
+   `0`; the `sleep()` loops that do not read the flag re-sleep).  A
    killed incarnation's trace is therefore a prefix of what it would have
    been, which `niTwoRunPrefix` states with no kill vocabulary: inputs a
    prefix and ledger histories below (`niHistLe`) give enters a prefix.
@@ -255,7 +261,9 @@ its observable form, and the strong instance.
 
 getpid's answer is the incarnation's pid (W2d's `niPidRow`: `a0 =
 signExtend 64 W.pid`, and the filing's pid is `W'.pid = W.pid`), so getpid
-reads nothing.  What the two-run hypothesis concedes after M2-X: the
+reads nothing; (NI M3 no-kill K1) pause's is `0` (the same row's pause
+clause, from usertrap's live row), so pause reads nothing either -- its
+answer is not a reading (`classReading` is unchanged).  What the two-run hypothesis concedes after M2-X: the
 SCHEDULE (per round, the cited era, ledger lengths, tick count and actor)
 and the HISTORIES (the other actors' pid and family events, and since the
 joint fork lane every actor's allocator order and the slot-occupancy
@@ -514,7 +522,8 @@ three clauses): the exit is an exit, the enter an enter, and
   `SFull`, `-1` otherwise; (NI M2-G3) sbrk's `usysSbrkAns` at the step's
   break `sz`, the exit's `a0`/`a1` and the CITED prefix -- `-1` at an
   overrun or an allocating eager grow whose cited allocator prefix ends in
-  the actor's `KNull`, the old break otherwise;
+  the actor's `KNull`, the old break otherwise; (NI M3 no-kill K1) pause's
+  `0` (its only `-1` is the kill, which never resumes: scope 11);
 * every other ecall is unconstrained. -/
 def niRoundLaw (secc : BitVec 64) (lz : Bool) (win : Nat) (sz : Nat) (wcon : Option Nat)
     (wout : List (BitVec 8)) (pid : BitVec 32) (x e : Obs) (c : Option (Nat × UIota)) : Prop :=
@@ -525,6 +534,7 @@ def niRoundLaw (secc : BitVec 64) (lz : Bool) (win : Nat) (sz : Nat) (wcon : Opt
     (sc = uecallScause → usysDetResumes (gprsNum secc xg) →
       pc' = retPc (retPc ep + 4#64) ∧ eg = xg.set 9 (gprsA0 eg) ∧
       (gprsNum secc xg = USYS_getpid → gprsA0 eg = BitVec.signExtend 64 pid) ∧
+      (gprsNum secc xg = USYS_pause → gprsA0 eg = 0#64) ∧
       (gprsNum secc xg = USYS_uptime → ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysUptimeWord ι.ticks) ∧
       (gprsNum secc xg = USYS_wait → (gprsA0 xg = 0#64 ∨ lz = false) →
         ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysWaitAns ι win) ∧
@@ -671,10 +681,10 @@ theorem niDetRow_write {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
       usysWriteAns (uvisRun W).perm (tfW (uvisRun W).tf (tfArgIdx 1)) (tfW (uvisRun W).tf (tfArgIdx 2)) := by
   have hcls : usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
       (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) := by
-    rw [hwr]; exact ⟨Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr rfl))))), fun h => absurd h (by decide),
+    rw [hwr]; exact ⟨Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl rfl)))))), fun h => absurd h (by decide),
       fun _ => ⟨hlz, hwc⟩⟩
   have he := hd hsc hcls
-  rw [hwr, usysDet_quiet _ _ (Or.inr (Or.inr rfl)), usysDetRet_write] at he
+  rw [hwr, usysDet_quiet _ _ (Or.inr (Or.inr (Or.inl rfl))), usysDetRet_write] at he
   exact ukeyEq_bump_a0 he
 
 /-- A round whose filing cites exactly at the citing numbers cites at an
@@ -735,14 +745,19 @@ theorem niStepOf_law {h : List Obs} {f : NiEntry} {s : NiStep} (hf : niEntryOk h
           rw [← gprList_tfResumeGpr0, ← gprList_tfResumeGpr0, hb1, hg0, gprList_set10]
         have ha0 : gprsA0 (tfGprs W'.tf) = r := by
           rw [← gprList_tfResumeGpr0, gprsA0_gprList, hb1]; simp
-        refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+        refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
         · rw [hpc, hb2, hep]
         · rw [ha0, heg]
         · intro hg
           show gprsA0 (tfGprs W'.tf) = BitVec.signExtend 64 W'.pid
           rw [gprsA0_tfGprs, hpid]
-          rw [hg] at hprow'
-          exact usysRetPid_getpid hprow'
+          have h1 := hprow'.1
+          rw [hg] at h1
+          exact usysRetPid_getpid h1
+        · -- (NI M3 no-kill K1) pause: the filing's live row
+          intro hp
+          rw [gprsA0_tfGprs]
+          exact hprow'.2 hp
         · intro hu
           rw [← hrun] at hu
           obtain ⟨k, ι, rfl⟩ := niCiting_some hcit hsc (Or.inl hu)
@@ -928,14 +943,16 @@ theorem NiStep.output_eq_of {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.
     · subst hsc
       have hc := hcls secc lz win sz wcon wout x e c rfl ep xg hx₁
       have hres : usysDetResumes (gprsNum secc xg) := usysDetClass_resumes hc.1 (hxt₁ rfl)
-      obtain ⟨hp₁, hg₁, hpid₁, -⟩ := hb₁ rfl hres
-      obtain ⟨hp₂, hg₂, hpid₂, -⟩ := hb₂ rfl hres
+      obtain ⟨hp₁, hg₁, hpid₁, hpz₁, -⟩ := hb₁ rfl hres
+      obtain ⟨hp₂, hg₂, hpid₂, hpz₂, -⟩ := hb₂ rfl hres
       have ha : gprsA0 eg₁ = gprsA0 eg₂ := by
-        rcases hres with (hn | hn | hn) | hn | hn | hn
+        rcases hres with (hn | hn | hn | hn) | hn | hn | hn
         · rw [hpid₁ hn, hpid₂ hn]
         · exact hans secc lz win sz wcon wout x e c lz' win' sz' wcon' wout' x' e' c' ep xg rfl rfl hx₁ (Or.inl hn) _ _ _ _ he₁ he₂
         · exact hans secc lz win sz wcon wout x e c lz' win' sz' wcon' wout' x' e' c' ep xg rfl rfl hx₁
             (Or.inr (Or.inr (Or.inr (Or.inr hn)))) _ _ _ _ he₁ he₂
+        · -- (NI M3 no-kill K1) pause: both laws answer 0
+          rw [hpz₁ hn, hpz₂ hn]
         · exact hans secc lz win sz wcon wout x e c lz' win' sz' wcon' wout' x' e' c' ep xg rfl rfl hx₁ (Or.inr (Or.inl hn)) _ _ _ _ he₁ he₂
         · exact hans secc lz win sz wcon wout x e c lz' win' sz' wcon' wout' x' e' c' ep xg rfl rfl hx₁ (Or.inr (Or.inr (Or.inl hn)))
             _ _ _ _ he₁ he₂
@@ -1005,9 +1022,9 @@ theorem NiStep.output_eq {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law
       · exact Or.inr (Or.inl hn)
       · exact Or.inr (Or.inr (Or.inl hn))
       · exact Or.inr (Or.inr (Or.inr hn))
-      · exact Or.inl (Or.inr (Or.inr hn))
-    obtain ⟨-, -, -, hu₁, hw₁, hf₁, hs₁, hwr₁⟩ := hb₁ rfl hres
-    obtain ⟨-, -, -, hu₂, hw₂, hf₂, hs₂, hwr₂⟩ := hb₂ rfl hres
+      · exact Or.inl (Or.inr (Or.inr (Or.inl hn)))
+    obtain ⟨-, -, -, -, hu₁, hw₁, hf₁, hs₁, hwr₁⟩ := hb₁ rfl hres
+    obtain ⟨-, -, -, -, hu₂, hw₂, hf₂, hs₂, hwr₂⟩ := hb₂ rfl hres
     rcases hn with hn | hn | hn | hn | hn
     · obtain ⟨k, ι, hc₁, ha₁⟩ := hu₁ hn
       obtain ⟨k', ι', hc₂, ha₂⟩ := hu₂ hn
@@ -1328,8 +1345,8 @@ theorem NiStep.outBytes_of_law {pid : BitVec 32} {s : NiStep} (hl : s.law pid) :
       obtain ⟨hsc, hwr, hlz, hsome⟩ := hcl
       obtain ⟨d, hd⟩ := Option.isSome_iff_exists.mp hsome
       have hres : usysDetResumes (gprsNum secc xg) := by
-        rw [hwr]; exact Or.inl (Or.inr (Or.inr rfl))
-      obtain ⟨-, -, -, -, -, -, -, hw⟩ := hb hsc hres
+        rw [hwr]; exact Or.inl (Or.inr (Or.inr (Or.inl rfl)))
+      obtain ⟨-, -, -, -, -, -, -, -, hw⟩ := hb hsc hres
       obtain ⟨-, k, ι, hc, hout⟩ := hw hwr hlz d hd
       subst hc
       simp only [NiStep.outBytes, hoc, NiStep.wout]

@@ -28,7 +28,9 @@ failed at a negative count or the process was killed) and the zero kill flag.
 Lean's `UexecSG` class has no such law, so the reason is a hypothesis
 `UtReadWhy` of the syscall block, discharged at the instance by
 `UtReadWhyXv6.utReadWhy_xv6` (the console receipt's `-1` reason,
-consoleread's kill shot) in the seal.
+consoleread's kill shot) in the seal.  Pause's (NI M3 no-kill K1) is its
+twin `UtPauseWhy`: a nonzero pause answer is the kill shot
+(`UtReadWhyXv6.utPauseWhy_xv6`, off post 13).
 
 Definitional + pure + small proof-mode lemmas; no instruction stepping.
 -/
@@ -61,6 +63,15 @@ def UtReadWhy : Prop :=
     utReadCons W.tf W.fd → r = -1#64 →
     spostAt X USYS_read f W r M' fdv' cw' cs' ⊢
       □ (⌜usysRdcount W.tf < 0⌝ ∨ killShot W.gen) ∗ spostAt X USYS_read f W r M' fdv' cw' cs'
+
+/-- **pause's reason** (NI M3 no-kill K1, `UtReadWhy`'s twin): pause's
+armed post, at an answer other than `0`, says the incarnation was killed
+(persistent, read without spending the post). -/
+def UtPauseWhy : Prop :=
+  ∀ (X : Uvis → IProp GF) (f : sfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
+    (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
+    r ≠ 0#64 → spostAt X USYS_pause f W r M' fdv' cw' cs' ⊢
+      □ killShot W.gen ∗ spostAt X USYS_pause f W r M' fdv' cw' cs'
 
 end ReadWhy
 

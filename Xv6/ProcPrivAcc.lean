@@ -241,6 +241,42 @@ theorem procPrivFd_tf (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : P
   · ipureintro; exact h
   · ipureintro; exact hlz
 
+/-- **The pointer quarter, the page, the pid half and the generation row's
+marker-bearing halves** (NI M3 no-kill K1): sys_pause's premise -- argint's
+two, and the two rows `killed()`'s reading borrows (`genHalvesPriv`: the
+registration eighth and the pid's range), all handed back unchanged. -/
+theorem procPrivFd_tfGen (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
+        (pageAddr V.upt.tfp) ∗
+      @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+      genHalvesPriv pa pid V.gen ∗
+      (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
+          (pageAddr V.upt.tfp) -∗
+        @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf -∗
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+        genHalvesPriv pa pid V.gen -∗
+        procPrivFd γ pa pid V M) := by
+  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile procGenAt
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr,
+    ⟨Hf, Hq, Hx, Hgh⟩⟩, Ho⟩
+  ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2 $$ Htf
+  icases procPrivAcc_split curCtx _ 8 1 _ $$ Htf with ⟨Htf, Htf2⟩
+  icases procPrivAcc_split curCtx _ 8 (1 : Qp).half _ $$ Htf with ⟨Htf, Htf1⟩
+  iframe Htf Htfp Hpid Hgh
+  iintro Htf Htfp Hpid Hgh
+  ihave Htf := procPrivAcc_join curCtx _ 8 (1 : Qp).half _ $$ [Htf Htf1]
+  · iframe
+  ihave Htf := procPrivAcc_join curCtx _ 8 1 _ $$ [Htf Htf2]
+  · iframe
+  ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2.symm $$ Htf
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hf Hq Hx Hgh Ho Hev
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
 /-- **The write twin** (Rocq `proc_priv_tf_upd`): the pointer cell WHOLE and
 the page, taken back at any contents `ws'` (`tfPageAt` carries the length). -/
 theorem procPrivFd_tfUpd (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)

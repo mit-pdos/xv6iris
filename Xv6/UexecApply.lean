@@ -581,7 +581,7 @@ theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf
   rcases uroundOk_ecall hr with ⟨hexec, -, -⟩ | ⟨hnex, r, hb, hm, hc, hs⟩
   · change uvisNum (uvisRun W) = USYS_exec at hexec
     exfalso
-    rcases hcls.1 with h | h | h | h | h | h | h <;> rw [h] at hexec <;> exact absurd hexec (by decide)
+    rcases hcls.1 with h | h | h | h | h | h | h | h <;> rw [h] at hexec <;> exact absurd hexec (by decide)
   · change uvisNum (uvisRun W) ≠ USYS_exit at hnex
     have hres := usysDetClass_resumes hcls.1 hnex
     obtain ⟨hb1, hb2⟩ := hb
@@ -625,13 +625,14 @@ theorem uexecRetContF_det (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : U
     have hch := hch h3 hf
     rw [usysDet_quiet W ι h] at hm hfd hp hc hg hs hch ⊢
     iapply H $$ %(usysDetRet n W ι) %W.M %W.perm %W.sz %W.fd %W.cwd %W.gen %W.ch %W.lazy %W.secc
-      %hm %hfd %hp %hc %hg %hpid %(uexecLiveOk_ne W.tf W.fd _ W.ch h5 h3) %hs %hch Hsp
+      %hm %hfd %hp %hc %hg %hpid %(⟨fun h => absurd h h5, fun h => absurd h h3, fun hp => by subst hp; exact usysDetRet_pause W ι⟩ :
+        uexecLiveOk n W.tf W.fd (usysDetRet n W ι) W.ch) %hs %hch Hsp
   · unfold uexecRetContF uexecRetContGen uexecRetDetF
-    iintro H %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz' %secc' %hm %hfd %_ %hc %hg %hpid %_ %hs %hch Hsp
+    iintro H %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz' %secc' %hm %hfd %_ %hc %hg %hpid %hlv %hs %hch Hsp
     have hup : n = USYS_uptime → usysUptimeRet r := fun hu => by
       subst hu; exact usysMemOk_uptimeRet hm
     obtain ⟨ι, hfit⟩ := usysIotaFits_exists (W := W) (cs' := cs') (M' := M') (szv' := szv') (lz' := lz')
-      hup h3 hf h12 hw
+      hup h3 hf h12 hw hlv.2.2
     obtain ⟨hM, -, -⟩ := usysMemOk_quiet h7 h12 h3 h4 h5 h8 hm
     have hfd' := usysFdOk_quiet hcl hdp hop h4 hfd
     have hc' := usysCwdOk_quiet hcd hc

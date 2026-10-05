@@ -106,7 +106,7 @@ theorem ut90_outs (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
 
 set_option maxHeartbeats 2000000 in
 /-- **The continuation of the syscall arm** (see the header). -/
-theorem ut90_tail (hW : UtReadWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A : UtArgs GF)
+theorem ut90_tail (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A : UtArgs GF)
     (hok : UtOk Γ A) (hsc : A.sc = uecallScause) (hb : umBelow A.V.sz A.V.upt)
     (cpu : CPU) (a b : Bool) (R' : RegMap) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
     (sts2 : List FdState) (cs2 : ExtTreeSet GName compare) (hpins : utPins A R')
@@ -133,7 +133,7 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A
   have hpj : A.N.pj = procAddr A.j := hok.pj
   iintro ⟨Hk, Hpc, Hfr, Hte, Hce, #Hcaps, #Hpay, Hkont, Hbs, Hfd, Hir, Henv, Hpriv, Hfrag, Hch,
     Hxo, Hso, Hfo, Hwo, #Heo, Huh⟩
-  icases ut_sys_live hW A V2 M2 sts2 cs2 hsc hok.hgn $$ [Hso Hwo] with ⟨#Hwhy, Hso, Hwo⟩
+  icases ut_sys_live hW hP A V2 M2 sts2 cs2 hsc hok.hgn $$ [Hso Hwo] with ⟨#Hwhy, Hso, Hwo⟩
   · iframe Hso Hwo
   -- THE ROUND'S LEDGER EVIDENCE (NI M2-X2), at usertrap's post: the era's
   -- anchor off the environment, the dispatcher's citation re-spelled

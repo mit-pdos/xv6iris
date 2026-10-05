@@ -47,7 +47,8 @@ caller's break rides the step) and the console write at a lazy-free key on
 a writable console descriptor (NI M2-G4: `NiTrace` scope 10; the caller's
 readable-prefix reading rides the step; NI M3 NI-OUT: the UART bytes are
 attributed by accepted-stream index through the citation, `NiTrace` scope
-10, `xv6NiOut`); every
+10, `xv6NiOut`) and pause at every key (NI M3 no-kill K1: answer `0`, its
+kill `-1` never resumes, `NiTrace` scope 11); every
 filing spent a distinct claim minted
 before its enter (`niOneShot`, W2d); the mask and actor are carried per
 filing; uptime's, wait's, fork's and sbrk's answers are derived from the

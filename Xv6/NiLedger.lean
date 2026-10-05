@@ -118,11 +118,17 @@ def enterFits (e : Obs) (W : Uvis) : Prop :=
 
 /-- getpid's answer at a round (M2-W2d, W4's request): an ecall round whose
 effective number (at the trapped key's mask and run frame) is getpid
-answers the key's pid -- `UserretClosedRows.urc_post`'s `hpidrow`. -/
+answers the key's pid -- `UserretClosedRows.urc_post`'s `hpidrow`; and (NI
+M3 no-kill K1) one at pause answers `0` -- usertrap's live row
+(`UexecRet.uexecLiveOk`'s pause clause, `UserretClosedRows.urc_pauseRow`:
+pause's only `-1` is the kill, which never resumes).  The two class
+members that resume and cite nothing. -/
 def niPidRow (sc : BitVec 64) (W W' : Uvis) : Prop :=
   sc = uecallScause →
     usysRetPid (usysEff W.secc (tfOf (tfResumeGpr0 W.tf) (retPc (tfW W.tf tfEpcIdx))))
-      (tfW W'.tf (tfArgIdx 0)) W.pid
+      (tfW W'.tf (tfArgIdx 0)) W.pid ∧
+    (usysEff W.secc (tfOf (tfResumeGpr0 W.tf) (retPc (tfW W.tf tfEpcIdx))) = USYS_pause →
+      tfW W'.tf (tfArgIdx 0) = 0#64)
 
 /-- wait's answer at a round (NI G1d, W4's wait conjunct): an ecall round
 whose effective number is wait answers `-1` or a reaped pid in `[1,

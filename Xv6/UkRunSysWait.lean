@@ -66,7 +66,7 @@ theorem wp_uk_ecall_wait_null_gen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m
   have hsc' : secc' = seccAll := usysSeccOk_quiet (by decide) hsc
   have hg : g' = gn := hgn
   have hf' : fdv' = fdv := usysFdOk_quiet (by decide) (by decide) (by decide) (by decide) hfd
-  have hm1 : r = -1#64 → cs' = ∅ := hlive.2 rfl ha0
+  have hm1 : r = -1#64 → cs' = ∅ := hlive.2.1 rfl ha0
   clear hok hok2 hcw hgn hsc hfd hlive
   subst M' pm' sz' lz' cw' secc' g' fdv'
   icases urunIds_ch N cs pidv $$ Hids with ⟨Hcha, Hidsback⟩

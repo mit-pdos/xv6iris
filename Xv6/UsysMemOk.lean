@@ -97,6 +97,8 @@ def USYS_chdir : Int := 9
 def USYS_dup : Int := 10
 def USYS_getpid : Int := 11
 def USYS_sbrk : Int := 12
+/-- (NI M3 no-kill K1) `pause`: its only `-1` is the kill, so a resumed pause answered `0`. -/
+def USYS_pause : Int := 13
 def USYS_uptime : Int := 14
 def USYS_open : Int := 15
 def USYS_close : Int := 21

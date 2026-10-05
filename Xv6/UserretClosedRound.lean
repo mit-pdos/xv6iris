@@ -86,18 +86,21 @@ theorem urc_left_kpt (cpu : CPU) (k : KCtx) :
   ipureintro; exact hw
 
 /-- **getpid's row at the filing** (NI M2-W2d, `niFit`'s round arm): usertrap's
-`utRetPid`, read at the trapped key's run frame (`urc_post`'s `hpidrow`). -/
+`utRetPid`, read at the trapped key's run frame (`urc_post`'s `hpidrow`);
+(NI M3 no-kill K1) pause's, usertrap's live row (`urc_pauseRow`). -/
 theorem urc_niPidRow (W : Uvis) (V : ProcPriv) (sc : BitVec 64) (V' : ProcPriv) (M' : Nat → List (BitVec 8))
     (sts' : List FdState) (gn : GName) (cs' : ExtTreeSet GName compare) (pid : BitVec 32)
     (hl : V.tf.length = 36) (hpid : W.pid = pid) (hsc : W.secc = V.pvSecc)
-    (hrp : utRetPid sc V.pvSecc (urcV0 V W).tf V'.tf pid) :
+    (hrp : utRetPid sc V.pvSecc (urcV0 V W).tf V'.tf pid)
+    (hlive : utLiveOut sc V.pvSecc (utProTf (tfW W.tf tfEpcIdx) (urcV0 V W)) W.fd (tfW V'.tf (tfArgIdx 0))
+      cs') :
     niPidRow sc W (uvisOf V' M' sts' gn cs' pid) := by
   have hnum0 : usysEff V.pvSecc (urcV0 V W).tf = usysEff W.secc (uvisRun W).tf := by
     rw [← hsc]; exact usysEff_numCong _ _ _ ((urc_num_entry W V hl).trans (uvisRun_num W).symm)
   intro h
   have := hrp h
   rw [hnum0, ← hpid] at this
-  exact this
+  exact ⟨this, urc_pauseRow W V sc V' cs' hl hsc hlive h⟩
 
 set_option maxHeartbeats 2000000 in
 /-- **THE ROUND'S EXIT**: usertrap's post, at the record uservec saved, to
@@ -159,7 +162,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
   have hfit : niFit (some (i, x)) (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf)) :=
     ⟨sc, W, uvisOf V' M' sts' gn cs' pid, hx, ⟨cpu', _, uepc, rfl, hpc'⟩,
       urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm,
-      urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp,
+      urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp hlive,
       niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround)⟩
   have HRS := urc_resume (hlc := hlc) (GF := GF) UR PT Γ j cpu'
     (((uservecCtx k (tfResumeGpr0 W.tf) V.tf).intrOff true false).withRegs R') 0
@@ -190,11 +193,11 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
             (some (ke, ι)) :=
           ⟨sc, W, uvisOf V' M' sts' gn cs' pid, hx, ⟨cpu', _, uepc, rfl, hpc'⟩,
             urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm,
-            urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp,
+            urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp hlive,
             niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
             ⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩,
             urc_niDetRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hlw hM hpi hsz hcw hgn hch hpid hlz hsc
-              hround hchk hfde hrp hev,
+              hround hchk hfde hrp hlive hev,
             urc_niOutRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hM hpi hsz hch hlz hsc hev⟩
         iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ (some (ke, ι)) hfe
         unfold niCiteRes niCiteResRaw
@@ -203,7 +206,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
     · have hfe : niFitEv (some (i, x)) (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf)) none :=
         ⟨sc, W, uvisOf V' M' sts' gn cs' pid, hx, ⟨cpu', _, uepc, rfl, hpc'⟩,
           urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm,
-          urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp,
+          urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp hlive,
           niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
           ⟨fun h => absurd h hcit, fun h => absurd h (by simp)⟩, trivial, trivial⟩
       iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ none hfe

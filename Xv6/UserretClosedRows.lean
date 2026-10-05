@@ -208,10 +208,26 @@ theorem urc_niOutRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
   intro _ hw hcons
   exact (urc_evRow W V Mp V' M' cs cs' W.fd ι hl hch hsc hM hpi hsz hlz rfl hev).2.2.2.2.2 hw hcons
 
+/-- **pause's answer at the trapped key's run frame** (NI M3 no-kill K1):
+usertrap's live row (`UexecRet.uexecLiveOk`'s pause clause) read at the
+number `roundOkKeys` reads -- a resumed pause answered `0`. -/
+theorem urc_pauseRow (W : Uvis) (V : ProcPriv) (sc : BitVec 64) (V' : ProcPriv) (cs' : ExtTreeSet GName compare)
+    (hl : V.tf.length = 36) (hsc : W.secc = V.pvSecc)
+    (hlive : utLiveOut sc V.pvSecc (utProTf (tfW W.tf tfEpcIdx) (urcV0 V W)) W.fd (tfW V'.tf (tfArgIdx 0))
+      cs') :
+    sc = uecallScause → uvisNum (uvisRun W) = USYS_pause → tfW V'.tf (tfArgIdx 0) = 0#64 := by
+  intro h hp
+  have hu := urc_proTf_run W V hl
+  have hn : usysEff V.pvSecc (utProTf (tfW W.tf tfEpcIdx) (urcV0 V W)) = uvisNum (uvisRun W) := by
+    show _ = usysEff W.secc (uvisRun W).tf
+    rw [← hsc]; exact usysEff_numCong _ _ _ (usysNum_tfUeq hu)
+  exact (hlive h).2.2 (hn.trans hp)
+
 /-- **M0's ROW AT THE CITED ι** (NI M2-X2; fork's answer among it since NI
 joint fork lane F3): `uexecRet_roundDet` at the cited prefix, from usertrap's rows (`utChKept`, `utFdEcall`, `utRetPid`), the
 round at the keys (`urc_roundOkKeys`) and the fit `UsysDet.usysIotaFits_of_ev`
-(the re-keyed cited row IS the fit). -/
+(the re-keyed cited row IS the fit; NI M3 no-kill K1: pause's answer is the
+live row's, `urc_pauseRow`). -/
 theorem urc_niDetRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (sc : BitVec 64)
     (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (sts' : List FdState) (gn : GName)
     (cs cs' : ExtTreeSet GName compare) (pid : BitVec 32) (k : Nat) (ι : UIota)
@@ -223,6 +239,8 @@ theorem urc_niDetRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
     (hchk : utChKept sc V.pvSecc (urcV0 V W).tf cs cs')
     (hfde : utFdEcall sc V.pvSecc (urcV0 V W).tf V'.tf W.fd sts')
     (hrp : utRetPid sc V.pvSecc (urcV0 V W).tf V'.tf pid)
+    (hlive : utLiveOut sc V.pvSecc (utProTf (tfW W.tf tfEpcIdx) (urcV0 V W)) W.fd (tfW V'.tf (tfArgIdx 0))
+      cs')
     (hev : syscEvRow (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) V'
       (syscImg (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) Mp) (syscImg V' M') cs cs' W.fd ι) :
     niDetRow sc W (uvisOf V' M' sts' gn cs' pid) (some (k, ι)) := by
@@ -249,7 +267,7 @@ theorem urc_niDetRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
   have hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0))
       (uvisOf V' M' sts' gn cs' pid).ch (uvisOf V' M' sts' gn cs' pid).M (uvisOf V' M' sts' gn cs' pid).sz
       (uvisOf V' M' sts' gn cs' pid).lazy ι :=
-    usysIotaFits_of_ev hcls.2.1 hup hw hfk hsb hcls.2.2 hwr
+    usysIotaFits_of_ev hcls.2.1 hup hw hfk hsb hcls.2.2 hwr (urc_pauseRow W V sc V' cs' hl hsc hlive hsce)
   exact uexecRet_roundDet sc W (uvisOf V' M' sts' gn cs' pid) ι hlw (hgn.symm ▸ rfl) hpid.symm hchrow hfdrow
     hpidrow hr hsce hcls hfit
 

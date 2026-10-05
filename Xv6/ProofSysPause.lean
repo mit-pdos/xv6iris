@@ -32,6 +32,15 @@ re-acquire window, the epilogue) run with `k_step_e` / `k_next_e`; each
 acquire's arm joins the complement into the whole bundle (`sp_armJoin`),
 which the loop invariant keeps, and each release re-splits it
 (`armExt_split`, `reen` = the base's `SIE`).
+
+THE KILL REASON (NI M3 no-kill K1): the caller lends `p->pid`'s half and
+the generation row (`genHalvesPriv`); they ride the hart-free continuation
+(`spPostAll`, which is why the loop invariant did not move), the loop's
+`killed(myproc())` is the READING form (`sp_killed_r`, consoleread's
+`cr_killed`), and its nonzero branch -- the ONLY way to the `-1` exit
+(`sp_retm1`: the `n < 0` arm is the clamp at `+0x96`, which rejoins the
+`0` path) -- carries the shot to the exit (`spPostAllK … -1`); the `0`
+exit's reason is vacuous (`spPostAll_ret0`).
 -/
 import Xv6.SpecSysPause
 import Xv6.SpecAcquire
@@ -41,6 +50,8 @@ import Xv6.SpecSleepPrepare
 import Xv6.ArgLemmas
 import MachCSL.WpSmodeFrame8
 import Xv6.SpecArgint
+import Xv6.KillRow
+import Xv6.WordFrac
 
 namespace Xv6
 
@@ -226,41 +237,75 @@ theorem spFrame_close (sp ra s0 v1 v2 v3 v4 v6 : BitVec 64) (lo nn : BitVec 32)
 
 /-! ## The post -/
 
-/-- The specification's post, as a λ over the returning hart. -/
-def spPost (k : KCtx) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac) :
-    CPU → IProp GF := fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+/-- The specification's post, as a λ over the returning hart, at the pid
+half and generation row the caller lent (NI M3 no-kill K1: handed back,
+beside the `-1` answer's reason). -/
+def spPost (k : KCtx) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac) (pid : BitVec 32)
+    (gn : GName) : CPU → IProp GF := fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
   ⌜calleeSaved k.regs R' ∧ (R' 10#5 = 0#64 ∨ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64)⌝ -∗
+  (⌜R' 10#5 = -1#64⌝ -∗ killShot gn) -∗
   kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
   trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-  wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗ wpLoop cpu')
+  wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
+  wordPointsTo (pPid k.proc) 4 pidPriv pid -∗ genHalvesPriv k.proc pid gn -∗ wpLoop cpu')
 
 /-- The caller's continuation, taken hart-free once at entry (a park's
 crossing at `k.proc ≠ 0`, so it is claimable at whichever hart the thread
-ends on). -/
+ends on), beside the two rows the caller lent -- `p->pid`'s half and the
+generation row, which the loop's `killed()` reads (NI M3 no-kill K1). -/
 def spPostAll (k : KCtx) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac) : IProp GF :=
-  iprop(∀ c : CPU, spPost k tfp ws dqt c)
+  iprop(∃ (pid : BitVec 32) (gn : GName), wordPointsTo (pPid k.proc) 4 pidPriv pid ∗
+    genHalvesPriv k.proc pid gn ∗ ∀ c : CPU, spPost k tfp ws dqt pid gn c)
+
+/-- ...and at the exit answering `r`: the reason a `-1` answer owes (the
+kill shot `killed()` read; vacuous at `0`). -/
+def spPostAllK (k : KCtx) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac) (r : BitVec 64) :
+    IProp GF :=
+  iprop(∃ (pid : BitVec 32) (gn : GName), wordPointsTo (pPid k.proc) 4 pidPriv pid ∗
+    genHalvesPriv k.proc pid gn ∗ (⌜r = -1#64⌝ -∗ killShot gn) ∗ ∀ c : CPU, spPost k tfp ws dqt pid gn c)
 
 /-- The post is claimable at any hart: `k.proc ≠ 0`. -/
 theorem spPostAll_of_spec (cpu : CPU) (k : KCtx) (j : Nat) (tfp : BitVec 44) (ws : List (BitVec 64))
-    (dqt : DFrac) (hj : j < NPROC) (hkproc : k.proc = procAddr j) :
+    (dqt : DFrac) (pid : BitVec 32) (gn : GName) (hj : j < NPROC) (hkproc : k.proc = procAddr j) :
+    wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗ genHalvesPriv (procAddr j) pid gn ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R' ∧ (R' 10#5 = 0#64 ∨ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64)⌝ -∗
+      (⌜R' 10#5 = -1#64⌝ -∗ killShot gn) -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-      wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗ wpLoop cpu'))
+      wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
+      wordPointsTo (pPid (procAddr j)) 4 pidPriv pid -∗ genHalvesPriv (procAddr j) pid gn -∗
+      wpLoop cpu'))
     ⊢ spPostAll (GF := GF) k tfp ws dqt := by
+  rw [← hkproc]
   unfold spPostAll spPost
-  iintro H %c
+  iintro ⟨Hpid, Hgen, H⟩
+  iexists pid, gn
+  iframe Hpid Hgen
+  iintro %c
   iapply wpNext_at true k.proc cpu c _
     (fun h => h.elim (fun h => absurd h (by decide))
       (fun h => absurd h (by rw [hkproc]; exact procAddr_nonzero hj))) $$ H
 
-theorem spPost_elim (c : CPU) (k : KCtx) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac) :
-    spPost (GF := GF) k tfp ws dqt c ⊢ ∀ (spie spp : Bool) (R' : RegMap),
+/-- At the `0` exit the reason is vacuous. -/
+theorem spPostAll_ret0 (k : KCtx) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac) :
+    spPostAll (GF := GF) k tfp ws dqt ⊢ spPostAllK k tfp ws dqt 0#64 := by
+  unfold spPostAll spPostAllK
+  iintro ⟨%pid, %gn, Hpid, Hgen, H⟩
+  iexists pid, gn
+  iframe Hpid Hgen H
+  iintro %h
+  exact absurd h (by decide)
+
+theorem spPost_elim (c : CPU) (k : KCtx) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac)
+    (pid : BitVec 32) (gn : GName) :
+    spPost (GF := GF) k tfp ws dqt pid gn c ⊢ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R' ∧ (R' 10#5 = 0#64 ∨ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64)⌝ -∗
+      (⌜R' 10#5 = -1#64⌝ -∗ killShot gn) -∗
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
-      wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗ wpLoop c := by
+      wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
+      wordPointsTo (pPid k.proc) 4 pidPriv pid -∗ genHalvesPriv k.proc pid gn -∗ wpLoop c := by
   unfold spPost; iintro H; iexact H
 
 /-! ## The callee call-site wrappers -/
@@ -343,21 +388,53 @@ theorem sp_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
   simp only [myprocAddr] at h
   exact h
 
-theorem sp_killed (KL : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : Nat)
+/-- `killed(myproc())` WITH THE READING (NI M3 no-kill K1; consoleread's
+`cr_killed`): the lent pid half and the generation row's registration
+eighth go into the critical section and come back beside the flag's
+reading, `⌜kl = 0⌝ ∨ killShot gn` (`KillRow.killPaid_shot`). -/
+theorem sp_killed_r (KL : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : Nat) (pid : BitVec 32)
+    (gn : GName)
     (hj : j < NPROC) (hp : k'.regs 10#5 = procAddr j)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "proc" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«killed» ∗ procsInv Γ ∗
+    wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗ genHalvesPriv (procAddr j) pid gn ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ∀ kl : BitVec 32,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R' ∧ ∃ kl : BitVec 32, R' 10#5 = BitVec.signExtend 64 kl⌝ -∗
+      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 kl⌝ -∗
+      (⌜kl = 0#32⌝ ∨ killShot gn) -∗
+      wordPointsTo (pPid (procAddr j)) 4 pidPriv pid -∗ genHalvesPriv (procAddr j) pid gn -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KL.wp_killed (hlc := hlc) (GF := GF) Γ c k' j hj hp hnoff hK hlk htier
-  unfold wp_killed_body at h
+  have h := KL.wp_killed_r (hlc := hlc) (GF := GF) Γ c k' j
+    (fun kl => iprop((⌜kl = 0#32⌝ ∨ killShot gn) ∗ wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
+      genHalvesPriv (procAddr j) pid gn)) hj hp hnoff hK hlk htier
+  unfold wp_killed_r_body at h
   simp only [killedAddr] at h
-  exact h
+  iintro ⟨Hk, Hpc, #Hpi, Hqp, Hgen, Hnext⟩
+  ihave %hnz := genHalvesPriv_nz (procAddr j) pid gn $$ Hgen
+  iapply h
+  iframe Hk Hpc Hpi
+  isplitl [Hqp Hgen]
+  · iintro %pidr %klr Hq Hr
+    icases (show wordPointsTo (GF := GF) (pPid (procAddr j)) 4 pidPub pidr ∗
+        wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ⊢
+        ⌜pidr = pid⌝ ∗ wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
+          wordPointsTo (pPid (procAddr j)) 4 pidPriv pid from by
+      unfold pidPub pidPriv; exact wordPointsTo_agree_keep _ _ _ _ _ _) $$ [Hq Hqp]
+      with ⟨%he, Hq, Hqp⟩
+    · iframe Hq Hqp
+    subst he
+    icases genHalvesPriv_reg (procAddr j) pidr gn $$ Hgen with ⟨Hrg, Hgb⟩
+    icases killPaid_shot _ pidr klr (.own qeighth) gn hnz $$ [Hr Hrg] with ⟨Hr, Hrg, Hs⟩
+    · iframe Hr Hrg
+    ihave Hgen := Hgb $$ Hrg
+    iframe Hq Hr Hs Hqp Hgen
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %c' HK %spie %spp %R' %kl %hs Hk Hpc %hc ⟨Hs, Hqp, Hgen⟩
+  iapply HK $$ %spie %spp %R' %kl %hs Hk Hpc %hc Hs Hqp Hgen
 
 theorem sp_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat)
@@ -425,7 +502,7 @@ theorem sp_exit (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (j : Nat)
     frame8s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     trapCsrsExt cpu kb.sie ∗ cpuClaimExt cpu kb.sie k.proc ∗
     wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
-    spPostAll k tfp ws dqt
+    spPostAllK k tfp ws dqt r
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨p2, p8, p20, p21, p22, p23, p24, p25, p26, p27⟩ := id hpre
   obtain ⟨q9, q18, q19⟩ := id hsv
@@ -447,15 +524,21 @@ theorem sp_exit (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (j : Nat)
   inext
   k_next_e
   iintro Hk Hpc
-  unfold spPostAll
+  unfold spPostAllK
+  icases HΦ with ⟨%pid, %gn, Hpid, Hgen, Hwhy, HΦ⟩
   ispecialize HΦ $$ %cpu
-  ihave HΦ := spPost_elim cpu k tfp ws dqt $$ HΦ
+  ihave HΦ := spPost_elim cpu k tfp ws dqt pid gn $$ HΦ
   k_norm_g
-  iapply HΦ $$ %a %b %_ [] Hk Hpc Hte Hce Htf Htp
-  ipureintro
-  refine ⟨MachCSL.calleeSaved_mk _ _ q9 q18 q19 p20 p21 p22 p23 p24 p25 p26 p27, ?_⟩
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  rw [h10]; exact hr
+  iapply HΦ $$ %a %b %_ [] [Hwhy] Hk Hpc Hte Hce Htf Htp Hpid Hgen
+  · ipureintro
+    refine ⟨MachCSL.calleeSaved_mk _ _ q9 q18 q19 p20 p21 p22 p23 p24 p25 p26 p27, ?_⟩
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    rw [h10]; exact hr
+  · iintro %hm1
+    iapply Hwhy
+    ipureintro
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at hm1
+    rw [← h10]; exact hm1
 
 end
 
@@ -484,6 +567,8 @@ theorem sp_ret0 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γt
   -- inside the tick lock's critical section interrupts are off
   have hsie : ∀ (a' b' : Bool), (kb.pushOffAt a' b').sie = false := fun _ _ => rfl
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, Hpay, Hframe, Htc, Hcl, Hir, Htf, Htp, HΦ⟩
+  -- the `0` exit owes no reason
+  ihave HΦ := spPostAll_ret0 k tfp ws dqt $$ HΦ
   -- the release takes back the arm the entry acquire paid out
   icases armExt_split cpu kb.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -551,7 +636,7 @@ theorem sp_retm1 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γ
       v4 v6 lo nn ∗
     trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
     wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
-    spPostAll k tfp ws dqt
+    spPostAllK k tfp ws dqt 0xFFFFFFFFFFFFFFFF#64
     ⊢ wpLoop (GF := GF) cpu := by
   have hav : kb.avail = k.avail - 8 := hb.avail
   -- inside the tick lock's critical section interrupts are off
@@ -1023,11 +1108,23 @@ theorem sp_loop_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     k_step (wp_s_jal cpu _ (KA.«sys_pause» + 0x4e#64) false 2094850#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_fffffffffffff750]
     iintro Hk Hpc
-    iapply (sp_killed KL Γ cpu _ j hj ?hkp ?hkn ?hkK ?hkl ?hkt) $$ [- $Hk $Hpc $Hpinv]
+    -- THE KILL READING (NI M3 no-kill K1): the rows the caller lent, out of
+    -- the continuation's bundle, into `killed()`
+    unfold spPostAll
+    icases HΦ with ⟨%pid, %gn, Hpid, Hgen, HΦ⟩
+    ihave Hpid := (show wordPointsTo (GF := GF) (pPid k.proc) 4 pidPriv pid ⊢
+        wordPointsTo (pPid (procAddr j)) 4 pidPriv pid from by rw [hkproc]) $$ Hpid
+    ihave Hgen := (show genHalvesPriv (GF := GF) k.proc pid gn ⊢ genHalvesPriv (procAddr j) pid gn
+        from by rw [hkproc]) $$ Hgen
+    iapply (sp_killed_r KL Γ cpu _ j pid gn hj ?hkp ?hkn ?hkK ?hkl ?hkt) $$ [- $Hk $Hpc $Hpinv $Hpid $Hgen]
     rotate_right 1
     · k_norm_g [spj_2a5e]
       iapply wpNext_off_intro
-      iintro %spieK %sppK %RK %hspK Hk Hpc %⟨hcsK, kl, hkl⟩
+      iintro %spieK %sppK %RK %kl %hspK Hk Hpc %⟨hcsK, hkl⟩ Hwhy Hpid Hgen
+      ihave Hpid := (show wordPointsTo (GF := GF) (pPid (procAddr j)) 4 pidPriv pid ⊢
+          wordPointsTo (pPid k.proc) 4 pidPriv pid from by rw [hkproc]) $$ Hpid
+      ihave Hgen := (show genHalvesPriv (GF := GF) (procAddr j) pid gn ⊢ genHalvesPriv k.proc pid gn
+          from by rw [hkproc]) $$ Hgen
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
       k_norm_g at hspK
       obtain ⟨f1, f2⟩ := hspK trivial
@@ -1054,6 +1151,17 @@ theorem sp_loop_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
         k_step (wp_s_branch cpu _ (KA.«sys_pause» + 0x52#64) true 74#13 10#5 0#5 (by decide) bop.BNE)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hkl, hbn]
         iintro Hk Hpc
+        -- a nonzero flag: the reading is the kill shot, the `-1` exit's reason
+        have hkl0 : kl ≠ 0#32 := by
+          intro h0; subst h0; revert hbn; decide
+        ihave HΦ : spPostAllK k tfp ws dqt 0xFFFFFFFFFFFFFFFF#64 $$ [Hpid Hgen HΦ Hwhy]
+        · unfold spPostAllK
+          iexists pid, gn
+          iframe Hpid Hgen HΦ
+          iintro %_
+          icases Hwhy with (%h0 | #Hsh)
+          · exact absurd h0 hkl0
+          · iexact Hsh
         iapply (sp_retm1 RE cpu k kb hb γt j tfp ws dqt hj hkproc hK a b RK hpreK
             nn lo v4 v6 hal)
           $$ [- $Hk $Hpc $Hlk $Hlocked $Hpay $Hframe $Htc $Hcl $Hir $Htf $Htp $HΦ]
@@ -1061,6 +1169,10 @@ theorem sp_loop_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
         k_step (wp_s_branch cpu _ (KA.«sys_pause» + 0x52#64) true 74#13 10#5 0#5 (by decide) bop.BNE)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hkl, hbn]
         iintro Hk Hpc
+        ihave HΦ : spPostAll k tfp ws dqt $$ [Hpid Hgen HΦ]
+        · unfold spPostAll
+          iexists pid, gn
+          iframe Hpid Hgen HΦ
         iapply (sp_round AC RE SP SL Γ cpu k kb hb γt j tfp ws dqt hj hkproc hK
             t0 nn lo v4 v6 hal a b RK hpreK hK9 hK18 hK19)
           $$ [- $Hk $Hpc $Hlk $Hlocked $Hpay $Hframe $Htc $Hcl $Hir $Htf $Htp $HΦ $IH]
@@ -1261,17 +1373,17 @@ call) run at the caller's index with the complement following the thread
 loop keeps. -/
 theorem sys_pause_proof (AI : ARGINT) (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP) : SYSPAUSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γt j tfp ws v dqt hj hproc hws hK hnoff htier => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γt j pid gn tfp ws v dqt hj hproc hws hK hnoff htier => by
   unfold wp_sys_pause_eb_body
   simp only [sysPauseAddr]
-  iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hlk, Htf, Htp, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hlk, Htf, Htp, Hpid, Hgen, HΦ⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK8 : 8 ≤ k.avail := by unfold sysPauseSlots sleepSlots at hK; omega
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   have hint : k.intena = k.sie := (hwf.1 hnoff).symm
   -- the caller's continuation, hart-free (a park's crossing, at a proc)
-  ihave HΦ := spPostAll_of_spec cpu k j tfp ws dqt hj hproc $$ HΦ
+  ihave HΦ := spPostAll_of_spec cpu k j tfp ws dqt pid gn hj hproc $$ [$Hpid $Hgen $HΦ]
   -- the prologue
   iapply (wp_prologue8s0_gen cpu k KA.«sys_pause» hK8)
   k_code (text_instr _ _ _ _ rfl rfl) Htext

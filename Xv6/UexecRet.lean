@@ -522,18 +522,20 @@ theorem uexecForkChild_to (X : Uvis → IProp GF) (W : Uvis) (Q : Int → IProp 
 
 /-- **Rocq `uexec_live_ok`**: at an open readable CONSOLE descriptor a
 non-negative-count read did not return -1; at a NULL status pointer a -1
-from wait means the caller's children column was EMPTY. -/
+from wait means the caller's children column was EMPTY; (NI M3 no-kill K1)
+a resumed pause answered 0 (its only -1 is the kill, refuted at +0xa6). -/
 def uexecLiveOk (n : Int) (tf : List (BitVec 64)) (sts : List FdState) (r : BitVec 64)
     (cs' : ExtTreeSet GName compare) : Prop :=
   (n = USYS_read → 0 ≤ usysRdcount tf → ∀ rb : Bool, 0 ≤ usysArgfd tf → usysArgfd tf < (NOFILE : Int) →
     sts[(usysArgfd tf).toNat]? = some (.open true rb (.device 1)) → r ≠ -1#64) ∧
-  (n = USYS_wait → (tfW tf (tfArgIdx 0)).toNat = 0 → r = -1#64 → cs' = ∅)
+  (n = USYS_wait → (tfW tf (tfArgIdx 0)).toNat = 0 → r = -1#64 → cs' = ∅) ∧
+  (n = USYS_pause → r = 0#64)
 
 /-- Rocq `uexec_live_ok_ne`. -/
 theorem uexecLiveOk_ne {n : Int} (tf : List (BitVec 64)) (sts : List FdState) (r : BitVec 64)
-    (cs' : ExtTreeSet GName compare) (hr : n ≠ USYS_read) (hw : n ≠ USYS_wait) :
+    (cs' : ExtTreeSet GName compare) (hr : n ≠ USYS_read) (hw : n ≠ USYS_wait) (hp : n ≠ USYS_pause) :
     uexecLiveOk n tf sts r cs' :=
-  ⟨fun h => absurd h hr, fun h => absurd h hw⟩
+  ⟨fun h => absurd h hr, fun h => absurd h hw, fun h => absurd h hp⟩
 
 /-- Rocq `uexec_live_ok_cong`. -/
 theorem uexecLiveOk_cong {n : Int} {tf1 tf2 : List (BitVec 64)} {sts : List FdState} {r : BitVec 64}
