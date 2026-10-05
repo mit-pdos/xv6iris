@@ -5302,6 +5302,356 @@ number wait), the only reader of the family ledger.  Honest scope 12 ("Families"
 
 Gates: full build, `lint.sh` (12 roots), `tcb.sh` (unchanged), `audit.sh` (12 PASS), `run_all.sh`.
 
+### M3 ustep design (2026-10-05)
+
+Design pass on `lane/ustep` (based on `lean` dfba06bee: FAM-1a landed, FAM-1b deferred behind this lane). No code
+landed. Rulings U-R1…R9 at the end are needed before a lane starts.
+
+**Short version.**
+- **Today no theorem says anything about a user computation, for ANY program.** The NI roots are at the generic
+  application (`appTriv`, `USER` discharged by `userProof`; `LinkNiAdequacy.lean:1-5`), every slot is the generic
+  mint (`UexecExecMint.uslotMint_all:72`), and the kernel's obligation takes EVERY trap-out key (`UexecRet.ukbF:672`,
+  `∀ W'`). So the gap from an enter at `W'` to the next exit at `V` is open for verified programs too. The design's
+  "first theorem scoped to a verified low process" was never instantiated (the union application has no NI ledger).
+- **The pure step.** `ustep : Uvis → UOut` (`run W'`, `trap sc` at the key itself, or `stuck` = outside the
+  deterministic class), one user instruction at the key's resume pc, registers, lazy image `M` and permission view
+  `perm`. It needs NOTHING from outside the key: a lazily absent page in range reads `0` at the key (`umemLazy`,
+  `UserExec.lean:325`), and the machine's fault on it is a TRANSPARENT round (served: the slot half of
+  `uexecKillArmF`, same key) or a death (allocator empty: a truncation, scope 11). The allocator never enters
+  `ustep`. Interrupts are transparent rounds at a reachable key. Out of the class (`stuck`): SC (`match_reservation`
+  is platform-free), a counter-CSR read (Lean's `scounteren` is power-on garbage, F7), a fetch from a W+X page.
+- **The machine foothold is the Uk ENGINE, not `USER`.** `USER`'s loop (`ust_exec`) re-seals the existential
+  `userInv` after every step and its fetch result is an unconstrained word: it can never be re-cut as "lands at
+  `ustep W`". The engine's leaf facts (`UkDefs.UkExecRetire`, `UkFetchFact`) ARE the key-level unwinding: from EVERY
+  realization (table, physical placement, TLB, pinned CSRs) of `(m, pc, V)` and every oracle, the walk lands at a
+  NAMED `(m', pc', V')`. That ∀-realization form replaces Rocq's `goodmb (Dr, Dw)` + `goodb_agree_congr`. It covers
+  17 families today, the verified programs' subset, at `lazy = false`, `seccAll`.
+- **The export moves ONE user/kernel contract: `ukbF`.** The kernel's obligation gains the resumed key `Wr` and the
+  premise `⌜ulands Wr sc W'⌝`. The kernel gets the fact for free. The user tier pays it through the engine, which
+  carries `ureach Wr (M, m, pc)` as its Löb invariant. The generic mint moves onto the engine, with a `stuck`
+  fallback into `USER`'s loop. `USER` itself does NOT move. The chain between rounds rides the existing per-process
+  key history `uhist`, which gains its start key and a chain invariant and is registered at the origin filing like
+  M2-X's era anchor.
+- **The theorem** (`xv6NiDet`, the next root): two runs. Per incarnation, given equal first keys, the run-1 class
+  (ecalls in the class, never `stuck`), the cited POSITIONS of the ecall rounds (the schedule) as a prefix, and the
+  ledger histories below, the ECALL SKELETON (the origin's enter and every ecall round's exit AND enter) is a prefix,
+  and so are the attributed console runs. Exits, masks, `lz`/`win`/`sz`/`wcon`/`wout` are no longer inputs: they are
+  derived. Transparent rounds (interrupts, served lazy faults) drop out, because their number and timing are the
+  schedule and the mapped set.
+- **Size: the largest item, about 9–13k lines for U-1..U-3** at the engine's present 17-family class, plus about
+  5–8k for U-4 (totality: every decodable family, lazy tables, masks, fault/kill arms, WRS, misaligned, AMO/LR,
+  cross-page fetch). Cheapest honest alternative: U-1 plus a CONDITIONAL U-3 (the FAM-1a pattern), about 2.5–4k
+  lines, no moves.
+
+**Findings.**
+- **F1 (the generic tier forgets, by construction).**
+  - `SpecUser.USER` (`SpecUser.lean:66-75`) is `userInv … -∗ ▷ stvecHandlerWp … -∗ wpLoop`. `userInv`
+    (`UserExec.lean:288`) holds ARBITRARY pc, registers and `userPtAny` (existential memory).
+  - The step obligation (`UserStep.lean:48-50`) closes back into `userInv` or into `userTrapFrame`
+    (`UserExec.lean:303`, everything existential except the exit token's registers).
+  - The execute facts are existential: `UstExecOk` (`UserStepLand.lean:105-109`) is `∀ orc, ∃ res s' orc', runRW …
+    = some … ∧ UstResOk`, and `UstResOk` (`:89-95`) keeps only `UstLand`.
+  - The fetch outcome is unconstrained in its word: `UstFetchOut`'s `.F_Base _` (`:98-102`). The generic tier holds
+    no stamped text, because `uexecWp_gen` forgets `userPtInvX` (`UkFrame.userPtInvX_forget`). So a generic step
+    does not even know WHICH instruction ran.
+  - Determinism is latent, not stated: `runRW` (`MachCSL/URunRW.lean:283`) is a pure function of `(orc, s)` ("the
+    walker's `some` IS the certificate", `:50`). But `s` is a PHYSICAL walker state (`UWSt`: pins, file, byte map
+    over `PAddr`, `:270-275`), and `orc` answers wires and `choose`.
+  - Answer to sub-question 2: there is no single generic U-step lemma that can be re-cut. The generic tier is ONE
+    Löb loop (`ust_exec`) over a per-family classification (`ucl_cover32/16`, 54 + 44 constructors,
+    `UserClassify.lean:31-38`) that proves SAFETY only.
+- **F2 (the key-level unwinding exists, in the engine).**
+  - `UkExecRetire` / `UkExecTrap` / `UkFetchFact` (`Xv6/UkDefs.lean:93-130`) and `UkExecOut`
+    (`UkFetchArm.lean:36-45`) quantify over every walker state realizing `(m, pc, V)`: `ukRegs s.file m` (GPRs),
+    `PC`, and `ukView P.um s.mm T = V` (the page view at ANY placement `T`). Every oracle lands at a fixed
+    `UkPost … m' pc' V'`.
+  - `uk_engine` (`UkEngine.lean:121-136`) takes the leaf at every `C pt T V` realizing `π`, `sz` and
+    `umemLazy pt sz V = M`.
+  - Read through this, Rocq's foothold maps as follows:
+    - the "register half" (`goodb_agree_congr`) is the leaf's `∀ s, ukRegs s.file m → …`;
+    - the "memory half" (`UserMemClassify` at the key) is `UkImage.uk_perm_page`/`uk_view_bytes`/`uk_store_view`
+      plus `UkXlate` (translation at any table realizing `π`).
+    - Lean has `UFoot.Dr/Dw/Dany` (`URunRW.lean:202-207`) as the CERTIFIED footprint. Its only general congruence
+      is read-only (`runRW_ro`, `:1135`), plus point congruences (`uxaXget_congr`, `ukRegs_congr`). No read-write
+      agree-congruence exists, and none is needed: the ∀-realization form is the congruence.
+  - Coverage: 17 families (`SpecUkLeaves.lean:495-527`: rtype, itype, shiftiop, rtypew, addiw, shiftiwop, utype,
+    div, rem, jal, jalr, btype, load, load_text, store, store_denied, ecall; RVC by expansion, deviation 1). Each is
+    stated at a value function copied from the Sail model (deviation 2). The register families cost about 10 lines
+    each (`UkExecAlu.lean`, e.g. `uke_rtype`).
+  - Restrictions: `ukLeafGoal` (`UkEngine.lean:105-111`) is at `lazy = false`, `lazyFree pt.um sz`, `seccAll`.
+- **F3 (the obligation is ∀-keyed, and that is the whole gap).**
+  - `ukbF` (`UexecRet.lean:672-680`) is `∀ W' sc stv`, side fields pinned, `trappedMachine ∗ Rfd ∗ uexecRetF X sc
+    W' -∗ wpLoop`. It is built at RESUME (`UexecApply.uslot_applyLoop:525`, `ukc_apply`) from the side fields only.
+    The resumed `tf`/`M` are not parameters.
+  - A program's proof may call it at any `W'`. The kernel therefore cannot file anything about `W'` beyond what the
+    trapped machine pins: the exit token's registers (`userTrapFrame`'s `uExitTok`), which do NOT include memory.
+  - `NiTrace` scope 3 (`NiTrace.lean:88-89`) records the same: "nothing in the ledger ties a round's trapped key to
+    the previous round's resumed key".
+  - Answer to sub-question 3: the filing can carry `V = ustep^* W'` ONLY if the user/kernel contract carries it.
+- **F4 (the lazy page needs no allocator bit).**
+  - `umemLazy` (`UserExec.lean:325-327`) reads a live unmapped byte below `pgRoundUpN sz` as `some 0`.
+  - The machine faults (scause 13/15). The kernel's non-ecall arm is `uexecKillArmF := ukillCredAt … ∧ X W`
+    (`UexecRet.lean:614`): a served fault resumes the SAME key (`uroundOk`'s transparent arm, `UexecRound.lean:68`,
+    `M' = M` at the lazy view). An empty pool kills, which is scope 11's truncation.
+  - So at `lazy = true`, `ustep` is a function of the key, and the allocator affects only WHETHER a transparent
+    round happens or the trace ends.
+  - A fetch fault (scause 12) and a fault outside `perm` are kills, determined by `perm`. A store to a non-W mapped
+    page is a kill (`ukTrap_storeDenied`).
+- **F5 (transparent rounds are not functional in the key, so the theorem is on the ecall skeleton).**
+  - Interrupts come from wires and ticks (the oracle, `wpLoop_ucStep`'s `∀ tick`). The engine's interrupt arm
+    resumes at the same key (`uk_engine`'s `uexecRet_transparent`).
+  - Served lazy faults happen at a first touch of a page the KEY cannot see as mapped or unmapped. A fork child
+    inherits the parent's mapped set, which is not in its first key.
+  - So the number and position of non-ecall rounds are not a function of the first key. Their exits are still at
+    reachable keys (`ureach`), and their enters replay (`niRoundLaw`'s non-ecall clause, `NiTrace.lean:563`).
+  - Determinism holds for the subsequence of ecall rounds (and the origin).
+- **F6 (the resume key is not pinned whole by the filing).**
+  - `niEntryOk` (`NiLedger.lean:236-242`) pins `W'` through `roundOkKeys` (`tf`, `M`, `perm`, `sz`, `cwd`, `lazy`,
+    `secc`; `UhistDefs.lean:164`), `W'.pid = W.pid`, and, AT CITING NUMBERS ONLY, `niDetRow`'s full
+    `ukeyEq (usysDet …) W'`.
+  - At a transparent round and at the non-citing class members (getpid, pause), `fd`/`gen`/`ch` are unpinned. The
+    console-write class and its answer read `W.fd` (`uwriteCon`).
+  - So the chain needs a `niKeyRow` (whole `ukeyEq` at transparent and at every class round). The kernel has every
+    piece (`uexecRet_roundDet` holds at every class member; the transparent arm keeps the descriptor view).
+- **F7 (§3's "NOT channels: rdtime/rdcycle" is false of the Lean machine).**
+  - `MachCSL/HwConfig.lean:22-25`: `scounteren` is EXISTENTIAL (power-on garbage), so "a user `rdcycle`/`rdtime`/
+    `rdinstret`/`rdhpmcounter` may RETIRE".
+  - Both the trap-versus-retire choice and the value are outside the key: a timing read. So `ustep` must be `stuck`
+    there. §3's line holds only if the platform resets `scounteren` to 0, or if xv6's `start()` wrote it (it does
+    not).
+  - Likewise SC (`UserMemLrsc.lean:7-12`: the outcome is `match_reservation`, left free) and a W+X fetch (data
+    bytes, not stamped: icache staleness, §3).
+- **F8 (pid reuse: `utrace q` is not one process's chain).**
+  - `PIDMAX = 1000` (`ProcGeom.lean:80`), and `pidPick` wraps. Within one era, `(era, pid)` names every process
+    that held the pid.
+  - The landed roots are per-step laws and do not care. A CHAIN theorem does: consecutive steps of `utrace q` may
+    belong to two processes.
+  - The chain is per ORIGIN (per `uhist` name). The root needs a one-origin hypothesis, or a per-origin trace.
+
+**Answer to sub-question 1 (what `ustep W` returns, by class).** Fetch, decode, execute at the key. `pc :=
+tfResumePc W.tf`, `m := tfResumeGpr0 W.tf`, bytes `W.M`, permissions `upermAt W.perm`. The side fields (`perm sz fd
+cwd gen ch pid lazy secc`) are carried unchanged.
+
+| Instruction class | `ustep W` | Needs from outside the key |
+|---|---|---|
+| fetch: `perm` has X, not W | the word(s) at `pc` in `W.M` (cross-page halves read the two pages) | nothing |
+| fetch: no X / unmapped / misaligned | `trap 12/1/0` (a kill: usertrap does not serve 12) | nothing |
+| fetch: W+X page | `stuck` (unstamped bytes, icache) | — |
+| illegal / undecodable / `ebreak` / `wfi` / `sret` / `mret` / `sfence` / refused CBO | `trap` (cause by the model) → kill | nothing |
+| ALU, M, Zba/Zbb/Zbs/Zbkb/Zicond, `lui`/`auipc`, `jal`/`jalr`, branches, fences (no-op), prefetch (no-op), WRS (retires `pc+len`: the parked hart wakes by retiring, `UserStepWait.lean:1-12`) | `run` at the value function | nothing |
+| load/store/AMO, all bytes in `perm` (R; W for store/AMO): mapped or lazy-in-range | `run`: bytes from `W.M` (lazy reads `0`), store via `uMStore` | nothing (a lazy fault is a transparent round; a failed `kalloc` kills) |
+| load/store/AMO outside `perm`, store to non-W, misaligned crossing into a bad page | `trap` 13/15/5/7 → kill | nothing |
+| LR | `run` (reads as a load; the reservation is not in the key) | nothing |
+| SC | `stuck` | an oracle bit (U-R7) |
+| CSR: a counter (`cycle`/`time`/`instret`/`hpm`) | `stuck` (F7) | `scounteren` and the clock |
+| CSR: any other U-reachable number | `trap` (illegal) or `run` at a value the model reads off pinned cells | nothing |
+| `ecall` | `trap uecallScause` | nothing |
+
+**Proposed definitions (U-1, new `Xv6/Ustep.lean`, after `UexecApply`):**
+
+    /-- one user instruction's outcome AT THE KEY -/
+    inductive UOut where
+      | run (W : Uvis)          -- retired; side fields unchanged
+      | trap (sc : BitVec 64)   -- a synchronous trap at the instruction's own key (registers, pc, image unchanged)
+      | stuck                   -- outside the deterministic class: SC, a counter CSR, a W+X fetch (U-R5, U-R7)
+
+    /-- **THE PURE USER STEP** (fetch through `W.perm`/`W.M`, decode by the model's `ext_decode` at `udrefU`,
+    execute at the family's value function; SpecUkLeaves deviation 2's convention) -/
+    def ustep (W : Uvis) : UOut
+
+    def ustepTo (W W' : Uvis) : Prop := ustep W = .run W'
+    /-- the run from a resumed key: the reflexive-transitive closure of the retiring step -/
+    inductive ureach (Wr : Uvis) : Uvis → Prop
+      | refl : ureach Wr Wr
+      | step {V V'} : ureach Wr V → ustepTo V V' → ureach Wr V'
+    def ustuckFrom (Wr : Uvis) : Prop := ∃ V, ureach Wr V ∧ ustep V = .stuck
+    /-- **WHERE A RUN FROM `Wr` MAY TRAP**: at a reachable key, and at an ecall only where the instruction IS the
+    ecall; anything after a stuck point -/
+    def ulands (Wr : Uvis) (sc : BitVec 64) (W : Uvis) : Prop :=
+      ustuckFrom Wr ∨ ∃ V, ureach Wr V ∧ ukeyEq V W ∧ (sc = uecallScause → ustep V = .trap uecallScause)
+
+    theorem ustep_congr : ukeyEq W₁ W₂ → UOut.rel ukeyEq (ustep W₁) (ustep W₂)
+    theorem ulands_ecall_unique : ¬ ustuckFrom Wr → ulands Wr uecallScause W₁ → ulands Wr uecallScause W₂ →
+        ukeyEq W₁ W₂                                        -- the chain is linear, a trap is terminal
+    theorem ulands_transparent : ¬ ustuckFrom Wr → sc ≠ uecallScause → ulands Wr sc W → ureach Wr W   -- up to ukeyEq
+    theorem ulands_trans : ureach Wr W → ulands W sc V → ulands Wr sc V
+
+**The route.**
+
+**(a) The contract move (U-2, owner's call: U-R3).** In `UexecRet`:
+
+    def ukbF (X : Uvis → IProp GF) [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd)
+        (Rfd : List FdState → IProp GF) (Rut : UPtd → IProp GF) (Wr : Uvis) : IProp GF :=
+      iprop(∀ (W' : Uvis) (sc stv : BitVec 64),
+        ⌜W'.perm = Wr.perm⌝ -∗ ⌜W'.sz = Wr.sz⌝ -∗ ⌜W'.fd = Wr.fd⌝ -∗ ⌜W'.cwd = Wr.cwd⌝ -∗ ⌜W'.gen = Wr.gen⌝ -∗
+        ⌜W'.ch = Wr.ch⌝ -∗ ⌜W'.pid = Wr.pid⌝ -∗ ⌜W'.lazy = Wr.lazy⌝ -∗ ⌜W'.secc = Wr.secc⌝ -∗
+        ⌜ulands Wr sc W'⌝ -∗                                                  -- NEW: the user's part, for free
+        (trappedMachine cpu C pt Rut Wr.sz sc stv W' ∗ Rfd W'.fd ∗ uexecRetF X sc W') -∗ wpLoop cpu)
+
+- The nine side parameters become `Wr`'s fields. `ukontF`/`uvbF` take `Wr`, and `uslotF X W` passes `W` itself.
+- `ukc` (`UexecRet.lean:819`) becomes `∀ Wr, ⌜ureach Wr ⟨M, m, pc …⟩⌝ -∗ …` with the bundle at `Wr`. Its BINDER
+  LIST is unchanged, so `ukStep`/`ukcq` and the 17 `UK_LEAVES` fields are byte-identical in text and grow in
+  meaning.
+- The verified programs (`UkRun*`, `Ush*`, ~87k lines) see only `ukc`/`ukStep` and do not move (to be confirmed by
+  the U-2 build).
+- Kernel producers of `ukb` thread `Wr`: `UexecApply.ukc_apply`/`uslot_applyLoop`,
+  `UserretClosed{Defs,Resume,Round}`, `ProofUserretClosed`, `UexecExecMint`, `UexecSeccMint` (13 files).
+- `USER`, `UEXEC_GEN`, `uexecWp` are UNCHANGED. `USERRET_CLOSED`'s and `UK_LEAVES`'s texts are byte-identical,
+  meanings move.
+
+**(b) The engine pays it (U-2, with U-1's agreement lemmas).**
+- `ukLeafGoal` gains `Wr` and `⌜ureach Wr (cur)⌝`. `uk_engine` gains a pure premise `hU : ustep (cur) = if ret then
+  .run (next) else .trap (utrapScause (.Exception e) 0)`, discharged per family in a new `UkUstep.lean` (each leaf's
+  value function IS `ustep`'s, by unfolding).
+- At a retire: `ureach.step`. At a trap and at an interrupt: `ulands` by `ureach` (interrupt: `sc ≠ ecall`).
+- At a `stuck` instruction: the FALLBACK. The bundle goes into `USER`'s loop (`ust_body`) with a handler that calls
+  the new `ukbF` at `userTrapFrame_trapped`'s key, with `ulands` by `ustuckFrom`, and returns the det slot (Löb).
+  This is the one place the generic tier is still used.
+- **The det generic mint**: `uslot W` at every key is the engine at `W`. It replaces `uslotMint_all`'s generic
+  inhabitant in the generic application (`AppLaws`, `SystemAdequacy:405-425`). The kernel's mint sites' statements
+  are byte-identical.
+- At 17 families, every other instruction is `stuck`, which is safe but out of the class (U-4 shrinks `stuck`).
+
+**(c) The chain carrier: `uhist` (U-2, U-R4).**
+- `uhist` already exists: per process, residue-held (`UhistDefs.uhistRow`), appended at `urc_exit`
+  (`UserretClosedRound.lean:133-140`), born at kfork (`ProofKfork.lean:2538`) and userinit.
+- It gains its START key and a chain invariant:
+
+      abbrev Uround : Type := BitVec 64 × Uvis × Uvis × Uvis               -- sc, Wr (resumed), W (trapped), W'
+      def uhistChain (W0 : Uvis) : List Uround → Prop                       -- each Wr is the previous W' (W0 first),
+                                                                           -- and ulands Wr sc W
+      def uhistOwn (γ : GName) : IProp GF :=
+        iprop(∃ (W0 : Uvis) (h : List Uround), uhistAuth γ W0 h ∗ ⌜uhistWf h ∧ uhistChain W0 h⌝)
+
+- `urc_exit` appends `(sc, Wr, W, W')`. It gets `ulands Wr sc W` from (a)'s premise; `Wr` = the last `W'` (or
+  `W0`) is the kernel's own bookkeeping.
+- The fork child's `W0` is its child key. Exec keeps `γ` (the exec round is outside the class anyway).
+
+**(d) The filing (U-2, the M2-X pattern).**
+- The origin filing REGISTERS `γ` with its `W0`: the NI ledger keeps `niUhKey γe γ j` (a `gmUnitG` discarded key,
+  `niEraKey`'s shape). `NiFitIs.evidNone` carries `uhistLb γ W0 []`.
+- Every round's `uEvid` carries `uhistLb γ W0 (h ++ [(sc, Wr, W, W')])` and the anchor. `NiFitIs.evid` gains it.
+  Persistent mono-list lower bounds, as M2-X's `niIotaLbs`.
+- The pure side:
+
+      def niUserRow (Wr : Uvis) (sc : BitVec 64) (W : Uvis) : Prop := ulands Wr sc W
+      def niKeyRow (sc : BitVec 64) (W W' : Uvis) (c : Option (Nat × UIota)) : Prop :=     -- F6
+        (sc ≠ uecallScause → ukeyEq W W') ∧
+        (sc = uecallScause →
+          usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) W.lazy (uwriteCon W).isSome →
+          ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ((c.map Prod.snd).getD UIota.boot)) W')
+      inductive NiEntry where
+        | origin (j : Nat) (W0 : Uvis) (p : Nat) (γ : GName)
+        | round (i j : Nat) (sc : BitVec 64) (Wr W W' : Uvis) (cite : Option (Nat × UIota)) (γ : GName) (k : Nat)
+      -- niEntryOk's round arm + niUserRow Wr sc W ∧ niKeyRow sc W W' cite
+      def niUserChain (F : List NiEntry) : Prop   -- per registered γ: the rounds citing γ are its entries 0,1,…,
+                                                  -- each Wr the previous W' (the origin's W0 first)
+
+- `niUserChain` comes from the ledger's per-γ chain state (the longest cited `uhistLb` per γ, `niHist`'s
+  construction), and joins `xv6NiPhi`.
+- `niKeyRow`'s producers: `urc_niDetRow` extended to `c = none` (getpid, pause, exit: `uexecRet_roundDet` at
+  `UIota.boot`), and a transparent row from usertrap's non-ecall arm.
+
+**(e) The theorem (U-3).** NiTrace §10:
+- `NiStep.skel` (an origin or an ecall round), `NiStep.detIn` (the cited positions only), `NiStep.view` (exit and
+  enter, both observable);
+- `NiDetClass q h F` (run 1: every skeleton ecall in the class, no `ustuckFrom` along the chain; ghost-key readings
+  as scope 3's mask);
+- `niDet_trace`, by induction along the chain: an equal key gives an equal next ecall key (`ulands_ecall_unique`).
+  That gives an equal exit and equal readings. With equal positions and histories (`niBelow_pos`, `cite_eq`) the
+  resume key is equal (`niKeyRow`). Transparent rounds keep the chain (`ulands_transparent`).
+
+    theorem xv6NiDet {hlc : HasLC} (g₁ g₂ …) (hsteps₁ …) (hsteps₂ …) :
+        ∃ F₁ F₂, niOk κs₁ F₁ ∧ niOneShot κs₁ F₁ ∧ niChain F₁ (niHist F₁) ∧ niUserChain F₁ ∧
+          niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ niUserChain F₂ ∧ ∀ q : NiInc,
+          NiOneOrigin q κs₁ F₁ → NiOneOrigin q κs₂ F₂ →                     -- F8 (or per-origin, U-R6)
+          NiDetClass q κs₁ F₁ →
+          firstKey q κs₁ F₁ = firstKey q κs₂ F₂ →
+          ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.detIn <+:
+            ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.detIn →          -- THE SCHEDULE stays an input
+          (∀ k, niBelow (niHistLed F₁ k) (niHistLed F₂ k)) →
+          ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.view <+:
+            ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.view ∧
+          niOutput q κs₁ F₁ <+: niOutput q κs₂ F₂                             -- wout DERIVED (U-R9)
+
+**The hypotheses that remain, and why each is honest.**
+- The first key: the origin. Exec's image and fork's child key are the program and its parent.
+- The run-1 class:
+  - ecalls in the class, as every landed two-run root assumes;
+  - not `stuck`: SC, counters and W+X are real nondeterminism (F7);
+  - at U-1..U-3 only, the engine's 17 families, lazy-free, `seccAll`.
+- The cited positions of the ecall rounds: the order of rounds in the global ledgers, i.e. the schedule. X F4 already
+  conceded it; it is not derivable from `q`'s key.
+- Histories below: the other actors' events (unchanged concession).
+- One origin per incarnation: F8, pid reuse.
+- GONE: exits, masks, `lz`, `win`, `sz`, `wcon`, `wout`. Each is a reading of a key that is now a function of the
+  first key and the cited ι.
+
+**Lanes.**
+
+| Lane | Content | Files | Statements that move | Est. lines |
+|---|---|---|---|---|
+| U-1 | the pure `ustep` (UOut, value functions for every family the engine has, the rest `stuck`), `ureach`/`ulands`, the determinism lemmas, anti-vacuity (`echo`'s text evaluates to its ecalls under `ustep`) | new `Xv6/Ustep.lean`, `Xv6/UstepVal.lean` | none (dead_allow rows until U-3) | 1.5–2.5k |
+| U-2 | the contract move (a), the engine's landing + per-family agreement + `stuck` fallback + det generic mint (b), `uhist` chain (c), the filing (`NiEntry`, `niUserRow`, `niKeyRow`, per-γ registration, `niUserChain` into `xv6NiPhi`) (d) | `UexecRet`, `UexecApply`, `UkEngine`, `UkBundle`, `UkRunLeaf`, new `UkUstep`, `UexecExecMint`, `AppLaws`, `SystemAdequacy`, `UhistDefs`, `UserretClosed*`, `ProofKfork`, `ProofUserinit`, `NiLedger`, `NiEvid`/`NiFitIs`, `NiAdequacy` | `ukbF`/`ukontF`/`uvbF`/`ukc` defs (`USERRET_CLOSED`, `UK_LEAVES` texts byte-identical, meanings move: U-R3); `uhistOwn`; `NiEntry`/`niEntryOk`/`NiFitIs`; `xv6NiAdequacy`'s φ + `niUserChain` (a root's statement: U-R3) | 6–9k |
+| U-3 | NiTrace §10 (`skel`, `detIn`, `view`, `NiDetClass`, `NiOneOrigin`, `niDet_trace`), `xv6NiDet` (next root: 13th, or 14th after FAM-1b) | `NiTrace`, `LinkNiAdequacy`, roots/audit/tcb baselines | the eleven other NI roots byte-identical; `xv6NiOut` untouched (U-R9) | 1–1.5k |
+| U-4 (optional, incremental) | totality: the remaining base families (M, bit-manip, Zicond, CSR non-counter, fences, ebreak/illegal), misaligned and cross-page accesses, AMO/LR, fault/kill arms, lazy tables in the engine (drop `lazyFree`; the served-fault arm), seccomp masks (drop `seccAll`), WRS parked arm, cross-page fetch | `UkExec*`, `UkLoad*`/`UkStoreX`, new `UkAmo`, `UkFault`, `UkEngine`, `Ustep*` | none (the class grows) | 5–8k |
+
+- Gates per lane: full build, `lint.sh`, `tcb.sh --update`, `audit.sh`, `run_all.sh`.
+- TCB: `Xv6.Ustep` (+`UstepVal`) ENTERS `xv6NiDet`'s statement cone (the class hypothesis reads `ustep`), and
+  `xv6NiAdequacy`'s if `niUserChain` joins φ. Roughly 1–1.5k lines of definitions that mirror the Sail model. A
+  wrong value function makes U-2's agreement lemma unprovable, not the theorem unsound. The only TCB risk is a too-
+  `stuck` `ustep` (vacuity), which the anti-vacuity examples check. The system theorems' module sets should not
+  move (their statements never unfold `ukbF`); `tcb.sh` decides.
+- Order: U-1 → U-2 → U-3, then U-4 at will. FAM-1b (deferred behind this lane) is independent of all four.
+
+**RULINGS REQUESTED.**
+- **U-R1 (go or defer).**
+  - Recommend: GO, staged at the engine's 17-family class (U-1..U-3), U-4 later.
+  - Cheapest alternative: U-1 + a CONDITIONAL U-3, about 2.5–4k lines, no moves. `niDetTwoRun` is stated with
+    `niUserChain` as a HYPOTHESIS on ghost keys, the FAM-1a pattern.
+  - "Defer, since the verified-low-process instance already covers programs with their own proofs" is NOT
+    available as stated. No landed root covers ANY program's computation: the NI roots are at `appTriv` with the
+    generic slot (F3), and a verified-program NI theorem needs the same (a) move plus the union application under
+    the NI ledger. Deferring means user computation stays outside every NI theorem.
+- **U-R2 (how `ustep` is defined).**
+  - Recommend: hand-written value functions per family, at the model's own arms (SpecUkLeaves deviation 2's
+    convention: the 17 exist), with RVC by the model's expansion.
+  - Alternative: `ustep :=` the model's own walk at a CANONICAL realization (a pure page table built from `perm`).
+    That gives a smaller TCB, but adds a canonical-table construction (about 1k lines) and kernel-evaluation cost.
+    The agreement proof is the same ∀-realization leaf.
+- **U-R3 (the export route; the one user/kernel contract move).**
+  - Recommend: (a) `ukbF` takes `Wr` and `⌜ulands Wr sc W'⌝`. `USER` is untouched. The `USERRET_CLOSED`/`UK_LEAVES`
+    texts are byte-identical, meanings move. `xv6NiAdequacy`'s φ gains `niUserChain`.
+  - Rejected: a machine-level enter token (`hartObsPermit`'s enter arm returning a resource). It moves MachCSL and
+    every root's TCB.
+  - Cheapest: U-R1's conditional theorem (no move).
+- **U-R4 (the chain carrier).**
+  - Recommend: `uhist` with `W0` + `uhistChain`, registered at the origin filing (M2-X's anchor pattern; persistent
+    lower bounds fit `uEvid`).
+  - Alternative: a per-incarnation exclusive token. It needs a resource returned by the enter hook (`uEvid` is
+    persistent), which is a machine move.
+- **U-R5 (counter CSRs, F7).**
+  - Recommend: `stuck` (out of the class, a new honest scope), and correct §3's "NOT channels" line: on the Lean
+    machine a user counter read is a timing channel unless `scounteren` resets to 0.
+  - Alternative: a kernel change (`start()` writes `scounteren = 0`), which belongs in the quotas/kernel-changes lane.
+  - Rejected: a platform reset assumption (TCB).
+- **U-R6 (trace indexing, F8).**
+  - Recommend: the root at `utrace q` with `NiOneOrigin q` per run, and the per-origin chain internal to NiTrace.
+  - Alternative: a per-origin trace `otrace γ` in the root's statement. It is more precise but adds observable-free
+    vocabulary.
+- **U-R7 (SC).**
+  - Recommend: `stuck`. xv6's processes are single-threaded and have no use for it.
+  - Alternative: an SC-outcome stream as a per-incarnation input.
+- **U-R8 (the skeleton).**
+  - Recommend: compare the origin and the ecall rounds only (F5). Transparent rounds keep their landed "replay" law
+    (`xv6NiStrongInstance`, `niRoundLaw`).
+  - Alternative: include them, with their count and positions as inputs (schedule), which adds nothing a reader
+    could check.
+- **U-R9 (`xv6NiOut`).**
+  - Recommend: leave it byte-identical (its `wout` input stays honest for the class without `ustep`) and put the
+    derived form in `xv6NiDet`'s second conjunct.
+  - Alternative: weaken `xv6NiOut`'s hypothesis to `xv6NiDet`'s, which moves a landed root.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
