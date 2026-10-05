@@ -4021,6 +4021,412 @@ at a lazy-free key on a writable console descriptor}.
 
 What remains: M3 (incl. NI-OUT: the UART bytes as a function of the key's image), G3c (optional: wait's lazy copyout)
 
+### M3 NI-OUT design (2026-10-05)
+
+Design pass on `lane/m3out` (based on `lean` 89bc19c9b, G4 landed). No code landed. The shapes below were read
+off the tree (`MachCSL/Dev/Uart`, `ObsTrace`, `Resources`, `UartTrace`, `UartGhosts`, `UartInv`, `UartLinks`,
+`SpecUartwrite`/`ProofUartwrite`, `SpecUartputcSync`, `SpecConsolewrite`/`ProofConsolewrite`, `SpecFilewrite`,
+`SpecSysWrite`, `SyscallEnv`, `SyscallDefs`, `SyscallArmsFd2`, `UsysDet`, `NiEvid`, `NiLedger`, `NiAdequacy`,
+`NiTrace`, `LinkNiAdequacy`, `SystemBootEra`, `UMemImg`, `UserExec`) and the C (`uart.c`, `console.c`). They are
+not shape-checked in Lean. The rulings OUT-R1…R9 at the end are needed before a lane starts.
+
+**Short version.**
+- **The bytes cannot be attributed by their position in `h`, and nothing needs to be.** A `.dev (.uartOut 0 b)`
+  event is the UART DEVICE's autonomous drain (`Uart.txArm`, run by the device thread), not the storing hart's THR
+  store. The store appends `b` to the port's ACCEPTED stream `Uart.acc u = u.out ++ u.tx` and emits no event. The
+  drain of the round's last byte can come after the round's enter, after the incarnation dies, or never (power
+  loss with the byte in the FIFO). So no kernel receipt can name a position in `h` at the enter.
+- **The kernel already holds an exact receipt per byte, and drops it.** `UartInv.thr_write_au` returns
+  `uartSent γ (l ++ [b])`, a persistent lower bound on the port's accepted stream (`γ.acc ↪◯ML`, a mono list per
+  era), so the byte sits at index `l.length`. `uartwrite`'s post weakens it to `uartSentSub γ (bs ++ cs)` (a
+  sublist: order kept, positions lost), and consolewrite calls it with `bs = []` per chunk and drops the result.
+- **The attribution is by ACCEPTED-STREAM INDEX, through the citation.** The write round already cites
+  `{boot with act}` (G4-R4). It cites, in addition, `ι.cacc` (a prefix of the era's console accepted stream, a
+  sixth anchored lower bound at `fscUart.acc`) and `ι.cpos` (the strictly increasing indices of its pushed bytes in
+  it). The kernel row says `ι.cpos.map (ι.cacc[·]?) = run.map some`, the run being the key's image at
+  `a1 .. a1 + r`. The chain joins `cacc` per era, so every filing's indices point into ONE stream per era.
+- **The theorem is honest and small.** The step carries the buffer's run `wout` (the caller's own bytes,
+  `uwriteOut W`, a ghost-key reading like `wcon`). The law says the attributed bytes `NiStep.outBytes` (read off the
+  citation) ARE `wout` at a class console write. An eleventh root `xv6NiOut`: equal masks, lazy bits, console
+  readings, buffer runs and exits give equal attributed runs, with no histories and no positions assumed. A
+  key-level form (the buffer derived, not an input) needs the user-step determinism of M3's largest item, not
+  this lane.
+- **The two-run theorem must not concede the console stream.** With `cacc` in `niHist`, `xv6NiTwoRun`'s
+  `niHist F₁ = niHist F₂` would assume equal console streams, q's own output included. Its `hH` moves to the ledger
+  part `niHistLed` (= today's `niHist`, same meaning). `NiStep.input` stays byte-identical (`wout` is not in it).
+- **What stays outside:** the tie of the accepted stream to the wire in `h` (lane OUT-4, deferred: the drain hook
+  would need the era's anchor); uniqueness of indices across filings (not free, not needed); lazy and non-console
+  writes (outside the class).
+- **Lanes:** OUT-1 (the kernel's per-byte receipt reaches the arm) → OUT-2 (the citation, the row, the filing) →
+  OUT-3 (the step, the law, the root). OUT-4 (the wire tie) is optional.
+
+**Findings.**
+- **F1 (which event, at which position: sub-question 5).**
+  - This xv6 has no software output ring (no `uartputc`/`uartstart`; `KA` names `uartwrite`, `uartputc_sync`,
+    `uartintr`, `uartinit(one)` only). `consolewrite` → `uartwrite(0, buf, nn)`. `uartwrite` stores THR under
+    `tx_lock` only when `LSR & TX_IDLE` (THRE: `u.tx = []`), else it sleeps. Kernel `printf` goes to port 1
+    (`prputc` → `uartputc_sync(1, c)`). The echo goes to port 0 (`consputc` → `uartputc_sync(0, c)`, also at THRE).
+  - The THR store is `Uart.writeN … 0 1 b`: `tx := tx ++ [b]`, no `DevObs` (`UartInv.thr_write_au` is a
+    `devWriteAU`, it touches `obsAuth` nowhere). The `uartOut` event is `Uart.txArm`'s drain
+    (`some (u', [.uartOut i b])` unless loopback), a step of the device's own program (`Uart.body`).
+  - Every writer stores at THRE, so `|u.tx| ≤ 1`. The wire order is the accepted order, lagging it by at most one
+    byte: `obsWire i (openSeg h) = u.wire = u.out` (the drain permit's premises, `NiAdequacy.niLedger_tx`) and
+    `acc = out ++ tx`.
+  - So the filing can cite only the ACCEPTED-stream index of each byte. The `h` position of its drain is not
+    known when the round enters, and may not exist.
+- **F2 (what the kernel holds: sub-question 1).**
+  - `consOutChain`'s `Q j` is the CALLER's cursor (the user tier's payload), handed back at the stop index. It
+    carries no trace position. Each `outLink` hands back `obsHistLbO o'`, the console claim's INPUT witness (the
+    read side's mark). It is not an output position. There is no UART permit at the store: the writer's ghost step
+    is `storeOb` → `consClaimAt` → the application's `consRes`.
+  - The leaf DOES return the position: `thr_write_au i γ l bs b Φ` gives `txOwn γ (l ++ [b]) ∗ uartSent γ (l ++
+    [b]) ∗ uartSentSub γ (bs ++ [b]) ∗ Φ`, where `txOwn γ l` (the lock payload) pins `acc = l` exactly. So `b` is
+    at index `l.length` of the stream at `γ.acc`.
+  - `ProofUartwrite` keeps only `uartSentSub` (`#Hsent` is destructured and dropped at `+0x6a`). `UARTWRITE`'s post
+    is `uartSentSub γ (bs ++ cs)`. `ProofConsolewrite.cw_uartwrite` calls it at `bs = []`, from a fresh
+    `uartInv_sentSub`, and drops the result.
+  - What must move: a positional post on `uartwrite` (OUT-R6). Its only caller is consolewrite. `uartputc_sync`,
+    `consputc`, `prputc` and the drain/arrival permits stay byte-identical. The cross-chunk order needs ONE more
+    fact at the store: a prior lower bound `uartSent γ L0` is a prefix of `l` (the auth is open there), so the new
+    index `l.length ≥ L0.length`. That is a sibling leaf `thr_write_au_at` (one more `MonoList.auth_lb_own_valid`).
+- **F3 (the bytes are the key's image, at every lazy bit: sub-question 2).**
+  - consolewrite's chain is at `writerImg V.upt M` (the ENTRY table). The key's image is `syscImg V M =
+    umemLazy V.upt V.sz M`. They agree byte for byte, unconditionally: at a mapped page both read `(M pg)[off]?`;
+    at an unmapped page `writerImg` is `replicate 4096 0` and `umemLazy` reads `some 0` or `none`. So
+    `umemByte (writerImg P M) va = (umemLazy P sz M va).getD 0#8`.
+  - No `viewFaulted` or `lazyFree` premise is needed (`writerImg_fault` already makes the faulted pages read zero
+    at the writer's image). The kernel row can hold at every lazy bit. The law reads it at the class (lazy-free),
+    where the count is input-derived.
+- **F4 (the carrier: ι, not a new filing field: sub-question 2).**
+  - The citation `c : Option (Nat × UIota)` already flows arm → `syscEvOut` → `utEvOut` → `urc_exit` →
+    `uEvid` → `niR_enter` → `NiEntry.round … cite`, and write already cites at every write. Two defaulted `UIota`
+    fields (`cacc`, `cpos`, the joint fork lane's `sev` precedent) ride it with no new route, no new `NiEntry`
+    field, no new `uEvid`/`niFitEv` argument.
+  - The anchor gains one name: `niNamesHere` + `fscUart.acc`, the era's console stream. `fscUart` is the era's
+    `Fscfg` field (already a binder of `niNamesHere`), and `SystemBootEra` proves `fscUart = γ0` (`hties`).
+  - One gap: `parkWorld` holds the console port at an EXISTENTIAL `γ0` (SyscallEnv deviation 5: "the pin is not
+    needed by any consumer"). The write arm's `filewriteDevsw γl γu` must be at `γu = fscUart` for its lower
+    bound to be the anchored name's. So `parkWorld`'s body gains `⌜γ0 = fscUart⌝` (OUT-R7).
+  - The camera: `γ.acc ↪◯ML` is `Xv6G.monoListG : MonoListG GF (BitVec 8)`, which `niIotaLbs`'s `[Xv6G GF]`
+    binder already supplies. Check in OUT-2 that `uartSent`'s instance path is syntactically `niIotaLbs`'s: X3 hit
+    a `MonoNatG` diamond at the UART permits.
+- **F5 (the chain, and why `xv6NiTwoRun`'s `hH` must move).**
+  - With `cacc` in `niBelow`/`niJoin` (one more `lb_own_valid` in `niIotaLbs_compat`/`_join`, as `sev`),
+    `niChain F (niHist F)` states that every write's cited stream is a prefix of ONE stream per era. That is the
+    pure content of the attribution: without the chain a citation's `cacc` is any list.
+  - But `niTwoRun`'s `hH : niHist F₁ = niHist F₂` would then assume equal console streams per era (q's own bytes,
+    every other incarnation's, and the echo). That is a strictly stronger hypothesis for a conclusion (equal
+    enters) that never reads the stream.
+  - Fix: `NiStep.cite_eq` concludes equality of the LEDGER parts (`UIota.led`, `cacc`/`cpos` erased; `NiPos` is
+    unchanged, so the positions determine the ledger part below one history). `output_eq` takes `hc` at `.led`,
+    since every answer reads only ledger fields (`usys*Ans ι = usys*Ans ι.led`, `rfl`). `niTwoRun`/`xv6NiTwoRun`'s
+    `hH` becomes `niHistLed F₁ = niHistLed F₂`: the same hypothesis as today's, since today's `niHist` has no
+    console part.
+  - Alternative (B): a separate console chain (`niOutHist`, its own state in `niChainSt`, a conjunct of
+    `xv6NiPhi`) keeps `xv6NiTwoRun` byte-identical, at more Iris-side surface (OUT-R3).
+- **F6 (what rides the step: sub-question 3).**
+  - `niTwoRun` quantifies no key equality. It works at equal step inputs per round and equal histories
+    (`NiStep.output_eq_of`: "equal exit content and masks (or equal first keys)"); no lemma chains `W.M` from one
+    round to the next. So the buffer cannot be derived. It rides the step, as `wcon` does: `wout := uwriteOut W`,
+    the key's bytes at `a1 .. a1 + usysWriteCnt a2 d` at `wcon = some d`, else `[]`.
+  - It is the caller's own datum (its own image of its own buffer), so "equal buffers push equal bytes" is the
+    honest minimal statement. The stronger form (the buffer derived from the first key) is the key-level two-run
+    lemma through `ukeyEq`/`usysDet` and the USER steps: the verified-low-process item, M3's largest, not this lane.
+  - `wout` is NOT in `NiStep.input`: otherwise `xv6NiTwoRun`'s hypothesis would demand equal buffers for equal
+    enters. It is in a new `NiStep.outInput`.
+- **F7 (uniqueness: not free, not needed).**
+  - Within one round the indices are strictly increasing (the kernel row's `Pairwise`).
+  - Across filings nothing excludes two citations of one index: the receipts are persistent lower bounds, and the
+    joined stream is any incarnation's. Rounds of one incarnation are ordered in time, but consolewrite starts
+    each call from `uartSent γ []`, so the order of its calls' indices is not carried either.
+  - Uniqueness would need an exclusive per-index token minted at the THR store and spent at the filing (a new
+    camera in `UartNames`, `niOneShot`'s pattern). The two-run statement does not need it. Honest scope.
+- **F8 (the wire tie: OUT-4, deferred).**
+  - The pure conclusion says the bytes are in the era's ACCEPTED stream. That the stream's prefix is the wire of
+    `h` (`obsWire .uart0 (eraSeg k h)` comparable with `(niHist F k).cacc`) is the UART invariant's fact. The NI
+    ledger frames drains (`niLedger_niR_snoc`).
+  - Exporting it would make the drain hook (`niLedger_tx`) store a lower bound of the accepted stream (it holds
+    `uartGhosts γ u'`, so `sentAuth γ u'`) and know that `γ.acc` is era `k`'s REGISTERED sixth name. The drain
+    permit is built (`xv6NiAppAdequacy`'s UART goal, `SystemBootEra`'s `hperm`) before the boot shoots the
+    registration, so the anchor would have to reach the device thread's permit: the permit plumbing's statements
+    move.
+  - Not in this lane. Until then the stream is a ghost witness inside `F`, as ι's histories are (scope 5), and
+    the theorem attributes bytes at ACCEPTANCE, which is "what the console specs talk about" (`Uart.acc`'s doc).
+
+**1. The kernel's receipt (OUT-1).**
+
+    -- UartTrace (beside uartSent / uartSentSub)
+    /-- **THE RUN, AT ITS POSITIONS** (NI M3 NI-OUT): the bytes `cs` were accepted by the port, in order, at the
+        strictly increasing indices `ps` of its stream, every one at or after the end of `L0` -/
+    def uartSentRun (γ : UartNames) (L0 : List (BitVec 8)) (ps : List Nat) (cs : List (BitVec 8)) : IProp GF :=
+      iprop(∃ L : List (BitVec 8), uartSent γ L ∗
+        ⌜L0 <+: L ∧ ps.map (fun p => L[p]?) = cs.map some ∧ ps.Pairwise (· < ·) ∧ ∀ p ∈ ps, L0.length ≤ p⌝)
+    -- persistent; uartSentRun_nil (ps = cs = [] at L := L0), uartSentRun_app (chunks chain: the second's L0 is
+    -- the first's L), uartSentRun_lb (the final L)
+
+    -- UartInv (sibling leaf; thr_write_au byte-identical)
+    theorem thr_write_au_at (i : UartId) (γ : UartNames) (l bs L0 : List (BitVec 8)) (b : BitVec 8) (Φ : IProp GF) :
+        uartInv i γ ∗ txOwn γ l ∗ outLb γ l ∗ dlabOff γ ∗ uartSentSub γ bs ∗ uartSent γ L0 ∗ storeOb i γ b Φ ⊢@{IProp GF}
+          devWriteAU (.uart i) 0 1 b
+            iprop(txOwn γ (l ++ [b]) ∗ uartSent γ (l ++ [b]) ∗ uartSentSub γ (bs ++ [b]) ∗ ⌜L0 <+: l⌝ ∗ Φ)
+
+    -- SpecUartwrite (both bodies): pre + `uartSent γ L0` (a new binder L0), post + `∃ ps, uartSentRun γ L0 ps cs`
+    -- SpecConsolewrite
+    /-- **THE RUN CONSOLEWRITE PUSHED, AT ITS POSITIONS** (NI M3 NI-OUT): the writer's image at `ua .. ua + i`,
+        accepted in order at strictly increasing indices of the port's stream -/
+    def consOutAt (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i : Nat) : IProp GF :=
+      iprop(∃ ps : List Nat, uartSentRun γ [] ps
+        ((List.range i).map fun j => umemByte M (ua + BitVec.ofNat 64 j).toNat))
+    -- wp_consolewrite_eb_body's continuation: + `consOutAt γ (writerImg V.upt M) (k.regs 11#5) i -∗` (after the ⌜⌝)
+    -- SpecFilewrite
+    /-- the console arm's pushed run, relayed (NI M3 NI-OUT): vacuous off a writable console descriptor, empty
+        at the −1 answer, else consolewrite's -/
+    def fwConsOut (st : FdState) (γu : UartNames) (M : Nat → List (BitVec 8)) (ua r : BitVec 64) : IProp GF :=
+      iprop(⌜∀ rb, st ≠ .open rb true (.device CONSOLE)⌝ ∨ ⌜r = -1#64⌝ ∨
+        ∃ i : Nat, ⌜r = BitVec.ofNat 64 i⌝ ∗ consOutAt γu M ua i)
+    -- filewritePost: + `fwConsOut st γu (writerImg V.upt M) (k.regs 11#5) (R' 10#5) -∗` (γu already a parameter)
+    -- SpecSysWrite.sysWritePost: + `(γu : UartNames)` and
+    --   `fwConsOut (sysFdSt v V.ofile sts) γu (writerImg V.upt M) v1 (R' 10#5) -∗`
+
+- `ProofUartwrite`: the loop carries `∃ ps, uartSentRun γ L0 ps (cs.take m)`. At `+0x6a` the store takes
+  `thr_write_au_at` at the run's current `L`, so the new index `l.length` is past every earlier one (`L <+: l`), and
+  the run's `L` becomes `l ++ [b]`. About 80 lines.
+- `ProofConsolewrite`: `cwLoopInv` + `consOutAt γ (writerImg V.upt M) ua i`. Each chunk calls `cw_uartwrite` at the
+  run's `L` (in place of a fresh `uartInv_sentSub`'s `[]`), then `uartSentRun_app`. The chunk's bytes are the
+  image's by the same `hat` that `consOutChain_run` takes. About 120 lines.
+- Filewrite: the device arm relays it, and every other arm takes the left disjunct (as `fwConsCnt`).
+  `FilewriteTail.fwrK` moves with `filewritePost` (G4a deviation 4). sys_write relays at `sysFdSt` (argfd's
+  `none` is `.closed`, the left disjunct). About 100 lines.
+- `UMemImg` (pure): `umemByte_writerImg_lazy : umemByte (writerImg P M) va = (umemLazy P sz M va).getD 0#8` (F3).
+
+**2. The citation, the row, the filing (OUT-2).**
+
+    -- UsysDet.UIota: + two fields, LAST, defaulted (the sev precedent; UIota.boot's anonymous constructor + `[], []`)
+      /-- (NI M3 NI-OUT) a prefix of the era's CONSOLE ACCEPTED STREAM (`UartTrace.uartSent` at `fscUart`) -/
+      cacc : List (BitVec 8) := []
+      /-- (NI M3 NI-OUT) the round's pushed bytes' indices in it -- the round's own, like `act` -/
+      cpos : List Nat := []
+    /-- the ledger part (what every answer reads) -/
+    def UIota.led (ι : UIota) : UIota := { ι with cacc := [], cpos := [] }
+    /-- the key's byte (`umemByte`'s twin on an `ElfMem`) -/
+    def uimgByte (M : ElfMem) (va : Nat) : BitVec 8 := (M va).getD 0#8
+    /-- the `n` bytes of the key's image from `a` -/
+    def uwriteRun (M : ElfMem) (a : BitVec 64) (n : Nat) : List (BitVec 8) :=
+      (List.range n).map fun j => uimgByte M (a + BitVec.ofNat 64 j).toNat
+    /-- how many bytes an answer says were pushed (−1: none) -/
+    def uwriteCntOf (r : BitVec 64) : Nat := if r = -1#64 then 0 else r.toNat
+    /-- ...on the step's readings -/
+    def usysWriteCnt (a2 : BitVec 64) (d : Nat) : Nat :=
+      if usysCntW a2 < 0 then 0 else consCnt (usysCntW a2).toNat d
+    theorem uwriteCntOf_ansAt (a2 : BitVec 64) (d : Nat) : uwriteCntOf (usysWriteAnsAt a2 d) = usysWriteCnt a2 d
+    /-- the step's buffer reading: the run a class console write pushes (`[]` elsewhere) -/
+    def uwriteOut (W : Uvis) : List (BitVec 8) :=
+      match uwriteCon W with
+      | some d => uwriteRun W.M (tfW W.tf (tfArgIdx 1)) (usysWriteCnt (tfW W.tf (tfArgIdx 2)) d)
+      | none => []
+    /-- **THE ATTRIBUTION**: the cited stream holds `run` at the cited, strictly increasing indices -/
+    def usysOutAt (ι : UIota) (run : List (BitVec 8)) : Prop :=
+      ι.cpos.map (fun p => ι.cacc[p]?) = run.map some ∧ ι.cpos.Pairwise (· < ·)
+
+    -- NiEvid
+    -- niNamesHere: + `fscUart.acc` (sixth)
+    -- niIotaLbs: + `∗ ((ns.getD 5 0) ↪◯ML ι.cacc)`   (an ↪◯ML over List (BitVec 8): Xv6G.monoListG)
+    -- niBelow: + `∧ ι.cacc <+: H.cacc`;  niJoin: + `niLonger H.cacc ι.cacc` and `H.cpos`
+    -- niIotaLbs_boot/_compat/_join/_mk/_lists/_act, niBelow_join, niLonger_le users: one more conjunct each
+
+    -- SyscallEnv.parkWorld: the console port pinned (OUT-R7)
+      (∃ (γ0 γ1 : UartNames) (γc γl0 γl1 γt : GName) (pd pav pu : BitVec 64),
+        ⌜γ0 = fscUart⌝ ∗ devintrCaps Γ γ0 γ1 γc γl0 γl1 fscDisk fscDlock γt pd pav pu) ∗ …
+    theorem syscallEnv_devswAt : syscallEnv PT Γ γ ⊢ ∃ γl : GName, filewriteDevsw γl fscUart
+    -- (syscallEnv_devsw kept: its corollary)
+
+    -- SyscallDefs.syscEvRow: + a sixth clause, LAST (every lazy bit; F3)
+      (syscNum V = USYS_write → uwriteCons sts (tfW V.tf (tfArgIdx 0)) = true →
+        usysOutAt ι (uwriteRun img (tfW V.tf (tfArgIdx 1)) (uwriteCntOf (tfW V'.tf (tfArgIdx 0)))))
+
+    -- NiLedger
+    /-- **THE PUSHED RUN AT THE CITED STREAM** (NI M3 NI-OUT): at a console write the round's citation holds the
+        trapped key's bytes at `a1 .. a1 + (the resumed count)` -/
+    def niOutRow (sc : BitVec 64) (W W' : Uvis) : Option (Nat × UIota) → Prop
+      | some (_, ι) => sc = uecallScause → uvisNum (uvisRun W) = USYS_write →
+          uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)) = true →
+          usysOutAt ι (uwriteRun (uvisRun W).M (tfW (uvisRun W).tf (tfArgIdx 1)) (uwriteCntOf (tfW W'.tf (tfArgIdx 0))))
+      | none => True
+    -- niFitEv's round arm and niEntryOk's round clause: + `∧ niOutRow sc W W' c` (after niDetRow)
+
+- **The arm** (`SyscallArmsFd2.syscall_arm_write`) takes `syscallEnv_devswAt` (γu := `fscUart`) and the post's
+  `fwConsOut`. At a writable console descriptor with `r = ofNat i` it cites `{UIota.boot with act := procAddr j,
+  cacc := L, cpos := ps}` from `consOutAt`'s `uartSentRun fscUart [] ps run` (its `uartSent fscUart L` IS
+  `(niNamesHere.getD 5 0) ↪◯ML L`). At −1, and at every other descriptor, it cites as today (`cacc = cpos =
+  []`). The sixth clause is `umemByte_writerImg_lazy` over the run, and `uwriteCntOf (ofNat i) = i` (`i < 2^31`).
+- Arms that build `syscEvRow` by anonymous constructor (`syscArmFork_ev`/`_evNeg`, `syscArmWait_ev`,
+  `syscArmSbrk_ev`, the uptime row) gain one absurd conjunct (G4b's pattern).
+- The filing: `UserretClosedRows.urc_evRow` gains the sixth conjunct re-keyed to `uvisRun W` (`W.M = syscImg V
+  M`, `urc_a1_run`, `hfd`). `urc_exit` proves `niOutRow` from it. `UserretClosedRound`'s `rcases` gains a case.
+  `niChainSt_file`/`niEra_lbs` take the sixth lower bound like the fifth.
+
+**3. The step, the law, the theorem (OUT-3; `NiTrace`, `LinkNiAdequacy`).**
+
+    inductive NiStep where
+      | origin (W0 : Uvis) (e : Obs)
+      | round (secc : BitVec 64) (lz : Bool) (win : Nat) (sz : Nat) (wcon : Option Nat) (wout : List (BitVec 8))
+          (x e : Obs) (c : Option (Nat × UIota))
+    -- niStepOf: `.round W.secc W.lazy (uwaitWin …) W.sz (uwriteCon W) (uwriteOut W) x e c`
+    -- NiStep.input: TYPE AND TEXT BYTE-IDENTICAL (wout is not an input of the enter); obsInput likewise
+    -- niRoundLaw secc lz win sz wcon wout pid x e c: write's clause in the resume block becomes
+          (gprsNum secc xg = USYS_write → lz = false → ∀ d, wcon = some d →
+            gprsA0 eg = usysWriteAnsAt (gprsA2 xg) d ∧ ∃ k ι, c = some (k, ι) ∧ usysOutAt ι wout)
+    -- (from niDetRow_write + niOutRow + uwriteCntOf_ansAt; niCiting_some gives c.isSome)
+
+    /-- a class console write round (the law's write clause applies) -/
+    def NiStep.outClass : NiStep → Bool
+      | .round secc lz _ _ wcon _ x _ _ =>
+        match exitView x with
+        | some (sc, _, xg) => decide (sc = uecallScause ∧ gprsNum secc xg = USYS_write ∧ lz = false ∧ wcon.isSome)
+        | none => false
+      | .origin .. => false
+    /-- **THE BYTES THE STEP PUSHED, AS ATTRIBUTED**: read off its citation -- the cited console stream at the
+        cited indices -- at a class console write; nothing elsewhere -/
+    def NiStep.outBytes (s : NiStep) : List (BitVec 8) :=
+      match s.outClass, s with
+      | true, .round _ _ _ _ _ _ _ _ (some (_, ι)) => ι.cpos.filterMap fun p => ι.cacc[p]?
+      | _, _ => []
+    /-- the OUT theorem's input: the readings the run depends on -/
+    def NiStep.outInput :
+        NiStep → Option (BitVec 64 × Bool × Option Nat × List (BitVec 8) × Option (BitVec 64 × BitVec 64 × List (BitVec 64)))
+      | .origin .. => none
+      | .round secc lz _ _ wcon wout x _ _ => some (secc, lz, wcon, wout, exitView x)
+    theorem NiStep.outBytes_of_law {pid} {s : NiStep} (hl : s.law pid) :
+        s.outBytes = if s.outClass then s.wout else []                -- the unary content
+    def niOutput (q : NiInc) (h : List Obs) (F : List NiEntry) : List (List (BitVec 8)) :=
+      (utrace q h F).map NiStep.outBytes
+    theorem niOut {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk h₁ F₁) (hF₂ : niOk h₂ F₂) (q : NiInc)
+        (hin : (utrace q h₁ F₁).map NiStep.outInput = (utrace q h₂ F₂).map NiStep.outInput) :
+        niOutput q h₁ F₁ = niOutput q h₂ F₂
+
+    -- the two-run theorem at the ledger part (F5)
+    def niHistLed (F : List NiEntry) (k : Nat) : UIota := (niHist F k).led
+    -- NiStep.cite_eq: concludes `s₁.cite.map (fun p => (p.1, p.2.led)) = s₂.cite.map (…)`;
+    -- NiStep.output_eq: `hc` at that projection; niTwoRun: `(hH : niHistLed F₁ = niHistLed F₂)`
+
+    -- LinkNiAdequacy: THE ELEVENTH ROOT
+    theorem xv6NiOut {hlc : HasLC}
+        (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
+        (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
+        (n₁ n₂ : Nat) (κs₁ κs₂ : List Obs) (t₁ t₂ : List Expr) (g₁' g₂' : GState)
+        (hsteps₁ : ([Expr.power], g₁) -<κs₁>->ₜₚ^[n₁] (t₁, g₁'))
+        (hsteps₂ : ([Expr.power], g₂) -<κs₂>->ₜₚ^[n₂] (t₂, g₂')) :
+        ∃ F₁ F₂, niOk κs₁ F₁ ∧ niOneShot κs₁ F₁ ∧ niChain F₁ (niHist F₁) ∧
+          niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ ∀ q : NiInc,
+          (utrace q κs₁ F₁).map NiStep.outInput = (utrace q κs₂ F₂).map NiStep.outInput →
+          niOutput q κs₁ F₁ = niOutput q κs₂ F₂
+
+- `niChain F (niHist F)` in the conclusion is what makes `outBytes` mean "the era's ONE accepted stream holds
+  these bytes, at these indices". `niHist F k`'s `cacc` is the join of every write's cited stream of era `k`.
+  `xv6NiAdequacy`'s statement is byte-identical: its meaning grows through `niRoundLaw`, `niEntryOk` and
+  `niBelow`.
+- The class law needs no `NiInClass` hypothesis in `niOut`: `outBytes` is `[]` off a class write, and equal
+  `outInput`s agree on `outClass`.
+- Honest scope 10 is rewritten. The UART bytes of a class console write are ATTRIBUTED through the citation: the
+  round cites indices in its era's console accepted stream, and the law says the stream holds the key's run
+  there (`wout`, a ghost-key reading riding the step: the caller's own bytes, like `wcon`; not in
+  `NiStep.input`). `xv6NiOut`: equal readings and buffers push equal runs. Still outside:
+  - the stream ↔ wire tie (OUT-4);
+  - one index cited by two filings (F7);
+  - lazy and non-console writes;
+  - the echo and other writers' bytes in the stream (unattributed: no filing cites them);
+  - the drain of an attributed byte, which may follow the enter or never happen.
+  A new deviation 10 records `wout`, the sixth field.
+
+**4. The route.**
+
+| Fact (made at) | Carried by | Arm / filing | Read as |
+|---|---|---|---|
+| byte `b` accepted at index `l.length` (`thr_write_au_at`: `uartSent γ (l++[b])`, `L0 <+: l`) | `uartwrite` post `uartSentRun γ L0 ps cs` → consolewrite `consOutAt γ (writerImg V.upt M) ua i` (chunks chained) | `fwConsOut` (filewritePost, sysWritePost) → write arm | `ι.cacc := L`, `ι.cpos := ps` |
+| the chunk's bytes are the writer's image (`consOutChain_run`'s `hat`) | `consOutAt`'s run | arm: `umemByte_writerImg_lazy` | `uwriteRun img a1 r` (syscEvRow's sixth clause) |
+| `γu = fscUart` (`SystemBootEra.hties`) | `parkWorld`'s `⌜γ0 = fscUart⌝` → `syscallEnv_devswAt` | arm's `filewriteDevsw γl fscUart` | `uartSent fscUart L` = `niIotaLbs`'s sixth conjunct |
+| the era's console name registered (`niNamesHere`'s sixth) | the anchor (unchanged route) | `niIotaLbs_act`-style cite | `niChainSt`'s per-era lower bounds |
+| the count `r` | landed (G4: `fwConsCnt`, `syscEvRow`'s fifth clause) | — | `uwriteCntOf r = usysWriteCnt a2 d` at the class |
+| the run at the cited stream | `syscEvOut` → `utEvOut` → `urc_evRow` (unchanged route, ι bigger) | `niOutRow` in `niFitEv`/`niEntryOk` | the law's write clause → `outBytes = wout` |
+
+**5. Lanes** (one `lake` at a time; per-lane gate `lake build Xv6 MachCSL` + `tools/ci/lint.sh` + no `sorry`;
+baselines in the same commit when they move).
+
+| Lane | Content | Files | Statements that move | Gate |
+|---|---|---|---|---|
+| **OUT-1 the receipt** | §1: `uartSentRun` (+ `_nil`/`_app`/`_lb`), `thr_write_au_at`, uartwrite's positional pre/post, `consOutAt` on consolewrite, `fwConsOut` on filewrite and sys_write, `umemByte_writerImg_lazy`; the write arm drops it (OUT-2 consumes it) | `UartTrace`, `UartInv`, `SpecUartwrite`, `ProofUartwrite`, `LinkUartwrite`, `SpecConsolewrite`, `ProofConsolewrite`, `LinkConsolewrite`, `SpecFilewrite`, `FilewriteCalls`, `FilewriteArms`, `FilewriteTail`, `ProofFilewrite`, `SpecSysWrite`, `ProofSysWrite`/`SysWriteParts`, `UMemImg`, `SyscallArmsFd2` (proof), `dead_allow.txt` (interim rows) | `UARTWRITE` (both bodies: `L0`, pre, post), `CONSOLEWRITE` (continuation + `consOutAt`), `FILEWRITE` (`filewritePost`, `fwrK`), `SYSWRITE` (`sysWritePost` + `γu`, + `fwConsOut`). Byte-identical: `thr_write_au`, `UARTPUTC_SYNC`, `CONSPUTC`, `PRPUTC`, the UART permits, `consOutChain`, `writeConsArms`, `fwConsCnt`, `filewriteArms`, `sysWriteArms`, `SYSCALL`, `USERTRAP`, every `Uk*`/`Ush*`/`User*` file | build + lint; `tcb.sh` (expect none) |
+| **OUT-2 the citation and the filing** | §2: `UIota` + `cacc`/`cpos`, `led`, the run vocabulary, `usysOutAt`; `niNamesHere` + `fscUart.acc`; `niIotaLbs`/`niBelow`/`niJoin` + the stream; `parkWorld`'s pin, `syscallEnv_devswAt`; `syscEvRow`'s sixth clause; the arm's citation; `niOutRow` in `niFitEv`/`niEntryOk`; `urc_evRow`; the chain state's sixth bound | `UsysDet`, `NiEvid`, `SyscallEnv`, the `parkWorld` builders (`ProofUserinit`, `ProofKfork`, `ProofForkretPark`, `ForkretClose`, `HandlerEnv`, `ParkCap`, `UtResFits`: proof or unfold only), `SystemBootEra`/`ProofMain` phases (carry `hties`' pin), `SyscallDefs`, `SyscallArmsFd2`, `SyscallArmsFork`/`Wait`/`Sbrk`/`Proc` (absurd conjunct), `NiLedger`, `UserretClosedRows`, `UserretClosedRound`, `NiAdequacy`/`LinkNiAdequacy` (proofs), `dead_allow.txt` (OUT-1's rows off) | `UIota` (+2 defaulted fields), `UIota.boot`, `niNamesHere`, `niIotaLbs`, `niBelow`, `niJoin` and their lemmas, `parkWorld` (body), `syscEvRow` (+ clause), `niFitEv`, `niEntryOk`, `urc_evRow`. Byte-identical: `syscEvOut`/`utEvOut`/`SYSCALL`/`USERTRAP` texts (ι only grows), `uEvid`, `NiEntry`, `NiFitIs`, the four NI roots' statements | full `run_all.sh` + `reports`; `tcb.sh` (`UartTrace` should not enter a root's cone: the roots see `UIota`, not `niNamesHere`); `audit.sh` |
+| **OUT-3 the step, the law, the root** | §3: `NiStep` + `wout`, the law's write clause, `outClass`/`outBytes`/`outInput`/`niOutput`, `outBytes_of_law`, `niOut`; `cite_eq`/`output_eq` at `.led`, `niHistLed`, `niTwoRun`'s `hH`; `xv6NiOut`; honest scope 10 | `NiTrace`, `LinkNiAdequacy`, `NiAdequacy` (header), `tools/ci/roots.txt`, `tools/audit/baseline.json`, `tools/tcb/expected.json` | `NiStep`, `niStepOf`, `niRoundLaw`, `NiStep.law`, `NiInClass`/`classReading`/`output_eq_of` binders (+`wout`), `cite_eq`, `output_eq`, `niTwoRun_trace`, `niTwoRun` (`hH`), `xv6NiTwoRun` (`hH`: `niHistLed`). New root `xv6NiOut`. Byte-identical: `NiStep.input`, `NiStep.obsInput`, `xv6NiAdequacy`, `xv6NiTwoRunObs`, `xv6NiStrongInstance` | full `run_all.sh`; `roots.txt` + `baseline.json` gain `Xv6.xv6NiOut` (lint checks the two lists agree); `tcb.sh --update` (one new theorem entry; `xv6NiTwoRun`'s def count +1: `niHistLed`, `UIota.led`); `audit.sh` (no new axiom) |
+| *OUT-4 the wire tie (optional, later)* | F8: the drain hook keeps a lower bound of the era's accepted stream; `niR` states `obsWire .uart0 (eraSeg k h)` comparable with `(niHist F k).cacc`; `xv6NiPhi` + that conjunct | `NiLedger`, `NiAdequacy` (`niLedger_tx`), `SystemBootEra`/`SystemAdequacy` (the anchor reaching the device thread's permit), `AppLaws` (perhaps) | the UART drain permit's plumbing statements; `xv6NiPhi` (body) | full |
+
+Order: OUT-1 → OUT-2 → OUT-3 (OUT-1's posts are independent of everything after them; OUT-2 needs OUT-1's
+receipt; OUT-3 needs OUT-2's row). One worktree, three commits. Estimates:
+- **OUT-1:** ~17 files. uartwrite's loop (~80 lines), the sibling leaf (~30), consolewrite's chunk chaining (~120),
+  the relay through filewrite's arms and sys_write (~100), `uartSentRun` lemmas (~60).
+- **OUT-2:** ~25 files. The chain lemmas (+1 `lb_own_valid` each, ~60), the `parkWorld` pin (~6 builders, the
+  boot's `hties` already has it), the arm's citation and bridge (~120), `urc_evRow` (~40), `niOutRow` (~30).
+- **OUT-3:** `NiTrace` (~150 mechanical for the `wout` binder, as G4b's `wcon`; ~60 for `.led` in `cite_eq`/
+  `output_eq`; ~80 new for `outBytes`/`niOut`), `LinkNiAdequacy` (~25), baselines.
+
+**RULINGS REQUESTED.**
+- **OUT-R1 (the attribution's index).**
+  - Recommended: the ACCEPTED-STREAM index (`Uart.acc` at the era's `fscUart.acc`), from the THR store's exact
+    receipt (F1, F2). The theorem attributes at acceptance.
+  - Alternative: an `h` position (the brief's `obsHistLb` per byte). Not available: the `uartOut` event is the
+    device's drain, after the store, possibly after the enter or never. Its honest form is OUT-4's tie.
+- **OUT-R2 (the carrier).**
+  - Recommended: two defaulted `UIota` fields (`cacc`, `cpos`) on the landed citation route (F4). `NiEntry`,
+    `uEvid`, `niFitEv`'s arity and every route text are unchanged.
+  - Alternative (the brief's): `NiEntry.round … out` with its own evidence. It needs a second datum through
+    `syscEvOut`/`utEvOut`/`urc_exit`/`uEvid`/`niR_enter` and `NiFitIs.evid`'s text: more surface for the same
+    content.
+- **OUT-R3 (the chain and `xv6NiTwoRun`'s `hH`).**
+  - Recommended: (C) `cacc` chained like `sev` (`niBelow`/`niJoin`); `cite_eq`/`output_eq` at the ledger part
+    `.led`; `niTwoRun`/`xv6NiTwoRun`'s `hH` at `niHistLed F₁ = niHistLed F₂` (the same hypothesis as today's). One
+    root statement moves by one hypothesis's text.
+  - Alternative (B): a separate console chain (`niOutHist`, its own `niChainSt` state, an `xv6NiPhi` conjunct).
+    `xv6NiTwoRun` stays byte-identical, at about twice the Iris-side surface.
+  - Cheapest (A): leave `hH` as is. `xv6NiTwoRun` then assumes equal console streams per era (q's own output
+    included). Not recommended.
+- **OUT-R4 (what rides the step).**
+  - Recommended: a sixth field `wout : List (BitVec 8)` (`uwriteOut W`), NOT in `NiStep.input` (so
+    `xv6NiTwoRun`'s hypothesis does not grow), read by a new `NiStep.outInput`.
+  - Alternative: `wout` in `NiStep.input` (one input for both roots, but `xv6NiTwoRun` would demand equal buffers
+    for equal enters), or folded into `wcon : Option (Nat × List (BitVec 8))` (moves G4's texts).
+  - Not this lane: the buffer derived from the first key (a key-level two-run lemma through the USER steps).
+- **OUT-R5 (the root).**
+  - Recommended: an eleventh root `xv6NiOut` (§3), two-run at equal `outInput` only: no histories, no positions,
+    no class hypothesis. The unary content (`outBytes_of_law`) is also inside `xv6NiAdequacy` through the law.
+    `roots.txt`, `baseline.json` and `expected.json` gain it.
+  - Alternative: a conjunct of `xv6NiTwoRun`'s conclusion (its statement moves and the output claim inherits its
+    unneeded `hH`/positions).
+  - Cheapest: no new root (the law grows inside `xv6NiAdequacy`, the four roots byte-identical except OUT-R3's
+    `hH`).
+- **OUT-R6 (the kernel's contracts).**
+  - Recommended: move `UARTWRITE` (its one caller is consolewrite: pre `uartSent γ L0`, post `uartSentRun`) with
+    the sibling leaf `thr_write_au_at`, and add a persistent `IProp` conjunct to `CONSOLEWRITE`, `FILEWRITE` and
+    `SYSWRITE` (+ `γu`), G4a's route. `uartputc_sync`/`consputc`/`prputc`, the permits and the user tier are
+    byte-identical.
+  - Alternative: sibling contracts (`wp_uartwrite_at_eb`, …) with the landed ones as corollaries. Every statement
+    stays byte-identical, at twice the contract text.
+- **OUT-R7 (the console port's name).**
+  - Recommended: `parkWorld`'s body pins `γ0 = fscUart` (the boot proves it, `SystemBootEra.hties`). The texts
+    that name `parkWorld` are byte-identical (X2's pattern), and `syscallEnv_devswAt` gives the write arm the
+    anchored name.
+  - Alternative: register the existential port's name instead (the anchor's sixth name from `bootSharedOut`'s
+    `γ0`, not from `Fscfg`). `niNamesHere` stops being a constant list and the registration statement moves. Not
+    cheaper.
+- **OUT-R8 (the wire tie).**
+  - Recommended: deferred (OUT-4). Record in honest scope 10 that the stream is the port's accepted bytes, a
+    ghost witness inside `F` (scope 5's limit), tied to `h`'s wire by the UART invariant (`obsWire .uart0 (openSeg
+    h) = u.out`, `acc = out ++ tx`, `|tx| ≤ 1`), not by the NI conclusion.
+  - Alternative: OUT-4 now. The anchor must reach the device thread's drain permit (F8); large.
+- **OUT-R9 (where the kernel row holds).**
+  - Recommended: `syscEvRow`'s sixth clause and `niOutRow` at EVERY lazy bit on a writable console descriptor,
+    with the count read off the resumed `a0` (F3: no lazy premise is needed). The law reads it only at the class,
+    where `uwriteCntOf r = usysWriteCnt a2 d`.
+  - Alternative: guard the row with `pvLazy = false` like the fifth clause. That saves nothing and states less.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
