@@ -37,8 +37,10 @@ The protocol layer, in place and green:
   covers every `fence` (the model's whole pred/succ dispatch is barriers, and a
   barrier is a no-op in the functional interpreter — `WpSmodePtCtl.
   exec_execute_FENCE_S` is the exec fact).  `wp_fence_s_sconf` is its rw,w
-  restatement (`release`'s `__sync_lock_release`); the driver's
-  `__sync_synchronize` sites pass rw,rw.  Never clone it per barrier flavour.
+  restatement (`release`'s `__atomic_store_n(…,__ATOMIC_RELEASE)`, which gcc
+  lowers to `fence rw,w ; sw`); the driver's four barrier sites are
+  `io_fence()` = `fence iorw,iorw` (`0ff0000f`), not the `rw,rw` of the old
+  `__sync_synchronize`.  Never clone the leaf per barrier flavour.
 - **`kmap_static_claims` comes off the ambient config.**
   `SmodeCore.hw_config_kmap_claims`, lifted to `IntrDefs.sconf_kmap_claims` /
   `sie_cap_gpr_kmap_claims` (both `-∗ kmap_static_claims ∗ <bundle>`, consuming

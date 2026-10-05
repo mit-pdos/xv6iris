@@ -397,6 +397,118 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   home, and what the landing settled (the share-form dp row, `IregClaimPlain`,
   `path_nodot` pins).
 
+## Weak memory (RVWMO) — merged from the Rocq weak line
+
+> **Lean port in progress:** the weak-memory development is being ported to
+> Lean on bookmark `weak` (see [`../notes/weak-port-map.md`](../notes/weak-port-map.md)).
+> Every file below carries that banner; their file/tactic names are Rocq
+> ([`LEAN.md`](LEAN.md)). Unlike the rest of this index, the weak line's
+> `projects/`, `completed/` and draft files are listed here too, since they
+> are the only record of that line in this tree. Left on the Rocq side (not
+> copied): `projects/drafts/AxSpinE8_draft.v`, a Rocq proof draft.
+
+**Where to start.** LB/AxSL spinlock work (the weak line's current focus):
+[`weak-memory-lb-axsl-primer.md`](design/weak-memory-lb-axsl-primer.md), then
+[`weak-memory-lb-axsl-spinlock.md`](design/weak-memory-lb-axsl-spinlock.md)
+and the resume line in
+[`spinlock-progress-2026-10-05.md`](projects/drafts/spinlock-progress-2026-10-05.md).
+Overall architecture: [`weak-memory.md`](design/weak-memory.md) →
+[`weak-memory-event-granular.md`](design/weak-memory-event-granular.md) →
+[`weak-memory-srvwmo.md`](design/weak-memory-srvwmo.md).
+
+### Design
+
+- **[`weak-memory.md`](design/weak-memory.md)** — the RVWMO model's base
+  design (M0–M3): the promise-free view machine, the read-oracle `exec` seam,
+  the pinned-fragment transfer bridge, the Cosmo-style vProp surface, the
+  device/MMIO/fetch/walker decisions, the store-reordering gap.
+- **[`weak-memory-event-granular.md`](design/weak-memory-event-granular.md)**
+  — the event-granular weak language (supersedes the two-machine lift): the
+  logic's machine IS the promise-free machine; built end to end.
+- **[`weak-memory-srvwmo.md`](design/weak-memory-srvwmo.md)** — sRVWMO, the
+  declared-model plan of record: tier 1 = adequacy ∘ characterization, no xv6
+  side conditions; tier 2 = the RVWMO upgrade.
+- **[`weak-memory-lb-axsl.md`](design/weak-memory-lb-axsl.md)** — load
+  buffering via an AxSL-style axiomatic base logic (tier 2's LB gap): target,
+  owned-read mechanism, the ctrl-gate pivot.
+- **[`weak-memory-lb-axsl-primer.md`](design/weak-memory-lb-axsl-primer.md)**
+  — agent primer for `iris/Ax*.v` work: file map, entry lemmas, conventions.
+- **[`weak-memory-lb-axsl-spinlock.md`](design/weak-memory-lb-axsl-spinlock.md)**
+  — plan of record for xv6's spinlock on RVWMO (interrupts off), validated
+  by allocpid; owner decisions and the removable page-table simplification.
+- **[`weak-memory-lb-axsl-review-fetch.md`](design/weak-memory-lb-axsl-review-fetch.md)**
+  — adversarial review of the "∀v reads + fetch as an addr-dependent read"
+  pivot; why it fails as stated and the ctrl-gate recut.
+- **[`weak-memory-tier2-s6.md`](design/weak-memory-tier2-s6.md)** — S6, the
+  tier-2 gate (GO on the certification route): the L2′ edge inventory, the
+  RVWMO⁻ front-end finding, the lock-protocol export, staging T2-0…T2-6.
+- **[`weak-memory-route-b.md`](design/weak-memory-route-b.md)** — route B
+  (exchange normalization): the chain, `gx_deps`, the exchange lemma's case
+  trichotomy, staging B0–B3.
+- **[`weak-memory-layer2.md`](design/weak-memory-layer2.md)** — Layer 2 as a
+  direct acyclicity theorem: the minimal-cycle case tree C1–C6 and what Ψ can
+  export.
+- **[`parm-certification-notes.md`](design/parm-certification-notes.md)** —
+  reference notes on Promising-ARM/RISC-V's certification proofs and the risks
+  of porting them.
+- **[`weak-memory-rmw-split.md`](design/weak-memory-rmw-split.md)** — the RMW
+  split at the weak tier: `LExLoad`/`LExStore` plus an agent-local
+  reservation, mirroring [`main-cycle-port.md`](design/main-cycle-port.md) §3a.
+- **[`weak-memory-deps.md`](design/weak-memory-deps.md)** — proposal: PARM's
+  dependency tracking (per-register views + `vcap`) in the full machine.
+- **[`weak-memory-premise-discharge.md`](design/weak-memory-premise-discharge.md)**
+  — analysis + plan for discharging the capstone's `main_premises`.
+- **[`weak-memory-m5.md`](design/weak-memory-m5.md)** — M5, the virtio disk
+  as a weak-memory agent (a read/write/fence device program); the device-side
+  assumptions the final theorem carries.
+- **[`weak-memory-sc-parity.md`](design/weak-memory-sc-parity.md)** — making
+  a lock-disciplined function's weak proof literally its SC proof (threaded
+  view token, objective points-to; the context-indexed `WeakCtx` layer).
+- **[`weak-memory-phi-upgrade.md`](design/weak-memory-phi-upgrade.md)** — the
+  three-state (Clean/Dirty/Sync) per-byte points-to protocol that makes
+  `pf_violation_free` provable, and why it lands before the mass port.
+- **[`weak-memory-walk-bridge.md`](design/weak-memory-walk-bridge.md)** — the
+  page-table walk's double read of its leaf slot, and the stale-memory SC
+  mirror (`WeakStale.v`) that resolved it.
+- **[`weak-memory-m6-robustness.md`](design/weak-memory-m6-robustness.md)** —
+  M6's tee-up: the robustness theorem closing the store-reordering gap.
+
+### Worklists, drafts, handoff
+
+- **[`HANDOFF.md`](HANDOFF.md)** — the weak line's 2026-08-19 session handoff
+  (the sRVWMO decision and the tier-2 criterion).
+- **[`weak-memory-lb-axsl.md`](projects/weak-memory-lb-axsl.md)** — the
+  LB/AxSL tracker (challenge table, status); companion report
+  [`weak-memory-lb-axsl-axdeps-report.md`](projects/weak-memory-lb-axsl-axdeps-report.md)
+  (unmasking load address dependencies, gap D-8).
+- **[`drafts/step3-plan.md`](projects/drafts/step3-plan.md)** — the spinlock
+  step-3 plan (`wpd_release`/`wpd_acquire`/`wpd_allocpid` → Theorems 1/2);
+  **[`drafts/spinlock-progress-2026-10-05.md`](projects/drafts/spinlock-progress-2026-10-05.md)**
+  — progress estimate and resume line, 2026-10-05.
+- **[`weak-memory-srvwmo.md`](projects/weak-memory-srvwmo.md)** — sRVWMO tier-1
+  worklist (closed) and asset ledger.
+- **[`weak-memory-certification.md`](projects/weak-memory-certification.md)**
+  — the certification route's worklist (W1/W2, D8, E1, L2′, the RMW S-track).
+- **[`weak-memory-event-lang.md`](projects/weak-memory-event-lang.md)** — the
+  event-granular language spike (verdict PASS).
+- **[`weak-memory-soundness.md`](projects/weak-memory-soundness.md)** — the
+  one-machine soundness capstone (`WeakEvCapstone.xv6_ev_weak_robust`).
+- **[`weak-memory-fabric.md`](projects/weak-memory-fabric.md)** — the Layer-1
+  fabric generalization; read the G6 findings before touching it.
+- **[`weak-memory-premises.md`](projects/weak-memory-premises.md)** — the
+  premise-ledger shrink (closed): six refutations, each repaired by narrowing
+  a monad-predicate arm.
+- **[`weak-memory-m4-retarget.md`](projects/weak-memory-m4-retarget.md)** —
+  the M4 retarget decision (bridge from the symbolic `exec_eff` certificates).
+- **[`weak-memory.md`](projects/weak-memory.md)** — the staged M0–M6 worklist;
+  **[`weak-memory-porting.md`](projects/weak-memory-porting.md)** — the
+  per-file M4 port recipe.
+- Archived: [`weak-memory-lift.md`](completed/weak-memory-lift.md) (the
+  WeakLang ↔ wp-machine lift),
+  [`weak-memory-m6.md`](completed/weak-memory-m6.md) (the M6 robustness
+  theorem), [`weak-memory-m6-w3-recon.md`](completed/weak-memory-m6-w3-recon.md)
+  (the W3 adequacy-export recon).
+
 ## `projects/` — ongoing worklists & plans (one per effort)
 
 One file per effort, each file's top banner saying precisely what is left.

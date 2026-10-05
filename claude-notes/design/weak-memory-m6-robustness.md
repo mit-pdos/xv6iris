@@ -1,0 +1,467 @@
+# M6 — closing the store-reordering gap (design)
+
+> **Lean port in progress:** the weak-memory development is being ported to Lean on bookmark `weak` (see [`notes/weak-port-map.md`](../../notes/weak-port-map.md)); file/tactic names below are Rocq ([`claude-notes/LEAN.md`](../../claude-notes/LEAN.md)).
+
+**Status (2026-08-12): COMPLETE — the archived worklist with all
+outcomes, landing deltas and the declared residue is
+[`completed/weak-memory-m6.md`](../completed/weak-memory-m6.md); the
+headline theorem is `WeakCompose.xv6_weak_robust` and the seam record is
+`WeakCompose.v` §6.**  Note two designs below were REVISED during the
+build (recorded in the archived worklist): the Layer-2 mechanism's
+premise-discharge story was split by decision D-M6-8 (machine facts /
+supported-pc site facts / a static residue — a φ conjunct alone cannot
+discharge trace-global premises), and §4b's ownership-reflection chain is
+deferred with a blocking analysis (the fragment-vs-hazard link needs a
+`↦w` transfer-discipline rework; `pf_violation_free` is a declared,
+precisely-stated premise until then).  Historic opening follows.
+Original status (2026-08-11): planned. Everything
+below is either (a) established and cited, (b) a decision already taken and
+recorded, or (c) explicitly marked OPEN. Read
+[`weak-memory.md`](weak-memory.md) Decision 1 first — it states the gap and
+why it is safe for this kernel; this file does not repeat that argument, it
+says what has to be PROVED and in what order. The two questions this file
+originally marked "settle first" (§4's third store class, §5's
+`interference_certify` tension) were settled from the PARM sources on
+2026-08-11 — resolutions inline below and in the worklist's §0.
+
+---
+
+## 1. What the end-state theorem is
+
+The promise-free machine is scaffolding. The final claim composes three
+pieces, only the middle one of which is missing:
+
+```
+  [ Iris adequacy over the promise-free machine ]        -- HAVE (M1–M5)
+∘ [ M6 robustness: every full-machine execution of      -- THIS FILE
+      THIS kernel is matched by a promise-free one ]
+∘ [ Promising-RISC-V ≡ axiomatic RVWMO (Pulte et al.) ] -- HAVE (published, Coq)
+= adequacy over real RVWMO, with no strengthening in the statement.
+```
+
+**The toolchain seam (recorded 2026-08-11, decision D-M6-3 in the
+worklist):** the third leg is Coq 8.15 + sflib + hahn and cannot be
+`Require`d from this Rocq 9 tree. The full-promising machine is therefore
+RESTATED natively (per-byte, extending `WeakMem.v`, rules kept syntactically
+parallel to PARM's), and that leg of the composition is a
+definitional-correspondence note — the same epistemic category as the
+model↔hardware seam. A Rocq-9 port of PARM is the upgrade path, not the
+plan.
+
+What we have today, verbatim (`iris/WeakAdequacy.v:91`,
+`Theorem weak_system_adequacy`): given the boot resources and a proof of
+`WWP` for every hart and device loop,
+
+```coq
+  forall t2 g2 e2,
+    rtc erased_step (wcpu_pool cs, g) (t2, g2) ->
+    e2 ∈ t2 ->
+    reducible (Λ := weak_riscv_lang) e2 g2.
+```
+
+Two things follow for M6's shape.
+
+- The conclusion is **reducibility over `weak_riscv_lang`** — the
+  promise-free machine. Robustness has to transport exactly this, i.e. it is
+  a statement relating executions of the SAME program under two machines, not
+  a statement about xv6's source.
+- It is stated over `rtc erased_step` from the boot state, so the Layer-1
+  lemma must be about **reachability from a fixed initial state**, which is
+  what makes the PARM `pf_exec` skeleton (below) usable.
+
+**Robustness is a program property** — "this program's reorderings are
+unobservable" — not "hardware does not reorder". Keep that framing: it is
+what makes the obligation finite and extractable from the Iris proof.
+
+---
+
+## 2. What PARM actually gives us (RESOLVED — do not re-derive)
+
+Read from the snu-sf/promising-arm sources (2026-08). This was the main
+unknown and it is settled:
+
+- **The base machine has NO certification.** `Machine.step` lifts
+  `state_step ∪ promise_step` with promising unconditional. Doomed threads
+  are trivially reachable and are pruned only EX POST: a "behavior"
+  (`Machine.exec`) is a run whose FINAL state has all promise sets ⊥. Both
+  directions of the axiomatic equivalence, and Thm 7.1, quantify over
+  `Machine.exec` only.
+- **Consequence (a):** full-machine adequacy must be stated over
+  **completable prefixes** — prefixes extendable to a `no_promise`
+  completion. Doomed runs are model artifacts hardware never exhibits, which
+  is exactly what `Machine.exec` already prunes. Do not try to prove anything
+  about arbitrary prefixes.
+- **Consequence (b), the important one:** their **Thm 7.1
+  (`promising_to_promising_pf`, `PtoPF.v`) is a reusable Layer-1 skeleton.**
+  Every behavior factors as a promise PHASE from init, then per-thread
+  `state_step`s against FROZEN memory (`pf_exec`). So robustness reduces to:
+
+  > for our kernel, a nonempty front-loaded promise set admits no
+  > `no_promise` completion beyond what the empty phase admits
+
+  — a statement about frozen-memory per-thread runs, which is enormously more
+  tractable than arbitrary interleavings. **Start here.** In fact stronger
+  than first recorded (verified in-source 2026-08-11): `Machine.state_exec`
+  (Promising.v:1758) is per-thread `rtc state_step` against the SAME frozen
+  memory with NO interleaving at all — after the promise phase, threads are
+  fully independent, so the Layer-1 simulation is about SINGLE-thread runs
+  over a frozen log.
+- The certified machine (`lcertify/Certify.v`) checks only the STEPPING
+  thread post-step. All-threads-certified is preserved only via
+  `interference_certify` (certification survives arbitrary memory extension),
+  which exists ONLY for RISC-V (`arch == riscv` hypothesis) — hence Thm 6.3's
+  deadlock freedom being RISC-V-only.
+- Coq 8.15 + sflib + hahn, ~17k lines; the architecture is a parameter, not a
+  separate RISC-V file.
+
+---
+
+## 3. Layer 1 — the operational lemma
+
+Program-independent, no xv6 and no Sail in the statement, no Iris:
+
+> if no promise-free execution of P reaches the **violation pattern**, then
+> every full-machine execution of P is matched by a promise-free one (same
+> observable states, and reducibility transports).
+
+Proof idea = **delay simulation**: a promise matters only if some other agent
+reads it before it is fulfilled; unread promises commute forward to their
+fulfilment point; an early read implies the violation pattern *back in the
+promise-free semantics* (which is what makes the premise checkable by the
+Iris proof rather than by an analysis of the full machine).
+
+Precedents to mine, in order of closeness: PS1 **DRF-Promise** (same
+structure at language level), PS2 Thm 6.5, then the robustness literature —
+Shasha–Snir, Bouajjani–Derevenetc–Meyer (TSO), Lahav–Margalit (RA).
+
+### THE CRUX, AND IT IS OPEN: what is the violation pattern?
+
+This is the one piece with no candidate written down, and everything else
+depends on its exact shape. Constraints it must satisfy:
+
+- **Sufficient** — its absence must really imply the simulation goes through.
+- **Checkable from the Iris proof** — it has to be refutable by a per-store
+  side condition the WP already establishes, else Layer 2 cannot supply it.
+- **The fenced empty-predecessor wrinkle** (recorded, unresolved): a
+  release-fenced store with *nothing to order* CAN be promised, and must
+  commute harmlessly. So "po-after a release fence" is not by itself the
+  right pattern; the pattern has to be about a promise being READ early, not
+  about the promise existing.
+- **Byte granularity and mixed-size** need care — the log is per-byte
+  (`WeakMem.wmsg`), and a promise/fulfilment pair at different widths must
+  not fall through a crack.
+
+---
+
+## 4. Layer 2 — what the Iris side must export
+
+The premise of Layer 1, extracted from the WP proof rather than from a
+separate whole-program analysis. The intended statement:
+
+> every store is either (i) to bytes the storing hart exclusively OWNS, so no
+> other agent can read the promise before fulfilment, or (ii) an enumerated
+> FENCED sync site, where certification arithmetic pins the promise —
+> fulfilment po-after `fence rw,w` forces the timestamp above everything the
+> fence covers.
+
+### What the tree gives today, and what it does not
+
+Every store leaf concludes `WeakInstr.wQ_store_w n tid ea v` (or
+`wQ_amo_aq_w`), which says: the message lands at `S (length log)`, the image
+is unchanged, views only grow, and the hart's own floor covers the new
+message. **That is a statement about the MESSAGE, not about the store's
+protection class**, so nothing in the current certificates distinguishes (i)
+from (ii). Layer 2 needs a new export.
+
+The store-side surface to cover (all of `iris/`):
+`WeakLeafSd8.v`, `WeakLeafSw4.v`, `WeakLeafSdspOff.v`, `WeakLeafTor.v`,
+`WeakLeafAmo4Leaf.v` (the invariant-form lock leaf), plus the generic
+certificates `WeakCert.wcert_store`/`wcert_amo_aq`/`wcert_amo_aq_pin`,
+`WeakEff.wcert_store_gen`/`wcert_amo_aq_gen`,
+`WeakEffSkel.wcert_store_via_skeleton`, and the fetch-alignment instances in
+`WeakFetchEff.v` / `WeakFetch2.v`.
+
+Two candidate mechanisms — **DECISION NEEDED, this is the first real fork**:
+
+- **(A) Ghost trail.** The state interpretation carries a per-message tag
+  beside `wlog_auth`; each store rule sets it; adequacy exports "every
+  message in the final log is tagged owned-or-fenced". Costs: touches the
+  state interpretation and every store rule (~10 leaves plus the generic
+  certificates), i.e. the same blast radius as the width generalization.
+  Buys: the premise is a THEOREM of the same Iris proof, with no separate
+  argument, and it survives refactors.
+- **(B) Meta-theorem over the leaf rules.** Prove, outside Iris, that any
+  store admitted by these leaves falls in one of the two classes, by
+  inspecting the rules' premises. Costs: a side argument that must be redone
+  whenever a leaf is added, and it is not machine-checked against the actual
+  call sites. Buys: zero churn now.
+
+Recommendation (not a decision): **(A)**, because the enumeration in (B) is
+exactly the kind of "checked once, silently invalidated later" claim this
+project has already been bitten by, and because the tag is cheap next to what
+6c will cost anyway.
+
+### A THIRD STORE CLASS THE OLD PLAN DOES NOT COVER (new, 2026-08-11)
+
+The M6 block was written before the update cone landed. **The hardware
+walker's A/D write-back is a store that is neither software-owned nor
+fenced.** In the landed model
+(`model-xv6iris/rv64d.v:24965 update_and_write_pte`) it is the conditional
+half of a CAS: `read_pte_exclusive` (`Read_RISCV_reserved`) then
+`write_pte_conditional` (`Write_RISCV_conditional`), both classifying to
+`AkInfo false true false` — exclusive, `ak_latest`, not synchronising
+(`iris/WeakUpdEff.v` header).
+
+So the Layer-2 enumeration needs a third arm. **RESOLVED (2026-08-11, from
+source): an exclusive-conditional write CAN be promised — the arm is real.**
+`Local.promise` (Promising.v:798) is unconditional and inspects no access
+kind. What pins the arm is the FULFIL rule: `ex = true` fulfilment requires
+`EX: exbank = Some eb ∧ (eb.loc = loc → Memory.exclusive tid loc eb.ts ts)`
+(Promising.v:884–886) — no other agent's write to the location between the
+exclusive read and the conditional write. Combined with the read half being
+`ak_latest`, an early-promoted write-back's value is a function of the
+coherence-latest PTE and its window admits no interposition, so the Layer-1
+move for this arm is **commute-EARLIER** (early promotion ≡ running the
+walker earlier, itself a legal promise-free run), not delay-to-fulfilment.
+The tag (mechanism (A)) gets a third constructor for it: `SCexcl`.
+
+---
+
+## 4b. Soundness end to end: how the premise is stated and discharged
+
+(Recorded 2026-08-11, after W1/W2a landed.  This answers the natural
+objection to the whole plan: the kernel's discipline — owned points-to,
+verified sync sites, walker CAS — lives in the PROOF of the kernel, not in
+its top-level spec, so how can a premise about it ever be extracted from
+the end-to-end WP theorem?)
+
+**The premise is a pure STATE predicate over the promise-free machine, and
+it is exported from the state interpretation — never from any spec.**
+The chain, with what exists and what is owed:
+
+```
+weak_state_interp carries ⌜φ⌝            [W3: wm_ak, w_pub, ownership reflection — owed]
+  → adequacy exports ∀ reachable g2, φ g2  [3-line change at WeakAdequacy.v:225 — owed]
+  → prefix closure: φ along every pf trace [free: rtc is prefix-closed]
+  → projection: WeakLang runs ↔ wp_pf_run / exec_wf   [W4 projections + W5 — owed]
+  → pf_violation_free cls pub …            [exists: WeakRobust.v]
+  → Layer 1 (W2a acyclicity + W2b construction)       [in progress]
+  → every full-machine behavior matched promise-free.
+```
+
+Piece by piece:
+
+- **The formal premise** (landed, `WeakRobust.v`): `pf_violation_free` —
+  no `wp_pf_run`-reachable configuration satisfies `violation` (an
+  owned-UNPUBLISHED message some foreign agent's per-byte `coh` floor has
+  reached), plus reader-discipline and class-soundness.  All state
+  predicates over machine configurations (D-M6-2); no Iris in any of them.
+
+- **The export mechanism.**  `wp_strong_adequacy`'s final continuation
+  hands the state interpretation at the reachable state `g2` (today bound
+  and discarded, `WeakAdequacy.v:225-227`).  A pure conjunct `⌜φ g⌝` in
+  `weak_state_interp` therefore exports as
+  `∀ reachable g2, reducible … ∧ φ g2`.  Prefix closure of `rtc` makes the
+  per-state export a TRACE property — every intermediate state of every
+  execution is itself a reachable endpoint — PROVIDED φ carries no
+  `∃ tagging` (two reachable states' witnesses would come from two
+  unrelated adequacy instantiations and compose into nothing).  Hence
+  D-M6-6: the class is a field of the message (`wm_ak`, written from the
+  access kind the store leaf already has) and publication is an inert
+  `w_pub` watermark in `wstate`; φ is then a plain predicate over
+  (log, wstates) and no existential ever appears.
+
+- **Why "the points-to is just part of the proof" does not matter: the
+  enforcement is by ENUMERATION OF PROOF RULES, not of program sites.**
+  A WP proof, whatever it proves, has exactly one way to take a memory
+  step: a leaf rule.  Every store leaf either consumes the exclusive
+  `↦w{1}` for its bytes, or is an enumerated sync-site leaf, or is the
+  walker-CAS path — there is no fourth way to append a message.  Every
+  load leaf either holds a points-to fragment or is an enumerated racy
+  rule (acquire-shaped, classified bytes only).  The one genuinely owed
+  piece is the OWNERSHIP REFLECTION: holding `↦w{1}` is invisible in the
+  state today (`wlat_interp` is an agreement, no owner), so W3 mints a
+  ghost token at store time recording "these bytes are owned by hart c,
+  unpublished"; with it, φ's preservation is provable rule by rule — a
+  foreign load over owned bytes would need a fragment fractional
+  arithmetic says cannot exist — and the release fence raises `w_pub`
+  exactly where the lock/invariant hands the points-to onward.
+
+- **Reader discipline is the same pattern once more**: "classified read
+  then `fence r,rw` before the next store" spans two instructions, so it
+  becomes one more inert per-agent component (set by a plain classified
+  read, cleared by an acquire fence, violation = fulfil while set),
+  discharged in Iris because the enumerated racy readers ARE verified
+  instruction sequences that go through the fence leaf in order.  SCexcl
+  needs no discharge at all: `wm_ak` is written by the machine at append
+  time, so that arm's class-soundness is definitional.
+
+- **The seam back to the full machine.**  Iris only ever talks about the
+  promise-free machine, and that is enough: the W2b construction builds a
+  promise-free prefix step by step, and at the point where matching the
+  full behavior would need a foreign early read of an owned-unpublished
+  message, the prefix-plus-that-read IS a promise-free run reaching a
+  violating state — contradicting exactly the statement adequacy
+  exported.  The premise is stated, proven and consumed entirely on the
+  promise-free side; the full machine sees only its consequences through
+  the simulation.
+
+In one sentence: the discipline is made an INVARIANT OF THE STATE
+INTERPRETATION — which every memory-touching proof rule must
+re-establish, which the closed set of leaves makes provable, and which
+adequacy exports at every reachable state — so the kernel's top-level
+spec never has to mention it.
+
+---
+
+## 5. The interference_certify tension — RESOLVED (2026-08-11, from source)
+
+`interference_certify` as paraphrased — certification survives ANY memory
+extension, on RISC-V — seemed to contradict the critical-section-store
+scenario: a thread that promised a CS store while the lock was free looks
+uncertifiable once another hart's acquire lands.
+
+**Resolution: the scenario's premise is false — such a promise was never
+certifiable, even thread-alone, so `interference_certify`
+(CertifyProgressRiscV.v:1233, premise `CERTIFY` in the OLD memory) never
+applies to it.** The mechanism, and it is the lever Layer 1 needs: on
+RISC-V a successful SC's RESULT carries the write's timestamp as its view
+(`RES: … ifc (ex && arch == riscv) ts`, Promising.v:902); the acquire loop
+BRANCHES on that result, so the timestamp lands in `vcap`; `vcap` is a join
+component of every later write's `view_pre` (Promising.v:873–881); and
+fulfilment requires `EXT: view_pre < ts_promise` (Promising.v:883). A CS
+store promised before the acquire has `ts_promise` below the AMO write's
+own later append, so `EXT` can never hold. Same-flavor riscv-only pins:
+acquire reads join their post-view into `vwn` (Promising.v:852–853); an
+exclusive write's `view_pre` joins the exbank view (Promising.v:876–880).
+
+**What the robustness invariant may therefore assume:** a promise that
+survives into a behavior has a timestamp exceeding every timestamp its
+thread's remaining path to fulfilment can route into `view_pre` (`vwn` via
+acquires, `vcap` via SC-result-fed branches, the exbank view via
+exclusives). This is exactly what makes the fenced arm (ii) sound: a
+certifiable promise of a release-fenced store already has ALL the writer's
+pre-fence stores in the log below it (else `vwo ⊑ view_pre` meets a later
+append and `EXT` fails), so a reader that acquires from the early-read
+promise sees the complete deposit — early read ≡ early execution.
+
+⚠ Our machine dropped `vcap` with dependency tracking (Decision 3), and the
+worklist's D-M6-5 keeps it out of the native full machine as well (polarity:
+a weaker full machine only adds behaviors, the free direction). The `vcap`
+arithmetic above is PARM-side background; the Layer-1 proof works with the
+surviving pins — `w_vwNew` via release fences and acquires, and the rmw
+event's exclusivity window — and D-M6-5 records the escalation rule if
+those turn out not to suffice.
+
+---
+
+## 6. The characterization lemma (independent, do it early — it is cheap and it de-risks)
+
+Conjectured, precedent PS1 Thm 5:
+
+```
+    promise-free machine  ≡  RVWMO ∧ acyclic(po ∪ rf) ∧ (po ∩ W×W) ⊆ gmo
+```
+
+Value out of proportion to cost: it turns the interim model assumption from
+"we omitted a mechanism" into a crisp axiomatic statement a reader can check
+against RVWMO, and it is what keeps the promise-free machine from looking ad
+hoc. It does not depend on Layers 1–2 and can be done in parallel.
+
+---
+
+## 7. Fallbacks, in order
+
+1. **Ship the interim theorem.** Already unconditional for **Ztso** hardware
+   (Ztso's implicit RCpc annotations put `po ∩ W×W` into ppo and forbid LB);
+   assumption-carrying only for weaker RVWMO implementations. The assumption
+   is declared in the same epistemic category as the five `rv64d.*` platform
+   axioms — stated once, visible in the final footprint.
+2. **Standalone Lahav–Margalit-style robustness analysis** instead of
+   extracting the premise from the Iris proof.
+3. **Promises in the semantics + SLR-style logic.** Transfinite Iris
+   (ℕ×ℕ lexicographic step indices — an unbounded certification run is
+   re-verified at every step, which vanilla Iris cannot express). On the shelf
+   unless robustness genuinely fails. Do not start here.
+
+---
+
+## 8. Recorded rejections — do not reopen without new information
+
+- **The ORC11-shaped machine** (per-byte timestamp orders, view-carrying
+  messages) represents W→W reordering without promises. Rejected: views
+  become per-location timemaps everywhere, messages carry views (infecting
+  the log, the base state interpretation, and every leaf rule), the PARM
+  lineage (equivalence theorem, deadlock freedom) is lost — and the M6
+  obligation is the SAME SHAPE either way, since promises are the single
+  mechanism behind both LB and W→W.
+- **Full promises-in-logic** as the primary route (see fallback 3).
+
+---
+
+## 9. Order of attack — superseded by the worklist
+
+Steps 1–3 of the original list are DONE (2026-08-11): §5 resolved, §4's
+third class resolved (both above), and the Layer-2 mechanism decided —
+(A), the ghost trail, with the third `SCexcl` arm. The staged plan (W1
+full-promising machine natively → W2 violation pattern + Layer 1 → W3
+Layer-2 ghost trail ∥ W4 characterization lemma → W5 composition), with
+its parallelism notes and risk register, lives in
+[`completed/weak-memory-m6.md`](../completed/weak-memory-m6.md).
+
+**Polarity check to keep in mind throughout** (Decision 1's closing note):
+dropping dependency tracking makes the model WEAKER than hardware — free for
+adequacy. The promise-free choice makes it STRONGER — adequacy needs
+hardware ⊆ model, and that strengthening is exactly what M6 discharges.
+Adding behaviors is free; removing them needs a theorem.
+
+---
+
+## 10. THE INVARIANT OF THE WHOLE LAYER: `pstep` IS LOG-BLIND
+
+Recorded 2026-08-14 (fabric effort, finding G6a2) because it was nearly
+violated twice and it is not written down anywhere else.
+
+Layer 1's program step is `pstep : P → D → wlabel → P → D → Prop`. It sees
+the program state and the shared fabric; it does **not** see the image or
+the log. That is not an accident of the interface, it is what two central
+arguments consume:
+
+- **`WeakPromiseFact.wp_swap`** — the front-loading commutation, which is
+  what turns a behavior into agent-contiguous phases — moves a state step
+  past a promise step by RE-APPLYING THE SAME `pstep` INSTANCE at a log
+  with one more message appended. Only a log-blind `pstep` survives that.
+- **`WeakRobustSim`'s replay** re-applies the recorded `pstep` instance at
+  `pf_log TS done`, a PERMUTED SUBSET of the behavior's log.
+
+Everything the machine reads from the log is therefore in the machine's own
+side conditions (`read_ok`, `excl_ok`, `fulfil_ok`), where the stability
+lemmas live — and the ONE side condition an append can destroy, a `lat`
+(latest/coherent) read, is excluded by the `lat_free_prog` premise for
+exactly this reason.
+
+**The corollary, and the trap.** Any log-derived value you are tempted to
+hand a program agent — the flat memory `wflat img log`, a "latest write"
+answer, a DMA source — is a `lat` read in disguise (`wflat` is
+`latest_ts`-indexed by definition) and breaks both arguments. G4's device
+witness rescues the FABRIC (the `gdev` chain pins each fabric-touching step
+at its recorded fabric); there is no analogue for the log, short of chaining
+every store into the witness, which forces the replay permutation to the
+identity and makes the robustness theorem vacuous.
+
+So: a device whose semantics genuinely reads memory (virtio's DMA) cannot be
+a Layer-1 program agent with an exact memory input. Either it
+over-approximates (its memory is existential — the archived `delta (i)`), or
+its read becomes a REAL machine read in a machine that has device views
+(M5). There is no third option at this interface, and "widen the language so
+the over-approximation is inside it" is not one either: it makes the disk
+thread's WP false, because the C/D/S protocol conjunct of the state
+interpretation depends on the DMA writing where its descriptors say.
+
+**Related polarity note.** The same section's closing rule applies to the
+message class: pinning `wp_pf_step`'s class binder (G6a) REMOVES behaviors,
+so it needs an argument — and it has one, namely that no rule reads
+`wm_ak`, so the removed behaviors differ from a kept one only in an inert
+tag. Contrast the `MemRead` F6 guard and any proposed `MemWrite` guard,
+which remove real hardware behavior and must be paid for by a per-image side
+condition instead (`WeakSailLTS.sail_plainw`).

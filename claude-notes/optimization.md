@@ -493,6 +493,13 @@ for it.
   term is re-elaborated anyway.
 - **Do not write a trailing `[-]` in a leaf `iApply`'s spec pattern** — it forces
   an explicit `envs_split` of the whole spatial context at every instruction.
+- **`iApply fupd_mask_intro; [set_solver|]` on an empty-mask goal is a hidden
+  time sink** (the weak-memory tier: most of `WkEntryNew.wwp_entry`'s compile
+  time). The `set_solver` solves `∅ ⊆ E` the slow way; write
+  `iApply fupd_mask_intro; [apply empty_subseteq|]`. Reflex: any `set_solver`
+  discharging a mask side-goal of the shape `∅ ⊆ _` should be `apply
+  empty_subseteq`. (The weak line's batch-2 leaves still carry the slow
+  spelling — patch on next touch.)
 
 ## Register-file towers and register maps
 

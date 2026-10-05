@@ -69,6 +69,7 @@ pointer line per top-level and `design/` file and does NOT list `projects/` or
   broken tactic script; `-vok` is the other half and costs what the `.vo` does.
   Delete the `.vos` first: an ordinary `coqc` run leaves an EMPTY one beside the
   `.vo`, so `-vos` over a built tree reports success having done nothing.
+- **Edit loop and lookup tools (use these):** `tools/rocq-check FILE.v` (sync to the build VM + `rocq-warm check`, compact verdict), `tools/decl NAME` / `tools/outline FILE.v` (local statement / outline lookup), `tools/rocq-query 'About X.'` (ask Rocq on the VM). Details in `.claude/skills/rocq-{check,decl,query}/SKILL.md`; the build VM itself is in [`remote-build-gcp.md`](remote-build-gcp.md).
 - **Builds run on the GCP VM** (owner's instruction, 2026-09-23):
   `gcp-rocq/vmbuild.sh <checkout> <log>` for a checkout's `iris/` cone,
   `gcp-rocq/run-on-gcp --proofs` for the whole tree, `--check Foo.v` for the
@@ -93,6 +94,7 @@ pointer line per top-level and `design/` file and does NOT list `projects/` or
   inherits it; recovery is to delete `CoqMakefile`/`CoqMakefile.conf`.
 - The generated Sail model is not an opam package — rebuild from
   `model-xv6iris/` in order `rv64d_types.v → riscv_extras.v → rv64d.v`.
+- **THE MODEL IS GENERATED WITH `-D SYMBOLIC` (2026-08-17), SO `riscv_step` HAS TWO SILENT ANNOUNCE NODES.** The Sail library wires `sail_instr_announce`/`sail_branch_announce` to the concurrency interface only under that flag (otherwise they are no-op stubs — upstream's Rocq target leaves them off). With it, every instruction carries an `Interface.InstrAnnounce opcode` node right after the fetch (before decode) and every PC redirect (`set_next_pc`) an `Interface.BranchAnnounce` node. All interpreters (`RiscvLang.run`, `RiscvExec.exec`, `WeakInterp.wrun/wexec`, `WeakCert.exec_eff`, `WeakEvLang`) treat them as silent; the `reflexivity` lemmas are `RiscvExec.exec_instr_announce`/`exec_branch_announce` and `WeakEff.exec_eff_instr_announce`/`_branch_announce`. What a proof sees: any structural walk of `run_hart_active`'s or `set_next_pc`'s bind spine needs one extra `rewrite execR_bind0 execR_liftR exec_instr_announce` (or the `exec_eff` twin) — 12 sites in the tree at the switch — and any HARD-CODED node count of a stretch that crosses the fetch or a redirect moves by one (`WeakEvStarted.ev_len2` 178 → 179). Regenerating without the flag silently drops the nodes again: `tools/regen_sail_model.sh` passes it; the model's `riscv_extras.v` carries `tools/riscv_extras_symbolic.v` (the `mark_register` no-op the flag's Isla extern needs) appended.
 - **The image toolchain is Ubuntu's `gcc-riscv64-linux-gnu` (gcc 15) with its
   `binutils-riscv64-linux-gnu`**, and the cross-compiler version decides the
   kernel image. Before any dump rule, `readelf -p .comment
@@ -451,6 +453,17 @@ value-precise `exec` fact is unsatisfiable for anything that jumps.
 Symptoms: `No product even after head-reduction` at the jumping call sites while
 the others typecheck; and, at a site that omits the argument, the leftover goal
 is the certificate, so the next tactic fails as an unrelated `rewrite`.
+
+- **Vacuity trap (Iris/Rocq boundary):** never take `⊢ own γ a` (e.g. a full-fraction `hist_auth`/auth element) as a Rocq-level hypothesis — `⊢ own γ a` twice + `own_valid_2` + `pure_soundness` proves `False`, so the theorem is vacuous. Allocate with `|==> ∃ γ, …` inside the `step_fupdN_soundness` continuation instead. `Print Assumptions` does not detect false-hypothesis vacuity.
+
+### SECTION HYPOTHESES OF A CAPSTONE: CHECK ITS CLOSED TYPE
+Inside a `Section`, `About`/`Print Assumptions` hide which `Context` hypotheses a lemma
+absorbs; the closing `End` adds every one its proof used — including ones picked up
+silently by automation or by helper lemmas. Two case-specific Contexts in one section
+(e.g. "acquire reads the image" vs "acquire reads release w_rel") then yield capstones with
+CONTRADICTORY, i.e. vacuous, hypotheses. Scope each case in its own nested section, keep
+shared helpers in the common part, and check the closed type from another file:
+`Require Import F. Check (lemma : False).` — the type error prints the full statement.
 
 ## Contracts and resources
 
@@ -1296,6 +1309,7 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
   into its branches** — write `0%nat` per branch.
 - **`++` in a lemma STATEMENT parses in `string_scope`**; and an argument to a
   LOCAL hypothesis parses with no scope information at all. Annotate.
+- **`rewrite lem` REFUSES A LEMMA WHOSE RIGHT-HAND SIDE FORGETS AN ARGUMENT.** If `lem`'s conclusion is `f a b c = g a c` — the access-kind argument of `WeakBridge.wread_bytes_read_bytes`/`wread_pinned_ts` is the worked case — then `rewrite (lem s _ _ _ H)` cannot infer `b` from the *goal*, because ssreflect unifies the LHS only after elaborating the term, and it fails before it ever looks at the goal. Spell the forgotten argument out (`classify (Interface.ReadReq.access_kind t)`); `apply`/`exact` are unaffected.
 - **`Qp_scope` has no `<=`, only `≤`** — `((1/2) <= 1)%Qp` proves `0 ≤ 1`.
 - **A `.` immediately before `(*` parses as `.(` projection.**
 - Value binders must be `mword 64` (`add_vec` will not unify a `bv 64` binder),
@@ -1309,6 +1323,49 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
 - **Bare `NoDup` can resolve to Stdlib's, not stdpp's** — different inductives.
   And **`NoDup_fmap_2_strong` with a section-variable `f` leaves the list an
   evar**, with the follow-up failing on an unrelated instance.
+- **`Stdlib.Lists.List` SHADOWS stdpp for several list lemma names** in files
+  that import both (seen in `WeakRvwmoLin.v`): `filter_app`, `NoDup_app`,
+  `NoDup_cons`, `NoDup_filter`, `NoDup_Permutation`, `Forall_forall` resolve to
+  the Stdlib versions, and the failure reads as unification nonsense ("the LHS
+  of filter_app `(List.filter _ (_ ++ _))` does not match").  Fix: qualify the
+  stdpp ones (`list_basics.filter_app`, `list_relations.NoDup_app`/`_filter`/
+  `_Permutation`), use `NoDup_cons_1_1`/`_1_2` and `Forall_lookup_1`/`_2`.
+  `filter_cons`, `elem_of_list_filter`, `list_filter_filter`, `list_filter_iff`,
+  `NoDup_alt`, `NoDup_lookup` are stdpp-only and safe.  Also in the family
+  (2026-08-23): **`Forall_cons` resolves to Stdlib's CONSTRUCTOR** ("Unable to
+  find an instance for the variable x") — use `Forall_cons_1`/`Forall_cons_2`;
+  `by split_and!` fails on a `True` conjunct in this import context — write
+  `split_and!; [exact I|…]`; and `apply lem in H` on an `iff` lemma picks the
+  BACKWARD direction (`apply elem_of_remove_dups in H` yields
+  `x ∈ remove_dups (remove_dups l)`) — use `apply (proj1 lem) in H`.  An
+  intro pattern `(j & <- & …)` on `x = f y` rewrites the WRONG way (use
+  `->`); ssreflect's `.1` on an `iff` is pair-`fst`, not `proj1` — write
+  `proj1 (proj1 lem H)`.  `[->|->]` in an intro pattern lexes `|->` as one
+  token (write `[-> | ->]`; bites `destruct … as` too); and
+  `WeakInterp.acc_addr : Arch.pa → nat → Z` shadows
+  `WeakAxiomatic.acc_addr : Z → nat → Z` when both are imported — the error
+  surfaces at an IMAGE definition ("pa_z … has type Z while expected
+  Arch.pa"), not where the graph is built.  `||` in an intro pattern
+  fails the same way (`[|tgt|tgt||]` → write `[ | tgt | tgt | | ]`).
+- **`stdpp.bitvector.definitions` pulls in `Stdlib.Lists.List`, which SHADOWS
+  stdpp's `last` and `NoDup_cons`** (Stdlib's `last : list A → A → A`, and the
+  `NoDup` CONSTRUCTOR where stdpp has the lemma). Any file importing that
+  module must write `list_basics.last` / `list_relations.NoDup_cons`; bare
+  `NoDup` still resolves to stdpp's. The family is WIDE: Stdlib's
+  `Forall_forall`, `Exists_exists`, `NoDup_app`, `NoDup_alt`,
+  `NoDup_lookup`, `NoDup_submseteq`, `submseteq_length` all win over
+  stdpp's and are stated with `In` instead of `∈` — the tell is a
+  `by exists x` failing with "No applicable tactic" (`done` cannot close
+  an `In` goal). Qualify as `list_relations.X` (or use `Forall_lookup_2`).
+  Found in the M6 dependency-free files (`WeakRobustTrace.v`,
+  `WeakRobustLin.v`), which import bitvector.definitions without the iris
+  proofmode.
+- **ssreflect's `last first` REVERSES the remaining goal list, it does not
+  rotate it** — with three or more open goals the middle ones change
+  position too, which silently misroutes bullet-per-goal scripts (found in
+  `WeakRobustAcyc.v`, where a three-way `destruct` under `last first` sent
+  two arms to each other's bullets and the failure surfaced lines later).
+  With >2 goals prefer plain bullets in destruct order.
 - **An implicit binder inside a `Definition`'s BODY is silently ignored**, and a
   local hypothesis of a Pi type has no implicit arguments at all. Write them
   explicit and pass `_` — an evar whose type is a CLASS is still filled by
@@ -1475,6 +1532,31 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
   hanging, which is what surfaces the real bug. Then bypass `iFrame` with an
   explicit `iSplitL`/`iExact` chain.
 
+- **`iNext` PEELS A LATER OUT OF A HYPOTHESIS EVEN WHEN THE LATER IS BURIED
+  SIX `∃`/`∗` LAYERS DEEP AND EVERY SIBLING CONJUNCT IS MERELY `Timeless`**
+  (2026-09-25, `AxWp.skel_wp_skip_step_of_psi`): `iNext` strips one `▷` from
+  the GOAL and, via `MaybeIntoLaterN`'s commuting instances, from every
+  context hypothesis it can VIEW as `▷ _` — `Timeless` conjuncts (`own`,
+  `ghost_map_auth`, pure facts) get this view for FREE, so a hypothesis with
+  ONE real nested `▷` (e.g. `AxAnnot.annot_interp`'s `▷ □ (P -∗ …)`) loses
+  exactly that later, while an UN-DESTRUCTED goal occurrence of the same
+  proposition (still folded behind an `∃` you have not introduced yet) is
+  untouched by `iNext`'s single-layer goal strip. The two copies then
+  silently diverge — `iFrame`/`iExact` fail with "does not match goal", and
+  both sides PRINT IDENTICALLY as `annot_interp na` at every `Set Printing
+  Implicit`/`All` level, because the divergence is deep inside the folded
+  name, not in an implicit argument — and keeping `annot_interp` folded
+  (never `simpl`/`unfold`-ing it) does NOT help either, since typeclass
+  search delta-unfolds as needed to find the `Timeless`/commuting view
+  regardless of surface folding. Fix (already this codebase's own idiom,
+  `ProofPipewrite.v`'s header): use **`iApply bi.later_intro`** in
+  place of `iNext` whenever you only need the GOAL's later gone and want to
+  hand a hypothesis back unchanged — it proves `▷ Q` from `Q` by
+  monotonicity and does not walk the context at all.
+  When the goal itself needs `iNext` (e.g. `wp_ev_step`'s `|==> ▷ |==>`), first
+  wrap every fresh `annot_interp` hyp: `iDestruct (bi.later_intro with "H") as "H"`,
+  so `iNext` strips that shallow `▷` instead of weakening H (AxLock3Writer `wpd_w3`).
+
 ### Model code
 
 - **An `is_Some` probe does not measure a model evaluation — forcing a field is
@@ -1535,6 +1617,86 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
   checking against "did anything ASK it to". **A claim that the model CANNOT do
   something has to come from its DEFINITIONS, or from a positive wrong transition
   — never from a runner's silence.**
+
+- **AN EQUATION BETWEEN TWO MONAD TERMS (`M unit`) CLOSES ONLY BY LAZY
+  CONVERSION** (`exact_no_check (@eq_refl (M unit) …)`, 3 s in
+  `WeakEvProv2.la_head_succ`); `vm_cast_no_check` on the identical goal did
+  not converge in three runs (2, 2, >8 min at a flat 0.72 GB) — the VM must
+  read back the NORMAL FORM of the monad term, i.e. every unexecuted branch
+  of the Sail step function under every continuation's binder, while lazy
+  conversion compares whnfs and short-circuits on syntactic equality.  Rule:
+  `vm_cast_no_check` when the result is a label/count/request/register;
+  lazy conversion when it is a monad term (the "compare the two final
+  regstates" shortcut dies the same way).
+- **NEVER `simpl`/`/=`/`done` A GOAL MENTIONING `krole pc`/`kw pc` AT A
+  VARIABLE `pc`** (2026-08-23, the pin bridge): `kw` bottoms out in
+  `KernelInstrs.kernel_bytes !! a` and reduction tries to unfold the whole
+  image literal — `rewrite /taint_step /=` hung >10 min with no error, a
+  `done` that tried `reflexivity` cost 54 s.  State an unfolding lemma and
+  close by `reflexivity`; step with `cbv beta iota zeta` (no delta); end
+  branches with `exact H`, never `by`/`done`.  9.6 s after the fix.  Related paper cuts:
+  `StronglySorted`-family lemmas hand back un-beta-reduced `R x y`, so `lia`
+  fails with "Cannot find witness" until `cbn in H`; in the same import
+  context `if decide P then _ else _` does NOT elaborate (the scrutinee is
+  forced to `bool`) — use `bool_decide` + `case_bool_decide` in definitions;
+  and `lia` consumes the propositional structure of arithmetic hypotheses
+  (e.g. `¬ (p1 = n ∧ p2 = S n)`) on its own, so a following
+  `exfalso; apply Hne` fails with "No such goal".  Two more from the same
+  genre: `apply` does not pick a direction for an `iff` — use
+  `proj1`/`proj2` explicitly — and `apply lem in H` for an `iff` `lem`
+  silently picks the BACKWARD direction, so `apply elem_of_remove_dups in H`
+  turns `x ∈ remove_dups l` into `x ∈ remove_dups (remove_dups l)` rather
+  than `x ∈ l`, and the failure surfaces one tactic later as an
+  `exact`/`assumption` type mismatch; write `apply (proj1 (lem args)) in H`
+  (and a `naive_solver` over a four-disjunct
+  iff-equivalence can simply not terminate; write per-disjunct lemmas);
+  and ssreflect's `rewrite lem; [|lia]` puts the side condition FIRST
+  (e.g. `lookup_app_r`'s `length l1 ≤ i` lands in goal 1, not 2), so the
+  failure reads as a bogus `lia: Cannot find witness`.
+- **`f_equal` on a record equality whose fields contain `enum CPU` is unreliable.** `simpl` expands `enum CPU` into the 9-element literal and computes the `insert`, so `f_equal` on a `WPCfg …  = WPCfg …` goal sometimes closes it outright ("No such goal" for the next tactic) and sometimes leaves a differently-shaped residue. Prove such equalities by `rewrite`-ing a pre-established equation on the offending field (e.g. an agent-list equation) and finish with `reflexivity` (`WeakEvCapstone.v`).
+- **`rewrite !lem` KEEPS GOING BY DELTA-UNFOLDING ONCE THE SYNTACTIC MATCHES
+  RUN OUT** (2026-09-23, `AxGraphDec.v`): `rewrite !andb_true_iff` on
+  `gpo_b G e1 e2 && f && g = true` splits the visible `&&`s and then unifies
+  `gpo_b G e1 e2 = true` with `?b1 && ?b2 = true` by unfolding the
+  DEFINITION `gpo_b` (whose body is an `&&`), so the next `rewrite gpo_b_spec`
+  fails with "The LHS ... does not match any subterm".  Same for
+  `!orb_true_iff` over a definition whose body is an `||`.  Use an explicit
+  count (`rewrite 2!andb_true_iff`) whenever an operand is itself a
+  bool-valued definition you want to keep folded.  Related: `apply
+  bool_decide_eq_true_1` (or any lemma whose `Decision` instance is only
+  determined by a HYPOTHESIS) fails with "Unable to find an instance for the
+  variable Decision0" — write `exact (bool_decide_eq_true_1 _ H)`; the `in H`
+  form (`apply … in H`) is fine because H supplies the instance.  And the
+  tree's `WeakRvwmoDec` `Decision` instances are `Qed`-opaque: `decide` over
+  them does NOT reduce under `vm_compute` — for computed verdicts write
+  transparent `bool` checkers with `↔`/soundness specs (`AxGraphDec.v`).
+- **UNFOLDING A `Fixpoint` GATED BY AN OPAQUE DISCRIMINEE: `unfold F at 1 2`
+  / `simpl`/`cbn` BEHAVE UNPREDICTABLY ACROSS TWO OCCURRENCES WITH
+  DIFFERENT ARGUMENTS** (2026-09-25, `AxProtCov2.v`'s `H_of_fuel`, a
+  recursion on `fuel` whose OUTER `match` is on an unrelated opaque call
+  `axprot_immpred GD w`, not on `fuel` itself). `unfold F at 1 2` on a goal
+  `F (S f) w = F f' w` does NOT reliably iota-reduce a numbered occurrence
+  whose recursion variable (`f'`) is an unconstrained variable — the
+  outer match stays folded behind the unreduced `fix` application, so a
+  following `rewrite Himm` (a fact about the discriminee) cannot find its
+  pattern on that side and fails with "does not match any subterm of the
+  goal", while `cbn [F]` risks the OPPOSITE failure — over-eagerly
+  re-unfolding a RECURSIVE occurrence one level further than intended
+  (whenever cbn cannot immediately get stuck, it keeps going), so a
+  later `apply IH`/`rewrite` expecting `F n w0` folded sees its expanded
+  match instead and fails to unify. Also: `f_equal` on `l1 ++ [x] = l2 ++
+  [x]` is NOT reliably 2 subgoals — when the appended tails are already
+  syntactically identical, some invocations produce only 1 (silently
+  dropping the trivial `[x]=[x]` goal), so a `f_equal; [tac1|tac2]`
+  bracket errors "Incorrect number of goals". **Fix, both issues**: state
+  ONE-STEP UNFOLDING EQUATIONS as separate lemmas, each with the
+  discriminee-relevant argument already a LITERAL constructor
+  (`F (S f) w = F f w0 ++ [...]` given `disc w = Some w0`; `F f w = [...]`
+  given `disc w = None`, proved by bare `simpl; rewrite Hdisc;
+  reflexivity` — full kernel conversion, not a tactic-specific reduction
+  strategy, so it cannot under- or over-shoot), then build every downstream
+  fact by `rewrite`ing THESE equations and closing with `assert (Heq : ... )
+  by (apply IH; lia); rewrite Heq; reflexivity` instead of `f_equal`.
 
 ### Large pure-map work
 
@@ -1602,6 +1764,253 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
   (Iris hypotheses live in the goal term, so a `rewrite` reaches them) — expect
   one tactic per converted proof to have been working for the wrong reason.
 
+## A PREDICATE OVER AN EFFECT MONAD: CHECK EVERY OUTCOME'S *ANSWER TYPE*, NOT
+## JUST WHETHER THE MACHINE HAS AN ARM FOR IT
+
+Eight times on this tree a shape/liveness predicate over a Sail-style
+interaction monad has been **refutable because one arm demanded more than the
+machine can supply** (the ∀-path oracle; the memory abort; the
+exclusive-window read; the standalone conditional write; the decoder's zero
+width; the throw; the page walker's abandoned reservation; and the register
+read). The recurring
+mistake is not the ∀ itself — it is deciding an arm is harmless from the
+CONSTRUCTOR's name instead of from its answer type.
+
+**The rule.** For every constructor of the outcome type, write down two
+things: (a) does the LTS/stepping relation have an arm for it, and (b) what is
+its ANSWER TYPE? A default arm `∀ r, P (k r)` is:
+
+- harmless when the answer type is **empty** (`GenericFail`, `Discard` — their
+  index is `False`, so the arm is vacuous);
+- a silent, unbounded **strengthening** when the answer type is inhabited and
+  the machine supplies nothing — and this is the dangerous case, because it
+  reads exactly like the harmless one.
+
+The instance that cost a stage: `ExtraOutcome {A} : eOutcome A -> outcome A`
+is indexed by **the monad's own return type**, and `throw e = Next
+(ExtraOutcome e) mret`, so `bind (throw e) k = Next (ExtraOutcome e) k`. A
+default arm therefore walks the WHOLE REST OF THE COMPUTATION at every value
+of the type the throw pretends to produce — for a decoder that is every
+instruction, including ill-formed ones the decoder cannot build. The tree's
+own comment already said "the agent is stuck there, so the node is vacuous";
+the claim was true of two of the three failure outcomes and false of the
+third. Fix: narrow the arm to what the machine supplies (here: nothing, i.e.
+`True`).
+
+**AND THE SEVENTH INSTANCE IS THE ONE THAT GENERALISES FURTHEST: A "THE TAIL
+IS QUIET FROM HERE" BRACKET IS ONLY AS GOOD AS THE CALL DEPTH AT WHICH THE
+TAIL BEGINS.** When an arm of the predicate opens an obligation that must be
+discharged LATER in the same computation (here: an exclusive read whose window
+must close at a conditional write), the standard repair is to legalise
+abandonment by BRACKETING the abandoned remainder in the machine — "from here
+on the computation is silent, so let one step stand for all of it". That is
+sound exactly when abandonment happens at the TOP of the instruction, and the
+model decides where it happens: this tree's page walker abandons its PTE
+reservation inside `translate`, i.e. inside a callee of every memory
+instruction, so the "silent tail" was the whole rest of the instruction and
+the bracket was worthless. Before writing such a bracket, find the DEEPEST
+call site that can abandon, and ask what follows it there.
+
+**AND THE EIGHTH INSTANCE IS THE REGISTER ARM, WHICH IS WHERE THE RULE STOPS
+BEING ABOUT FAILURE OUTCOMES.** `RegRead`'s answer type is inhabited and the
+stepping relation answers it *from the agent's own state* (`k (register_lookup
+r rs)`), so a `∀ v, P (k v)` arm is the same silent strengthening — it demands
+the property along control-flow paths the machine never takes, and on this
+tree that refuted the liveness half outright (a decoder gate reads
+`cur_privilege` and throws at a value an H-less machine never holds). The
+repair is again to narrow: **thread the state through the predicate** — answer
+`RegRead` concretely from it, and let `RegWrite` move it. Two consequences
+worth knowing before writing such a predicate:
+
+- **The bind rule must become CPS.** At `bind m k` the state `k` starts in is
+  path-dependent, so the only compositional formulation carries a
+  postcondition over the FINAL state (`Ret x ↦ P x rs`) and says "the prefix's
+  postcondition is the continuation's hypothesis". A state-blind predicate can
+  hypothesise `∀ x, P (k x)`; a state-threading one cannot. (This is the same
+  driver a state-pinned boolean traversal has — see the section below — so
+  port that driver, and expect the ∀-quantified predicate to survive as the
+  register-free specialisation, reusable at every prefix that does not branch
+  on a register.)
+- **∀-quantify in exactly the components ANOTHER agent can write.** Whatever
+  the environment can change behind the residual's back (here: one interrupt
+  pin, written by the LTS's own delivery arm without moving the monad) must
+  stay quantified, or the invariant is not preserved by that arm. Everything
+  else is concrete. Getting this wrong is invisible until the frame lemma for
+  that arm fails to typecheck, several files away.
+
+The repair that worked, four times running, is the opposite of adding an
+index: **narrow the predicate until the arm says only what the machine
+enforces.** Each time the deferred obligation was deleted (`ak_latest = false`
+on writes; then on reads; then the window itself), the machine's arm became
+the ORDINARY arm — no new disjunct, no new mode — and the cost stayed where it
+already was, in one run-local, target-indexed side condition (`fused_blk`).
+A predicate that has to describe a multi-step protocol is a sign that the
+protocol belongs in the run's own evidence, not in the predicate.
+
+Corollary for the KIT built on top of such a predicate: a kit may be STRICTLY
+STRONGER than the specification where that buys compositionality (this tree
+keeps `gwalk (Some _) (ExtraOutcome _) = False` so that `try_catch`'s handler
+hypothesis stays at the closed window), but say so at the arm — a kit-side
+strengthening and a specification claim look identical six months later.
+
+## A STATE-PINNED BOOLEAN TRAVERSAL AND A ∀-QUANTIFIED ONE ARE THE SAME
+## TRAVERSAL: PORT THE DRIVER, NOT THE THEOREM
+
+A decode/config traversal that answers `RegRead` from a CONCRETE state
+(`iris/DecodeSetU.v`'s `goodbP D P m s`) and one that answers it with `∀ r`
+(`WeakShapeOverrides2.gpost`) differ in exactly one arm. Everything else —
+the clause-spine rule, the bind rules, the leaf driver, the per-mapping
+Q-rules — transfers line for line, and the pinning arm is simply DELETED
+(disabled-extension families are then traversed on both branches, which costs
+dead arms and nothing else). So when a state-pinned result exists and you need
+a state-generic one, do not re-derive it and do not try to reuse the theorem:
+copy the driver and drop the pin. What makes this sound is worth checking
+explicitly first — here, that the fields being constrained (instruction
+widths) come from a mapping applied to an opcode slice and no gate touches
+them.
+
+## A CHAIN OF GENERATED PROOF SHARDS MUST IMPORT *EVERY* EARLIER SHARD
+
+When a generated tower uses a hint database as its dependency mechanism (the
+`tools/gen_shape.py` design: shard *n* proves lemmas whose callees were proved
+in shards `< n`, and `gw_solve` closes a leaf out of the DB), **`#[export]`
+hints are activated by `Import` and are NOT re-exported transitively.** Shard 3
+requiring only shard 2 therefore sees shard 2's hints and **silently loses
+shard 1's** — and the symptom is not a missing-hint error but *"Attempt to save
+an incomplete proof"* in a lemma whose callee was proved two shards earlier,
+i.e. it reads like a tactic bug in the lemma that failed. Emit
+`Require Import Shard01 … Shard(n-1)` in every shard (or use `#[global]`).
+Cost of the diagnosis when it bites: one full shard compile per guess, and
+these shards run ~10 minutes each.
+
+**AND IT MUST EMIT EVERY MODE IT WILL EVER NEED IN THE SAME PASS.**  The
+shards are a serial `Require` chain (the hint DB is the dependency mechanism),
+so a second predicate — a liveness mode, a value-postcondition mode — costs
+the WHOLE chain again, 1-3 hours, and cannot reuse the first: `gwalk None`
+(shape) does not imply `gsilent`/`gpost` (they forbid memory events) and says
+nothing about `glive`.  Decide the predicate set before generating, not after
+the first consumer gets stuck.
+
+**A GENERATED TOWER SURVIVES A CHANGE TO THE PREDICATE IT PROVES, AS LONG AS
+THE CHANGE IS A WEAKENING.**  Stage C8 deleted an index from the swept
+predicate (`gwalk (w : win) m` became `gwalk m`) — a change to the very
+statement all 294 generated lemmas make — and the regeneration came back green
+with NO proof-script change and the same wall time: the shards are
+`cbv [f]; <solver>` and the solver's structural rules were re-derived from the
+new definition.  What the edit costs is the LEAF TABLE (the hand-written
+combinator lemmas the solver's hint database and `match goal` patterns name),
+not the sweep.  Corollary: budget a predicate change as "rewrite the kit, then
+one full tower rebuild to confirm", and regenerate BOTH modes in the same pass.
+**And audit the tactic patterns by eye**: an `Ltac`'s `match goal with |- P _ x`
+pattern that is left with a stale arity does NOT fail when its file compiles —
+it fails much later, inside the shards, as a lemma that will not close.
+
+**…UNLESS THE SECOND MODE'S BIND RULE CONSUMES THE FIRST AT THE PREFIX, WHICH
+IS A DESIGN CHOICE AND WORTH MAKING DELIBERATELY.**  Measured on this tree
+(2026-08-14): the shape tower is 294 lemmas / 5 min 20 s; the value mode over
+the same cone is 116 lemmas / **9 s**, because its bind rule's PREFIX
+obligation is the shape mode's `gwalk None` — resolved by one premise-free
+hint out of the existing tower — so only the ~60 clause BODIES are walked, not
+their cones.  When you add a mode, ask first what the bind rule can demand of
+a prefix; a mode that must re-walk every callee costs the whole chain again,
+a mode that reuses the previous one at the prefix costs the leaves only.
+
+**A "HUNG" GENERATED SHARD IS A TACTIC BUG UNTIL PROVEN OTHERWISE, AND THE
+TWO CAUSES ARE BOTH IN THE LEAF TACTIC.**  A sweep whose solver is
+`repeat first [... | solve [leaf] | step]` runs the LEAF AT EVERY NODE, not
+only at leaves, so anything expensive in it is paid once per node of every
+proof — and it looks like the model being big, not like a bug.  Two causes,
+each ~an order of magnitude, measured on this tree (2026-08-14):
+
+- **An alternative that always `apply`s.** `apply gwalk_quiet` (`gquiet m ->
+  gwalk None m`) succeeds on *any* goal of the right head, and then hands a
+  whole subterm to `eauto`. Gate the leaf on the goal being ATOMIC — a
+  `lazymatch` that `fail`s on every combinator head (`bind`, `try_catch`,
+  `if`, `match`, the loop combinators). At a combinator node the structural
+  step is the only correct move anyway, so the gate cannot lose a proof.
+- **AND IT IS NOT ONLY HINT DATABASES: any `apply` of a lemma about a
+  generated function is the same trap.** A dispatch written as
+  `try (by apply H1); try (by apply H2); …` over a ~130-arm `match` did not
+  finish in two minutes for exactly this reason; matching on the goal's HEAD
+  CONSTANT with a `lazymatch` instead made it 3 s. If a tactic that only
+  `apply`s a dozen hypotheses is slow, suspect delta-unfolding before
+  suspecting the goal.
+- **A `discriminated` hint DB does NOT prune unless the constants are opaque
+  to it.** Hints concluding `P (<generated function> ?a …)` over a
+  TRANSPARENT model make `eauto` delta-unfold and compare bodies; sibling
+  functions share long prefixes, so each failed match descends through two
+  huge terms, once per hint, per node. One line: `Hint Constants Opaque : db`.
+
+Measured: one lemma **>40 min -> 0.9 s**, a 200-arm CSR dispatch **>18 min ->
+23 s**, a 48-lemma shard **7 min -> 68 s**, a 294-lemma tower **>4 h
+(projected) -> 5 min 20 s**. The diagnostic: compile a COPY of the stuck file
+with `coqc -time` CONCURRENTLY (the log streams, so its last line names the
+stalling sentence), then bisect the leaf tactic by deleting alternatives.
+
+**SHARD FOR PARTIAL PROGRESS, NOT FOR BALANCE.** There is no partial `.vo`, so
+a killed build loses the whole shard; and per-lemma cost varies by orders of
+magnitude across the topological order. Make shards small where the cost is
+high (a `--shard-sizes` list whose last value repeats), and have the generator
+DELETE stale higher-numbered shards, or a re-shard leaves files on disk that
+the "regenerated, never patched" check cannot distinguish from hand-written
+ones.
+
+**THE GENERATOR'S OWN COVERAGE PREDICATES ARE WHERE THE SILENT HOLES ARE.**
+Two bit this tree, and neither showed up as a build error — a missing function
+appears as a stuck leaf in a HAND proof of one of its callers, months later:
+- a *monadic-ness* test that greps the definition head for `' M ('` misses the
+  ones Sail line-wraps so that `: M (...)` starts a line (normalise the
+  whitespace first);
+- a call graph rooted at ONE entry point misses whatever else the real
+  top-level calls (here `RiscvLang.riscv_step` also calls `tick_clock`).
+Both are one-line fixes, but fixing them RENUMBERS the topological order and
+therefore rebuilds every shard — so check them before the first full run, and
+afterwards prefer a `SKIP` entry plus a hand proof to a regeneration.
+
+Two more rules from the same generator, both about the ~10-minute feedback
+loop:
+
+- **Make the generator IDEMPOTENT ON DISK** — write a file only when its text
+  actually changed. A generator that rewrites every shard unconditionally
+  makes `make` rebuild the whole tower after a no-op regeneration.
+- **Put the hint-DB lookup FIRST in the leaf tactic, at depth 1.** With a
+  `first [...]` chain that tries a dozen `apply`s and two nested `solve
+  [...]`s before `eauto with <db>`, the common case (a call to an
+  already-proven generated function) pays for every failing alternative, on
+  every leaf of every proof. Keep the DB premise-free so `eauto 1` suffices.
+  The exception stays the register leaves: `eauto`'s unification does not see
+  through `Arch.reg_type`, so those must be applied **by name**.
+- **A Sail function with more than one PATTERN binder (`'(C x)`) elaborates to
+  a `match` APPLIED to the remaining arguments**, which no
+  `|- P (match ?x with _ => _ end)` tactic rule matches. Destruct the pattern
+  arguments up front — the generator knows which they are from the binder
+  region, so this is derived, not guessed.
+
+## A PREMISE THAT DOES NOT REDUCE MAKES A TACTIC RULE FALL THROUGH SILENTLY
+
+The failure mode has no error message and surfaces several steps away from its
+cause. A rule of the form `apply lemma; [solve [by intros] | …]` carries a
+side condition like `∀ e, Q e`; when `Q` is a postcondition over a SUM type
+(the shape a `catch_early_return` installs — `λ ea, match ea with inl a => P a
+| inr e => Q0 e end`) the goal is a stuck `match` until the sum is destructed,
+so `by intros` fails, so the whole `first [...]` alternative fails, so a LATER
+and WEAKER rule fires instead. On this tree the weaker rule was the plain
+shape route, which walked the decoder happily and DROPPED its postcondition;
+the symptom, four steps later, was a goal needing a hypothesis that "should
+have been in scope". Two habits:
+
+- write such side conditions as a named tactic that also destructs
+  (`intros e; destruct e; first [exact I | reflexivity | done]`), not as
+  `by intros`;
+- when a solver leaves a goal that looks like it lost information, instrument
+  the rule you EXPECTED to fire (`idtac "MATCHED"; …`) before reading the
+  goal — a rule that never matched and a rule whose body failed look identical
+  from the goal alone.
+
+**And unpack a postcondition only once its subject is a CONSTRUCTOR.** A
+cleanup rule that `clear`s a "not yet usable" hypothesis will fire before the
+scrutinee is destructed and throw away the fact the next branch needs.
+
 ## Spec-design preferences
 
 - **State a hardware-attribute obligation as what the CONSUMER consumes, never as
@@ -1663,6 +2072,8 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
   the range invariant open at the record, which a walk usually cannot name.
 - Avoid ad-hoc argument couplings in preconditions; prefer deriving branch
   conditions internally.
+- **A ⇐ RECONSTRUCTION NEEDS THE TWO SIDES' LOGS TO AGREE *SYNTACTICALLY*, SO "THE INTERPRETER ACCEPTS THAT STEP" IS NOT ENOUGH — AN INERT FIELD STILL COSTS A SIDE CONDITION.** When a step-relation is widened so that the abstract machine can take a transition it was stuck at, the ⇒ direction is free (the machine only gains behaviors) and the ⇐ direction is where the price lands. Check the price at the level of the DATA the two sides append, not at the level of "does the interpreter have an arm for this". Instance (weak-memory C4, a standalone `sc`): `WeakInterp.wrun`'s write arm never inspects `ak_latest`, so it takes a conditional write exactly like a plain one — but it COMPUTES the message class (`WCexcl`) while the abstract step carries the class computed from the label (`WCrel`/`WCplain`), and the reconstruction's induction needs the logs literally equal. The class is inert in every rule of the machine and the top-level theorem is class-independent, and it STILL forced a side condition. The alternative — making the class function read the source program node instead of the label — was rejected because a label-indexed class function is a parameter of the retag machinery upstream.
+- **FOLD A NEW RUN-LOCAL SIDE CONDITION INTO THE EXISTING TARGET-INDEXED PREDICATE INSTEAD OF ADDING A THIRD PREMISE.** The cost of such a premise is not the predicate, it is the SIGNATURE RIPPLE: every bracket lemma, every block lemma, every segment bundle and the capstone's premise list grows a conjunct, across thousands of lines. Two seams of the same kind (here: "the block took no bare exclusive read" and "the block took no standalone conditional write" — both "an exclusive access that is not part of a fused RMW") belong under ONE name whose statement does not change, only its definition; then the downstream files need prose, not proofs. Pay for it once at the SUPPLIERS (each construction of the predicate gains a small vacuity argument), which is where the fact is actually known.
 
 ## Two non-convertible instances of one class in one application do not fail -- they wedge (2026-09-12)
 

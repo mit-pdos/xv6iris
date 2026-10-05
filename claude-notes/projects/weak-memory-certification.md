@@ -1,0 +1,1858 @@
+# The tier-2 containment worklist (was: the certification route)
+
+> **Lean port in progress:** the weak-memory development is being ported to Lean on bookmark `weak` (see [`notes/weak-port-map.md`](../../notes/weak-port-map.md)); file/tactic names below are Rocq ([`claude-notes/LEAN.md`](../../claude-notes/LEAN.md)).
+
+## THE HONEST LEDGER (2026-08-24, THIRTEENTH PASS — end of session)
+## READ THIS FIRST; the AUDIT block and the twelfth-pass checkpoint below
+## are its history
+
+`xv6_rvwmo_safe_modulo_l2''` (PreNorm/Walk2) — tier 1's conclusion for
+every RVWMO⁻(+deps)-consistent, `gdexec_qconf`-conformant (device-quiet)
+execution; `Print Assumptions` = tier 1's five rv64d axioms; every
+hypothesis below is a NAMED theorem premise, none an axiom.
+- (R-1) `l2_claim`: per cycle segment, `seg_pin ∨ cs_hyps ∨ Bad`.  Its
+  kernel content = the `WProt` port convention + the static pin check
+  (1446/1611 sites certified; bridge proved modulo R-3) + the per-site
+  side conditions in `cs_hyps` (`n0 < gwix ACQ`, the protected write
+  does not touch the lock word, `lock_word_byte`) — `lock_pattern` is
+  GONE (replaced by `acq_row`; `lkw2` witnesses the new hypotheses where
+  the old fails).
+- (R-2a) `wsupply_res` = the writer-scope clause (boot PHart for every
+  writing agent — disk DMA stores EXCLUDED, named) + `∃ W tm`: the
+  frozen witness set with `W_poloc_closed` and `wubA`, the per-hart
+  MONOTONE taint map, and `wsite_supply` (per position: the RMW site,
+  the classification `wsite_cls`, and at WRITE positions `wexit_ut` —
+  the exit's instruction reads no tainted carrier: its DEC-7 discharge
+  (a tainted carrier at `z` ⇒ a `row_deps` edge from the witness ⇒ the
+  witness is below `z`) is stated, NOT proved).  Inside `wsite_cls` at
+  a poisoned position: `wpois_site`, which contains
+  `poisoned_no_fault` (the poisoned load's address is mapped — a
+  KERNEL claim of `l2_claim`'s kind; discharged by construction at the
+  instance).
+- (R-2b) `gwrow_gmo` ⇐ `normalize_ww3` + `ww_residue` (`RwwD`-acyclic)
+  + the `co`/`fr` transport arms of `orbit_cycle_transport` (still owed).
+- Scope: device-quiet (`em_devfree`, constant fabric); the full bundle
+  via `fconf_trace_realize` needs the glue mirror (F-a/F-b).
+WHAT THE MACHINERY PROVES END-TO-END: the generic walk derives the LB
+cycle's certification (`cyg_walk'`, values DIFFERING, no coincidence);
+the diverged arm fires on the real spin-load node
+(`w2_seg_step_diverged`); the real nine-node tail re-converges under the
+paired law (`la_tail_par`); the poisoned arm is inhabited at a block
+(`w3_blk`, taint grows `[15]→[15;14]`, nodes differ) but NOT yet inside a
+whole segment (the real tail across the instruction boundary is not
+wired into `seg_step_of_segment`).
+WHAT REMAINS, in order: (1) `wexit_ut`'s DEC-7 discharge (the
+`PinBridge2`-style induction over the emission); (2) the poisoned arm
+inside a full segment (wire `tpar`/`la_tail_par` into
+`seg_step_of_segment`'s boundary crossing); (3) R-1: R-3, the 165
+sites, the final assembly; (4) `ww_residue` + the `co`/`fr` transport;
+(5) F-a/F-b, R6, `wprot_store` width, `WeakRvwmoLock`'s failed-swap arm,
+the decoder audit.  THE RULE that found three vacuities this session:
+every new hypothesis gets a non-coincidental satisfiability witness,
+and a witness constructed to make a hypothesis hold is the vacuity.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
+## AUDIT (2026-08-24, on the user's question "are miscellaneous unproven
+## premises re-appearing?") — YES; READ BEFORE THE TWELFTH-PASS CHECKPOINT
+
+Reading `xv6_rvwmo_safe_modulo_l2''`'s actual hypotheses:
+- INTENDED, honest: `l2_claim`, the WP package family, `prot_reg`,
+  `gwrow_gmo` (scoped).
+- DERIVABLE PLUMBING LEFT AS HYPOTHESES (drift): in `wsupply_res` the
+  hart bound (`gdexec_qconf`'s hart-count clause gives it), `∃ W` with
+  `W_poloc_closed` (a poloc closure), `wubA` (already proved vacuous —
+  `wub_of_witness`), `wrmw_site` (from `gatomicity`).
+- **FALSE IN GENERAL — must be removed:** (a) `cs_hyps` carries
+  `lock_pattern (gd_g GD) b`, the global pattern F4 showed is false for
+  xv6 (failed swaps, pipe lifetimes) — the kill arms reused `cs_chained`
+  with it; replace with the exported `wlp_at`/`wlp_alt`/`wprot_at`
+  facts `prot_reg` supplies.  (b) `wwit_site` demands `lrd_vs c … = vs`
+  — G's row value at a witness equals the candidate's latest bytes —
+  because `lbl_reidx` frees indices only; the LB acceptance test passed
+  ONLY because `cy_img` was built so the values coincide (CycWit ~395
+  says so).  Fix: `lbl_reidx` must allow value substitution at witness
+  positions (the certified row differs in VALUE there; downstream reads
+  only exit messages), and the witness must use differing values.
+- SCOPE, unrecorded until now: `wsupply_res` requires `boot x` to be a
+  `PHart` for every WRITING agent — excludes the disk agent's DMA
+  writes (the disk is a graph agent with real `LStore`s).
+- TRUSTED/OWED, documented: `own` (59 pin witnesses), R-3, the
+  F-variant's `tr_dev_ordered` guard, the checker's Python-trusted parts.
+FIXED (same day): (a) `lock_pattern` is out of the kill — replaced by
+the per-site row fact `acq_row` (the acquire's read entry names zero);
+the contended-lock witness `lkw2` (a failed swap before the reader's
+acquire) discharges every `cs_chained` hypothesis while
+`lkw2_no_pattern` refutes the old one — Closed.  (b) `lbl_reidx_w` lets
+a witness read carry ARBITRARY values (same footprint, `aq = false`);
+`wwit_site`'s value clause is gone; `cy_img` is now all-zero so the LB
+witness's substituted value DIFFERS from the row's
+(`cyg_values_differ`, Closed).  WHAT (b) EXPOSED: a genuinely
+substituted read lands at a DIFFERENT monad node, and `cert_segment'`'s
+invariant is "same node" — the re-convergence lemma (Cert3
+`boundary_reconverge_run`, O-2) is not yet integrated into the
+segment induction; so the generic walk at a witness now carries the
+named premise `wwit_vindep` ("the read's continuation ignores the
+value" — true at the real node, `cy_node_vindep`), not a coincidence.
+`wsupply_res`: the hart bound derived; `wrmw_site` derived; the
+writer-scope clause named (`wsupply_res_no_disk_writes`: disk DMA
+stores excluded); `∃ W` stays (the frozen set is chosen, not data).
+RE-CONVERGENCE, INTEGRATED (2026-08-23), and what it changed.
+`WeakRvwmoCert3` §5b lands `cert_segment''`: the iteration's invariant is
+generalized from "the two runs are at the same node" to `csync` — the same
+node (`clockstep`, register files agreeing off the taint set `T`), OR,
+after a witness, both runs inside the SAME instruction's silent tail
+(`tail_silent`), re-converging at its boundary.  Three findings worth
+keeping:
+- **TERMINATION AT THE BOUNDARY IS A THEOREM, NOT A HYPOTHESIS.**
+  `Interface.iMon` is an INDUCTIVE type, so a monad node is a well-founded
+  tree and `tail_silent_run` builds the run to `Interface.Ret tt` by
+  induction on `tail_silent`.  Nothing in §5b uses `WeakRvwmoProgress.
+  cert_progress`, and no `reaches_boundary` premise exists.  What IS
+  program-specific is only the SHAPE — "the rest of this instruction is
+  administrative" — and that is `tail_silent`, a structural predicate on
+  the node, checkable at a site.
+- **`witness_instr_tail_silent`**: the emission's own administrative
+  stretch out of a witness's successor CANNOT end at a node realizing a row
+  label (a `tail_silent` node emits only administrative labels), so it
+  necessarily factors through the boundary: `ls = ls1 ++ LInstr :: ls2`.
+  That is what makes "between a witness and the boundary there is no memory
+  label" a theorem rather than an appeal to "one access per instruction".
+  It needs the emission device-quiet (`LDev ∉ es.*1`, which `em_devfree`
+  already gives) so the PLIC arm of `pstep_hw` cannot interleave.
+- **THE REAL BLOCKER IS NOT PROGRESS, IT IS THAT THE POLICY INTERFACE IS
+  NODE-BLIND.**  `wblk_pol_at` is handed a `cblk` and the site's LABEL;
+  every witness datum — `tail_silent`, the read-set clause `rds_ok`, and
+  the old `wwit_vindep` — is a property of the monad NODE, which no label
+  determines.  §5b.4 supplies the fix as a parameter: `Nd : nat → M unit →
+  Prop`, closed under one administrative stretch and one block (`ndreach`
+  is the canonical instance whose constructors ARE those closures), handed
+  to the policy at every block by `cert_segment''`.  THREADING `Nd`
+  through `WeakRvwmoCert4.seg_step_of_segment`, `WeakRvwmoWalk`'s
+  `wpol`/`wblk_pol_at`/`wsite_ok` family and `wlk_inv'` is what actually
+  retires `wwit_vindep` — at `cyg` the site datum is then discharged from
+  `WeakRvwmoCycWit.cy_pstep_ld'` (its load node's successor is the same at
+  every answer, so `csync`'s LOCKSTEP arm serves it and `T = []` suffices).
+  NOT DONE; `wwit_site` still carries `wwit_vindep` and `cyg_walk'` still
+  takes it as a named premise.
+- **THE TAINT FRAME IS UNPAIRED** (`WeakEvProv.taint_closure` demands every
+  register a divergent remainder writes be a carrier in the taint set).
+  The real tail of `lw a5,0(a4)` is NINE nodes — measured:
+  `RegWrite x15` (the loaded value), `hart_state` r,r, `nextPC` r,
+  `PC` w, `PC` r, `minstret_increment` r, `minstret` r,w — then
+  `Interface.Ret tt`.  Of its three writes only `x15` is a carrier
+  (`ereg_num PC = None`, `ereg_num minstret = None`), though BOTH runs
+  write `PC` and `minstret` with the same value.  Admitting the full real
+  tail needs a PAIRED law (`tail_par`: one arm for the tainted write, after
+  which the continuations are the same term, and one for the shared node,
+  discharged by `phrun_dagree`), not a bigger taint set.
+NON-VACUITY: `WeakRvwmoCycWit2.v` (a LEAF, NOT in `_CoqProject` — add the
+line `WeakRvwmoCycWit2.v` after `WeakRvwmoWalk2.v`) inhabits `tail_silent`,
+`csync`'s diverged arm and the re-convergence at a load whose VALUE IS USED
+(written into the real destination `a5`) and whose two runs carry DIFFERENT
+values — the two conditions `cy_node_vindep`'s value-INDEPENDENT node could
+not test.  Real there: the load REQUEST (`ld_reql`, hart 1's spin load at
+`main+0x16`) and the destination register; hand-built: the tail, for the
+reason in the previous bullet.
+NEXT: thread `Nd` (and the `csync`-shaped policy conclusion) through Cert4
+/ Walk / Progress / Walk2 so `wwit_vindep` disappears; then the paired
+taint law; then re-run the audit.
+RE-AUDIT after the Nd migration (2026-08-24): `wwit_vindep` retired and
+the value clause gone, BUT `wsupply`'s `wrds_free d0 T` quantifies over
+EVERY block from ANY node ("no emitted block reads a carrier in `T`") —
+false for any `T ≠ []` at a real execution — so the capstone's `∃ W T`
+is satisfiable only at `T = []`: witnesses whose value is never used
+(the `cy_m` shape).  The diverged-arm machinery is PROVED to work
+(`w2_seg_step_diverged` at `T = [x15]`; the real tail via
+`WeakEvProv2.tpar`), but a global fixed `T` with a global read-freedom
+clause was a shortcut.  NEXT (the honest design): per-hart ACCUMULATED
+taint (`T_x` grows at each witness by the tail's written carriers,
+`taint_closure`/`tpar`), a THIRD row-relation arm for POISONED reads
+(any non-write label at a position whose instruction reads a tainted
+carrier — a load whose address depends on the witness; its G-label is
+unreproducible and, not feeding the exit, is irrelevant to the kill),
+and an explicit boundary for the FAULT case (a poisoned address that
+traps changes control flow — either excluded by classification or
+shown to be a pf run the EWPs cover but the row does not follow).
+Only exits are required untainted (deps-independence).
+LESSON for the discipline: "assumptions Closed + tree green" is not
+enough — every NEW hypothesis needs a non-coincidental satisfiability
+witness, and a witness constructed to make a hypothesis hold is the
+vacuity it was meant to catch.
+
+LANDED (the per-hart taint migration).  `wrds_free` is GONE from
+`wsupply`; the taint is `tm : agent -> nat -> list wreg`, monotone
+along each row, and `wlk_inv'` identifies each hart's process with its
+emission off `tm x (gcnt x ...)`.  `cert_segment''`/`seg_step_of_segment`
+take `Tf : nat -> list wreg` with `Tf k ⊆ Tf (S k)`; `csync`/`clockstep`/
+`tail_silent`/`dreg_agree` are monotone in it (`csync_mono` &c).  The
+POISONED arm is a third disjunct of `lbl_reidx_w` (`lbl_poisoned`, loads
+only), of `ctp_step` (`cpois_step`, discriminated from the witness arm
+`cwit_step` by "not G's label" + "not G's footprint") and of
+`cstep_cls`; the policy `wblk_pol_at'` case-splits on
+`rds_ok (∉ tm k) rds` (`rds_ok_dec`).  THE OBSTRUCTION THE DESIGN DID
+NOT NAME: a poisoned load's address is the MACHINE's, so `cinv_replay`'s
+(W-a)/(W-b) for a later TRUE read of the same hart follow from neither
+`W_poloc_closed` nor `wit_fence_ub`.  A universal over candidates is
+FALSE (ctrace_prefix permits a poisoned step anywhere), so it is carried
+as an INVARIANT: `pois_ok_hart` inside `cpol_ctx`/`wctx'`/`wlk_inv'`,
+extended one step at a time by `cstep_pois_ok` (a clause of `wcls_at`,
+free at every non-poisoned route) via `pois_ok_hart_snoc`.  Residuals,
+all per-position and in `wsite_supply`: `wexit_ut` (= exit_untainted, to
+be discharged by DEC-7 dynamic provenance, NOT proved), `wpois_site`,
+and `poisoned_no_fault` inside it — a KERNEL claim of `l2_claim`'s kind,
+recorded in `WeakRvwmoWalk` §7's ledger.  NON-VACUITY: `WeakRvwmoCycWit2`
+§3d (`w3_pair`) — the real `lw` request at two real RAM addresses, a
+`RegRead a5` prefix putting the tainted carrier in the block's read set,
+the two runs' labels related by `lbl_poisoned` and by NEITHER
+`lbl_reidx` NOR `lbl_reidx_sub`, and `csync`'s diverged arm at the taint
+the block itself grew.
+
+## CHECKPOINT (2026-08-24, TWELFTH PASS — end of session) — READ THIS FIRST
+
+**THE RESIDUE, EXACTLY.**  `WeakRvwmoPreNorm2.v` settles where
+`gwrow_gmo` comes from.  `normalize_ww2` (acyclic case) is 8 lines —
+`topo_linearizes` ALREADY performs the ascent (`gpow ⊆ RacyD`) — so the
+exchange kit is not needed; the real content is `normalize_ww3`: the
+linearization section goes through with `gpow` narrowed to SAME-HART
+WRITE→WRITE po (`RwwD`), still yielding `gwrow_gmo`, and `RwwD` does NOT
+contain LB's read→write edges, so cyclic graphs pre-normalize.
+`gwrow_seg_iff` closes off "restrict to covered ranges" (vacuous —
+the walk covers every write).  `Rwwt` (= `gpoww ∪ rf ∪ ppo ∪ deps`)
+transports along `gd_equiv` and its acyclicity is NECESSARY for any
+member to have `gwrow_gmo`; `RwwD ∖ Rwwt = co ∪ fr` — F2′'s arms.
+`wsupply_orbit_pull` was the WRONG statement (it assumed the inversion
+away — `wsupply_orbit_pull_forces_gwrow`); replaced by
+`cycle_kill_of_member` (the kill run at the normalized member,
+conformant by `gdexec_qconf_ren`) under (i) `ww_residue := RwwD`
+-acyclicity (implied by `RacyD`-acyclicity, not by consistency) and
+(ii) `orbit_cycle_transport` — free for `Rwwt`, residual for `co`/`fr`.
+Whole tree green; five rv64d axioms / Closed.
+
+**THE STANDING RESULT.**  `xv6_rvwmo_safe_modulo_l2''` (Walk2/PreNorm):
+for every RVWMO⁻(+deps)-consistent, `gdexec_qconf`-conformant
+execution (device-quiet), tier 1's safety conclusion under
+(R-1) `l2_claim` [its kernel content reduced to the `WProt` port
+convention + the static pin check, 1446/1611 sites certified, bridge
+proved modulo R-3], (R-2a) `wsupply_res` [bounds + the witness set —
+graph facts], (R-2b) `gwrow_gmo` [⇐ `ww_residue` + the `co`/`fr`
+transport].  The capstone's assumptions are tier 1's five axioms.
+
+**WHAT REMAINS, in order:** (1) the `co`/`fr` transport residual of
+`orbit_cycle_transport` (read-pinned pairs transport — state it via
+`gco_rows_rel_mono`'s condition on the cycle's own pairs) and
+`ww_residue`'s discharge for cyclic graphs (an `RwwD` cycle needs two
+same-hart writes inverted AND a cross-hart path back — show it is an
+`R`-cycle through write-pinned edges, killable by the arms); (2) R-1:
+R-3 (`pstep_ev` runs emit `erw_of` groups at the announced word), the
+165 non-certified sites (the `WProt` convention for the ten
+lock-payload sites as M4 ports them; the ~5 ownership idioms), the
+final `l2_claim` assembly; (3) the F-variant's glue mirror, R6,
+`wprot_store` width lift, `WeakRvwmoLock`'s failed-swap arm, the
+decoder audit.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
+## CHECKPOINT (2026-08-24, ELEVENTH PASS) — READ THIS FIRST
+
+**THE GENERIC WALK PASSES ITS ACCEPTANCE TEST.**  After three repairs
+(row-position-indexed policy; the witness route inside the policy with
+`cpol_ctx` carrying only the `ctrace_prefix` bookkeeping; the invariant
+`wlk_inv'` carrying each hart's emission TAIL, process state up to the
+taint, `w_relp` fold and position boundary, with a FROZEN witness set
+`W` as a parameter — `ctrace_prefix` is not monotone under a shrinking
+`wwit`, so accumulation is wrong and freezing is right), `WeakRvwmoWalk2.
+cyg_walk'` derives the LB cycle's whole walk from `wlk_run'` with nothing
+built by hand.  `walk_supply_of_sites`: `walk_supply` from a GRAPH-ONLY
+residue `wsupply` (`gwrow_gmo`, booted-hart bounds, `W_poloc_closed`,
+`wubA`, `wsite_supply` incl. `lb_rmwfree`).  `xv6_rvwmo_safe_modulo_l2'`
+= the capstone at `l2_claim` + `wsupply` (+ WP package + fresh era).
+`cert_segment'` gained frame conclusions (other harts untouched).
+Whole tree green; five rv64d axioms.
+
+**TWO HONEST RESIDUALS in `wsupply`, and what they are:**
+- **`gwrow_gmo`** — one hart's writes reach the log in PROGRAM order.
+  RVWMO⁻ does not imply it (same-hart byte-disjoint stores are
+  unordered by `gppo`), `grule14` does but `cyg` refutes rule 14.  It is
+  exactly the WRITE-WITNESS case B2d's exchange kit handled ((W,W)
+  byte-disjoint swaps, with K2/K3 residuals — themselves `R`-cycles).
+  DISCHARGE PLAN: a pre-pass `normalize_ww` — every consistent `GD` has
+  a `gd_equiv` graph whose same-hart writes are po-ordered, obtained by
+  `WeakRvwmoXchg.gswapw_ww` on each same-hart inversion; blocked pairs
+  are K2/K3 shapes, which are `R`-cycles already covered by the kill;
+  the kill's certificates transport along `gd_equiv` for read-pinned
+  edges (F2′) — state the walk over the pre-normalized graph.
+- **`lb_rmwfree`** at covered positions — wire `Walk2.wcpolp_at` /
+  `cpolp_of_align` into `wQ'` (priced, mechanical).
+
+**Since the tenth pass:** `WeakRvwmoPinBridge2` (`checker_taint_sub_prov`
+proved; residual R-3), repairs 1/2/2b (`2a3cc65d`, `2c3b6c2f`, this).
+
+**`normalize_ww` LANDED (`WeakRvwmoPreNorm.v`) — with findings.**  The
+descending event is a WRITE, so K1 never arises, but write-only
+minimality leaves THREE residuals: `kill_ww_K2` (stale reader), `_K3`
+(cross-hart same-byte write), and NEW **`kill_ww_K4`** (an interval
+read `z` with `gppo z e` or a dep into `e`).  Each is a two-edge `R`
+path `z → e → w` missing only `w →⁺ z`; machine-checked COUNTEREXAMPLE
+(§7: one hart `z = load a; e = store x; w = store y`, gmo `w, z, e`,
+`gppo z e`) is RVWMO⁻-consistent, `R`-acyclic, WW-inverted and
+K4-blocked — so acyclicity does NOT discharge the kills; the graph IS
+normalizable by ASCENDING `w` past `z` (F1's insight on the write side),
+and every blocker of an ascent hands back the missing `w →` edge.
+RMW wiring DONE (`wrmw_site`/`wcpolp_of_sites`; `wsupply` free of
+`lb_rmwfree`).  Capstone now `xv6_rvwmo_safe_modulo_l2''`: residue
+`l2_claim` + `wsupply_res` (bounds + the witness set) + `gwrow_gmo`;
+`_prenorm` trades `gwrow_gmo` for the three kills + `wsupply_orbit_pull`
+(the consumers — `cut_supply`/`cert_supply`/`cycle_kill` — must be
+stated at the pre-normalized `gd_equiv` member; `Rt` transports).
+
+**WHAT REMAINS:** (1) `normalize_ww` with BOTH moves (descend reads/the
+witness; ASCEND `w` past unread byte-disjoint events): prove the
+residual after both is an `R`-cycle (the dual of B2d's descent
+discipline) so acyclicity discharges it; then run the T2-LIN skeleton
+over the class `gwrow_gmo` (closed under hulls) and retire
+`wsupply_orbit_pull`; (2) R-1: PinBridge's R-3 (items are
+`erw_of`'s groups at the announced word — a `pstep_ev` run lemma),
+the 165 non-certified sites (`WProt` convention + ~5 ownership idioms),
+and the final `l2_claim` assembly from `pin_seg_pin'` + the records;
+(3) the F-variant's glue mirror, R6, `wprot_store` width lift,
+`WeakRvwmoLock`'s failed-swap arm, the decoder audit.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
+## CHECKPOINT (2026-08-23, TENTH PASS) — READ THIS FIRST
+
+**State of the residue.**  `WeakRvwmoProgress.xv6_rvwmo_safe_modulo_walk'`
+is the capstone with residue (R-1) `l2_claim` and (R-2) `walk_seg_data`
+= per walk state: the hart's EMISSION (progress-backed from tier 1's
+`reducible` conjunct: `epf_progress_hart`, `cert_progress`,
+`step_at_chosen_answer`), the read/register policy `wpol` (no progress
+content — a finding), and the RMW policy `cpolp`.  The fence hook is
+GONE (a witness never has a fence over its own backward step;
+vacuous at the walk).  **R-1(B)**: `tools/gen_pins.py` +
+`KernelPinsDef.v`/`KernelPins.v` certify **1446 of 1611 load sites**
+with BOTH branch arms and call descent (depth 2) re-checked in Rocq by
+one 0.5 s reflection lemma (census: 991 Stack / 3 PerCpu / 280 Ctrl /
+2 Fence / 170 Dep / 65 Call / 100 Residue; a latent `c.j` hole in
+slice 1 caught; 59 witnesses assume the callee's own `sp`-spills are
+its own — `own`); `WeakRvwmoPinBridge.v` turns a `PDep`/`PCtrl`/
+`PFence` witness into `seg_pin` (`pin_seg_pin`) under ONE precisely
+stated hypothesis, `checker_taint_sub_prov` (the checker's taint walk
+is a sub-approximation of the emission's `dprov` — both run the same
+decoder; what is missing is the induction lining an emission's items
+up with the pc walk), with a real-bytes instance agreeing by
+`vm_compute` (`la_ctrl_checker_agrees`).  Whole tree green.
+
+**WHAT REMAINS:**
+1. `checker_taint_sub_prov` — the induction over `pstep_ev` runs /
+   `adm_lbls` relating `KernelPinsDef.taint_step` to `dstep` along the
+   announce-boundary structure (DEC-7's `erw_srcs_covers` lifted along
+   a run).  Then `l2_claim` at pinned sites is DISCHARGED.
+2. The 165 non-certified sites: 65 `Call` (indirect/deep), 100
+   `Residue` — the ten lock-payload sites + `userret`/`swtch`/trampoline
+   idioms ⇒ the `WProt` convention (A) and the ~5 ownership idioms
+   (boot-published globals, the running proc's trapframe/pagetable,
+   `swtch`'s incoming context) — each needs a small per-idiom argument
+   (same-hart or lock-transfer), stated as `seg_pin`/`cs_hyps`.
+3. **R-2's `walk_seg_data` — VACUITY CAUGHT, REPAIR 1 + REPAIR 2(a) LANDED
+   (`WeakRvwmoWalk2.v`)**: the
+   residue's `wpol` (and `cert_segment'`'s `Hpol'`, `seg_step_of_segment`'s)
+   quantifies over EVERY `cpol_ctx` candidate while its classification
+   speaks of that candidate's own position; the empty candidate is a
+   context, so a store is pinned to its hart's row position 0
+   (`wpol_pins_store`, `walk_seg_data_exit_at_zero`) — any real site
+   refutes `walk_seg_data`, and `xv6_rvwmo_safe_modulo_walk'` is
+   VACUOUS as stated.  Also over-quantified: `wrow_in_log`/`wnw` over all
+   row positions (false for `cyg`'s hart 0), and `wlk_inv` does not
+   record that the state is a certified prefix though `walk_seg_data`
+   assumes `cpol_ctx` of it.  THE REPAIR (half-done): index the
+   per-block policy by row position — `wpol_ix` proved outright from
+   the conformance bundle (`wpol_ix_of_sites`, with §1–§3: the emission
+   per state from `gdexec_qconf` via `hemit_app`, the read/RMW policies
+   at an aligned candidate) — and thread it through `cert_segment'`'s
+   `Hpol'`, `seg_step_of_segment`, and `wlk_inv` (pin each hart's
+   replayed count to its row position).
+   REPAIR 1 DONE (`2a3cc65d`): the policy is row-position-indexed
+   (`wQ`/`wctx`, the alignment inside `Ctx`), **(W-1) `wpol`
+   DISCHARGED** (`wpol_of_sites`); `xv6_rvwmo_safe_modulo_l2` = the
+   capstone with residue `l2_claim` + ONE per-state datum `wseg_supply`
+   (the step's write/position, `W_poloc_closed`, `wub`, `wnw_seg`, and
+   `wseg_align`: the walk state's `pexv6` IS the emission's — `wlk_inv`
+   never ties the state's process supply to the row's emission).
+   OBSTRUCTION 2 — **REPAIR 2 (a) DONE, THE SPLIT**: `cpol_ctx` used to
+   assert `¬ W` at the candidate's OWN position, so a witness position
+   could not carry the context and the substituted route was unreachable
+   through `cert_segment'`.  `cpol_ctx` now keeps only the `ctrace_prefix`
+   bookkeeping + `wit_fence_ub`; the `¬ W` fact is a PREMISE of the
+   TRUE-read case (`cpol_read`), and a witness position is served by the
+   latest-read route (`cert_read_witness`, with the block re-timestamped by
+   the new shape-free `Cert2.cblk_load_retime` — it covers BOTH wlabels
+   `proj_lbl` sends to an axiomatic `LLoad`, plain `LLoad` and `LExLoad`).
+   The policy `wpol_of_sites` now dispatches on `wsrc_or_wwit` (the
+   classification is log-DECIDED given the label) and discharges both
+   routes.  WHAT THE SUBSTITUTED ROUTE COSTS, and it is a real new site
+   datum: `Walk.wwit_site` — at a witness the graph read must be plain
+   (`aq = false`, what `ctp_step`'s witness arm writes), its footprint must
+   exist at the candidate's latest source (`latest_bytes_ok`), and its
+   VALUES must be the candidate's latest bytes (`lrd_vs c base n = vs`),
+   because `lbl_reidx` frees the read INDICES and nothing else.  All three
+   are functions of `G` and the write count (the candidate is pinned by
+   `cd_img = gx_img G` + `wlog_pfx G n`), so they are site data.  FALLOUT:
+   `wnw_seg` is GONE from `wctx_pres`/`wlk_seg_of_cert`/`walk_seg_data'`
+   (it existed only to feed the deleted clause); `wsite_ok` lost `wsrc_le`.
+   THE ACCEPTANCE TEST, at `cyg` (`Walk2` §6.2): `cyg_ctx0` (the exact
+   negation of the old `cyg_no_ctx0`), `cyg_wwit_site00`, `cyg_wQ_seg0`
+   (the site data at a WITNESS position — unstatable before), and
+   **`cyg_step0_generic : wlk_step cyg d0 cw_S0 0`** built by the GENERIC
+   engine (`wlk_seg_of_cert` + `wlk_step_of_seg`) from `cy_hart_conf`'s own
+   emission, no hand-built block.  All at the five rv64d axioms.
+   **REPAIR 2 (b) NOT DONE — and this is what blocks a whole `cyg_walk'`:**
+   `wlk_inv` still records only the candidate/image/boot/log-prefix, NOT
+   the hart's process state, NOT its row position, and NOT the carried
+   context (which is indexed by the write count `n`, so it must be
+   re-established at every step).  Hence `wseg_align` + `wctx` stay in
+   `wseg_supply`, and the walk cannot be CHAINED generically: the segment
+   theorem's output state is existential, so a second generic step cannot
+   be applied to it.  NEXT: `wlk_inv` carries `hemit_states`' state per
+   hart (modulo `dreg_agree` off the taint, with the `w_relp` fold) plus
+   the hart's row position and a `ctrace_prefix` for the CURRENT `n`
+   (`wwit_poloc_closed`: a same-byte later read after a witness has a
+   source ≥ the witness's, so it is a witness too).  Then `wseg_align` is
+   derived, the residue drops to the step's write/position, and
+   `cyg_step0_generic` becomes `cyg_walk'`.  Until then the honest
+   capstone form is `xv6_rvwmo_safe_modulo_l2` (R-2 as `wseg_supply`).
+4. The F-variant's glue mirror; **R6**; `wprot_store` width lift;
+   `WeakRvwmoLock`'s failed-swap arm; the `c.j`-style decoder audit
+   (bitmask vs Sail, `KernelSitesDef` §6.6).
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
+## CHECKPOINT (2026-08-23, NINTH PASS) — READ THIS FIRST
+
+**R-2 IS AN ENGINE NOW.**  `WeakRvwmoWalk.walk_supply_of_policy`: the
+certification walk iterates the graph's writes in gmo order from the
+EMPTY candidate (Glue2's zero cut, used), one `cert_segment'` per
+write, and yields `walk_supply`; what it still asks per step is the
+honest ledger (W-1) `wpol` — the read/register policy carrying
+progress, (W-2) `wub` = `wit_fence_ub`, (W-3) `wcls` (decidable from
+the log), (W-4) `wnw`; plus (O-E) three bookkeeping equations
+`cert_segment'` establishes but does not state, and (O-F) RMW segments
+(`HEpair`) out of scope.  `xv6_rvwmo_safe_modulo_walk` is the
+capstone with (R-2) replaced by the policy.  **THE LB CYCLE WITNESS
+`WeakRvwmoCycWit.cyg`** (real `sw`/`lw` requests with the address
+changed, a three-node hand-built monad with the `InstrAnnounce`
+boundary) is consistent, conformant, carries `tc (RacyD) (0,0) (0,0)`,
+and **runs the walk end to end** (`cyg_walk`: hart 0's load
+substituted at the empty log, hart 1's true).  FINDING: without the
+`InstrAnnounce` boundary the load and store are one instruction and
+`ds_ld` emits the rule-13 edge, making LB INCONSISTENT — the announce
+is what resets `ds_ld`.  Whole tree green; all at the five axioms.
+
+**LEDGER CLOSED (same day):** (O-E) `cert_segment'` states the three
+bookkeeping equations; (O-F) the RMW block is certified in place
+(`cpolp`, never a witness); (W-4) `wnw` from the log-decided witness
+set `wwit`; (W-3) `wcls` ABSORBED into the policy's `Cls` output
+(finding: the classification is not derivable from graph/log facts —
+`lbl_reidx` is exactly the relation that lets indices differ).  The
+walk's remaining hypotheses: **(W-1) `wpol`** (the read/register
+policy, carrying progress and the classification) and **(W-2) `wub`**
+(`wit_fence_ub`), plus the graph datum `wrow_in_log`.
+
+**R-1(B) SLICES 1 AND 2 LANDED:** `tools/gen_pins.py` +
+`KernelPinsDef.v` + `KernelPins.v` + `WeakRvwmoPinBridge.v`.  Slice 2
+moved the three Python-trusted parts into Rocq: control flow is DECODED
+(`kflow_of` — slice 1 read it off the roles and `c.j` has none, a latent
+hole, no landed witness affected), the walk DESCENDS INTO CALLEES (a
+return stack of depth 2, so a witness pc may sit inside a callee and the
+callee-summary table is audit-only), and BOTH BRANCH ARMS are searched
+(`pdfs`, a fuel-bounded DFS with a visited set) — the `all_paths` column
+is now a `vm_compute` fact.  ONE new assumption, carried IN the witness
+as `own : bool`: skipping stores based on `sp` (the dual of `PStack`).
+Census 1611 loads: **1446 certifying** (991 Stack / 3 PerCpu / 280 Ctrl /
+2 Fence / 170 Dep), only **59** of them needing `own = true`; residue 65
+`PCall` + 100 `PResidue`.  Of slice 1's 162 `PCall` sites, 64 became
+pins, 33 moved to the residue; exactly one site was DOWNGRADED by the
+all-paths check and is kept as a negative `Example`.  Timings:
+`KernelPinsDef.v` 28 s, `KernelPins.v` 2.6 s (`image_pinnedb` Qed 0.54 s
+— no sharding), `WeakRvwmoPinBridge.v` 11 s / 1.4 GB.  THE BRIDGE proves
+the emission-side arithmetic outright (`row_deps_item`, `dedges_reg`,
+`ds_run_ctl_sub` — a control item taints every po-later store) and
+derives `pin_seg_pin` in Glue's vocabulary under ONE stated hypothesis,
+`checker_taint_sub_prov` (the checker's taint ⊆ the emission's
+provenance — both sides run the same decoder; what is missing is the
+induction lining an item list up with a pc walk).  §7 exhibits the
+agreement on `WeakRvwmoAdm`'s computed stretch.  See route-b §4g.1.
+
+**WHAT REMAINS:**
+1. R-1(B) slice 3: DISCHARGE `checker_taint_sub_prov` (the announce-
+   boundary induction over `pstep_ev` runs, with DEC-7's `erw_srcs_covers`
+   pointwise fact lifted along a run), and supply the site oracle from
+   `WeakRvwmoAdm`-tier machinery.  The 100 + 65 residue ⇒ the `WProt`
+   convention (A) as M4 ports them; a deeper inlining depth or a jump-table
+   decoder would move some of the 65 `PCall`.
+1b. (W-1)/(W-2) are the EWPs' content (progress; the fence hook) —
+   state them once against the WP package and discharge from the
+   adequacy theorem (a sibling export), not per site.
+2. **R-1, L2′ proper** — (A) the `WProt` port convention; (B)
+   `gen_pins.py` + `KernelPinsDef.v` (§4g.1), then the bridge to
+   `seg_pin`.
+3. The F-variant's glue mirror; **R6**; `wprot_store` width lift;
+   `WeakRvwmoLock`'s failed-swap arm.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
+## CHECKPOINT (2026-08-23, EIGHTH PASS — THE MILESTONE) — READ THIS FIRST
+
+**`WeakRvwmoCapstone.xv6_rvwmo_safe_modulo` IS THE TIER-2 CAPSTONE MODULO
+TWO NAMED HYPOTHESES.**  For every RVWMO⁻(+deps)-consistent graph that
+is `gdexec_qconf`-conformant to the booted image (device-quiet scope):
+T2-LIN (`RacyD` acyclic), a realized cand with an `exec_prog_ok'`
+supply and its erased pf run (log identified), φ's
+`violation_hart`-freedom, and progress — `xv6_srvwmo_safe`'s
+conclusion verbatim — under (R-1) `l2_claim` (the per-site
+classification) and (R-2) `walk_supply` (the certification walk).
+`Print Assumptions` = exactly tier 1's five rv64d reservation axioms;
+the two residues are hypotheses, not axioms.  The full-bundle variant
+`xv6_rvwmo_safe_modulo_F` (moving fabric, via `fconf_trace_realize`)
+takes the revised dev-order acyclicity as a hypothesis; its glue
+mirror is enumerated (F-a/F-b).  Whole tree green.
+
+**Since the seventh pass:** Glue2 (`walk_supply` as the residue; the
+zero-cut finding) — `5cead230`; the two-hart emission witness
+(`WeakRvwmoConfWit2.v`) — `5ad2c28d`; the `esil → adm_run` bridge
+(`WeakRvwmoAdm.v`; fetches are row events) — `23c08c0e`; the capstone
+— this commit.
+
+**WHAT REMAINS — the project's content from here:**
+1. **R-2 `walk_supply`**: the certification walk around a cycle from the
+   realized hull (Cert4's `segs_run` + Glue2's `cpol_Hpres`, exits in
+   gmo order, ending with the whole graph's writes in the log), with
+   `wit_fence_ub` and progress inside.  Leaf-sized, now that multi-event
+   rows emit (`WeakRvwmoAdm`).  Build the `RacyD`-cycle witness (four
+   blocks, two per hart — mechanical now) FIRST so the walk is checked
+   non-vacuously.
+2. **R-1 `l2_claim` — L2′ proper**, REDUCED (route-b §4g/§4g.1): (A) the
+   port convention (payload accesses through the `WProt` rules) and
+   (B) the static site check — `tools/gen_pins.py` (untrusted witness
+   generator over the existing `gen_sites.py` walk) + `KernelPinsDef.v`
+   (a `vm_compute` re-checker with one reflection lemma), residue ≈
+   10–40 `WProt` sites + ~5 ownership idioms; then the bridge
+   "pinned witness at the site ⇒ `seg_pin`".  Census: 1611 loads, 620
+   non-`sp`, 10 unpinned-before-store (all lock-payload).
+3. The F-variant's glue mirror; **R6** (the deletion contract, the
+   `lb_rfoldfree → lb_ldepfree` items, `WeakCertify` archival,
+   `WeakAxiomatic.acq_po`'s narrowing); `wprot_store` width lift;
+   `WeakRvwmoLock`'s failed-swap arm.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
+## CHECKPOINT (2026-08-23, SEVENTH PASS — the session's closing state)
+## READ THIS FIRST
+
+**THE MILESTONE: T2-LIN MODULO THE PER-SITE CLAIM.**  `WeakRvwmoGlue.v`
+(`t2lin_of_l2`) derives `cycle_kill` — hence `RacyD`-acyclicity of
+every conformant graph, hence (via `t2lin_supply`/`topo`/T2-1c/T1) its
+realization — from `l2_claim boot d0 P Bad`: "at every certified
+configuration of every `R`-cycle's segment list, each segment is
+graph-PINNED (`gacq_po ∨ gfence_covers ∨ gd_deps`), CS-CHAINED
+(`cs_hyps`: the reader's section + the exported `wprot_at`/`wlp_at`/
+`wlp_alt` at the certified log, two honest side conditions), or BAD
+(φ refutes)".  `l2_claim` is a HYPOTHESIS, never an axiom; the
+adequacy composition (`run_erased`, `prot_reg_of_run`, `no_bad_run`)
+is proved; `weak_ev_adequacy_lockalt` turned out subsumed by `_prot`.
+Three residual premises besides the claim, all named in the file's
+§9: (G-2) `cut_supply` — the SCC's causal past as a `cut_ok` cut
+(rf-closed, proper, and WRITE-CLOSED, Cert4's (O-B)); (G-3)
+`cert_supply` — slice 3's solo-run certification delivered as a
+`run_data` (Cert4's `cert_cycle` + (O-C)/(O-A)); (G-4) `boot_tie` —
+`gdexec_qconf` has no image/hart-count clause tying it to the booted
+σ0 (FIX: add one to `gdexec_qconf`, free at every producer).  Whole
+tree green.
+
+**Everything landed this session, in files:** Acyc, ProbeK1/Restr/Swap,
+Topo, Hull, Dec, Supply, LinInd, ConfWit, Fab, FabInd, Cert, Cert2,
+Cert3, Cert4, Floor, Lin2, KillArms, Glue (route-B leaves); the
+exports F3′/F3″ in WeakGhost/WeakStore/WeakLock/WeakEvAdequacy; DEC-4..7
+in WeakDeps/WeakEvLang/WeakEvInst/WeakLang + WeakEvProv (the soundness
+spine).
+
+**(G-2)/(G-3)/(G-4) — DONE (`WeakRvwmoGlue2.v`, same day):** `gdexec_qconf`
+gained the image/hart-count clause (`boot_tie` gone); `cut_supply` is
+discharged by the ZERO cut — the glue's `cut_ok` never relates the cut
+to the cycle, so the intended write-closed causal past buys nothing at
+that interface (and is NOT provably proper in general: rf-closure can
+climb above another hart's entry, recorded in §2.4); `cert_supply`
+reduces to **`walk_supply`** — the certification WALK itself (Cert4's
+`segs_run` over the cycle, ending with a FULL-graph `log_of`), with
+(P-1) `Hpres` discharged (`ctrace_prefix_snoc`, `cpol_Hpres`) and the
+exits' gmo order FORCED (`walk_exits_gmo_forced`), not assumed.  The
+final premise list of `t2lin_of_l2''`: fresh era + boot equations,
+`l2_claim`, `walk_supply` (inside it: `wit_fence_ub` per witness and
+progress), the WP package.
+
+**WHAT REMAINS:**
+1. **`walk_supply`** — run `segs_run` around the cycle from the realized
+   hull (`hull_run`) processing exits in gmo order, with `cstep_cls` at
+   each step, and end with the whole graph's writes in the log (the
+   remaining non-cycle writes appended by the same solo machinery) —
+   the last piece of §4d.2(2).
+   WITNESS STATUS (`WeakRvwmoConfWit2.v`): the SECOND emitted block
+   exists — hart 1's real `lw started` (built from the image at
+   `main+0x16`, plain, same byte the store writes) — giving the first
+   two-row `gdexec_qconf` (`mpw`/`mpw'`, MP both ways) and the first
+   two-hart `exec_prog_ok'` supply (`mp_supply`).  A genuine `RacyD`
+   CYCLE witness needs two-event rows, whose only missing mechanism is
+   the `esil → adm_run` BRIDGE (the ~200 silent nodes between a load's
+   resume and the next store, certified at the WP tier in
+   `WeakEvStarted` §4 but never as `adm_run` at the `pstep_ev` tier) —
+   leaf-sized, not a design problem; the same-hart carrier is the
+   `beqz` control dep `dstep` already records.
+2. **L2′ proper — prove `l2_claim` for xv6's image**: per site class
+   (S6 §3's inventory: aq/fenced/branched/data-fed/CS-covered/bad),
+   from the emission (site records, `row_deps`) and the certified
+   configuration.  This is the kernel claim and the project's remaining
+   content; it needs a 2-hart emitted cycle witness first (the second
+   emitted block) to keep it non-vacuous.
+3. **B3**: compose `t2lin_of_l2` + `t2lin_supply` + T1 + adequacy into
+   `xv6_rvwmo_safe` modulo `l2_claim` (device-quiet; then the full
+   bundle via `fconf_trace_realize`); **R6**; `wprot_store` width lift;
+   `WeakRvwmoLock`'s failed-swap arm.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
+## CHECKPOINT (2026-08-23, SIXTH PASS) — READ THIS FIRST
+
+**Landed since the fifth pass:** slice 3c the CYCLE CERTIFICATION
+(`WeakRvwmoCert4.v`: `cert_cycle`; the forced finding that a
+`ctrace_prefix` appends writes in gmo order — `ctp_wix_gmo_mono` — so
+certification runs in a gmo-respecting order, and the cut must be
+write-closed, `wcut_closed`/`hren_id`) — `d4584de7`; **B2e-3c's
+ARITHMETIC** (`WeakRvwmoKillArms.v`: `cycle_kill_arms` over
+`Pinned`/`CSchained`/`Bad` certificates, needing NO `grule14`;
+`cs_chained` in BOTH window orders from F3′/F3″'s log predicates via
+the dictionary `log_of` (log position p ⇔ write index S p); `lkw` — a
+4-byte-lock witness discharging every hypothesis, since `lkg`'s 1-byte
+lock cannot satisfy the word fold; LB's two-segment cycle fires iff
+both `Pinned` certificates exist) — this commit.  Whole tree green.
+
+**WHAT REMAINS (assembly-facing):**
+1. **Glue `cert_cycle` to `cycle_kill_arms`** — the B2e-3c DISCHARGE of
+   `cycle_kill`: per segment, produce its certificate from the certified
+   configuration: `Pinned` from rule 4/5/`gd_deps` (graph arithmetic);
+   `CSchained` from the exports at the certified run's final state
+   (`weak_ev_adequacy_lockalt`/`_prot` applied through T1's run — the
+   adequacy-level step that turns `cert_cycle`'s cand into a machine run
+   whose log is the cand's; `prot_read` records at `cert_cycle_pos`) plus
+   the row facts; `Bad` from φ (`weak_ev_pf_violation_free` at the read
+   step).  THE PER-SITE CLASSIFICATION (every segment gets one) is the
+   L2′ claim; state it as the hypothesis of the glue and attack it
+   site-class by site-class.  Honest side conditions found by the arms:
+   `n0 < gwix ACQ` (registration precedes the reader's acquire), the
+   protected write does not touch the lock word, `lock_word_byte`.
+2. Small: export `tfull` from `WeakRvwmoLin2` (O-D); `WeakRvwmoCert3`'s
+   P-1 `Hpres`; a second emitted block for a 2-hart witness.
+3. **B3** assembly (`t2lin_of_cycle_kill` + `t2lin_supply` + T1 +
+   adequacy) at the device-quiet milestone; then the full bundle via
+   `fconf_trace_realize`; **R6**; `wprot_store` width lift;
+   `WeakRvwmoLock`'s failed-swap arm.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
+## CHECKPOINT (2026-08-23, FIFTH PASS) — READ THIS FIRST
+
+**Landed since the fourth pass:** the certification WIRING
+(`WeakRvwmoCert3.v`: `floor_ok` discharged, `witness_not_aq` proved,
+the RMW block closed, re-convergence at `Ret tt`; the honest
+`wit_fence_ub` hook) — `afb588df`; **T2-1c′** (`WeakRvwmoLin2.v`:
+`gtrace_linearization` — ANY linear extension of `po ∪ rf ∪ gmo|W`
+with reads at their G-sources is an `srvwmo_consistent` cand with the
+same image/rows/log, NO renaming and `grule14` NOT needed once the
+trace is given; T2-1c's rank trace is one such extension
+(`glin_ptrace_ext`, `rule14_linearization'`); the dev-order version
+in full — `gfexec_consistent'` (acyclicity of `po ∪ rf ∪ gmo|W ∪ dev`),
+`ptrace_exists_F`, `tr_dev_ordered_of_ptrace`, **`fconf_trace_realize`**:
+from the revised bundle axiom + `gfexec_conf`, a realized cand with an
+`exec_prog_ok'` supply at the MOVING fabric) — this commit.  Whole
+tree green (`make -k`, EXIT=0) with every new leaf registered.
+
+**WHAT REMAINS:**
+1. **Slice 3c** — the cycle-order iteration of `cert_segment'` from a
+   backward step (route-b §4e), with P-1..P-4's bookkeeping
+   (`Hpres`; `src_in_log` as data from the gmo-order processing;
+   `wit_fence_ub`; progress as the EWPs' content), producing the
+   certified configuration and its log/`prot_read` facts.
+2. **B2e-3c — discharge `cycle_kill`** (the three arms; L2′ proper).
+3. **B3** at the device-quiet milestone (and, with `fconf_trace_realize`,
+   at the full bundle: switch `cycle_kill_F`'s realization to it and
+   retire the `tr_dev_ordered` guard), **R6**, `wprot_store` width
+   lift, `WeakRvwmoLock`'s failed-swap arm.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
+## CHECKPOINT (2026-08-23, FOURTH PASS) — READ THIS FIRST
+
+**Landed since the third pass:** B1b-2's residue + the T2-1c/dev-order
+finding (`WeakRvwmoFabInd.v`) — `d912e8cf`; slice 3a cand extension
+(`WeakRvwmoCert.v`: `srvwmo_consistent = exec_wf`, stepwise
+`snoc_consistent`, older-source reads admissible under `cd_floor`) —
+`ebd1ffbd`; slice 3b SEGMENT CERTIFICATION (`WeakRvwmoCert2.v`:
+`cert_segment` proved, `seg_exit_write` verbatim) — `2931df6d`; THE
+FLOOR DISCHARGE (`WeakRvwmoFloor.v`: `floor_of_graph` — the machine's
+coherence floor is five agent-local watermarks each bounded by one
+ppo⁻ arm, NO message views; `gtrace_snoc_read/write_consistent`, the
+induction steps of T2-1c′ — all Closed) — this commit.
+
+**THE REMAINING CHAIN, in order:**
+1. **Wire `floor_of_graph` into `cert_segment`'s `floor_ok`** (its
+   hypothesis is exactly `WeakRvwmoFloor`'s conclusion once the
+   certified cand is a `gtrace_prefix` of the graph with witnesses
+   re-sourced — define that correspondence) and discharge 3b's O-1
+   (the `HEpair`/RMW block twin) and O-2 (re-convergence after a
+   witness at the next `Ret`: the EWPs' progress).
+2. **Slice 3c** — the cycle-order iteration of `cert_segment` from a
+   backward step, producing the certified configuration (route-b §4e
+   "SLICE 3's SHAPE"), and the log/`prot_read` facts the kill reads.
+3. **B2e-3c — discharge `cycle_kill`** (route-b §4d.2(3)): the three
+   arms at the certified configuration; consumes `wlp_alt_two_acq`/
+   `wlp_alt_open` (F3′), `wprot_writer_cs` (F3″), φ.  The CS-chained
+   arm's window order is row data when the acquire's `ts` names the
+   other section's release.  L2′ proper.
+4. **T2-1c′** — `gtrace_linearization` (WeakRvwmoFloor §10: O1 list
+   arithmetic, O2 the rf arm, O6 `rmw_latest` via `gatomicity`), which
+   also gives B1b-2 its dev-respecting trace (axiom revised to
+   acyclicity of `po ∪ rf ∪ gmo|W ∪ dev`).
+5. **B3** assembly at the device-quiet milestone; **R6**; `wprot_store`
+   width lift; `WeakRvwmoLock`'s failed-swap arm.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
+## CHECKPOINT (2026-08-22, THIRD PASS — end of the session) — READ THIS
+## FIRST; the two checkpoints below it are the design record and the
+## mid-session landing record
+
+**Landed since the second-pass checkpoint (commit order):** B1b-1 the
+quiescent supply derivation (`WeakRvwmoSupply.v`, `supply_of_qconf`,
+`cand_ws_relp`) — `75aadd32`; B2e-3b slice 2a DYNAMIC PROVENANCE
+(DEC-7; `WeakEvProv.v`'s spine) — `a8bf11ed`; the T2-LIN INDUCTION
+SKELETON (`WeakRvwmoLinInd.v`: `cycle_kill`, `t2lin_of_cycle_kill`,
+`hull_realizable_of_acyclic`, non-vacuity both ways) + the `hemit`
+witness (`WeakRvwmoConfWit.v`, the real `sw &started`) — `cbdeacd7`;
+B1b-2 the FABRIC ORDER as bundle data (`WeakRvwmoFab.v`: `gfexec`,
+`RacyF`, `topo_linearizes_F`, `supply_of_fconf`; a vacuity in the
+orchestrator's own bundle spec caught and fixed by `hemitf`) —
+`63bb2e89`; B2e-3b slice 2b the PER-INSTRUCTION SOUNDNESS LEMMA
+(`WeakEvProv.v` §§6–10: `instr_dagree`/`instr_dagree_ev` — the
+certified run can be built to follow the emission step for step,
+hence equal write labels; `taint_closure`/`taint_closure_load`; a
+non-vacuity fragment) — this commit.  Everything Closed or at the five
+rv64d reservation axioms; tree green after each bottom-of-tree edit.
+
+**THE REMAINING CHAIN, in order:**
+1. **B2e-3b slice 3 — the certification induction** (route-b §4e
+   "SLICES 2b/3, STATED"): the gmo-ordered induction over an SCC's
+   writes maintaining the per-hart taint invariant, at the quiescent
+   fabric (B1b-1) first; it needs the per-form inventory for "which
+   register a load's `RegWrite` taints" (the decoder's `rd`, DEC-4's
+   join) and composes `instr_dagree` (untainted instruction ⇒ equal
+   labels) with `taint_closure_load` (a substituted read taints `rd`).
+   Its honest boundary: a tainted value reaching the PC is a control
+   divergence — excluded by ctrl-deps into stores and `sret`/`mret`'s
+   DEC-6 role, but NOT for a trap taken on a tainted address; decide
+   whether the solo run's traps are covered by the EWPs (they are pf
+   steps of the verified program) or excluded by classification.
+2. **B2e-3c — discharge `cycle_kill`** (the three arms at the certified
+   configuration: pinned / CS-chained via `_lockalt` + `_prot` /
+   bad via φ), composed with `hull_realizable_of_acyclic` (the IH
+   realized) and T1's run.  This is L2′ proper.
+3. **B1b-2's residue** (`WeakRvwmoFab.v` §8 O1–O5: the conformance
+   restriction to `gf_hull`; the `cycle_kill_F` mirror); an
+   `LDev`-emitting witness (none exists in the tree).
+4. **B3** assembly (`t2lin_supply` ∘ T1 ∘ adequacy with `gfexec_conf`
+   as the conformance hypothesis), **R6**; the width-4/8 lift of
+   `wprot_store`; `WeakRvwmoLock`'s failed-swap arm (witness hygiene).
+
+**Tree:** `xv6-riscv/` remains off `XV6_REV`; never `make proofs` from
+the root; `make -f CoqMakefile` inside `iris/` only.
+
+## CHECKPOINT (2026-08-22, SECOND PASS — end of the build session)
+## READ THIS FIRST; the design-session checkpoint right below stays as the
+## design record (its "next session" list is superseded by this one)
+
+**LANDED TODAY, after the design session, in commit order:** B2d′(a)
+the DIRECT LINEARIZATION (`WeakRvwmoTopo.v`: `topo_linearizes`,
+`topo_exists`, `normalize_of_acyclic`) + B1a′ CAUSAL HULLS
+(`WeakRvwmoHull.v`) — `af07389e`; the `Decision (RacyD)` instance
+(`WeakRvwmoDec.v`) + the W-TV line in `dedges` — `53b21cfb`; T2-0′/F3′
+the lock ALTERNATION export (`weak_ev_adequacy_lockalt`,
+`wlp_alt_two_acq`/`wlp_alt_open`) — `5c2b4c3e`; F5′ load-address
+provenance (`deps_addr`, DEC-4) — `2b8633fe`; T2-0′/F3″ the
+PROTECTED-BYTE export (`WProt`, `weak_ev_adequacy_prot`,
+`wprot_writer_cs` = `(P)`) — `57e468bb`; the satp-provenance edge
+(DEC-5) — `104cb3d2`; CSR provenance uniformly (DEC-6: 21
+pseudo-registers, `ORcsr` two-destination role, `sret`/`mret` as
+`jalr`-like on `sepc`/`mepc`) — this commit.  Every landing: tree
+green by `make -f CoqMakefile -k` (re-run by the orchestrator),
+`xv6_srvwmo_safe`'s assumptions unchanged (five rv64d reservation
+axioms), no Admitted.  THE CHAIN IS NOW: T2-LIN ⇒ `RacyD` acyclic ⇒
+`topo_linearizes` ⇒ T2-1c ⇒ T1; `normalize` is demoted to analysis.
+
+**WHAT REMAINS (in order):**
+1. **B1b-1 DONE** (`WeakRvwmoSupply.v`: `gdexec_qconf` the QUIESCENT
+   bundle, `gdexec_qconf_hull`/`_ren`, `cand_ws_relp` (the machine's
+   per-agent relp at a trace position = the row fold — Closed),
+   `supply_of_qconf` the interleaving theorem, `hull_supply`,
+   `topo_supply` (pair it with `WeakRvwmoDec.racyD_dec`)).  REMAINING:
+   **B1b-2** the fabric order as bundle data (route-b §4d.4 B1b entry),
+   and a one-instruction `hemit` non-vacuity witness (B0b-1's open
+   question, inherited).
+2. **B2e-3b slice 2a DONE — DYNAMIC PROVENANCE (DEC-7)**: the
+   per-instruction channel `ibch` carries the carrier-register read
+   set; `erw_of` sources are dynamic (decoder still picks destinations
+   and the control GATE — ungating it would be a strengthening beyond
+   hardware); `WeakEvProv.v` has the soundness spine: `dreg_agree`,
+   `pnode_step_dagree`, `erun_silent_dagree`, `erun_ib_rds` (the
+   channel accumulates exactly the stretch's carrier reads),
+   `pstep_ev_dagree`.  REMAINING slice 2b: the per-INSTRUCTION
+   statement with memory answers (obligations P-a..P-d enumerated in
+   `WeakEvProv.v`'s header; P-c is a certification hypothesis, P-d the
+   iteration that needs slice 3's statement).  Residual: trap ENTRY
+   has no `stvec` edge (xv6 writes it from constants).
+3. **B2e-3b slice 3** — the gmo-ordered solo-run certification
+   (§4d.2(2)) on top of 1–2.
+4. **B2e-3c** — the per-segment classification.  The T2-LIN INDUCTION
+   SKELETON IS DONE (`WeakRvwmoLinInd.v`: `proper_cut`, `hull_events_lt`,
+   the kill interface `cycle_kill boot d0`, `hull_realizable_of_acyclic`
+   (the IH turned into a realized cand, rows up to the retiming `π`),
+   `t2lin_of_cycle_kill`, `t2lin_supply`; non-vacuity `lbgd_cycle` and
+   `mpgd_acyclic`).  What remains is DISCHARGING `cycle_kill`: the
+   three arms (pinned / CS-chained via `_lockalt` + `_prot` / bad via
+   φ) over the certified configuration of slice 3.  Also done: the
+   `hemit` non-vacuity witness (`WeakRvwmoConfWit.v`, the real
+   `sw &started` of `main`, `hart_conf_nonempty`).
+5. **B3** assembly, **R6**; the width-4/8 lift of `wprot_store`; the
+   `lock_pattern` failed-swap arm in `WeakRvwmoLock.v` (now only the
+   witness kit's hygiene, since the kill consumes the exports).
+
+**Tree:** `xv6-riscv/` is still off `XV6_REV` — never `make proofs` from
+the root here; `make -f CoqMakefile` inside `iris/` only.
+
+## CHECKPOINT (2026-08-22, end of the B2e-3 DESIGN session) — READ THIS
+## FIRST WHEN RESUMING; the 2026-08-21b checkpoint below is SUPERSEDED
+## (kept for its landing record and design pointers)
+
+**What this session did.**  Ran the B2e-3 design session S6-style against
+route-b §4d's three candidates and found the problem mis-posed; the
+result is a NEW §4d in `../design/weak-memory-route-b.md` (read §4d.1
+findings F1–F6, §4d.2 the design, §4d.3 the two exports, §4d.4 the
+staging, §7 the probes).  Nothing landed in the chain; the deliverables
+are the design and the machine-checked probe witnesses listed below.
+THE HEADLINES: (1) `kill_K1` is stronger than the theorem needs — the
+normalization has a SOURCE-DESCENT move, and the only genuine residual
+is a cycle of `R := po|→W ∪ rf ∪ co ∪ fr ∪ ppo⁻ ∪ deps` through the
+violation (F1/F2 — with F2′'s correction: `co`/`fr` count only where a
+read pins them); (2) the kernel claim is therefore ONE sentence,
+T2-LIN: no violation lies on an `R`-cycle — and a topological order of
+`R` is itself the rule-14 gmo, which likely RETIRES the exchange kit as
+the chain's first step (B2d′(a), §4d.4); (3) the old wild-value crux
+dissolves into: strong induction on |V| over CAUSAL HULLS (every
+informative hull of a non-saturated cycle is a proper sub-graph, so the
+IH kills it for free), plus — for the saturated case only —
+CERTIFICATION of the cycle's SCC by gmo-ordered solo runs (route A's
+E1, made precise: §4d.2(2)); (4) two exports are needed, both T2-0's
+mechanism — ALTERNATION (holder-pairing of the lock word, F3′) and the
+PROTECTED-BYTE FOOTPRINT with access records (F3″) — and F3″ costs
+almost nothing NOW because the weak-logic kernel port (M4) has no lock
+client yet: shape the interface before the sweep reaches one;
+(5) three defects in landed/assumed pieces: `restr_ok` cannot express
+B1b's prefix (other harts' early reads — F3), `lock_pattern` is false
+for any contended lock (failed `amoswap` iterations — F4a) and for any
+pipe lock over its lifetime (F4b), and `dedges` drops the W-TV edges
+(`ds_ld` accumulated, never consumed — F5).  Rule-9-load is NOT needed
+(F5, with the reason).
+
+**Probe witnesses (iris/, each a leaf; add to `_CoqProject` when
+committing):** ALL FOUR LANDED, every theorem
+`Qed`, `Print Assumptions` Closed.  `WeakRvwmoAcyc.v` (P5: `R_acyclic`,
+`gcaus_acyclic`, `caus_cycle_gviol`, the `Rt`/`gcaus` orbit transports —
+and the NEGATIVE result that `co`/`fr` do not transport, which produced
+F2′: the obligation is disjunctive over the per-byte write order, and
+unread same-byte pairs must be swappable), `WeakRvwmoProbeK1.v` (P4:
+`¬ kill_K1` at a graph with `mpg_normalizes`), `WeakRvwmoProbeRestr.v`
+(P2: `∀ cs, ¬ restr_ok erg 1`, unconditional), `WeakRvwmoProbeSwap.v`
+(P1: contended-lock graph consistent, `¬ lock_pattern`, `lock_paired`
+intact).  Read route-b §4d.1 F2′ before touching the normalization or
+the kill tree.
+
+**TREE STATE WARNING.**  This checkout's `xv6-riscv/` clone is at
+`4398009`, not the pinned `XV6_REV`; a bare `make proofs` RE-DUMPS
+`kernel-rocq/` from its stale ELF (it did, this session; restored with
+`git checkout -- kernel-rocq/*.v && touch kernel-rocq/*.v`).  The
+`kernel-rocq/*.vo` and every `.vo` rebuilt in that run are against the
+clobbered image: run `make kernel-rocq` then `make -C iris -f
+CoqMakefile -j16 -k` before trusting a full build, and fix the clone
+per durable-notes ("AFTER A git pull, RUN make xv6-rev-check").  The
+route-B leaves (`WeakRvwmo*.vo`) compile and are what the probes use.
+
+**NEXT SESSION, in order:** (1) B2e-3a — T2-LIN's arithmetic core
+(§4d.4): `R_acyclic` lands with P5; then the violation-on-every-cycle
+lemma, the F4a/F5 repairs, and the segment-composition lemma;
+(2) [DONE later the same day: B2d′(a) LANDED — `WeakRvwmoTopo.v`,
+`topo_linearizes`/`topo_exists`/`normalize_of_acyclic`, Closed; the
+chain's first step is now the direct linearization and `normalize` is
+demoted to analysis; one open item: the `Decision (RacyD GD x y)`
+instance — DONE: `WeakRvwmoDec.v`, `racyD_dec` + `normalize_of_acyclic'`, Closed]; F5's W-TV line landed in `WeakRvwmoConf.dedges` (`row_deps_wtv` non-vacuity); (3) [F3′ DONE the same day — `weak_ev_adequacy_lockalt`, tree green]
+[F3″ DONE the same day — `WProt` + `wprot_at` + the four rules +
+`wprot_writer_cs` in `WeakGhost.v`, the protected lock
+`WeakLock.wplock_body` (footprint fragments INSIDE the lock invariant,
+`n0` a parameter), `weak_ev_adequacy_prot`/`_protread`, tree green; the
+interface is settled for M4's first lock client — see route-b §4d.4's
+F3″ entry for the three shapes the mechanization forced and for the
+one open item, the width-4/8 lift of the single-byte protected store]; (4) [DONE the same day: B1a′ LANDED — `WeakRvwmoHull.v`, Closed];
+(4b) [F5′ DONE the same day: `WeakDeps.deps_addr`/`deps_rd` (DEC-4), `row_deps_addr_chain` smoke test, tree green, capstone assumptions unchanged]; (4c) B1b's device-order extension (`Rdev` as a sixth R arm; route-b §4d.4 B1b note); (5) B2e-3b — READ route-b §4e FIRST: its crux is DEPENDENCY SOUNDNESS (value determinism of the emission modulo provenance), with the satp/translation chain (CSRs have no dep role, D-4) as the hard part; build the satp-provenance edge, then the soundness lemma, then the solo-run certification certification
+machinery; (6) B2e-3c the per-segment classification (the L2′
+content); then B1b, B3, R6.
+
+## CHECKPOINT (2026-08-21b, end of the route-B-opening + T1-D session)
+## — READ THIS FIRST WHEN RESUMING; both earlier checkpoints below are
+## SUPERSEDED and kept only for their design pointers
+
+**Where things stand.**  ROUTE B is the plan of record
+(`../design/weak-memory-route-b.md`); this session landed, in commit
+order: **B0a** (`f360a96f`, `gdexec`/`gdeps_wf`/`gdeps_gmo` + the LB
+witness re-checked with empty deps), **B2a** (`d319ec9e`,
+`WeakRvwmoXchg.gswap_read_down` + viol bookkeeping — the read-down
+free-move claim machine-validated), **B2bc** (`19313efd`, the exchange
+kit COMPLETE: `gswap_write_down` (R,W) + `gswapw_ww` (W,W)-byte-disjoint
+with the ts-transposition rewrite; the RMW-dep-source finding — every
+moved-up-may-be-RMW lemma carries `∉ gd_deps`), and THE T1-D ARC — the
+discovered-and-closed TIER-1 CONFORMANCE GAP (`fe9b78fa` the finding:
+`xv6_srvwmo_safe`'s old hypothesis was UNSATISFIABLE for the real
+image; then three machine-model ALIGNMENT slices, all the same species
+"the machine drifted stronger than its declared model": **D-7r**
+`2d9dc660` the forward bank's view column returns to 0, **D-2r**
+`3880cbbc` the exclusive read's address view leaves
+admissibility/fold, and **T1-D** `493547b8` the interface repair —
+`lb_nobarex`/`lat_free`/`lb_rfoldfree` gates, `cfg_matchd`/`ws_eqr`,
+the administrative-star supply `exec_prog_ok'`, the recomposed
+capstone, and the SATISFIABILITY WITNESS `T1dWitness.v` proving the
+new hypothesis dischargeable at a real dep-carrying store).  Every
+landing at exactly the five rv64d axioms; every route-B lemma
+Closed outright.  Also landed earlier in the session (see the
+2026-08-21a checkpoint below): D-i, D-ii, T2-1c, W2b-c1, the D-iii
+probes, the R3 correction.
+
+**FURTHER PROGRESS (2026-08-21, latest first): B2e-2 witness slice**
+(`548820ef` — CAUGHT A VACUITY: `gacq_po`'s unconstrained successor
+made `cs_kill`'s hypotheses unsatisfiable for every graph; fixed by
+riscv.cat's `ppo ⊆ M × M` typing (`gppo_gmem` now a theorem, model
+WEAKENED — safe direction), all leaves repaired, the satisfiability
+witness `WeakRvwmoLockWit.cs_kill_hyps_sat` landed;
+`WeakAxiomatic.acq_po` flagged with the same shape, R6-adjacent),
+**B2e-2** (`45003fda` — the lock kit, with the `lock_paired`
+correction: pattern alone does NOT give exclusion, machine-found
+counterexample recorded), **B2e-1** (`221a225b`), **B1a**
+(`3606f340`), **B0b-1** (`7389d6f2`).  **THE NEXT SESSION'S
+CENTERPIECE: the B2e-3 design session** — route-b §4d carries the
+precise problem statement: the architecture is settled
+(`xv6_row_ok` / kill discharges / the row_ok discharge), and THE CRUX
+is the WILD-VALUE OBSTRUCTION (emittability does not ground values;
+realization reaches only the violation-free prefix; the kills need
+site facts above it — route A's E1 in route-B clothing).  Three
+candidate resolutions recorded (R1 extended realization with
+strengthened minimality — note the recorded po-closure-climbing
+obstruction to the naive extension cut; R2 groundedness as an
+induction invariant / top-level strong induction on |V|; R3 the
+static-checker component for value-independent fragments).  Run it
+S6-style: the miniature end-to-end per candidate, probes for the
+checkable claims (the closure-climbing shape is constructible; R2's
+subsequence-restriction consistency is probe-able).  After B2e-3:
+B1b (the supply derivation), B3 (assembly), R6.
+
+**EARLIER PROGRESS (in commit order): B2d** (`5ba52f7a`, `WeakRvwmoNorm.normalize` — see the note
+below), **B0b-1** (`7389d6f2`, `WeakRvwmoConf.v`: `row_deps` over
+tagged items + `hart_conf` + the no-side-condition orbit transport
+`hart_conf_ren` + `gdexec_conf`), **B1a** (`3606f340`,
+`WeakRvwmoRestr.v`: `gx_restrict`/`restr_ok` + `restrict_linearizes`
+through the landed linearization), **B2e-1** (`221a225b`,
+`WeakRvwmoKill.v`: the `gviol_no_*` family over all four ppo⁻ arms +
+the racy reductions with fidelity certificates + the K2 cross-hart
+shrink — K2's residual is uniformly the MP shape).  **B2e-2 in
+flight** (`WeakRvwmoLock.v`: `lock_pattern` → `win_excl_of_pattern`
+→ `cs_kill`).  REMAINING: B2e-2 verify+commit; then the **B2e-3
+design session** (the per-site classification — the pattern +
+CS-coverage + φ discharges at the realized prefix; the kernel-facing
+L2′ content and the route's last big item); **B1b** (the supply
+derivation `gdexec_conf` → `exec_prog_ok'` for restricted-cand
+traces, threading the device witness); **B3** (capstone assembly);
+**R6**.
+
+**RESUMPTION ORDER (as of B2d's landing — kept for the design
+pointers in items 1–4):**
+1. **B0b design+build**: the per-hart emission conformance against
+   `exec_prog_ok'`'s administrative star (the two `LInstr`s per
+   instruction land in `adm_star true`; the pair's interior in
+   `adm_star false`) + `row_deps` (the pure register-dataflow
+   relation over emitted instance labels) + the ts-genericity via
+   the `ts_oblivious` family (normalization renames ts entries, so
+   the emission must be ts-generic — state at the graph's own ts,
+   derive the renamed).
+2. **B1**: the prefix realization (T2-1c's prefix variant + T1 via
+   the REPAIRED interface at `cfg_matchd`), consumed by B2e; note
+   B2e discharges the kills for an ARBITRARY `gd_equiv`-orbit
+   member (rows + write messages are orbit-invariant, which is what
+   the realization argument reads).
+3. **B2e**: the kill package — K1 (reader-of-early-write; the
+   aq/deps/fence sub-cases are pure graph arithmetic and could land
+   FIRST as a partial discharge), K2 (MP-stale-reader), K3
+   (cross-hart same-byte write race) — the φ/lock residues via B1's
+   realized prefix + the exports; this is L2′'s content in route-B
+   clothing and the route's largest remaining item (the kernel-level
+   read/write-class exhaustiveness lives here).
+4. **B3** (capstone assembly: normalize ∘ T2-1c ∘ T1 ∘ adequacy,
+   with the conformance hypotheses; zero kernel premises), then
+   **R6** (deletion contract — also: `lb_rfoldfree` →
+   `lb_ldepfree`, the fused arms' fold residue, `ewg_ib`,
+   `WeakCertify` archival, `ak_excl` rename).
+5. Parked: T2-1b, D-iv, D-vi.
+
+**Working discipline unchanged** (orchestrator designs/specs, Opus
+executes, independent verification before every commit, no premises
+ever).  New standing rules from this session: machine-model
+alignment slices carry a VETO condition ("if a landed proof consumed
+the removed strength load-bearing-ly, stop"); relations between
+dep-carrying and dep-free tiers are COMPONENTWISE, never equality
+(`ws_ctrl_up`, `ws_le_nc`, `ws_eqr` — the third instance made it a
+pattern); batch comment edits with code in the WeakMem band (a
+comment-only edit costs a full rebuild).
+
+## SUPERSEDED CHECKPOINT (2026-08-21a, mid-session)
+
+**Where things stand.**  Landed this session, in commit order: **D-i**
+(`4717bcf6`, W-TV consumption, option α — `_0` equations became
+conversions, `cfg_match` untouched, the erasure dropped its vcap
+conjunct via `ws_le_nc`, `lcfg_match` weakened to `ws_ctrl_up`),
+**D-ii** (`e7678e40`, the walker gate: `ad_shaped` in `WPExStore`'s EXT
++ the TOP fact — the machine's first log-reading fulfil side condition,
+now in both log-stability audits), **T2-1c** (`573e9fee`,
+`WeakRvwmoLin.rule14_linearization`, Closed, no axioms; the
+six-obligation BOOTSTRAP is the standard construct-a-candidate route),
+the **R3-staleness correction** (`5dfc85cb` — the split producers/retry
+arm were already in-tree; only R6 remains of the S-track), the **D-iii
+probe pass** (`c8ce013a` — G-i/G-iii confirmed, G-0/G-ii refuted-by-a-
+bug), and **W2b-c1** (`31c7ce42`, the reset-point fix: the boundary
+emits `LInstr`/`instr_post` before the fetch, the blanket
+load→later-store edge is dead, LB admissible at the instance; the
+announce KEEPS its reset — the two-reset rationale is at all three
+sites).  Both capstones at EXACTLY the five rv64d axioms after every
+landing; re-verify after any change.
+
+**THE ROUTE DECISION: B (the exchange normalization), user-adopted
+2026-08-21** on the probe evidence — see the D-iii entry below for the
+full story and `../design/weak-memory-route-b.md` for the plan of
+record.  D8-2/D8-3 and the quarantine retrofit are OFF the plan;
+`WeakCertify` (D8-1) is archive (mark its header at R6).
+
+**RESUMPTION ORDER:**
+1. **B0 design pass** (the route's hardest open item): the
+   `gx_deps`/conformance question — bare RVWMO⁻ admits thin-air, so
+   the capstone hypothesis needs the dep fragment plus a conformance
+   clause the fused alphabet cannot state; working favorite is (α)
+   conformance via `WeakDeps.deps_of_bits` (pure decoder front-end).
+   Decide, then build B0 (the `gdexec` wrapper + model).
+2. **B1**: the prefix-realization invariant (T2-1c's prefix variant +
+   T1, packaged); design then build.
+3. **B2**: the exchange lemma's trichotomy + the induction (the kills:
+   deps/fence/aq are graph arithmetic post-B0; φ and the lock protocol
+   enter through the realized prefix).
+4. **B3**: the capstone assembly + audits; then R6 (cleanup contract:
+   fused-machinery deletion, `ak_excl` rename, the `ewg_ib` residue
+   flagged at W2b-c1, `WeakCertify` archival header).
+5. Still-parked: T2-1b (off critical path), D-iv (T2-5 export-seam
+   options), D-vi (`lb_ok` clauses before any `lts_enabled` consumer).
+
+**Working discipline unchanged**: orchestrator (Fable) does recon +
+design + spec; Opus subagents execute from precise specs with the
+durable-notes build discipline quoted; every landing independently
+verified (full `-k` + both capstone audits + diff assumption-grep)
+before commit; findings recorded same-day.  No premises, ever — a
+premise that resists machine-checked discharge is a stop-the-line
+event.
+
+## SUPERSEDED CHECKPOINT (2026-08-20) — kept for its design pointers
+
+**Where things stand.**  TIER 1 IS CLOSED (`xv6_srvwmo_safe` + `t2_ev` +
+the litmus suite, all on the five rv64d axioms — see the sRVWMO worklist).
+S6 ran with verdict GO (route A, certification;
+[`../design/weak-memory-tier2-s6.md`](../design/weak-memory-tier2-s6.md)).
+Tier-2 slices LANDED this session, in commit order: **T2-0** (the
+lock-protocol export, `WLock`/`wlat4L`/`weak_ev_adequacy_lockproto`),
+**T2-1a** (`iris/WeakRvwmoGraph.v` — RVWMO⁻ declared + the LB
+non-collapse witness), **T2-2a = S4** (the tower replays the split pair;
+`lat_free_prog` is lat-only; the capstone's `Hfused` is DELETED — the
+tier-2 containment capstone is instantiable for the real instance again).
+Every landed piece keeps both capstones at EXACTLY the five reservation
+axioms; re-verify that audit after any change.
+
+**THE PENDING DESIGN DECISIONS — each needs an orchestrator design pass
+BEFORE building; none is delegate-ready as it stands:**
+
+- **(D-i) W-TV CONSUMPTION, the tier decision** (gates L2′'s walker
+  cases #7/#8, NOT D8-2).  The in-tree spec is the long comment at
+  `WeakMem.load_post_run_d` (~:1035): joining `w_tbank` into the access
+  node's `w_vcap` moves three things in lockstep — the `_0`
+  correspondence (dragging the bank into the NON-`_d` tier:
+  `WeakAxiomatic.mstep`, the litmus tier, ~20 call sites),
+  `WeakPromiseBridge.cfg_match`'s per-agent `w_vcap` EQUALITY, and
+  `WeakRobustProv`'s `lstate` mirror (needs `l_tbank`).  THE STAKES the
+  comment predates: `mstep` now carries T1
+  (`promise_free_complete_clean`) and the whole tier-1 characterization —
+  changing its load arm touches the completeness invariant.  Candidate
+  resolutions to weigh: (α) push the bank into the non-`_d` tier and
+  repair T1's invariant (honest, widest ripple); (β) keep the bank
+  `_d`-only and WEAKEN the `_0` equations to ≤-form where consumed;
+  (γ) make `cfg_match` stop looking at `w_vcap` (check what the bridge
+  actually needs it for first).  Decide against T1's proof structure,
+  not against the comment alone.
+- **(D-ii) W1/W2 — the walker discriminator wiring.**  Verdicts already
+  recorded (layer2 §12/§13 + this file's W-track): the written-value
+  discriminator (GO), W2a's release-strength-EXT-at-fulfil form, the two
+  recorded obstacles to a promise-side gate.  What remains is the
+  realization: name walker-shaped `LExStore` at fulfil from the
+  reservation + log values, gate non-promisability there, re-prove
+  `wp_behavior_factor` compatibility.  Design pass: pick the
+  discriminator's exact site against the R2 machine arms.
+- **(D-iii) T2-3 = D8-2, the restriction simulation** — the route's
+  highest-risk item.  Before building: design `sim_wpcfg`'s four
+  invariants against PARM's `CertifySim.v` (port spec:
+  [`../design/parm-certification-notes.md`](../design/parm-certification-notes.md),
+  Recommendation section — start with the two `vcap` lemmas), design
+  `sim_dev` (the fabric component PARM lacks; reuse bet: G4/G5's
+  `qfab`/`gdev` machinery), and the split-RMW in-case obligation
+  (`excl_ok` per byte in the restriction).  THE FALLBACK TRIGGER IS
+  ARMED: if `sim_dev` exceeds the `qfab`/`gdev` reuse estimate, STOP and
+  switch to route B (S6 §5's graph linearization route).
+- **(D-iv) T2-5's export seam** — recorded under T2-0 below: `wlock_regd`
+  is per lock word; upgrade to a finite set of `(base, N)` pairs if L2′
+  wants a family at once; and the trace-side `win_excl` derivation must
+  take unlock COVERAGE from trace fences, never from message class (the
+  release arm is `≠ WCplain ∧ zero`).
+- **(D-v) T2-6's front-end remainder** — `gx_deps` (the store-dep
+  fragment, S6's F2 caveat) added to `WeakRvwmoGraph` when the
+  realizability direction starts, and the `axiomatic_to_promising` port
+  (promise everything up front; M6's W4 characterization is the banked
+  half).
+- **(D-vi) the `lb_ok` debt** (surfaced by S4): `WeakRobustBlocks.lb_ok`
+  is now the ONLY alphabet gate and its `LExLoad`/`LExStore` clauses are
+  still `False`; they need real content (`data ≠ []` + `exwin_ok`)
+  before any `lts_enabled` consumer appears.
+
+**Recommended resumption order**: (D-i) design → build (it is the
+smallest gate and unblocks L2′'s walker kills); then (D-ii); then the
+T2-1c build (design fully recorded below — pure order theory, no Iris);
+then (D-iii) with the fallback watch; E1; L2′; T2-6.  R6 (the fused-
+machinery deletion contract) stays last — cleanup, not gating.
+
+**Fixed working discipline that held all session**: orchestrator (Fable)
+does recon + design + spec; Opus subagents execute mechanical
+proof/threading from precise specs with the durable-notes build
+discipline quoted; every landing is verified independently (full `-k`
+build + both capstone audits) before commit; findings that change
+statements are recorded in the notes the same day.
+
+
+
+**S6 RAN AND THE GATE IS OPEN (2026-08-20): GO on this route.**  The
+two-hart L2′ paper exercise is
+[`../design/weak-memory-tier2-s6.md`](../design/weak-memory-tier2-s6.md) —
+read it FIRST: it carries the full edge-inventory table (every kill named
+M/φ/lock-protocol, none in C6), the two structural findings that reshape
+the plan (F1: the `cand` presentation cannot express rule-14 violations,
+so tier 2 needs a graph-presentation front-end for a declared **RVWMO⁻**
+— RVWMO minus ppo 6/9–13, which only strengthens the final theorem and
+dissolves the D-8 dependency-alphabet obstacle; F3: ONE new export, the
+lock-word value protocol as a `weak_state_interp` ghost — the φ mechanism
+— because `wlock_inv` is a namespace invariant adequacy cannot see), the
+finding that §5's `w_rdw`/`w_lock` are NOT needed, the route-B fallback
+trigger, and the revised staging **T2-0 … T2-6** that supersedes this
+file's bare item list as the execution order.
+
+**T2-0 LANDED (2026-08-20): the lock-word protocol export** — `wcds`
+gains `WLock (base) (n0)` whose `wcds_ok` arm is `wcds_clean ∧ wlp_at`
+(the clean half is FORCED: the suffix protocol says nothing about the
+pre-registration history where `initlock`'s plain store sits, and φ's
+`nv_ok` must still be paid); `wlock_inv` holds the new `wlat4L` bundle
+(`n0` EXISTENTIAL inside it, so every downstream lock-client statement
+is textually unchanged); `wlock_alloc` performs the C→WLock registration
+flip; both lock cores store through `wcds_ok_store_lock`; the export is
+`WeakGhost.wlock_regd` (a persistent invariant + accessor — nothing
+discarded is minted; a `DfracDiscarded` cds copy would freeze the byte)
+consumed by **`weak_ev_adequacy_lockproto`**: at every reachable σ,
+`∃ n0, wlp_at (wglog σ) a base n0`.  On the 5 rv64d axioms.  TWO
+DEVIATIONS THAT BIND T2-5: (i) the release arm of `wlock_shaped` is
+`wm_ak ≠ WCplain ∧ data = zero`, NOT `= WCrel` (`wQ_store_w` leaves the
+class existential) — so the trace-side `win_excl` derivation must take
+the unlock's COVERAGE from the trace's fence (C4's
+`covered_of_release_chain`), never from the message class, which is what
+it did anyway; (ii) `wlock_regd` is per lock word — if T2-5 wants a
+family at once, upgrade it to a finite set of `(base, N)` pairs rather
+than adding a registry ghost (rejected: it reopens the ~50-site
+`weak_state_interp` reassembly).
+
+**T2-1 slice 1 LANDED (2026-08-20): `iris/WeakRvwmoGraph.v`** — the
+RVWMO⁻ herd-style presentation (per-agent label lists; `gx_gmo` as DATA,
+so stores can be early; read `ts` entries reinterpreted as gmo-write
+indices, which makes `graph_of_cand` the identity on labels), the model
+`rvwmo_minus_consistent` (gwf ∧ ppo⁻⊆gmo ∧ load-value with the
+po-forwarding disjunct ∧ atomicity; ppo⁻ = rules 1–5, 7 only), and the
+NON-COLLAPSE WITNESS `lb_graph_consistent` (the four-event LB execution
+is RVWMO⁻-consistent — machine-checked proof that the declared model
+admits exactly what sRVWMO forbids, so the tier-2 gap is real; Closed
+under the global context).  **T2-1b owed, and OFF THE
+CRITICAL PATH** (scoping finding, 2026-08-20): the safety chain consumes
+only the graph→cand direction (T2-1c); cand→graph consistency transfer
+serves the tier-2 EQUALITY statement only.  And it is NOT the easy
+direction it looks: `graph_of_cand`'s trace-order gmo placement violates
+`gload_value`'s co-maximality for STALE reads (a cand read of old `t`
+sits trace-after newer same-byte writes), and the obvious repair — place
+each read at its read-timestamp — breaks acquire ordering ACROSS bytes
+(acquire x@t=5 then read y@t=2 is machine-legal but by-ts placement
+inverts them against ppo rule 5).  Both translation directions are
+genuine per-event scheduling arguments; expect interval/topological
+placement, not a projection.  **T2-1c owed** (critical path): the
+rule-14 linearization (graph → same-log cand) and the store-dep fragment
+(`gx_deps`, per the S6 F2 caveat).  DESIGN WORKED OUT (2026-08-20, to
+spec the build):
+  - THE EXTENSION ORDER: R := po ∪ gmo|W ∪ rf-placement (each read after
+    its source write).  Acyclicity by the A3(v) contraction, with the
+    detail that makes it go: R's cross-hart edges are write-sourced
+    (gmo|W, rfe), every hart segment exits through a WRITE, rule 14 maps
+    each po-exit into gmo, and rfE is gmo-forward because cross-hart
+    visibility has no po disjunct — the po-forwarding case of load-value
+    is exactly rfi, which stays inside a segment.  So every R-cycle is a
+    gmo cycle.  Linear-extension existence over the finite event set is
+    hand-rolled topological selection (no stdpp helper).
+  - THE CONSTRUCTION: place events in extension order; writes land in
+    gmo order, so the cand log IS `gwrites`' message sequence and log
+    positions equal `gwix` with NO renumbering; `cand_values` then falls
+    out of load-value's value half plus rf-placement.
+  - THE AXIOM TRANSFER (graph → `srvwmo_consistent` of the built cand):
+    everything flows from gpos arithmetic — cand `ob_op` edges embed into
+    G's gmo (ppo arms by `gppo_gmo`; fr by load-value CO-MAXIMALITY: a
+    same-byte write not visible-before the read sits gmo-at-or-after it),
+    so ob-acyclicity is a kless measure on gpos; `ax_ord`/`ax_rel_ord`
+    derive the same way (e1 ord e2 gmo-forward; the fr target w is not
+    visible-before e2, so gpos e2 ≤ gpos w and the published ts = wix e1
+    < wix w on the write suborder); coherence via the A5 kit's
+    `coh_rel_acyc_ts` with poloc-ts-monotonicity from rules 1–3.
+    Estimate 600–1000 lines, one to two sessions, all order theory — no
+    Iris, no simulation.
+
+Plan of record: [`../design/weak-memory-layer2.md`](../design/weak-memory-layer2.md)
+§8 (the route), §11 (the PARM investigation's answer), §13 (the walker
+decision: the A/D RMW is non-promisable, as Sail fidelity).  The port spec is
+[`../design/parm-certification-notes.md`](../design/parm-certification-notes.md)
+— read it in full before any D8 item; its Recommendation section is the
+per-item contract.  PARM reference sources: shallow clone at
+`/tmp/claude-0/-shared-xv6iris-2/36d033b8-a541-4970-8c24-4e924a5dca1a/scratchpad/parm/src`
+(re-clone `snu-sf/promising-arm` if evicted).
+
+Goal: replace `robust_main_l2`'s site-fact hypotheses (`sf_edges`'s C4/C6
+residue, `win_excl`) with theorems, by making every read of the full machine a
+read of some pf run (the promise author's certifying run), so φ and the
+WP-exported invariants apply to it.  No kernel side conditions anywhere.
+
+## THE TIER-1 CONFORMANCE GAP (found 2026-08-21 during the B0b recon —
+## a latent vacuity in the LANDED tier-1 capstone's end-to-end reading)
+
+`xv6_srvwmo_safe`'s hypothesis (c) `exec_prog_ok pstep_ev …` is
+UNSATISFIABLE for the real xv6 image: `lbl_realizes` forces the machine
+label to the depfree `unproj_lbl` (its `lb_depfree` conjunct +
+`lbl_realizes_unproj`), while `pnode_step`'s store arm PINS
+`l = LStore … (deps_asrc (deps_of_ib ib)) (deps_vsrc …)` — nonempty for
+every register-addressed store, i.e. essentially every real store — so
+no `pstep_ev` step exists at the label the realization emits.  The
+theorem is TRUE but covers only dep-free programs; the coverage
+narrowed silently when D3-2 made the instance emit real operand lists
+(the deps design recorded the FORWARD projection's residue going
+non-vacuous, but not this reverse-direction consequence; A3(iii)'s
+named-conjunct design anticipated the relaxation, and A4 composed the
+capstone without noticing the emptiness).  There is no in-tree escape:
+`ib` is necessarily `Some bits` at a store node (set at the announce,
+cleared only at the boundary), and realizing into
+`erase_pstep pstep_ev` would land outside `epf_run`, where adequacy
+does not apply.
+
+CONSEQUENCE FOR ROUTE B: the tier-2 chain ends at this capstone, so
+the gap must be closed for EITHER tier's end-to-end claim.  The
+recorded remedy direction (deps design §3's deliberate deferral,
+"`WeakAxiomatic*` gains ppo 9–11") now has a concrete shape thanks to
+the B-track: the declared model grows dep data + ordering axioms (the
+`gdeps` pattern landed at B0a), the realization becomes dep-aware
+(either the fused alphabet gains operand data, or the bridge's
+`cfg_match` equality gives way with the model's new dep axioms
+excluding exactly the cands whose reads the dep-raised machine floors
+refuse — the D-i α precedent says which invariants tolerate what).
+This is now a MANDATORY stage (call it **T1-D**), to be designed
+JOINTLY with B0b (they are the same problem: the conformance interface
+must speak dep-carrying labels end to end).  Do not build B1/B3
+against the current capstone statement.
+
+**T1-D REMEDY SKETCH (2026-08-21, orchestrator design pass — much
+smaller than feared, and NO model change):**
+- THE GAP IS WIDER THAN THE DEPFREE CONJUNCT: `exec_prog_ok`'s
+  one-pstep-per-trace-event shape cannot thread the instance's node
+  stream AT ALL — every instruction also takes dep-only/administrative
+  steps (`LInstr` at the announce and now the boundary, `LRegW`,
+  `LCtrl`, `LSilent` nodes), which have no trace event; even a
+  dep-free program's announce is `LInstr`, where `lb_depfree` is
+  `False`.  The landed emission shape was always a fiction.
+- THE SAVING MACHINE FACT: in the PF FRAGMENT the dep machinery
+  (`w_regv`/`w_vcap`/`w_ldv`/`w_tbank`) NEVER FEEDS A SIDE CONDITION —
+  loads carry `asrc = []` (D-8, pinned by `elab_ok`), so `load_vpre`'s
+  floors are dep-free, and the pf store arms append at the fresh top
+  with no `fulfil_ok`.  So realizing at REAL dep-carrying labels
+  changes only post-state view BOOKKEEPING, never admissibility:
+  **sRVWMO needs NO new axioms for realizability** — the deps design's
+  "gains ppo 9–11" deferral was about the forward projection's
+  equality, not this direction.
+- THE REMEDY, three interface repairs and no alphabet/model change:
+  (i) delete `lb_depfree` from `lbl_realizes` (the recorded
+  one-conjunct deletion) and let `l` carry the instance's real
+  operand lists; (ii) generalize the supply from one-pstep-per-event
+  (+ the pair arm) to ADMINISTRATIVE-STAR + memory step per event — a
+  finite run of non-memory-labeled psteps (whose machine arms are the
+  dep-only/silent ones) followed by the realizing step; (iii) weaken
+  the bridge's `cfg_match` componentwise: EQUAL on the
+  read-admissibility components (`coh`, `vrOld`, `vrNew`, `vwOld`,
+  `vwNew`, `vRel`, `fwd`, `relp`, `pub`, `res`), machine-≥ (or
+  unrelated) on the dep components — the D-i `ws_ctrl_up`/`ws_le_nc`
+  component discipline is the exact precedent.  The capstone's
+  program-state conclusion adapts to the starred supply.
+- B0b's per-hart emission must be designed on the SAME generalized
+  supply.  Sequencing: T1-D is the next BUILD priority (it un-blocks
+  B1/B3 and repairs the landed tier-1 claim); the B2 kit continues in
+  parallel (its lemmas are supply-independent).
+- **CORRECTION to the sketch (2026-08-21, same day — the "saving
+  machine fact" was INCOMPLETE):** there is exactly ONE place dep
+  views reach pf-fragment admissibility — THE FORWARD BANK.  D-7's
+  `store_post_d` banks `(t, V(asrc) ⊔ V(vsrc))`, so a later own-
+  forward load's `vpost` carries the dep views into `w_vrOld`, and a
+  higher `vrOld` widens `readable`'s no-write window — the machine
+  can REFUSE a stale read the cand's axioms admit.  This is RVWMO
+  rule 12's pipeline shape returning, exactly as the sRVWMO residue
+  table predicted ("the `dep_dom` domination argument is what the D2
+  dependency track will need for the register views rule 12 will
+  then bank").  So T1-D's step (iii) splits: (iii-a) the pure dep
+  components (`regv`/`vcap`/`ldv`/`tbank`) are side-condition-free —
+  unrelated in the weakened `cfg_match`, as sketched; (iii-b) the
+  FWD component needs the `dep_dom` domination — show the cand's
+  existing axioms bound the banked dep views enough that the raised
+  floors never refuse a cand-admissible read (or the model grows a
+  rule-12-shaped axiom, re-raising the dep-data alphabet question).
+  (iii-b) is the real content of T1-D and needs its own design pass
+  (the A1a `dep_dom` probe machinery is the recorded starting
+  point).  The interface repairs (i)/(ii) and (iii-a) stand as
+  sketched.
+- **(iii-b) RESOLVED (2026-08-21) BY WEAKENING THE MACHINE — slice
+  D-7r, the β move.**  The forward bank's VIEW COLUMN IS `0` again
+  (`WeakMem.store_post_d` banks `(t, 0)`; `vf` is a dead parameter kept
+  for signature stability, collapsed by `store_post_d_vf`).  No
+  `dep_dom` domination argument is needed and no model growth: the one
+  channel by which dep views reached pf-fragment admissibility is
+  simply gone, so `cfg_match`'s `fwd` component can stay EQUAL and
+  (iii) is entirely (iii-a).  The reversal is D-7r in
+  `design/weak-memory-deps.md`, which also records the RE-UPGRADE
+  COUPLING (re-banking `vf` requires the model to grow rule 12 and the
+  alphabet to carry dep data — the two move together).  The audit that
+  landed it found NO landed lemma consuming the dep-carrying bank: the
+  entire tree-wide repair set was `WeakRobustProv`'s mirror
+  (`lstore_post_d` banks `(t, [])`, and three transport/leaf premises
+  and disjuncts became vacuous and were deleted) plus two statement
+  updates in `WeakMem` (`store_post_fold_d_fwd`,
+  `store_post_run_d_fwd_inv`: `vfd = vf`/`Nat.max vaddr vdata` →
+  `vfd = 0`).  Both capstones stayed at exactly the five rv64d axioms.
+- **(iii-b) RESOLVED (2026-08-21, the β move — slice D-7r, build in
+  flight): the forward bank's view column returns to 0.**  The
+  design pass sharpened to a fork: (α) keep the machine's rule-12
+  fidelity (D2's D-7 upgrade banks `V(asrc) ⊔ V(vsrc)` — PARM's
+  dep-carrying `FwdItem`) and grow the completeness model by rule 12
+  (dep data in the fused alphabet — big); or (β) bank `(t, 0)` —
+  PARM's dependency-FREE `FwdItem`, exactly D-7's original fix and
+  the deps design's own recorded fallback.  β wins under route B:
+  the DECLARED model (RVWMO⁻+deps) has no rule 12, so the
+  dep-carrying bank made the machine STRICTLY STRONGER than its
+  declared model — the realization-direction bug pattern — while β
+  aligns them, is a machine WEAKENING (more behaviors, the
+  containment-safe direction), keeps every DIRECT dep floor (fulfil
+  `vd`, `rv_view`, `vcap`/`regv` chains — only through-forward
+  inheritance dies, which no landed kill uses), and restores
+  REALIZATION EQUALITY on all read-relevant components: the
+  join-absorption argument shows `vrOld` never diverged, and with
+  the bank equal, `coh`/`vpost` equalize too, so the weakened
+  `cfg_match` needs only {`regv`,`vcap`,`ldv`,`tbank`} unrelated
+  plus a res-None-between-events invariant.  `dep_dom` is not
+  needed at all.  Re-upgrade coupling recorded at the code site.
+  REMAINING T1-D BUILD (after D-7r): the interface slice — (i)
+  delete `lb_depfree` from `lbl_realizes`; (ii) the
+  administrative-star supply (admin labels `LSilent`/`LRegW`/
+  `LCtrl`/`LInstr`/`LDev` between realizing steps, star also inside
+  the exclusive pair); (iii-a) the weakened `cfg_match`; the
+  capstone re-composed.  Spec after D-7r's report.
+- **T1-D INTERFACE DESIGN COMPLETED (2026-08-21), with two spec
+  refinements and ONE MORE ALIGNMENT SLICE (D-2r) found:**
+  * (i) is a WEAKENING, not a deletion: `lb_depfree` →
+    `lb_ldepfree` (D3-2's existing gate — plain loads keep
+    `asrc = []`, stores/exclusives free).  Plain-load realization
+    stays at the 0 floor; store arms have no admissibility; the
+    PAIRED exclusive read is admissible at ANY floor via
+    `rmw_latest` + `latest_readable` (the A3 note's own
+    observation).
+  * THE RMW's post-state: the address view entering the exload's
+    byte fold raises `coh`/`vrOld` — `vrOld` is join-absorbed
+    (machine regv views ≤ `vrOld`, same argument as D-7r's), and
+    the PAIRED case's `coh` is absorbed by the write half's
+    fresh-top timestamp.  THE DANGLING exload (walker races,
+    amocas-miss — real, projects as a plain load) has NO absorbing
+    write: its address view leaks into its bytes' `coh` and can
+    refuse a later stale re-read the model admits — the same
+    machine-stronger-than-declared-model species as D-7r, in
+    rule 9's exclusive-read flavor.  **D-2r** (slice, before the
+    interface build): the exclusive read's address view leaves its
+    ADMISSIBILITY (`read_ok_d` → the 0 floor at the exload arms)
+    and its BYTE FOLD (fold at plain `vpre`); it SURVIVES in
+    `w_vcap` (`ctrl_post`, W-TV's consumer) and the reservation;
+    `rv_view` weakens naturally (the tower already leaves it
+    unrelated — S4's own note).  D-2's original EXT purpose is
+    full-machine-only, invisible to route B.  Align the fused
+    `WPRmw`/`PFRmw` arms identically for uniformity (they die at R6
+    anyway).
+    **D-2r LANDED (2026-08-21).**  THE VETO DID NOT FIRE: no landed
+    kill or capstone consumed the exload's address-view admissibility
+    or fold — every repair was mechanical and several got SHORTER
+    (`WeakErase.exload_post_run_d_er` lost its `vae ≤ vai` premise
+    outright; `WeakRobustAcyc`'s two exclusive-read bullets lost their
+    `load_post_bytes_d_mono` bridge; the `srcs_view_nil read_ok_d_0`
+    peels at the bridge/realizer rmw arms are gone).  W-TV's consumers
+    are untouched (`ctrl_post (vaddr ⊔ w_tbank)` and
+    `exload_post_run_d_vcap` are textually unchanged).  New in-tree
+    names: `WeakMem.exload_post_run_d_ctrl` (the collapse lemma, the
+    twin of `store_post_d_vf`), `WeakRobustGraph.lb_rasrc` (the
+    READ-FLOOR operand list — a plain load's `asrc`, `[]` for the
+    exclusives and the fused rmw — used by `rd_leaves`/`rd_floor_ws`/
+    `WeakRobustSim.read_ok_pf`), and `WeakRobustProv`'s mirror trio
+    `lexload_post_run_d` / `lrel_lexload_post_run_d` /
+    `lexload_post_run_d_leaf`.  Rationale + the RE-UPGRADE COUPLING are
+    at `WeakMem.exload_post_run_d` and in `design/weak-memory-deps.md`
+    (entry D-2r).  Both capstones stayed at exactly the five rv64d
+    axioms.
+  * (iii-a)'s relation `ws_eqr`: EQUAL on `coh`/`vrOld`/`vwOld`/
+    `vrNew`/`vwNew`/`vRel`/`fwd`/`pub`/`relp`; UNRELATED
+    `regv`/`vcap`/`ldv`/`tbank`/`res` (`res` handled inside the
+    pair arm; the intra-pair admin star excludes `LInstr`, which
+    the instance discharges trivially — no `LInstr` within an
+    instruction).
+
+## Items
+
+- **W1 — walker-naming spike**: **DONE (2026-08-18) — GO** on the
+  written-value discriminator, with conjunct (ii) REPLACED (see Findings).
+- **W2 — realizing §13, PREMISE-FREE** (re-scoped 2026-08-18: the user
+  REJECTS undischarged premises — the `no_early_ad` route is dead; see
+  layer2 §13's addendum).  Blocked on the W1′ investigation below.  What
+  survives regardless: the discriminator's bit-level facts (the spike's
+  `update_PTE_Bits_A1`/`update_PTE_Bits_ne`, to land in `PtAdBits.v` when a
+  consumer exists) and the one-line staleness fix to `WeakInterp.v`'s
+  access-kind table (A/D path is `Read_RISCV_reserved`/
+  `Write_RISCV_conditional` post-fork, not `Write_plain`).
+- **W1′ — the premise-free walker analysis: DONE (2026-08-18).**  Verdict
+  in layer2 §13's addendum: non-promisability necessary but NOT sufficient
+  (variant B is a real, certifiable machine run — machine-checked probes
+  `fulfil_ok_survives_walk_read`/`fulfil_vext_walk_read` in the
+  walker-analysis scratchpad); the certification route closes NO walker
+  shape; the recommended repair is W-TV (below).  Probe file worth
+  harvesting when W2 lands.
+- **W2a — the §13 gate, front-loading-safe form**: walker-shaped
+  `LExStore` (named AT FULFIL from the reservation + the log's values —
+  the spike's `ad_variant` discriminator, split-adapted) fulfils with
+  release-strength `vpre` (join `w_vrOld ⊔ w_vwOld`).  Yields the TOP
+  fact (its timestamp exceeds everything the agent read/fulfilled before)
+  ⇒ closes every walker-write-EXIT segment; every store stays promisable;
+  `wp_behavior_factor` untouched.  Land the TOP fact as a named Layer-1
+  lemma.  Sequencing: with/after the split's S2 (it is a premise on the
+  new `LExStore` arm).
+- **W2b — W-TV, the missing translation ordering** (closes the
+  walker-read-ENTRY shapes, variant B): bank the instruction's prior read
+  timestamps `w_ldv`-style and join them into every memory-access node's
+  `vaddr` (hence `w_vcap` via the existing `ctrl_post`), dying at
+  `LInstr`.  No discriminator.  **ADOPTED (the user, 2026-08-18)** — the
+  boundary sentence is recorded in layer2 §13; implementation per the W3
+  entry's five conditions (note condition 1 refines the reset point:
+  instruction BOUNDARY before the fetch, not `LInstr`), bundled into the
+  split's S1 (`wstate`/`lstate` opened once).
+- **W3 — the W-TV containment audit: DONE (2026-08-18), verdict (B) —
+  ADOPT as a documented model-of-record boundary, awaiting the user's go.**
+  Nothing in {(i),(ii),(iii)} contradicts the ISA: (i) is ASSERTED by the
+  privileged spec ("those implicit accesses are ordered before their
+  associated explicit accesses", `supervisor.adoc:1303-1304`); (ii) is not
+  RISC-V-normative (RVWMO leaves walks unformalized) but is the ratified
+  Arm VMSA `dob` clause (`[Imp & TTD & R]; tr-ib; [Exp & M]; po;
+  [Exp & W | HU]`, Arm ARM B2.3.7) and RVWMO ppo rule 13's own rationale
+  ("a store generally cannot be performed until it is known that preceding
+  instructions will not cause an exception due to failed address
+  resolution"); (iii) is deviation D-2, already landed.  Loads are
+  deliberately NOT ordered (matches both Arm models).  The narrow variant
+  is REFUTED concretely (`narrow_gap` probe: a two-instruction variant B
+  survives it).  28 machine-checked probes in the wtv-audit scratchpad;
+  the proposed boundary sentence is in the audit report, to be copied into
+  layer2 §13 on adoption.
+  **W2b's five conditions (from the audit — carry, don't rediscover):**
+  (1) reset the translation bank at the instruction BOUNDARY, before the
+  fetch (`pnode_step`'s `Ret` arm emits the reset, not `LSilent`) — with
+  only the `LInstr` reset, the fetch's load consumes the previous
+  instruction's data-read views and LB DIES; (2) a dedicated `w_tbank`
+  joined with `fwd_view` only — NOT `w_ldv`, whose `vpre` component drags
+  `w_vrNew` into every fulfil's EXT (probe `wtv_ldv_leaks_vrNew`);
+  (3) add `LInstr` steps to `WeakPromiseLitmus.lbstep` and `WeakLitmus`'s
+  toy language or their reachability theorems go false; (4) read the bank
+  at each node's PRE-state (keeps the AMO's read half out of `w_vcap`);
+  (5) the Layer-2 consumer already exists — `WeakRobustL2.fcov_of_vcap`
+  turns a `vcapat` into `fcov`; only the `vcapat` producer at the access
+  node is owed.  Also record with the boundary: the fetch's own
+  translation reads gain the same edge, and misaligned/page-crossing
+  component accesses become ordered (both RVWMO-unformalized; both
+  vacuous for this image).
+- **Fallback if W3 fails**: §12 option (b), the walker-idempotent exhibit —
+  priced by W1′ as LARGER than the RMW split (walker READ discriminator =
+  `pcls` state classification or a model fork; non-event-preserving replay
+  re-bases `U_Qinv`/`head_prestate_pf_real`'s `pc_log = pf_log` framing; a
+  new `walk_absorbing` Layer-1 parameter).
+- **S-track — the RMW split** (design:
+  [`../design/weak-memory-rmw-split.md`](../design/weak-memory-rmw-split.md),
+  user-confirmed; gates D8-2's final shape and the L2 vocabulary):
+  - **S0 — validation pass: DONE (2026-08-18)**, design revised from it.
+    Size: ≈3,150 lines / ~40 files / ≈2,070 semantic.  Riskiest three:
+    `WeakRobustSim.excl_ok_pf` (~230 ln, the pf-replay window straddles two
+    events), the §5 retry arm's WP rule, `WeakRobustProv`'s `l_res` mirror
+    (~150 ln).  Free: `WeakKpt*`/`WeakWalk*`/`WeakDeps`/litmus (zero
+    change); net deletions: `fused_blk` + the `menvcfg.ADUE = 0` escape
+    hatch + the `own_coh` dovetail.
+  - **S0.5 — exhaustivise the 22 catch-all `wlabel` matches** (~150 ln,
+    no semantic change; the 6 critical absorbers: `WeakEvInst.elab_log`/
+    `edlab_log`/`pcls_ev`, `WeakSailLTS2.lbl_class`,
+    `WeakRobustBlocks.lb_writes`/`lb_loads`; full site list in the S0
+    report — sites at `WeakRobustGraph.v:111,121`, `WeakRobustL2.v:82`,
+    `WeakRobustMain.v:140`, `WeakRobustAcyc.v:114,124,408`,
+    `WeakRobustDisc.v:122`, `WeakRobustBlocks.v:90,94,100`,
+    `WeakRobustOrd.v:217`, `WeakSailLTS2.v:316,370`, `WeakSailCone.v:419`,
+    `WeakEvInst.v:158,500,559`, `WeakPromise.v:182`,
+    `WeakPromiseFact.v:58`).  **Status: IN FLIGHT (2026-08-18).**
+  - **R1 DONE** (`9f9ef678`, additive) and **R2 DONE** (`58e66071`,
+    machine arms + reservation activation).  R2's findings of record:
+    the store's reservation clear is PER BYTE in `store_post_d`/
+    `store_post` (observationally identical to the run-level rule, saves
+    ~20 rewrite sites); front-loading needed ZERO changes; the litmus
+    repairs W3 condition 3 predicted are UNNECESSARY (the toy languages
+    have no `w_vcap` consumer, and LB survives any consumption because
+    the bank is read at the PRE-state — condition 4 is what does the
+    work); `WeakCertify.astep_ok_del_vcap`'s conditional-write arm is
+    the predicted one-liner.
+  - **W-TV: HALF-LANDED.**  Production (`load_post_at` joins
+    `fwd_view`-based bank) + reset (`instr_post`) are in;
+    **CONSUMPTION (`ctrl_post … (vaddr ⊔ w_tbank)`) is DEFERRED to its
+    own slice** — the `_d`-at-0 correspondence forces the bank into the
+    non-`_d` tier (drags `WeakAxiomatic.mstep`, ~18 rewrite sites,
+    `cfg_match`'s `w_vcap` equality, and the `lstate` mirror needing
+    `l_tbank`).  Pickup spec: the 30-line comment at
+    `WeakMem.load_post_run_d`.  Tier-1 does not need it (rule 14 gives
+    the pf tier the ordering); sequence with tier-2 resumption or after
+    A2.
+  - **S4/R4 (pair-form tower re-index) — DONE (2026-08-20, T2-2a).**
+    `WeakRobustSim.Qinv_step` and `WeakRobustCone.Qcfg_step` (the
+    step-EXPORTING twin — it carries its own copy of all eleven arms, so
+    every replay change lands twice) now replay `LExLoad`/`LExStore`
+    directly, and `lat_free_prog`'s fused conjunct, `lat_free_prog_fused`
+    and the old capstone's `Hfused` are DELETED.  What the pair costs, as
+    three new obligations:
+    * `ts_oblivious` gains an `LExLoad` conjunct (the instance proves it
+      at ARBITRARY `asrc` — the exclusive read's operand list is real,
+      D3-2 — via `WeakEvInst.pstep_ev_ts_exload`; the Sail LTS refutes it
+      from `sail_step_fused`).
+    * `pcls_obl` gains an `LExStore` conjunct: the conditional write
+      APPENDS, so `wp_pf_step`'s class pinning reaches it.  Both provers
+      (`pcls_ev_obl`, `WeakSailLTS2.lbl_class_obl`) reuse their `LStore`
+      bullet verbatim.
+    * THE RESERVATION crosses the replay in `WeakRobustProv`:
+      `res_cols`/`aevs_post_res` (the replayed `w_res` is the recorded one
+      with `rv_base` kept and `rv_ts` σ-mapped — `rv_view` is NOT related
+      and no consumer needs it) and `aevs_post_res_src` (a recorded
+      reservation names the `LExLoad` event of the same prefix that set
+      it).  The window then transports by `WeakRobustSim.excl_ok_ts_pf`,
+      `excl_ok_pf`'s trichotomy with the lower bounds' `gev_reads` facts
+      taken at that EARLIER event (in `done` by `qorder_dc`).
+    Supporting `WeakMem` equations: `load_post_run_d_res` /
+    `store_post_run_d_res` / `fence_post_res` / `ws_init_res` — the
+    per-byte clears mean an access clears `w_res` iff it has a byte, and
+    the replayed and recorded folds take the same branch because they
+    differ only in timestamps, never in a length.
+  - **`WeakRobustBlocks.lb_ok` IS NOW THE ONLY ALPHABET GATE.**  Its
+    `LExLoad`/`LExStore` clauses are still `False`; before S4 an instance
+    that emitted the pair was excluded by `lat_free_prog`, now it is
+    excluded here.  Harmless today (`lb_ok` has no prover outside that
+    file, and nothing proves `lts_enabled` for the event instance), but
+    the clauses need real content (`data ≠ []` + `WeakPromise.exwin_ok`)
+    before any consumer of `lts_enabled` appears.
+  - **W-TV CONSUMPTION: LANDED (2026-08-20, the D-i slice, option α).**
+    All four run functions wrap in `ctrl_post … (vaddr ⊔ w_tbank
+    ws-at-ENTRY)`; the `_0` equations became CONVERSIONS (`Nat.max 0 x`
+    reduces) and `cfg_match` needed zero edits.  The vcapat producer's
+    WeakMem half is `load_post_run_d_tbank_vcap` + store twin.  What it
+    cost, all premise-free: (i) `WeakLitmusProj.lcfg_match` weakened
+    from state EQUALITY to `ws_ctrl_up` ("equal but for a raised
+    control view") — THE GENERAL RULE: after α, any relation equating
+    a per-byte-stepping machine's `wstate` with a run-level one is off
+    by a `ctrl_post`, and `WeakMem.ws_ctrl_up` (+ `ctrl_post_ctrl`,
+    `load_post_at_ctrl`, `load_post_run_d_ctrl`) is the vocabulary;
+    (ii) the erasure's `er_ws` runs on `ws_le_nc` (the vcap conjunct
+    DELETED, per the design finding); (iii) `lstate` gained the
+    `l_tbank` mirror (11th `lrel` conjunct, appended so positional
+    patterns survive; the tower replay in Sim/Cone transported it FOR
+    FREE through `lrel_aev_post`).  A ZERO-WIDTH ACCESS IS NO LONGER
+    INERT (`ts = []` still consumes the bank): "empty access moves
+    nothing" reasoning now needs a `w_vcap`-blindness lemma
+    (`invw_ctrl_post`, `rf_ws_ctrl`).  L2′'s remaining owed piece from
+    W2b condition 5: the trace-level `vcapat` producer at the access
+    node, to be designed with the L2′ slice.
+  - **R3/S3 IS ALREADY LANDED — the worklist line saying it remained was
+    STALE (verified 2026-08-20 post-T2-1c):** `WeakEvLang.emonad_step`
+    carries the split arms (exclusive `MemRead` → `exload_post_run_d`
+    with the F6 guard deleted; conditional `MemWrite` → `exwin_ok` +
+    the §5 UNGUARDED retry self-loop, with the two forcing reasons
+    recorded at the arm), `WeakEvInst` emits `LExLoad`/`LExStore` (the
+    disk's `LRmw` arm is `False`, marked "(S3)"), and
+    `WeakEvLift.ewp_ev_exstore` is the Löb-absorbed retry WP rule.  No
+    producer emits the fused label.  What actually remains of the
+    S-track: **R6/S6** (the deletion contract: `LRmw`/`WPRmw`/`PFRmw`/
+    `wpstep_rmw_now`/fused event machinery — cleanup, stays last) and
+    the §6 `ak_excl` rename ("flips", cosmetic — the arms still test
+    `ak_latest` with the "extensionally equal today" comment; fold into
+    R6).
+- **D8-1 — `wp_cert_step` / `wp_certify` + the vcap lemmas**: **DONE
+  (2026-08-18, `da090933`)** — `iris/WeakCertify.v`: `wp_cert_step i :=
+  wp_astep_of i ∪ (∃ l, wp_pf_step i l)` (fully by reference, no arm
+  duplicated), `prom_free`/`wp_certify`, `cert_step_vcap`,
+  `cert_step_vcap_promise`, `rtc_cert_step_vcap_promise`, the contrapositive
+  `rtc_cert_step_prom_free_vcap`, and `cert_step_rtc_wpstep` (a certifying
+  run IS a full-machine run — `cfg_wf` replaces the bridge's `no_promises`
+  premise via `prom_wf`'s length bound).  All closed under the global
+  context.
+- **D8-2 — the restriction simulation** (`sim_wpcfg`, PARM `CertifySim.v`'s
+  arch-generic line): views equal below the boundary; every source message
+  above the boundary is agent i's; the forward bank two-armed; `excl_ok`
+  extended upward from the boundary.  The three deltas PARM does not have —
+  budget against THESE, not view arithmetic: (i) the device fabric `pc_dev`
+  (needs a `sim_dev`; reuse G4/G5's `qfab`/`gdev` machinery); (ii) `lat = true`
+  reads (restrict certification to lat-free programs, as Layer 1 already
+  does); (iii) the fused RMW (`sim_exbank`'s payload becomes an in-case
+  obligation; reproduce `sim_mem1_exclusive` for `excl_ok`, per-byte over
+  `tvs`).
+- **D8-3 — completeness**: `promise_step_certify`, `interference_certify`
+  (restriction direction), `eu_wf_interference`'s analogue, and
+  `certified_exec_complete`'s backward induction from the terminal state.
+- **E1 — the extended exhibit**: replay `U ++ certifying runs ++ the early
+  read` as a pf run (the `U_Qinv` replay plus solo certifying runs);
+  `head_prestate_pf_real` (L2-M2 §8.3) is the place it stands.
+- **L2′ — the case analysis on extended pf runs**: φ refutes early reads of
+  owned-unpublished messages (kills C5/C6's bad residue); sync bytes by
+  machine facts + the exported lock-word value protocol (`wlockN` exports the
+  values: RMWs write 1, releases write 0, an RMW reads its co-predecessor) —
+  turns `win_excl` (SF-1) into a theorem.  Target: `robust_main_l2`'s
+  hypotheses discharged with no site facts.
+
+## Findings
+
+(record per-item findings here as they land; rules and durable gotchas go up
+to the design file / durable-notes, not narrative)
+
+- **D-i DECIDED: option α (2026-08-20, orchestrator design pass; build in
+  flight).**  The bank enters the non-`_d` tier symmetrically — both
+  `_run`/`_run_d` families take `ctrl_post … (vaddr ⊔ w_tbank ws-at-ENTRY)`
+  — so the `_0` equations and `cfg_match`'s equality stay EXACT.  The recon
+  that decided it: T1's `invw` (`WeakAxiomatic3.v:1298`) never mentions
+  `w_vcap`/`w_tbank` (the whole file has zero references), and `ctrl_post`
+  is a `w_vcap`-only update, so α is invariant-transparent for T1; β would
+  smear ≤-side-conditions over ~20 call sites to avoid churn that is
+  mostly mechanical; γ's motivation dies once equality is free.  THE ONE
+  REAL CASUALTY is the ERASURE: `er_ws`'s `ws_le` carries a `w_vcap`
+  conjunct, and post-α the erased side's vcap can OVERTAKE the instance's
+  (instance resets `w_tbank` at `LInstr`; the erased run maps `LInstr` to
+  `LSilent` and never resets).  Resolution: DELETE the vcap conjunct from
+  the erasure relation (a `ws_le_nc` bundle) — justified by `WeakErase`'s
+  own header (the pf fragment has no `fulfil_ok`, so `w_vcap` never
+  appears in a side condition), and verified consumer-free
+  (`ws_le_vcap`'s uses are all machine-step monotonicity chains;
+  `WeakRefuse` never mentions vcap).  A deletion, not a premise.  Also
+  verified in design: the toy-tier LB proof SURVIVES full consumption
+  with no `LInstr` in the toy language, because `fulfil_ok` reads the
+  PRE-state's `w_vcap` and the fulfilling agent's own bank is produced
+  but not yet consumed at fulfil time (this is what W2b condition 4
+  buys); and the fused `LRmw` composition `store_post_run ∘
+  load_post_run` consumes the intermediate bank on BOTH tiers equally,
+  so the split/fused correspondence is undisturbed.  Slice spec:
+  scratchpad `di-spec.md`.
+- **T2-1c LANDED (2026-08-20): `iris/WeakRvwmoLin.v`,
+  `rule14_linearization` — graph → same-log cand, `Closed under the
+  global context` (no axioms at all), statement verbatim as specced,
+  re-verified on the post-D-i/D-ii tree.**  TWO REUSABLE FINDS: (i) THE
+  BOOTSTRAP — a construct-a-candidate slice should prove ONLY
+  `cand_shape`, `cand_values`, `ax_coherence`, `ax_atomicity`,
+  `ax_ord`, `ax_rel_ord`, then get `exec_wf` + all of `axiomatic_ok` +
+  ob-acyclicity FREE from `promise_free_complete_local` +
+  `promise_free_sound` — the `tc_kless` ob replay is never needed;
+  record this as the standard route (T2-6's realizability direction
+  should use it).  (ii) the model-free order kit in `WeakRvwmoLin.v` §1
+  (`rblocks` block-decomposition family, `pidx`,
+  filter-preserves-relative-order via `StronglySorted`) — liftable.
+  Also: `grf_gmo` (EVERY rf edge gmo-forward, rfi via poloc) means the
+  linearization never cares whether a read was forwarded.
+- **T2-1c SHARPENED in the spec pass (2026-08-20): no topological
+  selection needed.**  Two upgrades over the recorded design: (i) ALL rf
+  edges are gmo-forward — the forwarding (rfi) case is same-byte po, so
+  ppo rules 1–3 (`gpoloc ⊆ gppo ⊆ gmo`) already order it — so the
+  extension order needs no rfi special-casing; (ii) the linear extension
+  has a CLOSED FORM: for each write in gmo order emit its hart's
+  po-segment ending at that write, then the write-less tails —
+  equivalently sort by the injective key `(gpos of next-po-write, hart,
+  position)`.  Rule 14 fires in exactly two places (same-hart segments
+  appear in po order; a read precedes its own next write, which places
+  it after its rf source's segment).  Acyclicity never needs stating —
+  each cand obligation is proven directly against the enumeration.
+  Slice spec: scratchpad `t21c-spec.md` (build in flight, worktree).
+- **D-iii DESIGN PASS, FIRST HALF (2026-08-20, orchestrator; PENDING
+  PROBE VERIFICATION — do not build D8-2 until the probes below run).
+  THE RISK IS NOT `sim_dev` — it DISSOLVES; the real obstacle is the
+  QUARANTINE, and it is larger than budgeted.**  Working through PARM's
+  `CertifySim` against our Layer-1 shape:
+  * `sim_dev` dissolves: at abstract `P` the only available program-state
+    relation is EQUALITY, so the source must replay the target's pstep
+    transitions in lockstep with retimed labels (`ts_oblivious`, the
+    existing mechanism) — and under lockstep the fabric stays EQUAL.
+    The G4/G5 reuse estimate was budgeting for a problem that does not
+    exist in this design.
+  * THE REAL PROBLEM: value divergence.  The only value the source
+    cannot match is a read of the STRIPPED foreign promise (everything
+    else exists in both logs with equal values, only timestamps
+    differing).  PARM survives divergence by per-register view
+    quarantine; our quarantine has FOUR GAPS, each a place where a
+    divergent (above-boundary) value can influence a below-boundary
+    fulfil without any view crossing the boundary first:
+    (G-0) **D-8** — loads carry `asrc = []`, so a load at a TAINTED
+    (divergent) address returns a low-timestamp value with a LOW view:
+    untainted-looking divergent data, which a later ≤-B fulfil can
+    consume as data.  PARM's essential `vcap ⊔= view(addr)` at
+    `Local.read` is exactly what D-8 dropped.  Fixing it = giving loads
+    their address operands = rule 9's load half returns to sRVWMO (the
+    residue table's own "IF D-8 IS EVER DROPPED" note) + a T1
+    completeness repair.
+    (G-i) **effect (i) is not enforced** — `fulfil_vpre` does not see
+    `w_tbank`, so a store can fulfil ≤ B even though its OWN
+    translation's walk read was > B (the privileged-spec-asserted
+    same-instruction ordering).  Fix: join the bank into fulfil EXT;
+    cost: W2b condition 3 finally bites (litmus `LInstr` repairs).
+    (G-ii) the walker's FAULT path: a divergent walk read that faults
+    emits no further access node, the bank dies at the boundary reset,
+    and the taint vanishes.  Fix: `LCtrl`/trap-redirect consumes the
+    bank.
+    (G-iii) a divergent FETCH (fetching a fresh foreign write) decodes a
+    DIFFERENT INSTRUCTION with no view mark anywhere.  Fix: the fetch
+    read is a control dependency (its view enters `w_vcap`).
+  * WORSE, AT LAYER-1 GENERALITY: even with all four closed, an abstract
+    `pstep` may consume a read VALUE invisibly (no `LRegW`, empty
+    `vsrc`) and leak it into a later ≤-B fulfil's data.  D8-2 therefore
+    needs a NEW `ts_oblivious`-genre instance-obligation family
+    ("value-dependence of pstep is guarded by emitted deps") — a
+    relational condition on `P`, dischargeable by the instance but
+    HEAVY to state.
+  * ROUTE-B COMPARISON: the exchange-lemma route stays in the
+    recorded-trace-permutation regime (values recorded and unchanged;
+    `ts_oblivious` suffices — the banked tower's own trick) and needs
+    NONE of the quarantine work.  The fallback trigger's letter
+    (`sim_dev` overrun) did not fire, but its spirit arguably has.
+  * PROBES RAN (2026-08-20, scratchpad `d8-probes/D8Probes.v`, all
+    `Closed under the global context`; tree untouched).  VERDICTS:
+    **G-0 and G-ii are REFUTED at the instance** — but by an
+    over-approximation, not by design (see the defect below); **G-i
+    CONFIRMED** (`fulfil_ok_d` is `w_tbank`-blind BY CONVERSION; the
+    exposure is exactly one instruction wide — a store's own walk
+    cannot gate it, the next fetch consumes one node too late);
+    **G-iii CONFIRMED** (the fetch's word is unguarded: ordinary
+    `LLoad asrc=[]`, decode is a PURE Sail function, the announced-bits
+    slot is `None` during the fetch, and the fetch's OWN bank is wiped
+    by the immediately-following `LInstr` — though the fetch's
+    TRANSLATION reads are already guarded).  The P-inst table adds two
+    unguarded value paths beyond the four gaps: **CSR writes are
+    `LSilent`** (load → `csrw satp` → walker addresses, fully
+    unguarded) and the **trap path's non-`rd` writes** likewise.
+  * **THE DEFECT THE PROBES SURFACED (route-independent, W2b condition
+    1 violated):** the Sail node order is fetch → `InstrAnnounce`
+    (`LInstr`) → decode → body, so the `instr_post` bank reset lands
+    ONE NODE TOO LATE and every instruction's fetch consumes the
+    PREVIOUS instruction's data-read bank into `w_vcap` — exactly what
+    condition 1 warned would happen ("with only the `LInstr` reset …
+    LB DIES").  Machine-checked: `P_inst_load_store_overordering` — a
+    blanket load → later-store ordering RVWMO does not have, so THE
+    INSTANCE FORBIDS LB and is strictly stronger than RVWMO⁻.  This is
+    what "closes" G-0/G-ii: the quarantine holds by over-ordering.
+    Consequences: (a) tier-2's REALIZATION direction (machine covers
+    RVWMO⁻) is FALSE at the instance until the reset moves before the
+    fetch; (b) moving it RE-OPENS G-0/G-ii for route A.
+  * **THE RE-PRICED BILLS.**  Route A (certification), honestly: fix
+    the reset point, then close G-0 (drop D-8 → rule 9's load half
+    returns to sRVWMO → T1 completeness repair), G-i (bank → fulfil
+    EXT + litmus `LInstr` repairs), G-ii (trap-path/`LCtrl` bank
+    consumption), G-iii (fetch-as-control), the CSR and trap value
+    paths (dependency labels for `LSilent` sites — new alphabet or
+    srcs), THEN the sim + D8-3 — in sum, a near-complete dependency
+    discipline retrofit.  Route B (exchange induction on graphs):
+    needs NONE of the quarantine work — its containment never realizes
+    a weak execution in the machine (the machine only ever runs the
+    NORMALIZED prefix, pf-tier), so even the reset-point defect stops
+    gating the capstone; its cost is the exchange induction itself
+    (M6-W2-permutation-genre, on the banked tower) + the same exports.
+  * **ROUTE B ADOPTED (the user, 2026-08-21)**, on the probe evidence
+    and the orchestrator's recommendation; the reset-point fix is also
+    user-approved and building (slice W2b-c1, spec in the session
+    scratchpad: the boundary Ret arm emits `LInstr`/`instr_post`, the
+    announce KEEPS its `LInstr` — two resets per instruction, the
+    minimal-semantics form; the `w_ldv`-scoping rationale is in the
+    spec and must not be "simplified" away).  D8-2/D8-3 and the
+    route-A-specific quarantine retrofit are OFF the plan; `WeakCertify`
+    (D8-1) becomes archive.  The route-B design pass is the next
+    orchestrator task: its plan-of-record document is
+    [`../design/weak-memory-route-b.md`](../design/weak-memory-route-b.md)
+    (in progress).  FIRST DESIGN FACTS, from re-reading S6 §3 against
+    the route: the dependency-based kills (#2/#3/#6 control+data, #7/#8
+    W-TV) are NOT expressible in bare RVWMO⁻ (rules 9–13 dropped), so
+    route B's declared model needs the STORE-DEP FRAGMENT as graph data
+    — D-v's `gx_deps`, promoted from the realizability direction to the
+    route's core; adding it SHRINKS the declared model toward RVWMO and
+    the final theorem still covers RVWMO (the added edges are ⊆ RVWMO's
+    ppo).  The φ/lock-protocol kills (#4/#5) enter through the
+    induction invariant "the normalized gmo-prefix is pf-realizable
+    (T1)" — only rule-14-respecting prefixes are ever realized, which
+    is why none of the quarantine work is needed.  The open vocabulary
+    decision (trace-graph vs `gexec` for the obstruction analysis) is
+    the design pass's first question.
+- **D-ii REALIZATION SITE PICKED (2026-08-20, design pass; build queued
+  behind D-i).**  The discriminator lives in `WPExStore`'s `fulfil_ok_d`
+  view argument: when the written `data` is the A/D update of the values
+  the reservation's read observed (`data = bytes of pte_set_ad read 1 d`
+  ∧ `data ≠ read`, the spike's classifier — read values recovered from
+  `pc_log`/`pc_img` at `rv_ts`, all fulfil-time data), join
+  `w_vrOld ⊔ w_vwOld` into the EXT floor.  Nothing else changes: the pf
+  fragment has no `fulfil_ok` (tower replay untouched), constructors
+  that append at the fresh top satisfy any floor (front-loading and
+  D8-3's certify-then-fulfil pay nothing), and inverters get W2a's TOP
+  fact directly.  The spike's `update_PTE_Bits_A1`/`update_PTE_Bits_ne`
+  land in `PtAdBits.v` with this slice (probe file:
+  session-`0f027e1d` scratchpad `walker-spike/WalkDisc.v`, still
+  present and building against in-tree `PtAdBits`).
