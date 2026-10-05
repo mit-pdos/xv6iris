@@ -6033,6 +6033,543 @@ lazy-free, unmasked; SC, counter CSRs, W+X fetches `stuck`), one origin, no gaps
 
 What remains in M3: quotas (a kernel change and the theorem that it closes a channel), private files; later optional: U-4 totality, FAM-1b, K2 sys_kill, dup/close, pipes, OUT-4, G3c
 
+### M3 quotas design (2026-10-05)
+
+Design pass on `lane/quota` (based on `lean` 98fbb6a23: ustep U-3 landed). No code landed and `xv6-riscv/` was not
+touched: the kernel was cloned and built in a SCRATCH directory (`zeldovich/xv6-riscv` at the pin), and the
+candidate patches below were built there, so the shift figures are MEASURED from the two symbol tables
+(durable-notes "Changing the kernel SOURCE": step 1 done, the toolchain reproduces the pinned ELF byte for byte).
+The Lean shapes were read off the tree (`KallocDefs`, `SpecKalloc`, `UPtDefs`, `PtTree`, `SpecSysSbrk`,
+`UsysDet`, `NiTrace`, `NiEvid`, `NiLedger`, `SpecKkill`, `SpecUserinit`, `SpecKinit`, `KvmDefs`, `MachCSL/UExecCsr*`)
+and are not shape-checked. The rulings Q-R1…R10 at the end, Q-R1 the OWNER's, are needed before a lane starts.
+
+**Short version.**
+- **One kernel change closes the allocator channel: a per-process memory quota on the BREAK, a constant
+  (`MAXUSZ` = 768 KiB), with a pipe-buffer cap (`NPIPE` = 50).** 34 C lines in 6 files: `sys_sbrk` refuses
+  growth past `MAXUSZ`, `kexec` refuses a segment ending past `MAXUSZ − 2 pages` (merged into its existing wrap
+  test), `pipealloc` refuses the 51st live pipe. `kalloc.c` is byte-identical: the pool is partitioned in the
+  PROOF (credits), not in C. RAM fits all 64 slots at full quota: 64·427 + 50 = 27378 ≤ 32563 free pages after
+  boot.
+- **The key does not grow.** The quota is the same constant for every process, so `Uvis`, `ukeyEq`, `bump`
+  and every row's key reading are byte-identical. A page COUNTER (`p->npages`, charged in kalloc) would NOT do:
+  the count includes interior page-table pages and, lazily, the faulted set, and the key carries neither
+  (G3 F3). Only a bound on `W.sz`, which the key does carry, makes the failure bit key-functional.
+- **The proof's new content is a reservation.** An `Auth (ℕ,+)` credit beside the allocator's count (`kmemAuth`
+  holds `c ≤ n`). Every page table carries its WEIGHT in pages plus credits (`ptW` = 5 interior + 192 data:
+  with `MAXUSZ ≤ 2 MiB` a table has at most five interior pages, a geometric lemma). Every slot holds its share
+  `slotB` = 1 + 2·`ptW` + 32 (trapframe, the live table, exec's second table, sys_exec's argv pages). The
+  pipe lock holds `NPIPE − npipe`. A credited `kalloc` is never null. So sbrk's `-1` is the key's quota
+  overrun alone, fork's `-1` is the slot ledger's `SFull` alone, and a lazy fault never kills.
+- **The theorem: `xv6NiDetQ`, a fourteenth root.** It is `xv6NiDet` with the allocator removed from BOTH
+  hypotheses: the histories compare by `niBelowQ` (no `kev` conjunct) and the positions by `detInQ` (the cited
+  `kev` length erased). Every other root, `xv6NiDet` included, and `xv6NiPhi` stay byte-identical. The closure
+  lives in the rows: `usysDet n W ι = usysDet n W ι.ledQ` holds on the quota kernel and FAILS on b72cbac1,
+  whose sbrk reads `ι.kNull` and fork `ι.kOk`.
+- **Bundled at no extra relayout: `scounteren = 0`** (two instructions at the end of `plicinithart`, which every
+  hart runs in S-mode). A user counter read then traps, and usertrap kills: F7's timing channel closes and
+  `ustep`'s counter CSRs go from `stuck` to `trap` (optional lane Q-5).
+- **Not bundled.**
+  - The kill permission check: spelled provably (under `wait_lock`) it grows `.eh_frame` and shifts every data
+    symbol. Its NI gain needs FAM-1b, which is blocked. It also breaks `user/kill.c` from sh.
+  - Pid quotas and slot quotas: each needs a `struct proc` field and a key field, about one bump-equivalent
+    each, so they are not minimal. `pev`, `sev`, `zev`, the ticks and the console stream stay in the
+    hypothesis.
+- **Cost:** Q-0 (the commit, re-dump, relayout, four reshaped functions) ≈ 0.35 bump-equivalents (BE).
+  - The measured window: 86 of 197 text symbols move.
+  - Data: only `disk` and `end` move (+24).
+  - Bridge lemmas: 253 of the 609 change, in 89 files.
+  - About 100–130 files have a mixed-delta line, against the chroot relayout's 326 files.
+  - No new function, no `struct proc` change, no user-image or `fs.img` change.
+
+  Then Q-1 (credits) ≈ 0.5 BE, Q-2 (rows) ≈ 0.1, Q-3 (root) ≈ 0.03: **≈ 1.0 BE in all**, plus ≈ 0.05 BE at
+  every later upstream bump (re-applying the 34 lines).
+- **OWNER DECISION (Q-R1):** a kernel-source change at all? Recommended: yes, as ONE commit on a fork branch of
+  the pin, `verified-quota` = b72cbac1 + the patch. Upstream later only if xv6 itself should have quotas. The
+  cheapest alternative, with no kernel change, is a pure corollary that closes nothing (Q-R1 (c)).
+
+**Findings.**
+- **F1 (where the pin lives in THIS tree; the toolchain reproduces it).**
+  - The Lean tree's top-level `Makefile` has no `XV6_REV`/`XV6_URL`. Those, and durable-notes' text about them,
+    are the Rocq tree's. Here the pin is the generated headers:
+    - `Xv6/KernelImage.lean`: "xv6-riscv b72cbac1 (branch verified)";
+    - `MachCSL/KernelElf.lean`: the same, plus the ELF's md5 `50784a3e875fc46306b83304da6c79cb`;
+    - README "Images".
+  - `git ls-remote` (2026-10-05): b72cbac1 is the tip of `mit-pdos/xv6-riscv` `verified` AND of
+    `zeldovich/xv6-riscv` `chroot`.
+  - CI never builds the ELF. `tools/ci/run_all.sh:201` clones `mit-pdos/xv6-riscv --branch verified` for
+    source attribution only (best effort).
+  - Built in scratch with Ubuntu `riscv64-linux-gnu-gcc` 15.2, `make kernel/kernel` at b72cbac1 gives md5
+    `50784a3e…`, the header's value. The source-change procedure's precondition holds.
+- **F2 (only a bound on the BREAK makes the failure bit key-functional; a constant needs no key field).**
+  - The brief's "charge `kalloc` on behalf of `p`, refund in `kfree`, fail before touching the pool" is a C
+    counter of owned pages. That count is NOT a function of the key:
+    - eager growth adds interior page-table pages, which depend on what earlier, since-shrunk breaks left
+      (G3 F3; `uvmdealloc` never frees interior nodes);
+    - at `lazy = true` the faulted set is hidden by `umemLazy`'s zeros.
+
+    So "fails iff `p->npages + k > QUOTA`" would be a new non-key reading, not a closure.
+  - The break `W.sz` IS in the key, so a quota on it is: `-1` iff `0 < n ∧ MAXUSZ < sz + n`.
+  - That the pool then never runs dry is a PROOF obligation (F3, F4), not a C check. A uniform constant needs
+    no `Uvis` field. A per-process variable quota (a `setquota` call, or a split at fork) would need the field
+    (playbook §4i: the ~40-file arity path) and buys NI nothing more. **Recommended: the constant (Q-R2).**
+- **F3 (every post-boot consumer of the pool must be bounded, or the reservation leaks).**
+  - The reservation is the invariant `outstanding credits ≤ free pages`. An UNCREDITED post-boot `kalloc`
+    could take a reserved page, and C `kalloc` cannot refuse it (it does not know the reservation).
+  - The post-boot `kalloc` sites at b72cbac1 (grep of `kernel/*.c`):
+    - the user VM ring: `walk(alloc)`, `uvmcreate`, `uvmalloc`, `uvmcopy`, `vmfault`. Bounded by `MAXUSZ`
+      and the table weight (F4).
+    - `allocproc`'s trapframe: one per slot.
+    - `kexec`'s second image, built while the first is live (`proc_freepagetable(oldpagetable)` runs last):
+      a second table weight per slot.
+    - `sys_exec`'s argv pages: at most `MAXARG` = 32, freed on return.
+    - `pipealloc`'s buffer. UNBOUNDED today: `NFILE` does not bound live buffers, because `fileclose` frees
+      the file slot under `ftable.lock` BEFORE `pipeclose`'s `kfree`, a window per kernel thread. So pipes
+      need their own cap: the `npipe` counter (Q-R4).
+  - The boot draws come before the credits are minted: `kvmmakeCount` = 166 (`KvmDefs`, the kernel stacks
+    included) and `virtio_disk_init`'s 3.
+- **F4 (the footprint is geometric; the numbers).**
+  - With `MAXUSZ ≤ 2 MiB` every user leaf lies under root index 0 → level-1 index 0. The two fixed pages
+    (`TRAMPOLINE`, `TRAPFRAME`: vpn `0x3ffffff`/`0x3fffffe`) lie under root index 255 → level-1 index 511.
+  - So a table has at most FIVE interior pages: the root, two level-1 nodes and two level-0 nodes.
+    `SpecProcPagetable.procPagetableNodes` = 3 is the top three. Data pages ≤ `MAXUSZ/4096`, by `umBelow`
+    and the block fact `sz ≤ MAXUSZ`.
+  - The weight of a table: `ptW` = 5 + 192 = 197.
+  - A slot's share: `slotB` = 1 (trapframe) + 2·197 (exec's two tables) + 32 (argv) = 427.
+  - The sizing: 64·427 + `NPIPE` 50 = 27378 ≤ `kinitPages − kvmmakeCount − 3` = 32732 − 166 − 3 = 32563.
+    Slack 5185.
+  - The CEILING is 232 pages (928 KiB): `ptW` 237, `slotB` 507, 64·507 + 50 = 32498 ≤ 32563.
+
+    768 KiB is recommended for the slack (Q-R3). The boot counts are exact in the specs: `SpecKinit.kinitPages`,
+    `SpecKvmmake`'s `nb - kvmmakeCount`, `SpecUserinit`'s `nb - g`. So the minting needs only arithmetic.
+  - User-visible:
+    - sbrk refuses growth past 768 KiB. usertests' big-memory cases (`sbrkmuch`'s 100 MB) would fail; nothing
+      in this repository runs them.
+    - exec refuses a segment ending past 760 KiB. The largest image today is `_usertests`, whose segments end at
+      `0x10cf8` (67 KiB); `_sh` ends at `0x2098`.
+    - `pipe()` fails at 50 live pipes.
+- **F5 (the measured shift; and the `.eh_frame` trap).**
+  - Method: `nm -n -S` of the pinned ELF against each candidate's, grouped by delta (playbook §2).
+  - The chosen patch (below):
+    - `sys_sbrk` +16 bytes in place: four instructions after its `ld s1,72(a0)` (`blez a0`, `add`,
+      `lui a4,0xc0`, `bltu`) and a new `-1` arm.
+    - Every symbol from `sys_pause` moves +16, then +76 from `pipeclose` (`pipealloc` grows 0xc8 → 0x104),
+      +114 from `pipewrite` (`pipeclose` 0x5e → 0x84), and +122 from `argfd` (`kexec` 0x35a → 0x362).
+    - `kernelvec`'s alignment absorbs 10 bytes (+112). Then +118 from `plic_claim` (`plicinithart`
+      0x36 → 0x3c: `li a5,0`, `csrw scounteren,a5`).
+    - In all, 86 of 197 text symbols move or resize. `.text` still ends below the trampoline page (slack 554 → 436
+      bytes), so `.rodata` does not move.
+    - Data: only `disk` and `end` move, +24: the two new `.bss` cells `npipelock`/`npipe` sit before `disk`.
+      `PGROUNDUP(end)` is unchanged, so `kinitPages` is too.
+  - In the tree:
+    - 253 of the 609 `X_br_<hex>` bridge lemmas change (their two ends get different deltas), in 89 files;
+    - about 101 files have a line naming two symbols with different deltas;
+    - 407 files name some window symbol (the loose upper bound; a symbolic offset INSIDE a moved function is
+      invariant).
+
+    The chroot bump's relayout (lane LL1) touched 326 files.
+  - **THE TRAP, for the playbook.** `.eh_frame` lies between `.rodata` and `.data`. A new function (a new FDE),
+    or a reshape that changes a function's CFI, grows it, and EVERY `.data`/`.bss` symbol (`kmem`, `proc`,
+    `cpus`, `ticks`, `ftable`, …) moves: a whole-kernel data relayout. Three spellings tried in scratch did
+    this:
+    - `kexec` with a SEPARATE stack-size check: `.eh_frame` +0x18, data +32;
+    - the pipe counter as two new `file.c` helpers under `ftable.lock`: +0x60, data +96;
+    - the kill check under `wait_lock`: +0x10, data +16.
+
+    The chosen spellings leave `.eh_frame` byte-identical: the segment bound merged into `kexec`'s existing
+    wrap test (the stack fits by construction: segments end ≤ `MAXUSZ − 2` pages), and the pipe counter inline
+    under a zero-initialised static lock. **Check `objdump -h`'s `.eh_frame` size before accepting any kernel
+    spelling.**
+- **F6 (candidate 1, the memory quota: what the NI theorems gain).**
+  - (i) The allocator leaves the two-run hypothesis. sbrk's row reads `uQuota` and the key. Fork's reads
+    `SFull` and `pidPick`. No class row reads `ι.kev`, so `xv6NiDetQ` holds with neither `kev` histories nor
+    `kev` positions. Scopes 8 and 9's "What `H` CONCEDES: every actor's `Kev` order" is gone.
+  - (ii) The lazy-fault kill through the pool (scope 9's last sentence; a truncation) cannot happen.
+    `vmfault`'s `kalloc` is credited by the table's weight. The prefix form cannot display this, but a kernel
+    row can (`utFaultResumes`, Q-4).
+  - (iii) G1e/G3c's lazy status copyout at wait and G4's lazy console write can rejoin the class at EVERY lazy
+    bit. Their only obstacle was a null `kalloc` at a page the key cannot locate. That is optional lane Q-4,
+    about G3 F6's 18 files minus the null arms.
+  - (iv) U-4L (later): `ustep` at `lazy = true`. A first touch below `sz` is a transparent round that always
+    resumes, at the view `umemLazy` already shows.
+  - Cost: Q-0..Q-3, about 1.0 BE.
+- **F7 (candidate 2, pid quota / per-process namespace: NOT minimal).**
+  - A per-family `nextpid` seeded at fork is not unique.
+  - A unique key-functional pid needs parent-RELATIVE pids: the child number in the parent's own counter,
+    `p->nextchild`. Then `wait`, `kill` and `getpid` speak relative ids, a user-visible API change. It also
+    needs a `struct proc` field (the stride moves: playbook §2's `procinit`/`proc_mapstacks` magic reciprocal,
+    `--proc-fields`) and a `Uvis` field (§4i's arity path).
+  - Gain: fork's pid leaves `pev`. But the pid ledger stays for `kill` and the families.
+  - About 1 BE alone. Rejected now (Q-R6).
+- **F8 (the slot channel, `sev`: a slot quota is the same shape and NOT minimal).**
+  - A per-process slot budget (`p->nslots`) would make fork's slot `-1` key-functional (`W.nsl = 0`):
+    - split at fork;
+    - refunded at the parent's reap (the child's unused budget must ride `ZExit`, a `zev` field);
+    - orphans' slots returned to init at its reap;
+    - invariant `Σ budgets + occupied = NPROC` over the proc table.
+  - Cost: `struct proc` and `Uvis` fields, kfork/kwait/kexit/userinit reshapes, a table-wide sum invariant. About
+    1 BE. Deferred. Fork's `-1` stays the cited `SFull` (scope 8).
+- **F9 (candidate 3, the kill permission check: provable spelling is expensive, gain is blocked).**
+  - `kkill` (`proc.c`, 0x800021b6) restricted to the caller's children must read `p->parent` under
+    `wait_lock`: the cell is the wait lock's payload (`kernel-defects`, freeproc's `p->parent = 0`). That
+    spelling grows `kkill`'s FDE: `.eh_frame` +0x10, every data symbol +16, a whole-kernel relayout.
+  - The racy spelling (`p->parent == myproc()` under `p->lock` only) keeps `.eh_frame`, but it is unprovable:
+    no read permission to the parent cell.
+  - `SpecKkill`'s post (`0 ∨ -1`) stays TRUE either way. The Lean side gains nothing until a stronger post
+    (`0 →` the target's parent is the caller) and K2 put `sys_kill` in the class. Its answer would then read
+    only the FAMILY ledger (a live-or-zombie child with that pid), and scope 12's "an outsider's kill of a
+    member" disappears. Both need FAM-1b, which is blocked at kfork's parent store.
+  - Behaviour: sh runs `kill N` in a child, a SIBLING of `N`, so `user/kill.c` stops working from the shell.
+  - **Recommended: not now. Pay its data relayout with the next upstream bump, whose relayout is paid anyway
+    (Q-R6).**
+- **F10 (candidate 4, `scounteren = 0`: bundled free).**
+  - `start()` (the ustep design's R5 text) is M-mode at 0x80000058. One instruction there shifts 189 of 197
+    text symbols.
+  - `scounteren` is an S-mode CSR, and every hart runs `plicinithart()` in S-mode (`main`'s two branches).
+    `plic.c` is the second-to-last object, inside Q-0's window, so writing it there costs NO extra shift (+6
+    bytes, measured above).
+  - U-mode needs BOTH `mcounteren`'s and `scounteren`'s bit, so zeroing `scounteren` suffices whatever
+    `start()`'s `r_mcounteren() | 2` leaves.
+  - Lean, in Q-0:
+    - a new S-mode CSR rule (`MachCSL/WpSmodeScounteren`, beside `WpSmodeStvec`/`WpSmodeSscratch`; no rule
+      exists today);
+    - `plicinithart`'s proof. Its post may keep forgetting the value.
+  - Lean, in Q-5 (optional):
+    - the per-hart pin `scounteren = 0` from `plicinithart` to the user configuration at every `sret`
+      (`UExecCsrCnt`'s `generalize (s.file .scounteren …)` becomes a known `0`: the illegal-instruction arm);
+    - `Ustep.ustep`'s counter numbers → `.trap` (scause 2), which usertrap's unexpected-cause arm kills (a
+      truncation);
+    - `NiNoStuck` loses its counter clause (scope 13 (iii)), and §3's corrected line becomes true of this kernel.
+- **F11 (bundling).** A kernel change costs its relayout once per change. The memory quota, the pipe cap and
+  `scounteren` share one window (from `sys_sbrk`), so they go as ONE commit and one Q-0. The kill check would
+  widen the window to `kkill` (112 text symbols, 481 files naming one) AND move all data (F9). It is better
+  paid with an upstream bump.
+- **F12 (the cheapest alternative, no kernel change, closes nothing).**
+  - On b72cbac1, an incarnation whose skeleton cites no allocator event (run 1's positions all have `kev = 0`:
+    no fork, no failed eager sbrk) already satisfies `xv6NiDet` with `niBelowQ`. The `kev` components of its
+    cited prefixes are `[]` in both runs, by the positions.
+  - A pure corollary `xv6NiDetNoAlloc` (about 150 lines, `NiTrace` only) would state it. But its premise is
+    exactly "LOW never forked and never met an empty pool". It shows WHERE the allocator enters the trace;
+    it does not close the channel.
+
+**The kernel change (Q-R1…R5; NOT applied; a patch against b72cbac1, built and measured in scratch).**
+
+```diff
+--- a/kernel/param.h
++++ b/kernel/param.h
+@@ -13,3 +13,5 @@
+ #define MAXPATH     128               // maximum file path name
+ #define USERSTACK   1                 // user stack pages
+ #define PIDMAX      1000              // highest PID
++#define MAXUSZ      (192 * 4096)      // memory quota: the largest user break
++#define NPIPE       (NFILE / 2)       // memory quota: pipe buffers at once
+--- a/kernel/sysproc.c
++++ b/kernel/sysproc.c
+@@ -47,6 +47,10 @@ sys_sbrk(void)
+   argint(1, &t);
+   addr = myproc()->sz;
+ 
++  // memory quota: no process grows past MAXUSZ.
++  if (n > 0 && addr + n > MAXUSZ)
++    return -1;
++
+   if (t == SBRK_EAGER || n < 0) {
+     if (growproc(n) < 0) {
+       return -1;
+--- a/kernel/exec.c
++++ b/kernel/exec.c
+@@ -64,7 +64,8 @@ kexec(char *path, char **argv)
+       continue;
+     if (ph.memsz < ph.filesz)
+       goto bad;
+-    if (ph.vaddr + ph.memsz < ph.vaddr)
++    if (ph.vaddr + ph.memsz < ph.vaddr ||
++        ph.vaddr + ph.memsz > MAXUSZ - (USERSTACK + 1) * PGSIZE) // quota
+       goto bad;
+     if (ph.vaddr % PGSIZE != 0)
+       goto bad;
+--- a/kernel/pipe.c
++++ b/kernel/pipe.c
+@@ -19,6 +19,11 @@ struct pipe {
+   int writeopen; // write fd is still open
+ };
+ 
++// memory quota: pipe buffers allocated, at most NPIPE (under npipelock;
++// zero-initialized, so it needs no initlock).
++static struct spinlock npipelock;
++static int npipe;
++
+ int
+ pipealloc(struct file **f0, struct file **f1)
+ {
+@@ -28,6 +33,13 @@ pipealloc(struct file **f0, struct file **f1)
+   *f0 = *f1 = 0;
+   if ((*f0 = filealloc()) == 0 || (*f1 = filealloc()) == 0)
+     goto bad;
++  acquire(&npipelock);
++  if (npipe >= NPIPE) {
++    release(&npipelock);
++    goto bad;
++  }
++  npipe++;
++  release(&npipelock);
+   if ((pi = (struct pipe *)kalloc()) == 0)
+     goto bad;
+   pi->readopen = 1;
+@@ -69,6 +81,9 @@ pipeclose(struct pipe *pi, int writable)
+   if (pi->readopen == 0 && pi->writeopen == 0) {
+     release(&pi->lock);
+     kfree((char *)pi);
++    acquire(&npipelock);
++    npipe--;
++    release(&npipelock);
+   } else
+     release(&pi->lock);
+ }
+--- a/kernel/riscv.h
++++ b/kernel/riscv.h
+@@ -281,6 +281,13 @@ r_stval()
+   return x;
+ }
+ 
++// Supervisor-mode Counter-Enable
++static inline void
++w_scounteren(uint64 x)
++{
++  asm volatile("csrw scounteren, %0" : : "r"(x));
++}
++
+ // Machine-mode Counter-Enable
+ static inline void
+ w_mcounteren(uint64 x)
+--- a/kernel/plic.c
++++ b/kernel/plic.c
+@@ -29,6 +29,10 @@ plicinithart(void)
+ 
+   // set this hart's S-mode priority threshold to 0.
+   *(uint32 *)PLIC_SPRIORITY(hart) = 0;
++
++  // user-mode reads of cycle/time/instret trap (usertrap kills them):
++  // no clock reaches user space.
++  w_scounteren(0);
+ }
+```
+
+Notes on the patch:
+- The `kalloc` that a failed `npipe` check skips leaves no reservation to undo. The `bad:` path frees only a
+  buffer it got, and a credited `kalloc` never returns 0 (Q-1). On the C level, a null after a successful
+  reservation would leak one count. That is unreachable under the credits. A fix needs a `pipealloc` local, a
+  saved register that may move `.eh_frame` (F5). The NI lanes do not need it: recorded, not fixed.
+- `growproc`'s `TRAPFRAME` test and the lazy path's `addr + n > TRAPFRAME` become dead, because `sys_sbrk`'s new
+  test is stronger. They stay in the C (the minimal change); their proofs refute the arms.
+- `npipelock` is never `initlock`ed. A zero `struct spinlock` is a free lock to `acquire` (b72cbac1's
+  `acquire` reads no name), and the proof mints its `isLock` at boot from the zero `.bss` cells (Q-0).
+
+**Proposed Lean definitions (verbatim; Q-1/Q-2/Q-3).**
+
+    -- Xv6/UPtDefs.lean (Q-1)
+    /-- (NI M3 quotas) `MAXUSZ`: the largest break of every process (the memory quota). -/
+    def uQuota : Nat := 192 * 4096
+    def uQpages : Nat := 192
+    /-- The most interior pages a table below `uQuota ≤ 2 MiB` can have: the root, level-1 at root[0]
+    and root[255], level-0 at [0][0] and [255][511] (`procPagetableNodes` is the top three). -/
+    def ptNodesMax : Nat := 5
+    /-- A table's WEIGHT: the pages it may ever own; it holds them as pages plus credits. -/
+    def ptW : Nat := ptNodesMax + uQpages
+    /-- A slot's share of RAM: the trapframe, two tables (exec builds the second before freeing the first),
+    `sys_exec`'s argv pages. -/
+    def slotB : Nat := 1 + 2 * ptW + 32
+    def NPIPE : Nat := 50
+    /-- The quota shape: kids only on the paths of `[0, uQuota)` and of the two top pages. -/
+    def _root_.MachCSL.PTree.shapeQ (t : PTree) : Prop :=
+      (∀ i, (t.kids i).isSome → i = 0#9 ∨ i = 255#9) ∧
+      (∀ c, t.kids 0#9 = some c → ∀ i, (c.kids i).isSome → i = 0#9) ∧
+      (∀ c, t.kids 255#9 = some c → ∀ i, (c.kids i).isSome → i = 511#9)
+    theorem _root_.MachCSL.PTree.pages_le_of_shapeQ (t : PTree) (h : t.shapeQ) :
+        (t.pages 2).length ≤ ptNodesMax
+    /-- User leaves of a leaf map (the two fixed leaves excluded). -/
+    def uLeafCnt (L : RegMapF (BitVec 64)) : Nat := …   -- the card of `L` below `tfVpn`
+    -- ptOwnRep, IN PLACE (18 files name it): the shape and the table's unspent weight ride the tree
+    def ptOwnRep (root : BitVec 44) (L : RegMapF (BitVec 64)) : IProp GF := iprop%
+      ∃ t : PTree, ⌜t.base = root ∧ ptRep t L ∧ t.shapeQ⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
+        kCredit fsReadyKmem (ptW - (t.pages 2).length - uLeafCnt L)
+
+    -- Xv6/KallocDefs.lean (Q-1): RESERVED PAGES.  `KmemNames` gains a third name `cred`
+    -- (`fscKpages` becomes a triple); an `Auth (ℕ, +)` camera, its spelling Q-1a's.
+    def credAuth (γk : KmemNames) (c : Nat) : IProp GF := …   -- ● c at γk.cred
+    def kCredit (γk : KmemNames) (n : Nat) : IProp GF := …    -- ◯ n at γk.cred; kCredit (a + b) ⊣⊢ kCredit a ∗ kCredit b
+    def kmemAuth (γk : KmemNames) (n : Nat) : IProp GF := iprop%     -- in place
+      kmemCnt γk n ∗ kmemLedger γk n ∗ ∃ c, credAuth γk c ∗ ⌜c ≤ n⌝
+
+    -- Xv6/SpecKalloc.lean / SpecKfree.lean (Q-1): a FIELD beside `wp_kalloc_led` / `wp_kfree_led`
+    -- (no existing field moves): the led form with `kCredit γk 1` in, and the post
+    def kallocPostCred (γk : KmemNames) (act r : BitVec 64) : IProp GF := iprop%
+      ⌜r ≠ 0#64 ∧ pageValid r⌝ ∗ byteBuf r (DFrac.own 1) (List.replicate 4096 5#8) ∗ kAllocRcpt γk act
+    -- `wp_kfree_cred`: the led kfree with `kCredit γk 1` added to its post.
+
+    -- the slot's share (Q-1): an UNUSED slot's dormant shapes hold `kCredit fsReadyKmem slotB`; a live block
+    -- holds its table (weight `ptW`), the trapframe page and `kCredit fsReadyKmem (ptW + 32)`; the pipe
+    -- lock's payload holds `kCredit fsReadyKmem (NPIPE - npipe)`; the block fact `V.sz.toNat ≤ uQuota`
+    -- sits beside `≤ uvmMaxsz` (`procPrivFd_facts`).  `SpecUserinit`'s `kallocAvail_seal` becomes the
+    -- MINT: `kallocAvail (some (nb - g))` with `64 * slotB + NPIPE ≤ nb - g` gives `credAuth` and the 64
+    -- slot shares plus the pipe share.
+
+    -- Xv6/UsysDet.lean (Q-2), IN PLACE (the signatures kept, so every caller is untouched)
+    def usysSbrkOverrun (sz : Nat) (a0 : BitVec 64) : Prop :=
+      0 < (sbrkArgW a0).toInt ∧ (uQuota : Int) < sz + (sbrkArgW a0).toInt
+    def usysSbrkFails (sz : Nat) (a0 a1 : BitVec 64) (ι : UIota) : Prop := usysSbrkOverrun sz a0
+    def forkOk (ι : UIota) : Prop := ¬ ι.sFull
+    -- SyscallDefs.syscEvRow: fork's positive reason `¬ forkOk ι → ι.sFull ∧ cs' = cs` (JF-R5's `kNull ∨`
+    -- gone); sbrk's `-1` needs no citation (the arm still cites `{boot with act}`)
+
+    -- Xv6/UsysDet.lean / NiEvid.lean / NiTrace.lean (Q-3)
+    /-- The ledger part without the allocator. -/
+    def UIota.ledQ (ι : UIota) : UIota := { ι.led with kev := [] }
+    /-- **THE CLOSURE** (false on b72cbac1: sbrk read `ι.kNull`, fork `ι.kOk`). -/
+    theorem usysDet_ledQ (n : Int) (W : Uvis) (ι : UIota) : usysDet n W ι = usysDet n W ι.ledQ
+    /-- `niBelow` without the allocator's conjunct. -/
+    def niBelowQ (ι H : UIota) : Prop :=
+      ι.pev <+: H.pev ∧ ι.zev <+: H.zev ∧ ι.ticks ≤ H.ticks ∧ ι.sev <+: H.sev ∧ ι.cacc <+: H.cacc
+    /-- A position without the cited allocator length. -/
+    def NiPos.noKev (p : NiPos) : NiPos := { p with kev := 0 }
+    def NiStep.detInQ (s : NiStep) : Option NiPos := s.detIn.map NiPos.noKev
+
+**The theorem (Q-3; verbatim).** `niTwoRunDetQ` is `niTwoRunDet` with `hpos` at `detInQ` and `hH` at
+`niBelowQ`. Its induction is `niDet_runs` unchanged except at the citation: `citePos_led` becomes `citePosQ`
+(`ι₁.ledQ = ι₂.ledQ` from the kev-free positions and histories), and `niKeyRow_det` reads the rows through
+`usysDet_ledQ`. The root, in `LinkNiAdequacy` beside `xv6NiDet`, has `xv6NiDet`'s binders and adequacy premises
+byte for byte, and the SAME `xv6NiPhi` (no new conjunct: the closure is in the rows, not the filing):
+
+    /-- **(NI M3 quotas) The allocator channel is closed**: `xv6NiDet` WITHOUT the allocator -- neither its
+    history (`niBelowQ`) nor its positions (`detInQ`).  An incarnation's ecall skeleton and console output
+    are a prefix of the other run's whatever every actor allocated and freed. -/
+    theorem xv6NiDetQ … :
+        ∃ F₁ F₂, niOk κs₁ F₁ ∧ niOneShot κs₁ F₁ ∧ niChain F₁ (niHist F₁) ∧ niUserChain F₁ ∧
+          niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ niUserChain F₂ ∧ ∀ q : NiInc,
+          NiOneOrigin q κs₁ F₁ → NiOneOrigin q κs₂ F₂ →
+          NiGapFree q κs₁ F₁ → NiGapFree q κs₂ F₂ →
+          NiInClass (utrace q κs₁ F₁) → NiNoStuck q κs₁ F₁ →
+          firstKey q κs₁ F₁ = firstKey q κs₂ F₂ →
+          ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.detInQ <+:
+            ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.detInQ →
+          (∀ k, niBelowQ (niHistLed F₁ k) (niHistLed F₂ k)) →
+          ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.view <+:
+              ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.view ∧
+            ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.outBytes <+:
+              ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.outBytes
+
+Why it is the theorem that the change closes a channel: on b72cbac1 the statement is false of the kernel, not
+merely unproved. Take two runs that differ only in another actor's allocations, at a LOW eager sbrk that meets
+an empty pool in one run and not in the other. The views differ, and the only hypothesis that told them apart
+was `kev`. On the quota kernel no class row reads `kev` (`usysDet_ledQ`), so dropping it costs nothing.
+`xv6NiDet` stays (byte-identical, still true, now weaker than the new root).
+
+Honest scope 14 (to be written into `NiTrace` by Q-3):
+- CLOSED: the allocator.
+  - Every actor's `Kev` order, the round's own kalloc count included, leaves both hypotheses.
+  - sbrk's `-1` is the key's quota overrun.
+  - fork's `-1` is the cited `SFull` alone.
+  - A lazy fault within the break always resumes (the truncation through the pool is gone; the prefix form
+    does not show it).
+- NOT closed: the pid order (`pev`: fork's pid is `pidPick`), slot occupancy (`sev`: fork's `-1`), the ticks
+  (uptime), the family ledger (`zev`: wait), the console stream (`cacc`), the schedule (positions), the regime,
+  one origin, no gaps.
+- NEW global readings (outside the class):
+  - `pipe()`'s `-1` at `NPIPE` live pipes, a global count (pipes stay parked);
+  - `exec`'s refusal of an over-quota image (exec is outside the class).
+- The sizing `64 * slotB + NPIPE ≤ kinitPages - kvmmakeCount - 3` is a proved arithmetic fact about this image
+  (`end` and `PHYSTOP`), not an assumption.
+
+**Lanes.** One worktree, in sequence. Q-4 and Q-5 are optional and independent after Q-1 and Q-0 respectively.
+A BUMP-EQUIVALENT (BE) is the chroot bump b72cbac1 (2026-10-01):
+- image regen (26 files);
+- the tool relayout LL1 (326 files, ±2.9k lines);
+- the five shape lanes LL2–LL6 (≈ 210 files, +6.0k/−2.6k);
+- the user relayout (59 files).
+
+About a day of five parallel lanes.
+
+| Lane | Content | Files (est.) | Lines (est.) | BE |
+|---|---|---|---|---|
+| **Q-0 the commit, the image, the relayout** | The patch as ONE commit on the fork branch (Q-R1). Rebuild the ELF, `tools/dump_kernel.py --rev`, `gen_kernel_data.py`, `check-gen-kernel`. `tools/rebase_kernel.py` literal + `--fixup` + `--symbolic` with ONE `--intervals` file for the four reshaped functions (`sys_sbrk` from its +0x24 insertion; `pipealloc`, `pipeclose`, `kexec` at their inserted compares; `plicinithart`'s tail) and `disk`'s +24. Shapes: `sysSbrkOk`'s FAILED reason at the quota (`sysSbrkOverrun` in place, `usysSbrkOverrun` with it, so `usysSbrkFails` stays `overrun ∨ (allocs ∧ kNull)` until Q-2); `kexec`'s merged segment test (the refusal files under `KexecLoad.execFailOk`'s `.noMem` cause, whose only premise is the magic test, which precedes the loop, so `ExecFailCause` does not move; a separate `.quota` cause would be more honest and moves the type); `pipealloc`/`pipeclose` with `npipelock` (its `isLock` minted at boot from the zero cells; no lock nesting); `plicinithart` with a new `MachCSL` S-mode `csrw scounteren` rule (post unchanged). Gate: all thirteen roots byte-identical, `tcb.sh` (the `usysSbrkOverrun` body moves), `audit.sh`, `coverage` (no new functions), full `run_all.sh`. | regen 4–5 generated; relayout ≈ 100–130; shapes ≈ 15 | ≈ 1.5–2.5k by hand | ≈ 0.35 |
+| **Q-1 the reservation** | `KmemNames.cred`, `credAuth`/`kCredit`, `kmemAuth` in place; `wp_kalloc_cred`/`wp_kfree_cred` fields (proofs from the led ones plus the camera); `PTree.shapeQ` and `pages_le_of_shapeQ`; `ptOwnRep`'s weight in place; the VM ring threads it (walk's allocating form takes `vpn` in the quota region; mappages, uvmcreate, uvmalloc (pre `newsz ≤ uQuota`), uvmcopy, vmfault, uvmunmap/uvmdealloc/freewalk/uvmfree/proc_freepagetable return credits); the slot shares (procinit's dormant shapes, allocproc/freeproc, kfork's child slot, kexec's second table, sys_exec's argv); the block fact `sz ≤ uQuota` (sbrk, exec, fork, userinit); the pipe share; userinit MINTS instead of sealing. The L3b permit sweep is the precedent (36 files, +1.1k/−0.4k); this is that sweep plus counting plus the geometric lemma. | ≈ 60–80 | ≈ 3–4k | ≈ 0.5 |
+| **Q-2 the rows** | The credited forms make the null arms unreachable: `growprocOk`'s `-1` only at the dead TRAPFRAME test, `sysSbrkOk`'s `-1` only at the quota, `kforkRetLed`'s `-1` only at `SFull`. `usysSbrkFails`/`forkOk` in place (above); `syscEvRow`'s fork reason; `SyscallArmsSbrk`/`SyscallArmsFork`; `UsysDet` §4 and `NiTrace` scopes 8/9 rewritten. The G3a/F2 null receipts stay in the Specs (affine), deleted later by the dead-code pass if unreached. | ≈ 15 | ≈ 0.6–0.9k | ≈ 0.1 |
+| **Q-3 the root** | `UIota.ledQ`, `usysDet_ledQ`, `niBelowQ`, `NiPos.noKev`, `NiStep.detInQ`, `citePosQ`, `niTwoRunDetQ`, `LinkNiAdequacy.xv6NiDetQ` (the fourteenth root); `roots.txt` + `baseline.json`; `tcb.sh --update` (one new entry, no existing one moves); honest scope 14. | 4–5 | ≈ 0.2–0.3k | ≈ 0.03 |
+| Q-4 (optional) the lazy class | wait's lazy status copyout (G3c) and the lazy console write (G4) at EVERY lazy bit: `vmfault`'s 0 arm unreachable below the break, so the window is the key's `π`; `usysDetClassAt` drops `lz`; a usertrap row `utFaultResumes` (a fault below the break resumes). | ≈ 18 | ≈ 1k | ≈ 0.12 |
+| Q-5 (optional) the clock | The per-hart pin `scounteren = 0` into the user configuration; `Ustep.ustep`'s counter CSRs `.trap` (scause 2); `NiNoStuck` without its counter clause; scope 13 (iii) and §3 updated. | ≈ 12 (MachCSL + Ustep + NiTrace) | ≈ 0.6–1k | ≈ 0.1 |
+
+**Total:** Q-0..Q-3 ≈ 1.0 BE. With Q-4 and Q-5 ≈ 1.2 BE. Every later upstream bump re-applies the 34 lines and
+their four shape lanes: ≈ 0.05 BE recurring. Q-0 alone changes no NI statement (the thirteen roots stay
+byte-identical; only `usysSbrkOverrun`'s body moves). The channel closes at Q-3.
+
+Risks:
+- (R1) `ptOwnRep`'s weight is the one in-place body change in the VM ring's vocabulary. 18 files name it, but
+  every proof that opens the existential must carry the credit.
+- (R2) walk's allocating form has callers outside the user ring: `kvmmap` at boot uses the kernel table, not
+  `ptOwnRep`. Q-1 checks that no user caller lacks the region premise.
+- (R3) The boot mint needs `SpecUserinit`'s `nb - g` lower-bounded by 27378. Today it carries only
+  `procPagetableNodes + 1 < nb`; `ProofMain`'s chain from `kinitPages` gives the exact value.
+- (R4) The new `MachCSL` CSR rule is a machine-layer addition, and the device suite must not notice it.
+
+**RULINGS REQUESTED (Q-R1…Q-R10).**
+- **Q-R1 (OWNER DECISION) Does the owner want a kernel-source change at all (a fork of the pin / an upstream
+  commit on `verified` / `chroot`), given the relayout cost (≈ 1.0 BE for the channel, ≈ 0.05 BE at every
+  later bump)?**
+  - (a) A FORK of the pin: a branch `verified-quota` (on `mit-pdos` or `zeldovich`) = b72cbac1 + this one
+    commit. The pin becomes that commit:
+    - the dump headers say "(branch verified-quota)", and so does README "Images";
+    - `tools/ci/run_all.sh:201`'s attribution clone moves to the branch (best effort; the coverage numbers
+      do not depend on it);
+    - every worktree's `.gitignore`d `xv6-riscv/` clone must fetch the branch to regenerate. CI is unaffected:
+      it compiles the checked-in dumps and never builds the ELF;
+    - each upstream bump rebases the commit.
+  - (b) UPSTREAM on `verified` (and `chroot`):
+    - the pin stays "the branch tip";
+    - xv6 itself gets quotas: usertests' big-memory cases need edits, and 768 KiB, `NPIPE` and the
+      killed counter reads become xv6 behaviour for everyone on that branch.
+  - (c) NO source change: keep the honest theorems. The cheapest alternative is `xv6NiDetNoAlloc` (F12, about
+    150 pure lines). It does not close the channel.
+  - **Recommended: (a).** The change is minimal by measurement: 34 lines, no new function, no `struct proc`
+    change, data fixed but `disk`/`end`, 86 of 197 text symbols. It is the first statement in this campaign
+    that a channel is CLOSED rather than conceded. Take (b) later only if the owner wants xv6 to have quotas.
+    If ≈ 1 BE is too much now, take (c) and record the quota as designed.
+- **Q-R2 (the quota's form).** Recommended: a uniform CONSTANT on the break. There is no key field (F2). A
+  per-process variable quota is rejected: a key field and nothing gained.
+- **Q-R3 (the numbers).** Recommended: `MAXUSZ` = 768 KiB (192 pages; slack 5185 pages) and `NPIPE` = `NFILE/2`
+  = 50. The ceiling is 928 KiB.
+- **Q-R4 (pipes).**
+  - Recommended: the C cap `npipe` under a zero-initialised static lock in `pipe.c`. It is measured not to move
+    `.eh_frame`. The proof is local (the lock's payload holds `NPIPE − npipe` credits).
+  - Alternative: no C, a ghost bound. Each file slot holds a credit, and each process lends one across
+    `fileclose`'s window before `pipeclose`'s `kfree`. That is a counting invariant in the file layer (≈ 15
+    files, ≈ 1k lines) and subtler.
+  - Rejected: the counter as `file.c` helpers. Two new functions move every data symbol (F5).
+- **Q-R5 (bundle `scounteren`).** Recommended: yes, in `plicinithart` (free inside the window). The Lean side of
+  the gain is optional lane Q-5.
+- **Q-R6 (not bundled).** Recommended:
+  - the kill permission check deferred to the next upstream bump (F9: a whole-data relayout now; gain blocked
+    on FAM-1b; it breaks `kill` from sh);
+  - pid and slot quotas rejected as not minimal (F7, F8).
+- **Q-R7 (where the credits live).** Recommended:
+  - the table's weight inside `ptOwnRep`'s existential (the interior count is only known there);
+  - the slot share in the dormant shapes and the live block;
+  - the pipe share in `npipelock`'s payload;
+  - credited `kalloc`/`kfree` as NEW fields beside the led ones (no existing field moves).
+
+  Alternative: a `nint` field in `UPtd`. Rejected: `UPtd` is built positionally.
+- **Q-R8 (the theorem).** Recommended:
+  - a new fourteenth root `xv6NiDetQ` at the SAME `xv6NiPhi`;
+  - `xv6NiDet` and the other twelve roots byte-identical;
+  - the closure stated as the row lemma `usysDet_ledQ`.
+
+  Alternative: a `niKevFree F` conjunct in φ (every citation's `kev` empty). Rejected: it moves `xv6NiPhi`,
+  and the rows already make `kev` irrelevant.
+- **Q-R9 (rows in place).** Recommended:
+  - `usysSbrkOverrun` at `uQuota` with `0 < n` (the C's `n > 0`);
+  - `usysSbrkFails` and `forkOk` without the allocator;
+  - the null receipts left in the Specs for the dead-code pass.
+- **Q-R10 (order).** Recommended: Q-0 → Q-1 → Q-2 → Q-3 in one worktree; Q-4 and Q-5 optional afterwards.
+  U-4L (`ustep` at lazy keys) is recorded as unlocked by Q-1.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
@@ -6446,6 +6983,8 @@ no-kill landed (K3 + K1; K2 deferred to families); next: families
 families: FAM-1a landed (pure: `zLowest_zevIn`, `niTwoRunFam` conditional on `zevWf`); FAM-1b blocked at kfork's parent store (needs a ruling, see "M3 families as landed"); next: that ruling, or ustep
 
 ustep landed (U-1..U-3; U-4 totality later); next: quotas
+
+quotas DESIGNED (2026-10-05, "M3 quotas design" above: the break quota + pipe cap + `scounteren`, one commit on a fork of the pin; `xv6NiDetQ` without the allocator; ≈ 1.0 BE); awaiting the OWNER's Q-R1 and rulings Q-R2…R10
 
 What remains in M3: quotas (a kernel change and the theorem that it closes a channel), private files; later optional: U-4 totality, FAM-1b, K2 sys_kill, dup/close, pipes, OUT-4, G3c
 
