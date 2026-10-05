@@ -7136,6 +7136,8 @@ Risks:
 - (R5) The footprint hypotheses quantify over `niHistLed F k` per era; a run whose high side moves `S` makes
   `xv6NiFs` vacuous for that `S` — by design (that is the channel), but the scope must say so.
 
+**RULINGS FS-R1…R10 (2026-10-05):** **FS-R1 OWNER DECISION: the FULL lane FS-L through FS-4** ("Full lane FS-L..FS-4 (Recommended)"), ≈2.8 BE, no kernel change. Coordinator, all as recommended: R2 one per-era fs-event ledger keyed by inode number, kept in `ftopBody`, tied to the TYPED rows (an unlinked-but-open file stays readable); R3 moves at the delta level, observations carry only their position, rows compute the answers; only the inode number, `γo` and the out-of-resources verdicts are recorded as given (no `zevWf`-style export); R4 the class: close/dup at every key; read/write/fstat on a regular-file fd at a lazy-free key with the buffer mapped; open, chdir, mkdir; OUTSIDE: directory reads/fstat, link/unlink/mknod, exec, chroot, pipes; R5 FS-0 = F7 (a)–(d); R6 `NiStep.round` gains `wfd`, `rt`, `fout`; R7 one new root `xv6NiFs`, the equal-history form an internal lemma; R8 file the block's `rti` per round, FS-5 (chroot spec + root field) recorded; R9 no kernel change (block/inode/file-table quotas rejected as not minimal); R10 order FS-L → (FS-0 + FS-1, one worktree) → FS-2a → FS-2b → FS-3/4; FS-2c optional. chroot is NOT the partition (recorded).
+
 **RULINGS REQUESTED (FS-R1…FS-R10).**
 - **FS-R1 (go or defer).** (a) Full: FS-L → FS-0 → FS-1 → FS-2a → FS-2b → FS-3/4 (≈ 2.8 BE), FS-2c optional.
   (b) FS-L only now, the rest recorded as designed (≈ 0.05 BE). (c) Defer everything. **Recommended: (a).**
