@@ -1,6 +1,8 @@
 import MachCSL.Hello
 import MachCSL.FrameFilter
 import MachCSL.TsoMem
+import MachCSL.OrdKeys
+import MachCSL.StdppList
 import MachCSL.KernelElf
 import MachCSL.BootImage
 import MachCSL.Dev.DevIds

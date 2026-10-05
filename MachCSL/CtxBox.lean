@@ -42,7 +42,7 @@ THE TRANSITIONS (Rocq's seven, with their hooked forms): (a)
 * the map is `Std.ExtTreeMap (Id × Nat) UFrac compare` (`MachCSL.StampMap`;
   Rocq's `gmap (id * nat) ufrac`), so the identity type carries a lawful
   order where Rocq's carries `Countable`; Lean's lexicographic pair order
-  `lexOrd` is made an instance here (`MachCSL.instOrdProdLex`).  Masses are
+  `lexOrd` is made an instance in `MachCSL.OrdKeys` (`MachCSL.instOrdProdLex`).  Masses are
   iris-lean's `UFrac`; Rocq's `Qc` sums are `Rat`, and `nat_Qc` is the cast.
 * `qsum` / `max_stamp` are folds over the map's `toList` rather than
   `map_fold` (so Rocq's `qsum_step` / `max_step` are gone); they are proved
@@ -72,6 +72,7 @@ THE TRANSITIONS (Rocq's seven, with their hooked forms): (a)
   half itself.
 -/
 import MachCSL.Lock
+import MachCSL.OrdKeys
 
 namespace MachCSL
 
@@ -228,14 +229,9 @@ end transport
 
 Rocq keys the stamps camera by `id * nat` under stdpp's `Countable`; here the
 map is `Std.ExtTreeMap` (the port's finite map, as `MachCSL.RegMapF`), so the
-key needs a lawful order.  Lean's core declares the lexicographic order on
-pairs (`lexOrd`) but does not make it an instance; its `TransOrd` /
-`LawfulEqOrd` instances for pairs exist and are keyed on it, so it is made an
-instance here.  The masses are iris-lean's `UFrac` (Rocq's `ufrac`), and the
-`Qc`-valued sums are `Rat`. -/
-
-/-- The lexicographic order on pairs (Lean's `lexOrd`), as an instance. -/
-instance instOrdProdLex {α β : Type _} [Ord α] [Ord β] : Ord (α × β) := lexOrd
+key needs a lawful order: the lexicographic pair order, made an instance
+(`MachCSL.instOrdProdLex`) in `MachCSL.OrdKeys`.  The masses are iris-lean's
+`UFrac` (Rocq's `ufrac`), and the `Qc`-valued sums are `Rat`. -/
 
 /-- The finite maps keyed by (identity, stamp). -/
 abbrev StampMapF (Id : Type) [Ord Id] : Type → Type := fun V => Std.ExtTreeMap (Id × Nat) V compare
