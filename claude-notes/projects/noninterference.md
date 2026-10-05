@@ -4368,6 +4368,8 @@ receipt; OUT-3 needs OUT-2's row). One worktree, three commits. Estimates:
 - **OUT-3:** `NiTrace` (~150 mechanical for the `wout` binder, as G4b's `wcon`; ~60 for `.led` in `cite_eq`/
   `output_eq`; ~80 new for `outBytes`/`niOut`), `LinkNiAdequacy` (~25), baselines.
 
+**RULINGS OUT-R1…R9 (2026-10-05, coordinator, all as recommended):** R1 attribution by ACCEPTED-STREAM index (an `h` position is the device's drain, not the store: F1; the wire tie is OUT-4); R2 the carrier is two defaulted `UIota` fields `cacc`/`cpos` on the existing citation route (the `sev` precedent); R3 chain `cacc` as the sixth anchored name, compare only `.led` in `cite_eq`/`output_eq`, and move `xv6NiTwoRun`'s `hH` to `niHistLed F₁ = niHistLed F₂` — the theorem must NOT assume equal console streams; R4 a sixth step field `wout` kept OUT of `NiStep.input`, read by `NiStep.outInput`; R5 an eleventh root `xv6NiOut` ("equal out-inputs, including the caller's own buffer, push equal runs"); R6 `UARTWRITE` moves in place with the sibling leaf `thr_write_au_at`, persistent conjuncts on the consolewrite/filewrite/sys_write posts, the UART drain permits and `uartputc_sync`/`consputc`/`prputc` byte-identical; R7 pin `γ0 = fscUart` in `parkWorld`'s body; R8 OUT-4 (stream ↔ wire) deferred and recorded in scope 10; R9 the kernel row holds at every lazy bit, the law reads it at the class. Lanes OUT-1 → OUT-2 → OUT-3, one worktree, three commits.
+
 **RULINGS REQUESTED.**
 - **OUT-R1 (the attribution's index).**
   - Recommended: the ACCEPTED-STREAM index (`Uart.acc` at the era's `fscUart.acc`), from the THR store's exact
