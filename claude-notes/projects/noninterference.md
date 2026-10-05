@@ -5236,6 +5236,8 @@ hypothesis, not a replacement.
 
 ### M3 families as landed (2026-10-05): FAM-1a only; FAM-1b blocked
 
+**Coordinator ruling after FAM-1a (2026-10-05):** FAM-1b is DEFERRED behind `ustep` (the family partition's content is small by the design's own verdict, and FAM-1b needs a ghost restructure outside the sanctioned moves). When it is taken up, the recommended route is the FRACTIONAL T2 element kfork keeps across `release(&np->lock)` until its parent store: it is safe because the child is not RUNNABLE until after that store (kfork sets `np->state = RUNNABLE` under `np->lock` AFTER the `wait_lock` section), so nothing needs the whole element in the window; the kexit clause `ip = I` ties `I` to the `initproc` cell in the `wait_lock` payload. FAM-1a's two `dead_allow.txt` rows stay, justified, until then. `zevStepOk`'s three corrections (the single reparenting target `I` no fork targets; a fork's target unparented, not a zombie, nobody's parent, forked by a live actor in another slot) were found by model-testing the lemma and are the design's version's counterexamples.
+
 Lane `lane/fam`, one commit (FAM-1a).  FAM-1b is NOT landed: R3's amended plan (1a+1b together) could not
 be met, so FAM-1a carries interim `dead_allow.txt` rows (`decl Xv6.niTwoRunFam`, `decl Xv6.niForkChild`,
 "FAM-1b reaches").  No statement moved; the twelve roots, every kernel and NI statement are byte-identical.
