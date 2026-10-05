@@ -6794,6 +6794,386 @@ branch (the rows read no `kev` definitionally).  (3) `niTwoRunDet`'s proof gener
 
 What remains in M3: private files; later optional: Q-4 (wait/write at lazy keys), Q-5 (the clock), U-4 totality, FAM-1b, K2 sys_kill, dup/close, pipes, OUT-4, G3c
 
+### M3 private files design (2026-10-05)
+
+Design pass on `lane/pfiles` (based on `lean` f50f35ebe: quotas Q-3 landed). No code. The shapes below were
+read off the tree (`FsAbsDefs`, `FsAbsDelta`, `FsAbs*Fire`, `FsAbsInvFire`, `AppInv`, `InodeRegionInv`,
+`OffGv`, `FileDefs`, `SysReadDefs`, `SysWriteDefs`, `SysLinkDefs`, the `Spec*` of every fs syscall and of
+`readi`/`writei`/`ialloc`/`balloc`/`iget`/`filealloc`, `UsysMemOk`, `UsysDet`, `UexecSlot`, `NiEvid`,
+`NiTrace`, `LinkNiAdequacy`, `tools/tcb/expected.json`) and are not shape-checked. Rulings FS-R1…R10 at the end.
+
+**Short version.**
+- **The prerequisite is mostly there.** The fs syscall contracts ARE functional, at the instant: every
+  content and namespace syscall (read, write, open plain/create/trunc, unlink, mkdir, mknod, chdir, exec's
+  image) has a logically-atomic commit whose post ties the answer to the ABSTRACT VIEW observed at the
+  linearization point (`readArms`: count `ardCount n off |bs|` and buffer `bs[off+j]`; the write chain's
+  per-chunk `deltaWrite`; open's walk trace and observed row; unlink's per-reason observations). The gaps:
+  `fstat` (a window of `d ≤ 24` unnamed bytes), `chroot` (no commit, the root not in the key), `link`'s and
+  open-create's `-1` (some arms carry no reason), writei's short count (no reason at an out-of-blocks
+  `bmap`), and the inode number create picks (`∃ i ∉ dom av`: ialloc's scan is not atomic, so no
+  functional spec exists — it must be CARRIED). Directory bytes are not in the view (`ADir` is an entry
+  map): `read`/`fstat` on a directory fd stay relational.
+- **What is missing is not the specs but the HISTORY.** The commits hand their receipts to the CLIENT's
+  piece (`Pfam`), and the generic dispatcher passes trivial pieces (`FsAbsInvFire.fsabsAread`, …): no
+  kernel-owned record says what any read returned. The γtop authority is a CURRENT-state map, not a history.
+  So the lane is a ledger-and-row lane like the others: a per-era fs-event ledger `Fev` beside the kernel's
+  half of the top map (`InodeRegionInv.ftopBody`), appended by the FIRE lemmas themselves (as `kalloc`'s led
+  form appends `Kev`), the seventh anchored name.
+- **Rows are computed, not carried.** Moves (create's arm, entry and link-count legs, a write chunk, trunc,
+  iput's free) carry their delta; observations (a read, a hop, an fd install, a stat) carry only their
+  POSITION, and the row computes the answer from the fold of the prefix before it (`fevReadBytes`,
+  `fevLookup`), functional in (key, ι) like wait's. Carried, i.e. declassified: the inum ialloc picked, the
+  offset shadow's name `γo` (it is in the key's fd row), the three exhaustion verdicts (`FsFull`: inodes,
+  blocks, NFILE).
+- **The theorem worth stating is the PRIVATE-FOOTPRINT form, not the equal-history one.** At equal fs
+  histories (FS-3) the theorem concedes every byte anyone wrote — honest, weak, cheap once the rows exist. The
+  content (FS-4): for an incarnation whose fs rows cite only a FOOTPRINT `S` (inodes, directory entries
+  `(d, nm)`, struct-file offsets) that no other actor MOVES in either run, the fs history leaves the
+  hypothesis: the restricted fold is the fold of q's own events, and q's events are its rows' outputs (as
+  `wout` was derived in `xv6NiDet`). What remains: the oracle (q's inum picks, its `γo`s, its exhaustion
+  verdicts), the root it walked from, the era's recovered cut, the schedule of OTHER syscalls.
+- **chroot is NOT the partition.** It confines q's NAMING (`..` stops at `p->root`), not other processes'
+  access (an unconfined `sh` names the subtree from `/`), and leaves cwd and pre-chroot fds outside. Privacy
+  is a fact of the run's history (nobody else moves `S`), stated on the ledger; closure (q cites only `S`)
+  is checkable on q's own trace. chroot is a sufficient condition for closure, recorded, not built.
+- **Channels that stay open** (F6): inode numbers (ialloc's global first-free scan, visible in the key's fd
+  row and cwd, not only through fstat); exhaustion of blocks/inodes/NFILE (write's `-1`, create's `-1`); the
+  icache's `iget: no inodes` PANIC (live: a machine-wide truncation); directory slot layout (only through
+  directory reads, which stay outside the class); the crash cut across eras. The log is NOT a channel:
+  `begin_op` sleeps and never fails, `log_write`'s and `bget`'s panics are refuted by the budget and the
+  `bslot` credits; its batching is schedule (`.dev`), invisible to the theorem.
+- **Cost:** FS-L (close/dup, no ledger) ≈ 0.05 BE; FS-0 (the missing reasons, fstat) ≈ 0.7; FS-1 (the ledger,
+  the fires append) ≈ 1.0; FS-2a/2b (rows, class) ≈ 0.7; FS-3/FS-4 (the pure theorems, one root) ≈ 0.35:
+  **≈ 2.8 BE**, the largest M3 lane (the parked pipes lane was 6–9k lines; FS-1 alone is that size). No
+  kernel change.
+
+**Findings.**
+- **F1 (the abstract state; inventory).** `FsAbsDefs.Aview := RegMapF Anode`, `Anode = ⟨Absnode, nlink⟩`,
+  `Absnode = AFile bytes | ADir (ExtTreeMap Fname Nat) | ADev ma mi` (FsAbsDefs.lean:93–102), `absView I :=
+  omap absOf I` (:390) over LIVE rows only (`absOf` is `none` at type 0 or nlink 0, :138): an
+  unlinked-but-open file has no view row, and fd-reached commits state their row conditionally
+  (`arowAt`, :243). The deltas `deltaWrite`/create/link/unlink are `FsAbsDelta`. Every view move goes through
+  ONE lemma, `AppInv.appTopUpdate` (`_step` at an AU fire, `_same` between absent rows: ialloc's claim,
+  iput's free). The client resources: `FdType.inode i γo om` (FileDefs.lean:131: the inum AND the offset
+  shadow's name are in the KEY's fd table, `Uvis.fd`), the offset itself is NOT in the key (`offUserInv γo`
+  parks the user half at an existential value, OffGv.lean:137; the kernel half rides `f->off`'s box), the
+  cwd's inum is `Uvis.cwd`, the root's inum `V.rti` is NOT in `Uvis` (chroot.md §1, a recorded gap).
+
+  | syscall | contract (Lean) | post | NI status |
+  |---|---|---|---|
+  | read (inode fd) | `SpecSysRead.sysReadArms` :116 → `FsAbsReadFire.readArms` :280 / `readPostOk` :256 (`SysReadDefs.ardRetTie` :136, `readBufTie` :174) | FUNCTIONAL at the instant for a FILE row: `r = ardCount n off |bs|`, buffer `= bs[off+j]`, offset advanced by `r`; `-1` only at `n<0` or a copyout fault (`rdFailWhy`, reason carried; buffer unspecified) | row-ready; dir rows relational (`∃ rv`, `readBufTie = True`) |
+  | write (inode fd) | `SpecSysWrite.sysWriteArms` :117 → `FsAbsWriteFire.awriteChain` :375 (`deltaWrite` FsAbsDelta.lean:237, `wriPre` SysWriteDefs.lean:78) | per-chunk AU, each chunk a `deltaWrite` at the offset of ITS instant; post: pure totals, `filewriteRet` (SpecFilewrite.lean:209: `-1` or `0..n`; C returns `n` or `-1`) | per-chunk functional; the short chunk's reason is carried only at an unmapped source (`wrFailWhy`), NOT at `bmap`'s out-of-blocks `0` (SpecWritei header: "a short write is a normal return") — FS-0 |
+  | open plain / O_TRUNC | `SpecSysOpen.openArms` :487, receipts `openReceiptPlain` :507 | walk trace (hops at their instants), observed row `arowAt av i a`, trunc delta, fd at `fdLeastClosed`, `∃ γo` fresh | functional modulo the carried `γo`; `-1` arms carry their observation except "table full" (NFILE: global) |
+  | open O_CREATE | `openPostFailCreate` :401, arm (c) :445 | create fires `δ_create` with `∃ i ∉ dom av` | inum CARRIED (no functional spec possible: ialloc's scan releases each block); arm (c) "nothing observed: nlink guard, out of inodes, dirlink failure, `/`" — FS-0 |
+  | close | `UsysMemOk.usysFdOk` :454 (close branch), `SpecSysClose.sysClosePost` :63 | key-functional on an open fd (`r = 0`, slot closed); a bad fd's `-1` not pinned (only `r ≠ 0 → sts' = sts`) | FS-L (one clause) |
+  | dup | `usysFdOk` dup branch, `SpecSysDup.sysDupPost` :48 | key-functional: `fdLeastClosed`, or `-1` at a closed fd / full table | FS-L as is |
+  | fstat | `SpecSysFstat.sysFstatPost` :107, `SpecFilestat.filestatRet` :160 | RELATIONAL: `d ≤ 24` bytes written, unnamed | FS-0 (a stat observation commit) |
+  | chdir | `SpecSysChdir.chdirArms` :189, `chdirPostOk` :179 | walk trace, observed `ADir` row, `cwi := i` | functional |
+  | unlink | `SpecSysUnlink.unlinkArms` :278, `unlinkPostOk` :213 | both fired legs; every `-1` names its observation (dot, miss, non-empty dir, walk death) | functional |
+  | mkdir / mknod | `SpecSysMkdir.mkdirArms` :219, `SpecSysMknod.mknodArms` :342 | create's legs fired; `-1` through `creFailArms` | as open-create: inum carried; exhaustion arms unexplained |
+  | link | `SysLinkDefs.linkArms` :215, `SpecSysLink.sysLinkPost` :146 | legs fired; `-1` = "commits back" or the do-then-undo pair, NO reason (dirlink's balloc vs name present) | FS-0 (optional lane) |
+  | chroot | `SpecSysChroot.sysChrootPost` :106 | RELATIONAL: `∃ ipv z`, no commit; root not in the key | out (F5) |
+  | exec | `SpecSysExec.sysExecArms` :245 | pinned observation of the image | out (the image load; outside the class as today) |
+
+  Verdict: most of it is functional. The remaining FS-0 work is reasons and one observation, not a
+  re-specification (≈ 4–6k lines, F7).
+- **F2 (why the specs do not yet give rows: the receipts are the client's).** A commit's post is
+  `F.pfRecv av off a d` for the CALLER's piece `F` (`PieceFam`). A verified program deposits a piece and reads
+  its receipt (`UkRunSysRead`); the generic process — the one `xv6NiAdequacy` runs — is handed the trivial
+  family by `FsAbsInvFire` (`fsabsAread`, `fsabsAwriteChain`, `fsabsOpenIn`, …), so its row is
+  `usysMemOk`'s `∃ bs` (UsysMemOk.lean:248). The same wall the pipe lane met (F3 of the families design:
+  "no kernel-owned record says what bytes a read returned"). Unlike pipes the fs has no taint: `appSup` is a
+  credential, not a kill. So the fix is a KERNEL-owned ledger appended by the fire lemmas, which hold the
+  kernel's half of the top map at the instant (`arfRead_fire` opens `ftopN`, `arfFoffN_sub`).
+- **F3 (the ledger: one per era, keyed by inum; the seventh name).** Not the top map read as a history (it is
+  a current-state map). Not per-inode names (≈ `16·icfgNib` names under a FIXED `niNamesHere`). One mono-list
+  per era — the `Zev`-keyed-by-slot pattern — authority inside `ftopBody` beside the kernel's half, with the
+  TIE `fevState h = typedRows I` (the fold of the ledger is the raw map read through `absRow` on TYPED rows,
+  orphans included). Typed rather than live because a read through an fd of an unlinked file reads a row the
+  view no longer has: the fold must keep nlink-0 rows until iput's free. Every move that changes a typed row
+  appends: the ~23 fire lemmas (`FsAbs*Fire`), the escrow deposit (iput's free, `EscrowInode.escABody`), and
+  the exhaustion sites. ialloc's claim does not (it makes an EMPTY row at nlink 0 that only create's arm leg
+  makes readable; the arm event carries the inum). Registration: an era-indexed name beside `Γ_L.top`,
+  anchored as `niNamesHere`'s seventh entry, `niIotaLbs` gaining `(ns.getD 6 0) ↪◯ML ι.fev`, `niBelow`/`niJoin`
+  a conjunct (NI-OUT's plumbing).
+- **F4 (what each row cites).** A round cites its OWN event positions `ι.fpos` (the `cpos` pattern) in the era
+  prefix `ι.fev`.
+  - read on inode `i`, shadow `γo`: one `read` event at `p`; answer `fevReadBytes (ι.fev.take p) i γo n`
+    (the bytes from the fold's offset for `γo`, at most `n`), count its length, the image written at a1. The
+    offset is the fold's: open sets 0, every read/write event on `γo` advances it — by ANY holder of the
+    struct file (fork and dup share it), so the offset is family state, as the pipe ends were.
+  - write: one `write` event per chunk, each at its own position (`filewrite` unlocks between transactions;
+    another holder may move `f->off` between chunks). Answer `n` when every chunk landed whole; `-1` at a
+    short chunk whose reason is the key's unreadable source byte (G4's rule) or a carried `full .blocks`.
+  - open: its hop events (one per walk element, start directory = the cwd, or the root for an absolute path),
+    then `open act i γo` (or create's `arm`/`ent`/`nlink` legs then `open`). Answer the fd `fdLeastClosed`,
+    the row `.inode i γo .parked`, `i` from the last hop (computed) or the arm (carried), `γo` carried; `-1`
+    at a computed miss/dir-for-write/major, or a carried `full`.
+  - fstat: a `stat` event; the 24 bytes `statBytes` of the fold's row (dev, ino, type, nlink, `|bs|`) — for a
+    FILE or device row; a directory's raw size is not in the view.
+  - close/dup: no event, key only (FAM-R6's "cheap per-incarnation lane"; a last close's iput free is
+    appended by the kernel, the answer does not read it).
+  - chdir/mkdir: hops (+ mkdir's legs), as open.
+- **F5 (chroot is not the partition; footprints are).** chroot (SpecSysChroot.lean header) moves `p->root`
+  and makes `dirlookup` answer `..` at the root with the root itself. It does NOT move the cwd, close fds,
+  or stop anyone else from naming the subtree. Privacy for q is "no OTHER actor moves what q reads". That is
+  a property of the run, statable on the ledger as `fevPrivate S acts h`. It is a hypothesis on the high
+  side, like `H`, but a far weaker one: it constrains the events on `S` only, and is decidable on the
+  history. The granularity that matches the kernel is the FOOTPRINT: inode contents and link counts, single
+  directory ENTRIES `(d, nm)` (a hop reads one name in one directory, first-match: other names' moves in the
+  same directory do not change it, so `/` can stay shared while `/lo` is q's), and struct-file offsets
+  `γo`. Closure ("q's citations stay in `S`") is checkable on q's trace and needs no chroot. What chroot would
+  add is closure BY CONSTRUCTION (cwd and fds inside, `..` stopped), at a cost: an AU form for sys_chroot and
+  the root in the key (`Uvis` arity, ≈ 1 BE by quotas F7). Recorded as FS-5, not recommended now. The root
+  the walks start from is needed anyway for absolute paths and `..` at the root: carried per filing (the
+  block's `V.rti`, filed as `secc` once was).
+- **F6 (the fs channels).**
+  - *Inode numbers.* `ialloc` scans from inum 1 for the first `type == 0` dinode, one block lock at a time:
+    the pick is a function of every actor's creates and frees (an unlinked file is freed at its LAST close,
+    by whoever closes it, including at exit), and the scan is not atomic, so not even a function of one
+    prefix. It is visible in the KEY (the fd row's `.inode i`, the cwd), not only via fstat. CARRIED in the
+    `arm` event; in FS-4 the oracle.
+  - *Exhaustion.* `ialloc: no inodes` returns 0 (create `-1`, SpecIalloc header: "live"); `balloc: out of
+    blocks` returns 0 (SpecBalloc.lean:43, live): `bmap` 0, writei short, filewrite `-1`, dirlink `-1`;
+    `filealloc` at NFILE returns 0 (open `-1`). Three global tables. Carried as `full` verdicts. A block or
+    inode QUOTA is the fs analogue of Q-0, but needs a per-process counter (a `struct proc` field, a key field,
+    a credit proof through the log and bitmap): rejected now (as Q-R6 rejected pid quotas), recorded.
+  - *The icache.* `iget: no inodes` PANICS (SpecIget.lean:67, live): 50 inodes referenced by anyone halt the
+    machine. A truncation of every trace (the prefix form absorbs it, scope 11's pattern), not a value
+    channel.
+  - *Block numbers.* `balloc`'s order is invisible: no row reads a block address (the view hides them, AppInv
+    §7), so only its exhaustion leaks.
+  - *Directory slot order.* `dirlink` takes the first empty slot, `unlink` zeroes one: the raw bytes of a
+    directory record its history. Visible only through `read`/`fstat` (size) of a directory fd, which stay
+    OUTSIDE the class; lookups are by name, order-free.
+  - *The log and the disk.* `begin_op` sleeps (never fails); `log_write`'s panics are refuted by the budget
+    (SpecLogWrite), `bget: no buffers` by the `bslot` credits (SpecBread). Group commit and disk steps are the
+    schedule (`.dev` events). Durability is visible only across a power cycle: SNAPSHOT says the recovered
+    state is the state at some batch boundary, so per era the restriction of the recovered rows to `S` is the
+    fold of a PREFIX of q's events on `S` — one number per era, the cut (`fevCut`), an input like the cited
+    era (scope 7). At era 0 both runs boot `fsImgDisk` (the roots' `Hdisk`), so the boot rows are equal.
+  - *GNames in the key.* `γo` (like `gen`, `ch`, `γp`) is a proof artefact in `Uvis.fd`; first-key equality
+    over it is the tree's existing convention (fork's generations come from `zev` the same way). An
+    erasing projection is the honest fix, out of scope.
+- **F7 (FS-0, what must be strengthened first).** (a) `fstat`: a stat observation commit in `filestat` at
+  its ilock instant (stati's five fields as the row's reading) and the 24-byte tie, on the read commit's
+  model. (b) The out-of-blocks reason relayed from `balloc`'s `0` through `bmap` to `writei`'s short count,
+  `filewrite`'s `-1`, `dirlink`'s `-1` (G3a relayed `kNullRcpt` through uvmalloc/growproc/sbrk the same way).
+  (c) open-create's arm (c) and mkdir/mknod's `creFailArms` split by reason (nlink guard: computed; out of
+  inodes; dirlink's out of blocks; NFILE). (d) `sys_close`'s bad-fd `-1`. (e) Optional, with FS-2c:
+  `linkArms`' `-1` reasons. No re-specification of any success arm.
+- **F8 (TCB).** The roots' TCB is 138 modules, 29 `Xv6.*` (`xv6NiDetQ`). Stating the rows over
+  `FsAbsDefs.Aview` would pull its import cone (48 modules not yet in the TCB: `FsStateInode`, `FsTree`,
+  `DirView`, the encoders, `MachCSL.Wp…`). So the rows state over a self-contained pure `Xv6/NiFs.lean`
+  (`Fnode` over plain lists, the fold, the readings), and the bridge `fevState h = typedRows I` lives in the
+  ledger module, outside the statement TCB: **+1 module**.
+
+**Proposed definitions (verbatim, not shape-checked).**
+
+    -- Xv6/NiFs.lean (FS-1a), PURE; imports FileDefs (GName, FdState) only
+    /-- the node the rows read (`FsAbsDefs.Absnode` over plain lists: a directory as the name ↦ inum
+    association `dirlookup`'s first match reads) -/
+    inductive Fnode where
+      | file (bs : List (BitVec 8))
+      | dir (ents : List (List (BitVec 8) × Nat))
+      | dev (ma mi : Nat)
+    /-- the TYPED rows, orphans (nlink 0, still referenced) included: inum ↦ node, link count -/
+    abbrev Frows := Nat → Option (Fnode × Nat)
+    inductive FsFull where | inodes | blocks | files
+    /-- one fs event of an era.  MOVES carry their delta; OBSERVATIONS carry only what names them (their
+    answer is computed from the fold of the prefix before them); CARRIED values are the declassified ones. -/
+    inductive Fev where
+      | boot  (s : Frows)                                              -- the era's recovered rows
+      | arm   (act : BitVec 64) (i : Nat) (n : Fnode)                  -- create's child appears at nlink 1 (i CARRIED)
+      | ent   (act : BitVec 64) (d : Nat) (nm : List (BitVec 8)) (t : Option Nat)  -- an entry set / removed
+      | nlink (act : BitVec 64) (i : Nat) (nl : Nat)                   -- a link-count leg
+      | write (act : BitVec 64) (i : Nat) (γo : GName) (bs : List (BitVec 8))      -- one chunk, at γo's offset
+      | trunc (act : BitVec 64) (i : Nat)
+      | free  (act : BitVec 64) (i : Nat)                              -- iput's last-reference free
+      | hop   (act : BitVec 64) (d : Nat) (nm : List (BitVec 8))       -- a lookup at its instant
+      | open  (act : BitVec 64) (i : Nat) (γo : GName)                 -- an fd installed (γo CARRIED); offset 0
+      | read  (act : BitVec 64) (i : Nat) (γo : GName) (n : Nat)       -- at most n bytes from γo's offset
+      | stat  (act : BitVec 64) (i : Nat)
+      | full  (act : BitVec 64) (why : FsFull)                         -- an exhaustion verdict (CARRIED)
+    /-- the fold: the rows and every struct file's offset after `h` -/
+    def fevRun : List Fev → Frows × (GName → Nat) := …
+    def fevRows (h : List Fev) : Frows := (fevRun h).1
+    def fevOff (h : List Fev) (γo : GName) : Nat := (fevRun h).2 γo
+    def fevContent (h : List Fev) (i : Nat) : List (BitVec 8) :=
+      match fevRows h i with | some (.file bs, _) => bs | _ => []
+    def fevReadBytes (h : List Fev) (i : Nat) (γo : GName) (n : Nat) : List (BitVec 8) :=
+      ((fevContent h i).drop (fevOff h γo)).take n
+    /-- a hop's answer: `..` at the walker's root is the root (chroot's rule), else the first match -/
+    def fevHop (h : List Fev) (rt d : Nat) (nm : List (BitVec 8)) : Option Nat :=
+      if nm = [46#8, 46#8] ∧ d = rt then some d else
+        match fevRows h d with | some (.dir es, _) => (es.find? (·.1 = nm)).map (·.2) | _ => none
+    def fevStatBytes (h : List Fev) (i : Nat) : Option (List (BitVec 8)) := …   -- none at a directory row
+
+    -- Xv6/UsysDet.lean (FS-1a/FS-2): UIota gains, LAST (defaults, as `cacc`/`cpos`)
+      /-- (FS-1) a prefix of the era's fs-event ledger -/
+      fev : List Fev := []
+      /-- (FS-1) the round's own events' indices in it -- the round's own, like `cpos` -/
+      fpos : List Nat := []
+    /-- the fd's inode and shadow at the trapped a0, from the key's table -/
+    def fdInodeAt (W : Uvis) : Option (Nat × GName × Bool × Bool) := …
+    /-- (FS-2a) read on an inode descriptor: the bytes the round's `read` event observed -/
+    def usysReadAns (W : Uvis) (ι : UIota) : List (BitVec 8) :=
+      match fdInodeAt W, ι.fpos.head? with
+      | some (i, γo, true, _), some p => fevReadBytes (ι.fev.take p) i γo (max 0 (usysRdcount W.tf)).toNat
+      | _, _ => []
+    def usysDetRead (W : Uvis) (ι : UIota) : Uvis :=
+      let bs := usysReadAns W ι
+      bump W (BitVec.ofNat 64 bs.length) (usysWr W.M (tfW W.tf (tfArgIdx 1)) bs) W.perm W.sz W.fd W.cwd W.gen
+        W.ch W.lazy W.secc
+    /-- (FS-2a) the events the round APPENDED, as the key and the prefix decide them (NI-OUT's `wout` for
+    the fs): a write's chunks, open's install, create's legs -- FS-4's induction reads this -/
+    def usysFevOut (n : Int) (W : Uvis) (ι : UIota) : List Fev := …
+    /-- (FS-2) the class, extended: close/dup at every key; read/write/fstat on an INODE descriptor of a
+    regular file (`fdir = false`, the cited prefix's type) at a lazy-free key; open/chdir/mkdir -/
+    def usysDetClassAtF (n : Int) (a0 : BitVec 64) (lz wc : Bool) (wf : Option FdState) (fdir : Bool) : Prop :=
+      usysDetClassAt n a0 lz wc ∨ n = USYS_close ∨ n = USYS_dup ∨
+        ((n = USYS_read ∨ n = USYS_write ∨ n = USYS_fstat) ∧ lz = false ∧ fdIsInode wf ∧ fdir = false) ∨
+        ((n = USYS_open ∨ n = USYS_chdir ∨ n = USYS_mkdir) ∧ lz = false)   -- USYS_mkdir (20): a new constant
+
+    -- Xv6/NiTrace.lean: `NiStep.round` gains the readings `wfd : Option FdState` (the key's row at a0),
+    -- `rt : Nat` (the block's root inum, filed) and `fout : List Fev` (the round's appended events, read
+    -- off ι at `fpos`), as G3/G4 added `sz`/`wcon`/`wout`
+    def niBelowF (ι H : UIota) : Prop := niBelowQ ι H ∧ ι.fev <+: H.fev
+    def NiStep.detInF (s : NiStep) : Option (NiPos × List Nat)      -- detInQ beside the fs positions
+
+    -- FS-4 (pure): footprints
+    structure FsFoot where
+      ino : Nat → Prop                          -- inodes whose rows q reads
+      ent : Nat → List (BitVec 8) → Prop        -- directory entries q's hops read
+      off : GName → Prop                        -- struct files whose offsets q's reads/writes use
+    /-- `h` restricted to the events that MOVE the footprint -/
+    def fevOn (S : FsFoot) (h : List Fev) : List Fev := …
+    /-- every move of `S` in `h` is by an actor in `A` -/
+    def fevPrivate (S : FsFoot) (A : BitVec 64 → Prop) (h : List Fev) : Prop := ∀ e ∈ h, fevMoves S e → A (fevAct e)
+    /-- the footprint is closed in `h`: entries of `S` point into `S.ino`, `S`'s rows are moved by `S`-events -/
+    def fevClosed (S : FsFoot) (h : List Fev) : Prop := …
+    theorem fevReadBytes_on (hc : fevClosed S h) (hi : S.ino i) (ho : S.off γo) :
+        fevReadBytes h i γo n = fevReadBytes (fevOn S h) i γo n
+    theorem fevHop_on (hc : fevClosed S h) (he : S.ent d nm) : fevHop h rt d nm = fevHop (fevOn S h) rt d nm
+
+**The theorems.** FS-3 is `niTwoRunDetQ` at `NiInClassF`, `detInF`, `niBelowF` — a LEMMA (`niTwoRunFs`), the
+FS-4 root's first step, not a root: equal fs histories concede everything, and a root stating it would add
+TCB for no reader. FS-4, the fifteenth root, in `LinkNiAdequacy` with `xv6NiDetQ`'s binders and adequacy
+premises byte for byte, the SAME `xv6NiPhi`:
+
+    /-- **(NI M3 private files)** An incarnation whose fs rows read only a footprint that no other actor moves
+    has the same skeleton and console output in two runs whatever the rest of the file system holds --
+    the fs history leaves the hypothesis but for q's carried oracle (its inum picks, offset-shadow names and
+    exhaustion verdicts), its walks' root and each era's recovered cut. -/
+    theorem xv6NiFs … :
+        ∃ F₁ F₂, niOk κs₁ F₁ ∧ niOneShot κs₁ F₁ ∧ niChain F₁ (niHist F₁) ∧ niUserChain F₁ ∧
+          niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ niUserChain F₂ ∧
+          ∀ (q : NiInc) (S : FsFoot),
+          NiOneOrigin q κs₁ F₁ → NiOneOrigin q κs₂ F₂ →
+          NiGapFree q κs₁ F₁ → NiGapFree q κs₂ F₂ →
+          NiInClassF (utrace q κs₁ F₁) → NiNoStuck q κs₁ F₁ →
+          firstKey q κs₁ F₁ = firstKey q κs₂ F₂ →
+          NiFsCites S (utrace q κs₁ F₁) →                               -- closure: q reads only S
+          (∀ k, fevPrivate S (niActs q κs₁ F₁) (niHistLed F₁ k).fev ∧ fevClosed S (niHistLed F₁ k).fev) →
+          (∀ k, fevPrivate S (niActs q κs₂ F₂) (niHistLed F₂ k).fev ∧ fevClosed S (niHistLed F₂ k).fev) →
+          (∀ k, fevCut S q κs₁ F₁ k = fevCut S q κs₂ F₂ k) →            -- each era's recovered prefix of q's S-events
+          niFsOracle q κs₁ F₁ <+: niFsOracle q κs₂ F₂ →                 -- carried: inums, γo's, `full`s
+          ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.detInQ <+:
+            ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.detInQ →   -- NO fs positions
+          (∀ k, niBelowQ (niHistLed F₁ k) (niHistLed F₂ k)) →           -- NO fs history
+          ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.view <+:
+              ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.view ∧
+            ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.outBytes <+:
+              ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.outBytes
+
+  Why it holds: by `fevReadBytes_on`/`fevHop_on`, every class row q cites reads `fevOn S` of its prefix; by
+  `fevPrivate`, `fevOn S` of the era is `boot|S` followed by q's own appended events (`fout`) in order —
+  the cut decides how much of the previous era survived; by the rows, each round's `fout` is
+  `usysFevOut n W ι`, a function of the key and (inductively) of q's earlier `fout`s and the oracle. So the
+  fs positions and history drop out exactly as `wout` did (`niDet_runs` at a third reading, after
+  `niDetLed`/`niDetLedQ`). `fevPrivate`/`fevClosed` are hypotheses ON THE RUN'S LEDGER (decidable), not
+  in-logic invariants: nothing needs exporting (unlike `zevWf`, FAM-1a). `niActs q` is q's slot at its
+  filings (a single incarnation; a family variant is FAM-1a's pattern and is not in this lane).
+
+  Honest scope 15 (to be written into `NiTrace` by FS-4): CLOSED for the footprint: other actors' fs writes,
+  creates, links and unlinks anywhere else; the schedule of q's fs events relative to theirs; the content
+  of `/` beyond the entries q looks up. NOT closed: the oracle (inode numbers: ialloc's global order;
+  exhaustion of inodes, blocks, NFILE), the icache panic (a truncation), the walks' root, the crash cut; and
+  whatever `niBelowQ` still concedes. OUTSIDE the class: directory reads and directory fstat (slot order,
+  raw size), link/unlink/mknod (until FS-2c), exec, chroot, pipes.
+
+**Lanes.** One worktree, in order; FS-L is independent and can land first. BE as in the quotas design (the
+chroot bump; ≈ 7k changed lines).
+
+| Lane | Content | Files (est.) | Lines (est.) | BE |
+|---|---|---|---|---|
+| **FS-L close/dup** (FAM-R6) | `sys_close`'s bad-fd `-1` pinned in `usysFdOk` (F7d, one Spec clause + its proof); `usysDetClass` gains close and dup, rows the key's (`usysFdOk` is already a function there); `syscEvRow`'s two clauses; `NiTrace` scope 1. No ledger, no citation. Statements of the fourteen roots byte-identical (the class moves inside `usysDetClass`, which the roots name: TCB entries move, as G4's did). | 6–8 | 0.3–0.5k | ≈ 0.05 |
+| **FS-0 the reasons and fstat** | F7 (a)–(c): `filestat`'s stat commit (`FsAbsStatFire`, new; `SpecFilestat`/`SpecSysFstat` posts, their proofs); the `bFull` reason relayed balloc → bmap → writei → filewrite / dirlink (G3a's relay pattern); create's failure fold split by reason (ialloc 0, dirlink, nlink guard) and open's NFILE arm. Every Spec post that moves is a PUBLIC contract: one lane per seal, gates `SYS*` byte-identical elsewhere. | ≈ 30 | 4–6k | ≈ 0.7 |
+| **FS-1 the ledger** | (a) `Xv6/NiFs.lean` (pure, TCB +1). (b) `Xv6/FsLedger.lean`: the per-era mono-list, its name in the era's fs names, the tie in `ftopBody` (18 openers frame it), the boot mint (`boot` of the era's rows; era 0 from `fsImgDisk`). (c) The fires append, with the actor threaded as `wp_kalloc_led` threads it: the read/hop/open/stat observations, create/link/unlink/mknod/mkdir legs, write chunks, trunc, the escrow's free, the three `full` sites; each returns a receipt `fevRcpt act p e` relayed to the syscall post (as `kAllocRcpt`/`sFullRcpt`). (d) `niNamesHere` seventh, `niIotaLbs`/`niBelow`/`niJoin` + a conjunct. Statements: every `FsAbs*Fire` and every fs `Spec*` post gains a receipt (moved); the fourteen roots byte-identical (`UIota` moves: TCB entries move, as NI-OUT's did). | 70–90 | 6–9k | ≈ 1.0 |
+| **FS-2a the content rows** | `usysDetRead`/`usysDetWriteIno`/`usysDetFstat`, `usysFevOut` for them, `usysDetClassAtF`, `syscEvRow` clauses, `SyscallArms*` arms citing the fires' receipts, `NiStep.round`'s `wfd`/`fout`, `NiInClassF`, `output_eq_of`; `UsysDet` §4 and the honest scopes. | ≈ 20 | 2–3k | ≈ 0.35 |
+| **FS-2b the path rows** | open plain/create/trunc, chdir, mkdir: hop rows (`fevHop` at the filed `rt`), the install, the carried arm/`γo`/`full`; `NiEntry`'s `rt` reading. | ≈ 20 | 2–3k | ≈ 0.35 |
+| FS-2c (optional) | link, unlink, mknod rows; F7(e). | ≈ 12 | 1–1.5k | ≈ 0.2 |
+| **FS-3/4 the theorem** | `niBelowF`, `detInF`, `niTwoRunFs` (the equal-history lemma: `niTwoRunDetBy` at a third reading); `FsFoot`, `fevOn`, `fevPrivate`, `fevClosed`, `fevReadBytes_on`, `fevHop_on`, `fevCut`, `niFsOracle`, `NiFsCites`; the induction on `fout`; `LinkNiAdequacy.xv6NiFs` (the fifteenth root); `roots.txt`, `baseline.json`, `tcb.sh --update` (one new entry); honest scope 15. | 5–7 | 2–3k | ≈ 0.35 |
+
+**Total:** FS-L..FS-4 without FS-2c ≈ 2.8 BE (≈ 17–25k lines). FS-L alone ≈ 0.05 BE. Gates as every lane:
+build + lint, the fourteen roots' statements byte-identical (`tcb.sh` will show moved TCB entries at FS-L,
+FS-1 and FS-2a, all from `UsysDet`/`UIota`/`NiStep` definitions, each to be listed in the lane's note),
+`audit.sh`, coverage, dead-code (FS-0's reasons are reached only once FS-2 reads them: land FS-0 and FS-2
+in one push, or allow-list for one lane), full `run_all.sh`.
+
+Risks:
+- (R1) FS-1's tie is in `ftopBody`, which 18 files open; every `_same` retag must re-establish it with the
+  ledger unchanged, so `typedRows` must be insensitive to the raw-only retags (block addresses, size-only
+  moves). Check that `absRow` on typed rows is exactly what the `_same` movers preserve; if a mover changes a
+  typed row's content without an AU fire (none found), it needs an event.
+- (R2) Actor threading into fires reached from contexts without a process (none expected: every fs fire is
+  inside a syscall; boot's `fsinit` recovery makes the era's `boot` event).
+- (R3) The write chain's caller-built `Q` cursor and the new receipts: the receipts must ride the kernel's
+  side, not the client's node (the piece-shape rule: "a piece may not ask the client to move a kernel-owned
+  ghost").
+- (R4) The read's copyout-fault arm (`rdFailWhy`) leaves the buffer unspecified: the class requires the
+  whole buffer writable in the key's `π` (G1e's window rule), so the arm is refuted, not rowed.
+- (R5) The footprint hypotheses quantify over `niHistLed F k` per era; a run whose high side moves `S` makes
+  `xv6NiFs` vacuous for that `S` — by design (that is the channel), but the scope must say so.
+
+**RULINGS REQUESTED (FS-R1…FS-R10).**
+- **FS-R1 (go or defer).** (a) Full: FS-L → FS-0 → FS-1 → FS-2a → FS-2b → FS-3/4 (≈ 2.8 BE), FS-2c optional.
+  (b) FS-L only now, the rest recorded as designed (≈ 0.05 BE). (c) Defer everything. **Recommended: (a).**
+  The specs ARE functional at the instant (F1), so this is a ledger-and-row lane, and the footprint theorem is
+  the first M3 statement whose hypothesis does not mention the high side's fs activity at all. If ≈ 2.8 BE is
+  too much now, take (b): it is the cheapest piece with a theorem-level gain (two more numbers in the class).
+- **FS-R2 (the ledger).** Recommended: ONE per-era mono-list keyed by inum, authority in `ftopBody` with the
+  tie to the TYPED rows (orphans included), appended by the fire lemmas; the seventh anchored name.
+  Alternatives rejected: the top map read as a history (it has none); per-inode names (a fixed
+  `niNamesHere` of ≈ `16·icfgNib` entries); the ledger in `appBody` (the application's invariant must name no
+  kernel record, AppInv's owner rule).
+- **FS-R3 (event granularity).** Recommended: moves at the `Aview` delta level (plus `free`); observations
+  carry only their position and their rows COMPUTE the answer from the fold; CARRIED only the inum pick,
+  `γo` and the exhaustion verdicts. Alternative: self-describing observations (a read carries its bytes) —
+  the same FS-1 cost, but FS-4 would then need an exported well-formedness invariant (FAM-1a's `zevWf`
+  problem). Rejected.
+- **FS-R4 (the class).** Recommended: close/dup at every key; read/write/fstat on a REGULAR-FILE inode fd at a
+  lazy-free key with the whole buffer mapped (the cited prefix decides "regular file"); open (all modes),
+  chdir, mkdir. OUTSIDE: directory reads and directory fstat (slot order and raw size are not in the view;
+  modelling raw directory bytes would need dirlink's slot choice and unlink's zeroing specified — FS-0 work
+  with no reader), link/unlink/mknod until FS-2c, exec, chroot, pipes.
+- **FS-R5 (FS-0's scope).** Recommended: F7 (a)–(d); (e) only with FS-2c. No success arm re-specified.
+- **FS-R6 (the step's readings).** Recommended: `NiStep.round` gains `wfd`, `rt`, `fout` (the G3/G4 precedent:
+  readings ride the step); the fourteen roots' statements stay byte-identical, their TCB entries move.
+  Alternative: a separate step type for fs rounds. Rejected (every NiTrace induction would split).
+- **FS-R7 (the root).** Recommended: ONE new root, `xv6NiFs` = the footprint form, at the SAME `xv6NiPhi`; the
+  equal-history form a lemma inside it. Alternative: both as roots (FS-3's adds TCB for a statement that
+  concedes the fs).
+- **FS-R8 (the root directory).** Recommended: the block's `rti` FILED per round (`NiEntry`), not a `Uvis`
+  field; chroot stays outside the class and a chroot-as-closure lane (FS-5: sys_chroot's AU form, `Uvis.root`
+  per chroot.md §1) is recorded, not scheduled. Alternative: `Uvis.root` now (≈ 1 BE by quotas F7).
+- **FS-R9 (kernel change).** Recommended: none. Block/inode/file-table quotas are the fs analogue of Q-0 but need
+  per-process counters (a `struct proc` field and a key field): rejected as not minimal, recorded.
+- **FS-R10 (order).** Recommended: FS-L first (independent, can run beside FS-0). Then FS-0 → FS-1 in one
+  worktree (FS-0 moves the posts and FS-1 adds receipts to the same posts, so they do not parallelise), then
+  FS-2a → FS-2b → FS-3/4; FS-2c optional afterwards.
+
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
@@ -7211,6 +7591,8 @@ ustep landed (U-1..U-3; U-4 totality later); next: quotas
 quotas DESIGNED (2026-10-05, "M3 quotas design" above: the break quota + pipe cap + `scounteren`, one commit on a fork of the pin; `xv6NiDetQ` without the allocator; ≈ 1.0 BE); awaiting the OWNER's Q-R1 and rulings Q-R2…R10
 
 quotas landed (Q-0..Q-3; Q-4/Q-5 optional); next: private files
+
+private files DESIGNED (2026-10-05, "M3 private files design" above: a per-era fs-event ledger appended by the fire lemmas, computed rows, the footprint theorem `xv6NiFs`; chroot not the partition; ≈ 2.8 BE, FS-L alone ≈ 0.05); awaiting rulings FS-R1…R10
 
 What remains in M3: private files; later optional: Q-4 (wait/write at lazy keys), Q-5 (the clock), U-4 totality, FAM-1b, K2 sys_kill, dup/close, pipes, OUT-4, G3c
 
