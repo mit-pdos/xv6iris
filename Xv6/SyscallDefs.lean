@@ -174,10 +174,14 @@ reason (ruling JF-R5: the cited allocator prefix ends in the actor's
 sbrk's (NI M2-G3) `UsysDet.usysSbrkFitsAt` at the entry's break, argument
 words and lazy bit -- the answer, the break and the lazy bit after, `-1`
 only at an overrun or at an allocating eager grow whose cited allocator
-prefix ends in the actor's `KNull`.  The records are the dispatch's
-(`V`/`img` the entry, `V'`/`img'` the record the call left). -/
-def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare) (ι : UIota) :
-    Prop :=
+prefix ends in the actor's `KNull`; the console write's (NI M2-G4, ruling
+G4-R4), at a lazy-free entry whose argument 0 names a writable console
+descriptor of the entry's table `sts`, `UsysDet.usysWriteAns` at the entry's
+permission view and argument words 1 and 2 (it reads no ledger: the boot
+prefix is cited).  The records are the dispatch's (`V`/`img` the entry,
+`V'`/`img'` the record the call left; `sts` the entry's descriptor states). -/
+def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare)
+    (sts : List FdState) (ι : UIota) : Prop :=
   (syscNum V = USYS_uptime → tfW V'.tf (tfArgIdx 0) = usysUptimeWord ι.ticks) ∧
   (syscNum V = USYS_wait → (tfW V.tf (tfArgIdx 0) = 0#64 ∨ V.pvLazy = false) →
     usysWaitFitsAt (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 0)) cs img ι (tfW V'.tf (tfArgIdx 0))
@@ -190,7 +194,10 @@ def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName c
     (¬ forkOk ι → (ι.kNull ∨ ι.sFull) ∧ cs' = cs)) ∧
   (syscNum V = USYS_sbrk →
     usysSbrkFitsAt V.sz.toNat (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) V.pvLazy ι
-      (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy)
+      (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy) ∧
+  (syscNum V = USYS_write → V.pvLazy = false → uwriteCons sts (tfW V.tf (tfArgIdx 0)) = true →
+    tfW V'.tf (tfArgIdx 0) =
+      usysWriteAns (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2)))
 
 /-! ## §2 The dispatch table -/
 

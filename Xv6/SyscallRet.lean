@@ -203,7 +203,7 @@ theorem syscall_epilogue_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
     syscSysOut (hlc := hlc) f V M sts gn cs pid (syscA0 V2) (syscImg V2 M2) sts' V2.cwi cs' ∗
     syscForkOut f V (syscA0 V2) cs cs' ∗
     syscWaitOut V M (syscImg V2 M2) (syscA0 V2) cs cs' pid ∗
-    syscEvOut (hlc := hlc) V M V2 M2 cs cs' gn ∗
+    syscEvOut (hlc := hlc) V M sts V2 M2 cs cs' gn ∗
     wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f)
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨h2, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
@@ -262,7 +262,7 @@ theorem syscall_ret_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
       (syscImg (syscStore V1 (R 10#5)) M1) sts' V1.cwi cs' ∗
     syscForkOut f V (syscA0 (syscStore V1 (R 10#5))) cs cs' ∗
     syscWaitOut V M (syscImg (syscStore V1 (R 10#5)) M1) (syscA0 (syscStore V1 (R 10#5))) cs cs' pid ∗
-    syscEvOut (hlc := hlc) V M (syscStore V1 (R 10#5)) M1 cs cs' gn ∗
+    syscEvOut (hlc := hlc) V M sts (syscStore V1 (R 10#5)) M1 cs cs' gn ∗
     wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f)
     ⊢ wpLoop (GF := GF) cpu := by
   have hpins' := hpins

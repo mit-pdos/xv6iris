@@ -47,8 +47,8 @@ shot), so the citation is never filed. -/
 theorem ut_evOut_of (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
     (cs2 : ExtTreeSet GName compare) (ke : Nat) (act : BitVec 64) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
-      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M V2 M2 A.cs cs2 A.gn -∗
-      |==> utEvOut (hlc := hlc) A.sc A.sep A.V A.M V2 M2 A.cs cs2 := by
+      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M A.sts V2 M2 A.cs cs2 A.gn -∗
+      |==> utEvOut (hlc := hlc) A.sc A.sep A.V A.M A.sts V2 M2 A.cs cs2 := by
   iintro #Ha #He
   unfold syscEvOut utEvOut
   icases He with (%hq | ⟨%k, %ι, #Hk, #Hl, %hr⟩ | ⟨%hk, -⟩)
@@ -70,7 +70,8 @@ theorem ut_evOut_of (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8
     iframe Ha Hl
     ipureintro
     refine ⟨fun h => absurd (hw.symm.trans h) (by decide), fun _ _ => ?_,
-      fun h => absurd (hw.symm.trans h) (by decide), fun h => absurd (hw.symm.trans h) (by decide)⟩
+      fun h => absurd (hw.symm.trans h) (by decide), fun h => absurd (hw.symm.trans h) (by decide),
+      fun h => absurd (hw.symm.trans h) (by decide)⟩
     show usysWaitFitsAt _ _ _ _ { UIota.boot with act := act } _ _ _
     unfold usysWaitFitsAt UIota.reap
     dsimp only [UIota.boot]
@@ -86,7 +87,7 @@ theorem ut90_outs (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
         (syscImg V2 M2) sts2 V2.cwi cs2 ∗
       syscForkOut A.f (utSysRec A.sep A.V) (syscA0 V2) A.cs cs2 ∗
       syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid ∗
-      utEvOut (hlc := hlc) A.sc A.sep A.V A.M V2 M2 A.cs cs2 ⊢
+      utEvOut (hlc := hlc) A.sc A.sep A.V A.M A.sts V2 M2 A.cs cs2 ⊢
     utOuts (hlc := hlc) A V2 M2 sts2 cs2 := by
   unfold utOuts utExecOut utForkOut utWaitOut utSysOut
   iintro ⟨Hx, Hs, Hf, Hw, He⟩
@@ -121,7 +122,7 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A
         (syscImg V2 M2) sts2 V2.cwi cs2 ∗
       syscForkOut A.f (utSysRec A.sep A.V) (syscA0 V2) A.cs cs2 ∗
       syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid ∗
-      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M V2 M2 A.cs cs2 A.gn ∗
+      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M A.sts V2 M2 A.cs cs2 A.gn ∗
       uhistRow
     ⊢ wpLoop (GF := GF) cpu := by
   have hr0 : UtRows0 A V2 M2 sts2 cs2 := ut_rows_of_sysc A V2 M2 sts2 cs2 hok.hlen hok.hP hb hsc hrows

@@ -42,9 +42,11 @@ are `LinkNiAdequacy` (only a `Link` file may import a `Proof` file).
 
 1. The class is {exit, getpid, uptime}, wait at a null status pointer or
    of a lazy-free process (NI M2-G1e: the key's lazy bit rides the step),
-   (NI joint fork lane F3) fork at every key and (NI M2-G3) sbrk at every
-   key (the caller's break rides the step); every other ecall's enter
-   is free.  The class's meaning grew through `UsysDet.usysDetClass` and
+   (NI joint fork lane F3) fork at every key, (NI M2-G3) sbrk at every
+   key (the caller's break rides the step) and (NI M2-G4) the console write
+   at a lazy-free key on a writable console descriptor (its readable-prefix
+   reading `wcon` rides the step; the UART bytes are outside, `NiTrace`
+   scope 10); every other ecall's enter is free.  The class's meaning grew through `UsysDet.usysDetClass` and
    `UIota` (+ the slot ledger) with every statement here byte-identical.
 2. Origins are honest by W2d's one-shot claims (`niOneShot` in the
    conclusion): the filing's origin claims are fork exits' or power-ons',

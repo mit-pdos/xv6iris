@@ -109,7 +109,7 @@ the class with its `round_det` discharge):
 | **M2-G3 sbrk** | `sysSbrkOk`'s −1 only when the pool is empty (growproc/uvmalloc functional in the allocator ledger), and the eager grow's page-table pages as events (`Alloc A vpn`-grained, §3 "concedes more") | `sbrk` |
 | **M2-G4 console write** | the kernel's short count stated at the key's permission view `π` (copyin at the key, not the table) and a write row in the trap contract | console `write` |
 
-- [x] M2-G1 (G1a-e landed; complete with fork re-admitted by the joint fork lane F1-F3, "Joint fork lane F3 as landed" below)  - [x] M2-G2 (G2a-b landed; complete with fork re-admitted by the joint fork lane F1-F3)  - [x] M2-G3 (G3a c04d2c467, G3b "M2-G3 as landed" below: sbrk at every key, the break rides the step)  - [ ] M2-G4  - [x] M2-X (ι export; X1 ba13ce661, X2 2c3f0000b, X3 e864f14ed, X4 "M2-X4 as landed" below: xv6NiPhi carries the chain, uptime/wait derived from usysDet at the cited ι, xv6NiTwoRun at equal ledger histories, xv6NiTwoRunObs the tenth root)
+- [x] M2-G1 (G1a-e landed; complete with fork re-admitted by the joint fork lane F1-F3, "Joint fork lane F3 as landed" below)  - [x] M2-G2 (G2a-b landed; complete with fork re-admitted by the joint fork lane F1-F3)  - [x] M2-G3 (G3a c04d2c467, G3b "M2-G3 as landed" below: sbrk at every key, the break rides the step)  - [x] M2-G4 (G4a0 b0162b5e7, G4a 5d3fdf455, G4b "M2-G4 as landed" below: the console write at a lazy-free key on a writable console descriptor, `wcon` rides the step)  - [x] M2-X (ι export; X1 ba13ce661, X2 2c3f0000b, X3 e864f14ed, X4 "M2-X4 as landed" below: xv6NiPhi carries the chain, uptime/wait derived from usysDet at the cited ι, xv6NiTwoRun at equal ledger histories, xv6NiTwoRunObs the tenth root)
 
 Risk register (honest): W1 changes the language and every lifting lemma -- mechanical but wide, and the device
 suite must not notice; W3 is the proof's content and may find a row that cannot be made functional in `(key,
@@ -3927,6 +3927,99 @@ RULINGS REQUESTED.**
     fit (G3-R6's lesson).
   - Alternative: a write branch in `usysMemOk` carrying `r`. It cannot (no `sts` there), and moving it moves the
     user tier's table (W3's lesson). Not recommended.
+
+### M2-G4 as landed (2026-10-04)
+
+On `lane/g4`, three commits, rulings G4-R1…R7 as recommended. The console write joins the NI class at a lazy-free
+key whose argument 0 names a writable console descriptor of its table.
+
+**G4a0 (b0162b5e7): every user leaf is readable.** `UPtDefs.uLeafR w := w &&& PTE_U ≠ 0#64 → w &&& PTE_R ≠ 0#64`,
+`uptWf`'s sixth conjunct `(∀ k w, get? P.um k = some w → uLeafR w)`. `uptWf_insert` and both `uptWf_insertLeaf`
+gain `hR`; proved at every constructor: uvmalloc's `x ||| 18` (`ProofUvmalloc.ua_perm_r`, threaded beside `hrw`),
+vmfault's `W|U|R`, uvmcopy's copied flags (`uLeafR_pteFlags`), uvmclear's cleared `U` (`uLeafR_andNotU`),
+`uptWf_delRun`, `uptWf_empty`. No constructor failed: xv6 makes no `U` leaf without `R`. Destructuring sites
+(`hwf.2.2.2.2` → `.2.2.2.2.1`): `UPtFaultLemmas`, `ProofUvmcopy`, `VmfaultQuiet`, `UserFetchWf`; no `Uk*`/`User*`
+file changed (the design expected `UkRun`/`UkRunSysDefs` proofs to move; their `hlo.2.2.2.2` is `loopOk`'s, not
+`uptWf`'s). Every Spec statement byte-identical; tcb/audit unchanged.
+
+**G4a (5d3fdf455): the kernel's exact count.** `UPtDefs.uvaRprefix` (the design's text). `SpecCopyin`'s success arm
+gains, last, `uvaRprefix P' (k.regs 13#5) old.length` (`ProofCopyin`: `ci_page`'s mapped arm gains `pteVU w` --
+walkaddr's leaf or vmfault's fresh one, `ci_vu_faultLeaf` --; `ci_move`/`ci_nsel`/`ci_iter`/`ci_loop` thread
+`∀ i < d, uvaRmapped P (A + i)` across the growing tables, `ci_rpre_step`; the wrapped cursor at the end by
+`ci_rmapped_lt` + `paAddToNat'`). `SpecEitherCopyin`'s user success arm gains `uvaRprefix P' (k.regs 12#5)
+old.length`; the restating wrappers move with it (`EitherDefs.ec_copyin_call`, `ProofPipewrite.pw_copyin`,
+`ProofConsolewrite.cw_either_copyin`); `WriteiDefs.writei_either_copyin` keeps its statement (drops the conjunct),
+`ProofFetchaddr`/`ProofPipewrite` adapt destructurings. `SpecConsolewrite.consWriteCnt` (the design's text); the post
+gains `∧ consWriteCnt V.upt P' (k.regs 11#5) n i` (`cwLoopInv` carries `uvaRprefix P (k.regs 11#5) i ∧ i % 32 =
+0`; `cw_body` takes `nn = 32 ∨ i + nn = N`; `cw_rpre_ext` grows the prefix by a chunk, `cw_why_cnt` gives the
+chunk-local bad byte at the entry table). `SpecFilewrite.fwConsCnt` (the design's text); `filewritePost`'s pure
+part `calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ fwConsCnt st V.upt P' (k.regs 11#5) n (R' 10#5)`, and
+`FilewriteTail.fwrK` (the hart-free restatement) the same; every non-console arm discharges it vacuously (the
+unwritable early return by `fdstateOk`). `SpecSysWrite.sysWritePost` gains `fwConsCnt (sysFdSt v V.ofile sts)
+V.upt P' v1 (argZ v2) (R' 10#5)` (argfd's none: `.closed`). `VmfaultQuiet.lazyFree_rmapped_ext`/`_iff` (+ `vq_bitR`).
+`SyscallArmsFd2.syscall_arm_write` drops the conjunct. Byte-identical: `writeConsShort`, `writeConsArms`,
+`filewriteExtra`/`Arms`, `sysWriteArms`, `SyscRows`, `SYSCALL`, `USERTRAP`, every `Uk*`/`Ush*`/`User*` file (the
+user tier compiled unchanged).
+
+**G4b: the row, the class, the law.**
+- `UsysMemOk.USYS_write := 16` (the only change there; `usysMemOk` byte-identical, R7).
+- `UsysDet`: `usysCntW`, `usysFdKey`, `uwriteCons`, `πReadable`, `uwriteRd`, `consCnt`, `usysWriteAnsAt`,
+  `uwriteCon`, `usysWriteAns` (the design's texts); `usysDetQuiet` + write; `usysDetClass` + write;
+  `usysDetClassAt n a0 lz wc := usysDetClass n ∧ (n = USYS_wait → a0 = 0#64 ∨ lz = false) ∧ (n = USYS_write → lz =
+  false ∧ wc = true)`; `usysDetRet`'s write branch (before uptime), `usysDetRet_write`; `usysIotaFits`'s fifth
+  conjunct `(n = USYS_write → r = usysWriteAns W.perm (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2)))`;
+  `usysIotaFits_exists` + `hwr : n ≠ USYS_write`; `_of_ev` + `hclw`/`hwr`; `usysDet_mem` (quiet arm), `_rows`,
+  `_of_rows` (r from the fit). `rangeFind_spec` and `consCnt_of_rd` (the design's statement). §4's console bullet:
+  RE-ADMITTED BY G4, W3's "copyin does not fault it in" corrected.
+- `SyscallDefs.syscEvRow V V' img img' cs cs' sts ι`, fifth clause (the design's text). `SpecSyscall.syscEvOut V M
+  sts V' M' cs cs' gn` (quiet disjunct `∧ syscNum V ≠ USYS_write`), `syscEvOut_quiet` + `sts` + `(h16 : n ≠ 16 :=
+  by decide)`, `syscEvOut_cite` + `sts`, `syscallPost` passes its `sts`; `SpecUsertrap.utEvOut sc sep V M sts V' M'
+  cs cs'` (quiet `≠ USYS_write`), `utEvOut_nonecall` + `sts`, `usertrapPost` passes its `sts`. `SYSCALL`/`USERTRAP`
+  move by that argument (R4).
+- Arms: the ~25 `syscEvOut_quiet` sites gain one `_`; `syscArmFork_ev`/`_evNeg`, `syscArmWait_ev`, `syscArmSbrk_ev`
+  gain `(sts : List FdState)` and one absurd conjunct; `SyscallArmsProc`'s uptime row one absurd conjunct;
+  `SyscallArmsExec` passes `hne 16`; `SyscallArmsFdDefs.syscall_ret_fd` + `(h16 : n ≠ 16 := by decide)`, and a new
+  `syscall_ret_fd_ev` (the evidence supplied by the arm). `SyscallArmsFd2.syscArmWrite_ans` (the bridge: `uwriteCons`
+  → the key's `.open rb true (.device CONSOLE)`, `fwConsCnt` → `lazyFree_rmapped_ext`/`_iff` → `consCnt_of_rd`);
+  `syscall_arm_write` cites `{boot with act := procAddr j}` at every write (`syscallEnv_anchor`, `niIotaLbs_act`) and
+  pays through `syscall_ret_fd_ev`. `UsertrapParts.utEvOut_retf` + `sts`, `UsertrapSysTail.ut_evOut_of` at `A.sts`
+  (one more absurd conjunct on the kill disjunct).
+- `NiLedger.niCiting` + `∨ uvisNum (uvisRun W) = USYS_write`; `niDetRow`'s class at `(uvisRun W).lazy (uwriteCons
+  (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)))`. `UserretClosedRows.urc_a2_run`; `urc_evRow` + `sts`, `hfd :
+  W.fd = sts` and the fifth conjunct; `urc_niDetRow`'s `hev` at `W.fd` (the USERTRAP instance's entry table, as
+  `hfde`'s -- the tie is that instance's argument). `UserretClosedRound`: five `rcases` cases.
+  `UexecApply.uexecRet_roundDet`'s `hcls` at `… (uvisRun W).lazy (uwriteCons (uvisRun W).fd …)`.
+- `NiTrace`: `NiStep.round secc lz win sz (wcon : Option Nat) x e c`; `niStepOf` fills `uwriteCon W`;
+  `NiStep.input` `.inr (secc, lz, win, sz, wcon, exitView x, positions)`; `obsInput` `.inr (secc, lz, wcon.isSome,
+  exitView x)`; `gprsA2` (+ `_gprList`, `_tfGprs`); `niRoundLaw secc lz win sz wcon pid x e c` with, last in the
+  resume block, `(gprsNum secc xg = USYS_write → lz = false → ∀ d, wcon = some d → gprsA0 eg = usysWriteAnsAt (gprsA2
+  xg) d)`, derived by `niDetRow_write`; `NiInClass` at `usysDetClassAt (gprsNum secc xg) (gprsA0 xg) lz
+  wcon.isSome`; `classReading` + `∨ (gprsNum secc xg = USYS_write ∧ lz = false ∧ wcon.isSome)`; `output_eq_of`
+  (binders + `wcon`, `hans` + write), `output_eq`, `niCiting_some` (+ write). Honest scope 10 (F8 and F7);
+  deviation 9 (`wcon` a fifth field).
+- The four NI roots' statements are byte-identical (`NiAdequacy`/`LinkNiAdequacy` header docs only).
+
+**Deviations.** (1) `SyscallArmsFdDefs.syscall_ret_fd_ev` is new: write's arm supplies its own `syscEvOut`, so the
+generic quiet tail is split (the old `syscall_ret_fd` is proved through it, statement + `h16`). (2)
+`UexecApply.uexecRetContF_det` (unreached, dead_allow) gains `(hw : n ≠ USYS_write)`: write is quiet but its
+relational row leaves `r` free, so the relational/functional equivalence holds off write only. (3) `urc_niDetRow`
+takes the cited row at `W.fd` directly (the design's `hfd : W.fd = sts` lives on `urc_evRow`, discharged by `rfl`).
+(4) `WriteiDefs.writei_either_copyin`'s restated contract stays byte-identical (the conjunct is dropped in its proof),
+so no `Writei*` statement moved; `FilewriteTail.fwrK` (filewrite's hart-free restatement) moves with
+`filewritePost`. (5) G4a0 touched no `Uk*`/`User*` proof (see above). (6) `UsysDet.rangeFind_spec` (the first-index
+lemma of `List.range`'s `find?`) is new beside `consCnt_of_rd`.
+
+**Baselines.** `tools/tcb/expected.json`: no root's module set moved in any commit (`--update` is a no-op). Line
+and definition counts: every root reaching `UPtDefs` sees its text grow (G4a0's `uLeafR`, G4a's `uvaRprefix`), no
+new definition in a non-NI cone; the four NI roots gain `UsysDet`'s write readings (+9 defs), `USYS_write`, and
+`SlotSupply.NOFILE` (+1 def; the module was already in the cone). `tools/audit/baseline.json` unchanged; no new axiom
+or opaque. `dead_allow.txt`: G4a's interim rows (`lazyFree_rmapped_ext`/`_iff`, "G4b reaches") removed by G4b
+(reached: `urc_niDetRow` → … → `syscArmWrite_ans`).
+
+The class: {exit, getpid, uptime, wait at a null status pointer or a lazy-free key, fork, sbrk, the console write
+at a lazy-free key on a writable console descriptor}.
+
+What remains: M3 (incl. NI-OUT: the UART bytes as a function of the key's image), G3c (optional: wait's lazy copyout)
 
 ## Lanes (opened 2026-09-15)
 

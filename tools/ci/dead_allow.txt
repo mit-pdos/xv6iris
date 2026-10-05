@@ -28,8 +28,3 @@ decl Xv6.Spin
 #    is reached only when a program proof takes the det arm -- keep it until
 #    one does (claude-notes/projects/noninterference.md, "M2-X design" §3)
 decl Xv6.uexecRetContF_det
-
-# -- NI M2-G4a: the kernel/key readability bridge, landed with the kernel's
-#    exact console count; G4b reaches (the write arm's fifth syscEvRow clause)
-decl Xv6.lazyFree_rmapped_ext    # G4b reaches
-decl Xv6.lazyFree_rmapped_iff    # G4b reaches

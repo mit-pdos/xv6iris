@@ -97,6 +97,12 @@ theorem urc_a1_run (W : Uvis) (V : ProcPriv) (hl : V.tf.length = 36) :
   show tfW (utSysTf (tfW W.tf tfEpcIdx) (urcV0 V W)) (tfArgIdx 1) = _
   rw [urc_sysTf_arg W V hl 1 (by decide), uvisRun_arg W 1 (by decide)]
 
+/-- (NI M2-G4) ...and its argument word 2 (write's count). -/
+theorem urc_a2_run (W : Uvis) (V : ProcPriv) (hl : V.tf.length = 36) :
+    tfW (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)).tf (tfArgIdx 2) = tfW (uvisRun W).tf (tfArgIdx 2) := by
+  show tfW (utSysTf (tfW W.tf tfEpcIdx) (urcV0 V W)) (tfArgIdx 2) = _
+  rw [urc_sysTf_arg W V hl 2 (by decide), uvisRun_arg W 2 (by decide)]
+
 /-- **THE CITED ROW, RE-KEYED** (NI M2-X2, next to `urc_skey` / `urc_num`;
 NI M2-G1e): the dispatcher's `syscEvRow` at the record `syscall()` was
 called with, read at the trapped key's run projection and the key the round
@@ -104,48 +110,75 @@ left -- wait's at the key's permission view, status pointer, lazy bit,
 children and image (`hpi`, `hlz`, `hch`, `hM`: the record's `permOf V.upt.um
 V.sz`, `pvLazy`, column and lazy image ARE the key's); (NI joint fork lane
 F3) fork's as `usysForkFitsAt` at the key's children; (NI M2-G3) sbrk's as
-`usysSbrkFitsAt` at the key's break (`hsz`), argument words and lazy bit. -/
+`usysSbrkFitsAt` at the key's break (`hsz`), argument words and lazy bit;
+(NI M2-G4) the console write's as `usysWriteAns` at the key's permission
+view and argument words, at a lazy-free key whose descriptor table (`hfd`:
+the dispatch's entry states ARE the key's table) names a writable console. -/
 theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' : ProcPriv)
-    (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (ι : UIota)
+    (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (sts : List FdState) (ι : UIota)
     (hl : V.tf.length = 36) (hch : W.ch = cs) (hsc : W.secc = V.pvSecc)
     (hM : umemLazy V.upt V.sz.toNat Mp = W.M) (hpi : W.perm = permOf V.upt.um V.sz.toNat)
-    (hsz : W.sz = V.sz.toNat) (hlz : W.lazy = V.pvLazy)
+    (hsz : W.sz = V.sz.toNat) (hlz : W.lazy = V.pvLazy) (hfd : W.fd = sts)
     (hev : syscEvRow (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) V'
-      (syscImg (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) Mp) (syscImg V' M') cs cs' ι) :
+      (syscImg (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) Mp) (syscImg V' M') cs cs' sts ι) :
     (uvisNum (uvisRun W) = USYS_uptime → tfW V'.tf (tfArgIdx 0) = usysUptimeWord ι.ticks) ∧
     (uvisNum (uvisRun W) = USYS_wait → (tfW (uvisRun W).tf (tfArgIdx 0) = 0#64 ∨ (uvisRun W).lazy = false) →
       usysWaitFits (uvisRun W) ι (tfW V'.tf (tfArgIdx 0)) cs' (syscImg V' M')) ∧
     (uvisNum (uvisRun W) = USYS_fork → usysForkFitsAt (uvisRun W).ch ι (tfW V'.tf (tfArgIdx 0)) cs') ∧
     (uvisNum (uvisRun W) = USYS_sbrk →
       usysSbrkFitsAt (uvisRun W).sz (tfW (uvisRun W).tf (tfArgIdx 0)) (tfW (uvisRun W).tf (tfArgIdx 1))
-        (uvisRun W).lazy ι (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy) := by
+        (uvisRun W).lazy ι (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy) ∧
+    (uvisNum (uvisRun W) = USYS_write → (uvisRun W).lazy = false →
+      uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)) = true →
+      tfW V'.tf (tfArgIdx 0) =
+        usysWriteAns (uvisRun W).perm (tfW (uvisRun W).tf (tfArgIdx 1)) (tfW (uvisRun W).tf (tfArgIdx 2))) := by
   have hnum := urc_num_run W V hl hsc
   have ha0 := urc_a0_run W V hl
-  obtain ⟨hu, hw, hf, hsb⟩ := hev
-  refine ⟨fun h => hu (hnum.trans h), fun h hcl => ?_, fun h => ?_, fun h => ?_⟩
-  rotate_right
-  · have h' := hsb (hnum.trans h)
+  obtain ⟨hu, hw, hf, hsb, hwr⟩ := hev
+  have hS : uvisNum (uvisRun W) = USYS_sbrk →
+      usysSbrkFitsAt (uvisRun W).sz (tfW (uvisRun W).tf (tfArgIdx 0)) (tfW (uvisRun W).tf (tfArgIdx 1))
+        (uvisRun W).lazy ι (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy := by
+    intro h
+    have h' := hsb (hnum.trans h)
     rw [urc_a0_run W V hl, urc_a1_run W V hl] at h'
     show usysSbrkFitsAt W.sz _ _ W.lazy ι _ _ _
     rw [hsz, hlz]
     exact h'
-  rotate_left
-  · obtain ⟨ha, hok, hnok⟩ := hf (hnum.trans h)
+  have hF : uvisNum (uvisRun W) = USYS_fork → usysForkFitsAt (uvisRun W).ch ι (tfW V'.tf (tfArgIdx 0)) cs' := by
+    intro h
+    obtain ⟨ha, hok, hnok⟩ := hf (hnum.trans h)
     refine ⟨ha, ?_⟩
     show cs' = if forkOk ι then W.ch ∪ {usysForkGen ι} else W.ch
     rw [hch]
     by_cases ho : forkOk ι
     · rw [if_pos ho]; exact (hok ho).2
     · rw [if_neg ho]; exact (hnok ho).2
-  have hcl' : tfW (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)).tf (tfArgIdx 0) = 0#64 ∨
-      (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)).pvLazy = false := by
-    rcases hcl with h0 | h0
-    · exact Or.inl (ha0.trans h0)
-    · exact Or.inr (hlz.symm.trans h0)
-  have hw' := hw (hnum.trans h) hcl'
-  show usysWaitFitsAt W.perm (tfW (uvisRun W).tf (tfArgIdx 0)) W.ch W.M ι _ _ _
-  rw [hpi, ← hM, ← ha0, hch]
-  exact hw'
+  have hWt : uvisNum (uvisRun W) = USYS_wait →
+      (tfW (uvisRun W).tf (tfArgIdx 0) = 0#64 ∨ (uvisRun W).lazy = false) →
+      usysWaitFits (uvisRun W) ι (tfW V'.tf (tfArgIdx 0)) cs' (syscImg V' M') := by
+    intro h hcl
+    have hcl' : tfW (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)).tf (tfArgIdx 0) = 0#64 ∨
+        (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)).pvLazy = false := by
+      rcases hcl with h0 | h0
+      · exact Or.inl (ha0.trans h0)
+      · exact Or.inr (hlz.symm.trans h0)
+    have hw' := hw (hnum.trans h) hcl'
+    show usysWaitFitsAt W.perm (tfW (uvisRun W).tf (tfArgIdx 0)) W.ch W.M ι _ _ _
+    rw [hpi, ← hM, ← ha0, hch]
+    exact hw'
+  have hWr : uvisNum (uvisRun W) = USYS_write → (uvisRun W).lazy = false →
+      uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)) = true →
+      tfW V'.tf (tfArgIdx 0) =
+        usysWriteAns (uvisRun W).perm (tfW (uvisRun W).tf (tfArgIdx 1)) (tfW (uvisRun W).tf (tfArgIdx 2)) := by
+    intro h hlz' hcons
+    have hcons' : uwriteCons sts (tfW (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)).tf (tfArgIdx 0)) = true := by
+      rw [ha0, ← hfd]; exact hcons
+    have h' := hwr (hnum.trans h) (hlz.symm.trans hlz') hcons'
+    rw [urc_a1_run W V hl, urc_a2_run W V hl] at h'
+    show tfW V'.tf (tfArgIdx 0) = usysWriteAns W.perm _ _
+    rw [hpi]
+    exact h'
+  exact ⟨fun h => hu (hnum.trans h), hWt, hF, hS, hWr⟩
 
 /-- **M0's ROW AT THE CITED ι** (NI M2-X2; fork's answer among it since NI
 joint fork lane F3): `uexecRet_roundDet` at the cited prefix, from usertrap's rows (`utChKept`, `utFdEcall`, `utRetPid`), the
@@ -163,7 +196,7 @@ theorem urc_niDetRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
     (hfde : utFdEcall sc V.pvSecc (urcV0 V W).tf V'.tf W.fd sts')
     (hrp : utRetPid sc V.pvSecc (urcV0 V W).tf V'.tf pid)
     (hev : syscEvRow (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) V'
-      (syscImg (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) Mp) (syscImg V' M') cs cs' ι) :
+      (syscImg (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) Mp) (syscImg V' M') cs cs' W.fd ι) :
     niDetRow sc W (uvisOf V' M' sts' gn cs' pid) (some (k, ι)) := by
   intro hsce hcls
   have hnum0 : usysEff V.pvSecc (urcV0 V W).tf = usysEff W.secc (uvisRun W).tf := by
@@ -184,11 +217,11 @@ theorem urc_niDetRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
   have hpidrow : sc = uecallScause →
       usysRetPid (uvisNum (uvisRun W)) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0)) W.pid := by
     intro h; rw [← hnr, ← hnum0, hpid]; exact hrp h
-  obtain ⟨hup, hw, hfk, hsb⟩ := urc_evRow W V Mp V' M' cs cs' ι hl hch hsc hM hpi hsz hlz hev
+  obtain ⟨hup, hw, hfk, hsb, hwr⟩ := urc_evRow W V Mp V' M' cs cs' W.fd ι hl hch hsc hM hpi hsz hlz rfl hev
   have hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0))
       (uvisOf V' M' sts' gn cs' pid).ch (uvisOf V' M' sts' gn cs' pid).M (uvisOf V' M' sts' gn cs' pid).sz
       (uvisOf V' M' sts' gn cs' pid).lazy ι :=
-    usysIotaFits_of_ev hcls.2 hup hw hfk hsb
+    usysIotaFits_of_ev hcls.2.1 hup hw hfk hsb hcls.2.2 hwr
   exact uexecRet_roundDet sc W (uvisOf V' M' sts' gn cs' pid) ι hlw (hgn.symm ▸ rfl) hpid.symm hchrow hfdrow
     hpidrow hr hsce hcls hfit
 

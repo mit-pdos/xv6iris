@@ -89,6 +89,8 @@ def USYS_exit : Int := 2
 def USYS_wait : Int := 3
 def USYS_pipe : Int := 4
 def USYS_read : Int := 5
+/-- (NI M2-G4) `write`, the console write's number. -/
+def USYS_write : Int := 16
 def USYS_exec : Int := 7
 def USYS_fstat : Int := 8
 def USYS_chdir : Int := 9

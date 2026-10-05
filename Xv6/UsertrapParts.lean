@@ -218,7 +218,7 @@ def utOuts (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 
   utWaitOut A.sc A.sep A.V A.M (syscImg V2 M2) (tfW V2.tf (tfArgIdx 0)) A.cs cs2 A.pid ∗
   utSysOut (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid (tfW V2.tf (tfArgIdx 0))
     (syscImg V2 M2) sts2 V2.cwi cs2 ∗
-  utEvOut (hlc := hlc) A.sc A.sep A.V A.M V2 M2 A.cs cs2)
+  utEvOut (hlc := hlc) A.sc A.sep A.V A.M A.sts V2 M2 A.cs cs2)
 
 /-- Off the ecall every answer is owed nothing. -/
 theorem utOuts_quiet (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)
@@ -233,17 +233,18 @@ theorem utOuts_quiet (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 
   · iapply utWaitOut_quiet _ _ _ _ _ _ _ _ _ h
   isplitl []
   · iapply utSysOut_quiet _ _ _ _ _ _ _ _ _ _ _ _ _ _ h
-  · iapply utEvOut_nonecall _ _ _ _ _ _ _ _ h
+  · iapply utEvOut_nonecall _ _ _ _ _ _ _ _ _ h
 
 /-- **The evidence survives a kernel-word rewrite** (it reads the record's
 `a0` and image only). -/
-theorem utEvOut_retf (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V2 : ProcPriv)
-    (M2 : Nat → List (BitVec 8)) (cs cs2 : ExtTreeSet GName compare) (ws : List (BitVec 64))
+theorem utEvOut_retf (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
+    (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (cs cs2 : ExtTreeSet GName compare) (ws : List (BitVec 64))
     (ha : tfW ws (tfArgIdx 0) = tfW V2.tf (tfArgIdx 0)) :
-    utEvOut (hlc := hlc) (GF := GF) sc sep V M V2 M2 cs cs2 ⊢ utEvOut sc sep V M { V2 with tf := ws } M2 cs cs2 := by
-  have hrow : ∀ ι, syscEvRow (utSysRec sep V) V2 (syscImg (utSysRec sep V) M) (syscImg V2 M2) cs cs2 ι →
+    utEvOut (hlc := hlc) (GF := GF) sc sep V M sts V2 M2 cs cs2 ⊢
+      utEvOut sc sep V M sts { V2 with tf := ws } M2 cs cs2 := by
+  have hrow : ∀ ι, syscEvRow (utSysRec sep V) V2 (syscImg (utSysRec sep V) M) (syscImg V2 M2) cs cs2 sts ι →
       syscEvRow (utSysRec sep V) { V2 with tf := ws } (syscImg (utSysRec sep V) M)
-        (syscImg { V2 with tf := ws } M2) cs cs2 ι := by
+        (syscImg { V2 with tf := ws } M2) cs cs2 sts ι := by
     intro ι h
     unfold syscEvRow at h ⊢
     simp only [ha]
@@ -276,7 +277,7 @@ theorem utOuts_retf (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8
     iframe H
     ipureintro
     exact tfUeq_trans hu' hu
-  · iapply utEvOut_retf A.sc A.sep A.V A.M V2 M2 A.cs cs2 ws ha $$ He
+  · iapply utEvOut_retf A.sc A.sep A.V A.M A.sts V2 M2 A.cs cs2 ws ha $$ He
 
 end Outs
 

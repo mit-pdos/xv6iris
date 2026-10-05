@@ -193,7 +193,7 @@ shot with nothing moved (F5).  The cited row holds at a null status pointer
 or a lazy-free process (`hlf`): there the copyout's window is the key's
 (`syscArmWait_win`).  `bs` is the status word's bytes (`hbs`), of which the
 copy wrote `d` (`himg`). -/
-theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
+theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (rv : BitVec 32)
     (xs : Int) (nullst : Bool) (act : BitVec 64) (ke : Nat) (P' : UPtd) (d : Nat) (bs : List (BitVec 8))
     (hn : syscNum V = 3) (ha : syscA0 V' = BitVec.signExtend 64 rv)
@@ -206,15 +206,15 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPr
     (himg : syscImg V' M' = usysWr (syscImg V M) (tfW V.tf (tfArgIdx 0)) (bs.take d)) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
       waitLedCite rv xs cs cs' gn nullst act (tfW V.tf (tfArgIdx 0)) V.upt P' d -∗
-        |==> syscEvOut (hlc := hlc) V M V' M' cs cs' gn := by
+        |==> syscEvOut (hlc := hlc) V M sts V' M' cs cs' gn := by
   have h14 : syscNum V ≠ USYS_uptime := by rw [hn]; decide
   have h1 : syscNum V ≠ USYS_fork := by rw [hn]; decide
   have hw : syscNum V = USYS_wait := hn
   have hnone : ∀ (h : List Zev), zLowest h act = none → d = 0 → rv = -1#32 → cs' = cs →
-      syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' { UIota.boot with zev := h, act := act } := by
+      syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts { UIota.boot with zev := h, act := act } := by
     intro h hz hd' hrv hcs
     refine ⟨fun h' => absurd h' h14, fun _ _ => ?_, fun h' => absurd h' h1,
-      fun h' => absurd (hw.symm.trans h') (by decide)⟩
+      fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide)⟩
     show usysWaitFitsAt _ _ _ _ { UIota.boot with zev := h, act := act } _ _ _
     unfold usysWaitFitsAt UIota.reap
     dsimp only
@@ -231,10 +231,10 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPr
     ihave #Hlb' := (show zombLedLb (GF := GF) h ⊢ ((niNamesHere (GF := GF)).getD 2 0) ↪◯ML h from .rfl) $$ Hlb
     imod niIotaLbs_zev (GF := GF) (niNamesHere (GF := GF)) h act $$ Hlb' with #Hl
     imodintro
-    iapply syscEvOut_cite V M V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_ $$ Ha Hl
+    iapply syscEvOut_cite V M sts V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_ $$ Ha Hl
     have h0 := hnull hnl
     refine ⟨fun h' => absurd h' h14, fun _ hcl => ?_, fun h' => absurd h' h1,
-      fun h' => absurd (hw.symm.trans h') (by decide)⟩
+      fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide)⟩
     have hlz : V.pvLazy = false := hcl.resolve_left h0
     have hwin : uwaitWin (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 0)) = d :=
       syscArmWait_win hext (hlf hlz) hwf h0 (Nat.le_of_lt hcf.1) hcf.2.1 (fun _ => hcf.2.2)
@@ -252,7 +252,7 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPr
     ihave #Hlb' := (show zombLedLb (GF := GF) h ⊢ ((niNamesHere (GF := GF)).getD 2 0) ↪◯ML h from .rfl) $$ Hlb
     imod niIotaLbs_zev (GF := GF) (niNamesHere (GF := GF)) h act $$ Hlb' with #Hl
     imodintro
-    iapply syscEvOut_cite V M V' M' cs cs' gn ke { UIota.boot with zev := h, act := act }
+    iapply syscEvOut_cite V M sts V' M' cs cs' gn ke { UIota.boot with zev := h, act := act }
       (hnone h hz hd' hf.1 hf.2) $$ Ha Hl
   · -- the kill shot (F5), nothing moved
     imodintro
@@ -269,9 +269,9 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPr
     imodintro
     obtain ⟨hzl, hcs, -, hr2, hok⟩ := hz
     have hrv : rv ≠ -1#32 := fun e => by subst e; exact absurd hr2 (by decide)
-    iapply syscEvOut_cite V M V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_ $$ Ha Hl
+    iapply syscEvOut_cite V M sts V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_ $$ Ha Hl
     refine ⟨fun h' => absurd h' h14, fun _ hcl => ?_, fun h' => absurd h' h1,
-      fun h' => absurd (hw.symm.trans h') (by decide)⟩
+      fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide)⟩
     have hwin : uwaitWin (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 0)) = 4 := by
       by_cases h0 : tfW V.tf (tfArgIdx 0) = 0#64
       · rw [h0]; exact uwaitWin_null _
@@ -388,7 +388,7 @@ theorem syscall_arm_wait (SW : SYSWAIT)
   -- THE ROUND'S LEDGER EVIDENCE (NI M2-X2), at the era's anchor
   icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
   iapply wpLoop_bupd
-  imod syscArmWait_ev V M (syscStore { V.updEv k' with upt := P' } (R2 10#5))
+  imod syscArmWait_ev V M sts (syscStore { V.updEv k' with upt := P' } (R2 10#5))
       (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) cs cs' gn rv (xstateVal xw)
       (decide (v = 0#64)) (procAddr j) ke P' d (xstateBytes xw) hn3 (by rw [hsa0, ha0])
       (fun hb h0 => by rw [hw0] at h0; subst h0; simp at hb)

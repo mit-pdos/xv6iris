@@ -482,7 +482,7 @@ outcome cites the boot prefix at the actor (success is the ABSENCE of a
 cited `KNull`; an overrun's `-1` is the key's).  The row is `sbrkArm_fits`
 at the record the call left (`V'`: the answer stored, the break and the
 lazy bit `sysSbrkOk`'s `V2`'s). -/
-theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (V' : ProcPriv)
+theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (gn : GName) (act : BitVec 64) (ke : Nat)
     (v0 v1 r : BitVec 64) (hn : syscNum V = 12) (hw0 : tfW V.tf (tfArgIdx 0) = v0)
     (hw1 : tfW V.tf (tfArgIdx 1) = v1) (hszb : V.sz.toNat ≤ uvmMaxsz)
@@ -490,12 +490,13 @@ theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (V' : 
     (hlz : V'.pvLazy = V2.pvLazy) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
       (⌜r = -1#64 ∧ ¬ sysSbrkOverrun V v0⌝ -∗ kNullRcpt fsReadyKmem act) -∗
-      |==> syscEvOut (hlc := hlc) V M V' M' cs cs gn := by
+      |==> syscEvOut (hlc := hlc) V M sts V' M' cs cs gn := by
   have hrow : ∀ ι : UIota, (ι.kNull ↔ (r = -1#64 ∧ ¬ sysSbrkOverrun V v0)) →
-      syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs ι := by
+      syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs sts ι := by
     intro ι hk
     refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
-      fun h' => absurd (hn.symm.trans h') (by decide), fun _ => ?_⟩
+      fun h' => absurd (hn.symm.trans h') (by decide), fun _ => ?_,
+      fun h' => absurd (hn.symm.trans h') (by decide)⟩
     rw [hw0, hw1, hsz, hlz]
     show usysSbrkFitsAt _ _ _ _ _ (syscA0 V') _ _
     rw [ha]
@@ -510,7 +511,7 @@ theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (V' : 
         ((niNamesHere (GF := GF)).getD 3 0) ↪◯ML (hk ++ [.KNull act]) from .rfl) $$ Hk
     imod niIotaLbs_kev (GF := GF) (niNamesHere (GF := GF)) (hk ++ [.KNull act]) act $$ Hk' with #Hl
     imodintro
-    iapply syscEvOut_cite V M V' M' cs cs gn ke { UIota.boot with kev := hk ++ [.KNull act], act := act }
+    iapply syscEvOut_cite V M sts V' M' cs cs gn ke { UIota.boot with kev := hk ++ [.KNull act], act := act }
       (hrow _ ?_) $$ Ha Hl
     have hnull : UIota.kNull { UIota.boot with kev := hk ++ [.KNull act], act := act } := by
       show (hk ++ [Kev.KNull act]).getLast? = some (.KNull act)
@@ -520,7 +521,7 @@ theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (V' : 
     iclear Hw
     imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
     imodintro
-    iapply syscEvOut_cite V M V' M' cs cs gn ke { UIota.boot with act := act } (hrow _ ?_) $$ Ha Hl
+    iapply syscEvOut_cite V M sts V' M' cs cs gn ke { UIota.boot with act := act } (hrow _ ?_) $$ Ha Hl
     have hnn : ¬ UIota.kNull { UIota.boot with act := act } := by
       show ¬ ([] : List Kev).getLast? = some (.KNull act)
       simp
@@ -590,7 +591,7 @@ theorem syscall_arm_sbrk (SS : SYSSBRK)
   -- boot prefix at the actor
   icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
   iapply wpLoop_bupd
-  imod syscArmSbrk_ev V V' M M' (syscStore (V'.updEv k') (R2 10#5)) M' cs gn (procAddr j) ke v0 v1 (R2 10#5)
+  imod syscArmSbrk_ev V V' M M' sts (syscStore (V'.updEv k') (R2 10#5)) M' cs gn (procAddr j) ke v0 v1 (R2 10#5)
     hn12 hw0 hw1 hszb hok (syscStore_a0 _ _ (by show tfArgIdx 0 < V'.tf.length; rw [htf, hl]; decide))
     rfl rfl $$ Hanc [Hw] with #Hev
   · rw [← hproc]

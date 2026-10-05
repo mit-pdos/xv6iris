@@ -31,8 +31,11 @@ A `Link` file because it consumes `ProofUser` (tools/check_layering.sh).
 The class is {exit, getpid, uptime}, wait at a null status pointer or of
 a lazy-free process (NI M2-G1e), fork at every key (NI joint fork lane
 F3: `NiTrace` scope 8 says what fork's answer is derived from and what the
-histories concede) and sbrk at every key (NI M2-G3: `NiTrace` scope 9; the
-caller's break rides the step); every filing spent a distinct claim minted
+histories concede), sbrk at every key (NI M2-G3: `NiTrace` scope 9; the
+caller's break rides the step) and the console write at a lazy-free key on
+a writable console descriptor (NI M2-G4: `NiTrace` scope 10; the caller's
+readable-prefix reading rides the step, the UART bytes are outside); every
+filing spent a distinct claim minted
 before its enter (`niOneShot`, W2d); the mask and actor are carried per
 filing; uptime's, wait's, fork's and sbrk's answers are derived from the
 cited ι, getpid's

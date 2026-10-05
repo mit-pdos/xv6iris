@@ -581,8 +581,42 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
+/-- **`SyscallRet.syscall_ret_tail` at a descriptor arm, the evidence
+supplied** (NI M2-G4: the write arm cites): the three foreign channels
+answer by number; the arm supplies its own `syscSysOut` and `syscEvOut`. -/
+theorem syscall_ret_fd_ev (PT : SchedNames → IProp GF) (Γ : SchedNames)
+    (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γ : FileNames) (j : Nat)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
+    (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
+    (V1 : ProcPriv) (M1 : Nat → List (BitVec 8)) (sts' : List FdState) (cs' : ExtTreeSet GName compare)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : syscallSlots ≤ k.avail)
+    (htier : k.tier = KTier.kpt) (hpins : syscPins k R) (hs2 : R 18#5 = pageAddr V1.upt.tfp)
+    (hrows : SyscRows V M (syscStore V1 (R 10#5)) M1 sts sts' cs cs' pid)
+    (n : Int) (hn : syscNum V = n) (h1 : n ≠ 1) (h3 : n ≠ 3) (h7 : n ≠ 7) :
+    kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x46#64) ∗
+    frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+    bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
+    syscallEnv (hlc := hlc) PT Γ γ ∗
+    procPrivFd γ (procAddr j) pid V1 M1 ∗ fdFrags V.fdg sts' ∗ chFrag V.chg (procAddr j) cs' ∗
+    syscSysOut (hlc := hlc) f V M sts gn cs pid (syscA0 (syscStore V1 (R 10#5)))
+      (syscImg (syscStore V1 (R 10#5)) M1) sts' V1.cwi cs' ∗
+    syscEvOut (hlc := hlc) V M sts (syscStore V1 (R 10#5)) M1 cs cs' gn ∗
+    wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f)
+    ⊢ wpLoop (GF := GF) cpu := by
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hbs, Hip, Hfd, Hir, Henv, Hpriv, Hfr, Hch, Hso, Heo, Hnext⟩
+  iapply (syscall_ret_tail PT Γ c0 cpu k spie spp R γ j pid V M sts gn cs ip f V1 M1 sts' cs'
+    hj hproc hK htier hpins hs2 hrows)
+  iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hso Heo Hnext
+  isplitr
+  · iapply syscExecOut_ne; rw [hn]; exact h7
+  isplitr
+  · iapply syscForkOut_ne; rw [hn]; exact h1
+  · iapply syscWaitOut_ne; rw [hn]; exact h3
+
+set_option maxHeartbeats 4000000 in
 /-- **`SyscallRet.syscall_ret_tail` at a descriptor arm** (not exec, fork,
-wait): the three foreign channels answer by number (`syscExecOut_ne`,
+wait, write): the three foreign channels answer by number (`syscExecOut_ne`,
 `syscForkOut_ne`, `syscWaitOut_ne`) and the ledger evidence cites nothing
 (`syscEvOut_quiet`, NI M2-X2); the arm supplies its own `syscSysOut`. -/
 theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
@@ -594,7 +628,7 @@ theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
     (htier : k.tier = KTier.kpt) (hpins : syscPins k R) (hs2 : R 18#5 = pageAddr V1.upt.tfp)
     (hrows : SyscRows V M (syscStore V1 (R 10#5)) M1 sts sts' cs cs' pid)
     (n : Int) (hn : syscNum V = n) (h1 : n ≠ 1) (h3 : n ≠ 3) (h7 : n ≠ 7)
-    (h14 : n ≠ 14 := by decide) (h12 : n ≠ 12 := by decide) :
+    (h14 : n ≠ 14 := by decide) (h12 : n ≠ 12 := by decide) (h16 : n ≠ 16 := by decide) :
     kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x46#64) ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
@@ -606,16 +640,10 @@ theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
     wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hbs, Hip, Hfd, Hir, Henv, Hpriv, Hfr, Hch, Hso, Hnext⟩
-  iapply (syscall_ret_tail PT Γ c0 cpu k spie spp R γ j pid V M sts gn cs ip f V1 M1 sts' cs'
-    hj hproc hK htier hpins hs2 hrows)
+  iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie spp R γ j pid V M sts gn cs ip f V1 M1 sts' cs'
+    hj hproc hK htier hpins hs2 hrows n hn h1 h3 h7)
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hso Hnext
-  isplitr
-  · iapply syscExecOut_ne; rw [hn]; exact h7
-  isplitr
-  · iapply syscForkOut_ne; rw [hn]; exact h1
-  isplitr
-  · iapply syscWaitOut_ne; rw [hn]; exact h3
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hn h14 h3 h1 h12
+  iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn h14 h3 h1 h12 h16
 
 /-- **The syscall channel, paid from the armed post at the stored `a0`**
 (Rocq `sysc_sys_out_at` at the record after the tail's store). -/

@@ -387,7 +387,7 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   · iapply syscForkOut_ne; rw [hn9]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn9]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hn9
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn9
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_unlink`** (table index 18). -/
@@ -471,7 +471,7 @@ theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (hlc := hlc) (
   · iapply syscForkOut_ne; rw [hn]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hn
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_link`** (table index 19). -/
@@ -551,7 +551,7 @@ theorem syscall_arm_link (SL : SYSLINK) (hdep : SyscDepLink (hlc := hlc) (GF := 
   · iapply syscForkOut_ne; rw [hn]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hn
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_mkdir`** (table index 20). -/
@@ -630,7 +630,7 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
   · iapply syscForkOut_ne; rw [hn]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hn
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_mknod`** (table index 17). -/
@@ -711,7 +711,7 @@ theorem syscall_arm_mknod (SN : SYSMKNOD) (hdep : SyscDepMknod (hlc := hlc) (GF 
   · iapply syscForkOut_ne; rw [hn]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hn
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn
 
 /-- **Rocq `proc_priv_states_agree`, at every row** (deviation 4): the
 block's descriptor array and the fragments at its own ghost agree on which
@@ -889,7 +889,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   · iapply syscForkOut_ne; rw [hn]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hn
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn
 
 end Arms
 

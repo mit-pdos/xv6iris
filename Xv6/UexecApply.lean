@@ -559,7 +559,9 @@ count; wait's answer, children set and image at the family ledger's reading
 through the key's status window -- the kernel's window is turned into the
 key's at the arm, `SyscallArmsWait.syscArmWait_win`, so this is pure on the
 keys; (NI M2-G3) sbrk's answer, break and lazy bit, `usysSbrkFitsAt` at
-the resumed key's `W'.sz`/`W'.lazy`).  Exit's arm is empty (`uroundOk_exit`).  The equality is the KEY's
+the resumed key's `W'.sz`/`W'.lazy`; NI M2-G4: the console write's
+answer at the key's permission view, the class read at the key's lazy bit
+and `uwriteCons` of its table).  Exit's arm is empty (`uroundOk_exit`).  The equality is the KEY's
 (`UsysDet` deviation 3). -/
 theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf.length = 36)
     (hgn : W'.gen = W.gen) (hpidk : W'.pid = W.pid)
@@ -571,14 +573,15 @@ theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf
     (hr : uroundOk sc (uvisRun W).tf W.M W.perm W.sz W.cwd W.lazy W.secc W'.tf W'.M W'.perm W'.sz W'.cwd
       W'.lazy W'.secc)
     (hsc : sc = uecallScause)
-    (hcls : usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy)
+    (hcls : usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
+      (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))))
     (hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW W'.tf (tfArgIdx 0)) W'.ch W'.M W'.sz W'.lazy ι) :
     ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ι) W' := by
   subst hsc
   rcases uroundOk_ecall hr with ⟨hexec, -, -⟩ | ⟨hnex, r, hb, hm, hc, hs⟩
   · change uvisNum (uvisRun W) = USYS_exec at hexec
     exfalso
-    rcases hcls.1 with h | h | h | h | h | h <;> rw [h] at hexec <;> exact absurd hexec (by decide)
+    rcases hcls.1 with h | h | h | h | h | h | h <;> rw [h] at hexec <;> exact absurd hexec (by decide)
   · change uvisNum (uvisRun W) ≠ USYS_exit at hnex
     have hres := usysDetClass_resumes hcls.1 hnex
     obtain ⟨hb1, hb2⟩ := hb
@@ -608,9 +611,11 @@ def uexecRetDetF (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : Uvis) : IP
 /-- **The landed arm IS the functional arm at the class** (deviation 6): the
 relational continuation `uexecRetContF` at getpid / uptime and the policy
 `uexecRetDetF` are the same proposition -- the program proving either proves
-the other, and the kernel holding either may only resume at `usysDet`. -/
+the other, and the kernel holding either may only resume at `usysDet`.
+(NI M2-G4) Off the console write: its relational row leaves the answer
+free, its functional answer is the key's at a lazy-free console only. -/
 theorem uexecRetContF_det (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : Uvis)
-    (h : usysDetQuiet n) : uexecRetContF X n f W ⊣⊢ uexecRetDetF X n f W := by
+    (h : usysDetQuiet n) (hw : n ≠ USYS_write) : uexecRetContF X n f W ⊣⊢ uexecRetDetF X n f W := by
   obtain ⟨h7, h12, h3, h4, h5, h8, hf, -, hcl, hdp, hop, hcd, h23⟩ := usysDetQuiet_ne h
   constructor
   · unfold uexecRetContF uexecRetContGen uexecRetDetF
@@ -626,7 +631,7 @@ theorem uexecRetContF_det (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : U
     have hup : n = USYS_uptime → usysUptimeRet r := fun hu => by
       subst hu; exact usysMemOk_uptimeRet hm
     obtain ⟨ι, hfit⟩ := usysIotaFits_exists (W := W) (cs' := cs') (M' := M') (szv' := szv') (lz' := lz')
-      hup h3 hf h12
+      hup h3 hf h12 hw
     obtain ⟨hM, -, -⟩ := usysMemOk_quiet h7 h12 h3 h4 h5 h8 hm
     have hfd' := usysFdOk_quiet hcl hdp hop h4 hfd
     have hc' := usysCwdOk_quiet hcd hc
