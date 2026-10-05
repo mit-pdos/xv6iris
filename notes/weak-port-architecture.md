@@ -218,3 +218,18 @@ by the owner after a full `lake build` (`Weak` is already a default target) and 
 
 No decision is needed for `TsoMem` (untouched), `VirtioProg` (Weak-local), `PtAdBits` (Weak-local),
 `MinstretInv` (Weak-local) or the `exec` evaluator (Weak-local, bridged to `runRW`).
+
+## Owner decisions (2026-10-05)
+
+- **§B: YES** — the Lean line gets `-D SYMBOLIC` too (as the Rocq weak line did): lean-sail `Outcome`
+  announce events, model regenerated, silent `evStep` arms, SC proofs fixed in the same change.
+- **Sail revision:** target Lean's `070832a1` (diff against the weak line's `c32fbf41` and record any
+  event-stream change that moves a weak certificate).
+- **Superseded / retired Rocq files: skipped** (listed in this note's skip list as they are met, with the
+  header line that marks them).
+- **Naming: the tree's convention (camelCase)**, with a Rocq→Lean name map in each file header — not the
+  verbatim-Rocq-names rule of §E.
+- **Proofs: everything fully proved** — no `sorry`/`admit`/axiom; `native_decide` stays banned
+  (`bv_decide` allowed as in the tree).
+- Library shims live in `MachCSL/` (`Rel`, `QpLemmas`, `FinToSet`, `StdppSet`, `StdppMap`, `SetSolver`,
+  `OrdKeys`, `StdppList`), not `Weak/Lib/`.
