@@ -1536,6 +1536,8 @@ inductive Register : Type where
   | rvfi_pc_data
   | rvfi_inst_data
   | rvfi_instruction
+  | __monomorphize_writes
+  | __monomorphize_reads
   | fp_rounding_global
   deriving DecidableEq, Hashable, Repr
 open Register
@@ -1720,6 +1722,8 @@ abbrev RegisterType : Register → Type
   | .rvfi_pc_data => (BitVec 128)
   | .rvfi_inst_data => (BitVec 192)
   | .rvfi_instruction => (BitVec 64)
+  | .__monomorphize_writes => Bool
+  | .__monomorphize_reads => Bool
   | .fp_rounding_global => (BitVec 5)
 
 /-- Type quantifiers: k_n : Nat, k_n ≥ 0, m : Nat, m ≥ 0, m ≥ k_n -/
@@ -1777,7 +1781,7 @@ instance : Inhabited (RegisterRef RegisterType (BitVec 704)) where
 instance : Inhabited (RegisterRef RegisterType (BitVec (2 ^ 8))) where
   default := .Reg vr0
 instance : Inhabited (RegisterRef RegisterType Bool) where
-  default := .Reg rvfi_int_data_present
+  default := .Reg __monomorphize_reads
 instance : Inhabited (RegisterRef RegisterType (List PMA_Region)) where
   default := .Reg pma_regions
 instance : Inhabited (RegisterRef RegisterType (Option (BitVec 64))) where

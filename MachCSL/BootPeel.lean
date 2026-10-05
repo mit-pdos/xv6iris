@@ -208,6 +208,13 @@ def step (cx : Ctx) (g : MVarId) : MetaM (Option (List MVarId)) := g.withContext
       let g' ← mkFreshExprSyntheticOpaqueMVar (bootFinTy X Q (k.beta #[mkConst ``Unit.unit]) f)
       g.assign (mkAppN (mkConst ``bootFin_message) #[X, Q, s, k, f, g'])
       return some [g'.mvarId!]
+    for c in [``Outcome.instrAnnounce, ``Outcome.branchAnnounce] do
+      if o.getAppFn.isConstOf c then
+        let n := oa[oa.size - 2]!; let w := oa[oa.size - 1]!
+        let lem := if c == ``Outcome.instrAnnounce then ``bootFin_instrAnnounce else ``bootFin_branchAnnounce
+        let g' ← mkFreshExprSyntheticOpaqueMVar (bootFinTy X Q (k.beta #[mkConst ``Unit.unit]) f)
+        g.assign (mkAppN (mkConst lem) #[X, Q, n, w, k, f, g'])
+        return some [g'.mvarId!]
     throwError "boot_peel: unsupported event{indentExpr o}"
   if fn.isConstOf ``FreeM.bind then
     let ma := m.getAppArgs

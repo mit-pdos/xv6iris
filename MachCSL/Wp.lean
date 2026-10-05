@@ -1109,6 +1109,17 @@ theorem swp_print_effect (cpu : CPU) (s : String) (Φ : Unit → IProp GF) :
     ▷ Φ () ⊢ swp cpu (print_effect s) Φ :=
   swp_silent cpu (.message s) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) Φ
 
+/-- The instruction announcement (`-D SYMBOLIC`: the opcode just fetched) is
+silent for the SC semantics. -/
+theorem swp_instr_announce (cpu : CPU) {n : Nat} (w : BitVec n) (Φ : Unit → IProp GF) :
+    ▷ Φ () ⊢ swp cpu (LeanRV64D.Functions.instr_announce w) Φ :=
+  swp_silent cpu (.instrAnnounce n w) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) Φ
+
+/-- The branch announcement (`-D SYMBOLIC`: a PC redirect) is silent. -/
+theorem swp_branch_announce (cpu : CPU) (n : Nat) (pc : BitVec n) (Φ : Unit → IProp GF) :
+    ▷ Φ () ⊢ swp cpu (LeanRV64D.Functions.branch_announce n pc) Φ :=
+  swp_silent cpu (.branchAnnounce n pc) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) Φ
+
 /-- A nondeterministic choice: the continuation must handle every answer. -/
 theorem swp_choose (cpu : CPU) (p : Sail.Primitive) (Φ : p.reflect → IProp GF) :
     (∀ c, ▷ Φ c) ⊢ swp cpu (PreSail.choose p) Φ := by

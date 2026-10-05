@@ -207,45 +207,11 @@ open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n > 0 -/
-def sail_instr_announce (x_0 : (BitVec k_n)) : Unit :=
-  ()
-
-/-- Type quantifiers: x_0 : Nat, x_0 ≥ 0, x_0 ∈ {32, 64} -/
-def sail_branch_announce (x_0 : Nat) (x_1 : (BitVec x_0)) : Unit :=
-  ()
-
-def sail_reset_registers (_ : Unit) : Unit :=
-  ()
-
-def sail_synchronize_registers (_ : Unit) : Unit :=
-  ()
-
-/-- Type quantifiers: k_a : Type -/
-def sail_mark_register (x_0 : (RegisterRef k_a)) (x_1 : String) : Unit :=
-  ()
-
-/-- Type quantifiers: k_a : Type, k_b : Type -/
-def sail_mark_register_pair (x_0 : (RegisterRef k_a)) (x_1 : (RegisterRef k_b)) (x_2 : String) : Unit :=
-  ()
-
 /-- Type quantifiers: k_a : Type -/
 def sail_ignore_write_to (reg : (RegisterRef k_a)) : Unit :=
-  (sail_mark_register reg "ignore_write")
+  (mark_register reg "ignore_write")
 
 /-- Type quantifiers: k_a : Type -/
 def sail_pick_dependency (reg : (RegisterRef k_a)) : Unit :=
-  (sail_mark_register reg "pick")
-
-/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n ≥ 0 -/
-def __monomorphize (bv : (BitVec k_n)) : (BitVec k_n) :=
-  bv
-
-/-- Type quantifiers: n : Int -/
-def __monomorphize_int (n : Int) : Int :=
-  n
-
-/-- Type quantifiers: k_b : Bool -/
-def __monomorphize_bool (b : Bool) : Bool :=
-  b
+  (mark_register reg "pick")
 

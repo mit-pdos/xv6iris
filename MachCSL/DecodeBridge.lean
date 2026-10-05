@@ -55,6 +55,8 @@ def runRead {X : Type} (dref : (r : Register) → Option (RegisterType r)) :
     | .cycleCount, k => (runRead dref (k ())).map fun p => (p.1, true)
     | .getCycleCount, k => (runRead dref (k (0 : Nat))).map fun p => (p.1, true)
     | .message _, k => (runRead dref (k ())).map fun p => (p.1, true)
+    | .instrAnnounce _ _, k => (runRead dref (k ())).map fun p => (p.1, true)
+    | .branchAnnounce _ _, k => (runRead dref (k ())).map fun p => (p.1, true)
     | _, _ => none
 
 /-- The machine-mode reference map: what the decoder may read in machine
@@ -220,6 +222,14 @@ theorem swp_runRead (cpu : CPU) (dref : (r : Register) → Option (RegisterType 
         obtain ⟨⟨x', b'⟩, h', hx, rfl⟩ := h; subst hx
         exact silent (0 : Nat) (fun _ _ _ => Iff.rfl) (fun _ _ h => h) b' h'
       | message _ =>
+        simp only [runRead, Option.map_eq_some_iff, Prod.mk.injEq] at h
+        obtain ⟨⟨x', b'⟩, h', hx, rfl⟩ := h; subst hx
+        exact silent () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) b' h'
+      | instrAnnounce _ _ =>
+        simp only [runRead, Option.map_eq_some_iff, Prod.mk.injEq] at h
+        obtain ⟨⟨x', b'⟩, h', hx, rfl⟩ := h; subst hx
+        exact silent () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) b' h'
+      | branchAnnounce _ _ =>
         simp only [runRead, Option.map_eq_some_iff, Prod.mk.injEq] at h
         obtain ⟨⟨x', b'⟩, h', hx, rfl⟩ := h; subst hx
         exact silent () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) b' h'

@@ -1,5 +1,4 @@
 import LeanRV64D.Xlen
-import LeanRV64D.Common0
 import LeanRV64D.Callbacks
 import LeanRV64D.Regs
 
@@ -212,7 +211,7 @@ def get_next_pc (_ : Unit) : SailM (BitVec 64) := do
   readReg nextPC
 
 def set_next_pc (pc : (BitVec 64)) : SailM Unit := do
-  let _ : Unit := (sail_branch_announce xlen pc)
+  (branch_announce xlen pc)
   writeReg nextPC pc
   (pure (redirect_callback pc))
 

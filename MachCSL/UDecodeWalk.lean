@@ -76,6 +76,8 @@ def runReadP {X : Type} (dref : (r : Register) → Option (RegisterType r)) (P :
     | .cycleCount, k => runReadP dref P (k ())
     | .getCycleCount, k => runReadP dref P (k (0 : Nat))
     | .message _, k => runReadP dref P (k ())
+    | .instrAnnounce _ _, k => runReadP dref P (k ())
+    | .branchAnnounce _ _, k => runReadP dref P (k ())
     | _, _ => false
 
 section
@@ -504,7 +506,7 @@ def step (cx : Ctx) (g : MVarId) : MetaM (List MVarId) := g.withContext do
       return ← replaceM (k.beta #[mkNatLit 0])
     for n in [``Outcome.barrier, ``Outcome.cacheOp, ``Outcome.tlbi, ``Outcome.translationStart,
         ``Outcome.translationEnd, ``Outcome.takeException, ``Outcome.returnException,
-        ``Outcome.cycleCount, ``Outcome.message] do
+        ``Outcome.cycleCount, ``Outcome.message, ``Outcome.instrAnnounce, ``Outcome.branchAnnounce] do
       if ofn.isConstOf n then return ← replaceM (k.beta #[mkConst ``Unit.unit])
     throwError "udecode: unsupported event{indentExpr o}"
   if fn.isConstOf ``ite then

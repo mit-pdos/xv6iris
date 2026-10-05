@@ -795,7 +795,8 @@ partial def walkEvent (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr ×
      (``Outcome.tlbi, mkConst ``Unit.unit), (``Outcome.translationStart, mkConst ``Unit.unit),
      (``Outcome.translationEnd, mkConst ``Unit.unit), (``Outcome.takeException, mkConst ``Unit.unit),
      (``Outcome.returnException, mkConst ``Unit.unit), (``Outcome.cycleCount, mkConst ``Unit.unit),
-     (``Outcome.message, mkConst ``Unit.unit), (``Outcome.getCycleCount, mkNatLit 0)]
+     (``Outcome.message, mkConst ``Unit.unit), (``Outcome.instrAnnounce, mkConst ``Unit.unit),
+     (``Outcome.branchAnnounce, mkConst ``Unit.unit), (``Outcome.getCycleCount, mkNatLit 0)]
   for (c, u) in silent do
     if ofn.isConstOf c then
       let m' := k.beta #[u]

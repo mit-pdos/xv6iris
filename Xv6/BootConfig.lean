@@ -28,7 +28,7 @@ DEVIATIONS from Rocq (none process-layer):
 1. NO `boot_D`.  Rocq's adequacy allocates each era's register map at an
    explicit DOMAIN (`boot_D`, 43 registers), so the domain has to be complete
    and documented.  Lean's power thread allocates the WHOLE file
-   (`MachCSL.regs_alloc_one` over `MachCSL.allRegs`, all 180 registers) and
+   (`MachCSL.regs_alloc_one` over `MachCSL.allRegs`, all 182 registers) and
    hands all of it but the two wire pins to the client, so there is no
    domain to state and nothing a spec can ask for that is missing.
 2. NO separate `mmode_config` bundle: Lean's machine-mode configuration is

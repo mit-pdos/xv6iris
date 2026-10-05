@@ -325,6 +325,8 @@ def runRW {X : Type} (D : UFoot) : UOrc → UWSt → SailM X → Option (X × UW
     | .cycleCount, k => runRW D orc s (k ())
     | .getCycleCount, k => runRW D orc s (k (0 : Nat))
     | .message _, k => runRW D orc s (k ())
+    | .instrAnnounce _ _, k => runRW D orc s (k ())
+    | .branchAnnounce _ _, k => runRW D orc s (k ())
     | .choose p, k => runRW D orc.tail s (k ((orc 0).ch p))
     | .readRam .., _ => none
     | .writeRam .., _ => none
@@ -437,6 +439,15 @@ theorem runRW_regRead_any {X : Type} (orc : UOrc) (s : UWSt) (r : Register)
     (k : RegisterType r → SailM X) (h : D.Dr r = false) (h' : D.Dany r = true) :
     runRW D orc s (FreeM.impure (.ok (.regRead r)) k) = runRW D orc.tail s (k ((orc 0).reg r)) := by
   simp only [runRW, h, h', if_true, Bool.false_eq_true, if_false]
+
+/-- The `-D SYMBOLIC` announcements are silent for the walk. -/
+@[simp] theorem runRW_instr_announce_bind {X : Type} (orc : UOrc) (s : UWSt) {n : Nat} (w : BitVec n)
+    (k : Unit → SailM X) :
+    runRW D orc s (LeanRV64D.Functions.instr_announce w >>= k) = runRW D orc s (k ()) := rfl
+
+@[simp] theorem runRW_branch_announce_bind {X : Type} (orc : UOrc) (s : UWSt) (n : Nat) (pc : BitVec n)
+    (k : Unit → SailM X) :
+    runRW D orc s (LeanRV64D.Functions.branch_announce n pc >>= k) = runRW D orc s (k ()) := rfl
 
 end steps
 
@@ -871,6 +882,16 @@ theorem urw_message (msg : String) {X : Type} (k : Unit → SailM X) (ih : ∀ u
   urw_silent RF BF (.message msg) () k (ih ()) (fun _ _ => rfl) (fun Φ =>
     swp_silent_k cpu (.message msg) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) k Φ)
 
+theorem urw_instrAnnounce (n : Nat) (w : BitVec n) {X : Type} (k : Unit → SailM X)
+    (ih : ∀ u, URW RF BF (k u)) : URW RF BF (FreeM.impure (.ok (.instrAnnounce n w)) k) :=
+  urw_silent RF BF (.instrAnnounce n w) () k (ih ()) (fun _ _ => rfl) (fun Φ =>
+    swp_silent_k cpu (.instrAnnounce n w) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) k Φ)
+
+theorem urw_branchAnnounce (n : Nat) (pc : BitVec n) {X : Type} (k : Unit → SailM X)
+    (ih : ∀ u, URW RF BF (k u)) : URW RF BF (FreeM.impure (.ok (.branchAnnounce n pc)) k) :=
+  urw_silent RF BF (.branchAnnounce n pc) () k (ih ()) (fun _ _ => rfl) (fun Φ =>
+    swp_silent_k cpu (.branchAnnounce n pc) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) k Φ)
+
 theorem urw_getCycleCount {X : Type} (k : Nat → SailM X) (ih : ∀ u, URW RF BF (k u)) :
     URW RF BF (FreeM.impure (.ok .getCycleCount) k) :=
   urw_silent RF BF .getCycleCount (0 : Nat) k (ih _) (fun _ _ => rfl) (fun Φ =>
@@ -914,6 +935,8 @@ theorem swp_runRW_gen {X : Type} (m : SailM X) : URW RF BF m := by
       | getCycleCount => exact urw_getCycleCount RF BF k ih
       | message msg => exact urw_message RF BF msg k ih
       | choose p => exact urw_choose RF BF p k ih
+      | instrAnnounce n w => exact urw_instrAnnounce RF BF n w k ih
+      | branchAnnounce n pc => exact urw_branchAnnounce RF BF n pc k ih
 
 /-- **`swp_runRW`**: a computation every oracle's walk runs through, from
 the frames of `s`, with the obligation at every landing. -/
@@ -1102,7 +1125,7 @@ theorem runRW_of_runRead (D : UFoot) (dref : (r : Register) → Option (Register
             obtain ⟨rfl, -⟩ := h
             exact ih v x' b' hk
       | barrier _ | cacheOp _ | tlbi _ | translationStart _ | translationEnd _ | takeException _
-      | returnException _ | cycleCount | message _ =>
+      | returnException _ | cycleCount | message _ | instrAnnounce _ _ | branchAnnounce _ _ =>
         simp only [runRead] at h
         cases hk : runRead dref (k ()) with
         | none => rw [hk] at h; cases h
@@ -1213,6 +1236,8 @@ theorem runRW_ro {X : Type} (Lr : List Register) (D : UFoot) (hD : ∀ r ∈ Lr,
       | getCycleCount => exact ih _ _ _ _ _ _ _ hf hm hr h
       | message _ => exact ih _ _ _ _ _ _ _ hf hm hr h
       | choose p => exact ih _ _ _ _ _ _ _ hf hm hr h
+      | instrAnnounce _ _ => exact ih _ _ _ _ _ _ _ hf hm hr h
+      | branchAnnounce _ _ => exact ih _ _ _ _ _ _ _ hf hm hr h
       | readRam _ _ _ => simp only [runRW, reduceCtorEq] at h
       | writeRam _ _ _ _ => simp only [runRW, reduceCtorEq] at h
 

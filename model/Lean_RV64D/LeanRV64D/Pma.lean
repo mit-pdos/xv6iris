@@ -377,7 +377,7 @@ def is_mag_applicable_access (access : (MemoryAccessType mem_payload)) (width : 
       (HAppend.hAppend "Invalid payload ("
         (HAppend.hAppend (mem_payload_name_forwards p) ") for StoreConditional.")))
 
-/-- Type quantifiers: k_ex673337_ : Bool -/
+/-- Type quantifiers: k_ex673493_ : Bool -/
 def mag_of_pma (pma : PMA) (is_vector : Bool) : (Option Nat) :=
   let mag :=
     if (is_vector : Bool)
@@ -387,7 +387,7 @@ def mag_of_pma (pma : PMA) (is_vector : Bool) : (Option Nat) :=
   then none
   else (some mag)
 
-/-- Type quantifiers: k_ex673338_ : Bool, width : Nat, 0 < width ∧ width ≤ max_mem_access -/
+/-- Type quantifiers: k_ex673494_ : Bool, width : Nat, 0 < width ∧ width ≤ max_mem_access -/
 def within_pma_mag (pma : PMA) (typ_1 : physaddr) (width : Nat) (is_vector : Bool) : Bool :=
   let .Physaddr addr : physaddr := typ_1
   match (mag_of_pma pma is_vector) with

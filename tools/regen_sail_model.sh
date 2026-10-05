@@ -16,6 +16,18 @@
 # The generated Lean project `require`s the vendored lean-sail fork
 # (vendor/lean-sail), whose `PreSailM` is a free monad -- see its README.
 #
+# THE MODEL IS GENERATED WITH -D SYMBOLIC (2026-10-05, as the Rocq weak line
+# did on 2026-08-17): the Sail library's flag under which the concurrency
+# interface's announcements (sail_instr_announce / sail_branch_announce,
+# lib/concurrency_interface/common.sail) are the monadic builtins
+# `instr_announce` / `branch_announce` instead of no-op stubs, so `step`
+# emits an `Outcome.instrAnnounce` node (the opcode) after every fetch and an
+# `Outcome.branchAnnounce` node at every PC redirect.  The weak-memory tier
+# banks the announced opcode bits (Rocq WeakEvInst / WeakDeps).  SYMBOLIC also
+# turns `__monomorphize_reads/writes` into registers and the Isla-only
+# `mark_register` & co. into pure externs, realised in model/Xv6Extras.lean.
+# See notes/symbolic-model.md.
+#
 # Usage:
 #   tools/regen_sail_model.sh [SAIL_RISCV_DIR]
 #
@@ -120,6 +132,7 @@ mkdir -p "$SAIL_RISCV_DIR/build/model"
     --require-version "$SAIL_REQUIRED_VER" \
     --memo-z3 --memo-z3-path "$SAIL_RISCV_DIR/build/model/sail_smt_cache" \
     --config "$CONFIG_JSON" \
+    -D SYMBOLIC \
     --lean \
     --lean-output-dir "$TMP_OUT" \
     --lean-force-output \

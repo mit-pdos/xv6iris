@@ -260,10 +260,6 @@ def mem_read_request_is_ifetch (request : (Mem_read_request k_n k_vasize k_pa k_
   | .AK_ifetch () => true
   | _ => false
 
-def __monomorphize_reads : Bool := false
-
-def __monomorphize_writes : Bool := false
-
 /-- Type quantifiers: k_n : Nat, k_vasize : Nat, k_pa : Type, k_translation_summary : Type, k_arch_ak
   : Type, k_n > 0 ∧ k_vasize > 0 -/
 def mem_write_request_is_exclusive (request : (Mem_write_request k_n k_vasize k_pa k_translation_summary k_arch_ak)) : Bool :=

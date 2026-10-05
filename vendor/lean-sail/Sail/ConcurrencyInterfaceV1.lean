@@ -151,6 +151,13 @@ inductive Outcome (Register : Type) (RegisterType : Register → Type) [Arch] : 
   | getCycleCount
   | message (msg : String)
   | choose (p : Sail.Primitive)
+  /-- the opcode just fetched (`instr_announce`, emitted only by a model
+  generated with `-D SYMBOLIC`, after every fetch): label-free for the
+  sequential semantics, banked by the weak-memory tier -/
+  | instrAnnounce (n : Nat) (w : BitVec n)
+  /-- a PC redirect (`branch_announce`, `-D SYMBOLIC` only, at every write
+  of the next pc): label-free -/
+  | branchAnnounce (n : Nat) (pc : BitVec n)
 
 section
 variable [Arch]
@@ -174,6 +181,8 @@ abbrev Outcome.ret : Outcome Register RegisterType → Type
   | .getCycleCount => Nat
   | .message _ => Unit
   | .choose p => p.reflect
+  | .instrAnnounce _ _ => Unit
+  | .branchAnnounce _ _ => Unit
 
 instance : Effect (Outcome Register RegisterType) where
   ret := Outcome.ret
@@ -379,6 +388,16 @@ def sail_take_exception (f : Arch.fault) : PreSailM RegisterType c ue Unit :=
 def sail_return_exception (pa : Arch.pa) : PreSailM RegisterType c ue Unit :=
   emit (.returnException pa)
 
+/-- Announce the opcode just fetched (the `instr_announce` builtin). -/
+@[simp_sail]
+def instr_announce {n : Nat} (w : BitVec n) : PreSailM RegisterType c ue Unit :=
+  emit (.instrAnnounce n w)
+
+/-- Announce a PC redirect (the `branch_announce` builtin). -/
+@[simp_sail]
+def branch_announce (n : Nat) (pc : BitVec n) : PreSailM RegisterType c ue Unit :=
+  emit (.branchAnnounce n pc)
+
 @[simp_sail]
 def cycle_count (_ : Unit) : PreSailM RegisterType c ue Unit := emit .cycleCount
 
@@ -492,7 +511,7 @@ def interpOutcome (paToNat : Arch.pa → Nat) (o : Outcome Register RegisterType
   | .readRam _ data_size addr => SeqM.readBytes data_size addr.toNat
   | .writeRam _ _ addr value => SeqM.writeBytes addr.toNat value
   | .barrier _ | .cacheOp _ | .tlbi _ | .translationStart _ | .translationEnd _
-  | .takeException _ | .returnException _ => pure ()
+  | .takeException _ | .returnException _ | .instrAnnounce _ _ | .branchAnnounce _ _ => pure ()
   | .cycleCount => modify fun s => { s with cycleCount := s.cycleCount + 1 }
   | .getCycleCount => do pure (← get).cycleCount
   | .message msg => modify fun s => { s with sailOutput := s.sailOutput.push msg }

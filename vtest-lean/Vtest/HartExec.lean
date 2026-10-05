@@ -382,6 +382,8 @@ def evExec (pol : HPol) (cpu : CPU) (x : XState) :
   | .cycleCount => some ((), x)
   | .getCycleCount => some ((0 : Nat), x)
   | .message _ => some ((), x)
+  | .instrAnnounce _ _ => some ((), x)
+  | .branchAnnounce _ _ => some ((), x)
   | .choose p => some (trivialChoiceSource.choose p (), x)
 
 theorem evExec_sound (pol : HPol) (cpu : CPU) (x : XState) (o : Outcome Register RegisterType)

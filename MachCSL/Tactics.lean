@@ -346,7 +346,8 @@ def unfoldDenylist : List Name :=
    ``LeanRV64D.print_effect, ``LeanRV64D.print_int_effect, ``LeanRV64D.print_bits_effect,
    ``LeanRV64D.print_endline_effect, ``LeanRV64D.internal_pick, ``LeanRV64D.sailTryCatch,
    ``LeanRV64D.sailThrow, ``LeanRV64D.sailTryCatchE, ``LeanRV64D.SailM, ``LeanRV64D.SailME,
-   ``LeanRV64D.SailME.run, ``LeanRV64D.SailME.throw, ``LeanRV64D.RegisterType, ``LeanRV64D.Register]
+   ``LeanRV64D.SailME.run, ``LeanRV64D.SailME.throw, ``LeanRV64D.RegisterType, ``LeanRV64D.Register,
+   ``LeanRV64D.Functions.instr_announce, ``LeanRV64D.Functions.branch_announce]
 
 /-- Model predicates on addresses that must stay folded: for a symbolic
 address they are decided by the facts of `MachCSL.PlatformFacts`, rewritten in
@@ -735,6 +736,18 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
       evalTactic (← `(tactic| (iapply swp_bind; iapply swp_cycle_count; inext; iapply swp_ret)))
     else if n == ``LeanRV64D.get_cycle_count then
       evalTactic (← `(tactic| (iapply swp_bind; iapply swp_get_cycle_count; inext; iapply swp_ret)))
+    else if n == ``LeanRV64D.Functions.instr_announce then
+      -- `-D SYMBOLIC`: the opcode announcement after the fetch, silent
+      if bind then
+        evalTactic (← `(tactic| (iapply swp_bind; iapply swp_instr_announce; inext)))
+      else
+        evalTactic (← `(tactic| (iapply swp_instr_announce; try inext)))
+    else if n == ``LeanRV64D.Functions.branch_announce then
+      -- `-D SYMBOLIC`: the PC-redirect announcement in `set_next_pc`, silent
+      if bind then
+        evalTactic (← `(tactic| (iapply swp_bind; iapply swp_branch_announce; inext)))
+      else
+        evalTactic (← `(tactic| (iapply swp_branch_announce; try inext)))
     else if n == ``LeanRV64D.print_effect then
       evalTactic (← `(tactic| (iapply swp_bind; iapply swp_print_effect; inext; iapply swp_ret)))
     else if n == ``Pure.pure && !bind then
@@ -1038,7 +1051,8 @@ register_option swp_run.trace : Bool := { defValue := false, descr := "trace swp
 def stepableHeads : List Name :=
   [``LeanRV64D.readReg, ``LeanRV64D.writeReg, ``LeanRV64D.ConcurrencyInterfaceV1.sail_mem_read,
    ``LeanRV64D.ConcurrencyInterfaceV1.sail_mem_write, ``LeanRV64D.ConcurrencyInterfaceV1.sail_barrier,
-   ``LeanRV64D.cycle_count, ``LeanRV64D.get_cycle_count, ``LeanRV64D.print_effect]
+   ``LeanRV64D.cycle_count, ``LeanRV64D.get_cycle_count, ``LeanRV64D.print_effect,
+   ``LeanRV64D.Functions.instr_announce, ``LeanRV64D.Functions.branch_announce]
 
 /-- Normalise, then step; repeat up to `n` times, each time with the head's
 continuations hidden.  Stops quietly when the computation is consumed, in

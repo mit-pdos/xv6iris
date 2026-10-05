@@ -2,6 +2,7 @@ import LeanRV64D.Flow
 import LeanRV64D.Common
 import LeanRV64D.Prelude
 import LeanRV64D.Xlen
+import LeanRV64D.ReadWriteV1
 import LeanRV64D.PlatformConfig
 import LeanRV64D.SysRegs
 import LeanRV64D.InterruptRegs
@@ -220,6 +221,8 @@ def initialize_registers (_ : Unit) : Unit :=
 
 def sail_model_init (x_0 : Unit) : SailM Unit := do
   writeReg fp_rounding_global fp_rounding_default
+  writeReg __monomorphize_reads false
+  writeReg __monomorphize_writes false
   writeReg misa (_update_Misa_MXL (Mk_Misa (zeros (n := 64))) (architecture_bits_forwards RV64))
   writeReg mstatus (let mxl := (architecture_bits_forwards RV64)
   (_update_Mstatus_UXL

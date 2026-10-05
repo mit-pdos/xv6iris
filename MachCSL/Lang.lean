@@ -389,6 +389,8 @@ abbrev evStep (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) :
   | .getCycleCount => fun v σ' => v = (0 : Nat) ∧ σ' = σ
   | .message _ => fun _ σ' => σ' = σ
   | .choose _ => fun _ σ' => σ' = σ
+  | .instrAnnounce _ _ => fun _ σ' => σ' = σ
+  | .branchAnnounce _ _ => fun _ σ' => σ' = σ
 
 /-- `blockedStep cpu o σ σ'`: event `o` is blocked by another hart's
 reservation; the hart self-loops (the event is retried), a blocked exclusive

@@ -119,7 +119,7 @@ theorem uk_afterFetch_base (orc orc2 : UOrc) (s s2 : UWSt) (w : BitVec 32) (i : 
     uxRun ufFoot T orc s (ucAfterFetch (F_Base w)) =
       some (Step_Execute (r, zero_extend (m := 32) w), s2, orc2) := by
   simp only [ucAfterFetch, ext_fetch_hook]
-  rw [uxw_bind_runRW ufFoot T _ _ orc orc s s i hd hdec,
+  rw [uxw_instr_announce_bind ufFoot T _ _ orc s hd, uxw_bind_runRW ufFoot T _ _ orc orc s s i hd hdec,
     uxw_bind_runRW ufFoot T _ _ orc orc s s false hd (uk_lpad_run orc s hv)]
   simp only [Bool.false_and, Bool.false_eq_true, if_false]
   rw [uxw_bind_runRW ufFoot T _ _ orc orc s s _ hd (uk_readPC_run orc s)]
@@ -134,7 +134,7 @@ theorem uk_afterFetch_rvc (orc orc2 : UOrc) (s s2 : UWSt) (h : BitVec 16) (i : i
     uxRun ufFoot T orc s (ucAfterFetch (F_RVC h)) =
       some (Step_Execute (r, zero_extend (m := 32) h), s2, orc2) := by
   simp only [ucAfterFetch, ext_fetch_hook]
-  rw [uxw_bind_runRW ufFoot T _ _ orc orc s s i hd hdec,
+  rw [uxw_instr_announce_bind ufFoot T _ _ orc s hd, uxw_bind_runRW ufFoot T _ _ orc orc s s i hd hdec,
     uxw_bind_runRW ufFoot T _ _ orc orc s s false hd (uk_lpad_run orc s hv)]
   simp only [Bool.false_eq_true, if_false]
   rw [uxw_bind_runRW ufFoot T _ _ orc orc s s true hd (uk_zca_run orc s hm)]

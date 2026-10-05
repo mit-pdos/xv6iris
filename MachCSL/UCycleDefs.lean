@@ -172,6 +172,7 @@ noncomputable def ucAfterFetch (fr : FetchResult) : SailM Step := do
   | .F_Error (e, addr) => (pure (Step_Fetch_Failure ((virtaddr.Virtaddr addr), e)))
   | .F_RVC h =>
     (do
+      (instr_announce h)
       let instbits : instbits := (zero_extend (m := 32) h)
       let instruction ← do (ext_decode_compressed h)
       if ((← (is_landing_pad_expected ())) : Bool)
@@ -190,6 +191,7 @@ noncomputable def ucAfterFetch (fr : FetchResult) : SailM Step := do
           else (pure (Step_Execute ((Illegal_Instruction ()), instbits)))))
   | .F_Base w =>
     (do
+      (instr_announce w)
       let instbits : instbits := (zero_extend (m := 32) w)
       let instruction ← do (ext_decode w)
       if (((← (is_landing_pad_expected ())) && (Functions.not (is_lpad_instruction instruction))) : Bool)
@@ -224,7 +226,7 @@ theorem uc_runHartActive_eq : run_hart_active 0 =
     cases fr <;> simp only [ucAfterFetch, uxaExecAs, ext_fetch_hook, get_config_print_instr,
       ExceptT.run_bind, ExceptT.run_pure, pure_bind, run_liftM, bind_assoc, Bool.false_eq_true, ite_false]
     all_goals try rfl
-    all_goals (congr 1; funext i; congr 1; funext lp)
+    all_goals (congr 1; funext ann; congr 1; funext i; congr 1; funext lp)
     · by_cases hlp : (lp && Functions.not (is_lpad_instruction i)) = true
       · rw [if_pos hlp, if_pos hlp]
         simp only [ExceptT.run_bind, ExceptT.run_pure, pure_bind, run_liftM, bind_assoc]

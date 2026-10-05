@@ -68,6 +68,8 @@ def bootRun {X : Type} : SailM X → BootRegs → Option (X × BootRegs)
     | .cycleCount, k => bootRun (k ()) f
     | .getCycleCount, k => bootRun (k (0 : Nat)) f
     | .message _, k => bootRun (k ()) f
+    | .instrAnnounce _ _, k => bootRun (k ()) f
+    | .branchAnnounce _ _, k => bootRun (k ()) f
     | _, _ => none
 
 section
@@ -127,6 +129,17 @@ theorem bootFin_regWrite (Q : X → BootRegs → Prop) (r : Register) (v : Regis
 /-- Rocq `px_msg`. -/
 theorem bootFin_message (Q : X → BootRegs → Prop) (s : String) (k : Unit → SailM X) (f : BootRegs)
     (h : BootFin Q (k ()) f) : BootFin Q (FreeM.impure (.ok (.message s)) k) f := by
+  obtain ⟨x, f', h1, h2⟩ := h
+  exact ⟨x, f', h1, h2⟩
+
+/-- The `-D SYMBOLIC` announcements are silent for the register run. -/
+theorem bootFin_instrAnnounce (Q : X → BootRegs → Prop) (n : Nat) (w : BitVec n) (k : Unit → SailM X)
+    (f : BootRegs) (h : BootFin Q (k ()) f) : BootFin Q (FreeM.impure (.ok (.instrAnnounce n w)) k) f := by
+  obtain ⟨x, f', h1, h2⟩ := h
+  exact ⟨x, f', h1, h2⟩
+
+theorem bootFin_branchAnnounce (Q : X → BootRegs → Prop) (n : Nat) (pc : BitVec n) (k : Unit → SailM X)
+    (f : BootRegs) (h : BootFin Q (k ()) f) : BootFin Q (FreeM.impure (.ok (.branchAnnounce n pc)) k) f := by
   obtain ⟨x, f', h1, h2⟩ := h
   exact ⟨x, f', h1, h2⟩
 

@@ -2,7 +2,6 @@ import LeanRV64D.Flow
 import LeanRV64D.Prelude
 import LeanRV64D.Errors
 import LeanRV64D.MemAddrtype
-import LeanRV64D.Common0
 import LeanRV64D.RvfiDii
 import LeanRV64D.PlatformConfig
 import LeanRV64D.Types
@@ -227,7 +226,7 @@ open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-/-- Type quantifiers: k_ex673576_ : Bool, _step_no : Nat, 0 ≤ _step_no -/
+/-- Type quantifiers: k_ex673732_ : Bool, _step_no : Nat, 0 ≤ _step_no -/
 def run_hart_waiting (_step_no : Nat) (wr : WaitReason) (instbits : (BitVec 32)) (exit_wait : Bool) : SailM Step := do
   if ((← (shouldWakeForInterrupt ())) : Bool)
   then
@@ -338,7 +337,7 @@ def run_hart_active (step_no : Nat) : SailM Step := SailME.run do
   | .F_Error (e, addr) => (pure (Step_Fetch_Failure ((Virtaddr addr), e)))
   | .F_RVC h =>
     (do
-      let _ : Unit := (sail_instr_announce h)
+      (instr_announce h)
       let _ : Unit := (fetch_callback h)
       let instbits : instbits := (zero_extend (m := 32) h)
       let instruction ← do (ext_decode_compressed h)
@@ -375,7 +374,7 @@ def run_hart_active (step_no : Nat) : SailM Step := SailME.run do
           else (pure (Step_Execute ((Illegal_Instruction ()), instbits)))))
   | .F_Base w =>
     (do
-      let _ : Unit := (sail_instr_announce w)
+      (instr_announce w)
       let _ : Unit := (fetch_callback w)
       let instbits : instbits := (zero_extend (m := 32) w)
       let instruction ← do (ext_decode w)
@@ -413,7 +412,7 @@ def wait_is_nop (wr : WaitReason) : Bool :=
   | .WAIT_WRS_STO => false
   | .WAIT_WRS_NTO => false
 
-/-- Type quantifiers: k_ex673579_ : Bool, step_no : Nat, 0 ≤ step_no -/
+/-- Type quantifiers: k_ex673735_ : Bool, step_no : Nat, 0 ≤ step_no -/
 def try_step (step_no : Nat) (exit_wait : Bool) : SailM Bool := do
   let _ : Unit := (ext_pre_step_hook ())
   writeReg minstret_increment (← (should_inc_minstret (← readReg cur_privilege)))

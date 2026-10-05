@@ -40,10 +40,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
 /-! ## A whole register file as a ghost map -/
 
-/-- Every register (the model's `Register` has 180 constructors). -/
-def allRegs : List Register := (List.range 180).map Register.ofNat
+/-- Every register (the model's `Register` has 182 constructors: 180, plus the two
+`-D SYMBOLIC` registers `__monomorphize_reads/writes`). -/
+def allRegs : List Register := (List.range 182).map Register.ofNat
 
-theorem ctorIdx_lt (r : Register) : r.ctorIdx < 180 := by cases r <;> decide
+theorem ctorIdx_lt (r : Register) : r.ctorIdx < 182 := by cases r <;> decide
 
 theorem mem_allRegs (r : Register) : r ∈ allRegs :=
   List.mem_map.mpr ⟨r.ctorIdx, List.mem_range.mpr (ctorIdx_lt r), Register.ofNat_ctorIdx r⟩

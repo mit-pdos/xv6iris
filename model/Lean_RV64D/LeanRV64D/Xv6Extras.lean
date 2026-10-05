@@ -89,4 +89,28 @@ def plat_term_write (_ : BitVec 8) : SailM Unit :=
 
 def sys_enable_experimental_extensions (_ : Unit) : Bool := false
 
+-- ---- -D SYMBOLIC: the concurrency-interface announcements ------------
+-- The model is generated with `-D SYMBOLIC` (tools/regen_sail_model.sh), so
+-- Sail's `sail_instr_announce` / `sail_branch_announce` are the impure
+-- externs `instr_announce` / `branch_announce`, which the Lean backend spells
+-- by their extern names and lean-sail does not specialise.  Each EMITS its
+-- `Outcome` event (`instrAnnounce` after every fetch, `branchAnnounce` at
+-- every write of the next pc): silent for the SC semantics
+-- (`MachCSL.evStep`), the opcode the weak-memory tier banks.  (Rocq: the
+-- `instr_announce` / `branch_announce` builtins of the concurrency
+-- interface.)
+
+abbrev instr_announce {n : Nat} (w : BitVec n) : SailM Unit :=
+  PreSail.instr_announce w
+
+abbrev branch_announce (n : Nat) (pc : BitVec n) : SailM Unit :=
+  PreSail.branch_announce n pc
+
+-- SYMBOLIC also makes the Isla-only `sail_mark_register` the pure extern
+-- `mark_register` (it annotates Isla traces); a no-op, exactly as Rocq's
+-- `tools/riscv_extras_symbolic.v`.
+
+def mark_register {α : Type} (_ : @RegisterRef Register RegisterType α) (_ : String) : Unit :=
+  ()
+
 end LeanRV64D.Functions

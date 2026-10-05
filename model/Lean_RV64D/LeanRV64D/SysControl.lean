@@ -710,7 +710,7 @@ def tval (excinfo : (Option (BitVec 64))) : (BitVec 64) :=
   | .some e => e
   | none => (zeros (n := 64))
 
-/-- Type quantifiers: k_ex673301_ : Bool -/
+/-- Type quantifiers: k_ex673457_ : Bool -/
 def track_trap (p : Privilege) (is_interrupt : Bool) (cause : (BitVec 6)) : SailM Unit := do
   (long_csr_write_callback "mstatus" "mstatush" (← readReg mstatus))
   match p with

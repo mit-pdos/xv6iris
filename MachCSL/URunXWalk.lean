@@ -193,6 +193,17 @@ theorem uxw_bind_runRW {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc orc' 
     uxRun D T orc s (m >>= f) = uxRun D T orc' s' (f x) :=
   uxw_bind_some D T m f orc orc' s s' x (uxw_of_runRW' D T m orc s _ hd h)
 
+/-- The `-D SYMBOLIC` announcements are silent for the text-map walk. -/
+theorem uxw_instr_announce_bind {X : Type} {n : Nat} (w : BitVec n) (k : Unit → SailM X) (orc : UOrc)
+    (s : UWSt) (hd : UxwDisj T s) :
+    uxRun D T orc s (LeanRV64D.Functions.instr_announce w >>= k) = uxRun D T orc s (k ()) :=
+  uxw_bind_runRW D T _ k orc orc s s () hd rfl
+
+theorem uxw_branch_announce_bind {X : Type} (n : Nat) (pc : BitVec n) (k : Unit → SailM X) (orc : UOrc)
+    (s : UWSt) (hd : UxwDisj T s) :
+    uxRun D T orc s (LeanRV64D.Functions.branch_announce n pc >>= k) = uxRun D T orc s (k ()) :=
+  uxw_bind_runRW D T _ k orc orc s s () hd rfl
+
 end walker
 
 end MachCSL

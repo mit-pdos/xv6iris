@@ -227,6 +227,8 @@ def xbootRun {X : Type} : SailM X → XRegs → Option (X × XRegs)
     | .cycleCount, k => xbootRun (k ()) f
     | .getCycleCount, k => xbootRun (k (0 : Nat)) f
     | .message _, k => xbootRun (k ()) f
+    | .instrAnnounce _ _, k => xbootRun (k ()) f
+    | .branchAnnounce _ _, k => xbootRun (k ()) f
     | _, _ => none
 
 theorem xbootRun_sound {X : Type} (m : SailM X) (f f' : XRegs) (v : X)

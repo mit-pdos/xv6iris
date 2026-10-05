@@ -375,7 +375,7 @@ theorem uc_afterFetch_base (hD : UcFoot D) (orc orc2 : UOrc) (s s2 : UWSt) (w : 
     (hdec : runRW D orc s (ext_decode w) = some (i, s, orc))
     (hex : runRW D orc (ucNpcS s 4) (uxaExecAs i) = some (r, s2, orc2)) :
     runRW D orc s (ucAfterFetch (F_Base w)) = some (Step_Execute (r, zero_extend (m := 32) w), s2, orc2) := by
-  simp only [ucAfterFetch, ext_fetch_hook]
+  simp only [ucAfterFetch, ext_fetch_hook, runRW_instr_announce_bind]
   rw [runRW_bind_some D _ _ orc orc s s i hdec, uc_lpad orc s hrd hv]
   simp only [Bool.false_and, Bool.false_eq_true, if_false, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_pc,
     ucRW_writeReg D _ _ _ _ _ hD.wr_npc]
@@ -389,7 +389,7 @@ theorem uc_afterFetch_rvc (hD : UcFoot D) (orc orc2 : UOrc) (s s2 : UWSt) (h : B
     (hdec : runRW D orc s (ext_decode_compressed h) = some (i, s, orc))
     (hex : runRW D orc (ucNpcS s 2) (uxaExecAs i) = some (r, s2, orc2)) :
     runRW D orc s (ucAfterFetch (F_RVC h)) = some (Step_Execute (r, zero_extend (m := 32) h), s2, orc2) := by
-  simp only [ucAfterFetch, ext_fetch_hook]
+  simp only [ucAfterFetch, ext_fetch_hook, runRW_instr_announce_bind]
   rw [runRW_bind_some D _ _ orc orc s s i hdec, uc_lpad orc s hrd hv]
   simp only [Bool.false_eq_true, if_false, uc_currentlyEnabled_Zca hm, if_true,
     MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_pc, ucRW_writeReg D _ _ _ _ _ hD.wr_npc]
