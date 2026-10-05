@@ -34,6 +34,7 @@ import MachCSL.SailHooks
 import MachCSL.Tactics
 import MachCSL.StdppSet
 import MachCSL.StdppMap
+import MachCSL.MonPredExtra
 import MachCSL.SetSolver
 import MachCSL.Platform
 import MachCSL.PlatformFacts
