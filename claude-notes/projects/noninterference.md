@@ -4840,6 +4840,398 @@ usertrap's live row (`urc_niPidRow` and `urc_niDetRow` + `hlive`). Dead code: `K
 What remains in M3: families (incl. K2 sys_kill as a slot-ledger event), ustep, quotas, private files; OUT-4 optional;
 G3c optional
 
+### M3 families design (2026-10-05)
+
+Design pass on `lane/fam` (based on `lean` a538e59f2: no-kill K3 + K1 landed). No code landed. The shapes below
+were read off the tree (`NiTrace`, `NiLedger`, `NiEvid`, `UsysDet`, `UsysMemOk`, `SyscallDefs`, `ZombEv`,
+`WaitInvTies`, `SlotEv`, `ChildTok`, `UkFork`, `PipeNames`/`PipeQueue`/`PipeInvDefs`/`PipeProto`,
+`SpecPiperead`/`SpecPipewrite`, `FilereadArms`, `FileDefs`, `SpecKkill`/`SpecSysKill`, `NiAdequacy`/
+`LinkNiAdequacy`). The pure definitions in "Proposed definitions" were type-checked in a scratch file against
+a538e59f2. The theorems were stated with `sorry`. One `#eval` was run on the orphan scenario below. None of it is
+in the tree. Rulings FAM-R1…R6 at the end are needed before a lane starts.
+
+**Short version.**
+- **The family partition is mostly a re-statement of what `H` already concedes.** Every family-internal event
+  that the theorems read is co-recorded in a GLOBAL ledger:
+  - a member's fork appends `PAlloc` (pid ledger), `SOcc` (slot ledger) and `KAlloc` (allocator), and
+    `ZFork` (family ledger);
+  - a reap appends `PFree`, `SVac` and `KFree`s beside `ZReap`.
+
+  `pev`, `kev`, `sev` and `ticks` are inherently global: `pidPick` reads the whole pid history, and the
+  allocator and the slot scan are shared. So two runs that differ in an outsider's process activity almost
+  always differ in a hypothesis that the family form must keep. What the family form removes from the
+  hypotheses is the FAMILY LEDGER's outsider events: other families' `ZExit` timing, and the zev positions
+  their forks and reaps occupy. That is real but small.
+- **The one piece of new content is a pure lemma: wait reads only the family's own events.** On a
+  well-formed family ledger, `zLowest h a = zLowestR (zevIn r h) a` for every member actor `a`. Here `zevIn r h`
+  is the subsequence of `h` whose actor is a member's slot when the event is appended. This holds across
+  reparenting to init: an orphan's `ZExit` is the member's own event and stays in, and init's reap of the
+  orphan drops out harmlessly, because the restricted reading resets a slot whole at a member's fork. It
+  needs a ledger well-formedness `zevWf` that the kernel keeps today but does not export.
+- **The family tree is recoverable two ways, and the ledger's is the right one.**
+  - From the FILINGS: a filed fork round with `forkOk ι` names parent `incOf h f` (the key's pid) and child
+    `(era, pidPick ι.pev)`. This is incomplete: a fork whose parent never resumed (it was killed) is not filed.
+  - From the FAMILY LEDGER: `ZFork act j pid g` places `pid` at slot `j` under the occupant of `act`'s slot.
+    The parent's PID is the pid of the last `ZFork` into that slot (none for init). This is complete wherever
+    the ledger is cited.
+  - Membership in the restriction must be a function of the restricted object itself, so it is the
+    ledger's: a per-slot family column `zFamOf r h`, built by lineage, not by the current parent.
+  - The filings' tree is a derived reading. It agrees with the ledger's only once the filing carries
+    `syscEvRow`'s fork fact ("the cited prefix ends in `ZFork ι.act i pid γ`"). Today only the kernel side has
+    that fact.
+- **The merged order of the members' enters is schedule, so the statement is PER MEMBER.** For a family `r`
+  and any incarnation `q` whose waits act from family slots in both runs, these hypotheses give equal outputs:
+  - equal FAMILY inputs: the zev position is counted in `zevIn r`, the other positions are global;
+  - equal family-restricted ledger parts `(niHist F k).famLed r`.
+
+  `ftrace`, a merged family trace, is NOT proposed: its order is the scheduler's.
+- **Pipes stay OUT (FAM-3 parked).** The kernel keeps no pipe record that the NI instance can cite. The byte
+  queue's authority is the APPLICATION's, "coupled or tainted" (`PipeInvDefs.pipeQres`), and the generic supply
+  pays with the taint (`killCred`), so a generic run may have every pipe disconnected. A pipe ledger would be a
+  new kernel-owned, untaintable, inv-held ledger, which means a seventh anchored name. Its rows would be
+  pipealloc, piperead, pipewrite and pipeclose, plus filedup and fileclose's reference counts, plus a
+  key↔pipe tie and a pure "holders ⊆ the creator's later descendants" export, which does not exist today. It
+  is larger than the joint fork lane, and it would buy the same kind of "derived from a cited history"
+  answers as wait's.
+- **K2 (`sys_kill`) does not depend on families, and its family "consumer" is a scope paragraph.**
+  - The killer's answer reads the global slot ledger. A member-kills-member event is no more internal than
+    any other `SKill`.
+  - At the family level an outsider's kill is NOT a truncation (contrast scope 11). The victim's `ZExit … (-1)`
+    is a member event (its actor is the victim), so it sits INSIDE `zevIn` and changes other members' wait
+    answers (status `-1`, exit order).
+  - The family theorem concedes it through the internal hypothesis. "Forbidding" it would need the killer on
+    the death: the `killWhy` tie that K-R4 rejected.
+- **Lanes:**
+  - FAM-1a (pure: the family column, `zevIn`, the reading lemma, the tree, the conditional pure corollary;
+    honest scope 12): recommended.
+  - FAM-1b (export `zevWf` and the fork's `ZFork` fact through the filing; the thirteenth root `xv6NiFam`):
+    optional.
+  - FAM-2 = K2 as the no-kill design sketched: only if the owner wants kill in the class.
+  - FAM-3 pipes: parked.
+
+**Findings.**
+- **F1 (the family as a partition: sub-question 1).**
+  - *The tree from the filings.* A round filing `.round i j sc W W' (some (k, ι))` at an ecall whose
+    effective number is fork has, by the law's fork clause, answer `usysForkAns ι`.
+    - On `forkOk ι` the answer is `usysForkPid ι`, so the child is `(obsBoots (h.take j), ofNat 32 (pidPick
+      PIDMAX ι.pev))`. The parent's pid is the filing's `W.pid` (`NiEntry.pid`; `niEntryOk`'s `W'.pid =
+      W.pid`). So yes: the parent's PID IS recoverable from the filing, and it is not the ledger's `act`
+      (a slot address).
+    - An origin filing names its claim's position `p` (the parent's fork EXIT, `niOneShot`). But nothing pure
+      ties the origin's `W0.pid` to that fork's answer. So the origin side gives no edge.
+    - Completeness: the edge exists only if the parent RESUMED from fork. A parent killed between kfork's
+      `ZFork` and its resume leaves a child that no filing names.
+  - *The tree from the family ledger.* `ZFork act j pid g` (kfork, under `wait_lock`) is in every later
+    citation of the era's family ledger, and `niHist F k` is their join.
+    - The parent's pid is the pid field of the last `ZFork` into `act`'s slot (`zSlotOf act`), or init (no
+      `ZFork`; pid 1).
+    - Lineage, not the current parent: `famOf`'s `par` is re-pointed to `ip` at a parent's exit (reparenting),
+      but membership must survive it. Otherwise an orphan's pipes and exit would "leave" the family.
+    - The family column `zFamOf r h` (below) sets slot `j` to member at a `ZFork` whose pid is the root's, or
+      whose actor's slot is a member's. It clears the slot at its reap. Exits change nothing (a zombie is
+      still a member).
+  - *The era.* The root is `(era, pid)`. The ledger is per era (`niHist F k`), and the restriction is applied
+      per cited era (F6 of M2-X: a citation's era is an input). Pid wrap-around inside an era, the caveat
+      `NiInc` already carries, is harmless to the slot column, because it is keyed by slot occupancy, not by
+      pid.
+  - *What two runs must agree on.* NOT the merged order: interleaving members' enters is the scheduler's
+    business, which is HIGH. So the family statement is the per-member statement quantified over members,
+    with the family-restricted ledger history as the shared object. The family's internal schedule appears
+    only as the restricted POSITIONS (each wait's place among the family's own events). Recommended (FAM-R1).
+- **F2 (what becomes family-internal: sub-question 2).**
+  - *Wait's answer is a function of the family's events only.* `zLowest h a` reads slots `k` with
+    `(famOf h k).par = a`. For a member actor `a ≠ ip` every such slot holds `a`'s own child (a member, by
+    lineage), and every event that moves such a slot has a member actor:
+    - `a`'s `ZFork` into it;
+    - the child's `ZExit`;
+    - `a`'s `ZReap` of it.
+
+    Outsider events move only slots whose parent is an outsider or `ip`:
+    - an outsider's `ZFork` lands in an EMPTY slot;
+    - an outsider's `ZExit` reparents only its own children;
+    - init's `ZReap` takes only `ip`'s zombies (orphans, including the family's own orphans).
+
+    So `zLowest h a = zLowestR (zevIn r h) a` on a WELL-FORMED `h`. The one subtlety is the landed
+    `famStep`, whose `ZFork` keeps the zombie column (G1a deviation 5). On a filtered history, a
+    family orphan reaped by init (filtered out) leaves a stale zombie, and a member's later fork into that slot
+    would inherit it. So the restricted reading uses `famStepR`, which resets the slot whole (G1's design text
+    `⟨act, g, none⟩`). Checked by `#eval` on the scenario: init forks root A; init forks outsider X; A forks
+    B; B forks C; B exits (C → init); C exits; init reaps C; X forks Y; Y exits; A forks D into C's old slot;
+    D exits. Result: `zLowest = zLowestR ∘ zevIn = some (2, 6, 0, 12)` (B, the lowest zombie child), with 6
+    of the 11 events kept.
+  - *What the kernel must keep: `zevWf`* (snoc form, `zevStepOk`):
+    - a `ZFork` places into an EMPTY slot (`famOf h j = ZSlot.empty`), from a live (non-zombie) actor;
+    - a `ZExit` is a live actor's, with `ip ≠ act`;
+    - a `ZReap act j pid` takes `act`'s own zombie child.
+
+    Each is a G1 tie read at its append site. kfork's fresh slot has a zero parent cell and the element `none`
+    (T1 and T2), and a zero `par` is the empty slot, because every `ZFork`/`ZExit` writes a nonzero address.
+    kexit's and kfork's caller is running (element `none`). kwait's reap is `zLowest`'s fact. None of it is
+    exported: the filing carries the cited LIST, not its well-formedness.
+  - *Is the exit order a function of the family's inputs?* No. Which child exits first is the scheduler's
+    choice, even when every member is LOW. The restricted history is the family's own schedule, and it stays a
+    HYPOTHESIS. Deriving it from the members' traces would need three things:
+    - the exits as steps: a `ZExit`'s status is the dying member's exit `a0`, an INPUT (an exit with no enter
+      is unfiled, scope 11);
+    - the payloads of internal events as functions of member steps (a `ZFork`'s slot and pid are global:
+      slot placement and `pidPick`);
+    - the merged order as an input.
+
+    None of that is available, and the first needs `ustep`'s user-side model.
+  - *Reparenting.* A member that dies before its children hands them to init (`ip`, outside the family unless
+    the root IS init). Lineage keeps them members. Their exits stay internal events, and init's reaps of them
+    are external events that touch no member's reading (F2's first bullet). So the tree needs no special case,
+    only the reset fold.
+  - *Is this an improvement worth stating?* It is a strict weakening of `xv6NiTwoRun`'s history hypothesis:
+    equal ledger histories and equal positions imply equal restricted histories and positions. But it is a
+    SMALL one. Only the family ledger is restricted; an outsider's fork or reap still shows in `pev`/`sev`/`kev`.
+    The real gain is the timing of outsiders' EXITS, plus the honest statement that wait declassifies "the
+    family's exit order up to slot order, the statuses, and the placement of the family's children", with
+    nothing of other families' lifecycles. That is G1-R5's paragraph made precise.
+- **F3 (pipes: sub-question 3).**
+  - *The state model.* `PipeNames.PipeSt = ⟨ws, rp, ro, wo⟩` is every byte ever written, the read pointer and
+    the two open flags. Its authority `pipeQauth γp.pnQueue` sits in `pi->lock`'s payload, coupled to the ring
+    (`pipeQueueOk ws rp nr nw bs`) OR TAINTED (`pipeQres`'s second arm, `MachFixedGS.killCred`). The exact
+    fragment is the APPLICATION's: sh's runcmd child holds it, through `PipeProto`'s permits. A
+    generic-instance read pays `pipeRpay … ∨ taint` (`FilereadArms`). So in `xv6NiAdequacy`'s run, the
+    application may have tainted every pipe. Then no kernel-owned record says what bytes a read returned, and
+    the relational row is `∃ bs` (`usysMemOk`'s read branch, `usysReadRet`).
+  - *A pipe cannot escape the family that created it.* Fds enter a table only these ways:
+    - `sys_pipe` (fresh names, `usysFdOk`'s pipe arm);
+    - `dup` (within the table);
+    - `fork` (the child's table is a copy: `UkFork`'s "the child's table is a copy");
+    - `open`, which never installs a pipe (`fdstNopipe`).
+
+    `exec` keeps the table, and xv6 has no fd passing. So a pipe created by member `m` is held only by `m` and
+    the members forked from `m` after the creation. The root's INHERITED pipes are shared with the parent's
+    family (the cross-family channel). sh's pipeline is internal: the per-command child (the family root)
+    calls `pipe()` and forks both sides.
+
+    Two facts are NOT exported purely, though both are true in-logic:
+    - freshness of `γp` (the row's `∃ γp`);
+    - the child's first key's fd table = the parent's fork-time table (an origin's `W0` is tied to nothing).
+  - *What a pipe lane would cost.* A kernel-owned per-era pipe ledger (`Qev := QNew act g | QPut act g bs |
+    QGet act g n | QShut act g w`, keyed by `γp.pnQueue`). It would be held in an INVARIANT, because pipes are
+    many and one `pi->lock` payload cannot hold a global list. It would be the seventh anchored name, with
+    `UIota.qev`, `niIotaLbs`/`niBelow`/`niJoin` + a conjunct (OUT-2's plumbing). The rest:
+    - appends at pipealloc, piperead, pipewrite and pipeclose;
+    - fileclose/filedup's reference counts (`ro`/`wo` fall only at the LAST close, and that close is in
+      `close` or `exit` of ANY holder);
+    - rows: read's count and bytes at the cited prefix and the key's window (lazy-free); write's `n`, its `-1`
+      at a shut read end (the kill is dead at +0xa6), its short count at a copyin fault;
+    - the class at `usysDetClassAt` with a "pipe fd" key reading (G4's `wcon` again);
+    - the key↔ledger tie through `FdType.pipe γp`;
+    - for the FAMILY restriction, the two missing exports above.
+
+    Estimate: 6000–9000 lines, 5+ commits, above the joint fork lane. The answers it buys are, like wait's,
+    derived from a cited history whose positions are the family's schedule.
+  - Recommended: pipes stay OUT. FAM-3 is recorded as designed and parked (FAM-R4), behind `ustep`, where a
+    verified family (sh's pipeline, `PipeProto`'s untainted discipline) can carry the bytes instead.
+  - *`UkFork`'s two continuations* (the M3 entry's remark) are the USER-tier logic. A VERIFIED program's ghost
+    resources (pipe permits, descriptor handles) split between parent and child by separation. That is the
+    resource story for a verified-family instance after `ustep`. The generic trace theorem sees none of it.
+- **F4 (`sys_kill`: sub-question 4).**
+  - K2's row is unchanged by families. The killer's answer is `usysKillAns ι`, read off the GLOBAL slot ledger
+    (`SKill act j pid` / `SKillMiss act k0 pid`, rulings K-R3). A member killing a member appends the same
+    global event as anyone else. So K2 is independent of FAM-1 and can land before, after or never.
+  - *The flow it labels.* An outsider's kill of member `m` reaches the family in two places:
+    - the external `H.sev` (`SKill`, with the killer's slot): attributed;
+    - the INTERNAL `zevIn`, as `m`'s own `ZExit … (-1)` (its actor is the victim). `m`'s parent's wait sees
+      status `-1` and an earlier exit. With pipes, readers would see EOF early.
+  - **So at the family level a kill is NOT a truncation.** Scope 11's corollary `xv6NiPrefix` is
+    per-incarnation and stays true. A family-prefix form ("the family's traces in a killed run are prefixes")
+    is FALSE: the parent's wait answer changes.
+  - *What is provable.* The family theorem's internal hypothesis concedes the outsider's kill (equal `zevIn`
+    histories), and its external hypothesis attributes it (equal `sev`). A partition-level "if no outsider
+    `SKill` names a member, the internal history is outsider-free" needs every kill-death `ZExit` tied to its
+    `SKill`. That is K-R4's rejected `killWhy` tie (a receipt in `killRow`'s paid arm, carried by kexit to the
+    `ZExit`). Without it, "no outsider `SKill`" constrains nothing that `zevIn` reads.
+  - It would be an AUDIT fact, not an NI strengthening: hypotheses on histories stay hypotheses. Not
+    recommended (FAM-R5).
+  - K-R6's caveat carries over: with K2, a member's `xv6NiPrefix` needs run 1 cut before the first `SKill`
+    naming it.
+- **F5 (the theorems: sub-question 5).**
+  - The root shape is `xv6NiTwoRun`'s, with:
+    - `NiStep.input` → `NiStep.famInput r` (the zev position counted in `zevIn r`);
+    - `niHistLed F₁ = niHistLed F₂` → `∀ k, (niHist F₁ k).famLed r = (niHist F₂ k).famLed r` (the zev part
+      restricted);
+    - a premise `NiFamActs r` on both traces: every citing step's actor is a family slot of its cited prefix.
+      Only wait reads the family ledger, and `ι.act` is an input position, but membership is run-local.
+  - New provable content: `zLowest_zevIn` and its use in `output_eq`, nothing else. Equal restricted lists at
+    equal restricted positions give equal restricted prefixes (`zevIn_prefix`: the restriction is a left
+    fold, so it is prefix-monotone). The reading lemma then gives equal wait answers. Every other clause reads
+    the unrestricted global ledgers, as today.
+  - The premise `NiFamActs` could be DERIVED from "q's pid is a family pid" with an actor tie T3 (at a wait
+    citation, the last `ZFork` into `zSlotOf ι.act` names `W.pid`, from `genPid` against T1's `gen`). That is
+    optional (FAM-1c). As a premise it is honest: it is about q's own cited actors, as `NiInClass` is about
+    q's own numbers.
+  - The unconditional root needs `zevWf (niHist F k).zev`. Every cited `ι.zev` would carry `zevWf` (the
+    arms read it off the `wait_lock` payload with the lower bound), and the join is the longest cited
+    prefix, so it is well-formed (`niHist_zevWf`). That is FAM-1b. Without it the corollary is pure and
+    conditional (FAM-1a): `niTwoRunFam` with `∀ k, zevWf (niHist Fᵢ k).zev` premises, not a root.
+- **F6 (the rows outside the class, by partition).**
+  - Family-internal at a family partition: pipe `read`/`write`/`close` on a pipe the family created (F3,
+    parked).
+  - Shared kernel state, external at any partition:
+    - `open`, `read`/`write` on inode fds, `fstat`, `chdir`, `exec`, `mkdir`/`mknod`/`link`/`unlink`: the
+      file system, M3's "private files";
+    - `pipe()` itself: its −1 is file-table and allocator exhaustion, while its names are internal;
+    - `kill`: the slot table (K2);
+    - console `read`: the system's input.
+  - Own-key, independent of families: `dup` and `close`. The answer is a function of the key's fd table:
+    `usysFdOk`'s dup arm is the least closed fd or −1, and close is 0 at an open fd. Their joining the class
+    needs an fd-table key reading riding the step, as `sz`/`wcon` do. That is a small per-incarnation lane,
+    not this one. Recorded only.
+
+**Proposed definitions (verbatim; type-checked in scratch against a538e59f2).**
+
+    -- Xv6/ZombEv.lean (pure; FAM-1a)
+    /-- The slot index of a slot address (`procAddr` is injective below NPROC). -/
+    def zSlotOf (a : BitVec 64) : Option Nat := (List.range NPROC).find? (fun k => procAddr k == a)
+
+    /-- **THE FAMILY COLUMN** of the family rooted at pid `r`: per slot, whether its occupant descends from `r`
+    through the `ZFork` chain (the root's own `ZFork` places it; a member's `ZFork` places a member; any other
+    `ZFork` places a non-member; a reap empties the slot; an exit changes no membership -- a zombie is still a
+    member).  LINEAGE, not `famOf`'s current parent: reparenting to init keeps an orphan in its family. -/
+    def zFamStep (r : BitVec 32) (m : Nat → Bool) : Zev → Nat → Bool
+      | .ZFork act j pid _ => fun k => if k = j then (pid == r || (zSlotOf act).any m) else m k
+      | .ZExit .. => m
+      | .ZReap _ j _ => fun k => if k = j then false else m k
+
+    def zFamOf (r : BitVec 32) (h : List Zev) : Nat → Bool := h.foldl (zFamStep r) (fun _ => false)
+
+    /-- The event's actor slot is a member's (at the event, before its step). -/
+    def zActIn (m : Nat → Bool) : Zev → Bool
+      | .ZFork act .. | .ZExit act .. | .ZReap act .. => (zSlotOf act).any m
+
+    def zevInStep (r : BitVec 32) (acc : List Zev × (Nat → Bool)) (e : Zev) : List Zev × (Nat → Bool) :=
+      (if zActIn acc.2 e then acc.1 ++ [e] else acc.1, zFamStep r acc.2 e)
+
+    /-- **THE FAMILY'S OWN EVENTS**: the subsequence of `h` whose actors are members' slots when appended. -/
+    def zevIn (r : BitVec 32) (h : List Zev) : List Zev := (h.foldl (zevInStep r) ([], fun _ => false)).1
+
+    /-- The reading on the restricted history: a fork resets the slot WHOLE (G1's design text; the landed
+    `famStep` keeps the zombie column, G1a deviation 5 -- equal on a well-formed history, not on a filtered
+    one: a family orphan reaped by init leaves a stale zombie in the filtered history). -/
+    def famStepR (m : Nat → ZSlot) : Zev → Nat → ZSlot
+      | .ZFork act j _ g => fun k => if k = j then ⟨act, g, none⟩ else m k
+      | e => famStep m e
+    def famOfR (h : List Zev) : Nat → ZSlot := h.foldl famStepR (fun _ => ZSlot.empty)
+    def zLowestR (h : List Zev) (a : BitVec 64) : Option (Nat × BitVec 32 × Int × GName) :=
+      zScan (famOfR h) a 0 NPROC
+
+    /-- **THE FAMILY LEDGER'S WELL-FORMEDNESS** (snoc form; what kfork / kexit / kwait establish under
+    `wait_lock`, from G1's ties T1/T2). -/
+    def zevStepOk (h : List Zev) : Zev → Prop
+      | .ZFork act j _ _ => j < NPROC ∧ famOf h j = ZSlot.empty ∧ zLive h act
+      | .ZExit act _ _ ip => zLive h act ∧ ip ≠ act ∧
+          (∀ k < NPROC, procAddr k = act → (famOf h k).par ≠ 0 ∨ act = ip)
+      | .ZReap act j pid => zLive h act ∧ j < NPROC ∧ (famOf h j).par = act ∧ ∃ xs, (famOf h j).zomb = some (pid, xs)
+    where
+      zLive (h : List Zev) (act : BitVec 64) : Prop := ∃ k < NPROC, procAddr k = act ∧ (famOf h k).zomb = none
+    def zevWf (h : List Zev) : Prop := ∀ p e, p ++ [e] <+: h → zevStepOk p e
+
+    theorem zevIn_prefix (r : BitVec 32) {p h : List Zev} (hp : p <+: h) : zevIn r p <+: zevIn r h
+    /-- **WAIT READS ONLY THE FAMILY'S EVENTS.** -/
+    theorem zLowest_zevIn (r : BitVec 32) (h : List Zev) (a : BitVec 64) (hwf : zevWf h)
+        (ha : (zSlotOf a).any (zFamOf r h) = true) :
+        zLowest h a = zLowestR (zevIn r h) a
+
+    -- Xv6/NiTrace.lean §9 (FAM-1a): THE FAMILY FORM
+    def UIota.famLed (r : BitVec 32) (ι : UIota) : UIota := { ι.led with zev := zevIn r ι.zev }
+    def UIota.famPos (r : BitVec 32) (k : Nat) (ι : UIota) : NiPos := { ι.pos k with zev := (zevIn r ι.zev).length }
+    def NiStep.famInput (r : BitVec 32) :
+        NiStep → Uvis ⊕ (BitVec 64 × Bool × Nat × Nat × Option Nat ×
+          Option (BitVec 64 × BitVec 64 × List (BitVec 64)) × Option NiPos)
+      | .origin W0 _ => .inl W0
+      | .round secc lz win sz wcon _ x _ c => .inr (secc, lz, win, sz, wcon, exitView x, c.map fun p => p.2.famPos r p.1)
+    /-- Every citing step of the trace acts from a member's slot of its cited prefix. -/
+    def NiFamActs (r : BitVec 32) (tr : List NiStep) : Prop :=
+      ∀ s ∈ tr, ∀ k ι, s.cite = some (k, ι) → (zSlotOf ι.act).any (zFamOf r ι.zev) = true
+    /-- the filings' tree: a filed successful fork round names (parent, child) -/
+    def niForkChild (h : List Obs) : NiEntry → Option (NiInc × NiInc)
+      | f@(.round _ j _ W _ (some (_, ι))) =>
+        if uvisNum (uvisRun W) = USYS_fork ∧ forkOk ι then
+          some (incOf h f, (obsBoots (h.take j), BitVec.ofNat 32 (pidPick PIDMAX ι.pev)))
+        else none
+      | _ => none
+
+    theorem niTwoRunFam {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk h₁ F₁) (hC₁ : niChain F₁ (niHist F₁))
+        (hF₂ : niOk h₂ F₂) (hC₂ : niChain F₂ (niHist F₂))
+        (hw₁ : ∀ k, zevWf (niHist F₁ k).zev) (hw₂ : ∀ k, zevWf (niHist F₂ k).zev)   -- FAM-1b discharges these
+        (r : BitVec 32) (q : NiInc) (hcls : NiInClass (utrace q h₁ F₁))
+        (hfam₁ : NiFamActs r (utrace q h₁ F₁)) (hfam₂ : NiFamActs r (utrace q h₂ F₂))
+        (hin : (utrace q h₁ F₁).map (NiStep.famInput r) = (utrace q h₂ F₂).map (NiStep.famInput r))
+        (hH : ∀ k, (niHist F₁ k).famLed r = (niHist F₂ k).famLed r) :
+        (utrace q h₁ F₁).map NiStep.output = (utrace q h₂ F₂).map NiStep.output
+
+    -- Xv6/LinkNiAdequacy.lean (FAM-1b): THE THIRTEENTH ROOT -- `xv6NiTwoRun`'s binders and ∃ F₁ F₂ block
+    -- verbatim, then
+    --   ∀ (r : BitVec 32) (q : NiInc), NiInClass (utrace q κs₁ F₁) →
+    --     NiFamActs r (utrace q κs₁ F₁) → NiFamActs r (utrace q κs₂ F₂) →
+    --     (utrace q κs₁ F₁).map (NiStep.famInput r) = (utrace q κs₂ F₂).map (NiStep.famInput r) →
+    --     (∀ k, (niHist F₁ k).famLed r = (niHist F₂ k).famLed r) →
+    --     (utrace q κs₁ F₁).map NiStep.output = (utrace q κs₂ F₂).map NiStep.output
+    theorem xv6NiFam …
+
+    -- FAM-1b, the export (kernel side): syscEvRow's wait and fork clauses gain `zevWf ι.zev`; the filing
+    -- gains the fork's ledger fact (today kernel-side only, `syscEvRow`'s `∃ hz i, ι.zev = hz ++ [.ZFork ι.act i
+    -- (ofNat 32 (pidPick PIDMAX ι.pev)) (usysForkGen ι)]`) as a row beside `niOutRow`:
+    def niForkZRow (sc : BitVec 64) (W : Uvis) : Option (Nat × UIota) → Prop
+      | some (_, ι) => sc = uecallScause → uvisNum (uvisRun W) = USYS_fork → forkOk ι →
+          ∃ hz i, ι.zev = hz ++ [.ZFork ι.act i (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) (usysForkGen ι)]
+      | none => True
+    -- WaitInvTies.waitInvResAt: `⌜zevWf h⌝` beside T1/T2 (the body; its statement and waitLockPay unchanged)
+
+`xv6NiTwoRun`, `xv6NiPrefix` and the other eleven roots stay byte-identical. `niTwoRunFam` implies `niTwoRun`'s
+conclusion under `niTwoRun`'s hypotheses plus `zevWf` and `NiFamActs`. It is a strict weakening of the zev
+hypothesis, not a replacement.
+
+**§Lanes.**
+
+| Lane | Content | Files | Moved statements | Byte-identical | Gate | Estimate | TCB |
+|---|---|---|---|---|---|---|---|
+| **FAM-1a** (recommended; pure) | the family column, `zevIn`, `famStepR`/`zLowestR`, `zevStepOk`/`zevWf`, `zevIn_prefix`, `zLowest_zevIn`; `famLed`/`famPos`/`famInput`/`NiFamActs`, `niTwoRunFam_trace`, `niTwoRunFam` (conditional on `zevWf`); `niForkChild`; honest scope 12 "families" in NiTrace's header (F1–F4 in short: per-member, the merged order is schedule; what the restriction removes and what it does not, the global ledgers; the outsider kill inside `zevIn` is not a truncation; pipes parked) | `ZombEv`, `NiTrace` | none | all twelve roots; every kernel and NI statement | build + lint | ~500–800 lines (the reading lemma is the content: a fold invariant relating `famOf h` and `famOfR (zevIn r h)` at member-parented slots), ½–1 day | no root moves (no root states it) |
+| **FAM-1b** (optional) | `zevWf` in `waitInvResAt`, preserved at kfork's `ZFork`, kexit's `ZExit`, kwait's `ZReap` and the boot; the receipts carry it (`waitAnsLed`'s arms, `kf_wait_fork`); `syscEvRow`'s wait/fork clauses + `zevWf ι.zev`; `niForkZRow` through `syscEvOut` → `utEvOut` → filing; `niHist_zevWf`; the root `xv6NiFam` | `WaitInvTies`, `ProofKfork`, `ProofKexit`, `ProofKwait`, `UserChildren`, `SyscallDefs`, `SyscallArmsWait`, `SyscallArmsFork`, `NiLedger`, `UserretClosedRows`, `NiTrace`, `LinkNiAdequacy`; `roots.txt` 12 → 13, `baseline.json`, `expected.json` | `waitInvResAt` body, `waitAnsLed`, `kf_wait_fork`, `syscEvRow`, `niFitEv`/`niEntryOk` (+`niForkZRow`) | `SYSCALL`, `USERTRAP`, `KWAIT`/`KFORK` texts (the fact rides the receipts), the twelve roots | full `run_all.sh` + audit + tcb | ~1000–1500 lines, 2 commits (G1c+d scale) | `xv6NiFam`'s module set = `xv6NiTwoRun`'s (`ZombEv` already in) |
+| FAM-1c (optional) | actor tie T3 (`genPid` vs T1's `gen` at the wait citation): `NiFamActs` derived from "q's pid is a family pid" | `WaitInvTies`, `ProofKwait`, `SyscallDefs`, `NiLedger`, `NiTrace` | `syscEvRow` wait clause | roots | build + audit | ~400 lines | none |
+| **FAM-2 = K2** (only if kill joins the class) | as the no-kill design's K2a–c (the slot ledger with pids, `SKill`/`SKillMiss`, kkill's scan accumulator, `usysKillAns`, the class, the law); plus scope 12's kill paragraph | no-kill design's K2 row | `KKILL`, `SYSKILL`, `Sev`, `syscEvRow`, the class | `SYSCALL`, `USERTRAP`, roots | full | ~2500–3500 lines, 3 commits | `SlotEv`/`SlotLed` already in |
+| FAM-3 pipes (PARKED) | F3's ledger and rows | ~25 files | `PIPEREAD`/`PIPEWRITE`/`PIPECLOSE`/`PIPEALLOC`, `FILECLOSE`/`FILEDUP`, `niNamesHere` (7th), `UIota`, `niIotaLbs`, the class, the law | — | full | 6000–9000 lines | a new ledger module enters the NI roots |
+
+**RULINGS REQUESTED.**
+- **FAM-R1 (the statement's shape).**
+  - Recommended: PER MEMBER, with the family-restricted zev history and family positions. The merged order of
+    the members' enters is schedule and is not compared, and no `ftrace` is introduced.
+  - Alternative: a merged family trace with the interleaving as an input. That is the same content plus a
+    schedule datum.
+  - Cheapest: no family statement; scope 12 only.
+- **FAM-R2 (the tree's source).**
+  - Recommended: the family LEDGER (`zFamOf`, lineage via `ZFork`), because the restriction must be computed on
+    the object it restricts. The filings' tree (`niForkChild`) is a derived reading, exact once FAM-1b's
+    `niForkZRow` exports the fork's `ZFork`.
+  - Alternative: the filings' tree as primary. It misses children of forks that never resumed, and it needs
+    the same row to relate to the ledger.
+- **FAM-R3 (which lanes).**
+  - Recommended: FAM-1a now (pure, no statement moves, the reading lemma is the content), with FAM-1b
+    optional. FAM-1b's gain is small: the timing of outsiders' exits and the zev positions of outsiders'
+    events (F2). Do it if the owner wants the thirteenth root unconditional.
+  - Cheapest: scope 12 only (zero Lean). It records F1–F4 and states the reading lemma as a fact of the design.
+- **FAM-R4 (pipes).**
+  - Recommended: OUT, with FAM-3 parked behind `ustep`. The kernel keeps no untaintable pipe record, and
+    building one is the largest lane of M3 for answers that are still derived from a cited history.
+  - Alternative: FAM-3 now. Do it if the owner wants pipe I/O in the class before `ustep`.
+- **FAM-R5 (kill at the family level).**
+  - Recommended: K2's row as designed (FAM-2), landed only if the owner wants kill in the class. At the family
+    level an outsider's kill is conceded through the internal history (the victim's `ZExit … (-1)`) and
+    attributed in the external `sev`. Scope 12 states that it is NOT a truncation for the other members. No
+    `killWhy` tie (K-R4 stands): a "no outsider kill" hypothesis would be an audit fact, not a stronger NI
+    statement.
+  - Alternative: `killWhy` in `killRow`'s paid arm, carried to the `ZExit`, for the audit lemma "every
+    kill-death in `zevIn` has its `SKill`". It moves `KillRow`, `kkill`, `setkilled`, kexit and the `Zev`
+    carrier.
+  - Cheapest: kill stays outside the class; scope 12's paragraph only.
+- **FAM-R6 (`dup`/`close`).** Recommended: recorded only (F6). They are own-key rows needing an fd-table key
+  reading, a per-incarnation lane independent of families. It can be scheduled with `ustep` or quotas.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
