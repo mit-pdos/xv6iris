@@ -28,6 +28,19 @@ loop.  It is proved by Löb (`uk_engine`):
     pay fact and `Kc ∧ uslot W` (the slot again from the Löb hypothesis:
     Rocq's additive pair).
 
+**THE LANDING (NI M3 lane U-2a).**  The bundle holds the kernel obligation at
+the key the kernel RESUMED, `Wr`, with the running state's trap-out key
+reachable from it by the pure user step (`Ustep.ureachK`: the Löb invariant).
+The engine takes the pure premise `hU` (the instruction's `Ustep.ustep` at
+the running key: `run` at the leaf's post, or `trap` at its cause;
+`UkUstep`'s agreements) and
+  - at a RETIRE steps the invariant (`Ustep.ureachK_step`);
+  - at an INTERRUPT and an EXECUTE TRAP pays the obligation's
+    `Ustep.ulands Wr sc W'` at the trap-out key (`Ustep.ulands_of_reachK`:
+    an interrupt is not the ecall; an execute trap's step IS the trap).
+The caller's return `hTrap` may take a ghost update (the engine-based generic
+mint builds it out of the supply, `UslotDetMint`).
+
 ## Deviations from Rocq
 
 1. The payload is not routed THROUGH the cycle rule (Rocq's `R` / `uv_psi`):
@@ -71,7 +84,8 @@ theorem uk_uvb_elim [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List
     (m : RegMap) (pc : BitVec 64) :
     uvb cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc M m pc ⊢
       uvAmb cpu ∗ ukCore cpu C pt Rut sz M m pc ∗ Rfd fdv ∗
-        ukontF uslot cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc := by
+        ∃ Wr : Uvis, ⌜Ustep.ureachK Wr (uvisOfRun m pc M π sz fdv cw g cs pidv lz secc)⌝ ∗
+          ukontF uslot cpu C pt Rfd Rut Wr := by
   unfold uvb uvbF ukCore
   iintro ⟨Ha, Hr, Hsz, Hp, Hf, Hc, Hg, Hpc, Hrut, Hk⟩
   iframe
@@ -81,7 +95,8 @@ theorem uk_uvb_intro [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : Lis
     (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) (M : ElfMem)
     (m : RegMap) (pc : BitVec 64) :
     uvAmb cpu ∗ ukCore cpu C pt Rut sz M m pc ∗ Rfd fdv ∗
-        ukontF uslot cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc ⊢
+        (∃ Wr : Uvis, ⌜Ustep.ureachK Wr (uvisOfRun m pc M π sz fdv cw g cs pidv lz secc)⌝ ∗
+          ukontF uslot cpu C pt Rfd Rut Wr) ⊢
       uvb cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc M m pc := by
   unfold uvb uvbF ukCore
   iintro ⟨Ha, ⟨Hr, Hsz, Hp, Hc, Hg, Hpc, Hrut⟩, Hf, Hk⟩
@@ -95,6 +110,7 @@ theorem uk_uvb_x0 [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List F
     uvb cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc M m pc ⊢
       uvb cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc M m' pc := by
   unfold uvb uvbF
+  rw [Ustep.uvisOfRun_x0 pc M π sz fdv cw g cs pidv lz secc h]
   iintro ⟨Ha, Hr, Hsz, Hp, Hf, Hc, Hg, Hpc, Hrut, Hk⟩
   ihave Hg := MachCSL.gprFile_ext cpu m m' h $$ Hg
   iframe
@@ -129,15 +145,18 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
     (hKc : ret = true → Kc = ukc π M' sz K.fdv K.cw K.gn K.cs K.pid false seccAll m' pc')
     (hTrap : ret = false → myPay K.gn Qp ∗
       (Kc ∧ uslot (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll)) ⊢
-        uexecRetF uslot (utrapScause (.Exception e) 0#64)
-          (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll)) :
+        |==> uexecRetF uslot (utrapScause (.Exception e) 0#64)
+          (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll))
+    (hU : Ustep.ustep (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll) =
+      if ret then .run (uvisOfRun m' pc' M' π sz K.fdv K.cw K.gn K.cs K.pid false seccAll)
+      else .trap (utrapScause (.Exception e) 0#64)) :
     ⊢ ukLeafGoal (GF := GF) π sz Qp K M m pc Kc := by
   unfold ukLeafGoal
   iloeb as IH
   imodintro
   iintro %h %xi %C %pt %Rfd %Rut %hacc %hlo %hpm %hlf Hb HKc
   icases uk_uvb_elim h C pt Rfd Rut sz π K.fdv K.cw K.gn K.cs K.pid false seccAll M m pc $$ Hb
-    with ⟨#Hamb, Hcore, Hrfd, Hk⟩
+    with ⟨#Hamb, Hcore, Hrfd, %Wr, %hR, Hk⟩
   icases Hamb with ⟨#Hhw, #HS, #Hwi⟩
   icases uk_core_open h C pt Rut sz M m pc (hacc pt) $$ [Hcore] with
     ⟨%s0, %D, %T, %Kt, %V, %⟨hop, hM, hsz⟩, Hfr, HX, #HK, Ha, Hres⟩
@@ -221,7 +240,12 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
       · iexact Hcore
       isplitl [Hrfd]
       · iexact Hrfd
-      · unfold ukontF
+      · -- the invariant steps: the pure step retires to the post key
+        iexists Wr
+        isplitr
+        · ipureintro
+          exact Ustep.ureachK_step hR (by rw [hU, if_pos hret])
+        unfold ukontF
         inext
         iexact Hk
     rw [hKc hret]
@@ -247,17 +271,27 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
       iapply IH $$ %h' %xi' %C' %pt' %Rfd' %Rut' %hacc' %hlo' %hpm' %(hlf' rfl) Hb'
       inext
       iframe Hmy HR
+    -- the obligation at the resumed key: the side fields, and THE LANDING
+    obtain ⟨hpe, hszr, hfdr, hcwr, hgnr, hchr, hpidr, hlzr, hscr⟩ := Ustep.ureachK_side hR
+    have hszR : Wr.sz = sz := hszr
+    have hland : Ustep.ulands Wr sc (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll) := by
+      refine Ustep.ulands_of_reachK hR (fun hsc => ?_)
+      rcases hwhy with ⟨i0, hi, hsc', -⟩ | ⟨exc, ⟨hr, hex⟩, hsc', -⟩
+      · exact absurd (hsc'.symm.trans hsc) (uk_sCause_ne i0 hi).1
+      · rw [hU, hr]
+        simp only [Bool.false_eq_true, ↓reduceIte]
+        rw [← hex, ← hsc', hsc]
     unfold ukbF
-    iapply Hk $$ %(uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll) %sc %stv
-      %rfl %rfl %rfl %rfl %rfl %rfl %rfl %rfl %rfl
-    isplitl [Htm]
-    · iexact Htm
-    isplitl [Hrfd]
-    · rw [show (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll).fd = K.fdv from rfl]
-      iexact Hrfd
     rcases hwhy with ⟨i0, hi, rfl, rfl⟩ | ⟨exc, ⟨hr, hex⟩, rfl, rfl⟩
     · -- THE INTERRUPT: the transparent arm, the pay fact and the slot
       obtain ⟨hne, hnk⟩ := uk_sCause_ne i0 hi
+      iapply Hk $$ %(uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll) %(sCause i0) %0#64
+        %hpe.symm %hszr.symm %hfdr.symm %hcwr.symm %hgnr.symm %hchr.symm %hpidr.symm %hlzr.symm %hscr.symm %hland
+      isplitl [Htm]
+      · rw [hszR]; iexact Htm
+      isplitl [Hrfd]
+      · rw [show (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll).fd = K.fdv from rfl]
+        iexact Hrfd
       rw [show uexecRetF (GF := GF) uslot (sCause i0) (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll) =
           iprop(∃ f : sfam GF, uexecPayDep (sCause i0) (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll) f ∗ uexecKillArm (sCause i0) (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll) f)
         from uexecRet_transparent _ _ hne]
@@ -274,14 +308,29 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
       iframe Hmy HKc
     · -- THE EXECUTE TRAP: the caller's return, out of the pay fact and the pair
       rw [hex]
-      iapply hTrap hr
-      iframe Hmy
-      isplit
-      · iexact HKc
-      · iapply hslot
-        isplitl []
-        · unfold ukLeafGoal; iexact IH
-        iframe Hmy HKc
+      ihave Hret : iprop(|==> uexecRetF uslot (utrapScause (.Exception e) 0#64)
+          (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll)) $$ [HKc]
+      · iapply hTrap hr
+        iframe Hmy
+        isplit
+        · iexact HKc
+        · iapply hslot
+          isplitl []
+          · unfold ukLeafGoal; iexact IH
+          iframe Hmy HKc
+      iapply wpLoop_bupd
+      imod Hret
+      imodintro
+      iapply Hk $$ %(uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll)
+        %(utrapScause (.Exception e) 0#64) %(tval exc.excinfo)
+        %hpe.symm %hszr.symm %hfdr.symm %hcwr.symm %hgnr.symm %hchr.symm %hpidr.symm %hlzr.symm %hscr.symm
+        %(by rw [← hex]; exact hland)
+      isplitl [Htm]
+      · rw [hszR]; iexact Htm
+      isplitl [Hrfd]
+      · rw [show (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll).fd = K.fdv from rfl]
+        iexact Hrfd
+      iexact Hret
 
 end engine
 

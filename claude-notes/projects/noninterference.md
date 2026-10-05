@@ -5748,6 +5748,97 @@ Each premise is a `Bool` test, and wherever the test fails the result is `stuck`
 - the round trip `tfResumePc (uvisNext W M' m' pc').tf = pc'` (`tfOf_resumePc`, pc' even: `+len`, the jal/btype
   premise, `retPc`) and `tfResumeGpr0 … = m'` (`tfOf_resumeGpr`, `ukWr` keeps `x0 = 0`).
 
+### M3 ustep U-2a as landed (2026-10-05)
+
+Lane U-2a on `lane/ustep`: the trap obligation names the resumed key, and the Uk engine lands at
+`Ustep.ustep`.  `USER`, `userProof`, `USERRET_CLOSED`, `UK_LEAVES` (and `ukStep`, `ukUvb`, `ukc`, `ukcq`,
+`uslotF`), `SYSCALL`/`USERTRAP`/`USERRET` and `uexecRetF` are byte-identical; the twelve roots' statements
+and their TCB module sets are unchanged (`tcb.sh` green without `--update`; `Xv6.Ustep` is in no root's
+statement cone); no new axiom/opaque (`audit.sh` unchanged).
+
+**The obligation (`UexecRetSlot.ukbF`), verbatim the design's:**
+
+    def ukbF (X : Uvis → IProp GF) [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd)
+        (Rfd : List FdState → IProp GF) (Rut : UPtd → IProp GF) (Wr : Uvis) : IProp GF :=
+      iprop(∀ (W' : Uvis) (sc stv : BitVec 64),
+        ⌜W'.perm = Wr.perm⌝ -∗ ⌜W'.sz = Wr.sz⌝ -∗ ⌜W'.fd = Wr.fd⌝ -∗ ⌜W'.cwd = Wr.cwd⌝ -∗ ⌜W'.gen = Wr.gen⌝ -∗
+        ⌜W'.ch = Wr.ch⌝ -∗ ⌜W'.pid = Wr.pid⌝ -∗ ⌜W'.lazy = Wr.lazy⌝ -∗ ⌜W'.secc = Wr.secc⌝ -∗
+        ⌜Ustep.ulands Wr sc W'⌝ -∗
+        (trappedMachine cpu C pt Rut Wr.sz sc stv W' ∗ Rfd W'.fd ∗ uexecRetF X sc W') -∗ wpLoop cpu)
+
+`ukontF X cpu C pt Rfd Rut Wr := ▷ ukbF …`; `ukb … Wr := ukbF uslot … Wr`.
+
+**The engine's invariant rides the bundle.**  `uvbF` keeps its binder list; its last conjunct is
+
+    ∃ Wr : Uvis, ⌜Ustep.ureachK Wr (uvisOfRun m pc M π sz fdv cw g cs pidv lz secc)⌝ ∗
+      ukontF X cpu C pt Rfd Rut Wr
+
+with `Ustep.ureachK Wr V := ∃ V', ureach Wr V' ∧ ukeyEq V' V` (up to `ukeyEq`: the resumed key is a
+kernel trapframe, the running one `uvisOfRun`'s).  So `ukc` (and `ukLeafGoal`) keep their TEXT and mean
+"for every resumed key the running state is reachable from".  `UkEngine.uk_engine` gains `hU :
+Ustep.ustep (cur) = if ret then .run (post) else .trap (utrapScause (.Exception e) 0)`; at a retire it
+steps the invariant (`ureachK_step`), at an interrupt or an execute trap it pays `ulands` at the trap-out
+key (`ulands_of_reachK`); its `hTrap` may take a `|==>`.
+
+**The 17 agreements** (`Xv6/UkUstep.lean`): the fetch bridge both ways (`ufetch_of_instr :
+UkInstr π M pc isRvc i → ufetch π M pc = some (isRvc, i)`, `instr_of_ufetch`), and per family, e.g.
+
+    theorem ustep_rtype (hI : UkInstr π M pc isRvc (.RTYPE (.Regidx rs2, .Regidx rs1, .Regidx rd, op))) :
+        ustep (uvisOfRun m pc M π sz fdv cw g cs pid false seccAll) =
+          .run (uvisOfRun (ukWr m rd (ukRtypeVal op (m.get rs1) (m.get rs2))) (pc + instrLen isRvc) M π sz
+            fdv cw g cs pid false seccAll)
+
+(`ustep_load` takes `ukLoadOk ∨ ukTextOk`, so load and load_text share it; `ustep_storeDenied`/
+`ustep_ecall` give `.trap ustoreFaultScause`/`.trap uecallScause`).  `LinkUkLeaves` hands each to the
+engine.  The converse: `UkCase` (17 constructors, the loads split by page) and `ukCase_of_ustep : ustep W ≠
+.stuck → W.lazy = false ∧ W.secc = seccAll ∧ UkCase W.perm W.M (tfResumeGpr0 W.tf) (tfResumePc W.tf)`.
+
+**The mint** (`Xv6/UslotDetMint.lean`): `uslot_of_creds`, `uexecWp_uslot_mint`, `uexecWp_uslot`,
+`uexecWp_uslot_triv` keep `UexecRet` §4's statements verbatim (so `UexecExecMint.uslotMint`/
+`uslotMint_all`/`initBootBundle_of_mint` and every mint site are unchanged), proved by Löb on the key:
+`ustep W ≠ stuck` → `uslot_det_engine` (the proved retiring leaf of `UK_LEAVES` with the Löb hypothesis'
+slot at the post key, or `uk_ecall_goal`/`uk_storeDenied_goal` with the return out of the supply);
+`ustep W = stuck` → `UexecRetSlot.uslot_of_wp_stuck`, `USER`'s loop paying `ulands` by `ustuckFrom`
+(`ustuckFrom_of_reachK`).  The seccomp universe's mint (`UexecSeccMint.useccompMintOfCons`) is the fallback
+alone (a masked key is outside the regime: `seccMasked_ne_all`).
+
+**Where `Wr` comes from at the resume.**  `UexecApply.uslot_applyLoop` takes `▷ ukb cpu C pt Rfd Rut W` at
+THE KEY IT RESUMES, `W` (`ukc_apply` takes any `Wr` with `ureachK Wr (running key)`).  `urcLoop` is now
+`□ ∀ h C pt γfd Wr, ⌜loopOk C pt⌝ -∗ ⌜Wr.perm = permOf pt.um Wr.sz⌝ -∗ hwConfig h -∗ ukb h C pt (fdFrags γfd)
+(urcRut PT Γ j h Wr.sz γfd Wr.cwd Wr.gen Wr.ch Wr.pid Wr.lazy Wr.secc) Wr`; `urc_resume` instantiates it at
+`uvisOf V M sts gn cs pid` (the key `USERRET_CLOSED` resumes); `urc_round` takes `Wr` with its side fields
+pinned (`hWr`).
+
+**What U-2b must absorb.**
+- The landing is in hand and DISCARDED at one place: `UserretClosedRound.urc_round` introduces
+  `⌜Ustep.ulands Wr sc W⌝` as `%_` (`W` the trapped key).  U-2b names it there and threads it into
+  `urc_exit` to append `(sc, Wr, W, W')`; `Wr` is `urc_round`'s parameter, which `urcLoop` gets from the
+  resume (`uvisOf V M sts gn cs pid` at `urc_resume`), i.e. the previous round's `W'`/the origin key — the
+  chain's `Wr = previous W'` is that bookkeeping (exact, not up to `ukeyEq`).
+- The filing can read: `ulands Wr sc W` (pure, per round), the trapped key `W` and the resumed key `Wr`;
+  nothing about transparent rounds beyond `ulands` (U-1's `ulands_transparent`).
+- `urcLoop`'s quantifier is over `Wr` (not the side fields): the uhist chain invariant can be stated
+  against `Wr` directly.
+
+**Module moves (an import cycle, text byte-identical).**  `ukbF` naming `Ustep.ulands` while `Ustep` read
+`SpecUkLeaves` (which imports `UexecRet`) and `UexecApply`: `UexecRet` is split at `ukbF` (the obligation,
+bundle, slot and everything after it is new `Xv6/UexecRetSlot.lean`; the generic inhabitant moved to
+`UslotDetMint`); `SpecUkLeaves` §1–§5 (decode fact, byte windows, `UkInstr`, value functions, leaf
+permissions) is new `Xv6/UkVals.lean`; `ukeyEq`/`ukeyEq_symm` moved from `UexecApply` to `UexecRet`
+(beside `uvisOfRun`; the NI roots' module sets do not move: both files were in them).  New
+`Xv6/UkUstep.lean` (agreements) and `Xv6/UslotDetMint.lean` (mint).
+
+**Deviations from the design text.**
+1. `ukc`'s TEXT does not move (the design: "becomes `∀ Wr, ⌜ureach Wr …⌝ -∗ …`, binder list unchanged"):
+   the `Wr` is an `∃` inside `uvbF`, which is the same proposition placed one level down.
+2. The invariant is `ureachK` (reachable up to `ukeyEq`), not `ureach` on the nose: the resumed key's
+   trapframe is the kernel's, the running key `uvisOfRun`'s, so `Wr` itself is reachable only up to
+   `ukeyEq`.  `ulands` is unchanged.
+3. `ukLeafGoal` does not gain `Wr` (the invariant is inside the bundle it takes); `uk_engine`'s `hTrap`
+   allows a `|==>` (the mint's return out of the supply is a ghost update).
+4. The fallback is chosen PER KEY at each slot (each resume, each engine retire's post slot): once inside
+   `USER`'s loop it runs to the next trap, which pays `ulands` by `ustuckFrom`.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

@@ -36,6 +36,7 @@ Rocq's header, point for point:
    mint it composes, for the generic application's `Hinit_boot`.
 -/
 import Xv6.UexecExecInst
+import Xv6.UslotDetMint
 
 namespace Xv6
 

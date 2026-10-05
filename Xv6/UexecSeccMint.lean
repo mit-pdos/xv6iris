@@ -427,8 +427,19 @@ theorem seccRet (sc : BitVec 64) (W : Uvis) :
 
 /-! ## 7.  THE MINTER, over the console payer -/
 
+/-- A masked mask is not `seccAll`: the seccomp universe is outside the
+engine's regime (NI M3 U-2a). -/
+theorem seccMasked_ne_all {m : BitVec 64} (h : seccMasked m) : m ≠ seccAll := by
+  intro he
+  have h6 := h 6 (by simp [seccB])
+  rw [he] at h6
+  revert h6
+  decide
+
 /-- Rocq `useccomp_mint_of_cons`: `UexecRet.uslot_of_creds`'s Löb, at the
-universe. -/
+universe.  NI M3 U-2a: every key of the universe is masked, so its pure
+step is `stuck` (outside the engine's regime) and the generic loop is its
+slot (`UexecRetSlot.uslot_of_wp_stuck`). -/
 theorem useccompMintOfCons :
     seccConsPay (hlc := hlc) (GF := GF) ⊢ □ uexecWp (hlc := hlc) (GF := GF) -∗
       □ (∀ W : Uvis, □ seccKey (hlc := hlc) W -∗ myPay W.gen (fun _ => iprop(True)) -∗
@@ -437,45 +448,24 @@ theorem useccompMintOfCons :
   iloeb as IH
   imodintro
   iintro %W #Hkey #Hpay
-  iapply (uslot_unfold W).mpr
-  unfold uslotF
-  iintro %h %xi %C %pt %Rfd %Rut %hRut %hlo %hpm %hlz Hb
-  unfold uvbF ukontF ukbF
-  icases Hb with ⟨⟨#Hhw, #Hks, #Hwi⟩, Hur, %hsz, Hpt, Hfrag, Hcfg, Hg, Hpc, Hrut, Hk⟩
-  ihave ⟨%Mp, Hpt⟩ := @userPtmInvX_pt hlc GF _ xi h pt W.sz W.M $$ Hpt
-  ihave ⟨%ms, %sc, %stv, %sep, %hms, Hregs⟩ := uvRegs_uRegs h (tfResumePc W.tf) (tfResumeGpr0 W.tf) $$ [Hur Hg Hpc]
-  · isplitl [Hur]
-    · iexact Hur
-    isplitl [Hg]
-    · iexact Hg
-    · iexact Hpc
-  ihave Hwp0 := uexecWp_unfold_mp $$ Hwp
-  unfold uexecF
-  iapply Hwp0 $$ %h %xi %C %pt %Rut %hRut %Mp %(tfResumeGpr0 W.tf) %ms %sc %stv %sep %(tfResumePc W.tf)
-    %hlo %hms Hhw Hks Hwi Hregs Hpt Hcfg Hrut [Hk Hfrag]
+  ihave %hm := seccKey_masked W $$ Hkey
+  have hst : Ustep.ustep (Ustep.ucur W) = .stuck := by
+    apply Ustep.ustep_stuck_of_class
+    have hne := seccMasked_ne_all hm
+    simp [Ustep.uclassOk, Ustep.ucur, uvisOfRun, hne]
+  iapply uslot_of_wp_stuck W hst $$ Hwp
   inext
-  iintro ⟨Hframe, -⟩
-  ihave ⟨%W', %sc', %stv', %hpins, Htm⟩ :=
-    @userTrapFrame_trapped hlc GF _ xi h C pt Rut W.sz W.perm W.fd W.cwd W.gen W.ch W.pid W.lazy W.secc $$ Hframe
-  obtain ⟨hperm, hszw, hfdw, hcww, hgnw, hchw, hpidw, hlzw, hscw⟩ := hpins
-  iapply wpLoop_bupd
-  ihave #Hkey' := seccKeyCong W W' hfdw hscw $$ Hkey
+  iintro %W' %sc' %hside
+  obtain ⟨-, -, hfdw, -, hgnw, -, -, -, hscw⟩ := hside
+  ihave #Hkey' := seccKeyCong W W' hfdw.symm hscw.symm $$ Hkey
   ihave #Hpay' : iprop(myPay W'.gen (fun _ => iprop(True))) $$ []
-  · rw [hgnw]; iexact Hpay
+  · rw [← hgnw]; iexact Hpay
   ihave #HIH : seccSlots (hlc := hlc) (GF := GF) $$ []
   · unfold seccSlots
     imodintro
     iintro %W'' #Hk'' Hp''
     iapply IH $$ %W'' Hk'' Hp''
-  ihave Hret := seccRet sc' W' $$ Hc Hkey' Hpay' HIH
-  imod Hret
-  imodintro
-  iapply Hk $$ %W' %sc' %stv' %hperm %hszw %hfdw %hcww %hgnw %hchw %hpidw %hlzw %hscw
-  isplitl [Htm]
-  · iexact Htm
-  isplitl [Hfrag]
-  · rw [hfdw]; iexact Hfrag
-  · iexact Hret
+  iapply seccRet sc' W' $$ Hc Hkey' Hpay' HIH
 
 /-! ## 8.  THE ERA CREDENTIAL PAYS THE CONSOLE ROWS -/
 

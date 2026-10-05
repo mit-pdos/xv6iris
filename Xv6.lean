@@ -1104,6 +1104,8 @@ import Xv6.FsDurXferRuns
 import Xv6.FsDurXferPool
 import Xv6.FsDurXfer
 import Xv6.UexecRet
+import Xv6.UkVals
+import Xv6.UexecRetSlot
 import Xv6.UexecRound
 import Xv6.UsysDet
 import Xv6.NiEvid
@@ -2033,6 +2035,8 @@ import Xv6.UkLoadText
 import Xv6.UkFetch
 import Xv6.UkFetchFact
 import Xv6.LinkUkLeaves
+import Xv6.UkUstep
+import Xv6.UslotDetMint
 import Xv6.UnionGF
 import Xv6.AppPreGS
 import Xv6.AppUnionRec

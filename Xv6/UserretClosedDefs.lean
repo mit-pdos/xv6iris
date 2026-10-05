@@ -213,14 +213,14 @@ theorem urcRut_acc (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (c
   · ipureintro; exact hw
 
 /-- **Rocq `stvec_handler_loop`'s conclusion**: at every hart, config record,
-table and key reading, the kernel obligation a slot's bundle carries,
-at the parked residue. -/
+table and RESUMED KEY `Wr` (NI M3 U-2a: the obligation names the key the
+kernel resumed; its permission view is the table's at its size), the kernel
+obligation a slot's bundle carries, at the parked residue. -/
 def urcLoop (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) : IProp GF :=
-  iprop(□ ∀ (h : CPU) (C : UCfg) (pt : UPtd) (sz : Nat) (γfd : GName) (cw : Nat) (gn : GName)
-      (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) (secc : BitVec 64) (fdv : List FdState),
-    ⌜loopOk C pt⌝ -∗ hwConfig h -∗
-    ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz secc) sz (permOf pt.um sz)
-      fdv cw gn cs pid lz secc)
+  iprop(□ ∀ (h : CPU) (C : UCfg) (pt : UPtd) (γfd : GName) (Wr : Uvis),
+    ⌜loopOk C pt⌝ -∗ ⌜Wr.perm = permOf pt.um Wr.sz⌝ -∗ hwConfig h -∗
+    ukb (hlc := hlc) h C pt (fdFrags γfd)
+      (urcRut PT Γ j h Wr.sz γfd Wr.cwd Wr.gen Wr.ch Wr.pid Wr.lazy Wr.secc) Wr)
 
 instance urcLoop_persistent (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) :
     Persistent (urcLoop (hlc := hlc) (GF := GF) PT Γ j) := by

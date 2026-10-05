@@ -20,7 +20,7 @@ body is `uvAmb ∗ ukCore ∗ Rfd ∗ ukontF` up to reassociation.
   forgotten.
 -/
 import Xv6.UkLand
-import Xv6.UexecRet
+import Xv6.UexecRetSlot
 
 namespace Xv6
 

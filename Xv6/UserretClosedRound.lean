@@ -227,12 +227,16 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
     (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
     (j : Nat) (hj : j < NPROC) (h : CPU) (C : UCfg) (pt : UPtd) (sz : Nat) (γfd : GName) (cw : Nat)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) (secc : BitVec 64)
-    (fdv : List FdState) (hlo : loopOk C pt) :
+    (fdv : List FdState) (Wr : Uvis)
+    (hWr : Wr.sz = sz ∧ Wr.perm = permOf pt.um sz ∧ Wr.fd = fdv ∧ Wr.cwd = cw ∧ Wr.gen = gn ∧ Wr.ch = cs ∧
+      Wr.pid = pid ∧ Wr.lazy = lz ∧ Wr.secc = secc) (hlo : loopOk C pt) :
     (wireInv ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop (hlc := hlc) PT Γ j) ∗ hwConfig h ⊢
-      ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz secc) sz (permOf pt.um sz)
-        fdv cw gn cs pid lz secc := by
+      ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz secc) Wr := by
   unfold ukb ukbF trappedMachine
-  iintro ⟨⟨#Hwire, #Hcl, #Hloop⟩, #Hhw⟩ %W %sc %stv %hpe %hsz %hfd %hcw %hgn %hch %hpid %hlz %hsc
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9⟩ := hWr
+  rw [e1, e2, e3, e4, e5, e6, e7, e8, e9]
+  -- the landing (NI M3 U-2a) is the user's part: U-2b files it
+  iintro ⟨⟨#Hwire, #Hcl, #Hloop⟩, #Hhw⟩ %W %sc %stv %hpe %hsz %hfd %hcw %hgn %hch %hpid %hlz %hsc %_
     ⟨⟨%ms, %hlw, Htm⟩, Hfrag, Hret⟩
   -- the frame, its residue out
   icases urc_frame_rut h C pt _ sz W.M ms sc stv (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) $$ Htm with

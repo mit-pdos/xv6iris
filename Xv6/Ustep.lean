@@ -52,9 +52,14 @@ anti-vacuity check evaluates (`Xv6.UstepEcho`).
 4. **The namespace.** Everything here is in `Xv6.Ustep` (refer to it as
    `Ustep.ustep`, `Ustep.ulands`, …): `Xv6.ustep` is already UnionDisc's
    file-level step (Rocq's name), and `Xv6.urun` UkRun's.
+5. **The place in the import order** (lane U-2a): the kernel obligation
+   `UexecRetSlot.ukbF` names `ulands`, so this file sits below it: it
+   imports `UkVals` (`SpecUkLeaves`' pure §1–§5, split out) and `UexecRet`
+   (`uvisOfRun`, `ukeyEq`), not `SpecUkLeaves`/`UexecApply`.  §6b is U-2a's:
+   the engine's invariant `ureachK` and the lemmas the engine, the resume
+   and the generic fallback use.
 -/
-import Xv6.SpecUkLeaves
-import Xv6.UexecApply
+import Xv6.UkVals
 import MachCSL.UTrap
 
 namespace Xv6.Ustep
@@ -79,6 +84,23 @@ inductive UOut where
 fields of `W` (`uvisOfRun`, the key the engine's continuation `ukc` is at). -/
 def uvisNext (W : Uvis) (M' : ElfMem) (m' : RegMap) (pc' : BitVec 64) : Uvis :=
   uvisOfRun m' pc' M' W.perm W.sz W.fd W.cwd W.gen W.ch W.pid W.lazy W.secc
+
+/-- The saved frame does not read x0: two files agreeing off x0 save the
+same frame (the engine's bundle does not pin x0, `UexecRet` deviation 2). -/
+theorem tfOf_x0 {m m' : RegMap} (pc : BitVec 64) (h : ∀ i, i ≠ 0#5 → m i = m' i) : tfOf m pc = tfOf m' pc := by
+  unfold tfOf
+  congr 1
+  refine List.map_congr_left (fun k hk => h _ ?_)
+  intro he
+  have := congrArg BitVec.toNat he
+  simp at hk this
+  omega
+
+theorem uvisOfRun_x0 {m m' : RegMap} (pc : BitVec 64) (M : ElfMem) (π : Nat → Option UPerm) (szv : Nat)
+    (fdv : List FdState) (cw : Nat) (g : Iris.GName) (cs : Std.ExtTreeSet Iris.GName compare) (pidv : BitVec 32)
+    (lz : Bool) (secc : BitVec 64) (h : ∀ i, i ≠ 0#5 → m i = m' i) :
+    uvisOfRun m pc M π szv fdv cw g cs pidv lz secc = uvisOfRun m' pc M π szv fdv cw g cs pidv lz secc := by
+  unfold uvisOfRun; rw [tfOf_x0 pc h]
 
 /-- The retiring outcome. -/
 def uretire (W : Uvis) (M' : ElfMem) (m' : RegMap) (pc' : BitVec 64) : UOut :=
@@ -495,6 +517,107 @@ and execute-trap arms). -/
 theorem ulands_here {Wr V : Uvis} {sc : BitVec 64} (h : ureach Wr V)
     (ht : sc = uecallScause → ustep V = .trap uecallScause) : ulands Wr sc V :=
   .inr ⟨V, h, ukeyEq_refl V, ht⟩
+
+/-! ## §6b The engine's invariant (lane U-2a)
+
+The kernel obligation `UexecRetSlot.ukbF` is at the key the kernel RESUMED,
+`Wr`, and the bundle the user runs under holds it with the running state's
+trap-out key reachable from `Wr` (`ureachK`, up to `ukeyEq`: the resumed key
+itself is a kernel trapframe, the running one `uvisOfRun`'s).  The engine
+steps the invariant at a retire (`ureachK_step`), pays `ulands` at a trap
+(`ulands_of_reachK`), and the generic loop pays it once a stuck key is
+reachable (`ustuckFrom_of_reachK`). -/
+
+/-- **The running key of a key**: the trap-out key (`uvisOfRun`) of the
+machine a resume at `W` runs (`UexecApply.uvisRun`, stated here below it). -/
+def ucur (W : Uvis) : Uvis :=
+  uvisOfRun (tfResumeGpr0 W.tf) (tfResumePc W.tf) W.M W.perm W.sz W.fd W.cwd W.gen W.ch W.pid W.lazy W.secc
+
+/-- A key and its running key are the same key. -/
+theorem ukeyEq_ucur (W : Uvis) : ukeyEq W (ucur W) := by
+  refine ⟨?_, ?_, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  · exact (tfOf_resumeGpr _ _ (tfResumeGpr0_x0 W.tf)).symm
+  · show tfResumePc W.tf = retPc (tfW (tfOf _ _) tfEpcIdx)
+    rw [tfOf_epc]; exact (retPc_idem _).symm
+
+/-- **The engine's invariant**: `V` is a key a run from `Wr` reaches, up to
+`ukeyEq`. -/
+def ureachK (Wr V : Uvis) : Prop := ∃ V', ureach Wr V' ∧ ukeyEq V' V
+
+/-- The nine side fields of a key (what `ukbF` pins the trap-out key to). -/
+def usideEq (W W' : Uvis) : Prop :=
+  W.perm = W'.perm ∧ W.sz = W'.sz ∧ W.fd = W'.fd ∧ W.cwd = W'.cwd ∧ W.gen = W'.gen ∧ W.ch = W'.ch ∧
+  W.pid = W'.pid ∧ W.lazy = W'.lazy ∧ W.secc = W'.secc
+
+theorem usideEq_refl (W : Uvis) : usideEq W W := ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+
+theorem usideEq_trans {W₁ W₂ W₃ : Uvis} (h₁ : usideEq W₁ W₂) (h₂ : usideEq W₂ W₃) : usideEq W₁ W₃ := by
+  obtain ⟨a, b, c, d, e, f, g, i, j⟩ := h₁
+  obtain ⟨a', b', c', d', e', f', g', i', j'⟩ := h₂
+  exact ⟨a.trans a', b.trans b', c.trans c', d.trans d', e.trans e', f.trans f', g.trans g', i.trans i',
+    j.trans j'⟩
+
+theorem usideEq_of_ukeyEq {W W' : Uvis} (h : ukeyEq W W') : usideEq W W' := by
+  obtain ⟨-, -, -, a, b, c, d, e, f, g, i, j⟩ := h
+  exact ⟨a, b, c, d, e, f, g, i, j⟩
+
+theorem uexec_run {W W' : Uvis} {m : RegMap} {pc : BitVec 64} {b : Bool} {i : instruction}
+    (h : uexec W m pc b i = .run W') : ∃ M' m' pc', W' = uvisNext W M' m' pc' := by
+  unfold uexec at h
+  split at h
+  all_goals (try simp only [ustepRtype, ustepItype, ustepShiftiop, ustepRtypew, ustepAddiw, ustepShiftiwop,
+    ustepUtype, ustepDiv, ustepRem, ustepJal, ustepJalr, ustepBtype, ustepLoad, ustepStore, ustepEcall,
+    uretire] at h)
+  all_goals (repeat' split at h)
+  all_goals first
+    | (injection h with h; exact ⟨_, _, _, h.symm⟩)
+    | cases h
+
+/-- A retire keeps the side fields. -/
+theorem ustep_run_side {W W' : Uvis} (h : ustep W = .run W') : usideEq W W' := by
+  unfold ustep at h
+  split at h
+  · split at h
+    · obtain ⟨M', m', pc', rfl⟩ := uexec_run h
+      exact usideEq_refl W
+    · cases h
+  · cases h
+
+theorem ureach_side {Wr V : Uvis} (h : ureach Wr V) : usideEq Wr V := by
+  induction h with
+  | refl => exact usideEq_refl _
+  | step _ hs ih => exact usideEq_trans ih (ustep_run_side hs)
+
+/-- **The invariant pins the side fields** (the resumed key's are the running state's). -/
+theorem ureachK_side {Wr V : Uvis} (h : ureachK Wr V) : usideEq Wr V := by
+  obtain ⟨V', hr, he⟩ := h
+  exact usideEq_trans (ureach_side hr) (usideEq_of_ukeyEq he)
+
+theorem ureachK_of_ukeyEq {Wr V : Uvis} (h : ukeyEq Wr V) : ureachK Wr V := ⟨Wr, .refl, h⟩
+
+/-- **A retire steps the invariant.** -/
+theorem ureachK_step {Wr V V' : Uvis} (h : ureachK Wr V) (hs : ustep V = .run V') : ureachK Wr V' := by
+  obtain ⟨V'', hr, he⟩ := h
+  exact ⟨V', .step hr ((ustep_congr he).trans hs), ukeyEq_refl _⟩
+
+/-- **A trap at the running key is a landing** (an interrupt: `sc` not the
+ecall; an execute trap: the step itself traps). -/
+theorem ulands_of_reachK {Wr V : Uvis} {sc : BitVec 64} (h : ureachK Wr V)
+    (ht : sc = uecallScause → ustep V = .trap uecallScause) : ulands Wr sc V := by
+  obtain ⟨V'', hr, he⟩ := h
+  exact .inr ⟨V'', hr, he, fun e => (ustep_congr he).trans (ht e)⟩
+
+/-- **The generic fallback's landing**: a stuck running key makes every key a
+landing. -/
+theorem ustuckFrom_of_reachK {Wr V : Uvis} (h : ureachK Wr V) (hs : ustep V = .stuck) : ustuckFrom Wr := by
+  obtain ⟨V'', hr, he⟩ := h
+  exact ⟨V'', hr, (ustep_congr he).trans hs⟩
+
+theorem ulands_of_stuck {Wr W : Uvis} {sc : BitVec 64} (h : ustuckFrom Wr) : ulands Wr sc W := .inl h
+
+/-- Outside the engine's regime the step is stuck. -/
+theorem ustep_stuck_of_class {W : Uvis} (h : uclassOk W = false) : ustep W = .stuck := by
+  unfold ustep; rw [h]; rfl
 
 /-! ## §7 The bounded run (what the anti-vacuity check evaluates) -/
 

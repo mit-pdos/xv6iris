@@ -114,17 +114,6 @@ theorem uvisRun_arg (W : Uvis) (k : Nat) (hk : k < 8) :
 theorem uvisRun_num (W : Uvis) : usysNum (uvisRun W).tf = usysNum W.tf :=
   usysNum_argCong _ _ (uvisRun_arg W 7 (by decide))
 
-/-- **The eleven readings a slot sees** (Rocq `uslot_key_cong`'s premises,
-bundled: deviation 2). -/
-def ukeyEq (W W' : Uvis) : Prop :=
-  tfResumeGpr0 W.tf = tfResumeGpr0 W'.tf ∧ tfResumePc W.tf = tfResumePc W'.tf ∧ W.M = W'.M ∧
-  W.perm = W'.perm ∧ W.sz = W'.sz ∧ W.fd = W'.fd ∧ W.cwd = W'.cwd ∧ W.gen = W'.gen ∧ W.ch = W'.ch ∧
-  W.pid = W'.pid ∧ W.lazy = W'.lazy ∧ W.secc = W'.secc
-
-theorem ukeyEq_symm {W W' : Uvis} (h : ukeyEq W W') : ukeyEq W' W := by
-  obtain ⟨a, b, c, d, e, f, g, i, j, k, l, m⟩ := h
-  exact ⟨a.symm, b.symm, c.symm, d.symm, e.symm, f.symm, g.symm, i.symm, j.symm, k.symm, l.symm, m.symm⟩
-
 /-- the key and its run projection -/
 theorem ukeyEq_run (W : Uvis) : ukeyEq W (uvisRun W) :=
   ⟨(uvisRun_gpr W).symm, (uvisRun_pc W).symm, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
@@ -484,11 +473,12 @@ theorem ukc_apply [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List F
     (Rut : UPtd → IProp GF) (hRut : ∀ pt' : UPtd, Rut pt' ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut pt'))
     (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare)
     (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) (M : ElfMem) (m : RegMap) (ms sc stv sep pc : BitVec 64)
-    (hlo : loopOk C pt) (hsz : uszOk sz) (hms : userMstatusOk ms)
-    (hlz : lz = false → lazyFree pt.um (BitVec.ofNat 64 sz)) :
+    (Wr : Uvis) (hlo : loopOk C pt) (hsz : uszOk sz) (hms : userMstatusOk ms)
+    (hlz : lz = false → lazyFree pt.um (BitVec.ofNat 64 sz))
+    (hR : Ustep.ureachK Wr (uvisOfRun m pc M (permOf pt.um sz) sz fdv cw gn cs pidv lz secc)) :
     ⊢ ukc (permOf pt.um sz) M sz fdv cw gn cs pidv lz secc m pc -∗ hwConfig cpu -∗ kmapStatic (hlc := hlc) (GF := GF) -∗ wireInv -∗
       uRegs cpu (HartState.HART_ACTIVE ()) ms sc stv sep pc pc m -∗ userPtmInvX cpu pt sz M -∗ Rfd fdv -∗
-      userCfg cpu C -∗ Rut pt -∗ ▷ ukb cpu C pt Rfd Rut sz (permOf pt.um sz) fdv cw gn cs pidv lz secc -∗
+      userCfg cpu C -∗ Rut pt -∗ ▷ ukb cpu C pt Rfd Rut Wr -∗
       wpLoop cpu := by
   iintro Hkc #Hhw #Hks #Hwi Hregs Hupt Hfrag Hcfg Hrut Hk
   ihave ⟨Hur, Hg, Hpc⟩ := uRegs_uvRegs cpu ms sc stv sep pc m hms $$ Hregs
@@ -517,11 +507,16 @@ theorem ukc_apply [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List F
   · iexact Hpc
   isplitl [Hrut]
   · iexact Hrut
-  · iexact Hk
+  · iexists Wr
+    isplitr
+    · ipureintro; exact hR
+    · iexact Hk
 
 /-- **Rocq `uslot_apply_loop`**: the slot at a KEY, the projections supplied as
 equations, so the caller states what its post gave it and never unfolds the
-fixpoint. -/
+fixpoint.  NI M3 U-2a: the kernel obligation is at THE KEY RESUMED, `W`
+(the bundle's invariant `Ustep.ureachK W` holds at once: the running state is
+`W`'s own, `Ustep.ukeyEq_ucur`). -/
 theorem uslot_applyLoop [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
     (Rut : UPtd → IProp GF) (hRut : ∀ pt' : UPtd, Rut pt' ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut pt'))
     (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare)
@@ -534,11 +529,16 @@ theorem uslot_applyLoop [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : 
     (hpc : tfResumePc W.tf = pc) :
     ⊢ uslot W -∗ hwConfig cpu -∗ kmapStatic (hlc := hlc) (GF := GF) -∗ wireInv -∗ uRegs cpu (HartState.HART_ACTIVE ()) ms sc stv sep pc pc m -∗
       userPtmInvX cpu pt sz M -∗ Rfd fdv -∗ userCfg cpu C -∗ Rut pt -∗
-      ▷ ukb cpu C pt Rfd Rut sz (permOf pt.um sz) fdv cw gn cs pidv lz secc -∗ wpLoop cpu := by
+      ▷ ukb cpu C pt Rfd Rut W -∗ wpLoop cpu := by
+  have hR : Ustep.ureachK W (uvisOfRun m pc M (permOf pt.um sz) sz fdv cw gn cs pidv lz secc) := by
+    have h := Ustep.ukeyEq_ucur W
+    unfold Ustep.ucur at h
+    rw [hpi, hM, hsw, hfd, hcw, hgn, hch, hpid, hlzw, hscw, hg, hpc] at h
+    exact Ustep.ureachK_of_ukeyEq h
   iintro Hs
   ihave Hs := (uslot_ukc W).mp $$ Hs
   rw [hpi, hM, hsw, hfd, hcw, hgn, hch, hpid, hlzw, hscw, hg, hpc]
-  iapply ukc_apply cpu C pt Rfd Rut hRut sz fdv cw gn cs pidv lz secc M m ms sc stv sep pc hlo hsz hms hlf $$ Hs
+  iapply ukc_apply cpu C pt Rfd Rut hRut sz fdv cw gn cs pidv lz secc M m ms sc stv sep pc W hlo hsz hms hlf hR $$ Hs
 
 end LoopApply
 

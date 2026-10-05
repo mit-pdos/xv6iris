@@ -31,7 +31,7 @@ them.  `TfUser.tfUeq` is the corresponding equivalence and
    permission view, `Nat` break and cwd); the bump's `<[Regidx 10 := r]>` is
    `RegMap.set 10#5 r`, `add_vec_int x 4` is `x + 4#64`.
 -/
-import Xv6.UexecRet
+import Xv6.UexecRetSlot
 
 namespace Xv6
 

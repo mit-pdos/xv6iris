@@ -40,7 +40,7 @@ carrying it is built at the PARKER's context and spent at the RESUMER's).
    `Fscfg` for `fscFs`/`fscCons`, `Xv6G` for the console reader token; Rocq's `xv6G`/`fileG`/… section binders
    read nothing here.
 -/
-import Xv6.UexecRet
+import Xv6.UexecRetSlot
 import Xv6.SpecKexec
 import Xv6.ConsoleInvDefs
 

@@ -39,15 +39,14 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- The loop hypothesis at one hart / config / table / key reading. -/
 theorem urcLoop_ukb (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (h : CPU) (C : UCfg) (pt : UPtd)
-    (sz : Nat) (γfd : GName) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32)
-    (lz : Bool) (secc : BitVec 64) (fdv : List FdState) (hlo : loopOk C pt) :
+    (γfd : GName) (Wr : Uvis) (hlo : loopOk C pt) (hpw : Wr.perm = permOf pt.um Wr.sz) :
     ▷ urcLoop (hlc := hlc) PT Γ j ∗ hwConfig h ⊢
-      ▷ ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz secc) sz
-        (permOf pt.um sz) fdv cw gn cs pid lz secc := by
+      ▷ ukb (hlc := hlc) h C pt (fdFrags γfd)
+        (urcRut PT Γ j h Wr.sz γfd Wr.cwd Wr.gen Wr.ch Wr.pid Wr.lazy Wr.secc) Wr := by
   iintro ⟨#H, #Hhw⟩
   inext
   unfold urcLoop
-  iapply H $$ %h %C %pt %sz %γfd %cw %gn %cs %pid %lz %secc %fdv %hlo Hhw
+  iapply H $$ %h %C %pt %γfd %Wr %hlo %hpw Hhw
 
 /-- The user machine's image, at the lazy view the key reads. -/
 theorem urc_ptm (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) (sz : Nat) :
@@ -123,9 +122,15 @@ theorem urc_resume (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames →
     iframe Hleft Htf Hclose
     ipureintro; exact hpins
   ihave Hptm := urc_ptm cpu P M V.sz.toNat $$ Hpt
-  ihave Hk := urcLoop_ukb PT Γ j cpu C P V.sz.toNat V.fdg V.cwi gn cs pid V.pvLazy V.pvSecc sts hlo $$
+  -- the obligation at THE KEY RESUMED (NI M3 U-2a)
+  ihave Hk : iprop(▷ ukb (hlc := hlc) cpu C P (fdFrags V.fdg)
+      (urcRut PT Γ j cpu V.sz.toNat V.fdg V.cwi gn cs pid V.pvLazy V.pvSecc) (uvisOf V M sts gn cs pid)) $$
     [Hloop Hhw]
-  · iframe Hloop Hhw
+  · iapply (show ▷ urcLoop (hlc := hlc) PT Γ j ∗ hwConfig cpu ⊢ ▷ ukb (hlc := hlc) cpu C P (fdFrags V.fdg)
+        (urcRut PT Γ j cpu V.sz.toNat V.fdg V.cwi gn cs pid V.pvLazy V.pvSecc) (uvisOf V M sts gn cs pid) from
+      urcLoop_ukb PT Γ j cpu C P V.fdg (uvisOf V M sts gn cs pid) hlo
+        (show permOf V.upt.um V.sz.toNat = permOf P.um V.sz.toNat by rw [hVP]))
+    iframe Hloop Hhw
   rw [urc_jump_retPc]
   have hlf : V.pvLazy = false → lazyFree P.um (BitVec.ofNat 64 V.sz.toNat) := by
     intro h; rw [BitVec.ofNat_toNat, BitVec.setWidth_eq]; exact hlzf h
