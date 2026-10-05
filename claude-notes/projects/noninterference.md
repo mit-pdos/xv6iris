@@ -5943,6 +5943,96 @@ again.  The history is BORN at the incarnation's first resume (`userretClosed_pr
   `ustoreFaultScause_ne`; `NiOneOrigin`, `NiEntry.isOrigin`.  `dead_allow`: `module Xv6.Ustep` is off (reached
   through `niEntryOk`); `module Xv6.UstepEcho` stays (no root and no test target reaches it until U-3 cites it).
 
+### M3 ustep U-3 as landed (2026-10-05)
+
+Lane U-3 on `lane/ustep`: the thirteenth root, `xv6NiDet`, the determinism theorem for arbitrary low code.
+The twelve landed roots are byte-identical (`xv6NiOut` included, ruling U-R9); `xv6NiDet` has the same three
+axioms and three opaques as every root, and its TCB module set equals `xv6NiTwoRun`'s (the seven ustep modules
+included; `tcb.sh --update` reported 0 changes to the existing entries, so no non-NI root moved).
+
+**The gap question (U-2b deviation 4): HYPOTHESISED, `NiGapFree`.**  Not derivable from the ledger.
+`niUserChain` says only that a round citing entry `k` of history `γ` IS `H[k]`; the citation is a persistent
+lower bound, so nothing orders the cited indices by enter position, or forbids a skipped or a repeated index
+(two filings at different exits can cite the same `H[k]`: `niOneShot` separates their exits, not their
+indices).  `niOk`'s "every enter is filed" and the exits in `h` do not help: the kernel's one append per exit
+and one filing per resume are the trap loop's bookkeeping, which no filing records.  So
+`NiGapFree q h F := (ufilings q h F).map NiEntry.hidx = List.range (ufilings q h F).length` (origin `0`, a
+round citing entry `k` is `k + 1`): `q`'s filings in enter order are its origin, then the rounds citing
+`0, 1, 2, …`.  Taken per run, beside `NiOneOrigin` (whose "at most one origin" it implies; its single `γ` is
+still needed).
+
+**What landed (`NiTrace` §10, pure).**
+- Vocabulary: `NiStep.skel` (origin, or a round whose exit is an ecall), `NiStep.detIn` (`s.cite.map pos`),
+  `exitViewPc` and `NiStep.view` (exit: cause, `retPc` of the epc, `x1..x31`; enter: `enterView`),
+  `ufilings q h F` (`utrace`'s filings before the steps are read; `utrace_filings`), `NiEntry.hidx`,
+  `NiGapFree`, `NiEntry.resumeKey`, `NiNoStuck q h F := ∀ f ∈ F, incOf h f = q → ¬ Ustep.ustuckFrom
+  f.resumeKey`, `NiEntry.skel`/`citePos`/`inClass`, `niClassKey` (niKeyRow's class premise),
+  `niRunFrom C rs` (each round resumed the previous round's left key), `niDetPair`.
+- Key lemmas: `uvisRun_congr` (`ukeyEq` keys have EQUAL run keys), `tfArg_congr`, `tfGprs_congr`,
+  `uwriteCon_congr`, `uwriteOut_congr`, `usysDet_led` (`rfl`: `usysDet` reads no console stream),
+  `niKeyRow_det` (equal trapped keys in the class + citations with one ledger part → `ukeyEq` left keys),
+  `niClassKey_of` (`NiInClass`'s step reading → the key's), `ulands_reachK` (via `Ustep.ulands_trans`),
+  `reachK_transparent` (via `Ustep.ulands_transparent`), `citePos_led` (`niBelow_pos` per citation).
+- The induction `niDet_runs` (by fuel `|rs₁| + |rs₂|`): state `(R₁ ≅ R₂, C₁, C₂)` with `ureachK Rᵢ Cᵢ`; a
+  transparent round of either run advances `Cᵢ` to its left key; two ecall rounds land at `ukeyEq` keys
+  (`Ustep.ulands_det_congr`, from `¬ ustuckFrom R₁`), resume at `ukeyEq` keys (`niKeyRow_det`), and pair
+  (`niDetPair_round`); run 2 running out of ecalls contradicts the positions prefix.
+- `niRun_of`: `niUserChain` + `NiOneOrigin` + `NiGapFree` → `ufilings = []` or `origin j W0 p γ :: rs` with
+  `niRunFrom W0 rs` (`niRunFrom_of_hist` reads `uhistChain`).
+- `niTwoRunDet`:
+
+      theorem niTwoRunDet {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk h₁ F₁)
+          (hC₁ : niChain F₁ (niHist F₁)) (hU₁ : niUserChain F₁) (hF₂ : niOk h₂ F₂) (hC₂ : niChain F₂ (niHist F₂))
+          (hU₂ : niUserChain F₂) (q : NiInc) (ho₁ : NiOneOrigin q h₁ F₁) (ho₂ : NiOneOrigin q h₂ F₂)
+          (hg₁ : NiGapFree q h₁ F₁) (hg₂ : NiGapFree q h₂ F₂) (hcls : NiInClass (utrace q h₁ F₁))
+          (hns : NiNoStuck q h₁ F₁) (hk : firstKey q h₁ F₁ = firstKey q h₂ F₂)
+          (hpos : ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.detIn <+:
+            ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.detIn)
+          (hH : ∀ k, niBelow (niHistLed F₁ k) (niHistLed F₂ k)) :
+          ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.view <+:
+              ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.view ∧
+            ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.outBytes <+:
+              ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.outBytes
+
+**The root (`LinkNiAdequacy.xv6NiDet`)**, the design's statement with the hypotheses this lane found
+necessary:
+
+    ∃ F₁ F₂, niOk κs₁ F₁ ∧ niOneShot κs₁ F₁ ∧ niChain F₁ (niHist F₁) ∧ niUserChain F₁ ∧
+      niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ niUserChain F₂ ∧ ∀ q : NiInc,
+      NiOneOrigin q κs₁ F₁ → NiOneOrigin q κs₂ F₂ →
+      NiGapFree q κs₁ F₁ → NiGapFree q κs₂ F₂ →
+      NiInClass (utrace q κs₁ F₁) → NiNoStuck q κs₁ F₁ →
+      firstKey q κs₁ F₁ = firstKey q κs₂ F₂ →
+      ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.detIn <+:
+        ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.detIn →
+      (∀ k, niBelow (niHistLed F₁ k) (niHistLed F₂ k)) →
+      ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.view <+:
+        ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.view ∧
+      ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.outBytes <+:
+        ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.outBytes
+
+**Deviations from the design text.**
+1. `NiGapFree` (both runs) joins `NiOneOrigin` (above).
+2. The design's `NiDetClass` is the landed `NiInClass` plus the new `NiNoStuck` (the regime: no stuck key
+   reachable from any resumed key of run 1; run 2's follows by `ustuckFrom_congr` at equal keys).
+3. The exit view reads `retPc` of the epc (`exitViewPc`): `ukeyEq` pins `tfResumePc`, not the raw epc word's
+   bit 0.
+4. The console conjunct is the skeleton's `outBytes`, not `niOutput q κs₁ F₁ <+: niOutput q κs₂ F₂`, which
+   is FALSE in general: `niOutput` lists one (empty) run per transparent round, and their number is the
+   schedule (F5).
+5. `Ustep.ulands_here` and `Ustep.ustoreFaultScause_ne` are DELETED (reached by nothing; the dead-code policy);
+   `ulands_det(_congr)`, `ulands_transparent`, `ulands_trans`, `ureach_linear`, `ureach_congr`,
+   `ustuckFrom_congr`, `ustuckFrom_of_reach`, `ukeyEq_trans`, `NiOneOrigin`, `NiEntry.isOrigin` are reached by
+   `xv6NiDet`.  `module Xv6.UstepEcho` keeps its `dead_allow` row, now "anti-vacuity check, test by design".
+6. §3's "NOT channels: U-mode `rdtime`/`rdcycle`/`rdinstret` trap" lives in this note's §3, not in `NiTrace`'s
+   header; corrected there (F7, ruling U-R5).  `NiTrace` scope 13 states the counter reads as `stuck`.
+
+Honest scope 13 (`NiTrace`): derived -- every skeleton exit and enter, masks, lazy bits, `win`, `sz`, `wcon`,
+`wout`; hypothesised -- the schedule (positions), the histories below, the regime (`NiNoStuck`: 17 families,
+lazy-free, unmasked; SC, counter CSRs, W+X fetches `stuck`), one origin, no gaps.
+
+What remains in M3: quotas (a kernel change and the theorem that it closes a channel), private files; later optional: U-4 totality, FAM-1b, K2 sys_kill, dup/close, pipes, OUT-4, G3c
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
@@ -6158,7 +6248,13 @@ generate?", and xv6's answer is uncomfortable but true.
   directions of NI unless the high side is assumed not to call it, or the
   kill is an event.  NOT channels: U-mode `rdtime`/`rdcycle`/`rdinstret`
   trap, because xv6 never writes `scounteren` (grep of `kernel/` finds no
-  occurrence), and `usertrap` kills the process — deterministic; and
+  occurrence), and `usertrap` kills the process — deterministic
+  [CORRECTED 2026-10-05, finding F7 / ruling U-R5: FALSE of the Lean
+  machine -- `scounteren` is power-on garbage (`MachCSL/HwConfig.lean`), so a
+  U-mode counter read may RETIRE with the clock's value, a timing channel;
+  `Ustep.ustep` is `stuck` there and `xv6NiDet` excludes it by `NiNoStuck`
+  (`NiTrace` scope 13).  The claim holds only on a platform that resets
+  `scounteren` to 0, or after a kernel change that writes it]; and
   instruction-cache staleness, because no page a program can write is a
   page it can fetch from (`flags2perm` never yields W+X unless the ELF asks
   for it — require that it does not, a decidable fact about the image).
@@ -6349,7 +6445,9 @@ no-kill landed (K3 + K1; K2 deferred to families); next: families
 
 families: FAM-1a landed (pure: `zLowest_zevIn`, `niTwoRunFam` conditional on `zevWf`); FAM-1b blocked at kfork's parent store (needs a ruling, see "M3 families as landed"); next: that ruling, or ustep
 
-What remains in M3: FAM-1b (the kernel export of `zevWf`, the thirteenth root), ustep (arbitrary low code), quotas, private files; later optional: K2 sys_kill, dup/close, pipes (FAM-3), OUT-4, G3c
+ustep landed (U-1..U-3; U-4 totality later); next: quotas
+
+What remains in M3: quotas (a kernel change and the theorem that it closes a channel), private files; later optional: U-4 totality, FAM-1b, K2 sys_kill, dup/close, pipes, OUT-4, G3c
 
 - **M3 — extensions**, independent: arbitrary low code (`ustep`, §4);
   process FAMILIES as partitions (pipes and `wait` order become

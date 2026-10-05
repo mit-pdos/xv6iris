@@ -55,6 +55,18 @@ its observable form, and the strong instance.
   histories below run 2's, per era), `niTwoRunPrefix` (inputs a PREFIX and
   ledger histories below give enters a prefix: a truncation -- a kill --
   cuts the trace and changes no step; scope 11).
+* §9 (NI M3 FAM-1a) the family form `niTwoRunFam` (scope 12).
+* §10 (NI M3 U-3) DETERMINISM: `NiStep.skel` (the ECALL SKELETON: the
+  origin and the ecall rounds, ruling U-R8), `NiStep.detIn` (a skeleton
+  step's cited positions), `NiStep.view` (its exit -- cause, resume pc,
+  `x1..x31`, `exitViewPc` -- and its enter); the filings in enter order
+  `ufilings` (ghost: `utrace` before the steps are read), `NiGapFree`
+  (no gaps in the key history's citations) and `NiNoStuck` (the regime),
+  both scope 13; the induction `niDet_runs` (`Ustep.ulands_det_congr`
+  through the transparent rounds, `niKeyRow_det` at the ecall) and
+  `niTwoRunDet`: from EQUAL FIRST KEYS, the positions a prefix and the
+  ledger histories below, the skeleton's views and console runs are a
+  prefix.
 
 ## Honest scope
 
@@ -284,6 +296,46 @@ its observable form, and the strong instance.
    child slot's zombie column, its row and the forking parent's own zombie
    column, which the `wait_lock` payload does not hold there (design notes,
    "M3 families as landed").
+13. **The user computation** (NI M3 U-3, rulings U-R1…R9; §10,
+   `niTwoRunDet`, the root `xv6NiDet`).  DERIVED: every exit of the
+   skeleton (its cause, resume pc and registers), every enter, the masks,
+   the lazy bits, wait's window, the break, the console reading `wcon` and
+   the buffer run `wout` -- each is a reading of a key, and the keys are a
+   function of the first key and the cited ι: the next ecall key is where
+   the pure user run `Ustep.ustep` from the resumed key lands
+   (`niUserRow`, U-2a), the resumed key is `usysDet` at the cited ledger
+   part (`niKeyRow`, U-2b).  So scope 3's "nothing ties a round's trapped
+   key to the previous round's resumed key" no longer holds for the
+   filings `xv6NiPhi` returns (`niUserChain`), and `xv6NiDet` takes none of
+   `NiStep.input`'s readings.  HYPOTHESISED, per incarnation:
+   (i) THE SCHEDULE: the cited positions of the skeleton (X F4: the order
+   of rounds in the global ledgers is not a function of `q`'s key);
+   (ii) THE HISTORIES below (the other actors' events, unchanged);
+   (iii) THE REGIME, `NiNoStuck` (run 1): no stuck key reachable from any
+   resumed key -- today `Ustep.ustep`'s class is the engine's 17 families,
+   lazy-free (`lazy = false`), unmasked (`secc = seccAll`); every other
+   instruction (M-extension multiply, AMO, LR/SC, fences, CSRs) is
+   `stuck` (U-4 widens it); SC is real nondeterminism (`match_reservation`
+   is platform-free, U-R7), and a COUNTER CSR read (`rdcycle`/`rdtime`/
+   `rdinstret`) is a timing channel on the Lean machine -- `scounteren` is
+   power-on garbage (`MachCSL/HwConfig`, finding F7, ruling U-R5), so such
+   a read may retire with the clock's value -- and is `stuck`; a fetch
+   from a W+X page is `stuck` (unstamped bytes);
+   (iv) ONE ORIGIN, `NiOneOrigin` (both runs; PID reuse, F8);
+   (v) NO GAPS, `NiGapFree` (both runs): the incarnation's filings in
+   enter order are its origin and then the rounds citing entries `0, 1,
+   2, …` of its key history.  NOT DERIVABLE from the ledger: a citation is
+   a persistent lower bound of the history, so `niUserChain` says only
+   that a round citing entry `k` IS entry `k`; nothing orders the indices
+   by enter position or forbids a skipped (or repeated) entry -- the
+   kernel's one append per exit and one filing per resume are the trap
+   loop's bookkeeping, not ledger facts (U-2b deviation 4).
+   The transparent rounds (interrupts, served faults) are NOT compared:
+   their number and timing are the schedule and the mapped set (F5, ruling
+   U-R8); they keep the replay law (`niStrongInstance`, `niRoundLaw`), and
+   the chain passes through them (`Ustep.ulands_transparent`).  The
+   console output is compared per SKELETON step (`outBytes`), not as
+   `niOutput`, which also lists the transparent rounds' empty runs.
 
 getpid's answer is the incarnation's pid (W2d's `niPidRow`: `a0 =
 signExtend 64 W.pid`, and the filing's pid is `W'.pid = W.pid`), so getpid
@@ -344,6 +396,11 @@ counts, scope 9; ticks carry nothing).  Nothing inside the class is a declassifi
    write's citations cite the empty family prefix, where nobody is a
    member, so the design's premise would make `niTwoRunFam` vacuous at
    every trace with such a round.
+12. (NI M3 U-3) The design's `NiDetClass` is the landed `NiInClass` plus
+   `NiNoStuck`; `NiGapFree` joins `NiOneOrigin` (scope 13 (v)); the view
+   of an exit reads its resume pc (`exitViewPc`, `retPc` of the epc: what
+   `ukeyEq` pins), not the raw epc word; the console conjunct is the
+   skeleton's `outBytes`, not `niOutput` (scope 13).
 
 PURE: imports `NiLedger` (its pure definitions only) and `UsysDet`.
 -/
@@ -1755,5 +1812,595 @@ theorem niTwoRunFam {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : n
   niTwoRunFam_trace r q (niHist F₁) (niHist F₂) hH hw₁ hw₂ _ _ (niOk_classLaw hF₁ q) (niOk_classLaw hF₂ q)
     hcls (niTraceChain_of hC₁ q) (niTraceChain_of hC₂ q) hfam₁ hfam₂ hin
 
+
+/-! ## §10 Determinism (NI M3 U-3, rulings U-R6, U-R8; scope 13)
+
+The user computation enters the theorem.  Along one incarnation's filings the
+resumed key of each round is the previous round's left key (the origin's first
+key first: `niUserChain`, read in enter order by `NiGapFree`), the trapped key
+is where the pure user run from it lands (`niUserRow`), and the left key is
+pinned whole (`niKeyRow`).  So two runs from one first key, with no stuck key
+reachable in run 1 (`NiNoStuck`), trap at the same ecall keys
+(`Ustep.ulands_det_congr`, through the transparent rounds between:
+`Ustep.ulands_transparent`), and -- the class at the key, equal cited
+positions below histories below -- resume at the same keys
+(`niKeyRow`, `usysDet` at one ledger part).  The ECALL SKELETON
+(`NiStep.skel`: the origin and the ecall rounds, ruling U-R8 -- the number
+and timing of the transparent rounds are the schedule and the mapped set,
+finding F5) is a prefix (`niTwoRunDet`), and so are the console runs its
+writes push. -/
+
+/-- **A skeleton step** (ruling U-R8): an origin or an ecall round. -/
+def NiStep.skel (s : NiStep) : Bool :=
+  match s with
+  | .origin .. => true
+  | .round .. => s.ecall
+
+/-- **A skeleton step's cited POSITIONS** (the schedule, X F4): none at an
+origin and at a round that cites nothing. -/
+def NiStep.detIn (s : NiStep) : Option NiPos := s.cite.map fun p => p.2.pos p.1
+
+/-- An exit's cause, the pc it would resume at (`retPc` of the trapped epc:
+what the key reads, `tfResumePc`) and `x1..x31`. -/
+def exitViewPc : Obs → Option (BitVec 64 × BitVec 64 × List (BitVec 64))
+  | .uExit _ _ sc ep gs => some (sc, retPc ep, gs)
+  | _ => none
+
+/-- **A step's VIEW**: its exit (`exitViewPc`; none at an origin) and its
+enter -- both machine events of `h`. -/
+def NiStep.view : NiStep → Option (BitVec 64 × BitVec 64 × List (BitVec 64)) × Option (BitVec 64 × List (BitVec 64))
+  | .origin _ e => (none, enterView e)
+  | .round _ _ _ _ _ _ x e _ => (exitViewPc x, enterView e)
+
+/-! ### The filings of an incarnation, in enter order (ghost) -/
+
+/-- **`ufilings q h F`**: incarnation `q`'s filings, in the order of their
+enters in `h` (`utrace`'s positions, before reading the steps). -/
+def ufilings (q : NiInc) (h : List Obs) (F : List NiEntry) : List NiEntry :=
+  (List.range h.length).filterMap fun j =>
+    match niFilingAt F j with
+    | some f => if incOf h f = q then some f else none
+    | none => none
+
+theorem utrace_filings (q : NiInc) (h : List Obs) (F : List NiEntry) :
+    utrace q h F = (ufilings q h F).filterMap (niStepOf h) := by
+  unfold utrace ufilings
+  rw [List.filterMap_filterMap]
+  congr 1
+  funext j
+  cases niFilingAt F j with
+  | none => rfl
+  | some f => by_cases hq : incOf h f = q <;> simp [hq]
+
+theorem mem_ufilings {q : NiInc} {h : List Obs} {F : List NiEntry} {f : NiEntry} (hf : f ∈ ufilings q h F) :
+    f ∈ F ∧ incOf h f = q := by
+  unfold ufilings at hf
+  obtain ⟨j, -, hj⟩ := List.mem_filterMap.mp hf
+  revert hj
+  split
+  · rename_i g hg
+    split
+    · rename_i hq; intro hj; cases hj; exact ⟨niFilingAt_mem hg, hq⟩
+    · intro hj; cases hj
+  · intro hj; cases hj
+
+/-- A filing's place in its key history: `0` at an origin, `k + 1` at a round
+citing entry `k`. -/
+def NiEntry.hidx : NiEntry → Nat
+  | .origin .. => 0
+  | .round _ _ _ _ _ _ _ _ k => k + 1
+
+/-- **NO GAPS** (NI M3 U-3, the gap question of U-2b deviation 4; scope 13):
+incarnation `q`'s filings, in enter order, are its origin and then the
+rounds citing entries `0, 1, 2, …` of its key history.  The kernel makes it
+true (the trap loop appends one round per exit and files it at the enter
+that resumes it); the ledger cannot see it -- a citation is a persistent
+lower bound, so a filing may cite any entry of the history -- so `xv6NiDet`
+takes it per run, a ghost hypothesis like `NiOneOrigin`'s name. -/
+def NiGapFree (q : NiInc) (h : List Obs) (F : List NiEntry) : Prop :=
+  (ufilings q h F).map NiEntry.hidx = List.range (ufilings q h F).length
+
+/-- The key a filing resumes: the origin's first key, a round's left key. -/
+def NiEntry.resumeKey : NiEntry → Uvis
+  | .origin _ W0 .. => W0
+  | .round _ _ _ _ _ W' .. => W'
+
+/-- **THE REGIME** (NI M3 U-3, rulings U-R5/U-R7; scope 13): no key the pure
+user run reaches from a resumed key of `q` is `stuck` -- every instruction
+`q` runs is in `Ustep.ustep`'s class (today the engine's 17 families,
+lazy-free, unmasked: no SC, no counter CSR, no W+X fetch). -/
+def NiNoStuck (q : NiInc) (h : List Obs) (F : List NiEntry) : Prop :=
+  ∀ f ∈ F, incOf h f = q → ¬ Ustep.ustuckFrom f.resumeKey
+
+/-- A skeleton filing: an origin or an ecall round. -/
+def NiEntry.skel : NiEntry → Bool
+  | .origin .. => true
+  | .round _ _ sc .. => decide (sc = uecallScause)
+
+/-- A filing's cited positions. -/
+def NiEntry.citePos (f : NiEntry) : Option NiPos := f.cite.map fun p => p.2.pos p.1
+
+/-- `niKeyRow`'s class premise, at a trapped key. -/
+def niClassKey (W : Uvis) : Prop :=
+  usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
+    (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)))
+
+/-- An ecall round's trapped key is in the class. -/
+def NiEntry.inClass : NiEntry → Prop
+  | .origin .. => True
+  | .round _ _ sc _ W .. => sc = uecallScause → niClassKey W
+
+/-- **The rounds of a run from resumed key `C`**: each round resumed the
+previous round's left key (`C` first). -/
+def niRunFrom : Uvis → List NiEntry → Prop
+  | _, [] => True
+  | _, .origin .. :: _ => False
+  | C, .round _ _ _ Wr _ W' _ _ _ :: fs => Wr = C ∧ niRunFrom W' fs
+
+/-- Two filings' steps have the same view and push the same console run. -/
+def niDetPair (h₁ h₂ : List Obs) (f₁ f₂ : NiEntry) : Prop :=
+  ∀ s₁ s₂, niStepOf h₁ f₁ = some s₁ → niStepOf h₂ f₂ = some s₂ → s₁.view = s₂.view ∧ s₁.outBytes = s₂.outBytes
+
+/-! ### Steps of valid filings -/
+
+theorem niStepOf_some {h : List Obs} {f : NiEntry} (hf : niEntryOk h f) : ∃ s, niStepOf h f = some s := by
+  match f, hf with
+  | .origin j W0 _ _, hf =>
+    obtain ⟨e, he, -⟩ := hf
+    exact ⟨.origin W0 e, by simp only [niStepOf, he, Option.map_some]⟩
+  | .round i j _ _ W _ c _ _, hf =>
+    obtain ⟨-, ⟨x, hx, -⟩, ⟨e, he, -⟩, -⟩ := hf
+    exact ⟨.round W.secc W.lazy (uwaitWin W.perm (tfW W.tf (tfArgIdx 0))) W.sz (uwriteCon W) (uwriteOut W) x e c,
+      by simp only [niStepOf, hx, he]⟩
+
+theorem niStepOf_skel {h : List Obs} {f : NiEntry} {s : NiStep} (hf : niEntryOk h f)
+    (hs : niStepOf h f = some s) : s.skel = f.skel := by
+  match f, hf, hs with
+  | .origin j W0 _ _, hf, hs =>
+    simp only [niStepOf] at hs
+    obtain ⟨e, -, rfl⟩ := Option.map_eq_some_iff.mp hs
+    rfl
+  | .round i j sc _ W _ c _ _, hf, hs =>
+    obtain ⟨-, ⟨x, hx, cpu, sa, rfl⟩, ⟨e, he, -⟩, -⟩ := hf
+    simp only [niStepOf, hx, he, Option.some.injEq] at hs
+    subst hs
+    rfl
+
+theorem niStepOf_detIn {h : List Obs} {f : NiEntry} {s : NiStep} (hs : niStepOf h f = some s) :
+    s.detIn = f.citePos := by
+  unfold NiStep.detIn NiEntry.citePos; rw [niStepOf_cite hs]
+
+/-- The skeleton of the steps is the steps of the skeleton filings. -/
+theorem filter_skel_filterMap {h : List Obs} :
+    ∀ (L : List NiEntry), (∀ f ∈ L, niEntryOk h f) →
+      (L.filterMap (niStepOf h)).filter NiStep.skel = (L.filter NiEntry.skel).filterMap (niStepOf h)
+  | [], _ => rfl
+  | f :: L, hL => by
+    obtain ⟨s, hs⟩ := niStepOf_some (hL f (List.mem_cons_self ..))
+    have ih := filter_skel_filterMap L (fun g hg => hL g (List.mem_cons_of_mem _ hg))
+    have hk := niStepOf_skel (hL f (List.mem_cons_self ..)) hs
+    rw [List.filterMap_cons, hs]
+    cases hfk : f.skel
+    · rw [hfk] at hk
+      simp only [List.filter_cons, hk, hfk, ih]
+      try rfl
+    · rw [hfk] at hk
+      simp only [List.filter_cons, hk, hfk, ih, if_true, List.filterMap_cons, hs]
+      try rfl
+
+theorem filterMap_map_eq {α β γ : Type _} (g : α → Option β) (v : β → γ) (v' : α → γ) :
+    ∀ L : List α, (∀ a ∈ L, ∃ b, g a = some b ∧ v b = v' a) → (L.filterMap g).map v = L.map v'
+  | [], _ => rfl
+  | a :: L, hL => by
+    obtain ⟨b, hb, hv⟩ := hL a (List.mem_cons_self ..)
+    rw [List.filterMap_cons, hb, List.map_cons, List.map_cons, hv,
+      filterMap_map_eq g v v' L (fun x hx => hL x (List.mem_cons_of_mem _ hx))]
+
+theorem forall₂_filterMap_map {α β γ : Type _} {P : α → α → Prop} (g₁ g₂ : α → Option β) (v : β → γ)
+    (hP : ∀ a b, P a b → ∀ s₁ s₂, g₁ a = some s₁ → g₂ b = some s₂ → v s₁ = v s₂) :
+    ∀ {A B : List α}, List.Forall₂ P A B → (∀ a ∈ A, ∃ s, g₁ a = some s) → (∀ b ∈ B, ∃ s, g₂ b = some s) →
+      (A.filterMap g₁).map v = (B.filterMap g₂).map v
+  | [], [], .nil, _, _ => rfl
+  | a :: A, b :: B, .cons hab hAB, hA, hB => by
+    obtain ⟨s₁, h₁⟩ := hA a (List.mem_cons_self ..)
+    obtain ⟨s₂, h₂⟩ := hB b (List.mem_cons_self ..)
+    rw [List.filterMap_cons, List.filterMap_cons, h₁, h₂, List.map_cons, List.map_cons, hP a b hab s₁ s₂ h₁ h₂,
+      forall₂_filterMap_map g₁ g₂ v hP hAB (fun x hx => hA x (List.mem_cons_of_mem _ hx))
+        (fun x hx => hB x (List.mem_cons_of_mem _ hx))]
+
+/-! ### Keys -/
+
+theorem uvisRun_congr {W₁ W₂ : Uvis} (h : ukeyEq W₁ W₂) : uvisRun W₁ = uvisRun W₂ := by
+  obtain ⟨hg, hp, hM, hπ, hsz, hfd, hcw, hgen, hch, hpid, hlz, hsc⟩ := h
+  unfold tfResumePc at hp
+  unfold uvisRun
+  simp only [hg, hp, hM, hπ, hsz, hfd, hcw, hgen, hch, hpid, hlz, hsc]
+
+theorem tfArg_congr {W₁ W₂ : Uvis} (h : ukeyEq W₁ W₂) (k : Nat) (hk : k < 8) :
+    tfW W₁.tf (tfArgIdx k) = tfW W₂.tf (tfArgIdx k) := by
+  rw [← uvisRun_arg W₁ k hk, ← uvisRun_arg W₂ k hk, uvisRun_congr h]
+
+theorem tfGprs_congr {W₁ W₂ : Uvis} (h : ukeyEq W₁ W₂) : tfGprs W₁.tf = tfGprs W₂.tf := by
+  rw [← gprList_tfResumeGpr0, ← gprList_tfResumeGpr0, h.1]
+
+theorem uwriteCon_congr {W₁ W₂ : Uvis} (h : ukeyEq W₁ W₂) : uwriteCon W₁ = uwriteCon W₂ := by
+  unfold uwriteCon
+  rw [h.2.2.2.1, h.2.2.2.2.2.1, tfArg_congr h 0 (by decide), tfArg_congr h 1 (by decide),
+    tfArg_congr h 2 (by decide)]
+
+theorem uwriteOut_congr {W₁ W₂ : Uvis} (h : ukeyEq W₁ W₂) : uwriteOut W₁ = uwriteOut W₂ := by
+  unfold uwriteOut
+  rw [uwriteCon_congr h, h.2.2.1, tfArg_congr h 1 (by decide), tfArg_congr h 2 (by decide)]
+
+theorem niClassKey_congr {W₁ W₂ : Uvis} (h : ukeyEq W₁ W₂) (hc : niClassKey W₁) : niClassKey W₂ := by
+  unfold niClassKey at *; rw [← uvisRun_congr h]; exact hc
+
+/-- M0's row at one ledger part: `usysDet` reads no console stream. -/
+theorem usysDet_led (n : Int) (W : Uvis) (ι : UIota) : usysDet n W ι.led = usysDet n W ι := rfl
+
+theorem getD_led {c₁ c₂ : Option (Nat × UIota)} (hc : c₁.map (fun p => p.2.led) = c₂.map (fun p => p.2.led)) :
+    ((c₁.map Prod.snd).getD UIota.boot).led = ((c₂.map Prod.snd).getD UIota.boot).led := by
+  cases c₁ with
+  | none => cases c₂ with
+    | none => rfl
+    | some p => exact absurd hc (by simp)
+  | some p₁ => cases c₂ with
+    | none => exact absurd hc (by simp)
+    | some p₂ => exact Option.some.inj hc
+
+/-- **THE RESUME KEY IS DETERMINED**: at equal trapped keys in the class and
+citations with one ledger part, the left keys `niKeyRow` pins agree. -/
+theorem niKeyRow_det {W₁ W₂ W₁' W₂' : Uvis} {c₁ c₂ : Option (Nat × UIota)} (hW : ukeyEq W₁ W₂)
+    (hk₁ : niKeyRow uecallScause W₁ W₁' c₁) (hk₂ : niKeyRow uecallScause W₂ W₂' c₂) (hcl : niClassKey W₁)
+    (hc : c₁.map (fun p => p.2.led) = c₂.map (fun p => p.2.led)) : ukeyEq W₁' W₂' := by
+  have hr := uvisRun_congr hW
+  have e₁ := hk₁.2 rfl hcl
+  have e₂ := hk₂.2 rfl (niClassKey_congr hW hcl)
+  rw [← hr] at e₂
+  have hd : usysDet (uvisNum (uvisRun W₁)) (uvisRun W₁) ((c₁.map Prod.snd).getD UIota.boot) =
+      usysDet (uvisNum (uvisRun W₁)) (uvisRun W₁) ((c₂.map Prod.snd).getD UIota.boot) := by
+    rw [← usysDet_led _ _ ((c₁.map Prod.snd).getD UIota.boot), getD_led hc, usysDet_led]
+  rw [hd] at e₁
+  exact Ustep.ukeyEq_trans (ukeyEq_symm e₁) e₂
+
+theorem uvisRun_fd (W : Uvis) : (uvisRun W).fd = W.fd := rfl
+theorem uvisRun_lazy (W : Uvis) : (uvisRun W).lazy = W.lazy := rfl
+
+/-- The class at the step (`NiInClass`'s reading) is the class at the key. -/
+theorem niClassKey_of {W : Uvis} {x : Obs} {sc : BitVec 64} (hx : exitFits x sc W) (hsc : sc = uecallScause)
+    (h : ∀ ep xg, exitView x = some (uecallScause, ep, xg) →
+      usysDetClassAt (gprsNum W.secc xg) (gprsA0 xg) W.lazy (uwriteCon W).isSome) : niClassKey W := by
+  obtain ⟨cpu, s, rfl⟩ := hx
+  have h' := h _ _ (by rw [hsc]; rfl)
+  have hwc : uwriteCons W.fd (gprsA0 (tfGprs W.tf)) = (uwriteCon W).isSome := by
+    unfold uwriteCon; rw [gprsA0_tfGprs]; split <;> simp_all
+  unfold niClassKey
+  rw [uvisNum_run_gprs, uvisRun_arg W 0 (by decide), ← gprsA0_tfGprs, uvisRun_fd, uvisRun_lazy, hwc]
+  exact h'
+
+/-! ### One skeleton step, two runs -/
+
+/-- **An origin pair**: one first key, one view, no console run. -/
+theorem niDetPair_origin {h₁ h₂ : List Obs} {j₁ j₂ p₁ p₂ : Nat} {γ₁ γ₂ : Iris.GName} {W0 : Uvis}
+    (hf₁ : niEntryOk h₁ (.origin j₁ W0 p₁ γ₁)) (hf₂ : niEntryOk h₂ (.origin j₂ W0 p₂ γ₂)) :
+    niDetPair h₁ h₂ (.origin j₁ W0 p₁ γ₁) (.origin j₂ W0 p₂ γ₂) := by
+  intro s₁ s₂ hs₁ hs₂
+  obtain ⟨e₁, he₁, cpu₁, sa₁, ep₁, rfl, hpc₁⟩ := hf₁
+  obtain ⟨e₂, he₂, cpu₂, sa₂, ep₂, rfl, hpc₂⟩ := hf₂
+  simp only [niStepOf, he₁, Option.map_some, Option.some.injEq] at hs₁
+  simp only [niStepOf, he₂, Option.map_some, Option.some.injEq] at hs₂
+  subst hs₁ hs₂
+  refine ⟨?_, rfl⟩
+  simp only [NiStep.view, enterView, hpc₁, hpc₂]
+
+/-- **A round pair**: equal trapped keys and equal left keys give one view
+(the exit's cause, resume pc and registers; the enter's pc and registers)
+and one console run (the readings `outBytes` reads are the trapped key's). -/
+theorem niDetPair_round {h₁ h₂ : List Obs} {i₁ j₁ i₂ j₂ k₁ k₂ : Nat} {sc : BitVec 64}
+    {Wr₁ W₁ W₁' Wr₂ W₂ W₂' : Uvis} {c₁ c₂ : Option (Nat × UIota)} {γ₁ γ₂ : Iris.GName}
+    (hf₁ : niEntryOk h₁ (.round i₁ j₁ sc Wr₁ W₁ W₁' c₁ γ₁ k₁))
+    (hf₂ : niEntryOk h₂ (.round i₂ j₂ sc Wr₂ W₂ W₂' c₂ γ₂ k₂)) (hW : ukeyEq W₁ W₂) (hW' : ukeyEq W₁' W₂') :
+    niDetPair h₁ h₂ (.round i₁ j₁ sc Wr₁ W₁ W₁' c₁ γ₁ k₁) (.round i₂ j₂ sc Wr₂ W₂ W₂' c₂ γ₂ k₂) := by
+  intro s₁ s₂ hs₁ hs₂
+  have hl₁ := niStepOf_law hf₁ hs₁
+  have hl₂ := niStepOf_law hf₂ hs₂
+  obtain ⟨-, ⟨x₁, hx₁, cpu₁, sa₁, rfl⟩, ⟨e₁, he₁, cpu₁', sa₁', ep₁, rfl, hpc₁⟩, -⟩ := hf₁
+  obtain ⟨-, ⟨x₂, hx₂, cpu₂, sa₂, rfl⟩, ⟨e₂, he₂, cpu₂', sa₂', ep₂, rfl, hpc₂⟩, -⟩ := hf₂
+  simp only [niStepOf, hx₁, he₁, Option.some.injEq] at hs₁
+  simp only [niStepOf, hx₂, he₂, Option.some.injEq] at hs₂
+  subst hs₁ hs₂
+  have hg := tfGprs_congr hW
+  have hg' := tfGprs_congr hW'
+  have hp : retPc (tfW W₁.tf tfEpcIdx) = retPc (tfW W₂.tf tfEpcIdx) := hW.2.1
+  refine ⟨?_, ?_⟩
+  · simp only [NiStep.view, exitViewPc, enterView, hpc₁, hpc₂, hg, hg', hp, hW'.2.1]
+  · rw [NiStep.outBytes_of_law hl₁, NiStep.outBytes_of_law hl₂]
+    simp only [NiStep.outClass, NiStep.wout, exitView, hg, uwriteCon_congr hW, uwriteOut_congr hW,
+      hW.2.2.2.2.2.2.2.2.2.2.1, hW.2.2.2.2.2.2.2.2.2.2.2]
+
+/-! ### The run -/
+
+/-- A landing from a key reachable from `R` is a landing from `R`. -/
+theorem ulands_reachK {R C W : Uvis} {sc : BitVec 64} (hC : Ustep.ureachK R C) (hl : Ustep.ulands C sc W) :
+    Ustep.ulands R sc W := by
+  obtain ⟨C', hr, he⟩ := hC
+  refine Ustep.ulands_trans hr ?_
+  rcases hl with hs | ⟨V, hV, hVW, ht⟩
+  · exact .inl (Ustep.ustuckFrom_congr he hs)
+  · obtain ⟨V', hV', hV'V⟩ := Ustep.ureach_congr he hV
+    exact .inr ⟨V', hV', Ustep.ukeyEq_trans hV'V hVW, fun e => (Ustep.ustep_congr hV'V).trans (ht e)⟩
+
+/-- **A transparent round keeps the run**: its left key is reachable. -/
+theorem reachK_transparent {R C W W' : Uvis} {sc : BitVec 64} (hns : ¬ Ustep.ustuckFrom R)
+    (hC : Ustep.ureachK R C) (hl : Ustep.ulands C sc W) (hk : ukeyEq W W') : Ustep.ureachK R W' := by
+  obtain ⟨V, hV, hVW⟩ := Ustep.ulands_transparent hns (ulands_reachK hC hl)
+  exact ⟨V, hV, Ustep.ukeyEq_trans hVW hk⟩
+
+/-- Equal positions below histories with one ledger part: one ledger part. -/
+theorem citePos_led {H₁ H₂ : Nat → UIota} (hH : ∀ k, (H₁ k).led = (H₂ k).led) {c₁ c₂ : Option (Nat × UIota)}
+    (h₁ : ∀ k ι, c₁ = some (k, ι) → niBelow ι (H₁ k)) (h₂ : ∀ k ι, c₂ = some (k, ι) → niBelow ι (H₂ k))
+    (hp : c₁.map (fun p => p.2.pos p.1) = c₂.map (fun p => p.2.pos p.1)) :
+    c₁.map (fun p => p.2.led) = c₂.map (fun p => p.2.led) := by
+  match c₁, c₂, hp with
+  | none, none, _ => rfl
+  | none, some _, hp => simp at hp
+  | some _, none, hp => simp at hp
+  | some (k₁, ι₁), some (k₂, ι₂), hp =>
+    simp only [Option.map_some, Option.some.injEq] at hp ⊢
+    have hk : k₁ = k₂ := congrArg NiPos.era hp
+    subst hk
+    exact niBelow_pos (h₁ k₁ ι₁ rfl) (h₂ k₁ ι₂ rfl) (hH k₁) hp
+
+/-- **THE INDUCTION** (by fuel): two runs of rounds from resumed keys `R₁ ≅ R₂`
+(at running keys reachable from them), run 1 never stuck and in the class:
+run 1's skeleton filings pair with a prefix of run 2's. -/
+theorem niDet_runs {h₁ h₂ : List Obs} {H₁ H₂ : Nat → UIota} (hH : ∀ k, (H₁ k).led = (H₂ k).led) :
+    ∀ (n : Nat) (rs₁ rs₂ : List NiEntry) (R₁ R₂ C₁ C₂ : Uvis), rs₁.length + rs₂.length ≤ n →
+    ukeyEq R₁ R₂ → ¬ Ustep.ustuckFrom R₁ → Ustep.ureachK R₁ C₁ → Ustep.ureachK R₂ C₂ →
+    niRunFrom C₁ rs₁ → niRunFrom C₂ rs₂ →
+    (∀ f ∈ rs₁, niEntryOk h₁ f) → (∀ f ∈ rs₂, niEntryOk h₂ f) →
+    (∀ f ∈ rs₁, ¬ Ustep.ustuckFrom f.resumeKey) → (∀ f ∈ rs₁, f.inClass) →
+    (∀ f ∈ rs₁, ∀ k ι, f.cite = some (k, ι) → niBelow ι (H₁ k)) →
+    (∀ f ∈ rs₂, ∀ k ι, f.cite = some (k, ι) → niBelow ι (H₂ k)) →
+    (rs₁.filter NiEntry.skel).map NiEntry.citePos <+: (rs₂.filter NiEntry.skel).map NiEntry.citePos →
+    ∃ l, l <+: rs₂.filter NiEntry.skel ∧ List.Forall₂ (niDetPair h₁ h₂) (rs₁.filter NiEntry.skel) l := by
+  intro n
+  induction n with
+  | zero =>
+    intro rs₁ rs₂ R₁ R₂ C₁ C₂ hn
+    have : rs₁ = [] := List.eq_nil_of_length_eq_zero (by omega)
+    subst this
+    intros
+    exact ⟨[], List.nil_prefix, .nil⟩
+  | succ n ih =>
+    intro rs₁ rs₂ R₁ R₂ C₁ C₂ hn hR hns hC₁ hC₂ hr₁ hr₂ hok₁ hok₂ hst hcl hb₁ hb₂ hpos
+    match rs₁, hn, hr₁, hok₁, hst, hcl, hb₁, hpos with
+    | [], _, _, _, _, _, _, _ => exact ⟨[], List.nil_prefix, .nil⟩
+    | .origin .. :: _, _, hr₁, _, _, _, _, _ => exact hr₁.elim
+    | .round i j sc Wr W W' c γ k :: rs₁', hn, hr₁, hok₁, hst, hcl, hb₁, hpos =>
+      have hf := hok₁ _ (List.mem_cons_self ..)
+      obtain ⟨-, -, -, -, -, -, -, -, -, -, -, hu, hkr⟩ := id hf
+      have hu : Ustep.ulands C₁ sc W := by rw [← hr₁.1]; exact hu
+      have tl : ∀ {P : NiEntry → Prop}, (∀ f ∈ NiEntry.round i j sc Wr W W' c γ k :: rs₁', P f) →
+          ∀ f ∈ rs₁', P f := fun hP f hf => hP f (List.mem_cons_of_mem _ hf)
+      by_cases hsc : sc = uecallScause
+      · -- an ecall: walk run 2 to its next ecall
+        subst hsc
+        match rs₂, hn, hr₂, hok₂, hb₂, hpos with
+        | [], _, _, _, _, hpos => simp [NiEntry.skel] at hpos
+        | .origin .. :: _, _, hr₂, _, _, _ => exact hr₂.elim
+        | .round i₂ j₂ sc₂ Wr₂ W₂ W₂' c₂ γ₂ k₂ :: rs₂', hn, hr₂, hok₂, hb₂, hpos =>
+          have hf₂ := hok₂ _ (List.mem_cons_self ..)
+          obtain ⟨-, -, -, -, -, -, -, -, -, -, -, hu₂, hkr₂⟩ := id hf₂
+          have hu₂ : Ustep.ulands C₂ sc₂ W₂ := by rw [← hr₂.1]; exact hu₂
+          have tl₂ : ∀ {P : NiEntry → Prop}, (∀ f ∈ NiEntry.round i₂ j₂ sc₂ Wr₂ W₂ W₂' c₂ γ₂ k₂ :: rs₂', P f) →
+              ∀ f ∈ rs₂', P f := fun hP f hf => hP f (List.mem_cons_of_mem _ hf)
+          by_cases hsc₂ : sc₂ = uecallScause
+          · -- both ecalls: the trapped keys, then the left keys, agree
+            subst hsc₂
+            rw [List.filter_cons_of_pos (by simp [NiEntry.skel]), List.filter_cons_of_pos (by simp [NiEntry.skel]),
+              List.map_cons, List.map_cons, List.cons_prefix_cons] at hpos
+            rw [List.filter_cons_of_pos (by simp [NiEntry.skel]), List.filter_cons_of_pos (by simp [NiEntry.skel])]
+            obtain ⟨hp, hpos'⟩ := hpos
+            have hW : ukeyEq W W₂ :=
+              Ustep.ulands_det_congr hR hns (ulands_reachK hC₁ hu) (ulands_reachK hC₂ hu₂)
+            have hc := citePos_led hH (hb₁ _ (List.mem_cons_self ..)) (hb₂ _ (List.mem_cons_self ..)) hp
+            have hW' : ukeyEq W' W₂' := niKeyRow_det hW hkr hkr₂ (hcl _ (List.mem_cons_self ..) rfl) hc
+            obtain ⟨l, hl, hF⟩ := ih rs₁' rs₂' W' W₂' W' W₂' (by simp at hn; omega) hW'
+              (hst _ (List.mem_cons_self ..)) (Ustep.ureachK_of_ukeyEq (Ustep.ukeyEq_refl _))
+              (Ustep.ureachK_of_ukeyEq (Ustep.ukeyEq_refl _)) hr₁.2 hr₂.2 (tl hok₁) (tl₂ hok₂) (tl hst) (tl hcl)
+              (tl hb₁) (tl₂ hb₂) hpos'
+            exact ⟨_, List.cons_prefix_cons.mpr ⟨rfl, hl⟩, .cons (niDetPair_round hf hf₂ hW hW') hF⟩
+          · -- run 2's next round is transparent: skip it
+            have hns₂ : ¬ Ustep.ustuckFrom R₂ := fun h => hns (Ustep.ustuckFrom_congr hR h)
+            rw [List.filter_cons_of_neg (p := NiEntry.skel) (a := .round i₂ j₂ sc₂ Wr₂ W₂ W₂' c₂ γ₂ k₂)
+              (by simp [NiEntry.skel, hsc₂])] at hpos ⊢
+            exact ih _ rs₂' R₁ R₂ C₁ W₂' (by simp at hn ⊢; omega) hR hns hC₁
+              (reachK_transparent hns₂ hC₂ hu₂ (hkr₂.1 hsc₂)) hr₁ hr₂.2 hok₁ (tl₂ hok₂) hst hcl hb₁ (tl₂ hb₂) hpos
+      · -- transparent: run 1's next round
+        rw [List.filter_cons_of_neg (p := NiEntry.skel) (a := .round i j sc Wr W W' c γ k)
+          (by simp [NiEntry.skel, hsc])] at hpos ⊢
+        exact ih rs₁' rs₂ R₁ R₂ W' C₂ (by simp at hn ⊢; omega) hR hns
+          (reachK_transparent hns hC₁ hu (hkr.1 hsc)) hC₂ hr₁.2 hr₂ (tl hok₁) hok₂ (tl hst) (tl hcl) (tl hb₁) hb₂ hpos
+
+/-! ### One incarnation's filings are one chain -/
+
+/-- A history's rounds, read at the filings that cite them in order, are a run
+from its start key. -/
+theorem niRunFrom_of_hist : ∀ (rs : List NiEntry) (H : List Uround) (C : Uvis), uhistChain C H →
+    (∀ (n : Nat) (f : NiEntry), rs[n]? = some f → ∃ (i j : Nat) (sc : BitVec 64) (Wr W W' : Uvis)
+      (c : Option (Nat × UIota)) (γ : Iris.GName) (k : Nat), f = NiEntry.round i j sc Wr W W' c γ k ∧
+      H[n]? = some (sc, Wr, W, W')) →
+    niRunFrom C rs
+  | [], _, _, _, _ => trivial
+  | f :: rs, H, C, hc, hf => by
+    obtain ⟨i, j, sc, Wr, W, W', c, γ, k, rfl, hH⟩ := hf 0 f rfl
+    match H, hc, hH with
+    | [], _, hH => simp at hH
+    | e :: H', hc, hH =>
+      simp only [List.getElem?_cons_zero, Option.some.injEq] at hH
+      subst hH
+      obtain ⟨h1, -, h3⟩ := hc
+      exact ⟨h1, niRunFrom_of_hist rs H' W' h3 (fun n g hg => by
+        obtain ⟨i', j', sc', Wr', W₀, W₀', c', γ', k', hg', hgH⟩ := hf (n + 1) g (by simpa using hg)
+        exact ⟨i', j', sc', Wr', W₀, W₀', c', γ', k', hg', by simpa using hgH⟩)⟩
+
+/-- **ONE INCARNATION, ONE CHAIN**: with one key history (`NiOneOrigin`) read
+without gaps (`NiGapFree`), `q`'s filings are its origin at the history's start
+key and then a run of rounds from it (`niUserChain`). -/
+theorem niRun_of {q : NiInc} {h : List Obs} {F : List NiEntry} (hU : niUserChain F)
+    (ho : NiOneOrigin q h F) (hg : NiGapFree q h F) :
+    ufilings q h F = [] ∨
+      ∃ j W0 p γ rs, ufilings q h F = .origin j W0 p γ :: rs ∧ niRunFrom W0 rs := by
+  obtain ⟨γ, hγ, -⟩ := ho
+  have hmem : ∀ f ∈ ufilings q h F, f ∈ F ∧ f.uh = γ := fun f hf =>
+    ⟨(mem_ufilings hf).1, hγ f (mem_ufilings hf).1 (mem_ufilings hf).2⟩
+  unfold NiGapFree at hg
+  have hidx : ∀ (n : Nat) (f : NiEntry), (ufilings q h F)[n]? = some f → f.hidx = n := by
+    intro n f hf
+    have h1 := congrArg (·[n]?) hg
+    simp only [List.getElem?_map, hf, Option.map_some] at h1
+    have hn : n < (ufilings q h F).length := (List.getElem?_eq_some_iff.mp hf).1
+    rw [List.getElem?_range hn] at h1
+    exact Option.some.inj h1
+  generalize ufilings q h F = L at hmem hidx ⊢
+  match L, hmem, hidx with
+  | [], _, _ => exact .inl rfl
+  | .round .. :: _, _, hidx => exact absurd (hidx 0 _ rfl) (by simp [NiEntry.hidx])
+  | .origin j W0 p γ₀ :: rs, hmem, hidx =>
+    refine .inr ⟨j, W0, p, γ₀, rs, rfl, ?_⟩
+    obtain ⟨ho, hγ₀⟩ := hmem _ (List.mem_cons_self ..)
+    simp only [NiEntry.uh] at hγ₀
+    subst hγ₀
+    obtain ⟨W0', H, hch, horig, hround⟩ := hU γ₀
+    have hW := horig j W0 p ho
+    subst hW
+    refine niRunFrom_of_hist rs H W0 hch (fun n f hf => ?_)
+    have hfL : (NiEntry.origin j W0 p γ₀ :: rs)[n + 1]? = some f := by simpa using hf
+    have hi := hidx (n + 1) f hfL
+    obtain ⟨hfF, hfγ⟩ := hmem f (List.mem_cons_of_mem _ (List.mem_of_getElem? hf))
+    match f, hi, hfF, hfγ with
+    | .origin .., hi, _, _ => simp [NiEntry.hidx] at hi
+    | .round i j' sc Wr W W' c γ' k, hi, hfF, hfγ =>
+      simp only [NiEntry.hidx, Nat.add_right_cancel_iff] at hi
+      simp only [NiEntry.uh] at hfγ
+      subst hi hfγ
+      exact ⟨i, j', sc, Wr, W, W', c, γ', k, rfl, hround i j' sc Wr W W' c k hfF⟩
+
+theorem firstKey_nil {q : NiInc} {h : List Obs} {F : List NiEntry} (hL : ufilings q h F = []) :
+    firstKey q h F = none := by
+  unfold firstKey; rw [utrace_filings, hL]; rfl
+
+theorem firstKey_origin {q : NiInc} {h : List Obs} {F : List NiEntry} (hF : niOk h F) {j : Nat} {W0 : Uvis}
+    {p : Nat} {γ : Iris.GName} {rs : List NiEntry} (hL : ufilings q h F = .origin j W0 p γ :: rs) :
+    firstKey q h F = some W0 := by
+  have hv : niEntryOk h (.origin j W0 p γ) :=
+    hF.1 _ (mem_ufilings (q := q) (hL ▸ List.mem_cons_self ..)).1
+  obtain ⟨e, he, -⟩ := hv
+  unfold firstKey; rw [utrace_filings, hL, List.filterMap_cons]
+  simp only [niStepOf, he, Option.map_some]
+
+/-! ### The determinism theorem, pure -/
+
+/-- **`niTwoRunDet`** (NI M3 U-3, rulings U-R6/U-R8): two histories with ledger
+filings whose chains hold at their histories and whose key histories are
+chains (`niUserChain`), one incarnation `q` with ONE key history and one
+origin, filed without gaps, in both runs (`NiOneOrigin`, `NiGapFree`), its
+ecalls in run 1 in the class and no stuck key reachable from any of its
+resumed keys in run 1 (`NiNoStuck`, the regime), EQUAL FIRST KEYS, the cited
+positions of its skeleton (the schedule) a prefix, and run 1's ledger
+histories below run 2's: its ECALL SKELETON's views -- exits and enters -- in
+run 1 are a prefix of run 2's, and so are the console runs its skeleton
+pushes.  No mask, no key reading, no exit is an input. -/
+theorem niTwoRunDet {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk h₁ F₁)
+    (hC₁ : niChain F₁ (niHist F₁)) (hU₁ : niUserChain F₁) (hF₂ : niOk h₂ F₂) (hC₂ : niChain F₂ (niHist F₂))
+    (hU₂ : niUserChain F₂) (q : NiInc) (ho₁ : NiOneOrigin q h₁ F₁) (ho₂ : NiOneOrigin q h₂ F₂)
+    (hg₁ : NiGapFree q h₁ F₁) (hg₂ : NiGapFree q h₂ F₂) (hcls : NiInClass (utrace q h₁ F₁))
+    (hns : NiNoStuck q h₁ F₁) (hk : firstKey q h₁ F₁ = firstKey q h₂ F₂)
+    (hpos : ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.detIn <+:
+      ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.detIn)
+    (hH : ∀ k, niBelow (niHistLed F₁ k) (niHistLed F₂ k)) :
+    ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.view <+:
+        ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.view ∧
+      ((utrace q h₁ F₁).filter NiStep.skel).map NiStep.outBytes <+:
+        ((utrace q h₂ F₂).filter NiStep.skel).map NiStep.outBytes := by
+  have hv₁ : ∀ f ∈ ufilings q h₁ F₁, niEntryOk h₁ f := fun f hf => hF₁.1 f (mem_ufilings hf).1
+  have hv₂ : ∀ f ∈ ufilings q h₂ F₂, niEntryOk h₂ f := fun f hf => hF₂.1 f (mem_ufilings hf).1
+  -- the class, at the filings' keys
+  have hcl : ∀ f ∈ ufilings q h₁ F₁, f.inClass := by
+    intro f hf
+    match f, hf, hv₁ f hf with
+    | .origin .., _, _ => trivial
+    | .round i j sc Wr W W' c γ k, hf, hok =>
+      intro hsc
+      obtain ⟨-, ⟨x, hx, hxf⟩, ⟨e, he, -⟩, -⟩ := id hok
+      have hs : niStepOf h₁ (.round i j sc Wr W W' c γ k) =
+          some (.round W.secc W.lazy (uwaitWin W.perm (tfW W.tf (tfArgIdx 0))) W.sz (uwriteCon W) (uwriteOut W)
+            x e c) := by simp only [niStepOf, hx, he]
+      have hmem : NiStep.round W.secc W.lazy (uwaitWin W.perm (tfW W.tf (tfArgIdx 0))) W.sz (uwriteCon W)
+          (uwriteOut W) x e c ∈ utrace q h₁ F₁ := by
+        rw [utrace_filings]; exact List.mem_filterMap.mpr ⟨_, hf, hs⟩
+      exact niClassKey_of hxf hsc (hcls _ _ _ _ _ _ _ _ _ hmem)
+  -- run 1's chain, lifted: run 2's ledger part, run 1's console stream (`niTwoRunPrefix_trace`)
+  let H' : Nat → UIota := fun k => { niHist F₂ k with cacc := (niHist F₁ k).cacc }
+  have hH' : ∀ k, (H' k).led = (niHist F₂ k).led := fun _ => rfl
+  have hb₁ : ∀ f ∈ ufilings q h₁ F₁, ∀ k ι, f.cite = some (k, ι) → niBelow ι (H' k) := by
+    intro f hf k ι hc
+    obtain ⟨p1, z1, k1, t1, s1, c1⟩ := hC₁ f (mem_ufilings hf).1 k ι hc
+    obtain ⟨p2, z2, k2, t2, s2, -⟩ := hH k
+    exact ⟨p1.trans p2, z1.trans z2, k1.trans k2, Nat.le_trans t1 t2, s1.trans s2, c1⟩
+  have hb₂ : ∀ f ∈ ufilings q h₂ F₂, ∀ k ι, f.cite = some (k, ι) → niBelow ι (niHist F₂ k) :=
+    fun f hf k ι hc => hC₂ f (mem_ufilings hf).1 k ι hc
+  rw [utrace_filings, filter_skel_filterMap _ hv₁, utrace_filings, filter_skel_filterMap _ hv₂] at hpos ⊢
+  rw [filterMap_map_eq _ _ NiEntry.citePos _ (fun f hf => by
+        obtain ⟨s, hs⟩ := niStepOf_some (hv₁ f ((List.mem_filter.mp hf).1))
+        exact ⟨s, hs, niStepOf_detIn hs⟩),
+      filterMap_map_eq _ _ NiEntry.citePos _ (fun f hf => by
+        obtain ⟨s, hs⟩ := niStepOf_some (hv₂ f ((List.mem_filter.mp hf).1))
+        exact ⟨s, hs, niStepOf_detIn hs⟩)] at hpos
+  have hrest := niDet_runs (h₁ := h₁) (h₂ := h₂) hH'
+  rcases niRun_of hU₁ ho₁ hg₁ with hL₁ | ⟨j₁, W0, p₁, γ₁, rs₁, hL₁, hr₁⟩
+  · rw [hL₁]; exact ⟨List.nil_prefix, List.nil_prefix⟩
+  rcases niRun_of hU₂ ho₂ hg₂ with hL₂ | ⟨j₂, W0₂, p₂, γ₂, rs₂, hL₂, hr₂⟩
+  · rw [firstKey_origin hF₁ hL₁, firstKey_nil hL₂] at hk; cases hk
+  have hW0 : W0₂ = W0 := by
+    rw [firstKey_origin hF₁ hL₁, firstKey_origin hF₂ hL₂] at hk; exact (Option.some.inj hk).symm
+  subst hW0
+  rw [hL₁] at hv₁ hcl hb₁ hpos ⊢
+  rw [hL₂] at hv₂ hb₂ hpos ⊢
+  have hnsW : ¬ Ustep.ustuckFrom W0₂ := by
+    have := hns _ (mem_ufilings (hL₁ ▸ List.mem_cons_self ..)).1 (mem_ufilings (hL₁ ▸ List.mem_cons_self ..)).2
+    exact this
+  have hst : ∀ f ∈ rs₁, ¬ Ustep.ustuckFrom f.resumeKey := fun f hf =>
+    hns f (mem_ufilings (hL₁ ▸ List.mem_cons_of_mem _ hf)).1 (mem_ufilings (hL₁ ▸ List.mem_cons_of_mem _ hf)).2
+  rw [List.filter_cons_of_pos (by rfl), List.filter_cons_of_pos (by rfl), List.map_cons, List.map_cons,
+    List.cons_prefix_cons] at hpos
+  rw [List.filter_cons_of_pos (by rfl), List.filter_cons_of_pos (by rfl)]
+  obtain ⟨l, hl, hP⟩ := hrest (rs₁.length + rs₂.length) rs₁ rs₂ W0₂ W0₂ W0₂ W0₂ (Nat.le_refl _)
+    (Ustep.ukeyEq_refl _) hnsW (Ustep.ureachK_of_ukeyEq (Ustep.ukeyEq_refl _))
+    (Ustep.ureachK_of_ukeyEq (Ustep.ukeyEq_refl _)) hr₁ hr₂
+    (fun f hf => hv₁ f (List.mem_cons_of_mem _ hf)) (fun f hf => hv₂ f (List.mem_cons_of_mem _ hf)) hst
+    (fun f hf => hcl f (List.mem_cons_of_mem _ hf)) (fun f hf => hb₁ f (List.mem_cons_of_mem _ hf))
+    (fun f hf => hb₂ f (List.mem_cons_of_mem _ hf)) hpos.2
+  have hP' : List.Forall₂ (niDetPair h₁ h₂) (.origin j₁ W0₂ p₁ γ₁ :: rs₁.filter NiEntry.skel)
+      (.origin j₂ W0₂ p₂ γ₂ :: l) :=
+    .cons (niDetPair_origin (hv₁ _ (List.mem_cons_self ..)) (hv₂ _ (List.mem_cons_self ..))) hP
+  have hl' : (NiEntry.origin j₂ W0₂ p₂ γ₂ :: l) <+: .origin j₂ W0₂ p₂ γ₂ :: rs₂.filter NiEntry.skel :=
+    List.cons_prefix_cons.mpr ⟨rfl, hl⟩
+  have hA : ∀ f ∈ NiEntry.origin j₁ W0₂ p₁ γ₁ :: rs₁.filter NiEntry.skel, ∃ s, niStepOf h₁ f = some s :=
+    fun f hf => niStepOf_some (hv₁ f (by
+      rcases List.mem_cons.mp hf with rfl | hf
+      · exact List.mem_cons_self ..
+      · exact List.mem_cons_of_mem _ ((List.mem_filter.mp hf).1)))
+  have hB : ∀ f ∈ NiEntry.origin j₂ W0₂ p₂ γ₂ :: l, ∃ s, niStepOf h₂ f = some s :=
+    fun f hf => niStepOf_some (hv₂ f (by
+      rcases List.mem_cons.mp hf with rfl | hf
+      · exact List.mem_cons_self ..
+      · exact List.mem_cons_of_mem _ ((List.mem_filter.mp (hl.subset hf)).1)))
+  refine ⟨?_, ?_⟩
+  · rw [forall₂_filterMap_map _ _ NiStep.view (fun a b hab s₁ s₂ h₁ h₂ => (hab s₁ s₂ h₁ h₂).1) hP' hA hB]
+    exact (hl'.filterMap _).map _
+  · rw [forall₂_filterMap_map _ _ NiStep.outBytes (fun a b hab s₁ s₂ h₁ h₂ => (hab s₁ s₂ h₁ h₂).2) hP' hA hB]
+    exact (hl'.filterMap _).map _
 
 end Xv6

@@ -233,9 +233,6 @@ theorem ustoreDeniedPerm_iff (π : Nat → Option UPerm) (va : BitVec 64) :
   · rename_i hq
     rw [hq]; simp
 
-/-- The store fault is not an ecall. -/
-theorem ustoreFaultScause_ne : ustoreFaultScause ≠ uecallScause := by decide
-
 section Families
 variable (W : Uvis) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
 
@@ -511,12 +508,6 @@ theorem ulands_trans {Wr W V : Uvis} {sc : BitVec 64} (h : ureach Wr W) (hl : ul
   rcases hl with hs | ⟨V', hr, he, ht⟩
   · exact .inl (ustuckFrom_of_reach h hs)
   · exact .inr ⟨V', ureach_trans h hr, he, ht⟩
-
-/-- The trap-out key of a reachable key is a landing (the engine's interrupt
-and execute-trap arms). -/
-theorem ulands_here {Wr V : Uvis} {sc : BitVec 64} (h : ureach Wr V)
-    (ht : sc = uecallScause → ustep V = .trap uecallScause) : ulands Wr sc V :=
-  .inr ⟨V, h, ukeyEq_refl V, ht⟩
 
 /-! ## §6b The engine's invariant (lane U-2a)
 

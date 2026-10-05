@@ -55,6 +55,10 @@
     { "name": "Xv6.xv6NiPrefix",
       "axioms": ["propext", "Classical.choice", "Quot.sound"],
       "opaques": ["LeanRV64D.Functions.xv6_resv_is_valid", "LeanRV64D.Functions.xv6_resv_matches",
+                  "MachCSL.bootImageSealed"] },
+    { "name": "Xv6.xv6NiDet",
+      "axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "opaques": ["LeanRV64D.Functions.xv6_resv_is_valid", "LeanRV64D.Functions.xv6_resv_matches",
                   "MachCSL.bootImageSealed"] }
   ],
   "platform_hooks": {

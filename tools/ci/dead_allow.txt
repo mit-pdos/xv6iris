@@ -41,6 +41,7 @@ decl Xv6.niForkChild             # FAM-1b reaches (the filings' tree, FAM-R2's d
 #    landed"; "U-2b as landed"): the pure user step is reached by the NI
 #    roots since U-2b (`niUserRow`/`uhistChain` in `niEntryOk` and
 #    `xv6NiPhi`'s `niUserChain`), so its module row is off; the anti-vacuity
-#    check (echo's text runs to its ecall) is a result in its own right,
-#    reached by no root until U-3's `xv6NiDet` cites it (or never).
-module Xv6.UstepEcho             # ustep U-3 reaches (anti-vacuity: echo runs to its ecall under ustep)
+#    check (echo's text runs to its ecall) is a result in its own right: a
+#    TEST BY DESIGN, which no root cites (U-3's `xv6NiDet` is about every
+#    program; this row says `ustep` is not vacuously `stuck` on a real one).
+module Xv6.UstepEcho             # anti-vacuity check, test by design (echo runs to its ecall under ustep)

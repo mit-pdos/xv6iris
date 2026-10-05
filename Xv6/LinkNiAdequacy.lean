@@ -34,6 +34,14 @@ booted, `fs.img` on its disk) -- and its pure corollaries over runs.
   1's ledger histories below run 2's, its ecalls in the class, give enters
   a prefix -- a kill (any truncation) only cuts the trace short
   (`NiTrace` scope 11).
+* **`xv6NiDet`** (NI M3 U-3, rulings U-R6/R8/R9): two runs; per
+  incarnation, from EQUAL FIRST KEYS, one origin and no gaps in its key
+  history's filings, no stuck key reachable in run 1 (the regime), its
+  ecalls (in run 1) in the class, the cited positions of its ECALL
+  SKELETON (the schedule) a prefix and run 1's ledger histories below run
+  2's: the skeleton's exits and enters, and the console runs its writes
+  push, are a prefix.  Exits, masks and the key readings are DERIVED, not
+  inputs (`NiTrace` scope 13).
 
 A `Link` file because it consumes `ProofUser` (tools/check_layering.sh).
 
@@ -177,6 +185,43 @@ theorem xv6NiPrefix {hlc : HasLC}
   obtain ⟨-, F₂, hF₂, h1₂, hC₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
   exact ⟨F₁, F₂, hF₁, h1₁, hC₁, hF₂, h1₂, hC₂, fun q hc hin hH => niTwoRunPrefix hF₁ hC₁ hF₂ hC₂ q hc hin hH⟩
 
+/-- **THE DETERMINISM THEOREM FOR ARBITRARY LOW CODE** (NI M3 U-3, rulings
+U-R6, U-R8, U-R9): two runs from booting machines; at the one-shot filings
+their ledgers witness, each with its citations below its canonical histories
+and its key histories chains (`niUserChain`), an incarnation `q` with one
+origin and one key history filed without gaps in each run (`NiOneOrigin`,
+`NiGapFree`), its ecalls (in run 1) in the class and no stuck key reachable
+from its resumed keys in run 1 (`NiNoStuck`: the pure user step's regime),
+EQUAL FIRST KEYS, the cited positions of its ECALL SKELETON (the schedule) in
+run 1 a prefix of run 2's, and run 1's ledger histories below run 2's: the
+skeleton's views (exits and enters) in run 1 are a prefix of run 2's, and so
+are the console runs the skeleton pushes.  No exit, mask or key reading is an
+input: the user computation `Ustep.ustep` derives them (`NiTrace` scope 13). -/
+theorem xv6NiDet {hlc : HasLC}
+    (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
+    (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
+    (n₁ n₂ : Nat) (κs₁ κs₂ : List Obs) (t₁ t₂ : List Expr) (g₁' g₂' : GState)
+    (hsteps₁ : ([Expr.power], g₁) -<κs₁>->ₜₚ^[n₁] (t₁, g₁'))
+    (hsteps₂ : ([Expr.power], g₂) -<κs₂>->ₜₚ^[n₂] (t₂, g₂')) :
+    ∃ F₁ F₂, niOk κs₁ F₁ ∧ niOneShot κs₁ F₁ ∧ niChain F₁ (niHist F₁) ∧ niUserChain F₁ ∧
+      niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ niUserChain F₂ ∧ ∀ q : NiInc,
+      NiOneOrigin q κs₁ F₁ → NiOneOrigin q κs₂ F₂ →
+      NiGapFree q κs₁ F₁ → NiGapFree q κs₂ F₂ →
+      NiInClass (utrace q κs₁ F₁) → NiNoStuck q κs₁ F₁ →
+      firstKey q κs₁ F₁ = firstKey q κs₂ F₂ →
+      ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.detIn <+:
+        ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.detIn →
+      (∀ k, niBelow (niHistLed F₁ k) (niHistLed F₂ k)) →
+      ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.view <+:
+        ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.view ∧
+      ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.outBytes <+:
+        ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.outBytes := by
+  obtain ⟨-, F₁, hF₁, h1₁, hC₁, hU₁, -⟩ := xv6NiAdequacy (hlc := hlc) g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
+  obtain ⟨-, F₂, hF₂, h1₂, hC₂, hU₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
+  exact ⟨F₁, F₂, hF₁, h1₁, hC₁, hU₁, hF₂, h1₂, hC₂, hU₂,
+    fun q ho₁ ho₂ hg₁ hg₂ hc hns hk hpos hH =>
+      niTwoRunDet hF₁ hC₁ hU₁ hF₂ hC₂ hU₂ q ho₁ ho₂ hg₁ hg₂ hc hns hk hpos hH⟩
+
 /-- **THE STRONG INSTANCE**: in a run from a booting machine, at the filing
 its ledger witnesses, every incarnation's steps before its first ecall
 replay their exits (`NiTrace.niStrongInstance`; T's
@@ -197,3 +242,4 @@ end Xv6
 #print axioms Xv6.xv6NiStrongInstance
 #print axioms Xv6.xv6NiOut
 #print axioms Xv6.xv6NiPrefix
+#print axioms Xv6.xv6NiDet
