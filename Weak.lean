@@ -56,5 +56,6 @@ import Weak.WeakRobustLin
 import Weak.WeakCtx
 import Weak.WeakRvwmoDec
 import Weak.WeakExec
+import Weak.WeakFence
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
