@@ -143,5 +143,6 @@ import Weak.WkStartedMp
 import Weak.WeakVariant
 import Weak.WkYieldFrame
 import Weak.WeakRvwmoFabInd
+import Weak.AxSched
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
