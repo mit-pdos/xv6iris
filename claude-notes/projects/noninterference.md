@@ -8073,6 +8073,8 @@ declaration is dead). `run_all.sh`: all 11 steps pass.
 
 **Second FS-3/4 attempt (2026-10-06): BLOCKED, no code.** FS-3 confirmed = `xv6NiDetQ`. `xv6NiFs` needs one more export lane (FS-2g, ≈1–1.5 BE): (1) failed chdir/open/mkdir cite `{boot with act}` — a −1 in run 2 cannot be ruled out, and equating `rt` per round would quietly concede whether those rounds succeeded (`rt = 0` on failure): the −1 arms must cite their deciding observation (dead lookup, failed type test, verdict — FS-0 put these in the posts) and the rows compute −1 from it; (2) a read's count `d` in `fout` is free: the clause needs `d = (usysReadBytes a2 ι).length` (small); (3) run 2's class read is tied only under `fevReadDir = false`: export `fevReadOn` at a non-negative request regardless of the row type; (4) a walk's lookups are not placed after the previous round (`fsPast`/`niWinRow` place only `fout`): carry `fevWalkPast w.1 ι.fev po` for the cited type test or install; non-blocking: (5) create's parent `d`/`nl`/`nd` free (cite the parent walk or extend the oracle), (6) the claim/dot-entry/free receipts (claim sits in ilock's generic fill with no bound; the dots need the bounded form; `free` in `iregFreeDeposit_au`), (7) `fevPrivateQ` as landed can never hold (the era's `boot` event is a move not in any `fout`; must be stated at the eras q cites), (8) `fevCut` at era 0 needs the boot rows exported; `∀ k, fevOffWf` only at write citations. Hypothesis-based shortcuts for (1) and (2) REJECTED by the lane (they concede q's own answers). Owner decision requested: FS-2g then FS-3/4, or stop with `xv6NiDetQ` as the private-files result.
 
+**Owner decision (2026-10-06): "Stop here".** `xv6NiDetQ` (the equal-fs-history form, fifteen syscalls in the class) is the private-files result. `xv6NiFs` stays DESIGNED-BUT-BLOCKED: its eight remaining gaps and the FS-2g scope above are the record; the hypothesis-based shortcuts are rejected because they concede the process's own answers. M3 ends here. Spent on private files: FS-L, FS-0, FS-1, FS-2a, FS-2b, FS-2b′, FS-2a′, FS-2d (partial), FS-2e (a+b), FS-2f ≈ 4.3 BE; the exports they landed (the fs-event ledger, the offset tie, the back-pointered walks, the ordered receipts, the fs cursor, `fout` on the step) stand on their own and are what FS-2g would build on.
+
 On `lane/pfiles` (the owner's decision after FS-2d, "finish it: sublist form"). The round's own fs events ride
 the trace step; their shape is a function of the key's readings; the inode write's cited descriptor is the key's;
 the citation order is in `xv6NiPhi`; privacy is stated by incarnation. No kernel code change; the fourteen roots'
@@ -8566,11 +8568,11 @@ ustep landed (U-1..U-3; U-4 totality later); next: quotas
 
 quotas DESIGNED (2026-10-05, "M3 quotas design" above: the break quota + pipe cap + `scounteren`, one commit on a fork of the pin; `xv6NiDetQ` without the allocator; ≈ 1.0 BE); awaiting the OWNER's Q-R1 and rulings Q-R2…R10
 
-quotas landed (Q-0..Q-3; Q-4/Q-5 optional); next: private files
+quotas landed (Q-0..Q-3; Q-4/Q-5 optional); private files landed through FS-2f (xv6NiDetQ is the result; xv6NiFs designed-but-blocked, FS-2g scoped); M3 ENDED 2026-10-06 by owner decision
 
 private files DESIGNED (2026-10-05, "M3 private files design" above: a per-era fs-event ledger appended by the fire lemmas, computed rows, the footprint theorem `xv6NiFs`; chroot not the partition; ≈ 2.8 BE, FS-L alone ≈ 0.05); awaiting rulings FS-R1…R10
 
-What remains in M3: private files; later optional: Q-4 (wait/write at lazy keys), Q-5 (the clock), U-4 totality, FAM-1b, K2 sys_kill, dup/close, pipes, OUT-4, G3c
+What remains, all optional: FS-2g + FS-3/4 (the footprint theorem xv6NiFs), FS-2c (link/unlink/mknod), FS-5 (chroot spec + root field), fstat (after the kernel zeroes the stat padding), Q-4 (wait/write at lazy keys), Q-5 (the clock), U-4 (ustep totality), FAM-1b, K2 (sys_kill), pipes, OUT-4 (stream ↔ wire), G3c
 
 - **M3 — extensions**, independent: arbitrary low code (`ustep`, §4);
   process FAMILIES as partitions (pipes and `wait` order become
