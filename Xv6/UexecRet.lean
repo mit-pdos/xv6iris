@@ -76,7 +76,6 @@ Rocq's header, kept point for point:
    `Xv6/UslotDetMint.lean` (minted on the engine).  `ukeyEq` moved here
    from `UexecApply` (beside `uvisOfRun`) for the same reason.
 -/
-import Xv6.UexecWp
 import Xv6.UexecSG
 import Xv6.TfUser
 import MachCSL.WpSmodeSret
