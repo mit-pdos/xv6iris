@@ -104,3 +104,4 @@ Rocq→Lean name map only.
 - WeakFetchRvc: the `Ext_Zca` probe runs in `run_hart_active` (not in `fetch`); 2-aligned (two-halfword) fetch arms are not covered by WeakFetchRvc.
 - Decoding SFENCE_VMA by `rfl` needs `virtual_memory_supported`, `hartSupports`, `currentlyEnabled` `local semireducible` (AxSfence).
 - WeakRvwmoCert2: `hlblRealizesLoadShape` has a third (fetch) case `aq = false ∧ l = LIFetch base tvs`; `certBlockSnoc` takes `lbFetchInert (candLastSt c) x l`, and `certSegment`'s policy `Hpol` must also return `lbFetchInert (candLastSt c0) x l'` (Cert3/Cert4/Walk/Glue supply it; `WeakRvwmoCert2.lbFetchInertOfStoreNe` for store labels; trivial for non-fetch labels).
+- WeakFetch2: 2-aligned fetch arms — F_Base emits `[.WEread wakIfetch pc 2, .WEread wakIfetch (BitVec.addInt pc 2) 2]`, F_RVC `[.WEread wakIfetch pc 2]`; `BitVec.addInt pc 2` is defeq `pc + BitVec.ofNat 64 2` (WeakCert form; may need `show`). Never ascribe `extractLsb` halves (silent `setWidth`).
