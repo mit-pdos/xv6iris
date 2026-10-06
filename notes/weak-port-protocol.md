@@ -85,3 +85,7 @@ Rocq→Lean name map only.
   emission is fetch-inert at its trace position); `hullSupply`/`topoSupply` return the supply conditional on
   it. Consumers (WeakRvwmoGlue, capstones) discharge it for the candidate they receive (e.g. fetches of
   never-written text at timestamp 0).
+- `bv_decide` adds an auxiliary `<Enum>.enumToBitVec` the first time it meets an enum; two modules that each
+  trigger it clash when imported together ("environment already contains … enumToBitVec"). Import the module
+  that already encodes that enum (e.g. `MachCSL.WpTrap` for `Privilege`, `Weak.ExecSC5` for
+  `MemoryRegionType`, `MachCSL.BvEnumSatp` for `SATPMode`) so `bv_decide` reuses it.
