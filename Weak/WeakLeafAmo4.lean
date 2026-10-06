@@ -62,8 +62,8 @@ The Rocq header, in substance.
 5. `exec_eff_write_ram_cond_4` is the width-4 instance of the Lean-only
    `execEffWriteRamCond` (any width); the `execEff` memory lemmas are proved
    by a `simp` peel (the local tactic `amo_eff_mem`) rather than one rewrite
-   per bind; the MMIO windows by the Lean-only `execEffWithinMmioReadableFalse`
-   / `execEffWithinMmioWritableFalse` (Rocq inlines them as `Hmmio`).
+   per bind; the MMIO windows by the Lean-only `WeakLeafAmo4.execEffWithinMmioReadableFalse`
+   / `WeakLeafAmo4.execEffWithinMmioWritableFalse` (Rocq inlines them as `Hmmio`).
 6. `exec_eff_amo_writeback` is stated on the Lean shape of the tail,
    `liftM (wX_bits (.Regidx rd) v) >>= fun _ => pure RETIRE_SUCCESS`.
 7. Rocq §9's `Print Assumptions` commands are not declarations.
@@ -96,7 +96,7 @@ The Rocq header, in substance.
 `exec_eff_execute_AMOSWAP_4_gpr` `execEffExecuteAMOSWAP4Gpr`.  Section `Let`s:
 `ea` `amoM4Ea`, `a8` `amoM4A8`, `pa` `amoM4Pa`, `storeval` `amoM4Store`.
 Lean-only: the tactic `amo_eff_mem`, `execEffWriteRamCond`,
-`execEffWithinMmioReadableFalse`, `execEffWithinMmioWritableFalse`.
+`WeakLeafAmo4.execEffWithinMmioReadableFalse`, `WeakLeafAmo4.execEffWithinMmioWritableFalse`.
 
 **Dropped:** nothing (27 Rocq `Lemma`s + 4 `Let`s; Lean 27 theorems + 4 defs,
 plus the Lean-only items above).
@@ -440,7 +440,7 @@ theorem execEffPmaCheckRamAmo4 (addr : BitVec 64) (pbmt : page_based_mem_type) (
 
 /-- The three device-window probes make the read a RAM access, at `execEff`
 (Lean-only; Rocq's inline `Hmmio`). -/
-theorem execEffWithinMmioReadableFalse (addr : BitVec 64) (n : Nat) (s : ExecSt)
+theorem WeakLeafAmo4.execEffWithinMmioReadableFalse (addr : BitVec 64) (n : Nat) (s : ExecSt)
     (hc : execEff (within_clint (.Physaddr addr) n) s = some (false, s, []))
     (hsig : execEff (within_sig (.Physaddr addr) n) s = some (false, s, []))
     (hh : execEff (within_htif_readable (.Physaddr addr) n) s = some (false, s, [])) :
@@ -449,7 +449,7 @@ theorem execEffWithinMmioReadableFalse (addr : BitVec 64) (n : Nat) (s : ExecSt)
   eff_run [hc, hsig, hh]
 
 /-- The write twin (Lean-only). -/
-theorem execEffWithinMmioWritableFalse (addr : BitVec 64) (n : Nat) (s : ExecSt)
+theorem WeakLeafAmo4.execEffWithinMmioWritableFalse (addr : BitVec 64) (n : Nat) (s : ExecSt)
     (hc : execEff (within_clint (.Physaddr addr) n) s = some (false, s, []))
     (hsig : execEff (within_sig (.Physaddr addr) n) s = some (false, s, []))
     (hh : execEff (within_htif_writable (.Physaddr addr) n) s = some (false, s, [])) :
@@ -499,7 +499,7 @@ theorem execEffCheckedMemReadRamAmo4M (pbmt : page_based_mem_type) (addr : BitVe
     execEff (checked_mem_read (.Atomic (.AMOSWAP, true, false, .Data, .Data)) pbmt .Machine (.Physaddr addr) 4
       true false true false) s = some (.Ok (w, default_meta), s, [.WEread ⟨false, true, true⟩ addr 4]) := by
   have hpma := execEffPmaCheckRamAmo4 addr pbmt region s hm hal hrd hwr ha
-  have hmm := execEffWithinMmioReadableFalse addr 4 s hc hsig hh
+  have hmm := WeakLeafAmo4.execEffWithinMmioReadableFalse addr 4 s hc hsig hh
   have hrr := execEffReadRamResacq4 addr w s hdev hb
   unfold checked_mem_read check_pma_with_pmp_priority
   rw [execEffCatchEarlyReturn]
@@ -552,7 +552,7 @@ theorem execEffCheckedMemWriteRamAmo4M (pbmt : page_based_mem_type) (addr : BitV
       .Machine () false false true) s =
       some (.Ok true, s.setMem (bmWrite s.mem addr 4 data), [.WEwrite ⟨false, true, false⟩ addr 4 data]) := by
   have hpma := execEffPmaCheckRamAmo4 addr pbmt region s hm hal hrd hwr ha
-  have hmm := execEffWithinMmioWritableFalse addr 4 s hc hsig hh
+  have hmm := WeakLeafAmo4.execEffWithinMmioWritableFalse addr 4 s hc hsig hh
   have hw : ∀ k (d : BitVec (8 * k)), execEff (write_ram .Write_RISCV_conditional (.Physaddr addr) k d ()) s =
       some (true, s.setMem (bmWrite s.mem addr k d), [.WEwrite ⟨false, true, false⟩ addr k d]) :=
     fun k d => execEffWriteRamCond addr k d s hdev
