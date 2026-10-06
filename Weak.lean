@@ -40,5 +40,6 @@ import Weak.WeakErase
 import Weak.WeakRobust
 import Weak.WeakRvwmoKill
 import Weak.WeakRvwmoProbeK1
+import Weak.WeakAxRealize
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
