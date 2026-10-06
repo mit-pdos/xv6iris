@@ -44,8 +44,8 @@ import re
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TREES = ["Xv6", "MachCSL"]
-ROOTS = ["Xv6", "MachCSL"]           # the lake default targets
+TREES = ["Xv6", "MachCSL", "Weak"]
+ROOTS = ["Xv6", "MachCSL", "Weak"]           # the lake default targets
 # Trees outside the proof build that still must not fake a result.  vtest-lean/
 # (the device-conformance suite, its own `Vtest` lake library) gets the
 # `sorry`, `axiom` and `options` lints only: a test passes by COMPILING, so a
