@@ -363,8 +363,10 @@ theorem cafAcre_fire_nm [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat �
     (hpnm : nm ≠ DOT ∧ nm ≠ DOTDOT)
     (habsp' : absOf np' =
       some ⟨.ADir ((dirEntries np).insert nm i), fnNlink np + acreBump (cf d i)⟩)
-    (habsc : absOf nc = some ⟨cf d i, 1⟩) (act : BitVec 64) :
+    (habsc : absOf nc = some ⟨cf d i, 1⟩) (act : BitVec 64) (L : List Fev) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
+      -- (NI M3 private files FS-2e) the bound the leg lands past (the arm's)
+      fsLedLb γfs L -∗
       -- THE NAME PREDICATE RIDES ALONG (INIT-FILE): the commit is
       -- `acreCommitAtGenNm` and the fire owes `Nm nm` beside the dot-name
       -- credential
@@ -378,10 +380,10 @@ theorem cafAcre_fire_nm [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat �
         topFrag (fsGammaL γfs) d np' ∗ topFragQ (fsGammaL γfs) dqc i nc ∗ Pd d ∗
         -- (NI M3 private files FS-1) the parent leg's events: the entry and
         -- the count (a no-op at a non-directory child)
-        fsMoveRcpt γfs [.ent act d nm (some i), .nlink act d (fnNlink np + acreBump (cf d i))] d np ∗
+        fsMoveRcptAfter γfs L [.ent act d nm (some i), .nlink act d (fnNlink np + acreBump (cf d i))] d np ∗
         ∃ av : Aview, ⌜crePre av d nm (dirEntries np) (fnNlink np) i (cf d i)⌝ ∗
           Fok.pfRecv av d nm i := by
-  iintro #Hi #Hai Hcm Harm HPd Hfp Hfc
+  iintro #Hi #Hai #HL Hcm Harm HPd Hfp Hfc
   ihave Hcm := pfAt_au _ _ $$ Hcm
   unfold topFrag topFragQ
   -- PARENT AND CHILD ARE DISTINCT KEYS: the parent's fragment is whole
@@ -413,9 +415,9 @@ theorem cafAcre_fire_nm [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat �
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HΦ⟩
   obtain ⟨⟨hnzp, habsp⟩, -⟩ := (absOf_some_iff np _).1 (Xv6.absOf_dir np hdir hnl)
   obtain ⟨⟨hnzp', habsp'2⟩, -⟩ := (absOf_some_iff np' _).1 habsp'
-  imod ftopLed_moveAt γfs I d np np' [.ent act d nm (some i), .nlink act d (fnNlink np + acreBump (cf d i))]
-    hlkp rfl (fun h ht => fevTie_entNlink act nm (some i) (dirEntries np) (fnNlink np) _ ht hlkp hnzp habsp
-      hnzp' habsp'2) $$ Hled with ⟨Hled, #Hrc⟩
+  imod ftopLed_moveAtAfter γfs I d np np' [.ent act d nm (some i), .nlink act d (fnNlink np + acreBump (cf d i))]
+    L hlkp rfl (fun h ht => fevTie_entNlink act nm (some i) (dirEntries np) (fnNlink np) _ ht hlkp hnzp habsp
+      hnzp' habsp'2) $$ HL Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I d np', A
     iframe Ha Hla Hpark Hled

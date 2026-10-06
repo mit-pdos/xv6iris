@@ -470,6 +470,8 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
     -- THE NAME PREDICATE, at the name this leg files (INIT-FILE)
     (hNm : Nm (bname 14 nf)) (act : BitVec 64) :
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
+      -- (NI M3 private files FS-2e) the child's arm, which the leg lands past
+      creArmRcpt fscFs act cinum.toNat -∗
       dlinks fscFs dind.toNat dn bm data -∗
       FsStateLink.linkToks (fsGammaL fscFs) (cinum.toNat : Int)
         (FsStateLink.linkReps (createDelta ty) (createIty ty (dind.toNat : Int))) -∗
@@ -486,8 +488,9 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
         Pd dind.toNat ∗
         creAcreFired Fok dind.toNat (bname 14 nf) cinum.toNat
           (creChild ty.toNat major.toNat minor.toNat dind.toNat cinum.toNat) ∗
-        -- (NI M3 private files FS-1) the parent leg's ledger receipt
-        creParentRcpt fscFs act cinum.toNat := by
+        -- (NI M3 private files FS-1, FS-2e) the parent leg's ledger receipt:
+        -- the name it filed, after the arm
+        creParentRcpt fscFs act (bname 14 nf) cinum.toNat := by
   obtain ⟨hty', hnl', hszmax, hcap', hiok', hrl', hdok', hddix', hduq'⟩ :=
     create_alloc_append_facts dind dn dn' bm bm' data data' cinum nf hty hiok hdok hddix hduq hrl
       hnone hc16 hcinb hwf' hholes' haddr' hcov' hdn' hcapp hsizedp hrng
@@ -534,7 +537,9 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
     exact entTok_ofLink (fsGammaL fscFs) dind.toNat _ _ false (bname 14 nf) cinum.toNat .tFile
       (entTyOk_name _ _ _ false _ (by rw [DOT_dot]; exact hnd.1) (by rw [DOTDOT_dotdot]; exact hnd.2)
         (by simp))
-  iintro #Hinv Hdl Htok Htop Hctop Hacre Harm HPd
+  iintro #Hinv #Harc Hdl Htok Htop Hctop Hacre Harm HPd
+  unfold creArmRcpt fsLedAt
+  icases Harc with ⟨%na, %ha, #Harc⟩
   icases dlinks_open fscFs dind.toNat dn bm data $$ Hdl with ⟨%D, %hD, Hetk⟩
   obtain ⟨hdok0, hxact0⟩ := hD
   have hsD : bname 14 nf ∉ D := fun hin => by
@@ -557,8 +562,9 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
   imod (cafAcre_fire_nm (hlc := hlc) fscFs ⊤ (creChild ty.toNat major.toNat minor.toNat) Nm Pd Farm
     Fok dind.toNat cinum.toNat (bname 14 nf) (DFrac.own 1) _ _ _ CoPset.subseteq_top hNm hloc
     (mkfEra_is_dir dn bm data hdz) (Xv6.eraNlink_nz dn bm data hnl0z) hnoneE
-    ⟨by rw [DOT_dot]; exact hnd.1, by rw [DOTDOT_dotdot]; exact hnd.2⟩ habsp' habsc act)
-    $$ Hft Hap Hacre Harm HPd Htop Hctop with ⟨Htop, Hctop, HPd, #Hprc, ⟨%av, %hpre, HFok⟩⟩
+    ⟨by rw [DOT_dot]; exact hnd.1, by rw [DOTDOT_dotdot]; exact hnd.2⟩ habsp' habsc act
+    (ha ++ [.arm act cinum.toNat na]))
+    $$ Hft Hap Harc Hacre Harm HPd Htop Hctop with ⟨Htop, Hctop, HPd, #Hprc, ⟨%av, %hpre, HFok⟩⟩
   ihave Hctop : topFrag (fsGammaL fscFs) cinum.toNat
       (eraNode (createSetf dnc major minor 1#16) bmc datc) $$ [Hctop]
   · rw [topFrag_1]; iexact Hctop
@@ -569,9 +575,7 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
     iexists av, (dirEntries (eraNode dn bm data)), (fnNlink (eraNode dn bm data))
     iframe HFok
     ipureintro; exact hpre
-  · unfold creParentRcpt
-    iexists dind.toNat, bname 14 nf, _
-    iapply fsMoveRcpt_at $$ Hprc
+  · iapply creParentRcpt_of $$ Harc Hprc
 
 end Repark
 
@@ -699,7 +703,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
       creAcreFired Fok dind.toNat (bname 14 nf) cinum.toNat
         (creChild ty.toNat major.toNat minor.toNat dind.toNat cinum.toNat) -∗
       -- (NI M3 private files FS-1) the made child's ledger receipt
-      creOkRcpt fscFs k.proc true cinum.toNat -∗
+      creOkRcpt fscFs k.proc true (bname 14 nf) cinum.toNat -∗
       (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
       wpLoop cpu := by
@@ -795,7 +799,8 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
   · ipureintro
     refine ⟨fun x hx => hsub2 x (hsb x hx), by omega, fun _ => ?_⟩
     exact create_fail_ip_left n' n2 w2 hn' hn2
-  · unfold creRcptAt; iright; iexact Hcrc
+  · unfold creRcptAt; iright; iexists bname 14 nf; iframe Hcrc
+    ipureintro; exact Xv6.sys_unlink_last_of_npar _ nf hnp
   simp only [↓reduceIte]
   isplitl []
   · ipureintro
@@ -1087,7 +1092,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
       bmc datc Nm Nd (P (nparElems (bview plen pfun)).length) Farm Fok htyd hnl0 hiok hdok hddix hduq hrl
       hnone hc16 hcpos.1 hcinb htdir htyc hfresh hty hwf' hholes' haddr' hcov' hdn' hcapp hsizedp
       hrng (hNmL _ (Xv6.sys_unlink_last_of_npar _ nf hnp)) k.proc)
-      $$ Hinv Hdl Htok Htop Hctop Hacre Harm HP with ⟨Hdl, Htop, Hctop, HP, HFok, #Hprc⟩
+      $$ Hinv Harc Hdl Htok Htop Hctop Hacre Harm HP with ⟨Hdl, Htop, Hctop, HP, HFok, #Hprc⟩
     imodintro
     icases create_alloc_map_open (ientry kd) bm' $$ Hmap with ⟨Ha, Hi⟩
     ihave Hload := icMkLoaded fscFs fscIreg fscCov fscLogst kd dind dn' bm' data' hiok' hrl' hdok'
@@ -1118,7 +1123,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
     · unfold creOkRcpt; ileft
       isplitl []
       · ipureintro; rfl
-      iframe Harc Hprc
+      iexact Hprc
   · -- ======== ARM FAIL's non-directory entry: the append fell short ========
     have htot0 : tot = 0 := by rcases hatom with h | h <;> omega
     -- (NI M3 FS-0) the append's reason

@@ -61,3 +61,4 @@ decl Xv6.fevStatOf               # FS-2 reaches (fstat's row; out of FS-2a: the 
 decl Xv6.fevRun_prefix           # FS-2 reaches (the fold at a cited prefix)
 decl Xv6.fsLedLb_prefix          # FS-2 reaches (a receipt's prefix bound)
 decl Xv6.fsEvRcpt_of_lb          # FS-2 reaches (a citation's lower bound from a receipt)
+decl Xv6.creOkIn_mono            # FS-2f reaches (FS-2e: create's events inside the install's prefix, lifted from the fixing one)

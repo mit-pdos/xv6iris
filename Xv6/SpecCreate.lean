@@ -141,20 +141,21 @@ def creOkArms (Γ : FsViewNames GF) (tyz ma mi : Nat) (Nm : Fname → Prop) (Nd 
      else
       iprop(creExFired Fex d nm i ∗ creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok)))
 
-/-- ...relayed to the post, keyed on `ok` -/
-def creRcptAt (γfs : FsNames) (act : BitVec 64) (ok made : Bool) (i : Nat) : IProp GF :=
-  iprop(⌜ok = false⌝ ∨ creOkRcpt γfs act made i)
+/-- ...relayed to the post, keyed on `ok`; (NI M3 private files FS-2e) at the
+entry name, the path's last element -/
+def creRcptAt (γfs : FsNames) (act : BitVec 64) (pl : List (BitVec 8)) (ok made : Bool) (i : Nat) : IProp GF :=
+  iprop(⌜ok = false⌝ ∨ ∃ nm : Fname, ⌜(pathElems pl).getLast? = some nm⌝ ∗ creOkRcpt γfs act made nm i)
 
-instance creRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (ok made : Bool) (i : Nat) :
-    Persistent (creRcptAt (GF := GF) γfs act ok made i) := by
-  unfold creRcptAt creOkRcpt creArmRcpt creParentRcpt; infer_instance
+instance creRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (pl : List (BitVec 8)) (ok made : Bool)
+    (i : Nat) : Persistent (creRcptAt (GF := GF) γfs act pl ok made i) := by
+  unfold creRcptAt; infer_instance
 
-theorem creRcptAt_act (γfs : FsNames) (a b : BitVec 64) (ok made : Bool) (i : Nat) (h : a = b) :
-    creRcptAt (GF := GF) γfs a ok made i ⊢ creRcptAt γfs b ok made i := by
+theorem creRcptAt_act (γfs : FsNames) (a b : BitVec 64) (pl : List (BitVec 8)) (ok made : Bool) (i : Nat)
+    (h : a = b) : creRcptAt (GF := GF) γfs a pl ok made i ⊢ creRcptAt γfs b pl ok made i := by
   subst h; exact .rfl
 
-theorem creRcptAt_fail (γfs : FsNames) (act : BitVec 64) (made : Bool) (i : Nat) :
-    ⊢@{IProp GF} creRcptAt γfs act false made i := by
+theorem creRcptAt_fail (γfs : FsNames) (act : BitVec 64) (pl : List (BitVec 8)) (made : Bool) (i : Nat) :
+    ⊢@{IProp GF} creRcptAt γfs act pl false made i := by
   unfold creRcptAt; ileft; ipureintro; rfl
 
 /-- (NI M3 FS-0) **WHY create GAVE UP once the walk reached the parent**
@@ -482,7 +483,7 @@ def createPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor
     ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ u' ≤ u ∧ (ok = true → iputUnits ≤ u')⌝ -∗
     logOpS icfgLog u' Sb' -∗
     -- (NI M3 private files FS-1) the call's ledger receipt (`creRcptAt`)
-    creRcptAt fscFs k.proc ok made inum.toNat -∗
+    creRcptAt fscFs k.proc (bview plen pfun) ok made inum.toNat -∗
     (if ok then
       -- BOTH SUCCESS ARMS RETURN A LOCKED INODE
       iprop(⌜R' 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧

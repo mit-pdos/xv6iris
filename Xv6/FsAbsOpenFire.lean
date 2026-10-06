@@ -259,8 +259,10 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     (i : Nat) (bs0 : List (BitVec 8)) (nl : Nat) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
     (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.AFile bs0, nl⟩)
-    (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile [], nl⟩) (act : BitVec 64) :
+    (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile [], nl⟩) (act : BitVec 64) (L : List Fev) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
+      -- (NI M3 private files FS-2e) the bound the truncation lands past
+      fsLedLb γfs L -∗
       -- THE PIECE ARRIVES KEYED AT THE INUM (Rocq lane F-OPEN-3): the permit
       -- was paid where what pays it was still in hand
       -- (`SysOpenDefs.openTruncAt`)
@@ -268,9 +270,9 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
       topFrag (fsGammaL γfs) i n ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
         -- (NI M3 private files FS-1) the truncation's event
-        fsMoveRcpt γfs [.trunc act i] i n ∗
+        fsMoveRcptAfter γfs L [.trunc act i] i n ∗
         ∃ av : Aview, ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗ Ft.pfRecv av i bs0 := by
-  iintro #Hi #Hai Hcm Hf
+  iintro #Hi #Hai #HL Hcm Hf
   ihave Hcm := pfAt_au _ _ $$ Hcm
   unfold ftopInv
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
@@ -303,8 +305,8 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     iapply (appStep_at i I _ n' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I i n') %hdelta Ha
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HΦ⟩
-  imod ftopLed_moveAt γfs I i n n' [.trunc act i] hlk rfl
-    (fun h ht => fevTie_trunc act bs0 nl ht hlk hnz habs hnz' habs') $$ Hled with ⟨Hled, #Hrc⟩
+  imod ftopLed_moveAtAfter γfs I i n n' [.trunc act i] L hlk rfl
+    (fun h ht => fevTie_trunc act bs0 nl ht hlk hnz habs hnz' habs') $$ HL Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I i n', A
     iframe Ha Hla Hpark Hled

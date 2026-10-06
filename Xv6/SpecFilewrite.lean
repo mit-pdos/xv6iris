@@ -586,37 +586,208 @@ theorem fwWhyAt_why (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd)
   rcases st with _ | ⟨rb, _ | _, _ | ⟨i, γo, om⟩ | mj⟩ <;> try (iintro -; iempintro)
   iintro Hw -; iright; iexists w; iexact Hw
 
-/-- (NI M3 private files FS-1) **THE WRITE'S LEDGER RECEIPT**, relayed to the
-post: at a writable inode descriptor, the chunks that moved the row, one
-`write` block per chunk at its own position (`FsLedger.fwChunks`); other
+/-- (NI M3 private files FS-2e) **ONE CHUNK'S FACTS**: `e` is `act`'s write of
+`(i, γo)` at the mode `hd`, whose counted bytes (`bs.take r`) are the caller's
+own run at `ua + t` (`t` the advances of the chunks before it), landing more
+than it counted (writei's disturbed tail) only at a source fault. -/
+def fwChunkOk (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool) (M : Nat → List (BitVec 8))
+    (ua : BitVec 64) (P : UPtd) (n : Int) (t : Nat) (e : Fev) : Prop :=
+  ∃ (off : Nat) (bs : List (BitVec 8)) (r : Nat), e = .write act i γo hd off bs r ∧
+    ubytesAt M (ua + BitVec.ofNat 64 t) (bs.take r) ∧ (r < bs.length → wrFailWhy P ua n.toNat)
+
+/-- (NI M3 private files FS-2e) **A WRITE'S CHUNKS, IN LEDGER ORDER**: each
+chunk `(q, e)` is the ledger's event at position `q`, past the previous
+chunk's (`lo` the bound, the previous position + 1), its bytes the caller's
+run after the chunks before it (`t` their advances). -/
+def fwChunksOrd (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) :
+    Nat → Nat → List (Nat × Fev) → IProp GF
+  | _, _, [] => iprop(emp)
+  | lo, t, (q, e) :: cs => iprop(⌜lo ≤ q ∧ fwChunkOk act i γo hd M ua P n t e⌝ ∗ fsLedPos γfs q e ∗
+      fwChunksOrd γfs act i γo hd M ua P n (q + 1) (t + fevWriteR e) cs)
+
+instance fwChunksOrd_persistent (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (lo t : Nat) (cs : List (Nat × Fev)) :
+    Persistent (fwChunksOrd (GF := GF) γfs act i γo hd M ua P n lo t cs) := by
+  induction cs generalizing lo t with
+  | nil => unfold fwChunksOrd; infer_instance
+  | cons c cs ih => obtain ⟨q, e⟩ := c; unfold fwChunksOrd; infer_instance
+
+/-- the position after the last chunk (`lo` if none) -/
+def fwEnd (lo : Nat) (cs : List (Nat × Fev)) : Nat :=
+  match cs.getLast? with
+  | some (q, _) => q + 1
+  | none => lo
+
+theorem fwEnd_append (lo : Nat) (cs cs' : List (Nat × Fev)) :
+    fwEnd lo (cs ++ cs') = fwEnd (fwEnd lo cs) cs' := by
+  unfold fwEnd
+  rw [List.getLast?_append]
+  cases h : cs'.getLast? with
+  | none => simp
+  | some c => obtain ⟨q, e⟩ := c; simp
+
+theorem fwEnd_cons (lo q : Nat) (e : Fev) (cs : List (Nat × Fev)) :
+    fwEnd lo ((q, e) :: cs) = fwEnd (q + 1) cs := by
+  rw [show (q, e) :: cs = [(q, e)] ++ cs from rfl, fwEnd_append]; rfl
+
+theorem fwChunksOrd_cons (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (lo t q : Nat) (e : Fev)
+    (cs : List (Nat × Fev)) :
+    fwChunksOrd (GF := GF) γfs act i γo hd M ua P n lo t ((q, e) :: cs) =
+      iprop(⌜lo ≤ q ∧ fwChunkOk act i γo hd M ua P n t e⌝ ∗ fsLedPos γfs q e ∗
+        fwChunksOrd γfs act i γo hd M ua P n (q + 1) (t + fevWriteR e) cs) := rfl
+
+theorem fwChunksOrd_nil (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (lo t : Nat) :
+    ⊢@{IProp GF} fwChunksOrd γfs act i γo hd M ua P n lo t [] := by
+  unfold fwChunksOrd; iempintro
+
+theorem fwChunksOrd_app (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (cs cs' : List (Nat × Fev)) :
+    ∀ lo t, fwChunksOrd (GF := GF) γfs act i γo hd M ua P n lo t cs ⊢
+      fwChunksOrd γfs act i γo hd M ua P n (fwEnd lo cs) (t + fwSum cs) cs' -∗
+      fwChunksOrd γfs act i γo hd M ua P n lo t (cs ++ cs') := by
+  induction cs with
+  | nil =>
+    intro lo t
+    simp only [List.nil_append, fwSum, List.map_nil, List.sum_nil, Nat.add_zero]
+    have he : fwEnd lo [] = lo := rfl
+    rw [he]
+    iintro - H; iexact H
+  | cons c cs ih =>
+    intro lo t
+    obtain ⟨q, e⟩ := c
+    rw [List.cons_append, fwEnd_cons, fwChunksOrd_cons, fwChunksOrd_cons]
+    iintro ⟨%he, #Hp, H1⟩ H2
+    isplitl []
+    · ipureintro; exact he
+    isplitl []
+    · iexact Hp
+    have hs : t + fwSum ((q, e) :: cs) = t + fevWriteR e + fwSum cs := by
+      unfold fwSum; simp [Nat.add_assoc]
+    rw [hs]
+    iapply ih (q + 1) (t + fevWriteR e) $$ H1 H2
+
+/-- the bound past the last chunk, as a lower bound of the ledger (none
+before the first) -/
+theorem fwChunksOrd_bound (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (cs : List (Nat × Fev)) :
+    ∀ lo t, fwChunksOrd (GF := GF) γfs act i γo hd M ua P n lo t cs ⊢
+      ⌜cs = []⌝ ∨ ∃ L : List Fev, ⌜L.length = fwEnd lo cs⌝ ∗ fsLedLb γfs L := by
+  induction cs with
+  | nil => intro lo t; iintro -; ileft; ipureintro; rfl
+  | cons c cs ih =>
+    intro lo t
+    obtain ⟨q, e⟩ := c
+    rw [fwChunksOrd_cons]
+    iintro ⟨-, #Hp, H1⟩
+    iright
+    rw [fwEnd_cons]
+    icases ih (q + 1) (t + fevWriteR e) $$ H1 with (%h0 | H)
+    · subst h0
+      unfold fsLedPos
+      icases Hp with ⟨%h, %hl, #Hr⟩
+      iexists h ++ [e]
+      iframe Hr
+      ipureintro; simp [fwEnd, hl]
+    · iexact H
+
+/-- the bound at a run of chunks from `0`, the empty one minted -/
+theorem fwChunksOrd_bound0 (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (t : Nat) (cs : List (Nat × Fev)) :
+    fwChunksOrd (GF := GF) γfs act i γo hd M ua P n 0 t cs ⊢
+      |==> ∃ L : List Fev, ⌜L.length = fwEnd 0 cs⌝ ∗ fsLedLb γfs L := by
+  iintro H
+  icases fwChunksOrd_bound γfs act i γo hd M ua P n cs 0 t $$ H with (%h0 | H)
+  · subst h0
+    imod fsLedLb_nil γfs with #H0
+    imodintro
+    iexists []
+    iframe H0
+    ipureintro; rfl
+  · imodintro; iexact H
+
+/-- ONE CHUNK, from its fire's receipt past the bound: the chunk at its
+position, and the new bound past it -/
+theorem fwChunksOrd_one (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (lo t : Nat) (L : List Fev)
+    (e : Fev) (nd : FsNode) (hlo : lo ≤ L.length) (hok : fwChunkOk act i γo hd M ua P n t e) :
+    fsMoveRcptAfter (GF := GF) γfs L [e] i nd ⊢
+      ∃ q : Nat, fwChunksOrd γfs act i γo hd M ua P n lo t [(q, e)] ∗
+        ∃ L' : List Fev, ⌜L'.length = q + 1⌝ ∗ fsLedLb γfs L' := by
+  unfold fsMoveRcptAfter
+  iintro ⟨%h, %⟨hv, -⟩, #Hr⟩
+  iexists h.length
+  rw [fwChunksOrd_cons]
+  isplitl []
+  · isplitl []
+    · ipureintro; exact ⟨Nat.le_trans hlo hv.length_le, hok⟩
+    isplitl []
+    · unfold fsLedPos; iexists h; iframe Hr; ipureintro; rfl
+    · iapply fwChunksOrd_nil
+  · iexists h ++ [e]; iframe Hr; ipureintro; simp
+
+/-- (NI M3 private files FS-2e) **A SHORT CHUNK'S REASON, PAST A POSITION**:
+a source fault, or writei's verdict (`.max`: the file at its size cap;
+`.blocks`: the disk out of blocks) past `lo` -/
+def fwWhyAfter (γfs : FsNames) (act : BitVec 64) (P : UPtd) (ua : BitVec 64) (n : Int) (lo : Nat) :
+    IProp GF :=
+  iprop(⌜wrFailWhy P ua n.toNat⌝ ∨ fsFullAfter γfs act .max lo ∨ fsFullAfter γfs act .blocks lo)
+
+instance fwWhyAfter_persistent (γfs : FsNames) (act : BitVec 64) (P : UPtd) (ua : BitVec 64) (n : Int)
+    (lo : Nat) : Persistent (fwWhyAfter (GF := GF) γfs act P ua n lo) := by
+  unfold fwWhyAfter; infer_instance
+
+/-- ...is a reason of FS-0's -/
+theorem fwWhyAfter_why (γfs : FsNames) (act : BitVec 64) (P : UPtd) (ua : BitVec 64) (n : Int)
+    (lo : Nat) : fwWhyAfter (GF := GF) γfs act P ua n lo ⊢ ∃ w : FwWhy, fwWhyRcpt γfs act P ua n w := by
+  unfold fwWhyAfter
+  iintro (%h | H | H)
+  · iexists FwWhy.src; unfold fwWhyRcpt; ipureintro; exact h
+  · iexists FwWhy.max; unfold fwWhyRcpt; iapply fsFullAfter_rcpt $$ H
+  · iexists FwWhy.full; unfold fwWhyRcpt; iapply fsFullAfter_rcpt $$ H
+
+/-- (NI M3 private files FS-1, FS-2e) **THE WRITE'S LEDGER RECEIPT**, relayed
+to the post: at a writable inode descriptor, the chunks that moved the row
+IN LEDGER ORDER (`fwChunksOrd`: positions increasing, each chunk's counted
+bytes the caller's buffer `M` at `ua` past the chunks before it), summing to
+the answer on success; on a `-1` past the sign guard, the
+short chunk's reason (`fwWhyAfter`: a verdict past the last chunk).  Other
 descriptors carry nothing. -/
-def fwRcptAt (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (r : BitVec 64) : IProp GF :=
+def fwRcptAt (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd) (M : Nat → List (BitVec 8))
+    (ua : BitVec 64) (n : Int) (r : BitVec 64) : IProp GF :=
   match st with
   | .open _ true (.inode i γo om) =>
-    iprop(∃ cs : List Fev, fwChunks γfs act i γo (om == .held) cs ∗ ⌜r ≠ -1#64 → fwSum cs = n.toNat⌝)
+    iprop(∃ cs : List (Nat × Fev), fwChunksOrd γfs act i γo (om == .held) M ua P n 0 0 cs ∗
+      ⌜r ≠ -1#64 → fwSum cs = n.toNat⌝ ∗
+      (⌜r ≠ -1#64 ∨ n < 0⌝ ∨ fwWhyAfter γfs act P ua n (fwEnd 0 cs)))
   | _ => iprop(True)
 
-instance fwRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (r : BitVec 64) :
-    Persistent (fwRcptAt (GF := GF) γfs act st n r) := by
+instance fwRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (r : BitVec 64) :
+    Persistent (fwRcptAt (GF := GF) γfs act st P M ua n r) := by
   unfold fwRcptAt
   rcases st with _ | ⟨rb, _ | _, t⟩ <;> try infer_instance
   cases t <;> infer_instance
 
-/-- no chunk landed: a `-1`, a zero (or negative) count, or no writable inode -/
-theorem fwRcptAt_nil (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (r : BitVec 64)
-    (h : r = -1#64 ∨ n.toNat = 0 ∨ ∀ rb i γo om, st ≠ .open rb true (.inode i γo om)) :
-    ⊢@{IProp GF} fwRcptAt γfs act st n r := by
+/-- no chunk landed: a zero (or negative) count at a non-`-1` answer or past
+the sign guard, or no writable inode -/
+theorem fwRcptAt_nil (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (r : BitVec 64)
+    (h : (n.toNat = 0 ∧ (r ≠ -1#64 ∨ n < 0)) ∨ ∀ rb i γo om, st ≠ .open rb true (.inode i γo om)) :
+    ⊢@{IProp GF} fwRcptAt γfs act st P M ua n r := by
   unfold fwRcptAt
   rcases st with _ | ⟨rb, _ | _, t⟩ <;> try (ipureintro; trivial)
   cases t with
   | inode i γo om =>
-    rcases h with h | h | h
-    · iexists []; isplitl
-      · iapply fwChunks_nil
-      · ipureintro; intro hr; exact absurd h hr
-    · iexists []; isplitl
-      · iapply fwChunks_nil
+    rcases h with ⟨h, h'⟩ | h
+    · iexists []
+      isplitl
+      · iapply fwChunksOrd_nil
+      isplitl
       · ipureintro; intro _; simp [fwSum, h]
+      · ileft; ipureintro; exact h'
     · exact absurd rfl (h rb i γo om)
   | _ => ipureintro; trivial
 
@@ -982,7 +1153,7 @@ def filewritePost (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (f
     -- (NI M3 FS-0) ...AND WHY a writable inode's `-1`
     fwWhyAt fscFs k.proc st V.upt (k.regs 11#5) n (R' 10#5) -∗
     -- (NI M3 private files FS-1) ...AND THE CHUNKS' LEDGER RECEIPTS
-    fwRcptAt fscFs k.proc st n (R' 10#5) -∗
+    fwRcptAt fscFs k.proc st V.upt (writerImg V.upt M) (k.regs 11#5) n (R' 10#5) -∗
     wpLoop cpu')
 
 end Post

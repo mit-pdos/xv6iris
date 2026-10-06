@@ -129,8 +129,9 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
     (harms : (a0 = -1#64 ∧ tot = 0 ∧ bm' = bm ∧ data' = data ∧ dn' = dn) ∨
       (a0 = BitVec.ofNat 64 tot ∧ off ≤ dn.diSize.toNat ∧
         dn'.diSize.toNat = max (off + tot) dn.diSize.toNat))
-    (hchunk : ubytesAt Mimg (ua + BitVec.ofNat 64 t) (wrfRun wrote tot)) (act : BitVec 64) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗
+    (hchunk : ubytesAt Mimg (ua + BitVec.ofNat 64 t) (wrfRun wrote tot)) (act : BitVec 64)
+    (lo : Nat) (L : List Fev) (hlo : lo ≤ L.length) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ fsLedLb fscFs L -∗
       topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) -∗
       offLinkB (hlc := hlc) (om == .held) γo (off : Int) -∗
       fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p 0 ={⊤}=∗
@@ -139,8 +140,11 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
         ((⌜tot = c⌝ ∗ fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
          (⌜tot < c⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
            fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p x)) ∗
-        -- (NI M3 private files FS-1) the chunk's event, when the row moved
-        ∃ cs : List Fev, fwChunks fscFs act inum.toNat γo (om == .held) cs ∗ ⌜fwSum cs = tot⌝ := by
+        -- (NI M3 private files FS-1, FS-2e) the chunk's event, when the row
+        -- moved, past the bound `lo`, its bytes the caller's run at `ua + t`;
+        -- and the bound past it
+        ∃ cs : List (Nat × Fev), fwChunksOrd fscFs act inum.toNat γo (om == .held) Mimg ua P n lo t cs ∗
+          ⌜fwSum cs = tot⌝ ∗ ∃ L' : List Fev, ⌜fwEnd lo cs ≤ L'.length⌝ ∗ fsLedLb fscFs L' := by
   have hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ ⊤ := CoPset.subseteq_top
   have hnz : fnType (eraNode dn bm data) ≠ 0 := opfEra_file_typed dn bm data hty
   have hrow := opfEra_file_row dn bm data hty
@@ -150,7 +154,7 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
     rw [wrfEra_bytes]; exact Xv6.fileBytes_length' _ _
   have hptie : ua + BitVec.ofNat 64 t = ua + BitVec.ofInt 64 (FW_MAX * (p : Int)) := by
     rw [← htie, BitVec.ofInt_natCast]
-  iintro #Hft #Hai Htop Hgv Hst
+  iintro #Hft #Hai #HL Htop Hgv Hst
   rcases harms with ⟨h0, htot0, hbm, hdata, hdn⟩ | ⟨h0, hle, hsz'⟩
   · -- WRITEI'S -1: the up-front guards failed, nothing ran
     subst bm' data' dn' htot0
@@ -167,9 +171,12 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
       iexists 0
       iframe Hst
       ipureintro; omega
-    · iexists []; isplitl
-      · iapply fwChunks_nil
+    · iexists []
+      isplitl []
+      · iapply fwChunksOrd_nil
+      isplitl []
       · ipureintro; rfl
+      iexists L; iframe HL; ipureintro; exact hlo
   · have hrange' : ∀ k, k < MAXFILE * BSIZE →
         fileByte data' k =
           if off ≤ k ∧ k < off + tot then wrote (k - off)
@@ -190,8 +197,8 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
         (fnFileBytes (eraNode dn bm data)) (fnNlink (eraNode dn bm data)) (eraNode dn bm data)
         (eraNode dn' bm' data') hE hloc (by rw [wrfRun_length]; omega)
         (by rw [hbs0]; exact hle) (by rw [wrfRun_length]; exact hcap) hnz hrow hnz' hrow'
-        hchunk (by rw [wrfRun_length, hfull]; exact hcw) htn htie act)
-        $$ Hft Hai Hst Htop Hgv with ⟨Htop, Hgv, Hst, #Hrc⟩
+        hchunk (by rw [wrfRun_length, hfull]; exact hcw) htn htie act L)
+        $$ Hft Hai HL Hst Htop Hgv with ⟨Htop, Hgv, Hst, #Hrc⟩
       imodintro
       iframe Htop
       rw [wrfRun_length] at *
@@ -202,9 +209,18 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
         · ipureintro; exact hfull
         rw [← hfull]
         iexact Hst
-      · iexists _; isplitl
-        · iapply fwChunks_one $$ Hrc
+      · have hok : fwChunkOk act inum.toNat γo (om == .held) Mimg ua P n t
+            (.write act inum.toNat γo (om == .held) off (wrfRun wrote tot) (wrfRun wrote tot).length) :=
+          ⟨off, wrfRun wrote tot, (wrfRun wrote tot).length, rfl, by rw [List.take_length]; exact hchunk,
+            fun h => absurd h (Nat.lt_irrefl _)⟩
+        rw [wrfRun_length] at hok
+        icases fwChunksOrd_one fscFs act inum.toNat γo (om == .held) Mimg ua P n lo t L _ _ hlo hok
+          $$ Hrc with ⟨%q, #Hc, ⟨%L', %hL', #HL'⟩⟩
+        iexists _
+        iframe Hc
+        isplitl []
         · ipureintro; simp [fwSum, fevWriteR]
+        iexists L'; iframe HL'; ipureintro; simp [fwEnd, hL']
     · have htotlt : tot < c := by omega
       by_cases hland : 0 < (wrfLanded wrote dstb dn.diSize.toNat off tot dist).length
       · -- THE PARTIAL NODE FIRES, at the run that landed
@@ -226,8 +242,8 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
             have hct : (wchunkAt n p).toNat = c := by rw [← hcw]; omega
             rw [hct] at hb
             rcases hw16 hb with h | h <;> omega)
-          htn htie act)
-          $$ Hft Hai Hst Htop Hgv with ⟨Htop, Hgv, Hst, #Hrc⟩
+          htn htie act L)
+          $$ Hft Hai HL Hst Htop Hgv with ⟨Htop, Hgv, Hst, #Hrc⟩
         imodintro
         iframe Htop Hgv
         isplitl [Hst]
@@ -238,9 +254,17 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
           isplitr
           · ipureintro; omega
           iexact Hst
-        · iexists _; isplitl
-          · iapply fwChunks_one $$ Hrc
+        · have hok : fwChunkOk act inum.toNat γo (om == .held) Mimg ua P n t
+              (.write act inum.toNat γo (om == .held) off (wrfLanded wrote dstb dn.diSize.toNat off tot dist) tot) :=
+            ⟨off, _, tot, rfl, by rw [htake]; exact hchunk,
+              fun hlt => hwhy (by rw [hbslen] at hlt; omega)⟩
+          icases fwChunksOrd_one fscFs act inum.toNat γo (om == .held) Mimg ua P n lo t L _ _ hlo hok
+            $$ Hrc with ⟨%q, #Hc, ⟨%L', %hL', #HL'⟩⟩
+          iexists _
+          iframe Hc
+          isplitl []
           · ipureintro; simp [fwSum, fevWriteR]
+          iexists L'; iframe HL'; ipureintro; simp [fwEnd, hL']
       · -- NOTHING LANDED: the view does not move
         have hlen0 : (wrfLanded wrote dstb dn.diSize.toNat off tot dist).length = 0 := by omega
         have hbslen := wrfLanded_length wrote dstb dn.diSize.toNat off tot dist
@@ -262,9 +286,12 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
           iexists 0
           iframe Hst
           ipureintro; omega
-        · iexists []; isplitl
-          · iapply fwChunks_nil
+        · iexists []
+          isplitl []
+          · iapply fwChunksOrd_nil
+          isplitl []
           · ipureintro; simp [fwSum]
+          iexists L; iframe HL; ipureintro; exact hlo
 
 end Fire
 
@@ -366,7 +393,9 @@ theorem fwr_post_ghost (act : BitVec 64) (om : OffMode) (cpu : CPU) (ik fk : Nat
         dn'.diSize.toNat = max (v.toNat + tot) dn.diSize.toNat))
     (hchunk : ubytesAt Mimg (ua + BitVec.ofNat 64 t) (wrfRun wrote tot))
     (hok' : inodeOk fscCov fscLogst dn' bm' data') (hrl' : inodeRecLocal dn')
-    (hnd' : dn'.diType.toNat ≠ T_DIR_z) (hdn0 : dn0' = dn') :
+    (hnd' : dn'.diType.toNat ≠ T_DIR_z) (hdn0 : dn0' = dn') (cs : List (Nat × Fev)) (hsum0 : fwSum cs = t) :
+    -- (NI M3 private files FS-2e) the chunks so far, in ledger order
+    fwChunksOrd fscFs act inum.toNat γo (om == .held) Mimg ua P n 0 0 cs ∗
     ownCtx cpu curCtx ∗ fsReady (hlc := hlc) ∗
       topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) ∗
       offLinkB (hlc := hlc) (om == .held) γo (v.toNat : Int) ∗
@@ -377,14 +406,17 @@ theorem fwr_post_ghost (act : BitVec 64) (om : OffMode) (cpu : CPU) (ik fk : Nat
       inodeBlocks fscFs bm' data' ⊢
       |={⊤}=> ownCtx cpu curCtx ∗ offFd fk q γb γo om C ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
         icLoaded fscFs fscIreg fscCov fscLogst ik inum dn' bm' ∗
-        -- (NI M3 private files FS-1) the chunk's ledger receipt (if it moved the row)
-        (∃ cs : List Fev, fwChunks fscFs act inum.toNat γo (om == .held) cs ∗ ⌜fwSum cs = tot⌝) ∗
+        -- (NI M3 private files FS-1, FS-2e) the chunk's ledger receipt (if it
+        -- moved the row), after the chunks so far
+        ∃ cs' : List (Nat × Fev), fwChunksOrd fscFs act inum.toNat γo (om == .held) Mimg ua P n 0 0 (cs ++ cs') ∗
+          ⌜fwSum cs' = tot⌝ ∗
         ((⌜tot = c⌝ ∗ fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
          (⌜tot < c⌝ ∗
-           -- (NI M3 FS-0) THE SHORT CHUNK'S REASON: writei's own `-1` (the
-           -- file at MAXFILE), a disturbed tail (an unmapped source byte), or
-           -- neither -- bmap's out-of-blocks `0`
-           (∃ w : FwWhy, fwWhyRcpt fscFs act P ua n w) ∗
+           -- (NI M3 FS-0, FS-2e) THE SHORT CHUNK'S REASON: writei's own `-1`
+           -- (the file at MAXFILE), a disturbed tail (an unmapped source
+           -- byte), or neither -- bmap's out-of-blocks `0`; a verdict lands
+           -- past the last chunk
+           fwWhyAfter fscFs act P ua n (fwEnd 0 (cs ++ cs')) ∗
            ∃ x : Nat, ⌜x ≤ 1⌝ ∗
            fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p x)) := by
   have hloc : InodeLocal inum.toNat (eraNode dn' bm' data') :=
@@ -393,14 +425,22 @@ theorem fwr_post_ghost (act : BitVec 64) (om : OffMode) (cpu : CPU) (ik fk : Nat
   have hw : (filerwOffW v tot).toNat = v.toNat + tot :=
     filerwOffW_toNat v tot (by have : MAXFILE * BSIZE = 274432 := rfl; omega)
   have hwf : offWf (filerwOffW v tot) := by unfold offWf; rw [hw]; exact hcap
-  iintro ⟨Hrun, #Hfs, Htop, Hgv, Hst, Hcell, Hout, Hdi, Hmeta, Hmap, Hblk⟩
+  iintro ⟨#Hcs0, Hrun, #Hfs, Htop, Hgv, Hst, Hcell, Hout, Hdi, Hmeta, Hmap, Hblk⟩
   icases fsReady_region $$ Hfs with ⟨#Hireg, -⟩
   ihave #Hft := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hireg
   ihave #Hai := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hireg
+  -- (NI M3 private files FS-2e) the bound past the chunks so far
+  imod fwChunksOrd_bound0 fscFs act inum.toNat γo (om == .held) Mimg ua P n 0 cs $$ Hcs0
+    with ⟨%L0, %hL0, #HL0⟩
   imod (fwr_fire om inum γo P n Mimg ua Q t p c dn dn' bm bm' data data' v.toNat tot dist wrote dstb a0
     htn htie hcpos hcw hw16 hty hty' hnl' hh hh' hcap0 hcap htotc hdistle hdistf hwhy hloc hrange harms
-    hchunk act)
-    $$ Hft Hai Htop Hgv Hst with ⟨Htop, Hgv, Hst, #Hcs⟩
+    hchunk act (fwEnd 0 cs) L0 (by omega))
+    $$ Hft Hai HL0 Htop Hgv Hst with ⟨Htop, Hgv, Hst, ⟨%cs', #Hcs', %hsum', ⟨%L1, %hL1, #HL1⟩⟩⟩
+  ihave #Hcs : fwChunksOrd fscFs act inum.toNat γo (om == .held) Mimg ua P n 0 0 (cs ++ cs') $$ []
+  · iapply fwChunksOrd_app fscFs act inum.toNat γo (om == .held) Mimg ua P n cs cs' 0 0 $$ Hcs0
+    rw [Nat.zero_add, hsum0]
+    iexact Hcs'
+  have hL1' : fwEnd 0 (cs ++ cs') ≤ L1.length := by rw [fwEnd_append]; exact hL1
   -- CHECK IN the cell: the half came back at exactly its word
   ihave Hres := offResident_of curCtx γo (om == .held) fk (filerwOffW v tot) hwf $$ [Hcell] [Hgv]
   · rw [wordAtN_cur]; unfold aFoff; iexact Hcell
@@ -420,37 +460,43 @@ theorem fwr_post_ghost (act : BitVec 64) (om : OffMode) (cpu : CPU) (ik fk : Nat
     (dirOrphanClean_not_dir dn0' data' hnd') (dirUniq_not_dir dn0' data' hnd')
     $$ Hdl Hdi Hmeta Haddrs Hind Hblk Htop
   iframe Hrun Hoffd Hrows Hload
+  iexists cs'
+  iframe Hcs
   isplitl []
-  · iexact Hcs
+  · ipureintro; exact hsum'
   icases Hst with (Hf | ⟨%hs, Hx⟩)
   · imodintro; ileft; iexact Hf
   · by_cases hm : a0 = -1#64
     · -- writei's own `-1` (the file at its size cap from this offset):
       -- (NI M3 FS-2a) the verdict recorded in the era's ledger, at this
       -- instant, as given (`FsFull.max`)
-      imod (ftopFull ⊤ fscFs act .max CoPset.subseteq_top) $$ Hft with #Hmax
+      imod (ftopFullAfter ⊤ fscFs act .max L1 CoPset.subseteq_top) $$ Hft HL1 with #Hmax
       imodintro; iright
       isplitr
       · ipureintro; exact hs
       isplitl []
-      · iexists FwWhy.max; unfold fwWhyRcpt; iexact Hmax
+      · unfold fwWhyAfter; iright; ileft
+        iapply (show fsFullAfter (GF := GF) fscFs act .max L1.length ⊢ fsFullAfter fscFs act .max (fwEnd 0 (cs ++ cs')) from by
+          unfold fsFullAfter; iintro ⟨%h, %hh, H⟩; iexists h; iframe H; ipureintro; omega) $$ Hmax
       · iexact Hx
     · by_cases hd : 0 < dist
       · imodintro; iright
         isplitr
         · ipureintro; exact hs
         isplitl []
-        · iexists FwWhy.src; unfold fwWhyRcpt; ipureintro; exact hwhy hd
+        · unfold fwWhyAfter; ileft; ipureintro; exact hwhy hd
         · iexact Hx
       · -- writei's short count at no tail: bmap's out-of-blocks `0`
         -- (`WriteiOut.full`); (NI M3 private files FS-1) the verdict recorded
         -- in the era's ledger, at this instant
-        imod (ftopFull ⊤ fscFs act .blocks CoPset.subseteq_top) $$ Hft with #Hfull
+        imod (ftopFullAfter ⊤ fscFs act .blocks L1 CoPset.subseteq_top) $$ Hft HL1 with #Hfull
         imodintro; iright
         isplitr
         · ipureintro; exact hs
         isplitl []
-        · iexists FwWhy.full; unfold fwWhyRcpt; iexact Hfull
+        · unfold fwWhyAfter; iright; iright
+          iapply (show fsFullAfter (GF := GF) fscFs act .blocks L1.length ⊢ fsFullAfter fscFs act .blocks (fwEnd 0 (cs ++ cs')) from by
+            unfold fsFullAfter; iintro ⟨%h, %hh, H⟩; iexists h; iframe H; ipureintro; omega) $$ Hfull
         · iexact Hx
 
 end Held

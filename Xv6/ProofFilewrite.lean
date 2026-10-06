@@ -371,7 +371,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
     iapply HΦ $$ %cpu %k.spie %k.spp %_ %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv [] [] []
     rotate_right
-    · iapply fwRcptAt_nil; right; right; intro rb i γo om hst; subst hst
+    · iapply fwRcptAt_nil; right; intro rb i γo om hst; subst hst
       obtain ⟨-, hw', -⟩ := hok
       rw [hw] at hw'; exact absurd hw' (by decide)
     · ipureintro

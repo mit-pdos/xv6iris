@@ -902,7 +902,7 @@ instance sysOpenEnv_persistent (Γ : SchedNames) (A : SysOpenArgs GF) :
 `so_cont_au` / `so_cont0_au`, which are `SpecSysOpen.sysOpenK` at
 `openArmsPlain`; deviation 3). -/
 abbrev sysOpenPostP (k : KCtx) (A : SysOpenArgs GF) (c : CPU) : IProp GF :=
-  sysOpenK (hlc := hlc) k A.ns A.V A.M
+  sysOpenK (hlc := hlc) k A.ns A.V A.M A.v A.vom
     (openArmsPlain (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts) c
 
@@ -910,7 +910,7 @@ abbrev sysOpenPostP (k : KCtx) (A : SysOpenArgs GF) (c : CPU) : IProp GF :=
 abbrev sysOpenPostC (k : KCtx) (A : SysOpenArgs GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (c : CPU) : IProp GF :=
-  sysOpenK (hlc := hlc) k A.ns A.V A.M
+  sysOpenK (hlc := hlc) k A.ns A.V A.M A.v A.vom
     (openArmsCreate (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts) c
 
@@ -918,8 +918,8 @@ abbrev sysOpenPostC (k : KCtx) (A : SysOpenArgs GF)
 process pins nothing; `CreateSharedBody.create_post_pin`). -/
 theorem sys_open_post_pin (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
     (cpu : CPU) (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) :
-    wpNext true k.proc cpu (sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS) ⊢
-      ∀ c : CPU, sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS c := by
+    wpNext true k.proc cpu (sysOpenK (hlc := hlc) k A.ns A.V A.M A.v A.vom ARMS) ⊢
+      ∀ c : CPU, sysOpenK (hlc := hlc) k A.ns A.V A.M A.v A.vom ARMS c := by
   iintro H %c
   iapply (wpNext_at true k.proc cpu c _ (fun h => h.elim (fun h => absurd h (by decide))
     (fun h => absurd h (by rw [hS.hproc]; exact procAddr_nonzero hS.hj)))) $$ H
@@ -928,26 +928,26 @@ theorem sys_open_post_pin (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k 
 `ProofSysOpen`): argstr hands the block back at `V.updEv kv`, and the rest
 of the run is at that record; the contract's continuation, which takes any
 count at least `V.ev`, takes any count at least `kv`. -/
-theorem sysOpenK_raise (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
+theorem sysOpenK_raise (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8)) (v vom : BitVec 64)
     (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (c : CPU) (kv : Nat)
     (hkv : V.ev ≤ kv) :
-    sysOpenK (hlc := hlc) k ns V M ARMS c ⊢ sysOpenK (hlc := hlc) k ns (V.updEv kv) M ARMS c := by
+    sysOpenK (hlc := hlc) k ns V M v vom ARMS c ⊢ sysOpenK (hlc := hlc) k ns (V.updEv kv) M v vom ARMS c := by
   unfold sysOpenK
   iintro H %spie %spp %R' %P' %k' %hcs %hext %hk'
   iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %(Nat.le_trans hkv hk')
 
 /-- ...and at the count it came in at (an arm that lends nothing; Rocq
 `upd_ev_id`): the continuation's old shape. -/
-theorem sysOpenK_same (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
+theorem sysOpenK_same (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8)) (v vom : BitVec 64)
     (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (c : CPU) :
-    sysOpenK (hlc := hlc) k ns V M ARMS c ⊢
+    sysOpenK (hlc := hlc) k ns V M v vom ARMS c ⊢
       ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
         ⌜calleeSaved k.regs R'⌝ -∗ ⌜V.upt.extSz V.sz P'⌝ -∗
         kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
         trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
         bslots 3 -∗ irefSlots ns -∗
         ARMS { V with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
-        openRcptAt fscFs k.proc (R' 10#5) -∗ wpLoop c := by
+        openRcptAt fscFs k.proc (viewLazy V.upt V.sz M) v.toNat vom (R' 10#5) -∗ wpLoop c := by
   unfold sysOpenK
   iintro H %spie %spp %R' %P' %hcs %hext
   iapply H $$ %spie %spp %R' %P' %V.ev %hcs %hext %(Nat.le_refl _)
@@ -1415,7 +1415,7 @@ def sysOpenPubBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF 
     logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗
     fdFrags A.V.fdg A.sts -∗ fdStAuth A.V.fdg fd .closed -∗
     -- (NI M3 private files FS-1) the install's ledger receipt (and itrunc's)
-    openOkRcpt fscFs k.proc -∗
+    openOkRcpt fscFs k.proc (sysOpenIm A) A.v.toNat A.vom -∗
     -- (NI M3 private files FS-2b′) ...and open's at the installed type
     sysOpenLed A t -∗
     -- THE ARM, as a wand

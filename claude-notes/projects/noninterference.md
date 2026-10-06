@@ -7893,6 +7893,122 @@ opaque). `dead_allow.txt`: + `fevReadBytes_on`, `fevHop_on` ("FS-4 reaches"); `f
 `ftopInv_lb_wf` STAY (the write arm is X1's); `fevStatOf`, `fevRun_prefix`, `fsLedLb_prefix`, `fsEvRcpt_of_lb`
 unchanged.
 
+### M3 private files FS-2e as landed (2026-10-06)
+
+On `lane/pfiles` (the owner's decision after FS-2d, "finish it: sublist form"). PARTIAL: **FS-2e-a lands** (the
+ordered receipts, below); **FS-2e-b is STOPPED** (the per-incarnation fs cursor: the brief is not satisfiable as
+written, gap and options below). No kernel change; the fourteen roots' statements, `SYSCALL`/`USERTRAP`/`USERRET`/
+`USER`, `SyscRows`, `NiStep` and every `Uk*`/`User*` file byte-identical.
+
+**The device: fires past a bound.** `FsLedger.fsMoveRcptAfter γfs L evs i n := ∃ h, ⌜L <+: h ∧ fevRows h i =
+ftopRow n⌝ ∗ fsLedLb γfs (h ++ evs)` (a move's receipt whose prefix extends a lower bound the mover held, checked
+against the authority at the move's instant), `ftopLed_moveAtAfter`, `ftopLed_pkAdvAfter` (`ftopLed_pkAdv` is it at
+`[]`), `ftopLed_fullAfter`/`InodeRegionInv.ftopFullAfter` (a verdict past a bound: `fsFullAfter γfs act why lo :=
+∃ h, ⌜lo ≤ |h|⌝ ∗ fsEvRcpt γfs h (.full act why)`), `fsLedPos γfs q e := ∃ h, ⌜|h| = q⌝ ∗ fsLedLb γfs (h ++ [e])`
+(the ledger's event at index `q`). The fires take the bound (`fsLedLb γfs L` premise, `fsMoveRcptAfter` out):
+`FsAbsWriteFire.wrfFire_core/_corePk` and the six chunk fires, `FilewriteChain.fwrSt_fire_full/_part`,
+`FsAbsMknodFire.cafAcre_fire_nm` (the parent leg), `FsAbsOpenFire.opfAtrunc_fire` (the truncation).
+
+**Write (`SpecFilewrite`, `SpecSysWrite`).** Exactly:
+
+    def fwChunkOk (act) (i) (γo) (hd : Bool) (M) (ua) (P : UPtd) (n : Int) (t : Nat) (e : Fev) : Prop :=
+      ∃ off bs r, e = .write act i γo hd off bs r ∧
+        ubytesAt M (ua + BitVec.ofNat 64 t) (bs.take r) ∧ (r < bs.length → wrFailWhy P ua n.toNat)
+    def fwChunksOrd γfs act i γo hd M ua P n : Nat → Nat → List (Nat × Fev) → IProp GF
+      | _, _, [] => emp
+      | lo, t, (q, e) :: cs => ⌜lo ≤ q ∧ fwChunkOk act i γo hd M ua P n t e⌝ ∗ fsLedPos γfs q e ∗
+          fwChunksOrd γfs act i γo hd M ua P n (q + 1) (t + fevWriteR e) cs
+    def fwWhyAfter γfs act P ua n lo := ⌜wrFailWhy P ua n.toNat⌝ ∨ fsFullAfter γfs act .max lo ∨
+      fsFullAfter γfs act .blocks lo
+    def fwRcptAt γfs act (st : FdState) (P : UPtd) M ua (n : Int) (r : BitVec 64) : IProp GF :=
+      match st with
+      | .open _ true (.inode i γo om) => ∃ cs : List (Nat × Fev),
+          fwChunksOrd γfs act i γo (om == .held) M ua P n 0 0 cs ∗ ⌜r ≠ -1#64 → fwSum cs = n.toNat⌝ ∗
+          (⌜r ≠ -1#64 ∨ n < 0⌝ ∨ fwWhyAfter γfs act P ua n (fwEnd 0 cs))
+      | _ => True
+
+The chunks are POSITIONED (`(q, e)`, `q` strictly increasing: each fire lands past the previous chunk's lower
+bound, the first past `[]`), each chunk's COUNTED bytes `bs.take r` are the caller's run at `ua + t` with `t` the
+advances before it (the fire's `ubytesAt` relayed: `wrfRun`, `wrfLanded`'s counted prefix), and a chunk lands more
+than it counted only at a source fault (`wrFailWhy`, refuted at a class key's mapped buffer: there `r = |bs|`);
+the advances sum to the answer; a short write's verdict (`.max`, `.blocks`) lands past the last chunk (`fwEnd lo cs`
+= last position + 1, or `lo`). `fwSum` is over the positioned list; `fwChunks` (unordered) is gone. Relayed in
+place: `filewritePost … fwRcptAt fscFs k.proc st V.upt (writerImg V.upt M) (k.regs 11#5) n (R' 10#5)`,
+`sysWritePost … fwRcptAt fscFs k.proc (sysFdSt v V.ofile sts) V.upt (writerImg V.upt M) v1 (argZ v2) (R' 10#5)`
+(the writer's image at argument 1: FS-2f ties `writerImg V.upt M` at `v1` to the key's buffer). The loop
+(`FilewriteLoop.fwrHead`, `fwr_tests`, `fwr_iter`; `FilewriteFire.fwr_fire/fwr_post_ghost`, `FilewriteTail`,
+`FilewriteArms`) carries `fwChunksOrd … 0 0 cs` and reads its bound off it (`fwChunksOrd_bound0`); the short
+exit carries `fwWhyAfter … (fwEnd 0 cs)` (FS-0's `fwWhyAt` comes off it, `fwWhyAfter_why`).
+
+**Create (`FsLedger`, `SpecCreate`, `SpecSysMkdir`, `SpecSysMknod`).** The receipts carry the entry NAME and the
+arm's ORDER:
+
+    def creParentRcpt γfs act (nm : List (BitVec 8)) (i : Nat) : IProp GF :=
+      ∃ (n : Fnode) (h h' : List Fev) (d nl : Nat), ⌜h ++ [.arm act i n] <+: h'⌝ ∗
+        fsLedLb γfs (h ++ [.arm act i n]) ∗ fsLedLb γfs (h' ++ [.ent act d nm (some i), .nlink act d nl])
+    def creFoundRcpt γfs act nm i := ∃ h d e nl, ⌜fevRows h d = some (.dir e, nl) ∧ e[nm]? = some i⌝ ∗
+        fsLedLb γfs (h ++ [.hop act d nm none])
+    def creOkRcpt γfs act made nm i := (⌜made = true⌝ ∗ creParentRcpt γfs act nm i) ∨
+        (⌜made = false⌝ ∗ creFoundRcpt γfs act nm i)
+    def creRcptAt γfs act (pl : List (BitVec 8)) ok made i :=
+        ⌜ok = false⌝ ∨ ∃ nm, ⌜(pathElems pl).getLast? = some nm⌝ ∗ creOkRcpt γfs act made nm i
+
+(the leg fires past the arm's lower bound, which `createDirty` already carried; `creParentRcpt_of`). The pure
+form FS-2f reads: `creOkIn act made nm i H` (a made child's arm, then its leg filing `nm`, inside `H`; a found
+node's hop of `nm` at its parent's entry, inside `H`), `creOkIn_mono`; `creOkRcpt_fixed` now reads what fixed the
+inode at the lower bound ending in the LEG (made) and returns `creOkIn … H` beside `fevOpenFixed`. Relayed in place:
+`createPost … creRcptAt fscFs k.proc (bview plen pfun) ok made inum.toNat`; `sysMkdirK … mkdirRcptAt fscFs pa
+(viewLazy V.upt V.sz M) pv (R' 10#5)`, `sysMknodK … mknodRcptAt fscFs pa (viewLazy V.upt V.sz M) pv (R' 10#5)`,
+both `⌜r ≠ 0⌝ ∨ ∃ pl nm i, ⌜argPathOf Mv pv pl ∧ (pathElems pl).getLast? = some nm⌝ ∗ creOkRcpt γfs act true nm i`
+(`mkdirOkRcpt`/`mknodOkRcpt`); mkdir's citation (`SyscallArmsPath.syscMkdir_cite`) reads the leg out of it.
+
+**Open: O_TRUNC and O_CREATE before the install (`SpecSysOpen`, `SysOpenDefs`).** Exactly:
+
+    def openOkRcpt γfs act (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) : IProp GF :=
+      ∃ (pl : List (BitVec 8)) (H0 h : List Fev) (i : Nat) (γo : GName) (held : Bool) (po : Option Nat),
+        ⌜argPathOf Mim pv pl ∧ H0 <+: h ∧
+          (omCreate vom = true → ∃ made nm, (pathElems pl).getLast? = some nm ∧ creOkIn act made nm i H0) ∧
+          (omTrunc vom = true → fevIsFile h i = true → ∃ ht, H0 <+: ht ∧ ht ++ [.trunc act i] <+: h)⌝ ∗
+        fsLedLb γfs (h ++ [.open act i γo held po])
+    def openRcptAt γfs act Mim pv vom r := ⌜r = -1#64⌝ ∨ openOkRcpt γfs act Mim pv vom
+
+`H0` holds what fixed `i` (the walk's chain, or ALL of create's events); the truncation fires past `H0`
+(`opfAtrunc_fire` + bound) and the install past the truncation (`sys_open_stores_pub` takes the opened
+`sysOpenLedPre`: `pl0 H0 po hpl0 hfix` and `htrb : tr = (omTrunc vom && decide (dn.diType.toNat = T_FILE))`).
+The `tr` flag (FS-2b′) is GONE: the receipt's truncation is tied to the O_TRUNC bit AND the install's row being a
+file (`fevIsFile_era`: xv6 itruncs only a T_FILE). Not stated: the ABSENCE of a truncation when the bit is clear
+(absence is not a receipt). `openLedPre` gains `omCreate vom = true → ∃ made nm, last = nm ∧ creOkIn act made nm i
+H` (built in `SysOpenEntryC` from create's relayed receipt; vacuous in `SysOpenWalk`). `sysOpenK` gains the path
+argument and the omode, `sysOpenK k ns V M v vom ARMS`: `openRcptAt fscFs k.proc (viewLazy V.upt V.sz M) v.toNat vom
+(R' 10#5)` (`SysOpenParts`, `SysOpenPlainA`, `SysOpenCreArm` follow).
+
+**What FS-2f reads.** write: `fwChunksOrd` (positions, bytes `bs.take r` at `ua + t`, the sum) and `fwWhyAfter`
+past `fwEnd`; create: `creOkIn` (arm < leg, the name, the found hop), via `mkdirOkRcpt`/`mknodOkRcpt` (path at
+`argPathOf`) and `openOkRcpt`'s create clause; open: `H0 <+: h`, the truncation in `(H0, h)` at a truncating open of
+a file, the install at `|h|`. The syscall arms do not cite these yet (FS-2f: `fout` on the step, the law).
+
+**FS-2e-b STOPPED -- the gap.** The brief asks for a cursor "carried by the trap loop exactly as `uhist` is
+(`urcRut` parks it, `urc_round` carries it AROUND usertrap)" AND for "the fs arms [to] advance it at their
+citation" with `cursor_before ≤ first event position`. The two cannot both hold: a resource framed around
+usertrap is invisible to the syscall arm and to every fire inside it, and the window-start fact is a
+fire-time fact (FS-2e-a's lesson: an event's position is pinned past a bound ONLY by the fire that appends it,
+comparing that bound with the authority; two persistent lower bounds are merely comparable, and nothing
+persistent says which came first). Derivable without the fires: the cursor carried, `cursor_after =
+max(cursor_before, |ι.fev|)` (comparability at the filing), contiguous windows -- but NOT that a round's events
+lie past `cursor_before` (a boot-citing round cites `[boot]`, shorter than every cursor; a decisive event's
+receipt can sit, as far as any persistent fact goes, inside the previous window). **Options:** (a) the cursor in
+the PROCESS RECORD (a per-slot name in `ProcPriv` pinned by `UrcPins`, its exclusive var and a lower bound in the
+bare block -- the `V.ev` precedent): the arm reads it from the residue usertrap hands it, every class fs contract
+takes the bound (`SpecFileread`, `SpecFilewrite`, `SpecCreate`, `SpecSysOpen`'s walk, `SpecSysChdir`, close's
+iput) and its fires use FS-2e-a's `…After` forms; the trap loop advances the record's cursor at the filing;
+≈1–1.5 BE, moves the record and the fs Spec contracts. (b) the bound rides `SYSCALL`'s statement into the arms
+(a root-adjacent statement moves; owner). (c) hypothesise the window fact (`NiFsWindow`, an honest scope beside
+`NiGapFree`) with (a)'s carrier minus the fires -- a weakening, not recommended. Recommended: (a).
+
+**Baselines.** `tools/tcb/expected.json` unchanged (`tcb.sh` passes: no module enters or leaves any root's set).
+`tools/audit/baseline.json` unchanged (14 PASS, no axiom or opaque). `dead_allow.txt`: + `creOkIn_mono` ("FS-2f
+reaches"). `run_all.sh`: all 11 steps pass.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

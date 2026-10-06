@@ -140,6 +140,22 @@ theorem sys_open_led_ftopRow (dn : Dinode) (bm : Blkmap) (data : Nat → List (B
       some (fnodeOf (absRow (eraNode dn bm data)).anNode, (absRow (eraNode dn bm data)).anNlink) :=
   ftopRow_typed _ hnz
 
+/-- (NI M3 private files FS-2e) the row the install reads is a file only at
+a regular file's record -/
+theorem fevIsFile_era (h : List Fev) (i : Nat) (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
+    (hr : fevRows h i = ftopRow (eraNode dn bm data)) (hf : fevIsFile h i = true) :
+    dn.diType.toNat = T_FILE := by
+  have hnz : fnType (eraNode dn bm data) ≠ 0 := by
+    intro h0; unfold fevIsFile at hf; rw [hr, ftopRow_free _ h0] at hf; cases hf
+  unfold fevIsFile at hf
+  rw [hr, ftopRow_typed _ hnz] at hf
+  unfold absRow absNode at hf
+  by_cases hd : fnIsDir (eraNode dn bm data) = true
+  · simp [hd, fnodeOf] at hf
+  · by_cases ht : fnType (eraNode dn bm data) = T_FILE
+    · exact ht
+    · simp [hd, ht, fnodeOf] at hf
+
 /-- **THE CITED INSTALL READS THE INSTALLED TYPE**: what fixed the inode in
 the ledger, the install appended past it at the row the lock holds, and the
 store block's type facts give `usysOpenAt … = some t`. -/
@@ -210,6 +226,16 @@ theorem sys_open_stores_types (C0 : FContent) (dn : Dinode) (inum : BitVec 32) (
     refine ⟨fun hi => absurd (hi.symm.trans h1) (by decide), Or.inr ⟨h1, ?_⟩⟩
     rw [h4, h2]
   · exact ⟨fun _ => hd, Or.inl (hti hd)⟩
+
+/-- (NI M3 private files FS-2e) what fixed the inode, opened -/
+theorem sysOpenLedPre_open (A : SysOpenArgs GF) (i : Nat) :
+    sysOpenLedPre A i ⊢
+      ∃ (pl : List (BitVec 8)) (H : List Fev) (po : Option Nat), ⌜argPathOf (sysOpenIm A) A.v.toNat pl⌝ ∗
+        fsLedLb fscFs H ∗
+        ⌜fevOpenFixed H (procAddr A.j) A.V.rti (umStartOf A.V.rti A.V.cwi pl) (pathElems pl) (omCreate A.vom) i po =
+            true ∧
+          (omCreate A.vom = true → ∃ (made : Bool) (nm : List (BitVec 8)),
+            (pathElems pl).getLast? = some nm ∧ creOkIn (procAddr A.j) made nm i H)⌝ := .rfl
 
 /-- (NI M3 private files FS-2a′) **THE INSTALL, AT THE MODE**: a PARKED inode
 open's install hands the fs ledger its quarter of the fresh shadow
@@ -289,10 +315,21 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     (hti : dn.diType.toNat ≠ T_DEVICE → C0.type = FD_INODE ∧ t = .inode inum.toNat γo A.omo)
     (hE : nsj + 1 = A.ns ∧ A.V.upt.extSz A.V.sz P2)
     (hpins : sysOpenPins k R (ientry kk) (fnode kf) (BitVec.ofNat 64 fd))
-    (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0) (tr : Bool) (hproc : k.proc = procAddr A.j) :
-    ⊢ (⌜tr = false⌝ ∨ fsLedAt fscFs [.trunc k.proc inum.toNat]) -∗
-    -- (NI M3 private files FS-2b′) what fixed the inode, in the ledger
-    sysOpenLedPre A inum.toNat -∗
+    (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0) (hproc : k.proc = procAddr A.j)
+    -- (NI M3 private files FS-2b′, FS-2e) what fixed the inode, in the ledger
+    -- (`sysOpenLedPre`, opened): the fetched path, the prefix `H0` holding it
+    -- and (O_CREATE) all of create's events
+    (pl0 : List (BitVec 8)) (H0 : List Fev) (po : Option Nat)
+    (hpl0 : argPathOf (sysOpenIm A) A.v.toNat pl0)
+    (hfix : fevOpenFixed H0 (procAddr A.j) A.V.rti (umStartOf A.V.rti A.V.cwi pl0) (pathElems pl0)
+      (omCreate A.vom) inum.toNat po = true ∧
+      (omCreate A.vom = true → ∃ (made : Bool) (nm : List (BitVec 8)),
+        (pathElems pl0).getLast? = some nm ∧ creOkIn (procAddr A.j) made nm inum.toNat H0))
+    -- (FS-2e) a truncating open of a FILE truncated it
+    (tr : Bool) (htrb : tr = (omTrunc A.vom && decide (dn.diType.toNat = T_FILE))) :
+    ⊢ fsLedLb fscFs H0 -∗
+    -- ...past `H0`
+    (⌜tr = false⌝ ∨ ∃ ht : List Fev, ⌜H0 <+: ht⌝ ∗ fsLedLb fscFs (ht ++ [.trunc k.proc inum.toNat])) -∗
     kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs cpu (KA.«sys_open» + 0xb8#64) -∗
     trapCsrsExt cpu k.sie -∗ cpuClaimExt cpu k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
@@ -317,7 +354,7 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
   unfold sysOpenPubBody at hPub
   simp only [sysOpenAddr] at hPub
   obtain ⟨hdvw, hty2⟩ := sys_open_stores_types C0 dn inum γo A.omo t htd hti
-  iintro #Htr #Hpre Hk Hpc Hte Hce #Henv Hcells Hbuf Hlk Hload Hkeep Href Hflds Hnames Hoff
+  iintro #HL #Htr Hk Hpc Hte Hce #Henv Hcells Hbuf Hlk Hload Hkeep Href Hflds Hnames Hoff
     Hiru Hcore Howe Hop Hbs Hisl Hfds Hfrags Hauth Harm Hpost
   ihave Hoff := (show sysOpenOffCell (GF := GF) kf C0 γo ⊢
     sysOpenOffCell kf (sysOpenStoredC C0 kk (sysOpenOm A)) γo from .rfl) $$ Hoff
@@ -329,8 +366,17 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
   ihave %hpure := sys_open_flat_pure kk inum dn bm data $$ Hflat
   have hen := sys_open_stores_en dn bm data hpure.1 hpure.2
   icases sys_open_flat_top kk inum dn bm data $$ Hflat with ⟨Ht, Hfback⟩
-  unfold sysOpenLedPre openLedPre
-  icases Hpre with ⟨%pl, %H0, %po, %hpl, #HL, %hfix⟩
+  -- (NI M3 private files FS-2e) the install lands past `H0` AND past the
+  -- truncation, if any
+  ihave HLx : (∃ L : List Fev, ⌜H0 <+: L ∧ (tr = true → ∃ ht : List Fev, H0 <+: ht ∧
+      ht ++ [.trunc (procAddr A.j) inum.toNat] <+: L)⌝ ∗ fsLedLb fscFs L) $$ []
+  · icases Htr with (%htf | ⟨%ht, %hht, #Hht⟩)
+    · iexists H0; iframe HL; ipureintro; exact ⟨List.prefix_refl _, fun h => by rw [htf] at h; cases h⟩
+    · iexists ht ++ [.trunc k.proc inum.toNat]; iframe Hht
+      ipureintro
+      refine ⟨hht.trans (List.prefix_append _ _), fun _ => ⟨ht, hht, ?_⟩⟩
+      rw [hproc]; exact List.prefix_refl _
+  icases HLx with ⟨%L, %hL, #HLL⟩
   iapply wpLoop_fupd
   unfold sysOpenEnv
   icases Henv with ⟨#Henv1, #Henv2, #Henvfs, #Henv4⟩
@@ -345,20 +391,26 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
       decide (dn.diType.toNat = T_DEVICE) = true := fun hc => decide_eq_true
     (Classical.byContradiction fun hnd => hc (hti hnd).1)
   imod (sys_open_install (hlc := hlc) (procAddr A.j) kf (sysOpenStoredC C0 kk (sysOpenOm A)) γo A.omo
-      inum.toNat po H0 (eraNode dn bm data) (decide (dn.diType.toNat = T_DEVICE)) hdevf hndevf)
-    $$ Hft HL Ht Hoff with ⟨Ht, Hoff, ⟨%h, %hh, #Hop0⟩⟩
+      inum.toNat po L (eraNode dn bm data) (decide (dn.diType.toNat = T_DEVICE)) hdevf hndevf)
+    $$ Hft HLL Ht Hoff with ⟨Ht, Hoff, ⟨%h, %hh, #Hop0⟩⟩
+  have hH0h : H0 <+: h := hL.1.trans hh.1
   rw [← topFrag_1]
   ihave Hflat := Hfback $$ Ht
   ihave Hload := sys_open_flat_close kk inum dn bm data $$ Hflat
   imodintro
   ihave #Henv : sysOpenEnv (hlc := hlc) Γ A $$ []
   · unfold sysOpenEnv; iframe #
-  ihave #Hok : openOkRcpt fscFs k.proc $$ []
+  ihave #Hok : openOkRcpt fscFs k.proc (sysOpenIm A) A.v.toNat A.vom $$ []
   · unfold openOkRcpt
-    iexists inum.toNat, γo, ((A.omo == .held) || decide (dn.diType.toNat = T_DEVICE)), po, tr
-    isplitl []
-    · rw [hproc]; unfold fsLedAt; iexists h; iexact Hop0
-    · iexact Htr
+    iexists pl0, H0, h, inum.toNat, γo, ((A.omo == .held) || decide (dn.diType.toNat = T_DEVICE)), po
+    rw [hproc]
+    iframe Hop0
+    ipureintro
+    refine ⟨hpl0, hH0h, hfix.2, fun hot hfile => ?_⟩
+    have hft := fevIsFile_era h inum.toNat dn bm data hh.2 hfile
+    have htt : tr = true := by rw [htrb, hot, hft]; rfl
+    obtain ⟨ht, hht, hle⟩ := hL.2 htt
+    exact ⟨ht, hht, hle.trans hh.1⟩
   have hdirk : dn.diType.toNat = T_DIR_z → omArg A.vom = 0 := fun h' =>
     (sys_open_omode_arg A.vom).1 (hdir h')
   have hdev : dn.diType.toNat = T_DEVICE →
@@ -367,10 +419,10 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
   have hino : dn.diType.toNat ≠ T_DEVICE → t = .inode inum.toNat γo A.omo := fun h' => (hti h').2
   ihave #Hled : sysOpenLed A t $$ []
   · unfold sysOpenLed openLedOk
-    iexists pl, h ++ [.open (procAddr A.j) inum.toNat γo ((A.omo == .held) || decide (dn.diType.toNat = T_DEVICE)) po]
+    iexists pl0, h ++ [.open (procAddr A.j) inum.toNat γo ((A.omo == .held) || decide (dn.diType.toNat = T_DEVICE)) po]
     iframe Hop0
     ipureintro
-    exact ⟨hpl, sys_open_led_at H0 h _ _ _ _ _ A.vom inum γo A.omo po dn bm data t _ hfix hh.1 hh.2 hen hdirk
+    exact ⟨hpl0, sys_open_led_at H0 h _ _ _ _ _ A.vom inum γo A.omo po dn bm data t _ hfix.1 hH0h hh.2 hen hdirk
       hdev hino (fun hnd => by simp [hnd])⟩
   iapply hPub $$ %cpu %spie %spp %R %(fnode kf) %w6 %lo %w24 %γil %γisl %loc %tlc %kk %s %g %inum
     %dn %bm %kf %fd %l %(sysOpenStoredC C0 kk (sysOpenOm A)) %pn %γo %P2 %u %nsj %t %hA %hB
@@ -551,6 +603,7 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
       (dirUniq_not_dir _ _ hnd') (dirDotsIx_not_dir _ _ _ hnd')
   unfold sysOpenResidue plainTruncKept
   icases Hres with ⟨%hpl, #Hpre, HP, Hobs, Htc⟩
+  icases sysOpenLedPre_open A inum.toNat $$ Hpre with ⟨%pl0, %H0, %po, %hpl0, #HL0, %hfix⟩
   -- THE KEYED PIECE AT THIS INODE (Rocq F-OPEN-3 / TRUNC-PERMIT): the caller's
   -- omode has O_TRUNC, so it is the commit at `inum`; the permit that keyed it
   -- was the walk's terminal cursor, paid at the join (`plainTruncKey`), so
@@ -567,7 +620,7 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
     (eraNode (diTrunc dn) bmEmpty (fun _ => List.replicate BSIZE 0)) CoPset.subseteq_top hloc
     (opfEra_file_typed dn bm data hfile) (opfEra_file_row dn bm data hfile)
     (opfEra_file_typed (diTrunc dn) bmEmpty _ hfile)
-    (opfTrunc_row dn bm bmEmpty data _ hfile) k.proc $$ Hftop Happ Htc Htop with ⟨Htop, #Htrc, Htr2⟩
+    (opfTrunc_row dn bm bmEmpty data _ hfile) k.proc H0 $$ Hftop Happ HL0 Htc Htop with ⟨Htop, #Htrc, Htr2⟩
   -- the kept family's receipt IS the caller's (`SysOpenDefs.creFtKept`)
   rw [creFtKept_pfRecv]
   imodintro
@@ -590,11 +643,17 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
     iframe Hslk Hsl Hfl Hdep Hrows Hdev Hinum Hval Hshot Hfrz
   ihave Hlk := (show sysOpenLk (GF := GF) γil γisl loc tlc A.pid kk s g inum dn ⊢
     sysOpenLk γil γisl loc tlc A.pid kk s g inum (diTrunc dn) from .rfl) $$ Hlk
-  ihave #Htr0 : (⌜true = false⌝ ∨ fsLedAt fscFs [.trunc k.proc inum.toNat]) $$ []
-  · iright; iapply fsMoveRcpt_at $$ Htrc
+  ihave #Htr0 : (⌜true = false⌝ ∨ ∃ ht : List Fev, ⌜H0 <+: ht⌝ ∗
+      fsLedLb fscFs (ht ++ [.trunc k.proc inum.toNat])) $$ []
+  · iright
+    unfold fsMoveRcptAfter
+    icases Htrc with ⟨%ht, %⟨hht, -⟩, #Hht⟩
+    iexists ht; iframe Hht; ipureintro; exact hht
+  have htrb : true = (omTrunc A.vom && decide ((diTrunc dn).diType.toNat = T_FILE)) := by
+    rw [htr]; exact (decide_eq_true hfile).symm
   iapply (sys_open_stores_pub Γ k A hPub cpu spie1 spp1 _ w6 lo w24 γil γisl loc tlc kk s g inum
       (diTrunc dn) bmEmpty kf fd l C0 pn γo P2 u' nsj _ ⟨hkk, hinb, hipos, hle⟩ hB hty0 hdir htd hti
-      hE hp1 hal true hS.hproc) $$ Htr0 Hpre Hk Hpc Hte Hce Henv Hcells Hbuf Hlk Hload Hkeep Href Hflds Hnames Hoff Hiru
+      hE hp1 hal hS.hproc pl0 H0 po hpl0 hfix true htrb) $$ HL0 Htr0 Hk Hpc Hte Hce Henv Hcells Hbuf Hlk Hload Hkeep Href Hflds Hnames Hoff Hiru
     Hcore Howe Hop Hbs Hisl Hfds Hfrags Hauth Harm Hpost
 
 set_option maxHeartbeats 32000000 in
@@ -671,6 +730,7 @@ theorem sys_open_stores (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   have hino : dn.diType.toNat ≠ T_DEVICE → t = .inode inum.toNat γo A.omo := fun h => (hti h).2
   unfold sysOpenResidue
   icases Hres with ⟨%hpl, #Hpre, HP, Hobs, Htc⟩
+  icases sysOpenLedPre_open A inum.toNat $$ Hpre with ⟨%pl0, %H0, %po, %hpl0, #HL0, %hfix⟩
   -- ===== +0xac c.beqz a5 -> +0xb8 =====
   have hbr : bcond bop.BEQ (BitVec.signExtend 64 (sysOpenOm A) &&& 1024#64) 0#64 = !omTrunc A.vom :=
     sys_open_stores_trbr A.vom
@@ -685,11 +745,14 @@ theorem sys_open_stores (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
       (sysOpenIm A) A.v.toNat A.vom A.P A.Fo A.Ft (sysOpenLed A) A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) pl
       inum.toNat dn bm data t γo hpl (Or.inl htr) hdirk hdev hino hen $$ HP Hobs Htc
     ihave Hload := sys_open_flat_close kk inum dn bm data $$ Hflat
-    ihave #Hntr : (⌜false = false⌝ ∨ fsLedAt fscFs [.trunc k.proc inum.toNat]) $$ []
+    ihave #Hntr : (⌜false = false⌝ ∨ ∃ ht : List Fev, ⌜H0 <+: ht⌝ ∗
+        fsLedLb fscFs (ht ++ [.trunc k.proc inum.toNat])) $$ []
     · ileft; ipureintro; rfl
+    have htrb : false = (omTrunc A.vom && decide (dn.diType.toNat = T_FILE)) := by rw [htr]
     iapply (sys_open_stores_pub Γ k A hPub cpu spie spp _ w6 lo w24 γil γisl loc tlc kk s g inum dn
-        bm kf fd l C0 pn γo P2 u nsj t ⟨hkk, hinb, hipos, hle⟩ hB hty0 hdir htd hti hE ?hpins1 hal false hS.hproc)
-      $$ Hntr Hpre Hk Hpc Hte Hce Henv Hcells Hbuf Hlk Hload Hkeep Href Hflds Hnames Hoff Hiru Hcore Howe Hop
+        bm kf fd l C0 pn γo P2 u nsj t ⟨hkk, hinb, hipos, hle⟩ hB hty0 hdir htd hti hE ?hpins1 hal hS.hproc
+        pl0 H0 po hpl0 hfix false htrb)
+      $$ HL0 Hntr Hk Hpc Hte Hce Henv Hcells Hbuf Hlk Hload Hkeep Href Hflds Hnames Hoff Hiru Hcore Howe Hop
         Hbs Hisl Hfds Hfrags Hauth Harm Hpost
     all_goals try (repeat (refine sysOpenPins_set _ _ _ _ _ _ _ ?_ (by decide))); exact hpins
   · -- ---- O_TRUNC: the type test ----
@@ -737,11 +800,15 @@ theorem sys_open_stores (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
         (sysOpenIm A) A.v.toNat A.vom A.P A.Fo A.Ft (sysOpenLed A) A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) pl
         inum.toNat dn bm data t γo hpl (Or.inr hf) hdirk hdev hino hen $$ HP Hobs Htc
       ihave Hload := sys_open_flat_close kk inum dn bm data $$ Hflat
-      ihave #Hntr : (⌜false = false⌝ ∨ fsLedAt fscFs [.trunc k.proc inum.toNat]) $$ []
+      ihave #Hntr : (⌜false = false⌝ ∨ ∃ ht : List Fev, ⌜H0 <+: ht⌝ ∗
+          fsLedLb fscFs (ht ++ [.trunc k.proc inum.toNat])) $$ []
       · ileft; ipureintro; rfl
+      have htrb : false = (omTrunc A.vom && decide (dn.diType.toNat = T_FILE)) := by
+        rw [htr]; simp [hf]
       iapply (sys_open_stores_pub Γ k A hPub cpu spie spp _ w6 lo w24 γil γisl loc tlc kk s g inum
-          dn bm kf fd l C0 pn γo P2 u nsj t ⟨hkk, hinb, hipos, hle⟩ hB hty0 hdir htd hti hE ?hpins3 hal false hS.hproc)
-        $$ Hntr Hpre Hk Hpc Hte Hce Henv Hcells Hbuf Hlk Hload Hkeep Href Hflds Hnames Hoff Hiru Hcore Howe Hop
+          dn bm kf fd l C0 pn γo P2 u nsj t ⟨hkk, hinb, hipos, hle⟩ hB hty0 hdir htd hti hE ?hpins3 hal hS.hproc
+          pl0 H0 po hpl0 hfix false htrb)
+        $$ HL0 Hntr Hk Hpc Hte Hce Henv Hcells Hbuf Hlk Hload Hkeep Href Hflds Hnames Hoff Hiru Hcore Howe Hop
           Hbs Hisl Hfds Hfrags Hauth Harm Hpost
       all_goals try (repeat (refine sysOpenPins_set _ _ _ _ _ _ _ ?_ (by decide))); exact hpins
 end

@@ -556,7 +556,7 @@ def sysMknodOut (A : SysMknodArgs GF) (r : BitVec 64) : IProp GF := iprop%
     procPrivFd A.γ (procAddr A.j) A.pid { A.V with upt := P' } (viewFaulted A.V.upt P' A.M) ∗
     mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
       (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex r) ∗
-  mknodRcptAt fscFs (procAddr A.j) r
+  mknodRcptAt fscFs (procAddr A.j) (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat r
 
 set_option maxHeartbeats 8000000 in
 /-- **THE JOIN POINT `+0x50`** (Rocq `mn_epilogue` + the caller's

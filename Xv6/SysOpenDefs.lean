@@ -837,7 +837,11 @@ lookup in the parent (O_CREATE) -/
 def openLedPre (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (i : Nat) : IProp GF :=
   iprop(∃ (pl : List (BitVec 8)) (H : List Fev) (po : Option Nat), ⌜argPathOf Mim pv pl⌝ ∗ fsLedLb γfs H ∗
-    ⌜fevOpenFixed H act rt (umStartOf rt cw pl) (pathElems pl) (omCreate vom) i po = true⌝)
+    ⌜fevOpenFixed H act rt (umStartOf rt cw pl) (pathElems pl) (omCreate vom) i po = true ∧
+      -- (NI M3 private files FS-2e) under O_CREATE, ALL of create's events
+      -- (at the path's last element) lie inside `H`
+      (omCreate vom = true → ∃ (made : Bool) (nm : List (BitVec 8)),
+        (pathElems pl).getLast? = some nm ∧ creOkIn act made nm i H)⌝)
 
 instance openLedPre_persistent (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8))
     (pv : Nat) (vom : BitVec 64) (i : Nat) : Persistent (openLedPre (GF := GF) γfs act rt cw Mim pv vom i) := by

@@ -411,7 +411,7 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     refine ⟨hpl, ?_⟩
     rw [hcr]
     rw [List.take_of_length_le (Nat.le_refl _)] at hw
-    exact fevOpenFixed_walk (procAddr A.j) hw
+    exact ⟨fevOpenFixed_walk (procAddr A.j) hw, fun h => absurd h (by decide)⟩
   ihave Hres : sysOpenResidue (hlc := hlc) A pl inum dn bm data $$ [HP HFo Htc]
   · unfold sysOpenResidue sysOpenObs
     iframe HP Htc Hpre

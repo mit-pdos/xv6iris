@@ -770,11 +770,11 @@ theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : Fs
 /-- THE CONTINUATION IS MONOTONE IN ITS ARMS, under a fupd (the loop pays
 it). -/
 theorem sysOpenK_mono_fupd (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (ARMS ARMS' : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (c : CPU) :
-    sysOpenK (hlc := hlc) k ns V M ARMS c ⊢
+    (v vom : BitVec 64) (ARMS ARMS' : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (c : CPU) :
+    sysOpenK (hlc := hlc) k ns V M v vom ARMS c ⊢
       (∀ (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64),
         ARMS' VW MW r -∗ |={⊤}=> ARMS VW MW r) -∗
-      sysOpenK (hlc := hlc) k ns V M ARMS' c := by
+      sysOpenK (hlc := hlc) k ns V M v vom ARMS' c := by
   unfold sysOpenK
   iintro H Hw %spie %spp %R' %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms Hor
   iapply wpLoop_fupd
@@ -796,7 +796,7 @@ theorem sys_open_cr_post_fresh (k : KCtx) (A : SysOpenArgs GF)
           (sysOpenCrFt (hlc := hlc) (fsGammaL fscFs) pl A.P Farm Fok Fex i0 A.Ft)) c := by
   iintro HR HΦ %c
   ispecialize HΦ $$ %c
-  iapply (sysOpenK_mono_fupd k A.ns A.V A.M _ _ c) $$ HΦ
+  iapply (sysOpenK_mono_fupd k A.ns A.V A.M A.v A.vom _ _ c) $$ HΦ
   iintro %VW %MW %r H
   iapply (sys_open_cr_arms_fresh (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j)
     A.pid (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts VW MW r pl i0 nl0
@@ -816,7 +816,7 @@ theorem sys_open_cr_post_exists (k : KCtx) (A : SysOpenArgs GF)
           (sysOpenCrFtEx (hlc := hlc) (fsGammaL fscFs) pl A.P Farm Fex i0 A.Ft)) c := by
   iintro HR HΦ %c
   ispecialize HΦ $$ %c
-  iapply (sysOpenK_mono_fupd k A.ns A.V A.M _ _ c) $$ HΦ
+  iapply (sysOpenK_mono_fupd k A.ns A.V A.M A.v A.vom _ _ c) $$ HΦ
   iintro %VW %MW %r H
   iapply (sys_open_cr_arms_exists (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j)
     A.pid (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts VW MW r pl i0 a0

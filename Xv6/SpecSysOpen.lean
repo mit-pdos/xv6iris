@@ -1009,24 +1009,35 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- (NI M3 private files FS-1) **OPEN'S LEDGER RECEIPT**, relayed to the
-post: at a descriptor (`r ≠ -1`) the install event `open act i γo` sits in
-the era's ledger, and at an O_TRUNC open (`tr`) itrunc's `trunc act i`
-before it; at `-1` nothing is claimed (a failure's verdict rides the arms'
-reasons, `openWhyRcpt`). -/
-def openOkRcpt (γfs : FsNames) (act : BitVec 64) : IProp GF :=
-  iprop(∃ (i : Nat) (γo : GName) (held : Bool) (po : Option Nat) (tr : Bool),
-    fsLedAt γfs [.open act i γo held po] ∗ (⌜tr = false⌝ ∨ fsLedAt γfs [.trunc act i]))
+/-- (NI M3 private files FS-1, FS-2e) **OPEN'S LEDGER RECEIPT**, relayed to
+the post: at a descriptor (`r ≠ -1`) the install event `open act i γo` sits
+in the era's ledger after the prefix `h`, which extends the prefix `H0` that
+holds what fixed `i` -- under O_CREATE ALL of create's events (`creOkIn`:
+a made child's arm, then its parent leg filing the fetched path's last
+element; or a found node's lookup of it); and a truncating open (the O_TRUNC
+bit of the omode word `vom`) of a FILE truncated `i` (`trunc act i`) past
+`H0` and before the install.  At `-1` nothing is claimed (a failure's
+verdict rides the arms' reasons, `openWhyRcpt`). -/
+def openOkRcpt (γfs : FsNames) (act : BitVec 64) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) :
+    IProp GF :=
+  iprop(∃ (pl : List (BitVec 8)) (H0 h : List Fev) (i : Nat) (γo : GName) (held : Bool) (po : Option Nat),
+    ⌜argPathOf Mim pv pl ∧ H0 <+: h ∧
+      (omCreate vom = true → ∃ (made : Bool) (nm : List (BitVec 8)),
+        (pathElems pl).getLast? = some nm ∧ creOkIn act made nm i H0) ∧
+      (omTrunc vom = true → fevIsFile h i = true → ∃ ht : List Fev, H0 <+: ht ∧ ht ++ [.trunc act i] <+: h)⌝ ∗
+    fsLedLb γfs (h ++ [.open act i γo held po]))
 
-instance openOkRcpt_persistent (γfs : FsNames) (act : BitVec 64) :
-    Persistent (openOkRcpt (GF := GF) γfs act) := by
+instance openOkRcpt_persistent (γfs : FsNames) (act : BitVec 64) (Mim : Nat → List (BitVec 8)) (pv : Nat)
+    (vom : BitVec 64) : Persistent (openOkRcpt (GF := GF) γfs act Mim pv vom) := by
   unfold openOkRcpt; infer_instance
 
-def openRcptAt (γfs : FsNames) (act : BitVec 64) (r : BitVec 64) : IProp GF :=
-  iprop(⌜r = -1#64⌝ ∨ openOkRcpt γfs act)
+def openRcptAt (γfs : FsNames) (act : BitVec 64) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
+    (r : BitVec 64) : IProp GF :=
+  iprop(⌜r = -1#64⌝ ∨ openOkRcpt γfs act Mim pv vom)
 
-theorem openRcptAt_of (γfs : FsNames) (act r : BitVec 64) (h : r = -1#64) :
-    ⊢@{IProp GF} openRcptAt γfs act r := by
+theorem openRcptAt_of (γfs : FsNames) (act : BitVec 64) (Mim : Nat → List (BitVec 8)) (pv : Nat)
+    (vom r : BitVec 64) (h : r = -1#64) :
+    ⊢@{IProp GF} openRcptAt γfs act Mim pv vom r := by
   unfold openRcptAt; ileft; ipureintro; exact h
 
 /-- **THE CONTRACT'S CONTINUATION** (the `wp_next true pj (…)` body of Rocq's
@@ -1035,7 +1046,7 @@ whole, and the ARMED post on the final block and the returned a0.  THE
 IMAGE DOES NOT MOVE: the binders are `(R', P', k')` and the block returns at
 `{ V.updEv k' with upt := P' }` at the faulted view (Rocq `us_upt U P'`, at
 the raised count of deviation 11). -/
-def sysOpenK (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
+def sysOpenK (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8)) (v vom : BitVec 64)
     (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (cpu' : CPU) :
     IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
@@ -1052,8 +1063,9 @@ def sysOpenK (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
     irefSlots ns -∗
     -- the armed post on the final block and the returned a0
     ARMS { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
-    -- (NI M3 private files FS-1) the install's (and itrunc's) ledger receipt
-    openRcptAt fscFs k.proc (R' 10#5) -∗
+    -- (NI M3 private files FS-1, FS-2e) the install's ledger receipt, create's
+    -- and itrunc's before it, at the path argument 0 names and the omode
+    openRcptAt fscFs k.proc (viewLazy V.upt V.sz M) v.toNat vom (R' 10#5) -∗
     wpLoop cpu')
 
 /-- **THE WHOLE-FUNCTION FRAME** (Rocq's `wp_sys_open_frame`), abstracted
@@ -1079,7 +1091,7 @@ def wp_sys_open_frame (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
   -- THE AU SIDE (the one addition to the landed premise list)
   EXTRA ∗
   -- THE CROSSING IS THE LITERAL `true`
-  wpNext true k.proc cpu (sysOpenK k ns V M ARMS)
+  wpNext true k.proc cpu (sysOpenK k ns V M v vom ARMS)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- **THE ONE BODY** (Rocq's `wp_sys_open_body`): the abstract state at the

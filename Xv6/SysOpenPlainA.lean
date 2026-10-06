@@ -193,7 +193,7 @@ def sysOpenAt36 (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) (EXTRA : IProp
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
     logOpS icfgLog MAXOPBLOCKS Sb -∗ logTx icfgLog -∗
     bslots 3 -∗ irefSlots A.ns -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
-    EXTRA -∗ (∀ c' : CPU, sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS c') -∗
+    EXTRA -∗ (∀ c' : CPU, sysOpenK (hlc := hlc) k A.ns A.V A.M A.v A.vom ARMS c') -∗
     wpLoop c)
 
 /-- ARM 0's receipt, per side: the bundle comes home UNSPENT beside the block
@@ -228,7 +228,7 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     byteBuf (sysOpenPath (k.regs 2#5)) (DFrac.own 1) bs ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     bslots 3 ∗ irefSlots A.ns ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
-    EXTRA ∗ (∀ c' : CPU, sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS c')
+    EXTRA ∗ (∀ c' : CPU, sysOpenK (hlc := hlc) k A.ns A.V A.M A.v A.vom ARMS c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hblk, Hbs, Hir, Hfd, Hfr, Hx, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -341,7 +341,7 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
         trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c') $$ [HΦ Hx Hblk Hfr Hfd Hbs Hir]
     · iintro %c' %R' %⟨hcs, ha0⟩ Hk Hpc Hte Hce
       ispecialize HΦ $$ %c'
-      ihave HΦ := sysOpenK_same k A.ns A.V A.M ARMS c' $$ HΦ
+      ihave HΦ := sysOpenK_same k A.ns A.V A.M A.v A.vom ARMS c' $$ HΦ
       have ha0' : R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 := by
         rw [ha0]; simp only [RegMap.set_apply, ite_true]
       iapply HΦ $$ %spie %spp %R' %P2 %hcs %hP2 Hk Hpc Hte Hce Hbs Hir [Hx Hblk Hfr Hfd] []
@@ -374,7 +374,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
     bslots 3 ∗ irefSlots A.ns ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
-    EXTRA ∗ (∀ c' : CPU, sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS c')
+    EXTRA ∗ (∀ c' : CPU, sysOpenK (hlc := hlc) k A.ns A.V A.M A.v A.vom ARMS c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hblk, Hbs, Hir, Hfd, Hfr, Hx, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -466,10 +466,10 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
   -- argstr lent the block's counter (permit sweep L1b): the rest of the run
   -- is at the record it came back at (Rocq's `UA`)
   ihave HΦ : (∀ c' : CPU, sysOpenK (hlc := hlc) k (A.raise kv).ns (A.raise kv).V (A.raise kv).M
-      ARMS c') $$ [HΦ]
+      (A.raise kv).v (A.raise kv).vom ARMS c') $$ [HΦ]
   · iintro %c'
     ispecialize HΦ $$ %c'
-    iapply (sysOpenK_raise k A.ns A.V A.M ARMS c' kv hkv) $$ HΦ
+    iapply (sysOpenK_raise k A.ns A.V A.M A.v A.vom ARMS c' kv hkv) $$ HΦ
   ihave Hpc := (show pcIs (GF := GF) cpu (KA.«sys_open» + 32#64) ⊢
     pcIs cpu (sysOpenAddr + 0x20#64) from .rfl) $$ Hpc
   have hp1 : sysOpenPins k R1 (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) := by
@@ -508,7 +508,7 @@ theorem sys_open_entry (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNa
     procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗ isFtable A.γl A.γ ∗
     bslots 3 ∗ irefSlots A.ns ∗ fdSlot ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗ fdFrags A.V.fdg A.sts ∗
-    EXTRA ∗ wpNext true k.proc cpu (sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS)
+    EXTRA ∗ wpNext true k.proc cpu (sysOpenK (hlc := hlc) k A.ns A.V A.M A.v A.vom ARMS)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Hpi, #Hpe, #Hrdy, #Hft, Hbs, Hir, Hfd, Hblk, Hfr, Hx, Hnext⟩
   icases kctx_tier cpu _ $$ Hk with ⟨%hct0, Hk⟩

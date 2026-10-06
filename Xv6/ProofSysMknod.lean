@@ -146,7 +146,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
     (∀ c : CPU, sysMknodPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
-    creRcptAt fscFs (procAddr A.j) ok made inum.toNat ∗
+    creRcptAt fscFs (procAddr A.j) pl ok made inum.toNat ∗
     (if ok then
       iprop(⌜R 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧
           creOkPure T_DEVICE_w (sysMknodHw A.v1) (sysMknodHw A.v2) made dn⌝ ∗
@@ -215,9 +215,12 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
         hj hproc hK hnoff htier hct hpins h10 hal hP2 hkk hnib (hu rfl) hns)
       $$ [$Hk $Hpc $Hcells $Hbuf $Hlow $Hte $Hce $Henv $Hblk $HΦ $Hlk $Hbs $Hir $Hop $Hok]
     unfold creRcptAt
-    icases Hcr with (%h | #Hcr)
+    icases Hcr with (%h | ⟨%nm, %hnm, #Hcr⟩)
     · cases h
-    · iexists inum.toNat; iexact Hcr
+    · unfold mknodOkRcpt
+      iexists pl, nm, inum.toNat
+      iframe Hcr
+      ipureintro; exact ⟨hpl, hnm⟩
 
 /-! ## +0x2e: argstr came back -/
 
@@ -373,10 +376,13 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     unfold sysMknodCreateK createPost
     iintro %spie1 %spp1 %R1 %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs1 Hk Hpc Hte Hce
       - - - - Hblk Hp Hbs %hns1 Hir %⟨-, -, hu1⟩ HopS #Hcr Harm
-    ihave #Hcr : creRcptAt fscFs (procAddr A.j) ok made inum.toNat $$ []
-    · iapply (creRcptAt_act (GF := GF) fscFs _ (procAddr A.j) ok made inum.toNat ?hh)
+    ihave #Hcr : creRcptAt fscFs (procAddr A.j) pl ok made inum.toNat $$ []
+    · have e := sys_mknod_bview_self pl
+      have hb : ∀ a : BitVec 64, creRcptAt (GF := GF) fscFs a (bview pl.length (sysfilePfun pl)) ok made
+          inum.toNat ⊢ creRcptAt fscFs a pl ok made inum.toNat := fun a => by rw [e]
+      iapply (creRcptAt_act (GF := GF) fscFs _ (procAddr A.j) pl ok made inum.toNat ?hh)
       rotate_left
-      · iexact Hcr
+      · iapply hb; iexact Hcr
       · exact hproc
     k_norm_g [sys_mknod_ret_44, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
     ihave Hp := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551472#64) (DFrac.own 1)

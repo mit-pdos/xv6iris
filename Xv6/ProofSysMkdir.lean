@@ -83,7 +83,9 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     (hal : (sysMkdirBuf (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
     (hlen : pl.length + 1 + rest.length = 128)
     (hns' : if ok then ns' + 1 = A.ns else ns' = A.ns)
-    (hf : ok = true → iputUnits ≤ u') :
+    (hf : ok = true → iputUnits ≤ u')
+    -- (NI M3 private files FS-2e) create's buffer IS the path argument 0 names
+    (hpof : argPathOf (viewLazy A.V.upt A.V.sz A.M) A.v.toNat (bview pl.length (sysfilePfun pl))) :
     kctx cpu (((k.withSpie spie spp).pushed 18).withRegs R) ∗ pcIs cpu (KA.«sys_mkdir» + 0x2c#64) ∗
     sysMkdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     byteBuf (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) ∗
@@ -91,7 +93,7 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMkdirV1 A P2) (sysMkdirM1 A P2) ∗
     (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
-    creRcptAt fscFs (procAddr A.j) ok made inum.toNat ∗
+    creRcptAt fscFs (procAddr A.j) (bview pl.length (sysfilePfun pl)) ok made inum.toNat ∗
     (if ok then
       iprop(⌜R 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧
           creOkPure T_DIR (0#16) (0#16) made dn⌝ ∗
@@ -142,9 +144,12 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
         hkk hnib (hf rfl) hns')
       $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hlk $Harms]
     unfold creRcptAt
-    icases Hcr with (%h | #Hcr)
+    icases Hcr with (%h | ⟨%nm, %hnm, #Hcr⟩)
     · cases h
-    · iexact Hcr
+    · unfold mkdirOkRcpt
+      iexists bview pl.length (sysfilePfun pl), nm, inum.toNat
+      iframe Hcr
+      ipureintro; exact ⟨hpof, hnm⟩
 
 /-! ## +0x1a: argstr came back -/
 
@@ -264,7 +269,7 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     have hlen : pl'.length + 1 + (old.drop (pl'.length + 1)).length = 128 := by
       rw [List.length_drop]; omega
     iapply (sys_mkdir_created IUP EO Γ cpu k A P2 spie1 spp1 R1 pl' _ ok made kk qi s g inum dn bm
-        u' Sb' ns' hj hproc hK hnoff htier hct hp1 hal hP2 hlen hns' hf)
+        u' Sb' ns' hj hproc hK hnoff htier hct hp1 hal hP2 hlen hns' hf hpof)
       $$ [$Hk $Hpc $Hcells $Hp $Hrest $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hcr Harm]
     cases ok
     · iexact Harm

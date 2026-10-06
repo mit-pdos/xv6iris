@@ -501,17 +501,19 @@ theorem syscOpen_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat �
 /-- (NI M3 private files FS-2b) **mkdir's citation**: the boot prefix at a
 `-1`, the fs prefix ending in the caller's parent leg at a `0`. -/
 theorem syscMkdir_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat → List (BitVec 8))
-    (sts : List FdState) {sts' : List FdState} (cs : ExtTreeSet GName compare) (r a : BitVec 64) (hnum : syscNum V = 20)
+    (sts : List FdState) {sts' : List FdState} (cs : ExtTreeSet GName compare) (r a : BitVec 64)
+    (Mv : Nat → List (BitVec 8)) (pv : Nat) (hnum : syscNum V = 20)
     (hl : tfArgIdx 0 < V1.tf.length) (hret : sysMkdirRet r) :
-    mkdirRcptAt (GF := GF) fscFs a r ⊢
+    mkdirRcptAt (GF := GF) fscFs a Mv pv r ⊢
       |==> ∃ ι : UIota, niIotaLbs (GF := GF) (niNamesHere (GF := GF)) ι ∗
         ⌜syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts sts' ι⌝ := by
   rcases hret with h0 | hm1
   · unfold mkdirRcptAt
-    iintro (%hne | ⟨%i, Hok⟩)
+    iintro (%hne | Hok)
     · exact absurd h0 hne
-    unfold creOkRcpt creParentRcpt fsLedAt
-    icases Hok with (⟨-, -, ⟨%d, %nm, %nl, ⟨%h, #Hlb⟩⟩⟩ | ⟨%hf, -⟩)
+    unfold mkdirOkRcpt creOkRcpt creParentRcpt
+    icases Hok with ⟨%pl, %nm, %i, -, Hok⟩
+    icases Hok with (⟨-, ⟨%n, %ha, %h, %d, %nl, -, -, #Hlb⟩⟩ | ⟨%hf, -⟩)
     · ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML (h ++ [Fev.ent a d nm (some i), Fev.nlink a d nl])
         $$ [Hlb]
       · rw [show (niNamesHere (GF := GF)).getD 6 0 = fscFs.fev from rfl]
@@ -877,7 +879,7 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
   icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
   iapply wpLoop_bupd
   imod syscMkdir_cite (GF := GF) V { V.updEv k' with upt := P' } M (viewFaulted V.upt P' M) sts cs (R2 10#5)
-    (procAddr j) hn (by show tfArgIdx 0 < V.tf.length; rw [hl]; decide) hmret $$ Hmr with ⟨%ι, #Hl, %hrow⟩
+    (procAddr j) _ _ hn (by show tfArgIdx 0 < V.tf.length; rw [hl]; decide) hmret $$ Hmr with ⟨%ι, #Hl, %hrow⟩
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts (syscStore { V.updEv k' with upt := P' } (R2 10#5))
     (viewFaulted V.upt P' M) cs cs gn ke ι hrow $$ Hanc Hl
   imodintro

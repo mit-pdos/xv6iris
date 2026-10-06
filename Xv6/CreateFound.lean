@@ -695,7 +695,7 @@ theorem createFound_exit_ok (cpu : CPU) (k : KCtx) (A : CreateFoundArgs)
     createLocked A.pid kk q q g inum dn bm ∗
     creOkArms (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
       F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) false inum.toNat ∗
-    creOkRcpt fscFs k.proc false inum.toNat ∗
+    creRcptAt fscFs k.proc (bview A.plen A.pfun) true false inum.toNat ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
   unfold createFoundFr createFoundOwe
@@ -714,7 +714,7 @@ theorem createFound_exit_ok (cpu : CPU) (k : KCtx) (A : CreateFoundArgs)
     %Sb' %(1 + (A.ns - 2)) %hcs Hk Hpc Hte Hce Hsn Hsi Hss Hsb Hpriv Hpath Hbs [] Hsl [] Hop []
   · ipureintro; exact create_slots_1 true A.ns rfl hns
   · ipureintro; exact ⟨hsub, hu, fun _ => hip⟩
-  · unfold creRcptAt; iright; iexact Hcrc
+  · iexact Hcrc
   simp only [if_true]
   iframe Hlk Harms
   ipureintro
@@ -1089,7 +1089,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     -- child IS dp and carries its `T_DIR` one-shot
     creExFired F.Fex dind.toNat (bname 14 nf) cexv ∗
     -- (NI M3 private files FS-1) the lookup's hop, in the era's ledger
-    creFoundRcpt fscFs k.proc cexv ∗
+    creFoundRcpt fscFs k.proc (bname 14 nf) cexv ∗
     (⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR) ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
@@ -1172,8 +1172,11 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
           hK10 hal htl (createTregs_of_regs k _ _ _ _ _ _ ?hr6) ?h18
           hkc hcpos hcnib hpure hS.hns hsub hn2 hn)
         rotate_left 2
-        ihave #Hcrc : creOkRcpt fscFs k.proc false cinum.toNat $$ []
-        · unfold creOkRcpt; iright
+        ihave #Hcrc : creRcptAt fscFs k.proc (bview A.plen A.pfun) true false cinum.toNat $$ []
+        · unfold creRcptAt; iright; iexists bname 14 nf
+          isplitl []
+          · ipureintro; exact hlast
+          unfold creOkRcpt; iright
           isplitl []
           · ipureintro; rfl
           rw [← hcex]; iexact Hhop
@@ -1243,7 +1246,7 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     creExFired F.Fex dind.toNat (bname 14 nf) cexv ∗
     -- (NI M3 private files FS-1) the lookup's hop, in the era's ledger
-    creFoundRcpt fscFs k.proc cexv ∗
+    creFoundRcpt fscFs k.proc (bname 14 nf) cexv ∗
     (⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR) ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗

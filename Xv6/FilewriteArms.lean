@@ -97,7 +97,7 @@ theorem fwr_arm_neg (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl :
     iapply filewriteExtra_neg (pmv := pmv) (szv := szv) (lzv := lzv) _ _ st n _ _ Q Qe hneg htb $$ Hin
   · -- (NI M3 FS-0) the sign guard's -1
     iapply fwWhyAt_neg; exact hneg
-  iapply fwRcptAt_nil; right; left; omega
+  iapply fwRcptAt_nil; left; exact ⟨by omega, Or.inr hneg⟩
 
 /-- THE INODE ARM'S INPUT AT A ZERO COUNT, at either mode: the chain at
 the kernel's table (at a held row the client-advanced chain converts down,
@@ -201,7 +201,7 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
     iapply writeArmsOm_ok _ _ _ _ _ _ _ _ _ _ ⟨rfl, Int.le_refl 0⟩ $$ Hc
   · -- (NI M3 FS-0) the answer is 0, not -1
     iapply fwWhyAt_ne; rw [ha0]; decide
-  iapply fwRcptAt_nil; right; left; rfl
+  iapply fwRcptAt_nil; left; exact ⟨rfl, Or.inl (by rw [ha0]; decide)⟩
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x5c .. +0x62`: THE PIPE ARM** (Rocq's `+0x54 .. +0x5a`):
@@ -299,7 +299,7 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     try rw [h11]
     iexact Hpost
   · iapply fwWhyAt_other; intro _ _ _ _ h; cases h
-  iapply fwRcptAt_nil; right; right; intro _ _ _ _ h; cases h
+  iapply fwRcptAt_nil; right; intro _ _ _ _ h; cases h
 
 /-! ## The FD_DEVICE arm's readings -/
 
@@ -381,7 +381,7 @@ theorem fwr_dev_m1 (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : 
     · ipureintro; exact filewriteRet_m1 n
     iapply filewriteExtra_dev_drop (pmv := pmv) (szv := szv) (lzv := lzv) _ _ rb mj hnc n _ _ Q Qe _ $$ Hin
   · iapply fwWhyAt_other; intro _ _ _ _ h; cases h
-  iapply fwRcptAt_nil; right; right; intro _ _ _ _ h; cases h
+  iapply fwRcptAt_nil; right; intro _ _ _ _ h; cases h
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x64 .. +0x88`: THE FD_DEVICE ARM** (Rocq's `+0x5c .. +0x80`):
@@ -577,7 +577,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     iapply filewriteExtra_cons _ _ rb n _ _ Q Qe _ $$ H
   · -- (NI M3 FS-0) a device row: no inode reason
     iapply fwWhyAt_other; intro _ _ _ _ h; cases h
-  iapply fwRcptAt_nil; right; right; intro _ _ _ _ h; cases h
+  iapply fwRcptAt_nil; right; intro _ _ _ _ h; cases h
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0x102 .. +0x116`: THE ELSE ARM** (Rocq's `fw_panic`): the six lazy
@@ -720,7 +720,7 @@ theorem fwr_arm_inode (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
   isplitl []
   · iexact Henv
   isplitl []
-  · iapply fwChunks_nil
+  · iapply fwChunksOrd_nil
   · ipureintro; rfl
 
 end

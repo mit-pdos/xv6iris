@@ -99,7 +99,7 @@ def fwrK (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) 
     filewriteEnvOut γl γu st -∗
     filewriteArms (hlc := hlc) V.gen V.upt st n (writerImg V.upt M) (k.regs 11#5) Q Qe (R' 10#5) -∗
     fwWhyAt fscFs k.proc st V.upt (k.regs 11#5) n (R' 10#5) -∗
-    fwRcptAt fscFs k.proc st n (R' 10#5) -∗ wpLoop c)
+    fwRcptAt fscFs k.proc st V.upt (writerImg V.upt M) (k.regs 11#5) n (R' 10#5) -∗ wpLoop c)
 
 /-- ...WITH THE GENERATION HALVES OUT: the continuation that takes the
 block's `genHalvesPriv` back (pipewrite's kill read lends them; every other
@@ -192,7 +192,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     fileRef A.γ A.fk A.q A.st ∗ procPrivExtEv (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
     -- (NI M3 private files FS-1) the loop's chunk receipts, summing to the count
-    (∃ cs : List Fev, fwChunks fscFs k.proc A.i A.γo (A.om == .held) cs ∗ ⌜fwSum cs = A.n.toNat⌝) ∗
+    (∃ cs : List (Nat × Fev), fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n 0 0 cs ∗ ⌜fwSum cs = A.n.toNat⌝) ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
@@ -250,7 +250,10 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     iapply fwWhyAt_ne; rw [ha0]; exact fwr_ofInt_ne_m1 A.n (by have := hA.hn.1; omega) hA.hn.2
   · unfold fwRcptAt
     icases Hcs with ⟨%cs, #Hc, %hs⟩
-    iexists cs; iframe Hc; ipureintro; intro _; exact hs
+    iexists cs; iframe Hc
+    isplitl []
+    · ipureintro; intro _; exact hs
+    · ileft; ipureintro; left; rw [ha0]; exact fwr_ofInt_ne_m1 A.n (by have := hA.hn.1; omega) hA.hn.2
 
 set_option maxHeartbeats 16000000 in
 /-- **THE FAIL EXIT** (`+0xe2` taken, `+0x12a .. +0x138`, the tail): a
@@ -266,15 +269,15 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fileRef A.γ A.fk A.q A.st ∗ procPrivExtEv (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x ∗
-    -- (NI M3 FS-0) the short chunk's reason
-    (∃ w : FwWhy, fwWhyRcpt fscFs k.proc A.V.upt (k.regs 11#5) A.n w) ∗
-    -- (NI M3 private files FS-1) the loop's chunk receipts
-    (∃ cs : List Fev, fwChunks fscFs k.proc A.i A.γo (A.om == .held) cs) ∗
+    -- (NI M3 private files FS-1, FS-2e) the loop's chunk receipts, in ledger
+    -- order, and (NI M3 FS-0) the short chunk's reason past the last of them
+    (∃ cs : List (Nat × Fev), fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n 0 0 cs ∗
+      fwWhyAfter fscFs k.proc A.V.upt (k.regs 11#5) A.n (fwEnd 0 cs)) ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Hbs, Hst, #Hwhy, #Hcs, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Hbs, Hst, ⟨%cs, #Hcs, #Hwa⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0xe2  bne s5,s4 : taken (i < n)
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0xe2#64) false 72#13 21#5 20#5 (by decide) bop.BNE)
@@ -329,11 +332,13 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     iapply writeArmsOm_fail
     iapply fwrSt_fail A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x (Or.inl htn) $$ Hst
   · -- (NI M3 FS-0) the short chunk's reason
-    icases Hwhy with ⟨%w, Hw⟩
+    icases fwWhyAfter_why _ _ _ _ _ _ $$ Hwa with ⟨%w, Hw⟩
     iapply fwWhyAt_why; iexact Hw
   · unfold fwRcptAt
-    icases Hcs with ⟨%cs, #Hc⟩
-    iexists cs; iframe Hc; ipureintro; intro h; rw [ha0] at h; exact absurd rfl h
+    iexists cs; iframe Hcs
+    isplitl []
+    · ipureintro; intro h; rw [ha0] at h; exact absurd rfl h
+    · iright; iexact Hwa
 
 end
 

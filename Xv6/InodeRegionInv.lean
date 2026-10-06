@@ -526,6 +526,25 @@ theorem ftopFull [Icfg] (E : CoPset) (γfs : FsNames) (act : BitVec 64) (why : F
   imodintro
   iexact Hr
 
+/-- (NI M3 private files FS-2e) **AN EXHAUSTION VERDICT PAST A BOUND**: the
+era's ledger takes `full act why` past a lower bound the caller holds -/
+theorem ftopFullAfter [Icfg] (E : CoPset) (γfs : FsNames) (act : BitVec 64) (why : FsFull)
+    (L : List Fev) (hE : (↑ftopN : CoPset) ⊆ E) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ fsLedLb γfs L -∗ |={E}=> fsFullAfter γfs act why L.length := by
+  iintro #Hi #HL
+  unfold ftopInv
+  imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs) hE) $$ Hi
+    with ⟨Hb, Hclose⟩
+  unfold ftopBody
+  icases Hb with ⟨%I, %A, Hta, Hla, Hpark, %hcl, Hled⟩
+  imod ftopLed_fullAfter γfs I act why L $$ HL Hled with ⟨Hled, #Hr⟩
+  imod Hclose $$ [Hta Hla Hpark Hled]
+  · iexists I, A
+    iframe Hta Hla Hpark Hled
+    ipureintro; exact hcl
+  imodintro
+  iexact Hr
+
 /-- (NI M3 private files FS-1) **AN OBSERVATION THAT READS NO ROW,
 RECORDED**: the era's ledger takes `e` (an `fevObs` event: fstat's `stat`,
 open's install) at this instant, its receipt out. -/

@@ -104,7 +104,7 @@ theorem sys_mkdir_out_ok (A : SysMkdirArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz 
       bslots 3 ∗ irefSlots A.ns ∗
       creOkArms (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Farm A.Fdots A.Fun A.Fok A.Fex
         pl true i ∗
-      creOkRcpt fscFs (procAddr A.j) true i ⊢
+      mkdirOkRcpt fscFs (procAddr A.j) (viewLazy A.V.upt A.V.sz A.M) A.v.toNat ⊢
     sysMkdirOut A 0#64 := by
   iintro ⟨Hb, Hbs, Hir, Ha, #Hcr⟩
   unfold sysMkdirOut
@@ -120,7 +120,7 @@ theorem sys_mkdir_out_ok (A : SysMkdirArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz 
     · ipureintro; rfl
     iexists pl, i
     iexact Ha
-  · unfold mkdirRcptAt; iright; iexists i; iexact Hcr
+  · unfold mkdirRcptAt; iright; iexact Hcr
 
 /-! ## The shared "-1" tail: `+0x40` -/
 
@@ -206,7 +206,7 @@ theorem sys_mkdir_tail_ok (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     createLocked A.pid kk qi s g inum dn bm ∗
     creOkArms (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Farm A.Fdots A.Fun A.Fok A.Fex
       pl true i ∗
-    creOkRcpt fscFs (procAddr A.j) true i
+    mkdirOkRcpt fscFs (procAddr A.j) (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hlk, Harms, #Hcr⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
