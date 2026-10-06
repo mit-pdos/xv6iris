@@ -112,3 +112,4 @@ Rocq→Lean name map only.
 - WeakRvwmoLin2: `fconfSupply'` takes `candFetchInertF boot N (candOf G L)`; `fconfTraceRealize` returns `∃ L, … ∧ (candFetchInertF boot N c → ∃ pst, …)` — consumers discharge `candFetchInertF` at their candidate.
 - GPR leaves: a whnf timeout at `exact` after `rw [(lemma _ x _ y _ _).field]` comes from open metavariables — instantiate all args. Before `WeakLeafLw4.gprUpdate` on a `.setMem` state, `rw [show … = (… .setMem M).regs from rfl]` (never pass `_` for the state). WeakLeafCsrw is the worked CSR leaf.
 - Wide (8-byte) leaves: whnf unfolds `wwin pc ea 8` inside the confined-state literal — use `WeakLeafLd8.confBytes`/`confDom` (stated over an abstract window W) instead of stating BytesAt/bmDomSub at the literal.
+- `exact wwinWdom σ pc ea n vs` against a `(⟨r, m, d⟩ : ExecSt).mem` goal times out — `dsimp only` first. Model wPEff<X> as in wPEffLw4: apply `wPEffOfLeafBase`, one bullet per premise.
