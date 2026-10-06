@@ -24,6 +24,7 @@ THE MOVE (NI M3 U-2a, ruling U-R3; design of record
   (`UslotDetMint`).
 -/
 import Xv6.Ustep
+import Xv6.UexecWp
 
 namespace Xv6
 

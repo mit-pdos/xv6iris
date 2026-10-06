@@ -50,7 +50,6 @@ import Xv6.SpecSleepPrepare
 import Xv6.ArgLemmas
 import MachCSL.WpSmodeFrame8
 import Xv6.SpecArgint
-import Xv6.KillRow
 import Xv6.WordFrac
 
 namespace Xv6

@@ -50,7 +50,6 @@ import Xv6.LinkShMalloc
 import Xv6.UshmSbrkHolds
 import Xv6.InitPrintfLink
 import Xv6.UnionBootAdequacy
-import Xv6.LinkUkLeaves
 import Xv6.UnionAdmDemo
 import Xv6.ProofUser
 

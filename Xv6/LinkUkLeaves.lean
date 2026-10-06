@@ -26,7 +26,6 @@ import Xv6.UkFetchDec
 import Xv6.UkRetireAlu
 import Xv6.UkRetireCtl
 import Xv6.UkStoreX
-import Xv6.UkAbi
 import Xv6.UkUstep
 
 namespace Xv6
