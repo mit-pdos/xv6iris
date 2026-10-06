@@ -263,3 +263,4 @@ No decision is needed for `TsoMem` (untouched), `VirtioProg` (Weak-local), `PtAd
 - **Q3 (2026-10-06): option A** — Rocq's `mmode_config` (hw_config + minstret/clock invariants + hart cells)
   is restated as the Lean SC tree's `mConf cpu dq c` plus the five owned clock cells (`clockCells cpu`), mask
   ⊤; `MinstretInv` is NOT ported. All weak leaf files that take `mmode_config` use this interface.
+- **Q4 (2026-10-06): leave as premise** — the 'kernel text is never written' premises (efetchItvOk, fetchSrcOk) stay carried and documented in the capstones; to be lifted later (not part of the port).
