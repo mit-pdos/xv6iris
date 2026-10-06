@@ -110,5 +110,6 @@ import Weak.ExecSC9
 import Weak.ExecSC10
 import Weak.WeakRobustCone
 import Weak.WeakEvInst
+import Weak.AxStepDet
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
