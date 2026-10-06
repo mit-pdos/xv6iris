@@ -92,5 +92,6 @@ import Weak.WeakRobustBlocks
 import Weak.WeakEvPf
 import Weak.WeakSailComplete
 import Weak.WeakCertify
+import Weak.WeakCert
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
