@@ -214,6 +214,7 @@ def SyscDepLink : Prop :=
           linkArms (hlc := hlc) (fsGammaL fscFs) Ftgt Fent Funt r -∗
             spostAt (uslot (hlc := hlc)) 19 f W r M' fdv' cw' cs')
 
+variable [Xv6G GF] in
 /-- **Rocq `sysc_dep_mkdir` + `sysc_out_mkdir`** (deviation 2: the image
 guard; TL-3C made mkdir's bundle path-fixed): branch 20 is mkdir's caller
 bundle at the key's cwd and the path at argument 0; mkdir's arms at the view
@@ -256,7 +257,7 @@ def SyscDepMknod : Prop :=
               Fex r -∗
             spostAt (uslot (hlc := hlc)) 17 f W r M' fdv' cw' cs')
 
-variable [OffboxG GF] in
+variable [OffboxG GF] [Xv6G GF] in
 /-- **Rocq `sysc_dep_open` + `sysc_out_open`** (deviation 2: the image
 guard): branch 15 is open's one input at the O_CREATE bit of argument 1, the
 path at argument 0, at every page view agreeing with the key's image; open's
@@ -438,7 +439,7 @@ theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (hlc := hlc) (
   iapply wpNext_intro_pin
   iintro %c %_
   unfold sysUnlinkPost
-  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir2 Hpriv Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir2 Hpriv Harms -
   ihave Hir := (show irefSlots (GF := GF) sysUnlinkSlots ∗ irefSlots 2 ⊢ irefSlots IREFSPARE from
     irefSlots_combine 2 2) $$ [Hir2 Hirk]
   · iframe
@@ -600,7 +601,7 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
   iapply wpNext_intro_pin
   iintro %c %_
   unfold sysMkdirK
-  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Hpriv %- Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Hpriv %- Harms -
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -681,7 +682,7 @@ theorem syscall_arm_mknod (SN : SYSMKNOD) (hdep : SyscDepMknod (hlc := hlc) (GF 
   iapply wpNext_intro_pin
   iintro %c %_
   unfold sysMknodK
-  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Hpriv Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Hpriv Harms -
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -842,7 +843,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   iapply wpNext_intro_pin
   iintro %c %_
   unfold sysOpenK
-  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms -
   icases openArms_split (hlc := hlc) omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
     (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat (tfW V.tf (tfArgIdx 1)) P Pmiss Farm Fun
     Fok Fex Fo Ft sts { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R2 10#5) $$ Harms with

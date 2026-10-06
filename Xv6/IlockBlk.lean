@@ -57,7 +57,7 @@ set_option maxHeartbeats 8000000 in
 /-- **THE BLOCK, OPENED** (Rocq 1088-1395). -/
 theorem il_blk_open [Icfg] [Fscfg] [CurCtx] (kb : Nat) (pidv : BitVec 32) (inum : BitVec 32)
     (bs bsd : List (BitVec 8)) (db : Bool) (o : Ilkc) (g : GName) (hfills : ilkFills o)
-    (hnib : inum.toNat < 16 * icfgNib) (hib : IBLOCK inum icfgIst < 2 ^ 31) :
+    (hnib : inum.toNat < 16 * icfgNib) (hib : IBLOCK inum icfgIst < 2 ^ 31) (act : BitVec 64) :
     iregInv (hlc := hlc) (GF := GF) fscIreg fscFs icfgIst icfgNib ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kb pidv icfgDev
       (BitVec.ofNat 32 (IBLOCK inum icfgIst)) bs bsd db ∗
@@ -82,7 +82,7 @@ theorem il_blk_open [Icfg] [Fscfg] [CurCtx] (kb : Nat) (pidv : BitVec 32) (inum 
     (iregBi_lt inum icfgNib hin) $$ Hireg HL with ⟨%hex, HL⟩
   obtain ⟨ds, hwf, rfl⟩ := hex
   rw [← iregBi_iblock]
-  imod il_fill fscIreg fscFs icfgIst icfgNib fscCov fscLogst inum ds o g hfills hin hwf
+  imod il_fill fscIreg fscFs icfgIst icfgNib fscCov fscLogst inum ds o g hfills hin hwf act
     $$ Hireg Hpool Hcl HL with ⟨HL, Hrest⟩
   imod ityShoot g ds[islot inum]!.diType $$ Hpend with #Hshot
   rw [iregBi_iblock, ← hbno]

@@ -241,7 +241,9 @@ theorem sys_open_ec_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   iintro %c %_
   unfold createPost
   iintro %spie %spp %R' %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs Hk Hpc Hte Hce
-    - - - - Hblk Hpath Hbs %hns' Hir %hf Hop Harm
+    - - - - Hblk Hpath Hbs %hns' Hir %hf Hop - Harm
+  -- (NI M3 private files FS-1) create's legs are in the era's ledger; their
+  -- receipt is not relayed to sys_open's post (FS-2b: O_CREATE's legs)
   unfold sysOpenCreateK
   iapply HK $$ %c %spie %spp %R' %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs Hk Hpc
     Hte Hce Hblk Hpath Hbs %hns' Hir %hf Hop Harm
@@ -301,6 +303,9 @@ theorem sys_open_ec_fail (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCt
   ispecialize HΦ $$ %c'
   unfold sysOpenPostC sysOpenK
   iapply HΦ $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir
+    [Hfd Hblk Hfr Hcf Hoc Htc] []
+  rotate_right
+  · iapply openRcptAt_of; rw [hr]; decide
   unfold openArmsCreate
   iframe Hfd
   ileft

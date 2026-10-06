@@ -153,8 +153,8 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
   iapply wpLoop_fupd
   icases kctx_token_acc _ _ $$ Hk with ⟨Hrun, Hkb⟩
   imod frd_post_ghost cpu ik fk q γb γo C m T0 Tr s g lo inum dn bm data v dd F wb om hip hik hq hok hloc
-    hwf hcap $$ [Hrun Hcm Htop Hgv Hcell Hout Hmeta Hmap Hblk]
-    with ⟨Hrun, Hoffd, Hrows, Hheld, ⟨%av, %hrow, Hrecv⟩⟩
+    hwf hcap k.proc $$ [Hrun Hcm Htop Hgv Hcell Hout Hmeta Hmap Hblk]
+    with ⟨Hrun, Hoffd, Hrows, Hheld, #Hrdrc, ⟨%av, %hrow, Hrecv⟩⟩
   · iframe Hrun Hcm Htop Hgv Hcell Hout Hmeta Hmap Hblk
     iframe #
   ihave Hk := Hkb $$ Hrun
@@ -190,7 +190,17 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     · exact Or.inl h
   have hwin := frd_wrote_rdImg V.upt P' M M' (k.regs 11#5) data v.toNat tot himg
   unfold frdK
-  iapply HΦ $$ %c' %spie3 %spp3 %R' %P' %M' %tot [] Hk Hpc Hte Hce Href Hpriv Hgen [Hbs] [HP Hrecv]
+  iapply HΦ $$ %c' %spie3 %spp3 %R' %P' %M' %tot [] Hk Hpc Hte Hce Href Hpriv Hgen [Hbs] [HP Hrecv] []
+  rotate_right
+  · -- (NI M3 private files FS-1) the read's event, at the count it returned
+    unfold freadRcptAt
+    rcases harm with ⟨ha0, -⟩ | ⟨ha0, -, hdd⟩
+    · ileft; ipureintro; rw [h10', ha0]
+    · iright
+      iexists dd, absRow (eraNode dn bm data)
+      isplitl []
+      · ipureintro; rw [h10', ha0, hdd]
+      · iexact Hrdrc
   · ipureintro; exact ⟨hcs, hext, by omega, hr10, hwin⟩
   · iapply frd_envout_inode $$ Hbs
   unfold filereadArms

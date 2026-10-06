@@ -316,6 +316,31 @@ theorem fsReady_region [Fscfg] [Icfg] [CurCtx] :
   iintro ⟨-, -, -, -, -, -, H1, H2, -⟩
   iframe H1 H2
 
+/-- (NI M3 private files FS-1) the era's top map invariant, off the bundle -/
+theorem fsReady_ftop [Fscfg] [Icfg] [CurCtx] :
+    fsReady (hlc := hlc) (GF := GF) ⊢ ftopInv (hlc := hlc) fscFs := by
+  iintro H
+  icases fsReady_region $$ H with ⟨Hr, -⟩
+  iapply iregInv_ftop $$ Hr
+
+/-- (NI M3 private files FS-1) an exhaustion verdict recorded in the era's
+ledger, at any mask holding `ftopN` -/
+theorem fsReady_full [Fscfg] [Icfg] [CurCtx] (E : CoPset) (act : BitVec 64) (why : FsFull)
+    (hE : (↑ftopN : CoPset) ⊆ E) :
+    fsReady (hlc := hlc) (GF := GF) ⊢ |={E}=> fsFullRcpt fscFs act why := by
+  iintro #H
+  ihave #Hft := fsReady_ftop $$ H
+  iapply (ftopFull E fscFs act why hE) $$ Hft
+
+/-- (NI M3 private files FS-1) a row-free observation recorded in the
+era's ledger (fstat's `stat`, open's install), at any mask holding `ftopN` -/
+theorem fsReady_obs [Fscfg] [Icfg] [CurCtx] (E : CoPset) (e : Fev) (he : fevObs e)
+    (hE : (↑ftopN : CoPset) ⊆ E) :
+    fsReady (hlc := hlc) (GF := GF) ⊢ |={E}=> ∃ h : List Fev, fsEvRcpt fscFs h e := by
+  iintro #H
+  ihave #Hft := fsReady_ftop $$ H
+  iapply (ftopObs E fscFs e he hE) $$ Hft
+
 /-- The byte view's row readi takes (`fsBytesAny`, via `iregInv_bytes`). -/
 theorem fsReady_bytes [Fscfg] [Icfg] [CurCtx] :
     fsReady (hlc := hlc) (GF := GF) ⊢ fsBytesAny fscFs := by

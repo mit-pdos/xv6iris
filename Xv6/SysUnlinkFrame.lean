@@ -551,7 +551,7 @@ def sysUnlinkOut (A : SysUnlinkArgs GF) (r : BitVec 64) : IProp GF := iprop%
   bslots 3 ∗ irefSlots sysUnlinkSlots ∗
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
     procPrivFd A.γ (procAddr A.j) A.pid { A.V with upt := P' } (viewFaulted A.V.upt P' A.M)) ∗
-  sysUnlinkArmsA A r
+  sysUnlinkArmsA A r ∗ unlinkRcptAt fscFs (procAddr A.j) r
 
 /-- THE BLOCK AFTER argstr AND nameiparent, WITH ITS PID CELL OUT: the page
 table at `P2` (grown under the break), the view faulted, and the hole the pid
@@ -623,10 +623,11 @@ theorem sys_unlink_block_close (A : SysUnlinkArgs GF) (pa : BitVec 64) (P2 : UPt
 /-- The out bundle, assembled (every exit's last ghost step). -/
 theorem sys_unlink_out_intro (A : SysUnlinkArgs GF) (pa : BitVec 64) (P2 : UPtd) (r : BitVec 64) :
     sysUnlinkHole (GF := GF) A pa P2 ∗ wordPointsTo (pPid pa) 4 pidPriv A.pid ∗ bslots 3 ∗
-      irefSlots sysUnlinkSlots ∗ sysUnlinkArmsA (hlc := hlc) A r ⊢ sysUnlinkOut A r := by
-  iintro ⟨Hh, Hr, Hbs, Hir, Ha⟩
+      irefSlots sysUnlinkSlots ∗ sysUnlinkArmsA (hlc := hlc) A r ∗
+      unlinkRcptAt fscFs (procAddr A.j) r ⊢ sysUnlinkOut A r := by
+  iintro ⟨Hh, Hr, Hbs, Hir, Ha, #Hu⟩
   unfold sysUnlinkOut
-  iframe Hbs Hir Ha
+  iframe Hbs Hir Ha Hu
   iapply sys_unlink_block_close A pa P2 $$ Hh Hr
 
 set_option maxHeartbeats 8000000 in
@@ -667,13 +668,15 @@ theorem sys_unlink_exit (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   unfold sysUnlinkOut
-  icases Hout with ⟨Hbs, Hir, ⟨%P', %hP', Hblk⟩, Harms⟩
+  icases Hout with ⟨Hbs, Hir, ⟨%P', %hP', Hblk⟩, Harms, #Hu⟩
   subst hr
   ispecialize HΦ $$ %c
   unfold sysUnlinkPostA sysUnlinkPost
-  iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  iexact Harms
+  iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk [Harms] []
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    iexact Harms
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    iexact Hu
 
 theorem sys_unlink_ir_11 : irefSlot (GF := GF) ∗ irefSlot ⊢ irefSlots sysUnlinkSlots :=
   (irefSlots_op 1 1).2

@@ -344,9 +344,10 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
       ihave HΦ := sysOpenK_same k A.ns A.V A.M ARMS c' $$ HΦ
       have ha0' : R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 := by
         rw [ha0]; simp only [RegMap.set_apply, ite_true]
-      iapply HΦ $$ %spie %spp %R' %P2 %hcs %hP2 Hk Hpc Hte Hce Hbs Hir
-      rw [ha0']
-      iapply (harm0 (sysOpenV2 A P2) (sysOpenM2 A P2) rfl) $$ [$Hx $Hblk $Hfr $Hfd]
+      iapply HΦ $$ %spie %spp %R' %P2 %hcs %hP2 Hk Hpc Hte Hce Hbs Hir [Hx Hblk Hfr Hfd] []
+      · rw [ha0']
+        iapply (harm0 (sysOpenV2 A P2) (sysOpenM2 A P2) rfl) $$ [$Hx $Hblk $Hfr $Hfd]
+      · iapply openRcptAt_of; rw [ha0']; decide
     iapply (sys_open_exit cpu k spie spp _ w3 w4 w5 w6 lo (sysOpenOm A) w24 hS.hK hp1 hal)
       $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $HK]
 

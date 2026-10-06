@@ -206,7 +206,7 @@ theorem iregFreeDeposit_au [Icfg] (E : CoPset) (icn : IcNames) (γi : GName) (γ
     (hEftop : (↑ftopN : CoPset) ∪ ↑appN ⊆ (E \ ↑iregN) \ ↑(escAN inum.toNat))
     (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hdn' : dinodeWf dn') (hz : dn'.diType.toNat = 0) (hbare : iregBare dn')
-    (hnl : diNlinkStable dn' dn) :
+    (hnl : diNlinkStable dn' dn) (act : BitVec 64) :
     ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗
       escAInv (hlc := hlc) γfs ge gr gd inum.toNat rg -∗
       ipoolInv (hlc := hlc) icn γfs γi cov logstart nib -∗
@@ -277,9 +277,13 @@ theorem iregFreeDeposit_au [Icfg] (E : CoPset) (icn : IcNames) (γi : GName) (γ
   have habs : absOf ntop = absOf (freeNode dn') := by
     rw [(absOf_none ntop).1 (Or.inr hntop0),
       absOf_bare _ (fnBare_freeNode dn' hbare hnl0')]
-  imod iregTopRetag_same ((E \ ↑iregN) \ ↑(escAN inum.toNat)) γfs inum.toNat ntop
-    (freeNode dn') hEftop habs (inodeLocal_freeNode inum.toNat dn' hbare hnl0' hz) $$
-    Hftopi Happi Htop with Htop
+  -- (NI M3 private files FS-1) ...BUT THE TYPED ROW GOES: the ledger's `free`
+  -- event, at the deposit's own instant
+  have hfr0 : fnType (freeNode dn') = 0 := hz
+  imod iregTopRetag_ev ((E \ ↑iregN) \ ↑(escAN inum.toNat)) γfs inum.toNat ntop
+    (freeNode dn') [.free act inum.toNat] hEftop habs (inodeLocal_freeNode inum.toNat dn' hbare hnl0' hz)
+    (fun h I _ ht => fevTie_move _ _ _ ht (by rw [fevRows_free, ftopRow_free _ hfr0])) $$
+    Hftopi Happi Htop with ⟨Htop, -⟩
   ihave Hpark := iregTopPark_free γfs inum.toNat dn' hbare $$ Htop
   unfold ifreezePost ifreezeOff
   ihave %hfz := iregRcol_freeze_agree inum.toNat cl rl fz cn _ (.frzPost rg) $$ Hla Hfz

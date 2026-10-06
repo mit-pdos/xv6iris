@@ -106,7 +106,7 @@ theorem il_load (BD : BREAD) (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC) : IlLoadE
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcsa
   -- THE BLOCK, OPENED THROUGH THE REGION: decode, fill, spend the one-shot, borrow the slot
   iapply wpLoop_fupd
-  imod il_blk_open kb pidv inum bs bsd db o g hfills hnib hib $$ [Hlk Hpool Hlic Hpend]
+  imod il_blk_open kb pidv inum bs bsd db o g hfills hnib hib k.proc $$ [Hlk Hpool Hlic Hpend]
     with ⟨%ds, %hwk, Hrest, #Hshot, Hslot, Hsback⟩
   · iframe Hireg Hlk Hpool Hlic Hpend
   obtain ⟨hwf, hkb⟩ := hwk

@@ -268,13 +268,13 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
   icases Hpg with ⟨Hft, HQ, Hxs, Hgen⟩
   ihave HΦ : frdK (hlc := hlc) k γ fk q st j pid V M n F Rd Rin Rp Rpe P $$ [Hnext Hcwd Hrtr Hft HQ Hxs Hsp]
   · unfold frdK filereadPost
-    iintro %c %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Hgen Henv Harms
+    iintro %c %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Hgen Henv Harms Hrr
     icases procPrivExtEv_elim _ _ _ _ _ $$ Hpriv with ⟨%kv, %hkv, Hpriv⟩
     ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
     ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid (V.updEv kv) P' M').2 $$ [Hpriv Hcwd Hrtr Hft HQ Hxs Hgen Hsp]
     · unfold procGenAt
       iframe
-    iapply HK $$ %spie %spp %R' %P' %M' %d %kv %hp Hk Hpc Hte Hce Href %hkv Hpriv Henv Harms
+    iapply HK $$ %spie %spp %R' %P' %M' %d %kv %hp Hk Hpc Hte Hce Href %hkv Hpriv Henv Harms Hrr
   -- the reference, taken apart
   icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, omC, γpC, hok⟩, Htok, Hfields, Hpay⟩
   simp only [filereadAddr]
@@ -318,7 +318,9 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     ihave HP := filereadIn_unreadable F Rd Rin P Rp Rpe inumC γoC omC γpC C st n hok hrz $$ Hin HP
     unfold frdK
     ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-    iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [HP]
+    iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [HP] []
+    rotate_right
+    · rw [show R' 10#5 = -1#64 by rw [h10]; decide]; iapply freadRcptAt_m1
     · ipureintro
       exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
     · unfold filereadArms
@@ -393,7 +395,9 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     imodintro
     unfold frdK
     ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-    iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex]
+    iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex] []
+    rotate_right
+    · rw [show R' 10#5 = -1#64 by rw [h10]; decide]; iapply freadRcptAt_m1
     · ipureintro
       exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
     · unfold filereadArms

@@ -98,7 +98,8 @@ def fwrK (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) 
     fileRef γ fk q st -∗ procPrivExtEv (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗
     filewriteEnvOut γl γu st -∗
     filewriteArms (hlc := hlc) V.gen V.upt st n (writerImg V.upt M) (k.regs 11#5) Q Qe (R' 10#5) -∗
-    fwWhyAt fscFs k.proc st V.upt (k.regs 11#5) n (R' 10#5) -∗ wpLoop c)
+    fwWhyAt fscFs k.proc st V.upt (k.regs 11#5) n (R' 10#5) -∗
+    fwRcptAt fscFs k.proc st n (R' 10#5) -∗ wpLoop c)
 
 /-- ...WITH THE GENERATION HALVES OUT: the continuation that takes the
 block's `genHalvesPriv` back (pipewrite's kill read lends them; every other
@@ -188,11 +189,13 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fileRef A.γ A.fk A.q A.st ∗ procPrivExtEv (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
+    -- (NI M3 private files FS-1) the loop's chunk receipts, summing to the count
+    (∃ cs : List Fev, fwChunks fscFs k.proc A.i A.γo cs ∗ ⌜fwSum cs = A.n.toNat⌝) ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Hbs, Hst, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Hbs, Hst, #Hcs, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0xe2  bne s5,s4 : falls (i = n)
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0xe2#64) false 72#13 21#5 20#5 (by decide) bop.BNE)
@@ -229,7 +232,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     simp only [h10, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpriv := fwr_priv_backEv (procAddr A.j) A.pid A.V P A.M hext.1 $$ Hpriv
   unfold fwrK
-  iapply HΦ $$ %c' %spie %spp %R' %P [] [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst] []
+  iapply HΦ $$ %c' %spie %spp %R' %P [] [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst] [] []
   · ipureintro; exact ⟨hcs, hext, fun _ h => by cases h⟩
   · iapply fwConsOut_off; intro _ h; cases h
   · iapply (filewrite_env_out_inode (GF := GF) A.γul A.γuu A.rb true A.i A.γo A.om)
@@ -246,6 +249,9 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     iapply fwrSt_ok A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p htn $$ Hst
   · -- (NI M3 FS-0) the answer is n, not -1
     iapply fwWhyAt_ne; rw [ha0]; exact fwr_ofInt_ne_m1 A.n (by have := hA.hn.1; omega) hA.hn.2
+  · unfold fwRcptAt
+    icases Hcs with ⟨%cs, #Hc, %hs⟩
+    iexists cs; iframe Hc; ipureintro; intro _; exact hs
 
 set_option maxHeartbeats 16000000 in
 /-- **THE FAIL EXIT** (`+0xe2` taken, `+0x12a .. +0x138`, the tail): a
@@ -263,11 +269,13 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x ∗
     -- (NI M3 FS-0) the short chunk's reason
     (∃ w : FwWhy, fwWhyRcpt fscFs k.proc A.V.upt (k.regs 11#5) A.n w) ∗
+    -- (NI M3 private files FS-1) the loop's chunk receipts
+    (∃ cs : List Fev, fwChunks fscFs k.proc A.i A.γo cs) ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Hbs, Hst, #Hwhy, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Hbs, Hst, #Hwhy, #Hcs, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0xe2  bne s5,s4 : taken (i < n)
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0xe2#64) false 72#13 21#5 20#5 (by decide) bop.BNE)
@@ -309,7 +317,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     simp only [h10, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; decide
   ihave Hpriv := fwr_priv_backEv (procAddr A.j) A.pid A.V P A.M hext.1 $$ Hpriv
   unfold fwrK
-  iapply HΦ $$ %c' %spie %spp %R' %P [] [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst] []
+  iapply HΦ $$ %c' %spie %spp %R' %P [] [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst] [] []
   · ipureintro; exact ⟨hcs, hext, fun _ h => by cases h⟩
   · iapply fwConsOut_off; intro _ h; cases h
   · iapply (filewrite_env_out_inode (GF := GF) A.γul A.γuu A.rb true A.i A.γo A.om)
@@ -327,6 +335,9 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
   · -- (NI M3 FS-0) the short chunk's reason
     icases Hwhy with ⟨%w, Hw⟩
     iapply fwWhyAt_why; iexact Hw
+  · unfold fwRcptAt
+    icases Hcs with ⟨%cs, #Hc⟩
+    iexists cs; iframe Hc; ipureintro; intro h; rw [ha0] at h; exact absurd rfl h
 
 end
 

@@ -215,7 +215,7 @@ theorem createFail_child_park (kslot : Nat) (cinum : BitVec 32) (ty major minor 
     (hrl : inodeRecLocal dnc) (hok : inodeOk fscCov fscLogst dnc bmc datc)
     (hdok : dirOk icfgNib dnc datc)
     -- THE NODE PREDICATE at the row the arm placed (INIT-FILE, the UNARM ruling)
-    (hNd : Nd (creC0 ty.toNat major.toNat minor.toNat)) :
+    (hNd : Nd (creC0 ty.toNat major.toNat minor.toNat)) (act : BitVec 64) :
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
       dinodeAt fscIreg cinum (createSetf dnc major minor 0#16) -∗
       inodeMeta (ientry kslot) (createSetf dnc major minor 0#16) -∗
@@ -250,7 +250,8 @@ theorem createFail_child_park (kslot : Nat) (cinum : BitVec 32) (ty major minor 
   ihave #Hap := iregInv_app $$ Hinv
   ihave Hun := aunarmOfArmNd_open (hlc := hlc) (fsGammaL fscFs) appE Nd Farm Fun cinum.toNat $$ Harm Hun
   imod (create_unarm_fire_nd (hlc := hlc) fscFs ⊤ cinum.toNat _ Nd Fun _ _ CoPset.subseteq_top hloc
-    hrow hnone hNd) $$ Hft Hap Hun Htop with ⟨Htop, Hr⟩
+    hrow hnone hNd (create_setf_row0 dnc bmc datc major minor _ hrow) act)
+    $$ Hft Hap Hun Htop with ⟨Htop, Hr, -⟩
   ihave Hdl := dlinks_notDir (GF := GF) fscFs cinum.toNat _ bmc datc htz
   unfold inodeMap
   icases Hmap with ⟨Ha, Hi⟩
@@ -328,8 +329,6 @@ theorem createFail_parent_park (kd : Nat) (dind cinum : BitVec 32) (nf : Nat →
     simp only [fnType, eraNode_rec, hty']
   have hnln : fnNlink (eraNode dn bm data) = fnNlink (eraNode dn' bm' data') := by
     simp only [fnNlink, eraNode_rec, hnl']
-  have habs : absOf (eraNode dn bm data) = absOf (eraNode dn' bm' data') :=
-    absOf_dir_same _ _ hdir htyn hnln heq.symm
   have hloc' := inodeLocal_ofOkRec dind.toNat fscCov fscLogst dn' bm' data' hiok' hrl' hduq' hddix'
   have hdoc := create_doc_of_live dn dn' data' hnl' hnl0
   iintro #Hinv Hdl Hdi Hmeta Hmap Hblk Htop
@@ -347,7 +346,8 @@ theorem createFail_parent_park (kd : Nat) (dind cinum : BitVec 32) (nf : Nat →
     nodeExact_cong _ _ D (by unfold fnIsDir fnType; rw [eraNode_rec, eraNode_rec, hty'])
       (by simp only [fnNlink, eraNode_rec, hnl']) hx0
   ihave Hdl := dlinks_intro fscFs dind.toNat dn' bm' data' D hdok0' hx0' $$ Hetk
-  imod (iregTopRetag_same (hlc := hlc) ⊤ fscFs dind.toNat _ _ CoPset.subseteq_top habs hloc')
+  imod (iregTopRetag_same (hlc := hlc) ⊤ fscFs dind.toNat _ _ CoPset.subseteq_top
+    (ftopRow_dir_same _ _ hdir htyn hnln heq.symm) hloc')
     $$ Hft Hap Htop with Htop
   unfold inodeMap
   icases Hmap with ⟨Ha, Hi⟩
@@ -452,6 +452,12 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hframe, Hnb14, Hnb2, Hslkd, Hslkdd, Hdep, Hoffr, Hidev,
     Hiinum, Hivalid, Hload, Hshotl, Hfrzl, Hkeep, Hrud, Hsbb, Hsbi, Hpid, Hbsl, Hop, Hisl1, Htq1,
     Htx, Hbareback, Hback, Hsbn, Hsbs, Hpath, Hislr, HPpar, Hdlkc, Hdots, Hacre, Hunr, Hcont⟩
+  -- (NI M3 private files FS-1) the entry's dirlink failure's reason, recorded
+  iapply wpLoop_fupd
+  ihave #Hinv0 := create_env_ireg Γ γl pd pav pu γkl γk $$ Henv
+  ihave #Hft0 := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hinv0
+  imod (creWhyRcpt_dl ⊤ fscFs k.proc w hw CoPset.subseteq_top) $$ Hft0 with #Hwhy
+  imodintro
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- ===== +0x156  c.mv a0,s1 =====
   k_step_e (wp_s_add cpu _ (KA.«create» + 0x156#64) true 10#5 0#5 9#5 (by decide))
@@ -525,7 +531,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     k.proc w $$ HPpar Hdlkc Hacre [Hdots] Hunr []
   · iright; iexact Hdots
   · -- (NI M3 FS-0) the entry's dirlink failed: `w` is its reason
-    iapply creWhyRcpt_intro
+    iexact Hwhy
   unfold irefSlot
   ihave Hisl := irefSlots_combine 1 (ns - 2) $$ [Hisl2 Hislr]
   · iframe
@@ -535,11 +541,12 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
   unfold createPost
   iapply Hcont $$ %spie3 %spp3 %R' %false %false %0 %(1 : Qp) %(1 : Qp) %γl %(0#32) %dnp %bmp
     %n6 %Sb6 %(1 + (1 + (ns - 2))) [] Hk Hpc Hte Hce Hsbn Hsbi Hsbs Hsbb Hpriv Hpath Hbsl []
-    Hisl [] Hop
+    Hisl [] Hop []
   · ipureintro; exact hcsf
   · ipureintro; exact create_slots_2 false ns rfl hS.hns
   · ipureintro
     refine ⟨Xv6.namex_sub_trans _ _ _ hsb5 hsb6, by omega, fun h => absurd h (by decide)⟩
+  · iapply creRcptAt_fail
   simp only [Bool.false_eq_true, if_false]
   iframe Htx Hcf
   ipureintro
@@ -654,7 +661,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   -- THE TWO RE-PARKS: the UNARM fires at the child, the parent retags
   iapply wpLoop_fupd
   ihave Hpk := createFail_child_park (hlc := hlc) kslot cinum ty major minor dnc bmc datc Nm Nd Farm Fun
-    htd htyc hfresh hrlc hciok hcdok (hNdF htd) $$ Hinv Hcdiat Hcmeta Hcmap Hcblocks Hctop Harmr Hun
+    htd htyc hfresh hrlc hciok hcdok (hNdF htd) k.proc $$ Hinv Hcdiat Hcmeta Hcmap Hcblocks Hctop Harmr Hun
   imod Hpk with ⟨Hcload, Hunr⟩
   ihave Hpk := createFail_parent_park (hlc := hlc) kd dind cinum nf dn dnp bm bmp data datap
     htydir hnl0 hiok hdok hddix hduq hrl hcnib hS.h16 hwf' hholes' haddr' hcov' hszcap' hsized'

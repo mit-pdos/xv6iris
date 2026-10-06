@@ -659,8 +659,8 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
       have hnlp : fnNlink (eraNode dnd bmd datd) ≠ 0 := by rw [Xv6.cafEra_nlink]; exact hnl0
       iapply wpLoop_fupd
       imod (lfEnt_fire (hlc := hlc) fscFs ⊤ A.Fent dinum.toNat inum.toNat (bname 14 nf)
-          (eraNode dnd bmd datd) (eraNode dn' bm' data') ufNd_top hloc' hdir hnlp hentnone hprow)
-        $$ Hftop Happ Hlent Htd with ⟨Htd, %av, %hav, %hav2, Hrcv⟩
+          (eraNode dnd bmd datd) (eraNode dn' bm' data') ufNd_top hloc' hdir hnlp hentnone hprow k.proc)
+        $$ Hftop Happ Hlent Htd with ⟨Htd, -, %av, %hav, %hav2, Hrcv⟩
       imodintro
       ihave Hlentf : lentFired A.Fent dinum.toNat (bname 14 nf) inum.toNat $$ [Hrcv]
       · unfold lentFired
@@ -695,12 +695,11 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
         (entDsetOk_grow _ _ D (fun s h => by rw [heqent]; exact h) hDok)
         (nodeExact_cong _ _ D hdirEq hnlEq hDx) $$ Hetk
       -- ...and the era value with them, VIEW-PRESERVINGLY
-      have habsd : absOf (eraNode dnd bmd datd) = absOf (eraNode dn' bm' data') :=
-        absOf_dir_same _ _ hdir (by rw [Xv6.cafEra_type, Xv6.cafEra_type, htyeq])
-          (by rw [Xv6.cafEra_nlink, Xv6.cafEra_nlink, hnleq]) heqent.symm
       iapply wpLoop_fupd
       imod (iregTopRetag_same (hlc := hlc) ⊤ fscFs dinum.toNat (eraNode dnd bmd datd)
-          (eraNode dn' bm' data') ufNd_top habsd hloc') $$ Hftop Happ Htd with Htd
+          (eraNode dn' bm' data') ufNd_top
+          (ftopRow_dir_same _ _ hdir (by rw [Xv6.cafEra_type, Xv6.cafEra_type, htyeq])
+            (by rw [Xv6.cafEra_nlink, Xv6.cafEra_nlink, hnleq]) heqent.symm) hloc') $$ Hftop Happ Htd with Htd
       imodintro
       ihave Hloadd := icMkLoaded fscFs fscIreg fscCov fscLogst kd dinum dn' bm' data' hok' hrl' hdok'
         hddix' hdoc' hduq' $$ Hdld' Hdid Hmetad Had' Hrd' Hbd Htd

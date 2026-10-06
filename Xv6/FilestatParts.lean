@@ -542,7 +542,7 @@ def fstatK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (pa : 
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     fileRef γ fk q st -∗ ⌜V.ev ≤ k'⌝ -∗ procPrivExt pa pid (V.updEv k') P' M' -∗
-    filestatEnvOut st -∗ wpLoop c)
+    filestatEnvOut st -∗ fstatRcptAt fscFs k.proc st (R' 10#5) -∗ wpLoop c)
 
 end
 

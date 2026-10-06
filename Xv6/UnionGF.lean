@@ -220,6 +220,8 @@ instance ugfZomCol : GhostMapG unionGF Nat (Option (BitVec 32 × Int)) RegMapF :
 -- WchGpre: the slot-occupancy ledger and its column (inherited from `xv6GF`'s slots 126 / 127)
 instance ugfMlSev : MonoListG unionGF Sev := ⟨ugf_slot 126⟩
 instance ugfSlotOcc : GhostMapG unionGF (BitVec 64) Bool AddrMapF := ⟨ugf_slot 127⟩
+-- Xv6G: the era's fs-event ledger (inherited from `xv6GF`'s slot 128)
+instance ugfMlFev : MonoListG unionGF Fev := ⟨ugf_slot 128⟩
 
 -- the union's new cameras
 instance ugfEraPins : GhostMapG unionGF Nat EraPins RegMapF := ⟨ugf_slot 95⟩

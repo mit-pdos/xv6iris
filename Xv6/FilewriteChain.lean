@@ -487,14 +487,16 @@ theorem fwrSt_fire_full (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
     (hnz : fnType nd ≠ 0) (habs : absRow nd = ⟨.AFile bs0, nl⟩)
     (hnz' : fnType nd' ≠ 0) (habs' : absRow nd' = ⟨.AFile (blkSplice off bs bs0), nl⟩)
     (hby : ubytesAt M (ua + BitVec.ofNat 64 t) bs) (hlen : (bs.length : Int) = wchunkAt n p)
-    (htn : (t : Int) < n) (htie : (t : Int) = FW_MAX * p) :
+    (htn : (t : Int) < n) (htie : (t : Int) = FW_MAX * p) (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
       fwrSt (hlc := hlc) om (fsGammaL γfs) i γo P n M ua Q t p 0 -∗
       topFrag (fsGammaL γfs) i nd -∗
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i nd' ∗
         offLink (hlc := hlc) γo ((off + bs.length : Nat) : Int) ∗
-        fwrSt (hlc := hlc) om (fsGammaL γfs) i γo P n M ua Q (t + bs.length) (p + 1) 0 := by
+        fwrSt (hlc := hlc) om (fsGammaL γfs) i γo P n M ua Q (t + bs.length) (p + 1) 0 ∗
+        -- (NI M3 private files FS-1) the chunk's event
+        fsMoveRcpt γfs [.write act i γo off bs bs.length] i nd := by
   have hfoff := arfFoffN_sub E hE
   have hptie : ua + BitVec.ofNat 64 t = ua + BitVec.ofInt 64 (FW_MAX * (p : Int)) := by
     rw [← htie, BitVec.ofInt_natCast]
@@ -506,29 +508,29 @@ theorem fwrSt_fire_full (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
     icases fwrRaw_take (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
     ihave Hs := fwrSupply_off E γo off bs.length hfoff $$ Hsup
     imod wrfAwrite_fire_gen γfs E i γo M ua n p _ iprop(True) off bs bs0 nl nd nd'
-      hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen $$ Hi Hai Hs Hcm Hf Hg
-      with ⟨Hf, Hg, -, Htail⟩
+      hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen act $$ Hi Hai Hs Hcm Hf Hg
+      with ⟨Hf, Hg, -, Htail, #Hrc⟩
     imodintro
-    iframe Hf Hg Hsup
+    iframe Hf Hg Hsup Hrc
     iapply Hback $$ %bs %hby Htail
   | held =>
     dsimp only [fwrSt]
     iintro #Hi #Hai (Hau | ⟨#Hsup, Hau⟩) Hf Hg
     · icases fwrAdv_take (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
       imod wrfAwrite_fire_adv γfs E i γo M ua n p _ off bs bs0 nl nd nd'
-        hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen $$ Hi Hai Hcm Hf Hg
-        with ⟨Hf, Hg, Htail⟩
+        hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen act $$ Hi Hai Hcm Hf Hg
+        with ⟨Hf, Hg, Htail, #Hrc⟩
       imodintro
-      iframe Hf Hg
+      iframe Hf Hg Hrc
       ileft
       iapply Hback $$ %bs %hby Htail
     · icases fwrRaw_take (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
       ihave Hs := fwrSupply_off E γo off bs.length hfoff $$ Hsup
       imod wrfAwrite_fire_gen γfs E i γo M ua n p _ iprop(True) off bs bs0 nl nd nd'
-        hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen $$ Hi Hai Hs Hcm Hf Hg
-        with ⟨Hf, Hg, -, Htail⟩
+        hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen act $$ Hi Hai Hs Hcm Hf Hg
+        with ⟨Hf, Hg, -, Htail, #Hrc⟩
       imodintro
-      iframe Hf Hg
+      iframe Hf Hg Hrc
       iright
       iframe Hsup
       iapply Hback $$ %bs %hby Htail
@@ -547,14 +549,15 @@ theorem fwrSt_fire_part (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
     (hshort : (r : Int) < wchunkAt n p)
     (hwhy : r < bs.length → wrFailWhy P ua n.toNat)
     (hsb1 : wiBlocks off (wchunkAt n p).toNat = 1 → r = 0)
-    (htn : (t : Int) < n) (htie : (t : Int) = FW_MAX * p) :
+    (htn : (t : Int) < n) (htie : (t : Int) = FW_MAX * p) (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
       fwrSt (hlc := hlc) om (fsGammaL γfs) i γo P n M ua Q t p 0 -∗
       topFrag (fsGammaL γfs) i nd -∗
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i nd' ∗
         offLink (hlc := hlc) γo ((off + r : Nat) : Int) ∗
-        fwrSt (hlc := hlc) om (fsGammaL γfs) i γo P n M ua Q t p 1 := by
+        fwrSt (hlc := hlc) om (fsGammaL γfs) i γo P n M ua Q t p 1 ∗
+        fsMoveRcpt γfs [.write act i γo off bs r] i nd := by
   have hfoff := arfFoffN_sub E hE
   cases om with
   | parked =>
@@ -563,29 +566,29 @@ theorem fwrSt_fire_part (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
     icases fwrRaw_spendPart (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
     ihave Hs := fwrSupply_off E γo off r hfoff $$ Hsup
     imod wrfApart_fire_gen γfs E i γo M ua P n p _ iprop(True) off r bs bs0 nl nd nd'
-      hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1
-      $$ Hi Hai Hs Hcm Hf Hg with ⟨Hf, Hg, -, Htail⟩
+      hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1 act
+      $$ Hi Hai Hs Hcm Hf Hg with ⟨Hf, Hg, -, Htail, #Hrc⟩
     imodintro
-    iframe Hf Hg Hsup
+    iframe Hf Hg Hsup Hrc
     iapply Hback $$ Htail
   | held =>
     dsimp only [fwrSt]
     iintro #Hi #Hai (Hau | ⟨#Hsup, Hau⟩) Hf Hg
     · icases fwrAdv_spendPart (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
       imod wrfApart_fire_adv γfs E i γo M ua P n p _ off r bs bs0 nl nd nd'
-        hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1
-        $$ Hi Hai Hcm Hf Hg with ⟨Hf, Hg, Htail⟩
+        hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1 act
+        $$ Hi Hai Hcm Hf Hg with ⟨Hf, Hg, Htail, #Hrc⟩
       imodintro
-      iframe Hf Hg
+      iframe Hf Hg Hrc
       ileft
       iapply Hback $$ Htail
     · icases fwrRaw_spendPart (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
       ihave Hs := fwrSupply_off E γo off r hfoff $$ Hsup
       imod wrfApart_fire_gen γfs E i γo M ua P n p _ iprop(True) off r bs bs0 nl nd nd'
-        hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1
-        $$ Hi Hai Hs Hcm Hf Hg with ⟨Hf, Hg, -, Htail⟩
+        hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1 act
+        $$ Hi Hai Hs Hcm Hf Hg with ⟨Hf, Hg, -, Htail, #Hrc⟩
       imodintro
-      iframe Hf Hg
+      iframe Hf Hg Hrc
       iright
       iframe Hsup
       iapply Hback $$ Htail

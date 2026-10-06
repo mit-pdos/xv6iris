@@ -115,7 +115,7 @@ theorem creChild_file_fun (ma mi : Nat) :
 
 section Arms
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
-  [Appcfg GF]
+  [Appcfg GF] [Xv6G GF]
 
 /-- **ARMS C-OK / F-OK, keyed on `made`** (Rocq's `cre_ok_arms`).  Both
 success arms ran nameiparent, so both return the WALK CURSOR at the parent
@@ -141,6 +141,22 @@ def creOkArms (Γ : FsViewNames GF) (tyz ma mi : Nat) (Nm : Fname → Prop) (Nd 
      else
       iprop(creExFired Fex d nm i ∗ creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok)))
 
+/-- ...relayed to the post, keyed on `ok` -/
+def creRcptAt (γfs : FsNames) (act : BitVec 64) (ok made : Bool) (i : Nat) : IProp GF :=
+  iprop(⌜ok = false⌝ ∨ creOkRcpt γfs act made i)
+
+instance creRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (ok made : Bool) (i : Nat) :
+    Persistent (creRcptAt (GF := GF) γfs act ok made i) := by
+  unfold creRcptAt creOkRcpt creArmRcpt creParentRcpt; infer_instance
+
+theorem creRcptAt_act (γfs : FsNames) (a b : BitVec 64) (ok made : Bool) (i : Nat) (h : a = b) :
+    creRcptAt (GF := GF) γfs a ok made i ⊢ creRcptAt γfs b ok made i := by
+  subst h; exact .rfl
+
+theorem creRcptAt_fail (γfs : FsNames) (act : BitVec 64) (made : Bool) (i : Nat) :
+    ⊢@{IProp GF} creRcptAt γfs act false made i := by
+  unfold creRcptAt; ileft; ipureintro; rfl
+
 /-- (NI M3 FS-0) **WHY create GAVE UP once the walk reached the parent**
 (F7 (c), ruling FS-R5): every failure arm past the walk is one of these.
 `nlink` -- the parent's link count is zero (`sysfile.c:269`) or, at a
@@ -165,6 +181,10 @@ their tag (their rows compute them). -/
 def creWhyRcpt (γfs : FsNames) (act : BitVec 64) : CreWhy → IProp GF
   | .full why => fsFullRcpt γfs act why
   | _ => iprop(emp)
+
+instance creWhyRcpt_persistent (γfs : FsNames) (act : BitVec 64) (w : CreWhy) :
+    Persistent (creWhyRcpt (GF := GF) γfs act w) := by
+  cases w <;> unfold creWhyRcpt <;> infer_instance
 
 /-- an entry's `dirlink` failure, as a reason (`SpecDirlink.dlFullWhy` read
 at create's level) -/
@@ -210,14 +230,16 @@ def creFailArms (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (tyz ma mi : N
       -- (NI M3 FS-0) ...AND WHY (`CreWhy`, F7 (c))
       ∃ w : CreWhy, creWhyRcpt γfs act w))
 
-/-- (NI M3 FS-0) a reason whose verdict is not an exhaustion carries nothing;
-FS-0 makes the exhaustion receipt from nothing too (`fsFullRcpt_intro`;
-FS-1 appends it at the site instead) -/
-theorem creWhyRcpt_intro (γfs : FsNames) (act : BitVec 64) (w : CreWhy) :
+/-- (NI M3 FS-0) a reason whose verdict is not an exhaustion carries nothing -/
+theorem creWhyRcpt_tag (γfs : FsNames) (act : BitVec 64) (w : CreWhy) (hw : ∀ f, w ≠ .full f) :
     ⊢@{IProp GF} creWhyRcpt γfs act w := by
   cases w with
-  | full why => exact fsFullRcpt_intro γfs act why
+  | full why => exact absurd rfl (hw why)
   | _ => unfold creWhyRcpt; iempintro
+
+/-- (NI M3 FS-1) an exhaustion's reason is its ledger receipt -/
+theorem creWhyRcpt_full (γfs : FsNames) (act : BitVec 64) (f : FsFull) :
+    fsFullRcpt (GF := GF) γfs act f ⊢ creWhyRcpt γfs act (.full f) := .rfl
 
 /-! ### The two pinned readings of the arms (Rocq :812–1028)
 
@@ -459,6 +481,8 @@ def createPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor
     -- THE SET GREW, THE COUNTER FELL, AND ON SUCCESS AN `iput` IS STILL COVERED
     ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ u' ≤ u ∧ (ok = true → iputUnits ≤ u')⌝ -∗
     logOpS icfgLog u' Sb' -∗
+    -- (NI M3 private files FS-1) the call's ledger receipt (`creRcptAt`)
+    creRcptAt fscFs k.proc ok made inum.toNat -∗
     (if ok then
       -- BOTH SUCCESS ARMS RETURN A LOCKED INODE
       iprop(⌜R' 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧

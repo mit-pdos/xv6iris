@@ -721,14 +721,15 @@ theorem niNamesCode_inj : ∀ {a b : List GName}, niNamesCode a = niNamesCode b 
 
 theorem niBelow_refl (ι : UIota) : niBelow ι ι :=
   ⟨List.prefix_refl _, List.prefix_refl _, List.prefix_refl _, Nat.le_refl _, List.prefix_refl _,
-    List.prefix_refl _⟩
+    List.prefix_refl _, List.prefix_refl _⟩
 
 theorem niBelow_trans {a b c : UIota} (h₁ : niBelow a b) (h₂ : niBelow b c) : niBelow a c :=
   ⟨h₁.1.trans h₂.1, h₁.2.1.trans h₂.2.1, h₁.2.2.1.trans h₂.2.2.1, Nat.le_trans h₁.2.2.2.1 h₂.2.2.2.1,
-    h₁.2.2.2.2.1.trans h₂.2.2.2.2.1, h₁.2.2.2.2.2.trans h₂.2.2.2.2.2⟩
+    h₁.2.2.2.2.1.trans h₂.2.2.2.2.1, h₁.2.2.2.2.2.1.trans h₂.2.2.2.2.2.1,
+    h₁.2.2.2.2.2.2.trans h₂.2.2.2.2.2.2⟩
 
 theorem niBelow_boot (B : UIota) : niBelow UIota.boot B := by
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp [UIota.boot]
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp [UIota.boot]
 
 theorem niLonger_le {α : Type _} {a b c : List α} (ha : a <+: c) (hb : b <+: c) : niLonger a b <+: c := by
   unfold niLonger
@@ -742,10 +743,11 @@ theorem niJoin_below {H ι B : UIota} (hH : niBelow H B) (hι : niBelow ι B) :
   have hc := niBelow_join (List.prefix_or_prefix_of_prefix hH.1 hι.1)
     (List.prefix_or_prefix_of_prefix hH.2.1 hι.2.1) (List.prefix_or_prefix_of_prefix hH.2.2.1 hι.2.2.1)
     (List.prefix_or_prefix_of_prefix hH.2.2.2.2.1 hι.2.2.2.2.1)
-    (List.prefix_or_prefix_of_prefix hH.2.2.2.2.2 hι.2.2.2.2.2)
+    (List.prefix_or_prefix_of_prefix hH.2.2.2.2.2.1 hι.2.2.2.2.2.1)
+    (List.prefix_or_prefix_of_prefix hH.2.2.2.2.2.2 hι.2.2.2.2.2.2)
   exact ⟨⟨niLonger_le hH.1 hι.1, niLonger_le hH.2.1 hι.2.1, niLonger_le hH.2.2.1 hι.2.2.1,
     Nat.max_le.mpr ⟨hH.2.2.2.1, hι.2.2.2.1⟩, niLonger_le hH.2.2.2.2.1 hι.2.2.2.2.1,
-    niLonger_le hH.2.2.2.2.2 hι.2.2.2.2.2⟩, hc.2, hc.1⟩
+    niLonger_le hH.2.2.2.2.2.1 hι.2.2.2.2.2.1, niLonger_le hH.2.2.2.2.2.2 hι.2.2.2.2.2.2⟩, hc.2, hc.1⟩
 
 /-- **THE CHAIN**: every citation of era `k` the filing records is below
 `H k` (each cited prefix a prefix of `H k`'s, each cited count at most its). -/
@@ -1236,7 +1238,7 @@ theorem niChainSt_file (γe : GName) (h : List Obs) (e : Obs) (F : List NiEntry)
       · iexact Hv
       · iexact Hold
     icases niIotaLbs_compat ns (Hc k) ι $$ HlbO Hlb with %hcp
-    have hjb := niBelow_join hcp.1 hcp.2.1 hcp.2.2.1 hcp.2.2.2.1 hcp.2.2.2.2
+    have hjb := niBelow_join hcp.1 hcp.2.1 hcp.2.2.1 hcp.2.2.2.1 hcp.2.2.2.2.1 hcp.2.2.2.2.2
     ihave #Hj := niIotaLbs_join ns (Hc k) ι $$ HlbO Hlb
     icases Hj with ⟨#Hj, -⟩
     imodintro

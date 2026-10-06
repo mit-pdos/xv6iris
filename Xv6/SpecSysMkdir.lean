@@ -142,7 +142,7 @@ def sysMkdirRet (r : BitVec 64) : Prop := r = 0#64 ∨ r = 0xFFFFFFFFFFFFFFFF#64
 
 section Arms
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
-  [Appcfg GF]
+  [Appcfg GF] [Xv6G GF]
 
 /-! ### THE PATH-FIXED BUNDLE (Rocq TL-3C item (M), `3e3a157ae`) --
 `SpecSysMknod.mknodAuPre` / `mknodAuAt`'s TWIN.
@@ -251,6 +251,16 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- (NI M3 private files FS-1) **MKDIR'S LEDGER RECEIPT**, relayed to the
+post: a `0` answer names the made directory's arm and its parent leg, by
+the caller, in the era's ledger. -/
+def mkdirRcptAt (γfs : FsNames) (act : BitVec 64) (r : BitVec 64) : IProp GF :=
+  iprop(⌜r ≠ 0#64⌝ ∨ ∃ i : Nat, creOkRcpt γfs act true i)
+
+instance mkdirRcptAt_persistent (γfs : FsNames) (act r : BitVec 64) :
+    Persistent (mkdirRcptAt (GF := GF) γfs act r) := by
+  unfold mkdirRcptAt; infer_instance
+
 /-- **THE CONTRACT'S CONTINUATION** (the `wp_next true pj (…)` body of Rocq's
 `wp_sys_mkdir_sconf_body`): the registers, the complement, the slot supply
 and the reference allowance EXACTLY as handed in (`ns`), the block at the
@@ -281,6 +291,8 @@ def sysMkdirK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     -- ...and the legs' receipts, keyed on that answer
     mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) pv
       P Pmiss Farm Fdots Fun Fok Fex (R' 10#5) -∗
+    -- (NI M3 private files FS-1) ...and the made directory's ledger receipt
+    mkdirRcptAt fscFs pa (R' 10#5) -∗
     wpLoop cpu')
 
 end

@@ -555,7 +555,8 @@ def sysMknodOut (A : SysMknodArgs GF) (r : BitVec 64) : IProp GF := iprop%
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
     procPrivFd A.γ (procAddr A.j) A.pid { A.V with upt := P' } (viewFaulted A.V.upt P' A.M) ∗
     mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
-      (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex r)
+      (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex r) ∗
+  mknodRcptAt fscFs (procAddr A.j) r
 
 set_option maxHeartbeats 8000000 in
 /-- **THE JOIN POINT `+0x50`** (Rocq `mn_epilogue` + the caller's
@@ -595,12 +596,14 @@ theorem sys_mknod_exit (cpu : CPU) (k : KCtx) (A : SysMknodArgs GF)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   unfold sysMknodOut
-  icases Hout with ⟨Hbs, Hir, ⟨%P', %hP', Hblk, Harms⟩⟩
+  icases Hout with ⟨Hbs, Hir, ⟨%P', %hP', Hblk, Harms⟩, #Hmr⟩
   ispecialize HΦ $$ %c
   unfold sysMknodPostA sysMknodK
-  iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  iexact Harms
+  iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk [Harms] []
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    iexact Harms
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    iexact Hmr
 
 end
 

@@ -368,7 +368,8 @@ def sysMkdirOut (A : SysMkdirArgs GF) (r : BitVec 64) : IProp GF := iprop%
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
     procPrivFd A.γ (procAddr A.j) A.pid { A.V with upt := P' } (viewFaulted A.V.upt P' A.M)) ∗
   mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
-    A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex r
+    A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex r ∗
+  mkdirRcptAt fscFs (procAddr A.j) r
 
 set_option maxHeartbeats 8000000 in
 /-- **THE JOIN POINT `+0x38`** (Rocq `md_epilogue` + the caller's
@@ -406,16 +407,18 @@ theorem sys_mkdir_exit (cpu : CPU) (k : KCtx) (A : SysMkdirArgs GF)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   unfold sysMkdirOut
-  icases Hout with ⟨Hbs, Hir, ⟨%P', %hP', Hblk⟩, Harms⟩
+  icases Hout with ⟨Hbs, Hir, ⟨%P', %hP', Hblk⟩, Harms, #Hmr⟩
   ihave %hret := mkdirArms_ret (hlc := hlc) _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Harms
   ispecialize HΦ $$ %c
   unfold sysMkdirPostA sysMkdirK
-  iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk [] [Harms]
+  iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk [] [Harms] []
   · ipureintro
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     exact hret
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     iexact Harms
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    iexact Hmr
 
 end
 

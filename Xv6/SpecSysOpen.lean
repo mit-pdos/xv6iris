@@ -266,12 +266,16 @@ def openWhyRcpt (γfs : FsNames) (act : BitVec 64) : OpenWhy → IProp GF
   | .full => fsFullRcpt γfs act .files
   | _ => iprop(emp)
 
-/-- FS-0 makes the receipt from nothing (FS-1 appends it at the site). -/
-theorem openWhyRcpt_intro (γfs : FsNames) (act : BitVec 64) (w : OpenWhy) :
+/-- a reason whose verdict is not an exhaustion carries nothing -/
+theorem openWhyRcpt_tag (γfs : FsNames) (act : BitVec 64) (w : OpenWhy) (hw : w ≠ .full) :
     ⊢@{IProp GF} openWhyRcpt γfs act w := by
   cases w with
-  | full => exact fsFullRcpt_intro γfs act .files
+  | full => exact absurd rfl hw
   | _ => unfold openWhyRcpt; iempintro
+
+/-- (NI M3 FS-1) NFILE's reason is its ledger receipt -/
+theorem openWhyRcpt_full (γfs : FsNames) (act : BitVec 64) :
+    fsFullRcpt (GF := GF) γfs act .files ⊢ openWhyRcpt γfs act .full := .rfl
 
 /-! ### 2f.  The PLAIN arms -/
 
@@ -969,6 +973,26 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- (NI M3 private files FS-1) **OPEN'S LEDGER RECEIPT**, relayed to the
+post: at a descriptor (`r ≠ -1`) the install event `open act i γo` sits in
+the era's ledger, and at an O_TRUNC open (`tr`) itrunc's `trunc act i`
+before it; at `-1` nothing is claimed (a failure's verdict rides the arms'
+reasons, `openWhyRcpt`). -/
+def openOkRcpt (γfs : FsNames) (act : BitVec 64) : IProp GF :=
+  iprop(∃ (i : Nat) (γo : GName) (tr : Bool),
+    fsLedAt γfs [.open act i γo] ∗ (⌜tr = false⌝ ∨ fsLedAt γfs [.trunc act i]))
+
+instance openOkRcpt_persistent (γfs : FsNames) (act : BitVec 64) :
+    Persistent (openOkRcpt (GF := GF) γfs act) := by
+  unfold openOkRcpt; infer_instance
+
+def openRcptAt (γfs : FsNames) (act : BitVec 64) (r : BitVec 64) : IProp GF :=
+  iprop(⌜r = -1#64⌝ ∨ openOkRcpt γfs act)
+
+theorem openRcptAt_of (γfs : FsNames) (act r : BitVec 64) (h : r = -1#64) :
+    ⊢@{IProp GF} openRcptAt γfs act r := by
+  unfold openRcptAt; ileft; ipureintro; exact h
+
 /-- **THE CONTRACT'S CONTINUATION** (the `wp_next true pj (…)` body of Rocq's
 `wp_sys_open_frame`): the registers, the complement, the two allowances
 whole, and the ARMED post on the final block and the returned a0.  THE
@@ -992,6 +1016,8 @@ def sysOpenK (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
     irefSlots ns -∗
     -- the armed post on the final block and the returned a0
     ARMS { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
+    -- (NI M3 private files FS-1) the install's (and itrunc's) ledger receipt
+    openRcptAt fscFs k.proc (R' 10#5) -∗
     wpLoop cpu')
 
 /-- **THE WHOLE-FUNCTION FRAME** (Rocq's `wp_sys_open_frame`), abstracted

@@ -194,11 +194,13 @@ COUNT (E2-V2): at a MISS nothing pins the parent live. -/
 theorem ufDmiss_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (d : Nat) (nm : Fname) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hdir : fnIsDir n = true)
-    (hnm : (dirEntries n)[nm]? = none) :
+    (hnm : (dirEntries n)[nm]? = none) (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗
       pfAt (dmissCommitAt (hlc := hlc) (fsGammaL γfs) appE) Fmiss -∗
       topFragQ (fsGammaL γfs) dq d n ={E}=∗
         topFragQ (fsGammaL γfs) dq d n ∗
+        -- (NI M3 private files FS-1) the lookup's hop
+        fsObsRcpt γfs (.hop act d nm) d n ∗
         ∃ av : Aview, ⌜arowAt av d ⟨.ADir (dirEntries n), fnNlink n⟩⌝ ∗
           ⌜(dirEntries n)[nm]? = none⌝ ∗ Fmiss.pfRecv av d nm := by
   iintro #Hi Hcm Hf
@@ -208,7 +210,7 @@ theorem ufDmiss_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
   unfold topFragQ fsGammaL
   ihave %hlk := ghost_map_lookup $$ Ha Hf
   have hrow : arowAt (absView I) d ⟨.ADir (dirEntries n), fnNlink n⟩ := by
@@ -218,12 +220,13 @@ theorem ufDmiss_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   unfold dmissCommitAt
   ihave Hcm := Hcm $$ %I %d %nm %(dirEntries n) %(fnNlink n) %hrow %hnm Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HΦ⟩
-  imod Hclose $$ [Ha Hla Hpark]
+  imod ftopLed_obsAt γfs I (.hop act d nm) trivial d n hlk $$ Hled with ⟨Hled, #Hrc⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists I, A
-    iframe Ha Hla Hpark
+    iframe Ha Hla Hpark Hled
     ipureintro; exact hcl
   imodintro
-  iframe Hf
+  iframe Hf Hrc
   iexists absView I
   iframe HΦ
   isplitr
@@ -239,12 +242,15 @@ theorem ufDex_fire [Icfg] (γfs : FsNames) (E : CoPset) (dqd dqt : DFrac)
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (d t : Nat) (nm : Fname)
     (nd nt : FsNode) (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E)
     (hdird : fnIsDir nd = true) (hnld : fnNlink nd ≠ 0) (hnm : (dirEntries nd)[nm]? = some t)
-    (hdirt : fnIsDir nt = true) (hnlt : fnNlink nt ≠ 0) (hne : ¬ dotsOnly (dirEntries nt)) :
+    (hdirt : fnIsDir nt = true) (hnlt : fnNlink nt ≠ 0) (hne : ¬ dotsOnly (dirEntries nt))
+    (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗
       pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL γfs) appE) Fex -∗
       topFragQ (fsGammaL γfs) dqd d nd -∗
       topFragQ (fsGammaL γfs) dqt t nt ={E}=∗
         topFragQ (fsGammaL γfs) dqd d nd ∗ topFragQ (fsGammaL γfs) dqt t nt ∗
+        -- (NI M3 private files FS-1) the lookup's hop
+        fsObsRcpt γfs (.hop act d nm) d nd ∗
         ∃ av : Aview, ⌜PartialMap.get? av d = some ⟨.ADir (dirEntries nd), fnNlink nd⟩⌝ ∗
           ⌜(dirEntries nd)[nm]? = some t⌝ ∗
           ⌜PartialMap.get? av t = some ⟨.ADir (dirEntries nt), fnNlink nt⟩⌝ ∗
@@ -255,7 +261,7 @@ theorem ufDex_fire [Icfg] (γfs : FsNames) (E : CoPset) (dqd dqt : DFrac)
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
   unfold topFragQ fsGammaL
   ihave %hlkd := ghost_map_lookup $$ Ha Hfd
   ihave %hlkt := ghost_map_lookup $$ Ha Hft
@@ -267,12 +273,13 @@ theorem ufDex_fire [Icfg] (γfs : FsNames) (E : CoPset) (dqd dqt : DFrac)
   unfold dlookupCommitAt
   ihave Hcm := Hcm $$ %I %d %t %nm %(dirEntries nd) %(fnNlink nd) %hrowd %hnm Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HΦ⟩
-  imod Hclose $$ [Ha Hla Hpark]
+  imod ftopLed_obsAt γfs I (.hop act d nm) trivial d nd hlkd $$ Hled with ⟨Hled, #Hrc⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists I, A
-    iframe Ha Hla Hpark
+    iframe Ha Hla Hpark Hled
     ipureintro; exact hcl
   imodintro
-  iframe Hfd Hft
+  iframe Hfd Hft Hrc
   iexists absView I
   iframe HΦ
   ipureintro; exact ⟨hrowd, hnm, hrowt, hne⟩
@@ -294,7 +301,7 @@ theorem ufUent_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (dqt : DFra
     (hdots : ∀ es, (absRow nt).anNode = .ADir es → dotsOnly es)
     (hdec : unlDec (absRow nt).anNode = dec)
     (habsp' : absOf np' = some ⟨.ADir ((dirEntries np).erase nm), fnNlink np - dec⟩)
-    (hnzt : fnType nt ≠ 0) :
+    (hnzt : fnType nt ≠ 0) (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
       pfAt (uentCommitAt (hlc := hlc) (fsGammaL γfs) appE Pd) Fent -∗
       -- THE PARENT CURSOR (TL-3K): READ by the commit and handed straight back
@@ -302,6 +309,9 @@ theorem ufUent_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (dqt : DFra
       topFrag (fsGammaL γfs) d np -∗
       topFragQ (fsGammaL γfs) dqt t nt ={E}=∗
         topFrag (fsGammaL γfs) d np' ∗ topFragQ (fsGammaL γfs) dqt t nt ∗ Pd d ∗
+        -- (NI M3 private files FS-1) the parent leg's events: the entry gone,
+        -- the count (a no-op at a file)
+        fsMoveRcpt γfs [.ent act d nm none, .nlink act d (fnNlink np - dec)] d np ∗
         ∃ av : Aview, ⌜unlPre av d nm (dirEntries np) (fnNlink np) t (absRow nt)⌝ ∗
           Fent.pfRecv av d nm t := by
   iintro #Hi #Hai Hcm HPd Hfp Hft
@@ -310,7 +320,7 @@ theorem ufUent_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (dqt : DFra
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
   unfold topFrag topFragQ fsGammaL
   ihave %hlkp := ghost_map_lookup $$ Ha Hfp
   ihave %hlkt := ghost_map_lookup $$ Ha Hft
@@ -337,12 +347,17 @@ theorem ufUent_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (dqt : DFra
     iapply (appStep_at d I _ np' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I d np') %hdelta Ha
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HΦ⟩
-  imod Hclose $$ [Ha Hla Hpark]
+  obtain ⟨⟨hnzp, habsp⟩, -⟩ := (absOf_some_iff np _).1 (absOf_dir np hdir (by omega))
+  obtain ⟨⟨hnzp', habsp'2⟩, -⟩ := (absOf_some_iff np' _).1 habsp'
+  imod ftopLed_moveAt γfs I d np np' [.ent act d nm none, .nlink act d (fnNlink np - dec)]
+    hlkp (fun h ht => fevTie_entNlink act nm none (dirEntries np) (fnNlink np) _ ht hlkp hnzp habsp
+      hnzp' habsp'2) $$ Hled with ⟨Hled, #Hrc⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I d np', A
-    iframe Ha Hla Hpark
+    iframe Ha Hla Hpark Hled
     ipureintro; exact ufFtopClean_insert I A d np' hloc hcl
   imodintro
-  iframe Hfp Hft HPd
+  iframe Hfp Hft HPd Hrc
   iexists absView I
   iframe HΦ
   ipureintro; exact hpre
@@ -357,11 +372,13 @@ theorem ufUtgt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal t nt')
     (hnl : 1 ≤ fnNlink nt)
     (habs' : fnType nt' ≠ 0 ∧ absRow nt' = ⟨(absRow nt).anNode, fnNlink nt - 1⟩)
-    (hnzt : fnType nt ≠ 0) :
+    (hnzt : fnType nt ≠ 0) (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
       pfAt (utgtCommitAt (hlc := hlc) (fsGammaL γfs) appE) Ftgt -∗
       topFrag (fsGammaL γfs) t nt ={E}=∗
         topFrag (fsGammaL γfs) t nt' ∗
+        -- (NI M3 private files FS-1) the target's count leg
+        fsMoveRcpt γfs [.nlink act t (fnNlink nt - 1)] t nt ∗
         ∃ av : Aview, ⌜PartialMap.get? av t = some (absRow nt)⌝ ∗ Ftgt.pfRecv av t := by
   iintro #Hi #Hai Hcm Hf
   ihave Hcm := pfAt_au _ _ $$ Hcm
@@ -369,7 +386,7 @@ theorem ufUtgt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
   unfold topFrag fsGammaL
   ihave %hlk := ghost_map_lookup $$ Ha Hf
   have hrow : PartialMap.get? (absView I) t = some (absRow nt) :=
@@ -388,12 +405,15 @@ theorem ufUtgt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     iapply (appStep_at t I _ nt' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I t nt') %hdelta Ha
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HΦ⟩
-  imod Hclose $$ [Ha Hla Hpark]
+  imod ftopLed_moveAt γfs I t nt nt' [.nlink act t (fnNlink nt - 1)] hlk
+    (fun h ht => fevTie_nlink act (absRow nt).anNode (fnNlink nt) _ ht hlk hnzt rfl habs'.1 habs'.2)
+    $$ Hled with ⟨Hled, #Hrc⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I t nt', A
-    iframe Ha Hla Hpark
+    iframe Ha Hla Hpark Hled
     ipureintro; exact ufFtopClean_insert I A t nt' hloc hcl
   imodintro
-  iframe Hf
+  iframe Hf Hrc
   iexists absView I
   iframe HΦ
   ipureintro; exact hrow

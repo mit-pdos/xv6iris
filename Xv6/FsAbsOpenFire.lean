@@ -212,7 +212,7 @@ theorem opfOpen_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
   unfold topFragQ fsGammaL
   ihave %hlk := ghost_map_lookup $$ Ha Hf
   have hrow : arowAt (absView I) i (absRow n) := absView_arow I i n hlk hnz
@@ -220,9 +220,9 @@ theorem opfOpen_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   unfold aopenCommitAt
   ihave Hcm := Hcm $$ %I %i %(absRow n) %hrow Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HΦ⟩
-  imod Hclose $$ [Ha Hla Hpark]
+  imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists I, A
-    iframe Ha Hla Hpark
+    iframe Ha Hla Hpark Hled
     ipureintro; exact hcl
   imodintro
   iframe Hf
@@ -259,7 +259,7 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     (i : Nat) (bs0 : List (BitVec 8)) (nl : Nat) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
     (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.AFile bs0, nl⟩)
-    (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile [], nl⟩) :
+    (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile [], nl⟩) (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
       -- THE PIECE ARRIVES KEYED AT THE INUM (Rocq lane F-OPEN-3): the permit
       -- was paid where what pays it was still in hand
@@ -267,6 +267,8 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
       pfAt (atruncCommitI (hlc := hlc) (fsGammaL γfs) appE i) Ft -∗
       topFrag (fsGammaL γfs) i n ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
+        -- (NI M3 private files FS-1) the truncation's event
+        fsMoveRcpt γfs [.trunc act i] i n ∗
         ∃ av : Aview, ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗ Ft.pfRecv av i bs0 := by
   iintro #Hi #Hai Hcm Hf
   ihave Hcm := pfAt_au _ _ $$ Hcm
@@ -274,7 +276,7 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
   unfold topFrag fsGammaL
   ihave %hlk := ghost_map_lookup $$ Ha Hf
   have hrow : arowAt (absView I) i ⟨.AFile bs0, nl⟩ := by
@@ -301,9 +303,11 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     iapply (appStep_at i I _ n' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I i n') %hdelta Ha
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HΦ⟩
-  imod Hclose $$ [Ha Hla Hpark]
+  imod ftopLed_moveAt γfs I i n n' [.trunc act i] hlk
+    (fun h ht => fevTie_trunc act bs0 nl ht hlk hnz habs hnz' habs') $$ Hled with ⟨Hled, #Hrc⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I i n', A
-    iframe Ha Hla Hpark
+    iframe Ha Hla Hpark Hled
     ipureintro
     intro j m hj hun
     by_cases hji : i = j
@@ -312,7 +316,7 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     · rw [get?_insert_ne hji] at hj
       exact hcl j m hj hun
   imodintro
-  iframe Hf
+  iframe Hf Hrc
   iexists absView I
   iframe HΦ
   ipureintro; exact hrow

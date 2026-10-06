@@ -272,9 +272,12 @@ theorem fsBootGhosts (γd : DiskNames) (dk : Nat → BitVec 8) (cov : ExtTreeSet
       ([∗set] b ∈ cov, fsDirtyHalf γfs b false) ∗
       ([∗list] b ∈ fsHomeList cov ls, fsblock γfs.bytes b (Dv b)) ∗
       fsChalf γfs (logHdrBno ls) (fsBlocks dk (logHdrBno ls)) ∗
-      ([∗list] i ∈ List.range LOGBLOCKS, ∃ bs : List (BitVec 8), fsChalf γfs (logSlotBno ls i) bs) := by
+      ([∗list] i ∈ List.range LOGBLOCKS, ∃ bs : List (BitVec 8), fsChalf γfs (logSlotBno ls i) bs) ∗
+      -- (NI M3 private files FS-1) the era's fs-event ledger, empty
+      (γfs.fev ↪●ML ([] : List Fev)) := by
   have hndH : (fsHomeList cov ls).Nodup := (covList_nodup cov).filter _
   iintro Hd
+  imod (MonoList.own_alloc (GF := GF) (α := Fev) []) with ⟨%gfev, Hfev, -⟩
   imod (ghost_map_alloc (GF := GF) (K := Nat) (V := List (BitVec 8)) (H := RegMapF) (fsC0 dk cov))
     with ⟨%gc, Hca, Hcf⟩
   imod (ghost_map_alloc (GF := GF) (K := Nat) (V := Bool) (H := RegMapF) (fsD0 cov))
@@ -309,7 +312,7 @@ theorem fsBootGhosts (γd : DiskNames) (dk : Nat → BitVec 8) (cov : ExtTreeSet
       cases hzb
       rw [← hg]; exact hagr z hz hnX) $$ Hhome
     with ⟨%gL, %gX, Hinv, Hxo, Hfb⟩
-  let γfs : FsNames := ⟨gc, gd, gL, γlk, γtp, gX⟩
+  let γfs : FsNames := ⟨gc, gd, gL, γlk, γtp, gX, gfev⟩
   imodintro
   iexists γfs
   isplitl []
@@ -348,6 +351,7 @@ theorem fsBootGhosts (γd : DiskNames) (dk : Nat → BitVec 8) (cov : ExtTreeSet
     cov ls hreg).1 $$ Hreg with ⟨Hh, Hs⟩
   isplitl [Hh]
   · unfold fsChalf; iexact Hh
+  isplitl [Hs]
   · iapply BigSepL.bigSepL_mono (Φ := fun _ i => iprop(gc ↪◯MAP[logSlotBno ls i]{.own (1 : Qp).half}
         (fsBlocks dk (logSlotBno ls i))))
     · intro k i _
@@ -356,6 +360,7 @@ theorem fsBootGhosts (γd : DiskNames) (dk : Nat → BitVec 8) (cov : ExtTreeSet
       unfold fsChalf
       iexact H
     iexact Hs
+  · iexact Hfev
 
 end
 

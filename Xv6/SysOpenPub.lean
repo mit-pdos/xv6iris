@@ -185,7 +185,7 @@ theorem sys_open_pub (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (
   unfold sysOpenPubBody sysOpenPostP sysOpenK
   iintro %c %spie %spp %R %s2v %w6 %lo %w24 %γil %γisl %loc %tlc %kk %s %g %inum %dn %bm %kf %fd %l
     %C %pn %γo %P2 %u %nsj %t %hA %hB %hC %hD %hty2 %hE %hpins %hal Hk Hpc Hte Hce #Henv Hcells Hbuf
-    Hlk Hload Hkeep Href Hflds Hnames Hoff Hiru Hcore Howe Hop Hbs Hisl Hfds Hfrags Hauth Harm Hpost
+    Hlk Hload Hkeep Href Hflds Hnames Hoff Hiru Hcore Howe Hop Hbs Hisl Hfds Hfrags Hauth #Hok Harm Hpost
   obtain ⟨hkk, hinb, hipos, hle⟩ := hA
   obtain ⟨hkf, hfd, hlen, hfr⟩ := hB
   obtain ⟨hip, hty, hwr, hrd⟩ := hC
@@ -247,6 +247,10 @@ theorem sys_open_pub (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (
   rw [hns]
   ispecialize Hpost $$ %c'
   iapply Hpost $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hisl
+    [Hfds Harm Hpriv Hfrags Hpub] []
+  rotate_right
+  · -- (NI M3 private files FS-1) the install's ledger receipt
+    unfold openRcptAt; iright; iexact Hok
   unfold openArmsPlain
   iframe Hfds
   iright

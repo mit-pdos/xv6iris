@@ -68,12 +68,13 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     fileRef γ fk q st ∗ procPrivExt (procAddr j) pid V V.upt M ∗ bslot ∗
+    (∃ inum : BitVec 32, ⌜fdInumIs st inum⌝ ∗ fsLedAt fscFs [.stat k.proc inum.toNat]) ∗
     fstatK k γ fk q st (procAddr j) pid V M
     ⊢ wpLoop (GF := GF) cpu := by
   rw [filestatSlots_eq] at hK
   have hK10 : 10 ≤ k.avail := by omega
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
-  iintro ⟨Hk, Hpc, Hframe, Hstat, Hhole, Hte, Hce, #Hkl, #Hav, Href, Hpriv, Hbs, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hstat, Hhole, Hte, Hce, #Hkl, #Hav, Href, Hpriv, Hbs, #Hsr, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x3c  c.li a4,24
   k_step_e (wp_s_addi cpu _ (KA.«filestat» + 0x3c#64) true 24#12 14#5 0#5 (by decide))
@@ -168,13 +169,17 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
   unfold fstatK
   have hR : R' 10#5 = R1 10#5 := by rw [h10']
   rcases hw with ⟨h10, hM, hmap⟩ | ⟨h10, d, hd, hM, hmap⟩
-  · iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %24 %kc [] Hk Hpc Hte Hce Href %hkc Hpriv Henv
+  · iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %24 %kc [] Hk Hpc Hte Hce Href %hkc Hpriv Henv [Hsr]
+    rotate_right
+    · unfold fstatRcptAt; iright; iexact Hsr
     ipureintro
     obtain ⟨inum, dn, hin, hrun⟩ := hnamed
     refine ⟨hcs', Or.inl (hR.trans h10), hext, Nat.le_refl _, ⟨_, fstatBytes_length _ _ _ _ _ _, hM, hmap⟩,
       ⟨fun _ => ⟨inum, dn, h, hin, ?_⟩, fun hn => absurd hst hn⟩⟩
     rw [← hrun, List.take_of_length_le (by rw [fstatBytes_length]; exact Nat.le_refl _)]; exact hM
-  · iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d %kc [] Hk Hpc Hte Hce Href %hkc Hpriv Henv
+  · iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d %kc [] Hk Hpc Hte Hce Href %hkc Hpriv Henv [Hsr]
+    rotate_right
+    · unfold fstatRcptAt; iright; iexact Hsr
     have hd' : d < 24 := hd
     ipureintro
     obtain ⟨inum, dn, hin, hrun⟩ := hnamed
@@ -252,6 +257,18 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
   -- ===== back from stati =====
   iintro %c1 %R1 %hcs Hk Hpc Hte Hce Hdev Hinum Hmeta Hstat
   k_norm_g [filestat_ret_36]
+  -- (NI M3 private files FS-1) THE STAT EVENT: the era's ledger records the
+  -- caller's stat of its descriptor's inode at this instant
+  iapply wpLoop_fupd
+  unfold fstatEnvP
+  icases Henv with ⟨#Hpi, #Hpe, #Hfs, #Hkl, #Hav⟩
+  imod (fsReady_obs ⊤ (.stat k.proc inum.toNat) trivial CoPset.subseteq_top) $$ Hfs with ⟨%hst0, #Hst0⟩
+  imodintro
+  ihave #Hsr : (∃ inum : BitVec 32, ⌜fdInumIs st inum⌝ ∗ fsLedAt fscFs [.stat k.proc inum.toNat]) $$ []
+  · iexists inum
+    isplitl []
+    · ipureintro; exact hinum
+    · iapply fsEvRcpt_at $$ Hst0
   have hr1 : fstatRegs k fk (procAddr j) (fstatBufAddr (k.regs 2#5)) R1 := by
     refine fstatRegs_cs _ _ _ _ _ _ ?_ hcs
     refine fstatRegs_set _ _ _ _ _ _ _ ?_ (by decide)
@@ -273,8 +290,6 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filestat_br_iunlock]
   iintro Hk Hpc
   icases filerw_priv_pid (procAddr j) pid V V.upt M $$ Hpriv with ⟨Hpid, Hpw⟩
-  unfold fstatEnvP
-  icases Henv with ⟨#Hpi, #Hpe, #Hfs, #Hkl, #Hav⟩
   iapply (fstat_iunlock IU Γ cpu _ ik s g lo tl inum dn bm γil γisl pid ?hKu ?hnu ?hlu ?htu hik
       ?ha0u hle) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -309,8 +324,9 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
   k_norm_g
   iframe
   iframe #
-  rw [hproc]
-  iexact Hce
+  isplitl [Hce]
+  · rw [hproc]; iexact Hce
+  · rw [← hproc]; iexact Hsr
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x1e .. +0x28`: the lazy saves, `s2 := p`, ilock at the read arm**

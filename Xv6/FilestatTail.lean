@@ -104,7 +104,9 @@ theorem filestat_err (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk :
   iframe
   iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   unfold fstatK
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce Href %(Nat.le_refl V.ev) Hpriv Henv
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce Href %(Nat.le_refl V.ev) Hpriv Henv []
+  rotate_right
+  · iapply fstatRcptAt_m1; rw [h10]
   ipureintro
   refine ⟨hcs, ?_, UMemL.extSz_refl _ _, Nat.zero_le _, UMemL.umemWrote_refl _ _ _,
     ⟨fun h => absurd h hnst, fun _ => rfl⟩⟩

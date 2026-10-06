@@ -522,11 +522,13 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
     ihave Hout : sysUnlinkOut (A.raise kv) 0xFFFFFFFFFFFFFFFF#64 $$ [Hbs Hir Hcore Howe Harms]
     · unfold sysUnlinkOut
       iframe Hbs Hir Harms
-      iexists P2
-      isplitr
-      · ipureintro; exact hext
-      iapply (procPrivFd_split _ _ _ _ _).2
-      iframe
+      isplitl [Hcore Howe]
+      · iexists P2
+        isplitr
+        · ipureintro; exact hext
+        iapply (procPrivFd_split _ _ _ _ _).2
+        iframe
+      · iapply unlinkRcptAt_m1; decide
     ihave Hpath := suAny_intro (GF := GF) _ bs 128 (by omega) $$ Hpath
     ihave Hbufs : sysUnlinkBufs (k.regs 2#5) $$ [Hjunk Hde Hnm Hpath Hoff Hdel]
     · unfold sysUnlinkBufs; iframe

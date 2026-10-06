@@ -240,6 +240,44 @@ def filestatNamed [Icfg] (st : FdState) (P0 : UPtd) (M : Nat → List (BitVec 8)
   -- ...and on the type-error arm nothing at all
   (¬ fstatStInode st → d = 0)
 
+section Rcpt
+variable {GF : BundledGFunctors} [Xv6G GF]
+
+/-- (NI M3 private files FS-1) **FSTAT'S LEDGER RECEIPT**, relayed to the
+post: on a descriptor with an inode (`fstatStInode`: an inode or device
+row) the `stat act inum` event of the inode it locked sits in the era's
+ledger (appended at stati's instant, under the inode's lock; `fdInumIs`
+ties `inum` to an inode row's own number); other descriptors carry
+nothing. -/
+def fstatRcptAt (γfs : FsNames) (act : BitVec 64) (st : FdState) (r : BitVec 64) : IProp GF :=
+  iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∨
+    ∃ inum : BitVec 32, ⌜fdInumIs st inum⌝ ∗ fsLedAt γfs [.stat act inum.toNat])
+
+instance fstatRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (st : FdState) (r : BitVec 64) :
+    Persistent (fstatRcptAt (GF := GF) γfs act st r) := by
+  unfold fstatRcptAt; infer_instance
+
+theorem fstatRcptAt_m1 (γfs : FsNames) (act : BitVec 64) (st : FdState) (r : BitVec 64)
+    (h : r = 0xFFFFFFFFFFFFFFFF#64) : ⊢@{IProp GF} fstatRcptAt γfs act st r := by
+  unfold fstatRcptAt; ileft; ipureintro; exact h
+
+/-- ...at the syscall: a `0` answer names a stat event of the caller's -/
+def sysFstatRcpt (γfs : FsNames) (act : BitVec 64) (r : BitVec 64) : IProp GF :=
+  iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∨ ∃ inum : BitVec 32, fsLedAt γfs [.stat act inum.toNat])
+
+theorem sysFstatRcpt_m1 (γfs : FsNames) (act r : BitVec 64) (h : r = 0xFFFFFFFFFFFFFFFF#64) :
+    ⊢@{IProp GF} sysFstatRcpt γfs act r := by
+  unfold sysFstatRcpt; ileft; ipureintro; exact h
+
+theorem sysFstatRcpt_of (γfs : FsNames) (act r : BitVec 64) (st : FdState) :
+    fstatRcptAt (GF := GF) γfs act st r ⊢ sysFstatRcpt γfs act r := by
+  unfold fstatRcptAt sysFstatRcpt
+  iintro (%hn | ⟨%inum, -, #Hr⟩)
+  · ileft; ipureintro; exact hn
+  · iright; iexists inum; iexact Hr
+
+end Rcpt
+
 section Env
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -417,7 +455,9 @@ def filestatPost (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) 
     -- counter to copyout, which may step it
     ⌜V.ev ≤ k'⌝ -∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid { V.updEv k' with upt := P' } M' -∗
-    filestatEnvOut st -∗ wpLoop cpu')
+    filestatEnvOut st -∗
+    -- (NI M3 private files FS-1) the stat's ledger receipt
+    fstatRcptAt fscFs k.proc st (R' 10#5) -∗ wpLoop cpu')
 
 end Post
 

@@ -325,6 +325,8 @@ def sysUnlinkPost (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     -- the armed post on the returned a0
     unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) pv
       P Pmiss Fent Ftgt Fex Fmiss (R' 10#5) -∗
+    -- (NI M3 private files FS-1) the parent leg and the target's count, by the caller
+    unlinkRcptAt fscFs pa (R' 10#5) -∗
     wpLoop cpu')
 
 /-- The `true` crossing: sys_unlink parks in its callees. -/

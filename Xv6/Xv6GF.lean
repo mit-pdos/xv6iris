@@ -205,6 +205,9 @@ def xv6GF : BundledGFunctors :=
   -- 126 / 127, clear of the union's (95..108)
   |>.set 126 ⟨xgfMl Sev, inferInstance⟩
   |>.set 127 ⟨xgfGm (BitVec 64) Bool AddrMapF, inferInstance⟩
+  -- Xv6G: the era's fs-event ledger (NI M3 private files FS-1); slot 128, clear of the
+  -- union's (95..108)
+  |>.set 128 ⟨xgfMl Fev, inferInstance⟩
 
 /-! ## One instance per camera -/
 
@@ -344,6 +347,8 @@ instance xgfZomCol : GhostMapG xv6GF Nat (Option (BitVec 32 × Int)) RegMapF := 
 -- WchGpre: the slot-occupancy ledger and its column
 instance xgfMlSev : MonoListG xv6GF Sev := ⟨xgf_slot 126⟩
 instance xgfSlotOcc : GhostMapG xv6GF (BitVec 64) Bool AddrMapF := ⟨xgf_slot 127⟩
+-- Xv6G: the era's fs-event ledger
+instance xgfMlFev : MonoListG xv6GF Fev := ⟨xgf_slot 128⟩
 
 end cameras
 

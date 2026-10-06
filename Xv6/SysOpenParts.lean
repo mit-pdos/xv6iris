@@ -946,7 +946,8 @@ theorem sysOpenK_same (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (Bi
         kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
         trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
         bslots 3 -∗ irefSlots ns -∗
-        ARMS { V with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗ wpLoop c := by
+        ARMS { V with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
+        openRcptAt fscFs k.proc (R' 10#5) -∗ wpLoop c := by
   unfold sysOpenK
   iintro H %spie %spp %R' %P' %hcs %hext
   iapply H $$ %spie %spp %R' %P' %V.ev %hcs %hext %(Nat.le_refl _)
@@ -1386,6 +1387,8 @@ def sysOpenPubBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF 
     procOfilesOwe A.γ A.V.fdg (procAddr A.j) ((sysOpenV2 A P2).ofile.set fd (fnode kf)) [fd] -∗
     logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗
     fdFrags A.V.fdg A.sts -∗ fdStAuth A.V.fdg fd .closed -∗
+    -- (NI M3 private files FS-1) the install's ledger receipt (and itrunc's)
+    openOkRcpt fscFs k.proc -∗
     -- THE ARM, as a wand
     (∀ r : BitVec 64,
       openFdOk A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2)

@@ -520,8 +520,8 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
   ihave #Happ := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hinv
   iapply wpLoop_fupd
   imod (ufUtgt_fire (hlc := hlc) fscFs ⊤ A.Funt inum.toNat (eraNode dn bm data)
-      (eraNode (sysLinkDec dn) bm data) ufNd_top hloc hnl1 habs' hnzt) $$ Hftop Happ Hcmu Ht
-    with ⟨Ht, %av, %hav, Hrcv⟩
+      (eraNode (sysLinkDec dn) bm data) ufNd_top hloc hnl1 habs' hnzt k.proc) $$ Hftop Happ Hcmu Ht
+    with ⟨Ht, #Hurc, %av, %hav, Hrcv⟩
   imodintro
   ihave Huntgt : luntgtFired A.Funt inum.toNat $$ [Hrcv]
   · unfold luntgtFired

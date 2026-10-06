@@ -369,7 +369,7 @@ theorem fsCollectDur [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNames
   imod (inv_acc_timeless (E := E \ ↑appN) (N := ftopN) (P := ftopBody (GF := GF) γfs) h1)
     $$ Hftop with ⟨Hfb, Hclft⟩
   unfold ftopBody
-  icases Hfb with ⟨%I, %A, Hta, Hlk, Hpk, %hclean⟩
+  icases Hfb with ⟨%I, %A, Hta, Hlk, Hpk, %hclean, Hfled⟩
   -- the two halves agree: the application's claim is about THIS map
   ihave %hIa := ghost_map_auth_agree _ _ _ _ _ $$ Hta Hha
   subst hIa
@@ -423,9 +423,9 @@ theorem fsCollectDur [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNames
   · iexists used; iexact Hbres
   imod Hclir $$ [Hma Hblks Hreg]
   · iexists m; iframe Hma Hblks Hreg
-  imod Hclft $$ [Hta Hlk Hpk]
+  imod Hclft $$ [Hta Hlk Hpk Hfled]
   · iexists I, A
-    iframe Hta Hlk Hpk
+    iframe Hta Hlk Hpk Hfled
     ipureintro; exact hclean
   imod Hclapp $$ [Hha Hpa]
   · inext
@@ -512,7 +512,7 @@ theorem fsCollectGhost [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNam
   imod (inv_acc_timeless (E := E \ ↑appN) (N := ftopN) (P := ftopBody (GF := GF) γfs) h1)
     $$ Hftop with ⟨Hfb, Hclft⟩
   unfold ftopBody
-  icases Hfb with ⟨%I, %A, Hta, Hlk, Hpk, %hclean⟩
+  icases Hfb with ⟨%I, %A, Hta, Hlk, Hpk, %hclean, Hfled⟩
   -- the two halves agree: the application's claim is about THIS map
   ihave %hIa := ghost_map_auth_agree _ _ _ _ _ $$ Hta Hha
   subst hIa
@@ -567,9 +567,9 @@ theorem fsCollectGhost [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNam
   · iexists used; iexact Hbres
   imod Hclir $$ [Hma Hblks Hreg]
   · iexists m; iframe Hma Hblks Hreg
-  imod Hclft $$ [Hta Hlk Hpk]
+  imod Hclft $$ [Hta Hlk Hpk Hfled]
   · iexists I, A
-    iframe Hta Hlk Hpk
+    iframe Hta Hlk Hpk Hfled
     ipureintro; exact hclean
   imod Hclapp $$ [Hha Hpa]
   · inext

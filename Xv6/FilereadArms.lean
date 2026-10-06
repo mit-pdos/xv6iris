@@ -190,7 +190,9 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     · exact Or.inr hm
     · exact Or.inl (by rw [hd, BitVec.ofInt_natCast])
   unfold frdK
-  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen [] [HP Hpost]
+  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen [] [HP Hpost] []
+  rotate_right
+  · iapply freadRcptAt_of_ne; intro _ _ _ _ h; cases h
   · ipureintro; exact ⟨hcs, hext, hdle, hr10, hwin⟩
   · iapply frd_envout_pipe
   · unfold filereadArms

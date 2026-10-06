@@ -146,6 +146,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
     (∀ c : CPU, sysMknodPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
+    creRcptAt fscFs (procAddr A.j) ok made inum.toNat ∗
     (if ok then
       iprop(⌜R 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧
           creOkPure T_DEVICE_w (sysMknodHw A.v1) (sysMknodHw A.v2) made dn⌝ ∗
@@ -158,7 +159,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
           (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P A.Pmiss A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok
           A.Fex pl k.proc))
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hlow, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Harm⟩
+  iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hlow, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, #Hcr, Harm⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hbuf := sysfile_buf_join _ pl rest hlen $$ [$Hp $Hrest]
   cases ok
@@ -213,6 +214,10 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     iapply (sys_mknod_tail_46 IUP EO Γ cpu k A P2 spie spp _ kk qi s g inum dn bm u' Sb' ns'
         hj hproc hK hnoff htier hct hpins h10 hal hP2 hkk hnib (hu rfl) hns)
       $$ [$Hk $Hpc $Hcells $Hbuf $Hlow $Hte $Hce $Henv $Hblk $HΦ $Hlk $Hbs $Hir $Hop $Hok]
+    unfold creRcptAt
+    icases Hcr with (%h | #Hcr)
+    · cases h
+    · iexists inum.toNat; iexact Hcr
 
 /-! ## +0x2e: argstr came back -/
 
@@ -367,7 +372,12 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     iintro %cpu
     unfold sysMknodCreateK createPost
     iintro %spie1 %spp1 %R1 %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs1 Hk Hpc Hte Hce
-      - - - - Hblk Hp Hbs %hns1 Hir %⟨-, -, hu1⟩ HopS Harm
+      - - - - Hblk Hp Hbs %hns1 Hir %⟨-, -, hu1⟩ HopS #Hcr Harm
+    ihave #Hcr : creRcptAt fscFs (procAddr A.j) ok made inum.toNat $$ []
+    · iapply (creRcptAt_act (GF := GF) fscFs _ (procAddr A.j) ok made inum.toNat ?hh)
+      rotate_left
+      · iexact Hcr
+      · exact hproc
     k_norm_g [sys_mknod_ret_44, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
     ihave Hp := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551472#64) (DFrac.own 1)
         (bview (pl.length + 1) (sysfilePfun pl)) ⊢
@@ -387,7 +397,7 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     isimp only [sys_mknod_hw_dev, sys_mknod_bview_self] at Harm
     iapply (sys_mknod_created IUP EO Γ cpu k A P2 spie1 spp1 R1 pl _ ok made kk qi s g inum dn bm u'
         Sb' ns' hj hproc hK hnoff htier hct hp1 hal hP2 hlen hpl hns1 hu1)
-      $$ [$Hk $Hpc $Hcells $Hp $Hrest $Hlow $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $HopS $Harm]
+      $$ [$Hk $Hpc $Hcells $Hp $Hrest $Hlow $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $HopS $Hcr $Harm]
   · -- ===== the string did not fetch: the -1 tail =====
     k_step_e (wp_s_branch cpu _ (KA.«sys_mknod» + 0x2e#64) false 42#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, MachCSL.bltz_m1]

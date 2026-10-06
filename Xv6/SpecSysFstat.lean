@@ -124,7 +124,9 @@ def sysFstatPost (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : Pr
     -- counter to copyout, which may step it
     ⌜V.ev ≤ k'⌝ -∗
     procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' } M' -∗
-    filestatFsOut -∗ wpLoop cpu')
+    filestatFsOut -∗
+    -- (NI M3 private files FS-1) the stat's ledger receipt (`fstatRcptAt`)
+    sysFstatRcpt fscFs k.proc (R' 10#5) -∗ wpLoop cpu')
 
 end
 

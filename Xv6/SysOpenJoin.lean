@@ -160,7 +160,7 @@ theorem sys_open_join (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) (hS : Sy
         repeat (refine sysOpenPins_set _ _ _ _ _ _ _ ?_ (by decide))
         exact hpins
       -- (NI M3 FS-0) the node's type or the mode refused it
-      ihave Hw := openWhyRcpt_intro (GF := GF) fscFs (procAddr A.j) .refused
+      ihave Hw := openWhyRcpt_tag (GF := GF) fscFs (procAddr A.j) .refused (by decide)
       iapply sys_open_fail_ret k A P2 nsj pl inum dn bm data hct hE.1 hE.2 .refused
       iframe
       try iexact Hw

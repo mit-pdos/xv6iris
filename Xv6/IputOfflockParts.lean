@@ -103,7 +103,7 @@ freeze. -/
 theorem iput_ofl_au [Fscfg] [Icfg] (inum : BitVec 32) (dn : Dinode) (ds : List Dinode)
     (ge gr gd : GName) (rg : Frzidx) (t : Nat) (q : Qp) (e0 : Nat)
     (hnib : inum.toNat < 16 * icfgNib) (hdn : dinodeWf dn) (hnl0 : dn.diNlink.toNat = 0)
-    (hbare : iregBare dn) :
+    (hbare : iregBare dn) (act : BitVec 64) :
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
       escAInv (hlc := hlc) fscFs ge gr gd inum.toNat rg ∗
       ipoolInv (hlc := hlc) fscIc fscFs fscIreg fscCov fscLogst icfgNib ∗
@@ -117,7 +117,7 @@ theorem iput_ofl_au [Fscfg] [Icfg] (inum : BitVec 32) (dn : Dinode) (ds : List D
   iapply (iregFreeDeposit_au (hlc := hlc) ⊤ fscIc fscIreg fscFs icfgIst fscCov fscLogst icfgNib
     inum dn (iputOflZ dn) (diblkBytes ds) ge gr gd rg t q CoPset.subseteq_top
     (iput_ofl_mask_esc _) (iput_ofl_mask_pool _) (iput_ofl_mask_ftop _) (by omega)
-    (iputOflZ_wf dn hdn) rfl hbare (iputOflZ_nlst dn hnl0))
+    (iputOflZ_wf dn hdn) rfl hbare (iputOflZ_nlst dn hnl0) act)
     $$ Hinv Hesc Hpinv Hcel Hdn Hdep
 
 end

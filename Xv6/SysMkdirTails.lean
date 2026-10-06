@@ -90,10 +90,12 @@ theorem sys_mkdir_out_fail (A : SysMkdirArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extS
   · iexists P2
     iframe Hb
     ipureintro; exact hP2
-  unfold mkdirArms sysMkdirFail
-  iright
-  iframe Hf
-  ipureintro; rfl
+  isplitl [Hf]
+  · unfold mkdirArms sysMkdirFail
+    iright
+    iframe Hf
+    ipureintro; rfl
+  · unfold mkdirRcptAt; ileft; ipureintro; decide
 
 /-- ret 0: the block closed at the grown page table, the directory MADE. -/
 theorem sys_mkdir_out_ok (A : SysMkdirArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz A.V.sz P2)
@@ -101,21 +103,24 @@ theorem sys_mkdir_out_ok (A : SysMkdirArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz 
     procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid (sysMkdirV1 A P2) (sysMkdirM1 A P2) ∗
       bslots 3 ∗ irefSlots A.ns ∗
       creOkArms (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Farm A.Fdots A.Fun A.Fok A.Fex
-        pl true i ⊢
+        pl true i ∗
+      creOkRcpt fscFs (procAddr A.j) true i ⊢
     sysMkdirOut A 0#64 := by
-  iintro ⟨Hb, Hbs, Hir, Ha⟩
+  iintro ⟨Hb, Hbs, Hir, Ha, #Hcr⟩
   unfold sysMkdirOut
   iframe Hbs Hir
   isplitl [Hb]
   · iexists P2
     iframe Hb
     ipureintro; exact hP2
-  unfold mkdirArms
-  ileft
-  isplitr
-  · ipureintro; rfl
-  iexists pl, i
-  iexact Ha
+  isplitl [Ha]
+  · unfold mkdirArms
+    ileft
+    isplitr
+    · ipureintro; rfl
+    iexists pl, i
+    iexact Ha
+  · unfold mkdirRcptAt; iright; iexists i; iexact Hcr
 
 /-! ## The shared "-1" tail: `+0x40` -/
 
@@ -200,9 +205,10 @@ theorem sys_mkdir_tail_ok (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
     createLocked A.pid kk qi s g inum dn bm ∗
     creOkArms (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Farm A.Fdots A.Fun A.Fok A.Fex
-      pl true i
+      pl true i ∗
+    creOkRcpt fscFs (procAddr A.j) true i
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hlk, Harms⟩
+  iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hlk, Harms, #Hcr⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨-, -, hKe, -, hKup⟩ := sys_mkdir_K _ hK
   unfold createLocked
@@ -257,7 +263,7 @@ theorem sys_mkdir_tail_ok (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   ihave Hslot := (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl) $$ Hslot
   ihave Hir := (irefSlots_op ns' 1).2 $$ [$Hir $Hslot]
   rw [hns]
-  ihave Hout := sys_mkdir_out_ok A P2 hP2 pl i $$ [$Hblk $Hbs $Hir $Harms]
+  ihave Hout := sys_mkdir_out_ok A P2 hP2 pl i $$ [$Hblk $Hbs $Hir $Harms $Hcr]
   iapply (sys_mkdir_exit cpu k A spie2 spp2 _ hK hp3 hal)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $HΦ Hout]
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]

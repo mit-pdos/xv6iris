@@ -481,8 +481,10 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
       (by rw [sys_unlink_bname_kk datd _ kk nf hfn]; exact hndd)
       (sys_unlink_nl1 dnd bmd datd hlive) (sys_unlink_nl1 dni bmi dati hnli)
       (sys_unlink_dir_dots dni bmi dati hoki.2.2.2.2.2.1 hoki.2.2.2.2.1 htyi hdots)
-      (sys_unlink_dir_dec _ hdiri) habsp hoki.2.2.2.1)
-    $$ Hftop Happ He HP Htop Htopi with ⟨Htop, Htopi, HP, %av0, %hpre, Hrecv⟩
+      (sys_unlink_dir_dec _ hdiri) habsp hoki.2.2.2.1 k.proc)
+    $$ Hftop Happ He HP Htop Htopi with ⟨Htop, Htopi, HP, #Hurc, %av0, %hpre, Hrecv⟩
+  ihave #Hpar : unlParentRcpt fscFs k.proc $$ []
+  · unfold unlParentRcpt; iexists _, _, _; iapply fsMoveRcpt_at $$ Hurc
   imodintro
   ihave Htopi := (show topFragQ (GF := GF) (fsGammaL fscFs) (DFrac.own 1)
         (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) ⊢

@@ -62,6 +62,11 @@ structure FsNames where
   /-- **THE BYTE VIEW'S EXCEPTION SET** (Rocq's `fs_exc`).  LAST, so no
   positional application of the constructor moves. -/
   exc : GName
+  /-- (NI M3 private files FS-1) **THE ERA'S FS-EVENT LEDGER** (a mono-list of
+  `NiFs.Fev`, `FsLedger.fsLedAuth`): its authority rides
+  `InodeRegionInv.ftopBody` beside the kernel's half of `top`.  A bare
+  `GName`, as `top`: this block layer names no abstract-state camera. -/
+  fev : GName
 
 /-- The ghost libraries the block view needs (the `fsLogG` members
 `LogInv` names).

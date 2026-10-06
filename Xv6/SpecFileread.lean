@@ -680,6 +680,47 @@ end Keyed
 
 /-! ## THE CONTRACT -/
 
+section Rcpt
+variable {GF : BundledGFunctors} [Xv6G GF]
+
+/-- (NI M3 private files FS-1) **THE READ'S LEDGER RECEIPT**, relayed to the
+post: at `-1` nothing is claimed; at a count on an inode descriptor the read's
+event `read act i γo d` is in the era's ledger at a prefix whose fold holds
+the row it read (`FsLedger.fsObsAt`), its advance the count; other
+descriptors carry nothing. -/
+def freadRcptAt (γfs : FsNames) (act : BitVec 64) (st : FdState) (r : BitVec 64) : IProp GF :=
+  iprop(⌜r = -1#64⌝ ∨ match st with
+    | .open true _ (.inode i γo _) =>
+      ∃ (d : Nat) (a : Anode), ⌜r = BitVec.ofNat 64 d⌝ ∗ fsObsAt γfs (.read act i γo d) i a
+    | _ => True)
+
+instance freadRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (st : FdState) (r : BitVec 64) :
+    Persistent (freadRcptAt (GF := GF) γfs act st r) := by
+  unfold freadRcptAt
+  rcases st with _ | ⟨rb, wb, t⟩
+  · infer_instance
+  · rcases rb with _ | _ <;> rcases t <;> infer_instance
+
+theorem freadRcptAt_m1 (γfs : FsNames) (act : BitVec 64) (st : FdState) :
+    ⊢@{IProp GF} freadRcptAt γfs act st (-1#64) := by
+  unfold freadRcptAt; ileft; ipureintro; rfl
+
+/-- a descriptor that is not a readable inode carries nothing -/
+theorem freadRcptAt_of_ne (γfs : FsNames) (act : BitVec 64) (st : FdState) (r : BitVec 64)
+    (hst : ∀ wb i γo om, st ≠ .open true wb (.inode i γo om)) :
+    ⊢@{IProp GF} freadRcptAt γfs act st r := by
+  unfold freadRcptAt
+  iright
+  rcases st with _ | ⟨rb, wb, t⟩
+  · ipureintro; trivial
+  · rcases rb with _ | _
+    · ipureintro; trivial
+    · cases t with
+      | inode i γo om => exact absurd rfl (hst wb i γo om)
+      | _ => ipureintro; trivial
+
+end Rcpt
+
 section Post
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -712,6 +753,8 @@ def filereadPost (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) 
     procPrivCoreNoctxAt curCtx (procAddr j) pid { V.updEv k' with upt := P' } M' -∗
     filereadEnvOut (hlc := hlc) st -∗
     filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin Rp Rpe P (R' 10#5) M' (k.regs 11#5) -∗
+    -- (NI M3 private files FS-1) the read's ledger receipt
+    freadRcptAt fscFs k.proc st (R' 10#5) -∗
     wpLoop cpu')
 
 end Post

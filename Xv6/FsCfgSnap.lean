@@ -316,12 +316,13 @@ theorem fsCfgSnap_fs [Icfg] (E : CoPset) (γv : DiskNames) (dk : Nat → BitVec 
   ihave Hdisk := fsBoot_diskCarve γv dk cov ndisk hcovin $$ Hdisk
   imod (fsBootGhosts γv dk cov S.fssSb.sbLogstart icfgDev gl gt E Pb Xexc hreg
       (fun b _ => hlPb b) hXsub hagr) $$ Hdisk
-    with ⟨%γfs, %hγ, Hpool, HaL, HaD, #Hbinv, Hxo, Hdty, Hfsb, Hhdr, Hslots⟩
+    with ⟨%γfs, %hγ, Hpool, HaL, HaD, #Hbinv, Hxo, Hdty, Hfsb, Hhdr, Hslots, Hfev⟩
   obtain ⟨rfl, rfl⟩ := hγ
   ihave #Hbrow := fsBytesAt_of γfs (fsHomeList cov S.fssSb.sbLogstart) Pb $$ Hbinv
   -- THE TOP MAP: the kernel's half founds `ftopInv`, the other the application's
   ihave ⟨Htopa, Htopb⟩ := (fsSnapTop_halves γfs.top S.fssInodes).1 $$ Htopa
-  imod (ftopAlloc E γfs S.fssInodes hloc) $$ Htopa Hlkauth with #Hftopi
+  imod (ftopAlloc E γfs S.fssInodes hloc) $$ Htopa Hlkauth [Hfev] with #Hftopi
+  · unfold fsLedAuth; iexact Hfev
   imod (appInv_alloc γfs S.fssInodes E hdom) $$ Htopb Hclaim with #Henv
   ihave Htopf := BigSepM.bigSepM_mono (m := S.fssInodes)
     (Φ := fun i n => iprop(γfs.top ↪◯MAP[i] n))

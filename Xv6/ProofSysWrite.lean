@@ -83,11 +83,11 @@ theorem swr_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     filewriteEnvOut γl γu st ∗ (filewriteEnvOut γl γu st -∗ filewriteFsOut (GF := GF)) ∗
     filewriteArms (hlc := hlc) V.gen V.upt st (argZ v2) (writerImg V.upt M) v1 Q Qe (R 10#5) ∗
     fwConsOut st γu (writerImg V.upt M) v1 (R 10#5) ∗
-    fwWhyAt fscFs k.proc st V.upt v1 (argZ v2) (R 10#5) ∗
+    fwWhyAt fscFs k.proc st V.upt v1 (argZ v2) (R 10#5) ∗ fwRcptAt fscFs k.proc st (argZ v2) (R 10#5) ∗
     (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hra, Hs0, Hcells, Hte, Hce, Hcore, Howe, Href, Hauth, Hfr, Henvo, Henvb, Harms,
-    #HO, Hwhy, HΦ⟩
+    #HO, Hwhy, #Hfwr, HΦ⟩
   ihave Hfso := Henvb $$ Henvo
   ihave Howe := procOfilesOwe_repay γ V.fdg (procAddr j) V.ofile [] fd0 kk q st (by simp) hfv hkk hst
     $$ [Howe Href Hauth]
@@ -100,7 +100,7 @@ theorem swr_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
   iframe
   iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   unfold sysWritePost
-  iapply HΦ $$ %c' %spie %spp %R' %P' %kv [] [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfr Hfso [Harms] [Hwhy]
+  iapply HΦ $$ %c' %spie %spp %R' %P' %kv [] [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfr Hfso [Harms] [Hwhy] []
   · ipureintro
     refine ⟨hcs, hext, ?_⟩
     rw [sysFdSt_some v V.ofile sts fd0 (fnode kk) st hsome hsts, h10]; exact hcnt
@@ -109,6 +109,7 @@ theorem swr_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     iframe Hcore Howe
   · rw [h10]; iexact Harms
   · rw [sysFdSt_some v V.ofile sts fd0 (fnode kk) st hsome hsts, h10]; iexact Hwhy
+  · rw [sysFdSt_some v V.ofile sts fd0 (fnode kk) st hsome hsts, h10]; iexact Hfwr
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x3c`: `jal filewrite`** over the LENT reference (Rocq
@@ -190,7 +191,7 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   iintro %cpu
   unfold filewritePost
   iintro %spie3 %spp3 %R3 %P' %kv %⟨hcs3, hext, hcnt⟩ #HO Hk Hpc Hte Hce Href %hkv Hcore Henvo Harms
-    Hwhy
+    Hwhy #Hfwr
   k_norm_g [swr_ret_40, h11, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr5 : swrRegs k R3 := by
     refine swrRegs_cs _ _ _ ?_ hcs3
@@ -201,7 +202,7 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
       (by simpa only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, h11] using hcnt)
       kv hkv)
     $$ [$Hk $Hpc $Hra $Hs0 $Hcells $Hte $Hce $Hcore $Howe $Href $Hauth $Hfr $Henvo $Henvb $Harms
-      $HO $Hwhy $HΦ]
+      $HO $Hwhy $Hfwr $HΦ]
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x28 .. +0x38`, argfd SUCCEEDED** (`a0 = 0`): `mv a5,a0`, the
@@ -312,7 +313,7 @@ theorem swr_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
   iframe
   iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   unfold sysWritePost
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt %V.ev [] [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) [Hcore Howe] Hfr [Hfs] [] []
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt %V.ev [] [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) [Hcore Howe] Hfr [Hfs] [] [] []
   · ipureintro
     refine ⟨hcs, UMemL.extSz_refl _ _, fun _ h => ?_⟩
     rw [sysFdSt_none v V.ofile sts hnone] at h; cases h
@@ -327,6 +328,7 @@ theorem swr_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
   · -- (NI M3 FS-0) argfd's -1: no descriptor, no inode reason
     rw [sysFdSt_none v V.ofile sts hnone]
     iapply fwWhyAt_other; intro _ _ _ _ h; cases h
+  · iapply fwRcptAt_nil; right; right; rw [sysFdSt_none v V.ofile sts hnone]; intro _ _ _ _ h; cases h
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x1c .. +0x24`: `argfd(0, 0, &f)`** (`pfd` null, `pf = &f`), and

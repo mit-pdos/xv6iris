@@ -45,3 +45,15 @@ decl Xv6.niForkChild             # FAM-1b reaches (the filings' tree, FAM-R2's d
 #    TEST BY DESIGN, which no root cites (U-3's `xv6NiDet` is about every
 #    program; this row says `ustep` is not vacuously `stuck` on a real one).
 module Xv6.UstepEcho             # anti-vacuity check, test by design (echo runs to its ecall under ustep)
+
+# -- NI M3 private files FS-1: the fs-event ledger's readings and receipt
+#    algebra that the computed rows read; FS-2 reaches them
+#    (claude-notes/projects/noninterference.md, "M3 private files design")
+decl Xv6.fevOff                  # FS-2 reaches (read's offset, the fold's)
+decl Xv6.fevContent              # FS-2 reaches (read's bytes)
+decl Xv6.fevReadBytes            # FS-2 reaches (usysReadAns)
+decl Xv6.fevHop                  # FS-2 reaches (open/chdir/mkdir hops)
+decl Xv6.fevStatOf               # FS-2 reaches (fstat's row)
+decl Xv6.fevRun_prefix           # FS-2 reaches (the fold at a cited prefix)
+decl Xv6.fsLedLb_prefix          # FS-2 reaches (a receipt's prefix bound)
+decl Xv6.fsEvRcpt_of_lb          # FS-2 reaches (a citation's lower bound from a receipt)

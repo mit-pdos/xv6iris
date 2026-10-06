@@ -120,6 +120,7 @@ InodeRegionLink / InodeRegionMovers, which each carried a copy.
 import Xv6.InodeRegionSlot
 import Xv6.AppInv
 import Xv6.FsBytesMint
+import Xv6.FsLedger
 
 namespace Xv6
 
@@ -458,7 +459,10 @@ def ftopBody [Icfg] (γfs : FsNames) : IProp GF :=
     (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
     (icfgLk ↪●MAP A) ∗
     ([∗map] _k ↦ e ∈ A, iregParked e) ∗
-    ⌜ftopClean I A⌝)
+    ⌜ftopClean I A⌝ ∗
+    -- (NI M3 private files FS-1) ...AND THE ERA'S FS-EVENT LEDGER, TIED TO
+    -- THE MAP: its fold IS the map's typed rows (`FsLedger.fevTie`)
+    ftopLed γfs I)
 
 /-- Rocq's `ftop_inv`. -/
 def ftopInv [Icfg] (γfs : FsNames) : IProp GF :=
@@ -482,8 +486,12 @@ theorem ftopClean_empty (I : RegMapF FsNode)
 theorem ftopAlloc [Icfg] (E : CoPset) (γfs : FsNames) (I : RegMapF FsNode)
     (hloc : ∀ i n, PartialMap.get? I i = some n → InodeLocal i n) :
     ⊢@{IProp GF} (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗
-      (icfgLk ↪●MAP (∅ : RegMapF IregArmEnt)) -∗ |={E}=> ftopInv (hlc := hlc) γfs := by
-  iintro Ha Hlk
+      (icfgLk ↪●MAP (∅ : RegMapF IregArmEnt)) -∗
+      -- (NI M3 private files FS-1) the era's ledger, empty; its first event
+      -- is the era's recovered rows
+      fsLedAuth γfs [] -∗ |={E}=> ftopInv (hlc := hlc) γfs := by
+  iintro Ha Hlk Hled
+  imod fsLed_append γfs [] [.boot (ftopRows I)] $$ Hled with ⟨Hled, -⟩
   unfold ftopInv
   iapply (inv_alloc ftopN E (ftopBody (GF := GF) γfs))
   inext
@@ -493,7 +501,55 @@ theorem ftopAlloc [Icfg] (E : CoPset) (γfs : FsNames) (I : RegMapF FsNode)
   isplitl []
   · iapply BigSepM.bigSepM_empty.2
     iempintro
+  isplitl []
   · ipureintro; exact ftopClean_empty I hloc
+  unfold ftopLed
+  iexists [] ++ [.boot (ftopRows I)]
+  iframe Hled
+  ipureintro
+  rfl
+
+/-- (NI M3 private files FS-1) **AN EXHAUSTION VERDICT, RECORDED**: the era's
+ledger takes `full act why` at this instant, its receipt out (the three
+out-of-resources sites: create's ialloc 0, a write's or a dirlink's
+out-of-blocks short count, open's filealloc 0). -/
+theorem ftopFull [Icfg] (E : CoPset) (γfs : FsNames) (act : BitVec 64) (why : FsFull)
+    (hE : (↑ftopN : CoPset) ⊆ E) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ |={E}=> fsFullRcpt γfs act why := by
+  iintro #Hi
+  unfold ftopInv
+  imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs) hE) $$ Hi
+    with ⟨Hb, Hclose⟩
+  unfold ftopBody
+  icases Hb with ⟨%I, %A, Hta, Hla, Hpark, %hcl, Hled⟩
+  imod ftopLed_full γfs I act why $$ Hled with ⟨Hled, #Hr⟩
+  imod Hclose $$ [Hta Hla Hpark Hled]
+  · iexists I, A
+    iframe Hta Hla Hpark Hled
+    ipureintro; exact hcl
+  imodintro
+  iexact Hr
+
+/-- (NI M3 private files FS-1) **AN OBSERVATION THAT READS NO ROW,
+RECORDED**: the era's ledger takes `e` (an `fevObs` event: fstat's `stat`,
+open's install) at this instant, its receipt out. -/
+theorem ftopObs [Icfg] (E : CoPset) (γfs : FsNames) (e : Fev) (he : fevObs e)
+    (hE : (↑ftopN : CoPset) ⊆ E) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ |={E}=> ∃ h : List Fev, fsEvRcpt γfs h e := by
+  iintro #Hi
+  unfold ftopInv
+  imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs) hE) $$ Hi
+    with ⟨Hb, Hclose⟩
+  unfold ftopBody
+  icases Hb with ⟨%I, %A, Hta, Hla, Hpark, %hcl, Hled⟩
+  imod ftopLed_obs γfs I e he $$ Hled with ⟨Hled, ⟨%h, -, #Hr⟩⟩
+  imod Hclose $$ [Hta Hla Hpark Hled]
+  · iexists I, A
+    iframe Hta Hla Hpark Hled
+    ipureintro; exact hcl
+  imodintro
+  iexists h
+  iexact Hr
 
 /-- A key the registry's map does not hold (Rocq `fresh (dom A)`). -/
 theorem iregArm_fresh (A : RegMapF IregArmEnt) : ∃ k, PartialMap.get? A k = none := by
@@ -529,13 +585,13 @@ theorem iregArm [Icfg] (E : CoPset) (γfs : FsNames) (i t : Nat) (q : Qp)
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs) hE) $$ Hi
     with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Hta, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Hta, Hla, Hpark, %hcl, Hled⟩
   obtain ⟨k, hfree⟩ := iregArm_fresh A
   imod ghost_map_insert k ((t, q, ({i} : Std.ExtTreeSet Nat compare)) : IregArmEnt) hfree $$ Hla
     with ⟨Hla, Hrec⟩
-  imod Hclose $$ [Hta Hla Hpark Ht]
+  imod Hclose $$ [Hta Hla Hpark Ht Hled]
   · iexists I, PartialMap.insert A k ((t, q, ({i} : Std.ExtTreeSet Nat compare)) : IregArmEnt)
-    iframe Hta Hla
+    iframe Hta Hla Hled
     isplitl [Hpark Ht]
     · iapply (BigSepM.bigSepM_insert (Φ := fun _ e => iregParked (GF := GF) e) hfree).2
       isplitl [Ht]
@@ -567,14 +623,14 @@ theorem iregDisarm [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) (q : Qp)
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs) hE) $$ Hi
     with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Hta, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Hta, Hla, Hpark, %hcl, Hled⟩
   ihave %hAt := ghost_map_lookup $$ Hla Hrec
   unfold topFrag fsGammaL
   ihave %hIi := ghost_map_lookup $$ Hta Hfr
   imod ghost_map_update ((t, q, S \ {i}) : IregArmEnt) $$ Hla Hrec with ⟨Hla, Hrec⟩
-  imod Hclose $$ [Hta Hla Hpark]
+  imod Hclose $$ [Hta Hla Hpark Hled]
   · iexists I, PartialMap.insert A k ((t, q, S \ {i}) : IregArmEnt)
-    iframe Hta Hla
+    iframe Hta Hla Hled
     isplitl [Hpark]
     · iapply (iregParked_retag A k t q S (S \ {i}) hAt)
       iexact Hpark
@@ -603,13 +659,13 @@ theorem iregRelease [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) (q : Qp)
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs) hE) $$ Hi
     with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Hta, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Hta, Hla, Hpark, %hcl, Hled⟩
   ihave %hAt := ghost_map_lookup $$ Hla Hrec
   icases (BigSepM.bigSepM_delete hAt).1 $$ Hpark with ⟨Ht, Hpark⟩
   imod ghost_map_delete k _ $$ Hla Hrec with Hla
-  imod Hclose $$ [Hta Hla Hpark]
+  imod Hclose $$ [Hta Hla Hpark Hled]
   · iexists I, PartialMap.delete A k
-    iframe Hta Hla Hpark
+    iframe Hta Hla Hpark Hled
     ipureintro
     intro j m hj hun
     refine hcl j m hj fun k' t' q' S' hk' => ?_
@@ -753,29 +809,38 @@ section Retag
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsTopG GF] [FsBytesG GF] [Appcfg GF]
 
-/-- Rocq's `ireg_top_retag_gen`. -/
+/-- Rocq's `ireg_top_retag_gen`, (NI M3 private files FS-1) WITH THE MOVE's
+EVENTS: the ledger grows by `evs`, which take its fold from the map to the
+moved map (`hev`), and the receipt -- the prefix they followed and the lower
+bound past them -- comes out. -/
 theorem iregTopRetag_gen [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n') :
+    (evs : List Fev) (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
+    (hev : ∀ (h : List Fev) (I : RegMapF FsNode), PartialMap.get? I i = some n → fevTie h I →
+      fevTie (h ++ evs) (PartialMap.insert I i n')) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
       (∀ I : RegMapF FsNode, ⌜PartialMap.get? I i = some n⌝ -∗
         ▷ appPred appRun (absView I) -∗
         ▷ appPred appRun (absView (PartialMap.insert I i n'))) -∗
-      topFrag (fsGammaL γfs) i n -∗ |={E}=> topFrag (fsGammaL γfs) i n' := by
+      topFrag (fsGammaL γfs) i n -∗ |={E}=> topFrag (fsGammaL γfs) i n' ∗
+        fsMoveRcpt γfs evs i n := by
   iintro #Hi #Hai Hstep Hf
   unfold ftopInv
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
   unfold topFrag fsGammaL
+  ihave %hlk := ghost_map_lookup $$ Ha Hf
   imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' (appN_sub_ftop E hE)) $$ Hai [Hstep] Ha Hf
     with ⟨Ha, Hf⟩
   · iintro %hi Hp
     imodintro
     iapply Hstep $$ %I %hi Hp
-  imod Hclose $$ [Ha Hla Hpark]
+  imod ftopLed_step γfs I (PartialMap.insert I i n') evs (fun h ht => hev h I hlk ht) $$ Hled
+    with ⟨Hled, ⟨%h, %ht, #Hlb⟩⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I i n', A
-    iframe Ha Hla Hpark
+    iframe Ha Hla Hpark Hled
     ipureintro
     intro j m hj hun
     by_cases hji : i = j
@@ -784,15 +849,43 @@ theorem iregTopRetag_gen [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : 
     · rw [get?_insert_ne hji] at hj
       exact hcl j m hj hun
   imodintro
-  iexact Hf
+  iframe Hf
+  unfold fsMoveRcpt
+  iexists h
+  iframe Hlb
+  ipureintro; exact fevTie_row i n ht hlk
 
-/-- Rocq's `ireg_top_retag_same`. -/
+/-- Rocq's `ireg_top_retag_same`: (NI M3 private files FS-1) the TYPED ROW
+is unchanged (`ftopRow n = ftopRow n'`, which gives the view's), so the
+ledger is untouched. -/
 theorem iregTopRetag_same [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (habs : absOf n = absOf n') (hloc : InodeLocal i n') :
+    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hrow : ftopRow n = ftopRow n') (hloc : InodeLocal i n') :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
       topFrag (fsGammaL γfs) i n -∗ |={E}=> topFrag (fsGammaL γfs) i n' := by
   iintro #Hi #Hai Hf
-  iapply (iregTopRetag_gen E γfs i n n' hE hloc) $$ Hi Hai [] Hf
+  imod (iregTopRetag_gen E γfs i n n' [] hE hloc
+    (fun h I hi ht => by simpa using fevTie_same i n n' hi hrow ht)) $$ Hi Hai [] Hf with ⟨Hf, -⟩
+  · iintro %I %hin Hp
+    rw [absView_insert_same I i n n' hin (absOf_of_ftopRow hrow)]
+    iexact Hp
+  imodintro
+  iexact Hf
+
+/-- (NI M3 private files FS-1) **A VIEW-PRESERVING MOVE THAT IS AN EVENT**:
+the view does not move (`absOf n = absOf n'`: both records absent from it)
+but the typed row does -- iput's free (a typed orphan to a free record,
+`Fev.free`) and ilock's claim fill (a free record to a typed claim box,
+`Fev.claim`).  The events are the caller's; the receipt comes out. -/
+theorem iregTopRetag_ev [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : FsNode)
+    (evs : List Fev) (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (habs : absOf n = absOf n')
+    (hloc : InodeLocal i n')
+    (hev : ∀ (h : List Fev) (I : RegMapF FsNode), PartialMap.get? I i = some n → fevTie h I →
+      fevTie (h ++ evs) (PartialMap.insert I i n')) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
+      topFrag (fsGammaL γfs) i n -∗ |={E}=> topFrag (fsGammaL γfs) i n' ∗
+        fsMoveRcpt γfs evs i n := by
+  iintro #Hi #Hai Hf
+  iapply (iregTopRetag_gen E γfs i n n' evs hE hloc hev) $$ Hi Hai [] Hf
   iintro %I %hin Hp
   rw [absView_insert_same I i n n' hin habs]
   iexact Hp
@@ -800,32 +893,39 @@ theorem iregTopRetag_same [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' :
 /-- ...and the SUSPENDED form: the walk holds a receipt naming this inum,
 so the row says nothing about it and the new node may be anything.  The
 application's claim is owed all the same (Rocq's
-`ireg_top_retag_armed_gen`). -/
+`ireg_top_retag_armed_gen`), and (NI M3 private files FS-1) the ledger the
+move's events. -/
 theorem iregTopRetag_armed_gen [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) (q : Qp)
-    (S : Std.ExtTreeSet Nat compare) (i : Nat) (n n' : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S) :
+    (S : Std.ExtTreeSet Nat compare) (i : Nat) (n n' : FsNode) (evs : List Fev)
+    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S)
+    (hev : ∀ (h : List Fev) (I : RegMapF FsNode), PartialMap.get? I i = some n → fevTie h I →
+      fevTie (h ++ evs) (PartialMap.insert I i n')) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
       (∀ I : RegMapF FsNode, ⌜PartialMap.get? I i = some n⌝ -∗
         ▷ appPred appRun (absView I) -∗
         ▷ appPred appRun (absView (PartialMap.insert I i n'))) -∗
       topFrag (fsGammaL γfs) i n -∗
-      |={E}=> (iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n') := by
+      |={E}=> (iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗
+        fsMoveRcpt γfs evs i n) := by
   iintro #Hi #Hai Hrec Hstep Hf
   unfold ftopInv iregArmed
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
   ihave %hAt := ghost_map_lookup $$ Hla Hrec
   unfold topFrag fsGammaL
+  ihave %hlk := ghost_map_lookup $$ Ha Hf
   imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' (appN_sub_ftop E hE)) $$ Hai [Hstep] Ha Hf
     with ⟨Ha, Hf⟩
   · iintro %hi Hp
     imodintro
     iapply Hstep $$ %I %hi Hp
-  imod Hclose $$ [Ha Hla Hpark]
+  imod ftopLed_step γfs I (PartialMap.insert I i n') evs (fun h ht => hev h I hlk ht) $$ Hled
+    with ⟨Hled, ⟨%h, %ht, #Hlb⟩⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I i n', A
-    iframe Ha Hla Hpark
+    iframe Ha Hla Hpark Hled
     ipureintro
     intro j m hj hun
     by_cases hji : i = j
@@ -836,19 +936,28 @@ theorem iregTopRetag_armed_gen [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) 
       exact hcl j m hj hun
   imodintro
   iframe Hrec Hf
+  unfold fsMoveRcpt
+  iexists h
+  iframe Hlb
+  ipureintro; exact fevTie_row i n ht hlk
 
-/-- Rocq's `ireg_top_retag_armed_same`. -/
+/-- Rocq's `ireg_top_retag_armed_same`: (NI M3 private files FS-1) at an
+unchanged typed row. -/
 theorem iregTopRetag_armed_same [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) (q : Qp)
     (S : Std.ExtTreeSet Nat compare) (i : Nat) (n n' : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S) (habs : absOf n = absOf n') :
+    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S) (hrow : ftopRow n = ftopRow n') :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
       topFrag (fsGammaL γfs) i n -∗
       |={E}=> (iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n') := by
   iintro #Hi #Hai Hrec Hf
-  iapply (iregTopRetag_armed_gen E γfs k t q S i n n' hE hin) $$ Hi Hai Hrec [] Hf
-  iintro %I %hlk Hp
-  rw [absView_insert_same I i n n' hlk habs]
-  iexact Hp
+  imod (iregTopRetag_armed_gen E γfs k t q S i n n' [] hE hin
+    (fun h I hi ht => by simpa using fevTie_same i n n' hi hrow ht)) $$ Hi Hai Hrec [] Hf
+    with ⟨Hrec, Hf, -⟩
+  · iintro %I %hlk Hp
+    rw [absView_insert_same I i n n' hlk (absOf_of_ftopRow hrow)]
+    iexact Hp
+  imodintro
+  iframe Hrec Hf
 
 end Retag
 

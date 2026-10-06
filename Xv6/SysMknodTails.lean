@@ -84,14 +84,16 @@ theorem sys_mknod_out_fail (A : SysMknodArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extS
   iintro ⟨Hblk, Hbs, Hir, Hf⟩
   unfold sysMknodOut
   iframe Hbs Hir
-  iexists P2
-  isplitr
-  · ipureintro; exact hP2
-  iframe Hblk
-  unfold mknodArms
-  iright
-  iframe Hf
-  ipureintro; rfl
+  isplitl [Hblk Hf]
+  · iexists P2
+    isplitr
+    · ipureintro; exact hP2
+    iframe Hblk
+    unfold mknodArms
+    iright
+    iframe Hf
+    ipureintro; rfl
+  · unfold mknodRcptAt; ileft; ipureintro; decide
 
 /-- ret 0: the block at the grown descriptor, the allowances whole, the
 receipt the caller built. -/
@@ -99,19 +101,22 @@ theorem sys_mknod_out_ok (A : SysMknodArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz 
     procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
       bslots 3 ∗ irefSlots A.ns ∗
       mknodPostOk (hlc := hlc) (fsGammaL fscFs) (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (devArg A.v1)
-        (devArg A.v2) A.P A.Farm A.Fun A.Fok A.Fex ⊢
+        (devArg A.v2) A.P A.Farm A.Fun A.Fok A.Fex ∗
+      (∃ i : Nat, creOkRcpt fscFs (procAddr A.j) true i) ⊢
     sysMknodOut A 0#64 := by
-  iintro ⟨Hblk, Hbs, Hir, Hok⟩
+  iintro ⟨Hblk, Hbs, Hir, Hok, #Hcr⟩
   unfold sysMknodOut
   iframe Hbs Hir
-  iexists P2
-  isplitr
-  · ipureintro; exact hP2
-  iframe Hblk
-  unfold mknodArms
-  ileft
-  iframe Hok
-  ipureintro; rfl
+  isplitl [Hblk Hok]
+  · iexists P2
+    isplitr
+    · ipureintro; exact hP2
+    iframe Hblk
+    unfold mknodArms
+    ileft
+    iframe Hok
+    ipureintro; rfl
+  · unfold mknodRcptAt; iright; iexact Hcr
 
 /-! ## The -1 tail: `+0x58` -/
 
@@ -197,9 +202,10 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     createLocked A.pid kk qi s g inum dn bm ∗
     bslots 3 ∗ irefSlots ns1 ∗ logOpS icfgLog n Sb ∗
     mknodPostOk (hlc := hlc) (fsGammaL fscFs) (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (devArg A.v1)
-      (devArg A.v2) A.P A.Farm A.Fun A.Fok A.Fex
+      (devArg A.v2) A.P A.Farm A.Fun A.Fok A.Fex ∗
+    (∃ i : Nat, creOkRcpt fscFs (procAddr A.j) true i)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hcells, Hbuf, Hlow, Hte, Hce, #Henv, Hblk, HΦ, Hlk, Hbs, Hir, Hop, Hok⟩
+  iintro ⟨Hk, Hpc, Hcells, Hbuf, Hlow, Hte, Hce, #Henv, Hblk, HΦ, Hlk, Hbs, Hir, Hop, Hok, #Hcr⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨-, -, -, hKe, -, hKup⟩ := sys_mknod_K _ hK
   unfold createLocked
@@ -255,7 +261,7 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   ihave Hslot := (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl) $$ Hslot
   ihave Hir := irefSlots_combine ns1 1 $$ [$Hir $Hslot]
   ihave Hir := (show irefSlots (GF := GF) (ns1 + 1) ⊢ irefSlots A.ns from by rw [hns1]) $$ Hir
-  ihave Hout := sys_mknod_out_ok A P2 hP2 $$ [$Hblk $Hbs $Hir $Hok]
+  ihave Hout := sys_mknod_out_ok A P2 hP2 $$ [$Hblk $Hbs $Hir $Hok $Hcr]
   iapply (sys_mknod_exit cpu k A spie2 spp2 _ hK hp3 hal)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hlow $Hte $Hce $HΦ Hout]
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]

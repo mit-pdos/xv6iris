@@ -224,7 +224,7 @@ theorem sys_open_walk_tested (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
         repeat (refine sysOpenPins_set _ _ _ _ _ _ _ ?_ (by decide))
         exact hpins
       -- (NI M3 FS-0) the node's type or the mode refused it
-      ihave Hw := openWhyRcpt_intro (GF := GF) fscFs (procAddr A.j) .refused
+      ihave Hw := openWhyRcpt_tag (GF := GF) fscFs (procAddr A.j) .refused (by decide)
       iapply sys_open_fail_ret k A P2 nsj pl inum dn bm data hct hE.1 hE.2 .refused
       iframe
       try iexact Hw
@@ -285,6 +285,9 @@ theorem sys_open_walk_dead (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
   ispecialize Hpost $$ %c'
   unfold sysOpenPostP sysOpenK
   iapply Hpost $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hisl
+    [Hpriv Hfrags Hfds Hdead Hoc Htc] []
+  rotate_right
+  · iapply openRcptAt_of; rw [hr]; decide
   iapply (sys_open_arm_dead (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) (R' 10#5)
       pl hpl hr)

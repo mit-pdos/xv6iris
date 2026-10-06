@@ -473,8 +473,8 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   imod (ufDex_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) (DFrac.own 1) A.Fex dinum.toNat
       (BitVec.setWidth 32 (dirInum datd kk)).toNat (bname 14 nf) (eraNode dnd bmd datd)
       (eraNode dni bmi dati) ufNd_top (mkfEra_is_dir dnd bmd datd htyz) hnld hnm
-      (mkfEra_is_dir dni bmi dati htyi) hnli hne)
-    $$ Hftop Hx Htop Htopi with ⟨Htop, Htopi, ⟨%av, %hrowd, %hnm', %hrowt, %hne', Hrecv⟩⟩
+      (mkfEra_is_dir dni bmi dati htyi) hnli hne k.proc)
+    $$ Hftop Hx Htop Htopi with ⟨Htop, Htopi, -, ⟨%av, %hrowd, %hnm', %hrowt, %hne', Hrecv⟩⟩
   imodintro
   rw [← topFrag_1, ← topFrag_1]
   ihave HP := (show A.P (npElems pl).length dinum.toNat ⊢ A.P (nparElems pl).length dinum.toNat

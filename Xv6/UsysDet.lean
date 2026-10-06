@@ -203,6 +203,7 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
    `if forkOk` (the design's two bumps under one `if`; equal).
 -/
 import Xv6.UexecRound
+import Xv6.NiFs
 
 namespace Xv6
 
@@ -233,12 +234,18 @@ structure UIota where
   cacc : List (BitVec 8) := []
   /-- (NI M3 NI-OUT) the round's pushed bytes' indices in it -- the round's own, like `act` -/
   cpos : List Nat := []
+  /-- (NI M3 private files FS-1) a prefix of the era's FS-EVENT LEDGER
+  (`FsLedger.fsLedLb` at `fscFs.fev`) -/
+  fev : List Fev := []
+  /-- (NI M3 private files FS-1) the round's own events' positions in it --
+  the round's own, like `cpos` -/
+  fpos : List Nat := []
 
 /-- The empty prefix (the boot's). -/
-def UIota.boot : UIota := ⟨[], [], [], 0, 0#64, [], [], []⟩
+def UIota.boot : UIota := ⟨[], [], [], 0, 0#64, [], [], [], [], []⟩
 
 /-- the ledger part (what every answer reads) -/
-def UIota.led (ι : UIota) : UIota := { ι with cacc := [], cpos := [] }
+def UIota.led (ι : UIota) : UIota := { ι with cacc := [], cpos := [], fpos := [] }
 
 /-- (NI M3 quotas Q-3) **The ledger part without the allocator**: what every
 answer reads on the quota kernel (`usysDet_ledQ`). -/

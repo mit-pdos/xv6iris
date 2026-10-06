@@ -343,6 +343,7 @@ end Env
 
 section Arms
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [OffboxG GF] [Appcfg GF]
+  [Xv6G GF]
 
 /-- ret n (`0 ≤ n`): every byte landed (Rocq `write_post_ok_at`).  The
 fired chunks concatenate to the whole count, their concatenation IS the
@@ -485,6 +486,40 @@ theorem fwWhyAt_why (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd)
   unfold fwWhyAt
   rcases st with _ | ⟨rb, _ | _, _ | ⟨i, γo, om⟩ | mj⟩ <;> try (iintro -; iempintro)
   iintro Hw -; iright; iexists w; iexact Hw
+
+/-- (NI M3 private files FS-1) **THE WRITE'S LEDGER RECEIPT**, relayed to the
+post: at a writable inode descriptor, the chunks that moved the row, one
+`write` block per chunk at its own position (`FsLedger.fwChunks`); other
+descriptors carry nothing. -/
+def fwRcptAt (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (r : BitVec 64) : IProp GF :=
+  match st with
+  | .open _ true (.inode i γo _) =>
+    iprop(∃ cs : List Fev, fwChunks γfs act i γo cs ∗ ⌜r ≠ -1#64 → fwSum cs = n.toNat⌝)
+  | _ => iprop(True)
+
+instance fwRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (r : BitVec 64) :
+    Persistent (fwRcptAt (GF := GF) γfs act st n r) := by
+  unfold fwRcptAt
+  rcases st with _ | ⟨rb, _ | _, t⟩ <;> try infer_instance
+  cases t <;> infer_instance
+
+/-- no chunk landed: a `-1`, a zero (or negative) count, or no writable inode -/
+theorem fwRcptAt_nil (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (r : BitVec 64)
+    (h : r = -1#64 ∨ n.toNat = 0 ∨ ∀ rb i γo om, st ≠ .open rb true (.inode i γo om)) :
+    ⊢@{IProp GF} fwRcptAt γfs act st n r := by
+  unfold fwRcptAt
+  rcases st with _ | ⟨rb, _ | _, t⟩ <;> try (ipureintro; trivial)
+  cases t with
+  | inode i γo om =>
+    rcases h with h | h | h
+    · iexists []; isplitl
+      · iapply fwChunks_nil
+      · ipureintro; intro hr; exact absurd h hr
+    · iexists []; isplitl
+      · iapply fwChunks_nil
+      · ipureintro; intro _; simp [fwSum, h]
+    · exact absurd rfl (h rb i γo om)
+  | _ => ipureintro; trivial
 
 end Arms
 
@@ -837,6 +872,8 @@ def filewritePost (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (f
     filewriteArms (hlc := hlc) V.gen V.upt st n (writerImg V.upt M) (k.regs 11#5) Q Qe (R' 10#5) -∗
     -- (NI M3 FS-0) ...AND WHY a writable inode's `-1`
     fwWhyAt fscFs k.proc st V.upt (k.regs 11#5) n (R' 10#5) -∗
+    -- (NI M3 private files FS-1) ...AND THE CHUNKS' LEDGER RECEIPTS
+    fwRcptAt fscFs k.proc st n (R' 10#5) -∗
     wpLoop cpu')
 
 end Post

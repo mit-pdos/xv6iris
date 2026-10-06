@@ -401,8 +401,8 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   icases Hcm with ⟨Hltgtc, Hlent, Hcmu⟩
   iapply wpLoop_fupd
   imod (lfTgt_fire (hlc := hlc) fscFs ⊤ A.Ftgt inum.toNat (eraNode dn bm data)
-      (eraNode (sysLinkInc dn) bm data) ufNd_top hloc hnzt hokt habs') $$ Hftop Happ Hltgtc Ht
-    with ⟨Ht, %av, %hav, %hokav, Hrcv⟩
+      (eraNode (sysLinkInc dn) bm data) ufNd_top hloc hnzt hokt habs' k.proc) $$ Hftop Happ Hltgtc Ht
+    with ⟨Ht, -, %av, %hav, %hokav, Hrcv⟩
   imodintro
   ihave Hltgt : ltgtFired A.Ftgt inum.toNat $$ [Hrcv]
   · unfold ltgtFired

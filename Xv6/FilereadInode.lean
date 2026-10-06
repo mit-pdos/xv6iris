@@ -128,7 +128,8 @@ def frdK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat
     fileRef γ fk q st -∗ procPrivExtEv (procAddr j) pid V P' M' -∗
     genHalvesPriv (procAddr j) pid V.gen -∗
     filereadEnvOut (hlc := hlc) st -∗
-    filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin Rp Rpe P (R' 10#5) M' (k.regs 11#5) -∗ wpLoop c)
+    filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin Rp Rpe P (R' 10#5) M' (k.regs 11#5) -∗
+    freadRcptAt fscFs k.proc st (R' 10#5) -∗ wpLoop c)
 
 /-! ## The lock-held ghost steps -/
 
@@ -196,7 +197,7 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
     (dd : Nat) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (wb : Bool) (om : OffMode)
     (hip : C.ip = ientry ik) (hik : ik < NINODE) (hq : MachCSL.qsum m = q.val)
     (hok : inodeOk fscCov fscLogst dn bm data) (hloc : InodeLocal inum.toNat (eraNode dn bm data))
-    (hwf : offWf v) (hcap : v.toNat + dd ≤ MAXFILE * BSIZE) :
+    (hwf : offWf v) (hcap : v.toNat + dd ≤ MAXFILE * BSIZE) (act : BitVec 64) :
     ownCtx cpu curCtx ∗ fsReady (hlc := hlc) ∗
       foffRow (GF := GF) (.open true wb (.inode inum.toNat γo om)) ∗
       areadInOm (hlc := hlc) om (fsGammaL fscFs) appE inum.toNat γo F ∗
@@ -208,6 +209,8 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
       inodeBlocksQ fscFs (DFrac.own Qp.quarter) bm data ⊢
       |={⊤}=> ownCtx cpu curCtx ∗ offFd fk q γb γo C ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
         icDepHeld fscFs fscIreg fscCov fscLogst (.depRd s icfgDev inum g lo) ik inum dn bm ∗
+        -- (NI M3 private files FS-1) the read's event, at the row it read
+        fsObsAt fscFs (.read act inum.toNat γo dd) inum.toNat (absRow (eraNode dn bm data)) ∗
         ∃ av : Aview, ⌜arowAt av inum.toNat (absRow (eraNode dn bm data))⌝ ∗
           F.pfRecv av v.toNat (absRow (eraNode dn bm data)) dd := by
   have hw : (filerwOffW v dd).toNat = v.toNat + dd :=
@@ -223,7 +226,7 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
   -- THE ONE FIRE, AT THE ROW'S MODE (Rocq lane OFF-LINK-5's
   -- `arf_read_fire_om`): the row itself goes in, and the mode is read there
   imod (arfRead_fire_om om fscFs ⊤ (DFrac.own Qp.quarter) F inum.toNat γo v.toNat dd true wb
-    (eraNode dn bm data) hE hwf hsz hnz) $$ Hft Hrow Hcm Htop Hgv with ⟨Htop, Hgv, Hav⟩
+    (eraNode dn bm data) hE hwf hsz hnz act) $$ Hft Hrow Hcm Htop Hgv with ⟨Htop, Hgv, #Hrc, Hav⟩
   -- CHECK IN the cell: the half came back at exactly its word
   ihave Hres := offResident_of curCtx γo fk (filerwOffW v dd) hwf' $$ [Hcell] [Hgv]
   · rw [wordAtN_cur]; unfold aFoff; iexact Hcell
@@ -240,6 +243,9 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
     $$ Hind Hblk Htop
   imodintro
   iframe Hrun Hoffd Hrows Hav
+  isplitl [Hmeta Haddrs Hq]
+  rotate_left
+  · iapply fsObsRcpt_at _ _ _ _ hnz $$ Hrc
   unfold icDepHeld
   simp only [icDepRd, ↓reduceIte]
   unfold icRdHeld

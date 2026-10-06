@@ -356,6 +356,16 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- (NI M3 private files FS-1) **MKNOD'S LEDGER RECEIPT**, relayed to the
+post: a `0` answer names the made node's arm and its parent leg, by the
+caller, in the era's ledger. -/
+def mknodRcptAt (γfs : FsNames) (act : BitVec 64) (r : BitVec 64) : IProp GF :=
+  iprop(⌜r ≠ 0#64⌝ ∨ ∃ i : Nat, creOkRcpt γfs act true i)
+
+instance mknodRcptAt_persistent (γfs : FsNames) (act r : BitVec 64) :
+    Persistent (mknodRcptAt (GF := GF) γfs act r) := by
+  unfold mknodRcptAt; infer_instance
+
 /-- **THE CONTRACT'S CONTINUATION** (the `wp_next true pj (…)` body of
 Rocq's `wp_sys_mknod_frame`): the registers, the complement, the two
 allowances whole (the reference ledger closes EXACTLY), the block back at
@@ -383,6 +393,8 @@ def sysMknodK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     -- the armed post (implies `sysMknodRet`)
     mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) pv
       ma mi P Pmiss Farm Fun Fok Fex (R' 10#5) -∗
+    -- (NI M3 private files FS-1) ...and the made node's ledger receipt
+    mknodRcptAt fscFs pa (R' 10#5) -∗
     wpLoop cpu')
 
 end

@@ -91,6 +91,7 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMkdirV1 A P2) (sysMkdirM1 A P2) ∗
     (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
+    creRcptAt fscFs (procAddr A.j) ok made inum.toNat ∗
     (if ok then
       iprop(⌜R 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧
           creOkPure T_DIR (0#16) (0#16) made dn⌝ ∗
@@ -102,7 +103,7 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
         creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Pmiss
           A.Farm A.Fdots A.Fun A.Fok A.Fex (bview pl.length (sysfilePfun pl)) (procAddr A.j)))
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Harm⟩
+  iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, #Hcr, Harm⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hbuf := sysfile_buf_join _ pl rest hlen $$ [$Hp $Hrest]
   cases ok
@@ -140,6 +141,10 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
         (bview pl.length (sysfilePfun pl)) inum.toNat hj hproc hK hnoff htier hct hpins h10 hal hP2
         hkk hnib (hf rfl) hns')
       $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hlk $Harms]
+    unfold creRcptAt
+    icases Hcr with (%h | #Hcr)
+    · cases h
+    · iexact Hcr
 
 /-! ## +0x1a: argstr came back -/
 
@@ -246,7 +251,7 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     case c3 => k_norm_g <;> decide
     unfold sysMkdirCreateK
     iintro %cpu %spie1 %spp1 %R1 %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs1 Hk Hpc
-      Hte Hce Hblk Hp Hbs %hns' Hir %⟨-, -, hf⟩ Hop Harm
+      Hte Hce Hblk Hp Hbs %hns' Hir %⟨-, -, hf⟩ Hop #Hcr Harm
     k_norm_g [sys_mkdir_ret_2c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
     ihave Hp := (show byteBuf (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFF70#64) (DFrac.own 1)
         (bview (pl'.length + 1) (sysfilePfun pl')) ⊢
@@ -260,7 +265,7 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
       rw [List.length_drop]; omega
     iapply (sys_mkdir_created IUP EO Γ cpu k A P2 spie1 spp1 R1 pl' _ ok made kk qi s g inum dn bm
         u' Sb' ns' hj hproc hK hnoff htier hct hp1 hal hP2 hlen hns' hf)
-      $$ [$Hk $Hpc $Hcells $Hp $Hrest $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop Harm]
+      $$ [$Hk $Hpc $Hcells $Hp $Hrest $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hcr Harm]
     cases ok
     · iexact Harm
     · iexact Harm

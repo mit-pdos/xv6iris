@@ -180,7 +180,7 @@ theorem il_fill_box [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (cov : ExtTreeSet Nat compare) (ls : Nat) (inum : BitVec 32) (ds : List Dinode)
     (o : Ilkc) (g : GName) (hfills : ilkFills o)
     (hin : (inum.toNat : Int) < 16 * (nib : Int)) (hwf : diblkWf ds)
-    (hnz : ds[islot inum]!.diType.toNat ≠ 0) :
+    (hnz : ds[islot inum]!.diType.toNat ≠ 0) (act : BitVec 64) :
     iregInv (hlc := hlc) (GF := GF) γi γfs inodestart nib ⊢
       imark γi (inum.toNat : Int) -∗ iregWdLic o g inum.toNat -∗
       (γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half} (diblkBytes ds)) -∗
@@ -208,8 +208,19 @@ theorem il_fill_box [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     exact hnl
   ihave #Hft := iregInv_ftop γi γfs inodestart nib $$ Hinv
   ihave #Hap := iregInv_app γi γfs inodestart nib $$ Hinv
-  imod iregTopRetag_same ⊤ γfs inum.toNat n0 _ CoPset.subseteq_top habs hloc $$ Hft Hap Htop
-    with Htop
+  -- (NI M3 private files FS-1) THE CLAIM BOX BECOMES A TYPED ROW: the
+  -- ledger's `claim` event, at nlink 0
+  have hnzb : fnType (eraNode ds[islot inum]! bmEmpty (fun _ => List.replicate BSIZE 0)) ≠ 0 := by
+    unfold fnType; rw [eraNode_rec]; exact hnz
+  have hnlb : fnNlink (eraNode ds[islot inum]! bmEmpty (fun _ => List.replicate BSIZE 0)) = 0 := by
+    unfold fnNlink; rw [eraNode_rec]; exact hnl
+  imod iregTopRetag_ev ⊤ γfs inum.toNat n0 _
+    [.claim act inum.toNat (fnodeOf (absNode (eraNode ds[islot inum]! bmEmpty
+      (fun _ => List.replicate BSIZE 0))))] CoPset.subseteq_top habs hloc
+    (fun h I _ ht => fevTie_move _ _ _ ht (by
+      rw [fevRows_claim, ftopRow_typed _ hnzb]
+      simp only [absRow, hnlb]))
+    $$ Hft Hap Htop with ⟨Htop, -⟩
   imodintro
   iframe HL
   unfold ilFillOut
@@ -243,7 +254,7 @@ theorem il_fill_box [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
 theorem il_fill [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (cov : ExtTreeSet Nat compare) (ls : Nat) (inum : BitVec 32) (ds : List Dinode)
     (o : Ilkc) (g : GName) (hfills : ilkFills o)
-    (hin : (inum.toNat : Int) < 16 * (nib : Int)) (hwf : diblkWf ds) :
+    (hin : (inum.toNat : Int) < 16 * (nib : Int)) (hwf : diblkWf ds) (act : BitVec 64) :
     iregInv (hlc := hlc) (GF := GF) γi γfs inodestart nib ⊢
       ipoolShapeNp γfs γi cov ls inum -∗ iregWdLic o g inum.toNat -∗
       (γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half} (diblkBytes ds)) -∗
@@ -261,7 +272,7 @@ theorem il_fill [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
       iright
       ipureintro
       exact ht0
-    · iapply il_fill_box γi γfs inodestart nib cov ls inum ds o g hfills hin hwf ht0 $$ Hinv Hmk
+    · iapply il_fill_box γi γfs inodestart nib cov ls inum ds o g hfills hin hwf ht0 act $$ Hinv Hmk
         Hcl HL
 
 end Fill

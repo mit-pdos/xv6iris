@@ -7246,6 +7246,126 @@ write at a lazy-free key on a writable console descriptor, pause, close, dup}.
 
 What remains in M3 private files: FS-0 + FS-1 (one worktree), FS-2a, FS-2b, FS-3/4; FS-2c optional.
 
+### M3 private files FS-0 as landed
+
+On `lane/pfiles`, commit `d7894c3d0` (rulings FS-R3, R5; design F7 (a)-(d)). The fs failures carry their
+reasons and fstat's bytes are named; no kernel change; the user tier byte-identical.
+
+- **(a) Out-of-blocks relayed.** `SpecWritei.WriteiOut.full` (a short count at no disturbed tail is bmap's
+  `0`), `WriteiDefs.WiSizeOk.full`; `SpecDirlink.dlFullWhy bm' off := MAXFILE*BSIZE < off+16 ∨ the block 0`
+  and `DirlinkOut.full`; writei's builders (`WriteiStep`/`Main`/`Tail`/`Loop`), dirlink's (`DirlinkWrite`/
+  `DirlinkFound`).
+- **(b) create's failure arm split.** `SpecCreate.CreWhy` (`nlink | seen | root | dirFull | full why`),
+  `creWhyRcpt γfs act`, `creDlWhy`/`creWhyOfDl`; `creFailArms` gains the actor and `∃ w, creWhyRcpt γfs act w`
+  in its right disjunct; every create half passes its reason (A-FAIL `.full .inodes`, the entries' dirlink).
+- **(c) open's reasons.** `SpecSysOpen.OpenWhy` (`refused | nofile | full`), `openWhyRcpt`; the fail posts
+  carry `(act)` and the reason (E-FAIL `.full`, F-FAIL `.nofile`, the walk's `.refused`, create's `CreWhy`).
+  mkdir's arms bind the actor; mknod drops the reason (`mknodPostFail` is consumed by `UInitCons`).
+- **(d) write's `-1`, fstat's bytes.** `SpecFilewrite.FwWhy` (`src | max | full`), `fwWhyAt` as a final premise
+  of `filewritePost`/`sysWritePost`; `SpecFilestat.fstatBytes`/`fstatRun`/`fdInumIs`, `filestatNamed` in
+  `filestatPost`, `sysFstatNamed` in `sysFstatPost` (fstat's 4-byte hole is stale kernel stack: a recorded
+  channel, not named).
+- `Xv6/NiFs.lean` (`FsFull`), `Xv6/FsLedger.lean` (a placeholder receipt FS-1 replaced).
+- Baselines unchanged (tcb no diff, audit 14 PASS); dead code clean.
+
+### M3 private files FS-1 as landed (2026-10-06)
+
+On `lane/pfiles` (rulings FS-R2, R3; coordinator rulings of 2026-10-06: (A) below, the two NI-trace moves).
+The fs-event ledger lands: one mono-list per era keyed by inode number, its authority in `ftopBody` beside the
+kernel's half of the top map, TIED to the typed rows; the fire lemmas append at the move's instant with the
+actor; the receipts reach the syscall posts; the seventh anchored name. No kernel change; the fourteen roots,
+`SYSCALL`/`USERTRAP`/`USERRET`/`USER`, `SyscRows`, `NiStep` and every `Uk*`/`User*` file byte-identical.
+
+**The vocabulary (`NiFs`, pure, TCB).** `Fnode` (`file bs | dir (ents : ExtTreeMap) | dev ma mi`), `Frows`,
+`Fev` (`boot s | claim act i n | arm act i n | ent act d nm (t : Option Nat) | nlink act i nl |
+write act i γo off bs r | trunc act i | free act i | hop act d nm | open act i γo | read act i γo n |
+stat act i | full act why`), `fevStep`/`fevRun` (rows and every struct file's offset), `fevRows`, the readings
+FS-2 reads (`fevOff`, `fevContent`, `fevReadBytes`, `fevHop`, `fevStatOf`; dead-allowed "FS-2 reaches"),
+`fevObs`, the fold's algebra. The footprints (`FsFoot`, `fevOn`, `fevPrivate`, `fevClosed`) are FS-4's.
+
+**The tie (`FsLedger`, `InodeRegionInv`).** `ftopRow n := if fnType n = 0 then none else some (fnodeOf
+(absNode n), fnNlink n)`; `fevTie h I := fevRows h = ftopRows I` (EXACT); `ftopLed γfs I := ∃ h, fsLedAuth γfs h
+∗ ⌜fevTie h I⌝` is `ftopBody`'s last conjunct. `ftopAlloc` appends `boot (ftopRows I)` at the era's mint; every
+retag moves through `iregTopRetag_gen`/`_armed_gen` with the appended events and a tie proof (`_same` takes
+`ftopRow n = ftopRow n'`). Receipts: `fsEvRcpt γfs h e := fsLedLb γfs (h ++ [e])`, `fsObsRcpt` / `fsMoveRcpt`
+(the prefix's fold holds the row moved from), `fsObsAt` (at the abstract row), `fsLedAt γfs evs` (the block
+`evs` contiguous in the ledger, the posts' shape), `fsFullRcpt`; `ftopFull`/`ftopObs` record a verdict / a
+row-free observation from `ftopInv` alone (`fsReady_full`/`_obs`).
+
+**The appends (the actor is the caller's `k.proc`, passed as an explicit `act` to every fire).**
+- ilock's fill: `claim act i n` (`IlockFill`/`IlockBlk`/`IlockLoad`); iput's free: `free act i`
+  (`EscrowDeposit`, `IputOfflock`).
+- read: `read act i γo d` at the row it read (`arfRead_fire*`, `frd_post_ghost`).
+- write: one `write act i γo off bs r` per chunk that moved the row (`wrfFire_core` and its four wrappers,
+  `fwrSt_fire_full/part`, `fwr_fire`).
+- open: O_TRUNC's `trunc act i` (`opfAtrunc_fire`); the install `open act i γo` (`sys_open_stores_pub`, every
+  opened descriptor, device rows included).
+- fstat: `stat act inum` at stati's instant (`filestat_stat`).
+- create: `arm act i (fnodeOf c)`, mkdir's dots (`dotsEvs`), the parent leg `ent act d nm (some i)` +
+  `nlink act d _`, the unarm `nlink act i 0`, the dirlookup hops `hop act d nm` (create's found arm, unlink's
+  two lookups).
+- link: `nlink` (+1) and `ent` (`lfTgt_fire`/`lfEnt_fire`, and the undo through `ufUtgt_fire`).
+- unlink: the parent leg `ent act d nm none` + `nlink act d _`, the target's `nlink act t _`.
+- the verdicts: `full act .inodes` (create's A-FAIL), `full act .blocks` (a write's out-of-blocks short chunk,
+  an entry's dirlink), `full act .files` (open's E-FAIL); FS-0's reason receipts are now real.
+
+**The receipts at the posts, per syscall (what FS-2a/2b read; each a FINAL PREMISE of the post).**
+- read (`sysReadPost`): `freadRcptAt fscFs k.proc (sysFdSt v V.ofile sts) r := ⌜r = -1⌝ ∨ (on an
+  `.open true _ (.inode i γo _)` row) ∃ d a, ⌜r = ofNat d⌝ ∗ fsObsAt (.read act i γo d) i a`.
+- write (`sysWritePost`): `fwRcptAt fscFs k.proc st (argZ v2) r := (on a writable inode row)
+  ∃ cs, fwChunks act i γo cs ∗ ⌜r ≠ -1 → fwSum cs = n⌝` — ONE `fsLedAt [write …]` BLOCK PER CHUNK, each at
+  its own position (filewrite unlocks between chunks), the advances summing to the answer on success.
+- open (`sysOpenK`): `openRcptAt fscFs k.proc r := ⌜r = -1⌝ ∨ ∃ i γo tr, fsLedAt [.open act i γo] ∗
+  (⌜tr = false⌝ ∨ fsLedAt [.trunc act i])`.
+- fstat (`sysFstatPost`): `sysFstatRcpt fscFs k.proc r := ⌜r = -1⌝ ∨ ∃ inum, fsLedAt [.stat act inum]`
+  (filestat's `fstatRcptAt` ties `inum` to the row: `fdInumIs st inum`).
+- mkdir (`sysMkdirK`), mknod (`sysMknodK`): `⌜r ≠ 0⌝ ∨ ∃ i, creOkRcpt act true i` — the arm `∃ n,
+  fsLedAt [.arm act i n]` and the parent leg `∃ d nm nl, fsLedAt [.ent act d nm (some i), .nlink act d nl]`.
+  create's own post (`createPost`) carries `creRcptAt act ok made i` (made: arm + parent leg; found: the hop),
+  the arm's receipt riding `createDirty t i act` from the arm to the clear.
+- unlink (`sysUnlinkPost`): `unlinkRcptAt fscFs pa r := ⌜r ≠ 0⌝ ∨ unlParentRcpt act ∗ ∃ t nl,
+  fsLedAt [.nlink act t nl]`.
+- the reasons (FS-0's `creWhyRcpt`/`openWhyRcpt`/`fwWhyRcpt`) now carry `fsFullRcpt` = a real `full` event.
+
+**The seventh name.** `niNamesHere` + `fscFs.fev` (the ledger's name, `FsNames.fev`; the camera
+`MonoListG GF Fev` is `Xv6G.mlFevG`, GF slot 128 in `Xv6GF`/`UnionGF`); `niIotaLbs` + `((ns.getD 6 0) ↪◯ML
+ι.fev)`; `niBelow`/`niJoin`/`niBelow_join`/`_boot`/`_compat`/`_join` + `fev`; `UIota` + `fev : List Fev := []`,
+`fpos : List Nat := []` LAST, `UIota.led` erases `fpos` (keeps `fev`), `ledQ` keeps `fev`. Two moves outside the
+brief, accepted (F3's `NiPos.sev` precedent): `NiPos` + `fev : Nat` (`UIota.pos` + `ι.fev.length`), and
+`niBelowQ` + `ι.fev <+: H.fev` — positions must cover `fev` once `led`/`ledQ` keep it. The roots' meaning grows
+(vacuously today: every citation's `fev` is `[]`), their text byte-identical.
+
+**Deviations.** (1) The ledger name is `FsNames.fev` (camera in `Xv6G`), not `WchG.wfsName`: the user-tier
+receipt sections have no `WchG` (the `fsReadyKmem.pend` precedent). (2) `Fev.claim` (new): ialloc's claim made
+visible at ilock's fill, so the tie is EXACT (the design kept the claim out; then a claimed-but-unarmed inode is a
+typed row the fold lacks). (3) `write` carries `off` and the advance `r`; `read`'s `n` is the advance.
+(4) `Fnode.dir` is an `ExtTreeMap` (the view's own). (5) The fold's offsets are not tied to the real offsets
+(the offboxes are outside `ftopBody`): FS-2a ties them or reads the cited `fpos`. (6) NiFs enters
+`xv6PowerAdequacy`'s base through the `Xv6G` camera field, as SlotEv/KallocEv/PidEv/ZombEv before it
+(ruling (A)).
+
+**Gaps (FS-2a/2b/2c absorb them; nothing ticked).**
+- The namex hops are NOT appended: the walk's per-element lookups are the client's `axHop` pieces, fired in
+  `FsAbsWalk` / namex's proof across ~46 files; threading `act` through namex exceeds the bound. FS-2b's open
+  row (and chdir/mkdir's) needs them: the path's hops `hop act d nm` per element, start directory the cwd (or
+  the root for an absolute path).
+- open with O_CREATE: create's legs are in the ledger but their receipt is DROPPED at
+  `SysOpenEntryC.sys_open_cr_*` (the `createPost` receipt is not threaded through the join to
+  `sysOpenPubBody`); `openRcptAt`'s `i`/`γo` are not tied to the installed row (FS-2b ties them, or reads the
+  install off the cited prefix), nor `tr` to O_TRUNC's bit.
+- fstat: `sysFstatRcpt`'s `inum` is not tied to the descriptor at the syscall layer (it is at filestat's,
+  `fdInumIs`); a directory's raw size is not in the fold (FS-2's row stats files and devices only).
+- link's receipts stay DROPPED (FS-2c); unlink's two dirlookup hops (its `-1` arms) are dropped; the claim and
+  free receipts reach no post (no syscall answer reads them).
+- mknod's dropped failure reason (FS-0): `UInitCons` consumes `mknodPostFail`, a known gap.
+- The rows (`usysReadAns`, `usysFevOut`, …), `NiStep.round`'s `rt`/`fout`, `niBelowF`/`detInF` and the class
+  extension are FS-2/FS-3.
+
+**Baselines.** `tools/tcb/expected.json`: `Xv6.NiFs` enters the nine roots `xv6PowerAdequacy`, `xv6NiAdequacy`,
+`xv6NiTwoRun`, `xv6NiTwoRunObs`, `xv6NiStrongInstance`, `xv6NiOut`, `xv6NiPrefix`, `xv6NiDet`, `xv6NiDetQ`; no
+other module moves; no axiom or opaque. `tools/audit/baseline.json` unchanged (14 PASS). `dead_allow.txt` +
+eight rows "FS-2 reaches".
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

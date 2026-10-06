@@ -90,7 +90,9 @@ theorem frd_dev_m1_post (k : KCtx) (spie spp : Bool) (γ : FileNames) (fk : Nat)
   ihave Henv := frd_envout_dev true wb mj $$ Henv
   unfold frdK
   ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex]
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex] []
+  rotate_right
+  · iapply freadRcptAt_of_ne; intro _ _ _ _ h; cases h
   · ipureintro
     exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
   · unfold filereadArms
@@ -379,7 +381,9 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   ihave Henv := frd_envout_dev true wb CONSOLE $$ Henv
   unfold frdK
   iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen Henv
-    [HP Hrd Hwin Hks]
+    [HP Hrd Hwin Hks] []
+  rotate_right
+  · iapply freadRcptAt_of_ne; intro _ _ _ _ h; cases h
   · ipureintro; exact ⟨hcs, hext, hdle, hr10, hwin⟩
   unfold filereadArms
   rw [h10']

@@ -122,11 +122,12 @@ theorem srd_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
   have hm1 : R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 := by
     rw [h10']; try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]
   unfold sysReadPost
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) Hblk Hfr Hfso [HP]
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) Hblk Hfr Hfso [HP] []
   · ipureintro
     refine ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr (by rw [hm1]; decide),
       UMemL.umemWrote_refl _ _ _⟩
   · iapply sysReadArms_none F Rd Rin P Rp Rpe V v sts (argZ v2) (R' 10#5) M v1 hm1 hnone $$ HP
+  · rw [show R' 10#5 = -1#64 by rw [hm1]; decide]; iapply freadRcptAt_m1
 
 set_option maxHeartbeats 16000000 in
 /-- **Back from fileread**: the block rejoined at fileread's descriptor, the
@@ -155,10 +156,11 @@ theorem srd_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ fdFrags V.fdg sts ∗
     filereadEnvOut (hlc := hlc) st ∗ (filereadEnvOut (hlc := hlc) st -∗ filereadFsOut) ∗
     filereadArms (hlc := hlc) V.gen V.upt st (argZ v2) F Rd Rin Rp Rpe P (R 10#5) M' a1 ∗
+    freadRcptAt fscFs k.proc st (R 10#5) ∗
     (∀ c : CPU, sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst a1
-  iintro ⟨Hk, Hpc, Hcells, Hte, Hce, Hcore, Howe, Href, Hauth, Hfr, Henvo, Henvb, Harms, HΦ⟩
+  iintro ⟨Hk, Hpc, Hcells, Hte, Hce, Hcore, Howe, Href, Hauth, Hfr, Henvo, Henvb, Harms, #Hrr, HΦ⟩
   ihave Howe := procOfilesOwe_repay γ V.fdg (procAddr j) V.ofile [] fd0 kk q st (by simp) hfv hkk hst
     $$ [Howe Href Hauth]
   · iframe
@@ -172,11 +174,12 @@ theorem srd_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
   iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   unfold sysReadPost
   rw [← h10] at hr10
-  iapply HΦ $$ %c' %spie %spp %R' %P' %M' %d %kv [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfr Hfso [Harms]
+  iapply HΦ $$ %c' %spie %spp %R' %P' %M' %d %kv [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfr Hfso [Harms] []
   · ipureintro; exact ⟨hcs, hext, hd, hr10, hwin⟩
   · iapply (procPrivFd_split γ (procAddr j) pid { V.updEv kv with upt := P' } M').2
     iframe Hcore Howe
   · rw [h10]; iexact Harms
+  · rw [sysFdSt_some v V.ofile sts fd0 (fnode kk) st hsome hsts, h10]; iexact Hrr
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x3c`: `jal fileread`** over the LENT reference, the descriptor
@@ -251,7 +254,7 @@ theorem srd_ok_jal (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
   iintro %cpu
   unfold filereadPost
   iintro %spie3 %spp3 %R3 %P' %M' %d %kv %⟨hcs3, hext, hdle, hr10, hwin⟩ Hk Hpc Hte Hce Href %hkv
-    Hcore Henvo Harms
+    Hcore Henvo Harms #Hrr
   k_norm_g [srd_ret_40, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   k_norm_g [h11] at hwin
   have hr5 : srdRegs k R3 := by
@@ -260,7 +263,7 @@ theorem srd_ok_jal (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     exact hr
   iapply (srd_ok_back cpu k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P spie3 spp3 R3 fd0 kk q st P' M' d wf wp
       lo hi hK6 hr5 ht0 hsome hfv hkk hst hsts hext hdle hr10 hwin hal _ h11 kv hkv)
-    $$ [$Hk $Hpc $Hcells $Hte $Hce $Hcore $Howe $Href $Hauth $Hfr $Henvo $Henvb $Harms $HΦ]
+    $$ [$Hk $Hpc $Hcells $Hte $Hce $Hcore $Howe $Href $Hauth $Hfr $Henvo $Henvb $Harms $Hrr $HΦ]
 
 set_option maxHeartbeats 16000000 in
 /-- **argfd SUCCEEDED** (`a0 = 0`): `mv a5,a0`, the hoisted `li a0,-1`,

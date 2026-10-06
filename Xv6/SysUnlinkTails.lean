@@ -159,6 +159,7 @@ theorem sys_unlink_tail_b (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   · unfold sysUnlinkCells; iframe
   ihave Hout := sys_unlink_out_intro A k.proc P2 _ $$ [Hhole Hpid Hbs Hir Harms]
   · iframe
+    iapply unlinkRcptAt_m1; decide
   iapply (sys_unlink_exit cpu k A spie1 spp1 _ _ (k.regs 9#5) w₄ w₅ ok.hK hp2
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]) ok.hal)
     $$ [$Hk $Hpc $Hcells $Hbufs $Hte $Hce $Hout $HΦ]
@@ -251,6 +252,7 @@ theorem sys_unlink_tail_bad (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   ihave Hir := sys_unlink_ir_11 $$ [$Hir $Hslot]
   ihave Hout := sys_unlink_out_intro A k.proc P2 _ $$ [Hhole Hpid Hbs Hir Harms]
   · iframe
+    iapply unlinkRcptAt_m1; decide
   iapply (sys_unlink_exit cpu k A spie2 spp2 _ _ (k.regs 9#5) w₄ w₅ ok.hK hp3
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]) ok.hal)
     $$ [$Hk $Hpc $Hcells $Hbufs $Hte $Hce $Hout $HΦ]

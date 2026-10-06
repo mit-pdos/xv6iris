@@ -72,6 +72,7 @@ def sysMkdirCreateK (k' : KCtx) (se : Bool) (pj : BitVec 64) (plen : Nat) (pfun 
     irefSlots ns' -∗
     ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ u' ≤ u ∧ (ok = true → iputUnits ≤ u')⌝ -∗
     logOpS icfgLog u' Sb' -∗
+    creRcptAt fscFs pj ok made inum.toNat -∗
     (if ok then
       iprop(⌜R' 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧
           creOkPure ty major minor made dn⌝ ∗
@@ -146,10 +147,10 @@ theorem sys_mkdir_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   iintro %c %_
   unfold createPost
   iintro %spie %spp %R' %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs Hk Hpc Hte Hce
-    - - - - Hblk Hpath Hbs %hns' Hir %hf Hop Harm
+    - - - - Hblk Hpath Hbs %hns' Hir %hf Hop Hcr Harm
   unfold sysMkdirCreateK
   iapply HK $$ %c %spie %spp %R' %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs Hk Hpc
-    Hte Hce Hblk Hpath Hbs %hns' Hir %hf Hop Harm
+    Hte Hce Hblk Hpath Hbs %hns' Hir %hf Hop Hcr Harm
 
 /-! ## iunlockput (the created directory) -/
 

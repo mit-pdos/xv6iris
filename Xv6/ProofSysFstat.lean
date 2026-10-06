@@ -85,7 +85,9 @@ theorem sfs_fail_exit (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : B
   iframe
   iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   unfold sysFstatPost
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) Hblk
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) Hblk [Henv] []
+  rotate_right
+  · iapply sysFstatRcpt_m1; rw [h10', h10]
   · ipureintro
     refine ⟨hcs, Or.inl ⟨h10'.trans h10, hnone⟩, UMemL.extSz_refl _ _, Nat.zero_le _,
       UMemL.umemWrote_refl _ _ _, ⟨.closed, fun h => absurd h id, fun _ => rfl⟩⟩
@@ -110,9 +112,10 @@ theorem sfs_ok_exit (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     procPrivCoreNoctxAt curCtx (procAddr j) pid { V.updEv kv with upt := P' } M' ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [fd0] ∗
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ filestatFsOut (GF := GF) ∗
+    fstatRcptAt fscFs k.proc st (R 10#5) ∗
     (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hcore, Howe, Href, Hauth, Hfso, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hcore, Howe, Href, Hauth, Hfso, #Hsr, HΦ⟩
   ihave Howe := procOfilesOwe_repay γ V.fdg (procAddr j) V.ofile [] fd0 kk q st (by simp) hfv hkk hst
     $$ [Howe Href Hauth]
   · iframe
@@ -121,7 +124,9 @@ theorem sfs_ok_exit (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
   iframe
   iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   unfold sysFstatPost
-  iapply HΦ $$ %c' %spie %spp %R' %P' %M' %d %kv [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfso
+  iapply HΦ $$ %c' %spie %spp %R' %P' %M' %d %kv [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfso []
+  rotate_right
+  · rw [h10]; iapply sysFstatRcpt_of $$ Hsr
   · ipureintro
     exact ⟨hcs, Or.inr ⟨fd0, fnode kk, hsome, h10 ▸ hret⟩, hext, hd, hwin, ⟨st, hnamed⟩⟩
   · iapply (procPrivFd_split γ (procAddr j) pid { V.updEv kv with upt := P' } M').2
@@ -193,16 +198,16 @@ theorem sfs_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     procPrivCoreNoctxAt curCtx (procAddr j) pid { V.updEv kv with upt := P' } M' ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [fd0] ∗
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ filestatEnvOut st ∗
-    (filestatEnvOut st -∗ filestatFsOut (GF := GF)) ∗
+    (filestatEnvOut st -∗ filestatFsOut (GF := GF)) ∗ fstatRcptAt fscFs k.proc st (R 10#5) ∗
     (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hra, Hs0, Hcf, Hcs, Hte, Hce, Hcore, Howe, Href, Hauth, Henvo, Henvb, HΦ⟩
+  iintro ⟨Hk, Hpc, Hra, Hs0, Hcf, Hcs, Hte, Hce, Hcore, Howe, Href, Hauth, Henvo, Henvb, #Hsr, HΦ⟩
   ihave Hfso := Henvb $$ Henvo
   ihave Hframe := sfs_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) _ _ $$ [Hra Hs0 Hcf Hcs]
   · iframe
   iapply (sfs_ok_exit cpu k γ j pid V M v v1 spie spp R fd0 kk q st P' M' d hK4 hr hret hsome hfv
       hkk hst hext hd hwin hnamed kv hkv)
-    $$ [$Hk $Hpc $Hframe $Hte $Hce $Hcore $Howe $Href $Hauth $Hfso $HΦ]
+    $$ [$Hk $Hpc $Hframe $Hte $Hce $Hcore $Howe $Href $Hauth $Hfso $Hsr $HΦ]
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x2e`: `jal filestat`** over the LENT reference
@@ -259,7 +264,7 @@ theorem sfs_ok_jal (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
   iintro %cpu
   unfold filestatPost
   iintro %spie3 %spp3 %R3 %P' %M' %d %kv %⟨hcs3, hret, hext, hd, hwin, hnamed⟩ Hk Hpc Hte Hce Href %hkv Hpriv
-    Henvo
+    Henvo #Hsr
   k_norm_g [sfs_ret_32, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   k_norm_g [h11] at hwin
   k_norm_g [h11] at hnamed
@@ -269,7 +274,7 @@ theorem sfs_ok_jal (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     exact hr
   iapply (sfs_ok_back cpu k γ j pid V M v v1 spie3 spp3 R3 fd0 kk q st P' M' d hK4 hr5 hret hsome
       hfv hkk hst hext hd hwin hnamed kv hkv)
-    $$ [$Hk $Hpc $Hra $Hs0 $Hcf $Hcs $Hte $Hce $Hpriv $Howe $Href $Hauth $Henvo $Henvb $HΦ]
+    $$ [$Hk $Hpc $Hra $Hs0 $Hcf $Hcs $Hte $Hce $Hpriv $Howe $Href $Hauth $Henvo $Henvb $Hsr $HΦ]
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x1e .. +0x2a`, argfd SUCCEEDED** (`a0 = 0`): `mv a5,a0`, the

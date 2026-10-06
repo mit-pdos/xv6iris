@@ -657,10 +657,12 @@ structure NiPos where
   ticks : Nat
   act : BitVec 64
   sev : Nat
+  /-- (NI M3 private files FS-1) the cited fs-event prefix's length -/
+  fev : Nat
 
 /-- The positions of a citation of era `k` at `ι`. -/
 def UIota.pos (k : Nat) (ι : UIota) : NiPos :=
-  ⟨k, ι.kev.length, ι.pev.length, ι.zev.length, ι.ticks, ι.act, ι.sev.length⟩
+  ⟨k, ι.kev.length, ι.pev.length, ι.zev.length, ι.ticks, ι.act, ι.sev.length, ι.fev.length⟩
 
 /-- (NI M3 quotas Q-3) A position without the cited allocator length. -/
 def NiPos.noKev (p : NiPos) : NiPos := { p with kev := 0 }
@@ -1094,14 +1096,16 @@ theorem niBelow_pos {ι₁ ι₂ H₁ H₂ : UIota} {k : Nat} (h₁ : niBelow ι
     have h := congrArg UIota.kev hH; exact h
   have hHs : H₁.sev = H₂.sev := by
     have h := congrArg UIota.sev hH; exact h
+  have hHf : H₁.fev = H₂.fev := by
+    have h := congrArg UIota.fev hH; exact h
   simp only [UIota.pos, NiPos.mk.injEq, true_and] at hp
-  obtain ⟨hk, hpv, hz, ht, ha, hs⟩ := hp
-  obtain ⟨p1, z1, k1, -, s1, -⟩ := h₁
-  obtain ⟨p2, z2, k2, -, s2, -⟩ := h₂
-  rw [hHp] at p1; rw [hHz] at z1; rw [hHk] at k1; rw [hHs] at s1
+  obtain ⟨hk, hpv, hz, ht, ha, hs, hf⟩ := hp
+  obtain ⟨p1, z1, k1, -, s1, -, f1⟩ := h₁
+  obtain ⟨p2, z2, k2, -, s2, -, f2⟩ := h₂
+  rw [hHp] at p1; rw [hHz] at z1; rw [hHk] at k1; rw [hHs] at s1; rw [hHf] at f1
   cases ι₁; cases ι₂
   simp only [UIota.led, UIota.mk.injEq, and_true] at *
-  exact ⟨pre k1 k2 hk, pre p1 p2 hpv, pre z1 z2 hz, ht, ha, pre s1 s2 hs⟩
+  exact ⟨pre k1 k2 hk, pre p1 p2 hpv, pre z1 z2 hz, ht, ha, pre s1 s2 hs, trivial, trivial, pre f1 f2 hf⟩
 
 /-- (NI M3 quotas Q-3) **Equal kev-free positions below one kev-free history
 are one kev-free ledger part** (`niBelow_pos` without the allocator). -/
@@ -1115,14 +1119,16 @@ theorem niBelow_posQ {ι₁ ι₂ H₁ H₂ : UIota} {k : Nat} (h₁ : niBelow �
     have h := congrArg UIota.zev hH; exact h
   have hHs : H₁.sev = H₂.sev := by
     have h := congrArg UIota.sev hH; exact h
+  have hHf : H₁.fev = H₂.fev := by
+    have h := congrArg UIota.fev hH; exact h
   simp only [UIota.pos, NiPos.noKev, NiPos.mk.injEq, true_and] at hp
-  obtain ⟨hpv, hz, ht, ha, hs⟩ := hp
-  obtain ⟨p1, z1, -, -, s1, -⟩ := h₁
-  obtain ⟨p2, z2, -, -, s2, -⟩ := h₂
-  rw [hHp] at p1; rw [hHz] at z1; rw [hHs] at s1
+  obtain ⟨hpv, hz, ht, ha, hs, hf⟩ := hp
+  obtain ⟨p1, z1, -, -, s1, -, f1⟩ := h₁
+  obtain ⟨p2, z2, -, -, s2, -, f2⟩ := h₂
+  rw [hHp] at p1; rw [hHz] at z1; rw [hHs] at s1; rw [hHf] at f1
   cases ι₁; cases ι₂
   simp only [UIota.ledQ, UIota.led, UIota.mk.injEq, and_true, true_and] at *
-  exact ⟨pre p1 p2 hpv, pre z1 z2 hz, ht, ha, pre s1 s2 hs⟩
+  exact ⟨pre p1 p2 hpv, pre z1 z2 hz, ht, ha, pre s1 s2 hs, pre f1 f2 hf⟩
 
 /-- Two steps with equal inputs whose citations are below one `H` cite the
 same era and LEDGER PART (NI M3 NI-OUT: `UIota.led`, the console stream and
@@ -1707,9 +1713,9 @@ theorem niTwoRunPrefix_trace (q : NiInc) (H₁ H₂ : Nat → UIota) (hH : niHis
   have hH' : ∀ k, (H' k).led = (H₂ k).led := fun _ => rfl
   have hC' : niTraceChain H' tr₁ := by
     intro secc lz win sz wcon wout wfd wslot x e k ι hs
-    obtain ⟨p1, z1, k1, t1, s1, c1⟩ := hC₁ secc lz win sz wcon wout wfd wslot x e k ι hs
-    obtain ⟨p2, z2, k2, t2, s2, -⟩ := hH k
-    exact ⟨p1.trans p2, z1.trans z2, k1.trans k2, Nat.le_trans t1 t2, s1.trans s2, c1⟩
+    obtain ⟨p1, z1, k1, t1, s1, c1, f1⟩ := hC₁ secc lz win sz wcon wout wfd wslot x e k ι hs
+    obtain ⟨p2, z2, k2, t2, s2, -, f2⟩ := hH k
+    exact ⟨p1.trans p2, z1.trans z2, k1.trans k2, Nat.le_trans t1 t2, s1.trans s2, c1, f1.trans f2⟩
   -- run 2 cut at run 1's length
   have hin' : tr₁.map NiStep.input = (tr₂.take tr₁.length).map NiStep.input := by
     rw [List.map_take]
@@ -1789,16 +1795,18 @@ theorem niBelow_famPos {r : BitVec 32} {ι₁ ι₂ H₁ H₂ : UIota} {k : Nat}
     have h := congrArg UIota.kev hH; exact h
   have hHs : H₁.sev = H₂.sev := by
     have h := congrArg UIota.sev hH; exact h
+  have hHf : H₁.fev = H₂.fev := by
+    have h := congrArg UIota.fev hH; exact h
   simp only [UIota.famPos, UIota.pos, NiPos.mk.injEq, true_and] at hp
-  obtain ⟨hk, hpv, hz, ht, ha, hs⟩ := hp
-  obtain ⟨p1, z1, k1, -, s1, -⟩ := h₁
-  obtain ⟨p2, z2, k2, -, s2, -⟩ := h₂
+  obtain ⟨hk, hpv, hz, ht, ha, hs, hf⟩ := hp
+  obtain ⟨p1, z1, k1, -, s1, -, f1⟩ := h₁
+  obtain ⟨p2, z2, k2, -, s2, -, f2⟩ := h₂
   have z1' := zevIn_prefix r z1
   have z2' := zevIn_prefix r z2
-  rw [hHp] at p1; rw [hHz] at z1'; rw [hHk] at k1; rw [hHs] at s1
+  rw [hHp] at p1; rw [hHz] at z1'; rw [hHk] at k1; rw [hHs] at s1; rw [hHf] at f1
   cases ι₁; cases ι₂
   simp only [UIota.famLed, UIota.led, UIota.mk.injEq, and_true] at *
-  exact ⟨pre k1 k2 hk, pre p1 p2 hpv, pre z1' z2' hz, ht, ha, pre s1 s2 hs⟩
+  exact ⟨pre k1 k2 hk, pre p1 p2 hpv, pre z1' z2' hz, ht, ha, pre s1 s2 hs, trivial, trivial, pre f1 f2 hf⟩
 
 /-- Two steps with equal family inputs whose citations are below histories with one family part cite the
 same era and family part. -/
@@ -2673,9 +2681,9 @@ theorem niTwoRunDet {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : n
     (by rw [NiStep.detIn_eq_detBy] at hpos; exact hpos)
     (fun k => { niHist F₂ k with cacc := (niHist F₁ k).cacc }) ?_ (fun _ => rfl)
   intro f hf k ι hc
-  obtain ⟨p1, z1, k1, t1, s1, c1⟩ := hC₁ f hf k ι hc
-  obtain ⟨p2, z2, k2, t2, s2, -⟩ := hH k
-  exact ⟨p1.trans p2, z1.trans z2, k1.trans k2, Nat.le_trans t1 t2, s1.trans s2, c1⟩
+  obtain ⟨p1, z1, k1, t1, s1, c1, f1⟩ := hC₁ f hf k ι hc
+  obtain ⟨p2, z2, k2, t2, s2, -, f2⟩ := hH k
+  exact ⟨p1.trans p2, z1.trans z2, k1.trans k2, Nat.le_trans t1 t2, s1.trans s2, c1, f1.trans f2⟩
 
 /-- **`niTwoRunDetQ`** (NI M3 quotas Q-3, design "M3 quotas design
 (2026-10-05)"): `niTwoRunDet` WITHOUT THE ALLOCATOR -- the cited positions
@@ -2702,8 +2710,8 @@ theorem niTwoRunDetQ {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : 
     (by rw [NiStep.detInQ_eq_detBy] at hpos; exact hpos)
     (fun k => { niHist F₂ k with kev := (niHist F₁ k).kev, cacc := (niHist F₁ k).cacc }) ?_ (fun _ => rfl)
   intro f hf k ι hc
-  obtain ⟨p1, z1, k1, t1, s1, c1⟩ := hC₁ f hf k ι hc
-  obtain ⟨p2, z2, t2, s2, -⟩ := hH k
-  exact ⟨p1.trans p2, z1.trans z2, k1, Nat.le_trans t1 t2, s1.trans s2, c1⟩
+  obtain ⟨p1, z1, k1, t1, s1, c1, f1⟩ := hC₁ f hf k ι hc
+  obtain ⟨p2, z2, t2, s2, -, f2⟩ := hH k
+  exact ⟨p1.trans p2, z1.trans z2, k1, Nat.le_trans t1 t2, s1.trans s2, c1, f1.trans f2⟩
 
 end Xv6

@@ -332,8 +332,8 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
     iapply wpLoop_fupd
     rw [topFrag_1]
     imod (ufDmiss_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) A.Fmiss dinum.toNat (bname 14 nf)
-        (eraNode dnd bmd datd) ufNd_top (mkfEra_is_dir dnd bmd datd htyz) hnm)
-      $$ Hftop Hm Htop with ⟨Htop, ⟨%av, %hrow, %hnone, Hrecv⟩⟩
+        (eraNode dnd bmd datd) ufNd_top (mkfEra_is_dir dnd bmd datd htyz) hnm k.proc)
+      $$ Hftop Hm Htop with ⟨Htop, #Hhrc, ⟨%av, %hrow, %hnone, Hrecv⟩⟩
     imodintro
     rw [← topFrag_1]
     ihave Harms := unlinkArms_miss (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)

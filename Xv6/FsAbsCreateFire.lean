@@ -460,7 +460,9 @@ step is delivered at the RAW insert, and the phase-2 fupd runs at the post
 map before the body closes. -/
 theorem cafArmedRetag [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
     (S : Std.ExtTreeSet Nat compare) (i : Nat) (n n' : FsNode) (R : IProp GF)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S) :
+    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S) (evs : List Fev)
+    (hev : ∀ (h : List Fev) (I : RegMapF FsNode), PartialMap.get? I i = some n → fevTie h I →
+      fevTie (h ++ evs) (PartialMap.insert I i n')) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
       (∀ I : RegMapF FsNode, ⌜PartialMap.get? I i = some n⌝ -∗
         ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I) ={appE}=∗
@@ -471,13 +473,13 @@ theorem cafArmedRetag [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
             ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half}
               (PartialMap.insert I i n')) ∗ R)) -∗
       topFrag (fsGammaL γfs) i n ={E}=∗
-        iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ R := by
+        iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ R ∗ fsMoveRcpt γfs evs i n := by
   iintro #Hi #Hai Hrec Hcm Hf
   unfold ftopInv iregArmed
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
   ihave %hAt := ghost_map_lookup $$ Hla Hrec
   unfold topFrag fsGammaL
   ihave %hlk := ghost_map_lookup $$ Ha Hf
@@ -490,9 +492,10 @@ theorem cafArmedRetag [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
     iapply (appStep_at i I _ n' rfl) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ Ha
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HR⟩
-  imod Hclose $$ [Ha Hla Hpark]
+  imod ftopLed_moveAt γfs I i n n' evs hlk (fun h ht => hev h I hlk ht) $$ Hled with ⟨Hled, #Hrc⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I i n', A
-    iframe Ha Hla Hpark
+    iframe Ha Hla Hpark Hled
     ipureintro
     intro j m hj hun
     by_cases hji : i = j
@@ -502,12 +505,14 @@ theorem cafArmedRetag [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
     · rw [get?_insert_ne hji] at hj
       exact hcl j m hj hun
   imodintro
-  iframe Hrec Hf HR
+  iframe Hrec Hf HR Hrc
 
 /-- ...and the PLAIN one (Rocq's `caf_retag`, `ireg_top_retag_gen`'s
 section): the new node owes the row. -/
 theorem cafRetag [Icfg] (γfs : FsNames) (E : CoPset) (i : Nat) (n n' : FsNode) (R : IProp GF)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n') :
+    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n') (evs : List Fev)
+    (hev : ∀ (h : List Fev) (I : RegMapF FsNode), PartialMap.get? I i = some n → fevTie h I →
+      fevTie (h ++ evs) (PartialMap.insert I i n')) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
       (∀ I : RegMapF FsNode, ⌜PartialMap.get? I i = some n⌝ -∗
         ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I) ={appE}=∗
@@ -517,13 +522,13 @@ theorem cafRetag [Icfg] (γfs : FsNames) (E : CoPset) (i : Nat) (n n' : FsNode) 
               (PartialMap.insert I i n')) ={appE}=∗
             ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half}
               (PartialMap.insert I i n')) ∗ R)) -∗
-      topFrag (fsGammaL γfs) i n ={E}=∗ topFrag (fsGammaL γfs) i n' ∗ R := by
+      topFrag (fsGammaL γfs) i n ={E}=∗ topFrag (fsGammaL γfs) i n' ∗ R ∗ fsMoveRcpt γfs evs i n := by
   iintro #Hi #Hai Hcm Hf
   unfold ftopInv
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
   unfold topFrag fsGammaL
   ihave %hlk := ghost_map_lookup $$ Ha Hf
   have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
@@ -534,9 +539,10 @@ theorem cafRetag [Icfg] (γfs : FsNames) (E : CoPset) (i : Nat) (n n' : FsNode) 
     iapply (appStep_at i I _ n' rfl) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ Ha
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HR⟩
-  imod Hclose $$ [Ha Hla Hpark]
+  imod ftopLed_moveAt γfs I i n n' evs hlk (fun h ht => hev h I hlk ht) $$ Hled with ⟨Hled, #Hrc⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I i n', A
-    iframe Ha Hla Hpark
+    iframe Ha Hla Hpark Hled
     ipureintro
     intro j m hj hun
     by_cases hji : i = j
@@ -545,9 +551,36 @@ theorem cafRetag [Icfg] (γfs : FsNames) (E : CoPset) (i : Nat) (n n' : FsNode) 
     · rw [get?_insert_ne hji] at hj
       exact hcl j m hj hun
   imodintro
-  iframe Hf HR
+  iframe Hf HR Hrc
 
 /-! ## 3.  The fires, one per leg -/
+
+/-- (NI M3 private files FS-1) a live row's facts -/
+theorem absOf_some_iff (n : FsNode) (a : Anode) :
+    absOf n = some a ↔ (fnType n ≠ 0 ∧ absRow n = a) ∧ fnNlink n ≠ 0 := by
+  unfold absOf
+  by_cases h : fnType n = 0 ∨ fnNlink n = 0
+  · rw [if_pos h]; constructor
+    · intro hh; cases hh
+    · rintro ⟨⟨h1, -⟩, h2⟩; rcases h with h | h <;> contradiction
+  · rw [if_neg h]; constructor
+    · intro hh; cases hh; exact ⟨⟨fun e => h (Or.inl e), rfl⟩, fun e => h (Or.inr e)⟩
+    · rintro ⟨⟨-, h2⟩, -⟩; rw [h2]
+
+/-- (NI M3 private files FS-1) the dots' events: `..` then `.` (both), or
+`.` alone -/
+def dotsEvs (act : BitVec 64) (full : Bool) (i d : Nat) : List Fev :=
+  if full then [.ent act i DOTDOT (some d), .ent act i DOT (some i)] else [.ent act i DOT (some i)]
+
+theorem fevTie_dots (act : BitVec 64) (full : Bool) (i d : Nat) {h : List Fev} {I : RegMapF FsNode}
+    {n n' : FsNode} (ht : fevTie h I) (hi : PartialMap.get? I i = some n)
+    (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.ADir ∅, 1⟩)
+    (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.ADir (dotsEnts full i d), 1⟩) :
+    fevTie (h ++ dotsEvs act full i d) (PartialMap.insert I i n') := by
+  unfold dotsEvs dotsEnts at *
+  cases full
+  · exact fevTie_ent act DOT (some i) ∅ 1 ht hi hnz habs hnz' habs'
+  · exact fevTie_ent2 act DOTDOT DOT (some d) (some i) ∅ 1 ht hi hnz habs hnz' habs'
 
 /-- THE ARM (Rocq's `caf_arm_fire`; sites #8/#18/#23): the claim box
 (`absOf n = none`) becomes the row `(c, 1)`, under the registry because a
@@ -557,14 +590,18 @@ theorem cafArm_fire [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
     (S : Std.ExtTreeSet Nat compare) (i : Nat) (c : Absnode)
     (Farm : Pfam GF (Aview → Nat → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S)
-    (hnone : absOf n = none) (hrow : absOf n' = some ⟨c, 1⟩) :
+    (hnone : absOf n = none) (hrow : absOf n' = some ⟨c, 1⟩) (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
       pfAt (aarmCommitAt (hlc := hlc) (fsGammaL γfs) appE c) Farm -∗
       topFrag (fsGammaL γfs) i n ={E}=∗
-        iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ creArmFired Farm i := by
+        iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ creArmFired Farm i ∗
+        -- (NI M3 private files FS-1) the arm's event (the inum CARRIED)
+        fsMoveRcpt γfs [.arm act i (fnodeOf c)] i n := by
   iintro #Hi #Hai Hrec Hcm Hf
   ihave Hcm := pfAt_au _ _ $$ Hcm
-  iapply (cafArmedRetag γfs E k t q S i n n' (creArmFired Farm i) hE hin) $$ Hi Hai Hrec [Hcm] Hf
+  obtain ⟨⟨hnz', habs'⟩, -⟩ := absOf_some_iff n' ⟨c, 1⟩ |>.1 hrow
+  iapply (cafArmedRetag γfs E k t q S i n n' (creArmFired Farm i) hE hin [.arm act i (fnodeOf c)]
+    (fun h I _ ht => fevTie_arm act c ht hnz' habs')) $$ Hi Hai Hrec [Hcm] Hf
   iintro %I %hlk Ha
   have hav : PartialMap.get? (absView I) i = none := by
     rw [absView_lookup_of I i n hlk, hnone]
@@ -592,14 +629,20 @@ theorem cafDots_fire [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
     (S : Std.ExtTreeSet Nat compare) (i d : Nat) (full : Bool)
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S)
-    (hrow : absOf n = some ⟨.ADir ∅, 1⟩) (hrow' : absOf n' = some ⟨.ADir (dotsEnts full i d), 1⟩) :
+    (hrow : absOf n = some ⟨.ADir ∅, 1⟩) (hrow' : absOf n' = some ⟨.ADir (dotsEnts full i d), 1⟩)
+    (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
       pfAt (adotsCommitAt (hlc := hlc) (fsGammaL γfs) appE) Fdots -∗
       topFrag (fsGammaL γfs) i n ={E}=∗
-        iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ creDotsFired Fdots i d full := by
+        iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ creDotsFired Fdots i d full ∗
+        -- (NI M3 private files FS-1) the dots' entry events
+        fsMoveRcpt γfs (dotsEvs act full i d) i n := by
   iintro #Hi #Hai Hrec Hcm Hf
   ihave Hcm := pfAt_au _ _ $$ Hcm
-  iapply (cafArmedRetag γfs E k t q S i n n' (creDotsFired Fdots i d full) hE hin)
+  obtain ⟨⟨hnz, habs⟩, -⟩ := absOf_some_iff n ⟨.ADir ∅, 1⟩ |>.1 hrow
+  obtain ⟨⟨hnz', habs'⟩, -⟩ := absOf_some_iff n' ⟨.ADir (dotsEnts full i d), 1⟩ |>.1 hrow'
+  iapply (cafArmedRetag γfs E k t q S i n n' (creDotsFired Fdots i d full) hE hin
+    (dotsEvs act full i d) (fun h I hi ht => fevTie_dots act full i d ht hi hnz habs hnz' habs'))
     $$ Hi Hai Hrec [Hcm] Hf
   iintro %I %hlk Ha
   have hav : PartialMap.get? (absView I) i = some ⟨.ADir ∅, 1⟩ := by

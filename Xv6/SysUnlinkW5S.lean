@@ -79,6 +79,8 @@ def sysUnlinkAtB8 (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
   wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
   (∀ c : CPU, sysUnlinkPostA k A c) ∗
+  -- (NI M3 private files FS-1) the parent leg's ledger receipt
+  unlParentRcpt fscFs k.proc ∗
   sysUnlinkLkAt A.pid kd q g lo tl dinum dnX γil γisl t (1 : Qp).half.half ∗
   icLoaded fscFs fscIreg fscCov fscLogst kd dinum dnX bmX ∗
   sysUnlinkLkAt A.pid ks qi gi loi tli iinum dni γili γisli t (1 : Qp).half.half ∗
@@ -112,7 +114,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
     ⊢ wpLoop (GF := GF) cpu := by
   unfold sysUnlinkAtB8
   iintro ⟨%⟨hpins, hkd, hnib, hle, hks, hpos, hnibi, hlei, hnli, hoki, hopi2, hmem, h5, hlast,
-    hpre⟩, Hk, Hpc, Hcells, Hbufs, Hte, Hce, #Henv, Hpid, Hhole, HΦ, Hlkd, Hloadd, Hlki, Hmeta,
+    hpre⟩, Hk, Hpc, Hcells, Hbufs, Hte, Hce, #Henv, Hpid, Hhole, HΦ, #Hpar, Hlkd, Hloadd, Hlki, Hmeta,
     Hmap, Hblk, Hdi, Htopi, Hdl2, Htok, Hres, Hbs, Hop, HP, He, Hct, Hx, Hm⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨-, -, hKe, -, -, -, -, -, -, -, hKiu, hKup, -⟩ := sys_unlink_K _ ok.hK
@@ -211,8 +213,8 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
     (sys_unlink_nlink_down dni (sysUnlinkDni2 dni) bmi bmi dati dati hnli (by omega))
   iapply wpLoop_fupd
   imod (ufUtgt_fire (hlc := hlc) fscFs ⊤ A.Ftgt iinum.toNat (eraNode dni bmi dati)
-      (eraNode (sysUnlinkDni2 dni) bmi dati) ufNd_top hloc hnl1 habs' hoki.2.2.2.1)
-    $$ Hftop Happ Hct Htopi with ⟨Htopi, %av1, %hav1, Hrcv⟩
+      (eraNode (sysUnlinkDni2 dni) bmi dati) ufNd_top hloc hnl1 habs' hoki.2.2.2.1 k.proc)
+    $$ Hftop Happ Hct Htopi with ⟨Htopi, #Htrc, %av1, %hav1, Hrcv⟩
   imodintro
   -- the target re-parked at the lowered record
   icases (show inodeMap (GF := GF) fscFs (ientry ks) bmi ⊢
@@ -309,8 +311,13 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
     A.Fex A.Fmiss pl av0 av1 dinum.toNat iinum.toNat nm ents nl (absRow (eraNode dni bmi dati)) hlast
     hpre ⟨hpos, hnibi⟩ hav1 $$ [$HP $Hx $Hm $He $Hrcv]
   ihave Hir := sys_unlink_ir_11 $$ [$Hslot1 $Hslot2]
-  ihave Hout := sys_unlink_out_intro A k.proc P2 _ $$ [Hhole Hpid Hbs Hir Harms]
+  ihave #Hur : unlinkRcptAt fscFs (procAddr A.j) 0#64 $$ []
+  · rw [← ok.hproc]; unfold unlinkRcptAt; iright
+    iframe Hpar
+    iexists _, _; iapply fsMoveRcpt_at $$ Htrc
+  ihave Hout := sys_unlink_out_intro A k.proc P2 0#64 $$ [Hhole Hpid Hbs Hir Harms]
   · iframe
+    iexact Hur
   iapply (sys_unlink_exit cpu k A spie4 spp4 _ _ (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ok.hK hp5
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]) ok.hal)
     $$ [$Hk $Hpc $Hcells $Hbufs $Hte $Hce $Hout $HΦ]

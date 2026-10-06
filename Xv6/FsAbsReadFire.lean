@@ -349,13 +349,15 @@ theorem arfRead_fire_gen [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac) (R : 
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (i : Nat) (γo : GName)
     (off d : Nat) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
-    (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) :
+    (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ offSupply γo E off d R -∗
       pfAt (areadCommitAt (fsGammaL γfs) appE i γo) F -∗
       topFragQ (fsGammaL γfs) dq i n -∗
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
         offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗ R ∗
+        -- (NI M3 private files FS-1) THE READ's RECEIPT, at its instant
+        fsObsRcpt γfs (.read act i γo d) i n ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   iintro #Hi Hsup Hcm Hf Hg
   -- THE PIECE IS SPENT: the fire eliminates to the AU side.
@@ -364,7 +366,7 @@ theorem arfRead_fire_gen [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac) (R : 
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
   unfold topFragQ fsGammaL
   ihave %hlk := ghost_map_lookup $$ Ha Hf
   -- the row is stated on the COUNT (E2-V2): the fd's inode may have been
@@ -375,15 +377,16 @@ theorem arfRead_fire_gen [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac) (R : 
   ihave Hcm := Hcm $$ %I %off %(absRow n) %d %hpre Ha Hg
   have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hg, HΦ⟩
-  imod Hclose $$ [Ha Hla Hpark]
+  imod ftopLed_obsAt γfs I (.read act i γo d) trivial i n hlk $$ Hled with ⟨Hled, #Hrc⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists I, A
-    iframe Ha Hla Hpark
+    iframe Ha Hla Hpark Hled
     ipureintro; exact hcl
   -- THE ADVANCE: the user side answers at its own supplier.
   unfold offSupply
   imod Hsup $$ Hg with ⟨Hg, HR⟩
   imodintro
-  iframe Hf Hg HR
+  iframe Hf Hg HR Hrc
   iexists absView I
   iframe HΦ
   ipureintro; exact hrow
@@ -395,20 +398,21 @@ theorem arfRead_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (i : Nat) (γo : GName)
     (off d : Nat) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
-    (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) :
+    (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ offUserInv (hlc := hlc) γo -∗
       pfAt (areadCommitAt (fsGammaL γfs) appE i γo) F -∗
       topFragQ (fsGammaL γfs) dq i n -∗
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
         offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
+        fsObsRcpt γfs (.read act i γo d) i n ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   iintro #Hi #Hoinv Hcm Hf Hg
   ihave Hsup := offSupply_parked E γo off d (arfFoffN_sub E hE) $$ Hoinv
-  imod arfRead_fire_gen γfs E dq iprop(True) F i γo off d n hE hoff hsz hnz $$
-    Hi Hsup Hcm Hf Hg with ⟨Hf, Hg, -, Hav⟩
+  imod arfRead_fire_gen γfs E dq iprop(True) F i γo off d n hE hoff hsz hnz act $$
+    Hi Hsup Hcm Hf Hg with ⟨Hf, Hg, -, Hrc, Hav⟩
   imodintro
-  iframe Hf Hg Hav
+  iframe Hf Hg Hrc Hav
 
 /-- THE FIRE WITH NO SUPPLIER AT ALL (Rocq's `arf_read_fire_adv`, lane
 OFF-LINK-5): a HELD row's read.  The client's commit hands the box's arm
@@ -417,13 +421,14 @@ theorem arfRead_fire_adv [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (i : Nat) (γo : GName)
     (off d : Nat) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
-    (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) :
+    (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗
       pfAt (areadCommitAdv (fsGammaL γfs) appE i γo) F -∗
       topFragQ (fsGammaL γfs) dq i n -∗
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
         offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
+        fsObsRcpt γfs (.read act i γo d) i n ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   iintro #Hi Hcm Hf Hg
   ihave Hcm := pfAt_au _ _ $$ Hcm
@@ -431,7 +436,7 @@ theorem arfRead_fire_adv [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
   unfold ftopBody
-  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
   unfold topFragQ fsGammaL
   ihave %hlk := ghost_map_lookup $$ Ha Hf
   have hrow : arowAt (absView I) i (absRow n) := absView_arow I i n hlk hnz
@@ -440,12 +445,13 @@ theorem arfRead_fire_adv [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   ihave Hcm := Hcm $$ %I %off %(absRow n) %d %hpre Ha Hg
   have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hg, HΦ⟩
-  imod Hclose $$ [Ha Hla Hpark]
+  imod ftopLed_obsAt γfs I (.read act i γo d) trivial i n hlk $$ Hled with ⟨Hled, #Hrc⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists I, A
-    iframe Ha Hla Hpark
+    iframe Ha Hla Hpark Hled
     ipureintro; exact hcl
   imodintro
-  iframe Hf Hg
+  iframe Hf Hg Hrc
   iexists absView I
   iframe HΦ
   ipureintro; exact hrow
@@ -459,30 +465,31 @@ theorem arfRead_fire_om [Icfg] [FileG GF] [SleepLockG GF] [IcboxG GF] [OffboxBox
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (i : Nat) (γo : GName)
     (off d : Nat) (rw ww : Bool) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
-    (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) :
+    (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ foffRow (hlc := hlc) (.open rw ww (.inode i γo om)) -∗
       areadInOm (hlc := hlc) om (fsGammaL γfs) appE i γo F -∗
       topFragQ (fsGammaL γfs) dq i n -∗
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
         offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
+        fsObsRcpt γfs (.read act i γo d) i n ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   cases om with
   | parked =>
     unfold areadInOm
     iintro #Hi #Hrow Hcm Hf Hg
     ihave Hoinv := foffRow_inode_of (hlc := hlc) _ rw ww i γo rfl $$ Hrow
-    iapply arfRead_fire γfs E dq F i γo off d n hE hoff hsz hnz $$ Hi Hoinv Hcm Hf Hg
+    iapply arfRead_fire γfs E dq F i γo off d n hE hoff hsz hnz act $$ Hi Hoinv Hcm Hf Hg
   | held =>
     unfold areadInOm
     iintro #Hi _ Hcm Hf Hg
     icases Hcm with (Hcm | ⟨Hcm, #Ht⟩)
-    · iapply arfRead_fire_adv γfs E dq F i γo off d n hE hoff hsz hnz $$ Hi Hcm Hf Hg
+    · iapply arfRead_fire_adv γfs E dq F i γo off d n hE hoff hsz hnz act $$ Hi Hcm Hf Hg
     · ihave Hsup := offSupply_taint (hlc := hlc) E γo off d $$ Ht
-      imod arfRead_fire_gen γfs E dq iprop(True) F i γo off d n hE hoff hsz hnz $$
-        Hi Hsup Hcm Hf Hg with ⟨Hf, Hg, -, Hav⟩
+      imod arfRead_fire_gen γfs E dq iprop(True) F i γo off d n hE hoff hsz hnz act $$
+        Hi Hsup Hcm Hf Hg with ⟨Hf, Hg, -, Hrc, Hav⟩
       imodintro
-      iframe Hf Hg Hav
+      iframe Hf Hg Hrc Hav
 
 end ReadFire
 

@@ -114,7 +114,7 @@ theorem iput_ofl_body (LW : LOG_WRITE) (BL : BRELSE)
   icases Hsl with ⟨Hd0, Hrest⟩
   -- THE DEPOSIT's atomic update, at the list the walk learned
   ihave Hau := iput_ofl_au (hlc := hlc) inum dn ds ge gr gd (rgb, (tid, qf)) tid qc e0 hnib hdn
-    hnl0 hbare $$ [Hdn Hdep Hcel]
+    hnl0 hbare k.proc $$ [Hdn Hdep Hcel]
   · iframe Hinv Hesc Hpinv Hdn Hdep Hcel
   ihave Hfin : iprop(committedA ge ∗ iregRegime (rgb, (tid, qf)).1 ∗ iregFpin (rgb, (tid, qf)) ∗
       txPin icfgLog tid qc -∗ txPin icfgLog tid qtx ∗ iregRegime rgb) $$ [Htxa]

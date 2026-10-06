@@ -201,13 +201,14 @@ theorem createFailMkdir_child_park (kslot : Nat) (cinum : BitVec 32) (t : Nat)
     (hiok : inodeOk fscCov fscLogst dc bmc datc) (hrl : inodeRecLocal dc)
     (hdok : dirOk icfgNib dc datc) (hduq : dirUniq dc datc) (hdots : dirDotsOnly dc datc)
     -- THE NODE PREDICATE, owed at every node (INIT-FILE, the UNARM ruling)
-    (hNd : ∀ c : Absnode, Nd c) :
+    (hNd : ∀ c : Absnode, Nd c)
+    (hcmaj : dc.diMajor = major) (hcmin : dc.diMinor = minor) (act : BitVec 64) :
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
       dinodeAt fscIreg cinum (createSetf dc major minor 0#16) -∗
       inodeMeta (ientry kslot) (createSetf dc major minor 0#16) -∗
       inodeMap fscFs (ientry kslot) bmc -∗ inodeBlocks fscFs bmc datc -∗
       topFrag (fsGammaL fscFs) cinum.toNat (eraNode dc bmc datc) -∗
-      createDirty t cinum.toNat -∗
+      createDirty t cinum.toNat act -∗
       creArmFired Farm cinum.toNat -∗
       pfAt (aunarmOfArmNd (hlc := hlc) (fsGammaL fscFs) appE Nd Farm) Fun -∗
       |={⊤}=> icLoaded fscFs fscIreg fscCov fscLogst kslot cinum
@@ -227,6 +228,8 @@ theorem createFailMkdir_child_park (kslot : Nat) (cinum : BitVec 32) (t : Nat)
   have hloc : InodeLocal cinum.toNat (eraNode (createSetf dc major minor 0#16) bmc datc) :=
     inodeLocal_ofOkRec cinum.toNat fscCov fscLogst _ bmc datc hok0 hrl0 hduq0 hddix0
   have hrow := cafEra_row_nl1 dc bmc datc hctynz (by rw [hcnl]; rfl)
+  have hdc1 : createSetf dc major minor 1#16 = dc := by
+    subst hcmaj hcmin; rw [← hcnl]; rfl
   have hnone := cafEra_none_nl0 (createSetf dc major minor 0#16) bmc datc hz
   have hdset : entDsetOk (eraNode (createSetf dc major minor 0#16) bmc datc)
       (∅ : Std.ExtTreeSet Fname compare) := fun s hs => absurd hs LawfulSet.mem_empty
@@ -240,7 +243,9 @@ theorem createFailMkdir_child_park (kslot : Nat) (cinum : BitVec 32) (t : Nat)
   ihave #Hap := iregInv_app $$ Hinv
   ihave Hun := aunarmOfArmNd_open (hlc := hlc) (fsGammaL fscFs) appE Nd Farm Fun cinum.toNat $$ Harm Hun
   imod (create_dirty_clear_unarm_nd (hlc := hlc) ⊤ t cinum.toNat _ Nd Fun _ _ CoPset.subseteq_top
-    hloc hrow hnone (hNd _)) $$ Hft Hap Hdirty Hun Htop with ⟨Htx, Htop, Hr⟩
+    hloc hrow hnone (hNd _)
+    (create_setf_row0 dc bmc datc major minor _ (by rw [hdc1]; exact hrow)) act)
+    $$ Hft Hap Hdirty Hun Htop with ⟨Htx, Htop, Hr, -⟩
   ihave Het := entToks_eraDotsOnly (GF := GF) (fsGammaL fscFs) cinum.toNat
     (createSetf dc major minor 0#16) bmc datc ∅ hz hok0.2.2.2.2.2.1 hok0.2.2.2.2.1 hdots0
   ihave Hdl := dlinks_intro fscFs cinum.toNat _ bmc datc ∅ hdset hexact $$ Het
@@ -297,6 +302,12 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
     Hmeta Hmap Hblocks Htop #Hshotd Hfrzd Hkeepd Hrud #Hslkc Hslc Hdepc Hoffc Hdevc Hinumc Hvalc
     Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hshotc Hfrzc %hlek #Hflk Hkeepc Hruc Htoks Hsbn Hsbi Hsbs
     Hsbb Hbare Hback Hpath Hbs Hislr Hop Hdirty HP Hdlk Harmr Hdots Hun Hacre Hpost
+  -- (NI M3 private files FS-1) the failing entry's reason, recorded
+  iapply wpLoop_fupd
+  ihave #Hinv0 := create_env_ireg Γ γl pd pav pu γkl γk $$ Henv
+  ihave #Hft0 := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hinv0
+  imod (creWhyRcpt_dl ⊤ fscFs k.proc w hw CoPset.subseteq_top) $$ Hft0 with #Hwhy
+  imodintro
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier cpu _ $$ Hk with ⟨%ht, Hk⟩
   have hct : (curTier : KTier) = KTier.kpt := ht.symm.trans hS.htier
@@ -355,7 +366,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   ihave #Hinv := create_env_ireg Γ γl pd pav pu γkl γk $$ Henv
   iapply wpLoop_fupd
   imod (createFailMkdir_child_park kslot cinum t major minor dc bmc datc Nm Nd Farm Fun hctynz hcnl hciok
-    hcrl hcdok hcduq hcdots (hNdD htd)) $$ Hinv Hcdiat Hcmeta Hcmap Hcblocks Hctop Hdirty Harmr Hun
+    hcrl hcdok hcduq hcdots (hNdD htd) hcmaj hcmin k.proc) $$ Hinv Hcdiat Hcmeta Hcmap Hcblocks Hctop Hdirty Harmr Hun
     with ⟨Hcload, Htx0, Hunr⟩
   imodintro
   -- ===== +0x150  c.mv a0,s3 =====
@@ -487,7 +498,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
     minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat cinum.toNat
     k.proc w $$ HP Hdlk Hacre Hdots Hunr []
   · -- (NI M3 FS-0) the failing entry's reason
-    iapply creWhyRcpt_intro
+    iexact Hwhy
   have hns' : (if false = true then 1 + 1 + (ns - 2) + 1 = ns else 1 + 1 + (ns - 2) = ns) := by
     have := hS.hns; unfold createIrefSlots at this; simp; omega
   have hled : (∀ x ∈ Sb, x ∈ Sb6) ∧ n6 ≤ u ∧ (false = true → iputUnits ≤ n6) :=
@@ -496,7 +507,8 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   ispecialize Hpost $$ %c'
   unfold createPost
   iapply Hpost $$ %spie3 %spp3 %R' %false %false %0 %1 %1 %g %(0#32) %dp %bmp %n6 %Sb6
-    %(1 + 1 + (ns - 2)) %hcsf Hk Hpc Hte Hce Hsbn Hsbi Hsbs Hsbb Hpriv Hpath Hbs %hns' Hsl %hled Hop
+    %(1 + 1 + (ns - 2)) %hcsf Hk Hpc Hte Hce Hsbn Hsbi Hsbs Hsbb Hpriv Hpath Hbs %hns' Hsl %hled Hop []
+  · iapply creRcptAt_fail
   simp only [Bool.false_eq_true, if_false]
   iframe Htx Hcf
   ipureintro
