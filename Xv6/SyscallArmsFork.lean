@@ -131,14 +131,14 @@ BEFORE the round's `PAlloc` (the pid is `pidPick` of it,
 holds at it: the cited slot prefix is `[]`.  (Q-2) The allocator prefix is
 no longer cited: the trapframe's `KAlloc` decides nothing on the quota
 kernel (the led answer still carries its receipt; no row reads it). -/
-theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
+theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) {sts' : List FdState} (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (gn : GName) (rv : BitVec 32)
     (γc : GName) (act : BitVec 64) (ke : Nat)
     (hn : syscNum V = 1) (ha : syscA0 V' = BitVec.signExtend 64 rv) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
       pidAllocRcpt act rv -∗
       (∃ (hz : List Zev) (i : Nat), zombReceipt hz (.ZFork act i rv γc)) -∗
-      |==> syscEvOut (hlc := hlc) V M sts V' M' cs (cs ∪ {γc}) gn := by
+      |==> syscEvOut (hlc := hlc) V M sts sts' V' M' cs (cs ∪ {γc}) gn := by
   unfold pidAllocRcpt
   iintro #Ha ⟨%h, #Hp, %hpick⟩ ⟨%hz, %i, #Hz⟩
   have hrv : BitVec.ofNat 32 (pidPick PIDMAX h) = rv := by rw [← hpick]; exact BitVec.ofNat_toNat _ _
@@ -154,7 +154,7 @@ theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     $$ [Hp' Hz'] with #Hl
   · iframe Hp' Hz'
   imodintro
-  iapply syscEvOut_cite V M sts V' M' cs (cs ∪ {γc}) gn ke
+  iapply syscEvOut_cite V M sts sts' V' M' cs (cs ∪ {γc}) gn ke
     { UIota.boot with pev := h, zev := hz ++ [.ZFork act i rv γc], act := act }
     ?_ $$ Ha Hl
   have hok : forkOk { UIota.boot with pev := h, zev := hz ++ [.ZFork act i rv γc], act := act } := by
@@ -187,12 +187,12 @@ cited prefix -- the slot ledger's ending in the scan's `SFull`
 (ruling JF-R4).  (Q-2) The allocator prefix ending in a `KNull` is no
 longer a reason: on the quota kernel every kalloc on fork's path is paid
 out of a credit and never null. -/
-theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
+theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) {sts' : List FdState} (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (gn : GName) (act : BitVec 64)
     (ke : Nat) (hn : syscNum V = 1) (ha : syscA0 V' = -1#64) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
       sFullRcpt act -∗
-      |==> syscEvOut (hlc := hlc) V M sts V' M' cs cs gn := by
+      |==> syscEvOut (hlc := hlc) V M sts sts' V' M' cs cs gn := by
   iintro #Ha Hs
   unfold sFullRcpt slotLedLb
   icases Hs with ⟨%hs, %k0, #Hs, %-⟩
@@ -200,7 +200,7 @@ theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : Li
       ((niNamesHere (GF := GF)).getD 4 0) ↪◯ML (hs ++ [.SFull act k0]) from .rfl) $$ Hs
   imod niIotaLbs_sev (GF := GF) (niNamesHere (GF := GF)) (hs ++ [.SFull act k0]) act $$ Hs' with #Hl
   imodintro
-  iapply syscEvOut_cite V M sts V' M' cs cs gn ke { UIota.boot with sev := hs ++ [.SFull act k0], act := act }
+  iapply syscEvOut_cite V M sts sts' V' M' cs cs gn ke { UIota.boot with sev := hs ++ [.SFull act k0], act := act }
     ?_ $$ Ha Hl
   have hfull : UIota.sFull { UIota.boot with sev := hs ++ [.SFull act k0], act := act } :=
     ⟨k0, by show (hs ++ [Sev.SFull act k0]).getLast? = some (.SFull act k0); simp⟩

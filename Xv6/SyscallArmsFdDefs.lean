@@ -603,12 +603,12 @@ theorem fdRowOpen_argFd_some {fs : List (BitVec 64)} {sts : List FdState} (ha : 
 
 /-- **close's cited row** (NI M3 FS-L): either arm of `sysClosePost` answers
 `usysCloseAns` at the entry table. -/
-theorem syscClose_evRow (V V1 : ProcPriv) (M M1 : Nat → List (BitVec 8)) (sts : List FdState)
+theorem syscClose_evRow (V V1 : ProcPriv) (M M1 : Nat → List (BitVec 8)) (sts : List FdState) {sts' : List FdState}
     (cs : ExtTreeSet GName compare) (ι : UIota) (r : BitVec 64) (hnum : syscNum V = 21)
     (ha : syscFdAgree V.ofile sts) (hl : tfArgIdx 0 < V1.tf.length)
     (hans : (r = 0xFFFFFFFFFFFFFFFF#64 ∧ argFd (tfW V.tf (tfArgIdx 0)) V.ofile = none) ∨
       (r = 0#64 ∧ ∃ fd fv, argFd (tfW V.tf (tfArgIdx 0)) V.ofile = some (fd, fv))) :
-    syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts ι := by
+    syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts sts' ι := by
   have ha0 : tfW (syscStore V1 r).tf (tfArgIdx 0) = r := syscStore_a0 _ _ hl
   have hne : ∀ k : Int, k ≠ 21 → syscNum V ≠ k := fun k hk h => hk (h.symm.trans hnum)
   refine ⟨fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
@@ -623,7 +623,7 @@ theorem syscClose_evRow (V V1 : ProcPriv) (M M1 : Nat → List (BitVec 8)) (sts 
 
 /-- **dup's cited row** (NI M3 FS-L): each arm of `sysDupPost` answers
 `usysDupAns` at the entry table, whose length is `NOFILE`. -/
-theorem syscDup_evRow (V V1 : ProcPriv) (M M1 : Nat → List (BitVec 8)) (sts : List FdState)
+theorem syscDup_evRow (V V1 : ProcPriv) (M M1 : Nat → List (BitVec 8)) (sts : List FdState) {sts' : List FdState}
     (cs : ExtTreeSet GName compare) (ι : UIota) (r : BitVec 64) (hnum : syscNum V = 10)
     (ha : syscFdAgree V.ofile sts) (hl : tfArgIdx 0 < V1.tf.length)
     (hans : (r = 0xFFFFFFFFFFFFFFFF#64 ∧ argFd (tfW V.tf (tfArgIdx 0)) V.ofile = none) ∨
@@ -631,7 +631,7 @@ theorem syscDup_evRow (V V1 : ProcPriv) (M M1 : Nat → List (BitVec 8)) (sts : 
         fdFrees V.ofile = []) ∨
       (∃ fd0 fd1 fv l, r = BitVec.ofNat 64 fd1 ∧ argFd (tfW V.tf (tfArgIdx 0)) V.ofile = some (fd0, fv) ∧
         fdFrees V.ofile = fd1 :: l)) :
-    syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts ι := by
+    syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts sts' ι := by
   have ha0 : tfW (syscStore V1 r).tf (tfArgIdx 0) = r := syscStore_a0 _ _ hl
   have hne : ∀ k : Int, k ≠ 10 → syscNum V ≠ k := fun k hk h => hk (h.symm.trans hnum)
   refine ⟨fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
@@ -674,7 +674,7 @@ theorem syscall_ret_fd_ev (PT : SchedNames → IProp GF) (Γ : SchedNames)
     procPrivFd γ (procAddr j) pid V1 M1 ∗ fdFrags V.fdg sts' ∗ chFrag V.chg (procAddr j) cs' ∗
     syscSysOut (hlc := hlc) f V M sts gn cs pid (syscA0 (syscStore V1 (R 10#5)))
       (syscImg (syscStore V1 (R 10#5)) M1) sts' V1.cwi cs' ∗
-    syscEvOut (hlc := hlc) V M sts (syscStore V1 (R 10#5)) M1 cs cs' gn ∗
+    syscEvOut (hlc := hlc) V M sts sts' (syscStore V1 (R 10#5)) M1 cs cs' gn ∗
     wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hbs, Hip, Hfd, Hir, Henv, Hpriv, Hfr, Hch, Hso, Heo, Hnext⟩
@@ -703,7 +703,7 @@ theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
     (n : Int) (hn : syscNum V = n) (h1 : n ≠ 1) (h3 : n ≠ 3) (h7 : n ≠ 7)
     (h14 : n ≠ 14 := by decide) (h12 : n ≠ 12 := by decide) (h16 : n ≠ 16 := by decide)
     (h21 : n ≠ 21 := by decide) (h10 : n ≠ 10 := by decide) (h5 : n ≠ 5 := by decide)
-    (h9 : n ≠ 9 := by decide) (h20 : n ≠ 20 := by decide) :
+    (h9 : n ≠ 9 := by decide) (h20 : n ≠ 20 := by decide) (h15 : n ≠ 15 := by decide) :
     kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x46#64) ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
@@ -718,7 +718,7 @@ theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie spp R γ j pid V M sts gn cs ip f V1 M1 sts' cs'
     hj hproc hK htier hpins hs2 hrows n hn h1 h3 h7)
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hso Hnext
-  iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn h14 h3 h1 h12 h16 h21 h10 h5 h9 h20
+  iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hn h14 h3 h1 h12 h16 h21 h10 h5 h9 h20 h15
 
 set_option maxHeartbeats 4000000 in
 /-- **`syscall_ret_fd` at a number that cites the boot prefix** (NI M3 FS-L:
@@ -734,7 +734,7 @@ theorem syscall_ret_fd_boot (PT : SchedNames → IProp GF) (Γ : SchedNames)
     (htier : k.tier = KTier.kpt) (hpins : syscPins k R) (hs2 : R 18#5 = pageAddr V1.upt.tfp)
     (hrows : SyscRows V M (syscStore V1 (R 10#5)) M1 sts sts' cs cs pid)
     (n : Int) (hn : syscNum V = n) (h1 : n ≠ 1) (h3 : n ≠ 3) (h7 : n ≠ 7)
-    (hrow : syscEvRow V (syscStore V1 (R 10#5)) (syscImg V M) (syscImg (syscStore V1 (R 10#5)) M1) cs cs sts
+    (hrow : syscEvRow V (syscStore V1 (R 10#5)) (syscImg V M) (syscImg (syscStore V1 (R 10#5)) M1) cs cs sts sts'
       { UIota.boot with act := procAddr j }) :
     kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x46#64) ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
@@ -751,7 +751,7 @@ theorem syscall_ret_fd_boot (PT : SchedNames → IProp GF) (Γ : SchedNames)
   iapply wpLoop_bupd
   imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) (procAddr j) with #Hl
   imodintro
-  ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts (syscStore V1 (R 10#5)) M1 cs cs gn ke
+  ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts' (syscStore V1 (R 10#5)) M1 cs cs gn ke
     _ hrow $$ Hanc Hl
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie spp R γ j pid V M sts gn cs ip f V1 M1 sts' cs
     hj hproc hK htier hpins hs2 hrows n hn h1 h3 h7)

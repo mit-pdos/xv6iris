@@ -152,7 +152,7 @@ theorem syscall_arm_uptime (SU : SYSUPTIME)
   imod niIotaLbs_ticks (GF := GF) (niNamesHere (GF := GF)) nt (procAddr j) $$ Htk' with #Hlbs
   imodintro
   have hev : syscEvRow V (syscStore V (R2 10#5)) (syscImg V M) (syscImg (syscStore V (R2 10#5)) M) cs cs
-      sts { UIota.boot with ticks := nt, act := procAddr j } := by
+      sts sts { UIota.boot with ticks := nt, act := procAddr j } := by
     refine ⟨fun _ => ?_, fun h => absurd (hn14.symm.trans h) (by decide),
       fun h => absurd (hn14.symm.trans h) (by decide), fun h => absurd (hn14.symm.trans h) (by decide),
       fun h => absurd (hn14.symm.trans h) (by decide), fun h => absurd (hn14.symm.trans h) (by decide),
@@ -172,7 +172,7 @@ theorem syscall_arm_uptime (SU : SYSUPTIME)
   · iapply syscForkOut_ne; rw [hn14]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn14]; decide
-  · iapply syscEvOut_cite V M sts _ M cs cs gn ke _ hev $$ Hanc Hlbs
+  · iapply syscEvOut_cite V M sts sts _ M cs cs gn ke _ hev $$ Hanc Hlbs
 
 /-- **The kill deposit** (Rocq `ProofSyscall.sysc_dep_kill`, over
 `UexecExecInst.sbundle_at_kill_elim`): a process trapping with number 6
@@ -246,7 +246,7 @@ theorem syscall_arm_getpid
   · iapply syscForkOut_ne; rw [hnN]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hnN]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hnN
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hnN
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 6, `sys_kill`** (Rocq `sysc_arm_kill`; D31: the raw trapframe cells, the
@@ -321,7 +321,7 @@ theorem syscall_arm_kill
   · iapply syscForkOut_ne; rw [hnN]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hnN]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hnN
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hnN
 
 /-- **pause's out row** (NI M3 no-kill K1): post 13 is paid by the answer's
 reason -- `0`, or the incarnation's kill shot (`SYSPAUSE`'s post).
@@ -421,7 +421,7 @@ theorem syscall_arm_pause
   · iapply syscForkOut_ne; rw [hnN]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hnN]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hnN
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hnN
 
 /-- **Rocq `sysc_dep_sync` + `sysc_out_sync`** (sync K4): sync's bundle is
 the process's optional hook (`hookOpt genId oQ`, `emp` at `none`), handed to
@@ -525,7 +525,7 @@ theorem syscall_arm_sync
   · iapply syscForkOut_ne; rw [hnN]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hnN]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hnN
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hnN
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 23, `sys_seccomp`** (xv6 7b2c1b1b; Rocq `sysc_arm_seccomp`): the
@@ -591,7 +591,7 @@ theorem syscall_arm_seccomp
   · iapply syscForkOut_ne; rw [hnN]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hnN]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hnN
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hnN
 
 end
 

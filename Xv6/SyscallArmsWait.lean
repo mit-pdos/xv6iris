@@ -193,7 +193,7 @@ shot with nothing moved (F5).  The cited row holds at a null status pointer
 or a lazy-free process (`hlf`): there the copyout's window is the key's
 (`syscArmWait_win`).  `bs` is the status word's bytes (`hbs`), of which the
 copy wrote `d` (`himg`). -/
-theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
+theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) {sts' : List FdState} (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (rv : BitVec 32)
     (xs : Int) (nullst : Bool) (act : BitVec 64) (ke : Nat) (P' : UPtd) (d : Nat) (bs : List (BitVec 8))
     (hn : syscNum V = 3) (ha : syscA0 V' = BitVec.signExtend 64 rv)
@@ -206,12 +206,12 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     (himg : syscImg V' M' = usysWr (syscImg V M) (tfW V.tf (tfArgIdx 0)) (bs.take d)) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
       waitLedCite rv xs cs cs' gn nullst act (tfW V.tf (tfArgIdx 0)) V.upt P' d -∗
-        |==> syscEvOut (hlc := hlc) V M sts V' M' cs cs' gn := by
+        |==> syscEvOut (hlc := hlc) V M sts sts' V' M' cs cs' gn := by
   have h14 : syscNum V ≠ USYS_uptime := by rw [hn]; decide
   have h1 : syscNum V ≠ USYS_fork := by rw [hn]; decide
   have hw : syscNum V = USYS_wait := hn
   have hnone : ∀ (h : List Zev), zLowest h act = none → d = 0 → rv = -1#32 → cs' = cs →
-      syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts { UIota.boot with zev := h, act := act } := by
+      syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts sts' { UIota.boot with zev := h, act := act } := by
     intro h hz hd' hrv hcs
     refine ⟨fun h' => absurd h' h14, fun _ _ => ?_, fun h' => absurd h' h1,
       fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide),
@@ -233,7 +233,7 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     ihave #Hlb' := (show zombLedLb (GF := GF) h ⊢ ((niNamesHere (GF := GF)).getD 2 0) ↪◯ML h from .rfl) $$ Hlb
     imod niIotaLbs_zev (GF := GF) (niNamesHere (GF := GF)) h act $$ Hlb' with #Hl
     imodintro
-    iapply syscEvOut_cite V M sts V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_ $$ Ha Hl
+    iapply syscEvOut_cite V M sts sts' V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_ $$ Ha Hl
     have h0 := hnull hnl
     refine ⟨fun h' => absurd h' h14, fun _ hcl => ?_, fun h' => absurd h' h1,
       fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide),
@@ -256,7 +256,7 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     ihave #Hlb' := (show zombLedLb (GF := GF) h ⊢ ((niNamesHere (GF := GF)).getD 2 0) ↪◯ML h from .rfl) $$ Hlb
     imod niIotaLbs_zev (GF := GF) (niNamesHere (GF := GF)) h act $$ Hlb' with #Hl
     imodintro
-    iapply syscEvOut_cite V M sts V' M' cs cs' gn ke { UIota.boot with zev := h, act := act }
+    iapply syscEvOut_cite V M sts sts' V' M' cs cs' gn ke { UIota.boot with zev := h, act := act }
       (hnone h hz hd' hf.1 hf.2) $$ Ha Hl
   · -- the kill shot (F5), nothing moved
     imodintro
@@ -273,7 +273,7 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     imodintro
     obtain ⟨hzl, hcs, -, hr2, hok⟩ := hz
     have hrv : rv ≠ -1#32 := fun e => by subst e; exact absurd hr2 (by decide)
-    iapply syscEvOut_cite V M sts V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_ $$ Ha Hl
+    iapply syscEvOut_cite V M sts sts' V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_ $$ Ha Hl
     refine ⟨fun h' => absurd h' h14, fun _ hcl => ?_, fun h' => absurd h' h1,
       fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide),
       fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide),

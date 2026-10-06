@@ -7607,6 +7607,80 @@ resumed table in `syscEvOut`/`utEvOut`, `syscEvRow`'s open clause, the install's
 create receipt (`SysOpenEntryC`). FS-2a′: the offset tie (unchanged). FS-3/4: the back-pointers' irrelevance under
 restriction, the cited failure events, `fout`/`usysFevOut`, the root as a hypothesis (scope 17).
 
+### M3 private files FS-2b′ as landed (2026-10-06)
+
+The second commit of FS-2b (open; the coordinator's rulings (a) and (A) of 2026-10-06). No kernel change; the
+fourteen roots' statements, `SyscRows`, namex/nameiparent/dirlookup/create's statements and the user-program tier
+(`User*` other than the `Userret*`/`Usertrap*` glue, every `Uk*`) byte-identical. The `Userret*`/`Usertrap*` glue
+moves as in FS-2a and FS-2b (FS-2b's note's "every `User*` file" means the program tier, not that glue).
+
+**The install IS the observation.** `Fev.open act i γo held (prev : Option Nat)`: the install is appended at the
+opened row, under the lock open's type test holds, past what fixed `i` (`FsWalkLed.ftopObsAfterAt`, checked against
+the ledger authority), so open needs no separate `look`. `prev` names what fixed `i` (`NiFs.fevOpenFixed H a rt s0 m
+create i po`, with `fevOpenFixed_mono`): on a plain open the walk's last lookup, the walk followed as chdir's from
+the root or the cwd with `m` lookups (`fevOpenFixed_walk`, from `walkChain`); under O_CREATE create's arm (a made
+child) or create's lookup that FOUND the name, whose prefix's fold names `nm ↦ i` in its parent.
+
+**The kernel.** `FsLedger.creFoundRcpt` (the found hop at a prefix whose fold reads the parent as a directory naming
+`nm ↦ i`; `fsObsRcpt_found`) replaces the found case's bare hop in `creOkRcpt` (`CreateFound` builds it from the
+dlookup observation it already had); `creOkRcpt_fixed` reads either case as `fevOpenFixed`'s O_CREATE side.
+`SysOpenDefs.openLedPre` (what fixed `i`: the fetched path and a lower bound) and `openLedOk … t` (the fetched path
+and a lower bound whose `usysOpenAt` is `t`); `openFdOk` gains `L : FdType → IProp` (its output carries `L t`).
+`SpecSysOpen`: `openPostOkPlain/Create` gain `L`, the arms pass `openLedOk fscFs pa rt cw Mim pv vom`; the splits
+output `openLedRow` (`r = -1 ∧ sts' = sts`, or `r = fd`, `sts[fd] = closed`, `sts' = sts.set fd (.open rd wr t)`
+with `openLedOk … t`); `openOkRcpt`'s install carries `held` and `prev`. In the proof: `sysOpenResidue` carries
+`sysOpenLedPre A inum` (built in `SysOpenWalk` from the wrapped walk's chain -- the plain walk is now wrapped by
+`walkStart`/`walkCur_unwrap`/`walkDead_unwrap` as chdir's -- and in `SysOpenEntryC` from create's relayed receipt;
+`sysOpenEntryN/CBody` gain the `omCreate` key, `sysOpenCreateK` relays `creRcptAt`); `sys_open_stores_pub` appends the
+install and proves `usysOpenAt … = some t` (`sys_open_led_at`, off the store block's type facts).
+
+**The rows (`UsysDet`).** `uomArg/uomCreate/uomRd/uomWr`; `usysOpenRow` (a file, or a directory at an O_RDONLY word:
+an inode descriptor at the install's shadow and mode; a device of major ≤ NDEV: a device descriptor); `usysOpenAt`,
+`usysOpenTo wp cw a1 ι`, `usysOpenAns wp cw a1 ι ws` (the lowest closed slot `ws` at a cited install, else `-1`),
+`usysOpenFd`, `usysDetOpen`. The class gains `(n = USYS_open ∧ lz = false ∧ wp = true)` (`usysDetClassAtF_open`);
+`usysDetResumes` + open (`usysDetResumes_ne` loses `n ≠ USYS_open`); `usysDetRet`/`usysDet` + open;
+`usysIotaFits` gains `fdv'` and `(n = USYS_open → r = usysOpenAns (usysPath W) W.cwd a1 ι (fdLowestClosed W.fd) ∧
+fdv' = usysOpenFd …)`; `usysOpenFd_ok` (with `usysOpenTo_nopipe`), `usysDet_mem/_rows/_of_rows` + open.
+
+**SYSCALL and USERTRAP bind the resumed table (ruling A).** `syscEvRow`/`syscEvFs` gain `sts'`, `syscEvFs` gains
+
+    (syscNum V = USYS_open → V.pvLazy = false → (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128).isSome = true →
+      tfW V'.tf (tfArgIdx 0) = usysOpenAns (ukeyStr img …) V.cwi (tfW V.tf (tfArgIdx 1)) ι (fdLowestClosed sts) ∧
+      sts' = usysOpenFd sts (ukeyStr img …) V.cwi (tfW V.tf (tfArgIdx 1)) ι)
+
+`syscEvOut V M sts sts' …` and `utEvOut sc sep V M sts sts' …` (the continuations' existing `sts'` binder now feeds
+them; quiet disjuncts + `≠ open`); `syscEvOut_quiet` + `h15`, `syscEvFs_ne/_at` + `h15`, `syscall_ret_fd_ev` +
+`h15`. Every citing arm states its row at `sts sts` (the table kept) or an implicit `sts'`. The open arm
+(`SyscallArmsPath`): `syscOpen_cite` (boot prefix at `-1`, else `{boot with act, fev := H, rt := V.rti}`),
+`syscOpen_evRow`, `syscOpen_low` (the answered slot is the entry table's lowest closed one, off the split row),
+`usysOpenTo_boot`, `syscOpen_fdEq`.
+
+**The trace.** The law's resume block, last:
+
+    (gprsNum secc xg = USYS_open → lz = false → wpath.isSome = true →
+      ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysOpenAns wpath wcwd (gprsA1 xg) ι wslot)
+
+derived by `niDetRow_open`; `niCiting` + open; `urc_evRow` + open's clause (at the record's cwd and the key's
+table), `urc_niDetRow`/`urc_keyBoot`/`UserretClosedRound` follow; `output_eq_of`/`output_eq`/`output_eq_fam` answer
+open at the one `wpath`, `wcwd`, `wslot` and cited part; `classReading` admits open at a lazy-free key. Scope 17
+extended (open moved out of OUTSIDE).
+
+**Deviations.** (1) The install is the observation (no `look` for open). (2) RECORDED AS GIVEN beyond FS-2b's: the
+install's offset shadow and mode; O_CREATE's walk to the parent (a found name is checked against its parent's
+entry, a made child against its arm -- create's `nameiparent` stays unwrapped). (3) The failure arms cite the boot
+prefix, as chdir's. (4) For FS-4: the answers must not depend on the back-pointer positions once the history is
+restricted to the footprint.
+
+**Baselines.** `tools/tcb/expected.json` unchanged (tcb passes with no movement). `tools/audit/baseline.json`
+unchanged (14 PASS). `dead_allow.txt` unchanged (`fevRun_prefix`, `fsLedLb_prefix`, `fsEvRcpt_of_lb` still
+unreached).
+
+The class: {exit, getpid, uptime, wait at a null status pointer or a lazy-free key, fork, sbrk, the console write at a
+lazy-free key on a writable console descriptor, pause, close, dup, read on a readable inode descriptor of a regular
+file and write on a writable inode descriptor at a lazy-free key whose buffer is mapped, chdir and open at a lazy-free
+key holding its path argument, mkdir at a lazy-free key}. FS-2a′ (the offset tie), FS-3/4 (the footprint) absorb
+the recorded-as-given data.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

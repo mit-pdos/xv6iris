@@ -111,8 +111,12 @@ inductive Fev where
   position of the previous lookup of the SAME walk (`none` at a walk's first, and
   at a lookup no walk follows) -- a back-pointer, ledger bookkeeping -/
   | hop (act : BitVec 64) (d : Nat) (nm : List (BitVec 8)) (prev : Option Nat)
-  /-- an fd installed on `i` (`γo` CARRIED); its offset 0 -/
-  | open (act : BitVec 64) (i : Nat) (γo : GName)
+  /-- an fd installed on `i` (`γo` CARRIED); its offset 0.  (NI M3 FS-2b′) An
+  observation AT `i`'s row (the install runs under the open's lock on `i`, the
+  type test's lock): `held` the descriptor's offset mode (`OffMode.held`,
+  CARRIED like `γo`), `prev` the position of the event that fixed `i` -- the
+  walk's last lookup (a plain open), create's arm or create's lookup (O_CREATE) -/
+  | open (act : BitVec 64) (i : Nat) (γo : GName) (held : Bool) (prev : Option Nat)
   /-- `n` bytes read from `γo`'s offset `off` (the count the read advanced it
   by); (NI M3 FS-2a, ruling (C)) `off` is the REAL offset the read used,
   recorded AS GIVEN, as `write` records its own -/
@@ -176,7 +180,7 @@ def fevStep (st : Frows × (GName → Nat)) : Fev → Frows × (GName → Nat)
   | .write _ i γo off bs r => (frowsSet st.1 i (frowWrite off bs (st.1 i)), foffSet st.2 γo (off + r))
   | .trunc _ i => (frowsSet st.1 i (frowTrunc (st.1 i)), st.2)
   | .free _ i => (frowsSet st.1 i none, st.2)
-  | .open _ _ γo => (st.1, foffSet st.2 γo 0)
+  | .open _ _ γo _ _ => (st.1, foffSet st.2 γo 0)
   | .read _ _ γo off n => (st.1, foffSet st.2 γo (off + n))
   | .hop _ _ _ _ => st
   | .look _ _ _ => st
@@ -276,7 +280,7 @@ theorem fevRun_snoc (h : List Fev) (e : Fev) : fevRun (h ++ [e]) = fevStep (fevR
 
 /-- an OBSERVATION moves no row -/
 def fevObs : Fev → Prop
-  | .hop _ _ _ _ | .open _ _ _ | .read _ _ _ _ _ | .stat _ _ | .full _ _ | .look _ _ _ => True
+  | .hop _ _ _ _ | .open _ _ _ _ _ | .read _ _ _ _ _ | .stat _ _ | .full _ _ | .look _ _ _ => True
   | _ => False
 
 theorem fevRows_obs (h : List Fev) (e : Fev) (he : fevObs e) : fevRows (h ++ [e]) = fevRows h := by
@@ -477,5 +481,83 @@ theorem fevLookAt_snoc {H h : List Fev} (hp : H <+: h) {rt s0 : Nat} {po : Optio
 theorem fevLegBy_snoc (h : List Fev) (a : BitVec 64) (d : Nat) (nm : List (BitVec 8)) (i nl : Nat) :
     fevLegBy (h ++ [.ent a d nm (some i), .nlink a d nl]) a = true := by
   unfold fevLegBy; simp
+
+/-! ### open's install, cited (NI M3 FS-2b′)
+
+open's decisive event is its INSTALL, appended at the opened inode's row
+under the lock that also held the type test, so the fold before it holds the
+row the test read.  Its back-pointer reaches what fixed the inode: the walk's
+last lookup (a plain open: the walk, followed, resolved to it), create's
+`arm` (O_CREATE, made: the inode number recorded as given) or create's
+lookup in the parent (O_CREATE, found: the parent recorded as given in the
+lookup event, the entry the fold's). -/
+
+/-- **WHAT FIXED THE INODE**, at the install's back-pointer `po` -/
+def fevOpenFixed (H : List Fev) (a : BitVec 64) (rt s0 m : Nat) (create : Bool) (i : Nat)
+    (po : Option Nat) : Bool :=
+  if create then
+    match po with
+    | some p =>
+      decide (p < H.length) &&
+        (match H[p]? with
+         | some (.arm a' i' _) => a' == a && i' == i
+         | some (.hop a' d nm none) =>
+           a' == a &&
+             (match fevRows (H.take p) d with
+              | some (.dir e, _) => e[nm]? == some i
+              | _ => false)
+         | _ => false)
+    | none => false
+  else
+    (match po with
+     | some q => decide (q < H.length)
+     | none => true) && (fevChain H po).length == m && fevWalk H rt s0 (fevChain H po) == some i
+
+/-- what fixed the inode survives the ledger's growth -/
+theorem fevOpenFixed_mono {H H' : List Fev} (hp : H <+: H') {a : BitVec 64} {rt s0 m : Nat} {create : Bool}
+    {i : Nat} {po : Option Nat} (h : fevOpenFixed H a rt s0 m create i po = true) :
+    fevOpenFixed H' a rt s0 m create i po = true := by
+  unfold fevOpenFixed at h ⊢
+  cases create with
+  | true =>
+    simp only [if_true] at h ⊢
+    cases po with
+    | none => exact h
+    | some p =>
+      dsimp only at h ⊢
+      rw [Bool.and_eq_true] at h
+      obtain ⟨hlt, hc⟩ := h
+      have hlt' : p < H.length := of_decide_eq_true hlt
+      have hg : H'[p]? = H[p]? := by
+        obtain ⟨t, rfl⟩ := hp; rw [List.getElem?_append_left hlt']
+      have ht : H'.take p = H.take p := by
+        obtain ⟨t, rfl⟩ := hp; rw [List.take_append_of_le_length (Nat.le_of_lt hlt')]
+      rw [hg, ht, Bool.and_eq_true]
+      exact ⟨decide_eq_true (Nat.lt_of_lt_of_le hlt' hp.length_le), hc⟩
+  | false =>
+    simp only [Bool.false_eq_true, if_false, Bool.and_eq_true, beq_iff_eq] at h ⊢
+    obtain ⟨⟨hpo, hm⟩, hi⟩ := h
+    have hpo' : ∀ q, po = some q → q < H.length := by
+      intro q hq; subst hq; exact of_decide_eq_true hpo
+    have hw := fevWalkIs_mono (es := (fevChain H po).map Prod.snd) (d := i) hp ⟨hpo', rfl, hi⟩
+    obtain ⟨hpo'', hes', hi'⟩ := hw
+    refine ⟨⟨?_, ?_⟩, hi'⟩
+    · cases po with
+      | none => rfl
+      | some q => exact decide_eq_true (hpo'' q rfl)
+    · rw [← List.length_map (f := Prod.snd), hes', List.length_map, hm]
+
+/-- a plain walk so far IS what fixed its inode -/
+theorem fevOpenFixed_walk {H : List Fev} {rt s0 : Nat} {po : Option Nat} {es : List (List (BitVec 8))}
+    {d : Nat} (a : BitVec 64) (hw : fevWalkIs H rt s0 po es d) :
+    fevOpenFixed H a rt s0 es.length false d po = true := by
+  obtain ⟨hpo, hes, hd⟩ := hw
+  unfold fevOpenFixed
+  simp only [Bool.false_eq_true, if_false, Bool.and_eq_true, beq_iff_eq]
+  refine ⟨⟨?_, ?_⟩, hd⟩
+  · cases po with
+    | none => rfl
+    | some q => exact decide_eq_true (hpo q rfl)
+  · rw [← hes, List.length_map]
 
 end Xv6

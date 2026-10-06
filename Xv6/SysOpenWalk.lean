@@ -71,6 +71,7 @@ import MachCSL.WpSmodeLh
 import Xv6.SysOpenShared
 import Xv6.KexecACode
 import Xv6.SysChdirFrame
+import Xv6.FsWalkLed
 
 namespace Xv6
 
@@ -308,7 +309,8 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     (pl : List (BitVec 8))
     (hpins : sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)) (h10 : R 10#5 = ipv)
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
-    (hn : iputUnits ≤ n') (hns : 2 ≤ A.ns) (hpl : argPathOf (sysOpenIm A) A.v.toNat pl) :
+    (hn : iputUnits ≤ n') (hns : 2 ≤ A.ns) (hpl : argPathOf (sysOpenIm A) A.v.toNat pl)
+    (hcr : omCreate A.vom = false) :
     kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) ∗ pcIs cpu (KA.«sys_open» + 0xe4#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv (hlc := hlc) Γ A ∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 ∗
@@ -319,10 +321,12 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     inodeHeldAt ipv iL ∗ A.P (pathElems pl).length iL ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom (truncTermAt pl A.P) A.Ft ∗
-    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c')
+    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') ∗
+    -- (NI M3 private files FS-2b′) the walk's ledger chain, at the inum it reached
+    walkChain fscFs A.V.rti (umStartOf A.V.rti A.V.cwi pl) (pathElems pl) (pathElems pl).length iL
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hpriv, HopS, Htx, Hbs, Hir1, Hirr, Hfds, Hfrags,
-    Hheld, HP, Hoc, Htc, Hpost⟩
+    Hheld, HP, Hoc, Htc, Hpost, #Hch⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%htk, Hk⟩
   have hct : curTier = KTier.kpt := by
@@ -397,9 +401,20 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   -- payment and what the arms keep (`SpecSysOpen.curKept`)
   ihave Hkey := plainTruncKey (hlc := hlc) (fsGammaL fscFs) A.vom pl A.P inum.toNat A.Ft $$ Htc HP
   icases Hkey with ⟨HP, Htc⟩
+  -- (NI M3 private files FS-2b′) what fixed the inode: the walk, followed
+  icases walkChain_open _ _ _ _ _ _ $$ Hch with ⟨%H0, %po, #HL, %hw⟩
+  ihave #Hpre : sysOpenLedPre A inum.toNat $$ []
+  · unfold sysOpenLedPre openLedPre
+    iexists pl, H0, po
+    iframe HL
+    ipureintro
+    refine ⟨hpl, ?_⟩
+    rw [hcr]
+    rw [List.take_of_length_le (Nat.le_refl _)] at hw
+    exact fevOpenFixed_walk (procAddr A.j) hw
   ihave Hres : sysOpenResidue (hlc := hlc) A pl inum dn bm data $$ [HP HFo Htc]
   · unfold sysOpenResidue sysOpenObs
-    iframe HP Htc
+    iframe HP Htc Hpre
     isplitr
     · ipureintro; exact hpl
     iexists av
@@ -433,7 +448,7 @@ theorem sys_open_entry_n (NI : NAMEI_ERA) (IL : ILOCK) (Γ : SchedNames)
     ⊢ sysOpenEntryNBody (hlc := hlc) Γ k A := by
   unfold sysOpenEntryNBody
   simp only [sysOpenAddr]
-  iintro %cpu %spie %spp %R %s1v %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2 %hstr %hpins %hal Hk
+  iintro %cpu %spie %spp %R %s1v %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2 %hcr %hstr %hpins %hal Hk
     Hpc Hte Hce #Henv Hcells Hbuf Hpriv HopS Htx Hbs Hisl Hfds Hfrags Hst Hoc Htc Hpost
   obtain ⟨hnn, hterm, hplt, hpl⟩ := hstr
   have hns : 3 ≤ A.ns := by have := hS.hns; rw [sysOpenIrefs_eq] at this; exact this
@@ -460,9 +475,17 @@ theorem sys_open_entry_n (NI : NAMEI_ERA) (IL : ILOCK) (Γ : SchedNames)
   ihave Hisl := (show irefSlots (GF := GF) A.ns ⊢ irefSlots (2 + (A.ns - 2)) from by rw [← e2]) $$ Hisl
   icases (irefSlots_op 2 (A.ns - 2)).1 $$ Hisl with ⟨Hir2, Hirr⟩
   ihave Hce := sys_open_walk_ce cpu k.sie k.proc (procAddr A.j) hS.hproc $$ Hce
-  -- THE ONE-SHOT, HANDED DOWN UNFIRED: the walk picks the start inum
+  -- THE ONE-SHOT, HANDED DOWN UNFIRED: the walk picks the start inum --
+  -- (NI M3 private files FS-2b′) WRAPPED: each hop appends its lookup
+  ihave #Hrdy := sys_open_walk_rdy Γ A $$ Henv
+  icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
+  ihave #Hft := iregInv_ftop _ _ _ _ $$ Hinv
+  ihave Hst := walkStart (hlc := hlc) fscFs (procAddr A.j) A.V.rti A.V.cwi A.P A.Pmiss (bview plen bp)
+    $$ Hft Hst
   iapply (sys_open_namei_era NI Γ A cpu _ k.sie (by k_norm_g) (procAddr A.j)
-      (by k_norm_g; exact hS.hproc) A.j plen bp MAXOPBLOCKS Sb A.P A.Pmiss A.pid (sysOpenV2 A P2)
+      (by k_norm_g; exact hS.hproc) A.j plen bp MAXOPBLOCKS Sb
+      (walkCur fscFs A.V.rti (umStartOf A.V.rti A.V.cwi (bview plen bp)) (pathElems (bview plen bp)) A.P A.Pmiss)
+      (walkMiss fscFs A.V.rti (pathElems (bview plen bp)) A.P A.Pmiss) A.pid (sysOpenV2 A P2)
       (sysOpenM2 A P2) hS.hj ?np ?nK ?nn ?nt hnn hterm (by omega) (sys_open_walk_bud _))
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hcore $Hbs $Hir2 $HopS $Htx $Hst]
   rotate_right 1
@@ -492,6 +515,7 @@ theorem sys_open_entry_n (NI : NAMEI_ERA) (IL : ILOCK) (Γ : SchedNames)
   · -- ===== the walk DIED: ARM B-FAIL =====
     ihave Harm := Xv6.kxcA_ite_f _ _ $$ Harm
     icases Harm with ⟨%h10, Hir2, Hdead⟩
+    ihave Hdead := walkDead_unwrap fscFs A.V.rti _ A.P A.Pmiss _ $$ Hdead
     ihave Hdead := sys_open_walk_dead_rcpt _ A.P A.Pmiss _ $$ Hdead
     iapply (sys_open_walk_dead Γ k A hS hTB cpu spie1 spp1 R1 s1v w4 w5 w6 lo w24 P2 n' Sb'
         (bview plen bp) hp1 h10 hal hP2 (by omega) hpl)
@@ -500,11 +524,12 @@ theorem sys_open_entry_n (NI : NAMEI_ERA) (IL : ILOCK) (Γ : SchedNames)
   · -- ===== the walk LANDED =====
     ihave Harm := Xv6.kxcA_ite_t _ _ $$ Harm
     icases Harm with ⟨%iL, %h10, Hheld, HP, Hir1⟩
+    icases (walkCur_unwrap _ _ _ _ _ _ _ _).1 $$ HP with ⟨HP, #Hch, -⟩
     have hn : iputUnits ≤ n' := Xv6.sys_chdir_bud_iput n' w true hlo
     iapply (sys_open_walk_found IL Γ k A hS hJ hAl hTC cpu spie1 spp1 R1 s1v w4 w5 w6 lo w24 P2 n'
-        Sb' ipv iL (bview plen bp) hp1 h10 hal hP2 hn (by omega) hpl)
+        Sb' ipv iL (bview plen bp) hp1 h10 hal hP2 hn (by omega) hpl hcr)
       $$ [$Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hpriv $HopS $Htx $Hbs $Hir1 $Hirr $Hfds $Hfrags
-        $Hheld $HP $Hoc $Htc $Hpost]
+        $Hheld $HP $Hoc $Htc $Hpost $Hch]
 
 end
 

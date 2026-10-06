@@ -205,7 +205,7 @@ def niCiting (sc : BitVec 64) (W : Uvis) : Prop :=
   sc = uecallScause ∧ (uvisNum (uvisRun W) = USYS_uptime ∨ uvisNum (uvisRun W) = USYS_wait ∨
     uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_sbrk ∨ uvisNum (uvisRun W) = USYS_write ∨
     uvisNum (uvisRun W) = USYS_close ∨ uvisNum (uvisRun W) = USYS_dup ∨ uvisNum (uvisRun W) = USYS_read ∨
-    uvisNum (uvisRun W) = USYS_chdir ∨ uvisNum (uvisRun W) = USYS_mkdir)
+    uvisNum (uvisRun W) = USYS_chdir ∨ uvisNum (uvisRun W) = USYS_mkdir ∨ uvisNum (uvisRun W) = USYS_open)
 
 /-- (NI M3 FS-2a) **THE CITATION's `fdir` READING**: the cited read's row is
 not a file (`NiFs.fevReadDir` of the cited fs prefix; `false` at no

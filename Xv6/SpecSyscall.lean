@@ -471,45 +471,45 @@ which usertrap's resume never takes -- (NI M2-G1e) with nothing moved: the
 column kept and the image unwritten (kwait's kill path copies no status
 byte), so usertrap can cite the boot prefix for it at any status pointer.
 Persistent. -/
-def syscEvOut (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
+def syscEvOut (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) : IProp GF :=
   iprop(⌜syscNum V ≠ USYS_uptime ∧ syscNum V ≠ USYS_wait ∧ syscNum V ≠ USYS_fork ∧
       syscNum V ≠ USYS_sbrk ∧ syscNum V ≠ USYS_write ∧ syscNum V ≠ USYS_close ∧ syscNum V ≠ USYS_dup ∧
-      syscNum V ≠ USYS_read ∧ syscNum V ≠ USYS_chdir ∧ syscNum V ≠ USYS_mkdir⌝ ∨
+      syscNum V ≠ USYS_read ∧ syscNum V ≠ USYS_chdir ∧ syscNum V ≠ USYS_mkdir ∧ syscNum V ≠ USYS_open⌝ ∨
     (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
-      niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts ι⌝) ∨
+      niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts sts' ι⌝) ∨
     (⌜syscNum V = USYS_wait ∧ syscA0 V' = -1#64 ∧ cs' = cs ∧ syscImg V' M' = syscImg V M⌝ ∗
       killShot gn))
 
-instance syscEvOut_persistent (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
+instance syscEvOut_persistent (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) :
-    Persistent (syscEvOut (hlc := hlc) (GF := GF) V M sts V' M' cs cs' gn) := by
+    Persistent (syscEvOut (hlc := hlc) (GF := GF) V M sts sts' V' M' cs cs' gn) := by
   unfold syscEvOut; infer_instance
 
 /-- **The deposit at a number that cites nothing** (NI M2-X2): every arm but
 uptime's, wait's, fork's and (NI M2-G3) sbrk's -- and since NI M2-G4, NI
 M3 FS-L and FS-2a write's, close's, dup's and read's (the hypotheses default
 by `decide` at the arm's literal number). -/
-theorem syscEvOut_quiet (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
+theorem syscEvOut_quiet (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (n : Int)
     (hnum : syscNum V = n) (h14 : n ≠ 14 := by decide) (h3 : n ≠ 3 := by decide)
     (h1 : n ≠ 1 := by decide) (h12 : n ≠ 12 := by decide) (h16 : n ≠ 16 := by decide)
     (h21 : n ≠ 21 := by decide) (h10 : n ≠ 10 := by decide) (h5 : n ≠ 5 := by decide)
-    (h9 : n ≠ 9 := by decide) (h20 : n ≠ 20 := by decide) :
-    ⊢ syscEvOut (hlc := hlc) (GF := GF) V M sts V' M' cs cs' gn := by
+    (h9 : n ≠ 9 := by decide) (h20 : n ≠ 20 := by decide) (h15 : n ≠ 15 := by decide) :
+    ⊢ syscEvOut (hlc := hlc) (GF := GF) V M sts sts' V' M' cs cs' gn := by
   unfold syscEvOut
   ileft
   ipureintro
   rw [hnum]
-  exact ⟨h14, h3, h1, h12, h16, h21, h10, h5, h9, h20⟩
+  exact ⟨h14, h3, h1, h12, h16, h21, h10, h5, h9, h20, h15⟩
 
 /-- **The deposit at a citation** (NI M2-X2). -/
-theorem syscEvOut_cite (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
+theorem syscEvOut_cite (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (k : Nat) (ι : UIota)
-    (h : syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts ι) :
+    (h : syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts sts' ι) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ⊢
       niIotaLbs (niNamesHere (GF := GF)) ι -∗
-      syscEvOut (hlc := hlc) (GF := GF) V M sts V' M' cs cs' gn := by
+      syscEvOut (hlc := hlc) (GF := GF) V M sts sts' V' M' cs cs' gn := by
   unfold syscEvOut
   iintro #Ha #Hl
   iright; ileft
@@ -539,7 +539,7 @@ def syscallPost (PT : SchedNames → IProp GF) (Γ : SchedNames) (k : KCtx) (γ 
     syscForkOut f V (syscA0 V') cs cs' -∗
     syscWaitOut V M (syscImg V' M') (syscA0 V') cs cs' pid -∗
     -- THE ROUND'S LEDGER EVIDENCE (NI M2-X2), last
-    syscEvOut (hlc := hlc) V M sts V' M' cs cs' gn -∗
+    syscEvOut (hlc := hlc) V M sts sts' V' M' cs cs' gn -∗
     wpLoop cpu')
 
 /-- **The divergent conjunct** (deviation 8): an entry that declines to

@@ -573,15 +573,58 @@ instance creParentRcpt_persistent (γfs : FsNames) (act : BitVec 64) (i : Nat) :
     Persistent (creParentRcpt (GF := GF) γfs act i) := by
   unfold creParentRcpt; infer_instance
 
+/-- (NI M3 private files FS-2b′) a FOUND node's lookup hop by `act`, at a
+position whose prefix's fold reads the parent `d` as a directory naming
+`nm ↦ i` (the observation's receipt, the found entry read off it) -/
+def creFoundRcpt (γfs : FsNames) (act : BitVec 64) (i : Nat) : IProp GF :=
+  iprop(∃ (h : List Fev) (d : Nat) (nm : List (BitVec 8)) (e : Std.ExtTreeMap (List (BitVec 8)) Nat compare)
+      (nl : Nat),
+    ⌜fevRows h d = some (.dir e, nl) ∧ e[nm]? = some i⌝ ∗ fsLedLb γfs (h ++ [.hop act d nm none]))
+
+instance creFoundRcpt_persistent (γfs : FsNames) (act : BitVec 64) (i : Nat) :
+    Persistent (creFoundRcpt (GF := GF) γfs act i) := by
+  unfold creFoundRcpt; infer_instance
+
+/-- a directory's lookup observation, its entry read: the found receipt -/
+theorem fsObsRcpt_found (γfs : FsNames) (act : BitVec 64) (d i : Nat) (nm : List (BitVec 8))
+    (n : FsNode) (hd : fnIsDir n = true) (hnm : (dirEntries n)[nm]? = some i) :
+    fsObsRcpt (GF := GF) γfs (.hop act d nm none) d n ⊢ creFoundRcpt γfs act i := by
+  unfold fsObsRcpt fsEvRcpt creFoundRcpt
+  iintro ⟨%h, %hr, #Hr⟩
+  iexists h, d, nm, dirEntries n, fnNlink n
+  iframe Hr
+  ipureintro
+  refine ⟨?_, hnm⟩
+  rw [hr, ftopRow_typed n (fnIsDir_typed n hd), absRow_dir_eq n hd]
+  rfl
+
 /-- (NI M3 private files FS-1) **CREATE'S LEDGER RECEIPT** on a success: a
-MADE child's arm and parent leg, or a FOUND node's lookup hop. -/
+MADE child's arm and parent leg, or a FOUND node's lookup hop (FS-2b′: at
+its parent's entry). -/
 def creOkRcpt (γfs : FsNames) (act : BitVec 64) (made : Bool) (i : Nat) : IProp GF :=
   iprop((⌜made = true⌝ ∗ creArmRcpt γfs act i ∗ creParentRcpt γfs act i) ∨
-    (⌜made = false⌝ ∗ ∃ (d : Nat) (nm : List (BitVec 8)), fsLedAt γfs [.hop act d nm none]))
+    (⌜made = false⌝ ∗ creFoundRcpt γfs act i))
 
 instance creOkRcpt_persistent (γfs : FsNames) (act : BitVec 64) (made : Bool) (i : Nat) :
     Persistent (creOkRcpt (GF := GF) γfs act made i) := by
   unfold creOkRcpt; infer_instance
+
+/-- (NI M3 private files FS-2b′) **WHAT FIXED create's INODE**, in the
+ledger: a made child's arm, or a found node's hop at its parent's entry
+(`fevOpenFixed`'s O_CREATE side; the walk's start and length unread) -/
+theorem creOkRcpt_fixed (γfs : FsNames) (act : BitVec 64) (made : Bool) (i : Nat) (rt s0 m : Nat) :
+    creOkRcpt (GF := GF) γfs act made i ⊢
+      ∃ (H : List Fev) (p : Nat), fsLedLb γfs H ∗ ⌜fevOpenFixed H act rt s0 m true i (some p) = true⌝ := by
+  unfold creOkRcpt creArmRcpt fsLedAt creFoundRcpt
+  iintro (⟨-, ⟨%n, %h, #Ha⟩, -⟩ | ⟨-, ⟨%h, %d, %nm, %e, %nl, %⟨hr, hnm⟩, #Hh⟩⟩)
+  · iexists h ++ [.arm act i n], h.length
+    iframe Ha
+    ipureintro
+    simp [fevOpenFixed]
+  · iexists h ++ [.hop act d nm none], h.length
+    iframe Hh
+    ipureintro
+    simp [fevOpenFixed, List.take_left' rfl, hr, hnm]
 
 /-- (NI M3 private files FS-1) unlink's parent leg by `act`: the entry
 removed from `d` and `d`'s count, one block -/

@@ -167,6 +167,8 @@ def sysOpenCreateK (k' : KCtx) (se : Bool) (pj : BitVec 64) (plen : Nat) (pfun :
     irefSlots ns' -∗
     ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ u' ≤ u ∧ (ok = true → iputUnits ≤ u')⌝ -∗
     logOpS icfgLog u' Sb' -∗
+    -- (NI M3 private files FS-2b′) create's ledger receipt, relayed
+    creRcptAt fscFs pj ok made inum.toNat -∗
     (if ok then
       iprop(⌜R' 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧
           creOkPure ty major minor made dn⌝ ∗
@@ -241,12 +243,12 @@ theorem sys_open_ec_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   iintro %c %_
   unfold createPost
   iintro %spie %spp %R' %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs Hk Hpc Hte Hce
-    - - - - Hblk Hpath Hbs %hns' Hir %hf Hop - Harm
-  -- (NI M3 private files FS-1) create's legs are in the era's ledger; their
-  -- receipt is not relayed to sys_open's post (FS-2b: O_CREATE's legs)
+    - - - - Hblk Hpath Hbs %hns' Hir %hf Hop #Hcrc Harm
+  -- (NI M3 private files FS-1, FS-2b′) create's legs are in the era's
+  -- ledger; their receipt is relayed to what fixed open's inode
   unfold sysOpenCreateK
   iapply HK $$ %c %spie %spp %R' %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs Hk Hpc
-    Hte Hce Hblk Hpath Hbs %hns' Hir %hf Hop Harm
+    Hte Hce Hblk Hpath Hbs %hns' Hir %hf Hop Hcrc Harm
 
 /-! ## ARM A-FAIL: create refused -/
 
@@ -338,7 +340,9 @@ theorem sys_open_ec_fresh (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KC
     (hns : nsj + 1 = A.ns) (hP2 : A.V.upt.extSz A.V.sz P2)
     (hpins : sysOpenPins k R (ientry kk) (k.regs 18#5) (k.regs 19#5))
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0)
-    (hpl : argPathOf (sysOpenIm A) A.v.toNat pl) :
+    (hpl : argPathOf (sysOpenIm A) A.v.toNat pl) (hcr : omCreate A.vom = true) :
+    -- (NI M3 private files FS-2b′) what fixed the inode, in the ledger
+    sysOpenLedPre A inum.toNat ∗
     kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) ∗ pcIs cpu (sysOpenAddr + 0x4a#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv (hlc := hlc) Γ A ∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 ∗
@@ -355,7 +359,7 @@ theorem sys_open_ec_fresh (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KC
       A.Ft ∗
     (∀ c' : CPU, sysOpenPostC (hlc := hlc) k A Farm Fun Fok Fex c')
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hlk, Hflat, Hkeep, Hblk, Hop, Hbs, Hir, Hfd, Hfr,
+  iintro ⟨#Hpre, Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hlk, Hflat, Hkeep, Hblk, Hop, Hbs, Hir, Hfd, Hfr,
     Hcauf, Hoc, Htc, HΦ⟩
   obtain ⟨hkk, hinb, hipos, hle, hu⟩ := hA
   let nl0 := fnNlink (eraNode (createMade T_FILE_w 0#16 0#16) bm data)
@@ -397,7 +401,7 @@ theorem sys_open_ec_fresh (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KC
     Hlk Hflat Hkeep Hblk Hop Hbs Hir Hfd Hfr [Hobs Htc] HΦ
   unfold sysOpenResidue
   ihave Hc := sys_open_cr_cur (GF := GF) A.vom inum.toNat (pathElems pl).length
-  iframe Hc Hobs Htc
+  iframe Hc Hobs Htc Hpre
   ipureintro; exact hpl
 
 set_option maxHeartbeats 16000000 in
@@ -420,7 +424,9 @@ theorem sys_open_ec_exists (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : K
     (hns : nsj + 1 = A.ns) (hP2 : A.V.upt.extSz A.V.sz P2)
     (hpins : sysOpenPins k R (ientry kk) (k.regs 18#5) (k.regs 19#5))
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0)
-    (hpl : argPathOf (sysOpenIm A) A.v.toNat pl) :
+    (hpl : argPathOf (sysOpenIm A) A.v.toNat pl) (hcr : omCreate A.vom = true) :
+    -- (NI M3 private files FS-2b′) what fixed the inode, in the ledger
+    sysOpenLedPre A inum.toNat ∗
     kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) ∗ pcIs cpu (sysOpenAddr + 0x4a#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv (hlc := hlc) Γ A ∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 ∗
@@ -437,7 +443,7 @@ theorem sys_open_ec_exists (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : K
       A.Ft ∗
     (∀ c' : CPU, sysOpenPostC (hlc := hlc) k A Farm Fun Fok Fex c')
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hlk, Hflat, Hkeep, Hblk, Hop, Hbs, Hir, Hfd, Hfr,
+  iintro ⟨#Hpre, Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hlk, Hflat, Hkeep, Hblk, Hop, Hbs, Hir, Hfd, Hfr,
     Hcauf, Hoc, Htc, HΦ⟩
   obtain ⟨hkk, hinb, hipos, hle, hu⟩ := hA
   -- THE TERMINAL FIRE, off the payload's own topFrag
@@ -483,7 +489,7 @@ theorem sys_open_ec_exists (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : K
     Hlk Hflat Hkeep Hblk Hop Hbs Hir Hfd Hfr [Hobs Htc] HΦ
   unfold sysOpenResidue
   ihave Hc := sys_open_cr_cur (GF := GF) A.vom inum.toNat (pathElems pl).length
-  iframe Hc Hobs Htc
+  iframe Hc Hobs Htc Hpre
   ipureintro; exact hpl
 
 /-! ## create came back with a locked inode -/
@@ -508,7 +514,9 @@ theorem sys_open_ec_ok (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
     (hu : iputUnits ≤ u) (hns : nsj + 1 = A.ns) (hP2 : A.V.upt.extSz A.V.sz P2)
     (hpins : sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5))
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0)
-    (hpl : argPathOf (sysOpenIm A) A.v.toNat pl) :
+    (hpl : argPathOf (sysOpenIm A) A.v.toNat pl) (hcr : omCreate A.vom = true) :
+    -- (NI M3 private files FS-2b′) create's ledger receipt
+    creOkRcpt fscFs (procAddr A.j) made inum.toNat ∗
     kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) ∗ pcIs cpu (sysOpenAddr + 0x46#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv (hlc := hlc) Γ A ∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 ∗
@@ -523,9 +531,18 @@ theorem sys_open_ec_ok (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
       A.Ft ∗
     (∀ c' : CPU, sysOpenPostC (hlc := hlc) k A Farm Fun Fok Fex c')
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hblk, Hop, Hbs, Hir, Hfd, Hfr, Hlocked, Hcauf,
+  iintro ⟨#Hcrc, Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hblk, Hop, Hbs, Hir, Hfd, Hfr, Hlocked, Hcauf,
     Hoc, Htc, HΦ⟩
   obtain ⟨h10, hkk, hipos, hinb, hpure⟩ := hA
+  -- (NI M3 private files FS-2b′) what fixed the inode: create's receipt
+  ihave #Hpre : sysOpenLedPre A inum.toNat $$ []
+  · unfold sysOpenLedPre openLedPre
+    icases creOkRcpt_fixed fscFs (procAddr A.j) made inum.toNat A.V.rti
+      (umStartOf A.V.rti A.V.cwi pl) (pathElems pl).length $$ Hcrc with ⟨%H, %p, #HL, %hfix⟩
+    iexists pl, H, some p
+    iframe HL
+    ipureintro
+    rw [hcr]; exact ⟨hpl, hfix⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   simp only [sysOpenAddr]
   have hnz : ientry kk ≠ 0#64 := ientry_ne_zero kk (Nat.le_of_lt hkk)
@@ -552,16 +569,16 @@ theorem sys_open_ec_ok (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
     simp only [Bool.false_eq_true, if_false] at hrep
     iapply (sys_open_ec_exists Γ k A Farm Fun Fok Fex hJ cpu spie spp (R.set 9#5 (ientry kk)) w4 w5 w6
       lo w24 γil γisl loc tlc kk s g inum dn bm data P2 u nsj pl ⟨hkk, hinb, hipos, hle, hu⟩ hrep hns
-      hP2 hp1 hal hpl)
-      $$ [$Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hlk $Hflat $Hkeep $Hblk $Hop $Hbs $Hir $Hfd $Hfr
+      hP2 hp1 hal hpl hcr)
+      $$ [$Hpre $Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hlk $Hflat $Hkeep $Hblk $Hop $Hbs $Hir $Hfd $Hfr
         $Hcauf $Hoc $Htc $HΦ]
   · -- ARM C-OK: a FRESH child
     simp only [if_true] at hrep
     subst hrep
     iapply (sys_open_ec_fresh Γ k A Farm Fun Fok Fex hJ cpu spie spp (R.set 9#5 (ientry kk)) w4 w5 w6
       lo w24 γil γisl loc tlc kk s g inum bm data P2 u nsj pl ⟨hkk, hinb, hipos, hle, hu⟩ hns hP2 hp1
-      hal hpl)
-      $$ [$Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hlk $Hflat $Hkeep $Hblk $Hop $Hbs $Hir $Hfd $Hfr
+      hal hpl hcr)
+      $$ [$Hpre $Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hlk $Hflat $Hkeep $Hblk $Hop $Hbs $Hir $Hfd $Hfr
         $Hcauf $Hoc $Htc $HΦ]
 
 /-! ## The O_CREATE entry, +0x38 -/
@@ -583,7 +600,7 @@ theorem sys_open_entry_c (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     (hTA : ⊢ sysOpenTailABody (hlc := hlc) Γ k A) :
     ⊢ sysOpenEntryCBody (hlc := hlc) Γ k A Farm Fun Fok Fex := by
   unfold sysOpenEntryCBody
-  iintro %cpu %spie %spp %R %s1v %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2
+  iintro %cpu %spie %spp %R %s1v %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2 %hcr
     %⟨hnn, hterm, hplen, hpl⟩ %hpins %hal Hk Hpc Hte Hce #Henv Hcells Hbuf Hblk HopS Htx Hbs Hir
     Hfd Hfr Hst Hac Hdl Hoc Htc Hcl HΦ
   icases kctx_tier cpu _ $$ Hk with ⟨%hct0, Hk⟩
@@ -657,7 +674,7 @@ theorem sys_open_entry_c (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   case c3 => k_norm_g <;> decide
   unfold sysOpenCreateK
   iintro %cpu %spie1 %spp1 %R1 %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs1 Hk Hpc
-    Hte Hce Hblk Hp Hbs %hns' Hir %⟨-, -, hf⟩ Hop Harm
+    Hte Hce Hblk Hp Hbs %hns' Hir %⟨-, -, hf⟩ Hop #Hcrc Harm
   k_norm_g [sys_open_ec_ret_46, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hpc := (show pcIs (GF := GF) cpu (KA.«sys_open» + 70#64) ⊢
     pcIs cpu (sysOpenAddr + 0x46#64) from .rfl) $$ Hpc
@@ -692,9 +709,14 @@ theorem sys_open_entry_c (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     ihave Harm := Xv6.kxcA_ite_t _ _ $$ Harm
     icases Harm with ⟨%hA, Hlocked, Hcauf⟩
     simp only [if_true] at hns'
+    ihave #Hcrc : creOkRcpt fscFs (procAddr A.j) made inum.toNat $$ []
+    · unfold creRcptAt
+      icases Hcrc with (%hf0 | #Hc)
+      · exact absurd hf0 (by decide)
+      · rw [← hS.hproc]; iexact Hc
     iapply (sys_open_ec_ok Γ k A Farm Fun Fok Fex hJ cpu spie1 spp1 R1 s1v w4 w5 w6 lo w24 made kk qi
-        s g inum dn bm P2 u' ns' Sb' (bview plen bp) hA (hf rfl) hns' hP2 hp1 hal hpl)
-      $$ [$Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hblk $Hop $Hbs $Hir $Hfd $Hfr $Hlocked $Hcauf $Hoc
+        s g inum dn bm P2 u' ns' Sb' (bview plen bp) hA (hf rfl) hns' hP2 hp1 hal hpl hcr)
+      $$ [$Hcrc $Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hblk $Hop $Hbs $Hir $Hfd $Hfr $Hlocked $Hcauf $Hoc
         $Htc $HΦ]
 
 end

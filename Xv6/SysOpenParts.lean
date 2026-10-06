@@ -1089,6 +1089,15 @@ def sysOpenOffCell (kf : Nat) (C : FContent) (γo : GName) : IProp GF :=
       offGv γo 1 (vo.toNat : Int))
   else offFree kf 1
 
+/-- (NI M3 private files FS-2b′) open's ledger receipt at the record's own
+path argument, omode and actor -/
+abbrev sysOpenLed (A : SysOpenArgs GF) : FdType → IProp GF :=
+  openLedOk fscFs (procAddr A.j) A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom
+
+/-- (NI M3 private files FS-2b′) what fixed the inode, at the record -/
+abbrev sysOpenLedPre (A : SysOpenArgs GF) (i : Nat) : IProp GF :=
+  openLedPre fscFs (procAddr A.j) A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom i
+
 /-- The walk's AU RESIDUE below the fire (Rocq's three rows `cur_kept vom P
 (length (path_elems pl)) (bv_unsigned inum) -∗ so_obs Fo … -∗
 plain_trunc_kept … pl P (bv_unsigned inum) Ft`, lane TRUNC-PERMIT), at the
@@ -1096,6 +1105,8 @@ path the caller passed. -/
 def sysOpenResidue (A : SysOpenArgs GF) (pl : List (BitVec 8)) (inum : BitVec 32) (dn : Dinode)
     (bm : Blkmap) (data : Nat → List (BitVec 8)) : IProp GF :=
   iprop(⌜argPathOf (sysOpenIm A) A.v.toNat pl⌝ ∗
+    -- (NI M3 private files FS-2b′) what fixed the inode, in the ledger
+    sysOpenLedPre A inum.toNat ∗
     -- THE TERMINAL CURSOR AND THE KEYED PIECE (Rocq TRUNC-PERMIT): the permit
     -- was paid at the join out of the cursor (`SysOpenKept.plainTruncKey`),
     -- which rides the kept piece's refund at O_TRUNC
@@ -1389,15 +1400,17 @@ def sysOpenPubBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF 
     fdFrags A.V.fdg A.sts -∗ fdStAuth A.V.fdg fd .closed -∗
     -- (NI M3 private files FS-1) the install's ledger receipt (and itrunc's)
     openOkRcpt fscFs k.proc -∗
+    -- (NI M3 private files FS-2b′) ...and open's at the installed type
+    sysOpenLed A t -∗
     -- THE ARM, as a wand
     (∀ r : BitVec 64,
       openFdOk A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2)
-        (omReadable A.vom) (omWritable A.vom) t A.sts r -∗
+        (omReadable A.vom) (omWritable A.vom) t (sysOpenLed A) A.sts r -∗
       -- ...AND THE HALF THIS BLOCK'S PUBLISH HANDED OUT (Rocq L4), guarded by
       -- the type exactly as the deposit is: a device row has none
       foffPubT A.omo t -∗
       openPostOkPlain (hlc := hlc) A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid (sysOpenIm A) A.v.toNat A.vom
-        A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) r) -∗
+        A.P A.Fo A.Ft (sysOpenLed A) A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) r) -∗
     (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
     wpLoop c)
 
@@ -1512,6 +1525,8 @@ def sysOpenEntryNBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp 
   iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (s1v w4 w5 w6 : BitVec 64) (lo : BitVec 32)
       (w24 : BitVec 64) (P2 : UPtd) (plen : Nat) (bp : Nat → BitVec 8) (Sb : List Nat),
     ⌜A.V.upt.extSz A.V.sz P2⌝ -∗
+    -- (NI M3 private files FS-2b′) the plain side's key
+    ⌜omCreate A.vom = false⌝ -∗
     ⌜(∀ i, i < plen → bp i ≠ 0#8) ∧ bp plen = 0#8 ∧ plen < 128 ∧
       argPathOf (sysOpenIm A) A.v.toNat (bview plen bp)⌝ -∗
     ⌜sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)⌝ -∗
@@ -1541,6 +1556,8 @@ def sysOpenEntryCBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
   iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (s1v w4 w5 w6 : BitVec 64) (lo : BitVec 32)
       (w24 : BitVec 64) (P2 : UPtd) (plen : Nat) (bp : Nat → BitVec 8) (Sb : List Nat),
     ⌜A.V.upt.extSz A.V.sz P2⌝ -∗
+    -- (NI M3 private files FS-2b′) the O_CREATE side's key
+    ⌜omCreate A.vom = true⌝ -∗
     ⌜(∀ i, i < plen → bp i ≠ 0#8) ∧ bp plen = 0#8 ∧ plen < 128 ∧
       argPathOf (sysOpenIm A) A.v.toNat (bview plen bp)⌝ -∗
     ⌜sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)⌝ -∗

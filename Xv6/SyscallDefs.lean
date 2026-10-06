@@ -165,7 +165,7 @@ prefix ends in a read of a REGULAR-FILE row (`fevReadDir`), answered
 RECORDED offset -- at argument 1; a write at a lazy-free entry on a writable
 inode descriptor whose source is readable for the whole request answered
 `usysWriteAnsF` -- the request, or `-1` at the caller's cited verdict. -/
-def syscEvFs (V V' : ProcPriv) (img img' : ElfMem) (sts : List FdState) (ι : UIota) : Prop :=
+def syscEvFs (V V' : ProcPriv) (img img' : ElfMem) (sts sts' : List FdState) (ι : UIota) : Prop :=
   (syscNum V = USYS_read → V.pvLazy = false →
     (ufsBufAt (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))).1 = true →
     fdRdIno (usysFdAt sts (tfW V.tf (tfArgIdx 0))) = true → fevReadDir ι.fev = false →
@@ -182,21 +182,30 @@ def syscEvFs (V V' : ProcPriv) (img img' : ElfMem) (sts : List FdState) (ι : UI
     tfW V'.tf (tfArgIdx 0) = usysChdirAns (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi ι ∧
       V'.cwi = usysChdirCwd (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi ι) ∧
   -- mkdir: `0` exactly at a cited parent leg of the caller
-  (syscNum V = USYS_mkdir → tfW V'.tf (tfArgIdx 0) = usysMkdirAns ι)
+  (syscNum V = USYS_mkdir → tfW V'.tf (tfArgIdx 0) = usysMkdirAns ι) ∧
+  -- (NI M3 FS-2b′) open at a lazy-free entry whose image holds the path
+  -- argument: the answer and the resumed table are the cited install's
+  (syscNum V = USYS_open → V.pvLazy = false →
+    (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128).isSome = true →
+    tfW V'.tf (tfArgIdx 0) = usysOpenAns (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi
+      (tfW V.tf (tfArgIdx 1)) ι (fdLowestClosed sts) ∧
+    sts' = usysOpenFd sts (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi (tfW V.tf (tfArgIdx 1)) ι)
 
-/-- off read, write, chdir and mkdir the fs clauses are vacuous -/
-theorem syscEvFs_ne {V V' : ProcPriv} {img img' : ElfMem} {sts : List FdState} {ι : UIota}
+/-- off read, write, chdir, mkdir and open the fs clauses are vacuous -/
+theorem syscEvFs_ne {V V' : ProcPriv} {img img' : ElfMem} {sts sts' : List FdState} {ι : UIota}
     (h5 : syscNum V ≠ USYS_read) (h16 : syscNum V ≠ USYS_write) (h9 : syscNum V ≠ USYS_chdir)
-    (h20 : syscNum V ≠ USYS_mkdir) : syscEvFs V V' img img' sts ι :=
-  ⟨fun h => absurd h h5, fun h => absurd h h16, fun h => absurd h h9, fun h => absurd h h20⟩
+    (h20 : syscNum V ≠ USYS_mkdir) (h15 : syscNum V ≠ USYS_open) : syscEvFs V V' img img' sts sts' ι :=
+  ⟨fun h => absurd h h5, fun h => absurd h h16, fun h => absurd h h9, fun h => absurd h h20,
+    fun h => absurd h h15⟩
 
 /-- ...at a number literal -/
-theorem syscEvFs_at {V V' : ProcPriv} {img img' : ElfMem} {sts : List FdState} {ι : UIota} {k : Int}
+theorem syscEvFs_at {V V' : ProcPriv} {img img' : ElfMem} {sts sts' : List FdState} {ι : UIota} {k : Int}
     (hk : syscNum V = k) (h5 : k ≠ USYS_read := by decide) (h16 : k ≠ USYS_write := by decide)
-    (h9 : k ≠ USYS_chdir := by decide) (h20 : k ≠ USYS_mkdir := by decide) :
-    syscEvFs V V' img img' sts ι :=
+    (h9 : k ≠ USYS_chdir := by decide) (h20 : k ≠ USYS_mkdir := by decide)
+    (h15 : k ≠ USYS_open := by decide) :
+    syscEvFs V V' img img' sts sts' ι :=
   syscEvFs_ne (fun h => h5 (hk.symm.trans h)) (fun h => h16 (hk.symm.trans h)) (fun h => h9 (hk.symm.trans h))
-    (fun h => h20 (hk.symm.trans h))
+    (fun h => h20 (hk.symm.trans h)) (fun h => h15 (hk.symm.trans h))
 
 /-- **THE ROUND'S CITED ROW** (NI M2-X2, design "M2-X design" §1): what the
 kernel's arm read off the ledgers' receipts, at the CITED prefix `ι` (the
@@ -228,9 +237,10 @@ key, `UsysDet.usysCloseAns`/`usysDupAns` at the entry table's row at argument 0
 (dup's at its lowest closed slot, with the table's length `NOFILE`): they
 read no ledger, the boot prefix is cited; and (NI M3 FS-2a) the file-system
 clauses `syscEvFs`.  The records are the dispatch's (`V`/`img` the entry,
-`V'`/`img'` the record the call left; `sts` the entry's descriptor states). -/
+`V'`/`img'` the record the call left; `sts` the entry's descriptor states,
+`sts'` the resumed ones (NI M3 FS-2b′: open's clause pins them)). -/
 def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare)
-    (sts : List FdState) (ι : UIota) : Prop :=
+    (sts sts' : List FdState) (ι : UIota) : Prop :=
   (syscNum V = USYS_uptime → tfW V'.tf (tfArgIdx 0) = usysUptimeWord ι.ticks) ∧
   (syscNum V = USYS_wait → (tfW V.tf (tfArgIdx 0) = 0#64 ∨ V.pvLazy = false) →
     usysWaitFitsAt (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 0)) cs img ι (tfW V'.tf (tfArgIdx 0))
@@ -252,7 +262,7 @@ def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName c
   (syscNum V = USYS_close → tfW V'.tf (tfArgIdx 0) = usysCloseAns (usysFdAt sts (tfW V.tf (tfArgIdx 0)))) ∧
   (syscNum V = USYS_dup → sts.length = NOFILE ∧
     tfW V'.tf (tfArgIdx 0) = usysDupAns (usysFdAt sts (tfW V.tf (tfArgIdx 0))) (fdLowestClosed sts)) ∧
-  syscEvFs V V' img img' sts ι
+  syscEvFs V V' img img' sts sts' ι
 
 /-! ## §2 The dispatch table -/
 

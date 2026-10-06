@@ -619,7 +619,7 @@ theorem syscall_arm_read (SR : SYSREAD)
     (tfW V.tf (tfArgIdx 2)) (R2 10#5) _ d _ rfl ha.2.1 hext hw hpl (Nat.le_trans hfacts.1 uQuota_le_uvmMaxsz)
     hfacts.2.1 hfacts0.2.2.2 hfacts0.2.2.1 hd hr $$ Hrr with ⟨%ι, #Hl, %hfs⟩
   have hrow : syscEvRow V (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (syscImg V M)
-      (syscImg (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) M1) cs cs sts ι := by
+      (syscImg (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) M1) cs cs sts sts ι := by
     have ha0' : tfW (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)).tf (tfArgIdx 0) = R2 10#5 :=
       syscStore_a0 _ _ hl0
     refine ⟨fun h => absurd (hn5.symm.trans h) (by decide), fun h => absurd (hn5.symm.trans h) (by decide),
@@ -627,11 +627,12 @@ theorem syscall_arm_read (SR : SYSREAD)
       fun h => absurd (hn5.symm.trans h) (by decide), fun h => absurd (hn5.symm.trans h) (by decide),
       fun h => absurd (hn5.symm.trans h) (by decide), fun h => absurd (hn5.symm.trans h) (by decide),
       fun _ hlz hb hfd hdir => ?_, fun h => absurd (hn5.symm.trans h) (by decide),
-      fun h => absurd (hn5.symm.trans h) (by decide), fun h => absurd (hn5.symm.trans h) (by decide)⟩
+      fun h => absurd (hn5.symm.trans h) (by decide), fun h => absurd (hn5.symm.trans h) (by decide),
+        fun h => absurd (hn5.symm.trans h) (by decide)⟩
     rw [ha0']
     exact hfs hlz hb hfd hdir
   imodintro
-  ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts
+  ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts
     (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) M1 cs cs V.gen ke _ hrow $$ Hanc Hl
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
     (({ V with upt := P' } : ProcPriv).updEv k') M1 sts cs hj hproc hK htier hpins2 hs2'
@@ -759,18 +760,19 @@ theorem syscall_arm_write (SW : SYSWRITE)
       rw [show usysFdKey sts (tfW V.tf (tfArgIdx 0)) = syscFdKey (tfW V.tf (tfArgIdx 0)) sts from rfl, hk]
     have hrow : syscEvRow V (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (syscImg V M)
         (syscImg (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M))
-        cs cs sts ι := by
+        cs cs sts sts ι := by
       refine ⟨fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
         fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
         fun _ _ hcons => absurd (hcf.symm.trans hcons) (by decide),
         fun _ hcons => absurd (hcf.symm.trans hcons) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
         fun h => absurd (hn16.symm.trans h) (by decide),
         fun h => absurd (hn16.symm.trans h) (by decide), fun _ hlz hb _ => ?_,
-        fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide)⟩
+        fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
+        fun h => absurd (hn16.symm.trans h) (by decide)⟩
       rw [ha0']
       exact hfs hlz hb
     imodintro
-    ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts
+    ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts
       (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M) cs cs V.gen ke
       _ hrow $$ Hanc Hl
     iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
@@ -794,13 +796,14 @@ theorem syscall_arm_write (SW : SYSWRITE)
     (R2 10#5) (procAddr j) $$ HO with ⟨%ι, #Hl, %hsix⟩
   have hrow : syscEvRow V (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (syscImg V M)
       (syscImg (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M))
-      cs cs sts ι := by
+      cs cs sts sts ι := by
     refine ⟨fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
       fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
       fun _ hlz hcons => ?_, fun _ hcons => ?_, fun h => absurd (hn16.symm.trans h) (by decide),
       fun h => absurd (hn16.symm.trans h) (by decide),
       fun h => absurd (hn16.symm.trans h) (by decide), fun _ _ _ hfd => ?_,
-      fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide)⟩
+      fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
+        fun h => absurd (hn16.symm.trans h) (by decide)⟩
     · rw [ha0']
       exact syscArmWrite_ans V.upt P' V.sz sts _ _ _ _ hfacts.2.2.2 (hfacts.2.2.1 hlz) hext hcons hcnt
     · rw [ha0']
@@ -809,7 +812,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
       obtain ⟨rb, i, γo, om, hk⟩ := syscFdKey_of_wrIno ha.2.1 hfd
       exact absurd ⟨rb, i, γo, om, hk⟩ hino
   imodintro
-  ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts
+  ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts
     (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M) cs cs V.gen ke
     _ hrow $$ Hanc Hl
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f

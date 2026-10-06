@@ -285,7 +285,7 @@ observation fired, and the arm is keyed by the observed `Anode`. -/
 def openPostOkPlain (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
+    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (L : FdType → IProp GF)
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) :
     IProp GF :=
   iprop(∃ (pl : List (BitVec 8)) (av : Aview) (i : Nat),
@@ -299,7 +299,7 @@ def openPostOkPlain (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa :
         ⌜arowAt av i ⟨.ADev ma mi, nl⟩⌝ ∗ ⌜ma ≤ NDEV_max⌝ ∗
         Fo.pfRecv av i ⟨.ADev ma mi, nl⟩ ∗
         plainTruncKept (hlc := hlc) Γ vom pl P i Ft ∗
-        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) sts r) ∨
+        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) L sts r) ∨
      -- FILE: the ONE delta of this surface, iff O_TRUNC, at a state still
      -- holding the OBSERVED row (the lock-hold tie)
      (∃ (bs0 : List (BitVec 8)) (nl : Nat),
@@ -309,7 +309,7 @@ def openPostOkPlain (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa :
           iprop(∃ av' : Aview, ⌜arowAt av' i ⟨.AFile bs0, nl⟩⌝ ∗ Ft.pfRecv av' i bs0)
          else iprop(emp)) ∗
         ∃ γo : GName,
-          openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) sts r ∗
+          openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) L sts r ∗
           -- ...AND WHAT THE PUBLISH HANDED THE CALLER (Rocq L4): nothing at
           -- mode PARK, the program's own half of the shadow at ZERO at HAND
           foffPub omo γo) ∨
@@ -319,7 +319,7 @@ def openPostOkPlain (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa :
         ⌜arowAt av i ⟨.ADir ents, nl⟩⌝ ∗ ⌜omArg vom = 0⌝ ∗
         Fo.pfRecv av i ⟨.ADir ents, nl⟩ ∗
         plainTruncKept (hlc := hlc) Γ vom pl P i Ft ∗
-        ∃ γo : GName, openFdOk γ pa pid VW MW true false (.inode i γo omo) sts r ∗
+        ∃ γo : GName, openFdOk γ pa pid VW MW true false (.inode i γo omo) L sts r ∗
           foffPub omo γo)))
 
 /-- ret -1 (Rocq's `open_post_fail_plain`): the three-way fold.  THE FIRST
@@ -359,7 +359,7 @@ def openArmsPlain (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw 
     IProp GF :=
   iprop(((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ procPrivFd γ pa pid VW MW ∗ fdFrags VW.fdg sts ∗
         openPostFailPlain Γ γfs rt cw Mim pv vom P Pmiss Fo Ft pa) ∨
-      openPostOkPlain omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r) ∗
+      openPostOkPlain omo Γ γ pa pid Mim pv vom P Fo Ft (openLedOk γfs pa rt cw Mim pv vom) sts VW MW r) ∗
     fdSlot)
 
 /-! ### 2g.  The O_CREATE arms -/
@@ -374,7 +374,7 @@ def openPostOkCreate (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa 
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
+    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (L : FdType → IProp GF)
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) :
     IProp GF :=
   iprop(∃ (pl : List (BitVec 8)) (d i : Nat) (nm : Fname),
@@ -392,7 +392,7 @@ def openPostOkCreate (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa 
         -- the unarm comes home; the arm's permit was spent by the create leg
         pfAt (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun ∗
         ∃ γo : GName,
-          openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) sts r ∗
+          openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) L sts r ∗
           -- ...AND WHAT THE PUBLISH HANDED THE CALLER (Rocq L4): nothing at
           -- mode PARK, the program's own half of the shadow at ZERO at HAND
           foffPub omo γo) ∨
@@ -415,7 +415,7 @@ def openPostOkCreate (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa 
               iprop(∃ av' : Aview, ⌜arowAt av' i ⟨.AFile bs0, nl⟩⌝ ∗ Ft.pfRecv av' i bs0)
              else iprop(emp)) ∗
             ∃ γo : GName,
-              openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo)
+              openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) L
                 sts r ∗ foffPub omo γo) ∨
           -- ...or a DEVICE (the major test still stands between it and the fd)
           (∃ (ma mi : Nat),
@@ -426,7 +426,7 @@ def openPostOkCreate (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa 
             -- EXISTS permit -- the lookup's receipt beside the arm piece create
             -- never fired
             creTruncKeptEx (hlc := hlc) Γ vom pl P Farm Fex i Ft ∗
-            openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) sts r)))))
+            openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) L sts r)))))
 
 /-- ret -1 on the create side (Rocq's `open_post_fail_create`).  Note arm
 (a): a FRESH create that succeeded before open's table-full failure leaves
@@ -506,7 +506,8 @@ def openArmsCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw
     IProp GF :=
   iprop(((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ procPrivFd γ pa pid VW MW ∗ fdFrags VW.fdg sts ∗
         openPostFailCreate Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft pa) ∨
-      openPostOkCreate omo Γ γ pa pid Mim pv vom P Farm Fun Fok Fex Fo Ft sts VW MW r) ∗
+      openPostOkCreate omo Γ γ pa pid Mim pv vom P Farm Fun Fok Fex Fo Ft (openLedOk γfs pa rt cw Mim pv vom)
+        sts VW MW r) ∗
     fdSlot)
 
 /-! ### The one input and the one output, at the key the code branches on -/
@@ -658,6 +659,21 @@ def openSplitRow (r : BitVec 64) (V V' : ProcPriv) (sts sts' : List FdState) : P
     -- ...AND NOT A PIPE (Rocq `4fab0298e`): the one-liner per arm
     fdstNopipe (.open rb wb t))
 
+/-- (NI M3 private files FS-2b′) **the split's ledger row**: nothing moved,
+or the resume view retypes the answered descriptor at the caller's mode bits
+and the descriptor type open's ledger receipt names (`openLedOk`). -/
+def openLedRow (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8)) (pv : Nat)
+    (vom : BitVec 64) (r : BitVec 64) (sts sts' : List FdState) : IProp GF :=
+  iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ sts' = sts⌝ ∨
+    ∃ (fd : Nat) (t : FdType), ⌜r = BitVec.ofNat 64 fd ∧ sts[fd]? = some .closed ∧
+      sts' = sts.set fd (.open (omReadable vom) (omWritable vom) t)⌝ ∗
+      openLedOk γfs act rt cw Mim pv vom t)
+
+instance openLedRow_persistent (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8))
+    (pv : Nat) (vom r : BitVec 64) (sts sts' : List FdState) :
+    Persistent (openLedRow (GF := GF) γfs act rt cw Mim pv vom r sts sts') := by
+  unfold openLedRow; infer_instance
+
 /-- Rocq's `open_arms_plain_split`. -/
 theorem openArmsPlain_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
@@ -669,6 +685,7 @@ theorem openArmsPlain_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsName
       ∃ (V' : ProcPriv) (sts' : List FdState),
         ⌜openSplitRow r VW V' sts sts'⌝ ∗
         procPrivFd γ pa pid V' MW ∗ fdFrags VW.fdg sts' ∗ fdSlot ∗
+        openLedRow γfs pa rt cw Mim pv vom r sts sts' ∗
         openReceiptPlain omo Γ γfs rt cw Mim pv vom P Pmiss Fo Ft sts r sts' := by
   unfold openArmsPlain openPostOkPlain openReceiptPlain
   iintro ⟨(⟨%hr, Hpriv, Hb, Hfail⟩ | ⟨%pl, %av, %i, %hpl, HP, Hc⟩), Hslot⟩
@@ -676,6 +693,8 @@ theorem openArmsPlain_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsName
     iframe Hpriv Hb Hslot
     isplitr
     · ipureintro; exact Or.inl ⟨hr, rfl, rfl⟩
+    isplitl []
+    · unfold openLedRow; ileft; ipureintro; exact ⟨hr, rfl⟩
     · ileft
       iframe Hfail
       isplitr
@@ -683,13 +702,15 @@ theorem openArmsPlain_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsName
       · ipureintro; rfl
   · icases Hc with (⟨%ma, %mi, %nl, %ha, %hma, HFo, Ht, Hfd⟩ | ⟨%bs0, %nl, %ha, HFo, Htr, %go, Hfd, Hpub⟩ |
       ⟨%ents, %nl, %ha, %hom, HFo, Ht, %go, Hfd, Hpub⟩)
-    · icases openFdOk_split γ pa pid VW MW _ _ _ sts r $$ Hfd with
-        ⟨%fd, %l, %k, %fdv', ⟨%hr, %hfl, %hcl, %hins⟩, %hrc, Hpriv, Hb⟩
+    · icases openFdOk_split γ pa pid VW MW _ _ _ _ sts r $$ Hfd with
+        ⟨%fd, %l, %k, %fdv', ⟨%hr, %hfl, %hcl, %hins⟩, %hrc, Hpriv, Hb, #HL⟩
       iexists { VW with ofile := VW.ofile.set fd (fnode k) }, fdv'
       iframe Hpriv Hb Hslot
       isplitr
       · ipureintro
         exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins, trivial⟩
+      isplitl []
+      · unfold openLedRow; iright; iexists fd, _; iframe HL; ipureintro; exact ⟨hr, hcl, hins⟩
       iright
       iexists pl, av, i
       iframe HP
@@ -703,13 +724,15 @@ theorem openArmsPlain_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsName
       isplitr
       · ipureintro; exact hma
       ipureintro; exact hrc
-    · icases openFdOk_split γ pa pid VW MW _ _ _ sts r $$ Hfd with
-        ⟨%fd, %l, %k, %fdv', ⟨%hr, %hfl, %hcl, %hins⟩, %hrc, Hpriv, Hb⟩
+    · icases openFdOk_split γ pa pid VW MW _ _ _ _ sts r $$ Hfd with
+        ⟨%fd, %l, %k, %fdv', ⟨%hr, %hfl, %hcl, %hins⟩, %hrc, Hpriv, Hb, #HL⟩
       iexists { VW with ofile := VW.ofile.set fd (fnode k) }, fdv'
       iframe Hpriv Hb Hslot
       isplitr
       · ipureintro
         exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins, trivial⟩
+      isplitl []
+      · unfold openLedRow; iright; iexists fd, _; iframe HL; ipureintro; exact ⟨hr, hcl, hins⟩
       iright
       iexists pl, av, i
       iframe HP
@@ -723,13 +746,16 @@ theorem openArmsPlain_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsName
       iexists go
       iframe Hpub
       ipureintro; exact hrc
-    · icases openFdOk_split γ pa pid VW MW _ _ _ sts r $$ Hfd with
-        ⟨%fd, %l, %k, %fdv', ⟨%hr, %hfl, %hcl, %hins⟩, %hrc, Hpriv, Hb⟩
+    · icases openFdOk_split γ pa pid VW MW _ _ _ _ sts r $$ Hfd with
+        ⟨%fd, %l, %k, %fdv', ⟨%hr, %hfl, %hcl, %hins⟩, %hrc, Hpriv, Hb, #HL⟩
       iexists { VW with ofile := VW.ofile.set fd (fnode k) }, fdv'
       iframe Hpriv Hb Hslot
       isplitr
       · ipureintro
         exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins, trivial⟩
+      isplitl []
+      · unfold openLedRow; iright; iexists fd, _; iframe HL; ipureintro
+        rw [(omRdonly_modes vom hom).1, (omRdonly_modes vom hom).2]; exact ⟨hr, hcl, hins⟩
       iright
       iexists pl, av, i
       iframe HP
@@ -759,6 +785,7 @@ theorem openArmsCreate_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNam
       ∃ (V' : ProcPriv) (sts' : List FdState),
         ⌜openSplitRow r VW V' sts sts'⌝ ∗
         procPrivFd γ pa pid V' MW ∗ fdFrags VW.fdg sts' ∗ fdSlot ∗
+        openLedRow γfs pa rt cw Mim pv vom r sts sts' ∗
         openReceiptCreate omo Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts r sts' := by
   unfold openArmsCreate openPostOkCreate openReceiptCreate
   iintro ⟨(⟨%hr, Hpriv, Hb, Hfail⟩ | ⟨%pl, %d, %i, %nm, %hpl, %hlast, HP, Hc⟩), Hslot⟩
@@ -766,6 +793,8 @@ theorem openArmsCreate_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNam
     iframe Hpriv Hb Hslot
     isplitr
     · ipureintro; exact Or.inl ⟨hr, rfl, rfl⟩
+    isplitl []
+    · unfold openLedRow; ileft; ipureintro; exact ⟨hr, rfl⟩
     · ileft
       iframe Hfail
       isplitr
@@ -773,13 +802,15 @@ theorem openArmsCreate_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNam
       · ipureintro; rfl
   · icases Hc with (⟨%av, %ents, %nl, %hcre, %hib, HFok, Hex, Ho, Htr, Hun, %go, Hfd, Hpub⟩ |
       ⟨%avx, %entsx, %nlx, %hdx, %hent, HFex, HFok, Hchild, %av, %nl, Hnode⟩)
-    · icases openFdOk_split γ pa pid VW MW _ _ _ sts r $$ Hfd with
-        ⟨%fd, %l, %k, %fdv', ⟨%hr, %hfl, %hcl, %hins⟩, %hrc, Hpriv, Hb⟩
+    · icases openFdOk_split γ pa pid VW MW _ _ _ _ sts r $$ Hfd with
+        ⟨%fd, %l, %k, %fdv', ⟨%hr, %hfl, %hcl, %hins⟩, %hrc, Hpriv, Hb, #HL⟩
       iexists { VW with ofile := VW.ofile.set fd (fnode k) }, fdv'
       iframe Hpriv Hb Hslot
       isplitr
       · ipureintro
         exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins, trivial⟩
+      isplitl []
+      · unfold openLedRow; iright; iexists fd, _; iframe HL; ipureintro; exact ⟨hr, hcl, hins⟩
       iright
       iexists pl, d, i, nm
       iframe HP
@@ -798,13 +829,15 @@ theorem openArmsCreate_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNam
       iframe Hpub
       ipureintro; exact hrc
     · icases Hnode with (⟨%bs0, %ha, HFo, Htr, %go, Hfd, Hpub⟩ | ⟨%ma, %mi, %ha, %hma, HFo, Ht, Hfd⟩)
-      · icases openFdOk_split γ pa pid VW MW _ _ _ sts r $$ Hfd with
-          ⟨%fd, %l, %k, %fdv', ⟨%hr, %hfl, %hcl, %hins⟩, %hrc, Hpriv, Hb⟩
+      · icases openFdOk_split γ pa pid VW MW _ _ _ _ sts r $$ Hfd with
+          ⟨%fd, %l, %k, %fdv', ⟨%hr, %hfl, %hcl, %hins⟩, %hrc, Hpriv, Hb, #HL⟩
         iexists { VW with ofile := VW.ofile.set fd (fnode k) }, fdv'
         iframe Hpriv Hb Hslot
         isplitr
         · ipureintro
           exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins, trivial⟩
+        isplitl []
+        · unfold openLedRow; iright; iexists fd, _; iframe HL; ipureintro; exact ⟨hr, hcl, hins⟩
         iright
         iexists pl, d, i, nm
         iframe HP
@@ -828,13 +861,15 @@ theorem openArmsCreate_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNam
         iexists go
         iframe Hpub
         ipureintro; exact hrc
-      · icases openFdOk_split γ pa pid VW MW _ _ _ sts r $$ Hfd with
-          ⟨%fd, %l, %k, %fdv', ⟨%hr, %hfl, %hcl, %hins⟩, %hrc, Hpriv, Hb⟩
+      · icases openFdOk_split γ pa pid VW MW _ _ _ _ sts r $$ Hfd with
+          ⟨%fd, %l, %k, %fdv', ⟨%hr, %hfl, %hcl, %hins⟩, %hrc, Hpriv, Hb, #HL⟩
         iexists { VW with ofile := VW.ofile.set fd (fnode k) }, fdv'
         iframe Hpriv Hb Hslot
         isplitr
         · ipureintro
           exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins, trivial⟩
+        isplitl []
+        · unfold openLedRow; iright; iexists fd, _; iframe HL; ipureintro; exact ⟨hr, hcl, hins⟩
         iright
         iexists pl, d, i, nm
         iframe HP
@@ -873,6 +908,7 @@ theorem openArms_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (r
       ∃ (V' : ProcPriv) (sts' : List FdState),
         ⌜openSplitRow r VW V' sts sts'⌝ ∗
         procPrivFd γ pa pid V' MW ∗ fdFrags VW.fdg sts' ∗ fdSlot ∗
+        openLedRow γfs pa rt cw Mim pv vom r sts sts' ∗
         openReceipt omo Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts r sts' := by
   unfold openArms openReceipt
   cases omCreate vom
@@ -979,8 +1015,8 @@ the era's ledger, and at an O_TRUNC open (`tr`) itrunc's `trunc act i`
 before it; at `-1` nothing is claimed (a failure's verdict rides the arms'
 reasons, `openWhyRcpt`). -/
 def openOkRcpt (γfs : FsNames) (act : BitVec 64) : IProp GF :=
-  iprop(∃ (i : Nat) (γo : GName) (tr : Bool),
-    fsLedAt γfs [.open act i γo] ∗ (⌜tr = false⌝ ∨ fsLedAt γfs [.trunc act i]))
+  iprop(∃ (i : Nat) (γo : GName) (held : Bool) (po : Option Nat) (tr : Bool),
+    fsLedAt γfs [.open act i γo held po] ∗ (⌜tr = false⌝ ∨ fsLedAt γfs [.trunc act i]))
 
 instance openOkRcpt_persistent (γfs : FsNames) (act : BitVec 64) :
     Persistent (openOkRcpt (GF := GF) γfs act) := by

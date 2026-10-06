@@ -136,7 +136,7 @@ theorem sys_open_split_plain (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k :
   -- the reading has answered (Rocq TRUNC-PERMIT, `open_trunc_piece_term_arg_to_at`)
   ihave Ht := openTruncPiece_term_arg_to_at (hlc := hlc) (fsGammaL fscFs) A.vom (sysOpenIm A)
     A.v.toNat (bview plen bp) A.P A.Ft hpo $$ Ht
-  iapply hEN $$ %cpu %spie %spp %R %(k.regs 9#5) %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2
+  iapply hEN $$ %cpu %spie %spp %R %(k.regs 9#5) %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2 %hc
     %⟨hnn, hterm, hplen, hpo⟩ %hpins %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hblk HopS Htx Hbs Hir
     Hfd Hfr Hst Ho Ht HΦ
 
@@ -183,7 +183,7 @@ theorem sys_open_split_create (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k 
       (truncPermitOf (hlc := hlc) (fsGammaL fscFs) (truncTieAt (bview plen bp) A.P) Farm Fok Fex) A.Ft ⊢
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom
       (crePermit (hlc := hlc) (fsGammaL fscFs) (bview plen bp) A.P Farm Fok Fex) A.Ft from .rfl) $$ Ht
-  iapply hEC $$ %cpu %spie %spp %R %(k.regs 9#5) %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2
+  iapply hEC $$ %cpu %spie %spp %R %(k.regs 9#5) %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2 %hc
     %⟨hnn, hterm, hplen, hpo⟩ %hpins %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hblk HopS Htx Hbs Hir
     Hfd Hfr Hst Hac Hdl Ho Ht Hcl HΦ
 

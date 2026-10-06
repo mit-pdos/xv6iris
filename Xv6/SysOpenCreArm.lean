@@ -520,17 +520,17 @@ trunc component comes out at the caller's own receipt (`hrecv`: the tail's
 family and the caller's are the same RECEIPT, deviation 5). -/
 theorem sys_open_cr_ok_fresh (omo : OffMode) (Γ : FsViewNames GF) (i0 : Nat) (bs : List (BitVec 8))
     (nl0 : Nat) (Ft Ft' : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
-    (hrecv : Ft'.pfRecv = Ft.pfRecv)
+    (hrecv : Ft'.pfRecv = Ft.pfRecv) (L : FdType → IProp GF)
     (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8))
     (r : BitVec 64) :
     openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom (sysOpenCrP i0)
-      (sysOpenCrFoPure i0 ⟨.AFile bs, nl0⟩) Ft' sts VW MW r ⊢
+      (sysOpenCrFoPure i0 ⟨.AFile bs, nl0⟩) Ft' L sts VW MW r ⊢
       (if omTrunc vom then
         iprop(∃ (av' : Aview) (nl' : Nat), ⌜arowAt av' i0 ⟨.AFile bs, nl'⟩⌝ ∗ Ft.pfRecv av' i0 bs)
        else iprop(emp)) ∗
       ∃ γo : GName, openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom)
-        (.inode i0 γo omo) sts r ∗ foffPub omo γo := by
+        (.inode i0 γo omo) L sts r ∗ foffPub omo γo := by
   unfold openPostOkPlain sysOpenCrFoPure pfamTriv
   rw [hrecv]
   iintro ⟨%pl, %av, %i, -, -, Harm⟩
@@ -558,14 +558,14 @@ family with the tag permit dropped. -/
 theorem sys_open_cr_ok_exists (omo : OffMode) (Γ : FsViewNames GF) (i0 : Nat) (a0 : Anode)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft Ft' : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
-    (hrecv : Ft'.pfRecv = Ft.pfRecv)
+    (hrecv : Ft'.pfRecv = Ft.pfRecv) (L : FdType → IProp GF)
     (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8))
     (r : BitVec 64) (hnd : ∀ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
       a0 ≠ ⟨.ADir ents, nl⟩)
     (Kd : IProp GF) (hKd : openTruncAt (hlc := hlc) Γ vom i0 Ft' ⊢ Kd) :
     openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom (sysOpenCrP i0)
-      (sysOpenCrFoTag i0 a0 Fo) Ft' sts VW MW r ⊢
+      (sysOpenCrFoTag i0 a0 Fo) Ft' L sts VW MW r ⊢
       ∃ (av : Aview) (nl : Nat),
         (∃ bs0 : List (BitVec 8),
           ⌜arowAt av i0 ⟨.AFile bs0, nl⟩⌝ ∗
@@ -574,13 +574,13 @@ theorem sys_open_cr_ok_exists (omo : OffMode) (Γ : FsViewNames GF) (i0 : Nat) (
             iprop(∃ av' : Aview, ⌜arowAt av' i0 ⟨.AFile bs0, nl⟩⌝ ∗ Ft.pfRecv av' i0 bs0)
            else iprop(emp)) ∗
           ∃ γo : GName,
-            openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i0 γo omo) sts r ∗
+            openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i0 γo omo) L sts r ∗
             foffPub omo γo) ∨
         (∃ (ma mi : Nat),
           ⌜arowAt av i0 ⟨.ADev ma mi, nl⟩⌝ ∗ ⌜ma ≤ NDEV_max⌝ ∗
           Fo.pfRecv av i0 ⟨.ADev ma mi, nl⟩ ∗
           Kd ∗
-          openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) sts r) := by
+          openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) L sts r) := by
   unfold openPostOkPlain sysOpenCrFoTag
   iintro ⟨%pl, %av, %i, -, -, Harm⟩
   icases Harm with (⟨%ma, %mi, %nl, %hrow, %hmb, ⟨%htag, HP⟩, Htc, Hfd⟩ |
@@ -653,7 +653,7 @@ theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsN
     iframe HΦ Hdl Hoc Htc Hun Hw
     ipureintro; exact ⟨hl, hpre, hib⟩
   · ihave ⟨Htr, Hfd⟩ := sys_open_cr_ok_fresh (hlc := hlc) omo Γ i0 [] nl0 Ft
-      (sysOpenCrFt (hlc := hlc) Γ pl P Farm Fok Fex i0 Ft) rfl γ pa pid Mim pv vom sts VW MW r
+      (sysOpenCrFt (hlc := hlc) Γ pl P Farm Fok Fex i0 Ft) rfl _ γ pa pid Mim pv vom sts VW MW r
       $$ Hok
     unfold sysOpenCrFresh
     icases HR with ⟨%d, %nm, %av, %ents, %nl, %hl, %hpre, %hib, HP, HΦ, Hdl, Hoc, Hun⟩
@@ -741,7 +741,7 @@ theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : Fs
       iframe HP2
       ipureintro; exact hax
   · ihave Hrest := sys_open_cr_ok_exists (hlc := hlc) omo Γ i0 a0 Fo Ft
-      (sysOpenCrFtEx (hlc := hlc) Γ pl P Farm Fex i0 Ft) rfl γ pa pid Mim pv vom sts VW MW r hnd
+      (sysOpenCrFtEx (hlc := hlc) Γ pl P Farm Fex i0 Ft) rfl _ γ pa pid Mim pv vom sts VW MW r hnd
       (creTruncKeptEx (hlc := hlc) Γ vom pl P Farm Fex i0 Ft) .rfl $$ Hok
     unfold sysOpenCrExists
     icases HR with ⟨%d, %nm, %av, %ents, %nl, %hl, %hrow, %hent, HP, HΦ, Hac, Hcl⟩

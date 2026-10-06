@@ -450,15 +450,15 @@ EVERY sbrk ecall, the boot prefix at the actor -- the row reads no ledger
 (a `-1` is the key's quota overrun).  The row is `sbrkArm_fits` at the
 record the call left (`V'`: the answer stored, the break and the lazy bit
 `sysSbrkOk`'s `V2`'s). -/
-theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
+theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (sts : List FdState) {sts' : List FdState} (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (gn : GName) (act : BitVec 64) (ke : Nat)
     (v0 v1 r : BitVec 64) (hn : syscNum V = 12) (hw0 : tfW V.tf (tfArgIdx 0) = v0)
     (hw1 : tfW V.tf (tfArgIdx 1) = v1) (hszb : V.sz.toNat ≤ uvmMaxsz)
     (hok : sysSbrkOk V V2 M M2 v0 v1 r) (ha : syscA0 V' = r) (hsz : V'.sz = V2.sz)
     (hlz : V'.pvLazy = V2.pvLazy) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
-      |==> syscEvOut (hlc := hlc) V M sts V' M' cs cs gn := by
-  have hrow : ∀ ι : UIota, syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs sts ι := by
+      |==> syscEvOut (hlc := hlc) V M sts sts' V' M' cs cs gn := by
+  have hrow : ∀ ι : UIota, syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs sts sts' ι := by
     intro ι
     refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
       fun h' => absurd (hn.symm.trans h') (by decide), fun _ => ?_,
@@ -472,7 +472,7 @@ theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (sts :
   iintro #Ha
   imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
   imodintro
-  iapply syscEvOut_cite V M sts V' M' cs cs gn ke { UIota.boot with act := act } (hrow _) $$ Ha Hl
+  iapply syscEvOut_cite V M sts sts' V' M' cs cs gn ke { UIota.boot with act := act } (hrow _) $$ Ha Hl
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 12, `sys_sbrk`** (Rocq `sysc_arm_sbrk`; the whole block, D16). -/

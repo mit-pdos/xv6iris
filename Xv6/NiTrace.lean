@@ -87,7 +87,8 @@ its observable form, and the strong instance.
    FILE and write on a writable inode descriptor, at a lazy-free key whose
    buffer the call needs is mapped as it needs it (scope 16), and (NI M3
    FS-2b) chdir at a lazy-free key holding its path argument and mkdir at a
-   lazy-free key (scope 17)**
+   lazy-free key, and (FS-2b′) open at a lazy-free key holding its path
+   argument (scope 17)**
    (`UsysDet.usysDetClassAtF`); every other ecall's enter is UNCONSTRAINED by
    the law, and the two-run corollaries assume the incarnation's ecalls are
    all in the class.  The
@@ -439,9 +440,8 @@ its observable form, and the strong instance.
    (fork and dup share it) are conceded through the ledger histories `H`
    until FS-3/4's footprint theorem.  OUTSIDE the class: fstat (its 4-byte
    padding hole is stale kernel stack, FS-0: recorded as a channel, not
-   named -- the key's image cannot be pinned), directory reads, open
-   (FS-2b′), link/unlink/mknod (FS-2c), pipes, devices other than the
-   console.
+   named -- the key's image cannot be pinned), directory reads,
+   link/unlink/mknod (FS-2c), pipes, devices other than the console.
 17. **The path rows read the walk** (NI M3 FS-2b, rulings FS-R3, R4, R6,
    R8 and the coordinator's rulings (a) and (A) of 2026-10-06).  chdir at
    a lazy-free key whose image holds its path argument (the NUL-terminated
@@ -469,7 +469,28 @@ its observable form, and the strong instance.
    (FS-4 must show the answers do not depend on them once the history is
    restricted to the footprint), mkdir's outcome.  The failure arms cite
    the boot prefix (their `-1` is the row's at every prefix not closing on
-   a success).  OUTSIDE: open (FS-2b′), chroot.
+   a success).  (FS-2b′) open at a lazy-free key holding its path argument
+   joins the class: its answer and RESUMED TABLE are derived from the cited
+   fs prefix, which ends in the caller's INSTALL `open act i γo held prev`
+   -- itself a row-reading observation, appended at the opened row under
+   the lock its type test holds (`FsWalkLed.ftopObsAfterAt`), so the open
+   needs no separate `look`.  Its back-pointer names what fixed `i`
+   (`NiFs.fevOpenFixed`): on a plain open the walk's last lookup, followed
+   as chdir's from the cited root or the key's cwd with one lookup per
+   element; under O_CREATE create's arm (a made child) or create's lookup
+   that found the name, whose prefix's fold names `nm ↦ i` in the parent.
+   The descriptor type is the fold's row before the install read at the
+   key's omode word (`usysOpenRow`: a file or a readable-only directory an
+   inode descriptor at the install's offset shadow and mode, a device of
+   major at most `NDEV` a device descriptor), the slot the key's LOWEST
+   CLOSED one (`wslot`); anything else answers `-1` with the table kept
+   (`usysOpenAns`/`usysOpenFd`).  RECORDED AS GIVEN beyond chdir's: the
+   install's offset shadow and offset mode, and O_CREATE's walk to the
+   parent (create's lookup that found the name is checked against its
+   parent's entry, not resolved from the root; a made child is checked
+   against its arm).  The resumed table rides the cited row: SYSCALL's and
+   USERTRAP's evidence (`syscEvOut`/`utEvOut`) bind it (`syscEvRow`'s new
+   argument).  OUTSIDE: chroot.
 
 getpid's answer is the incarnation's pid (W2d's `niPidRow`: `a0 =
 signExtend 64 W.pid`, and the filing's pid is `W'.pid = W.pid`), so getpid
@@ -569,7 +590,8 @@ NI M3 quotas Q-2: on the quota kernel no class row reads it (scopes 8, 9;
    step field: it rides the CITATION (`UIota.rt`, compared through
    `NiPos.rt` beside `act`), filed per round with it.  The class gains the
    path reading's presence (`wpath.isSome`, `usysDetClassAtF`'s last
-   argument); `classReading` admits chdir and mkdir at a lazy-free key.
+   argument); `classReading` admits chdir and mkdir at a lazy-free key,
+   (FS-2b′) and open at a lazy-free key.
 
 PURE: imports `NiLedger` (its pure definitions only) and `UsysDet`.
 -/
@@ -822,7 +844,11 @@ three clauses): the exit is an exit, the enter an enter, and
   the CITED prefix (its type test, the walk followed through the lookups'
   back-pointers from the cited root `ι.rt`), at a lazy-free key holding the
   path; mkdir's `usysMkdirAns` at the CITED prefix (the parent leg, its
-  outcome event), at a lazy-free key (scope 17);
+  outcome event), at a lazy-free key (scope 17); (NI M3 FS-2b′) open's
+  `usysOpenAns` at the step's readings `wpath`, `wcwd`, the key's lowest
+  closed slot `wslot`, the exit's omode word and the CITED prefix (the
+  caller's install, what fixed its inode checked through the back-pointer),
+  at a lazy-free key holding the path;
 * every other ecall is unconstrained. -/
 def niRoundLaw (secc : BitVec 64) (lz : Bool) (win : Nat) (sz : Nat) (wcon : Option Nat)
     (wout : List (BitVec 8)) (wfd : Option FdState) (wslot : Option Nat) (wbuf : Bool × Bool)
@@ -853,7 +879,9 @@ def niRoundLaw (secc : BitVec 64) (lz : Bool) (win : Nat) (sz : Nat) (wcon : Opt
         ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysWriteAnsF (gprsA2 xg) ι) ∧
       (gprsNum secc xg = USYS_chdir → lz = false → wpath.isSome = true →
         ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysChdirAns wpath wcwd ι) ∧
-      (gprsNum secc xg = USYS_mkdir → lz = false → ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysMkdirAns ι))
+      (gprsNum secc xg = USYS_mkdir → lz = false → ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysMkdirAns ι) ∧
+      (gprsNum secc xg = USYS_open → lz = false → wpath.isSome = true →
+        ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysOpenAns wpath wcwd (gprsA1 xg) ι wslot))
 
 /-- One step's law, at the incarnation's pid: an origin's enter is its first
 key's resume; a round obeys `niRoundLaw`. -/
@@ -1081,9 +1109,23 @@ theorem niDetRow_mkdir {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
     (hd : niDetRow sc W W' (some (k, ι))) (hsc : sc = uecallScause) (hm : uvisNum (uvisRun W) = USYS_mkdir)
     (hlz : (uvisRun W).lazy = false) :
     gprsA0 (tfGprs W'.tf) = usysMkdirAns ι := by
-  have he := hd hsc (Or.inr (Or.inr (Or.inr (Or.inr ⟨hm, hlz⟩))))
+  have he := hd hsc (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨hm, hlz⟩)))))
   rw [hm, usysDet_mkdir] at he
   unfold usysDetMkdir at he
+  exact ukeyEq_bump_a0 he
+
+/-- **M0's row at the cited ι gives open's answer** (NI M3 FS-2b′;
+`usysDet_open`): at a lazy-free key holding its path argument,
+`usysOpenAns` at the key's path, cwd, omode word and lowest closed slot and
+the cited prefix. -/
+theorem niDetRow_open {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
+    (hd : niDetRow sc W W' (some (k, ι))) (hsc : sc = uecallScause) (ho : uvisNum (uvisRun W) = USYS_open)
+    (hlz : (uvisRun W).lazy = false) (hp : (usysPath (uvisRun W)).isSome = true) :
+    gprsA0 (tfGprs W'.tf) = usysOpenAns (usysPath (uvisRun W)) (uvisRun W).cwd (tfW (uvisRun W).tf (tfArgIdx 1)) ι
+      (fdLowestClosed (uvisRun W).fd) := by
+  have he := hd hsc (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ⟨ho, hlz, hp⟩)))))
+  rw [ho, usysDet_open] at he
+  unfold usysDetOpen at he
   exact ukeyEq_bump_a0 he
 
 /-- A round whose filing cites exactly at the citing numbers cites at an
@@ -1094,7 +1136,7 @@ theorem niCiting_some {sc : BitVec 64} {W : Uvis} {c : Option (Nat × UIota)} (h
     (hn : uvisNum (uvisRun W) = USYS_uptime ∨ uvisNum (uvisRun W) = USYS_wait ∨
       uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_sbrk ∨ uvisNum (uvisRun W) = USYS_write ∨
       uvisNum (uvisRun W) = USYS_close ∨ uvisNum (uvisRun W) = USYS_dup ∨ uvisNum (uvisRun W) = USYS_read ∨
-      uvisNum (uvisRun W) = USYS_chdir ∨ uvisNum (uvisRun W) = USYS_mkdir) :
+      uvisNum (uvisRun W) = USYS_chdir ∨ uvisNum (uvisRun W) = USYS_mkdir ∨ uvisNum (uvisRun W) = USYS_open) :
     ∃ k ι, c = some (k, ι) := by
   have := hc.mp ⟨hsc, hn⟩
   obtain ⟨⟨k, ι⟩, hki⟩ := Option.isSome_iff_exists.mp this
@@ -1147,7 +1189,7 @@ theorem niStepOf_law {h : List Obs} {f : NiEntry} {s : NiStep} (hf : niEntryOk h
           rw [← gprList_tfResumeGpr0, ← gprList_tfResumeGpr0, hb1, hg0, gprList_set10]
         have ha0 : gprsA0 (tfGprs W'.tf) = r := by
           rw [← gprList_tfResumeGpr0, gprsA0_gprList, hb1]; simp
-        refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+        refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
         · rw [hpc, hb2, hep]
         · rw [ha0, heg]
         · intro hg
@@ -1257,8 +1299,17 @@ theorem niStepOf_law {h : List Obs} {f : NiEntry} {s : NiStep} (hf : niEntryOk h
           intro hm hlzf
           rw [← hrun] at hm
           obtain ⟨k, ι, rfl⟩ := niCiting_some hcit hsc
-            (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr hm)))))))))
+            (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hm))))))))))
           exact ⟨k, ι, rfl, niDetRow_mkdir hdet hsc hm hlzf⟩
+        · -- (NI M3 FS-2b′) open: the step's readings `wpath`, `wcwd`, `wslot` are the key's
+          intro ho hlzf hp
+          rw [← hrun] at ho
+          obtain ⟨k, ι, rfl⟩ := niCiting_some hcit hsc
+            (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ho))))))))))
+          refine ⟨k, ι, rfl, ?_⟩
+          have hp' : (usysPath (uvisRun W)).isSome = true := by rw [usysPath_run]; exact hp
+          rw [niDetRow_open hdet hsc ho hlzf hp', usysPath_run, uvisRun_arg W 1 (by decide), gprsA1_tfGprs]
+          rfl
 
 /-- **`niOk_classLaw`: THE LEDGER'S FILING OBEYS THE CLASS LAW** -- pure, at
 every incarnation. -/
@@ -1399,7 +1450,7 @@ theorem NiStep.output_eq_of {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.
       (gprsNum secc xg = USYS_uptime ∨ gprsNum secc xg = USYS_wait ∨ gprsNum secc xg = USYS_fork ∨
         gprsNum secc xg = USYS_sbrk ∨ gprsNum secc xg = USYS_write ∨ gprsNum secc xg = USYS_close ∨
         gprsNum secc xg = USYS_dup ∨ gprsNum secc xg = USYS_read ∨ gprsNum secc xg = USYS_chdir ∨
-        gprsNum secc xg = USYS_mkdir) →
+        gprsNum secc xg = USYS_mkdir ∨ gprsNum secc xg = USYS_open) →
       ∀ pc₁ eg₁ pc₂ eg₂, enterView e = some (pc₁, eg₁) → enterView e' = some (pc₂, eg₂) →
       gprsA0 eg₁ = gprsA0 eg₂) :
     s₁.output = s₂.output := by
@@ -1424,7 +1475,7 @@ theorem NiStep.output_eq_of {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.
       obtain ⟨hp₁, hg₁, hpid₁, hpz₁, -⟩ := hb₁ rfl hres
       obtain ⟨hp₂, hg₂, hpid₂, hpz₂, -⟩ := hb₂ rfl hres
       have ha : gprsA0 eg₁ = gprsA0 eg₂ := by
-        rcases hres with (hn | hn | hn | hn) | hn | hn | hn | hn | hn | hn | hn | hn
+        rcases hres with (hn | hn | hn | hn) | hn | hn | hn | hn | hn | hn | hn | hn | hn
         · rw [hpid₁ hn, hpid₂ hn]
         · exact hans secc lz win sz wcon wout wfd wslot wbuf wpath wcwd x e c lz' win' sz' wcon' wout' wfd' wslot' wbuf' wpath' wcwd' x' e' c' ep xg rfl rfl hx₁ (Or.inl hn) _ _ _ _ he₁ he₂
         · exact hans secc lz win sz wcon wout wfd wslot wbuf wpath wcwd x e c lz' win' sz' wcon' wout' wfd' wslot' wbuf' wpath' wcwd' x' e' c' ep xg rfl rfl hx₁
@@ -1445,7 +1496,9 @@ theorem NiStep.output_eq_of {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.
         · exact hans secc lz win sz wcon wout wfd wslot wbuf wpath wcwd x e c lz' win' sz' wcon' wout' wfd' wslot' wbuf' wpath' wcwd' x' e' c' ep xg rfl rfl hx₁
             (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hn))))))))) _ _ _ _ he₁ he₂
         · exact hans secc lz win sz wcon wout wfd wslot wbuf wpath wcwd x e c lz' win' sz' wcon' wout' wfd' wslot' wbuf' wpath' wcwd' x' e' c' ep xg rfl rfl hx₁
-            (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr hn))))))))) _ _ _ _ he₁ he₂
+            (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hn)))))))))) _ _ _ _ he₁ he₂
+        · exact hans secc lz win sz wcon wout wfd wslot wbuf wpath wcwd x e c lz' win' sz' wcon' wout' wfd' wslot' wbuf' wpath' wcwd' x' e' c' ep xg rfl rfl hx₁
+            (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr hn)))))))))) _ _ _ _ he₁ he₂
       rw [hp₁, hp₂, hg₁, hg₂, ha]
     · obtain ⟨hp₁, hg₁⟩ := ht₁ hsc
       obtain ⟨hp₂, hg₂⟩ := ht₂ hsc
@@ -1510,7 +1563,7 @@ theorem NiStep.output_eq {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law
     obtain ⟨rfl, rfl⟩ := he₂'
     have hcl := hcls secc lz win sz wcon wout wfd wslot wbuf wpath wcwd x e c rfl ep xg hx
     have hres : usysDetResumes (gprsNum secc xg) := by
-      rcases hn with hn | hn | hn | hn | hn | hn | hn | hn | hn | hn
+      rcases hn with hn | hn | hn | hn | hn | hn | hn | hn | hn | hn | hn
       · exact Or.inl (Or.inr (Or.inl hn))
       · exact Or.inr (Or.inl hn)
       · exact Or.inr (Or.inr (Or.inl hn))
@@ -1520,10 +1573,11 @@ theorem NiStep.output_eq {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law
       · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hn)))))
       · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hn))))))
       · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hn)))))))
-      · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr hn)))))))
-    obtain ⟨-, -, -, -, hu₁, hw₁, hf₁, hs₁, hwr₁, hcl₁, hdp₁, hrd₁, hwi₁, hcd₁, hmk₁⟩ := hb₁ rfl hres
-    obtain ⟨-, -, -, -, hu₂, hw₂, hf₂, hs₂, hwr₂, hcl₂, hdp₂, hrd₂, hwi₂, hcd₂, hmk₂⟩ := hb₂ rfl hres
-    rcases hn with hn | hn | hn | hn | hn | hn | hn | hn | hn | hn
+      · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hn))))))))
+      · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr hn))))))))
+    obtain ⟨-, -, -, -, hu₁, hw₁, hf₁, hs₁, hwr₁, hcl₁, hdp₁, hrd₁, hwi₁, hcd₁, hmk₁, hop₁⟩ := hb₁ rfl hres
+    obtain ⟨-, -, -, -, hu₂, hw₂, hf₂, hs₂, hwr₂, hcl₂, hdp₂, hrd₂, hwi₂, hcd₂, hmk₂, hop₂⟩ := hb₂ rfl hres
+    rcases hn with hn | hn | hn | hn | hn | hn | hn | hn | hn | hn | hn
     · obtain ⟨k, ι, hc₁, ha₁⟩ := hu₁ hn
       obtain ⟨k', ι', hc₂, ha₂⟩ := hu₂ hn
       have hl := hled hc₁ hc₂
@@ -1592,6 +1646,14 @@ theorem NiStep.output_eq {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law
       have hl := hled hc₁ hc₂
       rw [ha₁, ha₂]
       show usysMkdirAns ι.led = usysMkdirAns ι'.led
+      rw [hl]
+    · -- (NI M3 FS-2b′) open: at the one `wpath`, `wcwd`, `wslot` and cited ledger part
+      obtain ⟨hlzf, hp⟩ := usysDetClassAtF_open hcl hn
+      obtain ⟨k, ι, hc₁, ha₁⟩ := hop₁ hn hlzf hp
+      obtain ⟨k', ι', hc₂, ha₂⟩ := hop₂ hn hlzf hp
+      have hl := hled hc₁ hc₂
+      rw [ha₁, ha₂]
+      show usysOpenAns wpath wcwd (gprsA1 xg) ι.led wslot = usysOpenAns wpath wcwd (gprsA1 xg) ι'.led wslot
       rw [hl]
 
 /-- **`niTwoRun`, the trace form** (M2-X4): two lawful traces with equal
@@ -1671,7 +1733,8 @@ def NiStep.classReading : NiStep → Option (BitVec 64)
           (gprsNum secc xg = USYS_wait ∧ (gprsA0 xg = 0#64 ∨ lz = false)) ∨ gprsNum secc xg = USYS_fork ∨
           gprsNum secc xg = USYS_sbrk ∨ (gprsNum secc xg = USYS_write ∧ lz = false) ∨
           gprsNum secc xg = USYS_close ∨ gprsNum secc xg = USYS_dup ∨ gprsNum secc xg = USYS_read ∨
-          (gprsNum secc xg = USYS_chdir ∧ lz = false) ∨ (gprsNum secc xg = USYS_mkdir ∧ lz = false))
+          (gprsNum secc xg = USYS_chdir ∧ lz = false) ∨ (gprsNum secc xg = USYS_mkdir ∧ lz = false) ∨
+          (gprsNum secc xg = USYS_open ∧ lz = false))
       then some (enterA0 e) else none
     | none => none
 
@@ -1743,9 +1806,10 @@ theorem niTwoRunObs_trace (q : NiInc) : ∀ (tr₁ tr₂ : List NiStep), NiClass
             gprsNum secc xg = USYS_fork ∨ gprsNum secc xg = USYS_sbrk ∨
             (gprsNum secc xg = USYS_write ∧ lz = false) ∨
             gprsNum secc xg = USYS_close ∨ gprsNum secc xg = USYS_dup ∨ gprsNum secc xg = USYS_read ∨
-            (gprsNum secc xg = USYS_chdir ∧ lz = false) ∨ (gprsNum secc xg = USYS_mkdir ∧ lz = false)) := by
+            (gprsNum secc xg = USYS_chdir ∧ lz = false) ∨ (gprsNum secc xg = USYS_mkdir ∧ lz = false) ∨
+            (gprsNum secc xg = USYS_open ∧ lz = false)) := by
         refine ⟨rfl, ?_⟩
-        rcases hn with hn | hn | hn | hn | hn | hn | hn | hn | hn | hn
+        rcases hn with hn | hn | hn | hn | hn | hn | hn | hn | hn | hn | hn
         · exact Or.inl hn
         · exact Or.inr (Or.inl ⟨hn, usysDetClassAtF_wait hcl hn⟩)
         · exact Or.inr (Or.inr (Or.inl hn))
@@ -1758,7 +1822,9 @@ theorem niTwoRunObs_trace (q : NiInc) : ∀ (tr₁ tr₂ : List NiStep), NiClass
         · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
             (Or.inl ⟨hn, (usysDetClassAtF_chdir hcl hn).1⟩))))))))
         · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
-            (Or.inr ⟨hn, usysDetClassAtF_mkdir hcl hn⟩))))))))
+            (Or.inr (Or.inl ⟨hn, usysDetClassAtF_mkdir hcl hn⟩)))))))))
+        · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+            (Or.inr (Or.inr ⟨hn, (usysDetClassAtF_open hcl hn).1⟩)))))))))
       have hx' : exitView x' = some (uecallScause, ep, xg) := by rw [← hin.1.2.2.2, hx]
       have hr := hrd.1
       simp only [NiStep.classReading, hx, hx'] at hr
@@ -2156,7 +2222,7 @@ theorem NiStep.output_eq_fam {r : BitVec 32} {pid : BitVec 32} {s₁ s₂ : NiSt
     obtain ⟨rfl, rfl⟩ := he₂'
     have hcl := hcls secc lz win sz wcon wout wfd wslot wbuf wpath wcwd x e c rfl ep xg hx
     have hres : usysDetResumes (gprsNum secc xg) := by
-      rcases hn with hn | hn | hn | hn | hn | hn | hn | hn | hn | hn
+      rcases hn with hn | hn | hn | hn | hn | hn | hn | hn | hn | hn | hn
       · exact Or.inl (Or.inr (Or.inl hn))
       · exact Or.inr (Or.inl hn)
       · exact Or.inr (Or.inr (Or.inl hn))
@@ -2166,10 +2232,11 @@ theorem NiStep.output_eq_fam {r : BitVec 32} {pid : BitVec 32} {s₁ s₂ : NiSt
       · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hn)))))
       · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hn))))))
       · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hn)))))))
-      · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr hn)))))))
-    obtain ⟨-, -, -, -, hu₁, hwt₁, hf₁, hs₁, hwr₁, hcl₁, hdp₁, hrd₁, hwi₁, hcd₁, hmk₁⟩ := hb₁ rfl hres
-    obtain ⟨-, -, -, -, hu₂, hwt₂, hf₂, hs₂, hwr₂, hcl₂, hdp₂, hrd₂, hwi₂, hcd₂, hmk₂⟩ := hb₂ rfl hres
-    rcases hn with hn | hn | hn | hn | hn | hn | hn | hn | hn | hn
+      · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hn))))))))
+      · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr hn))))))))
+    obtain ⟨-, -, -, -, hu₁, hwt₁, hf₁, hs₁, hwr₁, hcl₁, hdp₁, hrd₁, hwi₁, hcd₁, hmk₁, hop₁⟩ := hb₁ rfl hres
+    obtain ⟨-, -, -, -, hu₂, hwt₂, hf₂, hs₂, hwr₂, hcl₂, hdp₂, hrd₂, hwi₂, hcd₂, hmk₂, hop₂⟩ := hb₂ rfl hres
+    rcases hn with hn | hn | hn | hn | hn | hn | hn | hn | hn | hn | hn
     · obtain ⟨k, ι, hc₁, ha₁⟩ := hu₁ hn
       obtain ⟨k', ι', hc₂, ha₂⟩ := hu₂ hn
       have hl := hfl hc₁ hc₂
@@ -2242,6 +2309,15 @@ theorem NiStep.output_eq_fam {r : BitVec 32} {pid : BitVec 32} {s₁ s₂ : NiSt
       have hl := hfl hc₁ hc₂
       rw [ha₁, ha₂]
       show usysMkdirAns (ι.famLed r) = usysMkdirAns (ι'.famLed r)
+      rw [hl]
+    · -- (NI M3 FS-2b′) open, at the one cited family part
+      obtain ⟨hlzf, hp⟩ := usysDetClassAtF_open hcl hn
+      obtain ⟨k, ι, hc₁, ha₁⟩ := hop₁ hn hlzf hp
+      obtain ⟨k', ι', hc₂, ha₂⟩ := hop₂ hn hlzf hp
+      have hl := hfl hc₁ hc₂
+      rw [ha₁, ha₂]
+      show usysOpenAns wpath wcwd (gprsA1 xg) (ι.famLed r) wslot =
+        usysOpenAns wpath wcwd (gprsA1 xg) (ι'.famLed r) wslot
       rw [hl]
 
 /-- **`niTwoRunFam`, the trace form**: `niTwoRun_trace` with family inputs, histories with one family part

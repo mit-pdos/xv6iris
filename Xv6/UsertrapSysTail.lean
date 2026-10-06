@@ -42,11 +42,11 @@ zombie, so `-1` with nothing moved) the answer satisfies (NI M2-G1e: the
 disjunct carries it -- the column kept, no status bytes -- at any status
 pointer).  Such a round never resumes (usertrap's +0xa6 check takes the
 shot), so the citation is never filed. -/
-theorem ut_evOut_of (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
+theorem ut_evOut_of (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)
     (cs2 : ExtTreeSet GName compare) (ke : Nat) (act : BitVec 64) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
-      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M A.sts V2 M2 A.cs cs2 A.gn -∗
-      |==> utEvOut (hlc := hlc) A.sc A.sep A.V A.M A.sts V2 M2 A.cs cs2 := by
+      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M A.sts sts2 V2 M2 A.cs cs2 A.gn -∗
+      |==> utEvOut (hlc := hlc) A.sc A.sep A.V A.M A.sts sts2 V2 M2 A.cs cs2 := by
   iintro #Ha #He
   unfold syscEvOut utEvOut
   icases He with (%hq | ⟨%k, %ι, #Hk, #Hl, %hr⟩ | ⟨%hk, -⟩)
@@ -87,7 +87,7 @@ theorem ut90_outs (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
         (syscImg V2 M2) sts2 V2.cwi cs2 ∗
       syscForkOut A.f (utSysRec A.sep A.V) (syscA0 V2) A.cs cs2 ∗
       syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid ∗
-      utEvOut (hlc := hlc) A.sc A.sep A.V A.M A.sts V2 M2 A.cs cs2 ⊢
+      utEvOut (hlc := hlc) A.sc A.sep A.V A.M A.sts sts2 V2 M2 A.cs cs2 ⊢
     utOuts (hlc := hlc) A V2 M2 sts2 cs2 := by
   unfold utOuts utExecOut utForkOut utWaitOut utSysOut
   iintro ⟨Hx, Hs, Hf, Hw, He⟩
@@ -122,7 +122,7 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA :
         (syscImg V2 M2) sts2 V2.cwi cs2 ∗
       syscForkOut A.f (utSysRec A.sep A.V) (syscA0 V2) A.cs cs2 ∗
       syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid ∗
-      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M A.sts V2 M2 A.cs cs2 A.gn
+      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M A.sts sts2 V2 M2 A.cs cs2 A.gn
     ⊢ wpLoop (GF := GF) cpu := by
   have hr0 : UtRows0 A V2 M2 sts2 cs2 := ut_rows_of_sysc A V2 M2 sts2 cs2 hok.hlen hok.hP hb hsc hrows
   have hbase : utBase A.k (A.k.intrOn.withSpie a b) :=
@@ -138,7 +138,7 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA :
   -- anchor off the environment, the dispatcher's citation re-spelled
   icases syscallEnv_anchor_keep PT Γ A.N.f $$ Henv with ⟨⟨%ke, #Hanc⟩, Henv⟩
   iapply wpLoop_bupd
-  imod ut_evOut_of A V2 M2 cs2 ke (procAddr A.j) $$ Hanc Heo with Hev
+  imod ut_evOut_of A V2 M2 sts2 cs2 ke (procAddr A.j) $$ Hanc Heo with Hev
   imodintro
   ihave Houts := ut90_outs A V2 M2 sts2 cs2 $$ [Hxo Hso Hfo Hwo Hev]
   · iframe Hxo Hso Hfo Hwo Hev

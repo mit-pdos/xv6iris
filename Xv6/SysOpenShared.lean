@@ -274,16 +274,16 @@ publication only earns its antecedent. -/
 theorem sys_open_arm_dev (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
+    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (L : FdType → IProp GF) (sts : List FdState)
     (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (pl : List (BitVec 8)) (i ma mi nl : Nat)
     (hpl : argPathOf Mim pv pl) (hma : ma ≤ NDEV_max) :
     curKept vom P (pathElems pl).length i ⊢
       (∃ av : Aview, ⌜arowAt av i ⟨.ADev ma mi, nl⟩⌝ ∗ Fo.pfRecv av i ⟨.ADev ma mi, nl⟩) -∗
       plainTruncKept (hlc := hlc) Γ vom pl P i Ft -∗
       ∀ r : BitVec 64,
-        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) sts r -∗
+        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) L sts r -∗
         foffPubT omo (.device ma) -∗
-        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
+        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft L sts VW MW r := by
   iintro HP ⟨%av, %hav, HΦ⟩ Htc %r Hfd -
   unfold openPostOkPlain
   iexists pl, av, i
@@ -300,16 +300,16 @@ caller owed none and the arm returns none. -/
 theorem sys_open_arm_file (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
+    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (L : FdType → IProp GF) (sts : List FdState)
     (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (pl : List (BitVec 8)) (i : Nat)
     (bs0 : List (BitVec 8)) (nl : Nat) (γo : GName)
     (hpl : argPathOf Mim pv pl) (hnt : omTrunc vom = false) :
     curKept vom P (pathElems pl).length i ⊢
       (∃ av : Aview, ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗ Fo.pfRecv av i ⟨.AFile bs0, nl⟩) -∗
       ∀ r : BitVec 64,
-        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) sts r -∗
+        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) L sts r -∗
         foffPubT omo (.inode i γo omo) -∗
-        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
+        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft L sts VW MW r := by
   iintro HP ⟨%av, %hav, HΦ⟩ %r Hfd Hpub
   unfold openPostOkPlain
   iexists pl, av, i
@@ -334,7 +334,7 @@ theorem sys_open_arm_file (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames)
 theorem sys_open_arm_file_tr (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
+    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (L : FdType → IProp GF) (sts : List FdState)
     (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (pl : List (BitVec 8)) (i : Nat)
     (bs0 : List (BitVec 8)) (nl : Nat) (γo : GName)
     (hpl : argPathOf Mim pv pl) (ht : omTrunc vom = true) :
@@ -342,9 +342,9 @@ theorem sys_open_arm_file_tr (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNam
       (∃ av : Aview, ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗ Fo.pfRecv av i ⟨.AFile bs0, nl⟩) -∗
       (∃ av' : Aview, ⌜arowAt av' i ⟨.AFile bs0, nl⟩⌝ ∗ Ft.pfRecv av' i bs0) -∗
       ∀ r : BitVec 64,
-        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) sts r -∗
+        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) L sts r -∗
         foffPubT omo (.inode i γo omo) -∗
-        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
+        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft L sts VW MW r := by
   iintro HP ⟨%av, %hav, HΦ⟩ Htr %r Hfd Hpub
   unfold openPostOkPlain
   iexists pl, av, i
@@ -369,7 +369,7 @@ pays the writable-fd-is-not-a-directory theorem (`omRdonly_modes`). -/
 theorem sys_open_arm_dir (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
+    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (L : FdType → IProp GF) (sts : List FdState)
     (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (pl : List (BitVec 8)) (i : Nat)
     (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat) (γo : GName)
     (hpl : argPathOf Mim pv pl) (h0 : omArg vom = 0) :
@@ -377,9 +377,9 @@ theorem sys_open_arm_dir (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) 
       (∃ av : Aview, ⌜arowAt av i ⟨.ADir ents, nl⟩⌝ ∗ Fo.pfRecv av i ⟨.ADir ents, nl⟩) -∗
       plainTruncKept (hlc := hlc) Γ vom pl P i Ft -∗
       ∀ r : BitVec 64,
-        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) sts r -∗
+        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) L sts r -∗
         foffPubT omo (.inode i γo omo) -∗
-        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
+        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft L sts VW MW r := by
   obtain ⟨hrd, hwr⟩ := omRdonly_modes vom h0
   rw [hrd, hwr]
   iintro HP ⟨%av, %hav, HΦ⟩ Htc %r Hfd Hpub
@@ -407,7 +407,7 @@ mask was empty or the type test failed). -/
 theorem sys_open_arm_notr (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
+    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (L : FdType → IProp GF) (sts : List FdState)
     (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (pl : List (BitVec 8)) (i : Nat)
     (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)) (t : FdType) (γo : GName)
     (hpl : argPathOf Mim pv pl)
@@ -420,26 +420,26 @@ theorem sys_open_arm_notr (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames)
     curKept vom P (pathElems pl).length i ⊢
       sysOpenObs Fo i (eraNode dn bm data) -∗ plainTruncKept (hlc := hlc) Γ vom pl P i Ft -∗
       ∀ r : BitVec 64,
-        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) t sts r -∗
+        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) t L sts r -∗
         foffPubT omo t -∗
-        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
+        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft L sts VW MW r := by
   unfold sysOpenObs
   rcases hen with hd | hf | hv
   · have ht := hino (by rw [hd]; decide)
     subst ht
     rw [opfEra_dir_row dn bm data hd]
-    exact sys_open_arm_dir omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW pl i _ _ γo hpl (hdirk hd)
+    exact sys_open_arm_dir omo Γ γ pa pid Mim pv vom P Fo Ft L sts VW MW pl i _ _ γo hpl (hdirk hd)
   · have ht := hino (by rw [hf]; decide)
     subst ht
     have hntf : omTrunc vom = false := hnt.elim id (fun h => absurd hf h)
     rw [opfEra_file_row dn bm data hf]
     iintro HP Hobs -
-    iapply sys_open_arm_file omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW pl i _ _ γo hpl hntf
+    iapply sys_open_arm_file omo Γ γ pa pid Mim pv vom P Fo Ft L sts VW MW pl i _ _ γo hpl hntf
       $$ HP Hobs
   · obtain ⟨hmb, ht⟩ := hdev hv
     subst ht
     rw [opfEra_dev_row dn bm data (by rw [hv]; decide) (by rw [hv]; decide)]
-    exact sys_open_arm_dev omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW pl i _ _ _ hpl hmb
+    exact sys_open_arm_dev omo Γ γ pa pid Mim pv vom P Fo Ft L sts VW MW pl i _ _ _ hpl hmb
 
 /-! ## §5.  The failure tails' common continuation -/
 
@@ -470,7 +470,7 @@ theorem sys_open_fail_ret (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (nsj : Nat
   ihave Hisl := (irefSlots_op nsj 1).2 $$ [$Hisl $Hiru]
   rw [hns]
   unfold sysOpenResidue
-  icases Hres with ⟨%hpl, HP, Hobs, Htc⟩
+  icases Hres with ⟨%hpl, #Hpre, HP, Hobs, Htc⟩
   ispecialize Hpost $$ %c'
   unfold sysOpenPostP sysOpenK
   iapply Hpost $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hisl

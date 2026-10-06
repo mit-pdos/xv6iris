@@ -243,7 +243,7 @@ theorem sys_open_alloc_fail_ret_f (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (n
   have e : nsj - 1 + 2 = A.ns := by omega
   rw [e]
   unfold sysOpenResidue
-  icases Hres with ⟨%hpl, HP, Hobs, Htc⟩
+  icases Hres with ⟨%hpl, #Hpre, HP, Hobs, Htc⟩
   ispecialize Hpost $$ %c'
   unfold sysOpenPostP sysOpenK
   iapply Hpost $$ %spie' %spp' %R' %P2 %k2 %hcs %hP2 %hk2 Hk Hpc Hte Hce Hbs Hisl

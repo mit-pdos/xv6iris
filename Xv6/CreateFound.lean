@@ -1089,7 +1089,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     -- child IS dp and carries its `T_DIR` one-shot
     creExFired F.Fex dind.toNat (bname 14 nf) cexv ∗
     -- (NI M3 private files FS-1) the lookup's hop, in the era's ledger
-    fsLedAt fscFs [.hop k.proc dind.toNat (bname 14 nf) none] ∗
+    creFoundRcpt fscFs k.proc cexv ∗
     (⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR) ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
@@ -1176,7 +1176,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
         · unfold creOkRcpt; iright
           isplitl []
           · ipureintro; rfl
-          iexists dind.toNat, bname 14 nf; iexact Hhop
+          rw [← hcex]; iexact Hhop
         iframe Hk Hpc Hfr Hte Hce Hsi Hsb Howe Hpid Hbs Hop Hlkd Harms Hcrc Hpost
         iapply (show irefSlots (GF := GF) 1 ⊢ irefSlot from .rfl); iexact Hs1
         case hr6 => exact createFound_regs_caller k _ _ _ _ _ R _ hr (by simp [RegMap.set_apply])
@@ -1243,7 +1243,7 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     creExFired F.Fex dind.toNat (bname 14 nf) cexv ∗
     -- (NI M3 private files FS-1) the lookup's hop, in the era's ledger
-    fsLedAt fscFs [.hop k.proc dind.toNat (bname 14 nf) none] ∗
+    creFoundRcpt fscFs k.proc cexv ∗
     (⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR) ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
@@ -1574,7 +1574,8 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
       tl kd qd gd lod tld dind dn bm γil γisl kslot qq gc loc tlc cinum cexv n1 Sb1
       (createRegs_s2 k _ _ _ _ _ _ R1 _ rfl hr1) hkd hdnib hle hks hcnib hcpos hlec hal htl hname
       (create_n1_lo A.u n1 w hS.hu hled.1) hsub hled.2)
-    ihave #Hhop := fsObsRcpt_at' $$ Hhop0
+    ihave #Hhop := fsObsRcpt_found fscFs k.proc dind.toNat cexv (bname 14 nf) (eraNode dn bm data)
+      (mkfEra_is_dir dn bm data htyz) hents $$ Hhop0
     iframe Hk Hpc Hfr Hte Hce Hlk Hload Hsi Hsb Howe Hpid Hbs Hop Href Hru2 HP Hex Hhop Hsel Hcre Hpost
     iframe #
 

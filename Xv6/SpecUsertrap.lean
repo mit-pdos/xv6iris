@@ -339,22 +339,23 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG G
 disjuncts at the record `syscall()` was called with (`utSysRec`) -- the
 number cites nothing, or the arm's citation at era `k`'s anchor; the kill
 disjunct is gone (F5: a killed wait's round never reaches the post). -/
-def utEvOut (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
+def utEvOut (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState)
     (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) : IProp GF :=
   iprop(⌜sc = uecallScause⌝ -∗
     (⌜syscNum (utSysRec sep V) ≠ USYS_uptime ∧ syscNum (utSysRec sep V) ≠ USYS_wait ∧
         syscNum (utSysRec sep V) ≠ USYS_fork ∧ syscNum (utSysRec sep V) ≠ USYS_sbrk ∧
         syscNum (utSysRec sep V) ≠ USYS_write ∧ syscNum (utSysRec sep V) ≠ USYS_close ∧
         syscNum (utSysRec sep V) ≠ USYS_dup ∧ syscNum (utSysRec sep V) ≠ USYS_read ∧
-        syscNum (utSysRec sep V) ≠ USYS_chdir ∧ syscNum (utSysRec sep V) ≠ USYS_mkdir⌝ ∨
+        syscNum (utSysRec sep V) ≠ USYS_chdir ∧ syscNum (utSysRec sep V) ≠ USYS_mkdir ∧
+        syscNum (utSysRec sep V) ≠ USYS_open⌝ ∨
       (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
         niIotaLbs (niNamesHere (GF := GF)) ι ∗
-        ⌜syscEvRow (utSysRec sep V) V' (syscImg (utSysRec sep V) M) (syscImg V' M') cs cs' sts ι⌝)))
+        ⌜syscEvRow (utSysRec sep V) V' (syscImg (utSysRec sep V) M) (syscImg V' M') cs cs' sts sts' ι⌝)))
 
 /-- Off the ecall the evidence is owed nothing. -/
-theorem utEvOut_nonecall (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
+theorem utEvOut_nonecall (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState)
     (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (h : sc ≠ uecallScause) :
-    ⊢ utEvOut (hlc := hlc) (GF := GF) sc sep V M sts V' M' cs cs' := by
+    ⊢ utEvOut (hlc := hlc) (GF := GF) sc sep V M sts sts' V' M' cs cs' := by
   unfold utEvOut; iintro %hc; exact absurd hc h
 
 end Ev
@@ -397,7 +398,7 @@ def usertrapPost (R : CPU → UPtd → BitVec 64 → ProcPriv → List FdState �
     utSysOut (hlc := hlc) f sc sep V M sts gn cs pid (tfW V'.tf (tfArgIdx 0)) (syscImg V' M') sts'
       V'.cwi cs' -∗
     -- THE ROUND'S LEDGER EVIDENCE (NI M2-X2), last
-    utEvOut (hlc := hlc) sc sep V M sts V' M' cs cs' -∗
+    utEvOut (hlc := hlc) sc sep V M sts sts' V' M' cs cs' -∗
     wpLoop cpu')
 
 /-- **WP of `usertrap`** (Rocq `wp_usertrap_body`), over an abstract residue

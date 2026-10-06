@@ -105,6 +105,7 @@ Nothing dropped; everything not listed as ported is DEFERRED above.
 -/
 import Xv6.FsAbsMknodFire
 import Xv6.FdTable
+import Xv6.UsysDet
 
 namespace Xv6
 
@@ -818,6 +819,45 @@ def openFdRcpt (rb wb : Bool) (t : FdType) (sts : List FdState) (r : BitVec 64)
   ∃ fd : Nat, r = BitVec.ofNat 64 fd ∧ sts[fd]? = some .closed ∧
     fdv' = sts.set fd (.open rb wb t)
 
+/-! ## 2e0.  open's ledger receipts (NI M3 private files FS-2b′) -/
+
+section OpenLed
+variable {GF : BundledGFunctors} [Xv6G GF]
+
+theorem uomArg_eq (v : BitVec 64) : uomArg v = omArg v := rfl
+theorem uomCreate_eq (v : BitVec 64) : uomCreate v = omCreate v := rfl
+theorem uomRd_eq (v : BitVec 64) : uomRd v = omReadable v := rfl
+theorem uomWr_eq (v : BitVec 64) : uomWr v = omWritable v := rfl
+
+/-- (NI M3 FS-2b′) **WHAT FIXED THE INODE, IN THE LEDGER**, before the
+install: the path the call fetched, a lower bound of the era's fs ledger and
+the event at `po` that fixed `i` -- the walk's last lookup (a plain open:
+followed, the walk resolves to `i` over the path), create's arm or create's
+lookup in the parent (O_CREATE) -/
+def openLedPre (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8)) (pv : Nat)
+    (vom : BitVec 64) (i : Nat) : IProp GF :=
+  iprop(∃ (pl : List (BitVec 8)) (H : List Fev) (po : Option Nat), ⌜argPathOf Mim pv pl⌝ ∗ fsLedLb γfs H ∗
+    ⌜fevOpenFixed H act rt (umStartOf rt cw pl) (pathElems pl).length (omCreate vom) i po = true⌝)
+
+instance openLedPre_persistent (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8))
+    (pv : Nat) (vom : BitVec 64) (i : Nat) : Persistent (openLedPre (GF := GF) γfs act rt cw Mim pv vom i) := by
+  unfold openLedPre; infer_instance
+
+/-- (NI M3 FS-2b′) **OPEN'S LEDGER RECEIPT** at the installed descriptor type
+`t`: the path the call fetched and a lower bound ending in the caller's
+install, whose cited reading (`UsysDet.usysOpenAt`) is `t` -/
+def openLedOk (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8)) (pv : Nat)
+    (vom : BitVec 64) (t : FdType) : IProp GF :=
+  iprop(∃ (pl : List (BitVec 8)) (H : List Fev), ⌜argPathOf Mim pv pl⌝ ∗ fsLedLb γfs H ∗
+    ⌜usysOpenAt H act rt (umStartOf rt cw pl) (pathElems pl).length (omCreate vom) (decide (omArg vom = 0)) =
+      some t⌝)
+
+instance openLedOk_persistent (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8))
+    (pv : Nat) (vom : BitVec 64) (t : FdType) : Persistent (openLedOk (GF := GF) γfs act rt cw Mim pv vom t) := by
+  unfold openLedOk; infer_instance
+
+end OpenLed
+
 /-! ## 2e.  The descriptor story (the kernel's half; deviation 9) -/
 
 section OpenFd
@@ -835,13 +875,15 @@ at an EXPLICIT state list whose row at `fd` is the NEW descriptor's type --
 ...AND THE SLOT WAS CLOSED: fdalloc hands its authority back at `.closed`,
 and the process's insert needs the key free. -/
 def openFdOk (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (rb wb : Bool) (t : FdType) (sts : List FdState)
+    (M : Nat → List (BitVec 8)) (rb wb : Bool) (t : FdType) (L : FdType → IProp GF) (sts : List FdState)
     (r : BitVec 64) : IProp GF :=
   iprop(∃ (fd : Nat) (l : List Nat) (k : Nat),
     ⌜r = BitVec.ofNat 64 fd ∧ fdFrees V.ofile = fd :: l ∧ sts[fd]? = some .closed⌝ ∗
     procPrivFd γ pa pid { V with ofile := V.ofile.set fd (fnode k) } M ∗
     -- the caller's OWN table with exactly ONE row moved
-    fdFrags V.fdg (sts.set fd (.open rb wb t)))
+    fdFrags V.fdg (sts.set fd (.open rb wb t)) ∗
+    -- (NI M3 private files FS-2b′) the kernel's ledger receipt at the installed type
+    L t)
 
 /-! ## 2e'.  The descriptor story, SPLIT: the kernel's half and the process's
 
@@ -857,19 +899,19 @@ what the resume view is -- the dispatcher reads `fdFrees_below` at the
 descriptor the free list's head names), the receipt beside it, and the two
 kernel halves at that view. -/
 theorem openFdOk_split (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (rb wb : Bool) (t : FdType) (sts : List FdState)
+    (M : Nat → List (BitVec 8)) (rb wb : Bool) (t : FdType) (L : FdType → IProp GF) (sts : List FdState)
     (r : BitVec 64) :
-    openFdOk (GF := GF) γ pa pid V M rb wb t sts r ⊢
+    openFdOk (GF := GF) γ pa pid V M rb wb t L sts r ⊢
       ∃ (fd : Nat) (l : List Nat) (k : Nat) (fdv' : List FdState),
         ⌜r = BitVec.ofNat 64 fd ∧ fdFrees V.ofile = fd :: l ∧ sts[fd]? = some .closed ∧
           fdv' = sts.set fd (.open rb wb t)⌝ ∗
         ⌜openFdRcpt rb wb t sts r fdv'⌝ ∗
         procPrivFd γ pa pid { V with ofile := V.ofile.set fd (fnode k) } M ∗
-        fdFrags V.fdg fdv' := by
+        fdFrags V.fdg fdv' ∗ L t := by
   unfold openFdOk
-  iintro ⟨%fd, %l, %k, ⟨%hr, %hfl, %hcl⟩, Hp, Hb⟩
+  iintro ⟨%fd, %l, %k, ⟨%hr, %hfl, %hcl⟩, Hp, Hb, HL⟩
   iexists fd, l, k, (sts.set fd (.open rb wb t))
-  iframe Hp Hb
+  iframe Hp Hb HL
   isplitr
   · ipureintro; exact ⟨hr, hfl, hcl, rfl⟩
   · ipureintro; exact ⟨fd, hr, hcl, rfl⟩
