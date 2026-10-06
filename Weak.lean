@@ -119,5 +119,6 @@ import Weak.WeakPmpEff
 import Weak.WeakTickEff
 import Weak.WeakLeafEffCommon
 import Weak.WeakAcquire
+import Weak.WeakLeafEff8
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
