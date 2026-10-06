@@ -74,5 +74,6 @@ import Weak.AxLitmus
 import Weak.AxGraphWit
 import Weak.WeakRobustOrd
 import Weak.AxBridge
+import Weak.WeakRobustAcyc2
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
