@@ -223,7 +223,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
             niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
             ⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩,
             hdet, urc_niOutRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hM hpi hsz hch hlz hsc hev,
-            ⟨hktr, hdet⟩, rfl, huc'⟩
+            ⟨hktr, fun h1 h2 => (hdet h1 h2).1⟩, rfl, huc'⟩
         iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ (some (ke, ι)) _ hfe
         unfold niCiteRes niCiteResRaw niUhRes
         isplitr

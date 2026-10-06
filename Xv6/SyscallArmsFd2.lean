@@ -243,6 +243,28 @@ theorem syscFdKey_of_rdIno_pk {sts : List FdState} {a0 : BitVec 64} (hlen : sts.
           | _ => cases h
   · cases h
 
+/-- (NI M3 FS-2d) ...and the key's row at argument 0 IS that parked row -/
+theorem usysFdAt_of_rdIno_pk {sts : List FdState} {a0 : BitVec 64} (hlen : sts.length = NOFILE)
+    (h : fdRdIno (usysFdAt sts a0) = true) :
+    ∃ wb i γo, syscFdKey a0 sts = .open true wb (.inode i γo .parked) ∧
+      usysFdAt sts a0 = some (.open true wb (.inode i γo .parked)) := by
+  obtain ⟨wb, i, γo, hk⟩ := syscFdKey_of_rdIno_pk hlen h
+  refine ⟨wb, i, γo, hk, ?_⟩
+  unfold usysFdAt at h ⊢
+  split at h
+  · rename_i hz
+    rw [if_pos hz]
+    cases hs : sts[(BitVec.extractLsb' 0 32 a0).toInt.toNat]? with
+    | none => rw [hs] at h; cases h
+    | some st =>
+      have hlt : (BitVec.extractLsb' 0 32 a0).toInt.toNat < NOFILE := by
+        rw [← hlen]; exact (List.getElem?_eq_some_iff.mp hs).1
+      unfold syscFdKey argZ at hk
+      rw [if_pos ⟨hz, by omega⟩, hs] at hk
+      simp only [Option.getD_some] at hk
+      rw [hk]
+  · cases h
+
 /-- a writable inode row at argument 0 is the dispatch's key row -/
 theorem syscFdKey_of_wrIno {sts : List FdState} {a0 : BitVec 64} (hlen : sts.length = NOFILE)
     (h : fdWrIno (usysFdAt sts a0) = true) :
@@ -366,7 +388,8 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
         ⌜lz = false → (ufsBufAt (permOf P.um sz.toNat) a1 a2).1 = true →
           fdRdIno (usysFdAt sts a0) = true → fevReadDir ι.fev = false →
           r = usysReadAns a2 ι ∧
-            umemLazy P' sz.toNat M1 = usysWr (umemLazy P sz.toNat M) a1 (usysReadBytes a2 ι)⌝ := by
+            umemLazy P' sz.toNat M1 = usysWr (umemLazy P sz.toNat M) a1 (usysReadBytes a2 ι) ∧
+            (0 ≤ usysCntW a2 → fevReadOn (usysFdAt sts a0) ι.act ι.fev)⌝ := by
   have hn : argZ a2 = usysCntW a2 := rfl
   -- the boot prefix: the class there needs `-1` at a negative request (or no class at all)
   have hboot : (lz = false → (ufsBufAt (permOf P.um sz.toNat) a1 a2).1 = true →
@@ -375,11 +398,13 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
       fdRdIno (usysFdAt sts a0) = true → fevReadDir ({ UIota.boot with act := act } : UIota).fev = false →
       r = usysReadAns a2 { UIota.boot with act := act } ∧
         umemLazy P' sz.toNat M1 =
-          usysWr (umemLazy P sz.toNat M) a1 (usysReadBytes a2 { UIota.boot with act := act }) := by
+          usysWr (umemLazy P sz.toNat M) a1 (usysReadBytes a2 { UIota.boot with act := act }) ∧
+        (0 ≤ usysCntW a2 → fevReadOn (usysFdAt sts a0) ({ UIota.boot with act := act } : UIota).act
+          ({ UIota.boot with act := act } : UIota).fev) := by
     intro hneg hlz hb hfd _
     obtain ⟨hm1, hlt⟩ := hneg hlz hb hfd
     have hrb : usysReadBytes a2 ({ UIota.boot with act := act } : UIota) = [] := rfl
-    refine ⟨by unfold usysReadAns; rw [if_pos hlt]; exact hm1, ?_⟩
+    refine ⟨by unfold usysReadAns; rw [if_pos hlt]; exact hm1, ?_, fun h0 => absurd h0 (by omega)⟩
     rw [hrb]
     have hd0 : d = 0 := by rw [hn] at hd; omega
     subst hd0
@@ -418,12 +443,15 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
       intro hlz hb hfd hdir
       -- (NI M3 private files FS-2a′) the class's row is PARKED, so the read's
       -- receipt names its offset as the fold's
-      have hoff : off = fevOff h γo := by
-        obtain ⟨wb', i', γo', hk⟩ := syscFdKey_of_rdIno_pk hlen hfd
-        rw [hst] at hk
-        injection hk with _ _ ht
-        injection ht with _ _ hpk
-        exact hof hpk
+      obtain ⟨wb', i', γo', hk, hat⟩ := usysFdAt_of_rdIno_pk hlen hfd
+      rw [hst] at hk
+      injection hk with _ hwb ht
+      injection ht with hi hγ hpk
+      subst hi hγ hwb
+      have hoff : off = fevOff h γo := hof hpk
+      -- (NI M3 FS-2d, X3) the cited read is on the key's descriptor
+      have hon : fevReadOn (usysFdAt sts a0) act (h ++ [Fev.read act i γo (om == .held) off d']) :=
+        ⟨wb, i, γo, off, d', hat, by rw [hpk]; simp⟩
       simp only at hdir
       rw [fevReadDir_snoc] at hdir
       unfold fevIsFile at hdir
@@ -445,7 +473,7 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
         obtain ⟨h1, h2⟩ := syscRead_fileImg P P' sz M M1 a1 a2 r d d' off c hext hw hpl hsz hbel (hn ▸ hd) hr hr'
           hd'' hret hbuf
         rw [hrd]
-        refine ⟨?_, h2⟩
+        refine ⟨?_, h2, fun _ => hon⟩
         unfold usysReadAns
         rw [if_neg (by omega), hrd]
         exact h1

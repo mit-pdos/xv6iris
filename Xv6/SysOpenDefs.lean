@@ -837,7 +837,7 @@ lookup in the parent (O_CREATE) -/
 def openLedPre (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (i : Nat) : IProp GF :=
   iprop(∃ (pl : List (BitVec 8)) (H : List Fev) (po : Option Nat), ⌜argPathOf Mim pv pl⌝ ∗ fsLedLb γfs H ∗
-    ⌜fevOpenFixed H act rt (umStartOf rt cw pl) (pathElems pl).length (omCreate vom) i po = true⌝)
+    ⌜fevOpenFixed H act rt (umStartOf rt cw pl) (pathElems pl) (omCreate vom) i po = true⌝)
 
 instance openLedPre_persistent (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8))
     (pv : Nat) (vom : BitVec 64) (i : Nat) : Persistent (openLedPre (GF := GF) γfs act rt cw Mim pv vom i) := by
@@ -849,7 +849,7 @@ install, whose cited reading (`UsysDet.usysOpenAt`) is `t` -/
 def openLedOk (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (t : FdType) : IProp GF :=
   iprop(∃ (pl : List (BitVec 8)) (H : List Fev), ⌜argPathOf Mim pv pl⌝ ∗ fsLedLb γfs H ∗
-    ⌜usysOpenAt H act rt (umStartOf rt cw pl) (pathElems pl).length (omCreate vom) (decide (omArg vom = 0)) =
+    ⌜usysOpenAt H act rt (umStartOf rt cw pl) (pathElems pl) (omCreate vom) (decide (omArg vom = 0)) =
       some t⌝)
 
 instance openLedOk_persistent (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8))

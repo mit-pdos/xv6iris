@@ -217,14 +217,16 @@ def citeDir (c : Option (Nat × UIota)) : Bool := fevReadDir ((c.map Prod.snd).g
 fork at every key, since NI M2-G3 sbrk at every key; NI M3 FS-2a, the class
 with the file system, `usysDetClassAtF`, its `fdir` the cited read's row
 type), the key the round resumed IS `usysDet` at the cited
-prefix (up to the kernel words, `ukeyEq`). -/
+prefix (up to the kernel words, `ukeyEq`), and (NI M3 FS-2d) the citation
+satisfies the fs rows' facts beyond the key (`usysFsTie`: a read cites its
+own read on the key's descriptor). -/
 def niDetRow (sc : BitVec 64) (W W' : Uvis) : Option (Nat × UIota) → Prop
   | some (_, ι) => sc = uecallScause →
       usysDetClassAtF (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
         (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)))
         (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) (ufsBuf (uvisRun W)) (fevReadDir ι.fev)
         (usysPath (uvisRun W)).isSome →
-      ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ι) W'
+      ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ι) W' ∧ usysFsTie (uvisNum (uvisRun W)) (uvisRun W) ι
   | none => True
 
 /-- **THE PUSHED RUN AT THE CITED STREAM** (NI M3 NI-OUT): at a console write the round's citation holds the

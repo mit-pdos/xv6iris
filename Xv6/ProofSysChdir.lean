@@ -244,7 +244,7 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
     -- (NI M3 private files FS-2b) THE RECEIPT: the walk's chain closed by the test
     have hdir : fnIsDir (eraNode dn bm data) = true := mkfEra_is_dir dn bm data (Xv6.sys_unlink_tdir_zof _ hty)
     have hlook := fevLookAt_snoc hh.1 hw (procAddr A.j)
-    rw [List.length_take, Nat.min_self, hh.2, ftopRow_dir _ hdir] at hlook
+    rw [List.take_length, hh.2, ftopRow_dir _ hdir] at hlook
     ihave HFo : (A.Fo.pfRecv av inum.toNat ⟨.ADir (dirEntries (eraNode dn bm data)), fnNlink (eraNode dn bm data)⟩ ∗
         sysChdirLed A inum.toNat) $$ [HFo]
     · iframe HFo

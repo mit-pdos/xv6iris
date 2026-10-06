@@ -256,7 +256,7 @@ theorem chdirArms_split (Γ : FsViewNames GF) (γfs : FsNames) (γ : FileNames) 
 inum `i`: the path the call fetched (at `pv` in the view `Mv`) and a lower
 bound of the era's fs ledger ending in the caller's (`act`) type test of
 `i`, whose walk -- followed through the lookups' back-pointers -- made one
-lookup per path element and resolved, from namex's start (the root `rt` on
+lookup per path element (NI M3 FS-2d: of exactly the path's elements) and resolved, from namex's start (the root `rt` on
 an absolute path, the cwd `cw` on a relative one), to `i`, a directory in
 the fold before the test (`NiFs.fevLookAt`). -/
 def chdirLed (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mv : Nat → List (BitVec 8)) (pv : Nat)
@@ -264,7 +264,7 @@ def chdirLed (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mv : Nat → List
   iprop(∃ (pl : List (BitVec 8)) (H : List Fev) (e : Std.ExtTreeMap (List (BitVec 8)) Nat compare)
       (nl : Nat),
     ⌜argPathOf Mv pv pl⌝ ∗ fsLedLb γfs H ∗
-    ⌜fevLookAt H act rt (umStartOf rt cw pl) (pathElems pl).length = some (i, some (.dir e, nl))⌝)
+    ⌜fevLookAt H act rt (umStartOf rt cw pl) (pathElems pl) = some (i, some (.dir e, nl))⌝)
 
 instance chdirLed_persistent (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mv : Nat → List (BitVec 8))
     (pv i : Nat) : Persistent (chdirLed (GF := GF) γfs act rt cw Mv pv i) := by

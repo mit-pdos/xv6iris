@@ -170,7 +170,10 @@ def syscEvFs (V V' : ProcPriv) (img img' : ElfMem) (sts sts' : List FdState) (ι
     (ufsBufAt (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))).1 = true →
     fdRdIno (usysFdAt sts (tfW V.tf (tfArgIdx 0))) = true → fevReadDir ι.fev = false →
     tfW V'.tf (tfArgIdx 0) = usysReadAns (tfW V.tf (tfArgIdx 2)) ι ∧
-      img' = usysWr img (tfW V.tf (tfArgIdx 1)) (usysReadBytes (tfW V.tf (tfArgIdx 2)) ι)) ∧
+      img' = usysWr img (tfW V.tf (tfArgIdx 1)) (usysReadBytes (tfW V.tf (tfArgIdx 2)) ι) ∧
+      -- (NI M3 FS-2d, X3) the cited read is the caller's own, on the entry's descriptor
+      (0 ≤ usysCntW (tfW V.tf (tfArgIdx 2)) →
+        fevReadOn (usysFdAt sts (tfW V.tf (tfArgIdx 0))) ι.act ι.fev)) ∧
   (syscNum V = USYS_write → V.pvLazy = false →
     (ufsBufAt (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))).2 = true →
     fdWrIno (usysFdAt sts (tfW V.tf (tfArgIdx 0))) = true →

@@ -143,7 +143,8 @@ theorem sys_open_led_ftopRow (dn : Dinode) (bm : Blkmap) (data : Nat → List (B
 /-- **THE CITED INSTALL READS THE INSTALLED TYPE**: what fixed the inode in
 the ledger, the install appended past it at the row the lock holds, and the
 store block's type facts give `usysOpenAt … = some t`. -/
-theorem sys_open_led_at (H0 h : List Fev) (a : BitVec 64) (rt s0 m : Nat) (create : Bool) (vom : BitVec 64)
+theorem sys_open_led_at (H0 h : List Fev) (a : BitVec 64) (rt s0 : Nat) (m : List (List (BitVec 8))) (create : Bool)
+    (vom : BitVec 64)
     (inum : BitVec 32) (γo : GName) (omo : OffMode) (po : Option Nat) (dn : Dinode) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (t : FdType) (hd : Bool)
     (hfix : fevOpenFixed H0 a rt s0 m create inum.toNat po = true) (hp : H0 <+: h)

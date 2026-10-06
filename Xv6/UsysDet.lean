@@ -785,6 +785,24 @@ def usysWriteAnsK (W : Uvis) (ι : UIota) : BitVec 64 :=
     usysWriteAns W.perm (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2))
   else usysWriteAnsF (tfW W.tf (tfArgIdx 2)) ι
 
+/-- (NI M3 FS-2d, X3) **THE CITED READ IS ON THE KEY's DESCRIPTOR**: the
+cited prefix `h` ends in actor `a`'s PARKED read of exactly the inode and
+offset shadow the descriptor row `wf` names -- so the bytes a read row
+answers are read off the caller's OWN descriptor, not off whatever read the
+citation happens to close on (gap B2 of the coordinator's ruling before
+FS-3/4) -/
+def fevReadOn (wf : Option FdState) (a : BitVec 64) (h : List Fev) : Prop :=
+  ∃ (wb : Bool) (i : Nat) (γo : GName) (off d : Nat), wf = some (.open true wb (.inode i γo .parked)) ∧
+    h.getLast? = some (.read a i γo false off d)
+
+/-- (NI M3 FS-2d) **THE FS ROWS' CITATION FACTS** beyond the resumed key, at
+the key `W` and the cited prefix `ι` (`NiLedger.niDetRow` carries them
+beside `usysDet`): (X3) a read at a non-negative request cites its own read
+on the key's descriptor at argument 0 -/
+def usysFsTie (n : Int) (W : Uvis) (ι : UIota) : Prop :=
+  n = USYS_read → 0 ≤ usysCntW (tfW W.tf (tfArgIdx 2)) →
+    fevReadOn (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) ι.act ι.fev
+
 /-- **THE PRIVATE CLASS AT A KEY, WITH THE FILE SYSTEM** (NI M3 FS-2a, the
 design's `usysDetClassAtF`, ruling FS-R4): `usysDetClassAt`, or a read on a
 readable inode descriptor `wf` of a REGULAR FILE (`fdir = false`, the cited
@@ -925,8 +943,9 @@ Design "M3 private files design (2026-10-05)" F4, rulings FS-R3/R4/R6/R8 and
 the coordinator's ruling (a) of 2026-10-06 (back-pointers).  chdir's
 decisive event is its type test (`look act i prev`), whose back-pointer
 reaches the walk's lookups; the row follows them inside the cited prefix
-(`NiFs.fevLookAt`): the walk made one lookup per element of the KEY'S path
-(`usysPath`, the NUL-terminated string at argument 0 the key's image holds,
+(`NiFs.fevLookAt`): the walk looked up exactly the elements of the KEY'S
+path, in order (NI M3 FS-2d, X2: the hop NAMES, not only their count;
+`usysPath`, the NUL-terminated string at argument 0 the key's image holds,
 within MAXPATH), resolved -- from namex's start, the walker's root `ι.rt`
 on an absolute path and the key's cwd on a relative one -- to the inode
 the test observed, a directory in the fold before the test.  Anything else
@@ -958,7 +977,7 @@ def ustartOf (rt cw : Nat) (pl : List (BitVec 8)) : Nat := if pl[0]? = some 47#8
 def usysChdirTo (wp : Option (List (BitVec 8))) (cw : Nat) (ι : UIota) : Option Nat :=
   match wp with
   | some pl =>
-    match fevLookAt ι.fev ι.act ι.rt (ustartOf ι.rt cw pl) (pathElems pl).length with
+    match fevLookAt ι.fev ι.act ι.rt (ustartOf ι.rt cw pl) (pathElems pl) with
     | some (i, some (.dir _, _)) => some i
     | _ => none
   | none => none
@@ -1027,8 +1046,8 @@ theorem ukeyStr_spec (M : ElfMem) : ∀ (n a : Nat) (pl : List (BitVec 8)), ukey
 open's decisive event is its install (`Fev.open act i γo held prev`),
 appended at the opened inode's row under the lock that held the type test.
 The cited prefix ends in it; its back-pointer reaches what fixed the inode
-(`NiFs.fevOpenFixed`: the walk, followed, resolved to it over the key's
-path; create's arm; create's lookup in the parent); the fold before the
+(`NiFs.fevOpenFixed`: the walk, followed, looked up the key's path's
+elements and resolved to it (FS-2d X2: the names checked); create's arm; create's lookup in the parent); the fold before the
 install holds the row the type test read -- a file (an inode descriptor), a
 directory (an inode descriptor, at O_RDONLY only), a device of major at
 most 9.  The answer is the key's lowest closed slot (`wslot`), the new row
@@ -1054,10 +1073,11 @@ def usysOpenRow (row : Option (Fnode × Nat)) (i : Nat) (γo : GName) (held rd :
 
 /-- **THE CITED INSTALL**: the cited prefix ends in actor `a`'s install, what
 fixed its inode checks out (`fevOpenFixed`), and the row before it opens -/
-def usysOpenAt (H : List Fev) (a : BitVec 64) (rt s0 m : Nat) (create rd : Bool) : Option FdType :=
+def usysOpenAt (H : List Fev) (a : BitVec 64) (rt s0 : Nat) (es : List (List (BitVec 8))) (create rd : Bool) :
+    Option FdType :=
   match H.getLast? with
   | some (.open a' i γo held po) =>
-    if a' = a ∧ fevOpenFixed H.dropLast a rt s0 m create i po = true then
+    if a' = a ∧ fevOpenFixed H.dropLast a rt s0 es create i po = true then
       usysOpenRow (fevRows H.dropLast i) i γo held rd
     else none
   | _ => none
@@ -1065,7 +1085,7 @@ def usysOpenAt (H : List Fev) (a : BitVec 64) (rt s0 m : Nat) (create rd : Bool)
 /-- **the descriptor type a cited open installed**, at the key's path, cwd and omode -/
 def usysOpenTo (wp : Option (List (BitVec 8))) (cw : Nat) (a1 : BitVec 64) (ι : UIota) : Option FdType :=
   match wp with
-  | some pl => usysOpenAt ι.fev ι.act ι.rt (ustartOf ι.rt cw pl) (pathElems pl).length (uomCreate a1)
+  | some pl => usysOpenAt ι.fev ι.act ι.rt (ustartOf ι.rt cw pl) (pathElems pl) (uomCreate a1)
       (decide (uomArg a1 = 0))
   | none => none
 

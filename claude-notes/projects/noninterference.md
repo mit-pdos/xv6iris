@@ -7813,6 +7813,84 @@ lazy-free key on a writable console descriptor, pause, close, dup, read on a rea
 regular file and write on a writable PARKED inode descriptor at a lazy-free key whose buffer is mapped, chdir and
 open at a lazy-free key holding its path argument, mkdir at a lazy-free key}. FS-3/4 read `fevOffWf` as above.
 
+### M3 private files FS-2d as landed (2026-10-06)
+
+On `lane/pfiles` (the coordinator's ruling before FS-3/4 of 2026-10-06). PARTIAL: X2 and X3 (read) land with the
+prototype's footprint lemmas; **X1 is STOPPED** (not exportable with the sanctioned moves, and false as stated for
+every multi-event round), and X4/X5, whose shapes are functions of X1's, wait with it. No kernel change; the
+fourteen roots' statements, `SYSCALL`/`USERTRAP`/`USERRET`/`USER`, `SyscRows` and every `Uk*`/`User*` file
+byte-identical.
+
+**X2 (landed: chdir and plain open).** `NiFs.fevLookAt H a rt s0 es` and `fevOpenFixed H a rt s0 es create i po`
+take the path's ELEMENTS and check `(fevChain H po).map Prod.snd = es` (was `.length = m`); `fevLookAt_snoc`,
+`fevOpenFixed_mono/_walk` follow (the proofs are the `fevWalkIs` names, as ruled). Readers: `UsysDet.usysChdirTo`,
+`usysOpenAt H a rt s0 es create rd`, `usysOpenTo` pass `pathElems pl`. Producers (forced by the signature, text only):
+`SpecSysChdir.chdirLed`, `SysOpenDefs.openLedPre/openLedOk` state `pathElems pl`; `FsLedger.creOkRcpt_fixed` takes
+`es`; `SysOpenStores.sys_open_led_at`, `SysOpenEntryC`, `ProofSysChdir` (`List.take_length`), `SyscallArmsPath`.
+NOT landed: the names of O_CREATE's found lookup and of mkdir's parent leg (`creFoundRcpt`/`creParentRcpt` drop `nm`;
+create's state has `(pathElems pl).getLast? = some nm` but the receipts do not relay it -- the X1 gap below).
+
+**X3 (landed: read).** `UsysDet.fevReadOn wf a h := ∃ wb i γo off d, wf = some (.open true wb (.inode i γo .parked)) ∧
+h.getLast? = some (.read a i γo false off d)` and `usysFsTie n W ι := n = USYS_read → 0 ≤ usysCntW a2 → fevReadOn
+(usysFdAt W.fd a0) ι.act ι.fev`. `syscEvFs`'s read clause gains `∧ (0 ≤ usysCntW a2 → fevReadOn (usysFdAt sts a0)
+ι.act ι.fev)` (`SyscallArmsFd2.syscArmRead_ev` proves it off the receipt's row, `usysFdAt_of_rdIno_pk`);
+`UserretClosedRows.urc_evRow` + a last conjunct at the key; `NiLedger.niDetRow`'s cited case concludes
+`ukeyEq (usysDet …) W' ∧ usysFsTie (uvisNum (uvisRun W)) (uvisRun W) ι` (`urc_niDetRow` builds it; every `niDetRow_*`
+reads `.1`); `NiTrace.niDetRow_read` returns the tie; the law's read clause is now
+`∃ k ι, c = some (k, ι) ∧ (fevReadDir ι.fev = false → gprsA0 eg = usysReadAns (gprsA2 xg) ι ∧
+(0 ≤ usysCntW (gprsA2 xg) → fevReadOn wfd ι.act ι.fev))`. FS-4 reads: at a class read the cited event's `(i, γo)`
+ARE `wfd`'s. NOT landed: the inode write's (a successful write cites the boot prefix -- X1).
+
+**The footprints (landed, for FS-4).** `NiFs` §3: the prototype verbatim -- `FsFoot`, `fevMoves`, `fevClosed S`,
+`fevOn`, `frowAg`/`fstAg`, `fstAg_skip/_both/_run/_fevRun`, `fevReadBytes_on`, `fevHop_on`. Dead-allowed
+"FS-4 reaches" (two rows).
+
+**X1 STOPPED -- the gap.** (1) "`ι.fev` ENDS with `fout`" is FALSE in the kernel for every round with more than one
+event: the ledger is ONE per era, every fire opens `ftopN` for its own event only, and between two fires of one
+round any other process's fs event can land: write's chunks (`filewrite` releases the inode lock and the log op
+between chunks), create's `arm` then its dots then the parent leg (other inodes' events in between), O_TRUNC's
+`trunc` before the install, mkdir's arm before its leg. Only single-event rounds satisfy it: read (the cited read),
+a plain open (the install), chdir/close/dup (`[]`), mkdir's leg block alone. (2) For write the computed offsets
+are false too: a sharer of the struct file (fork, dup) can move `γo` between two chunks, so chunk k+1's offset is
+not chunk k's end; `fevOffWf` makes each chunk's offset the fold's AT ITS OWN POSITION, not a function of (key,
+round start). (3) The receipts do not carry what `usysFevOut` would compute: `FsLedger.fwChunks` is a set of
+unordered `∃ off bs r, fsLedAt [write …]` with `bs` unrelated to the key's buffer (the chain's `ubytesAt`/`wchunkAt`
+facts live in the client's piece, `FilewriteLoop`/`FilewriteFire`), and the successful write cites the boot prefix;
+`creParentRcpt`/`creFoundRcpt` drop the entry name; `openRcptAt`'s `trunc` is tied neither to O_TRUNC's bit nor to
+the install; the arm's and the leg's receipts are not ordered. Closing (3) moves `FsLedger.fwChunks`,
+`FilewriteFire`/`Loop`/`Tail`, `SpecFilewrite.fwRcptAt`, `SpecSysWrite`, create's proofs and `SpecCreate`,
+`SpecSysMkdir`, `SysOpenEntryC`/`SpecSysOpen` -- outside the sanctioned set (Spec posts are public contracts).
+**Options:** (a) re-rule X1 to the SUBLIST form: `fout <+ (ι.fev.drop |h0|)` with `ι.fev`'s last event `fout`'s
+last, the offsets AS RECORDED (`usysFevOutOk n W ι fout`: the shape -- actor, `(i, γo)` from `wfd`, chunk bytes the
+key's buffer slices of `FW_MAX`, the last path element, the install at the arm's inode -- with the offsets free),
+FS-4 deriving them from `∀ k, fevOffWf (niHist F k).fev` (the `zevWf` precedent) and privacy; kernel: ORDERED
+receipts (each fire takes the previous lower bound, as `fwChunks` would chain them), the bytes relayed from the
+chain's `ubytesAt`, the names from create's state, the arm/dots/leg/trunc/install ordered; ≈ 1–1.5 BE, ≈ 30 files,
+Spec posts move. (b) Positional: keep the round's positions (`UIota.fpos`, landed and unused) for the law clause
+(`ι.fev[fpos[k]]? = fout[k]?`, increasing), the offsets computed at their positions; same kernel cost plus filling
+`fpos`; FS-4 must show position-irrelevance under restriction (as for the back-pointers). (c) Narrow the class to
+single-event rounds (writes with `n ≤ FW_MAX`, no O_CREATE/O_TRUNC, mkdir out); still needs the write's chunk bytes
+and its citation at the chunk (`SpecFilewrite`/`FilewriteFire`); ≈ 0.4 BE. Recommended: (a).
+
+**X4 waits (needs X1's shape; derivation needs a ghost).** As ruled, `ι_j.fev ++ fout_j <+: ι_{j+1}.fev` also fails
+on interleaving (another actor's events between j's end and j+1's first), and many class rounds cite the boot prefix
+(`fev = []`). The derivable shape is "round j+1's events lie after round j's citation": every fire of round j+1
+compares a lower bound of `ι_j.fev` with the authority, so the incarnation must CARRY `ι_j`'s fs lower bound from
+its filing to its next round -- a per-incarnation fs cursor in the residue beside `uhist` (≈ 0.3 BE: the cursor's
+camera or an `uhist` field, the fires taking it); otherwise the stated hypothesis `NiFsOrder q h F` (with
+honest-scope line) once X1's form is ruled.
+
+**X5 waits.** Proposed, for the sublist form: `fevPrivateQ S q h F := ∃ ps : List Nat, ps.Pairwise (· < ·) ∧
+(∀ k, h[ps[k]]? = (niFouts q h F)[k]?) ∧ ∀ p e, h[p]? = some e → fevMoves S e → p ∈ ps` (every `S`-move of the
+era's history is one of q's filed `fout` events, embedded in order), `niFouts` the concatenation of q's steps'
+`fout`.
+
+**Baselines.** `tools/tcb/expected.json`: see `tcb.sh` (definitions moved inside `NiFs`/`UsysDet`/`NiLedger`/
+`NiTrace`; no module enters or leaves a root's set). `tools/audit/baseline.json` unchanged (14 PASS; no axiom or
+opaque). `dead_allow.txt`: + `fevReadBytes_on`, `fevHop_on` ("FS-4 reaches"); `fevOffWf_prefix`, `ftopLed_lb_wf`,
+`ftopInv_lb_wf` STAY (the write arm is X1's); `fevStatOf`, `fevRun_prefix`, `fsLedLb_prefix`, `fsEvRcpt_of_lb`
+unchanged.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

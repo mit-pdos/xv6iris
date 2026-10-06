@@ -452,7 +452,7 @@ theorem syscChdir_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat 
       have hpl' : argPathOf (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat pl := hpl
       rw [show syscImg V M = umemLazy V.upt V.sz.toNat M from rfl] at hk ⊢
       rw [syscPath_keyStr V.upt V.sz M _ pl hpl' hk]
-      show (match fevLookAt H a V.rti (ustartOf V.rti V.cwi pl) (pathElems pl).length with
+      show (match fevLookAt H a V.rti (ustartOf V.rti V.cwi pl) (pathElems pl) with
         | some (i, some (.dir _, _)) => some i
         | _ => none) = some V1.cwi
       rw [ustartOf_eq, hlook]

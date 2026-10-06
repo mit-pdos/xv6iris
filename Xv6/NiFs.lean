@@ -13,8 +13,9 @@ record `claude-notes/projects/noninterference.md`, "M3 private files design
   observations (a read, a hop, an install, a stat) carry only what names
   them, and a row computes its answer from the fold of the prefix before
   them (`fevReadBytes`, `fevHop`).
-* The footprints (`FsFoot`, `fevOn`, `fevPrivate`, `fevClosed` and the two
-  footprint lemmas) are FS-4's, and land with it.
+* The footprints (`FsFoot`, `fevMoves`, `fevOn`, `fevClosed` and the two
+  footprint lemmas `fevReadBytes_on`/`fevHop_on`, §3) land in FS-2d for
+  FS-4, which reads them.
 
 F8: this module is self-contained and pure (no ghost state, no kernel
 definition: it imports Lean's `Std` map and Iris's `GName` alone), so that
@@ -53,6 +54,10 @@ the NI roots' trusted base grows by it alone when `UsysDet.UIota` names it.
    `UIota.fpos`.
 5. (NI M3 FS-2a) `FsFull.max`: writei's refusal at the file's size cap
    from the offset, recorded as a verdict like the three exhaustions.
+6. (NI M3 FS-2d, X2) `fevLookAt`/`fevOpenFixed` take the path's ELEMENTS
+   `es` and check the followed walk's lookup NAMES against them
+   (`(fevChain H po).map Prod.snd = es`), not only their count: a walk of
+   the right length over other names no longer reads as the key's path.
 -/
 import Std.Data.ExtTreeMap
 import Iris.Algebra.IProp
@@ -493,12 +498,15 @@ def fevWalk (H : List Fev) (rt s0 : Nat) (cs : List (Nat × List (BitVec 8))) : 
 
 /-- **THE CITED TYPE TEST** (chdir's and open's decisive event): the cited
 prefix ends in actor `a`'s `look a i po`, whose walk -- the lookups followed
-from `po` -- made `m` lookups and resolved from `s0` to `i`; its reading is
-`i` and `i`'s row in the fold before the observation (`none` otherwise) -/
-def fevLookAt (H : List Fev) (a : BitVec 64) (rt s0 m : Nat) : Option (Nat × Option (Fnode × Nat)) :=
+from `po` -- looked up exactly the names `es` (NI M3 FS-2d, X2: the hop NAMES
+are the path's elements, not only their count) and resolved from `s0` to
+`i`; its reading is `i` and `i`'s row in the fold before the observation
+(`none` otherwise) -/
+def fevLookAt (H : List Fev) (a : BitVec 64) (rt s0 : Nat) (es : List (List (BitVec 8))) :
+    Option (Nat × Option (Fnode × Nat)) :=
   match H.getLast? with
   | some (.look a' i po) =>
-    if a' = a ∧ (fevChain H po).length = m ∧ fevWalk H rt s0 (fevChain H po) = some i then
+    if a' = a ∧ (fevChain H po).map Prod.snd = es ∧ fevWalk H rt s0 (fevChain H po) = some i then
       some (i, fevRows H.dropLast i)
     else none
   | _ => none
@@ -635,13 +643,13 @@ theorem fevWalkIs_hop {H h : List Fev} (hp : H <+: h) {rt s0 : Nat} {po : Option
 /-- **THE TYPE TEST CITED**: the walk so far, observed at `i` -/
 theorem fevLookAt_snoc {H h : List Fev} (hp : H <+: h) {rt s0 : Nat} {po : Option Nat}
     {es : List (List (BitVec 8))} {i : Nat} (hw : fevWalkIs H rt s0 po es i) (a : BitVec 64) :
-    fevLookAt (h ++ [.look a i po]) a rt s0 es.length = some (i, fevRows h i) := by
+    fevLookAt (h ++ [.look a i po]) a rt s0 es = some (i, fevRows h i) := by
   obtain ⟨hpo, hes, hd⟩ := fevWalkIs_mono (H' := h ++ [.look a i po]) (hp.trans (List.prefix_append _ _)) hw
   have hl : (h ++ [Fev.look a i po]).getLast? = some (.look a i po) := by simp
   unfold fevLookAt
   rw [hl]
   dsimp only
-  rw [if_pos ⟨rfl, by rw [← hes, List.length_map], hd⟩, List.dropLast_concat]
+  rw [if_pos ⟨rfl, hes, hd⟩, List.dropLast_concat]
 
 theorem fevLegBy_snoc (h : List Fev) (a : BitVec 64) (d : Nat) (nm : List (BitVec 8)) (i nl : Nat) :
     fevLegBy (h ++ [.ent a d nm (some i), .nlink a d nl]) a = true := by
@@ -657,9 +665,10 @@ last lookup (a plain open: the walk, followed, resolved to it), create's
 lookup in the parent (O_CREATE, found: the parent recorded as given in the
 lookup event, the entry the fold's). -/
 
-/-- **WHAT FIXED THE INODE**, at the install's back-pointer `po` -/
-def fevOpenFixed (H : List Fev) (a : BitVec 64) (rt s0 m : Nat) (create : Bool) (i : Nat)
-    (po : Option Nat) : Bool :=
+/-- **WHAT FIXED THE INODE**, at the install's back-pointer `po` (NI M3
+FS-2d, X2: a plain open's walk looked up exactly the names `es`) -/
+def fevOpenFixed (H : List Fev) (a : BitVec 64) (rt s0 : Nat) (es : List (List (BitVec 8))) (create : Bool)
+    (i : Nat) (po : Option Nat) : Bool :=
   if create then
     match po with
     | some p =>
@@ -676,12 +685,13 @@ def fevOpenFixed (H : List Fev) (a : BitVec 64) (rt s0 m : Nat) (create : Bool) 
   else
     (match po with
      | some q => decide (q < H.length)
-     | none => true) && (fevChain H po).length == m && fevWalk H rt s0 (fevChain H po) == some i
+     | none => true) && (fevChain H po).map Prod.snd == es && fevWalk H rt s0 (fevChain H po) == some i
 
 /-- what fixed the inode survives the ledger's growth -/
-theorem fevOpenFixed_mono {H H' : List Fev} (hp : H <+: H') {a : BitVec 64} {rt s0 m : Nat} {create : Bool}
-    {i : Nat} {po : Option Nat} (h : fevOpenFixed H a rt s0 m create i po = true) :
-    fevOpenFixed H' a rt s0 m create i po = true := by
+theorem fevOpenFixed_mono {H H' : List Fev} (hp : H <+: H') {a : BitVec 64} {rt s0 : Nat}
+    {es : List (List (BitVec 8))} {create : Bool} {i : Nat} {po : Option Nat}
+    (h : fevOpenFixed H a rt s0 es create i po = true) :
+    fevOpenFixed H' a rt s0 es create i po = true := by
   unfold fevOpenFixed at h ⊢
   cases create with
   | true =>
@@ -710,19 +720,280 @@ theorem fevOpenFixed_mono {H H' : List Fev} (hp : H <+: H') {a : BitVec 64} {rt 
     · cases po with
       | none => rfl
       | some q => exact decide_eq_true (hpo'' q rfl)
-    · rw [← List.length_map (f := Prod.snd), hes', List.length_map, hm]
+    · rw [hes', hm]
 
 /-- a plain walk so far IS what fixed its inode -/
 theorem fevOpenFixed_walk {H : List Fev} {rt s0 : Nat} {po : Option Nat} {es : List (List (BitVec 8))}
     {d : Nat} (a : BitVec 64) (hw : fevWalkIs H rt s0 po es d) :
-    fevOpenFixed H a rt s0 es.length false d po = true := by
+    fevOpenFixed H a rt s0 es false d po = true := by
   obtain ⟨hpo, hes, hd⟩ := hw
   unfold fevOpenFixed
   simp only [Bool.false_eq_true, if_false, Bool.and_eq_true, beq_iff_eq]
-  refine ⟨⟨?_, ?_⟩, hd⟩
-  · cases po with
-    | none => rfl
-    | some q => exact decide_eq_true (hpo q rfl)
-  · rw [← hes, List.length_map]
+  refine ⟨⟨?_, hes⟩, hd⟩
+  cases po with
+  | none => rfl
+  | some q => exact decide_eq_true (hpo q rfl)
+
+/-! ## §3 The footprints (NI M3 FS-2d, for FS-4)
+
+FS-4's private-footprint theorem restricts an era's history to the events
+that MOVE a footprint `S` (`fevOn`): inode rows, single directory entries
+`(d, nm)` and struct-file offsets.  When `S` is CLOSED (every entry of `S`
+lives in a directory of `S`, `fevClosed`), the restriction keeps every
+reading a class row makes inside `S`: the read's bytes (`fevReadBytes_on`)
+and a lookup's answer (`fevHop_on`), by one fold-agreement lemma
+(`fstAg_fevRun`: the fold of `h` and the fold of `fevOn S h` agree on `S`).
+A hop's answer reads names and `S`-rows only, so the back-pointer positions
+are bookkeeping under the restriction.  (The coordinator's prototype of
+2026-10-06, verbatim.) -/
+
+/-- **A FOOTPRINT**: the inode rows, the directory entries and the struct
+files' offsets an incarnation's rows read -/
+structure FsFoot where
+  ino : Nat → Prop
+  ent : Nat → List (BitVec 8) → Prop
+  off : GName → Prop
+
+/-- the event MOVES the footprint -/
+def fevMoves (S : FsFoot) : Fev → Prop
+  | .boot _ => True
+  | .claim _ i _ | .arm _ i _ | .nlink _ i _ | .trunc _ i | .free _ i => S.ino i
+  | .ent _ d nm _ => S.ent d nm
+  | .write _ i γo held _ _ _ => S.ino i ∨ (held = false ∧ S.off γo)
+  | .open _ _ γo held _ | .read _ _ γo held _ _ => held = false ∧ S.off γo
+  | _ => False
+
+/-- closed: an entry of S lives in a directory of S -/
+def fevClosed (S : FsFoot) : Prop := ∀ d nm, S.ent d nm → S.ino d
+
+noncomputable def fevOn (S : FsFoot) (h : List Fev) : List Fev :=
+  open Classical in h.filter fun e => decide (fevMoves S e)
+
+/-- two rows agree on S at inode `i` -/
+def frowAg (S : FsFoot) (i : Nat) : Option (Fnode × Nat) → Option (Fnode × Nat) → Prop
+  | some (.file a, n), some (.file b, n') => a = b ∧ n = n'
+  | some (.dev a b, n), some (.dev a' b', n') => a = a' ∧ b = b' ∧ n = n'
+  | some (.dir m, n), some (.dir m', n') => (∀ nm, S.ent i nm → m[nm]? = m'[nm]?) ∧ n = n'
+  | none, none => True
+  | _, _ => False
+
+def fstAg (S : FsFoot) (s t : Frows × (GName → Nat)) : Prop :=
+  (∀ i, S.ino i → frowAg S i (s.1 i) (t.1 i)) ∧ ∀ γ, S.off γ → s.2 γ = t.2 γ
+
+theorem frowAg_refl (S : FsFoot) (i : Nat) : ∀ r, frowAg S i r r
+  | some (.file _, _) => ⟨rfl, rfl⟩
+  | some (.dev _ _, _) => ⟨rfl, rfl, rfl⟩
+  | some (.dir _, _) => ⟨fun _ _ => rfl, rfl⟩
+  | none => trivial
+
+/-- a non-move keeps the S-view of the left state -/
+theorem fstAg_skip (S : FsFoot) (hc : fevClosed S) (s t : Frows × (GName → Nat)) (e : Fev)
+    (hm : ¬ fevMoves S e) (ha : fstAg S s t) : fstAg S (fevStep s e) t := by
+  obtain ⟨hr, ho⟩ := ha
+  cases e with
+  | boot => exact absurd trivial hm
+  | claim a i n | arm a i n | nlink a i nl | trunc a i | free a i =>
+    refine ⟨fun j hj => ?_, ho⟩
+    have : j ≠ i := fun h => hm (h ▸ hj)
+    simpa [fevStep, frowsSet, this] using hr j hj
+  | ent a d nm tg =>
+    refine ⟨fun j hj => ?_, ho⟩
+    by_cases hjd : j = d
+    · subst hjd
+      have := hr j hj
+      simp only [fevStep, frowsSet, if_true]
+      revert this
+      cases hs : s.1 j with
+      | none => intro h; exact h
+      | some p =>
+        obtain ⟨nd, nl⟩ := p
+        cases nd with
+        | dir m =>
+          intro h
+          cases ht : t.1 j with
+          | none => rw [ht] at h; exact h.elim
+          | some q =>
+            obtain ⟨nd', nl'⟩ := q
+            rw [ht] at h
+            cases nd' with
+            | dir m' =>
+              refine ⟨fun x hx => ?_, h.2⟩
+              have hne : nm ≠ x := fun he => hm (he ▸ hx)
+              cases tg <;> simp [fentSet, Std.ExtTreeMap.getElem?_insert, Std.ExtTreeMap.getElem?_erase,
+                hne, h.1 x hx]
+            | _ => exact h.elim
+        | _ => intro h; exact h
+    · simpa [fevStep, frowsSet, hjd] using hr j hj
+  | write a i γo held off bs r =>
+    simp only [fevMoves, not_or, not_and] at hm
+    refine ⟨fun j hj => ?_, fun γ hγ => ?_⟩
+    · have : j ≠ i := fun h => hm.1 (h ▸ hj)
+      simpa [fevStep, frowsSet, this] using hr j hj
+    · cases held
+      · have : γ ≠ γo := fun h => hm.2 rfl (h ▸ hγ)
+        simpa [fevStep, foffSet, this] using ho γ hγ
+      · simpa [fevStep] using ho γ hγ
+  | «open» a i γo held po =>
+    simp only [fevMoves, not_and] at hm
+    refine ⟨fun j hj => by simpa [fevStep] using hr j hj, fun γ hγ => ?_⟩
+    cases held
+    · have : γ ≠ γo := fun h => hm rfl (h ▸ hγ)
+      simpa [fevStep, foffSet, this] using ho γ hγ
+    · simpa [fevStep] using ho γ hγ
+  | read a i γo held off n =>
+    simp only [fevMoves, not_and] at hm
+    refine ⟨fun j hj => by simpa [fevStep] using hr j hj, fun γ hγ => ?_⟩
+    cases held
+    · have : γ ≠ γo := fun h => hm rfl (h ▸ hγ)
+      simpa [fevStep, foffSet, this] using ho γ hγ
+    · simpa [fevStep] using ho γ hγ
+  | hop | look | stat | full => exact ⟨hr, ho⟩
+
+/-- a move applied to both keeps agreement -/
+theorem fstAg_both (S : FsFoot) (hc : fevClosed S) (s t : Frows × (GName → Nat)) (e : Fev)
+    (ha : fstAg S s t) : fstAg S (fevStep s e) (fevStep t e) := by
+  obtain ⟨hr, ho⟩ := ha
+  have hoff : ∀ (o o' : GName → Nat) γo v, (∀ γ, S.off γ → o γ = o' γ) →
+      ∀ γ, S.off γ → foffSet o γo v γ = foffSet o' γo v γ := by
+    intro o o' γo v h γ hγ; unfold foffSet; split <;> simp_all
+  have hset : ∀ (i : Nat) (v v' : Option (Fnode × Nat)), (S.ino i → frowAg S i v v') →
+      ∀ j, S.ino j → frowAg S j (frowsSet s.1 i v j) (frowsSet t.1 i v' j) := by
+    intro i v v' hv j hj; unfold frowsSet
+    by_cases hji : j = i
+    · subst hji; simp only [if_true]; exact hv hj
+    · simp only [hji, if_false]; exact hr j hj
+  cases e with
+  | boot sb => exact ⟨fun j _ => frowAg_refl S j _, fun _ _ => rfl⟩
+  | claim a i n | arm a i n | free a i =>
+    exact ⟨hset _ _ _ (fun _ => frowAg_refl S _ _), ho⟩
+  | nlink a i nl =>
+    refine ⟨hset _ _ _ (fun hi => ?_), ho⟩
+    have := hr i hi
+    revert this
+    cases s.1 i with
+    | none => cases t.1 i with
+      | none => intro _; trivial
+      | some _ => intro h; exact h.elim
+    | some p => cases t.1 i with
+      | none => intro h; obtain ⟨nd, _⟩ := p; cases nd <;> exact h.elim
+      | some q =>
+        obtain ⟨nd, _⟩ := p; obtain ⟨nd', _⟩ := q
+        cases nd <;> cases nd' <;> simp_all [frowAg, frowNlink]
+  | trunc a i =>
+    refine ⟨hset _ _ _ (fun hi => ?_), ho⟩
+    have := hr i hi
+    revert this
+    cases s.1 i with
+    | none => cases t.1 i with
+      | none => intro _; trivial
+      | some _ => intro h; exact h.elim
+    | some p => cases t.1 i with
+      | none => intro h; obtain ⟨nd, _⟩ := p; cases nd <;> exact h.elim
+      | some q =>
+        obtain ⟨nd, _⟩ := p; obtain ⟨nd', _⟩ := q
+        cases nd <;> cases nd' <;> simp_all [frowAg, frowTrunc]
+  | write a i γo held off bs r =>
+    refine ⟨hset _ _ _ (fun hi => ?_), ?_⟩
+    · have := hr i hi
+      revert this
+      cases s.1 i with
+      | none => cases t.1 i with
+        | none => intro _; trivial
+        | some _ => intro h; exact h.elim
+      | some p => cases t.1 i with
+        | none => intro h; obtain ⟨nd, _⟩ := p; cases nd <;> exact h.elim
+        | some q =>
+          obtain ⟨nd, _⟩ := p; obtain ⟨nd', _⟩ := q
+          cases nd <;> cases nd' <;> simp_all [frowAg, frowWrite]
+    · cases held
+      · exact hoff _ _ _ _ ho
+      · exact ho
+  | ent a d nm tg =>
+    refine ⟨hset _ _ _ (fun hi => ?_), ho⟩
+    have := hr d hi
+    revert this
+    cases s.1 d with
+    | none => cases t.1 d with
+      | none => intro _; trivial
+      | some _ => intro h; exact h.elim
+    | some p => cases t.1 d with
+      | none => intro h; obtain ⟨nd, _⟩ := p; cases nd <;> exact h.elim
+      | some q =>
+        obtain ⟨nd, _⟩ := p; obtain ⟨nd', _⟩ := q
+        cases nd <;> cases nd' <;> simp only [frowAg, frowEnt] <;> try (intro h; exact h)
+        rename_i m m'
+        intro h
+        refine ⟨fun x hx => ?_, h.2⟩
+        cases tg <;> simp only [fentSet, Std.ExtTreeMap.getElem?_insert, Std.ExtTreeMap.getElem?_erase] <;>
+          split <;> simp_all
+  | «open» a i γo held po =>
+    refine ⟨hr, ?_⟩
+    cases held
+    · exact hoff _ _ _ _ ho
+    · exact ho
+  | read a i γo held off n =>
+    refine ⟨hr, ?_⟩
+    cases held
+    · exact hoff _ _ _ _ ho
+    · exact ho
+  | hop | look | stat | full => exact ⟨hr, ho⟩
+
+theorem fstAg_run (S : FsFoot) (hc : fevClosed S) :
+    ∀ (h : List Fev) (s t : Frows × (GName → Nat)), fstAg S s t →
+      fstAg S (h.foldl fevStep s) ((fevOn S h).foldl fevStep t) := by
+  intro h
+  induction h with
+  | nil => intro s t ha; exact ha
+  | cons e h ih =>
+    intro s t ha
+    classical
+    unfold fevOn
+    by_cases hm : fevMoves S e
+    · rw [List.filter_cons_of_pos (by simpa using hm)]
+      exact ih _ _ (fstAg_both S hc s t e ha)
+    · rw [List.filter_cons_of_neg (by simpa using hm)]
+      exact ih _ _ (fstAg_skip S hc s t e hm ha)
+
+theorem fstAg_fevRun (S : FsFoot) (hc : fevClosed S) (h : List Fev) :
+    fstAg S (fevRun h) (fevRun (fevOn S h)) :=
+  fstAg_run S hc h _ _ ⟨fun j _ => frowAg_refl S j _, fun _ _ => rfl⟩
+
+theorem fevReadBytes_on {S : FsFoot} {h : List Fev} {i : Nat} {γo : GName} (n : Nat) (hc : fevClosed S)
+    (hi : S.ino i) (ho : S.off γo) :
+    fevReadBytes h i γo n = fevReadBytes (fevOn S h) i γo n := by
+  obtain ⟨hr, hoo⟩ := fstAg_fevRun S hc h
+  have hrow := hr i hi
+  have hcont : fevContent h i = fevContent (fevOn S h) i := by
+    unfold fevContent fevRows
+    revert hrow
+    cases (fevRun h).1 i with
+    | none => cases (fevRun (fevOn S h)).1 i with
+      | none => intro _; rfl
+      | some _ => intro h; exact h.elim
+    | some p => cases (fevRun (fevOn S h)).1 i with
+      | none => intro h; obtain ⟨nd, _⟩ := p; cases nd <;> exact h.elim
+      | some q =>
+        obtain ⟨nd, _⟩ := p; obtain ⟨nd', _⟩ := q
+        cases nd <;> cases nd' <;> simp_all [frowAg]
+  unfold fevReadBytes fevOff
+  rw [hcont, hoo γo ho]
+
+theorem fevHop_on {S : FsFoot} {h : List Fev} {d : Nat} {nm : List (BitVec 8)} (rt : Nat) (hc : fevClosed S)
+    (he : S.ent d nm) : fevHop h rt d nm = fevHop (fevOn S h) rt d nm := by
+  obtain ⟨hr, -⟩ := fstAg_fevRun S hc h
+  have hrow := hr d (hc d nm he)
+  unfold fevHop fevRows
+  split
+  · rfl
+  · revert hrow
+    cases (fevRun h).1 d with
+    | none => cases (fevRun (fevOn S h)).1 d with
+      | none => intro _; rfl
+      | some _ => intro h; exact h.elim
+    | some p => cases (fevRun (fevOn S h)).1 d with
+      | none => intro h; obtain ⟨nd, _⟩ := p; cases nd <;> exact h.elim
+      | some q =>
+        obtain ⟨nd, _⟩ := p; obtain ⟨nd', _⟩ := q
+        cases nd <;> cases nd' <;> simp_all [frowAg]
 
 end Xv6

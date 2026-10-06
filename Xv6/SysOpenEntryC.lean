@@ -538,7 +538,7 @@ theorem sys_open_ec_ok (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
   ihave #Hpre : sysOpenLedPre A inum.toNat $$ []
   · unfold sysOpenLedPre openLedPre
     icases creOkRcpt_fixed fscFs (procAddr A.j) made inum.toNat A.V.rti
-      (umStartOf A.V.rti A.V.cwi pl) (pathElems pl).length $$ Hcrc with ⟨%H, %p, #HL, %hfix⟩
+      (umStartOf A.V.rti A.V.cwi pl) (pathElems pl) $$ Hcrc with ⟨%H, %p, #HL, %hfix⟩
     iexists pl, H, some p
     iframe HL
     ipureintro

@@ -939,10 +939,11 @@ instance creOkRcpt_persistent (γfs : FsNames) (act : BitVec 64) (made : Bool) (
 
 /-- (NI M3 private files FS-2b′) **WHAT FIXED create's INODE**, in the
 ledger: a made child's arm, or a found node's hop at its parent's entry
-(`fevOpenFixed`'s O_CREATE side; the walk's start and length unread) -/
-theorem creOkRcpt_fixed (γfs : FsNames) (act : BitVec 64) (made : Bool) (i : Nat) (rt s0 m : Nat) :
+(`fevOpenFixed`'s O_CREATE side; the walk's start and names unread) -/
+theorem creOkRcpt_fixed (γfs : FsNames) (act : BitVec 64) (made : Bool) (i : Nat) (rt s0 : Nat)
+    (es : List (List (BitVec 8))) :
     creOkRcpt (GF := GF) γfs act made i ⊢
-      ∃ (H : List Fev) (p : Nat), fsLedLb γfs H ∗ ⌜fevOpenFixed H act rt s0 m true i (some p) = true⌝ := by
+      ∃ (H : List Fev) (p : Nat), fsLedLb γfs H ∗ ⌜fevOpenFixed H act rt s0 es true i (some p) = true⌝ := by
   unfold creOkRcpt creArmRcpt fsLedAt creFoundRcpt
   iintro (⟨-, ⟨%n, %h, #Ha⟩, -⟩ | ⟨-, ⟨%h, %d, %nm, %e, %nl, %⟨hr, hnm⟩, #Hh⟩⟩)
   · iexists h ++ [.arm act i n], h.length

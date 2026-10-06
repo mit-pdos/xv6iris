@@ -159,7 +159,12 @@ theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' :
     (uvisNum (uvisRun W) = USYS_open → (uvisRun W).lazy = false → (usysPath (uvisRun W)).isSome = true →
       tfW V'.tf (tfArgIdx 0) = usysOpenAns (usysPath (uvisRun W)) V.cwi (tfW (uvisRun W).tf (tfArgIdx 1)) ι
           (fdLowestClosed (uvisRun W).fd) ∧
-        sts' = usysOpenFd (uvisRun W).fd (usysPath (uvisRun W)) V.cwi (tfW (uvisRun W).tf (tfArgIdx 1)) ι) := by
+        sts' = usysOpenFd (uvisRun W).fd (usysPath (uvisRun W)) V.cwi (tfW (uvisRun W).tf (tfArgIdx 1)) ι) ∧
+    -- (NI M3 FS-2d, X3) the cited read is the caller's own, on the key's descriptor
+    (uvisNum (uvisRun W) = USYS_read → (uvisRun W).lazy = false → (ufsBuf (uvisRun W)).1 = true →
+      fdRdIno (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) = true → fevReadDir ι.fev = false →
+      0 ≤ usysCntW (tfW (uvisRun W).tf (tfArgIdx 2)) →
+      fevReadOn (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) ι.act ι.fev) := by
   have hnum := urc_num_run W V hl hsc
   have ha0 := urc_a0_run W V hl
   obtain ⟨hu, hw, hf, hsb, hwr, hout, hcl, hdp, hrd, hwi, hcd, hmk, hop⟩ := hev
@@ -190,9 +195,11 @@ theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' :
   -- (NI M3 FS-2a) the fs clauses, at the key's lazy bit, view, table and image
   have hR : uvisNum (uvisRun W) = USYS_read → (uvisRun W).lazy = false → (ufsBuf (uvisRun W)).1 = true →
       fdRdIno (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) = true → fevReadDir ι.fev = false →
-      tfW V'.tf (tfArgIdx 0) = usysReadAns (tfW (uvisRun W).tf (tfArgIdx 2)) ι ∧
+      (tfW V'.tf (tfArgIdx 0) = usysReadAns (tfW (uvisRun W).tf (tfArgIdx 2)) ι ∧
         syscImg V' M' = usysWr (uvisRun W).M (tfW (uvisRun W).tf (tfArgIdx 1))
-          (usysReadBytes (tfW (uvisRun W).tf (tfArgIdx 2)) ι) := by
+          (usysReadBytes (tfW (uvisRun W).tf (tfArgIdx 2)) ι)) ∧
+      (0 ≤ usysCntW (tfW (uvisRun W).tf (tfArgIdx 2)) →
+        fevReadOn (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) ι.act ι.fev) := by
     intro h hlz' hb hfd' hdir
     have hb' : (ufsBufAt (permOf (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)).upt.um
         (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)).sz.toNat)
@@ -204,10 +211,10 @@ theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' :
     have hfd'' : fdRdIno (usysFdAt sts (tfW (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)).tf (tfArgIdx 0))) = true := by
       rw [ha0, ← hfd]; exact hfd'
     have h' := hrd (hnum.trans h) (hlz.symm.trans hlz') hb' hfd'' hdir
-    rw [urc_a1_run W V hl, urc_a2_run W V hl] at h'
-    refine ⟨h'.1, ?_⟩
+    rw [urc_a1_run W V hl, urc_a2_run W V hl, ha0, ← hfd] at h'
+    refine ⟨⟨h'.1, ?_⟩, h'.2.2⟩
     show _ = usysWr W.M _ _
-    rw [← hM]; exact h'.2
+    rw [← hM]; exact h'.2.1
   have hWi : uvisNum (uvisRun W) = USYS_write → (uvisRun W).lazy = false → (ufsBuf (uvisRun W)).2 = true →
       fdWrIno (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) = true →
       tfW V'.tf (tfArgIdx 0) = usysWriteAnsF (tfW (uvisRun W).tf (tfArgIdx 2)) ι := by
@@ -294,7 +301,8 @@ theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' :
     show usysOutAt ι (uwriteRun W.M _ _)
     rw [← hM]
     exact h'
-  exact ⟨fun h => hu (hnum.trans h), hWt, hF, hS, hWr, hO, hC, hD, hR, hWi, hCd, hMk, hOp⟩
+  exact ⟨fun h => hu (hnum.trans h), hWt, hF, hS, hWr, hO, hC, hD, fun h a b c d => (hR h a b c d).1, hWi, hCd,
+    hMk, hOp, fun h a b c d => (hR h a b c d).2⟩
 
 /-- **THE PUSHED RUN AT THE CITED STREAM, FILED** (NI M3 NI-OUT): the round's
 `niOutRow` at its citation, off the re-keyed cited row (`urc_evRow`'s sixth
@@ -365,7 +373,7 @@ theorem urc_niDetRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
   have hpidrow : sc = uecallScause →
       usysRetPid (uvisNum (uvisRun W)) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0)) W.pid := by
     intro h; rw [← hnr, ← hnum0, hpid]; exact hrp h
-  obtain ⟨hup, hw, hfk, hsb, hwr, -, hcl, hdp, hrd, hwi, hcd, hmk, hop⟩ :=
+  obtain ⟨hup, hw, hfk, hsb, hwr, -, hcl, hdp, hrd, hwi, hcd, hmk, hop, hrt⟩ :=
     urc_evRow W V Mp V' M' cs cs' W.fd ι hl hch hsc hM hpi hsz hlz rfl hev
   have hcwr : (uvisRun W).cwd = V.cwi := hcw
   have hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0))
@@ -376,8 +384,11 @@ theorem urc_niDetRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
       hcl hdp (fun hn => usysDetClassAtF_read hcls hn) hrd (fun hn => usysDetClassAtF_chdir hcls hn)
       (fun hn hlz' hp => by rw [hcwr]; exact hcd hn hlz' hp) hmk (fun hn => usysDetClassAtF_open hcls hn)
       (fun hn hlz' hp => by rw [hcwr]; exact hop hn hlz' hp)
-  exact uexecRet_roundDet sc W (uvisOf V' M' sts' gn cs' pid) ι hlw (hgn.symm ▸ rfl) hpid.symm hchrow hfdrow
-    hpidrow hr hsce hcls hfit
+  refine ⟨uexecRet_roundDet sc W (uvisOf V' M' sts' gn cs' pid) ι hlw (hgn.symm ▸ rfl) hpid.symm hchrow hfdrow
+    hpidrow hr hsce hcls hfit, fun hn hc => ?_⟩
+  -- (NI M3 FS-2d, X3) the cited read on the key's descriptor
+  obtain ⟨hlz', hb, hfd, hdir⟩ := usysDetClassAtF_read hcls hn
+  exact hrt hn hlz' hb hfd hdir hc
 
 /-- **THE TRANSPARENT ROUND KEEPS THE KEY** (NI M3 U-2b, `niKeyRow`'s first
 half, finding F6): off the ecall the round resumes the trapped key itself,

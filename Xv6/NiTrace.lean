@@ -426,6 +426,10 @@ its observable form, and the strong instance.
    the fold of the prefix before it, from the FOLD's offset for `γo`
    (`fevReadBytes`), at most the request (`usysReadAns`, `usysReadBytes`;
    the image is pinned whole, `niKeyRow`)
+   -- (NI M3 FS-2d, X3) at a non-negative request that read is the
+   caller's own, on the inode and offset shadow of the key's descriptor
+   `wfd` (`UsysDet.fevReadOn`, in `NiLedger.niDetRow` and the law), so the
+   bytes are read off the caller's own descriptor
    -- and an inode write's `-1` verdict (`usysWriteAnsF`: the request, or
    `-1` at a negative request or the caller's cited `full` verdict).
    "Regular file" is the cited row's type (`citeDir`, the class's `fdir`:
@@ -461,8 +465,9 @@ its observable form, and the strong instance.
    prefix (`NiFs.fevChain`; positions are ledger bookkeeping), each lookup
    answered by the fold of the prefix before it (`fevHop`), from namex's
    start -- the cited ROOT `ι.rt` on an absolute path, the key's cwd
-   (`wcwd`) on a relative one -- with one lookup per element of the key's
-   path; the inode they resolve to, a directory in the fold before the test,
+   (`wcwd`) on a relative one -- whose lookups name exactly the elements
+   of the key's path, in order (NI M3 FS-2d, X2: the names, not only their
+   count); the inode they resolve to, a directory in the fold before the test,
    is the new cwd (`usysChdirAns`/`usysChdirCwd`).  Anything else answers
    `-1` with the cwd kept: a walk dead at an intermediate directory (fewer
    lookups than elements), a missed lookup, a non-directory.  The kernel's
@@ -484,8 +489,8 @@ its observable form, and the strong instance.
    the lock its type test holds (`FsWalkLed.ftopObsAfterAt`), so the open
    needs no separate `look`.  Its back-pointer names what fixed `i`
    (`NiFs.fevOpenFixed`): on a plain open the walk's last lookup, followed
-   as chdir's from the cited root or the key's cwd with one lookup per
-   element; under O_CREATE create's arm (a made child) or create's lookup
+   as chdir's from the cited root or the key's cwd over the key's path's
+   elements (FS-2d X2: the names checked); under O_CREATE create's arm (a made child) or create's lookup
    that found the name, whose prefix's fold names `nm ↦ i` in the parent.
    The descriptor type is the fold's row before the install read at the
    key's omode word (`usysOpenRow`: a file or a readable-only directory an
@@ -845,7 +850,9 @@ three clauses): the exit is an exit, the enter an enter, and
   `usysReadAns` at the exit's request word and the CITED prefix, at a
   lazy-free key whose destination the step's reading `wbuf` maps writable,
   on a readable inode descriptor `wfd`, when the cited read's row is a
-  regular file; an inode write's `usysWriteAnsF` at the CITED prefix, at a
+  regular file -- (NI M3 FS-2d, X3) at a non-negative request the cited
+  prefix ending in the caller's own parked read on `wfd`'s inode and
+  shadow (`fevReadOn`); an inode write's `usysWriteAnsF` at the CITED prefix, at a
   lazy-free key whose source `wbuf` maps readable, on a writable inode
   descriptor (scope 16); (NI M3 FS-2b) chdir's `usysChdirAns` at the step's
   readings `wpath` (the key's path argument) and `wcwd` (the key's cwd) and
@@ -882,7 +889,8 @@ def niRoundLaw (secc : BitVec 64) (lz : Bool) (win : Nat) (sz : Nat) (wcon : Opt
       (gprsNum secc xg = USYS_close → gprsA0 eg = usysCloseAns wfd) ∧
       (gprsNum secc xg = USYS_dup → gprsA0 eg = usysDupAns wfd wslot) ∧
       (gprsNum secc xg = USYS_read → lz = false → wbuf.1 = true → fdRdIno wfd = true →
-        ∃ k ι, c = some (k, ι) ∧ (fevReadDir ι.fev = false → gprsA0 eg = usysReadAns (gprsA2 xg) ι)) ∧
+        ∃ k ι, c = some (k, ι) ∧ (fevReadDir ι.fev = false → gprsA0 eg = usysReadAns (gprsA2 xg) ι ∧
+          (0 ≤ usysCntW (gprsA2 xg) → fevReadOn wfd ι.act ι.fev))) ∧
       (gprsNum secc xg = USYS_write → lz = false → wbuf.2 = true → fdWrIno wfd = true →
         ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysWriteAnsF (gprsA2 xg) ι) ∧
       (gprsNum secc xg = USYS_chdir → lz = false → wpath.isSome = true →
@@ -958,7 +966,7 @@ theorem niDetRow_uptime {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
   have hcls : usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
       (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) := by
     rw [hu]; exact ⟨Or.inr (Or.inr (Or.inl rfl)), fun h => absurd h (by decide), fun h => absurd h (by decide)⟩
-  have he := hd hsc (Or.inl hcls)
+  have he := (hd hsc (Or.inl hcls)).1
   rw [hu, usysDet_quiet _ _ (Or.inr (Or.inl rfl)), usysDetRet_uptime] at he
   exact ukeyEq_bump_a0 he
 
@@ -972,7 +980,7 @@ theorem niDetRow_wait {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
   have hcls : usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
       (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) := by
     rw [hw]; exact ⟨Or.inr (Or.inr (Or.inr (Or.inl rfl))), fun _ => hcl, fun h => absurd h (by decide)⟩
-  have he := hd hsc (Or.inl hcls)
+  have he := (hd hsc (Or.inl hcls)).1
   rw [hw, usysDet_wait] at he
   unfold usysDetWait at he
   unfold usysWaitAns
@@ -996,7 +1004,7 @@ theorem niDetRow_fork {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
       (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) := by
     rw [hf]; exact ⟨Or.inr (Or.inr (Or.inr (Or.inr (Or.inl rfl)))), fun h => absurd h (by decide),
       fun h => absurd h (by decide)⟩
-  have he := hd hsc (Or.inl hcls)
+  have he := (hd hsc (Or.inl hcls)).1
   rw [hf, usysDet_fork] at he
   unfold usysDetFork at he
   exact ukeyEq_bump_a0 he
@@ -1012,7 +1020,7 @@ theorem niDetRow_sbrk {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
       (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) := by
     rw [hs]; exact ⟨Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl rfl))))), fun h => absurd h (by decide),
       fun h => absurd h (by decide)⟩
-  have he := hd hsc (Or.inl hcls)
+  have he := (hd hsc (Or.inl hcls)).1
   rw [hs, usysDet_sbrk] at he
   unfold usysDetSbrk at he
   exact ukeyEq_bump_a0 he
@@ -1030,7 +1038,7 @@ theorem niDetRow_write {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
       (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) := by
     rw [hwr]; exact ⟨Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl rfl)))))), fun h => absurd h (by decide),
       fun _ => ⟨hlz, hwc⟩⟩
-  have he := hd hsc (Or.inl hcls)
+  have he := (hd hsc (Or.inl hcls)).1
   rw [hwr, usysDet_quiet _ _ (Or.inr (Or.inr (Or.inl rfl))), usysDetRet_writeCons _ _ hwc] at he
   exact ukeyEq_bump_a0 he
 
@@ -1044,7 +1052,7 @@ theorem niDetRow_close {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
       (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) := by
     rw [hc]; exact ⟨Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl rfl)))))))),
       fun h => absurd h (by decide), fun h => absurd h (by decide)⟩
-  have he := hd hsc (Or.inl hcls)
+  have he := (hd hsc (Or.inl hcls)).1
   rw [hc, usysDet_close] at he
   unfold usysDetClose at he
   exact ukeyEq_bump_a0 he
@@ -1060,7 +1068,7 @@ theorem niDetRow_dup {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
       (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) := by
     rw [hdp]; exact ⟨Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr rfl)))))))),
       fun h => absurd h (by decide), fun h => absurd h (by decide)⟩
-  have he := hd hsc (Or.inl hcls)
+  have he := (hd hsc (Or.inl hcls)).1
   rw [hdp, usysDet_dup] at he
   unfold usysDetDup at he
   exact ukeyEq_bump_a0 he
@@ -1068,17 +1076,22 @@ theorem niDetRow_dup {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
 /-- **M0's row at the cited ι gives read's answer** (NI M3 FS-2a;
 `usysDet_read`, `usysDetRead`): at a lazy-free key whose destination is
 writable, on a readable inode descriptor, when the cited read's row is a
-regular file, `usysReadAns` at the request word and the cited prefix. -/
+regular file, `usysReadAns` at the request word and the cited prefix -- and
+(NI M3 FS-2d, X3) at a non-negative request the cited prefix ends in the
+caller's own parked read on the key's descriptor (`fevReadOn`). -/
 theorem niDetRow_read {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
     (hd : niDetRow sc W W' (some (k, ι))) (hsc : sc = uecallScause) (hr : uvisNum (uvisRun W) = USYS_read)
     (hlz : (uvisRun W).lazy = false) (hb : (ufsBuf (uvisRun W)).1 = true)
     (hfd : fdRdIno (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) = true)
     (hdir : fevReadDir ι.fev = false) :
-    gprsA0 (tfGprs W'.tf) = usysReadAns (tfW (uvisRun W).tf (tfArgIdx 2)) ι := by
-  have he := hd hsc (Or.inr (Or.inl ⟨hr, hlz, hb, hfd, hdir⟩))
+    gprsA0 (tfGprs W'.tf) = usysReadAns (tfW (uvisRun W).tf (tfArgIdx 2)) ι ∧
+      (0 ≤ usysCntW (tfW (uvisRun W).tf (tfArgIdx 2)) →
+        fevReadOn (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) ι.act ι.fev) := by
+  have hd' := hd hsc (Or.inr (Or.inl ⟨hr, hlz, hb, hfd, hdir⟩))
+  have he := hd'.1
   rw [hr, usysDet_read] at he
   unfold usysDetRead at he
-  exact ukeyEq_bump_a0 he
+  exact ⟨ukeyEq_bump_a0 he, hd'.2 hr⟩
 
 /-- **M0's row at the cited ι gives an inode write's answer** (NI M3 FS-2a;
 `usysDet_quiet`, `usysDetRet_writeIno`): at a lazy-free key whose source is
@@ -1089,7 +1102,7 @@ theorem niDetRow_writeIno {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
     (hlz : (uvisRun W).lazy = false) (hb : (ufsBuf (uvisRun W)).2 = true)
     (hfd : fdWrIno (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) = true) :
     gprsA0 (tfGprs W'.tf) = usysWriteAnsF (tfW (uvisRun W).tf (tfArgIdx 2)) ι := by
-  have he := hd hsc (Or.inr (Or.inr (Or.inl ⟨hw, hlz, hb, hfd⟩)))
+  have he := (hd hsc (Or.inr (Or.inr (Or.inl ⟨hw, hlz, hb, hfd⟩)))).1
   rw [hw, usysDet_quiet _ _ (Or.inr (Or.inr (Or.inl rfl))), usysDetRet_writeIno _ _ hfd] at he
   exact ukeyEq_bump_a0 he
 
@@ -1106,7 +1119,7 @@ theorem niDetRow_chdir {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
     (hd : niDetRow sc W W' (some (k, ι))) (hsc : sc = uecallScause) (hc : uvisNum (uvisRun W) = USYS_chdir)
     (hlz : (uvisRun W).lazy = false) (hp : (usysPath (uvisRun W)).isSome = true) :
     gprsA0 (tfGprs W'.tf) = usysChdirAns (usysPath (uvisRun W)) (uvisRun W).cwd ι := by
-  have he := hd hsc (Or.inr (Or.inr (Or.inr (Or.inl ⟨hc, hlz, hp⟩))))
+  have he := (hd hsc (Or.inr (Or.inr (Or.inr (Or.inl ⟨hc, hlz, hp⟩))))).1
   rw [hc, usysDet_chdir] at he
   unfold usysDetChdir at he
   exact ukeyEq_bump_a0 he
@@ -1117,7 +1130,7 @@ theorem niDetRow_mkdir {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
     (hd : niDetRow sc W W' (some (k, ι))) (hsc : sc = uecallScause) (hm : uvisNum (uvisRun W) = USYS_mkdir)
     (hlz : (uvisRun W).lazy = false) :
     gprsA0 (tfGprs W'.tf) = usysMkdirAns ι := by
-  have he := hd hsc (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨hm, hlz⟩)))))
+  have he := (hd hsc (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨hm, hlz⟩)))))).1
   rw [hm, usysDet_mkdir] at he
   unfold usysDetMkdir at he
   exact ukeyEq_bump_a0 he
@@ -1131,7 +1144,7 @@ theorem niDetRow_open {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
     (hlz : (uvisRun W).lazy = false) (hp : (usysPath (uvisRun W)).isSome = true) :
     gprsA0 (tfGprs W'.tf) = usysOpenAns (usysPath (uvisRun W)) (uvisRun W).cwd (tfW (uvisRun W).tf (tfArgIdx 1)) ι
       (fdLowestClosed (uvisRun W).fd) := by
-  have he := hd hsc (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ⟨ho, hlz, hp⟩)))))
+  have he := (hd hsc (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ⟨ho, hlz, hp⟩)))))).1
   rw [ho, usysDet_open] at he
   unfold usysDetOpen at he
   exact ukeyEq_bump_a0 he
@@ -1284,7 +1297,12 @@ theorem niStepOf_law {h : List Obs} {f : NiEntry} {s : NiStep} (hf : niEntryOk h
           have hb' : (ufsBuf (uvisRun W)).1 = true := by rw [ufsBuf_run]; exact hb
           have hfd' : fdRdIno (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) = true := by
             rw [uvisRun_arg W 0 (by decide)]; exact hfd
-          rw [niDetRow_read hdet hsc hr hlzf hb' hfd' hdir, uvisRun_arg W 2 (by decide), gprsA2_tfGprs]
+          have hrd := niDetRow_read hdet hsc hr hlzf hb' hfd' hdir
+          rw [uvisRun_arg W 2 (by decide), uvisRun_arg W 0 (by decide)] at hrd
+          refine ⟨?_, fun hn => ?_⟩
+          · rw [hrd.1, gprsA2_tfGprs]
+          · rw [gprsA2_tfGprs] at hn
+            exact hrd.2 hn
         · -- (NI M3 FS-2a) an inode write: likewise
           intro hw hlzf hb hfd
           rw [← hrun] at hw
@@ -1636,7 +1654,7 @@ theorem NiStep.output_eq {pid : BitVec 32} {s₁ s₂ : NiStep} (h₁ : s₁.law
       have hd₂ : fevReadDir ι'.fev = false := by
         have hf : ι.led.fev = ι'.led.fev := congrArg UIota.fev hl
         rw [← show ι.led.fev = ι.fev from rfl, hf] at hd₁; exact hd₁
-      rw [ha₁ hd₁, ha₂ hd₂]
+      rw [(ha₁ hd₁).1, (ha₂ hd₂).1]
       show usysReadAns (gprsA2 xg) ι.led = usysReadAns (gprsA2 xg) ι'.led
       rw [hl]
     · -- (NI M3 FS-2b) chdir: at the one `wpath`, `wcwd` and cited ledger part
@@ -2299,7 +2317,7 @@ theorem NiStep.output_eq_fam {r : BitVec 32} {pid : BitVec 32} {s₁ s₂ : NiSt
       have hd₂ : fevReadDir ι'.fev = false := by
         have hf : (ι.famLed r).fev = (ι'.famLed r).fev := congrArg UIota.fev hl
         rw [← show (ι.famLed r).fev = ι.fev from rfl, hf] at hd₁; exact hd₁
-      rw [ha₁ hd₁, ha₂ hd₂]
+      rw [(ha₁ hd₁).1, (ha₂ hd₂).1]
       show usysReadAns (gprsA2 xg) (ι.famLed r) = usysReadAns (gprsA2 xg) (ι'.famLed r)
       rw [hl]
     · -- (NI M3 FS-2b) chdir, at the one cited family part
