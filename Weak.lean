@@ -19,5 +19,11 @@ import Weak.KernelSites
 import Weak.AxReuseProbe
 import Weak.AxSpinSpikeRun
 import Weak.WeakInterp
+import Weak.WeakRvwmoGraph
+import Weak.WeakLitmusProj
+import Weak.WeakSrvwmoLitmus
+import Weak.WeakLang
+import Weak.KernelPinsDef
+import Weak.KernelPins
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
