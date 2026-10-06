@@ -26,5 +26,6 @@ import Weak.WeakLang
 import Weak.KernelPinsDef
 import Weak.KernelPins
 import Weak.VirtioProg
+import Weak.WeakRvwmoXchg
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
