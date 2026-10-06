@@ -157,5 +157,8 @@ import Weak.AxSpinSpike
 import Weak.WeakSrvwmoCapstone
 import Weak.WeakRvwmoCert
 import Weak.WeakFetchEff
+import Weak.AxPtProt3
+import Weak.AxSfence
+import Weak.AxScCat
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
