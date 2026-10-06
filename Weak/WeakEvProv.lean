@@ -33,7 +33,7 @@ Slice 2b (§§6-10): the per-instruction lemma over a hart's `pstepEv` chain (`p
 ## Deviations from Rocq
 
 1. NAMES / TYPES: camelCase; `M unit` ↦ `SailM Unit`; `regstate` ↦ `RegFile` (`register_lookup r
-   rs` ↦ `rs r`, `register_set r v rs` ↦ `rs.set r v`); `dev_state` ↦ `DevStates`; `oib32` ↦
+   rs` ↦ `rs r`, `register_set r v rs` ↦ `rs.set r v`); `dev_state` ↦ `DevStates` / `Efab` (deviation 7); `oib32` ↦
    `Ibch`; `wreg` ↦ `Nat`; `gset register` ↦ `List Register` (as `WeakEvLift.esilNode`);
    `default x o` ↦ `o.getD x`; `ereg_num` ↦ `eregNum`.  Lean's `RegRead` has no `dir` argument.
 2. `obar` (WeakEvInst deviation 4): every program-half relation carries the executed barrier
@@ -55,6 +55,13 @@ Slice 2b (§§6-10): the per-instruction lemma over a hart's `pstepEv` chain (`p
    Lean-only helpers: `dregAgreeGetD`, `wlIsStoreErw`, `wlIsStoreEbar`, `erwLabelNeInstr`.
 6. Constructors `pevrun_nil/more` ↦ `pevrun.nil/more`, `phrun_nil/more` ↦ `phrun.nil/more`
    (the `more` binders implicit).  `Example instr_dagree_nonvacuous` ↦ `theorem`.
+7. THE FABRIC TYPE (owner decision Q1; `WeakEvPf` deviation 9, `WeakEvInst` deviation 5): the
+   instance's fabric is `Efab` (the device states plus the residual UART/PLIC programs), so
+   `dev_state` ↦ `Efab` from §5 on (`pstepPlic*`, `pstepHart*`, `pstepEv*`, `pstepHw*`,
+   `pevrun`, `phrun`, §§7–10); the `pnodeStep`-level lemmas keep `DevStates`.  `pstepHw`'s two
+   node arms read `d.efDev` and add `d' = { d with efDev := d'.efDev }` (as `pstepHart`'s), and
+   `pstepPlic` now carries the PLIC program's `setPin` node (`∃ mm b k, d.efPlic = …`): only the
+   three isolated lemmas of deviation 4 and the node-arm patterns changed.
 
 **File-qualified names:** none (no name of this file is in `notes/weak-port-dupnames.json`).
 
@@ -491,16 +498,16 @@ theorem erunSilentDagreeChannel (n : Nat) (D : List Register) (rs1 rs2 : RegFile
 
 /-- Lean-only (deviation 4): the PLIC wire at two agreeing register files. -/
 theorem pstepPlicDagree (P : Nat → Prop) (cpu : CPU) (m : SailM Unit) (rs1 rs2 : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (m' : SailM Unit) (ors1 : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
-    (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
+    (d' : Efab) (oib : Option Ibch) (obar : Option barrier_kind) :
     dregAgree P rs1 rs2 →
     pstepPlic cpu m rs1 fn ib d l m' ors1 fn' d' oib obar →
     ∃ ors2 : Option RegFile, pstepPlic cpu m rs2 fn ib d l m' ors2 fn' d' oib obar ∧
       dregAgree P (ors1.getD rs1) (ors2.getD rs2) := by
   intro hag h
-  obtain ⟨h1, h2, h3, h4, h5, h6, mm, b, rfl⟩ := h
-  refine ⟨some (pinSet rs2 mm b), ⟨h1, h2, h3, h4, h5, h6, mm, b, rfl⟩, ?_⟩
+  obtain ⟨mm, b, k, hk, h1, h2, h3, h4, h5, h6, rfl⟩ := h
+  refine ⟨some (pinSet rs2 mm b), ⟨mm, b, k, hk, h1, h2, h3, h4, h5, h6, rfl⟩, ?_⟩
   cases mm
   · exact dregAgreeSet P rs1 rs2 _ _ hag
   · exact dregAgreeSet P rs1 rs2 _ _ hag
@@ -509,50 +516,50 @@ theorem pstepPlicDagree (P : Nat → Prop) (cpu : CPU) (m : SailM Unit) (rs1 rs2
 def plicWrs : List Register := [.sig_meip, .sig_seip]
 
 theorem pstepPlicWrs (cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
-    (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
+    (d' : Efab) (oib : Option Ibch) (obar : Option barrier_kind) :
     pstepPlic cpu m rs fn ib d l m' ors fn' d' oib obar →
     ∃ (r : Register) (v : RegisterType r), r ∈ plicWrs ∧ ors = some (rs.set r v) := by
   intro h
-  obtain ⟨_, _, _, _, _, _, mm, b, rfl⟩ := h
+  obtain ⟨mm, b, _, _, _, _, _, _, _, _, rfl⟩ := h
   cases mm
   · exact ⟨.sig_seip, if b then 1#1 else 0#1, by simp [plicWrs], rfl⟩
   · exact ⟨.sig_meip, if b then 1#1 else 0#1, by simp [plicWrs], rfl⟩
 
 theorem pstepPlicOib (cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
-    (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
+    (d' : Efab) (oib : Option Ibch) (obar : Option barrier_kind) :
     pstepPlic cpu m rs fn ib d l m' ors fn' d' oib obar → oib = none :=
-  fun h => h.2.2.2.2.1
+  fun h => by obtain ⟨_, _, _, _, _, _, _, _, h, _⟩ := h; exact h
 
 theorem pstepHartDagree (P : Nat → Prop) (cpu : CPU) (m : SailM Unit) (rs1 rs2 : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (m' : SailM Unit) (ors1 : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
-    (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
+    (d' : Efab) (oib : Option Ibch) (obar : Option barrier_kind) :
     rdsOk P (pnodeRds m) → dregAgree P rs1 rs2 →
     pstepHart cpu m rs1 fn ib d l m' ors1 fn' d' oib obar →
     ∃ ors2 : Option RegFile, pstepHart cpu m rs2 fn ib d l m' ors2 fn' d' oib obar ∧
       dregAgree P (ors1.getD rs1) (ors2.getD rs2) := by
   intro hsub hag h
-  rcases h with hn | hp
+  rcases h with ⟨hn, hd⟩ | hp
   · cases fn with
     | some f =>
       obtain ⟨pr, pw, sr, sw⟩ := f
-      exact ⟨ors1, Or.inl hn, dregAgreeGetD P rs1 rs2 ors1 hag⟩
+      exact ⟨ors1, Or.inl ⟨hn, hd⟩, dregAgreeGetD P rs1 rs2 ors1 hag⟩
     | none =>
-      obtain ⟨ors2, h2, hag2⟩ := pnodeStepDagree P m rs1 rs2 ib d l m' ors1 fn' d' oib obar
-        hsub hag hn
-      exact ⟨ors2, Or.inl h2, hag2⟩
+      obtain ⟨ors2, h2, hag2⟩ := pnodeStepDagree P m rs1 rs2 ib d.efDev l m' ors1 fn' d'.efDev
+        oib obar hsub hag hn
+      exact ⟨ors2, Or.inl ⟨h2, hd⟩, hag2⟩
   · obtain ⟨ors2, h2, hag2⟩ := pstepPlicDagree P cpu m rs1 rs2 fn ib d l m' ors1 fn' d' oib obar
       hag hp
     exact ⟨ors2, Or.inr h2, hag2⟩
 
 theorem pstepEvDagree (P : Nat → Prop) (cpu : CPU) (m : SailM Unit) (rs1 rs2 : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (m' : SailM Unit) (rs1' : RegFile) (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch)
-    (d' : DevStates) :
+    (d' : Efab) :
     rdsOk P (pnodeRds m) → dregAgree P rs1 rs2 →
     pstepEv (.PHart cpu m rs1 fn ib) d l (.PHart cpu m' rs1' fn' ib') d' →
     ∃ rs2' : RegFile,
@@ -582,20 +589,22 @@ theorem pnodeStepAnn (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevStates)
 
 /-- `pstepHart` with the three annotations (read list, written list, boundary flag). -/
 def pstepHw (cpu : CPU) (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool))
-    (ib : Ibch) (d : DevStates) (l : Wlabel) (rds : List Nat) (ws : List Register) (ann : Bool)
+    (ib : Ibch) (d : Efab) (l : Wlabel) (rds : List Nat) (ws : List Register) (ann : Bool)
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
-    (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) : Prop :=
-  (fn = none ∧ pnodeStep m rs ib d l m' ors fn' d' oib obar ∧
+    (d' : Efab) (oib : Option Ibch) (obar : Option barrier_kind) : Prop :=
+  (fn = none ∧ (pnodeStep m rs ib d.efDev l m' ors fn' d'.efDev oib obar ∧
+      d' = { d with efDev := d'.efDev }) ∧
     rds = pnodeRds m ∧ ws = pnodeWrs m ∧ ann = ibnAnn m)
   ∨ (∃ pr pw sr sw, fn = some (pr, pw, sr, sw) ∧
-      pstepNode cpu m rs fn ib d l m' ors fn' d' oib obar ∧ rds = [] ∧ ws = [] ∧ ann = false)
+      (pstepNode cpu m rs fn ib d.efDev l m' ors fn' d'.efDev oib obar ∧
+        d' = { d with efDev := d'.efDev }) ∧ rds = [] ∧ ws = [] ∧ ann = false)
   ∨ (pstepPlic cpu m rs fn ib d l m' ors fn' d' oib obar ∧
       rds = [] ∧ ws = plicWrs ∧ ann = false)
 
 theorem pstepHwHart (cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (rds : List Nat) (ws : List Register) (ann : Bool) (m' : SailM Unit) (ors : Option RegFile)
-    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : DevStates) (oib : Option Ibch)
+    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : Efab) (oib : Option Ibch)
     (obar : Option barrier_kind) :
     pstepHw cpu m rs fn ib d l rds ws ann m' ors fn' d' oib obar →
     pstepHart cpu m rs fn ib d l m' ors fn' d' oib obar := by
@@ -605,9 +614,9 @@ theorem pstepHwHart (cpu : CPU) (m : SailM Unit) (rs : RegFile)
   · exact Or.inr H
 
 theorem pstepHartHw (cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
-    (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
+    (d' : Efab) (oib : Option Ibch) (obar : Option barrier_kind) :
     pstepHart cpu m rs fn ib d l m' ors fn' d' oib obar →
     ∃ rds ws ann, pstepHw cpu m rs fn ib d l rds ws ann m' ors fn' d' oib obar := by
   rintro (hn | hp)
@@ -619,25 +628,25 @@ theorem pstepHartHw (cpu : CPU) (m : SailM Unit) (rs : RegFile)
   · exact ⟨[], plicWrs, false, Or.inr (Or.inr ⟨hp, rfl, rfl, rfl⟩)⟩
 
 theorem pstepHwAnn (cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (rds : List Nat) (ws : List Register) (ann : Bool) (m' : SailM Unit) (ors : Option RegFile)
-    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : DevStates) (oib : Option Ibch)
+    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : Efab) (oib : Option Ibch)
     (obar : Option barrier_kind) :
     pstepHw cpu m rs fn ib d l rds ws ann m' ors fn' d' oib obar → ann = true → l = LInstr := by
-  rintro (⟨-, H, -, -, rfl⟩ | ⟨_, _, _, _, -, -, -, -, rfl⟩ | ⟨-, -, -, rfl⟩) hann
-  · exact pnodeStepAnn m rs ib d l m' ors fn' d' oib obar H hann
+  rintro (⟨-, ⟨H, -⟩, -, -, rfl⟩ | ⟨_, _, _, _, -, -, -, -, rfl⟩ | ⟨-, -, -, rfl⟩) hann
+  · exact pnodeStepAnn m rs ib _ l m' ors fn' _ oib obar H hann
   · cases hann
   · cases hann
 
 theorem pstepHwChannel (cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (rds : List Nat) (ws : List Register) (ann : Bool) (m' : SailM Unit) (ors : Option RegFile)
-    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : DevStates) (oib : Option Ibch)
+    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : Efab) (oib : Option Ibch)
     (obar : Option barrier_kind) :
     pstepHw cpu m rs fn ib d l rds ws ann m' ors fn' d' oib obar → ann = false →
     (oib.getD ib).ibRds = ib.ibRds ++ rds := by
-  rintro (⟨-, H, rfl, -, rfl⟩ | ⟨_, _, _, _, rfl, H, rfl, -, -⟩ | ⟨H, rfl, -, -⟩) hann
-  · rw [pnodeStepChannel m rs ib d l m' ors fn' d' oib obar H]
+  rintro (⟨-, ⟨H, -⟩, rfl, -, rfl⟩ | ⟨_, _, _, _, rfl, ⟨H, -⟩, rfl, -, -⟩ | ⟨H, rfl, -, -⟩) hann
+  · rw [pnodeStepChannel m rs ib _ l m' ors fn' _ oib obar H]
     exact ibnStepRds m ib hann
   · obtain ⟨_, _, _, _, _, rfl, _⟩ := H
     simp
@@ -645,15 +654,15 @@ theorem pstepHwChannel (cpu : CPU) (m : SailM Unit) (rs : RegFile)
     simp
 
 theorem pstepHwFrame (P : Nat → Prop) (cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (rds : List Nat) (ws : List Register) (ann : Bool) (m' : SailM Unit) (ors : Option RegFile)
-    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : DevStates) (oib : Option Ibch)
+    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : Efab) (oib : Option Ibch)
     (obar : Option barrier_kind) :
     pstepHw cpu m rs fn ib d l rds ws ann m' ors fn' d' oib obar →
     (∀ r, r ∈ ws → ∃ n, eregNum r = some n ∧ ¬ P n) →
     dregAgree P rs (ors.getD rs) := by
-  rintro (⟨-, H, -, rfl, -⟩ | ⟨_, _, _, _, rfl, H, -, rfl, -⟩ | ⟨H, -, rfl, -⟩) hws
-  · rcases pnodeStepOrs m rs ib d l m' ors fn' d' oib obar H with rfl | ⟨r, v, hr, rfl⟩
+  rintro (⟨-, ⟨H, -⟩, -, rfl, -⟩ | ⟨_, _, _, _, rfl, ⟨H, -⟩, -, rfl, -⟩ | ⟨H, -, rfl, -⟩) hws
+  · rcases pnodeStepOrs m rs ib _ l m' ors fn' _ oib obar H with rfl | ⟨r, v, hr, rfl⟩
     · exact dregAgreeRefl P rs
     · exact dregAgreeExcl P rs r v (hws r hr)
   · obtain ⟨_, _, rfl, _⟩ := H
@@ -663,9 +672,9 @@ theorem pstepHwFrame (P : Nat → Prop) (cpu : CPU) (m : SailM Unit) (rs : RegFi
 
 /-- THE STEP'S OWN AGREEMENT LEMMA, annotations carried unchanged. -/
 theorem pstepHwDagree (P : Nat → Prop) (cpu : CPU) (m : SailM Unit) (rs1 rs2 : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (rds : List Nat) (ws : List Register) (ann : Bool) (m' : SailM Unit) (ors1 : Option RegFile)
-    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : DevStates) (oib : Option Ibch)
+    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : Efab) (oib : Option Ibch)
     (obar : Option barrier_kind) :
     pstepHw cpu m rs1 fn ib d l rds ws ann m' ors1 fn' d' oib obar →
     rdsOk P rds → dregAgree P rs1 rs2 →
@@ -673,9 +682,9 @@ theorem pstepHwDagree (P : Nat → Prop) (cpu : CPU) (m : SailM Unit) (rs1 rs2 :
       dregAgree P (ors1.getD rs1) (ors2.getD rs2) := by
   rintro (⟨rfl, H, rfl, rfl, rfl⟩ | ⟨pr, pw, sr, sw, rfl, H, rfl, rfl, rfl⟩ | ⟨H, rfl, rfl, rfl⟩)
     hrds hag
-  · obtain ⟨ors2, H2, hag2⟩ := pnodeStepDagree P m rs1 rs2 ib d l m' ors1 fn' d' oib obar
-      hrds hag H
-    exact ⟨ors2, Or.inl ⟨rfl, H2, rfl, rfl, rfl⟩, hag2⟩
+  · obtain ⟨ors2, H2, hag2⟩ := pnodeStepDagree P m rs1 rs2 ib d.efDev l m' ors1 fn' d'.efDev oib
+      obar hrds hag H.1
+    exact ⟨ors2, Or.inl ⟨rfl, ⟨H2, H.2⟩, rfl, rfl, rfl⟩, hag2⟩
   · exact ⟨ors1, Or.inr (Or.inl ⟨pr, pw, sr, sw, rfl, H, rfl, rfl, rfl⟩),
       dregAgreeGetD P rs1 rs2 ors1 hag⟩
   · obtain ⟨ors2, H2, hag2⟩ := pstepPlicDagree P cpu m rs1 rs2 fn ib d l m' ors1 fn' d' oib obar
@@ -685,32 +694,32 @@ theorem pstepHwDagree (P : Nat → Prop) (cpu : CPU) (m : SailM Unit) (rs1 rs2 :
 /-! ## 7. THE RUN -/
 
 /-- THE PLAIN CHAIN, at Layer 1's own type. -/
-inductive pevrun : List Wlabel → Pexv6 → DevStates → Pexv6 → DevStates → Prop where
-  | nil (p : Pexv6) (d : DevStates) : pevrun [] p d p d
-  | more {l : Wlabel} {ls : List Wlabel} {p : Pexv6} {d : DevStates} {p1 : Pexv6}
-      {d1 : DevStates} {p2 : Pexv6} {d2 : DevStates} :
+inductive pevrun : List Wlabel → Pexv6 → Efab → Pexv6 → Efab → Prop where
+  | nil (p : Pexv6) (d : Efab) : pevrun [] p d p d
+  | more {l : Wlabel} {ls : List Wlabel} {p : Pexv6} {d : Efab} {p1 : Pexv6}
+      {d1 : Efab} {p2 : Pexv6} {d2 : Efab} :
       pstepEv p d l p1 d1 → pevrun ls p1 d1 p2 d2 → pevrun (l :: ls) p d p2 d2
 
 /-- THE ANNOTATED CHAIN of ONE hart. -/
 inductive phrun (cpu : CPU) : List Wlabel → List Nat → List Register → Bool → SailM Unit →
-    RegFile → Option (Bool × Bool × Bool × Bool) → Ibch → DevStates → SailM Unit → RegFile →
-    Option (Bool × Bool × Bool × Bool) → Ibch → DevStates → Prop where
+    RegFile → Option (Bool × Bool × Bool × Bool) → Ibch → Efab → SailM Unit → RegFile →
+    Option (Bool × Bool × Bool × Bool) → Ibch → Efab → Prop where
   | nil (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch)
-      (d : DevStates) : phrun cpu [] [] [] false m rs fn ib d m rs fn ib d
+      (d : Efab) : phrun cpu [] [] [] false m rs fn ib d m rs fn ib d
   | more {l : Wlabel} {ls : List Wlabel} {rds rds' : List Nat} {ws ws' : List Register}
       {ann ann' : Bool} {m : SailM Unit} {rs : RegFile} {fn : Option (Bool × Bool × Bool × Bool)}
-      {ib : Ibch} {d : DevStates} {m1 : SailM Unit} {ors : Option RegFile}
+      {ib : Ibch} {d : Efab} {m1 : SailM Unit} {ors : Option RegFile}
       {fn1 : Option (Bool × Bool × Bool × Bool)} {oib : Option Ibch} {obar : Option barrier_kind}
-      {d1 : DevStates} {m2 : SailM Unit} {rs2 : RegFile}
-      {fn2 : Option (Bool × Bool × Bool × Bool)} {ib2 : Ibch} {d2 : DevStates} :
+      {d1 : Efab} {m2 : SailM Unit} {rs2 : RegFile}
+      {fn2 : Option (Bool × Bool × Bool × Bool)} {ib2 : Ibch} {d2 : Efab} :
       pstepHw cpu m rs fn ib d l rds ws ann m1 ors fn1 d1 oib obar →
       phrun cpu ls rds' ws' ann' m1 (ors.getD rs) fn1 (oib.getD ib) d1 m2 rs2 fn2 ib2 d2 →
       phrun cpu (l :: ls) (rds ++ rds') (ws ++ ws') (ann || ann') m rs fn ib d m2 rs2 fn2 ib2 d2
 
 theorem phrunPevrun (cpu : CPU) (ls : List Wlabel) (rds : List Nat) (ws : List Register)
     (ann : Bool) (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool))
-    (ib : Ibch) (d : DevStates) (m' : SailM Unit) (rs' : RegFile)
-    (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : DevStates) :
+    (ib : Ibch) (d : Efab) (m' : SailM Unit) (rs' : RegFile)
+    (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : Efab) :
     phrun cpu ls rds ws ann m rs fn ib d m' rs' fn' ib' d' →
     pevrun ls (.PHart cpu m rs fn ib) d (.PHart cpu m' rs' fn' ib') d' := by
   intro h
@@ -722,7 +731,7 @@ theorem phrunPevrun (cpu : CPU) (ls : List Wlabel) (rds : List Nat) (ws : List R
     exact ⟨rfl, ors, oib, obar, rfl, rfl,
       pstepHwHart cpu m rs fn ib d l rds ws ann m1 ors fn1 d1 oib obar hstep⟩
 
-theorem pevrunPhrun (ls : List Wlabel) (p : Pexv6) (d : DevStates) (p' : Pexv6) (d' : DevStates) :
+theorem pevrunPhrun (ls : List Wlabel) (p : Pexv6) (d : Efab) (p' : Pexv6) (d' : Efab) :
     pevrun ls p d p' d' →
     ∀ cpu m rs fn ib m' rs' fn' ib',
       p = .PHart cpu m rs fn ib → p' = .PHart cpu m' rs' fn' ib' →
@@ -749,8 +758,8 @@ theorem pevrunPhrun (ls : List Wlabel) (p : Pexv6) (d : DevStates) (p' : Pexv6) 
 
 theorem phrunIbRds (cpu : CPU) (ls : List Wlabel) (rds : List Nat) (ws : List Register)
     (ann : Bool) (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool))
-    (ib : Ibch) (d : DevStates) (m' : SailM Unit) (rs' : RegFile)
-    (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : DevStates) :
+    (ib : Ibch) (d : Efab) (m' : SailM Unit) (rs' : RegFile)
+    (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : Efab) :
     phrun cpu ls rds ws ann m rs fn ib d m' rs' fn' ib' d' →
     ann = false → ib'.ibRds = ib.ibRds ++ rds := by
   intro h
@@ -765,8 +774,8 @@ theorem phrunIbRds (cpu : CPU) (ls : List Wlabel) (rds : List Nat) (ws : List Re
 
 theorem phrunAnn (cpu : CPU) (ls : List Wlabel) (rds : List Nat) (ws : List Register)
     (ann : Bool) (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool))
-    (ib : Ibch) (d : DevStates) (m' : SailM Unit) (rs' : RegFile)
-    (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : DevStates) :
+    (ib : Ibch) (d : Efab) (m' : SailM Unit) (rs' : RegFile)
+    (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : Efab) :
     phrun cpu ls rds ws ann m rs fn ib d m' rs' fn' ib' d' →
     ann = true → LInstr ∈ ls := by
   intro h
@@ -782,8 +791,8 @@ theorem phrunAnn (cpu : CPU) (ls : List Wlabel) (rds : List Nat) (ws : List Regi
 
 theorem phrunNoInstr (cpu : CPU) (ls : List Wlabel) (rds : List Nat) (ws : List Register)
     (ann : Bool) (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool))
-    (ib : Ibch) (d : DevStates) (m' : SailM Unit) (rs' : RegFile)
-    (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : DevStates) :
+    (ib : Ibch) (d : Efab) (m' : SailM Unit) (rs' : RegFile)
+    (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : Efab) :
     phrun cpu ls rds ws ann m rs fn ib d m' rs' fn' ib' d' →
     LInstr ∉ ls → ann = false := by
   intro hrun hni
@@ -795,8 +804,8 @@ theorem phrunNoInstr (cpu : CPU) (ls : List Wlabel) (rds : List Nat) (ws : List 
 
 theorem phrunDagree (P : Nat → Prop) (cpu : CPU) (ls : List Wlabel) (rds : List Nat)
     (ws : List Register) (ann : Bool) (m : SailM Unit) (rs1 : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (m' : SailM Unit)
-    (rs1' : RegFile) (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : DevStates) :
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (m' : SailM Unit)
+    (rs1' : RegFile) (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : Efab) :
     phrun cpu ls rds ws ann m rs1 fn ib d m' rs1' fn' ib' d' →
     rdsOk P rds →
     ∀ rs2, dregAgree P rs1 rs2 →
@@ -818,8 +827,8 @@ theorem phrunDagree (P : Nat → Prop) (cpu : CPU) (ls : List Wlabel) (rds : Lis
 /-- THE HEADLINE, at the channel. -/
 theorem instrDagree (T : List Nat) (cpu : CPU) (ls : List Wlabel) (rds : List Nat)
     (ws : List Register) (ann : Bool) (m : SailM Unit) (rs1 : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (m' : SailM Unit)
-    (rs1' : RegFile) (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : DevStates) :
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (m' : SailM Unit)
+    (rs1' : RegFile) (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : Efab) :
     phrun cpu ls rds ws ann m rs1 fn ib d m' rs1' fn' ib' d' →
     LInstr ∉ ls →
     (∀ n, n ∈ ib'.ibRds → n ∉ T) →
@@ -836,9 +845,9 @@ theorem instrDagree (T : List Nat) (cpu : CPU) (ls : List Wlabel) (rds : List Na
   exact List.mem_append_right _ hn
 
 theorem instrDagreeEv (T : List Nat) (cpu : CPU) (ls : List Wlabel) (m : SailM Unit)
-    (rs1 : RegFile) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates)
+    (rs1 : RegFile) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab)
     (m' : SailM Unit) (rs1' : RegFile) (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch)
-    (d' : DevStates) :
+    (d' : Efab) :
     pevrun ls (.PHart cpu m rs1 fn ib) d (.PHart cpu m' rs1' fn' ib') d' →
     LInstr ∉ ls →
     (∀ n, n ∈ ib'.ibRds → n ∉ T) →
@@ -867,8 +876,8 @@ theorem pnodeStepStoreDet (m : SailM Unit) (rs1 rs2 : RegFile) (ib : Ibch) (d : 
 
 theorem phrunFrame (P : Nat → Prop) (cpu : CPU) (ls : List Wlabel) (rds : List Nat)
     (ws : List Register) (ann : Bool) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (m' : SailM Unit)
-    (rs' : RegFile) (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : DevStates) :
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (m' : SailM Unit)
+    (rs' : RegFile) (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : Efab) :
     phrun cpu ls rds ws ann m rs fn ib d m' rs' fn' ib' d' →
     (∀ r, r ∈ ws → ∃ n, eregNum r = some n ∧ ¬ P n) →
     dregAgree P rs rs' := by
@@ -885,12 +894,12 @@ theorem phrunFrame (P : Nat → Prop) (cpu : CPU) (ls : List Wlabel) (rds : List
 /-- THE CLOSURE, for two runs that have parted company. -/
 theorem taintClosure (P : Nat → Prop) (cpu1 : CPU) (ls1 : List Wlabel) (rds1 : List Nat)
     (ws1 : List Register) (ann1 : Bool) (m1 : SailM Unit) (rs1 : RegFile)
-    (fn1 : Option (Bool × Bool × Bool × Bool)) (ib1 : Ibch) (d1 : DevStates) (m1' : SailM Unit)
-    (rs1' : RegFile) (fn1' : Option (Bool × Bool × Bool × Bool)) (ib1' : Ibch) (d1' : DevStates)
+    (fn1 : Option (Bool × Bool × Bool × Bool)) (ib1 : Ibch) (d1 : Efab) (m1' : SailM Unit)
+    (rs1' : RegFile) (fn1' : Option (Bool × Bool × Bool × Bool)) (ib1' : Ibch) (d1' : Efab)
     (cpu2 : CPU) (ls2 : List Wlabel) (rds2 : List Nat) (ws2 : List Register) (ann2 : Bool)
     (m2 : SailM Unit) (rs2 : RegFile) (fn2 : Option (Bool × Bool × Bool × Bool)) (ib2 : Ibch)
-    (d2 : DevStates) (m2' : SailM Unit) (rs2' : RegFile)
-    (fn2' : Option (Bool × Bool × Bool × Bool)) (ib2' : Ibch) (d2' : DevStates) :
+    (d2 : Efab) (m2' : SailM Unit) (rs2' : RegFile)
+    (fn2' : Option (Bool × Bool × Bool × Bool)) (ib2' : Ibch) (d2' : Efab) :
     dregAgree P rs1 rs2 →
     phrun cpu1 ls1 rds1 ws1 ann1 m1 rs1 fn1 ib1 d1 m1' rs1' fn1' ib1' d1' →
     phrun cpu2 ls2 rds2 ws2 ann2 m2 rs2 fn2 ib2 d2 m2' rs2' fn2' ib2' d2' →
@@ -906,12 +915,12 @@ theorem taintClosure (P : Nat → Prop) (cpu1 : CPU) (ls1 : List Wlabel) (rds1 :
 /-- ... in the form §4e quotes: a load whose answers differ taints its destination `rd`. -/
 theorem taintClosureLoad (T : List Nat) (rd : Nat) (cpu1 : CPU) (ls1 : List Wlabel)
     (rds1 : List Nat) (ws1 : List Register) (ann1 : Bool) (m1 : SailM Unit) (rs1 : RegFile)
-    (fn1 : Option (Bool × Bool × Bool × Bool)) (ib1 : Ibch) (d1 : DevStates) (m1' : SailM Unit)
-    (rs1' : RegFile) (fn1' : Option (Bool × Bool × Bool × Bool)) (ib1' : Ibch) (d1' : DevStates)
+    (fn1 : Option (Bool × Bool × Bool × Bool)) (ib1 : Ibch) (d1 : Efab) (m1' : SailM Unit)
+    (rs1' : RegFile) (fn1' : Option (Bool × Bool × Bool × Bool)) (ib1' : Ibch) (d1' : Efab)
     (cpu2 : CPU) (ls2 : List Wlabel) (rds2 : List Nat) (ws2 : List Register) (ann2 : Bool)
     (m2 : SailM Unit) (rs2 : RegFile) (fn2 : Option (Bool × Bool × Bool × Bool)) (ib2 : Ibch)
-    (d2 : DevStates) (m2' : SailM Unit) (rs2' : RegFile)
-    (fn2' : Option (Bool × Bool × Bool × Bool)) (ib2' : Ibch) (d2' : DevStates) :
+    (d2 : Efab) (m2' : SailM Unit) (rs2' : RegFile)
+    (fn2' : Option (Bool × Bool × Bool × Bool)) (ib2' : Ibch) (d2' : Efab) :
     dregAgree (fun n => n ∉ T) rs1 rs2 →
     phrun cpu1 ls1 rds1 ws1 ann1 m1 rs1 fn1 ib1 d1 m1' rs1' fn1' ib1' d1' →
     phrun cpu2 ls2 rds2 ws2 ann2 m2 rs2 fn2 ib2 d2 m2' rs2' fn2' ib2' d2' →
@@ -931,13 +940,13 @@ theorem taintClosureLoad (T : List Nat) (rd : Nat) (cpu1 : CPU) (ls1 : List Wlab
 def witM : SailM Unit :=
   .impure (.ok (.regRead .x15)) (fun v => .impure (.ok (.regWrite .x14 v)) (fun _ => .pure ()))
 
-theorem witRun (cpu : CPU) (rs : RegFile) (d : DevStates) :
+theorem witRun (cpu : CPU) (rs : RegFile) (d : Efab) :
     ∃ ls rds ws ann m' ib' rs',
       phrun cpu ls rds ws ann witM rs none ibNone d m' rs' none ib' d ∧
       rds = [15] ∧ ws = [(.x14 : Register)] ∧ ann = false ∧ LInstr ∉ ls ∧ ib'.ibRds = [15] := by
   refine ⟨_, _, _, _, _, _, _,
-    phrun.more (Or.inl ⟨rfl, ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩, rfl, rfl, rfl⟩)
-      (phrun.more (Or.inl ⟨rfl, ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩, rfl, rfl, rfl⟩)
+    phrun.more (Or.inl ⟨rfl, ⟨⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩, rfl⟩, rfl, rfl, rfl⟩)
+      (phrun.more (Or.inl ⟨rfl, ⟨⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩, rfl⟩, rfl, rfl, rfl⟩)
         (phrun.nil _ _ _ _ _)), rfl, rfl, rfl, ?_, rfl⟩
   intro hin
   rcases List.mem_cons.1 hin with h | h
@@ -946,7 +955,7 @@ theorem witRun (cpu : CPU) (rs : RegFile) (d : DevStates) :
     · exact erwLabelNeInstr _ h.symm
     · cases h
 
-theorem instrDagreeNonvacuous (cpu : CPU) (rs1 rs2 : RegFile) (d : DevStates) :
+theorem instrDagreeNonvacuous (cpu : CPU) (rs1 rs2 : RegFile) (d : Efab) :
     dregAgree (fun n => n ∉ [14]) rs1 rs2 →
     ∃ ls m' ib' rs1' rs2',
       phrun cpu ls [15] [(.x14 : Register)] false witM rs1 none ibNone d m' rs1' none ib' d ∧

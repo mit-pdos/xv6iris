@@ -84,6 +84,13 @@ LAYOUT.  Hart `c` at pool position and agent index `c.val`; the disk is agent `n
 7. `fin_enum_lookup` & co. are about `List.finRange` (Rocq `fin_enum`); `fmap_enum_hset` uses
    `if c' = c` (Rocq `decide`).
 8. PROOFS: `epfRunLive` / `epfRtcErased` by tail induction on `rtc` (Rocq: head induction).
+9. THE FABRIC TYPE (owner decision Q1, `notes/weak-port-architecture.md`).  `ecfgOf` carries
+   `Efab` (Lean-only: `DevStates` plus the residual programs `efU0`/`efU1`/`efPlic` of the
+   UARTs and the PLIC, read off the pool), not `DevStates` (Rocq `dev_state`): Rocq's UART and
+   PLIC were stateless, Lean's are programs, and Layer 1's program half must step them exactly
+   (`WeakEvInst` deviation 5).  So `ecfgOf : Epool → WGState → Wpcfg Pexv6 Efab`, with
+   `pcDev = efabOf P σ`.  Lean-only: `Efab`, `efU`, `efUset`, `efabOf`, `efInit`, `efabOfInit`,
+   `efUOf`.
 
 **File-qualified names:** none (no name of this file is in `notes/weak-port-dupnames.json`).
 
@@ -107,7 +114,8 @@ LAYOUT.  Hart `c` at pool position and agent index `c.val`; the disk is agent `n
 `ecfg_of_log` `ecfgOfLog`, `no_violation_violation_hart` `noViolationViolationHart`.
 Lean-only: `Epool.epU0`/`epU1`/`epPlic`, `epU`, `epUset`, `epPset`, `epUsetGen`, `uartOff`,
 `plicAgent`, `epoolTail`, `epoolListTailGet`, `epoolListTailSet`, `epoolListUset`,
-`epoolListPlicLookup`, `epoolListPset`, `ediskStepEra`, `elabelOkIFetch0`, `pfFetchLoadOkHart`.
+`epoolListPlicLookup`, `epoolListPset`, `ediskStepEra`, `elabelOkIFetch0`, `pfFetchLoadOkHart`,
+`Efab` & co. (deviation 9).
 
 **Not ported:** nothing.
 
@@ -237,9 +245,39 @@ def ediskAg (P : Epool) : Wpagent Pexv6 := ⟨.PDisk P.epDp, P.epDws, ∅⟩
 
 def eags (P : Epool) (σ : WGState) : List (Wpagent Pexv6) := cpus.map (ehartAg P σ) ++ [ediskAg P]
 
-/-- THE PROJECTION to a `WeakPromise` configuration; the fabric is carried. -/
-def ecfgOf (P : Epool) (σ : WGState) : Wpcfg Pexv6 DevStates :=
-  ⟨imgZ σ.wgimg, σ.wglog, σ.wgdev, eags P σ⟩
+/-- THE FABRIC of the event instance (Lean-only, deviation 9; owner decision Q1): the device
+states AND the residual programs of the two UARTs and the PLIC, so that Layer 1's program half
+can step those programs exactly (`WeakEvInst.pstepPlic` / `pdiskUart`). -/
+structure Efab where
+  efDev : DevStates
+  efU0 : DevProg (.uart .uart0)
+  efU1 : DevProg (.uart .uart1)
+  efPlic : DevProg .plic
+
+/-- A UART's residual program in the fabric (Lean-only). -/
+def efU (F : Efab) : (i : UartId) → DevProg (.uart i)
+  | .uart0 => F.efU0
+  | .uart1 => F.efU1
+
+def efUset (F : Efab) : (i : UartId) → DevProg (.uart i) → Efab
+  | .uart0, m => { F with efU0 := m }
+  | .uart1, m => { F with efU1 := m }
+
+/-- The fabric of a pool and a state (Lean-only). -/
+def efabOf (P : Epool) (σ : WGState) : Efab := ⟨σ.wgdev, P.epU0, P.epU1, P.epPlic⟩
+
+/-- The fabric of a fresh era: every residual device program at `.pure ()` (Lean-only). -/
+def efInit (ds : DevStates) : Efab := ⟨ds, .pure (), .pure (), .pure ()⟩
+
+theorem efabOfInit (gen : Nat) (σ : WGState) : efabOf (epInit gen) σ = efInit σ.wgdev := rfl
+
+theorem efUOf (P : Epool) (σ : WGState) (i : UartId) : efU (efabOf P σ) i = epU P i := by
+  cases i <;> rfl
+
+/-- THE PROJECTION to a `WeakPromise` configuration; the fabric is carried (deviation 9: with
+the residual UART/PLIC programs). -/
+def ecfgOf (P : Epool) (σ : WGState) : Wpcfg Pexv6 Efab :=
+  ⟨imgZ σ.wgimg, σ.wglog, efabOf P σ, eags P σ⟩
 
 theorem eagsHart (P : Epool) (σ : WGState) (c : CPU) : (eags P σ)[c.val]? = some (ehartAg P σ c) := by
   unfold eags

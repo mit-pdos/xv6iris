@@ -42,7 +42,8 @@ WHAT IS HERE.
    `omap` ↦ `filterMap`.  `row_deps_aux_app` is a duplicated Rocq name: declared
    `WeakRvwmoSupply.rowDepsAuxApp`.  `gmsg` is `WeakRvwmoLin.gmsg` (the one `hullLinearizes`
    uses).  `nat_bounded_choice`'s witness type is any `A`; `filter_take_prefix` takes a Boolean
-   predicate.
+   predicate.  `dev_state` ↦ `Efab` (the event instance's fabric: the device states plus the
+   residual UART/PLIC programs, `WeakEvPf` deviation 9 / owner decision Q1).
 2. O2 / D1 — THE FETCH-INERTNESS OBLIGATION (`WeakRvwmoConf` deviation 3).
    `WeakRvwmoConf.hlblRealizesAx` is now `lblRealizes … ↔ hlblRealizes … ∧ lbFetchInert σ i l`:
    turning a per-hart block back into `lblRealizes` at the MACHINE state needs `lbFetchInert`
@@ -150,14 +151,14 @@ theorem pdevEvFalse (p : Pexv6) (l : Wlabel) (p' : Pexv6) : l ≠ LDev → pdevE
   intro h
   cases l <;> first | rfl | exact absurd rfl h
 
-theorem pstepEvDevfree (p : Pexv6) (d : DevStates) (l : Wlabel) (p' : Pexv6) (d' : DevStates) :
+theorem pstepEvDevfree (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
     pstepEv p d l p' d' → l ≠ LDev → d' = d ∧ ∀ d0, pstepEv p d0 l p' d0 :=
   fun hs hne => pdevEvOk p d l p' d' hs (pdevEvFalse p l p' hne)
 
 /-! ### 2.1 The administrative run -/
 
-theorem admRunDevfree (instr : Bool) (p : Pexv6) (d : DevStates) (ls : List Wlabel) (p' : Pexv6)
-    (d' : DevStates) : admRun instr p d ls p' d' → LDev ∉ ls → d' = d := by
+theorem admRunDevfree (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
+    (d' : Efab) : admRun instr p d ls p' d' → LDev ∉ ls → d' = d := by
   intro h
   induction h with
   | ARnil => intro _; rfl
@@ -167,8 +168,8 @@ theorem admRunDevfree (instr : Bool) (p : Pexv6) (d : DevStates) (ls : List Wlab
     obtain ⟨hd, _⟩ := pstepEvDevfree _ _ _ _ _ hs hne
     rw [ih (fun hin => hnd (List.mem_cons_of_mem _ hin)), hd]
 
-theorem admRunRefab (instr : Bool) (p : Pexv6) (d : DevStates) (ls : List Wlabel) (p' : Pexv6)
-    (d' : DevStates) : admRun instr p d ls p' d' → LDev ∉ ls →
+theorem admRunRefab (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
+    (d' : Efab) : admRun instr p d ls p' d' → LDev ∉ ls →
     ∀ d0, admRun instr p d0 ls p' d0 := by
   intro h
   induction h with
@@ -182,7 +183,7 @@ theorem admRunRefab (instr : Bool) (p : Pexv6) (d : DevStates) (ls : List Wlabel
 
 /-! ### 2.2 The emission -/
 
-theorem hemitDevfreeConst (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List Lbl)
+theorem hemitDevfreeConst (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
     hemit dv k ws row p es pfin → LDev ∉ es.map Prod.fst →
     ∀ j, k ≤ j → j ≤ k + row.length → dv j = dv k := by
@@ -221,10 +222,10 @@ theorem hemitDevfreeConst (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row 
 
 /-- THE REFABRICATION (Rocq's recorded STATEMENT CORRECTION: the emission replays at any fabric
 assignment CONSTANT on the block's index range, with no relation to `dv` at all). -/
-theorem hemitDevfreeRefab (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List Lbl)
+theorem hemitDevfreeRefab (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
     hemit dv k ws row p es pfin → LDev ∉ es.map Prod.fst →
-    ∀ (dv' : Nat → DevStates) (d0 : DevStates),
+    ∀ (dv' : Nat → Efab) (d0 : Efab),
       (∀ j, k ≤ j → j ≤ k + row.length → dv' j = d0) →
       hemit dv' k ws row p es pfin := by
   intro h
@@ -256,10 +257,10 @@ theorem hemitDevfreeRefab (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row 
       exact hall2 d0
     · exact ih hrest dv' d0 (fun j hlo hhi => hc j (by omega) (by simp only [List.length_cons]; omega))
 
-theorem hemitDevfreeReindex (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List Lbl)
+theorem hemitDevfreeReindex (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
     hemit dv k ws row p es pfin → LDev ∉ es.map Prod.fst →
-    ∀ d0 : DevStates, hemit (fun _ => d0) k ws row p es pfin :=
+    ∀ d0 : Efab, hemit (fun _ => d0) k ws row p es pfin :=
   fun hem hnd d0 => hemitDevfreeRefab dv k ws row p es pfin hem hnd _ d0 (fun _ _ _ => rfl)
 
 /-! ## 3. The quiescent conformance bundle -/
@@ -267,7 +268,7 @@ theorem hemitDevfreeReindex (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (ro
 def emDevfree (em : Hemission) : Prop := LDev ∉ emLabels em
 
 /-- THE QUIESCENT BUNDLE, with the BOOT TIE (`im` the booted image, `nh` the booted hart count). -/
-def gdexecQconf (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat) (GD : Gdexec) :
+def gdexecQconf (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GD : Gdexec) :
     Prop :=
   GD.gdG.gxImg = im ∧
   GD.gdG.gxProg.length ≤ nh ∧
@@ -276,15 +277,15 @@ def gdexecQconf (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat) 
           emDevfree em ∧
           (∀ jk, jk ∈ rowDeps em.emItems → ((i, jk.1), (i, jk.2)) ∈ GD.gdDeps))
 
-theorem gdexecQconfImg (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat)
+theorem gdexecQconfImg (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) : gdexecQconf boot d0 im nh GD → GD.gdG.gxImg = im :=
   fun h => h.1
 
-theorem gdexecQconfNharts (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat)
+theorem gdexecQconfNharts (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) : gdexecQconf boot d0 im nh GD → GD.gdG.gxProg.length ≤ nh :=
   fun h => h.2.1
 
-theorem gdexecQconfRows (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat)
+theorem gdexecQconfRows (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) : gdexecQconf boot d0 im nh GD →
     ∀ i row, GD.gdG.gxProg[i]? = some row →
       ∃ em, hartConf i row (boot i) (fun _ => d0) em ∧
@@ -293,7 +294,7 @@ theorem gdexecQconfRows (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh
   fun h => h.2.2
 
 /-- The bundle IS a `gdexecConf` bundle. -/
-theorem gdexecQconfConf (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat)
+theorem gdexecQconfConf (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) : gdexecQconf boot d0 im nh GD → gdexecConf boot (fun _ _ => d0) GD := by
   rintro ⟨_, _, h⟩ i row hrow
   obtain ⟨em, hem, _, hdep⟩ := h i row hrow
@@ -340,7 +341,7 @@ theorem rowDepsPrefix (es1 es2 : List Eitem) (jk : Nat × Nat) :
 
 /-! ### 3.3 The hull transport -/
 
-theorem gdexecQconfHull (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat)
+theorem gdexecQconfHull (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) (cs : List Nat) :
     gdexecQconf boot d0 im nh GD → gdexecQconf boot d0 im nh (gdHull GD cs) := by
   rintro ⟨himg, hnh, hq⟩
@@ -383,7 +384,7 @@ theorem gdexecQconfHull (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh
 
 /-! ### 3.4 The orbit transport -/
 
-theorem gdexecQconfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : DevStates) (im : Image)
+theorem gdexecQconfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : Efab) (im : Image)
     (nh : Nat) (GD GD' : Gdexec) :
     rowsRel π GD.gdG GD'.gdG →
     GD'.gdDeps = GD.gdDeps →
@@ -412,35 +413,35 @@ theorem gdexecQconfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : DevStates
 
 /-! ## 4. The emission's intermediate program states -/
 
-def hblock (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (lb : Lbl) (p p' : Pexv6) : Prop :=
-  ∃ (pa : Pexv6) (da : DevStates),
+def hblock (dv : Nat → Efab) (k : Nat) (ws : Wstate) (lb : Lbl) (p p' : Pexv6) : Prop :=
+  ∃ (pa : Pexv6) (da : Efab),
     admStar pstepEv true p (dv k) pa da ∧
     ((∃ l, hlblRealizes pa ws lb l ∧ pstepEv pa da l p' (dv (k + 1)))
-     ∨ (∃ (pm : Pexv6) (dm : DevStates) (pm2 : Pexv6) (dm2 : DevStates) (l1 l2 : Wlabel),
+     ∨ (∃ (pm : Pexv6) (dm : Efab) (pm2 : Pexv6) (dm2 : Efab) (l1 l2 : Wlabel),
           hlblRealizesPair pa pm2 ws lb l1 l2 ∧
           pstepEv pa da l1 pm dm ∧
           admStar pstepEv false pm dm pm2 dm2 ∧
           pstepEv pm2 dm2 l2 p' (dv (k + 1))))
 
 /-- (Lean-only, deviation 2) `hblock` whose single-step arm records its item in `es`. -/
-def hblockIn (es : List Eitem) (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (lb : Lbl)
+def hblockIn (es : List Eitem) (dv : Nat → Efab) (k : Nat) (ws : Wstate) (lb : Lbl)
     (p p' : Pexv6) : Prop :=
-  ∃ (pa : Pexv6) (da : DevStates),
+  ∃ (pa : Pexv6) (da : Efab),
     admStar pstepEv true p (dv k) pa da ∧
     ((∃ l, (l, some k) ∈ es ∧ hlblRealizes pa ws lb l ∧ pstepEv pa da l p' (dv (k + 1)))
-     ∨ (∃ (pm : Pexv6) (dm : DevStates) (pm2 : Pexv6) (dm2 : DevStates) (l1 l2 : Wlabel),
+     ∨ (∃ (pm : Pexv6) (dm : Efab) (pm2 : Pexv6) (dm2 : Efab) (l1 l2 : Wlabel),
           hlblRealizesPair pa pm2 ws lb l1 l2 ∧
           pstepEv pa da l1 pm dm ∧
           admStar pstepEv false pm dm pm2 dm2 ∧
           pstepEv pm2 dm2 l2 p' (dv (k + 1))))
 
-theorem hblockInHblock (es : List Eitem) (dv : Nat → DevStates) (k : Nat) (ws : Wstate)
+theorem hblockInHblock (es : List Eitem) (dv : Nat → Efab) (k : Nat) (ws : Wstate)
     (lb : Lbl) (p p' : Pexv6) : hblockIn es dv k ws lb p p' → hblock dv k ws lb p p' := by
   rintro ⟨pa, da, hs, ⟨l, _, h1, h2⟩ | h⟩
   · exact ⟨pa, da, hs, .inl ⟨l, h1, h2⟩⟩
   · exact ⟨pa, da, hs, .inr h⟩
 
-theorem hblockInMono (es es' : List Eitem) (dv : Nat → DevStates) (k : Nat) (ws : Wstate)
+theorem hblockInMono (es es' : List Eitem) (dv : Nat → Efab) (k : Nat) (ws : Wstate)
     (lb : Lbl) (p p' : Pexv6) :
     hblockIn es dv k ws lb p p' → (∀ x, x ∈ es → x ∈ es') → hblockIn es' dv k ws lb p p' := by
   rintro ⟨pa, da, hs, ⟨l, hm, h1, h2⟩ | h⟩ hsub
@@ -448,7 +449,7 @@ theorem hblockInMono (es es' : List Eitem) (dv : Nat → DevStates) (k : Nat) (w
   · exact ⟨pa, da, hs, .inr h⟩
 
 /-- (Lean-only) `hemitStates`, with the realizing items located in the emission. -/
-theorem hemitStatesIn (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List Lbl)
+theorem hemitStatesIn (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
     hemit dv k ws row p es pfin →
     ∃ f : Nat → Pexv6, f 0 = p ∧
@@ -493,7 +494,7 @@ theorem hemitStatesIn (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row : Li
       rw [e]
       exact hblockInMono _ _ _ _ _ _ _ _ (hf n lb0 hn) (fun x hx => by simp [hx])
 
-theorem hemitStates (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List Lbl)
+theorem hemitStates (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
     hemit dv k ws row p es pfin →
     ∃ f : Nat → Pexv6, f 0 = p ∧
@@ -504,7 +505,7 @@ theorem hemitStates (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List
   exact ⟨f, hf0, fun n lb hn => hblockInHblock _ _ _ _ _ _ _ (hf n lb hn)⟩
 
 /-- (Lean-only) `hartConfStates`, with the realizing items located in the emission. -/
-theorem hartConfStatesIn (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → DevStates)
+theorem hartConfStatesIn (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab)
     (em : Hemission) :
     hartConf i row p0 dv em →
     ∃ f : Nat → Pexv6, f 0 = p0 ∧
@@ -516,7 +517,7 @@ theorem hartConfStatesIn (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → D
   rw [Nat.add_zero] at h
   exact h
 
-theorem hartConfStates (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → DevStates)
+theorem hartConfStates (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab)
     (em : Hemission) :
     hartConf i row p0 dv em →
     ∃ f : Nat → Pexv6, f 0 = p0 ∧
@@ -641,10 +642,10 @@ def emFetchInert (c : Cand) (i : Nat) (em : Hemission) : Prop :=
 
 /-- (Lean-only, deviation 2) The candidate-level fetch obligation: every constant-fabric emission
 of every row of the trace (agents below `N`) is fetch-inert at `c`. -/
-def candFetchInert (boot : Nat → Pexv6) (d0 : DevStates) (N : Nat) (c : Cand) : Prop :=
+def candFetchInert (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (c : Cand) : Prop :=
   ∀ i em, i < N → hartConf i (trow i c.cdTr) (boot i) (fun _ => d0) em → emFetchInert c i em
 
-theorem supplyOfQconf (c : Cand) (boot : Nat → Pexv6) (d0 : DevStates)
+theorem supplyOfQconf (c : Cand) (boot : Nat → Pexv6) (d0 : Efab)
     (rows : Nat → List Lbl) (N : Nat) :
     -- the trace is an interleaving of the rows ...
     (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) = rows i) →
@@ -727,7 +728,7 @@ theorem supplyOfQconf (c : Cand) (boot : Nat → Pexv6) (d0 : DevStates)
 
 /-! ## 7. The compositions -/
 
-theorem qconfRows (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat) (GD : Gdexec)
+theorem qconfRows (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GD : Gdexec)
     (i : Nat) :
     gdexecQconf boot d0 im nh GD →
     ∃ em, hartConf i ((GD.gdG.gxProg[i]?).getD []) (boot i) (fun _ => d0) em := by
@@ -750,7 +751,7 @@ theorem gxhNharts (G : Gexec) (cs : List Nat) :
 
 /-! ### 7.1 The hull route -/
 
-theorem hullSupply (boot : Nat → Pexv6) (d0 : DevStates) (GD : Gdexec) (cs : List Nat)
+theorem hullSupply (boot : Nat → Pexv6) (d0 : Efab) (GD : Gdexec) (cs : List Nat)
     (N : Nat) :
     rvwmoMinusDepsConsistent GD →
     hullOk GD.gdG cs →
@@ -777,7 +778,7 @@ theorem hullSupply (boot : Nat → Pexv6) (d0 : DevStates) (GD : Gdexec) (cs : L
 
 /-! ### 7.2 The acyclicity route -/
 
-theorem topoSupply (boot : Nat → Pexv6) (d0 : DevStates) (GD : Gdexec) (N : Nat) :
+theorem topoSupply (boot : Nat → Pexv6) (d0 : Efab) (GD : Gdexec) (N : Nat) :
     rvwmoMinusDepsConsistent GD →
     (∀ x y, Decidable (racyD GD x y)) →
     (∀ x, ¬ tc (racyD GD) x x) →

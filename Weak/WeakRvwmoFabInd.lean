@@ -30,7 +30,8 @@ closing comment enumerates FIVE obligations (O1–O5) for the CONFORMANCE restri
 1. NAMES: camelCase (map below); `l !! n` ↦ `l[n]?`; `default [] o` ↦ `o.getD []`;
    `seq 0 N` ↦ `List.range' 0 N`; `es_ag`/`cd_tr` ↦ `esAg`/`cdTr`; `filter (λ s, es_ag s = i)` ↦
    `filter (fun s => decide (s.esAg = i))`; `agent → pexv6` ↦ `Nat → Pexv6`; `RacyF` ↦ `racyF`,
-   `RacyD` ↦ `racyD`; `tc_mono` ↦ `tcMono`.
+   `RacyD` ↦ `racyD`; `tc_mono` ↦ `tcMono`.  `dev_state` ↦ `Efab` (the event instance's fabric,
+   `WeakEvPf` deviation 9 / owner decision Q1).
 2. O2 / D1 — THE FETCH-INERTNESS OBLIGATION (`WeakRvwmoFab` deviation 2): `fconfSupply` takes
    `candFetchInertF boot N c`.  So the supply conjunct of `fconfRealize`,
    `hullRealizableOfAcyclicF` and `t2linSupplyF` is Rocq's
@@ -71,7 +72,7 @@ open MachCSL MachCSL.Stdpp Iris.Std
 
 /-! ### 1.1 O2: the normalization orbit -/
 
-theorem hemitfRen (π : Nat → Nat) (dvi dvo : Nat → DevStates) (k : Nat) (ws : Wstate)
+theorem hemitfRen (π : Nat → Nat) (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate)
     (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
     hemitf dvi dvo k ws row p es pfin →
     ∀ ws', ws'.wRelp = ws.wRelp →
@@ -99,7 +100,7 @@ theorem hemitfRen (π : Nat → Nat) (dvi dvo : Nat → DevStates) (k : Nat) (ws
       (ih _ (lblPostRelpRen π k ws ws' _ hrelp))
 
 theorem hartConffRen (π : Nat → Nat) (i : Nat) (row : List Lbl) (p0 : Pexv6)
-    (dvi dvo : Nat → DevStates) (em : Hemission) :
+    (dvi dvo : Nat → Efab) (em : Hemission) :
     hartConff i row p0 dvi dvo em → hartConff i (row.map (lblRen π)) p0 dvi dvo (emRen π em) :=
   fun hem => hemitfRen π dvi dvo 0 wsInit row p0 _ _ hem wsInit rfl
 
@@ -113,7 +114,7 @@ theorem WeakRvwmoFabInd.eadmTag (ls : List Wlabel) (it : Eitem) : it ∈ eadm ls
   rfl
 
 /-- Every tag in the item list of `hemitf … k …` is a row position SHIFTED BY `k`. -/
-theorem hemitfTagLt (dvi dvo : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List Lbl)
+theorem hemitfTagLt (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) (it : Eitem) (j : Nat) :
     hemitf dvi dvo k ws row p es pfin → it ∈ es → it.2 = some j →
     k ≤ j ∧ j - k < row.length := by
@@ -152,14 +153,14 @@ theorem hemitfTagLt (dvi dvo : Nat → DevStates) (k : Nat) (ws : Wstate) (row :
             simp only [List.length_cons]
             omega
 
-theorem hemitfTagGe (dvi dvo : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List Lbl)
+theorem hemitfTagGe (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) (it : Eitem) (j : Nat) :
     hemitf dvi dvo k ws row p es pfin → it ∈ es → it.2 = some j → k ≤ j :=
   fun hem hit hj => (hemitfTagLt dvi dvo k ws row p es pfin it j hem hit hj).1
 
 /-! ### 1.3 O1: prefix restriction, with the dropped tail's tags bounded -/
 
-theorem hemitfPrefix (dvi dvo : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List Lbl)
+theorem hemitfPrefix (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
     hemitf dvi dvo k ws row p es pfin →
     ∀ n, ∃ es1 es2 pfin', es = es1 ++ es2 ∧
@@ -246,7 +247,7 @@ theorem emDevAppNoTag (k : Nat) (es1 es2 : List Eitem) :
       exact ih _
 
 /-- THE PREFIX RESTRICTION, with the dev blocks below the cut AGREEING. -/
-theorem hartConffPrefix (i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Nat → DevStates)
+theorem hartConffPrefix (i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Nat → Efab)
     (em : Hemission) (n : Nat) :
     hartConff i row p0 dvi dvo em →
     ∃ em', hartConff i (row.take n) p0 dvi dvo em' ∧
@@ -265,7 +266,7 @@ theorem isDevBlockRen (π : Nat → Nat) (em : Hemission) (k : Nat) :
   rw [emDevRen]
 
 /-- A `rowDeps` edge of an emission of `row` names row positions of `row`. -/
-theorem hartConffRowDepsLt (i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Nat → DevStates)
+theorem hartConffRowDepsLt (i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Nat → Efab)
     (em : Hemission) (jk : Nat × Nat) :
     hartConff i row p0 dvi dvo em → jk ∈ rowDeps em.emItems →
     jk.1 < row.length ∧ jk.2 < row.length := by
@@ -281,8 +282,8 @@ theorem hartConffRowDepsLt (i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Na
 
 /-! ### 3.1 The normalization orbit -/
 
-theorem gfexecConfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : DevStates)
-    (fab : Nat → DevStates) (GF GF' : Gfexec) :
+theorem gfexecConfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : Efab)
+    (fab : Nat → Efab) (GF GF' : Gfexec) :
     rowsRel π GF.gfGd.gdG GF'.gfGd.gdG →
     GF'.gfGd.gdDeps = GF.gfGd.gdDeps →
     GF'.gfDev = GF.gfDev →
@@ -320,7 +321,7 @@ theorem gfexecConfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : DevStates)
 
 /-! ### 3.2 THE HULL: O1–O5 assembled -/
 
-theorem gfexecConfHull (boot : Nat → Pexv6) (d0 : DevStates) (fab : Nat → DevStates)
+theorem gfexecConfHull (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     (GF : Gfexec) (cs : List Nat) :
     gfexecConsistent GF →
     dclosed cs GF.gfDev →
@@ -389,7 +390,7 @@ theorem gfHullEventsLt (GF : Gfexec) (cs : List Nat) :
     (gevs' (gfHull GF cs).gfGd.gdG).length < (gevs' GF.gfGd.gdG).length :=
   fun h => hullEventsLt _ _ h.1
 
-def cycleKillF (boot : Nat → Pexv6) (d0 : DevStates) (fab : Nat → DevStates) : Prop :=
+def cycleKillF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) : Prop :=
   ∀ GF : Gfexec,
     gfexecConsistent GF →
     gfexecConf boot d0 fab GF →
@@ -405,7 +406,7 @@ def trDevOrdered (GF : Gfexec) (c : Cand) : Prop :=
     GF.gfDev[dcnt GF c.cdTr k]? = some (s.esAg, tcnt s.esAg (c.cdTr.take k))
 
 /-- (Deviation 2: the supply also needs `candFetchInertF`.) -/
-theorem fconfRealize (boot : Nat → Pexv6) (d0 : DevStates) (fab : Nat → DevStates)
+theorem fconfRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     (GF : Gfexec) (N : Nat) :
     gfexecConsistent GF →
     gfexecConf boot d0 fab GF →
@@ -440,7 +441,7 @@ theorem fconfRealize (boot : Nat → Pexv6) (d0 : DevStates) (fab : Nat → DevS
 
 /-! ### 4.2 The hull instance -/
 
-theorem hullRealizableOfAcyclicF (boot : Nat → Pexv6) (d0 : DevStates) (fab : Nat → DevStates)
+theorem hullRealizableOfAcyclicF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     (GF : Gfexec) (cs : List Nat) (N : Nat) :
     gfexecConsistent GF →
     gfexecConf boot d0 fab GF →
@@ -476,7 +477,7 @@ theorem hullRealizableOfAcyclicF (boot : Nat → Pexv6) (d0 : DevStates) (fab : 
 
 /-! ### 4.3 The induction -/
 
-theorem t2linAuxF (boot : Nat → Pexv6) (d0 : DevStates) (fab : Nat → DevStates) :
+theorem t2linAuxF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) :
     cycleKillF boot d0 fab →
     ∀ (n : Nat) (GF : Gfexec),
       (gevs' GF.gfGd.gdG).length ≤ n →
@@ -501,7 +502,7 @@ theorem t2linAuxF (boot : Nat → Pexv6) (d0 : DevStates) (fab : Nat → DevStat
     have := gfHullEventsLt GF cs hpc
     omega
 
-theorem t2linOfCycleKillF (boot : Nat → Pexv6) (d0 : DevStates) (fab : Nat → DevStates) :
+theorem t2linOfCycleKillF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) :
     cycleKillF boot d0 fab →
     ∀ GF : Gfexec,
       gfexecConsistent GF →
@@ -511,7 +512,7 @@ theorem t2linOfCycleKillF (boot : Nat → Pexv6) (d0 : DevStates) (fab : Nat →
 
 /-! ### 4.4 The corollary: the whole graph is realized (modulo the guard) -/
 
-theorem t2linSupplyF (boot : Nat → Pexv6) (d0 : DevStates) (fab : Nat → DevStates)
+theorem t2linSupplyF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     (GF : Gfexec) (N : Nat) :
     cycleKillF boot d0 fab →
     gfexecConsistent GF →
@@ -597,7 +598,7 @@ theorem linCrossHartGmoReversed :
 
 /-! ## 6. Non-vacuity: the two skeletons are the same skeleton -/
 
-theorem cycleKillOfF (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat) :
+theorem cycleKillOfF (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) :
     cycleKillF boot d0 (fun _ => d0) → cycleKill boot d0 im nh := by
   intro hkF GD hcons hq hhull x hcyc
   have hc : gfexecConsistent ⟨GD, []⟩ :=

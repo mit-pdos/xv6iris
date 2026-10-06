@@ -31,6 +31,7 @@ The kill itself is NOT here (`cycleKill` is a definition; nothing assumes it).  
    `racy`, `Rt` ↦ `rt`, `grf` ↦ `WeakRvwmoAcyc.grf`; `filter (λ s, es_ag s = i)` ↦
    `filter (fun s => decide (s.esAg = i))`.  `lbg_grf_01` / `lbg_grf_10` are duplicated Rocq
    names (also in WeakRvwmoKillArms): declared `WeakRvwmoLinInd.lbgGrf01` / `lbgGrf10`.
+   `dev_state` ↦ `Efab` (the event instance's fabric, `WeakEvPf` deviation 9 / owner decision Q1).
 2. O2 / D1 — THE FETCH-INERTNESS OBLIGATION (`WeakRvwmoSupply` deviation 2).
    `supplyOfQconf` takes `candFetchInert boot d0 N c`, and `topoSupply` returns the supply
    CONDITIONAL on it.  So, exactly as `WeakRvwmoSupply.hullSupply` / `topoSupply`:
@@ -153,7 +154,7 @@ theorem ergHullEventsLt : (gevs' (gxHull erg ecs)).length < (gevs' erg).length :
 
 /-- §4d.2's induction step as an obligation: at a conformant consistent graph EVERY PROPER HULL
 OF WHICH IS ALREADY ACYCLIC, there is no `racyD` cycle. -/
-def cycleKill (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat) : Prop :=
+def cycleKill (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) : Prop :=
   ∀ GD : Gdexec,
     rvwmoMinusDepsConsistent GD →
     gdexecQconf boot d0 im nh GD →
@@ -161,7 +162,7 @@ def cycleKill (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat) : 
     ∀ x, tc (racyD GD) x x → False
 
 /-- THE FORM THE KILL CONSUMES (deviation 2: the supply is conditional on `candFetchInert`). -/
-theorem hullRealizableOfAcyclic (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat)
+theorem hullRealizableOfAcyclic (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) (cs : List Nat) (N : Nat) :
     rvwmoMinusDepsConsistent GD →
     gdexecQconf boot d0 im nh GD →
@@ -203,7 +204,7 @@ theorem hullRealizableOfAcyclic (boot : Nat → Pexv6) (d0 : DevStates) (im : Im
 
 /-! ## 3. The theorem: T2-LIN, by strong induction on the event count -/
 
-theorem t2linAux (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat) :
+theorem t2linAux (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) :
     cycleKill boot d0 im nh →
     ∀ (n : Nat) (GD : Gdexec),
       (gevs' GD.gdG).length ≤ n →
@@ -229,7 +230,7 @@ theorem t2linAux (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat)
     change (gevs' (gxHull GD.gdG cs)).length ≤ n
     omega
 
-theorem t2linOfCycleKill (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat) :
+theorem t2linOfCycleKill (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) :
     cycleKill boot d0 im nh →
     ∀ GD : Gdexec,
       rvwmoMinusDepsConsistent GD →
@@ -238,7 +239,7 @@ theorem t2linOfCycleKill (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (n
   fun hk GD => t2linAux boot d0 im nh hk (gevs' GD.gdG).length GD (Nat.le_refl _)
 
 /-- THE COROLLARY: the whole graph is realized (deviation 2: conditional supply). -/
-theorem t2linSupply (boot : Nat → Pexv6) (d0 : DevStates) (im : Image) (nh : Nat)
+theorem t2linSupply (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) (N : Nat) :
     cycleKill boot d0 im nh →
     rvwmoMinusDepsConsistent GD →

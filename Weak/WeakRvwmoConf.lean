@@ -34,7 +34,7 @@ store through paths `rowDeps` already has (`sret`'s `LCtrl [DReg wsepc]`).  (S-b
 item carries its row position explicitly (`Eitem`), since the exclusive pair puts two
 projecting labels at ONE position.  (S-c) `rowDeps` emits only strictly-increasing edges (the
 pair's internal (k, k) edge is filtered).  (S-d) the fabric is a per-row-position parameter
-`dv : Nat → DevStates`, which makes `hartConfPrefix` carry the same `dv`.
+`dv : Nat → Efab`, which makes `hartConfPrefix` carry the same `dv`.
 
 THE CLASS EQUATION IS ts-INDEPENDENT: the per-hart projection equation is read at
 `rowWs row k`, a REPRESENTATIVE `Wstate` folded from the row's own labels; `pclsEv` reads the
@@ -46,7 +46,8 @@ on fence bits and on whether a write writes a byte (`rowWsRelp`, `lpostRelpRen`)
 1. NAMES: the tree's camelCase (map below); `tvs.*1`/`.*2` ↦ `tvs.map Prod.fst`/`Prod.snd`;
    `f <$> l` ↦ `l.map f` (and `Option.map` for `proj_lbl`'s square); `S k` ↦ `k + 1`;
    `l !! n` ↦ `l[n]?`; `prefix_of` ↦ `<+:`; `mjoin` ↦ `List.flatten`; `agent` ↦ `Nat`;
-   `dev_state` ↦ `DevStates`.  The four duplicated Rocq names are file-qualified
+   `dev_state` ↦ `Efab` (the event instance's fabric, `WeakEvPf` deviation 9 / owner decision
+   Q1: the device states plus the residual UART/PLIC programs).  The four duplicated Rocq names are file-qualified
    (`WeakRvwmoConf.pclsEvRelp`, `WeakRvwmoConf.loadPostRunRelp`, `WeakRvwmoConf.Dstate`,
    `WeakRvwmoConf.dstep`).  The wlabel constructors are the unqualified ones (`open Wlabel`, as
    Rocq's import order makes them); graph labels are written `Lbl.LLoad` / `.LLoad`.
@@ -204,8 +205,8 @@ theorem pclsEvWren (p : Pexv6) (π : Nat → Nat) (l : Wlabel) (we wi : Wstate) 
 
 /-- THE TIMESTAMP-OBLIVIOUSNESS OF THE PROGRAM, at the renaming (every arm is one of
 `WeakEvInst`'s `ts_oblivious` exports; the fetch arm is deviation 3). -/
-theorem pstepEvWren (π : Nat → Nat) (p : Pexv6) (d : DevStates) (l : Wlabel) (p' : Pexv6)
-    (d' : DevStates) :
+theorem pstepEvWren (π : Nat → Nat) (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6)
+    (d' : Efab) :
     latFree l → lbRfoldfree l → pstepEv p d l p' d' → pstepEv p d (wlblRen π l) p' d' := by
   cases l with
   | LLoad aq lat base tvs asrc =>
@@ -391,24 +392,24 @@ theorem hlblRealizesPairRen (π : Nat → Nat) (p pm : Pexv6) (ws ws' : Wstate) 
 
 /-! ## 5. The label-carrying administrative run -/
 
-inductive admRun (instr : Bool) : Pexv6 → DevStates → List Wlabel → Pexv6 → DevStates → Prop where
-  | ARnil (p : Pexv6) (d : DevStates) : admRun instr p d [] p d
-  | ARcons (p : Pexv6) (d : DevStates) (l : Wlabel) (p1 : Pexv6) (d1 : DevStates)
-      (ls : List Wlabel) (p' : Pexv6) (d' : DevStates) :
+inductive admRun (instr : Bool) : Pexv6 → Efab → List Wlabel → Pexv6 → Efab → Prop where
+  | ARnil (p : Pexv6) (d : Efab) : admRun instr p d [] p d
+  | ARcons (p : Pexv6) (d : Efab) (l : Wlabel) (p1 : Pexv6) (d1 : Efab)
+      (ls : List Wlabel) (p' : Pexv6) (d' : Efab) :
       lbAdmin instr l → pstepEv p d l p1 d1 →
       admRun instr p1 d1 ls p' d' →
       admRun instr p d (l :: ls) p' d'
 
-theorem admRunStar (instr : Bool) (p : Pexv6) (d : DevStates) (ls : List Wlabel) (p' : Pexv6)
-    (d' : DevStates) :
+theorem admRunStar (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
+    (d' : Efab) :
     admRun instr p d ls p' d' → admStar pstepEv instr p d p' d' := by
   intro h
   induction h with
   | ARnil p d => exact admStarRefl pstepEv instr p d
   | ARcons p d l p1 d1 ls p' d' ha hs _ ih => exact admStarL pstepEv instr p d l p1 d1 p' d' ha hs ih
 
-theorem admRunAdmin (instr : Bool) (p : Pexv6) (d : DevStates) (ls : List Wlabel) (p' : Pexv6)
-    (d' : DevStates) :
+theorem admRunAdmin (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
+    (d' : Efab) :
     admRun instr p d ls p' d' → ∀ l, l ∈ ls → lbAdmin instr l := by
   intro h
   induction h with
@@ -419,7 +420,7 @@ theorem admRunAdmin (instr : Bool) (p : Pexv6) (d : DevStates) (ls : List Wlabel
     · exact ha
     · exact ih l0 hl0
 
-theorem admRunMono (p : Pexv6) (d : DevStates) (ls : List Wlabel) (p' : Pexv6) (d' : DevStates) :
+theorem admRunMono (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6) (d' : Efab) :
     admRun false p d ls p' d' → ∀ instr, admRun instr p d ls p' d' := by
   intro h
   induction h with
@@ -428,8 +429,8 @@ theorem admRunMono (p : Pexv6) (d : DevStates) (ls : List Wlabel) (p' : Pexv6) (
     intro instr
     exact .ARcons p d l p1 d1 ls p' d' (lbAdminMono instr l ha) hs (ih instr)
 
-theorem admRunRen (π : Nat → Nat) (instr : Bool) (p : Pexv6) (d : DevStates) (ls : List Wlabel)
-    (p' : Pexv6) (d' : DevStates) :
+theorem admRunRen (π : Nat → Nat) (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel)
+    (p' : Pexv6) (d' : Efab) :
     admRun instr p d ls p' d' → admRun instr p d (ls.map (wlblRen π)) p' d' := by
   intro h
   induction h with
@@ -710,19 +711,19 @@ theorem rowDepsRen (π : Nat → Nat) (es : List Eitem) :
 
 /-! ## 7. `hartConf`: per-hart row emittability -/
 
-inductive hemit (dv : Nat → DevStates) :
+inductive hemit (dv : Nat → Efab) :
     Nat → Wstate → List Lbl → Pexv6 → List Eitem → Pexv6 → Prop where
   | HEnil (k : Nat) (ws : Wstate) (p : Pexv6) : hemit dv k ws [] p [] p
   | HEone (k : Nat) (ws : Wstate) (lb : Lbl) (row : List Lbl) (p : Pexv6) (ls : List Wlabel)
-      (pa : Pexv6) (da : DevStates) (l : Wlabel) (p' : Pexv6) (es : List Eitem) (pfin : Pexv6) :
+      (pa : Pexv6) (da : Efab) (l : Wlabel) (p' : Pexv6) (es : List Eitem) (pfin : Pexv6) :
       admRun true p (dv k) ls pa da →
       hlblRealizes pa ws lb l →
       pstepEv pa da l p' (dv (k + 1)) →
       hemit dv (k + 1) (lblPost k ws lb) row p' es pfin →
       hemit dv k ws (lb :: row) p (eadm ls ++ (l, some k) :: es) pfin
   | HEpair (k : Nat) (ws : Wstate) (lb : Lbl) (row : List Lbl) (p : Pexv6) (ls1 : List Wlabel)
-      (pa : Pexv6) (da : DevStates) (l1 : Wlabel) (pm : Pexv6) (dm : DevStates)
-      (ls2 : List Wlabel) (pm2 : Pexv6) (dm2 : DevStates) (l2 : Wlabel) (p' : Pexv6)
+      (pa : Pexv6) (da : Efab) (l1 : Wlabel) (pm : Pexv6) (dm : Efab)
+      (ls2 : List Wlabel) (pm2 : Pexv6) (dm2 : Efab) (l2 : Wlabel) (p' : Pexv6)
       (es : List Eitem) (pfin : Pexv6) :
       admRun true p (dv k) ls1 pa da →
       hlblRealizesPair pa pm2 ws lb l1 l2 →
@@ -750,7 +751,7 @@ theorem emLabelsRen (π : Nat → Nat) (em : Hemission) :
   rfl
 
 /-- `_i` is carried for the caller's benefit (the hart the row belongs to). -/
-def hartConf (_i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → DevStates) (em : Hemission) :
+def hartConf (_i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab) (em : Hemission) :
     Prop :=
   hemit dv 0 wsInit row p0 em.emItems em.emFin
 
@@ -788,7 +789,7 @@ theorem hlblRealizesKind (p : Pexv6) (ws : Wstate) (lb : Lbl) (l : Wlabel) :
   cases l <;> simp only [projLbl, Option.some.injEq, reduceCtorEq] at hpr <;> subst hpr <;>
     exact ⟨fun h => by first | rfl | exact h, fun h => by first | rfl | exact h⟩
 
-theorem hemitTagLbl (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List Lbl) (p : Pexv6)
+theorem hemitTagLbl (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl) (p : Pexv6)
     (es : List Eitem) (pfin : Pexv6) (it : Eitem) (j : Nat) :
     hemit dv k ws row p es pfin → it ∈ es → it.2 = some j →
     ∃ lb, k ≤ j ∧ row[j - k]? = some lb ∧
@@ -835,7 +836,7 @@ theorem hemitTagLbl (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List
       rw [show j - k = (j - (k + 1)) + 1 by omega, List.getElem?_cons_succ]
       exact hlk
 
-theorem hartConfTagLbl (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → DevStates)
+theorem hartConfTagLbl (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab)
     (em : Hemission) (it : Eitem) (j : Nat) :
     hartConf i row p0 dv em → it ∈ em.emItems → it.2 = some j →
     ∃ lb, row[j]? = some lb ∧
@@ -846,7 +847,7 @@ theorem hartConfTagLbl (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Dev
   exact ⟨lb, hlk, hr, hw⟩
 
 /-- THE `gdepsWf` SHAPE, at row level. -/
-theorem hartConfRowDepsWf (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → DevStates)
+theorem hartConfRowDepsWf (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab)
     (em : Hemission) (jk : Nat × Nat) :
     hartConf i row p0 dv em → jk ∈ rowDeps em.emItems →
     jk.1 < jk.2 ∧
@@ -863,7 +864,7 @@ theorem hartConfRowDepsWf (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → 
 
 /-! ### 7.2 Stability (1): the normalization orbit (no side condition on `π`) -/
 
-theorem hemitRen (π : Nat → Nat) (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List Lbl)
+theorem hemitRen (π : Nat → Nat) (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
     hemit dv k ws row p es pfin →
     ∀ ws', ws'.wRelp = ws.wRelp →
@@ -891,7 +892,7 @@ theorem hemitRen (π : Nat → Nat) (dv : Nat → DevStates) (k : Nat) (ws : Wst
       (ih _ (lblPostRelpRen π k ws ws' _ hrelp))
 
 theorem hartConfRen (π : Nat → Nat) (i : Nat) (row : List Lbl) (p0 : Pexv6)
-    (dv : Nat → DevStates) (em : Hemission) :
+    (dv : Nat → Efab) (em : Hemission) :
     hartConf i row p0 dv em → hartConf i (row.map (lblRen π)) p0 dv (emRen π em) :=
   fun hem => hemitRen π dv 0 wsInit row p0 _ _ hem wsInit rfl
 
@@ -903,7 +904,7 @@ theorem prefixBlock {A : Type _} (a : List A) (x : A) (b c : List A) :
   rintro ⟨t, rfl⟩
   exact ⟨t, by simp⟩
 
-theorem hemitPrefix (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List Lbl) (p : Pexv6)
+theorem hemitPrefix (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl) (p : Pexv6)
     (es : List Eitem) (pfin : Pexv6) :
     hemit dv k ws row p es pfin →
     ∀ n, ∃ es' pfin', es' <+: es ∧ hemit dv k ws (row.take n) p es' pfin' := by
@@ -932,7 +933,7 @@ theorem hemitPrefix (dv : Nat → DevStates) (k : Nat) (ws : Wstate) (row : List
         by rw [List.take_succ_cons]
            exact .HEpair _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ har1 hre hst1 har2 hst2 hem'⟩
 
-theorem hartConfPrefix (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → DevStates)
+theorem hartConfPrefix (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab)
     (em : Hemission) (n : Nat) :
     hartConf i row p0 dv em →
     ∃ em', hartConf i (row.take n) p0 dv em' ∧ em'.emItems <+: em.emItems := by
@@ -942,13 +943,13 @@ theorem hartConfPrefix (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Dev
 
 /-! ## 8. The conformance bundle -/
 
-def gdexecConf (boot : Nat → Pexv6) (dvp : Nat → Nat → DevStates) (GD : Gdexec) : Prop :=
+def gdexecConf (boot : Nat → Pexv6) (dvp : Nat → Nat → Efab) (GD : Gdexec) : Prop :=
   ∀ i row, GD.gdG.gxProg[i]? = some row →
     ∃ em, hartConf i row (boot i) (dvp i) em ∧
       ∀ jk, jk ∈ rowDeps em.emItems → ((i, jk.1), (i, jk.2)) ∈ GD.gdDeps
 
 /-- THE CONFORMANCE EDGES SATISFY `gdepsWf`'s clause (per edge). -/
-theorem gdexecConfDepsWf (boot : Nat → Pexv6) (dvp : Nat → Nat → DevStates) (GD : Gdexec)
+theorem gdexecConfDepsWf (boot : Nat → Pexv6) (dvp : Nat → Nat → Efab) (GD : Gdexec)
     (i : Nat) (row : List Lbl) (em : Hemission) (jk : Nat × Nat) :
     GD.gdG.gxProg[i]? = some row →
     hartConf i row (boot i) (dvp i) em →
@@ -963,7 +964,7 @@ theorem gdexecConfDepsWf (boot : Nat → Pexv6) (dvp : Nat → Nat → DevStates
   · simp only [gxLbl, hrow, Option.bind_some]; exact hl2
 
 /-- THE ORBIT TRANSPORT. -/
-theorem gdexecConfRen (π : Nat → Nat) (boot : Nat → Pexv6) (dvp : Nat → Nat → DevStates)
+theorem gdexecConfRen (π : Nat → Nat) (boot : Nat → Pexv6) (dvp : Nat → Nat → Efab)
     (GD GD' : Gdexec) :
     rowsRel π GD.gdG GD'.gdG →
     GD'.gdDeps = GD.gdDeps →
@@ -1122,7 +1123,7 @@ theorem rowDepsCsrReadback :
     = [(0, 1)] := by decide
 
 /-- The empty row is emittable. -/
-theorem hartConfNil (i : Nat) (p0 : Pexv6) (dv : Nat → DevStates) :
+theorem hartConfNil (i : Nat) (p0 : Pexv6) (dv : Nat → Efab) :
     hartConf i [] p0 dv ⟨[], p0⟩ :=
   .HEnil _ _ _
 

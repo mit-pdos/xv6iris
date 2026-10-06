@@ -26,7 +26,8 @@ them (the operand lists are a function of `ib`, and `projLbl` drops them).
 ## Deviations from Rocq
 
 1. NAMES / VOCABULARY: camelCase (map below); `regstate` ↦ `RegFile`, `oib32` ↦ `Ibch`
-   (`ib_bits ib` ↦ `ib.ibBits`), `dev_state` ↦ `DevStates`, `agent` ↦ `Nat`, `pa_z` ↦ `paZ`,
+   (`ib_bits ib` ↦ `ib.ibBits`), `dev_state` ↦ `Efab` (the event instance's fabric, `WeakEvPf`
+   deviation 9 / owner decision Q1; the witness fabric is `efInit` of a device state), `agent` ↦ `Nat`, `pa_z` ↦ `paZ`,
    `WeakLock.lock_one` ↦ `lockOne`, `ev_x2.2` ↦ `evX2.2`.
 2. The request facts are used ONLY through `WeakEvStarted`'s fact theorems (`evStoreReq`,
    `evStoreRam`, `evStoreVal`, `evStorePlain`, `evStorePa`): `evReqw` is an `Option.get`, not a
@@ -77,12 +78,12 @@ noncomputable def evEm (cpu : CPU) (rs : RegFile) (ib : Ibch) : Hemission :=
 
 /-! ## 2. The step -/
 
-theorem evPstep (cpu : CPU) (rs : RegFile) (ib : Ibch) (d0 : DevStates) :
+theorem evPstep (cpu : CPU) (rs : RegFile) (ib : Ibch) (d0 : Efab) :
     pstepEv (evP0 cpu rs ib) d0 (evWl ib) (evP1 cpu rs ib) d0 := by
   obtain ⟨K, Hm, Hres⟩ := ewriteReqAtInv 4 64 evX2.2 evReqw evStoreReq
   simp only [pstepEv, evP0, evP1]
   rw [Hres, Hm]
-  refine ⟨?_, none, none, none, ?_, ?_, Or.inl ?_⟩
+  refine ⟨?_, none, none, none, ?_, ?_, Or.inl ⟨?_, rfl⟩⟩
   any_goals trivial
   simp only [pstepNode, pnodeStep, evStoreRam, Bool.false_eq_true, if_false]
   split
@@ -110,7 +111,7 @@ theorem evRealizes (cpu : CPU) (rs : RegFile) (ib : Ibch) :
 
 /-! ## 3. The witness -/
 
-theorem evHartConf (i : Nat) (cpu : CPU) (rs : RegFile) (ib : Ibch) (d0 : DevStates) :
+theorem evHartConf (i : Nat) (cpu : CPU) (rs : RegFile) (ib : Ibch) (d0 : Efab) :
     hartConf i evRow (evP0 cpu rs ib) (fun _ => d0) (evEm cpu rs ib) :=
   hemit.HEone (dv := fun _ => d0) 0 wsInit
     (.LStore false (paZ evFlag) (WeakInterpProj.wbytes 4 lockOne) .WCplain) []
@@ -123,9 +124,9 @@ theorem evEmDevfree (cpu : CPU) (rs : RegFile) (ib : Ibch) : emDevfree (evEm cpu
 
 /-- THE POINT: `hartConf` IS INHABITED AT A NONEMPTY ROW, by a real memory event. -/
 theorem hartConfNonempty :
-    ∃ (i : Nat) (row : List Lbl) (p0 : Pexv6) (d0 : DevStates) (em : Hemission),
+    ∃ (i : Nat) (row : List Lbl) (p0 : Pexv6) (d0 : Efab) (em : Hemission),
       row ≠ [] ∧ hartConf i row p0 (fun _ => d0) em ∧ emDevfree em :=
-  ⟨0, evRow, evP0 ⟨0, by decide⟩ evRs0 ibNone, ⟨fun _ => default⟩,
+  ⟨0, evRow, evP0 ⟨0, by decide⟩ evRs0 ibNone, efInit ⟨fun _ => default⟩,
     evEm ⟨0, by decide⟩ evRs0 ibNone,
     by simp [evRow], evHartConf _ _ _ _ _, evEmDevfree _ _ _⟩
 

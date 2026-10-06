@@ -90,27 +90,40 @@ bits by `WeakDeps.depsOfIb` (`edeps`).
    `elabApply` takes it and applies `eitvApply σ c obar` (Lean-only).  `pstepEv` quantifies it
    existentially beside `ors`/`oib` (Layer 1 has no instruction view: `WeakPromise.wpstep.WPIFetch`
    checks at view 0).  `elabApplyBarrier` is stated with `ewgBar`.
-5. DEVICES (forced by Lean's device model, `Weak/WeakEvLang.lean` deviation 2).  Lean's UARTs and
-   PLIC are device PROGRAMS (`EExpr.EDev`, stepped by `WeakLang.wdevStep`) whose residual
-   programs are not part of `Pexv6`, so:
-   - `pstep_plic` ↦ `pstepPlic`: the wire write at hart `cpu` sets EITHER pin to ANY value
-     (`ors = some (pinSet rs mm b)`; Rocq: the S pin at `dev_seip d cpu`, a function of the
-     fabric).  The pin value is computed by the PLIC PROGRAM, which the hart's program state
-     cannot see, so this is the honest program-half abstraction.  It also fixes `obar = none`.
-   - `pdisk_uart` ↦ `pdiskUart`, generalised to every fabric move of a non-disk device thread
-     (the UARTs and the PLIC gateway): `dp' = dp ∧ l = LDev ∧ (d' = d ∨ ∃ dv s, dv ≠ .virtio ∧
-     d' = d.set dv s)` (Rocq: `uart_step d d'`).
+5. DEVICES (forced by Lean's device model, `Weak/WeakEvLang.lean` deviation 2; owner decision Q1,
+   `notes/weak-port-architecture.md`).  Lean's UARTs and PLIC are device PROGRAMS (`EExpr.EDev`,
+   stepped by `WeakLang.wdevStep`), not Rocq's stateless threads, and the program half steps them
+   EXACTLY: THE FABRIC TYPE is `Efab` (`WeakEvPf` deviation 9: `DevStates` plus the residual
+   programs `efU0`/`efU1`/`efPlic`), not `DevStates` (Rocq `dev_state`).  So `pstepEv`,
+   `pstepHart`, `pstepDisk`, `pstepPlic`, `pdiskUart` and every lemma about them are stated at
+   `Efab`; `pnodeStep`/`pstepNode`/`pdiskProg` keep `DevStates` and are lifted (`pstepHart`'s
+   node arm and `pstepDisk`'s program arm read `d.efDev` and move only it:
+   `d' = { d with efDev := d'.efDev }`).
+   - `fdevStep dv m ds m' ds'` (Lean-only): `wdevStep` at the root task, verbatim, over the
+     device states alone, at the `devOpPlain false` nodes (`step`, `get`, `choose`, `sample`, and
+     `pure`, which restarts the body); the bus-master `dmaRead`/`dmaWrite` (they read/move the
+     LOG), `join` (it reads the task bookkeeping), `fork` and the wire write are STUCK there.
+   - `pstep_plic` ↦ `pstepPlic`: the PLIC program sits at `setPin cpu mm b` (Rocq: the S pin at
+     `dev_seip d cpu`, a function of the fabric); hart `cpu` takes it, `ors = some (pinSet rs mm
+     b)`, and the PLIC program advances to `k ()`.  `obar = none`.
+   - `pdisk_uart` ↦ `pdiskUart`: one `fdevStep` of a UART program or of the PLIC program (the
+     gateway), at the disk agent (Rocq: `uart_step d d'`).
    - `pdisk_prog` has SEVEN arms: the PLIC latch is a step of the PLIC program (WeakEvLang
      deviation 2), so it is a `pdiskUart` move.
-   - `eplic_step_factor` / `euart_step_factor` (iff's over Rocq's stateless `eplic_step` /
-     `euart_step`) ↦ `eplicStepFactor`, an iff at the WIRE PRIMITIVE (`wdevOpStep … (.setPin c mm
-     b)`), and `euartStepFactor`, the ⇒ direction for every OTHER log-preserving step of a
-     non-disk device program (the ⇐ direction cannot hold: the program half does not know the
-     residual device program).  `euartStepFactor`'s σ-equation is modulo the Lean-only task
-     bookkeeping `wgrt` (`{ edlabApply σ LDev WCplain d' with wgrt := σ'.wgrt }`), which no
-     projection to Layer 1 reads.  `eplic_step_pstep_hart` ↦ `eplicStepPstepHart` (a `wdevStep`
-     at a `setPin` node), `euart_step_pstep_disk` ↦ `euartStepPstepDisk`.  Lean-only helpers
-     `pinSet`, `pstepPlicPin`, `wdevStepNoPin`, `wgEqDevRt`.
+   - `eplic_step_factor` ↦ `eplicStepFactor`, an iff at the WIRE PRIMITIVE (`wdevOpStep … (.setPin
+     c mm b)`); `euart_step_factor` ↦ `euartStepFactor`, an iff (as Rocq) between a root,
+     non-forking device step at a plain pin-free node (`devNodePlain false m`) and `fdevStep` with
+     σ-shape `edlabApply σ LDev .WCplain d'`.  `eplic_step_pstep_hart` ↦ `eplicStepPstepHart` (at
+     a `setPin` node of `F.efPlic`), `euart_step_pstep_disk` ↦ `euartStepPstepDisk` (per
+     `UartId`), Lean-only `eplicGateStepPstepDisk` (the PLIC off a wire write);
+     `ecycleStepPstepHart`/`ediskStepPstepDisk` take the fabric `F` with `F.efDev = σ.wgdev`.
+   - PLAINNESS (Lean-only): `devOpPlain pin`, the inductive `DevPlain pin` (every node plain),
+     `devNodePlain`, `devPlainNode`, `devPlainStep` (kept by a device step whose body is plain),
+     `devPlainBind`/`devPlainLift`/`devPlainChooseLt`, and THE BOARD'S BODIES: `uartBodyPlain`
+     (`DevPlain false`), `plicBodyPlain` (`DevPlain true`: its one other node is the wire write).
+     The ⇐ direction of `WeakEvCapstone` reads them off a pool invariant.
+   Lean-only helpers `pinSet`, `pstepPlicPin`, `wdevStepNoPin`, `wgEqDevRt`, `wdevOfFdevStep`,
+   `fdevStepOfWdev`.
 6. THE OPERAND LISTS: the Lean language's store / exclusive-read arms carry
    `depsAsrc`/`depsVsrc (edeps σ c)`, which is `depsOfIb (σ.wgib c).ibBits` — the program half's
    `depsOfIb ib.ibBits` at `ib = σ.wgib c`, by conversion (as Rocq).
@@ -171,14 +184,17 @@ bits by `WeakDeps.depsOfIb` (`edeps`).
 `pstepDiskTsExload`, `pstep_ev_ts_exload` `pstepEvTsExload`, `pnode_step_exstore_excl`
 `pnodeStepExstoreExcl`, `pstep_node_exstore_excl` `pstepNodeExstoreExcl`,
 `pstep_hart_exstore_excl` `pstepHartExstoreExcl`, `pcls_ev_fusable` `pclsEvFusable`, `t2_ev`
-`t2Ev`.  Lean-only: see deviations 2, 4, 5 and 8.
+`t2Ev`.  Lean-only: see deviations 2, 4, 5 and 8 (deviation 5: `fdevStep`, `devOpPlain`,
+`DevPlain`, `devNodePlain`, `devPlainNode`, `wdevOfFdevStep`, `fdevStepOfWdev`, `devPlainStep`,
+`devPlainBind`, `devPlainLift`, `devPlainChooseLt`, `uartBodyPlain`, `plicBodyPlain`,
+`eplicGateStepPstepDisk`).
 
 **Not ported:** nothing (the Rocq Ltacs are local macros, deviation 9).
 
 **Statements checked** (by hand, against Rocq): all; the changed ones are the deviations above
 (the `obar` argument everywhere, the RAM-read arm and `elabOk`/`edlabOk`'s `LIFetch` clauses,
-`pstepPlic`/`pdiskUart`/`pdiskProg`, the two device factorizations and their corollaries, `t2Ev`'s
-fetch premise).
+the `Efab` fabric of `pstepEv` & co., `pstepPlic`/`pdiskUart`/`pdiskProg`, the device
+factorizations and their corollaries, `t2Ev`'s fetch premise).
 -/
 import Weak.WeakEvPf
 import Weak.WeakRefuse
@@ -393,24 +409,71 @@ def pstepNode (_cpu : CPU) (m : SailM Unit) (rs : RegFile)
       obar = none
   | none => pnodeStep m rs ib d l m' ors fn' d' oib obar
 
+/-! ### The residual device programs (deviation 5, owner decision Q1) -/
+
+/-- The primitives the program half steps (Lean-only): the local-state primitives, and the wire
+write when `pin`.  Bus-master reads/writes read or move the LOG and `join` reads the task
+bookkeeping, neither of which Layer 1's program half sees; the board's UART/PLIC never use them
+(`uartBodyPlain`, `plicBodyPlain`). -/
+def devOpPlain {S T : Type} (pin : Bool) : DevOp S T → Prop
+  | .step _ => True
+  | .get => True
+  | .choose => True
+  | .sample _ => True
+  | .setPin _ _ _ => pin = true
+  | .dmaRead _ _ => False
+  | .dmaWrite _ _ _ _ => False
+  | .fork _ => False
+  | .join _ => False
+
+/-- A device program made of plain primitives only (Lean-only). -/
+inductive DevPlain {S T α : Type} (pin : Bool) : DevM S T α → Prop where
+  | pure (a : α) : DevPlain pin (.pure a)
+  | op (o : DevOp S T) (k : o.ret → DevM S T α) :
+      devOpPlain pin o → (∀ v, DevPlain pin (k v)) → DevPlain pin (.op o k)
+
+/-- THE DEVICE PROGRAM'S OWN STEP, over the fabric alone (Lean-only, deviation 5): `wdevStep` at
+the root task, verbatim, at every node but the wire write (`pstepPlic`) and the primitives
+`devOpPlain` excludes (stuck here). -/
+def fdevStep (dv : DevId) (m : DevProg dv) (ds : DevStates) (m' : DevProg dv)
+    (ds' : DevStates) : Prop :=
+  match m with
+  | .pure _ => m' = (devSig dv).body ∧ ds' = ds
+  | .op o k =>
+    match o, k with
+    | .step f, k =>
+        (∃ s' os, f (ds.st dv) = some (s', os) ∧ devObsOk dv (ds.st dv) s' os ∧ m' = k () ∧
+           ds' = ds.set dv s') ∨
+        ((∀ s' os, f (ds.st dv) = some (s', os) → ¬ devObsOk dv (ds.st dv) s' os) ∧
+           m' = .op (.step f) k ∧ ds' = ds)
+    | .get, k => m' = k (ds.st dv) ∧ ds' = ds
+    | .choose, k => ∃ n, m' = k n ∧ ds' = ds
+    | .sample src, k => m' = k (devLevel ds src) ∧ ds' = ds
+    | _, _ => False
+
 /-- The pin write of the PLIC wire (Lean-only, deviation 5). -/
 def pinSet (rs : RegFile) (mm b : Bool) : RegFile :=
   if mm then rs.set .sig_meip (if b then 1#1 else 0#1) else rs.set .sig_seip (if b then 1#1 else 0#1)
 
-/-- THE PLIC WIRE (deviation 5): available at ANY hart state, moving neither the monad nor the
-parked fence nor the fabric; it sets one pin. -/
-def pstepPlic (_cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (_ib : Ibch) (d : DevStates) (l : Wlabel)
+/-- THE PLIC WIRE (deviation 5): when the PLIC PROGRAM (in the fabric) sits at a wire write to
+hart `cpu`, that hart takes it — the pin the program names, the value it names — moving neither
+its monad nor its parked fence; the PLIC program advances. -/
+def pstepPlic (cpu : CPU) (m : SailM Unit) (rs : RegFile)
+    (fn : Option (Bool × Bool × Bool × Bool)) (_ib : Ibch) (d : Efab) (l : Wlabel)
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
-    (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) : Prop :=
-  l = LDev ∧ m' = m ∧ fn' = fn ∧ d' = d ∧ oib = none ∧ obar = none ∧
-  ∃ mm b : Bool, ors = some (pinSet rs mm b)
+    (d' : Efab) (oib : Option Ibch) (obar : Option barrier_kind) : Prop :=
+  ∃ (mm b : Bool) (k : Unit → DevProg .plic),
+    d.efPlic = .op (.setPin cpu mm b) k ∧
+    l = LDev ∧ m' = m ∧ fn' = fn ∧ d' = { d with efPlic := k () } ∧ oib = none ∧ obar = none ∧
+    ors = some (pinSet rs mm b)
 
+/-- The hart's own step moves only the device STATES of the fabric (deviation 5). -/
 def pstepHart (cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
-    (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) : Prop :=
-  pstepNode cpu m rs fn ib d l m' ors fn' d' oib obar ∨
+    (d' : Efab) (oib : Option Ibch) (obar : Option barrier_kind) : Prop :=
+  (pstepNode cpu m rs fn ib d.efDev l m' ors fn' d'.efDev oib obar ∧
+    d' = { d with efDev := d'.efDev }) ∨
   pstepPlic cpu m rs fn ib d l m' ors fn' d' oib obar
 
 /-- THE DISK AGENT (M5): one disjunct per node of the residual device program plus the two
@@ -446,17 +509,24 @@ def pdiskProg (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel) (dp' : Option
   -- nothing pending
   (dp = some (DRet DIdle) ∧ l = LSilent ∧ dp' = none ∧ d' = d)
 
-/-- THE DEVICE THREADS' FABRIC MOVE (Rocq: the UART thread; deviation 5). -/
-def pdiskUart (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel) (dp' : Option (DM Dres))
-    (d' : DevStates) : Prop :=
-  dp' = dp ∧ l = LDev ∧ (d' = d ∨ ∃ (dv : DevId) (s : DevSt dv), dv ≠ .virtio ∧ d' = d.set dv s)
+/-- THE DEVICE THREADS' FABRIC MOVE (Rocq: the UART thread; deviation 5): one `fdevStep` of a
+UART program or of the PLIC program off a wire write, at the disk agent. -/
+def pdiskUart (dp : Option (DM Dres)) (d : Efab) (l : Wlabel) (dp' : Option (DM Dres))
+    (d' : Efab) : Prop :=
+  dp' = dp ∧ l = LDev ∧
+  ((∃ (i : UartId) (m' : DevProg (.uart i)) (ds' : DevStates),
+      fdevStep (.uart i) (efU d i) d.efDev m' ds' ∧ d' = efUset { d with efDev := ds' } i m') ∨
+   (∃ (m' : DevProg .plic) (ds' : DevStates),
+      fdevStep .plic d.efPlic d.efDev m' ds' ∧ d' = { d with efDev := ds', efPlic := m' }))
 
-def pstepDisk (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel) (dp' : Option (DM Dres))
-    (d' : DevStates) : Prop :=
-  pdiskProg dp d l dp' d' ∨ pdiskUart dp d l dp' d'
+def pstepDisk (dp : Option (DM Dres)) (d : Efab) (l : Wlabel) (dp' : Option (DM Dres))
+    (d' : Efab) : Prop :=
+  (pdiskProg dp d.efDev l dp' d'.efDev ∧ d' = { d with efDev := d'.efDev }) ∨
+  pdiskUart dp d l dp' d'
 
-/-- THE PROGRAM STEP, at Layer 1's type.  Mismatched constructors are `False`. -/
-def pstepEv (p : Pexv6) (d : DevStates) (l : Wlabel) (p' : Pexv6) (d' : DevStates) : Prop :=
+/-- THE PROGRAM STEP, at Layer 1's type (fabric `Efab`, deviation 5).  Mismatched constructors
+are `False`. -/
+def pstepEv (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) : Prop :=
   match p, p' with
   | .PHart cpu m rs fn ib, .PHart cpu' m' rs' fn' ib' =>
       cpu' = cpu ∧
@@ -871,11 +941,15 @@ theorem eplicStepFactor (gen : Nat) {dv : DevId} (c : CPU) (mm b : Bool) (σ σ'
     refine ⟨rfl, ?_⟩
     cases mm <;> rfl
 
-/-- ... and the program half holds of that pin write, at every hart state. -/
-theorem pstepPlicPin (c : CPU) (mm b : Bool) (rs : RegFile) (d : DevStates) :
+/-- ... and the program half holds of that pin write, at every hart state, when the PLIC PROGRAM
+sits at it (deviation 5). -/
+theorem pstepPlicPin (c : CPU) (mm b : Bool) (k : Unit → DevProg .plic) (rs : RegFile)
+    (d : Efab) :
+    d.efPlic = .op (.setPin c mm b) k →
     ∀ (m : SailM Unit) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch),
-      pstepPlic c m rs fn ib d LDev m (some (pinSet rs mm b)) fn d none none :=
-  fun _ _ _ => ⟨rfl, rfl, rfl, rfl, rfl, rfl, mm, b, rfl⟩
+      pstepPlic c m rs fn ib d LDev m (some (pinSet rs mm b)) fn { d with efPlic := k () } none
+        none :=
+  fun hd _ _ _ => ⟨mm, b, k, hd, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 /-- Two `WGState`s agreeing off the fabric and the task bookkeeping (Lean-only). -/
 theorem wgEqDevRt (σ σ' : WGState) :
@@ -921,25 +995,148 @@ theorem wdevStepNoPin {gen : Nat} {dv : DevId} {tid : TaskId} {m m' : DevProg dv
       | join j => obtain ⟨-, rfl, -⟩ := h; exact ⟨rfl, rfl, Or.inl rfl⟩
     · exact ⟨rfl, rfl, Or.inl rfl⟩
 
-/-- THE DEVICE THREADS' FABRIC MOVES (Rocq `euart_step_factor`, ⇒ only; deviation 5). -/
-theorem euartStepFactor (gen : Nat) {dv : DevId} (tid : TaskId) (m m' : DevProg dv)
-    (σ σ' : WGState) (efs : List WExpr) :
-    dv ≠ .virtio →
-    wdevStep gen dv tid m σ m' σ' efs →
-    (∀ (c : CPU) (mm b : Bool) (k : Unit → DevProg dv), m ≠ .op (.setPin c mm b) k) →
-    σ'.wglog = σ.wglog →
-    ∃ d' : DevStates,
-      (∀ (dp : Option (DM Dres)) (dws : Wstate),
-        pdiskUart dp σ.wgdev LDev dp d' ∧ edlabWs σ dws LDev = dws ∧ edlabOk σ dws LDev) ∧
-      σ' = { edlabApply σ LDev .WCplain d' with wgrt := σ'.wgrt } := by
-  intro hvd h hnp hlog
-  obtain ⟨hregs, hib, hdev⟩ := wdevStepNoPin h hnp
-  obtain ⟨himg, hws, hitv, hgen, hpow, -, -⟩ := wdevStepFrame h
-  refine ⟨σ'.wgdev, fun dp dws => ⟨⟨rfl, rfl, ?_⟩, rfl, trivial⟩, ?_⟩
-  · rcases hdev with hdev | ⟨s, hs⟩
-    · exact Or.inl hdev
-    · exact Or.inr ⟨dv, s, hvd, hs⟩
-  · exact wgEqDevRt σ σ' hregs himg hlog hws hgen hpow hib hitv
+/-- A device program's NODE is plain (Lean-only): `pure`, or a `devOpPlain pin` primitive. -/
+def devNodePlain {dv : DevId} (pin : Bool) (m : DevProg dv) : Prop :=
+  match m with
+  | .pure _ => True
+  | .op o _ => devOpPlain pin o
+
+theorem devPlainNode {dv : DevId} {pin : Bool} {m : DevProg dv} : DevPlain pin m → devNodePlain pin m
+  | .pure _ => trivial
+  | .op _ _ ho _ => ho
+
+/-- `fdevStep` IS a root, non-forking device step of the language, σ-shape `ewgDev` (Lean-only). -/
+theorem wdevOfFdevStep (gen : Nat) {dv : DevId} (m m' : DevProg dv) (σ : WGState)
+    (ds' : DevStates) :
+    fdevStep dv m σ.wgdev m' ds' → wdevStep gen dv rootTask m σ m' (ewgDev σ ds') [] := by
+  intro h
+  cases m with
+  | pure a =>
+    obtain ⟨rfl, rfl⟩ := h
+    exact ⟨rfl, Or.inl ⟨rfl, rfl, rfl⟩⟩
+  | op o k =>
+    cases o with
+    | step f =>
+      rcases h with ⟨s', os, hf, hok, rfl, rfl⟩ | ⟨hb, rfl, rfl⟩
+      · exact Or.inl ⟨(), rfl, s', os, hf, hok, rfl, rfl⟩
+      · exact Or.inr ⟨hb, rfl, rfl, rfl⟩
+    | get => obtain ⟨rfl, rfl⟩ := h; exact Or.inl ⟨_, rfl, rfl, rfl, rfl⟩
+    | choose => obtain ⟨n, rfl, rfl⟩ := h; exact Or.inl ⟨n, rfl, rfl, rfl⟩
+    | sample src => obtain ⟨rfl, rfl⟩ := h; exact Or.inl ⟨_, rfl, rfl, rfl, rfl⟩
+    | dmaRead => exact h.elim
+    | dmaWrite => exact h.elim
+    | setPin => exact h.elim
+    | fork => exact h.elim
+    | join => exact h.elim
+
+/-- ... and conversely at a plain, pin-free node (Lean-only). -/
+theorem fdevStepOfWdev (gen : Nat) {dv : DevId} (m m' : DevProg dv) (σ σ' : WGState) :
+    devNodePlain false m → wdevStep gen dv rootTask m σ m' σ' [] →
+    fdevStep dv m σ.wgdev m' σ'.wgdev ∧ σ' = ewgDev σ σ'.wgdev := by
+  intro hp h
+  cases m with
+  | pure a =>
+    obtain ⟨-, ⟨-, rfl, rfl⟩ | ⟨hne, -, -⟩⟩ := h
+    · exact ⟨⟨rfl, rfl⟩, rfl⟩
+    · exact absurd rfl hne
+  | op o k =>
+    cases o with
+    | step f =>
+      rcases h with ⟨⟨⟩, rfl, s', os, hf, hok, rfl, -⟩ | ⟨hb, rfl, rfl, -⟩
+      · exact ⟨Or.inl ⟨s', os, hf, hok, rfl, rfl⟩, rfl⟩
+      · exact ⟨Or.inr ⟨hb, rfl, rfl⟩, rfl⟩
+    | get =>
+      rcases h with ⟨v, rfl, rfl, rfl, -⟩ | ⟨hb, -⟩
+      · exact ⟨⟨rfl, rfl⟩, rfl⟩
+      · exact hb.elim
+    | choose =>
+      rcases h with ⟨v, rfl, rfl, -⟩ | ⟨hb, -⟩
+      · exact ⟨⟨v, rfl, rfl⟩, rfl⟩
+      · exact hb.elim
+    | sample src =>
+      rcases h with ⟨v, rfl, rfl, rfl, -⟩ | ⟨hb, -⟩
+      · exact ⟨⟨rfl, rfl⟩, rfl⟩
+      · exact hb.elim
+    | dmaRead => exact hp.elim
+    | dmaWrite => exact hp.elim
+    | setPin => exact absurd hp Bool.false_ne_true
+    | fork => exact hp.elim
+    | join => exact hp.elim
+
+/-- THE DEVICE THREADS' FABRIC MOVES (Rocq `euart_step_factor`; deviation 5): at a plain node off
+the wire write, a root device step IS `fdevStep`, σ-shape `edlabApply` of `LDev`. -/
+theorem euartStepFactor (gen : Nat) {dv : DevId} (m m' : DevProg dv) (σ σ' : WGState) :
+    devNodePlain false m →
+    (wdevStep gen dv rootTask m σ m' σ' [] ↔
+      ∃ d' : DevStates, fdevStep dv m σ.wgdev m' d' ∧ σ' = edlabApply σ LDev .WCplain d') := by
+  intro hp
+  constructor
+  · intro h
+    obtain ⟨h1, h2⟩ := fdevStepOfWdev gen m m' σ σ' hp h
+    exact ⟨_, h1, h2⟩
+  · rintro ⟨d', h, rfl⟩
+    exact wdevOfFdevStep gen m m' σ d' h
+
+/-- A plain program stays plain across a device step, if the body it restarts at is plain
+(Lean-only). -/
+theorem devPlainStep {dv : DevId} {pin : Bool} {gen : Nat} {tid : TaskId} {m m' : DevProg dv}
+    {σ σ' : WGState} {efs : List WExpr} :
+    DevPlain pin (devSig dv).body → DevPlain pin m → wdevStep gen dv tid m σ m' σ' efs →
+    DevPlain pin m' := by
+  intro hb hm h
+  cases hm with
+  | pure a =>
+    obtain ⟨-, ⟨-, rfl, -⟩ | ⟨-, rfl, -⟩⟩ := h
+    · exact hb
+    · exact .pure _
+  | op o k ho hk =>
+    rcases h with ⟨v, rfl, -⟩ | ⟨-, rfl, -, -⟩
+    · exact hk v
+    · exact .op o k ho hk
+
+theorem devPlainBind {S T α β : Type} {pin : Bool} {m : DevM S T α} {f : α → DevM S T β} :
+    DevPlain pin m → (∀ a, DevPlain pin (f a)) → DevPlain pin (m >>= f) := by
+  intro hm hf
+  induction hm with
+  | pure a => exact hf a
+  | op o k ho _ ih => exact .op o _ ho ih
+
+theorem devPlainLift {S T : Type} {pin : Bool} (o : DevOp S T) :
+    devOpPlain pin o → DevPlain pin (DevM.lift o) :=
+  fun h => .op o _ h (fun v => .pure v)
+
+theorem devPlainChooseLt {S T : Type} {pin : Bool} (n : Nat) :
+    DevPlain pin (DevM.chooseLt n : DevM S T Nat) :=
+  devPlainBind (devPlainLift .choose trivial) (fun _ => .pure _)
+
+/-- THE BOARD'S UART BODY IS PLAIN AND PIN-FREE (Lean-only, deviation 5). -/
+theorem uartBodyPlain (i : UartId) : DevPlain false (devSig (.uart i)).body := by
+  show DevPlain false (Uart.body i)
+  unfold Uart.body
+  refine devPlainBind (devPlainChooseLt 3) (fun k => ?_)
+  split
+  · exact devPlainLift _ trivial
+  · split
+    · exact devPlainBind (devPlainBind (devPlainLift .choose trivial) (fun _ => .pure _))
+        (fun _ => devPlainLift _ trivial)
+    · exact .pure _
+
+/-- THE BOARD'S PLIC BODY IS PLAIN (its one non-plain-for-`false` node is the wire write). -/
+theorem plicBodyPlain : DevPlain true (devSig .plic).body := by
+  show DevPlain true Plic.body
+  unfold Plic.body
+  refine devPlainBind (devPlainChooseLt 2) (fun k => ?_)
+  split
+  · refine devPlainBind (devPlainChooseLt _) (fun src => ?_)
+    refine devPlainBind (devPlainLift (.sample src) trivial) (fun lvl => ?_)
+    split
+    · exact devPlainLift _ trivial
+    · exact .pure _
+  · refine devPlainBind (devPlainChooseLt _) (fun c => ?_)
+    refine devPlainBind (devPlainBind (devPlainLift .choose trivial) (fun _ => .pure _))
+      (fun mm => ?_)
+    refine devPlainBind (devPlainLift .get trivial) (fun p => ?_)
+    exact devPlainLift _ rfl
 
 /-- THE DISK THREAD (M5), arm for arm. -/
 theorem ediskStepFactor (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ : WGState)
@@ -981,64 +1178,82 @@ theorem ediskStepFactor (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ :
     · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨prog', rfl, hch, rfl, rfl⟩)))))
     · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ⟨rfl, rfl, rfl⟩)))))
 
-/-- The disk relation at the `pstepDisk` shape. -/
+/-- The disk relation at the `pstepDisk` shape (at any fabric over σ's device states). -/
 theorem ediskStepPstepDisk (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ : WGState)
-    (e' : EExpr) (σ' : WGState) :
+    (e' : EExpr) (σ' : WGState) (F : Efab) :
+    F.efDev = σ.wgdev →
     ediskStep gen dp dws σ e' σ' →
     ∃ (l : Wlabel) (dp' : Option (DM Dres)) (d' : DevStates),
       e' = .EDisk gen dp' (edlabWs σ dws l) ∧
-      pstepDisk dp σ.wgdev l dp' d' ∧
+      pstepDisk dp F l dp' { F with efDev := d' } ∧
       edlabOk σ dws l ∧
       σ' = edlabApply σ l (pclsEv (.PDisk dp) l dws) d' := by
-  intro h
+  intro hF h
   obtain ⟨l, dp', d', he, hd, hok, hs⟩ := (ediskStepFactor gen dp dws σ e' σ').1 h
-  exact ⟨l, dp', d', he, Or.inl hd, hok, hs⟩
+  exact ⟨l, dp', d', he, Or.inl ⟨by rw [hF]; exact hd, rfl⟩, hok, hs⟩
 
-/-- The device threads' moves at the `pstepDisk` shape (deviation 5). -/
-theorem euartStepPstepDisk (gen : Nat) {dv : DevId} (tid : TaskId) (m m' : DevProg dv)
-    (dp : Option (DM Dres)) (dws : Wstate) (σ σ' : WGState) (efs : List WExpr) :
-    dv ≠ .virtio →
-    wdevStep gen dv tid m σ m' σ' efs →
-    (∀ (c : CPU) (mm b : Bool) (k : Unit → DevProg dv), m ≠ .op (.setPin c mm b) k) →
-    σ'.wglog = σ.wglog →
+/-- A UART's moves at the `pstepDisk` shape (deviation 5). -/
+theorem euartStepPstepDisk (gen : Nat) (i : UartId) (F : Efab) (m' : DevProg (.uart i))
+    (dp : Option (DM Dres)) (dws : Wstate) (σ σ' : WGState) :
+    F.efDev = σ.wgdev → devNodePlain false (efU F i) →
+    wdevStep gen (.uart i) rootTask (efU F i) σ m' σ' [] →
     ∃ d' : DevStates,
-      pstepDisk dp σ.wgdev LDev dp d' ∧ edlabWs σ dws LDev = dws ∧ edlabOk σ dws LDev ∧
-      σ' = { edlabApply σ LDev (pclsEv (.PDisk dp) LDev dws) d' with wgrt := σ'.wgrt } := by
-  intro hvd h hnp hlog
-  obtain ⟨d', hall, hs⟩ := euartStepFactor gen tid m m' σ σ' efs hvd h hnp hlog
-  obtain ⟨hu, hws, hok⟩ := hall dp dws
-  exact ⟨d', Or.inr hu, hws, hok, hs⟩
+      pstepDisk dp F LDev dp (efUset { F with efDev := d' } i m') ∧ edlabWs σ dws LDev = dws ∧
+      edlabOk σ dws LDev ∧ σ' = edlabApply σ LDev (pclsEv (.PDisk dp) LDev dws) d' := by
+  intro hF hp h
+  obtain ⟨d', hf, hs⟩ := (euartStepFactor gen _ m' σ σ' hp).1 h
+  rw [← hF] at hf
+  exact ⟨d', Or.inr ⟨rfl, rfl, Or.inl ⟨i, m', d', hf, rfl⟩⟩, rfl, trivial, hs⟩
 
-/-- THE HART ARMS AT THE `pstepHart` SHAPE. -/
+/-- The PLIC GATEWAY (every PLIC node but the wire write) at the `pstepDisk` shape (Lean-only,
+deviation 5). -/
+theorem eplicGateStepPstepDisk (gen : Nat) (F : Efab) (m' : DevProg .plic)
+    (dp : Option (DM Dres)) (dws : Wstate) (σ σ' : WGState) :
+    F.efDev = σ.wgdev → devNodePlain false F.efPlic →
+    wdevStep gen .plic rootTask F.efPlic σ m' σ' [] →
+    ∃ d' : DevStates,
+      pstepDisk dp F LDev dp { F with efDev := d', efPlic := m' } ∧ edlabWs σ dws LDev = dws ∧
+      edlabOk σ dws LDev ∧ σ' = edlabApply σ LDev (pclsEv (.PDisk dp) LDev dws) d' := by
+  intro hF hp h
+  obtain ⟨d', hf, hs⟩ := (euartStepFactor gen _ m' σ σ' hp).1 h
+  rw [← hF] at hf
+  exact ⟨d', Or.inr ⟨rfl, rfl, Or.inr ⟨m', d', hf, rfl⟩⟩, rfl, trivial, hs⟩
+
+/-- THE HART ARMS AT THE `pstepHart` SHAPE (at any fabric over σ's device states). -/
 theorem ecycleStepPstepHart (gen : Nat) (σ : WGState) (c : CPU) (m : SailM Unit)
-    (fn : Option (Bool × Bool × Bool × Bool)) (e' : EExpr) (σ' : WGState) :
+    (fn : Option (Bool × Bool × Bool × Bool)) (e' : EExpr) (σ' : WGState) (F : Efab) :
+    F.efDev = σ.wgdev →
     ecycleStep gen σ c m fn e' σ' →
     ∃ (l : Wlabel) (m' : SailM Unit) (ors : Option RegFile)
       (fn' : Option (Bool × Bool × Bool × Bool)) (d' : DevStates) (oib : Option Ibch)
       (obar : Option barrier_kind),
       e' = .Sail gen c m' fn' ∧
-      pstepHart c m (σ.wgregs c) fn (σ.wgib c) σ.wgdev l m' ors fn' d' oib obar ∧
+      pstepHart c m (σ.wgregs c) fn (σ.wgib c) F l m' ors fn' { F with efDev := d' } oib obar ∧
       elabOk σ c l ∧
       σ' = elabApply σ c l (pclsEv (.PHart c m (σ.wgregs c) fn (σ.wgib c)) l (σ.wgws c))
              ors oib obar d' := by
-  intro h
+  intro hF h
   obtain ⟨l, m', ors, fn', d', oib, obar, he, hp, hok, hs⟩ :=
     (ecycleStepFactor gen σ c m fn e' σ').1 h
-  exact ⟨l, m', ors, fn', d', oib, obar, he, Or.inl hp, hok, hs⟩
+  exact ⟨l, m', ors, fn', d', oib, obar, he, Or.inl ⟨by rw [hF]; exact hp, rfl⟩, hok, hs⟩
 
-/-- THE PLIC WIRE at the `pstepHart` shape (deviation 5: a `wdevStep` at a `setPin` node). -/
-theorem eplicStepPstepHart (gen : Nat) {dv : DevId} (tid : TaskId) (c : CPU) (mm b : Bool)
-    (k : Unit → DevProg dv) (m' : DevProg dv) (σ σ' : WGState) (efs : List WExpr) :
-    wdevStep gen dv tid (.op (.setPin c mm b) k) σ m' σ' efs →
+/-- THE PLIC WIRE at the `pstepHart` shape (deviation 5: the PLIC program at a `setPin` node). -/
+theorem eplicStepPstepHart (gen : Nat) (tid : TaskId) (c : CPU) (mm b : Bool)
+    (k : Unit → DevProg .plic) (F : Efab) (m' : DevProg .plic) (σ σ' : WGState)
+    (efs : List WExpr) :
+    F.efPlic = .op (.setPin c mm b) k →
+    wdevStep gen .plic tid F.efPlic σ m' σ' efs →
     m' = k () ∧ efs = [] ∧
-    ∃ ors : Option RegFile,
       (∀ (m : SailM Unit) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch),
-        pstepHart c m (σ.wgregs c) fn ib σ.wgdev LDev m ors fn σ.wgdev none none) ∧
+        pstepHart c m (σ.wgregs c) fn ib F LDev m (some (pinSet (σ.wgregs c) mm b)) fn
+          { F with efPlic := k () } none none) ∧
       elabOk σ c LDev ∧
-      σ' = elabApply σ c LDev .WCplain ors none none σ.wgdev := by
-  rintro (⟨v, rfl, h⟩ | ⟨hb, -, -, -⟩)
+      σ' = elabApply σ c LDev .WCplain (some (pinSet (σ.wgregs c) mm b)) none none σ.wgdev := by
+  intro hF h
+  rw [hF] at h
+  rcases h with ⟨v, rfl, h⟩ | ⟨hb, -, -, -⟩
   · obtain ⟨hefs, hs⟩ := (eplicStepFactor gen c mm b σ σ' efs).1 h
-    exact ⟨rfl, hefs, _, fun m fn ib => Or.inr (pstepPlicPin c mm b _ _ m fn ib), trivial, hs⟩
+    exact ⟨rfl, hefs, fun m fn ib => Or.inr (pstepPlicPin c mm b k _ F hF m fn ib), trivial, hs⟩
   · exact hb.elim
 
 /-! ## 6. Two properties of the program half alone -/
@@ -1129,14 +1344,14 @@ theorem pstepNodeLatFree (cpu : CPU) (m : SailM Unit) (rs : RegFile)
   · intro h; exact nomatch h.1
 
 theorem pstepHartLatFree (cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (aq : Bool) (base : Int)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (aq : Bool) (base : Int)
     (tvs : List (Nat × BitVec 8)) (m' : SailM Unit) (ors : Option RegFile)
-    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : DevStates) (oib : Option Ibch)
+    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : Efab) (oib : Option Ibch)
     (obar : Option barrier_kind) :
     ¬ pstepHart cpu m rs fn ib d (LLoad aq true base tvs []) m' ors fn' d' oib obar := by
-  rintro (h | h)
-  · exact pstepNodeLatFree cpu m rs fn ib d aq base tvs m' ors fn' d' oib obar h
-  · exact nomatch h.1
+  rintro (⟨h, -⟩ | ⟨_, _, _, _, h, _⟩)
+  · exact pstepNodeLatFree cpu m rs fn ib _ aq base tvs m' ors fn' _ oib obar h
+  · exact nomatch h
 
 /-- The disk loads since M5 — but never with `lat = true`. -/
 theorem pdiskProgLatFree (dp : Option (DM Dres)) (d : DevStates) (aq : Bool) (base : Int)
@@ -1146,20 +1361,20 @@ theorem pdiskProgLatFree (dp : Option (DM Dres)) (d : DevStates) (aq : Bool) (ba
     ⟨_, _, h, _⟩ | ⟨_, _, _, h, _⟩ | ⟨_, h, _⟩)
   all_goals (cases h; done)
 
-theorem pstepDiskLatFree (dp : Option (DM Dres)) (d : DevStates) (aq : Bool) (base : Int)
-    (tvs : List (Nat × BitVec 8)) (dp' : Option (DM Dres)) (d' : DevStates) :
+theorem pstepDiskLatFree (dp : Option (DM Dres)) (d : Efab) (aq : Bool) (base : Int)
+    (tvs : List (Nat × BitVec 8)) (dp' : Option (DM Dres)) (d' : Efab) :
     ¬ pstepDisk dp d (LLoad aq true base tvs []) dp' d' := by
-  rintro (h | ⟨_, h, _⟩)
-  · exact pdiskProgLatFree dp d aq base tvs dp' d' h
+  rintro (⟨h, -⟩ | ⟨_, h, _⟩)
+  · exact pdiskProgLatFree dp _ aq base tvs dp' _ h
   · exact nomatch h
 
 /-- ... and no disk arm ever emits an `LRmw`. -/
-theorem pstepDiskNoRmw (dp : Option (DM Dres)) (d : DevStates) (aq rl : Bool) (base : Int)
+theorem pstepDiskNoRmw (dp : Option (DM Dres)) (d : Efab) (aq rl : Bool) (base : Int)
     (tvs : List (Nat × BitVec 8)) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
-    (dp' : Option (DM Dres)) (d' : DevStates) :
+    (dp' : Option (DM Dres)) (d' : Efab) :
     ¬ pstepDisk dp d (LRmw aq rl base tvs data asrc vsrc) dp' d' := by
-  rintro ((⟨_, h, _⟩ | ⟨_, _, _, _, _, _, _, h, _⟩ | ⟨_, _, _, _, _, h, _⟩ | ⟨_, _, h, _⟩ |
-    ⟨_, _, h, _⟩ | ⟨_, _, _, h, _⟩ | ⟨_, h, _⟩) | ⟨_, h, _⟩) <;> exact nomatch h
+  rintro (⟨(⟨_, h, _⟩ | ⟨_, _, _, _, _, _, _, h, _⟩ | ⟨_, _, _, _, _, h, _⟩ | ⟨_, _, h, _⟩ |
+    ⟨_, _, h, _⟩ | ⟨_, _, _, h, _⟩ | ⟨_, h, _⟩), -⟩ | ⟨_, h, _⟩) <;> exact nomatch h
 
 /-- THE TIMESTAMP-OBLIVIOUSNESS of the disk's own load. -/
 theorem pdiskProgTsLoad (dp : Option (DM Dres)) (d : DevStates) (aq : Bool) (base : Int)
@@ -1175,17 +1390,17 @@ theorem pdiskProgTsLoad (dp : Option (DM Dres)) (d : DevStates) (aq : Bool) (bas
   subst h1 h3 h4
   exact Or.inr (Or.inl ⟨pa, n, _, k, tvs', hdp, hlen'.trans hlen, rfl, by rw [hdp', hts], hd⟩)
 
-theorem pstepDiskTsLoad (dp : Option (DM Dres)) (d : DevStates) (aq : Bool) (base : Int)
-    (tvs tvs' : List (Nat × BitVec 8)) (dp' : Option (DM Dres)) (d' : DevStates) :
+theorem pstepDiskTsLoad (dp : Option (DM Dres)) (d : Efab) (aq : Bool) (base : Int)
+    (tvs tvs' : List (Nat × BitVec 8)) (dp' : Option (DM Dres)) (d' : Efab) :
     pstepDisk dp d (LLoad aq false base tvs []) dp' d' →
     tvs'.map Prod.snd = tvs.map Prod.snd →
     pstepDisk dp d (LLoad aq false base tvs' []) dp' d' := by
-  rintro (h | ⟨_, h, _⟩) hts
-  · exact Or.inl (pdiskProgTsLoad dp d aq base tvs tvs' dp' d' h hts)
+  rintro (⟨h, hd⟩ | ⟨_, h, _⟩) hts
+  · exact Or.inl ⟨pdiskProgTsLoad dp _ aq base tvs tvs' dp' _ h hts, hd⟩
   · exact nomatch h
 
-theorem pstepEvLatFree (p : Pexv6) (d : DevStates) (aq : Bool) (base : Int)
-    (tvs : List (Nat × BitVec 8)) (p' : Pexv6) (d' : DevStates) :
+theorem pstepEvLatFree (p : Pexv6) (d : Efab) (aq : Bool) (base : Int)
+    (tvs : List (Nat × BitVec 8)) (p' : Pexv6) (d' : Efab) :
     ¬ pstepEv p d (LLoad aq true base tvs []) p' d' := by
   cases p <;> cases p' <;> simp only [pstepEv, not_false_eq_true]
   · rintro ⟨_, _, _, _, _, _, h⟩
@@ -1282,41 +1497,41 @@ theorem pstepNodeTsLoad (cpu : CPU) (m : SailM Unit) (rs : RegFile)
   · intro h; exact nomatch h.1
 
 theorem pstepHartNoRmw (cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (aq rl : Bool)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (aq rl : Bool)
     (base : Int) (tvs : List (Nat × BitVec 8)) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
-    (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
+    (d' : Efab) (oib : Option Ibch) (obar : Option barrier_kind) :
     ¬ pstepHart cpu m rs fn ib d (LRmw aq rl base tvs data asrc vsrc) m' ors fn' d' oib obar := by
-  rintro (h | h)
+  rintro (⟨h, -⟩ | ⟨_, _, _, _, h, _⟩)
   · rcases fn with _ | ⟨pr, pw, sr, sw⟩
-    · exact pnodeStepNoRmw m rs ib d aq rl base tvs data asrc vsrc m' ors fn' d' oib obar h
+    · exact pnodeStepNoRmw m rs ib _ aq rl base tvs data asrc vsrc m' ors fn' _ oib obar h
     · exact nomatch h.1
-  · exact nomatch h.1
+  · exact nomatch h
 
-theorem pstepEvTsLoad (p : Pexv6) (d : DevStates) (aq : Bool) (base : Int)
-    (tvs tvs' : List (Nat × BitVec 8)) (p' : Pexv6) (d' : DevStates) :
+theorem pstepEvTsLoad (p : Pexv6) (d : Efab) (aq : Bool) (base : Int)
+    (tvs tvs' : List (Nat × BitVec 8)) (p' : Pexv6) (d' : Efab) :
     pstepEv p d (LLoad aq false base tvs []) p' d' →
     tvs'.map Prod.snd = tvs.map Prod.snd →
     pstepEv p d (LLoad aq false base tvs' []) p' d' := by
   cases p <;> cases p' <;> simp only [pstepEv, false_implies]
-  · rintro ⟨rfl, ors, oib, obar, rfl, rfl, h | h⟩ hts
-    · exact ⟨rfl, ors, oib, obar, rfl, rfl, Or.inl (pstepNodeTsLoad _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-        _ h hts)⟩
-    · exact nomatch h.1
+  · rintro ⟨rfl, ors, oib, obar, rfl, rfl, ⟨h, hd⟩ | ⟨_, _, _, _, h, _⟩⟩ hts
+    · exact ⟨rfl, ors, oib, obar, rfl, rfl, Or.inl ⟨pstepNodeTsLoad _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+        _ h hts, hd⟩⟩
+    · exact nomatch h
   · exact pstepDiskTsLoad _ _ _ _ _ _ _ _
 
-theorem pstepEvNoRmw (p : Pexv6) (d : DevStates) (aq rl : Bool) (base : Int)
+theorem pstepEvNoRmw (p : Pexv6) (d : Efab) (aq rl : Bool) (base : Int)
     (tvs : List (Nat × BitVec 8)) (data : List (BitVec 8)) (asrc vsrc : List Dsrc) (p' : Pexv6)
-    (d' : DevStates) :
+    (d' : Efab) :
     ¬ pstepEv p d (LRmw aq rl base tvs data asrc vsrc) p' d' := by
   cases p <;> cases p' <;> simp only [pstepEv, not_false_eq_true]
   · rintro ⟨_, _, _, _, _, _, h⟩
     exact pstepHartNoRmw _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ h
   · exact pstepDiskNoRmw _ _ _ _ _ _ _ _ _ _ _
 
-theorem pstepEvTsRmw (p : Pexv6) (d : DevStates) (aq rl : Bool) (base : Int)
+theorem pstepEvTsRmw (p : Pexv6) (d : Efab) (aq rl : Bool) (base : Int)
     (tvs tvs' : List (Nat × BitVec 8)) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
-    (p' : Pexv6) (d' : DevStates) :
+    (p' : Pexv6) (d' : Efab) :
     pstepEv p d (LRmw aq rl base tvs data asrc vsrc) p' d' →
     tvs'.map Prod.snd = tvs.map Prod.snd →
     pstepEv p d (LRmw aq rl base tvs' data asrc vsrc) p' d' :=
@@ -1423,12 +1638,12 @@ theorem pdiskProgDevFree (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel)
   · exact ⟨rfl, fun _ => Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
       ⟨hdp, hl, hdp', rfl⟩)))))⟩
 
-theorem pstepDiskDevFree (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel)
-    (dp' : Option (DM Dres)) (d' : DevStates) :
+theorem pstepDiskDevFree (dp : Option (DM Dres)) (d : Efab) (l : Wlabel)
+    (dp' : Option (DM Dres)) (d' : Efab) :
     pstepDisk dp d l dp' d' → l ≠ LDev → d' = d ∧ ∀ d0, pstepDisk dp d0 l dp' d0 := by
-  rintro (h | ⟨_, hl, _⟩) hne
-  · obtain ⟨rfl, hall⟩ := pdiskProgDevFree dp d l dp' d' h hne
-    exact ⟨rfl, fun d0 => Or.inl (hall d0)⟩
+  rintro (⟨h, hd⟩ | ⟨_, hl, _⟩) hne
+  · obtain ⟨he, hall⟩ := pdiskProgDevFree dp _ l dp' _ h hne
+    exact ⟨by rw [hd, he], fun d0 => Or.inl ⟨hall d0.efDev, rfl⟩⟩
   · exact absurd hl hne
 
 theorem pdevEvOk : pdevOk pstepEv pdevEv := by
@@ -1437,9 +1652,9 @@ theorem pdevEvOk : pdevOk pstepEv pdevEv := by
     rintro rfl
     exact absurd hm (by simp [pdevEv])
   cases p <;> cases p' <;> simp only [pstepEv] at hs ⊢
-  · obtain ⟨rfl, ors, oib, obar, rfl, rfl, hn | ⟨hl, _⟩⟩ := hs
-    · obtain ⟨rfl, hall⟩ := pstepNodeDevFree _ _ _ _ _ _ _ _ _ _ _ _ _ hn hne
-      exact ⟨rfl, fun d0 => ⟨rfl, ors, oib, obar, rfl, rfl, Or.inl (hall d0)⟩⟩
+  · obtain ⟨rfl, ors, oib, obar, rfl, rfl, ⟨hn, hd⟩ | ⟨_, _, _, _, hl, _⟩⟩ := hs
+    · obtain ⟨he, hall⟩ := pstepNodeDevFree _ _ _ _ _ _ _ _ _ _ _ _ _ hn hne
+      exact ⟨by rw [hd, he], fun d0 => ⟨rfl, ors, oib, obar, rfl, rfl, Or.inl ⟨hall d0.efDev, rfl⟩⟩⟩
     · exact absurd hl hne
   · exact pstepDiskDevFree _ _ _ _ _ hs hne
 
@@ -1467,28 +1682,28 @@ theorem pstepNodeLdepfree (cpu : CPU) (m : SailM Unit) (rs : RegFile)
   · rintro ⟨rfl, _⟩; trivial
 
 theorem pstepPlicLdepfree (cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
-    (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
+    (d' : Efab) (oib : Option Ibch) (obar : Option barrier_kind) :
     pstepPlic cpu m rs fn ib d l m' ors fn' d' oib obar → lbLdepfree l := by
-  rintro ⟨rfl, _⟩; trivial
+  rintro ⟨_, _, _, _, rfl, _⟩; trivial
 
 theorem pstepHartLdepfree (cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (l : Wlabel)
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
-    (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
+    (d' : Efab) (oib : Option Ibch) (obar : Option barrier_kind) :
     pstepHart cpu m rs fn ib d l m' ors fn' d' oib obar → lbLdepfree l := by
-  rintro (h | h)
-  · exact pstepNodeLdepfree cpu m rs fn ib d l m' ors fn' d' oib obar h
+  rintro (⟨h, -⟩ | h)
+  · exact pstepNodeLdepfree cpu m rs fn ib _ l m' ors fn' _ oib obar h
   · exact pstepPlicLdepfree cpu m rs fn ib d l m' ors fn' d' oib obar h
 
-theorem pstepDiskDepfree (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel)
-    (dp' : Option (DM Dres)) (d' : DevStates) : pstepDisk dp d l dp' d' → lbDepfree l := by
-  rintro ((⟨_, rfl, _⟩ | ⟨_, _, _, _, _, _, _, rfl, _⟩ | ⟨_, _, _, _, _, rfl, _⟩ | ⟨_, _, rfl, _⟩ |
-    ⟨_, _, rfl, _⟩ | ⟨_, _, _, rfl, _⟩ | ⟨_, rfl, _⟩) | ⟨_, rfl, _⟩) <;>
+theorem pstepDiskDepfree (dp : Option (DM Dres)) (d : Efab) (l : Wlabel)
+    (dp' : Option (DM Dres)) (d' : Efab) : pstepDisk dp d l dp' d' → lbDepfree l := by
+  rintro (⟨(⟨_, rfl, _⟩ | ⟨_, _, _, _, _, _, _, rfl, _⟩ | ⟨_, _, _, _, _, rfl, _⟩ | ⟨_, _, rfl, _⟩ |
+    ⟨_, _, rfl, _⟩ | ⟨_, _, _, rfl, _⟩ | ⟨_, rfl, _⟩), -⟩ | ⟨_, rfl, _⟩) <;>
     first | trivial | rfl | exact ⟨rfl, rfl⟩
 
-theorem pstepEvLdepfree (p : Pexv6) (d : DevStates) (l : Wlabel) (p' : Pexv6) (d' : DevStates) :
+theorem pstepEvLdepfree (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
     pstepEv p d l p' d' → lbLdepfree l := by
   cases p <;> cases p' <;> simp only [pstepEv, false_implies]
   · rintro ⟨_, _, _, _, _, _, h⟩
@@ -1497,17 +1712,17 @@ theorem pstepEvLdepfree (p : Pexv6) (d : DevStates) (l : Wlabel) (p' : Pexv6) (d
     exact lbDepfreeLdepfree _ (pstepDiskDepfree _ _ _ _ _ h)
 
 /-- THE RMW SPLIT: the device program has no exclusive access at all. -/
-theorem pstepDiskNoEx (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel)
-    (dp' : Option (DM Dres)) (d' : DevStates) : pstepDisk dp d l dp' d' → lbFused l := by
-  rintro ((⟨_, rfl, _⟩ | ⟨_, _, _, _, _, _, _, rfl, _⟩ | ⟨_, _, _, _, _, rfl, _⟩ | ⟨_, _, rfl, _⟩ |
-    ⟨_, _, rfl, _⟩ | ⟨_, _, _, rfl, _⟩ | ⟨_, rfl, _⟩) | ⟨_, rfl, _⟩) <;> trivial
+theorem pstepDiskNoEx (dp : Option (DM Dres)) (d : Efab) (l : Wlabel)
+    (dp' : Option (DM Dres)) (d' : Efab) : pstepDisk dp d l dp' d' → lbFused l := by
+  rintro (⟨(⟨_, rfl, _⟩ | ⟨_, _, _, _, _, _, _, rfl, _⟩ | ⟨_, _, _, _, _, rfl, _⟩ | ⟨_, _, rfl, _⟩ |
+    ⟨_, _, rfl, _⟩ | ⟨_, _, _, rfl, _⟩ | ⟨_, rfl, _⟩), -⟩ | ⟨_, rfl, _⟩) <;> trivial
 
 /-- O2 (Lean-only, deviation 8): ... and never fetches. -/
-theorem pstepDiskNoFetch (dp : Option (DM Dres)) (d : DevStates) (base : Int)
-    (tvs : List (Nat × BitVec 8)) (dp' : Option (DM Dres)) (d' : DevStates) :
+theorem pstepDiskNoFetch (dp : Option (DM Dres)) (d : Efab) (base : Int)
+    (tvs : List (Nat × BitVec 8)) (dp' : Option (DM Dres)) (d' : Efab) :
     ¬ pstepDisk dp d (LIFetch base tvs) dp' d' := by
-  rintro ((⟨_, h, _⟩ | ⟨_, _, _, _, _, _, _, h, _⟩ | ⟨_, _, _, _, _, h, _⟩ | ⟨_, _, h, _⟩ |
-    ⟨_, _, h, _⟩ | ⟨_, _, _, h, _⟩ | ⟨_, h, _⟩) | ⟨_, h, _⟩) <;> exact nomatch h
+  rintro (⟨(⟨_, h, _⟩ | ⟨_, _, _, _, _, _, _, h, _⟩ | ⟨_, _, _, _, _, h, _⟩ | ⟨_, _, h, _⟩ |
+    ⟨_, _, h, _⟩ | ⟨_, _, _, h, _⟩ | ⟨_, h, _⟩), -⟩ | ⟨_, h, _⟩) <;> exact nomatch h
 
 /-! ### THE RMW SPLIT (S4): timestamp-obliviousness of the exclusive read -/
 
@@ -1584,24 +1799,24 @@ theorem pstepNodeTsExload (cpu : CPU) (m : SailM Unit) (rs : RegFile)
   · exact pnodeStepTsExload m rs ib d aq base tvs tvs' asrc m' ors fn' d' oib obar
   · intro h; exact nomatch h.1
 
-theorem pstepDiskTsExload (dp : Option (DM Dres)) (d : DevStates) (aq : Bool) (base : Int)
+theorem pstepDiskTsExload (dp : Option (DM Dres)) (d : Efab) (aq : Bool) (base : Int)
     (tvs tvs' : List (Nat × BitVec 8)) (asrc : List Dsrc) (dp' : Option (DM Dres))
-    (d' : DevStates) :
+    (d' : Efab) :
     pstepDisk dp d (LExLoad aq base tvs asrc) dp' d' →
     tvs'.map Prod.snd = tvs.map Prod.snd →
     pstepDisk dp d (LExLoad aq base tvs' asrc) dp' d' :=
   fun h => (pstepDiskNoEx _ _ _ _ _ h).elim
 
-theorem pstepEvTsExload (p : Pexv6) (d : DevStates) (aq : Bool) (base : Int)
-    (tvs tvs' : List (Nat × BitVec 8)) (asrc : List Dsrc) (p' : Pexv6) (d' : DevStates) :
+theorem pstepEvTsExload (p : Pexv6) (d : Efab) (aq : Bool) (base : Int)
+    (tvs tvs' : List (Nat × BitVec 8)) (asrc : List Dsrc) (p' : Pexv6) (d' : Efab) :
     pstepEv p d (LExLoad aq base tvs asrc) p' d' →
     tvs'.map Prod.snd = tvs.map Prod.snd →
     pstepEv p d (LExLoad aq base tvs' asrc) p' d' := by
   cases p <;> cases p' <;> simp only [pstepEv, false_implies]
-  · rintro ⟨rfl, ors, oib, obar, rfl, rfl, h | h⟩ hts
-    · exact ⟨rfl, ors, oib, obar, rfl, rfl, Or.inl (pstepNodeTsExload _ _ _ _ _ _ _ _ _ _ _ _ _ _
-        _ _ _ h hts)⟩
-    · exact nomatch h.1
+  · rintro ⟨rfl, ors, oib, obar, rfl, rfl, ⟨h, hd⟩ | ⟨_, _, _, _, h, _⟩⟩ hts
+    · exact ⟨rfl, ors, oib, obar, rfl, rfl, Or.inl ⟨pstepNodeTsExload _ _ _ _ _ _ _ _ _ _ _ _ _ _
+        _ _ _ h hts, hd⟩⟩
+    · exact nomatch h
   · exact pstepDiskTsExload _ _ _ _ _ _ _ _ _
 
 /-! ### O2 (Lean-only, deviation 8): timestamp-obliviousness of the fetch -/
@@ -1679,23 +1894,23 @@ theorem pstepNodeTsIfetch (cpu : CPU) (m : SailM Unit) (rs : RegFile)
   · exact pnodeStepTsIfetch m rs ib d base tvs tvs' m' ors fn' d' oib obar
   · intro h; exact nomatch h.1
 
-theorem pstepDiskTsIfetch (dp : Option (DM Dres)) (d : DevStates) (base : Int)
-    (tvs tvs' : List (Nat × BitVec 8)) (dp' : Option (DM Dres)) (d' : DevStates) :
+theorem pstepDiskTsIfetch (dp : Option (DM Dres)) (d : Efab) (base : Int)
+    (tvs tvs' : List (Nat × BitVec 8)) (dp' : Option (DM Dres)) (d' : Efab) :
     pstepDisk dp d (LIFetch base tvs) dp' d' →
     tvs'.map Prod.snd = tvs.map Prod.snd →
     pstepDisk dp d (LIFetch base tvs') dp' d' :=
   fun h => absurd h (pstepDiskNoFetch dp d base tvs dp' d')
 
-theorem pstepEvTsIfetch (p : Pexv6) (d : DevStates) (base : Int)
-    (tvs tvs' : List (Nat × BitVec 8)) (p' : Pexv6) (d' : DevStates) :
+theorem pstepEvTsIfetch (p : Pexv6) (d : Efab) (base : Int)
+    (tvs tvs' : List (Nat × BitVec 8)) (p' : Pexv6) (d' : Efab) :
     pstepEv p d (LIFetch base tvs) p' d' →
     tvs'.map Prod.snd = tvs.map Prod.snd →
     pstepEv p d (LIFetch base tvs') p' d' := by
   cases p <;> cases p' <;> simp only [pstepEv, false_implies]
-  · rintro ⟨rfl, ors, oib, obar, rfl, rfl, h | h⟩ hts
-    · exact ⟨rfl, ors, oib, obar, rfl, rfl, Or.inl (pstepNodeTsIfetch _ _ _ _ _ _ _ _ _ _ _ _ _ _
-        _ h hts)⟩
-    · exact nomatch h.1
+  · rintro ⟨rfl, ors, oib, obar, rfl, rfl, ⟨h, hd⟩ | ⟨_, _, _, _, h, _⟩⟩ hts
+    · exact ⟨rfl, ors, oib, obar, rfl, rfl, Or.inl ⟨pstepNodeTsIfetch _ _ _ _ _ _ _ _ _ _ _ _ _ _
+        _ h hts, hd⟩⟩
+    · exact nomatch h
   · exact pstepDiskTsIfetch _ _ _ _ _ _ _
 
 /-! ### THE RE-FUSION'S CLASS PREMISE (`WeakRefuse.pclsFusable`) -/
@@ -1766,15 +1981,15 @@ theorem pstepNodeExstoreExcl (cpu : CPU) (m : SailM Unit) (rs : RegFile)
   · intro h; exact nomatch h.1
 
 theorem pstepHartExstoreExcl (cpu : CPU) (m : SailM Unit) (rs : RegFile)
-    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (rl : Bool) (base : Int)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (rl : Bool) (base : Int)
     (data : List (BitVec 8)) (asrc vsrc : List Dsrc) (m' : SailM Unit) (ors : Option RegFile)
-    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : DevStates) (oib : Option Ibch)
+    (fn' : Option (Bool × Bool × Bool × Bool)) (d' : Efab) (oib : Option Ibch)
     (obar : Option barrier_kind) (ws : Wstate) :
     pstepHart cpu m rs fn ib d (LExStore rl base data asrc vsrc) m' ors fn' d' oib obar →
     pnodeWclass m ws = .WCexcl := by
-  rintro (h | h)
-  · exact pstepNodeExstoreExcl cpu m rs fn ib d rl base data asrc vsrc m' ors fn' d' oib obar ws h
-  · exact nomatch h.1
+  rintro (⟨h, -⟩ | ⟨_, _, _, _, h, _⟩)
+  · exact pstepNodeExstoreExcl cpu m rs fn ib _ rl base data asrc vsrc m' ors fn' _ oib obar ws h
+  · exact nomatch h
 
 theorem pclsEvFusable : pclsFusable pstepEv pclsEv := by
   intro p d rl base data asrc vsrc p' d' aq tvs wF wS hs _
@@ -1785,7 +2000,7 @@ theorem pclsEvFusable : pclsFusable pstepEv pclsEv := by
 
 /-! ## 9. THE INSTANCE T2 (deviation 7: the fetch premise) -/
 
-theorem t2Ev (img : Image) (d0 : DevStates) (ps : List Pexv6) (c : Wpcfg Pexv6 DevStates) :
+theorem t2Ev (img : Image) (d0 : Efab) (ps : List Pexv6) (c : Wpcfg Pexv6 Efab) :
     (∀ cF, rtc (wpPfRun (refusePstep (erasePstep pstepEv)) pclsEv) (wpInit img d0 ps) cF →
       pfRunFetchOk (refusePstep (erasePstep pstepEv)) pclsEv (wpInit img d0 ps) cF) →
     rtc (wpPfRun pstepEv pclsEv) (wpInit img d0 ps) c →
