@@ -121,7 +121,7 @@ registry and the two re-build wands. -/
 
 section Open
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [OffboxG GF]
 
 /-- What stays behind when slot `islot inum` of block `iregBi inum` is out:
 the registry, the other blocks, the other fifteen slots. -/
@@ -274,7 +274,7 @@ end Open
 
 section Movers
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [OffboxG GF]
 
 /-- Rocq's `ireg_read`.  THE FLIP'S ONE ADDITION (durable-disk 1c-flip step
 3): the region holds the block's EXCLUSIVE byte run, not a cache half, so

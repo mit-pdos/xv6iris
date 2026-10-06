@@ -132,15 +132,15 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
     (hchunk : ubytesAt Mimg (ua + BitVec.ofNat 64 t) (wrfRun wrote tot)) (act : BitVec 64) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗
       topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) -∗
-      offLink (hlc := hlc) γo (off : Int) -∗
+      offLinkB (hlc := hlc) (om == .held) γo (off : Int) -∗
       fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p 0 ={⊤}=∗
         topFrag (fsGammaL fscFs) inum.toNat (eraNode dn' bm' data') ∗
-        offLink (hlc := hlc) γo ((off + tot : Nat) : Int) ∗
+        offLinkB (hlc := hlc) (om == .held) γo ((off + tot : Nat) : Int) ∗
         ((⌜tot = c⌝ ∗ fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
          (⌜tot < c⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
            fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p x)) ∗
         -- (NI M3 private files FS-1) the chunk's event, when the row moved
-        ∃ cs : List Fev, fwChunks fscFs act inum.toNat γo cs ∗ ⌜fwSum cs = tot⌝ := by
+        ∃ cs : List Fev, fwChunks fscFs act inum.toNat γo (om == .held) cs ∗ ⌜fwSum cs = tot⌝ := by
   have hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ ⊤ := CoPset.subseteq_top
   have hnz : fnType (eraNode dn bm data) ≠ 0 := opfEra_file_typed dn bm data hty
   have hrow := opfEra_file_row dn bm data hty
@@ -278,9 +278,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- The fd's off box, CHECKED OUT (what `protoReadCheckout` hands out beside
 the cell and `protoReadPark` takes back). -/
-def fwrOut (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (m : StampMap Nat) (T0 Tr : Nat) :
-    IProp GF := iprop%
-  offBox fk γb γo ∗ offMember offCfg ik γb ∗ l2Hold γb fk m ∗
+def fwrOut (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (om : OffMode) (m : StampMap Nat)
+    (T0 Tr : Nat) : IProp GF := iprop%
+  offBox fk γb γo (om == .held) ∗ offMember offCfg ik γb ∗ l2Hold γb fk m ∗
   (γb.slotd ↪VAR{.own q.half} (⟨T0, false, fk, none⟩ : SlotReg Nat Unit)) ∗
   (γb.cnt ↪VAR{.own q.half} (1 : Nat)) ∗ offRowsDepBut offCfg ik γb Tr
 
@@ -289,11 +289,11 @@ set_option maxHeartbeats 8000000 in
 `proto_read_checkout` block after ilock): the fd's type pinned by the two
 one-shots, the checked-out bundle opened, the fd's `f->off` checked out of
 its box at the floor ilock's acquire returned. -/
-theorem fwr_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo : GName)
+theorem fwr_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (om : OffMode)
     (C : FContent) (m : StampMap Nat) (K : Nat) (g : GName) (ty : BitVec 16) (inum : BitVec 32)
     (dn : Dinode) (bm : Blkmap) (hip : C.ip = ientry ik) (hik : ik < NINODE)
     (hK : maxStamp m ≤ K) :
-    ownCtx cpu curCtx ∗ ctxFloor curCtx K ∗ offFdAt (GF := GF) fk q γb γo C m ∗
+    ownCtx cpu curCtx ∗ ctxFloor curCtx K ∗ offFdAt (GF := GF) fk q γb γo om C m ∗
       offRows offCfg ik curCtx ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
       ityShot g dn.diType ∗ ityShot g ty ⊢
       |={⊤}=> ownCtx cpu curCtx ∗ ⌜dn.diType = ty⌝ ∗
@@ -302,14 +302,14 @@ theorem fwr_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo :
           dinodeAt fscIreg inum dn ∗ inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗
           inodeBlocks fscFs bm data ∗ topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) ∗
           wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) v ∗
-          offLink (hlc := hlc) γo (v.toNat : Int) ∗ fwrOut ik fk q γb γo m T0 Tr) := by
+          offLinkB (hlc := hlc) (om == .held) γo (v.toNat : Int) ∗ fwrOut ik fk q γb γo om m T0 Tr) := by
   iintro ⟨Hrun, #Hflr, Hat, Hrows, Hload, #Hshot', #Hshot⟩
   ihave %htyeq := ityShot_agree g dn.diType ty $$ [Hshot' Hshot]
   · iframe #
   ihave Hload := icLoaded_open fscFs fscIreg fscCov fscLogst ik inum dn bm $$ Hload
   unfold icLoadedFlatBody
   icases Hload with ⟨%data, %hok, %hrl, -, -, -, -, -, Hdi, Hmeta, Haddrs, Hind, Hblk, Htop⟩
-  imod protoReadCheckout cpu ⊤ ik fk q γb γo C m K curCtx CoPset.subseteq_top hip hik hK
+  imod protoReadCheckout cpu ⊤ ik fk q γb γo om C m K curCtx CoPset.subseteq_top hip hik hK
     $$ [Hrun Hflr Hat Hrows] with ⟨Hrun, Hres, #Hbox, #Hmem, ⟨%T0, Hhold, Hd, Hc, ⟨%Tr, Hrest⟩⟩⟩
   · iframe Hrun Hat Hrows; iexact Hflr
   unfold offResident
@@ -369,16 +369,16 @@ theorem fwr_post_ghost (act : BitVec 64) (om : OffMode) (cpu : CPU) (ik fk : Nat
     (hnd' : dn'.diType.toNat ≠ T_DIR_z) (hdn0 : dn0' = dn') :
     ownCtx cpu curCtx ∗ fsReady (hlc := hlc) ∗
       topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) ∗
-      offLink (hlc := hlc) γo (v.toNat : Int) ∗
+      offLinkB (hlc := hlc) (om == .held) γo (v.toNat : Int) ∗
       fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p 0 ∗
       wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (filerwOffW v tot) ∗
-      fwrOut (GF := GF) ik fk q γb γo m T0 Tr ∗
+      fwrOut (GF := GF) ik fk q γb γo om m T0 Tr ∗
       dinodeAt fscIreg inum dn0' ∗ inodeMeta (ientry ik) dn' ∗ inodeMap fscFs (ientry ik) bm' ∗
       inodeBlocks fscFs bm' data' ⊢
-      |={⊤}=> ownCtx cpu curCtx ∗ offFd fk q γb γo C ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
+      |={⊤}=> ownCtx cpu curCtx ∗ offFd fk q γb γo om C ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
         icLoaded fscFs fscIreg fscCov fscLogst ik inum dn' bm' ∗
         -- (NI M3 private files FS-1) the chunk's ledger receipt (if it moved the row)
-        (∃ cs : List Fev, fwChunks fscFs act inum.toNat γo cs ∗ ⌜fwSum cs = tot⌝) ∗
+        (∃ cs : List Fev, fwChunks fscFs act inum.toNat γo (om == .held) cs ∗ ⌜fwSum cs = tot⌝) ∗
         ((⌜tot = c⌝ ∗ fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
          (⌜tot < c⌝ ∗
            -- (NI M3 FS-0) THE SHORT CHUNK'S REASON: writei's own `-1` (the
@@ -402,12 +402,12 @@ theorem fwr_post_ghost (act : BitVec 64) (om : OffMode) (cpu : CPU) (ik fk : Nat
     hchunk act)
     $$ Hft Hai Htop Hgv Hst with ⟨Htop, Hgv, Hst, #Hcs⟩
   -- CHECK IN the cell: the half came back at exactly its word
-  ihave Hres := offResident_of curCtx γo fk (filerwOffW v tot) hwf $$ [Hcell] [Hgv]
+  ihave Hres := offResident_of curCtx γo (om == .held) fk (filerwOffW v tot) hwf $$ [Hcell] [Hgv]
   · rw [wordAtN_cur]; unfold aFoff; iexact Hcell
   · rw [hw]; iexact Hgv
   unfold fwrOut
   icases Hout with ⟨#Hbox, #Hmem, Hhold, Hd, Hc, Hrest⟩
-  imod protoReadPark cpu ⊤ ik fk q γb γo C m T0 Tr curCtx CoPset.subseteq_top hip hik hq
+  imod protoReadPark cpu ⊤ ik fk q γb γo om C m T0 Tr curCtx CoPset.subseteq_top hip hik hq
     $$ [Hrun Hres Hhold Hd Hc Hrest] with ⟨Hrun, Hoffd, Hrows⟩
   · iframe Hrun Hres Hhold Hd Hc Hrest Hbox Hmem
   -- THE RE-PARK at writei's record

@@ -169,11 +169,13 @@ theorem fwr_bne_lt (t : Nat) (n : Int) (h : (t : Int) < n) (hn : n < 2 ^ 31) :
   rw [BitVec.toNat_ofInt, BitVec.toNat_ofNat] at this
   omega
 
-/-- The FD_INODE arm's extra, at a writable parked state, IS `writeArmsAt`. -/
+/-- The FD_INODE arm's extra, at a writable state, IS the arms at its mode
+(NI M3 private files FS-2a′: `writeArmsOm`). -/
 theorem fwr_extra_of (gn : GName) (P : UPtd) (A : FwrA) (Mv : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) :
-    writeArmsAt (hlc := hlc) (fsGammaL fscFs) A.i A.γo P A.n Mv ua Q r ⊢
-      filewriteExtra (hlc := hlc) gn P A.st A.n Mv ua Q Qe r := .rfl
+    writeArmsOm (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo P A.n Mv ua Q r ⊢
+      filewriteExtra (hlc := hlc) gn P A.st A.n Mv ua Q Qe r := by
+  rw [FwrA.st, filewriteExtra_inode]
 
 set_option maxHeartbeats 16000000 in
 /-- **THE OK EXIT** (`+0xe2` falls, `+0xe6 .. +0xf2`, the tail): every chunk
@@ -190,7 +192,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     fileRef A.γ A.fk A.q A.st ∗ procPrivExtEv (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
     -- (NI M3 private files FS-1) the loop's chunk receipts, summing to the count
-    (∃ cs : List Fev, fwChunks fscFs k.proc A.i A.γo cs ∗ ⌜fwSum cs = A.n.toNat⌝) ∗
+    (∃ cs : List Fev, fwChunks fscFs k.proc A.i A.γo (A.om == .held) cs ∗ ⌜fwSum cs = A.n.toNat⌝) ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
@@ -242,10 +244,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     isplitr
     · ipureintro; exact filewriteRet_all A.n (by have := hA.hn.1; omega)
     iapply fwr_extra_of
-    unfold writeArmsAt
-    ileft
-    isplitr
-    · ipureintro; exact ⟨rfl, by have := hA.hn.1; omega⟩
+    iapply writeArmsOm_ok _ _ _ _ _ _ _ _ _ _ ⟨rfl, by have := hA.hn.1; omega⟩
     iapply fwrSt_ok A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p htn $$ Hst
   · -- (NI M3 FS-0) the answer is n, not -1
     iapply fwWhyAt_ne; rw [ha0]; exact fwr_ofInt_ne_m1 A.n (by have := hA.hn.1; omega) hA.hn.2
@@ -270,7 +269,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     -- (NI M3 FS-0) the short chunk's reason
     (∃ w : FwWhy, fwWhyRcpt fscFs k.proc A.V.upt (k.regs 11#5) A.n w) ∗
     -- (NI M3 private files FS-1) the loop's chunk receipts
-    (∃ cs : List Fev, fwChunks fscFs k.proc A.i A.γo cs) ∗
+    (∃ cs : List Fev, fwChunks fscFs k.proc A.i A.γo (A.om == .held) cs) ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
@@ -327,10 +326,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     isplitr
     · ipureintro; exact filewriteRet_m1 A.n
     iapply fwr_extra_of
-    unfold writeArmsAt
-    iright
-    isplitr
-    · ipureintro; rfl
+    iapply writeArmsOm_fail
     iapply fwrSt_fail A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x (Or.inl htn) $$ Hst
   · -- (NI M3 FS-0) the short chunk's reason
     icases Hwhy with ⟨%w, Hw⟩

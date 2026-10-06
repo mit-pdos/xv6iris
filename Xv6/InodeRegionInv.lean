@@ -418,7 +418,7 @@ exactly what `iregArm` took. -/
 
 section Top
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
-  [FsTopG GF] [FsBytesG GF]
+  [FsTopG GF] [FsBytesG GF] [OffboxG GF]
 
 /-- what an arm parks: its transaction's element, at the arm's own share -/
 def iregParked [Icfg] (e : IregArmEnt) : IProp GF :=
@@ -488,10 +488,10 @@ theorem ftopAlloc [Icfg] (E : CoPset) (γfs : FsNames) (I : RegMapF FsNode)
     ⊢@{IProp GF} (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗
       (icfgLk ↪●MAP (∅ : RegMapF IregArmEnt)) -∗
       -- (NI M3 private files FS-1) the era's ledger, empty; its first event
-      -- is the era's recovered rows
-      fsLedAuth γfs [] -∗ |={E}=> ftopInv (hlc := hlc) γfs := by
-  iintro Ha Hlk Hled
-  imod fsLed_append γfs [] [.boot (ftopRows I)] $$ Hled with ⟨Hled, -⟩
+      -- is the era's recovered rows; (FS-2a′) and its mirror, empty
+      fsLedAuth γfs [] -∗ (icfgFev ↪●ML ([] : List Fev)) -∗ |={E}=> ftopInv (hlc := hlc) γfs := by
+  iintro Ha Hlk Hled Hmir
+  imod ftopLed_boot γfs I $$ Hled Hmir with Hled
   unfold ftopInv
   iapply (inv_alloc ftopN E (ftopBody (GF := GF) γfs))
   inext
@@ -503,11 +503,7 @@ theorem ftopAlloc [Icfg] (E : CoPset) (γfs : FsNames) (I : RegMapF FsNode)
     iempintro
   isplitl []
   · ipureintro; exact ftopClean_empty I hloc
-  unfold ftopLed
-  iexists [] ++ [.boot (ftopRows I)]
-  iframe Hled
-  ipureintro
-  rfl
+  iexact Hled
 
 /-- (NI M3 private files FS-1) **AN EXHAUSTION VERDICT, RECORDED**: the era's
 ledger takes `full act why` at this instant, its receipt out (the three
@@ -550,6 +546,27 @@ theorem ftopObs [Icfg] (E : CoPset) (γfs : FsNames) (e : Fev) (he : fevObs e)
   imodintro
   iexists h
   iexact Hr
+
+/-- (NI M3 private files FS-2a′) **A RECEIPT's PREFIX IS WELL-FORMED**: any
+lower bound of the era's ledger records, at every parked read and write, the
+fold's own offset (`NiFs.fevOffWf`, the ledger's invariant, prefix-closed) --
+what a holder of a read or write receipt reads off with the invariant. -/
+theorem ftopInv_lb_wf [Icfg] (E : CoPset) (γfs : FsNames) (L : List Fev)
+    (hE : (↑ftopN : CoPset) ⊆ E) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ fsLedLb γfs L ={E}=∗ ⌜fevOffWf L⌝ := by
+  iintro #Hi #HL
+  unfold ftopInv
+  imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs) hE) $$ Hi
+    with ⟨Hb, Hclose⟩
+  unfold ftopBody
+  icases Hb with ⟨%I, %A, Hta, Hla, Hpark, %hcl, Hled⟩
+  icases ftopLed_lb_wf γfs I L $$ HL Hled with ⟨%hw, Hled⟩
+  imod Hclose $$ [Hta Hla Hpark Hled]
+  · iexists I, A
+    iframe Hta Hla Hpark Hled
+    ipureintro; exact hcl
+  imodintro
+  ipureintro; exact hw
 
 /-- A key the registry's map does not hold (Rocq `fresh (dom A)`). -/
 theorem iregArm_fresh (A : RegMapF IregArmEnt) : ∃ k, PartialMap.get? A k = none := by
@@ -684,7 +701,7 @@ end Top
 
 section Bundles
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [OffboxG GF]
 
 /-- THE REGION AT POWERON, BEFORE RECOVERY HAS RUN (durable-disk lane
 E-except).  Its byte row is the bare `fsBytesRow`: the era's mint runs at
@@ -807,7 +824,7 @@ reading the pre-node's zero count off `iregTopPark`). -/
 
 section Retag
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
-  [FsTopG GF] [FsBytesG GF] [Appcfg GF]
+  [FsTopG GF] [FsBytesG GF] [Appcfg GF] [OffboxG GF]
 
 /-- Rocq's `ireg_top_retag_gen`, (NI M3 private files FS-1) WITH THE MOVE's
 EVENTS: the ledger grows by `evs`, which take its fold from the map to the
@@ -815,6 +832,7 @@ moved map (`hev`), and the receipt -- the prefix they followed and the lower
 bound past them -- comes out. -/
 theorem iregTopRetag_gen [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : FsNode)
     (evs : List Fev) (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
+    (hneu : evs.all fevNeutral = true)
     (hev : ∀ (h : List Fev) (I : RegMapF FsNode), PartialMap.get? I i = some n → fevTie h I →
       fevTie (h ++ evs) (PartialMap.insert I i n')) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
@@ -836,7 +854,7 @@ theorem iregTopRetag_gen [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : 
   · iintro %hi Hp
     imodintro
     iapply Hstep $$ %I %hi Hp
-  imod ftopLed_step γfs I (PartialMap.insert I i n') evs (fun h ht => hev h I hlk ht) $$ Hled
+  imod ftopLed_step γfs I (PartialMap.insert I i n') evs hneu (fun h ht => hev h I hlk ht) $$ Hled
     with ⟨Hled, ⟨%h, %ht, #Hlb⟩⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I i n', A
@@ -863,7 +881,7 @@ theorem iregTopRetag_same [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
       topFrag (fsGammaL γfs) i n -∗ |={E}=> topFrag (fsGammaL γfs) i n' := by
   iintro #Hi #Hai Hf
-  imod (iregTopRetag_gen E γfs i n n' [] hE hloc
+  imod (iregTopRetag_gen E γfs i n n' [] hE hloc rfl
     (fun h I hi ht => by simpa using fevTie_same i n n' hi hrow ht)) $$ Hi Hai [] Hf with ⟨Hf, -⟩
   · iintro %I %hin Hp
     rw [absView_insert_same I i n n' hin (absOf_of_ftopRow hrow)]
@@ -878,14 +896,14 @@ but the typed row does -- iput's free (a typed orphan to a free record,
 `Fev.claim`).  The events are the caller's; the receipt comes out. -/
 theorem iregTopRetag_ev [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : FsNode)
     (evs : List Fev) (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (habs : absOf n = absOf n')
-    (hloc : InodeLocal i n')
+    (hloc : InodeLocal i n') (hneu : evs.all fevNeutral = true)
     (hev : ∀ (h : List Fev) (I : RegMapF FsNode), PartialMap.get? I i = some n → fevTie h I →
       fevTie (h ++ evs) (PartialMap.insert I i n')) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
       topFrag (fsGammaL γfs) i n -∗ |={E}=> topFrag (fsGammaL γfs) i n' ∗
         fsMoveRcpt γfs evs i n := by
   iintro #Hi #Hai Hf
-  iapply (iregTopRetag_gen E γfs i n n' evs hE hloc hev) $$ Hi Hai [] Hf
+  iapply (iregTopRetag_gen E γfs i n n' evs hE hloc hneu hev) $$ Hi Hai [] Hf
   iintro %I %hin Hp
   rw [absView_insert_same I i n n' hin habs]
   iexact Hp
@@ -897,7 +915,7 @@ application's claim is owed all the same (Rocq's
 move's events. -/
 theorem iregTopRetag_armed_gen [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) (q : Qp)
     (S : Std.ExtTreeSet Nat compare) (i : Nat) (n n' : FsNode) (evs : List Fev)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S)
+    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S) (hneu : evs.all fevNeutral = true)
     (hev : ∀ (h : List Fev) (I : RegMapF FsNode), PartialMap.get? I i = some n → fevTie h I →
       fevTie (h ++ evs) (PartialMap.insert I i n')) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
@@ -921,7 +939,7 @@ theorem iregTopRetag_armed_gen [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) 
   · iintro %hi Hp
     imodintro
     iapply Hstep $$ %I %hi Hp
-  imod ftopLed_step γfs I (PartialMap.insert I i n') evs (fun h ht => hev h I hlk ht) $$ Hled
+  imod ftopLed_step γfs I (PartialMap.insert I i n') evs hneu (fun h ht => hev h I hlk ht) $$ Hled
     with ⟨Hled, ⟨%h, %ht, #Hlb⟩⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I i n', A
@@ -950,7 +968,7 @@ theorem iregTopRetag_armed_same [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat)
       topFrag (fsGammaL γfs) i n -∗
       |={E}=> (iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n') := by
   iintro #Hi #Hai Hrec Hf
-  imod (iregTopRetag_armed_gen E γfs k t q S i n n' [] hE hin
+  imod (iregTopRetag_armed_gen E γfs k t q S i n n' [] hE hin rfl
     (fun h I hi ht => by simpa using fevTie_same i n n' hi hrow ht)) $$ Hi Hai Hrec [] Hf
     with ⟨Hrec, Hf, -⟩
   · iintro %I %hlk Hp

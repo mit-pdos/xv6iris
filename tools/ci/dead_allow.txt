@@ -49,11 +49,12 @@ module Xv6.UstepEcho             # anti-vacuity check, test by design (echo runs
 # -- NI M3 private files FS-1: the fs-event ledger's readings and receipt
 #    algebra that the computed rows read; FS-2 reaches them
 #    (claude-notes/projects/noninterference.md, "M3 private files design";
-#    FS-2a reached `fevContent` through `fevReadOut`.  The fold's own offset
-#    and the read bytes at it wait for FS-2a′, which ties `fevOff` to the
-#    real `f->off`: FS-2a's rows read the RECORDED offset, ruling (C))
-decl Xv6.fevOff                  # FS-2a′ reaches (the fold's offset, tied to f->off; FS-4's fevOffWf)
-decl Xv6.fevReadBytes            # FS-2a′ reaches (read's bytes at the fold's offset)
+#    FS-2a reached `fevContent` through `fevReadOut`; FS-2a′ reached the
+#    fold's own offset `fevOff` and `fevReadBytes`: the read row reads the
+#    fold's offset, tied to the real `f->off` by the ledger's quarter share)
+decl Xv6.fevOffWf_prefix         # FS-3/4 reaches (every cited prefix of a well-formed ledger is well-formed)
+decl Xv6.ftopLed_lb_wf           # FS-3/4 reaches (a receipt's prefix is well-formed: the recorded offsets are the fold's)
+decl Xv6.ftopInv_lb_wf           # FS-3/4 reaches (the same, off the invariant, at a write citation)
 decl Xv6.fevStatOf               # FS-2 reaches (fstat's row; out of FS-2a: the 4-byte stack hole)
 decl Xv6.fevRun_prefix           # FS-2 reaches (the fold at a cited prefix)
 decl Xv6.fsLedLb_prefix          # FS-2 reaches (a receipt's prefix bound)

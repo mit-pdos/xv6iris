@@ -316,7 +316,7 @@ structure WriteiOut (cov : ExtTreeSet Nat compare) (logst bmapstart : Nat)
 
 /-- **THE SET-FORM CONTRACT** (Rocq's `wp_writei_gen_body`).
 `a0 = ip`, `a1 = user_src`, `a2 = src`, `a3 = off`, `a4 = n`. -/
-def wp_writei_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_writei_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -406,7 +406,7 @@ def wp_writei_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
 /-- The eb-generic form of `wp_writei_gen_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_writei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_writei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -496,7 +496,7 @@ def wp_writei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 /-- The interface of `writei` (Rocq's `Module Type WRITEI`, less the dropped
 counted form). -/
 structure WRITEI : Prop where
-  wp_writei_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_writei_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]

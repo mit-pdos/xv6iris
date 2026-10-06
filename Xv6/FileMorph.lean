@@ -54,8 +54,8 @@ instance offFree_morph (t : KTier) (k : Nat) (q : Qp) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; offFree (GF := GF) k q) := by
   exact ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)
 
-instance offFd_morph (t : KTier) (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (C : FContent) :
-    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; offFd (GF := GF) k q γb γo C) := by
+instance offFd_morph (t : KTier) (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (om : OffMode) (C : FContent) :
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; offFd (GF := GF) k q γb γo om C) := by
   exact ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)
 
 /-- Rocq `inode_pay_morph`. -/

@@ -138,7 +138,7 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx] [OffboxG GF]
 
 theorem dirlookup_slots_iget (a : Nat) (h : dirlookupSlots ≤ a) : igetSlots ≤ a - 12 := by
   unfold dirlookupSlots readiSlots bmapSlots ballocSlots breadSlots igetSlots panicSlots at *

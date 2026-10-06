@@ -42,11 +42,15 @@ the NI roots' trusted base grows by it alone when `UsysDet.UIota` names it.
    arm event would have: the inum (carried, F6) and the record's type.
 4. (NI M3 FS-2a, the coordinator's ruling (C) of 2026-10-06) `Fev.read`
    carries the REAL offset `off` the read used, as `write` does, and the
-   fold sets `off + n`: the offset is RECORDED AS GIVEN (R3's status for
-   the inode number), because the fold's own offset is not yet tied to the
-   real `f->off` (FS-2a′ ties it; FS-4 derives the recorded offsets).  The
-   read row reads the cited prefix's last event (`fevReadOut`,
-   `fevReadDir`), so no row reads `UIota.fpos`.
+   fold sets `off + n`.  (NI M3 FS-2a′) The fold's offset is now TIED to
+   the real `f->off` at every parked read and write (`fevOffWf`, the
+   ledger's invariant, kept by the fs ledger's quarter share of the
+   shadow), so the read row reads the FOLD's offset (`fevReadOut`,
+   `fevReadBytes`); `read`/`write`/`open` carry the descriptor's mode
+   `held`, and the fold's offsets ignore the held ones (a held
+   descriptor's offset is the client's own).  The read row reads the cited
+   prefix's last event (`fevReadOut`, `fevReadDir`), so no row reads
+   `UIota.fpos`.
 5. (NI M3 FS-2a) `FsFull.max`: writei's refusal at the file's size cap
    from the offset, recorded as a verdict like the three exhaustions.
 -/
@@ -101,8 +105,11 @@ inductive Fev where
   | ent (act : BitVec 64) (d : Nat) (nm : List (BitVec 8)) (t : Option Nat)
   /-- a link-count leg: the count becomes `nl` -/
   | nlink (act : BitVec 64) (i : Nat) (nl : Nat)
-  /-- one chunk, spliced in at `off`; `γo`'s offset ends at `off + r` -/
-  | write (act : BitVec 64) (i : Nat) (γo : GName) (off : Nat) (bs : List (BitVec 8)) (r : Nat)
+  /-- one chunk, spliced in at `off`; `γo`'s offset ends at `off + r`.  (NI M3
+  FS-2a′) `held`: the descriptor's offset is the client's own (`OffMode.held`),
+  so the ledger does not track it and the fold's offsets ignore the chunk -/
+  | write (act : BitVec 64) (i : Nat) (γo : GName) (held : Bool) (off : Nat) (bs : List (BitVec 8))
+      (r : Nat)
   /-- O_TRUNC's itrunc -/
   | trunc (act : BitVec 64) (i : Nat)
   /-- iput's last-reference free -/
@@ -115,12 +122,18 @@ inductive Fev where
   observation AT `i`'s row (the install runs under the open's lock on `i`, the
   type test's lock): `held` the descriptor's offset mode (`OffMode.held`,
   CARRIED like `γo`), `prev` the position of the event that fixed `i` -- the
-  walk's last lookup (a plain open), create's arm or create's lookup (O_CREATE) -/
+  walk's last lookup (a plain open), create's arm or create's lookup (O_CREATE).
+  (NI M3 FS-2a′) `held` is ALSO set at a DEVICE install: a device descriptor
+  has no offset shadow, so the ledger tracks none (`fevPk`); only a PARKED
+  inode install (`held = false`) starts a tracked offset, at 0 -/
   | open (act : BitVec 64) (i : Nat) (γo : GName) (held : Bool) (prev : Option Nat)
   /-- `n` bytes read from `γo`'s offset `off` (the count the read advanced it
   by); (NI M3 FS-2a, ruling (C)) `off` is the REAL offset the read used,
-  recorded AS GIVEN, as `write` records its own -/
-  | read (act : BitVec 64) (i : Nat) (γo : GName) (off n : Nat)
+  recorded AS GIVEN, as `write` records its own.  (NI M3 FS-2a′) At a PARKED
+  descriptor (`held = false`) the recorded offset IS the fold's (`fevOffWf`,
+  the ledger's invariant); at a HELD one it is the client's own and the fold's
+  offsets ignore the read -/
+  | read (act : BitVec 64) (i : Nat) (γo : GName) (held : Bool) (off n : Nat)
   /-- a stat of `i` -/
   | stat (act : BitVec 64) (i : Nat)
   /-- an exhaustion verdict (CARRIED) -/
@@ -177,11 +190,12 @@ def fevStep (st : Frows × (GName → Nat)) : Fev → Frows × (GName → Nat)
   | .arm _ i n => (frowsSet st.1 i (some (n, 1)), st.2)
   | .ent _ d nm t => (frowsSet st.1 d (frowEnt nm t (st.1 d)), st.2)
   | .nlink _ i nl => (frowsSet st.1 i (frowNlink nl (st.1 i)), st.2)
-  | .write _ i γo off bs r => (frowsSet st.1 i (frowWrite off bs (st.1 i)), foffSet st.2 γo (off + r))
+  | .write _ i γo held off bs r =>
+    (frowsSet st.1 i (frowWrite off bs (st.1 i)), if held then st.2 else foffSet st.2 γo (off + r))
   | .trunc _ i => (frowsSet st.1 i (frowTrunc (st.1 i)), st.2)
   | .free _ i => (frowsSet st.1 i none, st.2)
-  | .open _ _ γo _ _ => (st.1, foffSet st.2 γo 0)
-  | .read _ _ γo off n => (st.1, foffSet st.2 γo (off + n))
+  | .open _ _ γo held _ => (st.1, if held then st.2 else foffSet st.2 γo 0)
+  | .read _ _ γo held off n => (st.1, if held then st.2 else foffSet st.2 γo (off + n))
   | .hop _ _ _ _ => st
   | .look _ _ _ => st
   | .stat _ _ => st
@@ -240,15 +254,18 @@ def fevIsFile (h : List Fev) (i : Nat) : Bool :=
 the view does not hold the bytes of): the class's `fdir` reading -/
 def fevReadDir (h : List Fev) : Bool :=
   match h.getLast? with
-  | some (.read _ i _ _ _) => !fevIsFile h.dropLast i
+  | some (.read _ i _ _ _ _) => !fevIsFile h.dropLast i
   | _ => false
 
 /-- **THE CITED READ's BYTES**: at most `n` bytes of the file row from the
-read's recorded offset, in the fold before it (`[]` when the cited prefix
-does not end in a read) -/
+FOLD's offset for the read's shadow, in the fold before it (`fevReadBytes`;
+`[]` when the cited prefix does not end in a read).  (NI M3 FS-2a′) DERIVED,
+not recorded: at a parked read the recorded offset IS the fold's
+(`fevOffWf`, the ledger's invariant; the read's receipt carries it,
+`SpecFileread.freadRcptAt`), so the row no longer reads the carried one. -/
 def fevReadOut (h : List Fev) (n : Nat) : List (BitVec 8) :=
   match h.getLast? with
-  | some (.read _ i _ off _) => ((fevContent h.dropLast i).drop off).take n
+  | some (.read _ i γo _ _ _) => fevReadBytes h.dropLast i γo n
   | _ => []
 
 /-- **THE CITED VERDICT**: the cited prefix ends in an out-of-resources
@@ -258,13 +275,19 @@ def fevFullBy (h : List Fev) (a : BitVec 64) : Bool :=
   | some (.full a' _) => a' == a
   | _ => false
 
-theorem fevReadDir_snoc (h : List Fev) (act : BitVec 64) (i : Nat) (γo : GName) (off d : Nat) :
-    fevReadDir (h ++ [.read act i γo off d]) = !fevIsFile h i := by
+theorem fevReadDir_snoc (h : List Fev) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool) (off d : Nat) :
+    fevReadDir (h ++ [.read act i γo hd off d]) = !fevIsFile h i := by
   unfold fevReadDir; simp
 
-theorem fevReadOut_snoc (h : List Fev) (act : BitVec 64) (i : Nat) (γo : GName) (off d n : Nat) :
-    fevReadOut (h ++ [.read act i γo off d]) n = ((fevContent h i).drop off).take n := by
+theorem fevReadOut_snoc (h : List Fev) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool) (off d n : Nat) :
+    fevReadOut (h ++ [.read act i γo hd off d]) n = fevReadBytes h i γo n := by
   unfold fevReadOut; simp
+
+/-- ...at the recorded offset, where it is the fold's -/
+theorem fevReadOut_snoc_at (h : List Fev) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool) (off d n : Nat)
+    (hoff : off = fevOff h γo) :
+    fevReadOut (h ++ [.read act i γo hd off d]) n = ((fevContent h i).drop off).take n := by
+  rw [fevReadOut_snoc, hoff]; rfl
 
 theorem fevFullBy_snoc (h : List Fev) (a : BitVec 64) (why : FsFull) :
     fevFullBy (h ++ [.full a why]) a = true := by
@@ -278,9 +301,13 @@ theorem fevRun_append (h h' : List Fev) : fevRun (h ++ h') = h'.foldl fevStep (f
 theorem fevRun_snoc (h : List Fev) (e : Fev) : fevRun (h ++ [e]) = fevStep (fevRun h) e := by
   rw [fevRun_append]; rfl
 
-/-- an OBSERVATION moves no row -/
+/-- an OBSERVATION moves no row -- and (NI M3 FS-2a′) no TRACKED offset: a
+PARKED install or read is not one (it moves the ledger's offset share,
+`FsLedger.ftopLed_pk*`) -/
 def fevObs : Fev → Prop
-  | .hop _ _ _ _ | .open _ _ _ _ _ | .read _ _ _ _ _ | .stat _ _ | .full _ _ | .look _ _ _ => True
+  | .hop _ _ _ _ | .stat _ _ | .full _ _ | .look _ _ _ => True
+  | .open _ _ _ held _ => held = true
+  | .read _ _ _ held _ _ => held = true
   | _ => False
 
 theorem fevRows_obs (h : List Fev) (e : Fev) (he : fevObs e) : fevRows (h ++ [e]) = fevRows h := by
@@ -295,6 +322,144 @@ theorem fevRun_prefix {h h' : List Fev} (hp : h <+: h') :
     ∃ t, h' = h ++ t ∧ fevRun h' = t.foldl fevStep (fevRun h) := by
   obtain ⟨t, rfl⟩ := hp
   exact ⟨t, rfl, fevRun_append h t⟩
+
+/-! ### The tracked offsets (NI M3 FS-2a′)
+
+The ledger TRACKS the offset of every struct file a PARKED inode install
+opened (`fevPk`: the install `open _ _ γo false _`): it holds a quarter of
+that file's offset shadow at the fold's value (`FsLedger.ftopLed`), so a
+fire at a parked descriptor finds the real offset EQUAL to the fold's at the
+instant it appends its `read`/`write`.  That is `fevOffWf`, the ledger's
+invariant: every parked read's and write's RECORDED offset is the fold's
+offset of the prefix before it.  A HELD descriptor's offset (and a device's,
+which has none) is the client's own datum: its events carry `held = true`,
+the fold's offsets ignore them, and `fevOffWf` says nothing of them. -/
+
+/-- the struct file a PARKED install starts tracking -/
+def fevPkOf : Fev → Option GName
+  | .open _ _ γo false _ => some γo
+  | _ => none
+
+/-- **THE TRACKED OFFSETS**: the shadows of the parked installs, in order -/
+def fevPk (h : List Fev) : List GName := h.filterMap fevPkOf
+
+theorem fevPk_snoc (h : List Fev) (e : Fev) : fevPk (h ++ [e]) = fevPk h ++ (fevPkOf e).toList := by
+  unfold fevPk
+  rw [List.filterMap_append]
+  cases hx : fevPkOf e <;> simp [hx]
+
+/-- an event that moves no tracked offset and starts none: everything but a
+parked install, read or write -- and the era's `boot` (which resets every
+offset; it is only ever the era's first event) -/
+def fevNeutral : Fev → Bool
+  | .boot _ => false
+  | .open _ _ _ false _ => false
+  | .read _ _ _ false _ _ => false
+  | .write _ _ _ false _ _ _ => false
+  | _ => true
+
+theorem fevNeutral_obs (e : Fev) (he : fevObs e) : fevNeutral e = true := by
+  cases e with
+  | «open» a i γo held po =>
+    cases held
+    · exact absurd he (by simp [fevObs])
+    · rfl
+  | read a i γo held off n =>
+    cases held
+    · exact absurd he (by simp [fevObs])
+    · rfl
+  | write => exact absurd he id
+  | boot => exact absurd he id
+  | _ => rfl
+
+theorem fevPk_neutral (h : List Fev) (e : Fev) (hn : fevNeutral e = true) : fevPk (h ++ [e]) = fevPk h := by
+  rw [fevPk_snoc]
+  have : fevPkOf e = none := by
+    cases e with
+    | «open» a i γo held po => cases held <;> simp_all [fevNeutral, fevPkOf]
+    | _ => rfl
+  rw [this]; simp
+
+theorem fevOff_neutral (h : List Fev) (e : Fev) (hn : fevNeutral e = true) (γ : GName) :
+    fevOff (h ++ [e]) γ = fevOff h γ := by
+  unfold fevOff; rw [fevRun_snoc]
+  cases e with
+  | «open» a i γo held po => cases held <;> simp_all [fevNeutral, fevStep]
+  | read a i γo held off n => cases held <;> simp_all [fevNeutral, fevStep]
+  | write a i γo held off bs r => cases held <;> simp_all [fevNeutral, fevStep]
+  | boot => simp [fevNeutral] at hn
+  | _ => rfl
+
+/-- a parked install starts its offset at 0 -/
+theorem fevOff_pkOpen (h : List Fev) (a : BitVec 64) (i : Nat) (γo : GName) (po : Option Nat) (γ : GName) :
+    fevOff (h ++ [.open a i γo false po]) γ = if γ = γo then 0 else fevOff h γ := by
+  unfold fevOff; rw [fevRun_snoc]; simp [fevStep, foffSet]
+
+/-- a parked read advances its offset from the recorded one -/
+theorem fevOff_pkRead (h : List Fev) (a : BitVec 64) (i : Nat) (γo : GName) (off n : Nat) (γ : GName) :
+    fevOff (h ++ [.read a i γo false off n]) γ = if γ = γo then off + n else fevOff h γ := by
+  unfold fevOff; rw [fevRun_snoc]; simp [fevStep, foffSet]
+
+/-- a parked chunk advances its offset from the recorded one -/
+theorem fevOff_pkWrite (h : List Fev) (a : BitVec 64) (i : Nat) (γo : GName) (off : Nat)
+    (bs : List (BitVec 8)) (r : Nat) (γ : GName) :
+    fevOff (h ++ [.write a i γo false off bs r]) γ = if γ = γo then off + r else fevOff h γ := by
+  unfold fevOff; rw [fevRun_snoc]; simp [fevStep, foffSet]
+
+/-- **ONE EVENT's OFFSET CONDITION**: a parked read or write recorded the
+offset the fold held for its shadow -/
+def fevOffOk (h : List Fev) : Fev → Prop
+  | .read _ _ γo false off _ => off = fevOff h γo
+  | .write _ _ γo false off _ _ => off = fevOff h γo
+  | _ => True
+
+/-- **THE RECORDED OFFSETS ARE THE FOLD's** (the ledger's invariant,
+`FsLedger.ftopLed`): every parked read's and write's carried offset is the
+fold's offset of the prefix before it -/
+def fevOffWf (h : List Fev) : Prop := ∀ (k : Nat) (e : Fev), h[k]? = some e → fevOffOk (h.take k) e
+
+theorem fevOffOk_neutral (h : List Fev) (e : Fev) (hn : fevNeutral e = true) : fevOffOk h e := by
+  cases e with
+  | read a i γo held off n => cases held <;> simp_all [fevNeutral, fevOffOk]
+  | write a i γo held off bs r => cases held <;> simp_all [fevNeutral, fevOffOk]
+  | _ => trivial
+
+theorem fevOffWf_nil : fevOffWf [] := fun _ _ h => by simp at h
+
+theorem fevOffWf_snoc (h : List Fev) (e : Fev) : fevOffWf (h ++ [e]) ↔ fevOffWf h ∧ fevOffOk h e := by
+  constructor
+  · intro hw
+    refine ⟨fun k e' hk => ?_, ?_⟩
+    · have hlt : k < h.length := (List.getElem?_eq_some_iff.mp hk).1
+      have h1 := hw k e' (by rw [List.getElem?_append_left hlt]; exact hk)
+      rwa [List.take_append_of_le_length (Nat.le_of_lt hlt)] at h1
+    · have h1 := hw h.length e (by simp)
+      rwa [List.take_left' rfl] at h1
+  · rintro ⟨hw, he⟩ k e' hk
+    by_cases hlt : k < h.length
+    · rw [List.getElem?_append_left hlt] at hk
+      rw [List.take_append_of_le_length (Nat.le_of_lt hlt)]
+      exact hw k e' hk
+    · rw [List.getElem?_append_right (Nat.le_of_not_lt hlt)] at hk
+      have hk0 : k - h.length = 0 := by
+        cases hx : k - h.length with
+        | zero => rfl
+        | succ m => rw [hx] at hk; simp at hk
+      have hkk : k = h.length := by omega
+      subst hkk
+      rw [hk0] at hk
+      simp at hk
+      subst hk
+      rw [List.take_left' rfl]
+      exact he
+
+/-- every prefix of a well-formed ledger is well-formed -/
+theorem fevOffWf_prefix {h h' : List Fev} (hp : h' <+: h) (hw : fevOffWf h) : fevOffWf h' := by
+  obtain ⟨t, rfl⟩ := hp
+  intro k e hk
+  have hlt : k < h'.length := (List.getElem?_eq_some_iff.mp hk).1
+  have h1 := hw k e (by rw [List.getElem?_append_left hlt]; exact hk)
+  rwa [List.take_append_of_le_length (Nat.le_of_lt hlt)] at h1
 
 /-! ### The walk's lookups, followed (NI M3 FS-2b)
 

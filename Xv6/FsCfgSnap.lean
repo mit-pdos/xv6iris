@@ -274,6 +274,8 @@ theorem fsCfgSnap_fs [Icfg] (E : CoPset) (γv : DiskNames) (dk : Nat → BitVec 
       iregBoot -∗
       (icfgReg ↪●MAP (∅ : RegMapF (GName × GName))) -∗
       (icfgLk ↪●MAP (∅ : RegMapF IregArmEnt)) -∗
+      -- (NI M3 private files FS-2a′) the fs ledger's mirror, empty
+      (icfgFev ↪●ML ([] : List Fev)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
       |={E}=> ∃ (γfs : FsNames) (γi : GName),
         iregReg (hlc := hlc) γi γfs S.fssSb.sbInodestart icfgNib ∗ iregBoot ∗
@@ -308,7 +310,7 @@ theorem fsCfgSnap_fs [Icfg] (E : CoPset) (γv : DiskNames) (dk : Nat → BitVec 
     (mem_snapHomeSet cov _ 1).1 (snapPeel_one S Pb cov hb hcovmeta 1 (LawfulSet.mem_singleton.2 rfl))
       |> (mem_fsHomeList cov _ 1).2
   obtain ⟨fch, vroot, hfok, hfvalid⟩ := hb.skLinks
-  iintro Hdisk Hla Hoff HcntR HcntP HmirR HmirP Hep Hboot Hrauth Hlkauth Hclaim
+  iintro Hdisk Hla Hoff HcntR HcntP HmirR HmirP Hep Hboot Hrauth Hlkauth Hfevm Hclaim
   -- 4. THE LINK FAMILY AT `skLinks`' SLACKED ELEMENT
   imod (fsBootAlloc_rootSlack (GF := GF) S.fssInodes fch (ROOTINO : Int) vroot hfok hfvalid)
     with ⟨%gl, %gt, Htopa, Htopf, Hlnk, Hkeep⟩
@@ -321,7 +323,7 @@ theorem fsCfgSnap_fs [Icfg] (E : CoPset) (γv : DiskNames) (dk : Nat → BitVec 
   ihave #Hbrow := fsBytesAt_of γfs (fsHomeList cov S.fssSb.sbLogstart) Pb $$ Hbinv
   -- THE TOP MAP: the kernel's half founds `ftopInv`, the other the application's
   ihave ⟨Htopa, Htopb⟩ := (fsSnapTop_halves γfs.top S.fssInodes).1 $$ Htopa
-  imod (ftopAlloc E γfs S.fssInodes hloc) $$ Htopa Hlkauth [Hfev] with #Hftopi
+  imod (ftopAlloc E γfs S.fssInodes hloc) $$ Htopa Hlkauth [Hfev] Hfevm with #Hftopi
   · unfold fsLedAuth; iexact Hfev
   imod (appInv_alloc γfs S.fssInodes E hdom) $$ Htopb Hclaim with #Henv
   ihave Htopf := BigSepM.bigSepM_mono (m := S.fssInodes)
@@ -428,7 +430,7 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
       (icntBootMap (regionInums nib)) (frzmBootMap (regionInums nib)) γlog S.fssSb.sbInodestart
       (linkBootMap_valid _) (icntBootMap_valid _) (frzmBootMap_valid _))
     with ⟨%I, %g0, %hdev, %hnibq, %hlogq, %histq, Hiref, Hlive, Hlk, Hcnt, Hfrzm, Hboot, Hep,
-      Hisl, -, Hstmp, Hbox, Hrauth, Hlkauth, Hpkey, Hxkey, Hhpn, Htkey, Hckey, Hoffa⟩
+      Hisl, -, Hstmp, Hbox, Hrauth, Hlkauth, Hpkey, Hxkey, Hhpn, Htkey, Hckey, Hoffa, Hfevm⟩
   subst hnibq
   -- 3. the boot splits
   ihave Hlk := link_boot_split (GF := GF) (regionInums I.icfgNib) $$ Hlk
@@ -453,7 +455,7 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
   ihave Hboot := (show ityPending (GF := GF) I.icfgBoot ⊢ iregBoot from .rfl) $$ Hboot
   -- 4-7b. THE FILE SYSTEM
   imod (fsCfgSnap_fs E γv dk ndisk S cov Pb Xexc hlPb hXsub hX1 hagr hok hnibeq hnib32 hcovin
-      hcovmeta) $$ Hdisk Hla Hoff HcntR HcntP HmirR HmirP Hep Hboot Hrauth Hlkauth Hclaim
+      hcovmeta) $$ Hdisk Hla Hoff HcntR HcntP HmirR HmirP Hep Hboot Hrauth Hlkauth Hfevm Hclaim
     with ⟨%γfs, %γi, Hireg, Hboot, Hipool, Hb1, Hauths, Hdty, Hhdr, Hslots, Hbm, Hrem, #Hbinv,
       Hxo, #Henv, Hpoolb⟩
   -- 8. the gname-only mints

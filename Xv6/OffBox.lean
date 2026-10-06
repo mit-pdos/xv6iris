@@ -165,19 +165,19 @@ and the handle `offBox k γ γo` a descriptor carries is what fixes which ghost
 that is. -/
 
 /-- Rocq `off_hdr`. -/
-def offHdr (γo : GName) (k : Nat) (_ : Unit) (ξ : CtxId) : IProp GF := offResident ξ γo k
+def offHdr (γo : GName) (hd : Bool) (k : Nat) (_ : Unit) (ξ : CtxId) : IProp GF := offResident ξ γo hd k
 
 /-- Rocq `off_rest`. -/
 def offRest (_ : Unit) (_ : CtxId) : IProp GF := iprop(emp)
 
-instance offHdr_morph (γo : GName) (k : Nat) (x : Unit) : CtxMorph (offHdr (GF := GF) γo k x) := by
-  unfold offHdr; exact instCtxMorphOffResident γo k
+instance offHdr_morph (γo : GName) (hd : Bool) (k : Nat) (x : Unit) : CtxMorph (offHdr (GF := GF) γo hd k x) := by
+  unfold offHdr; exact instCtxMorphOffResident γo hd k
 
 instance offRest_morph (x : Unit) : CtxMorph (offRest (GF := GF) x) := by
   unfold offRest; exact instCtxMorphConst _
 
-instance offHdr_timeless (γo : GName) (k : Nat) (x : Unit) (ξ : CtxId) :
-    Timeless (offHdr (GF := GF) γo k x ξ) := by
+instance offHdr_timeless (γo : GName) (hd : Bool) (k : Nat) (x : Unit) (ξ : CtxId) :
+    Timeless (offHdr (GF := GF) γo hd k x ξ) := by
   unfold offHdr offResident wordAtN; infer_instance
 
 instance offRest_timeless (x : Unit) (ξ : CtxId) : Timeless (offRest (GF := GF) x ξ) := by
@@ -185,27 +185,28 @@ instance offRest_timeless (x : Unit) (ξ : CtxId) : Timeless (offRest (GF := GF)
 
 /-- The client bundle: Rocq's section arguments `(off_hdr γo) off_rest (λ _,
 emp) emp`. -/
-def offPay (γo : GName) : BoxPay GF Nat Unit where
-  hdr := offHdr γo
+def offPay (γo : GName) (hd : Bool) : BoxPay GF Nat Unit where
+  hdr := offHdr γo hd
   rest := offRest
   q1 := fun _ => iprop(emp)
   q2 := iprop(emp)
 
-instance offPay_ok (γo : GName) : BoxPayOk (offPay (GF := GF) γo) where
-  hdrMorph k x := offHdr_morph γo k x
+instance offPay_ok (γo : GName) (hd : Bool) : BoxPayOk (offPay (GF := GF) γo hd) where
+  hdrMorph k x := offHdr_morph γo hd k x
   restMorph x := offRest_morph x
-  hdrTimeless k x ξ := offHdr_timeless γo k x ξ
+  hdrTimeless k x ξ := offHdr_timeless γo hd k x ξ
   restTimeless x ξ := offRest_timeless x ξ
   q1Timeless _ := by unfold offPay; infer_instance
   q2Timeless := by unfold offPay; infer_instance
 
 /-- THE BOX of file slot `k`, at names `γ` and shadow `γo` (both fresh per
-publish lifetime).  Rocq `off_box`. -/
-def offBox (k : Nat) (γ : BoxNames) (γo : GName) : IProp GF :=
-  isBox (offPay γo) (ndot offBoxN k) γ
+publish lifetime).  Rocq `off_box`.  (NI M3 FS-2a′) At the file's mode
+flag `hd` (`OffMode.held`): a parked box holds the bare half (`offLinkB`). -/
+def offBox (k : Nat) (γ : BoxNames) (γo : GName) (hd : Bool) : IProp GF :=
+  isBox (offPay γo hd) (ndot offBoxN k) γ
 
-instance offBox_persistent (k : Nat) (γ : BoxNames) (γo : GName) :
-    Persistent (offBox (GF := GF) k γ γo) := by
+instance offBox_persistent (k : Nat) (γ : BoxNames) (γo : GName) (hd : Bool) :
+    Persistent (offBox (GF := GF) k γ γo hd) := by
   unfold offBox; infer_instance
 
 /-! ## Registers, per box -/
@@ -580,8 +581,8 @@ visibility-free bytes -- the hook of `offLastClose` (Rocq's inline
 `ctx_word4_pointsto_unfold` + `ctx_pointsto_free` per byte).  The shadow
 half dies with the box: nothing owns a fragment of a closed file's `γo` any
 more, and the next publish mints a fresh name. -/
-theorem offResident_byteMapped (ξ : CtxId) (γo : GName) (k : Nat) :
-    offResident (GF := GF) ξ γo k ⊢
+theorem offResident_byteMapped (ξ : CtxId) (γo : GName) (hd : Bool) (k : Nat) :
+    offResident (GF := GF) ξ γo hd k ⊢
       [∗list] j ∈ List.range 4, byteMapped (aFoff k + BitVec.ofNat 64 j) := by
   unfold offResident wordAtN ctxBytes
   iintro ⟨%v, ⟨%ppn, #Hcl, %⟨hpin, hlt, hram, hal⟩, Hb⟩, -, -⟩
@@ -619,12 +620,12 @@ Proof: `boxAllocAt` (the deposit), `boxRefIncr` (the birth share),
 `offRows_insert_row` at `⟨0, none⟩` -- whose floor the lemma discharges
 itself with `ctxFloor_0`, so what comes out is the next link's premise (item
 31 (a)).  Rocq `off_publish_park`. -/
-theorem offPublishPark (cpu : CPU) (on : OffNames) (i k : Nat) (γ : BoxNames) (γo : GName)
+theorem offPublishPark (cpu : CPU) (on : OffNames) (i k : Nat) (γ : BoxNames) (γo : GName) (hd : Bool)
     (ξ : CtxId) (E : CoPset) (hE : ↑(ndot offBoxN k) ⊆ E) :
     stampsAuth (GF := GF) γ (∅ : StampMap Nat) ∗ (γ.cnt ↪VAR (0 : Nat)) ∗
       (γ.slotd ↪VAR (default : SlotReg Nat Unit)) ∗ (γ.slotp ↪VAR (default : L2Reg Nat)) ∗
-      ownCtx cpu ξ ∗ offResident ξ γo k ∗ offRows on i ξ ⊢
-      |={E}=> (ownCtx cpu ξ ∗ offBox k γ γo ∗
+      ownCtx cpu ξ ∗ offResident ξ γo hd k ∗ offRows on i ξ ⊢
+      |={E}=> (ownCtx cpu ξ ∗ offBox k γ γo hd ∗
         ∃ T0 T : Nat,
           offRegd γ (⟨T0, false, k, none⟩ : SlotReg Nat Unit) ∗ topLb T0 ∗
           offCnt γ 1 ∗
@@ -632,7 +633,7 @@ theorem offPublishPark (cpu : CPU) (on : OffNames) (i k : Nat) (γ : BoxNames) (
           offMember on i γ ∗
           offRows on i ξ) := by
   iintro ⟨Hst, Hc, Hd, Hp, Hrun, Hcell, Hrows⟩
-  imod boxAllocAt (offPay γo) (ndot offBoxN k) γ cpu ξ k E $$ [Hst Hc Hd Hp Hrun Hcell]
+  imod boxAllocAt (offPay γo hd) (ndot offBoxN k) γ cpu ξ k E $$ [Hst Hc Hd Hp Hrun Hcell]
     with ⟨Hrun, ⟨%Tb, #Hbx, Hrd, #Hllb, Hcnt, Hrp⟩⟩
   · iframe Hst Hc Hrun
     isplitl [Hd]
@@ -643,7 +644,7 @@ theorem offPublishPark (cpu : CPU) (on : OffNames) (i k : Nat) (γ : BoxNames) (
     · unfold inArm offPay offHdr offRest
       iexists ()
       iframe Hcell
-  imod boxRefIncr (offPay γo) (ndot offBoxN k) γ (⟨Tb, false, k, none⟩ : SlotReg Nat Unit) 0 E hE rfl
+  imod boxRefIncr (offPay γo hd) (ndot offBoxN k) γ (⟨Tb, false, k, none⟩ : SlotReg Nat Unit) 0 E hE rfl
     $$ [Hbx Hrd Hcnt] with ⟨Hrd, Hcnt, ⟨%T, Href⟩⟩
   · iframe Hbx Hrd Hcnt
   imod offRows_insert_row on i γ 0 ξ $$ [Hrows Hrp] with ⟨Hfold, #Hmem⟩
@@ -666,17 +667,17 @@ theorem offPublishPark (cpu : CPU) (on : OffNames) (i k : Nat) (γ : BoxNames) (
 the cell in hand; the row goes back re-floored at the fold.  Proof:
 `boxCheckout` at `Q := emp`, the row's own floor as `Kp`.  Rocq
 `off_read_checkout`. -/
-theorem offReadCheckout (cpu : CPU) (on : OffNames) (i k : Nat) (γ : BoxNames) (γo : GName)
+theorem offReadCheckout (cpu : CPU) (on : OffNames) (i k : Nat) (γ : BoxNames) (γo : GName) (hd : Bool)
     (ξ : CtxId) (m : StampMap Nat) (Kt Kp : Nat) (E : CoPset)
     (hE : ↑(ndot offBoxN k) ⊆ E) (hKt : maxStamp m ≤ Kt) :
-    offBox (GF := GF) k γ γo ∗ ownCtx cpu ξ ∗ ctxFloor ξ Kt ∗ ctxFloor ξ Kp ∗
+    offBox (GF := GF) k γ γo hd ∗ ownCtx cpu ξ ∗ ctxFloor ξ Kt ∗ ctxFloor ξ Kp ∗
       offMember on i γ ∗ reference γ k m ∗
       -- the row, taken from the inode payload's set: its floor is Kp
       (∃ s : L2Reg Nat, ⌜s.hold = none⌝ ∗ ⌜s.tp ≤ Kp⌝ ∗ offRegp γ s) ⊢
-      |={E}=> (ownCtx cpu ξ ∗ offResident ξ γo k ∗ l2Hold γ k m) := by
+      |={E}=> (ownCtx cpu ξ ∗ offResident ξ γo hd k ∗ l2Hold γ k m) := by
   unfold offBox offRegp
   iintro ⟨#Hbox, Hrun, #Hflt, #Hflp, -, Href, ⟨%s, %hh, %htp, Hrp⟩⟩
-  imod boxCheckout (offPay γo) (ndot offBoxN k) γ cpu ξ k m s Kt Kp E hE hh hKt htp
+  imod boxCheckout (offPay γo hd) (ndot offBoxN k) γ cpu ξ k m s Kt Kp E hE hh hKt htp
     $$ [Hbox Hrun Hflt Hflp Href Hrp] with ⟨Hrun, Hin, Hhold⟩
   · iframe Hbox Hrun Href Hrp
     isplit
@@ -691,9 +692,9 @@ theorem offReadCheckout (cpu : CPU) (on : OffNames) (i k : Nat) (γ : BoxNames) 
 
 /-- The park back, under ip->lock: `boxPark` at `Q := emp`.  Rocq
 `off_read_park`. -/
-theorem offReadPark (cpu : CPU) (k : Nat) (γ : BoxNames) (γo : GName) (ξ : CtxId)
+theorem offReadPark (cpu : CPU) (k : Nat) (γ : BoxNames) (γo : GName) (hd : Bool) (ξ : CtxId)
     (m : StampMap Nat) (E : CoPset) (hE : ↑(ndot offBoxN k) ⊆ E) :
-    offBox (GF := GF) k γ γo ∗ ownCtx cpu ξ ∗ offResident ξ γo k ∗ l2Hold γ k m ⊢
+    offBox (GF := GF) k γ γo hd ∗ ownCtx cpu ξ ∗ offResident ξ γo hd k ∗ l2Hold γ k m ⊢
       |={E}=> (ownCtx cpu ξ ∗
         ∃ (T' : Nat) (q : UFrac),
           ⌜q.frac.val = qsum m⌝ ∗
@@ -702,7 +703,7 @@ theorem offReadPark (cpu : CPU) (k : Nat) (γ : BoxNames) (γo : GName) (ξ : Ct
           topLb T') := by
   unfold offBox offRegp
   iintro ⟨#Hbox, Hrun, Hcell, Hhold⟩
-  imod boxPark (offPay γo) (ndot offBoxN k) γ cpu ξ k m E hE $$ [Hbox Hrun Hcell Hhold]
+  imod boxPark (offPay γo hd) (ndot offBoxN k) γ cpu ξ k m E hE $$ [Hbox Hrun Hcell Hhold]
     with ⟨Hrun, -, ⟨%T', %q, %hq, Hrp, Href, #Hllb⟩⟩
   · iframe Hbox Hrun Hhold
     unfold inArm offPay offHdr offRest
@@ -742,28 +743,28 @@ beside it: refuted by Σ).  What comes out is the free word (deviation 2),
 which the retype to FD_NONE puts in the free row.  Proof:
 `boxWithdrawL1Free` at `Qc := emp`, `Q1 1 = emp`; the hook is
 `offResident_byteMapped`.  Rocq `off_last_close`. -/
-theorem offLastClose (k : Nat) (γ : BoxNames) (γo : GName) (T0 : Nat) (m : StampMap Nat)
+theorem offLastClose (k : Nat) (γ : BoxNames) (γo : GName) (hd : Bool) (T0 : Nat) (m : StampMap Nat)
     (E : CoPset) (hE : ↑(ndot offBoxN k) ⊆ E) (hq : qsum m = 1) :
-    offBox (GF := GF) k γ γo ∗ offRegd γ (⟨T0, false, k, none⟩ : SlotReg Nat Unit) ∗
+    offBox (GF := GF) k γ γo hd ∗ offRegd γ (⟨T0, false, k, none⟩ : SlotReg Nat Unit) ∗
       offCnt γ 1 ∗ reference γ k m ⊢
       |={E}=> (offCnt γ 1 ∗
         [∗list] j ∈ List.range 4, byteMapped (aFoff k + BitVec.ofNat 64 j)) := by
   have hq1 : qsum m = ((1 : Nat) : Rat) := by rw [hq]; rfl
   have hhook : ∀ (x : Unit) (ξb : CtxId),
-      iprop(emp) ∗ (offPay (GF := GF) γo).hdr (⟨T0, false, k, none⟩ : SlotReg Nat Unit).ident x ξb ⊢
+      iprop(emp) ∗ (offPay (GF := GF) γo hd).hdr (⟨T0, false, k, none⟩ : SlotReg Nat Unit).ident x ξb ⊢
         |={E \ ↑(ndot offBoxN k)}=>
           (iprop([∗list] j ∈ List.range 4, byteMapped (GF := GF) (aFoff k + BitVec.ofNat 64 j)) ∗
-            (offPay (GF := GF) γo).q1 1) := by
+            (offPay (GF := GF) γo hd).q1 1) := by
     intro x ξb
     unfold offPay offHdr
     iintro ⟨-, Hcell⟩
     imodintro
     isplitl [Hcell]
-    · iapply offResident_byteMapped ξb γo k $$ Hcell
+    · iapply offResident_byteMapped ξb γo hd k $$ Hcell
     · dsimp only; iempintro
   unfold offBox offRegd offCnt reference
   iintro ⟨#Hbox, Hrd, Hcnt, ⟨%_, %_, HfD, #HllbD⟩⟩
-  imod boxWithdrawL1Free (offPay γo) (ndot offBoxN k) γ (⟨T0, false, k, none⟩ : SlotReg Nat Unit)
+  imod boxWithdrawL1Free (offPay γo hd) (ndot offBoxN k) γ (⟨T0, false, k, none⟩ : SlotReg Nat Unit)
     1 m iprop(emp) iprop([∗list] j ∈ List.range 4, byteMapped (GF := GF) (aFoff k + BitVec.ofNat 64 j))
     E hE rfl hq1 hhook $$ [Hbox Hrd Hcnt HfD HllbD] with ⟨Hcnt, Hfree, -⟩
   · iframe Hbox Hrd Hcnt HfD

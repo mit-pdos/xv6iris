@@ -71,7 +71,7 @@ theorem ig_ciwf_update (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
-  [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx] [OffboxG GF]
 
 set_option maxHeartbeats 8000000 in
 /-- THE HIT's GHOST MOVES AND ITS STORE's ACCESSOR (Rocq 2098--2380;

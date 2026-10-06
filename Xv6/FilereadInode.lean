@@ -135,9 +135,9 @@ def frdK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat
 
 /-- The fd's off box, CHECKED OUT (what `protoReadCheckout` hands out beside
 the cell and `protoReadPark` takes back). -/
-def frdOut (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (m : StampMap Nat) (T0 Tr : Nat) :
-    IProp GF := iprop%
-  offBox fk γb γo ∗ offMember offCfg ik γb ∗ l2Hold γb fk m ∗
+def frdOut (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (om : OffMode) (m : StampMap Nat)
+    (T0 Tr : Nat) : IProp GF := iprop%
+  offBox fk γb γo (om == .held) ∗ offMember offCfg ik γb ∗ l2Hold γb fk m ∗
   (γb.slotd ↪VAR{.own q.half} (⟨T0, false, fk, none⟩ : SlotReg Nat Unit)) ∗
   (γb.cnt ↪VAR{.own q.half} (1 : Nat)) ∗ offRowsDepBut offCfg ik γb Tr
 
@@ -145,11 +145,11 @@ set_option maxHeartbeats 8000000 in
 /-- **AFTER ILOCK** (Rocq's peel of the read arm and `proto_read_checkout`):
 the reader's quarter opened into readi's pieces and the era fragment's
 quarter, the fd's `f->off` checked out of its box. -/
-theorem frd_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo : GName)
+theorem frd_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (om : OffMode)
     (C : FContent) (m : StampMap Nat) (K : Nat) (s : Qp) (g : GName) (lo : Nat) (inum : BitVec 32)
     (dn : Dinode) (bm : Blkmap) (hip : C.ip = ientry ik) (hik : ik < NINODE)
     (hK : maxStamp m ≤ K) :
-    ownCtx cpu curCtx ∗ ctxFloor curCtx K ∗ offFdAt (GF := GF) fk q γb γo C m ∗
+    ownCtx cpu curCtx ∗ ctxFloor curCtx K ∗ offFdAt (GF := GF) fk q γb γo om C m ∗
       offRows offCfg ik curCtx ∗
       icDepHeld fscFs fscIreg fscCov fscLogst (.depRd s icfgDev inum g lo) ik inum dn bm ⊢
       |={⊤}=> ownCtx cpu curCtx ∗
@@ -159,7 +159,7 @@ theorem frd_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo :
           inodeBlocksQ fscFs (DFrac.own Qp.quarter) bm data ∗
           topFragQ (fsGammaL fscFs) (DFrac.own Qp.quarter) inum.toNat (eraNode dn bm data) ∗
           wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) v ∗
-          offLink (hlc := hlc) γo (v.toNat : Int) ∗ frdOut ik fk q γb γo m T0 Tr) := by
+          offLinkB (hlc := hlc) (om == .held) γo (v.toNat : Int) ∗ frdOut ik fk q γb γo om m T0 Tr) := by
   iintro ⟨Hrun, #Hflr, Hat, Hrows, Hheld⟩
   unfold icDepHeld
   simp only [icDepRd, ↓reduceIte]
@@ -168,7 +168,7 @@ theorem frd_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo :
   have hs := nodeShapeOk_ofInodeOk fscCov fscLogst dn bm data hok
   icases inodeRdEra_eraNodeTo fscFs (DFrac.own Qp.quarter) inum dn bm data hs hloc $$ Hq
     with ⟨Hind, Hblk, Htop⟩
-  imod protoReadCheckout cpu ⊤ ik fk q γb γo C m K curCtx CoPset.subseteq_top hip hik hK
+  imod protoReadCheckout cpu ⊤ ik fk q γb γo om C m K curCtx CoPset.subseteq_top hip hik hK
     $$ [Hrun Hflr Hat Hrows] with ⟨Hrun, Hres, #Hbox, #Hmem, ⟨%T0, Hhold, Hd, Hc, ⟨%Tr, Hrest⟩⟩⟩
   · iframe Hrun Hat Hrows; iexact Hflr
   unfold offResident
@@ -202,15 +202,17 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
       foffRow (GF := GF) (.open true wb (.inode inum.toNat γo om)) ∗
       areadInOm (hlc := hlc) om (fsGammaL fscFs) appE inum.toNat γo F ∗
       topFragQ (fsGammaL fscFs) (DFrac.own Qp.quarter) inum.toNat (eraNode dn bm data) ∗
-      offLink (hlc := hlc) γo (v.toNat : Int) ∗
+      offLinkB (hlc := hlc) (om == .held) γo (v.toNat : Int) ∗
       wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (filerwOffW v dd) ∗
-      frdOut (GF := GF) ik fk q γb γo m T0 Tr ∗
+      frdOut (GF := GF) ik fk q γb γo om m T0 Tr ∗
       inodeMeta (ientry ik) dn ∗ inodeMapQ fscFs (DFrac.own Qp.quarter) (ientry ik) bm ∗
       inodeBlocksQ fscFs (DFrac.own Qp.quarter) bm data ⊢
-      |={⊤}=> ownCtx cpu curCtx ∗ offFd fk q γb γo C ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
+      |={⊤}=> ownCtx cpu curCtx ∗ offFd fk q γb γo om C ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
         icDepHeld fscFs fscIreg fscCov fscLogst (.depRd s icfgDev inum g lo) ik inum dn bm ∗
         -- (NI M3 private files FS-1) the read's event, at the row it read
-        fsObsAt fscFs (.read act inum.toNat γo v.toNat dd) inum.toNat (absRow (eraNode dn bm data)) ∗
+        -- (FS-2a′) at a parked row, the offset the fold's
+        fsObsAtP fscFs (.read act inum.toNat γo (om == .held) v.toNat dd) inum.toNat
+          (absRow (eraNode dn bm data)) (fun h => om = .parked → v.toNat = fevOff h γo) ∗
         ∃ av : Aview, ⌜arowAt av inum.toNat (absRow (eraNode dn bm data))⌝ ∗
           F.pfRecv av v.toNat (absRow (eraNode dn bm data)) dd := by
   have hw : (filerwOffW v dd).toNat = v.toNat + dd :=
@@ -228,12 +230,12 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
   imod (arfRead_fire_om om fscFs ⊤ (DFrac.own Qp.quarter) F inum.toNat γo v.toNat dd true wb
     (eraNode dn bm data) hE hwf hsz hnz act) $$ Hft Hrow Hcm Htop Hgv with ⟨Htop, Hgv, #Hrc, Hav⟩
   -- CHECK IN the cell: the half came back at exactly its word
-  ihave Hres := offResident_of curCtx γo fk (filerwOffW v dd) hwf' $$ [Hcell] [Hgv]
+  ihave Hres := offResident_of curCtx γo (om == .held) fk (filerwOffW v dd) hwf' $$ [Hcell] [Hgv]
   · rw [wordAtN_cur]; unfold aFoff; iexact Hcell
   · rw [hw]; iexact Hgv
   unfold frdOut
   icases Hout with ⟨#Hbox, #Hmem, Hhold, Hd, Hc, Hrest⟩
-  imod protoReadPark cpu ⊤ ik fk q γb γo C m T0 Tr curCtx CoPset.subseteq_top hip hik hq
+  imod protoReadPark cpu ⊤ ik fk q γb γo om C m T0 Tr curCtx CoPset.subseteq_top hip hik hq
     $$ [Hrun Hres Hhold Hd Hc Hrest] with ⟨Hrun, Hoffd, Hrows⟩
   · iframe Hrun Hres Hhold Hd Hc Hrest Hbox Hmem
   -- THE READER'S QUARTER, RE-CLOSED
@@ -245,7 +247,7 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
   iframe Hrun Hoffd Hrows Hav
   isplitl [Hmeta Haddrs Hq]
   rotate_left
-  · iapply fsObsRcpt_at _ _ _ _ hnz $$ Hrc
+  · iapply fsObsRcptP_at _ _ _ _ _ hnz $$ Hrc
   unfold icDepHeld
   simp only [icDepRd, ↓reduceIte]
   unfold icRdHeld

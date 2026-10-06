@@ -95,7 +95,7 @@ theorem iput_ofl_mask_ftop (z : Nat) :
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [OffboxG GF]
 
 /-- THE DEPOSIT (Rocq's `ireg_free_deposit_au` through `lw_au_rec`): the
 region's type-0 write of the corpse, filling the escrow and retiring the

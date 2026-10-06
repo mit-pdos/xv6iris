@@ -174,7 +174,7 @@ with a nonzero count is LIVE by `FsAbsMknodFire.mkfEra_live` (Rocq's
 
 section OpenFire
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [FsTopG GF] [FsBytesG GF]
+  [FsTopG GF] [FsBytesG GF] [OffboxG GF]
 
 /-! ## 1.  Item 1: the walk premise -/
 
@@ -303,7 +303,7 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     iapply (appStep_at i I _ n' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I i n') %hdelta Ha
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HΦ⟩
-  imod ftopLed_moveAt γfs I i n n' [.trunc act i] hlk
+  imod ftopLed_moveAt γfs I i n n' [.trunc act i] hlk rfl
     (fun h ht => fevTie_trunc act bs0 nl ht hlk hnz habs hnz' habs') $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I i n', A

@@ -80,7 +80,7 @@ theorem IgRegs.set [Icfg] {k : KCtx} {inum : BitVec 32} {R : RegMap} (h : IgRegs
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
-  [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx] [OffboxG GF]
 
 /-- The contract's continuation (`wp_iget_body`'s last conjunct). -/
 def igPost (cpu : CPU) (k : KCtx) (inum : BitVec 32) (l : Ilic) : IProp GF :=

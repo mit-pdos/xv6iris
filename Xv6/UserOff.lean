@@ -50,6 +50,13 @@ the Rocq tree's `claude-notes/design/user-read.md` sections 2 and 4, and
    `[MachGS hlc GF]` where an invariant is named.
 3. Rocq's curried statements are `⊢ A -∗ B -∗ C`.
 
+5. **(NI M3 private files FS-2a′, sanctioned move.)**  The parked user
+   side is a QUARTER (`OffGv.offUserInv`), the fs ledger holding the other
+   (`FsLedger.ftopLed`); `off_pub_park` starts from the three quarters open's
+   install leaves; `offSupply_parked` is gone (the parked advance is the
+   three-party move inside the ledger's opening); `uoff_park` drops a
+   quarter.  The held shapes (`uoff`, `uoff_advance`, `off_pub_hand`,
+   `offSupply`, `offSupply_taint`) are unchanged.
 4. **LANE K6-C (Rocq 5c48aa727, bb7d140b3, 4919630d6).**  `offSupply`'s
    input is `offRet` and its output the box's arm `offLink`; the parked
    supplier passes the taint through, and `offSupply_taint` is the
@@ -157,11 +164,15 @@ section UserOffSupply
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF]
 
 /-- THE ONE-WAY DOOR (Rocq's `uoff_park`).  There is no converse:
-`offUserInv` is persistent. -/
+`offUserInv` is persistent.  (NI M3 FS-2a′) The invariant holds a QUARTER,
+so one quarter of the held half is dropped: the door yields the row's
+invariant, NOT a parked row (`FdTable.foffRow`'s parked arm also names the
+ledger's registration of the shadow, which only open's install makes). -/
 theorem uoff_park (E : CoPset) (γo : GName) (off : Nat) :
     ⊢@{IProp GF} uoff γo off ={E}=∗ offUserInv (hlc := hlc) γo := by
   unfold uoff
   iintro H
+  icases (offGv_quarters γo _).1 $$ H with ⟨H, -⟩
   iapply offUserInv_alloc E γo _ $$ H
 
 /-- `offSupply γo E off d R` (Rocq's `off_supply`): "the kernel's half goes
@@ -181,24 +192,13 @@ arm of it -- permanently. -/
 def offSupply (γo : GName) (E : CoPset) (off d : Nat) (R : IProp GF) : IProp GF :=
   iprop(offRet (hlc := hlc) γo off d ={E}=∗ offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗ R)
 
-/-- SUPPLIER 1 -- PARKED (Rocq's `off_supply_parked`): the generic-safety
-path.  The mask must contain `foffN`; every fire has that from `↑ftopN ∪
-↑appN ⊆ E`, since `foffN` sits under `appN`.  A node lent the taint hands
-the taint back, and the taint is the box's arm. -/
-theorem offSupply_parked (E : CoPset) (γo : GName) (off d : Nat) (hE : (↑foffN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} offUserInv (hlc := hlc) γo -∗ offSupply γo E off d iprop(True) := by
-  unfold offSupply offRet offLink
-  iintro #Hinv ⟨%v, Hk, -⟩
-  icases Hk with (Hk | #Ht)
-  · imod offUserInv_move E γo _ ((off + d : Nat) : Int) hE $$ Hinv Hk with Hk
-    imodintro
-    isplitl [Hk]
-    · ileft; iexact Hk
-    · ipureintro; trivial
-  · imodintro
-    isplitl []
-    · iright; iexact Ht
-    · ipureintro; trivial
+/- (NI M3 FS-2a′) SUPPLIER 1 -- PARKED (Rocq's `off_supply_parked`) IS GONE
+FROM THIS FILE: a parked file's shadow is ½ kernel / ¼ ledger / ¼ user, so
+the parked advance needs the fs ledger's quarter too, and runs INSIDE the
+ledger's opening (`OffGv.offUserInv_move`, `FsLedger.ftopLed_pkAdv`, the
+parked fires `FsAbsReadFire.arfRead_fire_pk` / `FsAbsWriteFire.wrfFire_corePk`).
+A parked fire lends its commit nothing (`areadCommitPk`), so it never meets
+the taint. -/
 
 /-- SUPPLIER 0 -- THE TAINT (Rocq's `off_supply_taint`), and this is the
 DISCONNECT: the kernel drops the half rather than moving it, and the box
@@ -213,11 +213,14 @@ theorem offSupply_taint (E : CoPset) (γo : GName) (off d : Nat) :
   · ipureintro; trivial
 
 /-- THE PUBLISH, MODE PARK (Rocq's `off_pub_park`): what sys_open's publish
-does, and what the generic tier must keep doing. -/
+does, and what the generic tier must keep doing.  (NI M3 FS-2a′) From THREE
+QUARTERS: open's install has already handed the fs ledger its quarter
+(`FsLedger.ftopLed_pkOpen`); the kernel's half goes to the box, the last
+quarter into the row's invariant. -/
 theorem off_pub_park (E : CoPset) (γo : GName) (z : Int) :
-    ⊢@{IProp GF} offGv γo 1 z ={E}=∗ offGv γo (1 : Qp).half z ∗ offUserInv (hlc := hlc) γo := by
-  iintro H
-  icases (offGv_halves γo z).1 $$ H with ⟨Hk, Hu⟩
+    ⊢@{IProp GF} offGv γo (1 : Qp).half z ∗ offGv γo (1 : Qp).half.half z ={E}=∗
+      offGv γo (1 : Qp).half z ∗ offUserInv (hlc := hlc) γo := by
+  iintro ⟨Hk, Hu⟩
   imod offUserInv_alloc E γo z $$ Hu with #Hinv
   imodintro
   iframe Hk Hinv

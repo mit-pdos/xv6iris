@@ -314,8 +314,8 @@ theorem frd_pay_carve (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (r w :
         ⌜C.ip = ientry ik ∧ ik < NINODE ∧ inum.toNat < 16 * icfgNib ∧ lo ≤ tl ∧
           i = inum.toNat ∧ C.type = FD_INODE⌝ ∗
         credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗
-        offFd fk q γb γo C ∗
-        (inodeShrGenlo ik s icfgDev inum g lo -∗ offFd fk q γb γo C -∗
+        offFd fk q γb γo om C ∗
+        (inodeShrGenlo ik s icfgDev inum g lo -∗ offFd fk q γb γo om C -∗
           filePaySt γ fk q C (.open r w (.inode i γo om))) := by
   unfold filePaySt fileCore
   iintro ⟨%pn, %hok, Htok, Hnoff, Hoff⟩
@@ -327,6 +327,7 @@ theorem frd_pay_carve (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (r w :
   icases Hnoff with ⟨#Hci, Hown, Hside, ⟨%ik, %lo, %tl, %hv, %hk, %hnib, %hle, #Hfl, Hshr⟩,
     ⟨%ty, #Hshot, %hnd, %hdv⟩⟩
   subst hg
+  subst hom
   iexists ik, pn.inum, qpMul q pn.iq, pn.ig, ty, lo, tl, pn.obox
   isplitr
   · ipureintro; exact ⟨hv, hk, hnib, hle, hi, hty⟩
@@ -335,7 +336,7 @@ theorem frd_pay_carve (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (r w :
   iexists pn
   iframe Htok
   isplitr
-  · ipureintro; exact ⟨hrd, hw, hty, hi, rfl, hom⟩
+  · ipureintro; exact ⟨hrd, hw, hty, hi, rfl, rfl⟩
   isplitl [Hci Hown Hside Hshr]
   · iapply (fileCoreNoff_inode q pn C hin).2
     unfold inodePay inodeShrHeldGen

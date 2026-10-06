@@ -7681,6 +7681,136 @@ file and write on a writable inode descriptor at a lazy-free key whose buffer is
 key holding its path argument, mkdir at a lazy-free key}. FS-2a′ (the offset tie), FS-3/4 (the footprint) absorb
 the recorded-as-given data.
 
+### M3 private files FS-2a′ as landed (2026-10-06)
+
+On `lane/pfiles` (the coordinator's ruling (C) of 2026-10-06, option (A)). The fs ledger now DERIVES the file
+offsets: it holds a quarter of every parked file's offset shadow at the fold's offset, so at every parked read
+and write the real `f->off` the call used is the fold's offset of the prefix before it. No kernel change; the
+fourteen roots' statements, `SYSCALL`/`USERTRAP`/`USERRET`/`USER`, `SyscRows`, `NiStep` and every `Uk*`/`User*`
+file but `UserOff.lean` byte-identical (the user tier compiles unchanged; the held shapes it uses -- `uoff`,
+`offLink`, `areadCommitAdv`, `awriteChainAdv`, `areadInOm .held`, `filewriteInHeld`, `writeArmsAt`, `readArms`,
+`offSupply_taint` -- are untouched).
+
+**The share scheme.** A PARKED file's shadow `γo` is ½ kernel (the off box: `offResident`'s arm is now
+`OffGv.offLinkB hd γo z := if hd then offLink γo z else offGv γo ½ z`, so a parked box holds the BARE half and the
+taint is held-only) / ¼ row (`OffGv.offUserInv γo := inv foffN (∃ z, offGv γo ¼ z)`) / ¼ LEDGER. A HELD file's is
+½ box (`offLink`) / ½ program (`uoff`), unchanged. `offBox`/`offResident`/`offHdr`/`offPay` take the mode flag
+`hd : Bool` (`OffMode` sits above `OffBox`), `offFd`/`offFdAt` take `om : OffMode` (`fileCoreOff` passes `pn.om`).
+
+    def ftopLed [Icfg] (γfs : FsNames) (I : RegMapF FsNode) : IProp GF :=
+      iprop(∃ h : List Fev, fsLedAuth γfs h ∗ (icfgFev ↪●ML h) ∗
+        ⌜fevTie h I ∧ fevOffWf h ∧ (fevPk h).Nodup⌝ ∗ fevShares h)
+    def fevShares (h : List Fev) : IProp GF :=
+      [∗list] γ ∈ fevPk h, offGv γ (1 : Qp).half.half ((fevOff h γ : Nat) : Int)
+
+`O` is DERIVED from the fold, not carried: `NiFs.fevPk h` = the shadows of the parked installs
+(`Fev.open _ _ γo false _`), duplicate-free (the install holds the WHOLE fresh shadow, which refutes a quarter
+already in the ledger, `fevShares_whole`). The quarter is minted at open's install (`FsLedger.ftopLed_pkOpen`,
+through `FsWalkLed.ftopPkOpenAfterAt` and `SysOpenStores.sys_open_install`: `fevOff (h ++ [open … false …]) γo = 0`)
+and NEVER returned: after the last close (`FilePay.fileOffReclaim` → `offLastClose`, the box's half dropped) the
+quarter stays in the ledger at the file's last fold offset, unmovable (no box, no fire), as harmless as the row's
+invariant. The fire finds the quarter through the REGISTRATION WITNESS `FsLedger.fevPkWit γo := ∃ L, icfgFev ↪◯ML L
+∗ ⌜γo ∈ fevPk L⌝`, carried by the parked row: `FdTable.foffRow (.open _ _ (.inode _ γo .parked)) := offUserInv γo ∗
+fevPkWit γo`. `icfgFev` is a NEW `Icfg` field (last), a MIRROR of the ledger the authority keeps equal to it:
+the rows cannot name the ledger's own `Fscfg` name (`fdFrags` is stated in contexts with no `Fscfg`).
+`IcacheRefDefs.icfgAlloc` mints it empty; `FsCfgSnap` threads it to `InodeRegionInv.ftopAlloc` (+ premise).
+
+**The ledger's lemmas.** `ftopLed_step`/`ftopLed_moveAt` take `hneu : evs.all fevNeutral = true` (neutral = not a
+parked install/read/write, not `boot`; every literal call site passes `rfl`; `iregTopRetag_gen/_ev/_armed_gen`,
+`FsAbsCreateFire.cafRetag/cafArmedRetag` + the premise); `fevObs` now admits `open`/`read` only at `held = true`;
+`ftopLed_pkOpen` (the parked install); `ftopLed_pkAdv` (the parked advance: witness → the quarter; with the
+kernel's half at `off`, `OffGv.offUserInv_move` (three-party: ½ + ¼ ledger + ¼ row, agreement, move) gives
+`off = fevOff h γo`, the event appended, all three shares at `off + d`); `ftopLed_lb_wf` and
+`InodeRegionInv.ftopInv_lb_wf` (every lower bound of the ledger is well-formed).
+
+**`fevOffWf` (NiFs, TCB), exactly:**
+
+    def fevOffOk (h : List Fev) : Fev → Prop
+      | .read _ _ γo false off _ => off = fevOff h γo
+      | .write _ _ γo false off _ _ => off = fevOff h γo
+      | _ => True
+    def fevOffWf (h : List Fev) : Prop := ∀ (k : Nat) (e : Fev), h[k]? = some e → fevOffOk (h.take k) e
+
+with `fevOffWf_nil`, `fevOffWf_snoc` (`↔ fevOffWf h ∧ fevOffOk h e`), `fevOffWf_prefix` (prefix-closed),
+`fevOffOk_neutral`. It is the ledger's invariant (`ftopLed`'s pure part). FORM LANDED: the rows read the DERIVED
+offset -- `NiFs.fevReadOut h n` now reads `fevReadBytes h.dropLast i γo n` (the fold's offset), so
+`UsysDet.usysReadBytes`/`usysReadAns` (text unchanged) state the derived bytes; the read's receipt carries the tie
+for its own prefix (`SpecFileread.freadRcptAt`: `fsObsAtP γfs (.read act i γo (om == .held) off d) i a (fun h =>
+om = .parked → off = fevOff h γo)`), and the read citation (`SyscallArmsFd2.syscArmRead_ev`) uses it at the
+class's parked row (`syscFdKey_of_rdIno_pk`, `NiFs.fevReadOut_snoc_at`). Why: the theorem's read row is then a
+function of the fold alone -- FS-4 needs no well-formedness hypothesis for reads. For writes and for any other
+prefix FS-3/4 read it as `fevOffWf (ι.fev)` off the citation's receipt through `ftopInv_lb_wf` (an in-logic step
+at the write arm when FS-4 cites the chunks), or -- the `zevWf` precedent -- as `∀ k, fevOffWf (niHist F k).fev`
+transferred to every citation by `fevOffWf_prefix` through `niBelowQ`'s `ι.fev <+: H.fev`. Not threaded into
+`niOk`/`niR_pure` in this lane.
+
+**Deviations (each forced).** (1) **`Fev.read`/`Fev.write` carry `held : Bool`** (after `γo`), and the fold's
+offsets IGNORE held events (`fevStep`: `if held then st.2 else foffSet …`; `open` likewise): a held fire's event at
+a tracked shadow would otherwise move the fold's offset with no share to move (a held box may hold only the taint),
+and uniqueness of an install per shadow across modes is not provable (a held install leaves nothing in the
+ledger). A DEVICE install is appended `held = true` (`(omo == .held) || isDevice`: no shadow, so the ledger tracks
+none; `usysOpenRow` ignores `held` at a device row; `sys_open_led_at` + `hhd`). (2) **The parked commits are lent
+NOTHING**: `areadCommitPk`, `awriteFullPk`/`awritePartPk`/`awriteChainPkAt`/`awriteChainPk` (+ `_0/_S/_of/
+_unit`), so a client cannot take the kernel's half (were it lent `offLink`, the client could hand back the taint
+and the parked box could not re-form); `areadInOm .parked`, `filewriteIn`/`filewriteInInodeOm` at `.parked` name
+them; the posts are keyed on the mode: `readArmsPk`/`readPostFailPk`/`readArmsOm` (+ `readArmsOm_of` past the
+sign guard), `writePostOkPk`/`writePostFailPk`/`writeArmsPk`/`writePostOkOm`/`writePostFailOm`/`writeArmsOm`
+(+ `_ok/_fail`), `SpecFileread.filereadExtraCore` and `SpecFilewrite.filewriteExtra` split by mode
+(`filewriteExtra_inode`); the generic dispatcher's units `FsAbsInvFire.fsabsAreadPk`/`fsabsAwriteChainPk`;
+`FilewriteChain.fwrRawPk` (+ five moves), `fwrSt .parked := (offUserInv γo ∗ fevPkWit γo) ∗ fwrRawPk …`, `fwrSt
+.held`'s second arm `killCred ∗ fwrRaw …` (`fwrSupply`/`fwrSupply_off` deleted). (3) The registration witness and
+the `Icfg` mirror (above). (4) The `OffboxG` binder (the shares) reached 47 files binder-only, among them the Spec
+interfaces `SpecWritei.WRITEI`, `SpecItrunc.ITRUNC`, `SpecIalloc`, `SpecIget`, `SpecIgetroot`, `SpecIdup`,
+`SpecIupdate`, `SpecDirlookup` (an instance binder; their Proof files' anonymous constructors gained one `_`:
+`ProofItrunc`, `ProofIalloc`, `ProofWritei`, `ProofIget`, `ProofIdup`); none in the user tier.
+
+**The fires (statements moved).** Read: `FsAbsReadFire.arfRead_fire_pk` (new, verbatim below),
+`arfRead_fire` deleted, `arfRead_fire_gen`/`_adv` append `held = true`, `arfRead_fire_om` at
+`offLinkB (om == .held)` with receipt `fsObsRcptP … (.read act i γo (om == .held) off d) … (fun h => om = .parked →
+off = fevOff h γo)`. Write: `FsAbsWriteFire.wrfFire_corePk`/`wrfAwrite_fire_pk`/`wrfApart_fire_pk` (new),
+`wrfFire_core` and the `_gen`/`_adv` fires append `held = true`; `FilewriteChain.fwrSt_fire_full/_part` at
+`offLinkB (om == .held)` and `[.write act i γo (om == .held) off bs r]`; `FilewriteFire.fwr_fire/fwrOut/
+fwr_pre_ghost/fwr_post_ghost`, `FilereadInode.frdOut/frd_pre_ghost/frd_post_ghost`, `FileOffProto.protoRead*`,
+`FilePay.offFd_split/offFdAt_qsum`, `FilereadParts.frd_pay_carve`, `FilewriteParts.fwr_pay_carve`,
+`FilewriteTail.fwr_extra_of` (now `writeArmsOm`), `FilewriteArms.fwr_in_zero` (now `writePostOkOm`) +`om`;
+`SpecFilewrite.fwRcptAt`, `FsLedger.fwChunks` + `(om == .held)`; the install `SysOpenParts.sysOpenOffPost`
+(new; `sysOpenPubBody` takes it), `sys_open_deposit` + `om`, `sys_open_publish` at `offFd … omo C`,
+`SysOpenPub.sys_open_pub_off` (from `sysOpenOffPost`). `UserOff`: `off_pub_park` now
+`offGv γo ½ z ∗ offGv γo ¼ z ={E}=∗ offGv γo ½ z ∗ offUserInv γo`, `uoff_park` drops a quarter, `offSupply_parked`
+deleted; `OffGv.offUserInv` a quarter, `offUserInv_alloc` from a quarter, `offUserInv_move` three-party.
+
+    theorem arfRead_fire_pk [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
+        (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (i : Nat) (γo : GName)
+        (off d : Nat) (n : FsNode)
+        (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
+        (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) (act : BitVec 64) :
+        ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ offUserInv (hlc := hlc) γo -∗ fevPkWit γo -∗
+          pfAt (areadCommitPk (fsGammaL γfs) appE i) F -∗
+          topFragQ (fsGammaL γfs) dq i n -∗
+          offGv γo (1 : Qp).half (off : Int) ={E}=∗
+            topFragQ (fsGammaL γfs) dq i n ∗
+            offGv γo (1 : Qp).half ((off + d : Nat) : Int) ∗
+            fsObsRcptP γfs (.read act i γo false off d) i n (fun h => off = fevOff h γo) ∗
+            ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d
+
+**The class.** `UsysDet.fdRdIno`/`fdWrIno` match only `.inode _ _ .parked` (texts of `usysDetClassAtF`,
+`NiInClass` unchanged); honest scope 16 and scope 1 (`NiTrace`): the offsets are DERIVED; a held descriptor's
+offset is its program's own datum (`uoff`), its events appended `held`, and held descriptors stay OUT of the
+class. `FsFull.max` stays a carried verdict (of the offset and the size).
+
+**Baselines.** `tools/tcb/expected.json` unchanged (`tcb.sh` passes: no module enters or leaves any root's set;
+definitions moved inside the TCB: `NiFs` (`Fev`, `fevStep`, `fevObs`, `fevReadOut`, + `fevPk`, `fevNeutral`,
+`fevOffOk`, `fevOffWf`), `UsysDet.fdRdIno/fdWrIno`, `OffGv.offUserInv` (+ `offLinkB`), `IcacheRefDefs.Icfg`
+(+ `icfgFev`) -- the latter two in the non-NI `xv6PowerAdequacy`/`xv6FsAdequacy_*` sets, no module added).
+`tools/audit/baseline.json` unchanged (14 PASS; no axiom or opaque). `dead_allow.txt`: `fevOff`/`fevReadBytes`
+off (reached through `fevReadOut`); + `fevOffWf_prefix`, `ftopLed_lb_wf`, `ftopInv_lb_wf` ("FS-3/4 reaches": the
+export FS-4 reads).
+
+The class: {exit, getpid, uptime, wait at a null status pointer or a lazy-free key, fork, sbrk, the console write at a
+lazy-free key on a writable console descriptor, pause, close, dup, read on a readable PARKED inode descriptor of a
+regular file and write on a writable PARKED inode descriptor at a lazy-free key whose buffer is mapped, chdir and
+open at a lazy-free key holding its path argument, mkdir at a lazy-free key}. FS-3/4 read `fevOffWf` as above.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

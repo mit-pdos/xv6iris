@@ -133,7 +133,7 @@ theorem mkfParent_row (dn dn' : Dinode) (bm bm' : Blkmap) (data data' : Nat → 
 
 section MknodFire
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [FsTopG GF] [FsBytesG GF]
+  [FsTopG GF] [FsBytesG GF] [OffboxG GF]
 
 /-- THE READ-ONLY FIRE, at create's dirlookup(found) under the parent's lock
 (Rocq's `mkf_dlookup_fire`).  The row comes off the FIRING FUNCTION's own
@@ -343,7 +343,7 @@ theorem cafMade_row (ty major minor : BitVec 16) (bm : Blkmap) (data : Nat → L
 
 section CreateFire2
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [FsTopG GF] [FsBytesG GF] [Appcfg GF]
+  [FsTopG GF] [FsBytesG GF] [Appcfg GF] [OffboxG GF]
 
 /-- THE SUCCESS FIRE, FUSED WITH THE PARENT-ROW RETAG (Rocq's
 `caf_acre_fire`), at the armed child `cf d i`.  Replaces the `iregTopRetag_*`
@@ -414,7 +414,7 @@ theorem cafAcre_fire_nm [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat �
   obtain ⟨⟨hnzp, habsp⟩, -⟩ := (absOf_some_iff np _).1 (Xv6.absOf_dir np hdir hnl)
   obtain ⟨⟨hnzp', habsp'2⟩, -⟩ := (absOf_some_iff np' _).1 habsp'
   imod ftopLed_moveAt γfs I d np np' [.ent act d nm (some i), .nlink act d (fnNlink np + acreBump (cf d i))]
-    hlkp (fun h ht => fevTie_entNlink act nm (some i) (dirEntries np) (fnNlink np) _ ht hlkp hnzp habsp
+    hlkp rfl (fun h ht => fevTie_entNlink act nm (some i) (dirEntries np) (fnNlink np) _ ht hlkp hnzp habsp
       hnzp' habsp'2) $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I d np', A

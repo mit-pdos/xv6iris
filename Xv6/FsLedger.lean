@@ -34,11 +34,24 @@ a statement's cone.
    `fsReadyKmem.pend` is keyed the same way (an `Fscfg` name).  The camera
    is `Xv6G.mlFevG` (as `Xv6G.mlKevG`).  `NiEvid.niNamesHere`'s seventh entry
    is `fscFs.fev`.
+2. (NI M3 private files FS-2a′) **THE TRACKED OFFSETS.**  `ftopLed` also
+   holds a QUARTER of every parked file's offset shadow at the fold's
+   offset (`fevShares`, over `NiFs.fevPk`), keeps the recorded offsets the
+   fold's (`NiFs.fevOffWf`) and the tracked shadows distinct, and keeps a
+   MIRROR of the ledger at the `Icfg` name `icfgFev` (the descriptor rows
+   cannot name the `Fscfg` ledger: `FdTable.foffRow`'s parked arm carries a
+   mirror lower bound naming the install, `fevPkWit`).  Neutral appends
+   (`ftopLed_step`, `fevNeutral`) leave the shares; a parked install mints
+   one from the whole fresh shadow (`ftopLed_pkOpen`); a parked read or
+   write moves the three shares together and records the agreed offset
+   (`ftopLed_pkAdv`).  Every lower bound is well-formed (`ftopLed_lb_wf`).
 -/
 import Xv6.NiFs
 import Xv6.FsAbsDefs
 import Xv6.FsBlocks
 import Xv6.UartTrace
+import Xv6.OffGv
+import Xv6.IcacheRefDefs
 
 namespace Xv6
 
@@ -149,10 +162,19 @@ theorem fevRows_nlink (h : List Fev) (a : BitVec 64) (i nl : Nat) :
     fevRows (h ++ [.nlink a i nl]) = frowsSet (fevRows h) i (frowNlink nl (fevRows h i)) := by
   rw [fevRows_snoc]; rfl
 
-theorem fevRows_write (h : List Fev) (a : BitVec 64) (i : Nat) (γo : GName) (off : Nat)
+theorem fevRows_write (h : List Fev) (a : BitVec 64) (i : Nat) (γo : GName) (hd : Bool) (off : Nat)
     (bs : List (BitVec 8)) (r : Nat) :
-    fevRows (h ++ [.write a i γo off bs r]) = frowsSet (fevRows h) i (frowWrite off bs (fevRows h i)) := by
+    fevRows (h ++ [.write a i γo hd off bs r]) = frowsSet (fevRows h) i (frowWrite off bs (fevRows h i)) := by
   rw [fevRows_snoc]; rfl
+
+/-- (NI M3 FS-2a′) an install and a read move no row, at either mode -/
+theorem fevTie_open {h : List Fev} {I : RegMapF FsNode} (a : BitVec 64) (i : Nat) (γo : GName) (hd : Bool)
+    (po : Option Nat) (ht : fevTie h I) : fevTie (h ++ [.open a i γo hd po]) I := by
+  unfold fevTie at *; rw [fevRows_snoc]; exact ht
+
+theorem fevTie_read {h : List Fev} {I : RegMapF FsNode} (a : BitVec 64) (i : Nat) (γo : GName) (hd : Bool)
+    (off d : Nat) (ht : fevTie h I) : fevTie (h ++ [.read a i γo hd off d]) I := by
+  unfold fevTie at *; rw [fevRows_snoc]; exact ht
 
 theorem fevRows_trunc (h : List Fev) (a : BitVec 64) (i : Nat) :
     fevRows (h ++ [.trunc a i]) = frowsSet (fevRows h) i (frowTrunc (fevRows h i)) := by
@@ -179,11 +201,11 @@ theorem ftopRow_absRow (n : FsNode) (hnz : fnType n ≠ 0) (c : Absnode) (nl : N
   rw [ftopRow_typed n hnz, habs]
 
 /-- a chunk written at `off` -/
-theorem fevTie_write (γo : GName) (off : Nat) (bs bs0 : List (BitVec 8)) (nl r : Nat)
+theorem fevTie_write (γo : GName) (hd : Bool) (off : Nat) (bs bs0 : List (BitVec 8)) (nl r : Nat)
     (ht : fevTie h I) (hi : PartialMap.get? I i = some n)
     (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.AFile bs0, nl⟩)
     (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile (blkSplice off bs bs0), nl⟩) :
-    fevTie (h ++ [.write a i γo off bs r]) (PartialMap.insert I i n') := by
+    fevTie (h ++ [.write a i γo hd off bs r]) (PartialMap.insert I i n') := by
   apply fevTie_move i n' _ ht
   rw [fevRows_write, fevTie_row i n ht hi, ftopRow_absRow n hnz _ _ habs,
     ftopRow_absRow n' hnz' _ _ habs']
@@ -262,7 +284,7 @@ end Moves
 /-! ## §2 The resource -/
 
 section Res
-variable {GF : BundledGFunctors} [Xv6G GF]
+variable {GF : BundledGFunctors} [Xv6G GF] [OffboxG GF]
 
 /-- the ledger's authority (it lives in `InodeRegionInv.ftopBody`) -/
 def fsLedAuth (γfs : FsNames) (h : List Fev) : IProp GF := γfs.fev ↪●ML h
@@ -313,6 +335,42 @@ instance fsObsAt_persistent (γfs : FsNames) (e : Fev) (i : Nat) (a : Anode) :
     Persistent (fsObsAt (GF := GF) γfs e i a) := by
   unfold fsObsAt; infer_instance
 
+/-- (NI M3 private files FS-2a′) **AN OBSERVATION's RECEIPT WITH A FACT ON ITS
+PREFIX**: `fsObsRcpt` whose prefix also satisfies `Φ` -- a parked read's
+receipt names its offset as the prefix's fold offset (`off = fevOff h γo`) -/
+def fsObsRcptP (γfs : FsNames) (e : Fev) (i : Nat) (n : FsNode) (Φ : List Fev → Prop) : IProp GF :=
+  iprop(∃ h : List Fev, ⌜fevRows h i = ftopRow n ∧ Φ h⌝ ∗ fsEvRcpt γfs h e)
+
+instance fsObsRcptP_persistent (γfs : FsNames) (e : Fev) (i : Nat) (n : FsNode) (Φ : List Fev → Prop) :
+    Persistent (fsObsRcptP (GF := GF) γfs e i n Φ) := by
+  unfold fsObsRcptP; infer_instance
+
+/-- ...at the abstract row -/
+def fsObsAtP (γfs : FsNames) (e : Fev) (i : Nat) (a : Anode) (Φ : List Fev → Prop) : IProp GF :=
+  iprop(∃ h, ⌜fevRows h i = some (fnodeOf a.anNode, a.anNlink) ∧ Φ h⌝ ∗ fsEvRcpt γfs h e)
+
+instance fsObsAtP_persistent (γfs : FsNames) (e : Fev) (i : Nat) (a : Anode) (Φ : List Fev → Prop) :
+    Persistent (fsObsAtP (GF := GF) γfs e i a Φ) := by
+  unfold fsObsAtP; infer_instance
+
+theorem fsObsRcptP_at (γfs : FsNames) (e : Fev) (i : Nat) (n : FsNode) (Φ : List Fev → Prop)
+    (hnz : fnType n ≠ 0) :
+    fsObsRcptP (GF := GF) γfs e i n Φ ⊢ fsObsAtP γfs e i (absRow n) Φ := by
+  unfold fsObsRcptP fsObsAtP
+  iintro ⟨%h, %⟨hr, hΦ⟩, Hr⟩
+  iexists h
+  iframe Hr
+  ipureintro; refine ⟨?_, hΦ⟩; rw [hr, ftopRow_typed n hnz]
+
+/-- a fact-free receipt carries the trivial fact -/
+theorem fsObsRcptP_of (γfs : FsNames) (e : Fev) (i : Nat) (n : FsNode) (Φ : List Fev → Prop)
+    (hΦ : ∀ h, Φ h) : fsObsRcpt (GF := GF) γfs e i n ⊢ fsObsRcptP γfs e i n Φ := by
+  unfold fsObsRcpt fsObsRcptP
+  iintro ⟨%h, %hr, Hr⟩
+  iexists h
+  iframe Hr
+  ipureintro; exact ⟨hr, hΦ h⟩
+
 theorem fsObsRcpt_at (γfs : FsNames) (e : Fev) (i : Nat) (n : FsNode) (hnz : fnType n ≠ 0) :
     fsObsRcpt (GF := GF) γfs e i n ⊢ fsObsAt γfs e i (absRow n) := by
   unfold fsObsRcpt fsObsAt
@@ -352,27 +410,164 @@ theorem fsEvRcpt_of_lb (γfs : FsNames) (h t : List Fev) (e : Fev) :
   apply fsLedLb_prefix
   exact ⟨t, by simp⟩
 
-/-- (NI M3 private files FS-1) **THE LEDGER BESIDE THE MAP**: the era's
-fs-event history, whose fold is the map's typed rows. -/
-def ftopLed (γfs : FsNames) (I : RegMapF FsNode) : IProp GF :=
-  iprop(∃ h : List Fev, fsLedAuth γfs h ∗ ⌜fevTie h I⌝)
+/-! ### The tracked offsets' shares (NI M3 private files FS-2a′)
 
-instance ftopLed_timeless (γfs : FsNames) (I : RegMapF FsNode) : Timeless (ftopLed (GF := GF) γfs I) := by
-  unfold ftopLed; infer_instance
+A PARKED file's offset shadow is split ½ kernel (its off box) / ¼ user (the
+row's invariant, `OffGv.offUserInv`) / ¼ LEDGER: the ledger holds, for every
+shadow a parked install opened (`NiFs.fevPk`), a quarter at the FOLD's
+offset.  So the fire that appends a parked `read`/`write` -- holding the
+kernel's half at the real offset, inside the ledger's opening -- finds the
+real offset EQUAL to the fold's (agreement), records it, and moves all three
+shares to the advanced offset (`OffGv.offUserInv_move`): the recorded
+offsets ARE the fold's (`NiFs.fevOffWf`, kept as the ledger's invariant).
+The quarter is minted by the install (`ftopLed_pkOpen`, from the WHOLE
+fresh shadow, which also refutes a second install of one shadow) and never
+returned: after the last close the box is gone and nothing moves it.
 
-/-- **THE STEP**: a map move whose events keep the tie appends them; the
-receipt is the prefix the events followed and the lower bound past them. -/
-theorem ftopLed_step (γfs : FsNames) (I I' : RegMapF FsNode) (evs : List Fev)
+The membership a fire needs (`γo ∈ fevPk h`) is witnessed by a lower bound
+of the ledger's MIRROR at the `Icfg` name `icfgFev` (`fevPkWit`, carried by
+the parked descriptor row `FdTable.foffRow`), which the ledger authority
+keeps equal to the ledger. -/
+
+/-- the ledger's quarters of the tracked shadows, at the fold's offsets -/
+def fevShares (h : List Fev) : IProp GF :=
+  [∗list] γ ∈ fevPk h, offGv γ (1 : Qp).half.half ((fevOff h γ : Nat) : Int)
+
+instance fevShares_timeless (h : List Fev) : Timeless (fevShares (GF := GF) h) := by
+  unfold fevShares; infer_instance
+
+/-- **THE REGISTRATION WITNESS**: shadow `γo` was opened by a parked install
+(a lower bound of the ledger's mirror naming it) -/
+def fevPkWit [Icfg] (γo : GName) : IProp GF :=
+  iprop(∃ L : List Fev, (icfgFev ↪◯ML L) ∗ ⌜γo ∈ fevPk L⌝)
+
+instance fevPkWit_persistent [Icfg] (γo : GName) : Persistent (fevPkWit (GF := GF) γo) := by
+  unfold fevPkWit; infer_instance
+
+theorem fevPk_prefix_mem {L h : List Fev} (hp : L <+: h) {γo : GName} (hm : γo ∈ fevPk L) :
+    γo ∈ fevPk h := by
+  obtain ⟨t, rfl⟩ := hp
+  unfold fevPk at hm ⊢
+  rw [List.filterMap_append]
+  exact List.mem_append_left _ hm
+
+theorem fevPk_neutrals (h evs : List Fev) (hn : evs.all fevNeutral = true) :
+    fevPk (h ++ evs) = fevPk h := by
+  induction evs generalizing h with
+  | nil => simp
+  | cons e es ih =>
+    simp only [List.all_cons, Bool.and_eq_true] at hn
+    rw [show h ++ e :: es = (h ++ [e]) ++ es by simp, ih _ hn.2, fevPk_neutral h e hn.1]
+
+theorem fevOff_neutrals (h evs : List Fev) (hn : evs.all fevNeutral = true) (γ : GName) :
+    fevOff (h ++ evs) γ = fevOff h γ := by
+  induction evs generalizing h with
+  | nil => simp
+  | cons e es ih =>
+    simp only [List.all_cons, Bool.and_eq_true] at hn
+    rw [show h ++ e :: es = (h ++ [e]) ++ es by simp, ih _ hn.2, fevOff_neutral h e hn.1]
+
+theorem fevOffWf_neutrals (h evs : List Fev) (hn : evs.all fevNeutral = true) (hw : fevOffWf h) :
+    fevOffWf (h ++ evs) := by
+  induction evs generalizing h with
+  | nil => simpa using hw
+  | cons e es ih =>
+    simp only [List.all_cons, Bool.and_eq_true] at hn
+    rw [show h ++ e :: es = (h ++ [e]) ++ es by simp]
+    exact ih _ hn.2 ((fevOffWf_snoc h e).2 ⟨hw, fevOffOk_neutral h e hn.1⟩)
+
+/-- a neutral block leaves the shares as they are -/
+theorem fevShares_neutrals (h evs : List Fev) (hn : evs.all fevNeutral = true) :
+    fevShares (GF := GF) h ⊢ fevShares (h ++ evs) := by
+  unfold fevShares
+  rw [fevPk_neutrals h evs hn]
+  refine BigSepL.bigSepL_mono fun {_ γ} _ => ?_
+  rw [fevOff_neutrals h evs hn γ]
+
+/-- **ONE SHARE OUT, ANOTHER VALUE BACK**: over a duplicate-free list, the
+quarter at `γo` comes out at `f γo`, and the list goes back at `g`, which
+agrees with `f` everywhere else -/
+theorem fevShares_upd (L : List GName) (f g : GName → Nat) (γo : GName) (hm : γo ∈ L) (hnd : L.Nodup)
+    (hfg : ∀ γ, γ ≠ γo → f γ = g γ) :
+    ([∗list] γ ∈ L, offGv (GF := GF) γ (1 : Qp).half.half ((f γ : Nat) : Int)) ⊢
+      offGv γo (1 : Qp).half.half ((f γo : Nat) : Int) ∗
+      (offGv γo (1 : Qp).half.half ((g γo : Nat) : Int) -∗
+        [∗list] γ ∈ L, offGv γ (1 : Qp).half.half ((g γ : Nat) : Int)) := by
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.mp hm
+  have hilt : i < L.length := (List.getElem?_eq_some_iff.mp hi).1
+  have hne : ∀ {k : Nat} {γ : GName}, L[k]? = some γ → k ≠ i → γ ≠ γo := by
+    intro k γ hk hki heq
+    subst heq
+    exact hki ((List.getElem?_inj hilt hnd).mp (hi.trans hk.symm)).symm
+  refine (BigSepL.bigSepL_delete_cond hi).1.trans (sep_mono_right ?_)
+  iintro Hrest Hg
+  iapply (BigSepL.bigSepL_delete_cond hi).2
+  iframe Hg
+  iapply (BigSepL.bigSepL_mono (fun {k γ} hk => ?_)) $$ Hrest
+  by_cases hki : k = i
+  · rw [if_pos hki, if_pos hki]
+  · rw [if_neg hki, if_neg hki, hfg γ (hne hk hki)]
+
+/-- the ledger's quarter at `γo` refutes a WHOLE shadow at `γo` -/
+theorem fevShares_whole (h : List Fev) (γo : GName) (z : Int) (hm : γo ∈ fevPk h) :
+    ⊢@{IProp GF} fevShares h -∗ offGv γo 1 z -∗ False := by
+  unfold fevShares
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.mp hm
+  iintro Hs Hw
+  icases (BigSepL.bigSepL_lookup_acc hi).1 $$ Hs with ⟨Hq, -⟩
+  iapply offGv_whole_excl γo _ z _ $$ Hw Hq
+
+/-- (NI M3 private files FS-1, FS-2a′) **THE LEDGER BESIDE THE MAP**: the
+era's fs-event history, whose fold is the map's typed rows; (FS-2a′) its
+MIRROR at `icfgFev`, kept equal to it; the recorded offsets ARE the fold's
+(`fevOffWf`); and the ledger's quarter of every tracked shadow, at the
+fold's offset. -/
+def ftopLed [Icfg] (γfs : FsNames) (I : RegMapF FsNode) : IProp GF :=
+  iprop(∃ h : List Fev, fsLedAuth γfs h ∗ (icfgFev ↪●ML h) ∗
+    ⌜fevTie h I ∧ fevOffWf h ∧ (fevPk h).Nodup⌝ ∗ fevShares h)
+
+instance ftopLed_timeless [Icfg] (γfs : FsNames) (I : RegMapF FsNode) : Timeless (ftopLed (GF := GF) γfs I) := by
+  unfold ftopLed fsLedAuth; infer_instance
+
+/-- **THE ERA's FIRST EVENT**: the empty ledger and its empty mirror take the
+era's recovered rows (`ftopAlloc`) -/
+theorem ftopLed_boot [Icfg] (γfs : FsNames) (I : RegMapF FsNode) :
+    ⊢@{IProp GF} fsLedAuth γfs [] -∗ (icfgFev ↪●ML ([] : List Fev)) ==∗ ftopLed γfs I := by
+  iintro Ha Hm
+  imod fsLed_append γfs [] [.boot (ftopRows I)] $$ Ha with ⟨Ha, -⟩
+  imod (MonoList.auth_own_update_app icfgFev [.boot (ftopRows I)]) $$ Hm with ⟨Hm, -⟩
+  imodintro
+  unfold ftopLed
+  iexists [] ++ [.boot (ftopRows I)]
+  iframe Ha Hm
+  isplitr
+  · ipureintro
+    refine ⟨?_, (fevOffWf_snoc [] _).2 ⟨fevOffWf_nil, trivial⟩, by simp [fevPk, fevPkOf]⟩
+    unfold fevTie fevRows fevRun; rfl
+  · unfold fevShares
+    simp only [List.nil_append, fevPk, List.filterMap_cons, fevPkOf, List.filterMap_nil]
+    iapply BigSepL.bigSepL_nil.2
+    iempintro
+
+/-- **THE STEP**: a map move whose events keep the tie appends them -- at
+NEUTRAL events (no parked install, read or write: those move the shares,
+`ftopLed_pkOpen` / `ftopLed_pkAdv`); the receipt is the prefix the events
+followed and the lower bound past them. -/
+theorem ftopLed_step [Icfg] (γfs : FsNames) (I I' : RegMapF FsNode) (evs : List Fev)
+    (hneu : evs.all fevNeutral = true)
     (hstep : ∀ h, fevTie h I → fevTie (h ++ evs) I') :
     ftopLed (GF := GF) γfs I ⊢ |==> (ftopLed γfs I' ∗ ∃ h : List Fev, ⌜fevTie h I⌝ ∗ fsLedLb γfs (h ++ evs)) := by
   unfold ftopLed
-  iintro ⟨%h, Ha, %ht⟩
+  iintro ⟨%h, Ha, Hm, %⟨ht, hw, hnd⟩, Hs⟩
   imod fsLed_append γfs h evs $$ Ha with ⟨Ha, #Hlb⟩
+  imod (MonoList.auth_own_update_app icfgFev evs) $$ Hm with ⟨Hm, -⟩
+  ihave Hs := fevShares_neutrals h evs hneu $$ Hs
   imodintro
-  isplitl [Ha]
+  isplitl [Ha Hm Hs]
   · iexists h ++ evs
-    iframe Ha
-    ipureintro; exact hstep h ht
+    iframe Ha Hm Hs
+    ipureintro
+    exact ⟨hstep h ht, fevOffWf_neutrals h evs hneu hw, by rw [fevPk_neutrals h evs hneu]; exact hnd⟩
   · iexists h
     iframe Hlb
     ipureintro; exact ht
@@ -390,39 +585,59 @@ theorem fsLedAuth_lb_valid (γfs : FsNames) (h L : List Fev) :
   ihave %hv := MonoList.auth_lb_own_valid (GF := GF) γfs.fev (DFrac.own 1) h L $$ Ha HL
   ipureintro; exact hv.2
 
+/-- (NI M3 FS-2a′) **EVERY LOWER BOUND OF THE LEDGER IS WELL-FORMED**: the
+recorded offsets of any prefix a receipt names are the fold's
+(`fevOffWf` is prefix-closed) -/
+theorem ftopLed_lb_wf [Icfg] (γfs : FsNames) (I : RegMapF FsNode) (L : List Fev) :
+    ⊢@{IProp GF} fsLedLb γfs L -∗ ftopLed γfs I -∗ ⌜fevOffWf L⌝ ∗ ftopLed γfs I := by
+  iintro #HL Hl
+  unfold ftopLed
+  icases Hl with ⟨%h, Ha, Hm, %⟨ht, hw, hnd⟩, Hs⟩
+  ihave %hv := fsLedAuth_lb_valid γfs h L $$ Ha HL
+  isplitr
+  · ipureintro; exact fevOffWf_prefix hv hw
+  iexists h
+  iframe Ha Hm Hs
+  ipureintro; exact ⟨ht, hw, hnd⟩
+
 /-- (NI M3 FS-2b) **AN OBSERVATION APPENDED AFTER A LOWER BOUND THE CALLER
 HOLDS**: the authority is checked against `L` (`MonoList.auth_lb_own_valid`),
 so the event lands past it -- what makes a back-pointer into `L` point
 strictly earlier. -/
-theorem ftopLed_obsAfter (γfs : FsNames) (I : RegMapF FsNode) (e : Fev) (he : fevObs e) (L : List Fev) :
+theorem ftopLed_obsAfter [Icfg] (γfs : FsNames) (I : RegMapF FsNode) (e : Fev) (he : fevObs e) (L : List Fev) :
     ⊢@{IProp GF} fsLedLb γfs L -∗ ftopLed γfs I ==∗
       ftopLed γfs I ∗ ∃ h : List Fev, ⌜fevTie h I ∧ L <+: h⌝ ∗ fsLedLb γfs (h ++ [e]) := by
   iintro #HL Hl
   unfold ftopLed
-  icases Hl with ⟨%h, Ha, %ht⟩
+  icases Hl with ⟨%h, Ha, Hm, %⟨ht, hw, hnd⟩, Hs⟩
   ihave %hv := fsLedAuth_lb_valid γfs h L $$ Ha HL
+  have hn : [e].all fevNeutral = true := by simp [fevNeutral_obs e he]
   imod fsLed_append γfs h [e] $$ Ha with ⟨Ha, #Hlb⟩
+  imod (MonoList.auth_own_update_app icfgFev [e]) $$ Hm with ⟨Hm, -⟩
+  ihave Hs := fevShares_neutrals h [e] hn $$ Hs
   imodintro
-  isplitl [Ha]
+  isplitl [Ha Hm Hs]
   · iexists h ++ [e]
-    iframe Ha
-    ipureintro; exact fevTie_obs e he ht
+    iframe Ha Hm Hs
+    ipureintro
+    exact ⟨fevTie_obs e he ht, fevOffWf_neutrals h [e] hn hw, by rw [fevPk_neutrals h [e] hn]; exact hnd⟩
   · iexists h
     iframe Hlb
     ipureintro; exact ⟨ht, hv⟩
 
 /-- an observation appended -/
-theorem ftopLed_obs (γfs : FsNames) (I : RegMapF FsNode) (e : Fev) (he : fevObs e) :
+theorem ftopLed_obs [Icfg] (γfs : FsNames) (I : RegMapF FsNode) (e : Fev) (he : fevObs e) :
     ftopLed (GF := GF) γfs I ⊢ |==> (ftopLed γfs I ∗ ∃ h : List Fev, ⌜fevTie h I⌝ ∗ fsEvRcpt γfs h e) := by
   iintro Hl
-  imod ftopLed_step γfs I I [e] (fun h ht => fevTie_obs e he ht) $$ Hl with ⟨Hl, Hr⟩
+  imod ftopLed_step γfs I I [e] (by simp [fevNeutral_obs e he]) (fun h ht => fevTie_obs e he ht) $$ Hl
+    with ⟨Hl, Hr⟩
   imodintro
   iframe Hl
   unfold fsEvRcpt
   iexact Hr
 
 /-- an observation at row `i`, the record the observer holds -/
-theorem ftopLed_obsAt (γfs : FsNames) (I : RegMapF FsNode) (e : Fev) (he : fevObs e) (i : Nat)
+theorem ftopLed_obsAt [Icfg] (γfs : FsNames) (I : RegMapF FsNode) (e : Fev) (he : fevObs e) (i : Nat)
     (n : FsNode) (hi : PartialMap.get? I i = some n) :
     ftopLed (GF := GF) γfs I ⊢ |==> (ftopLed γfs I ∗ fsObsRcpt γfs e i n) := by
   iintro Hl
@@ -435,13 +650,13 @@ theorem ftopLed_obsAt (γfs : FsNames) (I : RegMapF FsNode) (e : Fev) (he : fevO
   ipureintro; exact fevTie_row i n ht hi
 
 /-- a move at row `i` from record `n`, its receipt out -/
-theorem ftopLed_moveAt (γfs : FsNames) (I : RegMapF FsNode) (i : Nat) (n n' : FsNode) (evs : List Fev)
-    (hi : PartialMap.get? I i = some n)
+theorem ftopLed_moveAt [Icfg] (γfs : FsNames) (I : RegMapF FsNode) (i : Nat) (n n' : FsNode) (evs : List Fev)
+    (hi : PartialMap.get? I i = some n) (hneu : evs.all fevNeutral = true)
     (hstep : ∀ h, fevTie h I → fevTie (h ++ evs) (PartialMap.insert I i n')) :
     ftopLed (GF := GF) γfs I ⊢
       |==> (ftopLed γfs (PartialMap.insert I i n') ∗ fsMoveRcpt γfs evs i n) := by
   iintro Hl
-  imod ftopLed_step γfs I _ evs hstep $$ Hl with ⟨Hl, ⟨%h, %ht, #Hr⟩⟩
+  imod ftopLed_step γfs I _ evs hneu hstep $$ Hl with ⟨Hl, ⟨%h, %ht, #Hr⟩⟩
   imodintro
   iframe Hl
   unfold fsMoveRcpt
@@ -450,7 +665,7 @@ theorem ftopLed_moveAt (γfs : FsNames) (I : RegMapF FsNode) (i : Nat) (n n' : F
   ipureintro; exact fevTie_row i n ht hi
 
 /-- an exhaustion verdict recorded at its instant -/
-theorem ftopLed_full (γfs : FsNames) (I : RegMapF FsNode) (act : BitVec 64) (why : FsFull) :
+theorem ftopLed_full [Icfg] (γfs : FsNames) (I : RegMapF FsNode) (act : BitVec 64) (why : FsFull) :
     ftopLed (GF := GF) γfs I ⊢ |==> (ftopLed γfs I ∗ fsFullRcpt γfs act why) := by
   iintro Hl
   imod ftopLed_obs γfs I (.full act why) trivial $$ Hl with ⟨Hl, ⟨%h, -, #Hr⟩⟩
@@ -459,6 +674,119 @@ theorem ftopLed_full (γfs : FsNames) (I : RegMapF FsNode) (act : BitVec 64) (wh
   unfold fsFullRcpt
   iexists h
   iexact Hr
+
+/-- (NI M3 FS-2a′) **THE PARKED INSTALL**: a parked open's install appended
+after a lower bound the caller holds, the WHOLE fresh shadow at offset 0 in
+hand (which refutes a second install of one shadow: the ledger would hold a
+quarter of it).  The ledger keeps a quarter; the kernel's half and the
+row's quarter come back, with the registration witness. -/
+theorem ftopLed_pkOpen [Icfg] (γfs : FsNames) (I : RegMapF FsNode) (a : BitVec 64) (i : Nat)
+    (γo : GName) (po : Option Nat) (L : List Fev) :
+    ⊢@{IProp GF} fsLedLb γfs L -∗ offGv γo 1 0 -∗ ftopLed γfs I ==∗
+      ftopLed γfs I ∗ offGv γo (1 : Qp).half 0 ∗ offGv γo (1 : Qp).half.half 0 ∗ fevPkWit γo ∗
+      ∃ h : List Fev, ⌜fevTie h I ∧ L <+: h⌝ ∗ fsLedLb γfs (h ++ [.open a i γo false po]) := by
+  iintro #HL Hw Hl
+  unfold ftopLed
+  icases Hl with ⟨%h, Ha, Hm, %⟨ht, hw, hnd⟩, Hs⟩
+  ihave %hv := fsLedAuth_lb_valid γfs h L $$ Ha HL
+  by_cases hm : γo ∈ fevPk h
+  · iexfalso
+    iapply fevShares_whole h γo 0 hm $$ Hs Hw
+  icases (offGv_whole3 γo 0).1 $$ Hw with ⟨Hk, Hq, Hu⟩
+  have hpk : fevPk (h ++ [.open a i γo false po]) = fevPk h ++ [γo] := by
+    rw [fevPk_snoc]; rfl
+  imod fsLed_append γfs h [.open a i γo false po] $$ Ha with ⟨Ha, #Hlb⟩
+  imod (MonoList.auth_own_update_app icfgFev [.open a i γo false po]) $$ Hm with ⟨Hm, #Hmb⟩
+  imodintro
+  iframe Hk Hu
+  isplitl [Ha Hm Hs Hq]
+  · iexists h ++ [.open a i γo false po]
+    iframe Ha Hm
+    isplitr
+    · ipureintro
+      refine ⟨fevTie_open a i γo false po ht, (fevOffWf_snoc h _).2 ⟨hw, trivial⟩, ?_⟩
+      rw [hpk, List.nodup_append]
+      exact ⟨hnd, by simp, fun x hx y hy => by
+        simp at hy; subst hy; intro e; subst e; exact hm hx⟩
+    · unfold fevShares
+      rw [hpk]
+      iapply BigSepL.bigSepL_snoc.2
+      isplitl [Hs]
+      · iapply (BigSepL.bigSepL_mono (fun {k γ} hk => ?_)) $$ Hs
+        have hne : γ ≠ γo := fun e => hm (e ▸ List.mem_of_getElem? hk)
+        rw [fevOff_pkOpen, if_neg hne]
+      · rw [fevOff_pkOpen, if_pos rfl]
+        iexact Hq
+  isplitr
+  · unfold fevPkWit
+    iexists h ++ [.open a i γo false po]
+    iframe Hmb
+    ipureintro; rw [hpk]; simp
+  iexists h
+  iframe Hlb
+  ipureintro; exact ⟨ht, hv⟩
+
+/-- (NI M3 FS-2a′) **THE PARKED ADVANCE**: a parked read or write of `γo`
+at the offset `off` the kernel's half holds, advancing it by `d` -- inside
+the ledger's opening, the registration witness finds the ledger's quarter,
+which AGREES with the kernel's half (`off` is the fold's offset); the event
+is appended, and all three shares (the kernel's half, the ledger's quarter,
+the row's quarter in its invariant) move to `off + d`. -/
+theorem ftopLed_pkAdv [Icfg] {hlc : HasLC} [MachGS hlc GF] (E : CoPset) (hE : (↑foffN : CoPset) ⊆ E)
+    (γfs : FsNames) (I I' : RegMapF FsNode) (γo : GName) (off d : Nat) (e : Fev)
+    (hpk : fevPkOf e = none)
+    (hoff : ∀ h γ, fevOff (h ++ [e]) γ = if γ = γo then off + d else fevOff h γ)
+    (hok : ∀ h, off = fevOff h γo → fevOffOk h e)
+    (hstep : ∀ h, fevTie h I → fevTie (h ++ [e]) I') :
+    ⊢@{IProp GF} fevPkWit γo -∗ offUserInv (hlc := hlc) γo -∗ offGv γo (1 : Qp).half (off : Int) -∗
+      ftopLed γfs I ={E}=∗
+      ftopLed γfs I' ∗ offGv γo (1 : Qp).half ((off + d : Nat) : Int) ∗
+      ∃ h : List Fev, ⌜fevTie h I ∧ off = fevOff h γo⌝ ∗ fsLedLb γfs (h ++ [e]) := by
+  iintro #Hwit #Hinv Hk Hl
+  unfold ftopLed
+  icases Hl with ⟨%h, Ha, Hm, %⟨ht, hw, hnd⟩, Hs⟩
+  unfold fevPkWit
+  icases Hwit with ⟨%L, #HmL, %hmL⟩
+  ihave %hv := MonoList.auth_lb_own_valid (GF := GF) icfgFev (DFrac.own 1) h L $$ Hm HmL
+  have hm : γo ∈ fevPk h := fevPk_prefix_mem hv.2 hmL
+  have hpk' : fevPk (h ++ [e]) = fevPk h := by rw [fevPk_snoc, hpk]; simp
+  unfold fevShares
+  icases fevShares_upd (fevPk h) (fevOff h) (fevOff (h ++ [e])) γo hm hnd
+    (fun γ hne => by rw [hoff, if_neg hne]) $$ Hs with ⟨Hq, Hback⟩
+  imod offUserInv_move E γo (off : Int) ((fevOff h γo : Nat) : Int) ((off + d : Nat) : Int) hE $$
+    Hinv Hk Hq with ⟨%heq, Hk, Hq⟩
+  have hoff0 : off = fevOff h γo := by exact_mod_cast heq.symm
+  imod fsLed_append γfs h [e] $$ Ha with ⟨Ha, #Hlb⟩
+  imod (MonoList.auth_own_update_app icfgFev [e]) $$ Hm with ⟨Hm, -⟩
+  imodintro
+  iframe Hk
+  isplitl [Ha Hm Hq Hback]
+  · iexists h ++ [e]
+    iframe Ha Hm
+    isplitr
+    · ipureintro
+      exact ⟨hstep h ht, (fevOffWf_snoc h e).2 ⟨hw, hok h hoff0⟩, by rw [hpk']; exact hnd⟩
+    · rw [hpk']
+      iapply Hback
+      rw [hoff, if_pos rfl]
+      iexact Hq
+  iexists h
+  iframe Hlb
+  ipureintro; exact ⟨ht, hoff0⟩
+
+/-- (NI M3 FS-2a′) a parked READ: the advance's three facts -/
+theorem fevPkRead_facts (a : BitVec 64) (i : Nat) (γo : GName) (off d : Nat) :
+    fevPkOf (.read a i γo false off d) = none ∧
+    (∀ h γ, fevOff (h ++ [.read a i γo false off d]) γ = if γ = γo then off + d else fevOff h γ) ∧
+    (∀ h, off = fevOff h γo → fevOffOk h (.read a i γo false off d)) :=
+  ⟨rfl, fun h γ => fevOff_pkRead h a i γo off d γ, fun _ h => h⟩
+
+/-- (NI M3 FS-2a′) a parked CHUNK: the advance's three facts -/
+theorem fevPkWrite_facts (a : BitVec 64) (i : Nat) (γo : GName) (off : Nat) (bs : List (BitVec 8)) (r : Nat) :
+    fevPkOf (.write a i γo false off bs r) = none ∧
+    (∀ h γ, fevOff (h ++ [.write a i γo false off bs r]) γ = if γ = γo then off + r else fevOff h γ) ∧
+    (∀ h, off = fevOff h γo → fevOffOk h (.write a i γo false off bs r)) :=
+  ⟨rfl, fun h γ => fevOff_pkWrite h a i γo off bs r γ, fun _ h => h⟩
 
 /-- a move whose typed row is unchanged appends nothing -/
 theorem fevTie_same {h : List Fev} {I : RegMapF FsNode} (i : Nat) (n n' : FsNode)
@@ -502,7 +830,7 @@ theorem fsEvRcpt_at (γfs : FsNames) (h : List Fev) (e : Fev) :
 
 /-- a write event's advance (`0` for every other event) -/
 def fevWriteR : Fev → Nat
-  | .write _ _ _ _ _ r => r
+  | .write _ _ _ _ _ _ r => r
   | _ => 0
 
 /-- the chunks' total advance -/
@@ -514,23 +842,23 @@ theorem fwSum_append (cs cs' : List Fev) : fwSum (cs ++ cs') = fwSum cs + fwSum 
 /-- **A WRITE'S CHUNKS**: one block per chunk that moved the row, each a
 `write act i γo off bs r` at its own position (filewrite unlocks between
 chunks, so they need not be adjacent). -/
-def fwChunks (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) : List Fev → IProp GF
+def fwChunks (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool) : List Fev → IProp GF
   | [] => iprop(emp)
-  | e :: cs => iprop(⌜∃ off bs r, e = Fev.write act i γo off bs r⌝ ∗ fsLedAt γfs [e] ∗
-      fwChunks γfs act i γo cs)
+  | e :: cs => iprop(⌜∃ off bs r, e = Fev.write act i γo hd off bs r⌝ ∗ fsLedAt γfs [e] ∗
+      fwChunks γfs act i γo hd cs)
 
-instance fwChunks_persistent (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (cs : List Fev) :
-    Persistent (fwChunks (GF := GF) γfs act i γo cs) := by
+instance fwChunks_persistent (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool) (cs : List Fev) :
+    Persistent (fwChunks (GF := GF) γfs act i γo hd cs) := by
   induction cs with
   | nil => unfold fwChunks; infer_instance
   | cons e cs ih => unfold fwChunks; infer_instance
 
-theorem fwChunks_nil (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) :
-    ⊢@{IProp GF} fwChunks γfs act i γo [] := by
+theorem fwChunks_nil (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool) :
+    ⊢@{IProp GF} fwChunks γfs act i γo hd [] := by
   unfold fwChunks; iempintro
 
-theorem fwChunks_app (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (cs cs' : List Fev) :
-    fwChunks (GF := GF) γfs act i γo cs ⊢ fwChunks γfs act i γo cs' -∗ fwChunks γfs act i γo (cs ++ cs') := by
+theorem fwChunks_app (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool) (cs cs' : List Fev) :
+    fwChunks (GF := GF) γfs act i γo hd cs ⊢ fwChunks γfs act i γo hd cs' -∗ fwChunks γfs act i γo hd (cs ++ cs') := by
   induction cs with
   | nil => rw [List.nil_append]; iintro - H; iexact H
   | cons e cs ih =>
@@ -542,10 +870,10 @@ theorem fwChunks_app (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) 
     · iexact Hr
     iapply ih $$ H1 H2
 
-theorem fwChunks_one (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (off : Nat)
+theorem fwChunks_one (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool) (off : Nat)
     (bs : List (BitVec 8)) (r : Nat) (n : FsNode) :
-    fsMoveRcpt (GF := GF) γfs [Fev.write act i γo off bs r] i n ⊢
-      fwChunks γfs act i γo [Fev.write act i γo off bs r] := by
+    fsMoveRcpt (GF := GF) γfs [Fev.write act i γo hd off bs r] i n ⊢
+      fwChunks γfs act i γo hd [Fev.write act i γo hd off bs r] := by
   iintro #Hr
   ihave #Hr2 := fsMoveRcpt_at $$ Hr
   unfold fwChunks fwChunks

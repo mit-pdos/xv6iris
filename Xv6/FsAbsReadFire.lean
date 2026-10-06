@@ -212,6 +212,27 @@ theorem areadCommitAt_unit (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : G
   · iapply offRet_of_link $$ Hk
   · ipureintro; trivial
 
+/-- (NI M3 private files FS-2a′) **THE PARKED ROW's COMMIT**: single-phase
+and read-only at the raw map, LENT NOTHING of the offset.  A parked file's
+shadow is ½ kernel / ¼ ledger / ¼ row, all three the kernel's to move at the
+fire (`arfRead_fire_pk`), so the client observes the offset `off` and the
+count `d` and never holds a share: it cannot steal the kernel's half, and
+the taint is held-only. -/
+def areadCommitPk (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
+    (Φ : Aview → Nat → Anode → Nat → IProp GF) : IProp GF :=
+  iprop(∀ (I : RegMapF FsNode) (off : Nat) (a : Anode) (d : Nat),
+    ⌜ardPre (absView I) i off a⌝ -∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ={E}=∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ Φ (absView I) off a d)
+
+/-- satisfiability, FROM NOTHING -/
+theorem areadCommitPk_unit (Γ : FsViewNames GF) (E : CoPset) (i : Nat) :
+    ⊢ areadCommitPk Γ E i (fun _ _ _ _ => iprop(True)) := by
+  unfold areadCommitPk
+  iintro %I %off %a %d %_ Ha
+  imodintro
+  iframe Ha
+
 /-- THE CLIENT-ADVANCED COMMIT (Rocq's `aread_commit_adv`, lane OFF-LINK-5):
 a HELD row's commit.  The client's closure holds the program's own half, so
 the lent arm comes back ADVANCED BY THE COUNT and the fire needs no
@@ -315,14 +336,70 @@ theorem readArms_mapped (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd)
   · exact absurd hlt (by omega)
   · exact (rdFailWhy_refute hnk hmap hwhy).elim
 
+/-- (NI M3 FS-2a′) ret -1 at a PARKED row: `readPostFail` with the parked
+commit as the unfired guard's refund -/
+def readPostFailPk (Γ : FsViewNames GF) (i : Nat) (P : UPtd) (n : Int)
+    (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (addr : BitVec 64) : IProp GF :=
+  iprop((⌜n < 0⌝ ∗ pfAt (areadCommitPk Γ appE i) F) ∨
+    (⌜0 ≤ n⌝ ∗ ⌜rdFailWhy P addr n.toNat⌝ ∗ ∃ (av : Aview) (off : Nat) (a : Anode),
+      ⌜ardPre av i off a⌝ ∗ F.pfRecv av off a 0))
+
+/-- (NI M3 FS-2a′) the armed disjunction at a PARKED row -/
+def readArmsPk (Γ : FsViewNames GF) (i : Nat) (P : UPtd) (n : Int)
+    (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (r : BitVec 64)
+    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) : IProp GF :=
+  iprop(readPostOk i n F r M' addr ∨ (⌜r = -1#64⌝ ∗ readPostFailPk Γ i P n F addr))
+
+theorem readArmsPk_neg (Γ : FsViewNames GF) (i : Nat) (P : UPtd) (n : Int)
+    (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF))
+    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (hn : n < 0) :
+    pfAt (areadCommitPk Γ appE i) F ⊢ readArmsPk Γ i P n F (-1#64) M' addr := by
+  unfold readArmsPk readPostFailPk
+  iintro Hc
+  iright
+  isplitr
+  · ipureintro; rfl
+  · ileft
+    isplitr
+    · ipureintro; exact hn
+    · iexact Hc
+
+/-- (NI M3 FS-2a′) **THE ARMS AT A ROW's MODE**: a parked row's refund is
+the parked commit, a held one's the landed `readArms` -/
+def readArmsOm (om : OffMode) (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
+    (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (r : BitVec 64)
+    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) : IProp GF :=
+  match om with
+  | .parked => readArmsPk Γ i P n F r M' addr
+  | .held => readArms Γ i γo P n F r M' addr
+
+/-- (NI M3 FS-2a′) past the sign guard the two refunds never appear, so the
+landed arms ARE the arms at either mode -/
+theorem readArmsOm_of (om : OffMode) (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
+    (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (r : BitVec 64)
+    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (hn : 0 ≤ n) :
+    readArms (hlc := hlc) Γ i γo P n F r M' addr ⊢ readArmsOm (hlc := hlc) om Γ i γo P n F r M' addr := by
+  cases om with
+  | held => exact .rfl
+  | parked =>
+    show _ ⊢ readArmsPk Γ i P n F r M' addr
+    unfold readArms readArmsPk readPostFail readPostFailPk
+    iintro (Hok | ⟨%hr, (⟨%hlt, -⟩ | H)⟩)
+    · ileft; iexact Hok
+    · exact absurd hlt (by omega)
+    · iright; isplitr
+      · ipureintro; exact hr
+      · iright; iexact H
+
 /-- WHAT A DESCRIPTOR'S READ HANDS IN, AT ITS ROW'S OFFSET MODE (Rocq's
 `aread_in_om`, lane OFF-LINK-5): a PARKED row pays what it always paid; a
 HELD one pays `link ∨ taint` -- the client-advanced commit, or the landed
-commit beside the taint. -/
+commit beside the taint.  (NI M3 FS-2a′) A PARKED row pays the parked
+commit (`areadCommitPk`, lent nothing). -/
 def areadInOm (om : OffMode) (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) : IProp GF :=
   match om with
-  | .parked => pfAt (areadCommitAt (hlc := hlc) Γ E i γo) F
+  | .parked => pfAt (areadCommitPk Γ E i) F
   | .held => iprop(pfAt (areadCommitAdv (hlc := hlc) Γ E i γo) F ∨
       (pfAt (areadCommitAt (hlc := hlc) Γ E i γo) F ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)))
 
@@ -344,7 +421,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6
 `ftopN` opened and closed inside, the row read off the firing function's
 own fragment (any share: the commit only reads); the kernel's offset half
 goes in at the offset the read used, the client hands it back UNMOVED, and
-THIS LEMMA advances it by `d` through the user side's supplier. -/
+THIS LEMMA advances it by `d` through the user side's supplier.  (NI M3
+FS-2a′) A HELD row's fire only (the taint arm): its read is appended
+`held`, outside the ledger's tracked offsets. -/
 theorem arfRead_fire_gen [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac) (R : IProp GF)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (i : Nat) (γo : GName)
     (off d : Nat) (n : FsNode)
@@ -357,7 +436,7 @@ theorem arfRead_fire_gen [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac) (R : 
         topFragQ (fsGammaL γfs) dq i n ∗
         offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗ R ∗
         -- (NI M3 private files FS-1) THE READ's RECEIPT, at its instant
-        fsObsRcpt γfs (.read act i γo off d) i n ∗
+        fsObsRcpt γfs (.read act i γo true off d) i n ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   iintro #Hi Hsup Hcm Hf Hg
   -- THE PIECE IS SPENT: the fire eliminates to the AU side.
@@ -377,7 +456,7 @@ theorem arfRead_fire_gen [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac) (R : 
   ihave Hcm := Hcm $$ %I %off %(absRow n) %d %hpre Ha Hg
   have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hg, HΦ⟩
-  imod ftopLed_obsAt γfs I (.read act i γo off d) trivial i n hlk $$ Hled with ⟨Hled, #Hrc⟩
+  imod ftopLed_obsAt γfs I (.read act i γo true off d) rfl i n hlk $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists I, A
     iframe Ha Hla Hpark Hled
@@ -391,32 +470,68 @@ theorem arfRead_fire_gen [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac) (R : 
   iframe HΦ
   ipureintro; exact hrow
 
-/-- SUPPLIER 1 -- THE PARKED PATH (Rocq's `arf_read_fire`): the generic
-user-mode WP's process holds only the row's invariant, and the fire opens
-it. -/
-theorem arfRead_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
+/-- (NI M3 private files FS-2a′) **THE PARKED FIRE** (Rocq's `arf_read_fire`,
+the generic-safety path, re-cut): the commit is lent NOTHING
+(`areadCommitPk`); inside the ONE `ftopN` opening, after the commit, the
+kernel's bare half at the read's offset meets the LEDGER's quarter (found by
+the row's registration witness) -- so `off` IS the fold's offset -- the read
+is appended `parked` at it, and the half, the ledger's quarter and the row's
+quarter (its invariant) move together to `off + d` (`FsLedger.ftopLed_pkAdv`). -/
+theorem arfRead_fire_pk [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (i : Nat) (γo : GName)
     (off d : Nat) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
     (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) (act : BitVec 64) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ offUserInv (hlc := hlc) γo -∗
-      pfAt (areadCommitAt (fsGammaL γfs) appE i γo) F -∗
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ offUserInv (hlc := hlc) γo -∗ fevPkWit γo -∗
+      pfAt (areadCommitPk (fsGammaL γfs) appE i) F -∗
       topFragQ (fsGammaL γfs) dq i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
+      offGv γo (1 : Qp).half (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
-        offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
-        fsObsRcpt γfs (.read act i γo off d) i n ∗
+        offGv γo (1 : Qp).half ((off + d : Nat) : Int) ∗
+        -- (FS-2a′) the receipt names the offset as the fold's
+        fsObsRcptP γfs (.read act i γo false off d) i n (fun h => off = fevOff h γo) ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
-  iintro #Hi #Hoinv Hcm Hf Hg
-  ihave Hsup := offSupply_parked E γo off d (arfFoffN_sub E hE) $$ Hoinv
-  imod arfRead_fire_gen γfs E dq iprop(True) F i γo off d n hE hoff hsz hnz act $$
-    Hi Hsup Hcm Hf Hg with ⟨Hf, Hg, -, Hrc, Hav⟩
+  iintro #Hi #Hoinv #Hwit Hcm Hf Hg
+  ihave Hcm := pfAt_au _ _ $$ Hcm
+  unfold ftopInv
+  imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
+    (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
+  unfold ftopBody
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
+  unfold topFragQ fsGammaL
+  ihave %hlk := ghost_map_lookup $$ Ha Hf
+  have hrow : arowAt (absView I) i (absRow n) := absView_arow I i n hlk hnz
+  have hpre : ardPre (absView I) i off (absRow n) := ⟨hrow, hoff, hsz⟩
+  unfold areadCommitPk
+  ihave Hcm := Hcm $$ %I %off %(absRow n) %d %hpre Ha
+  have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
+  imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HΦ⟩
+  -- THE TIE: the ledger's quarter agrees with the kernel's half, the read is
+  -- recorded at the fold's offset, all three shares advance
+  have hfo : (↑foffN : CoPset) ⊆ E \ ↑ftopN := nclose_subseteq' (N := appN) "foff" (appN_sub_ftop E hE)
+  obtain ⟨hpk, hof, hok⟩ := fevPkRead_facts act i γo off d
+  imod ftopLed_pkAdv (E \ ↑ftopN) hfo γfs I I γo off d (.read act i γo false off d) hpk hof hok
+    (fun h ht => fevTie_read act i γo false off d ht) $$ Hwit Hoinv Hg Hled
+    with ⟨Hled, Hg, ⟨%h, %⟨ht, hof0⟩, #Hlb⟩⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
+  · iexists I, A
+    iframe Ha Hla Hpark Hled
+    ipureintro; exact hcl
   imodintro
-  iframe Hf Hg Hrc Hav
+  iframe Hf Hg
+  isplitr
+  · unfold fsObsRcptP fsEvRcpt
+    iexists h
+    iframe Hlb
+    ipureintro; exact ⟨fevTie_row i n ht hlk, hof0⟩
+  iexists absView I
+  iframe HΦ
+  ipureintro; exact hrow
 
 /-- THE FIRE WITH NO SUPPLIER AT ALL (Rocq's `arf_read_fire_adv`, lane
 OFF-LINK-5): a HELD row's read.  The client's commit hands the box's arm
-back ALREADY ADVANCED, so the lemma has no user-side premise. -/
+back ALREADY ADVANCED, so the lemma has no user-side premise.  (NI M3
+FS-2a′) Appended `held`. -/
 theorem arfRead_fire_adv [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (i : Nat) (γo : GName)
     (off d : Nat) (n : FsNode)
@@ -428,7 +543,7 @@ theorem arfRead_fire_adv [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
         offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
-        fsObsRcpt γfs (.read act i γo off d) i n ∗
+        fsObsRcpt γfs (.read act i γo true off d) i n ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   iintro #Hi Hcm Hf Hg
   ihave Hcm := pfAt_au _ _ $$ Hcm
@@ -445,7 +560,7 @@ theorem arfRead_fire_adv [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   ihave Hcm := Hcm $$ %I %off %(absRow n) %d %hpre Ha Hg
   have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hg, HΦ⟩
-  imod ftopLed_obsAt γfs I (.read act i γo off d) trivial i n hlk $$ Hled with ⟨Hled, #Hrc⟩
+  imod ftopLed_obsAt γfs I (.read act i γo true off d) rfl i n hlk $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists I, A
     iframe Ha Hla Hpark Hled
@@ -458,8 +573,12 @@ theorem arfRead_fire_adv [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
 
 /-- ...AND THE ONE FIRE THE WALK CALLS (Rocq's `arf_read_fire_om`), where the
 mode is read and the only place it is: the supplier comes off the ROW
-(`foffRow`: `offUserInv` at a parked inode row, `emp` at a held one), off
-the taint on the disconnected arm, or -- on the LINK arm -- not at all. -/
+(`foffRow`: at a parked inode row `offUserInv` and the ledger's registration
+witness, `emp` at a held one), off the taint on the disconnected arm, or --
+on the LINK arm -- not at all.  (NI M3 FS-2a′) The box's arm and the read's
+event are KEYED ON THE MODE: a parked row's box holds the bare half and its
+read is appended at the fold's offset (`arfRead_fire_pk`); a held row's is
+the client's own. -/
 theorem arfRead_fire_om [Icfg] [FileG GF] [SleepLockG GF] [IcboxG GF] [OffboxBoxG GF] [CurCtx]
     (om : OffMode) (γfs : FsNames) (E : CoPset) (dq : DFrac)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (i : Nat) (γo : GName)
@@ -469,27 +588,42 @@ theorem arfRead_fire_om [Icfg] [FileG GF] [SleepLockG GF] [IcboxG GF] [OffboxBox
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ foffRow (hlc := hlc) (.open rw ww (.inode i γo om)) -∗
       areadInOm (hlc := hlc) om (fsGammaL γfs) appE i γo F -∗
       topFragQ (fsGammaL γfs) dq i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
+      offLinkB (hlc := hlc) (om == .held) γo (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
-        offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
-        fsObsRcpt γfs (.read act i γo off d) i n ∗
+        offLinkB (hlc := hlc) (om == .held) γo ((off + d : Nat) : Int) ∗
+        fsObsRcptP γfs (.read act i γo (om == .held) off d) i n (fun h => om = .parked → off = fevOff h γo) ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   cases om with
   | parked =>
     unfold areadInOm
+    simp only [show (OffMode.parked == OffMode.held) = false from rfl, offLinkB_parked]
     iintro #Hi #Hrow Hcm Hf Hg
-    ihave Hoinv := foffRow_inode_of (hlc := hlc) _ rw ww i γo rfl $$ Hrow
-    iapply arfRead_fire γfs E dq F i γo off d n hE hoff hsz hnz act $$ Hi Hoinv Hcm Hf Hg
+    icases foffRow_inode_of (hlc := hlc) _ rw ww i γo rfl $$ Hrow with ⟨#Hoinv, #Hwit⟩
+    imod arfRead_fire_pk γfs E dq F i γo off d n hE hoff hsz hnz act $$ Hi Hoinv Hwit Hcm Hf Hg
+      with ⟨Hf, Hg, #Hrc, Hav⟩
+    imodintro
+    iframe Hf Hg Hav
+    unfold fsObsRcptP
+    icases Hrc with ⟨%h, %⟨hr, hof⟩, #Hr⟩
+    iexists h
+    iframe Hr
+    ipureintro; exact ⟨hr, fun _ => hof⟩
   | held =>
     unfold areadInOm
+    simp only [show (OffMode.held == OffMode.held) = true from rfl, offLinkB_held]
     iintro #Hi _ Hcm Hf Hg
     icases Hcm with (Hcm | ⟨Hcm, #Ht⟩)
-    · iapply arfRead_fire_adv γfs E dq F i γo off d n hE hoff hsz hnz act $$ Hi Hcm Hf Hg
+    · imod arfRead_fire_adv γfs E dq F i γo off d n hE hoff hsz hnz act $$ Hi Hcm Hf Hg
+        with ⟨Hf, Hg, #Hrc, Hav⟩
+      imodintro
+      iframe Hf Hg Hav
+      iapply fsObsRcptP_of _ _ _ _ _ (fun _ h => absurd h (by decide)) $$ Hrc
     · ihave Hsup := offSupply_taint (hlc := hlc) E γo off d $$ Ht
       imod arfRead_fire_gen γfs E dq iprop(True) F i γo off d n hE hoff hsz hnz act $$
-        Hi Hsup Hcm Hf Hg with ⟨Hf, Hg, -, Hrc, Hav⟩
+        Hi Hsup Hcm Hf Hg with ⟨Hf, Hg, -, #Hrc, Hav⟩
       imodintro
-      iframe Hf Hg Hrc Hav
+      iframe Hf Hg Hav
+      iapply fsObsRcptP_of _ _ _ _ _ (fun _ h => absurd h (by decide)) $$ Hrc
 
 end ReadFire
 

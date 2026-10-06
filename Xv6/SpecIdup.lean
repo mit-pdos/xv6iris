@@ -87,7 +87,7 @@ acquire's/release's 10. -/
 def idupSlots : Nat := 4 + 10
 
 /-- **WP of `idup`** (Rocq `wp_idup_sconf_body`). -/
-def wp_idup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+def wp_idup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
     [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (kk z : Nat)
@@ -107,7 +107,7 @@ def wp_idup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 /-- **WP of `idup`, THE SHARE FORM** (Rocq `wp_idup_shr_sconf_body`): a share
 of the caller's reference to `ientry kk` and its unit in; the share back, a
 new reference, two units out. -/
-def wp_idup_shr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+def wp_idup_shr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
     [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (kk : Nat) (s : Qp) (inum : BitVec 32)
@@ -127,12 +127,12 @@ def wp_idup_shr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 
 /-- The interface of `idup` (Rocq `Module Type IDUP`). -/
 structure IDUP : Prop where
-  wp_idup : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+  wp_idup : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
     [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (kk z : Nat) hnoff hK hkk hlk ha0,
     wp_idup_body (hlc := hlc) (GF := GF) cpu k kk z hnoff hK hkk hlk ha0
-  wp_idup_shr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+  wp_idup_shr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
     [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (kk : Nat) (s : Qp) (inum : BitVec 32) hnoff hK hkk hlk ha0,

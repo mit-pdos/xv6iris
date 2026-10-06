@@ -218,7 +218,7 @@ end MovePure
 
 section Move
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
-  [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
+  [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [OffboxG GF]
 
 /-! ## THE THREE MOVERS
 

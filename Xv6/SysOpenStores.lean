@@ -145,20 +145,23 @@ the ledger, the install appended past it at the row the lock holds, and the
 store block's type facts give `usysOpenAt … = some t`. -/
 theorem sys_open_led_at (H0 h : List Fev) (a : BitVec 64) (rt s0 m : Nat) (create : Bool) (vom : BitVec 64)
     (inum : BitVec 32) (γo : GName) (omo : OffMode) (po : Option Nat) (dn : Dinode) (bm : Blkmap)
-    (data : Nat → List (BitVec 8)) (t : FdType)
+    (data : Nat → List (BitVec 8)) (t : FdType) (hd : Bool)
     (hfix : fevOpenFixed H0 a rt s0 m create inum.toNat po = true) (hp : H0 <+: h)
     (hrow : fevRows h inum.toNat = ftopRow (eraNode dn bm data))
     (hen : dn.diType.toNat = T_DIR_z ∨ dn.diType.toNat = T_FILE ∨ dn.diType.toNat = T_DEVICE)
     (hdir : dn.diType.toNat = T_DIR_z → omArg vom = 0)
     (htd : dn.diType.toNat = T_DEVICE → dn.diMajor.toNat ≤ NDEV_max ∧ t = .device dn.diMajor.toNat)
-    (hti : dn.diType.toNat ≠ T_DEVICE → t = .inode inum.toNat γo omo) :
-    usysOpenAt (h ++ [.open a inum.toNat γo (omo == .held) po]) a rt s0 m create (decide (omArg vom = 0)) =
+    (hti : dn.diType.toNat ≠ T_DEVICE → t = .inode inum.toNat γo omo)
+    -- (NI M3 private files FS-2a′) the install's `held` flag is the mode's at an
+    -- inode row (a device's install records `held`: it has no shadow)
+    (hhd : dn.diType.toNat ≠ T_DEVICE → hd = (omo == .held)) :
+    usysOpenAt (h ++ [.open a inum.toNat γo hd po]) a rt s0 m create (decide (omArg vom = 0)) =
       some t := by
-  have hl : (h ++ [Fev.open a inum.toNat γo (omo == .held) po]).getLast? =
-      some (.open a inum.toNat γo (omo == .held) po) := by simp
+  have hl : (h ++ [Fev.open a inum.toNat γo hd po]).getLast? =
+      some (.open a inum.toNat γo hd po) := by simp
   have hfix' := fevOpenFixed_mono hp hfix
-  have hom : (if (omo == .held) = true then OffMode.held else OffMode.parked) = omo := by
-    cases omo <;> rfl
+  have hom : dn.diType.toNat ≠ T_DEVICE → (if hd = true then OffMode.held else OffMode.parked) = omo := by
+    intro hnd; rw [hhd hnd]; cases omo <;> rfl
   unfold usysOpenAt
   rw [hl]
   dsimp only
@@ -166,15 +169,17 @@ theorem sys_open_led_at (H0 h : List Fev) (a : BitVec 64) (rt s0 m : Nat) (creat
   have hnz : dn.diType.toNat ≠ 0 := by
     rcases hen with h | h | h <;> rw [h] <;> decide
   rw [sys_open_led_ftopRow dn bm data hnz]
-  rcases hen with hd | hf | hv
-  · rw [opfEra_dir_row dn bm data hd]
-    have ht := hti (by rw [hd]; decide)
+  rcases hen with hdd | hf | hv
+  · rw [opfEra_dir_row dn bm data hdd]
+    have hnd : dn.diType.toNat ≠ T_DEVICE := by rw [hdd]; decide
+    have ht := hti hnd
     subst ht
-    simp only [fnodeOf, usysOpenRow, decide_eq_true (hdir hd), if_true, hom]
+    simp only [fnodeOf, usysOpenRow, decide_eq_true (hdir hdd), if_true, hom hnd]
   · rw [opfEra_file_row dn bm data hf]
-    have ht := hti (by rw [hf]; decide)
+    have hnd : dn.diType.toNat ≠ T_DEVICE := by rw [hf]; decide
+    have ht := hti hnd
     subst ht
-    simp only [fnodeOf, usysOpenRow, hom]
+    simp only [fnodeOf, usysOpenRow, hom hnd]
   · rw [opfEra_dev_row dn bm data (by rw [hv]; decide) (by rw [hv]; decide)]
     obtain ⟨hmb, ht⟩ := htd hv
     subst ht
@@ -204,6 +209,63 @@ theorem sys_open_stores_types (C0 : FContent) (dn : Dinode) (inum : BitVec 32) (
     refine ⟨fun hi => absurd (hi.symm.trans h1) (by decide), Or.inr ⟨h1, ?_⟩⟩
     rw [h4, h2]
   · exact ⟨fun _ => hd, Or.inl (hti hd)⟩
+
+/-- (NI M3 private files FS-2a′) **THE INSTALL, AT THE MODE**: a PARKED inode
+open's install hands the fs ledger its quarter of the fresh shadow
+(`FsWalkLed.ftopPkOpenAfterAt`, appended `held = false`); a HELD inode open's
+and a DEVICE open's install is a plain observation (appended `held = true`:
+the ledger tracks no offset of theirs).  The cell comes out past the
+install (`sysOpenOffPost`). -/
+theorem sys_open_install (a : BitVec 64) (kf : Nat) (C : FContent) (γo : GName) (omo : OffMode)
+    (i : Nat) (po : Option Nat) (H0 : List Fev) (n : FsNode) (dev : Bool)
+    (hdev : C.type = FD_INODE → dev = false) (hndev : C.type ≠ FD_INODE → dev = true) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ fsLedLb fscFs H0 -∗
+      topFragQ (fsGammaL fscFs) (DFrac.own 1) i n -∗ sysOpenOffCell kf C γo ={⊤}=∗
+      topFragQ (fsGammaL fscFs) (DFrac.own 1) i n ∗ sysOpenOffPost omo kf C γo ∗
+      ∃ h : List Fev, ⌜H0 <+: h ∧ fevRows h i = ftopRow n⌝ ∗
+        fsLedLb fscFs (h ++ [.open a i γo ((omo == .held) || dev) po]) := by
+  iintro #Hft #HL Ht Hoff
+  unfold sysOpenOffCell sysOpenOffPost
+  by_cases hc : C.type = FD_INODE
+  · rw [if_pos hc, if_pos hc, hdev hc, Bool.or_false]
+    icases Hoff with ⟨%vo, Hcell, %⟨hwf, hv0⟩, Hgv⟩
+    subst hv0
+    have h0 : (((0#32 : BitVec 32).toNat : Nat) : Int) = 0 := rfl
+    rw [h0]
+    cases omo with
+    | parked =>
+      simp only [show (OffMode.parked == OffMode.held) = false from rfl]
+      imod (ftopPkOpenAfterAt (hlc := hlc) fscFs ⊤ CoPset.subseteq_top a i γo po H0 (DFrac.own 1) n)
+        $$ Hft HL Ht Hgv with ⟨Ht, Hk, Hu, #Hwit, Hrc⟩
+      imodintro
+      iframe Ht Hrc
+      iexists 0#32
+      iframe Hcell Hwit
+      rw [h0]
+      iframe Hk Hu
+      ipureintro; exact ⟨hwf, rfl⟩
+    | held =>
+      simp only [show (OffMode.held == OffMode.held) = true from rfl]
+      imod (ftopObsAfterAt (hlc := hlc) fscFs ⊤ CoPset.subseteq_top
+          (.open a i γo true po) rfl H0 (DFrac.own 1) i n) $$ Hft HL Ht with ⟨Ht, ⟨%h, %hh, #Hop0⟩⟩
+      imodintro
+      iframe Ht
+      isplitl [Hcell Hgv]
+      · iexists 0#32
+        rw [h0]
+        iframe Hcell Hgv
+        ipureintro; exact ⟨hwf, rfl⟩
+      iexists h
+      iframe Hop0
+      ipureintro; exact hh
+  · rw [if_neg hc, if_neg hc, hndev hc, Bool.or_true]
+    imod (ftopObsAfterAt (hlc := hlc) fscFs ⊤ CoPset.subseteq_top
+        (.open a i γo true po) rfl H0 (DFrac.own 1) i n) $$ Hft HL Ht with ⟨Ht, ⟨%h, %hh, #Hop0⟩⟩
+    imodintro
+    iframe Ht Hoff
+    iexists h
+    iframe Hop0
+    ipureintro; exact hh
 
 set_option maxHeartbeats 16000000 in
 /-- **THE +0xb8 HAND-OFF** (Rocq's three `Pub.so_tail_pub_au` applications):
@@ -274,9 +336,16 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
   icases fsReady_region $$ Henvfs with ⟨#Hinv, #Hopen⟩
   ihave #Hft := iregInv_ftop _ _ _ _ $$ Hinv
   rw [topFrag_1]
-  imod (ftopObsAfterAt (hlc := hlc) fscFs ⊤ CoPset.subseteq_top
-      (.open (procAddr A.j) inum.toNat γo (A.omo == .held) po) trivial H0 (DFrac.own 1) inum.toNat
-      (eraNode dn bm data)) $$ Hft HL Ht with ⟨Ht, ⟨%h, %hh, #Hop0⟩⟩
+  -- (NI M3 private files FS-2a′) at a parked inode open the install hands the
+  -- ledger its quarter of the shadow; a held or device open's is an observation
+  have hdevf : (sysOpenStoredC C0 kk (sysOpenOm A)).type = FD_INODE →
+      decide (dn.diType.toNat = T_DEVICE) = false := fun hc => decide_eq_false (hdvw hc)
+  have hndevf : (sysOpenStoredC C0 kk (sysOpenOm A)).type ≠ FD_INODE →
+      decide (dn.diType.toNat = T_DEVICE) = true := fun hc => decide_eq_true
+    (Classical.byContradiction fun hnd => hc (hti hnd).1)
+  imod (sys_open_install (hlc := hlc) (procAddr A.j) kf (sysOpenStoredC C0 kk (sysOpenOm A)) γo A.omo
+      inum.toNat po H0 (eraNode dn bm data) (decide (dn.diType.toNat = T_DEVICE)) hdevf hndevf)
+    $$ Hft HL Ht Hoff with ⟨Ht, Hoff, ⟨%h, %hh, #Hop0⟩⟩
   rw [← topFrag_1]
   ihave Hflat := Hfback $$ Ht
   ihave Hload := sys_open_flat_close kk inum dn bm data $$ Hflat
@@ -285,7 +354,7 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
   · unfold sysOpenEnv; iframe #
   ihave #Hok : openOkRcpt fscFs k.proc $$ []
   · unfold openOkRcpt
-    iexists inum.toNat, γo, (A.omo == .held), po, tr
+    iexists inum.toNat, γo, ((A.omo == .held) || decide (dn.diType.toNat = T_DEVICE)), po, tr
     isplitl []
     · rw [hproc]; unfold fsLedAt; iexists h; iexact Hop0
     · iexact Htr
@@ -297,11 +366,11 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
   have hino : dn.diType.toNat ≠ T_DEVICE → t = .inode inum.toNat γo A.omo := fun h' => (hti h').2
   ihave #Hled : sysOpenLed A t $$ []
   · unfold sysOpenLed openLedOk
-    iexists pl, h ++ [.open (procAddr A.j) inum.toNat γo (A.omo == .held) po]
+    iexists pl, h ++ [.open (procAddr A.j) inum.toNat γo ((A.omo == .held) || decide (dn.diType.toNat = T_DEVICE)) po]
     iframe Hop0
     ipureintro
-    exact ⟨hpl, sys_open_led_at H0 h _ _ _ _ _ A.vom inum γo A.omo po dn bm data t hfix hh.1 hh.2 hen hdirk
-      hdev hino⟩
+    exact ⟨hpl, sys_open_led_at H0 h _ _ _ _ _ A.vom inum γo A.omo po dn bm data t _ hfix hh.1 hh.2 hen hdirk
+      hdev hino (fun hnd => by simp [hnd])⟩
   iapply hPub $$ %cpu %spie %spp %R %(fnode kf) %w6 %lo %w24 %γil %γisl %loc %tlc %kk %s %g %inum
     %dn %bm %kf %fd %l %(sysOpenStoredC C0 kk (sysOpenOm A)) %pn %γo %P2 %u %nsj %t %hA %hB
     %⟨rfl, hty0, rfl, rfl⟩ %⟨hdir, hdvw⟩ %hty2 %hE %hpins %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hlk

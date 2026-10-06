@@ -513,7 +513,7 @@ end BufList
 
 section FreezeOff
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [OffboxG GF]
 
 /-- Rocq's inline `Hcp (islot inum) Hsl; rewrite -ireg_key_split`: the
 coupling names the region's record at the caller's slot. -/

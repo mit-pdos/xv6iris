@@ -215,6 +215,34 @@ theorem syscFdKey_of_rdIno {sts : List FdState} {a0 : BitVec 64} (hlen : sts.len
           | _ => cases h
   · cases h
 
+/-- (NI M3 private files FS-2a′) ...and the class's readable inode row is a
+PARKED one -/
+theorem syscFdKey_of_rdIno_pk {sts : List FdState} {a0 : BitVec 64} (hlen : sts.length = NOFILE)
+    (h : fdRdIno (usysFdAt sts a0) = true) :
+    ∃ wb i γo, syscFdKey a0 sts = .open true wb (.inode i γo .parked) := by
+  unfold usysFdAt at h
+  split at h
+  · rename_i hz
+    cases hs : sts[(BitVec.extractLsb' 0 32 a0).toInt.toNat]? with
+    | none => rw [hs] at h; cases h
+    | some st =>
+      rw [hs] at h
+      have hlt : (BitVec.extractLsb' 0 32 a0).toInt.toNat < NOFILE := by
+        rw [← hlen]; exact (List.getElem?_eq_some_iff.mp hs).1
+      rcases st with _ | ⟨rb, wb, t⟩
+      · cases h
+      · cases rb
+        · cases t <;> cases h
+        · cases t with
+          | inode i γo om =>
+            cases om
+            · refine ⟨wb, i, γo, ?_⟩
+              unfold syscFdKey argZ
+              rw [if_pos ⟨hz, by omega⟩, hs]; rfl
+            · cases h
+          | _ => cases h
+  · cases h
+
 /-- a writable inode row at argument 0 is the dispatch's key row -/
 theorem syscFdKey_of_wrIno {sts : List FdState} {a0 : BitVec 64} (hlen : sts.length = NOFILE)
     (h : fdWrIno (usysFdAt sts a0) = true) :
@@ -366,8 +394,8 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
     exact hne wb i γo om (hst ▸ hk)
   by_cases hro : ∃ wb i γo om, st = .open true wb (.inode i γo om)
   · obtain ⟨wb, i, γo, om, rfl⟩ := hro
-    unfold freadRcptAt fsObsAt fsEvRcpt
-    iintro (%hm | ⟨%off, %d', %a, %⟨hr', hd', hret, hbuf⟩, ⟨%h, %hrow, #Hlb⟩⟩)
+    unfold freadRcptAt fsObsAtP fsEvRcpt
+    iintro (%hm | ⟨%off, %d', %a, %⟨hr', hd', hret, hbuf⟩, ⟨%h, %⟨hrow, hof⟩, #Hlb⟩⟩)
     · -- `-1`: the sign guard, or a copyout fault the class refutes
       imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
       imodintro
@@ -379,15 +407,23 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
       · exact hn ▸ h
       · exact (rdFailWhy_key hwf (hlf hlz) hb (hn ▸ h)).elim
     · -- a count: the fs prefix ending in the read
-      ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML (h ++ [Fev.read act i γo off d']) $$ [Hlb]
+      ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML (h ++ [Fev.read act i γo (om == .held) off d']) $$ [Hlb]
       · rw [show (niNamesHere (GF := GF)).getD 6 0 = fscFs.fev from rfl]
         unfold fsLedLb; iexact Hlb
       imod niIotaLbs_fev (GF := GF) (niNamesHere (GF := GF)) _ act $$ Hf with #Hl
       imodintro
-      iexists { UIota.boot with act := act, fev := h ++ [Fev.read act i γo off d'] }
+      iexists { UIota.boot with act := act, fev := h ++ [Fev.read act i γo (om == .held) off d'] }
       iframe Hl
       ipureintro
       intro hlz hb hfd hdir
+      -- (NI M3 private files FS-2a′) the class's row is PARKED, so the read's
+      -- receipt names its offset as the fold's
+      have hoff : off = fevOff h γo := by
+        obtain ⟨wb', i', γo', hk⟩ := syscFdKey_of_rdIno_pk hlen hfd
+        rw [hst] at hk
+        injection hk with _ _ ht
+        injection ht with _ _ hpk
+        exact hof hpk
       simp only at hdir
       rw [fevReadDir_snoc] at hdir
       unfold fevIsFile at hdir
@@ -398,10 +434,10 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
         have hc : fevContent h i = c := by
           unfold fevContent; rw [hrow, han]; rfl
         have hrd : usysReadBytes a2
-            ({ UIota.boot with act := act, fev := h ++ [Fev.read act i γo off d'] } : UIota) =
+            ({ UIota.boot with act := act, fev := h ++ [Fev.read act i γo (om == .held) off d'] } : UIota) =
             (c.drop off).take (usysCntW a2).toNat := by
-          show fevReadOut (h ++ [Fev.read act i γo off d']) (usysCntW a2).toNat = _
-          rw [fevReadOut_snoc, hc]
+          show fevReadOut (h ++ [Fev.read act i γo (om == .held) off d']) (usysCntW a2).toNat = _
+          rw [fevReadOut_snoc_at _ _ _ _ _ _ _ _ hoff, hc]
         unfold ardRetTie at hret
         unfold readBufTie at hbuf
         rw [han] at hret hbuf
@@ -432,14 +468,17 @@ theorem filewriteExtra_inoRet (gn : GName) (P : UPtd) (st : FdState) (rb : Bool)
     filewriteExtra (hlc := hlc) gn P st n M ua Q Qe r ⊢
       ⌜r = -1#64 ∨ (r = BitVec.ofInt 64 n ∧ 0 ≤ n)⌝ ∗ filewriteExtra (hlc := hlc) gn P st n M ua Q Qe r := by
   subst hst
-  unfold filewriteExtra writeArmsAt
-  iintro (⟨%h, H⟩ | ⟨%h, H⟩)
-  · isplitr
-    · ipureintro; exact Or.inr h
-    · ileft; iframe H; ipureintro; exact h
-  · isplitr
-    · ipureintro; exact Or.inl h
-    · iright; iframe H; ipureintro; exact h
+  rw [filewriteExtra_inode]
+  cases om <;>
+  · simp only [writeArmsOm]
+    first | unfold writeArmsPk | unfold writeArmsAt
+    iintro (⟨%h, H⟩ | ⟨%h, H⟩)
+    · isplitr
+      · ipureintro; exact Or.inr h
+      · ileft; iframe H; ipureintro; exact h
+    · isplitr
+      · ipureintro; exact Or.inl h
+      · iright; iframe H; ipureintro; exact h
 
 /-- **AN INODE WRITE's CITATION** (NI M3 FS-2a): at its `-1` for an
 out-of-resources verdict, the fs prefix ending in that verdict; the boot

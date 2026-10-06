@@ -83,8 +83,9 @@ its observable form, and the strong instance.
    kill, which never resumes, scope 11; the elapsed ticks are schedule and
    are not exported), and close and dup at every key (NI M3 FS-L, ruling
    FS-R4: answers of the caller's own descriptor table, scope 15), and (NI
-   M3 FS-2a, ruling FS-R4) read on a readable inode descriptor of a REGULAR
-   FILE and write on a writable inode descriptor, at a lazy-free key whose
+   M3 FS-2a, ruling FS-R4; FS-2a′: PARKED) read on a readable parked inode
+   descriptor of a REGULAR FILE and write on a writable parked inode
+   descriptor, at a lazy-free key whose
    buffer the call needs is mapped as it needs it (scope 16), and (NI M3
    FS-2b) chdir at a lazy-free key holding its path argument and mkdir at a
    lazy-free key, and (FS-2b′) open at a lazy-free key holding its path
@@ -412,29 +413,36 @@ its observable form, and the strong instance.
    every other fs syscall (FS-0…FS-4).
 16. **The fs rows read the fs history** (NI M3 FS-2a, rulings FS-R3, R4,
    R6 and the coordinator's ruling (C) of 2026-10-06; design "M3 private
-   files design (2026-10-05)" F4).  read on a readable inode descriptor of a
-   regular file and write on a writable inode descriptor join the class at
+   files design (2026-10-05)" F4; NI M3 FS-2a′).  read on a readable PARKED
+   inode descriptor of a regular file and write on a writable PARKED inode
+   descriptor join the class at
    a lazy-free key whose buffer is mapped for the whole request (read's
    destination writable, write's source readable: the class's `wbuf`
    reading, `UsysDet.ufsBuf`, riding the step as `wfd` does; readi's
    copyout fault and the write chain's unmapped-source stop are refuted
    there).  The answers are DERIVED from the CITED fs-event prefix
    (`UIota.fev`), which closes on the round's own decisive event: read's
-   `read act i γo off d` -- the bytes are the file row's content in the
-   fold of the prefix before it, from `off`, at most the request
-   (`usysReadAns`, `usysReadBytes`; the image is pinned whole, `niKeyRow`)
+   `read act i γo false off d` -- the bytes are the file row's content in
+   the fold of the prefix before it, from the FOLD's offset for `γo`
+   (`fevReadBytes`), at most the request (`usysReadAns`, `usysReadBytes`;
+   the image is pinned whole, `niKeyRow`)
    -- and an inode write's `-1` verdict (`usysWriteAnsF`: the request, or
    `-1` at a negative request or the caller's cited `full` verdict).
    "Regular file" is the cited row's type (`citeDir`, the class's `fdir`:
    a directory's raw bytes are not in the view, so directory reads stay
-   OUT).  RECORDED AS GIVEN, i.e. declassified, beside the inode number,
-   `γo` and the exhaustion verdicts (R3): THE READ AND WRITE OFFSETS (the
-   events carry the real `f->off` the call used: the fold's `fevOff` is not
-   yet tied to it, FS-2a′ -- a quarter share of the offset shadow in the
-   ledger for parked files, `offFd`/`offBox` keyed on the mode, the taint
-   held-only, the class at `.inode i γo .parked` -- is scheduled before
-   FS-3/4 so that FS-4's footprint theorem derives them, `fevOffWf`) and
-   writei's size-cap refusal (`FsFull.max`, a function of the offset).  What
+   OUT).  THE OFFSETS ARE DERIVED (NI M3 FS-2a′): the fs ledger holds a
+   quarter of every parked file's offset shadow at the fold's offset (the
+   kernel's half in the file's off box, the row's quarter in its
+   invariant; `offFd`/`offBox` keyed on the mode, so the taint is
+   held-only), so at every parked read and write the real `f->off` the call
+   used IS the fold's offset of the prefix before it (`NiFs.fevOffWf`, the
+   ledger's invariant; the read's receipt carries it to the citation).  A
+   HELD descriptor's offset is its program's own datum (the verified
+   programs hold the user half, `UserOff.uoff`): its events are appended
+   `held`, the fold's offsets ignore them, and held descriptors stay OUT of
+   the class.  RECORDED AS GIVEN, i.e. declassified, beside the inode
+   number, `γo` and the exhaustion verdicts (R3): writei's size-cap refusal
+   (`FsFull.max`, a verdict of the offset and the size).  What
    read's bytes depend on -- every write to that inode, by anyone, in the
    cited prefix -- and the offsets other holders of the struct file move
    (fork and dup share it) are conceded through the ledger histories `H`

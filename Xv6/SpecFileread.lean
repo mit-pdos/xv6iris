@@ -449,7 +449,9 @@ def filereadExtraCore (gn : GName) (pt : UPtd) (st : FdState) (n : Int) (F : Pfa
     (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (r : BitVec 64)
     (M' : Nat → List (BitVec 8)) (addr : BitVec 64) : IProp GF :=
   match st with
-  | .open true _ (.inode i γo _) =>
+  -- (NI M3 private files FS-2a′) a PARKED row's refund is its parked commit
+  | .open true _ (.inode i _ .parked) => readArmsPk (fsGammaL fscFs) i pt n F r M' addr
+  | .open true _ (.inode i γo .held) =>
     -- `pt` IS THE INODE ARM'S TABLE TOO (lane READ-RELAY): the fired `-1`
     -- arm names an address of the buffer `addr` this table cannot write
     readArms (hlc := hlc) (fsGammaL fscFs) i γo pt n F r M' addr
@@ -509,12 +511,13 @@ theorem filereadIn_inode_of (st : FdState) (n : Int) (om : OffMode) (wb : Bool) 
 theorem filereadExtra_inode_of (st : FdState) (om : OffMode) (wb : Bool) (i : Nat) (γo : GName)
     (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64)
     (h : st = .open true wb (.inode i γo om)) :
-    P ⊢ readArms (hlc := hlc) (fsGammaL fscFs) i γo pt n F r M' addr -∗
+    P ⊢ readArmsOm (hlc := hlc) om (fsGammaL fscFs) i γo pt n F r M' addr -∗
       filereadExtra (hlc := hlc) gn pt st n F Rd Rin Rp Rpe P r M' addr := by
   subst h
-  unfold filereadExtra filereadExtraCore
-  iintro HP H
-  iframe HP H
+  cases om <;>
+  · unfold filereadExtra filereadExtraCore readArmsOm
+    iintro HP H
+    iframe HP H
 
 /-- Rocq `fileread_in_of_pipe`: the pipe arm's input, at the key the walk
 holds -- what the reader hands piperead. -/
@@ -653,7 +656,7 @@ theorem filereadExtra_neg (st : FdState) (n : Int) (M' : Nat → List (BitVec 8)
       cases om with
       | parked =>
         unfold areadInOm
-        iapply readArms_neg _ i γo pt n F M' addr hn $$ Hc
+        iapply readArmsPk_neg _ i pt n F M' addr hn $$ Hc
       | held =>
         unfold areadInOm
         icases Hc with (Hc | ⟨Hc, -⟩)
@@ -687,8 +690,10 @@ variable {GF : BundledGFunctors} [Xv6G GF]
 to the post.  On a READABLE INODE descriptor: either `-1` with its reason
 (the sign guard `n < 0`, or readi's copyout fault at a byte of the table `P`
 the call ran at, `rdFailWhy` -- what the read arms carry), or a count `d`
-whose event `read act i γo off d` -- at the REAL offset `off` the read used,
-recorded as given (ruling (C)) -- is in the era's ledger at a prefix whose
+whose event `read act i γo (om == .held) off d` -- at the REAL offset `off`
+the read used, recorded as given (ruling (C)); (FS-2a′) at a PARKED row it
+IS the fold's offset (`NiFs.fevOffWf`, the ledger's invariant) -- is in the
+era's ledger at a prefix whose
 fold holds the row `a` it read (`FsLedger.fsObsAt`), with the read arm's
 return tie and buffer tie at that row (`ardRetTie`, `readBufTie`: on a file
 row the count is `ardCount` and the `d` bytes at `addr` in `M'` are the
@@ -696,11 +701,11 @@ row's from `off`).  Other descriptors carry nothing. -/
 def freadRcptAt (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (P : UPtd)
     (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (r : BitVec 64) : IProp GF :=
   match st with
-  | .open true _ (.inode i γo _) =>
+  | .open true _ (.inode i γo om) =>
     iprop(⌜r = -1#64 ∧ (n < 0 ∨ rdFailWhy P addr n.toNat)⌝ ∨
       ∃ (off d : Nat) (a : Anode),
         ⌜r = BitVec.ofNat 64 d ∧ (d : Int) ≤ n ∧ ardRetTie n a off r ∧ readBufTie a off d M' addr⌝ ∗
-        fsObsAt γfs (.read act i γo off d) i a)
+        fsObsAtP γfs (.read act i γo (om == .held) off d) i a (fun h => om = .parked → off = fevOff h γo))
   | _ => iprop(True)
 
 instance freadRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (P : UPtd)

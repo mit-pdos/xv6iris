@@ -185,7 +185,7 @@ theorem ufNd_top : ((↑ftopN : CoPset) ∪ ↑appN) ⊆ ⊤ := CoPset.subseteq_
 
 section UnlinkFire
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [FsTopG GF] [FsBytesG GF]
+  [FsTopG GF] [FsBytesG GF] [OffboxG GF]
 
 /-- THE MISS, at dirlookup's `none` under the parent's lock (Rocq's
 `uf_dmiss_fire`): read-only, the row off the firing function's own
@@ -350,7 +350,7 @@ theorem ufUent_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (dqt : DFra
   obtain ⟨⟨hnzp, habsp⟩, -⟩ := (absOf_some_iff np _).1 (absOf_dir np hdir (by omega))
   obtain ⟨⟨hnzp', habsp'2⟩, -⟩ := (absOf_some_iff np' _).1 habsp'
   imod ftopLed_moveAt γfs I d np np' [.ent act d nm none, .nlink act d (fnNlink np - dec)]
-    hlkp (fun h ht => fevTie_entNlink act nm none (dirEntries np) (fnNlink np) _ ht hlkp hnzp habsp
+    hlkp rfl (fun h ht => fevTie_entNlink act nm none (dirEntries np) (fnNlink np) _ ht hlkp hnzp habsp
       hnzp' habsp'2) $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I d np', A
@@ -405,7 +405,7 @@ theorem ufUtgt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     iapply (appStep_at t I _ nt' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I t nt') %hdelta Ha
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HΦ⟩
-  imod ftopLed_moveAt γfs I t nt nt' [.nlink act t (fnNlink nt - 1)] hlk
+  imod ftopLed_moveAt γfs I t nt nt' [.nlink act t (fnNlink nt - 1)] hlk rfl
     (fun h ht => fevTie_nlink act (absRow nt).anNode (fnNlink nt) _ ht hlk hnzt rfl habs'.1 habs'.2)
     $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]

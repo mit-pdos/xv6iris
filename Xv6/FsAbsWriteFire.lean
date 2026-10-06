@@ -663,6 +663,128 @@ theorem awriteChain_unit [Appcfg GF] (γfs : FsNames) [FsBytesG GF] (E : CoPset)
   iintro #Hsup %P
   iapply awriteChainAt_unit γfs E i γo M ua P n k cnt $$ Hsup
 
+/-! ### 2c.  The PARKED chain (NI M3 private files FS-2a′)
+
+A PARKED row's shadow is ½ kernel / ¼ ledger / ¼ row, all the kernel's to
+move at the fire, so its nodes are LENT NOTHING of the offset: they observe
+the chunk's `off` and hand back the rest of the chain.  Everything else is
+`awriteFullAt` / `awritePartAt` / `awriteChainAt` verbatim. -/
+
+/-- the parked full-chunk node -/
+def awriteFullPk [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (k : Nat) (REST : IProp GF) :
+    IProp GF :=
+  iprop(∀ (I : RegMapF FsNode) (off : Nat) (bs bs0 : List (BitVec 8)) (nl : Nat),
+    ⌜wriPre (absView I) i off bs bs0 nl⌝ -∗
+    ⌜ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) bs⌝ -∗
+    ⌜(bs.length : Int) = wchunkAt n k⌝ -∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ={E}=∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
+      appStep i I (deltaWrite i off bs (absView I)) ∗
+      (∀ I' : RegMapF FsNode,
+        ⌜absView I' = deltaWrite i off bs (absView I)⌝ -∗
+        (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ={E}=∗
+        (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗ REST))
+
+/-- the parked partial-chunk node -/
+def awritePartPk [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (k : Nat)
+    (REST : IProp GF) : IProp GF :=
+  iprop(∀ (I : RegMapF FsNode) (off r : Nat) (bs bs0 : List (BitVec 8)) (nl : Nat),
+    ⌜wriPre (absView I) i off bs bs0 nl⌝ -∗
+    ⌜r ≤ bs.length⌝ -∗
+    ⌜bs.length ≤ r + BSIZE⌝ -∗
+    ⌜(r : Int) < wchunkAt n k⌝ -∗
+    ⌜r < bs.length → wrFailWhy P ua n.toNat⌝ -∗
+    ⌜wiBlocks off (wchunkAt n k).toNat = 1 → r = 0⌝ -∗
+    ⌜ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) (bs.take r)⌝ -∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ={E}=∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
+      appStep i I (deltaWrite i off bs (absView I)) ∗
+      (∀ I' : RegMapF FsNode,
+        ⌜absView I' = deltaWrite i off bs (absView I)⌝ -∗
+        (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ={E}=∗
+        (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗ REST))
+
+/-- the parked chain at one table -/
+def awriteChainPkAt [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (Q : Nat → IProp GF) :
+    Nat → Nat → IProp GF
+  | k, 0 => Q k
+  | k, cnt + 1 =>
+    iprop(Q k ∧
+      (awriteFullPk Γ E i M ua n k (awriteChainPkAt Γ E i M ua P n Q (k + 1) cnt) ∧
+        awritePartPk Γ E i M ua P n k (awriteChainPkAt Γ E i M ua P n Q (k + 1) cnt)))
+
+/-- the parked chain the caller supplies -/
+def awriteChainPk [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (Q : Nat → IProp GF) (k cnt : Nat) :
+    IProp GF :=
+  iprop(∀ P : UPtd, awriteChainPkAt Γ E i M ua P n Q k cnt)
+
+theorem awriteChainPkAt_0 [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (Q : Nat → IProp GF)
+    (k : Nat) :
+    awriteChainPkAt Γ E i M ua P n Q k 0 = Q k := rfl
+
+theorem awriteChainPkAt_S [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (Q : Nat → IProp GF)
+    (k cnt : Nat) :
+    awriteChainPkAt Γ E i M ua P n Q k (cnt + 1) =
+      iprop(Q k ∧
+        (awriteFullPk Γ E i M ua n k (awriteChainPkAt Γ E i M ua P n Q (k + 1) cnt) ∧
+          awritePartPk Γ E i M ua P n k (awriteChainPkAt Γ E i M ua P n Q (k + 1) cnt))) := rfl
+
+theorem awriteChainPkAt_of [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (Q : Nat → IProp GF) (k cnt : Nat)
+    (P : UPtd) :
+    awriteChainPk Γ E i M ua n Q k cnt ⊢ awriteChainPkAt Γ E i M ua P n Q k cnt := by
+  unfold awriteChainPk
+  iintro H; ispecialize H $$ %P; iexact H
+
+/-- satisfiability of the parked chain, paid out of the SUPPLY -/
+theorem awriteChainPkAt_unit [Appcfg GF] (γfs : FsNames) [FsBytesG GF] (E : CoPset) (i : Nat)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (k cnt : Nat) :
+    appSup (GF := GF) ⊢
+      awriteChainPkAt (fsGammaL γfs) E i M ua P n (fun _ => iprop(True)) k cnt := by
+  induction cnt generalizing k with
+  | zero =>
+    rw [awriteChainPkAt_0]
+    iintro _
+    ipureintro; trivial
+  | succ cnt IH =>
+    rw [awriteChainPkAt_S]
+    iintro #Hsup
+    isplit
+    · ipureintro; trivial
+    isplit
+    · unfold awriteFullPk
+      iintro %I %off %bs %bs0 %nl %_ %_ %_ Ha
+      ihave Hstep := appStep_acc i I (deltaWrite i off bs (absView I)) $$ Hsup
+      imodintro
+      iframe Ha Hstep
+      iintro %I' %_ Ha'
+      imodintro
+      iframe Ha'
+      iapply IH (k + 1) $$ Hsup
+    · unfold awritePartPk
+      iintro %I %off %r %bs %bs0 %nl %_ %_ %_ %_ %_ %_ %_ Ha
+      ihave Hstep := appStep_acc i I (deltaWrite i off bs (absView I)) $$ Hsup
+      imodintro
+      iframe Ha Hstep
+      iintro %I' %_ Ha'
+      imodintro
+      iframe Ha'
+      iapply IH (k + 1) $$ Hsup
+
+theorem awriteChainPk_unit [Appcfg GF] (γfs : FsNames) [FsBytesG GF] (E : CoPset) (i : Nat)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (k cnt : Nat) :
+    appSup (GF := GF) ⊢
+      awriteChainPk (fsGammaL γfs) E i M ua n (fun _ => iprop(True)) k cnt := by
+  unfold awriteChainPk
+  iintro #Hsup %P
+  iapply awriteChainPkAt_unit γfs E i M ua P n k cnt $$ Hsup
+
 end WriteCommit
 
 /-! ## 3.  Item 1: the chunk fire, fused with the row retag -/
@@ -717,8 +839,8 @@ theorem wrfFire_core [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat) 
       offLink (hlc := hlc) (GF := GF) γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗ X ∗
         -- (NI M3 private files FS-1) the chunk's event, at `off`, the offset
-        -- advanced by `r`
-        fsMoveRcpt γfs [.write act i γo off bs r] i n := by
+        -- advanced by `r`; (FS-2a′) a HELD row's, outside the tracked offsets
+        fsMoveRcpt γfs [.write act i γo true off bs r] i n := by
   iintro #Hi #Hai Hcm Hf Hg
   unfold ftopInv
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
@@ -742,8 +864,8 @@ theorem wrfFire_core [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat) 
     iapply (appStep_at i I _ n' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I i n') %hdelta Ha
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HX⟩
-  imod ftopLed_moveAt γfs I i n n' [.write act i γo off bs r] hlk
-    (fun h ht => fevTie_write act γo off bs bs0 nl r ht hlk hnz habs hnz' habs') $$ Hled
+  imod ftopLed_moveAt γfs I i n n' [.write act i γo true off bs r] hlk rfl
+    (fun h ht => fevTie_write act γo true off bs bs0 nl r ht hlk hnz habs hnz' habs') $$ Hled
     with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I i n', A
@@ -774,7 +896,7 @@ theorem wrfAwrite_fire_gen [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i :
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
         offLink (hlc := hlc) γo ((off + bs.length : Nat) : Int) ∗ ROff ∗ REST ∗
-        fsMoveRcpt γfs [.write act i γo off bs bs.length] i n := by
+        fsMoveRcpt γfs [.write act i γo true off bs bs.length] i n := by
   iintro #Hi #Hai Hsup Hcm Hf Hg
   imod wrfFire_core γfs E i off bs bs0 nl n n'
     iprop(offRet (hlc := hlc) γo off bs.length ∗ REST)
@@ -807,7 +929,7 @@ theorem wrfAwrite_fire_adv [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i :
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
         offLink (hlc := hlc) γo ((off + bs.length : Nat) : Int) ∗ REST ∗
-        fsMoveRcpt γfs [.write act i γo off bs bs.length] i n := by
+        fsMoveRcpt γfs [.write act i γo true off bs bs.length] i n := by
   iintro #Hi #Hai Hcm Hf Hg
   imod wrfFire_core γfs E i off bs bs0 nl n n'
     iprop(offLink (hlc := hlc) γo ((off + bs.length : Nat) : Int) ∗ REST)
@@ -842,7 +964,7 @@ theorem wrfApart_fire_gen [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : 
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
         offLink (hlc := hlc) γo ((off + r : Nat) : Int) ∗ ROff ∗ REST ∗
-        fsMoveRcpt γfs [.write act i γo off bs r] i n := by
+        fsMoveRcpt γfs [.write act i γo true off bs r] i n := by
   iintro #Hi #Hai Hsup Hcm Hf Hg
   imod wrfFire_core γfs E i off bs bs0 nl n n'
     iprop(offRet (hlc := hlc) γo off r ∗ REST)
@@ -877,7 +999,7 @@ theorem wrfApart_fire_adv [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : 
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
         offLink (hlc := hlc) γo ((off + r : Nat) : Int) ∗ REST ∗
-        fsMoveRcpt γfs [.write act i γo off bs r] i n := by
+        fsMoveRcpt γfs [.write act i γo true off bs r] i n := by
   iintro #Hi #Hai Hcm Hf Hg
   imod wrfFire_core γfs E i off bs bs0 nl n n'
     iprop(offLink (hlc := hlc) γo ((off + r : Nat) : Int) ∗ REST)
@@ -886,6 +1008,130 @@ theorem wrfApart_fire_adv [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : 
   · unfold awritePartAdv
     iintro %I %hpre Ha Hg
     iapply Hcm $$ %I %off %r %bs %bs0 %nl %hpre %hr %hgap %hshort %hwhy %hsb1 %hby Ha Hg
+  imodintro
+  iframe Hf Hg Hrest Hrc
+
+/-- (NI M3 private files FS-2a′) **THE PARKED CHUNK's CRITICAL SECTION**
+(`wrfFire_core`'s twin): the node lent nothing; after phase 2, inside the
+same `ftopN` opening, the kernel's bare half at the chunk's offset meets the
+LEDGER's quarter (found by the row's registration witness) -- so `off` IS
+the fold's offset -- the chunk is appended `parked` at it, and the half, the
+ledger's quarter and the row's quarter move together to `off + r`
+(`FsLedger.ftopLed_pkAdv`). -/
+theorem wrfFire_corePk [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat) (off : Nat)
+    (bs bs0 : List (BitVec 8)) (nl : Nat) (n n' : FsNode) (X : IProp GF)
+    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
+    (hpos : 0 < bs.length) (hoff : off ≤ bs0.length) (hcap : off + bs.length ≤ MAXFILE * BSIZE)
+    (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.AFile bs0, nl⟩)
+    (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile (blkSplice off bs bs0), nl⟩)
+    (γo : GName) (act : BitVec 64) (r : Nat) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
+      offUserInv (hlc := hlc) γo -∗ fevPkWit γo -∗
+      (∀ I : RegMapF FsNode, ⌜wriPre (absView I) i off bs bs0 nl⌝ -∗
+        ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I) ={appE}=∗
+        ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
+          appStep (GF := GF) i I (deltaWrite i off bs (absView I)) ∗
+          (∀ I' : RegMapF FsNode,
+            ⌜absView I' = deltaWrite i off bs (absView I)⌝ -∗
+            ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I') ={appE}=∗
+            ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗ X)) -∗
+      topFrag (fsGammaL γfs) i n -∗
+      offGv γo (1 : Qp).half (off : Int) ={E}=∗
+        topFrag (fsGammaL γfs) i n' ∗ X ∗ offGv γo (1 : Qp).half ((off + r : Nat) : Int) ∗
+        fsMoveRcpt γfs [.write act i γo false off bs r] i n := by
+  iintro #Hi #Hai #Hoinv #Hwit Hcm Hf Hg
+  unfold ftopInv
+  imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
+    (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
+  unfold ftopBody
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
+  unfold topFrag fsGammaL
+  ihave %hlk := ghost_map_lookup $$ Ha Hf
+  have hrow : arowAt (absView I) i ⟨.AFile bs0, nl⟩ := habs ▸ absView_arow I i n hlk hnz
+  have hpre : wriPre (absView I) i off bs bs0 nl := ⟨hrow, hpos, hoff, hcap⟩
+  have hdelta := wrfDelta_insert I i off bs bs0 nl n' hrow hnz' habs'
+  have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
+  ihave Hcm := Hcm $$ %I %hpre Ha
+  imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hstep, Hph2⟩
+  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' hsub) $$ Hai [Hstep] Ha Hf with ⟨Ha, Hf⟩
+  · iintro %_ Hp
+    iapply (appStep_at i I _ n' hdelta) $$ Hstep Hp
+  ihave Hph2 := Hph2 $$ %(PartialMap.insert I i n') %hdelta Ha
+  imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HX⟩
+  have hfo : (↑foffN : CoPset) ⊆ E \ ↑ftopN := nclose_subseteq' (N := appN) "foff" (appN_sub_ftop E hE)
+  obtain ⟨hpk, hof, hok⟩ := fevPkWrite_facts act i γo off bs r
+  imod ftopLed_pkAdv (E \ ↑ftopN) hfo γfs I (PartialMap.insert I i n') γo off r
+    (.write act i γo false off bs r) hpk hof hok
+    (fun h ht => fevTie_write act γo false off bs bs0 nl r ht hlk hnz habs hnz' habs') $$ Hwit Hoinv Hg Hled
+    with ⟨Hled, Hg, ⟨%h, %⟨ht, -⟩, #Hlb⟩⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
+  · iexists PartialMap.insert I i n', A
+    iframe Ha Hla Hpark Hled
+    ipureintro; exact Xv6.ufFtopClean_insert I A i n' hloc hcl
+  imodintro
+  iframe Hf HX Hg
+  unfold fsMoveRcpt
+  iexists h
+  iframe Hlb
+  ipureintro; exact fevTie_row i n ht hlk
+
+/-- (NI M3 FS-2a′) THE PARKED FULL-CHUNK FIRE -/
+theorem wrfAwrite_fire_pk [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat) (γo : GName)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (cnt : Int) (k : Nat) (REST : IProp GF)
+    (off : Nat) (bs bs0 : List (BitVec 8)) (nl : Nat) (n n' : FsNode)
+    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
+    (hpos : 0 < bs.length) (hoff : off ≤ bs0.length) (hcap : off + bs.length ≤ MAXFILE * BSIZE)
+    (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.AFile bs0, nl⟩)
+    (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile (blkSplice off bs bs0), nl⟩)
+    (hby : ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) bs)
+    (hlen : (bs.length : Int) = wchunkAt cnt k) (act : BitVec 64) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
+      offUserInv (hlc := hlc) γo -∗ fevPkWit γo -∗
+      awriteFullPk (fsGammaL γfs) appE i M ua cnt k REST -∗
+      topFrag (fsGammaL γfs) i n -∗
+      offGv γo (1 : Qp).half (off : Int) ={E}=∗
+        topFrag (fsGammaL γfs) i n' ∗
+        offGv γo (1 : Qp).half ((off + bs.length : Nat) : Int) ∗ REST ∗
+        fsMoveRcpt γfs [.write act i γo false off bs bs.length] i n := by
+  iintro #Hi #Hai #Hoinv #Hwit Hcm Hf Hg
+  imod wrfFire_corePk γfs E i off bs bs0 nl n n' REST
+    hE hloc hpos hoff hcap hnz habs hnz' habs' γo act bs.length $$ Hi Hai Hoinv Hwit [Hcm] Hf Hg
+    with ⟨Hf, Hrest, Hg, #Hrc⟩
+  · unfold awriteFullPk
+    iintro %I %hpre Ha
+    iapply Hcm $$ %I %off %bs %bs0 %nl %hpre %hby %hlen Ha
+  imodintro
+  iframe Hf Hg Hrest Hrc
+
+/-- (NI M3 FS-2a′) THE PARKED PARTIAL-CHUNK FIRE, the offset advanced by the
+count `r` -/
+theorem wrfApart_fire_pk [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat) (γo : GName)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (cnt : Int) (k : Nat)
+    (REST : IProp GF) (off r : Nat) (bs bs0 : List (BitVec 8)) (nl : Nat) (n n' : FsNode)
+    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
+    (hpos : 0 < bs.length) (hoff : off ≤ bs0.length) (hcap : off + bs.length ≤ MAXFILE * BSIZE)
+    (hr : r ≤ bs.length) (hgap : bs.length ≤ r + BSIZE)
+    (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.AFile bs0, nl⟩)
+    (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile (blkSplice off bs bs0), nl⟩)
+    (hby : ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) (bs.take r))
+    (hshort : (r : Int) < wchunkAt cnt k)
+    (hwhy : r < bs.length → wrFailWhy P ua cnt.toNat)
+    (hsb1 : wiBlocks off (wchunkAt cnt k).toNat = 1 → r = 0) (act : BitVec 64) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
+      offUserInv (hlc := hlc) γo -∗ fevPkWit γo -∗
+      awritePartPk (fsGammaL γfs) appE i M ua P cnt k REST -∗
+      topFrag (fsGammaL γfs) i n -∗
+      offGv γo (1 : Qp).half (off : Int) ={E}=∗
+        topFrag (fsGammaL γfs) i n' ∗
+        offGv γo (1 : Qp).half ((off + r : Nat) : Int) ∗ REST ∗
+        fsMoveRcpt γfs [.write act i γo false off bs r] i n := by
+  iintro #Hi #Hai #Hoinv #Hwit Hcm Hf Hg
+  imod wrfFire_corePk γfs E i off bs bs0 nl n n' REST
+    hE hloc hpos hoff hcap hnz habs hnz' habs' γo act r $$ Hi Hai Hoinv Hwit [Hcm] Hf Hg
+    with ⟨Hf, Hrest, Hg, #Hrc⟩
+  · unfold awritePartPk
+    iintro %I %hpre Ha
+    iapply Hcm $$ %I %off %r %bs %bs0 %nl %hpre %hr %hgap %hshort %hwhy %hsb1 %hby Ha
   imodintro
   iframe Hf Hg Hrest Hrc
 

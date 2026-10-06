@@ -81,13 +81,13 @@ theorem sys_open_pub_off (cpu : CPU) (kk kf : Nat) (γo : GName) (C : FContent) 
     (inum : BitVec 32) (t : FdType) (hkk : kk < NINODE) (hip : C.ip = ientry kk)
     (ht : (C.type = FD_INODE ∧ t = .inode inum.toNat γo omo) ∨
       (C.type = FD_DEVICE ∧ t = .device C.major.toNat)) :
-    ownCtx (GF := GF) cpu curCtx ∗ offRows offCfg kk curCtx ∗ sysOpenOffCell kf C γo ⊢
+    ownCtx (GF := GF) cpu curCtx ∗ offRows offCfg kk curCtx ∗ sysOpenOffPost omo kf C γo ⊢
       |={⊤}=> ownCtx cpu curCtx ∗ offRows offCfg kk curCtx ∗
-        ∃ γb : BoxNames, (if C.type = FD_INODE then offFd kf 1 γb γo C else offFree kf 1) ∗
+        ∃ γb : BoxNames, (if C.type = FD_INODE then offFd kf 1 γb γo omo C else offFree kf 1) ∗
           (if C.type = FD_INODE then foffRow (GF := GF) (.open true true (.inode 0 γo omo))
             else iprop(True)) ∗
           foffPubT omo t := by
-  unfold sysOpenOffCell
+  unfold sysOpenOffPost
   by_cases h : C.type = FD_INODE
   · have ht' : t = .inode inum.toNat γo omo := by
       rcases ht with ⟨-, e⟩ | ⟨hc, -⟩
@@ -95,12 +95,15 @@ theorem sys_open_pub_off (cpu : CPU) (kk kf : Nat) (γo : GName) (C : FContent) 
       · rw [h] at hc; exact absurd hc (by decide)
     subst ht'
     simp only [if_pos h]
-    iintro ⟨Hctx, Hrows, ⟨%vo, Hcell, %hwf, Hgv⟩⟩
-    obtain ⟨hwf, rfl⟩ := hwf
     cases omo with
     | parked =>
-      imod off_pub_park ⊤ γo ((0#32 : BitVec 32).toNat : Int) $$ Hgv with ⟨Hgk, #Huinv⟩
-      imod sys_open_deposit cpu ⊤ kk kf γo C CoPset.subseteq_top hkk hip $$ [Hctx Hrows Hcell Hgk]
+      iintro ⟨Hctx, Hrows, ⟨%vo, Hcell, %hwf, Hgk, Hgu, #Hwit⟩⟩
+      obtain ⟨hwf, rfl⟩ := hwf
+      -- (NI M3 private files FS-2a′) the half to the box, the row's quarter
+      -- into its invariant; the ledger's quarter went at the install
+      imod off_pub_park ⊤ γo ((0#32 : BitVec 32).toNat : Int) $$ [Hgk Hgu] with ⟨Hgk, #Huinv⟩
+      · iframe Hgk Hgu
+      imod sys_open_deposit cpu ⊤ kk kf γo .parked C CoPset.subseteq_top hkk hip $$ [Hctx Hrows Hcell Hgk]
         with ⟨Hctx, Hrows, %γb, Hfd⟩
       · iframe Hctx Hrows
         unfold offResident
@@ -108,17 +111,23 @@ theorem sys_open_pub_off (cpu : CPU) (kk kf : Nat) (γo : GName) (C : FContent) 
         iframe Hcell
         isplitr
         · ipureintro; exact hwf
-        · iapply offLink_of $$ Hgk
+        · simp only [show (OffMode.parked == OffMode.held) = false from rfl, offLinkB_parked]
+          iexact Hgk
       imodintro
       iframe Hctx Hrows
       iexists γb
       iframe Hfd
       isplitr
-      · unfold foffRow; iexact Huinv
+      · unfold foffRow
+        isplitl []
+        · iexact Huinv
+        · iexact Hwit
       · unfold foffPubT foffPub; iempintro
     | held =>
+      iintro ⟨Hctx, Hrows, ⟨%vo, Hcell, %hwf, Hgv⟩⟩
+      obtain ⟨hwf, rfl⟩ := hwf
       icases off_pub_hand γo (0#32 : BitVec 32).toNat $$ Hgv with ⟨Hgk, Hu⟩
-      imod sys_open_deposit cpu ⊤ kk kf γo C CoPset.subseteq_top hkk hip $$ [Hctx Hrows Hcell Hgk]
+      imod sys_open_deposit cpu ⊤ kk kf γo .held C CoPset.subseteq_top hkk hip $$ [Hctx Hrows Hcell Hgk]
         with ⟨Hctx, Hrows, %γb, Hfd⟩
       · iframe Hctx Hrows
         unfold offResident
@@ -126,7 +135,8 @@ theorem sys_open_pub_off (cpu : CPU) (kk kf : Nat) (γo : GName) (C : FContent) 
         iframe Hcell
         isplitr
         · ipureintro; exact hwf
-        · iapply offLink_of $$ Hgk
+        · simp only [show (OffMode.held == OffMode.held) = true from rfl, offLinkB_held]
+          iapply offLink_of $$ Hgk
       imodintro
       iframe Hctx Hrows
       iexists γb

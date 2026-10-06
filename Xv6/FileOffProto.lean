@@ -50,8 +50,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- Rocq `proto_read_llb`: the share's stamps fragment, named, with its
 store-order receipt (what the reader presents at its ilock acquire). -/
-theorem protoReadLlb (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (C : FContent) :
-    offFd (GF := GF) k q γb γo C ⊢ ∃ m : StampMap Nat, offFdAt k q γb γo C m ∗ topLb (maxStamp m) := by
+theorem protoReadLlb (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (om : OffMode) (C : FContent) :
+    offFd (GF := GF) k q γb γo om C ⊢ ∃ m : StampMap Nat, offFdAt k q γb γo om C m ∗ topLb (maxStamp m) := by
   unfold offFd offFdAt offRefStamps
   iintro ⟨%i, %T0, %hip, %hi, #Hbox, #Hmem, Hd, Hc, ⟨%m, %hq, Href⟩⟩
   icases reference_topLb γb k m $$ Href with ⟨Href, #Hllb⟩
@@ -70,11 +70,12 @@ theorem protoReadLlb (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (C : FCon
 of the inode's rows (its floor is `Kp`), the cell checked out at the
 reader's floor `Kt ≥ max_stamp m` (the ilock acquire's). -/
 theorem protoReadCheckout (cpu : CPU) (E : CoPset) (i k : Nat) (q : Qp) (γb : BoxNames)
-    (γo : GName) (C : FContent) (m : StampMap Nat) (Kt : Nat) (ξ : CtxId)
+    (γo : GName) (om : OffMode) (C : FContent) (m : StampMap Nat) (Kt : Nat) (ξ : CtxId)
     (hE : ↑(ndot offBoxN k) ⊆ E) (hip : C.ip = ientry i) (hi : i < NINODE)
     (hKt : maxStamp m ≤ Kt) :
-    ownCtx cpu ξ ∗ ctxFloor ξ Kt ∗ offFdAt (GF := GF) k q γb γo C m ∗ offRows offCfg i ξ ⊢
-      |={E}=> (ownCtx cpu ξ ∗ offResident ξ γo k ∗ offBox k γb γo ∗ offMember offCfg i γb ∗
+    ownCtx cpu ξ ∗ ctxFloor ξ Kt ∗ offFdAt (GF := GF) k q γb γo om C m ∗ offRows offCfg i ξ ⊢
+      |={E}=> (ownCtx cpu ξ ∗ offResident ξ γo (om == .held) k ∗ offBox k γb γo (om == .held) ∗
+        offMember offCfg i γb ∗
         ∃ T0 : Nat, l2Hold γb k m ∗
           (γb.slotd ↪VAR{.own q.half} (⟨T0, false, k, none⟩ : SlotReg Nat Unit)) ∗
           (γb.cnt ↪VAR{.own q.half} (1 : Nat)) ∗
@@ -87,7 +88,7 @@ theorem protoReadCheckout (cpu : CPU) (E : CoPset) (i k : Nat) (q : Qp) (γb : B
   · iframe Hrows; iexact Hmem
   unfold offL2Row l2Row
   icases Hrow with ⟨⟨Hrp, %hh, #Hflp⟩, -⟩
-  imod offReadCheckout cpu offCfg i' k γb γo ξ m Kt s.tp E hE hKt
+  imod offReadCheckout cpu offCfg i' k γb γo (om == .held) ξ m Kt s.tp E hE hKt
     $$ [Hctx Href Hrp] with ⟨Hctx, Hres, Hhold⟩
   · iframe Hbox Hctx Href Hmem
     isplit
@@ -108,16 +109,16 @@ theorem protoReadCheckout (cpu : CPU) (E : CoPset) (i k : Nat) (q : Qp) (γb : B
 /-- Rocq `proto_read_park`: after the read, the cell parks back and the
 share is re-formed at the fresh stamp; the row goes back into the set. -/
 theorem protoReadPark (cpu : CPU) (E : CoPset) (i k : Nat) (q : Qp) (γb : BoxNames) (γo : GName)
-    (C : FContent) (m : StampMap Nat) (T0 Tr : Nat) (ξ : CtxId)
+    (om : OffMode) (C : FContent) (m : StampMap Nat) (T0 Tr : Nat) (ξ : CtxId)
     (hE : ↑(ndot offBoxN k) ⊆ E) (hip : C.ip = ientry i) (hi : i < NINODE)
     (hq : MachCSL.qsum m = q.val) :
-    ownCtx cpu ξ ∗ offResident ξ γo k ∗ l2Hold γb k m ∗
+    ownCtx cpu ξ ∗ offResident ξ γo (om == .held) k ∗ l2Hold γb k m ∗
       (γb.slotd ↪VAR{.own q.half} (⟨T0, false, k, none⟩ : SlotReg Nat Unit)) ∗
       (γb.cnt ↪VAR{.own q.half} (1 : Nat)) ∗
-      offBox (GF := GF) k γb γo ∗ offMember offCfg i γb ∗ offRowsDepBut offCfg i γb Tr ⊢
-      |={E}=> (ownCtx cpu ξ ∗ offFd k q γb γo C ∗ ∃ T' : Nat, offRowsDep offCfg i T') := by
+      offBox (GF := GF) k γb γo (om == .held) ∗ offMember offCfg i γb ∗ offRowsDepBut offCfg i γb Tr ⊢
+      |={E}=> (ownCtx cpu ξ ∗ offFd k q γb γo om C ∗ ∃ T' : Nat, offRowsDep offCfg i T') := by
   iintro ⟨Hctx, Hres, Hhold, Hd, Hc, #Hbox, #Hmem, Hrest⟩
-  imod offReadPark cpu k γb γo ξ m E hE $$ [Hbox Hctx Hres Hhold]
+  imod offReadPark cpu k γb γo (om == .held) ξ m E hE $$ [Hbox Hctx Hres Hhold]
     with ⟨Hctx, ⟨%T', %q', %hq', Hrp, Href, #Hllb⟩⟩
   · iframe Hbox Hctx Hres Hhold
   imodintro

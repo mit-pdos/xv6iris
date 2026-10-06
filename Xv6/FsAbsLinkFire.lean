@@ -134,7 +134,7 @@ theorem lfParent_row (dn dn' : Dinode) (bm bm' : Blkmap) (data data' : Nat → L
 
 section LinkFire
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [FsTopG GF] [FsBytesG GF]
+  [FsTopG GF] [FsBytesG GF] [OffboxG GF]
 
 /-- INSTANT 1 -- THE TARGET'S COUNT UP, FUSED WITH ITS RETAG (Rocq's
 `lf_tgt_fire`).  Same premise (`InodeLocal` of the flushed record), same
@@ -181,7 +181,7 @@ theorem lfTgt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     iapply (appStep_at t I _ nt' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I t nt') %hdelta Ha
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HΦ⟩
-  imod ftopLed_moveAt γfs I t nt nt' [.nlink act t (fnNlink nt + 1)] hlk
+  imod ftopLed_moveAt γfs I t nt nt' [.nlink act t (fnNlink nt + 1)] hlk rfl
     (fun h ht => fevTie_nlink act (absRow nt).anNode (fnNlink nt) _ ht hlk hnzt rfl habs'.1 habs'.2)
     $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
@@ -240,7 +240,7 @@ theorem lfEnt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HΦ⟩
   obtain ⟨⟨hnzp, habsp⟩, -⟩ := (absOf_some_iff np _).1 (absOf_dir np hdir hnl)
   obtain ⟨⟨hnzp', habsp'2⟩, -⟩ := (absOf_some_iff np' _).1 habsp'
-  imod ftopLed_moveAt γfs I d np np' [.ent act d nm (some t)] hlk
+  imod ftopLed_moveAt γfs I d np np' [.ent act d nm (some t)] hlk rfl
     (fun h ht => fevTie_ent act nm (some t) (dirEntries np) (fnNlink np) ht hlk hnzp habsp hnzp' habsp'2)
     $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]

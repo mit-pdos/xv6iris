@@ -109,8 +109,8 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     %lo, %tl, %γb, %⟨hip, hik, hnib, hle, hi, hty⟩, #Hfl, #Hshot, Hshr, Hoffd, Hback⟩
   subst hi
   icases filerw_fields_ip fk q C $$ Hfields with ⟨Hip, Hfw⟩
-  icases protoReadLlb fk q γb γo C $$ Hoffd with ⟨%m, Hat, #Hllb⟩
-  icases offFdAt_qsum fk q γb γo C m $$ Hat with ⟨%hq, Hat⟩
+  icases protoReadLlb fk q γb γo om C $$ Hoffd with ⟨%m, Hat, #Hllb⟩
+  icases offFdAt_qsum fk q γb γo om C m $$ Hat with ⟨%hq, Hat⟩
   icases fsReady_icache $$ Hfs with ⟨-, -, #Hslks⟩
   icases icSleeplocks_lookup fscIc ik hik $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
   icases filerw_priv_pid (procAddr j) pid V V.upt M $$ Hpriv with ⟨Hpid, Hpback⟩
@@ -127,7 +127,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
   -- the lock-held ghost steps before readi: open the quarter, check `f->off` out
   iapply wpLoop_fupd
   icases kctx_token_acc _ _ $$ Hk with ⟨Hrun, Hkb⟩
-  imod frd_pre_ghost cpu ik fk q γb γo C m K s g lo inum dn bm hip hik hK1
+  imod frd_pre_ghost cpu ik fk q γb γo om C m K s g lo inum dn bm hip hik hK1
     $$ [Hrun Hat Hoff Hheld] with ⟨Hrun, ⟨%data, %v, %T0, %Tr, %⟨hok, hloc, hwf⟩, Hmeta, Hmap, Hblk,
       Htop, Hcell, Hgv, Hout⟩⟩
   · iframe Hrun Hat Hoff Hheld
@@ -218,6 +218,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     · rw [h]; exact filereadRet_m1 n
   iapply filereadExtra_inode_of V.gen V.upt F Rd Rin P Rp Rpe _ om wb inum.toNat γo n (R' 10#5) M' (k.regs 11#5) rfl $$ HP
   rw [h10']
+  iapply readArmsOm_of om _ inum.toNat γo V.upt n F a0 M' (k.regs 11#5) hn0
   iapply (frd_inode_arms inum.toNat γo n F dn bm data v.toNat tot dd a0 P' (viewFaulted V.upt P' M) M'
     (k.regs 11#5) av hn0 hn1 hok hwf hrow hle2 V.upt harm himg.1 himg.2 hpl) $$ Hrecv
 

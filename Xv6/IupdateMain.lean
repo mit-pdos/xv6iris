@@ -290,7 +290,7 @@ set_option maxHeartbeats 16000000 in
 /-- `+0x24 .. +0x30`: bread's return, THE COUPLING, the slot opened and its
 address computed; then `iu_copy`. -/
 theorem iu_body (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames)
@@ -420,7 +420,7 @@ the only difference between the three contracts `Xv6/ProofIupdate.lean`
 seals.  The credit is a RESOURCE against the named epoch `e0`, forwarded
 untouched to `log_write`. -/
 theorem iu_main (BD : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]

@@ -114,7 +114,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
 section EscrowDeposit
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [OffboxG GF]
 
 /-- The registry, lent out of what stays behind at a slot opening (the
 deposit is the one mover that rebinds an inum's escrow-name pair). -/
@@ -281,7 +281,7 @@ theorem iregFreeDeposit_au [Icfg] (E : CoPset) (icn : IcNames) (γi : GName) (γ
   -- event, at the deposit's own instant
   have hfr0 : fnType (freeNode dn') = 0 := hz
   imod iregTopRetag_ev ((E \ ↑iregN) \ ↑(escAN inum.toNat)) γfs inum.toNat ntop
-    (freeNode dn') [.free act inum.toNat] hEftop habs (inodeLocal_freeNode inum.toNat dn' hbare hnl0' hz)
+    (freeNode dn') [.free act inum.toNat] hEftop habs (inodeLocal_freeNode inum.toNat dn' hbare hnl0' hz) rfl
     (fun h I _ ht => fevTie_move _ _ _ ht (by rw [fevRows_free, ftopRow_free _ hfr0])) $$
     Hftopi Happi Htop with ⟨Htop, -⟩
   ihave Hpark := iregTopPark_free γfs inum.toNat dn' hbare $$ Htop

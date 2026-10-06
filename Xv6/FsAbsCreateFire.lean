@@ -451,7 +451,7 @@ phases on either side of the map update -/
 
 section CreateFire
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [FsTopG GF] [FsBytesG GF] [Appcfg GF]
+  [FsTopG GF] [FsBytesG GF] [Appcfg GF] [OffboxG GF]
 
 /-- UNDER THE ARMED REGISTRY (Rocq's `caf_armed_retag`): the receipt names
 this inum, so the row says nothing about it and the new node may be
@@ -461,6 +461,7 @@ map before the body closes. -/
 theorem cafArmedRetag [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
     (S : Std.ExtTreeSet Nat compare) (i : Nat) (n n' : FsNode) (R : IProp GF)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S) (evs : List Fev)
+    (hneu : evs.all fevNeutral = true)
     (hev : ∀ (h : List Fev) (I : RegMapF FsNode), PartialMap.get? I i = some n → fevTie h I →
       fevTie (h ++ evs) (PartialMap.insert I i n')) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
@@ -492,7 +493,7 @@ theorem cafArmedRetag [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
     iapply (appStep_at i I _ n' rfl) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ Ha
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HR⟩
-  imod ftopLed_moveAt γfs I i n n' evs hlk (fun h ht => hev h I hlk ht) $$ Hled with ⟨Hled, #Hrc⟩
+  imod ftopLed_moveAt γfs I i n n' evs hlk hneu (fun h ht => hev h I hlk ht) $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I i n', A
     iframe Ha Hla Hpark Hled
@@ -511,6 +512,7 @@ theorem cafArmedRetag [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
 section): the new node owes the row. -/
 theorem cafRetag [Icfg] (γfs : FsNames) (E : CoPset) (i : Nat) (n n' : FsNode) (R : IProp GF)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n') (evs : List Fev)
+    (hneu : evs.all fevNeutral = true)
     (hev : ∀ (h : List Fev) (I : RegMapF FsNode), PartialMap.get? I i = some n → fevTie h I →
       fevTie (h ++ evs) (PartialMap.insert I i n')) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
@@ -539,7 +541,7 @@ theorem cafRetag [Icfg] (γfs : FsNames) (E : CoPset) (i : Nat) (n n' : FsNode) 
     iapply (appStep_at i I _ n' rfl) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ Ha
   imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HR⟩
-  imod ftopLed_moveAt γfs I i n n' evs hlk (fun h ht => hev h I hlk ht) $$ Hled with ⟨Hled, #Hrc⟩
+  imod ftopLed_moveAt γfs I i n n' evs hlk hneu (fun h ht => hev h I hlk ht) $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists PartialMap.insert I i n', A
     iframe Ha Hla Hpark Hled
@@ -600,7 +602,7 @@ theorem cafArm_fire [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
   iintro #Hi #Hai Hrec Hcm Hf
   ihave Hcm := pfAt_au _ _ $$ Hcm
   obtain ⟨⟨hnz', habs'⟩, -⟩ := absOf_some_iff n' ⟨c, 1⟩ |>.1 hrow
-  iapply (cafArmedRetag γfs E k t q S i n n' (creArmFired Farm i) hE hin [.arm act i (fnodeOf c)]
+  iapply (cafArmedRetag γfs E k t q S i n n' (creArmFired Farm i) hE hin [.arm act i (fnodeOf c)] rfl
     (fun h I _ ht => fevTie_arm act c ht hnz' habs')) $$ Hi Hai Hrec [Hcm] Hf
   iintro %I %hlk Ha
   have hav : PartialMap.get? (absView I) i = none := by
@@ -642,7 +644,7 @@ theorem cafDots_fire [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
   obtain ⟨⟨hnz, habs⟩, -⟩ := absOf_some_iff n ⟨.ADir ∅, 1⟩ |>.1 hrow
   obtain ⟨⟨hnz', habs'⟩, -⟩ := absOf_some_iff n' ⟨.ADir (dotsEnts full i d), 1⟩ |>.1 hrow'
   iapply (cafArmedRetag γfs E k t q S i n n' (creDotsFired Fdots i d full) hE hin
-    (dotsEvs act full i d) (fun h I hi ht => fevTie_dots act full i d ht hi hnz habs hnz' habs'))
+    (dotsEvs act full i d) (by cases full <;> rfl) (fun h I hi ht => fevTie_dots act full i d ht hi hnz habs hnz' habs'))
     $$ Hi Hai Hrec [Hcm] Hf
   iintro %I %hlk Ha
   have hav : PartialMap.get? (absView I) i = some ⟨.ADir ∅, 1⟩ := by

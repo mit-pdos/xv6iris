@@ -36,7 +36,7 @@ set_option linter.unusedSimpArgs false
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-  [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+  [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx] [OffboxG GF]
 
 /-- The contract's ledger (the `∃ w u' Sb'` of `Xv6.wp_itrunc_gen_body`). -/
 def itLedger (crb cru : Bool) (u : Nat) (Sb : List Nat) (inum : BitVec 32) : IProp GF := iprop%

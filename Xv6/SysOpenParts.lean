@@ -343,10 +343,10 @@ step births the fd's off box on it (four fresh ghosts, then
 `kk`'s set -- the creator deposits and never absorbs.  Yields the fd's
 whole share, at the offset shadow's name `γo` (what the published
 descriptor's `.inode` reports). -/
-theorem sys_open_deposit [Icfg] [CurCtx] (cpu : CPU) (E : CoPset) (kk kf : Nat) (γo : GName)
+theorem sys_open_deposit [Icfg] [CurCtx] (cpu : CPU) (E : CoPset) (kk kf : Nat) (γo : GName) (om : OffMode)
     (C : FContent) (hE : ↑(ndot offBoxN kf) ⊆ E) (hkk : kk < NINODE) (hip : C.ip = ientry kk) :
-    ownCtx (GF := GF) cpu curCtx ∗ offResident curCtx γo kf ∗ offRows offCfg kk curCtx ⊢
-      |={E}=> ownCtx cpu curCtx ∗ offRows offCfg kk curCtx ∗ ∃ γb : BoxNames, offFd kf 1 γb γo C := by
+    ownCtx (GF := GF) cpu curCtx ∗ offResident curCtx γo (om == .held) kf ∗ offRows offCfg kk curCtx ⊢
+      |={E}=> ownCtx cpu curCtx ∗ offRows offCfg kk curCtx ∗ ∃ γb : BoxNames, offFd kf 1 γb γo om C := by
   iintro ⟨Hctx, Hres, Hrows⟩
   imod stampsAuth_alloc (GF := GF) (Id := Nat) with ⟨%gs, Hst⟩
   imod ghost_var_alloc (0 : Nat) with ⟨%gc, Hc⟩
@@ -355,7 +355,7 @@ theorem sys_open_deposit [Icfg] [CurCtx] (cpu : CPU) (E : CoPset) (kk kf : Nat) 
   let γb : BoxNames := ⟨gs, gc, gd, gp⟩
   ihave Hst := (show stampsAuth (GF := GF) ⟨gs, 0, 0, 0⟩ (∅ : StampMap Nat) ⊢
       stampsAuth γb (∅ : StampMap Nat) from .rfl) $$ Hst
-  imod offPublishPark cpu offCfg kk kf γb γo curCtx E hE $$ [Hst Hc Hd Hp Hctx Hres Hrows]
+  imod offPublishPark cpu offCfg kk kf γb γo (om == .held) curCtx E hE $$ [Hst Hc Hd Hp Hctx Hres Hrows]
     with ⟨Hctx, #Hbox, %T0, %T, Hregd, -, Hcnt, Href, #Hmem, Hrows⟩
   · iframe
   imodintro
@@ -394,7 +394,7 @@ theorem sys_open_publish [Icfg] [CurCtx] (omo : OffMode) (E : CoPset) (γ : File
     inodeRefShortGenlo (GF := GF) kk (s + s) s icfgDev inum g lo ∗ runitAny inum.toNat ∗
       inodeShrHeldGen (ientry kk) s g inum ∗ ityShot g ty ∗
       frefTok γ kf 1 ∗ fileFieldsAt curCtx kf 1 C ∗ fpayTok γ kf 1 pn ∗
-      (if C.type = FD_INODE then offFd kf 1 γb γo C else offFree kf 1) ⊢
+      (if C.type = FD_INODE then offFd kf 1 γb γo omo C else offFree kf 1) ⊢
       |={E}=> ∃ st : FdState, ⌜fdstateOk inum γo omo pn.pipe C st⌝ ∗ fileRef γ kf 1 st := by
   iintro ⟨Hkeep, Hru, Hs, #Hshot, Href, Hflds, Hnames, Hcoff⟩
   imod inodePay_alloc E kk s g lo inum C.type (fcWbool C) ty hkk hinb hipos
@@ -1089,6 +1089,21 @@ def sysOpenOffCell (kf : Nat) (C : FContent) (γo : GName) : IProp GF :=
       offGv γo 1 (vo.toNat : Int))
   else offFree kf 1
 
+/-- (NI M3 private files FS-2a′) **THE CELL AFTER THE INSTALL**, at the
+caller's mode: on the `FD_INODE` arm of a PARKED open the install has handed
+the fs ledger its quarter of the shadow (`FsWalkLed.ftopPkOpenAfterAt`), so
+the cell holds the kernel's half and the row's quarter beside the
+registration witness the row will carry; a HELD open's install takes nothing
+(the whole stays, for the box and the program).  The device arm as before. -/
+def sysOpenOffPost (om : OffMode) (kf : Nat) (C : FContent) (γo : GName) : IProp GF :=
+  if C.type = FD_INODE then
+    iprop(∃ vo : BitVec 32, wordAtN curCtx (aFoff kf) 4 (DFrac.own 1) vo ∗ ⌜offWf vo ∧ vo = 0#32⌝ ∗
+      match om with
+      | .parked => iprop(offGv γo (1 : Qp).half (vo.toNat : Int) ∗
+          offGv γo (1 : Qp).half.half (vo.toNat : Int) ∗ fevPkWit γo)
+      | .held => offGv γo 1 (vo.toNat : Int))
+  else offFree kf 1
+
 /-- (NI M3 private files FS-2b′) open's ledger receipt at the record's own
 path argument, omode and actor -/
 abbrev sysOpenLed (A : SysOpenArgs GF) : FdType → IProp GF :=
@@ -1390,7 +1405,8 @@ def sysOpenPubBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF 
     icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm -∗ sysOpenKeep kk s g inum -∗
     -- the fresh slot's raw pieces, carried across the tail
     frefTok A.γ kf 1 -∗ fileFieldsAt curCtx kf 1 C -∗ fpayTok A.γ kf 1 pn -∗
-    sysOpenOffCell kf C γo -∗
+    -- (NI M3 private files FS-2a′) the cell past the install, at the mode
+    sysOpenOffPost A.omo kf C γo -∗
     -- the untyped slot's own unit, released when the slot was opened
     irefSlot -∗
     -- the process, split at the descriptor table by fdalloc

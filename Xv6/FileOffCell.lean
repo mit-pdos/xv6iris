@@ -89,14 +89,19 @@ new word, the fs commit having moved the ghost (`offResident_of`).  Rocq
 4919630d6): the kernel's half at the value the cell holds, or -- once a fire
 has run at a HELD row with no link -- the application's taint and NO GHOST
 AT ALL, permanently (`offLink`).  The CELL is kept in both arms (the store
-`f->off += r` needs it); only the tie to the shadow is dropped. -/
-def offResident [CurCtx] (ξ : CtxId) (γo : GName) (k : Nat) : IProp GF := iprop%
+`f->off += r` needs it); only the tie to the shadow is dropped.
+
+(NI M3 private files FS-2a′) ...KEYED ON THE FILE's MODE `hd` (`offLinkB`):
+a PARKED file's box (`hd = false`) holds the BARE half -- the taint is
+HELD-ONLY, so a parked file's offset is always tied to its shadow, whose
+other quarters are the row's and the fs ledger's. -/
+def offResident [CurCtx] (ξ : CtxId) (γo : GName) (hd : Bool) (k : Nat) : IProp GF := iprop%
   ∃ v : BitVec 32, wordAtN ξ (aFoff k) 4 (DFrac.own 1) v ∗ ⌜offWf v⌝ ∗
-    offLink (hlc := hlc) γo (v.toNat : Int)
+    offLinkB (hlc := hlc) hd γo (v.toNat : Int)
 
 /-- Rocq's `off_hdr` CtxMorph (`ctx_morph_solve`). -/
-instance instCtxMorphOffResident [CurCtx] (γo : GName) (k : Nat) :
-    CtxMorph (GF := GF) (fun ξ => offResident ξ γo k) := by
+instance instCtxMorphOffResident [CurCtx] (γo : GName) (hd : Bool) (k : Nat) :
+    CtxMorph (GF := GF) (fun ξ => offResident ξ γo hd k) := by
   unfold offResident
   infer_instance
 
@@ -104,10 +109,10 @@ instance instCtxMorphOffResident [CurCtx] (γo : GName) (k : Nat) :
 commit moved both halves at the fire: a wf word and the kernel's half at
 exactly that word re-form the resident cell, no ghost step.  Rocq
 `off_resident_of`. -/
-theorem offResident_of [CurCtx] (ξ : CtxId) (γo : GName) (k : Nat) (v : BitVec 32)
+theorem offResident_of [CurCtx] (ξ : CtxId) (γo : GName) (hd : Bool) (k : Nat) (v : BitVec 32)
     (hwf : offWf v) :
     ⊢@{IProp GF} wordAtN ξ (aFoff k) 4 (DFrac.own 1) v -∗
-      offLink (hlc := hlc) γo (v.toNat : Int) -∗ offResident ξ γo k := by
+      offLinkB (hlc := hlc) hd γo (v.toNat : Int) -∗ offResident ξ γo hd k := by
   iintro Hc Hg
   unfold offResident
   iexists v

@@ -12,6 +12,11 @@ So an offset advance -- fileread's / filewrite's `f->off += r`, at the
 checkin of the cell -- needs BOTH halves at the instant, and the kernel gets
 the process's by a client obligation, never by owning it.
 
+(NI M3 private files FS-2a′: at a PARKED file the user side is two
+QUARTERS -- the row's invariant below, and the fs ledger's
+`FsLedger.ftopLed` at the fold's offset -- and the box's arm is the bare
+half, `offLinkB`; the HELD shapes are unchanged.)
+
 THE USER HALF.  `offUserInv γo`: the half parked in a PERSISTENT invariant
 with its value EXISTENTIAL and unconstrained.  This is what a process the
 GENERIC user-mode safety WP manages holds -- it knows nothing about its
@@ -114,6 +119,49 @@ theorem offGv_update_halves (z' : Int) (γo : GName) (z1 z2 : Int) :
       offGv γo (1 : Qp).half z' ∗ offGv γo (1 : Qp).half z' :=
   @ghost_var_update_halves GF Int OffboxG.offG z' γo z1 z2
 
+/-- (NI M3 FS-2a′) a half as its two quarters -/
+theorem offGv_quarters (γo : GName) (z : Int) :
+    offGv (GF := GF) γo (1 : Qp).half z ⊣⊢ offGv γo (1 : Qp).half.half z ∗ offGv γo (1 : Qp).half.half z := by
+  have h := offGv_split (GF := GF) γo (1 : Qp).half.half (1 : Qp).half.half z
+  rw [Qp.half_add_half] at h
+  exact h
+
+/-- (NI M3 FS-2a′) the whole shadow excludes any other share of it (`UserOff`'s
+`offGv_whole_half`, below the ledger) -/
+theorem offGv_whole_excl (γo : GName) (q : Qp) (z z' : Int) :
+    ⊢@{IProp GF} offGv γo 1 z -∗ offGv γo q z' -∗ False := by
+  unfold offGv
+  iintro H1 H2
+  ihave %hv := @ghost_var_valid_2 GF Int OffboxG.offG γo z (.own 1) z' (.own q) $$ H1 H2
+  exact absurd hv.1 (CMRA.not_valid_excl_op_left (x := (DFrac.own 1 : DFrac)))
+
+/-- (NI M3 FS-2a′) the whole as the kernel's half and two quarters -/
+theorem offGv_whole3 (γo : GName) (z : Int) :
+    offGv (GF := GF) γo 1 z ⊣⊢
+      offGv γo (1 : Qp).half z ∗ offGv γo (1 : Qp).half.half z ∗ offGv γo (1 : Qp).half.half z := by
+  refine (offGv_halves γo z).trans ?_
+  refine ⟨sep_mono_right (offGv_quarters γo z).1, sep_mono_right (offGv_quarters γo z).2⟩
+
+/-- (NI M3 FS-2a′) **THE THREE-PARTY ADVANCE**: a parked file's shadow is
+split ½ kernel (the off box) / ¼ ledger (`FsLedger.ftopLed`) / ¼ user (the
+row's invariant); the three agree, and together they move to any value. -/
+theorem offGv_update3 (z' : Int) (γo : GName) (z1 z2 z3 : Int) :
+    ⊢@{IProp GF} offGv γo (1 : Qp).half z1 -∗ offGv γo (1 : Qp).half.half z2 -∗
+      offGv γo (1 : Qp).half.half z3 ==∗
+      ⌜z2 = z1 ∧ z3 = z1⌝ ∗ offGv γo (1 : Qp).half z' ∗ offGv γo (1 : Qp).half.half z' ∗
+        offGv γo (1 : Qp).half.half z' := by
+  iintro H1 H2 H3
+  ihave %h12 := offGv_agree γo _ _ _ _ $$ H1 H2
+  ihave %h13 := offGv_agree γo _ _ _ _ $$ H1 H3
+  subst h12; subst h13
+  ihave H23 := (offGv_quarters γo z1).2 $$ [$H2 $H3]
+  imod offGv_update_halves z' γo z1 z1 $$ H1 H23 with ⟨H1, H23⟩
+  icases (offGv_quarters γo z').1 $$ H23 with ⟨H2, H3⟩
+  imodintro
+  isplitr
+  · ipureintro; exact ⟨rfl, rfl⟩
+  iframe H1 H2 H3
+
 end OffGv
 
 /-! ## THE USER HALF: the existential invariant
@@ -133,34 +181,40 @@ def foffN : Namespace := ndot (ndot nroot "app") "foff"
 section OffUser
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF]
 
-/-- The user half, parked with its value existential (Rocq `off_user_inv`). -/
+/-- The user half, parked with its value existential (Rocq `off_user_inv`).
+(NI M3 FS-2a′) A QUARTER, not a half: the other quarter of the user side is
+the fs ledger's (`FsLedger.ftopLed`), at the fold's offset, so a parked
+file's shadow is ½ kernel / ¼ ledger / ¼ user and no party moves it alone. -/
 def offUserInv (γo : GName) : IProp GF :=
-  inv foffN iprop(∃ z : Int, offGv γo (1 : Qp).half z)
+  inv foffN iprop(∃ z : Int, offGv γo (1 : Qp).half.half z)
 
 instance offUserInv_persistent (γo : GName) : Persistent (offUserInv (GF := GF) γo) := by
   unfold offUserInv
   infer_instance
 
 theorem offUserInv_alloc (E : CoPset) (γo : GName) (z : Int) :
-    ⊢@{IProp GF} offGv γo (1 : Qp).half z ={E}=∗ offUserInv γo := by
+    ⊢@{IProp GF} offGv γo (1 : Qp).half.half z ={E}=∗ offUserInv γo := by
   iintro H
   unfold offUserInv
-  iapply (inv_alloc foffN E iprop(∃ z : Int, offGv (GF := GF) γo (1 : Qp).half z))
+  iapply (inv_alloc foffN E iprop(∃ z : Int, offGv (GF := GF) γo (1 : Qp).half.half z))
   inext
   iexists z
   iexact H
 
-/-- THE MOVE, at any mask that contains the namespace: the kernel's half goes
-from any value to any value against the existential. -/
-theorem offUserInv_move (E : CoPset) (γo : GName) (z z' : Int) (hE : (↑foffN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} offUserInv γo -∗ offGv γo (1 : Qp).half z ={E}=∗ offGv γo (1 : Qp).half z' := by
+/-- THE MOVE, at any mask that contains the namespace (NI M3 FS-2a′: the
+three-party form): the kernel's half and the LEDGER's quarter, which agree,
+go from their value to any value against the row's existential quarter.
+The ledger's quarter is what pins the value (`FsLedger.ftopLed_pkAdv`). -/
+theorem offUserInv_move (E : CoPset) (γo : GName) (z zl z' : Int) (hE : (↑foffN : CoPset) ⊆ E) :
+    ⊢@{IProp GF} offUserInv γo -∗ offGv γo (1 : Qp).half z -∗ offGv γo (1 : Qp).half.half zl ={E}=∗
+      ⌜zl = z⌝ ∗ offGv γo (1 : Qp).half z' ∗ offGv γo (1 : Qp).half.half z' := by
   unfold offUserInv
-  iintro #Hinv Hk
+  iintro #Hinv Hk Hl
   ihave Hacc := inv_acc (E := E) (N := foffN)
-    (P := iprop(∃ z : Int, offGv (GF := GF) γo (1 : Qp).half z)) hE $$ Hinv
+    (P := iprop(∃ z : Int, offGv (GF := GF) γo (1 : Qp).half.half z)) hE $$ Hinv
   imod Hacc with ⟨Hbody, Hclose⟩
   icases Hbody with ⟨%zu, >Hu⟩
-  imod offGv_update_halves z' γo z zu $$ Hk Hu with ⟨Hk, Hu⟩
+  imod offGv_update3 z' γo z zl zu $$ Hk Hl Hu with ⟨%heq, Hk, Hl, Hu⟩
   ihave Hcl := Hclose $$ [Hu]
   case' _ =>
     inext
@@ -168,7 +222,9 @@ theorem offUserInv_move (E : CoPset) (γo : GName) (z z' : Int) (hE : (↑foffN 
     iexact Hu
   imod Hcl
   imodintro
-  iexact Hk
+  isplitr
+  · ipureintro; exact heq.1
+  iframe Hk Hl
 
 /-! ### The coupling, or the taint (Rocq lane OFF-LINK's L3)
 
@@ -203,6 +259,24 @@ theorem offLink_taint (γo : GName) (z : Int) :
   iintro H
   iright
   iexact H
+
+/-- (NI M3 FS-2a′) **THE BOX's ARM, KEYED ON THE FILE's MODE**: a PARKED
+file's box holds the kernel's BARE half (its user quarter is the row's, its
+ledger quarter the fs ledger's, and no commit is ever lent it: the taint is
+held-only); a HELD file's box holds `offLink` (the half, or the taint).
+`held` is `OffMode.held`'s flag (the mode type sits above this file). -/
+def offLinkB (held : Bool) (γo : GName) (z : Int) : IProp GF :=
+  if held then offLink (hlc := hlc) γo z else offGv γo (1 : Qp).half z
+
+instance offLinkB_timeless (held : Bool) (γo : GName) (z : Int) :
+    Timeless (offLinkB (hlc := hlc) (GF := GF) held γo z) := by
+  unfold offLinkB; cases held <;> (simp only [Bool.false_eq_true, if_false, if_true]; infer_instance)
+
+theorem offLinkB_held (γo : GName) (z : Int) :
+    offLinkB (hlc := hlc) (GF := GF) true γo z = offLink (hlc := hlc) γo z := rfl
+
+theorem offLinkB_parked (γo : GName) (z : Int) :
+    offLinkB (hlc := hlc) (GF := GF) false γo z = offGv γo (1 : Qp).half z := rfl
 
 /-- WHAT THE COMMIT HANDS BACK (Rocq `off_ret`, lane WRITE-RELAY): the half
 comes back UNMOVED or ADVANCED BY THE COUNT `d`, either arm possibly the

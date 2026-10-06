@@ -100,7 +100,7 @@ theorem il_box_rec (dn : Dinode) (hf : freshShape dn) (hty : iregTyOk dn) :
 
 section Fill
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [OffboxG GF]
 
 /-- What the fill hands on to the type test (Rocq 1123-1152): EITHER the
 record's fragment, the licence's payout and the whole loaded bundle's
@@ -216,7 +216,7 @@ theorem il_fill_box [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     unfold fnNlink; rw [eraNode_rec]; exact hnl
   imod iregTopRetag_ev ⊤ γfs inum.toNat n0 _
     [.claim act inum.toNat (fnodeOf (absNode (eraNode ds[islot inum]! bmEmpty
-      (fun _ => List.replicate BSIZE 0))))] CoPset.subseteq_top habs hloc
+      (fun _ => List.replicate BSIZE 0))))] CoPset.subseteq_top habs hloc rfl
     (fun h I _ ht => fevTie_move _ _ _ ht (by
       rw [fevRows_claim, ftopRow_typed _ hnzb]
       simp only [absRow, hnlb]))

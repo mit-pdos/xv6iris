@@ -38,7 +38,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section WalkLed
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF]
-  [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsTopG GF] [FsBytesG GF]
+  [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsTopG GF] [FsBytesG GF] [OffboxG GF]
 
 /-- **AN OBSERVATION AT A HELD ROW, APPENDED PAST A BOUND THE CALLER HOLDS**:
 the fragment pins the row in the fold before the event, the authority pins
@@ -63,6 +63,37 @@ theorem ftopObsAfterAt [Icfg] (γfs : FsNames) (E : CoPset) (hE : (↑ftopN : Co
     ipureintro; exact hcl
   imodintro
   iframe Hf
+  iexists h
+  iframe Hr
+  ipureintro; exact ⟨hh.2, fevTie_row i n hh.1 hlk⟩
+
+/-- (NI M3 private files FS-2a′) **open's PARKED INSTALL, AT THE ROW, AFTER A
+LOWER BOUND**: `ftopObsAfterAt`'s twin for a parked inode install, the WHOLE
+fresh shadow in hand: the ledger keeps its quarter (`FsLedger.ftopLed_pkOpen`),
+the kernel's half and the row's quarter come back with the registration
+witness the descriptor row will carry. -/
+theorem ftopPkOpenAfterAt [Icfg] (γfs : FsNames) (E : CoPset) (hE : (↑ftopN : CoPset) ⊆ E)
+    (a : BitVec 64) (i : Nat) (γo : GName) (po : Option Nat) (L : List Fev) (dq : DFrac) (n : FsNode) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ fsLedLb γfs L -∗ topFragQ (fsGammaL γfs) dq i n -∗
+      offGv γo 1 0 ={E}=∗
+      topFragQ (fsGammaL γfs) dq i n ∗ offGv γo (1 : Qp).half 0 ∗ offGv γo (1 : Qp).half.half 0 ∗
+      fevPkWit γo ∗
+      ∃ h : List Fev, ⌜L <+: h ∧ fevRows h i = ftopRow n⌝ ∗ fsLedLb γfs (h ++ [.open a i γo false po]) := by
+  iintro #Hi #HL Hf Hw
+  unfold ftopInv
+  imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs) hE) $$ Hi
+    with ⟨Hb, Hclose⟩
+  unfold ftopBody
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
+  unfold topFragQ fsGammaL
+  ihave %hlk := ghost_map_lookup $$ Ha Hf
+  imod ftopLed_pkOpen γfs I a i γo po L $$ HL Hw Hled with ⟨Hled, Hk, Hu, #Hwit, ⟨%h, %hh, #Hr⟩⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
+  · iexists I, A
+    iframe Ha Hla Hpark Hled
+    ipureintro; exact hcl
+  imodintro
+  iframe Hf Hk Hu Hwit
   iexists h
   iframe Hr
   ipureintro; exact ⟨hh.2, fevTie_row i n hh.1 hlk⟩

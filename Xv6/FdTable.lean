@@ -224,9 +224,12 @@ theorem fdSt_alloc (n : Nat) :
 (`offUserInv`, what fileread/filewrite advance `f->off` against); a HELD one
 claims nothing (the half is in the program's hands); every other row is
 `True`.  PERSISTENT and a PURE FUNCTION OF THE STATE, so every site that
-threads the bundle opaquely is untouched. -/
+threads the bundle opaquely is untouched.  (NI M3 private files FS-2a′) A
+parked row ALSO carries the fs ledger's registration of the shadow
+(`FsLedger.fevPkWit`, minted by open's install): what lets a fire find the
+ledger's quarter of the offset. -/
 def foffRow : FdState → IProp GF
-  | .open _ _ (.inode _ γo .parked) => offUserInv γo
+  | .open _ _ (.inode _ γo .parked) => iprop(offUserInv γo ∗ fevPkWit γo)
   | .open _ _ (.inode _ _ .held) => iprop(emp)
   | _ => iprop(True)
 
@@ -248,7 +251,7 @@ theorem foffRow_pipe (r w : Bool) (γp : PipeNames) : ⊢ foffRow (GF := GF) (.o
 `foff_row_inode_of`). -/
 theorem foffRow_inode_of (st : FdState) (r w : Bool) (i : Nat) (γo : GName)
     (h : st = .open r w (.inode i γo .parked)) :
-    foffRow (GF := GF) st ⊢ offUserInv γo := by
+    foffRow (GF := GF) st ⊢ offUserInv γo ∗ fevPkWit γo := by
   subst h; unfold foffRow; iintro H; iexact H
 
 /-- What a publish owes the row of the descriptor it fills (Rocq

@@ -425,6 +425,104 @@ theorem writeArmsAt_neg_held (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : 
   simp only [List.length_nil, Nat.add_zero, Nat.zero_sub, awriteChainAt_0]
   iexact Hc
 
+/-! ### (NI M3 private files FS-2a′) The PARKED row's arms
+
+A parked row's chain is the parked one (`FsAbsWriteFire.awriteChainPk`,
+lent nothing of the offset), so its residues are parked chains: the same
+two arms over `awriteChainPkAt`. -/
+
+/-- ret n at a parked row -/
+def writePostOkPk (Γ : FsViewNames GF) (i : Nat) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) : IProp GF :=
+  iprop(∃ bss : List (List (BitVec 8)),
+    ⌜(bss.flatten.length : Int) = n⌝ ∗ ⌜bss.length ≤ wchunks n⌝ ∗
+    ⌜ubytesAt M ua bss.flatten⌝ ∗
+    awriteChainPkAt Γ appE i M ua P n Q bss.length (wchunks n - bss.length))
+
+/-- ret -1 at a parked row -/
+def writePostFailPk (Γ : FsViewNames GF) (i : Nat) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) : IProp GF :=
+  iprop(∃ (bss : List (List (BitVec 8))) (x : Nat),
+    ⌜(bss.flatten.length : Int) < n ∨ (n < 0 ∧ bss = [])⌝ ∗
+    ⌜bss.length + x ≤ wchunks n⌝ ∗ ⌜x ≤ 1⌝ ∗
+    ⌜ubytesAt M ua bss.flatten⌝ ∗
+    awriteChainPkAt Γ appE i M ua P n Q (bss.length + x) (wchunks n - bss.length - x))
+
+/-- the two arms at a parked row -/
+def writeArmsPk (Γ : FsViewNames GF) (i : Nat) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) : IProp GF :=
+  iprop((⌜r = BitVec.ofInt 64 n ∧ 0 ≤ n⌝ ∗ writePostOkPk Γ i P n M ua Q) ∨
+    (⌜r = -1#64⌝ ∗ writePostFailPk Γ i P n M ua Q))
+
+/-- the sign guard's exit at a parked row -/
+theorem writeArmsPk_neg (Γ : FsViewNames GF) (i : Nat) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (hn : n < 0) :
+    awriteChainPk Γ appE i M ua n Q 0 (wchunks n) ⊢ writeArmsPk Γ i P n M ua Q (-1#64) := by
+  unfold writeArmsPk writePostFailPk
+  iintro Hc
+  ihave Hc := awriteChainPkAt_of Γ appE i M ua n Q 0 (wchunks n) P $$ Hc
+  iright
+  isplitr
+  · ipureintro; rfl
+  iexists [], 0
+  rw [wchunks_nonpos n (by omega)]
+  isplitr
+  · ipureintro; exact Or.inr ⟨hn, rfl⟩
+  isplitr
+  · ipureintro; simp
+  isplitr
+  · ipureintro; omega
+  isplitr
+  · ipureintro; exact ubytesAt_nil M ua
+  iexact Hc
+
+/-- (NI M3 FS-2a′) the arms at a row's mode: the parked residues at a parked
+row, the landed ones at a held row -/
+def writePostOkOm (om : OffMode) (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) : IProp GF :=
+  match om with
+  | .parked => writePostOkPk Γ i P n M ua Q
+  | .held => writePostOkAt (hlc := hlc) Γ i γo P n M ua Q
+
+def writePostFailOm (om : OffMode) (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) : IProp GF :=
+  match om with
+  | .parked => writePostFailPk Γ i P n M ua Q
+  | .held => writePostFailAt (hlc := hlc) Γ i γo P n M ua Q
+
+def writeArmsOm (om : OffMode) (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) : IProp GF :=
+  match om with
+  | .parked => writeArmsPk Γ i P n M ua Q r
+  | .held => writeArmsAt (hlc := hlc) Γ i γo P n M ua Q r
+
+theorem writeArmsOm_ok (om : OffMode) (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64)
+    (hr : r = BitVec.ofInt 64 n ∧ 0 ≤ n) :
+    writePostOkOm (hlc := hlc) om Γ i γo P n M ua Q ⊢ writeArmsOm (hlc := hlc) om Γ i γo P n M ua Q r := by
+  cases om with
+  | parked =>
+    show writePostOkPk Γ i P n M ua Q ⊢ writeArmsPk Γ i P n M ua Q r
+    unfold writeArmsPk
+    iintro H; ileft; iframe H; ipureintro; exact hr
+  | held =>
+    show writePostOkAt (hlc := hlc) Γ i γo P n M ua Q ⊢ writeArmsAt (hlc := hlc) Γ i γo P n M ua Q r
+    unfold writeArmsAt
+    iintro H; ileft; iframe H; ipureintro; exact hr
+
+theorem writeArmsOm_fail (om : OffMode) (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) :
+    writePostFailOm (hlc := hlc) om Γ i γo P n M ua Q ⊢ writeArmsOm (hlc := hlc) om Γ i γo P n M ua Q (-1#64) := by
+  cases om with
+  | parked =>
+    show writePostFailPk Γ i P n M ua Q ⊢ writeArmsPk Γ i P n M ua Q (-1#64)
+    unfold writeArmsPk
+    iintro H; iright; iframe H; ipureintro; rfl
+  | held =>
+    show writePostFailAt (hlc := hlc) Γ i γo P n M ua Q ⊢ writeArmsAt (hlc := hlc) Γ i γo P n M ua Q (-1#64)
+    unfold writeArmsAt
+    iintro H; iright; iframe H; ipureintro; rfl
+
 /-! ### (NI M3 FS-0) WHY a writable inode's write answered `-1`
 
 The sign guard (`n < 0`), or a SHORT CHUNK, whose reason writei relays
@@ -494,8 +592,8 @@ post: at a writable inode descriptor, the chunks that moved the row, one
 descriptors carry nothing. -/
 def fwRcptAt (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (r : BitVec 64) : IProp GF :=
   match st with
-  | .open _ true (.inode i γo _) =>
-    iprop(∃ cs : List Fev, fwChunks γfs act i γo cs ∗ ⌜r ≠ -1#64 → fwSum cs = n.toNat⌝)
+  | .open _ true (.inode i γo om) =>
+    iprop(∃ cs : List Fev, fwChunks γfs act i γo (om == .held) cs ∗ ⌜r ≠ -1#64 → fwSum cs = n.toNat⌝)
   | _ => iprop(True)
 
 instance fwRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (r : BitVec 64) :
@@ -670,9 +768,10 @@ def filewriteIn (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : Bit
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) : IProp GF :=
   match st with
   -- KEYED ON THE ROW'S OFFSET MODE (Rocq lane OFF-LINK-4): a PARKED row pays
-  -- what it always paid, a HELD one `link ∨ taint` (`filewriteInHeld`)
-  | .open _ true (.inode i γo .parked) =>
-    awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n)
+  -- what it always paid, a HELD one `link ∨ taint` (`filewriteInHeld`);
+  -- (NI M3 FS-2a′) a parked row the parked chain, lent nothing
+  | .open _ true (.inode i _ .parked) =>
+    awriteChainPk (fsGammaL fscFs) appE i M ua n Q 0 (wchunks n)
   | .open _ true (.inode i γo .held) => filewriteInHeld (hlc := hlc) pmv szv lzv i γo n M ua Q
   | .open _ true (.device _) =>
     consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat
@@ -691,7 +790,8 @@ callee was consolewrite. -/
 def filewriteExtra (gn : GName) (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8))
     (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) : IProp GF :=
   match st with
-  | .open _ true (.inode i γo _) => writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo P n M ua Q r
+  | .open _ true (.inode i _ .parked) => writeArmsPk (fsGammaL fscFs) i P n M ua Q r
+  | .open _ true (.inode i γo .held) => writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo P n M ua Q r
   | .open _ true (.device mj) => if mj = CONSOLE then writeConsArms P ua Q n r else emp
   -- THE PIPE ARM: pipewrite's queue post -- the chain at the stop cursor with
   -- the answer's reason (the kill arm with the killer's credential, Rocq lane
@@ -700,6 +800,14 @@ def filewriteExtra (gn : GName) (P : UPtd) (st : FdState) (n : Int) (M : Nat →
     pipeWpost (hlc := hlc) P γp.pnQueue M ua Q Qe
       iprop(killShot gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat r
   | _ => emp
+
+/-- (NI M3 FS-2a′) a writable inode row's extra IS the arms at its mode -/
+theorem filewriteExtra_inode (gn : GName) (P : UPtd) (rb : Bool) (i : Nat) (γo : GName) (om : OffMode)
+    (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
+    (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) :
+    filewriteExtra (hlc := hlc) gn P (.open rb true (.inode i γo om)) n M ua Q Qe r =
+      writeArmsOm (hlc := hlc) om (fsGammaL fscFs) i γo P n M ua Q r := by
+  cases om <;> rfl
 
 /-- THE WHOLE POST'S ARMED PART (Rocq `filewrite_arms`): the landed blanket
 beside the arm's extra. -/
@@ -712,7 +820,7 @@ walk's carrier is initialised from. -/
 def filewriteInInodeOm (om : OffMode) (i : Nat) (γo : GName) (n : Int) (M : Nat → List (BitVec 8))
     (ua : BitVec 64) (Q : Nat → IProp GF) : IProp GF :=
   match om with
-  | .parked => awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n)
+  | .parked => awriteChainPk (fsGammaL fscFs) appE i M ua n Q 0 (wchunks n)
   | .held => filewriteInHeld (hlc := hlc) pmv szv lzv i γo n M ua Q
 
 /-- Rocq `filewrite_in_inode_any`. -/
@@ -822,7 +930,7 @@ theorem filewriteExtra_neg (gn : GName) (P : UPtd) (st : FdState) (n : Int) (M :
         | parked =>
           unfold filewriteIn filewriteExtra
           iintro Hc
-          iapply writeArmsAt_neg _ i g P n M ua Q hn $$ Hc
+          iapply writeArmsPk_neg _ i P n M ua Q hn $$ Hc
         | held =>
           unfold filewriteIn filewriteExtra filewriteInHeld
           iintro (Hc | ⟨Hc, -⟩)

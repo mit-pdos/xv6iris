@@ -228,7 +228,7 @@ theorem dirlookup_lic_live (dn : Dinode) (data : Nat → List (BitVec 8))
 
 /-- **WP of `dirlookup(dp = a0, name = a1, poff = a2)`** (Rocq's
 `wp_dirlookup_sconf_body`). -/
-def wp_dirlookup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_dirlookup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -330,7 +330,7 @@ def wp_dirlookup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
 /-- The eb-generic form of `wp_dirlookup_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_dirlookup_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_dirlookup_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -432,7 +432,7 @@ def wp_dirlookup_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 /-- The interface of `dirlookup` (Rocq's `Module Type DIRLOOKUP`; its one
 field is Rocq's `wp_dirlookup_sconf`). -/
 structure DIRLOOKUP : Prop where
-  wp_dirlookup_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_dirlookup_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]

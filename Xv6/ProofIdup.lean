@@ -88,7 +88,7 @@ theorem id_filter_itable (l : List String) (h : "itable" ∉ l) :
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
-  [FsLinkG GF] [Appcfg GF]
+  [FsLinkG GF] [Appcfg GF] [OffboxG GF]
 
 /-! ## The store rule with the stored word pinned -/
 
@@ -401,7 +401,7 @@ end
 /-! ## The public contract: ONE PACKAGE IN, TWO OUT (Rocq `wp_idup_sconf`) -/
 
 theorem idup_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : IDUP := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k kk z hnoff hK hkk hlk ha0 => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k kk z hnoff hK hkk hlk ha0 => by
   unfold wp_idup_body
   simp only [idupAddr]
   iintro ⟨Hk, Hpc, #Hit, #Hinv, #Hrinv, Hislot, Hheld, Hnext⟩
@@ -440,7 +440,7 @@ theorem idup_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : IDUP := ⟨
     isplitr; · ipureintro; exact hz
     iframe Hnew Hru2,
   -- THE SHARE FORM, PUBLIC (chroot.md §2.2): the core, verbatim
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k kk s inum hnoff hK hkk hlk ha0 => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k kk s inum hnoff hK hkk hlk ha0 => by
   unfold wp_idup_shr_body
   simp only [idupAddr]
   exact idup_core AC RE cpu k kk s inum hnoff hK hkk hlk ha0⟩

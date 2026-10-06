@@ -186,7 +186,7 @@ end Env
 section Dirty
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [LogG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [FsBytesG GF]
-  [Appcfg GF] [Fscfg] [Icfg]
+  [Appcfg GF] [Fscfg] [Icfg] [OffboxG GF]
 
 /-- THE CHILD'S ROW IS SUSPENDED (Rocq's `cr_dirty`): between create's
 `ip->nlink = 1` flush and its two interior dot entries a mkdir's child is a
@@ -324,7 +324,7 @@ theorem create_unarm_fire_nd (γfs : FsNames) (E : CoPset) (i : Nat) (c : Absnod
         fsMoveRcpt γfs [.nlink act i 0] i n := by
   iintro #Hi #Hai Hcm Hf
   obtain ⟨⟨hnz, habs⟩, -⟩ := absOf_some_iff n ⟨c, 1⟩ |>.1 hrow
-  iapply (cafRetag γfs E i n n' (creUnarmFired Fun i) hE hloc [.nlink act i 0]
+  iapply (cafRetag γfs E i n n' (creUnarmFired Fun i) hE hloc [.nlink act i 0] rfl
     (fun h I hi ht => fevTie_nlink act c 1 0 ht hi hnz habs hrow0.1 hrow0.2)) $$ Hi Hai [Hcm] Hf
   iintro %I %hlk Ha
   have hav : PartialMap.get? (absView I) i = some ⟨c, 1⟩ := by
@@ -360,7 +360,7 @@ theorem create_unarm_fire_armed_nd (γfs : FsNames) (E : CoPset) (k t : Nat) (q 
         fsMoveRcpt γfs [.nlink act i 0] i n := by
   iintro #Hi #Hai Hrec Hcm Hf
   obtain ⟨⟨hnz, habs⟩, -⟩ := absOf_some_iff n ⟨c, 1⟩ |>.1 hrow
-  iapply (cafArmedRetag γfs E k t q S i n n' (creUnarmFired Fun i) hE hin [.nlink act i 0]
+  iapply (cafArmedRetag γfs E k t q S i n n' (creUnarmFired Fun i) hE hin [.nlink act i 0] rfl
     (fun h I hi ht => fevTie_nlink act c 1 0 ht hi hnz habs hrow0.1 hrow0.2)) $$ Hi Hai Hrec [Hcm] Hf
   iintro %I %hlk Ha
   have hav : PartialMap.get? (absView I) i = some ⟨c, 1⟩ := by

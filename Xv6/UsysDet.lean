@@ -698,28 +698,32 @@ stop are then refuted, R4).  The answers read the CITED fs prefix
 (`UIota.fev`), which closes on the round's own decisive event -- the fork
 row's pattern, so no row reads `fpos`:
 
-* read: the cited prefix ends in the round's `read act i γo off d`; the
+* read: the cited prefix ends in the round's `read act i γo false off d`; the
   bytes are `fevReadOut` -- the file row's content in the fold BEFORE the
-  event, from the RECORDED offset `off`, at most the request (`-1` at a
-  negative request, nothing written).  The offset is RECORDED AS GIVEN
-  (ruling (C)): the fold's own `fevOff` is not yet tied to the real
-  `f->off` (FS-2a′ ties it and FS-4 derives the recorded offsets,
-  `fevOffWf`).  "Regular file" is the cited row's type (`fevReadDir`, the
-  class's `fdir` reading): a directory's raw bytes are not in the view.
+  event, from the FOLD's offset for `γo` (`fevReadBytes`), at most the
+  request (`-1` at a negative request, nothing written).  (NI M3 FS-2a′) The
+  offset is DERIVED: at a parked descriptor (the class's, `fdRdIno`) the
+  real offset the read used IS the fold's (the fs ledger's quarter share of
+  the shadow; `NiFs.fevOffWf`, carried by the read's receipt).  "Regular
+  file" is the cited row's type (`fevReadDir`, the class's `fdir` reading):
+  a directory's raw bytes are not in the view.
 * write: `n` at a non-negative request, `-1` when the cited prefix ends in
   the caller's out-of-resources verdict (`fevFullBy`: a chunk short at
   out-of-blocks, or writei's `-1` at the file's size cap from the offset,
   `FsFull.max`) -- the verdicts RECORDED AS GIVEN (R3).  The chunks
   themselves are not read by the answer (FS-4's `fout`). -/
 
-/-- the row at argument 0 is a READABLE inode descriptor -/
+/-- the row at argument 0 is a READABLE inode descriptor -- (NI M3 private
+files FS-2a′) a PARKED one: a held descriptor's offset is its program's own
+datum, outside the fs ledger's tracked offsets, so it stays out of the class -/
 def fdRdIno : Option FdState → Bool
-  | some (.open true _ (.inode _ _ _)) => true
+  | some (.open true _ (.inode _ _ .parked)) => true
   | _ => false
 
-/-- the row at argument 0 is a WRITABLE inode descriptor -/
+/-- the row at argument 0 is a WRITABLE inode descriptor -- (NI M3 private
+files FS-2a′) a PARKED one, as `fdRdIno` -/
 def fdWrIno : Option FdState → Bool
-  | some (.open _ true (.inode _ _ _)) => true
+  | some (.open _ true (.inode _ _ .parked)) => true
   | _ => false
 
 /-- the key's window of `m` bytes from `a`: every byte's page in the

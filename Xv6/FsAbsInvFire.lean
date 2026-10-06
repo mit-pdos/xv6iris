@@ -66,7 +66,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section FsAbsInvFire
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
-  [Appcfg GF]
+  [Appcfg GF] [OffboxG GF]
 
 /-! ## 1.  The walk premises: every hop says yes, every cursor is `True` -/
 
@@ -172,6 +172,18 @@ theorem fsabsAwriteChain [OffboxG GF] (γfs : FsNames) (i : Nat) (γo : GName)
       awriteChain (hlc := hlc) (fsGammaL γfs) appE i γo M ua n (fun _ => iprop(True)) k cnt :=
   awriteChain_unit γfs appE i γo M ua n k cnt
 
+/-- (NI M3 private files FS-2a′) read's PARKED piece, FROM NOTHING -/
+theorem fsabsAreadPk (Γ : FsViewNames GF) (i : Nat) :
+    ⊢ pfAt (areadCommitPk Γ appE i) (pfamTriv (fun _ _ _ _ => iprop(True))) :=
+  (areadCommitPk_unit Γ appE i).trans (pfAt_triv _ _)
+
+/-- (NI M3 private files FS-2a′) write's PARKED chain, out of the supply -/
+theorem fsabsAwriteChainPk (γfs : FsNames) (i : Nat)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (k cnt : Nat) :
+    appSup (GF := GF) ⊢
+      awriteChainPk (fsGammaL γfs) appE i M ua n (fun _ => iprop(True)) k cnt :=
+  awriteChainPk_unit γfs appE i M ua n k cnt
+
 /-! ## 3.  The keyed inputs of read and write -/
 
 /-- **Rocq `fsabs_fileread_in`**: read's whole input at the trivial families
@@ -204,7 +216,7 @@ theorem fsabsFilereadIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (n : Int) 
     cases om with
     | parked =>
       unfold areadInOm
-      iapply (fsabsAread (hlc := hlc) (fsGammaL fscFs) i γo)
+      iapply (fsabsAreadPk (hlc := hlc) (fsGammaL fscFs) i)
     | held =>
       unfold areadInOm
       iright
@@ -243,7 +255,7 @@ theorem fsabsFilewriteIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (n : Int)
     -- at a HELD row the generic tier takes the RIGHT arm, the same chain
     -- beside the taint it already holds
     cases om with
-    | parked => iapply (fsabsAwriteChain (hlc := hlc) fscFs i γo M ua n 0 (wchunks n)) $$ Hsup
+    | parked => iapply (fsabsAwriteChainPk (hlc := hlc) fscFs i M ua n 0 (wchunks n)) $$ Hsup
     | held =>
       unfold filewriteInHeld
       iright

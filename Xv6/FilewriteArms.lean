@@ -101,23 +101,45 @@ theorem fwr_arm_neg (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl :
 
 /-- THE INODE ARM'S INPUT AT A ZERO COUNT, at either mode: the chain at
 the kernel's table (at a held row the client-advanced chain converts down,
-`awriteChainAt_of_adv`; on its taint arm the plain chain is there). -/
+`awriteChainAt_of_adv`; on its taint arm the plain chain is there), as the
+OK post's empty prefix; (NI M3 private files FS-2a′) at a parked row the
+parked chain. -/
 theorem fwr_in_zero (rb : Bool) (i : Nat) (γo : GName) (om : OffMode) (M : Nat → List (BitVec 8))
     (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool) (P : UPtd)
     (htb : wrTb pmv szv lzv P) :
     filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.inode i γo om)) 0 M ua Q Qe ⊢
-      awriteChainAt (hlc := hlc) (fsGammaL fscFs) appE i γo M ua P 0 Q 0 (wchunks 0) := by
+      writePostOkOm (hlc := hlc) om (fsGammaL fscFs) i γo P 0 M ua Q := by
   cases om with
   | parked =>
-    unfold filewriteIn
+    show awriteChainPk (fsGammaL fscFs) appE i M ua 0 Q 0 (wchunks 0) ⊢ writePostOkPk (fsGammaL fscFs) i P 0 M ua Q
     iintro Hc
-    iapply awriteChainAt_of (hlc := hlc) (fsGammaL fscFs) appE i γo M ua 0 Q 0 (wchunks 0) P $$ Hc
+    ihave Hc := awriteChainPkAt_of (fsGammaL fscFs) appE i M ua 0 Q 0 (wchunks 0) P $$ Hc
+    unfold writePostOkPk
+    iexists []
+    isplitr
+    · ipureintro; rfl
+    isplitr
+    · ipureintro; simp
+    isplitr
+    · ipureintro; exact ubytesAt_nil _ _
+    iexact Hc
   | held =>
-    unfold filewriteIn filewriteInHeld
-    iintro (Hc | ⟨Hc, -⟩)
-    · ispecialize Hc $$ %P %htb
-      iapply awriteChainAt_of_adv $$ Hc
-    · iapply awriteChainAt_of (hlc := hlc) (fsGammaL fscFs) appE i γo M ua 0 Q 0 (wchunks 0) P $$ Hc
+    show filewriteInHeld (hlc := hlc) pmv szv lzv i γo 0 M ua Q ⊢ writePostOkAt (hlc := hlc) (fsGammaL fscFs) i γo P 0 M ua Q
+    unfold filewriteInHeld writePostOkAt
+    iintro Hc
+    ihave Hc : awriteChainAt (hlc := hlc) (fsGammaL fscFs) appE i γo M ua P 0 Q 0 (wchunks 0) $$ [Hc]
+    · icases Hc with (Hc | ⟨Hc, -⟩)
+      · ispecialize Hc $$ %P %htb
+        iapply awriteChainAt_of_adv $$ Hc
+      · iapply awriteChainAt_of (hlc := hlc) (fsGammaL fscFs) appE i γo M ua 0 Q 0 (wchunks 0) P $$ Hc
+    iexists []
+    isplitr
+    · ipureintro; rfl
+    isplitr
+    · ipureintro; simp
+    isplitr
+    · ipureintro; exact ubytesAt_nil _ _
+    iexact Hc
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0x126`: THE ZERO TRIP** (Rocq's `+0x116`): the hoisted `n <= 0`
@@ -172,22 +194,11 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
   · -- the chain at the writer's table, at EITHER mode (Rocq L2: the
     -- zero-trip exit pays at the file's mode too)
     ihave Hc := fwr_in_zero rb i γo om (writerImg V.upt M) (k.regs 11#5) Q Qe pmv szv lzv V.upt htb $$ Hin
-    unfold filewriteArms filewriteExtra
-    rw [ha0]
+    unfold filewriteArms
+    rw [filewriteExtra_inode, ha0]
     isplitr
     · ipureintro; exact filewriteRet_all 0 (Int.le_refl 0)
-    unfold writeArmsAt writePostOkAt
-    ileft
-    isplitr
-    · ipureintro; exact ⟨rfl, Int.le_refl 0⟩
-    iexists []
-    isplitr
-    · ipureintro; rfl
-    isplitr
-    · ipureintro; simp
-    isplitr
-    · ipureintro; exact ubytesAt_nil _ _
-    iexact Hc
+    iapply writeArmsOm_ok _ _ _ _ _ _ _ _ _ _ ⟨rfl, Int.le_refl 0⟩ $$ Hc
   · -- (NI M3 FS-0) the answer is 0, not -1
     iapply fwWhyAt_ne; rw [ha0]; decide
   iapply fwRcptAt_nil; right; left; rfl

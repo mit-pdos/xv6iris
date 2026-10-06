@@ -215,7 +215,7 @@ structure WiSizeOk [Fscfg] (A : WiArgs) (src : BitVec 64) (tot : Nat) (bm' : Blk
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-  [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+  [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx] [OffboxG GF]
 
 /-- The persistent environment every stage carries. -/
 def wiEnv (Γ : SchedNames) (A : WiArgs) : IProp GF := iprop%
@@ -449,7 +449,7 @@ structure WiFactsEb [Fscfg] [Icfg] (k : KCtx) (A : WiArgs) : Prop where
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-  [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+  [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx] [OffboxG GF]
 
 /-- **THE CONTINUATION, HART-FREE** (the eb contract's, `wpNext true` at a
 proc read at every hart; the complement comes back at the caller's `SIE`). -/

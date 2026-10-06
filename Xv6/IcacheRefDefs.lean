@@ -720,10 +720,17 @@ class Icfg where
   icfgBox : Nat → BoxNames
   /-- R4b: the per-slot set of published off boxes (deviation 6) -/
   icfgOff : Nat → GName
+  /-- (NI M3 private files FS-2a′) THE FS LEDGER's MIRROR: a mono-list of
+  `NiFs.Fev` the era's ledger authority (`FsLedger.ftopLed`) keeps EQUAL to
+  the ledger, at a name the file layer can state (the ledger's own,
+  `FsNames.fev`, is an `Fscfg` name the descriptor rows cannot see): a parked
+  descriptor's row carries a lower bound of it naming its install
+  (`FsLedger.fevPkWit`).  LAST, so no positional construction moves. -/
+  icfgFev : GName
 
 export Icfg (icfgIref icfgDev icfgNib icfgLive icfgLink icfgLog icfgIst icfgIep icfgIsl
   icfgBoot icfgReg icfgLk icfgPool icfgPext icfgIcnt icfgFrzm icfgHpn icfgPtrn icfgPcrp
-  icfgIeplo icfgIstmp icfgBox icfgOff)
+  icfgIeplo icfgIstmp icfgBox icfgOff icfgFev)
 
 /-- `IcacheEscrow`'s three per-slot gname families, THREADED rather than
 ambient (Rocq `ic_names`, `BioDefs.bio_names`' shape): per slot the
@@ -1022,7 +1029,9 @@ theorem icfgAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF]
       (I.icfgPtrn ↪VAR (∅ : RegMapF (Nat × Qp))) ∗
       (I.icfgPcrp ↪●MAP (∅ : RegMapF Icorpse)) ∗
       ([∗list] k ∈ List.range NINODE,
-        iOwn (F := constOF OffSetUR) (I.icfgOff k) (● (LeibnizSet.valid (∅ : OffSet))))) := by
+        iOwn (F := constOF OffSetUR) (I.icfgOff k) (● (LeibnizSet.valid (∅ : OffSet)))) ∗
+      -- (NI M3 private files FS-2a′) the fs ledger's mirror, empty
+      (I.icfgFev ↪●ML ([] : List Fev))) := by
   imod iepFunAlloc (16 * nib) with ⟨%fep, Hep⟩
   imod islFunAlloc NINODE with ⟨%fisl, Hisl⟩
   imod Xv6.iepFunAlloc NINODE with ⟨%feplo, Heplo⟩
@@ -1055,13 +1064,14 @@ theorem icfgAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF]
     with ⟨%γpcrp, Hpcrp⟩
   imod icfgBoxFunAlloc NINODE with ⟨%fbox, Hbox⟩
   imod icfgOffFunAlloc NINODE with ⟨%foff, Hoff⟩
+  imod (MonoList.own_alloc (GF := GF) (α := Fev) []) with ⟨%gfev, Hfev, -⟩
   imodintro
   iexists ({ icfgIref := γ, icfgDev := dv, icfgNib := nib, icfgLive := γl, icfgLink := γlk,
              icfgLog := γlog, icfgIst := ist, icfgIep := fep, icfgIsl := fisl,
              icfgBoot := g0, icfgReg := γreg, icfgLk := γlkr, icfgPool := γpool,
              icfgPext := γpext, icfgIcnt := γcnt, icfgFrzm := γfrzm, icfgHpn := γhpn,
              icfgPtrn := γptrn, icfgPcrp := γpcrp, icfgIeplo := feplo, icfgIstmp := fstmp,
-             icfgBox := fbox, icfgOff := foff } : Icfg), g0
+             icfgBox := fbox, icfgOff := foff, icfgFev := gfev } : Icfg), g0
   -- BUILD the bundle, do not frame it (Rocq's note: each row is one
   -- syntactic check)
   isplitr; · ipureintro; rfl
@@ -1086,7 +1096,8 @@ theorem icfgAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF]
   isplitl [Hhpn]; · iexact Hhpn
   isplitl [Hptrn]; · iexact Hptrn
   isplitl [Hpcrp]; · iexact Hpcrp
-  iexact Hoff
+  isplitl [Hoff]; · iexact Hoff
+  iexact Hfev
 
 end Alloc
 

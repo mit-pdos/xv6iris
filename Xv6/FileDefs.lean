@@ -453,20 +453,22 @@ def offFree (k : Nat) (q : Qp) : IProp GF :=
 /-- THE FD'S SHARE OF THE OFF BOX (Rocq `off_fd`): every piece at the fd's
 fraction `q` -- the two register halves of the box's client side at `q/2`
 (the birth stamp `T0` ∃-bound, the count at the constant 1), the stamps
-share at mass `q`, membership in the inode's published set, the handle. -/
-def offFd (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (C : FContent) : IProp GF := iprop%
+share at mass `q`, membership in the inode's published set, the handle.
+(NI M3 private files FS-2a′) At the FILE's mode `om` (`FPNames.om`): a
+parked file's box holds the bare half, a held one's `offLink`. -/
+def offFd (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (om : OffMode) (C : FContent) : IProp GF := iprop%
   ∃ (i T0 : Nat), ⌜C.ip = ientry i⌝ ∗ ⌜i < NINODE⌝ ∗
-    offBox k γb γo ∗ offMember offCfg i γb ∗
+    offBox k γb γo (om == .held) ∗ offMember offCfg i γb ∗
     (γb.slotd ↪VAR{.own q.half} (⟨T0, false, k, none⟩ : SlotReg Nat Unit)) ∗
     (γb.cnt ↪VAR{.own q.half} (1 : Nat)) ∗
     offRefStamps γb k q
 
 /-- The share with its stamps fragment NAMED (Rocq `off_fd_at`): what a
 reader presents at its ilock acquire is the fragment's `topLb`. -/
-def offFdAt (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (C : FContent) (m : StampMap Nat) :
+def offFdAt (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (om : OffMode) (C : FContent) (m : StampMap Nat) :
     IProp GF := iprop%
   ∃ (i T0 : Nat), ⌜C.ip = ientry i⌝ ∗ ⌜i < NINODE⌝ ∗
-    offBox k γb γo ∗ offMember offCfg i γb ∗
+    offBox k γb γo (om == .held) ∗ offMember offCfg i γb ∗
     (γb.slotd ↪VAR{.own q.half} (⟨T0, false, k, none⟩ : SlotReg Nat Unit)) ∗
     (γb.cnt ↪VAR{.own q.half} (1 : Nat)) ∗
     ⌜MachCSL.qsum m = q.val⌝ ∗ reference γb k m
@@ -489,7 +491,7 @@ def fileCoreNoff (q : Qp) (pn : FPNames) (C : FContent) : IProp GF :=
 fd's share of the off box named by `pn.obox`; every other type holds the
 word at the free tier. -/
 def fileCoreOff (k : Nat) (q : Qp) (pn : FPNames) (C : FContent) : IProp GF :=
-  if C.type = FD_INODE then offFd k q pn.obox pn.ooff C else offFree k q
+  if C.type = FD_INODE then offFd k q pn.obox pn.ooff pn.om C else offFree k q
 
 /-- THE PAYLOAD (Rocq `file_core`), a function of the content and the names:
 what lets the exclusive holder publish a payload by storing to `f->type`. -/

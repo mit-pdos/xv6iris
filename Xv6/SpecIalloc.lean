@@ -156,7 +156,7 @@ theorem iallocFresh_wf (ty : BitVec 16) : dinodeWf (iallocFresh ty) := rfl
 There is no absorption credit: the logged block is `IBLOCK inum icfgIst` at
 the inum THE SCAN chose, so the spend is unconditional and the set growth
 is determinate. -/
-def wp_ialloc_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_ialloc_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -227,7 +227,7 @@ def wp_ialloc_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
 /-- The eb-generic form of `wp_ialloc_gen_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_ialloc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_ialloc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -297,7 +297,7 @@ def wp_ialloc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 
 /-- **THE COUNTED CONTRACT** (Rocq's `wp_ialloc_sconf_body`): the set form
 with the op's set forgotten. -/
-def wp_ialloc_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_ialloc_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -353,7 +353,7 @@ def wp_ialloc_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 /-- The eb-generic form of `wp_ialloc_sconf_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_ialloc_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_ialloc_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -409,7 +409,7 @@ def wp_ialloc_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
 /-- The interface of `ialloc` (Rocq's `Module Type IALLOC`, less the derived
 counted form -- deviation 6). -/
 structure IALLOC : Prop where
-  wp_ialloc_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_ialloc_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]

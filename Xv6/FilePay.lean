@@ -258,8 +258,8 @@ theorem offFree_one (k : Nat) :
 
 /-- Rocq `off_fd_split`: every piece at the fd's fraction; the rejoin
 recovers one birth stamp `T0` by the register halves' agreement. -/
-theorem offFd_split (k : Nat) (q1 q2 : Qp) (γb : BoxNames) (γo : GName) (C : FContent) :
-    offFd (GF := GF) k (q1 + q2) γb γo C ⊣⊢ offFd k q1 γb γo C ∗ offFd k q2 γb γo C := by
+theorem offFd_split (k : Nat) (q1 q2 : Qp) (γb : BoxNames) (γo : GName) (om : OffMode) (C : FContent) :
+    offFd (GF := GF) k (q1 + q2) γb γo om C ⊣⊢ offFd k q1 γb γo om C ∗ offFd k q2 γb γo om C := by
   unfold offFd
   rw [qp_half_add]
   constructor
@@ -299,9 +299,9 @@ theorem offFd_split (k : Nat) (q1 q2 : Qp) (γb : BoxNames) (γo : GName) (C : F
 
 /-- The named fragment's mass, read off without disturbing the share (Rocq
 `off_fd_at_qsum`). -/
-theorem offFdAt_qsum (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (C : FContent)
+theorem offFdAt_qsum (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (om : OffMode) (C : FContent)
     (m : StampMap Nat) :
-    offFdAt (GF := GF) k q γb γo C m ⊢ ⌜MachCSL.qsum m = q.val⌝ ∗ offFdAt k q γb γo C m := by
+    offFdAt (GF := GF) k q γb γo om C m ⊢ ⌜MachCSL.qsum m = q.val⌝ ∗ offFdAt k q γb γo om C m := by
   unfold offFdAt
   iintro ⟨%i, %T0, %hip, %hi, #Hbox, #Hmem, Hd, Hc, %hq, Href⟩
   isplitr; · ipureintro; exact hq
@@ -355,7 +355,7 @@ theorem fileCoreNoff_none (q : Qp) (pn : FPNames) (C : FContent) (h : C.type = F
 
 /-- The off conjunct of an `FD_INODE` file is its off-box share. -/
 theorem fileCoreOff_inode (k : Nat) (q : Qp) (pn : FPNames) (C : FContent) (h : C.type = FD_INODE) :
-    fileCoreOff (GF := GF) k q pn C ⊣⊢ offFd k q pn.obox pn.ooff C := by
+    fileCoreOff (GF := GF) k q pn C ⊣⊢ offFd k q pn.obox pn.ooff pn.om C := by
   unfold fileCoreOff
   rw [if_pos h]
   exact .rfl
@@ -402,7 +402,7 @@ theorem fileCoreOff_split (k : Nat) (q1 q2 : Qp) (pn : FPNames) (C : FContent) :
     fileCoreOff (GF := GF) k (q1 + q2) pn C ⊣⊢ fileCoreOff k q1 pn C ∗ fileCoreOff k q2 pn C := by
   unfold fileCoreOff
   split
-  · exact offFd_split k q1 q2 _ _ C
+  · exact offFd_split k q1 q2 _ _ _ C
   · exact offFree_split k q1 q2
 
 /-- Rocq `file_core_split`: a genuine ⊣⊢ (filedup leftwards, fileclose
@@ -421,7 +421,11 @@ theorem fileCore_split (k : Nat) (q1 q2 : Qp) (pn : FPNames) (C : FContent) :
 
 /-- THE LAST CLOSE'S OFF STEP (Rocq FileInv.v `file_off_reclaim`): the
 closer holds the fd's whole share and drops the cell to the free tier
-through `offLastClose`; at a non-`FD_INODE` type the word is already free. -/
+through `offLastClose`; at a non-`FD_INODE` type the word is already free.
+(NI M3 private files FS-2a′) The box's half of the shadow dies with the box;
+a parked file's LEDGER quarter is not returned: it stays in the fs ledger at
+the file's last fold offset, unmovable (no box, no fire), as harmless as the
+row's invariant. -/
 theorem fileOffReclaim (E : CoPset) (k : Nat) (pn : FPNames) (C : FContent)
     (hE : ↑(ndot offBoxN k) ⊆ E) :
     fileCoreOff (GF := GF) k 1 pn C ⊢ |={E}=> offFree k 1 := by
@@ -429,7 +433,7 @@ theorem fileOffReclaim (E : CoPset) (k : Nat) (pn : FPNames) (C : FContent)
   split
   · unfold offFd offRefStamps
     iintro ⟨%i, %T0, -, -, #Hbox, -, Hd, Hc, %m, %hq, Href⟩
-    imod offLastClose k pn.obox pn.ooff T0 m E hE hq $$ [Hbox Hd Hc Href] with ⟨-, Hfree⟩
+    imod offLastClose k pn.obox pn.ooff (pn.om == .held) T0 m E hE hq $$ [Hbox Hd Hc Href] with ⟨-, Hfree⟩
     · unfold offRegd offCnt slotdHalf cntHalf
       iframe Hbox Hd Hc Href
     imodintro

@@ -48,6 +48,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 
 section FilewriteChain
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [OffboxG GF] [Appcfg GF]
+  [Xv6G GF] [Icfg]
 
 /-- THE LOOP'S CARRIED COMMIT STATE (Rocq `fw_au_raw`). -/
 def fwrRaw (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int) (M : Nat → List (BitVec 8))
@@ -175,6 +176,154 @@ theorem fwrRaw_fail (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n 
     (hex : (t : Int) < n ∨ (n < 0 ∧ p = 0)) :
     fwrRaw (hlc := hlc) Γ i γo P n M ua Q t p x ⊢ writePostFailAt (hlc := hlc) Γ i γo P n M ua Q := by
   unfold fwrRaw writePostFailAt
+  iintro ⟨%bss, %hlen, %htot, %hp, %hx, %hby, Hcm⟩
+  iexists bss, x
+  isplitr
+  · ipureintro
+    rcases hex with h | ⟨h, h0⟩
+    · left; rw [htot]; exact h
+    · right; refine ⟨h, ?_⟩
+      exact List.eq_nil_of_length_eq_zero (by rw [hlen, h0])
+  isplitr
+  · ipureintro; omega
+  isplitr
+  · ipureintro; exact hx
+  isplitr
+  · ipureintro; exact hby
+  rw [hlen]
+  iexact Hcm
+
+/-! ## (NI M3 private files FS-2a′) The PARKED walk's carrier
+
+`fwrRaw` at the PARKED chain (`awriteChainPk`, lent nothing of the offset):
+the five moves verbatim, at the parked residues. -/
+
+/-- THE LOOP'S CARRIED COMMIT STATE (Rocq `fw_au_raw`). -/
+def fwrRawPk (Γ : FsViewNames GF) (i : Nat) (P : UPtd) (n : Int) (M : Nat → List (BitVec 8))
+    (ua : BitVec 64) (Q : Nat → IProp GF) (t p x : Nat) : IProp GF :=
+  iprop(∃ bss : List (List (BitVec 8)),
+    ⌜bss.length = p⌝ ∗ ⌜bss.flatten.length = t⌝ ∗ ⌜p + x ≤ wchunks n⌝ ∗ ⌜x ≤ 1⌝ ∗
+    -- THE CONTENT HALF (RULING A): what has been spliced so far IS the
+    -- caller's own run at `ua`
+    ⌜ubytesAt M ua bss.flatten⌝ ∗
+    awriteChainPkAt Γ appE i M ua P n Q (p + x) (wchunks n - p - x))
+
+/-- Rocq `fw_au_raw_init`. -/
+theorem fwrRawPk_init (Γ : FsViewNames GF) (i : Nat) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) :
+    awriteChainPk Γ appE i M ua n Q 0 (wchunks n) ⊢ fwrRawPk Γ i P n M ua Q 0 0 0 := by
+  unfold fwrRawPk
+  iintro Hc
+  ihave Hc := awriteChainPkAt_of Γ appE i M ua n Q 0 (wchunks n) P $$ Hc
+  iexists []
+  isplitr
+  · ipureintro; rfl
+  isplitr
+  · ipureintro; rfl
+  isplitr
+  · ipureintro; omega
+  isplitr
+  · ipureintro; omega
+  isplitr
+  · ipureintro; exact ubytesAt_nil M ua
+  iexact Hc
+
+/-- ONE CHUNK'S FIRE, both halves (Rocq `fw_au_raw_take`): the head node's
+FULL arm comes out at the index the chain handed it out at (its
+continuation IS the rest of the chain), and the closer takes that rest back
+with the chunk's bytes.  The chain's own `Q p` conjunct is DROPPED -- the
+kernel eliminates to an arm when it fires. -/
+theorem fwrRawPk_take (Γ : FsViewNames GF) (i : Nat) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (t p : Nat)
+    (htn : (t : Int) < n) (htie : (t : Int) = FW_MAX * p) :
+    fwrRawPk Γ i P n M ua Q t p 0 ⊢
+      awriteFullPk Γ appE i M ua n p (awriteChainPkAt Γ appE i M ua P n Q (p + 1) (wchunks n - (p + 1))) ∗
+      (∀ bs : List (BitVec 8),
+        ⌜ubytesAt M (ua + BitVec.ofNat 64 t) bs⌝ -∗
+        awriteChainPkAt Γ appE i M ua P n Q (p + 1) (wchunks n - (p + 1)) -∗
+        fwrRawPk Γ i P n M ua Q (t + bs.length) (p + 1) 0) := by
+  have hsp := wriCount_step n t p (by omega) htn htie
+  unfold fwrRawPk
+  iintro ⟨%bss, %hlen, %htot, %hp, %hx, %hby, Hcm⟩
+  have hcnt : wchunks n - p - 0 = (wchunks n - (p + 1)) + 1 := by omega
+  rw [hcnt, Nat.add_zero, awriteChainPkAt_S]
+  icases Hcm with ⟨-, Hhead, -⟩
+  iframe Hhead
+  iintro %bs %hbyc Htail
+  iexists bss ++ [bs]
+  isplitr
+  · ipureintro; simp [hlen]
+  isplitr
+  · ipureintro; simp [htot]
+  isplitr
+  · ipureintro; omega
+  isplitr
+  · ipureintro; omega
+  isplitr
+  · ipureintro
+    rw [List.flatten_append, List.flatten_singleton]
+    exact ubytesAt_app M ua bss.flatten bs hby (by rw [htot]; exact hbyc)
+  rw [Nat.add_zero, Nat.sub_zero]
+  iexact Htail
+
+/-- ONE SHORT CHUNK'S INSTANT (Rocq `fw_au_raw_spend_part`): the head
+node's PARTIAL arm comes out, and the closer takes the rest of the chain
+back one node further on. -/
+theorem fwrRawPk_spendPart (Γ : FsViewNames GF) (i : Nat) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (t p : Nat)
+    (htn : (t : Int) < n) (htie : (t : Int) = FW_MAX * p) :
+    fwrRawPk Γ i P n M ua Q t p 0 ⊢
+      awritePartPk Γ appE i M ua P n p (awriteChainPkAt Γ appE i M ua P n Q (p + 1) (wchunks n - (p + 1))) ∗
+      (awriteChainPkAt Γ appE i M ua P n Q (p + 1) (wchunks n - (p + 1)) -∗
+        fwrRawPk Γ i P n M ua Q t p 1) := by
+  have hsp := wriCount_step n t p (by omega) htn htie
+  unfold fwrRawPk
+  iintro ⟨%bss, %hlen, %htot, %hp, %hx, %hby, Hcm⟩
+  have hcnt : wchunks n - p - 0 = (wchunks n - (p + 1)) + 1 := by omega
+  rw [hcnt, Nat.add_zero, awriteChainPkAt_S]
+  icases Hcm with ⟨-, -, Hpart⟩
+  iframe Hpart
+  iintro Htail
+  iexists bss
+  isplitr
+  · ipureintro; exact hlen
+  isplitr
+  · ipureintro; exact htot
+  isplitr
+  · ipureintro; omega
+  isplitr
+  · ipureintro; omega
+  isplitr
+  · ipureintro; exact hby
+  have hcnt' : wchunks n - p - 1 = wchunks n - (p + 1) := by omega
+  rw [hcnt']
+  iexact Htail
+
+/-- THE OK EXIT (Rocq `fw_au_raw_ok`). -/
+theorem fwrRawPk_ok (Γ : FsViewNames GF) (i : Nat) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (t p : Nat)
+    (hn : (t : Int) = n) :
+    fwrRawPk Γ i P n M ua Q t p 0 ⊢ writePostOkPk Γ i P n M ua Q := by
+  unfold fwrRawPk writePostOkPk
+  iintro ⟨%bss, %hlen, %htot, %hp, %hx, %hby, Hcm⟩
+  iexists bss
+  isplitr
+  · ipureintro; rw [htot]; exact hn
+  isplitr
+  · ipureintro; omega
+  isplitr
+  · ipureintro; exact hby
+  rw [hlen, Nat.add_zero, Nat.sub_zero]
+  iexact Hcm
+
+/-- THE FAIL EXIT, AT BOTH OF ITS TWO SHAPES (Rocq `fw_au_raw_fail`): the
+loop's own short-write break (`t < n`), and the never-entered loop at
+`n < 0` (`p = 0`). -/
+theorem fwrRawPk_fail (Γ : FsViewNames GF) (i : Nat) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (t p x : Nat)
+    (hex : (t : Int) < n ∨ (n < 0 ∧ p = 0)) :
+    fwrRawPk Γ i P n M ua Q t p x ⊢ writePostFailPk Γ i P n M ua Q := by
+  unfold fwrRawPk writePostFailPk
   iintro ⟨%bss, %hlen, %htot, %hp, %hx, %hby, Hcm⟩
   iexists bss, x
   isplitr
@@ -336,46 +485,32 @@ theorem fwrAdv_fail (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n 
   rw [hlen]
   iapply awriteChainAt_of_adv $$ Hcm
 
-/-- ONE SUPPLIER NOTION FOR THE TWO WAYS THE KERNEL MAY MOVE THE SHADOW
-ITSELF (Rocq `fw_supply`): the row's existential invariant (mode park) or
-the taint (an object already disconnected).  Both persistent. -/
-def fwrSupply (γo : GName) : IProp GF :=
-  iprop(offUserInv (hlc := hlc) γo ∨ MachFixedGS.killCred (hlc := hlc) (GF := GF))
-
-instance fwrSupply_persistent (γo : GName) : Persistent (fwrSupply (hlc := hlc) (GF := GF) γo) := by
-  unfold fwrSupply; infer_instance
-
-/-- Rocq `fw_supply_off`. -/
-theorem fwrSupply_off (E : CoPset) (γo : GName) (off d : Nat) (hE : (↑foffN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} fwrSupply (hlc := hlc) γo -∗ offSupply (hlc := hlc) γo E off d iprop(True) := by
-  unfold fwrSupply
-  iintro (#Hinv | #Ht)
-  · iapply offSupply_parked E γo off d hE $$ Hinv
-  · iapply offSupply_taint E γo off d $$ Ht
-
 /-- AND THE CARRIER ITSELF (Rocq `fw_au_st`), keyed on the row's offset
-mode: a PARKED row walks the landed carrier beside that supplier; a HELD
-one the client-advanced carrier -- or, for an object disconnected before
-the call, the landed carrier beside the taint.  Each arm's fire reproduces
-its own arm. -/
+mode: a PARKED row walks the parked carrier (NI M3 private files FS-2a′: the
+chain lent nothing) beside the row's invariant and the ledger's
+registration witness -- what the parked fires need; a HELD one the
+client-advanced carrier -- or, for an object disconnected before the call,
+the landed carrier beside the taint (`fw_supply`'s taint arm; its parked
+arm is gone: the parked advance runs inside the ledger's opening).  Each
+arm's fire reproduces its own arm. -/
 def fwrSt (om : OffMode) (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (t p x : Nat) : IProp GF :=
   match om with
-  | .parked => iprop(fwrSupply (hlc := hlc) γo ∗ fwrRaw Γ i γo P n M ua Q t p x)
+  | .parked => iprop((offUserInv (hlc := hlc) γo ∗ fevPkWit γo) ∗ fwrRawPk Γ i P n M ua Q t p x)
   | .held => iprop(fwrAdv Γ i γo P n M ua Q t p x ∨
-      (fwrSupply (hlc := hlc) γo ∗ fwrRaw Γ i γo P n M ua Q t p x))
+      (MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗ fwrRaw Γ i γo P n M ua Q t p x))
 
 /-- Rocq `fw_au_st_init_parked`. -/
 theorem fwrSt_init_parked (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) :
-    ⊢@{IProp GF} offUserInv (hlc := hlc) γo -∗
-      awriteChain (hlc := hlc) Γ appE i γo M ua n Q 0 (wchunks n) -∗
+    ⊢@{IProp GF} offUserInv (hlc := hlc) γo -∗ fevPkWit γo -∗
+      awriteChainPk Γ appE i M ua n Q 0 (wchunks n) -∗
       fwrSt .parked Γ i γo P n M ua Q 0 0 0 := by
-  unfold fwrSt fwrSupply
-  iintro #Hinv Hcm
+  unfold fwrSt
+  iintro #Hinv #Hwit Hcm
   isplitr
-  · ileft; iexact Hinv
-  · iapply fwrRaw_init $$ Hcm
+  · iframe Hinv Hwit
+  · iapply fwrRawPk_init $$ Hcm
 
 /-- Rocq `fw_au_st_init_held`. -/
 theorem fwrSt_init_held (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
@@ -393,25 +528,25 @@ theorem fwrSt_init_taint (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd
     ⊢@{IProp GF} MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗
       awriteChain (hlc := hlc) Γ appE i γo M ua n Q 0 (wchunks n) -∗
       fwrSt .held Γ i γo P n M ua Q 0 0 0 := by
-  unfold fwrSt fwrSupply
+  unfold fwrSt
   iintro #Ht Hcm
   iright
   isplitr
-  · iright; iexact Ht
+  · iexact Ht
   · iapply fwrRaw_init $$ Hcm
 
-/-- Rocq `fw_au_st_ok`: the ok exit, at the landed post. -/
+/-- Rocq `fw_au_st_ok`: the ok exit, at the row's mode's post. -/
 theorem fwrSt_ok (om : OffMode) (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (t p : Nat)
     (hn : (t : Int) = n) :
-    fwrSt (hlc := hlc) om Γ i γo P n M ua Q t p 0 ⊢ writePostOkAt (hlc := hlc) Γ i γo P n M ua Q := by
+    fwrSt (hlc := hlc) om Γ i γo P n M ua Q t p 0 ⊢ writePostOkOm (hlc := hlc) om Γ i γo P n M ua Q := by
   cases om with
   | parked =>
-    unfold fwrSt
+    unfold fwrSt writePostOkOm
     iintro ⟨-, H⟩
-    iapply fwrRaw_ok Γ i γo P n M ua Q t p hn $$ H
+    iapply fwrRawPk_ok Γ i P n M ua Q t p hn $$ H
   | held =>
-    unfold fwrSt
+    unfold fwrSt writePostOkOm
     iintro (H | ⟨-, H⟩)
     · iapply fwrAdv_ok Γ i γo P n M ua Q t p hn $$ H
     · iapply fwrRaw_ok Γ i γo P n M ua Q t p hn $$ H
@@ -420,14 +555,14 @@ theorem fwrSt_ok (om : OffMode) (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P
 theorem fwrSt_fail (om : OffMode) (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (t p x : Nat)
     (hex : (t : Int) < n ∨ (n < 0 ∧ p = 0)) :
-    fwrSt (hlc := hlc) om Γ i γo P n M ua Q t p x ⊢ writePostFailAt (hlc := hlc) Γ i γo P n M ua Q := by
+    fwrSt (hlc := hlc) om Γ i γo P n M ua Q t p x ⊢ writePostFailOm (hlc := hlc) om Γ i γo P n M ua Q := by
   cases om with
   | parked =>
-    unfold fwrSt
+    unfold fwrSt writePostFailOm
     iintro ⟨-, H⟩
-    iapply fwrRaw_fail Γ i γo P n M ua Q t p x hex $$ H
+    iapply fwrRawPk_fail Γ i P n M ua Q t p x hex $$ H
   | held =>
-    unfold fwrSt
+    unfold fwrSt writePostFailOm
     iintro (H | ⟨-, H⟩)
     · iapply fwrAdv_fail Γ i γo P n M ua Q t p x hex $$ H
     · iapply fwrRaw_fail Γ i γo P n M ua Q t p x hex $$ H
@@ -460,8 +595,8 @@ theorem fwrSt_init (om : OffMode) (rb wb : Bool) (i : Nat) (γo : GName)
   | parked =>
     unfold filewriteInInodeOm
     iintro #Hrow Hcm
-    ihave Hinv := foffRow_inode_of (hlc := hlc) _ rb wb i γo rfl $$ Hrow
-    iapply fwrSt_init_parked $$ Hinv Hcm
+    icases foffRow_inode_of (hlc := hlc) _ rb wb i γo rfl $$ Hrow with ⟨#Hinv, #Hwit⟩
+    iapply fwrSt_init_parked $$ Hinv Hwit Hcm
   | held =>
     unfold filewriteInInodeOm filewriteInHeld
     iintro _ (Hcm | ⟨Hcm, #Ht⟩)
@@ -478,7 +613,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- ONE CHUNK'S FIRE, PACKAGED (Rocq `fw_st_fire_full`): the peel, the fire
 and the closer in one step, so the loop body branches on the mode HERE.
-The arms differ in exactly one line -- which fire lemma runs. -/
+The arms differ in exactly one line -- which fire lemma runs.  (NI M3
+private files FS-2a′) The box's arm and the chunk's event are KEYED ON THE
+MODE: a parked row's box holds the bare half and its chunk is appended at
+the fold's offset (`wrfAwrite_fire_pk`); a held row's is the client's own. -/
 theorem fwrSt_fire_full (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (γo : GName)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (Q : Nat → IProp GF)
     (t p : Nat) (off : Nat) (bs bs0 : List (BitVec 8)) (nl : Nat) (nd nd' : FsNode)
@@ -491,12 +629,12 @@ theorem fwrSt_fire_full (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
       fwrSt (hlc := hlc) om (fsGammaL γfs) i γo P n M ua Q t p 0 -∗
       topFrag (fsGammaL γfs) i nd -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
+      offLinkB (hlc := hlc) (om == .held) γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i nd' ∗
-        offLink (hlc := hlc) γo ((off + bs.length : Nat) : Int) ∗
+        offLinkB (hlc := hlc) (om == .held) γo ((off + bs.length : Nat) : Int) ∗
         fwrSt (hlc := hlc) om (fsGammaL γfs) i γo P n M ua Q (t + bs.length) (p + 1) 0 ∗
         -- (NI M3 private files FS-1) the chunk's event
-        fsMoveRcpt γfs [.write act i γo off bs bs.length] i nd := by
+        fsMoveRcpt γfs [.write act i γo (om == .held) off bs bs.length] i nd := by
   have hfoff := arfFoffN_sub E hE
   have hptie : ua + BitVec.ofNat 64 t = ua + BitVec.ofInt 64 (FW_MAX * (p : Int)) := by
     rw [← htie, BitVec.ofInt_natCast]
@@ -504,18 +642,21 @@ theorem fwrSt_fire_full (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
   cases om with
   | parked =>
     dsimp only [fwrSt]
-    iintro #Hi #Hai ⟨#Hsup, Hau⟩ Hf Hg
-    icases fwrRaw_take (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
-    ihave Hs := fwrSupply_off E γo off bs.length hfoff $$ Hsup
-    imod wrfAwrite_fire_gen γfs E i γo M ua n p _ iprop(True) off bs bs0 nl nd nd'
-      hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen act $$ Hi Hai Hs Hcm Hf Hg
-      with ⟨Hf, Hg, -, Htail, #Hrc⟩
+    simp only [show (OffMode.parked == OffMode.held) = false from rfl, offLinkB_parked]
+    iintro #Hi #Hai ⟨⟨#Hinv, #Hwit⟩, Hau⟩ Hf Hg
+    icases fwrRawPk_take (fsGammaL γfs) i P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
+    imod wrfAwrite_fire_pk γfs E i γo M ua n p _ off bs bs0 nl nd nd'
+      hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen act $$ Hi Hai Hinv Hwit Hcm Hf Hg
+      with ⟨Hf, Hg, Htail, #Hrc⟩
     imodintro
-    iframe Hf Hg Hsup Hrc
+    iframe Hf Hg Hrc
+    isplitr
+    · iframe Hinv Hwit
     iapply Hback $$ %bs %hby Htail
   | held =>
     dsimp only [fwrSt]
-    iintro #Hi #Hai (Hau | ⟨#Hsup, Hau⟩) Hf Hg
+    simp only [show (OffMode.held == OffMode.held) = true from rfl, offLinkB_held]
+    iintro #Hi #Hai (Hau | ⟨#Ht, Hau⟩) Hf Hg
     · icases fwrAdv_take (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
       imod wrfAwrite_fire_adv γfs E i γo M ua n p _ off bs bs0 nl nd nd'
         hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen act $$ Hi Hai Hcm Hf Hg
@@ -525,14 +666,14 @@ theorem fwrSt_fire_full (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
       ileft
       iapply Hback $$ %bs %hby Htail
     · icases fwrRaw_take (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
-      ihave Hs := fwrSupply_off E γo off bs.length hfoff $$ Hsup
+      ihave Hs := offSupply_taint (hlc := hlc) E γo off bs.length $$ Ht
       imod wrfAwrite_fire_gen γfs E i γo M ua n p _ iprop(True) off bs bs0 nl nd nd'
         hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen act $$ Hi Hai Hs Hcm Hf Hg
         with ⟨Hf, Hg, -, Htail, #Hrc⟩
       imodintro
       iframe Hf Hg Hrc
       iright
-      iframe Hsup
+      iframe Ht
       iapply Hback $$ %bs %hby Htail
 
 /-- ...and the short chunk's (Rocq `fw_st_fire_part`): the offset advances
@@ -553,27 +694,30 @@ theorem fwrSt_fire_part (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
       fwrSt (hlc := hlc) om (fsGammaL γfs) i γo P n M ua Q t p 0 -∗
       topFrag (fsGammaL γfs) i nd -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
+      offLinkB (hlc := hlc) (om == .held) γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i nd' ∗
-        offLink (hlc := hlc) γo ((off + r : Nat) : Int) ∗
+        offLinkB (hlc := hlc) (om == .held) γo ((off + r : Nat) : Int) ∗
         fwrSt (hlc := hlc) om (fsGammaL γfs) i γo P n M ua Q t p 1 ∗
-        fsMoveRcpt γfs [.write act i γo off bs r] i nd := by
+        fsMoveRcpt γfs [.write act i γo (om == .held) off bs r] i nd := by
   have hfoff := arfFoffN_sub E hE
   cases om with
   | parked =>
     dsimp only [fwrSt]
-    iintro #Hi #Hai ⟨#Hsup, Hau⟩ Hf Hg
-    icases fwrRaw_spendPart (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
-    ihave Hs := fwrSupply_off E γo off r hfoff $$ Hsup
-    imod wrfApart_fire_gen γfs E i γo M ua P n p _ iprop(True) off r bs bs0 nl nd nd'
+    simp only [show (OffMode.parked == OffMode.held) = false from rfl, offLinkB_parked]
+    iintro #Hi #Hai ⟨⟨#Hinv, #Hwit⟩, Hau⟩ Hf Hg
+    icases fwrRawPk_spendPart (fsGammaL γfs) i P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
+    imod wrfApart_fire_pk γfs E i γo M ua P n p _ off r bs bs0 nl nd nd'
       hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1 act
-      $$ Hi Hai Hs Hcm Hf Hg with ⟨Hf, Hg, -, Htail, #Hrc⟩
+      $$ Hi Hai Hinv Hwit Hcm Hf Hg with ⟨Hf, Hg, Htail, #Hrc⟩
     imodintro
-    iframe Hf Hg Hsup Hrc
+    iframe Hf Hg Hrc
+    isplitr
+    · iframe Hinv Hwit
     iapply Hback $$ Htail
   | held =>
     dsimp only [fwrSt]
-    iintro #Hi #Hai (Hau | ⟨#Hsup, Hau⟩) Hf Hg
+    simp only [show (OffMode.held == OffMode.held) = true from rfl, offLinkB_held]
+    iintro #Hi #Hai (Hau | ⟨#Ht, Hau⟩) Hf Hg
     · icases fwrAdv_spendPart (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
       imod wrfApart_fire_adv γfs E i γo M ua P n p _ off r bs bs0 nl nd nd'
         hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1 act
@@ -583,14 +727,14 @@ theorem fwrSt_fire_part (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
       ileft
       iapply Hback $$ Htail
     · icases fwrRaw_spendPart (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
-      ihave Hs := fwrSupply_off E γo off r hfoff $$ Hsup
+      ihave Hs := offSupply_taint (hlc := hlc) E γo off r $$ Ht
       imod wrfApart_fire_gen γfs E i γo M ua P n p _ iprop(True) off r bs bs0 nl nd nd'
         hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1 act
         $$ Hi Hai Hs Hcm Hf Hg with ⟨Hf, Hg, -, Htail, #Hrc⟩
       imodintro
       iframe Hf Hg Hrc
       iright
-      iframe Hsup
+      iframe Ht
       iapply Hback $$ Htail
 
 end FilewriteChainFire2

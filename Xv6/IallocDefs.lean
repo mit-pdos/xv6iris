@@ -186,7 +186,7 @@ theorem ialloc_refb_claim {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [OffboxG GF]
 
 /-- **THE CLAIM** (Rocq 1532–1536): `lwAuRec` ∘ `iregClaim_au`.  No resource
 in beyond the persistent region and seal and the transaction's share; the
@@ -215,7 +215,7 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
-  [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [OffboxG GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `iget(dev, inum)` at `+0xaa` (Rocq 1751), at the licence the caller
