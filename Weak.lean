@@ -183,5 +183,6 @@ import Weak.WeakLeafStimecmp
 import Weak.WeakUpdEff
 import Weak.WeakEvFunnel
 import Weak.WeakEvProv2
+import Weak.WeakLeafMret
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
