@@ -60,3 +60,9 @@ are defined in more than one Rocq weak file (`notes/weak-port-dupnames.json`: na
 you port is in that table, declare it FILE-QUALIFIED: `theorem <RocqFile>.<camelName> …` inside
 `namespace Weak` (e.g. `theorem WeakLitmus.msgByteSingle`), and refer to it qualified. When you USE a
 duplicated name from a dependency, use the qualified name of the file you actually import.
+
+**Pre-translated drafts (tools/weak_rocq2lean.py; see notes/weak-port-pretranslate.md).** If your assignment
+says "WITH DRAFT", start from the draft the orchestrator generated (or generate it yourself per that note):
+review every statement against the Rocq source (≈96% are faithful as emitted, not 100%), fix the proofs
+that fail, delete every `sorry` placeholder and every leftover `-- ROCQ:` line, and shorten the verbose
+`first | …` fallbacks to the tree's style. Not useful for Iris/MonPred-heavy files.
