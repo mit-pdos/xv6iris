@@ -66,3 +66,14 @@ tools/weak_rocq2lean.py cost MORE (≈178 vs ≈149 agent tokens per Rocq line):
 statements but rewrote every proof, and draft errors (untyped binders, record literals, maps as lists)
 hit the 100-error cap and hid the real ones. You MAY use `tools/weak_rocq2lean.py --names <Name>` for the
 Rocq→Lean name map only.
+
+**Cross-file facts later ports must respect** (read the named headers):
+- Fetches: `fetchSrcOk` premise carried by the robustness capstones (WeakRobustSim/Main); `pstepNoFetch` on
+  WeakErase/WeakRefuse bridges; the bridge fetch → plain load premise `pfFetchLoadOk` (WeakPromiseBridge);
+  `LtsEnabled.leIfetch` (WeakRobustBlocks); text pin `pinnedRead ∧ fetchPinned` (WeakInstr/WeakBridge).
+- Event pool (WeakEvPf): harts, then uart0, uart1, disk, plic — disk at index `NCPU+2`, plic at `NCPU+3`
+  (Rocq: disk `NCPU+1`); device arms have the new shapes and `plicAgent` (WeakEvPf header).
+- Exec layer: Weak/Exec + ExecLib (+ ExecSC*), `exec_steps` tactic; writes answer `.Ok (some true)`;
+  MMIO test `mmioAcc` (= `devAddr pa && n != 0`).
+- Archive files imported by live files are ported only as far as live files use them (WeakRobustL2 = one
+  lemma; WeakSailComplete = its register-file section).
