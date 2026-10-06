@@ -54,3 +54,9 @@ D3/D4 as recommended), `notes/symbolic-model.md` (announce events), `notes/weak-
 
 **Report** (≤ 300 words): files, decl counts Rocq vs Lean, dropped lemmas, deviations, shim additions,
 build times, new lessons, anything blocking.
+
+**Duplicated Rocq names (all files share `namespace Weak`).** Rocq names are module-qualified; 326 names
+are defined in more than one Rocq weak file (`notes/weak-port-dupnames.json`: name → files). If a name
+you port is in that table, declare it FILE-QUALIFIED: `theorem <RocqFile>.<camelName> …` inside
+`namespace Weak` (e.g. `theorem WeakLitmus.msgByteSingle`), and refer to it qualified. When you USE a
+duplicated name from a dependency, use the qualified name of the file you actually import.
