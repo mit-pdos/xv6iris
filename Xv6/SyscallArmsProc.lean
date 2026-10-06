@@ -156,7 +156,8 @@ theorem syscall_arm_uptime (SU : SYSUPTIME)
     refine ⟨fun _ => ?_, fun h => absurd (hn14.symm.trans h) (by decide),
       fun h => absurd (hn14.symm.trans h) (by decide), fun h => absurd (hn14.symm.trans h) (by decide),
       fun h => absurd (hn14.symm.trans h) (by decide), fun h => absurd (hn14.symm.trans h) (by decide),
-      fun h => absurd (hn14.symm.trans h) (by decide), fun h => absurd (hn14.symm.trans h) (by decide)⟩
+      fun h => absurd (hn14.symm.trans h) (by decide), fun h => absurd (hn14.symm.trans h) (by decide),
+      syscEvFs_at hn14⟩
     show syscA0 (syscStore V (R2 10#5)) = _
     rw [syscStore_a0 V _ (by rw [hl]; decide)]; exact hupw
   unfold syscallRet syscallAddr at *

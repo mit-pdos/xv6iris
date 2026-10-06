@@ -201,14 +201,15 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
       icases Heo with (%hq | ⟨%ke, %ι, #Hanc, #Hl, %hev⟩)
       · exfalso
         rw [hnum] at hq
-        rcases hcn with h | h | h | h | h | h | h
+        rcases hcn with h | h | h | h | h | h | h | h
         · exact hq.1 h
         · exact hq.2.1 h
         · exact hq.2.2.1 h
         · exact hq.2.2.2.1 h
         · exact hq.2.2.2.2.1 h
         · exact hq.2.2.2.2.2.1 h
-        · exact hq.2.2.2.2.2.2 h
+        · exact hq.2.2.2.2.2.2.1 h
+        · exact hq.2.2.2.2.2.2.2 h
       · have hdet := urc_niDetRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hlw hM hpi hsz hcw hgn hch hpid hlz
           hsc hround hchk hfde hrp hlive hev
         have hfe : niFitEv (some (i, x)) (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf))

@@ -257,7 +257,7 @@ theorem utEvOut_retf (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitV
       syscEvRow (utSysRec sep V) { V2 with tf := ws } (syscImg (utSysRec sep V) M)
         (syscImg { V2 with tf := ws } M2) cs cs2 sts ι := by
     intro ι h
-    unfold syscEvRow at h ⊢
+    unfold syscEvRow syscEvFs at h ⊢
     simp only [ha]
     exact h
   unfold utEvOut

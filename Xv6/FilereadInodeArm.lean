@@ -192,14 +192,21 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
   unfold frdK
   iapply HΦ $$ %c' %spie3 %spp3 %R' %P' %M' %tot [] Hk Hpc Hte Hce Href Hpriv Hgen [Hbs] [HP Hrecv] []
   rotate_right
-  · -- (NI M3 private files FS-1) the read's event, at the count it returned
+  · -- (NI M3 private files FS-1; FS-2a) the read's event at the offset it
+    -- used, at the count it returned, with the arm's return and buffer ties
     unfold freadRcptAt
-    rcases harm with ⟨ha0, -⟩ | ⟨ha0, -, hdd⟩
-    · ileft; ipureintro; rw [h10', ha0]
+    rcases harm with ⟨ha0, -, hwhy⟩ | ⟨ha0, htot, hdd⟩
+    · ileft; ipureintro; exact ⟨by rw [h10', ha0], Or.inr hwhy⟩
     · iright
-      iexists dd, absRow (eraNode dn bm data)
+      iexists v.toNat, dd, absRow (eraNode dn bm data)
       isplitl []
-      · ipureintro; rw [h10', ha0, hdd]
+      · ipureintro
+        have hcl' := rdClamp_le dn.diSize v.toNat n.toNat
+        refine ⟨by rw [h10', ha0, hdd], by rw [hdd, htot]; omega, ?_, ?_⟩
+        · rw [h10', ha0]; exact frd_ret_tie n dn bm data v.toNat tot hn0 htot
+        · rw [hdd]
+          exact frd_buffer_tie dn bm data P' (viewFaulted V.upt P' M) M' (k.regs 11#5) n v.toNat tot
+            hok.2.2.2.2.2.1 hok.2.2.2.2.1 htot himg.1 himg.2 hpl
       · iexact Hrdrc
   · ipureintro; exact ⟨hcs, hext, by omega, hr10, hwin⟩
   · iapply frd_envout_inode $$ Hbs

@@ -562,7 +562,8 @@ keys; (NI M2-G3) sbrk's answer, break and lazy bit, `usysSbrkFitsAt` at
 the resumed key's `W'.sz`/`W'.lazy`; NI M2-G4: the console write's
 answer at the key's permission view, the class read at the key's lazy bit
 and `uwriteCons` of its table; NI M3 FS-L: close's and dup's answers at the
-key's table).  Exit's arm is empty (`uroundOk_exit`).  The equality is the KEY's
+key's table; NI M3 FS-2a: the class with the file system, `usysDetClassAtF`,
+read's answer and image and an inode write's answer at the cited prefix).  Exit's arm is empty (`uroundOk_exit`).  The equality is the KEY's
 (`UsysDet` deviation 3). -/
 theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf.length = 36)
     (hgn : W'.gen = W.gen) (hpidk : W'.pid = W.pid)
@@ -574,18 +575,17 @@ theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf
     (hr : uroundOk sc (uvisRun W).tf W.M W.perm W.sz W.cwd W.lazy W.secc W'.tf W'.M W'.perm W'.sz W'.cwd
       W'.lazy W'.secc)
     (hsc : sc = uecallScause)
-    (hcls : usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
-      (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))))
+    (hcls : usysDetClassAtF (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
+      (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)))
+      (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) (ufsBuf (uvisRun W)) (fevReadDir ι.fev))
     (hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW W'.tf (tfArgIdx 0)) W'.ch W'.M W'.sz W'.lazy ι) :
     ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ι) W' := by
   subst hsc
   rcases uroundOk_ecall hr with ⟨hexec, -, -⟩ | ⟨hnex, r, hb, hm, hc, hs⟩
   · change uvisNum (uvisRun W) = USYS_exec at hexec
-    exfalso
-    rcases hcls.1 with h | h | h | h | h | h | h | h | h | h <;> rw [h] at hexec <;>
-      exact absurd hexec (by decide)
+    exact absurd hexec (usysDetClassAtF_ne_exec hcls)
   · change uvisNum (uvisRun W) ≠ USYS_exit at hnex
-    have hres := usysDetClass_resumes hcls.1 hnex
+    have hres := usysDetClassAtF_resumes hcls hnex
     obtain ⟨hb1, hb2⟩ := hb
     have ha0 : tfW W'.tf (tfArgIdx 0) = r := by
       have := congrFun hb1 10#5
@@ -635,7 +635,7 @@ theorem uexecRetContF_det (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : U
     have hup : n = USYS_uptime → usysUptimeRet r := fun hu => by
       subst hu; exact usysMemOk_uptimeRet hm
     obtain ⟨ι, hfit⟩ := usysIotaFits_exists (W := W) (cs' := cs') (M' := M') (szv' := szv') (lz' := lz')
-      hup h3 hf h12 hw hlv.2.2 hcl hdp
+      hup h3 hf h12 hw hlv.2.2 hcl hdp h5
     obtain ⟨hM, -, -⟩ := usysMemOk_quiet h7 h12 h3 h4 h5 h8 hm
     have hfd' := usysFdOk_quiet hcl hdp hop h4 hfd
     have hc' := usysCwdOk_quiet hcd hc

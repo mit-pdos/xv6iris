@@ -320,7 +320,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
     iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [HP] []
     rotate_right
-    · rw [show R' 10#5 = -1#64 by rw [h10]; decide]; iapply freadRcptAt_m1
+    · iapply freadRcptAt_of_ne; intro wb i γo om h; subst h; exact absurd (hrz.symm.trans hok.1) (by decide)
     · ipureintro
       exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
     · unfold filereadArms
@@ -397,7 +397,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
     iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex] []
     rotate_right
-    · rw [show R' 10#5 = -1#64 by rw [h10]; decide]; iapply freadRcptAt_m1
+    · rw [show R' 10#5 = -1#64 by rw [h10]; decide]; iapply freadRcptAt_neg _ _ _ _ _ _ _ hneg
     · ipureintro
       exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
     · unfold filereadArms

@@ -127,7 +127,7 @@ theorem srd_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
     refine ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr (by rw [hm1]; decide),
       UMemL.umemWrote_refl _ _ _⟩
   · iapply sysReadArms_none F Rd Rin P Rp Rpe V v sts (argZ v2) (R' 10#5) M v1 hm1 hnone $$ HP
-  · rw [show R' 10#5 = -1#64 by rw [hm1]; decide]; iapply freadRcptAt_m1
+  · rw [sysFdSt_none v V.ofile sts hnone]; iapply freadRcptAt_of_ne; intro _ _ _ _ h; cases h
 
 set_option maxHeartbeats 16000000 in
 /-- **Back from fileread**: the block rejoined at fileread's descriptor, the
@@ -156,7 +156,7 @@ theorem srd_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ fdFrags V.fdg sts ∗
     filereadEnvOut (hlc := hlc) st ∗ (filereadEnvOut (hlc := hlc) st -∗ filereadFsOut) ∗
     filereadArms (hlc := hlc) V.gen V.upt st (argZ v2) F Rd Rin Rp Rpe P (R 10#5) M' a1 ∗
-    freadRcptAt fscFs k.proc st (R 10#5) ∗
+    freadRcptAt fscFs k.proc st (argZ v2) V.upt M' a1 (R 10#5) ∗
     (∀ c : CPU, sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst a1

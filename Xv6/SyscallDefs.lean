@@ -156,6 +156,37 @@ theorem syscWaitRow_ret {V V' : ProcPriv} {img img' : ElfMem} {cs cs' : ExtTreeS
   · exact Or.inl h
   · exact Or.inr ⟨pid, h1, h2, h3⟩
 
+/-- (NI M3 private files FS-2a) **THE CITED ROW's FILE-SYSTEM CLAUSES**, at
+the class's keys (`UsysDet.usysDetClassAtF`): a read at a lazy-free entry on
+a readable inode descriptor of the entry table `sts`, whose destination the
+entry's permission view maps writable for the whole request and whose cited
+prefix ends in a read of a REGULAR-FILE row (`fevReadDir`), answered
+`usysReadAns` and wrote `usysReadBytes` -- the cited read's bytes from its
+RECORDED offset -- at argument 1; a write at a lazy-free entry on a writable
+inode descriptor whose source is readable for the whole request answered
+`usysWriteAnsF` -- the request, or `-1` at the caller's cited verdict. -/
+def syscEvFs (V V' : ProcPriv) (img img' : ElfMem) (sts : List FdState) (ι : UIota) : Prop :=
+  (syscNum V = USYS_read → V.pvLazy = false →
+    (ufsBufAt (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))).1 = true →
+    fdRdIno (usysFdAt sts (tfW V.tf (tfArgIdx 0))) = true → fevReadDir ι.fev = false →
+    tfW V'.tf (tfArgIdx 0) = usysReadAns (tfW V.tf (tfArgIdx 2)) ι ∧
+      img' = usysWr img (tfW V.tf (tfArgIdx 1)) (usysReadBytes (tfW V.tf (tfArgIdx 2)) ι)) ∧
+  (syscNum V = USYS_write → V.pvLazy = false →
+    (ufsBufAt (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))).2 = true →
+    fdWrIno (usysFdAt sts (tfW V.tf (tfArgIdx 0))) = true →
+    tfW V'.tf (tfArgIdx 0) = usysWriteAnsF (tfW V.tf (tfArgIdx 2)) ι)
+
+/-- off read and write the fs clauses are vacuous -/
+theorem syscEvFs_ne {V V' : ProcPriv} {img img' : ElfMem} {sts : List FdState} {ι : UIota}
+    (h5 : syscNum V ≠ USYS_read) (h16 : syscNum V ≠ USYS_write) : syscEvFs V V' img img' sts ι :=
+  ⟨fun h => absurd h h5, fun h => absurd h h16⟩
+
+/-- ...at a number literal -/
+theorem syscEvFs_at {V V' : ProcPriv} {img img' : ElfMem} {sts : List FdState} {ι : UIota} {k : Int}
+    (hk : syscNum V = k) (h5 : k ≠ USYS_read := by decide) (h16 : k ≠ USYS_write := by decide) :
+    syscEvFs V V' img img' sts ι :=
+  syscEvFs_ne (fun h => h5 (hk.symm.trans h)) (fun h => h16 (hk.symm.trans h))
+
 /-- **THE ROUND'S CITED ROW** (NI M2-X2, design "M2-X design" §1): what the
 kernel's arm read off the ledgers' receipts, at the CITED prefix `ι` (the
 receipts' histories, as `NiEvid.niIotaLbs` lower bounds, and the caller's
@@ -184,7 +215,8 @@ writable console descriptor, THE PUSHED RUN AT THE CITED STREAM:
 as the resumed `a0` says were pushed; and (NI M3 FS-L) close's and dup's, at every
 key, `UsysDet.usysCloseAns`/`usysDupAns` at the entry table's row at argument 0
 (dup's at its lowest closed slot, with the table's length `NOFILE`): they
-read no ledger, the boot prefix is cited.  The records are the dispatch's (`V`/`img` the entry,
+read no ledger, the boot prefix is cited; and (NI M3 FS-2a) the file-system
+clauses `syscEvFs`.  The records are the dispatch's (`V`/`img` the entry,
 `V'`/`img'` the record the call left; `sts` the entry's descriptor states). -/
 def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare)
     (sts : List FdState) (ι : UIota) : Prop :=
@@ -208,7 +240,8 @@ def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName c
     usysOutAt ι (uwriteRun img (tfW V.tf (tfArgIdx 1)) (uwriteCntOf (tfW V'.tf (tfArgIdx 0))))) ∧
   (syscNum V = USYS_close → tfW V'.tf (tfArgIdx 0) = usysCloseAns (usysFdAt sts (tfW V.tf (tfArgIdx 0)))) ∧
   (syscNum V = USYS_dup → sts.length = NOFILE ∧
-    tfW V'.tf (tfArgIdx 0) = usysDupAns (usysFdAt sts (tfW V.tf (tfArgIdx 0))) (fdLowestClosed sts))
+    tfW V'.tf (tfArgIdx 0) = usysDupAns (usysFdAt sts (tfW V.tf (tfArgIdx 0))) (fdLowestClosed sts)) ∧
+  syscEvFs V V' img img' sts ι
 
 /-! ## §2 The dispatch table -/
 

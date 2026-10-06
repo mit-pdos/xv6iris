@@ -40,6 +40,15 @@ the NI roots' trusted base grows by it alone when `UsysDet.UIota` names it.
    no row of the fold can tell such a box from an empty unlinked file (the
    bare record is not a function of the abstract row).  It carries what the
    arm event would have: the inum (carried, F6) and the record's type.
+4. (NI M3 FS-2a, the coordinator's ruling (C) of 2026-10-06) `Fev.read`
+   carries the REAL offset `off` the read used, as `write` does, and the
+   fold sets `off + n`: the offset is RECORDED AS GIVEN (R3's status for
+   the inode number), because the fold's own offset is not yet tied to the
+   real `f->off` (FS-2a′ ties it; FS-4 derives the recorded offsets).  The
+   read row reads the cited prefix's last event (`fevReadOut`,
+   `fevReadDir`), so no row reads `UIota.fpos`.
+5. (NI M3 FS-2a) `FsFull.max`: writei's refusal at the file's size cap
+   from the offset, recorded as a verdict like the three exhaustions.
 -/
 import Std.Data.ExtTreeMap
 import Iris.Algebra.IProp
@@ -56,6 +65,11 @@ inductive FsFull where
   | blocks
   /-- the open-file table: `filealloc` found all `NFILE` entries in use -/
   | files
+  /-- (NI M3 FS-2a) the FILE's size cap: writei refused the chunk at its
+  offset (`off > size` or past `MAXFILE * BSIZE`) -- a per-file verdict, not
+  a table, recorded AS GIVEN like the three exhaustions (it reads the offset,
+  which the ledger records as given until FS-2a′ ties it to the fold) -/
+  | max
   deriving DecidableEq, Repr
 
 /-! ## §1 The rows and the events -/
@@ -97,8 +111,10 @@ inductive Fev where
   | hop (act : BitVec 64) (d : Nat) (nm : List (BitVec 8))
   /-- an fd installed on `i` (`γo` CARRIED); its offset 0 -/
   | open (act : BitVec 64) (i : Nat) (γo : GName)
-  /-- `n` bytes read from `γo`'s offset (the count the read advanced it by) -/
-  | read (act : BitVec 64) (i : Nat) (γo : GName) (n : Nat)
+  /-- `n` bytes read from `γo`'s offset `off` (the count the read advanced it
+  by); (NI M3 FS-2a, ruling (C)) `off` is the REAL offset the read used,
+  recorded AS GIVEN, as `write` records its own -/
+  | read (act : BitVec 64) (i : Nat) (γo : GName) (off n : Nat)
   /-- a stat of `i` -/
   | stat (act : BitVec 64) (i : Nat)
   /-- an exhaustion verdict (CARRIED) -/
@@ -156,7 +172,7 @@ def fevStep (st : Frows × (GName → Nat)) : Fev → Frows × (GName → Nat)
   | .trunc _ i => (frowsSet st.1 i (frowTrunc (st.1 i)), st.2)
   | .free _ i => (frowsSet st.1 i none, st.2)
   | .open _ _ γo => (st.1, foffSet st.2 γo 0)
-  | .read _ _ γo n => (st.1, foffSet st.2 γo (st.2 γo + n))
+  | .read _ _ γo off n => (st.1, foffSet st.2 γo (off + n))
   | .hop _ _ _ => st
   | .stat _ _ => st
   | .full _ _ => st
@@ -196,6 +212,54 @@ def fevStatOf (h : List Fev) (i : Nat) : Option (Nat × Nat × Nat) :=
   | some (.file bs, nl) => some (2, nl, bs.length)
   | _ => none
 
+/-! ### The cited read (NI M3 FS-2a, ruling (C))
+
+A read row cites the prefix ENDING IN its own `read` event (the fork row's
+pattern: the decisive event closes the cited prefix), so the reading is a
+function of the cited list alone.  The bytes are the file row's content in
+the fold of the prefix BEFORE the event, from the event's RECORDED offset
+(not the fold's `fevOff`: FS-2a′ ties the two), at most `n`. -/
+
+/-- the row is a file in `h`'s fold -/
+def fevIsFile (h : List Fev) (i : Nat) : Bool :=
+  match fevRows h i with
+  | some (.file _, _) => true
+  | _ => false
+
+/-- **THE CITED READ's ROW IS NOT A FILE** (a directory, or anything else
+the view does not hold the bytes of): the class's `fdir` reading -/
+def fevReadDir (h : List Fev) : Bool :=
+  match h.getLast? with
+  | some (.read _ i _ _ _) => !fevIsFile h.dropLast i
+  | _ => false
+
+/-- **THE CITED READ's BYTES**: at most `n` bytes of the file row from the
+read's recorded offset, in the fold before it (`[]` when the cited prefix
+does not end in a read) -/
+def fevReadOut (h : List Fev) (n : Nat) : List (BitVec 8) :=
+  match h.getLast? with
+  | some (.read _ i _ off _) => ((fevContent h.dropLast i).drop off).take n
+  | _ => []
+
+/-- **THE CITED VERDICT**: the cited prefix ends in an out-of-resources
+verdict of actor `a` (write's `-1`, recorded as given) -/
+def fevFullBy (h : List Fev) (a : BitVec 64) : Bool :=
+  match h.getLast? with
+  | some (.full a' _) => a' == a
+  | _ => false
+
+theorem fevReadDir_snoc (h : List Fev) (act : BitVec 64) (i : Nat) (γo : GName) (off d : Nat) :
+    fevReadDir (h ++ [.read act i γo off d]) = !fevIsFile h i := by
+  unfold fevReadDir; simp
+
+theorem fevReadOut_snoc (h : List Fev) (act : BitVec 64) (i : Nat) (γo : GName) (off d n : Nat) :
+    fevReadOut (h ++ [.read act i γo off d]) n = ((fevContent h i).drop off).take n := by
+  unfold fevReadOut; simp
+
+theorem fevFullBy_snoc (h : List Fev) (a : BitVec 64) (why : FsFull) :
+    fevFullBy (h ++ [.full a why]) a = true := by
+  unfold fevFullBy; simp
+
 /-! ### The fold's algebra -/
 
 theorem fevRun_append (h h' : List Fev) : fevRun (h ++ h') = h'.foldl fevStep (fevRun h) := by
@@ -206,7 +270,7 @@ theorem fevRun_snoc (h : List Fev) (e : Fev) : fevRun (h ++ [e]) = fevStep (fevR
 
 /-- an OBSERVATION moves no row -/
 def fevObs : Fev → Prop
-  | .hop _ _ _ | .open _ _ _ | .read _ _ _ _ | .stat _ _ | .full _ _ => True
+  | .hop _ _ _ | .open _ _ _ | .read _ _ _ _ _ | .stat _ _ | .full _ _ => True
   | _ => False
 
 theorem fevRows_obs (h : List Fev) (e : Fev) (he : fevObs e) : fevRows (h ++ [e]) = fevRows h := by

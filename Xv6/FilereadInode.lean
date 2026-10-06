@@ -129,7 +129,7 @@ def frdK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat
     genHalvesPriv (procAddr j) pid V.gen -∗
     filereadEnvOut (hlc := hlc) st -∗
     filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin Rp Rpe P (R' 10#5) M' (k.regs 11#5) -∗
-    freadRcptAt fscFs k.proc st (R' 10#5) -∗ wpLoop c)
+    freadRcptAt fscFs k.proc st n V.upt M' (k.regs 11#5) (R' 10#5) -∗ wpLoop c)
 
 /-! ## The lock-held ghost steps -/
 
@@ -210,7 +210,7 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
       |={⊤}=> ownCtx cpu curCtx ∗ offFd fk q γb γo C ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
         icDepHeld fscFs fscIreg fscCov fscLogst (.depRd s icfgDev inum g lo) ik inum dn bm ∗
         -- (NI M3 private files FS-1) the read's event, at the row it read
-        fsObsAt fscFs (.read act inum.toNat γo dd) inum.toNat (absRow (eraNode dn bm data)) ∗
+        fsObsAt fscFs (.read act inum.toNat γo v.toNat dd) inum.toNat (absRow (eraNode dn bm data)) ∗
         ∃ av : Aview, ⌜arowAt av inum.toNat (absRow (eraNode dn bm data))⌝ ∗
           F.pfRecv av v.toNat (absRow (eraNode dn bm data)) dd := by
   have hw : (filerwOffW v dd).toNat = v.toNat + dd :=

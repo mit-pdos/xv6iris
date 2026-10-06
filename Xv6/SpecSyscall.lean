@@ -474,7 +474,8 @@ Persistent. -/
 def syscEvOut (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) : IProp GF :=
   iprop(⌜syscNum V ≠ USYS_uptime ∧ syscNum V ≠ USYS_wait ∧ syscNum V ≠ USYS_fork ∧
-      syscNum V ≠ USYS_sbrk ∧ syscNum V ≠ USYS_write ∧ syscNum V ≠ USYS_close ∧ syscNum V ≠ USYS_dup⌝ ∨
+      syscNum V ≠ USYS_sbrk ∧ syscNum V ≠ USYS_write ∧ syscNum V ≠ USYS_close ∧ syscNum V ≠ USYS_dup ∧
+      syscNum V ≠ USYS_read⌝ ∨
     (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
       niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts ι⌝) ∨
     (⌜syscNum V = USYS_wait ∧ syscA0 V' = -1#64 ∧ cs' = cs ∧ syscImg V' M' = syscImg V M⌝ ∗
@@ -486,19 +487,20 @@ instance syscEvOut_persistent (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts 
   unfold syscEvOut; infer_instance
 
 /-- **The deposit at a number that cites nothing** (NI M2-X2): every arm but
-uptime's, wait's, fork's and (NI M2-G3) sbrk's (the hypotheses default by
-`decide` at the arm's literal number). -/
+uptime's, wait's, fork's and (NI M2-G3) sbrk's -- and since NI M2-G4, NI
+M3 FS-L and FS-2a write's, close's, dup's and read's (the hypotheses default
+by `decide` at the arm's literal number). -/
 theorem syscEvOut_quiet (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (n : Int)
     (hnum : syscNum V = n) (h14 : n ≠ 14 := by decide) (h3 : n ≠ 3 := by decide)
     (h1 : n ≠ 1 := by decide) (h12 : n ≠ 12 := by decide) (h16 : n ≠ 16 := by decide)
-    (h21 : n ≠ 21 := by decide) (h10 : n ≠ 10 := by decide) :
+    (h21 : n ≠ 21 := by decide) (h10 : n ≠ 10 := by decide) (h5 : n ≠ 5 := by decide) :
     ⊢ syscEvOut (hlc := hlc) (GF := GF) V M sts V' M' cs cs' gn := by
   unfold syscEvOut
   ileft
   ipureintro
   rw [hnum]
-  exact ⟨h14, h3, h1, h12, h16, h21, h10⟩
+  exact ⟨h14, h3, h1, h12, h16, h21, h10, h5⟩
 
 /-- **The deposit at a citation** (NI M2-X2). -/
 theorem syscEvOut_cite (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)

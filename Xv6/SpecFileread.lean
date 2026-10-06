@@ -683,34 +683,49 @@ end Keyed
 section Rcpt
 variable {GF : BundledGFunctors} [Xv6G GF]
 
-/-- (NI M3 private files FS-1) **THE READ'S LEDGER RECEIPT**, relayed to the
-post: at `-1` nothing is claimed; at a count on an inode descriptor the read's
-event `read act i γo d` is in the era's ledger at a prefix whose fold holds
-the row it read (`FsLedger.fsObsAt`), its advance the count; other
-descriptors carry nothing. -/
-def freadRcptAt (γfs : FsNames) (act : BitVec 64) (st : FdState) (r : BitVec 64) : IProp GF :=
-  iprop(⌜r = -1#64⌝ ∨ match st with
-    | .open true _ (.inode i γo _) =>
-      ∃ (d : Nat) (a : Anode), ⌜r = BitVec.ofNat 64 d⌝ ∗ fsObsAt γfs (.read act i γo d) i a
-    | _ => True)
+/-- (NI M3 private files FS-1; FS-2a) **THE READ'S LEDGER RECEIPT**, relayed
+to the post.  On a READABLE INODE descriptor: either `-1` with its reason
+(the sign guard `n < 0`, or readi's copyout fault at a byte of the table `P`
+the call ran at, `rdFailWhy` -- what the read arms carry), or a count `d`
+whose event `read act i γo off d` -- at the REAL offset `off` the read used,
+recorded as given (ruling (C)) -- is in the era's ledger at a prefix whose
+fold holds the row `a` it read (`FsLedger.fsObsAt`), with the read arm's
+return tie and buffer tie at that row (`ardRetTie`, `readBufTie`: on a file
+row the count is `ardCount` and the `d` bytes at `addr` in `M'` are the
+row's from `off`).  Other descriptors carry nothing. -/
+def freadRcptAt (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (P : UPtd)
+    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (r : BitVec 64) : IProp GF :=
+  match st with
+  | .open true _ (.inode i γo _) =>
+    iprop(⌜r = -1#64 ∧ (n < 0 ∨ rdFailWhy P addr n.toNat)⌝ ∨
+      ∃ (off d : Nat) (a : Anode),
+        ⌜r = BitVec.ofNat 64 d ∧ (d : Int) ≤ n ∧ ardRetTie n a off r ∧ readBufTie a off d M' addr⌝ ∗
+        fsObsAt γfs (.read act i γo off d) i a)
+  | _ => iprop(True)
 
-instance freadRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (st : FdState) (r : BitVec 64) :
-    Persistent (freadRcptAt (GF := GF) γfs act st r) := by
+instance freadRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (P : UPtd)
+    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (r : BitVec 64) :
+    Persistent (freadRcptAt (GF := GF) γfs act st n P M' addr r) := by
   unfold freadRcptAt
   rcases st with _ | ⟨rb, wb, t⟩
   · infer_instance
   · rcases rb with _ | _ <;> rcases t <;> infer_instance
 
-theorem freadRcptAt_m1 (γfs : FsNames) (act : BitVec 64) (st : FdState) :
-    ⊢@{IProp GF} freadRcptAt γfs act st (-1#64) := by
-  unfold freadRcptAt; ileft; ipureintro; rfl
+/-- the sign guard's `-1` -/
+theorem freadRcptAt_neg (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (P : UPtd)
+    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (hn : n < 0) :
+    ⊢@{IProp GF} freadRcptAt γfs act st n P M' addr (-1#64) := by
+  unfold freadRcptAt
+  rcases st with _ | ⟨rb, wb, t⟩
+  · ipureintro; trivial
+  · rcases rb with _ | _ <;> rcases t <;> first | (ipureintro; trivial) | (ileft; ipureintro; exact ⟨rfl, Or.inl hn⟩)
 
 /-- a descriptor that is not a readable inode carries nothing -/
-theorem freadRcptAt_of_ne (γfs : FsNames) (act : BitVec 64) (st : FdState) (r : BitVec 64)
+theorem freadRcptAt_of_ne (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (P : UPtd)
+    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (r : BitVec 64)
     (hst : ∀ wb i γo om, st ≠ .open true wb (.inode i γo om)) :
-    ⊢@{IProp GF} freadRcptAt γfs act st r := by
+    ⊢@{IProp GF} freadRcptAt γfs act st n P M' addr r := by
   unfold freadRcptAt
-  iright
   rcases st with _ | ⟨rb, wb, t⟩
   · ipureintro; trivial
   · rcases rb with _ | _
@@ -754,7 +769,7 @@ def filereadPost (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) 
     filereadEnvOut (hlc := hlc) st -∗
     filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin Rp Rpe P (R' 10#5) M' (k.regs 11#5) -∗
     -- (NI M3 private files FS-1) the read's ledger receipt
-    freadRcptAt fscFs k.proc st (R' 10#5) -∗
+    freadRcptAt fscFs k.proc st n V.upt M' (k.regs 11#5) (R' 10#5) -∗
     wpLoop cpu')
 
 end Post

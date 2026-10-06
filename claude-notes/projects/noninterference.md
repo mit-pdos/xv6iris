@@ -7368,6 +7368,123 @@ typed row the fold lacks). (3) `write` carries `off` and the advance `r`; `read`
 other module moves; no axiom or opaque. `tools/audit/baseline.json` unchanged (14 PASS). `dead_allow.txt` +
 eight rows "FS-2 reaches".
 
+### M3 private files FS-2a as landed (2026-10-06)
+
+On `lane/pfiles` (rulings FS-R3, R4, R6; the coordinator's ruling (C) of 2026-10-06 after the offset-tie gap
+report). read and write on an inode descriptor join the class; their answers are DERIVED from the cited fs-event
+prefix; the read/write OFFSETS are RECORDED AS GIVEN (R3's status for the inode number), not derived. No kernel
+change; the fourteen roots' statements, `SYSCALL`/`USERTRAP`/`USERRET`/`USER`, `SyscRows` and every `Uk*`/`User*`
+file byte-identical.
+
+**The gap and ruling (C).** The real offset lives only in the file's off box (`FileOffCell.offResident`: the cell
+and `offLink γo v = offGv γo ½ v ∨ killCred`); `ftopBody` holds no share of any shadow (½ kernel box, ½ user), and
+the taint arm (`killCred = True` in the generic app, `AppIface`) lets a box hold the cell with no ghost, with nothing
+tying the arm to the file's mode. So the tie `fevOff h γo = f->off` cannot be exported by the sanctioned moves.
+Ruling (C): FS-2a on footing (B) now; FS-2a′ (option A) before FS-3/4.
+
+**The offset, recorded (`NiFs`, TCB).** `Fev.read act i γo off n` carries the REAL offset the read used (as `write`
+carries its own), `fevStep` sets `off + n`. The fire (`FsAbsReadFire.arfRead_fire*`, `frd_post_ghost`) appends it at
+`v.toNat`. `FsFull.max` (new): writei's refusal at the file's size cap from the offset, recorded as a verdict
+(`SpecFilewrite.fwWhyRcpt .max := fsFullRcpt γfs act .max`, appended by `FilewriteFire.fwr_post_ghost` through
+`ftopFull`). The readings: `fevIsFile`, `fevReadDir h` (the cited prefix ends in a read whose row in the fold
+before it is NOT a file), `fevReadOut h n` (`((fevContent h.dropLast i).drop off).take n` at a last `read`),
+`fevFullBy h a` (the cited prefix ends in `a`'s `full` verdict). No row reads `UIota.fpos`: the cited prefix closes on
+the round's own decisive event (fork's pattern), so `usysDet_ledQ` holds unchanged.
+
+**The receipt (`SpecFileread.freadRcptAt`, moved).** `freadRcptAt γfs act st n P M' addr r`: on a readable inode row,
+`⌜r = -1 ∧ (n < 0 ∨ rdFailWhy P addr n.toNat)⌝ ∨ ∃ off d a, ⌜r = ofNat d ∧ (d : Int) ≤ n ∧ ardRetTie n a off r ∧
+readBufTie a off d M' addr⌝ ∗ fsObsAt γfs (.read act i γo off d) i a`; `True` elsewhere. Producers:
+`FilereadInodeArm` (from readi's arms, `frd_ret_tie`, `frd_buffer_tie`), `ProofFileread` (unreadable, sign guard),
+`ProofSysRead` (argfd none). `filereadPost`/`frdK`/`sysReadPost` pass `n V.upt M' addr`.
+
+**The rows (`UsysDet`).** `fdRdIno`/`fdWrIno` (the row at a0 is a readable/writable inode descriptor), `uwinOk`,
+`ufsBufAt perm a1 a2 : Bool × Bool` (read's destination writable, write's source readable over the request),
+`ufsBuf W`; `usysReadBytes a2 ι := fevReadOut ι.fev (usysCntW a2).toNat`;
+`usysReadAns a2 ι := if usysCntW a2 < 0 then -1 else ofNat (usysReadBytes a2 ι).length`;
+`usysDetRead W ι := bump W (usysReadAns a2 ι) (usysWr W.M a1 (usysReadBytes a2 ι)) W.perm W.sz W.fd …`;
+`usysWriteAnsF a2 ι := if usysCntW a2 < 0 ∨ fevFullBy ι.fev ι.act then -1 else ofNat (usysCntW a2).toNat`;
+`usysWriteAnsK W ι` (console's at a writable console, inode's elsewhere; `usysDetRet`'s write branch). The class,
+beside the old one (deviation 1):
+
+    def usysDetClassAtF (n : Int) (a0 : BitVec 64) (lz wc : Bool) (wf : Option FdState) (wb : Bool × Bool)
+        (fdir : Bool) : Prop :=
+      usysDetClassAt n a0 lz wc ∨
+      (n = USYS_read ∧ lz = false ∧ wb.1 = true ∧ fdRdIno wf = true ∧ fdir = false) ∨
+      (n = USYS_write ∧ lz = false ∧ wb.2 = true ∧ fdWrIno wf = true)
+
+`usysDetResumes` + read (not `usysDetClass`: read is a member only through the F-class); `usysDet` + read's branch;
+`usysIotaFits`: write's clause `r = usysWriteAnsK W ι`, + `(n = USYS_read → r = usysReadAns a2 ι ∧ M' = usysWr W.M
+a1 (usysReadBytes a2 ι))`; `_exists` + `hrd`, `_of_ev` + `hwi`/`hclr`/`hrd` (write's class premise the console's or
+the inode's); `usysDet_mem/_rows/_of_rows` + read; `usysDetClassAtF_resumes/_ne_exec/_wait/_write/_read`.
+
+**The citation (`SyscallDefs`, `NiLedger`, the arms).** `syscEvRow` + last conjunct `syscEvFs V V' img img' sts ι`:
+`(syscNum V = read → V.pvLazy = false → (ufsBufAt (permOf V.upt.um V.sz.toNat) a1 a2).1 → fdRdIno (usysFdAt sts
+a0) → fevReadDir ι.fev = false → a0' = usysReadAns a2 ι ∧ img' = usysWr img a1 (usysReadBytes a2 ι)) ∧ (syscNum V
+= write → … .2 → fdWrIno … → a0' = usysWriteAnsF a2 ι)`; every other arm passes `syscEvFs_at`. `syscEvOut`/`utEvOut`
+quiet disjuncts + `≠ USYS_read`; `syscEvOut_quiet`/`syscall_ret_fd` + `h5`. `niCiting` + read; `citeDir c` (new);
+`niDetRow`/`niKeyRow` at the F-class (`fdir` the citation's). The read arm (`SyscallArmsFd2.syscall_arm_read`) now
+cites (`syscArmRead_ev`: the boot prefix at `-1` or off a readable inode row, else the prefix ending in the read; at
+the class the image through `syscRead_fileImg`, the copyout fault refuted by `rdFailWhy_key`); the write arm splits:
+on a writable inode row `syscArmWriteIno_ev` (the boot prefix, or the prefix ending in the caller's `full` verdict;
+the source stop refuted by `wrFailWhy_key`; `filewriteExtra_inoRet` reads `r = -1 ∨ r = ofInt n` off the arms
+before the deposit spends them), elsewhere the console citation unchanged. `NiEvid.niIotaLbs_fev` (new).
+`UserretClosedRows.urc_evRow` + the two clauses at the key, `urc_niDetRow` through `usysIotaFits_of_ev`,
+`urc_keyBoot` at the F-class (boot citation); `UexecApply.uexecRet_roundDet` at the F-class.
+
+**The trace (`NiTrace`).** `NiStep.round secc lz win sz wcon wout wfd wslot (wbuf : Bool × Bool) x e c`
+(`niStepOf`: `ufsBuf W`); `input`/`famInput` + `wbuf`. The law's resume block, last:
+
+    (gprsNum secc xg = USYS_read → lz = false → wbuf.1 = true → fdRdIno wfd = true →
+      ∃ k ι, c = some (k, ι) ∧ (fevReadDir ι.fev = false → gprsA0 eg = usysReadAns (gprsA2 xg) ι)) ∧
+    (gprsNum secc xg = USYS_write → lz = false → wbuf.2 = true → fdWrIno wfd = true →
+      ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysWriteAnsF (gprsA2 xg) ι)
+
+derived by `niDetRow_read`/`niDetRow_writeIno` (+ `ufsBuf_run`). The class:
+
+    def NiInClass (tr : List NiStep) : Prop :=
+      ∀ secc lz win sz wcon wout wfd wslot wbuf x e c,
+        NiStep.round secc lz win sz wcon wout wfd wslot wbuf x e c ∈ tr → ∀ ep xg,
+        exitView x = some (uecallScause, ep, xg) →
+        usysDetClassAtF (gprsNum secc xg) (gprsA0 xg) lz wcon.isSome wfd wbuf (citeDir c)
+
+`output_eq_of`/`output_eq`/`output_eq_fam` answer read and the inode write at the one cited ledger (or family) part,
+whose `fev` is one (`led`/`famLed` keep it); `classReading` admits read at every key and write at every lazy-free key
+(`write ∧ lz = false`); §10: `niClassKey W c` at the F-class, `NiDetReading.hEf` (the erasure keeps `fev`),
+`niKeyRow_det` + `hEf`. Honest scope 16 (the fs rows read the fs history; offsets and the size-cap refusal recorded as
+given; FS-2a′ scheduled; conceded through `H` until FS-3/4; fstat, directory reads, FS-2b/2c out); scope 1's class;
+deviation 14.
+
+**Deviations.** (1) `usysDetClassAtF` beside `usysDetClassAt`, not in place: the old predicate stays the four-argument
+one every old member's proof builds (`Or.inl`). (2) `usysReadAns a2 ι` / `usysWriteAnsF a2 ι` take the request WORD,
+not `W` (the law states them at the exit's `a2`). (3) The rows read the cited prefix's LAST event, not `ι.fpos.head?`
+(`fpos` is erased by `led`, so reading it would break `usysDet_ledQ` and every two-run proof); the citation closes on
+the decisive event. (4) `fout`/`usysFevOut` NOT landed: no FS-2a answer reads the round's appended events (write's
+chunks never decide `n`; the bytes are pinned by `niKeyRow`), so they land with their reader, FS-4 (dead code
+otherwise). (5) One new step reading `wbuf` (R6 named `wfd`, `rt`, `fout`; `rt` is FS-2b's). (6) `fdir` is the
+citation's (`citeDir c`), not a step field. (7) **fstat stays OUT**: its 4-byte padding hole is stale kernel stack
+(FS-0 recorded it as a channel, not named), so the key's image after fstat is not a function of (key, ι) without
+declassifying a kernel-stack word; also its `stat` event is appended row-free (`fsReady_obs`, no `fsObsAt`), so the
+24 bytes are not tied to the fold either. The inum tie was therefore not lifted (it would be dead code). Options for
+the owner: (a) carry the hole in `Fev.stat act i h` (a declassification of the caller's own kernel-stack word, to be
+written into scope 16) and append the stat at the row (`ftopLed_obsAt` under ilock, where `fstat_rd_meta` holds the
+record) plus `sysFstatRcpt`'s `∃ inum` tied by `fdInumIs` at `sysFdSt` (filestat's `fstatRcptAt` already has it:
+relay `fstatRcptAt` instead of `sysFstatRcpt_of`'s weakening); (b) zero the padding in the kernel (a kernel change,
+R9). (8) `classReading`'s write clause drops `wcon.isSome` (an inode write's answer is a reading too).
+
+**Baselines.** `tools/tcb/expected.json` and `tools/audit/baseline.json`: see the lane's commit (no axiom or opaque).
+`dead_allow.txt`: `fevContent` off (reached); `fevOff`/`fevReadBytes` re-labelled "FS-2a′ reaches"; `fevStatOf`
+"out of FS-2a"; `fevHop`, `fevRun_prefix`, `fsLedLb_prefix`, `fsEvRcpt_of_lb` unchanged.
+
+The class: {exit, getpid, uptime, wait at a null status pointer or a lazy-free key, fork, sbrk, the console write at a
+lazy-free key on a writable console descriptor, pause, close, dup, read on a readable inode descriptor of a regular
+file and write on a writable inode descriptor at a lazy-free key whose buffer is mapped}.
+
+**What FS-2b absorbs.** open (plain/create/trunc), chdir, mkdir: the namex hops (not appended, FS-1's gap), the
+dropped create receipt in `SysOpenEntryC`, `openRcptAt`'s `i`/`γo`/`tr` ties, `NiStep`'s `rt`. **FS-2a′** (before
+FS-3/4): the ledger's ¼ share of the offset shadow for parked files, `offFd`/`offBox` keyed on the mode, taint
+held-only, the class at `.inode i γo .parked`, `fevOffWf` (the recorded offsets ARE the fold's); `UserOff.lean` may
+move (flagged to the owner). fstat per deviation 7 if the owner rules (a).
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

@@ -65,7 +65,11 @@ attributed by accepted-stream index through the citation, `NiTrace` scope
 10, `xv6NiOut`) and pause at every key (NI M3 no-kill K1: answer `0`, its
 kill `-1` never resumes, `NiTrace` scope 11) and close and dup at every key
 (NI M3 FS-L: answers of the caller's own descriptor table, whose readings
-ride the step, `NiTrace` scope 15); every
+ride the step, `NiTrace` scope 15) and (NI M3 FS-2a) read on a readable
+inode descriptor of a regular file and write on a writable inode
+descriptor at a lazy-free key whose buffer is mapped (answers derived
+from the cited fs-event prefix, the offsets and verdicts recorded as
+given, `NiTrace` scope 16); every
 filing spent a distinct claim minted
 before its enter (`niOneShot`, W2d); the mask and actor are carried per
 filing; uptime's, wait's, fork's and sbrk's answers are derived from the

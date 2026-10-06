@@ -425,11 +425,15 @@ theorem fwr_post_ghost (act : BitVec 64) (om : OffMode) (cpu : CPU) (ik fk : Nat
   icases Hst with (Hf | ⟨%hs, Hx⟩)
   · imodintro; ileft; iexact Hf
   · by_cases hm : a0 = -1#64
-    · imodintro; iright
+    · -- writei's own `-1` (the file at its size cap from this offset):
+      -- (NI M3 FS-2a) the verdict recorded in the era's ledger, at this
+      -- instant, as given (`FsFull.max`)
+      imod (ftopFull ⊤ fscFs act .max CoPset.subseteq_top) $$ Hft with #Hmax
+      imodintro; iright
       isplitr
       · ipureintro; exact hs
       isplitl []
-      · iexists FwWhy.max; unfold fwWhyRcpt; iempintro
+      · iexists FwWhy.max; unfold fwWhyRcpt; iexact Hmax
       · iexact Hx
     · by_cases hd : 0 < dist
       · imodintro; iright

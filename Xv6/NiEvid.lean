@@ -259,6 +259,22 @@ theorem niIotaLbs_cacc (ns : List GName) (ca : List (BitVec 8)) (cp : List Nat) 
   iapply niIotaLbs_lists
   iframe H1 H2 H3 H4 Hc H6
 
+/-- (NI M3 FS-2a) The evidence of a round that cites a prefix of its era's
+fs-event ledger (read's prefix ending in its read, an inode write's ending
+in its verdict), at its actor. -/
+theorem niIotaLbs_fev (ns : List GName) (fv : List Fev) (a : BitVec 64) :
+    ((ns.getD 6 0) ↪◯ML fv) ⊢@{IProp GF}
+      |==> niIotaLbs ns { UIota.boot with act := a, fev := fv } := by
+  show _ ⊢ |==> niIotaLbs ns ⟨[], [], [], 0, a, [], [], [], fv, []⟩
+  iintro #Hf
+  imod MonoList.lb_own_nil (GF := GF) (α := Pev) (ns.getD 1 0) with #H1
+  imod MonoList.lb_own_nil (GF := GF) (α := Zev) (ns.getD 2 0) with #H2
+  imod MonoList.lb_own_nil (GF := GF) (α := Kev) (ns.getD 3 0) with #H3
+  imod MonoList.lb_own_nil (GF := GF) (α := Sev) (ns.getD 4 0) with #H4
+  imod MonoList.lb_own_nil (GF := GF) (α := BitVec 8) (ns.getD 5 0) with #H5
+  iapply (niIotaLbs_lists (GF := GF) ns [] [] [] [] [] [] a fv [])
+  iframe H1 H2 H3 H4 H5 Hf
+
 /-- The evidence of a round that read nothing, at its actor. -/
 theorem niIotaLbs_act (ns : List GName) (a : BitVec 64) :
     ⊢@{IProp GF} |==> niIotaLbs ns { UIota.boot with act := a } :=

@@ -194,20 +194,31 @@ console write -- the numbers whose answer the kernel read off a ledger
 (sbrk's at every call: the boot prefix at the actor unless an allocating
 grow failed) or whose cited row carries the key's answer (write's: the boot
 prefix at every write; NI M3 FS-L, close's and dup's: the boot prefix at
-every call, the answer the entry table's). -/
+every call, the answer the entry table's; NI M3 FS-2a, read's: the fs prefix
+ending in the round's own read event at a counted read of an inode
+descriptor, the boot prefix elsewhere -- and an inode write cites the fs
+prefix ending in its own `-1` verdict). -/
 def niCiting (sc : BitVec 64) (W : Uvis) : Prop :=
   sc = uecallScause ∧ (uvisNum (uvisRun W) = USYS_uptime ∨ uvisNum (uvisRun W) = USYS_wait ∨
     uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_sbrk ∨ uvisNum (uvisRun W) = USYS_write ∨
-    uvisNum (uvisRun W) = USYS_close ∨ uvisNum (uvisRun W) = USYS_dup)
+    uvisNum (uvisRun W) = USYS_close ∨ uvisNum (uvisRun W) = USYS_dup ∨ uvisNum (uvisRun W) = USYS_read)
+
+/-- (NI M3 FS-2a) **THE CITATION's `fdir` READING**: the cited read's row is
+not a file (`NiFs.fevReadDir` of the cited fs prefix; `false` at no
+citation, whose prefix is the boot's) -/
+def citeDir (c : Option (Nat × UIota)) : Bool := fevReadDir ((c.map Prod.snd).getD UIota.boot).fev
 
 /-- **M0'S ROW AT THE CITED ι** (NI M2-X2): at an ecall in the private class
 (at the key: NI M2-G1e, with the key's lazy bit; since NI joint fork lane F3
-fork at every key, since NI M2-G3 sbrk at every key), the key the round resumed IS `usysDet` at the cited
+fork at every key, since NI M2-G3 sbrk at every key; NI M3 FS-2a, the class
+with the file system, `usysDetClassAtF`, its `fdir` the cited read's row
+type), the key the round resumed IS `usysDet` at the cited
 prefix (up to the kernel words, `ukeyEq`). -/
 def niDetRow (sc : BitVec 64) (W W' : Uvis) : Option (Nat × UIota) → Prop
   | some (_, ι) => sc = uecallScause →
-      usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
-        (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) →
+      usysDetClassAtF (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
+        (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)))
+        (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) (ufsBuf (uvisRun W)) (fevReadDir ι.fev) →
       ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ι) W'
   | none => True
 
@@ -234,8 +245,10 @@ The class premise is `niDetRow`'s. -/
 def niKeyRow (sc : BitVec 64) (W W' : Uvis) (c : Option (Nat × UIota)) : Prop :=
   (sc ≠ uecallScause → ukeyEq W W') ∧
   (sc = uecallScause →
-    usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
-      (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) →
+    usysDetClassAtF (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
+      (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)))
+      (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) (ufsBuf (uvisRun W))
+      (citeDir c) →
     ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ((c.map Prod.snd).getD UIota.boot)) W')
 
 /-- **A key-history citation** (NI M3 U-2b): the history's ghost name, its

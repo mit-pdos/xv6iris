@@ -357,7 +357,7 @@ theorem arfRead_fire_gen [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac) (R : 
         topFragQ (fsGammaL γfs) dq i n ∗
         offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗ R ∗
         -- (NI M3 private files FS-1) THE READ's RECEIPT, at its instant
-        fsObsRcpt γfs (.read act i γo d) i n ∗
+        fsObsRcpt γfs (.read act i γo off d) i n ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   iintro #Hi Hsup Hcm Hf Hg
   -- THE PIECE IS SPENT: the fire eliminates to the AU side.
@@ -377,7 +377,7 @@ theorem arfRead_fire_gen [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac) (R : 
   ihave Hcm := Hcm $$ %I %off %(absRow n) %d %hpre Ha Hg
   have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hg, HΦ⟩
-  imod ftopLed_obsAt γfs I (.read act i γo d) trivial i n hlk $$ Hled with ⟨Hled, #Hrc⟩
+  imod ftopLed_obsAt γfs I (.read act i γo off d) trivial i n hlk $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists I, A
     iframe Ha Hla Hpark Hled
@@ -405,7 +405,7 @@ theorem arfRead_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
         offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
-        fsObsRcpt γfs (.read act i γo d) i n ∗
+        fsObsRcpt γfs (.read act i γo off d) i n ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   iintro #Hi #Hoinv Hcm Hf Hg
   ihave Hsup := offSupply_parked E γo off d (arfFoffN_sub E hE) $$ Hoinv
@@ -428,7 +428,7 @@ theorem arfRead_fire_adv [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
         offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
-        fsObsRcpt γfs (.read act i γo d) i n ∗
+        fsObsRcpt γfs (.read act i γo off d) i n ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   iintro #Hi Hcm Hf Hg
   ihave Hcm := pfAt_au _ _ $$ Hcm
@@ -445,7 +445,7 @@ theorem arfRead_fire_adv [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   ihave Hcm := Hcm $$ %I %off %(absRow n) %d %hpre Ha Hg
   have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hg, HΦ⟩
-  imod ftopLed_obsAt γfs I (.read act i γo d) trivial i n hlk $$ Hled with ⟨Hled, #Hrc⟩
+  imod ftopLed_obsAt γfs I (.read act i γo off d) trivial i n hlk $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists I, A
     iframe Ha Hla Hpark Hled
@@ -472,7 +472,7 @@ theorem arfRead_fire_om [Icfg] [FileG GF] [SleepLockG GF] [IcboxG GF] [OffboxBox
       offLink (hlc := hlc) γo (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
         offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
-        fsObsRcpt γfs (.read act i γo d) i n ∗
+        fsObsRcpt γfs (.read act i γo off d) i n ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   cases om with
   | parked =>

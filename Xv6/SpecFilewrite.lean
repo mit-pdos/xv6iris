@@ -430,8 +430,9 @@ theorem writeArmsAt_neg_held (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : 
 The sign guard (`n < 0`), or a SHORT CHUNK, whose reason writei relays
 (F7 (b), ruling FS-R5): an unmapped source byte (`src`: writei's disturbed
 tail, `wrFailWhy` at the writer's table), the file at `MAXFILE` blocks
-(`max`: writei's own `-1`; its rows compute it from the file's size and the
-offset), or the disk out of blocks (`full`: writei's short count at an
+(`max`: writei's own `-1` -- a function of the file's size and the offset,
+which the ledger records as given, so (NI M3 FS-2a) the verdict is carried
+as `fsFullRcpt .max`), or the disk out of blocks (`full`: writei's short count at an
 unmapped block -- `SpecWritei.WriteiOut.full`, balloc's live arm relayed
 through bmap -- carried as `fsFullRcpt .blocks`). -/
 
@@ -445,7 +446,7 @@ inductive FwWhy where
 def fwWhyRcpt (γfs : FsNames) (act : BitVec 64) (P : UPtd) (ua : BitVec 64) (n : Int) :
     FwWhy → IProp GF
   | .src => iprop(⌜wrFailWhy P ua n.toNat⌝)
-  | .max => iprop(emp)
+  | .max => fsFullRcpt γfs act .max
   | .full => fsFullRcpt γfs act .blocks
 
 instance fwWhyRcpt_persistent (γfs : FsNames) (act : BitVec 64) (P : UPtd) (ua : BitVec 64) (n : Int)

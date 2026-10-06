@@ -216,7 +216,7 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     refine ⟨fun h' => absurd h' h14, fun _ _ => ?_, fun h' => absurd h' h1,
       fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide),
       fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide),
-      fun h' => absurd (hw.symm.trans h') (by decide)⟩
+      fun h' => absurd (hw.symm.trans h') (by decide), syscEvFs_at hw⟩
     show usysWaitFitsAt _ _ _ _ { UIota.boot with zev := h, act := act } _ _ _
     unfold usysWaitFitsAt UIota.reap
     dsimp only
@@ -238,7 +238,7 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     refine ⟨fun h' => absurd h' h14, fun _ hcl => ?_, fun h' => absurd h' h1,
       fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide),
       fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide),
-      fun h' => absurd (hw.symm.trans h') (by decide)⟩
+      fun h' => absurd (hw.symm.trans h') (by decide), syscEvFs_at hw⟩
     have hlz : V.pvLazy = false := hcl.resolve_left h0
     have hwin : uwaitWin (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 0)) = d :=
       syscArmWait_win hext (hlf hlz) hwf h0 (Nat.le_of_lt hcf.1) hcf.2.1 (fun _ => hcf.2.2)
@@ -277,7 +277,7 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     refine ⟨fun h' => absurd h' h14, fun _ hcl => ?_, fun h' => absurd h' h1,
       fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide),
       fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide),
-      fun h' => absurd (hw.symm.trans h') (by decide)⟩
+      fun h' => absurd (hw.symm.trans h') (by decide), syscEvFs_at hw⟩
     have hwin : uwaitWin (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 0)) = 4 := by
       by_cases h0 : tfW V.tf (tfArgIdx 0) = 0#64
       · rw [h0]; exact uwaitWin_null _

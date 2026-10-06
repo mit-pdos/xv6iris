@@ -200,7 +200,7 @@ def sysReadPost (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : Pro
     fdFrags V.fdg sts -∗ filereadFsOut -∗
     sysReadArms (hlc := hlc) V v sts (argZ v2) F Rd Rin Rp Rpe P (R' 10#5) M' v1 -∗
     -- (NI M3 private files FS-1) the read's ledger receipt (`freadRcptAt`)
-    freadRcptAt fscFs k.proc (sysFdSt v V.ofile sts) (R' 10#5) -∗ wpLoop cpu')
+    freadRcptAt fscFs k.proc (sysFdSt v V.ofile sts) (argZ v2) V.upt M' v1 (R' 10#5) -∗ wpLoop cpu')
 
 end Post
 

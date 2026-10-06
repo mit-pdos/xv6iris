@@ -43,7 +43,13 @@ be made one today.
   (ruling G3-R2); the console write at a lazy-free key whose argument 0
   names a WRITABLE CONSOLE descriptor of its table (NI M2-G4, ruling
   G4-R3: `usysDetClassAt … lz wc`); close and dup at every key (NI M3
-  FS-L, ruling FS-R4).  Every other
+  FS-L, ruling FS-R4); (NI M3 FS-2a, ruling FS-R4, the coordinator's ruling
+  (C)) read (`usysDetRead`: `usysReadAns`/`usysReadBytes` at the cited fs
+  prefix, which ends in the round's own read event, its offset RECORDED AS
+  GIVEN) and an inode write (`usysWriteAnsF`: the request, or `-1` at the
+  caller's cited verdict) at a lazy-free key whose buffer is mapped, on an
+  inode descriptor -- read's of a regular file
+  (`usysDetClassAtF … wf wb fdir`).  Every other
   number stays
   RELATIONAL (`UsysMemOk.usysMemOk` and its siblings); §4 below says why
   each of §4's other candidates is out.
@@ -162,9 +168,11 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
    open on the `rocq` branch).  Nothing here is a port.
 2. **The class is {exit, getpid, uptime, wait at a null status pointer or
    a lazy-free key, fork, sbrk, the console write at a lazy-free key on a
-   writable console descriptor, pause, close, dup}** (NI M2-G1e; NI joint
-   fork lane F3; NI M2-G3; NI M2-G4; NI M3 no-kill K1; NI M3 FS-L), not
-   §4's whole list: §4 above.
+   writable console descriptor, pause, close, dup, read on a readable
+   inode descriptor of a regular file and write on a writable inode
+   descriptor at a lazy-free key whose buffer is mapped}** (NI M2-G1e; NI
+   joint fork lane F3; NI M2-G3; NI M2-G4; NI M3 no-kill K1; NI M3 FS-L;
+   NI M3 FS-2a, `usysDetClassAtF`), not §4's whole list: §4 above.
 3. **`round_det` concludes the KEY equality `ukeyEq`**, not `W' = usysDet …`
    on the nose: the round relation pins the resume trapframe through its
    restored file and pc only (`uroundBumpOk`), and the four kernel words
@@ -331,10 +339,12 @@ def usysDetQuiet (n : Int) : Prop := n = USYS_getpid ∨ n = USYS_uptime ∨ n =
 instance (n : Int) : Decidable (usysDetQuiet n) := by unfold usysDetQuiet; infer_instance
 
 /-- The class members that RESUME (exit does not): the quiet members, (NI G1d)
-wait, (NI joint fork lane F3) fork, (NI M2-G3) sbrk and (NI M3 FS-L) close
-and dup. -/
+wait, (NI joint fork lane F3) fork, (NI M2-G3) sbrk, (NI M3 FS-L) close
+and dup and (NI M3 FS-2a) read -- the last a member at a key only through
+`usysDetClassAtF`, never through `usysDetClass`. -/
 def usysDetResumes (n : Int) : Prop :=
-  usysDetQuiet n ∨ n = USYS_wait ∨ n = USYS_fork ∨ n = USYS_sbrk ∨ n = USYS_close ∨ n = USYS_dup
+  usysDetQuiet n ∨ n = USYS_wait ∨ n = USYS_fork ∨ n = USYS_sbrk ∨ n = USYS_close ∨ n = USYS_dup ∨
+    n = USYS_read
 
 instance (n : Int) : Decidable (usysDetResumes n) := by unfold usysDetResumes; infer_instance
 
@@ -374,7 +384,7 @@ theorem usysDetClass_resumes {n : Int} (h : usysDetClass n) (hx : n ≠ USYS_exi
   · exact Or.inl (Or.inr (Or.inr (Or.inl h)))
   · exact Or.inl (Or.inr (Or.inr (Or.inr h)))
   · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inl h))))
-  · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr h))))
+  · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl h)))))
 
 theorem usysDetQuiet_resumes {n : Int} (h : usysDetQuiet n) : usysDetResumes n := Or.inl h
 
@@ -666,6 +676,188 @@ def usysDetDup (W : Uvis) : Uvis :=
   bump W (usysDupAns (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) (fdLowestClosed W.fd)) W.M W.perm W.sz
     (usysDupFd W.fd (tfW W.tf (tfArgIdx 0))) W.cwd W.gen W.ch W.lazy W.secc
 
+/-! ### read and write on a regular file (NI M3 FS-2a)
+
+Design "M3 private files design (2026-10-05)" F4, rulings FS-R3/R4/R6 and
+the coordinator's ruling (C) of 2026-10-06.  The class: read on a READABLE
+inode descriptor of a REGULAR FILE and write on a WRITABLE inode
+descriptor, at a lazy-free key whose buffer the call needs is mapped as it
+needs it (read's destination writable, write's source readable, for the
+whole request: readi's copyout fault and the write chain's unmapped-source
+stop are then refuted, R4).  The answers read the CITED fs prefix
+(`UIota.fev`), which closes on the round's own decisive event -- the fork
+row's pattern, so no row reads `fpos`:
+
+* read: the cited prefix ends in the round's `read act i γo off d`; the
+  bytes are `fevReadOut` -- the file row's content in the fold BEFORE the
+  event, from the RECORDED offset `off`, at most the request (`-1` at a
+  negative request, nothing written).  The offset is RECORDED AS GIVEN
+  (ruling (C)): the fold's own `fevOff` is not yet tied to the real
+  `f->off` (FS-2a′ ties it and FS-4 derives the recorded offsets,
+  `fevOffWf`).  "Regular file" is the cited row's type (`fevReadDir`, the
+  class's `fdir` reading): a directory's raw bytes are not in the view.
+* write: `n` at a non-negative request, `-1` when the cited prefix ends in
+  the caller's out-of-resources verdict (`fevFullBy`: a chunk short at
+  out-of-blocks, or writei's `-1` at the file's size cap from the offset,
+  `FsFull.max`) -- the verdicts RECORDED AS GIVEN (R3).  The chunks
+  themselves are not read by the answer (FS-4's `fout`). -/
+
+/-- the row at argument 0 is a READABLE inode descriptor -/
+def fdRdIno : Option FdState → Bool
+  | some (.open true _ (.inode _ _ _)) => true
+  | _ => false
+
+/-- the row at argument 0 is a WRITABLE inode descriptor -/
+def fdWrIno : Option FdState → Bool
+  | some (.open _ true (.inode _ _ _)) => true
+  | _ => false
+
+/-- the key's window of `m` bytes from `a`: every byte's page in the
+permission view, and writable when `w` -/
+def uwinOk (perm : Nat → Option UPerm) (a : BitVec 64) (m : Nat) (w : Bool) : Bool :=
+  (List.range m).all fun j =>
+    match perm ((a + BitVec.ofNat 64 j).toNat / 4096) with
+    | some q => !w || q.W
+    | none => false
+
+/-- a window the key maps: every byte's page is in the view, writable when asked -/
+theorem uwinOk_at {perm : Nat → Option UPerm} {a : BitVec 64} {m : Nat} {w : Bool}
+    (h : uwinOk perm a m w = true) {j : Nat} (hj : j < m) :
+    ∃ q : UPerm, perm ((a + BitVec.ofNat 64 j).toNat / 4096) = some q ∧ (w = true → q.W = true) := by
+  unfold uwinOk at h
+  have := List.all_eq_true.mp h j (List.mem_range.mpr hj)
+  revert this
+  cases perm ((a + BitVec.ofNat 64 j).toNat / 4096) with
+  | none => intro h; cases h
+  | some q =>
+    intro hq
+    refine ⟨q, rfl, fun hw => ?_⟩
+    subst hw
+    simpa using hq
+
+/-- **THE FS CLASS's BUFFER READING** at argument words 1 and 2: (read's
+destination writable, write's source readable), over the whole request -/
+def ufsBufAt (perm : Nat → Option UPerm) (a1 a2 : BitVec 64) : Bool × Bool :=
+  (uwinOk perm a1 (usysCntW a2).toNat true, uwinOk perm a1 (usysCntW a2).toNat false)
+
+/-- ...at a key -/
+def ufsBuf (W : Uvis) : Bool × Bool := ufsBufAt W.perm (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2))
+
+/-- **read's bytes** at the request word and the cited prefix -/
+def usysReadBytes (a2 : BitVec 64) (ι : UIota) : List (BitVec 8) := fevReadOut ι.fev (usysCntW a2).toNat
+
+/-- **read's answer** (the design's `usysReadAns`, on the request word: the
+law states it at the exit's `a2`): `-1` at a negative request, else the
+count of the cited read's bytes -/
+def usysReadAns (a2 : BitVec 64) (ι : UIota) : BitVec 64 :=
+  if usysCntW a2 < 0 then -1#64 else BitVec.ofNat 64 (usysReadBytes a2 ι).length
+
+/-- **read's functional row**: the bumped key at `usysReadAns`, the bytes
+written at argument 1; nothing else moves. -/
+def usysDetRead (W : Uvis) (ι : UIota) : Uvis :=
+  bump W (usysReadAns (tfW W.tf (tfArgIdx 2)) ι)
+    (usysWr W.M (tfW W.tf (tfArgIdx 1)) (usysReadBytes (tfW W.tf (tfArgIdx 2)) ι)) W.perm W.sz W.fd W.cwd
+    W.gen W.ch W.lazy W.secc
+
+/-- **an inode write's answer** (the design's `usysWriteAnsF`): `-1` at a
+negative request or at the caller's cited verdict, else the request -/
+def usysWriteAnsF (a2 : BitVec 64) (ι : UIota) : BitVec 64 :=
+  if usysCntW a2 < 0 ∨ fevFullBy ι.fev ι.act = true then -1#64 else BitVec.ofNat 64 (usysCntW a2).toNat
+
+/-- **write's answer at a key**: the console's (NI M2-G4) at a writable
+console descriptor, an inode write's elsewhere -/
+def usysWriteAnsK (W : Uvis) (ι : UIota) : BitVec 64 :=
+  if uwriteCons W.fd (tfW W.tf (tfArgIdx 0)) then
+    usysWriteAns W.perm (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2))
+  else usysWriteAnsF (tfW W.tf (tfArgIdx 2)) ι
+
+/-- **THE PRIVATE CLASS AT A KEY, WITH THE FILE SYSTEM** (NI M3 FS-2a, the
+design's `usysDetClassAtF`, ruling FS-R4): `usysDetClassAt`, or a read on a
+readable inode descriptor `wf` of a REGULAR FILE (`fdir = false`, the cited
+row's type) at a lazy-free key whose destination `wb.1` is writable, or a
+write on a writable inode descriptor at a lazy-free key whose source `wb.2`
+is readable. -/
+def usysDetClassAtF (n : Int) (a0 : BitVec 64) (lz wc : Bool) (wf : Option FdState) (wb : Bool × Bool)
+    (fdir : Bool) : Prop :=
+  usysDetClassAt n a0 lz wc ∨
+  (n = USYS_read ∧ lz = false ∧ wb.1 = true ∧ fdRdIno wf = true ∧ fdir = false) ∨
+  (n = USYS_write ∧ lz = false ∧ wb.2 = true ∧ fdWrIno wf = true)
+
+instance (n : Int) (a0 : BitVec 64) (lz wc : Bool) (wf : Option FdState) (wb : Bool × Bool) (fdir : Bool) :
+    Decidable (usysDetClassAtF n a0 lz wc wf wb fdir) := by
+  unfold usysDetClassAtF; infer_instance
+
+theorem usysDetClassAtF_resumes {n : Int} {a0 : BitVec 64} {lz wc : Bool} {wf : Option FdState}
+    {wb : Bool × Bool} {fdir : Bool} (h : usysDetClassAtF n a0 lz wc wf wb fdir) (hx : n ≠ USYS_exit) :
+    usysDetResumes n := by
+  rcases h with h | ⟨h, -⟩ | ⟨h, -⟩
+  · exact usysDetClass_resumes h.1 hx
+  · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr h)))))
+  · exact Or.inl (Or.inr (Or.inr (Or.inl h)))
+
+/-- the class at wait is the old one's -/
+theorem usysDetClassAtF_wait {n : Int} {a0 : BitVec 64} {lz wc : Bool} {wf : Option FdState}
+    {wb : Bool × Bool} {fdir : Bool} (h : usysDetClassAtF n a0 lz wc wf wb fdir) (hn : n = USYS_wait) :
+    a0 = 0#64 ∨ lz = false := by
+  rcases h with h | ⟨h, -⟩ | ⟨h, -⟩
+  · exact h.2.1 hn
+  · rw [hn] at h; exact absurd h (by decide)
+  · rw [hn] at h; exact absurd h (by decide)
+
+/-- the class at write: the console's (NI M2-G4) or an inode's (NI M3 FS-2a) -/
+theorem usysDetClassAtF_write {n : Int} {a0 : BitVec 64} {lz wc : Bool} {wf : Option FdState}
+    {wb : Bool × Bool} {fdir : Bool} (h : usysDetClassAtF n a0 lz wc wf wb fdir) (hn : n = USYS_write) :
+    (lz = false ∧ wc = true) ∨ (lz = false ∧ wb.2 = true ∧ fdWrIno wf = true) := by
+  rcases h with h | ⟨h, -⟩ | ⟨-, h⟩
+  · exact Or.inl (h.2.2 hn)
+  · rw [hn] at h; exact absurd h (by decide)
+  · exact Or.inr h
+
+/-- the class at read (NI M3 FS-2a) -/
+theorem usysDetClassAtF_read {n : Int} {a0 : BitVec 64} {lz wc : Bool} {wf : Option FdState}
+    {wb : Bool × Bool} {fdir : Bool} (h : usysDetClassAtF n a0 lz wc wf wb fdir) (hn : n = USYS_read) :
+    lz = false ∧ wb.1 = true ∧ fdRdIno wf = true ∧ fdir = false := by
+  rcases h with h | ⟨-, h⟩ | ⟨h, -⟩
+  · rw [hn] at h
+    rcases h.1 with h | h | h | h | h | h | h | h | h | h <;> exact absurd h (by decide)
+  · exact h
+  · rw [hn] at h; exact absurd h (by decide)
+
+/-- a class key at exit's effective number does not resume -/
+theorem usysDetClassAtF_ne_exec {n : Int} {a0 : BitVec 64} {lz wc : Bool} {wf : Option FdState}
+    {wb : Bool × Bool} {fdir : Bool} (h : usysDetClassAtF n a0 lz wc wf wb fdir) : n ≠ USYS_exec := by
+  rcases h with h | ⟨rfl, -⟩ | ⟨rfl, -⟩
+  · rcases h.1 with h | h | h | h | h | h | h | h | h | h <;> rw [h] <;> decide
+  · decide
+  · decide
+
+/-- an inode row is not a console row -/
+theorem uwriteCons_of_wrIno {fd : List FdState} {a0 : BitVec 64} (h : fdWrIno (usysFdAt fd a0) = true) :
+    uwriteCons fd a0 = false := by
+  unfold uwriteCons usysFdKey
+  unfold usysFdAt at h
+  split at h
+  · rename_i hz
+    by_cases hlt : (BitVec.extractLsb' 0 32 a0).toInt < NOFILE
+    · simp only [if_pos (And.intro hz hlt)]
+      revert h
+      cases fd[(BitVec.extractLsb' 0 32 a0).toInt.toNat]? with
+      | none => intro h; cases h
+      | some st =>
+        rcases st with _ | ⟨rb, wb, t⟩
+        · intro h; cases h
+        · cases t <;> simp [fdWrIno]
+    · simp only [hlt, and_false, if_false]
+  · cases h
+
+/-- a cited read's byte count is the request's `take` -/
+theorem usysReadBytes_length_le (a2 : BitVec 64) (ι : UIota) :
+    (usysReadBytes a2 ι).length ≤ (usysCntW a2).toNat := by
+  unfold usysReadBytes fevReadOut
+  split
+  · exact List.length_take_le _ _
+  · exact Nat.zero_le _
+
 /-! ### sbrk's readings (NI M2-G3)
 
 sbrk's outcome is a function of the key -- the break `W.sz`, the two
@@ -756,18 +948,21 @@ reaped child's pid sign-extended at a whole status window, or `-1`
 (`usysWaitAns` at the key's window), fork (NI joint fork lane F3)
 `usysForkAns ι`, sbrk (NI M2-G3) `usysSbrkAns` at the key's break and
 argument words, the console write (NI M2-G4) `usysWriteAns` at the key's
-permission view and argument words 1 and 2, close and dup (NI M3 FS-L)
-`usysCloseAns`/`usysDupAns` at the key's row at argument 0 (and dup at its
-table's lowest closed slot). -/
+permission view and argument words 1 and 2 -- (NI M3 FS-2a) an inode write
+`usysWriteAnsF` at the cited prefix (`usysWriteAnsK`) --, close and dup (NI
+M3 FS-L) `usysCloseAns`/`usysDupAns` at the key's row at argument 0 (and dup
+at its table's lowest closed slot), read (NI M3 FS-2a) `usysReadAns` at the
+request word and the cited prefix. -/
 def usysDetRet (n : Int) (W : Uvis) (ι : UIota) : BitVec 64 :=
   if n = USYS_wait then usysWaitAns ι (uwaitWin W.perm (tfW W.tf (tfArgIdx 0)))
   else if n = USYS_fork then usysForkAns ι
   else if n = USYS_sbrk then usysSbrkAns W.sz (tfW W.tf (tfArgIdx 0)) (tfW W.tf (tfArgIdx 1)) ι
-  else if n = USYS_write then usysWriteAns W.perm (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2))
+  else if n = USYS_write then usysWriteAnsK W ι
   else if n = USYS_uptime then usysUptimeWord ι.ticks
   else if n = USYS_pause then 0#64
   else if n = USYS_close then usysCloseAns (usysFdAt W.fd (tfW W.tf (tfArgIdx 0)))
   else if n = USYS_dup then usysDupAns (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) (fdLowestClosed W.fd)
+  else if n = USYS_read then usysReadAns (tfW W.tf (tfArgIdx 2)) ι
   else BitVec.signExtend 64 W.pid
 
 /-- **wait's functional row** (NI G1d; G1 design §3; NI M2-G1e): at the
@@ -810,8 +1005,8 @@ def usysDetFork (W : Uvis) (ι : UIota) : Uvis :=
 /-- **`usysDet n W ι`**: the key the round resumes the process at -- for the
 quiet members the bumped key at `usysDetRet n W ι` with every other reading
 kept, for wait `usysDetWait`, for fork `usysDetFork`, for sbrk (NI M2-G3)
-`usysDetSbrk`, for close and dup (NI M3 FS-L) `usysDetClose`/`usysDetDup`;
-`W` itself elsewhere
+`usysDetSbrk`, for close and dup (NI M3 FS-L) `usysDetClose`/`usysDetDup`,
+for read (NI M3 FS-2a) `usysDetRead`; `W` itself elsewhere
 (exit never resumes, `uroundOk_exit`; outside the class the value is
 unused). -/
 def usysDet (n : Int) (W : Uvis) (ι : UIota) : Uvis :=
@@ -822,6 +1017,7 @@ def usysDet (n : Int) (W : Uvis) (ι : UIota) : Uvis :=
     bump W (usysDetRet n W ι) W.M W.perm W.sz W.fd W.cwd W.gen W.ch W.lazy W.secc
   else if n = USYS_close then usysDetClose W
   else if n = USYS_dup then usysDetDup W
+  else if n = USYS_read then usysDetRead W ι
   else W
 
 theorem usysDet_quiet {n : Int} (W : Uvis) (ι : UIota) (h : usysDetQuiet n) :
@@ -847,6 +1043,17 @@ theorem usysDet_dup (W : Uvis) (ι : UIota) : usysDet USYS_dup W ι = usysDetDup
   rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
     if_pos rfl]
 
+theorem usysDet_read (W : Uvis) (ι : UIota) : usysDet USYS_read W ι = usysDetRead W ι := by
+  unfold usysDet
+  rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
+    if_neg (by decide), if_pos rfl]
+
+theorem usysDetRet_read (W : Uvis) (ι : UIota) :
+    usysDetRet USYS_read W ι = usysReadAns (tfW W.tf (tfArgIdx 2)) ι := by
+  unfold usysDetRet
+  rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
+    if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos rfl]
+
 theorem usysDetRet_close (W : Uvis) (ι : UIota) :
     usysDetRet USYS_close W ι = usysCloseAns (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) := by
   unfold usysDetRet
@@ -863,7 +1070,7 @@ theorem usysDetRet_getpid (W : Uvis) (ι : UIota) :
     usysDetRet USYS_getpid W ι = BitVec.signExtend 64 W.pid := by
   unfold usysDetRet
   rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
-    if_neg (by decide), if_neg (by decide), if_neg (by decide)]
+    if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide)]
 
 /-- (NI M3 no-kill K1) pause's answer is `0`: its only `-1` is the kill,
 which never resumes (`UexecRet.uexecLiveOk`'s pause clause). -/
@@ -876,9 +1083,18 @@ theorem usysDetRet_uptime (W : Uvis) (ι : UIota) :
     usysDetRet USYS_uptime W ι = usysUptimeWord ι.ticks := by
   unfold usysDetRet; rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos rfl]
 
-theorem usysDetRet_write (W : Uvis) (ι : UIota) :
-    usysDetRet USYS_write W ι = usysWriteAns W.perm (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2)) := by
+theorem usysDetRet_write (W : Uvis) (ι : UIota) : usysDetRet USYS_write W ι = usysWriteAnsK W ι := by
   unfold usysDetRet; rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos rfl]
+
+/-- (NI M2-G4) at a writable console descriptor, the console's answer -/
+theorem usysDetRet_writeCons (W : Uvis) (ι : UIota) (hc : uwriteCons W.fd (tfW W.tf (tfArgIdx 0)) = true) :
+    usysDetRet USYS_write W ι = usysWriteAns W.perm (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2)) := by
+  rw [usysDetRet_write]; unfold usysWriteAnsK; rw [if_pos hc]
+
+/-- (NI M3 FS-2a) at a writable inode descriptor, the inode write's answer -/
+theorem usysDetRet_writeIno (W : Uvis) (ι : UIota) (hw : fdWrIno (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) = true) :
+    usysDetRet USYS_write W ι = usysWriteAnsF (tfW W.tf (tfArgIdx 2)) ι := by
+  rw [usysDetRet_write]; unfold usysWriteAnsK; rw [if_neg (by rw [uwriteCons_of_wrIno hw]; decide)]
 
 theorem usysDetRet_fork (W : Uvis) (ι : UIota) : usysDetRet USYS_fork W ι = usysForkAns ι := by
   unfold usysDetRet; rw [if_neg (by decide), if_pos rfl]
@@ -894,7 +1110,8 @@ ledger at the actor (`zLowest ι.zev ι.act`); fork the pid prefix, the family
 prefix's last `ZFork` and the slot prefix's `SFull` (`forkOk ι := ¬ ι.sFull`,
 NI M3 quotas Q-2); sbrk the key alone (`usysSbrkFails` is the quota overrun,
 Q-2); uptime the tick count; getpid, pause, the console write and (NI M3
-FS-L) close and dup the key alone.  FALSE on b72cbac1, whose sbrk read `ι.kNull` and fork `ι.kOk`. -/
+FS-L) close and dup the key alone; (NI M3 FS-2a) read and an inode write the
+cited fs prefix and the actor, which the ledger part keeps.  FALSE on b72cbac1, whose sbrk read `ι.kNull` and fork `ι.kOk`. -/
 theorem usysDet_ledQ (n : Int) (W : Uvis) (ι : UIota) : usysDet n W ι = usysDet n W ι.ledQ := by
   unfold usysDet
   by_cases hw : n = USYS_wait
@@ -965,18 +1182,23 @@ fit, carried with the rest); at pause (NI M3 no-kill K1) the answer is `0`
 answer is `usysCloseAns`/`usysDupAns` at the key's row at argument 0 (the
 key's fit, as write's: the relational descriptor row leaves close's answer
 at a bad descriptor and dup's at a negative one open), dup's with the
-table's length (`NOFILE`: a slot number is never the `-1` word); no other
-class member reads `ι`. -/
+table's length (`NOFILE`: a slot number is never the `-1` word); (NI M3
+FS-2a) at write the answer is `usysWriteAnsK` (the console's at a writable
+console descriptor, an inode write's at the cited prefix elsewhere), at read
+the answer and the image are the cited read's (`usysReadAns`,
+`usysReadBytes`); no other class member reads `ι`. -/
 def usysIotaFits (n : Int) (W : Uvis) (r : BitVec 64) (cs' : Std.ExtTreeSet GName compare) (M' : ElfMem)
     (szv' : Nat) (lz' : Bool) (ι : UIota) : Prop :=
   (n = USYS_uptime → r = usysUptimeWord ι.ticks) ∧ (n = USYS_wait → usysWaitFits W ι r cs' M') ∧
     (n = USYS_fork → usysForkFitsAt W.ch ι r cs') ∧
     (n = USYS_sbrk → usysSbrkFitsAt W.sz (tfW W.tf (tfArgIdx 0)) (tfW W.tf (tfArgIdx 1)) W.lazy ι r szv' lz') ∧
-    (n = USYS_write → r = usysWriteAns W.perm (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2))) ∧
+    (n = USYS_write → r = usysWriteAnsK W ι) ∧
     (n = USYS_pause → r = 0#64) ∧
     (n = USYS_close → r = usysCloseAns (usysFdAt W.fd (tfW W.tf (tfArgIdx 0)))) ∧
     (n = USYS_dup → W.fd.length = NOFILE ∧
-      r = usysDupAns (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) (fdLowestClosed W.fd))
+      r = usysDupAns (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) (fdLowestClosed W.fd)) ∧
+    (n = USYS_read → r = usysReadAns (tfW W.tf (tfArgIdx 2)) ι ∧
+      M' = usysWr W.M (tfW W.tf (tfArgIdx 1)) (usysReadBytes (tfW W.tf (tfArgIdx 2)) ι))
 
 /-- Every answer the rows allow at a number other than wait and fork has a
 prefix it fits: uptime's the row's count (NI M2-G1e: wait's fit pins the
@@ -990,14 +1212,16 @@ word the relational row allows). -/
 theorem usysIotaFits_exists {n : Int} {W : Uvis} {r : BitVec 64} {cs' : Std.ExtTreeSet GName compare}
     {M' : ElfMem} {szv' : Nat} {lz' : Bool} (hup : n = USYS_uptime → usysUptimeRet r) (hwt : n ≠ USYS_wait)
     (hfk : n ≠ USYS_fork) (hsb : n ≠ USYS_sbrk) (hwr : n ≠ USYS_write) (hpz : n = USYS_pause → r = 0#64)
-    (hcl : n ≠ USYS_close) (hdp : n ≠ USYS_dup) :
+    (hcl : n ≠ USYS_close) (hdp : n ≠ USYS_dup) (hrd : n ≠ USYS_read := by decide) :
     ∃ ι : UIota, usysIotaFits n W r cs' M' szv' lz' ι := by
   by_cases hu : n = USYS_uptime
   · obtain ⟨t, ht⟩ := hup hu
     exact ⟨{ UIota.boot with ticks := t }, fun _ => ht, fun h => absurd h hwt, fun h => absurd h hfk,
-      fun h => absurd h hsb, fun h => absurd h hwr, hpz, fun h => absurd h hcl, fun h => absurd h hdp⟩
+      fun h => absurd h hsb, fun h => absurd h hwr, hpz, fun h => absurd h hcl, fun h => absurd h hdp,
+      fun h => absurd h hrd⟩
   · exact ⟨UIota.boot, fun h => absurd h hu, fun h => absurd h hwt, fun h => absurd h hfk,
-      fun h => absurd h hsb, fun h => absurd h hwr, hpz, fun h => absurd h hcl, fun h => absurd h hdp⟩
+      fun h => absurd h hsb, fun h => absurd h hwr, hpz, fun h => absurd h hcl, fun h => absurd h hdp,
+      fun h => absurd h hrd⟩
 
 /-- **The cited row IS the fit** (NI M2-X2; NI M2-G1e; NI joint fork lane
 F3): what the kernel's arm cited at `ι` (`SyscallDefs.syscEvRow`, read at
@@ -1017,15 +1241,30 @@ theorem usysIotaFits_of_ev {n : Int} {W : Uvis} {r : BitVec 64} {cs' : Std.ExtTr
     (hf : n = USYS_fork → usysForkFitsAt W.ch ι r cs')
     (hs : n = USYS_sbrk →
       usysSbrkFitsAt W.sz (tfW W.tf (tfArgIdx 0)) (tfW W.tf (tfArgIdx 1)) W.lazy ι r szv' lz')
-    (hclw : n = USYS_write → W.lazy = false ∧ uwriteCons W.fd (tfW W.tf (tfArgIdx 0)) = true)
+    (hclw : n = USYS_write → (W.lazy = false ∧ uwriteCons W.fd (tfW W.tf (tfArgIdx 0)) = true) ∨
+      (W.lazy = false ∧ (ufsBuf W).2 = true ∧ fdWrIno (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) = true))
     (hwr : n = USYS_write → W.lazy = false → uwriteCons W.fd (tfW W.tf (tfArgIdx 0)) = true →
       r = usysWriteAns W.perm (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2)))
+    (hwi : n = USYS_write → W.lazy = false → (ufsBuf W).2 = true →
+      fdWrIno (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) = true → r = usysWriteAnsF (tfW W.tf (tfArgIdx 2)) ι)
     (hpz : n = USYS_pause → r = 0#64)
     (hcl : n = USYS_close → r = usysCloseAns (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))))
     (hdp : n = USYS_dup → W.fd.length = NOFILE ∧
-      r = usysDupAns (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) (fdLowestClosed W.fd)) :
-    usysIotaFits n W r cs' M' szv' lz' ι :=
-  ⟨hup, fun hn => hw hn (hcls hn), hf, hs, fun hn => hwr hn (hclw hn).1 (hclw hn).2, hpz, hcl, hdp⟩
+      r = usysDupAns (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) (fdLowestClosed W.fd))
+    (hclr : n = USYS_read → W.lazy = false ∧ (ufsBuf W).1 = true ∧
+      fdRdIno (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) = true ∧ fevReadDir ι.fev = false)
+    (hrd : n = USYS_read → W.lazy = false → (ufsBuf W).1 = true →
+      fdRdIno (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) = true → fevReadDir ι.fev = false →
+      r = usysReadAns (tfW W.tf (tfArgIdx 2)) ι ∧
+        M' = usysWr W.M (tfW W.tf (tfArgIdx 1)) (usysReadBytes (tfW W.tf (tfArgIdx 2)) ι)) :
+    usysIotaFits n W r cs' M' szv' lz' ι := by
+  refine ⟨hup, fun hn => hw hn (hcls hn), hf, hs, fun hn => ?_, hpz, hcl, hdp, fun hn => ?_⟩
+  · unfold usysWriteAnsK
+    rcases hclw hn with ⟨hlz, hc⟩ | ⟨hlz, hb, hi⟩
+    · rw [if_pos hc]; exact hwr hn hlz hc
+    · rw [if_neg (by rw [uwriteCons_of_wrIno hi]; decide)]; exact hwi hn hlz hb hi
+  · obtain ⟨h1, h2, h3, h4⟩ := hclr hn
+    exact hrd hn h1 h2 h3 h4
 
 /-! ## §3 The functional row refines the relation, and the relation at the
 class IS the functional row -/
@@ -1037,10 +1276,10 @@ theorem usysDetQuiet_ne {n : Int} (h : usysDetQuiet n) :
   rcases h with rfl | rfl | rfl | rfl <;> decide
 
 theorem usysDetResumes_ne {n : Int} (h : usysDetResumes n) :
-    n ≠ USYS_exec ∧ n ≠ USYS_pipe ∧ n ≠ USYS_read ∧
+    n ≠ USYS_exec ∧ n ≠ USYS_pipe ∧
       n ≠ USYS_fstat ∧ n ≠ USYS_exit ∧
       n ≠ USYS_open ∧ n ≠ USYS_chdir ∧ n ≠ USYS_seccomp := by
-  rcases h with (rfl | rfl | rfl | rfl) | rfl | rfl | rfl | rfl | rfl <;> decide
+  rcases h with (rfl | rfl | rfl | rfl) | rfl | rfl | rfl | rfl | rfl | rfl <;> decide
 
 /-- (NI M2-G3) sbrk's functional row satisfies the landed one: the
 answer is `usysSbrkRet`'s (`-1` keeps the break; success answers the old
@@ -1195,6 +1434,23 @@ theorem usysDupFd_of {tf : List (BitVec 64)} {fd fd' : List FdState} {r : BitVec
         have hlt : k < NOFILE := hlen ▸ fdLeastClosed_lt (l := fd) hs
         exact absurd (hr.symm.trans hm1) (ofNat_ne_m1 hlt)
 
+/-- (NI M3 FS-2a) a word below `2 ^ 31` reads back as itself -/
+theorem toInt_ofNat_small {L : Nat} (h : L < 2 ^ 31) : (BitVec.ofNat 64 L).toInt = L := by
+  rw [BitVec.toInt_eq_toNat_cond, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega), if_pos (by omega)]
+
+/-- (NI M3 FS-2a) read's answer has read's shape (`usysReadRet`) -/
+theorem usysReadAns_ret (tf : List (BitVec 64)) (ι : UIota) :
+    usysReadRet tf (usysReadAns (tfW tf (tfArgIdx 2)) ι) := by
+  unfold usysReadRet usysReadAns
+  have hle := usysReadBytes_length_le (tfW tf (tfArgIdx 2)) ι
+  have hw := usysCntW_lt (tfW tf (tfArgIdx 2))
+  have hc : usysRdcount tf = usysCntW (tfW tf (tfArgIdx 2)) := rfl
+  by_cases hn : usysCntW (tfW tf (tfArgIdx 2)) < 0
+  · rw [if_pos hn]; left; decide
+  · rw [if_neg hn]; right
+    rw [toInt_ofNat_small (by omega), hc]
+    omega
+
 /-- **`usysDet_mem`**: the functional row satisfies the landed image table
 at its own answer -- `usysMemOk` at `usysDet`'s image, map, break and lazy
 bit; at wait (NI G1d) given that the answer has wait's shape (`hwr`: a
@@ -1208,7 +1464,7 @@ theorem usysDet_mem {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
       (1 ≤ (usysDetRet n W ι).toInt ∧ (usysDetRet n W ι).toInt ≤ PIDMAX)) :
     usysMemOk n W.tf (usysDetRet n W ι) W.M W.perm W.sz W.lazy (usysDet n W ι).M (usysDet n W ι).perm
       (usysDet n W ι).sz (usysDet n W ι).lazy := by
-  rcases h with hq | rfl | rfl | rfl | rfl | rfl
+  rcases h with hq | rfl | rfl | rfl | rfl | rfl | rfl
   · rw [usysDet_quiet W ι hq]
     obtain ⟨h7, h12, h3, h4, h5, h8, hf, -⟩ := usysDetQuiet_ne hq
     unfold usysMemOk
@@ -1265,6 +1521,14 @@ theorem usysDet_mem {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
     rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
       if_neg (by decide), if_neg (by decide), if_neg (by decide)]
     exact ⟨rfl, rfl, rfl, rfl⟩
+  · -- (NI M3 FS-2a) read: the cited bytes at argument 1, the answer their count
+    rw [usysDet_read, usysDetRet_read]
+    unfold usysMemOk
+    rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos rfl]
+    have hle := usysReadBytes_length_le (tfW W.tf (tfArgIdx 2)) ι
+    have hc : usysRdcount W.tf = usysCntW (tfW W.tf (tfArgIdx 2)) := rfl
+    refine ⟨⟨usysReadBytes (tfW W.tf (tfArgIdx 2)) ι, ?_, rfl⟩, rfl, rfl, rfl, usysReadAns_ret W.tf ι⟩
+    rw [hc]; omega
 
 /-- **The other rows, at the functional answer**: descriptors, pipe, cwd,
 generation, pid, mask and (off wait and fork) children all hold at
@@ -1285,38 +1549,39 @@ theorem usysDet_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
     (n ≠ USYS_wait → n ≠ USYS_fork → usysChOk n (usysDetRet n W ι) W.ch (usysDet n W ι).ch) ∧
     usysIotaFits n W (usysDetRet n W ι) (usysDet n W ι).ch (usysDet n W ι).M (usysDet n W ι).sz
       (usysDet n W ι).lazy ι := by
-  obtain ⟨-, h4, -, -, -, hop, hcd, h23⟩ := usysDetResumes_ne h
+  obtain ⟨-, h4, -, -, hop, hcd, h23⟩ := usysDetResumes_ne h
   have hfdrow : usysFdOk n W.tf (usysDetRet n W ι) W.fd (usysDet n W ι).fd := by
     by_cases hcl : n = USYS_close
     · subst hcl; rw [usysDet_close, usysDetRet_close]; exact usysCloseFd_ok W.tf W.fd
     by_cases hdp : n = USYS_dup
     · subst hdp; rw [usysDet_dup, usysDetRet_dup]; exact usysDupFd_ok W.tf W.fd
     have hfd : (usysDet n W ι).fd = W.fd := by
-      unfold usysDet usysDetWait usysDetFork usysDetSbrk
+      unfold usysDet usysDetWait usysDetFork usysDetSbrk usysDetRead
       split <;> (repeat' split) <;> first | rfl | (exfalso; contradiction)
     rw [hfd]
     exact usysFdOk_refl_at n n _ _ _ rfl hcl hdp hop h4
   have hcw : (usysDet n W ι).cwd = W.cwd := by
-    unfold usysDet usysDetWait usysDetFork usysDetSbrk; split <;> (repeat' split) <;> rfl
+    unfold usysDet usysDetWait usysDetFork usysDetSbrk usysDetRead; split <;> (repeat' split) <;> rfl
   have hgn : (usysDet n W ι).gen = W.gen := by
-    unfold usysDet usysDetWait usysDetFork usysDetSbrk; split <;> (repeat' split) <;> rfl
+    unfold usysDet usysDetWait usysDetFork usysDetSbrk usysDetRead; split <;> (repeat' split) <;> rfl
   have hsc : (usysDet n W ι).secc = W.secc := by
-    unfold usysDet usysDetWait usysDetFork usysDetSbrk; split <;> (repeat' split) <;> rfl
+    unfold usysDet usysDetWait usysDetFork usysDetSbrk usysDetRead; split <;> (repeat' split) <;> rfl
   rw [hcw, hgn, hsc]
   refine ⟨hfdrow, usysPipeOk_quiet _ _ _ _ _ _ _ h4,
     usysCwdOk_refl_at n n _ _ rfl hcd, rfl, ?_, usysSeccOk_refl _ _ _ _ h23, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
-    ?_⟩
-  · rcases h with (rfl | rfl | rfl | rfl) | rfl | rfl | rfl | rfl | rfl
+    ?_, ?_⟩
+  · rcases h with (rfl | rfl | rfl | rfl) | rfl | rfl | rfl | rfl | rfl | rfl
     · exact usysRetPid_of _ _ _ (usysDetRet_getpid W ι)
     all_goals exact usysRetPid_ne _ _ _ (by decide)
   · intro hw hf
-    rcases h with hq | hq | hq | hq | hq | hq
+    rcases h with hq | hq | hq | hq | hq | hq | hq
     · rw [usysDet_quiet W ι hq]; rfl
     · exact absurd hq hw
     · exact absurd hq hf
     · subst hq; rw [usysDet_sbrk]; rfl
     · subst hq; rw [usysDet_close]; rfl
     · subst hq; rw [usysDet_dup]; rfl
+    · subst hq; rw [usysDet_read]; rfl
   · intro hu; subst hu; rw [usysDetRet_uptime]
   · intro hw; subst hw
     rw [usysDet_wait]
@@ -1340,6 +1605,7 @@ theorem usysDet_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
   · intro hp; subst hp; rw [usysDetRet_pause]
   · intro hc; subst hc; rw [usysDetRet_close]
   · intro hd; subst hd; rw [usysDetRet_dup]; exact ⟨hlen rfl, rfl⟩
+  · intro hr; subst hr; rw [usysDet_read, usysDetRet_read]; exact ⟨rfl, rfl⟩
 
 /-- **THE CONVERSE, at the arm** (`round_det`'s pure core): at a resuming
 class member, any `(r, M', …)` the landed rows allow, at a prefix the
@@ -1356,12 +1622,12 @@ theorem usysDet_of_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
     (hch : n ≠ USYS_wait → n ≠ USYS_fork → cs' = W.ch)
     (hfit : usysIotaFits n W r cs' M' szv' lz' ι) :
     r = usysDetRet n W ι ∧ bump W r M' π' szv' fdv' cw' g' cs' lz' secc' = usysDet n W ι := by
-  obtain ⟨h7, h4, h5, h8, -, hop, hcd, h23⟩ := usysDetResumes_ne h
+  obtain ⟨h7, h4, h8, -, hop, hcd, h23⟩ := usysDetResumes_ne h
   have hc' := usysCwdOk_quiet hcd hc
   have hs' := usysSeccOk_quiet h23 hs
   have hg' : g' = W.gen := hg
-  rcases h with hq | rfl | rfl | rfl | rfl | rfl
-  · obtain ⟨-, h12, h3, -, -, -, -, -, hcl, hdp, -⟩ := usysDetQuiet_ne hq
+  rcases h with hq | rfl | rfl | rfl | rfl | rfl | rfl
+  · obtain ⟨-, h12, h3, -, h5, -, -, -, hcl, hdp, -⟩ := usysDetQuiet_ne hq
     have hfd' := usysFdOk_quiet hcl hdp hop h4 hfd
     have hlz := usysMemOk_lazy h12 hm
     obtain ⟨hM, hp, hsz⟩ := usysMemOk_quiet h7 h12 h3 h4 h5 h8 hm
@@ -1442,11 +1708,24 @@ theorem usysDet_of_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
     have hlz := usysMemOk_lazy (by decide) hm
     obtain ⟨hM, hp, hsz⟩ := usysMemOk_quiet (by decide) (by decide) (by decide) (by decide) (by decide)
       (by decide) hm
-    obtain ⟨hlen, hr⟩ := hfit.2.2.2.2.2.2.2 rfl
+    obtain ⟨hlen, hr⟩ := hfit.2.2.2.2.2.2.2.1 rfl
     have hfd' := usysDupFd_of hfd hlen hr
     have hch' := hch (by decide) (by decide)
     rw [usysDet_dup, usysDetRet_dup]
     unfold usysDetDup
+    subst hM hp hsz hlz hfd' hc' hs' hg' hr hch'
+    exact ⟨rfl, rfl⟩
+  · -- (NI M3 FS-2a) read: the answer and the image the fit's, the rest the landed row's
+    have hfd' := usysFdOk_quiet (by decide) (by decide) (by decide) (by decide) hfd
+    have hpw : π' = W.perm ∧ szv' = W.sz ∧ lz' = W.lazy := by
+      unfold usysMemOk at hm
+      rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos rfl] at hm
+      exact ⟨hm.2.1, hm.2.2.1, hm.2.2.2.1⟩
+    obtain ⟨hp, hsz, hlz⟩ := hpw
+    obtain ⟨hr, hM⟩ := hfit.2.2.2.2.2.2.2.2 rfl
+    have hch' := hch (by decide) (by decide)
+    rw [usysDet_read, usysDetRet_read]
+    unfold usysDetRead
     subst hM hp hsz hlz hfd' hc' hs' hg' hr hch'
     exact ⟨rfl, rfl⟩
 
