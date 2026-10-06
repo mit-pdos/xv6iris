@@ -11,5 +11,10 @@ import Weak.WeakRobustTrace
 import Weak.WeakAxiomatic
 import Weak.WeakAxiomatic2
 import Weak.WeakAxiomatic3
+import Weak.KernelSitesDef
+import Weak.AxSymReg
+import Weak.WkGprAcc
+import Weak.AxSlice
+import Weak.KernelSites
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
