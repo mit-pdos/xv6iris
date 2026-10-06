@@ -126,5 +126,6 @@ import Weak.WeakRvwmoSupply
 import Weak.WeakRacy
 import Weak.WeakLeafAmo4
 import Weak.WeakEvLift
+import Weak.WeakBranch
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
