@@ -94,7 +94,7 @@ theorem img0Y : img0 ay = some b0 := by
 
 /-! ## Single-byte messages -/
 
-theorem msgByteSingle (a : Int) (v : BitVec 8) (tid : Option Nat) (k : WmClass) (a' : Int) :
+theorem WeakLitmus.msgByteSingle (a : Int) (v : BitVec 8) (tid : Option Nat) (k : WmClass) (a' : Int) :
     msgByte ⟨a, [v], tid, k⟩ a' = if a' = a then some v else none := by
   unfold msgByte
   by_cases h : a' = a
@@ -255,7 +255,7 @@ theorem mpNofenceWeakReachable :
     refine rtc_l (stepStore _ 0 _ _ _ _ _ rfl) ?_
     refine rtc_l (stepStore _ 0 _ _ _ _ _ rfl) ?_
     refine rtc_l (stepLoad _ 1 rg1 ay false _ _ _ 2 b1 rfl
-      ((logByte2 _ _ _ _ _).trans (by rw [msgByteSingle]; decide))
+      ((logByte2 _ _ _ _ _).trans (by rw [WeakLitmus.msgByteSingle]; decide))
       ((readablebSpec _ _ _ _ _ _).1 (by decide))) ?_
     refine rtc_l (stepLoad _ 1 rg2 ax false _ _ _ 0 b0 rfl img0X
       ((readablebSpec _ _ _ _ _ _).1 (by decide))) ?_
@@ -282,7 +282,7 @@ theorem mpWfenceWeakReachable :
     refine rtc_l (stepFence _ 0 _ _ _ _ _ _ _ rfl) ?_
     refine rtc_l (stepStore _ 0 _ _ _ _ _ rfl) ?_
     refine rtc_l (stepLoad _ 1 rg1 ay false _ _ _ 2 b1 rfl
-      ((logByte2 _ _ _ _ _).trans (by rw [msgByteSingle]; decide))
+      ((logByte2 _ _ _ _ _).trans (by rw [WeakLitmus.msgByteSingle]; decide))
       ((readablebSpec _ _ _ _ _ _).1 (by decide))) ?_
     refine rtc_l (stepLoad _ 1 rg2 ax false _ _ _ 0 b0 rfl img0X
       ((readablebSpec _ _ _ _ _ _).1 (by decide))) ?_
@@ -314,7 +314,7 @@ theorem sbFenced01Reachable :
     refine rtc_l (stepStore _ 1 _ _ _ _ _ rfl) ?_
     refine rtc_l (stepFence _ 1 _ _ _ _ _ _ _ rfl) ?_
     refine rtc_l (stepLoad _ 1 rg2 ax false _ _ _ 1 b1 rfl
-      ((logByte1 _ _ _ _).trans (by rw [msgByteSingle]; decide))
+      ((logByte1 _ _ _ _).trans (by rw [WeakLitmus.msgByteSingle]; decide))
       ((readablebSpec _ _ _ _ _ _).1 (by decide))) ?_
     exact rtc_refl _
   case rest => exact ⟨⟨_, _, rfl, lookupInsert⟩, ⟨_, _, rfl, lookupInsert⟩⟩
@@ -363,10 +363,10 @@ theorem img0YNb1 : img0 ay ≠ some b1 := by
 local notation "MX" => Wmsg.mk ax [b1] (some 0) WmClass.WCplain
 local notation "MY" => Wmsg.mk ay [b1] (some 0) WmClass.WCplain
 
-theorem mbMXX : msgByte MX ax = some b1 := by rw [msgByteSingle]; decide
-theorem mbMXY : msgByte MX ay = none := by rw [msgByteSingle]; decide
-theorem mbMYX : msgByte MY ax = none := by rw [msgByteSingle]; decide
-theorem mbMYY : msgByte MY ay = some b1 := by rw [msgByteSingle]; decide
+theorem mbMXX : msgByte MX ax = some b1 := by rw [WeakLitmus.msgByteSingle]; decide
+theorem mbMXY : msgByte MX ay = none := by rw [WeakLitmus.msgByteSingle]; decide
+theorem mbMYX : msgByte MY ax = none := by rw [WeakLitmus.msgByteSingle]; decide
+theorem mbMYY : msgByte MY ay = some b1 := by rw [WeakLitmus.msgByteSingle]; decide
 
 /-- The only logs any MP-family run can produce: the writer stores x then y. -/
 def mpLogs (log : List Wmsg) : Prop :=
@@ -732,8 +732,8 @@ local notation "CORR_R1" => [ILoad rg2 ax false]
 
 def corrC0 : Config := ⟨img0, [], [⟨CORR_W0, ∅, wsInit⟩, ⟨CORR_R0, ∅, wsInit⟩]⟩
 
-theorem mbCX1 : msgByte CX1 ax = some b1 := by rw [msgByteSingle]; decide
-theorem mbCX2 : msgByte CX2 ax = some b2 := by rw [msgByteSingle]; decide
+theorem mbCX1 : msgByte CX1 ax = some b1 := by rw [WeakLitmus.msgByteSingle]; decide
+theorem mbCX2 : msgByte CX2 ax = some b2 := by rw [WeakLitmus.msgByteSingle]; decide
 
 def corrLogs (log : List Wmsg) : Prop :=
   log = [] ∨ log = [CX1] ∨ log = [CX1, CX2]
@@ -904,10 +904,10 @@ local notation "LB_Q1" => [IStore ax b1]
 
 def lbC0 : Config := ⟨img0, [], [⟨LB_P0, ∅, wsInit⟩, ⟨LB_Q0, ∅, wsInit⟩]⟩
 
-theorem mbLXX : msgByte LX ax = some b1 := by rw [msgByteSingle]; decide
-theorem mbLXY : msgByte LX ay = none := by rw [msgByteSingle]; decide
-theorem mbLYX : msgByte LY ax = none := by rw [msgByteSingle]; decide
-theorem mbLYY : msgByte LY ay = some b1 := by rw [msgByteSingle]; decide
+theorem mbLXX : msgByte LX ax = some b1 := by rw [WeakLitmus.msgByteSingle]; decide
+theorem mbLXY : msgByte LX ay = none := by rw [WeakLitmus.msgByteSingle]; decide
+theorem mbLYX : msgByte LY ax = none := by rw [WeakLitmus.msgByteSingle]; decide
+theorem mbLYY : msgByte LY ay = some b1 := by rw [WeakLitmus.msgByteSingle]; decide
 theorem lXNeLY : LX ≠ LY := by decide
 
 def lbContent (log : List Wmsg) : Prop :=
@@ -1133,7 +1133,7 @@ theorem wfirstAbsurd (log : List Wmsg) (a b : Int) : wfirst log a b → wfirst l
 theorem msgNeB0 (m : Wmsg) (a : Int) : (m = IX ∨ m = IY) → msgByte m a ≠ some b0 := by
   intro hm h
   have hc : msgByte m a = none ∨ msgByte m a = some b1 := by
-    rcases hm with rfl | rfl <;> rw [msgByteSingle] <;> split <;> simp
+    rcases hm with rfl | rfl <;> rw [WeakLitmus.msgByteSingle] <;> split <;> simp
   rcases hc with hc | hc <;> rw [hc] at h
   · cases h
   · exact b0NeB1 (Option.some.inj h).symm
@@ -1348,7 +1348,7 @@ theorem amoSwapReachable :
   case run =>
     refine rtc_l (stepStore _ 0 _ _ _ _ _ rfl) ?_
     refine rtc_l (stepAmo _ 1 rg1 ax b2 _ _ _ 1 b1 rfl
-      ((logByte1 _ _ _ _).trans (by rw [msgByteSingle]; decide))
+      ((logByte1 _ _ _ _).trans (by rw [WeakLitmus.msgByteSingle]; decide))
       (notWritesInCompute _ _ _ _ (by decide))
       ((readablebSpec _ _ _ _ _ _).1 (by decide))) ?_
     exact rtc_refl _

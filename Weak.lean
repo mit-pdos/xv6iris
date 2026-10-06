@@ -8,5 +8,8 @@ import Weak.WeakViewMono
 import Weak.WeakLitmus
 import Weak.WeakPromiseLitmus
 import Weak.WeakRobustTrace
+import Weak.WeakAxiomatic
+import Weak.WeakAxiomatic2
+import Weak.WeakAxiomatic3
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
