@@ -81,3 +81,7 @@ Rocq→Lean name map only.
   `lblRealizes … ↔ hlblRealizes … ∧ lbFetchInert σ i l` — users that turn `hart_conf` blocks into
   `lblRealizes` (AxOpsem, AxDeps, B0b-2) must supply `lbFetchInert` at the machine state
   (`hlblRealizesAxNoFetch` for non-fetch labels). Under D1 `LIFetch` is treated like `LLoad false` there.
+- WeakRvwmoSupply: `supplyOfQconf` takes `candFetchInert boot d0 N c` (every fetch item of a constant-fabric
+  emission is fetch-inert at its trace position); `hullSupply`/`topoSupply` return the supply conditional on
+  it. Consumers (WeakRvwmoGlue, capstones) discharge it for the candidate they receive (e.g. fetches of
+  never-written text at timestamp 0).
