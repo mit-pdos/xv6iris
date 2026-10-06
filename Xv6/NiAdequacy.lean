@@ -5,7 +5,7 @@ design (2026-10-02)" §1/§4, rulings O2/O4/O6, "M2-W2c as landed", "M2-W2d as
 landed").
 
 * §1 `xv6NiPhi g h := ∃ F, niOk h F ∧ niOneShot h F ∧ niChain F (niHist F)
-  ∧ niUserChain F ∧ ∀ q, NiClassLaw q (utrace q h F)` (O6: the filing is part of the run's
+  ∧ niUserChain F ∧ (∀ q, NiClassLaw q (utrace q h F)) ∧ ∀ q, NiFsOrder q h F` (O6: the filing is part of the run's
   witness; `niOneShot`, W2d's fact, is what makes an origin filing honest:
   every filing spent a distinct claim minted in `h` before its enter -- a
   round's at the exit it cites, an origin's at a fork exit or a power-on --
@@ -15,7 +15,9 @@ landed").
   ruling X-R2; (NI M3 U-2b, ruling U-R3) `niUserChain F`: every key
   history the filing cites is ONE chain from its origin's start key, each
   round's trapped key reachable from its resumed key by the pure user step
-  `Ustep.ulands`, each resumed key the previous round's left key).
+  `Ustep.ulands`, each resumed key the previous round's left key; NI M3
+  private files FS-2f, X4: `NiFsOrder`, the citation order and each round's
+  own fs events past every earlier round's citation, read off the chain).
 * §2 THE NI LEDGER beside the application's: `niLedgerR A c γ γe h := A.R c
   h ∗ niR γ γe h` (W2c's composition, at W2d's claim authority `γ` and NI
   M2-X3's chain state `γe`), and its laws -- the power step (a power-on
@@ -88,16 +90,21 @@ set_option linter.unusedSectionVars false
 /-- **THE NI CONCLUSION** of a run ending at history `h`: the ledger's filing
 of `h` exists, it is one-shot (W2d), (NI M2-X4) its citations are prefixes
 of ONE history per (era, ledger), `niHist F` (the chain), (NI M3 U-2b) every
-key history it cites is one chain of pure user runs (`niUserChain`), and every
+key history it cites is one chain of pure user runs (`niUserChain`), every
 incarnation's trace obeys the class law (whose uptime, wait and -- NI joint
-fork lane F3 -- fork answers are M0's row at the cited ι). -/
+fork lane F3 -- fork answers are M0's row at the cited ι), and (NI M3 private
+files FS-2f, X4) every incarnation's citations are ordered, each round's own
+fs events past every earlier round's citation (`NiLedger.NiFsOrder`, the
+windows). -/
 def xv6NiPhi (_ : GState) (h : List Obs) : Prop :=
-  ∃ F, niOk h F ∧ niOneShot h F ∧ niChain F (niHist F) ∧ niUserChain F ∧ ∀ q, NiClassLaw q (utrace q h F)
+  ∃ F, niOk h F ∧ niOneShot h F ∧ niChain F (niHist F) ∧ niUserChain F ∧ (∀ q, NiClassLaw q (utrace q h F)) ∧
+    ∀ q, NiFsOrder q h F
 
-/-- The ledger's facts give the conclusion (`NiTrace.niOk_classLaw`). -/
+/-- The ledger's facts give the conclusion (`NiTrace.niOk_classLaw`,
+`NiLedger.niFsOrder_of_chain`). -/
 theorem xv6NiPhi_of {g : GState} {h : List Obs} {F : List NiEntry} (hF : niOk h F)
     (h1 : niOneShot h F) (hC : niChain F (niHist F)) (hU : niUserChain F) : xv6NiPhi g h :=
-  ⟨F, hF, h1, hC, hU, niOk_classLaw hF⟩
+  ⟨F, hF, h1, hC, hU, niOk_classLaw hF, fun q => niFsOrder_of_chain hU q h⟩
 
 /-! ## §2 THE NI LEDGER beside the application's -/
 

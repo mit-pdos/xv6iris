@@ -589,11 +589,14 @@ theorem fwWhyAt_why (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd)
 /-- (NI M3 private files FS-2e) **ONE CHUNK'S FACTS**: `e` is `act`'s write of
 `(i, γo)` at the mode `hd`, whose counted bytes (`bs.take r`) are the caller's
 own run at `ua + t` (`t` the advances of the chunks before it), landing more
-than it counted (writei's disturbed tail) only at a source fault. -/
+than it counted (writei's disturbed tail) only at a source fault, and (NI M3
+private files FS-2f) never less. -/
 def fwChunkOk (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool) (M : Nat → List (BitVec 8))
     (ua : BitVec 64) (P : UPtd) (n : Int) (t : Nat) (e : Fev) : Prop :=
   ∃ (off : Nat) (bs : List (BitVec 8)) (r : Nat), e = .write act i γo hd off bs r ∧
-    ubytesAt M (ua + BitVec.ofNat 64 t) (bs.take r) ∧ (r < bs.length → wrFailWhy P ua n.toNat)
+    ubytesAt M (ua + BitVec.ofNat 64 t) (bs.take r) ∧ (r < bs.length → wrFailWhy P ua n.toNat) ∧
+    -- (NI M3 private files FS-2f) the count is at most what landed
+    r ≤ bs.length
 
 /-- (NI M3 private files FS-2e) **A WRITE'S CHUNKS, IN LEDGER ORDER**: each
 chunk `(q, e)` is the ledger's event at position `q`, past the previous
@@ -780,7 +783,7 @@ theorem fwWhyAfter_why (γfs : FsNames) (act : BitVec 64) (P : UPtd) (ua : BitVe
 to the post: at a writable inode descriptor, the chunks that moved the row
 IN LEDGER ORDER (`fwChunksOrd`: positions increasing, each chunk's counted
 bytes the caller's buffer `M` at `ua` past the chunks before it), summing to
-the answer on success; on a `-1` past the sign guard, the
+the answer on success and (NI M3 private files FS-2f) to at most the request; on a `-1` past the sign guard, the
 short chunk's reason (`fwWhyAfter`: a verdict past the last chunk).  Other
 descriptors carry nothing. -/
 def fwRcptAt (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd) (M : Nat → List (BitVec 8))
@@ -788,7 +791,7 @@ def fwRcptAt (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd) (M : N
   match st with
   | .open _ true (.inode i γo om) =>
     iprop(∃ cs : List (Nat × Fev), fwChunksOrd γfs act i γo (om == .held) M ua P n lo 0 cs ∗
-      ⌜r ≠ -1#64 → fwSum cs = n.toNat⌝ ∗
+      ⌜(r ≠ -1#64 → fwSum cs = n.toNat) ∧ fwSum cs ≤ n.toNat⌝ ∗
       (⌜r ≠ -1#64 ∨ n < 0⌝ ∨ fwWhyAfter γfs act P ua n (fwEnd lo cs)))
   | _ => iprop(True)
 
@@ -849,7 +852,7 @@ theorem fwRcptAt_nil (γfs : FsNames) (act : BitVec 64) (st : FdState) (P : UPtd
       isplitl
       · iapply fwChunksOrd_nil
       isplitl
-      · ipureintro; intro _; simp [fwSum, h]
+      · ipureintro; exact ⟨fun _ => by simp [fwSum, h], by simp [fwSum]⟩
       · ileft; ipureintro; exact h'
     · exact absurd rfl (h rb i γo om)
   | _ => ipureintro; trivial

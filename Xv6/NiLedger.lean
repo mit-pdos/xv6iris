@@ -265,9 +265,12 @@ abbrev NiUh : Type := GName × Uvis × List Uround
 /-- (NI M3 private files FS-2e-b) **THE ROUND'S FS WINDOW AT ITS CITATION**:
 the caller's fs cursor before the round `w.1` and after it `w.2` -- a round
 citing a nonempty fs prefix moves it to the prefix's length, past where it
-was (the round's cited fs event lies past `w.1`); any other round leaves it. -/
+was (the round's cited fs event lies past `w.1`); any other round leaves it;
+and (FS-2f) the round's own fs events `ι.fout` lie in the window, the cited
+prefix ending in their last (`NiFs.fevOwn` past `w.1`). -/
 def niWinRow : Option (Nat × UIota) → Nat × Nat → Prop
-  | some (_, ι), w => (ι.fev = [] ∧ w.2 = w.1) ∨ (w.1 < ι.fev.length ∧ w.2 = ι.fev.length)
+  | some (_, ι), w => ((ι.fev = [] ∧ w.2 = w.1) ∨ (w.1 < ι.fev.length ∧ w.2 = ι.fev.length)) ∧
+      fevOwn (ι.fev.drop w.1) ι.fout
   | none, w => w.2 = w.1
 
 theorem niWinRow_le {c : Option (Nat × UIota)} {w : Nat × Nat} (h : niWinRow c w) : w.1 ≤ w.2 := by
@@ -275,7 +278,7 @@ theorem niWinRow_le {c : Option (Nat × UIota)} {w : Nat × Nat} (h : niWinRow c
   | none => exact Nat.le_of_eq (show w.2 = w.1 from h).symm
   | some p =>
     obtain ⟨k, ι⟩ := p
-    rcases (h : (ι.fev = [] ∧ w.2 = w.1) ∨ (w.1 < ι.fev.length ∧ w.2 = ι.fev.length)) with ⟨-, h⟩ | ⟨h1, h2⟩
+    rcases (h.1 : (ι.fev = [] ∧ w.2 = w.1) ∨ (w.1 < ι.fev.length ∧ w.2 = ι.fev.length)) with ⟨-, h⟩ | ⟨h1, h2⟩
     · omega
     · omega
 
@@ -995,7 +998,9 @@ INCARNATION'S ROUNDS**: two rounds of incarnation `q` (the era of the enter's
 position and the resumed key's pid) citing one key history, the earlier
 (history entry `n < n'`) and the later both citing a nonempty fs prefix: the
 earlier's cited prefix is strictly shorter -- every fs event a round cites
-lies past every fs event an earlier round of the incarnation cited.  `niR_pure`
+lies past every fs event an earlier round of the incarnation cited -- and
+(NI M3 private files FS-2f, X4) the later round's own fs events (`ι'.fout`)
+are a sublist of its cited prefix PAST the earlier one's (the windows chained).  `niR_pure`
 derives it at every `q` (`niFsOrder_of_chain`). -/
 def NiFsOrder (q : Nat × BitVec 32) (h : List Obs) (F : List NiEntry) : Prop :=
   ∀ (i j : Nat) (sc : BitVec 64) (Wr W W' : Uvis) (k : Nat) (ι : UIota) (γ : GName) (n : Nat)
@@ -1003,7 +1008,9 @@ def NiFsOrder (q : Nat × BitVec 32) (h : List Obs) (F : List NiEntry) : Prop :=
     NiEntry.round i j sc Wr W W' (some (k, ι)) γ n ∈ F →
     NiEntry.round i' j' sc' Wr' W₂ W₂' (some (k', ι')) γ n' ∈ F →
     (obsBoots (h.take j), W'.pid) = q → (obsBoots (h.take j'), W₂'.pid) = q →
-    n < n' → ι.fev ≠ [] → ι'.fev ≠ [] → ι.fev.length < ι'.fev.length
+    n < n' → ι.fev ≠ [] → ι'.fev ≠ [] → ι.fev.length < ι'.fev.length ∧
+      -- (FS-2f) the later round's own fs events lie past every event the earlier one cited
+      List.Sublist ι'.fout (ι'.fev.drop ι.fev.length)
 
 /-- **The order, read off the key chain** (the windows chained in the one
 history the rounds cite, each round's window at its citation). -/
@@ -1015,12 +1022,15 @@ theorem niFsOrder_of_chain {F : List NiEntry} (hU : niUserChain F) (q : Nat × B
   obtain ⟨w', hw', hwr'⟩ := hround _ _ _ _ _ _ _ _ hf'
   have hord := uhistWinFrom_order hwin hw hw' hlt
   simp only at hord
-  rcases (hwr : (ι.fev = [] ∧ w.2 = w.1) ∨ (w.1 < ι.fev.length ∧ w.2 = ι.fev.length)) with ⟨h0, -⟩ | ⟨-, h2⟩
+  rcases (hwr.1 : (ι.fev = [] ∧ w.2 = w.1) ∨ (w.1 < ι.fev.length ∧ w.2 = ι.fev.length)) with ⟨h0, -⟩ | ⟨-, h2⟩
   · exact absurd h0 hne
-  rcases (hwr' : (ι'.fev = [] ∧ w'.2 = w'.1) ∨ (w'.1 < ι'.fev.length ∧ w'.2 = ι'.fev.length)) with
+  rcases (hwr'.1 : (ι'.fev = [] ∧ w'.2 = w'.1) ∨ (w'.1 < ι'.fev.length ∧ w'.2 = ι'.fev.length)) with
     ⟨h0, -⟩ | ⟨h1', -⟩
   · exact absurd h0 hne'
-  omega
+  refine ⟨by omega, hwr'.2.1.trans ?_⟩
+  have hle : ι.fev.length ≤ w'.1 := by omega
+  rw [show w'.1 = ι.fev.length + (w'.1 - ι.fev.length) by omega, ← List.drop_drop]
+  exact List.drop_sublist _ _
 
 /-! ## §7 THE ERA'S REGISTRATION AND THE CHAIN, AS RESOURCES (NI M2-X3)
 

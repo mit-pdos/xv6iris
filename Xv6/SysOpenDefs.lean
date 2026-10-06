@@ -852,14 +852,24 @@ instance openLedPre_persistent (γfs : FsNames) (act : BitVec 64) (lo : Nat) (rt
 
 /-- (NI M3 FS-2b′) **OPEN'S LEDGER RECEIPT** at the installed descriptor type
 `t`: the path the call fetched and a lower bound ending in the caller's
-install, whose cited reading (`UsysDet.usysOpenAt`) is `t` -/
+install, whose cited reading (`UsysDet.usysOpenAt`) is `t`; (NI M3 private
+files FS-2f) before the install, past the caller's fs cursor, what fixed the
+installed inode (`H0`: under O_CREATE all of create's events, `creOkIn`) and
+the truncation of a truncating open of a file -- `SpecSysOpen.openOkRcpt`'s
+facts, at the citation's own prefix -/
 def openLedOk (γfs : FsNames) (act : BitVec 64) (lo : Nat) (rt cw : Nat) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (t : FdType) : IProp GF :=
   iprop(∃ (pl : List (BitVec 8)) (H : List Fev), ⌜argPathOf Mim pv pl⌝ ∗ fsLedLb γfs H ∗
     ⌜usysOpenAt H act rt (umStartOf rt cw pl) (pathElems pl) (omCreate vom) (decide (omArg vom = 0)) =
       some t ∧
       -- (NI M3 private files FS-2e-b) the install lies past the caller's fs cursor `lo`
-      lo < H.length⌝)
+      lo < H.length ∧
+      ∀ (i : Nat) (γo : GName) (held : Bool) (po : Option Nat), H.getLast? = some (.open act i γo held po) →
+        ∃ H0 : List Fev, H0 <+: H.dropLast ∧ lo ≤ H0.length ∧
+          (omCreate vom = true → ∃ (made : Bool) (nm : List (BitVec 8)),
+            (pathElems pl).getLast? = some nm ∧ creOkIn act lo made nm i H0) ∧
+          (omTrunc vom = true → fevIsFile H.dropLast i = true →
+            ∃ ht : List Fev, H0 <+: ht ∧ ht ++ [.trunc act i] <+: H.dropLast)⌝)
 
 instance openLedOk_persistent (γfs : FsNames) (act : BitVec 64) (lo : Nat) (rt cw : Nat) (Mim : Nat → List (BitVec 8))
     (pv : Nat) (vom : BitVec 64) (t : FdType) : Persistent (openLedOk (GF := GF) γfs act lo rt cw Mim pv vom t) := by

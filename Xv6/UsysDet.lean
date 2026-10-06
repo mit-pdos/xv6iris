@@ -255,12 +255,18 @@ structure UIota where
   block's `V.rti` at the filing, the caller's own (chroot) datum -- the
   root an absolute path and `..` at the root resolve from -/
   rt : Nat := 0
+  /-- (NI M3 private files FS-2f) **THE ROUND's OWN FS EVENTS**: the events of
+  the cited prefix the round itself appended (its moves and its decisive
+  event), a sublist of the prefix past the caller's fs cursor ending in its
+  last event (`NiFs.fevOwn`) -- the round's own, like `cpos`; a per-round
+  value, not ledger state (`UIota.led` erases it) -/
+  fout : List Fev := []
 
 /-- The empty prefix (the boot's). -/
-def UIota.boot : UIota := ⟨[], [], [], 0, 0#64, [], [], [], [], [], 0⟩
+def UIota.boot : UIota := ⟨[], [], [], 0, 0#64, [], [], [], [], [], 0, []⟩
 
 /-- the ledger part (what every answer reads) -/
-def UIota.led (ι : UIota) : UIota := { ι with cacc := [], cpos := [], fpos := [] }
+def UIota.led (ι : UIota) : UIota := { ι with cacc := [], cpos := [], fpos := [], fout := [] }
 
 /-- (NI M3 quotas Q-3) **The ledger part without the allocator**: what every
 answer reads on the quota kernel (`usysDet_ledQ`). -/
@@ -528,12 +534,6 @@ def uwriteCntOf (r : BitVec 64) : Nat := if r = -1#64 then 0 else r.toNat
 def usysWriteCnt (a2 : BitVec 64) (d : Nat) : Nat :=
   if usysCntW a2 < 0 then 0 else consCnt (usysCntW a2).toNat d
 
-/-- the step's buffer reading: the run a class console write pushes (`[]` elsewhere) -/
-def uwriteOut (W : Uvis) : List (BitVec 8) :=
-  match uwriteCon W with
-  | some d => uwriteRun W.M (tfW W.tf (tfArgIdx 1)) (usysWriteCnt (tfW W.tf (tfArgIdx 2)) d)
-  | none => []
-
 /-- **THE ATTRIBUTION**: the cited stream holds `run` at the cited, strictly increasing indices -/
 def usysOutAt (ι : UIota) (run : List (BitVec 8)) : Prop :=
   ι.cpos.map (fun p => ι.cacc[p]?) = run.map some ∧ ι.cpos.Pairwise (· < ·)
@@ -726,6 +726,17 @@ def fdWrIno : Option FdState → Bool
   | some (.open _ true (.inode _ _ .parked)) => true
   | _ => false
 
+/-- the step's buffer reading: the run a class console write pushes; (NI M3
+private files FS-2f) at a writable inode descriptor the request's bytes at
+argument 1 (the bytes an inode write's chunks carry); `[]` elsewhere -/
+def uwriteOut (W : Uvis) : List (BitVec 8) :=
+  match uwriteCon W with
+  | some d => uwriteRun W.M (tfW W.tf (tfArgIdx 1)) (usysWriteCnt (tfW W.tf (tfArgIdx 2)) d)
+  | none =>
+    if fdWrIno (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) then
+      uwriteRun W.M (tfW W.tf (tfArgIdx 1)) (usysCntW (tfW W.tf (tfArgIdx 2))).toNat
+    else []
+
 /-- the key's window of `m` bytes from `a`: every byte's page in the
 permission view, and writable when `w` -/
 def uwinOk (perm : Nat → Option UPerm) (a : BitVec 64) (m : Nat) (w : Bool) : Bool :=
@@ -794,14 +805,6 @@ FS-3/4) -/
 def fevReadOn (wf : Option FdState) (a : BitVec 64) (h : List Fev) : Prop :=
   ∃ (wb : Bool) (i : Nat) (γo : GName) (off d : Nat), wf = some (.open true wb (.inode i γo .parked)) ∧
     h.getLast? = some (.read a i γo false off d)
-
-/-- (NI M3 FS-2d) **THE FS ROWS' CITATION FACTS** beyond the resumed key, at
-the key `W` and the cited prefix `ι` (`NiLedger.niDetRow` carries them
-beside `usysDet`): (X3) a read at a non-negative request cites its own read
-on the key's descriptor at argument 0 -/
-def usysFsTie (n : Int) (W : Uvis) (ι : UIota) : Prop :=
-  n = USYS_read → 0 ≤ usysCntW (tfW W.tf (tfArgIdx 2)) →
-    fevReadOn (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) ι.act ι.fev
 
 /-- **THE PRIVATE CLASS AT A KEY, WITH THE FILE SYSTEM** (NI M3 FS-2a, the
 design's `usysDetClassAtF`, ruling FS-R4): `usysDetClassAt`, or a read on a
@@ -1082,6 +1085,18 @@ def usysOpenAt (H : List Fev) (a : BitVec 64) (rt s0 : Nat) (es : List (List (Bi
     else none
   | _ => none
 
+/-- the cited install ends the cited prefix -/
+theorem usysOpenAt_last {H : List Fev} {a : BitVec 64} {rt s0 : Nat} {es : List (List (BitVec 8))}
+    {create rd : Bool} {t : FdType} (h : usysOpenAt H a rt s0 es create rd = some t) :
+    ∃ (i : Nat) (γo : GName) (held : Bool) (po : Option Nat), H.getLast? = some (.open a i γo held po) := by
+  unfold usysOpenAt at h
+  split at h
+  · rename_i a' i γo held po hl
+    split at h
+    · rename_i hc; exact ⟨i, γo, held, po, by rw [hl, hc.1]⟩
+    · cases h
+  · cases h
+
 /-- **the descriptor type a cited open installed**, at the key's path, cwd and omode -/
 def usysOpenTo (wp : Option (List (BitVec 8))) (cw : Nat) (a1 : BitVec 64) (ι : UIota) : Option FdType :=
   match wp with
@@ -1107,6 +1122,171 @@ def usysOpenFd (fd : List FdState) (wp : Option (List (BitVec 8))) (cw : Nat) (a
 def usysDetOpen (W : Uvis) (ι : UIota) : Uvis :=
   bump W (usysOpenAns (usysPath W) W.cwd (tfW W.tf (tfArgIdx 1)) ι (fdLowestClosed W.fd)) W.M W.perm W.sz
     (usysOpenFd W.fd (usysPath W) W.cwd (tfW W.tf (tfArgIdx 1)) ι) W.cwd W.gen W.ch W.lazy W.secc
+
+/-! ### The round's own fs events (NI M3 private files FS-2f)
+
+The owner's decision after FS-2d ("finish it: sublist form"): the round's own
+fs events `ι.fout` -- its MOVES and its decisive event -- are a sublist of
+the cited prefix past the caller's fs cursor, ending in its last event
+(`NiFs.fevOwn`, the window at the filing), and their SHAPE is a function of
+the key's readings and the citation (`usysFevOutOkR`): a read's own read on
+the key's descriptor; an inode write's chunks on the key's descriptor, their
+bytes the key's buffer in order (`NiFs.fevWriteOut` at `uwriteOut`), then at
+most the verdict; chdir's type test; mkdir's arm and parent leg filing the
+path's LAST ELEMENT; open's create (the arm and the leg filing the last
+element, or the found lookup of it), its truncation exactly at O_TRUNC on a
+file, then the install.  The walk's lookups (observations, `fevMoves` false,
+their names already the answer's: X2) are not the round's own.  The offsets
+are AS RECORDED (`fevOffWf` makes them the fold's). -/
+
+/-- O_TRUNC (`SysOpenDefs.omTrunc`) -/
+def uomTrunc (a1 : BitVec 64) : Bool := (uomArg a1).testBit 10
+
+/-- **OPEN's OWN EVENTS** at the path `pl` and the omode word `a1`, the cited
+prefix `H` ending in actor `a`'s install: under O_CREATE create's (the made
+child's arm and parent leg filing the path's last element, or the found
+node's lookup of it), the truncation exactly when O_TRUNC is set and the
+installed row is a file before the install, then the install -/
+def fevOpenOut (a : BitVec 64) (pl : List (BitVec 8)) (a1 : BitVec 64) (H fout : List Fev) : Prop :=
+  ∃ (i : Nat) (γo : GName) (held : Bool) (po : Option Nat) (cre : List Fev),
+    H.getLast? = some (.open a i γo held po) ∧
+    fout = cre ++ (if uomTrunc a1 && fevIsFile H.dropLast i then [.trunc a i] else []) ++
+      [.open a i γo held po] ∧
+    (uomCreate a1 = false → cre = []) ∧
+    (uomCreate a1 = true → ∃ nm, (pathElems pl).getLast? = some nm ∧
+      ((∃ (nd : Fnode) (d nl : Nat), cre = [.arm a i nd, .ent a d nm (some i), .nlink a d nl]) ∨
+        ∃ d, cre = [.hop a d nm none]))
+
+/-- **THE SHAPE OF THE ROUND's OWN FS EVENTS** (the owner's `usysFevOutOk`),
+on the step's readings: the syscall number `n`, the argument words `a1`/`a2`,
+the key's row at argument 0 `wfd`, its path argument `wpath`, its cwd `wcwd`
+and its buffer bytes `wbytes` (`uwriteOut`), at the citation `ι` -/
+def usysFevOutOkR (n : Int) (a1 a2 : BitVec 64) (wfd : Option FdState) (wpath : Option (List (BitVec 8)))
+    (wcwd : Nat) (wbytes : List (BitVec 8)) (ι : UIota) (fout : List Fev) : Prop :=
+  (n = USYS_read → if 0 ≤ usysCntW a2 then
+      ∃ (wb : Bool) (i : Nat) (γo : GName) (off d : Nat), wfd = some (.open true wb (.inode i γo .parked)) ∧
+        fout = [.read ι.act i γo false off d]
+    else fout = []) ∧
+  (n = USYS_write → if 0 ≤ usysCntW a2 then
+      ∃ (rb : Bool) (i : Nat) (γo : GName), wfd = some (.open rb true (.inode i γo .parked)) ∧
+        fevWriteOut ι.act i γo wbytes fout
+    else fout = []) ∧
+  (n = USYS_chdir → if (usysChdirTo wpath wcwd ι).isSome then ∃ (i : Nat) (po : Option Nat), fout = [.look ι.act i po]
+    else fout = []) ∧
+  (n = USYS_mkdir → if fevLegBy ι.fev ι.act then
+      ∃ (pl nm : List (BitVec 8)) (nd : Fnode) (i d nl : Nat), wpath = some pl ∧ (pathElems pl).getLast? = some nm ∧
+        fout = [.arm ι.act i nd, .ent ι.act d nm (some i), .nlink ι.act d nl]
+    else fout = []) ∧
+  (n = USYS_open → match wpath, usysOpenTo wpath wcwd a1 ι with
+    | some pl, some _ => fevOpenOut ι.act pl a1 ι.fev fout
+    | _, _ => fout = [])
+
+theorem usysFevOutOkR_read {a1 a2 : BitVec 64} {wfd : Option FdState} {wpath : Option (List (BitVec 8))}
+    {wcwd : Nat} {wbytes : List (BitVec 8)} {ι : UIota} {fout : List Fev}
+    (h : if 0 ≤ usysCntW a2 then
+      ∃ (wb : Bool) (i : Nat) (γo : GName) (off d : Nat), wfd = some (.open true wb (.inode i γo .parked)) ∧
+        fout = [.read ι.act i γo false off d]
+    else fout = []) : usysFevOutOkR USYS_read a1 a2 wfd wpath wcwd wbytes ι fout :=
+  ⟨fun _ => h, fun h => absurd h (by decide), fun h => absurd h (by decide), fun h => absurd h (by decide),
+    fun h => absurd h (by decide)⟩
+
+theorem usysFevOutOkR_write {a1 a2 : BitVec 64} {wfd : Option FdState} {wpath : Option (List (BitVec 8))}
+    {wcwd : Nat} {wbytes : List (BitVec 8)} {ι : UIota} {fout : List Fev}
+    (h : if 0 ≤ usysCntW a2 then
+      ∃ (rb : Bool) (i : Nat) (γo : GName), wfd = some (.open rb true (.inode i γo .parked)) ∧
+        fevWriteOut ι.act i γo wbytes fout
+    else fout = []) : usysFevOutOkR USYS_write a1 a2 wfd wpath wcwd wbytes ι fout :=
+  ⟨fun h => absurd h (by decide), fun _ => h, fun h => absurd h (by decide), fun h => absurd h (by decide),
+    fun h => absurd h (by decide)⟩
+
+theorem usysFevOutOkR_chdir {a1 a2 : BitVec 64} {wfd : Option FdState} {wpath : Option (List (BitVec 8))}
+    {wcwd : Nat} {wbytes : List (BitVec 8)} {ι : UIota} {fout : List Fev}
+    (h : if (usysChdirTo wpath wcwd ι).isSome then ∃ (i : Nat) (po : Option Nat), fout = [.look ι.act i po]
+      else fout = []) : usysFevOutOkR USYS_chdir a1 a2 wfd wpath wcwd wbytes ι fout :=
+  ⟨fun h => absurd h (by decide), fun h => absurd h (by decide), fun _ => h, fun h => absurd h (by decide),
+    fun h => absurd h (by decide)⟩
+
+theorem usysFevOutOkR_mkdir {a1 a2 : BitVec 64} {wfd : Option FdState} {wpath : Option (List (BitVec 8))}
+    {wcwd : Nat} {wbytes : List (BitVec 8)} {ι : UIota} {fout : List Fev}
+    (h : if fevLegBy ι.fev ι.act then
+      ∃ (pl nm : List (BitVec 8)) (nd : Fnode) (i d nl : Nat), wpath = some pl ∧ (pathElems pl).getLast? = some nm ∧
+        fout = [.arm ι.act i nd, .ent ι.act d nm (some i), .nlink ι.act d nl]
+    else fout = []) : usysFevOutOkR USYS_mkdir a1 a2 wfd wpath wcwd wbytes ι fout :=
+  ⟨fun h => absurd h (by decide), fun h => absurd h (by decide), fun h => absurd h (by decide), fun _ => h,
+    fun h => absurd h (by decide)⟩
+
+theorem usysFevOutOkR_open {a1 a2 : BitVec 64} {wfd : Option FdState} {wpath : Option (List (BitVec 8))}
+    {wcwd : Nat} {wbytes : List (BitVec 8)} {ι : UIota} {fout : List Fev}
+    (h : match wpath, usysOpenTo wpath wcwd a1 ι with
+      | some pl, some _ => fevOpenOut ι.act pl a1 ι.fev fout
+      | _, _ => fout = []) : usysFevOutOkR USYS_open a1 a2 wfd wpath wcwd wbytes ι fout :=
+  ⟨fun h => absurd h (by decide), fun h => absurd h (by decide), fun h => absurd h (by decide),
+    fun h => absurd h (by decide), fun _ => h⟩
+
+/-- **`usysFevOutOk`**: the shape at a key's readings -/
+def usysFevOutOk (n : Int) (W : Uvis) (ι : UIota) (fout : List Fev) : Prop :=
+  usysFevOutOkR n (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2)) (usysFdAt W.fd (tfW W.tf (tfArgIdx 0)))
+    (usysPath W) W.cwd (uwriteOut W) ι fout
+
+/-- the shape is a function of the readings -/
+theorem usysFevOutOk_iff (n : Int) (W : Uvis) (ι : UIota) (fout : List Fev) :
+    usysFevOutOk n W ι fout ↔ usysFevOutOkR n (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2))
+      (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) (usysPath W) W.cwd (uwriteOut W) ι fout := Iff.rfl
+
+/-- off a write the shape does not read the bytes -/
+theorem usysFevOutOkR_bytes {n : Int} (hn : n ≠ USYS_write) (a1 a2 : BitVec 64) (wfd : Option FdState)
+    (wpath : Option (List (BitVec 8))) (wcwd : Nat) (wb wb' : List (BitVec 8)) (ι : UIota) (fout : List Fev) :
+    usysFevOutOkR n a1 a2 wfd wpath wcwd wb ι fout ↔ usysFevOutOkR n a1 a2 wfd wpath wcwd wb' ι fout := by
+  unfold usysFevOutOkR
+  exact and_congr Iff.rfl (and_congr ⟨fun _ h => absurd h hn, fun _ h => absurd h hn⟩ Iff.rfl)
+
+/-- the round's own fs events at a key's readings, at a cwd `cw` and buffer bytes `wb`: their shape, owned
+by the citation -/
+def usysFsOutR (n : Int) (W : Uvis) (cw : Nat) (wb : List (BitVec 8)) (ι : UIota) : Prop :=
+  usysFevOutOkR n (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2)) (usysFdAt W.fd (tfW W.tf (tfArgIdx 0)))
+    (usysPath W) cw wb ι ι.fout ∧ fevOwn ι.fev ι.fout
+
+/-- the round's own fs events at a key: their shape, owned by the citation -/
+def usysFsOut (n : Int) (W : Uvis) (ι : UIota) : Prop := usysFevOutOk n W ι ι.fout ∧ fevOwn ι.fev ι.fout
+
+theorem usysFsOut_iff (n : Int) (W : Uvis) (ι : UIota) : usysFsOut n W ι ↔ usysFsOutR n W W.cwd (uwriteOut W) ι :=
+  Iff.rfl
+
+/-- at a writable inode descriptor the step's buffer reading is the request's bytes -/
+theorem uwriteOut_ino {W : Uvis} (h : fdWrIno (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) = true) :
+    uwriteOut W = uwriteRun W.M (tfW W.tf (tfArgIdx 1)) (usysCntW (tfW W.tf (tfArgIdx 2))).toNat := by
+  unfold uwriteOut uwriteCon
+  rw [uwriteCons_of_wrIno h]
+  simp only [Bool.false_eq_true, if_false, h, if_true]
+
+/-- the round's own fs events at the key's cwd, from the readings at an equal cwd and the request's bytes --
+off a write the bytes are not read, at an inode write they ARE the step's reading -/
+theorem usysFsOut_of_R {n : Int} {W : Uvis} {cw : Nat} {ι : UIota} (hcw : W.cwd = cw)
+    (hb : n = USYS_write → fdWrIno (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) = true)
+    (h : usysFsOutR n W cw (uwriteRun W.M (tfW W.tf (tfArgIdx 1)) (usysCntW (tfW W.tf (tfArgIdx 2))).toNat) ι) :
+    usysFsOut n W ι := by
+  rw [usysFsOut_iff]
+  unfold usysFsOutR at h ⊢
+  rw [hcw]
+  by_cases hn : n = USYS_write
+  · rw [uwriteOut_ino (hb hn)]; exact h
+  · exact ⟨(usysFevOutOkR_bytes hn _ _ _ _ _ _ _ _ _).mp h.1, h.2⟩
+
+/-- (NI M3 FS-2d, FS-2f) **THE FS ROWS' CITATION FACTS** beyond the resumed
+key, at the key `W` and the cited prefix `ι` (`NiLedger.niDetRow` carries
+them beside `usysDet`, at the class's keys): (X3) a read at a non-negative
+request cites its own read on the key's descriptor at argument 0; (FS-2f) at
+read, an inode write, chdir, mkdir (at a key holding its path) and open the
+round's own fs events (`usysFsOut`), and an inode write's cited prefix
+carries the fold's offsets (`fevOffWf`) -/
+def usysFsTie (n : Int) (W : Uvis) (ι : UIota) : Prop :=
+  (n = USYS_read → 0 ≤ usysCntW (tfW W.tf (tfArgIdx 2)) →
+    fevReadOn (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) ι.act ι.fev) ∧
+  (n = USYS_read → usysFsOut n W ι) ∧
+  (n = USYS_write → fdWrIno (usysFdAt W.fd (tfW W.tf (tfArgIdx 0))) = true → usysFsOut n W ι ∧ fevOffWf ι.fev) ∧
+  (n = USYS_chdir → usysFsOut n W ι) ∧
+  (n = USYS_mkdir → (usysPath W).isSome = true → usysFsOut n W ι) ∧
+  (n = USYS_open → usysFsOut n W ι)
 
 /-! ### sbrk's readings (NI M2-G3)
 

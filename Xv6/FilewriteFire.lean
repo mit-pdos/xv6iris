@@ -212,7 +212,7 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
       · have hok : fwChunkOk act inum.toNat γo (om == .held) Mimg ua P n t
             (.write act inum.toNat γo (om == .held) off (wrfRun wrote tot) (wrfRun wrote tot).length) :=
           ⟨off, wrfRun wrote tot, (wrfRun wrote tot).length, rfl, by rw [List.take_length]; exact hchunk,
-            fun h => absurd h (Nat.lt_irrefl _)⟩
+            fun h => absurd h (Nat.lt_irrefl _), Nat.le_refl _⟩
         rw [wrfRun_length] at hok
         icases fwChunksOrd_one fscFs act inum.toNat γo (om == .held) Mimg ua P n lo t L _ _ hlo hok
           $$ Hrc with ⟨%q, #Hc, ⟨%L', %hL', #HL'⟩⟩
@@ -257,7 +257,7 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
         · have hok : fwChunkOk act inum.toNat γo (om == .held) Mimg ua P n t
               (.write act inum.toNat γo (om == .held) off (wrfLanded wrote dstb dn.diSize.toNat off tot dist) tot) :=
             ⟨off, _, tot, rfl, by rw [htake]; exact hchunk,
-              fun hlt => hwhy (by rw [hbslen] at hlt; omega)⟩
+              fun hlt => hwhy (by rw [hbslen] at hlt; omega), by rw [hbslen]; omega⟩
           icases fwChunksOrd_one fscFs act inum.toNat γo (om == .held) Mimg ua P n lo t L _ _ hlo hok
             $$ Hrc with ⟨%q, #Hc, ⟨%L', %hL', #HL'⟩⟩
           iexists _

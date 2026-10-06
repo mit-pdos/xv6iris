@@ -239,7 +239,8 @@ theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q
     iintro Hk Hpc
     iapply (fwr_exit_fail cpu k A hA Q Qe spie spp R t p x P a0 (BitVec.ofNat 64 c) v11 htn hext hr)
     iframe
-    iexact Hcs
+    iframe Hcs
+    ipureintro; omega
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0xd4 .. +0xe0`: THE TEST** (Rocq's `fw_test`): the chunk

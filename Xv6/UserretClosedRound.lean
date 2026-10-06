@@ -194,17 +194,17 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
         · iexists some (ke, ι), V.fsc
           isplitr
           · ipureintro
-            exact ⟨⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩, hrow, Or.inl ⟨hfe0, rfl⟩⟩
+            exact ⟨⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩, hrow, ⟨Or.inl ⟨hfe0, rfl⟩, hpast.2⟩⟩
           isplitl []
           · unfold niCiteRes niCiteResRaw
             iexists (niNamesHere (GF := GF))
             iframe Hanc Hl
           · iexact Hfc0
-        · have hp : V.fsc < ι.fev.length := hpast.resolve_left hfe0
+        · have hp : V.fsc < ι.fev.length := hpast.1.resolve_left hfe0
           iexists some (ke, ι), ι.fev.length
           isplitr
           · ipureintro
-            exact ⟨⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩, hrow, Or.inr ⟨hp, rfl⟩⟩
+            exact ⟨⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩, hrow, ⟨Or.inr ⟨hp, rfl⟩, hpast.2⟩⟩
           isplitl []
           · unfold niCiteRes niCiteResRaw
             iexists (niNamesHere (GF := GF))

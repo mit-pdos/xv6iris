@@ -425,11 +425,22 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     iframe Hop0
     ipureintro
     refine ⟨hpl0, sys_open_led_at H0 h _ _ _ _ _ A.vom inum γo A.omo po dn bm data t _ hfix.1 hH0h hh.2 hen hdirk
-      hdev hino (fun hnd => by simp [hnd]), ?_⟩
-    have := hH0h.length_le
-    have := hfix.2.2
-    simp only [List.length_append, List.length_singleton]
-    omega
+      hdev hino (fun hnd => by simp [hnd]), ?_, ?_⟩
+    · have := hH0h.length_le
+      have := hfix.2.2
+      simp only [List.length_append, List.length_singleton]
+      omega
+    · -- (NI M3 private files FS-2f) `openOkRcpt`'s facts at the citation's prefix
+      intro i' γo' held' po' hlast
+      simp only [List.getLast?_append, List.getLast?_singleton, Option.some_or, Option.some.injEq,
+        Fev.open.injEq] at hlast
+      obtain ⟨-, rfl, -, -, -⟩ := hlast
+      rw [List.dropLast_concat]
+      refine ⟨H0, hH0h, hfix.2.2, hfix.2.1, fun hot hfile => ?_⟩
+      have hft := fevIsFile_era h inum.toNat dn bm data hh.2 hfile
+      have htt : tr = true := by rw [htrb, hot, hft]; rfl
+      obtain ⟨ht, hht, hle⟩ := hL.2 htt
+      exact ⟨ht, hht, hle.trans hh.1⟩
   iapply hPub $$ %cpu %spie %spp %R %(fnode kf) %w6 %lo %w24 %γil %γisl %loc %tlc %kk %s %g %inum
     %dn %bm %kf %fd %l %(sysOpenStoredC C0 kk (sysOpenOm A)) %pn %γo %P2 %u %nsj %t %hA %hB
     %⟨rfl, hty0, rfl, rfl⟩ %⟨hdir, hdvw⟩ %hty2 %hE %hpins %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hlk

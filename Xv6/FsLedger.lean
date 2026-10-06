@@ -396,20 +396,6 @@ theorem fsLed_append (γfs : FsNames) (h evs : List Fev) :
   iintro Ha
   iapply (MonoList.auth_own_update_app γfs.fev evs) $$ Ha
 
-/-- a lower bound of a longer ledger is a lower bound of every prefix -/
-theorem fsLedLb_prefix (γfs : FsNames) {h h' : List Fev} (hp : h <+: h') :
-    fsLedLb (GF := GF) γfs h' ⊢ fsLedLb γfs h := by
-  unfold fsLedLb
-  iintro H
-  iapply (MonoList.lb_own_le (GF := GF) γfs.fev h hp) $$ H
-
-/-- a receipt inside a longer append's lower bound -/
-theorem fsEvRcpt_of_lb (γfs : FsNames) (h t : List Fev) (e : Fev) :
-    fsLedLb (GF := GF) γfs (h ++ e :: t) ⊢ fsEvRcpt γfs h e := by
-  unfold fsEvRcpt
-  apply fsLedLb_prefix
-  exact ⟨t, by simp⟩
-
 /-! ### The tracked offsets' shares (NI M3 private files FS-2a′)
 
 A PARKED file's offset shadow is split ½ kernel (its off box) / ¼ user (the

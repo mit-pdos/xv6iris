@@ -138,7 +138,7 @@ count. -/
 theorem syscArmWrite_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8))
     (sts : List FdState) (a0 a1 r act : BitVec 64) :
     fwConsOut (GF := GF) (syscFdKey a0 sts) fscUart (writerImg P M) a1 r ⊢
-      |==> ∃ ι : UIota, niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜ι.fev = []⌝ ∗
+      |==> ∃ ι : UIota, niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜ι.fev = [] ∧ ι.fout = []⌝ ∗
         ⌜uwriteCons sts a0 = true → usysOutAt ι (uwriteRun (umemLazy P sz M) a1 (uwriteCntOf r))⌝ := by
   unfold fwConsOut
   iintro (%hoff | %hm1 | ⟨%i, %hi, #HO⟩)
@@ -147,7 +147,7 @@ theorem syscArmWrite_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : Nat) (M : Na
     iexists { UIota.boot with act := act }
     iframe Hl
     isplitr
-    · ipureintro; rfl
+    · ipureintro; exact ⟨rfl, rfl⟩
     ipureintro
     intro hcons
     obtain ⟨rb, hst⟩ := uwriteCons_key hcons
@@ -157,7 +157,7 @@ theorem syscArmWrite_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : Nat) (M : Na
     iexists { UIota.boot with act := act }
     iframe Hl
     isplitr
-    · ipureintro; rfl
+    · ipureintro; exact ⟨rfl, rfl⟩
     ipureintro
     intro _
     rw [hm1]; exact usysOutAt_nil _ rfl _ _
@@ -167,7 +167,7 @@ theorem syscArmWrite_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : Nat) (M : Na
       iexists { UIota.boot with act := act }
       iframe Hl
       isplitr
-      · ipureintro; rfl
+      · ipureintro; exact ⟨rfl, rfl⟩
       ipureintro
       intro _
       rw [hr]; exact usysOutAt_nil _ rfl _ _
@@ -182,7 +182,7 @@ theorem syscArmWrite_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : Nat) (M : Na
       iexists { UIota.boot with act := act, cacc := L, cpos := ps }
       iframe Hl
       isplitr
-      · ipureintro; rfl
+      · ipureintro; exact ⟨rfl, rfl⟩
       ipureintro
       intro _
       have hc : uwriteCntOf r = r.toNat := by unfold uwriteCntOf; rw [if_neg hr]
@@ -398,7 +398,10 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
           fdRdIno (usysFdAt sts a0) = true → fevReadDir ι.fev = false →
           r = usysReadAns a2 ι ∧
             umemLazy P' sz.toNat M1 = usysWr (umemLazy P sz.toNat M) a1 (usysReadBytes a2 ι) ∧
-            (0 ≤ usysCntW a2 → fevReadOn (usysFdAt sts a0) ι.act ι.fev)⌝ := by
+            (0 ≤ usysCntW a2 → fevReadOn (usysFdAt sts a0) ι.act ι.fev) ∧
+            -- (NI M3 private files FS-2f) the round's own read, on the key's descriptor
+            (∀ wp cw wbs, usysFevOutOkR USYS_read a1 a2 (usysFdAt sts a0) wp cw wbs ι ι.fout) ∧
+            fevOwn ι.fev ι.fout⌝ := by
   have hn : argZ a2 = usysCntW a2 := rfl
   -- the boot prefix: the class there needs `-1` at a negative request (or no class at all)
   have hboot : (lz = false → (ufsBufAt (permOf P.um sz.toNat) a1 a2).1 = true →
@@ -409,11 +412,15 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
         umemLazy P' sz.toNat M1 =
           usysWr (umemLazy P sz.toNat M) a1 (usysReadBytes a2 { UIota.boot with act := act }) ∧
         (0 ≤ usysCntW a2 → fevReadOn (usysFdAt sts a0) ({ UIota.boot with act := act } : UIota).act
-          ({ UIota.boot with act := act } : UIota).fev) := by
+          ({ UIota.boot with act := act } : UIota).fev) ∧
+        (∀ wp cw wbs, usysFevOutOkR USYS_read a1 a2 (usysFdAt sts a0) wp cw wbs
+          ({ UIota.boot with act := act } : UIota) ({ UIota.boot with act := act } : UIota).fout) ∧
+        fevOwn ({ UIota.boot with act := act } : UIota).fev ({ UIota.boot with act := act } : UIota).fout := by
     intro hneg hlz hb hfd _
     obtain ⟨hm1, hlt⟩ := hneg hlz hb hfd
     have hrb : usysReadBytes a2 ({ UIota.boot with act := act } : UIota) = [] := rfl
-    refine ⟨by unfold usysReadAns; rw [if_pos hlt]; exact hm1, ?_, fun h0 => absurd h0 (by omega)⟩
+    refine ⟨by unfold usysReadAns; rw [if_pos hlt]; exact hm1, ?_, fun h0 => absurd h0 (by omega),
+      fun _ _ _ => usysFevOutOkR_read (by rw [if_neg (by omega)]; rfl), fevOwn_nil _⟩
     rw [hrb]
     have hd0 : d = 0 := by rw [hn] at hd; omega
     subst hd0
@@ -446,12 +453,15 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
       ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML (h ++ [Fev.read act i γo (om == .held) off d']) $$ [Hlb]
       · rw [show (niNamesHere (GF := GF)).getD 6 0 = fscFs.fev from rfl]
         unfold fsLedLb; iexact Hlb
-      imod niIotaLbs_fev (GF := GF) (niNamesHere (GF := GF)) _ act $$ Hf with #Hl
+      imod niIotaLbs_fevOut (GF := GF) (niNamesHere (GF := GF)) _ act [Fev.read act i γo (om == .held) off d']
+        $$ Hf with #Hl
       imodintro
-      iexists { UIota.boot with act := act, fev := h ++ [Fev.read act i γo (om == .held) off d'] }
+      iexists ({ UIota.boot with
+        act := act, fev := h ++ [Fev.read act i γo (om == .held) off d'],
+        fout := [Fev.read act i γo (om == .held) off d'] } : UIota)
       iframe Hl
       isplitr
-      · ipureintro; exact fsPast_snoc _ _ h _ rfl hlo
+      · ipureintro; exact fsPast_snoc _ _ h _ rfl hlo (fevOwn_last hlo)
       ipureintro
       intro hlz hb hfd hdir
       -- (NI M3 private files FS-2a′) the class's row is PARKED, so the read's
@@ -465,6 +475,17 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
       -- (NI M3 FS-2d, X3) the cited read is on the key's descriptor
       have hon : fevReadOn (usysFdAt sts a0) act (h ++ [Fev.read act i γo (om == .held) off d']) :=
         ⟨wb, i, γo, off, d', hat, by rw [hpk]; simp⟩
+      -- (NI M3 private files FS-2f) the round's own read, owned by the citation
+      have hown : fevOwn (h ++ [Fev.read act i γo (om == .held) off d']) [Fev.read act i γo (om == .held) off d'] :=
+        fevOwn_drop (lo := 0) (fevOwn_last (Nat.zero_le _))
+      have hout : ∀ wp cw wbs, usysFevOutOkR USYS_read a1 a2 (usysFdAt sts a0) wp cw wbs
+          ({ UIota.boot with
+            act := act, fev := h ++ [Fev.read act i γo (om == .held) off d'],
+            fout := [Fev.read act i γo (om == .held) off d'] } : UIota) [Fev.read act i γo (om == .held) off d'] := by
+        intro _ _ _
+        apply usysFevOutOkR_read
+        rw [if_pos (by rw [← hn]; omega)]
+        exact ⟨wb, i, γo, off, d', hat, by rw [hpk]; rfl⟩
       simp only at hdir
       rw [fevReadDir_snoc] at hdir
       unfold fevIsFile at hdir
@@ -475,7 +496,9 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
         have hc : fevContent h i = c := by
           unfold fevContent; rw [hrow, han]; rfl
         have hrd : usysReadBytes a2
-            ({ UIota.boot with act := act, fev := h ++ [Fev.read act i γo (om == .held) off d'] } : UIota) =
+            ({ UIota.boot with
+              act := act, fev := h ++ [Fev.read act i γo (om == .held) off d'],
+              fout := [Fev.read act i γo (om == .held) off d'] } : UIota) =
             (c.drop off).take (usysCntW a2).toNat := by
           show fevReadOut (h ++ [Fev.read act i γo (om == .held) off d']) (usysCntW a2).toNat = _
           rw [fevReadOut_snoc_at _ _ _ _ _ _ _ _ hoff, hc]
@@ -486,7 +509,7 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
         obtain ⟨h1, h2⟩ := syscRead_fileImg P P' sz M M1 a1 a2 r d d' off c hext hw hpl hsz hbel (hn ▸ hd) hr hr'
           hd'' hret hbuf
         rw [hrd]
-        refine ⟨?_, h2, fun _ => hon⟩
+        refine ⟨?_, h2, fun _ => hon, hout, hown⟩
         unfold usysReadAns
         rw [if_neg (by omega), hrd]
         exact h1
@@ -523,69 +546,327 @@ theorem filewriteExtra_inoRet (gn : GName) (P : UPtd) (st : FdState) (rb : Bool)
       · ipureintro; exact Or.inl h
       · iright; iframe H; ipureintro; exact h
 
-/-- **AN INODE WRITE's CITATION** (NI M3 FS-2a): at its `-1` for an
-out-of-resources verdict, the fs prefix ending in that verdict; the boot
-prefix elsewhere -- and at the class's keys the answer is `usysWriteAnsF`
-at it. -/
+/-- (NI M3 private files FS-2f) a short write's reason: a source fault, or one
+named verdict past the bound -/
+theorem fwWhyAfter_split (γfs : FsNames) (act : BitVec 64) (P : UPtd) (ua : BitVec 64) (n : Int) (lo : Nat) :
+    fwWhyAfter (GF := GF) γfs act P ua n lo ⊢
+      ⌜wrFailWhy P ua n.toNat⌝ ∨ ∃ why : FsFull, ⌜why = .max ∨ why = .blocks⌝ ∗ fsFullAfter γfs act why lo := by
+  unfold fwWhyAfter
+  iintro (%h | H | H)
+  · ileft; ipureintro; exact h
+  · iright; iexists FsFull.max; iframe H; ipureintro; exact Or.inl rfl
+  · iright; iexists FsFull.blocks; iframe H; ipureintro; exact Or.inr rfl
+
+/-- (NI M3 private files FS-2f) a writable inode row at argument 0 is the
+dispatch's key row, PARKED, and the key's row -/
+theorem usysFdAt_of_wrIno_pk {sts : List FdState} {a0 : BitVec 64} (hlen : sts.length = NOFILE)
+    (h : fdWrIno (usysFdAt sts a0) = true) :
+    ∃ rb i γo, syscFdKey a0 sts = .open rb true (.inode i γo .parked) ∧
+      usysFdAt sts a0 = some (.open rb true (.inode i γo .parked)) := by
+  unfold usysFdAt at h ⊢
+  split at h
+  · rename_i hz
+    rw [if_pos hz]
+    cases hs : sts[(BitVec.extractLsb' 0 32 a0).toInt.toNat]? with
+    | none => rw [hs] at h; cases h
+    | some st =>
+      rw [hs] at h
+      have hlt : (BitVec.extractLsb' 0 32 a0).toInt.toNat < NOFILE := by
+        rw [← hlen]; exact (List.getElem?_eq_some_iff.mp hs).1
+      rcases st with _ | ⟨rb, wb, t⟩
+      · cases h
+      · cases wb
+        · cases t <;> cases h
+        · cases t with
+          | inode i γo om =>
+            cases om
+            · refine ⟨rb, i, γo, ?_, rfl⟩
+              unfold syscFdKey argZ
+              rw [if_pos ⟨hz, by omega⟩, hs]; rfl
+            · cases h
+          | _ => cases h
+  · cases h
+
+/-- (NI M3 private files FS-2f) **THE CHUNKS' FACTS, AS A LIST** (the pure
+part of `fwChunksOrd`) -/
+def fwChunksOk (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
+    (P : UPtd) (n : Int) : Nat → List (Nat × Fev) → Prop
+  | _, [] => True
+  | t, (_, e) :: cs => fwChunkOk act i γo hd M ua P n t e ∧ fwChunksOk act i γo hd M ua P n (t + fevWriteR e) cs
+
+/-- (NI M3 private files FS-2f) **THE CHUNKS IN A CITED PREFIX**: a lower bound
+reaching past the last chunk holds every chunk at its position -/
+theorem fwChunksOrd_in (γfs : FsNames) (act : BitVec 64) (i : Nat) (γo : GName) (hd : Bool)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (H : List Fev) (cs : List (Nat × Fev)) :
+    ∀ lo t, fsLedLb (GF := GF) γfs H ⊢ fwChunksOrd γfs act i γo hd M ua P n lo t cs -∗
+      ⌜fwEnd lo cs ≤ H.length → fevAt H lo cs ∧ fwChunksOk act i γo hd M ua P n t cs⌝ := by
+  induction cs with
+  | nil => intro lo t; iintro - -; ipureintro; intro _; exact ⟨trivial, trivial⟩
+  | cons c cs ih =>
+    intro lo t
+    obtain ⟨q, e⟩ := c
+    rw [fwChunksOrd_cons]
+    iintro #HH ⟨%⟨hlo, hok⟩, #Hp, #Hr⟩
+    ihave %hge := fwChunksOrd_endGe γfs act i γo hd M ua P n cs (q + 1) (t + fevWriteR e) $$ Hr
+    ihave %hih := ih (q + 1) (t + fevWriteR e) $$ HH Hr
+    unfold fsLedPos
+    icases Hp with ⟨%h, %hl, #Hq⟩
+    unfold fsLedLb
+    ihave %hv := MonoList.lb_own_valid (GF := GF) γfs.fev H (h ++ [e]) $$ HH Hq
+    ipureintro
+    intro hend
+    rw [fwEnd_cons] at hend
+    obtain ⟨h1, h2⟩ := hih hend
+    refine ⟨⟨hlo, ?_, h1⟩, hok, h2⟩
+    have hpre : h ++ [e] <+: H := by
+      rcases hv with hv | hv
+      · have hle := hv.length_le
+        simp only [List.length_append, List.length_singleton] at hle
+        have heq : H = h ++ [e] := hv.eq_of_length (by simp; omega)
+        rw [heq]; exact List.prefix_refl _
+      · exact hv
+    obtain ⟨u, hu⟩ := hpre
+    rw [← hu, ← hl, List.append_assoc, List.getElem?_append_right (Nat.le_refl _)]
+    simp
+
+/-- (NI M3 private files FS-2f) the writer's image run at `ua + t` IS the
+key's buffer bytes there: a counted run inside the request is a prefix of the
+key's bytes past `t` -/
+theorem ubytesAt_key (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (t m : Nat)
+    (bs : List (BitVec 8)) (hb : ubytesAt (writerImg P M) (ua + BitVec.ofNat 64 t) bs) (hm : t + bs.length ≤ m) :
+    bs <+: (uwriteRun (umemLazy P sz M) ua m).drop t := by
+  rw [List.prefix_iff_eq_take]
+  apply List.ext_getElem
+  · simp [uwriteRun]; omega
+  · intro d h1 h2
+    have hb' := hb d bs[d] (List.getElem?_eq_getElem h1)
+    rw [umemByte_writerImg_lazy P sz] at hb'
+    simp only [List.getElem_take, List.getElem_drop, uwriteRun, List.getElem_map, List.getElem_range]
+    rw [← hb']
+    unfold uimgByte
+    rw [BitVec.add_assoc, ← BitVec.ofNat_add]
+
+/-- (NI M3 private files FS-2f) **THE CHUNKS ARE THE CALLER's BYTES**: at a
+class key (no source fault) a run of chunks inside the request, then the
+write's end -- every byte written, or a verdict -- is the write's own events
+at the key's bytes past `t` -/
+theorem fwChunksOk_out (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) (act : BitVec 64) (i : Nat) (γo : GName)
+    (ua : BitVec 64) (n : Int) (hnf : ¬ wrFailWhy P ua n.toNat) (tl : List Fev) :
+    ∀ (t : Nat) (cs : List (Nat × Fev)), fwChunksOk act i γo false (writerImg P M) ua P n t cs →
+      t + fwSum cs ≤ n.toNat →
+      ((tl = [] ∧ t + fwSum cs = n.toNat) ∨ ∃ why, tl = [.full act why] ∧ (why = .max ∨ why = .blocks)) →
+      fevWriteOut act i γo ((uwriteRun (umemLazy P sz M) ua n.toNat).drop t) (cs.map Prod.snd ++ tl) := by
+  intro t cs
+  induction cs generalizing t with
+  | nil =>
+    intro _ _ htl
+    simp only [List.map_nil, List.nil_append]
+    rcases htl with ⟨rfl, ht⟩ | ⟨why, rfl, hw⟩
+    · simp only [fwSum, List.map_nil, List.sum_nil, Nat.add_zero] at ht
+      show _ = []
+      rw [ht]; simp [uwriteRun]
+    · exact ⟨rfl, rfl, hw⟩
+  | cons c cs ih =>
+    obtain ⟨q, e⟩ := c
+    rintro ⟨⟨off, bs, r, rfl, hby, hfault, hle⟩, hcs⟩ hsum htl
+    have hr : r = bs.length := by
+      by_cases hlt : r < bs.length
+      · exact (hnf (hfault hlt)).elim
+      · omega
+    subst hr
+    rw [List.take_length] at hby
+    have hs : fwSum ((q, Fev.write act i γo false off bs bs.length) :: cs) = bs.length + fwSum cs := by
+      unfold fwSum; simp [fevWriteR]
+    rw [hs] at hsum htl
+    refine ⟨rfl, rfl, rfl, rfl, rfl, ubytesAt_key P sz M ua t _ bs hby (by omega), ?_⟩
+    rw [List.drop_drop]
+    have := ih (t + bs.length) hcs (by simp only [fevWriteR] at *; omega)
+      (htl.imp (fun h => ⟨h.1, by omega⟩) id)
+    simpa [fevWriteR, Nat.add_comm] using this
+
+/-- **AN INODE WRITE's CITATION** (NI M3 FS-2a, FS-2f): at its `-1` past the
+sign guard for an out-of-resources verdict, the fs prefix ending in that
+verdict; (FS-2f) at a successful write of some chunk, the fs prefix ending in
+its last chunk; the boot prefix elsewhere -- and at the class's keys the
+answer is `usysWriteAnsF` at it, the round's own events are its chunks (the
+key's bytes, in ledger order) and the verdict (`fevWriteOut`), and the cited
+prefix's recorded offsets are the fold's (`ftopInv_lb_wf`). -/
 theorem syscArmWriteIno_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : BitVec 64) (lz : Bool) (sts : List FdState)
     (a0 a1 a2 r act : BitVec 64) (st : FdState) (rb : Bool) (i : Nat) (γo : GName) (om : OffMode)
-    (hst : st = .open rb true (.inode i γo om)) (hwf : uptWf P) (hlf : lz = false → lazyFree P.um sz)
-    (hret : r = -1#64 ∨ (r = BitVec.ofInt 64 (argZ a2) ∧ 0 ≤ argZ a2)) (Mw : Nat → List (BitVec 8)) (lo : Nat) :
+    (hst : st = .open rb true (.inode i γo om)) (hk : syscFdKey a0 sts = st) (hlen : sts.length = NOFILE)
+    (hwf : uptWf P) (hlf : lz = false → lazyFree P.um sz)
+    (hret : r = -1#64 ∨ (r = BitVec.ofInt 64 (argZ a2) ∧ 0 ≤ argZ a2)) (M : Nat → List (BitVec 8)) (lo : Nat) :
     -- (NI M3 private files FS-2e-b) the write's receipt past the caller's fs cursor `lo`
-    fwRcptAt (GF := GF) fscFs act st P Mw a1 lo (argZ a2) r ⊢
-      |==> ∃ ι : UIota, niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜ι.cpos = [] ∧ ι.cacc = [] ∧ fsPast lo ι⌝ ∗
-        ⌜lz = false → (ufsBufAt (permOf P.um sz.toNat) a1 a2).2 = true → r = usysWriteAnsF a2 ι⌝ := by
+    fwRcptAt (GF := GF) fscFs act st P (writerImg P M) a1 lo (argZ a2) r ⊢ ftopInv (hlc := hlc) fscFs -∗
+      |={⊤}=> ∃ ι : UIota, niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜ι.cpos = [] ∧ ι.cacc = [] ∧ fsPast lo ι⌝ ∗
+        ⌜lz = false → (ufsBufAt (permOf P.um sz.toNat) a1 a2).2 = true → fdWrIno (usysFdAt sts a0) = true →
+          r = usysWriteAnsF a2 ι ∧
+          (∀ wp cw, usysFevOutOkR USYS_write a1 a2 (usysFdAt sts a0) wp cw
+            (uwriteRun (umemLazy P sz.toNat M) a1 (usysCntW a2).toNat) ι ι.fout) ∧
+          fevOwn ι.fev ι.fout ∧ fevOffWf ι.fev⌝ := by
   have hn : argZ a2 = usysCntW a2 := rfl
   subst hst
-  iintro Hw
-  by_cases hm : r = -1#64
-  · icases fwRcptAt_whyPast fscFs act rb i γo om P Mw a1 lo (argZ a2) r hm $$ Hw with
-      (%hwhy | Hy | Hy)
-    · imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
-      imodintro
-      iexists { UIota.boot with act := act }
-      iframe Hl
-      ipureintro
-      refine ⟨⟨rfl, rfl, fsPast_nil _ _ rfl⟩, fun hlz hb => ?_⟩
-      rcases hwhy with hneg | hwhy
-      · unfold usysWriteAnsF; rw [if_pos (Or.inl (hn ▸ hneg))]; exact hm
-      · exact (wrFailWhy_key hwf (hlf hlz) hb (hn ▸ hwhy)).elim
-    all_goals
-      unfold fsFullAfter fsEvRcpt fsLedLb
-      icases Hy with ⟨%h, %hlo, #Hlb⟩
-      ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML (h ++ [Fev.full act _]) $$ [Hlb]
-      · rw [show (niNamesHere (GF := GF)).getD 6 0 = fscFs.fev from rfl]; iexact Hlb
-      imod niIotaLbs_fev (GF := GF) (niNamesHere (GF := GF)) _ act $$ Hf with #Hl
-      imodintro
-      iexists { UIota.boot with act := act, fev := h ++ [Fev.full act _] }
-      iframe Hl
-      ipureintro
-      refine ⟨⟨rfl, rfl, fsPast_snoc _ _ h _ rfl hlo⟩, fun _ _ => ?_⟩
-      unfold usysWriteAnsF
-      rw [if_pos (Or.inr (fevFullBy_snoc h act _))]; exact hm
-  · iclear Hw
+  -- the class's row: parked, this one
+  have hrow : fdWrIno (usysFdAt sts a0) = true → om = .parked ∧
+      usysFdAt sts a0 = some (.open rb true (.inode i γo .parked)) := by
+    intro hfd
+    obtain ⟨rb', i', γo', hk', hat⟩ := usysFdAt_of_wrIno_pk hlen hfd
+    rw [hk] at hk'
+    injection hk' with hrb _ ht
+    injection ht with hi hγ hom
+    subst hrb hi hγ hom
+    exact ⟨rfl, hat⟩
+  -- the boot prefix: nothing of the round's own, at `-1` or at a zero count
+  have hboot : (lz = false → (ufsBufAt (permOf P.um sz.toNat) a1 a2).2 = true →
+      fdWrIno (usysFdAt sts a0) = true →
+      r = usysWriteAnsF a2 { UIota.boot with act := act } ∧ (0 ≤ usysCntW a2 → (usysCntW a2).toNat = 0)) →
+      ⊢@{IProp GF} |={⊤}=> ∃ ι : UIota, niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜ι.cpos = [] ∧ ι.cacc = [] ∧ fsPast lo ι⌝ ∗
+        ⌜lz = false → (ufsBufAt (permOf P.um sz.toNat) a1 a2).2 = true → fdWrIno (usysFdAt sts a0) = true →
+          r = usysWriteAnsF a2 ι ∧
+          (∀ wp cw, usysFevOutOkR USYS_write a1 a2 (usysFdAt sts a0) wp cw
+            (uwriteRun (umemLazy P sz.toNat M) a1 (usysCntW a2).toNat) ι ι.fout) ∧
+          fevOwn ι.fev ι.fout ∧ fevOffWf ι.fev⌝ := by
+    intro hb
     imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
     imodintro
     iexists { UIota.boot with act := act }
     iframe Hl
     ipureintro
-    refine ⟨⟨rfl, rfl, fsPast_nil _ _ rfl⟩, fun _ _ => ?_⟩
-    rcases hret with h | ⟨h, hn0⟩
-    · exact absurd h hm
-    · have hnf : ¬ (usysCntW a2 < 0 ∨ fevFullBy ([] : List Fev) act = true) := by
-        intro hc
-        rcases hc with hc | hc
-        · rw [← hn] at hc; omega
-        · simp [fevFullBy] at hc
-      have hval : usysWriteAnsF a2 ({ UIota.boot with act := act } : UIota) =
-          BitVec.ofNat 64 (usysCntW a2).toNat := by
-        unfold usysWriteAnsF
-        exact if_neg hnf
-      rw [hval, h, hn]
-      have h0 : 0 ≤ usysCntW a2 := by rw [← hn]; exact hn0
-      have e := BitVec.ofInt_natCast (w := 64) (usysCntW a2).toNat
-      rw [Int.toNat_of_nonneg h0] at e
-      exact e
+    refine ⟨⟨rfl, rfl, fsPast_nil _ _ rfl⟩, fun hlz hbuf hfd => ?_⟩
+    obtain ⟨hans, h0⟩ := hb hlz hbuf hfd
+    refine ⟨hans, fun _ _ => usysFevOutOkR_write ?_, fevOwn_nil _, fevOffWf_nil⟩
+    split
+    · rename_i hc
+      refine ⟨rb, i, γo, (hrow hfd).2, ?_⟩
+      show _ = []
+      rw [h0 hc]; rfl
+    · rfl
+  iintro Hw #Hft
+  unfold fwRcptAt
+  icases Hw with ⟨%cs, #Hc, %⟨hsum, hle⟩, Hw⟩
+  by_cases hneg : argZ a2 < 0
+  · -- the sign guard: `-1`, the boot prefix
+    iclear Hw
+    have hm : r = -1#64 := hret.resolve_right (fun h => by omega)
+    iapply hboot
+    intro _ _ _
+    refine ⟨?_, fun h0 => absurd h0 (by omega)⟩
+    unfold usysWriteAnsF; rw [if_pos (Or.inl (hn ▸ hneg))]; exact hm
+  by_cases hm : r = -1#64
+  · -- `-1` past the sign guard: a source fault (the class refutes it) or a verdict past the chunks
+    icases Hw with (%h | Hy)
+    · rcases h with h | h
+      · exact absurd hm h
+      · exact absurd h hneg
+    icases fwWhyAfter_split fscFs act P a1 (argZ a2) (fwEnd lo cs) $$ Hy with (%hwhy | ⟨%why, %hwy, Hy⟩)
+    · iapply hboot
+      intro hlz hb _
+      exact (wrFailWhy_key hwf (hlf hlz) hb (hn ▸ hwhy)).elim
+    · unfold fsFullAfter fsEvRcpt
+      icases Hy with ⟨%h, %hlo, #Hlb⟩
+      ihave %hin := fwChunksOrd_in fscFs act i γo (om == .held) (writerImg P M) a1 P (argZ a2)
+        (h ++ [Fev.full act why]) cs lo 0 $$ Hlb Hc
+      ihave %hge := fwChunksOrd_endGe fscFs act i γo (om == .held) (writerImg P M) a1 P (argZ a2) cs lo 0 $$ Hc
+      imod ftopInv_lb_wf (hlc := hlc) ⊤ fscFs _ (by simp) $$ Hft Hlb with %hwf'
+      ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML (h ++ [Fev.full act why]) $$ [Hlb]
+      · rw [show (niNamesHere (GF := GF)).getD 6 0 = fscFs.fev from rfl]; unfold fsLedLb; iexact Hlb
+      imod niIotaLbs_fevOut (GF := GF) (niNamesHere (GF := GF)) _ act (cs.map Prod.snd ++ [Fev.full act why])
+        $$ Hf with #Hl
+      imodintro
+      iexists ({ UIota.boot with
+        act := act, fev := h ++ [Fev.full act why],
+        fout := cs.map Prod.snd ++ [Fev.full act why] } : UIota)
+      iframe Hl
+      ipureintro
+      have hlen' : fwEnd lo cs ≤ (h ++ [Fev.full act why]).length := by simp; omega
+      obtain ⟨hat, hok⟩ := hin hlen'
+      have hat' : fevAt (h ++ [Fev.full act why]) lo (cs ++ [(h.length, Fev.full act why)]) :=
+        fevAt_append lo cs _ hat ⟨by rw [show fevAtEnd lo cs = fwEnd lo cs from rfl]; exact hlo, by simp, trivial⟩
+      have hown := fevOwn_of_at hat'
+      simp only [List.map_append, List.map_cons, List.map_nil] at hown
+      refine ⟨⟨rfl, rfl, fsPast_snoc _ _ h _ rfl (by omega) hown⟩, fun hlz hb hfd => ?_⟩
+      obtain ⟨hpk, hat0⟩ := hrow hfd
+      subst hpk
+      refine ⟨by unfold usysWriteAnsF; rw [if_pos (Or.inr (fevFullBy_snoc h act _))]; exact hm,
+        fun _ _ => usysFevOutOkR_write ?_, fevOwn_drop hown, hwf'⟩
+      rw [if_pos (by rw [← hn]; omega)]
+      refine ⟨rb, i, γo, hat0, ?_⟩
+      have := fwChunksOk_out P sz.toNat M act i γo a1 (argZ a2)
+        (fun hw => wrFailWhy_key hwf (hlf hlz) hb (hn ▸ hw)) _ 0 cs hok (by omega)
+        (Or.inr ⟨why, rfl, hwy⟩)
+      simpa [hn] using this
+  -- a count: the whole request landed
+  have hr : r = BitVec.ofInt 64 (argZ a2) := (hret.resolve_left hm).1
+  have hsum' := hsum hm
+  have hans : r = usysWriteAnsF a2 { UIota.boot with act := act } := by
+    have hnf : ¬ (usysCntW a2 < 0 ∨ fevFullBy ([] : List Fev) act = true) := by
+      intro hc
+      rcases hc with hc | hc
+      · rw [← hn] at hc; omega
+      · simp [fevFullBy] at hc
+    have hval : usysWriteAnsF a2 ({ UIota.boot with act := act } : UIota) =
+        BitVec.ofNat 64 (usysCntW a2).toNat := by
+      unfold usysWriteAnsF
+      exact if_neg hnf
+    rw [hval, hr, hn]
+    have h0 : 0 ≤ usysCntW a2 := by rw [← hn]; omega
+    have e := BitVec.ofInt_natCast (w := 64) (usysCntW a2).toNat
+    rw [Int.toNat_of_nonneg h0] at e
+    exact e
+  by_cases hcs : cs = []
+  · -- no chunk: the boot prefix
+    subst hcs
+    iclear Hw
+    iapply hboot
+    intro _ _ _
+    refine ⟨hans, fun _ => ?_⟩
+    simp only [fwSum, List.map_nil, List.sum_nil] at hsum'
+    rw [← hn]; omega
+  · -- the prefix ending in the last chunk
+    iclear Hw
+    icases fwChunksOrd_bound fscFs act i γo (om == .held) (writerImg P M) a1 P (argZ a2) cs lo 0 $$ Hc with
+      (%h0 | ⟨%L, %hL, #HL⟩)
+    · exact absurd h0 hcs
+    ihave %hin := fwChunksOrd_in fscFs act i γo (om == .held) (writerImg P M) a1 P (argZ a2) L cs lo 0 $$ HL Hc
+    imod ftopInv_lb_wf (hlc := hlc) ⊤ fscFs _ (by simp) $$ Hft HL with %hwf'
+    ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML L $$ [HL]
+    · rw [show (niNamesHere (GF := GF)).getD 6 0 = fscFs.fev from rfl]; unfold fsLedLb; iexact HL
+    imod niIotaLbs_fevOut (GF := GF) (niNamesHere (GF := GF)) _ act (cs.map Prod.snd) $$ Hf with #Hl
+    imodintro
+    iexists { UIota.boot with act := act, fev := L, fout := cs.map Prod.snd }
+    iframe Hl
+    ipureintro
+    obtain ⟨hat, hok⟩ := hin (by omega)
+    have hend : fevAtEnd lo cs = L.length := by rw [show fevAtEnd lo cs = fwEnd lo cs from rfl]; exact hL.symm
+    have hown := fevOwn_of_atEnd hat hend hcs
+    obtain ⟨-, hgt⟩ := fevAt_end lo cs hat
+    obtain ⟨hgt, -⟩ := hgt hcs
+    -- the cited prefix ends in a write, not a verdict
+    have hlast : fevFullBy L act = false := by
+      have hl := hown.2 (by simpa using hcs)
+      rw [List.getLast?_drop, if_neg (by omega)] at hl
+      unfold fevFullBy
+      rw [hl]
+      obtain ⟨cs', ⟨q, e⟩, rfl⟩ := List.eq_nil_or_concat cs |>.resolve_left hcs
+      simp only [List.concat_eq_append] at hok ⊢
+      have : ∀ t (cs : List (Nat × Fev)), fwChunksOk act i γo (om == .held) (writerImg P M) a1 P (argZ a2) t
+          (cs ++ [(q, e)]) → ∃ off bs r, e = .write act i γo (om == .held) off bs r := by
+        intro t cs
+        induction cs generalizing t with
+        | nil => rintro ⟨⟨off, bs, r, he, -⟩, -⟩; exact ⟨off, bs, r, he⟩
+        | cons c cs ih => obtain ⟨q', e'⟩ := c; rintro ⟨-, h⟩; exact ih _ h
+      obtain ⟨off, bs, r', rfl⟩ := this 0 cs' hok
+      simp
+    refine ⟨⟨rfl, rfl, ⟨Or.inr (show lo < L.length by omega), hown⟩⟩, fun hlz hb hfd => ?_⟩
+    obtain ⟨hpk, hat0⟩ := hrow hfd
+    subst hpk
+    refine ⟨?_, fun _ _ => usysFevOutOkR_write ?_, fevOwn_drop hown, hwf'⟩
+    · rw [hans]; unfold usysWriteAnsF; simp only [hlast]; rfl
+    rw [if_pos (by rw [← hn]; omega)]
+    refine ⟨rb, i, γo, hat0, ?_⟩
+    have := fwChunksOk_out P sz.toNat M act i γo a1 (argZ a2)
+      (fun hw => wrFailWhy_key hwf (hlf hlz) hb (hn ▸ hw)) [] 0 cs hok (by omega) (Or.inl ⟨rfl, by omega⟩)
+    simpa [hn] using this
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 5, `sys_read`** (Rocq `sysc_arm_read`). -/
@@ -704,7 +985,8 @@ theorem syscall_arm_read (SR : SYSREAD)
       fun h => absurd (hn5.symm.trans h) (by decide), fun h => absurd (hn5.symm.trans h) (by decide),
         fun h => absurd (hn5.symm.trans h) (by decide)⟩
     rw [ha0']
-    exact hfs hlz hb hfd hdir
+    obtain ⟨h1, h2, h3, h4, h5⟩ := hfs hlz hb hfd hdir
+    exact ⟨h1, h2, h3, by rw [hn5]; exact h4 _ _ _, h5⟩
   imodintro
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts
     (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) M1 cs cs V.gen ke _ hrow hpast $$ Hanc Hl
@@ -825,10 +1107,14 @@ theorem syscall_arm_write (SW : SYSWRITE)
     unfold filewriteFsOut
     unfold syscallRet syscallAddr at *
     icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
-    iapply wpLoop_bupd
+    -- (NI M3 private files FS-2f) the fs region's invariant: the cited prefix's offsets
+    ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
+    icases fsReady_region $$ Hrdy with ⟨#Hireg, -⟩
+    ihave #Hftop := iregInv_ftop _ _ _ _ $$ Hireg
+    iapply wpLoop_fupd
     imod syscArmWriteIno_ev (GF := GF) V.upt V.sz V.pvLazy sts (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1))
-      (tfW V.tf (tfArgIdx 2)) (R2 10#5) _ _ rb i γo om hk hfacts.2.2.2 hfacts.2.2.1 hreti _ V.fsc $$ Hrc
-      with ⟨%ι, #Hl, %⟨-, -, hpast⟩, %hfs⟩
+      (tfW V.tf (tfArgIdx 2)) (R2 10#5) _ _ rb i γo om hk rfl ha.2.1 hfacts.2.2.2 hfacts.2.2.1 hreti M V.fsc
+      $$ Hrc Hftop with ⟨%ι, #Hl, %⟨-, -, hpast⟩, %hfs⟩
     have hcf : uwriteCons sts (tfW V.tf (tfArgIdx 0)) = false := by
       unfold uwriteCons
       rw [show usysFdKey sts (tfW V.tf (tfArgIdx 0)) = syscFdKey (tfW V.tf (tfArgIdx 0)) sts from rfl, hk]
@@ -840,11 +1126,12 @@ theorem syscall_arm_write (SW : SYSWRITE)
         fun _ _ hcons => absurd (hcf.symm.trans hcons) (by decide),
         fun _ hcons => absurd (hcf.symm.trans hcons) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
         fun h => absurd (hn16.symm.trans h) (by decide),
-        fun h => absurd (hn16.symm.trans h) (by decide), fun _ hlz hb _ => ?_,
+        fun h => absurd (hn16.symm.trans h) (by decide), fun _ hlz hb hfd => ?_,
         fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
         fun h => absurd (hn16.symm.trans h) (by decide)⟩
       rw [ha0']
-      exact hfs hlz hb
+      obtain ⟨h1, h2, h3, h4⟩ := hfs hlz hb hfd
+      exact ⟨h1, ⟨by rw [hn16]; exact h2 _ _, h3⟩, h4⟩
     imodintro
     ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts
       (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M) cs cs V.gen ke
@@ -888,7 +1175,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
   imodintro
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts
     (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M) cs cs V.gen ke
-    _ hrow (fsPast_nil _ _ hfe) $$ Hanc Hl
+    _ hrow (fsPast_nil _ _ hfe.1 hfe.2) $$ Hanc Hl
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
     (({ V with upt := P' } : ProcPriv).updEv k') (viewFaulted V.upt P' M) sts cs hj hproc hK htier
     hpins2 hs2' (hrows.updEv k') 16 hn16 (by decide) (by decide) (by decide))

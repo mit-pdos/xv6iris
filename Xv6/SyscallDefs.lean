@@ -159,16 +159,38 @@ theorem syscWaitRow_ret {V V' : ProcPriv} {img img' : ElfMem} {cs cs' : ExtTreeS
 /-- (NI M3 private files FS-2e-b) **THE CITATION LIES PAST THE CURSOR**: a
 round's cited fs prefix is empty (it cites no fs event) or longer than the
 caller's fs cursor `c` (the position after the incarnation's last fs round,
-the record's `fsc`): the cited event sits at or past `c`. -/
-def fsPast (c : Nat) (ι : UIota) : Prop := ι.fev = [] ∨ c < ι.fev.length
+the record's `fsc`): the cited event sits at or past `c`; and (FS-2f) the
+round's own fs events `ι.fout` lie in the window past `c`, the cited prefix
+ending in their last (`NiFs.fevOwn`). -/
+def fsPast (c : Nat) (ι : UIota) : Prop := (ι.fev = [] ∨ c < ι.fev.length) ∧ fevOwn (ι.fev.drop c) ι.fout
 
-/-- a citation of no fs event lies past every cursor -/
-theorem fsPast_nil (c : Nat) (ι : UIota) (h : ι.fev = []) : fsPast c ι := Or.inl h
+/-- a citation of no fs event, owning none, lies past every cursor -/
+theorem fsPast_nil (c : Nat) (ι : UIota) (h : ι.fev = []) (hf : ι.fout = [] := by rfl) : fsPast c ι := by
+  refine ⟨Or.inl h, ?_⟩; rw [hf]; exact fevOwn_nil _
 
-/-- a citation ending in an event past a prefix that reaches the cursor -/
+/-- a citation ending in an event past a prefix that reaches the cursor, owning nothing -/
 theorem fsPast_snoc (c : Nat) (ι : UIota) (h : List Fev) (e : Fev) (hf : ι.fev = h ++ [e])
-    (hc : c ≤ h.length) : fsPast c ι := by
-  right; rw [hf, List.length_append, List.length_singleton]; omega
+    (hc : c ≤ h.length) (ho : fevOwn (ι.fev.drop c) ι.fout) : fsPast c ι := by
+  refine ⟨Or.inr ?_, ho⟩; rw [hf, List.length_append, List.length_singleton]; omega
+
+/-- (NI M3 private files FS-2f) **THE ROUND's OWN FS EVENTS AT THE DISPATCH**:
+their shape at the entry's readings (`UsysDet.usysFevOutOkR`: the number,
+argument words 1 and 2, the entry table's row at argument 0, the path the
+entry image holds at argument 0, the record's cwd and the image's bytes at
+argument 1 for the request), owned by the cited prefix -/
+def syscFsOut (V : ProcPriv) (img : ElfMem) (sts : List FdState) (ι : UIota) : Prop :=
+  usysFevOutOkR (syscNum V) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2)) (usysFdAt sts (tfW V.tf (tfArgIdx 0)))
+    (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi
+    (uwriteRun img (tfW V.tf (tfArgIdx 1)) (usysCntW (tfW V.tf (tfArgIdx 2))).toNat) ι ι.fout ∧
+  fevOwn ι.fev ι.fout
+
+/-- the round's own fs events at a number literal -/
+theorem syscFsOut_at {V : ProcPriv} {img : ElfMem} {sts : List FdState} {ι : UIota} {k : Int} (hk : syscNum V = k)
+    (h : usysFevOutOkR k (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2)) (usysFdAt sts (tfW V.tf (tfArgIdx 0)))
+      (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi
+      (uwriteRun img (tfW V.tf (tfArgIdx 1)) (usysCntW (tfW V.tf (tfArgIdx 2))).toNat) ι ι.fout)
+    (ho : fevOwn ι.fev ι.fout) : syscFsOut V img sts ι := by
+  unfold syscFsOut; rw [hk]; exact ⟨h, ho⟩
 
 /-- (NI M3 private files FS-2a) **THE CITED ROW's FILE-SYSTEM CLAUSES**, at
 the class's keys (`UsysDet.usysDetClassAtF`): a read at a lazy-free entry on
@@ -178,7 +200,10 @@ prefix ends in a read of a REGULAR-FILE row (`fevReadDir`), answered
 `usysReadAns` and wrote `usysReadBytes` -- the cited read's bytes from its
 RECORDED offset -- at argument 1; a write at a lazy-free entry on a writable
 inode descriptor whose source is readable for the whole request answered
-`usysWriteAnsF` -- the request, or `-1` at the caller's cited verdict. -/
+`usysWriteAnsF` -- the request, or `-1` at the caller's cited verdict;
+(NI M3 private files FS-2f) at read, an inode write (the cited prefix's
+offsets the fold's), chdir, mkdir (at an image holding the path) and open,
+the round's own fs events (`syscFsOut`). -/
 def syscEvFs (V V' : ProcPriv) (img img' : ElfMem) (sts sts' : List FdState) (ι : UIota) : Prop :=
   (syscNum V = USYS_read → V.pvLazy = false →
     (ufsBufAt (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))).1 = true →
@@ -187,26 +212,35 @@ def syscEvFs (V V' : ProcPriv) (img img' : ElfMem) (sts sts' : List FdState) (ι
       img' = usysWr img (tfW V.tf (tfArgIdx 1)) (usysReadBytes (tfW V.tf (tfArgIdx 2)) ι) ∧
       -- (NI M3 FS-2d, X3) the cited read is the caller's own, on the entry's descriptor
       (0 ≤ usysCntW (tfW V.tf (tfArgIdx 2)) →
-        fevReadOn (usysFdAt sts (tfW V.tf (tfArgIdx 0))) ι.act ι.fev)) ∧
+        fevReadOn (usysFdAt sts (tfW V.tf (tfArgIdx 0))) ι.act ι.fev) ∧
+      -- (NI M3 FS-2f) the round's own fs events
+      syscFsOut V img sts ι) ∧
   (syscNum V = USYS_write → V.pvLazy = false →
     (ufsBufAt (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))).2 = true →
     fdWrIno (usysFdAt sts (tfW V.tf (tfArgIdx 0))) = true →
-    tfW V'.tf (tfArgIdx 0) = usysWriteAnsF (tfW V.tf (tfArgIdx 2)) ι) ∧
+    tfW V'.tf (tfArgIdx 0) = usysWriteAnsF (tfW V.tf (tfArgIdx 2)) ι ∧
+      -- (NI M3 FS-2f) the chunks on the entry's descriptor, the caller's bytes;
+      -- the cited prefix's recorded offsets are the fold's
+      syscFsOut V img sts ι ∧ fevOffWf ι.fev) ∧
   -- (NI M3 FS-2b) chdir at a lazy-free entry whose image holds the path argument:
   -- the answer and the cwd after are the cited type test's walk's
   (syscNum V = USYS_chdir → V.pvLazy = false →
     (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128).isSome = true →
     tfW V'.tf (tfArgIdx 0) = usysChdirAns (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi ι ∧
-      V'.cwi = usysChdirCwd (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi ι) ∧
-  -- mkdir: `0` exactly at a cited parent leg of the caller
-  (syscNum V = USYS_mkdir → tfW V'.tf (tfArgIdx 0) = usysMkdirAns ι) ∧
+      V'.cwi = usysChdirCwd (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi ι ∧
+      syscFsOut V img sts ι) ∧
+  -- mkdir: `0` exactly at a cited parent leg of the caller; (FS-2f) at an
+  -- entry whose image holds the path, the round's own fs events
+  (syscNum V = USYS_mkdir → tfW V'.tf (tfArgIdx 0) = usysMkdirAns ι ∧
+    ((ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128).isSome = true → syscFsOut V img sts ι)) ∧
   -- (NI M3 FS-2b′) open at a lazy-free entry whose image holds the path
   -- argument: the answer and the resumed table are the cited install's
   (syscNum V = USYS_open → V.pvLazy = false →
     (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128).isSome = true →
     tfW V'.tf (tfArgIdx 0) = usysOpenAns (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi
       (tfW V.tf (tfArgIdx 1)) ι (fdLowestClosed sts) ∧
-    sts' = usysOpenFd sts (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi (tfW V.tf (tfArgIdx 1)) ι)
+    sts' = usysOpenFd sts (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi (tfW V.tf (tfArgIdx 1)) ι ∧
+    syscFsOut V img sts ι)
 
 /-- off read, write, chdir, mkdir and open the fs clauses are vacuous -/
 theorem syscEvFs_ne {V V' : ProcPriv} {img img' : ElfMem} {sts sts' : List FdState} {ι : UIota}

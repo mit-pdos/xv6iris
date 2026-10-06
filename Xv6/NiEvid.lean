@@ -89,7 +89,7 @@ def niBelowQ (ι H : UIota) : Prop :=
 /-- **The join**: the longer list per ledger, the larger count; H's actor. -/
 def niJoin (H ι : UIota) : UIota :=
   ⟨niLonger H.kev ι.kev, niLonger H.pev ι.pev, niLonger H.zev ι.zev, max H.ticks ι.ticks, H.act,
-    niLonger H.sev ι.sev, niLonger H.cacc ι.cacc, H.cpos, niLonger H.fev ι.fev, H.fpos, H.rt⟩
+    niLonger H.sev ι.sev, niLonger H.cacc ι.cacc, H.cpos, niLonger H.fev ι.fev, H.fpos, H.rt, H.fout⟩
 
 theorem niBelow_join {H ι : UIota} (hp : H.pev <+: ι.pev ∨ ι.pev <+: H.pev)
     (hz : H.zev <+: ι.zev ∨ ι.zev <+: H.zev) (hk : H.kev <+: ι.kev ∨ ι.kev <+: H.kev)
@@ -142,7 +142,7 @@ theorem niIotaLbs_mk (ns : List GName) (t : Nat) (p : List Pev) (z : List Zev) (
     MonoNat.lb_own (GF := GF) (ns.getD 0 0) (.ofNat t) ∗ ((ns.getD 1 0) ↪◯ML p) ∗
       ((ns.getD 2 0) ↪◯ML z) ∗ ((ns.getD 3 0) ↪◯ML k) ∗ ((ns.getD 4 0) ↪◯ML sv) ∗
       ((ns.getD 5 0) ↪◯ML ca) ∗ ((ns.getD 6 0) ↪◯ML fv) ⊢
-      niIotaLbs ns ⟨k, p, z, t, a, sv, ca, cp, fv, fp, r⟩ := .rfl
+      niIotaLbs ns ⟨k, p, z, t, a, sv, ca, cp, fv, fp, r, []⟩ := .rfl
 
 theorem niLb_tick0 (γ : GName) : ⊢@{IProp GF} |==> MonoNat.lb_own γ (.ofNat 0) := MonoNat.lb_own_0 γ
 
@@ -153,7 +153,7 @@ theorem niIotaLbs_lists (ns : List GName) (p : List Pev) (z : List Zev) (k : Lis
     (ca : List (BitVec 8)) (cp : List Nat) (a : BitVec 64) (fv : List Fev := []) (fp : List Nat := []) (r : Nat := 0) :
     ((ns.getD 1 0) ↪◯ML p) ∗ ((ns.getD 2 0) ↪◯ML z) ∗ ((ns.getD 3 0) ↪◯ML k) ∗ ((ns.getD 4 0) ↪◯ML sv) ∗
       ((ns.getD 5 0) ↪◯ML ca) ∗ ((ns.getD 6 0) ↪◯ML fv)
-      ⊢@{IProp GF} |==> niIotaLbs ns ⟨k, p, z, 0, a, sv, ca, cp, fv, fp, r⟩ := by
+      ⊢@{IProp GF} |==> niIotaLbs ns ⟨k, p, z, 0, a, sv, ca, cp, fv, fp, r, []⟩ := by
   iintro ⟨#Hp, #Hz, #Hk, #Hs, #Hc, #Hf⟩
   imod niLb_tick0 (GF := GF) (ns.getD 0 0) with #H0
   imodintro
@@ -168,7 +168,7 @@ theorem niIotaLbs_lists (ns : List GName) (p : List Pev) (z : List Zev) (k : Lis
 
 /-- **The boot's evidence is free.** -/
 theorem niIotaLbs_boot (ns : List GName) : ⊢@{IProp GF} |==> niIotaLbs ns UIota.boot := by
-  show ⊢@{IProp GF} |==> niIotaLbs ns ⟨[], [], [], 0, 0#64, [], [], [], [], [], 0⟩
+  show ⊢@{IProp GF} |==> niIotaLbs ns ⟨[], [], [], 0, 0#64, [], [], [], [], [], 0, []⟩
   imod MonoList.lb_own_nil (GF := GF) (α := Pev) (ns.getD 1 0) with #H1
   imod MonoList.lb_own_nil (GF := GF) (α := Zev) (ns.getD 2 0) with #H2
   imod MonoList.lb_own_nil (GF := GF) (α := Kev) (ns.getD 3 0) with #H3
@@ -183,7 +183,7 @@ count, the other ledgers at `[]`. -/
 theorem niIotaLbs_ticks (ns : List GName) (n : Nat) (a : BitVec 64) :
     MonoNat.lb_own (GF := GF) (ns.getD 0 0) (.ofNat n) ⊢
       |==> niIotaLbs ns { UIota.boot with ticks := n, act := a } := by
-  show _ ⊢ |==> niIotaLbs ns ⟨[], [], [], n, a, [], [], [], [], [], 0⟩
+  show _ ⊢ |==> niIotaLbs ns ⟨[], [], [], n, a, [], [], [], [], [], 0, []⟩
   iintro #Ht
   imod MonoList.lb_own_nil (GF := GF) (α := Pev) (ns.getD 1 0) with #H1
   imod MonoList.lb_own_nil (GF := GF) (α := Zev) (ns.getD 2 0) with #H2
@@ -205,7 +205,7 @@ theorem niIotaLbs_ticks (ns : List GName) (n : Nat) (a : BitVec 64) :
 prefix, the other ledgers at `[]` / `0`. -/
 theorem niIotaLbs_zev (ns : List GName) (h : List Zev) (a : BitVec 64) :
     ((ns.getD 2 0) ↪◯ML h) ⊢@{IProp GF} |==> niIotaLbs ns { UIota.boot with zev := h, act := a } := by
-  show _ ⊢ |==> niIotaLbs ns ⟨[], [], h, 0, a, [], [], [], [], [], 0⟩
+  show _ ⊢ |==> niIotaLbs ns ⟨[], [], h, 0, a, [], [], [], [], [], 0, []⟩
   iintro #Hz
   imod MonoList.lb_own_nil (GF := GF) (α := Pev) (ns.getD 1 0) with #H1
   imod MonoList.lb_own_nil (GF := GF) (α := Kev) (ns.getD 3 0) with #H3
@@ -221,7 +221,7 @@ the other ledgers at `[]` / `0`. -/
 theorem niIotaLbs_pz (ns : List GName) (hp : List Pev) (hz : List Zev) (a : BitVec 64) :
     ((ns.getD 1 0) ↪◯ML hp) ∗ ((ns.getD 2 0) ↪◯ML hz) ⊢@{IProp GF}
       |==> niIotaLbs ns { UIota.boot with pev := hp, zev := hz, act := a } := by
-  show _ ⊢ |==> niIotaLbs ns ⟨[], hp, hz, 0, a, [], [], [], [], [], 0⟩
+  show _ ⊢ |==> niIotaLbs ns ⟨[], hp, hz, 0, a, [], [], [], [], [], 0, []⟩
   iintro ⟨#Hp, #Hz⟩
   imod MonoList.lb_own_nil (GF := GF) (α := Kev) (ns.getD 3 0) with #H3
   imod MonoList.lb_own_nil (GF := GF) (α := Sev) (ns.getD 4 0) with #H4
@@ -234,7 +234,7 @@ theorem niIotaLbs_pz (ns : List GName) (hp : List Pev) (hz : List Zev) (a : BitV
 F3): the slot prefix, the other ledgers at `[]` / `0`. -/
 theorem niIotaLbs_sev (ns : List GName) (hs : List Sev) (a : BitVec 64) :
     ((ns.getD 4 0) ↪◯ML hs) ⊢@{IProp GF} |==> niIotaLbs ns { UIota.boot with sev := hs, act := a } := by
-  show _ ⊢ |==> niIotaLbs ns ⟨[], [], [], 0, a, hs, [], [], [], [], 0⟩
+  show _ ⊢ |==> niIotaLbs ns ⟨[], [], [], 0, a, hs, [], [], [], [], 0, []⟩
   iintro #Hs
   imod MonoList.lb_own_nil (GF := GF) (α := Pev) (ns.getD 1 0) with #H1
   imod MonoList.lb_own_nil (GF := GF) (α := Zev) (ns.getD 2 0) with #H2
@@ -249,7 +249,7 @@ prefix and the run's indices in it, the other ledgers at `[]` / `0`. -/
 theorem niIotaLbs_cacc (ns : List GName) (ca : List (BitVec 8)) (cp : List Nat) (a : BitVec 64) :
     ((ns.getD 5 0) ↪◯ML ca) ⊢@{IProp GF}
       |==> niIotaLbs ns { UIota.boot with act := a, cacc := ca, cpos := cp } := by
-  show _ ⊢ |==> niIotaLbs ns ⟨[], [], [], 0, a, [], ca, cp, [], [], 0⟩
+  show _ ⊢ |==> niIotaLbs ns ⟨[], [], [], 0, a, [], ca, cp, [], [], 0, []⟩
   iintro #Hc
   imod MonoList.lb_own_nil (GF := GF) (α := Pev) (ns.getD 1 0) with #H1
   imod MonoList.lb_own_nil (GF := GF) (α := Zev) (ns.getD 2 0) with #H2
@@ -265,7 +265,7 @@ in its verdict), at its actor. -/
 theorem niIotaLbs_fev (ns : List GName) (fv : List Fev) (a : BitVec 64) :
     ((ns.getD 6 0) ↪◯ML fv) ⊢@{IProp GF}
       |==> niIotaLbs ns { UIota.boot with act := a, fev := fv } := by
-  show _ ⊢ |==> niIotaLbs ns ⟨[], [], [], 0, a, [], [], [], fv, [], 0⟩
+  show _ ⊢ |==> niIotaLbs ns ⟨[], [], [], 0, a, [], [], [], fv, [], 0, []⟩
   iintro #Hf
   imod MonoList.lb_own_nil (GF := GF) (α := Pev) (ns.getD 1 0) with #H1
   imod MonoList.lb_own_nil (GF := GF) (α := Zev) (ns.getD 2 0) with #H2
@@ -274,6 +274,14 @@ theorem niIotaLbs_fev (ns : List GName) (fv : List Fev) (a : BitVec 64) :
   imod MonoList.lb_own_nil (GF := GF) (α := BitVec 8) (ns.getD 5 0) with #H5
   iapply (niIotaLbs_lists (GF := GF) ns [] [] [] [] [] [] a fv [])
   iframe H1 H2 H3 H4 H5 Hf
+
+/-- (NI M3 private files FS-2f) The evidence of a round citing a prefix of
+its era's fs-event ledger, with the round's own events in it. -/
+theorem niIotaLbs_fevOut (ns : List GName) (fv : List Fev) (a : BitVec 64) (fo : List Fev) :
+    ((ns.getD 6 0) ↪◯ML fv) ⊢@{IProp GF}
+      |==> niIotaLbs ns { UIota.boot with act := a, fev := fv, fout := fo } := by
+  refine (niIotaLbs_fev (GF := GF) ns fv a).trans (BIUpdate.mono ?_)
+  unfold niIotaLbs; exact .rfl
 
 /-- (NI M3 FS-2b) the evidence does not read the cited root -/
 theorem niIotaLbs_rt (ns : List GName) (ι : UIota) (r : Nat) :

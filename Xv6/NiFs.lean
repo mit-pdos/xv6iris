@@ -995,6 +995,69 @@ theorem fstAg_fevRun (S : FsFoot) (hc : fevClosed S) (h : List Fev) :
     fstAg S (fevRun h) (fevRun (fevOn S h)) :=
   fstAg_run S hc h _ _ ⟨fun j _ => frowAg_refl S j _, fun _ _ => rfl⟩
 
+/-- (NI M3 private files FS-2f, X5) **THE RESTRICTION THROUGH POSITIONS**: when
+every event of `H` that moves `S` sits at one of the strictly increasing
+positions `ps`, restricting `H` to `S` is restricting the events at `ps` --
+the moves are read in ledger order either way -/
+theorem fevOn_positions (S : FsFoot) : ∀ (H : List Fev) (ps : List Nat), ps.Pairwise (· < ·) →
+    (∀ (p : Nat) (e : Fev), H[p]? = some e → fevMoves S e → p ∈ ps) →
+    fevOn S H = fevOn S (ps.filterMap fun p => H[p]?) := by
+  classical
+  intro H
+  induction H with
+  | nil => intro ps _ _; simp [fevOn]
+  | cons a H ih =>
+    intro ps hs hc
+    -- the positions past the head, shifted
+    have hshift : ∀ (qs : List Nat), (∀ p ∈ qs, p ≠ 0) →
+        (qs.filterMap fun p => (a :: H)[p]?) = (qs.map (· - 1)).filterMap fun p => H[p]? := by
+      intro qs hq
+      induction qs with
+      | nil => rfl
+      | cons p qs ihq =>
+        have hp := hq p (List.mem_cons_self ..)
+        obtain ⟨p', rfl⟩ : ∃ p', p = p' + 1 := ⟨p - 1, by omega⟩
+        simp only [List.filterMap_cons, List.map_cons, List.getElem?_cons_succ, Nat.add_sub_cancel]
+        rw [ihq (fun x hx => hq x (List.mem_cons_of_mem _ hx))]
+    have hsorted' : ∀ (qs : List Nat), qs.Pairwise (· < ·) → (∀ p ∈ qs, p ≠ 0) →
+        (qs.map (· - 1)).Pairwise (· < ·) := by
+      intro qs hq hnz
+      rw [List.pairwise_map]
+      exact List.Pairwise.imp_of_mem (fun {x y} hx hy hxy => by
+        have := hnz x hx; have := hnz y hy; omega) hq
+    by_cases h0 : 0 ∈ ps
+    · -- the head's position is the first
+      obtain ⟨ps', rfl⟩ : ∃ ps', ps = 0 :: ps' := by
+        cases ps with
+        | nil => simp at h0
+        | cons p ps' =>
+          rcases List.mem_cons.mp h0 with h | h
+          · exact ⟨ps', by rw [h]⟩
+          · have := List.rel_of_pairwise_cons hs h; omega
+      have hnz : ∀ p ∈ ps', p ≠ 0 := fun p hp => by have := List.rel_of_pairwise_cons hs hp; omega
+      have hs' := hsorted' ps' (List.Pairwise.of_cons hs) hnz
+      have hc' : ∀ (p : Nat) (e : Fev), H[p]? = some e → fevMoves S e → p ∈ ps'.map (· - 1) := by
+        intro p e hp hm
+        have h1 := hc (p + 1) e (by simpa using hp) hm
+        rcases List.mem_cons.mp h1 with h | h
+        · omega
+        · exact List.mem_map.mpr ⟨p + 1, h, by omega⟩
+      have := ih _ hs' hc'
+      unfold fevOn at this ⊢
+      simp only [List.filterMap_cons, List.getElem?_cons_zero]
+      rw [hshift ps' hnz, List.filter_cons, List.filter_cons, this]
+    · -- the head does not move `S`
+      have hnz : ∀ p ∈ ps, p ≠ 0 := fun p hp h => h0 (h ▸ hp)
+      have hm : ¬ fevMoves S a := fun hm => h0 (hc 0 a rfl hm)
+      have hs' := hsorted' ps hs hnz
+      have hc' : ∀ (p : Nat) (e : Fev), H[p]? = some e → fevMoves S e → p ∈ ps.map (· - 1) := by
+        intro p e hp hm'
+        have h1 := hc (p + 1) e (by simpa using hp) hm'
+        exact List.mem_map.mpr ⟨p + 1, h1, by omega⟩
+      have := ih _ hs' hc'
+      unfold fevOn at this ⊢
+      rw [hshift ps hnz, List.filter_cons_of_neg (by simpa using hm), this]
+
 theorem fevReadBytes_on {S : FsFoot} {h : List Fev} {i : Nat} {γo : GName} (n : Nat) (hc : fevClosed S)
     (hi : S.ino i) (ho : S.off γo) :
     fevReadBytes h i γo n = fevReadBytes (fevOn S h) i γo n := by
@@ -1032,5 +1095,198 @@ theorem fevHop_on {S : FsFoot} {h : List Fev} {d : Nat} {nm : List (BitVec 8)} (
       | some q =>
         obtain ⟨nd, _⟩ := p; obtain ⟨nd', _⟩ := q
         cases nd <;> cases nd' <;> simp_all [frowAg]
+
+/-! ## §4 The round's own events (NI M3 private files FS-2f)
+
+A round's OWN fs events `fout` (the owner's decision after FS-2d: the
+sublist form) are a SUBLIST of the era's ledger past the caller's fs cursor
+-- other actors' events may interleave -- and the cited prefix ends in
+`fout`'s last event (`fevOwn`).  The kernel names them at their POSITIONS
+(`fevAt`: strictly increasing, the first past the cursor), which is what
+makes them a sublist (`fevAt_sublist`).  A write's chunks and verdict, as the
+caller's bytes decide them: `fevWriteOut`. -/
+
+open scoped List
+
+/-- **EVENTS AT THEIR POSITIONS**: each `(q, e)` is `H`'s event at `q`, the
+positions strictly increasing, the first at least `lo` -/
+def fevAt (H : List Fev) : Nat → List (Nat × Fev) → Prop
+  | _, [] => True
+  | lo, (q, e) :: cs => lo ≤ q ∧ H[q]? = some e ∧ fevAt H (q + 1) cs
+
+/-- positioned events are a sublist of the ledger past the first bound -/
+theorem fevAt_sublist {H : List Fev} : ∀ (lo : Nat) (cs : List (Nat × Fev)), fevAt H lo cs →
+    cs.map Prod.snd <+ H.drop lo := by
+  intro lo cs
+  induction cs generalizing lo with
+  | nil => intro _; exact List.nil_sublist _
+  | cons c cs ih =>
+    obtain ⟨q, e⟩ := c
+    rintro ⟨hlo, hq, hcs⟩
+    have hlt : q < H.length := (List.getElem?_eq_some_iff.mp hq).1
+    have hdq : H.drop q = e :: H.drop (q + 1) := by
+      rw [List.drop_eq_getElem_cons hlt]
+      congr 1
+      exact (List.getElem?_eq_some_iff.mp hq).2
+    have h1 : e :: cs.map Prod.snd <+ H.drop q := by
+      rw [hdq]; exact (ih (q + 1) hcs).cons_cons e
+    have h2 : H.drop q <+ H.drop lo := by
+      have : q = lo + (q - lo) := by omega
+      rw [this, ← List.drop_drop]
+      exact List.drop_sublist _ _
+    exact h1.trans h2
+
+/-- the position after the last positioned event (`lo` if none) -/
+def fevAtEnd (lo : Nat) (cs : List (Nat × Fev)) : Nat :=
+  match cs.getLast? with
+  | some (q, _) => q + 1
+  | none => lo
+
+theorem fevAtEnd_cons (lo q : Nat) (e : Fev) (cs : List (Nat × Fev)) :
+    fevAtEnd lo ((q, e) :: cs) = fevAtEnd (q + 1) cs := by
+  unfold fevAtEnd
+  cases cs with
+  | nil => rfl
+  | cons c cs =>
+    rw [List.getLast?_cons_cons]
+    cases hc : (c :: cs).getLast? with
+    | none => simp at hc
+    | some p => rfl
+
+theorem fevAtEnd_append (lo : Nat) (cs cs' : List (Nat × Fev)) :
+    fevAtEnd lo (cs ++ cs') = fevAtEnd (fevAtEnd lo cs) cs' := by
+  unfold fevAtEnd
+  rw [List.getLast?_append]
+  cases h : cs'.getLast? with
+  | none => simp
+  | some c => obtain ⟨q, e⟩ := c; simp
+
+/-- positioned events, then more past them -/
+theorem fevAt_append {H : List Fev} : ∀ (lo : Nat) (cs cs' : List (Nat × Fev)), fevAt H lo cs →
+    fevAt H (fevAtEnd lo cs) cs' → fevAt H lo (cs ++ cs') := by
+  intro lo cs cs'
+  induction cs generalizing lo with
+  | nil => intro _ h; exact h
+  | cons c cs ih =>
+    obtain ⟨q, e⟩ := c
+    rintro ⟨hlo, hq, hcs⟩ h
+    rw [fevAtEnd_cons] at h
+    exact ⟨hlo, hq, ih (q + 1) hcs h⟩
+
+/-- the end is past the bound, and inside the ledger -/
+theorem fevAt_end {H : List Fev} : ∀ (lo : Nat) (cs : List (Nat × Fev)), fevAt H lo cs →
+    lo ≤ fevAtEnd lo cs ∧ (cs ≠ [] → lo < fevAtEnd lo cs ∧ fevAtEnd lo cs ≤ H.length) := by
+  intro lo cs
+  induction cs generalizing lo with
+  | nil => intro _; exact ⟨Nat.le_refl _, fun h => absurd rfl h⟩
+  | cons c cs ih =>
+    obtain ⟨q, e⟩ := c
+    rintro ⟨hlo, hq, hcs⟩
+    rw [fevAtEnd_cons]
+    have hlt : q < H.length := (List.getElem?_eq_some_iff.mp hq).1
+    obtain ⟨h1, h2⟩ := ih (q + 1) hcs
+    by_cases hn : cs = []
+    · subst hn
+      have he : fevAtEnd (q + 1) [] = q + 1 := rfl
+      rw [he]; exact ⟨by omega, fun _ => ⟨by omega, by omega⟩⟩
+    · obtain ⟨h3, h4⟩ := h2 hn
+      exact ⟨by omega, fun _ => ⟨by omega, h4⟩⟩
+
+/-- **THE ROUND OWNS ITS EVENTS IN `H`**: `fout` is a sublist of `H`, and a
+nonempty `fout` ends in `H`'s last event -/
+def fevOwn (H fout : List Fev) : Prop := fout <+ H ∧ (fout ≠ [] → H.getLast? = fout.getLast?)
+
+theorem fevOwn_nil (H : List Fev) : fevOwn H [] := ⟨List.nil_sublist _, fun h => absurd rfl h⟩
+
+/-- owning past a position is owning -/
+theorem fevOwn_drop {H fout : List Fev} {lo : Nat} (h : fevOwn (H.drop lo) fout) : fevOwn H fout := by
+  refine ⟨h.1.trans (List.drop_sublist _ _), fun hne => ?_⟩
+  have hl := h.2 hne
+  have hd : H.drop lo ≠ [] := by
+    intro h0; rw [h0] at hl; cases hf : fout.getLast? with
+    | none => exact hne (List.getLast?_eq_none_iff.mp hf)
+    | some _ => rw [hf] at hl; cases hl
+  rw [← hl, List.getLast?_drop, if_neg (by intro hle; exact hd (List.drop_eq_nil_of_le hle))]
+
+/-- positioned events ending at the ledger's last are owned past the first bound -/
+theorem fevOwn_of_at {H : List Fev} {e : Fev} {lo : Nat} {cs : List (Nat × Fev)}
+    (h : fevAt (H ++ [e]) lo (cs ++ [(H.length, e)])) :
+    fevOwn ((H ++ [e]).drop lo) ((cs ++ [(H.length, e)]).map Prod.snd) := by
+  refine ⟨fevAt_sublist lo _ h, fun _ => ?_⟩
+  have hm := fevAt_sublist lo _ h
+  have hlo : lo ≤ H.length := by
+    have := hm.length_le
+    simp only [List.map_append, List.length_append, List.length_map, List.length_singleton,
+      List.length_drop] at this
+    omega
+  rw [List.getLast?_drop, if_neg (by simp; omega)]
+  simp
+
+/-- nonempty positioned events ending at the ledger's end are owned past the first bound -/
+theorem fevOwn_of_atEnd {H : List Fev} {lo : Nat} {cs : List (Nat × Fev)} (h : fevAt H lo cs)
+    (hend : fevAtEnd lo cs = H.length) (hne : cs ≠ []) : fevOwn (H.drop lo) (cs.map Prod.snd) := by
+  refine ⟨fevAt_sublist lo cs h, fun _ => ?_⟩
+  obtain ⟨cs', ⟨q, e⟩, rfl⟩ := List.eq_nil_or_concat cs |>.resolve_left hne
+  simp only [List.concat_eq_append] at *
+  have hq : fevAtEnd lo (cs' ++ [(q, e)]) = q + 1 := by unfold fevAtEnd; simp
+  rw [hq] at hend
+  have hat : H[q]? = some e := by
+    have hh := fevAt_sublist lo _ h
+    -- the last positioned event, read off the positions
+    have : ∀ (lo : Nat) (cs : List (Nat × Fev)), fevAt H lo (cs ++ [(q, e)]) → H[q]? = some e := by
+      intro lo cs
+      induction cs generalizing lo with
+      | nil => rintro ⟨-, hq, -⟩; exact hq
+      | cons c cs ih => obtain ⟨q', e'⟩ := c; rintro ⟨-, -, hc⟩; exact ih _ hc
+    exact this lo cs' h
+  have hlo : lo ≤ q := by
+    have := (fevAt_end lo _ h).2 (by simp)
+    rw [show fevAtEnd lo (cs' ++ [(q, e)]) = q + 1 by unfold fevAtEnd; simp] at this
+    omega
+  rw [List.getLast?_drop, if_neg (by omega), List.getLast?_eq_getElem?, show H.length - 1 = q by omega, hat]
+  simp
+
+/-- the ledger's last event alone is owned past a bound below the ledger's end -/
+theorem fevOwn_getLast {H : List Fev} {e : Fev} {lo : Nat} (hl : H.getLast? = some e) (hlo : lo < H.length) :
+    fevOwn (H.drop lo) [e] := by
+  have hne : H ≠ [] := by intro h; rw [h] at hl; cases hl
+  have hH : H = H.dropLast ++ [e] := by
+    rw [List.getLast?_eq_some_getLast hne, Option.some.injEq] at hl
+    rw [← hl, List.dropLast_concat_getLast]
+  rw [hH]
+  have := fevOwn_of_at (H := H.dropLast) (e := e) (lo := lo) (cs := [])
+    ⟨by rw [List.length_dropLast]; omega, by simp, trivial⟩
+  simpa using this
+
+/-- the cited type test's walk ends in the actor's type test -/
+theorem fevLookAt_last {H : List Fev} {a : BitVec 64} {rt s0 : Nat} {es : List (List (BitVec 8))}
+    {r : Nat × Option (Fnode × Nat)} (h : fevLookAt H a rt s0 es = some r) :
+    ∃ (i : Nat) (po : Option Nat), H.getLast? = some (.look a i po) := by
+  unfold fevLookAt at h
+  split at h
+  · rename_i a' i po hl
+    split at h
+    · rename_i hc; exact ⟨i, po, by rw [hl, hc.1]⟩
+    · cases h
+  · cases h
+
+/-- a single event at the ledger's last position is owned past a bound below it -/
+theorem fevOwn_last {H : List Fev} {e : Fev} {lo : Nat} (hlo : lo ≤ H.length) :
+    fevOwn ((H ++ [e]).drop lo) [e] := by
+  have h := fevOwn_of_at (H := H) (e := e) (lo := lo) (cs := []) ⟨hlo, by simp, trivial⟩
+  simpa using h
+
+/-- **A WRITE's OWN EVENTS AT THE CALLER's BYTES `bs`** (NI M3 FS-2f): its
+chunks, in order, each actor `a`'s parked write of `(i, γo)` landing exactly
+what it counted (`r = |cb|`), its bytes the caller's next ones; then either
+nothing (every byte written) or one out-of-resources verdict of `a` (the
+file at its size cap, `.max`, or the disk out of blocks, `.blocks`) -- the
+offsets AS RECORDED (`fevOffWf` makes them the fold's). -/
+def fevWriteOut (a : BitVec 64) (i : Nat) (γo : GName) : List (BitVec 8) → List Fev → Prop
+  | bs, [] => bs = []
+  | bs, .write a' i' γ' hd _ cb r :: rest =>
+    a' = a ∧ i' = i ∧ γ' = γo ∧ hd = false ∧ r = cb.length ∧ cb <+: bs ∧ fevWriteOut a i γo (bs.drop r) rest
+  | _, .full a' why :: rest => rest = [] ∧ a' = a ∧ (why = .max ∨ why = .blocks)
+  | _, _ => False
 
 end Xv6

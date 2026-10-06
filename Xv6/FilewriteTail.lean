@@ -254,7 +254,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     icases Hcs with ⟨%cs, #Hc, %hs⟩
     iexists cs; iframe Hc
     isplitl []
-    · ipureintro; intro _; exact hs
+    · ipureintro; exact ⟨fun _ => hs, by omega⟩
     · ileft; ipureintro; left; rw [ha0]; exact fwr_ofInt_ne_m1 A.n (by have := hA.hn.1; omega) hA.hn.2
 
 set_option maxHeartbeats 16000000 in
@@ -274,12 +274,12 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     -- (NI M3 private files FS-1, FS-2e) the loop's chunk receipts, in ledger
     -- order, and (NI M3 FS-0) the short chunk's reason past the last of them
     (∃ cs : List (Nat × Fev), fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n A.V.fsc 0 cs ∗
-      fwWhyAfter fscFs k.proc A.V.upt (k.regs 11#5) A.n (fwEnd A.V.fsc cs)) ∗
+      ⌜fwSum cs ≤ A.n.toNat⌝ ∗ fwWhyAfter fscFs k.proc A.V.upt (k.regs 11#5) A.n (fwEnd A.V.fsc cs)) ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Hbs, Hst, ⟨%cs, #Hcs, #Hwa⟩, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Hbs, Hst, ⟨%cs, #Hcs, %hle, #Hwa⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0xe2  bne s5,s4 : taken (i < n)
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0xe2#64) false 72#13 21#5 20#5 (by decide) bop.BNE)
@@ -339,7 +339,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
   · unfold fwRcptAt
     iexists cs; iframe Hcs
     isplitl []
-    · ipureintro; intro h; rw [ha0] at h; exact absurd rfl h
+    · ipureintro; exact ⟨fun h => by rw [ha0] at h; exact absurd rfl h, hle⟩
     · iright; iexact Hwa
 
 end

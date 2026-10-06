@@ -8069,6 +8069,83 @@ history). `xv6NiPhi` is unchanged (`NiAdequacy` drops the new conjunct).
 root's set). `tools/audit/baseline.json` unchanged (14 PASS, 0 `sorryAx`). `dead_allow.txt` unchanged (no new
 declaration is dead). `run_all.sh`: all 11 steps pass.
 
+### M3 private files FS-2f as landed (2026-10-06)
+
+On `lane/pfiles` (the owner's decision after FS-2d, "finish it: sublist form"). The round's own fs events ride
+the trace step; their shape is a function of the key's readings; the inode write's cited descriptor is the key's;
+the citation order is in `xv6NiPhi`; privacy is stated by incarnation. No kernel code change; the fourteen roots'
+statements, `SYSCALL`/`USERTRAP`/`USERRET`/`USER`, `SyscRows` and every `Uk*`/`User*` file byte-identical.
+
+**The carrier.** `UIota` gains a last field `fout : List Fev := []` (the round's own events; `UIota.led` erases it,
+`niBelow`/`niBelowQ`/`niIotaLbs` do not read it, `niJoin` keeps `H.fout`). `NiStep.round … wcwd (fout : List Fev) x e
+c`, OUTSIDE `input` (projection `NiStep.fsOut`), filled by `niStepOf` as `niFoutOf c` (the cited `ι.fout`).
+
+**What FS-3/4 reads.**
+
+* `UsysDet.usysFevOutOkR n a1 a2 wfd wpath wcwd wbytes ι fout` (the shape on the step's readings) and
+  `usysFevOutOk n W ι fout` (at a key: `a1`/`a2` its argument words, `wfd = usysFdAt W.fd a0`, `wpath = usysPath W`,
+  `wcwd = W.cwd`, `wbytes = uwriteOut W`), `usysFevOutOk_iff` (rfl). Per number: read -- at a non-negative request
+  `fout = [.read ι.act i γo false off d]` on `wfd = some (.open true wb (.inode i γo .parked))`, else `[]`; write -- at
+  a non-negative request `wfd = some (.open rb true (.inode i γo .parked))` and `NiFs.fevWriteOut ι.act i γo wbytes
+  fout` (chunks `write act i γo false off cb |cb|` with `cb` the next bytes of `wbytes`, then nothing -- every byte
+  written -- or one `full act .max/.blocks`; offsets as recorded), else `[]`; chdir -- `[.look ι.act i po]` at a
+  resolved walk, else `[]`; mkdir -- at a cited parent leg `[.arm ι.act i nd, .ent ι.act d nm (some i), .nlink ι.act d
+  nl]` with `wpath = some pl` and `nm` the last element of `pl`, else `[]`; open -- at a cited install
+  `fevOpenOut ι.act pl a1 ι.fev fout` (`cre ++ (if uomTrunc a1 && fevIsFile ι.fev.dropLast i then [.trunc] else []) ++
+  [install]`, `cre` = `[]` off O_CREATE, under O_CREATE the made child's `arm`/`ent nm`/`nlink` or the found node's
+  `hop nm`, `nm` the path's last element), else `[]`.
+* The law (`NiTrace.niRoundLaw`), each of read / inode write / chdir / mkdir (at `wpath.isSome`) / open: `∃ k ι, c =
+  some (k, ι) ∧ … ∧ niFsOut (gprsNum secc xg) (gprsA1 xg) (gprsA2 xg) wfd wpath wcwd wout fout ι` with `niFsOut … :=
+  fout = ι.fout ∧ usysFevOutOkR … ι fout ∧ fevOwn ι.fev fout` (`fevOwn H f := f <+ H ∧ (f ≠ [] → H.getLast? =
+  f.getLast?)`); the inode write's clause also `fevOffWf ι.fev` (the kernel reads it off the fs invariant,
+  `ftopInv_lb_wf`). X3's write half: the chunks are on `wfd`'s `(i, γo)` (the write branch of the shape).
+* `NiLedger.NiFsOrder q h F` (now with a second conjunct: the later round's `fout` is a sublist of its cited prefix
+  past the earlier round's cited length) is in `xv6NiPhi` (`∀ q, NiFsOrder q h F`; `xv6NiAdequacy`'s text
+  byte-identical). The window rides the key history: `niWinRow` carries `fevOwn (ι.fev.drop w.1) ι.fout`, from
+  `SyscallDefs.fsPast` (now `(fev = [] ∨ c < |fev|) ∧ fevOwn (fev.drop c) fout`).
+* `NiTrace.niFouts q h F := (utrace q h F).flatMap NiStep.fsOut`, `fevPrivateQ S q h F k := ∃ ps, ps.Pairwise (· <
+  ·) ∧ ps.map (fun p => (niHist F k).fev[p]?) = (niFouts q h F).map some ∧ ∀ p e, (niHist F k).fev[p]? = some e →
+  fevMoves S e → p ∈ ps`, and `fevOn_fouts : fevPrivateQ S q h F k → fevOn S (niHist F k).fev = fevOn S (niFouts q h
+  F)` (no `fevClosed` needed; `NiFs.fevOn_positions`).
+
+**Stated hypotheses / limits FS-3/4 inherits.** (1) `fout` holds the round's moves the receipts NAME: write chunks
+and verdict, create's arm and parent leg, O_TRUNC's trunc, the install; NOT ialloc's `claim`, mkdir's dot entries,
+close's iput `free` -- an `S` holding a created inode or its dots is moved by events outside `fout`, so `fevPrivateQ`
+is false there (a further receipt lane would add them). (2) The walk's hops are not in `fout` (observations). (3) The
+write's chunk SIZES are not a function of the key (the receipts do not record FW_MAX): two runs may chunk
+differently; their concatenated bytes and the fold agree. (4) mkdir's own events are lawful only at a key holding its
+path (`wpath.isSome`). (5) `fevPrivateQ` is at an era `k` the incarnation's citations cite.
+
+**Kernel-side threading (pure facts, statement texts byte-identical).** `SpecFilewrite.fwChunkOk` + `r ≤ |bs|`
+(`FilewriteFire`: both fires); `fwRcptAt` + `fwSum cs ≤ n.toNat` (`FilewriteTail.fwr_exit_fail`'s premise,
+`FilewriteLoop.fwr_tests` supplies it; `fwr_exit_ok`, `fwRcptAt_nil`); `SysOpenDefs.openLedOk` + `openOkRcpt`'s facts
+at the citation's own prefix (`SysOpenStores` producer). The arms: `SyscallArmsFd2` (`syscArmRead_ev`,
+`syscArmWriteIno_ev` -- now `|={⊤}=>` with `ftopInv`, citing the last chunk on success -- `fwChunksOrd_in`,
+`fwChunksOk_out`, `ubytesAt_key`, `usysFdAt_of_wrIno_pk`, `fwWhyAfter_split`), `SyscallArmsPath` (`creLeg_own`,
+`creOut_at`, `openOut_own`, the three cites), `UserretClosedRows` (`urc_evRow` + five clauses, `urc_niDetRow` builds
+`usysFsTie`), `UserretClosedRound` (`niWinRow` from `fsPast`).
+
+**Deviations.** (D1) The law's sublist is `fevOwn ι.fev fout` per step; the window form (`fout` past `w.1`) is not a
+step fact (the window rides the key history, not `NiEntry`/`NiStep`): it is in `niWinRow` and, across rounds, in
+`NiFsOrder`'s second conjunct, in `xv6NiPhi`. (D2) One `niFsOut` per fs member, not five texts; `usysFevOutOkR` is a
+conjunction over the number. (D3) `fout` holds no hops (chdir's own event is its type test). (D4) `wout` is REUSED
+for the inode write's bytes (`uwriteOut` at a writable inode descriptor = the key's image at `a1 .. a1 + cnt`);
+`NiStep.outInput` reads it only at a console reading, so `xv6NiOut`'s hypothesis keeps its meaning
+(`outClass_of_outInput` concludes the run's equality at a class console write only). (D5) All chunks satisfy `r =
+|cb|` (stronger than "except the last": the class's mapped source refutes the fault, `fwChunkOk` now carries `r ≤
+|bs|`). (D6) Outside the sanctioned set, pure facts threaded through def bodies (statement texts byte-identical):
+`SpecFilewrite` (`fwChunkOk`, `fwRcptAt`), `FilewriteFire`, `FilewriteTail`, `FilewriteLoop`, `SysOpenDefs`
+(`openLedOk`), `SysOpenStores` -- without them the write's failure path has no bound on its chunks and open's
+install receipt is not linked to its citation. (D7) `fevPrivateQ` takes the era `k` and the design's `∀ k` form
+list-wise (`ps.map … = (niFouts …).map some`, the `usysOutAt` pattern); `fevOn_fouts` needs no `fevClosed`.
+
+**Baselines.** `tools/tcb/expected.json` unchanged (`tcb.sh --update` writes no diff). `tools/audit/baseline.json`
+unchanged (14 roots PASS, 0 `sorryAx`). `dead_allow.txt`: − `ftopLed_lb_wf`, `ftopInv_lb_wf` (reached: the write
+arm); − `fsLedLb_prefix`, `fsEvRcpt_of_lb` (deleted, unused); + `fevOn_fouts` ("FS-4 reaches"); re-justified:
+`fevOffWf_prefix`, `creOkIn_mono` ("FS-3/4 reaches": FS-2f reads `fevOffWf` at the citation itself and create's
+events at the fixing prefix), `fevStatOf` (fstat, out of the class), `fevRun_prefix` ("FS-4 reaches"). `run_all.sh`:
+all 11 steps pass.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
