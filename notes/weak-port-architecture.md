@@ -259,3 +259,4 @@ No decision is needed for `TsoMem` (untouched), `VirtioProg` (Weak-local), `PtAd
 - **Q1 (2026-10-06): device programs modelled in the event tier.** WeakEvInst's PLIC/UART steps must follow the
   actual device programs (kept in the fabric state), not over-approximate them, so WeakEvCapstone needs no
   `evDevCover` premise.
+- **Q2 (2026-10-06): accepted** — WeakRvwmoSupply's `candFetchInert` premise, discharged by consumers.
