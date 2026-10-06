@@ -50,5 +50,6 @@ import Weak.AxGraph
 import Weak.WeakRvwmoHull
 import Weak.WeakRefuse
 import Weak.WeakGhost
+import Weak.WeakViolation
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
