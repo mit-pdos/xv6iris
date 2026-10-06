@@ -260,3 +260,6 @@ No decision is needed for `TsoMem` (untouched), `VirtioProg` (Weak-local), `PtAd
   actual device programs (kept in the fabric state), not over-approximate them, so WeakEvCapstone needs no
   `evDevCover` premise.
 - **Q2 (2026-10-06): accepted** — WeakRvwmoSupply's `candFetchInert` premise, discharged by consumers.
+- **Q3 (2026-10-06): option A** — Rocq's `mmode_config` (hw_config + minstret/clock invariants + hart cells)
+  is restated as the Lean SC tree's `mConf cpu dq c` plus the five owned clock cells (`clockCells cpu`), mask
+  ⊤; `MinstretInv` is NOT ported. All weak leaf files that take `mmode_config` use this interface.
