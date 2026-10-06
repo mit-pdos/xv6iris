@@ -147,5 +147,6 @@ import Weak.AxSched
 import Weak.WkCtxSurface
 import Weak.AxPtProt
 import Weak.WeakEvStarted
+import Weak.WeakStale
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
