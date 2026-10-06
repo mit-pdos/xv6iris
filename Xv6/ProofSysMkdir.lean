@@ -93,7 +93,7 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMkdirV1 A P2) (sysMkdirM1 A P2) ∗
     (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
-    creRcptAt fscFs (procAddr A.j) (bview pl.length (sysfilePfun pl)) ok made inum.toNat ∗
+    creRcptAt fscFs (procAddr A.j) (bview pl.length (sysfilePfun pl)) A.V.fsc ok made inum.toNat ∗
     (if ok then
       iprop(⌜R 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧
           creOkPure T_DIR (0#16) (0#16) made dn⌝ ∗

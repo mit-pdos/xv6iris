@@ -187,7 +187,7 @@ def sysWritePost (k : KCtx) (γ : FileNames) (γu : UartNames) (j : Nat) (pid : 
     fwWhyAt fscFs k.proc (sysFdSt v V.ofile sts) V.upt v1 (argZ v2) (R' 10#5) -∗
     -- (NI M3 private files FS-1, FS-2e) the chunks' ledger receipts (`fwRcptAt`),
     -- in ledger order, their bytes the caller's buffer at `v1` in the image
-    fwRcptAt fscFs k.proc (sysFdSt v V.ofile sts) V.upt (writerImg V.upt M) v1 (argZ v2) (R' 10#5) -∗
+    fwRcptAt fscFs k.proc (sysFdSt v V.ofile sts) V.upt (writerImg V.upt M) v1 V.fsc (argZ v2) (R' 10#5) -∗
     wpLoop cpu')
 
 end

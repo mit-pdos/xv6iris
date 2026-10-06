@@ -114,7 +114,7 @@ false`): the short parent forgotten, the escrow and the claims read off
 `isItable2`, hart-free; the arm's parked share `txPin t qt` comes back. -/
 theorem createFail_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) (γil γisl : GName) (kk : Nat) (qi s : Qp) (g : GName)
+    (γk : KmemNames) {fc : Nat} (γil γisl : GName) (kk : Nat) (qi s : Qp) (g : GName)
     (lo tl lo' tl' : Nat) (t : Nat) (qt : Qp)
     (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (n : Nat) (Sb : List Nat)
     (crb cru : Bool) (pidv : BitVec 32) (dqb dqs : DFrac)
@@ -130,7 +130,7 @@ theorem createFail_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc
     (hle : lo ≤ tl) (hle' : lo' ≤ tl') :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk fc ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗
     credFloor lo tl ∗ icHandle fscIc kk (.depTx s icfgDev inum g lo t qt) ∗
@@ -158,7 +158,7 @@ theorem createFail_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, #Hslk, Hsl, #Hfl, Hdep, Hoff, Hdev, Hinum, Hval, Hload,
     Hshot, Hfrz, #Hfl', Hkeep, Hru, Hsb, Hsi, Hpid, Hbs, Hop, HK⟩
   unfold createEnv
-  icases Henv with ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, -, -, #Hit2, #Hiti, -, #Hinv, #Hopen, #Hbmi⟩
+  icases Henv with ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, -, -, #Hit2, #Hiti, -, #Hinv, #Hopen, #Hbmi, -⟩
   ihave #Hescs := isItable2_escrows $$ Hit2
   ihave #Hesc := icEscrows_lookup fscIc fscFs fscIreg fscCov fscLogst kk hkk $$ Hescs
   ihave #Hcla := isItable2_claims $$ Hit2
@@ -408,7 +408,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     kctx cpu (((k.withSpie spie2 spp2).pushed 10).withRegs R2) ∗
     pcIs cpu (KA.«create» + 0x156#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc ∗
     createFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) ∗
     byteBuf (createBuf (k.regs 2#5)) (DFrac.own 1) (bview 14 nf) ∗
@@ -469,7 +469,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
   iintro Hk Hpc
   icases Hdep with ⟨%lodc, %tldc, %hledc, Hfldc, Hdep⟩
   icases Hkeep with ⟨%lo', %tl', %hle', Hfl', Hkeep⟩
-  iapply (createFail_iunlockput IUP Γ cpu _ j γl pd pav pu γkl γk γil γisl kd qd.half qd.half gd
+  iapply (createFail_iunlockput (fc := V.fsc) IUP Γ cpu _ j γl pd pav pu γkl γk γil γisl kd qd.half qd.half gd
       lodc tldc lo' tl' t Qp.quarter dind dnp bmp n5 Sb5 false false pid dqb dqs hS.hj ?hp ?hK
       ?hn ?ht hkd (fun h => absurd h (by decide)) (fun h => absurd h (by decide)) hS.hgeom
       hS.hbg hdcov hdlog hdib hS.hbel hipn5 hS.hpd ?ha0 hledc hle')
@@ -569,7 +569,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
     (hNdF : ty ≠ T_DIR → Nd (creC0 ty.toNat major.toNat minor.toNat)) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc ⊢
       createFailBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
         dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   have hK10 := create_slots_10 _ hS.hK
@@ -620,7 +620,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
       (FsStateLink.linkReps (iregDotDelta (createSetf dnc major minor 0#16).diType.toNat
         (createSetf dnc major minor 0#16).diNlink.toNat) (createIty ty (dind.toNat : Int)))
     from by rw [create_delta_eq ty major minor dnc 0#16 htyc rfl]) $$ Htoken
-  iapply (create_iupdate_unlink IU Γ cpu _ j γl pd pav pu γkl γk kslot cinum
+  iapply (create_iupdate_unlink (fc := V.fsc) IU Γ cpu _ j γl pd pav pu γkl γk kslot cinum
       (createSetf dnc major minor 0#16) (createSetf dnc major minor 1#16) bmc u0 Sb4 true
       (createIty ty (dind.toNat : Int)) pid dqs hS.hj ?gp ?gK ?gn ?gt (fun _ => hmem4) hS.hgeom
       hccov hclog hcnib (diTypeStable_eq _ _ rfl) (createSetf_type_nz _ _ _ _ hfresh.1)
@@ -671,7 +671,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   icases Hcdep with ⟨%locc, %tlcc, %hlecc, Hflcc, Hcdep⟩
   ihave Hcshot : ityShot g (createSetf dnc major minor 0#16).diType $$ [Hcshot]
   · rw [createSetf_type]; iexact Hcshot
-  iapply (createFail_iunlockput IUP Γ cpu _ j γl pd pav pu γkl γk gil gisl kslot q.half q.half g
+  iapply (createFail_iunlockput (fc := V.fsc) IUP Γ cpu _ j γl pd pav pu γkl γk gil gisl kslot q.half q.half g
       locc tlcc lo tl0 t Qp.quarter cinum (createSetf dnc major minor 0#16) bmc (u0 + 1)
       (IBLOCK cinum icfgIst :: Sb4) (decide (fscBmapstart ∈ IBLOCK cinum icfgIst :: Sb4)) true
       pid dqb dqs hS.hj ?hp ?hK ?hn ?ht hks (fun h => of_decide_eq_true h)

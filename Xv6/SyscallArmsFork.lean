@@ -156,7 +156,7 @@ theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
   imodintro
   iapply syscEvOut_cite V M sts sts' V' M' cs (cs ∪ {γc}) gn ke
     { UIota.boot with pev := h, zev := hz ++ [.ZFork act i rv γc], act := act }
-    ?_ $$ Ha Hl
+    ?_ (fsPast_nil _ _ rfl) $$ Ha Hl
   have hok : forkOk { UIota.boot with pev := h, zev := hz ++ [.ZFork act i rv γc], act := act } := by
     rintro ⟨k0, hk0⟩
     exact absurd hk0 (by simp [UIota.boot])
@@ -201,7 +201,7 @@ theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : Li
   imod niIotaLbs_sev (GF := GF) (niNamesHere (GF := GF)) (hs ++ [.SFull act k0]) act $$ Hs' with #Hl
   imodintro
   iapply syscEvOut_cite V M sts sts' V' M' cs cs gn ke { UIota.boot with sev := hs ++ [.SFull act k0], act := act }
-    ?_ $$ Ha Hl
+    ?_ (fsPast_nil _ _ rfl) $$ Ha Hl
   have hfull : UIota.sFull { UIota.boot with sev := hs ++ [.SFull act k0], act := act } :=
     ⟨k0, by show (hs ++ [Sev.SFull act k0]).getLast? = some (.SFull act k0); simp⟩
   have hnok : ¬ forkOk { UIota.boot with sev := hs ++ [.SFull act k0], act := act } :=

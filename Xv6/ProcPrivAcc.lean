@@ -497,7 +497,7 @@ theorem procPrivFd_noctxGen [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNam
       procPrivNoctxAt curCtx pa pid V M ∗ procGenAt curCtx pa pid V.gen ∗
       (∀ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
         ⌜V'.ofile = V.ofile ∧ V'.fdg = V.fdg ∧ V'.cwd = V.cwd ∧ V'.cwi = V.cwi ∧
-          V'.root = V.root ∧ V'.rti = V.rti⌝ -∗
+          V'.root = V.root ∧ V'.rti = V.rti ∧ V'.fsc = V.fsc⌝ -∗
         procPrivNoctxAt curCtx pa pid V' M' -∗ procGenAt curCtx pa pid V'.gen -∗
         procPrivFd γ pa pid V' M') := by
   have hcells := procOfilesOwe_cells_acc (GF := GF) γ V.fdg pa V.ofile []
@@ -518,21 +518,23 @@ theorem procPrivFd_noctxGen [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNam
   simp only at h
   subst h
   unfold procPrivFd procPrivCoreNoctxAt procOfiles
-  iintro ⟨⟨Hb, Hc, Hr, Hg, Hcr⟩, Ho⟩
+  iintro ⟨⟨Hb, Hc, Hr, Hg, Hcr, #Hfc⟩, Ho⟩
   icases hcells $$ Ho with ⟨Hcells, Hw⟩
   iframe Hg
   isplitl [Hb Hcells]
   · iapply hs1.2
     iframe Hb Hcells
   iintro %V' %M' %hV Hn Hg
-  obtain ⟨h1, h2, h3, h4, h5, h6⟩ := hV
+  obtain ⟨h1, h2, h3, h4, h5, h6, h8⟩ := hV
+  ihave #Hfc : fsCurOk (GF := GF) V'.fsc $$ []
+  · rw [h8]; iexact Hfc
   icases (hs2 V' M').1 $$ Hn with ⟨Hb, Hcells⟩
   ihave Hcells := hoc V' h1 $$ Hcells
   ihave Ho := Hw $$ Hcells
   ihave Ho := hback V' h1 h2 $$ Ho
   ihave Hc := hcw V' h3 h4 $$ Hc
   ihave Hr := hrt V' h5 h6 $$ Hr
-  iframe Hb Hc Hr Hg Ho Hcr
+  iframe Hb Hc Hr Hg Ho Hcr Hfc
 
 /-- **D31's accessor** (wave 8, the dispatch's entry-shape adapter for the
 arms whose bodies run over the cells form -- sys_wait; getpid and sbrk
@@ -547,17 +549,17 @@ theorem procPrivFd_noctx [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNames)
       procPrivNoctxAt curCtx pa pid V M ∗
       (∀ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
         ⌜V'.ofile = V.ofile ∧ V'.fdg = V.fdg ∧ V'.cwd = V.cwd ∧ V'.cwi = V.cwi ∧
-          V'.root = V.root ∧ V'.rti = V.rti ∧ V'.gen = V.gen⌝ -∗
+          V'.root = V.root ∧ V'.rti = V.rti ∧ V'.gen = V.gen ∧ V'.fsc = V.fsc⌝ -∗
         procPrivNoctxAt curCtx pa pid V' M' -∗ procPrivFd γ pa pid V' M') := by
   iintro H
   icases procPrivFd_noctxGen h γ pa pid V M $$ H with ⟨Hn, Hg, Hw⟩
   iframe Hn
   iintro %V' %M' %hV Hn
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := hV
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := hV
   ihave Hg := (show procGenAt (GF := GF) curCtx pa pid V.gen ⊢ procGenAt curCtx pa pid V'.gen
       from by rw [h7]) $$ Hg
   iapply Hw $$ %V' %M' [] Hn Hg
-  ipureintro; exact ⟨h1, h2, h3, h4, h5, h6⟩
+  ipureintro; exact ⟨h1, h2, h3, h4, h5, h6, h8⟩
 
 end
 

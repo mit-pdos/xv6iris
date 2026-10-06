@@ -171,8 +171,10 @@ resumed key and the chain) -/
 RESUMED at: the cause, the resumed key `Wr`, the trapped key `W`, the key
 the round left `W'` (design "M3 ustep design" (c): `sc × Wr × W × W'`;
 deviation 2: Lean's product nests to the right, `e.1`, `e.2.1`, `e.2.2.1`,
-`e.2.2.2`). -/
-abbrev Uround : Type := BitVec 64 × Uvis × Uvis × Uvis
+`e.2.2.2.1`); (NI M3 private files FS-2e-b) and THE ROUND'S FS WINDOW `w`
+(`e.2.2.2.2`): the caller's fs cursor before the round and after it (the
+cited fs prefix's length at a round citing a nonempty one, else unmoved). -/
+abbrev Uround : Type := BitVec 64 × Uvis × Uvis × Uvis × (Nat × Nat)
 
 /-- **Rocq `round_ok_keys`**: the round relation at the two keys, spelled
 exactly as `UexecApply.uexecRet_roundSlot_of`'s hypothesis is at
@@ -183,14 +185,14 @@ def roundOkKeys (sc : BitVec 64) (W W' : Uvis) : Prop :=
 
 /-- **Rocq `uhist_wf`**: every recorded round is a lawful one (at its
 trapped and left keys). -/
-def uhistWf (h : List Uround) : Prop := ∀ e ∈ h, roundOkKeys e.1 e.2.2.1 e.2.2.2
+def uhistWf (h : List Uround) : Prop := ∀ e ∈ h, roundOkKeys e.1 e.2.2.1 e.2.2.2.1
 
 /-- Rocq `uhist_wf_nil`. -/
 theorem uhistWf_nil : uhistWf [] := fun _ he => absurd he List.not_mem_nil
 
 /-- **Rocq `uhist_wf_snoc`**. -/
-theorem uhistWf_snoc {h : List Uround} {sc : BitVec 64} {Wr W W' : Uvis} (hh : uhistWf h)
-    (hr : roundOkKeys sc W W') : uhistWf (h ++ [(sc, Wr, W, W')]) := by
+theorem uhistWf_snoc {h : List Uround} {sc : BitVec 64} {Wr W W' : Uvis} {w : Nat × Nat} (hh : uhistWf h)
+    (hr : roundOkKeys sc W W') : uhistWf (h ++ [(sc, Wr, W, W', w)]) := by
   intro e he
   rcases List.mem_append.mp he with he | he
   · exact hh e he
@@ -210,7 +212,7 @@ theorem roundOkKeys_of_record (sc : BitVec 64) (W : Uvis) (V : ProcPriv) (M : Na
 key, or the start key. -/
 def uhistTail (W0 : Uvis) : List Uround → Uvis
   | [] => W0
-  | e :: h => uhistTail e.2.2.2 h
+  | e :: h => uhistTail e.2.2.2.1 h
 
 /-- **THE CHAIN INVARIANT** (NI M3 U-2b, design (c), ruling U-R4): the first
 round resumed the start key `W0`, every later one the previous round's left
@@ -220,28 +222,85 @@ trapped key is where the pure user run from its resumed key may trap
 ecall; anything after a `stuck` point). -/
 def uhistChain (W0 : Uvis) : List Uround → Prop
   | [] => True
-  | e :: h => e.2.1 = W0 ∧ Ustep.ulands e.2.1 e.1 e.2.2.1 ∧ uhistChain e.2.2.2 h
+  | e :: h => e.2.1 = W0 ∧ Ustep.ulands e.2.1 e.1 e.2.2.1 ∧ uhistChain e.2.2.2.1 h
 
 theorem uhistTail_snoc (W0 : Uvis) (h : List Uround) (e : Uround) :
-    uhistTail W0 (h ++ [e]) = e.2.2.2 := by
+    uhistTail W0 (h ++ [e]) = e.2.2.2.1 := by
   induction h generalizing W0 with
   | nil => rfl
-  | cons a h ih => exact ih a.2.2.2
+  | cons a h ih => exact ih a.2.2.2.1
 
 /-- **The chain grows by one round**: resumed at the tail, landed by `ulands`. -/
-theorem uhistChain_snoc {W0 : Uvis} {h : List Uround} {sc : BitVec 64} {W W' : Uvis}
+theorem uhistChain_snoc {W0 : Uvis} {h : List Uround} {sc : BitVec 64} {W W' : Uvis} {w : Nat × Nat}
     (hc : uhistChain W0 h) (hl : Ustep.ulands (uhistTail W0 h) sc W) :
-    uhistChain W0 (h ++ [(sc, uhistTail W0 h, W, W')]) := by
+    uhistChain W0 (h ++ [(sc, uhistTail W0 h, W, W', w)]) := by
   induction h generalizing W0 with
   | nil => exact ⟨rfl, hl, trivial⟩
   | cons a h ih => exact ⟨hc.1, hc.2.1, ih hc.2.2 hl⟩
 
 /-- The last round of a chain: resumed at the previous tail, landed by `ulands`. -/
-theorem uhistChain_last {W0 : Uvis} {h : List Uround} {sc : BitVec 64} {Wr W W' : Uvis}
-    (hc : uhistChain W0 (h ++ [(sc, Wr, W, W')])) : Wr = uhistTail W0 h ∧ Ustep.ulands Wr sc W := by
+theorem uhistChain_last {W0 : Uvis} {h : List Uround} {sc : BitVec 64} {Wr W W' : Uvis} {w : Nat × Nat}
+    (hc : uhistChain W0 (h ++ [(sc, Wr, W, W', w)])) : Wr = uhistTail W0 h ∧ Ustep.ulands Wr sc W := by
   induction h generalizing W0 with
   | nil => exact ⟨hc.1, hc.2.1⟩
   | cons a h ih => exact ih hc.2.2
+
+/-- (NI M3 private files FS-2e-b) **THE FS WINDOWS CHAIN**: from the cursor
+`c`, each round's window starts where the previous one ended (`c` first)
+and does not move backwards. -/
+def uhistWinFrom (c : Nat) : List Uround → Prop
+  | [] => True
+  | e :: h => e.2.2.2.2.1 = c ∧ c ≤ e.2.2.2.2.2 ∧ uhistWinFrom e.2.2.2.2.2 h
+
+/-- the cursor after the history: the last window's end, or the start -/
+def uhistEnd (c : Nat) : List Uround → Nat
+  | [] => c
+  | e :: h => uhistEnd e.2.2.2.2.2 h
+
+/-- the windows chain of a history, from some start -/
+def uhistWinOk (h : List Uround) : Prop := ∃ c, uhistWinFrom c h
+
+theorem uhistWinFrom_snoc {c : Nat} {h : List Uround} (e : Uround) (hw : uhistWinFrom c h)
+    (h1 : e.2.2.2.2.1 = uhistEnd c h) (h2 : uhistEnd c h ≤ e.2.2.2.2.2) :
+    uhistWinFrom c (h ++ [e]) ∧ uhistEnd c (h ++ [e]) = e.2.2.2.2.2 := by
+  induction h generalizing c with
+  | nil => exact ⟨⟨h1, h2, trivial⟩, rfl⟩
+  | cons a h ih =>
+    obtain ⟨ha1, ha2, hrest⟩ := hw
+    obtain ⟨ih1, ih2⟩ := ih hrest h1 h2
+    exact ⟨⟨ha1, ha2, ih1⟩, ih2⟩
+
+/-- **THE WINDOWS ORDER**: in a chained history an earlier round's window
+ends at or before a later round's starts -/
+theorem uhistWinFrom_order : ∀ {c : Nat} {h : List Uround} (_ : uhistWinFrom c h) {n n' : Nat} {e e' : Uround},
+    h[n]? = some e → h[n']? = some e' → n < n' → e.2.2.2.2.2 ≤ e'.2.2.2.2.1
+  | _, [], _, _, _, _, _, he, _, _ => by simp at he
+  | c, a :: h, hw, n, n', e, e', he, he', hlt => by
+    obtain ⟨-, -, hrest⟩ := hw
+    -- every window of the tail starts at or after the head's end
+    have hge : ∀ {c' : Nat} {t : List Uround}, uhistWinFrom c' t → ∀ {m : Nat} {x : Uround},
+        t[m]? = some x → c' ≤ x.2.2.2.2.1 := by
+      intro c' t ht m x hx
+      induction t generalizing c' m with
+      | nil => simp at hx
+      | cons b t ih =>
+        obtain ⟨hb1, hb2, ht'⟩ := ht
+        cases m with
+        | zero => simp at hx; subst hx; omega
+        | succ m => simp at hx; exact Nat.le_trans hb2 (ih ht' hx)
+    cases n with
+    | zero =>
+      cases n' with
+      | zero => omega
+      | succ n' =>
+        simp at he he'; subst he
+        exact hge hrest he'
+    | succ n =>
+      cases n' with
+      | zero => omega
+      | succ n' =>
+        simp at he he'
+        exact uhistWinFrom_order hrest he he' (by omega)
 
 /-- A placeholder key (the start key of a chain no filing cites). -/
 instance : Inhabited Uvis := ⟨⟨[], fun _ => none, fun _ => none, 0, [], 0, 0, ∅, 0, false, 0⟩⟩
@@ -325,9 +384,11 @@ theorem uhistLb_agree (γ : GName) (W0 W0' : Uvis) (h h' : List Uround) :
 carrier while the process runs (`UserretClosedDefs.urcRut`) -- the
 authority, every round lawful, the chain from the start key, and its tail
 the resumed key `Wr` (the next round's `Wr`, exactly). -/
-def uhistAt (Wr : Uvis) : IProp GF :=
+def uhistAt (Wr : Uvis) (c : Nat) : IProp GF :=
   iprop(∃ (γ : GName) (W0 : Uvis) (h : List Uround), uhistAuth γ W0 h ∗
-    ⌜uhistWf h ∧ uhistChain W0 h ∧ uhistTail W0 h = Wr⌝)
+    ⌜uhistWf h ∧ uhistChain W0 h ∧ uhistTail W0 h = Wr ∧
+      -- (NI M3 private files FS-2e-b) the windows chain, ending at the cursor `c`
+      ∃ c0, uhistWinFrom c0 h ∧ uhistEnd c0 h = c⌝)
 
 end Uhist
 

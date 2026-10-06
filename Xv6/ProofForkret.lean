@@ -147,7 +147,7 @@ theorem fkr_boot [X : CurCtx] (PR : PREPARE_RETURN) (FS : FSINIT) (KX : KEXEC) (
   ihave #Hpe := (show parkGlobals (GF := GF) Γ N.w N.ft N.f N.ip ⊢ panicEnv from by
       unfold parkGlobals; iintro ⟨-, H, -⟩; iexact H) $$ Hglob
   unfold parkBootBlock UtNames.pj
-  icases Hblk with ⟨Hbare, Hofs, Hcwr, Hrtr, Hfb, Hkq, #Hmp, Hgh, Hxs, Hcr⟩
+  icases Hblk with ⟨Hbare, Hofs, Hcwr, Hrtr, Hfb, Hkq, #Hmp, Hgh, Hxs, Hcr, #Hfc⟩
   icases firstBoot_open (hlc := hlc) $$ Hfb with ⟨Hf1, #Hbp, Hka, Hfsi⟩
   unfold procPrivBareAt
   icases Hbare with ⟨%hb, Hpid, Hfld, Hpt, Htfp, %hlz, Hev⟩
@@ -167,7 +167,7 @@ theorem fkr_boot [X : CurCtx] (PR : PREPARE_RETURN) (FS : FSINIT) (KX : KEXEC) (
   ihave #Htok := firstTok_of_done (hlc := hlc) $$ Hdone
   ihave Hpv : procPrivFd (GF := GF) N.f (procAddr N.j) N.pid V M $$ [Hpid Hfld Hpt Htfp Hofs Hcwr Hrtr Hkq Hgh Hxs Hev Hcr]
   · unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procGenAt
-    iframe Hpid Hfld Hpt Htfp Hofs Hcwr Hrtr Hgh Hxs Hev Hcr
+    iframe Hpid Hfld Hpt Htfp Hofs Hcwr Hrtr Hgh Hxs Hev Hcr Hfc
     isplitl []; · ipureintro; exact ⟨hb, hlz⟩
     isplitl []; · iexact Htok
     iexists (fun _ => iprop(True))

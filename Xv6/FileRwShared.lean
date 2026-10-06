@@ -172,7 +172,7 @@ theorem filerw_core_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     procPrivCoreNoctxAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢
       procPrivExt pa pid V P M ∗
         (cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ procGenAt curCtx pa pid V.gen ∗
-          pageCredit procSpare) := by
+          pageCredit procSpare ∗ fsCurOk V.fsc) := by
   obtain ⟨ξ, t⟩ := X
   simp only at h
   subst h

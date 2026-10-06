@@ -72,7 +72,7 @@ def sysMkdirCreateK (k' : KCtx) (se : Bool) (pj : BitVec 64) (plen : Nat) (pfun 
     irefSlots ns' -∗
     ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ u' ≤ u ∧ (ok = true → iputUnits ≤ u')⌝ -∗
     logOpS icfgLog u' Sb' -∗
-    creRcptAt fscFs pj (bview plen pfun) ok made inum.toNat -∗
+    creRcptAt fscFs pj (bview plen pfun) V.fsc ok made inum.toNat -∗
     (if ok then
       iprop(⌜R' 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧
           creOkPure ty major minor made dn⌝ ∗

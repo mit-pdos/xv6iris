@@ -97,12 +97,14 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     fileRef γ fk q (.open true wb (.inode i γo om)) ∗ procPrivExt (procAddr j) pid V V.upt M ∗
     genHalvesPriv (procAddr j) pid V.gen ∗ bslot ∗ P ∗
     areadInOm (hlc := hlc) om (fsGammaL fscFs) appE i γo F ∗
+    -- (NI M3 private files FS-2e-b) the caller's fs cursor's lower bound
+    fsCurOk V.fsc ∗
     frdK (hlc := hlc) k γ fk q (.open true wb (.inode i γo om)) j pid V M n F Rd Rin Rp Rpe P
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + readiSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by unfold readiSlots bmapSlots ballocSlots breadSlots panicSlots at hK'; omega
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hpe, #Hfs, #Hkl, #Hav, #Hrow, Href, Hpriv, Hgen, Hbs, HP, Hcm,
-    HΦ⟩
+    #Hfc, HΦ⟩
   -- THE REFERENCE, OPENED, AND THE CARVE
   icases filerw_ref_open γ fk q _ $$ Href with ⟨%C, %-, Htok, Hfields, Hpay⟩
   icases frd_pay_carve γ fk q C true wb i γo om $$ Hpay with ⟨%ik, %inum, %s, %g, %ty,
@@ -153,9 +155,9 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
   iapply wpLoop_fupd
   icases kctx_token_acc _ _ $$ Hk with ⟨Hrun, Hkb⟩
   imod frd_post_ghost cpu ik fk q γb γo C m T0 Tr s g lo inum dn bm data v dd F wb om hip hik hq hok hloc
-    hwf hcap k.proc $$ [Hrun Hcm Htop Hgv Hcell Hout Hmeta Hmap Hblk]
+    hwf hcap k.proc V.fsc $$ [Hrun Hcm Htop Hgv Hcell Hout Hmeta Hmap Hblk]
     with ⟨Hrun, Hoffd, Hrows, Hheld, #Hrdrc, ⟨%av, %hrow, Hrecv⟩⟩
-  · iframe Hrun Hcm Htop Hgv Hcell Hout Hmeta Hmap Hblk
+  · iframe Hfc Hrun Hcm Htop Hgv Hcell Hout Hmeta Hmap Hblk
     iframe #
   ihave Hk := Hkb $$ Hrun
   imodintro

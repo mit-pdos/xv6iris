@@ -752,7 +752,7 @@ theorem syscall_ret_fd_boot (PT : SchedNames → IProp GF) (Γ : SchedNames)
   imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) (procAddr j) with #Hl
   imodintro
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts' (syscStore V1 (R 10#5)) M1 cs cs gn ke
-    _ hrow $$ Hanc Hl
+    _ hrow (fsPast_nil _ _ rfl) $$ Hanc Hl
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie spp R γ j pid V M sts gn cs ip f V1 M1 sts' cs
     hj hproc hK htier hpins hs2 hrows n hn h1 h3 h7)
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hso Hnext Hev

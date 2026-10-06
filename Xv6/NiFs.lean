@@ -640,6 +640,43 @@ theorem fevWalkIs_hop {H h : List Fev} (hp : H <+: h) {rt s0 : Nat} {po : Option
     simp only [Option.bind_some, List.take_left' rfl]
     exact hc
 
+/-- (NI M3 private files FS-2e-b) one more lookup's chain: the walk's, then
+the new position -/
+theorem fevChain_hop {h : List Fev} {po : Option Nat} (hpo : ∀ q, po = some q → q < h.length)
+    (a : BitVec 64) (d : Nat) (nm : List (BitVec 8)) :
+    fevChain (h ++ [.hop a d nm po]) (some h.length) =
+      fevChain (h ++ [.hop a d nm po]) po ++ [(h.length, nm)] := by
+  show fevChainAt _ _ = _
+  rw [fevChainAt_eq]
+  simp only [List.getElem?_append_right (Nat.le_refl _), Nat.sub_self, List.getElem?_cons_zero]
+  cases po with
+  | none => rfl
+  | some q => simp only [fevChain, if_pos (hpo q rfl)]
+
+/-- (NI M3 private files FS-2e-b) **THE WALK PAST A CURSOR**: every lookup the
+walk followed (from `po`) sits at a position at least `lo` -/
+def fevWalkPast (lo : Nat) (H : List Fev) (po : Option Nat) : Prop := ∀ x ∈ fevChain H po, lo ≤ x.1
+
+theorem fevWalkPast_none (lo : Nat) (H : List Fev) : fevWalkPast lo H none := by
+  intro x hx; simp [fevChain] at hx
+
+theorem fevWalkPast_mono {lo : Nat} {H H' : List Fev} (hp : H <+: H') {po : Option Nat}
+    (hpo : ∀ q, po = some q → q < H.length) (h : fevWalkPast lo H po) : fevWalkPast lo H' po := by
+  intro x hx
+  rw [fevChain_prefix hp po hpo] at hx
+  exact h x hx
+
+theorem fevWalkPast_hop {lo : Nat} {H h : List Fev} (hp : H <+: h) {po : Option Nat}
+    (hpo : ∀ q, po = some q → q < H.length) (hw : fevWalkPast lo H po) (hlo : lo ≤ h.length)
+    (a : BitVec 64) (d : Nat) (nm : List (BitVec 8)) :
+    fevWalkPast lo (h ++ [.hop a d nm po]) (some h.length) := by
+  have hpo' : ∀ q, po = some q → q < h.length := fun q hq => Nat.lt_of_lt_of_le (hpo q hq) hp.length_le
+  intro x hx
+  rw [fevChain_hop hpo' a d nm, List.mem_append] at hx
+  rcases hx with hx | hx
+  · exact fevWalkPast_mono (hp.trans (List.prefix_append _ _)) hpo hw x hx
+  · simp at hx; rw [hx]; exact hlo
+
 /-- **THE TYPE TEST CITED**: the walk so far, observed at `i` -/
 theorem fevLookAt_snoc {H h : List Fev} (hp : H <+: h) {rt s0 : Nat} {po : Option Nat}
     {es : List (List (BitVec 8))} {i : Nat} (hw : fevWalkIs H rt s0 po es i) (a : BitVec 64) :

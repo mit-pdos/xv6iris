@@ -233,7 +233,8 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     ihave #Hlb' := (show zombLedLb (GF := GF) h ⊢ ((niNamesHere (GF := GF)).getD 2 0) ↪◯ML h from .rfl) $$ Hlb
     imod niIotaLbs_zev (GF := GF) (niNamesHere (GF := GF)) h act $$ Hlb' with #Hl
     imodintro
-    iapply syscEvOut_cite V M sts sts' V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_ $$ Ha Hl
+    iapply syscEvOut_cite V M sts sts' V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_
+      (fsPast_nil _ _ rfl) $$ Ha Hl
     have h0 := hnull hnl
     refine ⟨fun h' => absurd h' h14, fun _ hcl => ?_, fun h' => absurd h' h1,
       fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide),
@@ -257,7 +258,7 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     imod niIotaLbs_zev (GF := GF) (niNamesHere (GF := GF)) h act $$ Hlb' with #Hl
     imodintro
     iapply syscEvOut_cite V M sts sts' V' M' cs cs' gn ke { UIota.boot with zev := h, act := act }
-      (hnone h hz hd' hf.1 hf.2) $$ Ha Hl
+      (hnone h hz hd' hf.1 hf.2) (fsPast_nil _ _ rfl) $$ Ha Hl
   · -- the kill shot (F5), nothing moved
     imodintro
     unfold syscEvOut
@@ -273,7 +274,8 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     imodintro
     obtain ⟨hzl, hcs, -, hr2, hok⟩ := hz
     have hrv : rv ≠ -1#32 := fun e => by subst e; exact absurd hr2 (by decide)
-    iapply syscEvOut_cite V M sts sts' V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_ $$ Ha Hl
+    iapply syscEvOut_cite V M sts sts' V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_
+      (fsPast_nil _ _ rfl) $$ Ha Hl
     refine ⟨fun h' => absurd h' h14, fun _ hcl => ?_, fun h' => absurd h' h1,
       fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide),
       fun h' => absurd (hw.symm.trans h') (by decide), fun h' => absurd (hw.symm.trans h') (by decide),

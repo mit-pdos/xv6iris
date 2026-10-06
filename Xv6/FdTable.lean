@@ -639,6 +639,50 @@ theorem procPrivNoctxAt_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V
     · ipureintro; exact h
     · ipureintro; exact hlz
 
+section FsCur
+variable {GF : BundledGFunctors} [Xv6G GF] [Fscfg]
+
+/-- (NI M3 private files FS-2e-b) **THE FS CURSOR'S LOWER BOUND**: the era's
+fs-event ledger is at least `c` long -- a lower bound (at the ledger's own
+name, `fscFs.fev`; `FsLedger.fsLedLb`) of length at least `c`, or `c = 0`
+(nothing to bound: a fresh incarnation's cursor, before its first fs
+round). -/
+def fsCurOk (c : Nat) : IProp GF :=
+  iprop(⌜c = 0⌝ ∨ ∃ L : List Fev, (fscFs.fev ↪◯ML L) ∗ ⌜c ≤ L.length⌝)
+
+instance fsCurOk_persistent (c : Nat) : Persistent (fsCurOk (GF := GF) c) := by
+  unfold fsCurOk; infer_instance
+
+/-- (FS-2e-b) **THE CURSOR'S BOUND, AS A LOWER BOUND OF THE LEDGER**: a lower
+bound at least `c` long (the empty one minted at a cursor of 0) -/
+theorem fsCurOk_lb [OffboxG GF] (c : Nat) :
+    fsCurOk (GF := GF) c ⊢ |==> ∃ L : List Fev, ⌜c ≤ L.length⌝ ∗ fsLedLb fscFs L := by
+  unfold fsCurOk
+  iintro (%h0 | ⟨%L, #HL, %hL⟩)
+  · subst h0
+    imod fsLedLb_nil fscFs with #H0
+    imodintro
+    iexists []
+    iframe H0
+    ipureintro; exact Nat.le_refl _
+  · imodintro
+    iexists L
+    unfold fsLedLb
+    iframe HL
+    ipureintro; exact hL
+
+/-- (FS-2e-b) a lower bound at least `c` long bounds the cursor `c` -/
+theorem fsCurOk_of_lb [OffboxG GF] (c : Nat) (L : List Fev) (hL : c ≤ L.length) :
+    fsLedLb (GF := GF) fscFs L ⊢ fsCurOk c := by
+  unfold fsCurOk fsLedLb
+  iintro #HL
+  iright
+  iexists L
+  iframe HL
+  ipureintro; exact hL
+
+end FsCur
+
 section Core
 variable [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg]
 
@@ -677,7 +721,9 @@ def procPrivCoreNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Pro
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
   @rootRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
-  procGenAt ξ pa pid V.gen ∗ pageCredit procSpare
+  procGenAt ξ pa pid V.gen ∗ pageCredit procSpare ∗
+  -- (NI M3 private files FS-2e-b) the fs cursor's lower bound, LAST
+  fsCurOk V.fsc
 
 /-- **The core at a given SPARE** (NI M3 quotas Q-1): `procPrivCoreNoctxAt`
 holds the live process's spare credits (`procSpare`, LAST, after the
@@ -688,7 +734,15 @@ def procPrivCoreResAt (r : Nat) (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) 
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
   @rootRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
-  procGenAt ξ pa pid V.gen ∗ pageCredit r
+  procGenAt ξ pa pid V.gen ∗ pageCredit r ∗ fsCurOk V.fsc
+
+/-- (NI M3 private files FS-2e-b) the core's fs cursor bound, copied out -/
+theorem procPrivCoreNoctxAt_fsCur (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊢ fsCurOk V.fsc ∗ procPrivCoreNoctxAt ξ pa pid V M := by
+  unfold procPrivCoreNoctxAt
+  iintro ⟨Hb, Hc, Hr, Hg, Hcr, #Hfc⟩
+  iframe Hb Hc Hr Hg Hcr Hfc
 
 theorem procPrivCoreNoctxAt_res (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
@@ -702,7 +756,7 @@ theorem procPrivCoreNoctxAt_bare (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32)
     procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊣⊢
       procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
         @rootRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
-        procGenAt ξ pa pid V.gen ∗ pageCredit procSpare := .rfl
+        procGenAt ξ pa pid V.gen ∗ pageCredit procSpare ∗ fsCurOk V.fsc := .rfl
 
 /-- **The pid cell and the event counter, lent out of the core around a
 callee that takes the lend** (permit sweep L1b, Rocq
@@ -742,6 +796,15 @@ def procPrivFd (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfiles γ V.fdg pa V.ofile
 
+/-- (NI M3 private files FS-2e-b) the block's fs cursor bound, copied out -/
+theorem procPrivFd_fsCur (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢ fsCurOk V.fsc ∗ procPrivFd γ pa pid V M := by
+  unfold procPrivFd
+  iintro ⟨Hc, Ho⟩
+  icases procPrivCoreNoctxAt_fsCur _ _ _ _ _ $$ Hc with ⟨#Hfc, Hc⟩
+  iframe Hc Ho Hfc
+
 /-- **The private block at a given spare** (NI M3 quotas Q-1): what `kexec`
 takes and gives back (`SpecKexec`, at `ptW`: `sys_exec` holds the argument
 pages' share). -/
@@ -760,11 +823,11 @@ theorem procPrivFdRes_split (a b : Nat) (γ : FileNames) (pa : BitVec 64) (pid :
     procPrivFdRes (GF := GF) (a + b) γ pa pid V M ⊣⊢ procPrivFdRes a γ pa pid V M ∗ pageCredit b := by
   unfold procPrivFdRes procPrivCoreResAt
   constructor
-  · iintro ⟨⟨Hb, Hc, Hr, Hg, Hcr⟩, Ho⟩
+  · iintro ⟨⟨Hb, Hc, Hr, Hg, Hcr, #Hfc⟩, Ho⟩
     icases pageCredit_split a b $$ Hcr with ⟨Ha, Hb'⟩
-    iframe
-  · iintro ⟨⟨⟨Hb, Hc, Hr, Hg, Hcr⟩, Ho⟩, Hb'⟩
-    iframe
+    iframe Hb Hc Hr Hg Ha Hfc Ho Hb'
+  · iintro ⟨⟨⟨Hb, Hc, Hr, Hg, Hcr, #Hfc⟩, Ho⟩, Hb'⟩
+    iframe Hb Hc Hr Hg Hfc Ho
     iapply pageCredit_join $$ [Hcr Hb']
     iframe
 
@@ -800,7 +863,7 @@ def procPrivCoreUnmarkedAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : 
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
   @rootRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
-  procGenUnmarkedAt ξ pa pid V.gen ∗ pageCredit procSpare
+  procGenUnmarkedAt ξ pa pid V.gen ∗ pageCredit procSpare ∗ fsCurOk V.fsc
 
 /-- **THE BLOCK WITHOUT THE INCARNATION'S MARKER** (Rocq
 `ProcInv.proc_priv_unmarked`, lane PQ-C, design/pipe.md "The exit path").
@@ -825,11 +888,11 @@ theorem procPrivFd_unmark (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V
     procPrivFd (GF := GF) γ pa pid V M ⊣⊢ procPrivUnmarked γ pa pid V M ∗ takenAt V.gen := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivUnmarked procPrivCoreUnmarkedAt
   constructor
-  · iintro ⟨⟨Hb, Hc, Hr, Hg, Hcr⟩, Ho⟩
+  · iintro ⟨⟨Hb, Hc, Hr, Hg, Hcr, #Hfc⟩, Ho⟩
     icases (procGenAt_unmark curCtx pa pid V.gen).1 $$ Hg with ⟨Hg, Ht⟩
-    iframe Hb Hc Hr Hg Ho Ht Hcr
-  · iintro ⟨⟨⟨Hb, Hc, Hr, Hg, Hcr⟩, Ho⟩, Ht⟩
-    iframe Hb Hc Hr Ho Hcr
+    iframe Hb Hc Hr Hg Ho Ht Hcr Hfc
+  · iintro ⟨⟨⟨Hb, Hc, Hr, Hg, Hcr, #Hfc⟩, Ho⟩, Ht⟩
+    iframe Hb Hc Hr Ho Hcr Hfc
     iapply (procGenAt_unmark curCtx pa pid V.gen).2
     iframe Hg Ht
 

@@ -259,15 +259,18 @@ bound of the era's fs ledger ending in the caller's (`act`) type test of
 lookup per path element (NI M3 FS-2d: of exactly the path's elements) and resolved, from namex's start (the root `rt` on
 an absolute path, the cwd `cw` on a relative one), to `i`, a directory in
 the fold before the test (`NiFs.fevLookAt`). -/
-def chdirLed (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mv : Nat → List (BitVec 8)) (pv : Nat)
+def chdirLed (γfs : FsNames) (act : BitVec 64) (lo : Nat) (rt cw : Nat) (Mv : Nat → List (BitVec 8)) (pv : Nat)
     (i : Nat) : IProp GF :=
   iprop(∃ (pl : List (BitVec 8)) (H : List Fev) (e : Std.ExtTreeMap (List (BitVec 8)) Nat compare)
       (nl : Nat),
     ⌜argPathOf Mv pv pl⌝ ∗ fsLedLb γfs H ∗
-    ⌜fevLookAt H act rt (umStartOf rt cw pl) (pathElems pl) = some (i, some (.dir e, nl))⌝)
+    ⌜fevLookAt H act rt (umStartOf rt cw pl) (pathElems pl) = some (i, some (.dir e, nl)) ∧
+      -- (NI M3 private files FS-2e-b) the walk's lookups and the test past the
+      -- caller's fs cursor `lo`
+      lo < H.length ∧ ∀ (i' : Nat) (po : Option Nat), H.getLast? = some (.look act i' po) → fevWalkPast lo H po⌝)
 
-instance chdirLed_persistent (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mv : Nat → List (BitVec 8))
-    (pv i : Nat) : Persistent (chdirLed (GF := GF) γfs act rt cw Mv pv i) := by
+instance chdirLed_persistent (γfs : FsNames) (act : BitVec 64) (lo : Nat) (rt cw : Nat) (Mv : Nat → List (BitVec 8))
+    (pv i : Nat) : Persistent (chdirLed (GF := GF) γfs act lo rt cw Mv pv i) := by
   unfold chdirLed; infer_instance
 
 end Arms
@@ -302,7 +305,7 @@ def sysChdirK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     -- the armed post
     chdirArms (hlc := hlc) (fsGammaL fscFs) fscFs γ pa pid V.rti V.cwi P Pmiss Fo
       -- (NI M3 private files FS-2b) the ledger receipt, at the path argument
-      (chdirLed fscFs pa V.rti V.cwi (viewLazy V.upt V.sz M) (V.tf.getD (tfArgIdx 0) 0#64).toNat)
+      (chdirLed fscFs pa V.fsc V.rti V.cwi (viewLazy V.upt V.sz M) (V.tf.getD (tfArgIdx 0) 0#64).toNat)
       { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
     wpLoop cpu')
 

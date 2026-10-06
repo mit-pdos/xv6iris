@@ -296,7 +296,7 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
     iframe Hpid Hks Hsz Hpg Htf Hof Hcwd Hnm Hsc Hrt HPt HTf Hev
     ipureintro; exact ⟨hVb, hlz⟩
   ihave Hblk := Hback $$ %V %M [] Hblk
-  · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
   ihave Hframe := sw_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) v w2 $$ [Hra Hs0 Hslot Hc2]
   case' _ => iframe
   iapply (sw_kwait KW Γ c7 _ γw γp γl γk γ j pid V M cs k.sie k.proc v hj ?hpr ?hKw ?hn2 ?ht ?hs ?hp ?ha)

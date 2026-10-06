@@ -699,18 +699,20 @@ return tie and buffer tie at that row (`ardRetTie`, `readBufTie`: on a file
 row the count is `ardCount` and the `d` bytes at `addr` in `M'` are the
 row's from `off`).  Other descriptors carry nothing. -/
 def freadRcptAt (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (P : UPtd)
-    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (r : BitVec 64) : IProp GF :=
+    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (lo : Nat) (r : BitVec 64) : IProp GF :=
   match st with
   | .open true _ (.inode i γo om) =>
     iprop(⌜r = -1#64 ∧ (n < 0 ∨ rdFailWhy P addr n.toNat)⌝ ∨
       ∃ (off d : Nat) (a : Anode),
         ⌜r = BitVec.ofNat 64 d ∧ (d : Int) ≤ n ∧ ardRetTie n a off r ∧ readBufTie a off d M' addr⌝ ∗
-        fsObsAtP γfs (.read act i γo (om == .held) off d) i a (fun h => om = .parked → off = fevOff h γo))
+        -- (FS-2e-b) past the caller's fs cursor `lo`
+        fsObsAtP γfs (.read act i γo (om == .held) off d) i a
+          (fun h => (om = .parked → off = fevOff h γo) ∧ lo ≤ h.length))
   | _ => iprop(True)
 
 instance freadRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (P : UPtd)
-    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (r : BitVec 64) :
-    Persistent (freadRcptAt (GF := GF) γfs act st n P M' addr r) := by
+    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (lo : Nat) (r : BitVec 64) :
+    Persistent (freadRcptAt (GF := GF) γfs act st n P M' addr lo r) := by
   unfold freadRcptAt
   rcases st with _ | ⟨rb, wb, t⟩
   · infer_instance
@@ -718,8 +720,8 @@ instance freadRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (st : FdState
 
 /-- the sign guard's `-1` -/
 theorem freadRcptAt_neg (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (P : UPtd)
-    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (hn : n < 0) :
-    ⊢@{IProp GF} freadRcptAt γfs act st n P M' addr (-1#64) := by
+    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (lo : Nat) (hn : n < 0) :
+    ⊢@{IProp GF} freadRcptAt γfs act st n P M' addr lo (-1#64) := by
   unfold freadRcptAt
   rcases st with _ | ⟨rb, wb, t⟩
   · ipureintro; trivial
@@ -727,9 +729,9 @@ theorem freadRcptAt_neg (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : I
 
 /-- a descriptor that is not a readable inode carries nothing -/
 theorem freadRcptAt_of_ne (γfs : FsNames) (act : BitVec 64) (st : FdState) (n : Int) (P : UPtd)
-    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (r : BitVec 64)
+    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (lo : Nat) (r : BitVec 64)
     (hst : ∀ wb i γo om, st ≠ .open true wb (.inode i γo om)) :
-    ⊢@{IProp GF} freadRcptAt γfs act st n P M' addr r := by
+    ⊢@{IProp GF} freadRcptAt γfs act st n P M' addr lo r := by
   unfold freadRcptAt
   rcases st with _ | ⟨rb, wb, t⟩
   · ipureintro; trivial
@@ -774,7 +776,7 @@ def filereadPost (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) 
     filereadEnvOut (hlc := hlc) st -∗
     filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin Rp Rpe P (R' 10#5) M' (k.regs 11#5) -∗
     -- (NI M3 private files FS-1) the read's ledger receipt
-    freadRcptAt fscFs k.proc st n V.upt M' (k.regs 11#5) (R' 10#5) -∗
+    freadRcptAt fscFs k.proc st n V.upt M' (k.regs 11#5) V.fsc (R' 10#5) -∗
     wpLoop cpu')
 
 end Post

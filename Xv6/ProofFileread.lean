@@ -124,11 +124,13 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
     procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
     filereadEnv (hlc := hlc) st ∗
     filereadIn (hlc := hlc) st n F Rd Rin Rp Rpe P ∗ P ∗
+    -- (NI M3 private files FS-2e-b) the caller's fs cursor's lower bound
+    fsCurOk V.fsc ∗
     frdK (hlc := hlc) k γ fk q st j pid V M n F Rd Rin Rp Rpe P
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hpe, #Hkl, #Hav, #Hfoff, Htok, Hfields, Hpay,
-    Hpriv, Hgen, Henv, Hin, HP, HΦ⟩
+    Hpriv, Hgen, Henv, Hin, HP, #Hfc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x20  c.lw a5,0(a0)
   icases filerw_fields_type fk q C $$ Hfields with ⟨Hty, Hft⟩
@@ -262,7 +264,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hkwf.2.2.2.1; omega)
   -- THE CONTRACT'S CONTINUATION, hart-free, at the ambient block form (the cwd
   -- reference and the generation row parked in it)
-  icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd, Hrtr, Hpg, Hsp⟩
+  icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd, Hrtr, Hpg, Hsp, #Hfc⟩
   -- the generation halves stay out: consoleread's kill read lends them
   unfold procGenAt
   icases Hpg with ⟨Hft, HQ, Hxs, Hgen⟩
@@ -274,6 +276,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid (V.updEv kv) P' M').2 $$ [Hpriv Hcwd Hrtr Hft HQ Hxs Hgen Hsp]
     · unfold procGenAt
       iframe
+      iexact Hfc
     iapply HK $$ %spie %spp %R' %P' %M' %d %kv %hp Hk Hpc Hte Hce Href %hkv Hpriv Henv Harms Hrr
   -- the reference, taken apart
   icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, omC, γpC, hok⟩, Htok, Hfields, Hpay⟩
@@ -397,7 +400,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
     iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex] []
     rotate_right
-    · rw [show R' 10#5 = -1#64 by rw [h10]; decide]; iapply freadRcptAt_neg _ _ _ _ _ _ _ hneg
+    · rw [show R' 10#5 = -1#64 by rw [h10]; decide]; iapply freadRcptAt_neg _ _ _ _ _ _ _ _ hneg
     · ipureintro
       exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
     · unfold filereadArms

@@ -143,16 +143,16 @@ to the AU side. -/
 theorem mkfDlookup_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (d i : Nat) (nm : Fname) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hdir : fnIsDir n = true) (hnl : fnNlink n ≠ 0)
-    (hnm : (dirEntries n)[nm]? = some i) (act : BitVec 64) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗
+    (hnm : (dirEntries n)[nm]? = some i) (act : BitVec 64) (L : List Fev) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ fsLedLb γfs L -∗
       pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL γfs) appE) Fex -∗
       topFragQ (fsGammaL γfs) dq d n ={E}=∗
         topFragQ (fsGammaL γfs) dq d n ∗
-        -- (NI M3 private files FS-1) the lookup's hop
-        fsObsRcpt γfs (.hop act d nm none) d n ∗
+        -- (NI M3 private files FS-1) the lookup's hop; (FS-2e-b) past `L`
+        fsObsRcptP γfs (.hop act d nm none) d n (fun h => L <+: h) ∗
         ∃ av : Aview, ⌜PartialMap.get? av d = some ⟨.ADir (dirEntries n), fnNlink n⟩⌝ ∗
           ⌜(dirEntries n)[nm]? = some i⌝ ∗ Fex.pfRecv av d nm i := by
-  iintro #Hi Hcm Hf
+  iintro #Hi #HL Hcm Hf
   ihave Hcm := pfAt_au _ _ $$ Hcm
   unfold ftopInv
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
@@ -167,13 +167,18 @@ theorem mkfDlookup_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   unfold dlookupCommitAt
   ihave Hcm := Hcm $$ %I %d %i %nm %(dirEntries n) %(fnNlink n) %hrow %hnm Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HΦ⟩
-  imod ftopLed_obsAt γfs I (.hop act d nm none) trivial d n hlk $$ Hled with ⟨Hled, #Hrc⟩
+  imod ftopLed_obsAfter γfs I (.hop act d nm none) trivial L $$ HL Hled with ⟨Hled, ⟨%h, %⟨ht, hv⟩, #Hlb⟩⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists I, A
     iframe Ha Hla Hpark Hled
     ipureintro; exact hcl
   imodintro
-  iframe Hf Hrc
+  iframe Hf
+  isplitr
+  · unfold fsObsRcptP fsEvRcpt
+    iexists h
+    iframe Hlb
+    ipureintro; exact ⟨fevTie_row d n ht hlk, hv⟩
   iexists absView I
   iframe HΦ
   ipureintro; exact ⟨hrow, hnm⟩

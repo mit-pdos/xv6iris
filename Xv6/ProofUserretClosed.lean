@@ -96,12 +96,12 @@ theorem userretClosed_proof (UT : USERTRAP) (UV : USERVEC) (UR : USERRET) : USER
       ⟨rfl, rfl, cpu, _, sep, rfl, hsep⟩
     ihave #Hev := NiFitIs.evidNone (hlc := hlc) (GF := GF) _ _ hfo $$ [Hulb]
     · unfold niUhRes; iexact Hulb
-    ihave Huh : uhistAt (GF := GF) (uvisOf V M sts gn cs pid) $$ [Huh]
+    ihave Huh : uhistAt (GF := GF) (uvisOf V M sts gn cs pid) V.fsc $$ [Huh]
     · unfold uhistAt
       iexists γh, uvisOf V M sts gn cs pid, []
       iframe Huh
       ipureintro
-      exact ⟨uhistWf_nil, trivial, rfl⟩
+      exact ⟨uhistWf_nil, trivial, rfl, V.fsc, trivial, rfl⟩
     imodintro
     iapply HRS
     unfold uRcptOpt uClaimFor uClaimForRaw

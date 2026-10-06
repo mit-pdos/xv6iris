@@ -141,7 +141,7 @@ set_option maxHeartbeats 8000000 in
 the arm's share `txPin t q` comes back. -/
 theorem create_alloc_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) (γil γisl : GName) (kk : Nat) (qi s : Qp) (g : GName) (lo tl : Nat)
+    (γk : KmemNames) {fc : Nat} (γil γisl : GName) (kk : Nat) (qi s : Qp) (g : GName) (lo tl : Nat)
     (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (n : Nat) (Sb : List Nat) (crb cru : Bool)
     (e0 t : Nat) (q : Qp) (pidv : BitVec 32) (dqb dqs : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : iunlockputSlots ≤ k'.avail)
@@ -153,7 +153,7 @@ theorem create_alloc_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (h
     (ha0 : k'.regs 10#5 = ientry kk) (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk fc ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗
     credFloor lo tl ∗ icHandle fscIc kk (.depTx s icfgDev inum g lo t q) ∗
@@ -180,7 +180,7 @@ theorem create_alloc_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (h
   obtain ⟨hcov, hlog⟩ := hireg inum hnib
   unfold createEnv
   iintro ⟨Hk, Hpc, Hte, Hce, ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, -, -, #Hit2, #Hiti, #Hslks, #Hinv,
-    #Hopen, #Hbmi⟩, #Hslk, Hsl, #Hfl, Hdep, Hoff, Hdev, Hinum, Hval, Hload, Hshot, Hfrz, Hkeep, Hru,
+    #Hopen, #Hbmi, -⟩, #Hslk, Hsl, #Hfl, Hdep, Hoff, Hdev, Hinum, Hval, Hload, Hshot, Hfrz, Hkeep, Hru,
     Hsb, Hsi, Hpid, Hbs, Hop, HK⟩
   ihave #Hescs := isItable2_escrows $$ Hit2
   ihave #Hesc := icEscrows_lookup fscIc fscFs fscIreg fscCov fscLogst kk hkk $$ Hescs
@@ -212,7 +212,7 @@ set_option maxHeartbeats 8000000 in
 at `oty = Some (cr_ity ty dind)`): the chosen value is the minted pile's. -/
 theorem create_alloc_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
+    (γk : KmemNames) {fc : Nat} (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (cru pin : Bool) (v : Ity) (pidv : BitVec 32) (dqs : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : iupdateSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
@@ -226,7 +226,7 @@ theorem create_alloc_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := h
     (ha0 : k'.regs 10#5 = ip) :
     kctx cpu k' ∗ pcIs cpu KA.«iupdate» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk fc ∗
     wordPointsTo (iDev ip) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     wordPointsTo (iInum ip) 4 (DFrac.own (1 : Qp).half) inum ∗
     inodeMeta ip dn ∗ inodeMap fscFs ip bm ∗
@@ -251,7 +251,7 @@ theorem create_alloc_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := h
   obtain ⟨hcov, hlog⟩ := hireg inum hnib
   unfold createEnv
   iintro ⟨Hk, Hpc, Hte, Hce, ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, -, -, #Hit2, #Hiti, #Hslks, #Hinv,
-    #Hopen, #Hbmi⟩, Hdev, Hinum, Hmeta, Hmap, Hsi, Hdi, Hpin, Hpid, Hbs, Hop, HK⟩
+    #Hopen, #Hbmi, -⟩, Hdev, Hinum, Hmeta, Hmap, Hsi, Hdi, Hpin, Hpid, Hbs, Hop, HK⟩
   have h := IU.wp_iupdate_link_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j ip
     inum dn dn0 bm u Sb cru pin (some v) pidv pidPriv (DFrac.own (1 : Qp).half)
     (DFrac.own (1 : Qp).half) dqs hj hproc hK hnoff htier hcru hgeom hcov hlog hnib hstab hnz
@@ -277,7 +277,7 @@ set_option maxHeartbeats 8000000 in
 /-- `dirlink(dp, name, inum)` at `+0xd8` (Rocq `DLK.wp_dirlink_gen`). -/
 theorem create_alloc_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
+    (γk : KmemNames) {fc : Nat} (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (dn : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16)
     (ncount : Nat) (Sb : List Nat) (tid : Nat) (qtx : Qp) (pidv : BitVec 32)
     (dqs dqbs dqb : DFrac) (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
@@ -301,7 +301,7 @@ theorem create_alloc_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := 
     (hkd : ip = ientry kd) (hkdn : kd < NINODE) :
     kctx cpu k' ∗ pcIs cpu KA.«dirlink» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk fc ∗
     wordPointsTo (iDev ip) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     wordPointsTo (iInum ip) 4 (DFrac.own (1 : Qp).half) dinum ∗
     inodeMeta ip dn ∗ inodeMap fscFs ip bm ∗ inodeBlocks fscFs bm data ∗
@@ -344,7 +344,7 @@ theorem create_alloc_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := 
   obtain ⟨hdcov, hdlog⟩ := hireg dinum hdnib
   unfold createEnv
   iintro ⟨Hk, Hpc, Hte, Hce, ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
-    #Hinv, #Hopen, #Hbmi⟩, Hdev, Hinum, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid, Hsh, Hru,
+    #Hinv, #Hopen, #Hbmi, -⟩, Hdev, Hinum, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid, Hsh, Hru,
     Hrt, Hrh, Hbs, Hslot, Hdl, Hop, Htx, HK⟩
   have h := DLK.wp_dirlink_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j γkl γk
     ip dinum bm data dn dn fn inum ncount Sb tid qtx pidv pidPriv
@@ -468,10 +468,11 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
         dirSlot data (dirNrec dn.diSize.toNat)]!
       else fileByte data x)
     -- THE NAME PREDICATE, at the name this leg files (INIT-FILE)
-    (hNm : Nm (bname 14 nf)) (act : BitVec 64) :
+    (hNm : Nm (bname 14 nf)) (act : BitVec 64) (lo : Nat) :
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
       -- (NI M3 private files FS-2e) the child's arm, which the leg lands past
-      creArmRcpt fscFs act cinum.toNat -∗
+      -- (FS-2e-b: the arm past the caller's fs cursor `lo`)
+      creArmRcpt fscFs act lo cinum.toNat -∗
       dlinks fscFs dind.toNat dn bm data -∗
       FsStateLink.linkToks (fsGammaL fscFs) (cinum.toNat : Int)
         (FsStateLink.linkReps (createDelta ty) (createIty ty (dind.toNat : Int))) -∗
@@ -490,7 +491,7 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
           (creChild ty.toNat major.toNat minor.toNat dind.toNat cinum.toNat) ∗
         -- (NI M3 private files FS-1, FS-2e) the parent leg's ledger receipt:
         -- the name it filed, after the arm
-        creParentRcpt fscFs act (bname 14 nf) cinum.toNat := by
+        creParentRcpt fscFs act lo (bname 14 nf) cinum.toNat := by
   obtain ⟨hty', hnl', hszmax, hcap', hiok', hrl', hdok', hddix', hduq'⟩ :=
     create_alloc_append_facts dind dn dn' bm bm' data data' cinum nf hty hiok hdok hddix hduq hrl
       hnone hc16 hcinb hwf' hholes' haddr' hcov' hdn' hcapp hsizedp hrng
@@ -538,8 +539,8 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
       (entTyOk_name _ _ _ false _ (by rw [DOT_dot]; exact hnd.1) (by rw [DOTDOT_dotdot]; exact hnd.2)
         (by simp))
   iintro #Hinv #Harc Hdl Htok Htop Hctop Hacre Harm HPd
-  unfold creArmRcpt fsLedAt
-  icases Harc with ⟨%na, %ha, #Harc⟩
+  unfold creArmRcpt
+  icases Harc with ⟨%na, %ha, %hlo, #Harc⟩
   icases dlinks_open fscFs dind.toNat dn bm data $$ Hdl with ⟨%D, %hD, Hetk⟩
   obtain ⟨hdok0, hxact0⟩ := hD
   have hsD : bname 14 nf ∉ D := fun hin => by
@@ -575,7 +576,7 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
     iexists av, (dirEntries (eraNode dn bm data)), (fnNlink (eraNode dn bm data))
     iframe HFok
     ipureintro; exact hpre
-  · iapply creParentRcpt_of $$ Harc Hprc
+  · iapply creParentRcpt_of (hlo := hlo) $$ Harc Hprc
 
 end Repark
 
@@ -649,7 +650,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     (hsb : ∀ x ∈ Sb, x ∈ Sb') (hcru : IBLOCK dind icfgIst ∈ Sb') (hn' : iputUnits + 1 ≤ n')
     (hn'u : n' ≤ u) (hal : (createBuf (k.regs 2#5)).toNat % 8 = 0 ∧ tl.length = 2)
     (hledc : lodc ≤ tldc) (hle0 : lo ≤ tl0) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc ⊢
       kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) -∗
       pcIs cpu (KA.«create» + 0xe0#64) -∗
       trapCsrsExt cpu k.sie -∗ cpuClaimExt cpu k.sie k.proc -∗
@@ -703,7 +704,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
       creAcreFired Fok dind.toNat (bname 14 nf) cinum.toNat
         (creChild ty.toNat major.toNat minor.toNat dind.toNat cinum.toNat) -∗
       -- (NI M3 private files FS-1) the made child's ledger receipt
-      creOkRcpt fscFs k.proc true (bname 14 nf) cinum.toNat -∗
+      creOkRcpt fscFs k.proc V.fsc true (bname 14 nf) cinum.toNat -∗
       (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
       wpLoop cpu := by
@@ -727,7 +728,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   icases logOpS_named icfgLog n' Sb' $$ Hop with ⟨%e0, Hop⟩
-  iapply (create_alloc_iunlockput IUP Γ cpu _ j γl pd pav pu γkl γk γil γisl kd qd.half qd.half gd
+  iapply (create_alloc_iunlockput (fc := V.fsc) IUP Γ cpu _ j γl pd pav pu γkl γk γil γisl kd qd.half qd.half gd
       lodc tldc dind dn bm n' Sb' false true e0 t Qp.quarter pid dqb dqs hj ?gp ?gK ?gn ?gt hkd
       (fun h => absurd h (by decide)) (fun _ => hcru) hgeom hbg hbel hireg hdib (by omega) hpd ?ga0
       hledc)
@@ -854,7 +855,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
     (hNmL : ∀ nm : Fname, (pathElems (bview plen pfun)).getLast? = some nm → Nm nm)
-    (hF : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
+    (hF : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc ⊢
       createFailBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
         Nm Nd P Pmiss Farm Fdots Fun Fok Fex)
     (cpu : CPU) (spie spp : Bool) (R : RegMap)
@@ -877,7 +878,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
     (hsb3 : ∀ x ∈ Sb, x ∈ Sb3) (hib3 : IBLOCK cinum icfgIst ∈ Sb3) (hn3 : 8 ≤ n3 ∧ n3 ≤ u)
     (hal : (createBuf (k.regs 2#5)).toNat % 8 = 0 ∧ tl.length = 2)
     (hledc : lodc ≤ tldc) (hle0 : lo ≤ tl0) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc ⊢
       kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) -∗
       pcIs cpu (KA.«create» + 0xce#64) -∗
       trapCsrsExt cpu k.sie -∗ cpuClaimExt cpu k.sie k.proc -∗
@@ -937,7 +938,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
       irefSlots (ns - 2) -∗
       logOpS icfgLog n3 Sb3 -∗
       -- THE CHILD'S ROW IS SUSPENDED
-      createDirty t cinum.toNat k.proc -∗
+      createDirty t cinum.toNat k.proc V.fsc -∗
       -- ---- THE APPLICATION'S SIDE ----
       P (nparElems (bview plen pfun)).length dind.toNat -∗
       pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex -∗
@@ -1014,7 +1015,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
     $$ [$Hfl' $Hkeep] with ⟨Hkeep, Hshr⟩
   icases procPrivFd_root_lend_bare ht0 γ k.proc pid V M $$ [$Hpid $Hpw $Hbw]
     with ⟨Hpid, Hrt, Hrh, Hback⟩
-  iapply (create_alloc_dirlink DLK Γ cpu _ j γl pd pav pu γkl γk (ientry kd) dind bm data dn nf
+  iapply (create_alloc_dirlink (fc := V.fsc) DLK Γ cpu _ j γl pd pav pu γkl γk (ientry kd) dind bm data dn nf
       (createLow16 cinum) n3 Sb3 t (1 : Qp).half pid dqs dqbs dqb kd qd.half.half V.root V.rti
       (DFrac.own 1) hj ?gp ?gK ?gn ?gt htyd
       hiok.2.1 hszb (hdok hdz) (Or.inl (create_nl0z dn hnl0)) (create_doc_of_live dn dn data rfl hnl0)
@@ -1208,10 +1209,10 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
     (hNmL : ∀ nm : Fname, (pathElems (bview plen pfun)).getLast? = some nm → Nm nm)
-    (hM : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
+    (hM : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc ⊢
       createMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
         dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex)
-    (hF : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
+    (hF : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc ⊢
       createFailBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
         Nm Nd P Pmiss Farm Fdots Fun Fok Fex)
     (cpu : CPU) (spie spp : Bool) (R : RegMap)
@@ -1233,7 +1234,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
     (hkslot : kslot < NINODE) (hcpos : 0 < cinum.toNat ∧ cinum.toNat < fscNinodes)
     (hcinb : cinum.toNat < 16 * icfgNib) (htyc : dnc.diType = ty) (hfresh : freshShape dnc)
     (hnrt : cinum.toNat ≠ V.rti) (hledc : lodc ≤ tldc) (hle0 : lo ≤ tl0) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc ⊢
       kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) -∗
       pcIs cpu (KA.«create» + 0xb4#64) -∗
       trapCsrsExt cpu k.sie -∗ cpuClaimExt cpu k.sie k.proc -∗
@@ -1323,9 +1324,13 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
   ihave #Hinv := create_env_ireg Γ γl pd pav pu γkl γk $$ Henv
   ihave #Hft := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hinv
   ihave #Hap := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hinv
+  ihave #Hfc := createEnv_cur (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc $$ Henv
   iapply wpLoop_fupd
+  -- (NI M3 private files FS-2e-b) the arm lands past the caller's fs cursor
+  imod fsCurOk_lb _ $$ Hfc with ⟨%L, %hL, #HL⟩
   imod (create_dirty_arm (hlc := hlc) ⊤ t cinum.toNat (creC0 ty.toNat major.toNat minor.toNat) Nm Nd Farm
-    _ _ CoPset.subseteq_top hrow0 hrowc k.proc) $$ Hft Hap Htx Harm Hctop with ⟨Hdirty, Hctop, Harmr⟩
+    _ _ CoPset.subseteq_top hrow0 hrowc k.proc V.fsc L hL) $$ Hft Hap HL Htx Harm Hctop
+    with ⟨Hdirty, Hctop, Harmr⟩
   imodintro
   icases create_alloc_meta_open (ientry kslot) dnc $$ Hcmeta with ⟨Hcty, Hcmaj, Hcmin, Hcnl, Hcsz⟩
   -- +0xb4  sh s5,70(s3) : ip->major = major
@@ -1364,7 +1369,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
   -- THE FREEZE PIN, PAID WITH THE SPAN'S TOKEN (Rocq :649–671)
   ihave Hpin : iregLinkPin true cinum.toNat dnc $$ [Hcfrz]
   · rw [iregLinkPin, if_pos rfl]; iexact Hcfrz
-  iapply (create_alloc_iupdate IU Γ cpu _ j γl pd pav pu γkl γk (ientry kslot) cinum
+  iapply (create_alloc_iupdate (fc := V.fsc) IU Γ cpu _ j γl pd pav pu γkl γk (ientry kslot) cinum
       (createSetf dnc major minor 1#16) dnc bmc q2 (IBLOCK cinum icfgIst :: Sb1) true true
       (createIty ty (dind.toNat : Int)) pid dqs hj ?gp ?gK ?gn ?gt (fun _ => create_mem_cons _ _)
       hgeom hireg hcinb (diTypeStable_eq _ _ (createSetf_type dnc major minor 1#16))
@@ -1496,13 +1501,13 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
     (hNmL : ∀ nm : Fname, (pathElems (bview plen pfun)).getLast? = some nm → Nm nm)
-    (hM : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
+    (hM : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc ⊢
       createMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
         dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex)
-    (hF : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
+    (hF : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc ⊢
       createFailBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
         Nm Nd P Pmiss Farm Fdots Fun Fok Fex) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc ⊢
       createAllocBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
         Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   have hS' := hS
@@ -1604,7 +1609,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
     ihave Hkeep := inodeRefShort_gen_forget kd (qd.half + qd.half) qd.half icfgDev dind gd lo' tl'
       hle' $$ [$Hfl' $Hkeep]
     icases logOpS_named icfgLog (q2 + 1 + 1) Sb1 $$ Hop with ⟨%e0, Hop⟩
-    iapply (create_alloc_iunlockput IUP Γ cpu _ j γl pd pav pu γkl γk γil γisl kd qd.half qd.half gd
+    iapply (create_alloc_iunlockput (fc := V.fsc) IUP Γ cpu _ j γl pd pav pu γkl γk γil γisl kd qd.half qd.half gd
         lodc tldc dind dn bm (q2 + 1 + 1) Sb1 false false e0 t (1 : Qp).half pid dqb dqs hj ?gp ?gK
         ?gn ?gt hkd (fun h => absurd h (by decide)) (fun h => absurd h (by decide)) hgeom hbg hbel
         hireg hdib (create_ip_of9 _ hn1lo) hpd ?ga0 hledc)

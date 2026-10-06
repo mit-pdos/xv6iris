@@ -268,7 +268,7 @@ theorem utEvOut_retf (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitV
   · iright
     iexists k, ι
     iframe Ha Hl
-    ipureintro; exact hrow ι hr
+    ipureintro; exact ⟨hrow ι hr.1, hr.2⟩
 
 /-- **The answers survive a kernel-word rewrite.** -/
 theorem utOuts_retf (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)

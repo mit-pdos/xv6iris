@@ -162,10 +162,12 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     procPrivExt (procAddr j) pid V V.upt M ∗ filewriteEnv (hlc := hlc) γl γu st ∗
     filewriteIn (hlc := hlc) pmv szv lzv st n (writerImg V.upt M) (k.regs 11#5) Q Qe ∗
     genHalvesPriv (procAddr j) pid V.gen ∗
+    -- (NI M3 private files FS-2e-b) the caller's fs cursor's lower bound
+    fsCurOk V.fsc ∗
     fwrKG (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hpe, #Hkl, #Hav, #Hfoff, Htok, Hfields, Hpay, Hpriv,
-    Henv, Hin, Hgen, HΦG⟩
+    Henv, Hin, Hgen, #Hfc, HΦG⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x24  c.lw a5,0(a0)
   icases filerw_fields_type fk q C $$ Hfields with ⟨Hty, Hft⟩
@@ -320,7 +322,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hkwf.2.2.2.1; omega)
   -- THE CONTRACT'S CONTINUATION, hart-free, at the ambient block form (the cwd
   -- reference and the generation row parked in it)
-  icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd, Hrtr, Hpg, Hsp⟩
+  icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd, Hrtr, Hpg, Hsp, #Hfc⟩
   -- the generation halves stay out: pipewrite's kill read lends them
   unfold procGenAt
   icases Hpg with ⟨Hft, HQ, Hxs, Hgen⟩
@@ -332,6 +334,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid (V.updEv kv) P' _).2 $$ [Hpriv Hcwd Hrtr Hft HQ Hxs Hgen Hsp]
     · unfold procGenAt
       iframe
+      iexact Hfc
     iapply HK $$ %spie %spp %R' %P' %kv %hp HO Hk Hpc Hte Hce Href %hkv Hpriv Henv Harms Hwhy Hfwr
   -- the reference, taken apart
   icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, omC, γpC, hok⟩, Htok, Hfields, Hpay⟩

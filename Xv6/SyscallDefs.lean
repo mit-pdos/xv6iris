@@ -156,6 +156,20 @@ theorem syscWaitRow_ret {V V' : ProcPriv} {img img' : ElfMem} {cs cs' : ExtTreeS
   · exact Or.inl h
   · exact Or.inr ⟨pid, h1, h2, h3⟩
 
+/-- (NI M3 private files FS-2e-b) **THE CITATION LIES PAST THE CURSOR**: a
+round's cited fs prefix is empty (it cites no fs event) or longer than the
+caller's fs cursor `c` (the position after the incarnation's last fs round,
+the record's `fsc`): the cited event sits at or past `c`. -/
+def fsPast (c : Nat) (ι : UIota) : Prop := ι.fev = [] ∨ c < ι.fev.length
+
+/-- a citation of no fs event lies past every cursor -/
+theorem fsPast_nil (c : Nat) (ι : UIota) (h : ι.fev = []) : fsPast c ι := Or.inl h
+
+/-- a citation ending in an event past a prefix that reaches the cursor -/
+theorem fsPast_snoc (c : Nat) (ι : UIota) (h : List Fev) (e : Fev) (hf : ι.fev = h ++ [e])
+    (hc : c ≤ h.length) : fsPast c ι := by
+  right; rw [hf, List.length_append, List.length_singleton]; omega
+
 /-- (NI M3 private files FS-2a) **THE CITED ROW's FILE-SYSTEM CLAUSES**, at
 the class's keys (`UsysDet.usysDetClassAtF`): a read at a lazy-free entry on
 a readable inode descriptor of the entry table `sts`, whose destination the

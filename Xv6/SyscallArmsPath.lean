@@ -424,10 +424,11 @@ theorem syscChdir_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat 
     (hl : tfArgIdx 0 < V1.tf.length)
     (hdisj : (r = 0xFFFFFFFFFFFFFFFF#64 ∧ V1.cwi = V.cwi) ∨ r = 0#64) :
     (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∨
-        chdirLed (GF := GF) fscFs a V.rti V.cwi (viewLazy V.upt V.sz M) (V.tf.getD (tfArgIdx 0) 0#64).toNat
+        chdirLed (GF := GF) fscFs a V.fsc V.rti V.cwi (viewLazy V.upt V.sz M) (V.tf.getD (tfArgIdx 0) 0#64).toNat
           V1.cwi) ⊢
       |==> ∃ ι : UIota, niIotaLbs (GF := GF) (niNamesHere (GF := GF)) ι ∗
-        ⌜syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts sts' ι⌝ := by
+        ⌜syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts sts' ι ∧
+          fsPast V.fsc ι⌝ := by
   rcases hdisj with ⟨hm1, hcw⟩ | h0
   · iintro -
     imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) a with #Hl
@@ -435,9 +436,10 @@ theorem syscChdir_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat 
     iexists { UIota.boot with act := a }
     iframe Hl
     ipureintro
+    refine ⟨?_, fsPast_nil _ _ rfl⟩
     exact syscChdir_evRow V V1 M M1 sts cs _ r hnum hl (Or.inl ⟨hm1, hcw, usysChdirTo_boot _ _ a⟩)
   · unfold chdirLed
-    iintro (%hm1 | ⟨%pl, %H, %e, %nl, %hpl, #Hlb, %hlook⟩)
+    iintro (%hm1 | ⟨%pl, %H, %e, %nl, %hpl, #Hlb, %⟨hlook, hlo, -⟩⟩)
     · rw [h0] at hm1; exact absurd hm1 (by decide)
     · ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML H $$ [Hlb]
       · rw [show (niNamesHere (GF := GF)).getD 6 0 = fscFs.fev from rfl]
@@ -448,6 +450,7 @@ theorem syscChdir_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat 
       iexists { UIota.boot with act := a, fev := H, rt := V.rti }
       iframe Hl
       ipureintro
+      refine ⟨?_, Or.inr hlo⟩
       refine syscChdir_evRow V V1 M M1 sts cs _ r hnum hl (Or.inr ⟨h0, fun hk => ?_⟩)
       have hpl' : argPathOf (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat pl := hpl
       rw [show syscImg V M = umemLazy V.upt V.sz.toNat M from rfl] at hk ⊢
@@ -465,10 +468,11 @@ theorem syscOpen_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat �
     (hl : tfArgIdx 0 < V1.tf.length)
     (hlow : ∀ (fd : Nat) (X : FdState), sts[fd]? = some .closed → X ≠ .closed → sts' = sts.set fd X →
       fdLowestClosed sts = some fd) :
-    openLedRow (GF := GF) fscFs a V.rti V.cwi (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat
+    openLedRow (GF := GF) fscFs a V.fsc V.rti V.cwi (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat
         (tfW V.tf (tfArgIdx 1)) r sts sts' ⊢
       |==> ∃ ι : UIota, niIotaLbs (GF := GF) (niNamesHere (GF := GF)) ι ∗
-        ⌜syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts sts' ι⌝ := by
+        ⌜syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts sts' ι ∧
+          fsPast V.fsc ι⌝ := by
   unfold openLedRow
   iintro (%hm1 | ⟨%fd, %t, %⟨hr, hcl, hsts⟩, Hok⟩)
   · imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) a with #Hl
@@ -476,10 +480,11 @@ theorem syscOpen_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat �
     iexists { UIota.boot with act := a }
     iframe Hl
     ipureintro
+    refine ⟨?_, fsPast_nil _ _ rfl⟩
     exact syscOpen_evRow V V1 M M1 sts sts' cs _ r hnum hl
       (Or.inl ⟨hm1.1, hm1.2, usysOpenTo_boot _ _ _ a⟩)
   · unfold openLedOk
-    icases Hok with ⟨%pl, %H, %hpl, #Hlb, %hat⟩
+    icases Hok with ⟨%pl, %H, %hpl, #Hlb, %⟨hat, hlo⟩⟩
     ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML H $$ [Hlb]
     · rw [show (niNamesHere (GF := GF)).getD 6 0 = fscFs.fev from rfl]
       unfold fsLedLb; iexact Hlb
@@ -491,6 +496,7 @@ theorem syscOpen_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat �
     ipureintro
     have hY : FdState.open (omReadable (tfW V.tf (tfArgIdx 1))) (omWritable (tfW V.tf (tfArgIdx 1))) t ≠
         .closed := by intro h; cases h
+    refine ⟨?_, Or.inr hlo⟩
     refine syscOpen_evRow V V1 M M1 sts sts' cs _ r hnum hl
       (Or.inr ⟨fd, t, hr, hlow fd _ hcl hY hsts, hsts, fun hk => ?_⟩)
     have hpl' : argPathOf (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat pl := hpl
@@ -504,16 +510,17 @@ theorem syscMkdir_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat 
     (sts : List FdState) {sts' : List FdState} (cs : ExtTreeSet GName compare) (r a : BitVec 64)
     (Mv : Nat → List (BitVec 8)) (pv : Nat) (hnum : syscNum V = 20)
     (hl : tfArgIdx 0 < V1.tf.length) (hret : sysMkdirRet r) :
-    mkdirRcptAt (GF := GF) fscFs a Mv pv r ⊢
+    mkdirRcptAt (GF := GF) fscFs a V.fsc Mv pv r ⊢
       |==> ∃ ι : UIota, niIotaLbs (GF := GF) (niNamesHere (GF := GF)) ι ∗
-        ⌜syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts sts' ι⌝ := by
+        ⌜syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts sts' ι ∧
+          fsPast V.fsc ι⌝ := by
   rcases hret with h0 | hm1
   · unfold mkdirRcptAt
     iintro (%hne | Hok)
     · exact absurd h0 hne
     unfold mkdirOkRcpt creOkRcpt creParentRcpt
     icases Hok with ⟨%pl, %nm, %i, -, Hok⟩
-    icases Hok with (⟨-, ⟨%n, %ha, %h, %d, %nl, -, -, #Hlb⟩⟩ | ⟨%hf, -⟩)
+    icases Hok with (⟨-, ⟨%n, %ha, %h, %d, %nl, %⟨hlo, hpre⟩, -, #Hlb⟩⟩ | ⟨%hf, -⟩)
     · ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML (h ++ [Fev.ent a d nm (some i), Fev.nlink a d nl])
         $$ [Hlb]
       · rw [show (niNamesHere (GF := GF)).getD 6 0 = fscFs.fev from rfl]
@@ -523,6 +530,11 @@ theorem syscMkdir_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat 
       iexists { UIota.boot with act := a, fev := h ++ [Fev.ent a d nm (some i), Fev.nlink a d nl] }
       iframe Hl
       ipureintro
+      refine ⟨?_, Or.inr ?_⟩
+      rotate_left
+      · have := hpre.length_le
+        simp only [List.length_append, List.length_cons, List.length_nil] at this ⊢
+        omega
       refine syscMkdir_evRow V V1 M M1 sts cs _ r hnum hl ?_
       unfold usysMkdirAns
       rw [if_pos (fevLegBy_snoc h a d nm i nl)]
@@ -534,7 +546,7 @@ theorem syscMkdir_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat 
     iexists { UIota.boot with act := a }
     iframe Hl
     ipureintro
-    refine syscMkdir_evRow V V1 M M1 sts cs _ r hnum hl ?_
+    refine ⟨syscMkdir_evRow V V1 M M1 sts cs _ r hnum hl ?_, fsPast_nil _ _ rfl⟩
     rw [hm1]; rfl
 
 set_option maxHeartbeats 4000000 in
@@ -586,7 +598,7 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   unfold sysChdirK
   iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir2 Harms
   icases chdirArms_split (hlc := hlc) (fsGammaL fscFs) fscFs γ (procAddr j) pid V.rti V.cwi P Pmiss Fo
-    (chdirLed fscFs (procAddr j) V.rti V.cwi (viewLazy V.upt V.sz M) (V.tf.getD (tfArgIdx 0) 0#64).toNat)
+    (chdirLed fscFs (procAddr j) V.fsc V.rti V.cwi (viewLazy V.upt V.sz M) (V.tf.getD (tfArgIdx 0) 0#64).toNat)
     { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R2 10#5) rfl $$ Harms with
     ⟨%V1, %hdisj, Hpriv, Hrc, HLk⟩
   ihave Hir := (show irefSlots (GF := GF) 2 ∗ irefSlots 2 ⊢ irefSlots IREFSPARE from
@@ -627,7 +639,7 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   imod syscChdir_cite (GF := GF) V V1 M (viewFaulted V.upt P' M) sts cs (R2 10#5) (procAddr j) hn9
     (by rw [htf, hl]; decide) hd' $$ HLk with ⟨%ι, #Hl, %hrow⟩
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts (syscStore V1 (R2 10#5)) (viewFaulted V.upt P' M)
-    cs cs gn ke ι hrow $$ Hanc Hl
+    cs cs gn ke ι hrow.1 hrow.2 $$ Hanc Hl
   imodintro
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f V1
@@ -881,7 +893,7 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
   imod syscMkdir_cite (GF := GF) V { V.updEv k' with upt := P' } M (viewFaulted V.upt P' M) sts cs (R2 10#5)
     (procAddr j) _ _ hn (by show tfArgIdx 0 < V.tf.length; rw [hl]; decide) hmret $$ Hmr with ⟨%ι, #Hl, %hrow⟩
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts (syscStore { V.updEv k' with upt := P' } (R2 10#5))
-    (viewFaulted V.upt P' M) cs cs gn ke ι hrow $$ Hanc Hl
+    (viewFaulted V.upt P' M) cs cs gn ke ι hrow.1 hrow.2 $$ Hanc Hl
   imodintro
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f { V.updEv k' with upt := P' }
@@ -1133,7 +1145,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   iintro %c %_
   unfold sysOpenK
   iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms -
-  icases openArms_split (hlc := hlc) omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
+  icases openArms_split (hlc := hlc) omo (fsGammaL fscFs) fscFs V.fsc V.rti V.cwi γ (procAddr j) pid
     (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat (tfW V.tf (tfArgIdx 1)) P Pmiss Farm Fun
     Fok Fex Fo Ft sts { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R2 10#5) $$ Harms with
     ⟨%V1, %sts', %hrow, Hpriv, Hfr, Hfd1, #HLr, Hrc⟩
@@ -1171,7 +1183,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   imod syscOpen_cite (GF := GF) V V1 M (viewFaulted V.upt P' M) sts sts' cs (R2 10#5) (procAddr j) hn
     (by rw [htf, hl]; decide) (syscOpen_low hn hfdrow) $$ HLr with ⟨%ι, #Hl, %hev⟩
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts' (syscStore V1 (R2 10#5))
-    (viewFaulted V.upt P' M) cs cs gn ke ι hev $$ Hanc Hl
+    (viewFaulted V.upt P' M) cs cs gn ke ι hev.1 hev.2 $$ Hanc Hl
   imodintro
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f V1

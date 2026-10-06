@@ -380,7 +380,7 @@ theorem xv6NiAppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet 
       iintro ⟨-, Hn⟩
       ihave %hF := niR_pure p.2.1 p.2.2 h $$ Hn
       ipureintro
-      obtain ⟨F, hF, h1, hC, hU⟩ := hF
+      obtain ⟨F, hF, h1, hC, hU, -⟩ := hF
       exact xv6NiPhi_of hF h1 hC hU) γobs h
     iframe Ha HP
 

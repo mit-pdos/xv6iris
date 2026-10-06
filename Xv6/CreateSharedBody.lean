@@ -139,7 +139,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 `namexEnv` / `dirlinkEnv` idiom; Rocq's per-half `kernel_text -∗ … -∗
 is_lock …` premises): the contract's persistent premises. -/
 def createEnv (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) : IProp GF := iprop%
+    (γk : KmemNames) (fc : Nat) : IProp GF := iprop%
   procsInv Γ ∗ panicEnv ∗
   bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
@@ -148,19 +148,30 @@ def createEnv (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GN
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
   iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
-  bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize
+  bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
+  -- (NI M3 private files FS-2e-b) the caller's fs cursor's lower bound, LAST
+  fsCurOk fc
 
 instance createEnv_persistent (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) : Persistent (createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk) := by
+    (γk : KmemNames) (fc : Nat) : Persistent (createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk fc) := by
   unfold createEnv; infer_instance
 
 /-- ...and the fresh-type span's part of it (`CreateFreshTy.createFreshEnv`). -/
 theorem createEnv_fresh (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) :
-    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢ createFreshEnv (hlc := hlc) Γ γl pd pav pu := by
+    (γk : KmemNames) (fc : Nat) :
+    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk fc ⊢ createFreshEnv (hlc := hlc) Γ γl pd pav pu := by
   unfold createEnv createFreshEnv
   iintro ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, -, -, #Hit2, #Hiti, #Hslk, #Hinv, #Hopen, -⟩
   iframe #
+
+/-- (NI M3 private files FS-2e-b) the caller's fs cursor's bound, read off
+the environment -/
+theorem createEnv_cur (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
+    (γk : KmemNames) (fc : Nat) :
+    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk fc ⊢ fsCurOk fc := by
+  unfold createEnv
+  iintro ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, #Hfc⟩
+  iexact Hfc
 
 /-- The contract's `wpNext` continuation, HART-FREE (deviation 3). -/
 theorem create_post_pin {j : Nat} (hj : j < NPROC) (cpu : CPU) (k : KCtx)
@@ -194,10 +205,11 @@ directory with a link count and no dots, which `InodeLocal` rules out; the
 registry's receipt carries that window across the calls.  THE ARM ID IS
 EXISTENTIAL, THE TRANSACTION ID IS NOT: the registry parks the HALF of `t`'s
 element the two quarter-share escrows do not hold. -/
-def createDirty (t i : Nat) (act : BitVec 64) : IProp GF :=
+def createDirty (t i : Nat) (act : BitVec 64) (lo : Nat) : IProp GF :=
   iprop(∃ k : Nat, iregArmed k t (1 : Qp).half ({i} : Std.ExtTreeSet Nat compare) ∗
-    -- (NI M3 private files FS-1) the arm's ledger receipt rides the arm
-    creArmRcpt fscFs act i)
+    -- (NI M3 private files FS-1, FS-2e-b) the arm's ledger receipt rides the
+    -- arm, past the caller's fs cursor `lo`
+    creArmRcpt fscFs act lo i)
 
 theorem create_single_diff (i : Nat) :
     (({i} : Std.ExtTreeSet Nat compare) \ {i}) = (∅ : Std.ExtTreeSet Nat compare) :=
@@ -234,35 +246,36 @@ the arm commit at the row that appears (`creC0 ty`). -/
 theorem create_dirty_arm (E : CoPset) (t i : Nat) (c : Absnode)
     (Nm : Fname → Prop) (Nd : Absnode → Prop) (Farm : Pfam GF (Aview → Nat → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hnone : absOf n = none)
-    (hrow : absOf n' = some ⟨c, 1⟩) (act : BitVec 64) :
+    (hrow : absOf n' = some ⟨c, 1⟩) (act : BitVec 64) (lo : Nat) (L : List Fev) (hlo : lo ≤ L.length) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗
+      -- (NI M3 private files FS-2e-b) the bound the arm lands past
+      fsLedLb fscFs L -∗
       txPin icfgLog t (1 : Qp).half -∗
       pfAt (aarmCommitAt (hlc := hlc) (fsGammaL fscFs) appE c) Farm -∗
       topFrag (fsGammaL fscFs) i n ={E}=∗
-        createDirty t i act ∗ topFrag (fsGammaL fscFs) i n' ∗ creArmFired Farm i := by
-  iintro #Hi #Hai Htx Hcm Hf
+        createDirty t i act lo ∗ topFrag (fsGammaL fscFs) i n' ∗ creArmFired Farm i := by
+  iintro #Hi #Hai #HL Htx Hcm Hf
   imod (iregArm (hlc := hlc) E fscFs i t (1 : Qp).half (ftopN_sub_app E hE)) $$ Hi Htx
     with ⟨%k, Harm⟩
   imod (cafArm_fire (hlc := hlc) fscFs E k t (1 : Qp).half {i} i c Farm n n' hE
-    (create_single_mem i) hnone hrow act) $$ Hi Hai Harm Hcm Hf with ⟨Harm, Hf, Hr, #Hrc⟩
+    (create_single_mem i) hnone hrow act L) $$ Hi Hai HL Harm Hcm Hf with ⟨Harm, Hf, Hr, #Hrc⟩
   imodintro
   iframe Hf Hr
   unfold createDirty
   iexists k
   iframe Harm
-  unfold creArmRcpt
-  iexists _; iapply fsMoveRcpt_at $$ Hrc
+  iapply creArmRcpt_of _ _ _ _ _ _ _ hlo $$ Hrc
 
 /-- DOTS, still armed (Rocq's `cr_dirty_dots`; mkdir's two `fail:` entries
 that wrote a dot). -/
 theorem create_dirty_dots (E : CoPset) (t i d : Nat) (full : Bool)
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hrow : absOf n = some ⟨.ADir ∅, 1⟩)
-    (hrow' : absOf n' = some ⟨.ADir (dotsEnts full i d), 1⟩) (act : BitVec 64) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i act -∗
+    (hrow' : absOf n' = some ⟨.ADir (dotsEnts full i d), 1⟩) (act : BitVec 64) (lo : Nat) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i act lo -∗
       pfAt (adotsCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fdots -∗
       topFrag (fsGammaL fscFs) i n ={E}=∗
-        createDirty t i act ∗ topFrag (fsGammaL fscFs) i n' ∗ creDotsFired Fdots i d full ∗
+        createDirty t i act lo ∗ topFrag (fsGammaL fscFs) i n' ∗ creDotsFired Fdots i d full ∗
         fsMoveRcpt fscFs (dotsEvs act full i d) i n := by
   iintro #Hi #Hai Hd Hcm Hf
   unfold createDirty
@@ -280,13 +293,13 @@ theorem create_dirty_clear_dots (E : CoPset) (t i d : Nat) (full : Bool)
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
     (hrow : absOf n = some ⟨.ADir ∅, 1⟩)
-    (hrow' : absOf n' = some ⟨.ADir (dotsEnts full i d), 1⟩) (act : BitVec 64) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i act -∗
+    (hrow' : absOf n' = some ⟨.ADir (dotsEnts full i d), 1⟩) (act : BitVec 64) (lo : Nat) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i act lo -∗
       pfAt (adotsCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fdots -∗
       topFrag (fsGammaL fscFs) i n ={E}=∗
         txPin icfgLog t (1 : Qp).half ∗ topFrag (fsGammaL fscFs) i n' ∗
           creDotsFired Fdots i d full ∗ fsMoveRcpt fscFs (dotsEvs act full i d) i n ∗
-          creArmRcpt fscFs act i := by
+          creArmRcpt fscFs act lo i := by
   iintro #Hi #Hai Hd Hcm Hf
   unfold createDirty
   icases Hd with ⟨%k, Harm, #Har⟩
@@ -387,8 +400,8 @@ theorem create_dirty_clear_unarm_nd (E : CoPset) (t i : Nat) (c : Absnode) (Nd :
     (Fun : Pfam GF (Aview → Nat → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
     (hrow : absOf n = some ⟨c, 1⟩) (hnone : absOf n' = none) (hNd : Nd c)
-    (hrow0 : fnType n' ≠ 0 ∧ absRow n' = ⟨c, 0⟩) (act : BitVec 64) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i act -∗
+    (hrow0 : fnType n' ≠ 0 ∧ absRow n' = ⟨c, 0⟩) (act : BitVec 64) (lo : Nat) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i act lo -∗
       aunarmCommitAtNd (hlc := hlc) (fsGammaL fscFs) appE i Nd Fun.pfRecv -∗
       topFrag (fsGammaL fscFs) i n ={E}=∗
         txPin icfgLog t (1 : Qp).half ∗ topFrag (fsGammaL fscFs) i n' ∗ creUnarmFired Fun i ∗
@@ -409,10 +422,10 @@ theorem create_dirty_clear_unarm_nd (E : CoPset) (t i : Nat) (c : Absnode) (Nd :
 /-- THE VIEW-PRESERVING TWINS (Rocq's `cr_dirty_retag_same`): a retag
 whose reading is unchanged owes the application nothing. -/
 theorem create_dirty_retag_same (E : CoPset) (t i : Nat) (n n' : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (habs : ftopRow n = ftopRow n') (act : BitVec 64) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i act -∗
+    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (habs : ftopRow n = ftopRow n') (act : BitVec 64) (lo : Nat) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i act lo -∗
       topFrag (fsGammaL fscFs) i n ={E}=∗
-        createDirty t i act ∗ topFrag (fsGammaL fscFs) i n' := by
+        createDirty t i act lo ∗ topFrag (fsGammaL fscFs) i n' := by
   iintro #Hi #Hai Hd Hf
   unfold createDirty
   icases Hd with ⟨%k, Harm, #Har⟩
@@ -426,10 +439,10 @@ theorem create_dirty_retag_same (E : CoPset) (t i : Nat) (n n' : FsNode)
 /-- Rocq's `cr_dirty_clear_same` (the FILE arm's disarm). -/
 theorem create_dirty_clear_same (E : CoPset) (t i : Nat) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (habs : ftopRow n = ftopRow n') (hloc : InodeLocal i n')
-    (act : BitVec 64) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i act -∗
+    (act : BitVec 64) (lo : Nat) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i act lo -∗
       topFrag (fsGammaL fscFs) i n ={E}=∗
-        txPin icfgLog t (1 : Qp).half ∗ topFrag (fsGammaL fscFs) i n' ∗ creArmRcpt fscFs act i := by
+        txPin icfgLog t (1 : Qp).half ∗ topFrag (fsGammaL fscFs) i n' ∗ creArmRcpt fscFs act lo i := by
   iintro #Hi #Hai Hd Hf
   unfold createDirty
   icases Hd with ⟨%k, Harm, #Har⟩
@@ -882,7 +895,7 @@ def createMkdirBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major 
     irefSlots (ns - 2) -∗
     logOpS icfgLog n3 Sb3 -∗
     -- THE CHILD'S ROW IS SUSPENDED
-    createDirty t cinum.toNat k.proc -∗
+    createDirty t cinum.toNat k.proc V.fsc -∗
     -- ---- THE APPLICATION'S SIDE ----
     P (nparElems (bview plen pfun)).length dind.toNat -∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex -∗
@@ -1130,7 +1143,7 @@ def createFailMkdirBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8)
     irefSlots (ns - 2) -∗
     logOpS icfgLog n4 Sb4 -∗
     -- THE CHILD'S ROW IS SUSPENDED
-    createDirty t cinum.toNat k.proc -∗
+    createDirty t cinum.toNat k.proc V.fsc -∗
     -- ---- THE APPLICATION'S SIDE: the cursor and the observation home, the
     -- ARM fired, the DOTS fired at whatever the entry wrote (or not at
     -- all), the unarm and the parent leg unspent ----

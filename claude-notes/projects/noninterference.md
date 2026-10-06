@@ -8009,6 +8009,66 @@ iput) and its fires use FS-2e-a's `…After` forms; the trap loop advances the r
 `tools/audit/baseline.json` unchanged (14 PASS, no axiom or opaque). `dead_allow.txt`: + `creOkIn_mono` ("FS-2f
 reaches"). `run_all.sh`: all 11 steps pass.
 
+### M3 private files FS-2e-b as landed (2026-10-06)
+
+On `lane/pfiles`, after the owner's ruling (a) on the FS-2e-b stop: **the per-incarnation fs cursor rides the
+process record as the event counter does**. No kernel change; the fourteen roots' statements, `SYSCALL`/`USERTRAP`/
+`USERRET`/`USER`, `SyscRows`, `NiStep` and every `Uk*`/`User*` program-tier file byte-identical (the
+`Userret*`/`Usertrap*` glue moves, the FS-2b′ precedent).
+
+**The carrier.** `ProcDefs.ProcPriv` gains a last ghost field `fsc : Nat := 0` (as `ev`: no cell; born 0 at
+userinit's record and kfork's child, kept by exec and every `{V with …}`). Its meaning is a persistent bound in the
+block's CORE (the bare block cannot name the ledger: no `Fscfg` there):
+
+    def fsCurOk (c : Nat) : IProp GF := iprop(⌜c = 0⌝ ∨ ∃ L : List Fev, (fscFs.fev ↪◯ML L) ∗ ⌜c ≤ L.length⌝)
+
+(`FdTable`; `fsCurOk_lb` mints the lower bound, `fsCurOk_of_lb`), the last conjunct of `procPrivCoreNoctxAt`/
+`procPrivCoreResAt`/`procPrivCoreUnmarkedAt` and of usertrap's `utBlock`. Deviation from the ruling's wording: no
+exclusive var and no `UrcPins` field -- the trap loop pins the cursor through the history it parks
+(`urcRut … ∃ V, … ∗ uhistAt Wr V.fsc`), and nothing but the trap loop writes the field (SyscRows does not pin it, and
+the loop overwrites it at the filing, so no mover of the record needs to follow it).
+
+**The bound, taken by every class fs contract on the path** (receipts "past `lo`", `lo = V.fsc`, from FS-2e-a's
+`…After` fires): read (`freadRcptAt … lo r`: the read's prefix `lo ≤ |h|`; `FsAbsReadFire.arfRead_fire_*` take `L`),
+write (`fwRcptAt … lo n r`: `fwChunksOrd … lo 0 cs`, the verdict past `fwEnd lo cs`; `fwRcptAt_whyPast`), create
+(`createEnv … fc` carries `fsCurOk fc`; `createDirty t i act lo`, `creArmRcpt/creParentRcpt/creFoundRcpt/creOkRcpt
+γfs act lo …`, `creOkIn act lo …` with `creOkIn_len`; `cafArmedRetagAfter`, `cafArm_fire … L`,
+`mkfDlookup_fire … L`), mkdir/mknod (`mkdirOkRcpt/mkdirRcptAt/mknodOkRcpt/mknodRcptAt γfs act lo …`), the open walk
+and chdir (`walkChain/walkCur/walkStart/walkDead_unwrap γfs lo …` with `fevWalkPast`; `chdirLed γfs act lo …`:
+`lo < |H|`), open (`openLedPre`, `openOkRcpt`, `openRcptAt` and `openLedOk γfs act lo …`: `lo < |H|` -- threaded
+through `openArms*`, `openLedRow`). Close's iput carries no ledger receipt (nothing to bound; its events are not
+cited).
+
+**The evidence.** `SyscallDefs.fsPast c ι := ι.fev = [] ∨ c < ι.fev.length`; `syscEvOut`'s and `utEvOut`'s citing
+disjunct carry `⌜syscEvRow … ι ∧ fsPast V.fsc ι⌝` (`syscEvOut_cite` takes `hp`); the fs arms prove it from the
+bounded receipts (`syscArmRead_ev`, `syscArmWriteIno_ev` now reads `fwRcptAt`, `syscChdir_cite`, `syscOpen_cite`,
+`syscMkdir_cite`), the others at `fev = []`.
+
+**The trap loop and the window.** `Uround := BitVec 64 × Uvis × Uvis × Uvis × (Nat × Nat)` -- each round carries
+its fs window `w`; `uhistWinFrom c h` (windows chained from `c`), `uhistEnd`, `uhistWinOk`,
+`uhistWinFrom_order`; `uhistAt Wr c` adds `∃ c0, uhistWinFrom c0 h ∧ uhistEnd c0 h = c`. `urc_exit` reads the
+citation out of `utEvOut`, sets `w = (V.fsc, w2)` with `w2 = |ι.fev|` at a citation of a nonempty fs prefix (past
+`V.fsc`: the arm's `fsPast`), else `V.fsc`, appends `(sc, Wr, W, W', w)`, and resumes `{V' with fsc := w2}`
+(`usertrapResAt_fsc`, the bound from the cited lower bound `urc_iotaFsCur` or the parked one `usertrapResAt_fsCur`).
+
+**The filing.** The window RIDES THE KEY-HISTORY CITATION (`NiEntry.round` unchanged): `niWinRow c w`
+(`(fev = [] ∧ w.2 = w.1) ∨ (w.1 < |fev| ∧ w.2 = |fev|)`, none: `w.2 = w.1`); `niFitEv`'s round arm and `niUhFits`
+carry `∃ w, H[k]? = some (sc, Wr, W, W', w) ∧ niWinRow c w`, `niUserChain` adds `uhistWinOk H`. `niR_pure` now
+yields `∧ ∀ q, NiFsOrder q h F` (`niFsOrder_of_chain`):
+
+    def NiFsOrder (q : Nat × BitVec 32) (h : List Obs) (F : List NiEntry) : Prop :=
+      ∀ i j sc Wr W W' k ι γ n i' j' sc' Wr' W₂ W₂' k' ι' n',
+        NiEntry.round i j sc Wr W W' (some (k, ι)) γ n ∈ F → NiEntry.round i' j' sc' Wr' W₂ W₂' (some (k', ι')) γ n' ∈ F →
+        (obsBoots (h.take j), W'.pid) = q → (obsBoots (h.take j'), W₂'.pid) = q →
+        n < n' → ι.fev ≠ [] → ι'.fev ≠ [] → ι.fev.length < ι'.fev.length
+
+(defined in `NiLedger`, `q` spelled as `incOf`'s pair since `NiInc` lives in `NiTrace`; the order holds per key
+history). `xv6NiPhi` is unchanged (`NiAdequacy` drops the new conjunct).
+
+**Baselines.** `tools/tcb/expected.json` unchanged (`tcb.sh --update` writes no diff; no module enters or leaves a
+root's set). `tools/audit/baseline.json` unchanged (14 PASS, 0 `sorryAx`). `dead_allow.txt` unchanged (no new
+declaration is dead). `run_all.sh`: all 11 steps pass.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

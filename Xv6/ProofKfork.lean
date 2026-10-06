@@ -1381,16 +1381,16 @@ theorem kf_parent_open [X : CurCtx] (γ : FileNames) (pa : BitVec 64) (pid : Bit
       procPrivNoctxAt curCtx pa pid V M ∗
       @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
       @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
-      (procGenAt curCtx pa pid V.gen ∗ pageCredit procSpare) ∗
+      (procGenAt curCtx pa pid V.gen ∗ pageCredit procSpare ∗ fsCurOk V.fsc) ∗
       [∗list] i ↦ v ∈ V.ofile, kfPay γ V.fdg i v := by
   obtain ⟨ξ0, t0⟩ := X
   simp only at hX
   subst hX
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
   unfold procPrivFd procPrivCoreNoctxAt
-  iintro ⟨⟨Hb, Hcw, Hrt, Hg, Hsp⟩, Hof⟩
+  iintro ⟨⟨Hb, Hcw, Hrt, Hg, Hsp, #Hfc⟩, Hof⟩
   icases (kf_ofiles_split γ V.fdg pa V.ofile).1 $$ Hof with ⟨Hcells, Hp⟩
-  iframe Hcw Hrt Hg Hsp Hp
+  iframe Hcw Hrt Hg Hsp Hp Hfc
   iapply (procPrivNoctxAt_split curCtx pa pid V M).2
   iframe Hb Hcells
 
@@ -1400,18 +1400,18 @@ theorem kf_parent_close [X : CurCtx] (γ : FileNames) (pa : BitVec 64) (pid : Bi
     procPrivNoctxAt (GF := GF) curCtx pa pid V M ∗
       @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
       @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
-      (procGenAt curCtx pa pid V.gen ∗ pageCredit procSpare) ∗
+      (procGenAt curCtx pa pid V.gen ∗ pageCredit procSpare ∗ fsCurOk V.fsc) ∗
       ([∗list] i ↦ v ∈ V.ofile, kfPay γ V.fdg i v) ∗ fdFrags V.fdg sts ⊢
       iprop(procPrivFd γ pa pid V M ∗ fdFrags V.fdg sts) := by
   obtain ⟨ξ0, t0⟩ := X
   simp only at hX
   subst hX
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
-  iintro ⟨Hn, Hcw, Hrt, ⟨Hg, Hsp⟩, Hp, Hfr⟩
+  iintro ⟨Hn, Hcw, Hrt, ⟨Hg, Hsp, #Hfc⟩, Hp, Hfr⟩
   icases (procPrivNoctxAt_split curCtx pa pid V M).1 $$ Hn with ⟨Hb, Hcells⟩
   iframe Hfr
   unfold procPrivFd procPrivCoreNoctxAt
-  iframe Hb Hcw Hrt Hg Hsp
+  iframe Hb Hcw Hrt Hg Hsp Hfc
   iapply (kf_ofiles_split γ V.fdg pa V.ofile).2
   iframe Hcells Hp
 
@@ -1424,7 +1424,7 @@ abbrev kfChildV (V V_c : ProcPriv) (Pnew' : UPtd) (Cf : List (BitVec 64)) (cwd r
     (bs' : List (BitVec 8)) (γd : GName) : ProcPriv :=
   { V_c with sz := V.sz, upt := Pnew', tf := V.tf.set 14 0#64, ofile := Cf, cwd := cwd,
              cwi := V.cwi, name := bs', pvLazy := V.pvLazy, fdg := γd, pvSecc := V.pvSecc,
-             root := root, rti := V.rti }
+             root := root, rti := V.rti, fsc := 0 }
 
 /-- **The child's WHOLE block, closed** (D8 wiring: the park takes the
 whole block, Rocq `ProofKforkB6`'s close): the bare block, the child's
@@ -1434,7 +1434,9 @@ fragment bundle over the parent's states (whose length and offset rows are
 read off the parent's bundle, handed back). -/
 theorem kf_child_close [X : CurCtx] (γ : FileNames) (γd γp : GName) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (C : List (BitVec 64)) (sts : List FdState)
-    (hX : curTier = KTier.kpt) (hC : C.length = 16) (hfdg : V.fdg = γd) (hof : V.ofile = C) :
+    (hX : curTier = KTier.kpt) (hC : C.length = 16) (hfdg : V.fdg = γd) (hof : V.ofile = C)
+    -- (NI M3 private files FS-2e-b) the child's fs cursor is born at 0
+    (hfc : V.fsc = 0) :
     procPrivBareAt (GF := GF) curCtx pa pid V M ∗
       @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
       @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
@@ -1457,9 +1459,11 @@ theorem kf_child_close [X : CurCtx] (γ : FileNames) (γd γp : GName) (pa : Bit
       iframe H Hr
       ipureintro; exact h) $$ Hpf with ⟨%hsl, #Hrows, Hpf⟩
   iframe Hpf
+  ihave #Hfc : fsCurOk (GF := GF) V.fsc $$ []
+  · unfold fsCurOk; ileft; ipureintro; exact hfc
   isplitl [Hb Hcw Hrt Hg Hsp Hc]
   · unfold procPrivFd procPrivCoreNoctxAt procOfiles procOfilesOwe
-    iframe Hb Hcw Hrt Hg Hsp
+    iframe Hb Hcw Hrt Hg Hsp Hfc
     rw [hof, hfdg]
     isplitl []
     · ipureintro; rw [hC]; rfl
@@ -1905,7 +1909,7 @@ def kfOfileΨ [CurCtx] (cpu : CPU) (k : KCtx) (Γ : SchedNames) [ClaimIs (hlc :=
   procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ zsElem (procAddr i) none ∗ slotUsed Γ (procAddr i) ∗
   cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗
   bslots 3 ∗ chFrag V_c.chg (procAddr i) ∅ ∗
-  (procGenAt curCtx (procAddr j) pid V.gen ∗ pageCredit procSpare) ∗ chFrag V.chg (procAddr j) csP ∗
+  (procGenAt curCtx (procAddr j) pid V.gen ∗ pageCredit procSpare ∗ fsCurOk V.fsc) ∗ chFrag V.chg (procAddr j) csP ∗
   childTok V_c.gen pid_c Q ∗ procGenAt curCtx (procAddr i) pid_c V_c.gen ∗ pageCredit procSpare ∗
   slotGen (procAddr i) (.own Qp.threeQuarters) V_c.gen ∗ pidReg pid_c (.own Qp.threeQuarters) V_c.gen ∗
   genSlot V_c.gen (procAddr i) ∗ genPid V_c.gen pid_c ∗
@@ -2114,7 +2118,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
       procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ zsElem (procAddr i) none ∗ slotUsed Γ (procAddr i) ∗
       cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ fdSlots FDSPARE ∗
       irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 ∗ chFrag V_c.chg (procAddr i) ∅ ∗
-      (procGenAt curCtx (procAddr j) pid V.gen ∗ pageCredit procSpare) ∗ chFrag V.chg (procAddr j) csP ∗
+      (procGenAt curCtx (procAddr j) pid V.gen ∗ pageCredit procSpare ∗ fsCurOk V.fsc) ∗ chFrag V.chg (procAddr j) csP ∗
       childTok V_c.gen pid_c Q ∗ procGenAt curCtx (procAddr i) pid_c V_c.gen ∗ pageCredit procSpare ∗
       slotGen (procAddr i) (.own Qp.threeQuarters) V_c.gen ∗ pidReg pid_c (.own Qp.threeQuarters) V_c.gen ∗
       genSlot V_c.gen (procAddr i) ∗ genPid V_c.gen pid_c ∗
@@ -2411,7 +2415,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
   -- fixed): the finished table with its payloads, the cwd reference and the
   -- generation row go into the record beside the fragment bundle
   icases kf_child_close γ γdC V.fdg (procAddr i) pid_c (kfChildV V V_c Pnew' Cf (Rid 10#5) (Rid2 10#5) bs' γdC) Mnew' Cf stsP
-      rfl hCflen rfl rfl $$ [HcBare HcwC HrtC HgC HcSp Hchild Hcfr Hfr] with ⟨⟨HcFd, HcFr⟩, Hfr⟩
+      rfl hCflen rfl rfl rfl $$ [HcBare HcwC HrtC HgC HcSp Hchild Hcfr Hfr] with ⟨⟨HcFd, HcFr⟩, Hfr⟩
   · iframe
   -- ===== THE STEADY PARK (ParkCap.parkToken_park_steady, D25): the record
   -- the token builds, at the child's run key =====

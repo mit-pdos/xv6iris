@@ -2901,12 +2901,12 @@ theorem niDet_runs (D : NiDetReading) {h₁ h₂ : List Obs} {H₁ H₂ : Nat �
 from its start key. -/
 theorem niRunFrom_of_hist : ∀ (rs : List NiEntry) (H : List Uround) (C : Uvis), uhistChain C H →
     (∀ (n : Nat) (f : NiEntry), rs[n]? = some f → ∃ (i j : Nat) (sc : BitVec 64) (Wr W W' : Uvis)
-      (c : Option (Nat × UIota)) (γ : Iris.GName) (k : Nat), f = NiEntry.round i j sc Wr W W' c γ k ∧
-      H[n]? = some (sc, Wr, W, W')) →
+      (c : Option (Nat × UIota)) (γ : Iris.GName) (k : Nat) (w : Nat × Nat),
+      f = NiEntry.round i j sc Wr W W' c γ k ∧ H[n]? = some (sc, Wr, W, W', w)) →
     niRunFrom C rs
   | [], _, _, _, _ => trivial
   | f :: rs, H, C, hc, hf => by
-    obtain ⟨i, j, sc, Wr, W, W', c, γ, k, rfl, hH⟩ := hf 0 f rfl
+    obtain ⟨i, j, sc, Wr, W, W', c, γ, k, w, rfl, hH⟩ := hf 0 f rfl
     match H, hc, hH with
     | [], _, hH => simp at hH
     | e :: H', hc, hH =>
@@ -2914,8 +2914,8 @@ theorem niRunFrom_of_hist : ∀ (rs : List NiEntry) (H : List Uround) (C : Uvis)
       subst hH
       obtain ⟨h1, -, h3⟩ := hc
       exact ⟨h1, niRunFrom_of_hist rs H' W' h3 (fun n g hg => by
-        obtain ⟨i', j', sc', Wr', W₀, W₀', c', γ', k', hg', hgH⟩ := hf (n + 1) g (by simpa using hg)
-        exact ⟨i', j', sc', Wr', W₀, W₀', c', γ', k', hg', by simpa using hgH⟩)⟩
+        obtain ⟨i', j', sc', Wr', W₀, W₀', c', γ', k', w', hg', hgH⟩ := hf (n + 1) g (by simpa using hg)
+        exact ⟨i', j', sc', Wr', W₀, W₀', c', γ', k', w', hg', by simpa using hgH⟩)⟩
 
 /-- **ONE INCARNATION, ONE CHAIN**: with one key history (`NiOneOrigin`) read
 without gaps (`NiGapFree`), `q`'s filings are its origin at the history's start
@@ -2944,7 +2944,7 @@ theorem niRun_of {q : NiInc} {h : List Obs} {F : List NiEntry} (hU : niUserChain
     obtain ⟨ho, hγ₀⟩ := hmem _ (List.mem_cons_self ..)
     simp only [NiEntry.uh] at hγ₀
     subst hγ₀
-    obtain ⟨W0', H, hch, horig, hround⟩ := hU γ₀
+    obtain ⟨W0', H, hch, -, horig, hround⟩ := hU γ₀
     have hW := horig j W0 p ho
     subst hW
     refine niRunFrom_of_hist rs H W0 hch (fun n f hf => ?_)
@@ -2957,7 +2957,8 @@ theorem niRun_of {q : NiInc} {h : List Obs} {F : List NiEntry} (hU : niUserChain
       simp only [NiEntry.hidx, Nat.add_right_cancel_iff] at hi
       simp only [NiEntry.uh] at hfγ
       subst hi hfγ
-      exact ⟨i, j', sc, Wr, W, W', c, γ', k, rfl, hround i j' sc Wr W W' c k hfF⟩
+      obtain ⟨w, hw, -⟩ := hround i j' sc Wr W W' c k hfF
+      exact ⟨i, j', sc, Wr, W, W', c, γ', k, w, rfl, hw⟩
 
 theorem firstKey_nil {q : NiInc} {h : List Obs} {F : List NiEntry} (hL : ufilings q h F = []) :
     firstKey q h F = none := by

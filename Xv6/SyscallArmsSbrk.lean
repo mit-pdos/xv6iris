@@ -472,7 +472,7 @@ theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (sts :
   iintro #Ha
   imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
   imodintro
-  iapply syscEvOut_cite V M sts sts' V' M' cs cs gn ke { UIota.boot with act := act } (hrow _) $$ Ha Hl
+  iapply syscEvOut_cite V M sts sts' V' M' cs cs gn ke { UIota.boot with act := act } (hrow _) (fsPast_nil _ _ rfl) $$ Ha Hl
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 12, `sys_sbrk`** (Rocq `sysc_arm_sbrk`; the whole block, D16). -/

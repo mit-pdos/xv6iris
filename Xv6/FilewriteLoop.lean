@@ -130,7 +130,7 @@ def fwrHead (Γ : SchedNames) (k : KCtx) (A : FwrA) (Q : Nat → IProp GF) (Qe :
   fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
   -- (NI M3 private files FS-1, FS-2e) the chunks so far, in ledger order,
   -- their advances summing to the bytes written so far
-  fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n 0 0 cs ∗ ⌜fwSum cs = t⌝ ∗
+  fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n A.V.fsc 0 cs ∗ ⌜fwSum cs = t⌝ ∗
   fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
 
 /-- **THE LOOP INVARIANT** at the bottom test `+0xd4`, over the fuel. -/
@@ -163,10 +163,10 @@ theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q
     procPrivExtEv (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     ((⌜tot = c⌝ ∗ fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q (t + c)
         (p + 1) 0) ∨
-     (⌜tot < c⌝ ∗ fwWhyAfter fscFs k.proc A.V.upt (k.regs 11#5) A.n (fwEnd 0 cs) ∗
+     (⌜tot < c⌝ ∗ fwWhyAfter fscFs k.proc A.V.upt (k.regs 11#5) A.n (fwEnd A.V.fsc cs) ∗
         ∃ x : Nat, ⌜x ≤ 1⌝ ∗
         fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x)) ∗
-    fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n 0 0 cs ∗ ⌜fwSum cs = t + tot⌝ ∗
+    fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n A.V.fsc 0 cs ∗ ⌜fwSum cs = t + tot⌝ ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hn := hA.hn
@@ -209,7 +209,7 @@ theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r21, hb2]
       iintro Hk Hpc
       have heq : ((t + c : Nat) : Int) = A.n := by omega
-      ihave #Hcsn : (∃ cs : List (Nat × Fev), fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n 0 0 cs ∗ ⌜fwSum cs = A.n.toNat⌝) $$ []
+      ihave #Hcsn : (∃ cs : List (Nat × Fev), fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n A.V.fsc 0 cs ∗ ⌜fwSum cs = A.n.toNat⌝) $$ []
       · iexists cs; iframe Hcs; ipureintro; omega
       iapply (fwr_exit_ok cpu k A hA Q Qe spie spp _ (t + c) (p + 1) P a0 (BitVec.ofNat 64 c) v11 heq hext
           hr1) $$ [$Hk $Hpc $Hframe $Hte $Hce $Href $Hpriv $Hbs $Hst $Hcsn $HΦ]
@@ -332,7 +332,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   iintro ⟨Hk, Hpc, Hte, Hce, Hframe, #Henv, Href, Hpriv, Hbs, Hst, #Hcs, %hsum, HΦ⟩
   ihave Henv' := Henv
   unfold fwrEnv
-  icases Henv' with ⟨#Hpi, #Hpe, #Hfs, #Hkl, #Hav⟩
+  icases Henv' with ⟨#Hpi, #Hpe, #Hfs, #Hkl, #Hav, #Hfc⟩
   -- THE REFERENCE, OPENED, AND THE CARVE (per iteration)
   icases filerw_ref_open A.γ A.fk A.q A.st $$ Href with ⟨%C, %-, Htok, Hfields, Hpay⟩
   icases fwr_pay_carve A.γ A.fk A.q C A.rb A.i A.γo A.om $$ Hpay with ⟨%ik, %inum, %s, %g, %ty,
@@ -405,11 +405,11 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   imod fwr_post_ghost k.proc A.om cpu ik A.fk A.q γb C m T0 Tr inum A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p
     (fwrChunk A.n.toNat t) dn dn' dn0' bm bm' data data' v tot dist wrote dstb a0 hip hik hq htn htie
     hcpos (fwrChunk_wchunkAt A.n t p htn htie) hout.w16at htyF hty' hnl' hok.2.2.2.2.2.1 hout.holes hok.2.2.2.2.1 hcap htotc hout.distLe
-    hout.distFull hwhy hout.range harms hchunk hok' hrl' hnd' hdn0 cs hsum
+    hout.distFull hwhy hout.range harms hchunk hok' hrl' hnd' hdn0 A.V.fsc cs hsum
     $$ [Hrun Htop Hgv Hst Hcell Hout Hdi Hmeta Hmap Hblk] with ⟨Hrun, Hoffd, Hrows, Hload, ⟨%cs', #Hcs', %hsum', Hst⟩⟩
-  · ihave #Hcs0 : fwChunksOrd fscFs k.proc inum.toNat A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n 0 0 cs $$ []
+  · ihave #Hcs0 : fwChunksOrd fscFs k.proc inum.toNat A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n A.V.fsc 0 cs $$ []
     · rw [← hi]; iexact Hcs
-    iframe Hcs0 Hrun Htop Hgv Hst Hcell Hout Hdi Hmeta Hmap Hblk
+    iframe Hfc Hcs0 Hrun Htop Hgv Hst Hcell Hout Hdi Hmeta Hmap Hblk
     iframe #
   ihave Hk := Hkb $$ Hrun
   imodintro
@@ -443,7 +443,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   · iframe
   ihave Hst : ((⌜tot = fwrChunk A.n.toNat t⌝ ∗ fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img
         (k.regs 11#5) Q (t + fwrChunk A.n.toNat t) (p + 1) 0) ∨
-      (⌜tot < fwrChunk A.n.toNat t⌝ ∗ fwWhyAfter fscFs k.proc A.V.upt (k.regs 11#5) A.n (fwEnd 0 (cs ++ cs')) ∗
+      (⌜tot < fwrChunk A.n.toNat t⌝ ∗ fwWhyAfter fscFs k.proc A.V.upt (k.regs 11#5) A.n (fwEnd A.V.fsc (cs ++ cs')) ∗
         ∃ x : Nat, ⌜x ≤ 1⌝ ∗
         fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x)) $$ [Hst]
   · rw [hi]; iexact Hst
@@ -453,7 +453,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
     · exact Or.inl ⟨h, h2⟩
     · exact Or.inr h
   -- (NI M3 private files FS-1) the chunk's receipt joins the loop's
-  ihave #Hcs2 : fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n 0 0 (cs ++ cs') $$ []
+  ihave #Hcs2 : fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n A.V.fsc 0 (cs ++ cs') $$ []
   · rw [hi]; iexact Hcs'
   iapply (fwr_tests Γ k A hA Q Qe W IH cpu spie3 spp3 R3 t p (fwrChunk A.n.toNat t) tot P' a0
       (BitVec.ofNat 64 (fwrChunk A.n.toNat t)) v11 (cs ++ cs') hfuel htn htie (UMemL.extSz_trans hext hPP) rfl

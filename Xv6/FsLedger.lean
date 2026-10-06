@@ -936,112 +936,140 @@ def fwSum (cs : List (Nat × Fev)) : Nat := (cs.map (fun c => fevWriteR c.2)).su
 theorem fwSum_append (cs cs' : List (Nat × Fev)) : fwSum (cs ++ cs') = fwSum cs + fwSum cs' := by
   unfold fwSum; simp
 
-/-- (NI M3 private files FS-1) the arm event of `i` by `act`, in the era's ledger -/
-def creArmRcpt (γfs : FsNames) (act : BitVec 64) (i : Nat) : IProp GF :=
-  iprop(∃ n : Fnode, fsLedAt γfs [.arm act i n])
+/-- (NI M3 private files FS-1, FS-2e-b) the arm event of `i` by `act`, in the
+era's ledger, past the position `lo` (the caller's fs cursor) -/
+def creArmRcpt (γfs : FsNames) (act : BitVec 64) (lo : Nat) (i : Nat) : IProp GF :=
+  iprop(∃ (n : Fnode) (h : List Fev), ⌜lo ≤ h.length⌝ ∗ fsLedLb γfs (h ++ [.arm act i n]))
 
-instance creArmRcpt_persistent (γfs : FsNames) (act : BitVec 64) (i : Nat) :
-    Persistent (creArmRcpt (GF := GF) γfs act i) := by
+instance creArmRcpt_persistent (γfs : FsNames) (act : BitVec 64) (lo : Nat) (i : Nat) :
+    Persistent (creArmRcpt (GF := GF) γfs act lo i) := by
   unfold creArmRcpt; infer_instance
 
-/-- (NI M3 private files FS-1, FS-2e) **THE PARENT LEG BY `act`, AFTER THE
-ARM**: the entry `nm ↦ i` set in `d` and `d`'s count, one block in the era's
-ledger, past the made child's arm `arm act i n` (the leg fired past the arm's
-lower bound) -/
-def creParentRcpt (γfs : FsNames) (act : BitVec 64) (nm : List (BitVec 8)) (i : Nat) : IProp GF :=
-  iprop(∃ (n : Fnode) (h h' : List Fev) (d nl : Nat), ⌜h ++ [.arm act i n] <+: h'⌝ ∗
+/-- (FS-2e-b) the arm fire's receipt past a bound at least `lo` long -/
+theorem creArmRcpt_of (γfs : FsNames) (act : BitVec 64) (lo : Nat) (i : Nat) (L : List Fev) (n : Fnode)
+    (np : FsNode) (hlo : lo ≤ L.length) :
+    fsMoveRcptAfter (GF := GF) γfs L [.arm act i n] i np ⊢ creArmRcpt γfs act lo i := by
+  unfold fsMoveRcptAfter creArmRcpt
+  iintro ⟨%h, %⟨hv, -⟩, #Hl⟩
+  iexists n, h
+  iframe Hl
+  ipureintro; exact Nat.le_trans hlo hv.length_le
+
+/-- (NI M3 private files FS-1, FS-2e, FS-2e-b) **THE PARENT LEG BY `act`,
+AFTER THE ARM**: the entry `nm ↦ i` set in `d` and `d`'s count, one block in
+the era's ledger, past the made child's arm `arm act i n` (the leg fired past
+the arm's lower bound), the arm past the caller's fs cursor `lo` -/
+def creParentRcpt (γfs : FsNames) (act : BitVec 64) (lo : Nat) (nm : List (BitVec 8)) (i : Nat) : IProp GF :=
+  iprop(∃ (n : Fnode) (h h' : List Fev) (d nl : Nat), ⌜lo ≤ h.length ∧ h ++ [.arm act i n] <+: h'⌝ ∗
     fsLedLb γfs (h ++ [.arm act i n]) ∗ fsLedLb γfs (h' ++ [.ent act d nm (some i), .nlink act d nl]))
 
-instance creParentRcpt_persistent (γfs : FsNames) (act : BitVec 64) (nm : List (BitVec 8)) (i : Nat) :
-    Persistent (creParentRcpt (GF := GF) γfs act nm i) := by
+instance creParentRcpt_persistent (γfs : FsNames) (act : BitVec 64) (lo : Nat) (nm : List (BitVec 8)) (i : Nat) :
+    Persistent (creParentRcpt (GF := GF) γfs act lo nm i) := by
   unfold creParentRcpt; infer_instance
 
 /-- (FS-2e) the leg's receipt from the arm's and the leg fire's past it -/
-theorem creParentRcpt_of (γfs : FsNames) (act : BitVec 64) (nm : List (BitVec 8)) (i d nl : Nat)
-    (n : Fnode) (h : List Fev) (np : FsNode) :
+theorem creParentRcpt_of (γfs : FsNames) (act : BitVec 64) (lo : Nat) (nm : List (BitVec 8)) (i d nl : Nat)
+    (n : Fnode) (h : List Fev) (np : FsNode) (hlo : lo ≤ h.length) :
     fsLedLb (GF := GF) γfs (h ++ [.arm act i n]) ⊢
       fsMoveRcptAfter γfs (h ++ [.arm act i n]) [.ent act d nm (some i), .nlink act d nl] d np -∗
-      creParentRcpt γfs act nm i := by
+      creParentRcpt γfs act lo nm i := by
   unfold fsMoveRcptAfter creParentRcpt
   iintro #Ha ⟨%h', %⟨hv, -⟩, #Hl⟩
   iexists n, h, h', d, nl
   iframe Ha Hl
-  ipureintro; exact hv
+  ipureintro; exact ⟨hlo, hv⟩
 
-/-- (NI M3 private files FS-2b′, FS-2e) a FOUND node's lookup hop by `act`
-of the name `nm`, at a position whose prefix's fold reads the parent `d` as
-a directory naming `nm ↦ i` (the observation's receipt, the found entry read
-off it) -/
-def creFoundRcpt (γfs : FsNames) (act : BitVec 64) (nm : List (BitVec 8)) (i : Nat) : IProp GF :=
+/-- (NI M3 private files FS-2b′, FS-2e, FS-2e-b) a FOUND node's lookup hop by
+`act` of the name `nm`, past the caller's fs cursor `lo`, at a position whose
+prefix's fold reads the parent `d` as a directory naming `nm ↦ i` -/
+def creFoundRcpt (γfs : FsNames) (act : BitVec 64) (lo : Nat) (nm : List (BitVec 8)) (i : Nat) : IProp GF :=
   iprop(∃ (h : List Fev) (d : Nat) (e : Std.ExtTreeMap (List (BitVec 8)) Nat compare) (nl : Nat),
-    ⌜fevRows h d = some (.dir e, nl) ∧ e[nm]? = some i⌝ ∗ fsLedLb γfs (h ++ [.hop act d nm none]))
+    ⌜fevRows h d = some (.dir e, nl) ∧ e[nm]? = some i ∧ lo ≤ h.length⌝ ∗ fsLedLb γfs (h ++ [.hop act d nm none]))
 
-instance creFoundRcpt_persistent (γfs : FsNames) (act : BitVec 64) (nm : List (BitVec 8)) (i : Nat) :
-    Persistent (creFoundRcpt (GF := GF) γfs act nm i) := by
+instance creFoundRcpt_persistent (γfs : FsNames) (act : BitVec 64) (lo : Nat) (nm : List (BitVec 8)) (i : Nat) :
+    Persistent (creFoundRcpt (GF := GF) γfs act lo nm i) := by
   unfold creFoundRcpt; infer_instance
 
-/-- a directory's lookup observation, its entry read: the found receipt -/
-theorem fsObsRcpt_found (γfs : FsNames) (act : BitVec 64) (d i : Nat) (nm : List (BitVec 8))
-    (n : FsNode) (hd : fnIsDir n = true) (hnm : (dirEntries n)[nm]? = some i) :
-    fsObsRcpt (GF := GF) γfs (.hop act d nm none) d n ⊢ creFoundRcpt γfs act nm i := by
-  unfold fsObsRcpt fsEvRcpt creFoundRcpt
-  iintro ⟨%h, %hr, #Hr⟩
+/-- a directory's lookup observation past a bound at least `lo` long, its
+entry read: the found receipt -/
+theorem fsObsRcpt_found (γfs : FsNames) (act : BitVec 64) (lo : Nat) (L : List Fev) (d i : Nat)
+    (nm : List (BitVec 8)) (n : FsNode) (hd : fnIsDir n = true) (hnm : (dirEntries n)[nm]? = some i)
+    (hlo : lo ≤ L.length) :
+    fsObsRcptP (GF := GF) γfs (.hop act d nm none) d n (fun h => L <+: h) ⊢ creFoundRcpt γfs act lo nm i := by
+  unfold fsObsRcptP fsEvRcpt creFoundRcpt
+  iintro ⟨%h, %⟨hr, hv⟩, #Hr⟩
   iexists h, d, dirEntries n, fnNlink n
   iframe Hr
   ipureintro
-  refine ⟨?_, hnm⟩
+  refine ⟨?_, hnm, Nat.le_trans hlo hv.length_le⟩
   rw [hr, ftopRow_typed n (fnIsDir_typed n hd), absRow_dir_eq n hd]
   rfl
 
 /-- (NI M3 private files FS-1, FS-2e) **CREATE'S LEDGER RECEIPT** on a
 success, at the entry name `nm`: a MADE child's arm and, after it, its
 parent leg filing `nm`; or a FOUND node's lookup hop of `nm` (FS-2b′: at its
-parent's entry). -/
-def creOkRcpt (γfs : FsNames) (act : BitVec 64) (made : Bool) (nm : List (BitVec 8)) (i : Nat) : IProp GF :=
-  iprop((⌜made = true⌝ ∗ creParentRcpt γfs act nm i) ∨
-    (⌜made = false⌝ ∗ creFoundRcpt γfs act nm i))
+parent's entry); (FS-2e-b) all of it past the caller's fs cursor `lo`. -/
+def creOkRcpt (γfs : FsNames) (act : BitVec 64) (lo : Nat) (made : Bool) (nm : List (BitVec 8)) (i : Nat) :
+    IProp GF :=
+  iprop((⌜made = true⌝ ∗ creParentRcpt γfs act lo nm i) ∨
+    (⌜made = false⌝ ∗ creFoundRcpt γfs act lo nm i))
 
-instance creOkRcpt_persistent (γfs : FsNames) (act : BitVec 64) (made : Bool) (nm : List (BitVec 8))
-    (i : Nat) : Persistent (creOkRcpt (GF := GF) γfs act made nm i) := by
+instance creOkRcpt_persistent (γfs : FsNames) (act : BitVec 64) (lo : Nat) (made : Bool) (nm : List (BitVec 8))
+    (i : Nat) : Persistent (creOkRcpt (GF := GF) γfs act lo made nm i) := by
   unfold creOkRcpt; infer_instance
 
 /-- (NI M3 private files FS-2e) **CREATE'S EVENTS INSIDE A PREFIX**: a made
 child's arm by `act`, then its parent leg filing `nm ↦ i`; or a found node's
 lookup of `nm`, at a prefix whose fold names `nm ↦ i` in the parent -- all
-of it inside `H` -/
-def creOkIn (act : BitVec 64) (made : Bool) (nm : List (BitVec 8)) (i : Nat) (H : List Fev) : Prop :=
+of it inside `H`; (FS-2e-b) and past the position `lo` -/
+def creOkIn (act : BitVec 64) (lo : Nat) (made : Bool) (nm : List (BitVec 8)) (i : Nat) (H : List Fev) : Prop :=
   if made then
-    ∃ (n : Fnode) (h h' : List Fev) (d nl : Nat),
+    ∃ (n : Fnode) (h h' : List Fev) (d nl : Nat), lo ≤ h.length ∧
       h ++ [.arm act i n] <+: h' ∧ h' ++ [.ent act d nm (some i), .nlink act d nl] <+: H
   else
     ∃ (h : List Fev) (d : Nat) (e : Std.ExtTreeMap (List (BitVec 8)) Nat compare) (nl : Nat),
-      fevRows h d = some (.dir e, nl) ∧ e[nm]? = some i ∧ h ++ [.hop act d nm none] <+: H
+      fevRows h d = some (.dir e, nl) ∧ e[nm]? = some i ∧ lo ≤ h.length ∧ h ++ [.hop act d nm none] <+: H
 
-theorem creOkIn_mono {act : BitVec 64} {made : Bool} {nm : List (BitVec 8)} {i : Nat} {H H' : List Fev}
-    (hp : H <+: H') (h : creOkIn act made nm i H) : creOkIn act made nm i H' := by
+theorem creOkIn_mono {act : BitVec 64} {lo : Nat} {made : Bool} {nm : List (BitVec 8)} {i : Nat}
+    {H H' : List Fev} (hp : H <+: H') (h : creOkIn act lo made nm i H) : creOkIn act lo made nm i H' := by
   unfold creOkIn at h ⊢
   cases made with
   | true =>
     simp only [if_true] at h ⊢
-    obtain ⟨n, h1, h2, d, nl, ha, hb⟩ := h
-    exact ⟨n, h1, h2, d, nl, ha, hb.trans hp⟩
+    obtain ⟨n, h1, h2, d, nl, hl, ha, hb⟩ := h
+    exact ⟨n, h1, h2, d, nl, hl, ha, hb.trans hp⟩
   | false =>
     simp only [Bool.false_eq_true, if_false] at h ⊢
-    obtain ⟨h1, d, e, nl, hr, he, hb⟩ := h
-    exact ⟨h1, d, e, nl, hr, he, hb.trans hp⟩
+    obtain ⟨h1, d, e, nl, hr, he, hl, hb⟩ := h
+    exact ⟨h1, d, e, nl, hr, he, hl, hb.trans hp⟩
+
+/-- (FS-2e-b) create's events lie past their prefix's cursor: the prefix that
+holds them is at least `lo + 1` long -/
+theorem creOkIn_len {act : BitVec 64} {lo : Nat} {made : Bool} {nm : List (BitVec 8)} {i : Nat}
+    {H : List Fev} (h : creOkIn act lo made nm i H) : lo < H.length := by
+  unfold creOkIn at h
+  cases made with
+  | true =>
+    simp only [if_true] at h
+    obtain ⟨n, h1, h2, d, nl, hl, ha, hb⟩ := h
+    have := ha.length_le; have := hb.length_le; simp at *; omega
+  | false =>
+    simp only [Bool.false_eq_true, if_false] at h
+    obtain ⟨h1, d, e, nl, -, -, hl, hb⟩ := h
+    have := hb.length_le; simp at *; omega
 
 /-- (NI M3 private files FS-2b′) **WHAT FIXED create's INODE**, in the
 ledger: a made child's arm, or a found node's hop at its parent's entry
 (`fevOpenFixed`'s O_CREATE side; the walk's start and names unread); (FS-2e)
 read at a lower bound that holds ALL of create's events (a made child's
 ENDS IN ITS PARENT LEG), so what lands past it lands past the whole create -/
-theorem creOkRcpt_fixed (γfs : FsNames) (act : BitVec 64) (made : Bool) (nm : List (BitVec 8)) (i : Nat)
-    (rt s0 : Nat) (es : List (List (BitVec 8))) :
-    creOkRcpt (GF := GF) γfs act made nm i ⊢
+theorem creOkRcpt_fixed (γfs : FsNames) (act : BitVec 64) (lo : Nat) (made : Bool) (nm : List (BitVec 8))
+    (i : Nat) (rt s0 : Nat) (es : List (List (BitVec 8))) :
+    creOkRcpt (GF := GF) γfs act lo made nm i ⊢
       ∃ (H : List Fev) (p : Nat), fsLedLb γfs H ∗
-        ⌜fevOpenFixed H act rt s0 es true i (some p) = true ∧ creOkIn act made nm i H⌝ := by
+        ⌜fevOpenFixed H act rt s0 es true i (some p) = true ∧ creOkIn act lo made nm i H⌝ := by
   unfold creOkRcpt creParentRcpt creFoundRcpt
-  iintro (⟨%hm, ⟨%n, %h, %h', %d, %nl, %hv, -, #Hl⟩⟩ | ⟨%hm, ⟨%h, %d, %e, %nl, %⟨hr, hnm⟩, #Hh⟩⟩)
+  iintro (⟨%hm, ⟨%n, %h, %h', %d, %nl, %⟨hl, hv⟩, -, #Hl⟩⟩ | ⟨%hm, ⟨%h, %d, %e, %nl, %⟨hr, hnm, hl⟩, #Hh⟩⟩)
   · iexists h' ++ [.ent act d nm (some i), .nlink act d nl], h.length
     iframe Hl
     ipureintro
@@ -1049,13 +1077,13 @@ theorem creOkRcpt_fixed (γfs : FsNames) (act : BitVec 64) (made : Bool) (nm : L
       simp [fevOpenFixed]
     refine ⟨fevOpenFixed_mono (hv.trans (List.prefix_append _ _)) h0, ?_⟩
     subst hm
-    exact ⟨n, h, h', d, nl, hv, List.prefix_refl _⟩
+    exact ⟨n, h, h', d, nl, hl, hv, List.prefix_refl _⟩
   · iexists h ++ [.hop act d nm none], h.length
     iframe Hh
     ipureintro
     refine ⟨by simp [fevOpenFixed, List.take_left' rfl, hr, hnm], ?_⟩
     subst hm
-    exact ⟨h, d, e, nl, hr, hnm, List.prefix_refl _⟩
+    exact ⟨h, d, e, nl, hr, hnm, hl, List.prefix_refl _⟩
 
 /-- (NI M3 private files FS-1) unlink's parent leg by `act`: the entry
 removed from `d` and `d`'s count, one block -/

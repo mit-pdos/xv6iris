@@ -3196,7 +3196,7 @@ theorem kwait_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOU
   iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %k' %hp Hans Hkg Hrow Hk Hpc Hte Hce %hk' Hn
   ihave Hgen := Hgw $$ Hkg
   ihave Hblk := Hback $$ %{ V.updEv k' with upt := P' } %_ [] Hn Hgen
-  · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl⟩
+  · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
   iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %k' %hp Hans Hrow Hk Hpc Hte Hce %hk' Hblk
 
 /-- **THE LANDED CONTRACT, a corollary of the led form** (Rocq

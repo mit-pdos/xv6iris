@@ -516,19 +516,30 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
   unfold liveAllow uiBootRows
   icases Hal with ⟨Hfsp, Hirs, Hbs⟩
   icases Hgen with ⟨Hfb, Hkq, #Hmp, Hgh, Hxs⟩
+  -- (NI M3 private files FS-2e-b) the first process's cursor is born at 0;
+  -- the cursor is not a cell, so the bare block does not read it
+  ihave Hbare : procPrivBareAt (GF := GF) ξ0 (procAddr j) pid
+      { V with cwd := kf.regs 10#5, pvSecc := seccAll, cwi := ROOTINO, rti := ROOTINO, fdg := V.fdg, fsc := 0 } M
+    $$ [Hbare]
+  · iapply (procPrivBareAt_fsc ξ0 (procAddr j) pid
+      { V with cwd := kf.regs 10#5, pvSecc := seccAll, cwi := ROOTINO, rti := ROOTINO, fdg := V.fdg } M 0) $$ Hbare
   ihave Hchildr : parkChild (hlc := hlc) ξ0 ⟨γft, γ, γw, Γ, j, procAddr j, pid⟩ (List.replicate 12 0#64)
-      { V with cwd := kf.regs 10#5, pvSecc := seccAll, cwi := ROOTINO, rti := ROOTINO, fdg := V.fdg } M false
+      { V with cwd := kf.regs 10#5, pvSecc := seccAll, cwi := ROOTINO, rti := ROOTINO, fdg := V.fdg, fsc := 0 } M false
       $$ [Hctxc Hbare Hofs Hcwr Hrtr Hfb Hkq Hgh Hxs Hfsp Hirs Hcr]
   · unfold parkChild parkBlock parkBootBlock UtNames.pj
     simp only [Bool.false_eq_true, ↓reduceIte]
     rw [show (parkForkretPc :: (V.kstack + 4096#64) :: List.replicate 12 0#64) = V.context from by
       rw [hctx]; rfl]
+    -- (NI M3 private files FS-2e-b) the cursor is not a cell: the bare
+    -- block reads no `fsc`
     iframe Hctxc Hbare Hofs Hcwr Hrtr Hfb Hkq Hgh Hxs Hfsp Hirs Hcr
-    iexact Hmp
+    isplitl []
+    · iexact Hmp
+    unfold fsCurOk; ileft; ipureintro; rfl
   ihave #Htok := FP.park_token_intro (hlc := hlc) (GF := GF) Γ
   icases kctx_token_acc cpu _ $$ Hk with ⟨Hown, Hback⟩
   have hup := parkToken_park (hlc := hlc) (GF := GF) (SG := uexecSGXv6) cpu ξ0 ⟨γft, γ, γw, Γ, j, procAddr j, pid⟩
-    (List.replicate 12 0#64) { V with cwd := kf.regs 10#5, pvSecc := seccAll, cwi := ROOTINO, rti := ROOTINO, fdg := V.fdg } M
+    (List.replicate 12 0#64) { V with cwd := kf.regs 10#5, pvSecc := seccAll, cwi := ROOTINO, rti := ROOTINO, fdg := V.fdg, fsc := 0 } M
     (List.replicate NOFILE FdState.closed) ∅ hj (by simp)
   -- the park's bcache slots (NI M3 U-2b: the incarnation's key history is
   -- born at its first resume, `ProofUserretClosed.userretClosed_proof`)

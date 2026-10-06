@@ -172,7 +172,7 @@ theorem syscall_arm_uptime (SU : SYSUPTIME)
   · iapply syscForkOut_ne; rw [hn14]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn14]; decide
-  · iapply syscEvOut_cite V M sts sts _ M cs cs gn ke _ hev $$ Hanc Hlbs
+  · iapply syscEvOut_cite V M sts sts _ M cs cs gn ke _ hev (fsPast_nil _ _ rfl) $$ Hanc Hlbs
 
 /-- **The kill deposit** (Rocq `ProofSyscall.sysc_dep_kill`, over
 `UexecExecInst.sbundle_at_kill_elim`): a process trapping with number 6

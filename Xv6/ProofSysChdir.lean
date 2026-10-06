@@ -164,7 +164,7 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
     A.P (pathElems (bview pl.length (sysfilePfun pl))).length inum.toNat ∗
     -- (NI M3 private files FS-2b) the walk's ledger chain, at the inum it reached
-    walkChain fscFs A.V.rti (umStartOf A.V.rti A.V.cwi pl) (pathElems pl) (pathElems pl).length inum.toNat
+    walkChain fscFs A.V.fsc A.V.rti (umStartOf A.V.rti A.V.cwi pl) (pathElems pl) (pathElems pl).length inum.toNat
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hlk, Hbs, Hir, Hop, Hoc, HP, #Hch⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -177,7 +177,7 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
   ihave #Hrdy := Xv6.sys_link_env_ready Γ $$ Henv
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   ihave #Hft := iregInv_ftop _ _ _ _ $$ Hinv
-  icases walkChain_open _ _ _ _ _ _ $$ Hch with ⟨%H0, %po, #HL, %hw⟩
+  icases walkChain_open _ _ _ _ _ _ _ $$ Hch with ⟨%H0, %po, #HL, %⟨hw, hlo0, hwp0⟩⟩
   iapply wpLoop_fupd
   -- (NI M3 private files FS-2b) ...WITH THE TYPE TEST'S `look`, past the walk
   imod (walkLook_fire_1 (hlc := hlc) fscFs ⊤ A.Fo inum.toNat (eraNode dn bm data)
@@ -253,7 +253,11 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
         fnNlink (eraNode dn bm data)
       iframe HLr
       ipureintro
-      exact ⟨hpath, hlook⟩
+      refine ⟨hpath, hlook, ?_, ?_⟩
+      · simp; have := hh.1.length_le; omega
+      · intro i' po' hl
+        simp at hl; obtain ⟨-, rfl⟩ := hl
+        exact fevWalkPast_mono (hh.1.trans (List.prefix_append _ _)) hw.1 hwp0
     iapply (sys_chdir_tail_ok IU IP EO Γ cpu k A P2 spie spp _ kk q g lo tl γil γisl inum dn bm n Sb
         _ (sysfilePfun pl) pl.length rfl _ _ av harow
         hj hproc hK hnoff htier ?hp1 hal hP2 hkk hnib hpos hle hn)
@@ -347,7 +351,7 @@ theorem sys_chdir_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPU
     logOpS icfgLog n Sb ∗ logTx icfgLog ∗
     inodeHeldAt ipv iL ∗ A.P (pathElems (bview pl.length (sysfilePfun pl))).length iL ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
-    walkChain fscFs A.V.rti (umStartOf A.V.rti A.V.cwi pl) (pathElems pl) (pathElems pl).length iL
+    walkChain fscFs A.V.fsc A.V.rti (umStartOf A.V.rti A.V.cwi pl) (pathElems pl) (pathElems pl).length iL
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Htx, Hheld, HP, Hoc, #Hch⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -487,8 +491,13 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     ihave #Hrdy := Xv6.sys_link_env_ready Γ $$ Henv
     icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
     ihave #Hft := iregInv_ftop _ _ _ _ $$ Hinv
+    -- (NI M3 private files FS-2e-b) ...from the caller's fs cursor's bound
+    icases procPrivCoreNoctxAt_fsCur _ _ _ _ _ $$ Hcore with ⟨#Hfc, Hcore⟩
+    iapply wpLoop_bupd
+    imod fsCurOk_lb _ $$ Hfc with ⟨%Lc, %hLc, #HLc⟩
+    imodintro
     ihave Hst := walkStart (hlc := hlc) fscFs (procAddr A.j) A.V.rti A.V.cwi A.P A.Pmiss
-      (bview pl'.length (sysfilePfun pl')) $$ Hft Hst
+      (bview pl'.length (sysfilePfun pl')) A.V.fsc Lc hLc $$ Hft HLc Hst
     icases logOp_openS icfgLog MAXOPBLOCKS $$ Hop with ⟨%Sb, HopS, Htx⟩
     ihave Hp := (show byteBuf (GF := GF) (sysChdirBuf (k.regs 2#5)) (DFrac.own 1)
         (bview (pl'.length + 1) (sysfilePfun pl')) ⊢
@@ -496,7 +505,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
         (bview (pl'.length + 1) (sysfilePfun pl')) from .rfl) $$ Hp
     iapply (sys_chdir_namei_era NI Γ cpu _ k.sie (by k_norm_g) (procAddr A.j)
         (by k_norm_g; exact hproc) A.j pl'.length (sysfilePfun pl') MAXOPBLOCKS Sb
-        (walkCur fscFs A.V.rti (umStartOf A.V.rti A.V.cwi (bview pl'.length (sysfilePfun pl')))
+        (walkCur fscFs A.V.fsc A.V.rti (umStartOf A.V.rti A.V.cwi (bview pl'.length (sysfilePfun pl')))
           (pathElems (bview pl'.length (sysfilePfun pl'))) A.P A.Pmiss)
         (walkMiss fscFs A.V.rti (pathElems (bview pl'.length (sysfilePfun pl'))) A.P A.Pmiss) A.pid
         (sysChdirV1 A P2) (sysChdirM1 A P2) hj ?np ?nK ?nn ?nt (sysfile_pfun_nn pl' hnul)
@@ -528,7 +537,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     · -- ===== the walk DIED: ARM B =====
       ihave Harm := Xv6.kxcA_ite_f _ _ $$ Harm
       icases Harm with ⟨%h10, Hir, Hdead⟩
-      ihave Hdead := walkDead_unwrap fscFs A.V.rti _ A.P A.Pmiss _ $$ Hdead
+      ihave Hdead := walkDead_unwrap fscFs A.V.fsc A.V.rti _ A.P A.Pmiss _ $$ Hdead
       ihave Hdead := sys_chdir_dead _ A.P A.Pmiss _ $$ Hdead
       iapply (sys_chdir_miss EO Γ cpu k A P2 spie1 spp1 R1 pl' _ n' Sb' hj hproc hK hnoff htier hct
           hp1 h10 hal hP2 hlen)
@@ -536,12 +545,12 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     · -- ===== the walk LANDED =====
       ihave Harm := Xv6.kxcA_ite_t _ _ $$ Harm
       icases Harm with ⟨%iL, %h10, Hheld, HP, Hir⟩
-      icases (walkCur_unwrap _ _ _ _ _ _ _ _).1 $$ HP with ⟨HP, #Hch, -⟩
-      ihave #Hch := (show walkChain (GF := GF) fscFs A.V.rti
+      icases (walkCur_unwrap _ _ _ _ _ _ _ _ _).1 $$ HP with ⟨HP, #Hch, -⟩
+      ihave #Hch := (show walkChain (GF := GF) fscFs A.V.fsc A.V.rti
           (umStartOf A.V.rti A.V.cwi (bview pl'.length (sysfilePfun pl')))
           (pathElems (bview pl'.length (sysfilePfun pl')))
           (pathElems (bview pl'.length (sysfilePfun pl'))).length iL ⊢
-        walkChain fscFs A.V.rti (umStartOf A.V.rti A.V.cwi pl') (pathElems pl') (pathElems pl').length iL
+        walkChain fscFs A.V.fsc A.V.rti (umStartOf A.V.rti A.V.cwi pl') (pathElems pl') (pathElems pl').length iL
         from by rw [sys_chdir_bview pl']) $$ Hch
       have hn : iputUnits ≤ n' := sys_chdir_bud_iput n' w true hlo
       iapply (sys_chdir_found IL IU IP IUP EO Γ cpu k A P2 spie1 spp1 R1 pl' _ n' Sb' ipv iL hj hproc

@@ -1586,7 +1586,12 @@ theorem kx_after_loop (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP
   obtain ⟨kv, hkv, rfl⟩ := hV1
   iunfold procPrivCoreUnmarkedAt, procPrivBareAt, procFieldsNoOfile at Hcore
   unfold filecloseFsEnv
-  icases Hcore with ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hname, Hsc, Hrt⟩, HPt, HTf, %hlz, Hev⟩, Hcwr, Hrtr, Hgen⟩
+  icases Hcore with ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hname, Hsc, Hrt⟩, HPt, HTf, %hlz, Hev⟩, Hcwr, Hrtr, Hgen0,
+    Hspare0, -⟩
+  -- (NI M3 private files FS-2e-b) the dying process's fs cursor is dropped
+  ihave Hgen := (show procGenUnmarkedAt (GF := GF) curCtx (procAddr j) pid (V.updEv kv).gen ∗ pageCredit procSpare
+    ⊢ procGenUnmarkedAt curCtx (procAddr j) pid (V.updEv kv).gen ∗ pageCredit procSpare from .rfl) $$ [Hgen0 Hspare0]
+  · iframe
   icases Hpenv with -
   icases Hfenv with ⟨-, -, #Hpinv, #Hrdy, Hbs⟩
   icases HΨ with ⟨Hfsp, Hirs, #Hpe, Hframe, Hcloser, #Hwl, #Hinit, Hch, #Hmy, HQ⟩

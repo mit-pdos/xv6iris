@@ -61,6 +61,12 @@ def procPrivBareAt [Xv6G GF] [WchG GF] (ξ : CtxId) (pa : BitVec 64) (pid : BitV
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
   actCnt pa V.ev
 
+/-- (NI M3 private files FS-2e-b) the fs cursor is not a cell: the bare
+block does not read it. -/
+theorem procPrivBareAt_fsc [Xv6G GF] [WchG GF] (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (c : Nat) :
+    procPrivBareAt (GF := GF) ξ pa pid V M ⊢ procPrivBareAt ξ pa pid { V with fsc := c } M := .rfl
+
 /-- The event counter is not a cell: writing it moves none of the fields. -/
 theorem procFieldsNoOfile_updEv (X : CurCtx) (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) (k : Nat) :
     @procFieldsNoOfile hlc GF _ X pa dq { V with ev := k } = @procFieldsNoOfile hlc GF _ X pa dq V :=

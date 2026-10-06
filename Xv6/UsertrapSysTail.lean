@@ -67,11 +67,11 @@ theorem ut_evOut_of (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8
     iexists ke, { UIota.boot with act := act }
     iframe Ha Hl
     ipureintro
-    refine ⟨fun h => absurd (hw.symm.trans h) (by decide), fun _ _ => ?_,
+    refine ⟨⟨fun h => absurd (hw.symm.trans h) (by decide), fun _ _ => ?_,
       fun h => absurd (hw.symm.trans h) (by decide), fun h => absurd (hw.symm.trans h) (by decide),
       fun h => absurd (hw.symm.trans h) (by decide), fun h => absurd (hw.symm.trans h) (by decide),
       fun h => absurd (hw.symm.trans h) (by decide), fun h => absurd (hw.symm.trans h) (by decide),
-      syscEvFs_at hw⟩
+      syscEvFs_at hw⟩, fsPast_nil _ _ rfl⟩
     show usysWaitFitsAt _ _ _ _ { UIota.boot with act := act } _ _ _
     unfold usysWaitFitsAt UIota.reap
     dsimp only [UIota.boot]

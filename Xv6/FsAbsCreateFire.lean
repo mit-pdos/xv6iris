@@ -508,6 +508,58 @@ theorem cafArmedRetag [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
   imodintro
   iframe Hrec Hf HR Hrc
 
+/-- (NI M3 private files FS-2e-b) `cafArmedRetag` past a lower bound the caller
+holds. -/
+theorem cafArmedRetagAfter [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
+    (S : Std.ExtTreeSet Nat compare) (i : Nat) (n n' : FsNode) (R : IProp GF)
+    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S) (evs : List Fev)
+    (hneu : evs.all fevNeutral = true)
+    (hev : ∀ (h : List Fev) (I : RegMapF FsNode), PartialMap.get? I i = some n → fevTie h I →
+      fevTie (h ++ evs) (PartialMap.insert I i n')) (L : List Fev) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ fsLedLb γfs L -∗ iregArmed k t q S -∗
+      (∀ I : RegMapF FsNode, ⌜PartialMap.get? I i = some n⌝ -∗
+        ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I) ={appE}=∗
+        ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
+          appStep i I (absView (PartialMap.insert I i n')) ∗
+          (((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half}
+              (PartialMap.insert I i n')) ={appE}=∗
+            ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half}
+              (PartialMap.insert I i n')) ∗ R)) -∗
+      topFrag (fsGammaL γfs) i n ={E}=∗
+        iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ R ∗ fsMoveRcptAfter γfs L evs i n := by
+  iintro #Hi #Hai #HL Hrec Hcm Hf
+  unfold ftopInv iregArmed
+  imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
+    (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
+  unfold ftopBody
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl, Hled⟩
+  ihave %hAt := ghost_map_lookup $$ Hla Hrec
+  unfold topFrag fsGammaL
+  ihave %hlk := ghost_map_lookup $$ Ha Hf
+  have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
+  ihave Hcm := Hcm $$ %I %hlk Ha
+  imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hstep, Hph2⟩
+  -- THE MOVE, at the whole authority (`AppInv.appTopUpdate`)
+  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' hsub) $$ Hai [Hstep] Ha Hf with ⟨Ha, Hf⟩
+  · iintro %_ Hp
+    iapply (appStep_at i I _ n' rfl) $$ Hstep Hp
+  ihave Hph2 := Hph2 $$ Ha
+  imod (fupd_mask_mono hsub) $$ Hph2 with ⟨Ha, HR⟩
+  imod ftopLed_moveAtAfter γfs I i n n' evs L hlk hneu (fun h ht => hev h I hlk ht) $$ HL Hled with ⟨Hled, #Hrc⟩
+  imod Hclose $$ [Ha Hla Hpark Hled]
+  · iexists PartialMap.insert I i n', A
+    iframe Ha Hla Hpark Hled
+    ipureintro
+    intro j m hj hun
+    by_cases hji : i = j
+    · -- this inum IS armed, so the row's own hypothesis is refuted
+      subst hji
+      exact absurd hin (hun k t q S hAt)
+    · rw [get?_insert_ne hji] at hj
+      exact hcl j m hj hun
+  imodintro
+  iframe Hrec Hf HR Hrc
+
 /-- ...and the PLAIN one (Rocq's `caf_retag`, `ireg_top_retag_gen`'s
 section): the new node owes the row. -/
 theorem cafRetag [Icfg] (γfs : FsNames) (E : CoPset) (i : Nat) (n n' : FsNode) (R : IProp GF)
@@ -592,18 +644,19 @@ theorem cafArm_fire [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
     (S : Std.ExtTreeSet Nat compare) (i : Nat) (c : Absnode)
     (Farm : Pfam GF (Aview → Nat → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S)
-    (hnone : absOf n = none) (hrow : absOf n' = some ⟨c, 1⟩) (act : BitVec 64) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
+    (hnone : absOf n = none) (hrow : absOf n' = some ⟨c, 1⟩) (act : BitVec 64) (L : List Fev) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ fsLedLb γfs L -∗ iregArmed k t q S -∗
       pfAt (aarmCommitAt (hlc := hlc) (fsGammaL γfs) appE c) Farm -∗
       topFrag (fsGammaL γfs) i n ={E}=∗
         iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ creArmFired Farm i ∗
-        -- (NI M3 private files FS-1) the arm's event (the inum CARRIED)
-        fsMoveRcpt γfs [.arm act i (fnodeOf c)] i n := by
-  iintro #Hi #Hai Hrec Hcm Hf
+        -- (NI M3 private files FS-1) the arm's event (the inum CARRIED);
+        -- (FS-2e-b) past the bound `L`
+        fsMoveRcptAfter γfs L [.arm act i (fnodeOf c)] i n := by
+  iintro #Hi #Hai #HL Hrec Hcm Hf
   ihave Hcm := pfAt_au _ _ $$ Hcm
   obtain ⟨⟨hnz', habs'⟩, -⟩ := absOf_some_iff n' ⟨c, 1⟩ |>.1 hrow
-  iapply (cafArmedRetag γfs E k t q S i n n' (creArmFired Farm i) hE hin [.arm act i (fnodeOf c)] rfl
-    (fun h I _ ht => fevTie_arm act c ht hnz' habs')) $$ Hi Hai Hrec [Hcm] Hf
+  iapply (cafArmedRetagAfter γfs E k t q S i n n' (creArmFired Farm i) hE hin [.arm act i (fnodeOf c)] rfl
+    (fun h I _ ht => fevTie_arm act c ht hnz' habs') L) $$ Hi Hai HL Hrec [Hcm] Hf
   iintro %I %hlk Ha
   have hav : PartialMap.get? (absView I) i = none := by
     rw [absView_lookup_of I i n hlk, hnone]

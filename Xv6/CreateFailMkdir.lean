@@ -112,7 +112,7 @@ descriptor `depTx s dev inum g lo t qt` (Rocq's
 false`); the arm's share `txPin t qt` comes home. -/
 theorem createFailMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames)
     [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName)
-    (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames) (γil γisl : GName) (kk : Nat)
+    (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames) {fc : Nat} (γil γisl : GName) (kk : Nat)
     (qi s : Qp) (g : GName) (lo tl : Nat) (t : Nat) (qt : Qp) (inum : BitVec 32) (dn : Dinode)
     (bm : Blkmap) (n : Nat) (Sb : List Nat) (crb cru : Bool) (pidv : BitVec 32) (dqb dqs : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : iunlockputSlots ≤ k'.avail)
@@ -127,7 +127,7 @@ theorem createFailMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames)
     (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk fc ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗
     credFloor lo tl ∗ icHandle fscIc kk (.depTx s icfgDev inum g lo t qt) ∗
@@ -153,7 +153,7 @@ theorem createFailMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames)
     ⊢ wpLoop (GF := GF) cpu := by
   unfold createEnv
   iintro ⟨Hk, Hpc, Hte, Hce, ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, -, -, #Hit2, #Hiti, -, #Hinv, #Hopen,
-    #Hbmi⟩, #Hslk, Hsl, #Hfl, Hdep, Hoff, Hdev, Hinum, Hval, Hload, Hshot, Hfrz, Hkeep, Hru,
+    #Hbmi, -⟩, #Hslk, Hsl, #Hfl, Hdep, Hoff, Hdev, Hinum, Hval, Hload, Hshot, Hfrz, Hkeep, Hru,
     Hsb, Hsi, Hpid, Hbs, Hop, HK⟩
   ihave #Hescs := isItable2_escrows $$ Hit2
   ihave #Hesc := icEscrows_lookup fscIc fscFs fscIreg fscCov fscLogst kk hkk $$ Hescs
@@ -202,13 +202,13 @@ theorem createFailMkdir_child_park (kslot : Nat) (cinum : BitVec 32) (t : Nat)
     (hdok : dirOk icfgNib dc datc) (hduq : dirUniq dc datc) (hdots : dirDotsOnly dc datc)
     -- THE NODE PREDICATE, owed at every node (INIT-FILE, the UNARM ruling)
     (hNd : ∀ c : Absnode, Nd c)
-    (hcmaj : dc.diMajor = major) (hcmin : dc.diMinor = minor) (act : BitVec 64) :
+    (hcmaj : dc.diMajor = major) (hcmin : dc.diMinor = minor) (act : BitVec 64) {fc : Nat} :
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
       dinodeAt fscIreg cinum (createSetf dc major minor 0#16) -∗
       inodeMeta (ientry kslot) (createSetf dc major minor 0#16) -∗
       inodeMap fscFs (ientry kslot) bmc -∗ inodeBlocks fscFs bmc datc -∗
       topFrag (fsGammaL fscFs) cinum.toNat (eraNode dc bmc datc) -∗
-      createDirty t cinum.toNat act -∗
+      createDirty t cinum.toNat act fc -∗
       creArmFired Farm cinum.toNat -∗
       pfAt (aunarmOfArmNd (hlc := hlc) (fsGammaL fscFs) appE Nd Farm) Fun -∗
       |={⊤}=> icLoaded fscFs fscIreg fscCov fscLogst kslot cinum
@@ -290,7 +290,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
     (hNdD : ty = T_DIR → ∀ c : Absnode, Nd c) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc ⊢
       createFailMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   unfold createFailMkdirBody
@@ -339,7 +339,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
         (FsStateLink.linkReps (iregDotDelta (createSetf dc major minor 0#16).diType.toNat
           (createSetf dc major minor 0#16).diNlink.toNat) (createIty ty (dind.toNat : Int))) from by
     rw [create_delta_eq ty major minor dc 0#16 hcty rfl]) $$ Htoks
-  iapply (create_iupdate_unlink IU Γ cpu _ j γl pd pav pu γkl γk kslot cinum
+  iapply (create_iupdate_unlink (fc := V.fsc) IU Γ cpu _ j γl pd pav pu γkl γk kslot cinum
       (createSetf dc major minor 0#16) dc bmc u0 Sb4 true (createIty ty (dind.toNat : Int)) pid dqs
       hS.hj ?up ?uK ?un ?ut (fun _ => hmem4) hS.hgeom hccov hclog hcnib
       (diTypeStable_eq _ _ (createSetf_type _ _ _ _)) (by rw [createSetf_type]; exact hctynz)
@@ -382,7 +382,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   icases Hdepc with ⟨%locc, %tlcc, %hlecc, #Hflcc, Hdepc⟩
   ihave Hkeepc := inodeRefShort_gen_forget kslot (q.half + q.half) q.half icfgDev cinum g lo tl0
     hlek $$ [$Hflk $Hkeepc]
-  iapply (createFailMkdir_iunlockput IUP Γ cpu _ j γl pd pav pu γkl γk gil gisl kslot q.half
+  iapply (createFailMkdir_iunlockput (fc := V.fsc) IUP Γ cpu _ j γl pd pav pu γkl γk gil gisl kslot q.half
       q.half g locc tlcc t Qp.quarter cinum (createSetf dc major minor 0#16) bmc (u0 + 1)
       (IBLOCK cinum icfgIst :: Sb4) (decide (fscBmapstart ∈ IBLOCK cinum icfgIst :: Sb4)) true
       pid dqb dqs hS.hj ?ip ?iK ?inn ?it hks (fun h => of_decide_eq_true h)
@@ -436,7 +436,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   icases Hmap with ⟨Ha, Hi⟩
   ihave Hload := icMkLoaded fscFs fscIreg fscCov fscLogst kd dind dp bmp datap hdiok hdrl hddk
     hddix (create_doc_of_live dp dp datap rfl hdnl) hduq $$ Hdlnk Hdiat Hmeta Ha Hi Hblocks Htop
-  iapply (createFailMkdir_iunlockput IUP Γ cpu _ j γl pd pav pu γkl γk γil γisl kd qd.half qd.half
+  iapply (createFailMkdir_iunlockput (fc := V.fsc) IUP Γ cpu _ j γl pd pav pu γkl γk γil γisl kd qd.half qd.half
       gd lodc tldc t Qp.quarter dind dp bmp n5 Sb5 false false pid dqb dqs hS.hj ?dp ?dK ?dnoff ?dt
       hkd (fun h => absurd h (by decide)) (fun h => absurd h (by decide)) hS.hgeom hS.hbg hdcov
       hdlog hdib hS.hbel hip5 hS.hpd ?da hledc)

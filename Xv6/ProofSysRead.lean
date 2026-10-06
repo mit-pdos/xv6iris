@@ -156,7 +156,7 @@ theorem srd_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ fdFrags V.fdg sts ∗
     filereadEnvOut (hlc := hlc) st ∗ (filereadEnvOut (hlc := hlc) st -∗ filereadFsOut) ∗
     filereadArms (hlc := hlc) V.gen V.upt st (argZ v2) F Rd Rin Rp Rpe P (R 10#5) M' a1 ∗
-    freadRcptAt fscFs k.proc st (argZ v2) V.upt M' a1 (R 10#5) ∗
+    freadRcptAt fscFs k.proc st (argZ v2) V.upt M' a1 V.fsc (R 10#5) ∗
     (∀ c : CPU, sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst a1

@@ -94,7 +94,7 @@ theorem urc_resume (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames →
     Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
     Register.stvec ↦ᵣ[cpu] uservecTvec ∗
     procPtAt P M ∗ tfPageAt P.tfp V.tf ∗ usertrapResAt (hlc := hlc) PT Γ j cpu P ksp V sts cs pid ∗
-    uhistAt (uvisOf V M sts gn cs pid) ∗
+    uhistAt (uvisOf V M sts gn cs pid) V.fsc ∗
     uslot (hlc := hlc) (uvisOf V M sts gn cs pid) ∗ ▷ urcLoop (hlc := hlc) PT Γ j
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hsie, hspie, hspp⟩ := hctx

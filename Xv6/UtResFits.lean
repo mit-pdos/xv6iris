@@ -110,6 +110,18 @@ theorem usertrapResAt_uservec (g : RegMap) :
       usertrapResAt PT Γ j cpu P ksp { V with tf := uservecTf V.tf g } sts cs pid :=
   utResBare_retf cpu _ P ksp V _ sts cs pid (uservecTf_low V.tf g)
 
+/-- (NI M3 private files FS-2e-b) the block's fs cursor bound, copied out -/
+theorem usertrapResAt_fsCur :
+    usertrapResAt (GF := GF) PT Γ j cpu P ksp V sts cs pid ⊢
+      fsCurOk V.fsc ∗ usertrapResAt PT Γ j cpu P ksp V sts cs pid :=
+  utResBare_fsCur cpu _ P ksp V sts cs pid
+
+/-- (NI M3 private files FS-2e-b) the residue at the moved fs cursor -/
+theorem usertrapResAt_fsc (c : Nat) :
+    fsCurOk (GF := GF) c ⊢ usertrapResAt PT Γ j cpu P ksp V sts cs pid -∗
+      usertrapResAt PT Γ j cpu P ksp { V with fsc := c } sts cs pid :=
+  utResBare_fsc cpu _ P ksp V sts cs pid c
+
 /-- **Rocq `usertrap_res_bare_sz`**. -/
 theorem usertrapResAt_sz :
     usertrapResAt (GF := GF) PT Γ j cpu P ksp V sts cs pid ⊢

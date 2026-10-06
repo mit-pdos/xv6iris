@@ -85,8 +85,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- The region's invariant, read off the environment. -/
 theorem create_env_ireg (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) :
-    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢
+    (γk : KmemNames) {fc : Nat} :
+    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk fc ⊢
       iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib := by
   unfold createEnv
   iintro ⟨-, -, -, -, -, -, -, -, -, -, #Hinv, -, -⟩
@@ -94,8 +94,8 @@ theorem create_env_ireg (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) 
 
 /-- One slot's escrow, read off the environment (Rocq's `cr_esc_acc`). -/
 theorem create_env_esc (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) (kk : Nat) (hkk : kk < NINODE) :
-    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢
+    (γk : KmemNames) {fc : Nat} (kk : Nat) (hkk : kk < NINODE) :
+    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk fc ⊢
       icEscrow fscIc fscFs fscIreg fscCov fscLogst kk := by
   unfold createEnv
   iintro ⟨-, -, -, -, -, -, -, #Hit2, -, -, -, -, -⟩
@@ -108,7 +108,7 @@ FLUSH (Rocq's `IU.wp_iupdate_unlink` site), the fill's pile retired,
 hart-free.  Both `fail:` entries (CreateFail, CreateFailMkdir) run it. -/
 theorem create_iupdate_unlink (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) (kk : Nat) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
+    (γk : KmemNames) {fc : Nat} (kk : Nat) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (cru : Bool) (uty : Ity) (pidv : BitVec 32) (dqs : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : iupdateSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
@@ -123,7 +123,7 @@ theorem create_iupdate_unlink (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := 
     (hpd : descPageRw pd) (ha0 : k'.regs 10#5 = ientry kk) :
     kctx cpu k' ∗ pcIs cpu KA.«iupdate» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk fc ∗
     wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum ∗
     inodeMeta (ientry kk) dn ∗ inodeMap fscFs (ientry kk) bm ∗

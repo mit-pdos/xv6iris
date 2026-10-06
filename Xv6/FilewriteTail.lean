@@ -79,7 +79,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- The persistent environment the FD_INODE arm runs in. -/
 def fwrEnv (Γ : SchedNames) (A : FwrA) : IProp GF := iprop%
   procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
-  isLock A.γkl kmemLockAddr "kmem" (kmemRes A.γk) ∗ kallocAvail A.γk none
+  isLock A.γkl kmemLockAddr "kmem" (kmemRes A.γk) ∗ kallocAvail A.γk none ∗
+  -- (NI M3 private files FS-2e-b) the caller's fs cursor's lower bound
+  fsCurOk A.V.fsc
 
 instance fwrEnv_persistent (Γ : SchedNames) (A : FwrA) :
     Persistent (fwrEnv (hlc := hlc) (GF := GF) Γ A) := by
@@ -99,7 +101,7 @@ def fwrK (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) 
     filewriteEnvOut γl γu st -∗
     filewriteArms (hlc := hlc) V.gen V.upt st n (writerImg V.upt M) (k.regs 11#5) Q Qe (R' 10#5) -∗
     fwWhyAt fscFs k.proc st V.upt (k.regs 11#5) n (R' 10#5) -∗
-    fwRcptAt fscFs k.proc st V.upt (writerImg V.upt M) (k.regs 11#5) n (R' 10#5) -∗ wpLoop c)
+    fwRcptAt fscFs k.proc st V.upt (writerImg V.upt M) (k.regs 11#5) V.fsc n (R' 10#5) -∗ wpLoop c)
 
 /-- ...WITH THE GENERATION HALVES OUT: the continuation that takes the
 block's `genHalvesPriv` back (pipewrite's kill read lends them; every other
@@ -192,7 +194,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     fileRef A.γ A.fk A.q A.st ∗ procPrivExtEv (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
     -- (NI M3 private files FS-1) the loop's chunk receipts, summing to the count
-    (∃ cs : List (Nat × Fev), fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n 0 0 cs ∗ ⌜fwSum cs = A.n.toNat⌝) ∗
+    (∃ cs : List (Nat × Fev), fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n A.V.fsc 0 cs ∗ ⌜fwSum cs = A.n.toNat⌝) ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
@@ -271,8 +273,8 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x ∗
     -- (NI M3 private files FS-1, FS-2e) the loop's chunk receipts, in ledger
     -- order, and (NI M3 FS-0) the short chunk's reason past the last of them
-    (∃ cs : List (Nat × Fev), fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n 0 0 cs ∗
-      fwWhyAfter fscFs k.proc A.V.upt (k.regs 11#5) A.n (fwEnd 0 cs)) ∗
+    (∃ cs : List (Nat × Fev), fwChunksOrd fscFs k.proc A.i A.γo (A.om == .held) A.img (k.regs 11#5) A.V.upt A.n A.V.fsc 0 cs ∗
+      fwWhyAfter fscFs k.proc A.V.upt (k.regs 11#5) A.n (fwEnd A.V.fsc cs)) ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega

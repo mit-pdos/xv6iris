@@ -477,7 +477,9 @@ def syscEvOut (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdSt
       syscNum V ≠ USYS_sbrk ∧ syscNum V ≠ USYS_write ∧ syscNum V ≠ USYS_close ∧ syscNum V ≠ USYS_dup ∧
       syscNum V ≠ USYS_read ∧ syscNum V ≠ USYS_chdir ∧ syscNum V ≠ USYS_mkdir ∧ syscNum V ≠ USYS_open⌝ ∨
     (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
-      niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts sts' ι⌝) ∨
+      niIotaLbs (niNamesHere (GF := GF)) ι ∗
+      -- (NI M3 private files FS-2e-b) the citation lies past the caller's fs cursor
+      ⌜syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts sts' ι ∧ fsPast V.fsc ι⌝) ∨
     (⌜syscNum V = USYS_wait ∧ syscA0 V' = -1#64 ∧ cs' = cs ∧ syscImg V' M' = syscImg V M⌝ ∗
       killShot gn))
 
@@ -506,7 +508,7 @@ theorem syscEvOut_quiet (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' :
 /-- **The deposit at a citation** (NI M2-X2). -/
 theorem syscEvOut_cite (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (k : Nat) (ι : UIota)
-    (h : syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts sts' ι) :
+    (h : syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts sts' ι) (hp : fsPast V.fsc ι) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ⊢
       niIotaLbs (niNamesHere (GF := GF)) ι -∗
       syscEvOut (hlc := hlc) (GF := GF) V M sts sts' V' M' cs cs' gn := by
@@ -515,7 +517,7 @@ theorem syscEvOut_cite (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : 
   iright; ileft
   iexists k, ι
   iframe Ha Hl
-  ipureintro; exact h
+  ipureintro; exact ⟨h, hp⟩
 
 /-- **The returning continuation** (Rocq `sysc_hcont_ty`'s body, the left
 conjunct of the exit slot): at every hart, every `(V', M')`, descriptor

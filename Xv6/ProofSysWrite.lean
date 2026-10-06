@@ -83,7 +83,7 @@ theorem swr_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     filewriteEnvOut γl γu st ∗ (filewriteEnvOut γl γu st -∗ filewriteFsOut (GF := GF)) ∗
     filewriteArms (hlc := hlc) V.gen V.upt st (argZ v2) (writerImg V.upt M) v1 Q Qe (R 10#5) ∗
     fwConsOut st γu (writerImg V.upt M) v1 (R 10#5) ∗
-    fwWhyAt fscFs k.proc st V.upt v1 (argZ v2) (R 10#5) ∗ fwRcptAt fscFs k.proc st V.upt (writerImg V.upt M) v1 (argZ v2) (R 10#5) ∗
+    fwWhyAt fscFs k.proc st V.upt v1 (argZ v2) (R 10#5) ∗ fwRcptAt fscFs k.proc st V.upt (writerImg V.upt M) v1 V.fsc (argZ v2) (R 10#5) ∗
     (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hra, Hs0, Hcells, Hte, Hce, Hcore, Howe, Href, Hauth, Hfr, Henvo, Henvb, Harms,

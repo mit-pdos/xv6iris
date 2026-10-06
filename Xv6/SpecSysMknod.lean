@@ -359,24 +359,24 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- (NI M3 private files FS-2e) a MADE node's receipt at the path the call
 fetched: create's arm and, after it, the parent leg filing the path's last
 element -/
-def mknodOkRcpt (γfs : FsNames) (act : BitVec 64) (Mv : Nat → List (BitVec 8)) (pv : Nat) : IProp GF :=
+def mknodOkRcpt (γfs : FsNames) (act : BitVec 64) (lo : Nat) (Mv : Nat → List (BitVec 8)) (pv : Nat) : IProp GF :=
   iprop(∃ (pl : List (BitVec 8)) (nm : Fname) (i : Nat),
-    ⌜argPathOf Mv pv pl ∧ (pathElems pl).getLast? = some nm⌝ ∗ creOkRcpt γfs act true nm i)
+    ⌜argPathOf Mv pv pl ∧ (pathElems pl).getLast? = some nm⌝ ∗ creOkRcpt γfs act lo true nm i)
 
-instance mknodOkRcpt_persistent (γfs : FsNames) (act : BitVec 64) (Mv : Nat → List (BitVec 8)) (pv : Nat) :
-    Persistent (mknodOkRcpt (GF := GF) γfs act Mv pv) := by
+instance mknodOkRcpt_persistent (γfs : FsNames) (act : BitVec 64) (lo : Nat) (Mv : Nat → List (BitVec 8)) (pv : Nat) :
+    Persistent (mknodOkRcpt (GF := GF) γfs act lo Mv pv) := by
   unfold mknodOkRcpt; infer_instance
 
 /-- (NI M3 private files FS-1, FS-2e) **MKNOD'S LEDGER RECEIPT**, relayed to
 the post: a `0` answer names the made node's arm and, after it, its parent
 leg filing the fetched path's last element, by the caller, in the era's
 ledger. -/
-def mknodRcptAt (γfs : FsNames) (act : BitVec 64) (Mv : Nat → List (BitVec 8)) (pv : Nat) (r : BitVec 64) :
+def mknodRcptAt (γfs : FsNames) (act : BitVec 64) (lo : Nat) (Mv : Nat → List (BitVec 8)) (pv : Nat) (r : BitVec 64) :
     IProp GF :=
-  iprop(⌜r ≠ 0#64⌝ ∨ mknodOkRcpt γfs act Mv pv)
+  iprop(⌜r ≠ 0#64⌝ ∨ mknodOkRcpt γfs act lo Mv pv)
 
-instance mknodRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (Mv : Nat → List (BitVec 8)) (pv : Nat)
-    (r : BitVec 64) : Persistent (mknodRcptAt (GF := GF) γfs act Mv pv r) := by
+instance mknodRcptAt_persistent (γfs : FsNames) (act : BitVec 64) (lo : Nat) (Mv : Nat → List (BitVec 8)) (pv : Nat)
+    (r : BitVec 64) : Persistent (mknodRcptAt (GF := GF) γfs act lo Mv pv r) := by
   unfold mknodRcptAt; infer_instance
 
 /-- **THE CONTRACT'S CONTINUATION** (the `wp_next true pj (…)` body of
@@ -407,7 +407,7 @@ def sysMknodK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) pv
       ma mi P Pmiss Farm Fun Fok Fex (R' 10#5) -∗
     -- (NI M3 private files FS-1) ...and the made node's ledger receipt
-    mknodRcptAt fscFs pa (viewLazy V.upt V.sz M) pv (R' 10#5) -∗
+    mknodRcptAt fscFs pa V.fsc (viewLazy V.upt V.sz M) pv (R' 10#5) -∗
     wpLoop cpu')
 
 end

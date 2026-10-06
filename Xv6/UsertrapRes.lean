@@ -395,6 +395,8 @@ def utBlock (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) :
   @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
   @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
   procGenAt curCtx pa pid V.gen ∗ pageCredit procSpare ∗
+  -- (NI M3 private files FS-2e-b) the fs cursor's lower bound, as the core's
+  fsCurOk V.fsc ∗
   procOfiles γ V.fdg pa V.ofile
 
 /-- **Rocq `proc_priv_split_pt` + `proc_priv_tf_open`**: the block is the
@@ -405,13 +407,13 @@ theorem utBlock_join (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊣⊢ procPrivFd γ pa pid V M := by
   unfold utBlock procPrivFd procPrivCoreNoctxAt procPrivBareAt
   constructor
-  · iintro ⟨⟨%h, Hpid, Hf, %hlz, Hev, Hc, Hr, Hg, Hcr, Ho⟩, Hpt, Htf⟩
-    iframe Hpid Hf Hc Hr Hg Hcr Ho Hpt Htf Hev
+  · iintro ⟨⟨%h, Hpid, Hf, %hlz, Hev, Hc, Hr, Hg, Hcr, #Hfc, Ho⟩, Hpt, Htf⟩
+    iframe Hpid Hf Hc Hr Hg Hcr Ho Hpt Htf Hev Hfc
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
-  · iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htf, %hlz, Hev⟩, Hc, Hr, Hg, Hcr⟩, Ho⟩
-    iframe Hpid Hf Hc Hr Hg Hcr Ho Hpt Htf Hev
+  · iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htf, %hlz, Hev⟩, Hc, Hr, Hg, Hcr, #Hfc⟩, Ho⟩
+    iframe Hpid Hf Hc Hr Hg Hcr Ho Hpt Htf Hev Hfc
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
@@ -628,6 +630,64 @@ theorem utResBare_sz (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) (P 
     iframe Htfk Hcl Hcaps Hb Hfd Hir Hbl Hrest
     ipureintro; exact ⟨hN, hb⟩
   · ipureintro; exact Nat.le_trans hb.1 uQuota_le_uvmMaxsz
+
+/-- (NI M3 private files FS-2e-b) the block's fs cursor bound, copied out -/
+theorem utResBare_fsCur (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) (P : UPtd) (ksp : BitVec 64)
+    (V : ProcPriv) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) :
+    utResBare (GF := GF) cpu Rsys P ksp V sts cs pid ⊢
+      fsCurOk V.fsc ∗ utResBare cpu Rsys P ksp V sts cs pid := by
+  unfold utResBare utOwnBare utBlock
+  iintro ⟨%N, %hN, #Htfk, Hcl, #Hcaps, Hb, Hfd, Hir,
+    ⟨%hb, Hpid, Hfl, %hlz, Hact, Hcwd, Hroot, Hgen, Hcr, #Hfc, Hof⟩, Hrest⟩
+  isplitl []
+  · iexact Hfc
+  iexists N
+  iframe Htfk Hcl Hcaps Hb Hfd Hir Hpid Hfl Hact Hcwd Hroot Hgen Hcr Hfc Hof Hrest
+  ipureintro; exact ⟨hN, hb, hlz⟩
+
+/-- (NI M3 private files FS-2e-b) **THE CURSOR MOVED** (the trap loop's, at
+the filing): the residue at the record with its fs cursor set to any
+position the ledger has reached -- nothing else in it reads the cursor -/
+theorem utResBare_fsc (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) (P : UPtd) (ksp : BitVec 64)
+    (V : ProcPriv) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (c : Nat) :
+    fsCurOk (GF := GF) c ⊢ utResBare cpu Rsys P ksp V sts cs pid -∗
+      utResBare cpu Rsys P ksp { V with fsc := c } sts cs pid := by
+  unfold utResBare utOwnBare utBlock
+  iintro #Hc ⟨%N, %hN, #Htfk, Hcl, #Hcaps, Hb, Hfd, Hir,
+    ⟨%hb, Hpid, Hfl, %hlz, Hact, Hcwd, Hroot, Hgen, Hcr, -, Hof⟩, Hrest⟩
+  have e1 : utTfk (GF := GF) cpu ksp { V with fsc := c } = utTfk cpu ksp V := rfl
+  have e2 : ∀ (pa : BitVec 64) (dq : DFrac), @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa dq
+      { V with fsc := c } = @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa dq V := fun _ _ => rfl
+  iexists N
+  rw [e1, e2]
+  isplitl []
+  · ipureintro; exact hN
+  isplitl []
+  · iexact Htfk
+  iframe Hcl Hcaps Hb Hfd Hir
+  isplitr [Hrest]
+  · isplitl []
+    · ipureintro; exact hb
+    isplitl [Hpid]
+    · iexact Hpid
+    isplitl [Hfl]
+    · iexact Hfl
+    isplitl []
+    · ipureintro; exact hlz
+    isplitl [Hact]
+    · iexact Hact
+    isplitl [Hcwd]
+    · iexact Hcwd
+    isplitl [Hroot]
+    · iexact Hroot
+    isplitl [Hgen]
+    · iexact Hgen
+    isplitl [Hcr]
+    · iexact Hcr
+    isplitl []
+    · iexact Hc
+    iexact Hof
+  iexact Hrest
 
 /-- **Rocq `ut_res_bare_lazy`**: what the lazy bit claims, at the
 residue's own table (kept). -/

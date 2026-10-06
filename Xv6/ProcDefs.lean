@@ -147,8 +147,17 @@ structure ProcPriv where
   /-- **The root directory's inum** (Rocq `pv_rti`), the twin of `cwi`: what
   the walk's absolute arm and `dirlookup`'s `..`-at-the-root arm compare
   against.  Not a cell.  NOT in the user-visible key (`UexecSlot.Uvis`;
-  chroot.md §1 says why).  A `Nat`, as `cwi`.  LAST. -/
+  chroot.md §1 says why).  A `Nat`, as `cwi`. -/
   rti : Nat
+  /-- **The fs cursor** (NI M3 private files FS-2e-b, the coordinator's
+  ruling (a)): the position in the era's fs-event ledger after this
+  incarnation's last fs round.  A GHOST FIELD, NOT A CELL, as `ev`: the core
+  carries a lower bound of the ledger at least this long
+  (`FdTable.fsCurOk`); the class's fs syscalls land their events past it and
+  move it to the cited prefix's length.  Born at 0 (userinit's record, the
+  default), copied by kfork (the child's first round lands past its parent's
+  cursor), kept by exec and every other `{ V with … }` update.  LAST. -/
+  fsc : Nat := 0
 
 /-- The event counter's ghost write (Rocq `upd_ev`): the permit's holder
 steps it once per actor-labelled append (design ni-strong-instance.md §7). -/

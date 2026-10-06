@@ -101,17 +101,18 @@ theorem ftopPkOpenAfterAt [Icfg] (γfs : FsNames) (E : CoPset) (hE : (↑ftopN :
 /-- **THE WALK's LEDGER CHAIN** after `k` elements of `es`, standing at `d`:
 a lower bound in which the lookups followed from the last one's position
 (`po`) name `es.take k` and resolve from the start `s0` to `d`. -/
-def walkChain (γfs : FsNames) (rt s0 : Nat) (es : List Fname) (k d : Nat) : IProp GF :=
-  iprop(∃ (H : List Fev) (po : Option Nat), fsLedLb γfs H ∗ ⌜fevWalkIs H rt s0 po (es.take k) d⌝)
+def walkChain (γfs : FsNames) (lo : Nat) (rt s0 : Nat) (es : List Fname) (k d : Nat) : IProp GF :=
+  iprop(∃ (H : List Fev) (po : Option Nat), fsLedLb γfs H ∗
+    ⌜fevWalkIs H rt s0 po (es.take k) d ∧ lo ≤ H.length ∧ fevWalkPast lo H po⌝)
 
-instance walkChain_persistent (γfs : FsNames) (rt s0 : Nat) (es : List Fname) (k d : Nat) :
-    Persistent (walkChain (GF := GF) γfs rt s0 es k d) := by
+instance walkChain_persistent (γfs : FsNames) (lo : Nat) (rt s0 : Nat) (es : List Fname) (k d : Nat) :
+    Persistent (walkChain (GF := GF) γfs lo rt s0 es k d) := by
   unfold walkChain; infer_instance
 
 /-- **THE WRAPPED CURSOR**: the original, the chain, the original unfired hops -/
-def walkCur (γfs : FsNames) (rt s0 : Nat) (es : List Fname) (P Pmiss : Nat → Nat → IProp GF)
+def walkCur (γfs : FsNames) (lo : Nat) (rt s0 : Nat) (es : List Fname) (P Pmiss : Nat → Nat → IProp GF)
     (k d : Nat) : IProp GF :=
-  iprop(P k d ∗ walkChain γfs rt s0 es k d ∗ axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss es k)
+  iprop(P k d ∗ walkChain γfs lo rt s0 es k d ∗ axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss es k)
 
 /-- **THE WRAPPED MISS CURSOR**: the original, the original unfired hops past it -/
 def walkMiss (γfs : FsNames) (rt : Nat) (es : List Fname) (P Pmiss : Nat → Nat → IProp GF)
@@ -133,10 +134,10 @@ theorem elend_close (Γ : FsViewNames GF) (d : Nat) (dq : DFrac) (ents : Std.Ext
   ipureintro; exact hn
 
 /-- the wrapped cursor, unwrapped -/
-theorem walkCur_unwrap (γfs : FsNames) (rt s0 : Nat) (es : List Fname) (P Pmiss : Nat → Nat → IProp GF)
+theorem walkCur_unwrap (γfs : FsNames) (lo : Nat) (rt s0 : Nat) (es : List Fname) (P Pmiss : Nat → Nat → IProp GF)
     (k d : Nat) :
-    walkCur (GF := GF) γfs rt s0 es P Pmiss k d ⊣⊢
-      P k d ∗ walkChain γfs rt s0 es k d ∗ axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss es k := by
+    walkCur (GF := GF) γfs lo rt s0 es P Pmiss k d ⊣⊢
+      P k d ∗ walkChain γfs lo rt s0 es k d ∗ axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss es k := by
   unfold walkCur; exact .rfl
 
 /-- the wrapped miss cursor, unwrapped -/
@@ -146,19 +147,21 @@ theorem walkMiss_unwrap (γfs : FsNames) (rt : Nat) (es : List Fname) (P Pmiss :
       Pmiss k d ∗ axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss es (k + 1) := by
   unfold walkMiss; exact .rfl
 
-theorem walkChain_open (γfs : FsNames) (rt s0 : Nat) (es : List Fname) (k d : Nat) :
-    walkChain (GF := GF) γfs rt s0 es k d ⊢
-      ∃ (H : List Fev) (po : Option Nat), fsLedLb γfs H ∗ ⌜fevWalkIs H rt s0 po (es.take k) d⌝ := by
+theorem walkChain_open (γfs : FsNames) (lo : Nat) (rt s0 : Nat) (es : List Fname) (k d : Nat) :
+    walkChain (GF := GF) γfs lo rt s0 es k d ⊢
+      ∃ (H : List Fev) (po : Option Nat), fsLedLb γfs H ∗
+        ⌜fevWalkIs H rt s0 po (es.take k) d ∧ lo ≤ H.length ∧ fevWalkPast lo H po⌝ := by
   unfold walkChain; exact .rfl
 
-theorem walkChain_intro (γfs : FsNames) (rt s0 : Nat) (es : List Fname) (k d : Nat) (H : List Fev)
-    (po : Option Nat) (hw : fevWalkIs H rt s0 po (es.take k) d) :
-    fsLedLb (GF := GF) γfs H ⊢ walkChain γfs rt s0 es k d := by
+theorem walkChain_intro (γfs : FsNames) (lo : Nat) (rt s0 : Nat) (es : List Fname) (k d : Nat) (H : List Fev)
+    (po : Option Nat) (hw : fevWalkIs H rt s0 po (es.take k) d) (hlo : lo ≤ H.length)
+    (hp : fevWalkPast lo H po) :
+    fsLedLb (GF := GF) γfs H ⊢ walkChain γfs lo rt s0 es k d := by
   unfold walkChain
   iintro #H
   iexists H, po
   iframe H
-  ipureintro; exact hw
+  ipureintro; exact ⟨hw, hlo, hp⟩
 
 /-- a directory's typed row is its entry map -/
 theorem ftopRow_dir (n : FsNode) (hd : fnIsDir n = true) :
@@ -186,17 +189,17 @@ theorem drop_of_get {es : List Fname} {k : Nat} {s : Fname} (hg : es[k]? = some 
 /-- **THE WRAPPED HOP**: owns nothing but `ftopInv`; takes the original hop
 out of the cursor, appends the lookup past the chain's bound with the chain's
 last position as its back-pointer, fires the original, re-forms the cursor. -/
-theorem walkHop [Icfg] (γfs : FsNames) (act : BitVec 64) (rt s0 : Nat) (es : List Fname)
+theorem walkHop [Icfg] (γfs : FsNames) (act : BitVec 64) (lo : Nat) (rt s0 : Nat) (es : List Fname)
     (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) (hg : es[k]? = some s) :
     ftopInv (hlc := hlc) γfs ⊢
-      axHop rt (elend (fsGammaL γfs)) (walkCur γfs rt s0 es P Pmiss) (walkMiss γfs rt es P Pmiss) k s := by
+      axHop rt (elend (fsGammaL γfs)) (walkCur γfs lo rt s0 es P Pmiss) (walkMiss γfs rt es P Pmiss) k s := by
   have hs := drop_of_get hg
   have htake := take_succ_of_get hg
   iintro #Hi
   unfold axHop
   iintro %d %ents %dqv Hc Hel
-  icases (walkCur_unwrap γfs rt s0 es P Pmiss k d).1 $$ Hc with ⟨HP, Hch, Hh⟩
-  icases walkChain_open γfs rt s0 es k d $$ Hch with ⟨%H, %po, #HL, %hw⟩
+  icases (walkCur_unwrap γfs lo rt s0 es P Pmiss k d).1 $$ Hc with ⟨HP, Hch, Hh⟩
+  icases walkChain_open γfs lo rt s0 es k d $$ Hch with ⟨%H, %po, #HL, %⟨hw, hlo, hwp⟩⟩
   ihave ⟨Hh0, Hh1⟩ := axHopsFrom_cons rt _ P Pmiss es k s _ hs $$ Hh
   icases elend_open _ _ _ _ $$ Hel with ⟨%n, Hf, %hn⟩
   imod ftopObsAfterAt γfs ⊤ CoPset.subseteq_top (.hop act d s po) trivial H dqv d n $$ Hi HL Hf
@@ -207,18 +210,21 @@ theorem walkHop [Icfg] (γfs : FsNames) (act : BitVec 64) (rt s0 : Nat) (es : Li
   obtain ⟨hdir, hents, -⟩ := hn
   have hhop := fevHop_dir (h := h) (rt := rt) hdir hh.2 s
   rw [hents] at hhop
+  have hloh : lo ≤ h.length := Nat.le_trans hlo hh.1.length_le
+  have hwp' := fevWalkPast_hop hh.1 hw.1 hwp hloh act d s
+  have hlo' : lo ≤ (h ++ [Fev.hop act d s po]).length := by simp; omega
   imodintro
   iframe Hel
   by_cases hsr : s = DOTDOT ∧ d = rt
   · rw [axHopAns_self rt P Pmiss k d s ents hsr.1 hsr.2,
-      axHopAns_self rt (walkCur γfs rt s0 es P Pmiss) (walkMiss γfs rt es P Pmiss) k d s ents hsr.1 hsr.2]
+      axHopAns_self rt (walkCur γfs lo rt s0 es P Pmiss) (walkMiss γfs rt es P Pmiss) k d s ents hsr.1 hsr.2]
     rw [if_pos hsr] at hhop
-    iapply (walkCur_unwrap γfs rt s0 es P Pmiss (k + 1) d).2
+    iapply (walkCur_unwrap γfs lo rt s0 es P Pmiss (k + 1) d).2
     iframe HA Hh1
-    iapply walkChain_intro γfs rt s0 es (k + 1) d _ (some h.length)
-      (by rw [htake]; exact fevWalkIs_hop hh.1 hw act s hhop) $$ Hr
+    iapply walkChain_intro γfs lo rt s0 es (k + 1) d _ (some h.length)
+      (by rw [htake]; exact fevWalkIs_hop hh.1 hw act s hhop) hlo' hwp' $$ Hr
   · rw [axHopAns_rec rt P Pmiss k d s ents hsr,
-      axHopAns_rec rt (walkCur γfs rt s0 es P Pmiss) (walkMiss γfs rt es P Pmiss) k d s ents hsr]
+      axHopAns_rec rt (walkCur γfs lo rt s0 es P Pmiss) (walkMiss γfs rt es P Pmiss) k d s ents hsr]
     rw [if_neg hsr] at hhop
     cases hc : ents[s]? with
     | none =>
@@ -228,58 +234,58 @@ theorem walkHop [Icfg] (γfs : FsNames) (act : BitVec 64) (rt s0 : Nat) (es : Li
     | some c =>
       simp only [axHopNext]
       rw [hc] at hhop
-      iapply (walkCur_unwrap γfs rt s0 es P Pmiss (k + 1) c).2
+      iapply (walkCur_unwrap γfs lo rt s0 es P Pmiss (k + 1) c).2
       iframe HA Hh1
-      iapply walkChain_intro γfs rt s0 es (k + 1) c _ (some h.length)
-        (by rw [htake]; exact fevWalkIs_hop hh.1 hw act s hhop) $$ Hr
+      iapply walkChain_intro γfs lo rt s0 es (k + 1) c _ (some h.length)
+        (by rw [htake]; exact fevWalkIs_hop hh.1 hw act s hhop) hlo' hwp' $$ Hr
 
 /-- **THE WRAPPED FAMILY**, from any index -/
-theorem walkHops [Icfg] (γfs : FsNames) (act : BitVec 64) (rt s0 : Nat) (es : List Fname)
+theorem walkHops [Icfg] (γfs : FsNames) (act : BitVec 64) (lo : Nat) (rt s0 : Nat) (es : List Fname)
     (P Pmiss : Nat → Nat → IProp GF) (n : Nat) :
     ftopInv (hlc := hlc) γfs ⊢
-      axHopsFrom rt (elend (fsGammaL γfs)) (walkCur γfs rt s0 es P Pmiss) (walkMiss γfs rt es P Pmiss) es n := by
+      axHopsFrom rt (elend (fsGammaL γfs)) (walkCur γfs lo rt s0 es P Pmiss) (walkMiss γfs rt es P Pmiss) es n := by
   refine (show ftopInv (hlc := hlc) γfs ⊢ □ ftopInv (hlc := hlc) γfs by
     iintro #H; imodintro; iexact H).trans ?_
   unfold axHopsFrom
   refine BigSepL.bigSepL_intro (fun j s hj => ?_)
   have hg : es[n + j]? = some s := by rw [← List.getElem?_drop]; exact hj
   iintro #H
-  iapply (walkHop γfs act rt s0 es P Pmiss (n + j) s hg) $$ H
+  iapply (walkHop γfs act lo rt s0 es P Pmiss (n + j) s hg) $$ H
 
 /-- **THE WRAPPED START** (namei's side, at the path the call fetched) -/
 theorem walkStart [Icfg] (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (pl : List (BitVec 8)) :
-    ftopInv (hlc := hlc) γfs ⊢ exStart γfs rt cw P Pmiss pl -∗
-      exStart γfs rt cw (walkCur γfs rt (umStartOf rt cw pl) (pathElems pl) P Pmiss)
+    (pl : List (BitVec 8)) (lo : Nat) (L : List Fev) (hlo : lo ≤ L.length) :
+    ftopInv (hlc := hlc) γfs ⊢ fsLedLb γfs L -∗ exStart γfs rt cw P Pmiss pl -∗
+      exStart γfs rt cw (walkCur γfs lo rt (umStartOf rt cw pl) (pathElems pl) P Pmiss)
         (walkMiss γfs rt (pathElems pl) P Pmiss) pl := by
-  iintro #Hi Hs
+  iintro #Hi #HL Hs
   unfold exStart
   iintro %r %hr
   imod Hs $$ %r %hr with ⟨HP, Hh⟩
-  imod (fsLedLb_nil γfs) with #HL
-  ihave Hw := walkHops γfs act rt (umStartOf rt cw pl) (pathElems pl) P Pmiss 0 $$ Hi
+  ihave Hw := walkHops γfs act lo rt (umStartOf rt cw pl) (pathElems pl) P Pmiss 0 $$ Hi
   imodintro
   rw [exHops_is_axHops, exHops_is_axHops]
   iframe Hw
-  iapply (walkCur_unwrap γfs rt (umStartOf rt cw pl) (pathElems pl) P Pmiss 0 r).2
+  iapply (walkCur_unwrap γfs lo rt (umStartOf rt cw pl) (pathElems pl) P Pmiss 0 r).2
   iframe HP Hh
-  iapply walkChain_intro γfs rt _ _ 0 r [] none (by rw [List.take_zero, hr]; exact fevWalkIs_nil _ _ _) $$ HL
+  iapply walkChain_intro γfs lo rt _ _ 0 r L none (by rw [List.take_zero, hr]; exact fevWalkIs_nil _ _ _) hlo
+    (fevWalkPast_none lo L) $$ HL
 
 /-- **A DEAD WALK, UNWRAPPED**: namex's death receipt at the wrapped family
 is the original's -- the cursor's own unfired hops come back, the wrapped
 ones (which own nothing) are dropped. -/
-theorem walkDead_unwrap (γfs : FsNames) (rt s0 : Nat) (P Pmiss : Nat → Nat → IProp GF)
+theorem walkDead_unwrap (γfs : FsNames) (lo : Nat) (rt s0 : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) :
     (∃ (kd d : Nat), ⌜kd < (pathElems pl).length⌝ ∗
-      ((walkCur γfs rt s0 (pathElems pl) P Pmiss kd d ∗
-          exHopsFrom rt γfs (walkCur γfs rt s0 (pathElems pl) P Pmiss) (walkMiss γfs rt (pathElems pl) P Pmiss) pl kd) ∨
+      ((walkCur γfs lo rt s0 (pathElems pl) P Pmiss kd d ∗
+          exHopsFrom rt γfs (walkCur γfs lo rt s0 (pathElems pl) P Pmiss) (walkMiss γfs rt (pathElems pl) P Pmiss) pl kd) ∨
        (walkMiss γfs rt (pathElems pl) P Pmiss kd d ∗
-          exHopsFrom rt γfs (walkCur γfs rt s0 (pathElems pl) P Pmiss) (walkMiss γfs rt (pathElems pl) P Pmiss) pl
+          exHopsFrom rt γfs (walkCur γfs lo rt s0 (pathElems pl) P Pmiss) (walkMiss γfs rt (pathElems pl) P Pmiss) pl
             (kd + 1)))) ⊢@{IProp GF}
     (∃ (kd d : Nat), ⌜kd < (pathElems pl).length⌝ ∗
       ((P kd d ∗ exHopsFrom rt γfs P Pmiss pl kd) ∨ (Pmiss kd d ∗ exHopsFrom rt γfs P Pmiss pl (kd + 1)))) := by
   iintro ⟨%kd, %d, %hk, (⟨Hc, -⟩ | ⟨Hm, -⟩)⟩
-  · icases (walkCur_unwrap γfs rt s0 (pathElems pl) P Pmiss kd d).1 $$ Hc with ⟨HP, -, Hh⟩
+  · icases (walkCur_unwrap γfs lo rt s0 (pathElems pl) P Pmiss kd d).1 $$ Hc with ⟨HP, -, Hh⟩
     iexists kd, d
     isplitr
     · ipureintro; exact hk

@@ -102,7 +102,7 @@ theorem sys_mknod_out_ok (A : SysMknodArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz 
       bslots 3 ∗ irefSlots A.ns ∗
       mknodPostOk (hlc := hlc) (fsGammaL fscFs) (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (devArg A.v1)
         (devArg A.v2) A.P A.Farm A.Fun A.Fok A.Fex ∗
-      mknodOkRcpt fscFs (procAddr A.j) (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat ⊢
+      mknodOkRcpt fscFs (procAddr A.j) A.V.fsc (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat ⊢
     sysMknodOut A 0#64 := by
   iintro ⟨Hblk, Hbs, Hir, Hok, #Hcr⟩
   unfold sysMknodOut
@@ -203,7 +203,7 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     bslots 3 ∗ irefSlots ns1 ∗ logOpS icfgLog n Sb ∗
     mknodPostOk (hlc := hlc) (fsGammaL fscFs) (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (devArg A.v1)
       (devArg A.v2) A.P A.Farm A.Fun A.Fok A.Fex ∗
-    mknodOkRcpt fscFs (procAddr A.j) (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+    mknodOkRcpt fscFs (procAddr A.j) A.V.fsc (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hlow, Hte, Hce, #Henv, Hblk, HΦ, Hlk, Hbs, Hir, Hop, Hok, #Hcr⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

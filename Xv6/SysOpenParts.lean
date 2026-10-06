@@ -903,7 +903,7 @@ instance sysOpenEnv_persistent (Γ : SchedNames) (A : SysOpenArgs GF) :
 `openArmsPlain`; deviation 3). -/
 abbrev sysOpenPostP (k : KCtx) (A : SysOpenArgs GF) (c : CPU) : IProp GF :=
   sysOpenK (hlc := hlc) k A.ns A.V A.M A.v A.vom
-    (openArmsPlain (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
+    (openArmsPlain (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.fsc A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts) c
 
 /-- ...and at the CREATE arms (Rocq's `so_cont0_au_create`). -/
@@ -911,7 +911,7 @@ abbrev sysOpenPostC (k : KCtx) (A : SysOpenArgs GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (c : CPU) : IProp GF :=
   sysOpenK (hlc := hlc) k A.ns A.V A.M A.v A.vom
-    (openArmsCreate (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
+    (openArmsCreate (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.fsc A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts) c
 
 /-- The contract's `wpNext` continuation, HART-FREE (a `true` crossing at a
@@ -947,7 +947,7 @@ theorem sysOpenK_same (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (Bi
         trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
         bslots 3 -∗ irefSlots ns -∗
         ARMS { V with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
-        openRcptAt fscFs k.proc (viewLazy V.upt V.sz M) v.toNat vom (R' 10#5) -∗ wpLoop c := by
+        openRcptAt fscFs k.proc V.fsc (viewLazy V.upt V.sz M) v.toNat vom (R' 10#5) -∗ wpLoop c := by
   unfold sysOpenK
   iintro H %spie %spp %R' %P' %hcs %hext
   iapply H $$ %spie %spp %R' %P' %V.ev %hcs %hext %(Nat.le_refl _)
@@ -1107,11 +1107,11 @@ def sysOpenOffPost (om : OffMode) (kf : Nat) (C : FContent) (γo : GName) : IPro
 /-- (NI M3 private files FS-2b′) open's ledger receipt at the record's own
 path argument, omode and actor -/
 abbrev sysOpenLed (A : SysOpenArgs GF) : FdType → IProp GF :=
-  openLedOk fscFs (procAddr A.j) A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom
+  openLedOk fscFs (procAddr A.j) A.V.fsc A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom
 
 /-- (NI M3 private files FS-2b′) what fixed the inode, at the record -/
 abbrev sysOpenLedPre (A : SysOpenArgs GF) (i : Nat) : IProp GF :=
-  openLedPre fscFs (procAddr A.j) A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom i
+  openLedPre fscFs (procAddr A.j) A.V.fsc A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom i
 
 /-- The walk's AU RESIDUE below the fire (Rocq's three rows `cur_kept vom P
 (length (path_elems pl)) (bv_unsigned inum) -∗ so_obs Fo … -∗
@@ -1415,7 +1415,7 @@ def sysOpenPubBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF 
     logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗
     fdFrags A.V.fdg A.sts -∗ fdStAuth A.V.fdg fd .closed -∗
     -- (NI M3 private files FS-1) the install's ledger receipt (and itrunc's)
-    openOkRcpt fscFs k.proc (sysOpenIm A) A.v.toNat A.vom -∗
+    openOkRcpt fscFs k.proc A.V.fsc (sysOpenIm A) A.v.toNat A.vom -∗
     -- (NI M3 private files FS-2b′) ...and open's at the installed type
     sysOpenLed A t -∗
     -- THE ARM, as a wand

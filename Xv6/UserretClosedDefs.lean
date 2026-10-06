@@ -198,7 +198,8 @@ def urcRut (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU
   fun p => iprop(∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz secc k ksp V⌝ ∗
     userretLeft cpu k ∗ tfPageAt p.tfp V.tf ∗
     (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt (hlc := hlc) PT Γ j cpu p ksp V sts' cs pid) ∗
-    uhistAt Wr ∗
+    -- (NI M3 private files FS-2e-b) the history's fs windows end at the record's cursor
+    uhistAt Wr V.fsc ∗
     -- NI M3 Q-1: the table's credits, at the page count the user tier sees
     uptCred p)
 

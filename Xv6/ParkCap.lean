@@ -132,7 +132,10 @@ def parkBootBlock [CurCtx] (N : UtNames) (V : ProcPriv) (M : Nat → List (BitVe
     cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ firstBoot (hlc := hlc) ∗
     genKq V.gen N.pj N.pid (fun _ => iprop(True)) ∗ myPay V.gen (fun _ => iprop(True)) ∗
     genHalvesPriv N.pj N.pid V.gen ∗ (∃ xsv : BitVec 32, wordPointsTo (pXstate N.pj) 4 xsHalf xsv) ∗
-    pageCredit procSpare)
+    pageCredit procSpare ∗
+    -- (NI M3 private files FS-2e-b) the fs cursor's lower bound (the first
+    -- process's cursor is born at 0)
+    fsCurOk V.fsc)
 
 /-- **THE BLOCK AT THE MODE** (Rocq `park_child`'s `if steady`): whole on the
 steady mode, split on the boot mode. -/

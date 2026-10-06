@@ -418,7 +418,7 @@ theorem sys_chdir_hole_close (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
 /-- (NI M3 private files FS-2b) chdir's ledger receipt at the record's own
 path argument and actor -/
 abbrev sysChdirLed (A : SysChdirArgs GF) (i : Nat) : IProp GF :=
-  chdirLed fscFs (procAddr A.j) A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+  chdirLed fscFs (procAddr A.j) A.V.fsc A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
     (A.V.tf.getD (tfArgIdx 0) 0#64).toNat i
 
 /-- What every exit hands the epilogue beside the machine state: the two

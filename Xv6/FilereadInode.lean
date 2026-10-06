@@ -129,7 +129,7 @@ def frdK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat
     genHalvesPriv (procAddr j) pid V.gen -∗
     filereadEnvOut (hlc := hlc) st -∗
     filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin Rp Rpe P (R' 10#5) M' (k.regs 11#5) -∗
-    freadRcptAt fscFs k.proc st n V.upt M' (k.regs 11#5) (R' 10#5) -∗ wpLoop c)
+    freadRcptAt fscFs k.proc st n V.upt M' (k.regs 11#5) V.fsc (R' 10#5) -∗ wpLoop c)
 
 /-! ## The lock-held ghost steps -/
 
@@ -197,7 +197,9 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
     (dd : Nat) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (wb : Bool) (om : OffMode)
     (hip : C.ip = ientry ik) (hik : ik < NINODE) (hq : MachCSL.qsum m = q.val)
     (hok : inodeOk fscCov fscLogst dn bm data) (hloc : InodeLocal inum.toNat (eraNode dn bm data))
-    (hwf : offWf v) (hcap : v.toNat + dd ≤ MAXFILE * BSIZE) (act : BitVec 64) :
+    (hwf : offWf v) (hcap : v.toNat + dd ≤ MAXFILE * BSIZE) (act : BitVec 64) (fc : Nat) :
+    -- (NI M3 private files FS-2e-b) the caller's fs cursor's lower bound
+    fsCurOk fc ∗
     ownCtx cpu curCtx ∗ fsReady (hlc := hlc) ∗
       foffRow (GF := GF) (.open true wb (.inode inum.toNat γo om)) ∗
       areadInOm (hlc := hlc) om (fsGammaL fscFs) appE inum.toNat γo F ∗
@@ -212,7 +214,7 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
         -- (NI M3 private files FS-1) the read's event, at the row it read
         -- (FS-2a′) at a parked row, the offset the fold's
         fsObsAtP fscFs (.read act inum.toNat γo (om == .held) v.toNat dd) inum.toNat
-          (absRow (eraNode dn bm data)) (fun h => om = .parked → v.toNat = fevOff h γo) ∗
+          (absRow (eraNode dn bm data)) (fun h => (om = .parked → v.toNat = fevOff h γo) ∧ fc ≤ h.length) ∗
         ∃ av : Aview, ⌜arowAt av inum.toNat (absRow (eraNode dn bm data))⌝ ∗
           F.pfRecv av v.toNat (absRow (eraNode dn bm data)) dd := by
   have hw : (filerwOffW v dd).toNat = v.toNat + dd :=
@@ -222,13 +224,22 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
   have hsz := arfSize_ok_era dn bm data hok.2.2.2.2.1
   have hnz := arfEra_typed dn bm data hok.2.2.2.1
   have hs := nodeShapeOk_ofInodeOk fscCov fscLogst dn bm data hok
-  iintro ⟨Hrun, #Hfs, #Hrow, Hcm, Htop, Hgv, Hcell, Hout, Hmeta, Hmap, Hblk⟩
+  iintro ⟨#Hfc, Hrun, #Hfs, #Hrow, Hcm, Htop, Hgv, Hcell, Hout, Hmeta, Hmap, Hblk⟩
   icases fsReady_region $$ Hfs with ⟨#Hireg, -⟩
   ihave #Hft := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hireg
+  -- (FS-2e-b) the read lands past the cursor's lower bound
+  imod fsCurOk_lb fc $$ Hfc with ⟨%L, %hL, #HL⟩
   -- THE ONE FIRE, AT THE ROW'S MODE (Rocq lane OFF-LINK-5's
   -- `arf_read_fire_om`): the row itself goes in, and the mode is read there
   imod (arfRead_fire_om om fscFs ⊤ (DFrac.own Qp.quarter) F inum.toNat γo v.toNat dd true wb
-    (eraNode dn bm data) hE hwf hsz hnz act) $$ Hft Hrow Hcm Htop Hgv with ⟨Htop, Hgv, #Hrc, Hav⟩
+    (eraNode dn bm data) hE hwf hsz hnz act L) $$ Hft HL Hrow Hcm Htop Hgv with ⟨Htop, Hgv, #Hrc0, Hav⟩
+  ihave #Hrc : fsObsRcptP fscFs (.read act inum.toNat γo (om == .held) v.toNat dd) inum.toNat (eraNode dn bm data)
+      (fun h => (om = .parked → v.toNat = fevOff h γo) ∧ fc ≤ h.length) $$ []
+  · unfold fsObsRcptP
+    icases Hrc0 with ⟨%h, %⟨hr, hof, hv⟩, #Hr⟩
+    iexists h
+    iframe Hr
+    ipureintro; exact ⟨hr, hof, Nat.le_trans hL hv.length_le⟩
   -- CHECK IN the cell: the half came back at exactly its word
   ihave Hres := offResident_of curCtx γo (om == .held) fk (filerwOffW v dd) hwf' $$ [Hcell] [Hgv]
   · rw [wordAtN_cur]; unfold aFoff; iexact Hcell

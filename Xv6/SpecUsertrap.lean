@@ -350,7 +350,8 @@ def utEvOut (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (s
         syscNum (utSysRec sep V) ≠ USYS_open⌝ ∨
       (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
         niIotaLbs (niNamesHere (GF := GF)) ι ∗
-        ⌜syscEvRow (utSysRec sep V) V' (syscImg (utSysRec sep V) M) (syscImg V' M') cs cs' sts sts' ι⌝)))
+        ⌜syscEvRow (utSysRec sep V) V' (syscImg (utSysRec sep V) M) (syscImg V' M') cs cs' sts sts' ι ∧
+          fsPast (utSysRec sep V).fsc ι⌝)))
 
 /-- Off the ecall the evidence is owed nothing. -/
 theorem utEvOut_nonecall (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState)

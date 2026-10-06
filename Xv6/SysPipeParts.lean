@@ -597,7 +597,7 @@ def sysPipeCoreRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF
   @ecRest hlc GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V V.upt ∗
   @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
   @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗ procGenAt curCtx pa pid V.gen ∗
-  pageCredit procSpare
+  pageCredit procSpare ∗ fsCurOk V.fsc
 
 /-- The rest's event counter, LENT (permit sweep L1b, Rocq
 `proc_priv_core_copy_ev`): for a copyout, the rest comes back at whatever

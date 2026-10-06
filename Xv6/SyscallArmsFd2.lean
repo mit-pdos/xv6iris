@@ -138,7 +138,7 @@ count. -/
 theorem syscArmWrite_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8))
     (sts : List FdState) (a0 a1 r act : BitVec 64) :
     fwConsOut (GF := GF) (syscFdKey a0 sts) fscUart (writerImg P M) a1 r ⊢
-      |==> ∃ ι : UIota, niIotaLbs (niNamesHere (GF := GF)) ι ∗
+      |==> ∃ ι : UIota, niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜ι.fev = []⌝ ∗
         ⌜uwriteCons sts a0 = true → usysOutAt ι (uwriteRun (umemLazy P sz M) a1 (uwriteCntOf r))⌝ := by
   unfold fwConsOut
   iintro (%hoff | %hm1 | ⟨%i, %hi, #HO⟩)
@@ -146,6 +146,8 @@ theorem syscArmWrite_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : Nat) (M : Na
     imodintro
     iexists { UIota.boot with act := act }
     iframe Hl
+    isplitr
+    · ipureintro; rfl
     ipureintro
     intro hcons
     obtain ⟨rb, hst⟩ := uwriteCons_key hcons
@@ -154,6 +156,8 @@ theorem syscArmWrite_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : Nat) (M : Na
     imodintro
     iexists { UIota.boot with act := act }
     iframe Hl
+    isplitr
+    · ipureintro; rfl
     ipureintro
     intro _
     rw [hm1]; exact usysOutAt_nil _ rfl _ _
@@ -162,6 +166,8 @@ theorem syscArmWrite_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : Nat) (M : Na
       imodintro
       iexists { UIota.boot with act := act }
       iframe Hl
+      isplitr
+      · ipureintro; rfl
       ipureintro
       intro _
       rw [hr]; exact usysOutAt_nil _ rfl _ _
@@ -175,6 +181,8 @@ theorem syscArmWrite_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : Nat) (M : Na
       imodintro
       iexists { UIota.boot with act := act, cacc := L, cpos := ps }
       iframe Hl
+      isplitr
+      · ipureintro; rfl
       ipureintro
       intro _
       have hc : uwriteCntOf r = r.toNat := by unfold uwriteCntOf; rw [if_neg hr]
@@ -382,10 +390,11 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
     (hst : syscFdKey a0 sts = st) (hlen : sts.length = NOFILE)
     (hext : P.extSz sz P') (hw : umemWrote P M a1 d P' M1) (hpl : umPageLen P' M1)
     (hsz : sz.toNat ≤ uvmMaxsz) (hbel : umBelow sz P') (hwf : uptWf P) (hlf : lz = false → lazyFree P.um sz)
-    (hd : (d : Int) ≤ max 0 (argZ a2)) (hr : r = BitVec.ofNat 64 d ∨ r = -1#64) :
-    freadRcptAt (GF := GF) fscFs act st (argZ a2) P M1 a1 r ⊢
+    (hd : (d : Int) ≤ max 0 (argZ a2)) (hr : r = BitVec.ofNat 64 d ∨ r = -1#64) (lo : Nat) :
+    -- (NI M3 private files FS-2e-b) the read's receipt past the caller's fs cursor `lo`
+    freadRcptAt (GF := GF) fscFs act st (argZ a2) P M1 a1 lo r ⊢
       |==> ∃ ι : UIota, niIotaLbs (niNamesHere (GF := GF)) ι ∗
-        ⌜lz = false → (ufsBufAt (permOf P.um sz.toNat) a1 a2).1 = true →
+        ⌜fsPast lo ι⌝ ∗ ⌜lz = false → (ufsBufAt (permOf P.um sz.toNat) a1 a2).1 = true →
           fdRdIno (usysFdAt sts a0) = true → fevReadDir ι.fev = false →
           r = usysReadAns a2 ι ∧
             umemLazy P' sz.toNat M1 = usysWr (umemLazy P sz.toNat M) a1 (usysReadBytes a2 ι) ∧
@@ -420,12 +429,14 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
   by_cases hro : ∃ wb i γo om, st = .open true wb (.inode i γo om)
   · obtain ⟨wb, i, γo, om, rfl⟩ := hro
     unfold freadRcptAt fsObsAtP fsEvRcpt
-    iintro (%hm | ⟨%off, %d', %a, %⟨hr', hd', hret, hbuf⟩, ⟨%h, %⟨hrow, hof⟩, #Hlb⟩⟩)
+    iintro (%hm | ⟨%off, %d', %a, %⟨hr', hd', hret, hbuf⟩, ⟨%h, %⟨hrow, hof, hlo⟩, #Hlb⟩⟩)
     · -- `-1`: the sign guard, or a copyout fault the class refutes
       imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
       imodintro
       iexists { UIota.boot with act := act }
       iframe Hl
+      isplitr
+      · ipureintro; exact fsPast_nil _ _ rfl
       ipureintro
       refine hboot fun hlz hb _ => ⟨hm.1, ?_⟩
       rcases hm.2 with h | h
@@ -439,6 +450,8 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
       imodintro
       iexists { UIota.boot with act := act, fev := h ++ [Fev.read act i γo (om == .held) off d'] }
       iframe Hl
+      isplitr
+      · ipureintro; exact fsPast_snoc _ _ h _ rfl hlo
       ipureintro
       intro hlz hb hfd hdir
       -- (NI M3 private files FS-2a′) the class's row is PARKED, so the read's
@@ -485,6 +498,8 @@ theorem syscArmRead_ev [MonoNatG GF] [WchGpre GF] (P P' : UPtd) (sz : BitVec 64)
     imodintro
     iexists { UIota.boot with act := act }
     iframe Hl
+    isplitr
+    · ipureintro; exact fsPast_nil _ _ rfl
     ipureintro
     intro _ _ hfd _
     exact (hnot (fun wb i γo om h => hro ⟨wb, i, γo, om, h⟩) hfd).elim
@@ -515,54 +530,46 @@ at it. -/
 theorem syscArmWriteIno_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : BitVec 64) (lz : Bool) (sts : List FdState)
     (a0 a1 a2 r act : BitVec 64) (st : FdState) (rb : Bool) (i : Nat) (γo : GName) (om : OffMode)
     (hst : st = .open rb true (.inode i γo om)) (hwf : uptWf P) (hlf : lz = false → lazyFree P.um sz)
-    (hret : r = -1#64 ∨ (r = BitVec.ofInt 64 (argZ a2) ∧ 0 ≤ argZ a2)) :
-    fwWhyAt (GF := GF) fscFs act st P a1 (argZ a2) r ⊢
-      |==> ∃ ι : UIota, niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜ι.cpos = [] ∧ ι.cacc = []⌝ ∗
+    (hret : r = -1#64 ∨ (r = BitVec.ofInt 64 (argZ a2) ∧ 0 ≤ argZ a2)) (Mw : Nat → List (BitVec 8)) (lo : Nat) :
+    -- (NI M3 private files FS-2e-b) the write's receipt past the caller's fs cursor `lo`
+    fwRcptAt (GF := GF) fscFs act st P Mw a1 lo (argZ a2) r ⊢
+      |==> ∃ ι : UIota, niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜ι.cpos = [] ∧ ι.cacc = [] ∧ fsPast lo ι⌝ ∗
         ⌜lz = false → (ufsBufAt (permOf P.um sz.toNat) a1 a2).2 = true → r = usysWriteAnsF a2 ι⌝ := by
   have hn : argZ a2 = usysCntW a2 := rfl
   subst hst
-  unfold fwWhyAt
   iintro Hw
   by_cases hm : r = -1#64
-  · ihave Hw := Hw $$ %hm
-    icases Hw with (%hneg | ⟨%w, Hy⟩)
+  · icases fwRcptAt_whyPast fscFs act rb i γo om P Mw a1 lo (argZ a2) r hm $$ Hw with
+      (%hwhy | Hy | Hy)
     · imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
       imodintro
       iexists { UIota.boot with act := act }
       iframe Hl
       ipureintro
-      refine ⟨⟨rfl, rfl⟩, fun _ _ => ?_⟩
-      unfold usysWriteAnsF; rw [if_pos (Or.inl (hn ▸ hneg))]; exact hm
-    · cases w with
-      | src =>
-        unfold fwWhyRcpt
-        icases Hy with %hwhy
-        imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
-        imodintro
-        iexists { UIota.boot with act := act }
-        iframe Hl
-        ipureintro
-        exact ⟨⟨rfl, rfl⟩, fun hlz hb => (wrFailWhy_key hwf (hlf hlz) hb (hn ▸ hwhy)).elim⟩
-      | max | full =>
-        unfold fwWhyRcpt fsFullRcpt fsEvRcpt fsLedLb
-        icases Hy with ⟨%h, #Hlb⟩
-        ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML (h ++ [Fev.full act _]) $$ [Hlb]
-        · rw [show (niNamesHere (GF := GF)).getD 6 0 = fscFs.fev from rfl]; iexact Hlb
-        imod niIotaLbs_fev (GF := GF) (niNamesHere (GF := GF)) _ act $$ Hf with #Hl
-        imodintro
-        iexists { UIota.boot with act := act, fev := h ++ [Fev.full act _] }
-        iframe Hl
-        ipureintro
-        refine ⟨⟨rfl, rfl⟩, fun _ _ => ?_⟩
-        unfold usysWriteAnsF
-        rw [if_pos (Or.inr (fevFullBy_snoc h act _))]; exact hm
+      refine ⟨⟨rfl, rfl, fsPast_nil _ _ rfl⟩, fun hlz hb => ?_⟩
+      rcases hwhy with hneg | hwhy
+      · unfold usysWriteAnsF; rw [if_pos (Or.inl (hn ▸ hneg))]; exact hm
+      · exact (wrFailWhy_key hwf (hlf hlz) hb (hn ▸ hwhy)).elim
+    all_goals
+      unfold fsFullAfter fsEvRcpt fsLedLb
+      icases Hy with ⟨%h, %hlo, #Hlb⟩
+      ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML (h ++ [Fev.full act _]) $$ [Hlb]
+      · rw [show (niNamesHere (GF := GF)).getD 6 0 = fscFs.fev from rfl]; iexact Hlb
+      imod niIotaLbs_fev (GF := GF) (niNamesHere (GF := GF)) _ act $$ Hf with #Hl
+      imodintro
+      iexists { UIota.boot with act := act, fev := h ++ [Fev.full act _] }
+      iframe Hl
+      ipureintro
+      refine ⟨⟨rfl, rfl, fsPast_snoc _ _ h _ rfl hlo⟩, fun _ _ => ?_⟩
+      unfold usysWriteAnsF
+      rw [if_pos (Or.inr (fevFullBy_snoc h act _))]; exact hm
   · iclear Hw
     imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
     imodintro
     iexists { UIota.boot with act := act }
     iframe Hl
     ipureintro
-    refine ⟨⟨rfl, rfl⟩, fun _ _ => ?_⟩
+    refine ⟨⟨rfl, rfl, fsPast_nil _ _ rfl⟩, fun _ _ => ?_⟩
     rcases hret with h | ⟨h, hn0⟩
     · exact absurd h hm
     · have hnf : ¬ (usysCntW a2 < 0 ∨ fevFullBy ([] : List Fev) act = true) := by
@@ -684,7 +691,7 @@ theorem syscall_arm_read (SR : SYSREAD)
   iapply wpLoop_bupd
   imod syscArmRead_ev (GF := GF) V.upt P' V.sz V.pvLazy M M1 sts (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1))
     (tfW V.tf (tfArgIdx 2)) (R2 10#5) _ d _ rfl ha.2.1 hext hw hpl (Nat.le_trans hfacts.1 uQuota_le_uvmMaxsz)
-    hfacts.2.1 hfacts0.2.2.2 hfacts0.2.2.1 hd hr $$ Hrr with ⟨%ι, #Hl, %hfs⟩
+    hfacts.2.1 hfacts0.2.2.2 hfacts0.2.2.1 hd hr V.fsc $$ Hrr with ⟨%ι, #Hl, %hpast, %hfs⟩
   have hrow : syscEvRow V (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (syscImg V M)
       (syscImg (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) M1) cs cs sts sts ι := by
     have ha0' : tfW (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)).tf (tfArgIdx 0) = R2 10#5 :=
@@ -700,7 +707,7 @@ theorem syscall_arm_read (SR : SYSREAD)
     exact hfs hlz hb hfd hdir
   imodintro
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts
-    (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) M1 cs cs V.gen ke _ hrow $$ Hanc Hl
+    (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) M1 cs cs V.gen ke _ hrow hpast $$ Hanc Hl
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
     (({ V with upt := P' } : ProcPriv).updEv k') M1 sts cs hj hproc hK htier hpins2 hs2'
     (hrows.updEv k') 5 hn5 (by decide) (by decide) (by decide))
@@ -772,7 +779,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
   iframe Hk Hpc Hpi Hte Hce Hpe Hpriv Hfr Hkl Hka Hfs Hdev Hin
   k_next_e
   unfold sysWritePost
-  iintro %spie2 %spp2 %R2 %P' %k' %⟨hcs, hext, hcnt⟩ #HO Hk Hpc Hte Hce %hk' Hpriv Hfr Hbs Harms Hwhy -
+  iintro %spie2 %spp2 %R2 %P' %k' %⟨hcs, hext, hcnt⟩ #HO Hk Hpc Hte Hce %hk' Hpriv Hfr Hbs Harms - #Hrc
   -- the block at the callee's raised event count (permit sweep L1b): the
   -- rows do not read it (`SyscRows.updEv`)
   ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) ⊢
@@ -820,8 +827,8 @@ theorem syscall_arm_write (SW : SYSWRITE)
     icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
     iapply wpLoop_bupd
     imod syscArmWriteIno_ev (GF := GF) V.upt V.sz V.pvLazy sts (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1))
-      (tfW V.tf (tfArgIdx 2)) (R2 10#5) _ _ rb i γo om hk hfacts.2.2.2 hfacts.2.2.1 hreti $$ Hwhy
-      with ⟨%ι, #Hl, %-, %hfs⟩
+      (tfW V.tf (tfArgIdx 2)) (R2 10#5) _ _ rb i γo om hk hfacts.2.2.2 hfacts.2.2.1 hreti _ V.fsc $$ Hrc
+      with ⟨%ι, #Hl, %⟨-, -, hpast⟩, %hfs⟩
     have hcf : uwriteCons sts (tfW V.tf (tfArgIdx 0)) = false := by
       unfold uwriteCons
       rw [show usysFdKey sts (tfW V.tf (tfArgIdx 0)) = syscFdKey (tfW V.tf (tfArgIdx 0)) sts from rfl, hk]
@@ -841,7 +848,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
     imodintro
     ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts
       (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M) cs cs V.gen ke
-      _ hrow $$ Hanc Hl
+      _ hrow hpast $$ Hanc Hl
     iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
       (({ V with upt := P' } : ProcPriv).updEv k') (viewFaulted V.upt P' M) sts cs hj hproc hK htier
       hpins2 hs2' (hrows.updEv k') 16 hn16 (by decide) (by decide) (by decide))
@@ -860,7 +867,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
   icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
   iapply wpLoop_bupd
   imod syscArmWrite_ev (GF := GF) V.upt V.sz.toNat M sts (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1))
-    (R2 10#5) (procAddr j) $$ HO with ⟨%ι, #Hl, %hsix⟩
+    (R2 10#5) (procAddr j) $$ HO with ⟨%ι, #Hl, %hfe, %hsix⟩
   have hrow : syscEvRow V (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (syscImg V M)
       (syscImg (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M))
       cs cs sts sts ι := by
@@ -881,7 +888,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
   imodintro
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts
     (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M) cs cs V.gen ke
-    _ hrow $$ Hanc Hl
+    _ hrow (fsPast_nil _ _ hfe) $$ Hanc Hl
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
     (({ V with upt := P' } : ProcPriv).updEv k') (viewFaulted V.upt P' M) sts cs hj hproc hK htier
     hpins2 hs2' (hrows.updEv k') 16 hn16 (by decide) (by decide) (by decide))

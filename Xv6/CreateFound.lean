@@ -197,7 +197,7 @@ the reference is SHED at its named generation, the share goes to the
 checkout at the plain licence (`runitAny`), the transaction token goes in
 (the tx form), `topLb 0`. -/
 theorem createFound_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
-    (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames)
+    (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames) {fc : Nat}
     (pidv : BitVec 32) (dqp dqs : DFrac)
     (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : ilockSlots ≤ k'.avail)
@@ -207,7 +207,7 @@ theorem createFound_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     (ha0 : k'.regs 10#5 = ientry ik) (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«ilock» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk fc ∗
     credFloor lo tl ∗ inodeRefGenlo ik q icfgDev inum g lo ∗ runitAny inum.toNat ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslot ∗ logTx icfgLog ∗
@@ -222,7 +222,7 @@ theorem createFound_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     ⊢ wpLoop (GF := GF) cpu := by
   unfold createEnv
   iintro ⟨Hk, Hpc, Hte, Hce, ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
-    #Hinv, #Hopen, #Hbmi⟩, #Hfl, Href, Hru, Hsi, Hpid, Hbs, Htx, HK⟩
+    #Hinv, #Hopen, #Hbmi, -⟩, #Hfl, Href, Hru, Hsi, Hpid, Hbs, Htx, HK⟩
   icases (inodeRefGenlo_shed ik q icfgDev inum g lo).1 $$ Href with ⟨Hpar, Hshr⟩
   ihave #Hescs := isItable2_escrows $$ Hit2
   ihave #Hesc := icEscrows_lookup fscIc fscFs fscIreg fscCov fscLogst ik hkk $$ Hescs
@@ -273,7 +273,7 @@ UNCREDITED (Rocq's `crb = cru = crz = false`): the tx form; the short
 parent forgotten to `inodeRefpShort`, the off rows re-parked. -/
 theorem createFound_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) (pidv : BitVec 32) (dqp dqb dqs : DFrac)
+    (γk : KmemNames) {fc : Nat} (pidv : BitVec 32) (dqp dqb dqs : DFrac)
     (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat)
     (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (γil γisl : GName) (n : Nat) (Sb : List Nat)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : iunlockputSlots ≤ k'.avail)
@@ -287,7 +287,7 @@ theorem createFound_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk fc ∗
     createFoundLk pidv ik q g lo tl inum dn γil γisl ∗
     icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
@@ -298,7 +298,7 @@ theorem createFound_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     ⊢ wpLoop (GF := GF) cpu := by
   unfold createEnv createFoundLk
   iintro ⟨Hk, Hpc, Hte, Hce, ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
-    #Hinv, #Hopen, #Hbmi⟩, ⟨#Hslk, #Hesc, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, Hshot,
+    #Hinv, #Hopen, #Hbmi, -⟩, ⟨#Hslk, #Hesc, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, Hshot,
     Hfrz, Hkeep, Hru⟩, Hload, Hsb, Hsi, Hpid, Hbs, Hop, HK⟩
   icases logOpS_named icfgLog n Sb $$ Hop with ⟨%e0, Hop⟩
   have h := IUP.wp_iunlockput_tx_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j
@@ -363,7 +363,7 @@ THE BORROWED LICENCE's left disjunct is the `dp->nlink == 0` guard the
 region record is the in-core one (premise (6')). -/
 theorem createFound_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) (pidv : BitVec 32) (dqp : DFrac)
+    (γk : KmemNames) {fc : Nat} (pidv : BitVec 32) (dqp : DFrac)
     (ik : Nat) (inum : BitVec 32) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (dn : Dinode) (nf : Nat → BitVec 8) (sd : Qp)
     (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
@@ -375,7 +375,7 @@ theorem createFound_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc :
     (hpd : descPageRw pd) (ha0 : k'.regs 10#5 = ientry ik) (ha2 : k'.regs 12#5 = 0#64) :
     kctx cpu k' ∗ pcIs cpu KA.«dirlookup» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk fc ∗
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗ inodeBlocks fscFs bm data ∗
     -- the inner lookup's rows (chroot): dp's share and unit, the root cell
@@ -398,7 +398,7 @@ theorem createFound_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc :
   simp only [dirlookupAddr, Bool.false_eq_true, if_false] at h
   unfold createEnv
   iintro ⟨Hk, Hpc, Hte, Hce, ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
-    #Hinv, #Hopen, #Hbmi⟩, Hdev, Hmeta, Hmap, Hblk, Hshr, Hru, Hnm, Hpid, Hrt, Hrh, Hbs, Hslot, Hlk,
+    #Hinv, #Hopen, #Hbmi, -⟩, Hdev, Hmeta, Hmap, Hblk, Hshr, Hru, Hnm, Hpid, Hrt, Hrh, Hbs, Hslot, Hlk,
     Hdi, HK⟩
   iapply h
   iframe Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hshr Hru Hnm Hpid Hrt Hrh Hbs Hslot Hlk Hdi
@@ -508,7 +508,7 @@ theorem createFound_npar (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs (hlc :=
     (hbud : walkNeed (pathElems (bview plen pfun)).length ≤ n) (hpd : descPageRw pd) :
     kctx cpu k' ∗ pcIs cpu KA.«nameiparent» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk V.fsc ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     procPrivCoreNoctxAt curCtx k'.proc pid V M ∗
@@ -525,7 +525,7 @@ theorem createFound_npar (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs (hlc :=
   simp only [nameiparentAddr] at h
   unfold createEnv
   iintro ⟨Hk, Hpc, Hte, Hce, ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
-    #Hinv, #Hopen, #Hbmi⟩, Hsb, Hsi, Hcore, Hpath, Hnm, Hbs, Hs2, Hop, Htx, Hst, HK⟩
+    #Hinv, #Hopen, #Hbmi, -⟩, Hsb, Hsi, Hcore, Hpath, Hnm, Hbs, Hs2, Hop, Htx, Hst, HK⟩
   iapply h
   iframe Hk Hpc Hte Hce Hsb Hsi Hcore Hpath Hnm Hbs Hs2 Hop Htx Hst
   iframe #
@@ -589,7 +589,7 @@ def createFoundK (k : KCtx) (A : CreateFoundArgs) (F : CreateFoundFams GF) : IPr
 
 /-- The contract's persistent context, at the bundled arguments. -/
 abbrev createFoundEnv (Γ : SchedNames) (A : CreateFoundArgs) : IProp GF :=
-  createEnv (hlc := hlc) Γ A.γl A.pd A.pav A.pu A.γkl A.γk
+  createEnv (hlc := hlc) Γ A.γl A.pd A.pav A.pu A.γkl A.γk A.V.fsc
 
 /-- What the found half OWES BACK and never lends on: two superblock
 cells, the caller's path buffer, the process block minus its pid cell,
@@ -695,7 +695,7 @@ theorem createFound_exit_ok (cpu : CPU) (k : KCtx) (A : CreateFoundArgs)
     createLocked A.pid kk q q g inum dn bm ∗
     creOkArms (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
       F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) false inum.toNat ∗
-    creRcptAt fscFs k.proc (bview A.plen A.pfun) true false inum.toNat ∗
+    creRcptAt fscFs k.proc (bview A.plen A.pfun) A.V.fsc true false inum.toNat ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
   unfold createFoundFr createFoundOwe
@@ -773,7 +773,7 @@ theorem createFound_armG (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
   k_step_e (wp_s_jal cpu _ (KA.«create» + 0x86#64) false 2090834#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
-  iapply (createFound_iunlockput IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
+  iapply (createFound_iunlockput (fc := A.V.fsc) IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
       A.dqb A.dqs kd qd gd lod tld dind dn bm γil γisl n1 Sb1 hS.hj ?gp ?gK ?gn ?gt hkd hS.hgeom
       hS.hbg hcov hlog hdnib hS.hbel hn hS.hpd ?ga0 hle)
     $$ [- $Hk $Hpc]
@@ -865,7 +865,7 @@ theorem createFound_armG2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
   k_step_e (wp_s_jal cpu _ (KA.«create» + 0x90#64) false 2090824#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
-  iapply (createFound_iunlockput IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
+  iapply (createFound_iunlockput (fc := A.V.fsc) IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
       A.dqb A.dqs kd qd gd lod tld dind dn bm γil γisl n1 Sb1 hS.hj ?gp ?gK ?gn ?gt hkd hS.hgeom
       hS.hbg hcov hlog hdnib hS.hbel hn hS.hpd ?ga0 hle)
     $$ [- $Hk $Hpc]
@@ -1010,7 +1010,7 @@ theorem createFound_fbad (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
   k_step_e (wp_s_jal cpu _ (KA.«create» + 0x9a#64) false 2090814#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
-  iapply (createFound_iunlockput IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
+  iapply (createFound_iunlockput (fc := A.V.fsc) IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
       A.dqb A.dqs kc qc gc loc tlc cinum dnc bmc γil γisl n2 Sb2 hS.hj ?gp ?gK ?gn ?gt hkc
       hS.hgeom hS.hbg hcov hlog hcnib hS.hbel hn hS.hpd ?ga0 hle)
     $$ [- $Hk $Hpc]
@@ -1089,7 +1089,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     -- child IS dp and carries its `T_DIR` one-shot
     creExFired F.Fex dind.toNat (bname 14 nf) cexv ∗
     -- (NI M3 private files FS-1) the lookup's hop, in the era's ledger
-    creFoundRcpt fscFs k.proc (bname 14 nf) cexv ∗
+    creFoundRcpt fscFs k.proc A.V.fsc (bname 14 nf) cexv ∗
     (⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR) ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
@@ -1172,7 +1172,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
           hK10 hal htl (createTregs_of_regs k _ _ _ _ _ _ ?hr6) ?h18
           hkc hcpos hcnib hpure hS.hns hsub hn2 hn)
         rotate_left 2
-        ihave #Hcrc : creRcptAt fscFs k.proc (bview A.plen A.pfun) true false cinum.toNat $$ []
+        ihave #Hcrc : creRcptAt fscFs k.proc (bview A.plen A.pfun) A.V.fsc true false cinum.toNat $$ []
         · unfold creRcptAt; iright; iexists bname 14 nf
           isplitl []
           · ipureintro; exact hlast
@@ -1246,7 +1246,7 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     creExFired F.Fex dind.toNat (bname 14 nf) cexv ∗
     -- (NI M3 private files FS-1) the lookup's hop, in the era's ledger
-    creFoundRcpt fscFs k.proc (bname 14 nf) cexv ∗
+    creFoundRcpt fscFs k.proc A.V.fsc (bname 14 nf) cexv ∗
     (⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR) ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
@@ -1267,7 +1267,7 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
   k_step_e (wp_s_jal cpu _ (KA.«create» + 0x50#64) false 2090888#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
-  iapply (createFound_iunlockput IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
+  iapply (createFound_iunlockput (fc := A.V.fsc) IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
       A.dqb A.dqs kd qd gd lod tld dind dn bm γil γisl n1 Sb1 hS.hj ?gp ?gK ?gn ?gt hkd hS.hgeom
       hS.hbg hcov hlog hdnib hS.hbel (create_ip_of9 n1 hn9) hS.hpd ?ga0 hle)
     $$ [- $Hk $Hpc]
@@ -1301,7 +1301,7 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_ilock]
   iintro Hk Hpc
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
-  iapply (createFound_ilock IL Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv A.dqs
+  iapply (createFound_ilock (fc := A.V.fsc) IL Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv A.dqs
       kslot qq gc loc tlc cinum hS.hj ?lp ?lK ?ln ?lt hks hS.hgeom hccov hcnib hS.hpd ?la0 hlec)
     $$ [- $Hk $Hpc]
   rotate_right 1
@@ -1414,7 +1414,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
   icases Howe with ⟨Hsn, Hss, Hpath, Hpcl, Hrest⟩
   icases procPrivFd_root_lend_pid ht0 A.γ k.proc A.pid A.V A.M $$ [$Hpid $Hpcl]
     with ⟨Hpid, Hrt, Hrh, Hback⟩
-  iapply (createFound_dirlookup DL Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
+  iapply (createFound_dirlookup (fc := A.V.fsc) DL Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
       kd dind bm data dn nf qd.half.half A.V.root A.V.rti (DFrac.own 1) hS.hj ?gp ?gK ?gn ?gt htype
       hnlz hS.hgeom hok hdok hdoc hkd hS.hpd ?ga0 ?ga2)
     $$ [- $Hk $Hpc]
@@ -1542,13 +1542,15 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
         iexact Hshotc
     icases Hsel3 with ⟨Hsel, Href, Hkeep⟩
     ihave #Hft := createFound_env_ftop Γ A $$ Henv
+    ihave #Hfc := createEnv_cur (hlc := hlc) Γ A.γl A.pd A.pav A.pu A.γkl A.γk A.V.fsc $$ Henv
     iapply wpLoop_fupd
+    imod fsCurOk_lb _ $$ Hfc with ⟨%L, %hL, #HL⟩
     ihave Htop := (show topFrag (GF := GF) (fsGammaL fscFs) dind.toNat (eraNode dn bm data) ⊢
       topFragQ (fsGammaL fscFs) (DFrac.own 1) dind.toNat (eraNode dn bm data) from .rfl) $$ Htop
     imod (mkfDlookup_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) F.Fex dind.toNat cexv (bname 14 nf)
       (eraNode dn bm data)
-      CoPset.subseteq_top (mkfEra_is_dir dn bm data htyz) (Xv6.eraNlink_nz dn bm data hnlz) hents k.proc)
-      $$ Hft Hdlc Htop with ⟨Htop, #Hhop0, %av, %hrow, %hnm, Hrecv⟩
+      CoPset.subseteq_top (mkfEra_is_dir dn bm data htyz) (Xv6.eraNlink_nz dn bm data hnlz) hents k.proc L)
+      $$ Hft HL Hdlc Htop with ⟨Htop, #Hhop0, %av, %hrow, %hnm, Hrecv⟩
     imodintro
     ihave Htop := (show topFragQ (GF := GF) (fsGammaL fscFs) (DFrac.own 1) dind.toNat
       (eraNode dn bm data) ⊢ topFrag (fsGammaL fscFs) dind.toNat (eraNode dn bm data) from .rfl)
@@ -1577,8 +1579,8 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
       tl kd qd gd lod tld dind dn bm γil γisl kslot qq gc loc tlc cinum cexv n1 Sb1
       (createRegs_s2 k _ _ _ _ _ _ R1 _ rfl hr1) hkd hdnib hle hks hcnib hcpos hlec hal htl hname
       (create_n1_lo A.u n1 w hS.hu hled.1) hsub hled.2)
-    ihave #Hhop := fsObsRcpt_found fscFs k.proc dind.toNat cexv (bname 14 nf) (eraNode dn bm data)
-      (mkfEra_is_dir dn bm data htyz) hents $$ Hhop0
+    ihave #Hhop := fsObsRcpt_found fscFs k.proc A.V.fsc L dind.toNat cexv (bname 14 nf) (eraNode dn bm data)
+      (mkfEra_is_dir dn bm data htyz) hents hL $$ Hhop0
     iframe Hk Hpc Hfr Hte Hce Hlk Hload Hsi Hsb Howe Hpid Hbs Hop Href Hru2 HP Hex Hhop Hsel Hcre Hpost
     iframe #
 
@@ -1738,7 +1740,7 @@ theorem createFound_parent (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_ilock]
   iintro Hk Hpc
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
-  iapply (createFound_ilock IL Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv A.dqs
+  iapply (createFound_ilock (fc := A.V.fsc) IL Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv A.dqs
       kd qd gd lod tld dind hS.hj ?lp ?lK ?ln ?lt hkd hS.hgeom hcov hdnib hS.hpd ?la0 hle)
     $$ [- $Hk $Hpc]
   rotate_right 1
@@ -1965,7 +1967,7 @@ theorem create_found_half (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
     (hNmL : ∀ nm : Fname, (pathElems (bview plen pfun)).getLast? = some nm → Nm nm)
     (hNdF : ty ≠ T_DIR → Nd (creC0 ty.toNat major.toNat minor.toNat))
     (hNdD : ty = T_DIR → ∀ c : Absnode, Nd c)
-    (hA : createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢
+    (hA : createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk V.fsc ⊢
       createAllocBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex) :
     wp_create_sconf_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun
@@ -1980,6 +1982,7 @@ theorem create_found_half (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
     #Hinv, #Hopen, Hsn, Hsi, Hss, Hsb, #Hbmi, Hpriv, Hpath, Hbs, Hisl, Hop, Htx, Hst, Hdlc, Hcre,
     Hnext⟩
+  icases procPrivFd_fsCur _ _ _ _ _ $$ Hpriv with ⟨#Hfc, Hpriv⟩
   ihave #Henv : createFoundEnv (hlc := hlc) Γ A $$ []
   · unfold createFoundEnv createEnv; iframe #
   ihave Hpost : createFoundK k A F $$ [Hnext]

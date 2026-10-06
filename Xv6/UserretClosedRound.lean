@@ -76,7 +76,7 @@ theorem urcRut_open (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (
       ∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz secc k ksp V⌝ ∗
         userretLeft cpu k ∗ tfPageAt p.tfp V.tf ∗
         (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt (hlc := hlc) PT Γ j cpu p ksp V sts' cs pid) ∗
-        uhistAt Wr ∗ uptCred p :=
+        uhistAt Wr V.fsc ∗ uptCred p :=
   .rfl
 
 /-- The kernel table's invariant, copied out of the parked context. -/
@@ -106,9 +106,23 @@ theorem urc_niPidRow (W : Uvis) (V : ProcPriv) (sc : BitVec 64) (V' : ProcPriv) 
   rw [hnum0, ← hpid] at this
   exact ⟨this, urc_pauseRow W V sc V' cs' hl hsc hlive h⟩
 
-set_option maxHeartbeats 2000000 in
+/-- (NI M3 private files FS-2e-b) a citation's fs prefix, as the cursor's bound -/
+theorem urc_iotaFsCur (ι : UIota) : niIotaLbs (GF := GF) (niNamesHere (GF := GF)) ι ⊢ fsCurOk ι.fev.length := by
+  unfold niIotaLbs
+  iintro ⟨-, -, -, -, -, -, #Hf⟩
+  iapply fsCurOk_of_lb ι.fev.length ι.fev (Nat.le_refl _)
+  unfold fsLedLb
+  rw [show fscFs.fev = (niNamesHere (GF := GF)).getD 6 0 from rfl]
+  iexact Hf
+
+set_option maxHeartbeats 4000000 in
 /-- **THE ROUND'S EXIT**: usertrap's post, at the record uservec saved, to
-the next round (steps A/B, then the resume). -/
+the next round (steps A/B, then the resume).  (NI M3 private files FS-2e-b)
+THE FS CURSOR: the round's window starts at the parked record's cursor
+`V.fsc` (the history's last window's end, `uhistAt Wr V.fsc`) and ends at the
+cited fs prefix's length at a round citing a nonempty one (past the start:
+the arm's `fsPast`), else where it started; the window is appended with the
+round, and the next round resumes the record at the window's end. -/
 theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat)
     (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (k : KCtx) (pt : UPtd) (ksp : BitVec 64)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (sc : BitVec 64) (f : UexecSG.sfam GF)
@@ -122,12 +136,13 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
     (i : Nat) (x : Obs) (hx : exitFits x sc W) (Wr : Uvis) (hland : Ustep.ulands Wr sc W) :
     wireInv ∗ uRcpt (i, x) ∗ MachFixedGS.uClaimR (hlc := hlc) (GF := GF) i ∗
       kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop (hlc := hlc) PT Γ j ∗
-      (if sc = uecallScause then uexecArm (hlc := hlc) sc W f else iprop(emp)) ∗ uhistAt Wr ⊢
+      (if sc = uecallScause then uexecArm (hlc := hlc) sc W f else iprop(emp)) ∗ uhistAt Wr V.fsc ∗
+      fsCurOk V.fsc ⊢
       usertrapPost (hlc := hlc) (fun h => usertrapResAt (hlc := hlc) PT Γ j h)
         (uservecCtx k (tfResumeGpr0 W.tf) V.tf) pt ksp (urcV0 V W) Mp W.fd gn cs pid (tfW W.tf tfEpcIdx) sc f
         (uvisRun W) cpu' := by
   unfold usertrapPost
-  iintro ⟨#Hwire, #Hrc, HcR, #Hcl, #Hloop, Harm, Huh⟩ %R' %P' %V' %M' %sts' %cs' %uepc %⟨hcs, ha0⟩
+  iintro ⟨#Hwire, #Hrc, HcR, #Hcl, #Hloop, Harm, Huh, #Hfc0⟩ %R' %P' %V' %M' %sts' %cs' %uepc %⟨hcs, ha0⟩
     %⟨hupt', htfp'⟩ %hround
     %hfdk %hchk %hgk %hevq %hfde %hpipe %hrp %hpc' %hlive Hk Hpc Hsep ⟨%sc2, Hsc⟩ ⟨%tv2, Hstv⟩ Hstvec Hppt Htf Hres
     Hxo Hfo Hwo Hko Hso Heo
@@ -135,24 +150,100 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
   ihave Hslot := urc_post W V Mp gn cs pid sc f V' M' sts' cs' hl hlw hM hpi hsz hcw hgn hch hpid hlz hsc hround
     hfdk hchk hfde hpipe hrp hlive $$ [Hxo Hfo Hwo Hko Hso Harm]
   · iframe Hxo Hfo Hwo Hko Hso Harm
+  have hnum := urc_num_run W V hl hsc
+  -- (NI M3 U-2b) the resume key pinned whole off the ecall
+  have hktr : sc ≠ uecallScause → ukeyEq W (uvisOf V' M' sts' gn cs' pid) :=
+    urc_keyTransparent W V Mp sc V' M' sts' gn cs cs' pid hl hM hpi hsz hcw hgn hch hpid hlz hsc hround hfdk hchk
+  -- THE CITATION (NI M2-X2), out of usertrap's post (`utEvOut`): at a citing
+  -- number (at the ecall) the era and prefix the arm cited, with M0's row at
+  -- it; elsewhere none.  (NI M3 private files FS-2e-b) AND THE ROUND'S FS
+  -- WINDOW: from the parked cursor `V.fsc` to the cited fs prefix's length
+  -- (past it: the arm's `fsPast`) at a nonempty one, else unmoved
+  ihave Hcit : (∃ (oc : Option (Nat × UIota)) (w2 : Nat),
+      ⌜(niCiting sc W ↔ oc.isSome) ∧
+        (∀ ke ι, oc = some (ke, ι) → syscEvRow (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) V'
+          (syscImg (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) Mp) (syscImg V' M') cs cs' W.fd sts' ι) ∧
+        niWinRow oc (V.fsc, w2)⌝ ∗ niCiteRes (hlc := hlc) (GF := GF) oc ∗ fsCurOk w2) $$ [Heo]
+  · by_cases hcit : niCiting sc W
+    · obtain ⟨hsce, hcn⟩ := hcit
+      unfold utEvOut
+      ihave Heo := Heo $$ %hsce
+      icases Heo with (%hq | ⟨%ke, %ι, #Hanc, #Hl, %⟨hev, hpast⟩⟩)
+      · exfalso
+        rw [hnum] at hq
+        rcases hcn with h | h | h | h | h | h | h | h | h | h | h
+        · exact hq.1 h
+        · exact hq.2.1 h
+        · exact hq.2.2.1 h
+        · exact hq.2.2.2.1 h
+        · exact hq.2.2.2.2.1 h
+        · exact hq.2.2.2.2.2.1 h
+        · exact hq.2.2.2.2.2.2.1 h
+        · exact hq.2.2.2.2.2.2.2.1 h
+        · exact hq.2.2.2.2.2.2.2.2.1 h
+        · exact hq.2.2.2.2.2.2.2.2.2.1 h
+        · exact hq.2.2.2.2.2.2.2.2.2.2 h
+      · have hrow : ∀ ke' ι', some (ke, ι) = some (ke', ι') →
+            syscEvRow (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) V'
+              (syscImg (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) Mp) (syscImg V' M') cs cs' W.fd sts' ι' := by
+          intro ke' ι' h
+          simp only [Option.some.injEq, Prod.mk.injEq] at h
+          obtain ⟨-, rfl⟩ := h
+          exact hev
+        by_cases hfe0 : ι.fev = []
+        · iexists some (ke, ι), V.fsc
+          isplitr
+          · ipureintro
+            exact ⟨⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩, hrow, Or.inl ⟨hfe0, rfl⟩⟩
+          isplitl []
+          · unfold niCiteRes niCiteResRaw
+            iexists (niNamesHere (GF := GF))
+            iframe Hanc Hl
+          · iexact Hfc0
+        · have hp : V.fsc < ι.fev.length := hpast.resolve_left hfe0
+          iexists some (ke, ι), ι.fev.length
+          isplitr
+          · ipureintro
+            exact ⟨⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩, hrow, Or.inr ⟨hp, rfl⟩⟩
+          isplitl []
+          · unfold niCiteRes niCiteResRaw
+            iexists (niNamesHere (GF := GF))
+            iframe Hanc Hl
+          · iapply urc_iotaFsCur $$ Hl
+    · iclear Heo
+      iexists none, V.fsc
+      isplitr
+      · ipureintro
+        exact ⟨⟨fun h => absurd h hcit, fun h => absurd h (by simp)⟩, (fun _ _ h => nomatch h), rfl⟩
+      isplitl []
+      · unfold niCiteRes niCiteResRaw; iempintro
+      · iexact Hfc0
+  icases Hcit with ⟨%oc, %w2, %⟨hcio, hevo, hwin⟩, Hcr, #Hfc2⟩
   -- THE KEY HISTORY (design/ni-uhist.md D5; NI M3 U-2b): one lawful round
   -- appended -- the cause, the RESUMED key (the history's tail, exactly), the
-  -- trapped key, the key the round left; the chain steps by the landing the
-  -- obligation handed back (`hland`); the lower bound the grow hands back is
-  -- the round's evidence (`niUhRes`)
+  -- trapped key, the key the round left, (FS-2e-b) the round's fs window --
+  -- the chain steps by the landing the obligation handed back (`hland`), the
+  -- windows by the window starting at the history's end; the lower bound the
+  -- grow hands back is the round's evidence (`niUhRes`)
   unfold uhistAt
-  icases Huh with ⟨%γh, %W0h, %hh, Huh, %⟨hwf, huc, htl⟩⟩
+  icases Huh with ⟨%γh, %W0h, %hh, Huh, %⟨hwf, huc, htl, c0, hwf0, hend⟩⟩
   iapply wpLoop_bupd
-  imod uhistAuth_grow γh W0h hh (sc, Wr, W, uvisOf V' M' sts' gn cs' pid) $$ Huh with ⟨Huh, #Hulb⟩
-  have huc' : uhistChain W0h (hh ++ [(sc, Wr, W, uvisOf V' M' sts' gn cs' pid)]) := by
+  imod uhistAuth_grow γh W0h hh (sc, Wr, W, uvisOf V' M' sts' gn cs' pid, (V.fsc, w2)) $$ Huh with ⟨Huh, #Hulb⟩
+  have huc' : uhistChain W0h (hh ++ [(sc, Wr, W, uvisOf V' M' sts' gn cs' pid, (V.fsc, w2))]) := by
     rw [← htl]; exact uhistChain_snoc huc (htl ▸ hland)
-  ihave Huh : uhistAt (GF := GF) (uvisOf V' M' sts' gn cs' pid) $$ [Huh]
+  have hwin' := uhistWinFrom_snoc (c := c0) (h := hh) (sc, Wr, W, uvisOf V' M' sts' gn cs' pid, (V.fsc, w2))
+    hwf0 hend.symm (by rw [hend]; exact niWinRow_le hwin)
+  ihave Huh : uhistAt (GF := GF) (uvisOf { V' with fsc := w2 } M' sts' gn cs' pid) { V' with fsc := w2 }.fsc
+    $$ [Huh]
   · unfold uhistAt
-    iexists γh, W0h, hh ++ [(sc, Wr, W, uvisOf V' M' sts' gn cs' pid)]
+    iexists γh, W0h, hh ++ [(sc, Wr, W, uvisOf V' M' sts' gn cs' pid, (V.fsc, w2))]
     iframe Huh
     ipureintro
     exact ⟨uhistWf_snoc hwf (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
-      huc', uhistTail_snoc _ _ _⟩
+      huc', uhistTail_snoc _ _ _, c0, hwin'.1, hwin'.2⟩
+  -- (FS-2e-b) THE RECORD RESUMES AT THE WINDOW'S END: its cursor moved, the
+  -- residue at it
+  ihave Hres := usertrapResAt_fsc PT Γ j cpu' P' ksp V' sts' cs' pid w2 $$ Hfc2 Hres
   imodintro
   -- the resume, at usertrap's exit
   have hpcu : jumpPc ((uservecCtx k (tfResumeGpr0 W.tf) V.tf).regs 1#5) = userretVa :=
@@ -181,72 +272,60 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
       niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround)⟩
   have HRS := urc_resume (hlc := hlc) (GF := GF) UR PT Γ j cpu'
     (((uservecCtx k (tfResumeGpr0 W.tf) V.tf).intrOff true false).withRegs R') 0
-    P' ksp V' M' sts' gn cs' pid uepc sc2 tv2 hproc hctx' htier hnoff hsp' hav' ha0 hpc'
+    P' ksp { V' with fsc := w2 } M' sts' gn cs' pid uepc sc2 tv2 hproc hctx' htier hnoff hsp' hav' ha0 hpc'
     (hVgn.symm.trans hgk.symm) (some (i, x)) hfit
-  -- ...and THE RECORD'S EVIDENCE (NI M2-X2): at a citing number (uptime,
-  -- wait, fork, NI M2-G3 sbrk, NI M2-G4 write, NI M3 FS-L close and dup, at the ecall) the round cites the era and prefix usertrap's
-  -- post carries (`utEvOut`), with M0's row at it (`urc_niDetRow`:
-  -- `uexecRet_roundDet` at the cited ι, fork's answer among it since NI
-  -- joint fork lane F3); elsewhere it cites nothing
-  have hnum := urc_num_run W V hl hsc
-  -- (NI M3 U-2b) the resume key pinned whole off the ecall
-  have hktr : sc ≠ uecallScause → ukeyEq W (uvisOf V' M' sts' gn cs' pid) :=
-    urc_keyTransparent W V Mp sc V' M' sts' gn cs cs' pid hl hM hpi hsz hcw hgn hch hpid hlz hsc hround hfdk hchk
+  -- ...and THE RECORD'S EVIDENCE (NI M2-X2): the round's citation, with M0's
+  -- row at it (`urc_niDetRow`: `uexecRet_roundDet` at the cited ι, fork's
+  -- answer among it since NI joint fork lane F3), and (FS-2e-b) its window
   ihave #Hev : MachFixedGS.uEvid (hlc := hlc) (GF := GF) (some (i, x))
-      (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf)) $$ [Heo]
-  · by_cases hcit : niCiting sc W
-    · obtain ⟨hsce, hcn⟩ := hcit
-      unfold utEvOut
-      ihave Heo := Heo $$ %hsce
-      icases Heo with (%hq | ⟨%ke, %ι, #Hanc, #Hl, %hev⟩)
-      · exfalso
-        rw [hnum] at hq
-        rcases hcn with h | h | h | h | h | h | h | h | h | h | h
-        · exact hq.1 h
-        · exact hq.2.1 h
-        · exact hq.2.2.1 h
-        · exact hq.2.2.2.1 h
-        · exact hq.2.2.2.2.1 h
-        · exact hq.2.2.2.2.2.1 h
-        · exact hq.2.2.2.2.2.2.1 h
-        · exact hq.2.2.2.2.2.2.2.1 h
-        · exact hq.2.2.2.2.2.2.2.2.1 h
-        · exact hq.2.2.2.2.2.2.2.2.2.1 h
-        · exact hq.2.2.2.2.2.2.2.2.2.2 h
-      · have hdet := urc_niDetRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hlw hM hpi hsz hcw hgn hch hpid hlz
-          hsc hround hchk hfde hrp hlive hev
-        have hfe : niFitEv (some (i, x)) (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf))
-            (some (ke, ι)) (γh, W0h, hh ++ [(sc, Wr, W, uvisOf V' M' sts' gn cs' pid)]) :=
-          ⟨sc, Wr, W, uvisOf V' M' sts' gn cs' pid, hh, hx, ⟨cpu', _, uepc, rfl, hpc'⟩,
-            urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm,
-            urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp hlive,
-            niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
-            ⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩,
-            hdet, urc_niOutRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hM hpi hsz hch hlz hsc hev,
-            ⟨hktr, fun h1 h2 => (hdet h1 h2).1⟩, rfl, huc'⟩
-        iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ (some (ke, ι)) _ hfe
-        unfold niCiteRes niCiteResRaw niUhRes
-        isplitr
-        · iexists (niNamesHere (GF := GF))
-          iframe Hanc Hl
-        · iexact Hulb
-    · have hfe : niFitEv (some (i, x)) (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf)) none
-          (γh, W0h, hh ++ [(sc, Wr, W, uvisOf V' M' sts' gn cs' pid)]) :=
-        ⟨sc, Wr, W, uvisOf V' M' sts' gn cs' pid, hh, hx, ⟨cpu', _, uepc, rfl, hpc'⟩,
+      (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf)) $$ [Hcr]
+  · cases oc with
+    | some pc =>
+      obtain ⟨ke, ι⟩ := pc
+      have hev := hevo ke ι rfl
+      obtain ⟨hsce, hcn⟩ : niCiting sc W := hcio.2 rfl
+      have hdet := urc_niDetRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hlw hM hpi hsz hcw hgn hch hpid hlz
+        hsc hround hchk hfde hrp hlive hev
+      have hfe : niFitEv (some (i, x)) (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf))
+          (some (ke, ι)) (γh, W0h, hh ++ [(sc, Wr, W, uvisOf V' M' sts' gn cs' pid, (V.fsc, w2))]) :=
+        ⟨sc, Wr, W, uvisOf V' M' sts' gn cs' pid, hh, (V.fsc, w2), hx, ⟨cpu', _, uepc, rfl, hpc'⟩,
+          urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm,
+          urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp hlive,
+          niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
+          ⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩,
+          hdet, urc_niOutRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hM hpi hsz hch hlz hsc hev,
+          ⟨hktr, fun h1 h2 => (hdet h1 h2).1⟩, rfl, huc', hwin, ⟨c0, hwin'.1⟩⟩
+      iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ (some (ke, ι)) _ hfe
+      unfold niUhRes
+      isplitl [Hcr]
+      · iexact Hcr
+      · iexact Hulb
+    | none =>
+      have hcit : ¬ niCiting sc W := fun h => by have := hcio.1 h; simp at this
+      have hfe : niFitEv (some (i, x)) (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf)) none
+          (γh, W0h, hh ++ [(sc, Wr, W, uvisOf V' M' sts' gn cs' pid, (V.fsc, w2))]) :=
+        ⟨sc, Wr, W, uvisOf V' M' sts' gn cs' pid, hh, (V.fsc, w2), hx, ⟨cpu', _, uepc, rfl, hpc'⟩,
           urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm,
           urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp hlive,
           niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
           ⟨fun h => absurd h hcit, fun h => absurd h (by simp)⟩, trivial, trivial,
           ⟨hktr, urc_keyBoot W V Mp sc V' M' sts' gn cs cs' pid hl hlw hM hpi hsz hcw hgn hch hpid hlz hsc hround
-            hchk hfde hrp hlive hcit⟩, rfl, huc'⟩
+            hchk hfde hrp hlive hcit⟩, rfl, huc', hwin, ⟨c0, hwin'.1⟩⟩
       iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ none _ hfe
       unfold niCiteRes niCiteResRaw niUhRes
       isplitl []
       · iempintro
       · iexact Hulb
+  ihave Hev' := (show MachFixedGS.uEvid (hlc := hlc) (GF := GF) (some (i, x))
+      (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf)) ⊢
+      MachFixedGS.uEvid (hlc := hlc) (GF := GF) (some (i, x))
+      (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs { V' with fsc := w2 }.tf)) from .rfl) $$ Hev
+  ihave Hslot := (show uslot (hlc := hlc) (GF := GF) (uvisOf V' M' sts' gn cs' pid) ⊢
+      uslot (hlc := hlc) (uvisOf { V' with fsc := w2 } M' sts' gn cs' pid) from .rfl) $$ Hslot
+  ihave Htf := (show tfPageAt (GF := GF) P'.tfp V'.tf ⊢ tfPageAt P'.tfp { V' with fsc := w2 }.tf from .rfl) $$ Htf
   iapply HRS
   unfold uRcptOpt uClaimFor uClaimForRaw
-  iframe Hwire Hrc HcR Hev Hcl Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Huh Hslot
+  iframe Hwire Hrc HcR Hev' Hcl Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Huh Hslot
   inext
   iexact Hloop
 
@@ -279,6 +358,9 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   obtain ⟨hsie, htier, hnoff, hproc, ⟨hksp, hkav⟩, hVsz, hVfdg, hVcwi, hVgen, hVlz, hVsc⟩ := hp
   -- the residue, at the view the process handed back
   ihave Hres := Hclose $$ %W.fd Hfrag
+  -- (NI M3 private files FS-2e-b) the parked record's fs cursor bound, kept
+  -- for the window of a round that cites no fs event
+  icases usertrapResAt_fsCur PT Γ j h pt ksp V W.fd cs pid $$ Hres with ⟨#Hfc0, Hres⟩
   icases urc_tfPage_len pt.tfp V.tf $$ Htf with ⟨Htf, %hl⟩
   icases urc_res_upt PT Γ j h pt ksp V W.fd cs pid $$ Hres with ⟨Hres, %hVP⟩
   -- the kernel words
@@ -328,7 +410,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
     (hcw.trans hVcwi.symm) hgn hch hpid (hlz.trans hVlz.symm) (hsc.trans hVsc.symm) hVgen hproc hsie htier
     hnoff hstk.1 hkav ir
     (.uExit h (satpOf KTier.kpt pt.root) sc (tfW W.tf tfEpcIdx) (gprList (tfResumeGpr0 W.tf))) hxf Wr hland)
-  iframe Hwire Hrc HcR Hcl Hloop Harm Huh
+  iframe Hwire Hrc HcR Hcl Hloop Harm Huh Hfc0
 
 end
 

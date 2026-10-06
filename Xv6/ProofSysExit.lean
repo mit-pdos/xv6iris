@@ -204,7 +204,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
       actCnt (procAddr j) V.ev ∗
       (cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ procGenAt curCtx (procAddr j) pid V.gen ∗
-        pageCredit procSpare)
+        pageCredit procSpare ∗ fsCurOk V.fsc)
       from by unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile; iintro ⟨⟨H1, H2, H3, H4, H5, H6, H8⟩, H7⟩; iframe) $$ Hcore
     with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, HPt, HTf, %hlz, Hev, Hcwr⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ⊢

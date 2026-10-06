@@ -289,7 +289,7 @@ theorem sys_open_walk_dead (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     [Hpriv Hfrags Hfds Hdead Hoc Htc] []
   rotate_right
   · iapply openRcptAt_of; rw [hr]; decide
-  iapply (sys_open_arm_dead (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
+  iapply (sys_open_arm_dead (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.fsc A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) (R' 10#5)
       pl hpl hr)
     $$ Hpriv Hfrags Hfds Hdead Hoc Htc
@@ -323,7 +323,7 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom (truncTermAt pl A.P) A.Ft ∗
     (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') ∗
     -- (NI M3 private files FS-2b′) the walk's ledger chain, at the inum it reached
-    walkChain fscFs A.V.rti (umStartOf A.V.rti A.V.cwi pl) (pathElems pl) (pathElems pl).length iL
+    walkChain fscFs A.V.fsc A.V.rti (umStartOf A.V.rti A.V.cwi pl) (pathElems pl) (pathElems pl).length iL
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hpriv, HopS, Htx, Hbs, Hir1, Hirr, Hfds, Hfrags,
     Hheld, HP, Hoc, Htc, Hpost, #Hch⟩
@@ -402,7 +402,7 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   ihave Hkey := plainTruncKey (hlc := hlc) (fsGammaL fscFs) A.vom pl A.P inum.toNat A.Ft $$ Htc HP
   icases Hkey with ⟨HP, Htc⟩
   -- (NI M3 private files FS-2b′) what fixed the inode: the walk, followed
-  icases walkChain_open _ _ _ _ _ _ $$ Hch with ⟨%H0, %po, #HL, %hw⟩
+  icases walkChain_open _ _ _ _ _ _ _ $$ Hch with ⟨%H0, %po, #HL, %⟨hw, hlo0, -⟩⟩
   ihave #Hpre : sysOpenLedPre A inum.toNat $$ []
   · unfold sysOpenLedPre openLedPre
     iexists pl, H0, po
@@ -411,7 +411,7 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     refine ⟨hpl, ?_⟩
     rw [hcr]
     rw [List.take_of_length_le (Nat.le_refl _)] at hw
-    exact ⟨fevOpenFixed_walk (procAddr A.j) hw, fun h => absurd h (by decide)⟩
+    exact ⟨fevOpenFixed_walk (procAddr A.j) hw, fun h => absurd h (by decide), hlo0⟩
   ihave Hres : sysOpenResidue (hlc := hlc) A pl inum dn bm data $$ [HP HFo Htc]
   · unfold sysOpenResidue sysOpenObs
     iframe HP Htc Hpre
@@ -480,11 +480,15 @@ theorem sys_open_entry_n (NI : NAMEI_ERA) (IL : ILOCK) (Γ : SchedNames)
   ihave #Hrdy := sys_open_walk_rdy Γ A $$ Henv
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   ihave #Hft := iregInv_ftop _ _ _ _ $$ Hinv
+  -- (NI M3 private files FS-2e-b) the walk's hops land past the caller's fs cursor
+  icases procPrivCoreNoctxAt_fsCur _ _ _ _ _ $$ Hcore with ⟨#Hfc, Hcore⟩
+  iapply wpLoop_bupd
+  imod fsCurOk_lb _ $$ Hfc with ⟨%Lc, %hLc, #HLc⟩
   ihave Hst := walkStart (hlc := hlc) fscFs (procAddr A.j) A.V.rti A.V.cwi A.P A.Pmiss (bview plen bp)
-    $$ Hft Hst
+    A.V.fsc Lc hLc $$ Hft HLc Hst
   iapply (sys_open_namei_era NI Γ A cpu _ k.sie (by k_norm_g) (procAddr A.j)
       (by k_norm_g; exact hS.hproc) A.j plen bp MAXOPBLOCKS Sb
-      (walkCur fscFs A.V.rti (umStartOf A.V.rti A.V.cwi (bview plen bp)) (pathElems (bview plen bp)) A.P A.Pmiss)
+      (walkCur fscFs A.V.fsc A.V.rti (umStartOf A.V.rti A.V.cwi (bview plen bp)) (pathElems (bview plen bp)) A.P A.Pmiss)
       (walkMiss fscFs A.V.rti (pathElems (bview plen bp)) A.P A.Pmiss) A.pid (sysOpenV2 A P2)
       (sysOpenM2 A P2) hS.hj ?np ?nK ?nn ?nt hnn hterm (by omega) (sys_open_walk_bud _))
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hcore $Hbs $Hir2 $HopS $Htx $Hst]
@@ -515,7 +519,7 @@ theorem sys_open_entry_n (NI : NAMEI_ERA) (IL : ILOCK) (Γ : SchedNames)
   · -- ===== the walk DIED: ARM B-FAIL =====
     ihave Harm := Xv6.kxcA_ite_f _ _ $$ Harm
     icases Harm with ⟨%h10, Hir2, Hdead⟩
-    ihave Hdead := walkDead_unwrap fscFs A.V.rti _ A.P A.Pmiss _ $$ Hdead
+    ihave Hdead := walkDead_unwrap fscFs A.V.fsc A.V.rti _ A.P A.Pmiss _ $$ Hdead
     ihave Hdead := sys_open_walk_dead_rcpt _ A.P A.Pmiss _ $$ Hdead
     iapply (sys_open_walk_dead Γ k A hS hTB cpu spie1 spp1 R1 s1v w4 w5 w6 lo w24 P2 n' Sb'
         (bview plen bp) hp1 h10 hal hP2 (by omega) hpl)
@@ -524,7 +528,7 @@ theorem sys_open_entry_n (NI : NAMEI_ERA) (IL : ILOCK) (Γ : SchedNames)
   · -- ===== the walk LANDED =====
     ihave Harm := Xv6.kxcA_ite_t _ _ $$ Harm
     icases Harm with ⟨%iL, %h10, Hheld, HP, Hir1⟩
-    icases (walkCur_unwrap _ _ _ _ _ _ _ _).1 $$ HP with ⟨HP, #Hch, -⟩
+    icases (walkCur_unwrap _ _ _ _ _ _ _ _ _).1 $$ HP with ⟨HP, #Hch, -⟩
     have hn : iputUnits ≤ n' := Xv6.sys_chdir_bud_iput n' w true hlo
     iapply (sys_open_walk_found IL Γ k A hS hJ hAl hTC cpu spie1 spp1 R1 s1v w4 w5 w6 lo w24 P2 n'
         Sb' ipv iL (bview plen bp) hp1 h10 hal hP2 hn (by omega) hpl hcr)

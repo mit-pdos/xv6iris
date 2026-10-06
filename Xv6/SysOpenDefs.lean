@@ -834,30 +834,35 @@ install: the path the call fetched, a lower bound of the era's fs ledger and
 the event at `po` that fixed `i` -- the walk's last lookup (a plain open:
 followed, the walk resolves to `i` over the path), create's arm or create's
 lookup in the parent (O_CREATE) -/
-def openLedPre (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8)) (pv : Nat)
+def openLedPre (γfs : FsNames) (act : BitVec 64) (lo : Nat) (rt cw : Nat) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (i : Nat) : IProp GF :=
   iprop(∃ (pl : List (BitVec 8)) (H : List Fev) (po : Option Nat), ⌜argPathOf Mim pv pl⌝ ∗ fsLedLb γfs H ∗
     ⌜fevOpenFixed H act rt (umStartOf rt cw pl) (pathElems pl) (omCreate vom) i po = true ∧
       -- (NI M3 private files FS-2e) under O_CREATE, ALL of create's events
-      -- (at the path's last element) lie inside `H`
+      -- (at the path's last element) lie inside `H`; (FS-2e-b) past `lo`
       (omCreate vom = true → ∃ (made : Bool) (nm : List (BitVec 8)),
-        (pathElems pl).getLast? = some nm ∧ creOkIn act made nm i H)⌝)
+        (pathElems pl).getLast? = some nm ∧ creOkIn act lo made nm i H) ∧
+      -- (FS-2e-b) `H` reaches the caller's fs cursor `lo`
+      lo ≤ H.length⌝)
 
-instance openLedPre_persistent (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8))
-    (pv : Nat) (vom : BitVec 64) (i : Nat) : Persistent (openLedPre (GF := GF) γfs act rt cw Mim pv vom i) := by
+instance openLedPre_persistent (γfs : FsNames) (act : BitVec 64) (lo : Nat) (rt cw : Nat)
+    (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (i : Nat) :
+    Persistent (openLedPre (GF := GF) γfs act lo rt cw Mim pv vom i) := by
   unfold openLedPre; infer_instance
 
 /-- (NI M3 FS-2b′) **OPEN'S LEDGER RECEIPT** at the installed descriptor type
 `t`: the path the call fetched and a lower bound ending in the caller's
 install, whose cited reading (`UsysDet.usysOpenAt`) is `t` -/
-def openLedOk (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8)) (pv : Nat)
+def openLedOk (γfs : FsNames) (act : BitVec 64) (lo : Nat) (rt cw : Nat) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (t : FdType) : IProp GF :=
   iprop(∃ (pl : List (BitVec 8)) (H : List Fev), ⌜argPathOf Mim pv pl⌝ ∗ fsLedLb γfs H ∗
     ⌜usysOpenAt H act rt (umStartOf rt cw pl) (pathElems pl) (omCreate vom) (decide (omArg vom = 0)) =
-      some t⌝)
+      some t ∧
+      -- (NI M3 private files FS-2e-b) the install lies past the caller's fs cursor `lo`
+      lo < H.length⌝)
 
-instance openLedOk_persistent (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mim : Nat → List (BitVec 8))
-    (pv : Nat) (vom : BitVec 64) (t : FdType) : Persistent (openLedOk (GF := GF) γfs act rt cw Mim pv vom t) := by
+instance openLedOk_persistent (γfs : FsNames) (act : BitVec 64) (lo : Nat) (rt cw : Nat) (Mim : Nat → List (BitVec 8))
+    (pv : Nat) (vom : BitVec 64) (t : FdType) : Persistent (openLedOk (GF := GF) γfs act lo rt cw Mim pv vom t) := by
   unfold openLedOk; infer_instance
 
 end OpenLed

@@ -250,7 +250,7 @@ theorem sys_open_alloc_fail_ret_f (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (n
     [Hpriv Hfrags Hfds HP Hobs Htc] []
   rotate_right
   · iapply openRcptAt_of; rw [hr]; decide
-  iapply (sys_open_arm_fail (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
+  iapply (sys_open_arm_fail (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.fsc A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts ((sysOpenV2 A P2).updEv k2)
       (sysOpenM2 A P2) (R' 10#5) pl inum.toNat (eraNode dn bm data) hpl hr .nofile)
     $$ Hpriv Hfrags Hfds HP Hobs Htc []

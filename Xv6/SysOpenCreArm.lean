@@ -610,7 +610,7 @@ theorem sys_open_cr_ok_exists (omo : OffMode) (Γ : FsViewNames GF) (i0 : Nat) (
 
 /-- Rocq's `socr_arms_fresh`: the residue, out of the continuation's
 closure. -/
-theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
+theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (lo : Nat) (rt cw : Nat)
     (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -620,10 +620,10 @@ theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsN
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64)
     (pl : List (BitVec 8)) (i0 nl0 : Nat) (hpl : argPathOf Mim pv pl) :
     ⊢ sysOpenCrFresh (hlc := hlc) Γ vom P Farm Fun Fok Fex Fo pl i0 -∗
-      openArmsPlain (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom (sysOpenCrP i0) sysOpenCrPm
+      openArmsPlain (hlc := hlc) omo Γ γfs lo rt cw γ pa pid Mim pv vom (sysOpenCrP i0) sysOpenCrPm
         (sysOpenCrFoPure i0 ⟨.AFile [], nl0⟩) (sysOpenCrFt (hlc := hlc) Γ pl P Farm Fok Fex i0 Ft)
         sts VW MW r -∗
-      |={⊤}=> openArmsCreate (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo
+      |={⊤}=> openArmsCreate (hlc := hlc) omo Γ γfs lo rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo
         Ft sts VW MW r := by
   unfold openArmsPlain openArmsCreate
   iintro HR ⟨(⟨%hr, Hpriv, Hfrag, Hf⟩ | Hok), Hslot⟩
@@ -673,7 +673,7 @@ theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsN
     ipureintro; exact ⟨hpre, hib⟩
 
 /-- Rocq's `socr_arms_exists`. -/
-theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
+theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (lo : Nat) (rt cw : Nat)
     (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -684,9 +684,9 @@ theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : Fs
     (pl : List (BitVec 8)) (i0 : Nat) (a0 : Anode) (hpl : argPathOf Mim pv pl)
     (hnd : ∀ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat), a0 ≠ ⟨.ADir ents, nl⟩) :
     ⊢ sysOpenCrExists (hlc := hlc) Γ vom (nparNm Mim pv) P Farm Fun Fok Fex pl i0 -∗
-      openArmsPlain (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom (sysOpenCrP i0) sysOpenCrPm
+      openArmsPlain (hlc := hlc) omo Γ γfs lo rt cw γ pa pid Mim pv vom (sysOpenCrP i0) sysOpenCrPm
         (sysOpenCrFoTag i0 a0 Fo) (sysOpenCrFtEx (hlc := hlc) Γ pl P Farm Fex i0 Ft) sts VW MW r -∗
-      |={⊤}=> openArmsCreate (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo
+      |={⊤}=> openArmsCreate (hlc := hlc) omo Γ γfs lo rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo
         Ft sts VW MW r := by
   unfold openArmsPlain openArmsCreate
   iintro HR ⟨(⟨%hr, Hpriv, Hfrag, Hf⟩ | Hok), Hslot⟩
@@ -798,7 +798,7 @@ theorem sys_open_cr_post_fresh (k : KCtx) (A : SysOpenArgs GF)
   ispecialize HΦ $$ %c
   iapply (sysOpenK_mono_fupd k A.ns A.V A.M A.v A.vom _ _ c) $$ HΦ
   iintro %VW %MW %r H
-  iapply (sys_open_cr_arms_fresh (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j)
+  iapply (sys_open_cr_arms_fresh (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.fsc A.V.rti A.V.cwi A.γ (procAddr A.j)
     A.pid (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts VW MW r pl i0 nl0
     hpl) $$ HR H
 
@@ -818,7 +818,7 @@ theorem sys_open_cr_post_exists (k : KCtx) (A : SysOpenArgs GF)
   ispecialize HΦ $$ %c
   iapply (sysOpenK_mono_fupd k A.ns A.V A.M A.v A.vom _ _ c) $$ HΦ
   iintro %VW %MW %r H
-  iapply (sys_open_cr_arms_exists (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j)
+  iapply (sys_open_cr_arms_exists (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.fsc A.V.rti A.V.cwi A.γ (procAddr A.j)
     A.pid (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts VW MW r pl i0 a0
     hpl hnd) $$ HR H
 
