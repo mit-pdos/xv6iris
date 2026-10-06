@@ -57,5 +57,6 @@ import Weak.WeakCtx
 import Weak.WeakRvwmoDec
 import Weak.WeakExec
 import Weak.WeakFence
+import Weak.AxGraphCat
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
