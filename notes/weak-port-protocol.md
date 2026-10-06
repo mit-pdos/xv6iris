@@ -61,8 +61,8 @@ you port is in that table, declare it FILE-QUALIFIED: `theorem <RocqFile>.<camel
 `namespace Weak` (e.g. `theorem WeakLitmus.msgByteSingle`), and refer to it qualified. When you USE a
 duplicated name from a dependency, use the qualified name of the file you actually import.
 
-**Pre-translated drafts (tools/weak_rocq2lean.py; see notes/weak-port-pretranslate.md).** If your assignment
-says "WITH DRAFT", start from the draft the orchestrator generated (or generate it yourself per that note):
-review every statement against the Rocq source (≈96% are faithful as emitted, not 100%), fix the proofs
-that fail, delete every `sorry` placeholder and every leftover `-- ROCQ:` line, and shorten the verbose
-`first | …` fallbacks to the tree's style. Not useful for Iris/MonPred-heavy files.
+**Pre-translated drafts: NOT used.** An A/B test (2026-10-06, 3 vs 3 comparable files) found drafts from
+tools/weak_rocq2lean.py cost MORE (≈178 vs ≈149 agent tokens per Rocq line): workers kept the names and
+statements but rewrote every proof, and draft errors (untyped binders, record literals, maps as lists)
+hit the 100-error cap and hid the real ones. You MAY use `tools/weak_rocq2lean.py --names <Name>` for the
+Rocq→Lean name map only.

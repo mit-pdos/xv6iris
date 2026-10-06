@@ -250,3 +250,9 @@ No decision is needed for `TsoMem` (untouched), `VirtioProg` (Weak-local), `PtAd
     kept inert): the design's recommendations, adopted.
   - **D5: the archive is skipped** — `WeakSailLTS*`, `WeakCompose*`, `WeakShape*` (and files that only
     serve them) are not ported; listed in notes/weak-port-skip.md.
+- **Exec layer (WeakBridge blocker, 2026-10-06): route (a)** — build `Weak/Exec.lean` (a deterministic
+  evaluator over the Sail free monad + its library, bridged once to MachCSL's runRW) before WeakBridge and the
+  exec-using certificate files; WeakBridge then ports nearly literally with the O2 fetch pin
+  `latestTs log a ≤ itv`.
+- **Write answers aligned to MachCSL:** the weak interpreter answers memory writes `.Ok (some true)` like
+  MachCSL (not `.Ok none`); WeakInterp and dependents are changed accordingly.
