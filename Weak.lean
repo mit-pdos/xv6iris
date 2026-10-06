@@ -176,5 +176,6 @@ import Weak.WeakLeafAmo4Leaf
 import Weak.WeakLeafSw4
 import Weak.WeakLeafLd8
 import Weak.WeakLeafSd8
+import Weak.WkEntryEff
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
