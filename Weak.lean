@@ -170,5 +170,6 @@ import Weak.WeakLeafRegOnly
 import Weak.WeakRvwmoAdm
 import Weak.WeakLeafLw4
 import Weak.WeakWalkEff
+import Weak.WeakRvwmoLin2
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
