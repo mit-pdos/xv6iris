@@ -98,7 +98,8 @@ Rocq model never emits `AK_ifetch`/`AK_ttw` (fetch and walk both landed in
    and is stuck in `wexec` (as Rocq); `tlbi` is Rocq `TlbOp`; the two announce
    events are silent (the symbolic model, `notes/symbolic-model.md`).
 5. READ ANSWERS are `.Ok (w, none)` (Rocq `inl (w, None)`); WRITE answers are
-   `.Ok none` (Rocq `inl None`; the model only distinguishes `Ok`/`Err`).
+   `.Ok (some true)` (Rocq `inl None`), exactly MachCSL's `evStep` answer (owner decision
+   2026-10-06; the model only distinguishes `Ok`/`Err`).
 6. WRITE VALUES: Lean's write request carries `value : Option (BitVec (8*n))`
    (Rocq: the value itself).  A request with `value = none` is stuck (`False` /
    `none`), as in MachCSL's `evStep`.
@@ -666,12 +667,12 @@ def wrun (tid : Option Nat) {X : Type} : SailM X → Wmstate → X → Wmstate �
         match req.value with
         | some v =>
           match devWrite s.wmDev req.pa n v with
-          | some d' => wrun tid (k (.Ok none)) (wsetDev s d') x s'
+          | some d' => wrun tid (k (.Ok (some true))) (wsetDev s d') x s'
           | none => False
         | none => False
       else
         match req.value with
-        | some v => wrun tid (k (.Ok none)) (wwritePost tid s (classify req.access_kind) req.pa n v) x s'
+        | some v => wrun tid (k (.Ok (some true))) (wwritePost tid s (classify req.access_kind) req.pa n v) x s'
         | none => False
     -- FENCE: the view update, and (Stage B) the instruction view
     | .barrier b, k => wrun tid (k ()) (wbarrierPost s b) x s'
@@ -724,12 +725,12 @@ def wexec (tid : Option Nat) {X : Type} :
         match req.value with
         | some v =>
           match devWrite s.wmDev req.pa n v with
-          | some d' => wexec tid (k (.Ok none)) χ (wsetDev s d')
+          | some d' => wexec tid (k (.Ok (some true))) χ (wsetDev s d')
           | none => none
         | none => none
       else
         match req.value with
-        | some v => wexec tid (k (.Ok none)) χ (wwritePost tid s (classify req.access_kind) req.pa n v)
+        | some v => wexec tid (k (.Ok (some true))) χ (wwritePost tid s (classify req.access_kind) req.pa n v)
         | none => none
     | .barrier b, k => wexec tid (k ()) χ (wbarrierPost s b)
     | .instrAnnounce _ _, k => wexec tid (k ()) χ s

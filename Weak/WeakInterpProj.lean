@@ -44,8 +44,9 @@ only, deviation 3) `WeakPromiseBridge` for `wsEqr`.  Nothing Iris.
    `execExtendsTrans`.  File-qualified (orchestrator duplicated-name rule):
    `WeakInterpProj.wbytes`, `WeakInterpProj.wstep`.
 2. VOCABULARY: `M X` ↦ `SailM X`, `prefix_of` ↦ `List.IsPrefix` (`<+:`),
-   `seq 0 n` ↦ `List.range' 0 n`, `N` widths ↦ `Nat`.  `wbytes` is width-generic
-   as in Rocq, spelled with `extractLsb'` (MachCSL's `nthByte` is at width `8*n`
+   `seq 0 n` ↦ `List.range' 0 n`, `N` widths ↦ `Nat`.  `wrunFetchOk`'s write arms
+   resume with `.Ok (some true)`, `wrun`'s answer (WeakInterp deviation 5).
+   `wbytes` is width-generic as in Rocq, spelled with `extractLsb'` (MachCSL's `nthByte` is at width `8*n`
    only; `wbytesLookup` states it at `8*m` with `nthByte`, the definitional
    unfolding, and `wbytesLookupGen` at any width).  `nzWrites` has one arm per
    lean-sail `Outcome` constructor (Rocq: a wildcard), plus `True` at a model
@@ -410,13 +411,13 @@ def wrunFetchOk (tid : Option Nat) {X : Type} : SailM X → Wmstate → X → Wm
         match req.value with
         | some v =>
           match devWrite s.wmDev req.pa n v with
-          | some d' => wrunFetchOk tid (k (.Ok none)) (wsetDev s d') x s'
+          | some d' => wrunFetchOk tid (k (.Ok (some true))) (wsetDev s d') x s'
           | none => True
         | none => True
       else
         match req.value with
         | some v =>
-          wrunFetchOk tid (k (.Ok none)) (wwritePost tid s (classify req.access_kind) req.pa n v) x s'
+          wrunFetchOk tid (k (.Ok (some true))) (wwritePost tid s (classify req.access_kind) req.pa n v) x s'
         | none => True
     | .barrier b, k => wrunFetchOk tid (k ()) (wbarrierPost s b) x s'
     | .instrAnnounce _ _, k => wrunFetchOk tid (k ()) s x s'

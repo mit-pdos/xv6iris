@@ -73,9 +73,9 @@ RECORDED DECISIONS (Rocq D1–D5):
 4. THE MONAD (`Weak/WeakInterp.lean` deviation 4): `M unit` ↦ `SailM Unit`; one arm per lean-sail
    `Outcome` constructor.  A model `.error` node and the legacy `readRam`/`writeRam` are stuck
    (Rocq: `GenericFail`/`Discard`/the Sail exception); read answers are `.Ok (w, none)`, write
-   answers `.Ok none` (WeakInterp deviation 5); `tlbi` is Rocq `TlbOp`; `GetCycleCount`
-   answers `0`; `choose` branches.  A RAM/MMIO write whose request carries `value = none` is
-   stuck (WeakInterp deviation 6).
+   answers `.Ok (some true)`, as MachCSL's `evStep` (WeakInterp deviation 5); `tlbi` is
+   Rocq `TlbOp`; `GetCycleCount` answers `0`; `choose` branches.  A RAM/MMIO write whose
+   request carries `value = none` is stuck (WeakInterp deviation 6).
 5. O2 — THE READ ARM (`notes/weak-port-o2-design.md` §1.4, owner decisions O2/D2/D3/D4).  Rocq's
    RAM-read arm was guarded by `ak_coh (classify …) = false` (a fetch, being `AK_ifetch` in the
    Lean model, would have been STUCK).  It is now a TOTAL three-way split on `classify`:
@@ -716,7 +716,7 @@ def emonadStep (gen : Nat) (σ : WGState) (c : CPU) : SailM Unit → EExpr → W
           match req.value with
           | some v =>
               ∃ d' : DevStates, devWrite σ.wgdev req.pa n v = some d' ∧
-                e' = ECycle gen c (k (.Ok none)) none ∧ σ' = ewgDev σ d'
+                e' = ECycle gen c (k (.Ok (some true))) none ∧ σ' = ewgDev σ d'
           | none => False
         else
           match req.value with
@@ -724,7 +724,7 @@ def emonadStep (gen : Nat) (σ : WGState) (c : CPU) : SailM Unit → EExpr → W
               n ≠ 0 ∧
               (-- THE PLAIN RAM WRITE, guarded by exclusivity
                ((classify req.access_kind).akLatest = false ∧
-                 e' = ECycle gen c (k (.Ok none)) none ∧
+                 e' = ECycle gen c (k (.Ok (some true))) none ∧
                  σ' = ewgStore σ c
                         (storePostRunD (σ.wgws c) (classify req.access_kind).akSync
                            (srcsView (σ.wgws c) (depsAsrc (edeps σ c)))
@@ -736,7 +736,7 @@ def emonadStep (gen : Nat) (σ : WGState) (c : CPU) : SailM Unit → EExpr → W
                ((classify req.access_kind).akLatest = true ∧
                  (-- THE CONDITIONAL WRITE: the window must still be clean
                   (exwinOk σ.wglog c.val (σ.wgws c) (paZ req.pa) n (σ.wglog.length + 1) ∧
-                    e' = ECycle gen c (k (.Ok none)) none ∧
+                    e' = ECycle gen c (k (.Ok (some true))) none ∧
                     σ' = ewgStore σ c
                            (storePostRunD (σ.wgws c) (classify req.access_kind).akSync
                               (srcsView (σ.wgws c) (depsAsrc (edeps σ c)))
