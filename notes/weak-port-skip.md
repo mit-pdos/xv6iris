@@ -35,3 +35,4 @@ Owner decisions: skip superseded files; D5 skip the archive (WeakSailLTS*, WeakC
 - WeakShapePeel
 - WeakShapeTop
 - WeakShapeWin
+**Added 2026-10-06:** `WeakSailLTS`, `WeakSailLTS2` — archive. Their only live consumer is `WeakSailComplete`, and the ~180 live files importing `WeakSailComplete` use only its register-file section (`regs_agree*`, `seip_reg`, `register_lookup_set_ne`; `coh_fence_post` / `wp_pf_step_inv` are same-named copies elsewhere). So `WeakSailComplete` is ported as its register-file section only (the rest is archive), and the LTS chain is not ported. (A full port of `WeakSailLTS` exists but is not merged: under O2 its `sailShaped` premise is false at every fetch, so its theorems would be vacuous.)
