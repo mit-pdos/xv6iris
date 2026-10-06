@@ -68,5 +68,6 @@ import Weak.AxLockGraph
 import Weak.WeakLockPayload
 import Weak.AxGraphDec
 import Weak.WeakAdequacy
+import Weak.AxLockSerial
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
