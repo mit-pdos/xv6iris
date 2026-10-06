@@ -60,5 +60,13 @@ import Weak.WeakFence
 import Weak.AxGraphCat
 import Weak.WeakPtPub
 import Weak.WeakRobustAcyc
+import Weak.WeakRvwmoKillArms
+import Weak.WeakCtxPt
+import Weak.AxTieProc
+import Weak.WeakRobustProv
+import Weak.AxLockGraph
+import Weak.WeakLockPayload
+import Weak.AxGraphDec
+import Weak.WeakAdequacy
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
