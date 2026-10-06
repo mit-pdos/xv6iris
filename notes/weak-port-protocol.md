@@ -77,3 +77,7 @@ Rocq→Lean name map only.
   MMIO test `mmioAcc` (= `devAddr pa && n != 0`).
 - Archive files imported by live files are ported only as far as live files use them (WeakRobustL2 = one
   lemma; WeakSailComplete = its register-file section).
+- WeakRvwmoConf: `hlblRealizes` keeps Rocq's 4 conditions; `hlblRealizesAx` is now
+  `lblRealizes … ↔ hlblRealizes … ∧ lbFetchInert σ i l` — users that turn `hart_conf` blocks into
+  `lblRealizes` (AxOpsem, AxDeps, B0b-2) must supply `lbFetchInert` at the machine state
+  (`hlblRealizesAxNoFetch` for non-fetch labels). Under D1 `LIFetch` is treated like `LLoad false` there.
