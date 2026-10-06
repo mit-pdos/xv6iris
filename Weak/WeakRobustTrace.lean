@@ -320,6 +320,7 @@ theorem astepOkTsNone (img : Image) (log : List Wmsg) (i : Nat) (ag : Wpagent P)
   | LInstr => exact h.2
   -- THE RMW SPLIT (S2): the exclusive read fulfils nothing, the conditional write does
   | LExLoad => exact h.2.2
+  | LIFetch => exact h.2.2
 
 theorem atraceTsNone (img : Image) (log : List Wmsg) (i : Nat) (T : Atrace P D) (k : Nat)
     (ev : Aev D) :

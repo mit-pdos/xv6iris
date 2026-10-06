@@ -45,6 +45,21 @@ factorization) is `Weak/WeakPromiseFact.lean`.
 7. `lb_ldepfree` / `lb_fused` are written with a wildcard arm for the
    constructors Rocq lists one by one (same truth value per constructor).
 
+8. O2 / owner decision D4 (added with the `Weak/WeakInterp.lean` port, NOT in
+   Rocq): the Lean-only label `LIFetch (base : Int) (tvs : List (Nat × BitVec 8))`
+   — an instruction fetch, an i-cache read (no `aq`, no `lat`, no `asrc`; `lat`
+   stays inert, D5, and `LLoad`'s `lat := true` slot is NOT reused, so
+   `lat_free` stays true of the Sail LTS).  Its admissibility is the Lean-only
+   `ifetchByteOk`/`ifetchOk` (+ `ifetchByteOkb`, `…Spec`, `…0`, `…Anti`,
+   `…Img`, `…Bounded`, `ifetchOkTsBounded`, `…App`), placed here beside
+   `readOk` so both the promise machine and `WeakInterp` use one definition.
+   The machine arm `wpstep.WPIFetch` checks `ifetchOk img log 0 base tvs` and
+   leaves the log, the `Wstate` and the promises unchanged.  INSTRUCTION VIEW
+   0 at this tier (`WeakInterp` decision B5): the promise machine has no
+   per-agent `itv` and no `fence.i` label, so it admits every value a byte
+   ever held — a sound over-approximation of the Stage-B interpreter.
+   `lbDepfree (LIFetch ..)` is `True`; `cfgWfStep` gains the identity case.
+
 **Not ported:** nothing.
 
 **Statements checked** (by hand, against Rocq): all of them.
@@ -74,13 +89,17 @@ inductive Wlabel where
   | LInstr
   | LExLoad (aq : Bool) (base : Int) (tvs : List (Nat × BitVec 8)) (asrc : List Dsrc)
   | LExStore (rl : Bool) (base : Int) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
+  /-- An INSTRUCTION FETCH (O2 / owner decision D4, Lean-only): an i-cache read of the
+  per-byte answers `tvs` at `base`.  No `aq`, no `lat` (D5: `lat` stays inert), no
+  `asrc` (a fetch has no address dependency in RVWMO); it moves no view. -/
+  | LIFetch (base : Int) (tvs : List (Nat × BitVec 8))
 
 open Wlabel
 
 /-- THE DEPENDENCY-FREE FRAGMENT OF THE LABEL ALPHABET. -/
 def lbDepfree (l : Wlabel) : Prop :=
   match l with
-  | LSilent | LFence .. | LDev => True
+  | LSilent | LFence .. | LDev | LIFetch .. => True
   | LLoad _ _ _ _ asrc => asrc = []
   | LStore _ _ _ asrc vsrc => asrc = [] ∧ vsrc = []
   | LRmw _ _ _ _ _ asrc vsrc => asrc = [] ∧ vsrc = []
@@ -184,6 +203,100 @@ theorem readOkDMono (img : Image) (log : List Wmsg) (ws : Wstate) (aq lat : Bool
   obtain ⟨h1, h2, h3⟩ := hr j t v hj
   refine ⟨h1, readableAntiVpre img log ws _ _ _ t ?_ h2, h3⟩
   simp only [loadVpreD]; omega
+
+/-! ### The i-cache read (O2, Lean-only)
+
+THE INSTRUCTION-FETCH ADMISSIBILITY (`notes/weak-port-o2-design.md` §1.2, owner
+decisions O2/D3).  MachCSL's fetch reads every byte as the hart's i-cache agent
+at ONE view `tvn` with `itv ≤ tvn ≤ top` (no forwarding: the i-cache agent
+authors nothing).  The weak tier is per-byte (D3): byte `a` may return the
+write `t` (value `v`) when `t` is the latest write to `a` at SOME view
+`tvn ≥ itv`, i.e. nothing writes `a` in `(t, max t itv]`.  No `readable`, no
+load pre-view, no coherence floor, no forward bank. -/
+
+def ifetchByteOk (img : Image) (log : List Wmsg) (itv : Nat) (a : Int) (t : Nat)
+    (v : BitVec 8) : Prop :=
+  logByte img log t a = some v ∧ ¬ writesIn log a t (max t itv)
+
+/-- The whole fetch: every answered byte is admissible. -/
+def ifetchOk (img : Image) (log : List Wmsg) (itv : Nat) (base : Int)
+    (tvs : List (Nat × BitVec 8)) : Prop :=
+  ∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) → ifetchByteOk img log itv (base + (j : Int)) t v
+
+/-- The decision procedure (the `readableb` twin). -/
+def ifetchByteOkb (img : Image) (log : List Wmsg) (itv : Nat) (a : Int) (t : Nat) : Bool :=
+  match logByte img log t a with
+  | some _ => !(writesInb log a t (max t itv))
+  | none => false
+
+theorem ifetchByteOkbSpec (img : Image) (log : List Wmsg) (itv : Nat) (a : Int) (t : Nat)
+    (v : BitVec 8) :
+    logByte img log t a = some v →
+    (ifetchByteOkb img log itv a t = true ↔ ifetchByteOk img log itv a t v) := by
+  intro hv
+  unfold ifetchByteOkb ifetchByteOk
+  rw [hv]
+  simp only [Bool.not_eq_true', true_and]
+  exact notWritesInb log a t _
+
+/-- At instruction view 0 (the era start) every value the byte ever held is
+fetchable: the window `(t, t]` is empty. -/
+theorem ifetchByteOk0 (img : Image) (log : List Wmsg) (a : Int) (t : Nat) (v : BitVec 8) :
+    ifetchByteOk img log 0 a t v ↔ logByte img log t a = some v := by
+  refine ⟨fun h => h.1, fun h => ⟨h, ?_⟩⟩
+  rintro ⟨t', h1, h2, _⟩
+  simp only [Nat.max_zero] at h2
+  omega
+
+/-- A HIGHER instruction view only SHRINKS the admissible set. -/
+theorem ifetchByteOkAnti (img : Image) (log : List Wmsg) (itv itv' : Nat) (a : Int) (t : Nat)
+    (v : BitVec 8) :
+    itv' ≤ itv → ifetchByteOk img log itv a t v → ifetchByteOk img log itv' a t v := by
+  rintro hle ⟨hv, hn⟩
+  exact ⟨hv, fun hw => hn (writesInMonoHi log a t _ _ (by omega) hw)⟩
+
+theorem ifetchOkAnti (img : Image) (log : List Wmsg) (itv itv' : Nat) (base : Int)
+    (tvs : List (Nat × BitVec 8)) :
+    itv' ≤ itv → ifetchOk img log itv base tvs → ifetchOk img log itv' base tvs :=
+  fun hle h j t v hj => ifetchByteOkAnti img log itv itv' _ t v hle (h j t v hj)
+
+/-- The image is always fetchable where nothing ever wrote. -/
+theorem ifetchByteOkImg (img : Image) (log : List Wmsg) (itv : Nat) (a : Int) (v : BitVec 8) :
+    img a = some v → ¬ writesIn log a 0 log.length → ifetchByteOk img log itv a 0 v := by
+  intro hv hn
+  refine ⟨hv, fun hw => hn ?_⟩
+  obtain ⟨t, h1, _, m, hm, hs⟩ := hw
+  have := lookup_lt_Some hm
+  exact ⟨t, h1, by omega, m, hm, hs⟩
+
+/-- An admissible fetch answer is a real log position. -/
+theorem ifetchByteOkBounded (img : Image) (log : List Wmsg) (itv : Nat) (a : Int) (t : Nat)
+    (v : BitVec 8) : ifetchByteOk img log itv a t v → t ≤ log.length :=
+  fun h => logByteBounded img log t a (by rw [h.1]; rfl)
+
+theorem ifetchOkTsBounded (img : Image) (log : List Wmsg) (itv : Nat) (base : Int)
+    (tvs : List (Nat × BitVec 8)) :
+    ifetchOk img log itv base tvs → ∀ t ∈ tvs.map Prod.fst, t ≤ log.length := by
+  intro hr t ht
+  obtain ⟨⟨t', v⟩, hmem, rfl⟩ := List.mem_map.1 ht
+  obtain ⟨j, hj⟩ := List.mem_iff_getElem?.1 hmem
+  exact ifetchByteOkBounded img log itv _ t' v (hr j t' v hj)
+
+/-- A fetch is stable under appending, while the instruction view is inside the
+old log. -/
+theorem ifetchByteOkApp (img : Image) (log l : List Wmsg) (itv : Nat) (a : Int) (t : Nat)
+    (v : BitVec 8) :
+    itv ≤ log.length → ifetchByteOk img log itv a t v → ifetchByteOk img (log ++ l) itv a t v := by
+  intro hitv h
+  have ht := ifetchByteOkBounded img log itv a t v h
+  obtain ⟨hv, hn⟩ := h
+  exact ⟨by rw [logByteApp img log l t a ht]; exact hv,
+    fun hw => hn (writesInAppInv log l a t _ (by omega) hw)⟩
+
+theorem ifetchOkApp (img : Image) (log l : List Wmsg) (itv : Nat) (base : Int)
+    (tvs : List (Nat × BitVec 8)) :
+    itv ≤ log.length → ifetchOk img log itv base tvs → ifetchOk img (log ++ l) itv base tvs :=
+  fun hitv h j t v hj => ifetchByteOkApp img log l itv _ t v hitv (h j t v hj)
 
 /-- The fulfil conditions at timestamp `ts` (COH per byte, EXT). -/
 def fulfilOkD (ws : Wstate) (rl : Bool) (base : Int) (n ts vd : Nat) : Prop :=
@@ -609,6 +722,15 @@ inductive wpstep : Wpcfg P D → Wpcfg P D → Prop
         ⟨cfg.pcImg, cfg.pcLog, d',
          cfg.pcAgs.set i ⟨st', storePostRunD ag.paWs rl (srcsView ag.paWs asrc)
            (srcsView ag.paWs vsrc) base data.length ts, ag.paProm \ {ts}⟩⟩
+  /-- O2 / D4 (Lean-only): an instruction fetch.  The i-cache read moves no view;
+  the promise machine checks it at instruction view 0 (no per-agent `itv`, no
+  `fence.i` label at this tier: the sound over-approximation, see the header). -/
+  | WPIFetch (cfg : Wpcfg P D) (i : Nat) (ag : Wpagent P) (base : Int)
+      (tvs : List (Nat × BitVec 8)) (st' : P) (d' : D) :
+      cfg.pcAgs[i]? = some ag →
+      pstep ag.paSt cfg.pcDev (LIFetch base tvs) st' d' →
+      ifetchOk cfg.pcImg cfg.pcLog 0 base tvs →
+      wpstep cfg ⟨cfg.pcImg, cfg.pcLog, d', cfg.pcAgs.set i ⟨st', ag.paWs, ag.paProm⟩⟩
 
 /-! ### Initial configurations and behaviors -/
 
@@ -752,6 +874,8 @@ theorem cfgWfStep (cfg cfg' : Wpcfg P D) : cfgWf cfg → wpstep pstep cfg cfg' �
       obtain ⟨_, hle, _⟩ := hp ts hts
       exact ⟨storePostRunDBounded _ _ _ _ _ _ _ _ _ hb hle (Nat.le_refl _)
         (srcsViewBounded _ _ _ hb) (srcsViewBounded _ _ _ hb), promWfDiff _ _ _ _ _ _ hp⟩)
+  | WPIFetch i ag base tvs st' d' hlk _ _ =>
+    exact cfgWfSet cfg i ag _ _ _ hwf hlk (fun hb hp => ⟨hb, hp⟩)
 
 theorem cfgWfReach (cfg cfg' : Wpcfg P D) : cfgWf cfg → rtc (wpstep pstep) cfg cfg' → cfgWf cfg' := by
   intro h0 hr

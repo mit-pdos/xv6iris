@@ -37,6 +37,13 @@ dev-free fragment and the per-agent decomposition is re-proved over it.
    one by one (same truth value per constructor).  `cfg_wf_promise_step`
    keeps `pstep` as an explicit (unused-in-the-statement) argument via
    `include pstep in`, as Rocq's section abstraction gives it.
+6. O2 / owner decision D4 (added with the `Weak/WeakInterp.lean` port): the
+   label alphabet has the Lean-only `LIFetch base tvs` (`Weak/WeakPromise.lean`
+   deviation 8).  `astepOk`'s arm is `ifetchOk img log 0 base tvs ∧ f = id ∧
+   Dl = none` (the state-identity arm); `wpAstepWpstep`, `wpstepSplit`,
+   `astepOkApp` (via `ifetchOkApp`), `astepOkProm`, `astepOkDel` gain the
+   matching case.  `latFree (LIFetch ..)` is `True` (the wildcard arm), so
+   Layer 1's lat-free fragment contains fetches.
 
 **Not ported:** nothing.
 
@@ -143,6 +150,7 @@ def astepOk (img : Image) (log : List Wmsg) (i : Nat) (ag : Wpagent P) (l : Wlab
                then max ag.paWs.wVrOld ag.paWs.wVwOld else 0))) ∧
         f = (fun w => storePostRunD w rl (srcsView w asrc) (srcsView w vsrc) base data.length ts) ∧
         Dl = some ts
+  | LIFetch base tvs => ifetchOk img log 0 base tvs ∧ f = id ∧ Dl = none
 
 /-- The non-promise rules of `wpstep`, as ONE relation indexed by the acting
 agent and the label. -/
@@ -195,6 +203,8 @@ theorem wpAstepWpstep (i : Nat) (l : Wlabel) (c c' : Wpcfg P D) :
     | LExStore rl base data asrc vsrc =>
       obtain ⟨ts, k, R, h1, h2, h3, h4, h5, h6, h7, rfl, rfl⟩ := hok
       exact wpstep.WPExStore c i ag rl base data asrc vsrc k ts R st' d' hlk hps h1 h2 h3 h4 h5 h6 h7
+    | LIFetch base tvs =>
+      obtain ⟨hr, rfl, rfl⟩ := hok; exact wpstep.WPIFetch c i ag base tvs st' d' hlk hps hr
 
 theorem wpStateStepWpstep (c c' : Wpcfg P D) : wpStateStep pstep c c' → wpstep pstep c c' := by
   rintro ⟨i, l, h⟩; exact wpAstepWpstep pstep i l c c' h
@@ -248,6 +258,8 @@ theorem wpstepSplit (c c' : Wpcfg P D) :
     exact .inr ⟨i, _, wpAstep.WPAStep c ag st' d'
       (fun w => storePostRunD w rl (srcsView w asrc) (srcsView w vsrc) base data.length ts)
       (some ts) hlk hps ⟨ts, k, R, h1, h2, h3, h4, h5, h6, h7, rfl, rfl⟩⟩
+  | WPIFetch i ag base tvs st' d' hlk hps hr =>
+    exact .inr ⟨i, LIFetch base tvs, wpAstep.WPAStep c ag st' d' id none hlk hps ⟨hr, rfl, rfl⟩⟩
 
 /-- THE LAYER-1 PROGRAM-ALPHABET RESTRICTION: the program never emits a
 latest-kind load. -/
@@ -377,6 +389,9 @@ theorem astepOkApp (img : Image) (log l' : List Wmsg) (i : Nat) (ag : Wpagent P)
       exclOkTsApp log l' i base R.rvTs ts (by omega) he, ?_, hf, hdl⟩
     rw [adShapedbApp img log l' base R.rvTs data hrb']
     exact hful
+  | LIFetch base tvs =>
+    rintro ⟨hr, hf, hdl⟩
+    exact ⟨ifetchOkApp img log l' 0 base tvs (Nat.zero_le _) hr, hf, hdl⟩
 
 theorem wpAstepApp (i : Nat) (l : Wlabel) (c c' : Wpcfg P D) (m : Wmsg) :
     cfgWf c → latFree l → wpAstep pstep i l c c' →
@@ -440,6 +455,7 @@ theorem astepOkProm (img : Image) (log : List Wmsg) (i : Nat) (ag ag' : Wpagent 
     simp only [astepOk, hws]
     rintro ⟨ts, k, R, h1, h2, h3, h4, h5, h6, h7, h8, h9⟩
     exact ⟨ts, k, R, elemOfWeaken h1 hpr, h2, h3, h4, h5, h6, h7, h8, h9⟩
+  | LIFetch => exact id
 
 theorem astepOkDel (img : Image) (log : List Wmsg) (i : Nat) (ag : Wpagent P) (l : Wlabel)
     (f : Wstate → Wstate) (Dl : Option Nat) (ts : Nat) :
@@ -462,6 +478,7 @@ theorem astepOkDel (img : Image) (log : List Wmsg) (i : Nat) (ag : Wpagent P) (l
   | LRegW => rintro ⟨_, rfl⟩ h; cases h
   | LCtrl => rintro ⟨_, rfl⟩ h; cases h
   | LInstr => rintro ⟨_, rfl⟩ h; cases h
+  | LIFetch => rintro ⟨_, _, rfl⟩ h; cases h
 
 theorem wpAstepPromAdd (i : Nat) (l : Wlabel) (c c' : Wpcfg P D) (T : Nat) (ag ag' : Wpagent P) :
     c.pcAgs[i]? = some ag →
