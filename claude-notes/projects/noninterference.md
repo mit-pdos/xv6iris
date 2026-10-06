@@ -7815,6 +7815,8 @@ open at a lazy-free key holding its path argument, mkdir at a lazy-free key}. FS
 
 ### M3 private files FS-2d as landed (2026-10-06)
 
+**Owner decision after FS-2d (2026-10-06): "Finish it: sublist form".** X1 is re-ruled in the SUBLIST form: `fout` is a sublist of the round's window of the era ledger (other actors' events may interleave), the cited prefix ends in `fout`'s last event, the offsets are as recorded (`fevOffWf` + privacy give FS-4 the fold's), and a pure shape predicate `usysFevOutOk n W ι fout` checks the rest (the write chunks' bytes are the key's buffer bytes in order; the created entry's name is the last path element; `trunc` iff O_TRUNC, before the install). Lanes: **FS-2e** (kernel: ordered write-chunk receipts with the bytes tied to the key's buffer, the created names relayed through `creParentRcpt`/`creFoundRcpt`, `trunc` tied to the O_TRUNC bit and the install, and a per-incarnation fs CURSOR carried between rounds — the `uhist` pattern — so round j+1's citation provably extends round j's window: X4 derived), **FS-2f** (`fout` on the step outside `input`, the law `usysFevOutOk ∧ ι.fev ends in fout`, X3's write half, X4's order clause from the cursor, X5 `fevPrivateQ`), then **FS-3/4** (`xv6NiFs`). Estimate 1.5–2 BE.
+
 On `lane/pfiles` (the coordinator's ruling before FS-3/4 of 2026-10-06). PARTIAL: X2 and X3 (read) land with the
 prototype's footprint lemmas; **X1 is STOPPED** (not exportable with the sanctioned moves, and false as stated for
 every multi-event round), and X4/X5, whose shapes are functions of X1's, wait with it. No kernel change; the
