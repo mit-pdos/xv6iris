@@ -34,5 +34,6 @@ import Weak.WeakRvwmoLin
 import Weak.WeakRvwmoLockWit
 import Weak.WeakRvwmoProbeSwap
 import Weak.WeakRvwmoNorm
+import Weak.WeakRvwmoRestr
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
