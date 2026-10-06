@@ -415,13 +415,19 @@ theorem sys_chdir_hole_close (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
   iintro ⟨Hw, Hr⟩
   iapply Hw $$ %V.cwd %V.cwi Hr
 
+/-- (NI M3 private files FS-2b) chdir's ledger receipt at the record's own
+path argument and actor -/
+abbrev sysChdirLed (A : SysChdirArgs GF) (i : Nat) : IProp GF :=
+  chdirLed fscFs (procAddr A.j) A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+    (A.V.tf.getD (tfArgIdx 0) 0#64).toNat i
+
 /-- What every exit hands the epilogue beside the machine state: the two
 allowances whole and the armed post on the block the call leaves. -/
 def sysChdirOut (A : SysChdirArgs GF) (r : BitVec 64) : IProp GF := iprop%
   bslots 3 ∗ irefSlots 2 ∗
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
     chdirArms (hlc := hlc) (fsGammaL fscFs) fscFs A.γ (procAddr A.j) A.pid A.V.rti A.V.cwi A.P A.Pmiss A.Fo
-      { A.V with upt := P' } (viewFaulted A.V.upt P' A.M) r)
+      (sysChdirLed A) { A.V with upt := P' } (viewFaulted A.V.upt P' A.M) r)
 
 set_option maxHeartbeats 8000000 in
 /-- **THE JOIN POINT `+0x5c`** (Rocq `sc_epilogue` + the caller's

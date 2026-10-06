@@ -131,6 +131,7 @@ Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.SysOpenDefs
 import Xv6.SpecNamei
+import Xv6.UMemLazy
 
 namespace Xv6
 
@@ -177,20 +178,22 @@ def chdirPostFail (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (P Pmiss 
 observed as such, and the block's cwd moved to it -- pointer and inum both,
 the inum being the walk's own cursor `i`. -/
 def chdirPostOk (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (P : Nat → Nat → IProp GF)
-    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    IProp GF :=
+    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (Lk : Nat → IProp GF) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) : IProp GF :=
   iprop(∃ (ipv : BitVec 64) (pl : List (BitVec 8)) (i : Nat)
       (e : Std.ExtTreeMap Fname Nat compare) (nl : Nat) (av : Aview),
     P (pathElems pl).length i ∗ ⌜arowAt av i ⟨.ADir e, nl⟩⌝ ∗ Fo.pfRecv av i ⟨.ADir e, nl⟩ ∗
+    -- (NI M3 private files FS-2b) the kernel's ledger receipt at the new cwd
+    Lk i ∗
     procPrivFd γ pa pid { V with cwd := ipv, cwi := i } M)
 
 /-- THE ARMED DISJUNCTION the continuation receives, keyed on a0, at the
 block the syscall returns (Rocq's `chdir_arms`). -/
 def chdirArms (Γ : FsViewNames GF) (γfs : FsNames) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (r : BitVec 64) : IProp GF :=
+    (Lk : Nat → IProp GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (r : BitVec 64) : IProp GF :=
   iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ procPrivFd γ pa pid V M ∗ chdirPostFail Γ γfs rt cw P Pmiss Fo) ∨
-    (⌜r = 0#64⌝ ∗ chdirPostOk γ pa pid P Fo V M))
+    (⌜r = 0#64⌝ ∗ chdirPostOk γ pa pid P Fo Lk V M))
 
 /-- THE PROCESS-NAMEABLE HALF OF THE ARMS: chdir's RECEIPT (Rocq's
 `chdir_receipt`).  It names no kernel ghost -- no block, no cwd pointer --
@@ -212,28 +215,33 @@ beside the receipt, read at the inum the block now carries.  The premise is
 the contract's own instantiation (`cw := V.cwi`). -/
 theorem chdirArms_split (Γ : FsViewNames GF) (γfs : FsNames) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (r : BitVec 64) (hcw : V.cwi = cw) :
-    chdirArms Γ γfs γ pa pid rt cw P Pmiss Fo V M r ⊢
+    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (Lk : Nat → IProp GF) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (r : BitVec 64) (hcw : V.cwi = cw) :
+    chdirArms Γ γfs γ pa pid rt cw P Pmiss Fo Lk V M r ⊢
       ∃ V' : ProcPriv,
         ⌜(r = 0xFFFFFFFFFFFFFFFF#64 ∧ V' = V) ∨
           (r = 0#64 ∧ ∃ (ipv : BitVec 64) (i : Nat), V' = { V with cwd := ipv, cwi := i })⌝ ∗
-        procPrivFd γ pa pid V' M ∗ chdirReceipt Γ γfs rt cw P Pmiss Fo r V'.cwi := by
+        procPrivFd γ pa pid V' M ∗ chdirReceipt Γ γfs rt cw P Pmiss Fo r V'.cwi ∗
+        -- (NI M3 private files FS-2b) the kernel's half: the ledger receipt on success
+        (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∨ Lk V'.cwi) := by
   unfold chdirArms chdirPostOk chdirReceipt
-  iintro (⟨%hr, Hpriv, Hfail⟩ | ⟨%hr, ⟨%ipv, %pl, %i, %e, %nl, %av, HP, %harow, HFo, Hpriv⟩⟩)
+  iintro (⟨%hr, Hpriv, Hfail⟩ | ⟨%hr, ⟨%ipv, %pl, %i, %e, %nl, %av, HP, %harow, HFo, HLk, Hpriv⟩⟩)
   · iexists V
     iframe Hpriv
     isplitr
     · ipureintro; exact Or.inl ⟨hr, rfl⟩
+    isplitl [Hfail]
     · ileft
       iframe Hfail
       isplitr
       · ipureintro; exact hr
       · ipureintro; exact hcw
+    · ileft; ipureintro; exact hr
   · iexists { V with cwd := ipv, cwi := i }
     iframe Hpriv
     isplitr
     · ipureintro; exact Or.inr ⟨hr, ipv, i, rfl⟩
+    isplitl [HP HFo]
     · iright
       isplitr
       · ipureintro; exact hr
@@ -242,6 +250,25 @@ theorem chdirArms_split (Γ : FsViewNames GF) (γfs : FsNames) (γ : FileNames) 
         isplitr
         · ipureintro; rfl
         · ipureintro; exact harow
+    · iright; iexact HLk
+
+/-- (NI M3 private files FS-2b) **chdir's LEDGER RECEIPT** at the new cwd's
+inum `i`: the path the call fetched (at `pv` in the view `Mv`) and a lower
+bound of the era's fs ledger ending in the caller's (`act`) type test of
+`i`, whose walk -- followed through the lookups' back-pointers -- made one
+lookup per path element and resolved, from namex's start (the root `rt` on
+an absolute path, the cwd `cw` on a relative one), to `i`, a directory in
+the fold before the test (`NiFs.fevLookAt`). -/
+def chdirLed (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mv : Nat → List (BitVec 8)) (pv : Nat)
+    (i : Nat) : IProp GF :=
+  iprop(∃ (pl : List (BitVec 8)) (H : List Fev) (e : Std.ExtTreeMap (List (BitVec 8)) Nat compare)
+      (nl : Nat),
+    ⌜argPathOf Mv pv pl⌝ ∗ fsLedLb γfs H ∗
+    ⌜fevLookAt H act rt (umStartOf rt cw pl) (pathElems pl).length = some (i, some (.dir e, nl))⌝)
+
+instance chdirLed_persistent (γfs : FsNames) (act : BitVec 64) (rt cw : Nat) (Mv : Nat → List (BitVec 8))
+    (pv i : Nat) : Persistent (chdirLed (GF := GF) γfs act rt cw Mv pv i) := by
+  unfold chdirLed; infer_instance
 
 end Arms
 
@@ -274,6 +301,8 @@ def sysChdirK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     irefSlots 2 -∗
     -- the armed post
     chdirArms (hlc := hlc) (fsGammaL fscFs) fscFs γ pa pid V.rti V.cwi P Pmiss Fo
+      -- (NI M3 private files FS-2b) the ledger receipt, at the path argument
+      (chdirLed fscFs pa V.rti V.cwi (viewLazy V.upt V.sz M) (V.tf.getD (tfArgIdx 0) 0#64).toNat)
       { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
     wpLoop cpu')
 

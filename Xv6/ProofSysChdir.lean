@@ -53,6 +53,7 @@ arm.
 -/
 import Xv6.SysChdirTails
 import Xv6.FsAbsOpenFire
+import Xv6.FsWalkLed
 import MachCSL.WpSmodeLh
 import Xv6.KexecACode
 import Xv6.NamexParts
@@ -89,6 +90,17 @@ theorem sys_chdir_notdir (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVe
     simp only [T_DIR_z] at h1; rw [h1]; rfl
   rw [Xv6.era_notDir dn bm data hnd] at hd
   cases hd
+
+/-- (NI M3 private files FS-2b) namei's view of the fetched string IS the
+string. -/
+theorem sys_chdir_bview (pl : List (BitVec 8)) : bview pl.length (sysfilePfun pl) = pl := by
+  have h := sysfile_bview pl
+  unfold bview at h ⊢
+  rw [List.range_succ, List.map_append] at h
+  have h0 : List.map (sysfilePfun pl) [pl.length] = [0#8] := by
+    simp [sysfilePfun, List.getD_eq_getElem?_getD]
+  rw [h0] at h
+  exact List.append_cancel_right h
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -138,7 +150,8 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
     (hpins : sysChdirPins k R (ientry kk) (procAddr A.j))
     (hal : (sysChdirBuf (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
     (hkk : kk < NINODE) (hnib : inum.toNat < 16 * icfgNib) (hpos : 0 < inum.toNat)
-    (hle : lo ≤ tl) (hn : iputUnits ≤ n) :
+    (hle : lo ≤ tl) (hn : iputUnits ≤ n)
+    (hpath : argPathOf (viewLazy A.V.upt A.V.sz A.M) (A.V.tf.getD (tfArgIdx 0) 0#64).toNat pl) :
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_chdir» + 0x38#64) ∗
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     sysfileAny (sysChdirBuf (k.regs 2#5)) 128 ∗
@@ -149,9 +162,11 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
     sysChdirLocked kk q g lo tl γil γisl inum A.pid dn bm ∗
     bslots 3 ∗ irefSlots 1 ∗ logOpS icfgLog n Sb ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
-    A.P (pathElems (bview pl.length (sysfilePfun pl))).length inum.toNat
+    A.P (pathElems (bview pl.length (sysfilePfun pl))).length inum.toNat ∗
+    -- (NI M3 private files FS-2b) the walk's ledger chain, at the inum it reached
+    walkChain fscFs A.V.rti (umStartOf A.V.rti A.V.cwi pl) (pathElems pl) (pathElems pl).length inum.toNat
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hlk, Hbs, Hir, Hop, Hoc, HP⟩
+  iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hlk, Hbs, Hir, Hop, Hoc, HP, #Hch⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   unfold sysChdirLocked
   icases Hlk with ⟨#Hslk, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, Hload, Hshot, Hfrz, Hkeep, Hru⟩
@@ -162,10 +177,12 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
   ihave #Hrdy := Xv6.sys_link_env_ready Γ $$ Henv
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   ihave #Hft := iregInv_ftop _ _ _ _ $$ Hinv
+  icases walkChain_open _ _ _ _ _ _ $$ Hch with ⟨%H0, %po, #HL, %hw⟩
   iapply wpLoop_fupd
-  imod (opfOpen_fire_1 (hlc := hlc) fscFs ⊤ A.Fo inum.toNat (eraNode dn bm data)
-      CoPset.subseteq_top (opfEra_typed_ok _ _ dn bm data hok)) $$ Hft Hoc Ht
-    with ⟨Ht, %av, %harow, HFo⟩
+  -- (NI M3 private files FS-2b) ...WITH THE TYPE TEST'S `look`, past the walk
+  imod (walkLook_fire_1 (hlc := hlc) fscFs ⊤ A.Fo inum.toNat (eraNode dn bm data)
+      CoPset.subseteq_top (opfEra_typed_ok _ _ dn bm data hok) (procAddr A.j) po H0) $$ Hft HL Hoc Ht
+    with ⟨Ht, ⟨%h, %hh, #HLr⟩, %av, %harow, HFo⟩
   imodintro
   -- +0x38  lh a4,68(s1)
   icases sysfile_meta_type (ientry kk) dn $$ Hmeta with ⟨Hty, Hmcl⟩
@@ -224,6 +241,19 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
     ihave HFo := (show A.Fo.pfRecv av inum.toNat (absRow (eraNode dn bm data)) ⊢
       A.Fo.pfRecv av inum.toNat ⟨.ADir (dirEntries (eraNode dn bm data)), fnNlink (eraNode dn bm data)⟩
       from by rw [hrow]) $$ HFo
+    -- (NI M3 private files FS-2b) THE RECEIPT: the walk's chain closed by the test
+    have hdir : fnIsDir (eraNode dn bm data) = true := mkfEra_is_dir dn bm data (Xv6.sys_unlink_tdir_zof _ hty)
+    have hlook := fevLookAt_snoc hh.1 hw (procAddr A.j)
+    rw [List.length_take, Nat.min_self, hh.2, ftopRow_dir _ hdir] at hlook
+    ihave HFo : (A.Fo.pfRecv av inum.toNat ⟨.ADir (dirEntries (eraNode dn bm data)), fnNlink (eraNode dn bm data)⟩ ∗
+        sysChdirLed A inum.toNat) $$ [HFo]
+    · iframe HFo
+      unfold sysChdirLed chdirLed
+      iexists pl, h ++ [.look (procAddr A.j) inum.toNat po], dirEntries (eraNode dn bm data),
+        fnNlink (eraNode dn bm data)
+      iframe HLr
+      ipureintro
+      exact ⟨hpath, hlook⟩
     iapply (sys_chdir_tail_ok IU IP EO Γ cpu k A P2 spie spp _ kk q g lo tl γil γisl inum dn bm n Sb
         _ (sysfilePfun pl) pl.length rfl _ _ av harow
         hj hproc hK hnoff htier ?hp1 hal hP2 hkk hnib hpos hle hn)
@@ -305,7 +335,8 @@ theorem sys_chdir_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPU
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hct : curTier = KTier.kpt)
     (hpins : sysChdirPins k R (k.regs 9#5) (procAddr A.j)) (h10 : R 10#5 = ipv)
     (hal : (sysChdirBuf (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
-    (hlen : pl.length + 1 + rest.length = 128) (hn : iputUnits ≤ n) :
+    (hlen : pl.length + 1 + rest.length = 128) (hn : iputUnits ≤ n)
+    (hpath : argPathOf (viewLazy A.V.upt A.V.sz A.M) (A.V.tf.getD (tfArgIdx 0) 0#64).toNat pl) :
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_chdir» + 0x30#64) ∗
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) ∗
@@ -315,9 +346,10 @@ theorem sys_chdir_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPU
     (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 1 ∗
     logOpS icfgLog n Sb ∗ logTx icfgLog ∗
     inodeHeldAt ipv iL ∗ A.P (pathElems (bview pl.length (sysfilePfun pl))).length iL ∗
-    pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo
+    pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
+    walkChain fscFs A.V.rti (umStartOf A.V.rti A.V.cwi pl) (pathElems pl) (pathElems pl).length iL
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Htx, Hheld, HP, Hoc⟩
+  iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Htx, Hheld, HP, Hoc, #Hch⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hbuf := sysfile_buf_join _ pl rest hlen $$ [$Hp $Hrest]
   obtain ⟨-, -, -, -, -, hKil, -, -, -⟩ := sys_chdir_K _ hK
@@ -376,8 +408,8 @@ theorem sys_chdir_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPU
   ihave Hrows : sysChdirRows (procAddr A.j) A.pid A.V.cwd A.V.cwi $$ [Hpid Hcwd Hcwr]
   · unfold sysChdirRows; iframe
   iapply (sys_chdir_tested IU IP IUP EO Γ cpu k A P2 spie1 spp1 R1 kk q g lo tl γil γisl inum dn bm
-      n Sb pl hj hproc hK hnoff htier hp1 hal hP2 hkk hnib hpos hle hn)
-    $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hrows $Hhole $HΦ $Hlk $Hbs $Hir $Hop $Hoc $HP]
+      n Sb pl hj hproc hK hnoff htier hp1 hal hP2 hkk hnib hpos hle hn hpath)
+    $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hrows $Hhole $HΦ $Hlk $Hbs $Hir $Hop $Hoc $HP $Hch]
 
 /-! ## +0x22: argstr came back -/
 
@@ -396,7 +428,8 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hct : curTier = KTier.kpt)
     (hpins : sysChdirPins k R (k.regs 9#5) (procAddr A.j))
     (hal : (sysChdirBuf (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
-    (hold : old.length = 128) (hret : fetchstrRet (viewLazy A.V.upt A.V.sz A.M) v.toNat old bs (R 10#5)) :
+    (hold : old.length = 128) (hret : fetchstrRet (viewLazy A.V.upt A.V.sz A.M) v.toNat old bs (R 10#5))
+    (hv : A.V.tf[tfArgIdx 0]? = some v) :
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_chdir» + 0x22#64) ∗
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ (k.regs 18#5) ∗
     byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) bs ∗
@@ -414,6 +447,11 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     have hpl : pl' = pl := (List.append_cancel_right hpl'.symm)
     subst hpl
     subst hbs
+    -- (NI M3 private files FS-2b) the path argument, as the image reads it
+    have hpath : argPathOf (viewLazy A.V.upt A.V.sz A.M) (A.V.tf.getD (tfArgIdx 0) 0#64).toNat pl' := by
+      obtain ⟨q, hq, hpo⟩ := argPathOf_umemStr _ _ _ _ (by rw [hold]; decide) hs
+      rw [List.append_cancel_right hq, List.getD_eq_getElem?_getD, hv]
+      exact hpo
     rw [hold] at hlt
     -- +0x22  bltz a0 : falls through
     k_step_e (wp_s_branch cpu _ (KA.«sys_chdir» + 0x22#64) false 70#13 10#5 0#5 (by decide) bop.BLT)
@@ -445,13 +483,22 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     -- THE ONE-SHOT, HANDED DOWN UNFIRED: the walk picks the start
     ihave Hst := opfStart_of_open (hlc := hlc) fscFs A.V.rti A.V.cwi A.P A.Pmiss
       (bview pl'.length (sysfilePfun pl')) $$ Hwp
+    -- (NI M3 private files FS-2b) ...WRAPPED: each hop appends its lookup
+    ihave #Hrdy := Xv6.sys_link_env_ready Γ $$ Henv
+    icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
+    ihave #Hft := iregInv_ftop _ _ _ _ $$ Hinv
+    ihave Hst := walkStart (hlc := hlc) fscFs (procAddr A.j) A.V.rti A.V.cwi A.P A.Pmiss
+      (bview pl'.length (sysfilePfun pl')) $$ Hft Hst
     icases logOp_openS icfgLog MAXOPBLOCKS $$ Hop with ⟨%Sb, HopS, Htx⟩
     ihave Hp := (show byteBuf (GF := GF) (sysChdirBuf (k.regs 2#5)) (DFrac.own 1)
         (bview (pl'.length + 1) (sysfilePfun pl')) ⊢
       byteBuf (k.regs 2#5 + 18446744073709551456#64) (DFrac.own 1)
         (bview (pl'.length + 1) (sysfilePfun pl')) from .rfl) $$ Hp
     iapply (sys_chdir_namei_era NI Γ cpu _ k.sie (by k_norm_g) (procAddr A.j)
-        (by k_norm_g; exact hproc) A.j pl'.length (sysfilePfun pl') MAXOPBLOCKS Sb A.P A.Pmiss A.pid
+        (by k_norm_g; exact hproc) A.j pl'.length (sysfilePfun pl') MAXOPBLOCKS Sb
+        (walkCur fscFs A.V.rti (umStartOf A.V.rti A.V.cwi (bview pl'.length (sysfilePfun pl')))
+          (pathElems (bview pl'.length (sysfilePfun pl'))) A.P A.Pmiss)
+        (walkMiss fscFs A.V.rti (pathElems (bview pl'.length (sysfilePfun pl'))) A.P A.Pmiss) A.pid
         (sysChdirV1 A P2) (sysChdirM1 A P2) hj ?np ?nK ?nn ?nt (sysfile_pfun_nn pl' hnul)
         (sysfile_pfun_term pl') (by omega) (sys_chdir_bud_walk _))
       $$ [- $Hk $Hpc $Hte $Hce $Henv $Hcore $Hbs $Hir $HopS $Htx]
@@ -481,6 +528,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     · -- ===== the walk DIED: ARM B =====
       ihave Harm := Xv6.kxcA_ite_f _ _ $$ Harm
       icases Harm with ⟨%h10, Hir, Hdead⟩
+      ihave Hdead := walkDead_unwrap fscFs A.V.rti _ A.P A.Pmiss _ $$ Hdead
       ihave Hdead := sys_chdir_dead _ A.P A.Pmiss _ $$ Hdead
       iapply (sys_chdir_miss EO Γ cpu k A P2 spie1 spp1 R1 pl' _ n' Sb' hj hproc hK hnoff htier hct
           hp1 h10 hal hP2 hlen)
@@ -488,10 +536,17 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     · -- ===== the walk LANDED =====
       ihave Harm := Xv6.kxcA_ite_t _ _ $$ Harm
       icases Harm with ⟨%iL, %h10, Hheld, HP, Hir⟩
+      icases (walkCur_unwrap _ _ _ _ _ _ _ _).1 $$ HP with ⟨HP, #Hch, -⟩
+      ihave #Hch := (show walkChain (GF := GF) fscFs A.V.rti
+          (umStartOf A.V.rti A.V.cwi (bview pl'.length (sysfilePfun pl')))
+          (pathElems (bview pl'.length (sysfilePfun pl')))
+          (pathElems (bview pl'.length (sysfilePfun pl'))).length iL ⊢
+        walkChain fscFs A.V.rti (umStartOf A.V.rti A.V.cwi pl') (pathElems pl') (pathElems pl').length iL
+        from by rw [sys_chdir_bview pl']) $$ Hch
       have hn : iputUnits ≤ n' := sys_chdir_bud_iput n' w true hlo
       iapply (sys_chdir_found IL IU IP IUP EO Γ cpu k A P2 spie1 spp1 R1 pl' _ n' Sb' ipv iL hj hproc
-          hK hnoff htier hct hp1 h10 hal hP2 hlen hn)
-        $$ [$Hk $Hpc $Hcells $Hp $Hrest $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $HopS $Htx $Hheld $HP $Hoc]
+          hK hnoff htier hct hp1 h10 hal hP2 hlen hn hpath)
+        $$ [$Hk $Hpc $Hcells $Hp $Hrest $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $HopS $Htx $Hheld $HP $Hoc $Hch]
   · -- ===== the string did not fetch: ARM A =====
     k_step_e (wp_s_branch cpu _ (KA.«sys_chdir» + 0x22#64) false 70#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, MachCSL.bltz_m1]
@@ -587,7 +642,7 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
     repeat (refine sysChdirPins_set _ _ _ _ _ _ ?_ (by decide))
     exact hpins
   iapply (sys_chdir_fetched NI IL IU IP IUP EO Γ cpu k (A.raise kv) P2 spie1 spp1 R1 w₃ v old bs hj hproc hK
-      hnoff htier hct hp1 hal hext hold hret)
+      hnoff htier hct hp1 hal hext hold hret hv)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hau]
 
 /-! ## The entry: prologue, myproc, begin_op -/

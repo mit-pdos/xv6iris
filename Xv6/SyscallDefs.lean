@@ -174,18 +174,29 @@ def syscEvFs (V V' : ProcPriv) (img img' : ElfMem) (sts : List FdState) (ι : UI
   (syscNum V = USYS_write → V.pvLazy = false →
     (ufsBufAt (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))).2 = true →
     fdWrIno (usysFdAt sts (tfW V.tf (tfArgIdx 0))) = true →
-    tfW V'.tf (tfArgIdx 0) = usysWriteAnsF (tfW V.tf (tfArgIdx 2)) ι)
+    tfW V'.tf (tfArgIdx 0) = usysWriteAnsF (tfW V.tf (tfArgIdx 2)) ι) ∧
+  -- (NI M3 FS-2b) chdir at a lazy-free entry whose image holds the path argument:
+  -- the answer and the cwd after are the cited type test's walk's
+  (syscNum V = USYS_chdir → V.pvLazy = false →
+    (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128).isSome = true →
+    tfW V'.tf (tfArgIdx 0) = usysChdirAns (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi ι ∧
+      V'.cwi = usysChdirCwd (ukeyStr img (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi ι) ∧
+  -- mkdir: `0` exactly at a cited parent leg of the caller
+  (syscNum V = USYS_mkdir → tfW V'.tf (tfArgIdx 0) = usysMkdirAns ι)
 
-/-- off read and write the fs clauses are vacuous -/
+/-- off read, write, chdir and mkdir the fs clauses are vacuous -/
 theorem syscEvFs_ne {V V' : ProcPriv} {img img' : ElfMem} {sts : List FdState} {ι : UIota}
-    (h5 : syscNum V ≠ USYS_read) (h16 : syscNum V ≠ USYS_write) : syscEvFs V V' img img' sts ι :=
-  ⟨fun h => absurd h h5, fun h => absurd h h16⟩
+    (h5 : syscNum V ≠ USYS_read) (h16 : syscNum V ≠ USYS_write) (h9 : syscNum V ≠ USYS_chdir)
+    (h20 : syscNum V ≠ USYS_mkdir) : syscEvFs V V' img img' sts ι :=
+  ⟨fun h => absurd h h5, fun h => absurd h h16, fun h => absurd h h9, fun h => absurd h h20⟩
 
 /-- ...at a number literal -/
 theorem syscEvFs_at {V V' : ProcPriv} {img img' : ElfMem} {sts : List FdState} {ι : UIota} {k : Int}
-    (hk : syscNum V = k) (h5 : k ≠ USYS_read := by decide) (h16 : k ≠ USYS_write := by decide) :
+    (hk : syscNum V = k) (h5 : k ≠ USYS_read := by decide) (h16 : k ≠ USYS_write := by decide)
+    (h9 : k ≠ USYS_chdir := by decide) (h20 : k ≠ USYS_mkdir := by decide) :
     syscEvFs V V' img img' sts ι :=
-  syscEvFs_ne (fun h => h5 (hk.symm.trans h)) (fun h => h16 (hk.symm.trans h))
+  syscEvFs_ne (fun h => h5 (hk.symm.trans h)) (fun h => h16 (hk.symm.trans h)) (fun h => h9 (hk.symm.trans h))
+    (fun h => h20 (hk.symm.trans h))
 
 /-- **THE ROUND'S CITED ROW** (NI M2-X2, design "M2-X design" §1): what the
 kernel's arm read off the ledgers' receipts, at the CITED prefix `ι` (the

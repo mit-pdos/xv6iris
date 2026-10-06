@@ -7489,6 +7489,124 @@ FS-3/4): the ledger's ¼ share of the offset shadow for parked files, `offFd`/`o
 held-only, the class at `.inode i γo .parked`, `fevOffWf` (the recorded offsets ARE the fold's); `UserOff.lean` may
 move (flagged to the owner). fstat per deviation 7 if the owner rules (a).
 
+### M3 private files FS-2b as landed (2026-10-06)
+
+On `lane/pfiles` (rulings FS-R3, R4, R6, R8; the coordinator's rulings (a) and (A) of 2026-10-06). Landed in TWO
+commits: this one (chdir and mkdir; the walk's ledger, back-pointers, the type-test observation, `rt` in the
+citation) and FS-2b′ (open; `SYSCALL`/`USERTRAP` bind the resumed table), as the coordinator allowed. No kernel
+change; the fourteen roots' statements, `SyscRows`, every `Uk*`/`User*` file and namex/nameiparent/dirlookup
+byte-identical.
+
+**The design gap and ruling (a).** The rows read the cited prefix's last event (FS-2a deviation 3, `fpos` erased by
+`led`), and a walk's lookups are not contiguous (the walk releases each directory's lock) while `act` is not
+exclusive in the ledger (no invariant ties an actor to its process). So each walk event records a BACK-POINTER:
+`Fev.hop act d nm (prev : Option Nat)` (the previous lookup of the same walk; FS-1's create/unlink lookups pass
+`none`) and the new decisive observation `Fev.look act i (prev : Option Nat)` (chdir's and open's type test, the
+walk's last lookup). Every pointer is checked against the ledger authority (`FsLedger.ftopLed_obsAfter`,
+`MonoList.auth_lb_own_valid`), so it lands strictly earlier. FS-4 must show the answers do not depend on the
+positions once the history is restricted to the footprint (positions are bookkeeping).
+
+**The walk, without touching namex (`Xv6/FsWalkLed.lean`, new).** The ~46-file threading FS-1 estimated was
+AVOIDED: the hops are the caller's family, so a call site wraps it. `walkStart` turns `exStart … P Pmiss pl` into
+`exStart … (walkCur …) (walkMiss …) pl` where `walkCur k d := P k d ∗ walkChain k d ∗ (the ORIGINAL unfired hops
+from k)` and `walkMiss k d := Pmiss k d ∗ (the original hops from k+1)`; the wrapped hops (`walkHop`) own only
+`ftopInv` (persistent): each takes the original hop k out of the cursor, appends the lookup past the chain's bound
+(`ftopObsAfterAt`, the lent `elend` fragment pinning the row: `fevHop` of the prefix IS `axHopAns`'s answer,
+`fevHop_dir`), fires the original, re-forms the cursor. Every exit unwraps exactly (`walkCur_unwrap`,
+`walkDead_unwrap`): a dead walk hands the client its own unfired hops, as `nameiWalkDeadEra` demands.
+`walkChain` is a lower bound and `NiFs.fevWalkIs` (the lookups followed from the last position name the elements
+walked and resolve from namex's start to the cursor). `walkLook_fire_1` is `opfOpen_fire_1`'s twin (exec keeps the
+old fire). The per-hop `ftopInv` opening is at mask ⊤ (`elend_fire`'s), available at every call site.
+
+**The pure readings (`NiFs`, TCB).** `fevChainAt`/`fevChain` (the walk's lookups, followed), `fevWalk` (the
+resolution: `fevHop` at each lookup's own prefix, from a start), `fevLookAt H a rt s0 m` (the cited prefix ends in
+`a`'s `look a i po`, whose walk made `m` lookups and resolved from `s0` to `i`; its reading `(i, i's row in the fold
+before the test)`), `fevLegBy H a` (the prefix ends in `a`'s `[ent a d _ (some _), nlink a d _]`), the monotonicity
+and extension lemmas (`fevWalkIs_mono/_hop`, `fevLookAt_snoc`, `fevLegBy_snoc`).
+
+**The kernel (`SpecSysChdir`, moved).** `chdirPostOk`/`chdirArms` gain `Lk : Nat → IProp`, the success arm's
+ledger receipt at the new cwd; `sysChdirK` instantiates it at `chdirLed fscFs pa V.rti V.cwi (viewLazy V.upt V.sz M)
+pv i` -- the fetched path `pl` (`argPathOf`) and a lower bound with `fevLookAt H pa rt (umStartOf rt cw pl)
+|pathElems pl| = some (i, some (.dir e, nl))`; `chdirArms_split` hands it to the dispatcher. `ProofSysChdir` wraps
+the walk after argstr (`walkStart`), unwraps on death, carries the chain to the type test, fires `walkLook_fire_1`
+there. mkdir's kernel is unchanged: FS-1's `mkdirRcptAt` (the parent leg) is read as is.
+
+**The rows (`UsysDet`).** `USYS_mkdir := 20`; `UIota.rt : Nat := 0` (LAST; `led`/`ledQ` keep it); `ukeyStr`,
+`usysPath W` (the NUL-terminated string at argument 0 in `W.M`, within MAXPATH = 128, every byte defined),
+`ustartOf`; `usysChdirTo wp cw ι` (`fevLookAt ι.fev ι.act ι.rt (ustartOf ι.rt cw pl) |pathElems pl|` at a directory
+row), `usysChdirAns`/`usysChdirCwd`/`usysDetChdir`; `usysMkdirAns ι := if fevLegBy ι.fev ι.act then 0 else -1`,
+`usysDetMkdir`. The class:
+
+    def usysDetClassAtF (n : Int) (a0 : BitVec 64) (lz wc : Bool) (wf : Option FdState) (wb : Bool × Bool)
+        (fdir wp : Bool) : Prop :=
+      usysDetClassAt n a0 lz wc ∨
+      (n = USYS_read ∧ lz = false ∧ wb.1 = true ∧ fdRdIno wf = true ∧ fdir = false) ∨
+      (n = USYS_write ∧ lz = false ∧ wb.2 = true ∧ fdWrIno wf = true) ∨
+      (n = USYS_chdir ∧ lz = false ∧ wp = true) ∨
+      (n = USYS_mkdir ∧ lz = false)
+
+`usysDetResumes` + chdir, mkdir; `usysDetResumes_ne` loses `n ≠ USYS_chdir`; `usysIotaFits` gains `cw'` and
+`(n = USYS_chdir → r = usysChdirAns (usysPath W) W.cwd ι ∧ cw' = usysChdirCwd …) ∧ (n = USYS_mkdir → r =
+usysMkdirAns ι)`; `_exists`/`_of_ev`/`usysDet_mem/_rows/_of_rows` + chdir, mkdir (chdir's cwd row from
+`usysCwdOk`'s chdir case, which pins only `r ≠ 0 → c' = c`: the fit carries the new cwd).
+
+**The citation.** `syscEvFs` + `(syscNum V = chdir → V.pvLazy = false → (ukeyStr img a0 128).isSome → a0' =
+usysChdirAns (ukeyStr img a0 128) V.cwi ι ∧ V'.cwi = usysChdirCwd …) ∧ (syscNum V = mkdir → a0' = usysMkdirAns ι)`;
+`syscEvFs_ne/_at` + `h9 h20`; `syscEvOut`/`utEvOut` quiet disjuncts + `≠ chdir ∧ ≠ mkdir` (bodies; the `SYSCALL`/
+`USERTRAP` texts unchanged in this commit), `syscEvOut_quiet`/`syscall_ret_fd` + `h9 h20`. The arms
+(`SyscallArmsPath`): `syscChdir_cite` -- the boot prefix at `-1`, else `{boot with act, fev := H, rt := V.rti}`
+off the receipt, the key's string pinned to the Spec's path by `syscPath_keyStr` (`argPathOf_uniq` through the
+image guard); `syscMkdir_cite` -- the boot prefix at `-1`, the prefix ending in the parent leg at `0`.
+`NiEvid.niIotaLbs_rt`. `niCiting` + chdir, mkdir; `niDetRow`/`niKeyRow`/`niClassKey` read `(usysPath (uvisRun
+W)).isSome`. `UserretClosedRows.urc_evRow` + the two clauses (chdir's at the record's cwd), `urc_niDetRow` through
+`_of_ev`, `urc_keyBoot`'s non-citing list + chdir, mkdir; `UserretClosedRound` ten cases; `UexecApply` follows.
+
+**The trace (`NiTrace`).** `NiStep.round secc lz win sz wcon wout wfd wslot wbuf (wpath : Option (List (BitVec 8)))
+(wcwd : Nat) x e c` (`niStepOf`: `usysPath W`, `W.cwd`); `input`/`famInput` + both; `NiPos` + `rt` (`UIota.pos`:
+`ι.rt`), `niBelow_pos/_posQ` + it. The law's resume block, last:
+
+    (gprsNum secc xg = USYS_chdir → lz = false → wpath.isSome = true →
+      ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysChdirAns wpath wcwd ι) ∧
+    (gprsNum secc xg = USYS_mkdir → lz = false → ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysMkdirAns ι)
+
+derived by `niDetRow_chdir`/`niDetRow_mkdir` (+ `usysPath_run`). The class:
+
+    def NiInClass (tr : List NiStep) : Prop :=
+      ∀ secc lz win sz wcon wout wfd wslot wbuf wpath wcwd x e c,
+        NiStep.round secc lz win sz wcon wout wfd wslot wbuf wpath wcwd x e c ∈ tr → ∀ ep xg,
+        exitView x = some (uecallScause, ep, xg) →
+        usysDetClassAtF (gprsNum secc xg) (gprsA0 xg) lz wcon.isSome wfd wbuf (citeDir c) wpath.isSome
+
+`output_eq_of`/`output_eq`/`output_eq_fam` answer chdir and mkdir at the one cited ledger (or family) part (which
+keeps `fev`, `act`, `rt`); `classReading` admits chdir and mkdir at a lazy-free key. Honest scope 17 (the path rows
+read the walk; the root, the back-pointers and mkdir's outcome recorded as given; failures cite the boot prefix);
+scope 1's class; deviation 15.
+
+**Deviations.** (1) Two commits (FS-2b, FS-2b′) as allowed. (2) `rt` rides the CITATION (`UIota.rt`, `NiPos.rt`),
+not `NiStep` (ruling amended); the step gains `wpath`/`wcwd` instead. (3) mkdir's row is its OUTCOME EVENT (the
+parent leg), not the hop fold: create's missing lookup appends nothing (FS-1), so success is not computable from
+the walk (confirmed by the coordinator). (4) The failure arms cite the boot prefix: the row's `-1` holds at every
+prefix not closing on a success; the computed failure readings (fewer lookups than elements, a miss, a
+non-directory) are the row's but no arm cites them -- FS-4 cites the decisive failure events if it needs them.
+(5) Only chdir's call site wraps its walk (create's `nameiparent` is unwrapped: mkdir reads its outcome, O_CREATE's
+found case records the parent as given, FS-2b′).
+
+**Baselines.** `tools/tcb/expected.json`: `Xv6.PathElems` ENTERS the eight NI roots that name `usysDet`
+(`xv6NiAdequacy`, `xv6NiTwoRun`, `xv6NiTwoRunObs`, `xv6NiStrongInstance`, `xv6NiOut`, `xv6NiPrefix`, `xv6NiDet`,
+`xv6NiDetQ`: the row counts the key path's elements); no non-NI root moves. `tools/audit/baseline.json` unchanged
+(14 PASS; no axiom or opaque). `dead_allow.txt`: `fevHop` off (reached); `fevRun_prefix`, `fsLedLb_prefix`,
+`fsEvRcpt_of_lb` stay (unreached).
+
+The class: {exit, getpid, uptime, wait at a null status pointer or a lazy-free key, fork, sbrk, the console write at a
+lazy-free key on a writable console descriptor, pause, close, dup, read on a readable inode descriptor of a regular
+file and write on a writable inode descriptor at a lazy-free key whose buffer is mapped, chdir at a lazy-free key
+holding its path argument, mkdir at a lazy-free key}.
+
+**What FS-2b′, FS-2a′ and FS-3/4 absorb.** FS-2b′: open (plain/create/trunc), `SYSCALL`/`USERTRAP` binding the
+resumed table in `syscEvOut`/`utEvOut`, `syscEvRow`'s open clause, the install's back-pointer, O_CREATE's dropped
+create receipt (`SysOpenEntryC`). FS-2a′: the offset tie (unchanged). FS-3/4: the back-pointers' irrelevance under
+restriction, the cited failure events, `fout`/`usysFevOut`, the root as a hypothesis (scope 17).
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

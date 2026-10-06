@@ -577,8 +577,10 @@ theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf
     (hsc : sc = uecallScause)
     (hcls : usysDetClassAtF (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
       (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)))
-      (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) (ufsBuf (uvisRun W)) (fevReadDir ι.fev))
-    (hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW W'.tf (tfArgIdx 0)) W'.ch W'.M W'.sz W'.lazy ι) :
+      (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) (ufsBuf (uvisRun W)) (fevReadDir ι.fev)
+      (usysPath (uvisRun W)).isSome)
+    (hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW W'.tf (tfArgIdx 0)) W'.ch W'.M W'.sz W'.lazy
+      W'.cwd ι) :
     ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ι) W' := by
   subst hsc
   rcases uroundOk_ecall hr with ⟨hexec, -, -⟩ | ⟨hnex, r, hb, hm, hc, hs⟩
@@ -635,7 +637,7 @@ theorem uexecRetContF_det (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : U
     have hup : n = USYS_uptime → usysUptimeRet r := fun hu => by
       subst hu; exact usysMemOk_uptimeRet hm
     obtain ⟨ι, hfit⟩ := usysIotaFits_exists (W := W) (cs' := cs') (M' := M') (szv' := szv') (lz' := lz')
-      hup h3 hf h12 hw hlv.2.2 hcl hdp h5
+      hup h3 hf h12 hw hlv.2.2 hcl hdp h5 hcd (by rcases h with rfl | rfl | rfl | rfl <;> decide)
     obtain ⟨hM, -, -⟩ := usysMemOk_quiet h7 h12 h3 h4 h5 h8 hm
     have hfd' := usysFdOk_quiet hcl hdp hop h4 hfd
     have hc' := usysCwdOk_quiet hcd hc

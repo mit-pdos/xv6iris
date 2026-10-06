@@ -133,9 +133,9 @@ theorem sys_chdir_out_ok (A : SysChdirArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz 
     (harow : arowAt av i ⟨.ADir e, nl⟩) :
     sysChdirHole (GF := GF) A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
       sysChdirRows (procAddr A.j) A.pid ipv i ∗ bslots 3 ∗ irefSlots 2 ∗
-      A.P L i ∗ A.Fo.pfRecv av i ⟨.ADir e, nl⟩ ⊢
+      A.P L i ∗ (A.Fo.pfRecv av i ⟨.ADir e, nl⟩ ∗ sysChdirLed A i) ⊢
     sysChdirOut A 0#64 := by
-  iintro ⟨Hh, Hr, Hbs, Hir, HP, HFo⟩
+  iintro ⟨Hh, Hr, Hbs, Hir, HP, HFo, #HLk⟩
   unfold sysChdirOut
   iframe Hbs Hir
   iexists P2
@@ -147,7 +147,7 @@ theorem sys_chdir_out_ok (A : SysChdirArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz 
   · ipureintro; rfl
   iexists ipv, bview L' pf, i, e, nl, av
   rw [← hL]
-  iframe HP HFo
+  iframe HP HFo HLk
   isplitr
   · ipureintro; exact harow
   unfold sysChdirHole
@@ -379,7 +379,7 @@ theorem sys_chdir_tail_swap (IP : IPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs
     (∀ c : CPU, sysChdirPostA k A c) ∗
     inodeHeldAt (ientry kk) inum.toNat ∗
     bslots 3 ∗ irefSlots 1 ∗ logOp icfgLog n ∗
-    A.P L inum.toNat ∗ A.Fo.pfRecv av inum.toNat ⟨.ADir e, nl⟩
+    A.P L inum.toNat ∗ (A.Fo.pfRecv av inum.toNat ⟨.ADir e, nl⟩ ∗ sysChdirLed A inum.toNat)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hnew, Hbs, Hir, Hop, HP, HFo⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -489,7 +489,7 @@ theorem sys_chdir_tail_ok (IU : IUNLOCK) (IP : IPUT) (EO : END_OP) (Γ : SchedNa
     (∀ c : CPU, sysChdirPostA k A c) ∗
     sysChdirLocked kk q g lo tl γil γisl inum A.pid dn bm ∗
     bslots 3 ∗ irefSlots 1 ∗ logOpS icfgLog n Sb ∗
-    A.P L inum.toNat ∗ A.Fo.pfRecv av inum.toNat ⟨.ADir e, nl⟩
+    A.P L inum.toNat ∗ (A.Fo.pfRecv av inum.toNat ⟨.ADir e, nl⟩ ∗ sysChdirLed A inum.toNat)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hlk, Hbs, Hir, Hop, HP, HFo⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

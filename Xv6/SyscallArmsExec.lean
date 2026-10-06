@@ -624,7 +624,7 @@ theorem syscall_fallback (PK : PRINTK)
   · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ (syscNum V) rfl (hne 14 (by decide) (by decide))
       (hne 3 (by decide) (by decide)) (hne 1 (by decide) (by decide)) (hne 12 (by decide) (by decide))
       (hne 16 (by decide) (by decide)) (hne 21 (by decide) (by decide)) (hne 10 (by decide) (by decide))
-      (hne 5 (by decide) (by decide))
+      (hne 5 (by decide) (by decide)) (hne 9 (by decide) (by decide)) (hne 20 (by decide) (by decide))
 
 set_option maxHeartbeats 4000000 in
 /-- **THE BLOCKED ARM** (xv6 7b2c1b1b; Rocq `sysc_blocked`): the mask's bit

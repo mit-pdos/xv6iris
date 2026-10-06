@@ -377,6 +377,40 @@ theorem ftopLed_step (γfs : FsNames) (I I' : RegMapF FsNode) (evs : List Fev)
     iframe Hlb
     ipureintro; exact ht
 
+/-- (NI M3 FS-2b) the empty lower bound -/
+theorem fsLedLb_nil (γfs : FsNames) : ⊢@{IProp GF} |==> fsLedLb γfs [] := by
+  unfold fsLedLb
+  exact MonoList.lb_own_nil γfs.fev
+
+/-- (NI M3 FS-2b) a lower bound is a prefix of the authority -/
+theorem fsLedAuth_lb_valid (γfs : FsNames) (h L : List Fev) :
+    ⊢@{IProp GF} fsLedAuth γfs h -∗ fsLedLb γfs L -∗ ⌜L <+: h⌝ := by
+  unfold fsLedAuth fsLedLb
+  iintro Ha HL
+  ihave %hv := MonoList.auth_lb_own_valid (GF := GF) γfs.fev (DFrac.own 1) h L $$ Ha HL
+  ipureintro; exact hv.2
+
+/-- (NI M3 FS-2b) **AN OBSERVATION APPENDED AFTER A LOWER BOUND THE CALLER
+HOLDS**: the authority is checked against `L` (`MonoList.auth_lb_own_valid`),
+so the event lands past it -- what makes a back-pointer into `L` point
+strictly earlier. -/
+theorem ftopLed_obsAfter (γfs : FsNames) (I : RegMapF FsNode) (e : Fev) (he : fevObs e) (L : List Fev) :
+    ⊢@{IProp GF} fsLedLb γfs L -∗ ftopLed γfs I ==∗
+      ftopLed γfs I ∗ ∃ h : List Fev, ⌜fevTie h I ∧ L <+: h⌝ ∗ fsLedLb γfs (h ++ [e]) := by
+  iintro #HL Hl
+  unfold ftopLed
+  icases Hl with ⟨%h, Ha, %ht⟩
+  ihave %hv := fsLedAuth_lb_valid γfs h L $$ Ha HL
+  imod fsLed_append γfs h [e] $$ Ha with ⟨Ha, #Hlb⟩
+  imodintro
+  isplitl [Ha]
+  · iexists h ++ [e]
+    iframe Ha
+    ipureintro; exact fevTie_obs e he ht
+  · iexists h
+    iframe Hlb
+    ipureintro; exact ⟨ht, hv⟩
+
 /-- an observation appended -/
 theorem ftopLed_obs (γfs : FsNames) (I : RegMapF FsNode) (e : Fev) (he : fevObs e) :
     ftopLed (GF := GF) γfs I ⊢ |==> (ftopLed γfs I ∗ ∃ h : List Fev, ⌜fevTie h I⌝ ∗ fsEvRcpt γfs h e) := by
@@ -543,7 +577,7 @@ instance creParentRcpt_persistent (γfs : FsNames) (act : BitVec 64) (i : Nat) :
 MADE child's arm and parent leg, or a FOUND node's lookup hop. -/
 def creOkRcpt (γfs : FsNames) (act : BitVec 64) (made : Bool) (i : Nat) : IProp GF :=
   iprop((⌜made = true⌝ ∗ creArmRcpt γfs act i ∗ creParentRcpt γfs act i) ∨
-    (⌜made = false⌝ ∗ ∃ (d : Nat) (nm : List (BitVec 8)), fsLedAt γfs [.hop act d nm]))
+    (⌜made = false⌝ ∗ ∃ (d : Nat) (nm : List (BitVec 8)), fsLedAt γfs [.hop act d nm none]))
 
 instance creOkRcpt_persistent (γfs : FsNames) (act : BitVec 64) (made : Bool) (i : Nat) :
     Persistent (creOkRcpt (GF := GF) γfs act made i) := by

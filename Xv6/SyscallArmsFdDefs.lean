@@ -702,7 +702,8 @@ theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
     (hrows : SyscRows V M (syscStore V1 (R 10#5)) M1 sts sts' cs cs' pid)
     (n : Int) (hn : syscNum V = n) (h1 : n ≠ 1) (h3 : n ≠ 3) (h7 : n ≠ 7)
     (h14 : n ≠ 14 := by decide) (h12 : n ≠ 12 := by decide) (h16 : n ≠ 16 := by decide)
-    (h21 : n ≠ 21 := by decide) (h10 : n ≠ 10 := by decide) (h5 : n ≠ 5 := by decide) :
+    (h21 : n ≠ 21 := by decide) (h10 : n ≠ 10 := by decide) (h5 : n ≠ 5 := by decide)
+    (h9 : n ≠ 9 := by decide) (h20 : n ≠ 20 := by decide) :
     kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x46#64) ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
@@ -717,7 +718,7 @@ theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie spp R γ j pid V M sts gn cs ip f V1 M1 sts' cs'
     hj hproc hK htier hpins hs2 hrows n hn h1 h3 h7)
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hso Hnext
-  iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn h14 h3 h1 h12 h16 h21 h10 h5
+  iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn h14 h3 h1 h12 h16 h21 h10 h5 h9 h20
 
 set_option maxHeartbeats 4000000 in
 /-- **`syscall_ret_fd` at a number that cites the boot prefix** (NI M3 FS-L:

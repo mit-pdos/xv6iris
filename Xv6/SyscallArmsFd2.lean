@@ -626,7 +626,8 @@ theorem syscall_arm_read (SR : SYSREAD)
       fun h => absurd (hn5.symm.trans h) (by decide), fun h => absurd (hn5.symm.trans h) (by decide),
       fun h => absurd (hn5.symm.trans h) (by decide), fun h => absurd (hn5.symm.trans h) (by decide),
       fun h => absurd (hn5.symm.trans h) (by decide), fun h => absurd (hn5.symm.trans h) (by decide),
-      fun _ hlz hb hfd hdir => ?_, fun h => absurd (hn5.symm.trans h) (by decide)⟩
+      fun _ hlz hb hfd hdir => ?_, fun h => absurd (hn5.symm.trans h) (by decide),
+      fun h => absurd (hn5.symm.trans h) (by decide), fun h => absurd (hn5.symm.trans h) (by decide)⟩
     rw [ha0']
     exact hfs hlz hb hfd hdir
   imodintro
@@ -764,7 +765,8 @@ theorem syscall_arm_write (SW : SYSWRITE)
         fun _ _ hcons => absurd (hcf.symm.trans hcons) (by decide),
         fun _ hcons => absurd (hcf.symm.trans hcons) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
         fun h => absurd (hn16.symm.trans h) (by decide),
-        fun h => absurd (hn16.symm.trans h) (by decide), fun _ hlz hb _ => ?_⟩
+        fun h => absurd (hn16.symm.trans h) (by decide), fun _ hlz hb _ => ?_,
+        fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide)⟩
       rw [ha0']
       exact hfs hlz hb
     imodintro
@@ -797,7 +799,8 @@ theorem syscall_arm_write (SW : SYSWRITE)
       fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide),
       fun _ hlz hcons => ?_, fun _ hcons => ?_, fun h => absurd (hn16.symm.trans h) (by decide),
       fun h => absurd (hn16.symm.trans h) (by decide),
-      fun h => absurd (hn16.symm.trans h) (by decide), fun _ _ _ hfd => ?_⟩
+      fun h => absurd (hn16.symm.trans h) (by decide), fun _ _ _ hfd => ?_,
+      fun h => absurd (hn16.symm.trans h) (by decide), fun h => absurd (hn16.symm.trans h) (by decide)⟩
     · rw [ha0']
       exact syscArmWrite_ans V.upt P' V.sz sts _ _ _ _ hfacts.2.2.2 (hfacts.2.2.1 hlz) hext hcons hcnt
     · rw [ha0']

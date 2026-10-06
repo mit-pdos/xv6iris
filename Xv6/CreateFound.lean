@@ -1089,7 +1089,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     -- child IS dp and carries its `T_DIR` one-shot
     creExFired F.Fex dind.toNat (bname 14 nf) cexv ∗
     -- (NI M3 private files FS-1) the lookup's hop, in the era's ledger
-    fsLedAt fscFs [.hop k.proc dind.toNat (bname 14 nf)] ∗
+    fsLedAt fscFs [.hop k.proc dind.toNat (bname 14 nf) none] ∗
     (⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR) ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
@@ -1243,7 +1243,7 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     creExFired F.Fex dind.toNat (bname 14 nf) cexv ∗
     -- (NI M3 private files FS-1) the lookup's hop, in the era's ledger
-    fsLedAt fscFs [.hop k.proc dind.toNat (bname 14 nf)] ∗
+    fsLedAt fscFs [.hop k.proc dind.toNat (bname 14 nf) none] ∗
     (⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR) ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗

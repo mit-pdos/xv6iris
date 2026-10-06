@@ -197,11 +197,15 @@ prefix at every write; NI M3 FS-L, close's and dup's: the boot prefix at
 every call, the answer the entry table's; NI M3 FS-2a, read's: the fs prefix
 ending in the round's own read event at a counted read of an inode
 descriptor, the boot prefix elsewhere -- and an inode write cites the fs
-prefix ending in its own `-1` verdict). -/
+prefix ending in its own `-1` verdict; NI M3 FS-2b, chdir's: the fs prefix
+ending in its own type test on success, the boot prefix on `-1`; mkdir's:
+the fs prefix ending in its own parent leg on success, the boot prefix on
+`-1`). -/
 def niCiting (sc : BitVec 64) (W : Uvis) : Prop :=
   sc = uecallScause ∧ (uvisNum (uvisRun W) = USYS_uptime ∨ uvisNum (uvisRun W) = USYS_wait ∨
     uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_sbrk ∨ uvisNum (uvisRun W) = USYS_write ∨
-    uvisNum (uvisRun W) = USYS_close ∨ uvisNum (uvisRun W) = USYS_dup ∨ uvisNum (uvisRun W) = USYS_read)
+    uvisNum (uvisRun W) = USYS_close ∨ uvisNum (uvisRun W) = USYS_dup ∨ uvisNum (uvisRun W) = USYS_read ∨
+    uvisNum (uvisRun W) = USYS_chdir ∨ uvisNum (uvisRun W) = USYS_mkdir)
 
 /-- (NI M3 FS-2a) **THE CITATION's `fdir` READING**: the cited read's row is
 not a file (`NiFs.fevReadDir` of the cited fs prefix; `false` at no
@@ -218,7 +222,8 @@ def niDetRow (sc : BitVec 64) (W W' : Uvis) : Option (Nat × UIota) → Prop
   | some (_, ι) => sc = uecallScause →
       usysDetClassAtF (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
         (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)))
-        (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) (ufsBuf (uvisRun W)) (fevReadDir ι.fev) →
+        (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) (ufsBuf (uvisRun W)) (fevReadDir ι.fev)
+        (usysPath (uvisRun W)).isSome →
       ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ι) W'
   | none => True
 
@@ -248,7 +253,7 @@ def niKeyRow (sc : BitVec 64) (W W' : Uvis) (c : Option (Nat × UIota)) : Prop :
     usysDetClassAtF (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy
       (uwriteCons (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0)))
       (usysFdAt (uvisRun W).fd (tfW (uvisRun W).tf (tfArgIdx 0))) (ufsBuf (uvisRun W))
-      (citeDir c) →
+      (citeDir c) (usysPath (uvisRun W)).isSome →
     ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ((c.map Prod.snd).getD UIota.boot)) W')
 
 /-- **A key-history citation** (NI M3 U-2b): the history's ghost name, its

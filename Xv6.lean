@@ -108,6 +108,7 @@ import Xv6.SlotEv
 import Xv6.SlotLed
 import Xv6.NiFs
 import Xv6.FsLedger
+import Xv6.FsWalkLed
 import Xv6.KallocDefs
 import Xv6.QuotaDefs
 import Xv6.KcredDefs

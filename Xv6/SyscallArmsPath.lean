@@ -158,6 +158,77 @@ theorem syscPath_imgLazy (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec 8
       rfl
     · rw [if_neg hb] at h; cases h
 
+
+/-! ### NI M3 private files FS-2b: the path rows at the key -/
+
+/-- **the key holds the path the Spec read**: a string the key's image holds
+whole at the argument pointer IS the argument reading at the page view
+(`ArgPath.argPathOf_uniq` through the image guard `syscPath_imgLazy`). -/
+theorem syscPath_keyStr (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec 8)) (pv : Nat)
+    (pl : List (BitVec 8)) (hpl : argPathOf (viewLazy P sz M) pv pl)
+    (hk : (ukeyStr (umemLazy P sz.toNat M) pv 128).isSome = true) :
+    ukeyStr (umemLazy P sz.toNat M) pv 128 = some pl := by
+  obtain ⟨pk, hpk⟩ := Option.isSome_iff_exists.mp hk
+  rw [hpk]
+  obtain ⟨hb, hnul, hlen⟩ := ukeyStr_spec _ 128 pv pk hpk
+  have himg := syscPath_imgLazy P sz M
+  have hpk' : argPathOf (viewLazy P sz M) pv pk := by
+    refine ⟨⟨by omega, fun j b hj => (hb j b hj).2⟩, fun j b hj => himg _ _ (hb j b hj).1, himg _ _ hnul⟩
+  rw [argPathOf_uniq _ _ _ _ hpk' hpl]
+
+theorem ustartOf_eq (rt cw : Nat) (pl : List (BitVec 8)) : ustartOf rt cw pl = umStartOf rt cw pl := rfl
+
+/-- a cited chdir that did not move: at the boot prefix nothing resolved -/
+theorem usysChdirTo_boot (wp : Option (List (BitVec 8))) (cw : Nat) (a : BitVec 64) :
+    usysChdirTo wp cw { UIota.boot with act := a } = none := by
+  unfold usysChdirTo
+  cases wp with
+  | none => rfl
+  | some pl => rfl
+
+/-- **chdir's cited row** (NI M3 FS-2b): at the entry `V` and the record the
+call left, either `-1` with the cwd kept (cited: the boot prefix), or `0` at
+the new cwd `i` with chdir's ledger receipt -- the prefix ending in its type
+test, at the walker's root `V.rti` (cited). -/
+theorem syscChdir_evRow (V V1 : ProcPriv) (M M1 : Nat → List (BitVec 8)) (sts : List FdState)
+    (cs : ExtTreeSet GName compare) (ι : UIota) (r : BitVec 64) (hnum : syscNum V = 9)
+    (hl : tfArgIdx 0 < V1.tf.length)
+    (hch : (r = 0xFFFFFFFFFFFFFFFF#64 ∧ V1.cwi = V.cwi ∧ usysChdirTo
+        (ukeyStr (syscImg V M) (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi ι = none) ∨
+      (r = 0#64 ∧ ((ukeyStr (syscImg V M) (tfW V.tf (tfArgIdx 0)).toNat 128).isSome = true →
+        usysChdirTo (ukeyStr (syscImg V M) (tfW V.tf (tfArgIdx 0)).toNat 128) V.cwi ι = some V1.cwi))) :
+    syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts ι := by
+  have ha0 : tfW (syscStore V1 r).tf (tfArgIdx 0) = r := syscStore_a0 _ _ hl
+  have hne : ∀ k : Int, k ≠ 9 → syscNum V ≠ k := fun k hk h => hk (h.symm.trans hnum)
+  refine ⟨fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)), fun _ _ hk => ?_,
+    fun h => absurd h (hne _ (by decide))⟩
+  rw [ha0]
+  show r = usysChdirAns _ V.cwi ι ∧ V1.cwi = usysChdirCwd _ V.cwi ι
+  unfold usysChdirAns usysChdirCwd
+  rcases hch with ⟨rfl, hcw, hto⟩ | ⟨rfl, hto⟩
+  · rw [hto]; exact ⟨rfl, hcw⟩
+  · rw [hto hk]; exact ⟨rfl, rfl⟩
+
+/-- **mkdir's cited row** (NI M3 FS-2b): `-1` at the boot prefix, `0` at the
+prefix ending in the caller's parent leg. -/
+theorem syscMkdir_evRow (V V1 : ProcPriv) (M M1 : Nat → List (BitVec 8)) (sts : List FdState)
+    (cs : ExtTreeSet GName compare) (ι : UIota) (r : BitVec 64) (hnum : syscNum V = 20)
+    (hl : tfArgIdx 0 < V1.tf.length) (hr : r = usysMkdirAns ι) :
+    syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts ι := by
+  have ha0 : tfW (syscStore V1 r).tf (tfArgIdx 0) = r := syscStore_a0 _ _ hl
+  have hne : ∀ k : Int, k ≠ 20 → syscNum V ≠ k := fun k hk h => hk (h.symm.trans hnum)
+  refine ⟨fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun h => absurd h (hne _ (by decide)),
+    fun h => absurd h (hne _ (by decide)), fun _ => ?_⟩
+  rw [ha0]; exact hr
+
 /-! ## §2 The deposit laws (§4 template; deviation 1) -/
 
 section Laws
@@ -293,6 +364,84 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- (NI M3 private files FS-2b) **chdir's citation**: the boot prefix at a
+`-1`, the fs prefix ending in its type test (at the walker's root `V.rti`)
+at a `0`. -/
+theorem syscChdir_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat → List (BitVec 8))
+    (sts : List FdState) (cs : ExtTreeSet GName compare) (r a : BitVec 64) (hnum : syscNum V = 9)
+    (hl : tfArgIdx 0 < V1.tf.length)
+    (hdisj : (r = 0xFFFFFFFFFFFFFFFF#64 ∧ V1.cwi = V.cwi) ∨ r = 0#64) :
+    (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∨
+        chdirLed (GF := GF) fscFs a V.rti V.cwi (viewLazy V.upt V.sz M) (V.tf.getD (tfArgIdx 0) 0#64).toNat
+          V1.cwi) ⊢
+      |==> ∃ ι : UIota, niIotaLbs (GF := GF) (niNamesHere (GF := GF)) ι ∗
+        ⌜syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts ι⌝ := by
+  rcases hdisj with ⟨hm1, hcw⟩ | h0
+  · iintro -
+    imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) a with #Hl
+    imodintro
+    iexists { UIota.boot with act := a }
+    iframe Hl
+    ipureintro
+    exact syscChdir_evRow V V1 M M1 sts cs _ r hnum hl (Or.inl ⟨hm1, hcw, usysChdirTo_boot _ _ a⟩)
+  · unfold chdirLed
+    iintro (%hm1 | ⟨%pl, %H, %e, %nl, %hpl, #Hlb, %hlook⟩)
+    · rw [h0] at hm1; exact absurd hm1 (by decide)
+    · ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML H $$ [Hlb]
+      · rw [show (niNamesHere (GF := GF)).getD 6 0 = fscFs.fev from rfl]
+        unfold fsLedLb; iexact Hlb
+      imod niIotaLbs_fev (GF := GF) (niNamesHere (GF := GF)) _ a $$ Hf with #Hl
+      ihave #Hl := niIotaLbs_rt (GF := GF) _ _ V.rti $$ Hl
+      imodintro
+      iexists { UIota.boot with act := a, fev := H, rt := V.rti }
+      iframe Hl
+      ipureintro
+      refine syscChdir_evRow V V1 M M1 sts cs _ r hnum hl (Or.inr ⟨h0, fun hk => ?_⟩)
+      have hpl' : argPathOf (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat pl := hpl
+      rw [show syscImg V M = umemLazy V.upt V.sz.toNat M from rfl] at hk ⊢
+      rw [syscPath_keyStr V.upt V.sz M _ pl hpl' hk]
+      show (match fevLookAt H a V.rti (ustartOf V.rti V.cwi pl) (pathElems pl).length with
+        | some (i, some (.dir _, _)) => some i
+        | _ => none) = some V1.cwi
+      rw [ustartOf_eq, hlook]
+
+/-- (NI M3 private files FS-2b) **mkdir's citation**: the boot prefix at a
+`-1`, the fs prefix ending in the caller's parent leg at a `0`. -/
+theorem syscMkdir_cite [MonoNatG GF] [WchGpre GF] (V V1 : ProcPriv) (M M1 : Nat → List (BitVec 8))
+    (sts : List FdState) (cs : ExtTreeSet GName compare) (r a : BitVec 64) (hnum : syscNum V = 20)
+    (hl : tfArgIdx 0 < V1.tf.length) (hret : sysMkdirRet r) :
+    mkdirRcptAt (GF := GF) fscFs a r ⊢
+      |==> ∃ ι : UIota, niIotaLbs (GF := GF) (niNamesHere (GF := GF)) ι ∗
+        ⌜syscEvRow V (syscStore V1 r) (syscImg V M) (syscImg (syscStore V1 r) M1) cs cs sts ι⌝ := by
+  rcases hret with h0 | hm1
+  · unfold mkdirRcptAt
+    iintro (%hne | ⟨%i, Hok⟩)
+    · exact absurd h0 hne
+    unfold creOkRcpt creParentRcpt fsLedAt
+    icases Hok with (⟨-, -, ⟨%d, %nm, %nl, ⟨%h, #Hlb⟩⟩⟩ | ⟨%hf, -⟩)
+    · ihave #Hf : (niNamesHere (GF := GF)).getD 6 0 ↪◯ML (h ++ [Fev.ent a d nm (some i), Fev.nlink a d nl])
+        $$ [Hlb]
+      · rw [show (niNamesHere (GF := GF)).getD 6 0 = fscFs.fev from rfl]
+        unfold fsLedLb; iexact Hlb
+      imod niIotaLbs_fev (GF := GF) (niNamesHere (GF := GF)) _ a $$ Hf with #Hl
+      imodintro
+      iexists { UIota.boot with act := a, fev := h ++ [Fev.ent a d nm (some i), Fev.nlink a d nl] }
+      iframe Hl
+      ipureintro
+      refine syscMkdir_evRow V V1 M M1 sts cs _ r hnum hl ?_
+      unfold usysMkdirAns
+      rw [if_pos (fevLegBy_snoc h a d nm i nl)]
+      exact h0
+    · exact absurd hf (by decide)
+  · iintro -
+    imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) a with #Hl
+    imodintro
+    iexists { UIota.boot with act := a }
+    iframe Hl
+    ipureintro
+    refine syscMkdir_evRow V V1 M M1 sts cs _ r hnum hl ?_
+    rw [hm1]; rfl
+
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_chdir`** (table index 9). -/
 theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF := GF))
@@ -342,8 +491,9 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   unfold sysChdirK
   iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir2 Harms
   icases chdirArms_split (hlc := hlc) (fsGammaL fscFs) fscFs γ (procAddr j) pid V.rti V.cwi P Pmiss Fo
+    (chdirLed fscFs (procAddr j) V.rti V.cwi (viewLazy V.upt V.sz M) (V.tf.getD (tfArgIdx 0) 0#64).toNat)
     { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R2 10#5) rfl $$ Harms with
-    ⟨%V1, %hdisj, Hpriv, Hrc⟩
+    ⟨%V1, %hdisj, Hpriv, Hrc, HLk⟩
   ihave Hir := (show irefSlots (GF := GF) 2 ∗ irefSlots 2 ⊢ irefSlots IREFSPARE from
     irefSlots_combine 2 2) $$ [Hir2 Hirk]
   · iframe
@@ -371,6 +521,19 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
     (syscFdOk_refl_at V _ sts 9 hn9 (by decide) (by decide) (by decide) (by decide))
   have ha0 := syscPath_a0 V V1 (R2 10#5) hl htf
   have hup' : ({ V with upt := P' } : ProcPriv).upt = P' := rfl
+  -- (NI M3 private files FS-2b) THE CITATION: the boot prefix at `-1`, the fs
+  -- prefix ending in the type test at `0` (`syscChdir_cite`)
+  have hd' : (R2 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ V1.cwi = V.cwi) ∨ R2 10#5 = 0#64 := by
+    rcases hdisj with ⟨hm, rfl⟩ | ⟨h0, -⟩
+    · exact Or.inl ⟨hm, rfl⟩
+    · exact Or.inr h0
+  icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
+  iapply wpLoop_bupd
+  imod syscChdir_cite (GF := GF) V V1 M (viewFaulted V.upt P' M) sts cs (R2 10#5) (procAddr j) hn9
+    (by rw [htf, hl]; decide) hd' $$ HLk with ⟨%ι, #Hl, %hrow⟩
+  ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts (syscStore V1 (R2 10#5)) (viewFaulted V.upt P' M)
+    cs cs gn ke ι hrow $$ Hanc Hl
+  imodintro
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f V1
     (viewFaulted V.upt P' M) sts cs hj hproc hK htier hpins2 hs2' hrows)
@@ -388,7 +551,7 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   · iapply syscForkOut_ne; rw [hn9]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn9]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn9
+  · iexact Hev
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_unlink`** (table index 18). -/
@@ -601,7 +764,7 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
   iapply wpNext_intro_pin
   iintro %c %_
   unfold sysMkdirK
-  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Hpriv %- Harms -
+  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Hpriv %hmret Harms #Hmr
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -616,6 +779,15 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
     (by decide) hl hext rfl rfl rfl rfl rfl rfl rfl rfl (Or.inr rfl)
     (syscFdOk_refl_at V _ sts 20 hn (by decide) (by decide) (by decide) (by decide))
   have ha0 := syscPath_a0 V { V.updEv k' with upt := P' } (R2 10#5) hl rfl
+  -- (NI M3 private files FS-2b) THE CITATION: the boot prefix at `-1`, the fs
+  -- prefix ending in the parent leg at `0` (`syscMkdir_cite`)
+  icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
+  iapply wpLoop_bupd
+  imod syscMkdir_cite (GF := GF) V { V.updEv k' with upt := P' } M (viewFaulted V.upt P' M) sts cs (R2 10#5)
+    (procAddr j) hn (by show tfArgIdx 0 < V.tf.length; rw [hl]; decide) hmret $$ Hmr with ⟨%ι, #Hl, %hrow⟩
+  ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts (syscStore { V.updEv k' with upt := P' } (R2 10#5))
+    (viewFaulted V.upt P' M) cs cs gn ke ι hrow $$ Hanc Hl
+  imodintro
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f { V.updEv k' with upt := P' }
     (viewFaulted V.upt P' M) sts cs hj hproc hK htier hpins2 hs2' hrows)
@@ -631,7 +803,7 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
   · iapply syscForkOut_ne; rw [hn]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ hn
+  · iexact Hev
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_mknod`** (table index 17). -/

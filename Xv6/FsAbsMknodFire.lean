@@ -149,7 +149,7 @@ theorem mkfDlookup_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
       topFragQ (fsGammaL γfs) dq d n ={E}=∗
         topFragQ (fsGammaL γfs) dq d n ∗
         -- (NI M3 private files FS-1) the lookup's hop
-        fsObsRcpt γfs (.hop act d nm) d n ∗
+        fsObsRcpt γfs (.hop act d nm none) d n ∗
         ∃ av : Aview, ⌜PartialMap.get? av d = some ⟨.ADir (dirEntries n), fnNlink n⟩⌝ ∗
           ⌜(dirEntries n)[nm]? = some i⌝ ∗ Fex.pfRecv av d nm i := by
   iintro #Hi Hcm Hf
@@ -167,7 +167,7 @@ theorem mkfDlookup_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   unfold dlookupCommitAt
   ihave Hcm := Hcm $$ %I %d %i %nm %(dirEntries n) %(fnNlink n) %hrow %hnm Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HΦ⟩
-  imod ftopLed_obsAt γfs I (.hop act d nm) trivial d n hlk $$ Hled with ⟨Hled, #Hrc⟩
+  imod ftopLed_obsAt γfs I (.hop act d nm none) trivial d n hlk $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists I, A
     iframe Ha Hla Hpark Hled

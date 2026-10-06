@@ -107,8 +107,10 @@ inductive Fev where
   | trunc (act : BitVec 64) (i : Nat)
   /-- iput's last-reference free -/
   | free (act : BitVec 64) (i : Nat)
-  /-- a lookup of `nm` in `d`, at its instant -/
-  | hop (act : BitVec 64) (d : Nat) (nm : List (BitVec 8))
+  /-- a lookup of `nm` in `d`, at its instant; (NI M3 FS-2b) `prev` is the ledger
+  position of the previous lookup of the SAME walk (`none` at a walk's first, and
+  at a lookup no walk follows) -- a back-pointer, ledger bookkeeping -/
+  | hop (act : BitVec 64) (d : Nat) (nm : List (BitVec 8)) (prev : Option Nat)
   /-- an fd installed on `i` (`γo` CARRIED); its offset 0 -/
   | open (act : BitVec 64) (i : Nat) (γo : GName)
   /-- `n` bytes read from `γo`'s offset `off` (the count the read advanced it
@@ -119,6 +121,9 @@ inductive Fev where
   | stat (act : BitVec 64) (i : Nat)
   /-- an exhaustion verdict (CARRIED) -/
   | full (act : BitVec 64) (why : FsFull)
+  /-- (NI M3 FS-2b) a walk's TYPE TEST: an observation of `i`'s row at its
+  instant (chdir's and open's), `prev` the position of the walk's last lookup -/
+  | look (act : BitVec 64) (i : Nat) (prev : Option Nat)
 
 /-! ## §2 The fold -/
 
@@ -173,7 +178,8 @@ def fevStep (st : Frows × (GName → Nat)) : Fev → Frows × (GName → Nat)
   | .free _ i => (frowsSet st.1 i none, st.2)
   | .open _ _ γo => (st.1, foffSet st.2 γo 0)
   | .read _ _ γo off n => (st.1, foffSet st.2 γo (off + n))
-  | .hop _ _ _ => st
+  | .hop _ _ _ _ => st
+  | .look _ _ _ => st
   | .stat _ _ => st
   | .full _ _ => st
 
@@ -270,7 +276,7 @@ theorem fevRun_snoc (h : List Fev) (e : Fev) : fevRun (h ++ [e]) = fevStep (fevR
 
 /-- an OBSERVATION moves no row -/
 def fevObs : Fev → Prop
-  | .hop _ _ _ | .open _ _ _ | .read _ _ _ _ _ | .stat _ _ | .full _ _ => True
+  | .hop _ _ _ _ | .open _ _ _ | .read _ _ _ _ _ | .stat _ _ | .full _ _ | .look _ _ _ => True
   | _ => False
 
 theorem fevRows_obs (h : List Fev) (e : Fev) (he : fevObs e) : fevRows (h ++ [e]) = fevRows h := by
@@ -285,5 +291,191 @@ theorem fevRun_prefix {h h' : List Fev} (hp : h <+: h') :
     ∃ t, h' = h ++ t ∧ fevRun h' = t.foldl fevStep (fevRun h) := by
   obtain ⟨t, rfl⟩ := hp
   exact ⟨t, rfl, fevRun_append h t⟩
+
+/-! ### The walk's lookups, followed (NI M3 FS-2b)
+
+A path walk's lookups are NOT contiguous in the ledger (the walk releases
+each directory's lock before the next element), so each `hop` records the
+position of the previous lookup of its walk, and a walk's decisive event
+(chdir's and open's type test, `look`) records the position of its last.
+The rows follow the pointers inside the cited prefix -- positions are
+bookkeeping, every answer is a fold (`fevHop`) of the prefix before the
+lookup at its own position.  A pointer that is not strictly earlier stops
+the chain (the fires only ever record earlier ones). -/
+
+/-- the lookups of the walk whose LAST lookup sits at position `p` of `H`,
+in walk order: their positions and names -/
+def fevChainAt (H : List Fev) (p : Nat) : List (Nat × List (BitVec 8)) :=
+  match H[p]? with
+  | some (.hop _ _ nm (some q)) => if _h : q < p then fevChainAt H q ++ [(p, nm)] else [(p, nm)]
+  | some (.hop _ _ nm none) => [(p, nm)]
+  | _ => []
+termination_by p
+
+/-- ...from an optional last position (`none`: a walk that made no lookup) -/
+def fevChain (H : List Fev) : Option Nat → List (Nat × List (BitVec 8))
+  | none => []
+  | some p => fevChainAt H p
+
+/-- **THE WALK's RESOLUTION**: from the start `s0`, each lookup answered by
+the fold of the prefix before it (`fevHop` at the walker's root `rt`) -/
+def fevWalk (H : List Fev) (rt s0 : Nat) (cs : List (Nat × List (BitVec 8))) : Option Nat :=
+  cs.foldl (fun acc x => acc.bind fun cur => fevHop (H.take x.1) rt cur x.2) (some s0)
+
+/-- **THE CITED TYPE TEST** (chdir's and open's decisive event): the cited
+prefix ends in actor `a`'s `look a i po`, whose walk -- the lookups followed
+from `po` -- made `m` lookups and resolved from `s0` to `i`; its reading is
+`i` and `i`'s row in the fold before the observation (`none` otherwise) -/
+def fevLookAt (H : List Fev) (a : BitVec 64) (rt s0 m : Nat) : Option (Nat × Option (Fnode × Nat)) :=
+  match H.getLast? with
+  | some (.look a' i po) =>
+    if a' = a ∧ (fevChain H po).length = m ∧ fevWalk H rt s0 (fevChain H po) = some i then
+      some (i, fevRows H.dropLast i)
+    else none
+  | _ => none
+
+/-- **THE CITED PARENT LEG** (mkdir's decisive event, NI M3 FS-2b): the cited
+prefix ends in actor `a`'s entry set and the parent's count leg, one block -/
+def fevLegBy (H : List Fev) (a : BitVec 64) : Bool :=
+  match H.reverse with
+  | .nlink a1 d1 _ :: .ent a2 d2 _ (some _) :: _ => a1 == a && a2 == a && d1 == d2
+  | _ => false
+
+theorem fevChainAt_eq (H : List Fev) (p : Nat) :
+    fevChainAt H p = match H[p]? with
+      | some (.hop _ _ nm (some q)) => if q < p then fevChainAt H q ++ [(p, nm)] else [(p, nm)]
+      | some (.hop _ _ nm none) => [(p, nm)]
+      | _ => [] := by
+  rw [fevChainAt]
+  split <;> rfl
+
+/-- every position on a chain is at most its last -/
+theorem fevChainAt_le (H : List Fev) : ∀ (p : Nat), ∀ x ∈ fevChainAt H p, x.1 ≤ p := by
+  intro p
+  refine Nat.strongRecOn p ?_
+  intro p ih
+  · intro x hx
+    rw [fevChainAt_eq] at hx
+    split at hx
+    · split at hx
+      · rename_i q _ hq
+        rcases List.mem_append.mp hx with h | h
+        · exact Nat.le_of_lt (Nat.lt_of_le_of_lt (ih q hq x h) hq)
+        · simp at h; rw [h]; exact Nat.le_refl _
+      · simp at hx; rw [hx]; exact Nat.le_refl _
+    · simp at hx; rw [hx]; exact Nat.le_refl _
+    · simp at hx
+
+/-- a chain read in a longer ledger is the chain read in the shorter one -/
+theorem fevChainAt_prefix {H H' : List Fev} (hp : H <+: H') :
+    ∀ (p : Nat), p < H.length → fevChainAt H' p = fevChainAt H p := by
+  intro p
+  refine Nat.strongRecOn p ?_
+  intro p ih
+  · intro hlt
+    have hg : H'[p]? = H[p]? := by
+      obtain ⟨t, rfl⟩ := hp
+      rw [List.getElem?_append_left hlt]
+    rw [fevChainAt_eq, fevChainAt_eq H, hg]
+    split
+    · split
+      · rename_i q _ hq
+        rw [ih q hq (Nat.lt_trans hq hlt)]
+      · rfl
+    · rfl
+    · rfl
+
+theorem fevWalk_append (H : List Fev) (rt s0 : Nat) (cs : List (Nat × List (BitVec 8))) (x : Nat × List (BitVec 8)) :
+    fevWalk H rt s0 (cs ++ [x]) = (fevWalk H rt s0 cs).bind fun cur => fevHop (H.take x.1) rt cur x.2 := by
+  unfold fevWalk; rw [List.foldl_append]; rfl
+
+/-- a walk read in a longer ledger at positions inside the shorter one -/
+theorem fevWalk_prefix {H H' : List Fev} (hp : H <+: H') (rt s0 : Nat) :
+    ∀ (cs : List (Nat × List (BitVec 8))), (∀ x ∈ cs, x.1 ≤ H.length) →
+      fevWalk H' rt s0 cs = fevWalk H rt s0 cs := by
+  intro cs hc
+  unfold fevWalk
+  generalize (some s0 : Option Nat) = acc
+  induction cs generalizing acc with
+  | nil => rfl
+  | cons x cs ih =>
+    simp only [List.foldl_cons]
+    have hx := hc x (List.mem_cons_self ..)
+    have ht : H'.take x.1 = H.take x.1 := by
+      obtain ⟨t, rfl⟩ := hp
+      rw [List.take_append_of_le_length hx]
+    rw [ht]
+    exact ih (fun y hy => hc y (List.mem_cons_of_mem _ hy)) _
+
+/-- **THE WALK SO FAR** (what the wrapped cursor carries): the lookups
+followed from `po` in `H` name `es` and resolve from `s0` to `d` -/
+def fevWalkIs (H : List Fev) (rt s0 : Nat) (po : Option Nat) (es : List (List (BitVec 8))) (d : Nat) : Prop :=
+  (∀ q, po = some q → q < H.length) ∧ (fevChain H po).map Prod.snd = es ∧
+    fevWalk H rt s0 (fevChain H po) = some d
+
+theorem fevWalkIs_nil (H : List Fev) (rt s0 : Nat) : fevWalkIs H rt s0 none [] s0 :=
+  ⟨(fun _ h => nomatch h), rfl, rfl⟩
+
+theorem fevChain_le (H : List Fev) (po : Option Nat) (hpo : ∀ q, po = some q → q < H.length) :
+    ∀ x ∈ fevChain H po, x.1 < H.length := by
+  intro x hx
+  cases po with
+  | none => simp [fevChain] at hx
+  | some p => exact Nat.lt_of_le_of_lt (fevChainAt_le H p x hx) (hpo p rfl)
+
+theorem fevChain_prefix {H H' : List Fev} (hp : H <+: H') (po : Option Nat)
+    (hpo : ∀ q, po = some q → q < H.length) : fevChain H' po = fevChain H po := by
+  cases po with
+  | none => rfl
+  | some p => exact fevChainAt_prefix hp p (hpo p rfl)
+
+/-- the walk so far survives the ledger's growth -/
+theorem fevWalkIs_mono {H H' : List Fev} (hp : H <+: H') {rt s0 : Nat} {po : Option Nat}
+    {es : List (List (BitVec 8))} {d : Nat} (hw : fevWalkIs H rt s0 po es d) : fevWalkIs H' rt s0 po es d := by
+  obtain ⟨hpo, hes, hd⟩ := hw
+  have hlen : H.length ≤ H'.length := hp.length_le
+  refine ⟨fun q hq => Nat.lt_of_lt_of_le (hpo q hq) hlen, ?_, ?_⟩
+  · rw [fevChain_prefix hp po hpo]; exact hes
+  · rw [fevChain_prefix hp po hpo, fevWalk_prefix hp rt s0 _ (fun x hx => Nat.le_of_lt (fevChain_le H po hpo x hx))]
+    exact hd
+
+/-- **ONE MORE LOOKUP**: at a ledger `h` past the walk's, the lookup of `nm`
+in the walk's directory `d` appended with the back-pointer `po`, answered
+`c` by the fold of `h` -/
+theorem fevWalkIs_hop {H h : List Fev} (hp : H <+: h) {rt s0 : Nat} {po : Option Nat}
+    {es : List (List (BitVec 8))} {d c : Nat} (hw : fevWalkIs H rt s0 po es d) (a : BitVec 64)
+    (nm : List (BitVec 8)) (hc : fevHop h rt d nm = some c) :
+    fevWalkIs (h ++ [.hop a d nm po]) rt s0 (some h.length) (es ++ [nm]) c := by
+  have hw' := fevWalkIs_mono (H' := h ++ [.hop a d nm po]) (hp.trans (List.prefix_append _ _)) hw
+  obtain ⟨hpo', hes', hd'⟩ := hw'
+  have hpo : ∀ q, po = some q → q < h.length := fun q hq => Nat.lt_of_lt_of_le (hw.1 q hq) hp.length_le
+  have hch : fevChain (h ++ [.hop a d nm po]) (some h.length) =
+      fevChain (h ++ [.hop a d nm po]) po ++ [(h.length, nm)] := by
+    show fevChainAt _ _ = _
+    rw [fevChainAt_eq]
+    simp only [List.getElem?_append_right (Nat.le_refl _), Nat.sub_self, List.getElem?_cons_zero]
+    cases po with
+    | none => rfl
+    | some q => simp only [fevChain, if_pos (hpo q rfl)]
+  refine ⟨fun q hq => by cases hq; simp, ?_, ?_⟩
+  · rw [hch, List.map_append, hes']; rfl
+  · rw [hch, fevWalk_append, hd']
+    simp only [Option.bind_some, List.take_left' rfl]
+    exact hc
+
+/-- **THE TYPE TEST CITED**: the walk so far, observed at `i` -/
+theorem fevLookAt_snoc {H h : List Fev} (hp : H <+: h) {rt s0 : Nat} {po : Option Nat}
+    {es : List (List (BitVec 8))} {i : Nat} (hw : fevWalkIs H rt s0 po es i) (a : BitVec 64) :
+    fevLookAt (h ++ [.look a i po]) a rt s0 es.length = some (i, fevRows h i) := by
+  obtain ⟨hpo, hes, hd⟩ := fevWalkIs_mono (H' := h ++ [.look a i po]) (hp.trans (List.prefix_append _ _)) hw
+  have hl : (h ++ [Fev.look a i po]).getLast? = some (.look a i po) := by simp
+  unfold fevLookAt
+  rw [hl]
+  dsimp only
+  rw [if_pos ⟨rfl, by rw [← hes, List.length_map], hd⟩, List.dropLast_concat]
+
+theorem fevLegBy_snoc (h : List Fev) (a : BitVec 64) (d : Nat) (nm : List (BitVec 8)) (i nl : Nat) :
+    fevLegBy (h ++ [.ent a d nm (some i), .nlink a d nl]) a = true := by
+  unfold fevLegBy; simp
 
 end Xv6

@@ -200,7 +200,7 @@ theorem ufDmiss_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
       topFragQ (fsGammaL γfs) dq d n ={E}=∗
         topFragQ (fsGammaL γfs) dq d n ∗
         -- (NI M3 private files FS-1) the lookup's hop
-        fsObsRcpt γfs (.hop act d nm) d n ∗
+        fsObsRcpt γfs (.hop act d nm none) d n ∗
         ∃ av : Aview, ⌜arowAt av d ⟨.ADir (dirEntries n), fnNlink n⟩⌝ ∗
           ⌜(dirEntries n)[nm]? = none⌝ ∗ Fmiss.pfRecv av d nm := by
   iintro #Hi Hcm Hf
@@ -220,7 +220,7 @@ theorem ufDmiss_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   unfold dmissCommitAt
   ihave Hcm := Hcm $$ %I %d %nm %(dirEntries n) %(fnNlink n) %hrow %hnm Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HΦ⟩
-  imod ftopLed_obsAt γfs I (.hop act d nm) trivial d n hlk $$ Hled with ⟨Hled, #Hrc⟩
+  imod ftopLed_obsAt γfs I (.hop act d nm none) trivial d n hlk $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists I, A
     iframe Ha Hla Hpark Hled
@@ -250,7 +250,7 @@ theorem ufDex_fire [Icfg] (γfs : FsNames) (E : CoPset) (dqd dqt : DFrac)
       topFragQ (fsGammaL γfs) dqt t nt ={E}=∗
         topFragQ (fsGammaL γfs) dqd d nd ∗ topFragQ (fsGammaL γfs) dqt t nt ∗
         -- (NI M3 private files FS-1) the lookup's hop
-        fsObsRcpt γfs (.hop act d nm) d nd ∗
+        fsObsRcpt γfs (.hop act d nm none) d nd ∗
         ∃ av : Aview, ⌜PartialMap.get? av d = some ⟨.ADir (dirEntries nd), fnNlink nd⟩⌝ ∗
           ⌜(dirEntries nd)[nm]? = some t⌝ ∗
           ⌜PartialMap.get? av t = some ⟨.ADir (dirEntries nt), fnNlink nt⟩⌝ ∗
@@ -273,7 +273,7 @@ theorem ufDex_fire [Icfg] (γfs : FsNames) (E : CoPset) (dqd dqt : DFrac)
   unfold dlookupCommitAt
   ihave Hcm := Hcm $$ %I %d %t %nm %(dirEntries nd) %(fnNlink nd) %hrowd %hnm Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HΦ⟩
-  imod ftopLed_obsAt γfs I (.hop act d nm) trivial d nd hlkd $$ Hled with ⟨Hled, #Hrc⟩
+  imod ftopLed_obsAt γfs I (.hop act d nm none) trivial d nd hlkd $$ Hled with ⟨Hled, #Hrc⟩
   imod Hclose $$ [Ha Hla Hpark Hled]
   · iexists I, A
     iframe Ha Hla Hpark Hled
