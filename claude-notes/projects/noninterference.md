@@ -7270,6 +7270,8 @@ reasons and fstat's bytes are named; no kernel change; the user tier byte-identi
 
 ### M3 private files FS-1 as landed (2026-10-06)
 
+**Coordinator ruling before FS-2a (2026-10-06, the offset tie):** the ledger fold's file offsets cannot be tied to the kernel's real offsets with the sanctioned moves: `f->off` lives only in the file's off box, whose shadow is already split ½ kernel / ½ user with no share for the ledger, and a tainted box (`offLink`'s `killCred` arm, `True` in the generic app) can move the cell with no shadow at all. Ruling (C): FS-2a lands on footing (B) — `Fev.read` CARRIES the real offset recorded at the fire (as `Fev.write` already does) and the rows read the bytes at the carried offset; the offsets are thereby RECORDED AS GIVEN (R3's status for the inode number), not derived. A new lane **FS-2a′** (option A: `ftopLed` holds a ¼ share of each parked file's offset shadow at `fevOff h γo`, minted at open's install; `offFd`/`offBox` gain `om` so taint is held-only; the read/write fires move all three shares inside the ledger opening; the class at `.inode i γo .parked`; `UserOff.lean` may move — flagged to the owner; 0.5–0.8 BE) is scheduled BEFORE FS-3/4, so the footprint theorem derives the offsets (`fevOffWf`). Write's `FwWhy.max` −1 depends on the offset and becomes a cited verdict.
+
 On `lane/pfiles` (rulings FS-R2, R3; coordinator rulings of 2026-10-06: (A) below, the two NI-trace moves).
 The fs-event ledger lands: one mono-list per era keyed by inode number, its authority in `ftopBody` beside the
 kernel's half of the top map, TIED to the typed rows; the fire lemmas append at the move's instant with the
