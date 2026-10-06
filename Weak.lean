@@ -191,5 +191,6 @@ import Weak.WeakLeafCsrw2
 import Weak.WeakLeafTor
 import Weak.WeakWalkStale
 import Weak.WeakLeafCsrrM
+import Weak.WeakLeafSdspOff
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
