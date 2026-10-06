@@ -160,5 +160,6 @@ import Weak.WeakFetchEff
 import Weak.AxPtProt3
 import Weak.AxSfence
 import Weak.AxScCat
+import Weak.WeakRvwmoConfWit2
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
