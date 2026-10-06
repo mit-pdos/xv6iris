@@ -7370,6 +7370,8 @@ eight rows "FS-2 reaches".
 
 ### M3 private files FS-2a as landed (2026-10-06)
 
+**Coordinator ruling before FS-2b (2026-10-06, the hops):** a walk's lookups are spread through the ledger (the directory lock is released between path elements) and `led` erases positions, so a row cannot find the round's hops by position or by actor (a plain `act` value is not exclusive). Ruling (a): walk events carry a BACK-POINTER to the previous event of their walk (`Fev.hop act d nm (prev : Option Nat)`); the decisive events (the `open` install, a new observation event at chdir's and open's TYPE TESTS, mkdir's arm/leg/full) record the position of the walk's last hop; the rows follow the pointers inside `ι.fev`. The hops are appended by a wrapper around the client's `exStart`/`exHopsFrom` at the three call sites (open, chdir, create), so namex/nameiparent/dirlookup stay byte-identical (the ~46-file threading avoided). The path's element count is read off the key (`W.M` at the arg pointer, a mapped NUL-terminated string at a lazy-free key: a class condition like `wbuf`). FS-4 must show the answers do not depend on the back-pointer positions once the history is restricted to the footprint. Rejected: a per-actor exclusive walk cursor tied in the ledger (≈1 BE, moves the user tier) and keeping `fpos` through `led` (reverses FS-2a deviation 3).
+
 On `lane/pfiles` (rulings FS-R3, R4, R6; the coordinator's ruling (C) of 2026-10-06 after the offset-tie gap
 report). read and write on an inode descriptor join the class; their answers are DERIVED from the cited fs-event
 prefix; the read/write OFFSETS are RECORDED AS GIVEN (R3's status for the inode number), not derived. No kernel
