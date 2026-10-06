@@ -126,6 +126,13 @@ Rocq model never emits `AK_ifetch`/`AK_ttw` (fetch and walk both landed in
    `MachCSL.Stdpp.mapM_Some_1/_2`.
 10. `wrun_v_disk` ↦ `wrunDiskOf` over `MachCSL.diskOf` (Rocq `v_disk (dvirtio
    _)`), via `MachCSL.devRead_diskOf`/`devWrite_diskOf`.
+11. THE MMIO TEST (orchestrator decision 2026-10-06, for `Weak/WeakBridge.lean`'s
+   arm-for-arm port against `Weak/Exec.lean`): the device arms of `wrun`/`wexec`
+   fire on `Weak.mmioAcc req.pa n = (devAddr req.pa && n != 0)` (Exec deviation
+   2), Rocq `dev_addr pa`.  The two differ only on zero-width accesses, which the
+   model never emits; a zero-width access at a device address is a no-op RAM
+   access here, as in `exec` and `runRW`.  (`wrun` changes with `wexec` so that
+   `wexecWrun` and `WeakExec.wrunWexec` stay arm-for-arm.)
 
 **File-qualified names** (orchestrator rule: a Rocq name defined in more than
 one Rocq file is declared `Weak.WeakInterp.<name>`; `notes/weak-port-dupnames.json`):
@@ -175,6 +182,7 @@ Rocq "FULL ORACLE-COMPLETENESS" comment is a non-result, kept below.)
 ones are listed under deviation 8.
 -/
 import Weak.WeakPromise
+import Weak.Exec
 import MachCSL.DiskOf
 
 namespace Weak
@@ -654,7 +662,7 @@ def wrun (tid : Option Nat) {X : Type} : SailM X → Wmstate → X → Wmstate �
     | .regRead r, k => wrun tid (k (s.wmRegs r)) s x s'
     | .regWrite r v, k => wrun tid (k PUnit.unit) (wsetReg s r v) x s'
     | .memRead n _ req, k =>
-      if devAddr req.pa then
+      if mmioAcc req.pa n then
         match devRead s.wmDev req.pa n with
         | some (w, d') => wrun tid (k (.Ok (w, none))) (wsetDev s d') x s'
         | none => False
@@ -663,7 +671,7 @@ def wrun (tid : Option Nat) {X : Type} : SailM X → Wmstate → X → Wmstate �
           wreadOk s (classify req.access_kind) req.pa n ts w ∧
           wrun tid (k (.Ok (w, none))) (wreadPost s (classify req.access_kind) req.pa ts) x s'
     | .memWrite n _ req, k =>
-      if devAddr req.pa then
+      if mmioAcc req.pa n then
         match req.value with
         | some v =>
           match devWrite s.wmDev req.pa n v with
@@ -708,7 +716,7 @@ def wexec (tid : Option Nat) {X : Type} :
     | .regRead r, k => wexec tid (k (s.wmRegs r)) χ s
     | .regWrite r v, k => wexec tid (k PUnit.unit) χ (wsetReg s r v)
     | .memRead n _ req, k =>
-      if devAddr req.pa then
+      if mmioAcc req.pa n then
         match devRead s.wmDev req.pa n with
         | some (w, d') => wexec tid (k (.Ok (w, none))) χ (wsetDev s d')
         | none => none
@@ -721,7 +729,7 @@ def wexec (tid : Option Nat) {X : Type} :
             wexec tid (k (.Ok (w, none))) χ.tail (wreadPost s (classify req.access_kind) req.pa ts)
           | none => none
     | .memWrite n _ req, k =>
-      if devAddr req.pa then
+      if mmioAcc req.pa n then
         match req.value with
         | some v =>
           match devWrite s.wmDev req.pa n v with

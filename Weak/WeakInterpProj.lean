@@ -91,6 +91,11 @@ only, deviation 3) `WeakPromiseBridge` for `wsEqr`.  Nothing Iris.
    - Lean-only helpers: `wFetchLoadOk`, `wrunFetchOk`, `noIfetch`,
      `wrunFetchOkNoIfetch`, `wsEqrStorePostRun`, `execLoad` (the common load
      step of both read arms), `wbytesLookupGen`.
+4. THE MMIO TEST follows `WeakInterp` deviation 11 (`wrun`'s device arms fire on
+   `Weak.mmioAcc req.pa n`, Rocq `dev_addr`): `wrunFetchOk`'s device arms test
+   `mmioAcc`, and `nzWrites`' write premise is `mmioAcc req.pa n = true ∨ n ≠ 0`
+   (Rocq `dev_addr pa = true ∨ n ≠ 0`; both say "a RAM write has nonzero width"),
+   `noIfetch`'s read premise `mmioAcc req.pa n = true ∨ akIfetch = false`.
 
 **Rocq → Lean name map.**  `wbytes` ↦ `WeakInterpProj.wbytes`; `wbytes_length`
 ↦ `wbytesLength`; `wbytes_lookup` ↦ `wbytesLookup`; `wbytes_nonnil` ↦
@@ -367,7 +372,7 @@ def nzWrites {X : Type} : SailM X → Prop
     | .regRead _, k => ∀ r, nzWrites (k r)
     | .regWrite _ _, k => ∀ r, nzWrites (k r)
     | .memRead _ _ _, k => ∀ r, nzWrites (k r)
-    | .memWrite n _ req, k => (devAddr req.pa = true ∨ n ≠ 0) ∧ ∀ r, nzWrites (k r)
+    | .memWrite n _ req, k => (mmioAcc req.pa n = true ∨ n ≠ 0) ∧ ∀ r, nzWrites (k r)
     | .barrier _, k => ∀ r, nzWrites (k r)
     | .instrAnnounce _ _, k => ∀ r, nzWrites (k r)
     | .branchAnnounce _ _, k => ∀ r, nzWrites (k r)
@@ -396,7 +401,7 @@ def wrunFetchOk (tid : Option Nat) {X : Type} : SailM X → Wmstate → X → Wm
     | .regRead r, k => wrunFetchOk tid (k (s.wmRegs r)) s x s'
     | .regWrite r v, k => wrunFetchOk tid (k PUnit.unit) (wsetReg s r v) x s'
     | .memRead n _ req, k =>
-      if devAddr req.pa then
+      if mmioAcc req.pa n then
         match devRead s.wmDev req.pa n with
         | some (w, d') => wrunFetchOk tid (k (.Ok (w, none))) (wsetDev s d') x s'
         | none => True
@@ -407,7 +412,7 @@ def wrunFetchOk (tid : Option Nat) {X : Type} : SailM X → Wmstate → X → Wm
           ((classify req.access_kind).akIfetch = true → wFetchLoadOk s req.pa n ts) ∧
           wrunFetchOk tid (k (.Ok (w, none))) (wreadPost s (classify req.access_kind) req.pa ts) x s'
     | .memWrite n _ req, k =>
-      if devAddr req.pa then
+      if mmioAcc req.pa n then
         match req.value with
         | some v =>
           match devWrite s.wmDev req.pa n v with
@@ -443,8 +448,8 @@ def noIfetch {X : Type} : SailM X → Prop
     match o, k with
     | .regRead _, k => ∀ r, noIfetch (k r)
     | .regWrite _ _, k => ∀ r, noIfetch (k r)
-    | .memRead _ _ req, k =>
-        (devAddr req.pa = true ∨ (classify req.access_kind).akIfetch = false) ∧ ∀ r, noIfetch (k r)
+    | .memRead n _ req, k =>
+        (mmioAcc req.pa n = true ∨ (classify req.access_kind).akIfetch = false) ∧ ∀ r, noIfetch (k r)
     | .memWrite _ _ _, k => ∀ r, noIfetch (k r)
     | .barrier _, k => ∀ r, noIfetch (k r)
     | .instrAnnounce _ _, k => ∀ r, noIfetch (k r)

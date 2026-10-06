@@ -80,5 +80,7 @@ import Weak.AxCovMono
 import Weak.AxCovClose
 import Weak.Exec
 import Weak.ExecLib
+import Weak.WeakRobustSim
+import Weak.WeakBridge
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
