@@ -239,3 +239,14 @@ No decision is needed for `TsoMem` (untouched), `VirtioProg` (Weak-local), `PtAd
   explicit reads" classification. This redesigns WeakInterp's `classify`, WeakEvLang's read arm, the fetch
   lift (WeakEvLift §5c) and the fetch-event leaves; certificates computed on the old classification are
   re-derived. Design: notes/weak-port-o2-design.md.
+- **O2 design decisions (notes/weak-port-o2-design.md):**
+  - **D1: fetches STAY graph read events in the AxSL/RVWMO-graph tier** (as in Rocq: explicit reads with
+    po-loc/fr/dependency edges; sound because text is never written) — the design's `LFetch`-out-of-graph
+    route is NOT taken; O2 changes the view/promising tier (classify, i-cache agent) only, and the AxSL tier
+    keeps the Rocq fetch treatment (the design's §2 "fallback if D1 is refused").
+  - **D2: Stage B now** — the per-hart i-cache view `itv` and `fence.i` semantics are modelled during the
+    port (not the Stage-A over-approximation).
+  - **D3** (per-byte i-cache view, one-way bridge) and **D4** (new `LIFetch` wlabel constructor, `lat`
+    kept inert): the design's recommendations, adopted.
+  - **D5: the archive is skipped** — `WeakSailLTS*`, `WeakCompose*`, `WeakShape*` (and files that only
+    serve them) are not ported; listed in notes/weak-port-skip.md.
