@@ -84,5 +84,6 @@ import Weak.WeakRobustSim
 import Weak.WeakBridge
 import Weak.WeakInstr
 import Weak.WeakRobustMain
+import Weak.WeakRobustDisc
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
