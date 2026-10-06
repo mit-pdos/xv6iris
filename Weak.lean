@@ -128,5 +128,6 @@ import Weak.WeakLeafAmo4
 import Weak.WeakEvLift
 import Weak.WeakBranch
 import Weak.WkStartedLoad
+import Weak.WeakVarCert
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
