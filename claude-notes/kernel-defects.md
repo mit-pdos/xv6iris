@@ -334,3 +334,7 @@ is why the retirement of the pid-wrap row above is more than a bound on
   its clamp keeps its two cases.
 - **`initlog`'s "too big logheader" panic** is compile-time dead and absent from
   the image entirely.
+
+## fstat's padding bytes carry kernel stack (found by NI M3 FS-2a, 2026-10-06)
+
+`struct stat` is 24 bytes; bytes 12–15 are alignment padding between `nlink` (a `short`) and `size` (a `uint64`). `filestat` fills the fields and copies the whole struct out, so the padding carries whatever was on the kernel stack: a 4-byte kernel-stack leak to user space on every `fstat`. The NI proof records it as a channel (FS-0 did not name the bytes; FS-2a kept `fstat` OUT of the class rather than declassify a kernel-stack word). Fix: zero the struct (`memset(&st, 0, sizeof st)`) in `filestat`, or the C `= {0}` initialiser — a kernel change, to be bundled with the next `verified-quota` commit (relayout). Upstream xv6 has the same leak.
