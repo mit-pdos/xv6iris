@@ -233,3 +233,9 @@ No decision is needed for `TsoMem` (untouched), `VirtioProg` (Weak-local), `PtAd
   (`bv_decide` allowed as in the tree).
 - Library shims live in `MachCSL/` (`Rel`, `QpLemmas`, `FinToSet`, `StdppSet`, `StdppMap`, `SetSolver`,
   `OrdKeys`, `StdppList`), not `Weak/Lib/`.
+- **Fetch / walker access kinds (sail-riscv drift, notes/weak-port-sail-drift.md): O2 — Lean semantics.**
+  The Lean model tags fetches `AK_ifetch` and non-atomic walker reads `AK_ttw`; the weak tier follows
+  MachCSL (ifetch = the i-cache agent, moves no view; ttw per MachCSL), NOT the Rocq "fetches are plain
+  explicit reads" classification. This redesigns WeakInterp's `classify`, WeakEvLang's read arm, the fetch
+  lift (WeakEvLift §5c) and the fetch-event leaves; certificates computed on the old classification are
+  re-derived. Design: notes/weak-port-o2-design.md.
