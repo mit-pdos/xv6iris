@@ -138,5 +138,6 @@ import Weak.WeakRvwmoLinInd
 import Weak.WeakEvExecEff
 import Weak.WeakEvDisk
 import Weak.AxCutProbe
+import Weak.WeakEvProv
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
