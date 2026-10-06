@@ -256,3 +256,6 @@ No decision is needed for `TsoMem` (untouched), `VirtioProg` (Weak-local), `PtAd
   `latestTs log a ≤ itv`.
 - **Write answers aligned to MachCSL:** the weak interpreter answers memory writes `.Ok (some true)` like
   MachCSL (not `.Ok none`); WeakInterp and dependents are changed accordingly.
+- **Q1 (2026-10-06): device programs modelled in the event tier.** WeakEvInst's PLIC/UART steps must follow the
+  actual device programs (kept in the fabric state), not over-approximate them, so WeakEvCapstone needs no
+  `evDevCover` premise.
