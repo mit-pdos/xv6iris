@@ -94,3 +94,6 @@ Rocq→Lean name map only.
   theorems at `.hasLC`. Rocq's `efetch_ws*` are gone (a fetch leaves `ws` unchanged).
 - **Lean-only helpers must be FILE-QUALIFIED** (`theorem <File>.helperName`), like duplicated Rocq names —
   two files adding the same helper name (e.g. `execEffWithinMmioReadableFalse`) cannot be imported together.
+- WeakVariant: 8 variant/cover lemmas take `ak.akIfetch = false` (the i-cache window doesn't exclude the
+  initial image); Rocq's PtAdBits write-back lemmas live in WeakVariant as `PtAdBits.*` — reuse them, don't
+  redefine.
