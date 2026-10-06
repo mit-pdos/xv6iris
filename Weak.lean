@@ -116,5 +116,6 @@ import Weak.WeakStarted
 import Weak.WeakRvwmoConf
 import Weak.WeakPmpTorEff
 import Weak.WeakPmpEff
+import Weak.WeakTickEff
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
