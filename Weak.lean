@@ -47,5 +47,6 @@ import Weak.WeakRetag
 import Weak.WeakRvwmoTopo
 import Weak.WeakRobustGraph
 import Weak.AxGraph
+import Weak.WeakRvwmoHull
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
