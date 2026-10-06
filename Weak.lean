@@ -89,5 +89,6 @@ import Weak.WeakRobustL2
 import Weak.WeakStore
 import Weak.AxViolSubsume
 import Weak.WeakRobustBlocks
+import Weak.WeakEvPf
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
