@@ -123,5 +123,6 @@ import Weak.WeakLeafEff8
 import Weak.AxDeps
 import Weak.WeakLeafEff8s
 import Weak.WeakRvwmoSupply
+import Weak.WeakRacy
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
