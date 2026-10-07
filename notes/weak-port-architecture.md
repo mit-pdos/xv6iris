@@ -273,3 +273,7 @@ No decision is needed for `TsoMem` (untouched), `VirtioProg` (Weak-local), `PtAd
   Q4 (text never written / fence.i discipline) remains, on the i-cache view (`efetchItvOk`).
   Design + rework list: notes/weak-port-o2-stageC.md (consult, then one rework lane). Until approved,
   files on the fetch-in-graph path are HELD.
+- **Stage C rulings (owner, 2026-10-07 ~00:35, on notes/weak-port-o2-stageC.md):** Q-C1 ADMIN label (LIFetch has no
+  row item/identity/edges; boot-image pin = `emFetchImg` clause in `gdexecQconf` + `pstepPin`); Q-C2 delete the
+  oracle params `T`/`fetchImg`/`fetchAnswers` and `AxWp.axText` now; Q-C3 delete `pstepNoFetch`/`pfFetchLoadOk`;
+  Q-C4 `wlblRen` fixes `LIFetch`. Rework = stageC.md §C lanes 1–3 (39 files) in workspace ../xv6iris-weak-sc.
