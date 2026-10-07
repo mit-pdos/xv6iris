@@ -10,8 +10,9 @@ Rocq: `iris/AxEpiChainSdLd.v` @ xxvzwolszwmp.
 Row (Lean, Stage C): `[sd @kk; ld @kk + 1]`, and the row ends EXACTLY at `kk + 2` (`Hlen`).
 
 * §1 `wpdOfClosedRunG`: `AxWpdLift.wpdOfClosedRun` (`MaybeStuck`) whose closure premises may use
-  a per-`GD` fact `G GD` read off `gconstInterp GD` (the row length), and whose row-end
-  obligation is owed only under `G GD` (model-generic `wpdOfClosedRunGM`).
+  a per-`GD` fact `G GD` read off `gconstInterp GD` (the row length) and the step's boot-image
+  pin (Q12), and whose row-end obligation is owed only under `G GD` (model-generic
+  `wpdOfClosedRunGM`).
 * §2 THE `.pure ()` JUNCTION `wpdRetBoundary`: from any state `aeqv` to `.pure ()` at registers
   `rs` (position `k`, not the row end), the only program step is the boundary `LInstr` tick to
   `riscvStep tick` with the same registers, `ibNone`, same `k` (`RetNext`); the wire stays in
@@ -44,6 +45,12 @@ Row (Lean, Stage C): `[sd @kk; ld @kk + 1]`, and the row ends EXACTLY at `kk + 2
    `wpd .MaybeStuck i s Φ` (`wpdM M .MaybeStuck i s Φ` in §1); `A -∗ B` ↦ `⊢ A -∗ B`;
    `invGS_gen HasNoLc Σ` ↦ `[InvGS_gen hlc GF]`.  `wpd_of_closed_run_g` (a Rocq `Definition`
    alias) is a theorem.  Rocq's `section chainM` notations are not needed (`wpdM M` is explicit).
+
+5. Q12 (owner, THE FETCH PIN): `wpdOfClosedRunGM` / `wpdOfClosedRunG`'s closure premise `Hclos`
+   takes the program step's boot-image pin `WeakAxRealize.fetchPin GD.gdG.gxImg l` (as the WPd
+   step clause supplies it, Q8; Rocq: none — its fetches were row reads), so an administrative
+   fetch step need only be closed when it returns image bytes (`AxSpinRow.wpdMStuck`).  The
+   in-file closures (`wpdRetBoundary`, `wpdPastRowEnd`) ignore it.
 
 **Rocq → Lean name map.**  `ret_pstep_inv` `retPstepInv`, `astep_prog_ret_shape`
 `astepProgRetShape`, `astep_prog_row_end_shape'` `AxEpiChainSdLd.astepProgRowEndShape'`
@@ -168,6 +175,7 @@ theorem wpdOfClosedRunGM (M : Gdexec → Prop) (i : Agent) (G : Gdexec → Prop)
     (HG : ∀ GD, M GD → AxirisG.gconstInterp (GF := GF) GD ⊢ ⌜G GD⌝)
     (Hnord : ∀ GD s1 id K, G GD → P s1 → ¬ areadStep (AxOpsem.grow GD i) s1 id K)
     (Hclos : ∀ GD s1 l s2, G GD → P s1 → AxOpsem.astepProg (AxOpsem.grow GD i) s1 l s2 →
+       WeakAxRealize.fetchPin GD.gdG.gxImg l →
        wlWdata l = none ∧ s2.atK = s1.atK ∧ (P s2 ∨ Q s2))
     (Hwire : ∀ s1 s2, P s1 → awire s1 s2 → P s2 ∨ Q s2) :
     ⊢ ∀ s, ⌜P s⌝ -∗
@@ -189,8 +197,8 @@ theorem wpdOfClosedRunGM (M : Gdexec → Prop) (i : Agent) (G : Gdexec → Prop)
   · iintro %id %K %Hst
     exact (Hnord GD s id K HGD HP Hst).elim
   isplit
-  · iintro %l %s' %Hst %_
-    obtain ⟨Hw, Hk, HPQ⟩ := Hclos GD s l s' HGD HP Hst
+  · iintro %l %s' %Hst %Hfp
+    obtain ⟨Hw, Hk, HPQ⟩ := Hclos GD s l s' HGD HP Hst Hfp
     simp only [Hw]
     unfold wpSkipStep
     iintro %na Hna
@@ -236,6 +244,7 @@ theorem wpdOfClosedRunG (i : Agent) (G : Gdexec → Prop) (P Q : Athread → Pro
     (HG : ∀ GD, rvwmoCatConsistent GD → AxirisG.gconstInterp (GF := GF) GD ⊢ ⌜G GD⌝)
     (Hnord : ∀ GD s1 id K, G GD → P s1 → ¬ areadStep (AxOpsem.grow GD i) s1 id K)
     (Hclos : ∀ GD s1 l s2, G GD → P s1 → AxOpsem.astepProg (AxOpsem.grow GD i) s1 l s2 →
+       WeakAxRealize.fetchPin GD.gdG.gxImg l →
        wlWdata l = none ∧ s2.atK = s1.atK ∧ (P s2 ∨ Q s2))
     (Hwire : ∀ s1 s2, P s1 → awire s1 s2 → P s2 ∨ Q s2) :
     ⊢ ∀ s, ⌜P s⌝ -∗
@@ -263,9 +272,9 @@ theorem wpdRetBoundary (i : Agent) (Φ : Athread → IProp GF) (cpu : CPU) (rs :
     rw [← Hl] at Hrd
     simp [wlRd] at Hrd
   have Hclos : ∀ GD s1 l s2, (AxOpsem.grow GD i).length = kend → RetX cpu rs k s1 →
-      AxOpsem.astepProg (AxOpsem.grow GD i) s1 l s2 →
+      AxOpsem.astepProg (AxOpsem.grow GD i) s1 l s2 → WeakAxRealize.fetchPin GD.gdG.gxImg l →
       wlWdata l = none ∧ s2.atK = s1.atK ∧ (RetX cpu rs k s2 ∨ RetNext cpu rs k s2) := by
-    rintro GD s1 l s2 - HP Hst
+    rintro GD s1 l s2 - HP Hst -
     obtain ⟨rs1, ib1, rfl, Hag⟩ := retxShape cpu rs k s1 HP
     obtain ⟨d, d', Hps⟩ := astepProgPstep _ _ _ _ Hst
     obtain ⟨tick, rfl⟩ := astepProgRetShape _ cpu rs1 ib1 k l s2 Hst
@@ -299,9 +308,9 @@ theorem wpdPastRowEnd (i : Agent) (Φ : Athread → IProp GF) (E : Athread → P
     rw [pastEndK E k0 HE s1 HP, List.getElem?_eq_none Hle] at Hlk
     cases Hlk
   have Hclos : ∀ GD s1 l s2, (AxOpsem.grow GD i).length ≤ k0 → pastEnd E s1 →
-      AxOpsem.astepProg (AxOpsem.grow GD i) s1 l s2 →
+      AxOpsem.astepProg (AxOpsem.grow GD i) s1 l s2 → WeakAxRealize.fetchPin GD.gdG.gxImg l →
       wlWdata l = none ∧ s2.atK = s1.atK ∧ (pastEnd E s2 ∨ (fun _ => False) s2) := by
-    rintro GD s1 l s2 Hle HP Hst
+    rintro GD s1 l s2 Hle HP Hst -
     have Hnone : (AxOpsem.grow GD i)[s1.atK]? = none := by
       rw [pastEndK E k0 HE s1 HP]
       exact List.getElem?_eq_none Hle

@@ -22,8 +22,10 @@ Rocq: `iris/AxSpinRow4.v` @ xxvzwolszwmp.
 
 ## Deviations from Rocq
 
-1. O2 STAGE C (`AxSpinRow` deviation 1): `row_stuck_r` has no `T img`, so `cretOffStuck` /
-   `cretOnNotStuck` drop those parameters.  The Lean `OpaxWit` node is a PLAIN data read
+1. O2 STAGE C (`AxSpinRow` deviation 1) and Q12 (`AxSpinRow` deviation 2): `row_stuck_r`'s
+   `T img` is a label predicate `pin`; `cretOffKreach` / `cretOffFirst` / `cretOffStuck` /
+   `cretOnNotStuck` take any `pin` (the node has no administrative program step, so the pin is
+   unused), and `cretOffWpd` calls `wpdStuck` at `pin := fun _ => True` (statement unchanged).  The Lean `OpaxWit` node is a PLAIN data read
    (`wtAk = AK_explicit plain`, as Rocq's `wt_ak`), so its label is a graph `LLoad`; the
    certificate is unchanged.  `fetchNodePstep` concludes `l = rdLabel akIfetch false akSync …`,
    which is Rocq's `LLoad` at `wtAk` (`akIfetch = false` by `rfl`).
@@ -69,13 +71,13 @@ def AxSpinRow4.F0 (l : Wlabel) : Prop :=
 theorem wtLat : (classify wtAk).akLatest = false := rfl
 
 /-- The closure, by induction on the run. -/
-theorem cretOffKreach (cpu : CPU) (rs : RegFile) (s2 : Athread) :
-    rtc kstep0 ⟨wtP0 cpu rs, 0⟩ s2 →
+theorem cretOffKreach (pin : Wlabel → Prop) (cpu : CPU) (rs : RegFile) (s2 : Athread) :
+    rtc (kstep0 pin) ⟨wtP0 cpu rs, 0⟩ s2 →
     ∃ rs', s2 = ⟨.PHart cpu wtM rs' none ibNone, 0⟩ := by
   have Hcls : ∀ x y : Athread, (∃ rs', x = ⟨.PHart cpu wtM rs' none ibNone, 0⟩) →
-      kstep0 x y →
+      kstep0 pin x y →
       ∃ rs', y = ⟨.PHart cpu wtM rs' none ibNone, 0⟩ := by
-    rintro x ⟨py, ky⟩ ⟨rs', rfl⟩ (⟨Hk, d, l, d', Hadm, Hps⟩ | ⟨Hk, d, d', Hw⟩)
+    rintro x ⟨py, ky⟩ ⟨rs', rfl⟩ (⟨Hk, d, l, d', Hadm, -, Hps⟩ | ⟨Hk, d, d', Hw⟩)
     · exfalso
       obtain ⟨tvs, -, hl, -⟩ := fetchNodePstep cpu 4 64 wtRreq (fun ans => wtM2 (wtVal ans)) rs'
         ibNone d l _ d' wtPaRam wtLat Hps
@@ -95,10 +97,10 @@ theorem cretOffKreach (cpu : CPU) (rs : RegFile) (s2 : Athread) :
 
 /-- THE ROW-FREE (Sail) HALF: the node's first non-administrative label is the read of
 `wtBase`, whatever the wire did. -/
-theorem cretOffFirst (cpu : CPU) (rs : RegFile) :
-    firstEv AxSpinRow4.F0 ⟨wtP0 cpu rs, 0⟩ := by
+theorem cretOffFirst (pin : Wlabel → Prop) (cpu : CPU) (rs : RegFile) :
+    firstEv pin AxSpinRow4.F0 ⟨wtP0 cpu rs, 0⟩ := by
   intro s2 Hr d l p' d' Hps _
-  obtain ⟨rs', rfl⟩ := cretOffKreach cpu rs s2 Hr
+  obtain ⟨rs', rfl⟩ := cretOffKreach pin cpu rs s2 Hr
   obtain ⟨tvs, -, hl, -⟩ := fetchNodePstep cpu 4 64 wtRreq (fun ans => wtM2 (wtVal ans)) rs'
     ibNone d l p' d' wtPaRam wtLat Hps
   exact ⟨tvs, by rw [hl]; rfl⟩
@@ -117,14 +119,16 @@ theorem cretOffRejects (w0 w1 : BitVec (8 * 4)) :
   · simp [wlWr] at Hx
   · simp [wlFence] at Hx
 
-theorem cretOffStuck (cpu : CPU) (rs : RegFile) (w0 w1 : BitVec (8 * 4)) :
-    rowStuckR (offRow w0 w1) ⟨wtP0 cpu rs, 0⟩ :=
-  rowStuckOfFirst _ _ AxSpinRow4.F0 (cretOffFirst cpu rs) (cretOffRejects w0 w1)
+theorem cretOffStuck (pin : Wlabel → Prop) (cpu : CPU) (rs : RegFile)
+    (w0 w1 : BitVec (8 * 4)) :
+    rowStuckR pin (offRow w0 w1) ⟨wtP0 cpu rs, 0⟩ :=
+  rowStuckOfFirst pin _ _ AxSpinRow4.F0 (cretOffFirst pin cpu rs) (cretOffRejects w0 w1)
     (by simp [offRow])
 
 /-- … and the ON-ROW twin is NOT stuck. -/
-theorem cretOnNotStuck (cpu : CPU) (rs : RegFile) (w0 w1 : BitVec (8 * 4)) :
-    ¬ rowStuckR (wtRow w0 w1) ⟨wtP0 cpu rs, 0⟩ := by
+theorem cretOnNotStuck (pin : Wlabel → Prop) (cpu : CPU) (rs : RegFile)
+    (w0 w1 : BitVec (8 * 4)) :
+    ¬ rowStuckR pin (wtRow w0 w1) ⟨wtP0 cpu rs, 0⟩ := by
   intro H
   exact (H _ (rtc_refl _)).2.2.1 _ _ (wtAread cpu rs w0 w1)
 
@@ -138,11 +142,11 @@ theorem cretOffWpd (i : Agent) (cpu : CPU) (rs : RegFile) (w0 w1 : BitVec (8 * 4
     (HG : ∀ GD, rvwmoCatConsistent GD → AxirisG.gconstInterp (GF := GF) GD ⊢ ⌜G GD⌝)
     (Hrow : ∀ GD, G GD → AxOpsem.grow GD i = offRow w0 w1) (Φ : Athread → IProp GF) :
     ⊢ wpdM rvwmoCatConsistent .MaybeStuck i ⟨wtP0 cpu rs, 0⟩ Φ := by
-  apply wpdStuck i G HG Φ
+  apply wpdStuck i G HG (fun _ => True) (fun _ _ _ _ => trivial) Φ
   intro GD HGD
   unfold rowStuck
   rw [Hrow GD HGD]
-  exact cretOffStuck cpu rs w0 w1
+  exact cretOffStuck _ cpu rs w0 w1
 
 theorem cretOffWpdFalse (i : Agent) (cpu : CPU) (rs : RegFile) (w0 w1 : BitVec (8 * 4))
     (G : Gdexec → Prop)

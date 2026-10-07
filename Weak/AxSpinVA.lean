@@ -20,8 +20,10 @@ Rocq: `iris/AxSpinVA.v` @ xxvzwolszwmp.
   program steps, PLIC wires and exactly `i` RAM reads answered with IMAGE bytes.  `chainFirst`:
   if `hthr img Ks p`, then at every such `p'` with `Ks[i]? = some e`, the next
   non-administrative label from `⟨p', k⟩` along PINNED administrative steps has key `e`
-  (`AxSpinVA.firstEvPin`).  `hthrBoundary`: `BFEC n Ks t` at a register file agreeing with `t`
-  off the pins gives `hthr Ks` at the boundary node `.pure ()`.
+  (`firstEv (WeakAxRealize.fetchPin img)`); `rowStuckOfChain`: so a row item at `k` that does
+  not fit `e` makes `⟨p', k⟩` row-stuck along image-pinned runs (`AxSpinRow.rowStuckOfFirst`).
+  `hthrBoundary`: `BFEC n Ks t` at a register file agreeing with `t` off the pins gives
+  `hthr Ks` at the boundary node `.pure ()`.
 * §4 THE EVALUATOR `fstep fuel len t` and `fstepSound`: `fstep fuel len t = some Ks →
   BFEC fuel Ks t`; `fstepChain` packages it with `chainFirst`.
 
@@ -35,14 +37,17 @@ Rocq: `iris/AxSpinVA.v` @ xxvzwolszwmp.
    graph tier's fetch oracle, cf. `AxCjrWpd.pinnedBytes`).  Hence:
    - `hinvCStep`'s administrative half and `hthrAdmin` take `WeakAxRealize.fetchPin img l`;
    - `ireach`'s `irAdmin` constructor carries the pin;
-   - `hthrFirst` / `chainFirst` / `fstepChain` conclude the Lean-only PINNED first-label property
-     `AxSpinVA.firstEvPin img F s` (`AxSpinRow.firstEv` with administrative steps restricted to
-     `fetchPin img`, `AxSpinVA.kstep0Pin`), NOT `AxSpinRow.firstEv` (whose administrative
-     steps fetch ARBITRARY bytes: past a fetch no chain can be certified for it).
-   - **`row_stuck_of_chain` is NOT PORTED** (open question): it would feed
-     `AxSpinRow.rowStuckOfFirst`, whose `firstEv` / `rowStuckR` / `wpdMStuck` are unpinned.  A
-     pinned `rowStuckR` + a pinned `wpdOfClosedRunGM` (the WPd step clause IS pinned, Q8) are
-     needed first — an orchestrator decision outside this file.
+   - `hthrFirst` / `chainFirst` / `fstepChain` conclude the PINNED first-label property
+     `firstEv (WeakAxRealize.fetchPin img) F s` (Q12: `AxSpinRow.firstEv` takes the pin, its
+     administrative steps are restricted to `fetchPin img`; an unpinned fetch returns ARBITRARY
+     bytes and past it no chain can be certified).  The earlier Lean-only
+     `AxSpinVA.kstep0Pin` / `AxSpinVA.firstEvPin` are MERGED into `AxSpinRow.kstep0` /
+     `AxSpinRow.firstEv` (same definitions at `pin := fetchPin img`) and removed.
+   - Q12: `rowStuckOfChain` (Rocq `row_stuck_of_chain row T img0`) concludes
+     `rowStuckR (WeakAxRealize.fetchPin img) row ⟨p', k⟩` — the stuckness is along runs whose
+     fetches return the CHAIN's image `img` (Rocq: any `T img0`, its fetches were row reads).
+     To feed `AxSpinRow.wpdMStuck` at `pin := fetchPin img`, every allowed graph's boot image
+     must be `img` (`Hpin`).
 2. Q7 (sfence marker): `fcIa` takes `sfAnnB n w = false` (an announce is `LInstr`, admin); the
    Lean-only constructor `FEC.fcSf` ENDS the chain at an SFENCE.VMA announce with the marker's
    key `EFn (false, false, false, false)`.  The evaluator does the same.
@@ -60,8 +65,7 @@ Rocq: `iris/AxSpinVA.v` @ xxvzwolszwmp.
    (`x.1.2` ↦ `x.2.1`, `x.2` ↦ `x.2.2`); `F_of (eq e)` ↦ `FOf (Eq e)`; `bool_decide` ↦ `decide`.
    `pnode_step` carries `obar` (`hinvCStep` takes it).  `fstep` is `noncomputable` (`riscvStep`
    is); kernel evaluation (`decide +kernel`) is unaffected.
-6. Lean-only helpers (file-qualified): `AxSpinVA.kstep0Pin`, `AxSpinVA.firstEvPin`,
-   `AxSpinVA.erwLabelAdmin` (Rocq `erw_label_admin`, a duplicated name; = `AxCjrWpd`'s),
+6. Lean-only helpers (file-qualified): `AxSpinVA.erwLabelAdmin` (Rocq `erw_label_admin`, a duplicated name; = `AxCjrWpd`'s),
    `AxSpinVA.annAdmin`.
 
 **Rocq → Lean name map.**  `ekey` `ekey` (`ERd`/`EWr`/`EFn`), `lkey` `lkey`, `lkey_rd` `lkeyRd`,
@@ -77,10 +81,9 @@ Rocq: `iris/AxSpinVA.v` @ xxvzwolszwmp.
 `hthr_first` `hthrFirst`, `ireach` `ireach` (`ir_refl` `irRefl`, `ir_admin` `irAdmin`,
 `ir_wire` `irWire`, `ir_read` `irRead`), `chain_first` `chainFirst`, `hthr_boundary`
 `hthrBoundary`, `fch` `fch`, `fch_sound` `fchSound`, `fstep` `fstep`, `fstep_sound`
-`fstepSound`, `fstep_chain` `fstepChain`.
+`fstepSound`, `fstep_chain` `fstepChain`, `row_stuck_of_chain` `rowStuckOfChain`.
 
-**Dropped / not ported:** `row_stuck_of_chain` (deviation 1; open question) and the `nadm`
-tactic (inlined); the `Print Assumptions` block (the lint's axiom check covers it).
+**Dropped / not ported:** the `nadm` tactic (inlined); the `Print Assumptions` block (the lint's axiom check covers it).
 -/
 import Weak.AxSymEngine2
 import Weak.AxSpinRow
@@ -404,20 +407,8 @@ theorem hthrWire (Ks : List ekey) (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv
   rw [← AxRunClose.pinSetAgree rs mm b r hr]
   exact Hag r hr
 
-/-- (Lean-only, deviation 1) An administrative step whose fetch (if any) is pinned to `img`, or
-a wire (both keep the position). -/
-def AxSpinVA.kstep0Pin (a b : Athread) : Prop :=
-  (b.atK = a.atK ∧ ∃ d l d', lbAdmin true l ∧ WeakAxRealize.fetchPin img l ∧
-    pstepProg a.atP d l b.atP d') ∨
-  awire a b
-
-/-- (Lean-only, deviation 1) `firstEv` along PINNED administrative steps. -/
-def AxSpinVA.firstEvPin (F : Wlabel → Prop) (s : Athread) : Prop :=
-  ∀ s2, rtc (AxSpinVA.kstep0Pin img) s s2 →
-    ∀ d l p' d', pstepProg s2.atP d l p' d' → ¬ lbAdmin true l → F l
-
 theorem hthrFirst (e : ekey) (Ks : List ekey) (p : Pexv6) (k : Nat) :
-    hthr img (e :: Ks) p → AxSpinVA.firstEvPin img (FOf (Eq e)) ⟨p, k⟩ := by
+    hthr img (e :: Ks) p → firstEv (WeakAxRealize.fetchPin img) (FOf (Eq e)) ⟨p, k⟩ := by
   intro H0 s2 Hr
   have Hinv : hthr img (e :: Ks) s2.atP := by
     induction Hr with
@@ -454,7 +445,7 @@ inductive ireach : Pexv6 → Nat → Pexv6 → Prop where
 /-- THE CHAIN THEOREM. -/
 theorem chainFirst (Ks : List ekey) (p : Pexv6) (i : Nat) (p' : Pexv6) (e : ekey) (k : Nat) :
     hthr img Ks p → ireach img p i p' → Ks[i]? = some e →
-    AxSpinVA.firstEvPin img (FOf (Eq e)) ⟨p', k⟩ := by
+    firstEv (WeakAxRealize.fetchPin img) (FOf (Eq e)) ⟨p', k⟩ := by
   intro H Hr
   induction Hr generalizing Ks with
   | irRefl p =>
@@ -485,6 +476,16 @@ theorem chainFirst (Ks : List ekey) (p : Pexv6) (i : Nat) (p' : Pexv6) (e : ekey
       have HKs' : Ks' ≠ [] := by rintro rfl; simp at He
       obtain ⟨rfl, rfl, H'⟩ := Hc HKs' x Hx Himg
       exact IH Ks' ⟨cpu', m', rs, oib.getD ib, rfl, H'⟩ He
+
+/-- The engine's form (Q12, deviation 1): at a reached node, a row item that does not fit the
+chain's key there makes the hart row-stuck along image-pinned runs. -/
+theorem rowStuckOfChain (Ks : List ekey) (p : Pexv6) (i : Nat) (p' : Pexv6) (e : ekey) (k : Nat)
+    (row : List Lbl) :
+    hthr img Ks p → ireach img p i p' → Ks[i]? = some e →
+    rowRejects row k (FOf (Eq e)) → k < row.length →
+    rowStuckR (WeakAxRealize.fetchPin img) row ⟨p', k⟩ :=
+  fun H Hr He Hrej Hlt =>
+    rowStuckOfFirst _ row ⟨p', k⟩ (FOf (Eq e)) (chainFirst img Ks p i p' e k H Hr He) Hrej Hlt
 
 /-- The boundary node. -/
 theorem hthrBoundary (n : Nat) (Ks : List ekey) (t : ExecSt) (cpu : CPU) (rs : RegFile)
@@ -696,7 +697,7 @@ theorem fstepChain (fuel len : Nat) (t : ExecSt) (Ks : List ekey) (cpu : CPU) (r
     (ib : Ibch) (p' : Pexv6) (i : Nat) (e : ekey) (k : Nat) :
     fstep img fuel len t = some Ks → regsAgree AxRunClose.pinReg rs t.regs →
     ireach img (.PHart cpu (.pure ()) rs none ib) i p' → Ks[i]? = some e →
-    AxSpinVA.firstEvPin img (FOf (Eq e)) ⟨p', k⟩ := by
+    firstEv (WeakAxRealize.fetchPin img) (FOf (Eq e)) ⟨p', k⟩ := by
   intro Hf Hag Hr He
   exact chainFirst img _ _ _ _ _ _ (hthrBoundary img _ _ _ _ _ _ (fstepSound img _ _ _ _ Hf) Hag)
     Hr He

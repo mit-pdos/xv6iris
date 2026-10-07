@@ -48,6 +48,8 @@ STILL CONDITIONAL ON: `SpineOk` + `SpineFetch4` (∀-state, per regime) and `tex
    `hlc`; `GenId` dropped.  Rocq's §2 `Definition …3 := …3M rvwmo_cat_consistent` ↦ theorems
    restating the `…3M` lemma at `rvwmoCatConsistent` (with `wpd`).  Rocq's section `Let TX`/`XP`
    are inlined.
+6. Q12 (`AxEpiChainSdLd` deviation 5): `wpdOfClosedRunGM`'s closure premise takes the step's
+   boot-image pin; `wpdAdminNode3M` / `wpdRetNode3M` ignore it (statements unchanged).
 
 **Rocq → Lean name map.**  `EvA_hart_active_base` `EvAHartActiveBase`, `SpineFetch4`
 `SpineFetch4`, `text_ok_d4` `textOkD4`, `text_ok_dB` `textOkDB`, `incr` `incr`, `GoodN` `GoodN`,
@@ -324,8 +326,9 @@ theorem wpdAdminNode3M (m : SailM Unit) (Hm : isNext m) (kk : Nat) (A : RegFile 
     rw [← Hl, lbAdminRd l Had] at Hrd
     cases Hrd
   have Hclos : ∀ GD s1 l s2, G GD → P s1 → AxOpsem.astepProg (AxOpsem.grow GD i) s1 l s2 →
+      WeakAxRealize.fetchPin GD.gdG.gxImg l →
       wlWdata l = none ∧ s2.atK = s1.atK ∧ (P s2 ∨ N s2) := by
-    rintro GD s1 l s2 - ⟨rs1, ib1, rfl, HA1⟩ Hst
+    rintro GD s1 l s2 - ⟨rs1, ib1, rfl, HA1⟩ Hst -
     obtain ⟨d, d', Hp⟩ := astepProgPstep _ _ _ _ Hst
     obtain ⟨Had, HN⟩ := Hps _ _ _ _ _ _ HA1 Hp
     have Hk := astepProgAdminK' _ _ _ _ Hst Had
@@ -680,9 +683,9 @@ theorem wpdRetNode3M (rs : RegFile) (k : Nat) (s : Athread) (Hs : RetX cpu rs k 
     rw [← Hl] at Hrd
     simp [wlRd] at Hrd
   have Hclos : ∀ GD s1 l s2, G GD → RetX cpu rs k s1 →
-      AxOpsem.astepProg (AxOpsem.grow GD i) s1 l s2 →
+      AxOpsem.astepProg (AxOpsem.grow GD i) s1 l s2 → WeakAxRealize.fetchPin GD.gdG.gxImg l →
       wlWdata l = none ∧ s2.atK = s1.atK ∧ (RetX cpu rs k s2 ∨ RetNext cpu rs k s2) := by
-    rintro GD s1 l s2 - HP Hst
+    rintro GD s1 l s2 - HP Hst -
     obtain ⟨rs1, ib1, rfl, Hag⟩ := retxShape cpu rs k s1 HP
     obtain ⟨d, d', Hps⟩ := astepProgPstep _ _ _ _ Hst
     obtain ⟨tick, rfl⟩ := astepProgRetShape _ cpu rs1 ib1 k l s2 Hst
