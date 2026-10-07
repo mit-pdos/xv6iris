@@ -281,3 +281,4 @@ No decision is needed for `TsoMem` (untouched), `VirtioProg` (Weak-local), `PtAd
   - **Q6, keep:** `pstepNoFetch` stays in WeakRobustMain, used only by the Lean-only fetch-free robustness corollaries.
   - **Q7, own marker event:** `sfence.vma` gets its own marker label that IS a graph event (LFence-class), emitted at SFENCE_VMA execute. This is a small Lean-model/label change plus an AxOpsem arm. AxSfence and AxSfence2 are then re-ported on it.
   - **Q8, pin in the WP step clause:** add `⌜WeakAxRealize.fetchPin GD.gdG.gxImg l⌝ -∗` to the step clause of `AxWp2.wpPreStepDef` and AxWpD's twin. Adequacy discharges it from the pinned machine LTS. The merged Ax files get fixed, and AxCjrWpd gets its faithful statements back.
+- **Q10 (owner, 2026-10-07 ~09:57):** do not build a separate library. Extend WeakEffSkel and WeakFetchEff so their run lemmas also yield `WeakEvLang.noSfAnn`, and discharge it inside the AxFetch/AxRegOnly row-run lemmas.
