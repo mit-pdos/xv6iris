@@ -246,5 +246,6 @@ import Weak.AxLock3
 import Weak.AxLockWpD
 import Weak.AxSpinProt
 import Weak.WkStepPeel
+import Weak.WkStartNew
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
