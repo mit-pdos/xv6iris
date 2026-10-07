@@ -308,5 +308,6 @@ import Weak.AxLock3Wp
 import Weak.AxLockN
 import Weak.AxLockN2
 import Weak.AxLockMutex
+import Weak.AxProtGate
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
