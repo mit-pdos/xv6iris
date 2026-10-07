@@ -198,3 +198,4 @@ Rocq→Lean name map only.
 - AxSpinRow: `astepAny` constructor patterns don't bind the source state: `| AAStep _ h`, `| AARead id K vs Hrd _`. Rocq head-style `rtc` induction over an accumulator ports as plain tail-style induction with `rtc_r`. `wpd_stuck` (Rocq Definition alias) is a theorem.
 - AxLedgerG3: proof-mode `iexact`/`icases` do not unfold plain def constants (e.g. `L0x := {[xa := …]}`) — allocate with the literal and `unfold L0x` before `iexact`.
 - AxEpiOwned: `wpdEpiSdLdOwned` callers (AxEpiAdeq …) use `sdWriteOk GD i kk a` and `ldspOwnOk GD i (kk+1) (i,kk) a (writenHist (i,kk) sdData Hs0)`; store continuation is `X -∗ ∀ v' v s', …` (two pins).
+- AxSpinRow4: `False` as a WP postcondition in statements must be `(iprop(False) : IProp GF)` (else `AxirisG ?m` stuck). `classify req.access_kind` rewrite: state `have hc : classify … = ⟨false,false,false⟩ := wtAkPlain` then simp with `hc`. Rocq `fetch_node_pstep` ↦ `AxCjrWpd.fetchNodePstep`.
