@@ -255,5 +255,6 @@ import Weak.AxWpdLift
 import Weak.AxInstr
 import Weak.WeakRvwmoProgress
 import Weak.AxRunClose
+import Weak.AxLifting
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
