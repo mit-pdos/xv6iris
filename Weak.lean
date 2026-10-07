@@ -362,5 +362,6 @@ import Weak.AxLock3Thm
 import Weak.AxLock3Race
 import Weak.AxFwdSource
 import Weak.AxLock3Cert
+import Weak.AxSpineOk
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
