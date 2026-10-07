@@ -281,5 +281,6 @@ import Weak.AxProtInst
 import Weak.AxWpDSteps
 import Weak.AxGraphAgree
 import Weak.AxSchedFwd
+import Weak.AxGateAdeq
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
