@@ -218,3 +218,4 @@ Rocq→Lean name map only.
 - AxRelease6: `rf0ExecuteITYPEADDI` (AxRelease5, AxSpinE7d call it). Recipe for register-only `rf0` lemmas: `show rf0 (execute_X …)`, `unfold execute_X`, `ax_sym2_rf0_solve`.
 - AxSpineOk5: `spineOkT`/`spineCertT` thread the post-fetch state `t1`; reuse `ax_sym2_ev_go` (Rocq redeclared ev_* Ltacs not redeclared). `RegFile.set_other` premise is `r' ≠ r` (written reg on the left).
 - AxSpinX3: `nreadStep` premise `akIfetch = false`, label `rdLabel false …`; `rreqn`/`wreqn` records (`size := n`, `va := none`, `value := some v`). In `∀ j v, l[j]? = some v → … base + (j : Int)` statements give `j : Nat` explicitly (else inferred Int).
+- AxEpiSound2: `Hwp1 : ∀ [InvGS_gen .hasNoLC epiGF] [AxannotGS epiGF] nm, ⊢ @tierAWpd … epiPol …`; `Hrun : ∀ (_ : AxannotGS epiGF) nm` (no T); final step `tierAAdequacyAnnGmo` over `[0, 1]`; `epiHobAlloc2` wraps `epiHobAlloc`.
