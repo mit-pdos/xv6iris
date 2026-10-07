@@ -51,7 +51,7 @@ file is once the reload's bytes are in hand.  This section adds that spec.
 5. `afCldspRowRun'` is proved as the instance of `afCldspRowRun'Mem` (Rocq proves both inline,
    with the same script).
 
-Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `afCldspRowRun'Mem`/`afCldspRowRun'`/`afCldspContRd`/`afCldspContRdAll` take `WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, mm, σ.wmDev⟩` per tick (at their memory; see `AxFetch2`'s Q7 note), the first two also return `noSfAnn` at the data node, which `AxFetch3c.nodeCont` takes.
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `afCldspRowRun'Mem`/`afCldspRowRun'`/`afCldspContRd`/`afCldspContRdAll` took `WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, mm, σ.wmDev⟩` per tick; Q10: discharged (the inlined assembly of `afCldspRowRun'Mem` is mirrored by `WeakEffSkel.noSfAnnHartActiveProgressRVCGen`/`noSfAnnRiscvStepHartActive`), the pre-Q7 premises restored; the first two still return `noSfAnn` at the data node, which `AxFetch3c.nodeCont` takes.
 
 **Rocq → Lean name map.**  `af_riscv_step_all_ticks_frame` `afRiscvStepAllTicksFrame`,
 `af_cldsp_row_run'` `afCldspRowRun'`, `af_cldsp_cont_rd` `afCldspContRd`,
@@ -171,8 +171,6 @@ theorem afCldspRowRun'Mem (σ : Wmstate) (mm : BMap) (pc : BitVec 64) (h : BitVe
     (∀ j : Nat, j < 8 → mm (ea + BitVec.ofNat 64 j) = some (nthByte (n := 8) v j)) →
     afCldspRowShape row k (paZ ea) →
     ∀ tick : Bool,
-    -- Q7: the instruction's run announces no sfence.vma word (header, Q7)
-    WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, mm, σ.wmDev⟩ →
     ∃ (s3 : ExecSt) (ib3 : Ibch) (va : Nat)
       (req2 : Mem_read_request 8 va Arch.pa Arch.translation Arch.arch_ak)
       (KK2 : Result (BitVec (8 * 8) × Option Bool) Arch.abort → SailM Unit) (t' : ExecSt),
@@ -192,7 +190,7 @@ theorem afCldspRowRun'Mem (σ : Wmstate) (mm : BMap) (pc : BitVec 64) (h : BitVe
       (∀ j : BitVec 5, j ≠ rd → t'.gpr j = uxaXget σ.wmRegs j) ∧
       WeakEvLang.noSfAnn (.impure (.ok (.memRead 8 va req2)) KK2) s3 := by
   intro lpc lpriv lmprv lpmm lpmp lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext
-    hsub hisRVC hagree hDmi hgood hdec hgood0 hexp hrd hea hal8 hram8 hbytes8 hshape tick hsf
+    hsub hisRVC hagree hDmi hgood hdec hgood0 hexp hrd hea hal8 hram8 hbytes8 hshape tick
   obtain ⟨lbd, hrowd, hidd⟩ := hshape
   -- the inlined `execEffStepOfLeafRvc2` construction, at `s := ⟨σ.wmRegs, mm, σ.wmDev⟩`
   obtain ⟨b, hsi⟩ := execEffShouldIncMinstretSome (σ.wmRegs .cur_privilege)
@@ -252,6 +250,42 @@ theorem afCldspRowRun'Mem (σ : Wmstate) (mm : BMap) (pc : BitVec 64) (h : BitVe
     [.WEread wakPlain ea 8] hsi lhart_a lpriv_a hdisp hfetch hdec_a lelp_a lpc_a hzca hexp_a hex
     (Fhart.trans lhart) Fmi
   obtain ⟨t', ht', -, -, hframet⟩ := afRiscvStepAllTicksFrame _ _ _ hstep tick
+  -- Q10: the same assembly, sfence-free (`WeakEffSkel` §7 mirrors over the twins)
+  have hag : ∀ r, D r = true → dst.regs r = (hartActiveSA ⟨σ.wmRegs, mm, σ.wmDev⟩ b).regs r := by
+    intro r hD
+    have hne : r ≠ .minstret_increment := by
+      rintro rfl
+      rw [hDmi] at hD
+      exact absurd hD (by decide)
+    rw [WeakFetchEff.saLookup r _ b hne]
+    exact (hagree r hD).symm
+  have hrun := execEffHartActiveProgressRVCGen .Machine (hartActiveSA ⟨σ.wmRegs, mm, σ.wmDev⟩ b)
+    (hartActiveSA ⟨σ.wmRegs, mm, σ.wmDev⟩ b) _ h i0 (.LOAD (imm, sp, .Regidx rd, false, 8)) pc
+    (.Retire_Success ()) _ [.WEread wakPlain ea 8] lpriv_a hdisp hfetch hdec_a lelp_a lpc_a hzca hexp_a
+    hex
+  have srun := WeakEffSkel.noSfAnnHartActiveProgressRVCGen .Machine
+    (hartActiveSA ⟨σ.wmRegs, mm, σ.wmDev⟩ b) (hartActiveSA ⟨σ.wmRegs, mm, σ.wmDev⟩ b) _ h i0
+    (.LOAD (imm, sp, .Regidx rd, false, 8)) pc (.Retire_Success ()) _ [.WEread wakPlain ea 8] lpriv_a
+    hdisp hfetch hdec_a lelp_a lpc_a hzca hexp_a hex
+    (WeakFetchEff.noSfAnnDispatchInterruptMachine _
+      (by rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lmisaS)
+      (by rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lmIE))
+    (WeakFetch2.noSfAnnFetchFlatRvc2 _ pc h
+      (by rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact fun i => (lpmp i).2)
+      (by rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lpma)
+      (by rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lmisaC)
+      lpc_a lpriv_a
+      (by rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lhtif)
+      hal4 ⟨hal2, hram, w, ⟨hsub, hisRVC⟩, htext⟩)
+    (WeakFetchEff.noSfAnnOfGoodb0 D (ext_decode_compressed h) dst _ hag hgood)
+    (WeakFetch2.noSfAnnCurrentlyEnabledZca _)
+    (WeakFetchEff.noSfAnnOfGoodb0 D0 (execute i0) _ _ (fun _ _ => rfl) (hgood0 _))
+    (AxFetch3b.noSfAnnLd8OffAt ⟨σ.wmRegs, mm, σ.wmDev⟩ b (BitVec.addInt pc 2)
+      (zero_extend (m := 5) 0b10#2) rd imm ea v hrd lpriv lmprv lpmm lpmp lpma lhtif hea2 hal8 hram8
+      (fun j hj => hbytes8 j hj))
+  have hsf := WeakEffSkel.noSfAnnRiscvStepHartActive ⟨σ.wmRegs, mm, σ.wmDev⟩ _ _ b _ hsi lhart_a hrun
+    (Fhart.trans lhart) (WeakFetchEff.noSfAnnShouldIncMinstret _ _) srun WeakFetchEff.noSfAnnTickClock
+    tick
   -- the run: the admin peel + the admin fetch, then the peel to the data node
   obtain ⟨m2, s2, ib2, hmem2, hex2, hrtcb, hsf2⟩ :=
     AxFetch2.fetchPeel (riscvStep tick) ⟨σ.wmRegs, mm, σ.wmDev⟩ ib0
@@ -343,8 +377,6 @@ theorem afCldspRowRun' (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : Bit
     (∀ j : Nat, j < 8 → wmemRestrict σ W (ea + BitVec.ofNat 64 j) = some (nthByte (n := 8) v j)) →
     afCldspRowShape row k (paZ ea) →
     ∀ tick : Bool,
-    -- Q7: the instruction's run announces no sfence.vma word (header, Q7)
-    WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ →
     ∃ (s3 : ExecSt) (ib3 : Ibch) (va : Nat)
       (req2 : Mem_read_request 8 va Arch.pa Arch.translation Arch.arch_ak)
       (KK2 : Result (BitVec (8 * 8) × Option Bool) Arch.abort → SailM Unit) (t' : ExecSt),
@@ -406,8 +438,6 @@ theorem afCldspContRd (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : BitV
     (∀ j : Nat, j < 8 → wmemRestrict σ W (ea + BitVec.ofNat 64 j) =
       some (nthByte (n := 8) (wordOfBytes 8 vs) j)) →
     ∀ tick : Bool,
-    -- Q7: the instruction's run announces no sfence.vma word (header, Q7)
-    WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ →
     ∃ (s3 : ExecSt) (ib3 : Ibch) (va : Nat)
       (req2 : Mem_read_request 8 va Arch.pa Arch.translation Arch.arch_ak)
       (KK2 : Result (BitVec (8 * 8) × Option Bool) Arch.abort → SailM Unit) (s4 : ExecSt)
@@ -428,12 +458,12 @@ theorem afCldspContRd (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : BitV
         r ≠ .mcycle → r ≠ .mtime → r ≠ .mip → s4.regs r = σ.wmRegs r) ∧
       (∀ j : BitVec 5, j ≠ rd → s4.gpr j = uxaXget σ.wmRegs j) := by
   intro lpc lpriv lmprv lpmm lpmp lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext
-    hsub hisRVC hagree hDmi hgood hdec hgood0 hexp hrd hea hal8 hram8 hshape vs _ hbytes8 tick hsf
+    hsub hisRVC hagree hDmi hgood hdec hgood0 hexp hrd hea hal8 hram8 hshape vs _ hbytes8 tick
   obtain ⟨s3, ib3, va, req2, KK2, t', hcl, hpa, hdev, hmem, hrtc, harw, hee, hrdr, hpcr, hfr,
       hfg, hns⟩ :=
     afCldspRowRun' σ W pc h w rd imm ea (wordOfBytes 8 vs) i0 D D0 dst cpu row k ib0 lpc lpriv
       lmprv lpmm lpmp lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext hsub hisRVC
-      hagree hDmi hgood hdec hgood0 hexp hrd hea hal8 hram8 hbytes8 hshape tick hsf
+      hagree hDmi hgood hdec hgood0 hexp hrd hea hal8 hram8 hbytes8 hshape tick
   have hrb : bmRead s3.mem ea 8 = some (wordOfBytes 8 vs) := by
     rw [hmem]; exact bmRead_of_bytes _ ea 8 _ hbytes8
   obtain ⟨ib4, hrtc2⟩ :=
@@ -479,8 +509,6 @@ theorem afCldspContRdAll (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : B
     afCldspRowShape row k (paZ ea) →
     ∀ vs : List (BitVec 8), vs.length = 8 →
     ∀ tick : Bool,
-    -- Q7: the instruction's run announces no sfence.vma word (header, Q7)
-    WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, bmWrite (wmemRestrict σ W) ea 8 (wordOfBytes 8 vs), σ.wmDev⟩ →
     ∃ (s3 : ExecSt) (ib3 : Ibch) (va : Nat)
       (req2 : Mem_read_request 8 va Arch.pa Arch.translation Arch.arch_ak)
       (KK2 : Result (BitVec (8 * 8) × Option Bool) Arch.abort → SailM Unit) (s4 : ExecSt)
@@ -501,7 +529,7 @@ theorem afCldspContRdAll (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : B
         r ≠ .mcycle → r ≠ .mtime → r ≠ .mip → s4.regs r = σ.wmRegs r) ∧
       (∀ j : BitVec 5, j ≠ rd → s4.gpr j = uxaXget σ.wmRegs j) := by
   intro lpc lpriv lmprv lpmm lpmp lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext
-    hsub hisRVC hagree hDmi hgood hdec hgood0 hexp hrd hea hal8 hram8 hdisj hshape vs _ tick hsf
+    hsub hisRVC hagree hDmi hgood hdec hgood0 hexp hrd hea hal8 hram8 hdisj hshape vs _ tick
   -- the hypothetical confined memory: the real one, patched at `ea` to hold `vs`
   have htext' : ∀ j : Nat, j < 4 →
       bmWrite (wmemRestrict σ W) ea 8 (wordOfBytes 8 vs) (pc + BitVec.ofNat 64 j) =
@@ -520,7 +548,7 @@ theorem afCldspContRdAll (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : B
     afCldspRowRun'Mem σ (bmWrite (wmemRestrict σ W) ea 8 (wordOfBytes 8 vs)) pc h w rd imm ea
       (wordOfBytes 8 vs) i0 D D0 dst cpu row k ib0 lpc lpriv lmprv lpmm lpmp lpma lhtif lhart
       lmisaS lmisaC lmIE lelp hal2 hal4 hram htext' hsub hisRVC hagree hDmi hgood hdec hgood0 hexp
-      hrd hea hal8 hram8 hbytes8' hshape tick hsf
+      hrd hea hal8 hram8 hbytes8' hshape tick
   have hrb : bmRead s3.mem ea 8 = some (wordOfBytes 8 vs) := by
     rw [hmem]; exact bmRead_of_bytes _ ea 8 _ hbytes8'
   obtain ⟨ib4, hrtc2⟩ :=

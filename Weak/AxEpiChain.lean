@@ -76,12 +76,9 @@ stated as a pure `execEff` fact about the register file reached there.
    its copy with that conjunct.
 5. Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only; the row runs take
    `noSfAnn (riscvStep tick) ⟨…⟩`): `afCsdspFrame` takes it per tick (at `σ`'s confined state).
-   The capstones take it as three EXPLICIT parameters so that the pending rework (which removes
-   the hypothesis from the row runs) is a mechanical deletion: `HsfSd` at `σ0`; `HsfLd`/`HsfJr`
-   for the reload's / c.jr's start states, which are existential (the previous run's output),
-   so they are quantified over every register file `rs` with the PC and the frame the proof
-   establishes there (for `HsfLd` at the memory the reload's row run is fed: `wmemRestrict σ0 W`,
-   resp. the `bmWrite`-patched one in the `Own` capstone).
+   After Q10 (`WeakEffSkel`/`WeakFetchEff` yield `noSfAnn`), `afCldspContRd`/`afCjrRowRun` no
+   longer take it, so the capstones keep only `HsfSd` (at `σ0`, for `afCsdspFrame`'s write-node
+   peel, which the inlined construction still needs).
 6. CONTEXT (as `AxEpiShape` deviation 3): the section's `invGS_gen`/`axirisG` instances are used
    by nothing and dropped; `γ`, `GD`, `Hcons` are explicit arguments; `axlogG Σ hent` ↦
    `[AxlogG GF Hent]`.  `Hpaz : paZ ea = a` is kept (and `subst`ed in the proofs).
@@ -572,16 +569,7 @@ theorem epilogueConsecutiveRet (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatConsi
     (HlinkBefore : ∀ (j : Nat) (H : List Hent) wlast vlast, HsBefore[j]? = some H →
       H.getLast? = some (wlast, vlast) → WeakRvwmoGraph.gpo GD.gdG wlast (i, k))
     -- ---------- Q7 (Lean-only, header): the three runs announce no sfence.vma word ----------
-    (HsfSd : WeakEvLang.noSfAnn (riscvStep true) ⟨σ0.wmRegs, wmemRestrict σ0 W, σ0.wmDev⟩)
-    (HsfLd : ∀ rs : RegFile, rs .PC = BitVec.addInt pc0 2 →
-      (∀ r, r ≠ .PC → r ≠ .nextPC → r ≠ .minstret_increment → r ≠ .minstret → r ≠ .mcycle →
-        r ≠ .mtime → r ≠ .mip → rs r = σ0.wmRegs r) →
-      WeakEvLang.noSfAnn (riscvStep true) ⟨rs, wmemRestrict σ0 W, σ0.wmDev⟩)
-    (HsfJr : ∀ rs : RegFile, rs .PC = BitVec.addInt pc0 4 →
-      (∀ r, r ∉ uxaGprs → r ≠ .PC → r ≠ .nextPC → r ≠ .minstret_increment → r ≠ .minstret →
-        r ≠ .mcycle → r ≠ .mtime → r ≠ .mip → rs r = σ0.wmRegs r) →
-      (∀ j : BitVec 5, j ≠ ra → uxaXget rs j = uxaXget σ0.wmRegs j) →
-      WeakEvLang.noSfAnn (riscvStep true) ⟨rs, wmemRestrict σ0 W, σ0.wmDev⟩) :
+    (HsfSd : WeakEvLang.noSfAnn (riscvStep true) ⟨σ0.wmRegs, wmemRestrict σ0 W, σ0.wmDev⟩) :
     ⊢ (∀ (j : Nat) (w : Geid) (v : BitVec 8), ⌜gwritesByte GD.gdG w (a + (j : Int)) v⌝ -∗
         ⌜gmoLt GD.gdG w (i, k + 1)⌝ -∗
         ∃ H' : List Hent, ⌜w ∈ H'.map Prod.fst⌝ ∗ histSnap (GF := GF) γ (a + (j : Int)) H') -∗
@@ -660,7 +648,7 @@ theorem epilogueConsecutiveRet (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatConsi
       D0Ld dstLd cpu row (k + 1) ibNone
       Hpc1 Lpriv1 Lmprv1 Lpmm1 Lpmp1 Lpma1 Lhtif1 Lhart1 LmisaS1 LmisaC1 LmIE1 Lelp1
       Hal2Ld Hal4Ld HramLd HtextLd HsubLd HisRVCLd HagreeLd1 HDmiLd HgoodLd HdecLd Hgood0Ld HexpLd
-      Hra HeaLd1 Hal8 Hram8 HshapeLd (epiWriteVal row k) Hlen Hram8Ld true (HsfLd s1.regs Hpc1 HFsd)
+      Hra HeaLd1 Hal8 Hram8 HshapeLd (epiWriteVal row k) Hlen Hram8Ld true
   -- (3) c.jr's config tower, transported across BOTH boundaries
   have hJ : ∀ r : Register, r ∉ uxaGprs → (r ≠ .PC ∧ r ≠ .nextPC ∧ r ≠ .minstret_increment ∧
       r ≠ .minstret ∧ r ≠ .mcycle ∧ r ≠ .mtime ∧ r ≠ .mip) → s4.regs r = σ0.wmRegs r :=
@@ -710,8 +698,7 @@ theorem epilogueConsecutiveRet (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatConsi
       dstJr cpu row (k + 2) ibNone
       HPCJr LprivM LsecM LmisaCM LpmpM LpmaM LhtifM LhartM LmisaSM LmIEM LelpM
       Hal2Jr Hal4Jr HramJr HtextJr HsubJr HisRVCJr HagreeJr1 HDmiJr HgoodJr HdecJr Hgood0Jr HexpJr
-      Hra true (HsfJr s4.regs HPCJr (fun r hg h1 h2 h3 h4 h5 h6 h7 =>
-        hJ r hg ⟨h1, h2, h3, h4, h5, h6, h7⟩) hGj)
+      Hra true
   -- (2) `graphValue` and the PC target, from AxEpiShape's spill/reload capstone
   have Hmid : epiMidRegOnly row k (k + 1) := by
     intro p lb h1 h2 _
@@ -837,16 +824,7 @@ theorem epilogueConsecutiveRetOwn (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatCo
     (HlinkBefore : ∀ (j : Nat) (H : List Hent) wlast vlast, HsBefore[j]? = some H →
       H.getLast? = some (wlast, vlast) → WeakRvwmoGraph.gpo GD.gdG wlast (i, k))
     -- ---------- Q7 (Lean-only, header): the three runs announce no sfence.vma word ----------
-    (HsfSd : WeakEvLang.noSfAnn (riscvStep true) ⟨σ0.wmRegs, wmemRestrict σ0 W, σ0.wmDev⟩)
-    (HsfLd : ∀ rs : RegFile, rs .PC = BitVec.addInt pc0 2 →
-      (∀ r, r ≠ .PC → r ≠ .nextPC → r ≠ .minstret_increment → r ≠ .minstret → r ≠ .mcycle →
-        r ≠ .mtime → r ≠ .mip → rs r = σ0.wmRegs r) →
-      WeakEvLang.noSfAnn (riscvStep true) ⟨rs, bmWrite (wmemRestrict σ0 W) ea 8 (wordOfBytes 8 (epiWriteVal row k)), σ0.wmDev⟩)
-    (HsfJr : ∀ rs : RegFile, rs .PC = BitVec.addInt pc0 4 →
-      (∀ r, r ∉ uxaGprs → r ≠ .PC → r ≠ .nextPC → r ≠ .minstret_increment → r ≠ .minstret →
-        r ≠ .mcycle → r ≠ .mtime → r ≠ .mip → rs r = σ0.wmRegs r) →
-      (∀ j : BitVec 5, j ≠ ra → uxaXget rs j = uxaXget σ0.wmRegs j) →
-      WeakEvLang.noSfAnn (riscvStep true) ⟨rs, wmemRestrict σ0 W, σ0.wmDev⟩) :
+    (HsfSd : WeakEvLang.noSfAnn (riscvStep true) ⟨σ0.wmRegs, wmemRestrict σ0 W, σ0.wmDev⟩) :
     ⊢ (∀ (j : Nat) (w : Geid) (v : BitVec 8), ⌜gwritesByte GD.gdG w (a + (j : Int)) v⌝ -∗
         ⌜gmoLt GD.gdG w (i, k + 1)⌝ -∗
         ∃ H' : List Hent, ⌜w ∈ H'.map Prod.fst⌝ ∗ histSnap (GF := GF) γ (a + (j : Int)) H') -∗
@@ -925,7 +903,7 @@ theorem epilogueConsecutiveRetOwn (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatCo
       D0Ld dstLd cpu row (k + 1) ibNone
       Hpc1 Lpriv1 Lmprv1 Lpmm1 Lpmp1 Lpma1 Lhtif1 Lhart1 LmisaS1 LmisaC1 LmIE1 Lelp1
       Hal2Ld Hal4Ld HramLd HtextLd HsubLd HisRVCLd HagreeLd1 HDmiLd HgoodLd HdecLd Hgood0Ld HexpLd
-      Hra HeaLd1 Hal8 Hram8 HdisjLd HshapeLd (epiWriteVal row k) Hlen true (HsfLd s1.regs Hpc1 HFsd)
+      Hra HeaLd1 Hal8 Hram8 HdisjLd HshapeLd (epiWriteVal row k) Hlen true
   -- (3) c.jr's config tower, transported across BOTH boundaries
   have hJ : ∀ r : Register, r ∉ uxaGprs → (r ≠ .PC ∧ r ≠ .nextPC ∧ r ≠ .minstret_increment ∧
       r ≠ .minstret ∧ r ≠ .mcycle ∧ r ≠ .mtime ∧ r ≠ .mip) → s4.regs r = σ0.wmRegs r :=
@@ -975,8 +953,7 @@ theorem epilogueConsecutiveRetOwn (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatCo
       dstJr cpu row (k + 2) ibNone
       HPCJr LprivM LsecM LmisaCM LpmpM LpmaM LhtifM LhartM LmisaSM LmIEM LelpM
       Hal2Jr Hal4Jr HramJr HtextJr HsubJr HisRVCJr HagreeJr1 HDmiJr HgoodJr HdecJr Hgood0Jr HexpJr
-      Hra true (HsfJr s4.regs HPCJr (fun r hg h1 h2 h3 h4 h5 h6 h7 =>
-        hJ r hg ⟨h1, h2, h3, h4, h5, h6, h7⟩) hGj)
+      Hra true
   -- (2) `graphValue` and the PC target, from AxEpiShape's spill/reload capstone
   have Hmid : epiMidRegOnly row k (k + 1) := by
     intro p lb h1 h2 _

@@ -108,7 +108,7 @@ the whole AxFetch port:
    an opax run — the composition every peel arm uses), `AxFetch1.pstepProgFetchAny` (the fetch
    node's `pstepProg` fact, the fetch twin of `afPstepProgReadAny`).
 
-Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `afAdminRunToMemread`/`afAdminRunToMemwrite` take `WeakEvLang.noSfAnn m s` (along `execEff`'s path no announce is an SFENCE.VMA word — such an announce emits the marker, a graph event, and the run would not be admin-only); `afAdminRunToMemread` also returns `noSfAnn` at the reached node (for the next peel).  `afLd8RunToRead` takes the premise for its `execute` run.
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `afAdminRunToMemread`/`afAdminRunToMemwrite` take `WeakEvLang.noSfAnn m s` (along `execEff`'s path no announce is an SFENCE.VMA word — such an announce emits the marker, a graph event, and the run would not be admin-only); `afAdminRunToMemread` also returns `noSfAnn` at the reached node (for the next peel).  Q10 (owner ruling): `afLd8RunToRead` no longer takes it — its `execute` run's `noSfAnn` is the Lean-only `AxFetch1.noSfAnnLd8At` (the `nosf_run` twin of `WeakLeafLd8.execEffLd8At`, over `WeakFetchEff` §10d).
 
 **Rocq → Lean name map.**  `af_ld8_data_ident` `afLd8DataIdent`, `af_sd8_data_ident`
 `afSd8DataIdent`, `af_ld8_row_shape` `afLd8RowShape`, `af_sd8_row_shape` `afSd8RowShape`,
@@ -579,6 +579,69 @@ theorem afAstepWriteOfMemwrite (row : List Lbl) (cpu : CPU) (n va : Nat)
 trace, which is `afAdminRunToMemread`'s hypothesis shape; its admin run composed with
 `afAreadStepOfMemread` gives the row's data-event `areadStep` on the actual Sail term. -/
 
+/-- (Lean-only, Q10) `WeakLeafLd8.execEffLd8At`'s `noSfAnn` twin: the LOAD's run announces no
+sfence word (the same script, `WeakFetchEff.noSfAnnExecuteLOAD8Gpr` at the end). -/
+theorem AxFetch1.noSfAnnLd8At (s0 : ExecSt) (b : Bool) (pc : BitVec 64) (rs1 rd : BitVec 5) (imm : BitVec 12)
+    (ea : PAddr) (v : BitVec 64) :
+    rd.toNat ≠ 0 →
+    s0.regs .cur_privilege = .Machine →
+    (_get_Mstatus_MPRV (s0.regs .mstatus) == 1#1) = false →
+    pmm_mode_backwards (_get_Seccfg_PMM (s0.regs .mseccfg)) = .PMM_Disabled →
+    pmpAllOff (s0.regs .pmpcfg_n) →
+    s0.regs .pma_regions = bootPMA →
+    s0.regs .htif_tohost_base = none →
+    s0.gpr rs1 + sign_extend (m := 64) imm = ea →
+    is_aligned_paddr (.Physaddr ea) 8 = true →
+    inRam ea 8 →
+    BytesAt s0 ea 8 v →
+    WeakEvLang.noSfAnn (execute (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8))) ((s0.setReg .minstret_increment b).setReg .nextPC (Sail.BitVec.addInt pc 4)) := by
+  intro hrd lpriv lmprv lpmm lpmp lpma lhtif hea hal hram hbytes
+  -- every config register, moved past the funnel's two pre-writes
+  have lpriv_s : ((s0.setReg .minstret_increment b).setReg .nextPC (Sail.BitVec.addInt pc 4)).regs
+      .cur_privilege = .Machine := by
+    leaf_peel .cur_privilege; exact lpriv
+  have lms_s : ((s0.setReg .minstret_increment b).setReg .nextPC (Sail.BitVec.addInt pc 4)).regs
+      .mstatus = s0.regs .mstatus := by
+    leaf_peel .mstatus
+  have lsec_s : ((s0.setReg .minstret_increment b).setReg .nextPC (Sail.BitVec.addInt pc 4)).regs
+      .mseccfg = s0.regs .mseccfg := by
+    leaf_peel .mseccfg
+  have lpmpc_s : ((s0.setReg .minstret_increment b).setReg .nextPC (Sail.BitVec.addInt pc 4)).regs
+      .pmpcfg_n = s0.regs .pmpcfg_n := by
+    leaf_peel .pmpcfg_n
+  have lpma_s : ((s0.setReg .minstret_increment b).setReg .nextPC (Sail.BitVec.addInt pc 4)).regs
+      .pma_regions = s0.regs .pma_regions := by
+    leaf_peel .pma_regions
+  have lhtif_s : ((s0.setReg .minstret_increment b).setReg .nextPC (Sail.BitVec.addInt pc 4)).regs
+      .htif_tohost_base = none := by
+    leaf_peel .htif_tohost_base; exact lhtif
+  -- the base register
+  have hbase : ((s0.setReg .minstret_increment b).setReg .nextPC (Sail.BitVec.addInt pc 4)).gpr rs1 =
+      s0.gpr rs1 :=
+    uxaXget_congr _ _ (fun r hr => by
+      rw [setLookupNe r .nextPC _ _ (WeakLeafLd8.gprsNe r hr).2,
+        setLookupNe r .minstret_increment _ _ (WeakLeafLd8.gprsNe r hr).1]) rs1
+  have hea' : ((s0.setReg .minstret_increment b).setReg .nextPC (Sail.BitVec.addInt pc 4)).gpr rs1 +
+      sign_extend (m := 64) imm = ea := by rw [hbase]; exact hea
+  exact WeakFetchEff.noSfAnnExecuteLOAD8Gpr rs1 rd imm v ramRegion
+    ((s0.setReg .minstret_increment b).setReg .nextPC (Sail.BitVec.addInt pc 4)) hrd lpriv_s
+    (by rw [lms_s]; exact lmprv) (by rw [lsec_s]; exact lpmm) (by rw [hea']; exact hal)
+    (by
+      rw [hea']
+      exact execEffPmpCheckMachineNone _ 8 _ _ (fun i => by rw [lpmpc_s]; exact (lpmp i).1))
+    (by rw [lpma_s, lpma, hea']; exact matching_pma_ram ea 8 hram (by decide) (by decide))
+    (by rw [hea']; exact hal)
+    (by first | rfl | decide +kernel)
+    (by rw [hea', within_clint_ram ea 8 hram]; rfl)
+    (by
+      first
+      | rfl
+      | (simp only [within_sig, plat_have_sig, Functions.not]; rfl))
+    (by rw [hea']; exact execEffWithinHtifFalse _ 8 _ lhtif_s)
+    (by rw [hea']; exact devAddrRam ea 8 hram)
+    (by rw [hea']; exact hbytes)
+
+
 theorem afLd8RunToRead (s0 : ExecSt) (b : Bool) (pc : BitVec 64) (rs1 rd : BitVec 5)
     (imm : BitVec 12) (ea : PAddr) (v : BitVec 64) (cpu : CPU) (row : List Lbl) (ib : Ibch)
     (k : Nat) (lb : Lbl) :
@@ -595,10 +658,6 @@ theorem afLd8RunToRead (s0 : ExecSt) (b : Bool) (pc : BitVec 64) (rs1 rd : BitVe
     BytesAt s0 ea 8 v →
     row[k]? = some lb →
     aident lb = .IRead false (paZ ea) 8 →
-    -- Q7: the run announces no sfence.vma word (header, Q7)
-    WeakEvLang.noSfAnn
-      (execute (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8)) >>= fun _ => (pure () : SailM Unit))
-      ((s0.setReg .minstret_increment b).setReg .nextPC (Sail.BitVec.addInt pc 4)) →
     ∃ (s2 : ExecSt) (ib2 : Ibch) (va : Nat)
       (req : Mem_read_request 8 va Arch.pa Arch.translation Arch.arch_ak)
       (KK : Result (BitVec (8 * 8) × Option Bool) Arch.abort → SailM Unit),
@@ -611,9 +670,13 @@ theorem afLd8RunToRead (s0 : ExecSt) (b : Bool) (pc : BitVec 64) (rs1 rd : BitVe
       areadStep row ⟨.PHart cpu (.impure (.ok (.memRead 8 va req)) KK) s2.regs none ib2, k⟩
         (.IRead (classify req.access_kind).akSync (paZ req.pa) 8)
         (fun vs => ⟨.PHart cpu (KK (.Ok (wordOfBytes 8 vs, none))) s2.regs none ib2, k + 1⟩) := by
-  intro hrd lpriv lmprv lpmm lpmp lpma lhtif hea hal hram hbytes hrow hid hsf
+  intro hrd lpriv lmprv lpmm lpmp lpma lhtif hea hal hram hbytes hrow hid
   have hm0 := execEffLd8At s0 b pc rs1 rd imm ea v hrd lpriv lmprv lpmm lpmp lpma lhtif hea hal
     hram hbytes
+  -- Q10: the run is sfence-free (the LOAD's twin, then the `pure ()`)
+  have hsf := WeakEffSkel.noSfAnnBind _ (fun _ : ExecutionResult => (pure () : SailM Unit)) _ _ _ _ hm0
+    (AxFetch1.noSfAnnLd8At s0 b pc rs1 rd imm ea v hrd lpriv lmprv lpmm lpmp lpma lhtif hea hal
+      hram hbytes) trivial
   have hex := execEffBind _ (fun _ : ExecutionResult => (pure () : SailM Unit)) _ _ _ _ () _ []
     hm0 rfl
   rw [List.append_nil] at hex

@@ -45,7 +45,7 @@ this file (§2.7) and `AxFetch3c` (§2.8).
 5. `∀ j < 8, addr_is_ram (pa_add ea j)` ↦ `inRam ea 8`; `pa_add ea j ∈ W` ↦
    `ea + BitVec.ofNat 64 j ∈ W`.
 
-Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `afCsdspRowRun`/`afCldspRowRun` take `WeakEvLang.noSfAnn (riscvStep tick) ⟨…⟩` per tick (see `AxFetch2`'s Q7 note).
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `afCsdspRowRun`/`afCldspRowRun` took `WeakEvLang.noSfAnn (riscvStep tick) ⟨…⟩` per tick; Q10: discharged (`AxFetch3.execEffStepOfLeafRvc2Sf` with the Lean-only twins `AxFetch3b.noSfAnnLd8OffAt`/`noSfAnnSd8OffAt`), the pre-Q7 statements restored.
 
 **Rocq → Lean name map.**  `exec_eff_ld8_off_at` `execEffLd8OffAt`, `af_sp_uint` `afSpUint`
 (Rocq `Local`), `af_csdsp_row_shape` `afCsdspRowShape`, `af_cldsp_row_shape` `afCldspRowShape`,
@@ -99,6 +99,57 @@ theorem execEffLd8OffAt (s0 : ExecSt) (b : Bool) (npc : BitVec 64) (rs1 rd : Bit
       BitVec.add_zero]
   rw [hz] at H
   exact H
+
+/-- (Lean-only, Q10) `execEffLd8OffAt`'s `noSfAnn` twin. -/
+theorem AxFetch3b.noSfAnnLd8OffAt (s0 : ExecSt) (b : Bool) (npc : BitVec 64) (rs1 rd : BitVec 5)
+    (imm : BitVec 12) (ea : PAddr) (v : BitVec 64) :
+    rd.toNat ≠ 0 →
+    s0.regs .cur_privilege = .Machine →
+    (_get_Mstatus_MPRV (s0.regs .mstatus) == 1#1) = false →
+    pmm_mode_backwards (_get_Seccfg_PMM (s0.regs .mseccfg)) = .PMM_Disabled →
+    pmpAllOff (s0.regs .pmpcfg_n) →
+    s0.regs .pma_regions = bootPMA →
+    s0.regs .htif_tohost_base = none →
+    s0.gpr rs1 + sign_extend (m := 64) imm = ea →
+    is_aligned_paddr (.Physaddr ea) 8 = true →
+    inRam ea 8 →
+    BytesAt s0 ea 8 v →
+    WeakEvLang.noSfAnn (execute (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8))) ((s0.setReg .minstret_increment b).setReg .nextPC npc) := by
+  intro hrd lpriv lmprv lpmm lpmp lpma lhtif hea hal hram hbytes
+  have H := AxFetch1.noSfAnnLd8At s0 b (BitVec.addInt npc (-4)) rs1 rd imm ea v hrd lpriv lmprv lpmm lpmp
+    lpma lhtif hea hal hram hbytes
+  have hz : BitVec.addInt (BitVec.addInt npc (-4)) 4 = npc := by
+    unfold BitVec.addInt
+    rw [BitVec.add_assoc, show BitVec.ofInt 64 (-4) + BitVec.ofInt 64 4 = 0#64 by decide,
+      BitVec.add_zero]
+  rw [hz] at H
+  exact H
+
+
+/-- (Lean-only, Q10) `execEffSd8OffAt`'s `noSfAnn` twin. -/
+theorem AxFetch3b.noSfAnnSd8OffAt (s0 : ExecSt) (b : Bool) (npc : BitVec 64) (rs1 rs2 : BitVec 5)
+    (imm : BitVec 12) (ea vs : BitVec 64) :
+    s0.regs .cur_privilege = .Machine →
+    (_get_Mstatus_MPRV (s0.regs .mstatus) == 1#1) = false →
+    pmm_mode_backwards (_get_Seccfg_PMM (s0.regs .mseccfg)) = .PMM_Disabled →
+    pmpAllOff (s0.regs .pmpcfg_n) →
+    s0.regs .pma_regions = bootPMA →
+    s0.regs .htif_tohost_base = none →
+    s0.gpr rs1 + sign_extend (m := 64) imm = ea →
+    s0.gpr rs2 = vs →
+    is_aligned_paddr (.Physaddr ea) 8 = true →
+    inRam ea 8 →
+    WeakEvLang.noSfAnn (execute (.STORE (imm, .Regidx rs2, .Regidx rs1, 8))) ((s0.setReg .minstret_increment b).setReg .nextPC npc) := by
+  intro lpriv lmprv lpmm lpmp lpma lhtif hea hvs hal hram
+  have H := AxFetch2.noSfAnnSd8At s0 b (BitVec.addInt npc (-4)) rs1 rs2 imm ea vs lpriv lmprv lpmm lpmp lpma
+    lhtif hea hvs hal hram
+  have hz : BitVec.addInt (BitVec.addInt npc (-4)) 4 = npc := by
+    unfold BitVec.addInt
+    rw [BitVec.add_assoc, show BitVec.ofInt 64 (-4) + BitVec.ofInt 64 4 = 0#64 by decide,
+      BitVec.add_zero]
+  rw [hz] at H
+  exact H
+
 
 /-- Rocq `af_sp_uint` (deviation 4): `sp`'s payload is index 2. -/
 theorem afSpUint : (zero_extend (m := 5) 0b10#2).toNat = 2 := by decide
@@ -158,8 +209,6 @@ theorem afCsdspRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : BitV
     afCsdspRowShape row k (paZ ea) →
     (row[k]?).bind lblData = some (WeakInterpProj.wbytes 8 vs) →
     ∀ tick : Bool,
-    -- Q7: the instruction's run announces no sfence.vma word (header, Q7)
-    WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ →
     ∃ (s3 : ExecSt) (ib3 : Ibch) (va : Nat)
       (req2 : Mem_write_request 8 va Arch.pa Arch.translation Arch.arch_ak)
       (KK2 : Result (Option Bool) Arch.abort → SailM Unit),
@@ -173,15 +222,15 @@ theorem afCsdspRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : BitV
           (depsAsrc (depsOfIb ib3.ibBits)) (depsVsrc (depsOfIb ib3.ibBits)))
         ⟨.PHart cpu (KK2 (.Ok (some true))) s3.regs none ib3, k + 1⟩ := by
   intro lpc lpriv lmprv lpmm lpmp lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext
-    hsub hisRVC hagree hDmi hgood hdec hgood0 hexp hea hvs hal8 hram8 hwdom hshape hdat tick hsf
+    hsub hisRVC hagree hDmi hgood hdec hgood0 hexp hea hvs hal8 hram8 hwdom hshape hdat tick
   obtain ⟨lbd, hrowd, hidd⟩ := hshape
   have hea2 : (⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ : ExecSt).gpr (zero_extend (m := 5) 0b10#2) +
       sign_extend (m := 64) imm = ea := by
     unfold ExecSt.gpr; rw [AxFetch3b.spGpr]; exact hea
   have hvs2 : (⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ : ExecSt).gpr rs2 = vs := by
     unfold ExecSt.gpr; exact hvs
-  -- (a) the combined fetch + data `execEff` fact for the whole instruction
-  obtain ⟨t', hex, -⟩ := execEffStepOfLeafRvc2 σ W pc h w i0
+  -- (a) the combined fetch + data `execEff` fact for the whole instruction, sfence-free (Q10)
+  obtain ⟨⟨t', hex, -⟩, hsf⟩ := AxFetch3.execEffStepOfLeafRvc2Sf σ W pc h w i0
     (.STORE (imm, .Regidx rs2, sp, 8)) [.WEwrite wakPlain ea 8 vs] D D0 dst
     lpc lpriv (fun i => (lpmp i).2) lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext
     hsub hisRVC hagree hDmi hgood hdec hgood0 hexp
@@ -195,6 +244,8 @@ theorem afCsdspRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : BitV
       · exact hfacts.2.1
       · dsimp only
         exact writeBytesDomSub _ ea 8 vs W (wmemRestrictDom σ W) hwdom)
+    (fun b => AxFetch3b.noSfAnnSd8OffAt ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ b (BitVec.addInt pc 2)
+      (zero_extend (m := 5) 0b10#2) rs2 imm ea vs lpriv lmprv lpmm lpmp lpma lhtif hea2 hvs2 hal8 hram8)
     tick
   -- (b) the admin run to the (width-2) fetch node and the admin fetch step (position kept)
   obtain ⟨m2, s2, ib2, -, hex2, hrtcb, hsf2⟩ :=
@@ -251,8 +302,6 @@ theorem afCldspRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : BitV
     -- the row's shape
     afCldspRowShape row k (paZ ea) →
     ∀ tick : Bool,
-    -- Q7: the instruction's run announces no sfence.vma word (header, Q7)
-    WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ →
     ∃ (s3 : ExecSt) (ib3 : Ibch) (va : Nat)
       (req2 : Mem_read_request 8 va Arch.pa Arch.translation Arch.arch_ak)
       (KK2 : Result (BitVec (8 * 8) × Option Bool) Arch.abort → SailM Unit),
@@ -264,13 +313,13 @@ theorem afCldspRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : BitV
         (.IRead (classify req2.access_kind).akSync (paZ req2.pa) 8)
         (fun vs => ⟨.PHart cpu (KK2 (.Ok (wordOfBytes 8 vs, none))) s3.regs none ib3, k + 1⟩) := by
   intro lpc lpriv lmprv lpmm lpmp lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext
-    hsub hisRVC hagree hDmi hgood hdec hgood0 hexp hrd hea hal8 hram8 hbytes8 hshape tick hsf
+    hsub hisRVC hagree hDmi hgood hdec hgood0 hexp hrd hea hal8 hram8 hbytes8 hshape tick
   obtain ⟨lbd, hrowd, hidd⟩ := hshape
   have hea2 : (⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ : ExecSt).gpr (zero_extend (m := 5) 0b10#2) +
       sign_extend (m := 64) imm = ea := by
     unfold ExecSt.gpr; rw [AxFetch3b.spGpr]; exact hea
-  -- (a) the combined fetch + data `execEff` fact for the whole instruction
-  obtain ⟨t', hex, -⟩ := execEffStepOfLeafRvc2 σ W pc h w i0
+  -- (a) the combined fetch + data `execEff` fact for the whole instruction, sfence-free (Q10)
+  obtain ⟨⟨t', hex, -⟩, hsf⟩ := AxFetch3.execEffStepOfLeafRvc2Sf σ W pc h w i0
     (.LOAD (imm, sp, .Regidx rd, false, 8)) [.WEread wakPlain ea 8] D D0 dst
     lpc lpriv (fun i => (lpmp i).2) lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext
     hsub hisRVC hagree hDmi hgood hdec hgood0 hexp
@@ -287,6 +336,9 @@ theorem afCldspRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : BitV
       · exact hfacts.2.1
       · rw [hfacts.2.2.1]
         exact WeakLeafLd8.confDom σ W σ.wmRegs σ.wmDev)
+    (fun b => AxFetch3b.noSfAnnLd8OffAt ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ b (BitVec.addInt pc 2)
+      (zero_extend (m := 5) 0b10#2) rd imm ea v hrd lpriv lmprv lpmm lpmp lpma lhtif hea2 hal8
+      hram8 (fun j hj => hbytes8 j hj))
     tick
   -- (b) the admin run to the (width-2) fetch node and the admin fetch step (position kept)
   obtain ⟨m2, s2, ib2, -, hex2, hrtcb, hsf2⟩ :=

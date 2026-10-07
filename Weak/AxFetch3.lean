@@ -54,7 +54,7 @@ header carries the whole port's summary and the O2 Stage C account).
 5. `execEffStepOfLeafRvc2` is stated (and proved) as the instance of the Lean-only
    `WeakFetch2.execEffStepOfLeafRvc2St`, which carries Rocq's proof (`WeakFetch2` deviation 5).
 
-Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `afAdminRunToEnd` takes `WeakEvLang.noSfAnn m s` (as AxFetch1's peels); `afJalrRowRun`/`afCjrRowRun` take `noSfAnn (riscvStep tick) ⟨…⟩` per tick (see `AxFetch2`'s Q7 note).
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `afAdminRunToEnd` takes `WeakEvLang.noSfAnn m s` (as AxFetch1's peels); Q10: `afJalrRowRun` takes `sfAnnB 32 w = false` instead of the per-tick `noSfAnn` (AxFetch2's Q10 note), `afCjrRowRun` nothing (a width-16 announce is never an sfence announce).  Lean-only: `AxFetch3.execEffStepOfLeafRvc2Sf` (`execEffStepOfLeafRvc2` + `WeakFetch2.noSfAnnStepOfLeafRvc2St`) and the `ret` twins `AxFetch3.noSfAnnCEZicfilp`, `…SetNextPc`, `…JumpToZca`, `…ExecuteJALRRetZca`, `…ExecuteCretZca`.
 
 **Rocq → Lean name map.**  `af_admin_run_to_end` `afAdminRunToEnd`, `af_jalr_row_run`
 `afJalrRowRun`, `exec_eff_step_of_leaf_rvc2` `execEffStepOfLeafRvc2`, `af_cjr_row_run`
@@ -186,6 +186,55 @@ theorem afAdminRunToEnd (m : SailM Unit) :
            exact ⟨ib2, AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev s.dev .LSilent none none
              none kpos _ hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial⟩)
 
+/-! ### Q10 (Lean-only): the `ret` / `c.jr ra` `execute` is sfence-free (`WeakLeafJump` twins) -/
+
+theorem AxFetch3.noSfAnnCEZicfilp (s : ExecSt) (hcp : s.regs .cur_privilege = .Machine) :
+    WeakEvLang.noSfAnn (currentlyEnabled .Ext_Zicfilp) s := by
+  rw [currentlyEnabled]
+  simp only [execEffHartSupportsZicfilp, ↓reduceIte]
+  unfold get_xLPE
+  nosf_run [execEffRecCEZicsrAny, WeakFetchEff.noSfAnnCurrentlyEnabledZicsr, hcp]
+
+theorem AxFetch3.noSfAnnSetNextPc (t : BitVec 64) (s : ExecSt) :
+    WeakEvLang.noSfAnn (set_next_pc t) s := trivial
+
+theorem AxFetch3.noSfAnnJumpToZca (target : BitVec 64) (s : ExecSt)
+    (halign : (BitVec.access target 0 == 0#1) = true)
+    (hzca : execEff (currentlyEnabled .Ext_Zca) s = some (true, s, [])) :
+    WeakEvLang.noSfAnn (jump_to target) s := by
+  unfold jump_to
+  rw [WeakEffSkel.noSfAnnCatchEarlyReturn]
+  cases hb : bit_to_bool (BitVec.access target 1) <;>
+  nosf_run [ext_control_check_pc, halign, hzca, WeakFetch2.noSfAnnCurrentlyEnabledZca, Functions.not,
+    Bool.not_true, hb, AxFetch3.noSfAnnSetNextPc, WkEntryEff.execEffSetNextPc]
+
+theorem AxFetch3.noSfAnnExecuteJALRRetZca (imm : BitVec 12) (rs1 rdz : BitVec 5) (s : ExecSt)
+    (hrdz : rdz.toNat = 0)
+    (hzic : execEff (currentlyEnabled .Ext_Zicfilp) s = some (false, s, []))
+    (hzca : execEff (currentlyEnabled .Ext_Zca) s = some (true, s, []))
+    (halign : (BitVec.access (BitVec.update (s.gpr rs1 + sign_extend (m := 64) imm) 0 0#1) 0 == 0#1)
+      = true)
+    (szic : WeakEvLang.noSfAnn (currentlyEnabled .Ext_Zicfilp) s) :
+    WeakEvLang.noSfAnn (execute_JALR imm (.Regidx rs1) (.Regidx rdz)) s := by
+  have h0 : rdz = 0#5 := BitVec.eq_of_toNat_eq hrdz
+  subst h0
+  unfold execute_JALR update_elp_state get_next_pc
+  nosf_run [hzic, szic, execEffRXBitsGpr, WeakFetchEff.noSfAnnRXBitsGpr,
+    execEffJumpToZca _ s halign hzca, AxFetch3.noSfAnnJumpToZca _ s halign hzca, RETIRE_SUCCESS,
+    WeakLeafJump.execEffWXBitsX0, WeakFetchEff.noSfAnnWXBitsGpr]
+
+/-- `execEffExecuteCretZca`'s `noSfAnn` twin. -/
+theorem AxFetch3.noSfAnnExecuteCretZca (ra : BitVec 5) (s : ExecSt)
+    (hpriv : s.regs .cur_privilege = .Machine) (hsec : s.regs .mseccfg = 0#64)
+    (hC : (_get_Misa_C (s.regs .misa) == 1#1) = true) :
+    WeakEvLang.noSfAnn (execute (.JALR (zeros (n := 12), .Regidx ra, zreg))) s := by
+  have hzic := execEffCEZicfilpFalse s hpriv (by rw [hsec]; decide)
+  have hzca := execEffCurrentlyEnabledZca s hC
+  have htgt := WeakLeafJump.retPcJalr (s.gpr ra)
+  show WeakEvLang.noSfAnn (execute_JALR (zeros (n := 12)) (.Regidx ra) (.Regidx 0#5)) s
+  exact AxFetch3.noSfAnnExecuteJALRRetZca _ ra 0#5 s rfl hzic hzca
+    (by rw [htgt]; exact WeakLeafJump.retPcAligned _) (AxFetch3.noSfAnnCEZicfilp s hpriv)
+
 /-- Rocq `af_jalr_row_run` (deviations 1-4): the fetch glued in front of the register-only tail
 of `jalr x0,0(ra)`, against the REAL `riscvStep tick` term: a run from position `k` to the
 boundary `.pure ()`, still at `k` (Stage C: the fetch is admin; there is no data event). -/
@@ -214,19 +263,19 @@ theorem afJalrRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (w : BitVe
     D .minstret_increment = false →
     goodb0 D (ext_decode w) dst = true →
     exec (ext_decode w) dst = some (.JALR (zeros (n := 12), .Regidx ra, zreg), dst) →
+    -- Q10: the fetched word is not an sfence word (header, Q10)
+    sfAnnB 32 w = false →
     -- jalr's own geometry: `jalr x0,0(ra)`, `ra ≠ x0`
     ra.toNat ≠ 0 →
     ∀ tick : Bool,
-    -- Q7: the instruction's run announces no sfence.vma word (header, Q7)
-    WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ →
     ∃ (s3 : ExecSt) (ib3 : Ibch),
       rtc (fun t1 t2 => ∃ l, AxOpsem.astepProg row t1 l t2)
         ⟨.PHart cpu (riscvStep tick) σ.wmRegs none ib0, k⟩
         ⟨.PHart cpu (.pure ()) s3.regs none ib3, k⟩ := by
   intro lpc lpriv lsec lmisaC lpmp lpma lhtif lhart lmisaS lmIE lelp hal hram4 htext hnotRVC
-    hagree hDmi hgood hdec hranz tick hsf
-  -- (a) the whole instruction's `execEff` fact: the fetch, no data event
-  obtain ⟨t', hex, -⟩ := execEffStepOfLeafBase σ W pc w
+    hagree hDmi hgood hdec hsfw hranz tick
+  -- (a) the whole instruction's `execEff` fact (the fetch, no data event), sfence-free (Q10)
+  obtain ⟨⟨t', hex, -⟩, hsf⟩ := WeakFetchEff.execEffStepOfLeafBaseSf σ W pc w
     (.JALR (zeros (n := 12), .Regidx ra, zreg)) [] D dst
     lpc lpriv (fun i => (lpmp i).2) lpma lhtif lhart lmisaS lmIE lelp hal hram4 htext hnotRVC
     hagree hDmi hgood hdec (by first | rfl | decide)
@@ -249,6 +298,13 @@ theorem afJalrRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (w : BitVe
       refine ⟨_, he, ?_, F2, ?_⟩
       · exact F1.trans lhart
       · rw [F3]; exact wmemRestrictDom σ W)
+    hsfw
+    (by
+      intro b
+      refine AxFetch3.noSfAnnExecuteCretZca ra _ ?_ ?_ ?_
+      · leaf_peel .cur_privilege; exact lpriv
+      · leaf_peel .mseccfg; exact lsec
+      · leaf_peel .misa; exact lmisaC)
     tick
   -- (b) the admin run to the fetch node and the admin fetch step (position kept)
   obtain ⟨m2, s2, ib2, -, hex2, hrtcb, hsf2⟩ :=
@@ -307,6 +363,61 @@ theorem execEffStepOfLeafRvc2 (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (
   WeakFetch2.execEffStepOfLeafRvc2St ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ W pc h w i0 i es_x D D0
     dst
 
+/-- `execEffStepOfLeafRvc2` AND its `noSfAnn` twin (Lean-only, Q10; `WeakFetch2.noSfAnnStepOfLeafRvc2St`
+at the confined state): the compressed row runs' single call. -/
+theorem AxFetch3.execEffStepOfLeafRvc2Sf (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : BitVec 16)
+    (w : BitVec 32) (i0 i : instruction) (es_x : List Weff) (D D0 : Register → Bool)
+    (dst : ExecSt) :
+    -- the M-mode config tower
+    σ.wmRegs .PC = pc →
+    σ.wmRegs .cur_privilege = .Machine →
+    pmpAllowsAll (σ.wmRegs .pmpcfg_n) →
+    σ.wmRegs .pma_regions = bootPMA →
+    σ.wmRegs .htif_tohost_base = none →
+    σ.wmRegs .hart_state = .HART_ACTIVE () →
+    (_get_Misa_S (σ.wmRegs .misa) == 1#1) = true →
+    (_get_Misa_C (σ.wmRegs .misa) == 1#1) = true →
+    (_get_Mstatus_MIE (σ.wmRegs .mstatus) == 1#1) = false →
+    (σ.wmRegs .elp == landing_pad_bits_backwards .LP_EXPECTED) = false →
+    -- the text word, IN THE CONFINED MEMORY, at a 2-but-not-4-aligned pc
+    is_aligned_vaddr (.Virtaddr pc) 2 = true →
+    is_aligned_vaddr (.Virtaddr pc) 4 = false →
+    inRam pc 4 →
+    (∀ j : Nat, j < 4 → wmemRestrict σ W (pc + BitVec.ofNat 64 j) = some (nthByte (n := 4) w j)) →
+    Sail.BitVec.extractLsb w 15 0 = h →
+    isRVC h = true →
+    -- the COMPRESSED decode, and the expansion
+    (∀ r, D r = true → σ.wmRegs r = dst.regs r) →
+    D .minstret_increment = false →
+    goodb0 D (ext_decode_compressed h) dst = true →
+    exec (ext_decode_compressed h) dst = some (i0, dst) →
+    (∀ s : ExecSt, goodb0 D0 (execute i0) s = true) →
+    (∀ s : ExecSt, exec (execute i0) s = some (.ExecuteAs i, s)) →
+    -- the EXPANDED instruction's `execute`, at `execEff`
+    (∀ b : Bool, ∃ sExec : ExecSt,
+      execEff (execute i)
+        (((⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ : ExecSt).setReg .minstret_increment b).setReg
+          .nextPC (BitVec.addInt pc 2)) = some (.Retire_Success (), sExec, es_x) ∧
+      sExec.regs .hart_state = .HART_ACTIVE () ∧
+      sExec.regs .minstret_increment = b ∧
+      bmDomSub sExec.mem W) →
+    -- Q10: the expanded `execute` is sfence-free
+    (∀ b : Bool, WeakEvLang.noSfAnn (execute i)
+      (((⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ : ExecSt).setReg .minstret_increment b).setReg
+        .nextPC (BitVec.addInt pc 2))) →
+    ∀ tick : Bool, (∃ t' : ExecSt,
+      execEff (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ =
+        some ((), t', [.WEread WeakFetchEff.wakIfetch pc 2] ++ es_x) ∧
+      bmDomSub t'.mem W) ∧
+      WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ := by
+  intro lpc lpriv lpmp lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext hsub hisRVC hagree hDmi
+    hgood hdec hgood0 hexp hexec hsx tick
+  exact ⟨execEffStepOfLeafRvc2 σ W pc h w i0 i es_x D D0 dst lpc lpriv lpmp lpma lhtif lhart lmisaS lmisaC
+      lmIE lelp hal2 hal4 hram htext hsub hisRVC hagree hDmi hgood hdec hgood0 hexp hexec tick,
+    WeakFetch2.noSfAnnStepOfLeafRvc2St ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ W pc h w i0 i es_x D D0 dst
+      lpc lpriv lpmp lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext hsub hisRVC hagree hDmi
+      hgood hdec hgood0 hexp hexec hsx tick⟩
+
 /-- Rocq `af_cjr_row_run` (deviations 1-4): the COMPRESSED `c.jr ra` / `c.ret` row run — the
 kernel epilogue's own instruction, at a 2-but-not-4-aligned pc: a run from position `k` to the
 boundary `.pure ()`, still at `k`. -/
@@ -343,16 +454,14 @@ theorem afCjrRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : BitVec
     -- c.jr's own geometry
     ra.toNat ≠ 0 →
     ∀ tick : Bool,
-    -- Q7: the instruction's run announces no sfence.vma word (header, Q7)
-    WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ →
     ∃ (s3 : ExecSt) (ib3 : Ibch),
       rtc (fun t1 t2 => ∃ l, AxOpsem.astepProg row t1 l t2)
         ⟨.PHart cpu (riscvStep tick) σ.wmRegs none ib0, k⟩
         ⟨.PHart cpu (.pure ()) s3.regs none ib3, k⟩ := by
   intro lpc lpriv lsec lmisaC lpmp lpma lhtif lhart lmisaS lmIE lelp hal2 hal4 hram htext hsub
-    hisRVC hagree hDmi hgood hdec hgood0 hexp hranz tick hsf
-  -- (a) the whole instruction's `execEff` fact: the 2-byte fetch, no data event
-  obtain ⟨t', hex, -⟩ := execEffStepOfLeafRvc2 σ W pc h w i0
+    hisRVC hagree hDmi hgood hdec hgood0 hexp hranz tick
+  -- (a) the whole instruction's `execEff` fact (the 2-byte fetch, no data event), sfence-free (Q10)
+  obtain ⟨⟨t', hex, -⟩, hsf⟩ := AxFetch3.execEffStepOfLeafRvc2Sf σ W pc h w i0
     (.JALR (zeros (n := 12), .Regidx ra, zreg)) [] D D0 dst
     lpc lpriv (fun i => (lpmp i).2) lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext
     hsub hisRVC hagree hDmi hgood hdec hgood0 hexp
@@ -375,6 +484,12 @@ theorem afCjrRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : BitVec
       refine ⟨_, he, ?_, F2, ?_⟩
       · exact F1.trans lhart
       · rw [F3]; exact wmemRestrictDom σ W)
+    (by
+      intro b
+      refine AxFetch3.noSfAnnExecuteCretZca ra _ ?_ ?_ ?_
+      · leaf_peel .cur_privilege; exact lpriv
+      · leaf_peel .mseccfg; exact lsec
+      · leaf_peel .misa; exact lmisaC)
     tick
   -- (b) the admin run to the (width-2) fetch node and the admin fetch step (position kept)
   obtain ⟨m2, s2, ib2, -, hex2, hrtcb, hsf2⟩ :=

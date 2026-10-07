@@ -60,6 +60,7 @@ originals (`Weak/ExecSC6.lean`) do.
 7. §6c: Rocq `ak_coh akl = false` is `akl.akIfetch = false`, as in
    `WeakCert.wcertLoad`/`wcertAmoAq` (O2).
 8. Rocq §7's `Print Assumptions` commands are not declarations (no Lean twin).
+9. Q10 (owner ruling, Lean-only): §7 — the `noSfAnn` kit (`WeakEffSkel.noSfAnnBindEq` (THE bind law: the head's path, then the continuation's after a successful head run, `sfThen`), `noSfAnnBind`, the early-return layer `noSfAnnR`/`noSfAnnRBindEq`/`noSfAnnCatchEarlyReturn`, the tactic `nosf_run`), the two `run_hart_active` mirrors carrying `noSfAnn` (`noSfAnnHartActiveProgressBaseGen`: the announce is the fetched word, premise `sfAnnB 32 w = false`; `…RVCGen`: none needed, `sfAnnB16`) and the wrapper `noSfAnnRiscvStepHartActive` (both ticks).  This file now imports `Weak.WeakEvLang`.
 
 **Rocq → Lean name map.**  `execR_eff` `execREff`, `execR_eff_execR`
 `execREffExecR`, `execR_execR_eff` `execRExecREff`, `execR_eff_bind`
@@ -90,6 +91,7 @@ from ExecLib).
 under the deviations.
 -/
 import Weak.WeakEff
+import Weak.WeakEvLang
 
 namespace Weak
 
@@ -459,5 +461,340 @@ theorem wcertAmoAqViaSkeleton (cid : Nat) (pc : BitVec 64) (akf : AkInfo) (pf : 
       (wPEff (some cid) ([.WEread akf pf nf] ++ [.WEread aka ea 4, .WEwrite akw ea 4 v]))
       (wQAmoAq (some cid) ea v) :=
   fun hcoh hsync hlat => wcertAmoAq cid pc akf pf nf aka akw ea v hcoh hsync hlat
+
+/-! ## 7. Q10 (Lean-only): SFENCE-FREEDOM ALONG THE RUN
+
+Owner ruling Q10: `WeakEvLang.noSfAnn m s` (no SFENCE.VMA announce along `execEff`'s path) is
+carried by the SAME symbolic execution as the `execEff` facts.  `noSfAnn` follows `execEff`'s
+arms, so its bind law is stated over `execEff` of the head (`WeakEffSkel.noSfAnnBindEq`: the
+continuation is constrained only after a SUCCESSFUL head run, `WeakEffSkel.sfThen`), and the
+tactic `nosf_run` is `exec_eff_run` with these laws added: a `noSfAnn` twin of an `execEff` fact
+is the same script, with the head facts' twins as extra lemmas. -/
+
+/-- Continue a path predicate after a successful instrumented run (`True` on a stuck head). -/
+def WeakEffSkel.sfThen {X : Type} (r : Option (X × ExecSt × List Weff)) (g : X → ExecSt → Prop) :
+    Prop :=
+  match r with
+  | some (x, s1, _) => g x s1
+  | none => True
+
+theorem WeakEffSkel.sfThenSome {X : Type} (x : X) (s1 : ExecSt) (es : List Weff)
+    (g : X → ExecSt → Prop) : WeakEffSkel.sfThen (some (x, s1, es)) g = g x s1 := rfl
+
+theorem WeakEffSkel.sfThenNone {X : Type} (g : X → ExecSt → Prop) :
+    WeakEffSkel.sfThen (none : Option (X × ExecSt × List Weff)) g = True := rfl
+
+theorem WeakEffSkel.sfThenCons {X : Type} (e : Weff) (r : Option (X × ExecSt × List Weff))
+    (g : X → ExecSt → Prop) : WeakEffSkel.sfThen (Weff.cons e r) g = WeakEffSkel.sfThen r g := by
+  rcases r with _ | ⟨x, s1, es⟩ <;> rfl
+
+theorem WeakEffSkel.sfThenTrue {X : Type} (r : Option (X × ExecSt × List Weff)) :
+    WeakEffSkel.sfThen r (fun _ _ => True) = True := by
+  rcases r with _ | ⟨x, s1, es⟩ <;> rfl
+
+/-- **The bind law of `noSfAnn`**: the head's path, then the continuation's -- after a
+successful head run, at its value and state. -/
+theorem WeakEffSkel.noSfAnnBindEq {X Y : Type} (m : SailM X) (f : X → SailM Y) :
+    ∀ s, WeakEvLang.noSfAnn (m >>= f) s =
+      (WeakEvLang.noSfAnn m s ∧
+        WeakEffSkel.sfThen (execEff m s) (fun x s1 => WeakEvLang.noSfAnn (f x) s1)) := by
+  induction m with
+  | pure x =>
+    intro s
+    show WeakEvLang.noSfAnn (f x) s = (True ∧ WeakEvLang.noSfAnn (f x) s)
+    rw [true_and]
+  | impure call k ih =>
+    intro s
+    cases call with
+    | error e =>
+      show True = (True ∧ True)
+      rw [true_and]
+    | ok o =>
+      show WeakEvLang.noSfAnn (FreeM.impure (.ok o) (fun v => k v >>= f)) s = _
+      cases o
+      case memRead n va req =>
+        by_cases hm : mmioAcc req.pa n = true
+        · simp only [WeakEvLang.noSfAnn, execEff, hm, ↓reduceIte]
+          cases devRead s.dev req.pa n with
+          | none => simp only [WeakEffSkel.sfThenNone, and_self]
+          | some p =>
+            obtain ⟨w, d'⟩ := p
+            exact ih _ _
+        · simp only [WeakEvLang.noSfAnn, execEff, hm, Bool.false_eq_true, ↓reduceIte]
+          cases bmRead s.mem req.pa n with
+          | none => simp only [WeakEffSkel.sfThenNone, and_self]
+          | some w => rw [WeakEffSkel.sfThenCons]; exact ih _ _
+      case memWrite n va req =>
+        cases hv : req.value with
+        | none => simp only [WeakEvLang.noSfAnn, execEff, hv, WeakEffSkel.sfThenNone, and_self]
+        | some w =>
+          by_cases hm : mmioAcc req.pa n = true
+          · simp only [WeakEvLang.noSfAnn, execEff, hv, hm, ↓reduceIte]
+            cases devWrite s.dev req.pa n w with
+            | none => simp only [WeakEffSkel.sfThenNone, and_self]
+            | some d' => exact ih _ _
+          · simp only [WeakEvLang.noSfAnn, execEff, hv, hm, Bool.false_eq_true, ↓reduceIte]
+            rw [WeakEffSkel.sfThenCons]; exact ih _ _
+      case barrier b =>
+        simp only [WeakEvLang.noSfAnn, execEff]
+        rw [WeakEffSkel.sfThenCons]; exact ih _ _
+      case instrAnnounce n w =>
+        simp only [WeakEvLang.noSfAnn, execEff]
+        rw [ih, and_assoc]
+      case choose => simp only [WeakEvLang.noSfAnn, execEff, WeakEffSkel.sfThenNone, and_self]
+      case readRam => simp only [WeakEvLang.noSfAnn, execEff, WeakEffSkel.sfThenNone, and_self]
+      case writeRam => simp only [WeakEvLang.noSfAnn, execEff, WeakEffSkel.sfThenNone, and_self]
+      all_goals first | exact ih _ _ | (simp only [WeakEvLang.noSfAnn, execEff]; exact ih _ _)
+
+/-- The forward form: a head run that succeeds hands its own path and its continuation's. -/
+theorem WeakEffSkel.noSfAnnBind {X Y : Type} (m : SailM X) (f : X → SailM Y) (s : ExecSt) (x : X)
+    (s1 : ExecSt) (es : List Weff) :
+    execEff m s = some (x, s1, es) → WeakEvLang.noSfAnn m s → WeakEvLang.noSfAnn (f x) s1 →
+    WeakEvLang.noSfAnn (m >>= f) s := by
+  intro hm h1 h2
+  rw [WeakEffSkel.noSfAnnBindEq, hm]
+  exact ⟨h1, h2⟩
+
+/-- The announce node: its own word only. -/
+theorem WeakEffSkel.noSfAnnInstrAnnounce {n : Nat} (w : BitVec n) (s : ExecSt) :
+    WeakEvLang.noSfAnn (LeanRV64D.Functions.instr_announce w) s = (sfAnnB n w = false ∧ True) := rfl
+
+/-- A compressed announce (width 16) is never an sfence announce. -/
+theorem WeakEffSkel.sfAnnB16 (h : BitVec 16) : sfAnnB 16 h = false := rfl
+
+/-! ### 7b. The early-return layer -/
+
+/-- `noSfAnn` of the `ExceptT` run of an early-return computation. -/
+def WeakEffSkel.noSfAnnR {R X : Type} (m : SailME R X) (s : ExecSt) : Prop :=
+  WeakEvLang.noSfAnn (ExceptT.run m) s
+
+/-- Continue after a run of the early-return interpreter that yields a VALUE (an early return
+or a stuck head constrains nothing further). -/
+def WeakEffSkel.sfThenR {R X : Type} (r : Option ((R ⊕ X) × ExecSt × List Weff))
+    (g : X → ExecSt → Prop) : Prop :=
+  match r with
+  | some (.inr x, s1, _) => g x s1
+  | _ => True
+
+theorem WeakEffSkel.sfThenRInr {R X : Type} (x : X) (s1 : ExecSt) (es : List Weff)
+    (g : X → ExecSt → Prop) :
+    WeakEffSkel.sfThenR (some ((.inr x : R ⊕ X), s1, es)) g = g x s1 := rfl
+
+theorem WeakEffSkel.sfThenRInl {R X : Type} (r : R) (s1 : ExecSt) (es : List Weff)
+    (g : X → ExecSt → Prop) :
+    WeakEffSkel.sfThenR (some ((.inl r : R ⊕ X), s1, es)) g = True := rfl
+
+theorem WeakEffSkel.sfThenRNone {R X : Type} (g : X → ExecSt → Prop) :
+    WeakEffSkel.sfThenR (none : Option ((R ⊕ X) × ExecSt × List Weff)) g = True := rfl
+
+theorem WeakEffSkel.sfThenRTrue {R X : Type} (r : Option ((R ⊕ X) × ExecSt × List Weff)) :
+    WeakEffSkel.sfThenR r (fun _ _ => True) = True := by
+  rcases r with _ | ⟨_ | _, s1, es⟩ <;> rfl
+
+theorem WeakEffSkel.sfThenRAll {R X : Type} (r : Option ((R ⊕ X) × ExecSt × List Weff))
+    (g : X → ExecSt → Prop) : (∀ x s1, g x s1) → WeakEffSkel.sfThenR r g := by
+  intro h
+  rcases r with _ | ⟨_ | x, s1, es⟩
+  · trivial
+  · trivial
+  · exact h x s1
+
+/-- `execREffLiftR`'s result form, read back at `execEff`. -/
+theorem WeakEffSkel.sfThenRLift {R X : Type} (r : Option (X × ExecSt × List Weff))
+    (g : X → ExecSt → Prop) :
+    WeakEffSkel.sfThenR (match r with
+      | some (x, s', es) => some ((.inr x : R ⊕ X), s', es)
+      | none => none) g = WeakEffSkel.sfThen r g := by
+  rcases r with _ | ⟨x, s1, es⟩ <;> rfl
+
+theorem WeakEffSkel.noSfAnnRIte {R X : Type} (c : Prop) [Decidable c] (a b : SailME R X)
+    (s : ExecSt) :
+    WeakEffSkel.noSfAnnR (if c then a else b) s =
+      (if c then WeakEffSkel.noSfAnnR a s else WeakEffSkel.noSfAnnR b s) := by
+  split <;> rfl
+
+theorem WeakEffSkel.noSfAnnRBindEq {R X Y : Type} (m : SailME R Y) (f : Y → SailME R X)
+    (s : ExecSt) :
+    WeakEffSkel.noSfAnnR (m >>= f) s =
+      (WeakEffSkel.noSfAnnR m s ∧
+        WeakEffSkel.sfThenR (execREff m s) (fun a s1 => WeakEffSkel.noSfAnnR (f a) s1)) := by
+  unfold WeakEffSkel.noSfAnnR execREff
+  rw [ExceptT.run_bind, WeakEffSkel.noSfAnnBindEq]
+  rcases execEff (ExceptT.run m) s with _ | ⟨e | a, s1, es1⟩
+  · rfl
+  · rcases e with e | r0
+    · show (_ ∧ True) = (_ ∧ True)
+      rfl
+    · show (_ ∧ True) = (_ ∧ True)
+      rfl
+  · rfl
+
+theorem WeakEffSkel.noSfAnnRReturnR {R X : Type} (x : X) (s : ExecSt) :
+    WeakEffSkel.noSfAnnR (pure x : SailME R X) s = True := rfl
+
+theorem WeakEffSkel.noSfAnnRThrow {R X : Type} (r : R) (s : ExecSt) :
+    WeakEffSkel.noSfAnnR (SailME.throw r : SailME R X) s = True := rfl
+
+theorem WeakEffSkel.noSfAnnRLiftR {R X : Type} (m : SailM X) (s : ExecSt) :
+    WeakEffSkel.noSfAnnR (liftM m : SailME R X) s = WeakEvLang.noSfAnn m s := by
+  unfold WeakEffSkel.noSfAnnR
+  have e : ExceptT.run (liftM m : SailME R X) = m >>= fun a => pure (Except.ok a) := rfl
+  rw [e, WeakEffSkel.noSfAnnBindEq]
+  show (_ ∧ WeakEffSkel.sfThen _ (fun _ _ => True)) = _
+  rw [WeakEffSkel.sfThenTrue, and_true]
+
+/-- The bridge back through `SailME.run` (the twin of `execEffCatchEarlyReturn`). -/
+theorem WeakEffSkel.noSfAnnCatchEarlyReturn {X : Type} (body : SailME X X) (s : ExecSt) :
+    WeakEvLang.noSfAnn (SailME.run body) s = WeakEffSkel.noSfAnnR body s := by
+  unfold WeakEffSkel.noSfAnnR
+  show WeakEvLang.noSfAnn (ExceptT.run body >>= _) s = _
+  rw [WeakEffSkel.noSfAnnBindEq]
+  rcases execEff (ExceptT.run body) s with _ | ⟨e | a, s', es⟩
+  · exact propext (and_iff_left (by trivial))
+  · rcases e with e | r
+    · exact propext (and_iff_left (by trivial))
+    · exact propext (and_iff_left (by trivial))
+  · exact propext (and_iff_left (by trivial))
+
+theorem WeakEffSkel.sfThenAll {X : Type} (r : Option (X × ExecSt × List Weff))
+    (g : X → ExecSt → Prop) : (∀ x s1, g x s1) → WeakEffSkel.sfThen r g := by
+  intro h
+  rcases r with _ | ⟨x, s1, es⟩
+  · trivial
+  · exact h x s1
+
+theorem WeakEffSkel.noSfAnnIte {X : Type} (c : Prop) [Decidable c] (a b : SailM X) (s : ExecSt) :
+    WeakEvLang.noSfAnn (if c then a else b) s =
+      (if c then WeakEvLang.noSfAnn a s else WeakEvLang.noSfAnn b s) := by
+  split <;> rfl
+
+theorem WeakEffSkel.noSfAnnPure {X : Type} (x : X) (s : ExecSt) :
+    WeakEvLang.noSfAnn (pure x : SailM X) s = True := rfl
+
+theorem WeakEffSkel.noSfAnnTickPc (s : ExecSt) : WeakEvLang.noSfAnn (tick_pc ()) s = True := rfl
+
+theorem WeakEffSkel.noSfAnnIsLandingPad (s : ExecSt) :
+    WeakEvLang.noSfAnn (is_landing_pad_expected ()) s = True := rfl
+
+/-- `exec_eff_run` with the `noSfAnn` laws: the `noSfAnn` twin of an `execEff` script
+(Lean-only, Q10).  Extra lemmas in brackets: the `execEff` facts AND their `noSfAnn` twins. -/
+syntax "nosf_run" (" [" Lean.Parser.Tactic.simpLemma,* "]")? : tactic
+macro_rules
+  | `(tactic| nosf_run) => `(tactic| nosf_run [List.nil_append])
+  | `(tactic| nosf_run [$ls,*]) => `(tactic| simp (config := { decide := true }) only
+      [WeakEffSkel.noSfAnnBindEq, WeakEffSkel.noSfAnnRBindEq, WeakEffSkel.sfThenSome,
+      WeakEffSkel.sfThenNone, WeakEffSkel.sfThenCons, WeakEffSkel.sfThenRInr, WeakEffSkel.sfThenRInl,
+      WeakEffSkel.sfThenRNone, WeakEffSkel.noSfAnnRReturnR, WeakEffSkel.noSfAnnRThrow,
+      WeakEffSkel.noSfAnnRLiftR, WeakEffSkel.noSfAnnInstrAnnounce, WeakEvLang.noSfAnn,
+      WeakEffSkel.sfThenTrue, WeakEffSkel.sfThenRTrue, WeakEffSkel.noSfAnnPure,
+      WeakEffSkel.sfThenRLift, WeakEffSkel.noSfAnnRIte,
+      WeakEffSkel.noSfAnnIte, ite_self, execEffBindEq, readReg, writeReg, PreSail.readReg, PreSail.writeReg, PreSail.emit, execEff,
+      effThen, Weff.cons, execEffReturnm, ↓reduceIte, ite_true, ite_false, Bool.false_eq_true, assert,
+      PreSail.assert, execREffBindEq, execREffLiftR, execREffReturnR, execREffThrow, decide_false,
+      decide_true, Bool.and_false, Bool.false_and, Bool.and_true, Bool.true_and, List.nil_append,
+      List.append_nil, List.cons_append, true_and, and_true, and_self, $ls,*])
+
+/-! ### 7c. The two `run_hart_active` mirrors, sfence-free -/
+
+set_option linter.unusedSimpArgs false in
+/-- §4's base mirror, carrying `noSfAnn`: the announce is the fetched word `w` (not an sfence
+word, `hsfw`), and the dispatch, the fetch, the decode and the `execute` are sfence-free. -/
+theorem WeakEffSkel.noSfAnnHartActiveProgressBaseGen (priv : Privilege) (s s_f s_x : ExecSt)
+    (w : BitVec 32) (instr : instruction) (pc : BitVec 64) (resf : ExecutionResult)
+    (es_f es_x : List Weff)
+    (hpriv : s.regs .cur_privilege = priv)
+    (hdisp : execEff (dispatchInterrupt priv) s = some (none, s, []))
+    (hfetch : execEff (fetch ()) s = some (.F_Base w, s_f, es_f))
+    (hdec : execEff (ext_decode w) s_f = some (instr, s_f, []))
+    (hlpad : (s_f.regs .elp == landing_pad_bits_backwards .LP_EXPECTED) = false)
+    (hpc : s_f.regs .PC = pc)
+    (hexec : execEff (execute instr) (s_f.setReg .nextPC (BitVec.addInt pc 4)) = some (resf, s_x, es_x))
+    (hnot : match resf with | .ExecuteAs _ => False | _ => True)
+    (hsfw : sfAnnB 32 w = false)
+    (sdisp : WeakEvLang.noSfAnn (dispatchInterrupt priv) s)
+    (sfetch : WeakEvLang.noSfAnn (fetch ()) s)
+    (sdec : WeakEvLang.noSfAnn (ext_decode w) s_f)
+    (sexec : WeakEvLang.noSfAnn (execute instr) (s_f.setReg .nextPC (BitVec.addInt pc 4))) :
+    WeakEvLang.noSfAnn (run_hart_active 0) s := by
+  unfold run_hart_active ext_fetch_hook get_config_print_instr
+  rw [WeakEffSkel.noSfAnnCatchEarlyReturn]
+  simp (config := { decide := true }) only [WeakEffSkel.noSfAnnRBindEq, WeakEffSkel.noSfAnnRLiftR,
+    WeakEffSkel.sfThenRInr, WeakEffSkel.sfThenRInl, WeakEffSkel.sfThenRNone,
+    WeakEffSkel.noSfAnnRReturnR, WeakEffSkel.noSfAnnBindEq, WeakEffSkel.sfThenSome,
+    WeakEffSkel.sfThenNone, WeakEffSkel.noSfAnnInstrAnnounce, WeakEvLang.noSfAnn,
+    execREffBindEq, execREffLiftR, execREffReturnR,
+    readReg, writeReg, PreSail.readReg, PreSail.writeReg, PreSail.emit, execEff,
+    ↓reduceIte, Bool.false_eq_true, hpriv, hdisp, hfetch, execEffInstrAnnounce, hdec,
+    execEffIsLandingPad, hlpad, hpc, hexec, Bool.false_and, List.nil_append, List.append_nil,
+    hsfw, sdisp, sfetch, sdec, sexec, true_and, and_true, WeakEffSkel.noSfAnnIsLandingPad,
+    WeakEffSkel.sfThenRTrue, WeakEffSkel.sfThenTrue]
+  cases resf <;> simp at hnot <;> exact trivial
+
+set_option linter.unusedSimpArgs false in
+/-- §4's RVC mirror, carrying `noSfAnn` (a width-16 announce is never an sfence announce). -/
+theorem WeakEffSkel.noSfAnnHartActiveProgressRVCGen (priv : Privilege) (s s_f s_x : ExecSt)
+    (h : BitVec 16) (instr other : instruction) (pc : BitVec 64) (resf : ExecutionResult)
+    (es_f es_x : List Weff)
+    (hpriv : s.regs .cur_privilege = priv)
+    (hdisp : execEff (dispatchInterrupt priv) s = some (none, s, []))
+    (hfetch : execEff (fetch ()) s = some (.F_RVC h, s_f, es_f))
+    (hdec : execEff (ext_decode_compressed h) s_f = some (instr, s_f, []))
+    (hlpad : (s_f.regs .elp == landing_pad_bits_backwards .LP_EXPECTED) = false)
+    (hpc : s_f.regs .PC = pc)
+    (hzca : execEff (currentlyEnabled .Ext_Zca) s_f = some (true, s_f, []))
+    (hexec : execEff (execute instr) (s_f.setReg .nextPC (BitVec.addInt pc 2)) =
+      some (.ExecuteAs other, s_f.setReg .nextPC (BitVec.addInt pc 2), []))
+    (_hother : execEff (execute other) (s_f.setReg .nextPC (BitVec.addInt pc 2)) =
+      some (resf, s_x, es_x))
+    (sdisp : WeakEvLang.noSfAnn (dispatchInterrupt priv) s)
+    (sfetch : WeakEvLang.noSfAnn (fetch ()) s)
+    (sdec : WeakEvLang.noSfAnn (ext_decode_compressed h) s_f)
+    (szca : WeakEvLang.noSfAnn (currentlyEnabled .Ext_Zca) s_f)
+    (sexp : WeakEvLang.noSfAnn (execute instr) (s_f.setReg .nextPC (BitVec.addInt pc 2)))
+    (sother : WeakEvLang.noSfAnn (execute other) (s_f.setReg .nextPC (BitVec.addInt pc 2))) :
+    WeakEvLang.noSfAnn (run_hart_active 0) s := by
+  unfold run_hart_active ext_fetch_hook get_config_print_instr
+  rw [WeakEffSkel.noSfAnnCatchEarlyReturn]
+  simp (config := { decide := true }) only [WeakEffSkel.noSfAnnRBindEq, WeakEffSkel.noSfAnnRLiftR,
+    WeakEffSkel.sfThenRInr, WeakEffSkel.sfThenRInl, WeakEffSkel.sfThenRNone,
+    WeakEffSkel.noSfAnnRReturnR, WeakEffSkel.noSfAnnBindEq, WeakEffSkel.sfThenSome,
+    WeakEffSkel.sfThenNone, WeakEffSkel.noSfAnnInstrAnnounce, WeakEvLang.noSfAnn,
+    execREffBindEq, execREffLiftR, execREffReturnR,
+    readReg, writeReg, PreSail.readReg, PreSail.writeReg, PreSail.emit, execEff,
+    ↓reduceIte, hpriv, hdisp, hfetch, execEffInstrAnnounce, hdec, WeakEffSkel.sfAnnB16,
+    execEffIsLandingPad, hlpad, hzca, hpc, hexec, List.nil_append, List.append_nil,
+    sdisp, sfetch, sdec, szca, sexp, sother, true_and, and_true, WeakEffSkel.noSfAnnIsLandingPad,
+    WeakEffSkel.sfThenRTrue, WeakEffSkel.sfThenTrue]
+
+/-! ### 7d. The wrapper and the tick, sfence-free -/
+
+/-- `WeakEff.execEffRiscvStepHartActive`'s `noSfAnn` twin, at BOTH ticks: the wrapper's own
+nodes are register events; the tick is sfence-free at any state (`stick`). -/
+theorem WeakEffSkel.noSfAnnRiscvStepHartActive (s sExec : ExecSt) (retval : BitVec 32) (b : Bool)
+    (es : List Weff)
+    (hsi : execEff (should_inc_minstret (s.regs .cur_privilege)) s = some (b, s, []))
+    (hhartA : (hartActiveSA s b).regs .hart_state = .HART_ACTIVE ())
+    (hha : execEff (run_hart_active 0) (hartActiveSA s b) =
+      some (.Step_Execute (.Retire_Success (), retval), sExec, es))
+    (hhartExec : sExec.regs .hart_state = .HART_ACTIVE ())
+    (ssi : WeakEvLang.noSfAnn (should_inc_minstret (s.regs .cur_privilege)) s)
+    (sha : WeakEvLang.noSfAnn (run_hart_active 0) (hartActiveSA s b))
+    (stick : ∀ t, WeakEvLang.noSfAnn (tick_clock ()) t) :
+    ∀ tick : Bool, WeakEvLang.noSfAnn (riscvStep tick) s := by
+  intro tick
+  unfold riscvStep
+  rw [WeakEffSkel.noSfAnnBindEq]
+  refine ⟨?_, WeakEffSkel.sfThenAll _ _ (fun _ t => by
+    cases tick with
+    | false => trivial
+    | true => exact stick t)⟩
+  unfold hartActiveSA at hhartA hha sha
+  unfold try_step
+  simp only [WeakEffSkel.noSfAnnBindEq, WeakEffSkel.sfThenSome, WeakEffSkel.sfThenNone,
+    WeakEffSkel.sfThenTrue, WeakEvLang.noSfAnn, execEffBindEq, readReg, writeReg, PreSail.readReg,
+    PreSail.writeReg, PreSail.emit, execEff, effThen, hsi, ssi, hhartA, hha, sha, hhartExec, assert,
+    PreSail.assert, hart_is_active, ↓reduceIte, execEffReturnm, execEffTickPc, get_config_rvfi,
+    Bool.false_eq_true, List.nil_append, List.append_nil, true_and, and_true,
+    WeakEffSkel.noSfAnnIte, WeakEffSkel.noSfAnnTickPc, WeakEffSkel.noSfAnnPure, ite_self]
 
 end Weak

@@ -65,6 +65,8 @@ Sections: §1 the width-2 memory chain; §2 the two fetch arms; §3 the
    outright and is dropped (as `ExecSC5.execFetchFBase2`, its deviation 3).
 7. Rocq §6's `Print Assumptions` commands are not declarations.
 
+Q10 (owner ruling, Lean-only): §6 — the `noSfAnn` twins of the width-2 `F_RVC` fetch (`WeakFetch2.noSfAnnFetchFlatRvc2` & co.) and of `WeakFetch2.execEffStepOfLeafRvc2St` (`WeakFetch2.noSfAnnStepOfLeafRvc2St`; no word fact: a width-16 announce is never an sfence announce).
+
 **Rocq → Lean name map.**  `exec_eff_pmpCheck_machine_unlocked_ifetch2`
 `execEffPmpCheckMachineUnlockedIfetch2`, `exec_eff_read_ram_plain_2`
 `execEffReadRamPlain2`, `exec_eff_pmaCheck_ram_2` `execEffPmaCheckRam2`,
@@ -814,5 +816,196 @@ theorem wPLoadOfLeafBase2 (cid : Nat) (σ : Wmstate) (W : GSet PAddr)
       ([.WEread WeakFetchEff.wakIfetch pc 2, .WEread WeakFetchEff.wakIfetch (BitVec.addInt pc 2) 2]
         ++ [.WEread akl ea 4]) σ :=
   wPEffOfLeafBase2 cid σ W pc w i _ D dst
+
+/-! ## 6. Q10 (Lean-only): THE RVC-AT-2 RECIPE'S RUN IS SFENCE-FREE
+
+Owner ruling Q10, as `WeakFetchEff` §10: the `noSfAnn` twins of the width-2 fetch chain and of
+`WeakFetch2.execEffStepOfLeafRvc2St`.  A compressed announce (width 16) is never an sfence
+announce, so no word fact is needed; the decode and the expansion are sfence-free by `goodb0`. -/
+
+theorem WeakFetch2.noSfAnnCurrentlyEnabledC (s : ExecSt) :
+    WeakEvLang.noSfAnn (currentlyEnabled .Ext_C) s := by
+  rw [currentlyEnabled]
+  simp only [execEffHartSupportsC, ↓reduceIte]
+  nosf_run
+
+theorem WeakFetch2.noSfAnnCurrentlyEnabledZca (s : ExecSt) :
+    WeakEvLang.noSfAnn (currentlyEnabled .Ext_Zca) s := by
+  rw [currentlyEnabled]
+  simp only [WeakFetchRvc.execEffHartSupportsZca, ↓reduceIte]
+  nosf_run [execEffRecCECMisa, WeakFetch2.noSfAnnCurrentlyEnabledC]
+
+/-- `WeakFetch2.execEffFetch2Rvc`'s twin. -/
+theorem WeakFetch2.noSfAnnFetch2Rvc (pc : BitVec 64) (h : BitVec 16) (s s1 : ExecSt) (es : List Weff)
+    (hpc : s.regs .PC = pc)
+    (hbit0 : (Sail.BitVec.access pc 0 != 0#1) = false) (hbit1 : (Sail.BitVec.access pc 1 != 0#1) = true)
+    (hzca : execEff (currentlyEnabled .Ext_Zca) s = some (true, s, []))
+    (hvalign : is_aligned_vaddr (.Virtaddr pc) 4 = false)
+    (hfb : execEff (fetch_bytes pc pc 2) s = some (.FetchBytes_Success h, s1, es)) (hrvc : isRVC h = true)
+    (sfb : WeakEvLang.noSfAnn (fetch_bytes pc pc 2) s) :
+    WeakEvLang.noSfAnn (fetch ()) s := by
+  unfold fetch ext_fetch_check_pc get_config_rvfi
+  rw [WeakEffSkel.noSfAnnCatchEarlyReturn]
+  nosf_run [hpc, hbit0, hbit1, hzca, WeakFetch2.noSfAnnCurrentlyEnabledZca, hvalign, hfb, sfb, hrvc,
+    Functions.not]
+
+/-- `WeakFetch2.execEffFetchBytes2Ram`'s twin. -/
+theorem WeakFetch2.noSfAnnFetchBytes2Ram (pc pc2 : BitVec 64) (h : BitVec 16) (t : ExecSt)
+    (hpriv : t.regs .cur_privilege = .Machine) (hpmp : pmpAllowsAll (t.regs .pmpcfg_n))
+    (hpma : t.regs .pma_regions = bootPMA) (hhtif : t.regs .htif_tohost_base = none)
+    (hram : inRam pc2 2) (hb : BytesAt t pc2 2 h) (hal : pc2.toNat % 2 = 0) :
+    WeakEvLang.noSfAnn (fetch_bytes pc pc2 2) t := by
+  have hal' : is_aligned_paddr (.Physaddr (fetchPa pc2)) 2 = true := by
+    rw [fetchPa_eq]; exact is_aligned_paddr_of pc2 2 (by decide) hal
+  have hsig : execEff (within_sig (.Physaddr (fetchPa pc2)) 2) t = some (false, t, []) := by
+    first
+    | rfl
+    | (simp only [within_sig, plat_have_sig, Functions.not]; rfl)
+  have hpmp' := execEffPmpCheckMachineUnlockedIfetch2 _ t hpmp hal'
+  have hmatch : matching_pma_region (t.regs .pma_regions) (.Physaddr (fetchPa pc2)) 2 = some ramRegion := by
+    rw [hpma, fetchPa_eq]; exact matching_pma_ram pc2 2 hram (by decide) (by decide)
+  have hc : execEff (within_clint (.Physaddr (fetchPa pc2)) 2) t = some (false, t, []) := by
+    rw [fetchPa_eq, within_clint_ram pc2 2 hram]; rfl
+  have hhtif' := execEffWithinHtifFalse (fetchPa pc2) 2 t hhtif
+  have hdev : devAddr (fetchPa pc2) = false := by rw [fetchPa_eq]; exact devAddrRam pc2 2 hram
+  have hb' : BytesAt t (fetchPa pc2) 2 h := by rw [fetchPa_eq]; exact hb
+  have htr := execEffTranslateAddrIdentity pc2 t hpriv
+  have hmr := execEffMemReadFetch2 .PBMT_PMA (fetchPa pc2) ramRegion h t hpmp' hmatch hal' ramRegionExec
+    hc hsig hhtif' hdev hb' hpriv
+  have smr := WeakFetchEff.noSfAnnMemReadFetch .PBMT_PMA (fetchPa pc2) 2 ramRegion h t hpmp' hmatch hal'
+    ramRegionExec (execEffWithinMmioReadableFalse _ 2 t hc hsig hhtif') hdev
+    (bmRead_of_bytes _ _ _ _ hb')
+    ⟨_, _, execEffCheckedMemReadRam2 .PBMT_PMA (fetchPa pc2) ramRegion h t hpmp' hmatch hal'
+      ramRegionExec hc hsig hhtif' hdev hb'⟩ hpriv
+  have str := WeakFetchEff.noSfAnnTranslateAddrMachine (.Virtaddr pc2) (.InstructionFetch ()) t
+    (by rw [hpriv]; exact execEffEffectivePrivilegeFetch _ _ t)
+  exact WeakFetchEff.noSfAnnFetchBytesOk pc pc2 (fetchPa pc2) 2 .PBMT_PMA h t t _ htr hmr str smr
+
+/-- `execEffFetchFlatRvc2`'s twin. -/
+theorem WeakFetch2.noSfAnnFetchFlatRvc2 (t : ExecSt) (pc : BitVec 64) (h : BitVec 16) :
+    pmpAllowsAll (t.regs .pmpcfg_n) →
+    t.regs .pma_regions = bootPMA →
+    (_get_Misa_C (t.regs .misa) == 1#1) = true →
+    t.regs .PC = pc →
+    t.regs .cur_privilege = .Machine →
+    t.regs .htif_tohost_base = none →
+    is_aligned_vaddr (.Virtaddr pc) 4 = false →
+    fetchFlatOk t pc (.F_RVC h) →
+    WeakEvLang.noSfAnn (fetch ()) t := by
+  rintro hpmp hpma hmisaC lpc lpriv lhtif hal ⟨h2, hram, w, hr, hb⟩
+  obtain ⟨rfl, hisRVC⟩ := hr
+  have hm2 : pc.toNat % 2 = 0 := isAlignedVaddrMod pc 2 (by decide) h2
+  have hm4 : pc.toNat % 4 = 2 := by
+    by_cases hm : pc.toNat % 4 = 0
+    · rw [is_aligned_vaddr_of pc 4 hm] at hal; exact absurd hal (by decide)
+    · omega
+  have hramLo : inRam pc 2 := by unfold inRam at hram ⊢; omega
+  have hbLo : BytesAt t pc 2 (Sail.BitVec.extractLsb w 15 0) := by
+    intro j hj
+    rw [nthByteLo w j hj]
+    exact hb j (by omega)
+  exact WeakFetch2.noSfAnnFetch2Rvc pc _ t t _ lpc (bit0_clear_of_even pc hm2) (bit1_set_of_mod4 pc hm4)
+    (execEffCurrentlyEnabledZca t hmisaC) hal
+    (WeakFetch2.execEffFetchBytes2Ram pc pc _ t lpriv hpmp hpma lhtif hramLo hbLo hm2) hisRVC
+    (WeakFetch2.noSfAnnFetchBytes2Ram pc pc _ t lpriv hpmp hpma lhtif hramLo hbLo hm2)
+
+/-- `WeakFetch2.execEffStepOfLeafRvc2St`'s twin (Q10): the same premises and the expanded
+`execute`'s own `noSfAnn` give `noSfAnn` of the whole step at BOTH ticks. -/
+theorem WeakFetch2.noSfAnnStepOfLeafRvc2St (s : ExecSt) (W : GSet PAddr)
+    (pc : BitVec 64) (h : BitVec 16) (w : BitVec 32) (i0 i : instruction) (es_x : List Weff)
+    (D D0 : Register → Bool) (dst : ExecSt) :
+    s.regs .PC = pc →
+    s.regs .cur_privilege = .Machine →
+    pmpAllowsAll (s.regs .pmpcfg_n) →
+    s.regs .pma_regions = bootPMA →
+    s.regs .htif_tohost_base = none →
+    s.regs .hart_state = .HART_ACTIVE () →
+    (_get_Misa_S (s.regs .misa) == 1#1) = true →
+    (_get_Misa_C (s.regs .misa) == 1#1) = true →
+    (_get_Mstatus_MIE (s.regs .mstatus) == 1#1) = false →
+    (s.regs .elp == landing_pad_bits_backwards .LP_EXPECTED) = false →
+    is_aligned_vaddr (.Virtaddr pc) 2 = true →
+    is_aligned_vaddr (.Virtaddr pc) 4 = false →
+    inRam pc 4 →
+    (∀ j : Nat, j < 4 → s.mem (pc + BitVec.ofNat 64 j) = some (nthByte (n := 4) w j)) →
+    Sail.BitVec.extractLsb w 15 0 = h →
+    isRVC h = true →
+    (∀ r, D r = true → s.regs r = dst.regs r) →
+    D .minstret_increment = false →
+    goodb0 D (ext_decode_compressed h) dst = true →
+    exec (ext_decode_compressed h) dst = some (i0, dst) →
+    (∀ s' : ExecSt, goodb0 D0 (execute i0) s' = true) →
+    (∀ s' : ExecSt, exec (execute i0) s' = some (.ExecuteAs i, s')) →
+    (∀ b : Bool, ∃ sExec : ExecSt,
+      execEff (execute i) ((s.setReg .minstret_increment b).setReg .nextPC (BitVec.addInt pc 2)) =
+        some (.Retire_Success (), sExec, es_x) ∧
+      sExec.regs .hart_state = .HART_ACTIVE () ∧
+      sExec.regs .minstret_increment = b ∧
+      bmDomSub sExec.mem W) →
+    (∀ b : Bool, WeakEvLang.noSfAnn (execute i)
+      ((s.setReg .minstret_increment b).setReg .nextPC (BitVec.addInt pc 2))) →
+    ∀ tick : Bool, WeakEvLang.noSfAnn (riscvStep tick) s := by
+  intro lpc lpriv lpmp lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext hsub hisRVC hagree hDmi
+    hgood hdec hgood0 hexp hexec hsx tick
+  obtain ⟨b, hsi⟩ := execEffShouldIncMinstretSome (s.regs .cur_privilege) s
+  obtain ⟨sExec, hex, hhe, -, -⟩ := hexec b
+  have lpriv_a : (hartActiveSA s b).regs .cur_privilege = .Machine := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lpriv
+  have lpc_a : (hartActiveSA s b).regs .PC = pc := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lpc
+  have lhart_a : (hartActiveSA s b).regs .hart_state = .HART_ACTIVE () := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lhart
+  have lelp_a : ((hartActiveSA s b).regs .elp == landing_pad_bits_backwards .LP_EXPECTED) = false := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lelp
+  have lmisaS_a : (_get_Misa_S ((hartActiveSA s b).regs .misa) == 1#1) = true := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lmisaS
+  have lmIE_a : (_get_Mstatus_MIE ((hartActiveSA s b).regs .mstatus) == 1#1) = false := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lmIE
+  have lmisaC_a : (_get_Misa_C ((hartActiveSA s b).regs .misa) == 1#1) = true := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lmisaC
+  have lpmp_a : pmpAllowsAll ((hartActiveSA s b).regs .pmpcfg_n) := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lpmp
+  have lpma_a : (hartActiveSA s b).regs .pma_regions = bootPMA := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lpma
+  have lhtif_a : (hartActiveSA s b).regs .htif_tohost_base = none := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lhtif
+  have hdisp : execEff (dispatchInterrupt .Machine) (hartActiveSA s b) =
+      some (none, hartActiveSA s b, []) :=
+    execEffDispatchInterruptMachineNone _ lmisaS_a lmIE_a
+  have hzca : execEff (currentlyEnabled .Ext_Zca) (hartActiveSA s b) =
+      some (true, hartActiveSA s b, []) :=
+    execEffCurrentlyEnabledZca _ lmisaC_a
+  have hflat : fetchFlatOk (hartActiveSA s b) pc (.F_RVC h) := ⟨hal2, hram, w, ⟨hsub, hisRVC⟩, htext⟩
+  have hfetch : execEff (fetch ()) (hartActiveSA s b) =
+      some (.F_RVC h, hartActiveSA s b, [.WEread WeakFetchEff.wakIfetch pc 2]) :=
+    execEffFetchFlatRvc2 _ pc h lpmp_a lpma_a lmisaC_a lpc_a lpriv_a lhtif_a hal4 hflat
+  have sfetch : WeakEvLang.noSfAnn (fetch ()) (hartActiveSA s b) :=
+    WeakFetch2.noSfAnnFetchFlatRvc2 _ pc h lpmp_a lpma_a lmisaC_a lpc_a lpriv_a lhtif_a hal4 hflat
+  have hag : ∀ r, D r = true → dst.regs r = (hartActiveSA s b).regs r := by
+    intro r hD
+    have hne : r ≠ .minstret_increment := by
+      rintro rfl
+      rw [hDmi] at hD
+      exact absurd hD (by decide)
+    rw [WeakFetchEff.saLookup r s b hne]
+    exact (hagree r hD).symm
+  have hdec_a : execEff (ext_decode_compressed h) (hartActiveSA s b) =
+      some (i0, hartActiveSA s b, []) :=
+    execEffDecodeBridge D (ext_decode_compressed h) dst _ i0 (fun r hD => (hag r hD).symm) hgood hdec
+  have sdec : WeakEvLang.noSfAnn (ext_decode_compressed h) (hartActiveSA s b) :=
+    WeakFetchEff.noSfAnnOfGoodb0 D (ext_decode_compressed h) dst _ hag hgood
+  have hexp_a : execEff (execute i0) ((hartActiveSA s b).setReg .nextPC (BitVec.addInt pc 2)) =
+      some (.ExecuteAs i, (hartActiveSA s b).setReg .nextPC (BitVec.addInt pc 2), []) :=
+    execEffOfGoodb0Self D0 (execute i0) _ _ (hgood0 _) (hexp _)
+  have sexp : WeakEvLang.noSfAnn (execute i0) ((hartActiveSA s b).setReg .nextPC (BitVec.addInt pc 2)) :=
+    WeakFetchEff.noSfAnnOfGoodb0 D0 (execute i0) _ _ (fun _ _ => rfl) (hgood0 _)
+  have hrun := execEffHartActiveProgressRVCGen .Machine (hartActiveSA s b) (hartActiveSA s b) sExec h i0 i
+    pc (.Retire_Success ()) _ es_x lpriv_a hdisp hfetch hdec_a lelp_a lpc_a hzca hexp_a hex
+  have srun := WeakEffSkel.noSfAnnHartActiveProgressRVCGen .Machine (hartActiveSA s b) (hartActiveSA s b)
+    sExec h i0 i pc (.Retire_Success ()) _ es_x lpriv_a hdisp hfetch hdec_a lelp_a lpc_a hzca hexp_a hex
+    (WeakFetchEff.noSfAnnDispatchInterruptMachine _ lmisaS_a lmIE_a) sfetch sdec
+    (WeakFetch2.noSfAnnCurrentlyEnabledZca _) sexp (hsx b)
+  exact WeakEffSkel.noSfAnnRiscvStepHartActive s sExec _ b _ hsi lhart_a hrun hhe
+    (WeakFetchEff.noSfAnnShouldIncMinstret _ s) srun WeakFetchEff.noSfAnnTickClock tick
 
 end Weak

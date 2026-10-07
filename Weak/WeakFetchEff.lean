@@ -87,6 +87,7 @@ definition; it is still what walker and data reads classify to).
 10. Rocq's `W : _` binder trick (the leaked `Countable` instance) has no Lean
    counterpart: `W : GSet PAddr`.
 11. Rocq §10's `Print Assumptions` commands are not declarations.
+12. Q10 (owner ruling, Lean-only): `goodb0`'s announce arm rejects an SFENCE.VMA word (`!sfAnnB n w && …`; no decoder announces, so every `goodb0` fact still holds), so a `goodb0` walk is sfence-free (`WeakFetchEff.noSfAnnOfGoodb0`).  §10: the `noSfAnn` twins of the wrapper (`should_inc_minstret`, the interrupt gate, `tick_clock`), of the 4-aligned fetch chain (`pmpCheck` at any state, `pmaCheck` peels, `translateAddr` at Machine, `read_ram`, `checked_mem_read`/`mem_read` at any width), of the 8-byte LOAD `execute` chain, and the recipe twins `WeakFetchEff.noSfAnnStepOfLeafBaseSt`/`noSfAnnStepOfLeafBase` (premises: `sfAnnB 32 w = false` and the `execute`'s `noSfAnn`) and `WeakFetchEff.execEffStepOfLeafBaseSf` (both conclusions).
 
 **Rocq → Lean name map.**  `exec_eff_within_clint_false` `execEffWithinClintFalse`,
 `exec_eff_within_sig_false` `execEffWithinSigFalse`, `exec_eff_within_htif_false`
@@ -509,7 +510,7 @@ def goodb0 (D : Register → Bool) {X : Type} : SailM X → ExecSt → Bool
   | .impure (.ok o) k, s =>
     match o, k with
     | .regRead r, k => D r && goodb0 D (k (s.regs r)) s
-    | .instrAnnounce _ _, k => goodb0 D (k ()) s
+    | .instrAnnounce n w, k => !sfAnnB n w && goodb0 D (k ()) s
     | .branchAnnounce _ _, k => goodb0 D (k ()) s
     | .cacheOp _, k => goodb0 D (k ()) s
     | .tlbi _, k => goodb0 D (k ()) s
@@ -539,6 +540,9 @@ theorem goodb0Goodb (D : Register → Bool) {X : Type} (m : SailM X) (s : ExecSt
       case regRead r =>
         simp only [Bool.and_eq_true] at hg ⊢
         exact ⟨hg.1, ih _ s hg.2⟩
+      case instrAnnounce n w =>
+        simp only [Bool.and_eq_true] at hg
+        exact ih _ s hg.2
 
 /-- Rocq `exec_eff_goodb0_congr`: the read-frame congruence of
 `ExecSC7.execGoodbCongr`, at `execEff`, with the empty trace. -/
@@ -555,7 +559,7 @@ theorem execEffGoodb0Congr (D : Register → Bool) {X : Type} (m : SailM X) (s1 
     | error e => simp [goodb0] at hg
     | ok o =>
       cases o <;> simp only [goodb0] at hg <;> first
-        | (obtain ⟨x, h1, h2⟩ := ih _ hg; exact ⟨x, h1, h2⟩)
+        | exact ih _ hg
         | exact absurd hg (by decide)
         | skip
       case regRead r =>
@@ -565,6 +569,9 @@ theorem execEffGoodb0Congr (D : Register → Bool) {X : Type} (m : SailM X) (s1 
         show execEff (k (s2.regs r)) s2 = _
         rw [← hag r hg.1]
         exact h2
+      case instrAnnounce n w =>
+        simp only [Bool.and_eq_true] at hg
+        exact ih _ hg.2
 
 /-- Rocq `exec_eff_decode_bridge` (deviation 7: `agree_on` inlined): THE
 bridge a batch-2 leaf applies. -/
@@ -935,5 +942,831 @@ theorem wPLoadOfLeafBase (cid : Nat) (σ : Wmstate) (W : GSet PAddr)
       bmDomSub sExec.mem W) →
     wPEff (some cid) ([.WEread WeakFetchEff.wakIfetch pc 4] ++ [.WEread akl ea 4]) σ :=
   wPEffOfLeafBase cid σ W pc w i _ D dst
+
+/-! ## 10. Q10 (Lean-only): THE RECIPE'S RUN IS SFENCE-FREE
+
+Owner ruling Q10: the recipe's run facts also yield `WeakEvLang.noSfAnn` (no SFENCE.VMA
+announce along the run), from ONE extra word fact (`sfAnnB 32 w = false`, decidable for a
+concrete non-SFENCE word) and the `execute`'s own `noSfAnn`.  The decode is sfence-free by
+`goodb0` (whose announce arm rejects an sfence word, deviation 12); every other piece of the
+wrapper by the `nosf_run` twin of its `execEff` script. -/
+
+/-- A `goodb0` walk is sfence-free at every state agreeing on `D` (Lean-only). -/
+theorem WeakFetchEff.noSfAnnOfGoodb0 (D : Register → Bool) {X : Type} (m : SailM X)
+    (s1 s2 : ExecSt) :
+    (∀ r, D r = true → s1.regs r = s2.regs r) →
+    goodb0 D m s1 = true → WeakEvLang.noSfAnn m s2 := by
+  intro hag
+  induction m with
+  | pure x => intro _; trivial
+  | impure call k ih =>
+    intro hg
+    cases call with
+    | error e => simp [goodb0] at hg
+    | ok o =>
+      cases o <;> simp only [goodb0] at hg <;> first
+        | exact ih _ hg
+        | exact absurd hg (by decide)
+        | skip
+      case regRead r =>
+        simp only [Bool.and_eq_true] at hg
+        show WeakEvLang.noSfAnn (k (s2.regs r)) s2
+        rw [← hag r hg.1]
+        exact ih _ hg.2
+      case instrAnnounce n w =>
+        simp only [Bool.and_eq_true, Bool.not_eq_true'] at hg
+        exact ⟨hg.1, ih _ hg.2⟩
+
+/-- The `for` loop over an `IntRange` (step 1), at ANY state: sfence-free if every iteration
+is (Lean-only; the `noSfAnn` twin of `WeakPmpEff.execREffForInLoopConst`). -/
+theorem WeakFetchEff.noSfAnnRForInLoop {R β : Type} (range : IntRange) (hstep : range.step = 1)
+    (f : Int → β → SailME R (ForInStep β))
+    (hf : ∀ i b s, WeakEffSkel.noSfAnnR (f i b) s) :
+    ∀ (i : Int) (hs : (i - range.start) % range.step = 0) (b : β) (s : ExecSt),
+      WeakEffSkel.noSfAnnR (IntRange.forIn'.loop range (fun a _ b => f a b) b i hs) s := by
+  suffices H : ∀ (n : Nat) (i : Int) (hs : (i - range.start) % range.step = 0) (b : β) (s : ExecSt),
+      (range.stop - i + 1).toNat = n →
+      WeakEffSkel.noSfAnnR (IntRange.forIn'.loop range (fun a _ b => f a b) b i hs) s from
+    fun i hs b s => H _ i hs b s rfl
+  intro n
+  induction n with
+  | zero =>
+    intro i hs b s hn
+    rw [IntRange.loop_unfold]
+    have hni : ¬ i ∈ range := by
+      intro h
+      simp only [Membership.mem, hstep, show (1 : Int) > 0 from by decide, ite_true] at h
+      have := Int.toNat_eq_zero.mp hn
+      omega
+    simp only [dif_neg hni]
+    trivial
+  | succ n ih =>
+    intro i hs b s hn
+    rw [IntRange.loop_unfold]
+    by_cases h : i ∈ range
+    · simp only [dif_pos h]
+      rw [WeakEffSkel.noSfAnnRBindEq]
+      refine ⟨hf i b s, WeakEffSkel.sfThenRAll _ _ (fun r s1 => ?_)⟩
+      cases r with
+      | done b' => trivial
+      | yield b' =>
+        have hn' : (range.stop - (i + range.step) + 1).toNat = n := by
+          simp only [Membership.mem, hstep, show (1 : Int) > 0 from by decide, ite_true] at h
+          rw [hstep]
+          omega
+        exact ih _ _ b' s1 hn'
+    · simp only [dif_neg h]
+      trivial
+
+theorem WeakFetchEff.noSfAnnRForIn {R β : Type} (range : IntRange) (hstep : range.step = 1)
+    (b : β) (f : Int → β → SailME R (ForInStep β))
+    (hf : ∀ i b s, WeakEffSkel.noSfAnnR (f i b) s) (s : ExecSt) :
+    WeakEffSkel.noSfAnnR (forIn range b f) s :=
+  WeakFetchEff.noSfAnnRForInLoop range hstep f hf range.start (by simp) b s
+
+theorem WeakFetchEff.noSfAnnPmpReadAddrReg (n : Nat) (s : ExecSt) :
+    WeakEvLang.noSfAnn (pmpReadAddrReg n) s := by
+  unfold pmpReadAddrReg
+  nosf_run
+  split <;> trivial
+
+theorem WeakFetchEff.noSfAnnPmpMatchAddr (pa : physaddr) (width : BitVec 64) (ent : BitVec 8)
+    (pmpaddr prev : BitVec 64) (s : ExecSt) :
+    WeakEvLang.noSfAnn (pmpMatchAddr pa width ent pmpaddr prev) s := by
+  obtain ⟨a⟩ := pa
+  unfold pmpMatchAddr
+  split
+  split <;> (try split) <;> trivial
+
+theorem WeakFetchEff.noSfAnnPmpCheckRWX (ent : BitVec 8) (acc : MemoryAccessType mem_payload)
+    (s : ExecSt) : WeakEvLang.noSfAnn (pmpCheckRWX ent acc) s := by
+  unfold pmpCheckRWX
+  split <;> (try split) <;> trivial
+
+theorem WeakFetchEff.noSfAnnAccessFault (acc : MemoryAccessType mem_payload) (s : ExecSt) :
+    WeakEvLang.noSfAnn (accessFaultFromAccessType acc) s := by
+  unfold accessFaultFromAccessType
+  split <;> (try split) <;> trivial
+
+theorem WeakFetchEff.noSfAnnPmpCheck (addr : physaddr) (width : Nat)
+    (access : MemoryAccessType mem_payload) (p : Privilege) (s : ExecSt) :
+    WeakEvLang.noSfAnn (pmpCheck addr width access p) s := by
+  unfold pmpCheck
+  rw [WeakEffSkel.noSfAnnCatchEarlyReturn]
+  nosf_run
+  refine ⟨WeakFetchEff.noSfAnnRForIn _ rfl _ _ (fun i b s1 => ?_) s,
+    WeakEffSkel.sfThenRAll _ _ (fun _ _ => by nosf_run [WeakFetchEff.noSfAnnAccessFault])⟩
+  split
+  all_goals
+    nosf_run [execEffPmpReadAddrReg, WeakFetchEff.noSfAnnPmpReadAddrReg,
+      WeakFetchEff.noSfAnnPmpMatchAddr]
+    apply WeakEffSkel.sfThenAll
+    intro r s2
+    cases r <;> nosf_run [WeakFetchEff.noSfAnnAccessFault, WeakFetchEff.noSfAnnPmpCheckRWX]
+  done
+
+theorem WeakFetchEff.noSfAnnShouldIncMinstret (p : Privilege) (s : ExecSt) :
+    WeakEvLang.noSfAnn (should_inc_minstret p) s := by
+  unfold should_inc_minstret
+  nosf_run
+
+theorem WeakFetchEff.noSfAnnShouldIncMcycle (p : Privilege) (s : ExecSt) :
+    WeakEvLang.noSfAnn (should_inc_mcycle p) s := by
+  unfold should_inc_mcycle
+  nosf_run
+
+theorem WeakFetchEff.noSfAnnCurrentlyEnabledZicsr (s : ExecSt) :
+    WeakEvLang.noSfAnn (currentlyEnabled .Ext_Zicsr) s := by
+  rw [currentlyEnabled]
+  simp only [WeakFetchEff.execEffHartSupportsZicsr]
+  trivial
+
+theorem WeakFetchEff.noSfAnnCurrentlyEnabledS (s : ExecSt) :
+    WeakEvLang.noSfAnn (currentlyEnabled .Ext_S) s := by
+  rw [currentlyEnabled]
+  simp only [WeakFetchEff.execEffHartSupportsS, ↓reduceIte]
+  nosf_run [execEffRecCEZicsr, WeakFetchEff.noSfAnnCurrentlyEnabledZicsr]
+
+theorem WeakFetchEff.noSfAnnCurrentlyEnabledSstc (s : ExecSt) :
+    WeakEvLang.noSfAnn (currentlyEnabled .Ext_Sstc) s := by
+  rw [currentlyEnabled]
+  simp only [wteExecEffHartSupportsSstc]
+  trivial
+
+theorem WeakFetchEff.noSfAnnReadMip (s : ExecSt) :
+    WeakEvLang.noSfAnn (read_mip .IncludePlatformInterrupts) s := by
+  unfold read_mip external_interrupts_pending
+  nosf_run [WeakFetchEff.noSfAnnCurrentlyEnabledS, WeakFetchEff.execEffCurrentlyEnabledS]
+
+theorem WeakFetchEff.noSfAnnGetPendingSet (p : Privilege) (s : ExecSt) :
+    WeakEvLang.noSfAnn (getPendingSet p) s := by
+  unfold getPendingSet
+  nosf_run [WeakFetchEff.noSfAnnCurrentlyEnabledS, WeakFetchEff.execEffCurrentlyEnabledS,
+    WeakFetchEff.noSfAnnReadMip, wteExecEffReadMip]
+
+theorem WeakFetchEff.noSfAnnDispatchInterruptMachine (s : ExecSt)
+    (hmisaS : (_get_Misa_S (s.regs .misa) == 1#1) = true)
+    (hmIE : (_get_Mstatus_MIE (s.regs .mstatus) == 1#1) = false) :
+    WeakEvLang.noSfAnn (dispatchInterrupt .Machine) s := by
+  unfold dispatchInterrupt
+  nosf_run [WeakFetchEff.noSfAnnGetPendingSet, execEffGetPendingSetMachineNone s hmisaS hmIE]
+
+theorem WeakFetchEff.noSfAnnCsrNameWriteCallbackMip (V : BitVec 64) (s : ExecSt) :
+    WeakEvLang.noSfAnn (csr_name_write_callback "mip" V) s := trivial
+
+theorem WeakFetchEff.noSfAnnTickClock (s : ExecSt) : WeakEvLang.noSfAnn (tick_clock ()) s := by
+  obtain ⟨b, hb⟩ := execEffShouldIncMcycleSome (s.regs .cur_privilege) s
+  unfold tick_clock clint_dispatch get_config_print_clint
+  nosf_run [hb, WeakFetchEff.noSfAnnShouldIncMcycle, WeakFetchEff.noSfAnnCurrentlyEnabledSstc,
+    wteExecEffCurrentlyEnabledSstc, WeakFetchEff.noSfAnnReadMip, wteExecEffReadMip,
+    execEffCsrNameWriteCallbackMip, WeakFetchEff.noSfAnnCsrNameWriteCallbackMip]
+
+/-! ### 10b. The fetch chain, sfence-free -/
+
+theorem WeakFetchEff.noSfAnnWithinClint (a : physaddr) (w : Nat) (s : ExecSt) :
+    WeakEvLang.noSfAnn (within_clint a w) s := by
+  obtain ⟨a⟩ := a
+  unfold within_clint
+  nosf_run
+
+theorem WeakFetchEff.noSfAnnWithinSig (a : physaddr) (w : Nat) (s : ExecSt) :
+    WeakEvLang.noSfAnn (within_sig a w) s := by
+  obtain ⟨a⟩ := a
+  unfold within_sig
+  nosf_run
+
+theorem WeakFetchEff.noSfAnnWithinHtifWritable (a : physaddr) (w : Nat) (s : ExecSt) :
+    WeakEvLang.noSfAnn (within_htif_writable a w) s := by
+  obtain ⟨a⟩ := a
+  unfold within_htif_writable
+  nosf_run
+  split <;> trivial
+
+theorem WeakFetchEff.noSfAnnWithinHtifReadable (a : physaddr) (w : Nat) (s : ExecSt) :
+    WeakEvLang.noSfAnn (within_htif_readable a w) s :=
+  WeakFetchEff.noSfAnnWithinHtifWritable a w s
+
+theorem WeakFetchEff.noSfAnnWithinMmioReadable (a : physaddr) (w : Nat) (s : ExecSt) :
+    WeakEvLang.noSfAnn (within_mmio_readable a w) s := by
+  unfold within_mmio_readable
+  nosf_run [WeakFetchEff.noSfAnnWithinClint, WeakFetchEff.noSfAnnWithinSig,
+    WeakFetchEff.noSfAnnWithinHtifReadable]
+
+theorem WeakFetchEff.noSfAnnWithinMmioWritable (a : physaddr) (w : Nat) (s : ExecSt) :
+    WeakEvLang.noSfAnn (within_mmio_writable a w) s := by
+  unfold within_mmio_writable
+  nosf_run [WeakFetchEff.noSfAnnWithinClint, WeakFetchEff.noSfAnnWithinSig,
+    WeakFetchEff.noSfAnnWithinHtifWritable]
+
+theorem WeakFetchEff.noSfAnnEffectivePrivilege (acc : MemoryAccessType mem_payload) (m : BitVec 64)
+    (p : Privilege) (s : ExecSt) : WeakEvLang.noSfAnn (effectivePrivilege acc m p) s := by
+  unfold effectivePrivilege
+  nosf_run
+  split
+  · unfold privLevel_bits_forwards
+    split <;> trivial
+  · trivial
+
+theorem WeakFetchEff.noSfAnnIsShadowStack (acc : MemoryAccessType mem_payload) (s : ExecSt) :
+    WeakEvLang.noSfAnn (is_shadow_stack_access acc) s := by
+  unfold is_shadow_stack_access
+  split <;> (try split) <;> trivial
+
+/-- `translateAddr` at an effective Machine privilege (the identity), sfence-free. -/
+theorem WeakFetchEff.noSfAnnTranslationModeM (s : ExecSt) :
+    WeakEvLang.noSfAnn (translationMode .Machine) s := trivial
+
+theorem WeakFetchEff.noSfAnnTranslateAddrMachine (va : virtaddr) (acc : MemoryAccessType mem_payload)
+    (s : ExecSt)
+    (hep : execEff (effectivePrivilege acc (s.regs .mstatus) (s.regs .cur_privilege)) s =
+      some (.Machine, s, [])) :
+    WeakEvLang.noSfAnn (translateAddr va acc) s := by
+  unfold translateAddr
+  rw [WeakEffSkel.noSfAnnCatchEarlyReturn]
+  nosf_run [hep, WeakFetchEff.noSfAnnEffectivePrivilege, execEffTranslationModeM,
+    WeakFetchEff.noSfAnnIsShadowStack, WeakFetchEff.noSfAnnTranslationModeM]
+
+/-- The text word's `read_ram` (the one effect of the fetch), sfence-free. -/
+theorem WeakFetchEff.noSfAnnReadRamIfetch (addr : BitVec 64) (n : Nat) (w : BitVec (8 * n))
+    (s : ExecSt) (hdev : devAddr addr = false) (hr : bmRead s.mem addr n = some w) :
+    WeakEvLang.noSfAnn (read_ram .Read_ifetch (.Physaddr addr) n false) s := by
+  have hm : ∀ k, mmioAcc addr k = false := fun k => by simp [mmioAcc, hdev]
+  unfold read_ram LeanRV64D.ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read
+  nosf_run [hm, hr]
+
+/-- A plain data `read_ram` on RAM, sfence-free. -/
+theorem WeakFetchEff.noSfAnnReadRamPlain (addr : BitVec 64) (n : Nat) (w : BitVec (8 * n))
+    (s : ExecSt) (hdev : devAddr addr = false) (hr : bmRead s.mem addr n = some w) :
+    WeakEvLang.noSfAnn (read_ram .Read_plain (.Physaddr addr) n false) s := by
+  have hm : ∀ k, mmioAcc addr k = false := fun k => by simp [mmioAcc, hdev]
+  unfold read_ram LeanRV64D.ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read
+  nosf_run [hm, hr]
+
+theorem WeakFetchEff.noSfAnnIsMagApplicable (acc : MemoryAccessType mem_payload) (w : Nat)
+    (s : ExecSt) : WeakEvLang.noSfAnn (is_mag_applicable_access acc w) s := by
+  unfold is_mag_applicable_access
+  repeat' (first | trivial | split)
+
+theorem WeakFetchEff.noSfAnnMagPmaCheckAligned (pma : PMA) (acc : MemoryAccessType mem_payload)
+    (paddr : physaddr) (width : Nat) (b : Bool) (s : ExecSt)
+    (hma : execEff (is_mag_applicable_access acc width) s = some (b, s, []))
+    (halign : is_aligned_paddr paddr width = true) :
+    WeakEvLang.noSfAnn (mag_pma_check pma acc paddr width) s := by
+  unfold mag_pma_check
+  rw [WeakEffSkel.noSfAnnBindEq, hma]
+  refine ⟨?_, ?_⟩
+  · exact WeakFetchEff.noSfAnnIsMagApplicable acc width s
+  · simp only [WeakEffSkel.sfThenSome, halign, Bool.true_or, ↓reduceIte]
+    trivial
+
+/-- `pmaCheck` at a matching region and an aligned access (the `pma_ok_eff_peel` path),
+sfence-free; `hf` is the access's permission (any value). -/
+syntax "nosf_pma_peel" term:max term:max term:max : tactic
+macro_rules
+  | `(tactic| nosf_pma_peel $hm $hmag $hal) => `(tactic|
+      (unfold pmaCheck
+       rw [WeakEffSkel.noSfAnnCatchEarlyReturn]
+       nosf_run [$hm:term, Functions.not, Bool.not_true, Bool.not_false, execEffAssertExpTrue,
+         WeakFetchEff.noSfAnnAccessFault,
+         execEffMagPmaCheckAligned _ _ _ _ _ _ $hmag $hal,
+         WeakFetchEff.noSfAnnMagPmaCheckAligned _ _ _ _ _ _ $hmag $hal]))
+
+theorem WeakFetchEff.noSfAnnPmaCheckFetch (addr : BitVec 64) (w : Nat) (pbmt : page_based_mem_type)
+    (region : PMA_Region) (s : ExecSt)
+    (hm : matching_pma_region (s.regs .pma_regions) (.Physaddr addr) w = some region)
+    (hal : is_aligned_paddr (.Physaddr addr) w = true) :
+    WeakEvLang.noSfAnn (pmaCheck (.Physaddr addr) w (.InstructionFetch ()) pbmt false) s := by
+  obtain ⟨attrs, sz, inc, base⟩ := region
+  nosf_pma_peel hm (execEffIsMagApplicableFetch w s) hal
+
+theorem WeakFetchEff.noSfAnnPmaCheckLoad (addr : BitVec 64) (w : Nat) (pbmt : page_based_mem_type)
+    (region : PMA_Region) (s : ExecSt)
+    (hm : matching_pma_region (s.regs .pma_regions) (.Physaddr addr) w = some region)
+    (hal : is_aligned_paddr (.Physaddr addr) w = true) :
+    WeakEvLang.noSfAnn (pmaCheck (.Physaddr addr) w (.Load .Data) pbmt false) s := by
+  obtain ⟨attrs, sz, inc, base⟩ := region
+  nosf_pma_peel hm (execEffIsMagApplicableLoadData w s) hal
+
+theorem WeakFetchEff.noSfAnnPmaCheckStore (addr : BitVec 64) (w : Nat) (pbmt : page_based_mem_type)
+    (region : PMA_Region) (s : ExecSt)
+    (hm : matching_pma_region (s.regs .pma_regions) (.Physaddr addr) w = some region)
+    (hal : is_aligned_paddr (.Physaddr addr) w = true) :
+    WeakEvLang.noSfAnn (pmaCheck (.Physaddr addr) w (.Store .Data) pbmt false) s := by
+  obtain ⟨attrs, sz, inc, base⟩ := region
+  nosf_pma_peel hm (execEffIsMagApplicableStoreData w s) hal
+
+theorem WeakFetchEff.noSfAnnSplitMisalignedUnsplit (addr : BitVec 64) (width g : Nat) (s : ExecSt) :
+    WeakEvLang.noSfAnn (split_misaligned (.Physaddr addr) width g .CannotSplit) s := trivial
+
+/-- `exec_eff_mem`'s normaliser with the `noSfAnn` laws (Lean-only). -/
+syntax "nosf_mem" (" [" Lean.Parser.Tactic.simpLemma,* "]")? : tactic
+macro_rules
+  | `(tactic| nosf_mem [$ls,*]) => `(tactic| nosf_run [pmaOkAligned,
+      execEffSplitMisalignedUnsplit, WeakFetchEff.noSfAnnSplitMisalignedUnsplit, untilFuelM,
+      untilFuelM.go, misaligned_order, bits_of_physaddr,
+      Int.reduceToNat, Int.reduceMul, Int.reduceAdd, Int.reduceSub, Int.cast_ofNat_Int,
+      Int.natCast_zero, Int.toNat_natCast, Int.zero_mul, addIntZero, $ls,*])
+
+theorem WeakFetchEff.noSfAnnCurrentlyEnabledZiccif (s : ExecSt) :
+    WeakEvLang.noSfAnn (currentlyEnabled .Ext_Ziccif) s := by
+  rw [currentlyEnabled]
+  simp only [execEffHartSupportsZiccif]
+  trivial
+
+/-- The fetch's `read_ram` at any width, at `execEff` (Lean-only; `execEffReadRamIfetch4`
+generalised). -/
+theorem WeakFetchEff.execEffReadRamIfetchN (addr : BitVec 64) (n : Nat) (w : BitVec (8 * n))
+    (s : ExecSt) (hdev : devAddr addr = false) (hr : bmRead s.mem addr n = some w) :
+    execEff (read_ram .Read_ifetch (.Physaddr addr) n false) s =
+      some ((w, default_meta), s, [.WEread WeakFetchEff.wakIfetch addr n]) := by
+  have hm : ∀ k, mmioAcc addr k = false := fun k => by simp [mmioAcc, hdev]
+  unfold read_ram LeanRV64D.ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read
+  exec_eff_run [hm, hr]
+  rfl
+
+/-- `execEffCheckedMemReadRam`'s twin, at any width (the fetch's physical read). -/
+theorem WeakFetchEff.noSfAnnCheckedMemReadFetch (pbmt : page_based_mem_type) (addr : BitVec 64)
+    (n : Nat) (region : PMA_Region) (w : BitVec (8 * n)) (s : ExecSt)
+    (hpmp : execEff (pmpCheck (.Physaddr addr) n (.InstructionFetch ()) .Machine) s = some (none, s, []))
+    (hmatch : matching_pma_region (s.regs .pma_regions) (.Physaddr addr) n = some region)
+    (halign : is_aligned_paddr (.Physaddr addr) n = true)
+    (hexec : (override_PMA region.attributes pbmt).executable = true)
+    (hmm : execEff (within_mmio_readable (.Physaddr addr) n) s = some (false, s, []))
+    (hdev : devAddr addr = false) (hr : bmRead s.mem addr n = some w) :
+    WeakEvLang.noSfAnn
+      (checked_mem_read (.InstructionFetch ()) pbmt .Machine (.Physaddr addr) n false false false false) s := by
+  have hpma : execEff (pmaCheck (.Physaddr addr) n (.InstructionFetch ()) pbmt false) s =
+      some (.Ok pmaOkAligned, s, []) := by
+    obtain ⟨attrs, sz, inc, base⟩ := region
+    pma_ok_eff_peel hmatch hexec (execEffIsMagApplicableFetch n s) halign
+  have spma := WeakFetchEff.noSfAnnPmaCheckFetch addr n pbmt region s hmatch halign
+  have hrr := WeakFetchEff.execEffReadRamIfetchN addr n w s hdev hr
+  have srr := WeakFetchEff.noSfAnnReadRamIfetch addr n w s hdev hr
+  unfold checked_mem_read check_pma_with_pmp_priority
+  rw [WeakEffSkel.noSfAnnCatchEarlyReturn]
+  nosf_mem [hpma, spma, hpmp, WeakFetchEff.noSfAnnPmpCheck, hmm, WeakFetchEff.noSfAnnWithinMmioReadable,
+    hrr, srr, read_kind_of_flags]
+
+/-- `execEffMemReadFetch`'s twin, at any width. -/
+theorem WeakFetchEff.noSfAnnMemReadFetch (pbmt : page_based_mem_type) (addr : BitVec 64) (n : Nat)
+    (region : PMA_Region) (w : BitVec (8 * n)) (s : ExecSt)
+    (hpmp : execEff (pmpCheck (.Physaddr addr) n (.InstructionFetch ()) .Machine) s = some (none, s, []))
+    (hmatch : matching_pma_region (s.regs .pma_regions) (.Physaddr addr) n = some region)
+    (halign : is_aligned_paddr (.Physaddr addr) n = true)
+    (hexec : (override_PMA region.attributes pbmt).executable = true)
+    (hmm : execEff (within_mmio_readable (.Physaddr addr) n) s = some (false, s, []))
+    (hdev : devAddr addr = false) (hr : bmRead s.mem addr n = some w)
+    (hck : ∃ v es, execEff
+      (checked_mem_read (.InstructionFetch ()) pbmt .Machine (.Physaddr addr) n false false false false) s =
+        some (v, s, es))
+    (hpriv : s.regs .cur_privilege = .Machine) :
+    WeakEvLang.noSfAnn (mem_read (.InstructionFetch ()) pbmt (.Physaddr addr) n false false false) s := by
+  obtain ⟨v, es, hck⟩ := hck
+  have sck := WeakFetchEff.noSfAnnCheckedMemReadFetch pbmt addr n region w s hpmp hmatch halign hexec
+    hmm hdev hr
+  unfold mem_read mem_read_priv mem_read_priv_meta
+  nosf_run [hpriv, execEffEffectivePrivilegeFetch, WeakFetchEff.noSfAnnEffectivePrivilege, hck, sck]
+
+/-- `WeakFetchEff.execEffFetchBytesOk`'s twin. -/
+theorem WeakFetchEff.noSfAnnFetchBytesOk (fs gs pa : BitVec 64) (n : Nat) (pbmt : page_based_mem_type)
+    (w : BitVec (8 * n)) (s s1 : ExecSt) (es : List Weff)
+    (htr : execEff (translateAddr (.Virtaddr gs) (.InstructionFetch ())) s =
+      some (.Ok (.Physaddr pa, pbmt, ()), s1, []))
+    (hmr : execEff (mem_read (.InstructionFetch ()) pbmt (.Physaddr pa) n false false false) s1 =
+      some (.Ok w, s1, es))
+    (str : WeakEvLang.noSfAnn (translateAddr (.Virtaddr gs) (.InstructionFetch ())) s)
+    (smr : WeakEvLang.noSfAnn (mem_read (.InstructionFetch ()) pbmt (.Physaddr pa) n false false false) s1) :
+    WeakEvLang.noSfAnn (fetch_bytes fs gs n) s := by
+  unfold fetch_bytes ext_fetch_check_pc
+  rw [WeakEffSkel.noSfAnnCatchEarlyReturn]
+  nosf_run [htr, hmr, str, smr]
+
+/-- `WeakFetchEff.execEffFetch4`'s twin. -/
+theorem WeakFetchEff.noSfAnnFetch4 (pc : BitVec 64) (w : BitVec 32) (s s1 : ExecSt) (es : List Weff)
+    (hpc : s.regs .PC = pc) (hvalign : is_aligned_vaddr (.Virtaddr pc) 4 = true)
+    (hfb : execEff (fetch_bytes pc pc 4) s = some (.FetchBytes_Success w, s1, es))
+    (sfb : WeakEvLang.noSfAnn (fetch_bytes pc pc 4) s) :
+    WeakEvLang.noSfAnn (fetch ()) s := by
+  unfold fetch ext_fetch_check_pc get_config_rvfi
+  rw [WeakEffSkel.noSfAnnCatchEarlyReturn]
+  cases hr : isRVC (Sail.BitVec.extractLsb w 15 0) <;>
+  nosf_run [hpc, bit0ClearOfAligned4 pc hvalign, bit1ClearOfAligned4 pc hvalign, hvalign,
+    execEffCurrentlyEnabledZiccif, WeakFetchEff.noSfAnnCurrentlyEnabledZiccif, hfb, sfb, hr]
+
+/-- `execEffFetchFlatBase4`'s twin: the funnel's 4-aligned `F_Base` fetch is sfence-free. -/
+theorem WeakFetchEff.noSfAnnFetchFlatBase4 (t : ExecSt) (pc : BitVec 64) (w : BitVec 32) :
+    pmpAllowsAll (t.regs .pmpcfg_n) →
+    t.regs .pma_regions = bootPMA →
+    t.regs .PC = pc →
+    t.regs .cur_privilege = .Machine →
+    t.regs .htif_tohost_base = none →
+    is_aligned_vaddr (.Virtaddr pc) 4 = true →
+    fetchFlatOk t pc (.F_Base w) →
+    WeakEvLang.noSfAnn (fetch ()) t := by
+  rintro hpmp hpma lpc lpriv lhtif hal ⟨_, hram, w0, hr, hbytes⟩
+  obtain ⟨rfl, hnotRVC⟩ := hr
+  have halign : is_aligned_paddr (.Physaddr (fetchPa pc)) 4 = true := by rw [fetchPa_eq]; exact hal
+  have hmatch : matching_pma_region (t.regs .pma_regions) (.Physaddr (fetchPa pc)) 4 = some ramRegion := by
+    rw [hpma, fetchPa_eq]; exact matching_pma_ram pc 4 hram (by decide) (by decide)
+  have hc : execEff (within_clint (.Physaddr (fetchPa pc)) 4) t = some (false, t, []) := by
+    rw [fetchPa_eq, within_clint_ram pc 4 hram]; rfl
+  have hsig : execEff (within_sig (.Physaddr (fetchPa pc)) 4) t = some (false, t, []) := by
+    first
+    | rfl
+    | (simp only [within_sig, plat_have_sig, Functions.not]; rfl)
+  have hb : BytesAt t (fetchPa pc) 4 w := by rw [fetchPa_eq]; exact hbytes
+  have hpmp' := execEffPmpCheckMachineUnlockedIfetch4 (fetchPa pc) t hpmp halign
+  have hdev : devAddr (fetchPa pc) = false := by rw [fetchPa_eq]; exact devAddrRam pc 4 hram
+  have hhtif := execEffWithinHtifFalse (fetchPa pc) 4 t lhtif
+  have htr := execEffTranslateAddrIdentity pc t lpriv
+  have hmr := execEffMemReadFetch .PBMT_PMA (fetchPa pc) ramRegion w t hpmp' hmatch halign
+    ramRegionExec hc hsig hhtif hdev hb lpriv
+  have smr := WeakFetchEff.noSfAnnMemReadFetch .PBMT_PMA (fetchPa pc) 4 ramRegion w t hpmp' hmatch
+    halign ramRegionExec (execEffWithinMmioReadableFalse _ 4 t hc hsig hhtif) hdev
+    (bmRead_of_bytes _ _ _ _ hb)
+    ⟨_, _, execEffCheckedMemReadRam .PBMT_PMA (fetchPa pc) ramRegion w t hpmp' hmatch halign
+      ramRegionExec hc hsig hhtif hdev hb⟩ lpriv
+  have str := WeakFetchEff.noSfAnnTranslateAddrMachine (.Virtaddr pc) (.InstructionFetch ()) t
+    (by rw [lpriv]; exact execEffEffectivePrivilegeFetch _ _ t)
+  have hfb := execEffFetchBytes4 pc ramRegion w t lpriv hpmp' hmatch ramRegionExec hc hsig hhtif hdev hb hal
+  have sfb : WeakEvLang.noSfAnn (fetch_bytes pc pc 4) t :=
+    WeakFetchEff.noSfAnnFetchBytesOk pc pc (fetchPa pc) 4 .PBMT_PMA w t t _ htr hmr str smr
+  exact WeakFetchEff.noSfAnnFetch4 pc w t t _ lpc hal hfb sfb
+
+/-! ### 10c. THE RECIPE'S RUN, sfence-free -/
+
+/-- `WeakFetchEff.execEffStepOfLeafBaseSt`'s twin (Q10): the same premises, the fetched word not
+an sfence word, and the `execute`'s own `noSfAnn` give `noSfAnn` of the whole step at BOTH ticks. -/
+theorem WeakFetchEff.noSfAnnStepOfLeafBaseSt (s : ExecSt) (W : GSet PAddr)
+    (pc : BitVec 64) (w : BitVec 32) (i : instruction) (es_x : List Weff)
+    (D : Register → Bool) (dst : ExecSt) :
+    s.regs .PC = pc →
+    s.regs .cur_privilege = .Machine →
+    pmpAllowsAll (s.regs .pmpcfg_n) →
+    s.regs .pma_regions = bootPMA →
+    s.regs .htif_tohost_base = none →
+    s.regs .hart_state = .HART_ACTIVE () →
+    (_get_Misa_S (s.regs .misa) == 1#1) = true →
+    (_get_Mstatus_MIE (s.regs .mstatus) == 1#1) = false →
+    (s.regs .elp == landing_pad_bits_backwards .LP_EXPECTED) = false →
+    is_aligned_vaddr (.Virtaddr pc) 4 = true →
+    inRam pc 4 →
+    (∀ j : Nat, j < 4 → s.mem (pc + BitVec.ofNat 64 j) = some (nthByte (n := 4) w j)) →
+    isRVC (Sail.BitVec.extractLsb w 15 0) = false →
+    (∀ r, D r = true → s.regs r = dst.regs r) →
+    D .minstret_increment = false →
+    goodb0 D (ext_decode w) dst = true →
+    exec (ext_decode w) dst = some (i, dst) →
+    is_lpad_instruction i = false →
+    (∀ b : Bool, ∃ sExec : ExecSt,
+      execEff (execute i) ((s.setReg .minstret_increment b).setReg .nextPC (BitVec.addInt pc 4)) =
+        some (.Retire_Success (), sExec, es_x) ∧
+      sExec.regs .hart_state = .HART_ACTIVE () ∧
+      sExec.regs .minstret_increment = b ∧
+      bmDomSub sExec.mem W) →
+    sfAnnB 32 w = false →
+    (∀ b : Bool, WeakEvLang.noSfAnn (execute i)
+      ((s.setReg .minstret_increment b).setReg .nextPC (BitVec.addInt pc 4))) →
+    ∀ tick : Bool, WeakEvLang.noSfAnn (riscvStep tick) s := by
+  intro lpc lpriv lpmp lpma lhtif lhart lmisaS lmIE lelp hal hram htext hnotRVC hagree hDmi hgood hdec
+    hnlpad hexec hsfw hsx tick
+  obtain ⟨b, hsi⟩ := execEffShouldIncMinstretSome (s.regs .cur_privilege) s
+  obtain ⟨sExec, hex, hhe, -, -⟩ := hexec b
+  have lpriv_a : (hartActiveSA s b).regs .cur_privilege = .Machine := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lpriv
+  have lpc_a : (hartActiveSA s b).regs .PC = pc := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lpc
+  have lhart_a : (hartActiveSA s b).regs .hart_state = .HART_ACTIVE () := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lhart
+  have lelp_a : ((hartActiveSA s b).regs .elp == landing_pad_bits_backwards .LP_EXPECTED) = false := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lelp
+  have lmisaS_a : (_get_Misa_S ((hartActiveSA s b).regs .misa) == 1#1) = true := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lmisaS
+  have lmIE_a : (_get_Mstatus_MIE ((hartActiveSA s b).regs .mstatus) == 1#1) = false := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lmIE
+  have hdisp : execEff (dispatchInterrupt .Machine) (hartActiveSA s b) =
+      some (none, hartActiveSA s b, []) :=
+    execEffDispatchInterruptMachineNone _ lmisaS_a lmIE_a
+  have lpmp_a : pmpAllowsAll ((hartActiveSA s b).regs .pmpcfg_n) := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lpmp
+  have lpma_a : (hartActiveSA s b).regs .pma_regions = bootPMA := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lpma
+  have lhtif_a : (hartActiveSA s b).regs .htif_tohost_base = none := by
+    rw [WeakFetchEff.saLookup _ _ _ (by decide)]; exact lhtif
+  have hflat : fetchFlatOk (hartActiveSA s b) pc (.F_Base w) :=
+    ⟨align4Align2 pc hal, hram, w, ⟨rfl, hnotRVC⟩, htext⟩
+  have hfetch : execEff (fetch ()) (hartActiveSA s b) =
+      some (.F_Base w, hartActiveSA s b, [.WEread WeakFetchEff.wakIfetch pc 4]) :=
+    execEffFetchFlatBase4 _ pc w lpmp_a lpma_a lpc_a lpriv_a lhtif_a hal hflat
+  have sfetch : WeakEvLang.noSfAnn (fetch ()) (hartActiveSA s b) :=
+    WeakFetchEff.noSfAnnFetchFlatBase4 _ pc w lpmp_a lpma_a lpc_a lpriv_a lhtif_a hal hflat
+  have hag : ∀ r, D r = true → dst.regs r = (hartActiveSA s b).regs r := by
+    intro r hD
+    have hne : r ≠ .minstret_increment := by
+      rintro rfl
+      rw [hDmi] at hD
+      exact absurd hD (by decide)
+    rw [WeakFetchEff.saLookup r s b hne]
+    exact (hagree r hD).symm
+  have hdec_a : execEff (ext_decode w) (hartActiveSA s b) = some (i, hartActiveSA s b, []) :=
+    execEffDecodeBridge D (ext_decode w) dst _ i (fun r hD => (hag r hD).symm) hgood hdec
+  have sdec : WeakEvLang.noSfAnn (ext_decode w) (hartActiveSA s b) :=
+    WeakFetchEff.noSfAnnOfGoodb0 D (ext_decode w) dst _ hag hgood
+  have hrun := execEffHartActiveProgressBaseGen .Machine (hartActiveSA s b) (hartActiveSA s b) sExec w i
+    pc (.Retire_Success ()) _ es_x lpriv_a hdisp hfetch hdec_a lelp_a hnlpad lpc_a hex trivial
+  have srun := WeakEffSkel.noSfAnnHartActiveProgressBaseGen .Machine (hartActiveSA s b)
+    (hartActiveSA s b) sExec w i pc (.Retire_Success ()) _ es_x lpriv_a hdisp hfetch hdec_a lelp_a lpc_a
+    hex trivial hsfw (WeakFetchEff.noSfAnnDispatchInterruptMachine _ lmisaS_a lmIE_a) sfetch sdec
+    (hsx b)
+  exact WeakEffSkel.noSfAnnRiscvStepHartActive s sExec _ b _ hsi lhart_a hrun hhe
+    (WeakFetchEff.noSfAnnShouldIncMinstret _ s) srun WeakFetchEff.noSfAnnTickClock tick
+
+/-- `execEffStepOfLeafBase`'s twin (Q10), at the confined state. -/
+theorem WeakFetchEff.noSfAnnStepOfLeafBase (σ : Wmstate) (W : GSet PAddr)
+    (pc : BitVec 64) (w : BitVec 32) (i : instruction) (es_x : List Weff)
+    (D : Register → Bool) (dst : ExecSt) :
+    -- the M-mode config tower: the SAME facts `wwpInstr` collects
+    σ.wmRegs .PC = pc →
+    σ.wmRegs .cur_privilege = .Machine →
+    pmpAllowsAll (σ.wmRegs .pmpcfg_n) →
+    σ.wmRegs .pma_regions = bootPMA →
+    σ.wmRegs .htif_tohost_base = none →
+    σ.wmRegs .hart_state = .HART_ACTIVE () →
+    (_get_Misa_S (σ.wmRegs .misa) == 1#1) = true →
+    (_get_Mstatus_MIE (σ.wmRegs .mstatus) == 1#1) = false →
+    (σ.wmRegs .elp == landing_pad_bits_backwards .LP_EXPECTED) = false →
+    -- (a) the text word, IN THE CONFINED MEMORY, at a 4-aligned pc
+    is_aligned_vaddr (.Virtaddr pc) 4 = true →
+    inRam pc 4 →
+    (∀ j : Nat, j < 4 → wmemRestrict σ W (pc + BitVec.ofNat 64 j) = some (nthByte (n := 4) w j)) →
+    isRVC (Sail.BitVec.extractLsb w 15 0) = false →
+    -- (b) the DECODE, exactly as the decode library states it
+    (∀ r, D r = true → σ.wmRegs r = dst.regs r) →
+    D .minstret_increment = false →
+    goodb0 D (ext_decode w) dst = true →
+    exec (ext_decode w) dst = some (i, dst) →
+    is_lpad_instruction i = false →
+    -- (c) the `execute`'s own `execEff` fact, and its register frame
+    (∀ b : Bool, ∃ sExec : ExecSt,
+      execEff (execute i)
+        (((⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ : ExecSt).setReg .minstret_increment b).setReg .nextPC
+          (BitVec.addInt pc 4)) = some (.Retire_Success (), sExec, es_x) ∧
+      sExec.regs .hart_state = .HART_ACTIVE () ∧
+      sExec.regs .minstret_increment = b ∧
+      bmDomSub sExec.mem W) →
+    -- Q10: the word is not an sfence word; the `execute` is sfence-free
+    sfAnnB 32 w = false →
+    (∀ b : Bool, WeakEvLang.noSfAnn (execute i)
+      (((⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ : ExecSt).setReg .minstret_increment b).setReg .nextPC
+        (BitVec.addInt pc 4))) →
+    ∀ tick : Bool,
+      WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ :=
+  WeakFetchEff.noSfAnnStepOfLeafBaseSt ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ W pc w i es_x D dst
+
+/-- `execEffStepOfLeafBase` AND its `noSfAnn` twin, in one statement (Lean-only, Q10): the row
+runs' single call. -/
+theorem WeakFetchEff.execEffStepOfLeafBaseSf (σ : Wmstate) (W : GSet PAddr)
+    (pc : BitVec 64) (w : BitVec 32) (i : instruction) (es_x : List Weff)
+    (D : Register → Bool) (dst : ExecSt) :
+    -- the M-mode config tower: the SAME facts `wwpInstr` collects
+    σ.wmRegs .PC = pc →
+    σ.wmRegs .cur_privilege = .Machine →
+    pmpAllowsAll (σ.wmRegs .pmpcfg_n) →
+    σ.wmRegs .pma_regions = bootPMA →
+    σ.wmRegs .htif_tohost_base = none →
+    σ.wmRegs .hart_state = .HART_ACTIVE () →
+    (_get_Misa_S (σ.wmRegs .misa) == 1#1) = true →
+    (_get_Mstatus_MIE (σ.wmRegs .mstatus) == 1#1) = false →
+    (σ.wmRegs .elp == landing_pad_bits_backwards .LP_EXPECTED) = false →
+    -- (a) the text word, IN THE CONFINED MEMORY, at a 4-aligned pc
+    is_aligned_vaddr (.Virtaddr pc) 4 = true →
+    inRam pc 4 →
+    (∀ j : Nat, j < 4 → wmemRestrict σ W (pc + BitVec.ofNat 64 j) = some (nthByte (n := 4) w j)) →
+    isRVC (Sail.BitVec.extractLsb w 15 0) = false →
+    -- (b) the DECODE, exactly as the decode library states it
+    (∀ r, D r = true → σ.wmRegs r = dst.regs r) →
+    D .minstret_increment = false →
+    goodb0 D (ext_decode w) dst = true →
+    exec (ext_decode w) dst = some (i, dst) →
+    is_lpad_instruction i = false →
+    -- (c) the `execute`'s own `execEff` fact, and its register frame
+    (∀ b : Bool, ∃ sExec : ExecSt,
+      execEff (execute i)
+        (((⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ : ExecSt).setReg .minstret_increment b).setReg .nextPC
+          (BitVec.addInt pc 4)) = some (.Retire_Success (), sExec, es_x) ∧
+      sExec.regs .hart_state = .HART_ACTIVE () ∧
+      sExec.regs .minstret_increment = b ∧
+      bmDomSub sExec.mem W) →
+    -- Q10: the word is not an sfence word; the `execute` is sfence-free
+    sfAnnB 32 w = false →
+    (∀ b : Bool, WeakEvLang.noSfAnn (execute i)
+      (((⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ : ExecSt).setReg .minstret_increment b).setReg .nextPC
+        (BitVec.addInt pc 4))) →
+    ∀ tick : Bool, (∃ t' : ExecSt,
+      execEff (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ =
+        some ((), t', [.WEread WeakFetchEff.wakIfetch pc 4] ++ es_x) ∧
+      bmDomSub t'.mem W) ∧
+      WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ := by
+  intro lpc lpriv lpmp lpma lhtif lhart lmisaS lmIE lelp hal hram htext hnotRVC hagree hDmi hgood hdec
+    hnlpad hexec hsfw hsx tick
+  exact ⟨execEffStepOfLeafBase σ W pc w i es_x D dst lpc lpriv lpmp lpma lhtif lhart lmisaS lmIE lelp hal
+      hram htext hnotRVC hagree hDmi hgood hdec hnlpad hexec tick,
+    WeakFetchEff.noSfAnnStepOfLeafBase σ W pc w i es_x D dst lpc lpriv lpmp lpma lhtif lhart lmisaS lmIE
+      lelp hal hram htext hnotRVC hagree hDmi hgood hdec hnlpad hexec hsfw hsx tick⟩
+
+/-! ### 10d. The 8-byte LOAD's `execute` (`WeakLeafEff8`), sfence-free -/
+
+theorem WeakFetchEff.noSfAnnRXBitsGpr (i : BitVec 5) (s : ExecSt) :
+    WeakEvLang.noSfAnn (rX_bits (.Regidx i)) s := by
+  rcases uxa_bv5_cases i with
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+  all_goals trivial
+
+theorem WeakFetchEff.noSfAnnWXBitsGpr (i : BitVec 5) (v : BitVec 64) (s : ExecSt) :
+    WeakEvLang.noSfAnn (wX_bits (.Regidx i) v) s := by
+  rcases uxa_bv5_cases i with
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+  all_goals trivial
+
+theorem WeakFetchEff.noSfAnnExtDataGetAddrGpr (rs1 : BitVec 5) (offset : BitVec 64)
+    (acc : MemoryAccessType mem_payload) (w : Nat) (s : ExecSt) :
+    WeakEvLang.noSfAnn (ext_data_get_addr (.Regidx rs1) offset acc w) s := by
+  unfold ext_data_get_addr
+  nosf_run [execEffRXBitsGpr, WeakFetchEff.noSfAnnRXBitsGpr]
+
+
+theorem WeakFetchEff.noSfAnnCheckedMemReadRamLoad (pbmt : page_based_mem_type) (addr : BitVec 64)
+    (region : PMA_Region) (w : BitVec 64) (s : ExecSt)
+    (hpmp : execEff (pmpCheck (.Physaddr addr) 8 (.Load .Data) .Machine) s = some (none, s, []))
+    (hm : matching_pma_region (s.regs .pma_regions) (.Physaddr addr) 8 = some region)
+    (hal : is_aligned_paddr (.Physaddr addr) 8 = true)
+    (hr : (override_PMA region.attributes pbmt).readable = true)
+    (hc : execEff (within_clint (.Physaddr addr) 8) s = some (false, s, []))
+    (hsig : execEff (within_sig (.Physaddr addr) 8) s = some (false, s, []))
+    (hh : execEff (within_htif_readable (.Physaddr addr) 8) s = some (false, s, []))
+    (hdev : devAddr addr = false) (hb : BytesAt s addr 8 w) :
+    WeakEvLang.noSfAnn (checked_mem_read (.Load .Data) pbmt .Machine (.Physaddr addr) 8 false false false false) s := by
+  have hpma := execEffPmaCheckRamLoad addr pbmt region s hm hal hr
+  have spma := WeakFetchEff.noSfAnnPmaCheckLoad addr 8 pbmt region s hm hal
+  have hmm := execEffWithinMmioReadableFalse addr 8 s hc hsig hh
+  have hrr := execEffReadRamPlain8 addr w s hdev hb
+  have srr := WeakFetchEff.noSfAnnReadRamPlain addr 8 w s hdev (bmRead_of_bytes _ _ _ _ hb)
+  unfold checked_mem_read check_pma_with_pmp_priority
+  rw [WeakEffSkel.noSfAnnCatchEarlyReturn]
+  nosf_mem [hpma, spma, hpmp, WeakFetchEff.noSfAnnPmpCheck, hmm, WeakFetchEff.noSfAnnWithinMmioReadable,
+    hrr, srr, read_kind_of_flags]
+
+
+theorem WeakFetchEff.noSfAnnMemReadLoad (pbmt : page_based_mem_type) (addr : BitVec 64) (region : PMA_Region)
+    (w m : BitVec 64) (s : ExecSt)
+    (hpmp : execEff (pmpCheck (.Physaddr addr) 8 (.Load .Data) .Machine) s = some (none, s, []))
+    (hm : matching_pma_region (s.regs .pma_regions) (.Physaddr addr) 8 = some region)
+    (hal : is_aligned_paddr (.Physaddr addr) 8 = true)
+    (hr : (override_PMA region.attributes pbmt).readable = true)
+    (hc : execEff (within_clint (.Physaddr addr) 8) s = some (false, s, []))
+    (hsig : execEff (within_sig (.Physaddr addr) 8) s = some (false, s, []))
+    (hh : execEff (within_htif_readable (.Physaddr addr) 8) s = some (false, s, []))
+    (hdev : devAddr addr = false) (hb : BytesAt s addr 8 w) (hms : s.regs .mstatus = m)
+    (hmprv : (_get_Mstatus_MPRV m == 1#1) = false) (hpriv : s.regs .cur_privilege = .Machine) :
+    WeakEvLang.noSfAnn (mem_read (.Load .Data) pbmt (.Physaddr addr) 8 false false false) s := by
+  have hck := execEffCheckedMemReadRamLoad pbmt addr region w s hpmp hm hal hr hc hsig hh hdev hb
+  have sck := WeakFetchEff.noSfAnnCheckedMemReadRamLoad pbmt addr region w s hpmp hm hal hr hc hsig hh
+    hdev hb
+  unfold mem_read mem_read_priv mem_read_priv_meta
+  nosf_run [hms, hpriv, execEffEffectivePrivilegeLoad m s hmprv, WeakFetchEff.noSfAnnEffectivePrivilege,
+    hck, sck]
+
+
+set_option simprocs false in
+theorem WeakFetchEff.noSfAnnVmemReadAddrAligned8 (va pa : BitVec 64) (acc : MemoryAccessType mem_payload)
+    (aq rl : Bool) (p : Privilege) (mode : SATPMode) (pbmt : page_based_mem_type) (w : BitVec 64)
+    (s s1 : ExecSt) (es : List Weff) (hal : is_aligned_vaddr (.Virtaddr va) 8 = true)
+    (hep : execEff (effectivePrivilege acc (s.regs .mstatus) (s.regs .cur_privilege)) s =
+      some (p, s, []))
+    (hmode : execEff (translationMode p) s = some (mode, s, []))
+    (htr : execEff (translateAddr (.Virtaddr va) acc) s = some (.Ok (.Physaddr pa, pbmt, ()), s1, []))
+    (hmr : execEff (mem_read acc pbmt (.Physaddr pa) 8 aq rl false) s1 = some (.Ok w, s1, es))
+    (smode : WeakEvLang.noSfAnn (translationMode p) s)
+    (str : WeakEvLang.noSfAnn (translateAddr (.Virtaddr va) acc) s)
+    (smr : WeakEvLang.noSfAnn (mem_read acc pbmt (.Physaddr pa) 8 aq rl false) s1) :
+    WeakEvLang.noSfAnn (vmem_read_addr (.Virtaddr va) 8 acc aq rl false) s := by
+  have hsp := splitOnPageBoundaryAlignedEq va 8 (by simp [vmemWidth]) hal
+  cases mode <;>
+  · unfold vmem_read_addr translate_and_read_value
+    simp only [bits_of_virtaddr, hsp, pure_bind]
+    rw [WeakEffSkel.noSfAnnCatchEarlyReturn]
+    nosf_run [hal, Functions.not, hep, WeakFetchEff.noSfAnnEffectivePrivilege, hmode, smode, htr, str]
+    dsimp only [iteNoSplitBare, iteNoSplitSv32, iteNoSplitSv39, iteNoSplitSv48, iteNoSplitSv57,
+      Int.toNat_natCast]
+    nosf_run [hmr, smr]
+
+
+theorem WeakFetchEff.noSfAnnVmemReadAddr8 (a v : BitVec 64) (region : PMA_Region) (s : ExecSt)
+    (halign : is_aligned_vaddr (.Virtaddr a) 8 = true)
+    (hpriv : s.regs .cur_privilege = .Machine)
+    (hmprv : (_get_Mstatus_MPRV (s.regs .mstatus) == 1#1) = false)
+    (hpmp : execEff (pmpCheck (.Physaddr a) 8 (.Load .Data) .Machine) s = some (none, s, []))
+    (hm : matching_pma_region (s.regs .pma_regions) (.Physaddr a) 8 = some region)
+    (hpalign : is_aligned_paddr (.Physaddr a) 8 = true)
+    (hr : (override_PMA region.attributes .PBMT_PMA).readable = true)
+    (hc : execEff (within_clint (.Physaddr a) 8) s = some (false, s, []))
+    (hsig : execEff (within_sig (.Physaddr a) 8) s = some (false, s, []))
+    (hh : execEff (within_htif_readable (.Physaddr a) 8) s = some (false, s, []))
+    (hdev : devAddr a = false) (hb : BytesAt s a 8 v) :
+    WeakEvLang.noSfAnn (vmem_read_addr (.Virtaddr a) 8 (.Load .Data) false false false) s := by
+  have htr := execEffTranslateAddrIdentityLoad a s hpriv hmprv
+  rw [translateIdentityEq] at htr
+  have hep : execEff (effectivePrivilege (.Load .Data) (s.regs .mstatus) (s.regs .cur_privilege)) s =
+      some (.Machine, s, []) := by rw [hpriv]; exact execEffEffectivePrivilegeLoad _ s hmprv
+  exact WeakFetchEff.noSfAnnVmemReadAddrAligned8 a a _ false false .Machine .Bare .PBMT_PMA v s s _ halign
+    hep (execEffTranslationModeM s) htr
+    (execEffMemReadLoad .PBMT_PMA a region v _ s hpmp hm hpalign hr hc hsig hh hdev hb rfl hmprv hpriv)
+    (WeakFetchEff.noSfAnnTranslationModeM s)
+    (WeakFetchEff.noSfAnnTranslateAddrMachine _ _ s hep)
+    (WeakFetchEff.noSfAnnMemReadLoad .PBMT_PMA a region v _ s hpmp hm hpalign hr hc hsig hh hdev hb rfl
+      hmprv hpriv)
+
+
+theorem WeakFetchEff.noSfAnnGetPmlenLoad (s : ExecSt)
+    (hpmm : pmm_mode_backwards (_get_Seccfg_PMM (s.regs .mseccfg)) = .PMM_Disabled) :
+    WeakEvLang.noSfAnn (get_pmlen (.Load .Data) .Machine) s := by
+  have h0 : WeakEvLang.noSfAnn (is_pmm_applicable (.Load .Data) .Machine) s := trivial
+  unfold get_pmlen get_pmm
+  nosf_run [execEffIsPmmApplicableLoad, h0, hpmm]
+
+
+theorem WeakFetchEff.noSfAnnTransformEffectiveAddressLoad (ea : BitVec 64) (s : ExecSt)
+    (hcp : s.regs .cur_privilege = .Machine)
+    (hmprv : (_get_Mstatus_MPRV (s.regs .mstatus) == 1#1) = false)
+    (hpmm : pmm_mode_backwards (_get_Seccfg_PMM (s.regs .mseccfg)) = .PMM_Disabled) :
+    WeakEvLang.noSfAnn (transform_effective_address (.Virtaddr ea) (.Load .Data)) s := by
+  unfold transform_effective_address
+  nosf_run [hcp, execEffEffectivePrivilegeLoad _ s hmprv, WeakFetchEff.noSfAnnEffectivePrivilege,
+    execEffGetPmlenLoad s hpmm, WeakFetchEff.noSfAnnGetPmlenLoad s hpmm, execEffTranslationModeM,
+    WeakFetchEff.noSfAnnTranslationModeM]
+
+
+theorem WeakFetchEff.noSfAnnGetTransformedDataAddrLoad (rs1 : BitVec 5) (offset : BitVec 64) (s : ExecSt)
+    (hcp : s.regs .cur_privilege = .Machine)
+    (hmprv : (_get_Mstatus_MPRV (s.regs .mstatus) == 1#1) = false)
+    (hpmm : pmm_mode_backwards (_get_Seccfg_PMM (s.regs .mseccfg)) = .PMM_Disabled) :
+    WeakEvLang.noSfAnn (get_transformed_data_addr (.Regidx rs1) offset (.Load .Data) 8) s := by
+  unfold get_transformed_data_addr
+  nosf_run [execEffExtDataGetAddrGpr, WeakFetchEff.noSfAnnExtDataGetAddrGpr,
+    execEffTransformEffectiveAddressLoad _ s hcp hmprv hpmm,
+    WeakFetchEff.noSfAnnTransformEffectiveAddressLoad _ s hcp hmprv hpmm, pmTransformPA0]
+
+
+theorem WeakFetchEff.noSfAnnVmemRead8Gpr (rs1 : BitVec 5) (offset v : BitVec 64) (region : PMA_Region) (s : ExecSt)
+    (hcp : s.regs .cur_privilege = .Machine)
+    (hmprv : (_get_Mstatus_MPRV (s.regs .mstatus) == 1#1) = false)
+    (hpmm : pmm_mode_backwards (_get_Seccfg_PMM (s.regs .mseccfg)) = .PMM_Disabled)
+    (halign : is_aligned_vaddr (.Virtaddr (s.gpr rs1 + offset)) 8 = true)
+    (hpmp : execEff (pmpCheck (.Physaddr (s.gpr rs1 + offset)) 8 (.Load .Data) .Machine) s =
+      some (none, s, []))
+    (hm : matching_pma_region (s.regs .pma_regions) (.Physaddr (s.gpr rs1 + offset)) 8 = some region)
+    (hpalign : is_aligned_paddr (.Physaddr (s.gpr rs1 + offset)) 8 = true)
+    (hr : (override_PMA region.attributes .PBMT_PMA).readable = true)
+    (hc : execEff (within_clint (.Physaddr (s.gpr rs1 + offset)) 8) s = some (false, s, []))
+    (hsig : execEff (within_sig (.Physaddr (s.gpr rs1 + offset)) 8) s = some (false, s, []))
+    (hh : execEff (within_htif_readable (.Physaddr (s.gpr rs1 + offset)) 8) s = some (false, s, []))
+    (hdev : devAddr (s.gpr rs1 + offset) = false) (hb : BytesAt s (s.gpr rs1 + offset) 8 v) :
+    WeakEvLang.noSfAnn (vmem_read (.Regidx rs1) offset 8 (.Load .Data) false false false) s := by
+  unfold vmem_read
+  rw [WeakEffSkel.noSfAnnCatchEarlyReturn]
+  nosf_run [execEffGetTransformedDataAddrLoad rs1 offset s hcp hmprv hpmm,
+    WeakFetchEff.noSfAnnGetTransformedDataAddrLoad rs1 offset s hcp hmprv hpmm,
+    execEffVmemReadAddr8 _ v region s halign hcp hmprv hpmp hm hpalign hr hc hsig hh hdev hb,
+    WeakFetchEff.noSfAnnVmemReadAddr8 _ v region s halign hcp hmprv hpmp hm hpalign hr hc hsig hh hdev hb]
+
+
+theorem WeakFetchEff.noSfAnnExecuteLOAD8Gpr (rs1 rd : BitVec 5) (imm : BitVec 12) (v : BitVec 64) (region : PMA_Region)
+    (s : ExecSt) (_hrd : rd.toNat ≠ 0)
+    (hcp : s.regs .cur_privilege = .Machine)
+    (hmprv : (_get_Mstatus_MPRV (s.regs .mstatus) == 1#1) = false)
+    (hpmm : pmm_mode_backwards (_get_Seccfg_PMM (s.regs .mseccfg)) = .PMM_Disabled)
+    (halign : is_aligned_vaddr (.Virtaddr (s.gpr rs1 + sign_extend (m := 64) imm)) 8 = true)
+    (hpmp : execEff (pmpCheck (.Physaddr (s.gpr rs1 + sign_extend (m := 64) imm)) 8 (.Load .Data)
+      .Machine) s = some (none, s, []))
+    (hm : matching_pma_region (s.regs .pma_regions) (.Physaddr (s.gpr rs1 + sign_extend (m := 64) imm)) 8 =
+      some region)
+    (hpalign : is_aligned_paddr (.Physaddr (s.gpr rs1 + sign_extend (m := 64) imm)) 8 = true)
+    (hr : (override_PMA region.attributes .PBMT_PMA).readable = true)
+    (hc : execEff (within_clint (.Physaddr (s.gpr rs1 + sign_extend (m := 64) imm)) 8) s =
+      some (false, s, []))
+    (hsig : execEff (within_sig (.Physaddr (s.gpr rs1 + sign_extend (m := 64) imm)) 8) s =
+      some (false, s, []))
+    (hh : execEff (within_htif_readable (.Physaddr (s.gpr rs1 + sign_extend (m := 64) imm)) 8) s =
+      some (false, s, []))
+    (hdev : devAddr (s.gpr rs1 + sign_extend (m := 64) imm) = false)
+    (hb : BytesAt s (s.gpr rs1 + sign_extend (m := 64) imm) 8 v) :
+    WeakEvLang.noSfAnn (execute (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8))) s := by
+  show WeakEvLang.noSfAnn (execute_LOAD imm (.Regidx rs1) (.Regidx rd) false 8) s
+  unfold execute_LOAD
+  nosf_run [execEffVmemRead8Gpr rs1 _ v region s hcp hmprv hpmm halign hpmp hm hpalign hr hc hsig hh
+    hdev hb, WeakFetchEff.noSfAnnVmemRead8Gpr rs1 _ v region s hcp hmprv hpmm halign hpmp hm hpalign hr hc
+    hsig hh hdev hb, execEffWXBitsGpr, WeakFetchEff.noSfAnnWXBitsGpr]
 
 end Weak
