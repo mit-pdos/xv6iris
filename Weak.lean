@@ -275,5 +275,6 @@ import Weak.AxAdequacyL
 import Weak.AxAdequacyChk
 import Weak.WeakRvwmoWalk2
 import Weak.AxSchedGD
+import Weak.AxDefer
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
