@@ -251,5 +251,6 @@ import Weak.WkWalkRule
 import Weak.AxGateWp
 import Weak.WkWalkTails
 import Weak.WkWalkCapstone
+import Weak.AxWpdLift
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
