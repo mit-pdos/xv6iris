@@ -166,3 +166,4 @@ Rocq→Lean name map only.
 - flowEqDyn is UNSEALED in Lean: a flow equation proved at one AxirisG instance transfers by `exact` to another with the same obSt/obStInterp (AxLock3Wp; use for AxLock3Wp2/3 instead of copying Rocq scripts).
 - AxProtGate: `hOf'`/`naOf'`/`naVal'` take `(γ GD wdat rdat)`; `gateDeliversExpected*`/`axprotgateGateFacts*`/`naPureGlobal*` need `(GF := GF)`; `gateFacts` is `∀ e ∈ gsrcs` (start with `intro e He`). AxLockMutex2: use `AxLockMutex.protInvLock''`, `lockMutexDiscWrite` takes only L, pass `axLockMutexG` explicitly.
 - Files with `[AxlogG …]`-free statements that call universe-0 lemmas (gateSrcsDomOfSched): use `{GF : BundledGFunctors.{0,0,0}}` (AxProtGateN).
+- AxTokLedger: camera class `LedgerG GF` (GhostMapG GF Int Holder) — adequacy files using the ledger take `[LedgerG GF]` and ALLOCATE via `ledgerAlloc`; `lhCur`=`LH.getLast?.getD ∅`, reuse `lhCurApp`. `icombine Ha Hf gives %h` reads a ghost-map lookup without consuming.
