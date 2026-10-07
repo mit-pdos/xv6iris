@@ -220,5 +220,8 @@ import Weak.WkStartAux
 import Weak.WeakLeafO
 import Weak.WeakLeafO2
 import Weak.WkMemmoveLoop
+import Weak.WeakRvwmoWalk
+import Weak.WeakRvwmoWalk2
+import Weak.WeakRvwmoWalk3
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
