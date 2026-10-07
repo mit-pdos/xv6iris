@@ -215,5 +215,6 @@ import Weak.WeakLeafM
 import Weak.WeakSmodeFrame
 import Weak.AxOpsem
 import Weak.WkTimerinitAux
+import Weak.WeakKptStale
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
