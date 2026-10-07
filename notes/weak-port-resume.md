@@ -107,3 +107,11 @@ Steps:
 
 AxWp is done. 314 files were downstream of it, and the Ax tier fans out from AxToken, AxLifting,
 AxReadAll, AxInstrFacts, AxGateWp and others. Re-run `sched.py` after each merge.
+
+## Update 2026-10-06 23:49: account changed, limits reset
+
+- **New usage baseline:** both pools were at 0% at 193.9k Rocq lines done. Measure the rate against this
+  account's seven_day from that point.
+- **Launched:** the Stage C design consult (advisor) and six safe files in w1–w6: WkFetchPeel, WkTimerinit,
+  AxDevGraphWit, AxToken, AxReadAll, AxInstrFacts. Each prompt says to STOP if the file relies on fetches
+  being graph events.
