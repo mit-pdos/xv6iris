@@ -204,5 +204,7 @@ import Weak.AxPair2
 import Weak.WeakLeafJump
 import Weak.WeakRvwmoPinBridge
 import Weak.WeakRvwmoGlue2
+import Weak.WeakKpt
+import Weak.WeakKpt2
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
