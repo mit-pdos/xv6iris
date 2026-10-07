@@ -265,5 +265,9 @@ import Weak.AxFetch2
 import Weak.AxAdequacy
 import Weak.AxEpiProbe
 import Weak.AxFetch5
+import Weak.AxFetch3
+import Weak.AxFetch3b
+import Weak.AxFetch3c
+import Weak.AxFetch
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
