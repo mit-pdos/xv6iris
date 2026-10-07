@@ -213,5 +213,6 @@ import Weak.WkClipAdvance
 import Weak.WkUnmapMp
 import Weak.WeakLeafM
 import Weak.WeakSmodeFrame
+import Weak.AxOpsem
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
