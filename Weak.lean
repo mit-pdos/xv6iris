@@ -232,5 +232,6 @@ import Weak.AxReadAll
 import Weak.AxToken
 import Weak.AxWpD
 import Weak.AxLockOwn
+import Weak.WkTimerinit
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
