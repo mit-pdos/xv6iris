@@ -115,3 +115,20 @@ AxReadAll, AxInstrFacts, AxGateWp and others. Re-run `sched.py` after each merge
 - **Launched:** the Stage C design consult (advisor) and six safe files in w1–w6: WkFetchPeel, WkTimerinit,
   AxDevGraphWit, AxToken, AxReadAll, AxInstrFacts. Each prompt says to STOP if the file relies on fetches
   being graph events.
+
+## Update 2026-10-07 00:45: Stage C approved, rework running
+
+- **Design:** notes/weak-port-o2-stageC.md. The rulings are in notes/weak-port-architecture.md: Q-C1 admin
+  label; Q-C2 delete the oracle params; Q-C3 delete pstepNoFetch/pfFetchLoadOk; Q-C4 wlblRen fixes LIFetch.
+- **Integration workspace:** `../xv6iris-weak-sc` (jj workspace `weak-sc`), forked from the tip.
+- **Lane order:**
+  1. L1a: items 1–3, plus item 21 if pstepNoFetch breaks it. RUNNING.
+  2. L1b: items 4–8.
+  3. Then lane 2 (items 9–18), in a sc2 workspace forked from sc, in parallel with lane 3 (items 19–20) in sc.
+  4. Copy the lane 3 files into sc2, then do the full build plus lint.
+  5. Copy the changed Weak/* into the tip, build, and commit as "weak (WIP): Stage C rework".
+- **Commits:** after each lane is green, commit in the sc workspace (`jj commit Weak -m …`).
+- **New ports:** keep going at the tip only for files off the fetch path. At the Stage C merge, re-check
+  them against the new APIs.
+- **Held until lane 1 and item 13 are done:** AxLifting, AxGateWp, AxInstr, AxWpdLift, WeakRvwmoCycWit,
+  WeakRvwmoProgress.
