@@ -58,6 +58,8 @@ across the instruction: the clock cells are hart-local and simply owned (`Dw`).
    `BitVec (8 * 4)` (defeq `BitVec 32`): with `BitVec 32`, `etextWord _ 4 w` elaborates with a
    silent `setWidth` (the width's numeral instance is still pending when `w` is checked).
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `epureErun` has an `instrAnnounce` case (`WeakEvExecEff.epure` stops at an sfence announce).
+
 **Rocq → Lean name map.**  `erun` `erun`, `erun_returnm` `erunReturnm`, `erun_read_reg`
 `erunReadReg`, `erun_write_reg` `erunWriteReg`, `erun_read` `erunRead`, `erun_bind` `erunBind`,
 `erun_bind0` `erunBind0`, `erun_mono` `erunMono`, `erun_epurew` `erunEpurew`, `erun_exec_eff`
@@ -918,6 +920,11 @@ theorem epureErun {X : Type} (D : List Register) (m : SailM X) :
         · simp only [epure, erun, hr, ↓reduceIte] at h ⊢
           exact ih _ _ _ _ h
         · simp [epure, hr] at h
+      case instrAnnounce n w =>
+        cases hs : sfAnnB n w
+        · simp only [epure, erun, hs, Bool.false_eq_true, ↓reduceIte] at h ⊢
+          exact ih _ _ _ _ h
+        · simp [epure, hs] at h
       all_goals first
         | (simp [epure] at h; done)
         | (simp only [epure, erun] at h ⊢; exact ih _ _ _ _ h)

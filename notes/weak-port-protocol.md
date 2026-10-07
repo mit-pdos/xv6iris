@@ -81,7 +81,7 @@ Rocq→Lean name map only.
   emFetchInert, hullRunFetchInert, t2linFetchInert, fconfFetchInert, wfetchSite, pfFetchLoadOk, hlblRealizesAxNoFetch)
   are GONE. The capstones carry only `efetchItvOk` (Q4). `pstepNoFetch` survives only in WeakRobustMain (Q6);
   `fetchSrcOk` stays on the robustness line. Design: notes/weak-port-o2-stageC.md. Rows: a fetch that ended a Rocq
-  row is followed by the next real memory event (hemit allows no trailing admin items). AxSfence is HELD (Q7).
+  row is followed by the next real memory event (hemit allows no trailing admin items). AxSfence: Q7 implemented — sfence.vma marker = `LFence false false false false` at the SFENCE.VMA `instrAnnounce` (`WeakEvLang.sfAnnB`/`annLabel`/`annPost`); generic admin-run lemmas take `WeakEvLang.noSfAnn m s`; WeakEvProv boundary lemmas take `LFence false false false false ∉ ls`.
 - Event pool (WeakEvPf): harts, then uart0, uart1, disk, plic — disk at index `NCPU+2`, plic at `NCPU+3`
   (Rocq: disk `NCPU+1`); device arms have the new shapes and `plicAgent` (WeakEvPf header).
 - Exec layer: Weak/Exec + ExecLib (+ ExecSC*), `exec_steps` tactic; writes answer `.Ok (some true)`;

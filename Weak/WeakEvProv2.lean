@@ -65,6 +65,8 @@ the node term, so the law is a SIMULATION on node PAIRS:
 **File-qualified names:** none of this file's Rocq names is in `notes/weak-port-dupnames.json`;
 the Lean-only helpers of deviation 6 are file-qualified.
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `tparInstr` takes `LFence false false false false ∉ ls` (`WeakEvProv.phrunNoInstr`); Lean-only `WeakEvProv2.laLsNoMark` supplies it for the real tail.
+
 **Rocq → Lean name map.**  `dreg_agree_excl2` `dregAgreeExcl2`, `mrw_reg` `mrwReg`, `mrw_succ`
 `mrwSucc`, `mrw_set` `mrwSet`, `tpar` `tpar` (`tp_conv/gen/wr_eq/wr` `tpConv/tpGen/tpWrEq/tpWr`),
 `tpar_boundary` `tparBoundary`, `tpar_boundary_r` `tparBoundaryR`, `pnode_step_pair`
@@ -321,14 +323,14 @@ theorem tparInstr (T : List Nat) (cpu : CPU) (ls : List Wlabel) (rds : List Nat)
     (m2 : SailM Unit) (rs2 : RegFile) :
     phrun cpu ls rds ws ann m1 rs1 fn ib d m1' rs1' fn' ib' d' →
     tpar T m1 m2 →
-    LInstr ∉ ls →
+    LInstr ∉ ls → LFence false false false false ∉ ls →
     (∀ n, n ∈ ib'.ibRds → n ∉ T) →
     dregAgree (fun n => n ∉ T) rs1 rs2 →
     ∃ (m2' : SailM Unit) (rs2' : RegFile),
       phrun cpu ls rds ws ann m2 rs2 fn ib d m2' rs2' fn' ib' d' ∧
       tpar T m1' m2' ∧ dregAgree (fun n => n ∉ T) rs1' rs2' := by
-  intro hrun htp hni hib hag
-  have hann := phrunNoInstr cpu ls rds ws ann m1 rs1 fn ib d m1' rs1' fn' ib' d' hrun hni
+  intro hrun htp hni hnf hib hag
+  have hann := phrunNoInstr cpu ls rds ws ann m1 rs1 fn ib d m1' rs1' fn' ib' d' hrun hni hnf
   have hcov := phrunIbRds cpu ls rds ws ann m1 rs1 fn ib d m1' rs1' fn' ib' d' hrun hann
   refine tparRun T cpu ls rds ws ann m1 rs1 fn ib d m1' rs1' fn' ib' d' m2 rs2 hrun htp ?_ hag
   intro n hn
@@ -535,6 +537,12 @@ theorem laLsNoInstr (w : BitVec 32) : LInstr ∉ admLbls false 9 (laSt w) := by
   rw [laLsVal]
   simp
 
+/-- Q7 (Lean-only): nor the sfence.vma marker. -/
+theorem WeakEvProv2.laLsNoMark (w : BitVec 32) :
+    LFence false false false false ∉ admLbls false 9 (laSt w) := by
+  rw [laLsVal]
+  simp
+
 theorem laEndIbrds (w : BitVec 32) : (ahIb (laEnd w)).ibRds = (ahIb laX2).ibRds := by
   weak_adm_krfl
 
@@ -608,7 +616,8 @@ theorem laTailPar (cpu : CPU) (d : Efab) (w1 w2 : BitVec 32) :
   obtain ⟨m2', rs2', hrun2, htp2, hag2⟩ :=
     tparInstr [15] cpu (admLbls false 9 (laSt w1)) rds ws ann (laTl w1) (ahRs laX2) none
       (ahIb laX2) d (.pure ()) (ahRs (laEnd w1)) none (ahIb (laEnd w1)) d (laTl w2) (ahRs laX2)
-      hrun1 (laTpar w1 w2) (laLsNoInstr w1) (laEndUntainted w1) (dregAgreeRefl _ _)
+      hrun1 (laTpar w1 w2) (laLsNoInstr w1) (WeakEvProv2.laLsNoMark w1) (laEndUntainted w1)
+      (dregAgreeRefl _ _)
   rw [tparBoundary [15] () m2' htp2] at hrun2
   exact ⟨admLbls false 9 (laSt w1), rds, ws, ann, rs2', laLsLen w1, laLsNoInstr w1, hrun1, hrun2,
     hag2⟩

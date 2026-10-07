@@ -142,6 +142,8 @@ bits by `WeakDeps.depsOfIb` (`edeps`).
 
 **File-qualified names:** none (no name of this file is in `notes/weak-port-dupnames.json`).
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `pnodeStep`'s announce arm emits `annLabel n w` (`WeakEvLang`): the sfence.vma MARKER `LFence false false false false` at an SFENCE.VMA word (`sfAnnB`), `LInstr` otherwise; the bits are banked as before.  The memory half is unchanged (the marker's `fencePost … false false false false` is the identity, matching the language's `annPost`): `elabApplyAnn`, `elabOkAnn`, `annLabelCases` (the marker is `ebarLabel .Barrier_RISCV_i`, so `pnodeStepCases` keeps its statement).
+
 **Rocq → Lean name map.**  `pnode_wclass` `pnodeWclass`, `pcls_ev` `pclsEv`,
 `pcls_ev_exstore_excl` `pclsEvExstoreExcl`, `pcls_ev_silent` `pclsEvSilent`, `pcls_ev_ldev`
 `pclsEvLdev`, `pcls_ev_fence` `pclsEvFence`, `pnode_wclass_relp` `pnodeWclassRelp`,
@@ -362,9 +364,10 @@ def pnodeStep (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevStates) (l : W
     | .barrier b, k =>
         l = ebarLabel b ∧ m' = k () ∧ ors = none ∧ fn' = ebarPark b ∧ d' = d ∧ oib = none ∧
         obar = some b
-    -- D3: THE ANNOUNCE banks the bits; D3-2: it is the instruction start (`LInstr`)
-    | .instrAnnounce _ w, k =>
-        l = LInstr ∧ m' = k () ∧ ors = none ∧ fn' = none ∧ d' = d ∧
+    -- D3: THE ANNOUNCE banks the bits; D3-2: it is the instruction start (`LInstr`);
+    -- Q7: at an SFENCE.VMA word it is the sfence MARKER `LFence false false false false`
+    | .instrAnnounce n w, k =>
+        l = annLabel n w ∧ m' = k () ∧ ors = none ∧ fn' = none ∧ d' = d ∧
         oib = some (ibAnn (ibOfBvn w)) ∧ obar = none
     | .branchAnnounce _ _, k =>
         l = LSilent ∧ m' = k () ∧ ors = none ∧ fn' = none ∧ d' = d ∧ oib = none ∧ obar = none
@@ -721,6 +724,17 @@ theorem elabApplyInstr (σ : WGState) (c : CPU) (k : WmClass) (v : Ibch) :
     elabApply σ c LInstr k none (some v) none σ.wgdev = ewgIbws σ c v (instrPost (σ.wgws c)) :=
   rfl
 
+/-- Q7: the announce, at either label (`annLabel`/`annPost`). -/
+theorem elabApplyAnn (σ : WGState) (c : CPU) (k : WmClass) (n : Nat) (w : BitVec n)
+    (v : Ibch) :
+    elabApply σ c (annLabel n w) k none (some v) none σ.wgdev
+      = ewgIbws σ c v (annPost n w (σ.wgws c)) := by
+  unfold annLabel annPost
+  split
+  · show ewgIbws σ c v (fencePost (σ.wgws c) false false false false) = _
+    rw [fencePostId]
+  · rfl
+
 /-- DEC-7: the read-set accumulation. -/
 theorem elabApplyIb (σ : WGState) (c : CPU) (k : WmClass) (v : Ibch) :
     elabApply σ c LSilent k none (some v) none σ.wgdev = ewgIb σ c v := rfl
@@ -776,6 +790,20 @@ theorem elabOkErwLabel (σ : WGState) (c : CPU) (w : ErwKind) : elabOk σ c (erw
 theorem elabOkEbarLabel (σ : WGState) (c : CPU) (b : barrier_kind) : elabOk σ c (ebarLabel b) := by
   obtain ⟨pr, pw, sr, sw, h⟩ := ebarLabelFence b
   rw [h]; trivial
+
+/-- Q7 (Lean-only): the announce label is the instruction start or the inert fence of
+`fence.i` (the sfence.vma marker). -/
+theorem annLabelCases (n : Nat) (w : BitVec n) :
+    annLabel n w = LInstr ∨ annLabel n w = ebarLabel .Barrier_RISCV_i := by
+  unfold annLabel
+  split
+  · exact Or.inr rfl
+  · exact Or.inl rfl
+
+theorem elabOkAnn (σ : WGState) (c : CPU) (n : Nat) (w : BitVec n) :
+    elabOk σ c (annLabel n w) := by
+  unfold annLabel
+  split <;> trivial
 
 /-! ## 5. THE FACTORIZATION THEOREMS -/
 
@@ -915,7 +943,13 @@ theorem ecycleStepFactor (gen : Nat) (σ : WGState) (c : CPU) (m : SailM Unit)
           exact ⟨_, _, _, _, _, _, _, rfl, ⟨ch, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩, trivial, rfl⟩
         · rintro ⟨_, _, _, _, _, _, _, rfl, ⟨ch, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩, -, rfl⟩
           exact ⟨ch, rfl, rfl⟩
-      | instrAnnounce n w => esil_case
+      | instrAnnounce n w =>
+        constructor
+        · rintro ⟨rfl, rfl⟩
+          exact ⟨_, _, _, _, _, _, _, rfl, ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩,
+            elabOkAnn _ _ _ _, (elabApplyAnn _ _ _ _ _ _).symm⟩
+        · rintro ⟨_, _, _, _, _, _, _, rfl, ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩, -, rfl⟩
+          exact ⟨rfl, elabApplyAnn _ _ _ _ _ _⟩
       | branchAnnounce => esil_case
   · -- THE PARKED FENCE gates everything
     constructor
@@ -1314,7 +1348,11 @@ theorem pnodeStepCases (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevState
     | getCycleCount => obtain ⟨rfl, _⟩ := h; exact Or.inl rfl
     | message => obtain ⟨rfl, _⟩ := h; exact Or.inl rfl
     | choose p => obtain ⟨_, rfl, _⟩ := h; exact Or.inl rfl
-    | instrAnnounce n w => obtain ⟨rfl, _⟩ := h; exact Or.inr (Or.inl rfl)
+    | instrAnnounce n w =>
+      obtain ⟨rfl, _⟩ := h
+      rcases annLabelCases n w with h | h <;> rw [h]
+      · exact Or.inr (Or.inl rfl)
+      · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨_, rfl⟩))))
     | branchAnnounce => obtain ⟨rfl, _⟩ := h; exact Or.inl rfl
 
 theorem pnodeStepLatFree (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevStates) (aq : Bool)
@@ -1464,7 +1502,9 @@ theorem pnodeStepTsLoad (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevStat
     | cycleCount => exact nomatch h.1
     | getCycleCount => exact nomatch h.1
     | message => exact nomatch h.1
-    | instrAnnounce => exact nomatch h.1
+    | instrAnnounce n w =>
+      have h1 := h.1
+      rcases annLabelOr n w with e | e <;> rw [e] at h1 <;> exact nomatch h1
     | branchAnnounce => exact nomatch h.1
 
 /-- THE RMW SPLIT (S3): NO HART ARM EMITS THE FUSED LABEL. -/
@@ -1781,7 +1821,9 @@ theorem pnodeStepTsExload (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevSt
     | cycleCount => exact nomatch h.1
     | getCycleCount => exact nomatch h.1
     | message => exact nomatch h.1
-    | instrAnnounce => exact nomatch h.1
+    | instrAnnounce n w =>
+      have h1 := h.1
+      rcases annLabelOr n w with e | e <;> rw [e] at h1 <;> exact nomatch h1
     | branchAnnounce => exact nomatch h.1
 
 theorem pstepNodeTsExload (cpu : CPU) (m : SailM Unit) (rs : RegFile)
@@ -1876,7 +1918,9 @@ theorem pnodeStepTsIfetch (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevSt
     | cycleCount => exact nomatch h.1
     | getCycleCount => exact nomatch h.1
     | message => exact nomatch h.1
-    | instrAnnounce => exact nomatch h.1
+    | instrAnnounce n w =>
+      have h1 := h.1
+      rcases annLabelOr n w with e | e <;> rw [e] at h1 <;> exact nomatch h1
     | branchAnnounce => exact nomatch h.1
 
 theorem pstepNodeTsIfetch (cpu : CPU) (m : SailM Unit) (rs : RegFile)
@@ -1963,7 +2007,9 @@ theorem pnodeStepExstoreExcl (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : De
     | cycleCount => exact nomatch h.1
     | getCycleCount => exact nomatch h.1
     | message => exact nomatch h.1
-    | instrAnnounce => exact nomatch h.1
+    | instrAnnounce n w =>
+      have h1 := h.1
+      rcases annLabelOr n w with e | e <;> rw [e] at h1 <;> exact nomatch h1
     | branchAnnounce => exact nomatch h.1
 
 theorem pstepNodeExstoreExcl (cpu : CPU) (m : SailM Unit) (rs : RegFile)

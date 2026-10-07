@@ -93,6 +93,8 @@ THE STRUCTURAL FINDINGS (S4):
 
 **File-qualified names:** `WeakEvLift.cohLoadPostAtNe`, `WeakEvLift.weakStateInterpPin`.
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): the announce node's σ-shape is `ewgIbws σ c v (annPost n w ws)` (`WeakEvLang`), so `esilSigma`'s announce disjunct quantifies the word: `∃ v n w, σ' = ewgIbws σ c v (annPost n w (σ.wgws c))`.
+
 **Rocq → Lean name map.**  `store_fold_map` `storeFoldMap`, `coh_store_fold_nat`
 `cohStoreFoldNat`, `coh_store_post_run_moved` `cohStorePostRunMoved`, `store_fold_d_map`
 `storeFoldDMap`, `coh_store_post_d_ne` `cohStorePostDNe`, `coh_store_fold_d_nat`
@@ -722,7 +724,8 @@ theorem erunSilentSound (n : Nat) (D : List Register) (rs : RegFile) (m : SailM 
 /-- D3: THE σ-EFFECT OF A SILENT NODE, a named four-way disjunction. -/
 def esilSigma (σ : WGState) (c : CPU) (rs' : RegFile) (σ' : WGState) : Prop :=
   (∃ k : ErwKind, σ' = ewgRw σ c rs' k) ∨
-  (rs' = σ.wgregs c ∧ ∃ v : Ibch, σ' = ewgIbws σ c v (instrPost (σ.wgws c))) ∨
+  (rs' = σ.wgregs c ∧ ∃ (v : Ibch) (n : Nat) (w : BitVec n),
+    σ' = ewgIbws σ c v (annPost n w (σ.wgws c))) ∨
   (rs' = σ.wgregs c ∧ ∃ v : Ibch, σ' = ewgIb σ c v) ∨
   (rs' = σ.wgregs c ∧ σ' = σ)
 
@@ -754,7 +757,7 @@ theorem esilNodeEcycle (gen : Nat) (σ : WGState) (c : CPU) (D : List Register) 
     | instrAnnounce n w =>
       simp only [esilNode, Option.some.injEq, Prod.mk.injEq] at h
       obtain ⟨rfl, rfl⟩ := h
-      exact ⟨_, ⟨rfl, rfl⟩, Or.inr (Or.inl ⟨rfl, _, rfl⟩)⟩
+      exact ⟨_, ⟨rfl, rfl⟩, Or.inr (Or.inl ⟨rfl, _, n, w, rfl⟩)⟩
     | memRead => simp [esilNode] at h
     | memWrite => simp [esilNode] at h
     | readRam => simp [esilNode] at h
@@ -801,7 +804,7 @@ theorem esilNodeEcycleInv (gen : Nat) (σ : WGState) (c : CPU) (D : List Registe
       simp only [esilNode, Option.some.injEq, Prod.mk.injEq] at h
       obtain ⟨rfl, rfl⟩ := h
       obtain ⟨rfl, rfl⟩ := hcy
-      exact ⟨rfl, Or.inr (Or.inl ⟨rfl, _, rfl⟩)⟩
+      exact ⟨rfl, Or.inr (Or.inl ⟨rfl, _, n, w, rfl⟩)⟩
     | memRead => simp [esilNode] at h
     | memWrite => simp [esilNode] at h
     | readRam => simp [esilNode] at h
@@ -822,42 +825,42 @@ theorem esilNodeEcycleInv (gen : Nat) (σ : WGState) (c : CPU) (D : List Registe
 /-- THE VIEW MOVE OF A SILENT NODE is a `wsDepmove`. -/
 theorem esilSigmaDepmove (σ : WGState) (c : CPU) (rs' : RegFile) (σ' : WGState) :
     esilSigma σ c rs' σ' → wsDepmove (σ.wgws c) (σ'.wgws c) := by
-  rintro (⟨k, rfl⟩ | ⟨-, v, rfl⟩ | ⟨-, v, rfl⟩ | ⟨-, rfl⟩)
+  rintro (⟨k, rfl⟩ | ⟨-, v, nn, ww, rfl⟩ | ⟨-, v, rfl⟩ | ⟨-, rfl⟩)
   · rw [ewgRwWs]; exact erwWsDepmove _ _
-  · show wsDepmove (σ.wgws c) (updCpu σ.wgws c (instrPost (σ.wgws c)) c)
-    rw [gwsInsertEq]; exact instrPostDepmove _
+  · show wsDepmove (σ.wgws c) (updCpu σ.wgws c (annPost nn ww (σ.wgws c)) c)
+    rw [gwsInsertEq]; exact annPostDepmove _ _ _
   · exact wsDepmoveRefl _
   · exact wsDepmoveRefl _
 
 theorem esilSigmaLog (σ : WGState) (c : CPU) (rs' : RegFile) (σ' : WGState) :
     esilSigma σ c rs' σ' → σ'.wglog = σ.wglog := by
-  rintro (⟨k, rfl⟩ | ⟨-, v, rfl⟩ | ⟨-, v, rfl⟩ | ⟨-, rfl⟩)
+  rintro (⟨k, rfl⟩ | ⟨-, v, nn, ww, rfl⟩ | ⟨-, v, rfl⟩ | ⟨-, rfl⟩)
   · exact ewgRwLog _ _ _ _
   all_goals rfl
 
 theorem esilSigmaImg (σ : WGState) (c : CPU) (rs' : RegFile) (σ' : WGState) :
     esilSigma σ c rs' σ' → σ'.wgimg = σ.wgimg := by
-  rintro (⟨k, rfl⟩ | ⟨-, v, rfl⟩ | ⟨-, v, rfl⟩ | ⟨-, rfl⟩)
+  rintro (⟨k, rfl⟩ | ⟨-, v, nn, ww, rfl⟩ | ⟨-, v, rfl⟩ | ⟨-, rfl⟩)
   · exact ewgRwImg _ _ _ _
   all_goals rfl
 
 theorem esilSigmaRegs (σ : WGState) (c : CPU) (rs' : RegFile) (σ' : WGState) :
     esilSigma σ c rs' σ' → σ'.wgregs c = rs' := by
-  rintro (⟨k, rfl⟩ | ⟨rfl, v, rfl⟩ | ⟨rfl, v, rfl⟩ | ⟨rfl, rfl⟩)
+  rintro (⟨k, rfl⟩ | ⟨rfl, v, nn, ww, rfl⟩ | ⟨rfl, v, rfl⟩ | ⟨rfl, rfl⟩)
   · rw [ewgRwRegs]; exact gregInsertEq _ _ _
   all_goals rfl
 
 /-- The bound half of every silent node's closing (Lean-only). -/
 theorem esilSigmaBounded (σ : WGState) (c : CPU) (rs' : RegFile) (σ' : WGState) (n : Nat) :
     esilSigma σ c rs' σ' → wsBounded (σ.wgws c) n → wsBounded (σ'.wgws c) n := by
-  rintro (⟨k, rfl⟩ | ⟨-, v, rfl⟩ | ⟨-, v, rfl⟩ | ⟨-, rfl⟩) hb
+  rintro (⟨k, rfl⟩ | ⟨-, v, nn, ww, rfl⟩ | ⟨-, v, rfl⟩ | ⟨-, rfl⟩) hb
   · rw [ewgRwWs]
     cases k with
     | ERWnone => exact hb
     | ERWreg rd srcs => exact regwPostBounded _ _ _ _ hb (srcsViewBounded _ _ _ hb)
     | ERWctrl srcs => exact ctrlPostBounded _ _ _ hb (srcsViewBounded _ _ _ hb)
-  · show wsBounded (updCpu σ.wgws c (instrPost (σ.wgws c)) c) n
-    rw [gwsInsertEq]; exact instrPostBounded _ _ hb
+  · show wsBounded (updCpu σ.wgws c (annPost nn ww (σ.wgws c)) c) n
+    rw [gwsInsertEq]; exact annPostBounded _ _ _ _ hb
   · exact hb
   · exact hb
 
@@ -869,7 +872,7 @@ theorem esilSigmaShape (σ : WGState) (c : CPU) (rs' : RegFile) (σ' : WGState) 
     (ewgRegwslog σ c rs' (σ'.wgws c) σ.wglog).wgws = σ'.wgws ∧
     σ'.wglog = σ.wglog ∧ σ'.wgimg = σ.wgimg ∧ σ'.wgdev = σ.wgdev ∧ σ'.wggen = σ.wggen ∧
     σ'.wgpow = σ.wgpow := by
-  rintro (⟨k, rfl⟩ | ⟨rfl, v, rfl⟩ | ⟨rfl, v, rfl⟩ | ⟨rfl, rfl⟩)
+  rintro (⟨k, rfl⟩ | ⟨rfl, v, nn, ww, rfl⟩ | ⟨rfl, v, rfl⟩ | ⟨rfl, rfl⟩)
   · refine ⟨(ewgRwRegs _ _ _ _).symm, ?_, ewgRwLog _ _ _ _, ewgRwImg _ _ _ _, ewgRwDev _ _ _ _,
       ewgRwGen _ _ _ _, ewgRwPow _ _ _ _⟩
     cases k with

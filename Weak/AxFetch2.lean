@@ -55,6 +55,8 @@ whole port's summary and the O2 Stage C account); part D (§2.5 onwards) imports
 6. Lean-only helper (file-qualified): `AxFetch2.fetchPeel` (above; part D's jalr / c.jr / RVC
    runs reuse it).
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `AxFetch2.fetchPeel` takes and propagates `WeakEvLang.noSfAnn` (AxFetch1); the row runs (`afLd8RowRun`, `afSd8RowRun`) take `noSfAnn (riscvStep tick) ⟨…⟩` per tick and `afSd8RunToWrite` for its `execute` run.  NOT discharged: the announce word on `riscvStep`'s path is fixed only inside the leaf assembly (`WeakEffSkel`), whose components (fetch, decode, `execute i`) would each need a path fact.
+
 **Rocq → Lean name map.**  `af_ld8_row_run` `afLd8RowRun`, `af_sd8_run_to_write`
 `afSd8RunToWrite`, `af_sd8_row_run` `afSd8RowRun`.
 
@@ -81,13 +83,15 @@ theorem AxFetch2.fetchPeel (m : SailM Unit) (s : ExecSt) (ib : Ibch) (ak : AkInf
     (n : Nat) (s' : ExecSt) (es : List Weff) (cpu : CPU) (kpos : Nat) (row : List Lbl) :
     n ≠ 0 → ak.akIfetch = true →
     execEff m s = some ((), s', .WEread ak pa n :: es) →
+    WeakEvLang.noSfAnn m s →
     ∃ (m2 : SailM Unit) (s2 : ExecSt) (ib2 : Ibch),
       s2.mem = s.mem ∧ execEff m2 s2 = some ((), s', es) ∧
       rtc (fun t1 t2 => ∃ l, AxOpsem.astepProg row t1 l t2)
-        ⟨.PHart cpu m s.regs none ib, kpos⟩ ⟨.PHart cpu m2 s2.regs none ib2, kpos⟩ := by
-  intro hn hfe hex
-  obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee, hrtc⟩ :=
-    afAdminRunToMemread m s ib ak pa n s' es hn hex cpu kpos row
+        ⟨.PHart cpu m s.regs none ib, kpos⟩ ⟨.PHart cpu m2 s2.regs none ib2, kpos⟩ ∧
+      WeakEvLang.noSfAnn m2 s2 := by
+  intro hn hfe hex hsf
+  obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee, hrtc, hns⟩ :=
+    afAdminRunToMemread m s ib ak pa n s' es hn hex hsf cpu kpos row
   have hdev' : devAddr req.pa = false := by rw [hpa]; exact hdev
   have hm : mmioAcc req.pa n = false := by simp [mmioAcc, hdev']
   simp only [execEff, hm, Bool.false_eq_true, ↓reduceIte] at hee
@@ -101,7 +105,8 @@ theorem AxFetch2.fetchPeel (m : SailM Unit) (s : ExecSt) (ib : Ibch) (ak : AkInf
     have hst := afAstepFetchOfMemread row cpu n va req KK s2.regs ib2 (efInit s2.dev) kpos
       (WeakInterpProj.wbytes n w0) hdev' (by rw [hcl]; exact hfe) (wbytesLength n w0)
     rw [wordOfBytesWbytes] at hst
-    exact ⟨KK (.Ok (w0, none)), s2, ib2, hmem, h0, rtc_r hrtc ⟨_, hst⟩⟩
+    simp only [WeakEvLang.noSfAnn, hm, hrb, Bool.false_eq_true, ↓reduceIte] at hns
+    exact ⟨KK (.Ok (w0, none)), s2, ib2, hmem, h0, rtc_r hrtc ⟨_, hst⟩, hns⟩
 
 /-! ## 2.2 THE ld8 ROW RUN: the fetch glued in front of the data read, at `riscvStep tick` -/
 
@@ -142,6 +147,8 @@ theorem afLd8RowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (w : BitVec
     -- the row's shape
     afLd8RowShape row k (paZ ea) →
     ∀ tick : Bool,
+    -- Q7: the instruction's run announces no sfence.vma word (header, Q7)
+    WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ →
     ∃ (s3 : ExecSt) (ib3 : Ibch) (va : Nat)
       (req2 : Mem_read_request 8 va Arch.pa Arch.translation Arch.arch_ak)
       (KK2 : Result (BitVec (8 * 8) × Option Bool) Arch.abort → SailM Unit),
@@ -153,7 +160,7 @@ theorem afLd8RowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (w : BitVec
         (.IRead (classify req2.access_kind).akSync (paZ req2.pa) 8)
         (fun vs => ⟨.PHart cpu (KK2 (.Ok (wordOfBytes 8 vs, none))) s3.regs none ib3, k + 1⟩) := by
   intro lpc lpriv lpmp lpma lhtif lhart lmisaS lmIE lelp lmprv lpmm hal hram4 htext hnotRVC
-    hagree hDmi hgood hdec hrd hea hal8 hram8 hbytes8 hshape tick
+    hagree hDmi hgood hdec hrd hea hal8 hram8 hbytes8 hshape tick hsf
   obtain ⟨lbd, hrowd, hidd⟩ := hshape
   -- (a) the whole instruction's `execEff` fact
   obtain ⟨t', hex, -⟩ := execEffStepOfLeafBase σ W pc w
@@ -178,12 +185,12 @@ theorem afLd8RowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (w : BitVec
         exact WeakLeafLd8.confDom σ W σ.wmRegs σ.wmDev)
     tick
   -- (b) the admin run to the fetch node and the admin fetch step (position kept)
-  obtain ⟨m2, s2, ib2, -, hex2, hrtcb⟩ :=
+  obtain ⟨m2, s2, ib2, -, hex2, hrtcb, hsf2⟩ :=
     AxFetch2.fetchPeel (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ ib0
-      WeakFetchEff.wakIfetch pc 4 t' [.WEread wakPlain ea 8] cpu k row (by decide) rfl hex
+      WeakFetchEff.wakIfetch pc 4 t' [.WEread wakPlain ea 8] cpu k row (by decide) rfl hex hsf
   -- (d) the admin run to the data node, then the data event
-  obtain ⟨s3, ib3, va, req2, KK2, hcld, hpad, hdevd, -, -, hrtcd⟩ :=
-    afAdminRunToMemread m2 s2 ib2 wakPlain ea 8 t' [] (by decide) hex2 cpu k row
+  obtain ⟨s3, ib3, va, req2, KK2, hcld, hpad, hdevd, -, -, hrtcd, -⟩ :=
+    afAdminRunToMemread m2 s2 ib2 wakPlain ea 8 t' [] (by decide) hex2 hsf2 cpu k row
   refine ⟨s3, ib3, va, req2, KK2, hcld, hpad, rtc_transitive hrtcb hrtcd, ?_⟩
   exact afAreadStepOfMemread row cpu 8 va req2 KK2 s3.regs ib3 (efInit s3.dev) k lbd
     (by rw [hpad]; exact hdevd) (by rw [hcld]; rfl) (by rw [hcld]; rfl) hrowd
@@ -209,6 +216,10 @@ theorem afSd8RunToWrite (s0 : ExecSt) (b : Bool) (pc : BitVec 64) (rs1 rs2 : Bit
     row[k]? = some lb →
     aident lb = .IWrite false (paZ ea) 8 →
     lblData lb = some (WeakInterpProj.wbytes 8 vs) →
+    -- Q7: the run announces no sfence.vma word (header, Q7)
+    WeakEvLang.noSfAnn
+      (execute (.STORE (imm, .Regidx rs2, .Regidx rs1, 8)) >>= fun _ => (pure () : SailM Unit))
+      ((s0.setReg .minstret_increment b).setReg .nextPC (Sail.BitVec.addInt pc 4)) →
     ∃ (s2 : ExecSt) (ib2 : Ibch) (va : Nat)
       (req : Mem_write_request 8 va Arch.pa Arch.translation Arch.arch_ak)
       (KK : Result (Option Bool) Arch.abort → SailM Unit),
@@ -222,14 +233,14 @@ theorem afSd8RunToWrite (s0 : ExecSt) (b : Bool) (pc : BitVec 64) (rs1 rs2 : Bit
         (LStore (classify req.access_kind).akSync (paZ req.pa) (WeakInterpProj.wbytes 8 vs)
           (depsAsrc (depsOfIb ib2.ibBits)) (depsVsrc (depsOfIb ib2.ibBits)))
         ⟨.PHart cpu (KK (.Ok (some true))) s2.regs none ib2, k + 1⟩ := by
-  intro lpriv lmprv lpmm lpmp lpma lhtif hea hvs hal hram hrow hid hdat
+  intro lpriv lmprv lpmm lpmp lpma lhtif hea hvs hal hram hrow hid hdat hsf
   have hm0 := execEffSd8At s0 b pc rs1 rs2 imm ea vs lpriv lmprv lpmm lpmp lpma lhtif hea hvs hal
     hram
   have hex := execEffBind _ (fun _ : ExecutionResult => (pure () : SailM Unit)) _ _ _ _ () _ []
     hm0 rfl
   rw [List.append_nil] at hex
   obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hval, hdev, -, -, hrtc⟩ :=
-    afAdminRunToMemwrite _ _ ib wakPlain ea 8 vs _ [] (by decide) hex cpu k row
+    afAdminRunToMemwrite _ _ ib wakPlain ea 8 vs _ [] (by decide) hex hsf cpu k row
   refine ⟨s2, ib2, va, req, KK, hcl, hpa, hrtc, ?_⟩
   exact afAstepWriteOfMemwrite row cpu 8 va req KK s2.regs ib2 (efInit s2.dev) k lb vs
     (by rw [hpa]; exact hdev) (by decide) (by rw [hcl]; rfl) hval hrow
@@ -274,6 +285,8 @@ theorem afSd8RowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (w : BitVec
     afSd8RowShape row k (paZ ea) →
     (row[k]?).bind lblData = some (WeakInterpProj.wbytes 8 vs) →
     ∀ tick : Bool,
+    -- Q7: the instruction's run announces no sfence.vma word (header, Q7)
+    WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ →
     ∃ (s3 : ExecSt) (ib3 : Ibch) (va : Nat)
       (req2 : Mem_write_request 8 va Arch.pa Arch.translation Arch.arch_ak)
       (KK2 : Result (Option Bool) Arch.abort → SailM Unit),
@@ -287,7 +300,7 @@ theorem afSd8RowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (w : BitVec
           (depsAsrc (depsOfIb ib3.ibBits)) (depsVsrc (depsOfIb ib3.ibBits)))
         ⟨.PHart cpu (KK2 (.Ok (some true))) s3.regs none ib3, k + 1⟩ := by
   intro lpc lpriv lpmp lpma lhtif lhart lmisaS lmIE lelp lmprv lpmm hal hram4 htext hnotRVC
-    hagree hDmi hgood hdec hea hvs hal8 hram8 hwdom hshape hdat tick
+    hagree hDmi hgood hdec hea hvs hal8 hram8 hwdom hshape hdat tick hsf
   obtain ⟨lbd, hrowd, hidd⟩ := hshape
   -- (a) the whole instruction's `execEff` fact
   obtain ⟨t', hex, -⟩ := execEffStepOfLeafBase σ W pc w
@@ -312,12 +325,13 @@ theorem afSd8RowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (w : BitVec
         exact writeBytesDomSub _ ea 8 vs W (wmemRestrictDom σ W) hwdom)
     tick
   -- (b) the admin run to the fetch node and the admin fetch step (position kept)
-  obtain ⟨m2, s2, ib2, -, hex2, hrtcb⟩ :=
+  obtain ⟨m2, s2, ib2, -, hex2, hrtcb, hsf2⟩ :=
     AxFetch2.fetchPeel (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ ib0
       WeakFetchEff.wakIfetch pc 4 t' [.WEwrite wakPlain ea 8 vs] cpu k row (by decide) rfl hex
+      hsf
   -- (d) the admin run to the data (write) node, then the data event
   obtain ⟨s3, ib3, va, req2, KK2, hcld, hpad, hvald, hdevd, -, -, hrtcd⟩ :=
-    afAdminRunToMemwrite m2 s2 ib2 wakPlain ea 8 vs t' [] (by decide) hex2 cpu k row
+    afAdminRunToMemwrite m2 s2 ib2 wakPlain ea 8 vs t' [] (by decide) hex2 hsf2 cpu k row
   refine ⟨s3, ib3, va, req2, KK2, hcld, hpad, rtc_transitive hrtcb hrtcd, ?_⟩
   exact afAstepWriteOfMemwrite row cpu 8 va req2 KK2 s3.regs ib3 (efInit s3.dev) k lbd vs
     (by rw [hpad]; exact hdevd) (by decide) (by rw [hcld]; rfl) hvald hrowd

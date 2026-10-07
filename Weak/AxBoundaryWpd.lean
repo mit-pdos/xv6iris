@@ -52,6 +52,8 @@ tower (the "mirror gap" `AxCjrWpd` records).
    AxRunClose deviation 5).  `invGS_gen HasNoLc Σ` ↦ `[InvGS_gen hlc GF]` (any `hlc`);
    `A -∗ B` ↦ `⊢ A -∗ B`.
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): the local evaluator `erd` returns `none` at an SFENCE.VMA announce (`erdGstep` reads the sfence-freedom off it); `erunGstepToMemread` (over `WeakEvFunnel.erun`, not local) takes `WeakEvLang.noSfAnn m t`.
+
 **Rocq → Lean name map.**  `tc_of_step_rtc` `tcOfStepRtc`, `PbS` `PbS`, `QaS` `QaS`, `Pseip`
 `Pseip`, `n0_ok` `n0Ok`, `pbS_step` `pbSStep`, `pseip_hclos` `pseipHclos`, `pbefore_wire`
 `pbeforeWire`, `pseip_hwire` `pseipHwire`, `pseip_hnord` `pseipHnord`, `wpd_of_seip_split`
@@ -261,6 +263,7 @@ theorem erunGstepToMemread (Dr Dw : List Register) (m : SailM Unit) :
     ∀ (t : ExecSt) (ib : Ibch) (ak : AkInfo) (pa : PAddr) (n : Nat) (t' : ExecSt)
       (es : List Weff),
       erun Dr Dw m t = some (PUnit.unit, t', .WEread ak pa n :: es) →
+      WeakEvLang.noSfAnn m t →
     ∀ (cpu : CPU) (kk : Nat),
       ∃ (t2 : ExecSt) (ib2 : Ibch) (va : Nat)
         (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
@@ -276,7 +279,7 @@ theorem erunGstepToMemread (Dr Dw : List Register) (m : SailM Unit) :
     intro t ib ak pa n t' es hex
     simp [erun] at hex
   | impure call k ih =>
-    intro t ib ak pa n t' es hex cpu kk
+    intro t ib ak pa n t' es hex hsf cpu kk
     cases call with
     | error e => simp [erun] at hex
     | ok o =>
@@ -284,8 +287,9 @@ theorem erunGstepToMemread (Dr Dw : List Register) (m : SailM Unit) :
       case regRead r =>
         by_cases hr : r ∈ Dr
         · simp only [erun, hr, ↓reduceIte] at hex
+          simp only [WeakEvLang.noSfAnn] at hsf
           obtain ⟨t2, ib2, va, req, KK, h1, h2, h3, h4, h5, hrun⟩ :=
-            ih _ t (ibRd ib r) _ _ _ _ _ hex cpu kk
+            ih _ t (ibRd ib r) _ _ _ _ _ hex hsf cpu kk
           refine ⟨t2, ib2, va, req, KK, h1, h2, h3, h4, h5, rtc_l ?_ hrun⟩
           refine gstepRd cpu r k t.regs ib kk ?_
           rintro (rfl | rfl)
@@ -295,8 +299,9 @@ theorem erunGstepToMemread (Dr Dw : List Register) (m : SailM Unit) :
       case regWrite r v =>
         by_cases hr : r ∈ Dw
         · simp only [erun, hr, ↓reduceIte] at hex
+          simp only [WeakEvLang.noSfAnn] at hsf
           obtain ⟨t2, ib2, va, req, KK, h1, h2, h3, h4, h5, hrun⟩ :=
-            ih _ _ ib _ _ _ _ _ hex cpu kk
+            ih _ _ ib _ _ _ _ _ hex hsf cpu kk
           exact ⟨t2, ib2, va, req, KK, h1, h2, h3, h4, h5,
             rtc_l (gstepWr cpu r v k t.regs ib kk) hrun⟩
         · simp [erun, hr] at hex
@@ -315,16 +320,19 @@ theorem erunGstepToMemread (Dr Dw : List Register) (m : SailM Unit) :
             exact ⟨t, ib, va, req, k, rfl, rfl, by simpa using hd, rfl, hex0, rtc_refl _⟩
       case instrAnnounce nw w =>
         simp only [erun] at hex
+        simp only [WeakEvLang.noSfAnn] at hsf
+        obtain ⟨hsw, hsf⟩ := hsf
         obtain ⟨t2, ib2, va, req, KK, h1, h2, h3, h4, h5, hrun⟩ :=
-          ih _ t (ibAnn (ibOfBvn w)) _ _ _ _ _ hex cpu kk
+          ih _ t (ibAnn (ibOfBvn w)) _ _ _ _ _ hex hsf cpu kk
         exact ⟨t2, ib2, va, req, KK, h1, h2, h3, h4, h5,
           rtc_l (gstepOfPnode cpu _ t.regs ib kk _ _ none (some (ibAnn (ibOfBvn w))) none
-            ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial rfl) hrun⟩
+            ⟨(annLabelNot hsw).symm, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial rfl) hrun⟩
       all_goals first
         | (simp [erun] at hex; done)
         | (simp only [erun] at hex
+           simp only [WeakEvLang.noSfAnn] at hsf
            obtain ⟨t2, ib2, va, req, KK, h1, h2, h3, h4, h5, hrun⟩ :=
-             ih _ t ib _ _ _ _ _ hex cpu kk
+             ih _ t ib _ _ _ _ _ hex hsf cpu kk
            exact ⟨t2, ib2, va, req, KK, h1, h2, h3, h4, h5,
              rtc_l (gstepOfPnode cpu _ t.regs ib kk _ _ none none none
                ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial trivial) hrun⟩)
@@ -355,7 +363,8 @@ def erd (Dr Dw : List Register) : SailM Unit → ExecSt → Option (SailM Unit �
     | .cycleCount, k => erd Dr Dw (k ()) s
     | .getCycleCount, k => erd Dr Dw (k (0 : Nat)) s
     | .message _, k => erd Dr Dw (k ()) s
-    | .instrAnnounce _ _, k => erd Dr Dw (k ()) s
+    -- Q7: an sfence.vma announce is the marker (a graph event): stop
+    | .instrAnnounce n w, k => if sfAnnB n w then none else erd Dr Dw (k ()) s
     | .branchAnnounce _ _, k => erd Dr Dw (k ()) s
     | .choose _, _ => none
     | .readRam .., _ => none
@@ -412,11 +421,12 @@ theorem erdGstep (Dr Dw : List Register) (m : SailM Unit) :
           obtain ⟨rfl, rfl⟩ := hex
           exact ⟨ib, ⟨n, va, req, k, _, ib, rfl, by simpa using hd⟩, rfl, rtc_refl _⟩
       case instrAnnounce nw w =>
-        simp only [erd] at hex
+        cases hsw : sfAnnB nw w <;>
+          simp only [erd, hsw, Bool.false_eq_true, ↓reduceIte, reduceCtorEq] at hex
         obtain ⟨ib2, h1, h2, hrun⟩ := ih _ t (ibAnn (ibOfBvn w)) _ _ hex cpu kk
         exact ⟨ib2, h1, h2,
           rtc_l (gstepOfPnode cpu _ t.regs ib kk _ _ none (some (ibAnn (ibOfBvn w))) none
-            ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial rfl) hrun⟩
+            ⟨(annLabelNot hsw).symm, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial rfl) hrun⟩
       all_goals first
         | (simp [erd] at hex; done)
         | (simp only [erd] at hex

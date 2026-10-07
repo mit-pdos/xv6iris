@@ -65,6 +65,8 @@ Slice 2b (§§6-10): the per-instruction lemma over a hart's `pstepEv` chain (`p
 
 **File-qualified names:** none (no name of this file is in `notes/weak-port-dupnames.json`).
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): an announce node's label is `LInstr` OR the sfence marker, so `pnodeStepFacts`/`pnodeStepAnn`/`pstepHwAnn` conclude `l = LInstr ∨ l = LFence false false false false`, `phrunAnn` `LInstr ∈ ls ∨ LFence … ∈ ls`, and `phrunNoInstr`/`instrDagree`/`instrDagreeEv` take the extra premise `LFence false false false false ∉ ls` (`witRun` supplies it; Lean-only `WeakEvProv.erwLabelNeMark`).
+
 **Rocq → Lean name map.**  `pnode_rds` `pnodeRds`, `dreg_agree` `dregAgree`, `rds_ok` `rdsOk`,
 `rds_ok_app` `rdsOkApp`, `dreg_agree_refl/sym/trans/mono/set/excl/read`
 `dregAgreeRefl/Sym/Trans/Mono/Set/Excl/Read`, `pnode_rds_read` `pnodeRdsRead`,
@@ -266,6 +268,10 @@ theorem wlIsStoreEbar (b : barrier_kind) : wlIsStore (ebarLabel b) = false := by
 theorem erwLabelNeInstr (w : ErwKind) : erwLabel w ≠ LInstr := by
   cases w <;> nofun
 
+/-- Q7 (Lean-only): a register write never carries the sfence.vma marker. -/
+theorem WeakEvProv.erwLabelNeMark (w : ErwKind) : erwLabel w ≠ LFence false false false false := by
+  cases w <;> nofun
+
 /-- Lean-only (deviation 5): the four per-node facts, from one case analysis. -/
 theorem pnodeStepFacts (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevStates) (l : Wlabel)
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
@@ -273,13 +279,13 @@ theorem pnodeStepFacts (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevState
     pnodeStep m rs ib d l m' ors fn' d' oib obar →
     oib.getD ib = ibnStep m ib ∧
     (ors = none ∨ ∃ (r : Register) (v : RegisterType r), r ∈ pnodeWrs m ∧ ors = some (rs.set r v)) ∧
-    (ibnAnn m = true → l = LInstr) ∧
+    (ibnAnn m = true → l = LInstr ∨ l = LFence false false false false) ∧
     (wlIsStore l = true → l = pnodeStoreLbl m ib) := by
   intro h
   match m, h with
   | .pure _, h =>
     obtain ⟨_, rfl, _, rfl, _, _, rfl, _⟩ := h
-    exact ⟨rfl, Or.inl rfl, fun _ => rfl, fun h => by simp [wlIsStore] at h⟩
+    exact ⟨rfl, Or.inl rfl, fun _ => Or.inl rfl, fun h => by simp [wlIsStore] at h⟩
   | .impure (.error _) _, h => exact h.elim
   | .impure (.ok o) k, h =>
     cases o with
@@ -328,7 +334,8 @@ theorem pnodeStepFacts (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevState
       rw [wlIsStoreEbar] at h; cases h
     | instrAnnounce n w =>
       obtain ⟨rfl, _, rfl, _, _, rfl, _⟩ := h
-      exact ⟨rfl, Or.inl rfl, fun _ => rfl, fun h => by simp [wlIsStore] at h⟩
+      refine ⟨rfl, Or.inl rfl, fun _ => annLabelOr n w, fun h => ?_⟩
+      rcases annLabelOr n w with e | e <;> rw [e] at h <;> simp [wlIsStore] at h
     | choose p =>
       obtain ⟨_, rfl, _, rfl, _, _, rfl, _⟩ := h
       exact ⟨rfl, Or.inl rfl, fun h => by simp [ibnAnn] at h, fun h => by simp [wlIsStore] at h⟩
@@ -584,7 +591,8 @@ theorem pnodeStepOrs (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevStates)
 theorem pnodeStepAnn (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevStates) (l : Wlabel)
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
     (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
-    pnodeStep m rs ib d l m' ors fn' d' oib obar → ibnAnn m = true → l = LInstr :=
+    pnodeStep m rs ib d l m' ors fn' d' oib obar → ibnAnn m = true →
+      l = LInstr ∨ l = LFence false false false false :=
   fun h => (pnodeStepFacts m rs ib d l m' ors fn' d' oib obar h).2.2.1
 
 /-- `pstepHart` with the three annotations (read list, written list, boundary flag). -/
@@ -632,7 +640,8 @@ theorem pstepHwAnn (cpu : CPU) (m : SailM Unit) (rs : RegFile)
     (rds : List Nat) (ws : List Register) (ann : Bool) (m' : SailM Unit) (ors : Option RegFile)
     (fn' : Option (Bool × Bool × Bool × Bool)) (d' : Efab) (oib : Option Ibch)
     (obar : Option barrier_kind) :
-    pstepHw cpu m rs fn ib d l rds ws ann m' ors fn' d' oib obar → ann = true → l = LInstr := by
+    pstepHw cpu m rs fn ib d l rds ws ann m' ors fn' d' oib obar → ann = true →
+      l = LInstr ∨ l = LFence false false false false := by
   rintro (⟨-, ⟨H, -⟩, -, -, rfl⟩ | ⟨_, _, _, _, -, -, -, -, rfl⟩ | ⟨-, -, -, rfl⟩) hann
   · exact pnodeStepAnn m rs ib _ l m' ors fn' _ oib obar H hann
   · cases hann
@@ -777,7 +786,7 @@ theorem phrunAnn (cpu : CPU) (ls : List Wlabel) (rds : List Nat) (ws : List Regi
     (ib : Ibch) (d : Efab) (m' : SailM Unit) (rs' : RegFile)
     (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : Efab) :
     phrun cpu ls rds ws ann m rs fn ib d m' rs' fn' ib' d' →
-    ann = true → LInstr ∈ ls := by
+    ann = true → LInstr ∈ ls ∨ LFence false false false false ∈ ls := by
   intro h
   induction h with
   | nil => intro hann; cases hann
@@ -785,20 +794,27 @@ theorem phrunAnn (cpu : CPU) (ls : List Wlabel) (rds : List Nat) (ws : List Regi
       hstep _ ih =>
     intro hann
     rcases Bool.or_eq_true_iff.1 hann with ha | hb
-    · rw [pstepHwAnn cpu m rs fn ib d l rds ws ann m1 ors fn1 d1 oib obar hstep ha]
-      exact List.mem_cons_self
-    · exact List.mem_cons_of_mem _ (ih hb)
+    · rcases pstepHwAnn cpu m rs fn ib d l rds ws ann m1 ors fn1 d1 oib obar hstep ha with
+        rfl | rfl
+      · exact Or.inl List.mem_cons_self
+      · exact Or.inr List.mem_cons_self
+    · rcases ih hb with h | h
+      · exact Or.inl (List.mem_cons_of_mem _ h)
+      · exact Or.inr (List.mem_cons_of_mem _ h)
 
 theorem phrunNoInstr (cpu : CPU) (ls : List Wlabel) (rds : List Nat) (ws : List Register)
     (ann : Bool) (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool))
     (ib : Ibch) (d : Efab) (m' : SailM Unit) (rs' : RegFile)
     (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : Efab) :
     phrun cpu ls rds ws ann m rs fn ib d m' rs' fn' ib' d' →
-    LInstr ∉ ls → ann = false := by
-  intro hrun hni
+    LInstr ∉ ls → LFence false false false false ∉ ls → ann = false := by
+  intro hrun hni hnf
   cases ann with
   | false => rfl
-  | true => exact absurd (phrunAnn cpu ls rds ws true m rs fn ib d m' rs' fn' ib' d' hrun rfl) hni
+  | true =>
+    rcases phrunAnn cpu ls rds ws true m rs fn ib d m' rs' fn' ib' d' hrun rfl with h | h
+    · exact absurd h hni
+    · exact absurd h hnf
 
 /-! ## 8. (A) THE PER-INSTRUCTION SOUNDNESS LEMMA -/
 
@@ -830,13 +846,13 @@ theorem instrDagree (T : List Nat) (cpu : CPU) (ls : List Wlabel) (rds : List Na
     (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (m' : SailM Unit)
     (rs1' : RegFile) (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch) (d' : Efab) :
     phrun cpu ls rds ws ann m rs1 fn ib d m' rs1' fn' ib' d' →
-    LInstr ∉ ls →
+    LInstr ∉ ls → LFence false false false false ∉ ls →
     (∀ n, n ∈ ib'.ibRds → n ∉ T) →
     ∀ rs2, dregAgree (fun n => n ∉ T) rs1 rs2 →
     ∃ rs2', phrun cpu ls rds ws ann m rs2 fn ib d m' rs2' fn' ib' d' ∧
       dregAgree (fun n => n ∉ T) rs1' rs2' := by
-  intro hrun hni hib rs2 hag
-  have hann := phrunNoInstr cpu ls rds ws ann m rs1 fn ib d m' rs1' fn' ib' d' hrun hni
+  intro hrun hni hnf hib rs2 hag
+  have hann := phrunNoInstr cpu ls rds ws ann m rs1 fn ib d m' rs1' fn' ib' d' hrun hni hnf
   have hcov := phrunIbRds cpu ls rds ws ann m rs1 fn ib d m' rs1' fn' ib' d' hrun hann
   refine phrunDagree _ cpu ls rds ws ann m rs1 fn ib d m' rs1' fn' ib' d' hrun ?_ rs2 hag
   intro n hn
@@ -849,15 +865,15 @@ theorem instrDagreeEv (T : List Nat) (cpu : CPU) (ls : List Wlabel) (m : SailM U
     (m' : SailM Unit) (rs1' : RegFile) (fn' : Option (Bool × Bool × Bool × Bool)) (ib' : Ibch)
     (d' : Efab) :
     pevrun ls (.PHart cpu m rs1 fn ib) d (.PHart cpu m' rs1' fn' ib') d' →
-    LInstr ∉ ls →
+    LInstr ∉ ls → LFence false false false false ∉ ls →
     (∀ n, n ∈ ib'.ibRds → n ∉ T) →
     ∀ rs2, dregAgree (fun n => n ∉ T) rs1 rs2 →
     ∃ rs2', pevrun ls (.PHart cpu m rs2 fn ib) d (.PHart cpu m' rs2' fn' ib') d' ∧
       dregAgree (fun n => n ∉ T) rs1' rs2' := by
-  intro hrun hni hib rs2 hag
+  intro hrun hni hnf hib rs2 hag
   obtain ⟨rds, ws, ann, hh⟩ := pevrunPhrun ls _ d _ d' hrun cpu m rs1 fn ib m' rs1' fn' ib' rfl rfl
   obtain ⟨rs2', hh2, hag2⟩ :=
-    instrDagree T cpu ls rds ws ann m rs1 fn ib d m' rs1' fn' ib' d' hh hni hib rs2 hag
+    instrDagree T cpu ls rds ws ann m rs1 fn ib d m' rs1' fn' ib' d' hh hni hnf hib rs2 hag
   exact ⟨rs2', phrunPevrun cpu ls rds ws ann m rs2 fn ib d m' rs2' fn' ib' d' hh2, hag2⟩
 
 /-- THE WRITE LABEL IS A FUNCTION OF THE NODE AND THE CHANNEL. -/
@@ -943,17 +959,24 @@ def witM : SailM Unit :=
 theorem witRun (cpu : CPU) (rs : RegFile) (d : Efab) :
     ∃ ls rds ws ann m' ib' rs',
       phrun cpu ls rds ws ann witM rs none ibNone d m' rs' none ib' d ∧
-      rds = [15] ∧ ws = [(.x14 : Register)] ∧ ann = false ∧ LInstr ∉ ls ∧ ib'.ibRds = [15] := by
+      rds = [15] ∧ ws = [(.x14 : Register)] ∧ ann = false ∧ LInstr ∉ ls ∧
+      LFence false false false false ∉ ls ∧ ib'.ibRds = [15] := by
   refine ⟨_, _, _, _, _, _, _,
     phrun.more (Or.inl ⟨rfl, ⟨⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩, rfl⟩, rfl, rfl, rfl⟩)
       (phrun.more (Or.inl ⟨rfl, ⟨⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩, rfl⟩, rfl, rfl, rfl⟩)
-        (phrun.nil _ _ _ _ _)), rfl, rfl, rfl, ?_, rfl⟩
-  intro hin
-  rcases List.mem_cons.1 hin with h | h
-  · cases h
-  · rcases List.mem_cons.1 h with h | h
-    · exact erwLabelNeInstr _ h.symm
+        (phrun.nil _ _ _ _ _)), rfl, rfl, rfl, ?_, ?_, rfl⟩
+  · intro hin
+    rcases List.mem_cons.1 hin with h | h
     · cases h
+    · rcases List.mem_cons.1 h with h | h
+      · exact erwLabelNeInstr _ h.symm
+      · cases h
+  · intro hin
+    rcases List.mem_cons.1 hin with h | h
+    · cases h
+    · rcases List.mem_cons.1 h with h | h
+      · exact WeakEvProv.erwLabelNeMark _ h.symm
+      · cases h
 
 theorem instrDagreeNonvacuous (cpu : CPU) (rs1 rs2 : RegFile) (d : Efab) :
     dregAgree (fun n => n ∉ [14]) rs1 rs2 →
@@ -962,9 +985,9 @@ theorem instrDagreeNonvacuous (cpu : CPU) (rs1 rs2 : RegFile) (d : Efab) :
       phrun cpu ls [15] [(.x14 : Register)] false witM rs2 none ibNone d m' rs2' none ib' d ∧
       dregAgree (fun n => n ∉ [14]) rs1' rs2' := by
   intro hag
-  obtain ⟨ls, rds, ws, ann, m', ib', rs1', hrun, rfl, rfl, rfl, hni, hib⟩ := witRun cpu rs1 d
+  obtain ⟨ls, rds, ws, ann, m', ib', rs1', hrun, rfl, rfl, rfl, hni, hnf, hib⟩ := witRun cpu rs1 d
   obtain ⟨rs2', hrun2, hag2⟩ :=
-    instrDagree [14] cpu ls [15] [.x14] false witM rs1 none ibNone d m' rs1' none ib' d hrun hni
+    instrDagree [14] cpu ls [15] [.x14] false witM rs1 none ibNone d m' rs1' none ib' d hrun hni hnf
       (by rw [hib]; intro n hn; simp at hn; subst hn; decide) rs2 hag
   exact ⟨ls, m', ib', rs1', rs2', hrun, hrun2, hag2⟩
 

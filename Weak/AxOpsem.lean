@@ -97,6 +97,8 @@ FACTS THE NEXT LAYER MUST KNOW (Rocq (1)–(6)).
    `AxOpsem.wlRdErwLabel`, `AxOpsem.wlRdEbarLabel`; OpaxWit's `wtFreq`/`wtFm`/`wtPf0`/
    `wtFetchStep` (deviation 2).
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `pnodeStepReadInv`'s announce arm goes through `annLabelOr` (an announce node, marker or `LInstr`, is never a read).
+
 **Rocq → Lean name map.**  `athread` `Athread` (`AThread`, `at_p`/`at_k` `atP`/`atK`),
 `aident_t` `AidentT` (`IRead/IWrite/IRmw/IFence`), `aident` `aident`, `aident_rd` `aidentRd`,
 `aident_wr` `aidentWr`, `aident_fence` `aidentFence`, `aident_n` `aidentN`, `aident_adv_rd`
@@ -605,7 +607,9 @@ theorem pnodeStepReadInv (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevSta
     | cycleCount => obtain ⟨rfl, _⟩ := h; simp [wlRd] at hrd
     | getCycleCount => obtain ⟨rfl, _⟩ := h; simp [wlRd] at hrd
     | message => obtain ⟨rfl, _⟩ := h; simp [wlRd] at hrd
-    | instrAnnounce => obtain ⟨rfl, _⟩ := h; simp [wlRd] at hrd
+    | instrAnnounce n w =>
+      obtain ⟨rfl, _⟩ := h
+      rcases annLabelOr n w with e | e <;> rw [e] at hrd <;> simp [wlRd] at hrd
     | branchAnnounce => obtain ⟨rfl, _⟩ := h; simp [wlRd] at hrd
 
 /-- THE READ CONTINUATION: a program step with a read label determines a function `F` from byte

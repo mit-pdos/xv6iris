@@ -54,6 +54,8 @@ consumption interface for the memory-free, device-free part of a run.
 6. `epure_execute_UTYPE_LUI_gpr` / `epure_lui_tail` / `ewp_ev_lui_tail`: `tick_pc tt` ↦
    `tick_pc ()`; the post-state `let s1 := …` is kept as a `let`.
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `epure` returns `none` at an SFENCE.VMA announce (`sfAnnB`): such a node emits the marker, a graph event, so a successful `epure` run is sfence-free (AxCjrWpd's `epureGstepRtc` reads it off).  Each induction over `epure` has an `instrAnnounce` case.
+
 **Rocq → Lean name map.**  `epure` `epure`, `epure_returnm` `epureReturnm`, `epure_read_reg`
 `epureReadReg`, `epure_write_reg` `epureWriteReg`, `epure_bind` `epureBind`, `epure_bind0`
 `epureBind0`, `epure_mono` `epureMono`, `epure_exec_eff` `epureExecEff`, `exec_eff_epure`
@@ -106,7 +108,8 @@ def epure {X : Type} (D : List Register) : SailM X → ExecSt → Option (X × E
     | .cycleCount, k => epure D (k ()) s
     | .getCycleCount, k => epure D (k (0 : Nat)) s
     | .message _, k => epure D (k ()) s
-    | .instrAnnounce _ _, k => epure D (k ()) s
+    -- Q7: an sfence.vma announce is the marker (a graph event), not a silent node: stop
+    | .instrAnnounce n w, k => if sfAnnB n w then none else epure D (k ()) s
     | .branchAnnounce _ _, k => epure D (k ()) s
     | .choose _, _ => none
     | .readRam .., _ => none
@@ -152,6 +155,11 @@ theorem epureBind {X Y : Type} (D : List Register) (m : SailM X) (f : X → Sail
         · simp only [epure, hr, ↓reduceIte] at h ⊢
           exact ih _ _ _ _ h
         · simp [epure, hr] at h
+      case instrAnnounce n w =>
+        cases hs : sfAnnB n w
+        · simp only [epure, hs, Bool.false_eq_true, ↓reduceIte] at h ⊢
+          exact ih _ _ _ _ h
+        · simp [epure, hs] at h
       all_goals first
         | (simp [epure] at h; done)
         | (simp only [epure] at h ⊢; exact ih _ _ _ _ h)
@@ -183,6 +191,11 @@ theorem epureMono {X : Type} (D D' : List Register) (m : SailM X) :
         · simp only [epure, hr, hsub hr, ↓reduceIte] at h ⊢
           exact ih _ _ _ h
         · simp [epure, hr] at h
+      case instrAnnounce n w =>
+        cases hs : sfAnnB n w
+        · simp only [epure, hs, Bool.false_eq_true, ↓reduceIte] at h ⊢
+          exact ih _ _ _ h
+        · simp [epure, hs] at h
       all_goals first
         | (simp [epure] at h; done)
         | (simp only [epure] at h ⊢; exact ih _ _ _ h)
@@ -215,6 +228,11 @@ theorem epureExecEff {X : Type} (D : List Register) (m : SailM X) :
           obtain ⟨h1, h2, h3⟩ := ih _ _ _ _ h
           exact ⟨h1, h2, h3⟩
         · simp [epure, hr] at h
+      case instrAnnounce n w =>
+        cases hs : sfAnnB n w
+        · simp only [epure, hs, Bool.false_eq_true, ↓reduceIte] at h
+          exact ih _ _ _ _ h
+        · simp [epure, hs] at h
       all_goals first
         | (simp [epure] at h; done)
         | (simp only [epure] at h; exact ih _ _ _ _ h)
@@ -261,6 +279,11 @@ theorem epureEsilD (D : List Register) (m : SailM Unit) :
           exact rtc_l (y := (k PUnit.unit, t.regs.set r w)) (by simp [esilD, esilNode, hr])
             (ih _ _ _ _ h)
         · simp [epure, hr] at h
+      case instrAnnounce n w =>
+        cases hs : sfAnnB n w
+        · simp only [epure, hs, Bool.false_eq_true, ↓reduceIte] at h
+          exact rtc_l (by simp [esilD, esilNode]) (ih _ _ _ _ h)
+        · simp [epure, hs] at h
       all_goals first
         | (simp [epure] at h; done)
         | (simp only [epure] at h; exact rtc_l (by simp [esilD, esilNode]) (ih _ _ _ _ h))
@@ -450,6 +473,11 @@ theorem epureEpurew {X : Type} (D : List Register) (m : SailM X) :
         · simp only [epure, epurew, hr, ↓reduceIte] at h ⊢
           exact ih _ _ _ _ h
         · simp [epure, hr] at h
+      case instrAnnounce n w =>
+        cases hs : sfAnnB n w
+        · simp only [epure, epurew, hs, Bool.false_eq_true, ↓reduceIte] at h ⊢
+          exact ih _ _ _ _ h
+        · simp [epure, hs] at h
       all_goals first
         | (simp [epure] at h; done)
         | (simp only [epure, epurew] at h ⊢; exact ih _ _ _ _ h)

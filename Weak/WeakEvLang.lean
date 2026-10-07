@@ -96,6 +96,11 @@ RECORDED DECISIONS (Rocq D1–D5):
    `.instrAnnounce n w` (`w : BitVec n`); `ib_of_bvn o := Z_to_bv 32 (bvn_unsigned o)` ↦
    `ibOfBvn w := BitVec.ofNat 32 w.toNat` (the same zero-extension).  The arm is Rocq's: bank
    `ibAnn (ibOfBvn w)` and apply `instrPost`.  `.branchAnnounce n pc` is silent, as Rocq's.
+   Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a)): at an SFENCE.VMA announce
+   (`sfAnnB n w`, the opcode test) the program half labels the node with the sfence MARKER
+   `LFence false false false false` (`annLabel`, a graph event) instead of `LInstr`, so the
+   language applies the marker's identity instead of `instrPost` there (`annPost`); the reset
+   still happens at the instruction boundary.
 8. REGISTER NAMES.  Lean's `Register` is a flat enumeration (Rocq: `R_bitvector_64 rb` etc.), so
    `ereg_gpr_num` is an explicit `x1 ↦ 1 … x31 ↦ 31` table (Rocq: `num_of_register_bitvector_64`
    in `[16, 46]` minus 15 — the same map), and `ereg_csr_num` matches `.satp`, …, `.mcounteren`,
@@ -151,7 +156,9 @@ test `erw_of_<x>` `erwOf<X>` (e.g. `erw_of_lw_rd` `erwOfLwRd`, `erw_of_csrrci_ss
 `eprimStepDiskReducible`; the device lemmas as in deviation 2.
 Lean-only: `ewgBar` (+ `ewgBarWs`, `ewgBarItv`), `ofWExpr`, `dvirtio`, `setDvirtio`,
 `ecycFrameSt` and its shape lemmas, `ecycleStepFrame` (the one case analysis the six
-`ecycle_step_*` lemmas are read off), `ecycleStepItvLe`, `edevStepWs`.
+`ecycle_step_*` lemmas are read off), `ecycleStepItvLe`, `edevStepWs`; Q7 (deviation 7):
+`sfAnnB`, `annLabel`, `annPost` (+ `annLabelSf/Not/Or`, `annPostSf/Not/Le/Depmove/Bounded`),
+`WeakEvLang.noSfAnn` (the path premise of the generic admin-run lemmas, AxFetch1).
 
 **Not ported:** `euart_step`, `eplic_step` and the disk's PLIC-latch arm (deviation 2: Lean's
 devices are programs; uses checked: only this file's own `eprim_step`/inversion/`_ws` lemmas,
@@ -399,6 +406,112 @@ def erwLabel (k : ErwKind) : Wlabel :=
   | .ERWnone => .LSilent
   | .ERWreg rd srcs => .LRegW rd srcs
   | .ERWctrl srcs => .LCtrl srcs
+
+/-- Q7 (owner ruling, Lean-only; deviation 7): the SFENCE.VMA opcode test on an announced
+word — `sfence.vma rs1, rs2` for any `rs1`/`rs2` (funct7 `0001001`, `rd = 0`, funct3 `000`,
+opcode `SYSTEM`). -/
+def sfAnnB (n : Nat) (w : BitVec n) : Bool :=
+  n == 32 && (w.toNat &&& 0xFE007FFF) == 0x12000073
+
+/-- Q7: the announce's label — the sfence.vma MARKER (`LFence false false false false`, a
+graph event) at an sfence announce, the instruction start `LInstr` otherwise. -/
+def annLabel (n : Nat) (w : BitVec n) : Wlabel :=
+  if sfAnnB n w then .LFence false false false false else .LInstr
+
+/-- Q7: the announce's view update — the identity at an sfence announce (the marker's
+`fencePost … false false false false`), the second reset `instrPost` otherwise. -/
+def annPost (n : Nat) (w : BitVec n) (ws : Wstate) : Wstate :=
+  if sfAnnB n w then ws else instrPost ws
+
+theorem annLabelSf {n : Nat} {w : BitVec n} (h : sfAnnB n w = true) :
+    annLabel n w = .LFence false false false false := by
+  simp only [annLabel, h, ↓reduceIte]
+
+theorem annLabelNot {n : Nat} {w : BitVec n} (h : sfAnnB n w = false) :
+    annLabel n w = .LInstr := by
+  simp only [annLabel, h, Bool.false_eq_true, ↓reduceIte]
+
+theorem annPostSf {n : Nat} {w : BitVec n} (h : sfAnnB n w = true) (ws : Wstate) :
+    annPost n w ws = ws := by
+  simp only [annPost, h, ↓reduceIte]
+
+theorem annPostNot {n : Nat} {w : BitVec n} (h : sfAnnB n w = false) (ws : Wstate) :
+    annPost n w ws = instrPost ws := by
+  simp only [annPost, h, Bool.false_eq_true, ↓reduceIte]
+
+theorem annLabelOr (n : Nat) (w : BitVec n) :
+    annLabel n w = .LInstr ∨ annLabel n w = .LFence false false false false := by
+  cases h : sfAnnB n w
+  · exact Or.inl (annLabelNot h)
+  · exact Or.inr (annLabelSf h)
+
+theorem annPostLe (n : Nat) (w : BitVec n) (ws : Wstate) :
+    wsLe ws (annPost n w ws) := by
+  unfold annPost
+  split
+  · exact wsLeRefl ws
+  · exact instrPostLe ws
+
+theorem annPostDepmove (n : Nat) (w : BitVec n) (ws : Wstate) :
+    wsDepmove ws (annPost n w ws) := by
+  unfold annPost
+  split
+  · exact wsDepmoveRefl ws
+  · exact instrPostDepmove ws
+
+theorem annPostBounded (n : Nat) (w : BitVec n) (ws : Wstate) (b : Nat) :
+    wsBounded ws b → wsBounded (annPost n w ws) b := by
+  intro h
+  unfold annPost
+  split
+  · exact h
+  · exact instrPostBounded ws b h
+
+/-- Q7 (Lean-only): ALONG `WeakCert.execEff`'s path from `s` (arm for arm), no announce is an
+SFENCE.VMA word — the premise of the generic "a register-only run is a position-keeping admin
+run" lemmas (`afAdminRunToMemread` & co.): a run that announces an sfence emits the marker, a
+graph event.  A stuck node ends the path (`True`). -/
+def WeakEvLang.noSfAnn {X : Type} : SailM X → ExecSt → Prop
+  | .pure _, _ => True
+  | .impure (.error _) _, _ => True
+  | .impure (.ok o) k, s =>
+    match o, k with
+    | .regRead r, k => WeakEvLang.noSfAnn (k (s.regs r)) s
+    | .regWrite r v, k => WeakEvLang.noSfAnn (k PUnit.unit) (s.setReg r v)
+    | .memRead n _ req, k =>
+      if mmioAcc req.pa n then
+        match devRead s.dev req.pa n with
+        | some (w, d') => WeakEvLang.noSfAnn (k (.Ok (w, none))) (s.setDev d')
+        | none => True
+      else
+        match bmRead s.mem req.pa n with
+        | some w => WeakEvLang.noSfAnn (k (.Ok (w, none))) s
+        | none => True
+    | .memWrite n _ req, k =>
+      match req.value with
+      | none => True
+      | some w =>
+        if mmioAcc req.pa n then
+          match devWrite s.dev req.pa n w with
+          | some d' => WeakEvLang.noSfAnn (k (.Ok (some true))) (s.setDev d')
+          | none => True
+        else
+          WeakEvLang.noSfAnn (k (.Ok (some true))) (s.setMem (bmWrite s.mem req.pa n w))
+    | .barrier _, k => WeakEvLang.noSfAnn (k ()) s
+    | .cacheOp _, k => WeakEvLang.noSfAnn (k ()) s
+    | .tlbi _, k => WeakEvLang.noSfAnn (k ()) s
+    | .translationStart _, k => WeakEvLang.noSfAnn (k ()) s
+    | .translationEnd _, k => WeakEvLang.noSfAnn (k ()) s
+    | .takeException _, k => WeakEvLang.noSfAnn (k ()) s
+    | .returnException _, k => WeakEvLang.noSfAnn (k ()) s
+    | .cycleCount, k => WeakEvLang.noSfAnn (k ()) s
+    | .getCycleCount, k => WeakEvLang.noSfAnn (k (0 : Nat)) s
+    | .message _, k => WeakEvLang.noSfAnn (k ()) s
+    | .instrAnnounce n w, k => sfAnnB n w = false ∧ WeakEvLang.noSfAnn (k ()) s
+    | .branchAnnounce _ _, k => WeakEvLang.noSfAnn (k ()) s
+    | .choose _, _ => True
+    | .readRam .., _ => True
+    | .writeRam .., _ => True
 
 def erwWs (ws : Wstate) (k : ErwKind) : Wstate :=
   match k with
@@ -753,8 +866,9 @@ def emonadStep (gen : Nat) (σ : WGState) (c : CPU) : SailM Unit → EExpr → W
         e' = ECycle gen c (k ()) (ebarPark b) ∧
         σ' = ewgBar σ c (efenceApply (σ.wgws c) (ebarNow b)) (itvPost (σ.wgws c) (σ.wgitv c) b)
     -- D3: THE ANNOUNCE NODE banks the instruction bits and resets the load-result bank
-    | .instrAnnounce _ w, k =>
-        e' = ECycle gen c (k ()) none ∧ σ' = ewgIbws σ c (ibAnn (ibOfBvn w)) (instrPost (σ.wgws c))
+    -- Q7: at an sfence.vma announce the reset is replaced by the marker's identity (`annPost`)
+    | .instrAnnounce n w, k =>
+        e' = ECycle gen c (k ()) none ∧ σ' = ewgIbws σ c (ibAnn (ibOfBvn w)) (annPost n w (σ.wgws c))
     -- the branch announcement stays silent (the control view rides the nextPC write)
     | .branchAnnounce _ _, k => e' = ECycle gen c (k ()) none ∧ σ' = σ
     | .cacheOp _, k => e' = ECycle gen c (k ()) none ∧ σ' = σ
@@ -1041,7 +1155,7 @@ theorem ecycleStepFrame (gen : Nat) (σ : WGState) (c : CPU) (m : SailM Unit)
       | instrAnnounce n w =>
         obtain ⟨rfl, rfl⟩ := h
         exact ⟨Or.inr ⟨_, _, rfl⟩,
-          ecycFrameUpd σ _ c _ [] rfl rfl rfl (List.append_nil _).symm rfl (instrPostLe _)⟩
+          ecycFrameUpd σ _ c _ [] rfl rfl rfl (List.append_nil _).symm rfl (annPostLe _ _ _)⟩
       | branchAnnounce _ _ => obtain ⟨rfl, rfl⟩ := h; exact ⟨Or.inr ⟨_, _, rfl⟩, hsame⟩
       | cacheOp _ => obtain ⟨rfl, rfl⟩ := h; exact ⟨Or.inr ⟨_, _, rfl⟩, hsame⟩
       | tlbi _ => obtain ⟨rfl, rfl⟩ := h; exact ⟨Or.inr ⟨_, _, rfl⟩, hsame⟩

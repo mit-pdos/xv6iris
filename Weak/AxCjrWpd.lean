@@ -56,6 +56,8 @@ premise Rocq leaves undischarged (`AxFetch.af_cjr_row_run` only has the `execEff
    steps), `AxCjrWpd.wpdOfRunFrom` (§3's closed-run tail), and (Q8) `AxCjrWpd.fetchImgOk`,
    `AxCjrWpd.fetchGdOkImg`, `AxCjrWpd.pinnedBytes` (a pinned fetch returns the image bytes).
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `epureGstepRtc`'s announce case reads `sfAnnB n w = false` off `WeakEvExecEff.epure` (which stops at an sfence announce) and steps with `LInstr`.
+
 **Rocq → Lean name map.**  `erw_label_admin` `AxCjrWpd.erwLabelAdmin` (duplicated name),
 `epure_gstep_rtc` `epureGstepRtc`, `bytes_word_eq` `bytesWordEq`, `fetch_node_pstep`
 `fetchNodePstep`, `fetch_gd_ok` `fetchGdOk`, `fetch_flow` `fetchFlow`, `wpd_fetch_step`
@@ -127,11 +129,12 @@ theorem epureGstepRtc (D : List Register) (Hse : Register.sig_seip ∉ D)
             (efInit t.dev) trivial (AxCjrWpd.erwLabelAdmin _) ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
         · simp [epure, hr] at h
       case instrAnnounce a w =>
-        simp only [epure] at h
+        cases hsw : sfAnnB a w <;>
+          simp only [epure, hsw, Bool.false_eq_true, ↓reduceIte, reduceCtorEq] at h
         obtain ⟨ib', hrun⟩ := ih _ _ _ _ h cpu (ibAnn (ibOfBvn w)) kpos
         refine ⟨ib', rtc_l ?_ hrun⟩
         exact AxCjrWpd.gstepNode cpu _ _ t.regs ib kpos .LInstr none (some (ibAnn (ibOfBvn w)))
-          none (efInit t.dev) trivial rfl ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+          none (efInit t.dev) trivial rfl ⟨(annLabelNot hsw).symm, rfl, rfl, rfl, rfl, rfl, rfl⟩
       case getCycleCount =>
         simp only [epure] at h
         obtain ⟨ib', hrun⟩ := ih _ _ _ _ h cpu ib kpos

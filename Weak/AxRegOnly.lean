@@ -39,6 +39,8 @@ Rocq: `iris/AxRegOnly.v` @ xxvzwolszwmp (334 lines).
 3. `afRetToNextFetch` keeps Rocq's (unused) device binder `d`, now an `Efab`; the step is taken
    at `d` → `d`.
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `afRegonlyRowRun` takes `WeakEvLang.noSfAnn (riscvStep tick) ⟨…⟩` per tick (see `AxFetch2`'s Q7 note).
+
 **Rocq → Lean name map.**  `af_ret_to_next_fetch` `afRetToNextFetch`, `af_regonly_row_run`
 `afRegonlyRowRun`.  Neither name is in `notes/weak-port-dupnames.json`.
 
@@ -111,22 +113,24 @@ theorem afRegonlyRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : Bi
       sExec.regs .minstret_increment = b ∧
       bmDomSub sExec.mem W) →
     ∀ tick : Bool,
+    -- Q7: the instruction's run announces no sfence.vma word (header, Q7)
+    WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ →
     ∃ (s3 : ExecSt) (ib3 : Ibch),
       rtc (fun t1 t2 => ∃ l, AxOpsem.astepProg row t1 l t2)
         ⟨.PHart cpu (riscvStep tick) σ.wmRegs none ib0, k⟩
         ⟨.PHart cpu (.pure ()) s3.regs none ib3, k⟩ := by
   intro lpc lpriv lpmp lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext hsub
-    hisRVC hagree hDmi hgood hdec hgood0 hexp hexec tick
+    hisRVC hagree hDmi hgood hdec hgood0 hexp hexec tick hsf
   -- (a) the whole instruction's `execEff` fact: the 2-byte fetch, no data event
   obtain ⟨t', hex, -⟩ := execEffStepOfLeafRvc2 σ W pc h w i0 i [] D D0 dst
     lpc lpriv lpmp lpma lhtif lhart lmisaS lmisaC lmIE lelp hal2 hal4 hram htext
     hsub hisRVC hagree hDmi hgood hdec hgood0 hexp hexec tick
   -- (b) the admin run to the (width-2) fetch node and the admin fetch step (position kept)
-  obtain ⟨m2, s2, ib2, -, hex2, hrtcb⟩ :=
+  obtain ⟨m2, s2, ib2, -, hex2, hrtcb, hsf2⟩ :=
     AxFetch2.fetchPeel (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ ib0
-      WeakFetchEff.wakIfetch pc 2 t' [] cpu k row (by decide) rfl hex
+      WeakFetchEff.wakIfetch pc 2 t' [] cpu k row (by decide) rfl hex hsf
   -- (d) the admin run to the boundary (no data node)
-  obtain ⟨ib3, hrtcd⟩ := afAdminRunToEnd m2 s2 ib2 t' hex2 cpu k row
+  obtain ⟨ib3, hrtcd⟩ := afAdminRunToEnd m2 s2 ib2 t' hex2 hsf2 cpu k row
   exact ⟨t', ib3, rtc_transitive hrtcb hrtcd⟩
 
 end Weak

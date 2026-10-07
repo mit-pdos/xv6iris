@@ -89,6 +89,8 @@ the per-instruction channel `ib` (`ibRd`/`ibAnn`), and those are exactly the lab
    `Bool`/`Int` facts use `decide +kernel`.
 6. §7's `Print Assumptions` are dropped (the lint's axiom/sorry ban is the audit).
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): the private interpreter `admNode` returns `none` at an SFENCE.VMA announce (the marker is not an administrative label); `admNodePstep`/`admNodeAdmok` have the matching cases.
+
 **Rocq → Lean name map.**  `adm_run_of_pevrun` `admRunOfPevrun`, `pevrun_of_adm_run`
 `pevrunOfAdmRun`, `aht` `aht`, `ah_rs/ib/m` `ahRs/ahIb/ahM`, `ahP` `ahP`, `adm_node` `admNode`,
 `adm_iter` `admIter`, `adm_lbls` `admLbls`, `adm_count` `admCount`, `eread_width` `ereadWidth`,
@@ -191,7 +193,9 @@ noncomputable def admNode (tick : Bool) (x : aht) : Option (Wlabel × aht) :=
       | .regRead r, k => some (LSilent, ((rs, ibRd ib r), k (rs r)))
       | .regWrite r v, k =>
           some (erwLabel (erwOf (depsOfIb ib.ibBits) ib.ibRds r), ((rs.set r v, ib), k PUnit.unit))
-      | .instrAnnounce _ w, k => some (LInstr, ((rs, ibAnn (ibOfBvn w)), k ()))
+      -- Q7: an sfence.vma announce is a graph event (the marker), not an admin step: stop
+      | .instrAnnounce n w, k =>
+          if sfAnnB n w then none else some (LInstr, ((rs, ibAnn (ibOfBvn w)), k ()))
       | .branchAnnounce _ _, k => some (LSilent, ((rs, ib), k ()))
       | .cacheOp _, k => some (LSilent, ((rs, ib), k ()))
       | .tlbi _, k => some (LSilent, ((rs, ib), k ()))
@@ -279,9 +283,11 @@ theorem admNodePstep (tick : Bool) (cpu : CPU) (d : Efab) (x : aht) (l : Wlabel)
         pstepEvNode cpu d _ _ rs ib _ (some (rs.set r v)) none none
           ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩⟩
     case instrAnnounce a w =>
+      cases hs : sfAnnB a w <;> simp only [hs, Bool.false_eq_true, ↓reduceIte, reduceCtorEq,
+        Option.some.injEq, Prod.mk.injEq] at h
       obtain ⟨rfl, rfl⟩ := h
       exact ⟨rfl, pstepEvNode cpu d _ _ rs ib LInstr none (some (ibAnn (ibOfBvn w))) none
-        ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩⟩
+        ⟨(annLabelNot hs).symm, rfl, rfl, rfl, rfl, rfl, rfl⟩⟩
     all_goals
       obtain ⟨rfl, rfl⟩ := h
       exact ⟨trivial, pstepEvNode cpu d _ _ rs ib LSilent none none none
@@ -604,6 +610,11 @@ theorem admNodeAdmok (tick : Bool) (x : aht) (l : Wlabel) (y : aht) :
     case regWrite r v =>
       obtain ⟨rfl, rfl⟩ := h
       cases erwOf (depsOfIb ib.ibBits) ib.ibRds r <;> rfl
+    case instrAnnounce a w =>
+      cases hs : sfAnnB a w <;> simp only [hs, Bool.false_eq_true, ↓reduceIte, reduceCtorEq,
+        Option.some.injEq, Prod.mk.injEq] at h
+      obtain ⟨rfl, rfl⟩ := h
+      rfl
     all_goals
       obtain ⟨rfl, rfl⟩ := h
       rfl

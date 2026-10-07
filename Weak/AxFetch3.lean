@@ -54,6 +54,8 @@ header carries the whole port's summary and the O2 Stage C account).
 5. `execEffStepOfLeafRvc2` is stated (and proved) as the instance of the Lean-only
    `WeakFetch2.execEffStepOfLeafRvc2St`, which carries Rocq's proof (`WeakFetch2` deviation 5).
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `afAdminRunToEnd` takes `WeakEvLang.noSfAnn m s` (as AxFetch1's peels); `afJalrRowRun`/`afCjrRowRun` take `noSfAnn (riscvStep tick) ⟨…⟩` per tick (see `AxFetch2`'s Q7 note).
+
 **Rocq → Lean name map.**  `af_admin_run_to_end` `afAdminRunToEnd`, `af_jalr_row_run`
 `afJalrRowRun`, `exec_eff_step_of_leaf_rvc2` `execEffStepOfLeafRvc2`, `af_cjr_row_run`
 `afCjrRowRun`.
@@ -84,6 +86,7 @@ run (position kept) from `m` to the boundary `.pure ()` at the final registers. 
 theorem afAdminRunToEnd (m : SailM Unit) :
     ∀ (s : ExecSt) (ib : Ibch) (s' : ExecSt),
       execEff m s = some ((), s', []) →
+      WeakEvLang.noSfAnn m s →
       ∀ (cpu : CPU) (kpos : Nat) (row : List Lbl),
         ∃ ib2 : Ibch,
           rtc (fun t1 t2 => ∃ l, AxOpsem.astepProg row t1 l t2)
@@ -91,12 +94,12 @@ theorem afAdminRunToEnd (m : SailM Unit) :
             ⟨.PHart cpu (.pure ()) s'.regs none ib2, kpos⟩ := by
   induction m with
   | pure y =>
-    intro s ib s' hex cpu kpos row
+    intro s ib s' hex _ cpu kpos row
     simp only [execEff, Option.some.injEq, Prod.mk.injEq] at hex
     obtain ⟨-, rfl, -⟩ := hex
     exact ⟨ib, rtc_refl _⟩
   | impure call k ih =>
-    intro s ib s' hex cpu kpos row
+    intro s ib s' hex hsf cpu kpos row
     cases call with
     | error e => simp [execEff] at hex
     | ok o =>
@@ -112,7 +115,8 @@ theorem afAdminRunToEnd (m : SailM Unit) :
           | some p =>
             obtain ⟨w0, d0⟩ := p
             simp only [hdr] at hex
-            obtain ⟨ib2, hrtc⟩ := ih _ (s.setDev d0) ib s' hex cpu kpos row
+            simp only [WeakEvLang.noSfAnn, if_pos hm, hdr] at hsf
+            obtain ⟨ib2, hrtc⟩ := ih _ (s.setDev d0) ib s' hex hsf cpu kpos row
             refine ⟨ib2, ?_⟩
             refine AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev d0 .LDev none none none kpos _
               hrtc ?_ trivial
@@ -139,7 +143,8 @@ theorem afAdminRunToEnd (m : SailM Unit) :
             | none => simp only [hdw] at hex; cases hex
             | some d0 =>
               simp only [hdw] at hex
-              obtain ⟨ib2, hrtc⟩ := ih _ (s.setDev d0) ib s' hex cpu kpos row
+              simp only [WeakEvLang.noSfAnn, hv, if_pos hm, hdw] at hsf
+              obtain ⟨ib2, hrtc⟩ := ih _ (s.setDev d0) ib s' hex hsf cpu kpos row
               refine ⟨ib2, ?_⟩
               refine AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev d0 .LDev none none none kpos
                 _ hrtc ?_ trivial
@@ -154,24 +159,30 @@ theorem afAdminRunToEnd (m : SailM Unit) :
         cases hcons
       case regRead r =>
         simp only [execEff] at hex
-        obtain ⟨ib2, hrtc⟩ := ih _ s (ibRd ib r) s' hex cpu kpos row
+        simp only [WeakEvLang.noSfAnn] at hsf
+        obtain ⟨ib2, hrtc⟩ := ih _ s (ibRd ib r) s' hex hsf cpu kpos row
         exact ⟨ib2, AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev s.dev .LSilent none
           (some (ibRd ib r)) none kpos _ hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial⟩
       case regWrite r v =>
         simp only [execEff] at hex
-        obtain ⟨ib2, hrtc⟩ := ih _ (s.setReg r v) ib s' hex cpu kpos row
+        simp only [WeakEvLang.noSfAnn] at hsf
+        obtain ⟨ib2, hrtc⟩ := ih _ (s.setReg r v) ib s' hex hsf cpu kpos row
         exact ⟨ib2, AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev s.dev
           (erwLabel (erwOf (depsOfIb ib.ibBits) ib.ibRds r)) (some (s.regs.set r v)) none none
           kpos _ hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ (erwLabelLbAdmin _)⟩
       case instrAnnounce nw w =>
         simp only [execEff] at hex
-        obtain ⟨ib2, hrtc⟩ := ih _ s (ibAnn (ibOfBvn w)) s' hex cpu kpos row
+        simp only [WeakEvLang.noSfAnn] at hsf
+        obtain ⟨hsw, hsf⟩ := hsf
+        obtain ⟨ib2, hrtc⟩ := ih _ s (ibAnn (ibOfBvn w)) s' hex hsf cpu kpos row
         exact ⟨ib2, AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev s.dev .LInstr none
-          (some (ibAnn (ibOfBvn w))) none kpos _ hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ rfl⟩
+          (some (ibAnn (ibOfBvn w))) none kpos _ hrtc
+          ⟨(annLabelNot hsw).symm, rfl, rfl, rfl, rfl, rfl, rfl⟩ rfl⟩
       all_goals first
         | (simp [execEff] at hex; done)
         | (simp only [execEff] at hex
-           obtain ⟨ib2, hrtc⟩ := ih _ s ib s' hex cpu kpos row
+           simp only [WeakEvLang.noSfAnn] at hsf
+           obtain ⟨ib2, hrtc⟩ := ih _ s ib s' hex hsf cpu kpos row
            exact ⟨ib2, AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev s.dev .LSilent none none
              none kpos _ hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial⟩)
 
@@ -206,12 +217,14 @@ theorem afJalrRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (w : BitVe
     -- jalr's own geometry: `jalr x0,0(ra)`, `ra ≠ x0`
     ra.toNat ≠ 0 →
     ∀ tick : Bool,
+    -- Q7: the instruction's run announces no sfence.vma word (header, Q7)
+    WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ →
     ∃ (s3 : ExecSt) (ib3 : Ibch),
       rtc (fun t1 t2 => ∃ l, AxOpsem.astepProg row t1 l t2)
         ⟨.PHart cpu (riscvStep tick) σ.wmRegs none ib0, k⟩
         ⟨.PHart cpu (.pure ()) s3.regs none ib3, k⟩ := by
   intro lpc lpriv lsec lmisaC lpmp lpma lhtif lhart lmisaS lmIE lelp hal hram4 htext hnotRVC
-    hagree hDmi hgood hdec hranz tick
+    hagree hDmi hgood hdec hranz tick hsf
   -- (a) the whole instruction's `execEff` fact: the fetch, no data event
   obtain ⟨t', hex, -⟩ := execEffStepOfLeafBase σ W pc w
     (.JALR (zeros (n := 12), .Regidx ra, zreg)) [] D dst
@@ -238,11 +251,11 @@ theorem afJalrRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (w : BitVe
       · rw [F3]; exact wmemRestrictDom σ W)
     tick
   -- (b) the admin run to the fetch node and the admin fetch step (position kept)
-  obtain ⟨m2, s2, ib2, -, hex2, hrtcb⟩ :=
+  obtain ⟨m2, s2, ib2, -, hex2, hrtcb, hsf2⟩ :=
     AxFetch2.fetchPeel (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ ib0
-      WeakFetchEff.wakIfetch pc 4 t' [] cpu k row (by decide) rfl hex
+      WeakFetchEff.wakIfetch pc 4 t' [] cpu k row (by decide) rfl hex hsf
   -- (d) the admin run to the boundary, the END of the instruction (no data node)
-  obtain ⟨ib3, hrtcd⟩ := afAdminRunToEnd m2 s2 ib2 t' hex2 cpu k row
+  obtain ⟨ib3, hrtcd⟩ := afAdminRunToEnd m2 s2 ib2 t' hex2 hsf2 cpu k row
   exact ⟨t', ib3, rtc_transitive hrtcb hrtcd⟩
 
 /-! ## 2.6 THE RVC (COMPRESSED) FETCH TWIN, and the `c.jr ra` / `c.ret` row run -/
@@ -330,12 +343,14 @@ theorem afCjrRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : BitVec
     -- c.jr's own geometry
     ra.toNat ≠ 0 →
     ∀ tick : Bool,
+    -- Q7: the instruction's run announces no sfence.vma word (header, Q7)
+    WeakEvLang.noSfAnn (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ →
     ∃ (s3 : ExecSt) (ib3 : Ibch),
       rtc (fun t1 t2 => ∃ l, AxOpsem.astepProg row t1 l t2)
         ⟨.PHart cpu (riscvStep tick) σ.wmRegs none ib0, k⟩
         ⟨.PHart cpu (.pure ()) s3.regs none ib3, k⟩ := by
   intro lpc lpriv lsec lmisaC lpmp lpma lhtif lhart lmisaS lmIE lelp hal2 hal4 hram htext hsub
-    hisRVC hagree hDmi hgood hdec hgood0 hexp hranz tick
+    hisRVC hagree hDmi hgood hdec hgood0 hexp hranz tick hsf
   -- (a) the whole instruction's `execEff` fact: the 2-byte fetch, no data event
   obtain ⟨t', hex, -⟩ := execEffStepOfLeafRvc2 σ W pc h w i0
     (.JALR (zeros (n := 12), .Regidx ra, zreg)) [] D D0 dst
@@ -362,11 +377,11 @@ theorem afCjrRowRun (σ : Wmstate) (W : GSet PAddr) (pc : BitVec 64) (h : BitVec
       · rw [F3]; exact wmemRestrictDom σ W)
     tick
   -- (b) the admin run to the (width-2) fetch node and the admin fetch step (position kept)
-  obtain ⟨m2, s2, ib2, -, hex2, hrtcb⟩ :=
+  obtain ⟨m2, s2, ib2, -, hex2, hrtcb, hsf2⟩ :=
     AxFetch2.fetchPeel (riscvStep tick) ⟨σ.wmRegs, wmemRestrict σ W, σ.wmDev⟩ ib0
-      WeakFetchEff.wakIfetch pc 2 t' [] cpu k row (by decide) rfl hex
+      WeakFetchEff.wakIfetch pc 2 t' [] cpu k row (by decide) rfl hex hsf
   -- (d) the admin run to the boundary (no data node)
-  obtain ⟨ib3, hrtcd⟩ := afAdminRunToEnd m2 s2 ib2 t' hex2 cpu k row
+  obtain ⟨ib3, hrtcd⟩ := afAdminRunToEnd m2 s2 ib2 t' hex2 hsf2 cpu k row
   exact ⟨t', ib3, rtc_transitive hrtcb hrtcd⟩
 
 end Weak

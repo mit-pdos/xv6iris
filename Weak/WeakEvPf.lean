@@ -91,6 +91,8 @@ LAYOUT.  Hart `c` at pool position and agent index `c.val`; the disk is agent `n
 
 **File-qualified names:** none (no name of this file is in `notes/weak-port-dupnames.json`).
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `ecycleStepLabel`'s announce arm returns `annLabel n w`.
+
 **Rocq → Lean name map.**  `fin_enum_lookup` `finEnumLookup`, `fin_enum_lookup_nat`
 `finEnumLookupNat`, `fin_enum_length` `finEnumLength`, `enum_CPU_lookup` `enumCPULookup`,
 `enum_CPU_length` `enumCPULength`, `ehst` `ehst`, `ehexp` `ehexp`, `epool`/`EPool` `Epool`/
@@ -681,9 +683,16 @@ theorem ecycleStepLabel (gen : Nat) (σ : WGState) (c : CPU) (m : SailM Unit)
           rw [ewgBarWs]
           simp [efenceApply]
       | instrAnnounce n w =>
-        -- D3-2: THE ANNOUNCE, `LInstr`
+        -- D3-2: THE ANNOUNCE, `LInstr`; Q7: the sfence marker at an sfence.vma word
         obtain ⟨-, rfl⟩ := h
-        exact ⟨.LInstr, rfl, gwsInsertEq _ _ _⟩
+        refine ⟨annLabel n w, ?_⟩
+        cases hs : sfAnnB n w
+        · rw [annLabelNot hs, annPostNot hs]
+          exact ⟨rfl, gwsInsertEq _ _ _⟩
+        · rw [annLabelSf hs, annPostSf hs]
+          refine ⟨rfl, ?_⟩
+          rw [fencePostId]
+          exact gwsInsertEq _ _ _
       | branchAnnounce _ _ => obtain ⟨-, rfl⟩ := h; exact ⟨.LSilent, rfl, rfl⟩
       | cacheOp _ => obtain ⟨-, rfl⟩ := h; exact ⟨.LSilent, rfl, rfl⟩
       | tlbi _ => obtain ⟨-, rfl⟩ := h; exact ⟨.LSilent, rfl, rfl⟩

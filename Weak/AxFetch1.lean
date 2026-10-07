@@ -108,6 +108,8 @@ the whole AxFetch port:
    an opax run — the composition every peel arm uses), `AxFetch1.pstepProgFetchAny` (the fetch
    node's `pstepProg` fact, the fetch twin of `afPstepProgReadAny`).
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `afAdminRunToMemread`/`afAdminRunToMemwrite` take `WeakEvLang.noSfAnn m s` (along `execEff`'s path no announce is an SFENCE.VMA word — such an announce emits the marker, a graph event, and the run would not be admin-only); `afAdminRunToMemread` also returns `noSfAnn` at the reached node (for the next peel).  `afLd8RunToRead` takes the premise for its `execute` run.
+
 **Rocq → Lean name map.**  `af_ld8_data_ident` `afLd8DataIdent`, `af_sd8_data_ident`
 `afSd8DataIdent`, `af_ld8_row_shape` `afLd8RowShape`, `af_sd8_row_shape` `afSd8RowShape`,
 `af_ld8_row_shape_data` `afLd8RowShapeData`, `af_sd8_row_shape_data` `afSd8RowShapeData`,
@@ -201,6 +203,7 @@ theorem afAdminRunToMemread (m : SailM Unit) :
       (es : List Weff),
       n ≠ 0 →
       execEff m s = some ((), s', .WEread ak pa n :: es) →
+      WeakEvLang.noSfAnn m s →
       ∀ (cpu : CPU) (kpos : Nat) (row : List Lbl),
         ∃ (s2 : ExecSt) (ib2 : Ibch) (va : Nat)
           (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
@@ -211,13 +214,14 @@ theorem afAdminRunToMemread (m : SailM Unit) :
             some ((), s', .WEread ak pa n :: es) ∧
           rtc (fun t1 t2 => ∃ l, AxOpsem.astepProg row t1 l t2)
             ⟨.PHart cpu m s.regs none ib, kpos⟩
-            ⟨.PHart cpu (.impure (.ok (.memRead n va req)) KK) s2.regs none ib2, kpos⟩ := by
+            ⟨.PHart cpu (.impure (.ok (.memRead n va req)) KK) s2.regs none ib2, kpos⟩ ∧
+          WeakEvLang.noSfAnn (.impure (.ok (.memRead n va req)) KK) s2 := by
   induction m with
   | pure y =>
     intro s ib ak pa n s' es _ hex
     simp [execEff] at hex
   | impure call k ih =>
-    intro s ib ak pa n s' es hn hex cpu kpos row
+    intro s ib ak pa n s' es hn hex hsf cpu kpos row
     cases call with
     | error e => simp [execEff] at hex
     | ok o =>
@@ -234,9 +238,10 @@ theorem afAdminRunToMemread (m : SailM Unit) :
           | some p =>
             obtain ⟨w0, d0⟩ := p
             simp only [hdr] at hex
-            obtain ⟨s2, ib2, va2, req2, KK, hcl, hpa, hdev, hmem, hee, hrtc⟩ :=
-              ih _ (s.setDev d0) ib ak pa n s' es hn hex cpu kpos row
-            refine ⟨s2, ib2, va2, req2, KK, hcl, hpa, hdev, hmem, hee, ?_⟩
+            simp only [WeakEvLang.noSfAnn, if_pos hm, hdr] at hsf
+            obtain ⟨s2, ib2, va2, req2, KK, hcl, hpa, hdev, hmem, hee, hrtc, hns⟩ :=
+              ih _ (s.setDev d0) ib ak pa n s' es hn hex hsf cpu kpos row
+            refine ⟨s2, ib2, va2, req2, KK, hcl, hpa, hdev, hmem, hee, ?_, hns⟩
             refine AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev d0 .LDev none none none kpos _
               hrtc ?_ trivial
             simp only [pnodeStep, hdevT, ↓reduceIte]
@@ -253,7 +258,7 @@ theorem afAdminRunToMemread (m : SailM Unit) :
               cases hd : devAddr req.pa
               · rfl
               · simp [mmioAcc, hd, hn] at hm
-            exact ⟨s, ib, va, req, k, hak.symm, hpa.symm, hpa ▸ hdevF, rfl, hex0, rtc_refl _⟩
+            exact ⟨s, ib, va, req, k, hak.symm, hpa.symm, hpa ▸ hdevF, rfl, hex0, rtc_refl _, hsf⟩
       case memWrite n0 va req =>
         simp only [execEff] at hex
         cases hv : req.value with
@@ -268,9 +273,10 @@ theorem afAdminRunToMemread (m : SailM Unit) :
             | none => simp only [hdw] at hex; cases hex
             | some d0 =>
               simp only [hdw] at hex
-              obtain ⟨s2, ib2, va2, req2, KK, hcl, hpa, hdev, hmem, hee, hrtc⟩ :=
-                ih _ (s.setDev d0) ib ak pa n s' es hn hex cpu kpos row
-              refine ⟨s2, ib2, va2, req2, KK, hcl, hpa, hdev, hmem, hee, ?_⟩
+              simp only [WeakEvLang.noSfAnn, hv, if_pos hm, hdw] at hsf
+              obtain ⟨s2, ib2, va2, req2, KK, hcl, hpa, hdev, hmem, hee, hrtc, hns⟩ :=
+                ih _ (s.setDev d0) ib ak pa n s' es hn hex hsf cpu kpos row
+              refine ⟨s2, ib2, va2, req2, KK, hcl, hpa, hdev, hmem, hee, ?_, hns⟩
               refine AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev d0 .LDev none none none kpos
                 _ hrtc ?_ trivial
               simp only [pnodeStep, hdevT, hv, ↓reduceIte]
@@ -284,34 +290,40 @@ theorem afAdminRunToMemread (m : SailM Unit) :
         simp at hcons
       case regRead r =>
         simp only [execEff] at hex
-        obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee, hrtc⟩ :=
-          ih _ s (ibRd ib r) ak pa n s' es hn hex cpu kpos row
+        simp only [WeakEvLang.noSfAnn] at hsf
+        obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee, hrtc, hns⟩ :=
+          ih _ s (ibRd ib r) ak pa n s' es hn hex hsf cpu kpos row
         exact ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee,
           AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev s.dev .LSilent none (some (ibRd ib r))
-            none kpos _ hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial⟩
+            none kpos _ hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial, hns⟩
       case regWrite r v =>
         simp only [execEff] at hex
-        obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee, hrtc⟩ :=
-          ih _ (s.setReg r v) ib ak pa n s' es hn hex cpu kpos row
+        simp only [WeakEvLang.noSfAnn] at hsf
+        obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee, hrtc, hns⟩ :=
+          ih _ (s.setReg r v) ib ak pa n s' es hn hex hsf cpu kpos row
         exact ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee,
           AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev s.dev
             (erwLabel (erwOf (depsOfIb ib.ibBits) ib.ibRds r)) (some (s.regs.set r v)) none none
-            kpos _ hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ (erwLabelLbAdmin _)⟩
+            kpos _ hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ (erwLabelLbAdmin _), hns⟩
       case instrAnnounce nw w =>
         simp only [execEff] at hex
-        obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee, hrtc⟩ :=
-          ih _ s (ibAnn (ibOfBvn w)) ak pa n s' es hn hex cpu kpos row
+        simp only [WeakEvLang.noSfAnn] at hsf
+        obtain ⟨hsw, hsf⟩ := hsf
+        obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee, hrtc, hns⟩ :=
+          ih _ s (ibAnn (ibOfBvn w)) ak pa n s' es hn hex hsf cpu kpos row
         exact ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee,
           AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev s.dev .LInstr none
-            (some (ibAnn (ibOfBvn w))) none kpos _ hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ rfl⟩
+            (some (ibAnn (ibOfBvn w))) none kpos _ hrtc
+            ⟨(annLabelNot hsw).symm, rfl, rfl, rfl, rfl, rfl, rfl⟩ rfl, hns⟩
       all_goals first
         | (simp [execEff] at hex; done)
         | (simp only [execEff] at hex
-           obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee, hrtc⟩ :=
-             ih _ s ib ak pa n s' es hn hex cpu kpos row
+           simp only [WeakEvLang.noSfAnn] at hsf
+           obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee, hrtc, hns⟩ :=
+             ih _ s ib ak pa n s' es hn hex hsf cpu kpos row
            exact ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, hmem, hee,
              AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev s.dev .LSilent none none none kpos _
-               hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial⟩)
+               hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial, hns⟩)
 
 /-- THE PEEL (write target): the write twin of `afAdminRunToMemread` — the first effect is the
 plain RAM write `.WEwrite ak pa n v`; the node's request carries `value = some v`. -/
@@ -320,6 +332,7 @@ theorem afAdminRunToMemwrite (m : SailM Unit) :
       (s' : ExecSt) (es : List Weff),
       n ≠ 0 →
       execEff m s = some ((), s', .WEwrite ak pa n v :: es) →
+      WeakEvLang.noSfAnn m s →
       ∀ (cpu : CPU) (kpos : Nat) (row : List Lbl),
         ∃ (s2 : ExecSt) (ib2 : Ibch) (va : Nat)
           (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
@@ -336,7 +349,7 @@ theorem afAdminRunToMemwrite (m : SailM Unit) :
     intro s ib ak pa n v s' es _ hex
     simp [execEff] at hex
   | impure call k ih =>
-    intro s ib ak pa n v s' es hn hex cpu kpos row
+    intro s ib ak pa n v s' es hn hex hsf cpu kpos row
     cases call with
     | error e => simp [execEff] at hex
     | ok o =>
@@ -352,8 +365,9 @@ theorem afAdminRunToMemwrite (m : SailM Unit) :
           | some p =>
             obtain ⟨w0, d0⟩ := p
             simp only [hdr] at hex
+            simp only [WeakEvLang.noSfAnn, if_pos hm, hdr] at hsf
             obtain ⟨s2, ib2, va2, req2, KK, hcl, hpa, hval, hdev, hmem, hee, hrtc⟩ :=
-              ih _ (s.setDev d0) ib ak pa n v s' es hn hex cpu kpos row
+              ih _ (s.setDev d0) ib ak pa n v s' es hn hex hsf cpu kpos row
             refine ⟨s2, ib2, va2, req2, KK, hcl, hpa, hval, hdev, hmem, hee, ?_⟩
             refine AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev d0 .LDev none none none kpos _
               hrtc ?_ trivial
@@ -381,8 +395,9 @@ theorem afAdminRunToMemwrite (m : SailM Unit) :
             | none => simp only [hdw] at hex; cases hex
             | some d0 =>
               simp only [hdw] at hex
+              simp only [WeakEvLang.noSfAnn, hv, if_pos hm, hdw] at hsf
               obtain ⟨s2, ib2, va2, req2, KK, hcl, hpa, hval, hdev, hmem, hee, hrtc⟩ :=
-                ih _ (s.setDev d0) ib ak pa n v s' es hn hex cpu kpos row
+                ih _ (s.setDev d0) ib ak pa n v s' es hn hex hsf cpu kpos row
               refine ⟨s2, ib2, va2, req2, KK, hcl, hpa, hval, hdev, hmem, hee, ?_⟩
               refine AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev d0 .LDev none none none kpos
                 _ hrtc ?_ trivial
@@ -408,31 +423,37 @@ theorem afAdminRunToMemwrite (m : SailM Unit) :
         simp at hcons
       case regRead r =>
         simp only [execEff] at hex
+        simp only [WeakEvLang.noSfAnn] at hsf
         obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hval, hdev, hmem, hee, hrtc⟩ :=
-          ih _ s (ibRd ib r) ak pa n v s' es hn hex cpu kpos row
+          ih _ s (ibRd ib r) ak pa n v s' es hn hex hsf cpu kpos row
         exact ⟨s2, ib2, va, req, KK, hcl, hpa, hval, hdev, hmem, hee,
           AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev s.dev .LSilent none (some (ibRd ib r))
             none kpos _ hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial⟩
       case regWrite r v0 =>
         simp only [execEff] at hex
+        simp only [WeakEvLang.noSfAnn] at hsf
         obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hval, hdev, hmem, hee, hrtc⟩ :=
-          ih _ (s.setReg r v0) ib ak pa n v s' es hn hex cpu kpos row
+          ih _ (s.setReg r v0) ib ak pa n v s' es hn hex hsf cpu kpos row
         exact ⟨s2, ib2, va, req, KK, hcl, hpa, hval, hdev, hmem, hee,
           AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev s.dev
             (erwLabel (erwOf (depsOfIb ib.ibBits) ib.ibRds r)) (some (s.regs.set r v0)) none none
             kpos _ hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ (erwLabelLbAdmin _)⟩
       case instrAnnounce nw w =>
         simp only [execEff] at hex
+        simp only [WeakEvLang.noSfAnn] at hsf
+        obtain ⟨hsw, hsf⟩ := hsf
         obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hval, hdev, hmem, hee, hrtc⟩ :=
-          ih _ s (ibAnn (ibOfBvn w)) ak pa n v s' es hn hex cpu kpos row
+          ih _ s (ibAnn (ibOfBvn w)) ak pa n v s' es hn hex hsf cpu kpos row
         exact ⟨s2, ib2, va, req, KK, hcl, hpa, hval, hdev, hmem, hee,
           AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev s.dev .LInstr none
-            (some (ibAnn (ibOfBvn w))) none kpos _ hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ rfl⟩
+            (some (ibAnn (ibOfBvn w))) none kpos _ hrtc
+            ⟨(annLabelNot hsw).symm, rfl, rfl, rfl, rfl, rfl, rfl⟩ rfl⟩
       all_goals first
         | (simp [execEff] at hex; done)
         | (simp only [execEff] at hex
+           simp only [WeakEvLang.noSfAnn] at hsf
            obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hval, hdev, hmem, hee, hrtc⟩ :=
-             ih _ s ib ak pa n v s' es hn hex cpu kpos row
+             ih _ s ib ak pa n v s' es hn hex hsf cpu kpos row
            exact ⟨s2, ib2, va, req, KK, hcl, hpa, hval, hdev, hmem, hee,
              AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev s.dev .LSilent none none none kpos _
                hrtc ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ trivial⟩)
@@ -574,6 +595,10 @@ theorem afLd8RunToRead (s0 : ExecSt) (b : Bool) (pc : BitVec 64) (rs1 rd : BitVe
     BytesAt s0 ea 8 v →
     row[k]? = some lb →
     aident lb = .IRead false (paZ ea) 8 →
+    -- Q7: the run announces no sfence.vma word (header, Q7)
+    WeakEvLang.noSfAnn
+      (execute (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8)) >>= fun _ => (pure () : SailM Unit))
+      ((s0.setReg .minstret_increment b).setReg .nextPC (Sail.BitVec.addInt pc 4)) →
     ∃ (s2 : ExecSt) (ib2 : Ibch) (va : Nat)
       (req : Mem_read_request 8 va Arch.pa Arch.translation Arch.arch_ak)
       (KK : Result (BitVec (8 * 8) × Option Bool) Arch.abort → SailM Unit),
@@ -586,14 +611,14 @@ theorem afLd8RunToRead (s0 : ExecSt) (b : Bool) (pc : BitVec 64) (rs1 rd : BitVe
       areadStep row ⟨.PHart cpu (.impure (.ok (.memRead 8 va req)) KK) s2.regs none ib2, k⟩
         (.IRead (classify req.access_kind).akSync (paZ req.pa) 8)
         (fun vs => ⟨.PHart cpu (KK (.Ok (wordOfBytes 8 vs, none))) s2.regs none ib2, k + 1⟩) := by
-  intro hrd lpriv lmprv lpmm lpmp lpma lhtif hea hal hram hbytes hrow hid
+  intro hrd lpriv lmprv lpmm lpmp lpma lhtif hea hal hram hbytes hrow hid hsf
   have hm0 := execEffLd8At s0 b pc rs1 rd imm ea v hrd lpriv lmprv lpmm lpmp lpma lhtif hea hal
     hram hbytes
   have hex := execEffBind _ (fun _ : ExecutionResult => (pure () : SailM Unit)) _ _ _ _ () _ []
     hm0 rfl
   rw [List.append_nil] at hex
-  obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, _, _, hrtc⟩ :=
-    afAdminRunToMemread _ _ ib wakPlain ea 8 _ [] (by decide) hex cpu k row
+  obtain ⟨s2, ib2, va, req, KK, hcl, hpa, hdev, _, _, hrtc, -⟩ :=
+    afAdminRunToMemread _ _ ib wakPlain ea 8 _ [] (by decide) hex hsf cpu k row
   refine ⟨s2, ib2, va, req, KK, hcl, hpa, hrtc, ?_⟩
   exact afAreadStepOfMemread row cpu 8 va req KK s2.regs ib2 (efInit s2.dev) k lb
     (by rw [hpa]; exact hdev) (by rw [hcl]; rfl) (by rw [hcl]; rfl) hrow

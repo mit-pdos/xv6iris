@@ -91,6 +91,8 @@ Lean-only (deviation 4; all `WeakRvwmoCert2.`-qualified): `cblkG`, `lbPin`, `cbl
 `WeakRvwmoCert2.cblkRelpG`/`certBlockMirrorG`/`cblkRetimeG`/`cblkSubstG`/`cblkLoadRetimeG`/
 `certBlockReadG`/`certBlockWitnessG`.
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `instrRdsOfChannel` takes `LFence false false false false ∉ ls` (`WeakEvProv.phrunNoInstr`).
+
 **Rocq → Lean name map.**  `pstep_ev_phart` `pstepEvPhart`, `adm_run_phart` `admRunPhart`,
 `adm_run_pevrun` `admRunPevrun`, `pevrun_adm_run` `pevrunAdmRun`, `pcls_ev_rs` `pclsEvRs`,
 `hlbl_realizes_rs` `hlblRealizesRs`, `hlbl_realizes_pair_rs` `hlblRealizesPairRs`,
@@ -283,7 +285,9 @@ theorem pnodeStepLoadSubst (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevS
     | cycleCount => exact nomatch h.1
     | getCycleCount => exact nomatch h.1
     | message => exact nomatch h.1
-    | instrAnnounce => exact nomatch h.1
+    | instrAnnounce n w =>
+      have h1 := h.1
+      rcases annLabelOr n w with e | e <;> rw [e] at h1 <;> exact nomatch h1
     | branchAnnounce => exact nomatch h.1
 
 theorem pstepEvLoadSubst (cpu : CPU) (m : SailM Unit) (rs : RegFile) (fn : Ofence) (ib : Ibch)
@@ -361,13 +365,13 @@ theorem instrRdsOfChannel (T : List Nat) (cpu : CPU) (ls : List Wlabel) (rds : L
     (wrs : List Register) (ann : Bool) (m : SailM Unit) (rs : RegFile) (fn : Ofence) (ib : Ibch)
     (d : Efab) (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch) (d' : Efab) :
     phrun cpu ls rds wrs ann m rs fn ib d m' rs' fn' ib' d' →
-    LInstr ∉ ls →
+    LInstr ∉ ls → LFence false false false false ∉ ls →
     (∀ n, n ∈ ib'.ibRds → n ∉ T) →
     rdsOk (fun n => n ∉ T) rds := by
-  intro hrun hni hib n hn
+  intro hrun hni hnf hib n hn
   apply hib
   rw [phrunIbRds cpu ls rds wrs ann m rs fn ib d m' rs' fn' ib' d' hrun
-    (phrunNoInstr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hrun hni)]
+    (phrunNoInstr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hrun hni hnf)]
   exact List.mem_append_right _ hn
 
 /-! ## 3.5 The taint growth, at the step's OWN annotation -/

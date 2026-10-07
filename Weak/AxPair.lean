@@ -84,6 +84,8 @@ protocol; register writes need no strengthening; the runs coincide only at a re-
 `idKind idAq idRl idBase idBytes idAsrc idVsrc`, constructor `AxPair.Ident.mk`), `lbl_wdata` ↦
 `AxPair.lblWdata`; (§10, `AxPair2`) `phrun_app` ↦ `AxPair.phrunApp`.
 
+Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): the real-tail pair passes `WeakEvProv2.laLsNoMark` to `WeakEvProv.phrunNoInstr`.
+
 **Rocq → Lean name map.**  `ikind` `Ikind` (`IKload/IKstore/IKrmw/IKexload/IKexstore` the same),
 `ident_eq` `identEq`, `ident_eq_spec` `identEqSpec`, `lbl_ident` `lblIdent`, `lbl_moddata`
 `lblModdata`, `lbl_moddata_refl/ident/data` `lblModdataRefl/Ident/Data`, `Forall2_moddata_ident`
@@ -628,6 +630,7 @@ theorem laPairIdent (cpu : CPU) (d : Efab) (w1 w2 : BitVec 32) :
       dregAgree (fun n => n ∉ [15]) (ahRs (laEnd w1)) rs2' := by
   obtain ⟨rds, ws, ann, hrun1⟩ := laPhrun cpu d w1
   have hann := phrunNoInstr cpu _ rds ws ann _ _ _ _ _ _ _ _ _ _ hrun1 (laLsNoInstr w1)
+    (WeakEvProv2.laLsNoMark w1)
   have hok : rdsOk (fun n => n ∉ [15]) rds := by
     intro n hn
     apply laEndUntainted w1
