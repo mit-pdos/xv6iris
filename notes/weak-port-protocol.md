@@ -172,3 +172,4 @@ Rocq→Lean name map only.
 - `decide +kernel` does not reduce `List.mergeSort` (wf recursion): prove concrete mergeSort results by `List.Perm.eq_of_pairwise` + decided sortedness/distinctness (AxDefer3). `omega` does not see `Nat.max` as `max`.
 - AxClsStep: `Aprog` (apHarts/apS0/apImg; no ap_T), `clsStep` has no T; `CSProg` program arm takes the boot-image pin (`WeakAxRealize.fetchPin GD.gdG.gxImg l`) in place of Rocq's `wlabel_is_fetch l = false`. Downstream (AxLedgerG …) drop `ap_T`/`T`.
 - AxRowConf: `rowEmittedFromRun` has no `RowEmitFetch` and no T/img — fetches go through `RowEmitAdmin` (AxRunGV etc. drop T/img).
+- AxRunGV: `runAtGraphValuesNfGv` takes `hpin : ∀ p d l p' d', pstepProg p d l p' d' → lbAdmin true l → WeakAxRealize.fetchPin GD.gdG.gxImg l` (admin steps may be fetches; discharge from the pinned LTS, cf. AxAdequacy.astepProgNfOfPinned).
