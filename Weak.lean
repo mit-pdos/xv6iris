@@ -352,5 +352,6 @@ import Weak.AxClsStep2
 import Weak.AxClsStep2b
 import Weak.AxLock3Reader
 import Weak.AxLock3Reader2
+import Weak.AxEpiLdX1
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
