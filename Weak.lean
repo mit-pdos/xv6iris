@@ -199,5 +199,7 @@ import Weak.WeakLeafItype
 import Weak.WeakLeafUtypeShift
 import Weak.WkEntryNew
 import Weak.WeakRvwmoGlue
+import Weak.AxPair
+import Weak.AxPair2
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
