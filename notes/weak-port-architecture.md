@@ -277,3 +277,7 @@ No decision is needed for `TsoMem` (untouched), `VirtioProg` (Weak-local), `PtAd
   row item/identity/edges; boot-image pin = `emFetchImg` clause in `gdexecQconf` + `pstepPin`); Q-C2 delete the
   oracle params `T`/`fetchImg`/`fetchAnswers` and `AxWp.axText` now; Q-C3 delete `pstepNoFetch`/`pfFetchLoadOk`;
   Q-C4 `wlblRen` fixes `LIFetch`. Rework = stageC.md §C lanes 1–3 (39 files) in workspace ../xv6iris-weak-sc.
+- **Q6/Q7/Q8 (owner, 2026-10-07 ~02:55):**
+  - **Q6, keep:** `pstepNoFetch` stays in WeakRobustMain, used only by the Lean-only fetch-free robustness corollaries.
+  - **Q7, own marker event:** `sfence.vma` gets its own marker label that IS a graph event (LFence-class), emitted at SFENCE_VMA execute. This is a small Lean-model/label change plus an AxOpsem arm. AxSfence and AxSfence2 are then re-ported on it.
+  - **Q8, pin in the WP step clause:** add `⌜WeakAxRealize.fetchPin GD.gdG.gxImg l⌝ -∗` to the step clause of `AxWp2.wpPreStepDef` and AxWpD's twin. Adequacy discharges it from the pinned machine LTS. The merged Ax files get fixed, and AxCjrWpd gets its faithful statements back.
