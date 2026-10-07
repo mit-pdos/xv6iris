@@ -1,5 +1,5 @@
 /-
-Weak: **R-2: THE CERTIFICATION WALK** (§1–§4; §4.5–§4.6 are `WeakRvwmoWalk2`, §5 is
+Weak: **R-2: THE CERTIFICATION WALK** (§1–§4; §4.5–§4.6 are `WeakRvwmoWalkb`, §5 is
 `WeakRvwmoWalk3`).
 
 Rocq: `iris/WeakRvwmoWalk.v` @ xxvzwolszwmp (split in three at its section boundaries).
@@ -50,11 +50,11 @@ the empty trace over `G.gxImg` with `pst` constantly `boot <$> seq 0 N`.
    - the witness datum `wwitNd` is stated on PINNED blocks, at any image: `∀ im`, a block pinned
      to `im` has its witness re-run pinned to `im` (Rocq: plain `cblk`);
    - `wlkSegOfCert` takes `WeakRvwmoCert2.esPin St.cstC.cdImg es` after `LDev ∉ es.map
-     Prod.fst` (`segStepOfSegment`'s new premise; `WeakRvwmoWalk2.wemit` carries it).
+     Prod.fst` (`segStepOfSegment`'s new premise; `WeakRvwmoWalkb.wemit` carries it).
    `wpolFlat` (the refuted, over-quantified policy; no segment is built from it), `wrdsFree`,
    `wndOk` keep Rocq's unpinned `cblk`.
 3. `rdsOkDec`'s case split is classical (`Classical.em`), Rocq's `decide` over `Forall` (here
-   in `WeakRvwmoWalk2`); `wsrcOrWwit` likewise splits on `∃ t ∈ ts, n < t` by `by_cases`.
+   in `WeakRvwmoWalkb`); `wsrcOrWwit` likewise splits on `∃ t ∈ ts, n < t` by `by_cases`.
 
 **Rocq → Lean name map.**  `wlog_pfx` `wlogPfx`, `wlog_pfx_nil` `wlogPfxNil`, `wlog_pfx_snoc`
 `wlogPfxSnoc`, `log_of_of_pfx` `logOfOfPfx`, `wlk_inv` `wlkInv`, `wlk_step` `wlkStep`,
@@ -567,7 +567,7 @@ def wub (G : Gexec) (W : Geid → Prop) (x : Nat) : Prop :=
 def wnwSeg (G : Gexec) (n : Nat) (x : Nat) (k0 kz : Nat) : Prop :=
   ∀ k, k0 ≤ k → k ≤ kz → ¬ wwit G n (x, k + 1)
 
-/-- THE OLD, OVER-QUANTIFIED POLICY (kept ONLY as the subject of `WeakRvwmoWalk2`'s refutation;
+/-- THE OLD, OVER-QUANTIFIED POLICY (kept ONLY as the subject of `WeakRvwmoWalkb`'s refutation;
 Rocq's, deviation 2). -/
 def wpolFlat (G : Gexec) (W : Geid → Prop) (x : Nat) (cpu : CPU) (d0 : Efab) (T : List Nat)
     (Q : Lbl → Prop) : Prop :=

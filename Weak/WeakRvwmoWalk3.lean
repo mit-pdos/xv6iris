@@ -1,6 +1,6 @@
 /-
 Weak: **R-2: THE CERTIFICATION WALK, part 3 — the capstone shape, restated** (Rocq §5; §1–§4
-are `WeakRvwmoWalk`, §4.5–§4.6 `WeakRvwmoWalk2`).
+are `WeakRvwmoWalk`, §4.5–§4.6 `WeakRvwmoWalkb`).
 
 Rocq: `iris/WeakRvwmoWalk.v` @ xxvzwolszwmp (split at its section boundaries; this part imports
 `Weak.WeakRvwmoWalk` and `Weak.WeakRvwmoCapstone`).

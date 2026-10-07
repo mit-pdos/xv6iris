@@ -39,7 +39,7 @@ theorem.
      `wlkSegOfCert2` takes `esPin St.cstC.cdImg es` (after `LDev ∉ es.map Prod.fst`).
 3. `rdsOkDec` is `Classical.em` (Rocq: `decide` over `Forall`).  In `wlkStep'OfSupply`
    Rocq's `pose k0 := gcnt x …` is an equation `hk0 : gcnt x St.cstC.cdTr = k0`.
-4. Lean-only `WeakRvwmoWalk2.candEmptyWs` (the empty candidate's machine `Wstate` is `wsInit`
+4. Lean-only `WeakRvwmoWalkb.candEmptyWs` (the empty candidate's machine `Wstate` is `wsInit`
    at every hart, `WeakRvwmoCert.smWs` at an arbitrary hart).
 
 **Rocq → Lean name map.**  `qrow` `qrow`, `qrow_lbl` `qrowLbl`, `row_ws_aux_app` `rowWsAuxApp`,
@@ -62,7 +62,7 @@ theorem.
 `walk_supply_of_steps'` `walkSupplyOfSteps'`, `walk_supply_of_sites` `walkSupplyOfSites`.
 
 **File-qualified names:** none of this part's Rocq names is in `notes/weak-port-dupnames.json`;
-Lean-only (deviation 4): `WeakRvwmoWalk2.candEmptyWs`.
+Lean-only (deviation 4): `WeakRvwmoWalkb.candEmptyWs`.
 
 **Dropped:** none (§4.5–§4.6: Rocq 57 declarations; Lean 58 = 57 + the 1 Lean-only).
 -/
@@ -736,7 +736,7 @@ theorem wlkRun' (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec) (W : Ge
     exact ⟨o :: l, Sf, .segsMore o l St St' Sf hst hrun, hfin⟩
 
 /-- Lean-only (deviation 4): the empty candidate's machine `Wstate`, at every hart. -/
-theorem WeakRvwmoWalk2.candEmptyWs (img : Image) (x : Nat) :
+theorem WeakRvwmoWalkb.candEmptyWs (img : Image) (x : Nat) :
     (candLastSt ⟨img, []⟩).msWs x = wsInit := by
   unfold candLastSt
   rw [sttLookup _ _ _ (replay0 (candInit ⟨img, []⟩) ([] : List Estep))]
@@ -759,7 +759,7 @@ theorem wlkStartInv' (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec) (W
       rw [List.getElem?_map, lookup_seq_lt hx]
       simp
     · show ((candLastSt ⟨G.gxImg, []⟩).msWs x).wRelp = (rowWs (qrow G x) 0).wRelp
-      rw [WeakRvwmoWalk2.candEmptyWs]
+      rw [WeakRvwmoWalkb.candEmptyWs]
       rfl
     · intro cpu m rs fn ib h
       exact ⟨m, rs, fn, ib, h⟩
