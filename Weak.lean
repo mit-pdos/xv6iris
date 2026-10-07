@@ -258,5 +258,6 @@ import Weak.AxRunClose
 import Weak.AxLifting
 import Weak.AxFetch1
 import Weak.AxBoundaryWpd
+import Weak.WeakRvwmoCycWit
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
