@@ -166,3 +166,13 @@ The real dependency order among the Stage C files comes from the DAG.
   - then [AxPair → AxOpsem (resume) → AxWp + importers] ∥ [Lin2] ∥ [Glue → Glue2]
   - then Capstone, then Walk/2/3, then CycWit/Progress.
 - **AxLifting/AxInstr/AxWpdLift:** port them in a fork as soon as AxWp lands.
+
+## Update 2026-10-07 ~03:00: Stage C MERGED into the tip
+
+- **Merged:** commit "Stage C rework". 44 files, full build green (3,011 jobs), lint passes.
+- **Protocol notes:** the stale fetch-inertness entries are replaced by one Stage C entry.
+- **The sc workspaces** (`xv6iris-weak-sc*`) are side history now. Workers still running in sc3 (AxLifting) and
+  sc4 (AxInstr) are merged into the tip with `merge.sh sc3 AxLifting x` (merge.sh accepts any slot name).
+- **Open owner questions:**
+  - Q6: `pstepNoFetch` stays in WeakRobustMain.
+  - Q7: AxSfence/AxSfence2 sfence representation. AxSfence2 is HELD.
