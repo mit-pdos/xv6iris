@@ -374,5 +374,6 @@ import Weak.AxSymEngine2
 import Weak.AxEpiRun
 import Weak.AxLdgSeal
 import Weak.AxSpineOk2
+import Weak.AxRelease6
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
