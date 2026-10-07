@@ -288,5 +288,6 @@ import Weak.AxGateAdeq2
 import Weak.AxProtCov
 import Weak.AxSymLd
 import Weak.AxWpDHarts
+import Weak.WeakRvwmoPreNorm2
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
