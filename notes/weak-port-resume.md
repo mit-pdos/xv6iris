@@ -132,3 +132,37 @@ AxReadAll, AxInstrFacts, AxGateWp and others. Re-run `sched.py` after each merge
   them against the new APIs.
 - **Held until lane 1 and item 13 are done:** AxLifting, AxGateWp, AxInstr, AxWpdLift, WeakRvwmoCycWit,
   WeakRvwmoProgress.
+
+## Update 2026-10-07 01:20: Stage C parallelized (owner: "as parallel as possible")
+
+The real dependency order among the Stage C files comes from the DAG.
+
+- **Critical path to AxLifting** (286 files wait on it):
+  1. WeakRvwmoSupply
+  2. ConfWit2
+  3. Adm
+  4. AxPair
+  5. AxOpsem
+  6. AxWp
+
+  AxPair imports Supply, ConfWit2 and Adm, so lane "1b" could not go first.
+- **Mechanics:** `sc` is the Stage C tip. Each worker runs in its own fork, created with
+  `weak-orch/forksc.sh scN` from sc's @-. Results go back through `weak-orch/mergesc.sh SRC "Mods" msg`, which
+  copies the files, builds those modules in sc, and commits in sc. Downstream may stay red until its own wave.
+- **In sc:** lane 1a and AxDeps/AxGate are committed. AxOpsem has parked, uncommitted edits
+  (PROGRESS-StageC-L1bA.md).
+- **Running:**
+
+  | Workspace | Work |
+  |---|---|
+  | sc2 | Supply (critical) |
+  | sc3 | SrvwmoCapstone |
+  | sc4 | Ax witness files |
+  | sc5 | AxSpinSpike/Run, then AxScCat |
+  | sc6 | Rvwmo witness files |
+
+- **Next waves after Supply:**
+  - [ConfWit2 → Adm] ∥ [Cert → Cert2 → Cert3/3b → Cert4] ∥ [LinInd, Fab, FabInd]
+  - then [AxPair → AxOpsem (resume) → AxWp + importers] ∥ [Lin2] ∥ [Glue → Glue2]
+  - then Capstone, then Walk/2/3, then CycWit/Progress.
+- **AxLifting/AxInstr/AxWpdLift:** port them in a fork as soon as AxWp lands.
