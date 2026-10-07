@@ -346,5 +346,6 @@ import Weak.AxTokLedgerMp
 import Weak.AxLock3Writer
 import Weak.AxEpiLedgerTick
 import Weak.AxEpiLedgerTick2
+import Weak.AxReuseProbe2
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
