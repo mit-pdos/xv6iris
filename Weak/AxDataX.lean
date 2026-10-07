@@ -40,13 +40,14 @@ request, to `swr s bytes ak`).  Derived: `CBind0`, `CLiftR`, `CCatchEarlyReturn`
    `Empty → SailM X`.  `seip_reg` ↦ `AxRunClose.pinReg` (both pins).
 3. DATA NODES.  `CDrd`'s node is `.impure (.ok (.memRead n va req)) k` with the answer
    `.Ok (wordOfBytes n vs, none)`, premises `devAddr req.pa = false`,
-   `(classify req.access_kind).akLatest = false`, `dok (paZ req.pa) n`.  `CDwr` (lean-sail write
-   values are `Option`) takes the written word `v` with `req.value = some v` and continues at
-   `swr s (WeakInterpProj.wbytes n v) req.access_kind` with answer `.Ok none`.  The Lean model's
-   `checked_mem_read` reads with `Read_ifetch` / `Read_ttw` / `Read_plain` by access class
-   (Rocq: always `Read_plain`), so the generic data node is the Lean-only `AxDataX.xReadRamK`
-   (any of the three non-latest kinds) and `XCheckedMemRead` / `XMemRead` stay access-class
-   generic; `XReadRam` is its `Read_plain` instance.
+   `(classify req.access_kind).akLatest = false`, `(classify req.access_kind).akIfetch = false`,
+   `dok (paZ req.pa) n`.  `CDwr` (lean-sail write values are `Option`) takes the written word `v`
+   with `req.value = some v` and continues at `swr s (WeakInterpProj.wbytes n v) req.access_kind`
+   with answer `.Ok (some true)`.  The Lean model's `checked_mem_read` reads with `Read_ifetch` /
+   `Read_ttw` / `Read_plain` by access class (Rocq: always `Read_plain`), so the generic data
+   node is the Lean-only `AxDataX.xReadRamK` (`Read_plain` or `Read_ttw`) and
+   `XCheckedMemRead` / `XMemRead` take `acc ≠ .InstructionFetch ()` (section variable `hacc`,
+   after `hw`); `XReadRam` is its `Read_plain` instance.  See deviation 7.
 4. WIDTHS.  `Z` widths ↦ `Nat`; Rocq's section hypothesis `0 < w` (`X_checked_mem_read`,
    `X_mem_read`, `X_checked_mem_write`, `X_mem_write_value`) and `X_translate_and_read`'s `0 < w`
    ↦ `vmemWidth w` (the model's accumulator / extract casts are closed per width: the proofs
@@ -68,6 +69,12 @@ request, to `swr s bytes ak`).  Derived: `CBind0`, `CLiftR`, `CCatchEarlyReturn`
    (by decide)`); `x_step` / `x_go` ↦ the tactic `ax_datax_go K` over the Lean-only stepping
    lemmas; `x_use σ H` / `x_useT σ H` ↦ the Lean-only `AxDataX.cRUse` / `cRUseT` (early-return
    monad) and `AxDataX.cFactUse` / `cFactUseT` (base monad).
+7. INTERFACE FIX (2026-10-07, owner-approved, for `AxDataX2`'s instances).  The data nodes are
+   stated to match `EvD.evdDrd`/`evdDwr` and `AxCert.Cert.cDrd`/`cDwr`: `CDrd` gained the
+   `akIfetch = false` premise (a data read is never a fetch; Stage C), so `xReadRamK` no longer
+   covers `Read_ifetch` and `XCheckedMemRead`/`XMemRead` exclude `.InstructionFetch`; `CDwr`'s
+   continuation answer is `.Ok (some true)` (was `.Ok none`; `write_ram` matches `.Ok _`, so
+   `XWriteRam` is unchanged).  Every other statement is unchanged.
 
 **Rocq → Lean name map.**  `tσ` `tσ`, `rd_facts` `rdFacts`, `wr_facts` `wrFacts`, `rrv_eq`
 `rrvEq`, `rrv` `rrv`, `rrv_pi` `rrvPi`, `wrb` `AxDataX.wrb` (duplicated name), `wrb_pi` `wrbPi`,
@@ -449,23 +456,23 @@ variable {img : Image} {dok : Int → Nat → Prop} {S : Type}
     (s : S) (n va : Nat) (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
     (k : Result (BitVec (8 * n) × Option Bool) Arch.abort → SailM X) (t : ExecSt),
     pend s → devAddr req.pa = false → (classify req.access_kind).akLatest = false →
-    dok (paZ req.pa) n →
+    (classify req.access_kind).akIfetch = false → dok (paZ req.pa) n →
     (∀ vs : List (BitVec 8), vs.length = n → C QE Q (srd s vs) (k (.Ok (wordOfBytes n vs, none))) t) →
     C QE Q s (.impure (.ok (.memRead n va req)) k) t)
 include K CDrd
 
 /-- (Lean-only) The data node at any non-latest RAM read kind (the Lean model reads with
 `Read_ifetch` / `Read_ttw` / `Read_plain` by access class; deviation 3). -/
-theorem AxDataX.xReadRamK (rk : read_kind) (hrk : rk = .Read_plain ∨ rk = .Read_ifetch ∨ rk = .Read_ttw)
+theorem AxDataX.xReadRamK (rk : read_kind) (hrk : rk = .Read_plain ∨ rk = .Read_ttw)
     (w : Nat) (QE : S → Sail.Error exception → ExecSt → Prop)
     (Q : S → (BitVec (8 * w) × Unit) → ExecSt → Prop) (pa : BitVec 64) (s : S) (t : ExecSt) :
     pend s → devAddr pa = false → dok (paZ pa) w →
     (∀ vs : List (BitVec 8), vs.length = w → Q (srd s vs) (rrv w vs, default_meta) t) →
     C QE Q s (read_ram rk (.Physaddr pa) w false) t := by
   intro hp hdev hdok hq
-  rcases hrk with rfl | rfl | rfl <;>
+  rcases hrk with rfl | rfl <;>
   · simp only [read_ram, PreSail.sail_mem_read, PreSail.emit]
-    refine CDrd QE Q s w 64 _ _ t hp hdev rfl hdok (fun vs hvs => ?_)
+    refine CDrd QE Q s w 64 _ _ t hp hdev rfl rfl hdok (fun vs hvs => ?_)
     exact K.cRet _ _ _ _ _ (hq vs hvs)
 
 /-- THE DATA NODE. -/
@@ -479,7 +486,8 @@ theorem XReadRam (w : Nat) (QE : S → Sail.Error exception → ExecSt → Prop)
 section cmr
 variable (σ : ExecSt) (himg : img = imgOf σ) (acc : MemoryAccessType mem_payload)
   (pbmt : page_based_mem_type) (w : Nat) (pa : BitVec 64) (hw : vmemWidth w)
-include himg hw
+  (hacc : acc ≠ .InstructionFetch ())
+include himg hw hacc
 
 theorem XCheckedMemRead (Q : S → Result (BitVec (8 * w) × Unit) (physaddr × ExceptionType) → ExecSt → Prop)
     (s : S) (t : ExecSt) :
@@ -503,6 +511,7 @@ theorem XCheckedMemRead (Q : S → Result (BitVec (8 * w) × Unit) (physaddr × 
   rcases hw with rfl | rfl | rfl | rfl
   all_goals
     cases acc <;> (try (rename_i p; cases p))
+  all_goals try exact absurd rfl hacc
   all_goals
     simp only [read_kind_of_flags]
     first | refine AxDataX.cRUse K himg rfl ?_ | refine AxDataX.cRPureBind K ?_
@@ -545,7 +554,7 @@ theorem XMemRead (Q : S → Result (BitVec (8 * w)) (physaddr × ExceptionType) 
   refine AxDataX.cFactUse K himg heff ?_
   unfold mem_read_priv mem_read_priv_meta
   ax_datax_go K
-  refine AxDataX.cFact K (XCheckedMemRead K pend srd CDrd σ himg acc pbmt w pa hw
+  refine AxDataX.cFact K (XCheckedMemRead K pend srd CDrd σ himg acc pbmt w pa hw hacc
     (fun s' r t' => ∃ vs : List (BitVec 8), vs.length = w ∧ s' = srd s vs ∧
       r = .Ok (rrv w vs, default_meta) ∧ t' = t) s t hcp hpmp hmm hp hdev hdok
     (fun vs hvs => ⟨vs, hvs, rfl, rfl, rfl⟩)) ?_
@@ -573,7 +582,7 @@ theorem XTranslateAndRead (σ : ExecSt) (himg : img = imgOf σ) (va pa : BitVec 
   refine AxDataX.cFactUseT K himg htr ?_
   dsimp only
   refine AxDataX.cFact K (XMemRead K pend srd CDrd σ himg (.Load .Data) .PBMT_PMA w pa hw
-    (fun s' r t' => ∃ vs : List (BitVec 8), vs.length = w ∧ s' = srd s vs ∧
+    (by intro h; cases h) (fun s' r t' => ∃ vs : List (BitVec 8), vs.length = w ∧ s' = srd s vs ∧
       r = .Ok (rrv w vs) ∧ t' = ⟨s1.regs, t.mem, t.dev⟩) s _ hrf hp hdev hdok
     (fun vs hvs => ⟨vs, hvs, rfl, rfl, rfl⟩)) ?_
   rintro s' x t' ⟨vs, hvs, rfl, rfl, rfl⟩
@@ -712,7 +721,7 @@ variable {img : Image} {dok : Int → Nat → Prop} {S : Type}
     (k : Result (Option Bool) Arch.abort → SailM X) (t : ExecSt) (v : BitVec (8 * n)),
     pend s → devAddr req.pa = false → (classify req.access_kind).akLatest = false →
     dok (paZ req.pa) n → req.value = some v →
-    C QE Q (swr s (WeakInterpProj.wbytes n v) req.access_kind) (k (.Ok none)) t →
+    C QE Q (swr s (WeakInterpProj.wbytes n v) req.access_kind) (k (.Ok (some true))) t →
     C QE Q s (.impure (.ok (.memWrite n va req)) k) t)
 include K CDwr
 
