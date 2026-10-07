@@ -316,5 +316,6 @@ import Weak.AxProtGateN
 import Weak.AxEpilogue
 import Weak.AxTokLedger
 import Weak.AxEpiShape
+import Weak.AxLdspWpd
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
