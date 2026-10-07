@@ -301,5 +301,6 @@ import Weak.AxProtCov3
 import Weak.AxLockWitness
 import Weak.AxLockSmell
 import Weak.AxCondM
+import Weak.AxSchedSH
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
