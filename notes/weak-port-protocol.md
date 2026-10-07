@@ -273,3 +273,4 @@ Rocq→Lean name map only.
 - AxIntr3 (AxIntr4, AxLeafS/2): `TrapPost` GPR clause `∀ z : BitVec 5, uxaXget rs' z = uxaXget rs z`; `SpineOkI`, `spineOkIS`, `spineCertI`, `spineCertCI`, `AxIntr3.trapStXget`.
 - AxCertP (AxCertP2): `wpdXrdNodeP`, `wpdDrdNodeP` (takes `Hnf : akIfetch = false` after `Hlat`; no `Hntext`); section vars `M dok i Φ cpu G HG Hmid Out`.
 - AxDataX10: positional node lemmas `wpdDrdNodePosM`/`wpdXrdNodePosM` (`Hpos` constrains only row item `k`), `posOfRegionM`, `posOfBfinM` (+ riscv.cat instances).
+- AxDataX3: S-mode data regime `dataAtS`, `pmpW`, `dataTranslateS`, `rdFactsS`/`rdPreS`, `wrFactsS`/`wrPreS`; EA `gprVal t.regs rs1 + sign_extend (m := 64) imm`; widths `inRam pa w` + `1 ≤ w`, `w ≤ 8`. S-mode `get_transformed_data_addr`: `execExtDataGetAddrGpr` → `execTransformEffectiveAddress{Load,Store}S` → `AxDataX3.pmTransformVA0` (loads). `intro` patterns don't accept `-`.
