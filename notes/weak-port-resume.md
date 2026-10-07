@@ -51,7 +51,7 @@ After each report, add any new cross-file fact to `notes/weak-port-protocol.md` 
 ## Rules (owner)
 
 - **Workers are Opus.** Never use Fable workers. One fresh Fable advisor per design consult is allowed.
-- **5-hour pool:** launch nothing at ≳85%. At ≳91–92%, SendMessage every worker to reach a green point
+- **5-hour pool:** launch nothing at ≳90%. At ≥95% (owner, 2026-10-07), SendMessage every worker to reach a green point
   (keep only fully proved declarations, write `PROGRESS-<F>.md`), report, and stop. To resume, back up
   `Weak/<F>*.lean` and `PROGRESS-*`, reslot, restore the files, then start a "RESUME" worker.
 - **Weekly pool:** no cap ("go crazy, no limit"; still reported at status).
