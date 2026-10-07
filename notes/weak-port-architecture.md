@@ -264,3 +264,12 @@ No decision is needed for `TsoMem` (untouched), `VirtioProg` (Weak-local), `PtAd
   is restated as the Lean SC tree's `mConf cpu dq c` plus the five owned clock cells (`clockCells cpu`), mask
   ⊤; `MinstretInv` is NOT ported. All weak leaf files that take `mmode_config` use this interface.
 - **Q4 (2026-10-06): leave as premise** — the 'kernel text is never written' premises (efetchItvOk, fetchSrcOk) stay carried and documented in the capstones; to be lifted later (not part of the port).
+- **Stage C (owner, 2026-10-06 ~21:10) — D1 REVERSED: fetches leave the graph tier and go through the
+  per-hart i-cache view there too** ("merge the graph tier into the Lean tier; going through the i-cache view
+  seems the correct way"). The O2 design's `LFetch`-out-of-graph route (notes/weak-port-o2-design.md) is now
+  the target. Goals from the owner: verify the main assumptions first, and make it AS SIMPLE AS POSSIBLE.
+  Consequence: the fetch-inertness bridge (`lbFetchInert`, `candFetchInert(F)`, `hullRunFetchInert`,
+  `t2linFetchInert`, `fconfFetchInert`, `wfetchSite`; open question Q5) is to be REMOVED rather than carried.
+  Q4 (text never written / fence.i discipline) remains, on the i-cache view (`efetchItvOk`).
+  Design + rework list: notes/weak-port-o2-stageC.md (consult, then one rework lane). Until approved,
+  files on the fetch-in-graph path are HELD.
