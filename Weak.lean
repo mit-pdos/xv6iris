@@ -357,5 +357,6 @@ import Weak.AxSpinRow
 import Weak.AxLedgerG3
 import Weak.AxEpiOwned
 import Weak.AxSpinRow4
+import Weak.AxSymEngine
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
