@@ -14,53 +14,63 @@ STATE (as Rocq).  `AxSmodeProbe`'s supervisor hart (Sv39 over the 3-level table 
 
 §1 THE COMPUTED CHAINS (`fstep`, both ticks, all pin answers, `decide +kernel`; e2 = root slot
 0x80010010, e1 = L1[0] 0x80011000, e0(j) = L0[j] 0x80012000 + 8j, eD(a) = the 8-byte data read
-at a; under Stage C a FETCH is not a key — it is the pinned administrative step answered from the
-image, see deviation 1):
+at a, eF(a) = the hart stops at a 4-byte fetch at a with NO image bytes (`ekey.ENf`, Q13); under
+Stage C a fetch that HAS image bytes is no key — it is the pinned administrative step answered
+from the image, see deviation 1):
 
     pinned 0x80000000            [e2; e1; e0(0); e2; e1; e0(1); eD 0x80001008]
-    mapped text 0x80000004       [e2; e1; e0(0)]                         a prefix: no diff
-    mapped X data 0x80001000     [e2; e1; e0(1)]                         diff @2
-    misaligned 0x80000001        [e2; e1; e0(0)]                         a prefix: no diff
-    non-canonical 0x80_0000_0000 [e2; e1; e0(0)]                         a prefix: no diff
-    unmapped 0x80002000          [e2; e1; e0(2); e2; e1; e0(0)]          diff @2
-    mapped NON-X 0x80003000      [e2; e1; e0(3); e2; e1; e0(0)]          diff @2
+    mapped text 0x80000004       [e2; e1; e0(0); eF 0x80000008]  (fuel 3)  diff @3
+    mapped X data 0x80001000     [e2; e1; e0(1); eF 0x80001000]            diff @2
+    misaligned 0x80000001        [e2; e1; e0(0); eF stvec]                 diff @3
+    non-canonical 0x80_0000_0000 [e2; e1; e0(0); eF stvec]                 diff @3
+    unmapped 0x80002000          [e2; e1; e0(2); e2; e1; e0(0); eF stvec]  diff @2
+    mapped NON-X 0x80003000      [e2; e1; e0(3); e2; e1; e0(0); eF stvec]  diff @2
 
 The misaligned / non-canonical arms still emit NO memory event in the faulting step and land at
-stvec.  WARM TLB (after the pinned `ld`): pinned `[eD 0x80001008]`; mapped 0x80000004 has NO
-chain (`none`: two `c.nop`s, then a fetch at 0x80000008 outside the image); Lean-only: unmapped
-0x80002000 `[e2; e1; e0(2)]` — diff @0 (stuck AT the boundary).
+stvec, whose fetch has no image bytes.  WARM TLB (after the pinned `ld`): pinned
+`[eD 0x80001008]`; mapped 0x80000004 `[eF 0x80000008]` (fuel 3: two `c.nop`s, then a fetch past
+the image) — diff @0 (stuck AT the boundary); Lean-only: unmapped 0x80002000
+`[e2; e1; e0(2); eF stvec]` — diff @0.
 
-§2 CROSS-CHECK: each chain is the prefix of the (width, pa) NON-FETCH read list of the REAL run
-(`mtr` of `riscvStep false`, then of the next `riscvStep false` from the post-state).
+§2 CROSS-CHECK: each chain's NON-`eF` prefix is the prefix of the (width, pa) NON-FETCH read list
+of the REAL run (`mtr` of `riscvStep false`, then of the next `riscvStep false` from the
+post-state).
 
 §3 STUCK CERTIFICATES against the pinned ROW (`pinRow` = the pinned chain's items): the diverted
 hart fits the row on the common prefix (`*Fits`) and at the first differing index `j` every node
 it reaches through `j` image-answered reads is row-stuck along `fetchPin vaImg`-pinned runs
-(`*Stuck`, from `AxSpinVA.rowStuckOfChain`).  `AxSpinVA2.warmUnmappedStuckBoundary`: the j = 0
-case, fully closed.  `pinFits`: the pinned chain fits its own row everywhere.
+(`*Stuck`, from `AxSpinVA.rowStuckOfChain`).  `warmStuckBoundary` and the Lean-only
+`AxSpinVA2.warmUnmappedStuckBoundary`: the j = 0 case, fully closed.  `pinFits`: the pinned
+chain fits its own row everywhere.
 
 ## Deviations from Rocq
 
 1. O2 STAGE C (fetches are not graph events; `AxSpinVA` deviation 1).  Rocq's chains contained the
-   4-byte fetch key `eF a`, and the text / misaligned / non-canonical / warm-text verdicts were
-   ALL fetch-address mismatches (`F 0x80000004` / `F stvec` vs the row's `F 0x80000000`).  In Lean
-   a fetch is an administrative step pinned to the image (`FEC.fcIf`), so it is no chain key and
-   no row item: every chain loses its `eF` entries and the pinned chain continues to the `ld`'s
-   data walk and data read (7 keys, `fuel = 2`, `len = 8` everywhere; Rocq `len = 4`/`8`).
-   Consequences:
+   4-byte fetch key `eF a` for EVERY fetch.  In Lean a fetch with image bytes is an
+   administrative step pinned to the image (`FEC.fcIf`), so it is no chain key and no row item;
+   only a fetch with NO image bytes is a key — the chain's END `eF a := ekey.ENf (a, 4)` (Q13,
+   provisional; `FEC.fcNf`): along image-pinned runs such a hart has no step at all, and no row
+   item fits `eF`.  The pinned chain therefore continues to the `ld`'s data walk and data read
+   (7 keys, `len = 8` everywhere; Rocq `len = 4`/`8`).  Consequences:
    - `pinRow` has 7 items (Rocq 4); `pinWrow` is `[rdItem false 0x80001008 8]` (Rocq the fetch).
-   - text / misaligned / non-canonical chains are PREFIXES of the pinned chain (they diverge only
-     at a fetch, which the row does not see; past it the fetch at 0x80000008 / stvec 0x80000040
-     has no image bytes and the evaluator stops).  `textStuck`, `misalStuck`, `noncanonStuck`
-     and `warmStuckBoundary` are therefore NOT PROVABLE by the chain method and are DROPPED
-     (such a hart is stuck only because no pinned fetch exists outside the image, which `FEC`
-     cannot express).  `textFits` / `misalFits` are kept (as Rocq, true at index 3).
-   - `chWarmText` states `vaWchain 2 1 (sPc + 4) = none` (Rocq `Some [eF (s_pc + 4)]`);
-     `xcWarmText` states that the real warm-text run has NO non-fetch read (Rocq: its first read
-     is the fetch).  Lean-only replacement of the closed boundary verdict:
-     `AxSpinVA2.chWarmUnmapped`, `AxSpinVA2.xcWarmUnmapped`, `AxSpinVA2.warmUnmappedStuckBoundary`
-     (warm TLB, PC := 0x80002000: the data walk's root read at index 0 vs the row's data read).
-   - `real2` drops fetch events (`akTag = 1`) from the real run, as the chain does.
+   - the text / misaligned / non-canonical / warm-text verdicts were Rocq fetch-ADDRESS
+     mismatches (`F 0x80000004` / `F stvec` vs the row's `F 0x80000000`).  In Lean those harts
+     reach the row's index 3 (resp. 0) and stop at a fetch past the image (`eF 0x80000008` /
+     `eF stvec`) where the row has the data walk's root read `e2` (resp. the data read):
+     `textStuck`, `misalStuck`, `noncanonStuck` (at index 3, as Rocq) and `warmStuckBoundary`
+     (at index 0, as Rocq) are restored with Rocq's statements (modulo deviation 2/3 and Q12's
+     pin).  The text hart needs ONE MORE boundary (fuel 3; Rocq 2): its first fetch is no key,
+     the stuck fetch is after two `c.nop`s (`chText`, `chWarmText` at fuel 3; their `eF` is at
+     `sPc + 8`, Rocq `s_pc + 4`).
+   - the data / unmapped / non-X / misaligned / non-canonical chains end with `eF` at the address
+     Rocq's `eF` had (Rocq: the fetch read; Lean: the fetch past the image).
+   - `xc*` compare only the non-`eF` prefix (`real2` drops fetch events, `akTag = 1`, as the
+     chain drops pinned fetches); `xcWarmText` states that the real warm-text run has NO
+     non-fetch read (Rocq: its first read is the fetch).  `keyWp`/`itemOf` give `eF a` the
+     fetch's `(4, a)` / `rdItem false a 4`, as Rocq.
+   - Lean-only, kept: `AxSpinVA2.chWarmUnmapped`, `AxSpinVA2.xcWarmUnmapped`,
+     `AxSpinVA2.warmUnmappedStuckBoundary` (warm TLB, PC := 0x80002000: the data walk's root
+     read at index 0 vs the row's data read).
    - `rowStuckR` takes the pin `WeakAxRealize.fetchPin vaImg` (Q12); Rocq's `T img0` parameters
      of the stuck lemmas are gone.
 2. THE PINS: `regs_agree seip_reg` ↦ `regsAgree AxRunClose.pinReg` (`AxRunClose` deviation 1).
@@ -79,15 +89,15 @@ case, fully closed.  `pinFits`: the pinned chain fits its own row everywhere.
 `xc_*` `xc*`, `misal_step_no_read` `misalStepNoRead`, `noncanon_step_no_read`
 `noncanonStepNoRead`, `misal_lands_stvec` `misalLandsStvec`, `rd_item` `rdItem`, `item_of`
 `itemOf`, `pin_row` `pinRow`, `fits_upto` `fitsUpto`, `stuck_at` `stuckAt`, `pin_fits` `pinFits`,
-`text_fits` `textFits`, `data_fits` `dataFits`, `data_stuck` `dataStuck`, `misal_fits`
-`misalFits`, `unmapped_fits` `unmappedFits`, `unmapped_stuck` `unmappedStuck`, `nox_stuck`
-`noxStuck`, `pin_wrow` `pinWrow`, `warm_pin_fits` `warmPinFits`.  Lean-only (`AxSpinVA2.*`):
+`eF` `eF`, `text_fits` `textFits`, `text_stuck` `textStuck`, `data_fits` `dataFits`,
+`data_stuck` `dataStuck`, `misal_fits` `misalFits`, `misal_stuck` `misalStuck`,
+`noncanon_stuck` `noncanonStuck`, `unmapped_fits` `unmappedFits`, `unmapped_stuck`
+`unmappedStuck`, `nox_stuck` `noxStuck`, `pin_wrow` `pinWrow`, `warm_stuck_boundary`
+`warmStuckBoundary`, `warm_pin_fits` `warmPinFits`.  Lean-only (`AxSpinVA2.*`):
 `eD`, `chWarmUnmapped`, `xcWarmUnmapped`, `warmUnmappedStuckBoundary`.
 
-**Dropped:** `eF` (no fetch keys), `text_stuck`, `misal_stuck`, `noncanon_stuck`,
-`warm_stuck_boundary` (deviation 1; no Rocq file imports AxSpinVA2).  Rocq 57 definitions/lemmas;
-Lean 52 + 4 Lean-only.  **Not ported:** the `Print Assumptions` block (the lint's axiom check
-covers it).
+**Dropped:** nothing (no Rocq file imports AxSpinVA2).  Rocq 57 definitions/lemmas; Lean 57 +
+4 Lean-only.  **Not ported:** the `Print Assumptions` block (the lint's axiom check covers it).
 -/
 import Weak.AxSpinVA
 import Weak.AxSmodeProbe
@@ -130,6 +140,9 @@ noncomputable def vaWchain (fuel len : Nat) (v : Nat) : Option (List ekey) :=
 def e2 : ekey := .ERd (false, ((AxSmodeProbe.sRoot * 4096 + 16 : Nat) : Int), 8)
 def e1 : ekey := .ERd (false, ((AxSmodeProbe.sL1 * 4096 : Nat) : Int), 8)
 def e0 (j : Nat) : ekey := .ERd (false, ((AxSmodeProbe.sL0 * 4096 + 8 * j : Nat) : Int), 8)
+/-- the hart stops at a 4-byte FETCH at `a` that has no image bytes (Q13: Rocq the fetch read
+key `ERd (false, a, 4)`) -/
+def eF (a : Nat) : ekey := .ENf ((a : Int), 4)
 /-- (Lean-only) the 8-byte data read at `a` -/
 def AxSpinVA2.eD (a : Nat) : ekey := .ERd (false, (a : Int), 8)
 
@@ -137,20 +150,25 @@ def pinChain : List ekey :=
   [e2, e1, e0 0, e2, e1, e0 1, AxSpinVA2.eD (AxSmodeProbe.sSp + 8)]
 
 theorem chPinned : vaChain 2 8 sPc = some pinChain := by decide +kernel
-theorem chText : vaChain 2 8 (sPc + 4) = some [e2, e1, e0 0] := by decide +kernel
-theorem chData : vaChain 2 8 0x80001000 = some [e2, e1, e0 1] := by decide +kernel
-theorem chMisal : vaChain 2 8 (sPc + 1) = some [e2, e1, e0 0] := by decide +kernel
-theorem chNoncanon : vaChain 2 8 0x8000000000 = some [e2, e1, e0 0] := by decide +kernel
-theorem chUnmapped : vaChain 2 8 0x80002000 = some [e2, e1, e0 2, e2, e1, e0 0] := by
+theorem chText : vaChain 3 8 (sPc + 4) = some [e2, e1, e0 0, eF (sPc + 8)] := by decide +kernel
+theorem chData : vaChain 2 8 0x80001000 = some [e2, e1, e0 1, eF 0x80001000] := by decide +kernel
+theorem chMisal : vaChain 2 8 (sPc + 1) = some [e2, e1, e0 0, eF vaStvec] := by decide +kernel
+theorem chNoncanon : vaChain 2 8 0x8000000000 = some [e2, e1, e0 0, eF vaStvec] := by
   decide +kernel
-theorem chNox : vaChain 2 8 0x80003000 = some [e2, e1, e0 3, e2, e1, e0 0] := by decide +kernel
+theorem chUnmapped :
+    vaChain 2 8 0x80002000 = some [e2, e1, e0 2, e2, e1, e0 0, eF vaStvec] := by
+  decide +kernel
+theorem chNox : vaChain 2 8 0x80003000 = some [e2, e1, e0 3, e2, e1, e0 0, eF vaStvec] := by
+  decide +kernel
 theorem chWarmPinned : vaWchain 2 1 sPc = some [AxSpinVA2.eD (AxSmodeProbe.sSp + 8)] := by
   decide +kernel
-/-- (deviation 1) the warm text hart has NO chain: its run fetches past the image -/
-theorem chWarmText : vaWchain 2 1 (sPc + 4) = none := by decide +kernel
+/-- (deviation 1) the warm text hart: two `c.nop`s, then a fetch past the image -/
+theorem chWarmText : vaWchain 3 1 (sPc + 4) = some [eF (sPc + 8)] := by decide +kernel
 /-- (Lean-only) warm TLB, PC := the unmapped page: the data walk at the boundary -/
-theorem AxSpinVA2.chWarmUnmapped : vaWchain 2 8 0x80002000 = some [e2, e1, e0 2] := by
+theorem AxSpinVA2.chWarmUnmapped :
+    vaWchain 2 8 0x80002000 = some [e2, e1, e0 2, eF vaStvec] := by
   decide +kernel
+
 
 /-! # 2. Cross-check against the real run -/
 
@@ -158,6 +176,7 @@ def keyWp (e : ekey) : Int × Int :=
   match e with
   | .ERd (_, a, n) | .EWr (_, a, n) => ((n : Int), a)
   | .EFn _ => (0, 0)
+  | .ENf (a, n) => ((n : Int), a)
 
 def mtrEvs (r : (List AxSmodeProbe.mev × Nat) ⊕ (Nat × List AxSmodeProbe.mev)) :
     List AxSmodeProbe.mev :=
@@ -212,6 +231,7 @@ def itemOf (e : ekey) : Lbl :=
   | .ERd (aq, a, n) => rdItem aq a n
   | .EWr (rl, a, n) => .LStore rl a (List.replicate n 0#8) .WCplain
   | .EFn (pr, pw, sr, sw) => .LFence pr pw sr sw
+  | .ENf (a, n) => rdItem false a n
 
 def pinRow : List Lbl := pinChain.map itemOf
 
@@ -233,42 +253,70 @@ theorem stuckAt (fuel len : Nat) (t : ExecSt) (Ks : List ekey) (row : List Lbl) 
 
 theorem pinFits : fitsUpto pinChain pinRow 7 = true := by decide +kernel
 
-theorem textFits : fitsUpto [e2, e1, e0 0] pinRow 3 = true := by decide +kernel
+theorem textFits : fitsUpto [e2, e1, e0 0, eF (sPc + 8)] pinRow 3 = true := by decide +kernel
+theorem textStuck (cpu : CPU) (ib : Ibch) (p' : Pexv6) :
+    ireach vaImg (.PHart cpu (.pure ()) (vaRegs (sPc + 4)) none ib) 3 p' →
+    rowStuckR (WeakAxRealize.fetchPin vaImg) pinRow ⟨p', 3⟩ :=
+  stuckAt 3 8 (vaAt (sPc + 4)) [e2, e1, e0 0, eF (sPc + 8)] pinRow 3 (eF (sPc + 8))
+    (rdItem false ((AxSmodeProbe.sRoot * 4096 + 16 : Nat) : Int) 8) cpu _ ib p'
+    chText (regsAgreeRefl _ _) rfl (by decide +kernel) (by decide +kernel)
 
-theorem dataFits : fitsUpto [e2, e1, e0 1] pinRow 2 = true := by decide +kernel
+theorem dataFits : fitsUpto [e2, e1, e0 1, eF 0x80001000] pinRow 2 = true := by decide +kernel
 theorem dataStuck (cpu : CPU) (ib : Ibch) (p' : Pexv6) :
     ireach vaImg (.PHart cpu (.pure ()) (vaRegs 0x80001000) none ib) 2 p' →
     rowStuckR (WeakAxRealize.fetchPin vaImg) pinRow ⟨p', 2⟩ :=
-  stuckAt 2 8 (vaAt 0x80001000) [e2, e1, e0 1] pinRow 2 (e0 1)
+  stuckAt 2 8 (vaAt 0x80001000) [e2, e1, e0 1, eF 0x80001000] pinRow 2 (e0 1)
     (rdItem false ((AxSmodeProbe.sL0 * 4096 : Nat) : Int) 8) cpu _ ib p'
     chData (regsAgreeRefl _ _) rfl (by decide +kernel) (by decide +kernel)
 
-theorem misalFits : fitsUpto [e2, e1, e0 0] pinRow 3 = true := by decide +kernel
+theorem misalFits : fitsUpto [e2, e1, e0 0, eF vaStvec] pinRow 3 = true := by decide +kernel
+theorem misalStuck (cpu : CPU) (ib : Ibch) (p' : Pexv6) :
+    ireach vaImg (.PHart cpu (.pure ()) (vaRegs (sPc + 1)) none ib) 3 p' →
+    rowStuckR (WeakAxRealize.fetchPin vaImg) pinRow ⟨p', 3⟩ :=
+  stuckAt 2 8 (vaAt (sPc + 1)) [e2, e1, e0 0, eF vaStvec] pinRow 3 (eF vaStvec)
+    (rdItem false ((AxSmodeProbe.sRoot * 4096 + 16 : Nat) : Int) 8) cpu _ ib p'
+    chMisal (regsAgreeRefl _ _) rfl (by decide +kernel) (by decide +kernel)
 
-theorem unmappedFits : fitsUpto [e2, e1, e0 2, e2, e1, e0 0] pinRow 2 = true := by decide +kernel
+theorem noncanonStuck (cpu : CPU) (ib : Ibch) (p' : Pexv6) :
+    ireach vaImg (.PHart cpu (.pure ()) (vaRegs 0x8000000000) none ib) 3 p' →
+    rowStuckR (WeakAxRealize.fetchPin vaImg) pinRow ⟨p', 3⟩ :=
+  stuckAt 2 8 (vaAt 0x8000000000) [e2, e1, e0 0, eF vaStvec] pinRow 3 (eF vaStvec)
+    (rdItem false ((AxSmodeProbe.sRoot * 4096 + 16 : Nat) : Int) 8) cpu _ ib p'
+    chNoncanon (regsAgreeRefl _ _) rfl (by decide +kernel) (by decide +kernel)
+
+theorem unmappedFits : fitsUpto [e2, e1, e0 2, e2, e1, e0 0, eF vaStvec] pinRow 2 = true := by decide +kernel
 theorem unmappedStuck (cpu : CPU) (ib : Ibch) (p' : Pexv6) :
     ireach vaImg (.PHart cpu (.pure ()) (vaRegs 0x80002000) none ib) 2 p' →
     rowStuckR (WeakAxRealize.fetchPin vaImg) pinRow ⟨p', 2⟩ :=
-  stuckAt 2 8 (vaAt 0x80002000) [e2, e1, e0 2, e2, e1, e0 0] pinRow 2 (e0 2)
+  stuckAt 2 8 (vaAt 0x80002000) [e2, e1, e0 2, e2, e1, e0 0, eF vaStvec] pinRow 2 (e0 2)
     (rdItem false ((AxSmodeProbe.sL0 * 4096 : Nat) : Int) 8) cpu _ ib p'
     chUnmapped (regsAgreeRefl _ _) rfl (by decide +kernel) (by decide +kernel)
 
 theorem noxStuck (cpu : CPU) (ib : Ibch) (p' : Pexv6) :
     ireach vaImg (.PHart cpu (.pure ()) (vaRegs 0x80003000) none ib) 2 p' →
     rowStuckR (WeakAxRealize.fetchPin vaImg) pinRow ⟨p', 2⟩ :=
-  stuckAt 2 8 (vaAt 0x80003000) [e2, e1, e0 3, e2, e1, e0 0] pinRow 2 (e0 3)
+  stuckAt 2 8 (vaAt 0x80003000) [e2, e1, e0 3, e2, e1, e0 0, eF vaStvec] pinRow 2 (e0 3)
     (rdItem false ((AxSmodeProbe.sL0 * 4096 : Nat) : Int) 8) cpu _ ib p'
     chNox (regsAgreeRefl _ _) rfl (by decide +kernel) (by decide +kernel)
 
 /-- the warm row: the pinned warm hart's data read (deviation 1; Rocq: its fetch) -/
 def pinWrow : List Lbl := [rdItem false ((AxSmodeProbe.sSp + 8 : Nat) : Int) 8]
 
+/-- WARM TLB: the diverted hart is stuck AT THE BOUNDARY — fully closed (Q13: at the fetch of
+0x80000008, past the image, after two `c.nop`s; Rocq at its fetch of s_pc + 4) -/
+theorem warmStuckBoundary (cpu : CPU) (ib : Ibch) :
+    rowStuckR (WeakAxRealize.fetchPin vaImg) pinWrow
+      ⟨.PHart cpu (.pure ()) (vaWt (sPc + 4)).regs none ib, 0⟩ :=
+  stuckAt 3 1 (vaWt (sPc + 4)) [eF (sPc + 8)] pinWrow 0 (eF (sPc + 8))
+    (rdItem false ((AxSmodeProbe.sSp + 8 : Nat) : Int) 8) cpu _ ib _
+    chWarmText (regsAgreeRefl _ _) rfl rfl (by decide +kernel) (.irRefl _)
+
 /-- (Lean-only, deviation 1) WARM TLB, PC := the unmapped page: the diverted hart is stuck AT
 THE BOUNDARY — fully closed -/
 theorem AxSpinVA2.warmUnmappedStuckBoundary (cpu : CPU) (ib : Ibch) :
     rowStuckR (WeakAxRealize.fetchPin vaImg) pinWrow
       ⟨.PHart cpu (.pure ()) (vaWt 0x80002000).regs none ib, 0⟩ :=
-  stuckAt 2 8 (vaWt 0x80002000) [e2, e1, e0 2] pinWrow 0 e2
+  stuckAt 2 8 (vaWt 0x80002000) [e2, e1, e0 2, eF vaStvec] pinWrow 0 e2
     (rdItem false ((AxSmodeProbe.sSp + 8 : Nat) : Int) 8) cpu _ ib _
     AxSpinVA2.chWarmUnmapped (regsAgreeRefl _ _) rfl rfl (by decide +kernel) (.irRefl _)
 

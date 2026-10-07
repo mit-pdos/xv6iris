@@ -22,6 +22,8 @@ Rocq: `iris/AxSpinVA.v` @ xxvzwolszwmp.
   non-administrative label from `⟨p', k⟩` along PINNED administrative steps has key `e`
   (`firstEv (WeakAxRealize.fetchPin img)`); `rowStuckOfChain`: so a row item at `k` that does
   not fit `e` makes `⟨p', k⟩` row-stuck along image-pinned runs (`AxSpinRow.rowStuckOfFirst`).
+  `AxSpinVA.rowStuckOfChainNf`: at a node whose key is `ENf` (a fetch with no image bytes) the
+  hart is row-stuck in ANY row.
   `hthrBoundary`: `BFEC n Ks t` at a register file agreeing with `t` off the pins gives
   `hthr Ks` at the boundary node `.pure ()`.
 * §4 THE EVALUATOR `fstep fuel len t` and `fstepSound`: `fstep fuel len t = some Ks →
@@ -43,6 +45,14 @@ Rocq: `iris/AxSpinVA.v` @ xxvzwolszwmp.
      bytes and past it no chain can be certified).  The earlier Lean-only
      `AxSpinVA.kstep0Pin` / `AxSpinVA.firstEvPin` are MERGED into `AxSpinRow.kstep0` /
      `AxSpinRow.firstEv` (same definitions at `pin := fetchPin img`) and removed.
+   - Q13 (the no-fetch end, provisional): Rocq's verdicts from a fetch-ADDRESS mismatch (a Rocq
+     fetch key `ERd (false, a, 4)` vs the row's) have no Lean key.  The Lean-only key
+     `ekey.ENf (a, n)` and constructor `FEC.fcNf` END the chain at a fetch of `n` bytes at `a`
+     with `imgBytes img a n = none`: no pinned fetch exists there
+     (`AxSpinVA.noPinOfImgNone`), so along image-pinned runs the node has no step.  `lkey` never
+     returns `ENf` and `keyFits (.ENf _) _ = False`, so `rowStuckOfChain` / `rowRejectsKey1`
+     apply unchanged; `AxSpinVA.rowStuckOfChainNf` is the row-free form.  The evaluator's fetch
+     arm returns `some [.ENf (paZ req.pa, n)]` (budget `len ≥ 1`) where it returned `none`.
    - Q12: `rowStuckOfChain` (Rocq `row_stuck_of_chain row T img0`) concludes
      `rowStuckR (WeakAxRealize.fetchPin img) row ⟨p', k⟩` — the stuckness is along runs whose
      fetches return the CHAIN's image `img` (Rocq: any `T img0`, its fetches were row reads).
@@ -66,7 +76,8 @@ Rocq: `iris/AxSpinVA.v` @ xxvzwolszwmp.
    `pnode_step` carries `obar` (`hinvCStep` takes it).  `fstep` is `noncomputable` (`riscvStep`
    is); kernel evaluation (`decide +kernel`) is unaffected.
 6. Lean-only helpers (file-qualified): `AxSpinVA.erwLabelAdmin` (Rocq `erw_label_admin`, a duplicated name; = `AxCjrWpd`'s),
-   `AxSpinVA.annAdmin`.
+   `AxSpinVA.annAdmin`, `AxSpinVA.mapMNone`, `AxSpinVA.noPinOfImgNone`,
+   `AxSpinVA.rowStuckOfChainNf` (Q13); Lean-only key constructor `ekey.ENf` (Q13).
 
 **Rocq → Lean name map.**  `ekey` `ekey` (`ERd`/`EWr`/`EFn`), `lkey` `lkey`, `lkey_rd` `lkeyRd`,
 `lkey_fence` `lkeyFence`, `F_of` `FOf`, `key_fits` `keyFits`, `key_fitsb` `keyFitsb`,
@@ -75,7 +86,7 @@ Rocq: `iris/AxSpinVA.v` @ xxvzwolszwmp.
 `fc_wr` `fcWr`, `fc_mrd_end` `fcMrdEnd`, `fc_mrd_go` `fcMrdGo`, `fc_mwr` `fcMwr`, `fc_bar`
 `fcBar`, `fc_ia` `fcIa`, `fc_ba` `fcBa`, `fc_co` `fcCo`, `fc_tl` `fcTl`, `fc_te` `fcTe`, `fc_rx`
 `fcRx`, `fc_ts` `fcTs`, `fc_tx` `fcTx`, `fc_cc` `fcCc`, `fc_msg` `fcMsg`, `fc_gcc` `fcGcc`,
-`fc_gf`/`fc_dis`/`fc_ext` `fcExt`; Lean-only `fcIf`, `fcSf`), `QT` `QT`, `BFEC` `BFEC`, `hinvC`
+`fc_gf`/`fc_dis`/`fc_ext` `fcExt`; Lean-only `fcIf`, `fcSf`, `fcNf`), `QT` `QT`, `BFEC` `BFEC`, `hinvC`
 `hinvC`, `erw_label_admin` `AxSpinVA.erwLabelAdmin`, `ebar_label_not_admin` `ebarLabelNotAdmin`,
 `hinvC_step` `hinvCStep`, `hthr` `hthr`, `hthr_admin` `hthrAdmin`, `hthr_wire` `hthrWire`,
 `hthr_first` `hthrFirst`, `ireach` `ireach` (`ir_refl` `irRefl`, `ir_admin` `irAdmin`,
@@ -102,6 +113,9 @@ inductive ekey where
   | ERd (x : Bool × Int × Nat)
   | EWr (x : Bool × Int × Nat)
   | EFn (x : Bool × Bool × Bool × Bool)
+  /-- (Lean-only, Q13) the chain ENDS at a fetch of `x.2` bytes at `x.1` where the image has no
+  bytes: no label has this key (`lkey` never returns it), no row item fits it -/
+  | ENf (x : Int × Nat)
   deriving DecidableEq
 
 def lkey (l : Wlabel) : Option ekey :=
@@ -129,12 +143,14 @@ def keyFits (e : ekey) (lb : Lbl) : Prop :=
   | .ERd x => aidentRd (aident lb) = some x
   | .EWr x => aidentWr (aident lb) = some x
   | .EFn x => aidentFence (aident lb) = some x
+  | .ENf _ => False
 
 def keyFitsb (e : ekey) (lb : Lbl) : Bool :=
   match e with
   | .ERd x => decide (aidentRd (aident lb) = some x)
   | .EWr x => decide (aidentWr (aident lb) = some x)
   | .EFn x => decide (aidentFence (aident lb) = some x)
+  | .ENf _ => false
 
 theorem keyFitsbSpec (e : ekey) (lb : Lbl) : keyFitsb e lb = true ↔ keyFits e lb := by
   cases e <;> simp [keyFitsb, keyFits]
@@ -206,6 +222,13 @@ inductive FEC {X : Type} (QE : List ekey → Sail.Error exception → ExecSt →
       imgBytes img (paZ req.pa) n = some vs →
       FEC QE Q Ks (k (.Ok (wordOfBytes n vs, none))) t →
       FEC QE Q Ks (.impure (.ok (.memRead n va req)) k) t
+  /-- (Lean-only, Q13) a FETCH whose bytes are NOT in the image ENDS the chain: along
+  image-pinned runs the node has no step -/
+  | fcNf (n va : Nat) (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
+      (k : Result (BitVec (8 * n) × Option Bool) Arch.abort → SailM X) (t : ExecSt) :
+      devAddr req.pa = false → (classify req.access_kind).akIfetch = true →
+      imgBytes img (paZ req.pa) n = none →
+      FEC QE Q [.ENf (paZ req.pa, n)] (.impure (.ok (.memRead n va req)) k) t
   | fcMwr (n va : Nat) (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
       (k : Result (Option Bool) Arch.abort → SailM X) (t : ExecSt) :
       devAddr req.pa = false →
@@ -268,6 +291,34 @@ theorem ebarLabelNotAdmin (b : barrier_kind) : ¬ lbAdmin true (ebarLabel b) := 
 theorem AxSpinVA.annAdmin (n : Nat) (w : BitVec n) (h : sfAnnB n w = false) :
     lbAdmin true (annLabel n w) := by
   simp [annLabel, h, lbAdmin]
+
+/-- (Lean-only, Q13) A mapM in `Option` that fails has a failing entry. -/
+theorem AxSpinVA.mapMNone {α β : Type} (f : α → Option β) :
+    ∀ (l : List α), l.mapM f = none → ∃ x ∈ l, f x = none
+  | [], h => by simp at h
+  | a :: l, h => by
+    cases ha : f a with
+    | none => exact ⟨a, List.mem_cons_self, ha⟩
+    | some b =>
+      cases hl : l.mapM f with
+      | none =>
+        obtain ⟨x, hx, hfx⟩ := AxSpinVA.mapMNone f l hl
+        exact ⟨x, List.mem_cons_of_mem _ hx, hfx⟩
+      | some bs => simp [List.mapM_cons, ha, hl] at h
+
+/-- (Lean-only, Q13) A pinned fetch of `n` bytes at `base` needs every byte in the image:
+if `imgBytes img base n = none`, no fetch label there is pinned. -/
+theorem AxSpinVA.noPinOfImgNone (img : Image) (base : Int) (n : Nat)
+    (tvs : List (Nat × BitVec 8)) :
+    imgBytes img base n = none → tvs.length = n →
+    ¬ WeakAxRealize.fetchPin img (.LIFetch base tvs) := by
+  intro Hn Hlen Hpin
+  obtain ⟨j, hj, hnone⟩ := AxSpinVA.mapMNone _ _ Hn
+  have hjn : j < n := List.mem_range.mp hj
+  have h := Hpin.2 j (by omega)
+  have hnone' : img (base + (j : Int)) = none := hnone
+  rw [hnone', List.getElem?_map, List.getElem?_eq_getElem (by omega : j < tvs.length)] at h
+  simp at h
 
 theorem hinvCStep (Ks : List ekey) (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevStates)
     (l : Wlabel) (m' : SailM Unit) (ors : Option RegFile)
@@ -341,6 +392,12 @@ theorem hinvCStep (Ks : List ekey) (m : SailM Unit) (rs : RegFile) (ib : Ibch) (
       have Hw : w = wordOfBytes n0 vs := by
         rw [← Hsnd]; exact bytesWordEq n0 w tvs Hlen Hby
       rw [Hw]; exact Hk
+    · rw [Hif] at Hif'; cases Hif'
+  | fcNf n0 va req k t Hdev Hif Himg =>
+    simp only [pnodeStep, Hdev, Bool.false_eq_true, ↓reduceIte] at Hps
+    rcases Hps with ⟨-, w, tvs, Hlen, -, rfl, -⟩ | ⟨Hif', -⟩
+    · exact ⟨fun _ Hpin => (AxSpinVA.noPinOfImgNone img _ _ tvs Himg Hlen Hpin).elim,
+        fun Hna => absurd rfl Hna⟩
     · rw [Hif] at Hif'; cases Hif'
   | fcMwr n0 va req k t Hdev =>
     simp only [pnodeStep, Hdev, Bool.false_eq_true, ↓reduceIte] at Hps
@@ -487,6 +544,18 @@ theorem rowStuckOfChain (Ks : List ekey) (p : Pexv6) (i : Nat) (p' : Pexv6) (e :
   fun H Hr He Hrej Hlt =>
     rowStuckOfFirst _ row ⟨p', k⟩ (FOf (Eq e)) (chainFirst img Ks p i p' e k H Hr He) Hrej Hlt
 
+/-- (Lean-only, Q13) The no-fetch end: a reached node whose key is `ENf` is row-stuck in ANY
+row (before its end) along image-pinned runs — its next step is a fetch with no image bytes,
+which no pinned run takes. -/
+theorem AxSpinVA.rowStuckOfChainNf (Ks : List ekey) (p : Pexv6) (i : Nat) (p' : Pexv6)
+    (x : Int × Nat) (k : Nat) (row : List Lbl) :
+    hthr img Ks p → ireach img p i p' → Ks[i]? = some (.ENf x) → k < row.length →
+    rowStuckR (WeakAxRealize.fetchPin img) row ⟨p', k⟩ := by
+  intro H Hr He Hlt
+  refine rowStuckOfChain img Ks p i p' _ k row H Hr He ?_ Hlt
+  rintro lb - l ⟨e, He', rfl⟩ -
+  cases l <;> simp [lkey] at He'
+
 /-- The boundary node. -/
 theorem hthrBoundary (n : Nat) (Ks : List ekey) (t : ExecSt) (cpu : CPU) (rs : RegFile)
     (ib : Ibch) :
@@ -515,7 +584,10 @@ def fch {X : Type} (c : Nat → X → ExecSt → Option (List ekey)) :
       else if (classify req.access_kind).akIfetch then
         match imgBytes img (paZ req.pa) n with
         | some vs => fch c len (k (.Ok (wordOfBytes n vs, none))) t
-        | none => none
+        | none =>
+          match len with
+          | 0 => none
+          | _ + 1 => some [.ENf (paZ req.pa, n)]
       else
         match len with
         | 0 => none
@@ -626,7 +698,11 @@ theorem fchSound {X : Type} (c : Nat → X → ExecSt → Option (List ekey))
           · rw [fch.eq_def] at Hf
             simp only [hd, hif, Bool.false_eq_true, ↓reduceIte] at Hf
             cases hv : imgBytes img (paZ req.pa) n with
-            | none => rw [hv] at Hf; cases Hf
+            | none =>
+              rw [hv] at Hf
+              rcases len with _ | len'
+              · cases Hf
+              · cases Hf; exact .fcNf n va req k t hd hif hv
             | some vs =>
               rw [hv] at Hf
               exact .fcIf Ks n va req k t vs hd hif hv (ih _ _ _ _ Hf)
