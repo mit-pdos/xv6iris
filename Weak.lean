@@ -296,5 +296,6 @@ import Weak.AxTierA2
 import Weak.AxLockAdeq
 import Weak.AxLockAdeq2
 import Weak.AxTierA3
+import Weak.AxLockRace2
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
