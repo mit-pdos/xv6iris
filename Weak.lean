@@ -238,5 +238,6 @@ import Weak.AxSchedIris
 import Weak.AxProtLock
 import Weak.AxCov
 import Weak.WkFetchPeel
+import Weak.AxLockRace
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
