@@ -210,5 +210,6 @@ import Weak.WeakViewRacy
 import Weak.WeakRvwmoPinBridge2
 import Weak.WeakRvwmoCapstone
 import Weak.WkClipAdvance
+import Weak.WkUnmapMp
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
