@@ -156,3 +156,4 @@ Rocq→Lean name map only.
 - AxSpinProt: camera class `SpinlockG GF` (saved pred over Geid; ghost maps Nat→Option Geid and Int→GName×GName) — adequacy must allocate it. iprop `∃` binders with types must each be bracketed: `∃ (γR : GName) (γh : GName) (R : T), …`.
 - Stage C: the stageC.md list of "witness files with literal fetch rows" is unreliable (AxDeps and the 4 Rvwmo witnesses had none). A real fetch row = a 4-byte instruction-text read at a pc; 1-byte data `LLoad`s are not fetches. Grep before reworking.
 - Stage C: the image pin is `WeakAxRealize.fetchPin img l` (file-qualified; `fetchPin σ es` is WeakCert's, unrelated). Always file-qualify new Lean-only names in rework too.
+- Stage C (WeakRvwmoAdm): `hemit` allows no admin items after a row's last event — a fetch that was the last event of a Rocq row must be followed by the next real memory event in Lean (Adm: hart 1 row ends with the `fence r,rw` now).
