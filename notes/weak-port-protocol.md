@@ -160,3 +160,4 @@ Rocq→Lean name map only.
 - AxAdequacyChk: `AxAdequacyChk.stepAnnotGen` (+skipCaseGen/evCaseGen) is AxAdequacy.stepAnnot generic in the WP continuation — reuse it for wpc/other continuations. Q8 pin threads only through stepAnnotGen and AxAdequacy.stepAnnot.
 - Soundness in iris-lean: Rocq `step_fupdN_soundness(_no_lc)'` = `step_fupdN_soundness_close (hlc := …) n m`; `uPred.pure_soundness` = `Iris.pure_soundness (PROP := IProp GF)` (AxLockRace3).
 - AxProtInst declares a GLOBAL `instance axprotPol : Axpol …` (as Rocq). Files importing it get it for every anonymous `[Axpol]` binder — files that need another policy (AxLockGen, …) must pass a local instance / named def explicitly (`@lemma … inst`), never rely on resolution.
+- `AxAdequacy.stepFupdNSucc/Zero` need `[AxirisG GF]`; outside an AxirisG context use the instance-free `AxTierA2.stepFupdNSucc/Zero`. `AxirisG.localInterp GD j 0 ls` needs `(GF := GF)`.
