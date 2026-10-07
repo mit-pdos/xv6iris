@@ -334,5 +334,6 @@ import Weak.AxRunGV2
 import Weak.AxLedgerG
 import Weak.AxLedgerG2
 import Weak.AxLock3Prog
+import Weak.AxLock3Wp2
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
