@@ -272,3 +272,4 @@ Rocq→Lean name map only.
 - AxSymCtl4 (AxSymCtl5 …): Stage C counts — `AxSymCtl4.accCnt acc` (0 fetch, 1 else), `cntMemReadFetch{2,4}S` = 0, `cntFetchRVC{4,2}SGen` = `ntr`, `fcntS` 0 hit / 3 miss; `AxSymCtl4.tlbFill`; unconditional bind rules `AxSymCtl4.cntABind`/`cntARBind` turn `execA` simp scripts into count proofs; tactic `ax_sym_ctl4_run`.
 - AxIntr3 (AxIntr4, AxLeafS/2): `TrapPost` GPR clause `∀ z : BitVec 5, uxaXget rs' z = uxaXget rs z`; `SpineOkI`, `spineOkIS`, `spineCertI`, `spineCertCI`, `AxIntr3.trapStXget`.
 - AxCertP (AxCertP2): `wpdXrdNodeP`, `wpdDrdNodeP` (takes `Hnf : akIfetch = false` after `Hlat`; no `Hntext`); section vars `M dok i Φ cpu G HG Hmid Out`.
+- AxDataX10: positional node lemmas `wpdDrdNodePosM`/`wpdXrdNodePosM` (`Hpos` constrains only row item `k`), `posOfRegionM`, `posOfBfinM` (+ riscv.cat instances).
