@@ -39,27 +39,29 @@ bridge's `execPrefixPfRun` / `execWfPfRun`).
 3. PROOFS: `adm_star_pf_run` goes by TAIL induction on `rtc` (Rocq: head
    induction; Lean's `rtc` is built from the last step); the
    `admStarMonoRtc` inclusion is `rtc_subrel`.  Statements unchanged.
-4. O2 — THE INSTRUCTION FETCH (the Lean-only label `LIFetch`, bridge
-   deviation 6).  `projLbl (LIFetch base tvs) = some (LLoad false …)`, so a
-   fetch could realize an axiomatic plain load, but `MStepLoad`'s post-state
-   `loadPostRun` moves `coh`/`wVrOld` while the fetch (`PFIFetch`) is the
-   identity, so the `cfgMatchd` step needs the bridge's premise (ii) of
-   `pfFetchLoadOk` (premise (i) — readability — and the values come from the
-   axiomatic `rdOk`; the fetch window `ifetchOk … 0` is then vacuous).
-   Changes:
-   - the label gates get their `LIFetch` arms: `lbNobarex`/`lbRfoldfree` are
-     `True` there (a fetch is no exclusive and has no operand list),
-     `lbAdmin` is `False` (it projects to `some`);
-   - NEW gate `lbFetchInert σ i l` (vacuous unless `l = LIFetch base tvs`;
-     then `wsEqr (loadPostRun (σ.msWs i) false base tvs.*1) (σ.msWs i)`, read
-     at the AXIOMATIC `Wstate`), appended as a FIFTH conjunct of
-     `lblRealizes`; `mstepWpPfStepProg` gains the `LIFetch` arm (`PFIFetch`);
-   - `lblRealizesUnproj` gains the premise `lbNoFetch l` (Lean-only def):
-     `lbDepfree`/`lbFused` hold of `LIFetch`, whose projection is a plain
-     load but which is not `unprojLbl` of it;
-   - `lblRealizesIntro` is unchanged (`unprojLbl` never yields `LIFetch`, so
-     the new conjunct is trivial).
-   Every other statement is the Rocq one.
+4. O2 / STAGE C — THE INSTRUCTION FETCH (the Lean-only label `LIFetch`, bridge
+   deviation 6; owner rulings Q-C1/Q-C3, `notes/weak-port-o2-stageC.md` §B1).
+   The fetch is NOT an axiomatic event: `projLbl (LIFetch ..) = none`, and it is
+   an ADMINISTRATIVE label sitting where `LInstr` sits (`lbAdmin instr (LIFetch
+   ..) := instr = true`; a fetch never occurs inside a fused pair).  The
+   Stage-B fetch-inertness gate (`lbFetchInert`, `lbNoFetch`, the fifth
+   `lblRealizes` conjunct, the `LIFetch` arm of `mstepWpPfStepProg`, the
+   `lbNoFetch` premise of `lblRealizesUnproj`) is DELETED: `lblRealizes` and
+   `lblRealizesUnproj` are Rocq's again.  The graph tier's only fetch content —
+   the bytes are the boot image at timestamp 0 — is the PIN `WeakAxRealize.fetchPin img l`
+   (`True` off the fetch), carried by the pinned program LTS `pstepPin img
+   pstep` (a sub-LTS: `pstepPinSub`, `wpPfStepPinSub`, `wpPfRunPinSub`).
+   Replaying an admin fetch (`PFIFetch`, `ifetchOk img log 0 …`) needs the pin,
+   so the replay chain takes the Lean-only premise `pstepPinned img pstep`
+   (every step of the LTS is pinned to `img`; `pstepPinPinned` for the pinned
+   LTS): `admStepPf` (label form `WeakAxRealize.fetchPin c.pcImg l`), `admStarPfRun`,
+   `admStarPf`, `mstepWpPfStepPair` (at `c.pcImg`), `execPrefixPfRunProg`,
+   `execWfPfRunProg` (at `exImg E`).  The `progFree` corollaries keep Rocq's
+   statements (they replay at `pstepPin (exImg E) pstep`, `progFreeExecProgOkPin`,
+   and project back).  Lean-only: `fetchPin`, `fetchPinIfetchOk`, `pstepPin`,
+   `pstepPinSub`, `pstepPinned`, `pstepPinPinned`, `wpPfStepPinSub`,
+   `wpPfRunPinSub`, `progFreeExecProgOkPin`, `execWfPfRunPin` (the replay of a
+   pinned supply, projected to the unpinned LTS).
 
 **Rocq → Lean name map.**  `lb_nobarex` ↦ `lbNobarex`; `lb_rfoldfree` ↦
 `lbRfoldfree`; `lb_depfree_rfoldfree` ↦ `lbDepfreeRfoldfree`;
@@ -81,7 +83,7 @@ bridge's `execPrefixPfRun` / `execWfPfRun`).
 `execPrefixPfRunProg`; `exec_wf_pf_run_prog` ↦ `execWfPfRunProg`;
 `prog_free_exec_prog_ok` ↦ `progFreeExecProgOk`; `exec_prefix_pf_run_pf` ↦
 `execPrefixPfRunPf`; `exec_wf_pf_run_pf` ↦ `execWfPfRunPf`.  Lean-only:
-`lbFetchInert`, `lbNoFetch`, `listSetLookupId`.
+`listSetLookupId` and the deviation-4 declarations.
 
 **Not ported:** nothing — every Rocq definition and lemma has a Lean twin.
 -/
@@ -108,20 +110,6 @@ def lbRfoldfree (l : Wlabel) : Prop :=
   | .LRmw _ _ _ _ _ asrc _ => asrc = []
   | _ => True
 
-/-- (Lean-only, O2, deviation 4) A fetch realizing an axiomatic plain load must
-be `wsEqr`-inert as a load, read at the axiomatic `Wstate`. -/
-def lbFetchInert (σ : Mstate) (i : Nat) (l : Wlabel) : Prop :=
-  match l with
-  | .LIFetch base tvs =>
-      wsEqr (loadPostRun (σ.msWs i) false base (tvs.map Prod.fst)) (σ.msWs i)
-  | _ => True
-
-/-- (Lean-only, O2, deviation 4) `l` is not an instruction fetch. -/
-def lbNoFetch (l : Wlabel) : Prop :=
-  match l with
-  | .LIFetch .. => False
-  | _ => True
-
 theorem lbDepfreeRfoldfree (l : Wlabel) : lbDepfree l → lbRfoldfree l := by
   cases l <;> simp only [lbDepfree, lbRfoldfree] <;>
     first | exact fun h => h | exact fun h => h.1 | exact fun _ => trivial
@@ -136,12 +124,13 @@ theorem lbFusedNobarex (l : Wlabel) : lbFused l → lbNobarex l := by
 /-! ## (0b) THE ADMINISTRATIVE ALPHABET
 
 Exactly the labels `projLbl` sends to `none`; the Boolean index is `LInstr`'s
-(`instrPost` clears `wRes`, so the intra-pair star runs at `instr := false`). -/
+(`instrPost` clears `wRes`, so the intra-pair star runs at `instr := false`).
+Deviation 4 (Stage C): the fetch sits where `LInstr` sits. -/
 
 def lbAdmin (instr : Bool) (l : Wlabel) : Prop :=
   match l with
   | .LSilent | .LDev | .LRegW .. | .LCtrl _ => True
-  | .LInstr => instr = true
+  | .LInstr | .LIFetch .. => instr = true
   | _ => False
 
 /-- The `LInstr`-free star is a sub-alphabet of the full one. -/
@@ -162,6 +151,82 @@ theorem listSetLookupId {α : Type _} {l : List α} {i : Nat} {x : α} (h : l[i]
   · subst hij; rw [list_lookup_insert (lookup_lt_Some h), h]
   · rw [list_lookup_insert_ne hij]
 
+/-! ## (0c) THE FETCH PIN (deviation 4, Stage C)
+
+The graph tier's fetch oracle: a fetch answers the boot image at timestamp 0.
+It is a property of the PROGRAM's emitted label, carried by the pinned LTS. -/
+
+/-- The graph tier's fetch oracle: image bytes, timestamp 0.  `True` off the fetch. -/
+def WeakAxRealize.fetchPin (img : Image) (l : Wlabel) : Prop :=
+  match l with
+  | .LIFetch base tvs =>
+      (∀ t ∈ tvs.map Prod.fst, t = 0) ∧
+      ∀ j, j < tvs.length → img (base + (j : Int)) = (tvs.map Prod.snd)[j]?
+  | _ => True
+
+/-- A pinned fetch passes the pf machine's view-0 fetch check, at any log. -/
+theorem fetchPinIfetchOk (img : Image) (log : List Wmsg) (base : Int)
+    (tvs : List (Nat × BitVec 8)) :
+    WeakAxRealize.fetchPin img (.LIFetch base tvs) → ifetchOk img log 0 base tvs := by
+  rintro ⟨h0, himg⟩ j t v hj
+  have hlt : j < tvs.length := lookup_lt_Some hj
+  have ht : t = 0 := h0 t (List.mem_map.2 ⟨(t, v), List.mem_iff_getElem?.2 ⟨j, hj⟩, rfl⟩)
+  subst ht
+  refine (ifetchByteOk0 img log _ 0 v).2 ?_
+  rw [logByte0, himg j hlt, List.getElem?_map, hj]
+  rfl
+
+/-- `unprojLbl` never yields a fetch. -/
+theorem fetchPinUnproj (img : Image) (lb : Lbl) : WeakAxRealize.fetchPin img (unprojLbl lb) := by
+  cases lb <;> trivial
+
+/-- The program LTS with its fetches pinned (a sub-LTS of `pstep`). -/
+def pstepPin {P D : Type} (img : Image) (pstep : P → D → Wlabel → P → D → Prop) :
+    P → D → Wlabel → P → D → Prop :=
+  fun p d l p' d' => pstep p d l p' d' ∧ WeakAxRealize.fetchPin img l
+
+theorem pstepPinSub {P D : Type} (img : Image) (pstep : P → D → Wlabel → P → D → Prop)
+    (p : P) (d : D) (l : Wlabel) (p' : P) (d' : D) :
+    pstepPin img pstep p d l p' d' → pstep p d l p' d' :=
+  fun h => h.1
+
+/-- (Lean-only) Every step of the LTS is pinned to `img`. -/
+def pstepPinned {P D : Type} (img : Image) (pstep : P → D → Wlabel → P → D → Prop) : Prop :=
+  ∀ p d l p' d', pstep p d l p' d' → WeakAxRealize.fetchPin img l
+
+theorem pstepPinPinned {P D : Type} (img : Image) (pstep : P → D → Wlabel → P → D → Prop) :
+    pstepPinned img (pstepPin img pstep) :=
+  fun _ _ _ _ _ h => h.2
+
+/-- A pf step of the pinned LTS is one of the LTS. -/
+theorem wpPfStepPinSub {P D : Type} (img : Image) (pstep : P → D → Wlabel → P → D → Prop)
+    (pcls : P → Wlabel → Wstate → WmClass) (i : Nat) (l : Wlabel) (c c' : Wpcfg P D) :
+    wpPfStep (pstepPin img pstep) pcls i l c c' → wpPfStep pstep pcls i l c c' := by
+  intro h
+  cases h with
+  | PFSilent c ag st' d' hlk hps => exact .PFSilent c ag st' d' hlk hps.1
+  | PFLoad c ag aq lat base tvs asrc st' d' hlk hps hr =>
+    exact .PFLoad c ag aq lat base tvs asrc st' d' hlk hps.1 hr
+  | PFStore c ag rl base data asrc vsrc k st' d' hlk hps hnn hk =>
+    exact .PFStore c ag rl base data asrc vsrc k st' d' hlk hps.1 hnn hk
+  | PFRmw c ag aq rl base tvs data asrc vsrc k st' d' hlk hps hnn hlen hr he hk =>
+    exact .PFRmw c ag aq rl base tvs data asrc vsrc k st' d' hlk hps.1 hnn hlen hr he hk
+  | PFFence c ag pr pw sr sw st' d' hlk hps => exact .PFFence c ag pr pw sr sw st' d' hlk hps.1
+  | PFDev c ag st' d' hlk hps => exact .PFDev c ag st' d' hlk hps.1
+  | PFRegW c ag rd srcs st' d' hlk hps => exact .PFRegW c ag rd srcs st' d' hlk hps.1
+  | PFCtrl c ag srcs st' d' hlk hps => exact .PFCtrl c ag srcs st' d' hlk hps.1
+  | PFInstr c ag st' d' hlk hps => exact .PFInstr c ag st' d' hlk hps.1
+  | PFExLoad c ag aq base tvs asrc st' d' hlk hps hr =>
+    exact .PFExLoad c ag aq base tvs asrc st' d' hlk hps.1 hr
+  | PFExStore c ag rl base data asrc vsrc k R st' d' hlk hps hnn hres hrb hrlen he hk =>
+    exact .PFExStore c ag rl base data asrc vsrc k R st' d' hlk hps.1 hnn hres hrb hrlen he hk
+  | PFIFetch c ag base tvs st' d' hlk hps hif => exact .PFIFetch c ag base tvs st' d' hlk hps.1 hif
+
+theorem wpPfRunPinSub {P D : Type} (img : Image) (pstep : P → D → Wlabel → P → D → Prop)
+    (pcls : P → Wlabel → Wstate → WmClass) (c c' : Wpcfg P D) :
+    rtc (wpPfRun (pstepPin img pstep) pcls) c c' → rtc (wpPfRun pstep pcls) c c' :=
+  rtc_subrel (fun _ _ ⟨i, l, h⟩ => ⟨i, l, wpPfStepPinSub img pstep pcls i l _ _ h⟩)
+
 section realize
 
 variable {P D : Type}
@@ -171,18 +236,17 @@ variable (pcls : P → Wlabel → Wstate → WmClass)
 /-! ## (1) The label-supply relation -/
 
 /-- `l` REALIZES the axiomatic label `lb` for agent `i` at state `σ`, run at
-the acting agent's program state `p` (deviation 4: the fifth conjunct). -/
+the acting agent's program state `p`.  (`σ` is read only through `σ.msWs i`.) -/
 def lblRealizes (p : P) (σ : Mstate) (i : Nat) (lb : Lbl) (l : Wlabel) : Prop :=
   lbNobarex l ∧ latFree l ∧ lbRfoldfree l ∧
-  projLbl (pcls p l (σ.msWs i)) l = some lb ∧ lbFetchInert σ i l
+  projLbl (pcls p l (σ.msWs i)) l = some lb
 
-/-- Under the PRE-T1-D gates (and, deviation 4, off the fetch) the relation is
-FUNCTIONAL, its value the canonical `unprojLbl`, and its class side condition
-exactly `mstepClsOk`. -/
+/-- Under the PRE-T1-D gates the relation is FUNCTIONAL, its value the
+canonical `unprojLbl`, and its class side condition exactly `mstepClsOk`. -/
 theorem lblRealizesUnproj (p : P) (σ : Mstate) (i : Nat) (lb : Lbl) (l : Wlabel) :
-    lbDepfree l → lbFused l → lbNoFetch l → lblRealizes pcls p σ i lb l →
+    lbDepfree l → lbFused l → lblRealizes pcls p σ i lb l →
     l = unprojLbl lb ∧ mstepClsOk pcls p σ i lb := by
-  rintro hdf hfu hnf ⟨_, hlat, _, hpr, _⟩
+  rintro hdf hfu ⟨_, hlat, _, hpr⟩
   cases l with
   | LLoad aq lat base tvs asrc =>
     simp only [latFree] at hlat
@@ -207,7 +271,7 @@ theorem lblRealizesUnproj (p : P) (σ : Mstate) (i : Nat) (lb : Lbl) (l : Wlabel
     simp only [projLbl, Option.some.injEq] at hpr
     subst hpr
     exact ⟨rfl, trivial⟩
-  | _ => simp [projLbl, lbFused, lbNoFetch] at hpr hfu hnf
+  | _ => simp [projLbl, lbFused] at hpr hfu
 
 /-- The converse, at a label the axiomatic side actually stepped with. -/
 theorem lblRealizesIntro (p : P) (σ σ' : Mstate) (i : Nat) (lb : Lbl) :
@@ -216,18 +280,18 @@ theorem lblRealizesIntro (p : P) (σ σ' : Mstate) (i : Nat) (lb : Lbl) :
   cases hms with
   | MStepLoad aq base ts vs hrd =>
     have hl := hrd.1
-    refine ⟨trivial, rfl, rfl, ?_, trivial⟩
+    refine ⟨trivial, rfl, rfl, ?_⟩
     simp only [unprojLbl, projLbl]
     rw [List.map_fst_zip (by omega), List.map_snd_zip (by omega)]
   | MStepStore rl base vs kc _ =>
-    refine ⟨trivial, trivial, trivial, ?_, trivial⟩
+    refine ⟨trivial, trivial, trivial, ?_⟩
     simp only [mstepClsOk] at hck
     rw [hck]
     rfl
-  | MStepFence pr pw sr sw => exact ⟨trivial, trivial, trivial, rfl, trivial⟩
+  | MStepFence pr pw sr sw => exact ⟨trivial, trivial, trivial, rfl⟩
   | MStepRmw aq rl base ts rvs wvs kc _ _ hrd _ =>
     have hl := hrd.1
-    refine ⟨trivial, trivial, rfl, ?_, trivial⟩
+    refine ⟨trivial, trivial, rfl, ?_⟩
     simp only [mstepClsOk] at hck
     simp only [unprojLbl, projLbl]
     rw [List.map_fst_zip (by omega), List.map_snd_zip (by omega), hck]
@@ -361,6 +425,7 @@ reservation survives. -/
 theorem admStepPf (instr : Bool) (c : Wpcfg P D) (i : Nat) (ag : Wpagent P) (l : Wlabel) (p' : P)
     (d' : D) :
     lbAdmin instr l →
+    WeakAxRealize.fetchPin c.pcImg l →
     c.pcAgs[i]? = some ag →
     pstep ag.paSt c.pcDev l p' d' →
     ∃ (c' : Wpcfg P D) (ag' : Wpagent P),
@@ -369,7 +434,7 @@ theorem admStepPf (instr : Bool) (c : Wpcfg P D) (i : Nat) (ag : Wpagent P) (l :
       wsEqr ag.paWs ag'.paWs ∧
       (instr = false → ag'.paWs.wRes = ag.paWs.wRes) ∧
       c'.pcAgs.map Wpagent.paSt = (c.pcAgs.map Wpagent.paSt).set i p' := by
-  intro hadm hlk hps
+  intro hadm hpin hlk hps
   have hlt := lookup_lt_Some hlk
   -- the three configuration facts are the same in every arm
   have hpkg : ∀ (w : Wstate) (d0 : D), wsEqr ag.paWs w →
@@ -409,11 +474,17 @@ theorem admStepPf (instr : Bool) (c : Wpcfg P D) (i : Nat) (ag : Wpagent P) (l :
     simp only [lbAdmin] at hadm
     rw [hf] at hadm
     cases hadm
+  | LIFetch base tvs =>
+    -- (deviation 4) the PINNED fetch: state unchanged, the view-0 check from the pin
+    obtain ⟨h1, h2, h3⟩ := hpkg ag.paWs d' (wsEqrRefl _)
+    exact ⟨_, _, wpPfStep.PFIFetch c ag base tvs p' d' hlk hps
+      (fetchPinIfetchOk _ _ _ _ hpin), h1, rfl, h2, rfl, wsEqrRefl _, fun _ => rfl, h3⟩
   | _ => simp only [lbAdmin] at hadm
 
 theorem admStarPfRun (instr : Bool) (x y : P × D) :
     rtc (admStep pstep instr) x y →
     ∀ (c : Wpcfg P D) (i : Nat) (ag : Wpagent P),
+      pstepPinned c.pcImg pstep →
       c.pcAgs[i]? = some ag → ag.paSt = x.1 → c.pcDev = x.2 →
       ∃ (c' : Wpcfg P D) (ag' : Wpagent P),
         rtc (wpPfRun pstep pcls) c c' ∧ cfgEqr c c' ∧ c'.pcDev = y.2 ∧
@@ -424,20 +495,22 @@ theorem admStarPfRun (instr : Bool) (x y : P × D) :
   intro h
   induction h with
   | refl =>
-    intro c i ag hlk hst hdev
+    intro c i ag _ hlk hst hdev
     refine ⟨c, ag, rtc_refl _, cfgEqrRefl c, hdev, hlk, hst, wsEqrRefl _, fun _ => rfl, ?_⟩
     exact (listSetLookupId (by simp [List.getElem?_map, hlk, hst])).symm
   | tail _ hyz ih =>
-    intro c i ag hlk hst hdev
-    obtain ⟨c1, ag1, hrun, he1, hd1, hl1, hs1, hw1, hr1, hf1⟩ := ih c i ag hlk hst hdev
+    intro c i ag hpin hlk hst hdev
+    obtain ⟨c1, ag1, hrun, he1, hd1, hl1, hs1, hw1, hr1, hf1⟩ := ih c i ag hpin hlk hst hdev
     obtain ⟨l, hadm, hps⟩ := hyz
     obtain ⟨c2, ag2, hstep, he2, hd2, hl2, hs2, hw2, hr2, hf2⟩ :=
-      admStepPf pstep pcls instr c1 i ag1 l _ _ hadm hl1 (by rw [hs1, hd1]; exact hps)
+      admStepPf pstep pcls instr c1 i ag1 l _ _ hadm (by rw [he1.1]; exact hpin _ _ _ _ _ hps) hl1
+        (by rw [hs1, hd1]; exact hps)
     refine ⟨c2, ag2, rtc_r hrun ⟨i, l, hstep⟩, cfgEqrTrans _ _ _ he1 he2, hd2, hl2, hs2,
       wsEqrTrans hw1 hw2, fun hi => (hr2 hi).trans (hr1 hi), ?_⟩
     rw [hf2, hf1, list_insert_insert]
 
 theorem admStarPf (instr : Bool) (c : Wpcfg P D) (i : Nat) (ag : Wpagent P) (p' : P) (d' : D) :
+    pstepPinned c.pcImg pstep →
     c.pcAgs[i]? = some ag →
     admStar pstep instr ag.paSt c.pcDev p' d' →
     ∃ (c' : Wpcfg P D) (ag' : Wpagent P),
@@ -446,14 +519,15 @@ theorem admStarPf (instr : Bool) (c : Wpcfg P D) (i : Nat) (ag : Wpagent P) (p' 
       wsEqr ag.paWs ag'.paWs ∧
       (instr = false → ag'.paWs.wRes = ag.paWs.wRes) ∧
       c'.pcAgs.map Wpagent.paSt = (c.pcAgs.map Wpagent.paSt).set i p' :=
-  fun hlk hst => admStarPfRun pstep pcls instr (ag.paSt, c.pcDev) (p', d') hst c i ag hlk rfl rfl
+  fun hpin hlk hst =>
+    admStarPfRun pstep pcls instr (ag.paSt, c.pcDev) (p', d') hst c i ag hpin hlk rfl rfl
 
 /-! ## (5) One realizing step
 
 `mstepWpPfStep` with the `progFree` supply replaced by the given `pstep`, the
 "program states are untouched" conclusion replaced by the insert, and the
 state relation weakened to `cfgMatchd`; the case analysis is on the MACHINE
-label (deviation 4: plus the `LIFetch` arm). -/
+label. -/
 theorem mstepWpPfStepProg (σ σ' : Mstate) (i : Nat) (lb : Lbl) (c : Wpcfg P D) (ag : Wpagent P)
     (p p' : P) (l : Wlabel) (dn : D) :
     pclsEqr pcls →
@@ -464,7 +538,7 @@ theorem mstepWpPfStepProg (σ σ' : Mstate) (i : Nat) (lb : Lbl) (c : Wpcfg P D)
     ∃ c', wpPfStep pstep pcls i l c c' ∧ cfgMatchd c' σ' ∧
       c'.pcAgs.map Wpagent.paSt = (c.pcAgs.map Wpagent.paSt).set i p' ∧
       c'.pcDev = dn := by
-  rintro hce hm hlk hag ⟨hnb, hlat, hrf, hpr, hfi⟩ hps hms
+  rintro hce hm hlk hag ⟨hnb, hlat, hrf, hpr⟩ hps hms
   subst hag
   have hew := cfgMatchdWs c σ i ag hm hlk
   obtain ⟨img, lg, f⟩ := σ
@@ -561,23 +635,6 @@ theorem mstepWpPfStepProg (σ σ' : Mstate) (i : Nat) (lb : Lbl) (c : Wpcfg P D)
         hst _ _ _, rfl⟩
       exact hmatch _ _ _ _ _ _ (by rw [updWsEq]; exact wsEqrExloadPostRunD _ _ _ _ _ _ hew)
         (fun j hne => updWsNe _ _ _ _ hne)
-  | LIFetch base tvs =>
-    -- (Lean-only, O2) THE FETCH, realizing a PLAIN axiomatic load: the values and
-    -- the (vacuous) fetch window come from `rdOk`, the post-state from `lbFetchInert`
-    have hfi' : wsEqr (loadPostRun (f i) false base (tvs.map Prod.fst)) (f i) := hfi
-    simp only [projLbl, Option.some.injEq] at hpr
-    subst hpr
-    cases hms with
-    | MStepLoad _ _ _ _ hrd =>
-      refine ⟨_, wpPfStep.PFIFetch c ag base tvs p' dn hlk hps ?_, ?_, hst _ _ _, rfl⟩
-      · intro j t v hj
-        have ht : (tvs.map Prod.fst)[j]? = some t := by simp [List.getElem?_map, hj]
-        have hv : (tvs.map Prod.snd)[j]? = some v := by simp [List.getElem?_map, hj]
-        refine ⟨(hrd.2 j t v ht hv).1, ?_⟩
-        rintro ⟨t', h1, h2, _⟩
-        omega
-      · exact hmatch _ _ _ _ _ _ (by rw [updWsEq]; exact wsEqrTrans hfi' hew)
-          (fun j hne => updWsNe _ _ _ _ hne)
   | _ => simp [lbNobarex, projLbl] at hnb hpr
 
 /-! ## (5b) The PAIR step (A3(iv))
@@ -586,7 +643,7 @@ The reservation is created by the first step, SURVIVES the `LInstr`-free star
 and is consumed by the last step; `cfgMatchd` is restored only at the END. -/
 theorem mstepWpPfStepPair (σ σ' : Mstate) (i : Nat) (lb : Lbl) (c : Wpcfg P D) (ag : Wpagent P)
     (p pm pm2 p' : P) (l1 l2 : Wlabel) (dm dm2 dn : D) :
-    pclsEqr pcls →
+    pclsEqr pcls → pstepPinned c.pcImg pstep →
     cfgMatchd c σ → c.pcAgs[i]? = some ag → ag.paSt = p →
     lblRealizesPair pcls p pm2 σ i lb l1 l2 →
     pstep p c.pcDev l1 pm dm →
@@ -596,7 +653,7 @@ theorem mstepWpPfStepPair (σ σ' : Mstate) (i : Nat) (lb : Lbl) (c : Wpcfg P D)
     ∃ c', rtc (wpPfRun pstep pcls) c c' ∧ cfgMatchd c' σ' ∧
       c'.pcAgs.map Wpagent.paSt = (c.pcAgs.map Wpagent.paSt).set i p' ∧
       c'.pcDev = dn := by
-  intro hce hm hlk hag hre hps1 hstar hps2 hms
+  intro hce hpin hm hlk hag hre hps1 hstar hps2 hms
   subst hag
   have hew := cfgMatchdWs c σ i ag hm hlk
   have hlti := lookup_lt_Some hlk
@@ -630,7 +687,7 @@ theorem mstepWpPfStepPair (σ σ' : Mstate) (i : Nat) (lb : Lbl) (c : Wpcfg P D)
           ⟨pm, exloadPostRunD ag.paWs aq (srcsView ag.paWs asrc1) base (tvs.map Prod.fst),
            ag.paProm⟩⟩ i
         ⟨pm, exloadPostRunD ag.paWs aq (srcsView ag.paWs asrc1) base (tvs.map Prod.fst),
-         ag.paProm⟩ pm2 dm2 hlk1 hstar
+         ag.paProm⟩ pm2 dm2 hpin hlk1 hstar
     have hres2 : ag2.paWs.wRes
         = some ⟨base, tvs.map Prod.fst, ldvOf ag.paWs aq 0 base (tvs.map Prod.fst)⟩ :=
       (hr2 rfl).trans (exloadPostRunDRes _ _ _ _ _)
@@ -686,13 +743,13 @@ theorem mstepWpPfStepPair (σ σ' : Mstate) (i : Nat) (lb : Lbl) (c : Wpcfg P D)
 /-! ## (6) The replay -/
 
 theorem execPrefixPfRunProg (pst : Nat → List P) (dv : Nat → D) (E : Exec) (n : Nat) :
-    pclsEqr pcls →
+    pclsEqr pcls → pstepPinned (exImg E) pstep →
     execWf E → execProgOk' pstep pcls pst dv E →
     n ≤ E.exTr.length →
     ∃ c, rtc (wpPfRun pstep pcls) (wpInit (exImg E) (dv 0) (pst 0)) c ∧
       c.pcAgs.map Wpagent.paSt = pst n ∧ c.pcDev = dv n ∧
       cfgMatchd c (stt E n) := by
-  intro hce hE hpr
+  intro hce hpin hE hpr
   induction n with
   | zero =>
     intro _
@@ -719,9 +776,13 @@ theorem execPrefixPfRunProg (pst : Nat → List P) (dv : Nat → D) (E : Exec) (
       | none => rw [hag] at hp; cases hp
       | some ag => rw [hag] at hp; injection hp with hp; exact ⟨ag, rfl, hp⟩
     obtain ⟨ag, hag, hagp⟩ := hex
+    have hpc : pstepPinned c.pcImg pstep := by
+      have himg : c.pcImg = exImg E := by
+        rw [← hm.1]; exact execImgConst E n hE (by omega)
+      rw [himg]; exact hpin
     -- the leading administrative star
     obtain ⟨c0, ag0, hrun0, heq0, hd0, hlk0, hs0, _, _, hfm0⟩ :=
-      admStarPf pstep pcls true c s.esAg ag pa da hag (by rw [hagp, hdev]; exact hstar)
+      admStarPf pstep pcls true c s.esAg ag pa da hpc hag (by rw [hagp, hdev]; exact hstar)
     have hm0 : cfgMatchd c0 (stt E n) := cfgEqrMatchd _ _ _ heq0 hm
     rcases hsup with ⟨l, hre, hps⟩ | ⟨pm, dm, pm2, dm2, l1, l2, hre, hps1, hstar2, hps2⟩
     · obtain ⟨c2, hstep, hm2, hst2, hdev2⟩ :=
@@ -731,7 +792,7 @@ theorem execPrefixPfRunProg (pst : Nat → List P) (dv : Nat → D) (E : Exec) (
       rw [hst2, hfm0, hst, list_insert_insert, ← hnext]
     · obtain ⟨c2, hstep, hm2, hst2, hdev2⟩ :=
         mstepWpPfStepPair pstep pcls (stt E n) (stt E (n + 1)) s.esAg s.esLb c0 ag0 pa pm pm2 p'
-          l1 l2 dm dm2 (dv (n + 1)) hce hm0 hlk0 hs0 hre (by rw [hd0]; exact hps1) hstar2 hps2 hms
+          l1 l2 dm dm2 (dv (n + 1)) hce (by rw [heq0.1]; exact hpc) hm0 hlk0 hs0 hre (by rw [hd0]; exact hps1) hstar2 hps2 hms
       refine ⟨c2, rtc_transitive (rtc_transitive hrun hrun0) hstep, ?_, hdev2, hm2⟩
       rw [hst2, hfm0, hst, list_insert_insert, ← hnext]
 
@@ -739,14 +800,29 @@ theorem execPrefixPfRunProg (pst : Nat → List P) (dv : Nat → D) (E : Exec) (
 is carried by a run of the given program LTS is the projection of a
 promise-free run of the full machine, with the SAME LOG. -/
 theorem execWfPfRunProg (pst : Nat → List P) (dv : Nat → D) (E : Exec) :
-    pclsEqr pcls →
+    pclsEqr pcls → pstepPinned (exImg E) pstep →
     execWf E → execProgOk' pstep pcls pst dv E →
     ∃ c, rtc (wpPfRun pstep pcls) (wpInit (exImg E) (dv 0) (pst 0)) c ∧
       c.pcAgs.map Wpagent.paSt = pst E.exTr.length ∧
       c.pcDev = dv E.exTr.length ∧
       cfgMatchd c (stt E E.exTr.length) := by
-  intro hce hE hpr
-  exact execPrefixPfRunProg pstep pcls pst dv E E.exTr.length hce hE hpr (Nat.le_refl _)
+  intro hce hpin hE hpr
+  exact execPrefixPfRunProg pstep pcls pst dv E E.exTr.length hce hpin hE hpr (Nat.le_refl _)
+
+/-- (Lean-only, deviation 4) THE REPLAY OF A PINNED SUPPLY, projected to the
+unpinned LTS: the form the graph-tier consumers use. -/
+theorem execWfPfRunPin (img : Image) (pst : Nat → List P) (dv : Nat → D) (E : Exec) :
+    pclsEqr pcls → exImg E = img →
+    execWf E → execProgOk' (pstepPin img pstep) pcls pst dv E →
+    ∃ c, rtc (wpPfRun pstep pcls) (wpInit (exImg E) (dv 0) (pst 0)) c ∧
+      c.pcAgs.map Wpagent.paSt = pst E.exTr.length ∧
+      c.pcDev = dv E.exTr.length ∧
+      cfgMatchd c (stt E E.exTr.length) := by
+  intro hce himg hE hpr
+  subst himg
+  obtain ⟨c, h1, h2, h3, h4⟩ :=
+    execWfPfRunProg (pstepPin (exImg E) pstep) pcls pst dv E hce (pstepPinPinned _ _) hE hpr
+  exact ⟨c, wpPfRunPinSub _ pstep pcls _ _ h1, h2, h3, h4⟩
 
 /-! ## (7) The `progFree` forms are corollaries
 
@@ -766,6 +842,21 @@ theorem progFreeExecProgOk (ps : List P) (d0 : D) (E : Exec) :
       (hck k s p hs hp),
     hpf _ _ _ _, (listSetLookupId hp).symm⟩
 
+/-- (Lean-only, deviation 4) The same supply, at the pinned LTS (`unprojLbl`
+never yields a fetch). -/
+theorem progFreeExecProgOkPin (ps : List P) (d0 : D) (E : Exec) :
+    progFree pstep → execWf E → execClsOk pcls ps E →
+    (∀ (k : Nat) (s : Estep), E.exTr[k]? = some s → s.esAg < ps.length) →
+    execProgOk (pstepPin (exImg E) pstep) pcls (fun _ => ps) (fun _ => d0) E := by
+  intro hpf hE hck hag
+  apply execProgOkSingle
+  intro k s hs
+  obtain ⟨p, hp⟩ := someOfIsSome (lookup_lt_is_Some_2 (hag k s hs))
+  exact ⟨p, p, unprojLbl s.esLb, hp,
+    lblRealizesIntro pcls p (stt E k) (stt E (k + 1)) s.esAg s.esLb (execStepAt E k s hE hs)
+      (hck k s p hs hp),
+    ⟨hpf _ _ _ _, fetchPinUnproj _ _⟩, (listSetLookupId hp).symm⟩
+
 theorem execPrefixPfRunPf (ps : List P) (d0 : D) (E : Exec) (n : Nat) :
     pclsEqr pcls →
     progFree pstep → execWf E → execClsOk pcls ps E →
@@ -776,10 +867,11 @@ theorem execPrefixPfRunPf (ps : List P) (d0 : D) (E : Exec) (n : Nat) :
       cfgMatchd c (stt E n) := by
   intro hce hpf hE hck hag hn
   obtain ⟨c, hrun, hst, _, hm⟩ :=
-    execPrefixPfRunProg pstep pcls (fun _ => ps) (fun _ => d0) E n hce hE
-      (execProgOkStar pstep pcls _ _ _ (progFreeExecProgOk pstep pcls ps d0 E hpf hE hck hag)) hn
+    execPrefixPfRunProg (pstepPin (exImg E) pstep) pcls (fun _ => ps) (fun _ => d0) E n hce
+      (pstepPinPinned _ _) hE
+      (execProgOkStar _ pcls _ _ _ (progFreeExecProgOkPin pstep pcls ps d0 E hpf hE hck hag)) hn
   have hst' : c.pcAgs.map Wpagent.paSt = ps := hst
-  exact ⟨c, hrun, by rw [← hst', List.length_map], hst', hm⟩
+  exact ⟨c, wpPfRunPinSub _ pstep pcls _ _ hrun, by rw [← hst', List.length_map], hst', hm⟩
 
 theorem execWfPfRunPf (ps : List P) (d0 : D) (E : Exec) :
     pclsEqr pcls →

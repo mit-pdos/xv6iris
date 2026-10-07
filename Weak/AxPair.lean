@@ -63,10 +63,11 @@ protocol; register writes need no strengthening; the runs coincide only at a re-
    for its early-return monad `MR R A`, which in lean-sail is `ExceptT … (SailM …)`, i.e. a
    `SailM` at another result type.  `tpdd` is the `abbrev` `tpdg Unit` (Rocq `Notation`).
    `oc_wr` is over `Outcome Register RegisterType` (Lean's `.error` node is stuck; no arm).
-6. O2 / owner decision D1 (`notes/weak-port-o2-design.md`): Lean's `LIFetch base tvs` (Rocq: a
-   plain `LLoad false … []` fetch, finding F7) STAYS a graph read, so `lblIdent (LIFetch base tvs)
-   = some ⟨IKload, false, false, base, tvs.length, [], []⟩` -- the identity of that `LLoad`.
-   `lblModdata` / `AxPair.lblWdata` are unchanged (a fetch has no data and is not a store).
+6. O2 Stage C (`notes/weak-port-o2-stageC.md`, owner Q-C1): Lean's `LIFetch base tvs` (Rocq: a
+   plain `LLoad false … []` fetch, finding F7) is an ADMINISTRATIVE label of the graph tier (no row
+   item, no identity, no edges), so `lblIdent (LIFetch base tvs) = none` (Rocq: the identity of
+   that `LLoad`).  `lblModdata` / `AxPair.lblWdata` are unchanged (a fetch has no data and is not
+   a store).
 7. Lean-only helpers (file-qualified): `AxPair.pnodeStepMwIff` (the RAM `memWrite` arm of
    `pnodeStep` at a known value, as an iff), `AxPair.mwStepPairR` (`mwStepPair` with the relation
    abstracted: `tpidStep` and `tpddStep` both use it), `AxPair.genReadShape` (the `tpGen`/`tgGen`
@@ -149,7 +150,7 @@ theorem identEqSpec (i j : AxPair.Ident) : identEq i j = true ↔ i = j := by
   unfold identEq
   exact decide_eq_true_iff
 
-/-- The identity of a label (deviation 6: a fetch is the `LLoad false … []` it projects to). -/
+/-- The identity of a label (deviation 6: a fetch is an admin label and has none). -/
 def lblIdent (l : Wlabel) : Option AxPair.Ident :=
   match l with
   | LLoad aq _ base tvs asrc => some ⟨.IKload, aq, false, base, tvs.length, asrc, []⟩
@@ -158,7 +159,6 @@ def lblIdent (l : Wlabel) : Option AxPair.Ident :=
   | LExLoad aq base tvs asrc => some ⟨.IKexload, aq, false, base, tvs.length, asrc, []⟩
   | LExStore rl base data asrc vsrc =>
       some ⟨.IKexstore, false, rl, base, data.length, asrc, vsrc⟩
-  | LIFetch base tvs => some ⟨.IKload, false, false, base, tvs.length, [], []⟩
   | _ => none
 
 /-- The DATA of a write label. -/

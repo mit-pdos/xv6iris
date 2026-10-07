@@ -53,14 +53,15 @@ bridge at the `pstepEv` tier.
    `AkInfo false false false`); `ldLoadPa` is stated at `@Eq PAddr`.
 3. THE STEP: Lean's `pstepEv` is the fabric-`Efab` instance (the hart's own node arm, plain-RAM
    read disjunct, `WeakEvInst.pnodeStep`); `ldPstep` takes the `.Ok (w, none)` resume.
-4. §5 `mpSupply`: `supplyOfQconf` takes a FOURTH premise `candFetchInert` (`WeakRvwmoSupply`
-   deviation 2), discharged by the Lean-only `WeakRvwmoConfWit2.mpCandFetchInert`: no emission
-   of either row has a realizing FETCH item -- the store row's label cannot be a fetch's image
-   (`projLbl` sends a fetch to a LOAD), and the load row's block starts AT a data-read node that
-   no administrative step moves (`WeakRvwmoConfWit2.admRunReadNode`: only the PLIC wire can step
-   it, and that leaves the monad alone) and that cannot fetch
-   (`WeakRvwmoConfWit2.pstepReadNodeNoFetch`).  Lean-only helper
-   `WeakRvwmoConfWit2.hemitOneFetch` (a one-label row's fetch item is its realizing step).
+4. O2 / STAGE C (owner ruling Q-C1, `notes/weak-port-o2-stageC.md` item 17): the fetch is an
+   ADMINISTRATIVE label pinned to the boot image (`WeakRvwmoSupply` deviation 2).  Both
+   emissions here start AT their memory node (`ARnil`, as in Rocq), so they carry no fetch item
+   and the extra `gdexecQconf` slot `emFetchImg` holds vacuously: Lean-only
+   `WeakRvwmoConfWit2.ldEmFetchImg` / `WeakRvwmoConfWit2.evEmFetchImg`.  (The fetch that
+   precedes the load, `ldX1`'s 4-byte window, IS the image's: `WeakRvwmoConfWit2.ldWordKw`.)
+   `mpSupply` concludes at the PINNED LTS `pstepPin mpCand.cdImg pstepEv` (Rocq: `pstep_ev`);
+   `supplyOfQconf`'s third premise is discharged with the emission's `emFetchImg`.  Stage B's
+   `mpCandFetchInert`, `hemitOneFetch`, `admRunReadNode`, `pstepReadNodeNoFetch` are DELETED.
 5. §7's `Print Assumptions` are dropped (the lint's axiom/sorry ban is the audit).
 
 **Rocq → Lean name map.**  `ld_pc` `ldPc`, `ld_word` `ldWord`, `ld_wf` `ldWf`, `ld_rs0` `ldRs0`,
@@ -84,12 +85,11 @@ bridge at the `pstepEv` tier.
 `WeakRvwmoConfWit2.mpRows`, `mp_cand_rows` `mpCandRows`, `mp_supply` `mpSupply`.
 Lean-only (file-qualified): `WeakRvwmoConfWit2.ldWordKw`, `WeakRvwmoConfWit2.ldDCovers`,
 `WeakRvwmoConfWit2.ldDExact`, `WeakRvwmoConfWit2.ldX2IsRead` (deviation 2),
-`WeakRvwmoConfWit2.admRunReadNode`, `WeakRvwmoConfWit2.pstepReadNodeNoFetch`,
-`WeakRvwmoConfWit2.hemitOneFetch`, `WeakRvwmoConfWit2.mpCandFetchInert` (deviation 4);
+`WeakRvwmoConfWit2.ldEmFetchImg`, `WeakRvwmoConfWit2.evEmFetchImg` (deviation 4);
 `WeakRvwmoConfWit2.ldVsLookup`, `WeakRvwmoConfWit2.ldTsLookup`,
 `WeakRvwmoConfWit2.wbytesLookupInv` (the byte inversions Rocq does by `destruct j`).
 
-**Dropped:** nothing (Rocq 72 declarations; Lean 72 + 11 Lean-only).
+**Dropped:** nothing (Rocq 72 declarations; Lean 72 + 9 Lean-only).
 -/
 import Weak.WeakRvwmoConfWit
 import Weak.KernelSitesDef
@@ -234,6 +234,23 @@ theorem ldHartConf (i t : Nat) (w : BitVec 32) (cpu : CPU) (rs : RegFile) (ib : 
 theorem ldEmDevfree (t : Nat) (w : BitVec 32) (cpu : CPU) (rs : RegFile) (ib : Ibch) :
     emDevfree (ldEm t w cpu rs ib) := by
   simp [emDevfree, emLabels, ldEm, ldWl]
+
+/-- (Lean-only, deviation 4) the emission has no fetch item, so its fetches are pinned to any
+image vacuously. -/
+theorem WeakRvwmoConfWit2.ldEmFetchImg (im : Image) (t : Nat) (w : BitVec 32) (cpu : CPU)
+    (rs : RegFile) (ib : Ibch) : emFetchImg im (ldEm t w cpu rs ib) := by
+  intro l hl
+  simp only [emLabels, ldEm, List.map_cons, List.map_nil, List.mem_singleton] at hl
+  subst hl
+  trivial
+
+/-- (Lean-only, deviation 4) … and so has the store witness's. -/
+theorem WeakRvwmoConfWit2.evEmFetchImg (im : Image) (cpu : CPU) (rs : RegFile) (ib : Ibch) :
+    emFetchImg im (evEm cpu rs ib) := by
+  intro l hl
+  simp only [emLabels, evEm, List.map_cons, List.map_nil, List.mem_singleton] at hl
+  subst hl
+  trivial
 
 /-! ## 2. THE ROW-DEPS OF A ONE-EVENT EMISSION ARE EMPTY -/
 
@@ -444,9 +461,11 @@ theorem mpwQconf (cpu0 cpu1 : CPU) (rs0 rs1 : RegFile) (ib0 ib1 : Ibch) (d0 : Ef
   rcases i with _ | _ | i
   · obtain rfl : evRow = row := Option.some.inj hrow
     exact ⟨evEm cpu0 rs0 ib0, evHartConf _ _ _ _ _, evEmDevfree _ _ _,
+      WeakRvwmoConfWit2.evEmFetchImg _ _ _ _,
       fun jk hjk => (evRowDepsEmpty cpu0 rs0 ib0 jk hjk).elim⟩
   · obtain rfl : WeakRvwmoConfWit2.ldRow 1 lockOne = row := Option.some.inj hrow
     exact ⟨ldEm 1 lockOne cpu1 rs1 ib1, ldHartConf _ _ _ _ _ _ _, ldEmDevfree _ _ _ _ _,
+      WeakRvwmoConfWit2.ldEmFetchImg _ _ _ _ _ _,
       fun jk hjk => (ldRowDepsEmpty 1 lockOne cpu1 rs1 ib1 jk hjk).elim⟩
   · simp [mpwd, WeakRvwmoConfWit2.mpw] at hrow
 
@@ -525,9 +544,11 @@ theorem mpw'Qconf (cpu0 cpu1 : CPU) (rs0 rs1 : RegFile) (ib0 ib1 : Ibch) (d0 : E
   rcases i with _ | _ | i
   · obtain rfl : evRow = row := Option.some.inj hrow
     exact ⟨evEm cpu0 rs0 ib0, evHartConf _ _ _ _ _, evEmDevfree _ _ _,
+      WeakRvwmoConfWit2.evEmFetchImg _ _ _ _,
       fun jk hjk => (evRowDepsEmpty cpu0 rs0 ib0 jk hjk).elim⟩
   · obtain rfl : WeakRvwmoConfWit2.ldRow 0 lockZero = row := Option.some.inj hrow
     exact ⟨ldEm 0 lockZero cpu1 rs1 ib1, ldHartConf _ _ _ _ _ _ _, ldEmDevfree _ _ _ _ _,
+      WeakRvwmoConfWit2.ldEmFetchImg _ _ _ _ _ _,
       fun jk hjk => (ldRowDepsEmpty 0 lockZero cpu1 rs1 ib1 jk hjk).elim⟩
   · simp [mpwd', mpw'] at hrow
 
@@ -554,109 +575,12 @@ theorem mpCandRows (i : Nat) :
   · rfl
   · simp [mpCand, mpSt, mpLd, WeakRvwmoConfWit2.mpRows]
 
-/-! ### 5.1 (Lean-only, deviation 4) The fetch obligation -/
-
-/-- An administrative run from a hart parked at a non-MMIO DATA-read node never moves the
-monad: only the PLIC wire can step it. -/
-theorem WeakRvwmoConfWit2.admRunReadNode (cpu : CPU) (n va : Nat)
-    (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
-    (K : _ → SailM Unit) :
-    devAddr req.pa = false → (classify req.access_kind).akIfetch = false →
-    ∀ (rs : RegFile) (ib : Ibch) (d : Efab) (ls : List Wlabel) (pa : Pexv6) (da : Efab),
-      admRun true (.PHart cpu (.impure (.ok (.memRead n va req)) K) rs none ib) d ls pa da →
-      ∃ (rs' : RegFile) (ib' : Ibch),
-        pa = .PHart cpu (.impure (.ok (.memRead n va req)) K) rs' none ib' := by
-  intro hdev hif rs ib d ls pa da h
-  generalize hp : Pexv6.PHart cpu (.impure (.ok (.memRead n va req)) K) rs none ib = p at h
-  induction h generalizing rs ib with
-  | ARnil p d => exact ⟨rs, ib, hp.symm⟩
-  | ARcons p d l p1 d1 ls p' d' ha hs _ ih =>
-    subst hp
-    cases p1 with
-    | PDisk _ => simp [pstepEv] at hs
-    | PHart cpu' m' rs' fn' ib' =>
-      obtain ⟨rfl, ors, oib, obar, -, -, hh⟩ := hs
-      rcases hh with ⟨hn, -⟩ | ⟨mm, b, k, -, -, rfl, rfl, -⟩
-      · simp only [pstepNode, pnodeStep, hdev, hif, Bool.false_eq_true, if_false, false_and,
-          false_or, true_and] at hn
-        rcases hn with ⟨-, w, tvs, -, -, rfl, -⟩ | ⟨-, w, tvs, -, -, rfl, -⟩ <;>
-          simp [lbAdmin] at ha
-      · exact ih rs' ib' rfl
-
-/-- … and such a node cannot FETCH. -/
-theorem WeakRvwmoConfWit2.pstepReadNodeNoFetch (cpu : CPU) (n va : Nat)
-    (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
-    (K : _ → SailM Unit) (rs : RegFile) (ib : Ibch) (d : Efab) (base : Int)
-    (tvs : List (Nat × BitVec 8)) (p' : Pexv6) (d' : Efab) :
-    devAddr req.pa = false → (classify req.access_kind).akIfetch = false →
-    ¬ pstepEv (.PHart cpu (.impure (.ok (.memRead n va req)) K) rs none ib) d
-        (.LIFetch base tvs) p' d' := by
-  intro hdev hif hs
-  cases p' with
-  | PDisk _ => simp [pstepEv] at hs
-  | PHart cpu' m' rs' fn' ib' =>
-    obtain ⟨-, ors, oib, obar, -, -, hh⟩ := hs
-    rcases hh with ⟨hn, -⟩ | ⟨mm, b, k, -, hl, -⟩
-    · simp only [pstepNode, pnodeStep, hdev, hif, Bool.false_eq_true, if_false, false_and,
-        false_or, true_and] at hn
-      rcases hn with ⟨-, w, tvs', -, -, hl, -⟩ | ⟨-, w, tvs', -, -, hl, -⟩ <;> cases hl
-    · cases hl
-
-/-- A one-label row's FETCH item, if any, is its realizing step. -/
-theorem WeakRvwmoConfWit2.hemitOneFetch (dv : Nat → Efab) (k : Nat) (ws : Wstate) (lb : Lbl)
-    (p : Pexv6) (es : List Eitem) (pfin : Pexv6) (base : Int) (tvs : List (Nat × BitVec 8))
-    (n : Nat) :
-    hemit dv k ws [lb] p es pfin → (.LIFetch base tvs, some n) ∈ es →
-    ∃ (ls : List Wlabel) (pa : Pexv6) (da : Efab) (p' : Pexv6),
-      admRun true p (dv k) ls pa da ∧ hlblRealizes pa ws lb (.LIFetch base tvs) ∧
-      pstepEv pa da (.LIFetch base tvs) p' (dv (k + 1)) := by
-  intro h hmem
-  cases h with
-  | HEone _ _ _ _ _ ls pa da l p' es' _ hadm hreal hst hrest =>
-    cases hrest
-    simp only [eadm, List.mem_append, List.mem_map, List.mem_cons, List.not_mem_nil,
-      or_false] at hmem
-    rcases hmem with ⟨_, _, hc⟩ | hc
-    · cases hc
-    · obtain ⟨rfl, -⟩ := Prod.mk.inj hc
-      exact ⟨ls, pa, da, _, hadm, hreal, hst⟩
-  | HEpair _ _ _ _ _ ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es' _ _ hreal _ _ _ hrest =>
-    cases hrest
-    obtain ⟨aq, rl, b, tvs1, data, a1, a2, v2, rfl, rfl, -⟩ := hreal
-    simp only [eadm, List.mem_append, List.mem_map, List.mem_cons, List.not_mem_nil,
-      or_false] at hmem
-    rcases hmem with ⟨_, _, hc⟩ | hc | ⟨_, _, hc⟩ | hc <;> cases hc
-
-theorem WeakRvwmoConfWit2.mpCandFetchInert (cpu0 cpu1 : CPU) (rs0 rs1 : RegFile)
-    (ib0 ib1 : Ibch) (d0 : Efab) :
-    candFetchInert (mpBoot cpu0 cpu1 rs0 rs1 ib0 ib1) d0 2 mpCand := by
-  intro i em hi hconf base tvs n k s hmem _ _ _
-  exfalso
-  have hrow : trow i mpCand.cdTr = WeakRvwmoConfWit2.mpRows i := mpCandRows i
-  unfold hartConf at hconf
-  rw [hrow] at hconf
-  rcases i with _ | _ | i
-  · obtain ⟨_, _, _, _, _, hreal, _⟩ :=
-      WeakRvwmoConfWit2.hemitOneFetch _ _ _ _ _ _ _ base tvs n hconf hmem
-    exact absurd hreal.2.2.2 (by simp [projLbl])
-  · obtain ⟨ls, pa, da, p', hadm, _, hst⟩ :=
-      WeakRvwmoConfWit2.hemitOneFetch _ _ _ _ _ _ _ base tvs n hconf hmem
-    obtain ⟨K, Hm, _⟩ := ereadReqAtInv 4 64 ldX2.2 ldReql ldLoadReq
-    have hif : (classify ldReql.access_kind).akIfetch = false := by rw [ldLoadPlain]
-    change admRun true (.PHart cpu1 ldX2.2 rs1 none ib1) _ ls pa da at hadm
-    rw [Hm] at hadm
-    obtain ⟨rs', ib', rfl⟩ :=
-      WeakRvwmoConfWit2.admRunReadNode cpu1 4 64 ldReql K ldLoadRam hif _ _ _ _ _ _ hadm
-    exact WeakRvwmoConfWit2.pstepReadNodeNoFetch cpu1 4 64 ldReql K rs' ib' da base tvs p' _
-      ldLoadRam hif hst
-  · omega
-
 theorem mpSupply (cpu0 cpu1 : CPU) (rs0 rs1 : RegFile) (ib0 ib1 : Ibch) (d0 : Efab) :
     ∃ pst : Nat → List Pexv6,
       pst 0 = (List.range' 0 2).map (mpBoot cpu0 cpu1 rs0 rs1 ib0 ib1) ∧
-      execProgOk' pstepEv pclsEv pst (fun _ => d0) (candExec mpCand) := by
+      execProgOk' (pstepPin mpCand.cdImg pstepEv) pclsEv pst (fun _ => d0) (candExec mpCand) := by
   refine supplyOfQconf mpCand (mpBoot cpu0 cpu1 rs0 rs1 ib0 ib1) d0 WeakRvwmoConfWit2.mpRows 2
-    mpCandRows ?_ ?_ (WeakRvwmoConfWit2.mpCandFetchInert cpu0 cpu1 rs0 rs1 ib0 ib1 d0)
+    mpCandRows ?_ ?_
   · intro i hi
     rcases i with _ | _ | i
     · omega
@@ -664,8 +588,9 @@ theorem mpSupply (cpu0 cpu1 : CPU) (rs0 rs1 : RegFile) (ib0 ib1 : Ibch) (d0 : Ef
     · rfl
   · intro i hi
     rcases i with _ | _ | i
-    · exact ⟨evEm cpu0 rs0 ib0, evHartConf _ _ _ _ _⟩
-    · exact ⟨ldEm 1 lockOne cpu1 rs1 ib1, ldHartConf _ _ _ _ _ _ _⟩
+    · exact ⟨evEm cpu0 rs0 ib0, evHartConf _ _ _ _ _, WeakRvwmoConfWit2.evEmFetchImg _ _ _ _⟩
+    · exact ⟨ldEm 1 lockOne cpu1 rs1 ib1, ldHartConf _ _ _ _ _ _ _,
+        WeakRvwmoConfWit2.ldEmFetchImg _ _ _ _ _ _⟩
     · omega
 
 end Weak

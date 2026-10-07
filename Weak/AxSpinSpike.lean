@@ -36,34 +36,40 @@ trace is an instruction of THIS kernel's text, of the width the RVC flag says), 
 prototype verdicts on the small graphs (`fastG40PpoG10`, `fastG601`, `fastRevG601`).  The
 full-size prototype load-value runs are `#eval`s (`tm` prints value and time).
 
-LEAN RESULTS (this tree's kernel, xv6 b72cbac1; VM c4d):
-- Per hart (k failed spins): 464 + 4k instructions; 499/503 fetch reads; 33 walker reads (11
-  cold pages, 6 of them the proc table beyond pid_lock's page); data 98 R + 34 W + (k+1) RMW + 1
-  fence; 665/670 memory events; 1338/1365 DTctrl edges, 1394/1423 edges in all.  Racer: 3
-  instructions, 11 events.  THE DRIFT IS ALMOST ALL THE INLINED pid ALLOCATION (below): its
-  64-round uniqueness scan adds 256 instructions and 64 loads, and every scan load enters the
-  never-reset ctrl accumulator, so each later store carries about 70 DTctrl edges.
-- Graphs: (a) 1335 gmo events / 2817 deps; (a') 2000 / 4211; (b) 1346 / 2819 (about 2.1x
-  Rocq's events, 4.8x its deps).  Truncated: g10 (50, 12), g20 (80, 20), g40 (144, 36),
-  g601 (101, 31).
+LEAN RESULTS (this tree's kernel, xv6 b72cbac1; VM c4d).  O2 STAGE C (`notes/weak-port-o2-stageC.md`
+§B4, item 20): a fetch is an ADMINISTRATIVE label, not a graph event -- `doEv` pushes no row item
+and no `aGmo` entry for a class-1 read, `gen` gives the fetch no position (`emitA`) and no edge
+(the fetch reads left `ld`, so their `DTtrans` edges are gone, as `AxDeps.dstepT`'s fetch arm
+`(s, [])`), and `sched`'s position counter skips fetches.  The counts below are Stage C; the
+Stage B values (fetches as graph `LLoad`s) are in brackets.
+- Per hart (k failed spins): 464 + 4k instructions; 499/503 fetch reads (a TRACE statistic:
+  `counts` still reports them, and its "memory events" total 665/670 still includes them; the
+  graph events per hart are 166/167); 33 walker reads (11 cold pages, 6 of them the proc table
+  beyond pid_lock's page); data 98 R + 34 W + (k+1) RMW + 1 fence; 1338/1365 DTctrl edges,
+  1357/1385 edges in all [1394/1423].  Racer: 3 instructions, 11 accesses (8 graph events), 1
+  edge [2].  THE DRIFT IS ALMOST ALL THE INLINED pid ALLOCATION (below): its 64-round uniqueness
+  scan adds 256 instructions and 64 loads, and every scan load enters the never-reset ctrl
+  accumulator, so each later store carries about 70 DTctrl edges.
+- Graphs: (a) 333 gmo events / 2742 deps [1335 / 2817]; (a') 499 / 4099 [2000 / 4211]; (b) 341 /
+  2743 [1346 / 2819].  Truncated: g10 (24, 6) [(50, 12)], g20 (32, 6) [(80, 20)], g40 (50, 16)
+  [(144, 36)], g601 (30, 18) [(101, 31)].
 - SHIPPED checker under the compiled evaluator (`#eval`, the `vm_compute` analogue; the
   library's list functions are native code and `&&`/`||` short-circuit, which is what made
-  Rocq's strict `vm_compute` cubic-and-worse): `catTConsistentB` (a) = true in 208 s
-  (Rocq: extrapolated ~16 h); conjuncts on (a): c_wf 0.15 s, c_dw 0.03 s, c_dg 1.8 s, c_lv
-  12.2 s, c_at 0.2 s, c_ppo 173 s, c_ppo_po 173 s (the same: the cost is inside gppoCatB).
-  Ladder: c_lv g10/g20/g40 0.010/0.024/0.077 s, c_ppo 0.020/0.051/0.18 s (~N^2),
-  catTConsistentB g10 0.031 s; the shipped checker rejects reversed g601 in 0.13 s (Rocq
-  100.8 s).  ctrlClosedB (a) 6.7 s, (a') 14.0 s, (b) 6.7 s (all true); gsrcAll (a) 273916 in
-  2.6 s, (a') 407470 in 4.9 s, (b) 273916 in 2.7 s.  So the VERDICT DIFFERS from Rocq's: on
-  this evaluator the shipped checker is FEASIBLE at size (a) (minutes, not hours) -- but a
-  closed PROOF needs the kernel, which is far slower (below).
-- Prototype (§5): ppo <= gmo (a) 14.5 s, (a') 23.5 s, (b) 14.7 s (#eval; kept as comments,
-  too slow to re-run on every build); load-value + atomicity (a) 0.08 s, (a') 0.12 s, (b)
-  0.08 s (live `#eval`s); rejects the reversed gmo (a) in 14.7 s, g601 (kernel).
-- Kernel (`decide +kernel`, theorems checked in parallel, so times include contention):
-  counts 1.5-3 s each; gsize (a)/(a')/(b) 6/10/13 s; `fastG40PpoG10` 36 s; `fastG601` 57 s;
-  `fastRevG601` 72 s; for scale, `ctrlClosedB g40` took 62 s and `lvAtFast gA` 100 s (not
-  kept).  Build of this file: about 75 s wall.
+  Rocq's strict `vm_compute` cubic-and-worse), Stage C: `catTConsistentB` (a) = true in 5.1 s
+  [208 s; Rocq: extrapolated ~16 h], c_ppo (a) 3.4 s [173 s], catTConsistentB g10 0.013 s.
+  ctrlClosedB (a) 4.9 s [6.7 s], (a') 11.0 s [14.0 s] (true); gsrcAll (a) 70298 in 0.47 s
+  [273916], (a') 104606 in 0.99 s [407470].  Stage B only (not re-measured): conjuncts on (a)
+  c_wf 0.15 s, c_dw 0.03 s, c_dg 1.8 s, c_lv 12.2 s, c_at 0.2 s; ladder c_lv g10/g20/g40
+  0.010/0.024/0.077 s, c_ppo 0.020/0.051/0.18 s (~N^2); the shipped checker rejects reversed
+  g601 in 0.13 s (Rocq 100.8 s).  So the VERDICT DIFFERS from Rocq's: on this evaluator the
+  shipped checker is FEASIBLE at size (a) -- but a closed PROOF needs the kernel, which is far
+  slower (below).
+- Prototype (§5), Stage C: ppo <= gmo (a) 0.97 s, (a') 1.56 s, (b) 0.98 s [14.5/23.5/14.7 s]
+  (#eval; kept as comments); load-value + atomicity (a) 0.05 s, (a') 0.07 s, (b) 0.05 s (live
+  `#eval`s); rejects the reversed gmo (a) in 0.99 s [14.7 s], g601 (kernel).
+- Kernel (`decide +kernel`): all nine theorems re-pinned on the Stage C graphs; the whole file
+  now builds in about 25 s wall [75 s; Stage B kernel times: counts 1.5-3 s each, gsize
+  (a)/(a')/(b) 6/10/13 s, `fastG40PpoG10` 36 s, `fastG601` 57 s, `fastRevG601` 72 s].
 
 KERNEL-IMAGE DRIFT (Rocq build -> this tree, `MachCSL.KernelSyms`):
 - holding 0x80000ba2 -> 0x80000bf2, push_off 0x80000bce -> 0x80000c1e, acquire 0x80000c08 ->
@@ -89,6 +95,10 @@ KERNEL-IMAGE DRIFT (Rocq build -> this tree, `MachCSL.KernelSyms`):
 - The racer stays at Rocq's mock page 0x80002000 (not real text, as in Rocq).
 
 Deviations from Rocq:
+- O2 Stage C (above): fetches are not graph events (Rocq: a fetch is a graph `LLoad`, with
+  `DTtrans` edges to the instruction's store).  Lean-only `emitA`; `doEv`'s class-1 guard;
+  `sched` counts positions over graph events only.  `counts` is unchanged (the fetch count and
+  the access total are trace statistics).
 - The kernel image (above).  `allocpidTr` takes the process slot `p` (new argument; `hartTr`
   passes `hproc i = proc + 376 i`, hart i's slot — the mock does not model allocproc's slot
   search); new `sAllocproc`, `sProc`, `nproc`, `scanTr`, `hproc`.
@@ -131,7 +141,7 @@ cWf cLv cAt cDw cDg cPpo gsize gN gA gA' gB ppoGmoPoB cPpoPo g10 g20 g40`; `rdb 
 between ppo_fast ppo_gmo_fast vis lv_at_fast rev_gmo g60_1` -> `mkIdx posLt between ppoFast
 ppoGmoFast vis lvAtFast revGmo g601`.  The `Eval` lines -> `countsHart00 countsHart11
 countsRacer gsizeGA gsizeGA' gsizeGB fastG40PpoG10 fastG601 fastRevG601` (theorems) and the
-`#eval`s.  Lean-only: `sAllocproc sProc nproc scanTr hproc traceText imapFrom imap NMap
+`#eval`s.  Lean-only: `emitA sAllocproc sProc nproc scanTr hproc traceText imapFrom imap NMap
 NMap.get? NMap.ins NMap.lookup NMap.insert NMap.ofList GMap2 GMap2.lookup GMap2.insert
 GMap2.ofList zget zset tm gsizeSmall`.
 
@@ -399,6 +409,12 @@ def setprov (s : Gst) (r : Nat) (p : List Nat) : Gst :=
 def emit (s : Gst) (e : Aev) : Gst × Nat :=
   (⟨s.gPos + 1, s.gProv, s.gCtl, s.gTlb, e :: s.gEvs, s.gDeps⟩, s.gPos)
 
+/-- (Lean-only, O2 Stage C) record an ADMINISTRATIVE event, the fetch: it joins the trace
+statistics `gEvs` (so `counts` still reports it) but takes NO graph position (`gPos` unchanged)
+and is never an edge source (`AxDeps.dstepT`'s fetch arm `(s, [])`). -/
+def emitA (s : Gst) (e : Aev) : Gst :=
+  ⟨s.gPos, s.gProv, s.gCtl, s.gTlb, e :: s.gEvs, s.gDeps⟩
+
 def addDeps (s : Gst) (ds : List ((Nat × Nat) × Dtag)) : Gst :=
   ⟨s.gPos, s.gProv, s.gCtl, s.gTlb, s.gEvs, ds ++ s.gDeps⟩
 
@@ -435,11 +451,9 @@ def zn : Int → Nat := Int.toNat
 def step (s : Gst) (t : Ti) : Gst :=
   let (s, w1) := walk s t.tPc
   let al := Nat.beq (t.tPc.toNat &&& 3) 0
-  let (s, f1) := emit s ⟨KR, t.tPc, if al then 4 else 2, 1⟩
-  let (s, f2) := if !t.tRvc && !al
-                 then let (s, f) := emit s ⟨KR, t.tPc + 2, 2, 1⟩; (s, [f])
-                 else (s, [])
-  let ld := w1 ++ [f1] ++ f2
+  let s := emitA s ⟨KR, t.tPc, if al then 4 else 2, 1⟩
+  let s := if !t.tRvc && !al then emitA s ⟨KR, t.tPc + 2, 2, 1⟩ else s
+  let ld := w1
   match t.tIns with
   | IOp rd rs => setprov s (zn rd) (provs s (rs.map zn))
   | IJal rd => setprov s (zn rd) []
@@ -538,7 +552,10 @@ def wrBytes (m : NMap (Nat × BitVec 8)) (a : Int) (n t : Nat) : NMap (Nat × Bi
 def pushRow (rows : List (List Lbl)) (i : Nat) (l : Lbl) : List (List Lbl) :=
   rows.modify i fun r => l :: r
 
+/-- One event into the graph.  A fetch (class 1) is ADMINISTRATIVE (O2 Stage C): no row item,
+no `aGmo` entry. -/
 def doEv (s : Ast) (i : Nat) (pos : Nat) (e : Aev) : Ast :=
+  if Nat.beq e.aeCls 1 then s else
   let m := s.aMem
   match e.aeK with
   | KR =>
@@ -558,7 +575,9 @@ def doEv (s : Ast) (i : Nat) (pos : Nat) (e : Aev) : Ast :=
            .WCplain)⟩
   | KF => ⟨m, s.aNw, s.aGmo, pushRow s.aRows i (LFence true true true true)⟩
 
-/-- Round-robin over the harts, `ch` events per turn. -/
+/-- Round-robin over the harts, `ch` events per turn (fetches included in the chunk).  The
+position counter skips the fetches (Lean-only, O2 Stage C), so a hart's positions are the
+indices of its graph events, as `gen`'s `gPos`. -/
 def sched : Nat → Nat → Ast → List (Nat × List Aev) → Ast
   | 0, _, s, _ => s
   | fuel + 1, ch, s, rest =>
@@ -570,8 +589,9 @@ def sched : Nat → Nat → Ast → List (Nat × List Aev) → Ast
            let p := ie.2.1
            let evs := ie.2.2
            let now := evs.take ch
-           let s := (imap Prod.mk now).foldl (fun s (je : Nat × Aev) => doEv s i (p + je.1) je.2) s
-           (s, r ++ [(p + now.length, evs.drop ch)]))
+           let sq := now.foldl (fun (sq : Ast × Nat) (e : Aev) =>
+             (doEv sq.1 i sq.2 e, if Nat.beq e.aeCls 1 then sq.2 else sq.2 + 1)) (s, p)
+           (sq.1, r ++ [(sq.2, evs.drop ch)]))
         (s, [])
       sched fuel ch r.1 r.2
 
@@ -796,30 +816,31 @@ def tm (msg : String) (f : Unit → String) : IO Unit := do
 
 set_option synthInstance.maxSize 1024
 
+
 /-- Rocq `Eval vm_compute in counts (hart_tr 0 0)`. -/
 theorem countsHart00 :
-    counts (hartTr 0 0) = (464, 499, 33, 98, 34, 1, 1, 665, 1338, 1394) := by decide +kernel
+    counts (hartTr 0 0) = (464, 499, 33, 98, 34, 1, 1, 665, 1338, 1357) := by decide +kernel
 /-- Rocq `Eval vm_compute in counts (hart_tr 1 1)`. -/
 theorem countsHart11 :
-    counts (hartTr 1 1) = (468, 503, 33, 98, 34, 2, 1, 670, 1365, 1423) := by decide +kernel
+    counts (hartTr 1 1) = (468, 503, 33, 98, 34, 2, 1, 670, 1365, 1385) := by decide +kernel
 /-- Rocq `Eval vm_compute in counts racer_tr`. -/
-theorem countsRacer : counts racerTr = (3, 3, 6, 1, 1, 0, 0, 11, 0, 2) := by decide +kernel
+theorem countsRacer : counts racerTr = (3, 3, 6, 1, 1, 0, 0, 11, 0, 1) := by decide +kernel
 
 /-- Rocq `Time Eval vm_compute in gsize gA` (and `gA'`, `gB`). -/
-theorem gsizeGA : gsize gA = (1335, 2817) := by decide +kernel
-theorem gsizeGA' : gsize gA' = (2000, 4211) := by decide +kernel
-theorem gsizeGB : gsize gB = (1346, 2819) := by decide +kernel
+theorem gsizeGA : gsize gA = (333, 2742) := by decide +kernel
+theorem gsizeGA' : gsize gA' = (499, 4099) := by decide +kernel
+theorem gsizeGB : gsize gB = (341, 2743) := by decide +kernel
 
 /-- The truncated graphs' sizes (Rocq: in the §4 comment). -/
 theorem gsizeSmall :
-    (gsize g10, gsize g20, gsize g40, gsize g601) = ((50, 12), (80, 20), (144, 36), (101, 31)) := by
+    (gsize g10, gsize g20, gsize g40, gsize g601) = ((24, 6), (32, 6), (50, 16), (30, 18)) := by
   decide +kernel
 
 /-- Rocq `Time Eval vm_compute in (ppo_gmo_fast g40, c_ppo g10)`. -/
 theorem fastG40PpoG10 : (ppoGmoFast g40, cPpo g10) = (true, true) := by decide +kernel
 
 /-- Rocq `Time Eval vm_compute in (gsize g60_1, ppo_gmo_fast g60_1, lv_at_fast g60_1)`. -/
-theorem fastG601 : (gsize g601, ppoGmoFast g601, lvAtFast g601) = ((101, 31), true, true) := by
+theorem fastG601 : (gsize g601, ppoGmoFast g601, lvAtFast g601) = ((30, 18), true, true) := by
   decide +kernel
 
 /-- Rocq `Time Eval vm_compute in (ppo_gmo_fast (rev_gmo g60_1), lv_at_fast (rev_gmo g60_1))`:
@@ -827,16 +848,18 @@ the prototype REJECTS the reversed gmo. -/
 theorem fastRevG601 : (ppoGmoFast (revGmo g601), lvAtFast (revGmo g601)) = (false, false) := by
   decide +kernel
 
-/- Full-size prototype ppo runs (recorded, VM, too slow to re-run on every build):
-#eval tm "ppoGmoFast gA" ...                          = true, 14.5 s
-#eval tm "ppoGmoFast gA'" ...                         = true, 23.5 s
-#eval tm "ppoGmoFast gB" ...                          = true, 14.7 s
-#eval tm "(ppoGmoFast (revGmo gA), lvAtFast (revGmo gA))" ... = (false, false), 14.7 s
-   The shipped checker (recorded): catTConsistentB gA = true, 208 s; see the header. -/
+/- Full-size prototype ppo runs (recorded, VM; Stage C graphs, fetches admin -- Stage B values
+in brackets):
+#eval tm "ppoGmoFast gA" ...                          = true, 0.97 s  [14.5 s]
+#eval tm "ppoGmoFast gA'" ...                         = true, 1.56 s  [23.5 s]
+#eval tm "ppoGmoFast gB" ...                          = true, 0.98 s  [14.7 s]
+#eval tm "(ppoGmoFast (revGmo gA), lvAtFast (revGmo gA))" ... = (false, false), 0.99 s  [14.7 s]
+   The shipped checker (recorded): catTConsistentB gA = true, 5.1 s [208 s]; see the header. -/
 
 #eval tm "lvAtFast gA" fun _ => toString (lvAtFast gA)
 #eval tm "lvAtFast gA'" fun _ => toString (lvAtFast gA')
 #eval tm "lvAtFast gB" fun _ => toString (lvAtFast gB)
+
 
 end AxSpinSpike
 

@@ -19,15 +19,12 @@ corollaries.  §6 (the `Print Assumptions` audit) and §7 (the ledger) are Rocq 
    (explicit `hlc GF` with `[MachGpreS hlc GF] [WeakGpreS GF]`, `D : CPU → List Register` with
    `hD : ∀ c, (D c).Nodup`; `d0 = wgdev σ0` ↦ `d0 = efInit σ0.wgdev`; at the canonical tie
    `wgdev σ0` ↦ `efInit σ0.wgdev`).
-2. CARRIED PREMISES (the theorems used carry them; none is discharged here):
-   - THE FETCH-VIEW PREMISE `∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2`
-     (`WeakRvwmoGlue2` deviation 4, owner Q4): all three theorems, placed right after the WP
-     package premises (as `cycleKillOfL2''`/`t2linOfL2''`/`xv6RvwmoSafeModulo`).
-   - THE WHOLE-GRAPH FETCH-INERTNESS PREMISE `WeakRvwmoCapstone.t2linFetchInert`
-     (`WeakRvwmoCapstone` deviation 4): `xv6RvwmoSafeModuloWalk`, placed as in
-     `xv6RvwmoSafeModulo` (after the fetch-view premise).
-   - (via `walkPolicy`, `WeakRvwmoWalk` deviation 2) nothing extra: `walkPolicy` is stated over
-     certified segments, whose construction is where `WeakRvwmoWalk.wfetchSite` enters.
+2. CARRIED PREMISE (O2 / Stage C: the only fetch premise left; not discharged here):
+   THE FETCH-VIEW PREMISE `∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2`
+   (`WeakRvwmoGlue2` deviation 4, owner Q4): all three theorems, placed right after the WP
+   package premises (as `cycleKillOfL2''`/`t2linOfL2''`/`xv6RvwmoSafeModulo`).  Stage B's
+   whole-graph `WeakRvwmoCapstone.t2linFetchInert` premise of `xv6RvwmoSafeModuloWalk` is
+   DELETED (with `WeakRvwmoCapstone`'s), and `walkPolicy` carries nothing fetch-specific.
 
 **Rocq → Lean name map.**  `cycle_kill_of_l2''''` `cycleKillOfL2''''`, `t2lin_of_l2'''`
 `t2linOfL2'''`, `xv6_rvwmo_safe_modulo_walk` `xv6RvwmoSafeModuloWalk`.
@@ -111,9 +108,6 @@ theorem xv6RvwmoSafeModuloWalk (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS 
     (∀ a base, P a base → wpPackageProt hlc GF gen σ0 D (Nm a base) a base) →
     -- THE FETCH-VIEW PREMISE (deviation 2)
     (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2) →
-    -- THE WHOLE-GRAPH FETCH-INERTNESS PREMISE (deviation 2)
-    WeakRvwmoCapstone.t2linFetchInert (xboot σ0) (efInit σ0.wgdev) (imgZ σ0.wgimg) (xN σ0)
-      (xN σ0) →
     -- (R-1)
     l2Claim (xboot σ0) (efInit σ0.wgdev) (imgZ σ0.wgimg) (xN σ0) P (badRun gen σ0) →
     -- (R-2), as the walk's per-state policy
@@ -136,8 +130,8 @@ theorem xv6RvwmoSafeModuloWalk (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS 
       (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → ¬ violationHart clsOf pubOf nDisk (ecfgOf ρ.1 ρ.2)) ∧
       (∀ (t2 : List EExpr) (σ2 : WGState) (e2 : EExpr),
         (epowerFork gen, σ0) -·->ₜₚ* (t2, σ2) → e2 ∈ t2 → Reducible (e2, σ2)) :=
-  fun hfr hwp hwpp hcov hfi hl2 hpol =>
-    xv6RvwmoSafeModulo hlc GF gen σ0 D hD Nm P hfr hwp hwpp hcov hfi hl2
+  fun hfr hwp hwpp hcov hl2 hpol =>
+    xv6RvwmoSafeModulo hlc GF gen σ0 D hD Nm P hfr hwp hwpp hcov hl2
       (walkSupplyOfPolicy _ _ _ _ _ hpol)
 
 end walkCapstone

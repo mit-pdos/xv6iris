@@ -29,7 +29,8 @@ the per-instruction channel `ib` (`ibRd`/`ibAnn`), and those are exactly the lab
     load's own destination-register write with the load-result source.
 (4) §4 THE TWO-EVENT ROW `laHartConf`: hart 1's row is the spin load and THE FETCH of the next
     instruction (`main+0x18`), with §3's stretch between them -- the first row on the tree of
-    length > 1 whose `hemit` derivation uses a non-empty `admRun`.
+    length > 1 whose `hemit` derivation uses a non-empty `admRun`.  (Lean, Stage C: the fetch is
+    administrative, so the second event is the `fence r,rw` itself -- deviation 3.)
 (5) §5 THE TWO-HART GRAPH `mp2` with a two-event row (genuine program order), its consistency and
     its `gdexecQconf` bundle `mp2Qconf`.
 (6) §6 THE CONTROL CARRIER: the taken `beqz` at `main+0x1e` emits `LCtrl [DReg 15]` (item 12
@@ -46,13 +47,31 @@ the per-instruction channel `ib` (`ibRd`/`ibAnn`), and those are exactly the lab
    so `pstepEvNode` takes it as an extra argument.  `admNode`'s arms are `pnodeStep`'s (one per
    lean-sail `Outcome` constructor; `getCycleCount` answers `(0 : Nat)`, an `.error` node stops).
    Requests are indexed by the VA width too (`ereadReqAt n va`), so `ahLoadPstep` takes `va`.
-3. O2 — THE FETCH (`notes/weak-port-o2-design.md`; owner decision D1).  The Lean model tags
-   fetches `AK_ifetch` and `pstepEv` emits `LIFetch base tvs` for them (Rocq: a plain `LLoad`,
-   finding F7).  So the second row event is `laWl1 = LIFetch …` (its graph image is still the
-   plain `Lbl.LLoad false …`, `projLbl`); `laFetchPlain` reads
-   `classify … = ⟨true, false, false⟩` (`akIfetch`), and the fetch block is closed by the
-   Lean-only `WeakRvwmoAdm.ahFetchPstep` / `WeakRvwmoAdm.ahFetchRealizes` (Rocq reuses
-   `ah_load_pstep`/`ah_load_realizes`, which in Lean are the DATA-load twins).
+3. O2 / STAGE C — THE FETCH IS ADMINISTRATIVE (owner ruling Q-C1,
+   `notes/weak-port-o2-stageC.md` item 17).  The Lean model tags fetches `AK_ifetch` and
+   `pstepEv` emits `LIFetch base tvs` for them (Rocq: a plain `LLoad` row item, finding F7); under
+   Stage C `LIFetch` is an `lbAdmin true` label with NO row item (`projLbl` sends it to `none`).
+   So Rocq's second row event (the fetch at `main+0x18`) cannot be a row event; the row's second
+   event is the NEXT genuine memory event, the `fence r,rw` at `main+0x18` (`laRow t w =
+   [LLoad …, LFence true false true true]`), and the fetch sits as an ADMINISTRATIVE item
+   before that instruction's `LInstr`:
+   `laEm`'s items are `(laWl0, some 0) :: eadm (WeakRvwmoAdm.laAdm w) ++ [(laWlF, some 1)]`, with
+   `laAdm w = laLs w ++ laWl1 :: (stretch ++ laWlH :: stretch)` -- §3's 117-node stretch, the low
+   fetch `laWl1` (`0x000f`), a computed stretch, the HIGH fetch `WeakRvwmoAdm.laWlH` (`0x0230`,
+   at `main+0x1a = 2147487464`) and a computed stretch to the barrier node
+   (`WeakRvwmoAdm.laBar`: `Barrier_RISCV_r_rw`, uniformly in the word read).  `laFetchPlain`
+   reads `classify … = ⟨true, false, false⟩` (`akIfetch`).  Lean-only: `WeakRvwmoAdm.ahFetchPstep`
+   (the i-cache arm), `WeakRvwmoAdm.ahBarPstep` / `WeakRvwmoAdm.ahFenceRealizes` (the fence
+   block), `WeakRvwmoAdm.admRunApp` (runs compose), `WeakRvwmoAdm.laX4/laX5/laX6`,
+   `WeakRvwmoAdm.laX5IsRead`, `WeakRvwmoAdm.laReqh`, `WeakRvwmoAdm.laFetchHiReq/Plain/Ram/Pa`,
+   `WeakRvwmoAdm.laTxtHi`, `WeakRvwmoAdm.laTxtHiKw`, `WeakRvwmoAdm.laTvh`, `WeakRvwmoAdm.laWlH`,
+   `WeakRvwmoAdm.laWlF`, `WeakRvwmoAdm.laAdm`, `WeakRvwmoAdm.laP6`, `WeakRvwmoAdm.laPfin`,
+   `WeakRvwmoAdm.laAdmMem`, `WeakRvwmoAdm.eadmAllNostore`.  The graph `mp2`: hart 1's row is
+   `[load, fence]`, gmo `[(0,0), (1,0)]` (a fence is no memory event), `mp2Rd` has only the flag
+   disjunct; `mp2Img` carries the flag word and BOTH fetched halves (`mp2ImgTxt`,
+   `WeakRvwmoAdm.mp2ImgTxtHi`), so the extra `gdexecQconf` slot `emFetchImg` is discharged by
+   `WeakRvwmoAdm.laEmFetchImg` (the pinned bytes are the kernel image's: `laTxtKw`,
+   `laTxtHiKw`).  Stage B's `WeakRvwmoAdm.ahFetchRealizes` is DELETED.
 4. THE CONCRETE STATE (`WeakRvwmoConfWit2` deviation 2): the cursors start at `ldRs0` and resume
    the Lean fetch window `ldWf : BitVec 32`.  THE MEASUREMENTS MATCH ROCQ (106 + 97 nodes to the
    load; 117-node stretch, `LRegW 15 [DLdRes, DReg 14, DReg 39, DReg 45, DReg 44]` at item 0,
@@ -97,10 +116,9 @@ the per-instruction channel `ib` (`ibRd`/`ibAnn`), and those are exactly the lab
 `lc_loop_back_pa` `lcLoopBackPa`, `lc_ctrl` `lcCtrl`, `lc_ctrl_in_run` `lcCtrlInRun`.
 Lean-only (file-qualified): `WeakRvwmoAdm.lbAdminErwLabel`, `WeakRvwmoAdm.laX2IsRead`,
 `WeakRvwmoAdm.laX3IsRead`, `WeakRvwmoAdm.laTxtKw` (the fetched half IS the image's),
-`WeakRvwmoAdm.ahFetchPstep`, `WeakRvwmoAdm.ahFetchRealizes` (deviation 3), and the tactic
-`weak_adm_krfl` (deviation 5).
+and deviation 3's list, and the tactic `weak_adm_krfl` (deviation 5).
 
-**Dropped:** nothing (Rocq 103 declarations; Lean 103 + 6 Lean-only + the tactic).
+**Dropped:** nothing (Rocq 103 declarations; Lean 103 + 29 Lean-only + the tactic).
 -/
 import Weak.WeakRvwmoConfWit2
 import Weak.WeakEvProv
@@ -346,6 +364,47 @@ def laTxt : BitVec 16 := BitVec.ofNat 16 0xf
 theorem WeakRvwmoAdm.laTxtKw : kw ((KernelSyms.«main» : Int) + 0x18) % 0x10000 = laTxt.toNat := by
   decide +kernel
 
+/-! ### 4.0 (Lean-only, deviation 3) past the fetch: the upper half and the fence
+
+Under Stage C the fetch is ADMINISTRATIVE (no row item), so the row's second event is the next
+genuine memory event after it: the `fence r,rw` at `main+0x18` itself, reached through the low
+fetch, a stretch, the HIGH fetch (`0x0230`), and a second stretch. -/
+
+/-- The upper fetched halfword at `main+0x1a`. -/
+def WeakRvwmoAdm.laTxtHi : BitVec 16 := BitVec.ofNat 16 0x0230
+
+/-- … the kernel image's too. -/
+theorem WeakRvwmoAdm.laTxtHiKw :
+    kw ((KernelSyms.«main» : Int) + 0x18) / 0x10000 % 0x10000 = WeakRvwmoAdm.laTxtHi.toNat := by
+  decide +kernel
+
+noncomputable def WeakRvwmoAdm.laX4 (w : BitVec 32) : aht := ahRead laTxt.toNat (laX3 w)
+noncomputable def WeakRvwmoAdm.laX5 (w : BitVec 32) : aht :=
+  admIter false 400 (WeakRvwmoAdm.laX4 w)
+noncomputable def WeakRvwmoAdm.laX6 (w : BitVec 32) : aht :=
+  admIter false 400 (ahRead WeakRvwmoAdm.laTxtHi.toNat (WeakRvwmoAdm.laX5 w))
+
+theorem WeakRvwmoAdm.laX5IsRead :
+    (ereadReqAt 2 64 (ahM (WeakRvwmoAdm.laX5 lockZero))).isSome = true := by
+  decide +kernel
+
+noncomputable def WeakRvwmoAdm.laReqh : Mem_read_request 2 64 Arch.pa Arch.translation Arch.arch_ak :=
+  (ereadReqAt 2 64 (ahM (WeakRvwmoAdm.laX5 lockZero))).get WeakRvwmoAdm.laX5IsRead
+
+/-- The HIGH fetch, uniformly in the word read: width 2, an i-cache read, RAM, at `main+0x1a`. -/
+theorem WeakRvwmoAdm.laFetchHiReq (w : BitVec 32) :
+    ereadReqAt 2 64 (ahM (WeakRvwmoAdm.laX5 w)) = some WeakRvwmoAdm.laReqh := by
+  weak_adm_krfl
+theorem WeakRvwmoAdm.laFetchHiPlain :
+    classify WeakRvwmoAdm.laReqh.access_kind = ⟨true, false, false⟩ := by decide +kernel
+theorem WeakRvwmoAdm.laFetchHiRam : devAddr WeakRvwmoAdm.laReqh.pa = false := by decide +kernel
+theorem WeakRvwmoAdm.laFetchHiPa : paZ WeakRvwmoAdm.laReqh.pa = 2147487464 := by decide +kernel
+
+/-- … and THE FENCE, uniformly in the word read. -/
+theorem WeakRvwmoAdm.laBar (w : BitVec 32) :
+    ebarAt (ahM (WeakRvwmoAdm.laX6 w)) = some .Barrier_RISCV_r_rw := by
+  weak_adm_krfl
+
 /-- A DATA-load node's step, once: the request's own width, address and kind, ANY word. -/
 theorem ahLoadPstep (n va : Nat) (cpu : CPU) (d : Efab) (x : aht)
     (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
@@ -389,44 +448,85 @@ theorem WeakRvwmoAdm.ahFetchPstep (n va : Nat) (cpu : CPU) (d : Efab) (x : aht)
   refine Or.inl ⟨hif, w, tvs, hlen, hbytes, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   all_goals trivial
 
+/-- (Lean-only, deviation 3) a non-parking BARRIER node's step: `ebarLabel b`. -/
+theorem WeakRvwmoAdm.ahBarPstep (cpu : CPU) (d : Efab) (x : aht) (b : barrier_kind) :
+    ebarAt (ahM x) = some b → ebarPark b = none →
+    pstepEv (ahP cpu x) d (ebarLabel b) (ahP cpu (ahBar x)) d := by
+  intro hb hpk
+  obtain ⟨K, Hm, Hres⟩ := ebarAtInv (ahM x) b hb
+  have Hm' : ahM (ahBar x) = K () := Hres
+  have hstep := pstepEvNode cpu d (ahM x) (ahM (ahBar x)) (ahRs x) (ahIb x) (ebarLabel b)
+    none none (some b)
+  apply hstep
+  rw [Hm', Hm]
+  exact ⟨rfl, rfl, rfl, hpk.symm, rfl, rfl, rfl⟩
+
 /-- … and its axiomatic image, at any class. -/
 theorem ahLoadRealizes (p : Pexv6) (ws : Wstate) (base : Int) (tvs : List (Nat × BitVec 8)) :
     hlblRealizes p ws (.LLoad false base (tvs.map Prod.fst) (tvs.map Prod.snd))
       (LLoad false false base tvs []) :=
   ⟨trivial, rfl, rfl, rfl⟩
 
-/-- (Lean-only, deviation 3) the fetch's image is the plain graph load (D1). -/
-theorem WeakRvwmoAdm.ahFetchRealizes (p : Pexv6) (ws : Wstate) (base : Int)
-    (tvs : List (Nat × BitVec 8)) :
-    hlblRealizes p ws (.LLoad false base (tvs.map Prod.fst) (tvs.map Prod.snd))
-      (LIFetch base tvs) :=
+/-- (Lean-only, deviation 3) a fence's image is the graph fence. -/
+theorem WeakRvwmoAdm.ahFenceRealizes (p : Pexv6) (ws : Wstate) (pr pw sr sw : Bool) :
+    hlblRealizes p ws (.LFence pr pw sr sw) (LFence pr pw sr sw) :=
   ⟨trivial, trivial, trivial, rfl⟩
 
-/-- THE TWO ITEMS. -/
+/-- (Lean-only) administrative runs compose. -/
+theorem WeakRvwmoAdm.admRunApp (instr : Bool) (p : Pexv6) (d : Efab) (ls1 : List Wlabel)
+    (pm : Pexv6) (dm : Efab) (ls2 : List Wlabel) (p' : Pexv6) (d' : Efab) :
+    admRun instr p d ls1 pm dm → admRun instr pm dm ls2 p' d' →
+    admRun instr p d (ls1 ++ ls2) p' d' := by
+  intro h1
+  induction h1 with
+  | ARnil p d => intro h2; exact h2
+  | ARcons p d l p1 d1 ls q e ha hs _ ih =>
+    intro h2
+    exact .ARcons _ _ _ _ _ _ _ _ ha hs (ih h2)
+
+/-- THE ITEMS: the load, the two ADMINISTRATIVE fetches, and the fence. -/
 def laWl0 (t : Nat) (w : BitVec 32) : Wlabel := LLoad false false (paZ evFlag) (ldTvs t w) []
 
 def laTvf : List (Nat × BitVec 8) := [(0, nthByte (n := 2) laTxt 0), (0, nthByte (n := 2) laTxt 1)]
 
 noncomputable def laWl1 : Wlabel := LIFetch (paZ laReqf.pa) laTvf
 
-/-- THE ROW — two events, in program order. -/
-noncomputable def laRow (t : Nat) (w : BitVec 32) : List Lbl :=
-  [.LLoad false (paZ evFlag) (ldTs t) (WeakRvwmoConfWit2.ldVs w),
-   .LLoad false (paZ laReqf.pa) (laTvf.map Prod.fst) (laTvf.map Prod.snd)]
+def WeakRvwmoAdm.laTvh : List (Nat × BitVec 8) :=
+  [(0, nthByte (n := 2) WeakRvwmoAdm.laTxtHi 0), (0, nthByte (n := 2) WeakRvwmoAdm.laTxtHi 1)]
+
+noncomputable def WeakRvwmoAdm.laWlH : Wlabel := LIFetch (paZ WeakRvwmoAdm.laReqh.pa) WeakRvwmoAdm.laTvh
+
+/-- The fence's label: `fence r,rw` = `ebarLabel .Barrier_RISCV_r_rw`. -/
+def WeakRvwmoAdm.laWlF : Wlabel := LFence true false true true
+
+/-- THE ROW — two events, in program order: the spin load and the `fence r,rw`. -/
+def laRow (t : Nat) (w : BitVec 32) : List Lbl :=
+  [.LLoad false (paZ evFlag) (ldTs t) (WeakRvwmoConfWit2.ldVs w), .LFence true false true true]
 
 noncomputable def laLs (w : BitVec 32) : List Wlabel := admLbls false 200 (ahRead w.toNat laX2)
+
+/-- (Lean-only) the whole administrative run between the two events. -/
+noncomputable def WeakRvwmoAdm.laAdm (w : BitVec 32) : List Wlabel :=
+  laLs w ++ laWl1 :: (admLbls false 400 (WeakRvwmoAdm.laX4 w) ++
+    WeakRvwmoAdm.laWlH :: admLbls false 400 (ahRead WeakRvwmoAdm.laTxtHi.toNat (WeakRvwmoAdm.laX5 w)))
 
 noncomputable def laP0 (cpu : CPU) : Pexv6 := ahP cpu laX2
 noncomputable def laP1 (w : BitVec 32) (cpu : CPU) : Pexv6 := ahP cpu (ahRead w.toNat laX2)
 noncomputable def laP2 (w : BitVec 32) (cpu : CPU) : Pexv6 := ahP cpu (laX3 w)
 noncomputable def laP3 (w : BitVec 32) (cpu : CPU) : Pexv6 :=
   ahP cpu (ahRead laTxt.toNat (laX3 w))
+/-- (Lean-only) at the fence node, and past it. -/
+noncomputable def WeakRvwmoAdm.laP6 (w : BitVec 32) (cpu : CPU) : Pexv6 :=
+  ahP cpu (WeakRvwmoAdm.laX6 w)
+noncomputable def WeakRvwmoAdm.laPfin (w : BitVec 32) (cpu : CPU) : Pexv6 :=
+  ahP cpu (ahBar (WeakRvwmoAdm.laX6 w))
 
 noncomputable def laEm (t : Nat) (w : BitVec 32) (cpu : CPU) : Hemission :=
-  ⟨(laWl0 t w, some 0) :: (eadm (laLs w) ++ [(laWl1, some 1)]), laP3 w cpu⟩
+  ⟨(laWl0 t w, some 0) :: (eadm (WeakRvwmoAdm.laAdm w) ++ [(WeakRvwmoAdm.laWlF, some 1)]),
+    WeakRvwmoAdm.laPfin w cpu⟩
 
-/-- THE WITNESS.  The middle block is `admRunOfIter` at the computed stretch: `HEone`'s
-administrative premise discharged with a NON-EMPTY item list. -/
+/-- THE WITNESS.  The second block's administrative premise is a NON-EMPTY run: three computed
+stretches (`admRunOfIter`) and the two fetch steps between them. -/
 theorem laHartConf (i t : Nat) (w : BitVec 32) (cpu : CPU) (d0 : Efab) :
     hartConf i (laRow t w) (laP0 cpu) (fun _ => d0) (laEm t w cpu) := by
   have hld : pstepEv (laP0 cpu) d0 (laWl0 t w) (laP1 w cpu) d0 := by
@@ -449,14 +549,38 @@ theorem laHartConf (i t : Nat) (w : BitVec 32) (cpu : CPU) (d0 : Efab) :
         · rfl
         · rfl
         · omega)
+  have hfh : pstepEv (ahP cpu (WeakRvwmoAdm.laX5 w)) d0 WeakRvwmoAdm.laWlH
+      (ahP cpu (ahRead WeakRvwmoAdm.laTxtHi.toNat (WeakRvwmoAdm.laX5 w))) d0 :=
+    WeakRvwmoAdm.ahFetchPstep 2 64 cpu d0 (WeakRvwmoAdm.laX5 w) WeakRvwmoAdm.laReqh
+      WeakRvwmoAdm.laTvh WeakRvwmoAdm.laTxtHi (WeakRvwmoAdm.laFetchHiReq w)
+      WeakRvwmoAdm.laFetchHiRam (by rw [WeakRvwmoAdm.laFetchHiPlain]) rfl (by
+        intro j hj
+        rcases j with _ | _ | j
+        · rfl
+        · rfl
+        · omega)
+  have hbar : pstepEv (WeakRvwmoAdm.laP6 w cpu) d0 WeakRvwmoAdm.laWlF
+      (WeakRvwmoAdm.laPfin w cpu) d0 :=
+    WeakRvwmoAdm.ahBarPstep cpu d0 (WeakRvwmoAdm.laX6 w) .Barrier_RISCV_r_rw
+      (WeakRvwmoAdm.laBar w) rfl
+  have hadm : admRun true (laP1 w cpu) d0 (WeakRvwmoAdm.laAdm w) (WeakRvwmoAdm.laP6 w cpu) d0 :=
+    WeakRvwmoAdm.admRunApp true _ d0 (laLs w) (laP2 w cpu) d0 _ _ d0
+      (admRunOfIter false 200 cpu d0 (ahRead w.toNat laX2))
+      (.ARcons _ _ laWl1 (laP3 w cpu) d0 _ _ _ rfl hft
+        (WeakRvwmoAdm.admRunApp true _ d0 _ (ahP cpu (WeakRvwmoAdm.laX5 w)) d0 _ _ d0
+          (admRunOfIter false 400 cpu d0 (WeakRvwmoAdm.laX4 w))
+          (.ARcons _ _ WeakRvwmoAdm.laWlH _ d0 _ _ _ rfl hfh
+            (admRunOfIter false 400 cpu d0
+              (ahRead WeakRvwmoAdm.laTxtHi.toNat (WeakRvwmoAdm.laX5 w))))))
   exact hemit.HEone (dv := fun _ => d0) 0 wsInit
     (.LLoad false (paZ evFlag) (ldTs t) (WeakRvwmoConfWit2.ldVs w)) _ (laP0 cpu) [] (laP0 cpu) d0
-    (laWl0 t w) (laP1 w cpu) _ (laP3 w cpu) (.ARnil _ _)
+    (laWl0 t w) (laP1 w cpu) _ (WeakRvwmoAdm.laPfin w cpu) (.ARnil _ _)
     (ahLoadRealizes (laP0 cpu) wsInit (paZ evFlag) (ldTvs t w)) hld
-    (hemit.HEone 1 _ (.LLoad false (paZ laReqf.pa) (laTvf.map Prod.fst) (laTvf.map Prod.snd)) []
-      (laP1 w cpu) (laLs w) (laP2 w cpu) d0 laWl1 (laP3 w cpu) [] (laP3 w cpu)
-      (admRunOfIter false 200 cpu d0 (ahRead w.toNat laX2))
-      (WeakRvwmoAdm.ahFetchRealizes (laP2 w cpu) _ _ laTvf) hft (.HEnil _ _ _))
+    (hemit.HEone 1 _ (.LFence true false true true) [] (laP1 w cpu) (WeakRvwmoAdm.laAdm w)
+      (WeakRvwmoAdm.laP6 w cpu) d0 WeakRvwmoAdm.laWlF (WeakRvwmoAdm.laPfin w cpu) []
+      (WeakRvwmoAdm.laPfin w cpu) hadm
+      (WeakRvwmoAdm.ahFenceRealizes (WeakRvwmoAdm.laP6 w cpu) _ true false true true) hbar
+      (.HEnil _ _ _))
 
 /-! ### 4.1 The emission is fabric-free and dependency-free -/
 
@@ -534,8 +658,21 @@ theorem eadmNostore (ls : List Wlabel) : ls.all wlAdmok = true → (eadm ls).all
     rw [this, Bool.and_true]
     cases l <;> first | rfl | exact absurd hl (by simp [wlAdmok])
 
+/-- (Lean-only) the administrative run's labels: computed-stretch labels or one of the two
+fetches. -/
+theorem WeakRvwmoAdm.laAdmMem (w : BitVec 32) (l : Wlabel) :
+    l ∈ WeakRvwmoAdm.laAdm w → wlAdmok l = true ∨ l = laWl1 ∨ l = WeakRvwmoAdm.laWlH := by
+  intro h
+  simp only [WeakRvwmoAdm.laAdm, List.mem_append, List.mem_cons] at h
+  rcases h with h | h | h | h | h
+  · exact Or.inl (forallbElemOf wlAdmok (laLs w) l (admLblsAdmok false 200 _) h)
+  · exact Or.inr (Or.inl h)
+  · exact Or.inl (forallbElemOf wlAdmok _ l (admLblsAdmok false 400 _) h)
+  · exact Or.inr (Or.inr h)
+  · exact Or.inl (forallbElemOf wlAdmok _ l (admLblsAdmok false 400 _) h)
+
 theorem laEmItemsFst (t : Nat) (w : BitVec 32) (cpu : CPU) :
-    emLabels (laEm t w cpu) = laWl0 t w :: (laLs w ++ [laWl1]) := by
+    emLabels (laEm t w cpu) = laWl0 t w :: (WeakRvwmoAdm.laAdm w ++ [WeakRvwmoAdm.laWlF]) := by
   simp only [emLabels, laEm, List.map_cons, List.map_append, eadmFst, List.map_nil]
 
 theorem laEmDevfree (t : Nat) (w : BitVec 32) (cpu : CPU) : emDevfree (laEm t w cpu) := by
@@ -545,9 +682,11 @@ theorem laEmDevfree (t : Nat) (w : BitVec 32) (cpu : CPU) : emDevfree (laEm t w 
   rcases List.mem_cons.1 h with h | h
   · simp [laWl0] at h
   · rcases List.mem_append.1 h with h | h
-    · have hx := forallbElemOf wlAdmok _ LDev (admLblsAdmok false 200 (ahRead w.toNat laX2)) h
-      simp [wlAdmok] at hx
-    · simp [laWl1] at h
+    · rcases WeakRvwmoAdm.laAdmMem w LDev h with hx | hx | hx
+      · simp [wlAdmok] at hx
+      · simp [laWl1] at hx
+      · simp [WeakRvwmoAdm.laWlH] at hx
+    · simp [WeakRvwmoAdm.laWlF] at h
 
 theorem forallbNostoreShape (l0 l1 : Wlabel) (ls : List Wlabel) (k0 k1 : Nat) :
     itNostore (l0, some k0) = true → itNostore (l1, some k1) = true →
@@ -557,21 +696,44 @@ theorem forallbNostoreShape (l0 l1 : Wlabel) (ls : List Wlabel) (k0 k1 : Nat) :
   simp only [List.all_cons, List.all_append, h0, eadmNostore ls hls, h1, List.all_nil,
     Bool.and_self]
 
+/-- (Lean-only) an administrative item list is store-free label by label. -/
+theorem WeakRvwmoAdm.eadmAllNostore (ls : List Wlabel) :
+    (∀ l, l ∈ ls → itNostore (l, none) = true) → (eadm ls).all itNostore = true := by
+  intro h
+  rw [List.all_eq_true]
+  intro it hit
+  simp only [eadm, List.mem_map] at hit
+  obtain ⟨l, hl, rfl⟩ := hit
+  exact h l hl
+
 theorem laRowDepsEmpty (t : Nat) (w : BitVec 32) (cpu : CPU) :
-    rowDeps (laEm t w cpu).emItems = [] :=
-  rowDepsNostore _ (forallbNostoreShape _ _ _ _ _ rfl rfl (admLblsAdmok false 200 _))
+    rowDeps (laEm t w cpu).emItems = [] := by
+  apply rowDepsNostore
+  have hadm : (eadm (WeakRvwmoAdm.laAdm w)).all itNostore = true := by
+    apply WeakRvwmoAdm.eadmAllNostore
+    intro l hl
+    rcases WeakRvwmoAdm.laAdmMem w l hl with h | rfl | rfl
+    · cases l <;> first | rfl | exact absurd h (by simp [wlAdmok])
+    · rfl
+    · rfl
+  simp only [laEm, List.all_cons, List.all_append, hadm, List.all_nil]
+  rfl
 
 /-! ## 5. THE TWO-HART GRAPH WITH A TWO-EVENT ROW -/
 
 noncomputable def laTxtPa : Int := paZ laReqf.pa
 
+/-- The era image: the flag word CLEAR and the fence word `0x0230000f` at `main+0x18` (the two
+fetched halves; deviation 3). -/
 noncomputable def mp2Img : Image := fun a =>
   if paZ evFlag ≤ a ∧ a < paZ evFlag + 4 then some (nthByte (n := 4) lockZero (a - paZ evFlag).toNat)
   else if laTxtPa ≤ a ∧ a < laTxtPa + 2 then some (nthByte (n := 2) laTxt (a - laTxtPa).toNat)
+  else if laTxtPa + 2 ≤ a ∧ a < laTxtPa + 4 then
+    some (nthByte (n := 2) WeakRvwmoAdm.laTxtHi (a - (laTxtPa + 2)).toNat)
   else none
 
 noncomputable def mp2 : Gexec :=
-  ⟨mp2Img, [evRow, laRow 1 lockOne], [(0, 0), (1, 0), (1, 1)]⟩
+  ⟨mp2Img, [evRow, laRow 1 lockOne], [(0, 0), (1, 0)]⟩
 
 noncomputable def mp2d : Gdexec := ⟨mp2, []⟩
 
@@ -589,7 +751,7 @@ theorem mp2Lbl (e : Geid) (l : Lbl) :
     gxLbl mp2 e = some l →
     (e = (0, 0) ∧ l = .LStore false (paZ evFlag) (WeakInterpProj.wbytes 4 lockOne) .WCplain) ∨
     (e = (1, 0) ∧ l = .LLoad false (paZ evFlag) (ldTs 1) (WeakRvwmoConfWit2.ldVs lockOne)) ∨
-    (e = (1, 1) ∧ l = .LLoad false laTxtPa (laTvf.map Prod.fst) (laTvf.map Prod.snd)) := by
+    (e = (1, 1) ∧ l = .LFence true false true true) := by
   obtain ⟨i, k⟩ := e
   intro hl
   rcases i with _ | _ | i
@@ -636,26 +798,19 @@ theorem mp2Wr (e : Geid) (a : Int) (v : BitVec 8) :
   · simp [lbWr] at hwr
   · simp [lbWr] at hwr
 
+/-- The only read is the spin load (deviation 3: the fetch is no graph event). -/
 theorem mp2Rd (e : Geid) (a : Int) (t : Nat) (v : BitVec 8) :
     greadsByte mp2 e a t v →
-    (e = (1, 0) ∧ t = 1 ∧
-      ∃ j : Nat, j < 4 ∧ a = accAddr (paZ evFlag) j ∧ v = nthByte (n := 4) lockOne j) ∨
-    (e = (1, 1) ∧ t = 0 ∧
-      ∃ j : Nat, j < 2 ∧ a = accAddr laTxtPa j ∧ v = nthByte (n := 2) laTxt j) := by
+    e = (1, 0) ∧ t = 1 ∧
+      ∃ j : Nat, j < 4 ∧ a = accAddr (paZ evFlag) j ∧ v = nthByte (n := 4) lockOne j := by
   rintro ⟨l, base, ts, vs, j, hl, hrd, ht, hv, ha⟩
   rcases mp2Lbl e l hl with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
   · simp [lbRd] at hrd
   · simp only [lbRd, Option.some.injEq, Prod.mk.injEq] at hrd
     obtain ⟨rfl, rfl, rfl⟩ := hrd
     obtain ⟨hj, rfl⟩ := WeakRvwmoConfWit2.ldVsLookup lockOne j v hv
-    exact Or.inl ⟨rfl, WeakRvwmoConfWit2.ldTsLookup 1 j t ht, j, hj, ha.symm, rfl⟩
-  · simp only [lbRd, Option.some.injEq, Prod.mk.injEq] at hrd
-    obtain ⟨rfl, rfl, rfl⟩ := hrd
-    refine Or.inr ⟨rfl, ?_, j, ?_⟩
-    · rcases j with _ | _ | j <;> simp [laTvf] at ht <;> exact ht.symm
-    · rcases j with _ | _ | j <;> simp [laTvf] at hv
-      · exact ⟨by omega, ha.symm, hv.symm⟩
-      · exact ⟨by omega, ha.symm, hv.symm⟩
+    exact ⟨rfl, WeakRvwmoConfWit2.ldTsLookup 1 j t ht, j, hj, ha.symm, rfl⟩
+  · simp [lbRd] at hrd
 
 theorem mp2ImgTxt (j : Nat) : j < 2 → mp2Img (accAddr laTxtPa j) = some (nthByte (n := 2) laTxt j) := by
   intro hj
@@ -663,6 +818,16 @@ theorem mp2ImgTxt (j : Nat) : j < 2 → mp2Img (accAddr laTxtPa j) = some (nthBy
   have ht := laTxtPaVal
   unfold mp2Img accAddr
   rw [if_neg (by omega), if_pos (by omega), show (laTxtPa + (j : Int) - laTxtPa).toNat = j by omega]
+
+/-- (Lean-only) … and the upper half. -/
+theorem WeakRvwmoAdm.mp2ImgTxtHi (j : Nat) :
+    j < 2 → mp2Img (accAddr (laTxtPa + 2) j) = some (nthByte (n := 2) WeakRvwmoAdm.laTxtHi j) := by
+  intro hj
+  have hf := laFlagPa
+  have ht := laTxtPaVal
+  unfold mp2Img accAddr
+  rw [if_neg (by omega), if_neg (by omega), if_pos (by omega),
+    show (laTxtPa + 2 + (j : Int) - (laTxtPa + 2)).toNat = j by omega]
 
 theorem mp2Gwrites : gwrites mp2 = [(0, 0)] := by decide +kernel
 theorem mp2Gwix0 : gwix mp2 (0, 0) = 1 := by decide +kernel
@@ -675,19 +840,15 @@ theorem mp2PpoGmo : gppoGmo mp2 := by
   intro e1 e2 h
   exfalso
   rcases h with hloc | hf | hacq | hrel
-  · obtain ⟨hpo, a, ha1, ha2⟩ := hloc
+  · obtain ⟨hpo, a, _, ha2⟩ := hloc
     obtain ⟨rfl, rfl⟩ := mp2GpoInv e1 e2 hpo
-    rcases ha1 with ⟨v, hw⟩ | ⟨t, v, hr⟩
-    · exact absurd (mp2Wr _ _ _ hw).1 (by simp)
-    rcases mp2Rd _ _ _ _ hr with ⟨_, _, j, hj, rfl, _⟩ | ⟨hbad, _⟩
-    · rcases ha2 with ⟨v2, hw2⟩ | ⟨t2, v2, hr2⟩
-      · exact absurd (mp2Wr _ _ _ hw2).1 (by simp)
-      rcases mp2Rd _ _ _ _ hr2 with ⟨hbad, _⟩ | ⟨_, _, j', hj', heq, _⟩
-      · exact absurd hbad (by simp)
-      · exact laBytesDisj j j' hj hj' heq
-    · exact absurd hbad (by simp)
-  · obtain ⟨pr, pw, sr, sw, ⟨_, _, kf, _, _, hkf⟩, _, _⟩ := hf
-    rcases mp2Lbl (e1.1, kf) _ hkf with ⟨_, hb⟩ | ⟨_, hb⟩ | ⟨_, hb⟩ <;> cases hb
+    rcases ha2 with ⟨v2, hw2⟩ | ⟨t2, v2, hr2⟩
+    · exact absurd (mp2Wr _ _ _ hw2).1 (by simp)
+    · exact absurd (mp2Rd _ _ _ _ hr2).1 (by simp)
+  · obtain ⟨pr, pw, sr, sw, ⟨_, _, kf, hk1, hk2, _⟩, _, h2r⟩ := hf
+    have hs2 : (gxLbl mp2 e2).isSome = true := by
+      rcases h2r with ⟨⟨l, hl, _⟩, _⟩ | ⟨⟨l, hl, _⟩, _⟩ <;> rw [hl] <;> rfl
+    rcases mp2Pos e2 hs2 with rfl | rfl | rfl <;> dsimp only at hk2 <;> omega
   · exact mp2Noaq e1 hacq.2.2.1
   · exact mp2Noaq e2 hrel.2.2.2.2
 
@@ -697,48 +858,79 @@ theorem mp2Consistent : rvwmoMinusConsistent mp2 := by
     constructor
     · intro he
       simp only [mp2, List.mem_cons, List.not_mem_nil, or_false] at he
-      rcases he with rfl | rfl | rfl
+      rcases he with rfl | rfl
       · exact ⟨_, rfl, rfl⟩
       · exact ⟨_, rfl, rfl⟩
-      · exact ⟨_, rfl, rfl⟩
-    · rintro ⟨l, hl, _⟩
-      rcases mp2Lbl e l hl with ⟨rfl, _⟩ | ⟨rfl, _⟩ | ⟨rfl, _⟩ <;> simp [mp2]
+    · rintro ⟨l, hl, hm⟩
+      rcases mp2Lbl e l hl with ⟨rfl, _⟩ | ⟨rfl, _⟩ | ⟨rfl, rfl⟩
+      · simp [mp2]
+      · simp [mp2]
+      · simp [lbIsMem, lbIsR, lbIsW] at hm
   · intro i p k l hp hk
     rcases i with _ | _ | i <;> simp [mp2] at hp <;> subst hp
     · rcases k with _ | k <;> simp [evRow] at hk
       subst hk
       exact wbytesNonnil 4 lockOne (by decide)
-    · rcases k with _ | _ | k <;> simp [laRow] at hk <;> subst hk <;> rfl
+    · rcases k with _ | _ | k <;> simp [laRow] at hk <;> subst hk <;> first | rfl | trivial
   · intro e a t v hrd
-    rcases mp2Rd e a t v hrd with ⟨rfl, rfl, j, hj, rfl, rfl⟩ | ⟨rfl, rfl, j, hj, rfl, rfl⟩
-    · refine ⟨⟨(0, 0), mp2WriteAt1, ⟨_, paZ evFlag, WeakInterpProj.wbytes 4 lockOne, j, rfl, rfl,
-        wbytesLookup 4 (m := 4) lockOne j hj, rfl⟩, mp2Gvis0⟩, ?_⟩
-      intro w' v' hw' _
-      obtain ⟨rfl, _⟩ := mp2Wr w' _ v' hw'
-      rw [mp2Gwix0]
-      exact Nat.le_refl _
-    · refine ⟨mp2ImgTxt j hj, ?_⟩
-      intro w' v' hw' _
-      obtain ⟨rfl, j', hj', heq, _⟩ := mp2Wr w' _ v' hw'
-      exact (laBytesDisj j' j hj' hj heq.symm).elim
+    obtain ⟨rfl, rfl, j, hj, rfl, rfl⟩ := mp2Rd e a t v hrd
+    refine ⟨⟨(0, 0), mp2WriteAt1, ⟨_, paZ evFlag, WeakInterpProj.wbytes 4 lockOne, j, rfl, rfl,
+      wbytesLookup 4 (m := 4) lockOne j hj, rfl⟩, mp2Gvis0⟩, ?_⟩
+    intro w' v' hw' _
+    obtain ⟨rfl, _⟩ := mp2Wr w' _ v' hw'
+    rw [mp2Gwix0]
+    exact Nat.le_refl _
   · intro e a t v hrd hw
     obtain ⟨l, hl, hlw⟩ := hw
-    rcases mp2Rd e a t v hrd with ⟨rfl, _⟩ | ⟨rfl, _⟩
-    · have hl0 : gxLbl mp2 (1, 0) =
-          some (.LLoad false (paZ evFlag) (ldTs 1) (WeakRvwmoConfWit2.ldVs lockOne)) := rfl
-      rw [hl0] at hl
-      cases hl
-      simp [lbIsW] at hlw
-    · have hl1 : gxLbl mp2 (1, 1) =
-          some (.LLoad false laTxtPa (laTvf.map Prod.fst) (laTvf.map Prod.snd)) := rfl
-      rw [hl1] at hl
-      cases hl
-      simp [lbIsW] at hlw
+    obtain ⟨rfl, _⟩ := mp2Rd e a t v hrd
+    have hl0 : gxLbl mp2 (1, 0) =
+        some (.LLoad false (paZ evFlag) (ldTs 1) (WeakRvwmoConfWit2.ldVs lockOne)) := rfl
+    rw [hl0] at hl
+    cases hl
+    simp [lbIsW] at hlw
 
 theorem mp2DepsConsistent : rvwmoMinusDepsConsistent mp2d :=
   ⟨mp2Consistent, fun _ h => by simp [mp2d] at h, fun _ h => by simp [mp2d] at h⟩
 
 /-! ### 5.1 THE BUNDLE — the first `gdexecQconf` with a two-event row -/
+
+/-- (Lean-only, deviation 3) THE FETCH PIN: both administrative fetches of the emission read
+the image at timestamp 0 (`laTxtKw` / `laTxtHiKw`: the very bytes of the kernel image). -/
+theorem WeakRvwmoAdm.laEmFetchImg (t : Nat) (w : BitVec 32) (cpu : CPU) :
+    emFetchImg mp2Img (laEm t w cpu) := by
+  have hpa : paZ WeakRvwmoAdm.laReqh.pa = laTxtPa + 2 := by
+    rw [WeakRvwmoAdm.laFetchHiPa, laTxtPaVal]
+    decide
+  intro l hl
+  rw [laEmItemsFst] at hl
+  rcases List.mem_cons.1 hl with rfl | hl
+  · trivial
+  rcases List.mem_append.1 hl with hl | hl
+  · rcases WeakRvwmoAdm.laAdmMem w l hl with h | rfl | rfl
+    · cases l <;> first | trivial | exact absurd h (by simp [wlAdmok])
+    · show (∀ t ∈ laTvf.map Prod.fst, t = 0) ∧
+        ∀ j, j < laTvf.length → mp2Img (laTxtPa + (j : Int)) = (laTvf.map Prod.snd)[j]?
+      refine ⟨fun t ht => by simp [laTvf] at ht; omega, fun j hj => ?_⟩
+      have hj2 : j < 2 := hj
+      rw [show laTxtPa + (j : Int) = accAddr laTxtPa j from rfl, mp2ImgTxt j hj2]
+      rcases j with _ | _ | j
+      · rfl
+      · rfl
+      · omega
+    · show (∀ t ∈ WeakRvwmoAdm.laTvh.map Prod.fst, t = 0) ∧
+        ∀ j, j < WeakRvwmoAdm.laTvh.length →
+          mp2Img (paZ WeakRvwmoAdm.laReqh.pa + (j : Int)) = (WeakRvwmoAdm.laTvh.map Prod.snd)[j]?
+      refine ⟨fun t ht => by simp [WeakRvwmoAdm.laTvh] at ht; omega, fun j hj => ?_⟩
+      have hj2 : j < 2 := hj
+      rw [hpa, show laTxtPa + 2 + (j : Int) = accAddr (laTxtPa + 2) j from rfl,
+        WeakRvwmoAdm.mp2ImgTxtHi j hj2]
+      rcases j with _ | _ | j
+      · rfl
+      · rfl
+      · omega
+  · rw [List.mem_singleton] at hl
+    subst hl
+    trivial
 
 noncomputable def mp2Boot (cpu0 cpu1 : CPU) (rs0 : RegFile) (ib0 : Ibch) : Nat → Pexv6 :=
   fun i =>
@@ -754,9 +946,11 @@ theorem mp2Qconf (cpu0 cpu1 : CPU) (rs0 : RegFile) (ib0 : Ibch) (d0 : Efab) :
   rcases i with _ | _ | i
   · obtain rfl : evRow = row := Option.some.inj hrow
     exact ⟨evEm cpu0 rs0 ib0, evHartConf _ _ _ _ _, evEmDevfree _ _ _,
+      WeakRvwmoConfWit2.evEmFetchImg _ _ _ _,
       fun jk hjk => (evRowDepsEmpty cpu0 rs0 ib0 jk hjk).elim⟩
   · obtain rfl : laRow 1 lockOne = row := Option.some.inj hrow
-    refine ⟨laEm 1 lockOne cpu1, laHartConf _ _ _ _ _, laEmDevfree _ _ _, ?_⟩
+    refine ⟨laEm 1 lockOne cpu1, laHartConf _ _ _ _ _, laEmDevfree _ _ _,
+      WeakRvwmoAdm.laEmFetchImg _ _ _, ?_⟩
     intro jk hjk
     rw [laRowDepsEmpty 1 lockOne cpu1] at hjk
     exact absurd hjk List.not_mem_nil

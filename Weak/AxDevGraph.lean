@@ -78,6 +78,8 @@ RESIDUALS (a)–(f) of the Rocq header are design notes; they carry over unchang
    event instance's fabric `Efab` (`WeakEvInst` deviation 5), so `mmioStepAt F p` takes an
    `F : Efab` and the frontier clause reads `∀ F : Efab, devFrontier GV i F.efDev → mmioStepAt F
    p` (a hart's MMIO step reads and moves only `F.efDev`; Rocq quantified `d : dev_state`).
+   O2 Stage C (owner Q-C2): `devReducible` and the UART instances have no fetch-oracle
+   parameters `T`/`img` (`reducibleGd` lost them, `AxOpsem` deviation 2).
    `atMmio`'s requests are lean-sail records indexed by the va width (`va` bound too).  The UART
    MMIO step lemmas take the port window `devDecode req.pa = some (.uart pt, off)` and, for a
    write, `req.value = some v` (lean-sail write values are `Option`).
@@ -734,9 +736,8 @@ def devFrontier (GV : GdexecDev) (i : Nat) (d : DevStates) : Prop :=
     dreplay AxDevGraph.dev0State ((GV.gvDord.take p).filterMap (gvDlbl GV)) = some d
 
 /-- THE TARGET SHAPE (C11). -/
-def AxDevGraph.devReducible (GV : GdexecDev) (T : Int → Prop) (img : Int → Option (BitVec 8))
-    (i : Nat) (s : Athread) : Prop :=
-  reducibleGd GV.gvGd i T img s ∧
+def AxDevGraph.devReducible (GV : GdexecDev) (i : Nat) (s : Athread) : Prop :=
+  reducibleGd GV.gvGd i s ∧
   (atMmio s.atP → ∀ F : Efab, devFrontier GV i F.efDev → mmioStepAt F s.atP)
 
 theorem AxDevGraph.uartDecodeBounds (pa : PAddr) (pt : UartId) (off : Nat) :
@@ -815,13 +816,13 @@ theorem uartMmioReadStep (F : Efab) (cpu : CPU) (va : Nat)
   simp
 
 /-- THE UART INSTANCE OF `devReducible` (write). -/
-theorem uartDevReducibleWrite (GV : GdexecDev) (T : Int → Prop) (img : Int → Option (BitVec 8))
+theorem uartDevReducibleWrite (GV : GdexecDev)
     (i : Nat) (cpu : CPU) (va : Nat)
     (req : Mem_write_request 1 va Arch.pa Arch.translation Arch.arch_ak) (v : BitVec (8 * 1))
     (k : Result (Option Bool) Arch.abort → SailM Unit) (rs : RegFile) (ib : Ibch) (kk : Nat)
     (pt : UartId) (off : Nat) :
     devDecode req.pa = some (.uart pt, off) → req.value = some v →
-    AxDevGraph.devReducible GV T img i
+    AxDevGraph.devReducible GV i
       ⟨.PHart cpu (.impure (.ok (.memWrite 1 va req)) k) rs none ib, kk⟩ := by
   intro hdec hval
   refine ⟨?_, fun _ F _ => uartMmioWriteStep F cpu va req v k rs ib pt off hdec hval⟩
@@ -829,13 +830,13 @@ theorem uartDevReducibleWrite (GV : GdexecDev) (T : Int → Prop) (img : Int →
   exact ⟨[], ⟨p', kk⟩, .inl ⟨LDev, .AStepAdmin _ kk _ _ _ _ trivial hs⟩⟩
 
 /-- THE UART INSTANCE OF `devReducible` (read). -/
-theorem uartDevReducibleRead (GV : GdexecDev) (T : Int → Prop) (img : Int → Option (BitVec 8))
+theorem uartDevReducibleRead (GV : GdexecDev)
     (i : Nat) (cpu : CPU) (va : Nat)
     (req : Mem_read_request 1 va Arch.pa Arch.translation Arch.arch_ak)
     (k : Result (BitVec (8 * 1) × Option Bool) Arch.abort → SailM Unit) (rs : RegFile)
     (ib : Ibch) (kk : Nat) (pt : UartId) (off : Nat) :
     devDecode req.pa = some (.uart pt, off) →
-    AxDevGraph.devReducible GV T img i
+    AxDevGraph.devReducible GV i
       ⟨.PHart cpu (.impure (.ok (.memRead 1 va req)) k) rs none ib, kk⟩ := by
   intro hdec
   refine ⟨?_, fun _ F _ => uartMmioReadStep F cpu va req k rs ib pt off hdec⟩

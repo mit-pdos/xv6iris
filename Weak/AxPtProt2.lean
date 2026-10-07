@@ -26,7 +26,9 @@ The Rocq header, in substance.  Over `AxPtProt`'s `Gptw`.  PURE.  Verdicts by
     order PTW accesses) but VIOLATES H5'.2 (`gsfNotH5`); with the walk reading the new word
     (`GPsfok`) the full model holds and the agreement invariant holds (`gsfokSound`).
 
-O2 / D1: graph-level; no access kinds, no fetch events.  Nothing moves.
+Stage C (D1 reversed: fetches are not graph events): graph-level; no access kinds, no
+fetch events (every `LLoad` row item is a data or walker load; the sfence is the
+`LFence false false false false` marker).  Nothing moves.
 
 **Deviations from Rocq.**
 

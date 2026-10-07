@@ -64,13 +64,10 @@ LAYOUT.  Hart `c` at pool position and agent index `c.val`; the disk is agent `n
    language's RAM-read arm has a third, i-cache branch, so `elabelOk` gains the clause
    `LIFetch base tvs ↦ ifetchOk (imgZ σ.wgimg) σ.wglog (σ.wgitv c) base tvs ∧ log ∧ view
    unchanged` (at the hart's own instruction view, Stage B), and `ecycleStepLabel` exhibits it.
-   `edlabelOk (LIFetch ..)` is `False` (the disk never fetches).  The FETCH → PLAIN LOAD
-   premise of the bridge (`WeakPromiseBridge.pfFetchLoadOk`, its deviation 6) is NOT folded into
-   `elabelOk`: a stale pre-`fence.i` fetch is a legal language event whose bytes need not be
-   readable, so folding it in would falsify ⇒.  Lean-only bridges for the consumer:
-   `elabelOkIFetch0` (the language's check implies `PFIFetch`'s view-0 check, `ifetchOkAnti`)
-   and `pfFetchLoadOkHart` (the premise at a hart agent of `ecfgOf` is a statement about
-   `σ.wgws c`).
+   `edlabelOk (LIFetch ..)` is `False` (the disk never fetches).  Lean-only bridge for the
+   consumer: `elabelOkIFetch0` (the language's check implies `PFIFetch`'s view-0 check,
+   `ifetchOkAnti`).  (Stage C, owner ruling Q-C3: the bridge's Stage-B fetch → plain-load
+   premise and its hart form `pfFetchLoadOkHart` are deleted; a fetch is a bridge stutter.)
 4. O2 STAGE B — the barrier arm also moves `wgitv` (`ewgBar`); `elabelOk`'s clauses speak only of
    the log and the data view, so `fence.i` (`ebarNow = none`) is `LSilent` as in Rocq and the
    other ten barriers `LFence`.  The label is read off `ebarNow b` (Rocq: an eleven-way
@@ -114,7 +111,7 @@ LAYOUT.  Hart `c` at pool position and agent index `c.val`; the disk is agent `n
 `ecfg_of_log` `ecfgOfLog`, `no_violation_violation_hart` `noViolationViolationHart`.
 Lean-only: `Epool.epU0`/`epU1`/`epPlic`, `epU`, `epUset`, `epPset`, `epUsetGen`, `uartOff`,
 `plicAgent`, `epoolTail`, `epoolListTailGet`, `epoolListTailSet`, `epoolListUset`,
-`epoolListPlicLookup`, `epoolListPset`, `ediskStepEra`, `elabelOkIFetch0`, `pfFetchLoadOkHart`,
+`epoolListPlicLookup`, `epoolListPset`, `ediskStepEra`, `elabelOkIFetch0`,
 `Efab` & co. (deviation 9).
 
 **Not ported:** nothing.
@@ -378,23 +375,6 @@ theorem elabelOkIFetch0 (σ : WGState) (c : CPU) (base : Int) (tvs : List (Nat �
     (σ' : WGState) :
     elabelOk σ c (.LIFetch base tvs) σ' → ifetchOk (imgZ σ.wgimg) σ.wglog 0 base tvs :=
   fun h => ifetchOkAnti _ _ _ _ _ _ (Nat.zero_le _) h.1
-
-/-- O2 (Lean-only): the bridge's fetch premise at a hart agent of the projection. -/
-theorem pfFetchLoadOkHart (P : Epool) (σ : WGState) (c : CPU) (base : Int)
-    (tvs : List (Nat × BitVec 8)) :
-    pfFetchLoadOk (ecfgOf P σ) c.val (.LIFetch base tvs) ↔
-      ((∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) →
-          readable (imgZ σ.wgimg) σ.wglog (σ.wgws c) (loadVpre (σ.wgws c) false)
-            (base + (j : Int)) t) ∧
-        wsEqr (loadPostRun (σ.wgws c) false base (tvs.map Prod.fst)) (σ.wgws c)) := by
-  constructor
-  · intro h
-    exact h _ (eagsHart P σ c)
-  · intro h ag hag
-    have hag' : (eags P σ)[c.val]? = some ag := hag
-    rw [eagsHart] at hag'
-    cases hag'
-    exact h
 
 /-! ## 3. THE FABRIC-SHARED PROMISE-FREE MACHINE -/
 

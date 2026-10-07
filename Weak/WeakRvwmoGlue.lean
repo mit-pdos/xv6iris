@@ -52,17 +52,14 @@ commands/comments, not declarations.  A LEAF: nothing imports this file.
    `runErased`, `cycleKillOfL2` and `t2linOfL2` CARRY the Lean-only premise
    `∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2` (dischargeable by
    `WeakEvCapstone.efetchItvOkRunOfUnwritten`; nothing here proves the text unwritten).
-5. O2 / D1 — THE FETCH-INERTNESS PREMISE (WeakRvwmoCert4 deviation 3 / WeakRvwmoSupply
-   deviation 2).  `hullRealizableRowsG` returns the process supply CONDITIONAL on
-   `candFetchInert boot d0 N c` for the candidate it builds, while `hullRun` must deliver a full
-   `RunData` (with `rdProg`).  The Glue CANNOT discharge it: nothing in its hypotheses speaks of
-   the candidate's machine `Wstate` at a fetch, and `lbFetchInert` is not automatic even at
-   timestamp 0 (`loadPostRun` reads the forward bank; only `wsEqrLoadPostRunInit` at `wsInit`
-   is free).  So it is CARRIED as the explicit Lean-only premise
-   `WeakRvwmoGlue.hullRunFetchInert boot d0 im nh N` (named after `hull_run`): every candidate
-   that realizes a good cut's hull as `hullRealizableRowsG` describes it (consistent, the
-   graph's image, the hull's rows up to a renaming) is fetch-inert.  `hullRun`,
-   `cycleKillOfL2` and `t2linOfL2` take it; their conclusions are Rocq's.  OWNER QUESTION.
+5. O2 / STAGE C — THE PINNED LTS (WeakRvwmoCert4 deviation 3 / WeakRvwmoSupply deviation 2).
+   The fetch is an administrative label of the graph tier whose only content (the bytes are
+   the boot image at timestamp 0) is the pin `WeakAxRealize.fetchPin`.  `RunData.rdProg` is
+   therefore stated at the pinned program LTS `pstepPin c.cdImg pstepEv` (the form
+   `hullRealizableRowsG` and `WeakRvwmoCert4.cstOk` deliver, unconditionally), and `runErased`
+   replays it through `WeakAxRealize.execWfPfRunPin` (projected back to `pstepEv`).  The Stage-B
+   Lean-only premise `WeakRvwmoGlue.hullRunFetchInert` is DELETED: `hullRun`, `cycleKillOfL2`
+   and `t2linOfL2` carry only the fetch-view premise of deviation 4; conclusions are Rocq's.
 6. PROOFS: `tc`/`rtc` inductions split at the LAST step (MachCSL.Rel deviation 1), so
    `crunRawChain` builds the chain by appending (Lean-only `WeakRvwmoGlue.rawChainSnoc`) and
    `racyDDecompose` / `crunAppend` case on the last step; the statements are Rocq's.
@@ -81,11 +78,11 @@ commands/comments, not declarations.  A LEAF: nothing imports this file.
 `cert_supply` `certSupply`, `boot_tie` `bootTie`, `cycle_kill_of_l2` `cycleKillOfL2`,
 `t2lin_of_l2` `t2linOfL2`, `Rsame_RacyD` `rsameRacyD`, `rtc_Rsame_RacyD` `rtcRsameRacyD`,
 `raw_chain_tc` `rawChainTc`, `lbgd_segments` `lbgdSegments`, `l2_claim_mpgd` `l2ClaimMpgd`.
-Lean-only (file-qualified): `WeakRvwmoGlue.rawChainSnoc`, `WeakRvwmoGlue.hullRunFetchInert`.
+Lean-only (file-qualified): `WeakRvwmoGlue.rawChainSnoc`.
 
 **File-qualified Rocq names:** none (no name of this file is in `notes/weak-port-dupnames.json`).
 
-**Dropped:** none (Rocq 45 declarations; Lean 47 = 45 + the 2 Lean-only).
+**Dropped:** none (Rocq 45 declarations; Lean 46 = 45 + the 1 Lean-only).
 -/
 import Weak.WeakRvwmoCert4
 import Weak.WeakRvwmoKillArms
@@ -278,28 +275,12 @@ structure RunData (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec) (c : 
   rdImg : c.cdImg = G.gxImg
   rdPst0 : pst 0 = (List.range' 0 N).map boot
   rdDv0 : dv 0 = d0
-  rdProg : execProgOk' pstepEv pclsEv pst dv (candExec c)
+  /-- Deviation 5: at the pinned program LTS. -/
+  rdProg : execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst dv (candExec c)
 
-/-- Lean-only (deviation 5): THE FETCH-INERTNESS PREMISE of `hullRun` — every candidate that
-realizes a good cut's hull as `hullRealizableRowsG` describes it is fetch-inert. -/
-def WeakRvwmoGlue.hullRunFetchInert (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
-    (N : Nat) : Prop :=
-  ∀ (GD : Gdexec) (cs : List Nat) (c : Cand) (rho : Nat → Nat),
-    rvwmoMinusDepsConsistent GD →
-    gdexecQconf boot d0 im nh GD →
-    cutOk GD.gdG cs →
-    (∀ x, ¬ tc (racyD (gdHull GD cs)) x x) →
-    GD.gdG.gxProg.length ≤ N →
-    srvwmoConsistent c →
-    c.cdImg = GD.gdG.gxImg →
-    (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) =
-      (List.take ((cs[i]?).getD 0) ((GD.gdG.gxProg[i]?).getD [])).map (lblRen rho)) →
-    candFetchInert boot d0 N c
-
-/-- THE ROUTE, assembled (deviation 5: the fetch-inertness premise). -/
+/-- THE ROUTE, assembled. -/
 theorem hullRun (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) (cs : List Nat) (N : Nat) :
-    WeakRvwmoGlue.hullRunFetchInert boot d0 im nh N →
     rvwmoMinusDepsConsistent GD →
     gdexecQconf boot d0 im nh GD →
     cutOk GD.gdG cs →
@@ -309,10 +290,9 @@ theorem hullRun (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
       RunData boot d0 N GD.gdG c pst (fun _ => d0) ∧
       (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) =
         (List.take ((cs[i]?).getD 0) ((GD.gdG.gxProg[i]?).getD [])).map (lblRen rho)) := by
-  intro hfi hcons hq hcut hacy hN
-  obtain ⟨c, rho, hc, himg, hpst, hrow⟩ :=
+  intro hcons hq hcut hacy hN
+  obtain ⟨c, pst, rho, hc, himg, hpst0, hprog, hrow⟩ :=
     hullRealizableRowsG boot d0 im nh GD cs N hcons hq (cutOkProper _ _ hcut) hacy hN
-  obtain ⟨pst, hpst0, hprog⟩ := hpst (hfi GD cs c rho hcons hq hcut hacy hN hc himg hrow)
   exact ⟨c, pst, rho, ⟨hc, himg, hpst0, rfl, hprog⟩, hrow⟩
 
 /-! # 5. THE RUN AND THE EXPORTS -/
@@ -326,7 +306,7 @@ open LeanRV64D
 def freshEra (gen : Nat) (σ0 : WGState) : Prop :=
   gen = 0 ∧ σ0.wgpow = true ∧ σ0.wggen = 0 ∧ σ0.wglog = [] ∧ (∀ cc : CPU, σ0.wgws cc = wsInit)
 
-/-- Rocq `run_erased` (deviations 2, 4). -/
+/-- Rocq `run_erased` (deviations 2, 4, 5). -/
 theorem runErased (gen : Nat) (σ0 : WGState) (boot : Nat → Pexv6) (d0 : Efab) (N : Nat)
     (G : Gexec) (c : Cand) (pst : Nat → List Pexv6) (dv : Nat → Efab) :
     freshEra gen σ0 →
@@ -342,7 +322,7 @@ theorem runErased (gen : Nat) (σ0 : WGState) (boot : Nat → Pexv6) (d0 : Efab)
   have hlive : ethreadLive σ0 gen := ⟨hpow, by rw [hgen0, hgen]⟩
   obtain ⟨hwf, -, heximg⟩ := srvwmoRealizable c hcons
   obtain ⟨cf, hrun, -, -, hm⟩ :=
-    execWfPfRunProg pstepEv pclsEv pst dv (candExec c) pclsEvEqr hwf hprog
+    execWfPfRunPin pstepEv pclsEv c.cdImg pst dv (candExec c) pclsEvEqr heximg hwf hprog
   rw [heximg, himg, hb3, hpst0, hb1, hdv0, hb2, ← ecfgOfInit gen σ0 hlog hws] at hrun
   obtain ⟨P', σ', hr, heq⟩ := wpPfRtcEpfRtc (epInit gen) σ0 cf hlive hcov hrun
   refine ⟨epoolList P', σ', ?_, ?_⟩
@@ -532,8 +512,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode
 open Language.Notation PrimStep
 open LeanRV64D
 
-/-- Rocq `cycle_kill_of_l2` (deviations 3, 4, 5: `hD`, the fetch-view premise and
-`hullRunFetchInert`). -/
+/-- Rocq `cycle_kill_of_l2` (deviations 3, 4: `hD` and the fetch-view premise). -/
 theorem cycleKillOfL2 (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc GF] [WeakGpreS GF]
     (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
@@ -548,12 +527,10 @@ theorem cycleKillOfL2 (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc GF] [
     -- the two certification supplies (§6.3)
     cutSupply boot d0 im nh →
     certSupply boot d0 im nh N →
-    -- THE FETCH-INERTNESS PREMISE (deviation 5)
-    WeakRvwmoGlue.hullRunFetchInert boot d0 im nh N →
     -- THE L2′ CLAIM
     l2Claim boot d0 im nh P (badRun gen σ0) →
     cycleKill boot d0 im nh := by
-  rintro hfr ⟨hb1, hb2, hb3⟩ hwp hwpp hcov hcut hcert hfi hl2
+  rintro hfr ⟨hb1, hb2, hb3⟩ hwp hwpp hcov hcut hcert hl2
   intro GD hcons hq hIH x hcyc
   -- (1) the cycle, as segments
   obtain ⟨z, ss, hne, hch⟩ := cycleSegments GD x hcons.2.1 hcyc
@@ -561,7 +538,7 @@ theorem cycleKillOfL2 (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc GF] [
   obtain ⟨cs, hcutok⟩ := hcut GD z ss hcons hq hne hch
   obtain ⟨himg, hN⟩ := hb3 GD hq
   obtain ⟨c0, pst0, -, hrd0, -⟩ :=
-    hullRun boot d0 im nh GD cs N hfi hcons hq hcutok (hIH cs (cutOkProper _ _ hcutok)) hN
+    hullRun boot d0 im nh GD cs N hcons hq hcutok (hIH cs (cutOkProper _ _ hcutok)) hN
   -- (3) the certified configuration
   obtain ⟨c, pst, dv, hrd, hlog⟩ := hcert GD cs c0 pst0 z ss hcons hq hcutok hrd0 hne hch
   -- (4) the erased run, and the exports at its log
@@ -589,16 +566,14 @@ theorem t2linOfL2 (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc GF] [Weak
     (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2) →
     cutSupply boot d0 im nh →
     certSupply boot d0 im nh N →
-    WeakRvwmoGlue.hullRunFetchInert boot d0 im nh N →
     l2Claim boot d0 im nh P (badRun gen σ0) →
     ∀ GD : Gdexec,
       rvwmoMinusDepsConsistent GD →
       gdexecQconf boot d0 im nh GD →
       ∀ x, ¬ tc (racyD GD) x x := by
-  intro hfr hbt hwp hwpp hcov hcut hcert hfi hl2
+  intro hfr hbt hwp hwpp hcov hcut hcert hl2
   exact t2linOfCycleKill boot d0 im nh
-    (cycleKillOfL2 hlc GF gen σ0 D hD Nm P boot d0 im nh N hfr hbt hwp hwpp hcov hcut hcert hfi
-      hl2)
+    (cycleKillOfL2 hlc GF gen σ0 D hD Nm P boot d0 im nh N hfr hbt hwp hwpp hcov hcut hcert hl2)
 
 end glue
 

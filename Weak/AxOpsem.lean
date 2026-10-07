@@ -16,9 +16,9 @@ carries the answers in the label, so "one opax step" is one program step whose l
 against `row[k]?` IN IDENTITY (kind / aq-or-rl / base / size; never timestamps, never classes) —
 and, for a WRITE, also in the bytes it stores (`AStepWrite`: `wlWdata l = lblData lb`).  Two step
 relations:
-  `AxOpsem.astepProg` / `astep` — everything but reads.  Administrative labels keep `k`; a
-                store, a fence, OR A FETCH realizes `row[k]?` and advances `k` (the fetch is
-                answered by the fetch oracle `fetchImg` on the text region `T`, `fetchAnswers`).
+  `AxOpsem.astepProg` / `astep` — everything but reads.  Administrative labels (in Lean also
+                the FETCH, deviation 2) keep `k`; a store or a fence realizes `row[k]?` and
+                advances `k`.
   `areadStep` — "`s` is about to perform the read `id = aident (row[k]?)`, and `K vs` is the
                 state after receiving the bytes `vs`" — the VALUE IS FREE.  The exclusive read
                 half of a fused `LRmw` row item keeps `k`; the exclusive store half advances it.
@@ -34,11 +34,10 @@ FACTS THE NEXT LAYER MUST KNOW (Rocq (1)–(6)).
 (2) THE PLIC WIRE IS SEPARATED AND EXCLUDED FROM `reducible`: `pstepEv`'s hart arm is split into
     `pstepProg` (the program's own arms) and `pstepWire`; `astep := astepProg ∨ awire`;
     `reducible` ranges over `astepOwn` = program steps and reads only.
-(3) INSTRUCTION FETCH.  Under `hartConf` the fetch IS a row event (D1: it projects to the
-    `LLoad false …` row item); `hemitAstep` realizes it through `areadStep`, as any other read.
-    `AStepFetch` is the OTHER realization of that same row position: it fires only when the
-    identity matches the row item at `k` AND the byte range lies in `T`, with the bytes forced
-    to `fetchImg`.
+(3) INSTRUCTION FETCH.  Rocq: the fetch is a row event (an `LLoad false …` row item), realized
+    either through `areadStep` or by `AStepFetch` (answered by the oracle `fetchImg` on the text
+    region `T`).  Lean (O2 Stage C, deviation 2): the fetch is an ADMINISTRATIVE label — no row
+    item, no oracle; it is an `AStepAdmin` step (`lbAdmin true (LIFetch ..)`).
 (4) `terminated s := False` (harts never terminate; row exhaustion is `reducible`'s
     row-extension clause).
 (5) SOURCES ARE NOT IN THE ROW IDENTITY: `AxOpsem.astepProg` is INDEXED BY THE INSTANCE LABEL;
@@ -55,25 +54,28 @@ FACTS THE NEXT LAYER MUST KNOW (Rocq (1)–(6)).
    `Mem_read_request n va …` (lean-sail indexes the request by the va width too, so `va` is a
    new bound variable); a read continuation receives `.Ok (w, none)` (Rocq `inl (w, None)`).
    Duplicated Rocq names, file-qualified: `AxOpsem.astepProg` (constructors
-   `AxOpsem.astepProg.AStepAdmin/AStepFetch/AStepWrite/AStepFence`), `AxOpsem.grow`.
-2. O2 / owner decision D1 — THE FETCH LABEL.  The Lean event instance emits a fetch as the
-   Lean-only `LIFetch base tvs` (`WeakEvInst` deviation 2), treated EXACTLY as the `LLoad false …`
-   it projects to (`WeakPromiseBridge.projLbl`, `AxPair.lblIdent`):
-   - `wlRd (LIFetch base tvs) = some (false, base, tvs.length)`, `wlRvals`/`wlReval` have the
-     `LIFetch` arm (so `hemitAstep` realizes a fetch item through `areadStep`, as Rocq);
-   - `AStepFetch` is stated at the FETCH LABEL `LIFetch base tvs` against a row item of identity
-     `IRead false base tvs.length` (Rocq: at any `LLoad aq lat base tvs asrc` with identity
-     `IRead aq …` — in Rocq fetches WERE `LLoad`s; in Lean an `LLoad` is never a fetch, so the
-     arm moves to the label that is);
+   `AxOpsem.astepProg.AStepAdmin/AStepWrite/AStepFence`), `AxOpsem.grow`.
+2. O2 STAGE C (`notes/weak-port-o2-stageC.md`, owner Q-C1/Q-C2) — THE FETCH IS AN ADMIN LABEL.
+   The Lean event instance emits a fetch as the Lean-only `LIFetch base tvs` (`WeakEvInst`
+   deviation 2), which the graph tier treats as ADMINISTRATIVE (`WeakAxRealize.lbAdmin true`,
+   `projLbl … = none`, `AxPair.lblIdent … = none`): no row item, no identity, no edges.
+   - `wlRd`/`wlRvals`/`wlReval` have no `LIFetch` arm (`none` / `[]` / identity);
+   - DELETED (Q-C2): Rocq's `fetch_answers`, the `AStep_fetch` constructor, and the oracle
+     parameters `T`/`fetchImg` of `astepProg`/`astep`/`astepAny`/`astepOwn`/`reducible`/
+     `notStuck`/`consumed`/`hemitAstep`/… (and of their `G`/`Gd` forms); a fetch is an
+     `AStepAdmin` step;
    - `rdLabel` takes a first flag `fe` (the access kind's `akIfetch`): `rdLabel true … =
-     LIFetch base tvs`; `pnodeStepReadAny`/`pnodeStepReadInv` lose Rocq's `ak_coh … = false`
-     premise/conclusion (the Lean read arm is the TOTAL three-way split on `classify`, so a fetch
-     node is no longer stuck);
+     LIFetch base tvs`; `rdLabelReval`/`rdLabelRvals` take `fe = false`; `pnodeStepReadInv`
+     concludes `akIfetch = false` (a read label never comes from the fetch node) where Rocq
+     concludes `ak_coh … = false`; `pnodeStepReadAny` has NO premise (Rocq: `ak_coh … =
+     false`; the Lean read arm is the TOTAL three-way split on `classify`, so it also covers the
+     fetch node — stronger); `pstepProgMemreadLbl` takes `akIfetch = false`;
    - `OpaxWit.wtFetch` runs at a hand-built FETCH node `wtPf0` (an `AK_ifetch` read feeding the
-     same store node), not at the data-read node `wtP0` (whose `LLoad` label `AStepFetch` no
-     longer takes).
+     same store node) as an admin step at any position `k` (Rocq: consumes the row's read item
+     at 0); Rocq's `wt_fT`/`wt_fimg`/`wt_T`/`wt_img` are deleted with the oracle.
    No `hart_conf`→`lblRealizes` conversion occurs in this file (`hemit` is stated over Rocq's
-   four-conjunct `hlblRealizes`), so no `lbFetchInert` premise is needed.
+   four-conjunct `hlblRealizes`); `hemitAstepAux` reaches a fetch item only through
+   `admRunAstep` (it is an admin item of the emission).
 3. THE PLIC WIRE (owner decision Q1, `WeakEvInst` deviation 5).  The Lean wire is a step of the
    PLIC PROGRAM in the fabric (`pstepPlic`: the program sits at `.setPin cpu mm b`), not the
    stateless Rocq pin delivery `sig_seip := dev_seip d cpu`.  So `pstepWireInv` concludes
@@ -111,7 +113,7 @@ FACTS THE NEXT LAYER MUST KNOW (Rocq (1)–(6)).
 `wbytesWordOfBytes`, `rd_label` `rdLabel`, `rd_asrc` `rdAsrc`, `rd_label_reval` `rdLabelReval`,
 `rd_label_rvals` `rdLabelRvals`, `pnode_step_read_any` `pnodeStepReadAny`, `pnode_step_read_inv`
 `pnodeStepReadInv`, `pstep_prog_read_cont` `pstepProgReadCont`, `pstep_prog_memread_lbl`
-`pstepProgMemreadLbl`, `fetch_answers` `fetchAnswers`, `astep_prog` `AxOpsem.astepProg`,
+`pstepProgMemreadLbl`, `astep_prog` `AxOpsem.astepProg`,
 `astep_prog_pstep` `astepProgPstep`, `awire` `awire`, `astep` `astep`, `aread_step`
 `areadStep`, `astep_any` `astepAny` (`AAStep`/`AARead`), `astep_of_read` `astepOfRead`,
 `astep_own` `astepOwn`, `astep_any_own` `astepAnyOwn`, `astep_prog_k` `astepProgK`,
@@ -131,15 +133,15 @@ FACTS THE NEXT LAYER MUST KNOW (Rocq (1)–(6)).
 `hartConfCoverage`; `OpaxWit.wt_*` ↦ `OpaxWit.wt*` (`wt_pa` `wtPa`, `wt_pa_ram` `wtPaRam`,
 `wt_ak` `wtAk`, `wt_ak_plain` `wtAkPlain`, `wt_rreq` `wtRreq`, `wt_wreq` `wtWreq`, `wt_val`
 `wtVal`, `wt_m2` `wtM2`, `wt_m` `wtM`, `wt_p0/p1/p2` `wtP0/P1/P2`, `wt_base` `wtBase`, `wt_row`
-`wtRow`, `wt_T` `wtT`, `wt_img` `wtImg`, `wt_read_step` `wtReadStep`, `wt_write_step`
+`wtRow`, `wt_read_step` `wtReadStep`, `wt_write_step`
 `wtWriteStep`, `wt_aread` `wtAread`, `wt_astep_write` `wtAstepWrite`, `wt_run` `wtRun`,
 `wt_coverage` `wtCoverage`, `wt_reducible_end` `wtReducibleEnd`, `wt_stuck_empty_row`
-`wtStuckEmptyRow`, `wt_reducible_empty_row` `wtReducibleEmptyRow`, `wt_fT` `wtFT`, `wt_fimg`
-`wtFimg`, `wt_fetch` `wtFetch`, `wt_dv` `wtDv`, `wt_items` `wtItems`, `wt_ws1_relp`
+`wtStuckEmptyRow`, `wt_reducible_empty_row` `wtReducibleEmptyRow`, `wt_fetch` `wtFetch`, `wt_dv` `wtDv`, `wt_items` `wtItems`, `wt_ws1_relp`
 `wtWs1Relp`, `wt_pcls_store` `wtPclsStore`, `wt_hart_conf` `wtHartConf`, `wt_hemit_astep`
 `wtHemitAstep`).
 
-**Not ported:** nothing (the `Print Assumptions` block is replaced by the lint).
+**Not ported:** `fetch_answers`, `AStep_fetch`, `wt_T`, `wt_img`, `wt_fT`, `wt_fimg` (deleted by
+O2 Stage C, owner Q-C2; deviation 2); the `Print Assumptions` block is replaced by the lint.
 -/
 import Weak.WeakRvwmoConf
 import Weak.AxGraphCat
@@ -216,13 +218,12 @@ theorem aidentWrN (id : AidentT) (rl : Bool) (base : Int) (n : Nat) :
   intro h
   cases id <;> simp_all [aidentWr, aidentN]
 
-/-! ### 1.1 The instance labels' halves (deviation 2: the `LIFetch` arm) -/
+/-! ### 1.1 The instance labels' halves (deviation 2: a fetch has no read half) -/
 
 def wlRd (l : Wlabel) : Option (Bool × Int × Nat) :=
   match l with
   | LLoad aq _ base tvs _ => some (aq, base, tvs.length)
   | LExLoad aq base tvs _ => some (aq, base, tvs.length)
-  | LIFetch base tvs => some (false, base, tvs.length)
   | _ => none
 
 def wlWr (l : Wlabel) : Option (Bool × Int × Nat) :=
@@ -260,7 +261,6 @@ def wlRvals (l : Wlabel) : List (BitVec 8) :=
   match l with
   | LLoad _ _ _ tvs _ => tvs.map Prod.snd
   | LExLoad _ _ tvs _ => tvs.map Prod.snd
-  | LIFetch _ tvs => tvs.map Prod.snd
   | _ => []
 
 /-- A byte list as a label payload: every byte at timestamp 0. -/
@@ -287,7 +287,6 @@ def wlReval (l : Wlabel) (vs : List (BitVec 8)) : Wlabel :=
   match l with
   | LLoad aq lat base _ asrc => LLoad aq lat base (tagVals vs) asrc
   | LExLoad aq base _ asrc => LExLoad aq base (tagVals vs) asrc
-  | LIFetch base _ => LIFetch base (tagVals vs)
   | _ => l
 
 theorem wlRdN (l : Wlabel) (aq : Bool) (base : Int) (n : Nat) :
@@ -498,14 +497,14 @@ def rdAsrc (ex : Bool) (ib : Ibch) : List Dsrc :=
   if ex then depsAsrc (depsOfIb ib.ibBits) else []
 
 theorem rdLabelReval (fe ex aq : Bool) (base : Int) (tvs : List (Nat × BitVec 8))
-    (asrc : List Dsrc) (vs : List (BitVec 8)) :
+    (asrc : List Dsrc) (vs : List (BitVec 8)) : fe = false →
     wlReval (rdLabel fe ex aq base tvs asrc) vs = rdLabel fe ex aq base (tagVals vs) asrc := by
-  cases fe <;> cases ex <;> rfl
+  intro hfe; subst hfe; cases ex <;> rfl
 
 theorem rdLabelRvals (fe ex aq : Bool) (base : Int) (tvs : List (Nat × BitVec 8))
-    (asrc : List Dsrc) :
+    (asrc : List Dsrc) : fe = false →
     wlRvals (rdLabel fe ex aq base tvs asrc) = tvs.map Prod.snd := by
-  cases fe <;> cases ex <;> rfl
+  intro hfe; subst hfe; cases ex <;> rfl
 
 theorem pnodeStepReadAny (n va : Nat)
     (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
@@ -549,6 +548,7 @@ theorem pnodeStepReadInv (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevSta
       (KK : Result (BitVec (8 * n) × Option Bool) Arch.abort → SailM Unit)
       (w : BitVec (8 * n)) (tvs : List (Nat × BitVec 8)),
       m = .impure (.ok (.memRead n va req)) KK ∧ devAddr req.pa = false ∧
+      (classify req.access_kind).akIfetch = false ∧
       l = rdLabel (classify req.access_kind).akIfetch (classify req.access_kind).akLatest
             (classify req.access_kind).akSync (paZ req.pa) tvs
             (rdAsrc (classify req.access_kind).akLatest ib) ∧
@@ -570,12 +570,11 @@ theorem pnodeStepReadInv (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevSta
         rcases h with ⟨hif, w, tvs, hlen, hby, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ |
           ⟨hif, ⟨hlat, w, tvs, hlen, hby, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ |
             ⟨hlat, w, tvs, hlen, hby, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩⟩
-        · exact ⟨n, va, req, k, w, tvs, rfl, hdev, by simp only [rdLabel, hif, ↓reduceIte],
-            AxOpsem.sndEqWbytes n w tvs hlen hby, rfl, rfl, rfl, rfl, rfl, rfl⟩
-        · exact ⟨n, va, req, k, w, tvs, rfl, hdev,
+        · simp [wlRd] at hrd
+        · exact ⟨n, va, req, k, w, tvs, rfl, hdev, hif,
             by simp only [rdLabel, rdAsrc, hif, hlat, Bool.false_eq_true, ↓reduceIte],
             AxOpsem.sndEqWbytes n w tvs hlen hby, rfl, rfl, rfl, rfl, rfl, rfl⟩
-        · exact ⟨n, va, req, k, w, tvs, rfl, hdev,
+        · exact ⟨n, va, req, k, w, tvs, rfl, hdev, hif,
             by simp only [rdLabel, rdAsrc, hif, hlat, Bool.false_eq_true, ↓reduceIte],
             AxOpsem.sndEqWbytes n w tvs hlen hby, rfl, rfl, rfl, rfl, rfl, rfl⟩
     | memWrite n va req =>
@@ -627,16 +626,16 @@ theorem pstepProgReadCont (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' :
       obtain ⟨rfl, _⟩ := hn
       simp [wlRd] at hrd
     | none =>
-      obtain ⟨n, va, req, KK, w, tvs, rfl, hdev, rfl, htv, rfl, rfl, rfl, hd', rfl, rfl⟩ :=
+      obtain ⟨n, va, req, KK, w, tvs, rfl, hdev, hfe, rfl, htv, rfl, rfl, rfl, hd', rfl, rfl⟩ :=
         pnodeStepReadInv _ _ _ _ _ _ _ _ _ _ _ hn hrd
       refine ⟨fun vs => .PHart cpu (KK (.Ok (wordOfBytes n vs, none))) rs none ib, ?_, ?_, ?_⟩
-      · simp only [rdLabelRvals, htv, wordOfBytesWbytes, Option.getD_none]
+      · simp only [rdLabelRvals _ _ _ _ _ _ hfe, htv, wordOfBytesWbytes, Option.getD_none]
       · rw [hd, hd']
       · intro vs hvs d0
         refine ⟨rfl, none, none, none, rfl, rfl, ?_, rfl⟩
-        rw [rdLabelReval]
+        rw [rdLabelReval _ _ _ _ _ _ _ hfe]
         exact pnodeStepReadAny n va req KK rs ib d0.efDev vs hdev
-          (by rw [hvs, rdLabelRvals, htv, wbytesLength])
+          (by rw [hvs, rdLabelRvals _ _ _ _ _ _ hfe, htv, wbytesLength])
   | .PDisk dp, .PDisk dp', h =>
     rcases h with ⟨hp, hd⟩ | ⟨_, rfl, _⟩
     · rcases hp with ⟨_, rfl, _⟩ | ⟨pa, n, aq, k, tvs, rfl, hlen, rfl, rfl, hd'⟩ |
@@ -660,63 +659,50 @@ theorem pstepProgMemreadLbl (cpu : CPU) (n va : Nat)
     (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
     (KK : Result (BitVec (8 * n) × Option Bool) Arch.abort → SailM Unit) (rs : RegFile)
     (ib : Ibch) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
-    devAddr req.pa = false →
+    devAddr req.pa = false → (classify req.access_kind).akIfetch = false →
     pstepProg (.PHart cpu (.impure (.ok (.memRead n va req)) KK) rs none ib) d l p' d' →
     (wlRd l).isSome = true ∧ (wlRvals l).length = n := by
-  intro hdev h
+  intro hdev hfe h
   cases p' with
   | PDisk _ => exact False.elim h
   | PHart cpu' m' rs' fn' ib' =>
     obtain ⟨_, ors, oib, obar, _, _, hn, _⟩ := h
     simp only [pstepNode, pnodeStep, hdev, Bool.false_eq_true, ↓reduceIte] at hn
-    rcases hn with ⟨_, w, tvs, hlen, _, rfl, _⟩ | ⟨_, ⟨_, w, tvs, hlen, _, rfl, _⟩ |
-      ⟨_, w, tvs, hlen, _, rfl, _⟩⟩ <;> simp [wlRd, wlRvals, hlen]
+    rcases hn with ⟨hif, _⟩ | ⟨_, ⟨_, w, tvs, hlen, _, rfl, _⟩ |
+      ⟨_, w, tvs, hlen, _, rfl, _⟩⟩
+    · rw [hfe] at hif; exact absurd hif Bool.false_ne_true
+    all_goals simp [wlRd, wlRvals, hlen]
 
 /-! ## 4. The opax step relations -/
 
-/-- The fetch oracle answers a read whose whole range lies in `T` with the image's bytes. -/
-def fetchAnswers (T : Int → Prop) (fetchImg : Int → Option (BitVec 8)) (base : Int)
-    (tvs : List (Nat × BitVec 8)) : Prop :=
-  ∀ j : Nat, j < tvs.length →
-    T (base + (j : Int)) ∧ fetchImg (base + (j : Int)) = (tvs.map Prod.snd)[j]?
-
 /-- (A) EVERYTHING BUT READS, program arms only, INDEXED BY THE INSTANCE LABEL (Rocq fact 5).
-`AStepFetch` is stated at the fetch label (deviation 2). -/
-inductive AxOpsem.astepProg (row : List Lbl) (T : Int → Prop)
-    (fetchImg : Int → Option (BitVec 8)) : Athread → Wlabel → Athread → Prop where
+A fetch is an ADMINISTRATIVE step (`AStepAdmin` at `lbAdmin true (LIFetch ..)`; deviation 2). -/
+inductive AxOpsem.astepProg (row : List Lbl)  : Athread → Wlabel → Athread → Prop where
   | AStepAdmin (p : Pexv6) (k : Nat) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
       lbAdmin true l →
       pstepProg p d l p' d' →
-      AxOpsem.astepProg row T fetchImg ⟨p, k⟩ l ⟨p', k⟩
-  | AStepFetch (p : Pexv6) (k : Nat) (d : Efab) (base : Int) (tvs : List (Nat × BitVec 8))
-      (lb : Lbl) (p' : Pexv6) (d' : Efab) :
-      row[k]? = some lb →
-      aident lb = .IRead false base tvs.length →
-      fetchAnswers T fetchImg base tvs →
-      pstepProg p d (LIFetch base tvs) p' d' →
-      AxOpsem.astepProg row T fetchImg ⟨p, k⟩ (LIFetch base tvs) ⟨p', k + 1⟩
+      AxOpsem.astepProg row ⟨p, k⟩ l ⟨p', k⟩
   | AStepWrite (p : Pexv6) (k : Nat) (d : Efab) (l : Wlabel) (lb : Lbl) (p' : Pexv6)
       (d' : Efab) :
       row[k]? = some lb →
       (wlWr l).isSome = true → wlWr l = aidentWr (aident lb) →
       wlWdata l = lblData lb →
       pstepProg p d l p' d' →
-      AxOpsem.astepProg row T fetchImg ⟨p, k⟩ l ⟨p', k + 1⟩
+      AxOpsem.astepProg row ⟨p, k⟩ l ⟨p', k + 1⟩
   | AStepFence (p : Pexv6) (k : Nat) (d : Efab) (l : Wlabel) (lb : Lbl) (p' : Pexv6)
       (d' : Efab) :
       row[k]? = some lb →
       (wlFence l).isSome = true → wlFence l = aidentFence (aident lb) →
       pstepProg p d l p' d' →
-      AxOpsem.astepProg row T fetchImg ⟨p, k⟩ l ⟨p', k + 1⟩
+      AxOpsem.astepProg row ⟨p, k⟩ l ⟨p', k + 1⟩
 
 /-- The label is the program's own step's label. -/
-theorem astepProgPstep (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+theorem astepProgPstep (row : List Lbl) 
     (s : Athread) (l : Wlabel) (s' : Athread) :
-    AxOpsem.astepProg row T fetchImg s l s' → ∃ d d', pstepProg s.atP d l s'.atP d' := by
+    AxOpsem.astepProg row s l s' → ∃ d d', pstepProg s.atP d l s'.atP d' := by
   intro h
   cases h with
   | AStepAdmin _ _ d _ _ d' _ hs => exact ⟨d, d', hs⟩
-  | AStepFetch _ _ d _ _ _ _ d' _ _ _ hs => exact ⟨d, d', hs⟩
   | AStepWrite _ _ d _ _ _ d' _ _ _ _ hs => exact ⟨d, d', hs⟩
   | AStepFence _ _ d _ _ _ d' _ _ _ hs => exact ⟨d, d', hs⟩
 
@@ -724,9 +710,9 @@ theorem astepProgPstep (row : List Lbl) (T : Int → Prop) (fetchImg : Int → O
 def awire (s s' : Athread) : Prop :=
   s'.atK = s.atK ∧ ∃ d d', pstepWire s.atP d LDev s'.atP d'
 
-def astep (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+def astep (row : List Lbl) 
     (s s' : Athread) : Prop :=
-  (∃ l, AxOpsem.astepProg row T fetchImg s l s') ∨ awire s s'
+  (∃ l, AxOpsem.astepProg row s l s') ∨ awire s s'
 
 /-- (B) THE READ, with its continuation; every byte string of the identity's width is
 accepted. -/
@@ -738,26 +724,26 @@ def areadStep (row : List Lbl) (s : Athread) (id : AidentT) (K : List (BitVec 8)
         pstepProg s.atP d l (K vs).atP d' ∧ (K vs).atK = s.atK + aidentAdvRd id
 
 /-- The glue: one relation for the progress and coverage lemmas. -/
-inductive astepAny (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8)) :
+inductive astepAny (row : List Lbl)  :
     Athread → Athread → Prop where
-  | AAStep (s s' : Athread) : astep row T fetchImg s s' → astepAny row T fetchImg s s'
+  | AAStep (s s' : Athread) : astep row s s' → astepAny row s s'
   | AARead (s : Athread) (id : AidentT) (K : List (BitVec 8) → Athread) (vs : List (BitVec 8)) :
-      areadStep row s id K → vs.length = aidentN id → astepAny row T fetchImg s (K vs)
+      areadStep row s id K → vs.length = aidentN id → astepAny row s (K vs)
 
-theorem astepOfRead (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+theorem astepOfRead (row : List Lbl) 
     (s : Athread) (id : AidentT) (K : List (BitVec 8) → Athread) :
-    areadStep row s id K → ∀ vs, vs.length = aidentN id → astepAny row T fetchImg s (K vs) :=
+    areadStep row s id K → ∀ vs, vs.length = aidentN id → astepAny row s (K vs) :=
   fun h vs hvs => .AARead s id K vs h hvs
 
 /-- The hart's OWN steps — everything but the wire. -/
-def astepOwn (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+def astepOwn (row : List Lbl) 
     (s s' : Athread) : Prop :=
-  (∃ l, AxOpsem.astepProg row T fetchImg s l s') ∨
+  (∃ l, AxOpsem.astepProg row s l s') ∨
   ∃ id K vs, areadStep row s id K ∧ vs.length = aidentN id ∧ s' = K vs
 
-theorem astepAnyOwn (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+theorem astepAnyOwn (row : List Lbl) 
     (s s' : Athread) :
-    astepAny row T fetchImg s s' ↔ astepOwn row T fetchImg s s' ∨ awire s s' := by
+    astepAny row s s' ↔ astepOwn row s s' ∨ awire s s' := by
   constructor
   · intro h
     match h with
@@ -773,14 +759,13 @@ theorem astepAnyOwn (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Opti
 
 /-! ### 4.1 Positions: monotone, one per event step, valid -/
 
-theorem astepProgK (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+theorem astepProgK (row : List Lbl) 
     (s : Athread) (l : Wlabel) (s' : Athread) :
-    AxOpsem.astepProg row T fetchImg s l s' →
+    AxOpsem.astepProg row s l s' →
     s'.atK = s.atK ∨ (s'.atK = s.atK + 1 ∧ (row[s.atK]?).isSome = true) := by
   intro h
   cases h with
   | AStepAdmin => exact .inl rfl
-  | AStepFetch _ _ _ _ _ _ _ _ hrow => exact .inr ⟨rfl, by simp [hrow]⟩
   | AStepWrite _ _ _ _ _ _ _ hrow => exact .inr ⟨rfl, by simp [hrow]⟩
   | AStepFence _ _ _ _ _ _ _ hrow => exact .inr ⟨rfl, by simp [hrow]⟩
 
@@ -793,69 +778,68 @@ theorem areadStepK (row : List Lbl) (s : Athread) (id : AidentT)
   rw [hk]
   cases aident lb <;> simp [aidentAdvRd, hrow]
 
-theorem astepAnyK (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+theorem astepAnyK (row : List Lbl) 
     (s s' : Athread) :
-    astepAny row T fetchImg s s' →
+    astepAny row s s' →
     s'.atK = s.atK ∨ (s'.atK = s.atK + 1 ∧ (row[s.atK]?).isSome = true) := by
   intro h
   match h with
   | .AAStep _ _ h =>
     rcases h with ⟨l, h⟩ | ⟨hk, _⟩
-    · exact astepProgK row T fetchImg _ l _ h
+    · exact astepProgK row _ l _ h
     · exact .inl hk
   | .AARead _ id K vs h hvs => exact areadStepK row _ id K vs h hvs
 
-theorem astepProgressMono (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
-    (s s' : Athread) : astepAny row T fetchImg s s' → s.atK ≤ s'.atK := by
+theorem astepProgressMono (row : List Lbl) 
+    (s s' : Athread) : astepAny row s s' → s.atK ≤ s'.atK := by
   intro h
-  rcases astepAnyK row T fetchImg s s' h with h | ⟨h, _⟩ <;> omega
+  rcases astepAnyK row s s' h with h | ⟨h, _⟩ <;> omega
 
-theorem astepAdminOrEvent (row : List Lbl) (T : Int → Prop)
-    (fetchImg : Int → Option (BitVec 8)) (s s' : Athread) :
-    astepAny row T fetchImg s s' → s'.atK = s.atK ∨ s'.atK = s.atK + 1 := by
+theorem astepAdminOrEvent (row : List Lbl)  (s s' : Athread) :
+    astepAny row s s' → s'.atK = s.atK ∨ s'.atK = s.atK + 1 := by
   intro h
-  rcases astepAnyK row T fetchImg s s' h with h | ⟨h, _⟩
+  rcases astepAnyK row s s' h with h | ⟨h, _⟩
   · exact .inl h
   · exact .inr h
 
 /-- An event step consumes a VALID position (AxSL's `progress_is_valid`). -/
-theorem astepEventValid (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+theorem astepEventValid (row : List Lbl) 
     (s s' : Athread) :
-    astepAny row T fetchImg s s' → s'.atK = s.atK + 1 → s.atK < row.length := by
+    astepAny row s s' → s'.atK = s.atK + 1 → s.atK < row.length := by
   intro h hk
-  rcases astepAnyK row T fetchImg s s' h with h | ⟨_, hv⟩
+  rcases astepAnyK row s s' h with h | ⟨_, hv⟩
   · omega
   · exact lookup_lt_is_Some_1 hv
 
-theorem arunKMono (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
-    (s s' : Athread) : rtc (astepAny row T fetchImg) s s' → s.atK ≤ s'.atK := by
+theorem arunKMono (row : List Lbl) 
+    (s s' : Athread) : rtc (astepAny row) s s' → s.atK ≤ s'.atK := by
   intro h
   induction h with
   | refl => exact Nat.le_refl _
-  | tail _ h2 ih => exact Nat.le_trans ih (astepProgressMono row T fetchImg _ _ h2)
+  | tail _ h2 ih => exact Nat.le_trans ih (astepProgressMono row _ _ h2)
 
 /-! ### 4.2 Consumption: the positions a run consumes are its interval -/
 
-def consumed (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+def consumed (row : List Lbl) 
     (s s' : Athread) (j : Nat) : Prop :=
-  ∃ s1 s2, rtc (astepAny row T fetchImg) s s1 ∧ astepAny row T fetchImg s1 s2 ∧
-    rtc (astepAny row T fetchImg) s2 s' ∧ s1.atK = j ∧ s2.atK = j + 1
+  ∃ s1 s2, rtc (astepAny row) s s1 ∧ astepAny row s1 s2 ∧
+    rtc (astepAny row) s2 s' ∧ s1.atK = j ∧ s2.atK = j + 1
 
-theorem arunConsumedIff (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+theorem arunConsumedIff (row : List Lbl) 
     (s s' : Athread) (j : Nat) :
-    rtc (astepAny row T fetchImg) s s' →
-    (consumed row T fetchImg s s' j ↔ s.atK ≤ j ∧ j < s'.atK) := by
+    rtc (astepAny row) s s' →
+    (consumed row s s' j ↔ s.atK ≤ j ∧ j < s'.atK) := by
   intro hr
   constructor
   · rintro ⟨s1, s2, h1, _, h2, rfl, hk2⟩
-    have := arunKMono row T fetchImg _ _ h1
-    have := arunKMono row T fetchImg _ _ h2
+    have := arunKMono row _ _ h1
+    have := arunKMono row _ _ h2
     omega
   · induction hr with
     | refl => intro hj; omega
     | @tail b c hab hbc ih =>
       rintro ⟨hle, hlt⟩
-      rcases astepAnyK row T fetchImg _ _ hbc with heq | ⟨heq, _⟩
+      rcases astepAnyK row _ _ hbc with heq | ⟨heq, _⟩
       · obtain ⟨a1, a2, ha1, ha12, ha2, hk1, hk2⟩ := ih ⟨hle, by omega⟩
         exact ⟨a1, a2, ha1, ha12, rtc_r ha2 hbc, hk1, hk2⟩
       · by_cases hjb : j = b.atK
@@ -863,22 +847,22 @@ theorem arunConsumedIff (row : List Lbl) (T : Int → Prop) (fetchImg : Int → 
         · obtain ⟨a1, a2, ha1, ha12, ha2, hk1, hk2⟩ := ih ⟨hle, by omega⟩
           exact ⟨a1, a2, ha1, ha12, rtc_r ha2 hbc, hk1, hk2⟩
 
-theorem consumedBetween (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+theorem consumedBetween (row : List Lbl) 
     (s s' : Athread) (j : Nat) :
-    consumed row T fetchImg s s' j → s.atK ≤ j ∧ j < s'.atK := by
+    consumed row s s' j → s.atK ≤ j ∧ j < s'.atK := by
   rintro ⟨s1, s2, h1, _, h2, rfl, hk2⟩
-  have := arunKMono row T fetchImg _ _ h1
-  have := arunKMono row T fetchImg _ _ h2
+  have := arunKMono row _ _ h1
+  have := arunKMono row _ _ h2
   omega
 
 /-- AxSL's `tpcoverage`: a run from position 0 that reaches `row.length` consumes exactly the
 row. -/
-theorem coverageOfRow (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+theorem coverageOfRow (row : List Lbl) 
     (p p' : Pexv6) :
-    rtc (astepAny row T fetchImg) ⟨p, 0⟩ ⟨p', row.length⟩ →
-    ∀ j, consumed row T fetchImg ⟨p, 0⟩ ⟨p', row.length⟩ j ↔ j < row.length := by
+    rtc (astepAny row) ⟨p, 0⟩ ⟨p', row.length⟩ →
+    ∀ j, consumed row ⟨p, 0⟩ ⟨p', row.length⟩ j ↔ j < row.length := by
   intro hr j
-  rw [arunConsumedIff row T fetchImg _ _ j hr]
+  rw [arunConsumedIff row _ _ j hr]
   exact ⟨fun h => h.2, fun h => ⟨Nat.zero_le _, h⟩⟩
 
 /-! ### 4.3 `terminated`, `reducible`, `notStuck` -/
@@ -894,26 +878,22 @@ theorem awireAlways (cpu : CPU) (m : SailM Unit) (rs : RegFile)
     pstepWireAlways cpu m rs fn ib _ mm b (fun _ => d.efPlic) rfl⟩
 
 /-- `reducible`: the program's OWN progress in SOME row extension. -/
-def reducible (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+def reducible (row : List Lbl) 
     (s : Athread) : Prop :=
-  ∃ ext s', astepOwn (row ++ ext) T fetchImg s s'
+  ∃ ext s', astepOwn (row ++ ext) s s'
 
-def notStuck (row : List Lbl) (T : Int → Prop) (fetchImg : Int → Option (BitVec 8))
+def notStuck (row : List Lbl) 
     (s : Athread) : Prop :=
-  terminated s ∨ reducible row T fetchImg s
+  terminated s ∨ reducible row s
 
 /-! ### 4.4 The step relations read the row at the current position only -/
 
-theorem astepProgRowAgree (row row' : List Lbl) (T : Int → Prop)
-    (img : Int → Option (BitVec 8)) (s : Athread) (l : Wlabel) (s' : Athread) :
+theorem astepProgRowAgree (row row' : List Lbl)  (s : Athread) (l : Wlabel) (s' : Athread) :
     row[s.atK]? = row'[s.atK]? →
-    AxOpsem.astepProg row T img s l s' → AxOpsem.astepProg row' T img s l s' := by
+    AxOpsem.astepProg row s l s' → AxOpsem.astepProg row' s l s' := by
   intro hag h
   cases h with
   | AStepAdmin p k d l p' d' ha hs => exact .AStepAdmin p k d l p' d' ha hs
-  | AStepFetch p k d base tvs lb p' d' hrow hid hfa hs =>
-    have hag' : row[k]? = row'[k]? := hag
-    exact .AStepFetch p k d base tvs lb p' d' (hag'.symm.trans hrow) hid hfa hs
   | AStepWrite p k d l lb p' d' hrow hs1 hid hdat hs =>
     have hag' : row[k]? = row'[k]? := hag
     exact .AStepWrite p k d l lb p' d' (hag'.symm.trans hrow) hs1 hid hdat hs
@@ -927,29 +907,27 @@ theorem areadStepRowAgree (row row' : List Lbl) (s : Athread) (id : AidentT)
   rintro hag ⟨lb, hrow, hid, hrd, HK⟩
   exact ⟨lb, hag.symm.trans hrow, hid, hrd, HK⟩
 
-theorem astepOwnRowAgree (row row' : List Lbl) (T : Int → Prop)
-    (img : Int → Option (BitVec 8)) (s s' : Athread) :
-    row[s.atK]? = row'[s.atK]? → astepOwn row T img s s' → astepOwn row' T img s s' := by
+theorem astepOwnRowAgree (row row' : List Lbl)  (s s' : Athread) :
+    row[s.atK]? = row'[s.atK]? → astepOwn row s s' → astepOwn row' s s' := by
   rintro hag (⟨l, h⟩ | ⟨id, K, vs, h, hvs, rfl⟩)
-  · exact .inl ⟨l, astepProgRowAgree row row' T img s l _ hag h⟩
+  · exact .inl ⟨l, astepProgRowAgree row row' s l _ hag h⟩
   · exact .inr ⟨id, K, vs, areadStepRowAgree row row' s id K hag h, hvs, rfl⟩
 
-theorem astepAnyRowAgree (row row' : List Lbl) (T : Int → Prop)
-    (img : Int → Option (BitVec 8)) (s s' : Athread) :
-    row[s.atK]? = row'[s.atK]? → astepAny row T img s s' → astepAny row' T img s s' := by
+theorem astepAnyRowAgree (row row' : List Lbl)  (s s' : Athread) :
+    row[s.atK]? = row'[s.atK]? → astepAny row s s' → astepAny row' s s' := by
   intro hag h
   rw [astepAnyOwn] at h ⊢
   rcases h with h | h
-  · exact .inl (astepOwnRowAgree row row' T img s s' hag h)
+  · exact .inl (astepOwnRowAgree row row' s s' hag h)
   · exact .inr h
 
-theorem reducibleValid (row : List Lbl) (T : Int → Prop) (img : Int → Option (BitVec 8))
+theorem reducibleValid (row : List Lbl) 
     (s : Athread) :
-    s.atK < row.length → (reducible row T img s ↔ ∃ s', astepOwn row T img s s') := by
+    s.atK < row.length → (reducible row s ↔ ∃ s', astepOwn row s s') := by
   intro hk
   constructor
   · rintro ⟨ext, s', h⟩
-    exact ⟨s', astepOwnRowAgree (row ++ ext) row T img s s' (lookup_app_l hk) h⟩
+    exact ⟨s', astepOwnRowAgree (row ++ ext) row s s' (lookup_app_l hk) h⟩
   · rintro ⟨s', h⟩
     exact ⟨[], s', by rw [List.append_nil]; exact h⟩
 
@@ -972,34 +950,34 @@ theorem growGLookup (G : Gexec) (i : Nat) (row : List Lbl) :
   intro h
   simp [growG, h]
 
-def reducibleG (G : Gexec) (i : Nat) (T : Int → Prop) (img : Int → Option (BitVec 8))
+def reducibleG (G : Gexec) (i : Nat) 
     (s : Athread) : Prop :=
-  reducible (growG G i) T img s
+  reducible (growG G i) s
 
-def notStuckG (G : Gexec) (i : Nat) (T : Int → Prop) (img : Int → Option (BitVec 8))
+def notStuckG (G : Gexec) (i : Nat) 
     (s : Athread) : Prop :=
-  notStuck (growG G i) T img s
+  notStuck (growG G i) s
 
 /-- The `Gdexec` instance (the names the design uses). -/
 def AxOpsem.grow (GD : Gdexec) : Nat → List Lbl := growG GD.gdG
 
 def progressIsValid (GD : Gdexec) : Nat → Nat → Prop := progressIsValidG GD.gdG
 
-def reducibleGd (GD : Gdexec) : Nat → (Int → Prop) → (Int → Option (BitVec 8)) → Athread → Prop :=
+def reducibleGd (GD : Gdexec) : Nat → Athread → Prop :=
   reducibleG GD.gdG
 
-def notStuckGd (GD : Gdexec) : Nat → (Int → Prop) → (Int → Option (BitVec 8)) → Athread → Prop :=
+def notStuckGd (GD : Gdexec) : Nat → Athread → Prop :=
   notStuckG GD.gdG
 
 /-! ## 5. The tree's conformance run is an opax run -/
 
 /-- A read block: a program step with a read label that realizes the row item at `k` in identity
 is an `areadStep` at `k`, instantiated at the step's own bytes. -/
-theorem readBlock (row : List Lbl) (T : Int → Prop) (img : Int → Option (BitVec 8))
+theorem readBlock (row : List Lbl) 
     (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) (k : Nat) (lb : Lbl) :
     pstepProg p d l p' d' → (wlRd l).isSome = true →
     row[k]? = some lb → wlRd l = aidentRd (aident lb) →
-    astepAny row T img ⟨p, k⟩ ⟨p', k + aidentAdvRd (aident lb)⟩ := by
+    astepAny row ⟨p, k⟩ ⟨p', k + aidentAdvRd (aident lb)⟩ := by
   intro hs hrd hrow hid
   obtain ⟨F, rfl, hdd, HF⟩ := pstepProgReadCont p d l p' d' hs hrd
   subst d'
@@ -1016,9 +994,9 @@ theorem readBlock (row : List Lbl) (T : Int → Prop) (img : Int → Option (Bit
   exact astepAny.AARead _ _ _ (wlRvals l) hrb hn.symm
 
 /-- An administrative run is a run of position-preserving opax steps. -/
-theorem admRunAstep (row : List Lbl) (T : Int → Prop) (img : Int → Option (BitVec 8))
+theorem admRunAstep (row : List Lbl) 
     (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6) (d' : Efab) (k : Nat) :
-    admRun instr p d ls p' d' → nsteps (astepAny row T img) ls.length ⟨p, k⟩ ⟨p', k⟩ := by
+    admRun instr p d ls p' d' → nsteps (astepAny row) ls.length ⟨p, k⟩ ⟨p', k⟩ := by
   intro h
   induction h with
   | ARnil p d => exact nsteps_O _
@@ -1033,12 +1011,12 @@ theorem admRunAstep (row : List Lbl) (T : Int → Prop) (img : Int → Option (B
     · obtain ⟨rfl, _⟩ := pstepWireInv _ _ _ _ _ hw
       exact .inr ⟨rfl, d, d1, hw⟩
 
-theorem hemitAstepAux (row : List Lbl) (T : Int → Prop) (img : Int → Option (BitVec 8))
+theorem hemitAstepAux (row : List Lbl) 
     (dv : Nat → Efab) (k : Nat) (ws : Wstate) (rrow : List Lbl) (p : Pexv6) (es : List Eitem)
     (pfin : Pexv6) :
     hemit dv k ws rrow p es pfin →
     (∀ j, rrow[j]? = row[k + j]?) →
-    nsteps (astepAny row T img) es.length ⟨p, k⟩ ⟨pfin, k + rrow.length⟩ := by
+    nsteps (astepAny row) es.length ⟨p, k⟩ ⟨pfin, k + rrow.length⟩ := by
   intro h
   induction h with
   | HEnil k ws p => intro _; exact nsteps_O _
@@ -1053,23 +1031,20 @@ theorem hemitAstepAux (row : List Lbl) (T : Int → Prop) (img : Int → Option 
       have hj := hrow (j + 1)
       simp only [List.getElem?_cons_succ] at hj
       rw [hj, show k + (j + 1) = k + 1 + j by omega]
-    have har' := admRunAstep row T img true _ _ _ _ _ k har
-    have hstep : astepAny row T img ⟨pa, k⟩ ⟨p', k + 1⟩ := by
+    have har' := admRunAstep row true _ _ _ _ _ k har
+    have hstep : astepAny row ⟨pa, k⟩ ⟨p', k + 1⟩ := by
       obtain ⟨hnb, _, _, hpr⟩ := hre
       rcases (pstepEvSplit _ _ _ _ _).1 hst with hs | hw
       · cases l with
         | LLoad aq lat base tvs asrc =>
           have hrd := (aidentProj _ _ _ hpr rfl).1
           simp only [projLbl, Option.some.injEq] at hpr; subst hpr
-          exact readBlock row T img _ _ _ _ _ k _ hs rfl hlb hrd
+          exact readBlock row _ _ _ _ _ k _ hs rfl hlb hrd
         | LExLoad aq base tvs asrc =>
           have hrd := (aidentProj _ _ _ hpr rfl).1
           simp only [projLbl, Option.some.injEq] at hpr; subst hpr
-          exact readBlock row T img _ _ _ _ _ k _ hs rfl hlb hrd
-        | LIFetch base tvs =>
-          have hrd := (aidentProj _ _ _ hpr rfl).1
-          simp only [projLbl, Option.some.injEq] at hpr; subst hpr
-          exact readBlock row T img _ _ _ _ _ k _ hs rfl hlb hrd
+          exact readBlock row _ _ _ _ _ k _ hs rfl hlb hrd
+        | LIFetch => simp [projLbl] at hpr
         | LStore rl base data asrc vsrc =>
           have hwr := (aidentProj _ _ _ hpr rfl).2.1
           have hdat := aidentProjData _ _ _ hpr rfl
@@ -1106,16 +1081,16 @@ theorem hemitAstepAux (row : List Lbl) (T : Int → Prop) (img : Int → Option 
       simp only [List.getElem?_cons_succ] at hj
       rw [hj, show k + (j + 1) = k + 1 + j by omega]
     obtain ⟨hrd1, hsome1, hwr2, hsome2, hadv⟩ := aidentPair _ _ _ _ _ _ hre
-    have har1' := admRunAstep row T img true _ _ _ _ _ k har1
-    have har2' := admRunAstep row T img false _ _ _ _ _ k har2
-    have hs1 : astepAny row T img ⟨pa, k⟩ ⟨pm, k⟩ := by
+    have har1' := admRunAstep row true _ _ _ _ _ k har1
+    have har2' := admRunAstep row false _ _ _ _ _ k har2
+    have hs1 : astepAny row ⟨pa, k⟩ ⟨pm, k⟩ := by
       rcases (pstepEvSplit _ _ _ _ _).1 hst1 with hs | hw
-      · have hrb := readBlock row T img _ _ _ _ _ k lb hs hsome1 hlb hrd1
+      · have hrb := readBlock row _ _ _ _ _ k lb hs hsome1 hlb hrd1
         rw [hadv, Nat.add_zero] at hrb
         exact hrb
       · obtain ⟨rfl, _⟩ := pstepWireInv _ _ _ _ _ hw
         simp [wlRd] at hsome1
-    have hs2 : astepAny row T img ⟨pm2, k⟩ ⟨p', k + 1⟩ := by
+    have hs2 : astepAny row ⟨pm2, k⟩ ⟨p', k + 1⟩ := by
       rcases (pstepEvSplit _ _ _ _ _).1 hst2 with hs | hw
       · have hdat : wlWdata l2 = lblData lb := by
           obtain ⟨_, _, _, _, _, _, _, _, _, rfl, _, _, rfl⟩ := hre
@@ -1133,21 +1108,21 @@ theorem hemitAstepAux (row : List Lbl) (T : Int → Prop) (img : Int → Option 
       (nsteps_trans har2' (nsteps_l hs2 (ih hrow'))))
 
 /-- THE RELATION TO THE TREE: a conformant emission is an opax run of one step per emission
-item, from position 0 to the row's end (`T` and `img` arbitrary). -/
-theorem hemitAstep (row : List Lbl) (T : Int → Prop) (img : Int → Option (BitVec 8)) (i : Nat)
+item, from position 0 to the row's end. -/
+theorem hemitAstep (row : List Lbl)  (i : Nat)
     (p0 : Pexv6) (dv : Nat → Efab) (em : Hemission) :
     hartConf i row p0 dv em →
-    nsteps (astepAny row T img) em.emItems.length ⟨p0, 0⟩ ⟨em.emFin, row.length⟩ := by
+    nsteps (astepAny row) em.emItems.length ⟨p0, 0⟩ ⟨em.emFin, row.length⟩ := by
   intro h
-  have := hemitAstepAux row T img dv 0 wsInit row p0 _ _ h (fun j => by rw [Nat.zero_add])
+  have := hemitAstepAux row dv 0 wsInit row p0 _ _ h (fun j => by rw [Nat.zero_add])
   rwa [Nat.zero_add] at this
 
-theorem hartConfCoverage (row : List Lbl) (T : Int → Prop) (img : Int → Option (BitVec 8))
+theorem hartConfCoverage (row : List Lbl) 
     (i : Nat) (p0 : Pexv6) (dv : Nat → Efab) (em : Hemission) :
     hartConf i row p0 dv em →
-    ∀ j, consumed row T img ⟨p0, 0⟩ ⟨em.emFin, row.length⟩ j ↔ j < row.length := by
+    ∀ j, consumed row ⟨p0, 0⟩ ⟨em.emFin, row.length⟩ j ↔ j < row.length := by
   intro h
-  exact coverageOfRow row T img _ _ (rtc_nsteps_2 (hemitAstep row T img i p0 dv em h))
+  exact coverageOfRow row _ _ (rtc_nsteps_2 (hemitAstep row i p0 dv em h))
 
 /-! ## 6. Non-vacuity: a hand-built two-event program -/
 
@@ -1196,11 +1171,6 @@ def wtRow (w0 w1 : BitVec (8 * 4)) : List Lbl :=
   [.LLoad false wtBase [0, 0, 0, 0] (WeakInterpProj.wbytes 4 w0),
    .LStore false wtBase (WeakInterpProj.wbytes 4 w1) .WCplain]
 
-/-- No text region, empty fetch image. -/
-def wtT : Int → Prop := fun _ => False
-
-def wtImg : Int → Option (BitVec 8) := fun _ => none
-
 /-! ### 6.1 The two program steps, at EVERY read value -/
 
 theorem wtReadStep (cpu : CPU) (rs : RegFile) (d : Efab) (vs : List (BitVec 8)) :
@@ -1240,7 +1210,7 @@ theorem wtAread (cpu : CPU) (rs : RegFile) (w0 w1 : BitVec (8 * 4)) :
 
 /-- THE WRITE, IDENTITY AND BYTES. -/
 theorem wtAstepWrite (cpu : CPU) (rs : RegFile) (w0 w1 : BitVec (8 * 4)) :
-    AxOpsem.astepProg (wtRow w0 w1) wtT wtImg ⟨wtP1 cpu rs w1, 1⟩
+    AxOpsem.astepProg (wtRow w0 w1) ⟨wtP1 cpu rs w1, 1⟩
       (LStore false wtBase (WeakInterpProj.wbytes 4 w1) (depsAsrc (depsOfIb ibNone.ibBits))
         (depsVsrc (depsOfIb ibNone.ibBits)))
       ⟨wtP2 cpu rs, 2⟩ :=
@@ -1250,54 +1220,49 @@ theorem wtAstepWrite (cpu : CPU) (rs : RegFile) (w0 w1 : BitVec (8 * 4)) :
 /-- The whole run, for every read value whose word is the row's written one. -/
 theorem wtRun (cpu : CPU) (rs : RegFile) (w0 w1 : BitVec (8 * 4)) (vs : List (BitVec 8)) :
     vs.length = 4 → wordOfBytes 4 vs = w1 →
-    nsteps (astepAny (wtRow w0 w1) wtT wtImg) 2 ⟨wtP0 cpu rs, 0⟩ ⟨wtP2 cpu rs, 2⟩ := by
+    nsteps (astepAny (wtRow w0 w1)) 2 ⟨wtP0 cpu rs, 0⟩ ⟨wtP2 cpu rs, 2⟩ := by
   intro hvs hw
   subst hw
-  have h1 := astepOfRead (wtRow w0 (wordOfBytes 4 vs)) wtT wtImg _ _ _
+  have h1 := astepOfRead (wtRow w0 (wordOfBytes 4 vs)) _ _ _
     (wtAread cpu rs w0 (wordOfBytes 4 vs)) vs hvs
   exact nsteps_l h1 (nsteps_l (astepAny.AAStep _ _ (.inl ⟨_, wtAstepWrite cpu rs _ _⟩))
     (nsteps_O _))
 
 theorem wtCoverage (cpu : CPU) (rs : RegFile) (w0 w1 : BitVec (8 * 4)) (j : Nat) :
-    consumed (wtRow w0 w1) wtT wtImg ⟨wtP0 cpu rs, 0⟩ ⟨wtP2 cpu rs, 2⟩ j ↔ j < 2 :=
-  coverageOfRow (wtRow w0 w1) wtT wtImg _ _
+    consumed (wtRow w0 w1) ⟨wtP0 cpu rs, 0⟩ ⟨wtP2 cpu rs, 2⟩ j ↔ j < 2 :=
+  coverageOfRow (wtRow w0 w1) _ _
     (rtc_nsteps_2 (wtRun cpu rs w0 w1 (WeakInterpProj.wbytes 4 w1) (wbytesLength _ _)
       (wordOfBytesWbytes 4 w1))) j
 
 /-! ### 6.3 Progress: the boundary re-fetches; an empty row needs the extension clause -/
 
 theorem wtReducibleEnd (cpu : CPU) (rs : RegFile) (w0 w1 : BitVec (8 * 4)) :
-    reducible (wtRow w0 w1) wtT wtImg ⟨wtP2 cpu rs, 2⟩ :=
+    reducible (wtRow w0 w1) ⟨wtP2 cpu rs, 2⟩ :=
   ⟨[], ⟨.PHart cpu (riscvStep false) rs none ibNone, 2⟩,
     .inl ⟨LInstr, .AStepAdmin _ 2 wtD0 LInstr _ wtD0 rfl
       ⟨rfl, none, some ibNone, none, rfl, rfl, ⟨false, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩, rfl⟩⟩⟩
 
 /-- In the EMPTY row the read node has no own step (the wire aside). -/
 theorem wtStuckEmptyRow (cpu : CPU) (rs : RegFile) (s' : Athread) :
-    ¬ astepOwn [] wtT wtImg ⟨wtP0 cpu rs, 0⟩ s' := by
+    ¬ astepOwn [] ⟨wtP0 cpu rs, 0⟩ s' := by
   rintro (⟨l0, h⟩ | ⟨id, K, vs, ⟨lb, hrow, _⟩, _, _⟩)
   · match h with
     | .AStepAdmin _ _ d l _ _ ha hs =>
       obtain ⟨hrd, _⟩ := pstepProgMemreadLbl cpu 4 64 wtRreq (fun ans => wtM2 (wtVal ans)) rs
-        ibNone d l _ _ wtPaRam hs
+        ibNone d l _ _ wtPaRam rfl hs
       cases l <;> simp_all [wlRd, lbAdmin]
-    | .AStepFetch _ _ _ _ _ _ _ _ hrow _ _ _ => simp at hrow
     | .AStepWrite _ _ _ _ _ _ _ hrow _ _ _ _ => simp at hrow
     | .AStepFence _ _ _ _ _ _ _ hrow _ _ _ => simp at hrow
   · simp at hrow
 
 /-- … yet it is reducible: SOME extension supplies the read. -/
 theorem wtReducibleEmptyRow (cpu : CPU) (rs : RegFile) :
-    reducible [] wtT wtImg ⟨wtP0 cpu rs, 0⟩ :=
+    reducible [] ⟨wtP0 cpu rs, 0⟩ :=
   ⟨wtRow 0 0, ⟨wtP1 cpu rs (wordOfBytes 4 (WeakInterpProj.wbytes 4 (0 : BitVec (8 * 4)))), 1⟩,
     .inr ⟨.IRead false wtBase 4, fun vs => ⟨wtP1 cpu rs (wordOfBytes 4 vs), 1⟩,
       WeakInterpProj.wbytes 4 (0 : BitVec (8 * 4)), wtAread cpu rs 0 0, wbytesLength _ _, rfl⟩⟩
 
-/-! ### 6.4 The fetch arm: a text region over the node's range (deviation 2: a FETCH node) -/
-
-def wtFT : Int → Prop := fun z => wtBase ≤ z ∧ z < wtBase + 4
-
-def wtFimg (vs : List (BitVec 8)) : Int → Option (BitVec 8) := fun z => vs[(z - wtBase).toNat]?
+/-! ### 6.4 The fetch: an ADMINISTRATIVE step at a FETCH node (deviation 2) -/
 
 /-- (Lean-only) the fetch request: the same range, access kind `AK_ifetch`. -/
 def wtFreq : Mem_read_request 4 64 Arch.pa Arch.translation Arch.arch_ak :=
@@ -1317,20 +1282,14 @@ theorem wtFetchStep (cpu : CPU) (rs : RegFile) (d : Efab) (vs : List (BitVec 8))
   exact pnodeStepReadAny 4 64 wtFreq (fun ans => wtM2 (wtVal ans)) rs ibNone d.efDev vs wtPaRam
     hlen
 
-/-- The fetch consumes the row's own read item at position 0. -/
-theorem wtFetch (cpu : CPU) (rs : RegFile) (w0 w1 : BitVec (8 * 4)) (vs : List (BitVec 8)) :
+/-- The fetch is an admin step: it consumes NO row item (the position stays `k`). -/
+theorem wtFetch (cpu : CPU) (rs : RegFile) (w0 w1 : BitVec (8 * 4)) (k : Nat)
+    (vs : List (BitVec 8)) :
     vs.length = 4 →
-    AxOpsem.astepProg (wtRow w0 w1) wtFT (wtFimg vs) ⟨wtPf0 cpu rs, 0⟩
-      (LIFetch wtBase (tagVals vs)) ⟨wtP1 cpu rs (wordOfBytes 4 vs), 1⟩ := by
+    AxOpsem.astepProg (wtRow w0 w1) ⟨wtPf0 cpu rs, k⟩
+      (LIFetch wtBase (tagVals vs)) ⟨wtP1 cpu rs (wordOfBytes 4 vs), k⟩ := by
   intro hvs
-  refine .AStepFetch _ 0 wtD0 wtBase (tagVals vs) _ _ wtD0 rfl ?_ ?_ (wtFetchStep cpu rs wtD0 vs hvs)
-  · simp only [aident, wbytesLength, tagValsLength, hvs]
-  · intro j hj
-    rw [tagValsLength] at hj
-    refine ⟨⟨by omega, by omega⟩, ?_⟩
-    show vs[(wtBase + (j : Int) - wtBase).toNat]? = _
-    rw [show wtBase + (j : Int) - wtBase = (j : Int) by omega, tagValsSnd]
-    simp
+  exact .AStepAdmin _ k wtD0 _ _ wtD0 rfl (wtFetchStep cpu rs wtD0 vs hvs)
 
 /-! ### 6.5 The tree's conformance of the same program, and its opax run -/
 
@@ -1374,8 +1333,8 @@ theorem wtHartConf (i : Nat) (cpu : CPU) (rs : RegFile) (w0 : BitVec (8 * 4)) :
 
 /-- `hemitAstep` on it reproduces `wtRun`: two items, two steps. -/
 theorem wtHemitAstep (i : Nat) (cpu : CPU) (rs : RegFile) (w0 : BitVec (8 * 4)) :
-    nsteps (astepAny (wtRow w0 w0) wtT wtImg) 2 ⟨wtP0 cpu rs, 0⟩ ⟨wtP2 cpu rs, 2⟩ :=
-  hemitAstep _ wtT wtImg i _ wtDv _ (wtHartConf i cpu rs w0)
+    nsteps (astepAny (wtRow w0 w0)) 2 ⟨wtP0 cpu rs, 0⟩ ⟨wtP2 cpu rs, 2⟩ :=
+  hemitAstep _ i _ wtDv _ (wtHartConf i cpu rs w0)
 
 end OpaxWit
 

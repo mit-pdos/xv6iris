@@ -56,17 +56,22 @@ dummy default.
    `Gfexec` (constructor `GFExec`, fields `gfGd`, `gfDev`); `tc` is `MachCSL`'s (`TransGen`).
    `dev_state` ↦ `Efab` (the event instance's fabric: device states plus the residual UART/PLIC
    programs, `WeakEvPf` deviation 9 / owner decision Q1).
-2. O2 / D1 — THE FETCH-INERTNESS OBLIGATION, exactly as in `WeakRvwmoSupply` (its deviation 2):
-   turning a block back into `lblRealizes` at the machine state needs `lbFetchInert` there.
-   - Lean-only `hblkIn es k …` (`hblk` whose single-step arm records `(l, some k) ∈ es`),
-     `hblkInHblk`, `hblkInMono`, `hemitfStatesIn`, `hartConffStatesIn`, `fconfRowsIn`; Rocq's
-     `hblk` / `hemitfStates` / `hartConffStates` / `fconfRows` are kept, derived.
-   - `supplyOfFconf`'s THIRD premise carries, per agent, an emission `em` with
-     `WeakRvwmoSupply.emFetchInert c i em`, and the blocks as `hblkIn em.emItems n …` (Rocq: `∃ f`
-     with `hblk`).  The rest of the statement is Rocq's.
-   - `fconfSupply` gains the premise `candFetchInertF boot N c` (Lean-only: every two-endpoint
-     emission of every row `trow i c.cdTr`, `i < N`, is fetch-inert at `c`), the moving-fabric
-     twin of `WeakRvwmoSupply.candFetchInert`.
+2. O2 / STAGE C — THE FETCH IS ADMINISTRATIVE, PINNED TO THE BOOT IMAGE, exactly as in
+   `WeakRvwmoSupply` (its deviation 2; owner ruling Q-C1, `notes/weak-port-o2-stageC.md` §B).
+   - `gfexecConf` gains, per row, the clause `emFetchImg GF.gfGd.gdG.gxImg em` (every fetch
+     item of the emission reads the graph's image at timestamp 0), between the fabric clause and
+     the deps clause; `gfexecConfOfQconf` takes it from `gdexecQconf`'s.
+   - Lean-only `WeakRvwmoFab.pstepQ Q` (`pstepEv` restricted to labels satisfying `Q`;
+     `pstepQ (WeakAxRealize.fetchPin im)` is `pstepPin im pstepEv`, `WeakRvwmoFab.pstepQPin`),
+     `WeakRvwmoFab.admRunQ`, `hblkQ Q` (`hblk` at `pstepQ Q`), `hblkQHblk`, `hemitfStatesQ`,
+     `hartConffStatesQ`, `fconfRowsPin`.  Rocq's `hblk` / `hemitfStates` / `hartConffStates` /
+     `fconfRows` are kept as stated, derived at `Q := fun _ => True`.
+   - `supplyOfFconf` takes an image `im`; its third premise has the blocks as
+     `hblkQ (WeakAxRealize.fetchPin im) …` (Rocq: `hblk`) and its conclusion is
+     `execProgOk' (pstepPin im pstepEv) …`.
+   - `fconfSupply`: Rocq's premises; conclusion at `pstepPin GF.gfGd.gdG.gxImg pstepEv`.
+   Stage B's `hblkIn`, `hblkInHblk`, `hblkInMono`, `hemitfStatesIn`, `hartConffStatesIn`,
+   `fconfRowsIn` and `candFetchInertF` are DELETED.
 3. PROOFS: per-constructor case analysis and `omega`; `gdevAdjDec` searches `List.range` (Rocq
    `seq`); `linExtFDevBefore` inducts on the gap `n - (m+1)` as Rocq does.  Rocq's
    `Print Assumptions` audit is not reproduced (the lint bans axioms).  Lean-only helper
@@ -286,30 +291,48 @@ def hblk (d d' : Efab) (ws : Wstate) (lb : Lbl) (p p' : Pexv6) : Prop :=
           admStar pstepEv false pm dm pm2 dm2 ∧
           pstepEv pm2 dm2 l2 p' d'))
 
-/-- (Lean-only, deviation 2) `hblk` whose single-step arm records its item `(l, some k)` in `es`. -/
-def hblkIn (es : List Eitem) (k : Nat) (d d' : Efab) (ws : Wstate) (lb : Lbl)
-    (p p' : Pexv6) : Prop :=
+/-- (Lean-only, deviation 2) `pstepEv` restricted to the labels satisfying `Q`;
+`pstepQ (WeakAxRealize.fetchPin im)` is `WeakAxRealize.pstepPin im pstepEv` (by `rfl`). -/
+def WeakRvwmoFab.pstepQ (Q : Wlabel → Prop) (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6)
+    (d' : Efab) : Prop :=
+  pstepEv p d l p' d' ∧ Q l
+
+theorem WeakRvwmoFab.pstepQPin (im : Image) :
+    WeakRvwmoFab.pstepQ (WeakAxRealize.fetchPin im) = pstepPin im pstepEv := rfl
+
+/-- (Lean-only, deviation 2) An `admRun` whose labels satisfy `Q` is a run of `pstepQ Q`. -/
+theorem WeakRvwmoFab.admRunQ (Q : Wlabel → Prop) (instr : Bool) (p : Pexv6) (d : Efab)
+    (ls : List Wlabel) (p' : Pexv6) (d' : Efab) :
+    admRun instr p d ls p' d' → (∀ l, l ∈ ls → Q l) →
+    admStar (WeakRvwmoFab.pstepQ Q) instr p d p' d' := by
+  intro h
+  induction h with
+  | ARnil p d => intro _; exact admStarRefl _ instr p d
+  | ARcons p d l p1 d1 ls p' d' ha hs _ ih =>
+    intro hq
+    exact admStarL (WeakRvwmoFab.pstepQ Q) instr p d l p1 d1 p' d' ha
+      ⟨hs, hq l List.mem_cons_self⟩ (ih (fun x hx => hq x (List.mem_cons_of_mem _ hx)))
+
+/-- (Lean-only, deviation 2) `hblk` at the restricted LTS `pstepQ Q`. -/
+def hblkQ (Q : Wlabel → Prop) (d d' : Efab) (ws : Wstate) (lb : Lbl) (p p' : Pexv6) : Prop :=
   ∃ (pa : Pexv6) (da : Efab),
-    admStar pstepEv true p d pa da ∧
-    ((∃ l, (l, some k) ∈ es ∧ hlblRealizes pa ws lb l ∧ pstepEv pa da l p' d')
+    admStar (WeakRvwmoFab.pstepQ Q) true p d pa da ∧
+    ((∃ l, hlblRealizes pa ws lb l ∧ WeakRvwmoFab.pstepQ Q pa da l p' d')
      ∨ (∃ (pm : Pexv6) (dm : Efab) (pm2 : Pexv6) (dm2 : Efab) (l1 l2 : Wlabel),
           hlblRealizesPair pa pm2 ws lb l1 l2 ∧
-          pstepEv pa da l1 pm dm ∧
-          admStar pstepEv false pm dm pm2 dm2 ∧
-          pstepEv pm2 dm2 l2 p' d'))
+          WeakRvwmoFab.pstepQ Q pa da l1 pm dm ∧
+          admStar (WeakRvwmoFab.pstepQ Q) false pm dm pm2 dm2 ∧
+          WeakRvwmoFab.pstepQ Q pm2 dm2 l2 p' d'))
 
-theorem hblkInHblk (es : List Eitem) (k : Nat) (d d' : Efab) (ws : Wstate) (lb : Lbl)
-    (p p' : Pexv6) : hblkIn es k d d' ws lb p p' → hblk d d' ws lb p p' := by
-  rintro ⟨pa, da, hs, ⟨l, _, h1, h2⟩ | h⟩
-  · exact ⟨pa, da, hs, .inl ⟨l, h1, h2⟩⟩
-  · exact ⟨pa, da, hs, .inr h⟩
-
-theorem hblkInMono (es es' : List Eitem) (k : Nat) (d d' : Efab) (ws : Wstate) (lb : Lbl)
-    (p p' : Pexv6) :
-    hblkIn es k d d' ws lb p p' → (∀ x, x ∈ es → x ∈ es') → hblkIn es' k d d' ws lb p p' := by
-  rintro ⟨pa, da, hs, ⟨l, hm, h1, h2⟩ | h⟩ hsub
-  · exact ⟨pa, da, hs, .inl ⟨l, hsub _ hm, h1, h2⟩⟩
-  · exact ⟨pa, da, hs, .inr h⟩
+theorem hblkQHblk (Q : Wlabel → Prop) (d d' : Efab) (ws : Wstate) (lb : Lbl) (p p' : Pexv6) :
+    hblkQ Q d d' ws lb p p' → hblk d d' ws lb p p' := by
+  have hsub : ∀ (instr : Bool) (p d p' d'),
+      admStar (WeakRvwmoFab.pstepQ Q) instr p d p' d' → admStar pstepEv instr p d p' d' :=
+    fun _ _ _ _ _ h => rtc_subrel (fun _ _ ⟨l, ha, hs⟩ => ⟨l, ha, hs.1⟩) h
+  rintro ⟨pa, da, hs, ⟨l, h1, h2⟩ | ⟨pm, dm, pm2, dm2, l1, l2, h1, h2, h3, h4⟩⟩
+  · exact ⟨pa, da, hsub _ _ _ _ _ hs, .inl ⟨l, h1, h2.1⟩⟩
+  · exact ⟨pa, da, hsub _ _ _ _ _ hs,
+      .inr ⟨pm, dm, pm2, dm2, l1, l2, h1, h2.1, hsub _ _ _ _ _ h3, h4.1⟩⟩
 
 /-- `WeakRvwmoSupply.hblock` IS `hblk` at the two fabric values it reads. -/
 theorem hblockHblk (dv : Nat → Efab) (k : Nat) (ws : Wstate) (lb : Lbl) (p p' : Pexv6) :
@@ -318,22 +341,27 @@ theorem hblockHblk (dv : Nat → Efab) (k : Nat) (ws : Wstate) (lb : Lbl) (p p' 
 
 /-! ### 3.2 The state extraction, with block classification -/
 
-/-- (Lean-only) `hemitfStates`, with the realizing items located in the emission. -/
-theorem hemitfStatesIn (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
-    (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
-    hemitf dvi dvo k ws row p es pfin →
+/-- (Lean-only, deviation 2) `hemitfStates` at `pstepQ Q`, from an emission whose labels
+satisfy `Q`. -/
+theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate)
+    (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
+    hemitf dvi dvo k ws row p es pfin → (∀ x, x ∈ es.map Prod.fst → Q x) →
     ∃ f : Nat → Pexv6, f 0 = p ∧
       ∀ n lb, row[n]? = some lb →
-        hblkIn es (n + k) (dvi (n + k)) (dvo (n + k)) (rowWsAux k ws (row.take n)) lb
-          (f n) (f (n + 1))
+        hblkQ Q (dvi (n + k)) (dvo (n + k)) (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))
         ∧ (emDev false (n + k) es = false →
            dvo (n + k) = dvi (n + k) ∧
-           ∀ d, hblkIn es (n + k) d d (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))) := by
+           ∀ d, hblkQ Q d d (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))) := by
   intro h
   induction h with
-  | HFnil k ws p => exact ⟨fun _ => p, rfl, fun n lb hn => by simp at hn⟩
+  | HFnil k ws p => intro _; exact ⟨fun _ => p, rfl, fun n lb hn => by simp at hn⟩
   | HFone k ws lb row p ls pa da l p' es pfin har hre hst _ ih =>
-    obtain ⟨f', hf0, hf⟩ := ih
+    intro hq
+    rw [eblockFst] at hq
+    have hqls : ∀ x, x ∈ ls → Q x := fun x hx => hq x (List.mem_append_left _ hx)
+    have hql : Q l := hq l (List.mem_append_right _ List.mem_cons_self)
+    obtain ⟨f', hf0, hf⟩ :=
+      ih (fun x hx => hq x (List.mem_append_right _ (List.mem_cons_of_mem _ hx)))
     refine ⟨fun n => match n with | 0 => p | n' + 1 => f' n', rfl, ?_⟩
     intro n lb0 hn
     cases n with
@@ -341,8 +369,8 @@ theorem hemitfStatesIn (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : L
       simp only [List.getElem?_cons_zero, Option.some.injEq] at hn
       subst hn
       rw [Nat.zero_add]
-      have hmem : (l, some k) ∈ eadm ls ++ (l, some k) :: es := by simp
-      refine ⟨⟨pa, da, admRunStar _ _ _ _ _ _ har, .inl ⟨l, hmem, hre, ?_⟩⟩, ?_⟩
+      refine ⟨⟨pa, da, WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ har hqls,
+        .inl ⟨l, hre, ?_, hql⟩⟩, ?_⟩
       · show pstepEv pa da l (f' 0) (dvo k)
         rw [hf0]; exact hst
       · intro hnd
@@ -354,8 +382,8 @@ theorem hemitfStatesIn (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : L
         have hnl : LDev ∉ ls := hasDevFalse ls hls'
         have hda : da = dvi k := admRunDevfree _ _ _ _ _ _ har hnl
         obtain ⟨hd, hall⟩ := pstepEvDevfree _ _ _ _ _ hst hne
-        refine ⟨by rw [hd, hda], fun d => ⟨pa, d, ?_, .inl ⟨l, hmem, hre, ?_⟩⟩⟩
-        · exact admRunStar _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har hnl d)
+        refine ⟨by rw [hd, hda], fun d => ⟨pa, d, ?_, .inl ⟨l, hre, ?_, hql⟩⟩⟩
+        · exact WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har hnl d) hqls
         · show pstepEv pa d l (f' 0) d
           rw [hf0]; exact hall d
     | succ n =>
@@ -363,14 +391,20 @@ theorem hemitfStatesIn (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : L
       have e : n + 1 + k = n + (k + 1) := by omega
       rw [e]
       obtain ⟨h1, h2⟩ := hf n lb0 hn
-      have hsub : ∀ x, x ∈ es → x ∈ eadm ls ++ (l, some k) :: es := fun x hx => by simp [hx]
-      refine ⟨hblkInMono _ _ _ _ _ _ _ _ _ h1 hsub, ?_⟩
+      refine ⟨h1, ?_⟩
       rw [emDevTagNe false ls l k (n + (k + 1)) es (by omega)]
-      intro hnd
-      obtain ⟨h3, h4⟩ := h2 hnd
-      exact ⟨h3, fun d => hblkInMono _ _ _ _ _ _ _ _ _ (h4 d) hsub⟩
+      exact h2
   | HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2 hst2 _ ih =>
-    obtain ⟨f', hf0, hf⟩ := ih
+    intro hq
+    rw [eblockFst, eblockFst] at hq
+    have hq1 : ∀ x, x ∈ ls1 → Q x := fun x hx => hq x (List.mem_append_left _ hx)
+    have hql1 : Q l1 := hq l1 (List.mem_append_right _ List.mem_cons_self)
+    have h2' : ∀ x, x ∈ ls2 ++ l2 :: es.map Prod.fst → Q x :=
+      fun x hx => hq x (List.mem_append_right _ (List.mem_cons_of_mem _ hx))
+    have hq2 : ∀ x, x ∈ ls2 → Q x := fun x hx => h2' x (List.mem_append_left _ hx)
+    have hql2 : Q l2 := h2' l2 (List.mem_append_right _ List.mem_cons_self)
+    obtain ⟨f', hf0, hf⟩ :=
+      ih (fun x hx => h2' x (List.mem_append_right _ (List.mem_cons_of_mem _ hx)))
     refine ⟨fun n => match n with | 0 => p | n' + 1 => f' n', rfl, ?_⟩
     intro n lb0 hn
     cases n with
@@ -378,8 +412,9 @@ theorem hemitfStatesIn (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : L
       simp only [List.getElem?_cons_zero, Option.some.injEq] at hn
       subst hn
       rw [Nat.zero_add]
-      refine ⟨⟨pa, da, admRunStar _ _ _ _ _ _ har1,
-        .inr ⟨pm, dm, pm2, dm2, l1, l2, hre, hst1, admRunStar _ _ _ _ _ _ har2, ?_⟩⟩, ?_⟩
+      refine ⟨⟨pa, da, WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ har1 hq1,
+        .inr ⟨pm, dm, pm2, dm2, l1, l2, hre, ⟨hst1, hql1⟩,
+          WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ har2 hq2, ?_, hql2⟩⟩, ?_⟩
       · show pstepEv pm2 dm2 l2 (f' 0) (dvo k)
         rw [hf0]; exact hst2
       · intro hnd
@@ -397,9 +432,10 @@ theorem hemitfStatesIn (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : L
         have hdm2 : dm2 = dm := admRunDevfree _ _ _ _ _ _ har2 hn2
         obtain ⟨hd2, hall2⟩ := pstepEvDevfree _ _ _ _ _ hst2 (lbIsdevNe _ hl2)
         refine ⟨by rw [hd2, hdm2, hd1, hda], fun d =>
-          ⟨pa, d, admRunStar _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har1 hn1 d),
-            .inr ⟨pm, d, pm2, d, l1, l2, hre, hall1 d,
-              admRunStar _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har2 hn2 d), ?_⟩⟩⟩
+          ⟨pa, d, WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har1 hn1 d) hq1,
+            .inr ⟨pm, d, pm2, d, l1, l2, hre, ⟨hall1 d, hql1⟩,
+              WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har2 hn2 d) hq2,
+              ?_, hql2⟩⟩⟩
         show pstepEv pm2 d l2 (f' 0) d
         rw [hf0]; exact hall2 d
     | succ n =>
@@ -407,15 +443,10 @@ theorem hemitfStatesIn (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : L
       have e : n + 1 + k = n + (k + 1) := by omega
       rw [e]
       obtain ⟨h1, h2⟩ := hf n lb0 hn
-      have hsub : ∀ x, x ∈ es →
-          x ∈ eadm ls1 ++ (l1, some k) :: (eadm ls2 ++ (l2, some k) :: es) :=
-        fun x hx => by simp [hx]
-      refine ⟨hblkInMono _ _ _ _ _ _ _ _ _ h1 hsub, ?_⟩
+      refine ⟨h1, ?_⟩
       rw [emDevTagNe false ls1 l1 k (n + (k + 1)) _ (by omega),
         emDevTagNe false ls2 l2 k (n + (k + 1)) es (by omega)]
-      intro hnd
-      obtain ⟨h3, h4⟩ := h2 hnd
-      exact ⟨h3, fun d => hblkInMono _ _ _ _ _ _ _ _ _ (h4 d) hsub⟩
+      exact h2
 
 theorem hemitfStates (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
@@ -427,25 +458,26 @@ theorem hemitfStates (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : Lis
            dvo (n + k) = dvi (n + k) ∧
            ∀ d, hblk d d (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))) := by
   intro hem
-  obtain ⟨f, hf0, hf⟩ := hemitfStatesIn dvi dvo k ws row p es pfin hem
+  obtain ⟨f, hf0, hf⟩ :=
+    hemitfStatesQ (fun _ => True) dvi dvo k ws row p es pfin hem (fun _ _ => trivial)
   refine ⟨f, hf0, fun n lb hn => ?_⟩
   obtain ⟨h1, h2⟩ := hf n lb hn
-  refine ⟨hblkInHblk _ _ _ _ _ _ _ _ h1, fun hnd => ?_⟩
+  refine ⟨hblkQHblk _ _ _ _ _ _ _ h1, fun hnd => ?_⟩
   obtain ⟨h3, h4⟩ := h2 hnd
-  exact ⟨h3, fun d => hblkInHblk _ _ _ _ _ _ _ _ (h4 d)⟩
+  exact ⟨h3, fun d => hblkQHblk _ _ _ _ _ _ _ (h4 d)⟩
 
-/-- (Lean-only) `hartConffStates`, with the realizing items located in the emission. -/
-theorem hartConffStatesIn (i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Nat → Efab)
-    (em : Hemission) :
-    hartConff i row p0 dvi dvo em →
+/-- (Lean-only, deviation 2) `hartConffStates` at `pstepQ Q`. -/
+theorem hartConffStatesQ (Q : Wlabel → Prop) (i : Nat) (row : List Lbl) (p0 : Pexv6)
+    (dvi dvo : Nat → Efab) (em : Hemission) :
+    hartConff i row p0 dvi dvo em → (∀ x, x ∈ emLabels em → Q x) →
     ∃ f : Nat → Pexv6, f 0 = p0 ∧
       ∀ n lb, row[n]? = some lb →
-        hblkIn em.emItems n (dvi n) (dvo n) (rowWs row n) lb (f n) (f (n + 1))
+        hblkQ Q (dvi n) (dvo n) (rowWs row n) lb (f n) (f (n + 1))
         ∧ (¬ isDevBlock em n →
            dvo n = dvi n ∧
-           ∀ d, hblkIn em.emItems n d d (rowWs row n) lb (f n) (f (n + 1))) := by
-  intro hem
-  obtain ⟨f, hf0, hf⟩ := hemitfStatesIn _ _ _ _ _ _ _ _ hem
+           ∀ d, hblkQ Q d d (rowWs row n) lb (f n) (f (n + 1))) := by
+  intro hem hq
+  obtain ⟨f, hf0, hf⟩ := hemitfStatesQ Q _ _ _ _ _ _ _ _ hem hq
   refine ⟨f, hf0, fun n lb hn => ?_⟩
   obtain ⟨h1, h2⟩ := hf n lb hn
   refine ⟨h1, fun hnd => h2 ?_⟩
@@ -461,12 +493,13 @@ theorem hartConffStates (i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Nat �
            dvo n = dvi n ∧
            ∀ d, hblk d d (rowWs row n) lb (f n) (f (n + 1))) := by
   intro hem
-  obtain ⟨f, hf0, hf⟩ := hartConffStatesIn i row p0 dvi dvo em hem
+  obtain ⟨f, hf0, hf⟩ :=
+    hartConffStatesQ (fun _ => True) i row p0 dvi dvo em hem (fun _ _ => trivial)
   refine ⟨f, hf0, fun n lb hn => ?_⟩
   obtain ⟨h1, h2⟩ := hf n lb hn
-  refine ⟨hblkInHblk _ _ _ _ _ _ _ _ h1, fun hnd => ?_⟩
+  refine ⟨hblkQHblk _ _ _ _ _ _ _ h1, fun hnd => ?_⟩
   obtain ⟨h3, h4⟩ := h2 hnd
-  exact ⟨h3, fun d => hblkInHblk _ _ _ _ _ _ _ _ (h4 d)⟩
+  exact ⟨h3, fun d => hblkQHblk _ _ _ _ _ _ _ (h4 d)⟩
 
 /-! ### 3.3 The obstruction, machine-checked -/
 
@@ -485,6 +518,8 @@ structure Gfexec where
   gfGd : Gdexec
   gfDev : List Geid
 
+/-- The fabric bundle (deviation 2: each emission's fetches are pinned to the graph's image,
+`emFetchImg GF.gfGd.gdG.gxImg em`, between the fabric clause and the deps clause). -/
 def gfexecConf (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec) :
     Prop :=
   fab 0 = d0 ∧
@@ -496,6 +531,7 @@ def gfexecConf (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfe
        hartConff i row (boot i) dvi dvo em ∧
        (∀ k : Nat, k < row.length → (isDevBlock em k ↔ (i, k) ∈ GF.gfDev)) ∧
        (∀ (k n : Nat), GF.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1)) ∧
+       emFetchImg GF.gfGd.gdG.gxImg em ∧
        (∀ jk, jk ∈ rowDeps em.emItems → ((i, jk.1), (i, jk.2)) ∈ GF.gfGd.gdDeps))
 
 /-! ## 5. The model arm -/
@@ -616,9 +652,9 @@ theorem gfexecConfOfQconf (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : 
   have hq := gdexecQconfRows _ _ _ _ _ hq0
   refine ⟨rfl, List.nodup_nil, fun n i k hn => by simp at hn, ?_⟩
   intro i row hrow
-  obtain ⟨em, hem, hdf, hdep⟩ := hq i row hrow
+  obtain ⟨em, hem, hdf, hfi, hdep⟩ := hq i row hrow
   refine ⟨em, fun _ => d0, fun _ => d0, hartConfHemitf i row (boot i) (fun _ => d0) em hem,
-    ?_, fun k n hn => by simp at hn, hdep⟩
+    ?_, fun k n hn => by simp at hn, by rw [gdexecQconfImg _ _ _ _ _ hq0]; exact hfi, hdep⟩
   intro k _
   constructor
   · intro hd; exact absurd hd (emDevfreeNoDevBlock em k hdf)
@@ -648,43 +684,33 @@ theorem dcntStepNe (GF : Gfexec) (tr : List Estep) (k : Nat) :
   intro h
   simp [dcnt, h]
 
-/-- THE INTERLEAVING THEOREM, at the fabric `fab ∘ dcnt`.  (Deviation 2: the per-agent data
-carries the emission and its fetch-inertness.) -/
+/-- THE INTERLEAVING THEOREM, at the fabric `fab ∘ dcnt`.  (Deviation 2: the blocks are at the
+pinned LTS `pstepQ (WeakAxRealize.fetchPin im)`, and so is the supply.) -/
 theorem supplyOfFconf (c : Cand) (boot : Nat → Pexv6) (fab : Nat → Efab) (GF : Gfexec)
-    (rows : Nat → List Lbl) (N : Nat) :
+    (rows : Nat → List Lbl) (N : Nat) (im : Image) :
     -- the trace is an interleaving of the rows ...
     (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) = rows i) →
     -- ... over the agents below `N` ...
     (∀ i, N ≤ i → rows i = []) →
     -- ... every row emits, its dev blocks pinned to `fab`, its non-dev blocks fabric-blind
-    -- (and, Lean-only, its fetches inert at `c`) ...
-    (∀ i, i < N → ∃ (em : Hemission) (f : Nat → Pexv6), f 0 = boot i ∧ emFetchInert c i em ∧
+    -- (Lean-only: its fetches pinned to `im`) ...
+    (∀ i, i < N → ∃ f : Nat → Pexv6, f 0 = boot i ∧
        ∀ n lb, (rows i)[n]? = some lb →
          (∀ m, GF.gfDev[m]? = some (i, n) →
-               hblkIn em.emItems n (fab m) (fab (m + 1)) (rowWs (rows i) n) lb (f n) (f (n + 1)))
+               hblkQ (WeakAxRealize.fetchPin im) (fab m) (fab (m + 1)) (rowWs (rows i) n) lb (f n) (f (n + 1)))
          ∧ ((i, n) ∉ GF.gfDev →
-            ∀ d, hblkIn em.emItems n d d (rowWs (rows i) n) lb (f n) (f (n + 1)))) →
+            ∀ d, hblkQ (WeakAxRealize.fetchPin im) d d (rowWs (rows i) n) lb (f n) (f (n + 1)))) →
     -- ... and the trace respects `gfDev`'s order.
     (∀ k s, c.cdTr[k]? = some s →
        (s.esAg, tcnt s.esAg (c.cdTr.take k)) ∈ GF.gfDev →
        GF.gfDev[dcnt GF c.cdTr k]? = some (s.esAg, tcnt s.esAg (c.cdTr.take k))) →
     ∃ pst : Nat → List Pexv6,
       pst 0 = (List.range' 0 N).map boot ∧
-      execProgOk' pstepEv pclsEv pst (fun k => fab (dcnt GF c.cdTr k)) (candExec c) := by
+      execProgOk' (pstepPin im pstepEv) pclsEv pst (fun k => fab (dcnt GF c.cdTr k))
+        (candExec c) := by
   intro hrows hbnd hch hord
-  have hch' : ∀ i, i < N → ∃ fe : Hemission × (Nat → Pexv6),
-      fe.2 0 = boot i ∧ emFetchInert c i fe.1 ∧
-      ∀ n lb, (rows i)[n]? = some lb →
-        (∀ m, GF.gfDev[m]? = some (i, n) →
-              hblkIn fe.1.emItems n (fab m) (fab (m + 1)) (rowWs (rows i) n) lb
-                (fe.2 n) (fe.2 (n + 1)))
-        ∧ ((i, n) ∉ GF.gfDev →
-           ∀ d, hblkIn fe.1.emItems n d d (rowWs (rows i) n) lb (fe.2 n) (fe.2 (n + 1))) := by
-    intro i hi
-    obtain ⟨em, f, h⟩ := hch i hi
-    exact ⟨(em, f), h⟩
-  obtain ⟨F, hF⟩ := natBoundedChoice (⟨[], .PDisk none⟩, fun _ => .PDisk none) _ N hch'
-  refine ⟨fun k => (List.range' 0 N).map (fun i => (F i).2 (tcnt i (c.cdTr.take k))), ?_, ?_⟩
+  obtain ⟨F, hF⟩ := natBoundedChoice (fun _ => .PDisk none) _ N hch
+  refine ⟨fun k => (List.range' 0 N).map (fun i => F i (tcnt i (c.cdTr.take k))), ?_, ?_⟩
   · apply List.ext_getElem?
     intro j
     simp only [List.getElem?_map]
@@ -703,14 +729,14 @@ theorem supplyOfFconf (c : Cand) (boot : Nat → Pexv6) (fab : Nat → Efab) (GF
       by_cases hge : s.esAg < N
       · exact hge
       · rw [hbnd _ (by omega)] at hrow; simp at hrow
-    obtain ⟨_, hfe, hfb⟩ := hF _ hiN
+    obtain ⟨_, hfb⟩ := hF _ hiN
     obtain ⟨hdev, hnodev⟩ := hfb _ _ hrow
     -- THE BLOCK, at the two GLOBAL fabric values
-    have hblk' : hblkIn (F s.esAg).1.emItems (tcnt s.esAg (c.cdTr.take k))
+    have hblk' : hblkQ (WeakAxRealize.fetchPin im)
         (fab (dcnt GF c.cdTr k)) (fab (dcnt GF c.cdTr (k + 1)))
         (rowWs (rows s.esAg) (tcnt s.esAg (c.cdTr.take k))) s.esLb
-        ((F s.esAg).2 (tcnt s.esAg (c.cdTr.take k)))
-        ((F s.esAg).2 (tcnt s.esAg (c.cdTr.take k) + 1)) := by
+        (F s.esAg (tcnt s.esAg (c.cdTr.take k)))
+        (F s.esAg (tcnt s.esAg (c.cdTr.take k) + 1)) := by
       by_cases hin : (s.esAg, tcnt s.esAg (c.cdTr.take k)) ∈ GF.gfDev
       · have hda : dstepAt GF c.cdTr k = true := by
           unfold dstepAt; rw [hs]; exact decide_eq_true hin
@@ -726,8 +752,8 @@ theorem supplyOfFconf (c : Cand) (boot : Nat → Pexv6) (fab : Nat → Efab) (GF
       rw [candWsRelp c _ k hklen]
       unfold trow
       rw [hrows]
-    refine ⟨(F s.esAg).2 (tcnt s.esAg (c.cdTr.take k)), pa, da,
-      (F s.esAg).2 (tcnt s.esAg (c.cdTr.take k) + 1), ?_, ?_, hstar, ?_⟩
+    refine ⟨F s.esAg (tcnt s.esAg (c.cdTr.take k)), pa, da,
+      F s.esAg (tcnt s.esAg (c.cdTr.take k) + 1), ?_, ?_, hstar, ?_⟩
     · simp only [List.getElem?_map]
       rw [lookup_seq_lt hiN]
       simp
@@ -744,12 +770,9 @@ theorem supplyOfFconf (c : Cand) (boot : Nat → Pexv6) (fab : Nat → Efab) (GF
           simp only [Option.map_some, Nat.zero_add, tcntStepNe j _ k s hs (fun h => hj h.symm)]
         · rw [lookup_seq_ge (by omega)]
           rfl
-    · rcases hdisj with ⟨l, hmem, hre, hst⟩ | ⟨pm, dm, pm2, dm2, l1, l2, hre, hs1, hs2, hs3⟩
+    · rcases hdisj with ⟨l, hre, hst⟩ | ⟨pm, dm, pm2, dm2, l1, l2, hre, hs1, hs2, hs3⟩
       · left
-        refine ⟨l, (hlblRealizesAx _ _ _ _ _).2 ⟨hlblRealizesRelp _ _ _ _ _ hrelp hre, ?_⟩, hst⟩
-        cases l with
-        | LIFetch base tvs => exact hfe base tvs _ k s hmem hs rfl rfl
-        | _ => trivial
+        exact ⟨l, (hlblRealizesAx _ _ _ _ _).2 (hlblRealizesRelp _ _ _ _ _ hrelp hre), hst⟩
       · right
         exact ⟨pm, dm, pm2, dm2, l1, l2,
           (hlblRealizesPairAx _ _ _ _ _ _ _).1 (hlblRealizesPairRelp _ _ _ _ _ _ _ hrelp hre),
@@ -757,22 +780,23 @@ theorem supplyOfFconf (c : Cand) (boot : Nat → Pexv6) (fab : Nat → Efab) (GF
 
 /-! ### 7.1 The bundle supplies `supplyOfFconf`'s third hypothesis -/
 
-/-- (Lean-only) `fconfRows`, keeping the bundle's emission and the item locations. -/
-theorem fconfRowsIn (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec)
+/-- (Lean-only, deviation 2) `fconfRows` at the pinned LTS: the bundle's `emFetchImg` clause
+pins the blocks to the graph's image. -/
+theorem fconfRowsPin (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec)
     (i : Nat) (row : List Lbl) :
     gfexecConf boot d0 fab GF →
     GF.gfGd.gdG.gxProg[i]? = some row →
-    ∃ (em : Hemission) (dvi dvo : Nat → Efab) (f : Nat → Pexv6),
-      hartConff i row (boot i) dvi dvo em ∧ f 0 = boot i ∧
+    ∃ f : Nat → Pexv6, f 0 = boot i ∧
       ∀ n lb, row[n]? = some lb →
         (∀ m, GF.gfDev[m]? = some (i, n) →
-              hblkIn em.emItems n (fab m) (fab (m + 1)) (rowWs row n) lb (f n) (f (n + 1)))
+              hblkQ (WeakAxRealize.fetchPin GF.gfGd.gdG.gxImg) (fab m) (fab (m + 1)) (rowWs row n) lb
+                (f n) (f (n + 1)))
         ∧ ((i, n) ∉ GF.gfDev →
-           ∀ d, hblkIn em.emItems n d d (rowWs row n) lb (f n) (f (n + 1))) := by
+           ∀ d, hblkQ (WeakAxRealize.fetchPin GF.gfGd.gdG.gxImg) d d (rowWs row n) lb (f n) (f (n + 1))) := by
   rintro ⟨_, _, _, hc⟩ hrow
-  obtain ⟨em, dvi, dvo, hem, hiff, hpin, _⟩ := hc i row hrow
-  obtain ⟨f, hf0, hf⟩ := hartConffStatesIn i row (boot i) dvi dvo em hem
-  refine ⟨em, dvi, dvo, f, hem, hf0, fun n lb hn => ?_⟩
+  obtain ⟨em, dvi, dvo, hem, hiff, hpin, hfi, _⟩ := hc i row hrow
+  obtain ⟨f, hf0, hf⟩ := hartConffStatesQ _ i row (boot i) dvi dvo em hem hfi
+  refine ⟨f, hf0, fun n lb hn => ?_⟩
   obtain ⟨h1, h2⟩ := hf n lb hn
   refine ⟨fun m hm => ?_, fun hnin d => ?_⟩
   · obtain ⟨hi, ho⟩ := hpin n m hm
@@ -790,20 +814,15 @@ theorem fconfRows (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : 
               hblk (fab m) (fab (m + 1)) (rowWs row n) lb (f n) (f (n + 1)))
         ∧ ((i, n) ∉ GF.gfDev → ∀ d, hblk d d (rowWs row n) lb (f n) (f (n + 1))) := by
   intro hconf hrow
-  obtain ⟨_, _, _, f, _, hf0, hf⟩ := fconfRowsIn boot d0 fab GF i row hconf hrow
+  obtain ⟨f, hf0, hf⟩ := fconfRowsPin boot d0 fab GF i row hconf hrow
   refine ⟨f, hf0, fun n lb hn => ?_⟩
   obtain ⟨h1, h2⟩ := hf n lb hn
-  exact ⟨fun m hm => hblkInHblk _ _ _ _ _ _ _ _ (h1 m hm),
-    fun hnin d => hblkInHblk _ _ _ _ _ _ _ _ (h2 hnin d)⟩
-
-/-- (Lean-only, deviation 2) The moving-fabric candidate-level fetch obligation: every
-two-endpoint emission of every row of the trace (agents below `N`) is fetch-inert at `c`. -/
-def candFetchInertF (boot : Nat → Pexv6) (N : Nat) (c : Cand) : Prop :=
-  ∀ i em (dvi dvo : Nat → Efab), i < N →
-    hartConff i (trow i c.cdTr) (boot i) dvi dvo em → emFetchInert c i em
+  exact ⟨fun m hm => hblkQHblk _ _ _ _ _ _ _ (h1 m hm),
+    fun hnin d => hblkQHblk _ _ _ _ _ _ _ (h2 hnin d)⟩
 
 /-- THE COMPOSITION: a bundle plus a fabric-order-respecting interleaving of its rows IS an
-`execProgOk'` supply, and the run starts at `d0`. -/
+`execProgOk'` supply (deviation 2: at the LTS pinned to the graph's image), and the run starts
+at `d0`. -/
 theorem fconfSupply (c : Cand) (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     (GF : Gfexec) (N : Nat) :
     gfexecConf boot d0 fab GF →
@@ -813,32 +832,25 @@ theorem fconfSupply (c : Cand) (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat →
     (∀ k s, c.cdTr[k]? = some s →
        (s.esAg, tcnt s.esAg (c.cdTr.take k)) ∈ GF.gfDev →
        GF.gfDev[dcnt GF c.cdTr k]? = some (s.esAg, tcnt s.esAg (c.cdTr.take k))) →
-    -- (Lean-only, deviation 2)
-    candFetchInertF boot N c →
     ∃ pst : Nat → List Pexv6,
       pst 0 = (List.range' 0 N).map boot ∧
       (fun k => fab (dcnt GF c.cdTr k)) 0 = d0 ∧
-      execProgOk' pstepEv pclsEv pst (fun k => fab (dcnt GF c.cdTr k)) (candExec c) := by
-  intro hconf hrows hN hord hfi
+      execProgOk' (pstepPin GF.gfGd.gdG.gxImg pstepEv) pclsEv pst
+        (fun k => fab (dcnt GF c.cdTr k)) (candExec c) := by
+  intro hconf hrows hN hord
   obtain ⟨pst, hpst0, hprog⟩ := supplyOfFconf c boot fab GF
-    (fun i => (GF.gfGd.gdG.gxProg[i]?).getD []) N hrows
+    (fun i => (GF.gfGd.gdG.gxProg[i]?).getD []) N GF.gfGd.gdG.gxImg hrows
     (fun i hi => progRowNil _ _ (by omega))
     (by
-      intro i hi
+      intro i _
       cases e : GF.gfGd.gdG.gxProg[i]? with
       | some row =>
-        obtain ⟨em, dvi, dvo, f, hem, hf0, hf⟩ := fconfRowsIn boot d0 fab GF i row hconf e
-        have htrow : trow i c.cdTr = row := by
-          unfold trow; rw [hrows i, e]; rfl
-        refine ⟨em, f, hf0, hfi i em dvi dvo hi (by rw [htrow]; exact hem), ?_⟩
-        simp only [Option.getD_some]
-        exact hf
+        obtain ⟨f, hf0, hf⟩ := fconfRowsPin boot d0 fab GF i row hconf e
+        exact ⟨f, hf0, hf⟩
       | none =>
-        refine ⟨⟨[], boot i⟩, fun _ => boot i, rfl, ?_, ?_⟩
-        · intro base tvs n k s hmem
-          simp at hmem
-        · intro n lb hn
-          simp at hn)
+        refine ⟨fun _ => boot i, rfl, ?_⟩
+        intro n lb hn
+        simp at hn)
     hord
   exact ⟨pst, hpst0, hconf.1, hprog⟩
 

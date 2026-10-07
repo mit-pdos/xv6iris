@@ -33,8 +33,15 @@ CONCERNS (Rocq header, unchanged): (1) the fetch is treated as an EXPLICIT read 
 (2) `sfCoversF` counts stores ob-before the fetch itself — exactly the old marker semantics
 (§3); (3) `sfWord` is a ∀-state decode fact (non-triviality in AxSfence2).
 
-O2 / D1: fetches stay graph reads (`LLoad false …`) in the AxSL tier — exactly this file's
-modelling; no access kinds appear.
+O2 / D1 (as ported): fetches stay graph reads (`LLoad false …`) in the AxSL tier — exactly
+this file's modelling; no access kinds appear.
+STAGE C (D1 reversed, `notes/weak-port-o2-stageC.md` item 19) — HELD, rows UNCHANGED.  This
+file's fetch literals (`LFetchSf` at row position 1 of `gadF`, `gsfRowsF`, `gadm`) are not
+incidental: the sfence.vma's own fetch is the ONLY graph event the model gives the sfence
+(`sfFetch`, `gsfenceF`, `ptwWfF`'s third clause, `sfFetchB`).  Removing them leaves no
+event for `gpSf` to tag, so no re-index keeps the theorems' meaning (`gAdSoundF`,
+`gsfNotH5F`, `gsfokSoundF`, `gadmBoth` would become vacuous or false).  Re-locating the
+sfence (e.g. a row-position cut instead of an event) is a model change for the owner.
 
 **Deviations from Rocq.**
 

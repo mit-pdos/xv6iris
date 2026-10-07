@@ -241,7 +241,6 @@ theorem AxProtLock2.ΦLock'OpenX (γ γc : GName) (GD : Gdexec) (hm : GMapF Geid
   obStInterp := fun GD σ s => AxProtLock2.protInvLock'' L x γ γc GD s σ.1 σ.2
   logTsT := Unit
   localInterp := fun _ _ _ _ => iprop(True)
-  axText := fun _ => False
 
 @[reducible] def lock2Axpol : Axpol where
   sPol := fun _ _ => ∅

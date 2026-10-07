@@ -51,18 +51,31 @@ Rocq comments, unchanged.
    `pnodeStepLoadSubst`/`pstepEvLoadSubst` carry `obar` through and refute the PLIC arm.
    `bvOfBytes` assembles the word with `WeakInterp.assembleBytes` (Rocq: `Z_to_bv` of
    `assemble_bytes`, `nth_byte_assemble_len`).
-3. O2 / D1 — THE FETCH (`WeakRvwmoConf` deviation 3): `projLbl (LIFetch base tvs)` is the
-   axiomatic `LLoad false`, so a load row label has a THIRD realizing wlabel.
-   `hlblRealizesLoadShape`'s disjunction gains `aq = false ∧ l = LIFetch base tvs`, and
-   `cblkLoadRetime` retimes it with `WeakEvInst.pstepEvTsIfetch`.
-4. O2 — THE FETCH-INERTNESS PREMISE (cross-file fact; `WeakRvwmoCert` deviation 2):
-   `execProgOk'Snoc` needs `lbFetchInert (candLastSt c) i l` for the realizing wlabel, so
-   - `certBlockSnoc` gains the premise `lbFetchInert (candLastSt c) x l`;
-   - `certSegment`'s policy `Hpol` gains the conclusion conjunct
-     `lbFetchInert (candLastSt c0) x l'` (the certified block's realizing wlabel is fetch-inert at
-     the candidate it is appended to; `True` for every non-fetch wlabel);
-   - `polStore` discharges it with the Lean-only `WeakRvwmoCert2.lbFetchInertOfStoreNe` (a
-     wlabel realizing a store is not a fetch).
+3. O2 / STAGE C — THE FETCH IS ADMINISTRATIVE (`WeakRvwmoConf` deviation 3): `projLbl
+   (LIFetch ..) = none`, so a load row label has Rocq's TWO realizing wlabels again
+   (`hlblRealizesLoadShape`'s Stage-B third case and `cblkLoadRetime`'s third branch are gone).
+4. O2 / STAGE C — THE PINNED LTS (`WeakRvwmoCert` deviation 2; orchestrator ruling: the Cert
+   chain runs at `pstepPin img pstepEv`).  Every appended block must supply `fetchPin img` for
+   its ADMINISTRATIVE labels (the realizing wlabel's pin is free), and `cblk` hides them, so:
+   - Lean-only `cblkG A …`: Rocq's `cblk` body with the admin predicate `lbAdmin true` of the
+     admin labels abstracted to `A`; Rocq's `cblk` IS `cblkG (lbAdmin true)` (definitionally,
+     so every destructuring of a `cblk` is unchanged), and the PINNED block is
+     `cblkPin im := cblkG (lbPin im)`, `lbPin im l := lbAdmin true l ∧ fetchPin im l`.
+   - the transports that only carry the admin conjunct are proved once, at any `A`
+     (`WeakRvwmoCert2.cblkRelpG`, `certBlockMirrorG`, `cblkRetimeG`, `cblkSubstG`,
+     `cblkLoadRetimeG`, `certBlockReadG`, `certBlockWitnessG`); the Rocq-named lemmas are their
+     `lbAdmin true` instances (statements unchanged), and at `lbPin im` they transport pins.
+   - `cblkPinCblk` (forget the pins), `cblkIntroPin` (`cblkIntro` of a pinned run),
+     `cblkElimPin` (`cblkElim` with the pins), `WeakRvwmoCert2.esPin im es` (every label of an
+     emission item list is pinned; `emFetchImg im em = esPin im em.emItems`) and
+     `WeakRvwmoCert2.esPinBlock` (its split at one block).
+   - `certBlockSnoc`: the supply at `pstepPin c.cdImg pstepEv` (premise and conclusion), the
+     block `cblkPin c.cdImg …`; Stage B's `lbFetchInert` premise is DELETED.
+   - `certSegment`: the supply pinned at `c.cdImg`; the new premise `esPin c.cdImg es` (after
+     `srvwmoConsistent c`); the policy `Hpol` takes and returns `cblkPin c0.cdImg` blocks, and
+     Stage B's `lbFetchInert` conjunct is DELETED.  `polStore` likewise (its Stage-B helper
+     `lbFetchInertOfStoreNe` is DELETED); `certSegmentWitness` / `certSegmentNonvacuous` state
+     the pinned supply.
 5. `certStepTaint` takes ONE `cpu` for both runs, as Rocq (`WeakEvProv.taintClosureLoad` is
    stated at two).
 6. Rocq's `Section segment` / `Section nonvacuity` contexts become explicit parameters (in
@@ -72,7 +85,11 @@ Rocq comments, unchanged.
 7. §8's `Print Assumptions` audit is dropped (the lint's axiom/sorry ban is the audit).
 
 **File-qualified names:** none of this file's Rocq names is in `notes/weak-port-dupnames.json`;
-Lean-only helpers: `WeakRvwmoCert2.lbFetchInertOfStoreNe`.
+Lean-only (deviation 4; all `WeakRvwmoCert2.`-qualified): `cblkG`, `lbPin`, `cblkPin`, `cblkPinCblk`,
+`cblkIntroPin`, `cblkElimPin`,
+`WeakRvwmoCert2.esPin`, `WeakRvwmoCert2.esPinBlock`, `WeakRvwmoCert2.nvPin`, and the `…G` transports
+`WeakRvwmoCert2.cblkRelpG`/`certBlockMirrorG`/`cblkRetimeG`/`cblkSubstG`/`cblkLoadRetimeG`/
+`certBlockReadG`/`certBlockWitnessG`.
 
 **Rocq → Lean name map.**  `pstep_ev_phart` `pstepEvPhart`, `adm_run_phart` `admRunPhart`,
 `adm_run_pevrun` `admRunPevrun`, `pevrun_adm_run` `pevrunAdmRun`, `pcls_ev_rs` `pclsEvRs`,
@@ -106,7 +123,7 @@ Lean-only helpers: `WeakRvwmoCert2.lbFetchInertOfStoreNe`.
 `polStore`, `nv_hemit` `nvHemit`, `nv_row_class` `nvRowClass`, `cert_segment_witness`
 `certSegmentWitness`, `cert_segment_nonvacuous` `certSegmentNonvacuous`.
 
-**Dropped:** nothing (Rocq 78 declarations + the `ofence` notation; Lean 78 + 1 helper).
+**Dropped:** nothing (Rocq 78 declarations + the `ofence` notation; Lean 78 + 16 helpers).
 -/
 import Weak.WeakRvwmoCert
 import Weak.WeakEvProv
@@ -373,18 +390,54 @@ theorem certStepTaint (T : List Nat) (rd : Nat) (cpu : CPU)
 
 /-! # 4. Deliverable (2): `certBlock` -/
 
-/-- ONE `hemit` block with its run's annotations exposed. -/
-def cblk (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl) (l : Wlabel) (rds : List Nat)
-    (wrs : List Register) (m : SailM Unit) (rs : RegFile) (fn : Ofence) (ib : Ibch)
-    (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch) : Prop :=
+/-- (Lean-only, deviation 4) Rocq's `cblk` with the admin-label predicate abstracted to `A`. -/
+def WeakRvwmoCert2.cblkG (A : Wlabel → Prop) (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl)
+    (l : Wlabel) (rds : List Nat) (wrs : List Register) (m : SailM Unit) (rs : RegFile)
+    (fn : Ofence) (ib : Ibch) (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch) :
+    Prop :=
   ∃ (ls : List Wlabel) (ma : SailM Unit) (rsa : RegFile) (fna : Ofence) (iba : Ibch) (da : Efab)
     (rdsA : List Nat) (wrsA : List Register) (annA : Bool) (rdsB : List Nat)
     (wrsB : List Register) (annB : Bool),
-    (∀ l0, l0 ∈ ls → lbAdmin true l0) ∧
+    (∀ l0, l0 ∈ ls → A l0) ∧
     phrun cpu ls rdsA wrsA annA m rs fn ib d0 ma rsa fna iba da ∧
     hlblRealizes (.PHart cpu ma rsa fna iba) ws lb l ∧
     phrun cpu [l] rdsB wrsB annB ma rsa fna iba da m' rs' fn' ib' d0 ∧
     rds = rdsA ++ rdsB ∧ wrs = wrsA ++ wrsB
+
+/-- ONE `hemit` block with its run's annotations exposed (deviation 4: `cblkG (lbAdmin true)`,
+definitionally Rocq's body). -/
+def cblk (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl) (l : Wlabel) (rds : List Nat)
+    (wrs : List Register) (m : SailM Unit) (rs : RegFile) (fn : Ofence) (ib : Ibch)
+    (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch) : Prop :=
+  WeakRvwmoCert2.cblkG (lbAdmin true) cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib'
+
+
+/-- (Lean-only, deviation 4) A PINNED admin label: administrative, and pinned to `im`. -/
+def WeakRvwmoCert2.lbPin (im : Image) (l : Wlabel) : Prop :=
+  lbAdmin true l ∧ WeakAxRealize.fetchPin im l
+
+/-- (Lean-only, deviation 4) THE PINNED BLOCK: its admin labels are pinned to `im`. -/
+def WeakRvwmoCert2.cblkPin (im : Image) (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl)
+    (l : Wlabel) (rds : List Nat) (wrs : List Register) (m : SailM Unit) (rs : RegFile)
+    (fn : Ofence) (ib : Ibch) (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch) :
+    Prop :=
+  WeakRvwmoCert2.cblkG (WeakRvwmoCert2.lbPin im) cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib'
+
+/-- (Lean-only, deviation 4) Every label of an item list is pinned to `im`
+(`emFetchImg im em` is `esPin im em.emItems`). -/
+def WeakRvwmoCert2.esPin (im : Image) (es : List Eitem) : Prop :=
+  ∀ l0, l0 ∈ es.map Prod.fst → WeakAxRealize.fetchPin im l0
+
+/-- (Lean-only, deviation 4) The pin, split at one block. -/
+theorem WeakRvwmoCert2.esPinBlock (im : Image) (ls : List Wlabel) (l : Wlabel) (k : Nat)
+    (es : List Eitem) :
+    WeakRvwmoCert2.esPin im (eadm ls ++ (l, some k) :: es) →
+    (∀ l0, l0 ∈ ls → WeakAxRealize.fetchPin im l0) ∧ WeakRvwmoCert2.esPin im es := by
+  intro h
+  unfold WeakRvwmoCert2.esPin at h
+  rw [eblockFst] at h
+  exact ⟨fun l0 hl => h l0 (List.mem_append_left _ hl),
+    fun l0 hl => h l0 (List.mem_append_right _ (List.mem_cons_of_mem _ hl))⟩
 
 /-! ## 4.1 `cblk` and the `hemit` block are the same object -/
 
@@ -430,29 +483,87 @@ theorem cblkElim (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl) (l : Wlabel) (
     pevrunAdmRun true _ d0 ls _ da (phrunPevrun _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hA) hadm, hre,
     pevrunSingleInv _ _ _ _ _ (phrunPevrun _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hB)⟩
 
+/-- (Lean-only, deviation 4) Forget the pins. -/
+theorem WeakRvwmoCert2.cblkPinCblk (im : Image) (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl)
+    (l : Wlabel) (rds : List Nat) (wrs : List Register) (m : SailM Unit) (rs : RegFile)
+    (fn : Ofence) (ib : Ibch) (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch) :
+    WeakRvwmoCert2.cblkPin im cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' →
+    cblk cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' := by
+  rintro ⟨ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB, wrsB, annB, hadm, hA, hre, hB,
+    h1, h2⟩
+  exact ⟨ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB, wrsB, annB,
+    fun l0 h => (hadm l0 h).1, hA, hre, hB, h1, h2⟩
+
+/-- (Lean-only, deviation 4) `cblkIntro` of a run whose admin labels are pinned. -/
+theorem WeakRvwmoCert2.cblkIntroPin (im : Image) (cpu : CPU) (d0 : Efab) (ws : Wstate)
+    (lb : Lbl) (l : Wlabel) (ls : List Wlabel) (pa : Pexv6) (da : Efab) (m : SailM Unit)
+    (rs : RegFile) (fn : Ofence) (ib : Ibch) (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence)
+    (ib' : Ibch) :
+    admRun true (.PHart cpu m rs fn ib) d0 ls pa da →
+    (∀ l0, l0 ∈ ls → WeakAxRealize.fetchPin im l0) →
+    hlblRealizes pa ws lb l →
+    pstepEv pa da l (.PHart cpu m' rs' fn' ib') d0 →
+    ∃ rds wrs, WeakRvwmoCert2.cblkPin im cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' := by
+  intro har hpin hre hst
+  obtain ⟨ma0, rsa0, fna0, iba0, rfl⟩ := admRunPhart true _ _ d0 ls da har cpu m rs fn ib rfl
+  obtain ⟨rdsA0, wrsA0, annA0, hA0⟩ := pevrunPhrun ls _ d0 _ da
+    (admRunPevrun _ _ _ _ _ _ har) cpu m rs fn ib ma0 rsa0 fna0 iba0 rfl rfl
+  obtain ⟨rdsB0, wrsB0, annB0, hB0⟩ := pevrunPhrun [l] _ da _ d0
+    (pevrun.more hst (pevrun.nil _ _)) cpu ma0 rsa0 fna0 iba0 m' rs' fn' ib' rfl rfl
+  exact ⟨rdsA0 ++ rdsB0, wrsA0 ++ wrsB0, ls, ma0, rsa0, fna0, iba0, da, rdsA0, wrsA0, annA0,
+    rdsB0, wrsB0, annB0, fun l0 h => ⟨admRunAdmin _ _ _ _ _ _ har l0 h, hpin l0 h⟩, hA0, hre,
+    hB0, rfl, rfl⟩
+
+/-- (Lean-only, deviation 4) `cblkElim`, keeping the pins. -/
+theorem WeakRvwmoCert2.cblkElimPin (im : Image) (cpu : CPU) (d0 : Efab) (ws : Wstate)
+    (lb : Lbl) (l : Wlabel) (rds : List Nat) (wrs : List Register) (m : SailM Unit)
+    (rs : RegFile) (fn : Ofence) (ib : Ibch) (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence)
+    (ib' : Ibch) :
+    WeakRvwmoCert2.cblkPin im cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' →
+    ∃ ls pa da, admRun true (.PHart cpu m rs fn ib) d0 ls pa da ∧
+      (∀ l0, l0 ∈ ls → WeakAxRealize.fetchPin im l0) ∧
+      hlblRealizes pa ws lb l ∧
+      pstepEv pa da l (.PHart cpu m' rs' fn' ib') d0 := by
+  rintro ⟨ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB, wrsB, annB, hadm, hA, hre, hB, -, -⟩
+  exact ⟨ls, .PHart cpu ma rsa fna iba, da,
+    pevrunAdmRun true _ d0 ls _ da (phrunPevrun _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hA)
+      (fun l0 h => (hadm l0 h).1), fun l0 h => (hadm l0 h).2, hre,
+    pevrunSingleInv _ _ _ _ _ (phrunPevrun _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hB)⟩
+
+/-- (Lean-only, deviation 4) `cblkRelp` at any admin predicate `A`. -/
+theorem WeakRvwmoCert2.cblkRelpG (A : Wlabel → Prop)
+    (cpu : CPU) (d0 : Efab) (ws ws' : Wstate) (lb : Lbl) (l : Wlabel)
+    (rds : List Nat) (wrs : List Register) (m : SailM Unit) (rs : RegFile) (fn : Ofence)
+    (ib : Ibch) (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch) :
+    ws'.wRelp = ws.wRelp →
+    WeakRvwmoCert2.cblkG A cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' →
+    WeakRvwmoCert2.cblkG A cpu d0 ws' lb l rds wrs m rs fn ib m' rs' fn' ib' := by
+  rintro hr ⟨ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB, wrsB, annB, hadm, hA, hre, hB,
+    rfl, rfl⟩
+  exact ⟨ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB, wrsB, annB, hadm, hA,
+    hlblRealizesRelp _ _ _ _ _ hr hre, hB, rfl, rfl⟩
+
 /-- The projection equation inside a block reads the wstate only through `wRelp`. -/
 theorem cblkRelp (cpu : CPU) (d0 : Efab) (ws ws' : Wstate) (lb : Lbl) (l : Wlabel)
     (rds : List Nat) (wrs : List Register) (m : SailM Unit) (rs : RegFile) (fn : Ofence)
     (ib : Ibch) (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch) :
     ws'.wRelp = ws.wRelp →
     cblk cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' →
-    cblk cpu d0 ws' lb l rds wrs m rs fn ib m' rs' fn' ib' := by
-  rintro hr ⟨ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB, wrsB, annB, hadm, hA, hre, hB,
-    rfl, rfl⟩
-  exact ⟨ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB, wrsB, annB, hadm, hA,
-    hlblRealizesRelp _ _ _ _ _ hr hre, hB, rfl, rfl⟩
+    cblk cpu d0 ws' lb l rds wrs m rs fn ib m' rs' fn' ib' :=
+  WeakRvwmoCert2.cblkRelpG (lbAdmin true) cpu d0 ws ws' lb l rds wrs m rs fn ib m' rs' fn' ib'
 
 /-! ## 4.2 The block, transported -/
 
-/-- THE MIRROR: the block reads no tainted carrier, so the certified hart runs it step for step. -/
-theorem certBlockMirror (P : Nat → Prop) (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl)
+/-- (Lean-only, deviation 4) `certBlockMirror` at any admin predicate `A`. -/
+theorem WeakRvwmoCert2.certBlockMirrorG (A : Wlabel → Prop)
+    (P : Nat → Prop) (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl)
     (l : Wlabel) (rds : List Nat) (wrs : List Register) (m : SailM Unit) (rs1 : RegFile)
     (fn : Ofence) (ib : Ibch) (m' : SailM Unit) (rs1' : RegFile) (fn' : Ofence) (ib' : Ibch)
     (rs2 : RegFile) :
-    cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    WeakRvwmoCert2.cblkG A cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
     rdsOk P rds →
     dregAgree P rs1 rs2 →
-    ∃ rs2', cblk cpu d0 ws lb l rds wrs m rs2 fn ib m' rs2' fn' ib' ∧ dregAgree P rs1' rs2' := by
+    ∃ rs2', WeakRvwmoCert2.cblkG A cpu d0 ws lb l rds wrs m rs2 fn ib m' rs2' fn' ib' ∧ dregAgree P rs1' rs2' := by
   rintro ⟨ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB, wrsB, annB, hadm, hA, hre, hB,
     rfl, rfl⟩ hrds hag
   obtain ⟨hrdsA, hrdsB⟩ := rdsOkApp P _ _ hrds
@@ -462,6 +573,18 @@ theorem certBlockMirror (P : Nat → Prop) (cpu : CPU) (d0 : Efab) (ws : Wstate)
     ib' d0 hB hrdsB rsa2 haga
   exact ⟨rs2', ⟨ls, ma, rsa2, fna, iba, da, rdsA, wrsA, annA, rdsB, wrsB, annB, hadm, hA2,
     hlblRealizesRs _ _ _ _ _ _ _ _ _ _ _ hre, hB2, rfl, rfl⟩, hag2⟩
+
+/-- THE MIRROR: the block reads no tainted carrier, so the certified hart runs it step for step. -/
+theorem certBlockMirror (P : Nat → Prop) (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl)
+    (l : Wlabel) (rds : List Nat) (wrs : List Register) (m : SailM Unit) (rs1 : RegFile)
+    (fn : Ofence) (ib : Ibch) (m' : SailM Unit) (rs1' : RegFile) (fn' : Ofence) (ib' : Ibch)
+    (rs2 : RegFile) :
+    cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    rdsOk P rds →
+    dregAgree P rs1 rs2 →
+    ∃ rs2', cblk cpu d0 ws lb l rds wrs m rs2 fn ib m' rs2' fn' ib' ∧ dregAgree P rs1' rs2' :=
+  WeakRvwmoCert2.certBlockMirrorG (lbAdmin true) P cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn'
+    ib' rs2
 
 /-! ## 4.3 The two read policies, at the block -/
 
@@ -591,15 +714,16 @@ theorem hlblRealizesLoadInv (p : Pexv6) (ws : Wstate) (lb : Lbl) (aq : Bool) (ba
   rintro ⟨-, -, -, hpr⟩
   exact (Option.some.inj hpr).symm
 
-/-- RE-TIMESTAMPING a load block: same values, the candidate's indices, nothing else moves. -/
-theorem cblkRetime (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl) (rds : List Nat)
+/-- (Lean-only, deviation 4) `cblkRetime` at any admin predicate `A`. -/
+theorem WeakRvwmoCert2.cblkRetimeG (A : Wlabel → Prop)
+    (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl) (rds : List Nat)
     (wrs : List Register) (m : SailM Unit) (rs : RegFile) (fn : Ofence) (ib : Ibch)
     (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch) (aq : Bool) (base : Int)
     (tvs tvs2 : List (Nat × BitVec 8)) :
-    cblk cpu d0 ws lb (LLoad aq false base tvs []) rds wrs m rs fn ib m' rs' fn' ib' →
+    WeakRvwmoCert2.cblkG A cpu d0 ws lb (LLoad aq false base tvs []) rds wrs m rs fn ib m' rs' fn' ib' →
     tvs2.map Prod.snd = tvs.map Prod.snd →
     ∃ rds2 wrs2,
-      cblk cpu d0 ws (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd))
+      WeakRvwmoCert2.cblkG A cpu d0 ws (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd))
         (LLoad aq false base tvs2 []) rds2 wrs2 m rs fn ib m' rs' fn' ib' := by
   rintro ⟨ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB, wrsB, annB, hadm, hA, -, hB,
     rfl, rfl⟩ hts
@@ -612,15 +736,29 @@ theorem cblkRetime (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl) (rds : List 
   exact ⟨rdsA ++ rdsB2, wrsA ++ wrsB2, ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB2,
     wrsB2, annB2, hadm, hA, hlblRealizesLoad _ _ _ _ _, hB2, rfl, rfl⟩
 
-/-- SUBSTITUTING a load block's values (a WITNESS): the successor NODE differs. -/
-theorem cblkSubst (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl) (rds : List Nat)
+/-- RE-TIMESTAMPING a load block: same values, the candidate's indices, nothing else moves. -/
+theorem cblkRetime (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl) (rds : List Nat)
     (wrs : List Register) (m : SailM Unit) (rs : RegFile) (fn : Ofence) (ib : Ibch)
     (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch) (aq : Bool) (base : Int)
     (tvs tvs2 : List (Nat × BitVec 8)) :
     cblk cpu d0 ws lb (LLoad aq false base tvs []) rds wrs m rs fn ib m' rs' fn' ib' →
+    tvs2.map Prod.snd = tvs.map Prod.snd →
+    ∃ rds2 wrs2,
+      cblk cpu d0 ws (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd))
+        (LLoad aq false base tvs2 []) rds2 wrs2 m rs fn ib m' rs' fn' ib' :=
+  WeakRvwmoCert2.cblkRetimeG (lbAdmin true) cpu d0 ws lb rds wrs m rs fn ib m' rs' fn' ib' aq base
+    tvs tvs2
+
+/-- (Lean-only, deviation 4) `cblkSubst` at any admin predicate `A`. -/
+theorem WeakRvwmoCert2.cblkSubstG (A : Wlabel → Prop)
+    (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl) (rds : List Nat)
+    (wrs : List Register) (m : SailM Unit) (rs : RegFile) (fn : Ofence) (ib : Ibch)
+    (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch) (aq : Bool) (base : Int)
+    (tvs tvs2 : List (Nat × BitVec 8)) :
+    WeakRvwmoCert2.cblkG A cpu d0 ws lb (LLoad aq false base tvs []) rds wrs m rs fn ib m' rs' fn' ib' →
     tvs2.length = tvs.length →
     ∃ m2 rds2 wrs2,
-      cblk cpu d0 ws (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd))
+      WeakRvwmoCert2.cblkG A cpu d0 ws (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd))
         (LLoad aq false base tvs2 []) rds2 wrs2 m rs fn ib m2 rs' fn' ib' := by
   rintro ⟨ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB, wrsB, annB, hadm, hA, -, hB,
     rfl, rfl⟩ hlen
@@ -634,16 +772,27 @@ theorem cblkSubst (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl) (rds : List N
   exact ⟨m2, rdsA ++ rdsB2, wrsA ++ wrsB2, ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB2,
     wrsB2, annB2, hadm, hA, hlblRealizesLoad _ _ _ _ _, hB2, rfl, rfl⟩
 
+/-- SUBSTITUTING a load block's values (a WITNESS): the successor NODE differs. -/
+theorem cblkSubst (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl) (rds : List Nat)
+    (wrs : List Register) (m : SailM Unit) (rs : RegFile) (fn : Ofence) (ib : Ibch)
+    (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch) (aq : Bool) (base : Int)
+    (tvs tvs2 : List (Nat × BitVec 8)) :
+    cblk cpu d0 ws lb (LLoad aq false base tvs []) rds wrs m rs fn ib m' rs' fn' ib' →
+    tvs2.length = tvs.length →
+    ∃ m2 rds2 wrs2,
+      cblk cpu d0 ws (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd))
+        (LLoad aq false base tvs2 []) rds2 wrs2 m rs fn ib m2 rs' fn' ib' :=
+  WeakRvwmoCert2.cblkSubstG (lbAdmin true) cpu d0 ws lb rds wrs m rs fn ib m' rs' fn' ib' aq base
+    tvs tvs2
+
 /-! ## 4.3a The wlabel shape of a load block, and the shape-free retime -/
 
-/-- Deviation 3: the THIRD shape, the instruction fetch (`aq = false`). -/
 theorem hlblRealizesLoadShape (p : Pexv6) (ws : Wstate) (aq : Bool) (base : Int)
     (ts : List Nat) (vs : List (BitVec 8)) (l : Wlabel) :
     hlblRealizes p ws (.LLoad aq base ts vs) l →
     ∃ tvs : List (Nat × BitVec 8),
       tvs.map Prod.fst = ts ∧ tvs.map Prod.snd = vs ∧
-      (l = LLoad aq false base tvs [] ∨ (∃ asrc, l = LExLoad aq base tvs asrc) ∨
-        (aq = false ∧ l = LIFetch base tvs)) := by
+      (l = LLoad aq false base tvs [] ∨ ∃ asrc, l = LExLoad aq base tvs asrc) := by
   rintro ⟨_, hlat, hrf, hpr⟩
   cases l with
   | LLoad aq' lat base' tvs asrc =>
@@ -656,21 +805,19 @@ theorem hlblRealizesLoadShape (p : Pexv6) (ws : Wstate) (aq : Bool) (base : Int)
   | LExLoad aq' base' tvs asrc =>
     simp only [projLbl, Option.some.injEq, Lbl.LLoad.injEq] at hpr
     obtain ⟨rfl, rfl, rfl, rfl⟩ := hpr
-    exact ⟨tvs, rfl, rfl, Or.inr (Or.inl ⟨asrc, rfl⟩)⟩
-  | LIFetch base' tvs =>
-    simp only [projLbl, Option.some.injEq, Lbl.LLoad.injEq] at hpr
-    obtain ⟨rfl, rfl, rfl, rfl⟩ := hpr
-    exact ⟨tvs, rfl, rfl, Or.inr (Or.inr ⟨rfl, rfl⟩)⟩
+    exact ⟨tvs, rfl, rfl, Or.inr ⟨asrc, rfl⟩⟩
   | _ => simp [projLbl] at hpr
 
-theorem cblkLoadRetime (cpu : CPU) (d0 : Efab) (ws : Wstate) (aq : Bool) (base : Int)
+/-- (Lean-only, deviation 4) `cblkLoadRetime` at any admin predicate `A`. -/
+theorem WeakRvwmoCert2.cblkLoadRetimeG (A : Wlabel → Prop)
+    (cpu : CPU) (d0 : Efab) (ws : Wstate) (aq : Bool) (base : Int)
     (ts : List Nat) (vs : List (BitVec 8)) (l : Wlabel) (rds : List Nat) (wrs : List Register)
     (m : SailM Unit) (rs : RegFile) (fn : Ofence) (ib : Ibch) (m' : SailM Unit) (rs' : RegFile)
     (fn' : Ofence) (ib' : Ibch) (tvs2 : List (Nat × BitVec 8)) :
-    cblk cpu d0 ws (.LLoad aq base ts vs) l rds wrs m rs fn ib m' rs' fn' ib' →
+    WeakRvwmoCert2.cblkG A cpu d0 ws (.LLoad aq base ts vs) l rds wrs m rs fn ib m' rs' fn' ib' →
     tvs2.map Prod.snd = vs →
     ∃ l2 rds2 wrs2,
-      cblk cpu d0 ws (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd)) l2 rds2 wrs2
+      WeakRvwmoCert2.cblkG A cpu d0 ws (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd)) l2 rds2 wrs2
         m rs fn ib m' rs' fn' ib' := by
   rintro ⟨ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB, wrsB, annB, hadm, hA, hre, hB,
     rfl, rfl⟩ hts
@@ -678,7 +825,7 @@ theorem cblkLoadRetime (cpu : CPU) (d0 : Efab) (ws : Wstate) (aq : Bool) (base :
     pevrunSingleInv _ _ _ _ _ (phrunPevrun _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hB)
   obtain ⟨tvs, -, hs, hl⟩ := hlblRealizesLoadShape _ ws aq base ts vs l hre
   have hts' : tvs2.map Prod.snd = tvs.map Prod.snd := by rw [hts, hs]
-  rcases hl with rfl | ⟨asrc, rfl⟩ | ⟨rfl, rfl⟩
+  rcases hl with rfl | ⟨asrc, rfl⟩
   · have hst2 := pstepEvTsLoad _ _ _ _ _ _ _ _ hst hts'
     obtain ⟨rdsB2, wrsB2, annB2, hB2⟩ := pevrunPhrun [_] _ da _ d0
       (pevrun.more hst2 (pevrun.nil _ _)) cpu ma rsa fna iba m' rs' fn' ib' rfl rfl
@@ -690,11 +837,18 @@ theorem cblkLoadRetime (cpu : CPU) (d0 : Efab) (ws : Wstate) (aq : Bool) (base :
     exact ⟨LExLoad aq base tvs2 asrc, rdsA ++ rdsB2, wrsA ++ wrsB2, ls, ma, rsa, fna, iba, da,
       rdsA, wrsA, annA, rdsB2, wrsB2, annB2, hadm, hA, ⟨trivial, trivial, trivial, rfl⟩, hB2,
       rfl, rfl⟩
-  · have hst2 := pstepEvTsIfetch _ _ _ _ _ _ _ hst hts'
-    obtain ⟨rdsB2, wrsB2, annB2, hB2⟩ := pevrunPhrun [_] _ da _ d0
-      (pevrun.more hst2 (pevrun.nil _ _)) cpu ma rsa fna iba m' rs' fn' ib' rfl rfl
-    exact ⟨LIFetch base tvs2, rdsA ++ rdsB2, wrsA ++ wrsB2, ls, ma, rsa, fna, iba, da, rdsA,
-      wrsA, annA, rdsB2, wrsB2, annB2, hadm, hA, ⟨trivial, trivial, trivial, rfl⟩, hB2, rfl, rfl⟩
+
+theorem cblkLoadRetime (cpu : CPU) (d0 : Efab) (ws : Wstate) (aq : Bool) (base : Int)
+    (ts : List Nat) (vs : List (BitVec 8)) (l : Wlabel) (rds : List Nat) (wrs : List Register)
+    (m : SailM Unit) (rs : RegFile) (fn : Ofence) (ib : Ibch) (m' : SailM Unit) (rs' : RegFile)
+    (fn' : Ofence) (ib' : Ibch) (tvs2 : List (Nat × BitVec 8)) :
+    cblk cpu d0 ws (.LLoad aq base ts vs) l rds wrs m rs fn ib m' rs' fn' ib' →
+    tvs2.map Prod.snd = vs →
+    ∃ l2 rds2 wrs2,
+      cblk cpu d0 ws (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd)) l2 rds2 wrs2
+        m rs fn ib m' rs' fn' ib' :=
+  WeakRvwmoCert2.cblkLoadRetimeG (lbAdmin true) cpu d0 ws aq base ts vs l rds wrs m rs fn ib m'
+    rs' fn' ib' tvs2
 
 /-! ## 4.3b The substitution's machine-side cost, named -/
 
@@ -720,6 +874,31 @@ theorem cblkVfreeOfRetime (cpu : CPU) (d0 : Efab) (ws : Wstate) (aq : Bool) (bas
   fun hblk tvs2 hts => cblkLoadRetime cpu d0 ws aq base ts vs l rds wrs m rs fn ib m' rs' fn'
     ib' tvs2 hblk hts
 
+/-- (Lean-only, deviation 4) `certBlockRead` at any admin predicate `A`. -/
+theorem WeakRvwmoCert2.certBlockReadG (A : Wlabel → Prop)
+    (P : Nat → Prop) (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl)
+    (rds : List Nat) (wrs : List Register) (m : SailM Unit) (rs1 : RegFile) (fn : Ofence)
+    (ib : Ibch) (m' : SailM Unit) (rs1' : RegFile) (fn' : Ofence) (ib' : Ibch) (rs2 : RegFile)
+    (aq : Bool) (base : Int) (tvs tvs2 : List (Nat × BitVec 8)) :
+    WeakRvwmoCert2.cblkG A cpu d0 ws lb (LLoad aq false base tvs []) rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    rdsOk P rds → dregAgree P rs1 rs2 → tvs2.map Prod.snd = tvs.map Prod.snd →
+    ∃ rs2' rds2 wrs2,
+      WeakRvwmoCert2.cblkG A cpu d0 ws (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd))
+        (LLoad aq false base tvs2 []) rds2 wrs2 m rs2 fn ib m' rs2' fn' ib' ∧
+      lblReidx lb (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd)) ∧
+      dregAgree P rs1' rs2' := by
+  intro hblk hrds hag hts
+  have hlb : lb = .LLoad aq base (tvs.map Prod.fst) (tvs.map Prod.snd) := by
+    obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, hre, _⟩ := hblk
+    exact hlblRealizesLoadInv _ _ _ _ _ _ hre
+  obtain ⟨rs2', hblk2, hag2⟩ := WeakRvwmoCert2.certBlockMirrorG A P cpu d0 ws lb _ rds wrs m rs1 fn ib m' rs1' fn'
+    ib' rs2 hblk hrds hag
+  obtain ⟨rds2, wrs2, hblk3⟩ := WeakRvwmoCert2.cblkRetimeG A cpu d0 ws lb rds wrs m rs2 fn ib m' rs2' fn' ib' aq
+    base tvs tvs2 hblk2 hts
+  refine ⟨rs2', rds2, wrs2, hblk3, ?_, hag2⟩
+  subst hlb
+  exact ⟨rfl, rfl, hts, by simp only [List.length_map]; exact lenOfSnd hts⟩
+
 /-- THE IN-LOG READ — the block, transported and retimed. -/
 theorem certBlockRead (P : Nat → Prop) (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl)
     (rds : List Nat) (wrs : List Register) (m : SailM Unit) (rs1 : RegFile) (fn : Ofence)
@@ -731,18 +910,28 @@ theorem certBlockRead (P : Nat → Prop) (cpu : CPU) (d0 : Efab) (ws : Wstate) (
       cblk cpu d0 ws (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd))
         (LLoad aq false base tvs2 []) rds2 wrs2 m rs2 fn ib m' rs2' fn' ib' ∧
       lblReidx lb (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd)) ∧
+      dregAgree P rs1' rs2' :=
+  WeakRvwmoCert2.certBlockReadG (lbAdmin true) P cpu d0 ws lb rds wrs m rs1 fn ib m' rs1' fn' ib'
+    rs2 aq base tvs tvs2
+
+/-- (Lean-only, deviation 4) `certBlockWitness` at any admin predicate `A`. -/
+theorem WeakRvwmoCert2.certBlockWitnessG (A : Wlabel → Prop)
+    (P : Nat → Prop) (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl)
+    (rds : List Nat) (wrs : List Register) (m : SailM Unit) (rs1 : RegFile) (fn : Ofence)
+    (ib : Ibch) (m' : SailM Unit) (rs1' : RegFile) (fn' : Ofence) (ib' : Ibch) (rs2 : RegFile)
+    (aq : Bool) (base : Int) (tvs tvs2 : List (Nat × BitVec 8)) :
+    WeakRvwmoCert2.cblkG A cpu d0 ws lb (LLoad aq false base tvs []) rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    rdsOk P rds → dregAgree P rs1 rs2 → tvs2.length = tvs.length →
+    ∃ m2 rs2' rds2 wrs2,
+      WeakRvwmoCert2.cblkG A cpu d0 ws (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd))
+        (LLoad aq false base tvs2 []) rds2 wrs2 m rs2 fn ib m2 rs2' fn' ib' ∧
       dregAgree P rs1' rs2' := by
-  intro hblk hrds hag hts
-  have hlb : lb = .LLoad aq base (tvs.map Prod.fst) (tvs.map Prod.snd) := by
-    obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, hre, _⟩ := hblk
-    exact hlblRealizesLoadInv _ _ _ _ _ _ hre
-  obtain ⟨rs2', hblk2, hag2⟩ := certBlockMirror P cpu d0 ws lb _ rds wrs m rs1 fn ib m' rs1' fn'
+  intro hblk hrds hag hlen
+  obtain ⟨rs2', hblk2, hag2⟩ := WeakRvwmoCert2.certBlockMirrorG A P cpu d0 ws lb _ rds wrs m rs1 fn ib m' rs1' fn'
     ib' rs2 hblk hrds hag
-  obtain ⟨rds2, wrs2, hblk3⟩ := cblkRetime cpu d0 ws lb rds wrs m rs2 fn ib m' rs2' fn' ib' aq
-    base tvs tvs2 hblk2 hts
-  refine ⟨rs2', rds2, wrs2, hblk3, ?_, hag2⟩
-  subst hlb
-  exact ⟨rfl, rfl, hts, by simp only [List.length_map]; exact lenOfSnd hts⟩
+  obtain ⟨m2, rds2, wrs2, hblk3⟩ := WeakRvwmoCert2.cblkSubstG A cpu d0 ws lb rds wrs m rs2 fn ib m' rs2' fn' ib' aq
+    base tvs tvs2 hblk2 hlen
+  exact ⟨m2, rs2', rds2, wrs2, hblk3, hag2⟩
 
 /-- THE WITNESS READ — the block, transported and SUBSTITUTED. -/
 theorem certBlockWitness (P : Nat → Prop) (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl)
@@ -754,36 +943,32 @@ theorem certBlockWitness (P : Nat → Prop) (cpu : CPU) (d0 : Efab) (ws : Wstate
     ∃ m2 rs2' rds2 wrs2,
       cblk cpu d0 ws (.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd))
         (LLoad aq false base tvs2 []) rds2 wrs2 m rs2 fn ib m2 rs2' fn' ib' ∧
-      dregAgree P rs1' rs2' := by
-  intro hblk hrds hag hlen
-  obtain ⟨rs2', hblk2, hag2⟩ := certBlockMirror P cpu d0 ws lb _ rds wrs m rs1 fn ib m' rs1' fn'
-    ib' rs2 hblk hrds hag
-  obtain ⟨m2, rds2, wrs2, hblk3⟩ := cblkSubst cpu d0 ws lb rds wrs m rs2 fn ib m' rs2' fn' ib' aq
-    base tvs tvs2 hblk2 hlen
-  exact ⟨m2, rs2', rds2, wrs2, hblk3, hag2⟩
+      dregAgree P rs1' rs2' :=
+  WeakRvwmoCert2.certBlockWitnessG (lbAdmin true) P cpu d0 ws lb rds wrs m rs1 fn ib m' rs1' fn'
+    ib' rs2 aq base tvs tvs2
 
 /-! ## 4.4 The block, APPENDED -/
 
-/-- Deviation 4: the fetch-inertness premise. -/
+/-- Deviation 4: the pinned LTS and the pinned block. -/
 theorem certBlockSnoc (c : Cand) (x : Nat) (pst : Nat → List Pexv6) (dv : Nat → Efab)
     (cpu : CPU) (d0 : Efab) (lb : Lbl) (l : Wlabel) (rds : List Nat) (wrs : List Register)
     (m : SailM Unit) (rs : RegFile) (fn : Ofence) (ib : Ibch) (m' : SailM Unit) (rs' : RegFile)
     (fn' : Ofence) (ib' : Ibch) :
     srvwmoConsistent c →
-    execProgOk' pstepEv pclsEv pst dv (candExec c) →
+    execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst dv (candExec c) →
     (pst (cdEnd c))[x]? = some (.PHart cpu m rs fn ib) →
     dv (cdEnd c) = d0 →
-    cblk cpu d0 ((candLastSt c).msWs x) lb l rds wrs m rs fn ib m' rs' fn' ib' →
+    WeakRvwmoCert2.cblkPin c.cdImg cpu d0 ((candLastSt c).msWs x) lb l rds wrs m rs fn ib m' rs'
+      fn' ib' →
     mstepOk (candLastSt c) x lb →
-    lbFetchInert (candLastSt c) x l →
     srvwmoConsistent (candSnoc c ⟨x, lb⟩) ∧
-    execProgOk' pstepEv pclsEv (pstSnoc c pst x (.PHart cpu m' rs' fn' ib')) (dvSnoc c dv d0)
-      (candExec (candSnoc c ⟨x, lb⟩)) := by
-  intro hc hpo hp hdv hblk hok hfi
+    execProgOk' (pstepPin c.cdImg pstepEv) pclsEv (pstSnoc c pst x (.PHart cpu m' rs' fn' ib'))
+      (dvSnoc c dv d0) (candExec (candSnoc c ⟨x, lb⟩)) := by
+  intro hc hpo hp hdv hblk hok
   refine ⟨snocConsistent c ⟨x, lb⟩ hc hok, ?_⟩
-  obtain ⟨ls, pa, da, har, hre, hst⟩ := cblkElim cpu d0 _ lb l rds wrs m rs fn ib m' rs' fn' ib'
-    hblk
-  exact execProgOk'Snoc c x _ pa da ls l lb _ d0 pst dv hpo hp (by rw [hdv]; exact har) hre hfi
+  obtain ⟨ls, pa, da, har, hpin, hre, hst⟩ :=
+    WeakRvwmoCert2.cblkElimPin c.cdImg cpu d0 _ lb l rds wrs m rs fn ib m' rs' fn' ib' hblk
+  exact execProgOk'Snoc c x _ pa da ls l lb _ d0 pst dv hpo hp (by rw [hdv]; exact har) hpin hre
     hst
 
 /-! ## 4.5 The three admissibility routes, as `mstepOk` providers -/
@@ -891,7 +1076,8 @@ theorem candSnocRelpNe (c : Cand) (i j : Nat) (lb : Lbl) :
   rw [mnextWsNe _ _ _ _ hne]
 
 /-- THE ITERATION.  Rocq's `Section segment` context is the leading parameters (deviation 6);
-`Hpol` carries the fetch-inertness conjunct (deviation 4). -/
+deviation 4: the pinned LTS, the emission's pin `esPin c.cdImg es`, and `Hpol` on pinned
+blocks. -/
 theorem certSegment (x : Nat) (cpu : CPU) (d0 : Efab) (T : List Nat) (Q : Lbl → Prop)
     (_HQrmw : ∀ lb, Q lb → lbRmwfree lb)
     (Hpol : ∀ (c0 : Cand) (ws : Wstate) (lb : Lbl) (l : Wlabel) (rds : List Nat)
@@ -901,11 +1087,10 @@ theorem certSegment (x : Nat) (cpu : CPU) (d0 : Efab) (T : List Nat) (Q : Lbl �
       Q lb →
       ((candLastSt c0).msWs x).wRelp = ws.wRelp →
       dregAgree (fun n => n ∉ T) rs1 rs2 →
-      cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+      WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
       ∃ lb' l' rds' wrs' rs2',
-        cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
+        WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
         mstepOk (candLastSt c0) x lb' ∧
-        lbFetchInert (candLastSt c0) x l' ∧
         lblReidx lb lb' ∧
         dregAgree (fun n => n ∉ T) rs1' rs2')
     (k0 : Nat) (ws0 : Wstate) (rowseg : List Lbl) (p : Pexv6) (es : List Eitem)
@@ -915,7 +1100,8 @@ theorem certSegment (x : Nat) (cpu : CPU) (d0 : Efab) (T : List Nat) (Q : Lbl �
     ∀ m0 rs10 fn0 ib0, p = .PHart cpu m0 rs10 fn0 ib0 →
     ∀ (c : Cand) (pst : Nat → List Pexv6) (dv : Nat → Efab) (rs20 : RegFile),
       srvwmoConsistent c →
-      execProgOk' pstepEv pclsEv pst dv (candExec c) →
+      WeakRvwmoCert2.esPin c.cdImg es →
+      execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst dv (candExec c) →
       (pst (cdEnd c))[x]? = some (.PHart cpu m0 rs20 fn0 ib0) →
       dv (cdEnd c) = d0 →
       dregAgree (fun n => n ∉ T) rs10 rs20 →
@@ -926,7 +1112,7 @@ theorem certSegment (x : Nat) (cpu : CPU) (d0 : Efab) (T : List Nat) (Q : Lbl �
         (∀ s, s ∈ tradd → s.esAg = x) ∧
         List.Forall₂ lblReidxW rowseg (tradd.map (fun s => s.esLb)) ∧
         srvwmoConsistent c' ∧
-        execProgOk' pstepEv pclsEv pst' dv' (candExec c') ∧
+        execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst' dv' (candExec c') ∧
         (pst' (cdEnd c'))[x]? = some (.PHart cpu m1 rs21 fn1 ib1) ∧
         dv' (cdEnd c') = d0 ∧
         pfin = .PHart cpu m1 rs11 fn1 ib1 ∧
@@ -935,24 +1121,25 @@ theorem certSegment (x : Nat) (cpu : CPU) (d0 : Efab) (T : List Nat) (Q : Lbl �
   intro hem
   induction hem with
   | HEnil k ws p =>
-    intro _ m0 rs10 fn0 ib0 hp0 c pst dv rs20 hc hpo hp hdv hag hrelp
+    intro _ m0 rs10 fn0 ib0 hp0 c pst dv rs20 hc _ hpo hp hdv hag hrelp
     exact ⟨c, pst, dv, [], m0, rs10, rs20, fn0, ib0, by simp, fun s hs => absurd hs List.not_mem_nil,
       .nil, hc, hpo, hp, hdv, hp0, hag, hrelp⟩
   | HEone k ws lb row p ls pa da l p' es pfin har hre hst _ ih =>
-    intro hrf m0 rs10 fn0 ib0 hp0 c pst dv rs20 hc hpo hp hdv hag hrelp
+    intro hrf m0 rs10 fn0 ib0 hp0 c pst dv rs20 hc hes hpo hp hdv hag hrelp
     subst hp0
+    obtain ⟨hpin, hes'⟩ := WeakRvwmoCert2.esPinBlock c.cdImg ls l k es hes
     have hlb : Q lb := hrf lb List.mem_cons_self
     have hrf' : ∀ lb ∈ row, Q lb := fun lb0 h => hrf lb0 (List.mem_cons_of_mem _ h)
     obtain ⟨ma, rsa, fna, iba, rfl⟩ := admRunPhart true _ _ d0 ls da har cpu m0 rs10 fn0 ib0 rfl
     obtain ⟨m1, rs11, fn1, ib1, rfl⟩ := pstepEvPhart cpu ma rsa fna iba da l p' d0 hst
-    obtain ⟨rds, wrs, hblk⟩ := cblkIntro cpu d0 ws lb l ls (.PHart cpu ma rsa fna iba) da
-      m0 rs10 fn0 ib0 m1 rs11 fn1 ib1 har hre hst
-    obtain ⟨lb', l', rds', wrs', rs21, hblk2, hok, hfi, hri, hag2⟩ :=
+    obtain ⟨rds, wrs, hblk⟩ := WeakRvwmoCert2.cblkIntroPin c.cdImg cpu d0 ws lb l ls
+      (.PHart cpu ma rsa fna iba) da m0 rs10 fn0 ib0 m1 rs11 fn1 ib1 har hpin hre hst
+    obtain ⟨lb', l', rds', wrs', rs21, hblk2, hok, hri, hag2⟩ :=
       Hpol c ws lb l rds wrs m0 rs10 rs20 fn0 ib0 m1 rs11 fn1 ib1 hc hlb hrelp hag hblk
     obtain ⟨hc2, hpo2⟩ := certBlockSnoc c x pst dv cpu d0 lb' l' rds' wrs' m0 rs20 fn0 ib0 m1 rs21
       fn1 ib1 hc hpo hp hdv
-      (cblkRelp cpu d0 ws ((candLastSt c).msWs x) lb' l' rds' wrs' m0 rs20 fn0 ib0 m1 rs21 fn1
-        ib1 hrelp hblk2) hok hfi
+      (WeakRvwmoCert2.cblkRelpG _ cpu d0 ws ((candLastSt c).msWs x) lb' l' rds' wrs' m0 rs20 fn0
+        ib0 m1 rs21 fn1 ib1 hrelp hblk2) hok
     have hend : cdEnd (candSnoc c ⟨x, lb'⟩) = cdEnd c + 1 := cdEndSnoc c _
     have hp2 : (pstSnoc c pst x (.PHart cpu m1 rs21 fn1 ib1) (cdEnd (candSnoc c ⟨x, lb'⟩)))[x]?
         = some (.PHart cpu m1 rs21 fn1 ib1) := by
@@ -965,7 +1152,7 @@ theorem certSegment (x : Nat) (cpu : CPU) (d0 : Efab) (T : List Nat) (Q : Lbl �
     obtain ⟨c', pst', dv', tradd, m2, rs12, rs22, fn2, ib2, htr, hag', hf2, hc', hpo', hp'',
       hdv', hfin, hagf, hrelpf⟩ :=
       ih hrf' m1 rs11 fn1 ib1 rfl (candSnoc c ⟨x, lb'⟩) (pstSnoc c pst x (.PHart cpu m1 rs21 fn1 ib1))
-        (dvSnoc c dv d0) rs21 hc2 hpo2 hp2 hdv2 hag2 hrelp2
+        (dvSnoc c dv d0) rs21 hc2 hes' hpo2 hp2 hdv2 hag2 hrelp2
     refine ⟨c', pst', dv', ⟨x, lb'⟩ :: tradd, m2, rs12, rs22, fn2, ib2, ?_, ?_,
       .cons (Or.inl hri) hf2, hc', hpo', hp'', hdv', hfin, hagf, hrelpf⟩
     · rw [htr, candSnocTr, List.append_assoc]
@@ -1022,19 +1209,8 @@ theorem lbStoreNeOk (c : Cand) (x : Nat) (lb : Lbl) :
   | LStore rl base vs kc => exact fun h => h
   | _ => exact fun h => h.elim
 
-/-- (Lean-only, deviation 4) A wlabel realizing a store row label is not a fetch. -/
-theorem WeakRvwmoCert2.lbFetchInertOfStoreNe (p : Pexv6) (ws : Wstate) (σ : Mstate) (i : Nat)
-    (lb : Lbl) (l : Wlabel) :
-    lbStoreNe lb → hlblRealizes p ws lb l → lbFetchInert σ i l := by
-  intro hlb ⟨_, _, _, hpr⟩
-  cases l with
-  | LIFetch base tvs =>
-    simp only [projLbl, Option.some.injEq] at hpr
-    subst hpr
-    exact hlb.elim
-  | _ => trivial
-
-/-- THE POLICY, discharged: at an empty taint set every block mirrors. -/
+/-- THE POLICY, discharged: at an empty taint set every block mirrors (deviation 4: on pinned
+blocks; the mirror keeps the admin labels, hence their pins). -/
 theorem polStore (x : Nat) (cpu : CPU) (d0 : Efab) :
     ∀ (c0 : Cand) (ws : Wstate) (lb : Lbl) (l : Wlabel) (rds : List Nat)
       (wrs : List Register) (m : SailM Unit) (rs1 rs2 : RegFile) (fn : Ofence) (ib : Ibch)
@@ -1043,25 +1219,30 @@ theorem polStore (x : Nat) (cpu : CPU) (d0 : Efab) :
       lbStoreNe lb →
       ((candLastSt c0).msWs x).wRelp = ws.wRelp →
       dregAgree (fun n => n ∉ ([] : List Nat)) rs1 rs2 →
-      cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+      WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
       ∃ lb' l' rds' wrs' rs2',
-        cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
+        WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
         mstepOk (candLastSt c0) x lb' ∧
-        lbFetchInert (candLastSt c0) x l' ∧
         lblReidx lb lb' ∧
         dregAgree (fun n => n ∉ ([] : List Nat)) rs1' rs2' := by
   intro c0 ws lb l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib' _ hlb _ hag hblk
-  have hfi : lbFetchInert (candLastSt c0) x l := by
-    obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, hre, _⟩ := hblk
-    exact WeakRvwmoCert2.lbFetchInertOfStoreNe _ _ _ _ _ _ hlb hre
-  obtain ⟨rs2', hblk2, hag2⟩ := certBlockMirror (fun n => n ∉ ([] : List Nat)) cpu d0 ws lb l rds
-    wrs m rs1 fn ib m' rs1' fn' ib' rs2 hblk (fun n _ => List.not_mem_nil) hag
-  exact ⟨lb, l, rds, wrs, rs2', hblk2, lbStoreNeOk c0 x lb hlb, hfi, lblReidxRefl lb, hag2⟩
+  obtain ⟨rs2', hblk2, hag2⟩ := WeakRvwmoCert2.certBlockMirrorG _ (fun n => n ∉ ([] : List Nat))
+    cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' rs2 hblk (fun n _ => List.not_mem_nil) hag
+  exact ⟨lb, l, rds, wrs, rs2', hblk2, lbStoreNeOk c0 x lb hlb, lblReidxRefl lb, hag2⟩
 
 theorem nvHemit (cpu : CPU) (rs : RegFile) (ib : Ibch) (d0 : Efab) :
     hemit (fun _ => d0) 0 wsInit evRow (evP0 cpu rs ib) (evEm cpu rs ib).emItems
       (evEm cpu rs ib).emFin :=
   evHartConf 0 cpu rs ib d0
+
+/-- (Lean-only, deviation 4) The real block's emission is pinned at any image (its one label is a
+store). -/
+theorem WeakRvwmoCert2.nvPin (cpu : CPU) (rs : RegFile) (ib : Ibch) (im : Image) :
+    WeakRvwmoCert2.esPin im (evEm cpu rs ib).emItems := by
+  intro l0 hl0
+  simp only [evEm, List.map_cons, List.map_nil, List.mem_singleton] at hl0
+  subst hl0
+  trivial
 
 theorem nvRowClass : ∀ lb ∈ evRow, lbStoreNe lb := by
   intro lb hlb
@@ -1076,14 +1257,15 @@ theorem certSegmentWitness (cpu : CPU) (rs : RegFile) (ib : Ibch) (d0 : Efab) :
       (∀ s, s ∈ tradd → s.esAg = 0) ∧
       List.Forall₂ lblReidxW evRow (tradd.map (fun s => s.esLb)) ∧
       srvwmoConsistent c' ∧
-      execProgOk' pstepEv pclsEv pst' dv' (candExec c') ∧
+      execProgOk' (pstepPin (fun _ => none) pstepEv) pclsEv pst' dv' (candExec c') ∧
       tradd[0]? = some ⟨0, .LStore false (paZ evFlag) (WeakInterpProj.wbytes 4 lockOne)
         .WCplain⟩ := by
   obtain ⟨c', pst', dv', tradd, _, _, _, _, _, htr, hag, hf2, hc', hpo', -⟩ :=
     certSegment 0 cpu d0 [] lbStoreNe lbStoreNeRmwfree (polStore 0 cpu d0) 0 wsInit evRow
       (evP0 cpu rs ib) _ _ (nvHemit cpu rs ib d0) nvRowClass evX2.2 rs none ib rfl
       (smC (fun _ => none)) (smPst cpu rs ib) (smDv d0) rs (smConsistent _)
-      (smProg0 _ cpu rs ib d0) rfl rfl (dregAgreeRefl _ _) (by rw [smWs])
+      (WeakRvwmoCert2.nvPin cpu rs ib _) (smProg0 _ cpu rs ib d0) rfl rfl (dregAgreeRefl _ _)
+      (by rw [smWs])
   refine ⟨c', pst', dv', tradd, by rw [htr]; rfl, hag, hf2, hc', hpo', ?_⟩
   exact segExitWrite 0 evRow tradd 0 _ _ _ _ hf2 hag rfl
 
@@ -1093,7 +1275,7 @@ theorem certSegmentNonvacuous :
       tradd ≠ [] ∧ c'.cdTr = tradd ∧
       (∀ s, s ∈ tradd → s.esAg = 0) ∧
       srvwmoConsistent c' ∧
-      execProgOk' pstepEv pclsEv pst' dv' (candExec c') ∧
+      execProgOk' (pstepPin (fun _ => none) pstepEv) pclsEv pst' dv' (candExec c') ∧
       tradd[0]? = some ⟨0, .LStore false (paZ evFlag) (WeakInterpProj.wbytes 4 lockOne)
         .WCplain⟩ := by
   obtain ⟨c', pst', dv', tradd, htr, hag, -, hc', hpo', hlk⟩ :=

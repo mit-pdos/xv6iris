@@ -38,13 +38,15 @@ Rocq comments/audit, not ported (the lint's axiom/sorry ban is the audit).
 2. `filterDownwardPrefix` is stated for a Boolean predicate `P : α → Bool` (Lean's
    `List.filter`), Rocq's decidable `P : A → Prop`; `cycleOk`'s `Forall cyseg_ok l` is
    `∀ o, o ∈ l → cysegOk o`.
-3. FETCH-INERTNESS, conditional supply (cross-file fact `WeakRvwmoLin2`/`WeakRvwmoSupply`):
-   Lean's `hullRealizableOfAcyclic` returns the process supply conditional on
-   `candFetchInert boot d0 N c`, so `hullRealizableRowsG` does too (Rocq: `∃ c pst rho, …`; Lean
-   `∃ c rho, … ∧ (candFetchInert boot d0 N c → ∃ pst, …) ∧ …`).
-4. FETCH-INERTNESS, policy (cross-file fact `WeakRvwmoCert2`): `segStepOfSegment`'s policy
-   `Hpol''` returns `lbFetchInert (candLastSt c0) x l'` after `mstepOk` (as `certSegment''`);
-   `segsRunWitness` supplies it through `polStore'`.
+3. O2 / STAGE C — THE PINNED LTS (`WeakRvwmoSupply` deviation 2, `WeakRvwmoCert2` deviation 4).
+   `hullRealizableRowsG` is Rocq's `∃ c pst rho` again (Stage B's `candFetchInert` conditional
+   is DELETED), its supply at `pstepPin c.cdImg pstepEv`; `cstOk` (hence `segStep`, `segsRun`)
+   and `certCycle` state the supply at `pstepPin St.cstC.cdImg pstepEv`.
+4. O2 / STAGE C, policy (`WeakRvwmoCert3b` deviation 8): `segStepOfSegment`'s Stage-B
+   `lbFetchInert` conjunct of `Hpol''` is DELETED; `Hpol''` takes and returns
+   `WeakRvwmoCert2.cblkPin c0.cdImg` blocks, `Hpolp : cpolpr …` is on pinned pair blocks, and
+   the new premise `WeakRvwmoCert2.esPin St.cstC.cdImg es` follows `LDev ∉ es.map Prod.fst`;
+   `segsRunWitness` supplies them through `polStore'` and `WeakRvwmoCert2.nvPin`.
 5. Rocq's `Section nonvacuity4` context (`cpu rs ib d0`) is `nv4S0`/`nv4S0Ok`/
    `segsRunWitness`'s leading parameters; Rocq's `img0` notation is the literal `fun _ => none`.
 
@@ -153,19 +155,17 @@ theorem hullRealizableRowsG (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh 
     properCut GD.gdG cs →
     (∀ x, ¬ tc (racyD (gdHull GD cs)) x x) →
     GD.gdG.gxProg.length ≤ N →
-    ∃ (c : Cand) (rho : Nat → Nat),
+    ∃ (c : Cand) (pst : Nat → List Pexv6) (rho : Nat → Nat),
       srvwmoConsistent c ∧
       c.cdImg = GD.gdG.gxImg ∧
-      (candFetchInert boot d0 N c →
-        ∃ pst : Nat → List Pexv6,
-          pst 0 = (List.range' 0 N).map boot ∧
-          execProgOk' pstepEv pclsEv pst (fun _ => d0) (candExec c)) ∧
+      pst 0 = (List.range' 0 N).map boot ∧
+      execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun _ => d0) (candExec c) ∧
       (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) =
         (List.take ((cs[i]?).getD 0) ((GD.gdG.gxProg[i]?).getD [])).map (lblRen rho)) := by
   intro hcons hq hpc hacy hN
-  obtain ⟨c, pi, hc, himg, hpst, hrow⟩ :=
+  obtain ⟨c, pst, pi, hc, himg, hpst0, hpst, hrow⟩ :=
     hullRealizableOfAcyclic boot d0 im nh GD cs N hcons hq hpc hacy hN
-  refine ⟨c, fun t => pi (hren GD.gdG cs t), hc, himg, hpst, fun i => ?_⟩
+  refine ⟨c, pst, fun t => pi (hren GD.gdG cs t), hc, himg, hpst0, hpst, fun i => ?_⟩
   rw [hrow i, gxhRow]
   exact rowRenComp (hren GD.gdG cs) pi _ _ (fun _ => rfl)
 
@@ -369,7 +369,7 @@ structure CycState where
 
 def cstOk (d0 : Efab) (St : CycState) : Prop :=
   srvwmoConsistent St.cstC ∧
-  execProgOk' pstepEv pclsEv St.cstPst St.cstDv (candExec St.cstC) ∧
+  execProgOk' (pstepPin St.cstC.cdImg pstepEv) pclsEv St.cstPst St.cstDv (candExec St.cstC) ∧
   St.cstDv (cdEnd St.cstC) = d0
 
 /-! ## 4.2 One segment, and the walk -/
@@ -495,12 +495,11 @@ theorem segStepOfSegment (x : Nat) (cpu : CPU) (d0 : Efab)
       ((candLastSt c0).msWs x).wRelp = ws.wRelp →
       dregAgree (fun n => n ∉ Tf k) rs1 rs2 →
       Nd k m →
-      cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+      WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
       ∃ (lb' : Lbl) (l' : Wlabel) (rds' : List Nat) (wrs' : List Register) (rs2' : RegFile)
         (m2' : SailM Unit) (fn2' : Ofence) (ib2' : Ibch),
-        cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m2' rs2' fn2' ib2' ∧
+        WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m2' rs2' fn2' ib2' ∧
         mstepOk (candLastSt c0) x lb' ∧
-        lbFetchInert (candLastSt c0) x l' ∧
         lblReidxW lb lb' ∧
         Cls c0 lb' ∧
         csync (Tf (k + 1)) m' rs1' fn' ib' m2' rs2' fn2' ib2' ∧
@@ -512,6 +511,7 @@ theorem segStepOfSegment (x : Nat) (cpu : CPU) (d0 : Efab)
     (fn20 : Ofence) (ib20 : Ibch) :
     hemit (fun _ => d0) k0 ws0 rowseg (.PHart cpu m0 rs10 fn0 ib0) es pfin →
     LDev ∉ es.map Prod.fst →
+    WeakRvwmoCert2.esPin St.cstC.cdImg es →
     (∀ i lb, rowseg[i]? = some lb → Q (k0 + i) lb) →
     cstOk d0 St →
     Ctx k0 St.cstC →
@@ -537,14 +537,16 @@ theorem segStepOfSegment (x : Nat) (cpu : CPU) (d0 : Efab)
       (∀ y, y ≠ x → (St'.cstPst (cdEnd St'.cstC))[y]? = (St.cstPst (cdEnd St.cstC))[y]?) ∧
       (∀ y, y ≠ x → ((candLastSt St'.cstC).msWs y).wRelp
         = ((candLastSt St.cstC).msWs y).wRelp) := by
-  intro hem hdev hQ hS hctx hp hnd hsync hrelp
+  intro hem hdev hes hQ hS hctx hp hnd hsync hrelp
   obtain ⟨hc, hpo, hdv⟩ := hS
   obtain ⟨c', pst', dv', tradd, m1, rs11, fn1, ib1, m21, rs21, fn21, ib21, htr, hagf, hf2, hc',
     hctx', hpo', hp', hdv', hfin, hsyncf, hlockf, hrelpf, himg, hpst0, hdv0, hfr, hfrp, hndf⟩ :=
     certSegment'' x cpu d0 Tf Hmono Q Ctx Cls Hpres Nd Hrdsp HNdadm HNdblk HNdblkp Hpol'' Hpolp
       k0 ws0 rowseg _ es pfin hem hdev hQ m0 rs10 fn0 ib0 rfl hnd St.cstC St.cstPst St.cstDv
-      m20 rs20 fn20 ib20 hc hctx hpo hp hdv hsync hrelp
-  exact ⟨⟨c', pst', dv'⟩, tradd, ⟨⟨hc, hpo, hdv⟩, ⟨hc', hpo', hdv'⟩, rfl, htr, hagf, hf2⟩, hctx',
+      m20 rs20 fn20 ib20 hc hctx hes hpo hp hdv hsync hrelp
+  have hpo'' : execProgOk' (pstepPin c'.cdImg pstepEv) pclsEv pst' dv' (candExec c') := by
+    rw [himg]; exact hpo'
+  exact ⟨⟨c', pst', dv'⟩, tradd, ⟨⟨hc, hpo, hdv⟩, ⟨hc', hpo'', hdv'⟩, rfl, htr, hagf, hf2⟩, hctx',
     himg, hpst0, hdv0, ⟨m1, rs11, fn1, ib1, m21, rs21, fn21, ib21, hfin, hp', hsyncf, hlockf,
     hndf⟩, hrelpf, hfr, hfrp⟩
 
@@ -596,7 +598,7 @@ theorem certCycle (d0 : Efab) (l : List Segout) (S0 Sf : CycState) :
     segsRun d0 l S0 Sf →
     -- (a) a real promise-free run at the quiet fabric
     srvwmoConsistent Sf.cstC ∧
-    execProgOk' pstepEv pclsEv Sf.cstPst Sf.cstDv (candExec Sf.cstC) ∧
+    execProgOk' (pstepPin Sf.cstC.cdImg pstepEv) pclsEv Sf.cstPst Sf.cstDv (candExec Sf.cstC) ∧
     Sf.cstDv (cdEnd Sf.cstC) = d0 ∧
     -- (b) every segment's steps at a known offset
     (∀ o, o ∈ l → ∀ k s, o.soTr[k]? = some s → Sf.cstC.cdTr[o.soOff + k]? = some s) ∧
@@ -692,20 +694,19 @@ theorem segsRunWitness (cpu : CPU) (rs : RegFile) (ib : Ibch) (d0 : Efab) :
       ((candLastSt c0).msWs 0).wRelp = ws.wRelp →
       dregAgree (fun n => n ∉ ([] : List Nat)) rs1 rs2 →
       True →
-      cblk cpu d0 ws lb l rds wrs m rs1 fn ib0 m' rs1' fn' ib' →
+      WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb l rds wrs m rs1 fn ib0 m' rs1' fn' ib' →
       ∃ (lb' : Lbl) (l' : Wlabel) (rds' : List Nat) (wrs' : List Register) (rs2' : RegFile)
         (m2' : SailM Unit) (fn2' : Ofence) (ib2' : Ibch),
-        cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib0 m2' rs2' fn2' ib2' ∧
+        WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb' l' rds' wrs' m rs2 fn ib0 m2' rs2' fn2' ib2' ∧
         mstepOk (candLastSt c0) 0 lb' ∧
-        lbFetchInert (candLastSt c0) 0 l' ∧
         lblReidxW lb lb' ∧
         True ∧
         csync [] m' rs1' fn' ib' m2' rs2' fn2' ib2' ∧
         (lbIsW lb = true → clockstep [] m' rs1' fn' ib' m2' rs2' fn2' ib2') := by
     intro k c0 ws lb l rds wrs m rs1 rs2 fn ib0 m' rs1' fn' ib' hc _ hlb hrelp hag _ hblk
-    obtain ⟨lb', l', rds', wrs', rs2', h1, h2, hfi, h3, _, h5⟩ :=
+    obtain ⟨lb', l', rds', wrs', rs2', h1, h2, h3, _, h5⟩ :=
       polStore' 0 cpu d0 c0 ws lb l rds wrs m rs1 rs2 fn ib0 m' rs1' fn' ib' hc hlb hrelp hag hblk
-    exact ⟨lb', l', rds', wrs', rs2', m', fn', ib', h1, h2, hfi, h3, trivial,
+    exact ⟨lb', l', rds', wrs', rs2', m', fn', ib', h1, h2, h3, trivial,
       .inl ⟨rfl, rfl, rfl, h5⟩, fun _ => ⟨rfl, rfl, rfl, h5⟩⟩
   obtain ⟨Sf, tradd, hstep, -⟩ :=
     segStepOfSegment 0 cpu d0 (fun _ => []) (fun _ => lbStoreNe) (fun _ _ => True)
@@ -720,7 +721,7 @@ theorem segsRunWitness (cpu : CPU) (rs : RegFile) (ib : Ibch) (d0 : Efab) :
         (fun _ => lbStoreNe)
         (cpolpOfRmwfree 0 cpu d0 [] _ _ _ (fun _ lb hlb => lbStoreNeRmwfree lb hlb)))
       0 wsInit evRow _ _ evX2.2 rs none ib (nv4S0 cpu rs ib d0) evX2.2 rs none ib
-      (nvHemit cpu rs ib d0) (evEmDevfree cpu rs ib)
+      (nvHemit cpu rs ib d0) (evEmDevfree cpu rs ib) (WeakRvwmoCert2.nvPin cpu rs ib _)
       (fun _ lb hi => nvRowClass lb (List.mem_of_getElem? hi))
       (nv4S0Ok cpu rs ib d0) trivial rfl trivial
       (.inl ⟨rfl, rfl, rfl, dregAgreeRefl _ _⟩) (by rw [show (nv4S0 cpu rs ib d0).cstC =

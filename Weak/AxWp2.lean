@@ -9,7 +9,8 @@ The Rocq header and ALL deviations are in `Weak/AxWp.lean`'s header (one Rocq fi
 the §4/§5 boundary for size).  In short: plain `fixpoint`s, no seals, no notations (`AxWp.wp
 st i s Φ` for `WP s @ st; i {{ Φ }}`, `wpc st i s Φ` for `WPc …`); `[InvGS_gen hlc GF]` for any
 `hlc`; map unions `PartialMap.union`; `Proper` instances as theorems; the skeleton names
-`skelAxirisG γg Φp T` explicitly.
+`skelAxirisG γg Φp` explicitly; the L0 fetch oracle (`ax_text`, `T`, `gx_img`) is gone (O2
+Stage C, `Weak/AxWp.lean` deviation 10).
 
 **Rocq → Lean name map.**  §5: `post_lifting` `postLifting`, `post_lifting_interp_mod`
 `postLiftingInterpMod`, `post_lifting_strong_mono` `postLiftingStrongMono`, `post_lifting_True`
@@ -170,7 +171,7 @@ def progressObl (st : Stuckness) (i : Agent) (s : Athread) : IProp GF :=
   | .NotStuck =>
     iprop(∀ (GD : Gdexec) (ls : AxirisG.logTsT GF),
       ⌜rvwmoCatConsistent GD⌝ ∗ □ AxirisG.gconstInterp GD ∗ AxirisG.localInterp GD i s.atK ls -∗
-      interpMod iprop(⌜reducibleGd GD i (AxirisG.axText GF) GD.gdG.gxImg s⌝))
+      interpMod iprop(⌜reducibleGd GD i s⌝))
 
 theorem progressOblMaybestuck (i : Agent) (s : Athread) :
     progressObl (GF := GF) .MaybeStuck i s ⊣⊢ iprop(True) := .rfl
@@ -202,7 +203,7 @@ theorem progressOblIupd (st : Stuckness) (i : Agent) (s : Athread) :
     itrivial
 
 theorem progressOblOfPure (st : Stuckness) (i : Agent) (s : Athread) :
-    (∀ GD, reducibleGd GD i (AxirisG.axText GF) GD.gdG.gxImg s) → ⊢ progressObl (GF := GF) st i s := by
+    (∀ GD, reducibleGd GD i s) → ⊢ progressObl (GF := GF) st i s := by
   intro Hred
   cases st with
   | NotStuck =>
@@ -309,7 +310,7 @@ def wpPreStepDef (i : Agent) (wp : Athread → (Athread → IProp GF) → IProp 
          ∀ v, ⌜graphValue GD (i, s.atK) = some v⌝ -∗ ⌜v.length = aidentN id⌝ -∗
            wpSkipStep GD i (K v).atK (wp (K v) Φ)) ∧
     (∀ (l : Wlabel) (s' : Athread),
-       ⌜AxOpsem.astepProg (AxOpsem.grow GD i) (AxirisG.axText GF) GD.gdG.gxImg s l s'⌝ -∗
+       ⌜AxOpsem.astepProg (AxOpsem.grow GD i) s l s'⌝ -∗
        match wlWdata l with
        | some data =>
            wpEvStep GD i s.atK
@@ -769,7 +770,7 @@ theorem wpFrameWandL (st : Stuckness) (i : Agent) (s : Athread) (Q : IProp GF)
 
 /-- Discharging the progress obligation from a graph-uniform fact. -/
 theorem wpProgressIntro (st : Stuckness) (i : Agent) (s : Athread) (Φ : Athread → IProp GF) :
-    (∀ GD, reducibleGd GD i (AxirisG.axText GF) GD.gdG.gxImg s) →
+    (∀ GD, reducibleGd GD i s) →
     wpPreStepDef i (AxWp.wp st i) s Φ ⊢ AxWp.wp st i s Φ := by
   intro Hred
   rw [(wpUnfoldStep st i s Φ).to_eq]
@@ -1179,7 +1180,7 @@ end graphAgree
 
 section skeleton
 variable {GF : BundledGFunctors} [AxannotGS GF] [AxgraphG GF] (γg : GName)
-  (Φp : Gdexec → Geid → IProp GF) (T : Int → Prop)
+  (Φp : Gdexec → Geid → IProp GF)
 
 def protInterp (GD : Gdexec) (_ : Unit) (s : GSet Geid) : IProp GF :=
   iprop([∗set] e ∈ s, Φp GD e)
@@ -1192,26 +1193,25 @@ def protInterp (GD : Gdexec) (_ : Unit) (s : GSet Geid) : IProp GF :=
   obStInterp := protInterp Φp
   logTsT := Unit
   localInterp := fun _ _ _ _ => iprop(True)
-  axText := T
 
 /-- The annotation laws, at the class's interpretation. -/
 theorem skelAnnotSplit (e : Geid) (P Q : IProp GF) :
     ⊢ AxAnnot.annotOwn e iprop(P ∗ Q) -∗
-      ∀ na, AxirisG.annotInterp (self := skelAxirisG γg Φp T) na ==∗
+      ∀ na, AxirisG.annotInterp (self := skelAxirisG γg Φp) na ==∗
         (AxAnnot.annotOwn e P ∗ AxAnnot.annotOwn e Q) ∗
-        AxirisG.annotInterp (self := skelAxirisG γg Φp T) na :=
+        AxirisG.annotInterp (self := skelAxirisG γg Φp) na :=
   annotSplit e P Q
 
 theorem skelAnnotMerge (e : Geid) (P Q : IProp GF) :
     ⊢ AxAnnot.annotOwn e P -∗ AxAnnot.annotOwn e Q -∗
-      ∀ na, AxirisG.annotInterp (self := skelAxirisG γg Φp T) na ==∗
-        AxAnnot.annotOwn e iprop(P ∗ Q) ∗ AxirisG.annotInterp (self := skelAxirisG γg Φp T) na :=
+      ∀ na, AxirisG.annotInterp (self := skelAxirisG γg Φp) na ==∗
+        AxAnnot.annotOwn e iprop(P ∗ Q) ∗ AxirisG.annotInterp (self := skelAxirisG γg Φp) na :=
   annotMerge e P Q
 
 /-- Allocation at the current position: the position is not yet annotated. -/
 theorem annotAllocAtProgress (GD : Gdexec) (i : Agent) (k : Nat) (na : Mea GF) (P : IProp GF) :
-    ⊢ naAtProgress GD i k na ∗ AxirisG.annotInterp (self := skelAxirisG γg Φp T) na ==∗
-      AxirisG.annotInterp (self := skelAxirisG γg Φp T) (insert na (i, k) P) ∗
+    ⊢ naAtProgress GD i k na ∗ AxirisG.annotInterp (self := skelAxirisG γg Φp) na ==∗
+      AxirisG.annotInterp (self := skelAxirisG γg Φp) (insert na (i, k) P) ∗
       AxAnnot.annotOwn (i, k) P := by
   iintro ⟨Hpg, Hna⟩
   ihave %Hnin := naAtProgressNotElemOf GD i k na $$ Hpg
@@ -1221,8 +1221,8 @@ theorem annotAllocAtProgress (GD : Gdexec) (i : Agent) (k : Nat) (na : Mea GF) (
 /-- The protocol interpretation splits off a fresh event. -/
 theorem protInterpInsert (GD : Gdexec) (σ : Unit) (e : Geid) (s : GSet Geid) :
     e ∉ s →
-    AxirisG.obStInterp (self := skelAxirisG γg Φp T) GD σ (({e} : GSet Geid) ∪ s) ⊣⊢
-      Φp GD e ∗ AxirisG.obStInterp (self := skelAxirisG γg Φp T) GD σ s := by
+    AxirisG.obStInterp (self := skelAxirisG γg Φp) GD σ (({e} : GSet Geid) ∪ s) ⊣⊢
+      Φp GD e ∗ AxirisG.obStInterp (self := skelAxirisG γg Φp) GD σ s := by
   intro Hnin
   show protInterp Φp GD σ (({e} : GSet Geid) ∪ s) ⊣⊢ Φp GD e ∗ protInterp Φp GD σ s
   unfold protInterp
@@ -1239,7 +1239,7 @@ any event. -/
 theorem flowEqDynTriv {hlc : HasLC} [InvGS_gen hlc GF] (GD : Gdexec) (e : Geid)
     (s0 : GSet Geid) :
     (⊢ Φp GD e) →
-    ⊢ @flowEqDyn hlc GF _ (skelAxirisG γg Φp T) GD e s0 ∅ iprop(True) := by
+    ⊢ @flowEqDyn hlc GF _ (skelAxirisG γg Φp) GD e s0 ∅ iprop(True) := by
   intro HΦ
   unfold flowEqDyn
   iintro %σ %sOb %Hsub %Hnin Hob _
@@ -1250,7 +1250,7 @@ theorem flowEqDynTriv {hlc : HasLC} [InvGS_gen hlc GF] (GD : Gdexec) (e : Geid)
   imodintro
   iexists σ
   isplitl
-  · iapply (protInterpInsert γg Φp T GD σ e sOb Hnin).2
+  · iapply (protInterpInsert γg Φp GD σ e sOb Hnin).2
     iframe Hob
     iapply HΦ
   · itrivial
@@ -1258,7 +1258,7 @@ theorem flowEqDynTriv {hlc : HasLC} [InvGS_gen hlc GF] (GD : Gdexec) (e : Geid)
 /-- `wpSkipStep` closes from `Ψ` alone, under this concrete instance (the Rocq gotcha: the
 goal's later is introduced by `later_intro`, not `inext`, so the context is not touched). -/
 theorem skelWpSkipStepOfPsi (GD : Gdexec) (i : Agent) (k' : Nat) (Ψ : IProp GF) :
-    Ψ ⊢ @wpSkipStep GF (skelAxirisG γg Φp T) GD i k' Ψ := by
+    Ψ ⊢ @wpSkipStep GF (skelAxirisG γg Φp) GD i k' Ψ := by
   unfold wpSkipStep
   iintro HΨ %na Hna
   imodintro

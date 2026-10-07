@@ -16,10 +16,10 @@ postcondition under the annotations; otherwise the progress obligation AND the s
 three conjuncts: (a) the read, ANGELIC in the value (a flow equation whose conclusion carries
 `graphValue GD e = some v`; the fused RMW's read half posts no flow equation and is pinned to
 the graph's value); (b) every other program step, DEMONIC (a write validates its data
-`graphData GD e = some data`; administrative labels, the fetch oracle and fences skip); (c) the
+`graphData GD e = some data`; administrative labels -- in Lean also the fetch -- and fences skip); (c) the
 PLIC wire, a skip.  Both event cases are `wpEvStep`, both skips `wpSkipStep`.  The core is
-parametric in `AxirisG` (annotation interpretation, graph agreement, ob-state, local state, the
-text region `axText`) and `Axpol` (handout policy `sPol`, local flow set `lobp`); `AxirisGChk`
+parametric in `AxirisG` (annotation interpretation, graph agreement, ob-state, local state; Rocq's
+text region `ax_text` is deleted, deviation 10) and `Axpol` (handout policy `sPol`, local flow set `lobp`); `AxirisGChk`
 adds the checkpoint `chk` with `chkMidInstr`.  Rocq deviations from the AxSL source (kept):
 (1) `ghost_map_ag` is a ghost map with DISCARDED elements; (2) `naAtProgress` fixes the local
 domain to the MEMORY events before the position (`eidsBefore`); (3) `na_full` dropped; (4) skips
@@ -81,8 +81,8 @@ may change the local state; (5) `isTerminated s := false`, the terminated branch
    iris-lean's `ElimModal`/`FromModal` take an `io : InOut` argument (instances are generic in
    it).
 8. THE SKELETON (§7): Rocq's `Local Existing Instance skel_axirisG` ↦ the statements name the
-   instance (`AxirisG.annotInterp (self := skelAxirisG γg Φp T)`, `@flowEqDyn _ _ _
-   (skelAxirisG γg Φp T)`, `@wpSkipStep _ (skelAxirisG γg Φp T)`); `skelAxirisG` is
+   instance (`AxirisG.annotInterp (self := skelAxirisG γg Φp)`, `@flowEqDyn _ _ _
+   (skelAxirisG γg Φp)`, `@wpSkipStep _ (skelAxirisG γg Φp)`); `skelAxirisG` is
    `@[reducible]` (a definition of class type).  `skel_wp_skip_step_of_psi` keeps the Rocq
    recipe (`BI.later_intro`, not `inext`, for the goal's later).
 9. PROOFS (not statements): the annotation lemmas go through `AxWp.annotOpen`/`annotClose`
@@ -92,6 +92,11 @@ may change the local state; (5) `isTerminated s := false`, the terminated branch
    saved proposition with `saved_prop_alloc_cofinite` at `toList (dom res)`.  The WP laws use
    `wpUnfoldStep` (the terminated branch is dead: `isTerminated s = false` by definition), so
    `post_lifting_strong_mono` is not needed inside `wpStrongMono`.
+10. O2 STAGE C (`notes/weak-port-o2-stageC.md`, owner Q-C2): the fetch is an ADMINISTRATIVE
+   label (`AxOpsem` deviation 2), so the L0 fetch oracle is gone: `AxirisG` has no `ax_text`
+   field, `astepProgGraphData` has no `T`/`img` parameters and no `AStep_fetch` case, and the
+   step case (`AxWp2`) quantifies `AxOpsem.astepProg (AxOpsem.grow GD i) s l s'` (Rocq:
+   `astep_prog (grow GD i) ax_text (gx_img (gd_g GD))`).
 
 **Rocq → Lean name map.**  §1: `is_terminated` `isTerminated`, `is_terminated_terminated`
 `isTerminatedTerminated`, `at_boundary` `AxWp.atBoundary`, `lbl_value` `lblValue`,
@@ -109,7 +114,7 @@ may change the local state; (5) `isTerminated s := false`, the terminated branch
 `annotUpdate`, `annot_entail` `annotEntail`, `annot_interp_alloc` `annotInterpAlloc`.
 §3: `axirisG`/`AxIrisG` `AxirisG` (fields `annot_interp` `annotInterp`, `gconst_interp`
 `gconstInterp`, `ob_st` `obSt`, `ob_st_interp` `obStInterp`, `log_ts_t` `logTsT`,
-`local_interp` `localInterp`, `ax_text` `axText`), `axpol`/`AxPol` `Axpol` (`s_pol` `sPol`,
+`local_interp` `localInterp`; `ax_text` deleted, deviation 10), `axpol`/`AxPol` `Axpol` (`s_pol` `sPol`,
 `lobp`), `axirisGChk`/`AxIrisGChk` `AxirisGChk` (`chk`, `chk_mid_instr` `chkMidInstr`).
 §4: `na_at_progress` `naAtProgress`, `na_at_progress_not_elem_of` `naAtProgressNotElemOf`,
 `na_splitting_wf` `naSplittingWf`, `na_splitting_wf_persistent` `naSplittingWfPersistent`,
@@ -196,15 +201,14 @@ theorem areadStepGraphValue (GD : Gdexec) (i : Nat) (s : Athread) (id : AidentT)
   | LRmw aq rl base ts rvs wvs k => exact ⟨rvs, rfl, fun h => by simp [aident, aidentAdvRd] at h⟩
 
 /-- ... and a write about to happen has graph data of the label's width. -/
-theorem astepProgGraphData (GD : Gdexec) (i : Nat) (T : Int → Prop) (img : Int → Option (BitVec 8))
+theorem astepProgGraphData (GD : Gdexec) (i : Nat)
     (s : Athread) (l : Wlabel) (s' : Athread) (data : List (BitVec 8)) :
-    AxOpsem.astepProg (AxOpsem.grow GD i) T img s l s' → wlWdata l = some data →
+    AxOpsem.astepProg (AxOpsem.grow GD i) s l s' → wlWdata l = some data →
     ∃ d, graphData GD (i, s.atK) = some d ∧ d.length = data.length := by
   intro h hdata
   cases h with
   | AStepAdmin p k d l p' d' ha hs =>
     cases l <;> simp [lbAdmin, wlWdata] at ha hdata
-  | AStepFetch p k d base tvs lb p' d' hrow hid hfa hs => simp [wlWdata] at hdata
   | AStepWrite p k d l lb p' d' hrow hs1 hid hdat hs =>
     refine ⟨data, ?_, rfl⟩
     unfold graphData
@@ -966,8 +970,6 @@ class AxirisG (GF : BundledGFunctors) where
   /-- the per-hart logical state -/
   logTsT : Type
   localInterp : Gdexec → Agent → Nat → logTsT → IProp GF
-  /-- L0: the fetch oracle's text region -/
-  axText : Int → Prop
 
 /-- The policies of design §1-L1, deviations 1 and 2. -/
 class Axpol where

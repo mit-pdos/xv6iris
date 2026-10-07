@@ -19,7 +19,7 @@ every thread of every reachable erased configuration is reducible.  The realizat
 other half of the characterization is T2 (`WeakEvInst.t2Ev`).  Premise ledger: (a) four machine
 facts about a booted σ0; (b) THE WP PACKAGE, verbatim `WeakEvAdequacy.weakEvPfViolationFree`'s;
 (c) `srvwmoConsistent`, the boot image, the initial program states / fabric, and the
-conformance supply `execProgOk'`.  `pclsEqr pclsEv` is not a premise (`WeakEvCapstone.pclsEvEqr`).
+conformance supply `execProgOk'` at the boot-image-pinned LTS (deviation 4).  `pclsEqr pclsEv` is not a premise (`WeakEvCapstone.pclsEvEqr`).
 No `mainPremises`, no robustness package, no retag.
 
 ## Deviations from Rocq
@@ -38,20 +38,18 @@ No `mainPremises`, no robustness package, no retag.
    premise (b') `∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2` (dischargeable by
    `WeakEvCapstone.efetchItvOkRunOfUnwritten` from "no reachable log writes a fetched byte";
    nothing here proves the kernel text unwritten).  Only the T1 conjunct uses it.
-4. O2 — THE FETCH-INERTNESS GATE (WeakAxRealize deviation 4): Lean's `lblRealizes` has the fifth
-   conjunct `lbFetchInert`, so hypothesis (c)'s `execProgOk'` is (for a realizing `LIFetch`
-   step only) STRONGER than Rocq's: such a step must be `wsEqr`-inert as a load at the axiomatic
-   `Wstate`.  It is CARRIED inside `execProgOk'` (no general discharge: `loadPostRun` moves
-   `coh`/`wVrOld`).  It IS discharged for a supply whose single realizing steps are not fetches:
-   the Lean-only `execProgOkNf'` (the 4 Rocq gates plus `lbNoFetch`; the pair arm is unchanged —
-   `lblRealizesPair` has no fetch gate), `execProgOkNf'Ok`, and the corollary
-   `xv6SrvwmoSafeNoFetch`.
+4. O2 Stage C — THE FETCH PIN (WeakAxRealize deviation 4): fetches are ADMINISTRATIVE labels
+   (no row item; `lblRealizes` has Rocq's 4 conjuncts — the Stage-B gate `lbFetchInert`/`lbNoFetch`
+   and the Lean-only no-fetch corollaries of this file are DELETED).  The graph tier's fetch oracle
+   (a fetch answers the boot image at timestamp 0, Rocq `AStepFetch`/`fetch_answers`) becomes the
+   pin on the program LTS: hypothesis (c) is `execProgOk' (pstepPin (imgZ σ0.wgimg) pstepEv) …`
+   (Rocq: `execProgOk' pstepEv …`), i.e. every supplied step's fetch label is pinned to the boot
+   image.  The replay is `WeakAxRealize.execWfPfRunProg` at the pinned LTS (discharging
+   `pstepPinned` by `pstepPinPinned`; the administrative stars through `admStarPf`), projected to
+   the unpinned `wpPfRun pstepEv` by `wpPfRunPinSub`.  The conclusions are Rocq's.
 5. PROOFS: the Rocq script, with `cfgMatchd`'s log conjunct and `candElog` as in Rocq.
 
-**Rocq → Lean name map.**  `xv6_srvwmo_safe` ↦ `xv6SrvwmoSafe`.  Lean-only (file-qualified):
-`WeakSrvwmoCapstone.lbFetchInertOfNoFetch`, `WeakSrvwmoCapstone.lblRealizesOfNoFetch`,
-`WeakSrvwmoCapstone.execProgOkNf'`, `WeakSrvwmoCapstone.execProgOkNf'Ok`,
-`WeakSrvwmoCapstone.xv6SrvwmoSafeNoFetch`.
+**Rocq → Lean name map.**  `xv6_srvwmo_safe` ↦ `xv6SrvwmoSafe`.  No Lean-only declarations.
 
 **Not ported:** nothing (the Rocq `Print Assumptions` audit comment is not a declaration).
 -/
@@ -62,50 +60,6 @@ import Weak.WeakAxiomatic3
 namespace Weak
 
 open MachCSL MachCSL.Stdpp Iris.Std
-
-/-! ## Lean-only: discharging the fetch gate off the fetch (deviation 4) -/
-
-theorem WeakSrvwmoCapstone.lbFetchInertOfNoFetch (σ : Mstate) (i : Nat) (l : Wlabel) :
-    lbNoFetch l → lbFetchInert σ i l := by
-  intro h
-  cases l <;> first | exact trivial | exact absurd h id
-
-theorem WeakSrvwmoCapstone.lblRealizesOfNoFetch {P : Type}
-    (pcls : P → Wlabel → Wstate → WmClass) (p : P) (σ : Mstate) (i : Nat) (lb : Lbl)
-    (l : Wlabel) :
-    lbNobarex l → latFree l → lbRfoldfree l → projLbl (pcls p l (σ.msWs i)) l = some lb →
-    lbNoFetch l → lblRealizes pcls p σ i lb l :=
-  fun h1 h2 h3 h4 h5 => ⟨h1, h2, h3, h4, WeakSrvwmoCapstone.lbFetchInertOfNoFetch σ i l h5⟩
-
-/-- `execProgOk'` with the single realizing step gated by Rocq's four conjuncts and `lbNoFetch`
-(Lean-only, deviation 4). -/
-def WeakSrvwmoCapstone.execProgOkNf' {P D : Type} (pstep : P → D → Wlabel → P → D → Prop)
-    (pcls : P → Wlabel → Wstate → WmClass) (pst : Nat → List P) (dv : Nat → D) (E : Exec) :
-    Prop :=
-  ∀ (k : Nat) (s : Estep), E.exTr[k]? = some s →
-    ∃ (p pa : P) (da : D) (p' : P),
-      (pst k)[s.esAg]? = some p ∧
-      pst (k + 1) = (pst k).set s.esAg p' ∧
-      admStar pstep true p (dv k) pa da ∧
-      ((∃ l, (lbNobarex l ∧ latFree l ∧ lbRfoldfree l ∧
-                projLbl (pcls pa l ((stt E k).msWs s.esAg)) l = some s.esLb ∧ lbNoFetch l) ∧
-              pstep pa da l p' (dv (k + 1)))
-       ∨ (∃ (pm : P) (dm : D) (pm2 : P) (dm2 : D) (l1 l2 : Wlabel),
-            lblRealizesPair pcls pa pm2 (stt E k) s.esAg s.esLb l1 l2 ∧
-            pstep pa da l1 pm dm ∧
-            admStar pstep false pm dm pm2 dm2 ∧
-            pstep pm2 dm2 l2 p' (dv (k + 1))))
-
-theorem WeakSrvwmoCapstone.execProgOkNf'Ok {P D : Type}
-    (pstep : P → D → Wlabel → P → D → Prop) (pcls : P → Wlabel → Wstate → WmClass)
-    (pst : Nat → List P) (dv : Nat → D) (E : Exec) :
-    WeakSrvwmoCapstone.execProgOkNf' pstep pcls pst dv E → execProgOk' pstep pcls pst dv E := by
-  intro h k s hs
-  obtain ⟨p, pa, da, p', hp, hn, hst, hsup⟩ := h k s hs
-  refine ⟨p, pa, da, p', hp, hn, hst, ?_⟩
-  rcases hsup with ⟨l, ⟨h1, h2, h3, h4, h5⟩, hps⟩ | hpair
-  · exact .inl ⟨l, WeakSrvwmoCapstone.lblRealizesOfNoFetch pcls pa _ _ _ l h1 h2 h3 h4 h5, hps⟩
-  · exact .inr hpair
 
 /-! ## THE TIER-1 CAPSTONE -/
 
@@ -118,8 +72,7 @@ open LeanRV64D
 variable {hlc : HasLC} {GF : BundledGFunctors}
 
 /-- Rocq `xv6_srvwmo_safe`.  Ledger: (a) the booted-σ0 facts; (b) THE WP PACKAGE; (b') THE
-FETCH-VIEW PREMISE (deviation 3); (c) the sRVWMO side, with the fetch gate inside `execProgOk'`
-(deviation 4). -/
+FETCH-VIEW PREMISE (deviation 3); (c) the sRVWMO side, the supply at the boot-image-pinned LTS (deviation 4). -/
 theorem xv6SrvwmoSafe [MachGpreS hlc GF] [WeakGpreS GF]
     (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (cd : Cand) (pst : Nat → List Pexv6) (dv : Nat → Efab)
@@ -141,7 +94,7 @@ theorem xv6SrvwmoSafe [MachGpreS hlc GF] [WeakGpreS GF]
     cd.cdImg = imgZ σ0.wgimg →
     pst 0 = epsInit σ0 →
     dv 0 = efInit σ0.wgdev →
-    execProgOk' pstepEv pclsEv pst dv (candExec cd) →
+    execProgOk' (pstepPin (imgZ σ0.wgimg) pstepEv) pclsEv pst dv (candExec cd) →
     -- T1 ∘ the language lift
     (∃ P' σ',
       rtc epfRun (epInit gen, σ0) (P', σ') ∧
@@ -157,8 +110,12 @@ theorem xv6SrvwmoSafe [MachGpreS hlc GF] [WeakGpreS GF]
   refine ⟨?_, ?_, ?_⟩
   · -- T1: realizability, program-carried, then lifted to the language
     obtain ⟨hwf, -, heximg⟩ := srvwmoRealizable cd Hcons
+    have hpin : pstepPinned (exImg (candExec cd)) (pstepPin (imgZ σ0.wgimg) pstepEv) := by
+      rw [heximg, Himg]; exact pstepPinPinned _ _
     obtain ⟨c, hrun, hpg, -, hm⟩ :=
-      execWfPfRunProg pstepEv pclsEv pst dv (candExec cd) pclsEvEqr hwf Hprog
+      execWfPfRunProg (pstepPin (imgZ σ0.wgimg) pstepEv) pclsEv pst dv (candExec cd) pclsEvEqr
+        hpin hwf Hprog
+    have hrun := wpPfRunPinSub _ pstepEv pclsEv _ _ hrun
     rw [heximg, Himg, Hpst0, Hdv0, ← ecfgOfInit gen σ0 Hlog Hws] at hrun
     obtain ⟨P', σ', hr, heq⟩ := wpPfRtcEpfRtc (epInit gen) σ0 c hlive Hcov hrun
     refine ⟨P', σ', hr, ?_, ?_⟩
@@ -172,38 +129,6 @@ theorem xv6SrvwmoSafe [MachGpreS hlc GF] [WeakGpreS GF]
   · intro t2 σ2 e2 hrtc he2
     exact weakEvAdequacyReducible (hlc := hlc) (GF := GF) gen σ0 D hD Hgen Hpow Hgen0 Hlog Hws
       Hwp t2 σ2 e2 hrtc he2
-
-/-- Lean-only (deviation 4): the capstone for a NO-FETCH supply — the fetch gate discharged. -/
-theorem WeakSrvwmoCapstone.xv6SrvwmoSafeNoFetch [MachGpreS hlc GF] [WeakGpreS GF]
-    (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
-    (cd : Cand) (pst : Nat → List Pexv6) (dv : Nat → Efab)
-    (Hgen : gen = 0)
-    (Hpow : σ0.wgpow = true) (Hgen0 : σ0.wggen = 0) (Hlog : σ0.wglog = [])
-    (Hws : ∀ cc : CPU, σ0.wgws cc = wsInit) :
-    (∀ [MachGS hlc GF] [WeakGS GF],
-      (([∗list] cc ∈ cpus, [∗list] r ∈ D cc, regPointsTo cc r (DFrac.own 1) (σ0.wgregs cc r)) ∗
-        bigSepM (M := GMapF PAddr) (fun a b => wlatPointsto (paZ a) (DFrac.own 1) 0 b) σ0.wgimg ∗
-        ([∗list] cc ∈ cpus, hartView cc) ∗
-        wlogLb [] ∗
-        ([∗list] d ∈ DevId.all, devFragAt (MachGS.era (hlc := hlc) (GF := GF)) d (σ0.wgdev.st d)))
-      ⊢@{IProp GF} |={⊤}=> ([∗list] e ∈ epowerFork gen, ewpTriv (hlc := hlc) (GF := GF) ⊤ e)) →
-    (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2) →
-    srvwmoConsistent cd →
-    cd.cdImg = imgZ σ0.wgimg →
-    pst 0 = epsInit σ0 →
-    dv 0 = efInit σ0.wgdev →
-    WeakSrvwmoCapstone.execProgOkNf' pstepEv pclsEv pst dv (candExec cd) →
-    (∃ P' σ',
-      rtc epfRun (epInit gen, σ0) (P', σ') ∧
-      σ'.wglog = cdLog cd cd.cdTr.length ∧
-      (ecfgOf P' σ').pcAgs.map Wpagent.paSt = pst cd.cdTr.length) ∧
-    (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → ¬ violationHart clsOf pubOf nDisk (ecfgOf ρ.1 ρ.2)) ∧
-    (∀ (t2 : List EExpr) (σ2 : WGState) (e2 : EExpr),
-      (epowerFork gen, σ0) -·->ₜₚ* (t2, σ2) → e2 ∈ t2 → Reducible (e2, σ2)) :=
-  fun Hwp Hcov Hcons Himg Hpst0 Hdv0 Hprog =>
-    xv6SrvwmoSafe (hlc := hlc) (GF := GF) gen σ0 D hD cd pst dv Hgen Hpow Hgen0 Hlog Hws Hwp Hcov
-      Hcons Himg Hpst0 Hdv0
-      (WeakSrvwmoCapstone.execProgOkNf'Ok pstepEv pclsEv pst dv (candExec cd) Hprog)
 
 end capstone
 

@@ -38,17 +38,25 @@ A LEAF: nothing imports this file.
    Q1); `regstate` ↦ `RegFile`, `oib32` ↦ `Ibch`; `EStep i lb` ↦ `⟨i, lb⟩`; `WMsg` ↦ the
    `Wmsg` literal.  The axiomatic label constructors are written `.LLoad`/`Lbl.LLoad`
    (no `open` of either label type).
-2. O2 / D1 — THE FETCH-INERTNESS PREMISE (`WeakRvwmoConf` deviation 3): `execProgOk'Snoc` gains
-   the premise `lbFetchInert (candLastSt c) i l` (the realizing wlabel, if a fetch, is
-   `wsEqr`-inert at the candidate's last machine state), since `hlblRealizesAx` now needs it to
-   rebuild `lblRealizes`.  It is `True` for every non-fetch label (the smoke's store discharges it
-   by `trivial`).  `execProgOk'SnocPair` is unchanged (`hlblRealizesPairAx` is `Iff.rfl`).
+2. O2 / STAGE C — THE PINNED PROGRAM LTS (`WeakAxRealize` deviation 4, `WeakRvwmoSupply`
+   deviation 2; orchestrator ruling: the Cert chain runs at `pstepPin img pstepEv`, the LTS the
+   replay needs).  The fetch is an administrative label (`projLbl (LIFetch ..) = none`), so the
+   realizing wlabel is never a fetch (`WeakRvwmoCert.hlblRealizesPin`), and `hlblRealizesAx` is
+   `Iff.rfl` again (Stage B's `lbFetchInert` premise of `execProgOk'Snoc` is DELETED).  The supply
+   `execProgOk'` of `execProgOk'Snoc` / `execProgOk'SnocPair` (premise and conclusion), of the
+   smoke `smProg0` / `smSnocProg` and of `candExtendBlockNonempty` is at the PINNED LTS
+   `pstepPin c.cdImg pstepEv`, and each appended block supplies the pin of its administrative
+   labels: `execProgOk'Snoc` takes `∀ l0 ∈ ls, WeakAxRealize.fetchPin c.cdImg l0` (after the
+   `admRun`),
+   `execProgOk'SnocPair` the same for `ls1` and `ls2` (after their `admRun`s).  The realizing
+   labels' pins are free (`hlblRealizesPin`, `hlblRealizesPairPin`).
 3. Rocq's `Section smoke` context (`img cpu rs ib d0`) becomes explicit parameters of each smoke
    declaration (only those it uses, as Rocq's section closing does).  `cand_extend_block_nonempty`'s
    witnesses: CPU `⟨0, _⟩`, `evRs0`, `ibNone`, and Rocq's `dev0_state` ↦ the all-default fabric
    `efInit ⟨fun _ => default⟩` (as `WeakRvwmoConfWit.hartConfNonempty`).
 4. §7's `Print Assumptions` audit is dropped (the lint's axiom/sorry ban is the audit).
-5. Lean-only helper: `WeakRvwmoCert.rangeMapLookup` (the lookup of a `map` over `range' 0 n`).
+5. Lean-only helpers: `WeakRvwmoCert.rangeMapLookup` (the lookup of a `map` over `range' 0 n`),
+   `WeakRvwmoCert.hlblRealizesPin`, `WeakRvwmoCert.hlblRealizesPairPin` (deviation 2).
 
 **Rocq → Lean name map.**  `cand_snoc` `candSnoc`, `cd_end` `cdEnd`, `cand_last_st`
 `candLastSt`, `cd_log_end` `cdLogEnd`, `cand_snoc_img` `candSnocImg`, `cand_snoc_tr`
@@ -75,7 +83,7 @@ A LEAF: nothing imports this file.
 `smSnocProg`, `sm_latest_consistent` `smLatestConsistent`, `cand_extend_block_nonempty`
 `candExtendBlockNonempty`.
 
-**Dropped:** nothing (Rocq 62 declarations; Lean 62 + 1 helper).
+**Dropped:** nothing (Rocq 62 declarations; Lean 62 + 3 helpers).
 -/
 import Weak.WeakAxiomatic3
 import Weak.WeakSrvwmoLitmus
@@ -384,20 +392,36 @@ theorem dvSnocGt (c : Cand) (dv : Nat → Efab) (d' : Efab) (k : Nat) :
     cdEnd c < k → dvSnoc c dv d' k = d' := by
   intro h; simp [dvSnoc, show ¬ k ≤ cdEnd c by omega]
 
-/-- THE PROGRAM-SIDE EXTENSION THEOREM (the `HEone` block shape).  Deviation 2: the
-fetch-inertness premise. -/
+/-- (Lean-only, deviation 2) The realizing wlabel is never a fetch: it is pinned to any image. -/
+theorem WeakRvwmoCert.hlblRealizesPin (im : Image) (p : Pexv6) (ws : Wstate) (lb : Lbl)
+    (l : Wlabel) : hlblRealizes p ws lb l → WeakAxRealize.fetchPin im l := by
+  rintro ⟨-, -, -, hpr⟩
+  cases l with
+  | LIFetch base tvs => simp [projLbl] at hpr
+  | _ => trivial
+
+/-- (Lean-only, deviation 2) … and neither end of a fused pair is. -/
+theorem WeakRvwmoCert.hlblRealizesPairPin (im : Image) (p pm : Pexv6) (ws : Wstate) (lb : Lbl)
+    (l1 l2 : Wlabel) :
+    hlblRealizesPair p pm ws lb l1 l2 →
+      WeakAxRealize.fetchPin im l1 ∧ WeakAxRealize.fetchPin im l2 := by
+  rintro ⟨_, _, _, _, _, _, _, _, rfl, rfl, -⟩
+  exact ⟨trivial, trivial⟩
+
+/-- THE PROGRAM-SIDE EXTENSION THEOREM (the `HEone` block shape).  Deviation 2: the pinned LTS;
+the block's administrative labels are pinned. -/
 theorem execProgOk'Snoc (c : Cand) (i : Nat) (p pa : Pexv6) (da : Efab) (ls : List Wlabel)
     (l : Wlabel) (lb : Lbl) (p' : Pexv6) (d' : Efab) (pst : Nat → List Pexv6)
     (dv : Nat → Efab) :
-    execProgOk' pstepEv pclsEv pst dv (candExec c) →
+    execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst dv (candExec c) →
     (pst (cdEnd c))[i]? = some p →
     admRun true p (dv (cdEnd c)) ls pa da →
+    (∀ l0, l0 ∈ ls → WeakAxRealize.fetchPin c.cdImg l0) →
     hlblRealizes pa ((candLastSt c).msWs i) lb l →
-    lbFetchInert (candLastSt c) i l →
     pstepEv pa da l p' d' →
-    execProgOk' pstepEv pclsEv (pstSnoc c pst i p') (dvSnoc c dv d')
+    execProgOk' (pstepPin c.cdImg pstepEv) pclsEv (pstSnoc c pst i p') (dvSnoc c dv d')
       (candExec (candSnoc c ⟨i, lb⟩)) := by
-  intro hpo hp hrun hre hfi hst k s hs
+  intro hpo hp hrun hpin hre hst k s hs
   change (c.cdTr ++ [⟨i, lb⟩])[k]? = some s at hs
   have hlt := lookup_lt_Some hs
   simp only [List.length_append, List.length_singleton] at hlt
@@ -421,24 +445,27 @@ theorem execProgOk'Snoc (c : Cand) (i : Nat) (p pa : Pexv6) (da : Efab) (ls : Li
       pstSnocGt c pst i p' (cdEnd c + 1) (by omega),
       dvSnocLe c dv d' (cdEnd c) (Nat.le_refl _), dvSnocGt c dv d' (cdEnd c + 1) (by omega),
       candSnocLastSt]
-    exact ⟨hp, rfl, admRunStar _ _ _ _ _ _ hrun,
-      Or.inl ⟨l, (hlblRealizesAx _ _ _ _ _).2 ⟨hre, hfi⟩, hst⟩⟩
+    exact ⟨hp, rfl, admRunPin _ _ _ _ _ _ _ hrun hpin,
+      Or.inl ⟨l, (hlblRealizesAx _ _ _ _ _).2 hre,
+        hst, WeakRvwmoCert.hlblRealizesPin _ _ _ _ _ hre⟩⟩
 
-/-- … and the `HEpair` block shape (a fused exclusive pair). -/
+/-- … and the `HEpair` block shape (a fused exclusive pair).  Deviation 2. -/
 theorem execProgOk'SnocPair (c : Cand) (i : Nat) (p pa : Pexv6) (da : Efab)
     (ls1 : List Wlabel) (l1 l2 : Wlabel) (lb : Lbl) (pm : Pexv6) (dm : Efab)
     (ls2 : List Wlabel) (pm2 : Pexv6) (dm2 : Efab) (p' : Pexv6) (d' : Efab)
     (pst : Nat → List Pexv6) (dv : Nat → Efab) :
-    execProgOk' pstepEv pclsEv pst dv (candExec c) →
+    execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst dv (candExec c) →
     (pst (cdEnd c))[i]? = some p →
     admRun true p (dv (cdEnd c)) ls1 pa da →
+    (∀ l0, l0 ∈ ls1 → WeakAxRealize.fetchPin c.cdImg l0) →
     hlblRealizesPair pa pm2 ((candLastSt c).msWs i) lb l1 l2 →
     pstepEv pa da l1 pm dm →
     admRun false pm dm ls2 pm2 dm2 →
+    (∀ l0, l0 ∈ ls2 → WeakAxRealize.fetchPin c.cdImg l0) →
     pstepEv pm2 dm2 l2 p' d' →
-    execProgOk' pstepEv pclsEv (pstSnoc c pst i p') (dvSnoc c dv d')
+    execProgOk' (pstepPin c.cdImg pstepEv) pclsEv (pstSnoc c pst i p') (dvSnoc c dv d')
       (candExec (candSnoc c ⟨i, lb⟩)) := by
-  intro hpo hp hrun hre hs1 hrun2 hs2 k s hs
+  intro hpo hp hrun hpin1 hre hs1 hrun2 hpin2 hs2 k s hs
   change (c.cdTr ++ [⟨i, lb⟩])[k]? = some s at hs
   have hlt := lookup_lt_Some hs
   simp only [List.length_append, List.length_singleton] at hlt
@@ -462,9 +489,10 @@ theorem execProgOk'SnocPair (c : Cand) (i : Nat) (p pa : Pexv6) (da : Efab)
       pstSnocGt c pst i p' (cdEnd c + 1) (by omega),
       dvSnocLe c dv d' (cdEnd c) (Nat.le_refl _), dvSnocGt c dv d' (cdEnd c + 1) (by omega),
       candSnocLastSt]
-    exact ⟨hp, rfl, admRunStar _ _ _ _ _ _ hrun,
-      Or.inr ⟨pm, dm, pm2, dm2, l1, l2, (hlblRealizesPairAx _ _ _ _ _ _ _).1 hre, hs1,
-        admRunStar _ _ _ _ _ _ hrun2, hs2⟩⟩
+    have hpp := WeakRvwmoCert.hlblRealizesPairPin c.cdImg _ _ _ _ _ _ hre
+    exact ⟨hp, rfl, admRunPin _ _ _ _ _ _ _ hrun hpin1,
+      Or.inr ⟨pm, dm, pm2, dm2, l1, l2, (hlblRealizesPairAx _ _ _ _ _ _ _).1 hre, ⟨hs1, hpp.1⟩,
+        admRunPin _ _ _ _ _ _ _ hrun2 hpin2, ⟨hs2, hpp.2⟩⟩⟩
 
 /-! ## 5.2 The relp bridge -/
 
@@ -532,20 +560,21 @@ noncomputable def smPst (cpu : CPU) (rs : RegFile) (ib : Ibch) : Nat → List Pe
 def smDv (d0 : Efab) : Nat → Efab := fun _ => d0
 
 theorem smProg0 (img : Image) (cpu : CPU) (rs : RegFile) (ib : Ibch) (d0 : Efab) :
-    execProgOk' pstepEv pclsEv (smPst cpu rs ib) (smDv d0) (candExec (smC img)) := by
+    execProgOk' (pstepPin img pstepEv) pclsEv (smPst cpu rs ib) (smDv d0)
+      (candExec (smC img)) := by
   intro k s hs
   change ([] : List Estep)[k]? = some s at hs
   simp at hs
 
 theorem smSnocProg (img : Image) (cpu : CPU) (rs : RegFile) (ib : Ibch) (d0 : Efab) :
-    execProgOk' pstepEv pclsEv
+    execProgOk' (pstepPin img pstepEv) pclsEv
       (pstSnoc (smC img) (smPst cpu rs ib) 0 (evP1 cpu rs ib))
       (dvSnoc (smC img) (smDv d0) d0)
       (candExec (candSnoc (smC img) ⟨0, smLb⟩)) :=
   execProgOk'Snoc (smC img) 0 (evP0 cpu rs ib) (evP0 cpu rs ib) d0 [] (evWl ib) smLb
     (evP1 cpu rs ib) d0 (smPst cpu rs ib) (smDv d0)
-    (smProg0 img cpu rs ib d0) rfl (.ARnil _ _)
-    (by rw [smWs]; exact evRealizes cpu rs ib) trivial (evPstep cpu rs ib d0)
+    (smProg0 img cpu rs ib d0) rfl (.ARnil _ _) (fun _ h => absurd h List.not_mem_nil)
+    (by rw [smWs]; exact evRealizes cpu rs ib) (evPstep cpu rs ib d0)
 
 /-- The LATEST-source read is non-vacuous too: over a TOTAL image the latest-source label of ANY
 footprint is appendable, at any agent and any annotation. -/
@@ -566,7 +595,7 @@ theorem candExtendBlockNonempty :
       c.cdTr = [] ∧
       srvwmoConsistent (candSnoc c s) ∧
       cdLogEnd (candSnoc c s) ≠ [] ∧
-      execProgOk' pstepEv pclsEv pst dv (candExec (candSnoc c s)) :=
+      execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst dv (candExec (candSnoc c s)) :=
   ⟨smC (fun _ => none), ⟨0, smLb⟩,
     pstSnoc (smC (fun _ => none)) (smPst ⟨0, by decide⟩ evRs0 ibNone) 0
       (evP1 ⟨0, by decide⟩ evRs0 ibNone),

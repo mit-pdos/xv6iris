@@ -32,12 +32,13 @@ closing comment enumerates FIVE obligations (O1–O5) for the CONFORMANCE restri
    `filter (fun s => decide (s.esAg = i))`; `agent → pexv6` ↦ `Nat → Pexv6`; `RacyF` ↦ `racyF`,
    `RacyD` ↦ `racyD`; `tc_mono` ↦ `tcMono`.  `dev_state` ↦ `Efab` (the event instance's fabric,
    `WeakEvPf` deviation 9 / owner decision Q1).
-2. O2 / D1 — THE FETCH-INERTNESS OBLIGATION (`WeakRvwmoFab` deviation 2): `fconfSupply` takes
-   `candFetchInertF boot N c`.  So the supply conjunct of `fconfRealize`,
-   `hullRealizableOfAcyclicF` and `t2linSupplyF` is Rocq's
-   `trDevOrdered GF' c → ∃ pst, …` with the extra premise:
-   `trDevOrdered GF' c → candFetchInertF boot N c → ∃ pst, …`.  Every other conjunct is Rocq's.
-   The consumer discharges it at the candidate it receives.
+2. O2 / STAGE C — THE PINNED LTS (`WeakRvwmoFab` deviation 2; owner ruling Q-C1).
+   `gfexecConf` carries `emFetchImg GF.gfGd.gdG.gxImg em` per row; `gfexecConfRen` /
+   `gfexecConfHull` transport it (`emFetchImgRen`, `emFetchImgPrefix`; the image is fixed by the
+   renaming and the hull).  `fconfSupply` supplies the trace at the PINNED LTS, so the supply
+   conjunct of `fconfRealize`, `hullRealizableOfAcyclicF` and `t2linSupplyF` is Rocq's
+   `trDevOrdered GF' c → ∃ pst, …` with `exec_prog_ok' pstep_ev …` read as
+   `execProgOk' (pstepPin c.cdImg pstepEv) …`.  Stage B's `candFetchInertF` premise is gone.
 3. PROOFS: per-constructor induction and `omega`; Rocq's `vm_compute` / `reflexivity` on `lbg`'s
    linearization ↦ the Lean-only `WeakRvwmoFabInd.lbgGlinEids` (`decide +kernel`) plus `rfl`;
    Lean-only `WeakRvwmoFabInd.eadmTag` (administrative items carry no tag).  Rocq's
@@ -295,7 +296,7 @@ theorem gfexecConfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : Efab)
     obtain ⟨row, hrow, hlt⟩ := hbnd n i k hn
     exact ⟨row.map (lblRen π), rowsRelRow π _ _ i row hrr hrow, by rw [List.length_map]; exact hlt⟩
   · intro i row' hrow'
-    obtain ⟨_, hprog, _⟩ := hrr
+    obtain ⟨_, hprog, _⟩ := id hrr
     rw [hprog, List.getElem?_map] at hrow'
     cases hrow0 : GF.gfGd.gdG.gxProg[i]? with
     | none => rw [hrow0] at hrow'; simp at hrow'
@@ -303,8 +304,8 @@ theorem gfexecConfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : Efab)
       rw [hrow0] at hrow'
       simp only [Option.map_some, Option.some.injEq] at hrow'
       subst hrow'
-      obtain ⟨em, dvi, dvo, hem, hiff, hpin, hdep⟩ := hc i row hrow0
-      refine ⟨emRen π em, dvi, dvo, hartConffRen π i row (boot i) dvi dvo em hem, ?_, ?_, ?_⟩
+      obtain ⟨em, dvi, dvo, hem, hiff, hpin, hfi, hdep⟩ := hc i row hrow0
+      refine ⟨emRen π em, dvi, dvo, hartConffRen π i row (boot i) dvi dvo em hem, ?_, ?_, ?_, ?_⟩
       · intro k hk
         rw [List.length_map] at hk
         rw [hdev, isDevBlockRen]
@@ -312,6 +313,8 @@ theorem gfexecConfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : Efab)
       · intro k n hn
         rw [hdev] at hn
         exact hpin k n hn
+      · rw [rowsRelImg π _ _ hrr]
+        exact emFetchImgRen π _ em hfi
       · intro jk hjk
         rw [hdeps]
         apply hdep
@@ -356,10 +359,10 @@ theorem gfexecConfHull (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
         rw [hrow] at hrow'
         simp only [Option.bind_some, Option.some.injEq] at hrow'
         subst hrow'
-        obtain ⟨em, dvi, dvo, hem, hiff, hpin, hdep⟩ := hc i row hrow
+        obtain ⟨em, dvi, dvo, hem, hiff, hpin, hfi, hdep⟩ := hc i row hrow
         obtain ⟨em', hem', hpre, hdevb⟩ := hartConffPrefix i row (boot i) dvi dvo em c hem
         refine ⟨emRen (hren GF.gfGd.gdG cs) em', dvi, dvo,
-          hartConffRen _ _ _ _ _ _ _ hem', ?_, ?_, ?_⟩
+          hartConffRen _ _ _ _ _ _ _ hem', ?_, ?_, ?_, ?_⟩
         · intro k hk
           rw [List.length_map, List.length_take] at hk
           have hkc : k < c := by omega
@@ -369,6 +372,7 @@ theorem gfexecConfHull (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
           exact ⟨fun h => ⟨h, gcutIntro cs (i, k) c hcs hkc⟩, fun h => h.1⟩
         · intro k n hn
           exact hpin k n (gfHullDevLookup GF cs n (i, k) hdc hn)
+        · exact emFetchImgRen _ _ em' (emFetchImgPrefix _ em em' hpre hfi)
         · intro jk hjk
           simp only [emRen] at hjk
           rw [rowDepsRen] at hjk
@@ -405,7 +409,7 @@ def trDevOrdered (GF : Gfexec) (c : Cand) : Prop :=
     (s.esAg, tcnt s.esAg (c.cdTr.take k)) ∈ GF.gfDev →
     GF.gfDev[dcnt GF c.cdTr k]? = some (s.esAg, tcnt s.esAg (c.cdTr.take k))
 
-/-- (Deviation 2: the supply also needs `candFetchInertF`.) -/
+/-- (Deviation 2: the supply at the pinned LTS.) -/
 theorem fconfRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     (GF : Gfexec) (N : Nat) :
     gfexecConsistent GF →
@@ -420,10 +424,11 @@ theorem fconfRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
       gfexecConf boot d0 fab GF' ∧
       (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) =
         (GF'.gfGd.gdG.gxProg[i]?).getD []) ∧
-      (trDevOrdered GF' c → candFetchInertF boot N c →
+      (trDevOrdered GF' c →
         ∃ pst : Nat → List Pexv6,
           pst 0 = (List.range' 0 N).map boot ∧
-          execProgOk' pstepEv pclsEv pst (fun k => fab (dcnt GF' c.cdTr k)) (candExec c)) := by
+          execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun k => fab (dcnt GF' c.cdTr k))
+            (candExec c)) := by
   intro hc hconf hacy hN
   have hcons : rvwmoMinusDepsConsistent GF.gfGd := hc.1
   have hacyD : ∀ x, ¬ tc (racyD GF.gfGd) x x := fun x hcyc =>
@@ -433,11 +438,13 @@ theorem fconfRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
   have hconf' : gfexecConf boot d0 fab ⟨GD', GF.gfDev⟩ :=
     gfexecConfRen pi boot d0 fab GF ⟨GD', GF.gfDev⟩ hrr hdeps rfl hconf
   obtain ⟨c, hsr, himg, hrow, _⟩ := rule14Linearization GD'.gdG hcons'.1 h14
-  refine ⟨c, pi, ⟨GD', GF.gfDev⟩, hsr, ?_, hrr, rfl, hconf', hrow, fun hord hfi => ?_⟩
+  refine ⟨c, pi, ⟨GD', GF.gfDev⟩, hsr, ?_, hrr, rfl, hconf', hrow, fun hord => ?_⟩
   · rw [himg, rowsRelImg pi _ _ hrr]
   · obtain ⟨pst, hpst0, _, hprg⟩ := fconfSupply c boot d0 fab ⟨GD', GF.gfDev⟩ N hconf' hrow
-      (by rw [rowsRelNharts pi _ _ hrr]; exact hN) hord hfi
-    exact ⟨pst, hpst0, hprg⟩
+      (by rw [rowsRelNharts pi _ _ hrr]; exact hN) hord
+    refine ⟨pst, hpst0, ?_⟩
+    rw [himg]
+    exact hprg
 
 /-! ### 4.2 The hull instance -/
 
@@ -455,10 +462,11 @@ theorem hullRealizableOfAcyclicF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat �
       gfexecConf boot d0 fab GF' ∧
       (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) =
         (((gxHull GF.gfGd.gdG cs).gxProg[i]?).getD []).map (lblRen pi)) ∧
-      (trDevOrdered GF' c → candFetchInertF boot N c →
+      (trDevOrdered GF' c →
         ∃ pst : Nat → List Pexv6,
           pst 0 = (List.range' 0 N).map boot ∧
-          execProgOk' pstepEv pclsEv pst (fun k => fab (dcnt GF' c.cdTr k)) (candExec c)) := by
+          execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun k => fab (dcnt GF' c.cdTr k))
+            (candExec c)) := by
   intro hc hconf hpc hacy hN
   have hok : hullOk GF.gfGd.gdG cs := properCutOk _ _ hpc.1
   have hch : gfexecConsistent (gfHull GF cs) := gfHullConsistent GF cs hc hok hpc.2
@@ -523,10 +531,11 @@ theorem t2linSupplyF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
       c.cdImg = GF.gfGd.gdG.gxImg ∧
       GF'.gfDev = GF.gfDev ∧
       gfexecConf boot d0 fab GF' ∧
-      (trDevOrdered GF' c → candFetchInertF boot N c →
+      (trDevOrdered GF' c →
         ∃ pst : Nat → List Pexv6,
           pst 0 = (List.range' 0 N).map boot ∧
-          execProgOk' pstepEv pclsEv pst (fun k => fab (dcnt GF' c.cdTr k)) (candExec c)) := by
+          execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun k => fab (dcnt GF' c.cdTr k))
+            (candExec c)) := by
   intro hk hcons hconf hN
   obtain ⟨c, pi, GF', hsr, himg, _, hdev, hconf', _, hsup⟩ :=
     fconfRealize boot d0 fab GF N hcons hconf (t2linOfCycleKillF boot d0 fab hk GF hcons hconf) hN

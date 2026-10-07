@@ -45,15 +45,10 @@ price, and they are conversions.
    `WeakErase` deviation 6):
    - `refuseStep` gains the `PFIFetch` arm (kept by `RFKeep`: a fetch is `lbFused`; log-only side
      condition, identity post-state, the pending invariant carried verbatim).
-   - `refuseBridgeLog` and `t2Bridge` gain the premise `pstepNoFetch pstep`.  REASON:
-     `wpPfBridgeLog` now asks for `pfRunFetchOk` of the RE-FUSED run, which exists only inside the
-     proof; its clause (ii) (`wsEqr (loadPostRun ws false base ts) ws`) is a self-relation of each
-     side that `rfWs` (a `≤`-relation) does not transport.  For a fetch-free program it is
-     discharged by `pfRunFetchOkNoFetch` through `refusePstepNoFetch` (and, for `t2Bridge`,
-     `erasePstepNoFetch`).  Rocq's alphabet has no fetch, so the premise is the Lean form of a
-     Rocq truism.  For a program that DOES fetch, the Lean-only `refuseBridgeLogFetch` /
-     `t2BridgeFetch` carry the bridge's premise on every re-fused run instead.
-   - Lean-only helpers: `refusePstepNoFetch`, `refuseBridgeLogFetch`, `t2BridgeFetch`.
+   - STAGE C (owner ruling Q-C3, `notes/weak-port-o2-stageC.md`): the bridge treats a fetch as a
+     stutter (`WeakPromiseBridge` deviation 6), so `refuseBridgeLog` and `t2Bridge` have Rocq's
+     statements (Stage B's `pstepNoFetch` premise, `refusePstepNoFetch`, `refuseBridgeLogFetch`
+     and `t2BridgeFetch` are deleted).
 
 **Rocq → Lean name map.**  `ws_res_set_idem` ↦ `wsResSetIdem`; `ctrl_post_res_set` ↦
 `ctrlPostResSet`; `load_post_at_res` ↦ `loadPostAtRes`; `load_post_at_res_None` ↦
@@ -343,14 +338,6 @@ theorem refusePstepLatFree :
   | RFKeep l p' d' _ hs => exact hlf _ _ _ _ _ hs
   | RFDrop => trivial
   | RFFuse => trivial
-
-/-- Lean-only (deviation 4): re-fusion never INTRODUCES a fetch. -/
-theorem refusePstepNoFetch : pstepNoFetch pstep → pstepNoFetch (refusePstep pstep) := by
-  intro h p d l p' d' hs base tvs heq
-  cases hs with
-  | RFKeep l p' d' _ hs => exact h _ _ _ _ _ hs base tvs heq
-  | RFDrop => cases heq
-  | RFFuse => cases heq
 
 /-! ## 5. The configuration relation -/
 
@@ -646,31 +633,17 @@ theorem refuseRun (img : Image) (d0 : D) (ps : List P) (c : Wpcfg P D) :
   obtain ⟨agF, hlke, hst, _⟩ := hags i agS hlk
   exact ⟨agF, hlke, hst⟩
 
-/-- Lean-only (deviation 4): the stage-2 payoff for a program that may FETCH — the bridge's
-fetch premise is carried on every re-fused run from the initial configuration. -/
-theorem refuseBridgeLogFetch (img : Image) (d0 : D) (ps : List P) (c : Wpcfg P D) :
+/-- STAGE 2's PAYOFF: T2 containment for a DEPENDENCY-FREE run that emits the SPLIT alphabet;
+`wpPfBridgeLog`'s `pstepFused` premise is discharged by construction. -/
+theorem refuseBridgeLog (img : Image) (d0 : D) (ps : List P) (c : Wpcfg P D) :
     pclsErasable pcls → pclsFusable pstep pcls → pstepDepfree pstep →
-    (∀ cF, rtc (wpPfRun (refusePstep pstep) pcls) (wpInit img d0 ps) cF →
-      pfRunFetchOk (refusePstep pstep) pcls (wpInit img d0 ps) cF) →
     rtc (wpPfRun pstep pcls) (wpInit img d0 ps) c →
     ∃ E, execWf E ∧ exImg E = img ∧ exLog E = c.pcLog := by
-  intro hcls hfus hdf hfo hrun
+  intro hcls hfus hdf hrun
   obtain ⟨cF, hrunF, _, hlog, _⟩ := refuseRun pstep pcls img d0 ps c hcls hfus hdf hrun
   obtain ⟨E, hE, hEimg, hElog⟩ := wpPfBridgeLog (refusePstep pstep) pcls img d0 ps cF
-    (refusePstepDepfree pstep hdf) (refusePstepFused pstep) (hfo cF hrunF) hrunF
+    (refusePstepDepfree pstep hdf) (refusePstepFused pstep) hrunF
   exact ⟨E, hE, hEimg, hElog.trans hlog⟩
-
-/-- STAGE 2's PAYOFF: T2 containment for a DEPENDENCY-FREE run that emits the SPLIT alphabet;
-`wpPfBridgeLog`'s `pstepFused` premise is discharged by construction.  Deviation 4: the
-Lean-only `pstepNoFetch` (vacuous in Rocq's fetch-free alphabet). -/
-theorem refuseBridgeLog (img : Image) (d0 : D) (ps : List P) (c : Wpcfg P D) :
-    pclsErasable pcls → pclsFusable pstep pcls → pstepDepfree pstep → pstepNoFetch pstep →
-    rtc (wpPfRun pstep pcls) (wpInit img d0 ps) c →
-    ∃ E, execWf E ∧ exImg E = img ∧ exLog E = c.pcLog := by
-  intro hcls hfus hdf hnf hrun
-  exact refuseBridgeLogFetch pstep pcls img d0 ps c hcls hfus hdf
-    (fun cF _ => pfRunFetchOkNoFetch (refusePstep pstep) pcls _ cF
-      (refusePstepNoFetch pstep hnf)) hrun
 
 end refuse
 
@@ -691,31 +664,16 @@ theorem pclsFusableErase :
   obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := hl0
   exact (hfu _ _ _ _ _ _ _ _ _ aq tvs wF wS hs hrelp).trans (her _ _ wS wS rfl).symm
 
-/-- Lean-only (deviation 4): T2 for the dependency-carrying, split instance of a program that may
-FETCH — the bridge's premise is carried on the re-fused erased runs. -/
-theorem t2BridgeFetch (img : Image) (d0 : D) (ps : List P) (c : Wpcfg P D) :
-    pclsErasable pcls → pclsFusable pstep pcls →
-    (∀ cF, rtc (wpPfRun (refusePstep (erasePstep pstep)) pcls) (wpInit img d0 ps) cF →
-      pfRunFetchOk (refusePstep (erasePstep pstep)) pcls (wpInit img d0 ps) cF) →
-    rtc (wpPfRun pstep pcls) (wpInit img d0 ps) c →
-    ∃ E, execWf E ∧ exImg E = img ∧ exLog E = c.pcLog := by
-  intro hcls hfus hfo hrun
-  obtain ⟨ce, hrune, hme⟩ := eraseRtc pstep pcls _ _ c hcls (erCfgInit img d0 ps) hrun
-  obtain ⟨E, hE, himg, hlog⟩ := refuseBridgeLogFetch (erasePstep pstep) pcls img d0 ps ce hcls
-    (pclsFusableErase pstep pcls hcls hfus) (erasePstepDepfree pstep) hfo hrune
-  exact ⟨E, hE, himg, hlog.trans (erCfgLog _ _ hme)⟩
-
 /-- T2 FINAL for the dependency-carrying, split-alphabet instance: no `pstepDepfree`, no
-`pstepFused`, NO PAIRING PREMISE.  Deviation 4: the Lean-only `pstepNoFetch`. -/
+`pstepFused`, NO PAIRING PREMISE. -/
 theorem t2Bridge (img : Image) (d0 : D) (ps : List P) (c : Wpcfg P D) :
-    pclsErasable pcls → pclsFusable pstep pcls → pstepNoFetch pstep →
+    pclsErasable pcls → pclsFusable pstep pcls →
     rtc (wpPfRun pstep pcls) (wpInit img d0 ps) c →
     ∃ E, execWf E ∧ exImg E = img ∧ exLog E = c.pcLog := by
-  intro hcls hfus hnf hrun
+  intro hcls hfus hrun
   obtain ⟨ce, hrune, hme⟩ := eraseRtc pstep pcls _ _ c hcls (erCfgInit img d0 ps) hrun
   obtain ⟨E, hE, himg, hlog⟩ := refuseBridgeLog (erasePstep pstep) pcls img d0 ps ce hcls
-    (pclsFusableErase pstep pcls hcls hfus) (erasePstepDepfree pstep)
-    (erasePstepNoFetch pstep hnf) hrune
+    (pclsFusableErase pstep pcls hcls hfus) (erasePstepDepfree pstep) hrune
   exact ⟨E, hE, himg, hlog.trans (erCfgLog _ _ hme)⟩
 
 end compose

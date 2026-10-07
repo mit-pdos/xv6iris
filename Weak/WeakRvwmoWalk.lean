@@ -40,18 +40,19 @@ the empty trace over `G.gxImg` with `pst` constantly `boot <$> seq 0 N`.
    `CSt`/`Cand` literals ↦ anonymous constructors; `gmsg` ↦ `WeakRvwmoKillArms.gmsg` (the one
    Rocq's import order resolves to); `seq 0 N` ↦ `List.range' 0 N`; `bool_decide (k ≤ kz)` ↦
    the decidable `if`.  Rocq's `ofence` is the local notation `Ofence`.
-2. O2 / D1 — FETCH-INERTNESS (cross-file fact `WeakRvwmoCert2`): the policies handed to
-   `segStepOfSegment` must return `lbFetchInert (candLastSt c0) x l'`.  A row LOAD may be
-   realized by a FETCH (`hlblRealizesLoadShape`'s third case), and nothing in the walk's data
-   speaks of the candidate's `Wstate` at a fetch, so the site datum carries it:
-   - the Lean-only `WeakRvwmoWalk.wfetchSite d0 Nd x p` — every block at a reachable node of
-     row position `p` whose label is admissible at a candidate whose hart-`x` count is `p` has a
-     fetch-inert realizing wlabel there (vacuous unless the wlabel is a fetch);
-   - `wsiteOk` gains it as a sixth conjunct (and `WeakRvwmoWalk2.wsiteOk'`/`wsiteSupply` as
-     theirs);
-   - `wpol` and `wblkPolAt` (and `wpol'`/`wblkPolAt'`) gain the conclusion conjunct
-     `lbFetchInert (candLastSt c0) x l'` right after `mstepOk`, in `segStepOfSegment`'s order.
-   `wpolFlat` (the refuted, over-quantified policy; no segment is built from it) is Rocq's.
+2. O2 / STAGE C — THE PINNED POLICY (`WeakRvwmoCert2` deviation 4, `WeakRvwmoCert4` deviation 4).
+   The fetch is administrative, so Stage B's fetch-inertness datum (`wfetchSite`, the sixth
+   conjunct of `wsiteOk`) and the `lbFetchInert` conjunct of the policies are DELETED: `wsiteOk`
+   is Rocq's four conjuncts again.  `segStepOfSegment`'s policy takes and returns
+   `WeakRvwmoCert2.cblkPin c0.cdImg` blocks (admin labels pinned to the candidate's image), so:
+   - `wpol` and `wblkPolAt` take and return `cblkPin c0.cdImg` blocks (the true route mirrors
+     through `WeakRvwmoCert2.certBlockMirrorG` at `lbPin c0.cdImg`);
+   - the witness datum `wwitNd` is stated on PINNED blocks, at any image: `∀ im`, a block pinned
+     to `im` has its witness re-run pinned to `im` (Rocq: plain `cblk`);
+   - `wlkSegOfCert` takes `WeakRvwmoCert2.esPin St.cstC.cdImg es` after `LDev ∉ es.map
+     Prod.fst` (`segStepOfSegment`'s new premise; `WeakRvwmoWalk2.wemit` carries it).
+   `wpolFlat` (the refuted, over-quantified policy; no segment is built from it), `wrdsFree`,
+   `wndOk` keep Rocq's unpinned `cblk`.
 3. `rdsOkDec`'s case split is classical (`Classical.em`), Rocq's `decide` over `Forall` (here
    in `WeakRvwmoWalk2`); `wsrcOrWwit` likewise splits on `∃ t ∈ ts, n < t` by `by_cases`.
 
@@ -75,11 +76,11 @@ the empty trace over `G.gxImg` with `pst` constantly `boot <$> seq 0 N`.
 `walk_policy_steps` `walkPolicySteps`, `walk_supply_of_policy` `walkSupplyOfPolicy`.
 
 **File-qualified names:** `WeakRvwmoWalk.wsrcLe`, `WeakRvwmoWalk.gmsgByte` (in
-`notes/weak-port-dupnames.json`); Lean-only: `WeakRvwmoWalk.wfetchSite` (deviation 2),
+`notes/weak-port-dupnames.json`); Lean-only:
 `WeakRvwmoWalk.wlognLe`/`WeakRvwmoWalk.wlognGt` (the two `wlogn` branches, Rocq's inline
 `bool_decide_eq_true_2`/`bool_decide_eq_false_2` rewrites).
 
-**Dropped:** none (§1–§4: Rocq 60 declarations; Lean 63 = 60 + the 3 Lean-only).
+**Dropped:** none (§1–§4: Rocq 60 declarations; Lean 62 = 60 + the 2 Lean-only).
 -/
 import Weak.WeakRvwmoGlue2
 
@@ -586,17 +587,21 @@ def wpolFlat (G : Gexec) (W : Geid → Prop) (x : Nat) (cpu : CPU) (d0 : Efab) (
       wclsAt G W x c0 lb' ∧
       dregAgree (fun nn => nn ∉ T) rs1' rs2'
 
-/-- THE WITNESS SITE DATUM's machine-side clause. -/
+/-- THE WITNESS SITE DATUM's machine-side clause (deviation 2: on blocks pinned to any image
+`im`). -/
 def wwitNd (d0 : Efab) (T : List Nat) (Nd : Nat → CPU → SailM Unit → Prop) (p : Nat) : Prop :=
-  ∀ (cpu : CPU) (ws : Wstate) (aq : Bool) (base : Int) (ts : List Nat) (vs : List (BitVec 8))
+  ∀ (im : Image) (cpu : CPU) (ws : Wstate) (aq : Bool) (base : Int) (ts : List Nat)
+    (vs : List (BitVec 8))
     (l : Wlabel) (rds : List Nat) (wrs : List Register) (m : SailM Unit) (rs : RegFile)
     (fn : Ofence) (ib : Ibch) (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch)
     (tvs2 : List (Nat × BitVec 8)),
     Nd p cpu m →
-    cblk cpu d0 ws (Lbl.LLoad aq base ts vs) l rds wrs m rs fn ib m' rs' fn' ib' →
+    WeakRvwmoCert2.cblkPin im cpu d0 ws (Lbl.LLoad aq base ts vs) l rds wrs m rs fn ib m' rs'
+      fn' ib' →
     tvs2.length = ts.length →
     ∃ (l2 : Wlabel) (rds2 : List Nat) (wrs2 : List Register) (m2 : SailM Unit),
-      cblk cpu d0 ws (Lbl.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd))
+      WeakRvwmoCert2.cblkPin im cpu d0 ws
+        (Lbl.LLoad aq base (tvs2.map Prod.fst) (tvs2.map Prod.snd))
         l2 rds2 wrs2 m rs fn ib m2 rs' fn' ib' ∧
       csync T m' rs' fn' ib' m2 rs' fn' ib'
 
@@ -609,27 +614,13 @@ def wwitSite (G : Gexec) (d0 : Efab) (T : List Nat) (Nd : Nat → CPU → SailM 
      aq = false ∧ latestBytesOk c base ts.length) ∧
   wwitNd d0 T Nd p
 
-/-- (Lean-only, deviation 2) THE FETCH-INERTNESS SITE DATUM: every block at a reachable node of
-row position `p`, admissible at a candidate whose hart-`x` count is `p`, has a fetch-inert
-realizing wlabel there (vacuous unless that wlabel is a fetch). -/
-def WeakRvwmoWalk.wfetchSite (d0 : Efab) (Nd : Nat → CPU → SailM Unit → Prop) (x p : Nat) :
-    Prop :=
-  ∀ (c : Cand) (cpu : CPU) (ws : Wstate) (lb : Lbl) (l : Wlabel) (rds : List Nat)
-    (wrs : List Register) (m : SailM Unit) (rs : RegFile) (fn : Ofence) (ib : Ibch)
-    (m' : SailM Unit) (rs' : RegFile) (fn' : Ofence) (ib' : Ibch),
-    srvwmoConsistent c → gcnt x c.cdTr = p → Nd p cpu m →
-    cblk cpu d0 ws lb l rds wrs m rs fn ib m' rs' fn' ib' →
-    mstepOk (candLastSt c) x lb →
-    lbFetchInert (candLastSt c) x l
-
-/-- THE SITE DATUM (deviation 2: the sixth conjunct). -/
+/-- THE SITE DATUM. -/
 def wsiteOk (G : Gexec) (d0 : Efab) (T : List Nat) (Nd : Nat → CPU → SailM Unit → Prop)
     (n : Nat) (x : Nat) (p : Nat) (lb : Lbl) : Prop :=
   gxLbl G (x, p) = some lb ∧
   (lbIsW lb = true → gwix G (x, p) = n + 1) ∧
   lbRmwfree lb ∧
-  (wwit G n (x, p) → wwitSite G d0 T Nd n x p) ∧
-  WeakRvwmoWalk.wfetchSite d0 Nd x p
+  (wwit G n (x, p) → wwitSite G d0 T Nd n x p)
 
 /-- The log length a candidate at row position `k` of the segment carries. -/
 def wlogn (n kz k : Nat) : Nat :=
@@ -664,7 +655,7 @@ theorem wQLbl (G : Gexec) (d0 : Efab) (T : List Nat) (Nd : Nat → CPU → SailM
 
 /-! ## 4.0c THE POLICY AT AN ALIGNED CANDIDATE, AND ITS DISCHARGE -/
 
-/-- (deviation 2: the `lbFetchInert` conjunct.) -/
+/-- (deviation 2: on blocks pinned to the candidate's image.) -/
 def wpol (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T : List Nat)
     (Nd : Nat → CPU → SailM Unit → Prop) (k0 kz : Nat) : Prop :=
   ∀ (k : Nat) (c0 : Cand) (ws : Wstate) (lb : Lbl) (l : Wlabel) (rds : List Nat)
@@ -677,12 +668,11 @@ def wpol (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T : List Nat)
     dregAgree (fun nn => nn ∉ T) rs1 rs2 →
     rdsOk (fun nn => nn ∉ T) rds →
     Nd k cpu m →
-    cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
     ∃ (lb' : Lbl) (l' : Wlabel) (rds' : List Nat) (wrs' : List Register) (rs2' : RegFile)
       (m2' : SailM Unit) (fn2' : Ofence) (ib2' : Ibch),
-      cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m2' rs2' fn2' ib2' ∧
+      WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m2' rs2' fn2' ib2' ∧
       mstepOk (candLastSt c0) x lb' ∧
-      lbFetchInert (candLastSt c0) x l' ∧
       lblReidxW lb lb' ∧
       wclsAt G (wwit G n) x c0 lb' ∧
       csync T m' rs1' fn' ib' m2' rs2' fn2' ib2' ∧
@@ -702,7 +692,7 @@ theorem wclsOfWit (G : Gexec) (W : Geid → Prop) (x : Nat) (c0 : Cand) (base : 
   · intro _ _ hnw
     exact absurd ⟨base, ts.length, ts, vs, hl, rfl, rfl⟩ hnw
 
-/-- THE TWO READ ROUTES, AS ONE BLOCK POLICY (deviation 2: the `lbFetchInert` conjunct). -/
+/-- THE TWO READ ROUTES, AS ONE BLOCK POLICY (deviation 2: on pinned blocks). -/
 theorem wblkPolAt (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T : List Nat)
     (Nd : Nat → CPU → SailM Unit → Prop) (c0 : Cand) (ws : Wstate) (lb : Lbl) (l : Wlabel)
     (rds : List Nat) (wrs : List Register) (m : SailM Unit) (rs1 rs2 : RegFile) (fn : Ofence)
@@ -717,12 +707,11 @@ theorem wblkPolAt (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T : L
     dregAgree (fun nn => nn ∉ T) rs1 rs2 →
     rdsOk (fun nn => nn ∉ T) rds →
     Nd (gcnt x c0.cdTr) cpu m →
-    cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
     ∃ (lb' : Lbl) (l' : Wlabel) (rds' : List Nat) (wrs' : List Register) (rs2' : RegFile)
       (m2' : SailM Unit) (fn2' : Ofence) (ib2' : Ibch),
-      cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m2' rs2' fn2' ib2' ∧
+      WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m2' rs2' fn2' ib2' ∧
       mstepOk (candLastSt c0) x lb' ∧
-      lbFetchInert (candLastSt c0) x l' ∧
       lblReidxW lb lb' ∧
       wclsAt G (wwit G n) x c0 lb' ∧
       csync T m' rs1' fn' ib' m2' rs2' fn2' ib2' ∧
@@ -730,9 +719,9 @@ theorem wblkPolAt (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T : L
   intro hcons hpc hc himg hpfx hctx hsite hag hrds hnd hblk
   have hwf : gwf G := hcons.1
   have hlv : gloadValue G := hcons.2.2.1
-  obtain ⟨hl, hix, hrmw, hwit, hfi⟩ := hsite
-  obtain ⟨rs2', hblk2, hag2⟩ := certBlockMirror (fun nn => nn ∉ T) cpu d0 ws lb l rds wrs
-    m rs1 fn ib m' rs1' fn' ib' rs2 hblk hrds hag
+  obtain ⟨hl, hix, hrmw, hwit⟩ := hsite
+  obtain ⟨rs2', hblk2, hag2⟩ := WeakRvwmoCert2.certBlockMirrorG (WeakRvwmoCert2.lbPin c0.cdImg)
+    (fun nn => nn ∉ T) cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' rs2 hblk hrds hag
   rcases wsrcOrWwit G n (x, gcnt x c0.cdTr) lb hl with hle | hW
   · -- THE TRUE ROUTE
     have hnW : ¬ wwit G n (x, gcnt x c0.cdTr) := wsrcLeNotWwit _ _ _ hle
@@ -747,7 +736,6 @@ theorem wblkPolAt (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T : L
       | LFence pr pw sr sw => exact certFenceOk c0 x pr pw sr sw
       | LRmw => exact hrmw.elim
     exact ⟨lb, l, rds, wrs, rs2', m', fn', ib', hblk2, hok,
-      hfi c0 cpu ws lb l rds wrs m rs2 fn ib m' rs2' fn' ib' hc rfl hnd hblk2 hok,
       lblReidxWRefl lb, wclsOfPfx G (wwit G n) n x c0 lb hpfx hl hnW hix,
       .inl ⟨rfl, rfl, rfl, hag2⟩, fun _ => ⟨rfl, rfl, rfl, hag2⟩⟩
   · -- THE WITNESS ROUTE
@@ -757,15 +745,14 @@ theorem wblkPolAt (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T : L
     obtain ⟨hgs, hvf⟩ := hwit hW
     obtain ⟨haq, hbytes⟩ := hgs c0 aq base ts vs himg hpfx hl'
     subst haq
-    obtain ⟨l2, rds2, wrs2, m2, hblk3, hsync⟩ := hvf cpu ws false base ts vs l rds wrs
+    obtain ⟨l2, rds2, wrs2, m2, hblk3, hsync⟩ := hvf c0.cdImg cpu ws false base ts vs l rds wrs
       m rs2 fn ib m' rs2' fn' ib' (witTvs c0 base ts.length) hnd hblk2
       (witTvsLength c0 base ts.length)
     rw [witTvsLbl c0 false base ts.length] at hblk3
     have hok : mstepOk (candLastSt c0) x (latestReadLbl c0 false base ts.length) :=
       certReadWitness c0 x false base ts.length hc hbytes
     refine ⟨latestReadLbl c0 false base ts.length, l2, rds2, wrs2, rs2', m2, fn', ib', hblk3, hok,
-      hfi c0 cpu ws _ l2 rds2 wrs2 m rs2 fn ib m2 rs2' fn' ib' hc rfl hnd hblk3 hok, ?_,
-      wclsOfWit G (wwit G n) x c0 base ts vs hl' hW,
+      ?_, wclsOfWit G (wwit G n) x c0 base ts vs hl' hW,
       csyncRegs T m' m2 rs2' rs1' rs2' fn' ib' hsync hag2, fun hw => by cases hw⟩
     refine .inr (.inl ?_)
     show false = false ∧ false = false ∧ base = base ∧
@@ -815,7 +802,7 @@ theorem wctxPres (G : Gexec) (d0 : Efab) (T : List Nat) (Nd : Nat → CPU → Sa
   · -- THE EXIT STORE: the log grows by G's (n+1)-st write's message
     subst hkk
     have hw : lbIsW lb = true := hiff.2 rfl
-    obtain ⟨hl, _, hrmw, _, _⟩ := hsite
+    obtain ⟨hl, _, hrmw, _⟩ := hsite
     cases lb with
     | LLoad => cases hw
     | LFence => cases hw
@@ -868,6 +855,7 @@ theorem wlkSegOfCert (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T 
     wndOk cpu d0 (wQ G d0 T Nd n x k0 kz) Nd →
     hemit (fun _ => d0) k0 ws0 rowseg (.PHart cpu m0 rs10 fn0 ib0) es pfin →
     LDev ∉ es.map Prod.fst →
+    WeakRvwmoCert2.esPin St.cstC.cdImg es →
     (∀ i lb, rowseg[i]? = some lb → wQ G d0 T Nd n x k0 kz (k0 + i) lb) →
     cstOk d0 St →
     wctx G n x kz k0 St.cstC →
@@ -881,7 +869,7 @@ theorem wlkSegOfCert (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T 
       St'.cstC.cdImg = St.cstC.cdImg ∧
       St'.cstPst 0 = St.cstPst 0 ∧
       St'.cstDv 0 = St.cstDv 0 := by
-  intro hcons hpc hub hrdsf hNok hem hdev hQ hok hctx hp hnd hsync hrelp
+  intro hcons hpc hub hrdsf hNok hem hdev hes hQ hok hctx hp hnd hsync hrelp
   obtain ⟨hNa, hNb, hNbp⟩ := hNok
   have hwf : gwf G := hcons.1
   obtain ⟨St', tradd, hstep, hctx', himg, hpst0, hdv0, -⟩ :=
@@ -894,13 +882,14 @@ theorem wlkSegOfCert (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T 
       (fun k c0 ws lb l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib' hc hcx hQ0 hrp hag hn0 hblk =>
         wpolOfSites G n x cpu d0 T Nd k0 kz hcons hpc k c0 ws lb l rds wrs m rs1 rs2 fn ib m'
           rs1' fn' ib' hc hcx hQ0 hrp hag
-          (hrdsf cpu ws lb l l rds wrs m rs1 fn ib m' rs1' fn' ib' (.inl hblk)) hn0 hblk)
+          (hrdsf cpu ws lb l l rds wrs m rs1 fn ib m' rs1' fn' ib'
+            (.inl (WeakRvwmoCert2.cblkPinCblk _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hblk))) hn0 hblk)
       (cpolprOfCpolp x cpu d0 T (fun k m => Nd k cpu m) (wctx G n x kz) (wclsAt G (wwit G n) x)
         (wQ G d0 T Nd n x k0 kz)
         (cpolpOfRmwfree x cpu d0 T (wctx G n x kz) (wclsAt G (wwit G n) x)
           (wQ G d0 T Nd n x k0 kz) (fun k lb h => wQRmwfree G d0 T Nd n x k0 kz k lb h)))
       k0 ws0 rowseg es pfin m0 rs10 fn0 ib0 St m20 rs20 fn20 ib20
-      hem hdev hQ hok hctx hp hnd hsync hrelp
+      hem hdev hes hQ hok hctx hp hnd hsync hrelp
   exact ⟨St', tradd, hstep, hctx', himg, hpst0, hdv0⟩
 
 /-! ## 4.2 THE WALK'S SUPPLY, and the theorem -/

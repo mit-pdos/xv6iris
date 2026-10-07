@@ -32,15 +32,13 @@ The kill itself is NOT here (`cycleKill` is a definition; nothing assumes it).  
    `filter (fun s => decide (s.esAg = i))`.  `lbg_grf_01` / `lbg_grf_10` are duplicated Rocq
    names (also in WeakRvwmoKillArms): declared `WeakRvwmoLinInd.lbgGrf01` / `lbgGrf10`.
    `dev_state` ↦ `Efab` (the event instance's fabric, `WeakEvPf` deviation 9 / owner decision Q1).
-2. O2 / D1 — THE FETCH-INERTNESS OBLIGATION (`WeakRvwmoSupply` deviation 2).
-   `supplyOfQconf` takes `candFetchInert boot d0 N c`, and `topoSupply` returns the supply
-   CONDITIONAL on it.  So, exactly as `WeakRvwmoSupply.hullSupply` / `topoSupply`:
-   - `hullRealizableOfAcyclic`: Rocq's `∃ c pst pi, … ∧ pst 0 = … ∧ exec_prog_ok' … ∧ rows`
-     becomes `∃ c pi, … ∧ (candFetchInert boot d0 N c → ∃ pst, pst 0 = … ∧ execProgOk' …) ∧
-     rows` (the `∃ pst` moves under the implication; the other conjuncts are Rocq's).
-   - `t2linSupply`: `∃ c, srvwmoConsistent c ∧ c.cdImg = … ∧ (candFetchInert boot d0 N c →
-     ∃ pst, …)`.
-   The consumer discharges the premise at the candidate it receives.
+2. O2 / STAGE C — THE PINNED LTS (`WeakRvwmoSupply` deviation 2; owner ruling Q-C1).  The
+   fetch is an administrative label pinned to the boot image by `gdexecQconf`'s `emFetchImg`
+   clause, and `supplyOfQconf` / `topoSupply` supply the trace at the PINNED program LTS
+   `pstepPin c.cdImg pstepEv` (a sub-LTS of `pstepEv`, `WeakAxRealize.pstepPinSub`).  So
+   `hullRealizableOfAcyclic` and `t2linSupply` are Rocq's statements (same quantifiers, the
+   `∃ pst` unconditional) with `exec_prog_ok' pstep_ev …` read as
+   `execProgOk' (pstepPin c.cdImg pstepEv) …`.  Stage B's `candFetchInert` conditional is gone.
 3. PROOFS: `omega`/`simp` instead of `lia`/`csimpl`; `vm_compute` ↦ `decide`; Rocq's
    `Print Assumptions` audit is not reproduced (the lint bans axioms).
 
@@ -161,7 +159,7 @@ def cycleKill (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) : Prop 
     (∀ cs, properCut GD.gdG cs → ∀ x, ¬ tc (racyD (gdHull GD cs)) x x) →
     ∀ x, tc (racyD GD) x x → False
 
-/-- THE FORM THE KILL CONSUMES (deviation 2: the supply is conditional on `candFetchInert`). -/
+/-- THE FORM THE KILL CONSUMES (deviation 2: the supply at the pinned LTS). -/
 theorem hullRealizableOfAcyclic (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) (cs : List Nat) (N : Nat) :
     rvwmoMinusDepsConsistent GD →
@@ -169,13 +167,11 @@ theorem hullRealizableOfAcyclic (boot : Nat → Pexv6) (d0 : Efab) (im : Image) 
     properCut GD.gdG cs →
     (∀ x, ¬ tc (racyD (gdHull GD cs)) x x) →
     GD.gdG.gxProg.length ≤ N →
-    ∃ (c : Cand) (pi : Nat → Nat),
+    ∃ (c : Cand) (pst : Nat → List Pexv6) (pi : Nat → Nat),
       srvwmoConsistent c ∧
       c.cdImg = GD.gdG.gxImg ∧
-      (candFetchInert boot d0 N c →
-        ∃ pst : Nat → List Pexv6,
-          pst 0 = (List.range' 0 N).map boot ∧
-          execProgOk' pstepEv pclsEv pst (fun _ => d0) (candExec c)) ∧
+      pst 0 = (List.range' 0 N).map boot ∧
+      execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun _ => d0) (candExec c) ∧
       (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) =
         (((gxHull GD.gdG cs).gxProg[i]?).getD []).map (lblRen pi)) := by
   intro hcons hq hpc hacy hN
@@ -193,14 +189,16 @@ theorem hullRealizableOfAcyclic (boot : Nat → Pexv6) (d0 : Efab) (im : Image) 
     rw [hrr.2.1, List.getElem?_map]
     change (Option.map _ ((gxHull GD.gdG cs).gxProg[i]?)).getD [] = _
     cases (gxHull GD.gdG cs).gxProg[i]? <;> rfl
-  refine ⟨c, pi, hsr, ?_, fun hfi => ?_, fun i => by rw [hrow i, hprog i]⟩
-  · rw [himg, rowsRelImg pi _ _ hrr]
-    rfl
-  · have h1 := rowsRelNharts pi _ _ hrr
-    have h2 : (gdHull GD cs).gdG.gxProg.length ≤ GD.gdG.gxProg.length := gxhNharts GD.gdG cs
-    exact supplyOfQconf c boot d0 (fun i => (GD'.gdG.gxProg[i]?).getD []) N hrow
+  have hci : c.cdImg = im := himg.trans (gdexecQconfImg _ _ _ _ _ hq')
+  have h1 := rowsRelNharts pi _ _ hrr
+  have h2 : (gdHull GD cs).gdG.gxProg.length ≤ GD.gdG.gxProg.length := gxhNharts GD.gdG cs
+  obtain ⟨pst, hpst0, hprg⟩ :=
+    supplyOfQconf c boot d0 (fun i => (GD'.gdG.gxProg[i]?).getD []) N hrow
       (fun i hi => progRowNil _ _ (by omega))
-      (fun i _ => qconfRows boot d0 im nh GD' i hq') hfi
+      (fun i _ => by rw [hci]; exact qconfRows boot d0 im nh GD' i hq')
+  refine ⟨c, pst, pi, hsr, ?_, hpst0, hprg, fun i => by rw [hrow i, hprog i]⟩
+  rw [himg, rowsRelImg pi _ _ hrr]
+  rfl
 
 /-! ## 3. The theorem: T2-LIN, by strong induction on the event count -/
 
@@ -238,23 +236,22 @@ theorem t2linOfCycleKill (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : N
       ∀ x, ¬ tc (racyD GD) x x :=
   fun hk GD => t2linAux boot d0 im nh hk (gevs' GD.gdG).length GD (Nat.le_refl _)
 
-/-- THE COROLLARY: the whole graph is realized (deviation 2: conditional supply). -/
+/-- THE COROLLARY: the whole graph is realized (deviation 2: at the pinned LTS). -/
 theorem t2linSupply (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) (N : Nat) :
     cycleKill boot d0 im nh →
     rvwmoMinusDepsConsistent GD →
     gdexecQconf boot d0 im nh GD →
     GD.gdG.gxProg.length ≤ N →
-    ∃ c : Cand,
+    ∃ (c : Cand) (pst : Nat → List Pexv6),
       srvwmoConsistent c ∧
       c.cdImg = GD.gdG.gxImg ∧
-      (candFetchInert boot d0 N c →
-        ∃ pst : Nat → List Pexv6,
-          pst 0 = (List.range' 0 N).map boot ∧
-          execProgOk' pstepEv pclsEv pst (fun _ => d0) (candExec c)) := by
+      pst 0 = (List.range' 0 N).map boot ∧
+      execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun _ => d0) (candExec c) := by
   intro hk hcons hq hN
-  exact topoSupply boot d0 GD N hcons (fun x y => racyDDec GD x y)
-    (t2linOfCycleKill boot d0 im nh hk GD hcons hq) im nh hq hN
+  obtain ⟨c, hsr, himg, pst, hpst0, hprg⟩ := topoSupply boot d0 GD N hcons
+    (fun x y => racyDDec GD x y) (t2linOfCycleKill boot d0 im nh hk GD hcons hq) im nh hq hN
+  exact ⟨c, pst, hsr, himg, hpst0, hprg⟩
 
 /-! ## 4. Non-vacuity (i): `cycleKill` is a real obligation -/
 

@@ -59,16 +59,9 @@ projection.
      `lbDepfree`; the erasure is the identity on it, so `eraseLblDepfreeId` stays true).
    - `eraseStep` gains the `PFIFetch` arm: `ifetchOk` reads only the image and the log (both
      equal), and the `Wstate` is unchanged on both sides.
-   - `eraseBridgeLog` gains the premise `pstepNoFetch pstep`.  REASON: `wpPfBridgeLog` now asks
-     for `pfRunFetchOk` of the ERASED run, which exists only inside the proof, and whose clause
-     (ii) (`wsEqr (loadPostRun ws false base ts) ws`, the fetch's load replay is inert) is NOT
-     transported from the instance by `erWs` (it relates the erased `coh`/`wVrOld` to the
-     instance's only by `≤`, while (ii) is a self-relation of each side).  For a fetch-free
-     program it is discharged by `pfRunFetchOkNoFetch` through `erasePstepNoFetch`.  In Rocq the
-     alphabet has no fetch, so every Rocq `pstep` satisfies `pstepNoFetch`: the premise is the
-     Lean form of a Rocq truism.  For a program that DOES fetch, the Lean-only
-     `eraseBridgeLogFetch` carries the bridge's premise on every erased run instead.
-   - Lean-only helpers: `erasePstepNoFetch`, `eraseBridgeLogFetch`.
+   - STAGE C (owner ruling Q-C3, `notes/weak-port-o2-stageC.md`): the bridge treats a fetch as a
+     stutter (`WeakPromiseBridge` deviation 6), so `eraseBridgeLog` has Rocq's statement (Stage
+     B's `pstepNoFetch` premise, `erasePstepNoFetch` and `eraseBridgeLogFetch` are deleted).
 
 **Rocq → Lean name map.**  `erase_lbl` ↦ `eraseLbl`; `erase_lbl_{depfree,depfree_id,idem,
 lat_free,fused,ldepfree}` ↦ `eraseLbl{Depfree,DepfreeId,Idem,LatFree,Fused,Ldepfree}`; `fwd_le` ↦
@@ -93,7 +86,7 @@ Gates}`; `pcls_erasable` ↦ `pclsErasable`; `er_ag` ↦ `erAg`; `er_cfg` ↦ `e
 **Not ported:** nothing — every Rocq definition and lemma has a Lean twin.
 
 **Statements checked** (by hand, against Rocq): all of them; the changed ones are `eraseLbl`
-(+ arm), `eraseStep` (+ arm, same statement), `eraseBridgeLog` (+ `pstepNoFetch`), deviation 6.
+(+ arm), `eraseStep` (+ arm, same statement), deviation 6.
 -/
 import Weak.WeakPromiseBridge
 
@@ -458,13 +451,6 @@ theorem erasePstepGates :
   fun hlf hfu =>
     ⟨erasePstepDepfree pstep, erasePstepFused pstep hfu, erasePstepLatFree pstep hlf⟩
 
-/-- Lean-only (deviation 6): the erasure never INTRODUCES a fetch. -/
-theorem erasePstepNoFetch : pstepNoFetch pstep → pstepNoFetch (erasePstep pstep) := by
-  rintro h p d l p' d' ⟨l0, rfl, hs⟩ base tvs heq
-  cases l0 <;> simp only [eraseLbl, reduceCtorEq, Wlabel.LIFetch.injEq] at heq
-  obtain ⟨rfl, rfl⟩ := heq
-  exact h _ _ _ _ _ hs _ _ rfl
-
 /-- THE MESSAGE-CLASS PREMISE: the class does not read the operand lists and reads the state only
 through `wRelp` (what `WeakEvInst.pcls_ev` does). -/
 def pclsErasable : Prop :=
@@ -675,32 +661,18 @@ theorem eraseRun (img : Image) (d0 : D) (ps : List P) (c : Wpcfg P D) :
   obtain ⟨age, hlke, hst, _⟩ := hags i agi hlk
   exact ⟨age, hlke, hst⟩
 
-/-- Lean-only (deviation 6): the stage-1 payoff for a program that may FETCH — the bridge's
-fetch premise is carried on every erased run from the initial configuration. -/
-theorem eraseBridgeLogFetch (img : Image) (d0 : D) (ps : List P) (c : Wpcfg P D) :
-    pclsErasable pcls → pstepFused pstep →
-    (∀ ce, rtc (wpPfRun (erasePstep pstep) pcls) (wpInit img d0 ps) ce →
-      pfRunFetchOk (erasePstep pstep) pcls (wpInit img d0 ps) ce) →
-    rtc (wpPfRun pstep pcls) (wpInit img d0 ps) c →
-    ∃ E, execWf E ∧ exImg E = img ∧ exLog E = c.pcLog := by
-  intro hcls hfu hfo hrun
-  obtain ⟨ce, hrune, hm⟩ := eraseRtc pstep pcls _ _ c hcls (erCfgInit img d0 ps) hrun
-  obtain ⟨E, hE, himg, hlog⟩ := wpPfBridgeLog (erasePstep pstep) pcls img d0 ps ce
-    (erasePstepDepfree pstep) (erasePstepFused pstep hfu) (hfo ce hrune) hrune
-  exact ⟨E, hE, himg, hlog.trans (erCfgLog _ _ hm)⟩
-
 /-- THE STAGE-1 PAYOFF: T2 CONTAINMENT FOR A DEPENDENCY-CARRYING PROGRAM.  `wpPfBridge` asks for
 `pstepDepfree`, which the D2 event instance does NOT satisfy; composing it with the erasure
-replaces that premise by nothing.  What is left is `lbFused` (stage 2's), and (deviation 6) the
-Lean-only `pstepNoFetch` (vacuous in Rocq's fetch-free alphabet). -/
+replaces that premise by nothing.  What is left is `lbFused` (stage 2's). -/
 theorem eraseBridgeLog (img : Image) (d0 : D) (ps : List P) (c : Wpcfg P D) :
-    pclsErasable pcls → pstepFused pstep → pstepNoFetch pstep →
+    pclsErasable pcls → pstepFused pstep →
     rtc (wpPfRun pstep pcls) (wpInit img d0 ps) c →
     ∃ E, execWf E ∧ exImg E = img ∧ exLog E = c.pcLog := by
-  intro hcls hfu hnf hrun
-  exact eraseBridgeLogFetch pstep pcls img d0 ps c hcls hfu
-    (fun ce _ => pfRunFetchOkNoFetch (erasePstep pstep) pcls _ ce
-      (erasePstepNoFetch pstep hnf)) hrun
+  intro hcls hfu hrun
+  obtain ⟨ce, hrune, hm⟩ := eraseRtc pstep pcls _ _ c hcls (erCfgInit img d0 ps) hrun
+  obtain ⟨E, hE, himg, hlog⟩ := wpPfBridgeLog (erasePstep pstep) pcls img d0 ps ce
+    (erasePstepDepfree pstep) (erasePstepFused pstep hfu) hrune
+  exact ⟨E, hE, himg, hlog.trans (erCfgLog _ _ hm)⟩
 
 end erase
 

@@ -44,8 +44,10 @@ the model — sound direction): rule 6, rule 7's RCpc part, rule 8.  The §7 hea
 note on `gdepsWf` (no READ targets, so the identity stop quantifies over an
 ABSTRACT relation `D` with `D ⊆ gmo`) also stands.
 
-FETCHES (owner decision D1): this tier keeps the Rocq treatment — a fetch is a
-graph `LLoad` read like any other; nothing in this file distinguishes it.
+FETCHES (Stage C, owner 2026-10-06/07; D1 reversed): instruction fetches are not
+graph events in this tier (an administrative `LIFetch` emission item, no row item;
+`notes/weak-port-o2-stageC.md`).  This file never modelled one: every `LLoad` in its
+witnesses (`epc`, `isw`, …) is a data load, so no row or `decide` check changed.
 
 **Deviations from Rocq.**
 

@@ -44,28 +44,33 @@ WHAT IS HERE.
    uses).  `nat_bounded_choice`'s witness type is any `A`; `filter_take_prefix` takes a Boolean
    predicate.  `dev_state` ↦ `Efab` (the event instance's fabric: the device states plus the
    residual UART/PLIC programs, `WeakEvPf` deviation 9 / owner decision Q1).
-2. O2 / D1 — THE FETCH-INERTNESS OBLIGATION (`WeakRvwmoConf` deviation 3).
-   `WeakRvwmoConf.hlblRealizesAx` is now `lblRealizes … ↔ hlblRealizes … ∧ lbFetchInert σ i l`:
-   turning a per-hart block back into `lblRealizes` at the MACHINE state needs `lbFetchInert`
-   there, which the row's representative `rowWs` cannot supply (it reads the axiomatic
-   coherence/views).  So:
-   - Lean-only `hblockIn es …` / `hemitStatesIn` / `hartConfStatesIn`: `hblock` whose single-step
-     arm also records that the realizing item `(l, some k)` is IN the emission (Rocq's
-     `hblock`/`hemitStates`/`hartConfStates` are kept, derived via `hblockInHblock`).
-   - Lean-only `emFetchInert c i em` (every fetch item `(LIFetch base tvs, some n)` of `em` is
-     inert at the candidate's machine state at the trace position of `i`'s `n`-th event) and
-     `candFetchInert boot d0 N c` (this holds for EVERY constant-fabric emission of every row
-     `trow i c.cdTr`, `i < N`).  Only the fetch arm reads it; for every other label it is `True`.
-   - `supplyOfQconf` gains the FOURTH premise `candFetchInert boot d0 N c`.
-   - `hullSupply` / `topoSupply`: the candidate is produced INSIDE the theorem, so the premise
-     cannot be stated up front; the supply conjunct becomes CONDITIONAL —
-     `candFetchInert boot d0 N c → ∃ pst, pst 0 = … ∧ execProgOk' …` (the `∃ pst` moves under
-     the implication; the other conjuncts are Rocq's).  The consumer discharges it at the
-     candidate it gets back.
+2. O2 / STAGE C — THE FETCH IS ADMINISTRATIVE, PINNED TO THE BOOT IMAGE (`WeakRvwmoConf`
+   deviation 3, `WeakAxRealize` deviation 4; owner ruling Q-C1, `notes/weak-port-o2-stageC.md`
+   §B).  Rocq's fetch was an `LLoad false` row item whose value came from rf-from-init; in Lean
+   the fetch `LIFetch base tvs` is an administrative label (no row item), and its only
+   graph-tier content — the bytes are the boot image at timestamp 0 — is stated ONCE, on the
+   emission, and carried into the supply by the PINNED program LTS
+   `WeakAxRealize.pstepPin im pstepEv`.  So:
+   - Lean-only `emFetchImg im em` (every label of the emission is `WeakAxRealize.fetchPin im`, i.e. every fetch
+     item reads the image at timestamp 0; `True` off the fetch) and the extra `gdexecQconf`
+     conjunct `emFetchImg im em` (between `emDevfree em` and the deps clause; also returned by
+     `gdexecQconfRows` and `qconfRows`).  Stable under the hull (`emFetchImgPrefix`) and the
+     renaming (`emFetchImgRen`, since `wlblRen` fixes `LIFetch`, Q-C4).
+   - Lean-only `admRunPin` (an `admRun` whose labels are pinned is an `admStar` of the pinned
+     LTS) and `hblockPin` / `hemitStatesPin` / `hartConfStatesPin` (Rocq's `hblock` /
+     `hemitStates` / `hartConfStates` at the pinned LTS, from a pinned emission; Rocq's three
+     are kept as stated).
+   - `supplyOfQconf`: Rocq's three premises, the third with `∧ emFetchImg c.cdImg em`, and the
+     conclusion `execProgOk' (pstepPin c.cdImg pstepEv) pclsEv …` (the pinned LTS).
+   - `hullSupply` / `topoSupply`: Rocq's statements, the supply at `pstepPin c.cdImg pstepEv`
+     (unconditional).  Stage B's `emFetchInert`, `candFetchInert`, `hblockIn`,
+     `hblockInHblock`, `hblockInMono`, `hemitStatesIn`, `hartConfStatesIn` are DELETED.
 3. PROOFS: per-constructor case analysis and `omega`; the smoke tests (Rocq `Example …
    vm_compute`) are `theorem`s closed by `decide` / the bridge; Rocq's `Print Assumptions` audit
    is not reproduced (the lint bans axioms).
-4. Lean-only helpers: `filterTakeSucc` (the `take (k+1)` step of a filter), `hblockInMono`.
+4. Lean-only helpers: `filterTakeSucc` (the `take (k+1)` step of a filter), `fetchPinRen`,
+   and deviation 2's `emFetchImg`/`emFetchImgRen`/`emFetchImgPrefix`/`admRunPin`/`hblockPin`/
+   `hblockPinHblock`/`hemitStatesPin`/`hartConfStatesPin`.
 
 **Rocq → Lean name map.**  `eadm_fst` `eadmFst`, `eblock_fst` `eblockFst`, `not_elem_of_block`
 `notElemOfBlock`, `nat_bounded_choice` `natBoundedChoice`, `fmap_seq_default` `fmapSeqDefault`,
@@ -267,7 +272,12 @@ theorem hemitDevfreeReindex (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : L
 
 def emDevfree (em : Hemission) : Prop := LDev ∉ emLabels em
 
-/-- THE QUIESCENT BUNDLE, with the BOOT TIE (`im` the booted image, `nh` the booted hart count). -/
+/-- (Lean-only, deviation 2) Every administrative fetch item of the emission reads the booted
+image at timestamp 0 (`fetchPin` is `True` off the fetch). -/
+def emFetchImg (im : Image) (em : Hemission) : Prop := ∀ l, l ∈ emLabels em → WeakAxRealize.fetchPin im l
+
+/-- THE QUIESCENT BUNDLE, with the BOOT TIE (`im` the booted image, `nh` the booted hart count);
+deviation 2: the emission's fetches are pinned to `im`. -/
 def gdexecQconf (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GD : Gdexec) :
     Prop :=
   GD.gdG.gxImg = im ∧
@@ -275,6 +285,7 @@ def gdexecQconf (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GD :
   (∀ i row, GD.gdG.gxProg[i]? = some row →
     ∃ em, hartConf i row (boot i) (fun _ => d0) em ∧
           emDevfree em ∧
+          emFetchImg im em ∧
           (∀ jk, jk ∈ rowDeps em.emItems → ((i, jk.1), (i, jk.2)) ∈ GD.gdDeps))
 
 theorem gdexecQconfImg (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
@@ -290,6 +301,7 @@ theorem gdexecQconfRows (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Na
     ∀ i row, GD.gdG.gxProg[i]? = some row →
       ∃ em, hartConf i row (boot i) (fun _ => d0) em ∧
             emDevfree em ∧
+            emFetchImg im em ∧
             (∀ jk, jk ∈ rowDeps em.emItems → ((i, jk.1), (i, jk.2)) ∈ GD.gdDeps) :=
   fun h => h.2.2
 
@@ -297,7 +309,7 @@ theorem gdexecQconfRows (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Na
 theorem gdexecQconfConf (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) : gdexecQconf boot d0 im nh GD → gdexecConf boot (fun _ _ => d0) GD := by
   rintro ⟨_, _, h⟩ i row hrow
-  obtain ⟨em, hem, _, hdep⟩ := h i row hrow
+  obtain ⟨em, hem, _, _, hdep⟩ := h i row hrow
   exact ⟨em, hem, hdep⟩
 
 /-! ### 3.1 `emDevfree` is stable under the two emission operations -/
@@ -316,6 +328,29 @@ theorem emDevfreeRen (π : Nat → Nat) (em : Hemission) : emDevfree em → emDe
 theorem emDevfreePrefix (em em' : Hemission) :
     em'.emItems <+: em.emItems → emDevfree em → emDevfree em' := by
   rintro ⟨t, ht⟩ h hin
+  apply h
+  unfold emLabels at hin ⊢
+  rw [← ht, List.map_append]
+  exact List.mem_append_left _ hin
+
+/-! ### 3.1b `emFetchImg` is stable under the two emission operations (deviation 2) -/
+
+/-- (Lean-only) `wlblRen` fixes the fetch (Q-C4), so the pin is renaming-invariant. -/
+theorem fetchPinRen (π : Nat → Nat) (im : Image) (l : Wlabel) :
+    WeakAxRealize.fetchPin im (wlblRen π l) ↔ WeakAxRealize.fetchPin im l := by
+  cases l <;> exact Iff.rfl
+
+theorem emFetchImgRen (π : Nat → Nat) (im : Image) (em : Hemission) :
+    emFetchImg im em → emFetchImg im (emRen π em) := by
+  unfold emFetchImg
+  rw [emLabelsRen]
+  intro h l hl
+  obtain ⟨l0, hl0, rfl⟩ := List.mem_map.1 hl
+  exact (fetchPinRen π im l0).2 (h l0 hl0)
+
+theorem emFetchImgPrefix (im : Image) (em em' : Hemission) :
+    em'.emItems <+: em.emItems → emFetchImg im em → emFetchImg im em' := by
+  rintro ⟨t, ht⟩ h l hin
   apply h
   unfold emLabels at hin ⊢
   rw [← ht, List.map_append]
@@ -362,10 +397,11 @@ theorem gdexecQconfHull (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Na
         rw [hp] at hrow'
         simp only [Option.bind_some, Option.some.injEq] at hrow'
         subst hrow'
-        obtain ⟨em, hem, hdf, hdep⟩ := hq i p hp
+        obtain ⟨em, hem, hdf, hfi, hdep⟩ := hq i p hp
         obtain ⟨em', hem', hpre⟩ := hartConfPrefix i p (boot i) (fun _ => d0) em c hem
         refine ⟨emRen (hren GD.gdG cs) em', hartConfRen _ _ _ _ _ _ hem',
-          emDevfreeRen _ _ (emDevfreePrefix em em' hpre hdf), ?_⟩
+          emDevfreeRen _ _ (emDevfreePrefix em em' hpre hdf),
+          emFetchImgRen _ _ _ (emFetchImgPrefix im em em' hpre hfi), ?_⟩
         intro jk hjk
         simp only [emRen] at hjk
         rw [rowDepsRen] at hjk
@@ -402,8 +438,9 @@ theorem gdexecQconfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : Efab) (im
     rw [hrow0] at hrow'
     simp only [Option.map_some, Option.some.injEq] at hrow'
     subst hrow'
-    obtain ⟨em, hem, hdf, hdep⟩ := hq i row hrow0
-    refine ⟨emRen π em, hartConfRen π i row (boot i) _ em hem, emDevfreeRen π em hdf, ?_⟩
+    obtain ⟨em, hem, hdf, hfi, hdep⟩ := hq i row hrow0
+    refine ⟨emRen π em, hartConfRen π i row (boot i) _ em hem, emDevfreeRen π em hdf,
+      emFetchImgRen π im em hfi, ?_⟩
     intro jk hjk
     rw [hdeps]
     apply hdep
@@ -423,38 +460,47 @@ def hblock (dv : Nat → Efab) (k : Nat) (ws : Wstate) (lb : Lbl) (p p' : Pexv6)
           admStar pstepEv false pm dm pm2 dm2 ∧
           pstepEv pm2 dm2 l2 p' (dv (k + 1))))
 
-/-- (Lean-only, deviation 2) `hblock` whose single-step arm records its item in `es`. -/
-def hblockIn (es : List Eitem) (dv : Nat → Efab) (k : Nat) (ws : Wstate) (lb : Lbl)
+/-- (Lean-only, deviation 2) An `admRun` whose labels are pinned is a run of the pinned LTS. -/
+theorem admRunPin (im : Image) (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel)
+    (p' : Pexv6) (d' : Efab) :
+    admRun instr p d ls p' d' → (∀ l, l ∈ ls → WeakAxRealize.fetchPin im l) →
+    admStar (pstepPin im pstepEv) instr p d p' d' := by
+  intro h
+  induction h with
+  | ARnil p d => intro _; exact admStarRefl _ instr p d
+  | ARcons p d l p1 d1 ls p' d' ha hs _ ih =>
+    intro hpin
+    exact admStarL (pstepPin im pstepEv) instr p d l p1 d1 p' d' ha
+      ⟨hs, hpin l List.mem_cons_self⟩ (ih (fun x hx => hpin x (List.mem_cons_of_mem _ hx)))
+
+/-- (Lean-only, deviation 2) `hblock` at the pinned LTS. -/
+def hblockPin (im : Image) (dv : Nat → Efab) (k : Nat) (ws : Wstate) (lb : Lbl)
     (p p' : Pexv6) : Prop :=
   ∃ (pa : Pexv6) (da : Efab),
-    admStar pstepEv true p (dv k) pa da ∧
-    ((∃ l, (l, some k) ∈ es ∧ hlblRealizes pa ws lb l ∧ pstepEv pa da l p' (dv (k + 1)))
+    admStar (pstepPin im pstepEv) true p (dv k) pa da ∧
+    ((∃ l, hlblRealizes pa ws lb l ∧ pstepPin im pstepEv pa da l p' (dv (k + 1)))
      ∨ (∃ (pm : Pexv6) (dm : Efab) (pm2 : Pexv6) (dm2 : Efab) (l1 l2 : Wlabel),
           hlblRealizesPair pa pm2 ws lb l1 l2 ∧
-          pstepEv pa da l1 pm dm ∧
-          admStar pstepEv false pm dm pm2 dm2 ∧
-          pstepEv pm2 dm2 l2 p' (dv (k + 1))))
+          pstepPin im pstepEv pa da l1 pm dm ∧
+          admStar (pstepPin im pstepEv) false pm dm pm2 dm2 ∧
+          pstepPin im pstepEv pm2 dm2 l2 p' (dv (k + 1))))
 
-theorem hblockInHblock (es : List Eitem) (dv : Nat → Efab) (k : Nat) (ws : Wstate)
-    (lb : Lbl) (p p' : Pexv6) : hblockIn es dv k ws lb p p' → hblock dv k ws lb p p' := by
-  rintro ⟨pa, da, hs, ⟨l, _, h1, h2⟩ | h⟩
-  · exact ⟨pa, da, hs, .inl ⟨l, h1, h2⟩⟩
-  · exact ⟨pa, da, hs, .inr h⟩
+theorem hblockPinHblock (im : Image) (dv : Nat → Efab) (k : Nat) (ws : Wstate) (lb : Lbl)
+    (p p' : Pexv6) : hblockPin im dv k ws lb p p' → hblock dv k ws lb p p' := by
+  have hsub : ∀ (instr : Bool) (p d p' d'),
+      admStar (pstepPin im pstepEv) instr p d p' d' → admStar pstepEv instr p d p' d' :=
+    fun _ _ _ _ _ h => rtc_subrel (fun _ _ ⟨l, ha, hs⟩ => ⟨l, ha, hs.1⟩) h
+  rintro ⟨pa, da, hs, ⟨l, h1, h2⟩ | ⟨pm, dm, pm2, dm2, l1, l2, h1, h2, h3, h4⟩⟩
+  · exact ⟨pa, da, hsub _ _ _ _ _ hs, .inl ⟨l, h1, h2.1⟩⟩
+  · exact ⟨pa, da, hsub _ _ _ _ _ hs,
+      .inr ⟨pm, dm, pm2, dm2, l1, l2, h1, h2.1, hsub _ _ _ _ _ h3, h4.1⟩⟩
 
-theorem hblockInMono (es es' : List Eitem) (dv : Nat → Efab) (k : Nat) (ws : Wstate)
-    (lb : Lbl) (p p' : Pexv6) :
-    hblockIn es dv k ws lb p p' → (∀ x, x ∈ es → x ∈ es') → hblockIn es' dv k ws lb p p' := by
-  rintro ⟨pa, da, hs, ⟨l, hm, h1, h2⟩ | h⟩ hsub
-  · exact ⟨pa, da, hs, .inl ⟨l, hsub _ hm, h1, h2⟩⟩
-  · exact ⟨pa, da, hs, .inr h⟩
-
-/-- (Lean-only) `hemitStates`, with the realizing items located in the emission. -/
-theorem hemitStatesIn (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
+theorem hemitStates (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
     hemit dv k ws row p es pfin →
     ∃ f : Nat → Pexv6, f 0 = p ∧
       ∀ n lb, row[n]? = some lb →
-        hblockIn es dv (n + k) (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1)) := by
+        hblock dv (n + k) (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1)) := by
   intro h
   induction h with
   | HEnil k ws p => exact ⟨fun _ => p, rfl, fun n lb hn => by simp at hn⟩
@@ -467,14 +513,14 @@ theorem hemitStatesIn (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lb
       simp only [List.getElem?_cons_zero, Option.some.injEq] at hn
       subst hn
       rw [Nat.zero_add]
-      refine ⟨pa, da, admRunStar _ _ _ _ _ _ har, .inl ⟨l, by simp, hre, ?_⟩⟩
+      refine ⟨pa, da, admRunStar _ _ _ _ _ _ har, .inl ⟨l, hre, ?_⟩⟩
       show pstepEv pa da l (f' 0) (dv (k + 1))
       rw [hf0]; exact hst
     | succ n =>
       simp only [List.getElem?_cons_succ] at hn
       have e : n + 1 + k = n + (k + 1) := by omega
       rw [e]
-      exact hblockInMono _ _ _ _ _ _ _ _ (hf n lb0 hn) (fun x hx => by simp [hx])
+      exact hf n lb0 hn
   | HEpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2 hst2 _ ih =>
     obtain ⟨f', hf0, hf⟩ := ih
     refine ⟨fun n => match n with | 0 => p | n' + 1 => f' n', rfl, ?_⟩
@@ -492,30 +538,67 @@ theorem hemitStatesIn (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lb
       simp only [List.getElem?_cons_succ] at hn
       have e : n + 1 + k = n + (k + 1) := by omega
       rw [e]
-      exact hblockInMono _ _ _ _ _ _ _ _ (hf n lb0 hn) (fun x hx => by simp [hx])
+      exact hf n lb0 hn
 
-theorem hemitStates (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
+/-- (Lean-only, deviation 2) `hemitStates` at the pinned LTS, from a pinned emission. -/
+theorem hemitStatesPin (im : Image) (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
-    hemit dv k ws row p es pfin →
+    hemit dv k ws row p es pfin → (∀ x, x ∈ es.map Prod.fst → WeakAxRealize.fetchPin im x) →
     ∃ f : Nat → Pexv6, f 0 = p ∧
       ∀ n lb, row[n]? = some lb →
-        hblock dv (n + k) (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1)) := by
-  intro hem
-  obtain ⟨f, hf0, hf⟩ := hemitStatesIn dv k ws row p es pfin hem
-  exact ⟨f, hf0, fun n lb hn => hblockInHblock _ _ _ _ _ _ _ (hf n lb hn)⟩
-
-/-- (Lean-only) `hartConfStates`, with the realizing items located in the emission. -/
-theorem hartConfStatesIn (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab)
-    (em : Hemission) :
-    hartConf i row p0 dv em →
-    ∃ f : Nat → Pexv6, f 0 = p0 ∧
-      ∀ n lb, row[n]? = some lb → hblockIn em.emItems dv n (rowWs row n) lb (f n) (f (n + 1)) := by
-  intro hem
-  obtain ⟨f, hf0, hf⟩ := hemitStatesIn _ _ _ _ _ _ _ hem
-  refine ⟨f, hf0, fun n lb hn => ?_⟩
-  have h := hf n lb hn
-  rw [Nat.add_zero] at h
-  exact h
+        hblockPin im dv (n + k) (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1)) := by
+  intro h
+  induction h with
+  | HEnil k ws p => intro _; exact ⟨fun _ => p, rfl, fun n lb hn => by simp at hn⟩
+  | HEone k ws lb row p ls pa da l p' es pfin har hre hst _ ih =>
+    intro hpin
+    rw [eblockFst] at hpin
+    obtain ⟨f', hf0, hf⟩ :=
+      ih (fun x hx => hpin x (List.mem_append_right _ (List.mem_cons_of_mem _ hx)))
+    refine ⟨fun n => match n with | 0 => p | n' + 1 => f' n', rfl, ?_⟩
+    intro n lb0 hn
+    cases n with
+    | zero =>
+      simp only [List.getElem?_cons_zero, Option.some.injEq] at hn
+      subst hn
+      rw [Nat.zero_add]
+      refine ⟨pa, da, admRunPin im _ _ _ _ _ _ har
+          (fun x hx => hpin x (List.mem_append_left _ hx)),
+        .inl ⟨l, hre, ?_, hpin l (List.mem_append_right _ List.mem_cons_self)⟩⟩
+      show pstepEv pa da l (f' 0) (dv (k + 1))
+      rw [hf0]; exact hst
+    | succ n =>
+      simp only [List.getElem?_cons_succ] at hn
+      have e : n + 1 + k = n + (k + 1) := by omega
+      rw [e]
+      exact hf n lb0 hn
+  | HEpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2 hst2 _ ih =>
+    intro hpin
+    rw [eblockFst, eblockFst] at hpin
+    have h2 : ∀ x, x ∈ ls2 ++ l2 :: es.map Prod.fst → WeakAxRealize.fetchPin im x :=
+      fun x hx => hpin x (List.mem_append_right _ (List.mem_cons_of_mem _ hx))
+    obtain ⟨f', hf0, hf⟩ :=
+      ih (fun x hx => h2 x (List.mem_append_right _ (List.mem_cons_of_mem _ hx)))
+    refine ⟨fun n => match n with | 0 => p | n' + 1 => f' n', rfl, ?_⟩
+    intro n lb0 hn
+    cases n with
+    | zero =>
+      simp only [List.getElem?_cons_zero, Option.some.injEq] at hn
+      subst hn
+      rw [Nat.zero_add]
+      refine ⟨pa, da, admRunPin im _ _ _ _ _ _ har1
+          (fun x hx => hpin x (List.mem_append_left _ hx)),
+        .inr ⟨pm, dm, pm2, dm2, l1, l2, hre,
+          ⟨hst1, hpin l1 (List.mem_append_right _ List.mem_cons_self)⟩,
+          admRunPin im _ _ _ _ _ _ har2 (fun x hx => h2 x (List.mem_append_left _ hx)),
+          ?_, h2 l2 (List.mem_append_right _ List.mem_cons_self)⟩⟩
+      show pstepEv pm2 dm2 l2 (f' 0) (dv (k + 1))
+      rw [hf0]; exact hst2
+    | succ n =>
+      simp only [List.getElem?_cons_succ] at hn
+      have e : n + 1 + k = n + (k + 1) := by omega
+      rw [e]
+      exact hf n lb0 hn
 
 theorem hartConfStates (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab)
     (em : Hemission) :
@@ -523,8 +606,24 @@ theorem hartConfStates (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efa
     ∃ f : Nat → Pexv6, f 0 = p0 ∧
       ∀ n lb, row[n]? = some lb → hblock dv n (rowWs row n) lb (f n) (f (n + 1)) := by
   intro hem
-  obtain ⟨f, hf0, hf⟩ := hartConfStatesIn i row p0 dv em hem
-  exact ⟨f, hf0, fun n lb hn => hblockInHblock _ _ _ _ _ _ _ (hf n lb hn)⟩
+  obtain ⟨f, hf0, hf⟩ := hemitStates _ _ _ _ _ _ _ hem
+  refine ⟨f, hf0, fun n lb hn => ?_⟩
+  have h := hf n lb hn
+  rw [Nat.add_zero] at h
+  exact h
+
+/-- (Lean-only, deviation 2) `hartConfStates` at the pinned LTS, from a pinned emission. -/
+theorem hartConfStatesPin (im : Image) (i : Nat) (row : List Lbl) (p0 : Pexv6)
+    (dv : Nat → Efab) (em : Hemission) :
+    hartConf i row p0 dv em → emFetchImg im em →
+    ∃ f : Nat → Pexv6, f 0 = p0 ∧
+      ∀ n lb, row[n]? = some lb → hblockPin im dv n (rowWs row n) lb (f n) (f (n + 1)) := by
+  intro hem hfi
+  obtain ⟨f, hf0, hf⟩ := hemitStatesPin im _ _ _ _ _ _ _ hem hfi
+  refine ⟨f, hf0, fun n lb hn => ?_⟩
+  have h := hf n lb hn
+  rw [Nat.add_zero] at h
+  exact h
 
 /-! ## 5. The per-agent wstate, at a global trace position -/
 
@@ -633,43 +732,28 @@ theorem hlblRealizesPairRelp (p pm : Pexv6) (ws ws' : Wstate) (lb : Lbl) (l1 l2 
     (loadPostRun ws aq base (tvs.map Prod.fst))
     (by rw [WeakRvwmoConf.loadPostRunRelp, WeakRvwmoConf.loadPostRunRelp, hr])]
 
-/-- (Lean-only, deviation 2) Every fetch item of `em` is inert at the candidate's machine state,
-at the trace position of agent `i`'s matching row event. -/
-def emFetchInert (c : Cand) (i : Nat) (em : Hemission) : Prop :=
-  ∀ (base : Int) (tvs : List (Nat × BitVec 8)) (n k : Nat) (s : Estep),
-    (LIFetch base tvs, some n) ∈ em.emItems → c.cdTr[k]? = some s → s.esAg = i →
-    tcnt i (c.cdTr.take k) = n → lbFetchInert (stt (candExec c) k) i (LIFetch base tvs)
-
-/-- (Lean-only, deviation 2) The candidate-level fetch obligation: every constant-fabric emission
-of every row of the trace (agents below `N`) is fetch-inert at `c`. -/
-def candFetchInert (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (c : Cand) : Prop :=
-  ∀ i em, i < N → hartConf i (trow i c.cdTr) (boot i) (fun _ => d0) em → emFetchInert c i em
-
 theorem supplyOfQconf (c : Cand) (boot : Nat → Pexv6) (d0 : Efab)
     (rows : Nat → List Lbl) (N : Nat) :
     -- the trace is an interleaving of the rows ...
     (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) = rows i) →
     -- ... over the agents below `N` ...
     (∀ i, N ≤ i → rows i = []) →
-    -- ... every such agent's row is emittable at the CONSTANT fabric ...
-    (∀ i, i < N → ∃ em, hartConf i (rows i) (boot i) (fun _ => d0) em) →
-    -- ... (Lean-only, deviation 2) and the emissions' fetches are inert at `c`
-    candFetchInert boot d0 N c →
+    -- ... every such agent's row is emittable at the CONSTANT fabric, its fetches pinned to
+    -- the candidate's image (deviation 2) ...
+    (∀ i, i < N → ∃ em, hartConf i (rows i) (boot i) (fun _ => d0) em ∧ emFetchImg c.cdImg em) →
+    -- ... so the trace is supplied by the PINNED program LTS
     ∃ pst : Nat → List Pexv6,
       pst 0 = (List.range' 0 N).map boot ∧
-      execProgOk' pstepEv pclsEv pst (fun _ => d0) (candExec c) := by
-  intro hrows hbnd hconf hfi
+      execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun _ => d0) (candExec c) := by
+  intro hrows hbnd hconf
   have hch : ∀ i, i < N → ∃ fe : Hemission × (Nat → Pexv6),
-      fe.2 0 = boot i ∧ emFetchInert c i fe.1 ∧
+      fe.2 0 = boot i ∧
       ∀ n lb, (rows i)[n]? = some lb →
-        hblockIn fe.1.emItems (fun _ => d0) n (rowWs (rows i) n) lb (fe.2 n) (fe.2 (n + 1)) := by
+        hblockPin c.cdImg (fun _ => d0) n (rowWs (rows i) n) lb (fe.2 n) (fe.2 (n + 1)) := by
     intro i hi
-    obtain ⟨em, hem⟩ := hconf i hi
-    obtain ⟨f, hf0, hf⟩ := hartConfStatesIn i _ _ _ em hem
-    refine ⟨(em, f), hf0, hfi i em hi ?_, hf⟩
-    unfold trow
-    rw [hrows i]
-    exact hem
+    obtain ⟨em, hem, hfi⟩ := hconf i hi
+    obtain ⟨f, hf0, hf⟩ := hartConfStatesPin c.cdImg i _ _ _ em hem hfi
+    exact ⟨(em, f), hf0, hf⟩
   obtain ⟨F, hF⟩ := natBoundedChoice (⟨[], .PDisk none⟩, fun _ => .PDisk none) _ N hch
   refine ⟨fun k => (List.range' 0 N).map (fun i => (F i).2 (tcnt i (c.cdTr.take k))), ?_, ?_⟩
   · apply List.ext_getElem?
@@ -690,7 +774,7 @@ theorem supplyOfQconf (c : Cand) (boot : Nat → Pexv6) (d0 : Efab)
       by_cases hge : s.esAg < N
       · exact hge
       · rw [hbnd _ (by omega)] at hrow; simp at hrow
-    obtain ⟨_, hfe, hfb⟩ := hF _ hiN
+    obtain ⟨_, hfb⟩ := hF _ hiN
     obtain ⟨pa, da, hstar, hdisj⟩ := hfb _ _ hrow
     have hrelp : ((stt (candExec c) k).msWs s.esAg).wRelp =
         (rowWs (rows s.esAg) (tcnt s.esAg (c.cdTr.take k))).wRelp := by
@@ -715,12 +799,9 @@ theorem supplyOfQconf (c : Cand) (boot : Nat → Pexv6) (d0 : Efab)
           simp only [Option.map_some, Nat.zero_add, tcntStepNe j _ k s hs (fun h => hj h.symm)]
         · rw [lookup_seq_ge (by omega)]
           rfl
-    · rcases hdisj with ⟨l, hmem, hre, hst⟩ | ⟨pm, dm, pm2, dm2, l1, l2, hre, hs1, hs2, hs3⟩
+    · rcases hdisj with ⟨l, hre, hst⟩ | ⟨pm, dm, pm2, dm2, l1, l2, hre, hs1, hs2, hs3⟩
       · left
-        refine ⟨l, (hlblRealizesAx _ _ _ _ _).2 ⟨hlblRealizesRelp _ _ _ _ _ hrelp hre, ?_⟩, hst⟩
-        cases l with
-        | LIFetch base tvs => exact hfe base tvs _ k s hmem hs rfl rfl
-        | _ => trivial
+        exact ⟨l, (hlblRealizesAx _ _ _ _ _).2 (hlblRealizesRelp _ _ _ _ _ hrelp hre), hst⟩
       · right
         exact ⟨pm, dm, pm2, dm2, l1, l2,
           (hlblRealizesPairAx _ _ _ _ _ _ _).1 (hlblRealizesPairRelp _ _ _ _ _ _ _ hrelp hre),
@@ -731,13 +812,15 @@ theorem supplyOfQconf (c : Cand) (boot : Nat → Pexv6) (d0 : Efab)
 theorem qconfRows (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GD : Gdexec)
     (i : Nat) :
     gdexecQconf boot d0 im nh GD →
-    ∃ em, hartConf i ((GD.gdG.gxProg[i]?).getD []) (boot i) (fun _ => d0) em := by
+    ∃ em, hartConf i ((GD.gdG.gxProg[i]?).getD []) (boot i) (fun _ => d0) em ∧
+      emFetchImg im em := by
   intro hq
   cases h : GD.gdG.gxProg[i]? with
-  | none => exact ⟨⟨[], boot i⟩, hartConfNil i (boot i) _⟩
+  | none =>
+    exact ⟨⟨[], boot i⟩, hartConfNil i (boot i) _, fun l hl => by simp [emLabels] at hl⟩
   | some row =>
-    obtain ⟨em, hem, _, _⟩ := gdexecQconfRows _ _ _ _ _ hq i row h
-    exact ⟨em, hem⟩
+    obtain ⟨em, hem, _, hfi, _⟩ := gdexecQconfRows _ _ _ _ _ hq i row h
+    exact ⟨em, hem, hfi⟩
 
 theorem progRowNil (G : Gexec) (i : Nat) : G.gxProg.length ≤ i → (G.gxProg[i]?).getD [] = [] := by
   intro h
@@ -761,20 +844,21 @@ theorem hullSupply (boot : Nat → Pexv6) (d0 : Efab) (GD : Gdexec) (cs : List N
     ∃ c : Cand,
       srvwmoConsistent c ∧
       c.cdImg = GD.gdG.gxImg ∧
-      (candFetchInert boot d0 N c →
-        ∃ pst : Nat → List Pexv6,
-          pst 0 = (List.range' 0 N).map boot ∧
-          execProgOk' pstepEv pclsEv pst (fun _ => d0) (candExec c)) ∧
+      (∃ pst : Nat → List Pexv6,
+        pst 0 = (List.range' 0 N).map boot ∧
+        execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun _ => d0) (candExec c)) ∧
       cdLog c c.cdTr.length =
         ((gwrites GD.gdG).filter (gcut cs)).filterMap (WeakRvwmoLin.gmsg GD.gdG) := by
   intro hcons hok hvf im nh hq hN
   obtain ⟨c, hsr, himg, hrow, hlog⟩ := hullLinearizes GD cs hcons hok hvf
-  refine ⟨c, hsr, himg, fun hfi => ?_, hlog⟩
+  have hci : c.cdImg = im := himg.trans (gdexecQconfImg _ _ _ _ _ hq)
+  refine ⟨c, hsr, himg, ?_, hlog⟩
   exact supplyOfQconf c boot d0 (fun i => ((gxHull GD.gdG cs).gxProg[i]?).getD []) N
     (fun i => by rw [hrow i, gxhRow])
     (fun i hi => progRowNil _ _ (by have := gxhNharts GD.gdG cs; omega))
-    (fun i _ => qconfRows boot d0 im nh (gdHull GD cs) i (gdexecQconfHull boot d0 im nh GD cs hq))
-    hfi
+    (fun i _ => by
+      rw [hci]
+      exact qconfRows boot d0 im nh (gdHull GD cs) i (gdexecQconfHull boot d0 im nh GD cs hq))
 
 /-! ### 7.2 The acyclicity route -/
 
@@ -787,18 +871,18 @@ theorem topoSupply (boot : Nat → Pexv6) (d0 : Efab) (GD : Gdexec) (N : Nat) :
     ∃ c : Cand,
       srvwmoConsistent c ∧
       c.cdImg = GD.gdG.gxImg ∧
-      (candFetchInert boot d0 N c →
-        ∃ pst : Nat → List Pexv6,
-          pst 0 = (List.range' 0 N).map boot ∧
-          execProgOk' pstepEv pclsEv pst (fun _ => d0) (candExec c)) := by
+      (∃ pst : Nat → List Pexv6,
+        pst 0 = (List.range' 0 N).map boot ∧
+        execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun _ => d0) (candExec c)) := by
   intro hcons hdec hacy im nh hq hN
   obtain ⟨GD', pi, hcons', h14, hrr, hdeps, _⟩ := normalizeOfAcyclic GD hcons hdec hacy
   have hq' := gdexecQconfRen pi boot d0 im nh GD GD' hrr hdeps hq
   obtain ⟨c, hsr, himg, hrow, _⟩ := rule14Linearization GD'.gdG hcons'.1 h14
-  refine ⟨c, hsr, by rw [himg]; exact rowsRelImg pi _ _ hrr, fun hfi => ?_⟩
+  have hci : c.cdImg = im := himg.trans (gdexecQconfImg _ _ _ _ _ hq')
+  refine ⟨c, hsr, by rw [himg]; exact rowsRelImg pi _ _ hrr, ?_⟩
   exact supplyOfQconf c boot d0 (fun i => (GD'.gdG.gxProg[i]?).getD []) N hrow
     (fun i hi => progRowNil _ _ (by rw [rowsRelNharts pi _ _ hrr]; omega))
-    (fun i _ => qconfRows boot d0 im nh GD' i hq') hfi
+    (fun i _ => by rw [hci]; exact qconfRows boot d0 im nh GD' i hq')
 
 /-! ## 8. Smoke tests -/
 

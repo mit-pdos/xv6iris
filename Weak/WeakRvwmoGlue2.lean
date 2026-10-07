@@ -43,14 +43,12 @@ nothing imports this file.
    `cycleKillOfL2''` and `t2linOfL2''` take
    `∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2` (placed right after the WP
    package premises).  Nothing here proves the text unwritten, so it cannot be discharged.
-5. O2 / D1 — THE FETCH-INERTNESS PREMISE `WeakRvwmoGlue.hullRunFetchInert` (WeakRvwmoGlue
-   deviation 5) is DISCHARGED here, not carried: the three theorems of this file never call
-   `WeakRvwmoGlue.cycleKillOfL2` (which needs it at every cut) but the Lean-only
-   `WeakRvwmoGlue2.cycleKillZ`, the glue's own proof run at the ZERO CUT.  There the hull's rows
-   are empty, so the realized candidate's trace has no step and `candFetchInert` is vacuous
-   (`WeakRvwmoGlue2.hullRunZcut`).  Consequently `cycleKillOfL2'` keeps Rocq's `cutSupply`
-   premise but no longer uses it (it is discharged anyway by `cutSupplyOfCycle`); its
-   conclusion is Rocq's.
+5. O2 / STAGE C — THE PINNED LTS (WeakRvwmoGlue deviation 5): `RunData` (hence
+   `runDataOfCyc`, `walkSupply`) states the supply at `pstepPin c.cdImg pstepEv`, the form
+   `WeakRvwmoCert4.cstOk` carries.  The Stage-B fetch-inertness premise and its zero-cut
+   discharge (`WeakRvwmoGlue2.hullRunZcut`, `WeakRvwmoGlue2.cycleKillZ`) are DELETED;
+   `cycleKillOfL2'` is again Rocq's proof (`cycleKillOfL2` at `bootTieOfQconf`), and uses its
+   `cutSupply` premise.
 6. PROOFS: `ctracePrefixSnoc` follows `WeakRvwmoFloor.gtracePrefixSnoc`'s Lean script; the
    below-the-end / at-the-end transports are the Lean-only `WeakRvwmoGlue2.snocLt` /
    `WeakRvwmoGlue2.snocEnd`.  Statements are Rocq's.
@@ -71,11 +69,11 @@ nothing imports this file.
 `lbgd_zcut_empty` `lbgdZcutEmpty`, `lbgd_cut_drops_everything` `lbgdCutDropsEverything`,
 `lbgd_hull_empty` `lbgdHullEmpty`.
 Lean-only (file-qualified): `WeakRvwmoGlue2.zcutGetD`, `WeakRvwmoGlue2.snocLt`,
-`WeakRvwmoGlue2.snocEnd`, `WeakRvwmoGlue2.hullRunZcut`, `WeakRvwmoGlue2.cycleKillZ`.
+`WeakRvwmoGlue2.snocEnd`.
 
 **File-qualified Rocq names:** none (no name of this file is in `notes/weak-port-dupnames.json`).
 
-**Dropped:** none (Rocq 36 declarations; Lean 41 = 36 + the 5 Lean-only).
+**Dropped:** none (Rocq 36 declarations; Lean 39 = 36 + the 3 Lean-only).
 -/
 import Weak.WeakRvwmoGlue
 
@@ -493,84 +491,13 @@ theorem walkExitsGmoForced (G : Gexec) (d0 : Efab) (l : List Segout) (S0 Sf : Cy
 
 /-! # 4. THE THEOREM, WITH THE PREMISE LIST THAT REMAINS -/
 
-/-- Lean-only (deviation 5): `hullRun` at the ZERO CUT, where the fetch-inertness premise is
-free — the hull's rows are empty, so the realized candidate's trace has no step. -/
-theorem WeakRvwmoGlue2.hullRunZcut (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
-    (GD : Gdexec) (N : Nat) :
-    rvwmoMinusDepsConsistent GD →
-    gdexecQconf boot d0 im nh GD →
-    cutOk GD.gdG (zcut GD.gdG) →
-    (∀ x, ¬ tc (racyD (gdHull GD (zcut GD.gdG))) x x) →
-    GD.gdG.gxProg.length ≤ N →
-    ∃ (c : Cand) (pst : Nat → List Pexv6) (rho : Nat → Nat),
-      RunData boot d0 N GD.gdG c pst (fun _ => d0) ∧
-      (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) =
-        (List.take (((zcut GD.gdG)[i]?).getD 0) ((GD.gdG.gxProg[i]?).getD [])).map
-          (lblRen rho)) := by
-  intro hcons hq hcut hacy hN
-  obtain ⟨c, rho, hc, himg, hpst, hrow⟩ :=
-    hullRealizableRowsG boot d0 im nh GD (zcut GD.gdG) N hcons hq (cutOkProper _ _ hcut) hacy hN
-  have hfi : candFetchInert boot d0 N c := by
-    intro i em _ _ base tvs n k s _ hk hag _
-    have hr := hrow i
-    rw [WeakRvwmoGlue2.zcutGetD, List.take_zero, List.map_nil, List.map_eq_nil_iff,
-      List.filter_eq_nil_iff] at hr
-    exact absurd (decide_eq_true hag) (hr s (List.mem_of_getElem? hk))
-  obtain ⟨pst, hpst0, hprog⟩ := hpst hfi
-  exact ⟨c, pst, rho, ⟨hc, himg, hpst0, rfl, hprog⟩, hrow⟩
-
 section glue
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode
 open Language.Notation PrimStep
 open LeanRV64D
 
-/-- Lean-only (deviation 5): `WeakRvwmoGlue.cycleKillOfL2`'s proof, run at the zero cut
-(so neither `cutSupply` nor `WeakRvwmoGlue.hullRunFetchInert` is needed). -/
-theorem WeakRvwmoGlue2.cycleKillZ (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc GF]
-    [WeakGpreS GF]
-    (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
-    (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
-    (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) :
-    freshEra gen σ0 →
-    (List.range' 0 N).map boot = epsInit σ0 →
-    d0 = efInit σ0.wgdev →
-    wpPackage hlc GF gen σ0 D →
-    (∀ a base, P a base → wpPackageProt hlc GF gen σ0 D (Nm a base) a base) →
-    (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2) →
-    certSupply boot d0 (imgZ σ0.wgimg) N N →
-    l2Claim boot d0 (imgZ σ0.wgimg) N P (badRun gen σ0) →
-    cycleKill boot d0 (imgZ σ0.wgimg) N := by
-  intro hfr hb1 hb2 hwp hwpp hcov hcert hl2
-  intro GD hcons hq hIH x hcyc
-  -- (1) the cycle, as segments
-  obtain ⟨z, ss, hne, hch⟩ := cycleSegments GD x hcons.2.1 hcyc
-  -- (2) the zero cut, and the realized (empty) causal past
-  obtain ⟨i, hi, hn⟩ := cycleHasEvent GD z ss hcons.1 hne hch
-  have hcutok := zcutCutOk GD.gdG i hi hn
-  have himg := gdexecQconfImg _ _ _ _ _ hq
-  have hN := gdexecQconfNharts _ _ _ _ _ hq
-  obtain ⟨c0, pst0, -, hrd0, -⟩ :=
-    WeakRvwmoGlue2.hullRunZcut boot d0 _ N GD N hcons hq hcutok
-      (hIH _ (cutOkProper _ _ hcutok)) hN
-  -- (3) the certified configuration
-  obtain ⟨c, pst, dv, hrd, hlog⟩ :=
-    hcert GD (zcut GD.gdG) c0 pst0 z ss hcons hq hcutok hrd0 hne hch
-  -- (4) the erased run, and the exports at its log
-  obtain ⟨t2, σ2, hrtc, hlgeq⟩ :=
-    runErased gen σ0 boot d0 N GD.gdG c pst dv hfr hcov hb1 hb2 himg hrd
-  have hpr : protReg P (cdLog c c.cdTr.length) := by
-    rw [← hlgeq]
-    exact protRegOfRun hlc GF gen σ0 D hD Nm P t2 σ2 hfr hwpp hrtc
-  -- (5) the per-site classification, and the kill
-  have hnB : ¬ badRun gen σ0 := noBadRun hlc GF gen σ0 D hD hfr hwp
-  exact cycleKillArms GD.gdG z ss hcons.1 hne
-    (rawChainChain GD P (cdLog c c.cdTr.length) (badRun gen σ0) ss hcons hlog hpr hnB
-      (hl2 GD hq (cdLog c c.cdTr.length) z ss hcons hlog hpr hne hch) z z ss
-      (fun _ h => h) hch)
-
-/-- Rocq `cycle_kill_of_l2'`: the glue's theorem without `bootTie` (deviations 2-5; the
-`cutSupply` premise is kept but unused). -/
+/-- Rocq `cycle_kill_of_l2'`: the glue's theorem without `bootTie` (deviations 2-4). -/
 theorem cycleKillOfL2' (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc GF] [WeakGpreS GF]
     (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
@@ -586,11 +513,11 @@ theorem cycleKillOfL2' (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc GF] 
     certSupply boot d0 (imgZ σ0.wgimg) N N →
     l2Claim boot d0 (imgZ σ0.wgimg) N P (badRun gen σ0) →
     cycleKill boot d0 (imgZ σ0.wgimg) N :=
-  fun hfr hb1 hb2 hwp hwpp hcov _ hcert hl2 =>
-    WeakRvwmoGlue2.cycleKillZ hlc GF gen σ0 D hD Nm P boot d0 N hfr hb1 hb2 hwp hwpp hcov hcert
-      hl2
+  fun hfr hb1 hb2 hwp hwpp hcov hcut hcert hl2 =>
+    cycleKillOfL2 hlc GF gen σ0 D hD Nm P boot d0 (imgZ σ0.wgimg) N N hfr
+      (bootTieOfQconf boot d0 N σ0 hb1 hb2) hwp hwpp hcov hcut hcert hl2
 
-/-- Rocq `cycle_kill_of_l2''` (deviations 2-5). -/
+/-- Rocq `cycle_kill_of_l2''` (deviations 2-4). -/
 theorem cycleKillOfL2'' (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc GF] [WeakGpreS GF]
     (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)

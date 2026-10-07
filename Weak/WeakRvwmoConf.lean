@@ -54,25 +54,20 @@ on fence bits and on whether a write writes a byte (`rowWsRelp`, `lpostRelpRen`)
 2. `ds_prov : gmap wreg (list nat)` ↦ the TOTAL FUNCTION `dsProv : Nat → List Nat` (`∅` ↦
    `fun _ => []`, `<[rd := v]>` ↦ `dprovSet`, Lean-only); `dprov s r` (Rocq `default [] (ds_prov
    s !! r)`) is the application.  Every consumer goes through `dprov`/`∈`, as in Rocq.
-3. O2 — THE INSTRUCTION FETCH (Lean-only label `LIFetch base tvs`; owner decision D1: the fetch
-   STAYS a graph read, `projLbl (LIFetch ..) = some (LLoad false ..)`).  Rocq's fetch was an
-   `LLoad false` item; the Lean one is `LIFetch`, treated EXACTLY as that `LLoad`:
-   - `wlblRen` renames its `tvs` (the projection square `projLblWren` needs it), and
-     `pstepEvWren`'s arm is `WeakEvInst.pstepEvTsIfetch`;
-   - `elbIsR (LIFetch ..) = true` (it projects to a read), and `dstep`'s `LIFetch` arm is the
-     `LLoad` arm (a tagged fetch is pushed to `dsLd`; the model's announce `LInstr`, which
-     follows every fetch, resets it).
-   - `hlblRealizes` is Rocq's FOUR-conjunct relation; `WeakAxRealize.lblRealizes` has the
-     Lean-only fifth conjunct `lbFetchInert σ i l` (its deviation 4), which reads the AXIOMATIC
-     `Wstate`'s coherence/views and is therefore NOT stable under `rowWs`'s representative
-     state or the ts renaming.  So the definitional seam `hlbl_realizes_ax` is restated as
-     `hlblRealizesAx : lblRealizes pclsEv p σ i lb l ↔ hlblRealizes p (σ.msWs i) lb l ∧
-     lbFetchInert σ i l` (vacuous for every non-fetch label: `lbFetchInert` is `True` there,
-     `hlblRealizesAxNoFetch`, Lean-only).  The consumer (B0b-2) supplies `lbFetchInert` at the
-     machine's state, where it lives.  `hlblRealizesPairAx` is unchanged (`Iff.rfl`).
+3. O2 / STAGE C — THE INSTRUCTION FETCH (Lean-only label `LIFetch base tvs`; owner rulings
+   Q-C1/Q-C4, `notes/weak-port-o2-stageC.md`).  Rocq's fetch was an `LLoad false` row item; in
+   Lean the fetch is NOT a graph event (riscv.cat has none): it is an ADMINISTRATIVE label
+   (`WeakAxRealize.lbAdmin`, at the `LInstr` slot), `projLbl (LIFetch ..) = none`.  So:
+   - `wlblRen π (LIFetch base tvs) = LIFetch base tvs` (fetch tags are not graph write indices,
+     Q-C4); `projLblWren` and `pstepEvWren` are trivial at it, and `wlblRenAdmin` holds;
+   - `elbIsR (LIFetch ..) = false`, and `dstep`'s `LIFetch` arm is `(s, [])` (no `dsLd` push,
+     no dependency edges);
+   - `hlblRealizes` and `WeakAxRealize.lblRealizes` are both Rocq's four-conjunct relation, and
+     the seam `hlblRealizesAx` is `Iff.rfl` again (Stage B's `lbFetchInert` conjunct and
+     `hlblRealizesAxNoFetch` are deleted).
 4. PROOFS: per-constructor case analysis (Rocq `destruct l; simpl; try done`); the smoke tests
    (Rocq `Example … vm_compute`) are named `theorem`s closed by `decide`.
-5. Lean-only helpers: `dprovSet`, `dedgesSnd`, `hlblRealizesAxNoFetch`, and the `dstepWithin`
+5. Lean-only helpers: `dprovSet`, `dedgesSnd`, and the `dstepWithin`
    sub-lemmas `dsWithinPush`/`dsWithinInstr`/`dsWithinRegw`/`dsWithinCtrl`.
 
 **Rocq → Lean name map.**  `pcls_ev_relp` `WeakRvwmoConf.pclsEvRelp`, `tv_ren` `tvRen`,
@@ -149,7 +144,7 @@ def wlblRen (π : Nat → Nat) (l : Wlabel) : Wlabel :=
   | LLoad aq lat base tvs asrc => LLoad aq lat base (tvs.map (tvRen π)) asrc
   | LRmw aq rl base tvs data asrc vsrc => LRmw aq rl base (tvs.map (tvRen π)) data asrc vsrc
   | LExLoad aq base tvs asrc => LExLoad aq base (tvs.map (tvRen π)) asrc
-  | LIFetch base tvs => LIFetch base (tvs.map (tvRen π))
+  | LIFetch base tvs => LIFetch base tvs
   | LSilent => LSilent
   | LStore rl base data asrc vsrc => LStore rl base data asrc vsrc
   | LFence pr pw sr sw => LFence pr pw sr sw
@@ -204,7 +199,7 @@ theorem pclsEvWren (p : Pexv6) (π : Nat → Nat) (l : Wlabel) (we wi : Wstate) 
   exact WeakRvwmoConf.pclsEvRelp p l we wi h
 
 /-- THE TIMESTAMP-OBLIVIOUSNESS OF THE PROGRAM, at the renaming (every arm is one of
-`WeakEvInst`'s `ts_oblivious` exports; the fetch arm is deviation 3). -/
+`WeakEvInst`'s `ts_oblivious` exports; the fetch is fixed by the renaming, deviation 3). -/
 theorem pstepEvWren (π : Nat → Nat) (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6)
     (d' : Efab) :
     latFree l → lbRfoldfree l → pstepEv p d l p' d' → pstepEv p d (wlblRen π l) p' d' := by
@@ -221,9 +216,6 @@ theorem pstepEvWren (π : Nat → Nat) (p : Pexv6) (d : Efab) (l : Wlabel) (p' :
   | LExLoad aq base tvs asrc =>
     intro _ _ h
     exact pstepEvTsExload p d aq base tvs _ asrc p' d' h (tvRenSnd π tvs)
-  | LIFetch base tvs =>
-    intro _ _ h
-    exact pstepEvTsIfetch p d base tvs _ p' d' h (tvRenSnd π tvs)
   | _ => intro _ _ h; exact h
 
 /-! ## 3. The row's representative wstate fold -/
@@ -324,7 +316,7 @@ theorem rowWsRelpRen (π : Nat → Nat) (row : List Lbl) (k : Nat) :
 
 /-! ## 4. The per-hart realization relations -/
 
-/-- Rocq's four-conjunct `hlbl_realizes` (deviation 3: no fetch-inertness conjunct). -/
+/-- Rocq's four-conjunct `hlbl_realizes`. -/
 def hlblRealizes (p : Pexv6) (ws : Wstate) (lb : Lbl) (l : Wlabel) : Prop :=
   lbNobarex l ∧ latFree l ∧ lbRfoldfree l ∧ projLbl (pclsEv p l ws) l = some lb
 
@@ -337,23 +329,10 @@ def hlblRealizesPair (_p pm : Pexv6) (ws : Wstate) (lb : Lbl) (l1 l2 : Wlabel) :
     lb = Lbl.LRmw aq rl base (tvs.map Prod.fst) (tvs.map Prod.snd) data
            (pclsEv pm l2 (loadPostRun ws aq base (tvs.map Prod.fst)))
 
-/-- The seam back to T1-D's vocabulary (deviation 3: plus the fetch-inertness conjunct). -/
+/-- The seam back to T1-D's vocabulary (definitional, deviation 3). -/
 theorem hlblRealizesAx (p : Pexv6) (σ : Mstate) (i : Nat) (lb : Lbl) (l : Wlabel) :
-    lblRealizes pclsEv p σ i lb l ↔ hlblRealizes p (σ.msWs i) lb l ∧ lbFetchInert σ i l := by
-  constructor
-  · rintro ⟨h1, h2, h3, h4, h5⟩
-    exact ⟨⟨h1, h2, h3, h4⟩, h5⟩
-  · rintro ⟨⟨h1, h2, h3, h4⟩, h5⟩
-    exact ⟨h1, h2, h3, h4, h5⟩
-
-/-- (Lean-only) Off the fetch, the seam is Rocq's. -/
-theorem hlblRealizesAxNoFetch (p : Pexv6) (σ : Mstate) (i : Nat) (lb : Lbl) (l : Wlabel) :
-    lbNoFetch l → (hlblRealizes p (σ.msWs i) lb l ↔ lblRealizes pclsEv p σ i lb l) := by
-  intro hnf
-  rw [hlblRealizesAx]
-  have : lbFetchInert σ i l := by
-    cases l <;> first | trivial | exact hnf.elim
-  exact ⟨fun h => ⟨h, this⟩, fun h => h.1⟩
+    lblRealizes pclsEv p σ i lb l ↔ hlblRealizes p (σ.msWs i) lb l :=
+  Iff.rfl
 
 theorem hlblRealizesPairAx (p pm : Pexv6) (σ : Mstate) (i : Nat) (lb : Lbl) (l1 l2 : Wlabel) :
     hlblRealizesPair p pm (σ.msWs i) lb l1 l2 ↔ lblRealizesPair pclsEv p pm σ i lb l1 l2 :=
@@ -461,10 +440,10 @@ theorem eitemRenBlock (π : Nat → Nat) (ls : List Wlabel) (l : Wlabel) (k : Na
   rw [List.map_append, List.map_cons, eitemRenEadm]
   rfl
 
-/-- The label's memory role, at the INSTANCE alphabet (deviation 3: the fetch reads). -/
+/-- The label's memory role, at the INSTANCE alphabet (deviation 3: the fetch is no read). -/
 def elbIsR (l : Wlabel) : Bool :=
   match l with
-  | LLoad .. | LExLoad .. | LRmw .. | LIFetch .. => true
+  | LLoad .. | LExLoad .. | LRmw .. => true
   | _ => false
 
 def elbIsW (l : Wlabel) : Bool :=
@@ -513,11 +492,11 @@ def dedges (s : Dstate) (k : Nat) (asrc vsrc : List Dsrc) : List (Nat × Nat) :=
 
 def WeakRvwmoConf.dstep (s : Dstate) (it : Eitem) : Dstate × List (Nat × Nat) :=
   match it.1 with
-  | LSilent | LDev | LFence _ _ _ _ => (s, [])
+  | LSilent | LDev | LFence _ _ _ _ | LIFetch _ _ => (s, [])
   | LInstr => (⟨s.dsProv, [], s.dsCtl⟩, [])
   | LRegW rd srcs => (⟨dprovSet s.dsProv rd (dsrcsPos s srcs), s.dsLd, s.dsCtl⟩, [])
   | LCtrl srcs => (⟨s.dsProv, s.dsLd, s.dsCtl ++ dsrcsPos s srcs⟩, [])
-  | LLoad _ _ _ _ _ | LExLoad _ _ _ _ | LIFetch _ _ =>
+  | LLoad _ _ _ _ _ | LExLoad _ _ _ _ =>
       match it.2 with
       | some k => (⟨s.dsProv, k :: s.dsLd, s.dsCtl⟩, [])
       | none => (s, [])

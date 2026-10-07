@@ -90,7 +90,8 @@ relation the cone is closed under.  DEPENDENCY-FREE: no Iris, no Sail.
    never-written bytes, timestamp 0); the capstones in fetch-free form,
    `robustMainBundleNoFetch`, `robustMainNoFetch`, `robustTransportNoFetch`,
    carry `pstepNoFetch pstep` instead and are otherwise Rocq's statements.
-6. Lean-only declarations (no Rocq twin): `fetchSrcOkOfNoFetch`,
+6. Lean-only declarations (no Rocq twin): `pstepNoFetch` (Stage C: moved here from
+   `WeakPromiseBridge`, whose bridges no longer take it), `fetchSrcOkOfNoFetch`,
    `fetchSrcOkTsZero`, `robustMainBundleNoFetch`, `robustMainNoFetch`,
    `robustTransportNoFetch`.
 7. `lb_rl`'s Lean-only `LIFetch` arm is `false` (a fetch carries no `rl` bit);
@@ -1365,6 +1366,11 @@ theorem mainPremisesNil {P D : Type} (nh : Nat) (TS : Ptraces P D) (d : D) :
   fun h1 h2 h3 h4 => ⟨h1, h2, h3, devWitOkNil TS d, h4⟩
 
 /-! ### O2 (deviation 5): discharging the fetch-source premise -/
+
+/-- The program-level fetch-freedom predicate (Lean-only; Stage C relocated it here from
+`WeakPromiseBridge`, whose bridges no longer need it). -/
+def pstepNoFetch {P D : Type} (pstep : P → D → Wlabel → P → D → Prop) : Prop :=
+  ∀ p d l p' d', pstep p d l p' d' → ∀ base tvs, l ≠ .LIFetch base tvs
 
 /-- A program that never fetches has a vacuous fetch-source premise
 (Lean-only). -/

@@ -53,13 +53,14 @@ dependency (`rowDepsTChain`); (5) SOUNDNESS FIX: `dtAdr` is fed only from a memo
 
 A LEAF in Rocq: nothing imports this file.
 
-FETCHES (owner decision D1: a fetch STAYS a graph read).  Rocq's fetch row item was
-`LLoad false false pc tvs []`; the Lean one is `LIFetch pc tvs` (no `asrc`).  `dstepT`'s
-`LIFetch` arm is EXACTLY that `LLoad` arm at `asrc = []`: the fetch position is pushed to `dtLd`,
-`dtAdr` is `dtAcc s []`, and the fetch receives the `dedgesR s k []` edges (`DTctx` only).  This
-matches `WeakRvwmoConf.dstep`'s `LIFetch` arm (its deviation 3), so `dstepTState` holds by
-`rfl` in every arm.  Nothing in this file turns `hartConf` blocks into `lblRealizes`, so the
-`lbFetchInert` premise (`WeakRvwmoConf.hlblRealizesAx`) does not arise here.
+FETCHES (O2 Stage C, owner rulings Q-C1/Q-C4: the fetch is an ADMINISTRATIVE label, not a graph
+event).  Rocq's fetch row item was `LLoad false false pc tvs []`; the Lean instance label is
+`LIFetch pc tvs`, which has no row item, no identity and no edges.  `dstepT`'s `LIFetch` arm is
+`(s, [])` (no `dtLd` push, no `dtAdr` change, no edges), exactly `WeakRvwmoConf.dstep`'s
+`LIFetch` arm (its deviation 3; `elbIsR (LIFetch ..) = false`), so `dstepTState` holds by `rfl`
+in every arm.  The §5 witness `AxDeps.tw` (like Rocq's `tw_prog`) has no fetch row items, so its
+rows, positions and kernel-checked verdicts are unchanged by Stage C.  Nothing in this file turns
+`hartConf` blocks into `lblRealizes`.
 
 ## Deviations from Rocq
 
@@ -78,7 +79,8 @@ matches `WeakRvwmoConf.dstep`'s `LIFetch` arm (its deviation 3), so `dstepTState
 4. `dtag_eq_dec` ↦ `deriving DecidableEq`.  The `Local Notation`s `B0`/`B1`/`wld`/`wldA`/`wsd`
    are inlined (`b0`/`b1`, the literal labels); `Ltac vmr` and every `vm_compute` ↦
    `decide`/`decide +kernel`.  The `Example`s are named `theorem`s.
-5. O2 / D1: `dstepT` has the Lean-only `LIFetch` arm described above.
+5. O2 / Stage C: `dstepT` has the Lean-only `LIFetch` arm `(s, [])` described above (Rocq has
+   no fetch label; its fetch was an `LLoad` row item).
 6. CLOSURE INDUCTION: `obCatTSubGmo` inducts on the library `tc`, which splits at the LAST step
    (`MachCSL.Rel` deviation 1).
 7. Lean-only helpers: `Tdep`, `Redge`, `tagEdgesLt`, `dedgesRSnd`, `dedgesRLt`, `dedgesWLt`.
@@ -408,7 +410,7 @@ EDGES.  A READ at `k`: `DTaddr` from its address sources (rule 9's load half), `
 context CSRs' provenance.  A WRITE at `k`: `DTaddr` (rule 9), `DTdata` (10), `DTctrl` (11, from
 `dtCtl`), `DTtrans` (the tree's W-TV edge, from `dtLd`), `DTr13` (from `dtAdr`, BEFORE this
 access's own sources are appended), `DTctx`.  The fused RMW is a write here and also joins
-`dtLd`, exactly as in `dstep`.  The fetch (D1) is the `LLoad` arm at `asrc = []`. -/
+`dtLd`, exactly as in `dstep`.  The fetch (Stage C) is admin: `(s, [])`. -/
 
 structure DstateT where
   mk ::
@@ -458,7 +460,7 @@ def dtAcc (s : DstateT) (xs : List Dsrc) : List Nat :=
 
 def dstepT (s : DstateT) (it : Eitem) : DstateT × List Redge :=
   match it.1 with
-  | LSilent | LDev | LFence _ _ _ _ => (s, [])
+  | LSilent | LDev | LFence _ _ _ _ | LIFetch _ _ => (s, [])
   | LInstr => (⟨s.dtProv, [], s.dtCtl, s.dtAdr⟩, [])
   | LRegW rd srcs =>
       (⟨dprovSet s.dtProv rd (dtsrcs s srcs), s.dtLd, s.dtCtl, s.dtAdr⟩, [])
@@ -467,10 +469,6 @@ def dstepT (s : DstateT) (it : Eitem) : DstateT × List Redge :=
   | LLoad _ _ _ _ asrc | LExLoad _ _ _ asrc =>
       match it.2 with
       | some k => (⟨s.dtProv, k :: s.dtLd, s.dtCtl, dtAcc s asrc⟩, dedgesR s k asrc)
-      | none => (s, [])
-  | LIFetch _ _ =>
-      match it.2 with
-      | some k => (⟨s.dtProv, k :: s.dtLd, s.dtCtl, dtAcc s []⟩, dedgesR s k [])
       | none => (s, [])
   | LStore _ _ _ asrc vsrc | LExStore _ _ _ asrc vsrc =>
       match it.2 with

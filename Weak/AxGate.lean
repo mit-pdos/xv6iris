@@ -27,8 +27,9 @@ and ignores `it.2`), so `gateSrcs` is indexed by the row (hart, prefix state, so
 write (incl. AMO/SC write parts via `LRmw`).  (F5) A trap redirect emitting `LCtrl []` gives a
 vacuous gate.
 
-FETCHES (owner decision D1): untouched here — a fetch (`LIFetch`) is a read in `elbIsR`, and
-`dstepT`'s `LIFetch` arm leaves `dtCtl` unchanged like every non-`LCtrl` arm.
+FETCHES (O2 Stage C): untouched here — a fetch (`LIFetch`) is an administrative label
+(`elbIsR (LIFetch ..) = false`), and `dstepT`'s `LIFetch` arm is `(s, [])`, leaving `dtCtl`
+unchanged like every non-`LCtrl` arm.  This file has no `decide` checks over fetch rows.
 
 **Deviations from Rocq.**
 

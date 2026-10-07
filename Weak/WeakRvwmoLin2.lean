@@ -28,11 +28,11 @@ not needed); §6 the rank trace is a `ptraceExt` (`glinPtraceExt`), non-vacuity 
    Duplicated names file-qualified: `WeakRvwmoLin2.filterAll`, `WeakRvwmoLin2.tev`.
 2. The Rocq `Section Trace` / `Section Rank` hypotheses become explicit parameters of each
    declaration, exactly those Rocq's section closing keeps.
-3. O2 / D1 — fetch-inertness (`WeakRvwmoFab` deviation 2): `fconfSupply` takes
-   `candFetchInertF boot N c`.  So `fconfSupply'` gains that premise at `candOf G L`, and in
-   `fconfTraceRealize` (where `L` is existential) Rocq's `∃ L pst, … ∧ pst 0 = … ∧ fab … = d0 ∧
-   execProgOk' …` becomes `∃ L, … ∧ (candFetchInertF boot N c → ∃ pst, pst 0 = … ∧ fab … = d0 ∧
-   execProgOk' …)`; the other conjuncts are Rocq's.
+3. O2 / D1 at the pinned LTS (Stage C, item 14): `fconfSupply` (`WeakRvwmoFab`) concludes
+   `execProgOk' (pstepPin GF.gfGd.gdG.gxImg pstepEv) …` (Rocq: `execProgOk' pstepEv …`; the image
+   pin is `WeakAxRealize.fetchPin`), so `fconfSupply'` and the last conjunct of
+   `fconfTraceRealize` are stated at `pstepPin GF.gfGd.gdG.gxImg pstepEv`.  Premises and the other
+   conjuncts are Rocq's (the earlier `candFetchInertF` premise/conditional is deleted).
 4. Lean-only helpers: `WeakRvwmoLin2.gevs'Eq` (`gevs' G = gevs G`, Rocq: definitional) and
    `WeakRvwmoLin2.devLbl` (the "every dev event is labelled" fact Rocq inlines twice), and the
    local `where`-auxiliary `ptraceRelMem.gwriteAtInv'`.
@@ -991,7 +991,7 @@ theorem WeakRvwmoLin2.devLbl (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → E
   simp only [gxLbl, hrow, Option.bind_some]
   exact lookup_lt_is_Some_2 hlt
 
-/-- (Deviation 3: the fetch-inertness premise.) -/
+/-- (Deviation 3: at the pinned LTS.) -/
 theorem fconfSupply' (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec)
     (N : Nat) (L : List Geid) :
     gfexecConf boot d0 fab GF →
@@ -999,18 +999,16 @@ theorem fconfSupply' (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF
     ptraceExt GF.gfGd.gdG L →
     (∀ (m n : Nat) e e', m < n → GF.gfDev[m]? = some e → GF.gfDev[n]? = some e' → before L e e') →
     GF.gfGd.gdG.gxProg.length ≤ N →
-    candFetchInertF boot N (candOf GF.gfGd.gdG L) →
     ∃ pst : Nat → List Pexv6,
       pst 0 = (List.range' 0 N).map boot ∧
       fab (dcnt GF (candOf GF.gfGd.gdG L).cdTr 0) = d0 ∧
-      execProgOk' pstepEv pclsEv pst (fun k => fab (dcnt GF (candOf GF.gfGd.gdG L).cdTr k))
+      execProgOk' (pstepPin GF.gfGd.gdG.gxImg pstepEv) pclsEv pst (fun k => fab (dcnt GF (candOf GF.gfGd.gdG L).cdTr k))
         (candExec (candOf GF.gfGd.gdG L)) := by
-  intro hconf _ hext hord hN hfi
+  intro hconf _ hext hord hN
   exact fconfSupply (candOf GF.gfGd.gdG L) boot d0 fab GF N hconf (fun i => trowEq _ L hext i) hN
     (trDevOrderedOfPtrace GF L hext hconf.2.1 (WeakRvwmoLin2.devLbl boot d0 fab GF hconf) hord)
-    hfi
 
-/-- THE DELIVERABLE (deviation 3: the supply conditional on `candFetchInertF`). -/
+/-- THE DELIVERABLE (deviation 3: the supply at the pinned LTS). -/
 theorem fconfTraceRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec)
     (N : Nat) :
     gfexecConsistent' GF →
@@ -1024,17 +1022,16 @@ theorem fconfTraceRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab
             (GF.gfGd.gdG.gxProg[i]?).getD []) ∧
       cdLog (candOf GF.gfGd.gdG L) (candOf GF.gfGd.gdG L).cdTr.length =
         (gwrites GF.gfGd.gdG).filterMap (WeakRvwmoLin.gmsg GF.gfGd.gdG) ∧
-      (candFetchInertF boot N (candOf GF.gfGd.gdG L) →
-        ∃ pst : Nat → List Pexv6,
-          pst 0 = (List.range' 0 N).map boot ∧
-          fab (dcnt GF (candOf GF.gfGd.gdG L).cdTr 0) = d0 ∧
-          execProgOk' pstepEv pclsEv pst (fun k => fab (dcnt GF (candOf GF.gfGd.gdG L).cdTr k))
-            (candExec (candOf GF.gfGd.gdG L))) := by
+      ∃ pst : Nat → List Pexv6,
+        pst 0 = (List.range' 0 N).map boot ∧
+        fab (dcnt GF (candOf GF.gfGd.gdG L).cdTr 0) = d0 ∧
+        execProgOk' (pstepPin GF.gfGd.gdG.gxImg pstepEv) pclsEv pst
+          (fun k => fab (dcnt GF (candOf GF.gfGd.gdG L).cdTr k))
+          (candExec (candOf GF.gfGd.gdG L)) := by
   intro hc' hconf hN
   have hcons : rvwmoMinusConsistent GF.gfGd.gdG := hc'.1.1
   obtain ⟨L, hext, hord⟩ := ptraceExistsF GF hc' (WeakRvwmoLin2.devLbl boot d0 fab GF hconf)
   obtain ⟨h1, h2, h3, h4⟩ := gtraceLinearizationMin _ L hcons hext
-  exact ⟨L, h1, h2, h3, h4,
-    fun hfi => fconfSupply' boot d0 fab GF N L hconf hcons hext hord hN hfi⟩
+  exact ⟨L, h1, h2, h3, h4, fconfSupply' boot d0 fab GF N L hconf hcons hext hord hN⟩
 
 end Weak

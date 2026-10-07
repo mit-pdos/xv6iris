@@ -21,7 +21,7 @@ instruction-rule composition's job.
 
 The `AxirisG` instantiation is BY HYPOTHESIS: the flow equations are stated for an ARBITRARY
 ambient `AxirisG GF` together with the bridging hypothesis `Hob_eq : ∀ GD σ s, obStInterp GD σ s
-⊣⊢ protInv γ GD s`; §5 discharges it for `AxWp`'s own `skelAxirisG γg (ΦpOwn γ) (fun _ => False)`.
+⊣⊢ protInv γ GD s`; §5 discharges it for `AxWp`'s own `skelAxirisG γg (ΦpOwn γ)`.
 The flow equation's `R` is the BARE pure fact (the token handed in through `flowIn` is spent by
 `ownedReadRule`; a hart's own continued ownership travels on ordinary WP resources).
 `flowEqOwnedWrite` takes `graphData GD w = some data` as an explicit hypothesis (Rocq: STALE since
@@ -437,9 +437,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [InvGS_gen hlc GF] [AxannotGS GF]
 
 /-- The discharge of §4's `Hob_eq` at `AxWp`'s skeleton instance. -/
 theorem nonvacuityHobEq :
-    ∀ (GD : Gdexec) (σ : @AxirisG.obSt GF (skelAxirisG γg (ΦpOwn γ) (fun _ : Int => False)))
+    ∀ (GD : Gdexec) (σ : @AxirisG.obSt GF (skelAxirisG γg (ΦpOwn γ)))
       (s : GSet Geid),
-      AxirisG.obStInterp (self := skelAxirisG γg (ΦpOwn γ) (fun _ : Int => False)) GD σ s ⊣⊢
+      AxirisG.obStInterp (self := skelAxirisG γg (ΦpOwn γ)) GD σ s ⊣⊢
         protInv γ GD s :=
   fun _ _ _ => BIBase.BiEntails.rfl
 
@@ -461,14 +461,14 @@ theorem fwdGreadsByte0 : greadsByte fwd.gdG (0, 1) 0 3 b1 :=
 pure conclusion is the REAL forwarded value `b1`. -/
 theorem protNonvacuity :
     histAuth (GF := GF) γ 0 1 [] ⊢ |==>
-      @flowEqDyn hlc GF _ (skelAxirisG γg (ΦpOwn γ) (fun _ : Int => False)) fwd (0, 1) ∅
+      @flowEqDyn hlc GF _ (skelAxirisG γg (ΦpOwn γ)) fwd (0, 1) ∅
         {[(0, 0) := tokTie fwd γ 0 [((0, 0), b1)] {[(0, 0) := (1 : Qp)]}]}
         iprop(⌜∀ t v, greadsByte fwd.gdG (0, 1) 0 t v → v = b1⌝) := by
   have h0 : ⊢ protInv (GF := GF) γ fwd (∅ : GSet Geid) := by
     unfold protInv
     exact BigSepS.bigSepS_empty.2
   have hrd := fwdGreadsByte0
-  have hcore := flowEqOwnedRead (hlc := hlc) (GF := GF) (axG := skelAxirisG γg (ΦpOwn γ) (fun _ : Int => False)) γ
+  have hcore := flowEqOwnedRead (hlc := hlc) (GF := GF) (axG := skelAxirisG γg (ΦpOwn γ)) γ
     (nonvacuityHobEq γg γ) fwd (0, 1) 0 [((0, 0), b1)] {[(0, 0) := (1 : Qp)]} (0, 0) b1 ∅
     {[(0, 0) := tokTie fwd γ 0 [((0, 0), b1)] {[(0, 0) := (1 : Qp)]}]} AxGraphWit.fwdCat
     (greadsByteGmo _ _ _ _ _ AxGraphWit.fwdCat.1 hrd)

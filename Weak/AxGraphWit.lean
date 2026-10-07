@@ -37,7 +37,8 @@ strands r1); only the fractional flow strands nobody (`fracGmo`, `fracPo`).
 (2) Rule 12 over `gdDeps` over-approximates riscv.cat (control deps are not
 tagged apart); `r12` uses a genuine DATA dependency, so the verdict stands.
 
-FETCHES (owner decision D1): nothing here involves a fetch.
+FETCHES (Stage C, D1 reversed: fetches are not graph events): nothing here involves
+a fetch — every `LLoad` row item is a data load; no row or `decide` check changed.
 
 **Deviations from Rocq.**
 

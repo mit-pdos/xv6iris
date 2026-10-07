@@ -30,8 +30,8 @@ WHAT IS PROVED.
      under (3))), and the capstone `scGraphCatT : scGraph GT → rvwmoCatConsistentT GT`.
   §3 a SOUND boolean `scGraphB` (`scGraphBSound`; cubic, for SMALL graphs only).
   §4 SANITY.  Satisfiable: `tw2Sc` (`AxDeps.tw2`) and `g10Sc` / `g40Sc` — the spike
-     generator's truncated allocpid graphs (`AxSpinSpike.g10/g40`; in this tree 50 / 144 gmo
-     events) — so the capstone applies to them (`g40CatT`).  NOT TRIVIAL: `twNotSc` —
+     generator's truncated allocpid graphs (`AxSpinSpike.g10/g40`; in this tree, O2 Stage C,
+     24 / 50 gmo events with 6 / 16 deps -- Stage B, fetches as events: 50 / 144) — so the capstone applies to them (`g40CatT`).  NOT TRIVIAL: `twNotSc` —
      `AxDeps.tw` is consistent (`twCatT`) yet NOT `scGraph` (its gmo puts a forwarded read
      before its po-earlier source store), so `scGraph` is strictly stronger
      (`scStrictlyStronger`); `tw2RfBad`: a po-respecting gmo whose read names a stale source
@@ -44,9 +44,13 @@ WHAT IS PROVED.
 HONEST SCOPE (Rocq).  `scGraphCatT` is unconditional.  What a certificate still has to supply
 is `scGraph` of ITS graph; on small instances `scGraphB` decides it.
 
-FETCHES (owner decision D1): this tier keeps the Rocq treatment — a fetch is a graph `LLoad`;
-nothing here distinguishes it.  In §5 `dstepT`'s `LIFetch` arm leaves `dtCtl` unchanged and
-emits read edges only (no `DTctrl`).
+FETCHES (O2 Stage C, owner rulings Q-C1/Q-C4; `notes/weak-port-o2-stageC.md` item 8): a fetch
+is an ADMINISTRATIVE label, not a graph event — nothing here needs to distinguish it, since no
+graph contains one: `AxDeps.tw`/`tw2`/`twStale` have no fetch rows, and the spike graphs
+`g10`/`g40` no longer carry fetch reads (`AxSpinSpike` header).  `g10Sc`, `g40Sc` (and `tw2Sc`,
+`tw2RfBad`'s kernel facts, including `gwix twStale.gtG (1, 1) = 1`, unchanged) are re-checked on
+these graphs.  In §5 `dstepT`'s `LIFetch` arm is `(s, [])`: it leaves `dtCtl` unchanged and emits
+no edge.
 
 **Deviations from Rocq.**
 
@@ -57,8 +61,8 @@ emits read edges only (no `DTctrl`).
    `Nat.leb` ↦ `decide (· ≤ ·)`); the read-byte triple is left-nested `(Int × Nat) × BitVec 8`.
    Edges are `((j, k), tg)` (AxDeps' `Redge`) where Rocq writes `(j, k, tg)`.
 3. The `vm_compute` verdicts are `decide +kernel`.  In this tree `g10` / `g40` are the Lean
-   spike's graphs (this kernel's text; see `AxSpinSpike`'s header), not Rocq's 46 / 136-event
-   ones.
+   spike's graphs (this kernel's text, fetches administrative; 24 / 50 events, see
+   `AxSpinSpike`'s header), not Rocq's 46 / 136-event ones.
 4. `tw` is `AxDeps.tw` (file-qualified there); `B0`/`B1` (Rocq local notations for
    `WeakLitmus.b0/b1`) are AxDeps' `b0`/`b1` (`WeakLitmus`'s, the same values).
 5. `tw2RfBad`'s final step: Rocq computes the bound `gwix … ≤ 0` to `1 ≤ 0`; here

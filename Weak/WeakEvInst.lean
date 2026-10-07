@@ -127,12 +127,9 @@ bits by `WeakDeps.depsOfIb` (`edeps`).
 6. THE OPERAND LISTS: the Lean language's store / exclusive-read arms carry
    `depsAsrc`/`depsVsrc (edeps σ c)`, which is `depsOfIb (σ.wgib c).ibBits` — the program half's
    `depsOfIb ib.ibBits` at `ib = σ.wgib c`, by conversion (as Rocq).
-7. T2 (`t2Ev`).  The event instance FETCHES, so Rocq's `t2_bridge` route (Lean
-   `WeakRefuse.t2Bridge`, whose Lean-only premise is `pstepNoFetch`) does not apply; `t2Ev` goes
-   through the Lean-only `WeakRefuse.t2BridgeFetch` and therefore carries its premise: the
-   bridge's fetch → plain-load condition (`WeakPromiseBridge.pfRunFetchOk`, its deviation 6) on
-   every run of the re-fused erased instance.  (Cross-file fact: the fetch → plain load premise
-   `pfFetchLoadOk`.)
+7. T2 (`t2Ev`).  Stage C (owner ruling Q-C3): the bridge treats a fetch as a stutter, so `t2Ev`
+   is Rocq's statement again, through `WeakRefuse.t2Bridge` (Stage B's fetch → plain-load
+   premise on the re-fused runs is deleted).
 8. Lean-only O2 facts for the robustness tower (`WeakRobustSim.tsOblivious`'s fourth, fetch
    clause, its deviation 4): `pnodeStepTsIfetch`, `pstepNodeTsIfetch`, `pstepDiskTsIfetch`,
    `pstepEvTsIfetch`; and `pstepDiskNoFetch`.  Lean-only `pnodeStepCases` (the label shapes of
@@ -194,7 +191,7 @@ bits by `WeakDeps.depsOfIb` (`edeps`).
 **Statements checked** (by hand, against Rocq): all; the changed ones are the deviations above
 (the `obar` argument everywhere, the RAM-read arm and `elabOk`/`edlabOk`'s `LIFetch` clauses,
 the `Efab` fabric of `pstepEv` & co., `pstepPlic`/`pdiskUart`/`pdiskProg`, the device
-factorizations and their corollaries, `t2Ev`'s fetch premise).
+factorizations and their corollaries).
 -/
 import Weak.WeakEvPf
 import Weak.WeakRefuse
@@ -1998,13 +1995,11 @@ theorem pclsEvFusable : pclsFusable pstepEv pclsEv := by
     exact (pstepHartExstoreExcl _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ wS h).symm
   · exact (pstepDiskNoEx _ _ _ _ _ hs).elim
 
-/-! ## 9. THE INSTANCE T2 (deviation 7: the fetch premise) -/
+/-! ## 9. THE INSTANCE T2 -/
 
 theorem t2Ev (img : Image) (d0 : Efab) (ps : List Pexv6) (c : Wpcfg Pexv6 Efab) :
-    (∀ cF, rtc (wpPfRun (refusePstep (erasePstep pstepEv)) pclsEv) (wpInit img d0 ps) cF →
-      pfRunFetchOk (refusePstep (erasePstep pstepEv)) pclsEv (wpInit img d0 ps) cF) →
     rtc (wpPfRun pstepEv pclsEv) (wpInit img d0 ps) c →
     ∃ E, execWf E ∧ exImg E = img ∧ exLog E = c.pcLog :=
-  t2BridgeFetch pstepEv pclsEv img d0 ps c pclsEvErasable pclsEvFusable
+  t2Bridge pstepEv pclsEv img d0 ps c pclsEvErasable pclsEvFusable
 
 end Weak

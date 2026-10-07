@@ -43,20 +43,17 @@ proper, the project's remaining content; (R-2) `walkSupply` — the certificatio
    deviation 3, owner Q4): all three safety theorems take
    `∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2`, placed right after the WP package
    premises (as in `t2linOfL2''`).
-4. O2 / D1 — THE FETCH-INERTNESS PREMISE OF THE WHOLE-GRAPH CANDIDATE, CARRIED (WeakRvwmoLinInd
-   deviation 2 / WeakRvwmoSupply deviation 2, owner Q2).  Glue2 discharges fetch-inertness at
-   the ZERO cut (empty hull), but the capstone's TOPO step realizes the WHOLE graph, whose
-   candidate does carry fetches; `t2linSupply`/`topoSupply` return the process supply only
-   conditional on `candFetchInert boot d0 N c`, and nothing in the premises speaks of the
-   candidate's machine `Wstate` at a fetch (WeakRvwmoGlue deviation 5's argument).  So
-   §2 carries the Lean-only premise `WeakRvwmoCapstone.t2linFetchInert boot d0 im nh N`
-   (named after `t2lin_supply`): every sRVWMO-consistent candidate of an acyclic conformant
-   graph's image whose rows are the graph's rows up to a write renaming is fetch-inert.  To
-   state it at the realized rows, the Lean-only `WeakRvwmoCapstone.t2linSupplyRows` is
-   `t2linSupply` with the renaming and the rows exposed (the proof of `topoSupply`).  §3
-   likewise carries `WeakRvwmoCapstone.fconfFetchInert boot N GX` (every sRVWMO-consistent
-   linearization of `GX` with `GX`'s rows is `candFetchInertF`), discharging
-   `fconfTraceRealize`'s conditional supply.  Conclusions are Rocq's.
+4. O2 Stage C — THE PINNED PROGRAM LTS (spec item 16; WeakRvwmoLinInd / WeakRvwmoLin2 /
+   WeakSrvwmoCapstone).  The fetch is an administrative label of the graph tier, so there is no
+   fetch-inertness obligation: `t2linSupply` and `fconfTraceRealize` return the process supply
+   unconditionally, at the PINNED LTS `pstepPin img pstepEv` (`img` the graph's image, equal to
+   `imgZ σ0.wgimg` by `gdexecQconfImg` / the image premise).  The capstones hand that supply to
+   `xv6SrvwmoSafe` (which lifts through `execWfPfRunProg` / `wpPfRunPinSub`), and state the
+   Rocq conclusion `execProgOk' pstepEv …` via the Lean-only
+   `WeakRvwmoCapstone.execProgOkPinSub` (the pinned LTS is a sub-LTS).  The provisional (Q5)
+   Lean-only premises `t2linFetchInert` / `fconfFetchInert` and the helper `t2linSupplyRows`
+   are DELETED; the only fetch premise left is the efetchItvOk fetch-view premise (deviation 3,
+   Q4).  Conclusions are Rocq's.
 5. PROOFS: Rocq's scripts.  `defaultLookupSeq` by `List.ext_getElem`.
 
 **Rocq → Lean name map.**  `default_lookup_seq` `defaultLookupSeq`, `xboot` `xboot`, `xN` `xN`,
@@ -64,12 +61,11 @@ proper, the project's remaining content; (R-2) `walkSupply` — the certificatio
 `xv6_rvwmo_safe_modulo` `xv6RvwmoSafeModulo`, `xv6_rvwmo_safe_modulo_F` `xv6RvwmoSafeModuloF`,
 `model_premises_nonvacuous` `modelPremisesNonvacuous`, `model_premises_nonvacuous'`
 `modelPremisesNonvacuous'`.
-Lean-only (file-qualified): `WeakRvwmoCapstone.t2linFetchInert`,
-`WeakRvwmoCapstone.t2linSupplyRows`, `WeakRvwmoCapstone.fconfFetchInert`.
+Lean-only (file-qualified): `WeakRvwmoCapstone.execProgOkPinSub`.
 
 **File-qualified Rocq names:** none (no name of this file is in `notes/weak-port-dupnames.json`).
 
-**Dropped:** none (Rocq 9 declarations; Lean 12 = 9 + the 3 Lean-only).
+**Dropped:** none (Rocq 9 declarations; Lean 10 = 9 + the 1 Lean-only).
 -/
 import Weak.WeakRvwmoGlue2
 import Weak.WeakSrvwmoCapstone
@@ -102,55 +98,22 @@ theorem xbootSeq (σ0 : WGState) : (List.range' 0 (xN σ0)).map (xboot σ0) = ep
 
 /-! # 2. THE TIER-2 CAPSTONE, MODULO `l2Claim` AND `walkSupply` -/
 
-/-! ## 2.0 Lean-only: the whole-graph fetch-inertness premise (deviation 4) -/
+/-! ## 2.0 Lean-only: the pinned LTS is a sub-LTS of `execProgOk'` (deviation 4) -/
 
-/-- (Lean-only, deviation 4) Every sRVWMO-consistent candidate of an acyclic conformant graph's
-image whose rows are the graph's rows up to a write renaming is fetch-inert. -/
-def WeakRvwmoCapstone.t2linFetchInert (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
-    (N : Nat) : Prop :=
-  ∀ (GD : Gdexec) (c : Cand) (pi : Nat → Nat),
-    rvwmoMinusDepsConsistent GD →
-    gdexecQconf boot d0 im nh GD →
-    (∀ x, ¬ tc (racyD GD) x x) →
-    GD.gdG.gxProg.length ≤ N →
-    srvwmoConsistent c →
-    c.cdImg = GD.gdG.gxImg →
-    (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) =
-      ((GD.gdG.gxProg[i]?).getD []).map (lblRen pi)) →
-    candFetchInert boot d0 N c
-
-/-- (Lean-only, deviation 4) `t2linSupply` with the renaming and the realized rows exposed. -/
-theorem WeakRvwmoCapstone.t2linSupplyRows (boot : Nat → Pexv6) (d0 : Efab) (im : Image)
-    (nh : Nat) (GD : Gdexec) (N : Nat) :
-    (∀ x, ¬ tc (racyD GD) x x) →
-    rvwmoMinusDepsConsistent GD →
-    gdexecQconf boot d0 im nh GD →
-    GD.gdG.gxProg.length ≤ N →
-    ∃ (c : Cand) (pi : Nat → Nat),
-      srvwmoConsistent c ∧
-      c.cdImg = GD.gdG.gxImg ∧
-      (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) =
-        ((GD.gdG.gxProg[i]?).getD []).map (lblRen pi)) ∧
-      (candFetchInert boot d0 N c →
-        ∃ pst : Nat → List Pexv6,
-          pst 0 = (List.range' 0 N).map boot ∧
-          execProgOk' pstepEv pclsEv pst (fun _ => d0) (candExec c)) := by
-  intro hacy hcons hq hN
-  obtain ⟨GD', pi, hcons', h14, hrr, hdeps, _⟩ :=
-    normalizeOfAcyclic GD hcons (fun x y => racyDDec GD x y) hacy
-  have hq' := gdexecQconfRen pi boot d0 im nh GD GD' hrr hdeps hq
-  obtain ⟨c, hsr, himg, hrow, _⟩ := rule14Linearization GD'.gdG hcons'.1 h14
-  have hprog : ∀ i : Nat, (GD'.gdG.gxProg[i]?).getD [] =
-      ((GD.gdG.gxProg[i]?).getD []).map (lblRen pi) := by
-    intro i
-    rw [hrr.2.1, List.getElem?_map]
-    change (Option.map _ (GD.gdG.gxProg[i]?)).getD [] = _
-    cases GD.gdG.gxProg[i]? <;> rfl
-  refine ⟨c, pi, hsr, by rw [himg]; exact rowsRelImg pi _ _ hrr,
-    fun i => by rw [hrow i, hprog i], fun hfi => ?_⟩
-  exact supplyOfQconf c boot d0 (fun i => (GD'.gdG.gxProg[i]?).getD []) N hrow
-    (fun i hi => progRowNil _ _ (by rw [rowsRelNharts pi _ _ hrr]; omega))
-    (fun i _ => qconfRows boot d0 im nh GD' i hq') hfi
+/-- (Lean-only, deviation 4) A program-carried execution at the pinned LTS is one at the LTS. -/
+theorem WeakRvwmoCapstone.execProgOkPinSub {P D : Type} (img : Image)
+    (pstep : P → D → Wlabel → P → D → Prop) (pcls : P → Wlabel → Wstate → WmClass)
+    (pst : Nat → List P) (dv : Nat → D) (E : Exec) :
+    execProgOk' (pstepPin img pstep) pcls pst dv E → execProgOk' pstep pcls pst dv E := by
+  intro h k s hk
+  have hsub : ∀ (instr : Bool) (p : P) (d : D) (p' : P) (d' : D),
+      admStar (pstepPin img pstep) instr p d p' d' → admStar pstep instr p d p' d' :=
+    fun _ _ _ _ _ => rtc_subrel (fun _ _ ⟨l, ha, hs⟩ => ⟨l, ha, hs.1⟩)
+  obtain ⟨p, pa, da, p', h1, h2, h3, h4⟩ := h k s hk
+  refine ⟨p, pa, da, p', h1, h2, hsub _ _ _ _ _ h3, ?_⟩
+  rcases h4 with ⟨l, hr, hs⟩ | ⟨pm, dm, pm2, dm2, l1, l2, hr, hs1, hst, hs2⟩
+  · exact .inl ⟨l, hr, hs.1⟩
+  · exact .inr ⟨pm, dm, pm2, dm2, l1, l2, hr, hs1.1, hsub _ _ _ _ _ hst, hs2.1⟩
 
 section capstone
 
@@ -175,8 +138,6 @@ theorem xv6RvwmoSafeModuloGen (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS h
     (∀ a base, P a base → wpPackageProt hlc GF gen σ0 D (Nm a base) a base) →
     -- THE FETCH-VIEW PREMISE (deviation 3)
     (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2) →
-    -- THE WHOLE-GRAPH FETCH-INERTNESS PREMISE (deviation 4)
-    WeakRvwmoCapstone.t2linFetchInert boot d0 (imgZ σ0.wgimg) N N →
     -- (R-1) THE L2′ PER-SITE CLAIM
     l2Claim boot d0 (imgZ σ0.wgimg) N P (badRun gen σ0) →
     -- (R-2) THE CERTIFICATION WALK
@@ -200,25 +161,25 @@ theorem xv6RvwmoSafeModuloGen (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS h
       (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → ¬ violationHart clsOf pubOf nDisk (ecfgOf ρ.1 ρ.2)) ∧
       (∀ (t2 : List EExpr) (σ2 : WGState) (e2 : EExpr),
         (epowerFork gen, σ0) -·->ₜₚ* (t2, σ2) → e2 ∈ t2 → Reducible (e2, σ2)) := by
-  intro hfr hb1 hb2 hwp hwpp hcov hfi hl2 hwalk GD hcons hq
+  intro hfr hb1 hb2 hwp hwpp hcov hl2 hwalk GD hcons hq
   obtain ⟨hgen, hpow, hgen0, hlog, hws⟩ := hfr
   have hfr' : freshEra gen σ0 := ⟨hgen, hpow, hgen0, hlog, hws⟩
-  -- T2-LIN itself
-  have hacy : ∀ x, ¬ tc (racyD GD) x x :=
-    t2linOfL2'' hlc GF gen σ0 D hD Nm P boot d0 N hfr' hb1 hb2 hl2 hwalk hwp hwpp hcov GD hcons hq
-  -- topo ∘ T2-1c: the sRVWMO candidate
+  -- the cycle-kill step, and T2-LIN itself
+  have hk := cycleKillOfL2'' hlc GF gen σ0 D hD Nm P boot d0 N hfr' hb1 hb2 hl2 hwalk hwp hwpp hcov
+  have hacy : ∀ x, ¬ tc (racyD GD) x x := t2linOfCycleKill boot d0 _ N hk GD hcons hq
+  -- topo ∘ T2-1c: the sRVWMO candidate, at the pinned LTS (deviation 4)
   have hN := gdexecQconfNharts _ _ _ _ _ hq
-  obtain ⟨c, pi, hsr, himg, hrows, hsup⟩ :=
-    WeakRvwmoCapstone.t2linSupplyRows boot d0 _ N GD N hacy hcons hq hN
-  obtain ⟨pst, hpst0, hprog⟩ := hsup (hfi GD c pi hcons hq hacy hN hsr himg hrows)
+  obtain ⟨c, pst, hsr, himg, hpst0, hprog⟩ := t2linSupply boot d0 _ N GD N hk hcons hq hN
   have himg' : c.cdImg = imgZ σ0.wgimg := by rw [himg, gdexecQconfImg _ _ _ _ _ hq]
   have hpst0' : pst 0 = epsInit σ0 := by rw [hpst0, hb1]
+  rw [himg'] at hprog
   -- T1 ∘ adequacy
   obtain ⟨hreal, hvf, hred⟩ :=
     xv6SrvwmoSafe (hlc := hlc) (GF := GF) gen σ0 D hD c pst (fun _ => d0) hgen hpow hgen0 hlog
       hws hwp hcov hsr himg' hpst0' hb2 hprog
   obtain ⟨P', σ', hr, hlg, hpg⟩ := hreal
-  exact ⟨hacy, ⟨c, pst, P', σ', hsr, himg', hpst0', hprog, hr, hlg, hpg⟩, hvf, hred⟩
+  exact ⟨hacy, ⟨c, pst, P', σ', hsr, himg', hpst0',
+    WeakRvwmoCapstone.execProgOkPinSub _ _ _ _ _ _ hprog, hr, hlg, hpg⟩, hvf, hred⟩
 
 /-! ## 2.2 THE CAPSTONE, at the canonical boot tie -/
 
@@ -232,9 +193,6 @@ theorem xv6RvwmoSafeModulo (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc 
     (∀ a base, P a base → wpPackageProt hlc GF gen σ0 D (Nm a base) a base) →
     -- THE FETCH-VIEW PREMISE (deviation 3)
     (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2) →
-    -- THE WHOLE-GRAPH FETCH-INERTNESS PREMISE (deviation 4)
-    WeakRvwmoCapstone.t2linFetchInert (xboot σ0) (efInit σ0.wgdev) (imgZ σ0.wgimg) (xN σ0)
-      (xN σ0) →
     l2Claim (xboot σ0) (efInit σ0.wgdev) (imgZ σ0.wgimg) (xN σ0) P (badRun gen σ0) →
     walkSupply (xboot σ0) (efInit σ0.wgdev) (imgZ σ0.wgimg) (xN σ0) (xN σ0) →
     ∀ GD : Gdexec,
@@ -252,23 +210,13 @@ theorem xv6RvwmoSafeModulo (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc 
       (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → ¬ violationHart clsOf pubOf nDisk (ecfgOf ρ.1 ρ.2)) ∧
       (∀ (t2 : List EExpr) (σ2 : WGState) (e2 : EExpr),
         (epowerFork gen, σ0) -·->ₜₚ* (t2, σ2) → e2 ∈ t2 → Reducible (e2, σ2)) :=
-  fun hfr hwp hwpp hcov hfi hl2 hwalk =>
+  fun hfr hwp hwpp hcov hl2 hwalk =>
     xv6RvwmoSafeModuloGen hlc GF gen σ0 D hD Nm P (xboot σ0) (efInit σ0.wgdev) (xN σ0) hfr
-      (xbootSeq σ0) rfl hwp hwpp hcov hfi hl2 hwalk
+      (xbootSeq σ0) rfl hwp hwpp hcov hl2 hwalk
 
 end capstone
 
 /-! # 3. THE FULL-BUNDLE VARIANT (a MOVING fabric) -/
-
-/-- (Lean-only, deviation 4) Every sRVWMO-consistent linearization of `GX` with `GX`'s rows is
-fetch-inert at its two-endpoint emissions. -/
-def WeakRvwmoCapstone.fconfFetchInert (boot : Nat → Pexv6) (N : Nat) (GX : Gfexec) : Prop :=
-  ∀ L : List Geid,
-    srvwmoConsistent (candOf GX.gfGd.gdG L) →
-    (∀ i, List.map (fun s => s.esLb)
-        (List.filter (fun s => decide (s.esAg = i)) (candOf GX.gfGd.gdG L).cdTr) =
-          (GX.gfGd.gdG.gxProg[i]?).getD []) →
-    candFetchInertF boot N (candOf GX.gfGd.gdG L)
 
 section capstoneF
 
@@ -287,8 +235,6 @@ theorem xv6RvwmoSafeModuloF (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc
     wpPackage hlc GF gen σ0 D →
     -- THE FETCH-VIEW PREMISE (deviation 3)
     (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2) →
-    -- THE LINEARIZATION FETCH-INERTNESS PREMISE (deviation 4)
-    WeakRvwmoCapstone.fconfFetchInert boot N GX →
     -- the model side: the REVISED axiom and the fabric conformance bundle
     gfexecConsistent' GX →
     gfexecConf boot d0 fab GX →
@@ -306,10 +252,11 @@ theorem xv6RvwmoSafeModuloF (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc
     (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → ¬ violationHart clsOf pubOf nDisk (ecfgOf ρ.1 ρ.2)) ∧
     (∀ (t2 : List EExpr) (σ2 : WGState) (e2 : EExpr),
       (epowerFork gen, σ0) -·->ₜₚ* (t2, σ2) → e2 ∈ t2 → Reducible (e2, σ2)) := by
-  intro hfr hb1 hb2 hwp hcov hfi hc' hconf himg hN
+  intro hfr hb1 hb2 hwp hcov hc' hconf himg hN
   obtain ⟨hgen, hpow, hgen0, hlog, hws⟩ := hfr
-  obtain ⟨L, hsr, hcimg, hrows, _, hsup⟩ := fconfTraceRealize boot d0 fab GX N hc' hconf hN
-  obtain ⟨pst, hp0, hd0, hok⟩ := hsup (hfi L hsr hrows)
+  obtain ⟨L, hsr, hcimg, _, _, pst, hp0, hd0, hok⟩ :=
+    fconfTraceRealize boot d0 fab GX N hc' hconf hN
+  rw [himg] at hok
   have himg' : (candOf GX.gfGd.gdG L).cdImg = imgZ σ0.wgimg := by rw [hcimg, himg]
   have hpst0 : pst 0 = epsInit σ0 := by rw [hp0, hb1]
   have hdv0 : (fun k => fab (dcnt GX (candOf GX.gfGd.gdG L).cdTr k)) 0 = efInit σ0.wgdev := by
@@ -320,7 +267,8 @@ theorem xv6RvwmoSafeModuloF (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc
       hsr himg' hpst0 hdv0 hok
   obtain ⟨P', σ', hr, hlg, hpg⟩ := hreal
   exact ⟨⟨candOf GX.gfGd.gdG L, pst, fun k => fab (dcnt GX (candOf GX.gfGd.gdG L).cdTr k), P',
-    σ', hsr, himg', hpst0, hdv0, hok, hr, hlg, hpg⟩, hvf, hred⟩
+    σ', hsr, himg', hpst0, hdv0, WeakRvwmoCapstone.execProgOkPinSub _ _ _ _ _ _ hok, hr, hlg, hpg⟩,
+    hvf, hred⟩
 
 end capstoneF
 

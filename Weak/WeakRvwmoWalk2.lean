@@ -26,12 +26,17 @@ theorem.
 
 1. NAMES / VOCABULARY as `WeakRvwmoWalk` deviation 1; `default [] (gx_prog G !! x)` ↦
    `(G.gxProg[x]?).getD []`; `T ⊆ T'` is `List.Subset`; `is_Some o` ↦ `o.isSome`.
-2. O2 / D1 — FETCH-INERTNESS (`WeakRvwmoWalk` deviation 2, continued): `wsiteOk'` and
-   `wsiteSupply` gain the conjunct `WeakRvwmoWalk.wfetchSite d0 Nd x p` (last), and `wpol'` /
-   `wblkPolAt'` the conclusion conjunct `lbFetchInert (candLastSt c0) x l'` right after
-   `mstepOk` (the shape `segStepOfSegment`'s `Hpol''` asks for).  The pair route needs none.
-   `wsupply` therefore carries it through `wsiteSupply` (consumers of `walkSupplyOfSites` /
-   `wlkStep'OfSupply` supply it per position).
+2. O2 / STAGE C — THE PINNED POLICY (`WeakRvwmoWalk` deviation 2, continued).  Stage B's
+   `wfetchSite` conjunct of `wsiteOk'`/`wsiteSupply` and the `lbFetchInert` conjunct of `wpol'` /
+   `wblkPolAt'` are DELETED (Rocq's statements again), and:
+   - `wpol'`/`wblkPolAt'` take and return `WeakRvwmoCert2.cblkPin c0.cdImg` blocks, `wcpolpAt`
+     `WeakRvwmoCert3.cblkpPin c0.cdImg` pair blocks (the shapes `segStepOfSegment` asks for);
+   - the poisoned data `poisonedNoFault`/`wpoisSite` are stated on PINNED blocks at any image
+     (leading `∀ im`; Rocq: plain `cblk`); `wexitUt` keeps Rocq's `cblk`;
+   - `wemit` gains the conjunct `WeakRvwmoCert2.esPin G.gxImg es` (the emission's admin labels
+     are pinned to the graph's image), discharged at the start by `wemitOfQconf` from the
+     bundle's `emFetchImg` clause and carried across a segment by the emission split;
+     `wlkSegOfCert2` takes `esPin St.cstC.cdImg es` (after `LDev ∉ es.map Prod.fst`).
 3. `rdsOkDec` is `Classical.em` (Rocq: `decide` over `Forall`).  In `wlkStep'OfSupply`
    Rocq's `pose k0 := gcnt x …` is an equation `hk0 : gcnt x St.cstC.cdTr = k0`.
 4. Lean-only `WeakRvwmoWalk2.candEmptyWs` (the empty candidate's machine `Wstate` is `wsInit`
@@ -105,11 +110,13 @@ theorem rowWsSeg (row : List Lbl) (k0 L : Nat) :
 
 /-! ## 4.5b The per-hart emission tail, and the process identification -/
 
-/-- "Hart `x`'s emission, from row position `k` on, starts at `p`" — DEVICE-QUIET. -/
+/-- "Hart `x`'s emission, from row position `k` on, starts at `p`" — DEVICE-QUIET (deviation 2:
+and pinned to the graph's image). -/
 def wemit (d0 : Efab) (G : Gexec) (x : Nat) (k : Nat) (p : Pexv6) : Prop :=
   ∃ (es : List Eitem) (pfin : Pexv6),
     hemit (fun _ => d0) k (rowWs (qrow G x) k) ((qrow G x).drop k) p es pfin ∧
-    LDev ∉ es.map Prod.fst
+    LDev ∉ es.map Prod.fst ∧
+    WeakRvwmoCert2.esPin G.gxImg es
 
 /-- The walk state's process for a hart IS the emission's, off the taint. -/
 def pexDag (T : List Nat) (p q : Pexv6) : Prop :=
@@ -174,18 +181,20 @@ theorem wcpolpAt (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu : CPU)
     wrmwSite G n x (gcnt x c0.cdTr) lb →
     dregAgree (fun nn => nn ∉ T) rs1 rs2 →
     rdsOk (fun nn => nn ∉ T) rds →
-    cblkp cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    WeakRvwmoCert3.cblkpPin c0.cdImg cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' →
     ∃ rs2',
-      cblkp cpu d0 ws lb l1 l2 rds wrs m rs2 fn ib m' rs2' fn' ib' ∧
+      WeakRvwmoCert3.cblkpPin c0.cdImg cpu d0 ws lb l1 l2 rds wrs m rs2 fn ib m' rs2' fn' ib' ∧
       mstepOk (candLastSt c0) x lb ∧
       wclsAt G W x c0 lb ∧
       dregAgree (fun nn => nn ∉ T) rs1' rs2' := by
   rintro hcons himg hpfx hc ⟨ev, hgt, _⟩ hnW ⟨hl, hbnd, hix⟩ hag hrds hblk
   have hwf : gwf G := hcons.1
   have hlv : gloadValue G := hcons.2.2.1
-  obtain ⟨rs2', hblk2, hag2⟩ := certBlockPairMirror (fun nn => nn ∉ T) cpu d0 ws lb l1 l2 rds wrs
+  obtain ⟨rs2', hblk2, hag2⟩ := WeakRvwmoCert3.certBlockPairMirrorG
+    (WeakRvwmoCert2.lbPin c0.cdImg) (fun nn => nn ∉ T) cpu d0 ws lb l1 l2 rds wrs
     m rs1 fn ib m' rs1' fn' ib' rs2 hblk hrds hag
-  have hrmw : ¬ lbRmwfree lb := cblkpRmw cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' hblk
+  have hrmw : ¬ lbRmwfree lb := cblkpRmw cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib'
+    (WeakRvwmoCert3.cblkpPinCblkp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hblk)
   cases lb with
   | LLoad => exact absurd trivial hrmw
   | LStore => exact absurd trivial hrmw
@@ -257,35 +266,36 @@ def wexitUt (d0 : Efab) (T : List Nat) (Nd : Nat → CPU → SailM Unit → Prop
      cblkp cpu d0 ws lb l1 l2 rds wrs m rs fn ib m' rs' fn' ib') →
     rdsOk (fun nn => nn ∉ T) rds
 
-/-- THE FAULT BOUNDARY, NAMED. -/
+/-- THE FAULT BOUNDARY, NAMED (deviation 2: on blocks pinned to any image `im`). -/
 def poisonedNoFault (d0 : Efab) (T : List Nat) (Nd : Nat → CPU → SailM Unit → Prop) (p : Nat) :
     Prop :=
-  ∀ (cpu : CPU) (ws : Wstate) (lb : Lbl) (l : Wlabel) (rds : List Nat) (wrs : List Register)
+  ∀ (im : Image) (cpu : CPU) (ws : Wstate) (lb : Lbl) (l : Wlabel) (rds : List Nat)
+    (wrs : List Register)
     (m : SailM Unit) (rs1 rs2 : RegFile) (fn : Ofence) (ib : Ibch) (m' : SailM Unit)
     (rs1' : RegFile) (fn' : Ofence) (ib' : Ibch),
     Nd p cpu m → lbIsW lb = false →
     ¬ rdsOk (fun nn => nn ∉ T) rds →
     dregAgree (fun nn => nn ∉ T) rs1 rs2 →
-    cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    WeakRvwmoCert2.cblkPin im cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
     ∃ (lb2 : Lbl) (l2 : Wlabel) (rds2 : List Nat) (wrs2 : List Register) (m2 : SailM Unit)
       (rs2' : RegFile) (fn2' : Ofence) (ib2' : Ibch),
-      cblk cpu d0 ws lb2 l2 rds2 wrs2 m rs2 fn ib m2 rs2' fn2' ib2' ∧
+      WeakRvwmoCert2.cblkPin im cpu d0 ws lb2 l2 rds2 wrs2 m rs2 fn ib m2 rs2' fn2' ib2' ∧
       lblPoisoned lb lb2
 
-/-- THE POISONED SITE DATUM. -/
+/-- THE POISONED SITE DATUM (deviation 2: on blocks pinned to any image `im`). -/
 def wpoisSite (G : Gexec) (W : Geid → Prop) (x : Nat) (d0 : Efab) (T T' : List Nat)
     (Nd : Nat → CPU → SailM Unit → Prop) (p : Nat) : Prop :=
-  ∀ (c0 : Cand) (cpu : CPU) (ws : Wstate) (lb : Lbl) (l : Wlabel) (rds : List Nat)
+  ∀ (im : Image) (c0 : Cand) (cpu : CPU) (ws : Wstate) (lb : Lbl) (l : Wlabel) (rds : List Nat)
     (wrs : List Register) (m : SailM Unit) (rs1 rs2 : RegFile) (fn : Ofence) (ib : Ibch)
     (m' : SailM Unit) (rs1' : RegFile) (fn' : Ofence) (ib' : Ibch),
     Nd p cpu m → lbIsW lb = false →
     gcnt x c0.cdTr = p →
     ¬ rdsOk (fun nn => nn ∉ T) rds →
     dregAgree (fun nn => nn ∉ T) rs1 rs2 →
-    cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    WeakRvwmoCert2.cblkPin im cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
     ∃ (lb2 : Lbl) (l2 : Wlabel) (rds2 : List Nat) (wrs2 : List Register) (m2 : SailM Unit)
       (rs2' : RegFile) (fn2' : Ofence) (ib2' : Ibch),
-      cblk cpu d0 ws lb2 l2 rds2 wrs2 m rs2 fn ib m2 rs2' fn2' ib2' ∧
+      WeakRvwmoCert2.cblkPin im cpu d0 ws lb2 l2 rds2 wrs2 m rs2 fn ib m2 rs2' fn2' ib2' ∧
       lblPoisoned lb lb2 ∧
       poisOk c0 lb2 ∧
       -- THE CLASSIFICATION at the appended poisoned label
@@ -297,9 +307,9 @@ theorem wpoisNoFault (G : Gexec) (W : Geid → Prop) (x : Nat) (d0 : Efab) (T T'
     (Nd : Nat → CPU → SailM Unit → Prop) (p : Nat) (c0 : Cand) :
     gcnt x c0.cdTr = p →
     wpoisSite G W x d0 T T' Nd p → poisonedNoFault d0 T Nd p := by
-  intro hgc h cpu ws lb l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib' hnd hw hrds hag hblk
+  intro hgc h im cpu ws lb l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib' hnd hw hrds hag hblk
   obtain ⟨lb2, l2, rds2, wrs2, m2, rs2', fn2', ib2', hblk2, hpo, _⟩ :=
-    h c0 cpu ws lb l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib' hnd hw hgc hrds hag hblk
+    h im c0 cpu ws lb l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib' hnd hw hgc hrds hag hblk
   exact ⟨lb2, l2, rds2, wrs2, m2, rs2', fn2', ib2', hblk2, hpo⟩
 
 /-- THE READ SET IS DECIDABLE against a taint LIST (deviation 3: classically). -/
@@ -313,7 +323,6 @@ def wsiteCls (G : Gexec) (W : Geid → Prop) (d0 : Efab) (tm : Nat → List Nat)
   (¬ W (x, p) ∧ WeakRvwmoWalk.wsrcLe G n (x, p)) ∨
   (W (x, p) ∧ wwit G n (x, p) ∧ wwitSite G d0 (tm (p + 1)) Nd n x p)
 
-/-- (deviation 2: the last conjunct.) -/
 def wsiteOk' (G : Gexec) (W : Geid → Prop) (d0 : Efab) (tm : Nat → List Nat)
     (Nd : Nat → CPU → SailM Unit → Prop) (n : Nat) (x : Nat) (p : Nat) (lb : Lbl) : Prop :=
   gxLbl G (x, p) = some lb ∧
@@ -321,8 +330,7 @@ def wsiteOk' (G : Gexec) (W : Geid → Prop) (d0 : Efab) (tm : Nat → List Nat)
   (¬ lbRmwfree lb → wrmwSite G n x p lb) ∧
   wsiteCls G W d0 tm Nd n x p ∧
   wexitUt d0 (tm p) Nd p ∧
-  wpoisSite G W x d0 (tm p) (tm (p + 1)) Nd p ∧
-  WeakRvwmoWalk.wfetchSite d0 Nd x p
+  wpoisSite G W x d0 (tm p) (tm (p + 1)) Nd p
 
 def wQ' (G : Gexec) (W : Geid → Prop) (d0 : Efab) (tm : Nat → List Nat)
     (Nd : Nat → CPU → SailM Unit → Prop) (n : Nat) (x : Nat) (k0 kz : Nat) (k : Nat) (lb : Lbl) :
@@ -374,7 +382,7 @@ theorem wctx'Cpol (G : Gexec) (W : Geid → Prop) (n x kz k : Nat) (c : Cand) :
 
 /-! ## 4.5d The policy, at the frozen set -/
 
-/-- (deviation 2: the `lbFetchInert` conjunct.) -/
+/-- (deviation 2: on pinned blocks.) -/
 theorem wblkPolAt' (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab)
     (tm : Nat → List Nat) (Nd : Nat → CPU → SailM Unit → Prop) (c0 : Cand) (ws : Wstate)
     (lb : Lbl) (l : Wlabel) (rds : List Nat) (wrs : List Register) (m : SailM Unit)
@@ -390,12 +398,11 @@ theorem wblkPolAt' (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu : CP
     wsiteOk' G W d0 tm Nd n x (gcnt x c0.cdTr) lb →
     dregAgree (fun nn => nn ∉ tm (gcnt x c0.cdTr)) rs1 rs2 →
     Nd (gcnt x c0.cdTr) cpu m →
-    cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
     ∃ (lb' : Lbl) (l' : Wlabel) (rds' : List Nat) (wrs' : List Register) (rs2' : RegFile)
       (m2' : SailM Unit) (fn2' : Ofence) (ib2' : Ibch),
-      cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m2' rs2' fn2' ib2' ∧
+      WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m2' rs2' fn2' ib2' ∧
       mstepOk (candLastSt c0) x lb' ∧
-      lbFetchInert (candLastSt c0) x l' ∧
       lblReidxW lb lb' ∧
       wclsAt G W x c0 lb' ∧
       csync (tm (gcnt x c0.cdTr + 1)) m' rs1' fn' ib' m2' rs2' fn2' ib2' ∧
@@ -404,7 +411,7 @@ theorem wblkPolAt' (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu : CP
   intro hcons hpc hmono hc himg hpfx hctx hsite hag hnd hblk
   have hwf : gwf G := hcons.1
   have hlv : gloadValue G := hcons.2.2.1
-  obtain ⟨hl, hix, hrmw, hcl, hut, hpois, hfi⟩ := hsite
+  obtain ⟨hl, hix, hrmw, hcl, hut, hpois⟩ := hsite
   have hTT' : tm (gcnt x c0.cdTr) ⊆ tm (gcnt x c0.cdTr + 1) := hmono _
   rcases rdsOkDec (tm (gcnt x c0.cdTr)) rds with hrds | hnrds
   case inr =>
@@ -413,15 +420,16 @@ theorem wblkPolAt' (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu : CP
       cases hb : lbIsW lb with
       | false => rfl
       | true =>
-        exact absurd (hut cpu ws lb l l rds wrs m rs1 fn ib m' rs1' fn' ib' hnd hb (.inl hblk))
-          hnrds
+        exact absurd (hut cpu ws lb l l rds wrs m rs1 fn ib m' rs1' fn' ib' hnd hb
+          (.inl (WeakRvwmoCert2.cblkPinCblk _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hblk))) hnrds
     obtain ⟨lb2, l2, rds2, wrs2, m2, rs2', fn2', ib2', hblk2, hlp, hpok, hcls2, hsync⟩ :=
-      hpois c0 cpu ws lb l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib' hnd hw rfl hnrds hag hblk
+      hpois c0.cdImg c0 cpu ws lb l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib' hnd hw rfl hnrds hag
+        hblk
     have hok := poisOkMstep c0 x lb2 hc hpok
     exact ⟨lb2, l2, rds2, wrs2, rs2', m2, fn2', ib2', hblk2, hok,
-      hfi c0 cpu ws lb2 l2 rds2 wrs2 m rs2 fn ib m2 rs2' fn2' ib2' hc rfl hnd hblk2 hok,
       lblReidxWPois _ _ hlp, hcls2, hsync, fun h => by rw [hw] at h; cases h⟩
-  obtain ⟨rs2', hblk2, hag2'⟩ := certBlockMirror (fun nn => nn ∉ tm (gcnt x c0.cdTr)) cpu d0 ws
+  obtain ⟨rs2', hblk2, hag2'⟩ := WeakRvwmoCert2.certBlockMirrorG (WeakRvwmoCert2.lbPin c0.cdImg)
+    (fun nn => nn ∉ tm (gcnt x c0.cdTr)) cpu d0 ws
     lb l rds wrs m rs1 fn ib m' rs1' fn' ib' rs2 hblk hrds hag
   have hag2 : dregAgree (fun nn => nn ∉ tm (gcnt x c0.cdTr + 1)) rs1' rs2' :=
     dregAgreeTaintMono _ _ rs1' rs2' hTT' hag2'
@@ -449,7 +457,6 @@ theorem wblkPolAt' (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu : CP
           (by rw [hix2, hlenlog])
           (fun j t hj => by rw [hlenlog]; exact hbnd base ts rvs rfl j t hj) hsrc
     exact ⟨lb, l, rds, wrs, rs2', m', fn', ib', hblk2, hok,
-      hfi c0 cpu ws lb l rds wrs m rs2 fn ib m' rs2' fn' ib' hc rfl hnd hblk2 hok,
       lblReidxWRefl lb, wclsOfPfx G W n x c0 lb hpfx hl hnW hix,
       .inl ⟨rfl, rfl, rfl, hag2⟩, fun _ => ⟨rfl, rfl, rfl, hag2⟩⟩
   · -- THE WITNESS ROUTE
@@ -459,15 +466,14 @@ theorem wblkPolAt' (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu : CP
     obtain ⟨hgs, hvf⟩ := hwsite
     obtain ⟨haq, hbytes⟩ := hgs c0 aq base ts vs himg hpfx hl'
     subst haq
-    obtain ⟨l2, rds2, wrs2, m2, hblk3, hsync⟩ := hvf cpu ws false base ts vs l rds wrs
+    obtain ⟨l2, rds2, wrs2, m2, hblk3, hsync⟩ := hvf c0.cdImg cpu ws false base ts vs l rds wrs
       m rs2 fn ib m' rs2' fn' ib' (witTvs c0 base ts.length) hnd hblk2
       (witTvsLength c0 base ts.length)
     rw [witTvsLbl c0 false base ts.length] at hblk3
     have hok : mstepOk (candLastSt c0) x (latestReadLbl c0 false base ts.length) :=
       certReadWitness c0 x false base ts.length hc hbytes
     refine ⟨latestReadLbl c0 false base ts.length, l2, rds2, wrs2, rs2', m2, fn', ib', hblk3, hok,
-      hfi c0 cpu ws _ l2 rds2 wrs2 m rs2 fn ib m2 rs2' fn' ib' hc rfl hnd hblk3 hok, ?_,
-      wclsOfWit G W x c0 base ts vs hl' hW,
+      ?_, wclsOfWit G W x c0 base ts vs hl' hW,
       csyncRegs _ m' m2 rs2' rs1' rs2' fn' ib' hsync hag2, fun hw => by cases hw⟩
     refine .inr (.inl ?_)
     show false = false ∧ false = false ∧ base = base ∧
@@ -475,7 +481,7 @@ theorem wblkPolAt' (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu : CP
       (lrdVs c0 base ts.length).length = (lrdTs c0 base ts.length).length
     exact ⟨rfl, rfl, rfl, by simp [lrdTs], lrdLength _ _ _⟩
 
-/-- (deviation 2: the `lbFetchInert` conjunct.) -/
+/-- (deviation 2: on blocks pinned to the candidate's image.) -/
 def wpol' (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab)
     (tm : Nat → List Nat) (Nd : Nat → CPU → SailM Unit → Prop) (k0 kz : Nat) : Prop :=
   ∀ (k : Nat) (c0 : Cand) (ws : Wstate) (lb : Lbl) (l : Wlabel) (rds : List Nat)
@@ -487,12 +493,11 @@ def wpol' (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu : CPU) (d0 : 
     ((candLastSt c0).msWs x).wRelp = ws.wRelp →
     dregAgree (fun nn => nn ∉ tm k) rs1 rs2 →
     Nd k cpu m →
-    cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
     ∃ (lb' : Lbl) (l' : Wlabel) (rds' : List Nat) (wrs' : List Register) (rs2' : RegFile)
       (m2' : SailM Unit) (fn2' : Ofence) (ib2' : Ibch),
-      cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m2' rs2' fn2' ib2' ∧
+      WeakRvwmoCert2.cblkPin c0.cdImg cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m2' rs2' fn2' ib2' ∧
       mstepOk (candLastSt c0) x lb' ∧
-      lbFetchInert (candLastSt c0) x l' ∧
       lblReidxW lb lb' ∧
       wclsAt G W x c0 lb' ∧
       csync (tm (k + 1)) m' rs1' fn' ib' m2' rs2' fn2' ib2' ∧
@@ -549,7 +554,7 @@ theorem wctx'Pres (G : Gexec) (W : Geid → Prop) (d0 : Efab) (tm : Nat → List
     · -- THE EXIT WRITE — a store, or a FUSED RMW, stated through `lbWr`
       subst hkk
       have hw : lbIsW lb = true := hiff.2 rfl
-      obtain ⟨hl, _, _, hcls, _, _, _⟩ := hsite
+      obtain ⟨hl, _, _, hcls, _, _⟩ := hsite
       have hnW : ¬ W (x, gcnt x c0.cdTr) := by
         rw [hgc]
         exact wsiteClsNotW G W d0 tm Nd n x k _ hl hw hcls
@@ -594,9 +599,10 @@ theorem wcpolpOfSites (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu :
       (wQ' G W d0 tm Nd n x k0 kz) := by
   intro hcons hub k c0 ws lb l1 l2 rds wrs m rs1 rs2 fn ib m' rs1' fn' ib' hc hctx hQ _ hag
     hrds _ hblk
-  have hrmw : ¬ lbRmwfree lb := cblkpRmw cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' hblk
+  have hrmw : ¬ lbRmwfree lb := cblkpRmw cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib'
+    (WeakRvwmoCert3.cblkpPinCblkp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ hblk)
   obtain ⟨_, hkz, hsite, _⟩ := hQ
-  obtain ⟨hl, _, hrs, hcls, _, _, _⟩ := hsite
+  obtain ⟨hl, _, hrs, hcls, _, _⟩ := hsite
   have hcp : cpolCtx G W x c0 := wctx'Cpol G W n x kz k c0 hub hctx
   obtain ⟨_, _, hgc, hpfx⟩ := hctx
   have himg : c0.cdImg = G.gxImg := by
@@ -631,6 +637,7 @@ theorem wlkSegOfCert2 (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu :
     wndOk cpu d0 (wQ' G W d0 tm Nd n x k0 kz) Nd →
     hemit (fun _ => d0) k0 ws0 rowseg (.PHart cpu m0 rs10 fn0 ib0) es pfin →
     LDev ∉ es.map Prod.fst →
+    WeakRvwmoCert2.esPin St.cstC.cdImg es →
     (∀ i lb, rowseg[i]? = some lb → wQ' G W d0 tm Nd n x k0 kz (k0 + i) lb) →
     cstOk d0 St →
     wctx' G W n x kz k0 St.cstC →
@@ -656,7 +663,7 @@ theorem wlkSegOfCert2 (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu :
       (∀ y, y ≠ x → (St'.cstPst (cdEnd St'.cstC))[y]? = (St.cstPst (cdEnd St.cstC))[y]?) ∧
       (∀ y, y ≠ x → ((candLastSt St'.cstC).msWs y).wRelp
         = ((candLastSt St.cstC).msWs y).wRelp) := by
-  intro hcons hpc hub hmono hNok hem hdev hQ hok hctx hp hnd hsync hrelp
+  intro hcons hpc hub hmono hNok hem hdev hes hQ hok hctx hp hnd hsync hrelp
   obtain ⟨hNa, hNb, hNbp⟩ := hNok
   have hwf : gwf G := hcons.1
   exact segStepOfSegment x cpu d0 tm (wQ' G W d0 tm Nd n x k0 kz) (wctx' G W n x kz)
@@ -669,7 +676,7 @@ theorem wlkSegOfCert2 (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu :
     (wpol'OfSites G W n x cpu d0 tm Nd k0 kz hcons hpc hub hmono)
     (wcpolpOfSites G W n x cpu d0 tm Nd k0 kz hcons hub)
     k0 ws0 rowseg es pfin m0 rs10 fn0 ib0 St m20 rs20 fn20 ib20
-    hem hdev hQ hok hctx hp hnd hsync hrelp
+    hem hdev hes hQ hok hctx hp hnd hsync hrelp
 
 /-! # 4.6 THE CHAINED WALK ITSELF -/
 
@@ -768,7 +775,6 @@ theorem wlkStartInv' (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec) (W
 
 /-! ## 4.6b THE PER-GRAPH DATUM the chained walk consumes -/
 
-/-- (deviation 2: the last conjunct.) -/
 def wsiteSupply (boot : Nat → Pexv6) (d0 : Efab) (G : Gexec) (W : Geid → Prop)
     (tm : Nat → Nat → List Nat) : Prop :=
   ∀ (n : Nat) (x : Nat) (kz p : Nat) (lb : Lbl),
@@ -780,8 +786,7 @@ def wsiteSupply (boot : Nat → Pexv6) (d0 : Efab) (G : Gexec) (W : Geid → Pro
     wsiteCls G W d0 (tm x) (wnd d0 G boot x) n x p ∧
     -- THE EXIT'S READ-SET FREEDOM and THE POISONED ARM, per position
     wexitUt d0 (tm x p) (wnd d0 G boot x) p ∧
-    wpoisSite G W x d0 (tm x p) (tm x (p + 1)) (wnd d0 G boot x) p ∧
-    WeakRvwmoWalk.wfetchSite d0 (wnd d0 G boot x) x p
+    wpoisSite G W x d0 (tm x p) (tm x (p + 1)) (wnd d0 G boot x) p
 
 /-- THE ORDER FACT THE WALK NEEDS, AND EXACTLY IT. -/
 def gwrowGmo (G : Gexec) : Prop :=
@@ -902,7 +907,7 @@ theorem wlkStep'OfSupply (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec
     rw [hlenseg]
     omega
   -- ---- 5. THE EMISSION AT THE HART'S CURRENT POSITION ----
-  obtain ⟨p, q, ⟨es, pfin, hem, hdevf⟩, hq, hdag, hrelp, hph, hndp⟩ := hproc x hxLT
+  obtain ⟨p, q, ⟨es, pfin, hem, hdevf, hpinf⟩, hq, hdag, hrelp, hph, hndp⟩ := hproc x hxLT
   rw [hk0] at hem hdag hrelp hndp
   obtain ⟨cpu, mb, rsb, fnb, ibb, hbx⟩ := hbh x kz lbz hlbz hlbzw
   obtain ⟨m0, rs10, fn0, ib0, hp⟩ := hph cpu mb rsb fnb ibb hbx
@@ -926,6 +931,11 @@ theorem wlkStep'OfSupply (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec
     hdevf (by rw [hessp, List.map_append]; exact List.mem_append_left _ hin)
   have hdev2 : LDev ∉ es2.map Prod.fst := fun hin =>
     hdevf (by rw [hessp, List.map_append]; exact List.mem_append_right _ hin)
+  have hpin1 : WeakRvwmoCert2.esPin St.cstC.cdImg es1 := fun l0 hin => by
+    rw [himg]
+    exact hpinf l0 (by rw [hessp, List.map_append]; exact List.mem_append_left _ hin)
+  have hpin2 : WeakRvwmoCert2.esPin G.gxImg es2 := fun l0 hin =>
+    hpinf l0 (by rw [hessp, List.map_append]; exact List.mem_append_right _ hin)
   have hws : rowWsAux k0 (rowWs (qrow G x) k0) (((qrow G x).drop k0).take (kz + 1 - k0))
       = rowWs (qrow G x) (k0 + (((qrow G x).drop k0).take (kz + 1 - k0)).length) := by
     rw [rowWsSeg (qrow G x) k0 (kz + 1 - k0) (by omega), hlenseg]
@@ -953,10 +963,10 @@ theorem wlkStep'OfSupply (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec
         rw [heq, hlbz] at hl
         cases hl
         exact hlbzw
-    obtain ⟨hrmw, hcls, hut, hpois, hfs⟩ := hsite n x kz (k0 + i) lb hat (by omega)
+    obtain ⟨hrmw, hcls, hut, hpois⟩ := hsite n x kz (k0 + i) lb hat (by omega)
       (fun j lbj hj1 hj2 hlj => hnwr j lbj (by omega) hj2 hlj) hl
     exact ⟨by omega, by omega,
-      ⟨hl, fun hb => by rw [hiff.1 hb]; exact hwix, hrmw, hcls, hut, hpois, hfs⟩, hiff⟩
+      ⟨hl, fun hb => by rw [hiff.1 hb]; exact hwix, hrmw, hcls, hut, hpois⟩, hiff⟩
   -- ---- 7. THE SEGMENT ----
   have hctx : wctx' G W n x kz k0 St.cstC :=
     ⟨⟨ev0, hct0⟩, hpi, hk0, by rw [WeakRvwmoWalk.wlognLe n kz k0 hk0le]; exact hpfx⟩
@@ -967,7 +977,7 @@ theorem wlkStep'OfSupply (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec
       _ es1 pm m0 rs10 fn0 ib0 St m0 rs20 fn0 ib0 hcons hpc hub (hmono x)
       (wndWndOk cpu d0 G boot x _ (fun k lb h =>
         wQ'Lbl G W d0 (tm x) (wnd d0 G boot x) n x k0 kz k lb h))
-      hem1 hdev1 hQ hok hctx hq hnd0 (.inl ⟨rfl, rfl, rfl, hag⟩) hrelp
+      hem1 hdev1 hpin1 hQ hok hctx hq hnd0 (.inl ⟨rfl, rfl, rfl, hag⟩) hrelp
   subst hpm
   -- THE SEGMENT'S ROW ENDS IN A WRITE, so its exit is in LOCKSTEP
   obtain ⟨hm21, hfn21, hib21, hagx⟩ :=
@@ -994,7 +1004,7 @@ theorem wlkStep'OfSupply (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec
     · subst hyx
       rw [hgc1]
       rw [hws, hkzeq] at hem2
-      refine ⟨_, _, ⟨es2, pfin, hem2, hdev2⟩, hpx, ?_, ?_, ?_, ?_⟩
+      refine ⟨_, _, ⟨es2, pfin, hem2, hdev2, hpin2⟩, hpx, ?_, ?_, ?_, ?_⟩
       · intro cpu' m' rs' fn' ib' h
         cases h
         exact ⟨rs21, rfl, hagx⟩
@@ -1057,12 +1067,14 @@ theorem wemitOfQconf (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) 
   intro hq
   cases hrow : GD.gdG.gxProg[x]? with
   | some row =>
-    obtain ⟨em, hem, hdf, _⟩ := gdexecQconfRows boot d0 im nh GD hq x row hrow
-    refine ⟨em.emItems, em.emFin, ?_, hdf⟩
-    simp only [qrow, hrow, Option.getD_some, List.drop_zero]
-    exact hem
+    obtain ⟨em, hem, hdf, hfi, _⟩ := gdexecQconfRows boot d0 im nh GD hq x row hrow
+    refine ⟨em.emItems, em.emFin, ?_, hdf, ?_⟩
+    · simp only [qrow, hrow, Option.getD_some, List.drop_zero]
+      exact hem
+    · rw [gdexecQconfImg boot d0 im nh GD hq]
+      exact hfi
   | none =>
-    refine ⟨[], boot x, ?_, List.not_mem_nil⟩
+    refine ⟨[], boot x, ?_, List.not_mem_nil, fun _ h => absurd h List.not_mem_nil⟩
     simp only [qrow, hrow, Option.getD_none, List.drop_nil]
     exact .HEnil _ _ _
 

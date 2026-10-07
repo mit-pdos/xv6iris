@@ -113,7 +113,7 @@ def wpdMPreStepDef (i : Agent) (wpd : Athread → (Athread → IProp GF) → IPr
          ∀ v, ⌜graphValue GD (i, s.atK) = some v⌝ -∗ ⌜v.length = aidentN id⌝ -∗
            wpSkipStep GD i (K v).atK (wpd (K v) Φ)) ∧
     (∀ (l : Wlabel) (s' : Athread),
-       ⌜AxOpsem.astepProg (AxOpsem.grow GD i) (AxirisG.axText GF) GD.gdG.gxImg s l s'⌝ -∗
+       ⌜AxOpsem.astepProg (AxOpsem.grow GD i) s l s'⌝ -∗
        match wlWdata l with
        | some data =>
            wpEvStep GD i s.atK

@@ -56,50 +56,23 @@ here they are kept apart by namespace (`Wlabel.LLoad` vs `Lbl.LLoad`, written
 5. PROOFS: `wp_pf_run_rtc_wpstep` goes by tail induction on `rtc` (Rocq: head
    induction); `bridge_run` by `rtc_ind_l`.  Statements unchanged.
 6. O2 — THE INSTRUCTION FETCH (Lean-only label `LIFetch`, `Weak/WeakPromise.lean`
-   deviation 8; owner decision (B), 2026-10-06).  A fetch cannot be replayed as
-   an axiomatic load unconditionally: `MStepLoad` needs `rdOk` (readability at
-   `loadVpre`), which `ifetchOk` does not imply (a stale pre-`fence.i` fetch), and
-   `MStepLoad`'s post-state `loadPostRun` (raises `coh`/`wVrOld`/`wLdv`/`wVcap`,
-   clears `wRes`) differs from the fetch's IDENTITY post-state.  Changes:
-   - `wpPfStep` gains the arm `PFIFetch` (the twin of `wpstep.WPIFetch`:
-     `ifetchOk img log 0 base tvs`, state/log/promises unchanged);
-     `wpPfStepRtcWpstep` and `ownCohStep` gain the matching arm.
-   - `projLbl (LIFetch base tvs) = some (LLoad false base tvs.*1 tvs.*2)`: a fetch
-     projects to a PLAIN (`aq = false`) axiomatic load.
-   - THE EXTRA PREMISES, per step: `pfFetchLoadOk c i l` (vacuous unless `l` is
-     `LIFetch base tvs`; then, for the agent's `ws`):
-     (i)  every fetched byte `(t, v)` at `base + j` is `readable … ws (loadVpre ws
-          false) (base + j) t` — exactly `MStepLoad`'s `rdOk` minus the value
-          conjunct, which `ifetchOk` already gives;
-     (ii) `wsEqr (loadPostRun ws false base tvs.*1) ws` — the load's update is
-          inert on the nine compared components (field form:
-          `wsEqrLoadPostRunSelf`: for every byte, `vpost ≤ wVrOld` and
-          `max vpost t ≤ coh a`, `vpost = max (loadVpre ws false) (fwdView ws
-          false a t)`).
-     Run level: `pfRunFetchOk c c'` (every step of a pf run `c →* c'`
-     satisfies `pfFetchLoadOk`), discharged for fetch-free programs by
-     `pfRunFetchOkNoFetch` (`pstepNoFetch`).  Non-vacuity: `pfFetchLoadOkInit`
-     (a fresh agent's image-byte fetch), `wsEqrLoadPostRunInit`.
-   - THE MATCH IS WEAKENED, `cfgMatch` ↦ `cfgMatchd` (the Rocq T1-D relation,
-     per-agent `wsEqr`; image and log still equal), in `wpPfStepMstep`,
-     `bridgeStep`, `bridgeRun`, `wpPfBridge` (premise and conclusion).  WHY
-     (ii) is not stated as Wstate EQUALITY with `cfgMatch` kept: `loadPostAt`
-     inserts a `wCoh` entry unconditionally, so `loadPostRun ws false base ts =
-     ws` is FALSE whenever `wCoh` lacks the fetched addresses — e.g. every fetch
-     from `wsInit` (`wCoh = ∅`) — making the equality form vacuous in practice;
-     and it would also demand `wRes = none`, `wLdv`/`wVcap` already raised.
-     `wsEqr` ignores exactly `wRegv`/`wVcap`/`wLdv`/`wTbank`/`wRes`, which the
-     dependency-free, fused fragment never reads, and compares `coh`
-     pointwise; `coh` and `wVrOld` CANNOT be ignored (every later `rdOk`
-     reads them), so (ii) constrains exactly those.  (i) and (ii) are then the
-     smallest sound premises: (i) is `MStepLoad`'s own side condition, (ii) is
-     necessary and sufficient for the `cfgMatchd` step.
-   - `wpPfBridgeLog`: same conclusion; gains the `pfRunFetchOk` premise.  The
-     reverse direction (E) is unchanged (`unprojLbl` never yields `LIFetch`).
-   - Lean-only helpers: `wsEqrRdOk`, `wsEqrLoadPostAtSelf`,
-     `wsEqrLoadFoldSelf`, `wsEqrLoadPostRunSelf`, `wsEqrLoadPostRunInit`,
-     `pfFetchLoadOk`, `pfFetchLoadOkInit`, `pfRunFetchOk`, `pstepNoFetch`,
-     `pfRunFetchOkNoFetch`.
+   deviation 8).  `wpPfStep` gains the arm `PFIFetch` (the twin of
+   `wpstep.WPIFetch`: `ifetchOk img log 0 base tvs`, state/log/promises
+   unchanged); `wpPfStepRtcWpstep` and `ownCohStep` gain the matching arm.
+   STAGE C (owner rulings Q-C1/Q-C3, `notes/weak-port-o2-stageC.md`): the fetch
+   is NOT an axiomatic event (riscv.cat has no fetch events), so
+   `projLbl (LIFetch ..) = none` and the bridge treats `PFIFetch` as a STUTTER,
+   like `PFSilent` (its `Wstate` is unchanged).  The Stage-B fetch → plain-load
+   premises (`pfFetchLoadOk`, `pfRunFetchOk`, `pstepNoFetch`, their discharges
+   and the `wsEqr`-inertness helpers) are DELETED; `wpPfStepMstep`,
+   `bridgeStep`, `bridgeRun`, `wpPfBridge`, `wpPfBridgeLog` have Rocq's
+   premises again.
+   - THE MATCH stays the T1-D relation `cfgMatchd` (per-agent `wsEqr`; image
+     and log still equal) in `wpPfStepMstep`, `bridgeStep`, `bridgeRun`,
+     `wpPfBridge` (Rocq: `cfgMatch`).  Stage B needed it for the fetch's
+     load replay; after Stage C it is no longer forced but is kept (weaker
+     conclusion; no consumer reads the equality form).  Lean-only helper:
+     `wsEqrRdOk`.
 
 **Rocq → Lean name map.**  `ws_eqr` ↦ `wsEqr`; `ws_eqr_{coh,vrOld,vwOld,
 vrNew,vwNew,vRel,fwd,pub,relp}` ↦ `wsEqr{Coh,VrOld,VwOld,VrNew,VwNew,VRel,Fwd,
@@ -337,63 +310,6 @@ theorem wsEqrRdOk (img : Image) (log : List Wmsg) (w1 w2 : Wstate) (aq : Bool) (
     simp only [loadVpre, wsEqrVrNew _ _ he, wsEqrVRel _ _ he]
   exact ⟨h1, by rw [← hvp]; exact wsEqrReadable _ _ _ _ _ _ _ he h2⟩
 
-/-! ### (Lean-only, O2) When a fetch-as-load is `wsEqr`-harmless
-
-A plain (`aq = false`) load at `(a, t)` with pre-view `vpre` moves, among the
-components `wsEqr` compares, only `coh` at `a` (to `max (coh a) (max vpost t)`)
-and `wVrOld` (to `max wVrOld vpost`), `vpost = max vpre (fwdView ws false a t)`.
-So it is `wsEqr`-inert exactly when both are already at or above. -/
-
-theorem wsEqrLoadPostAtSelf (ws : Wstate) (vpre : Nat) (a : Int) (t : Nat) :
-    max vpre (fwdView ws false a t) ≤ ws.wVrOld →
-    max (max vpre (fwdView ws false a t)) t ≤ coh ws a →
-    wsEqr (loadPostAt ws false vpre a t) ws := by
-  intro h1 h2
-  refine ⟨fun b => ?_, ?_, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
-  · by_cases hb : b = a
-    · subst hb; rw [cohLoadPostAtEq]; omega
-    · exact cohLoadPostAtNe _ _ _ _ _ _ hb
-  · show max ws.wVrOld (max vpre (fwdView ws false a t)) = ws.wVrOld
-    omega
-
-theorem wsEqrLoadFoldSelf (vpre : Nat) (ats : List (Int × Nat)) :
-    ∀ ws : Wstate,
-    (∀ p ∈ ats, max vpre (fwdView ws false p.1 p.2) ≤ ws.wVrOld ∧
-      max (max vpre (fwdView ws false p.1 p.2)) p.2 ≤ coh ws p.1) →
-    wsEqr (ats.foldl (fun w at_ => loadPostAt w false vpre at_.1 at_.2) ws) ws := by
-  induction ats with
-  | nil => intro ws _; exact wsEqrRefl ws
-  | cons x ats ih =>
-    intro ws h
-    obtain ⟨hx1, hx2⟩ := h x List.mem_cons_self
-    have he1 := wsEqrLoadPostAtSelf ws vpre x.1 x.2 hx1 hx2
-    refine wsEqrTrans (ih _ (fun p hp => ?_)) he1
-    have hfv : fwdView (loadPostAt ws false vpre x.1 x.2) false p.1 p.2 = fwdView ws false p.1 p.2 :=
-      rfl
-    obtain ⟨hp1, hp2⟩ := h p (List.mem_cons_of_mem _ hp)
-    rw [hfv, wsEqrVrOld _ _ he1, wsEqrCoh _ _ _ he1]
-    exact ⟨hp1, hp2⟩
-
-/-- The run-level form: the harmlessness premise of the fetch projection, in
-field terms. -/
-theorem wsEqrLoadPostRunSelf (ws : Wstate) (base : Int) (ts : List Nat) :
-    (∀ p ∈ loadRunAts base ts, max (loadVpre ws false) (fwdView ws false p.1 p.2) ≤ ws.wVrOld ∧
-      max (max (loadVpre ws false) (fwdView ws false p.1 p.2)) p.2 ≤ coh ws p.1) →
-    wsEqr (loadPostRun ws false base ts) ws := by
-  intro h
-  unfold loadPostRun loadPostBytes
-  exact wsEqrTrans (wsEqrSym (wsEqrCtrlPost _ _)) (wsEqrLoadFoldSelf _ _ ws h)
-
-/-- NON-VACUITY: a fresh agent's one-byte fetch of timestamp 0 is harmless. -/
-theorem wsEqrLoadPostRunInit (base : Int) : wsEqr (loadPostRun wsInit false base [0]) wsInit := by
-  apply wsEqrLoadPostRunSelf
-  intro p hp
-  have hp' : p = (base + ((0 : Nat) : Int), 0) := by
-    simpa [loadRunAts] using hp
-  subst hp'
-  rw [fwdViewEmpty _ _ _ _ rfl, cohInit]
-  simp [loadVpre, wsInit]
-
 /-- THE CLASS FUNCTION'S T1-D OBLIGATION: a class function may not read a
 component `wsEqr` leaves unrelated (an INSTANCE-DISCHARGED OBLIGATION). -/
 def pclsEqr {P : Type} (clsf : P → Wlabel → Wstate → WmClass) : Prop :=
@@ -624,7 +540,7 @@ def projLbl (k : WmClass) (l : Wlabel) : Option Lbl :=
   | .LInstr => none
   | .LExLoad aq base tvs _ => some (.LLoad aq base (tvs.map Prod.fst) (tvs.map Prod.snd))
   | .LExStore rl base data _ _ => some (.LStore rl base data k)
-  | .LIFetch base tvs => some (.LLoad false base (tvs.map Prod.fst) (tvs.map Prod.snd))
+  | .LIFetch _ _ => none
 
 /-- The state projection, RELATIONALLY: same image, same log, and the
 `Mstate`'s view function agrees with the agent list where it is defined. -/
@@ -861,57 +777,20 @@ theorem pfRmwLatest (c : Wpcfg P D) (i : Nat) (ag : Wpagent P) (aq : Bool) (base
 
 /-! ### (D) The bridge
 
-O2 / owner decision (B) (deviation 6): an i-cache FETCH (`LIFetch`) projects to
-the axiomatic PLAIN load `LLoad false base ts vs`, under the per-step premise
-`pfFetchLoadOk` — (i) every fetched byte is also READABLE as a plain load at
-`loadVpre ws false` (`MStepLoad`'s `rdOk`; `ifetchOk` supplies the values but
-not readability: a stale pre-`fence.i` fetch need not be readable), and (ii) the
-load's post-state is `wsEqr`-harmless.  Because a fetch leaves the agent's
-`Wstate` IDENTICAL while `MStepLoad` applies `loadPostRun`, the forward bridge
-now tracks the T1-D weakening `cfgMatchd` (Rocq: `cfgMatch`). -/
-
-/-- THE FETCH PROJECTION PREMISE at one step (Lean-only, deviation 6).  Vacuous
-for every label but `LIFetch`. -/
-def pfFetchLoadOk (c : Wpcfg P D) (i : Nat) (l : Wlabel) : Prop :=
-  match l with
-  | .LIFetch base tvs =>
-      ∀ ag : Wpagent P, c.pcAgs[i]? = some ag →
-        (∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) →
-          readable c.pcImg c.pcLog ag.paWs (loadVpre ag.paWs false) (base + (j : Int)) t) ∧
-        wsEqr (loadPostRun ag.paWs false base (tvs.map Prod.fst)) ag.paWs
-  | _ => True
-
-/-- NON-VACUITY of `pfFetchLoadOk`: a fresh agent fetching one image byte. -/
-theorem pfFetchLoadOkInit (c : Wpcfg P D) (i : Nat) (base : Int) (v : BitVec 8) :
-    (∀ ag, c.pcAgs[i]? = some ag → ag.paWs = wsInit) →
-    logByte c.pcImg c.pcLog 0 base = some v →
-    pfFetchLoadOk c i (.LIFetch base [(0, v)]) := by
-  intro hini hv ag hlk
-  rw [hini ag hlk]
-  refine ⟨fun j t v' hj => ?_, wsEqrLoadPostRunInit base⟩
-  cases j with
-  | succ j => simp at hj
-  | zero =>
-    simp only [List.getElem?_cons_zero, Option.some.injEq, Prod.mk.injEq] at hj
-    obtain ⟨rfl, rfl⟩ := hj
-    refine ⟨by simp [hv], ?_⟩
-    rintro ⟨t', h1, h2, _⟩
-    rw [cohInit] at h2
-    simp only [loadVpre, wsInit] at h2
-    simp at h2
-    omega
+Stage C (deviation 6): an i-cache FETCH (`LIFetch`) is no axiomatic event; it
+projects to `none` and its pf step (`PFIFetch`, `Wstate` unchanged) stutters. -/
 
 /-- One pf step projects to one `mstep` (or, for the label-free arms, to
 nothing at all).  THE DEPENDENCY-FREE PREMISE (D2, recorded residue) and the
-`lbFused` GATE (lifted by A2): see the Rocq comments.  Deviation 6: the
-`pfFetchLoadOk` premise, and `cfgMatchd` for `cfgMatch`. -/
+`lbFused` GATE (lifted by A2): see the Rocq comments.  Deviation 6: `cfgMatchd`
+for `cfgMatch`; the fetch stutters. -/
 theorem wpPfStepMstep (i : Nat) (l : Wlabel) (c c' : Wpcfg P D) (σ : Mstate) :
-    lbDepfree l → lbFused l → pfFetchLoadOk c i l → ownCoh c → cfgMatchd c σ →
+    lbDepfree l → lbFused l → ownCoh c → cfgMatchd c σ →
     wpPfStep pstep pcls i l c c' →
     ∃ k, match projLbl k l with
       | none => cfgMatchd c' σ
       | some lb => ∃ σ', mstep σ i lb σ' ∧ cfgMatchd c' σ' := by
-  intro hdf hfu hfe hoc hm hstep
+  intro hdf hfu hoc hm hstep
   obtain ⟨img, lg, f⟩ := σ
   obtain ⟨himg, hlg, hf⟩ := hm
   dsimp only at himg hlg hf
@@ -979,38 +858,19 @@ theorem wpPfStepMstep (i : Nat) (l : Wlabel) (c c' : Wpcfg P D) (σ : Mstate) :
   -- the two split arms are excluded by `lbFused`
   | PFExLoad => exact (hfu : False).elim
   | PFExStore => exact (hfu : False).elim
-  -- O2 (deviation 6): the fetch, as a plain load, under `pfFetchLoadOk`
-  | PFIFetch c ag base tvs st' d' hlk _ hif =>
-    obtain ⟨hrd, hharm⟩ := hfe ag hlk
-    refine ⟨.WCplain, ?_⟩
-    dsimp only [projLbl]
-    refine ⟨_, mstep.MStepLoad false base (tvs.map Prod.fst) (tvs.map Prod.snd) ?_, ?_⟩
-    · dsimp only
-      refine wsEqrRdOk _ _ _ _ _ _ _ _ (wsEqrSym (hf i ag hlk)) ⟨by simp, fun j t v ht hv => ?_⟩
-      rw [List.getElem?_map] at ht hv
-      cases htv : tvs[j]? with
-      | none => rw [htv] at ht; cases ht
-      | some p =>
-        obtain ⟨t', v'⟩ := p
-        rw [htv] at ht hv
-        injection ht with ht
-        injection hv with hv
-        subst ht hv
-        exact ⟨(hif j t' v' htv).1, hrd j t' v' htv⟩
-    · dsimp only
-      exact cfgMatchdUpdGen _ _ _ _ i ag st' _ _ f _ hf hlk
-        (by rw [updWsEq]; exact wsEqrTrans (wsEqrLoadPostRun _ _ _ _ _ (hf i ag hlk)) hharm)
-        (fun j hne => updWsNe _ _ _ _ hne)
+  -- Stage C (deviation 6): the fetch STUTTERS (no axiomatic event, `Wstate` unchanged)
+  | PFIFetch c ag base tvs st' d' hlk _ _ =>
+    exact ⟨.WCplain,
+      cfgMatchdUpdGen _ _ _ _ i ag st' ag.paWs ag.paProm f f hf hlk (hf i ag hlk) (fun _ _ => rfl)⟩
 
-/-- Extending the execution by one pf step (deviation 6: `pfFetchLoadOk`,
-`cfgMatchd`). -/
+/-- Extending the execution by one pf step (deviation 6: `cfgMatchd`). -/
 theorem bridgeStep (E : Exec) (i : Nat) (l : Wlabel) (c c' : Wpcfg P D) :
-    lbDepfree l → lbFused l → pfFetchLoadOk c i l →
+    lbDepfree l → lbFused l →
     execWf E → cfgMatchd c (stt E E.exTr.length) →
     ownCoh c → wpPfStep pstep pcls i l c c' →
     ∃ E', execWf E' ∧ exImg E' = exImg E ∧ cfgMatchd c' (stt E' E'.exTr.length) := by
-  intro hdf hfu hfe hE hm hoc hstep
-  obtain ⟨k, hpr⟩ := wpPfStepMstep pstep pcls i l c c' _ hdf hfu hfe hoc hm hstep
+  intro hdf hfu hE hm hoc hstep
+  obtain ⟨k, hpr⟩ := wpPfStepMstep pstep pcls i l c c' _ hdf hfu hoc hm hstep
   revert hpr
   cases projLbl k l with
   | some lb =>
@@ -1043,64 +903,30 @@ theorem wpPfStepLbFused (i : Nat) (l : Wlabel) (c c' : Wpcfg P D) :
   intro hfu hs
   cases hs <;> (apply hfu; assumption)
 
-/-- THE RUN-LEVEL FETCH PREMISE (Lean-only, deviation 6): every pf step on a run
-from `c` to `c'` satisfies `pfFetchLoadOk` (i.e. every FETCH on it is readable
-as a plain load and `wsEqr`-harmless as one). -/
-def pfRunFetchOk (c c' : Wpcfg P D) : Prop :=
-  ∀ (x y : Wpcfg P D) (i : Nat) (l : Wlabel),
-    rtc (wpPfRun pstep pcls) c x → wpPfStep pstep pcls i l x y → rtc (wpPfRun pstep pcls) y c' →
-    pfFetchLoadOk x i l
-
-/-- The program-level discharge: a program LTS that never fetches. -/
-def pstepNoFetch : Prop :=
-  ∀ p d l p' d', pstep p d l p' d' → ∀ base tvs, l ≠ .LIFetch base tvs
-
-theorem pfRunFetchOkNoFetch (c c' : Wpcfg P D) :
-    pstepNoFetch pstep → pfRunFetchOk pstep pcls c c' := by
-  intro hnf x y i l _ hs _
-  cases hs with
-  | PFIFetch _ ag base tvs _ _ _ hps _ => exact absurd rfl (hnf _ _ _ _ _ hps base tvs)
-  | PFSilent => trivial
-  | PFLoad => trivial
-  | PFStore => trivial
-  | PFRmw => trivial
-  | PFFence => trivial
-  | PFDev => trivial
-  | PFRegW => trivial
-  | PFCtrl => trivial
-  | PFInstr => trivial
-  | PFExLoad => trivial
-  | PFExStore => trivial
-
 theorem bridgeRun (c c' : Wpcfg P D) :
-    pstepDepfree pstep → pstepFused pstep → pfRunFetchOk pstep pcls c c' →
+    pstepDepfree pstep → pstepFused pstep →
     rtc (wpPfRun pstep pcls) c c' → ownCoh c →
     ∀ E, execWf E → cfgMatchd c (stt E E.exTr.length) →
     ∃ E', execWf E' ∧ exImg E' = exImg E ∧ cfgMatchd c' (stt E' E'.exTr.length) := by
-  intro hpdf hpfu hfo0 hrun
-  refine rtc_ind_l (fun x => pfRunFetchOk pstep pcls x c' → ownCoh x → ∀ E, execWf E →
+  intro hpdf hpfu hrun
+  refine rtc_ind_l (fun x => ownCoh x → ∀ E, execWf E →
       cfgMatchd x (stt E E.exTr.length) →
       ∃ E', execWf E' ∧ exImg E' = exImg E ∧ cfgMatchd c' (stt E' E'.exTr.length)) c' ?_ ?_ c hrun
-      hfo0
-  · intro _ _ E hE hm; exact ⟨E, hE, rfl, hm⟩
-  · rintro x y ⟨i, l, hs⟩ hyc ih hfo hoc E hE hm
-    have hfx : pfFetchLoadOk x i l := hfo x y i l (rtc_refl _) hs hyc
-    have hfy : pfRunFetchOk pstep pcls y c' := fun x' y' i' l' h1 h2 h3 =>
-      hfo x' y' i' l' (rtc_l ⟨i, l, hs⟩ h1) h2 h3
+  · intro _ E hE hm; exact ⟨E, hE, rfl, hm⟩
+  · rintro x y ⟨i, l, hs⟩ _ ih hoc E hE hm
     obtain ⟨E1, hE1, himg1, hm1⟩ := bridgeStep pstep pcls E i l x y
       (wpPfStepLbDepfree pstep pcls i l x y hpdf hs)
-      (wpPfStepLbFused pstep pcls i l x y hpfu hs) hfx hE hm hoc hs
-    obtain ⟨E2, hE2, himg2, hm2⟩ := ih hfy (ownCohStep pstep pcls i l x y hoc hs) E1 hE1 hm1
+      (wpPfStepLbFused pstep pcls i l x y hpfu hs) hE hm hoc hs
+    obtain ⟨E2, hE2, himg2, hm2⟩ := ih (ownCohStep pstep pcls i l x y hoc hs) E1 hE1 hm1
     exact ⟨E2, hE2, himg2.trans himg1, hm2⟩
 
-/-- THE BRIDGE THEOREM (D-M6-7's W1 obligation).  Deviation 6: the run-level
-fetch premise `pfRunFetchOk`, and the conclusion is `cfgMatchd` (per-agent
-`wsEqr`; image and log still EQUAL). -/
+/-- THE BRIDGE THEOREM (D-M6-7's W1 obligation).  Deviation 6: the conclusion
+is `cfgMatchd` (per-agent `wsEqr`; image and log still EQUAL). -/
 theorem wpPfBridge (img : Image) (d0 : D) (ps : List P) (c : Wpcfg P D) :
-    pstepDepfree pstep → pstepFused pstep → pfRunFetchOk pstep pcls (wpInit img d0 ps) c →
+    pstepDepfree pstep → pstepFused pstep →
     rtc (wpPfRun pstep pcls) (wpInit img d0 ps) c →
     ∃ E, execWf E ∧ exImg E = img ∧ cfgMatchd c (stt E E.exTr.length) := by
-  intro hpdf hpfu hfo hrun
+  intro hpdf hpfu hrun
   let σ0 : Mstate := ⟨img, [], fun _ => wsInit⟩
   have hE : execWf ⟨[σ0], []⟩ := execNil σ0 rfl (fun _ => rfl)
   have hm0 : cfgMatch (wpInit img d0 ps) (stt ⟨[σ0], []⟩ 0) := by
@@ -1110,16 +936,16 @@ theorem wpPfBridge (img : Image) (d0 : D) (ps : List P) (c : Wpcfg P D) :
     | none => rw [hp] at hlk; cases hlk
     | some p => rw [hp] at hlk; injection hlk with hlk; subst hlk; rfl
   obtain ⟨E, hE', himg, hm⟩ :=
-    bridgeRun pstep pcls _ _ hpdf hpfu hfo hrun (ownCohInit img d0 ps) ⟨[σ0], []⟩ hE
+    bridgeRun pstep pcls _ _ hpdf hpfu hrun (ownCohInit img d0 ps) ⟨[σ0], []⟩ hE
       (cfgMatchCfgMatchd _ _ hm0)
   exact ⟨E, hE', himg, hm⟩
 
 theorem wpPfBridgeLog (img : Image) (d0 : D) (ps : List P) (c : Wpcfg P D) :
-    pstepDepfree pstep → pstepFused pstep → pfRunFetchOk pstep pcls (wpInit img d0 ps) c →
+    pstepDepfree pstep → pstepFused pstep →
     rtc (wpPfRun pstep pcls) (wpInit img d0 ps) c →
     ∃ E, execWf E ∧ exImg E = img ∧ exLog E = c.pcLog := by
-  intro hpdf hpfu hfo hrun
-  obtain ⟨E, h1, h2, hm⟩ := wpPfBridge pstep pcls img d0 ps c hpdf hpfu hfo hrun
+  intro hpdf hpfu hrun
+  obtain ⟨E, h1, h2, hm⟩ := wpPfBridge pstep pcls img d0 ps c hpdf hpfu hrun
   exact ⟨E, h1, h2, cfgMatchdLog _ _ hm⟩
 
 /-! ### (E) The reverse direction: "programs are free" (and FABRIC-BLIND) -/

@@ -30,16 +30,19 @@ code bytes are the kernel image's (`mycpuInstrs_text`).  `#kernel_eval` (below) 
 `Eval vm_compute` analogue: it prints the kernel's normal form of a closed term and its time.
 
 LEAN RESULTS (this tree's kernel build, `Xv6/KernelImage.lean`): `obs 14` =
-(pc 0x80000000 = ra, a0 = 0x800125b0 = cpus + 1 * 128, per-step memory-event counts
-[4, 5, 2, 1, 1, 1, 1, 2, 2, 1, 2, 2, 1, 1] = 26 events incl. the 2 cold walks; `obsEv_fourteen`
-lists them).  The Lean model fetches a 4-byte-aligned pc as ONE 4-byte read and a pc at 2 mod 4
+(pc 0x80000000 = ra, a0 = 0x800125b0 = cpus + 1 * 128, per-step GRAPH memory-event counts
+[3, 4, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0] = 10 events: the 2 cold walks (6 reads), 2 frame
+stores, 2 frame loads).  O2 STAGE C (`notes/weak-port-o2-stageC.md` §B4, item 20): a fetch is
+an administrative label, not a graph event, so the tracer CLASSIFIES each read by its access
+kind (`akIfetch`: kind 2 = fetch) and `obs` counts the non-fetch events only; with the 16
+fetch reads all accesses are [4, 5, 2, 1, 1, 1, 1, 2, 2, 1, 2, 2, 1, 1] = 26 (the Stage B
+`obs`), and `obsEv_fourteen` lists all 26, fetches as kind 2.  The Lean model fetches a 4-byte-aligned pc as ONE 4-byte read and a pc at 2 mod 4
 as a 2-byte read (a second one for a full word): the two extra events against Rocq are the
 4-byte `auipc`/`addi` pair, which sit at 2 mod 4 in this build (0x8000196a/0x8000196e) and at
-0 mod 4 in Rocq's.  Reads are listed as kind 0 whatever their access kind (the fetches are the
-reads at the pc; the Lean model tags them `AK_ifetch`, O2 -- the tracer, like Rocq's, does not
-look).  Kernel evaluation times (`#kernel_eval`, VM, c4d): `obs 1` 0.29 s, `obs 14` 1.7 s
+0 mod 4 in Rocq's.  Reads are kind 0, except the fetches (the reads at the pc, `AK_ifetch` in the
+Lean model), kind 2.  Kernel evaluation times (`#kernel_eval`, VM, c4d): `obs 1` 0.30 s, `obs 14` 1.6 s
 (about 0.12 s an S-mode instruction, against Rocq `vm_compute`'s 5 ms); the theorems' kernel
-checks: `obs_one` 0.22 s, `obs_fourteen` 1.8 s.
+checks: `obs_one` 0.23 s, `obs_fourteen` 1.8 s, `obsEv_fourteen` 3.3 s.
 
 Deviations from Rocq:
 - The kernel image is THIS tree's (`MachCSL.KernelSyms`, `Xv6.Kernel.textTree`): `mycpu` is at
@@ -59,6 +62,8 @@ Deviations from Rocq:
   answers them (Rocq answered `inl None` to a write).  The `-D SYMBOLIC` announce events are
   skipped, as Rocq's.
 - `obs`/`obsEv` results are `Sum`s of tuples (Rocq `+`, `*`).
+- O2 Stage C: the event kind 2 (fetch, by `akIfetch` of the access kind; Rocq: every read is
+  kind 0) and `obs` counting graph events only (Rocq: all events).
 
 Rocq -> Lean names (inside `namespace Weak`; `Q.` = `AxSpinSpikeRun.`, the file qualifier for
 the names Rocq defines in more than one file, `notes/weak-port-dupnames.json`, and for this
@@ -250,7 +255,9 @@ def rAt : AxSpinSpikeRun.TState := ⟨rRegs KernelSyms.«mycpu», rMem⟩
 
 /-! ## 2. The tracer, carrying the state ([AxSmodeProbe.mtr] + final state) -/
 
-/-- A memory event: (R/W as 0/1, width, pa). -/
+/-- A memory event: (kind, width, pa); kind 0 a data or walker read, 1 a write, 2 an
+instruction fetch (Lean-only class, O2 Stage C: a fetch is ADMINISTRATIVE, not a graph event;
+told apart by its access kind `AK_ifetch`). -/
 abbrev AxSpinSpikeRun.Mev := Nat × Nat × Nat
 
 /-- The `n` bytes at `pa`, little-endian, if all are mapped (Rocq `read_bytes`). -/
@@ -278,7 +285,7 @@ def ttr {X : Type} : SailM X → AxSpinSpikeRun.TState → List AxSpinSpikeRun.M
     | .regRead r, k => ttr (k (t.regs r)) t acc
     | .regWrite r v, k => ttr (k PUnit.unit) ⟨t.regs.set r v, t.mem⟩ acc
     | .memRead n _ req, k =>
-      let e : AxSpinSpikeRun.Mev := (0, n, req.pa.toNat)
+      let e : AxSpinSpikeRun.Mev := (if akIfetch req.access_kind then 2 else 0, n, req.pa.toNat)
       if devAddr req.pa then .inr (1, (e :: acc).reverse)
       else match AxSpinSpikeRun.readBytes t.mem req.pa n with
         | some w => ttr (k (.Ok (w, none))) t (e :: acc)
@@ -318,10 +325,13 @@ def AxSpinSpikeRun.pcOf (t : AxSpinSpikeRun.TState) : Nat := (t.regs .PC).toNat
 /-- Rocq `a0_of`. -/
 def a0Of (t : AxSpinSpikeRun.TState) : Nat := (t.regs .x10).toNat
 
-/-- Observable: (final pc, a0, #memory events per step). -/
+/-- Observable: (final pc, a0, #graph memory events per step -- the fetches, kind 2, are
+administrative and not counted, O2 Stage C). -/
 noncomputable def obs (n : Nat) : (Nat × Nat × List Nat) ⊕ (Nat × List AxSpinSpikeRun.Mev) :=
   match AxSpinSpikeRun.trun n rAt [] with
-  | .inl (evs, t) => .inl (AxSpinSpikeRun.pcOf t, a0Of t, evs.map List.length)
+  | .inl (evs, t) =>
+    .inl (AxSpinSpikeRun.pcOf t, a0Of t,
+      evs.map fun l => (l.filter fun e => !Nat.beq e.1 2).length)
   | .inr x => .inr x
 
 /-- Observable: (final pc, the events of every step). -/
@@ -338,28 +348,28 @@ noncomputable def obsEv (n : Nat) :
 
 set_option profiler true in
 /-- One step (Rocq `Time Eval vm_compute in obs 1`): `c.addi sp,-16` through a cold walk. -/
-theorem AxSpinSpikeRun.obs_one : obs 1 = .inl (0x8000195e, 0, [4]) := by
+theorem AxSpinSpikeRun.obs_one : obs 1 = .inl (0x8000195e, 0, [3]) := by
   decide +kernel
 
 set_option profiler true in
 /-- The whole of `mycpu` (Rocq `Time Eval vm_compute in obs 14`): back at `ra`, `a0 = cpus[1]`. -/
 theorem AxSpinSpikeRun.obs_fourteen :
-    obs 14 = .inl (ra0, KernelSyms.«cpus» + 1 * 128, [4, 5, 2, 1, 1, 1, 1, 2, 2, 1, 2, 2, 1, 1]) := by
+    obs 14 = .inl (ra0, KernelSyms.«cpus» + 1 * 128, [3, 4, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0]) := by
   decide +kernel
 
 set_option profiler true in
 /-- The events of every step of the run (walk reads at the three table levels, fetches at the
-pc, the two frame stores and the two frame loads). -/
+pc -- kind 2 --, the two frame stores and the two frame loads). -/
 theorem AxSpinSpikeRun.obsEv_fourteen :
     obsEv 14 = .inl (ra0,
-      [[(0, 8, 0x80010010), (0, 8, 0x80011000), (0, 8, 0x80012008), (0, 4, 0x8000195c)],
-       [(0, 2, 0x8000195e), (0, 8, 0x80010010), (0, 8, 0x80011000), (0, 8, 0x80012000),
+      [[(0, 8, 0x80010010), (0, 8, 0x80011000), (0, 8, 0x80012008), (2, 4, 0x8000195c)],
+       [(2, 2, 0x8000195e), (0, 8, 0x80010010), (0, 8, 0x80011000), (0, 8, 0x80012000),
         (1, 8, 0x80000ff8)],
-       [(0, 4, 0x80001960), (1, 8, 0x80000ff0)], [(0, 2, 0x80001962)], [(0, 4, 0x80001964)],
-       [(0, 2, 0x80001966)], [(0, 4, 0x80001968)], [(0, 2, 0x8000196a), (0, 2, 0x8000196c)],
-       [(0, 2, 0x8000196e), (0, 2, 0x80001970)], [(0, 2, 0x80001972)],
-       [(0, 4, 0x80001974), (0, 8, 0x80000ff8)], [(0, 2, 0x80001976), (0, 8, 0x80000ff0)],
-       [(0, 4, 0x80001978)], [(0, 2, 0x8000197a)]]) := by
+       [(2, 4, 0x80001960), (1, 8, 0x80000ff0)], [(2, 2, 0x80001962)], [(2, 4, 0x80001964)],
+       [(2, 2, 0x80001966)], [(2, 4, 0x80001968)], [(2, 2, 0x8000196a), (2, 2, 0x8000196c)],
+       [(2, 2, 0x8000196e), (2, 2, 0x80001970)], [(2, 2, 0x80001972)],
+       [(2, 4, 0x80001974), (0, 8, 0x80000ff8)], [(2, 2, 0x80001976), (0, 8, 0x80000ff0)],
+       [(2, 4, 0x80001978)], [(2, 2, 0x8000197a)]]) := by
   decide +kernel
 
 end Weak

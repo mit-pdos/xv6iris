@@ -68,23 +68,26 @@ hit the 100-error cap and hid the real ones. You MAY use `tools/weak_rocq2lean.p
 Rocq→Lean name map only.
 
 **Cross-file facts later ports must respect** (read the named headers):
-- Fetches: `fetchSrcOk` premise carried by the robustness capstones (WeakRobustSim/Main); `pstepNoFetch` on
-  WeakErase/WeakRefuse bridges; the bridge fetch → plain load premise `pfFetchLoadOk` (WeakPromiseBridge);
-  `LtsEnabled.leIfetch` (WeakRobustBlocks); text pin `pinnedRead ∧ fetchPinned` (WeakInstr/WeakBridge).
+- **Stage C (2026-10-07, merged): fetches are NOT graph events.** `LIFetch` is an ADMIN label in the graph tier
+  (`lbAdmin instr (LIFetch ..) := instr = true`; `projLbl`/`lblIdent` give `none`; no row item, no edges;
+  `AStepFetch`, the opax oracle params `T`/`fetchImg`/`fetchAnswers` and `AxWp.axText` are deleted — a fetch is an
+  `AStepAdmin` step / `wpSkipStep`). `lblRealizes` is Rocq's 4 conjuncts and `hlblRealizesAx` is `Iff.rfl`.
+  The only graph-tier fetch content is the boot-image pin `WeakAxRealize.fetchPin img l`: the program LTS is
+  `pstepPin img pstepEv` (supplies, Cert chain, Glue `RunData`, capstones' internals), `emFetchImg im em` is a
+  clause of `gdexecQconf`/`gfexecConf`, appended blocks are `WeakRvwmoCert2.cblkPin` / `cblkpPin`,
+  `certSegment*`/`segStepOfSegment`/`wlkSegOf*` take `WeakRvwmoCert2.esPin`; project back with
+  `WeakRvwmoCapstone.execProgOkPinSub` / `wpPfRunPinSub`. Walk: `wwitNd`/`poisonedNoFault`/`wpoisSite` are stated
+  on pinned blocks `∀ im`; `wemit` ends with `esPin`. ALL fetch-inertness names (lbFetchInert, candFetchInert(F),
+  emFetchInert, hullRunFetchInert, t2linFetchInert, fconfFetchInert, wfetchSite, pfFetchLoadOk, hlblRealizesAxNoFetch)
+  are GONE. The capstones carry only `efetchItvOk` (Q4). `pstepNoFetch` survives only in WeakRobustMain (Q6);
+  `fetchSrcOk` stays on the robustness line. Design: notes/weak-port-o2-stageC.md. Rows: a fetch that ended a Rocq
+  row is followed by the next real memory event (hemit allows no trailing admin items). AxSfence is HELD (Q7).
 - Event pool (WeakEvPf): harts, then uart0, uart1, disk, plic — disk at index `NCPU+2`, plic at `NCPU+3`
   (Rocq: disk `NCPU+1`); device arms have the new shapes and `plicAgent` (WeakEvPf header).
 - Exec layer: Weak/Exec + ExecLib (+ ExecSC*), `exec_steps` tactic; writes answer `.Ok (some true)`;
   MMIO test `mmioAcc` (= `devAddr pa && n != 0`).
 - Archive files imported by live files are ported only as far as live files use them (WeakRobustL2 = one
   lemma; WeakSailComplete = its register-file section).
-- WeakRvwmoConf: `hlblRealizes` keeps Rocq's 4 conditions; `hlblRealizesAx` is now
-  `lblRealizes … ↔ hlblRealizes … ∧ lbFetchInert σ i l` — users that turn `hart_conf` blocks into
-  `lblRealizes` (AxOpsem, AxDeps, B0b-2) must supply `lbFetchInert` at the machine state
-  (`hlblRealizesAxNoFetch` for non-fetch labels). Under D1 `LIFetch` is treated like `LLoad false` there.
-- WeakRvwmoSupply: `supplyOfQconf` takes `candFetchInert boot d0 N c` (every fetch item of a constant-fabric
-  emission is fetch-inert at its trace position); `hullSupply`/`topoSupply` return the supply conditional on
-  it. Consumers (WeakRvwmoGlue, capstones) discharge it for the candidate they receive (e.g. fetches of
-  never-written text at timestamp 0).
 - `bv_decide` adds an auxiliary `<Enum>.enumToBitVec` the first time it meets an enum; two modules that each
   trigger it clash when imported together ("environment already contains … enumToBitVec"). Import the module
   that already encodes that enum (e.g. `MachCSL.WpTrap` for `Privilege`, `Weak.ExecSC5` for
@@ -103,13 +106,11 @@ Rocq→Lean name map only.
 - WeakLeafWin: `wwin`, the `leaf_peel` macro, `loadSexecFacts` and the GPR frame lemmas `WeakLeafWin.setGprRegsNe`/`setGprMem`/`setGprDev`/`inRamByte` — later leaves reuse them. `(s.setReg r v).regs r = v` needs `simp only [ExecSt.setReg_regs, RegFile.set_same]`.
 - WeakFetchRvc: the `Ext_Zca` probe runs in `run_hart_active` (not in `fetch`); 2-aligned (two-halfword) fetch arms are not covered by WeakFetchRvc.
 - Decoding SFENCE_VMA by `rfl` needs `virtual_memory_supported`, `hartSupports`, `currentlyEnabled` `local semireducible` (AxSfence).
-- WeakRvwmoCert2: `hlblRealizesLoadShape` has a third (fetch) case `aq = false ∧ l = LIFetch base tvs`; `certBlockSnoc` takes `lbFetchInert (candLastSt c) x l`, and `certSegment`'s policy `Hpol` must also return `lbFetchInert (candLastSt c0) x l'` (Cert3/Cert4/Walk/Glue supply it; `WeakRvwmoCert2.lbFetchInertOfStoreNe` for store labels; trivial for non-fetch labels).
 - WeakFetch2: 2-aligned fetch arms — F_Base emits `[.WEread wakIfetch pc 2, .WEread wakIfetch (BitVec.addInt pc 2) 2]`, F_RVC `[.WEread wakIfetch pc 2]`; `BitVec.addInt pc 2` is defeq `pc + BitVec.ofNat 64 2` (WeakCert form; may need `show`). Never ascribe `extractLsb` halves (silent `setWidth`).
 - WeakRvwmoAdm: tactic `weak_adm_krfl` (kernel `Eq.refl` over the local context, for facts with free vars that `decide +kernel` refuses) — reuse it; do not name a tactic `kernel_rfl` (MachCSL.URunRW and Xv6/UserTextDecode both define one).
 - WeakLeafLw4: GPR-cell regInterp helpers `WeakLeafLw4.gprValid`/`gprUpdate`/`gprSetNe` — reuse in later leaves.
 - WeakWalkEff: `WeakWalkEff.uAcc6` is Rocq u_acc (6 arms; ExecSC2.uAcc has 3), PtTree pieces ptSlotMem/ptreeBlocks/ptreeMapsBlocksExcl/uweMatchOther/pteValidInvalidExcl as `WeakWalkEff.*`. WeakPmpEff and WeakPmpTorEff clash on `execEffPmpReadAddrReg` (do not import both).
 - **GPR leaves (wPEff*/wwp*Leaf whnf timeouts):** WeakLeafLw4 is the worked example — import it and reuse `WeakLeafLw4.gprValid`/`gprUpdate`/`gprSetNe`/`keepPure2`/`winstrBytesNotRVC` (do NOT re-prove gpr-cell lemmas; a 31/32-arm match or `uxa_bv5_cases`+`dsimp [gpr]` in a new file blows whnf). The `(⟨regs, M, dev⟩ : ExecSt).gpr r` vs `(wflatSt σ).gpr r` mismatch times out the unifier: `unfold ExecSt.gpr at h ⊢; exact h`. Model `wPEff<X>` on `wPEffLw4`.
-- WeakRvwmoLin2: `fconfSupply'` takes `candFetchInertF boot N (candOf G L)`; `fconfTraceRealize` returns `∃ L, … ∧ (candFetchInertF boot N c → ∃ pst, …)` — consumers discharge `candFetchInertF` at their candidate.
 - GPR leaves: a whnf timeout at `exact` after `rw [(lemma _ x _ y _ _).field]` comes from open metavariables — instantiate all args. Before `WeakLeafLw4.gprUpdate` on a `.setMem` state, `rw [show … = (… .setMem M).regs from rfl]` (never pass `_` for the state). WeakLeafCsrw is the worked CSR leaf.
 - Wide (8-byte) leaves: whnf unfolds `wwin pc ea 8` inside the confined-state literal — use `WeakLeafLd8.confBytes`/`confDom` (stated over an abstract window W) instead of stating BytesAt/bmDomSub at the literal.
 - `exact wwinWdom σ pc ea n vs` against a `(⟨r, m, d⟩ : ExecSt).mem` goal times out — `dsimp only` first. Model wPEff<X> as in wPEffLw4: apply `wPEffOfLeafBase`, one bullet per premise.
@@ -129,19 +130,14 @@ Rocq→Lean name map only.
 - GPR file: Rocq `gpr_file m` ↦ `MachCSL.gprFile cpu m` (x0 not owned): reads `m.get r` (x0 = 0), updates `m.set rd v` — WeakLeafM/WkStart*/WkTimerinit use this. Generic RVC register leaf `WeakLeafRtypeW.wwpGprRvcLeaf` (operator-abstracted) — reuse for ALU leaves.
 - WeakLeafItype: generic register-only leaves over `(i, op)` — `WeakLeafItype.wwpGprBaseLeaf`/`wwpGprRvcLeaf`; whole-file read/write `WeakLeafItype.gprFileValue`/`gprFileWrite`; `fetchPinRvc0`. Prefer these (or WeakLeafRtypeW.wwpGprRvcLeaf for two-source ops) over new funnel scripts.
 - WkEntryNew: generic gprFile register-only leaf `WkEntryNew.wwpRegLeaf` (+ fetch-arm lemmas armBase4/armRvc4/armBase2/armRvc2); decode facts = two `kernel_rfl` walks (drefM; supervisor map without mseccfg). Two GPR cells from one gprFile: read operand with `gprFile_lookup_acc` and restore, then take dest with `gprFile_acc`.
-- WeakRvwmoGlue (provisional, owner Q5): `hullRun`/`cycleKillOfL2`/`t2linOfL2` carry `WeakRvwmoGlue.hullRunFetchInert boot d0 im nh N` and the fetch-view premise `∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2`; consumers CARRY both (name them after the Rocq lemma) unless they can discharge them. `RunData` fields rdCons/rdImg/rdPst0/rdDv0/rdProg; `d0 = efInit σ0.wgdev`.
 - AxPair: under D1 `lblIdent (LIFetch base tvs)` = identity of the projected `LLoad false … []`; lean-sail regRead/regWrite have no access kind; write values are `Option` (`tpiMw`/`tgMw` take `rq1.value.isSome = rq2.value.isSome`, `pnodeStepStore` takes `rq.value = some v`); step lemmas carry `obar` (regreadStepInv/pairResume/pairResumeDd conclude `obar = none`). Dup names `AxPair.Ident`/`lblWdata`/`phrunApp`.
-- WeakRvwmoGlue2 DISCHARGES `hullRunFetchInert` at the zero cut (`WeakRvwmoGlue2.cycleKillZ`/`hullRunZcut`): consumers of `cycleKillOfL2'`/`cycleKillOfL2''`/`t2linOfL2''` carry only the efetchItvOk fetch-view premise (Q4 family). Prefer the Glue2 entry points over Glue's.
 - WeakKpt: new ghost class `WeakKpt.KptGS GF` (GhostVarG GF PTree + name) for Rocq's `kpt_lb` (Lean SC tree lacks it). Downstream files (WeakKptStale, Wk*) take `[WeakKpt.KptGS GF]` as an instance argument; the adequacy/boot file that allocates ghost state must ALLOCATE it (ghost_var alloc at the boot tree) and report doing so. `kmap_auth` = `MachGS.kmapName ↪●MAP{.discard} M` over `RegMapF (BitVec 64)`; `kptTreeSpecGen` has an extra conjunct (keys < 2^27). `wbyteOkGe` & collapse lemmas take `ak.akIfetch = false`. Kernel leaves via Lean `KPerm`/`mkPte` (A=D=0; statements A/D-closed).
 - `iexact` won't unify defeq `regInterp` args: `ieval (rewrite [h])`. Definitions as hyps: `iunfold X at H` before `icases`.
-- WeakRvwmoCapstone (provisional, owner Q5): `xv6RvwmoSafeModulo(Gen)` carry `WeakRvwmoCapstone.t2linFetchInert`; `xv6RvwmoSafeModuloF` carries `WeakRvwmoCapstone.fconfFetchInert boot N GX`; all three carry the efetchItvOk fetch-view premise. Consumers carry them through (named after these). `WeakRvwmoCapstone.t2linSupplyRows` exposes the realized rows.
 - WeakLeafM: 34 M-mode wrappers `wwp*` + token `winstrM`; 9 CSR-in-mConf write wrappers at `DFrac.own 1` (written value returned in `{ c with … }`), others generic `q`; no separate CSR cells; `wwpCsrwSatp` takes `_get_Mstatus_SXL c.mstatus = 2#2`. is_rvc-generic statements: `simp only [↓reduceIte]` (+ `Bool.false_eq_true`) on the proof-mode goal after `cases is_rvc`. `WkEntryNew.pcIsSplit` splits pcIs.
-- AxOpsem: `hemit` over the 4-conjunct `hlblRealizes` (no lbFetchInert here — files that convert to `lblRealizes` supply it). D1: `wlRd`/`wlRvals`/`wlReval` treat `LIFetch` like `LLoad false`; **`AStepFetch` fires on `LIFetch base tvs`** (row identity `IRead false base tvs.length`), not on `LLoad`; `rdLabel` takes a first flag `fe` (= akIfetch); `pnodeStepReadAny`/`ReadInv` have no `ak_coh = false`. Q1: `pstepWireInv` concludes PLIC at `.setPin cpu mm b`, `d' = { d with efPlic := k () }`, regs `pinSet rs mm b`; `pstepWireAlways` takes the PLIC position; `awireAlways` ranges over `mm b` from any `d`. Witness: `rs` explicit (Rocq init_regstate), `wtD0` = dev0_state. Dup names `AxOpsem.astepProg`/`grow`. Prefer `match h with | .Ctor …` over `cases h with` when naming indexed args.
 - Instruction-token files (Wk*Aux): restate the SC vocabulary file-qualified; decodes via `WkEntryNew.decBase`/`decRvc` on walks over `drefM` and `WkEntryNew.drefS0`; builders wrap `winstrMOfText`/`wkbWindow` (see WkTimerinitAux.tokBase/tokRvc). `simp only [fetchIsRvc] at H0` before `ihave` to get `winstrM pc true/false i`.
 - Kernel drift (start): Lean `start` = 0x80000058; at `start+0x24` Lean has `addi a5,a5,-426` (0xE5678793; Rocq -506) because Lean main = start+0xe76 — `WkStartAux.stw43`/`si43`=3670/`wsti43` carry the Lean immediate; other 38 words/offsets match.
 - **Scratch files: use a PRIVATE subdirectory** of the scratchpad named after your workspace slot (e.g. `<scratchpad>/w12/`) — the scratchpad is shared by all concurrent workers, and files at its top level get overwritten.
 - WeakLeafO: `whartRun cpu ξ q c := mConf cpu (DFrac.own q) c ∗ wrunning cpu ξ` (c a parameter); CSR-in-mConf `_o`/`_run` wrappers at `whartRun cpu ξ 1 c`. Keep a floor token without losing the authority: `WeakLeafO.addrsKeep` (persistent_entails_left); ghost update under the loop WP: `WeakLeafO.wwpBupd`.
-- WeakRvwmoWalk (provisional, owner Q5): `wsiteOk`/`wsiteOk'`/`wsiteSupply` end with `WeakRvwmoWalk.wfetchSite d0 Nd x p` (fetch-realized blocks are fetch-inert; vacuous otherwise) — files building wsupply/wsiteOk must SUPPLY it per position (discharge for non-fetch sites; for fetch sites carry it, named `<File>.fetchSiteOk`, and report). Policies `wpol`/`wpol'`/`wblkPolAt(')` return lbFetchInert after mstepOk. Walk3 corollaries carry efetchItvOk + `WeakRvwmoCapstone.t2linFetchInert`.
 - AxDevGraph: two UARTs (DUartTx/DUartRx carry the port; uart results per port); `DWire h mm b` covers M and S contexts; `Plic.latch` total (latching a pending/claimed source is a no-op); `devReducible`/`mmioStepAt` over the full fabric `F : Efab`. A pure dstep that reads the disk level and latches the PLIC is NOT the open PLIC-ownership point (that concerns Iris ownership: devFragAt .plic / plicInv / ewpEdiskLatch).
 - AxWp (Ax-tier hub): no seals/notations — `AxAnnot.annotOwn e P` (↦ₐ), `interpMod P` (|=i=>), `AxWp.wp st i s Φ` (WP), `wpc st i s Φ` (WPc); classes `AxirisG`/`Axpol`/`AxirisGChk`; skeleton `skelAxirisG γg Φp T` named explicitly. **Map unions on GMapF: write `PartialMap.union`** (bare `∪` picks Std ExtTreeMap union). `GF` at universe 0 where `AxannotGS` appears. `InvGS_gen hlc GF` for any hlc. Proper instances are theorems (`wpProper`, `wpMono'`, `interpModProper`). Dup names `AxWp.wp`/`atBoundary`/`growLookup`.
 - AxInstrFacts: Rocq `rdat` (Z * nat * bv 8, left-nested) is Lean `Int × Nat × BitVec 8` (right-nested): `.1.1/.1.2/.2` ↦ `.1/.2.1/.2.2` (AxProtGate/N, AxEpilogue). `Lbl` (graph alphabet) has no fetch constructor.
