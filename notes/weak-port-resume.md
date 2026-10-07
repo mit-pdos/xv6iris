@@ -181,7 +181,7 @@ The real dependency order among the Stage C files comes from the DAG.
 
 - **Done:** 358/537 files; the tip is green (3,148 jobs), lint passes, roots unchanged. Nothing running.
 - **At the reset, in this order:**
-  1. Q12 fix-up worker: pinned `rowStuckRPin`/`rowStuckOfFirstPin`/`wpdMStuckPin` (AxSpinRow) and `wpdOfClosedRunGMPin` (AxEpiChainSdLd), then add `row_stuck_of_chain` to AxSpinVA. Then AxSpinVA2.
+  1. Q12 fix-up worker (owner: change the existing lemmas): restate AxSpinRow `rowStuckR`/`rowStuckOfFirst`/`wpdMStuck`/`firstEv` and AxEpiChainSdLd `wpdOfClosedRunGM` with the fetch pin, fix the merged importers, then add `row_stuck_of_chain` to AxSpinVA. Then AxSpinVA2.
   2. Launch the ready set: AxSymCtl, AxSymMem, AxSpineOk4, AxDataX, AxSpinProt5, AxSpinProt4 (+ whatever sched.py lists).
   3. RESUME the parked partials: AxEpiSound3, AxScRun3 (`weak-orch/parked/`, PROGRESS files inside).
 - **Lessons from today:** never pre-warn about the limit in launch prompts (workers stop early); reslot or depcheck right before every launch; workers must grep the tip for every new short name.
