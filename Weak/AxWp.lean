@@ -96,7 +96,13 @@ may change the local state; (5) `isTerminated s := false`, the terminated branch
    label (`AxOpsem` deviation 2), so the L0 fetch oracle is gone: `AxirisG` has no `ax_text`
    field, `astepProgGraphData` has no `T`/`img` parameters and no `AStep_fetch` case, and the
    step case (`AxWp2`) quantifies `AxOpsem.astepProg (AxOpsem.grow GD i) s l s'` (Rocq:
-   `astep_prog (grow GD i) ax_text (gx_img (gd_g GD))`).
+   `astep_prog (grow GD i) ax_text (gx_img (gd_g GD))`).  OWNER Q8: the image half of Rocq's
+   oracle is kept as a PIN on the step clause — `wpPreStepDef` (and `AxWpD.wpdMPreStepDef`)
+   read `∀ l s', ⌜AxOpsem.astepProg (AxOpsem.grow GD i) s l s'⌝ -∗
+   ⌜WeakAxRealize.fetchPin GD.gdG.gxImg l⌝ -∗ …`: a fetch step answers the graph's boot image
+   at timestamp 0 (`True` off the fetch), as Rocq's `fetch_answers ax_text (gx_img (gd_g GD))`
+   did for `AStepFetch`.  Adequacy discharges the pin from the pinned machine LTS
+   (`AxAdequacy.astepProgNfOfPstepPin`).
 
 **Rocq → Lean name map.**  §1: `is_terminated` `isTerminated`, `is_terminated_terminated`
 `isTerminatedTerminated`, `at_boundary` `AxWp.atBoundary`, `lbl_value` `lblValue`,

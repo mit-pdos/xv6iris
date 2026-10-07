@@ -32,8 +32,9 @@ states them in prose only (no declarations), blocked on the multi-step compositi
 1. NAMES camelCase (map below); `invGS_gen HasNoLc Σ` ↦ `[InvGS_gen hlc GF]` for any `hlc`;
    wand chains stated `⊢ A -∗ B -∗ …` (AxWp deviations 6/7); `WPc s @ st; i {{ Φ }}` ↦
    `wpc st i s Φ`.
-2. O2 STAGE C: `astep_any_nf`, `not_stuck_gd`, `expected_run` lose the oracle parameters
-   `ax_text`/`gx_img` (AxAdequacy deviation 2), so the records need no `AxirisG` instance
+2. O2 STAGE C: `astep_any_nf`, `not_stuck_gd`, `expected_run` lose the oracle parameter
+   `ax_text` (AxAdequacy deviation 2; Q8: the image `img` is back on `astepAnyNf`, fixed at
+   `GD.gdG.gxImg` as Rocq's `gx_img (gd_g GD)`), so the records need no `AxirisG` instance
    (Rocq's section context `axirisG Σ` is dropped there).
 3. STEP-CLAUSE HANDLING LOCALIZED.  The Lean `AxAdequacy.stepAnnot` (and its helpers
    `AxAdequacy.evCase`/`skipCase`) is stated at the fixed continuation `AxWp.wp st i`, so it
@@ -41,7 +42,8 @@ states them in prose only (no declarations), blocked on the multi-step compositi
    continuation `wpF : Athread → (Athread → IProp GF) → IProp GF`, as the Lean-only
    `AxAdequacyChk.stepAnnotGen` (with `AxAdequacyChk.evCaseGen`/`skipCaseGen`); `stepChkAnnot`
    is `wpcUnfoldStep` + `stepAnnotGen (wpc st i)`.  Every dependency on `wpPreStepDef`'s step
-   clauses lives in `stepAnnotGen` (the place the pending Q8 fetch-pin hypothesis will land).
+   clauses lives in `stepAnnotGen`; under Q8 it hands the step's `WeakAxRealize.fetchPin` (from
+   `astepProgNf` at `GD.gdG.gxImg`) to the clause, as `AxAdequacy.stepAnnot` does.
 4. `wpc_unfold_step` here is Rocq's one-way peel; the iff `AxWp.wpcUnfoldStep` (AxWp2) is a
    different, Lean-only lemma.  The two names coexist (`Weak.wpcUnfoldStep` vs
    `Weak.AxWp.wpcUnfoldStep`).
@@ -205,7 +207,7 @@ file inspects `wpPreStepDef`'s step clauses; deviation 3). -/
 theorem AxAdequacyChk.stepAnnotGen (wpF : Athread → (Athread → IProp GF) → IProp GF)
     (GD : Gdexec) (Hwf : axpolWf) (Hcons : rvwmoCatConsistent GD)
     (i : Agent) (s s' : Athread)
-    (Hstep : astepAnyNf (AxOpsem.grow GD i) s s')
+    (Hstep : astepAnyNf (AxOpsem.grow GD i) GD.gdG.gxImg s s')
     (na : Mea GF) (ea : Sra GF) (ls : AxirisG.logTsT GF) (Φ : Athread → IProp GF) :
     ⊢ naAtProgress GD i s.atK na -∗
       AxirisG.annotInterp na -∗
@@ -237,9 +239,9 @@ theorem AxAdequacyChk.stepAnnotGen (wpF : Athread → (Athread → IProp GF) →
   ihave Habc := H $$ %GD %ls Hpre
   cases Hstep with
   | ANFProg _ Hprog =>
-    obtain ⟨l, Hap⟩ := Hprog
+    obtain ⟨l, Hap, Hpin⟩ := Hprog
     ihave Hb := (and_elim_r.trans and_elim_l) $$ Habc
-    ihave Hb := Hb $$ %l %s' %Hap
+    ihave Hb := Hb $$ %l %s' %Hap %Hpin
     cases hwd : wlWdata l with
     | some data =>
       have Hgmem := astepProgWdataGmem GD i s l s' data Hap hwd
@@ -291,7 +293,7 @@ theorem wpcUnfoldStep (st : Stuckness) (i : Agent) (s : Athread) (Φ : Athread �
 own fixpoint re-supplies the checkpoint at `sw`. -/
 theorem stepChkAnnot (GD : Gdexec) (Hwf : axpolWf) (Hcons : rvwmoCatConsistent GD)
     (i : Agent) (st : Stuckness) (s s' : Athread)
-    (Hstep : astepAnyNf (AxOpsem.grow GD i) s s')
+    (Hstep : astepAnyNf (AxOpsem.grow GD i) GD.gdG.gxImg s s')
     (na : Mea GF) (ea : Sra GF) (ls : AxirisG.logTsT GF) (Φ : Athread → IProp GF) :
     ⊢ naAtProgress GD i s.atK na -∗
       AxirisG.annotInterp na -∗

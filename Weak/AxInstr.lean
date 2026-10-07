@@ -34,7 +34,8 @@ affected lemmas take as a premise.
 
 1. NAMES: the tree's camelCase (map below).  No name of this file is in
    `notes/weak-port-dupnames.json`.  Lean-only helpers (file-qualified): `AxInstr.lbAdminWlWr`,
-   `AxInstr.lbAdminWlFence` (an admin label is neither a write nor a fence).  The §7 module is
+   `AxInstr.lbAdminWlFence` (an admin label is neither a write nor a fence), and (Q8)
+   `AxInstr.aadminExclPin`, `AxInstr.aadminExclPinOf`, `AxInstr.awpAdminStepPin`.  The §7 module is
    the namespace `AxInstr.NonVacuity` (Rocq `Module NonVacuity`).
 2. O2 STAGE C (`notes/weak-port-o2-stageC.md` §D, track F; `AxOpsem` deviation 2, `AxWp`
    deviation 10) — THE FETCH IS AN ADMINISTRATIVE LABEL, not a row read.
@@ -47,10 +48,14 @@ affected lemmas take as a premise.
      `aread_step` (the fetch was a row `LLoad` item answered by the oracle), hence dependent on
      `AxInstrTargets` through `t_owned_read`.  Lean: a fetch is an `AStepAdmin` step at
      `lbAdmin true (LIFetch base tvs)` that keeps the row position; `awpFetch` takes that step
-     `AxOpsem.astepProg (AxOpsem.grow GD i) s (.LIFetch base tvs) a`, the exclusivity
-     `aadminExcl s a` and the wire hypothesis of `awpAdminStep`, and is `awpAdminStep`
-     instantiated — it needs NO target (it moved from §3-5's targets section to its own).
-     There is no value premise: the fetched bytes are not a graph value.
+     `AxOpsem.astepProg (AxOpsem.grow GD i) s (.LIFetch base tvs) a`, the wire hypothesis of
+     `awpAdminStep`, and the PINNED exclusivity (owner Q8): `∀ GD', rvwmoCatConsistent GD' →
+     gconstInterp GD' ⊢ ⌜AxInstr.aadminExclPin GD'.gdG.gxImg s a⌝` — only fetches of the
+     graph's boot-image bytes (`WeakAxRealize.fetchPin`, the premise `AxWp.wpPreStepDef`'s step
+     clause now offers) must land at `a`.  (Before Q8 it took `aadminExcl s a`, which quantifies
+     fetches of ANY bytes and so is unsatisfiable at a real fetch node.)  It is the Lean-only
+     `AxInstr.awpAdminStepPin` instantiated and needs NO target (it moved from §3-5's targets
+     section to its own).  There is no value premise: the fetched bytes are not a graph value.
    - §7's rows lose their two fetch items: Rocq `[F0; W; F1; R]` at positions 0..3 with gmo
      `[F0; F1; R; W]` ↦ `[W; R]` at positions 0..1 with gmo `[R; W]`; the load's timestamp tag
      (the store's 1-based gmo write index, `1`) is unchanged.  `sliceForwarded`'s
@@ -211,7 +216,7 @@ theorem awpAdminStep (GD : Gdexec) (i : Agent) (s a : Athread) (Φ : Athread →
     exact (Hexclrd _ id K Hrd).elim
   isplit
   · -- every other program step: lands at `a`, no write data
-    iintro %l0 %s'' %Hstep0
+    iintro %l0 %s'' %Hstep0 %_
     obtain ⟨rfl, Hwd⟩ := Hexclwr _ _ _ Hstep0
     rw [Hwd]
     unfold wpSkipStep
@@ -369,17 +374,87 @@ end ownedStep
 section fetchStep
 variable {hlc : HasLC} {GF : BundledGFunctors} [InvGS_gen hlc GF] [AxirisG GF] [Axpol]
 
+/-- (Lean-only, Q8) `aadminExcl` against the WP's PINNED step clause: no read, and every
+program step whose label is pinned to `img` lands at `a` with no write data.  At a fetch node
+`aadminExcl` itself is unsatisfiable (a fetch of ANY bytes is a program step, and the successor
+depends on the bytes); the pinned form only speaks of the image's bytes. -/
+def AxInstr.aadminExclPin (img : Image) (s a : Athread) : Prop :=
+  (∀ row id K, ¬ areadStep row s id K) ∧
+  (∀ row l s'', AxOpsem.astepProg row s l s'' → WeakAxRealize.fetchPin img l →
+     s'' = a ∧ wlWdata l = none)
+
+theorem AxInstr.aadminExclPinOf (img : Image) (s a : Athread) :
+    aadminExcl s a → AxInstr.aadminExclPin img s a :=
+  fun ⟨h1, h2⟩ => ⟨h1, fun row l s'' h _ => h2 row l s'' h⟩
+
+/-- (Lean-only, Q8) `awpAdminStep` with the exclusivity read off the graph's image (through
+`gconstInterp`, as Rocq's `fetch_gd_ok`-style premises). -/
+theorem AxInstr.awpAdminStepPin (i : Agent) (s a : Athread) (Φ : Athread → IProp GF)
+    (st : Stuckness) (row : List Lbl) (l : Wlabel) :
+    AxOpsem.astepProg row s l a → lbAdmin true l →
+    (∀ GD', rvwmoCatConsistent GD' →
+      AxirisG.gconstInterp (GF := GF) GD' ⊢ ⌜AxInstr.aadminExclPin GD'.gdG.gxImg s a⌝) →
+    ⊢ (□ ∀ s'', ⌜awire s s''⌝ -∗ AxWp.wp st i s'' Φ) -∗
+      AxWp.wp st i a Φ -∗ AxWp.wp st i s Φ := by
+  intro Hstep Hladm Hexcl
+  obtain ⟨p, k⟩ := s
+  obtain ⟨p', k'⟩ := a
+  have Hk : k' = k := astepProgAdminK row _ l _ Hstep Hladm
+  subst Hk
+  obtain ⟨d, d', Hp⟩ := astepProgPstep _ _ _ _ Hstep
+  have Hred : ∀ GD', reducibleGd GD' i ⟨p, k'⟩ := fun GD' =>
+    ⟨[], ⟨p', k'⟩, .inl ⟨l, .AStepAdmin p k' d l p' d' Hladm Hp⟩⟩
+  iintro #Hwire Ha
+  iapply (wpProgressIntro st i ⟨p, k'⟩ Φ Hred)
+  unfold wpPreStepDef
+  iintro %GD' %ls ⟨%Hcons, #Hgc, Hloc⟩
+  ihave Hx := (Hexcl GD' Hcons) $$ Hgc
+  icases Hx with %Hx
+  isplit
+  · -- the read: vacuous
+    iintro %id %K %Hrd
+    exact (Hx.1 _ id K Hrd).elim
+  isplit
+  · -- every other PINNED program step: lands at `a`, no write data
+    iintro %l0 %s'' %Hstep0 %Hpin
+    obtain ⟨rfl, Hwd⟩ := Hx.2 _ _ _ Hstep0 Hpin
+    rw [Hwd]
+    unfold wpSkipStep
+    iintro %na Hna
+    imodintro
+    inext
+    imodintro
+    iexists ls
+    iframe Hna Hloc
+    iexact Ha
+  · -- the wire, from `s` itself
+    iintro %s'' %Hw
+    have Hkw : s''.atK = k' := Hw.1
+    rw [Hkw]
+    unfold wpSkipStep
+    iintro %na Hna
+    imodintro
+    inext
+    imodintro
+    iexists ls
+    iframe Hna Hloc
+    iapply Hwire
+    ipureintro
+    exact Hw
+
 /-- ITEM 5, THE FETCH STEP.  The fetch has no protocol content and no graph event: it is an
 `AStepAdmin` step at `lbAdmin true (LIFetch base tvs)` keeping the row position, so the WP
-passes straight to the post-fetch state (`awpAdminStep`). -/
+passes straight to the post-fetch state.  The exclusivity is the PINNED one (Q8): only the
+fetches of the image's bytes must land at `a`. -/
 theorem awpFetch (GD : Gdexec) (i : Agent) (s a : Athread) (base : Int)
     (tvs : List (Nat × BitVec 8)) (Φ : Athread → IProp GF) (st : Stuckness) :
     AxOpsem.astepProg (AxOpsem.grow GD i) s (.LIFetch base tvs) a →
-    aadminExcl s a →
+    (∀ GD', rvwmoCatConsistent GD' →
+      AxirisG.gconstInterp (GF := GF) GD' ⊢ ⌜AxInstr.aadminExclPin GD'.gdG.gxImg s a⌝) →
     ⊢ (□ ∀ s'', ⌜awire s s''⌝ -∗ AxWp.wp st i s'' Φ) -∗
       AxWp.wp st i a Φ -∗ AxWp.wp st i s Φ := by
   intro Hstep Hexcl
-  exact awpAdminStep GD i s a Φ st ⟨⟨_, _, Hstep, rfl⟩, Hexcl⟩
+  exact AxInstr.awpAdminStepPin i s a Φ st _ _ Hstep rfl Hexcl
 
 end fetchStep
 

@@ -44,6 +44,8 @@ fetches are graph read events.
    instance.
 4. STATEMENT SHAPES (as `AxWp`): Rocq's wand chains `A -∗ B -∗ C` ↦ `⊢ A -∗ B -∗ C`; `P ⊢ Q`
    stays; pure premises are `→`.  `GModel` is a `Prop`-valued class with field `gmWf`.
+5. OWNER Q8: clause (b) carries the image pin `⌜WeakAxRealize.fetchPin GD.gdG.gxImg l⌝ -∗`
+   after its step premise, verbatim as `wpPreStepDef` (`AxWp` deviation 10).
 
 **Rocq → Lean name map.**  §0: `GModel` `GModel` (`gm_wf` `GModel.gmWf`), `cat_gmodel`
 `catGmodel`, `gm_gwf` `gmGwf`.  §1: `post_lifting_bupd` `postLiftingBupd`,
@@ -114,6 +116,7 @@ def wpdMPreStepDef (i : Agent) (wpd : Athread → (Athread → IProp GF) → IPr
            wpSkipStep GD i (K v).atK (wpd (K v) Φ)) ∧
     (∀ (l : Wlabel) (s' : Athread),
        ⌜AxOpsem.astepProg (AxOpsem.grow GD i) s l s'⌝ -∗
+       ⌜WeakAxRealize.fetchPin GD.gdG.gxImg l⌝ -∗
        match wlWdata l with
        | some data =>
            wpEvStep GD i s.atK
@@ -155,8 +158,8 @@ theorem wpdMPreStepDefMono (i : Agent) (wpd1 wpd2 : Athread → (Athread → IPr
       iapply Hcont $$ Hw
   isplit
   · icases H with ⟨-, H, -⟩
-    iintro %l %s' %Hstep
-    ihave H := H $$ %l %s' %Hstep
+    iintro %l %s' %Hstep %Hpin
+    ihave H := H $$ %l %s' %Hstep %Hpin
     icases Hmono with ⟨Hcont, -⟩
     cases wlWdata l with
     | some data =>
@@ -211,14 +214,14 @@ theorem wpdMPreStepDefBupd (i : Agent) (wpd : Athread → (Athread → IProp GF)
       simp only [hadv, ↓reduceIte]
       iapply H $$ %v %Hv %Hlen
   isplit
-  · iintro %l %s' %Hstep
+  · iintro %l %s' %Hstep %Hpin
     cases hl : wlWdata l with
     | some data =>
       iapply wpEvStepBupd
       imod H
       imodintro
       icases H $$ %GD %ls Hpre with ⟨-, H, -⟩
-      ihave H := H $$ %l %s' %Hstep
+      ihave H := H $$ %l %s' %Hstep %Hpin
       rw [hl]
       iexact H
     | none =>
@@ -226,7 +229,7 @@ theorem wpdMPreStepDefBupd (i : Agent) (wpd : Athread → (Athread → IProp GF)
       imod H
       imodintro
       icases H $$ %GD %ls Hpre with ⟨-, H, -⟩
-      ihave H := H $$ %l %s' %Hstep
+      ihave H := H $$ %l %s' %Hstep %Hpin
       rw [hl]
       iexact H
   isplit
@@ -270,14 +273,14 @@ theorem wpdMPreStepDefIupd (i : Agent) (wpd : Athread → (Athread → IProp GF)
       simp only [hadv, ↓reduceIte]
       iapply H $$ %v %Hv %Hlen
   isplit
-  · iintro %l %s' %Hstep
+  · iintro %l %s' %Hstep %Hpin
     cases hl : wlWdata l with
     | some data =>
       iapply wpEvStepIupd
       imod H
       imodintro
       icases H $$ %GD %ls Hpre with ⟨-, H, -⟩
-      ihave H := H $$ %l %s' %Hstep
+      ihave H := H $$ %l %s' %Hstep %Hpin
       rw [hl]
       iexact H
     | none =>
@@ -285,7 +288,7 @@ theorem wpdMPreStepDefIupd (i : Agent) (wpd : Athread → (Athread → IProp GF)
       imod H
       imodintro
       icases H $$ %GD %ls Hpre with ⟨-, H, -⟩
-      ihave H := H $$ %l %s' %Hstep
+      ihave H := H $$ %l %s' %Hstep %Hpin
       rw [hl]
       iexact H
   isplit
@@ -327,6 +330,7 @@ theorem AxWpD.wpdMPreStepDefDist (i : Agent)
       exact AxWp.wpSkipStepDist _ _ _ _ _ n (fun m hm => h m hm (K v))
   · refine BI.forall_ne (fun l => ?_)
     refine BI.forall_ne (fun s' => ?_)
+    refine BI.wand_ne.ne .rfl ?_
     refine BI.wand_ne.ne .rfl ?_
     split
     · exact AxWp.wpEvStepDist _ _ _ _ _ _ _ _ n (fun m hm _ => h m hm s')
@@ -604,8 +608,8 @@ theorem wpdMWp (Hsub : ∀ GD, rvwmoCatConsistent GD → M GD) (st : Stuckness) 
         iapply IH $$ %(K v) %Φ Hc
     isplit
     · icases H with ⟨-, H, -⟩
-      iintro %l %s' %Hstep
-      ihave H := H $$ %l %s' %Hstep
+      iintro %l %s' %Hstep %Hpin
+      ihave H := H $$ %l %s' %Hstep %Hpin
       cases wlWdata l with
       | some data =>
         iapply wpEvStepMono $$ [] H

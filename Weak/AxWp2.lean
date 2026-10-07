@@ -311,6 +311,7 @@ def wpPreStepDef (i : Agent) (wp : Athread → (Athread → IProp GF) → IProp 
            wpSkipStep GD i (K v).atK (wp (K v) Φ)) ∧
     (∀ (l : Wlabel) (s' : Athread),
        ⌜AxOpsem.astepProg (AxOpsem.grow GD i) s l s'⌝ -∗
+       ⌜WeakAxRealize.fetchPin GD.gdG.gxImg l⌝ -∗
        match wlWdata l with
        | some data =>
            wpEvStep GD i s.atK
@@ -345,8 +346,8 @@ theorem wpPreStepDefMono (i : Agent) (wp1 wp2 : Athread → (Athread → IProp G
       iapply Hmono $$ Hw
   isplit
   · icases H with ⟨-, H, -⟩
-    iintro %l %s' %Hstep
-    ihave H := H $$ %l %s' %Hstep
+    iintro %l %s' %Hstep %Hpin
+    ihave H := H $$ %l %s' %Hstep %Hpin
     cases wlWdata l with
     | some data =>
       iapply wpEvStepMono $$ [Hmono] H
@@ -392,14 +393,14 @@ theorem wpPreStepDefBupd (i : Agent) (wp : Athread → (Athread → IProp GF) �
       simp only [hadv, ↓reduceIte]
       iapply H $$ %v %Hv %Hlen
   isplit
-  · iintro %l %s' %Hstep
+  · iintro %l %s' %Hstep %Hpin
     cases hl : wlWdata l with
     | some data =>
       iapply wpEvStepBupd
       imod H
       imodintro
       icases H $$ %GD %ls Hpre with ⟨-, H, -⟩
-      ihave H := H $$ %l %s' %Hstep
+      ihave H := H $$ %l %s' %Hstep %Hpin
       rw [hl]
       iexact H
     | none =>
@@ -407,7 +408,7 @@ theorem wpPreStepDefBupd (i : Agent) (wp : Athread → (Athread → IProp GF) �
       imod H
       imodintro
       icases H $$ %GD %ls Hpre with ⟨-, H, -⟩
-      ihave H := H $$ %l %s' %Hstep
+      ihave H := H $$ %l %s' %Hstep %Hpin
       rw [hl]
       iexact H
   · iintro %s' %Hstep
@@ -443,14 +444,14 @@ theorem wpPreStepDefIupd (i : Agent) (wp : Athread → (Athread → IProp GF) �
       simp only [hadv, ↓reduceIte]
       iapply H $$ %v %Hv %Hlen
   isplit
-  · iintro %l %s' %Hstep
+  · iintro %l %s' %Hstep %Hpin
     cases hl : wlWdata l with
     | some data =>
       iapply wpEvStepIupd
       imod H
       imodintro
       icases H $$ %GD %ls Hpre with ⟨-, H, -⟩
-      ihave H := H $$ %l %s' %Hstep
+      ihave H := H $$ %l %s' %Hstep %Hpin
       rw [hl]
       iexact H
     | none =>
@@ -458,7 +459,7 @@ theorem wpPreStepDefIupd (i : Agent) (wp : Athread → (Athread → IProp GF) �
       imod H
       imodintro
       icases H $$ %GD %ls Hpre with ⟨-, H, -⟩
-      ihave H := H $$ %l %s' %Hstep
+      ihave H := H $$ %l %s' %Hstep %Hpin
       rw [hl]
       iexact H
   · iintro %s' %Hstep
@@ -525,6 +526,7 @@ theorem AxWp.wpPreStepDefDist (i : Agent) (wp1 wp2 : Athread → (Athread → IP
       exact AxWp.wpSkipStepDist _ _ _ _ _ n (fun m hm => h m hm (K v))
   · refine BI.forall_ne (fun l => ?_)
     refine BI.forall_ne (fun s' => ?_)
+    refine BI.wand_ne.ne .rfl ?_
     refine BI.wand_ne.ne .rfl ?_
     split
     · exact AxWp.wpEvStepDist _ _ _ _ _ _ _ _ n (fun m hm _ => h m hm s')

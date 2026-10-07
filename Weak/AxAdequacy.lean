@@ -41,24 +41,31 @@ natural `gobCat`-predecessor choice satisfies it.
    `S k` ↦ `k + 1`; `|={⊤}[∅]▷=>^n` ↦ iris-lean's `|={⊤}[∅]▷=>^[n]` (`Nat.repeat`, outermost
    step first, as Rocq).  `invGS_gen HasNoLc Σ` ↦ `[InvGS_gen hlc GF]` for any `hlc` (as AxWp
    deviation 6).  Wand chains `A -∗ B -∗ C` are stated `⊢ A -∗ B -∗ C` (AxWp deviation 7).
-2. O2 STAGE C (`notes/weak-port-o2-stageC.md` §D) — NO FETCH EXCLUSION.  There is no
-   `AStepFetch`: a fetch is an `AStepAdmin` step (`lbAdmin true (LIFetch ..)`), handled by
-   `wpSkipStep` with `atK` unchanged like every administrative label.  So Rocq's
-   `wlabel_is_fetch` side condition is dropped (AxLifting deviation 2): `astepProgNf` is
-   `∃ l, AxOpsem.astepProg row s l s'` (no label filter), `astepAnyNf` is therefore equivalent to
-   `astepAny` (kept as its own inductive, the name downstream files use), and
+2. O2 STAGE C (`notes/weak-port-o2-stageC.md` §D) + OWNER Q8 — THE FETCH EXCLUSION BECOMES THE
+   IMAGE PIN.  There is no `AStepFetch`: a fetch is an `AStepAdmin` step (`lbAdmin true (LIFetch
+   ..)`), handled by `wpSkipStep` with `atK` unchanged like every administrative label.  Rocq's
+   `wlabel_is_fetch l = false` conjunct of `astep_prog_nf` is replaced by the boot-image pin
+   `WeakAxRealize.fetchPin img l` (AxLifting deviation 2): `astepProgNf row img s s'` is
+   `∃ l, AxOpsem.astepProg row s l s' ∧ WeakAxRealize.fetchPin img l` (Rocq's `fetch_img`
+   parameter is `img`; `T`/`ax_text` stays deleted), threaded through `astepAnyNf row img` and
+   `expectedRun` (at `GD.gdG.gxImg`, as Rocq's `gx_img (gd_g GD)`).  `stepAnnot` hands the pin to
+   `wpPreStepDef`'s step clause (`AxWp2`, Q8).  THE PIN IS DISCHARGED from the machine, not
+   assumed: `AxAdequacy.astepProgNfOfPstepPin` (the step's label is a step label of the pinned
+   machine LTS `pstepPin img pstepEv`) and `AxAdequacy.astepProgNfOfPinned` (the program step
+   lies in any `pstepPinned img` LTS) build `astepProgNf` from an `astepProg` step.
    `astepProgNodataFenceGmem` loses its `wlabel_is_fetch l = false` premise (an advancing
-   no-data step is a fence: `AStepAdmin` keeps the position).  The oracle parameters `T`/`img`
-   (`ax_text`, `gx_img`) of `astep_prog_nf`, `astep_any_nf`, `astep_prog_wdata_gmem`,
-   `astep_prog_nodata_fence_gmem`, `expected_run(_coverage)` are deleted (AxOpsem deviation 2),
-   so `expectedRun`/`expectedRunCoverage` need no `AxirisG` instance (Rocq: only for `ax_text`).
+   no-data step is a fence: `AStepAdmin` keeps the position).  The oracle parameter `T`
+   (`ax_text`) of `astep_prog_wdata_gmem`, `astep_prog_nodata_fence_gmem`,
+   `expected_run(_coverage)` is deleted (AxOpsem deviation 2), so `expectedRun` /
+   `expectedRunCoverage` need no `AxirisG` instance (Rocq: only for `ax_text`).
 3. `stepAnnot`'s three proof arms share two Lean-only helpers, `AxAdequacy.evCase` (an annotated
    event step: `wpEvStep` + `eaLocalWfEvStep` + `naDomGrow`) and `AxAdequacy.skipCase` (an
    unannotated skip, `wpSkipStep`); Rocq inlines them.  `flow_eq_dyn_mono … "[$ _]"` is
    `AxAdequacy.flowEqDynDropPure`.  `adequacyOrdAux`'s induction on `k = len - n` is the
    Lean-only `AxAdequacy.ordAuxK`.  Other Lean-only helpers (file-qualified):
    `AxAdequacy.memTake`, `AxAdequacy.memTakeOfLookup`, `AxAdequacy.bigSepSSingleUnion`,
-   `AxAdequacy.stepFupdNZero`, `AxAdequacy.stepFupdNSucc`.
+   `AxAdequacy.stepFupdNZero`, `AxAdequacy.stepFupdNSucc`, `AxAdequacy.astepProgNfOfPstepPin`,
+   `AxAdequacy.astepProgNfOfPinned` (Q8).
 4. `big_sepS_split_sub`/`big_sepS_merge_sub` are the two halves of iris-lean's
    `BigSepS.bigSepS_split_subset` (kept as named lemmas).  `ord_pending_extract`'s first
    conclusion `[∗ map] e0 ↦ v ∈ flow_in, v` is written `[∗map] Rin ∈ flowIn, Rin` (the same term;
@@ -94,34 +101,55 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Std.PartialMap MachCSL MachCSL.St
 
 /-! # 1. The (formerly fetch-excluding) step relation -/
 
-/-- Rocq `astep_prog_nf`: `astepProg` minus its fetch arm — under Stage C there is none
-(deviation 2), so no label filter. -/
-def astepProgNf (row : List Lbl) (s s' : Athread) : Prop :=
-  ∃ l, AxOpsem.astepProg row s l s'
+/-- Rocq `astep_prog_nf` (`∃ l, astep_prog row T fetch_img s l s' ∧ wlabel_is_fetch l =
+false`): under Stage C a fetch is an `AStepAdmin` step, so the label filter becomes the boot-image
+PIN `WeakAxRealize.fetchPin img l` (deviation 2; Rocq's `fetch_img` parameter is back as `img`). -/
+def astepProgNf (row : List Lbl) (img : Image) (s s' : Athread) : Prop :=
+  ∃ l, AxOpsem.astepProg row s l s' ∧ WeakAxRealize.fetchPin img l
 
-inductive astepAnyNf (row : List Lbl) : Athread → Athread → Prop where
-  | ANFProg (s s' : Athread) : astepProgNf row s s' → astepAnyNf row s s'
-  | ANFWire (s s' : Athread) : awire s s' → astepAnyNf row s s'
+/-- Lean-only (Q8): the pin DISCHARGED from the machine — a program step whose label is that of a
+step of the pinned machine LTS `pstepPin img pstepEv` (the graph tier's program LTS) is an
+`astepProgNf` step. -/
+theorem AxAdequacy.astepProgNfOfPstepPin (row : List Lbl) (img : Image) (s s' : Athread)
+    (l : Wlabel) (d d' : Efab) :
+    AxOpsem.astepProg row s l s' → pstepPin img pstepEv s.atP d l s'.atP d' →
+    astepProgNf row img s s' :=
+  fun h hp => ⟨l, h, hp.2⟩
+
+/-- Lean-only (Q8): the same, from a pinned LTS (`pstepPinned img pstep`) that the step's own
+`pstepProg` step belongs to. -/
+theorem AxAdequacy.astepProgNfOfPinned (row : List Lbl) (img : Image) (s s' : Athread)
+    (l : Wlabel) (pstep : Pexv6 → Efab → Wlabel → Pexv6 → Efab → Prop)
+    (Hpin : pstepPinned img pstep)
+    (Hsub : ∀ p d p' d', pstepProg p d l p' d' → pstep p d l p' d') :
+    AxOpsem.astepProg row s l s' → astepProgNf row img s s' := by
+  intro h
+  obtain ⟨d, d', hp⟩ := astepProgPstep row s l s' h
+  exact ⟨l, h, Hpin _ _ _ _ _ (Hsub _ _ _ _ hp)⟩
+
+inductive astepAnyNf (row : List Lbl) (img : Image) : Athread → Athread → Prop where
+  | ANFProg (s s' : Athread) : astepProgNf row img s s' → astepAnyNf row img s s'
+  | ANFWire (s s' : Athread) : awire s s' → astepAnyNf row img s s'
   | ANFRead (s : Athread) (id : AidentT) (K : List (BitVec 8) → Athread) (vs : List (BitVec 8)) :
-      areadStep row s id K → vs.length = aidentN id → astepAnyNf row s (K vs)
+      areadStep row s id K → vs.length = aidentN id → astepAnyNf row img s (K vs)
 
-theorem astepAnyNfAny (row : List Lbl) (s s' : Athread) :
-    astepAnyNf row s s' → astepAny row s s'
-  | .ANFProg _ _ ⟨l, hl⟩ => .AAStep _ _ (.inl ⟨l, hl⟩)
+theorem astepAnyNfAny (row : List Lbl) (img : Image) (s s' : Athread) :
+    astepAnyNf row img s s' → astepAny row s s'
+  | .ANFProg _ _ ⟨l, hl, _⟩ => .AAStep _ _ (.inl ⟨l, hl⟩)
   | .ANFWire _ _ hw => .AAStep _ _ (.inr hw)
   | .ANFRead _ id K vs h hl => .AARead _ id K vs h hl
 
-theorem astepAnyNfK (row : List Lbl) (s s' : Athread) :
-    astepAnyNf row s s' →
+theorem astepAnyNfK (row : List Lbl) (img : Image) (s s' : Athread) :
+    astepAnyNf row img s s' →
     s'.atK = s.atK ∨ (s'.atK = s.atK + 1 ∧ (row[s.atK]?).isSome = true) :=
-  fun h => astepAnyK row s s' (astepAnyNfAny row s s' h)
+  fun h => astepAnyK row s s' (astepAnyNfAny row img s s' h)
 
-theorem nstepsAstepAnyNfAny (row : List Lbl) (n : Nat) (s s' : Athread) :
-    nsteps (astepAnyNf row) n s s' → nsteps (astepAny row) n s s' := by
+theorem nstepsAstepAnyNfAny (row : List Lbl) (img : Image) (n : Nat) (s s' : Athread) :
+    nsteps (astepAnyNf row img) n s s' → nsteps (astepAny row) n s s' := by
   intro h
   induction h with
   | rfl => exact nsteps_O _
-  | tail _ _ h ih => exact nsteps_r ih (astepAnyNfAny row _ _ h)
+  | tail _ _ h ih => exact nsteps_r ih (astepAnyNfAny row img _ _ h)
 
 /-! # 2. Row-identity classification -/
 
@@ -368,7 +396,7 @@ theorem AxAdequacy.evCase {A : Type} (Hwf : axpolWf) (GD : Gdexec) (Hgwf : gwf G
 agrees with `s'` in row position. -/
 theorem stepAnnot (GD : Gdexec) (Hwf : axpolWf) (Hcons : rvwmoCatConsistent GD)
     (i : Agent) (st : Stuckness) (s s' : Athread)
-    (Hstep : astepAnyNf (AxOpsem.grow GD i) s s')
+    (Hstep : astepAnyNf (AxOpsem.grow GD i) GD.gdG.gxImg s s')
     (na : Mea GF) (ea : Sra GF) (ls : AxirisG.logTsT GF) (Φ : Athread → IProp GF) :
     ⊢ naAtProgress GD i s.atK na -∗
       AxirisG.annotInterp na -∗
@@ -400,9 +428,9 @@ theorem stepAnnot (GD : Gdexec) (Hwf : axpolWf) (Hcons : rvwmoCatConsistent GD)
   ihave Habc := H $$ %GD %ls Hpre
   cases Hstep with
   | ANFProg _ Hprog =>
-    obtain ⟨l, Hap⟩ := Hprog
+    obtain ⟨l, Hap, Hpin⟩ := Hprog
     ihave Hb := (and_elim_r.trans and_elim_l) $$ Habc
-    ihave Hb := Hb $$ %l %s' %Hap
+    ihave Hb := Hb $$ %l %s' %Hap %Hpin
     cases hwd : wlWdata l with
     | some data =>
       have Hgmem := astepProgWdataGmem GD i s l s' data Hap hwd
@@ -452,7 +480,7 @@ end step
 /-- A hart's EXPECTED RUN: an opax run from the boot state to a given final state (deviation 2:
 no oracle parameters, no `AxirisG` instance). -/
 def expectedRun (GD : Gdexec) (i : Agent) (p0 pfin : Pexv6) (kfin : Nat) : Prop :=
-  rtc (astepAnyNf (AxOpsem.grow GD i)) ⟨p0, 0⟩ ⟨pfin, kfin⟩
+  rtc (astepAnyNf (AxOpsem.grow GD i) GD.gdG.gxImg) ⟨p0, 0⟩ ⟨pfin, kfin⟩
 
 /-- ROW COVERAGE (AxSL's `tpcoverage`), via `coverageOfRow`. -/
 theorem expectedRunCoverage (GD : Gdexec) (i : Agent) (p0 pfin : Pexv6) :
@@ -460,7 +488,7 @@ theorem expectedRunCoverage (GD : Gdexec) (i : Agent) (p0 pfin : Pexv6) :
     ∀ j, consumed (AxOpsem.grow GD i) ⟨p0, 0⟩ ⟨pfin, (AxOpsem.grow GD i).length⟩ j ↔
       j < (AxOpsem.grow GD i).length := by
   intro Hrun
-  exact coverageOfRow _ p0 pfin (rtc_subrel (fun x y h => astepAnyNfAny _ x y h) Hrun)
+  exact coverageOfRow _ p0 pfin (rtc_subrel (fun x y h => astepAnyNfAny _ _ x y h) Hrun)
 
 /-- PHASE 2's INVARIANT, replacing AxSL's `na_full`: at gmo-prefix length `n`, every WRITE at or
 before it is annotated. -/

@@ -19,31 +19,29 @@ premise Rocq leaves undischarged (`AxFetch.af_cjr_row_run` only has the `execEff
 
 ## Deviations from Rocq
 
-1. O2 STAGE C — THE FETCH IS AN ADMIN STEP WITH A DEMONIC VALUE (`AxOpsem` deviation 2,
-   `AxInstr` deviation 2).  Rocq's fetch was a row `IRead` item, realised through clause (a)
-   (graph value, `fetch_flow` deposit) and clause (b) (`AStepFetch`, image oracle), landing at
-   `S k`.  In Lean the fetch node (`akIfetch = true`) has exactly one kind of program step,
-   `AStepAdmin` at `LIFetch (paZ pa) tvs` for ANY bytes, keeping `atK`, with `wlWdata = none`;
-   there is no read step (`AxCjrWpd.fetchNoRead`) and no oracle.  Consequently:
-   - `wpdFetchStep`, `wpdFetchThenRun`, `wpdCjrFromFetch` drop the premises `Hlat`, `Hlen`,
-     `Hgd` (`fetchGdOk`), `Hflow` (`fetchFlow`), `Hloc` and take `Hfe : akIfetch = true`; the
-     post-fetch state is at `k` (Rocq `S k`) and the continuation is owed FOR EVERY fetched
-     byte string `vs` of the width (Rocq: the image bytes `vs` only).  So `wpdFetchThenRun`'s run
-     is a family `Hrun : ∀ vs, vs.length = n → rtc gstep … (q vs)` and its resources quantify
-     `vs`; `wpdCjrFromFetch` drops `h : bv 16` and takes `Hpost` for every `vs` (with
-     `s3 : List (BitVec 8) → ExecSt`), its resources quantify `vs` (and `ib'`, as Rocq).
-   - Rocq's clause (d) (row end) was refuted by the fetch's own row item at `k`; Lean has none,
-     so each of the three lemmas takes one more `∧`-conjunct: `postLifting` at the fetch node
-     (any `rs'` agreeing off the pins) when `k` is the row length.
+1. O2 STAGE C + OWNER Q8 — THE FETCH IS A PINNED ADMIN STEP (`AxOpsem` deviation 2, `AxInstr`
+   deviation 2, `AxWp2`'s step clause).  Rocq's fetch was a row `IRead` item, realised through
+   clause (a) (graph value, `fetch_flow` deposit) and clause (b) (`AStepFetch`, image oracle),
+   landing at `S k`.  In Lean the fetch node (`akIfetch = true`) has exactly one kind of program
+   step, `AStepAdmin` at `LIFetch (paZ pa) tvs`, keeping `atK`, with `wlWdata = none`; there is
+   no read step (`AxCjrWpd.fetchNoRead`).  The WP's step clause offers only steps whose label is
+   PINNED to the graph's boot image (`WeakAxRealize.fetchPin GD.gdG.gxImg l`), so — as in Rocq —
+   the continuation is owed for the IMAGE's bytes `vs` only (`AxCjrWpd.pinnedBytes`).  The
+   statements are Rocq's, except:
+   - `Hlat` ↦ `Hfe : akIfetch = true`; `Hflow` and `Hloc` are dropped (no row item, no deposit,
+     no `k ↦ S k`); the post-fetch state is at `k` (Rocq `S k`).
+   - `Hgd` states `AxCjrWpd.fetchImgOk GD i k base vs` (Lean-only) in place of `fetchGdOk`:
+     Rocq's image conjunct verbatim, and of the row-item conjunct only `k < (grow GD i).length`
+     (Rocq: the fetch's own `IRead` item sits at `k`; in Lean the item at `k` is the next row
+     event) — it refutes clause (d) (row end) exactly as Rocq's item did.  The graph-value
+     conjunct is gone (the fetch has no graph value).  `AxCjrWpd.fetchGdOkImg` gives
+     `fetchGdOk → fetchImgOk`.
    - `fetchGdOk` and `fetchFlow` are ported verbatim (≈30 downstream Rocq files mention them)
      but are no longer premises of anything here.
    - `fetchNodePstep` (Rocq: plain `LLoad`) concludes `l = rdLabel akIfetch false akSync …`,
      i.e. it covers the fetch arm (`LIFetch`) too.
-   FINDING (for the orchestrator): with the fetch value demonic, a `wpd` of a SPECIFIC
-   instruction from its fetch node needs its post-fetch reasoning for all fetched bytes (§4's
-   `Hpost` for every halfword is false for real code).  Downstream Rocq users of
-   `wpd_fetch_step` (AxEpi*, AxLdspWpd, AxSmodeProbe, AxSymEngine) cannot be ported faithfully
-   without an Ax-tier fetch pin (e.g. `WeakAxRealize.fetchPin GD.gdG.gxImg l` on `AStepAdmin`).
+   (Before Q8 the step clause quantified fetches of ANY bytes, so these lemmas owed their
+   continuation for every byte string and took an extra row-end `∧`-conjunct; both are gone.)
 2. THE PINS (`AxRunClose` deviation 1): `regs_agree seip_reg` ↦ `regsAgree AxRunClose.pinReg`;
    `epureGstepRtc` and `wpdCjrFromFetch` take `Hse : sig_seip ∉ D` AND `Hme : sig_meip ∉ D`
    (`nodeOk` excludes reads of both pins).
@@ -55,7 +53,8 @@ premise Rocq leaves undischarged (`AxFetch.af_cjr_row_run` only has the `execEff
    `PartialMap.union (PartialMap.union {[e := R]} nu) na`.
 4. Lean-only helpers (file-qualified): `AxCjrWpd.gstepNode` (one `gstep` at a monad node),
    `AxCjrWpd.fetchStepInv`, `AxCjrWpd.fetchAstepInv`, `AxCjrWpd.fetchNoRead` (the fetch node's
-   steps), `AxCjrWpd.wpdOfRunFrom` (§3's closed-run tail, shared with §4).
+   steps), `AxCjrWpd.wpdOfRunFrom` (§3's closed-run tail), and (Q8) `AxCjrWpd.fetchImgOk`,
+   `AxCjrWpd.fetchGdOkImg`, `AxCjrWpd.pinnedBytes` (a pinned fetch returns the image bytes).
 
 **Rocq → Lean name map.**  `erw_label_admin` `AxCjrWpd.erwLabelAdmin` (duplicated name),
 `epure_gstep_rtc` `epureGstepRtc`, `bytes_word_eq` `bytesWordEq`, `fetch_node_pstep`
@@ -241,11 +240,38 @@ theorem AxCjrWpd.fetchNoRead (row : List Lbl) (cpu : CPU) (n va : Nat)
 
 /-- The pure graph facts Rocq's fetch needed (the fetch as a row read).  O2 Stage C: the fetch
 is no row item, so this is no longer a premise of `wpdFetchStep` (kept for the downstream
-ports that still state it). -/
+ports that still state it; its Stage-C remainder is `AxCjrWpd.fetchImgOk`). -/
 def fetchGdOk (GD : Gdexec) (i : Agent) (k : Nat) (base : Int) (vs : List (BitVec 8)) : Prop :=
   (∃ lb, (AxOpsem.grow GD i)[k]? = some lb ∧ aident lb = .IRead false base vs.length) ∧
   graphValue GD (i, k) = some vs ∧
   (∀ j : Nat, j < vs.length → GD.gdG.gxImg (base + j) = vs[j]?)
+
+/-- (Lean-only, Q8) What survives of `fetchGdOk` under Stage C: the row has an item at the
+fetch's position (Rocq: the fetch's own `IRead` item; Lean: the next row event, the fetch
+having none) and the boot IMAGE holds the fetched bytes (verbatim). -/
+def AxCjrWpd.fetchImgOk (GD : Gdexec) (i : Agent) (k : Nat) (base : Int) (vs : List (BitVec 8)) :
+    Prop :=
+  k < (AxOpsem.grow GD i).length ∧
+  (∀ j : Nat, j < vs.length → GD.gdG.gxImg (base + j) = vs[j]?)
+
+theorem AxCjrWpd.fetchGdOkImg (GD : Gdexec) (i : Agent) (k : Nat) (base : Int)
+    (vs : List (BitVec 8)) :
+    fetchGdOk GD i k base vs → AxCjrWpd.fetchImgOk GD i k base vs := by
+  rintro ⟨⟨lb, hlb, -⟩, -, himg⟩
+  exact ⟨lookup_lt_Some hlb, himg⟩
+
+/-- (Lean-only, Q8) A PINNED fetch of the image's bytes returns exactly those bytes. -/
+theorem AxCjrWpd.pinnedBytes (img : Image) (base : Int) (tvs : List (Nat × BitVec 8))
+    (vs : List (BitVec 8)) (hlen : tvs.length = vs.length)
+    (Himg : ∀ j : Nat, j < vs.length → img (base + j) = vs[j]?)
+    (Hpin : WeakAxRealize.fetchPin img (.LIFetch base tvs)) :
+    tvs.map Prod.snd = vs := by
+  unfold WeakAxRealize.fetchPin at Hpin
+  apply List.ext_getElem?
+  intro j
+  by_cases hj : j < vs.length
+  · rw [← Hpin.2 j (by omega), Himg j hj]
+  · rw [List.getElem?_eq_none (by simp; omega), List.getElem?_eq_none (by omega)]
 
 section fetch
 variable {hlc : HasLC} {GF : BundledGFunctors} [InvGS_gen hlc GF] [AxirisG GF] [Axpol]
@@ -261,35 +287,37 @@ def fetchFlow (GD : Gdexec) (i : Agent) (k : Nat) : IProp GF :=
       AxirisG.localInterp GD i (k + 1) ls')
 
 /-- THE FETCH NODE'S `wpd`, by Löb over the register file (the PLIC wire loops there).  The
-fetched bytes are DEMONIC (no graph value, no image oracle): the continuation is owed for every
-byte string of the width, at the SAME row position. -/
+WP's step clause only offers fetches PINNED to the boot image (Q8), and `Hgd` puts the image
+bytes `vs` there: the continuation is owed for `vs` only, at the SAME row position. -/
 theorem wpdFetchStep (Φ : Athread → IProp GF) (i : Agent) (cpu : CPU) (n va : Nat)
     (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
     (KK : Result (BitVec (8 * n) × Option Bool) Arch.abort → SailM Unit) (ib : Ibch) (k : Nat)
-    (rs0 : RegFile)
-    (Hdev : devAddr req.pa = false) (Hfe : (classify req.access_kind).akIfetch = true) :
+    (vs : List (BitVec 8)) (rs0 : RegFile)
+    (Hdev : devAddr req.pa = false) (Hfe : (classify req.access_kind).akIfetch = true)
+    (Hlen : vs.length = n)
+    (Hgd : ∀ GD, rvwmoCatConsistent GD →
+      AxirisG.gconstInterp (GF := GF) GD ⊢ ⌜AxCjrWpd.fetchImgOk GD i k (paZ req.pa) vs⌝) :
     ⊢ ∀ rs, ⌜regsAgree AxRunClose.pinReg rs0 rs⌝ -∗
-      ((∀ (vs : List (BitVec 8)) (rs' : RegFile), ⌜vs.length = n⌝ -∗
-          ⌜regsAgree AxRunClose.pinReg rs0 rs'⌝ -∗
-          wpd .MaybeStuck i ⟨.PHart cpu (KK (.Ok (wordOfBytes n vs, none))) rs' none ib, k⟩ Φ) ∧
-       (∀ (GD : Gdexec) (rs' : RegFile), ⌜regsAgree AxRunClose.pinReg rs0 rs'⌝ -∗
-          ⌜k = (AxOpsem.grow GD i).length⌝ -∗
-          postLifting Φ i ⟨.PHart cpu (.impure (.ok (.memRead n va req)) KK) rs' none ib, k⟩)) -∗
+      (∀ rs', ⌜regsAgree AxRunClose.pinReg rs0 rs'⌝ -∗
+         wpd .MaybeStuck i ⟨.PHart cpu (KK (.Ok (wordOfBytes n vs, none))) rs' none ib, k⟩ Φ) -∗
       wpd .MaybeStuck i ⟨.PHart cpu (.impure (.ok (.memRead n va req)) KK) rs none ib, k⟩ Φ := by
   iloeb as IH
-  iintro %rs %HP R
+  iintro %rs %HP C
   iapply (AxWpD.wpdMUnfoldStep rvwmoCatConsistent .MaybeStuck i _ Φ).2
   isplit
   · iapply (progressOblMaybestuck (GF := GF) i _).2
     itrivial
   unfold wpdMPreStepDef
   iintro %GD %ls ⟨%Hc, #Hg, Hloc⟩
+  ihave Hok := (Hgd GD Hc) $$ Hg
+  icases Hok with %Hok
   isplit
   · iintro %id %K %Hst
     exact (AxCjrWpd.fetchNoRead _ cpu n va req KK rs ib k id K Hdev Hfe Hst).elim
   isplit
-  · iintro %l %s' %Hst
+  · iintro %l %s' %Hst %Hpin
     obtain ⟨tvs, hlen, rfl, rfl⟩ := AxCjrWpd.fetchAstepInv _ cpu n va req KK rs ib k l s' Hdev Hfe Hst
+    rw [AxCjrWpd.pinnedBytes _ _ tvs vs (by omega) Hok.2 Hpin]
     simp only [wlWdata]
     unfold wpSkipStep
     iintro %na Hna
@@ -298,8 +326,7 @@ theorem wpdFetchStep (Φ : Athread → IProp GF) (i : Agent) (cpu : CPU) (n va :
     imodintro
     iexists ls
     iframe Hna Hloc
-    icases R with ⟨R, -⟩
-    iapply R $$ %(tvs.map Prod.snd) %rs %(by simp [hlen]) %HP
+    iapply C $$ %rs %HP
   isplit
   · iintro %s' %Hw
     obtain ⟨hk, hp⟩ := awireAeqv _ _ Hw
@@ -316,10 +343,11 @@ theorem wpdFetchStep (Φ : Athread → IProp GF) (i : Agent) (cpu : CPU) (n va :
       imodintro
       iexists ls
       iframe Hna Hloc
-      iapply IH $$ %rs' %(regsAgreeTrans _ _ _ _ HP (regsAgreeSym _ _ _ hag)) R
+      iapply IH $$ %rs' %(regsAgreeTrans _ _ _ _ HP (regsAgreeSym _ _ _ hag)) C
   · iintro %Heq
-    icases R with ⟨-, R⟩
-    iapply R $$ %GD %rs %HP %Heq
+    have h1 := Hok.1
+    simp only at Heq
+    omega
 
 /-! # 3. GENERIC: fetch, then a closed admin segment -/
 
@@ -343,77 +371,55 @@ theorem AxCjrWpd.wpdOfRunFrom (i : Agent) (q s0 s' : Athread) (Φ : Athread → 
 theorem wpdFetchThenRun (Φ : Athread → IProp GF) (i : Agent) (cpu : CPU) (n va : Nat)
     (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
     (KK : Result (BitVec (8 * n) × Option Bool) Arch.abort → SailM Unit) (ib : Ibch) (k : Nat)
-    (rs0 : RegFile) (q : List (BitVec 8) → Athread)
+    (vs : List (BitVec 8)) (rs0 : RegFile) (q : Athread)
     (Hdev : devAddr req.pa = false) (Hfe : (classify req.access_kind).akIfetch = true)
-    (Hrun : ∀ vs : List (BitVec 8), vs.length = n →
-      rtc gstep ⟨.PHart cpu (KK (.Ok (wordOfBytes n vs, none))) rs0 none ib, k⟩ (q vs)) :
-    ⊢ ((∀ (vs : List (BitVec 8)) s2, ⌜vs.length = n⌝ -∗ ⌜Qat (q vs) s2⌝ -∗
-          wpd .MaybeStuck i s2 Φ) ∧
-       (∀ (vs : List (BitVec 8)) (GD : Gdexec) s1, ⌜vs.length = n⌝ -∗ ⌜Pbefore (q vs) s1⌝ -∗
-          ⌜s1.atK = (AxOpsem.grow GD i).length⌝ -∗ postLifting Φ i s1) ∧
-       (∀ (GD : Gdexec) (rs' : RegFile), ⌜regsAgree AxRunClose.pinReg rs0 rs'⌝ -∗
-          ⌜k = (AxOpsem.grow GD i).length⌝ -∗
-          postLifting Φ i ⟨.PHart cpu (.impure (.ok (.memRead n va req)) KK) rs' none ib, k⟩)) -∗
+    (Hlen : vs.length = n)
+    (Hgd : ∀ GD, rvwmoCatConsistent GD →
+      AxirisG.gconstInterp (GF := GF) GD ⊢ ⌜AxCjrWpd.fetchImgOk GD i k (paZ req.pa) vs⌝)
+    (Hrun : rtc gstep ⟨.PHart cpu (KK (.Ok (wordOfBytes n vs, none))) rs0 none ib, k⟩ q) :
+    ⊢ ((∀ s2, ⌜Qat q s2⌝ -∗ wpd .MaybeStuck i s2 Φ) ∧
+       (∀ (GD : Gdexec) s1, ⌜Pbefore q s1⌝ -∗ ⌜s1.atK = (AxOpsem.grow GD i).length⌝ -∗
+          postLifting Φ i s1)) -∗
       wpd .MaybeStuck i ⟨.PHart cpu (.impure (.ok (.memRead n va req)) KK) rs0 none ib, k⟩ Φ := by
   iintro R
-  iapply (wpdFetchStep Φ i cpu n va req KK ib k rs0 Hdev Hfe) $$ %rs0 %(regsAgreeRefl _ rs0)
-  isplit
-  · iintro %vs %rs' %hl %hag
-    iapply (AxCjrWpd.wpdOfRunFrom i (q vs)
-      ⟨.PHart cpu (KK (.Ok (wordOfBytes n vs, none))) rs0 none ib, k⟩
-      ⟨.PHart cpu (KK (.Ok (wordOfBytes n vs, none))) rs' none ib, k⟩ Φ (Hrun vs hl)
-      ⟨rfl, rfl, rfl, rfl, rfl, regsAgreeSym _ _ _ hag⟩)
-    isplit
-    · icases R with ⟨R, -⟩
-      iintro %s2 %HQ
-      iapply R $$ %vs %s2 %hl %HQ
-    · icases R with ⟨-, R, -⟩
-      iintro %GD %s1 %HP %Heq
-      iapply R $$ %vs %GD %s1 %hl %HP %Heq
-  · icases R with ⟨-, -, R⟩
-    iexact R
+  iapply (wpdFetchStep Φ i cpu n va req KK ib k vs rs0 Hdev Hfe Hlen Hgd) $$ %rs0
+    %(regsAgreeRefl _ rs0)
+  iintro %rs' %hag
+  iapply (AxCjrWpd.wpdOfRunFrom i q
+    ⟨.PHart cpu (KK (.Ok (wordOfBytes n vs, none))) rs0 none ib, k⟩
+    ⟨.PHart cpu (KK (.Ok (wordOfBytes n vs, none))) rs' none ib, k⟩ Φ Hrun
+    ⟨rfl, rfl, rfl, rfl, rfl, regsAgreeSym _ _ _ hag⟩) $$ R
 
-/-! # 4. c.jr: a 2-byte fetch, then the post-fetch segment as an `epure` certificate -/
+/-! # 4. c.jr: the 2-byte fetch of `h`, then the post-fetch segment as an `epure` certificate -/
 
 theorem wpdCjrFromFetch (Φ : Athread → IProp GF) (i : Agent) (cpu : CPU) (va : Nat)
     (req : Mem_read_request 2 va Arch.pa Arch.translation Arch.arch_ak)
     (KK : Result (BitVec (8 * 2) × Option Bool) Arch.abort → SailM Unit) (ib : Ibch) (k : Nat)
-    (s2 : ExecSt) (s3 : List (BitVec 8) → ExecSt) (D : List Register)
+    (h : BitVec 16) (s2 s3 : ExecSt) (D : List Register)
     (Hdev : devAddr req.pa = false) (Hfe : (classify req.access_kind).akIfetch = true)
-    -- THE POST-FETCH CERTIFICATE, for every fetched halfword
+    (Hgd : ∀ GD, rvwmoCatConsistent GD →
+      AxirisG.gconstInterp (GF := GF) GD ⊢
+        ⌜AxCjrWpd.fetchImgOk GD i k (paZ req.pa) (WeakInterpProj.wbytes 2 h)⌝)
+    -- THE POST-FETCH CERTIFICATE (the undischarged c.jr residue), for the fetched halfword
     (Hseip : Register.sig_seip ∉ D) (Hmeip : Register.sig_meip ∉ D)
-    (Hpost : ∀ vs : List (BitVec 8), vs.length = 2 →
-      epure D (KK (.Ok (wordOfBytes 2 vs, none))) s2 = some ((), s3 vs)) :
-    ⊢ ((∀ (vs : List (BitVec 8)) (ib' : Ibch) s', ⌜vs.length = 2⌝ -∗
-          ⌜Qat ⟨.PHart cpu (.pure ()) (s3 vs).regs none ib', k⟩ s'⌝ -∗
+    (Hpost : epure D (KK (.Ok (wordOfBytes 2 (WeakInterpProj.wbytes 2 h), none))) s2 =
+      some ((), s3)) :
+    ⊢ ((∀ (ib' : Ibch) s', ⌜Qat ⟨.PHart cpu (.pure ()) s3.regs none ib', k⟩ s'⌝ -∗
           wpd .MaybeStuck i s' Φ) ∧
-       (∀ (vs : List (BitVec 8)) (ib' : Ibch) (GD : Gdexec) s1, ⌜vs.length = 2⌝ -∗
-          ⌜Pbefore ⟨.PHart cpu (.pure ()) (s3 vs).regs none ib', k⟩ s1⌝ -∗
-          ⌜s1.atK = (AxOpsem.grow GD i).length⌝ -∗ postLifting Φ i s1) ∧
-       (∀ (GD : Gdexec) (rs' : RegFile), ⌜regsAgree AxRunClose.pinReg s2.regs rs'⌝ -∗
-          ⌜k = (AxOpsem.grow GD i).length⌝ -∗
-          postLifting Φ i ⟨.PHart cpu (.impure (.ok (.memRead 2 va req)) KK) rs' none ib, k⟩)) -∗
+       (∀ (ib' : Ibch) (GD : Gdexec) s1,
+          ⌜Pbefore ⟨.PHart cpu (.pure ()) s3.regs none ib', k⟩ s1⌝ -∗
+          ⌜s1.atK = (AxOpsem.grow GD i).length⌝ -∗ postLifting Φ i s1)) -∗
       wpd .MaybeStuck i ⟨.PHart cpu (.impure (.ok (.memRead 2 va req)) KK) s2.regs none ib, k⟩
         Φ := by
   iintro R
-  iapply (wpdFetchStep Φ i cpu 2 va req KK ib k s2.regs Hdev Hfe) $$ %s2.regs
-    %(regsAgreeRefl _ s2.regs)
+  obtain ⟨ib', Hrun⟩ := epureGstepRtc D Hseip Hmeip _ _ _ _ Hpost cpu ib k
+  iapply (wpdFetchThenRun Φ i cpu 2 va req KK ib k (WeakInterpProj.wbytes 2 h) s2.regs _
+    Hdev Hfe (wbytesLength 2 h) Hgd Hrun)
   isplit
-  · iintro %vs %rs' %hl %hag
-    obtain ⟨ib', Hrun⟩ := epureGstepRtc D Hseip Hmeip _ _ _ _ (Hpost vs hl) cpu ib k
-    iapply (AxCjrWpd.wpdOfRunFrom i _
-      ⟨.PHart cpu (KK (.Ok (wordOfBytes 2 vs, none))) s2.regs none ib, k⟩
-      ⟨.PHart cpu (KK (.Ok (wordOfBytes 2 vs, none))) rs' none ib, k⟩ Φ Hrun
-      ⟨rfl, rfl, rfl, rfl, rfl, regsAgreeSym _ _ _ hag⟩)
-    isplit
-    · icases R with ⟨R, -⟩
-      iintro %s' %HQ
-      iapply R $$ %vs %ib' %s' %hl %HQ
-    · icases R with ⟨-, R, -⟩
-      iintro %GD %s1 %HP %Heq
-      iapply R $$ %vs %ib' %GD %s1 %hl %HP %Heq
-  · icases R with ⟨-, -, R⟩
-    iexact R
+  · icases R with ⟨R, -⟩
+    iapply R
+  · icases R with ⟨-, R⟩
+    iapply R
 
 end fetch
 

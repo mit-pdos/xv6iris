@@ -28,7 +28,9 @@ the invariant "strictly before the run's end".
    instruction's fetch.  In Lean (AxOpsem deviation 2) a fetch is an `AStepAdmin` step at
    `lbAdmin true (LIFetch ..)`: no row item, `wlWdata = none`, `atK` kept.  So `Hnord` no longer
    speaks of fetches at all, and a fetch inside the segment is simply one more `Hclos` step
-   (clause (b)); the "start after the fetch" side condition is vacuous.  Statements unchanged.
+   (clause (b)); the "start after the fetch" side condition is vacuous.  Statements unchanged
+   (owner Q8: clause (b) now also hands a `fetchPin` premise, which the proof ignores — `Hclos`
+   covers every program step, pinned or not).
 2. NAMES: camelCase (map below); `invGS_gen HasNoLc Σ` ↦ `[InvGS_gen hlc GF]` for any `hlc`
    (as AxWp/AxWpD); `astep_prog (grow GD i) ax_text (gx_img (gd_g GD))` ↦
    `AxOpsem.astepProg (AxOpsem.grow GD i)` (the oracle parameters are deleted, AxOpsem Q-C2);
@@ -75,7 +77,7 @@ theorem wpdOfClosedRun (st : Stuckness) (i : Agent) (P Q : Athread → Prop)
   · iintro %id %K %Hst
     exact (Hnord GD s id K HP Hst).elim
   isplit
-  · iintro %l %s' %Hst
+  · iintro %l %s' %Hst %_
     obtain ⟨Hw, Hk, HPQ⟩ := Hclos GD s l s' HP Hst
     simp only [Hw]
     unfold wpSkipStep
