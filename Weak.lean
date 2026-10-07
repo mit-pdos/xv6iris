@@ -230,5 +230,6 @@ import Weak.AxInstrFacts
 import Weak.AxDevGraphWit
 import Weak.AxReadAll
 import Weak.AxToken
+import Weak.AxWpD
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
