@@ -45,7 +45,8 @@ state at the row end is `good` (Lean: or still a `chkPre` boundary, deviation 1(
    (c) CONSEQUENCE for `InvGood`/`reachGood`: the position no longer separates the pre-fetch
        boundary (the start state itself, and its PLIC-wire variants) from the post-fetch
        boundaries, so the conclusion is `good rs' = true ∨ chkPre … (riscvStep tk) rs' = true`
-       (Rocq: `good rs' = true`).  OPEN for AxEpiRet (reported).
+       (Rocq: `good rs' = true`).  AxEpiRet does not use `reachGood`: it applies the reach at
+       hart 0's start over its own staged region (AxEpiRet deviation 1).
    (d) A fetch is NOT stuck at the row end in Lean (it is an admin step), so Rocq's
        `ram := λ _ _, true` of `chkNext`/`chkPost` (any RAM read is a row-end exit) is unsound;
        they use `AxCjrReach.dataRead` (Lean-only: the node is a NON-fetch RAM read, which IS
