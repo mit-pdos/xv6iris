@@ -11,10 +11,11 @@
 #   --build   `lake build Xv6 MachCSL` first (Rocq's `make audit` vs `audit-only`).
 #             Without it a stale .lake/build is audited as it stands.
 #   --weak    audit the weak-memory tier's top theorems instead (Theorem 2 /
-#             Theorem 1, tools/ci/roots-weak.txt) against
-#             tools/audit/baseline-weak.json, importing Weak.AxSpinT2b (Weak/
-#             is not in the Xv6/MachCSL build CI audits); output in
-#             $XV6_CI_OUT/weak.  With --build, `lake build Weak.AxSpinT2b` first.
+#             Theorem 1 / certificate (a'), tools/ci/roots-weak.txt) against
+#             tools/audit/baseline-weak.json, importing Weak.AxSpinT2b and
+#             Weak.AxSpinT2c (Weak/ is not in the Xv6/MachCSL build CI audits);
+#             output in $XV6_CI_OUT/weak.  With --build, `lake build
+#             Weak.AxSpinT2b Weak.AxSpinT2c` first.
 #
 # EXIT STATUS: non-zero iff the audit fails (an axiom or opaque outside the
 # baseline, a stale baseline entry, a `sorryAx` anywhere in MachCSL/Xv6) or
@@ -40,14 +41,14 @@ for a in "$@"; do
 done
 if [ "$weak" -eq 1 ]; then
   export XV6_CI_OUT="$XV6_CI_OUT/weak"
-  export XV6_AUDIT_MODULES="Weak.AxSpinT2b"
+  export XV6_AUDIT_MODULES="Weak.AxSpinT2b,Weak.AxSpinT2c"
   export XV6_AUDIT_BASELINE="tools/audit/baseline-weak.json"
 fi
 mkdir -p "$XV6_CI_OUT"
 rm -f "$XV6_CI_OUT/audit.json" "$XV6_CI_OUT/audit.md"
 
 if [ "$build" -eq 1 ]; then
-  if [ "$weak" -eq 1 ]; then lake build Weak.AxSpinT2b; else lake build Xv6 MachCSL; fi
+  if [ "$weak" -eq 1 ]; then lake build Weak.AxSpinT2b Weak.AxSpinT2c; else lake build Xv6 MachCSL; fi
 fi
 
 rc=0

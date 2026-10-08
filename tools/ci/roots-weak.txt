@@ -7,3 +7,4 @@
 # differ.
 Weak.allocpidOpen             # THEOREM 2: two-hart allocpid pid distinctness + nextpid source, open third hart (AxSpinT2b)
 Weak.allocpid2Distinct        # THEOREM 1: its corollary with no third hart (AxSpinT2b)
+Weak.allocpidOpenCert         # CERTIFICATE (a'): Theorem 2 applied to the concrete 3-hart run, no hypotheses (AxSpinT2c)

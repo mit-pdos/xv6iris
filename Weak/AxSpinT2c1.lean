@@ -69,7 +69,7 @@ DECISION: the non-collision holds for the whole layout family (not only (a′)'s
 * The literal carries SC timestamps (computed offline); `rowsFixed` re-derives them.
 * Image: only text, the table and `nextpid` are non-zero; the real `.data`/`.bss` of other
   objects is not modelled (nothing in the segment reads them).
-* Entry: `ctrlOkSW` of `regsE h` (part of AxSpinT2a's `entryOk`) is NOT proved here.
+* Entry: `ctrlOkSW` of `regsE h` (part of AxSpinT2a's `entryOk`) is not proved here; it is proved in `AxSpinT2c` (`ctrlOkSWE`, `entryOkE`).
 
 Reused: `graphOfSc`/`graphOfScCatT`/`graphOfScCtrlClosed`/`emsOkB`/`ctrlOkB`/`itemOkB`/`monoB`/
 `AxScRun.coverB`/`shapesOkB`/`ilOkB`/`scProg`/`sim`/`rowOf` (AxScRun), `drive2`/`drive2Sound`/

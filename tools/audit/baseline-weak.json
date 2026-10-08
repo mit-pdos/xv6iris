@@ -1,13 +1,25 @@
 {
   "comment": [
     "THE WEAK-TIER ASSUMPTION BASELINE, read by tools/audit/Audit.lean in its Weak run (tools/ci/audit.sh --weak:",
-    "XV6_AUDIT_MODULES=Weak.AxSpinT2b, XV6_AUDIT_BASELINE=this file).  Same format and rules as baseline.json.",
+    "XV6_AUDIT_MODULES=Weak.AxSpinT2b,Weak.AxSpinT2c, XV6_AUDIT_BASELINE=this file).  Same format and rules as baseline.json.",
     "Separate because Weak/ is not part of the Xv6/MachCSL build CI audits; tools/ci/lint.sh checks that this",
     "file and tools/ci/roots-weak.txt name the same theorems."
   ],
   "theorems": [
     {
       "name": "Weak.allocpidOpen",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "opaques": [
+        "LeanRV64D.Functions.xv6_resv_is_valid",
+        "LeanRV64D.Functions.xv6_resv_matches"
+      ]
+    },
+    {
+      "name": "Weak.allocpidOpenCert",
       "axioms": [
         "propext",
         "Classical.choice",

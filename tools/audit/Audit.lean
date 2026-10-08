@@ -88,7 +88,7 @@ theorems (Theorem 2 `Weak.allocpidOpen`, Theorem 1 `Weak.allocpid2Distinct`)
 are audited by a SEPARATE run of this same executable:
 `$XV6_AUDIT_MODULES` (comma-separated module names; default `Xv6,MachCSL`)
 names the modules to import, and the weak run passes
-`XV6_AUDIT_MODULES=Weak.AxSpinT2b` with
+`XV6_AUDIT_MODULES=Weak.AxSpinT2b,Weak.AxSpinT2c` with
 `XV6_AUDIT_BASELINE=tools/audit/baseline-weak.json`.  `Weak` is a local
 root (its opaques are this tree's, its declarations are in the tree-wide
 `sorryAx` / declared-axiom check) whenever it is imported; the default run
