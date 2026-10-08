@@ -328,3 +328,4 @@ Rocq→Lean name map only.
 - AxSpinAp2–5: `decA*`/`rfFDecA*`, `tkc*` (`ax_spin_ap3_tkc`); `TokC` is a plain def — `show TokC (0x…#16) _; unfold TokC` before `refine`.
 - AxSpinU4: capstones `uAlloc2`, `uCsSrc`; graphs `ua`/`ur`; `AxSpinU4.xr`; adds short globals `ua`, `ur`, `uCtrl`, `rnRow`, `rnM0`.
 - AxSpinVA6 (AxSpinVA7): `rfS` (rfF + pin reads) entered via `AxSpinVA6.rfSOfRfF`; `xtrapSt s e xv` uses cause-generic `AxSpinVA6.trapS9`; `execHandleExceptionTrap` delegation premise `bit_to_bool (BitVec.access (s.regs .medeleg) (BitVec.toNatInt (exceptionType_bits_forwards e))) = true`.
+- AxSpinE5: XBk instance premises at Ixv6 (`HGX`, `HtextX`, `HflowX`, `HlocX`) at `AxSpinX2.xG L GT nm`/`xv6Pol GT` with graph `gtAdGd GT`; slot flows `FstSlot`/`FldSlot`; `naWfEmpty L GT nm`. (The Stage C off-row concern is NOT in E5 — watch E6+.)
