@@ -313,3 +313,4 @@ Rocq→Lean name map only.
 - BV_DECIDE ENUM CLASH: `bv_decide` on a goal mentioning an enum (e.g. `Dkind`) adds `Weak.Dkind.enumToBitVec` (+ aux) to the CURRENT file's environment; two files doing this cannot both be imported (AxSpinE2 vs AxWalk3). Fix: import a file that already generated it (AxWalk3) so it is reused, or keep enum-typed terms out of `bv_decide` goals (generalize/clear them first, or `simp` the enum away).
 - AxWalk6: `PTranslateAddrMiss` (translateAddr front over a TLB miss at CertWP: `apply CertWPCatchEarlyReturn` then `ax_walk3_go`), `nvTranslatePreset`/`nvTranslateAd`.
 - KERNEL INLINING: check each per-function Rocq file's symbol exists in `Xv6/KernelImage.lean` before porting — `allocpid` is inlined into `allocproc` in this build (see Q18). AxSpinSpike.lean lines 83–95 record image drift.
+- AxSpinE9 (AxSpinE8d): boolean FirstRd checker `frb img …` (`frbSound`, `frbAgree` with `regsAgree AxRunClose.pinReg`), `FirstRdMono img P P' Q Q' m t`.
