@@ -33,6 +33,22 @@ the reload's GRAPH VALUE `Hval : graphValue (gtAdGd GT) (i, k + 2) = some (stByt
 proves nothing about a graph whose reload value differs.  The follow-up ROW-INTEGRITY theorem
 is to discharge `Hval` from the `RLfact` readback (reload bytes = spill bytes = entry `ra`).
 
+## Stage 2 P-FORM (Lean-only; notes/weak-lb-thm2-stage2.md §B, §C row `AxSpinE8`, Q-S2-1/2)
+
+`RowMycpuP k row pra ps0` is `RowMycpu` on a PREFIX row: each of the four memory events that is
+PRESENT (`k + j < row.length`) has its `mshape`; no length conjunct (`AxSpinE8.rowMycpuPOfFull`:
+`RowMycpu → RowMycpuP`).  `wpdMycpuP` is the same script as `wpdMycpu` with one `by_cases` per
+row position (`k`, `k+1`, `k+2`, `k+3`, `k+4` — the five boundaries where the row may end; the
+other leaf calls at the same position reuse the bound); the end case is discharged by the
+WINDOWED, RESOURCE-FREE hook (exact form, shared with the other P-form lanes):
+  `HΨend : ∀ k', k ≤ k' → k' ≤ k + 4 → (grow (gtAdGd GT) i).length ≤ k' →
+     ∀ pr : Pexv6, ⊢ wpdM … .MaybeStuck i ⟨pr, k'⟩ Ψ`
+(every program state; the caller instantiates it by `AxSpinApA.wpdEndAnn` + `postLiftingTrue`).
+mycpu has NO designated cut, so no end arm is proved here.  The `Hval` pin is GUARDED:
+`k + 2 < LEN → graphValue (i, k + 2) = some (stBytes 8 ret)` (design §A "guarded pins").  The
+continuation (unchanged) is reached only on rows with `k + 4 < LEN`.  `wpdMycpu` keeps its exact
+statement and is now the corollary (hook vacuous under `k + 4 < LEN`; `Hval` unguarded).
+
 ## Deviations from Rocq
 
 1. O2 STAGE C / Q20' (provisional Option V; protocol "Cross-file facts" Q20' entry):
@@ -81,10 +97,11 @@ is to discharge `Hval` from the `RLfact` readback (reload bytes = spill bytes = 
 duplicated-name table; the generic ones are file-qualified anyway); from other Rocq files
 (deviation 2) `mycpu_a5` `AxSpinE8.mycpuA5`, `mycpu_ret` `AxSpinE8.mycpuRet`,
 `frame_cancel_16` `AxSpinE8.frameCancel16`.  Lean-only (file-qualified): `AxSpinE8.updSame`,
-`updOther`, `updZero`, `owOkSome`, `gprValZero`, `ldResStBytes8`, `vaRa`, `vaS0`.
+`updOther`, `updZero`, `owOkSome`, `gprValZero`, `ldResStBytes8`, `vaRa`, `vaS0`,
+`rowMycpuPOfFull`; stage-2 P-form (unqualified, grepped unique): `RowMycpuP`, `wpdMycpuP`.
 
 **Dropped:** `rf_fetch` (deviation 1).  Rocq 23 definitions/lemmas (+ 5 Ltac); Lean 22 + 3
-ported from ProcGeom/KernelRvcDecode + 8 Lean-only (+ 1 macro).
+ported from ProcGeom/KernelRvcDecode + 11 Lean-only (+ 1 macro).
 -/
 import Weak.AxSpinE6
 import Weak.AxSpinE7b
@@ -217,6 +234,17 @@ def mshape (pra ps0 : Int) (j : Nat) (lb : Lbl) : Prop :=
 def RowMycpu (k : Nat) (row : List Lbl) (pra ps0 : Int) : Prop :=
   k + 4 < row.length ∧ ∀ j, j < 4 → ∃ lb, row[k + j]? = some lb ∧ mshape pra ps0 j lb
 
+/-- (Lean-only, stage 2 P-form) `RowMycpu` on a PREFIX row: every one of mycpu's four
+memory events that is PRESENT (`k + j < row.length`) has its shape; no length conjunct (the row
+may end anywhere, the end case is `wpdMycpuP`'s hook). -/
+def RowMycpuP (k : Nat) (row : List Lbl) (pra ps0 : Int) : Prop :=
+  ∀ j, j < 4 → k + j < row.length → ∃ lb, row[k + j]? = some lb ∧ mshape pra ps0 j lb
+
+/-- (Lean-only) a full mycpu window is a prefix window. -/
+theorem AxSpinE8.rowMycpuPOfFull (k : Nat) (row : List Lbl) (pra ps0 : Int) :
+    RowMycpu k row pra ps0 → RowMycpuP k row pra ps0 :=
+  fun ⟨_, Hs⟩ j hj _ => Hs j hj
+
 /-- Rocq `row_w8`: RV64 rows — every write is at most 8 bytes. -/
 def rowW8 (row : List Lbl) : Prop :=
   ∀ (k : Nat) (lb : Lbl) (rl : Bool) (b : Int) (m : Nat),
@@ -301,11 +329,13 @@ variable (HΨmid : ∀ s, midState s → s.atK = (AxOpsem.grow (gtAdGd GT) i).le
   ⊢ @postLifting GF (AxSpinX2.xG L GT nm) Ψ i s)
 
 include HL Hcons hmode hasid hppn Hfix Htxt HΨmid in
-/-- Rocq `wpd_mycpu` (deviation 1: Stage C positions, `Hval`/`Hret` replace the return-fetch
-pin `Hinj`/`Hstv`/`va_first_read`). -/
-theorem wpdMycpu (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64) (Pra Ps0 : BitVec 64) :
+/-- (Lean-only, stage 2) THE P-FORM of `wpdMycpu` on a PREFIX row (`RowMycpuP`; the `Hval` pin
+guarded by `k + 2 < LEN`): at each of mycpu's five row positions `k .. k + 4` a `by_cases` on
+`LEN ≤ position`; the row-end case is the WINDOWED hook `HΨend` (resource-free, every program
+state; mycpu has no designated cut).  The continuation is reached only when `k + 4 < LEN`. -/
+theorem wpdMycpuP (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64) (Pra Ps0 : BitVec 64) :
     -- the row
-    RowMycpu k (AxOpsem.grow (gtAdGd GT) i) (paZ Pra) (paZ Ps0) →
+    RowMycpuP k (AxOpsem.grow (gtAdGd GT) i) (paZ Pra) (paZ Ps0) →
     rowW8 (AxOpsem.grow (gtAdGd GT) i) → noRmw8 (AxOpsem.grow (gtAdGd GT) i) (paZ Pra) →
     noRmw8 (AxOpsem.grow (gtAdGd GT) i) (paZ Ps0) →
     -- the entry state
@@ -319,7 +349,13 @@ theorem wpdMycpu (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64) (Pra P
     (∀ j : Nat, j < 8 → priv L (paZ Ps0 + (j : Int)) i) → ¬ L.xlText (paZ Ps0) →
     (paZ Ps0 + 8 ≤ paZ Pra ∨ paZ Pra + 8 ≤ paZ Ps0) →
     -- the return address (Q20': the reload's graph value; deviation 1)
-    graphValue (gtAdGd GT) (i, k + 2) = some (stBytes 8 ret) → jalrTgt 0#12 ret = ret →
+    (k + 2 < (AxOpsem.grow (gtAdGd GT) i).length →
+      graphValue (gtAdGd GT) (i, k + 2) = some (stBytes 8 ret)) → jalrTgt 0#12 ret = ret →
+    -- the row-end hook (stage 2, design §B / Q-S2-2)
+    (∀ k' : Nat, k ≤ k' → k' ≤ k + 4 → (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
+      ∀ pr : Pexv6,
+        ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+          ⟨pr, k'⟩ Ψ) →
     ⊢ (∀ (vra vs0 : List (BitVec 8)) (rs' : RegFile) (ib' : Ibch),
         ⌜ctrlOkSW T satp0 rs' ∧ rs' .PC = ret ∧ rs' .tlb = rs0 .tlb ∧
           gprVal rs' AxSpinE8.r10 = AxSpinE8.mycpuRet (gprVal rs0 AxSpinE8.r4) ∧
@@ -341,9 +377,13 @@ theorem wpdMycpu (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64) (Pra P
       @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
         ⟨.PHart cpu (.pure ()) rs0 none ib0, k⟩ Ψ := by
   intro HR Hw8 Hnr_ra Hnr_s0 Hc0 HPC0 Hhit0 HdaS_ra HdaL_ra Hh_ra HdaS_s0 HdaL_s0 Hh_s0
-    Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hslots Hval Hret
-  obtain ⟨Hlen, Hsh⟩ := HR
+    Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hslots Hval Hret HΨend
+  have Hsh := HR
   iintro C
+  -- row end at k
+  by_cases E0 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k
+  · iclear C
+    iapply (HΨend _ (by omega) (by omega) (by omega) _)
   have XR := XxReg L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
   have XS := XxSt L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
   have XL := XxLd L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
@@ -369,6 +409,10 @@ theorem wpdMycpu (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64) (Pra P
   have HF2 := stepRegs0 T satp0 _ rs1 _ _ _ rs2 HF1 HG2
   have HPC2 : rs2 .PC = pcm 0x04 := by rw [gbPc T satp0 _ _ _ _ _ _ HG2]; decide
   have Htl2 : rs2 .tlb = rs0 .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG2).trans Htl1
+  -- row end at k + 1
+  by_cases E1 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 1
+  · iclear C
+    iapply (HΨend _ (by omega) (by omega) (by omega) _)
   -- ---- 0x04: c.sdsp s0,0(sp) (spill at k+1) ----
   iapply (XS _ rs2 (k + 1) (pcm 0x04) true AxSpinE8.immS0 8#5 2#5 (AxSpinE8.vaS0 rs0) Ps0
     (retxRefl cpu rs2 (k + 1) ib2) (gbCtrl T satp0 _ _ _ _ _ _ HG2) HPC2
@@ -379,6 +423,10 @@ theorem wpdMycpu (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64) (Pra P
   have HF3 := stepRegs0 T satp0 _ rs2 _ _ _ rs3 HF2 HG3
   have HPC3 : rs3 .PC = pcm 0x06 := by rw [gbPc T satp0 _ _ _ _ _ _ HG3]; decide
   have Htl3 : rs3 .tlb = rs0 .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG3).trans Htl2
+  -- row end at k + 2
+  by_cases E2 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 2
+  · iclear C
+    iapply (HΨend _ (by omega) (by omega) (by omega) _)
   -- ---- 0x06: c.addi4spn s0,sp,16 (k+2) ----
   have Hc4 := certAddi (ctrlOkSW T satp0) rs3 (pcm 0x06) true 2#5 8#5 (caddi4spnImm 4#8)
     (by decide)
@@ -464,9 +512,9 @@ theorem wpdMycpu (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64) (Pra P
   have HPC10 : rs10 .PC = pcm 0x18 := by rw [gbPc T satp0 _ _ _ _ _ _ HG10]; decide
   have Htl10 : rs10 .tlb = rs0 .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG10).trans Htl9
   -- ---- 0x18: c.ldsp ra,8(sp) — the RELOAD of ra's spill (k+2) ----
-  obtain ⟨lb0, Hlb0, vwra, cls0, rfl, Hlvw0⟩ := Hsh 0 (by omega)
-  obtain ⟨lb1, Hlb1, vws0, cls1, rfl, Hlvw1⟩ := Hsh 1 (by omega)
-  obtain ⟨lb2, Hlb2, aq2, Hid2⟩ := Hsh 2 (by omega)
+  obtain ⟨lb0, Hlb0, vwra, cls0, rfl, Hlvw0⟩ := Hsh 0 (by omega) (by omega)
+  obtain ⟨lb1, Hlb1, vws0, cls1, rfl, Hlvw1⟩ := Hsh 1 (by omega) (by omega)
+  obtain ⟨lb2, Hlb2, aq2, Hid2⟩ := Hsh 2 (by omega) (by omega)
   rw [Nat.add_zero] at Hlb0
   iapply (XL _ rs10 (k + 2) (pcm 0x18) true AxSpinE8.immRa 2#5 1#5 (AxSpinE8.vaRa rs0) Pra k
     vwra cls0 (retxRefl cpu rs10 (k + 2) ib10) (gbCtrl T satp0 _ _ _ _ _ _ HG10) HPC10
@@ -485,6 +533,11 @@ theorem wpdMycpu (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64) (Pra P
   have HF11 := stepRegs T satp0 _ rs10 _ _ _ _ _ rs11 HF10 HG11
   have HPC11 : rs11 .PC = pcm 0x1a := by rw [gbPc T satp0 _ _ _ _ _ _ HG11]; decide
   have Htl11 : rs11 .tlb = rs0 .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG11).trans Htl10
+  -- row end at k + 2 + 1
+  by_cases E3 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 2 + 1
+  · iclear C
+    iclear H2
+    iapply (HΨend _ (by omega) (by omega) (by omega) _)
   -- ---- 0x1a: c.ldsp s0,0(sp) — the RELOAD of s0's spill (k+3) ----
   iapply (XL _ rs11 (k + 2 + 1) (pcm 0x1a) true AxSpinE8.immS0 2#5 8#5 (AxSpinE8.vaS0 rs0) Ps0
     (k + 1) vws0 cls1 (retxRefl cpu rs11 (k + 2 + 1) ib11) (gbCtrl T satp0 _ _ _ _ _ _ HG11)
@@ -502,6 +555,12 @@ theorem wpdMycpu (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64) (Pra P
   have HF12 := stepRegs T satp0 _ rs11 _ _ _ _ _ rs12 HF11 HG12
   have HPC12 : rs12 .PC = pcm 0x1c := by rw [gbPc T satp0 _ _ _ _ _ _ HG12]; decide
   have Htl12 : rs12 .tlb = rs0 .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG12).trans Htl11
+  -- row end at k + 2 + 1 + 1
+  by_cases E4 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 2 + 1 + 1
+  · iclear C
+    iclear H2
+    iclear H3
+    iapply (HΨend _ (by omega) (by omega) (by omega) _)
   -- ---- 0x1c: c.addi sp,16 (k+4) ----
   have Hc13 := certAddi (ctrlOkSW T satp0) rs12 (pcm 0x1c) true 2#5 2#5
     (sign_extend (m := 12) (16#6)) (by decide)
@@ -538,7 +597,7 @@ theorem wpdMycpu (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64) (Pra P
     ax_spin_e8_zsimp at Hgd1
     exact Option.some.inj Hgd1
   subst Hra0 Hs00
-  have Hvra : vra = stBytes 8 ret := Option.some.inj (Hgv2.symm.trans Hval)
+  have Hvra : vra = stBytes 8 ret := Option.some.inj (Hgv2.symm.trans (Hval (by omega)))
   have Hgpr1 : gprVal rs13 1#5 = ldRes false 8 vra := by
     rw [HF13]
     ax_spin_e8_zsimp
@@ -573,6 +632,55 @@ theorem wpdMycpu (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64) (Pra P
       have n10 : r ≠ 10#5 := fun h => Hr10 (by rw [h]; rfl)
       have n15 : r ≠ 15#5 := fun h => Hr15 (by rw [h]; rfl)
       simp (disch := assumption) only [AxSpinE8.updOther]
+
+include HL Hcons hmode hasid hppn Hfix Htxt HΨmid in
+/-- Rocq `wpd_mycpu` (deviation 1: Stage C positions, `Hval`/`Hret` replace the return-fetch
+pin `Hinj`/`Hstv`/`va_first_read`).  Stage 2: the full-row corollary of `wpdMycpuP` (the hook
+is vacuous: `k + 4 < LEN`). -/
+theorem wpdMycpu (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64) (Pra Ps0 : BitVec 64) :
+    -- the row
+    RowMycpu k (AxOpsem.grow (gtAdGd GT) i) (paZ Pra) (paZ Ps0) →
+    rowW8 (AxOpsem.grow (gtAdGd GT) i) → noRmw8 (AxOpsem.grow (gtAdGd GT) i) (paZ Pra) →
+    noRmw8 (AxOpsem.grow (gtAdGd GT) i) (paZ Ps0) →
+    -- the entry state
+    ctrlOkSW T satp0 rs0 → rs0 .PC = pcm 0x00 → hitW rs0 (pcm 0x00) →
+    -- the two stack slots
+    dataAtS σi T (.Store .Data) (AxSpinE8.vaRa rs0) 8 Pra →
+    dataAtS σi T (.Load .Data) (AxSpinE8.vaRa rs0) 8 Pra → hitW rs0 (AxSpinE8.vaRa rs0) →
+    dataAtS σi T (.Store .Data) (AxSpinE8.vaS0 rs0) 8 Ps0 →
+    dataAtS σi T (.Load .Data) (AxSpinE8.vaS0 rs0) 8 Ps0 → hitW rs0 (AxSpinE8.vaS0 rs0) →
+    (∀ j : Nat, j < 8 → priv L (paZ Pra + (j : Int)) i) → ¬ L.xlText (paZ Pra) →
+    (∀ j : Nat, j < 8 → priv L (paZ Ps0 + (j : Int)) i) → ¬ L.xlText (paZ Ps0) →
+    (paZ Ps0 + 8 ≤ paZ Pra ∨ paZ Pra + 8 ≤ paZ Ps0) →
+    -- the return address (Q20': the reload's graph value; deviation 1)
+    graphValue (gtAdGd GT) (i, k + 2) = some (stBytes 8 ret) → jalrTgt 0#12 ret = ret →
+    ⊢ (∀ (vra vs0 : List (BitVec 8)) (rs' : RegFile) (ib' : Ibch),
+        ⌜ctrlOkSW T satp0 rs' ∧ rs' .PC = ret ∧ rs' .tlb = rs0 .tlb ∧
+          gprVal rs' AxSpinE8.r10 = AxSpinE8.mycpuRet (gprVal rs0 AxSpinE8.r4) ∧
+          gprVal rs' AxSpinE8.r2 = gprVal rs0 AxSpinE8.r2 ∧
+          vra.length = 8 ∧ vs0.length = 8 ∧
+          gprVal rs' AxSpinE8.r1 = ldRes false 8 vra ∧ gprVal rs' AxSpinE8.r8 = ldRes false 8 vs0 ∧
+          (∀ r : BitVec 5, r.toNat ≠ 1 → r.toNat ≠ 2 → r.toNat ≠ 8 → r.toNat ≠ 10 →
+            r.toNat ≠ 15 → gprVal rs' r = gprVal rs0 r) ∧
+          graphData (gtAdGd GT) (i, k) = some (stBytes 8 (gprVal rs0 AxSpinE8.r1)) ∧
+          graphData (gtAdGd GT) (i, k + 1) = some (stBytes 8 (gprVal rs0 AxSpinE8.r8)) ∧
+          graphValue (gtAdGd GT) (i, k + 2) = some vra ∧
+          graphValue (gtAdGd GT) (i, k + 3) = some vs0⌝ -∗
+        AxAnnot.annotOwn (GF := GF) (i, k + 2)
+          iprop(⌜RLfact GT i (paZ Pra) (k + 2) (stBytes 8 (gprVal rs0 AxSpinE8.r1))⌝) -∗
+        AxAnnot.annotOwn (GF := GF) (i, k + 3)
+          iprop(⌜RLfact GT i (paZ Ps0) (k + 3) (stBytes 8 (gprVal rs0 AxSpinE8.r8))⌝) -∗
+        @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+          ⟨.PHart cpu (.pure ()) rs' none ib', k + 4⟩ Ψ) -∗
+      @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+        ⟨.PHart cpu (.pure ()) rs0 none ib0, k⟩ Ψ := by
+  intro HR Hw8 Hnr_ra Hnr_s0 Hc0 HPC0 Hhit0 HdaS_ra HdaL_ra Hh_ra HdaS_s0 HdaL_s0 Hh_s0
+    Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hslots Hval Hret
+  have Hlen := HR.1
+  exact wpdMycpuP L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxt Ψ HΨmid k rs0 ib0
+    ret Pra Ps0 (AxSpinE8.rowMycpuPOfFull _ _ _ _ HR) Hw8 Hnr_ra Hnr_s0 Hc0 HPC0 Hhit0 HdaS_ra
+    HdaL_ra Hh_ra HdaS_s0 HdaL_s0 Hh_s0 Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hslots (fun _ => Hval) Hret
+    (fun _ _ h2 h3 => absurd h3 (by omega))
 
 end mycpu
 
