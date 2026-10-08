@@ -289,3 +289,4 @@ Rocq→Lean name map only.
 - AxDataX8 (AxWalk4/6, AxLeafS3, AxSfence2): probe data side `nvVa`, `dvpn`, `dW`, `ExecDLdNv`/`ExecDStNv`/`ExecDLdNvRun`, `nvPmpW`, `nvCtrlOkSW`; `AxDataX8.imm8`. AxRelease7: `dc00…dc08` via `AxRelease7.dcOf` (kernel `runRead` decode at `drefMisa` + `execOfRunRead`; footprint by `rff_auto` after literal pruning) — AxRelease8 copies it.
 - AxSpinX6: hart A twin of AxSpinX5 hart B (`wA6`…`AxSpinX6.wpdA`, race twin `AxSpinX6.wpdRTriv`).
 - AxRelease8: `dc0a`…`dc28` (same runRead recipe as AxRelease7). `EvAOfRfF img _ True.intro …` fails with an unsolved tree — `refine EvAOfRfF img _ ?_ t _ t (execExecuteCX … t)` then `exact True.intro`.
+- AxSpinH3: WPds from handle leaves — state each leaf as a Lean `have` with simple program states (`hStore vx`, `2` not `1 + 1`), then `iapply Hk $$ Hx [Hc] %rs`. `lean-gcp` does not forward stdin (write scratch files on the VM inside `bash -c`).
