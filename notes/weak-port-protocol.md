@@ -326,3 +326,4 @@ Rocq→Lean name map only.
 - AxSpinE7b/d/e/f/g: compressed `tok_xx` via `tokR` + `execOfRunRead` on a `drefMisa` walk (file-local macro `ax_spin_e7X_tokr`); `rf0*`/`rfFIns*` in AxSpinE7d.
 - AxSfence2 (18/25): `sfMarkOfRow` (row item `LFence false false false false` is an sfMark), `sfWordNotFence`, `spineCertXTTlb` (+ `sfAnnB 32 w = false`), `ctrlOkSWTick`. Sfence leaf pending Q19: the Cert engine has no sfence-announce arm.
 - AxSpinAp2–5: `decA*`/`rfFDecA*`, `tkc*` (`ax_spin_ap3_tkc`); `TokC` is a plain def — `show TokC (0x…#16) _; unfold TokC` before `refine`.
+- AxSpinU4: capstones `uAlloc2`, `uCsSrc`; graphs `ua`/`ur`; `AxSpinU4.xr`; adds short globals `ua`, `ur`, `uCtrl`, `rnRow`, `rnM0`.
