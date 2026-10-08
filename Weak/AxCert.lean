@@ -66,6 +66,11 @@ The WPd bridge is `AxCert2`.
    Rocq `Record cst := CS {…}` ↦ `structure Cst` with constructor `Cst.CS`.
 8. NAME CLASH: Rocq `Cert` is declared `AxCert.Cert` (constructors `AxCert.Cert.cRet` …) —
    `Weak.Cert` already exists (`WeakRvwmoKillArms`, Rocq `cert`).
+9. Q16 (owner ruling): `EvB` gained the Lean-only stuck end `EvB.ebNf` (an i-fetch with no image
+   bytes, accepted only where `QE` accepts every stuck end; `AxSymCtl` deviation 7), which `Cert`
+   has no counterpart for.  `CertOfEvB` takes `HQE : ∀ t', ¬ ∀ e, QE e t'` (no state accepts
+   every stuck end — e.g. `QE := fun _ _ => False`, the only form Rocq's users (`AxSpinE`) embed;
+   dischargeable by `fun _ h => h .Exit`), which rules `ebNf` out.
 
 **Rocq → Lean name map.**  `bud` `Bud` (`BInf`, `BFin`), `bsucc` `bsucc`, `dkind` `Dkind`
 (`DKLd`, `DKSt`, `DKRmw`), `cdata` `Cdata` (`CPend`, `CLd`, `CSt`, `CRmwR`, `CRmw`), `cst` `Cst`
@@ -461,12 +466,14 @@ theorem CertOfEvA (img : Image) (dok : Int → Nat → Prop) (kind : Dkind) {X :
 /-- `EvB` embeds at `BFin b`; the budget left at a `pure` is reported. -/
 theorem CertOfEvB (img : Image) (dok : Int → Nat → Prop) (kind : Dkind) {X : Type}
     (QE : Sail.Error exception → ExecSt → Prop) (Q : Nat → X → ExecSt → Prop) (d : Cdata)
-    (r : Bool) (m : SailM X) (t : ExecSt) (b : Nat) :
+    (r : Bool) (m : SailM X) (t : ExecSt) (b : Nat)
+    (HQE : ∀ t', ¬ ∀ e, QE e t') :
     EvB img QE Q m t b →
     AxCert.Cert img dok kind (fun s e t' => ∃ b', s = ⟨d, .BFin b', r⟩ ∧ QE e t')
       (fun s x t' => ∃ b', s = ⟨d, .BFin b', r⟩ ∧ Q b' x t') ⟨d, .BFin b, r⟩ m t := by
   intro h
   induction h with
+  | ebNf _ _ _ _ t _ _ _ _ hq => exact absurd hq (HQE t)
   | ebRet x t b h => exact .cRet _ x t ⟨b, rfl, h⟩
   | ebExt e k t b h => exact .cExt _ e k t ⟨b, rfl, h⟩
   | ebRd r0 k t b _ _ ihs ihn => exact .cRd _ r0 k t ihs ihn

@@ -263,7 +263,7 @@ theorem AxSpinE.certOfEvBF (img : Image) (dok : Int → Nat → Prop) (kind : Dk
     AxCert.Cert img dok kind (fun _ _ _ => False)
       (fun s x t' => ∃ b', s = ⟨d, .BFin b', r⟩ ∧ Q b' x t') ⟨d, .BFin b, r⟩ m t := fun H =>
   CertMono img dok kind _ _ _ _ _ m t (fun _ _ _ ⟨_, _, h⟩ => h.elim) (fun _ _ _ h => h)
-    (CertOfEvB img dok kind _ _ d r m t b H)
+    (CertOfEvB img dok kind _ _ d r m t b (fun _ h => h .Exit) H)
 
 section certB
 variable (img : Image) (dok : Int → Nat → Prop) (kind : Dkind)

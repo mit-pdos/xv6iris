@@ -59,6 +59,24 @@ fetch's shape.
    `register_lookup r rs` ↦ `rs r`, `set_reg` ↦ `ExecSt.setReg`, `read_bytes` ↦ `bmRead`,
    `inl (w, None)` ↦ `.Ok (w, none)`, `S b` ↦ `b + 1`, `Interface.Ret tt` ↦ `.pure ()`,
    `invGS_gen HasNoLc Σ` ↦ `[InvGS_gen hlc GF]` (any `hlc`).
+7. Q16 (owner ruling, 2026-10-07): THE IMAGELESS FETCH.  In Rocq a fetch was a graph read, so a
+   run whose next fetch has no image bytes stopped at the row end (`eb_end`).  In Lean a fetch
+   is the pinned admin step, and a pinned fetch with no image bytes has NO step: the Lean-only
+   constructor `EvB.ebNf` ENDS the run there (cf. `AxSpinVA`'s `ENf`/`fcNf`, Q13), at any
+   budget, premises `devAddr = false`, `akIfetch = true`, `imgBytes img (paZ pa) n = none` and
+   the GATE `∀ e, QE e t` (a stuck end, accepted only where `QE` accepts every stuck end).  So
+   every existing certificate at `QE := fun _ _ => False` excludes it, and `wpdOfEvBM` /
+   `wpdInstrOfEvBM` / `wpdOfEvB` / `wpdInstrOfEvB` / `execAEvB` keep their statements (the new
+   `wpdOfEvBM` arm is vacuous).  `EvBTryCatch` gains `HNf : ∀ t', (∀ e, QE1 e t') → ∀ e, QE2 e t'`
+   (a stuck end is not caught by the handler; no Lean user).  THE STUCK BRIDGE is Lean-only:
+   `AxSymCtl.wpdOfEvBStuckM` / `AxSymCtl.wpdInstrOfEvBStuckM` / `AxSymCtl.wpdInstrOfEvBStuck`
+   take certificates at `QE := fun _ _ => True` (failure nodes and imageless fetches are stuck
+   ends: `AxSymCtl.wpdStuckErrM`, `AxSymCtl.wpdStuckNfM`) plus `HGimg : ∀ GD, G GD → ∀ a,
+   img a = none → GD.gdG.gxImg a = none` (the allowed graphs' boot images lack what `img` lacks
+   — `textFixed` gives only `img ⊆ gxImg`; Q12's precedent `GD.gdG.gxImg = img`) and `Herr`
+   (the post at a failure node at the row end: failure nodes are not `midState`s).  Stop
+   certificates ending at an imageless fetch come from `AxSymCtl.EvBMeet0` (two certificates
+   over two EXTENSIONS of `img` met over `img`; disagreeing posts force the hole).
 
 **Rocq → Lean name map.**  `EvB` `EvB` (constructors `eb_ret` `ebRet`, `eb_rd` `ebRd`, `eb_wr`
 `ebWr`, `eb_mrd` `ebMrd`, `eb_end` `ebEnd`, `eb_ia` `ebIa`, `eb_ba` `ebBa`, `eb_co` `ebCo`, `eb_tl`
@@ -81,9 +99,12 @@ fetch's shape.
 `nrd_unf`/`nrd_cer` ↦ `ax_sym_ctl_nrd_step`, `nrd_auto` ↦ `ax_sym_ctl_nrd_auto`.  None is in the
 duplicated-name table.  Lean-only (file-qualified `AxSymCtl.*`): `nrdSailTryCatch`, `nrdRBind`,
 `cntABindZero`, `nrdRForInLoop`, `nrdRForIn`, `nrdIte`, `nrdRIte`, `nrdDite`, `nrdRDite`,
-`nrdFreeBind`, `nrdLiftSelf`.
+`nrdFreeBind`, `nrdLiftSelf`; Q16 (deviation 7): constructor `EvB.ebNf`, `mapMSub`, `mapMNone`,
+`imgBytesSub`, `imgBytesSubNone`, `imgBytesNoneByte`, `EvBMeet0`, `errState`, `pstepErrInv`,
+`wireKeeps`, `wpdStuckErrM`, `wpdStuckNfM`, `wpdOfEvBStuckM`, `wpdInstrOfEvBStuckM`,
+`wpdInstrOfEvBStuck`.
 
-**Dropped:** nothing (this part: Rocq 46 definitions/lemmas + 6 Ltacs; Lean 46 + 11 Lean-only +
+**Dropped:** nothing (this part: Rocq 46 definitions/lemmas + 6 Ltacs; Lean 46 + 25 Lean-only +
 2 tactics).
 **Not ported:** the `Print Assumptions` lines (the lint's axiom check covers them).
 -/
@@ -156,6 +177,13 @@ inductive EvB (img : Image) {X : Type} (QE : Sail.Error exception → ExecSt →
       EvB img QE Q (k (0 : Nat)) t b → EvB img QE Q (.impure (.ok .getCycleCount) k) t b
   | ebExt (e : Sail.Error exception) (k : Empty → SailM X) (t : ExecSt) (b : Nat) :
       QE e t → EvB img QE Q (.impure (.error e) k) t b
+  /-- (Lean-only, Q16) an i-FETCH WITH NO IMAGE BYTES: the run ends stuck there (no pinned fetch
+  exists; deviation 7).  A stuck end, accepted only where `QE` accepts every stuck end. -/
+  | ebNf (n va : Nat) (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
+      (k : Result (BitVec (8 * n) × Option Bool) Arch.abort → SailM X) (t : ExecSt) (b : Nat) :
+      devAddr req.pa = false → (classify req.access_kind).akIfetch = true →
+      imgBytes img (paZ req.pa) n = none → (∀ e, QE e t) →
+      EvB img QE Q (.impure (.ok (.memRead n va req)) k) t b
 
 section evb
 variable (img : Image)
@@ -173,6 +201,7 @@ theorem EvBMono {X : Type} (QE QE' : Sail.Error exception → ExecSt → Prop)
   | ebMrd n va req k t b vs h1 h2 h3 h4 _ ih => exact .ebMrd n va req k t b vs h1 h2 h3 h4 ih
   | ebIf n va req k t b vs h1 h2 h3 h4 _ ih => exact .ebIf n va req k t b vs h1 h2 h3 h4 ih
   | ebEnd n va req k t h1 h2 h3 => exact .ebEnd n va req k t h1 h2 h3
+  | ebNf n va req k t b h1 h2 h3 hq => exact .ebNf n va req k t b h1 h2 h3 (fun e => HE e t (hq e))
   | ebIa n w k t b hs _ ih => exact .ebIa n w k t b hs ih
   | ebBa n a k t b _ ih => exact .ebBa n a k t b ih
   | ebCo c k t b _ ih => exact .ebCo c k t b ih
@@ -197,6 +226,7 @@ theorem EvBBind {X Y : Type} (QE : Sail.Error exception → ExecSt → Prop)
   | ebMrd n va req k t b vs h1 h2 h3 h4 _ ih => exact .ebMrd n va req _ t b vs h1 h2 h3 h4 ih
   | ebIf n va req k t b vs h1 h2 h3 h4 _ ih => exact .ebIf n va req _ t b vs h1 h2 h3 h4 ih
   | ebEnd n va req k t h1 h2 h3 => exact .ebEnd n va req _ t h1 h2 h3
+  | ebNf n va req k t b h1 h2 h3 hq => exact .ebNf n va req _ t b h1 h2 h3 hq
   | ebIa n w k t b hs _ ih => exact .ebIa n w _ t b hs ih
   | ebBa n a k t b _ ih => exact .ebBa n a _ t b ih
   | ebCo c k t b _ ih => exact .ebCo c _ t b ih
@@ -227,7 +257,8 @@ theorem EvBWriteReg (QE : Sail.Error exception → ExecSt → Prop) (Q : Nat →
 
 theorem EvBTryCatch {X : Type} (QE1 QE2 : Sail.Error exception → ExecSt → Prop)
     (Q : Nat → X → ExecSt → Prop) (m : SailM X) (h : Sail.Error exception → SailM X)
-    (t : ExecSt) (b : Nat) :
+    (t : ExecSt) (b : Nat)
+    (HNf : ∀ t', (∀ e, QE1 e t') → ∀ e, QE2 e t') :
     (∀ e t' b', QE1 e t' → EvB img QE2 Q (h e) t' b') →
     EvB img QE1 Q m t b → EvB img QE2 Q (PreSail.tryCatchAll m h) t b := by
   intro Hh H
@@ -239,6 +270,7 @@ theorem EvBTryCatch {X : Type} (QE1 QE2 : Sail.Error exception → ExecSt → Pr
   | ebMrd n va req k t b vs h1 h2 h3 h4 _ ih => exact .ebMrd n va req _ t b vs h1 h2 h3 h4 ih
   | ebIf n va req k t b vs h1 h2 h3 h4 _ ih => exact .ebIf n va req _ t b vs h1 h2 h3 h4 ih
   | ebEnd n va req k t h1 h2 h3 => exact .ebEnd n va req _ t h1 h2 h3
+  | ebNf n va req k t b h1 h2 h3 hq => exact .ebNf n va req _ t b h1 h2 h3 (HNf t hq)
   | ebIa n w k t b hs _ ih => exact .ebIa n w _ t b hs ih
   | ebBa n a k t b _ ih => exact .ebBa n a _ t b ih
   | ebCo c k t b _ ih => exact .ebCo c _ t b ih
@@ -295,6 +327,164 @@ theorem EvBFact {X Y : Type} (QE : Sail.Error exception → ExecSt → Prop)
   exact EvBBind img QE Q m f t b (EvBMono img _ _ _ _ m t b (fun _ _ h => h) Hf Hm)
 
 end evb
+
+/-! ### (Lean-only, Q16) image extension and the imageless fetch -/
+
+/-- (Lean-only) `mapM` in `Option` along a pointwise extension. -/
+theorem AxSymCtl.mapMSub {α β : Type} (f g : α → Option β) (hfg : ∀ x b, f x = some b → g x = some b) :
+    ∀ (l : List α) (vs : List β), l.mapM f = some vs → l.mapM g = some vs
+  | [], vs, h => by simpa using h
+  | a :: l, vs, h => by
+    cases ha : f a with
+    | none => simp [List.mapM_cons, ha] at h
+    | some b =>
+      cases hl : l.mapM f with
+      | none => simp [List.mapM_cons, ha, hl] at h
+      | some bs =>
+        simp only [List.mapM_cons, ha, hl, Option.bind_eq_bind, Option.bind_some,
+          Option.pure_def, Option.some.injEq] at h
+        simp only [List.mapM_cons, hfg a b ha, AxSymCtl.mapMSub f g hfg l bs hl,
+          Option.bind_eq_bind, Option.bind_some, Option.pure_def, h]
+
+/-- (Lean-only) A failed `mapM` in `Option` has a failing entry. -/
+theorem AxSymCtl.mapMNone {α β : Type} (f : α → Option β) :
+    ∀ (l : List α), l.mapM f = none → ∃ x ∈ l, f x = none
+  | [], h => by simp at h
+  | a :: l, h => by
+    cases ha : f a with
+    | none => exact ⟨a, List.mem_cons_self, ha⟩
+    | some b =>
+      cases hl : l.mapM f with
+      | none =>
+        obtain ⟨x, hx, hfx⟩ := AxSymCtl.mapMNone f l hl
+        exact ⟨x, List.mem_cons_of_mem _ hx, hfx⟩
+      | some bs => simp [List.mapM_cons, ha, hl] at h
+
+/-- (Lean-only) Image bytes survive an extension of the image. -/
+theorem AxSymCtl.imgBytesSub (img img' : Image) (H : ∀ a v, img a = some v → img' a = some v)
+    (base : Int) (n : Nat) (vs : List (BitVec 8)) :
+    imgBytes img base n = some vs → imgBytes img' base n = some vs :=
+  AxSymCtl.mapMSub _ _ (fun j b h => H _ b h) _ vs
+
+/-- (Lean-only) Missing image bytes stay missing in a sub-image. -/
+theorem AxSymCtl.imgBytesSubNone (img img' : Image) (H : ∀ a v, img a = some v → img' a = some v)
+    (base : Int) (n : Nat) :
+    imgBytes img' base n = none → imgBytes img base n = none := by
+  intro h
+  cases h0 : imgBytes img base n with
+  | none => rfl
+  | some vs => rw [AxSymCtl.imgBytesSub img img' H base n vs h0] at h; cases h
+
+/-- (Lean-only) Missing image bytes: one missing byte. -/
+theorem AxSymCtl.imgBytesNoneByte (img : Image) (base : Int) (n : Nat) :
+    imgBytes img base n = none → ∃ j : Nat, j < n ∧ img (base + (j : Int)) = none := by
+  intro h
+  obtain ⟨j, hj, hn⟩ := AxSymCtl.mapMNone _ _ h
+  exact ⟨j, List.mem_range.mp hj, hn⟩
+
+/-- (Lean-only, Q16) THE MEET at budget 0: two certificates over two EXTENSIONS of `img` give one
+over `img`, with both posts.  Where the extensions supply bytes `img` lacks (a hole), the run of
+`img` ends stuck at the fetch (`ebNf`).  (At budget 0 a graph read is the row end, `ebEnd`, so
+no graph read needs bytes.)  With posts that disagree at every return, the meet is a stop
+certificate: the hole is always reached. -/
+theorem AxSymCtl.EvBMeet0 (img img1 img2 : Image) {X : Type}
+    (QE : Sail.Error exception → ExecSt → Prop)
+    (H1 : ∀ a v, img a = some v → img1 a = some v) (H2 : ∀ a v, img a = some v → img2 a = some v)
+    (HQE : ∀ e t, QE e t) (P1 P2 : Nat → X → ExecSt → Prop) (m : SailM X) (t : ExecSt) :
+    ∀ b, EvB img1 QE P1 m t b → b = 0 → EvB img2 QE P2 m t b →
+      EvB img QE (fun b' x t' => P1 b' x t' ∧ P2 b' x t') m t b := by
+  intro b d1
+  induction d1 with
+  | ebRet x t b h =>
+    intro _ d2
+    cases d2 with
+    | ebRet _ _ _ h2 => exact .ebRet x t b ⟨h, h2⟩
+  | ebExt e k t b h =>
+    intro _ _
+    exact .ebExt e k t b h
+  | ebRd r k t b _ _ ihs ihn =>
+    intro hb d2
+    cases d2 with
+    | ebRd _ _ _ _ hs2 hn2 =>
+      exact .ebRd r k t b (fun hp v => ihs hp v hb (hs2 hp v)) (fun hp => ihn hp hb (hn2 hp))
+  | ebWr r v k t b hr _ ih =>
+    intro hb d2
+    cases d2 with
+    | ebWr _ _ _ _ _ _ d2' => exact .ebWr r v k t b hr (ih hb d2')
+  | ebMrd n va req k t b vs h1 h2 h3 h4 _ _ =>
+    intro hb _
+    exact absurd hb (Nat.succ_ne_zero b)
+  | ebIf n va req k t b vs h1 h2 h3 h4 _ ih =>
+    intro hb d2
+    cases hi : imgBytes img (paZ req.pa) n with
+    | none => exact .ebNf n va req k t b h1 h3 hi (fun e => HQE e t)
+    | some vs0 =>
+      have e1 : vs = vs0 := by
+        rw [AxSymCtl.imgBytesSub img img1 H1 _ _ vs0 hi] at h4
+        exact (Option.some.inj h4).symm
+      subst e1
+      cases d2 with
+      | ebMrd _ _ _ _ _ b' _ _ _ _ _ _ => exact absurd hb (Nat.succ_ne_zero b')
+      | ebIf _ _ _ _ _ _ vs2 _ _ _ h4' d2' =>
+        have e2 : vs2 = vs := by
+          rw [AxSymCtl.imgBytesSub img img2 H2 _ _ vs hi] at h4'
+          exact (Option.some.inj h4').symm
+        subst e2
+        exact .ebIf n va req k t b vs2 h1 h2 h3 hi (ih hb d2')
+      | ebEnd _ _ _ _ _ _ _ h3' => rw [h3] at h3'; cases h3'
+      | ebNf _ _ _ _ _ _ _ _ hn2 _ =>
+        rw [AxSymCtl.imgBytesSub img img2 H2 _ _ vs hi] at hn2
+        cases hn2
+  | ebEnd n va req k t h1 h2 h3 =>
+    intro _ _
+    exact .ebEnd n va req k t h1 h2 h3
+  | ebNf n va req k t b h1 h2 h3 hq =>
+    intro _ _
+    exact .ebNf n va req k t b h1 h2 (AxSymCtl.imgBytesSubNone img img1 H1 _ _ h3) hq
+  | ebIa n w k t b hs _ ih =>
+    intro hb d2
+    cases d2 with
+    | ebIa _ _ _ _ _ _ d2' => exact .ebIa n w k t b hs (ih hb d2')
+  | ebBa n a k t b _ ih =>
+    intro hb d2
+    cases d2 with
+    | ebBa _ _ _ _ _ d2' => exact .ebBa n a k t b (ih hb d2')
+  | ebCo c k t b _ ih =>
+    intro hb d2
+    cases d2 with
+    | ebCo _ _ _ _ d2' => exact .ebCo c k t b (ih hb d2')
+  | ebTl c k t b _ ih =>
+    intro hb d2
+    cases d2 with
+    | ebTl _ _ _ _ d2' => exact .ebTl c k t b (ih hb d2')
+  | ebTe f k t b _ ih =>
+    intro hb d2
+    cases d2 with
+    | ebTe _ _ _ _ d2' => exact .ebTe f k t b (ih hb d2')
+  | ebRx a k t b _ ih =>
+    intro hb d2
+    cases d2 with
+    | ebRx _ _ _ _ d2' => exact .ebRx a k t b (ih hb d2')
+  | ebTs a k t b _ ih =>
+    intro hb d2
+    cases d2 with
+    | ebTs _ _ _ _ d2' => exact .ebTs a k t b (ih hb d2')
+  | ebTx a k t b _ ih =>
+    intro hb d2
+    cases d2 with
+    | ebTx _ _ _ _ d2' => exact .ebTx a k t b (ih hb d2')
+  | ebCc k t b _ ih =>
+    intro hb d2
+    cases d2 with
+    | ebCc _ _ _ d2' => exact .ebCc k t b (ih hb d2')
+  | ebMsg a k t b _ ih =>
+    intro hb d2
+    cases d2 with
+    | ebMsg _ _ _ _ d2' => exact .ebMsg a k t b (ih hb d2')
+  | ebGcc k t b _ ih =>
+    intro hb d2
+    cases d2 with
+    | ebGcc _ _ _ d2' => exact .ebGcc k t b (ih hb d2')
 
 /-! ### Read-free trees (`nrd`) -/
 
@@ -1036,6 +1226,7 @@ theorem wpdOfEvBM (Q : Nat → Unit → ExecSt → Prop) (m : SailM Unit) (t : E
     iintro C
     iapply C $$ %b %t %rs %ib %kk %HQ %Hag %Hkb
   | ebExt e k t b he => exact he.elim
+  | ebNf _ _ _ _ _ _ _ _ _ hq => exact (hq .Exit).elim
   | ebRd r k t b _ _ IHs IHn =>
     intro rs ib kk Hag Hkb
     iintro C
@@ -1139,6 +1330,255 @@ theorem wpdInstrOfEvBM (Q : Nat → Unit → ExecSt → Prop) (rs : RegFile) (k 
     (kend - k) (Hcert tick ⟨rs', fun _ => none, testDevs⟩ (regsAgreeSym _ _ _ Hag)) rs' ibNone k
     (regsAgreeRefl _ _) (by omega)) $$ C
 
+/-! ### (Lean-only, Q16) STUCK ENDS: a failure node and an imageless fetch have no step -/
+
+
+/-- (Lean-only) A hart thread at a failure node (a stuck end that is not a `midState`). -/
+def AxSymCtl.errState (s : Athread) : Prop :=
+  ∃ (c : CPU) (e : Sail.Error exception) (KK : Empty → SailM Unit) (rs : RegFile)
+    (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch),
+    s.atP = .PHart c (.impure (.error e) KK) rs fn ib
+
+/-- (Lean-only) A failure node has no program step. -/
+theorem AxSymCtl.pstepErrInv (e : Sail.Error exception) (KK : Empty → SailM Unit) (rs : RegFile)
+    (ib : Ibch) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
+    ¬ pstepProg (.PHart cpu (.impure (.error e) KK) rs none ib) d l p' d' := by
+  cases p' with
+  | PDisk _ => intro h; exact h.elim
+  | PHart c' m' rs' fn' ib' =>
+    rintro ⟨-, ors, oib, obar, -, -, hn, -⟩
+    first | exact hn | (simp only [pstepNode, pnodeStep] at hn)
+
+/-- (Lean-only) The hart-thread shape kept by a wire step. -/
+theorem AxSymCtl.wireKeeps (m : SailM Unit) (k : Nat) (A : RegFile → Prop)
+    (HA : ∀ rs rs', A rs → regsAgree AxRunClose.pinReg rs' rs → A rs') (s1 s2 : Athread) :
+    (∃ rs1 ib1, s1 = ⟨.PHart cpu m rs1 none ib1, k⟩ ∧ A rs1) → awire s1 s2 →
+    (∃ rs1 ib1, s2 = ⟨.PHart cpu m rs1 none ib1, k⟩ ∧ A rs1) ∨ False := by
+  rintro ⟨rs1, ib1, rfl, HA1⟩ Hw
+  obtain ⟨hk, hp⟩ := awireAeqv _ _ Hw
+  obtain ⟨p2, k2⟩ := s2
+  simp only at hk hp
+  subst hk
+  cases p2 with
+  | PDisk _ => exact hp.elim
+  | PHart c m2 rs2 fn2 ib2 =>
+    obtain ⟨rfl, rfl, rfl, rfl, hag⟩ := hp
+    exact .inl ⟨rs2, ib2, rfl, HA rs1 rs2 HA1 hag⟩
+
+include HG in
+/-- (Lean-only, Q16) A FAILURE NODE is stuck: the WPd holds at any row position (at the row end,
+the post holds there: `Herr`). -/
+theorem AxSymCtl.wpdStuckErrM
+    (Herr : ∀ GD s, G GD → AxSymCtl.errState s → s.atK = (AxOpsem.grow GD i).length →
+      ⊢ postLifting Φ i s)
+    (e : Sail.Error exception) (KK : Empty → SailM Unit) (ib : Ibch)
+    (k : Nat) (A : RegFile → Prop)
+    (HA : ∀ rs rs', A rs → regsAgree AxRunClose.pinReg rs' rs → A rs') :
+    ∀ rs, A rs → ⊢ wpdM M .MaybeStuck i ⟨.PHart cpu (.impure (.error e) KK) rs none ib, k⟩ Φ := by
+  intro rs HAr
+  let P : Athread → Prop := fun s => ∃ rs1 ib1,
+    s = ⟨.PHart cpu (.impure (.error e) KK) rs1 none ib1, k⟩ ∧ A rs1
+  have Hnord : ∀ GD s1 id K, G GD → P s1 → ¬ areadStep (AxOpsem.grow GD i) s1 id K := by
+    rintro GD s1 id K - ⟨rs1, ib1, rfl, -⟩ ⟨lb, -, -, -, HK⟩
+    obtain ⟨l, d, d', -, -, hps, -⟩ := HK (List.replicate (aidentN id) (0#8)) List.length_replicate
+    exact AxSymCtl.pstepErrInv cpu e KK rs1 ib1 d l _ d' hps
+  have Hclos : ∀ GD s1 l s2, G GD → P s1 → AxOpsem.astepProg (AxOpsem.grow GD i) s1 l s2 →
+      WeakAxRealize.fetchPin GD.gdG.gxImg l →
+      wlWdata l = none ∧ s2.atK = s1.atK ∧ (P s2 ∨ False) := by
+    rintro GD s1 l s2 - ⟨rs1, ib1, rfl, -⟩ Hst -
+    obtain ⟨d, d', hps⟩ := astepProgPstep _ _ _ _ Hst
+    exact (AxSymCtl.pstepErrInv cpu e KK rs1 ib1 d l _ d' hps).elim
+  iapply (wpdOfClosedRunGM M i G P (fun _ => False) Φ HG Hnord Hclos
+    (AxSymCtl.wireKeeps cpu _ k A HA)) $$
+    %⟨.PHart cpu (.impure (.error e) KK) rs none ib, k⟩ %⟨rs, ib, rfl, HAr⟩
+  isplit
+  · iintro %s2 %H
+    exact H.elim
+  · iintro %GD %s1 %HGD %HP1 %Heq
+    obtain ⟨rs1, ib1, rfl, -⟩ := HP1
+    iapply (Herr GD _ HGD ⟨cpu, e, KK, rs1, none, ib1, rfl⟩ Heq)
+
+include HG Hmid in
+/-- (Lean-only, Q16) AN IMAGELESS FETCH is stuck: when every allowed graph's boot image lacks a
+byte of it, no pinned fetch step exists; the WPd holds at any row position. -/
+theorem AxSymCtl.wpdStuckNfM (n va : Nat)
+    (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
+    (KK : Result (BitVec (8 * n) × Option Bool) Arch.abort → SailM Unit) (ib : Ibch) (k : Nat)
+    (A : RegFile → Prop)
+    (HA : ∀ rs rs', A rs → regsAgree AxRunClose.pinReg rs' rs → A rs')
+    (Hdev : devAddr req.pa = false) (Hfe : (classify req.access_kind).akIfetch = true)
+    (Hnone : ∀ GD, G GD → ∃ j : Nat, j < n ∧ GD.gdG.gxImg (paZ req.pa + (j : Int)) = none) :
+    ∀ rs, A rs →
+    ⊢ wpdM M .MaybeStuck i ⟨.PHart cpu (.impure (.ok (.memRead n va req)) KK) rs none ib, k⟩ Φ := by
+  intro rs HAr
+  let P : Athread → Prop := fun s => ∃ rs1 ib1,
+    s = ⟨.PHart cpu (.impure (.ok (.memRead n va req)) KK) rs1 none ib1, k⟩ ∧ A rs1
+  have Hnord : ∀ GD s1 id K, G GD → P s1 → ¬ areadStep (AxOpsem.grow GD i) s1 id K := by
+    rintro GD s1 id K - ⟨rs1, ib1, rfl, -⟩
+    exact AxCjrWpd.fetchNoRead _ cpu n va req KK rs1 ib1 k id K Hdev Hfe
+  have Hclos : ∀ GD s1 l s2, G GD → P s1 → AxOpsem.astepProg (AxOpsem.grow GD i) s1 l s2 →
+      WeakAxRealize.fetchPin GD.gdG.gxImg l →
+      wlWdata l = none ∧ s2.atK = s1.atK ∧ (P s2 ∨ False) := by
+    rintro GD s1 l s2 HGD ⟨rs1, ib1, rfl, -⟩ Hst Hpin
+    exfalso
+    obtain ⟨tvs, hlen, rfl, -⟩ :=
+      AxCjrWpd.fetchAstepInv _ cpu n va req KK rs1 ib1 k l s2 Hdev Hfe Hst
+    obtain ⟨j, hj, hno⟩ := Hnone GD HGD
+    have h := Hpin.2 j (by omega)
+    rw [hno, List.getElem?_map, List.getElem?_eq_getElem (by omega : j < tvs.length)] at h
+    simp at h
+  iapply (wpdOfClosedRunGM M i G P (fun _ => False) Φ HG Hnord Hclos
+    (AxSymCtl.wireKeeps cpu _ k A HA)) $$
+    %⟨.PHart cpu (.impure (.ok (.memRead n va req)) KK) rs none ib, k⟩ %⟨rs, ib, rfl, HAr⟩
+  isplit
+  · iintro %s2 %H
+    exact H.elim
+  · iintro %GD %s1 %HGD %HP1 %Heq
+    obtain ⟨rs1, ib1, rfl, -⟩ := HP1
+    iapply (Hmid GD _ HGD (by exact trivial) Heq)
+
+include HG HGl Hmid Htext Hflow in
+/-- (Lean-only, Q16) THE BUDGETED BRIDGE WITH STUCK ENDS: `wpdOfEvBM` for certificates accepting
+every stuck end (`QE := True`: failure nodes and imageless fetches, `EvB.ebNf`).  The imageless
+fetch is stuck because the allowed graphs' boot images lack what `img` lacks (`HGimg`). -/
+theorem AxSymCtl.wpdOfEvBStuckM
+    (HGimg : ∀ GD, G GD → ∀ a, img a = none → GD.gdG.gxImg a = none)
+    (Herr : ∀ GD s, G GD → AxSymCtl.errState s → s.atK = (AxOpsem.grow GD i).length →
+      ⊢ postLifting Φ i s)
+    (Q : Nat → Unit → ExecSt → Prop) (m : SailM Unit) (t : ExecSt) (b : Nat) :
+    EvB img (fun _ _ => True) Q m t b →
+    ∀ rs ib k, regsAgree AxRunClose.pinReg rs t.regs → k + b = kend →
+    ⊢ (∀ b' t' rs' ib' k', ⌜Q b' () t'⌝ -∗ ⌜regsAgree AxRunClose.pinReg rs' t'.regs⌝ -∗
+         ⌜k' + b' = kend⌝ -∗
+         wpdM M .MaybeStuck i ⟨.PHart cpu (.pure ()) rs' none ib', k'⟩ Φ) -∗
+      wpdM M .MaybeStuck i ⟨.PHart cpu m rs none ib, k⟩ Φ := by
+  intro H
+  induction H with
+  | ebRet x t b HQ =>
+    intro rs ib kk Hag Hkb
+    iintro C
+    iapply C $$ %b %t %rs %ib %kk %HQ %Hag %Hkb
+  | ebExt e k t b _ =>
+    intro rs ib kk Hag _
+    iintro -
+    iapply (AxSymCtl.wpdStuckErrM M i Φ cpu G HG Herr e k ib kk
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) rs Hag)
+  | ebNf n va req k t b Hdev Hfe Hno _ =>
+    intro rs ib kk Hag _
+    iintro -
+    obtain ⟨j, hj, hn⟩ := AxSymCtl.imgBytesNoneByte img _ n Hno
+    iapply (AxSymCtl.wpdStuckNfM M i Φ cpu G HG Hmid n va req k ib kk
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hfe
+      (fun GD hGD => ⟨j, hj, HGimg GD hGD _ hn⟩) rs Hag)
+  | ebRd r k t b _ _ IHs IHn =>
+    intro rs ib kk Hag Hkb
+    iintro C
+    iapply (wpdAdminNode3M M i Φ cpu G HG Hmid _ ?_ kk
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun s2 => ∃ rs1 ib1, s2 = ⟨.PHart cpu (k (rs1 r)) rs1 none ib1, kk⟩ ∧
+        regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) ?_ rs ib Hag)
+    all_goals try exact trivial
+    · intro rs1 ib1 d l p' d' HA1 Hp
+      obtain ⟨rfl, rfl⟩ := pstepRdInv cpu r k rs1 ib1 d l p' d' Hp
+      exact ⟨trivial, rs1, _, rfl, HA1⟩
+    · iintro %s2 %HN
+      obtain ⟨rs1, ib1, rfl, HA1⟩ := HN
+      by_cases Hs : AxRunClose.pinReg r
+      · iapply (IHs Hs (rs1 r) rs1 ib1 kk HA1 Hkb) $$ C
+      · have h := IHn Hs rs1 ib1 kk HA1 Hkb
+        rw [← HA1 r Hs] at h
+        iapply h $$ C
+  | ebWr r v k t b Hr _ IH =>
+    intro rs ib kk Hag Hkb
+    iintro C
+    iapply (wpdAdminNode3M M i Φ cpu G HG Hmid _ ?_ kk
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun s2 => ∃ rs1 ib1, s2 = ⟨.PHart cpu (k PUnit.unit) (rs1.set r v) none ib1, kk⟩ ∧
+        regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) ?_ rs ib Hag)
+    all_goals try exact trivial
+    · intro rs1 ib1 d l p' d' HA1 Hp
+      obtain ⟨Hl, rfl⟩ := pstepWrInv cpu r v k rs1 ib1 d l p' d' Hp
+      exact ⟨Hl, rs1, ib1, rfl, HA1⟩
+    · iintro %s2 %HN
+      obtain ⟨rs1, ib1, rfl, HA1⟩ := HN
+      iapply (IH (rs1.set r v) ib1 kk (regsAgreeSet _ _ _ r v HA1) Hkb) $$ C
+  | ebMrd n va req k t b vs Hdev Hlat Hnf Hvs _ IH =>
+    intro rs ib kk Hag Hkb
+    iintro C
+    iapply (AxSymEngine3.wpdImgRead3M M img i Φ cpu G HG Hmid Htext Hflow n va req k ib kk vs
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hlat Hnf Hvs) $$ %rs %Hag
+    iintro %rs' %HA'
+    iapply (IH rs' ib (kk + 1) HA' (by omega)) $$ C
+  | ebIf n va req k t b vs Hdev Hlat Hfe Hvs _ IH =>
+    intro rs ib kk Hag Hkb
+    iintro C
+    iapply (AxSymEngine3.wpdImgFetch3M M img i Φ cpu G HG Hmid Htext n va req k ib kk vs
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hfe Hvs) $$ %rs %Hag
+    iintro %rs' %HA'
+    iapply (IH rs' ib kk HA' Hkb) $$ C
+  | ebEnd n va req k t Hdev Hlat Hnf =>
+    intro rs ib kk Hag Hkb
+    have e : kk = kend := by omega
+    subst e
+    iintro -
+    iapply (wpdStuckReadM M i Φ cpu G HG Hmid kk HGl n va req k ib
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hlat Hnf rs Hag)
+  | ebIa n w k t b Hsf _ IH =>
+    intro rs ib kk Hag Hkb
+    iintro C
+    iapply (AxSymEngine3.wpdSilentNode3M M i Φ cpu G HG Hmid _ (k ()) ?_ kk t ?_ rs ib Hag)
+    all_goals try exact trivial
+    · intro rs ib d l m' ors fn' d' oib obar h
+      obtain ⟨rfl, rfl, rfl, rfl, -⟩ := h
+      rw [annLabelNot Hsf]
+      exact ⟨rfl, rfl, rfl, rfl⟩
+    · iintro %rs1 %ib1 %HA1
+      iapply (IH rs1 ib1 kk HA1 Hkb) $$ C
+  | ebBa _ _ k t b _ IH | ebCo _ k t b _ IH | ebTl _ k t b _ IH | ebTe _ k t b _ IH
+  | ebRx _ k t b _ IH | ebTs _ k t b _ IH | ebTx _ k t b _ IH | ebCc k t b _ IH
+  | ebMsg _ k t b _ IH | ebGcc k t b _ IH =>
+    intro rs ib kk Hag Hkb
+    iintro C
+    iapply (AxSymEngine3.wpdSilentNode3M M i Φ cpu G HG Hmid _ _ ?_ kk t ?_ rs ib Hag)
+    all_goals try exact trivial
+    · intro rs ib d l m' ors fn' d' oib obar h
+      obtain ⟨rfl, rfl, rfl, rfl, -⟩ := h
+      exact ⟨trivial, rfl, rfl, rfl⟩
+    · iintro %rs1 %ib1 %HA1
+      iapply (IH rs1 ib1 kk HA1 Hkb) $$ C
+
+include HG HGl Hmid Htext Hflow in
+/-- (Lean-only, Q16) `wpdInstrOfEvBM` with stuck ends (`AxSymCtl.wpdOfEvBStuckM`). -/
+theorem AxSymCtl.wpdInstrOfEvBStuckM
+    (HGimg : ∀ GD, G GD → ∀ a, img a = none → GD.gdG.gxImg a = none)
+    (Herr : ∀ GD s, G GD → AxSymCtl.errState s → s.atK = (AxOpsem.grow GD i).length →
+      ⊢ postLifting Φ i s)
+    (Q : Nat → Unit → ExecSt → Prop) (rs : RegFile) (k : Nat) (s : Athread)
+    (Hs : RetX cpu rs k s) (Hk : k ≤ kend)
+    (Hb : ∀ GD s1, G GD → RetX cpu rs k s1 → s1.atK = (AxOpsem.grow GD i).length →
+      ⊢ postLifting Φ i s1)
+    (Hcert : ∀ (tick : Bool) (t : ExecSt), regsAgree AxRunClose.pinReg t.regs rs →
+       EvB img (fun _ _ => True) Q (riscvStep tick) t (kend - k)) :
+    ⊢ (∀ b' t' rs' ib' k', ⌜Q b' () t'⌝ -∗ ⌜regsAgree AxRunClose.pinReg rs' t'.regs⌝ -∗
+         ⌜k' + b' = kend⌝ -∗
+         wpdM M .MaybeStuck i ⟨.PHart cpu (.pure ()) rs' none ib', k'⟩ Φ) -∗
+      wpdM M .MaybeStuck i s Φ := by
+  iintro C
+  iapply (wpdRetNode3M M i Φ cpu G HG rs k s Hs Hb)
+  iintro %s2 %HN
+  obtain ⟨tick, rs', Hag, rfl⟩ := HN
+  iapply (AxSymCtl.wpdOfEvBStuckM M img i Φ cpu G HG Hmid Htext Hflow kend HGl HGimg Herr Q _
+    ⟨rs', fun _ => none, testDevs⟩ (kend - k)
+    (Hcert tick ⟨rs', fun _ => none, testDevs⟩ (regsAgreeSym _ _ _ Hag)) rs' ibNone k
+    (regsAgreeRefl _ _) (by omega)) $$ C
+
 end bridgeB
 
 /-! ### The riscv.cat instances under the Rocq names (`…M` at `rvwmoCatConsistent`) -/
@@ -1193,6 +1633,25 @@ theorem wpdInstrOfEvB (Q : Nat → Unit → ExecSt → Prop) (rs : RegFile) (k :
       wpd .MaybeStuck i s Φ :=
   wpdInstrOfEvBM rvwmoCatConsistent img i Φ cpu G HG Hmid Htext Hflow kend HGl Q rs k s Hs Hk Hb
     Hcert
+
+include HG HGl Hmid Htext Hflow in
+/-- (Lean-only, Q16) `AxSymCtl.wpdInstrOfEvBStuckM` at `rvwmoCatConsistent`. -/
+theorem AxSymCtl.wpdInstrOfEvBStuck
+    (HGimg : ∀ GD, G GD → ∀ a, img a = none → GD.gdG.gxImg a = none)
+    (Herr : ∀ GD s, G GD → AxSymCtl.errState s → s.atK = (AxOpsem.grow GD i).length →
+      ⊢ postLifting Φ i s)
+    (Q : Nat → Unit → ExecSt → Prop) (rs : RegFile) (k : Nat) (s : Athread)
+    (Hs : RetX cpu rs k s) (Hk : k ≤ kend)
+    (Hb : ∀ GD s1, G GD → RetX cpu rs k s1 → s1.atK = (AxOpsem.grow GD i).length →
+      ⊢ postLifting Φ i s1)
+    (Hcert : ∀ (tick : Bool) (t : ExecSt), regsAgree AxRunClose.pinReg t.regs rs →
+       EvB img (fun _ _ => True) Q (riscvStep tick) t (kend - k)) :
+    ⊢ (∀ b' t' rs' ib' k', ⌜Q b' () t'⌝ -∗ ⌜regsAgree AxRunClose.pinReg rs' t'.regs⌝ -∗
+         ⌜k' + b' = kend⌝ -∗
+         wpd .MaybeStuck i ⟨.PHart cpu (.pure ()) rs' none ib', k'⟩ Φ) -∗
+      wpd .MaybeStuck i s Φ :=
+  AxSymCtl.wpdInstrOfEvBStuckM rvwmoCatConsistent img i Φ cpu G HG Hmid Htext Hflow kend HGl HGimg
+    Herr Q rs k s Hs Hk Hb Hcert
 
 end bridgeBCat
 

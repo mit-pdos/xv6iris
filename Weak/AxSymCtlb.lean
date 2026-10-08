@@ -41,8 +41,8 @@ and the concrete probe are `AxSymCtl5`.  NOT HERE (as Rocq): the SIE=1 interrupt
    the second, same-page fetch reads no graph item).  Lean-only:
    `AxSymCtl.wpdTailOfStop` (the tail from any stop certificate; `wpdTail` is its `spineStop`
    instance) and `AxSymCtl.wpdBlockClosedCold` (Rocq's premise shape `textAt (blkEnd pc) h3`
-   plus `∀ rs, warm cnt rs pc → 1 ≤ cnt rs (blkEnd pc)`).  OPEN for the orchestrator (not
-   blocking): which tail `AxSymCtl5`'s closed corollaries should use.
+   plus `∀ rs, warm cnt rs pc → 1 ≤ cnt rs (blkEnd pc)`).  Owner Q14: `AxSymCtl5`'s closed
+   corollaries use the `Htail` form (+ Cold twins).
 4. Section premises: `Hloc` DROPPED (part 1 deviation 1); `seip_reg` ↦ `AxRunClose.pinReg`;
    `svpn_of` ↦ `WeakKpt.svpnOf`; `register_lookup tlb rs` ↦ `rs .tlb`; GPR clauses over
    `uxaXget` at `BitVec 5` with `Z.eqb (uint r) (uint rd)` ↦ `r = rd`, `uint rd ≠ 0` ↦
@@ -52,6 +52,14 @@ and the concrete probe are `AxSymCtl5`.  NOT HERE (as Rocq): the SIE=1 interrupt
    tactic `ax_sym_ctl_eb_go` (`AxSymEngine2.ax_sym2_ev_go` for `EvB`); `lk` ↦ `RegFile.set_*`
    rewrites; `nseip` ↦ `AxSymEngine2.notPin`.  The spine twins take `t1` (post-fetch state) and
    the read-freedom premises exactly as Rocq; `EvBHartActiveStop`'s post is over `Step`.
+6. Q16 (owner ruling; `AxSymCtl` deviation 7): tails that run on past the row end through
+   register-only instructions and stop at an IMAGELESS FETCH.  Lean-only: `AxSymCtl.textOkNop` /
+   `AxSymCtl.EvBHartActiveRvcNop` / `AxSymCtl.spineCertCNop` / `AxSymCtl.XNopC` (an instruction
+   whose `execute` returns `RETIRE_SUCCESS` directly, e.g. `c.nop`: the `ExecuteAs`-free arm of
+   `run_hart_active`; GPRs kept); `AxSymCtl.ebFactLiftQ`, `AxSymCtl.EvBHartActiveStopF`,
+   `AxSymCtl.EvBTryStepStopQ`, `AxSymCtl.spineStopFetch` (the stop certificate from a fetch
+   certificate with post `False`, at any `QE`); `AxSymCtl.wpdTailOfStopStuck` (the tail through
+   the stuck bridge `AxSymCtl.wpdInstrOfEvBStuck`); `AxSymCtl.ΦRetErr` (`Herr` for `ΦRet`).
 
 **Rocq → Lean name map.**  `EvB_hart_active_rvc` `EvBHartActiveRvc`, `EvB_hart_active_stop`
 `EvBHartActiveStop`, `EvB_try_step_active` `EvBTryStepActive`, `EvB_try_step_stop`
@@ -63,9 +71,11 @@ and the concrete probe are `AxSymCtl5`.  NOT HERE (as Rocq): the SIE=1 interrupt
 kit.  None is in the duplicated-name table.  Lean-only (file-qualified `AxSymCtl.*`): `ebRBind`,
 `ebFactLift`, `ebRUse`, `ebRRead`, `ebRWrite`, `ebRAnn16`, `ebRPureBind`, `ebRAssoc`,
 `ebFactAssoc`, `ebFactRead`, `ebFactWrite`, `ebFactPure`, `ebFactUse`, `wpdTailOfStop`,
-`wpdBlockClosedCold`.
+`wpdBlockClosedCold`; Q16 (deviation 6): `ebFactLiftQ`, `EvBHartActiveStopF`, `EvBTryStepStopQ`,
+`spineStopFetch`, `EvBHartActiveRvcNop`, `textOkNop`, `spineCertCNop`, `XNopC`,
+`wpdTailOfStopStuck`, `ΦRetErr`.
 
-**Dropped:** nothing (this part: Rocq 14 definitions/lemmas + 4 Ltacs; Lean 14 + 15 Lean-only +
+**Dropped:** nothing (this part: Rocq 14 definitions/lemmas + 4 Ltacs; Lean 14 + 25 Lean-only +
 1 tactic; the field `sc_pos` moved to premises, deviation 2).
 **Not ported:** the `Print Assumptions` lines (the lint's axiom check covers them).
 -/
@@ -186,6 +196,22 @@ theorem AxSymCtl.ebFactUse {X Y : Type} {Q : Nat → Y → ExecSt → Prop} {m :
     (H : EvB img QE Q (f a) t1 b) : EvB img QE Q (m >>= f) t b :=
   EvBBind img QE Q m f t b (EvBMono img _ QE _ _ m t b (fun _ _ h => h.elim)
     (fun _ _ _ h => by obtain ⟨rfl, rfl, rfl⟩ := h; exact H) (EvBOfEvA img _ _ m t Hm Hn b))
+
+/-- (Lean-only, Q16) `AxSymCtl.ebFactLift` with the lifted certificate at the SAME `QE` (its
+stuck ends stay stuck ends). -/
+theorem AxSymCtl.ebFactLiftQ {R X Y : Type} {P : Nat → X → ExecSt → Prop}
+    {Q : Nat → Except (Sail.Error exception ⊕ R) Y → ExecSt → Prop} {m : SailM X}
+    {f : X → SailME R Y} {t : ExecSt} {b : Nat}
+    (Hm : EvB img QE P m t b)
+    (Hf : ∀ b' x t', P b' x t' → EvB img QE Q (ExceptT.run (f x)) t' b') :
+    EvB img QE Q (ExceptT.run (liftM m >>= f)) t b := by
+  apply AxSymCtl.ebRBind
+  have e : ExceptT.run (liftM m : SailME R X) = m >>= fun a => pure (Except.ok a) := rfl
+  rw [e]
+  apply EvBBind
+  refine EvBMono img _ _ _ _ m t b (fun _ _ h => h) ?_ Hm
+  intro b' x t' h
+  exact .ebRet _ t' b' (Hf b' x t' h)
 
 end ebkit
 
@@ -343,6 +369,107 @@ theorem EvBRiscvStep (tick : Bool) (t : ExecSt) (Qf Q : Nat → ExecSt → Prop)
       (fun _ _ _ h => by obtain ⟨rfl, h⟩ := h; exact h) (EvBOfEvA img _ _ _ t' Hk' nrdTickClock b')
   | false => exact .ebRet _ _ _ Hk'
 
+/-- (Lean-only, Q16) THE TAIL at a fetch that never returns (a `False`-post fetch certificate,
+any `QE`): `run_hart_active` stops there. -/
+theorem AxSymCtl.EvBHartActiveStopF (QE : Sail.Error exception → ExecSt → Prop) (t : ExecSt)
+    (P : Nat → Step → ExecSt → Prop) :
+    EvA img (fun _ _ => False) (fun r t' => r = none ∧ t' = t)
+      (dispatchInterrupt (t.regs .cur_privilege)) t →
+    EvB img QE (fun _ _ _ => False) (fetch ()) t 0 →
+    EvB img QE P (run_hart_active 0) t 0 := by
+  intro Hdisp Hfetch
+  unfold run_hart_active
+  apply EvBCatchEarlyReturn
+  ax_sym_ctl_eb_go
+  refine AxSymCtl.ebRUse Hdisp (nrdDispatchInterrupt _) ?_
+  ax_sym_ctl_eb_go
+  refine AxSymCtl.ebFactLiftQ Hfetch ?_
+  rintro _ _ _ h
+  exact h.elim
+
+/-- (Lean-only, Q16) `EvBTryStepStop` at any `QE`. -/
+theorem AxSymCtl.EvBTryStepStopQ (QE : Sail.Error exception → ExecSt → Prop) (t : ExecSt)
+    (bb : Bool) (P : Nat → Bool → ExecSt → Prop) :
+    EvA img (fun _ _ => False) (fun x t' => x = bb ∧ t' = t)
+      (should_inc_minstret (t.regs .cur_privilege)) t →
+    (t.setReg .minstret_increment bb).regs .hart_state = .HART_ACTIVE () →
+    EvB img QE (fun _ _ _ => False) (run_hart_active 0) (t.setReg .minstret_increment bb) 0 →
+    EvB img QE P (try_step 0 false) t 0 := by
+  intro Hsi Hha Hrun
+  unfold try_step
+  dsimp only
+  ax_sym_ctl_eb_go
+  refine AxSymCtl.ebFactUse Hsi (nrdShouldIncMinstret _) ?_
+  ax_sym_ctl_eb_go
+  apply EvBBind
+  ax_sym_ctl_eb_go
+  simp only [Hha]
+  exact EvBMono img _ _ _ _ _ _ _ (fun _ _ h => h) (fun _ _ _ h => h.elim) Hrun
+
+/-- (Lean-only, Q16) THE STOP CERTIFICATE from a fetch that never returns: at budget 0, from a
+regime state whose fetch certificate (at every regime state with its pc) has post `False`, the
+next step never reaches `.pure` (any `QE`, e.g. one accepting the imageless fetch `EvB.ebNf`). -/
+theorem AxSymCtl.spineStopFetch (ctrlOk : RegFile → Prop) (textAt : BitVec 64 → BitVec 16 → Prop)
+    (Hsp : SpineOkT img ctrlOk textAt) (QE : Sail.Error exception → ExecSt → Prop)
+    (rs : RegFile) (P : Nat → Unit → ExecSt → Prop)
+    (Hfe : ∀ t : ExecSt, ctrlOk t.regs → t.regs .PC = rs .PC →
+      EvB img QE (fun _ _ _ => False) (fetch ()) t 0) :
+    ctrlOk rs → ∀ (tick : Bool) (t : ExecSt), regsAgree AxRunClose.pinReg t.regs rs →
+      EvB img QE P (riscvStep tick) t 0 := by
+  intro Hct tick t Hag
+  have Hct_t : ctrlOk t.regs := Hsp.sptSeip _ _ Hct Hag
+  have HPC_t : t.regs .PC = rs .PC := Hag .PC (AxSymEngine2.notPin _ (by decide) (by decide))
+  obtain ⟨bb, Hb⟩ := Hsp.sptInc t Hct_t
+  have Hct_a : ctrlOk (t.setReg .minstret_increment bb).regs :=
+    Hsp.sptFrame _ _ _ (Or.inr (Or.inr (Or.inl rfl))) Hct_t
+  have HPC_a : (t.setReg .minstret_increment bb).regs .PC = rs .PC := by
+    rw [ExecSt.setReg_regs, RegFile.set_other _ _ _ _ (by decide)]; exact HPC_t
+  unfold riscvStep
+  refine EvBFact img _ (fun _ _ _ => False) P _ _ t 0 ?_ (fun _ _ _ h => h.elim)
+  refine AxSymCtl.EvBTryStepStopQ img QE t bb _ Hb (Hsp.sptHart _ Hct_a) ?_
+  exact AxSymCtl.EvBHartActiveStopF img QE _ _ (Hsp.sptDisp _ Hct_a) (Hfe _ Hct_a HPC_a)
+
+/-- (Lean-only, Q16) `EvBHartActiveRvc` for a compressed instruction whose `execute` RETURNS
+`RETIRE_SUCCESS` directly (no `ExecuteAs` expansion, e.g. `C_NOP`). -/
+theorem AxSymCtl.EvBHartActiveRvcNop (t t1 : ExecSt) (h : BitVec 16) (i0 : instruction)
+    (pc : BitVec 64) (c : Nat) :
+    EvA img (fun _ _ => False) (fun r t' => r = none ∧ t' = t)
+      (dispatchInterrupt (t.regs .cur_privilege)) t →
+    (∀ b, EvB img (fun _ _ => False) (fun b' r t' => b = b' + c ∧ r = .F_RVC h ∧ t' = t1)
+      (fetch ()) t b) →
+    EvA img (fun _ _ => False) (fun x t' => x = i0 ∧ t' = t1) (ext_decode_compressed h) t1 →
+    nrd (ext_decode_compressed h) →
+    EvA img (fun _ _ => False) (fun x t' => x = false ∧ t' = t1) (is_landing_pad_expected ()) t1 →
+    EvA img (fun _ _ => False) (fun x t' => x = true ∧ t' = t1) (currentlyEnabled .Ext_Zca) t1 →
+    t1.regs .PC = pc →
+    EvA img (fun _ _ => False)
+      (fun x t' => x = RETIRE_SUCCESS ∧ t' = t1.setReg .nextPC (BitVec.addInt pc 2))
+      (execute i0) (t1.setReg .nextPC (BitVec.addInt pc 2)) →
+    nrd (execute i0) →
+    ∀ b, EvB img (fun _ _ => False)
+      (fun b' x t' => b = b' + c ∧ x = .Step_Execute (RETIRE_SUCCESS, zero_extend (m := 32) h) ∧
+        t' = t1.setReg .nextPC (BitVec.addInt pc 2))
+      (run_hart_active 0) t b := by
+  intro Hdisp Hfetch Hdec Hden Hlpad Hzca HPC Hexp Hexn b
+  subst HPC
+  unfold run_hart_active
+  apply EvBCatchEarlyReturn
+  ax_sym_ctl_eb_go
+  refine AxSymCtl.ebRUse Hdisp (nrdDispatchInterrupt _) ?_
+  ax_sym_ctl_eb_go
+  refine AxSymCtl.ebFactLift (Hfetch b) ?_
+  rintro b1 _ _ ⟨Hb, rfl, rfl⟩
+  ax_sym_ctl_eb_go
+  refine AxSymCtl.ebRUse Hdec Hden ?_
+  ax_sym_ctl_eb_go
+  refine AxSymCtl.ebRUse Hlpad nrdLpad ?_
+  ax_sym_ctl_eb_go
+  refine AxSymCtl.ebRUse Hzca nrdZca ?_
+  ax_sym_ctl_eb_go
+  refine AxSymCtl.ebRUse Hexp Hexn ?_
+  ax_sym_ctl_eb_go
+  exact .ebRet _ _ _ ⟨Hb, rfl, rfl⟩
+
 end spineB
 
 /-- THE COUNTING SPINE (deviations 1–2: `cnt` counts the fetch's GRAPH reads — page-table walk
@@ -373,6 +500,18 @@ def textOkC (img : Image) (ctrlOk : RegFile → Prop) (textAt : BitVec 64 → Bi
       (execute i0) t) ∧
     nrd (execute i0) ∧
     rf0 (execute ins)
+
+/-- (Lean-only, Q16) The WPd reading of a compressed instruction that RETIRES DIRECTLY
+(`execute` returns `RETIRE_SUCCESS`, no expansion, no register write — e.g. `c.nop`). -/
+def AxSymCtl.textOkNop (img : Image) (ctrlOk : RegFile → Prop)
+    (textAt : BitVec 64 → BitVec 16 → Prop) (pc : BitVec 64) : Prop :=
+  ∃ h i0, textAt pc h ∧
+    (∀ t : ExecSt, ctrlOk t.regs →
+      EvA img (fun _ _ => False) (fun x t' => x = i0 ∧ t' = t) (ext_decode_compressed h) t) ∧
+    nrd (ext_decode_compressed h) ∧
+    (∀ t : ExecSt, EvA img (fun _ _ => False) (fun x t' => x = RETIRE_SUCCESS ∧ t' = t)
+      (execute i0) t) ∧
+    nrd (execute i0)
 
 /-- The page of `pc` is warm: every pc of it counts 0 graph reads (deviation 2). -/
 def warm (cnt : RegFile → BitVec 64 → Nat) (rs : RegFile) (pc : BitVec 64) : Prop :=
@@ -542,6 +681,111 @@ theorem spineStop (ctrlOk : RegFile → Prop) (textAt : BitVec 64 → BitVec 16 
   refine EvBTryStepStop img t bb _ Hb (Hsp.sptHart _ Hct_a) ?_
   exact EvBHartActiveStop img _ t1 h _ _ (Hsp.sptDisp _ Hct_a) (Hfetch 0) (Hcnt ▸ Hpos)
 
+/-- (Lean-only, Q16) `spineCertC` for an instruction that RETIRES DIRECTLY (`AxSymCtl.textOkNop`):
+exactly `cnt rs pc` row items, every GPR kept (`Good … 0#5 0#64`: no write), the page warm. -/
+theorem AxSymCtl.spineCertCNop (ctrlOk : RegFile → Prop) (textAt : BitVec 64 → BitVec 16 → Prop)
+    (cnt : RegFile → BitVec 64 → Nat) (Hsc : SpineCnt img ctrlOk textAt cnt)
+    (rs : RegFile) (pc : BitVec 64) :
+    ctrlOk rs → rs .PC = pc → AxSymCtl.textOkNop img ctrlOk textAt pc →
+    ∀ (tick : Bool) (t : ExecSt), regsAgree AxRunClose.pinReg t.regs rs → ∀ b,
+      EvB img (fun _ _ => False)
+        (fun b' _ t' => b = b' + cnt rs pc ∧ Good ctrlOk rs pc 0#5 0#64 t'.regs ∧
+          warm cnt t'.regs pc)
+        (riscvStep tick) t b := by
+  have Hsp := Hsc.scT
+  intro Hct HPC ⟨h, i0, Hat, Hdec, Hden, Hexp, Hexn⟩ tick t Hag b
+  have Hct_t : ctrlOk t.regs := Hsp.sptSeip _ _ Hct Hag
+  have HPC_t : t.regs .PC = pc := by
+    rw [Hag .PC (AxSymEngine2.notPin _ (by decide) (by decide))]; exact HPC
+  obtain ⟨bb, Hb⟩ := Hsp.sptInc t Hct_t
+  have Hct_a : ctrlOk (t.setReg .minstret_increment bb).regs :=
+    Hsp.sptFrame _ _ _ (Or.inr (Or.inr (Or.inl rfl))) Hct_t
+  have HPC_a : (t.setReg .minstret_increment bb).regs .PC = pc := by
+    rw [ExecSt.setReg_regs, RegFile.set_other _ _ _ _ (by decide)]; exact HPC_t
+  obtain ⟨t1, Hfr, Hct_1, Hwarm, Hfetch⟩ := Hsc.scFetch _ pc h Hct_a HPC_a Hat
+  have Hcnt : cnt (t.setReg .minstret_increment bb).regs pc = cnt rs pc := by
+    apply Hsc.scTlb
+    rw [ExecSt.setReg_regs, RegFile.set_other _ _ _ _ (by decide)]
+    exact Hag .tlb (AxSymEngine2.notPin _ (by decide) (by decide))
+  rw [Hcnt] at Hfetch
+  have HPC_1 : t1.regs .PC = pc := (tlbFrameLookup _ _ _ Hfr (by decide)).trans HPC_a
+  have Hgag : gprAgree (t1.setReg .nextPC (BitVec.addInt pc 2)).regs rs := by
+    intro r _
+    simp only [ExecSt.setReg_regs]
+    rw [AxSymEngine2.uxaXgetSetNe _ _ _ (by decide), AxSpineOk5.tlbFrameXget _ _ Hfr,
+      ExecSt.setReg_regs, AxSymEngine2.uxaXgetSetNe _ _ _ (by decide)]
+    exact AxSymEngine2.uxaXgetAgree _ _ Hag r
+  have Hrun := AxSymCtl.EvBHartActiveRvcNop img (t.setReg .minstret_increment bb) t1 h i0 pc
+    (cnt rs pc) (Hsp.sptDisp _ Hct_a) Hfetch (Hdec _ Hct_1) Hden (Hsp.sptLpad _ Hct_1)
+    (Hsp.sptZca _ Hct_1) HPC_1 (Hexp _) Hexn b
+  have Hmi1 : t1.regs .minstret_increment = bb := by
+    rw [tlbFrameLookup _ _ _ Hfr (by decide)]
+    simp only [ExecSt.setReg_regs, RegFile.set_same]
+  have Htx1 : (t1.setReg .nextPC (BitVec.addInt pc 2)).regs .tlb = t1.regs .tlb := by
+    rw [ExecSt.setReg_regs, RegFile.set_other _ _ _ _ (by decide)]
+  have Htlb_fin : ∀ bx, (tfinal bx (t1.setReg .nextPC (BitVec.addInt pc 2))).regs .tlb
+      = t1.regs .tlb := by
+    intro bx
+    unfold tfinal
+    cases bx
+    · simp only [ExecSt.setReg_regs, Bool.false_eq_true, ↓reduceIte]
+      rw [RegFile.set_other _ _ _ _ (by decide)]
+      exact Htx1
+    · simp only [ExecSt.setReg_regs, ↓reduceIte]
+      rw [RegFile.set_other _ _ _ _ (by decide), RegFile.set_other _ _ _ _ (by decide)]
+      exact Htx1
+  refine EvBRiscvStep img tick t
+    (fun b' t' => b = b' + cnt rs pc ∧ Good ctrlOk rs pc 0#5 0#64 t'.regs ∧
+      t'.regs .tlb = t1.regs .tlb) _ b ?_ ?_
+  · have HT := EvBTryStepActive img t bb (zero_extend (m := 32) h) (cnt rs pc)
+      (fun t' => t' = t1.setReg .nextPC (BitVec.addInt pc 2))
+      (fun t' => Good ctrlOk rs pc 0#5 0#64 t'.regs ∧ t'.regs .tlb = t1.regs .tlb) b Hb
+      (Hsp.sptHart _ Hct_a) Hrun ?_
+    · exact EvBMono img _ _ _ _ _ t b (fun _ _ h => h)
+        (fun _ _ _ h => ⟨h.1, h.2.2.1, h.2.2.2⟩) HT
+    · rintro _ rfl
+      refine ⟨?_, ?_, ?_, Htlb_fin bb⟩
+      · simp only [ExecSt.setReg_regs]
+        rw [RegFile.set_other _ _ _ _ (by decide)]
+        exact Hsp.sptHart _ Hct_1
+      · simp only [ExecSt.setReg_regs]
+        rw [RegFile.set_other _ _ _ _ (by decide)]
+        exact Hmi1
+      · have Hct_x : ctrlOk (t1.setReg .nextPC (BitVec.addInt pc 2)).regs :=
+          Hsp.sptFrame _ _ _ (Or.inr (Or.inl rfl)) Hct_1
+        refine ⟨?_, ?_, ?_⟩
+        · unfold tfinal
+          cases bb
+          · exact Hsp.sptFrame _ _ _ (Or.inl rfl) Hct_x
+          · exact Hsp.sptFrame _ _ _ (Or.inr (Or.inr (Or.inr (Or.inl rfl))))
+              (Hsp.sptFrame _ _ _ (Or.inl rfl) Hct_x)
+        · unfold tfinal
+          cases bb <;> simp only [ExecSt.setReg_regs, Bool.false_eq_true, ↓reduceIte] <;>
+            (try rw [RegFile.set_other _ _ _ _ (by decide)]) <;>
+            rw [RegFile.set_same, RegFile.set_same]
+        · intro r Hr
+          have hr0 : r ≠ 0#5 := fun e => Hr (by rw [e]; rfl)
+          rw [if_neg hr0]
+          have e : uxaXget (tfinal bb (t1.setReg .nextPC (BitVec.addInt pc 2))).regs r =
+              uxaXget (t1.setReg .nextPC (BitVec.addInt pc 2)).regs r := by
+            unfold tfinal
+            cases bb <;> simp only [ExecSt.setReg_regs, Bool.false_eq_true, ↓reduceIte] <;>
+              (try rw [AxSymEngine2.uxaXgetSetNe _ _ _ (by decide)]) <;>
+              rw [AxSymEngine2.uxaXgetSetNe _ _ _ (by decide)]
+          rw [e]
+          exact Hgag r Hr
+  · intro b' t' HG
+    cases tick with
+    | false =>
+      exact ⟨HG.1, HG.2.1, fun pc' Hpc' =>
+        (Hsc.scTlb t1.regs t'.regs pc' HG.2.2).trans (Hwarm pc' Hpc')⟩
+    | true =>
+      refine EvAMono img _ _ _ _ _ t' (fun _ _ h => h) ?_ (Hsc.scTick t' HG.2.1.1)
+      rintro _ t'' ⟨Hc, ⟨Hk1, Hk2⟩, Htl⟩
+      obtain ⟨Hbb, ⟨-, HG2, HG3⟩, Ht1⟩ := HG
+      exact ⟨Hbb, ⟨Hc, Hk1.trans HG2, fun r Hr => (Hk2 r).trans (HG3 r Hr)⟩,
+        fun pc' Hpc' => (Hsc.scTlb t1.regs t''.regs pc' (Htl.trans Ht1)).trans (Hwarm pc' Hpc')⟩
+
 end certC
 
 /-! # 5. X WITH THE ROW POSITION, the TAIL, and the CLOSED 2-instruction block -/
@@ -627,6 +871,67 @@ theorem AxSymCtl.wpdTailOfStop (s : Athread) (rs : RegFile) :
   exact H.elim
 
 include Hsc Htext Hflow HG HGl Hmid in
+/-- (Lean-only, Q16) `XGprWriteC` for an instruction that RETIRES DIRECTLY
+(`AxSymCtl.textOkNop`, e.g. `c.nop`): every GPR kept. -/
+theorem AxSymCtl.XNopC (s : Athread) (rs : RegFile) (k : Nat) (pc : BitVec 64) :
+    RetX cpu rs k s → ctrlOk rs → rs .PC = pc → AxSymCtl.textOkNop img ctrlOk textAt pc →
+    k ≤ kend →
+    (∀ GD s1, G GD → RetX cpu rs k s1 → s1.atK = (AxOpsem.grow GD i).length →
+      ⊢ postLifting Φ i s1) →
+    ⊢ (∀ s' rs' k',
+         ⌜RetX cpu rs' k' s'⌝ -∗ ⌜k' = k + cnt rs pc⌝ -∗ ⌜ctrlOk rs'⌝ -∗
+         ⌜rs' .PC = BitVec.addInt pc 2⌝ -∗
+         ⌜∀ r : BitVec 5, r.toNat ≠ 0 → uxaXget rs' r = uxaXget rs r⌝ -∗
+         ⌜warm cnt rs' pc⌝ -∗
+         wpd .MaybeStuck i s' Φ) -∗
+       wpd .MaybeStuck i s Φ := by
+  intro HRet Hctrl HPC Htx Hk Hb
+  iintro C
+  iapply (wpdInstrOfEvB img i Φ cpu G HG Hmid Htext Hflow kend HGl
+    (fun b' _ t' => kend - k = b' + cnt rs pc ∧ Good ctrlOk rs pc 0#5 0#64 t'.regs ∧
+      warm cnt t'.regs pc)
+    rs k s HRet Hk Hb
+    (fun tick t Hag => AxSymCtl.spineCertCNop img ctrlOk textAt cnt Hsc rs pc Hctrl HPC Htx
+      tick t Hag (kend - k)))
+  iintro %b' %t' %rs' %ib' %k' %HQ %Hag %Hk'
+  obtain ⟨Hbb, ⟨Hc, Hpc, Hg⟩, Hw⟩ := HQ
+  have HRet' : RetX cpu rs' k' ⟨.PHart cpu (.pure ()) rs' none ib', k'⟩ :=
+    ⟨ib', rfl, rfl, rfl, rfl, rfl, regsAgreeRefl _ _⟩
+  have Hkk : k' = k + cnt rs pc := by omega
+  have Hc' : ctrlOk rs' := Hsc.scT.sptSeip _ _ Hc Hag
+  have Hpc' : rs' .PC = BitVec.addInt pc 2 :=
+    (Hag .PC (AxSymEngine2.notPin _ (by decide) (by decide))).trans Hpc
+  have Hg' : ∀ r : BitVec 5, r.toNat ≠ 0 → uxaXget rs' r = uxaXget rs r :=
+    fun r Hr => (AxSymEngine2.uxaXgetAgree _ _ Hag r).trans
+      ((Hg r Hr).trans (if_neg (fun e => Hr (by rw [e]; rfl))))
+  have Hw' : warm cnt rs' pc := fun pc' Hpc'' =>
+    (Hsc.scTlb t'.regs rs' pc' (Hag .tlb (AxSymEngine2.notPin _ (by decide) (by decide)))).trans
+      (Hw pc' Hpc'')
+  iapply C $$ %_ %rs' %k' %HRet' %Hkk %Hc' %Hpc' %Hg' %Hw'
+
+include Htext Hflow HG HGl Hmid in
+/-- (Lean-only, Q16) THE TAIL from a stop certificate WITH STUCK ENDS (`QE := True`: an
+imageless fetch `EvB.ebNf`, a failure node): the boundary at the row end; the allowed graphs'
+boot images lack what `img` lacks (`HGimg`), the post holds at a failure node there (`Herr`). -/
+theorem AxSymCtl.wpdTailOfStopStuck
+    (HGimg : ∀ GD, G GD → ∀ a, img a = none → GD.gdG.gxImg a = none)
+    (Herr : ∀ GD s, G GD → AxSymCtl.errState s → s.atK = (AxOpsem.grow GD i).length →
+      ⊢ postLifting Φ i s)
+    (s : Athread) (rs : RegFile) :
+    RetX cpu rs kend s →
+    (∀ GD s1, G GD → RetX cpu rs kend s1 → s1.atK = (AxOpsem.grow GD i).length →
+      ⊢ postLifting Φ i s1) →
+    (∀ (tick : Bool) (t : ExecSt), regsAgree AxRunClose.pinReg t.regs rs →
+      EvB img (fun _ _ => True) (fun _ _ _ => False) (riscvStep tick) t 0) →
+    ⊢ wpd .MaybeStuck i s Φ := by
+  intro HR Hb Hstop
+  iapply (AxSymCtl.wpdInstrOfEvBStuck img i Φ cpu G HG Hmid Htext Hflow kend HGl HGimg Herr
+    (fun _ _ _ => False) rs kend s HR (Nat.le_refl _) Hb
+    (fun tick t Hag => by rw [Nat.sub_self]; exact Hstop tick t Hag))
+  iintro %_ %_ %_ %_ %_ %H
+  exact H.elim
+
+include Hsc Htext Hflow HG HGl Hmid in
 /-- THE TAIL: a boundary AT the row end whose pc holds text and whose fetch reads the graph
 (deviation 2): the next instruction's prefix up to its fetch's first graph read, stuck there. -/
 theorem wpdTail (s : Athread) (rs : RegFile) (pc : BitVec 64) (h : BitVec 16) :
@@ -639,6 +944,20 @@ theorem wpdTail (s : Athread) (rs : RegFile) (pc : BitVec 64) (h : BitVec 16) :
     (fun tick t Hag => spineStop img ctrlOk textAt cnt Hsc rs pc h _ Hc HPC Hat Hpos tick t Hag)
 
 end xC
+
+/-- (Lean-only, Q16) `ΦRet` holds at a failure node (it is not a boundary). -/
+theorem AxSymCtl.ΦRetErr {hlc : HasLC} {GF : BundledGFunctors} [InvGS_gen hlc GF] [AxirisG GF]
+    (i : Agent) (cpu : CPU) (P : RegFile → Prop) (G : Gdexec → Prop) :
+    ∀ GD s, G GD → AxSymCtl.errState s → s.atK = (AxOpsem.grow GD i).length →
+      ⊢ postLifting (ΦRet (GF := GF) cpu P) i s := by
+  intro GD s _ He _
+  refine postLiftingTrue _ i s ?_
+  unfold ΦRet
+  refine BI.pure_intro ?_
+  intro rs k HR
+  obtain ⟨rs1, ib1, rfl, -⟩ := retxShape cpu rs k s HR
+  obtain ⟨c, e, KK, rs2, fn, ib, h⟩ := He
+  cases h
 
 /-! ### THE CLOSED BLOCK: `c.mv a0, ra ; c.addiw a0, imm` as a REAL `wpd s0 (ΦRet …)` -/
 
