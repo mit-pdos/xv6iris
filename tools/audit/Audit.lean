@@ -81,6 +81,18 @@ Output (directory `$XV6_CI_OUT`, default `.lake/ci`): `audit.json`
 (machine-readable) and `audit.md` (the summary).  The executable exits
 non-zero iff the audit fails (or the tree cannot be loaded).
 (`$XV6_AUDIT_BASELINE` names another baseline file; for testing the check.)
+
+THE WEAK TARGET (`tools/ci/audit.sh --weak`).  The weak-memory tier `Weak/`
+is not a module of `Xv6`/`MachCSL` and CI does not build it, so its top
+theorems (Theorem 2 `Weak.allocpidOpen`, Theorem 1 `Weak.allocpid2Distinct`)
+are audited by a SEPARATE run of this same executable:
+`$XV6_AUDIT_MODULES` (comma-separated module names; default `Xv6,MachCSL`)
+names the modules to import, and the weak run passes
+`XV6_AUDIT_MODULES=Weak.AxSpinT2b` with
+`XV6_AUDIT_BASELINE=tools/audit/baseline-weak.json`.  `Weak` is a local
+root (its opaques are this tree's, its declarations are in the tree-wide
+`sorryAx` / declared-axiom check) whenever it is imported; the default run
+imports no `Weak` module and is unchanged.
 ======================================================================
 -/
 import Lean
@@ -91,7 +103,10 @@ namespace Xv6.CI.Audit
 
 /-- The roots of this tree's own modules: the framework, the kernel proofs,
 the generated Sail model and the vendored Sail library. -/
-def localRoots : List Name := [`MachCSL, `Xv6, `LeanRV64D, `Sail]
+def localRoots : List Name := [`MachCSL, `Xv6, `Weak, `LeanRV64D, `Sail]
+
+/-- The roots whose declarations the tree-wide check looks up (the proofs). -/
+def projRoots : List Name := [`MachCSL, `Xv6, `Weak]
 
 def moduleOf? (env : Environment) (c : Name) : Option Name :=
   (env.getModuleIdxFor? c).map fun i => env.header.moduleNames[i.toNat]!
@@ -341,7 +356,7 @@ def run : CoreM Bool := do
   for i in [0:env.header.moduleNames.size] do
     let m := env.header.moduleNames[i]!
     unless localRoots.contains m.getRoot do continue
-    let proj := m.getRoot == `MachCSL || m.getRoot == `Xv6
+    let proj := projRoots.contains m.getRoot
     for ci in env.header.moduleData[i]!.constants do
       if let .axiomInfo _ := ci then
         if isBvCertName ci.name && bvCertShapeOk env ci.name then declaredCerts := declaredCerts + 1
@@ -359,10 +374,10 @@ def run : CoreM Bool := do
   let mut treeProblems : Array String := #[]
   unless sorryDecls.isEmpty do
     treeProblems := treeProblems.push
-      s!"{sorryDecls.size} declaration(s) of MachCSL/Xv6 depend on sorryAx, e.g. `{sorryDecls[0]!}`"
+      s!"{sorryDecls.size} declaration(s) of MachCSL/Xv6/Weak depend on sorryAx, e.g. `{sorryDecls[0]!}`"
   for a in declaredAxioms do
     if let some m := moduleOf? env a then
-      if m.getRoot == `MachCSL || m.getRoot == `Xv6 then
+      if projRoots.contains m.getRoot then
         treeProblems := treeProblems.push s!"`{a}` is an axiom declared in {m}"
   let t2 ← IO.monoMsNow
   let problems : Array String := results.foldl (fun acc r => acc ++ r.problems) #[] ++ hookProblems ++ treeProblems
@@ -394,7 +409,7 @@ def run : CoreM Bool := do
     ("ms", Json.mkObj [("theorems", toJson (t1 - t0)), ("tree", toJson (t2 - t1))])]
   -- markdown summary
   let mut md := "## Assumption audit\n\n"
-  md := md ++ "`Lean.collectAxioms` on each top theorem, checked against `tools/audit/baseline.json`."
+  md := md ++ s!"`Lean.collectAxioms` on each top theorem, checked against `{baselinePath}`."
     ++ (if ok then " **PASS.**" else " **FAIL.**") ++ "\n\n"
   unless ok do
     md := md ++ "> :x: " ++ "\n> :x: ".intercalate problems.toList ++ "\n\n"
@@ -421,7 +436,7 @@ def run : CoreM Bool := do
     ++ (if otherUnreached.size ≤ 4 then s!": {mdList otherUnreached}" else
         s!": {mdList (otherUnreached.extract 0 4)}, ...") ++ ".\n\n"
   md := md ++ "### Tree-wide\n\n"
-  md := md ++ s!"{treeDecls} declarations of `MachCSL`/`Xv6` looked up: {sorryDecls.size} depend on `sorryAx`; "
+  md := md ++ s!"{treeDecls} declarations of `MachCSL`/`Xv6`/`Weak` (as imported) looked up: {sorryDecls.size} depend on `sorryAx`; "
     ++ s!"{declaredCerts} `bv_decide` certificates are declared in the tree."
   if treeOtherArr.isEmpty then
     md := md ++ " No declaration uses an axiom outside the baseline kinds.\n"
@@ -447,8 +462,10 @@ had (`open Lean Elab Command`, no namespace), so the printed types match. -/
 unsafe def main : IO UInt32 := do
   initSearchPath (← findSysroot)
   enableInitializersExecution
-  let env ← importModules #[{ module := `Lean }, { module := `Xv6 }, { module := `MachCSL }] {}
-    (loadExts := true) (leakEnv := true)
+  let mods := ((← IO.getEnv "XV6_AUDIT_MODULES").getD "Xv6,MachCSL").splitOn ","
+    |>.map String.trim |>.filter (· != "")
+  let env ← importModules (#[{ module := `Lean }] ++ (mods.toArray.map fun m => { module := m.toName }))
+    {} (loadExts := true) (leakEnv := true)
   let ctx : Core.Context := {
     fileName := "<audit>", fileMap := default
     openDecls := [.simple `Lean [], .simple `Lean.Elab [], .simple `Lean.Elab.Command []] }

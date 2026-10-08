@@ -1,0 +1,9 @@
+# The top theorems of the weak-memory tier Weak/ (the Weak twin of
+# tools/ci/roots.txt).  One fully qualified name per line.  Weak/ is not part
+# of the Xv6/MachCSL build that CI, the coverage / dead-code reports
+# (tools/ci/envfacts) and the default assumption audit load, so these roots
+# are kept apart: they are audited by `tools/ci/audit.sh --weak` against
+# tools/audit/baseline-weak.json, and tools/ci/lint.sh fails if the two lists
+# differ.
+Weak.allocpidOpen             # THEOREM 2: two-hart allocpid pid distinctness + nextpid source, open third hart (AxSpinT2b)
+Weak.allocpid2Distinct        # THEOREM 1: its corollary with no third hart (AxSpinT2b)

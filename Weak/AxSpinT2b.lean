@@ -164,7 +164,7 @@ premises (owner Q-T2-5) unless the collision-retry row family is added (Q-T2-3 a
 4. `Hk0` for A, B is derived from `entryOk` (`entryK0`); C's is `HkC`.
 5. Theorem 1 keeps the phantom C in the layout (`T2LayHyp A B C …`: `xlayXv6` is a three-hart
    layout); C's start state is A's program at position 0 (any state works: C never steps).
-6. Audit roots: NOT registered (see the worker report; the audit imports `Xv6`/`MachCSL` only).
+6. Audit roots: registered in the Weak audit target (`tools/ci/roots-weak.txt`, `tools/audit/baseline-weak.json`; run `tools/ci/audit.sh --weak`, see `Weak/AxSpinT2d.lean`).
 
 **Reused** (by name): `tierAAdequacyAnnGateJointT` (AxSpinJ), `xv6Init`/`xv6HobAlloc`/`xv6Hok`/
 `xv6AxpolWf`/`protXv6`/`clb`/`npb` (AxSpinX), `AxSpinX7.xv6GF`, `xlayXv6`/`xlayXv6Ok`/`T2LayHyp`/
