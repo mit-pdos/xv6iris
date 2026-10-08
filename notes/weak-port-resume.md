@@ -205,3 +205,8 @@ The real dependency order among the Stage C files comes from the DAG.
 3. Q18: one worker designs + reworks the Ap line against allocproc's inlined copy (Ap..Ap5 rework, then Ap6..Ap9), cross-checking every word against Xv6/KernelImage.lean.
 4. AxSymMem3 resume (perf fix per protocol KERNEL BLOW-UP; Q17 wp_cpuid_c).
 5. Ready set: AxCertP3, AxSpinXP, AxSpinHd6/6b/6c (+ sched.py); AxSpinAp6 HELD for Q18.
+
+## Update 2026-10-08 06:35 — Q22 (4-byte alignment) found; plan for the 10:00 reset
+- 537 merged; running: AxSpinCtl3 (w7), AxSpinAp9 (w4), AxSpinPO6 (w2), AxSpinAqr (w6). Remaining after these: see sched.py.
+- **Q22:** `textAt4S` requires 4-aligned pc; in this kernel ~half of 4-byte words are 2 mod 4 (mycpu, push_off, allocproc/allocpid, initlock, sched, swtch, …). Theorems over those texts are vacuous (AxSpinE8f.mycpuTextFalse). Provisional fix: generalize to 2-aligned 4-byte text (two-halfword fetch), then re-run non-vacuity certs.
+- **At 10:00 (first launch):** one fresh Fable advisor with brief `~/dev/weak-orch/q22_prompt.txt`; then the Q22 rework lane per its notes (notes/weak-port-q22-align.md); and any parked/ready files.
