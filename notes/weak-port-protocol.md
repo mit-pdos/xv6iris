@@ -350,3 +350,4 @@ Rocq→Lean name map only.
 - AxSpinE8e: all 13 kept (bit-vector/page-table facts `twin*`, `svpnUnsigned`, `lo11Unsigned`, `zShift39`, `hinjUnmapped`, `hinjRetUnmapped`; used by AxSpinE8f), even though Option V makes the Hinj finding moot.
 - AxSpinHd7 (HdA/HdB/Hd9/HdC): `XxLdO` = `XxLdP` with `AxSpinE4.XBk`; `dokAt`, `AxSpinHd7.vw4`, `XLd`, `OutR`, `FldMRow`, `dflowOMono` — AxSpinXP has primed copies.
 - AxSpinPOm: mstatus-tracking engine variant `CertBm`/`spineCertBm`/`XBkm`/`XxRegm` (copies of AxSpinE/E4/E6 with the mstatus fact), `CertBmQ0a`/`CertBmP0c`.
+- AxSpinAm3 (AxSpinAm4): `XBkWP` (window k ≤ k' < k+e, `CResWP … k (k+e)`), `AxSpinAm3.XAmo`/`XxAmoswap` (RMW at row item k, `FstRmwW … k (k+1)`, `Hnk` dropped), `HagreeX`, `OutWR`, `FstRmwWRow`.
