@@ -67,6 +67,11 @@ cut arm vacuous under `k + 8 < LEN`, pins unguarded.  HONESTY: nothing is weaken
 P-form's extra premises are row facts (`rlOk4`) and the two continuations; the pins it keeps are
 the stage-1 pins, guarded.
 
+THE FRAME (TODO-S2 fix, 2026-10-08): `wpdPpHeadP` takes an iProp FRAME `F` carried from the caller
+to the cut: the statement is `⊢ F -∗ (… -∗ F -∗ ann4O … -∗ WPd) -∗ WPd` and the cut arm is
+`KppN : … ⊢ F -∗ ann4O … -∗ WPd` (`AxSpinT2h.cutPpNF` needs push_off's genesis annotation, a
+resource, there; the hook sites drop `F`).  `wpdPpHead` is the corollary at `F := True`.
+
 ## Deviations from Rocq
 
 1. O2 STAGE C / Q20' (provisional Option V; protocol "Cross-file facts" Q20', AxSpinPOr,
@@ -295,7 +300,8 @@ WINDOWED hook `HΨend` on `[k, k+8]` EXCEPT the designated cut `ppN` at `k + 7`,
 premise `KppN` (it receives the noff load's graph value and its annotation).  The noff load runs
 the optional reload leaf `AxSpinPO5.XxLd4O rlN`; its annotation is handed to the continuation. -/
 theorem wpdPpHeadP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
-    (Pra Ps0 Pmra Pms0 Pn : BitVec 64) (rlN : Option (Nat × List (BitVec 8) × WmClass)) :
+    (Pra Ps0 Pmra Pms0 Pn : BitVec 64) (rlN : Option (Nat × List (BitVec 8) × WmClass))
+    (F : IProp GF) :
     -- the row (prefix)
     RowShP k (AxOpsem.grow (gtAdGd GT) i)
       (ppHead (paZ Pra) (paZ Ps0) (paZ Pmra) (paZ Pms0) (paZ Pn)) →
@@ -338,10 +344,10 @@ theorem wpdPpHeadP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
     -- the designated cut ppN (row ends right after the noff load)
     ((AxOpsem.grow (gtAdGd GT) i).length = k + 7 →
       ∀ (vn : List (BitVec 8)) (pr : Pexv6), graphValue (gtAdGd GT) (i, k + 6) = some vn →
-        ⊢ AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
+        ⊢ F -∗ AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
           @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
             ⟨pr, k + 7⟩ Ψ) →
-    ⊢ (∀ (vn : List (BitVec 8)) (rs' : RegFile) (ib' : Ibch),
+    ⊢ F -∗ (∀ (vn : List (BitVec 8)) (rs' : RegFile) (ib' : Ibch),
         ⌜ctrlOkSW T satp0 rs' ∧
           rs' .PC = (if c then ppp 0x28 else ppp 0x20) ∧
           rs' .tlb = rs0 .tlb ∧
@@ -356,7 +362,7 @@ theorem wpdPpHeadP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
           zopz0zKzJ_s zero_reg (ldRes false 4 vn) = false ∧
           graphData (gtAdGd GT) (i, k + 7) = some (stBytes 4 (addiwm1 (ldRes false 4 vn))) ∧
           (addiwm1 (ldRes false 4 vn) != zero_reg) = c⌝ -∗
-        AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
+        F -∗ AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
         @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨.PHart cpu (.pure ()) rs' none ib', k + 8⟩ Ψ) -∗
       @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
@@ -365,10 +371,11 @@ theorem wpdPpHeadP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
     ⟨HdaS_ra, _, Hh_ra, Hpr_ra, _⟩ ⟨HdaS_s0, _, Hh_s0, Hpr_s0, _⟩
     ⟨HdaS_mra, HdaL_mra, Hh_mra, Hpr_mra, Hnt_mra⟩ ⟨HdaS_ms0, HdaL_ms0, Hh_ms0, Hpr_ms0, Hnt_ms0⟩
     ⟨HdaS_n, HdaL_n, Hh_n, Hpr_n, Hnt_n⟩ Hdm Hval0c Hvge Hvc HrlN HΨend KppN
-  iintro C
+  iintro HF C
   -- row end at k
   by_cases E0 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k
   · iclear C
+    iclear HF
     iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) _)
   obtain ⟨T00, T02, T04, T06, T08, T0c, T10, T12, T14, T16, T1a, T1c, T1e, -⟩ := Htxq
   have XR := XxReg L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
@@ -407,6 +414,7 @@ theorem wpdPpHeadP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
   -- row end at k + 1
   by_cases E1 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 1
   · iclear C
+    iclear HF
     iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) _)
   -- ---- + 0x04: c.sdsp s0,0(sp) (spill at k+1) ----
   iapply (XS _ rs2 (k + 1) (ppp 0x04) true AxSpinE8.immS0 8#5 2#5
@@ -422,6 +430,7 @@ theorem wpdPpHeadP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
   -- row end at k + 2
   by_cases E2 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 2
   · iclear C
+    iclear HF
     iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) _)
   -- ---- + 0x06: c.addi4spn s0,sp,16 (k+2) ----
   have Hc4 := certAddi (ctrlOkSW T satp0) rs3 (ppp 0x06) true 2#5 8#5 (caddi4spnImm 4#8)
@@ -491,6 +500,7 @@ theorem wpdPpHeadP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
   -- row end at k + 6
   by_cases E6 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 6
   · iclear C
+    iclear HF
     iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) _)
   -- ---- + 0x0c: csrr a5,sstatus (k+6) ----
   have HSIE : (_get_Mstatus_SIE (rs6 .mstatus) == 1#1) = false := by
@@ -565,8 +575,7 @@ theorem wpdPpHeadP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
   -- row end at k + 7: THE DESIGNATED CUT ppN (the arm is the premise `KppN`)
   by_cases E7 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 7
   · iclear C
-    iapply (KppN (by omega) vn _ Hgv6)
-    iexact HaN
+    iapply (KppN (by omega) vn _ Hgv6) $$ HF HaN
   -- ---- + 0x16: bge zero,a5,panic — the gate (guarded pin `Hvge`) (k+7) ----
   have Hge : zopz0zKzJ_s zero_reg (ldRes false 4 vn) = false := Hvge (by omega) vn Hgv6
   have Hcg := certBTYPE (ctrlOkSW T satp0) (AxSpinE6.ctlRegimeSW T satp0) rs10
@@ -628,6 +637,7 @@ theorem wpdPpHeadP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
   -- row end at k + 8
   by_cases E8 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 8
   · iclear C
+    iclear HF
     iclear HaN
     iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) _)
   -- ---- + 0x1e: c.bnez a5 — the noff load's VALUE picks the arm (k+8) ----
@@ -657,7 +667,7 @@ theorem wpdPpHeadP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
   iintro %rs' %ib' %HGP
   obtain ⟨HGr, Htg⟩ := HGP
   have HFr := stepRegs0 T satp0 _ rs13 _ _ _ rs' HF13 HGr
-  iapply C $$ %vn %rs' %ib' [] HaN
+  iapply C $$ %vn %rs' %ib' [] HF HaN
   ipureintro
   refine ⟨gbCtrl T satp0 _ _ _ _ _ _ HGr, ?_, (gbTlb T satp0 _ _ _ _ _ _ HGr).trans Htl13, ?_,
     ?_, Hlvn, ?_, ?_, ?_, ?_, Hgv6, Hge, ?_, Hc⟩
@@ -757,11 +767,13 @@ theorem wpdPpHead (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
     Hval0c Hvge Hvc
   iintro C
   iapply (wpdPpHeadP L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxm Htxq Ψ HΨmid
-    k c rs0 ib0 Pra Ps0 Pmra Pms0 Pn none (rowShPOfSh HR) Hw8 Hnr_mra Hnr_ms0 Hwle Hnrn Hc0
-    HPC0 Hhit0 HhitM Bra Bs0 Bmra Bms0 Bn Hdm (fun _ => Hval0c) (fun _ => Hvge) Hvc trivial
-    (fun _ _ h2 _ h4 => absurd h4 (by omega)) (fun h => absurd h (by omega)))
-  iintro %vn %rs' %ib' %H -
-  iapply C $$ %vn %rs' %ib' %H
+    k c rs0 ib0 Pra Ps0 Pmra Pms0 Pn none iprop(True) (rowShPOfSh HR) Hw8 Hnr_mra Hnr_ms0 Hwle
+    Hnrn Hc0 HPC0 Hhit0 HhitM Bra Bs0 Bmra Bms0 Bn Hdm (fun _ => Hval0c) (fun _ => Hvge) Hvc
+    trivial (fun _ _ h2 _ h4 => absurd h4 (by omega)) (fun h => absurd h (by omega))) $$ [] [C]
+  · ipureintro
+    trivial
+  · iintro %vn %rs' %ib' %H - -
+    iapply C $$ %vn %rs' %ib' %H
 
 end pphead
 

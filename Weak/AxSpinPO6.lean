@@ -64,6 +64,11 @@ then 0 else 1)`):
        ⊢ ann4O … (k + 6) rlN -∗ ann4O … (k + 8) rlI -∗ wpdM … ⟨pr, k + 9⟩ Ψ`
   (BOTH annotations: refuting `ppI` needs the noff readback too — `c = false` ⇒ image noff 0 ⇒
   push_off took `b = true` and stored intena 0, `AxSpinT2g.noffArmZero` / `intenaZero`).
+THE FRAME (TODO-S2 fix, 2026-10-08): `wpdPopOffP` takes an iProp FRAME `F` (passed to
+`wpdPpHeadP`'s frame and folded into `wpdPpMidP`'s `R`): statement `⊢ F -∗ (… -∗ F -∗ ann4O … -∗
+ann4O … -∗ WPd) -∗ WPd`, arms `KppN : … ⊢ F -∗ ann4O … -∗ WPd`, `KppI : … ⊢ F -∗ ann4O … -∗
+ann4O … -∗ WPd` (AxSpinT2h's `cutPpNF` / `cutPpIF` with `F := AxSpinT2h.genF`, push_off's two
+genesis annotations).  `wpdPopOff` is the corollary at `F := True`.
 `wpdPpMidP` takes the `ppI` arm for a FRAME `R` (the caller's continuation and the noff
 annotation ride through it: `⊢ R -∗ (… -∗ R -∗ ann -∗ WPd) -∗ WPd`, `KppI : … ⊢ R -∗ ann -∗
 WPd`); its window `[u, u + 1]` excludes `u + 1`, and its continuation learns `u + 1 < LEN` (so
@@ -554,7 +559,7 @@ WINDOWED hook `HΨend` on `[k, tk + 2]` EXCEPT the two designated cuts — `ppN`
 optional reload leaf `AxSpinPO5.XxLd4O rlN` / `rlI` (`rlI` only used on `c = false`); both
 annotations are CARRIED to the continuation (the intena one is `True` on `c = true`). -/
 theorem wpdPopOffP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64)
-    (Pra Ps0 Pmra Pms0 Pn Pi : BitVec 64) (rlN rlI : Option (Nat × List (BitVec 8) × WmClass)) :
+    (Pra Ps0 Pmra Pms0 Pn Pi : BitVec 64) (rlN rlI : Option (Nat × List (BitVec 8) × WmClass)) (F : IProp GF) :
     -- the row (prefix)
     RowShP k (AxOpsem.grow (gtAdGd GT) i)
       (ppSh c (paZ Pra) (paZ Ps0) (paZ Pmra) (paZ Pms0) (paZ Pn) (paZ Pi)) →
@@ -607,18 +612,18 @@ theorem wpdPopOffP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : BitV
     -- the designated cut ppN (row ends right after the noff load)
     ((AxOpsem.grow (gtAdGd GT) i).length = k + 7 →
       ∀ (vn : List (BitVec 8)) (pr : Pexv6), graphValue (gtAdGd GT) (i, k + 6) = some vn →
-        ⊢ AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
+        ⊢ F -∗ AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
           @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
             ⟨pr, k + 7⟩ Ψ) →
     -- the designated cut ppI (arm c = false; row ends right after the intena load)
     (c = false → (AxOpsem.grow (gtAdGd GT) i).length = k + 9 →
       ∀ (vn vi : List (BitVec 8)) (pr : Pexv6), graphValue (gtAdGd GT) (i, k + 6) = some vn →
         graphValue (gtAdGd GT) (i, k + 8) = some vi →
-        ⊢ AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
+        ⊢ F -∗ AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
           AxSpinPO5.ann4O (GF := GF) GT i (paZ Pi) (k + 8) rlI -∗
           @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
             ⟨pr, k + 9⟩ Ψ) →
-    ⊢ (∀ (vn vi vra' vs0' : List (BitVec 8)) (rs' : RegFile) (ib' : Ibch),
+    ⊢ F -∗ (∀ (vn vi vra' vs0' : List (BitVec 8)) (rs' : RegFile) (ib' : Ibch),
         ⌜ctrlOkSW T satp0 rs' ∧ rs' .PC = ret ∧ rs' .tlb = rs0 .tlb ∧
           gprVal rs' AxSpinE8.r2 = gprVal rs0 AxSpinE8.r2 ∧
           gprVal rs' AxSpinE8.r10 = AxSpinE8.mycpuRet (gprVal rs0 AxSpinE8.r4) ∧
@@ -641,7 +646,7 @@ theorem wpdPopOffP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : BitV
         AxAnnot.annotOwn (GF := GF) (i, k + 8 + (if c then 0 else 1) + 1)
           iprop(⌜RLfact GT i (paZ Ps0) (k + 8 + (if c then 0 else 1) + 1)
             (stBytes 8 (gprVal rs0 AxSpinE8.r8))⌝) -∗
-        AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
+        F -∗ AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
         AxSpinPO5.ann4O (GF := GF) GT i (paZ Pi) (k + 8) (if c then none else rlI) -∗
         @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨.PHart cpu (.pure ()) rs' none ib', k + 8 + (if c then 0 else 1) + 2⟩ Ψ) -∗
@@ -699,19 +704,19 @@ theorem wpdPopOffP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : BitV
           (c = false → graphValue (gtAdGd GT) (i, k + 8) = some vi ∧
             (ldRes false 4 vi == zero_reg) = true) ∧
           (c = false → k + 9 < (AxOpsem.grow (gtAdGd GT) i).length) →
-        ⊢ Cp -∗ AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
+        ⊢ Cp -∗ F -∗ AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
           AxSpinPO5.ann4O (GF := GF) GT i (paZ Pi) (k + 8) (if c then none else rlI) -∗
           @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
             ⟨.PHart cpu (.pure ()) rs1 none ib1, k + 8 + (if c then 0 else 1)⟩ Ψ) →
-      ⊢ Cp -∗ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+      ⊢ F -∗ Cp -∗ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
         ⟨.PHart cpu (.pure ()) rs0 none ib0, k⟩ Ψ := by
     intro Cp TL
-    iintro C
+    iintro HF C
     iapply (wpdPpHeadP L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxm Htxq Ψ HΨmid
-      k c rs0 ib0 Pra Ps0 Pmra Pms0 Pn rlN HRh Hw8 Hnr_mra Hnr_ms0 Hwle_n Hnrn Hc0 HPC0 Hhit0
+      k c rs0 ib0 Pra Ps0 Pmra Pms0 Pn rlN F HRh Hw8 Hnr_mra Hnr_ms0 Hwle_n Hnrn Hc0 HPC0 Hhit0
       HhitM Bra Bs0 Bmra Bms0 Bn (djSym _ _ _ _ D_mra_ms0) Hval0c Hvge Hvc HrlN
-      (fun k' h1 h2 h3 h4 pr => HΨend k' h1 (by omega) h3 (fun _ => by omega) h4 pr) KppN)
-    iintro %vn %rs1 %ib1 %Hh HaN
+      (fun k' h1 h2 h3 h4 pr => HΨend k' h1 (by omega) h3 (fun _ => by omega) h4 pr) KppN) $$ HF
+    iintro %vn %rs1 %ib1 %Hh HF HaN
     obtain ⟨Hc1, HPC1, Htl1, Ea01, Esp1, _, _, Hkeep1, Hgd0, Hgd1, Hgv6, Hge, Hgd7, Hcc⟩ := Hh
     cases c with
     | true =>
@@ -720,7 +725,7 @@ theorem wpdPopOffP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : BitV
         Hgd7, Hcc, fun h => Bool.noConfusion h, fun h => Bool.noConfusion h⟩
       rw [show k + 8 + (if true = true then 0 else 1) = k + 8 from rfl] at TL'
       ihave TLi := TL'
-      iapply TLi $$ C HaN
+      iapply TLi $$ C HF HaN
       rw [if_pos rfl]
       simp only [AxSpinPO5.ann4O]
       ipureintro
@@ -730,18 +735,21 @@ theorem wpdPopOffP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : BitV
       have HRm : RowShP (k + 8) (AxOpsem.grow (gtAdGd GT) i) (ppMid (paZ Pi)) :=
         rowShPAppL (s1 := ppMid (paZ Pi)) (s2 := ppTail (paZ Pra) (paZ Ps0)) HRr
       iapply (wpdPpMidP L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxq Ψ HΨmid
-        (k + 8) rs1 ib1 Pi rlI iprop(Cp ∗ AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN)
+        (k + 8) rs1 ib1 Pi rlI
+        iprop(Cp ∗ F ∗ AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN)
         HRm Hnri Hc1 (by rw [HPC1]; rfl) (hitWAgree rs0 rs1 _ Htl1 Hhit0)
         (by rw [Ea01]; exact fld4Tlb _ _ _ _ _ _ _ _ Htl1 Bi) (Hvz rfl) (HrlI rfl)
         (fun k' h1 h2 h3 h4 pr => HΨend k' (by omega) (by show k' ≤ k + 8 + 1 + 2; omega)
           (by omega) (fun _ => by omega) h4 pr)
         (fun hL vi pr hv => by
-          iintro ⟨-, HaN⟩ HaI
-          iapply (KppI rfl hL vn vi pr Hgv6 hv) $$ HaN HaI)) $$ [C HaN] []
+          iintro ⟨-, HF, HaN⟩ HaI
+          iapply (KppI rfl hL vn vi pr Hgv6 hv) $$ HF HaN HaI)) $$ [C HF HaN] []
       · isplitl [C]
         · iexact C
-        · iexact HaN
-      · iintro %vi %rs2 %ib2 %Hm %Hlt9 ⟨C, HaN⟩ HaI
+        · isplitl [HF]
+          · iexact HF
+          · iexact HaN
+      · iintro %vi %rs2 %ib2 %Hm %Hlt9 ⟨C, HF, HaN⟩ HaI
         obtain ⟨Hc2, HPC2, Htl2, Hkeep2, Hgv8, Hz⟩ := Hm
         have TL' := TL vn vi rs2 ib2 ⟨Hc2, HPC2, Htl2.trans Htl1,
           by rw [Hkeep2 AxSpinE8.r2 (by decide)]; exact Esp1,
@@ -751,16 +759,17 @@ theorem wpdPopOffP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : BitV
           Hgd0, Hgd1, Hgv6, Hge, Hgd7, Hcc, fun _ => ⟨Hgv8, Hz⟩, fun _ => Hlt9⟩
         rw [show k + 8 + (if false = true then 0 else 1) = k + 8 + 1 from rfl] at TL'
         ihave TLi := TL'
-        iapply TLi $$ C HaN
+        iapply TLi $$ C HF HaN
         rw [if_neg (by decide)]
         iexact HaI
   refine HI _ (fun vn vi rs1 ib1 Hf => ?_)
   -- ---- the tail, once for both arms ----
   obtain ⟨Hc1, HPC1, Htl1, Esp1, Ea01, Hkeep1, Hgd0, Hgd1, Hgv6, Hge, Hgd7, Hcc, Hmid, Hlt9⟩ := Hf
-  iintro C HaN HaI
+  iintro C HF HaN HaI
   -- row end at tk (not the ppI cut: on c = false the mid ran past k + 9)
   by_cases Et : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 8 + (if c then 0 else 1)
   · iclear C
+    iclear HF
     iclear HaN
     iclear HaI
     iapply (HΨend _ (by omega) (by omega) (by omega)
@@ -812,7 +821,7 @@ theorem wpdPopOffP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : BitV
       (fun hc => by have := Htk9 hc; omega) h3 pr))
   iintro %vra' %vs0' %rs' %ib' %Hf H0 H1
   obtain ⟨Hcr, HPCr, Htlr, Espr, -, -, Hrar, Hs0r, Hkeepr, Hgv0, Hgv1⟩ := Hf
-  iapply C $$ %vn %vi %vra' %vs0' %rs' %ib' [] H0 H1 HaN HaI
+  iapply C $$ %vn %vi %vra' %vs0' %rs' %ib' [] H0 H1 HF HaN HaI
   ipureintro
   refine ⟨Hcr, HPCr, Htlr.trans Htl1, ?_, ?_, Hrar, Hs0r, ?_, Hgd0, Hgd1, Hgv6, Hge, Hgd7, Hcc,
     Hmid, Hgv0, Hgv1⟩
@@ -904,12 +913,14 @@ theorem wpdPopOff (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVe
   have Htk0 : (if c then 0 else 1) ≤ 1 := by split <;> omega
   iintro C
   iapply (wpdPopOffP L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxm Htxq Ψ HΨmid
-    k c rs0 ib0 ret Pra Ps0 Pmra Pms0 Pn Pi none none (rowShPOfSh HR) Hw8 Hnr_ra Hnr_s0 Hnr_mra
-    Hnr_ms0 Hwle_n Hnrn Hnri Hc0 HPC0 Hhit0 HhitM Bra Bs0 Bmra Bms0 Bn Bi Hdj (fun _ => Hval0c)
-    (fun _ => Hvge) Hvc (fun hc _ => Hvz hc) (fun _ => Hvalr) Hret trivial (fun _ => trivial)
-    (fun _ _ h2 _ _ h5 => absurd h5 (by omega)) (fun h => absurd h (by omega))
-    (fun _ h => absurd h (by omega)))
-  iintro %vn %vi %vra' %vs0' %rs' %ib' %H H0 H1 - -
+    k c rs0 ib0 ret Pra Ps0 Pmra Pms0 Pn Pi none none iprop(True) (rowShPOfSh HR) Hw8 Hnr_ra
+    Hnr_s0 Hnr_mra Hnr_ms0 Hwle_n Hnrn Hnri Hc0 HPC0 Hhit0 HhitM Bra Bs0 Bmra Bms0 Bn Bi Hdj
+    (fun _ => Hval0c) (fun _ => Hvge) Hvc (fun hc _ => Hvz hc) (fun _ => Hvalr) Hret trivial
+    (fun _ => trivial) (fun _ _ h2 _ _ h5 => absurd h5 (by omega)) (fun h => absurd h (by omega))
+    (fun _ h => absurd h (by omega))) $$ [] [C]
+  · ipureintro
+    trivial
+  iintro %vn %vi %vra' %vs0' %rs' %ib' %H H0 H1 - - -
   iapply C $$ %vn %vi %vra' %vs0' %rs' %ib' %H H0 H1
 
 end popoff

@@ -42,6 +42,9 @@ is the `rlS` arm): `AxSpinRl4.wpdRelHeadP` → `jal pop_off` → `AxSpinPO6.wpdP
   `KrlS` / `KrlL` (release's holding, `rlS` / `rlL`: resource-carrying, exactly `wpdRelHeadP`'s —
   `OHeld` / `OOwn` deposits, load outputs, reload annotations, the nextpid anchor) and `KppN` /
   `KppI` (pop_off's `ppN` / `ppI`: `wpdPopOffP`'s cut arms passed UP, at `relKp k`).
+THE FRAME (TODO-S2 fix, 2026-10-08): an iProp `F` is carried from the caller (after the nextpid
+anchor) to `wpdPopOffP`'s frame and handed back to the continuation (before the two `ann4O`);
+`KppN` / `KppI` take it (`⊢ F -∗ ann4O … -∗ WPd`).  `wpdRelease` is the corollary at `F := True`.
 pop_off's optional reloads `rlN` / `rlI` (`AxSpinPO5.rlOk4` premises at `relKp k + 6` / `+ 8`) are
 PARAMETERS: push_off's noff / intena stores are not in release's context (they are acquire's), so
 the caller (AxSpinApA) supplies `some` from push_off's post.  The continuation additionally
@@ -136,7 +139,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
     (Pra Ps0 Ps1 Hra Hs0 Hs1 Hram Hs0m Pcl PclS Plk PlkS Qra Qs0 Qmra Qms0 Qn Qi : BitVec 64)
     (plk : Int) (kc kw ks : Nat) (val : BitVec 64) (cls : WmClass) (Qc Qw : IProp GF)
     (tsc : List Nat) (rvsc wvsc : List (BitVec 8)) (clsc : WmClass)
-    (rlN rlI : Option (Nat × List (BitVec 8) × WmClass)) :
+    (rlN rlI : Option (Nat × List (BitVec 8) × WmClass)) (F : IProp GF) :
     -- the row (prefix)
     RowReleaseP k c hb (AxOpsem.grow (gtAdGd GT) i) (paZ Pra) (paZ Ps0) (paZ Ps1) plk (paZ Pcl)
       (paZ Hra) (paZ Hs0) (paZ Hs1) (paZ Hram) (paZ Hs0m) (paZ Qra) (paZ Qs0) (paZ Qmra)
@@ -283,7 +286,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
     -- the designated cut ppN (row ends right after pop_off's noff load)
     ((AxOpsem.grow (gtAdGd GT) i).length = relKp k + 7 →
       ∀ (vn : List (BitVec 8)) (pr : Pexv6), graphValue (gtAdGd GT) (i, relKp k + 6) = some vn →
-        ⊢ AxSpinPO5.ann4O (GF := GF) GT i (paZ Qn) (relKp k + 6) rlN -∗
+        ⊢ F -∗ AxSpinPO5.ann4O (GF := GF) GT i (paZ Qn) (relKp k + 6) rlN -∗
           @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
             ⟨pr, relKp k + 7⟩ Ψ) →
     -- the designated cut ppI (arm c = false; row ends right after pop_off's intena load)
@@ -291,7 +294,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
       ∀ (vn vi : List (BitVec 8)) (pr : Pexv6),
         graphValue (gtAdGd GT) (i, relKp k + 6) = some vn →
         graphValue (gtAdGd GT) (i, relKp k + 8) = some vi →
-        ⊢ AxSpinPO5.ann4O (GF := GF) GT i (paZ Qn) (relKp k + 6) rlN -∗
+        ⊢ F -∗ AxSpinPO5.ann4O (GF := GF) GT i (paZ Qn) (relKp k + 6) rlN -∗
           AxSpinPO5.ann4O (GF := GF) GT i (paZ Qi) (relKp k + 8) rlI -∗
           @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
             ⟨pr, relKp k + 9⟩ Ψ) →
@@ -300,7 +303,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
       AxAnnot.annotOwn (i, kw)
         iprop(Qw ∗ RVL nm.xnH (gtAdGd GT) (clb L) (i, kw) (WeakInterpProj.wbytes 8 val)) -∗
       AxAnnot.annotOwn (i, ks) (RNp L nm.xnH nm.xnM nm.xnI (gtAdGd GT) (i, ks)) -∗
-      (∀ (vra vs0 vs1 : List (BitVec 8)) (rs' : RegFile) (ib' : Ibch),
+      F -∗ (∀ (vra vs0 vs1 : List (BitVec 8)) (rs' : RegFile) (ib' : Ibch),
         ⌜ctrlOkSW T satp0 rs' ∧ rs' .PC = ret ∧ rs' .tlb = rs0 .tlb ∧
           gprVal rs' AxSpinE8.r2 = gprVal rs0 AxSpinE8.r2 ∧
           gprVal rs' AxSpinE8.r10 = AxSpinE8.mycpuRet (gprVal rs0 AxSpinE8.r4) ∧
@@ -322,7 +325,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
           iprop(⌜RLfact GT i (paZ Ps0) (relKr k c + 1) (stBytes 8 (gprVal rs0 AxSpinE8.r8))⌝) -∗
         AxAnnot.annotOwn (GF := GF) (i, relKr k c + 2)
           iprop(⌜RLfact GT i (paZ Ps1) (relKr k c + 2) (stBytes 8 (gprVal rs0 AxSpinHd8.r9))⌝) -∗
-        AxSpinPO5.ann4O (GF := GF) GT i (paZ Qn) (relKp k + 6) rlN -∗
+        F -∗ AxSpinPO5.ann4O (GF := GF) GT i (paZ Qn) (relKp k + 6) rlN -∗
         AxSpinPO5.ann4O (GF := GF) GT i (paZ Qi) (relKp k + 8) (if c then none else rlI) -∗
         @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨.PHart cpu (.pure ()) rs' none ib', relKe k c⟩ Ψ) -∗
@@ -352,7 +355,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
   have Hh_s1 := Bs1.2.2.1
   have Hpr_s1 := Bs1.2.2.2.1
   have Hnt_s1 := Bs1.2.2.2.2
-  iintro #Hil Hcl Hwl Hnp C
+  iintro #Hil Hcl Hwl Hnp HF C
   -- ---- the head: release + 0x00 … + 0x1a (k … relKw k) ----
   iapply (wpdRelHeadP L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxm Htxh Htxr Ψ
     HΨmid k c hb rs0 ib0 Pra Ps0 Ps1 Hra Hs0 Hs1 Hram Hs0m Pcl PclS Plk PlkS plk (paZ Qra)
@@ -369,6 +372,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
   -- row end at relKp k
   by_cases Ep : (AxOpsem.grow (gtAdGd GT) i).length ≤ relKp k
   · iclear C
+    iclear HF
     iclear Hnh
     iapply (HΨend _ (by simp only [relKp]; omega) (by simp only [relKe, relKr, relKp]; omega)
       (fun _ => by simp only [relKp, relKh]; omega) (by simp only [relKp, relKh]; omega)
@@ -411,7 +415,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
   -- ---- pop_off, at relKp k (P-form) ----
   have HRp := AxSpinRl4.relPPop HR
   iapply (wpdPopOffP L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxm Htxq Ψ HΨmid
-    (relKp k) c rs2 ib2 (AxSpinHdB.prl 0x22) Qra Qs0 Qmra Qms0 Qn Qi rlN rlI HRp
+    (relKp k) c rs2 ib2 (AxSpinHdB.prl 0x22) Qra Qs0 Qmra Qms0 Qn Qi rlN rlI F HRp
     Hw8 Hnq1 Hnq2 Hnq3 Hnq4 Hwle Hnrn Hnri
     (gbCtrl T satp0 _ _ _ _ _ _ HG2) HPC2
     (hitWSvpn rs2 (ppp 0) (AxSpinHdB.prl 0) (by decide) (hitWAgree rs0 rs2 _ Htl2 Hhit0))
@@ -426,8 +430,8 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
     (fun k' h1 h2 h3 h4 h5 pr => HΨend k' (by simp only [relKp] at h1 ⊢; omega)
       (by rw [AxSpinRl4b.popEnd] at h2; simp only [relKe]; omega)
       (fun _ => by simp only [relKp, relKh] at h1 ⊢; omega)
-      (by simp only [relKp, relKh] at h1 ⊢; omega) h3 h4 h5 pr) KppN KppI)
-  iintro %vn %vi %vra' %vs0' %rs3 %ib3 %HP - - HaN HaI
+      (by simp only [relKp, relKh] at h1 ⊢; omega) h3 h4 h5 pr) KppN KppI) $$ HF
+  iintro %vn %vi %vra' %vs0' %rs3 %ib3 %HP - - HF HaN HaI
   obtain ⟨Hc3, HPC3, Htl3', Esp3, Ea03, -, -, Ekeep3, -⟩ := HP
   have Htl3 : rs3 .tlb = rs0 .tlb := Htl3'.trans Htl2
   have Esp3' : gprVal rs3 AxSpinE8.r2 = spo (gprVal rs0 AxSpinE8.r2) := Esp3.trans Esp2
@@ -436,6 +440,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
   -- row end at relKr k c (pop_off's continuation)
   by_cases Er0 : (AxOpsem.grow (gtAdGd GT) i).length ≤ relKr k c
   · iclear C
+    iclear HF
     iclear Hnh
     iclear HaN
     iclear HaI
@@ -475,6 +480,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
   -- row end at relKr k c + 1
   by_cases Er1 : (AxOpsem.grow (gtAdGd GT) i).length ≤ relKr k c + 1
   · iclear C
+    iclear HF
     iclear Hnh
     iclear HaN
     iclear HaI
@@ -507,6 +513,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
   -- row end at relKr k c + 2
   by_cases Er2 : (AxOpsem.grow (gtAdGd GT) i).length ≤ relKr k c + 2
   · iclear C
+    iclear HF
     iclear Hnh
     iclear HaN
     iclear HaI
@@ -538,6 +545,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
   -- row end at relKe k c
   by_cases Ee : (AxOpsem.grow (gtAdGd GT) i).length ≤ relKe k c
   · iclear C
+    iclear HF
     iclear Hnh
     iclear HaN
     iclear HaI
@@ -586,7 +594,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
   have Hgpr1 : gprVal rs7 1#5 = ldRes false 8 vra := by
     rw [HF7]
     ax_spin_rl4b_zsimp
-  iapply C $$ %vra %vs0 %vs1 %rs' %ib' [] Hnh H0 H1 H2 HaN HaI
+  iapply C $$ %vra %vs0 %vs1 %rs' %ib' [] Hnh H0 H1 H2 HF HaN HaI
   ipureintro
   refine ⟨gbCtrl T satp0 _ _ _ _ _ _ HGr, ?_, (gbTlb T satp0 _ _ _ _ _ _ HGr).trans Htl7, ?_,
     ?_, Hlvra, Hlvs0, Hlvs1, ?_, ?_, ?_, ?_, Hgd0, Hgd1, Hgd2, Hgv0, Hgv1, Hgv2⟩
@@ -780,7 +788,7 @@ theorem wpdRelease (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : BitV
   iintro #Hil Hcl Hwl Hnp C
   iapply (wpdReleaseP L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxm Htxh Htxq Htxr
     Ψ HΨmid k c true rs0 ib0 ret Pra Ps0 Ps1 Hra Hs0 Hs1 Hram Hs0m Pcl PclS Plk PlkS Qra Qs0 Qmra
-    Qms0 Qn Qi plk kc kw ks val cls Qc Qw tsc rvsc wvsc clsc none none
+    Qms0 Qn Qi plk kc kw ks val cls Qc Qw tsc rvsc wvsc clsc none none iprop(True)
     (AxSpinRl4.rowRelPOfFull HR) Hw8 Hnra Hns0 Hns1 Hnr1 Hnr2 Hnr3 Hnr4 Hnr5 HnrCl Hnq1 Hnq2
     Hnq3 Hnq4 Hwle Hnrn Hnri Hc0 HPC0 Hhit0 HhitM Bra Bs0 Bs1 HdjS HdjW Bh1 Bh2 Bh3 Bh4 Bh5 Hdisj
     Bqra Bqs0 Bqmra Bqms0 Bqn Bqi HdjQ
@@ -797,8 +805,10 @@ theorem wpdRelease (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : BitV
       iintro %vlk %vcpu %vram %vs0m %vra %vs0 %vs1 %pr %Hp
       exact absurd Hp.1 (by simp only [relKh]; omega))
     (fun h => absurd h (by simp only [relKp]; omega))
-    (fun _ h => absurd h (by simp only [relKp]; omega))) $$ Hil Hcl Hwl Hnp
-  iintro %vra %vs0 %vs1 %rs' %ib' %H Hnh H0 H1 H2 - -
+    (fun _ h => absurd h (by simp only [relKp]; omega))) $$ Hil Hcl Hwl Hnp [] [C]
+  · ipureintro
+    trivial
+  iintro %vra %vs0 %vs1 %rs' %ib' %H Hnh H0 H1 H2 - - -
   iapply C $$ %vra %vs0 %vs1 %rs' %ib' %H Hnh H0 H1 H2
 
 end release

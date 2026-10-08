@@ -60,6 +60,15 @@ loaded bytes are the image word `BitVec.ofInt 32 v` with `toNat < 2³¹ − 1`.
    the genesis annotation as a second readback.  `cutPpI` additionally takes `w = 0 → rlI = some
    (kwi, stBytes 4 0, clsi)` (image noff 0 ⇒ push_off took `b = true` (`poArm`) and stored
    intena 0, PO4) and PO6's arm pin `Hvc` (`addiwm1 … != zero_reg = c`).
+5'. THE FRAME FIX (TODO-S2, 2026-10-08): PO5/PO6/Rl4b's `KppN`/`KppI` now take an iProp frame
+   `F`.  `cutPpNF` / `cutPpIF` prove them with `F := AxSpinT2h.genF GT i pa kg1 kg2` (push_off's
+   two noff loads' genesis annotations: `kg1` = the arm read, `kg2` = the read whose increment
+   push_off stores), reading back 2 resp. 3–4 annotations at once (`AxSpinT2h.wpdEndL`, the
+   list form of `wpdEnd2P`; `annMap`/`annSep`): `AxSpinT2h.vpImg` (genesis + `noffImgOk` ⇒ image
+   word) then `noffGate` / `noffArmZero` / `intenaGate`.  `cutPpI` additionally needs push_off's
+   ARM: the first read `vn0` (genesis ⇒ the same image word) and the arm pin `(ldRes vn0 == 0) =
+   b` (AllocPins2's `poArm`), with `b = true → rlI = some (_, stBytes 4 0, _)`.  `cutPpN` /
+   `cutPpI` (pure-`w` forms) are kept unchanged.
 6. `HΨ` is resource-free and receives `LEN = cutPos` and the gate (normal arm) in graph-value
    form; it is the designated-cut counterpart of the P-forms' resource-free hook (Q-S2-2).
 
@@ -452,6 +461,106 @@ theorem AxSpinT2h.wpdEnd2P (L : Xlay) (GT : GdexecT) (nm : Xv6N) (i : Agent) (k0
     itrivial
   iapply W $$ %pr
 
+/-- (Lean-only, frame fix) the annotation map of a list of (event, fact) pairs. -/
+def AxSpinT2h.annMap : List (Geid × Prop) → Mea GF
+  | [] => ∅
+  | x :: l => insert (AxSpinT2h.annMap l) x.1 iprop(⌜x.2⌝)
+
+/-- (Lean-only, frame fix) the owned pure annotations of a list of (event, fact) pairs. -/
+def AxSpinT2h.annSep : List (Geid × Prop) → IProp GF
+  | [] => iprop(True)
+  | x :: l => iprop(AxAnnot.annotOwn x.1 iprop(⌜x.2⌝) ∗ AxSpinT2h.annSep l)
+
+theorem AxSpinT2h.annMapNone (l : List (Geid × Prop)) (e : Geid) (h : ∀ x ∈ l, x.1 ≠ e) :
+    get? (AxSpinT2h.annMap (GF := GF) l) e = none := by
+  induction l with
+  | nil => exact lookupEmpty
+  | cons x l ih =>
+    simp only [AxSpinT2h.annMap]
+    rw [lookupInsertNe (h x List.mem_cons_self)]
+    exact ih (fun y hy => h y (List.mem_cons_of_mem _ hy))
+
+theorem AxSpinT2h.annMapDom (l : List (Geid × Prop)) (e : Geid) :
+    e ∈ (FiniteMap.dom_set (AxSpinT2h.annMap (GF := GF) l) : GSet Geid) → ∃ x ∈ l, x.1 = e := by
+  induction l with
+  | nil =>
+    intro h
+    simp only [AxSpinT2h.annMap] at h
+    rw [domEmpty] at h
+    exact absurd h (fun h' => (elemOfEmpty (S := GSet Geid)).1 h')
+  | cons x l ih =>
+    intro h
+    simp only [AxSpinT2h.annMap] at h
+    rw [domInsert] at h
+    rcases elemOfUnion.1 h with h | h
+    · exact ⟨x, List.mem_cons_self, (elemOfSingleton.1 h).symm⟩
+    · obtain ⟨y, hy, hye⟩ := ih h
+      exact ⟨y, List.mem_cons_of_mem _ hy, hye⟩
+
+theorem AxSpinT2h.annSepMap (l : List (Geid × Prop)) (hnd : l.Pairwise (fun x y => x.1 ≠ y.1)) :
+    AxSpinT2h.annSep (GF := GF) l ⊢
+      [∗map] e ↦ R ∈ AxSpinT2h.annMap (GF := GF) l, AxAnnot.annotOwn e R := by
+  induction l with
+  | nil =>
+    simp only [AxSpinT2h.annSep, AxSpinT2h.annMap]
+    iintro -
+    iapply BigSepM.bigSepM_empty.2
+    itrivial
+  | cons x l ih =>
+    rw [List.pairwise_cons] at hnd
+    have hn := AxSpinT2h.annMapNone (GF := GF) l x.1 (fun y hy h => hnd.1 y hy h.symm)
+    simp only [AxSpinT2h.annSep, AxSpinT2h.annMap]
+    iintro ⟨A, R⟩
+    iapply (BigSepM.bigSepM_insert hn).2
+    isplitl [A]
+    · iexact A
+    · iapply (ih hnd.2) $$ R
+
+theorem AxSpinT2h.annMapPure (l : List (Geid × Prop)) (hnd : l.Pairwise (fun x y => x.1 ≠ y.1)) :
+    ([∗map] R ∈ AxSpinT2h.annMap (GF := GF) l, R) ⊢ iprop(⌜∀ x ∈ l, x.2⌝) := by
+  induction l with
+  | nil =>
+    iintro -
+    ipureintro
+    intro x hx
+    cases hx
+  | cons x l ih =>
+    rw [List.pairwise_cons] at hnd
+    have hn := AxSpinT2h.annMapNone (GF := GF) l x.1 (fun y hy h => hnd.1 y hy h.symm)
+    simp only [AxSpinT2h.annMap]
+    iintro Hb
+    icases (BigSepM.bigSepM_insert hn).1 $$ Hb with ⟨%H1, Hb⟩
+    ihave %H2 := (ih hnd.2) $$ Hb
+    ipureintro
+    intro y hy
+    rcases List.mem_cons.1 hy with rfl | hy
+    · exact H1
+    · exact H2 y hy
+
+/-- (Lean-only, frame fix) ANY NUMBER of pure annotations at distinct events of hart `i` read
+back past the row end. -/
+theorem AxSpinT2h.wpdEndL (L : Xlay) (GT : GdexecT) (nm : Xv6N) (i : Agent) (k0 : Nat)
+    (Hend : (AxOpsem.grow (gtAdGd GT) i).length ≤ k0) (l : List (Geid × Prop))
+    (hi : ∀ x ∈ l, x.1.1 = i) (hnd : l.Pairwise (fun x y => x.1 ≠ y.1))
+    (Φ : Athread → IProp GF) (HRQ : (∀ x ∈ l, x.2) → ∀ s, ⊢ Φ s) (pr : Pexv6) :
+    ⊢ AxSpinT2h.annSep (GF := GF) l -∗
+      @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+        ⟨pr, k0⟩ Φ := by
+  have Hm : ∀ e, e ∈ (FiniteMap.dom_set (AxSpinT2h.annMap (GF := GF) l) : GSet Geid) →
+      e.1 = i := by
+    intro e he
+    obtain ⟨x, hx, rfl⟩ := AxSpinT2h.annMapDom l e he
+    exact hi x hx
+  have HR : ∀ s, ([∗map] R ∈ AxSpinT2h.annMap (GF := GF) l, R) ⊢ Φ s := by
+    intro s
+    iintro Hb
+    ihave %H := (AxSpinT2h.annMapPure l hnd) $$ Hb
+    iapply (HRQ H s)
+  iintro A
+  ihave W := (AxSpinT2h.wpdEndAnn L GT nm i k0 Hend _ Hm Φ HR) $$ [A]
+  · iapply (AxSpinT2h.annSepMap l hnd) $$ A
+  iapply W $$ %pr
+
 end rowend
 
 /-! # 4. The five designated cut arms -/
@@ -631,6 +740,187 @@ theorem cutPpI (i : Agent) (k : Nat) (c : Bool) (Pn Pi : BitVec 64)
         obtain ⟨-, rfl, -⟩ := Hs
         exact HΨ hL (fun _ vs Hv => AxSpinT2h.intenaGate (gtAdGd GT) Hcons.1 i (k + 8) (paZ Pi)
           (Hrd8 (by omega)) HI vs Hv) s) pr
+
+/-- (Lean-only, frame fix) THE FRAME of the noff arms: push_off's two noff loads' GENESIS
+annotations (`AxSpinLd4P.genFact4` at `kg1` — the arm read — and at `kg2` — the read whose
+increment push_off stores), carried from push_off to pop_off by the P-forms' frame `F`. -/
+def AxSpinT2h.genF (GT : GdexecT) (i : Agent) (pa : Int) (kg1 kg2 : Nat) : IProp GF :=
+  iprop(AxAnnot.annotOwn (GF := GF) (i, kg1) iprop(⌜AxSpinLd4P.genFact4 GT i pa kg1⌝) ∗
+    AxAnnot.annotOwn (GF := GF) (i, kg2) iprop(⌜AxSpinLd4P.genFact4 GT i pa kg2⌝))
+
+include Hcons in
+/-- (frame fix) push_off's second noff read `vp` at `kg2` read the IMAGE word (genesis readback,
+`noffImgOk`). -/
+theorem AxSpinT2h.vpImg (i : Agent) (kg : Nat) (Pn : BitVec 64) (vp : List (BitVec 8)) (v : Int) :
+    paZ Pn = cpuZ i + 120 → noffImgOk (gtAdGd GT).gdG.gxImg i v →
+    AxSpinT2h.RdAt (AxOpsem.grow (gtAdGd GT) i) kg (paZ Pn) 4 →
+    graphValue (gtAdGd GT) (i, kg) = some vp →
+    AxSpinLd4P.genFact4 GT i (paZ Pn) kg →
+    vp = WeakInterpProj.wbytes 4 (BitVec.ofInt 32 v) ∧ (BitVec.ofInt 32 v).toNat < 2 ^ 31 - 1 := by
+  intro Hpa Himg Hrd Hgv HG
+  obtain ⟨aq, ts, Hl, Hvl⟩ := AxSpinT2h.ldOfRd (gtAdGd GT) i kg _ _ vp Hrd Hgv
+  rw [Hpa] at Hl
+  refine AxSpinT2h.noffImgRead _ Hcons.1 (i, kg) aq i ts vp v Hl Hvl ?_ Himg
+  unfold AxSpinLd4P.genFact4 at HG
+  rw [Hpa] at HG
+  exact HG
+
+include Hcons in
+/-- **`ppN` WITH THE FRAME** (TODO-S2 frame fix): `KppN` of the framed P-forms with
+`F := AxSpinT2h.genF …`.  The noff reload annotation (`rlN` = push_off's `sw noff`, data
+`addiw1 vp`) and push_off's genesis annotation at `kg2` (`vp` = the image word, `noffImgOk`) are
+read back together (`AxSpinT2h.wpdEndL`); `noffPop` refutes `noff < 1`. -/
+theorem cutPpNF (i : Agent) (k kg1 kg2 : Nat) (Pn : BitVec 64)
+    (rlN : Option (Nat × List (BitVec 8) × WmClass)) (kw : Nat) (cls : WmClass)
+    (vp : List (BitVec 8)) (v : Int) (Ψ : Athread → IProp GF) :
+    paZ Pn = cpuZ i + 120 → noffImgOk (gtAdGd GT).gdG.gxImg i v →
+    rlN = some (kw, stBytes 4 (AxSpinPO3.addiw1 (ldRes false 4 vp)), cls) →
+    kg2 < k + 6 →
+    AxSpinT2h.RdAt (AxOpsem.grow (gtAdGd GT) i) kg2 (paZ Pn) 4 →
+    graphValue (gtAdGd GT) (i, kg2) = some vp →
+    (k + 6 < (AxOpsem.grow (gtAdGd GT) i).length →
+      AxSpinT2h.RdAt (AxOpsem.grow (gtAdGd GT) i) (k + 6) (paZ Pn) 4) →
+    ((AxOpsem.grow (gtAdGd GT) i).length = k + 7 →
+      (∀ vs, graphValue (gtAdGd GT) (i, k + 6) = some vs →
+        zopz0zKzJ_s zero_reg (ldRes false 4 vs) = false) →
+      ∀ s, ⊢ Ψ s) →
+    ((AxOpsem.grow (gtAdGd GT) i).length = k + 7 →
+      ∀ (vn : List (BitVec 8)) (pr : Pexv6), graphValue (gtAdGd GT) (i, k + 6) = some vn →
+        ⊢ AxSpinT2h.genF (GF := GF) GT i (paZ Pn) kg1 kg2 -∗
+          AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
+          @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+            ⟨pr, k + 7⟩ Ψ) := by
+  intro Hpa Himg HrlN Hkg Hrdg Hgvg Hrd HΨ hL vn pr _
+  subst HrlN
+  simp only [AxSpinPO5.ann4O, AxSpinT2h.genF]
+  iintro ⟨-, A2⟩ AN
+  iapply (AxSpinT2h.wpdEndL L GT nm i (k + 7) (by omega)
+    [((i, kg2), AxSpinLd4P.genFact4 GT i (paZ Pn) kg2),
+     ((i, k + 6), AxSpinLd4P.rlFact4 GT i (paZ Pn) (k + 6)
+        (stBytes 4 (AxSpinPO3.addiw1 (ldRes false 4 vp))))]
+    (by simp) (by simp <;> omega) Ψ ?_ pr)
+  · intro HA s
+    have HG := HA _ List.mem_cons_self
+    have HF := HA _ (List.mem_cons_of_mem _ List.mem_cons_self)
+    obtain ⟨Hvp, Hw⟩ := AxSpinT2h.vpImg GT Hcons i kg2 Pn vp v Hpa Himg Hrdg Hgvg HG
+    subst Hvp
+    exact HΨ hL (fun vs Hv => (AxSpinT2h.noffGate (gtAdGd GT) Hcons.1 i (k + 6) (paZ Pn) _
+      (Hrd (by omega)) Hw HF vs Hv).2) s
+  · simp only [AxSpinT2h.annSep]
+    isplitl [A2]
+    · iexact A2
+    isplitl [AN]
+    · iexact AN
+    itrivial
+
+include Hcons in
+/-- **`ppI` WITH THE FRAME** (TODO-S2 frame fix): `KppI` of the framed P-forms with
+`F := AxSpinT2h.genF …`.  FOUR annotations read back together: push_off's two genesis reads
+(`vn0` at `kg1`, `vp` at `kg2`: both the image word `w`), pop_off's noff reload (`= addiw1 w`;
+with the arm `c = false` (`Hvc`) `w = 0`, `noffArmZero`), so push_off's arm pin `Hvb` gives
+`b = true`, push_off stored intena 0 (`Hb`: `rlI` = that store), and pop_off's intena reload
+reads 0 (`intenaGate`). -/
+theorem cutPpIF (i : Agent) (k kg1 kg2 : Nat) (c b : Bool) (Pn Pi : BitVec 64)
+    (rlN rlI : Option (Nat × List (BitVec 8) × WmClass)) (kw : Nat) (cls : WmClass)
+    (kwi : Nat) (clsi : WmClass) (vn0 vp : List (BitVec 8)) (v : Int) (Ψ : Athread → IProp GF) :
+    paZ Pn = cpuZ i + 120 → noffImgOk (gtAdGd GT).gdG.gxImg i v →
+    rlN = some (kw, stBytes 4 (AxSpinPO3.addiw1 (ldRes false 4 vp)), cls) →
+    (b = true → rlI = some (kwi, stBytes 4 0#64, clsi)) →
+    kg1 < kg2 → kg2 < k + 6 →
+    AxSpinT2h.RdAt (AxOpsem.grow (gtAdGd GT) i) kg1 (paZ Pn) 4 →
+    graphValue (gtAdGd GT) (i, kg1) = some vn0 → (ldRes false 4 vn0 == zero_reg) = b →
+    AxSpinT2h.RdAt (AxOpsem.grow (gtAdGd GT) i) kg2 (paZ Pn) 4 →
+    graphValue (gtAdGd GT) (i, kg2) = some vp →
+    (∀ vn, graphValue (gtAdGd GT) (i, k + 6) = some vn →
+      (addiwm1 (ldRes false 4 vn) != zero_reg) = c) →
+    (k + 6 < (AxOpsem.grow (gtAdGd GT) i).length →
+      AxSpinT2h.RdAt (AxOpsem.grow (gtAdGd GT) i) (k + 6) (paZ Pn) 4) →
+    (k + 8 < (AxOpsem.grow (gtAdGd GT) i).length →
+      AxSpinT2h.RdAt (AxOpsem.grow (gtAdGd GT) i) (k + 8) (paZ Pi) 4) →
+    ((AxOpsem.grow (gtAdGd GT) i).length = k + 9 →
+      (c = false → ∀ vs, graphValue (gtAdGd GT) (i, k + 8) = some vs →
+        (ldRes false 4 vs == zero_reg) = true) →
+      ∀ s, ⊢ Ψ s) →
+    (c = false → (AxOpsem.grow (gtAdGd GT) i).length = k + 9 →
+      ∀ (vn vi : List (BitVec 8)) (pr : Pexv6), graphValue (gtAdGd GT) (i, k + 6) = some vn →
+        graphValue (gtAdGd GT) (i, k + 8) = some vi →
+        ⊢ AxSpinT2h.genF (GF := GF) GT i (paZ Pn) kg1 kg2 -∗
+          AxSpinPO5.ann4O (GF := GF) GT i (paZ Pn) (k + 6) rlN -∗
+          AxSpinPO5.ann4O (GF := GF) GT i (paZ Pi) (k + 8) rlI -∗
+          @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+            ⟨pr, k + 9⟩ Ψ) := by
+  intro Hpa Himg HrlN Hb Hk12 Hkg Hrd1 Hgv1 Hvb Hrd2 Hgv2 Hvc Hrd6 Hrd8 HΨ hc hL vn vi pr Hgv6 _
+  subst HrlN
+  -- the three noff facts force `b = true`
+  have Hb' : AxSpinLd4P.genFact4 GT i (paZ Pn) kg1 → AxSpinLd4P.genFact4 GT i (paZ Pn) kg2 →
+      AxSpinLd4P.rlFact4 GT i (paZ Pn) (k + 6)
+        (stBytes 4 (AxSpinPO3.addiw1 (ldRes false 4 vp))) → b = true := by
+    intro G1 G2 HF
+    obtain ⟨Hv1, Hw⟩ := AxSpinT2h.vpImg GT Hcons i kg1 Pn vn0 v Hpa Himg Hrd1 Hgv1 G1
+    obtain ⟨Hv2, -⟩ := AxSpinT2h.vpImg GT Hcons i kg2 Pn vp v Hpa Himg Hrd2 Hgv2 G2
+    subst Hv2
+    have Hn := (AxSpinT2h.noffGate (gtAdGd GT) Hcons.1 i (k + 6) (paZ Pn) _ (Hrd6 (by omega)) Hw
+      HF vn Hgv6).1
+    have Hc := Hvc vn Hgv6
+    rw [hc, Hn] at Hc
+    obtain ⟨-, Hz⟩ := AxSpinT2g.noffArmZero _ _ Hw rfl Hc
+    rw [← Hvb, Hv1]
+    exact Hz
+  simp only [AxSpinT2h.genF]
+  cases rlI with
+  | none =>
+    simp only [AxSpinPO5.ann4O]
+    iintro ⟨A1, A2⟩ AN -
+    iapply (AxSpinT2h.wpdEndL L GT nm i (k + 9) (by omega)
+      [((i, kg1), AxSpinLd4P.genFact4 GT i (paZ Pn) kg1),
+       ((i, kg2), AxSpinLd4P.genFact4 GT i (paZ Pn) kg2),
+       ((i, k + 6), AxSpinLd4P.rlFact4 GT i (paZ Pn) (k + 6)
+          (stBytes 4 (AxSpinPO3.addiw1 (ldRes false 4 vp))))]
+      (by simp) (by simp <;> omega) Ψ ?_ pr)
+    · intro HA _
+      have := Hb (Hb' (HA _ List.mem_cons_self)
+        (HA _ (List.mem_cons_of_mem _ List.mem_cons_self))
+        (HA _ (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))))
+      cases this
+    · simp only [AxSpinT2h.annSep]
+      isplitl [A1]
+      · iexact A1
+      isplitl [A2]
+      · iexact A2
+      isplitl [AN]
+      · iexact AN
+      itrivial
+  | some x =>
+    obtain ⟨kwi', vwi, clsi'⟩ := x
+    simp only [AxSpinPO5.ann4O]
+    iintro ⟨A1, A2⟩ AN AI
+    iapply (AxSpinT2h.wpdEndL L GT nm i (k + 9) (by omega)
+      [((i, kg1), AxSpinLd4P.genFact4 GT i (paZ Pn) kg1),
+       ((i, kg2), AxSpinLd4P.genFact4 GT i (paZ Pn) kg2),
+       ((i, k + 6), AxSpinLd4P.rlFact4 GT i (paZ Pn) (k + 6)
+          (stBytes 4 (AxSpinPO3.addiw1 (ldRes false 4 vp)))),
+       ((i, k + 8), AxSpinLd4P.rlFact4 GT i (paZ Pi) (k + 8) vwi)]
+      (by simp) (by simp <;> omega) Ψ ?_ pr)
+    · intro HA s
+      have Hs := Hb (Hb' (HA _ List.mem_cons_self)
+        (HA _ (List.mem_cons_of_mem _ List.mem_cons_self))
+        (HA _ (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))))
+      simp only [Option.some.injEq, Prod.mk.injEq] at Hs
+      obtain ⟨-, rfl, -⟩ := Hs
+      have HI := HA _ (List.mem_cons_of_mem _ (List.mem_cons_of_mem _
+        (List.mem_cons_of_mem _ List.mem_cons_self)))
+      exact HΨ hL (fun _ vs Hv => AxSpinT2h.intenaGate (gtAdGd GT) Hcons.1 i (k + 8) (paZ Pi)
+        (Hrd8 (by omega)) HI vs Hv) s
+    · simp only [AxSpinT2h.annSep]
+      isplitl [A1]
+      · iexact A1
+      isplitl [A2]
+      · iexact A2
+      isplitl [AN]
+      · iexact AN
+      isplitl [AI]
+      · iexact AI
+      itrivial
 
 end arms
 
