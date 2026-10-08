@@ -27,6 +27,21 @@ TLB kept ∧ a5 = 0 ∧ every other GPR kept ∧ the claim's graph value at `(i,
 `u = aqKh k b hb` (claim at `aqKA`, continuation at `aqKm`, both definitional) — the form
 `AxSpinAq2.wpdAcquire` composes after `holdingFromAcquire'` and before `wpdMycpu`.
 
+## Stage 2 P-FORM (Lean-only; notes/weak-lb-thm2-stage2.md §B, §C row `AxSpinAq1`, Q-S2-1/2)
+
+`AxSpinAq1.spinLoopP` / `wpdSpinP` / `wpdSpinAqP` are the loop on a PREFIX row: the row premises
+are `AxSpinAq1.spinRmwP` / `AxSpinAq1.spinValsP` (the stage-1 conditions at PRESENT positions only,
+definitionally `AxSpinT2f.spinRmwP` / `spinValsP`), no length premise, and the WINDOWED,
+RESOURCE-FREE row-end hook (the merged form of AxSpinE8 / AxSpinPO4 / AxSpinHdA)
+  `HΨend : ∀ k', u ≤ k' → k' ≤ u + (n + 1) → (grow (gtAdGd GT) i).length ≤ k' →
+     ∀ pr : Pexv6, ⊢ wpdM … .MaybeStuck i ⟨pr, k'⟩ Ψ`
+(`wpdSpinAqP`: window `[aqKh, aqKm]`).  ONE generic site in the induction, two `by_cases` per
+iteration: `LEN ≤ u + j` (before the iteration) and `LEN ≤ u + (j + 1)` (after its RMW — so the
+row may end after ANY failed amoswap, or after the claim).  The loop has no designated cut.
+`KSpin` (unchanged) is reached only when `u + (n + 1) < LEN`.  `spinLoop`, `wpdSpin`,
+`wpdSpinAq` keep their exact statements; `spinLoop` is now the corollary of `spinLoopP`
+(`spinRmwPOf`/`spinValsPOf`; hook vacuous under `u + (n + 1) < LEN`).
+
 ## How
 
 Induction on the number of remaining iterations (`AxSpinAq1.spinLoop`, the `AxSpinAp9.scanLoop`
@@ -93,7 +108,9 @@ Otherwise none from the design.  (Design wording "`XxAmoswap` with `FstAcqNh …
 `AxSpinAq1.backEdge`, `AxSpinAq1.aqFailZ4`, `AxSpinAq1.sxw0Z4`, `AxSpinAq1.sxw0Low`,
 `AxSpinAq1.aqFailOfLow`, `AxSpinAq1.keep15`, `AxSpinAq1.tok1a`/`tok1c`/`tok20`/`tok22`,
 `AxSpinAq1.rfF1a`/`rfF22`, `AxSpinAq1.oAcqClaim`, `AxSpinAq1.oAcqFail`, `AxSpinAq1.annotSplitX`,
-`AxSpinAq1.KSpin`, `AxSpinAq1.spinLoop`, `wpdSpin`, `wpdSpinAq` (+ 1 local macro).
+`AxSpinAq1.KSpin`, `AxSpinAq1.spinLoop`, `wpdSpin`, `wpdSpinAq` (+ 1 local macro); stage 2:
+`AxSpinAq1.spinRmwP`, `AxSpinAq1.spinValsP`, `AxSpinAq1.spinRmwPOf`, `AxSpinAq1.spinValsPOf`,
+`AxSpinAq1.spinLoopP`, and (unqualified, grepped unique) `wpdSpinP`, `wpdSpinAqP`.
 -/
 import Weak.AxSpinAqr
 import Weak.AxSpinAqt2
@@ -129,6 +146,26 @@ theorem AxSpinAq1.rowSpinOfRmw (row : List Lbl) (u n : Nat) (lk : Int) :
   obtain ⟨t, rvs, Hl, -⟩ := H j hj
   refine ⟨_, Hl, ?_⟩
   simp only [aident, AxSpinX4.o4, wbytesLength]
+
+/-- (Lean-only, stage 2) `AxSpinAq1.spinRmw` on a PREFIX row: only the PRESENT iterations
+(`u + j < row.length`) are constrained (definitionally `AxSpinT2f.spinRmwP`). -/
+def AxSpinAq1.spinRmwP (row : List Lbl) (u n : Nat) (lk : Int) : Prop :=
+  ∀ j, j ≤ n → u + j < row.length → ∃ (t : Nat) (rvs : List (BitVec 8)),
+    row[u + j]? = some (.LRmw true false lk [t, t, t, t] rvs AxSpinX4.o4 .WCexcl) ∧
+    (rvs = AxSpinX4.z4 ∨ ∃ b0', rvs[0]? = some b0' ∧ b0' ≠ b0)
+
+/-- (Lean-only, stage 2) `spinVals` on a PREFIX row (definitionally `AxSpinT2f.spinValsP`). -/
+def AxSpinAq1.spinValsP (row : List Lbl) (u n : Nat) : Prop :=
+  ∀ j, j ≤ n → u + j < row.length → ∃ lb vs, row[u + j]? = some lb ∧ lblValue lb = some vs ∧
+    aqFail vs = decide (j < n)
+
+theorem AxSpinAq1.spinRmwPOf {row : List Lbl} {u n : Nat} {lk : Int} :
+    AxSpinAq1.spinRmw row u n lk → AxSpinAq1.spinRmwP row u n lk :=
+  fun H j hj _ => H j hj
+
+theorem AxSpinAq1.spinValsPOf {row : List Lbl} {u n : Nat} :
+    spinVals row u n → AxSpinAq1.spinValsP row u n :=
+  fun H j hj _ => H j hj
 
 theorem AxSpinAq1.lwbAll (L : Xlay) : ∀ a, L.xlLk ≤ a ∧ a < L.xlLk + 4 → a ∈ lwb L := by
   rintro a ⟨h1, h2⟩
@@ -273,14 +310,19 @@ variable (HΨmid : ∀ s, midState s → s.atK = (AxOpsem.grow (gtAdGd GT) i).le
 
 set_option maxHeartbeats 4000000 in
 include HL Hcons hmode hasid hppn Hfix Htxt HΨmid in
-/-- The loop by induction on the remaining iterations `m` (iteration `j`, `j + m = n + 1`). -/
-theorem AxSpinAq1.spinLoop (u n : Nat) (rs0 : RegFile) (Pl : BitVec 64)
-    (Hrmw : AxSpinAq1.spinRmw (AxOpsem.grow (gtAdGd GT) i) u n L.xlLk)
-    (Hvals : spinVals (AxOpsem.grow (gtAdGd GT) i) u n)
-    (Hlen : u + (n + 1) < (AxOpsem.grow (gtAdGd GT) i).length)
+/-- (Lean-only, stage 2) THE LOOP on a PREFIX row, by induction on the remaining iterations `m`
+(iteration `j`, `j + m = n + 1`): a `by_cases` on `LEN ≤ u + j` (before the iteration) and on
+`LEN ≤ u + (j + 1)` (after its RMW); the row-end case is the windowed resource-free hook. -/
+theorem AxSpinAq1.spinLoopP (u n : Nat) (rs0 : RegFile) (Pl : BitVec 64)
+    (Hrmw : AxSpinAq1.spinRmwP (AxOpsem.grow (gtAdGd GT) i) u n L.xlLk)
+    (Hvals : AxSpinAq1.spinValsP (AxOpsem.grow (gtAdGd GT) i) u n)
     (Hpl : paZ Pl = L.xlLk) (Hntx : ¬ L.xlText (paZ Pl))
     (Hda : dataAtS σi T (accAmo true) (gprVal rs0 9#5) 4 Pl)
-    (Hhit : hitW rs0 (AxSpinHdB.pac 0x1a)) (Hhv : hitW rs0 (gprVal rs0 9#5)) :
+    (Hhit : hitW rs0 (AxSpinHdB.pac 0x1a)) (Hhv : hitW rs0 (gprVal rs0 9#5))
+    (HΨend : ∀ k' : Nat, u ≤ k' → k' ≤ u + (n + 1) →
+      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' → ∀ pr : Pexv6,
+        ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+          ⟨pr, k'⟩ Ψ) :
     ∀ m j, j + m = n + 1 → 0 < m → ∀ (rs : RegFile) (ib : Ibch),
       ctrlOkSW T satp0 rs → rs .PC = AxSpinHdB.pac 0x1a → rs .tlb = rs0 .tlb →
       (∀ r : BitVec 5, r.toNat ≠ 15 → gprVal rs r = gprVal rs0 r) →
@@ -295,9 +337,16 @@ theorem AxSpinAq1.spinLoop (u n : Nat) (rs0 : RegFile) (Pl : BitVec 64)
   | succ m ih =>
   intro j hjm _ rs ib Hc HPC Htl Hkeep
   have hj : j ≤ n := by omega
-  obtain ⟨t, rvs, Hlb, Hcase⟩ := Hrmw j hj
+  -- row end before iteration `j`
+  by_cases E0 : (AxOpsem.grow (gtAdGd GT) i).length ≤ u + j
+  · iintro #Hil Hnh K
+    iclear Hnh
+    iclear K
+    iapply (HΨend _ (by omega) (by omega) E0 _)
+  have Hlen : u + j < (AxOpsem.grow (gtAdGd GT) i).length := by omega
+  obtain ⟨t, rvs, Hlb, Hcase⟩ := Hrmw j hj Hlen
   have Hfail : aqFail rvs = decide (j < n) := by
-    obtain ⟨lb', vs', Hlb', Hv', Hf⟩ := Hvals j hj
+    obtain ⟨lb', vs', Hlb', Hv', Hf⟩ := Hvals j hj Hlen
     rw [Hlb] at Hlb'
     cases Hlb'
     simp only [lblValue, Option.some.injEq] at Hv'
@@ -369,6 +418,11 @@ theorem AxSpinAq1.spinLoop (u n : Nat) (rs0 : RegFile) (Pl : BitVec 64)
   have HPC2 : rs2 .PC = AxSpinHdB.pac 0x20 := by rw [gbPc T satp0 _ _ _ _ _ _ HG2]; decide
   have Htl2 : rs2 .tlb = rs0 .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG2).trans Htl1
   rw [show u + j + 1 = u + (j + 1) by omega]
+  -- row end after the RMW of iteration `j`
+  by_cases E1 : (AxOpsem.grow (gtAdGd GT) i).length ≤ u + (j + 1)
+  · iclear HO
+    iclear K
+    iapply (HΨend _ (by omega) (by omega) E1 _)
   -- ---- + 0x20: sext.w a5 (row u + (j + 1)) ----
   iapply (XR _ rs2 (u + (j + 1)) (AxSpinHdB.pac 0x20) true ins0a none _
     (retxRefl cpu rs2 (u + (j + 1)) ib2) (gbCtrl T satp0 _ _ _ _ _ _ HG2) HPC2
@@ -469,6 +523,82 @@ theorem AxSpinAq1.spinLoop (u n : Nat) (rs0 : RegFile) (Pl : BitVec 64)
     iapply (ih (j + 1) (by omega) (by omega) rs4 ib4 (gbCtrl T satp0 _ _ _ _ _ _ HG4)
       (gbPc T satp0 _ _ _ _ _ _ HG4) ((gbTlb T satp0 _ _ _ _ _ _ HG4).trans Htl3)
       (fun r hr => (HF4 r).trans (Hk3 r hr))) $$ Hil Hnh K
+
+include HL Hcons hmode hasid hppn Hfix Htxt HΨmid in
+/-- The loop by induction on the remaining iterations `m` (iteration `j`, `j + m = n + 1`).
+Stage 2: the full-row corollary of `AxSpinAq1.spinLoopP` (hook vacuous: `u + (n + 1) < LEN`). -/
+theorem AxSpinAq1.spinLoop (u n : Nat) (rs0 : RegFile) (Pl : BitVec 64)
+    (Hrmw : AxSpinAq1.spinRmw (AxOpsem.grow (gtAdGd GT) i) u n L.xlLk)
+    (Hvals : spinVals (AxOpsem.grow (gtAdGd GT) i) u n)
+    (Hlen : u + (n + 1) < (AxOpsem.grow (gtAdGd GT) i).length)
+    (Hpl : paZ Pl = L.xlLk) (Hntx : ¬ L.xlText (paZ Pl))
+    (Hda : dataAtS σi T (accAmo true) (gprVal rs0 9#5) 4 Pl)
+    (Hhit : hitW rs0 (AxSpinHdB.pac 0x1a)) (Hhv : hitW rs0 (gprVal rs0 9#5)) :
+    ∀ m j, j + m = n + 1 → 0 < m → ∀ (rs : RegFile) (ib : Ibch),
+      ctrlOkSW T satp0 rs → rs .PC = AxSpinHdB.pac 0x1a → rs .tlb = rs0 .tlb →
+      (∀ r : BitVec 5, r.toNat ≠ 15 → gprVal rs r = gprVal rs0 r) →
+      ⊢ isLock nm.xnReg L.xlLk (RPid L nm.xnH nm.xnM nm.xnI (gtAdGd GT)) -∗
+        notheld nm.xnReg L.xlLk i -∗
+        AxSpinAq1.KSpin (hlc := hlc) L GT nm T satp0 i cpu Ψ u n rs0 -∗
+        @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+          ⟨.PHart cpu (.pure ()) rs none ib, u + j⟩ Ψ :=
+  AxSpinAq1.spinLoopP L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxt Ψ HΨmid
+    u n rs0 Pl (AxSpinAq1.spinRmwPOf Hrmw) (AxSpinAq1.spinValsPOf Hvals) Hpl Hntx Hda Hhit Hhv
+    (fun _ _ h2 h3 => absurd h3 (by omega))
+
+include HL Hcons hmode hasid hppn Hfix Htxt HΨmid in
+/-- (Lean-only, stage 2) THE P-FORM of `wpdSpin` on a PREFIX row (`AxSpinAq1.spinRmwP` /
+`AxSpinAq1.spinValsP`, no length premise): the row may end before any iteration or after any
+RMW (in particular after any FAILED amoswap); those ends are the WINDOWED, RESOURCE-FREE hook
+over `[u, u + (n + 1)]`.  The spin loop has no designated cut.  `KSpin` is reached only when
+`u + (n + 1) < LEN`. -/
+theorem wpdSpinP (u j n : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pl : BitVec 64) :
+    -- the row
+    AxSpinAq1.spinRmwP (AxOpsem.grow (gtAdGd GT) i) u n L.xlLk →
+    AxSpinAq1.spinValsP (AxOpsem.grow (gtAdGd GT) i) u n →
+    j ≤ n →
+    -- the entry state
+    ctrlOkSW T satp0 rs0 → rs0 .PC = AxSpinHdB.pac 0x1a → hitW rs0 (AxSpinHdB.pac 0x1a) →
+    -- the lock word (`s1 = lk`)
+    paZ Pl = L.xlLk → ¬ L.xlText (paZ Pl) →
+    dataAtS σi T (accAmo true) (gprVal rs0 9#5) 4 Pl → hitW rs0 (gprVal rs0 9#5) →
+    -- the row-end hook (stage 2, design §B / Q-S2-2; windowed; no designated cut)
+    (∀ k' : Nat, u ≤ k' → k' ≤ u + (n + 1) →
+      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' → ∀ pr : Pexv6,
+        ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+          ⟨pr, k'⟩ Ψ) →
+    ⊢ isLock nm.xnReg L.xlLk (RPid L nm.xnH nm.xnM nm.xnI (gtAdGd GT)) -∗
+      notheld nm.xnReg L.xlLk i -∗
+      AxSpinAq1.KSpin (hlc := hlc) L GT nm T satp0 i cpu Ψ u n rs0 -∗
+      @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+        ⟨.PHart cpu (.pure ()) rs0 none ib0, u + j⟩ Ψ := by
+  intro Hrmw Hvals hj Hc HPC Hhit Hpl Hntx Hda Hhv HΨend
+  exact AxSpinAq1.spinLoopP L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxt Ψ HΨmid
+    u n rs0 Pl Hrmw Hvals Hpl Hntx Hda Hhit Hhv HΨend (n + 1 - j) j (by omega) (by omega) rs0 ib0
+    Hc HPC rfl (fun _ _ => rfl)
+
+include HL Hcons hmode hasid hppn Hfix Htxt HΨmid in
+/-- (Lean-only, stage 2) THE P-FORM of `wpdSpinAq`: `wpdSpinP 0 n` at `u = aqKh k b hb`, hook
+window `[aqKh, aqKm]`. -/
+theorem wpdSpinAqP (k : Nat) (b hb : Bool) (n : Nat) (rs0 : RegFile) (ib0 : Ibch)
+    (Pl : BitVec 64) :
+    AxSpinAq1.spinRmwP (AxOpsem.grow (gtAdGd GT) i) (aqKh k b hb) n L.xlLk →
+    AxSpinAq1.spinValsP (AxOpsem.grow (gtAdGd GT) i) (aqKh k b hb) n →
+    ctrlOkSW T satp0 rs0 → rs0 .PC = AxSpinHdB.pac 0x1a → hitW rs0 (AxSpinHdB.pac 0x1a) →
+    paZ Pl = L.xlLk → ¬ L.xlText (paZ Pl) →
+    dataAtS σi T (accAmo true) (gprVal rs0 9#5) 4 Pl → hitW rs0 (gprVal rs0 9#5) →
+    (∀ k' : Nat, aqKh k b hb ≤ k' → k' ≤ aqKm k b hb n →
+      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' → ∀ pr : Pexv6,
+        ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+          ⟨pr, k'⟩ Ψ) →
+    ⊢ isLock nm.xnReg L.xlLk (RPid L nm.xnH nm.xnM nm.xnI (gtAdGd GT)) -∗
+      notheld nm.xnReg L.xlLk i -∗
+      AxSpinAq1.KSpin (hlc := hlc) L GT nm T satp0 i cpu Ψ (aqKh k b hb) n rs0 -∗
+      @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+        ⟨.PHart cpu (.pure ()) rs0 none ib0, aqKh k b hb⟩ Ψ := by
+  intro Hrmw Hvals Hc HPC Hhit Hpl Hntx Hda Hhv HΨend
+  exact wpdSpinP L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxt Ψ HΨmid
+    (aqKh k b hb) 0 n rs0 ib0 Pl Hrmw Hvals (Nat.zero_le _) Hc HPC Hhit Hpl Hntx Hda Hhv HΨend
 
 include HL Hcons hmode hasid hppn Hfix Htxt HΨmid in
 /-- THE SPIN LOOP of `acquire` (+ 0x1a … + 0x22), from iteration `j ≤ n` at the boundary
