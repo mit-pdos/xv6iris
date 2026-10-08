@@ -41,6 +41,18 @@
         "LeanRV64D.Functions.xv6_resv_is_valid",
         "LeanRV64D.Functions.xv6_resv_matches"
       ]
+    },
+    {
+      "name": "Weak.allocpidRaceCert",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "opaques": [
+        "LeanRV64D.Functions.xv6_resv_is_valid",
+        "LeanRV64D.Functions.xv6_resv_matches"
+      ]
     }
   ],
   "platform_hooks": {
