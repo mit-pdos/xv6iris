@@ -495,5 +495,6 @@ import Weak.AxSpinAp5
 import Weak.AxSpinU4
 import Weak.AxSpinVA6
 import Weak.AxSpinE5
+import Weak.AxSpinAm
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
