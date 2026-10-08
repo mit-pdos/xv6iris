@@ -1,29 +1,30 @@
 /-
 Weak: **`TokC` (the pc-independent decode + expansion footprints, `AxSpinAp.TokC`) of the
-halfwords 4384 c398 8526 60e2 of Rocq's `allocpid`.**  Split for check time (template AxSpinE7b).
+halfwords 86ae 85aa of the inlined allocpid copy in `allocproc`** — the retry `c.mv a3,a1` (+
+0x60) and the wrap `c.mv a1,a0` (+ 0x62). Split for check time (template AxSpinE7b).
 
-Rocq: `iris/AxSpinAp4.v` @ xxvzwolszwmp.
+Rocq: `iris/AxSpinAp4.v` @ xxvzwolszwmp (owner ruling Q18: RETARGETED to the inlined code).
 
 ## Deviations from Rocq
 
-1. KERNEL DRIFT (`AxSpinAp` deviation 1, Q18): the halfwords are Rocq's; this tree's kernel
-   inlines `allocpid`, so they are not connected to the Lean image (`TokC` is a fact about
-   the halfword alone and holds regardless).
+1. KERNEL INLINING (`AxSpinAp` deviation 1 and its design section, Q18): the halfwords are the
+   inlined copy's (`AxSpinAp.apCodeImg` checks them against the Lean kernel image), not Rocq
+   allocpid's 4384 c398 8526 60e2; Rocq's `tkc_1e`, `tkc_24`, `tkc_32`, `tkc_34` are REPLACED by
+   `tkc60`, `tkc62` (same role: `TokC` of each compressed instruction of the code).
 2. DECODE (as `AxSpinE7b` deviation 2, the `AxRelease7.dcOf` recipe): Rocq's `kd_XXXX`
    (KernelDecode*) are not ported; `TokC`'s decode conjunct is the decoder's read-only kernel
    walk at `MachCSL.drefMisa` (`ax_epi_ledger_krfl`) turned into an `exec` fact by
    `execOfRunRead`; its `rfF` is `rff_auto` after pruning the decoder's pattern tests on the
    literal (Rocq `rfF_auto`); the expansion's `rfF` is `True.intro` (a compressed `execute`
-   is a `pure`).  Rocq's `ke_4384`/`ke_c398` (KernelDecode* expansion
-   facts) are `rfl` (`execute` of a compressed load/store is a `pure`).
+   is a `pure`).
 3. The Rocq `Ltac tkc kd ex` is the file-local macro `ax_spin_ap4_tkc`; it takes the
    halfword literal, the decoded compressed instruction (Rocq's evar) and the expansion fact.
 
-**Rocq → Lean name map.**  `tkc_1e` `tkc1e`, `tkc_24` `tkc24`, `tkc_32` `tkc32`, `tkc_34` `tkc34`
-(none in the duplicated-name table).  No Lean-only declarations.
+**Rocq → Lean name map.**  See deviation 1 (none in the duplicated-name table).  No Lean-only
+declarations.
 
-**Dropped:** nothing (Rocq 4 lemmas; Lean 4).  **Not ported:** the `Print Assumptions` line
-(the lint's axiom check covers it).
+**Dropped:** Rocq allocpid's `tkc_XX` (deviation 1).  **Not ported:** the `Print Assumptions`
+line (the lint's axiom check covers it).
 -/
 import Weak.AxSpinAp
 import Weak.AxRelease7
@@ -54,26 +55,14 @@ local macro "ax_spin_ap4_tkc" h:term:max i0:term:max hex:term:max : tactic =>
 
 set_option maxRecDepth 200000 in
 set_option maxHeartbeats 4000000 in
-/-- Rocq `tkc_1e`: `c.lw s1,0(a5)` (0x4384). -/
-theorem tkc1e : TokC (AxSpinE7.hw 0x4384) ap1e := by
-  ax_spin_ap4_tkc (0x4384#16) (.C_LW (0#5, .Cregidx 7#3, .Cregidx 1#3)) (fun _ => rfl)
+/-- `allocproc + 0x60`: `c.mv a3,a1` (0x86ae). -/
+theorem tkc60 : TokC (AxSpinE7.hw 0x86ae) ap60 := by
+  ax_spin_ap4_tkc (0x86ae#16) (.C_MV (.Regidx 13#5, .Regidx 11#5)) (execExecuteCMV _ _)
 
 set_option maxRecDepth 200000 in
 set_option maxHeartbeats 4000000 in
-/-- Rocq `tkc_24`: `c.sw a4,0(a5)` (0xc398). -/
-theorem tkc24 : TokC (AxSpinE7.hw 0xc398) ap24 := by
-  ax_spin_ap4_tkc (0xc398#16) (.C_SW (0#5, .Cregidx 7#3, .Cregidx 6#3)) (fun _ => rfl)
-
-set_option maxRecDepth 200000 in
-set_option maxHeartbeats 4000000 in
-/-- Rocq `tkc_32`: `c.mv a0,s1` (0x8526). -/
-theorem tkc32 : TokC (AxSpinE7.hw 0x8526) ap32 := by
-  ax_spin_ap4_tkc (0x8526#16) (.C_MV (.Regidx 10#5, .Regidx 9#5)) (execExecuteCMV _ _)
-
-set_option maxRecDepth 200000 in
-set_option maxHeartbeats 4000000 in
-/-- Rocq `tkc_34`: `c.ldsp ra,24(sp)` (0x60e2). -/
-theorem tkc34 : TokC (AxSpinE7.hw 0x60e2) ap34 := by
-  ax_spin_ap4_tkc (0x60e2#16) (.C_LDSP (3#6, .Regidx 1#5)) (execExecuteCLDSP _ _)
+/-- `allocproc + 0x62`: `c.mv a1,a0` (0x85aa). -/
+theorem tkc62 : TokC (AxSpinE7.hw 0x85aa) ap62 := by
+  ax_spin_ap4_tkc (0x85aa#16) (.C_MV (.Regidx 11#5, .Regidx 10#5)) (execExecuteCMV _ _)
 
 end Weak

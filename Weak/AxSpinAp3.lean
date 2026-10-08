@@ -1,15 +1,18 @@
 /-
 Weak: **`TokC` (the pc-independent decode + expansion footprints, `AxSpinAp.TokC`) of the
-halfwords 1101 ec06 e822 e426 1000 of Rocq's `allocpid`.**  Split for check time (template
+halfwords 4505 a021 of the inlined allocpid copy in `allocproc`** — the wrap constant `c.li
+a0,1` (+ 0x50) and the jump into the loop `c.j` (+ 0x5a). Split for check time (template
 AxSpinE7b).
 
-Rocq: `iris/AxSpinAp3.v` @ xxvzwolszwmp.
+Rocq: `iris/AxSpinAp3.v` @ xxvzwolszwmp (owner ruling Q18: RETARGETED to the inlined code).
 
 ## Deviations from Rocq
 
-1. KERNEL DRIFT (`AxSpinAp` deviation 1, Q18): the halfwords are Rocq's; this tree's kernel
-   inlines `allocpid`, so they are not connected to the Lean image (`TokC` is a fact about
-   the halfword alone and holds regardless).
+1. KERNEL INLINING (`AxSpinAp` deviation 1 and its design section, Q18): the halfwords are the
+   inlined copy's (`AxSpinAp.apCodeImg` checks them against the Lean kernel image), not Rocq
+   allocpid's 1101 ec06 e822 e426 1000; Rocq's `tkc_00`, `tkc_02`, `tkc_04`, `tkc_06`, `tkc_08`
+   are REPLACED by `tkc50`, `tkc5a` (same role: `TokC` of each compressed instruction of the
+   code).
 2. DECODE (as `AxSpinE7b` deviation 2, the `AxRelease7.dcOf` recipe): Rocq's `kd_XXXX`
    (KernelDecode*) are not ported; `TokC`'s decode conjunct is the decoder's read-only kernel
    walk at `MachCSL.drefMisa` (`ax_epi_ledger_krfl`) turned into an `exec` fact by
@@ -19,12 +22,11 @@ Rocq: `iris/AxSpinAp3.v` @ xxvzwolszwmp.
 3. The Rocq `Ltac tkc kd ex` is the file-local macro `ax_spin_ap3_tkc`; it takes the
    halfword literal, the decoded compressed instruction (Rocq's evar) and the expansion fact.
 
-**Rocq → Lean name map.**  `tkc_00` `tkc00`, `tkc_02` `tkc02`, `tkc_04` `tkc04`, `tkc_06` `tkc06`,
-`tkc_08` `tkc08`
-(none in the duplicated-name table).  No Lean-only declarations.
+**Rocq → Lean name map.**  See deviation 1 (none in the duplicated-name table).  No Lean-only
+declarations.
 
-**Dropped:** nothing (Rocq 5 lemmas; Lean 5).  **Not ported:** the `Print Assumptions` line
-(the lint's axiom check covers it).
+**Dropped:** Rocq allocpid's `tkc_XX` (deviation 1).  **Not ported:** the `Print Assumptions`
+line (the lint's axiom check covers it).
 -/
 import Weak.AxSpinAp
 import Weak.AxRelease7
@@ -55,32 +57,14 @@ local macro "ax_spin_ap3_tkc" h:term:max i0:term:max hex:term:max : tactic =>
 
 set_option maxRecDepth 200000 in
 set_option maxHeartbeats 4000000 in
-/-- Rocq `tkc_00`: `c.addi sp,-32` (0x1101). -/
-theorem tkc00 : TokC (AxSpinE7.hw 0x1101) ap00 := by
-  ax_spin_ap3_tkc (0x1101#16) (.C_ADDI (32#6, .Regidx 2#5)) (execExecuteCADDI _ _)
+/-- `allocproc + 0x50`: `c.li a0,1` (0x4505). -/
+theorem tkc50 : TokC (AxSpinE7.hw 0x4505) ap50 := by
+  ax_spin_ap3_tkc (0x4505#16) (.C_LI (1#6, .Regidx 10#5)) (execExecuteCLI _ _)
 
 set_option maxRecDepth 200000 in
 set_option maxHeartbeats 4000000 in
-/-- Rocq `tkc_02`: `c.sdsp ra,24(sp)` (0xec06). -/
-theorem tkc02 : TokC (AxSpinE7.hw 0xec06) ap02 := by
-  ax_spin_ap3_tkc (0xec06#16) (.C_SDSP (3#6, .Regidx 1#5)) (execExecuteCSDSP _ _)
-
-set_option maxRecDepth 200000 in
-set_option maxHeartbeats 4000000 in
-/-- Rocq `tkc_04`: `c.sdsp s0,16(sp)` (0xe822). -/
-theorem tkc04 : TokC (AxSpinE7.hw 0xe822) ap04 := by
-  ax_spin_ap3_tkc (0xe822#16) (.C_SDSP (2#6, .Regidx 8#5)) (execExecuteCSDSP _ _)
-
-set_option maxRecDepth 200000 in
-set_option maxHeartbeats 4000000 in
-/-- Rocq `tkc_06`: `c.sdsp s1,8(sp)` (0xe426). -/
-theorem tkc06 : TokC (AxSpinE7.hw 0xe426) ap06 := by
-  ax_spin_ap3_tkc (0xe426#16) (.C_SDSP (1#6, .Regidx 9#5)) (execExecuteCSDSP _ _)
-
-set_option maxRecDepth 200000 in
-set_option maxHeartbeats 4000000 in
-/-- Rocq `tkc_08`: `c.addi4spn s0,sp,32` (0x1000). -/
-theorem tkc08 : TokC (AxSpinE7.hw 0x1000) ap08 := by
-  ax_spin_ap3_tkc (0x1000#16) (.C_ADDI4SPN (.Cregidx 0#3, 8#8)) (execExecuteCADDI4SPN _ _)
+/-- `allocproc + 0x5a`: `c.j +8` (0xa021). -/
+theorem tkc5a : TokC (AxSpinE7.hw 0xa021) ap5a := by
+  ax_spin_ap3_tkc (0xa021#16) (.C_J (4#11)) (execExecuteCJ _)
 
 end Weak
