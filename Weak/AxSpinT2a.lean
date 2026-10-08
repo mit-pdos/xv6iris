@@ -37,7 +37,8 @@ NEW Lean file (no Rocq source: the Rocq development stopped before the capstone)
      cpu fields noff / intena at `cpuZ i + 120 / + 124` (`cpus[i]`); `p` = the proc slot.
    `allocFull row q i S p` = `RowShX 0 row (allocSeg …)` ∧ `row.length = t2Len q` ∧ the two
    `lkBranch`es ∧ `spinVals` ∧ `RowAllocpidBody` (plain-read bits) ∧ `AxSpinAq1.spinRmw` (the
-   spin items' exact labels) ∧ `t2CpuVals` (every lk->cpu write is a plain 8-byte store of
+   spin items' exact labels, RMW class `WCexcl` — the honest class, `AxSpinRl1.rowClsHonest`;
+   restated from `WCplain` 2026-10-08, AxSpinAmX) ∧ `t2CpuVals` (every lk->cpu write is a plain 8-byte store of
    `cvx i` or 0 — orchestrator ruling for AxSpinRl2's `CpuWin`; true on real rows, the data is
    fixed by the code).  Projections:
    `allocAcquire` (AxSpinAqr's `RowAcquire 0 …`), `allocBody`, `allocRelease` (Rl1's

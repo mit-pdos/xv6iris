@@ -31,7 +31,8 @@ TLB kept ∧ a5 = 0 ∧ every other GPR kept ∧ the claim's graph value at `(i,
 
 Induction on the number of remaining iterations (`AxSpinAq1.spinLoop`, the `AxSpinAp9.scanLoop`
 pattern).  Each iteration: `XxReg` (c.mv a5,a4; `certAdd`) → `XxAmoswap` (`AxSpinAm3`) with the
-write flow `FstAcqNh … (OAcq L GT nm i LK R2) (u+j) (u+j+1)` (`AxSpinAm4`, drawn from `isLock` ∗
+write flow `AxSpinAmX.fstAcqNh … .WCexcl (OAcq L GT nm i LK R2) (u+j) (u+j+1)` (`AxSpinAmX`,
+drawn from `isLock` ∗
 `notheld i`) → `XxReg` (sext.w; `certAddiw`, value `sxw0 (amoLdv 4 rvs)`) → `XxReg` (c.bnez a5;
 `certBTYPE`).  The branch direction is `aqFail rvs` of the RMW's PINNED graph value `rvs`, and
 `spinVals` says it is `decide (j < n)` — no new pin.  A failed iteration (`j < n`, so
@@ -52,12 +53,15 @@ i.e. 0x80000c72 / c74 / c78 / c7a) are entries of `AxSpinAq.aqCode`, tied to
 
 ## Premises / honesty
 
-* ROW PREMISE `AxSpinAq1.spinRmw row u n lk` (as `AxSpinAm4.FstAcqNh` / `AxSpinU.wpdAcquireX`
-  take it): for every `j ≤ n` the label at `u + j` is acquire's
-  `LRmw true false lk [t,t,t,t] rvs o4 WCplain` (timestamps, the written word `o4` = c.li's 1,
-  class plain) and `rvs = z4 ∨ rvs`'s low byte ≠ 0 (the lock word is only ever 0 / 1 — a graph
-  fact the flow does not derive; `FstAcqNh` needs it for the failure case).  It implies
-  AxSpinAqr's `RowSpin` (`AxSpinAq1.rowSpinOfRmw`).  `spinVals row u n` (AxSpinAqr) fixes the
+* ROW PREMISE `AxSpinAq1.spinRmw row u n lk` (as `AxSpinAmX.fstAcqNh` takes it): for every
+  `j ≤ n` the label at `u + j` is acquire's
+  `LRmw true false lk [t,t,t,t] rvs o4 WCexcl` (timestamps, the written word `o4` = c.li's 1,
+  class `WCexcl` — the class the hardware stamps on a fused RMW, `AxClsStep.pclsEv` /
+  `AxCert.wclsRmw`, and the one `AxSpinRl1.rowClsHonest` demands; Rocq's `wpd_acquireX` /
+  `FstAcq_nh` say `WCplain`, which no honest graph has — the flow is class-generic,
+  `AxSpinAmX.fstAcqNh`) and `rvs = z4 ∨ rvs`'s low byte ≠ 0 (the lock word is only ever
+  0 / 1 — a graph fact the flow does not derive; `FstAcqNh` needs it for the failure case).
+  It implies AxSpinAqr's `RowSpin` (`AxSpinAq1.rowSpinOfRmw`).  `spinVals row u n` (AxSpinAqr) fixes the
   loop count.  `u + (n + 1) < LEN`: the boundary after the claim runs two register-only
   instructions (`XxReg` needs `k < LEN`), as `RowAcquire`'s length conjunct gives.
 * Option V (Q20'): control flow is decided by graph VALUES (the RMW reads); the theorem proves
@@ -69,11 +73,14 @@ i.e. 0x80000c72 / c74 / c78 / c7a) are entries of `AxSpinAq.aqCode`, tied to
 
 ## Deviations
 
-None from the design.  (Design wording "`XxAmoswap` with `FstAcqNh … (OAcq LK RP)`": `OAcq`'s
-second component is `RCpu ∗ RNp`, i.e. `RP` unfolded, so the split is one `wpdAnnotSplit`.)
+RMW class (2026-10-08, found by AxSpinT2a): the RMW labels are stated at `WCexcl` (was
+`WCplain`, inherited from Rocq's `wpd_acquireX`); API names and argument order unchanged.
+Otherwise none from the design.  (Design wording "`XxAmoswap` with `FstAcqNh … (OAcq LK RP)`":
+`OAcq`'s second component is `RCpu ∗ RNp`, i.e. `RP` unfolded, so the split is one `wpdAnnotSplit`.)
 
 **Reused** (by name): `XxReg`, `AxSpinE6.ctlRegimeSW` (AxSpinE6); `XxAmoswap`, `AxSpinAm3.XAmo`
-(AxSpinAm3); `FstAcqNh`, `OAcq` (AxSpinAm4); `wpdAnnotSplit` (AxSpinH5); `RowSpin`, `spinVals`,
+(AxSpinAm3); `AxSpinAmX.fstAcqNh` (AxSpinAmX, class-generic `FstAcqNh`), `OAcq` (AxSpinAm4);
+`wpdAnnotSplit` (AxSpinH5); `RowSpin`, `spinVals`,
 `aqKh`/`aqKm`/`aqKA` (AxSpinAqr); `acquireText`, `aqFail`, `sxw0`, `a1a`, `a22`, `Wa1c`
 (AxSpinAq); `twa87ba`/`twa2781`/`twaFfe5` (AxSpinAqt2); `tokAmo`, `AxSpinAm.amoswapAcqAst`
 (AxSpinAm); `certAdd`/`certAddiw` (AxSpinE7), `certBTYPE`/`brOt` (AxSymCtl2); `retxRefl`,
@@ -90,7 +97,7 @@ second component is `RCpu ∗ RNp`, i.e. `RP` unfolded, so the split is one `wpd
 -/
 import Weak.AxSpinAqr
 import Weak.AxSpinAqt2
-import Weak.AxSpinAm4
+import Weak.AxSpinAmX
 import Weak.AxSpinH5
 import Weak.AxSpinHdA
 import Weak.AxSpinAp6
@@ -112,7 +119,7 @@ local macro "ax_spin_aq1_zsimp" loc:(ppSpace Lean.Parser.Tactic.location)? : tac
 disjunct (`FstAcqNh`'s premises), for every `j ≤ n`. -/
 def AxSpinAq1.spinRmw (row : List Lbl) (u n : Nat) (lk : Int) : Prop :=
   ∀ j, j ≤ n → ∃ (t : Nat) (rvs : List (BitVec 8)),
-    row[u + j]? = some (.LRmw true false lk [t, t, t, t] rvs AxSpinX4.o4 .WCplain) ∧
+    row[u + j]? = some (.LRmw true false lk [t, t, t, t] rvs AxSpinX4.o4 .WCexcl) ∧
     (rvs = AxSpinX4.z4 ∨ ∃ b0', rvs[0]? = some b0' ∧ b0' ≠ b0)
 
 /-- The label premise implies AxSpinAqr's `RowSpin`. -/
@@ -203,7 +210,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [InvGS_gen hlc GF] [Axann
 theorem AxSpinAq1.oAcqClaim (L : Xlay) (GT : GdexecT) (nm : Xv6N) (i : Agent) (kA t : Nat)
     (R1 R2 : IProp GF) (w : List (BitVec 8)) :
     (AxOpsem.grow (gtAdGd GT) i)[kA]? =
-      some (Lbl.LRmw true false L.xlLk [t, t, t, t] AxSpinX4.z4 AxSpinX4.o4 .WCplain) →
+      some (Lbl.LRmw true false L.xlLk [t, t, t, t] AxSpinX4.z4 AxSpinX4.o4 .WCexcl) →
     OAcq L GT nm i R1 R2 kA w ⊢
       iprop(AxAnnot.annotOwn (i, kA) R1 ∗ AxAnnot.annotOwn (i, kA) R2) := by
   intro h
@@ -214,7 +221,7 @@ theorem AxSpinAq1.oAcqClaim (L : Xlay) (GT : GdexecT) (nm : Xv6N) (i : Agent) (k
 theorem AxSpinAq1.oAcqFail (L : Xlay) (GT : GdexecT) (nm : Xv6N) (i : Agent) (kA t : Nat)
     (rvs : List (BitVec 8)) (R1 R2 : IProp GF) (w : List (BitVec 8)) :
     (AxOpsem.grow (gtAdGd GT) i)[kA]? =
-      some (Lbl.LRmw true false L.xlLk [t, t, t, t] rvs AxSpinX4.o4 .WCplain) →
+      some (Lbl.LRmw true false L.xlLk [t, t, t, t] rvs AxSpinX4.o4 .WCexcl) →
     rvs ≠ AxSpinX4.z4 →
     OAcq L GT nm i R1 R2 kA w ⊢ notheld nm.xnReg L.xlLk i := by
   intro h hne
@@ -308,7 +315,8 @@ theorem AxSpinAq1.spinLoop (u n : Nat) (rs0 : RegFile) (Pl : BitVec 64)
             RNp L nm.xnH nm.xnM nm.xnI (gtAdGd GT) (i, u + j)))
         (u + j) (u + j + 1) := by
     rw [Hpl]
-    exact FstAcqNh (hlc := hlc) L GT nm HL Hcons i (u + j) t rvs _ _ (u + j) (u + j + 1) Hlb Hcase
+    exact AxSpinAmX.fstAcqNh (hlc := hlc) L GT nm HL Hcons i (u + j) t rvs .WCexcl _ _ (u + j)
+      (u + j + 1) Hlb Hcase
       (AxSpinAq1.lwbAll L) (fun k' _ hk _ _ => by omega) (by unfold RPid; exact .rfl)
   have XA := XxAmoswap (hlc := hlc) L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ
     HΨmid (u + j) (AxSpinHdB.pac 0x1c) 15#5 9#5 15#5 (gprVal rs0 9#5) Pl
