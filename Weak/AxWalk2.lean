@@ -49,6 +49,8 @@ region-form corollary `wpdOfCertWRegionM` (`AxDataX9.CertW` through `CertWPOfCer
    `dok` after the section variables `M i Φ cpu G HG Hmid` (Rocq: the same).
 4. The riscv.cat instances (Rocq `Definition … := …M rvwmo_cat_consistent`): `WFr`/`WFw` are
    abbrevs, the rest theorems typed `type_of% (…M rvwmoCatConsistent)`.
+5. Q19 (provisional): `wpdOfCertWPM` has the case of the Lean-only `CertWP.pSf` (an SFENCE.VMA
+   announce, one row item), by `AxCert2.wpdSfNodeM` as the fence.
 
 **Rocq → Lean name map.**  `Wa` `Wa`, `wpd_wxrd_nodeM` `wpdWxrdNodeM`, `wpd_wxrd_node`
 `wpdWxrdNode`, `WFrM` `WFrM`, `WFwM` `WFwM`, `wres` `wres`, `WRes` `WRes`, `WRes_snoc`
@@ -499,6 +501,14 @@ theorem wpdOfCertWPM (Q : List (Nat × Wev) → Cst → Nat → Unit → ExecSt 
       exact ⟨rfl, rfl, rfl, rfl⟩
     · iintro %rs1 %ib1 %HA1
       iapply (ih rs1 ib1 HA1 Hb) $$ WFr WFw Hd Hw C
+  | pSf ws d b r k n w kk t Hsf _ ih =>
+    intro rs ib Hag Hb
+    iintro #WFr #WFw Hd Hw C
+    iapply (AxCert2.wpdSfNodeM M i Φ cpu G HG Hmid Hloc n w kk ib k
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hsf) $$ %rs %Hag
+    iintro %rs' %ib' %HA'
+    iapply (ih rs' ib' HA' (bposSucc G i k b Hb)) $$ WFr WFw Hd Hw C
   | pBa ws s k _ _ kk t _ ih | pCo ws s k _ kk t _ ih | pTl ws s k _ kk t _ ih
   | pTe ws s k _ kk t _ ih | pRx ws s k _ kk t _ ih | pTs ws s k _ kk t _ ih
   | pTx ws s k _ kk t _ ih | pCc ws s k kk t _ ih | pMsg ws s k _ kk t _ ih

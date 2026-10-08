@@ -35,6 +35,8 @@ instruction's start `k0` and before the current position `kc`.  `XBk` = `AxSpinE
    dok kind HnoRmw HnoSplit Out` (as `AxSpinE3.XB`).  `MState rs ∅ dev0_state` ↦
    `⟨rs, fun _ => none, testDevs⟩`, `Interface.Ret tt` ↦ `.pure ()`.
 4. The Ltac `silent_psK` is replaced by inline inversions (as `AxCert2.wpdOfCertM`).
+5. Q19 (provisional): `wpdOfCertK` has the case of the Lean-only `Cert.cSf` (an SFENCE.VMA
+   announce, one row item), by `AxCert2.wpdSfNodeM` as the fence.
 
 **Rocq → Lean name map.**  `CResK` `CResK`, `CResK_succ` `cResKSucc`, `wpd_of_CertK`
 `wpdOfCertK`, `wpd_instr_of_CertK` `wpdInstrOfCertK`, `XBk` `XBk`.
@@ -283,6 +285,15 @@ theorem wpdOfCertK (Q : Cst → Unit → ExecSt → Prop) (m : SailM Unit) (s : 
       exact ⟨rfl, rfl, rfl, rfl⟩
     · iintro %rs1 %ib1 %HA1
       iapply (IH rs1 ib1 kk HA1 Hb Hk0) $$ Hd C
+  | cSf d b r n w k t Hsf _ IH =>
+    intro rs ib kk Hag Hb Hk0
+    iintro Hd C
+    iapply (AxCert2.wpdSfNodeM rvwmoCatConsistent i Φ cpu G HG Hmid Hloc n w k ib kk
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hsf) $$ %rs %Hag
+    iintro %rs' %ib' %HA'
+    ihave Hd := (cResKSucc dok kind i Out k0 d kk) $$ Hd
+    iapply (IH rs' ib' (kk + 1) HA' (bposSucc G i kk b Hb) (by omega)) $$ Hd C
   | cBa s _ _ k t _ IH | cCo s _ k t _ IH | cTl s _ k t _ IH | cTe s _ k t _ IH
   | cRx s _ k t _ IH | cTs s _ k t _ IH | cTx s _ k t _ IH | cCc s k t _ IH
   | cMsg s _ k t _ IH | cGcc s k t _ IH =>

@@ -37,17 +37,20 @@ loads by their TAG (the constructor used, recorded in `ws`), not by the access k
    (`akLatest = true` excludes a fetch).
 3. TYPES: `Z` ↦ `Int`, `list (bv 8)` ↦ `List (BitVec 8)`, `N.to_nat n` ↦ `n : Nat`,
    `pa_z` ↦ `paZ`, `img_bytes` ↦ `imgBytes`, `Defs.bind` ↦ `>>=`.
+4. Q19 (provisional, as `AxCert` deviation 10): the Lean-only constructor `wSf` (an SFENCE.VMA
+   announce, `sfAnnB n w = true`: the marker fence, one row item, `ws` kept), so that
+   `CertWOfCert` covers `AxCert.Cert.cSf`.
 
 **Rocq → Lean name map.**  `wev` `Wev` (constructors `WRd`, `WRmwR`, `WRmw` kept), `CertW`
 `CertW` (constructors `w_ret` `wRet`, `w_rd` `wRd`, `w_wr` `wWr`, `w_mrd` `wMrd`, `w_end` `wEnd`,
 `w_drd` `wDrd`, `w_dwr` `wDwr`, `w_fence` `wFence`, `w_xrd` `wXrd`, `w_xwr` `wXwr`, `w_ia` `wIa`,
 `w_ba` `wBa`, `w_co` `wCo`, `w_tl` `wTl`, `w_te` `wTe`, `w_rx` `wRx`, `w_ts` `wTs`, `w_tx` `wTx`,
 `w_cc` `wCc`, `w_msg` `wMsg`, `w_gcc` `wGcc`, `w_ext` `wExt`, `w_wrd` `wWrd`, `w_wxrd` `wWxrd`,
-`w_wxwr` `wWxwr`; Lean-only `wIf`), `CertW_mono` `CertWMono`, `CertW_bind` `CertWBind`,
+`w_wxwr` `wWxwr`; Lean-only `wIf`, `wSf`), `CertW_mono` `CertWMono`, `CertW_bind` `CertWBind`,
 `CertW_of_Cert` `CertWOfCert`.  None is in the duplicated-name table.
 
-**Dropped:** nothing (Rocq 2 inductives + 3 lemmas; Lean 2 + 3, + the Lean-only constructor
-`wIf`).  **Not ported:** the section-local Ltac `certw_ctor` (Lean proofs name the constructor per
+**Dropped:** nothing (Rocq 2 inductives + 3 lemmas; Lean 2 + 3, + the Lean-only constructors
+`wIf`, `wSf`).  **Not ported:** the section-local Ltac `certw_ctor` (Lean proofs name the constructor per
 case) and `Print Assumptions`.
 -/
 import Weak.AxCert
@@ -163,6 +166,11 @@ inductive CertW (img : Image) (dok wok : Int → Nat → Prop) (kind : Dkind) {X
   | wIa (ws : List Wev) (s : Cst) (n : Nat) (w : BitVec n) (k : Unit → SailM X) (t : ExecSt) :
       sfAnnB n w = false → CertW img dok wok kind QE Q ws s (k ()) t →
       CertW img dok wok kind QE Q ws s (.impure (.ok (.instrAnnounce n w)) k) t
+  /-- (Lean-only, Q19) the SFENCE.VMA announce: the marker fence, one row item -/
+  | wSf (ws : List Wev) (d : Cdata) (b : Bud) (r : Bool) (n : Nat) (w : BitVec n)
+      (k : Unit → SailM X) (t : ExecSt) :
+      sfAnnB n w = true → CertW img dok wok kind QE Q ws ⟨d, b, r⟩ (k ()) t →
+      CertW img dok wok kind QE Q ws ⟨d, bsucc b, r⟩ (.impure (.ok (.instrAnnounce n w)) k) t
   | wBa (ws : List Wev) (s : Cst) (n : Nat) (a : BitVec n) (k : Unit → SailM X) (t : ExecSt) :
       CertW img dok wok kind QE Q ws s (k ()) t →
       CertW img dok wok kind QE Q ws s (.impure (.ok (.branchAnnounce n a)) k) t
@@ -260,6 +268,7 @@ theorem CertWMono {X : Type} (QE QE' : List Wev → Cst → Sail.Error exception
   | wXwr ws aq rvs b r n va req k t v h1 h2 h3 h4 h5 _ ih =>
     exact .wXwr ws aq rvs b r n va req k t v h1 h2 h3 h4 h5 ih
   | wIa ws s n w k t hs _ ih => exact .wIa ws s n w k t hs ih
+  | wSf ws d b r n w k t hs _ ih => exact .wSf ws d b r n w k t hs ih
   | wBa ws s n a k t _ ih => exact .wBa ws s n a k t ih
   | wCo ws s c k t _ ih => exact .wCo ws s c k t ih
   | wTl ws s c k t _ ih => exact .wTl ws s c k t ih
@@ -301,6 +310,7 @@ theorem CertWBind {X Y : Type} (QE : List Wev → Cst → Sail.Error exception �
   | wXwr ws aq rvs b r n va req k t v h1 h2 h3 h4 h5 _ ih =>
     exact .wXwr ws aq rvs b r n va req _ t v h1 h2 h3 h4 h5 ih
   | wIa ws s n w k t hs _ ih => exact .wIa ws s n w _ t hs ih
+  | wSf ws d b r n w k t hs _ ih => exact .wSf ws d b r n w _ t hs ih
   | wBa ws s n a k t _ ih => exact .wBa ws s n a _ t ih
   | wCo ws s c k t _ ih => exact .wCo ws s c _ t ih
   | wTl ws s c k t _ ih => exact .wTl ws s c _ t ih
@@ -346,6 +356,7 @@ theorem CertWOfCert (img : Image) (dok wok : Int → Nat → Prop) (kind : Dkind
   | cXwr aq rvs b r n va req k t v h1 h2 h3 h4 h5 _ ih =>
     exact .wXwr ws aq rvs b r n va req k t v h1 h2 h3 h4 h5 ih
   | cIa s n w k t hs _ ih => exact .wIa ws s n w k t hs ih
+  | cSf d b r n w k t hs _ ih => exact .wSf ws d b r n w k t hs ih
   | cBa s n a k t _ ih => exact .wBa ws s n a k t ih
   | cCo s c k t _ ih => exact .wCo ws s c k t ih
   | cTl s c k t _ ih => exact .wTl ws s c k t ih

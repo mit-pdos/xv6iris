@@ -53,6 +53,12 @@ wrapper `AxCertP2.wpdInstrOfCertP`.
    `img dok kind i Φ cpu G HG Hmid Htext Hflow Hloc Out k0 c HnoRmwW HnoSplitW`.
    `AxCertP2.cinv` takes `QE Q s m t` implicitly.
 4. The Ltac `silent_psP` is replaced by inline inversions (as `wpdOfCertK`).
+5. Q19 (provisional, as `AxCert.Cert.cSf`): the SFENCE.VMA announce is one row item.  `CInvO`'s
+   `instrAnnounce` arm is a disjunction — non-sfence (`sfAnnB n w = false`, state kept) or sfence
+   (`sfAnnB n w = true`, budget `bsucc b'` consumed, data/release kept).  `FamBound` / `FamRBound`
+   split an announce on `sfAnnB` (the sfence arm consumes like a fence).  The bridge gains a `cSf`
+   arm via `AxCert2.wpdSfNodeM` (no pin refutation: `CResK` carries no pin).  Lean-only,
+   file-qualified: `AxCertP2.annCons` (the announce inversion) and `AxCertP2.PFSf` (the `PF` step).
 
 **Rocq → Lean name map.**  `CInvO` `CInvO`, `CInv` `CInv`, `cinv` `AxCertP2.cinv` (`Weak.cinv`
 exists in WeakRvwmoCert3), `Qc` `Qc`, `FamP` `FamP`, `isR` `AxCertP2.isR` (`Weak.isR` exists in WeakAxiomatic), `v0` `v0`, `img_bytes_len`
@@ -64,7 +70,7 @@ exists in WeakRvwmoCert3), `Qc` `Qc`, `FamP` `FamP`, `isR` `AxCertP2.isR` (`Weak
 `AxCertP2.wpdOfCertP`, `wpd_instr_of_CertP` `AxCertP2.wpdInstrOfCertP` (both duplicated with
 AxCondM2).
 
-**Dropped:** nothing (Rocq 31 definitions/lemmas; Lean 31 + 2 Lean-only).  **Not ported:** the
+**Dropped:** nothing (Rocq 31 definitions/lemmas; Lean 31 + 4 Lean-only).  **Not ported:** the
 Ltac `silent_psP` (deviation 4), the `Print Assumptions` lines (the lint's axiom check covers them).
 -/
 import Weak.AxCertP
@@ -126,7 +132,10 @@ def CInvO {X : Type} (QE : Cst → Sail.Error exception → ExecSt → Prop)
   | .ok .getCycleCount, k => AxCert.Cert img dok kind QE Q s (k (0 : Nat)) t
   | .ok (.message _), k => AxCert.Cert img dok kind QE Q s (k ()) t
   | .ok (.choose _), _ => False
-  | .ok (.instrAnnounce _ _), k => AxCert.Cert img dok kind QE Q s (k ()) t
+  | .ok (.instrAnnounce n w), k =>
+      (sfAnnB n w = false ∧ AxCert.Cert img dok kind QE Q s (k ()) t)
+      ∨ (sfAnnB n w = true ∧ ∃ b', s.csB = bsucc b' ∧
+           AxCert.Cert img dok kind QE Q ⟨s.csD, b', s.csR⟩ (k ()) t)
   | .ok (.branchAnnounce _ _), k => AxCert.Cert img dok kind QE Q s (k ()) t
   | .error e, _ => QE s e t
 
@@ -153,7 +162,8 @@ theorem AxCertP2.cinv {X : Type} {QE : Cst → Sail.Error exception → ExecSt �
   | cXrd b r n va req k t _ _ h2 _ h =>
     exact Or.inr (Or.inr (Or.inr (Or.inr ⟨rfl, h2, fun vs hl => ⟨_, h vs hl⟩⟩)))
   | cXwr aq rvs b r n va req k t v _ _ _ _ _ h => exact ⟨b, _, rfl, h⟩
-  | cIa s n w k t _ h => exact h
+  | cIa s n w k t hs h => exact Or.inl ⟨hs, h⟩
+  | cSf d b r n w k t hs h => exact Or.inr ⟨hs, b, rfl, h⟩
   | cBa s _ _ k t h => exact h
   | cCo s _ k t h => exact h
   | cTl s _ k t h => exact h
@@ -304,6 +314,23 @@ theorem fenceCons {X : Type} {QE : Cst → Sail.Error exception → ExecSt → P
     simp only [bsucc, Bud.BFin.injEq] at Hb
     exact ⟨b', Hb, H⟩
 
+/-- (Lean-only, deviation 5) The announce inversion: a non-sfence announce keeps the state, an
+sfence announce consumes one budget unit. -/
+theorem AxCertP2.annCons {X : Type} {QE : Cst → Sail.Error exception → ExecSt → Prop}
+    {Q : Cst → X → ExecSt → Prop} {d : Cdata} {b : Nat} {r : Bool} {n : Nat} {w : BitVec n}
+    {k : Unit → SailM X} {t : ExecSt} :
+    AxCert.Cert img dok kind QE Q ⟨d, .BFin b, r⟩ (.impure (.ok (.instrAnnounce n w)) k) t →
+    (sfAnnB n w = false ∧ AxCert.Cert img dok kind QE Q ⟨d, .BFin b, r⟩ (k ()) t) ∨
+    (sfAnnB n w = true ∧ ∃ b', b = b' + 1 ∧ AxCert.Cert img dok kind QE Q ⟨d, .BFin b', r⟩ (k ()) t) := by
+  intro H
+  rcases AxCertP2.cinv img dok kind H with ⟨Hs, H⟩ | ⟨Hs, b', Hb, H⟩
+  · exact Or.inl ⟨Hs, H⟩
+  · cases b' with
+    | BInf => cases Hb
+    | BFin b' =>
+      simp only [bsucc, Bud.BFin.injEq] at Hb
+      exact Or.inr ⟨Hs, b', Hb, H⟩
+
 theorem FamStepP {X : Type} (P P' : Cdata → Prop) (m m' : SailM X) (t t' : ExecSt) (a a' c : Nat)
     (H : ∀ d r j, P d →
       AxCert.Cert img dok kind (fun _ _ _ => False) (Qc (c + j)) ⟨d, .BFin (a + j), r⟩ m t →
@@ -406,6 +433,30 @@ theorem FamBound {X : Type} (m : SailM X) :
           obtain rfl : b' = a' + j := by omega
           exact ⟨d, _, trivial, H⟩) HF)
         omega
+      case instrAnnounce n w =>
+        cases Hs : sfAnnB n w with
+        | false =>
+          refine IH () t a c (FamStepP img dok kind _ _ _ _ t t a a c ?_ HF)
+          intro d rr j Hd Hc
+          rcases AxCertP2.annCons img dok kind Hc with ⟨-, H⟩ | ⟨Hs', -⟩
+          · exact ⟨d, rr, trivial, H⟩
+          · rw [Hs] at Hs'
+            cases Hs'
+        | true =>
+          obtain ⟨d0, r0, -, Hc0⟩ := HF 0
+          obtain ⟨a', rfl⟩ : ∃ a', a = a' + 1 := by
+            rcases AxCertP2.annCons img dok kind Hc0 with ⟨Hs', -⟩ | ⟨-, a', Ha, -⟩
+            · rw [Hs] at Hs'
+              cases Hs'
+            · exact ⟨a', by omega⟩
+          have := IH () t a' c (FamStepP img dok kind _ _ _ _ t t (a' + 1) a' c (by
+            intro d rr j Hd Hc
+            rcases AxCertP2.annCons img dok kind Hc with ⟨Hs', -⟩ | ⟨-, b', Hb, H⟩
+            · rw [Hs] at Hs'
+              cases Hs'
+            · obtain rfl : b' = a' + j := by omega
+              exact ⟨d, rr, trivial, H⟩) HF)
+          omega
       all_goals first
         | (exfalso
            obtain ⟨d, rr, -, Hc⟩ := HF 0
@@ -508,6 +559,30 @@ theorem FamRBound {X : Type} (m : SailM X) :
           obtain rfl : b' = a' + j := by omega
           exact ⟨d, _, Hd, H⟩) HF)
         omega
+      case instrAnnounce n w =>
+        cases Hs : sfAnnB n w with
+        | false =>
+          refine IH () t a c (FamStepP img dok kind _ _ _ _ t t a a c ?_ HF)
+          intro d rr j Hd Hc
+          rcases AxCertP2.annCons img dok kind Hc with ⟨-, H⟩ | ⟨Hs', -⟩
+          · exact ⟨d, rr, Hd, H⟩
+          · rw [Hs] at Hs'
+            cases Hs'
+        | true =>
+          obtain ⟨d0, r0, -, Hc0⟩ := HF 0
+          obtain ⟨a', rfl⟩ : ∃ a', a = a' + 1 := by
+            rcases AxCertP2.annCons img dok kind Hc0 with ⟨Hs', -⟩ | ⟨-, a', Ha, -⟩
+            · rw [Hs] at Hs'
+              cases Hs'
+            · exact ⟨a', by omega⟩
+          have := IH () t a' c (FamStepP img dok kind _ _ _ _ t t (a' + 1) a' c (by
+            intro d rr j Hd Hc
+            rcases AxCertP2.annCons img dok kind Hc with ⟨Hs', -⟩ | ⟨-, b', Hb, H⟩
+            · rw [Hs] at Hs'
+              cases Hs'
+            · obtain rfl : b' = a' + j := by omega
+              exact ⟨d, rr, Hd, H⟩) HF)
+          omega
       all_goals first
         | (exfalso
            obtain ⟨d, rr, -, Hc⟩ := HF 0
@@ -663,6 +738,28 @@ theorem PFFence {X : Type} {bk : barrier_kind} {k : Unit → SailM X} {c : Nat} 
     obtain ⟨b', Hb, H⟩ := fenceCons img dok kind Hc
     obtain rfl : b' = b + j := by omega
     exact ⟨d0, _, H⟩
+
+/-- (Lean-only, deviation 5) The `PF` step at an SFENCE.VMA announce (twin of `PFFence`). -/
+theorem AxCertP2.PFSf {X : Type} {n : Nat} {w : BitVec n} {k : Unit → SailM X} {c : Nat}
+    {d : Cdata} {b : Bud} {r : Bool} {t : ExecSt} :
+    sfAnnB n w = true →
+    PF img dok kind c ⟨d, bsucc b, r⟩ (.impure (.ok (.instrAnnounce n w)) k) t →
+    PF img dok kind c ⟨d, b, r⟩ (k ()) t := by
+  intro Hs
+  apply PFStep img dok kind c ⟨d, bsucc b, r⟩ ⟨d, b, r⟩ _ _ t t (fun h => h)
+  intro a Ha _
+  cases b with
+  | BInf => cases Ha
+  | BFin b =>
+    simp only [bsucc, Bud.BFin.injEq] at Ha
+    subst Ha
+    refine ⟨b, rfl, fun d0 r0 j Hc => ?_⟩
+    rw [show b + 1 + j = (b + j) + 1 by omega] at Hc
+    rcases AxCertP2.annCons img dok kind Hc with ⟨Hs', -⟩ | ⟨-, b', Hb, H⟩
+    · rw [Hs] at Hs'
+      cases Hs'
+    · obtain rfl : b' = b + j := by omega
+      exact ⟨d0, r0, H⟩
 
 end famP
 
@@ -910,7 +1007,18 @@ theorem AxCertP2.wpdOfCertP (Q : Cst → Unit → ExecSt → Prop) (m : SailM Un
       rw [annLabelNot Hsf]
       exact ⟨rfl, rfl, rfl, rfl⟩
     · iintro %rs1 %ib1 %HA1
-      iapply (IH (PFSil' img dok kind HPF (fun _ _ H => H)) rs1 ib1 kk HA1 Hb Hk0) $$ Hd C
+      iapply (IH (PFSil' img dok kind HPF (fun _ _ H => Or.elim H And.right
+        (fun h => absurd (Hsf.symm.trans h.1) Bool.false_ne_true))) rs1 ib1 kk HA1 Hb Hk0) $$ Hd C
+  | cSf d b r n w k t Hsf _ IH =>
+    intro HPF rs ib kk Hag Hb Hk0
+    iintro Hd C
+    iapply (AxCert2.wpdSfNodeM rvwmoCatConsistent i Φ cpu G HG Hmid Hloc n w k ib kk
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hsf) $$ %rs %Hag
+    iintro %rs' %ib' %HA'
+    ihave Hd := (cResKSucc dok kind i Out k0 d kk) $$ Hd
+    iapply (IH (AxCertP2.PFSf img dok kind Hsf HPF) rs' ib' (kk + 1) HA' (bposSucc G i kk b Hb)
+      (by omega)) $$ Hd C
   | cBa s _ _ k t _ IH | cCo s _ k t _ IH | cTl s _ k t _ IH | cTe s _ k t _ IH
   | cRx s _ k t _ IH | cTs s _ k t _ IH | cTx s _ k t _ IH | cCc s k t _ IH
   | cMsg s _ k t _ IH | cGcc s k t _ IH =>

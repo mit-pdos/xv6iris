@@ -1,7 +1,6 @@
 /-
-Weak: **the sfence.vma execute certificate, the TLB-post spine, the row-level marker-form PTW
-model, and the concrete pieces on xv6's `sfence.vma zero, zero` (0x12000073)** — the parts of
-Rocq's AxSfence2 that hold in the Lean engine (the WPd LEAF itself is PENDING, see below).
+Weak: **the sfence.vma X LEAF (WPd) in the S-mode regime, the row-level marker-form PTW model,
+and the concrete instance on xv6's `sfence.vma zero, zero` (0x12000073)**.
 
 Rocq: `iris/AxSfence2.v` @ xxvzwolszwmp.
 
@@ -23,32 +22,21 @@ Companion of AxSfence (graph level).
    and that the spine's tail (rd write, PC/minstret update `tfinal`, `tick_clock`'s frame
    `tickFrame`) preserves; it needs the regime's tick-frame stability `HCtick`.
    `CertXTPSfence`: the execute certificate of sfence.vma, TLB-flushed.
-§4 THE X LEAF (Rocq `X_sfence`, `X_sfence_agrees`, `X_sfence_S`, `X_sfence_agrees_S`) — PENDING.
+§4 THE X LEAF.  `XSfence` (generic regime: Supervisor, TVM = 0, closed under a TLB flush and
+   under the tick frame): from a boundary at `pc` holding `sfence.vma zero, zero`, WPd holds
+   given the continuation at the next boundary with PC + 4, GPRs unchanged, regime kept, and the
+   TLB FLUSHED in the continuation's register file (hence `tlbAgrees` for every asid/tree:
+   `XSfenceAgrees`).  `XSfenceS` / `XSfenceAgreesS`: the S-mode kernel regime
+   `ctrlOkS T satp0` (spine `spineOkTS`; the 4-byte fetch field `SpineFetch4T` stays a premise
+   as for every S-mode 4-byte leaf, AxCert4 RESIDUALS).
 §5 CONCRETE (non-vacuity) at AxLeafS3's S-mode state `σL` with xv6's word: `decSfence`
    (decode fact at every regime state), `text4Sfence`, `ctrlOkSWFlush`, `ctrlOkSWTick`;
-   Rocq's `sfence_whole` / `sfence_whole_agrees` (whole-instruction certificate) — PENDING;
-   `sfWordNotFence`: AxSfence's `sfWord` is NOT trivially true (xv6's `fence rw,w` word is not
-   an sfence word; the decode hypotheses hold at a concrete regime state).
-
-## PENDING (blocked; owner/orchestrator question, nothing is stubbed)
-
-Q7 (`notes/weak-port-q7-sfence.md`) makes the SFENCE.VMA ANNOUNCE a graph event (label
-`LFence false false false false`, `WeakEvLang.annLabel`).  The Lean `AxCert.Cert` has no arm
-for that node: `Cert.cIa` requires `sfAnnB n w = false` (AxCert deviation 3), so NO `Cert` of a
-whole `riscvStep` that executes an sfence.vma word exists, and `CertHartActiveBaseT` /
-`spineCertX(T)` all carry `sfAnnB 32 w = false`.  Rocq's leaf `X_sfence` (through
-`wpd_instr_of_Cert`) and its corollaries `X_sfence_agrees`, `X_sfence_S`, `X_sfence_agrees_S`,
-and the whole-instruction certificates `sfence_whole`, `sfence_whole_agrees`, therefore cannot
-be stated on the existing engine (their premises `Hdec`/`text_at4` at an sfence word would
-contradict `sfAnnB 32 w = false`).  Proposed fix (needs edits outside this file): a Cert arm
-`cSf (d b r n w k t) : sfAnnB n w = true → Cert … ⟨d, b, r⟩ (k ()) t → Cert … ⟨d, bsucc b, r⟩
-(.impure (.ok (.instrAnnounce n w)) k) t` (one row item, the marker; the release flag is
-unchanged since `relpUpd` of the all-false fence is the identity), its case in
-`AxCert2.wpdOfCertM` via a twin of `wpdFenceNodeM` at the announce node (`pnodeStep`'s announce
-arm emits `annLabel n w`, `AStepFence` is the only step), the trivial cases in the other
-`Cert` inductions (`CertMono`, `CertBind`, AxCert3 `certb`, AxDataX9 `CertWOfCert`, …), and an
-sfence twin of `CertHartActiveBaseT` without `hw`.  The Lean leaf's continuation is then at row
-position `k + 1` (the marker is a row item; Rocq: "no row item").
+   `sfenceWhole` — the WHOLE-INSTRUCTION certificate of the real `riscvStep` (both ticks, every
+   pin answer): PC + 4, regime kept, TLB flushed — and `sfenceWholeAgrees` (`tlbAgrees` after
+   it); `sfWordNotFence`: AxSfence's `sfWord` is NOT trivially true (xv6's `fence rw,w` word is
+   not an sfence word; the decode hypotheses hold at a concrete regime state).
+RESIDUALS (as Rocq): the leaf is for `sfence.vma zero, zero` (full flush; xv6's only form); the
+marker-form model `ptwModelRowF` is not yet the graph premise of a WPd.
 
 ## Deviations from Rocq
 
@@ -57,9 +45,10 @@ position `k + 1` (the marker is a row item; Rocq: "no row item").
    is the announce's own `LFence false false false false` row item.  It is replaced by
    `sfMarkOfRow`: a row item `LFence false false false false` of hart `i` at `k` IS an
    `sfMark` event of the graph.
-2. Q7 — §3: `spineCertXTTlb` takes `Hsf : sfAnnB 32 w = false` right after `textAt4 pc w` (as
-   AxDataX5's `spineCertXT`, deviation 1 there); so it does NOT apply to the sfence word (see
-   PENDING).
+2. Q19 (provisional) — §3: the engine certifies the SFENCE.VMA announce (`AxCert.Cert.cSf`, the
+   marker, AxCert deviation 10), so `spineCertXTTlb` keeps Rocq's statement (no `sfAnnB`
+   premise) and runs the 4-byte arm through `AxCert4.CertHartActiveBaseTAny` (AxDataX5's
+   `spineCertXT` still takes `sfAnnB 32 w = false`).
 3. TYPES / SPELLING as AxDataX5 / AxLeafS3: `vec (option TLB_Entry) (2^6)` ↦
    `Vector (Option TLB_Entry) (2 ^ 6)`; `vec_access_dec v j` with `0 ≤ j < 64` over `Z` ↦
    `v[j]!` with `j : Nat`, `j < 64`; `tlb_hash (__id 39) vpn` ↦ `tlb_hash 39 vpn`;
@@ -78,25 +67,37 @@ position `k + 1` (the marker is a row item; Rocq: "no row item").
    `AxLeafS3.wFence` (`BitVec.ofNat 32`).
 5. `ctrl_ok_SW_tick`'s Lean twin `tickFrameCtrlSW` exists in AxSpinE (not imported here); this
    file states its own `ctrlOkSWTick` (Rocq name, Rocq statement).
+6. Q19 (provisional) — §4: Rocq's leaf comment "no row item: the instruction's only event is its
+   fetch, which IS the H5' sfence marker" does not hold in Lean: the fetch is no row item (Stage
+   C) and the marker is the announce's row item (Q7), so the instruction consumes ONE row item
+   and the continuation actually sits at `k + 1`.  The statement is Rocq's (the continuation is
+   quantified over every position `k'`, as AxCert4's `XFenceM`; the `BInf` bridge
+   `wpdInstrOfCertM` does not report the position).  `WPd … @ MaybeStuck; i {{ Φ }}` ↦
+   `wpdM rvwmoCatConsistent .MaybeStuck i … Φ`, `Interface.Ret tt` ↦ `.pure ()`; the
+   instance `[InvGS_gen hlc GF]` is any `hlc`; section variables are explicit arguments (in
+   Rocq's order `img i cpu ctrlOk textAt textAt4 Hsp Hf4 Hpriv HTVM Hflush HCtick Htext Hflow
+   Hloc G HG Φ Hmid`).  The section premise `Hloc` is AxCert2's (kept for the fence/marker
+   node); `HnoRmw` / `HnoSplit` are discharged by `Dkind` disjointness (kind `DKSt`).
+7. Rocq's `Definition`s `X_sfence_S` / `X_sfence_agrees_S` (partial applications) are theorems
+   typed `type_of%`, taking `hmode hasid hppn textAt4 Hf4 i cpu` (Rocq's section `xsfence_S`).
 
 **Rocq → Lean name map.**  `ptw_model_row_f` `ptwModelRowF`; `sf_fetch_of_fetch_gd_ok` ↦
 `sfMarkOfRow` (deviation 1); `tlb_flushed` `tlbFlushed`; `tlb_flushed_hash` `tlbFlushedHash`;
 `tlb_agrees_flushed` `tlbAgreesFlushed`; `tlb_exact_flushed` `tlbExactFlushed`;
 `cert_execute_sfence` `certExecuteSfence`; `tfinal_tlb` `tfinalTlb`; `CertXTP` `CertXTP`;
-`spine_certXT_tlb` `spineCertXTTlb`; `CertXTP_sfence` `CertXTPSfence`; `ctrl_ok_S_flush`
-`ctrlOkSFlush`; `ctrl_ok_S_TVM` `ctrlOkSTVM`; `dec_sfence` `decSfence`; `text4_sfence`
-`text4Sfence`; `ctrl_ok_SW_flush` `ctrlOkSWFlush`; `ctrl_ok_SW_tick` `ctrlOkSWTick`;
+`spine_certXT_tlb` `spineCertXTTlb`; `CertXTP_sfence` `CertXTPSfence`; `X_sfence` `XSfence`;
+`X_sfence_agrees` `XSfenceAgrees`; `ctrl_ok_S_flush` `ctrlOkSFlush`; `ctrl_ok_S_TVM`
+`ctrlOkSTVM`; `X_sfence_S` `XSfenceS`; `X_sfence_agrees_S` `XSfenceAgreesS`; `dec_sfence`
+`decSfence`; `text4_sfence` `text4Sfence`; `ctrl_ok_SW_flush` `ctrlOkSWFlush`; `ctrl_ok_SW_tick`
+`ctrlOkSWTick`; `sfence_whole` `sfenceWhole`; `sfence_whole_agrees` `sfenceWholeAgrees`;
 `sf_word_not_fence` `sfWordNotFence`.  None is in the duplicated-name table.
 Lean-only (file-qualified): `AxSfence2.walkSfence`, `AxSfence2.walkFence` (the `runRead` twin
 of AxLeafS3's `walkFence`, for `sfWordNotFence`).
 
-**Dropped:** `rfF_dec_sfence` (deviation 4; unused).  **PENDING (not ported, see above):**
-`X_sfence`, `X_sfence_agrees`, `X_sfence_S`, `X_sfence_agrees_S`, `sfence_whole`,
-`sfence_whole_agrees` (no downstream Rocq file imports AxSfence2).  **Not ported:** the section
-notations `CM` / `EvM`, the Ltac `lk` (`RegFile` rewrites instead) and the `Print Assumptions`
-lines (the lint's axiom check covers them).
-Rocq 25 definitions/lemmas; Lean 18 ported (one restated, deviation 1) + 2 Lean-only; 6 pending,
-1 dropped.
+**Dropped:** `rfF_dec_sfence` (deviation 4; unused).  **Not ported:** the section notations
+`CM` / `EvM` / `boundary`, the Ltac `lk` (`RegFile` rewrites instead) and the `Print
+Assumptions` lines (the lint's axiom check covers them).
+Rocq 25 definitions/lemmas; Lean 24 ported (one restated, deviation 1) + 2 Lean-only; 1 dropped.
 -/
 import Weak.AxLeafS3
 import Weak.AxSfence
@@ -105,7 +106,7 @@ import Weak.ExecSC9
 
 namespace Weak
 
-open MachCSL
+open Iris Iris.BI Iris.ProofMode MachCSL
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
@@ -182,7 +183,7 @@ def CertXTP (img : Image) (dok : Int → Nat → Prop) (kind : Dkind)
         ∃ t0, tlbFrame tpc t0 ∧ ctrlOk t0.regs ∧ Ptlb (t0.regs .tlb) ∧ t' = wrOpt (ow s) t0)
       s0 (execute ins) tpc
 
-/-- Rocq `spine_certXT_tlb` (deviation 2: `Hsf`). -/
+/-- Rocq `spine_certXT_tlb` (deviation 2: through `AxCert4.CertHartActiveBaseTAny`). -/
 theorem spineCertXTTlb (img : Image) (dok : Int → Nat → Prop) (kind : Dkind)
     (ctrlOk : RegFile → Prop) (textAt : BitVec 64 → BitVec 16 → Prop)
     (textAt4 : BitVec 64 → BitVec 32 → Prop)
@@ -191,7 +192,7 @@ theorem spineCertXTTlb (img : Image) (dok : Int → Nat → Prop) (kind : Dkind)
     (Ptlb : Vector (Option TLB_Entry) (2 ^ 6) → Prop)
     (rs : RegFile) (pc : BitVec 64) (w : BitVec 32) (ins : instruction)
     (ow : Cst → Option (BitVec 5 × BitVec 64)) (d : Cdata) (r : Bool) (PX : Cst → Prop) :
-    ctrlOk rs → rs .PC = pc → textAt4 pc w → sfAnnB 32 w = false →
+    ctrlOk rs → rs .PC = pc → textAt4 pc w →
     (∀ t : ExecSt, ctrlOk t.regs →
       EvA img (fun _ _ => False) (fun x t' => x = ins ∧ t' = t) (ext_decode w) t) →
     (∀ s, PX s → owOk (ow s)) → (∀ s, PX s → s.csB = .BInf) →
@@ -200,7 +201,7 @@ theorem spineCertXTTlb (img : Image) (dok : Int → Nat → Prop) (kind : Dkind)
       AxCert.Cert img dok kind (fun _ _ _ => False)
         (fun s _ t' => PX s ∧ GoodC ctrlOk false rs pc none (ow s) t'.regs ∧ Ptlb (t'.regs .tlb))
         ⟨d, .BInf, r⟩ (riscvStep tick) t := by
-  intro Hct HPC Htx Hsf Hdec How HPX Hcert tick t Hag
+  intro Hct HPC Htx Hdec How HPX Hcert tick t Hag
   have Hct_t : ctrlOk t.regs := Hsp.sptSeip _ _ Hct Hag
   have HPC_t : t.regs .PC = pc := by
     rw [Hag .PC (AxSymEngine2.notPin _ (by decide) (by decide))]; exact HPC
@@ -225,9 +226,9 @@ theorem spineCertXTTlb (img : Image) (dok : Int → Nat → Prop) (kind : Dkind)
       BitVec.addInt pc 4 := by
     simp only [ExecSt.setReg_regs, RegFile.set_same]
   have Hexec := Hcert _ Hct_pc HPC_pc Hnpc_pc Hgag
-  have Hrun := CertHartActiveBaseT img dok kind _ t1 w ins pc d r
+  have Hrun := AxCert4.CertHartActiveBaseTAny img dok kind _ t1 w ins pc d r
     (fun s t' => PX s ∧ ∃ t0, tlbFrame (t1.setReg .nextPC (BitVec.addInt pc 4)) t0 ∧
-      ctrlOk t0.regs ∧ Ptlb (t0.regs .tlb) ∧ t' = wrOpt (ow s) t0) Hsf
+      ctrlOk t0.regs ∧ Ptlb (t0.regs .tlb) ∧ t' = wrOpt (ow s) t0)
     (Hsp.sptDisp _ Hct_a) Hfetch (Hdec _ Hct1) (Hsp.sptLpad _ Hct1) HPC_1 Hexec
   have Hmi1 : t1.regs .minstret_increment = b := by
     rw [tlbFrameLookup _ _ _ Hfr (by decide)]
@@ -303,7 +304,101 @@ theorem CertXTPSfence (img : Image) (dok : Int → Nat → Prop) (kind : Dkind)
   simp only [ExecSt.setReg_regs, RegFile.set_same]
   exact Hv
 
-/-! # 4. The S-mode kernel regime (the X leaf itself is PENDING, see the header) -/
+/-! # 4. The X leaf -/
+
+section xsfence
+variable {hlc : HasLC} {GF : BundledGFunctors} [InvGS_gen hlc GF] [AxirisG GF] [Axpol]
+variable (img : Image) (i : Agent) (cpu : CPU)
+variable (ctrlOk : RegFile → Prop) (textAt : BitVec 64 → BitVec 16 → Prop)
+  (textAt4 : BitVec 64 → BitVec 32 → Prop)
+variable (Hsp : SpineOkT img ctrlOk textAt) (Hf4 : SpineFetch4T img ctrlOk textAt4)
+variable (Hpriv : ∀ rs, ctrlOk rs → rs .cur_privilege = .Supervisor)
+  (HTVM : ∀ rs, ctrlOk rs → (_get_Mstatus_TVM (rs .mstatus) == 1#1) = false)
+  (Hflush : ∀ rs v, ctrlOk rs → tlbFlushed v → ctrlOk (rs.set .tlb v))
+  (HCtick : ∀ t t' : ExecSt, tickFrame t t' → ctrlOk t.regs → ctrlOk t'.regs)
+variable (Htext : ∀ GD, rvwmoCatConsistent GD →
+  AxirisG.gconstInterp (GF := GF) GD ⊢ ⌜textFixed GD i img⌝)
+variable (Hflow : ∀ GD ls k, rvwmoCatConsistent GD →
+  (∃ lb aq base n vs, (AxOpsem.grow GD i)[k]? = some lb ∧ aident lb = .IRead aq base n ∧
+     imgBytes img base n = some vs) →
+  AxirisG.gconstInterp (GF := GF) GD ∗ AxirisG.localInterp GD i k ls ⊢ fetchFlow GD i k)
+variable (Hloc : ∀ GD ls k, rvwmoCatConsistent GD →
+  AxirisG.gconstInterp (GF := GF) GD ∗ AxirisG.localInterp GD i k ls ⊢
+    |==> ∃ ls', AxirisG.localInterp GD i (k + 1) ls')
+variable (G : Gdexec → Prop)
+  (HG : ∀ GD, rvwmoCatConsistent GD → AxirisG.gconstInterp (GF := GF) GD ⊢ ⌜G GD⌝)
+variable (Φ : Athread → IProp GF)
+variable (Hmid : ∀ GD s, G GD → midState s → s.atK = (AxOpsem.grow GD i).length →
+  ⊢ postLifting Φ i s)
+
+include Hsp Hf4 Hpriv HTVM Hflush HCtick Htext Hflow Hloc HG Hmid in
+/-- Rocq `X_sfence` (deviation 6): THE SFENCE.VMA LEAF.  The continuation is at the next
+boundary (PC + 4, GPRs unchanged, regime kept) and its register file has the TLB FLUSHED. -/
+theorem XSfence (s : Athread) (rs : RegFile) (k : Nat) (pc : BitVec 64) (w : BitVec 32)
+    (r : Bool) (HRet : RetX cpu rs k s) (Hctrl : ctrlOk rs) (HPC : rs .PC = pc)
+    (Htx : textAt4 pc w)
+    (Hdec : ∀ t : ExecSt, ctrlOk t.regs →
+      EvA img (fun (_ : Sail.Error exception) (_ : ExecSt) => False)
+        (fun x t' => x = .SFENCE_VMA (zreg, zreg) ∧ t' = t) (ext_decode w) t)
+    (Hb : ∀ GD s1, G GD → RetX cpu rs k s1 → s1.atK = (AxOpsem.grow GD i).length →
+      ⊢ postLifting Φ i s1) :
+    ⊢ (∀ (t' : ExecSt) (rs' : RegFile) (ib' : Ibch) (k' : Nat),
+        ⌜GoodC ctrlOk false rs pc none none t'.regs⌝ -∗
+        ⌜tlbFlushed (rs' .tlb)⌝ -∗
+        ⌜regsAgree AxRunClose.pinReg rs' t'.regs⌝ -∗
+        wpdM rvwmoCatConsistent .MaybeStuck i ⟨.PHart cpu (.pure ()) rs' none ib', k'⟩ Φ) -∗
+      wpdM rvwmoCatConsistent .MaybeStuck i s Φ := by
+  have Hc : ∀ (tick : Bool) (t : ExecSt), regsAgree AxRunClose.pinReg t.regs rs →
+      AxCert.Cert img dok0 .DKSt (fun _ _ _ => False)
+        (fun s' _ t' => s' = ⟨.CPend, .BInf, r⟩ ∧ GoodC ctrlOk false rs pc none none t'.regs ∧
+          tlbFlushed (t'.regs .tlb))
+        ⟨.CPend, .BInf, r⟩ (riscvStep tick) t := by
+    intro tick t Hag
+    exact spineCertXTTlb img dok0 .DKSt ctrlOk textAt textAt4 Hsp Hf4 HCtick tlbFlushed rs pc w
+      (.SFENCE_VMA (zreg, zreg)) (fun _ => none) .CPend r (fun s' => s' = ⟨.CPend, .BInf, r⟩)
+      Hctrl HPC Htx Hdec (fun _ _ => trivial) (fun _ h => by subst h; rfl)
+      (CertXTPSfence img dok0 .DKSt ctrlOk Hpriv HTVM Hflush rs pc .CPend r) tick t Hag
+  have H0' : ⊢ CResM rvwmoCatConsistent dok0 .DKSt i (fun _ _ => (iprop(emp) : IProp GF))
+      (⟨.CPend, .BInf, r⟩ : Cst).csD :=
+    FstDok0M rvwmoCatConsistent i _
+  iintro C
+  ihave H0 := H0'
+  iapply (wpdInstrOfCertM rvwmoCatConsistent img dok0 .DKSt i Φ cpu G HG Hmid Htext Hflow Hloc
+    (fun h => nomatch h) (fun h => nomatch h) (fun _ _ => (iprop(emp) : IProp GF)) _
+    ⟨.CPend, .BInf, r⟩ rs k s HRet trivial Hb Hc) $$ H0
+  iintro %s' %t' %rs' %ib' %k' %HQ %Hag %_ -
+  obtain ⟨-, HG', Hfl⟩ := HQ
+  have Hfl' : tlbFlushed (rs' .tlb) := by
+    rw [Hag .tlb (AxSymEngine2.notPin _ (by decide) (by decide))]
+    exact Hfl
+  iapply C $$ %t' %rs' %ib' %k' %HG' %Hfl' %Hag
+
+include Hsp Hf4 Hpriv HTVM Hflush HCtick Htext Hflow Hloc HG Hmid in
+/-- Rocq `X_sfence_agrees`: hence TLB-agrees-with-PT (`tlbAgrees`, the protocol's invariant)
+holds after it, for every asid and tree. -/
+theorem XSfenceAgrees (s : Athread) (rs : RegFile) (k : Nat) (pc : BitVec 64) (w : BitVec 32)
+    (r : Bool) (HRet : RetX cpu rs k s) (Hctrl : ctrlOk rs) (HPC : rs .PC = pc)
+    (Htx : textAt4 pc w)
+    (Hdec : ∀ t : ExecSt, ctrlOk t.regs →
+      EvA img (fun (_ : Sail.Error exception) (_ : ExecSt) => False)
+        (fun x t' => x = .SFENCE_VMA (zreg, zreg) ∧ t' = t) (ext_decode w) t)
+    (Hb : ∀ GD s1, G GD → RetX cpu rs k s1 → s1.atK = (AxOpsem.grow GD i).length →
+      ⊢ postLifting Φ i s1) :
+    ⊢ (∀ (t' : ExecSt) (rs' : RegFile) (ib' : Ibch) (k' : Nat),
+        ⌜GoodC ctrlOk false rs pc none none t'.regs⌝ -∗
+        ⌜∀ (asid : BitVec 16) (T : PTree), tlbAgrees asid T (rs' .tlb)⌝ -∗
+        ⌜regsAgree AxRunClose.pinReg rs' t'.regs⌝ -∗
+        wpdM rvwmoCatConsistent .MaybeStuck i ⟨.PHart cpu (.pure ()) rs' none ib', k'⟩ Φ) -∗
+      wpdM rvwmoCatConsistent .MaybeStuck i s Φ := by
+  iintro C
+  iapply (XSfence img i cpu ctrlOk textAt textAt4 Hsp Hf4 Hpriv HTVM Hflush HCtick Htext Hflow
+    Hloc G HG Φ Hmid s rs k pc w r HRet Hctrl HPC Htx Hdec Hb)
+  iintro %t' %rs' %ib' %k' %HG' %Hfl %Hag
+  iapply C $$ %t' %rs' %ib' %k' %HG' %(fun asid T => tlbAgreesFlushed asid T _ Hfl) %Hag
+
+end xsfence
+
+/-! ### The S-mode kernel regime -/
 
 /-- Rocq `ctrl_ok_S_flush`. -/
 theorem ctrlOkSFlush (T : PTree) (satp0 : BitVec 64) (rs : RegFile)
@@ -333,6 +428,39 @@ theorem ctrlOkSFlush (T : PTree) (satp0 : BitVec 64) (rs : RegFile)
 theorem ctrlOkSTVM (T : PTree) (satp0 : BitVec 64) (rs : RegFile) :
     ctrlOkS T satp0 rs → (_get_Mstatus_TVM (rs .mstatus) == 1#1) = false :=
   fun h => h.2.2.2.2.2.2.2.1.2.2.2.2.2.2.2.2.2
+
+section xsfenceS
+variable {hlc : HasLC} {GF : BundledGFunctors} [InvGS_gen hlc GF] [AxirisG GF] [Axpol]
+
+/-- Rocq `X_sfence_S` (a `Definition`, deviation 7): `XSfence` in the S-mode kernel regime. -/
+theorem XSfenceS (σi : ExecSt) (T : PTree) (satp0 : BitVec 64)
+    (hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = 8#4)
+    (hasid : zero_extend (m := 16) (satp_to_asid satp0) = 0#16)
+    (hppn : BitVec.setWidth 44 (satp_to_ppn satp0) = T.base)
+    (textAt4 : BitVec 64 → BitVec 32 → Prop)
+    (Hf4 : SpineFetch4T (imgS σi) (ctrlOkS T satp0) textAt4) (i : Agent) (cpu : CPU) :
+    type_of% (XSfence (hlc := hlc) (GF := GF) (imgS σi) i cpu (ctrlOkS T satp0) (textAtS σi T)
+      textAt4 (spineOkTS σi T satp0 hmode hasid hppn) Hf4 (ctrlOkSPriv T satp0)
+      (ctrlOkSTVM T satp0) (ctrlOkSFlush T satp0) (tickFrameCtrlS T satp0)) :=
+  XSfence (imgS σi) i cpu (ctrlOkS T satp0) (textAtS σi T) textAt4
+    (spineOkTS σi T satp0 hmode hasid hppn) Hf4 (ctrlOkSPriv T satp0) (ctrlOkSTVM T satp0)
+    (ctrlOkSFlush T satp0) (tickFrameCtrlS T satp0)
+
+/-- Rocq `X_sfence_agrees_S` (a `Definition`, deviation 7). -/
+theorem XSfenceAgreesS (σi : ExecSt) (T : PTree) (satp0 : BitVec 64)
+    (hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = 8#4)
+    (hasid : zero_extend (m := 16) (satp_to_asid satp0) = 0#16)
+    (hppn : BitVec.setWidth 44 (satp_to_ppn satp0) = T.base)
+    (textAt4 : BitVec 64 → BitVec 32 → Prop)
+    (Hf4 : SpineFetch4T (imgS σi) (ctrlOkS T satp0) textAt4) (i : Agent) (cpu : CPU) :
+    type_of% (XSfenceAgrees (hlc := hlc) (GF := GF) (imgS σi) i cpu (ctrlOkS T satp0)
+      (textAtS σi T) textAt4 (spineOkTS σi T satp0 hmode hasid hppn) Hf4 (ctrlOkSPriv T satp0)
+      (ctrlOkSTVM T satp0) (ctrlOkSFlush T satp0) (tickFrameCtrlS T satp0)) :=
+  XSfenceAgrees (imgS σi) i cpu (ctrlOkS T satp0) (textAtS σi T) textAt4
+    (spineOkTS σi T satp0 hmode hasid hppn) Hf4 (ctrlOkSPriv T satp0) (ctrlOkSTVM T satp0)
+    (ctrlOkSFlush T satp0) (tickFrameCtrlS T satp0)
+
+end xsfenceS
 
 /-! # 5. Concrete: xv6's `sfence.vma zero, zero` (0x12000073) at an S-mode state -/
 
@@ -369,6 +497,35 @@ theorem ctrlOkSWTick (t t' : ExecSt) : tickFrame t t' → ctrlOkSW pT nvSSatp t.
   intro Hf ⟨Hc, HW⟩
   refine ⟨tickFrameCtrlS _ _ _ _ Hf Hc, pmpWDep t.regs _ (fun r hr => ?_) HW⟩
   refine Hf r (fun h => ?_) (fun h => ?_) (fun h => ?_) <;> subst h <;> exact absurd hr (by decide)
+
+/-- Rocq `sfence_whole`: THE WHOLE-INSTRUCTION CERTIFICATE of the real `riscvStep` (both
+ticks) at `σL WSfence`: PC + 4, GPRs unchanged, the data regime kept, the TLB FLUSHED. -/
+theorem sfenceWhole (tick : Bool) :
+    AxCert.Cert (imgS (σL WSfence.toNat)) (fun _ _ => False) .DKSt (fun _ _ _ => False)
+      (fun s _ t' => s = ⟨.CPend, .BInf, false⟩ ∧
+        GoodC (ctrlOkSW pT nvSSatp) false rsL (AxEpiProbe.w64 sPc) none none t'.regs ∧
+        tlbFlushed (t'.regs .tlb))
+      ⟨.CPend, .BInf, false⟩ (riscvStep tick) (σL WSfence.toNat) :=
+  spineCertXTTlb (imgS (σL WSfence.toNat)) (fun _ _ => False) .DKSt (ctrlOkSW pT nvSSatp)
+    (textAtS (σL WSfence.toNat) pT) (textAt4S (σL WSfence.toNat) pT)
+    (SpineOkTSW _ pT nvSSatp nvSSatpMode nvSSatpAsid pTBase)
+    (SpineFetch4TSW _ pT nvSSatp nvSSatpMode nvSSatpAsid pTBase)
+    ctrlOkSWTick tlbFlushed rsL (AxEpiProbe.w64 sPc) _ (.SFENCE_VMA (zreg, zreg)) (fun _ => none)
+    .CPend false (fun s' => s' = ⟨.CPend, .BInf, false⟩) rsLCtrlOk rsLPC text4Sfence
+    (decSfence _) (fun _ _ => trivial) (fun _ h => by subst h; rfl)
+    (CertXTPSfence _ _ _ (ctrlOkSW pT nvSSatp) (fun _ h => ctrlOkSPriv _ _ _ h.1)
+      (fun _ h => ctrlOkSTVM _ _ _ h.1) ctrlOkSWFlush rsL _ .CPend false)
+    tick (σL WSfence.toNat) (σLAgree _)
+
+/-- Rocq `sfence_whole_agrees`. -/
+theorem sfenceWholeAgrees (tick : Bool) :
+    AxCert.Cert (imgS (σL WSfence.toNat)) (fun _ _ => False) .DKSt (fun _ _ _ => False)
+      (fun _ _ t' => t'.regs .PC = BitVec.addInt (AxEpiProbe.w64 sPc) 4 ∧
+        ∀ (asid : BitVec 16) (T : PTree), tlbAgrees asid T (t'.regs .tlb))
+      ⟨.CPend, .BInf, false⟩ (riscvStep tick) (σL WSfence.toNat) := by
+  refine CertMono _ _ _ _ _ _ _ _ _ _ (fun _ _ _ h => h) ?_ (sfenceWhole tick)
+  rintro s x t' ⟨-, ⟨-, HPC, -⟩, Hfl⟩
+  exact ⟨HPC, fun asid T => tlbAgreesFlushed asid T _ Hfl⟩
 
 /-- (Lean-only, deviation 4) the `runRead` decode walk of `fence rw,w` at `drefS`. -/
 theorem AxSfence2.walkFence :

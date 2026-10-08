@@ -71,6 +71,12 @@ The WPd bridge is `AxCert2`.
    has no counterpart for.  `CertOfEvB` takes `HQE : ∀ t', ¬ ∀ e, QE e t'` (no state accepts
    every stuck end — e.g. `QE := fun _ _ => False`, the only form Rocq's users (`AxSpinE`) embed;
    dischargeable by `fun _ h => h .Exit`), which rules `ebNf` out.
+10. Q19 (provisional): the Lean-only constructor `Cert.cSf` certifies an SFENCE.VMA announce
+   (`sfAnnB n w = true`): under Q7 that node is the graph's sfence MARKER
+   `LFence false false false false` (`WeakEvLang.annLabel`), so it consumes ONE row item
+   (`bsucc`, as `cFence`) and leaves the data event and the release flag unchanged (the
+   all-false fence arms nothing).  Rocq has no counterpart (there the marker is the fetch row
+   item).  Its bridge case is `AxCert2.wpdSfNodeM`.
 
 **Rocq → Lean name map.**  `bud` `Bud` (`BInf`, `BFin`), `bsucc` `bsucc`, `dkind` `Dkind`
 (`DKLd`, `DKSt`, `DKRmw`), `cdata` `Cdata` (`CPend`, `CLd`, `CSt`, `CRmwR`, `CRmw`), `cst` `Cst`
@@ -78,8 +84,8 @@ The WPd bridge is `AxCert2`.
 (constructors `c_ret` `cRet`, `c_rd` `cRd`, `c_wr` `cWr`, `c_mrd` `cMrd`, `c_end` `cEnd`, `c_drd`
 `cDrd`, `c_dwr` `cDwr`, `c_fence` `cFence`, `c_xrd` `cXrd`, `c_xwr` `cXwr`, `c_ia` `cIa`, `c_ba`
 `cBa`, `c_co` `cCo`, `c_tl` `cTl`, `c_te` `cTe`, `c_rx` `cRx`, `c_ts` `cTs`, `c_tx` `cTx`, `c_cc`
-`cCc`, `c_msg` `cMsg`, `c_gcc` `cGcc`, `c_ext` `cExt`; Lean-only `cIf`), `Cert_mono` `CertMono`,
-`Cert_bind` `CertBind`, `Cert_bind0` `CertBind0`, `Cert_fact` `CertFact`, `Cert_ret` `CertRet`,
+`cCc`, `c_msg` `cMsg`, `c_gcc` `cGcc`, `c_ext` `cExt`; Lean-only `cIf`, `cSf`), `Cert_mono`
+`CertMono`, `Cert_bind` `CertBind`, `Cert_bind0` `CertBind0`, `Cert_fact` `CertFact`, `Cert_ret` `CertRet`,
 `Cert_read_reg` `CertReadReg`, `Cert_write_reg` `CertWriteReg`, `Cert_try_catch` `CertTryCatch`,
 `Cert_liftR_any` `CertLiftRAny`, `Cert_catch_early_return` `CertCatchEarlyReturn`, `Cert_of_EvA`
 `CertOfEvA`, `Cert_of_EvB` `CertOfEvB`, `dk_of` `dkOf`, `cd_of` `cdOf`, `cd_of_pend` `cdOfPend`,
@@ -88,7 +94,8 @@ The WPd bridge is `AxCert2`.
 `wcls_armed` `wclsArmed`, `relp_upd_rw_w` `relpUpdRwW`, `wcls_rmw` `wclsRmw`, `wcls_rmw_norl`
 `wclsRmwNorl`.  None is in the duplicated-name table.
 
-**Dropped:** nothing (Rocq 32 definitions/lemmas; Lean 32, + the Lean-only constructor `cIf`).
+**Dropped:** nothing (Rocq 32 definitions/lemmas; Lean 32, + the Lean-only constructors `cIf`,
+`cSf`).
 **Not ported:** the section-local Ltac `cert_ctor` (Lean proofs name the constructor per case).
 -/
 import Weak.AxSymCtlb
@@ -230,6 +237,12 @@ inductive Cert (img : Image) (dok : Int → Nat → Prop) (kind : Dkind) {X : Ty
   | cIa (s : Cst) (n : Nat) (w : BitVec n) (k : Unit → SailM X) (t : ExecSt) :
       sfAnnB n w = false → Cert img dok kind QE Q s (k ()) t →
       Cert img dok kind QE Q s (.impure (.ok (.instrAnnounce n w)) k) t
+  /-- (Lean-only, Q19) THE SFENCE.VMA ANNOUNCE: the marker `LFence false false false false`
+  (`WeakEvLang.annLabel`), one row item; the release flag is unchanged -/
+  | cSf (d : Cdata) (b : Bud) (r : Bool) (n : Nat) (w : BitVec n) (k : Unit → SailM X)
+      (t : ExecSt) :
+      sfAnnB n w = true → Cert img dok kind QE Q ⟨d, b, r⟩ (k ()) t →
+      Cert img dok kind QE Q ⟨d, bsucc b, r⟩ (.impure (.ok (.instrAnnounce n w)) k) t
   | cBa (s : Cst) (n : Nat) (a : BitVec n) (k : Unit → SailM X) (t : ExecSt) :
       Cert img dok kind QE Q s (k ()) t →
       Cert img dok kind QE Q s (.impure (.ok (.branchAnnounce n a)) k) t
@@ -286,6 +299,7 @@ theorem CertMono {X : Type} (QE QE' : Cst → Sail.Error exception → ExecSt �
   | cXwr aq rvs b r n va req k t v h1 h2 h3 h4 h5 _ ih =>
     exact .cXwr aq rvs b r n va req k t v h1 h2 h3 h4 h5 ih
   | cIa s n w k t hs _ ih => exact .cIa s n w k t hs ih
+  | cSf d b r n w k t hs _ ih => exact .cSf d b r n w k t hs ih
   | cBa s n a k t _ ih => exact .cBa s n a k t ih
   | cCo s c k t _ ih => exact .cCo s c k t ih
   | cTl s c k t _ ih => exact .cTl s c k t ih
@@ -317,6 +331,7 @@ theorem CertBind {X Y : Type} (QE : Cst → Sail.Error exception → ExecSt → 
   | cXwr aq rvs b r n va req k t v h1 h2 h3 h4 h5 _ ih =>
     exact .cXwr aq rvs b r n va req _ t v h1 h2 h3 h4 h5 ih
   | cIa s n w k t hs _ ih => exact .cIa s n w _ t hs ih
+  | cSf d b r n w k t hs _ ih => exact .cSf d b r n w _ t hs ih
   | cBa s n a k t _ ih => exact .cBa s n a _ t ih
   | cCo s c k t _ ih => exact .cCo s c _ t ih
   | cTl s c k t _ ih => exact .cTl s c _ t ih
@@ -382,6 +397,7 @@ theorem CertTryCatch {X : Type} (QE1 QE2 : Cst → Sail.Error exception → Exec
   | cXwr aq rvs b r n va req k t v h1 h2 h3 h4 h5 _ ih =>
     exact .cXwr aq rvs b r n va req _ t v h1 h2 h3 h4 h5 ih
   | cIa s n w k t hs _ ih => exact .cIa s n w _ t hs ih
+  | cSf d b r n w k t hs _ ih => exact .cSf d b r n w _ t hs ih
   | cBa s n a k t _ ih => exact .cBa s n a _ t ih
   | cCo s c k t _ ih => exact .cCo s c _ t ih
   | cTl s c k t _ ih => exact .cTl s c _ t ih

@@ -57,6 +57,12 @@ region form is too coarse for whole-kernel use; the positional fix is expressibl
 5. `ebar_label_fence` is NOT redeclared: it is `Weak.ebarLabelFence` (WeakEvInst, same
    statement).  Lean-only (file-qualified): `AxCert2.nfOfLatest` (an `akLatest` access is not a
    fetch), `AxCert2.barrierAstepInv`, `AxCert2.xreadAstepFalse`, `AxCert2.xwriteAstepInv`.
+6. Q19 (provisional): the case of the Lean-only `Cert.cSf` (AxCert deviation 10) in
+   `wpdOfCertM` is the Lean-only node lemma `AxCert2.wpdSfNodeM` — the twin of `wpdFenceNodeM`
+   at an SFENCE.VMA announce node: `pnodeStep`'s announce arm emits `annLabel n w` = the marker
+   `LFence false false false false` (`annLabelSf`) and banks the announced bits, so
+   `AStepFence` is its only step (`AxCert2.sfAnnPstep`, `AxCert2.sfAnnAstepInv`), one row item,
+   no flow, `Hloc` advancing the local interpretation; the continuation takes any `ib'`.
 
 **Rocq → Lean name map.**  `ebar_label_fence` `ebarLabelFence` (existing), `barrier_pstep`
 `barrierPstep`, `xread_pstep` `xreadPstep`, `xwrite_pstep` `xwritePstep`, `bpos` `AxCert2.bpos`
@@ -69,7 +75,7 @@ region form is too coarse for whole-kernel use; the positional fix is expressibl
 `wpdInstrOfCert`, notations `CFk` `CFk`, `CRes` `CRes`.
 
 **Dropped:** nothing (Rocq 22 definitions/lemmas + 2 notations; Lean 21 + `ebarLabelFence` reused,
-+ 2 abbrevs, + 4 Lean-only).  The section premise `Hntext` is dropped (deviation 1).
++ 2 abbrevs, + 7 Lean-only).  The section premise `Hntext` is dropped (deviation 1).
 **Not ported:** the Ltac `silent_psC` (↦ `AxSymEngine3.wpdSilentNode3M`) and the
 `Print Assumptions` lines (the lint's axiom check covers them).
 -/
@@ -180,6 +186,43 @@ theorem AxCert2.barrierAstepInv (row : List Lbl) (cpu : CPU) (bk : barrier_kind)
   | AStepFence _ _ d _ lb p' d' _ _ _ hps =>
     obtain ⟨rfl, rfl⟩ := barrierPstep cpu bk KK rs ib d l p' d' hps
     exact ⟨rfl, rfl⟩
+
+/-- (Lean-only, Q19) The program step of an SFENCE.VMA announce node: the marker label
+`annLabel n w`, the announced bits banked. -/
+theorem AxCert2.sfAnnPstep (cpu : CPU) (n : Nat) (w : BitVec n) (KK : Unit → SailM Unit)
+    (rs : RegFile) (ib : Ibch) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
+    pstepProg (.PHart cpu (.impure (.ok (.instrAnnounce n w)) KK) rs none ib) d l p' d' →
+    l = annLabel n w ∧ p' = .PHart cpu (KK ()) rs none (ibAnn (ibOfBvn w)) := by
+  intro h
+  cases p' with
+  | PDisk _ => exact False.elim h
+  | PHart c m' rs' fn' ib' =>
+    obtain ⟨rfl, ors, oib, obar, rfl, rfl, hn, -⟩ := h
+    simp only [pstepNode, pnodeStep] at hn
+    obtain ⟨rfl, rfl, rfl, rfl, -, rfl, -⟩ := hn
+    exact ⟨rfl, rfl⟩
+
+/-- (Lean-only, Q19) The only `astepProg` step of an SFENCE.VMA announce node: the
+`AStepFence` of its marker `LFence false false false false`. -/
+theorem AxCert2.sfAnnAstepInv (row : List Lbl) (cpu : CPU) (n : Nat) (w : BitVec n)
+    (KK : Unit → SailM Unit) (rs : RegFile) (ib : Ibch) (k : Nat) (l : Wlabel) (s' : Athread)
+    (Hsf : sfAnnB n w = true) :
+    AxOpsem.astepProg row ⟨.PHart cpu (.impure (.ok (.instrAnnounce n w)) KK) rs none ib, k⟩ l s' →
+    l = .LFence false false false false ∧
+      s' = ⟨.PHart cpu (KK ()) rs none (ibAnn (ibOfBvn w)), k + 1⟩ := by
+  intro h
+  cases h with
+  | AStepAdmin _ _ d _ p' d' hadm hps =>
+    obtain ⟨rfl, -⟩ := AxCert2.sfAnnPstep cpu n w KK rs ib d l p' d' hps
+    rw [annLabelSf Hsf] at hadm
+    exact (hadm : False).elim
+  | AStepWrite _ _ d _ lb p' d' _ hsome _ _ hps =>
+    obtain ⟨rfl, -⟩ := AxCert2.sfAnnPstep cpu n w KK rs ib d l p' d' hps
+    rw [annLabelSf Hsf] at hsome
+    simp [wlWr] at hsome
+  | AStepFence _ _ d _ lb p' d' _ _ _ hps =>
+    obtain ⟨rfl, rfl⟩ := AxCert2.sfAnnPstep cpu n w KK rs ib d l p' d' hps
+    exact ⟨annLabelSf Hsf, rfl⟩
 
 /-- (Lean-only) No `astepProg` step at an exclusive RAM read node (only the read step). -/
 theorem AxCert2.xreadAstepFalse (row : List Lbl) (cpu : CPU) (n va : Nat)
@@ -336,6 +379,74 @@ theorem wpdFenceNodeM (bk : barrier_kind) (KK : Unit → SailM Unit) (ib : Ibch)
     iexists ls'
     iframe Hna Hl
     iapply C $$ %rs %HP
+  isplit
+  · -- (c) the PLIC wire
+    iintro %s' %Hw
+    obtain ⟨hk, hp⟩ := awireAeqv _ _ Hw
+    obtain ⟨p', k'⟩ := s'
+    simp only at hk hp
+    subst hk
+    match p', hp with
+    | .PHart c m' rs' fn' ib', hp =>
+      obtain ⟨rfl, rfl, rfl, rfl, hag⟩ := hp
+      unfold wpSkipStep
+      iintro %na Hna
+      imodintro
+      inext
+      imodintro
+      iexists ls
+      iframe Hna Hloc
+      iapply IH $$ %rs' %(HA rs rs' HP hag) C
+  · -- (d) row end: a mid-instruction state
+    iintro %Heq
+    iapply (Hmid GD _ HGD (by exact trivial) Heq)
+
+include HG Hmid Hloc in
+/-- (Lean-only, Q19) THE SFENCE.VMA ANNOUNCE ARM (twin of `wpdFenceNodeM`): the marker
+`LFence false false false false` is the only step, one row item, no flow. -/
+theorem AxCert2.wpdSfNodeM (n : Nat) (w : BitVec n) (KK : Unit → SailM Unit) (ib : Ibch)
+    (k : Nat) (A : RegFile → Prop)
+    (HA : ∀ rs rs', A rs → regsAgree AxRunClose.pinReg rs' rs → A rs')
+    (Hsf : sfAnnB n w = true) :
+    ⊢ ∀ rs, ⌜A rs⌝ -∗
+      (∀ rs' ib', ⌜A rs'⌝ -∗ wpdM M .MaybeStuck i ⟨.PHart cpu (KK ()) rs' none ib', k + 1⟩ Φ) -∗
+      wpdM M .MaybeStuck i ⟨.PHart cpu (.impure (.ok (.instrAnnounce n w)) KK) rs none ib, k⟩ Φ := by
+  iloeb as IH
+  iintro %rs %HP C
+  iapply (AxWpD.wpdMUnfoldStep M .MaybeStuck i _ Φ).2
+  isplit
+  · iapply (progressOblMaybestuck (GF := GF) i _).2
+    itrivial
+  unfold wpdMPreStepDef
+  iintro %GD %ls ⟨%Hc, #Hg, Hloc⟩
+  ihave HGD := (HG GD Hc) $$ Hg
+  icases HGD with %HGD
+  isplit
+  · -- (a) no read at the marker
+    iintro %id %K %Hst
+    have hfalse : False := by
+      obtain ⟨lb, -, -, Hsome, HK⟩ := Hst
+      obtain ⟨l, d, d', Hrd, -, Hps, -⟩ := HK (List.replicate (aidentN id) 0) List.length_replicate
+      obtain ⟨rfl, -⟩ := AxCert2.sfAnnPstep cpu n w KK rs ib d l _ d' Hps
+      rw [annLabelSf Hsf] at Hrd
+      simp only [wlRd] at Hrd
+      simp [← Hrd] at Hsome
+    exact hfalse.elim
+  isplit
+  · -- (b) THE MARKER: one row item, no flow
+    iintro %l %s' %Hst %Hpin
+    obtain ⟨rfl, rfl⟩ := AxCert2.sfAnnAstepInv _ cpu n w KK rs ib k l s' Hsf Hst
+    simp only [wlWdata]
+    unfold wpSkipStep
+    iintro %na Hna
+    ihave Hl := (BI.wand_intro (Hloc GD ls k Hc)) $$ Hg Hloc
+    imod Hl with ⟨%ls', Hl⟩
+    imodintro
+    inext
+    imodintro
+    iexists ls'
+    iframe Hna Hl
+    iapply C $$ %rs %_ %HP
   isplit
   · -- (c) the PLIC wire
     iintro %s' %Hw
@@ -973,6 +1084,14 @@ theorem wpdOfCertM (Q : Cst → Unit → ExecSt → Prop) (m : SailM Unit) (s : 
       exact ⟨rfl, rfl, rfl, rfl⟩
     · iintro %rs1 %ib1 %HA1
       iapply (IH rs1 ib1 kk HA1 Hb) $$ Hd C
+  | cSf d b r n w k t Hsf _ IH =>
+    intro rs ib kk Hag Hb
+    iintro Hd C
+    iapply (AxCert2.wpdSfNodeM M i Φ cpu G HG Hmid Hloc n w k ib kk
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hsf) $$ %rs %Hag
+    iintro %rs' %ib' %HA'
+    iapply (IH rs' ib' (kk + 1) HA' (bposSucc G i kk b Hb)) $$ Hd C
   | cBa s _ _ k t _ IH | cCo s _ k t _ IH | cTl s _ k t _ IH | cTe s _ k t _ IH
   | cRx s _ k t _ IH | cTs s _ k t _ IH | cTx s _ k t _ IH | cCc s k t _ IH
   | cMsg s _ k t _ IH | cGcc s k t _ IH =>

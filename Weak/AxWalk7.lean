@@ -25,7 +25,8 @@ before the certificate ends.)
    `csB`/`csD`; `S k` ↦ `k + 1`; `(k ≤ k' ≤ k + n)%nat` ↦ `k ≤ k' ∧ k' ≤ k + n`.
 2. O2 STAGE C (as `AxWalk2` deviation 1): Rocq's section premise `Hntext` is DROPPED (Lean's
    `AxWalk2.wpdOfCertWPM` no longer takes it; data reads carry `akIfetch = false`).  The Lean-only
-   fetch arm `cIf` maps to `CertWP.pIf` (position and budget kept).
+   fetch arm `cIf` maps to `CertWP.pIf` (position and budget kept).  Q19 (provisional): the
+   Lean-only sfence-announce arm `cSf` maps to `CertWP.pSf` (one row item, as `cFence`).
 3. Section variables `M img dok kind i Φ cpu G HG Hmid Htext Hflow Hloc Out` (Rocq additionally
    `Hntext`, deviation 2).  The empty-PT-region walker flows and the empty initial walker
    resource (Rocq's inline `iModIntro …` / `by rewrite /WRes` bullets) are the Lean-only lemmas
@@ -123,6 +124,11 @@ theorem CertWPOfCertPos (img : Image) (dok wok : Int → Nat → Prop) (kind : D
     have HX' := (okFromSucc _ _ _ HX).2
     exact .pXwr ws aq rvs b r k n va req kk t v h1 h2 h3 h4 h5 (ih ws (k + 1) HR' HX')
   | cIa s n w kk t hs _ ih => intro ws k HR HX; exact .pIa ws s k n w kk t hs (ih ws k HR HX)
+  | cSf d b r n w kk t hs _ ih =>
+    intro ws k HR HX
+    have HR' := (okFromSucc _ _ _ HR).2
+    have HX' := (okFromSucc _ _ _ HX).2
+    exact .pSf ws d b r k n w kk t hs (ih ws (k + 1) HR' HX')
   | cBa s n a kk t _ ih => intro ws k HR HX; exact .pBa ws s k n a kk t (ih ws k HR HX)
   | cCo s c kk t _ ih => intro ws k HR HX; exact .pCo ws s k c kk t (ih ws k HR HX)
   | cTl s c kk t _ ih => intro ws k HR HX; exact .pTl ws s k c kk t (ih ws k HR HX)

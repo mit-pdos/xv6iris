@@ -53,6 +53,9 @@ under a graph `GD0` the read step was given; `Hagree` (graph agreement; trivial 
    `iDestruct "P" … Hagree … subst` step: under the current graph the pin's facts hold) and
    `AxCondM2.cresPShift` (Rocq's `destruct d; simpl`: off `CRmwR`, `CResP` does not depend on
    the position).
+6. Q19 (provisional): the bridge's `Cert.cSf` case (an SFENCE.VMA announce, one row item) is
+   `AxCert2.wpdSfNodeM` off the pinned states and the Lean-only refutation `AxCondM2.wpdPinSf`
+   (twin of `wpdPinFence`) at a pinned state.
 
 **Rocq → Lean name map.**  `Pin` `Pin`, `Pin_pers` `pinPers`, `wpd_xrd_pin` `wpdXrdPin`,
 `wpd_pin_mread` `wpdPinMread`, `wpd_pin_fence` `wpdPinFence`, `CFkP` `CFkP`, `CResP` `CResP`,
@@ -60,7 +63,7 @@ under a graph `GD0` the read step was given; `Hagree` (graph agreement; trivial 
 duplicated with AxCertP2), `X_certTP` `XCertTP`, `X_amoswap_SP` `XAmoswapSP`, `OutOfV`
 `OutOfV`, `amo_out_pin` `amoOutPin`.
 
-**Dropped:** nothing (Rocq 13 definitions/lemmas/instances; Lean 13 + 2 Lean-only).  **Not
+**Dropped:** nothing (Rocq 13 definitions/lemmas/instances; Lean 13 + 3 Lean-only).  **Not
 ported:** the Ltac `silent_psC` (↦ `AxSymEngine3.wpdSilentNode3M`, as AxCert2), the section
 notations (written out), and the `Print Assumptions` lines (the lint's axiom check covers them).
 -/
@@ -438,6 +441,79 @@ theorem wpdPinFence (bk : barrier_kind) (KK : Unit → SailM Unit) (ib : Ibch) (
   · iintro %Heq
     iapply (Hmid GD _ HGD (by exact trivial) Heq)
 
+include HG Hmid Hagree in
+/-- (Lean-only, Q19) A pinned position refutes an SFENCE.VMA announce (its marker fence) there
+(twin of `wpdPinFence`). -/
+theorem AxCondM2.wpdPinSf (n : Nat) (w : BitVec n) (KK : Unit → SailM Unit) (ib : Ibch) (k : Nat)
+    (rvs : List (BitVec 8)) (Hsf : sfAnnB n w = true) :
+    ⊢ ∀ rs, Pin M i k rvs -∗
+      wpdM M .MaybeStuck i ⟨.PHart cpu (.impure (.ok (.instrAnnounce n w)) KK) rs none ib, k⟩ Φ := by
+  iloeb as IH
+  iintro %rs #P
+  iapply (AxWpD.wpdMUnfoldStep M .MaybeStuck i _ Φ).2
+  isplit
+  · iapply (progressOblMaybestuck (GF := GF) i _).2
+    itrivial
+  unfold wpdMPreStepDef
+  iintro %GD %ls ⟨%Hc, #Hg, Hloc⟩
+  ihave HGD := (HG GD Hc) $$ Hg
+  icases HGD with %HGD
+  ihave Hpf := (AxCondM2.pinAt M i Hagree GD k rvs Hc) $$ Hg P
+  icases Hpf with %Hpf
+  obtain ⟨-, lb0, aq0, rl0, base0, n0, Hlb0, Hid0⟩ := Hpf
+  isplit
+  · -- (a) no read at the marker
+    iintro %id %K %Hst
+    have hfalse : False := by
+      obtain ⟨lb, -, -, Hsome, HK⟩ := Hst
+      obtain ⟨l, d, d', Hrd, -, Hps, -⟩ := HK (List.replicate (aidentN id) 0) List.length_replicate
+      obtain ⟨rfl, -⟩ := AxCert2.sfAnnPstep cpu n w KK rs ib d l _ d' Hps
+      rw [annLabelSf Hsf] at Hrd
+      simp only [wlRd] at Hrd
+      simp [← Hrd] at Hsome
+    exact hfalse.elim
+  isplit
+  · -- (b) the marker would match the fused RMW row item
+    iintro %l %s' %Hst %Hpin
+    have hfalse : False := by
+      cases Hst with
+      | AStepAdmin _ _ d _ p' d' hadm hps =>
+        obtain ⟨rfl, -⟩ := AxCert2.sfAnnPstep cpu n w KK rs ib d l p' d' hps
+        rw [annLabelSf Hsf] at hadm
+        exact (hadm : False).elim
+      | AStepWrite _ _ d _ lb p' d' _ hsome _ _ hps =>
+        obtain ⟨rfl, -⟩ := AxCert2.sfAnnPstep cpu n w KK rs ib d l p' d' hps
+        rw [annLabelSf Hsf] at hsome
+        simp [wlWr] at hsome
+      | AStepFence _ _ d _ lb p' d' hrow hsome hf hps =>
+        rw [Hlb0] at hrow
+        cases hrow
+        rw [Hid0] at hf
+        simp only [aidentFence] at hf
+        rw [hf] at hsome
+        exact Bool.noConfusion hsome
+    exact hfalse.elim
+  isplit
+  · -- (c) the PLIC wire
+    iintro %s' %Hw
+    obtain ⟨hk, hp⟩ := awireAeqv _ _ Hw
+    obtain ⟨p', k'⟩ := s'
+    simp only at hk hp
+    subst hk
+    match p', hp with
+    | .PHart c m' rs' fn' ib', hp =>
+      obtain ⟨rfl, rfl, rfl, rfl, -⟩ := hp
+      unfold wpSkipStep
+      iintro %na Hna
+      imodintro
+      inext
+      imodintro
+      iexists ls
+      iframe Hna Hloc
+      iapply IH $$ %rs' P
+  · iintro %Heq
+    iapply (Hmid GD _ HGD (by exact trivial) Heq)
+
 /-! # 2. THE PINNED BRIDGE -/
 
 include HG Hmid Htext Hflow Hloc HnoRmw HnoSplit Hagree in
@@ -633,6 +709,26 @@ theorem AxCondM2.wpdOfCertP (Q : Cst → Unit → ExecSt → Prop) (m : SailM Un
       exact ⟨rfl, rfl, rfl, rfl⟩
     · iintro %rs1 %ib1 %HA1
       iapply (IH rs1 ib1 kk HA1 Hb) $$ Hd C
+  | cSf d b r n w k t Hsf _ IH =>
+    intro rs ib kk Hag Hb
+    by_cases hR : ∃ aq rvs, d = .CRmwR aq rvs
+    · -- a pinned state: the marker is refuted
+      obtain ⟨aq, rvs, rfl⟩ := hR
+      have hconv : CResP M dok kind i Out (.CRmwR aq rvs) kk ⊢
+          iprop(FstM M dok i Out ∗ Pin M i kk rvs) := .rfl
+      iintro Hd -
+      ihave Hd := hconv $$ Hd
+      icases Hd with ⟨-, #P⟩
+      iapply (AxCondM2.wpdPinSf M i Φ cpu G HG Hmid Hagree n w k ib kk rvs Hsf) $$ %rs P
+    · have hsh := AxCondM2.cresPShift M dok kind i Out d
+        (fun aq rvs h => hR ⟨aq, rvs, h⟩) kk (kk + 1)
+      iintro Hd C
+      ihave Hd := hsh $$ Hd
+      iapply (AxCert2.wpdSfNodeM M i Φ cpu G HG Hmid Hloc n w k ib kk
+        (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+        (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hsf) $$ %rs %Hag
+      iintro %rs' %ib' %HA'
+      iapply (IH rs' ib' (kk + 1) HA' (bposSucc G i kk b Hb)) $$ Hd C
   | cBa s _ _ k t _ IH | cCo s _ k t _ IH | cTl s _ k t _ IH | cTe s _ k t _ IH
   | cRx s _ k t _ IH | cTs s _ k t _ IH | cTx s _ k t _ IH | cCc s k t _ IH
   | cMsg s _ k t _ IH | cGcc s k t _ IH =>

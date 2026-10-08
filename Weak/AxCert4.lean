@@ -44,6 +44,10 @@ S-mode data translation is open; `AxCert3.ctaCert` is the concrete instance).
    `execute_fence_rw_w`'s right side writes the barrier node `.impure (.ok (.barrier …))`.
 4. The Rocq set-locals `rvs_of` / `PX` of `X_amoM` are Lean-only defs `AxCert4.rvsOf` /
    `AxCert4.amoPX`.
+5. Q19 (provisional): Lean-only `AxCert4.CertHartActiveBaseTSf`, the sfence twin of
+   `CertHartActiveBaseT` (premise `sfAnnB 32 w = true`; the announce is the marker
+   `Cert.cSf`, kit lemma `AxCert4.cRAnn32Sf`), and `AxCert4.CertHartActiveBaseTAny` (no
+   `sfAnnB` premise: the two by cases).
 
 **Rocq → Lean name map.**  `Cert_liftR_M` `CertLiftRM`, `Cert_EvA` `CertEvA`,
 `Cert_hart_active_base_T` `CertHartActiveBaseT`, `Cert_try_step_active` `CertTryStepActive`,
@@ -54,10 +58,11 @@ S-mode data translation is open; `AxCert3.ctaCert` is the concrete instance).
 `ctrlOkSPriv`, `X_fence_S` `XFenceS`, `X_amo_S` `XAmoS`.  None is in the duplicated-name table.
 Lean-only (file-qualified): the Cert stepping kit `AxCert4.cRBind`, `cFactLift`, `cFactQ`,
 `cFactRead`, `cFactWrite`, `cFactPure`, `cFactAssoc`, `cFactUse`, `cRRead`, `cRWrite`,
-`cRAnn16`, `cRAnn32`, `cRPureBind`, `cRAssoc`, `cRUse`; `AxCert4.rvsOf`, `AxCert4.amoPX`; tactic
+`cRAnn16`, `cRAnn32`, `cRAnn32Sf`, `cRPureBind`, `cRAssoc`, `cRUse`; `AxCert4.rvsOf`,
+`AxCert4.amoPX`, `AxCert4.CertHartActiveBaseTSf`, `AxCert4.CertHartActiveBaseTAny`; tactic
 `ax_cert4_go` (Rocq `c_go`).
 
-**Dropped:** nothing (Rocq 21 definitions/lemmas; Lean 21 + 17 Lean-only).
+**Dropped:** nothing (Rocq 21 definitions/lemmas; Lean 21 + 20 Lean-only).
 **Not ported:** the Ltacs `nseipX`, `c_step`/`c_go`/`c_use`/`c_useC`, `lk` (the kit above and
 `RegFile` rewrites instead), the `Print Assumptions` lines (the lint's axiom check covers them).
 -/
@@ -211,6 +216,19 @@ theorem AxCert4.cRAnn32 {R X : Type}
     (.cIa s 32 w _ t hw (.cRet _ _ _ ⟨rfl, rfl⟩))
     (fun _ _ _ h => by obtain ⟨rfl, rfl⟩ := h; exact H)
 
+/-- (Q19) the announce of an SFENCE.VMA word: the marker (`Cert.cSf`); at `BInf` the budget is
+unchanged -/
+theorem AxCert4.cRAnn32Sf {R X : Type}
+    {Q : Cst → Except (Sail.Error exception ⊕ R) X → ExecSt → Prop}
+    {w : BitVec 32} {f : Unit → SailME R X} {d : Cdata} {r : Bool} {t : ExecSt}
+    (hw : sfAnnB 32 w = true)
+    (H : AxCert.Cert img dok kind QE Q ⟨d, .BInf, r⟩ (ExceptT.run (f ())) t) :
+    AxCert.Cert img dok kind QE Q ⟨d, .BInf, r⟩
+      (ExceptT.run (liftM (instr_announce w : SailM Unit) >>= f)) t :=
+  AxCert4.cFactLift (P := fun s' _ t' => s' = ⟨d, .BInf, r⟩ ∧ t' = t)
+    (.cSf d .BInf r 32 w _ t hw (.cRet _ _ _ ⟨rfl, rfl⟩))
+    (fun _ _ _ h => by obtain ⟨rfl, rfl⟩ := h; exact H)
+
 theorem AxCert4.cRPureBind {R X Y : Type}
     {Q : Cst → Except (Sail.Error exception ⊕ R) X → ExecSt → Prop} {x : Y}
     {f : Y → SailME R X} {s : Cst} {t : ExecSt}
@@ -295,6 +313,63 @@ theorem CertHartActiveBaseT (t t1 : ExecSt) (w : BitVec 32) (ins : instruction)
   rintro _ _ t' ⟨rfl, hq⟩
   ax_cert4_go
   exact .cRet _ _ _ ⟨rfl, hq⟩
+
+/-- (Lean-only, Q19) THE SFENCE TWIN of `CertHartActiveBaseT`: the 4-byte arm at an SFENCE.VMA
+word (`sfAnnB 32 w = true`), whose announce is the marker (`AxCert4.cRAnn32Sf`). -/
+theorem AxCert4.CertHartActiveBaseTSf (t t1 : ExecSt) (w : BitVec 32) (ins : instruction)
+    (pc : BitVec 64) (d : Cdata) (r : Bool) (Qx : Cst → ExecSt → Prop)
+    (hw : sfAnnB 32 w = true) :
+    EvA img (fun _ _ => False) (fun r t' => r = none ∧ t' = t)
+      (dispatchInterrupt (t.regs .cur_privilege)) t →
+    EvA img (fun _ _ => False) (fun r t' => r = .F_Base w ∧ t' = t1) (fetch ()) t →
+    EvA img (fun _ _ => False) (fun x t' => x = ins ∧ t' = t1) (ext_decode w) t1 →
+    EvA img (fun _ _ => False) (fun x t' => x = false ∧ t' = t1) (is_landing_pad_expected ()) t1 →
+    t1.regs .PC = pc →
+    AxCert.Cert img dok kind (fun _ _ _ => False) (fun s x t' => x = RETIRE_SUCCESS ∧ Qx s t')
+      ⟨d, .BInf, r⟩ (execute ins) (t1.setReg .nextPC (BitVec.addInt pc 4)) →
+    AxCert.Cert img dok kind (fun _ _ _ => False)
+      (fun s x t' => x = .Step_Execute (RETIRE_SUCCESS, zero_extend (m := 32) w) ∧ Qx s t')
+      ⟨d, .BInf, r⟩ (run_hart_active 0) t := by
+  intro Hdisp Hfetch Hdec Hlpad HPC Hexec
+  subst HPC
+  unfold run_hart_active
+  apply CertCatchEarlyReturn
+  ax_cert4_go
+  refine AxCert4.cRUse Hdisp ?_
+  ax_cert4_go
+  refine AxCert4.cRUse Hfetch ?_
+  ax_cert4_go
+  refine AxCert4.cRAnn32Sf hw ?_
+  ax_cert4_go
+  refine AxCert4.cRUse Hdec ?_
+  ax_cert4_go
+  refine AxCert4.cRUse Hlpad ?_
+  ax_cert4_go
+  simp only [Bool.false_and, Bool.false_eq_true, ↓reduceIte]
+  ax_cert4_go
+  refine AxCert4.cFactLift Hexec ?_
+  rintro _ _ t' ⟨rfl, hq⟩
+  ax_cert4_go
+  exact .cRet _ _ _ ⟨rfl, hq⟩
+
+/-- (Lean-only, Q19) `CertHartActiveBaseT` at ANY 4-byte word (no `sfAnnB` premise): an
+SFENCE.VMA word goes through `AxCert4.CertHartActiveBaseTSf`. -/
+theorem AxCert4.CertHartActiveBaseTAny (t t1 : ExecSt) (w : BitVec 32) (ins : instruction)
+    (pc : BitVec 64) (d : Cdata) (r : Bool) (Qx : Cst → ExecSt → Prop) :
+    EvA img (fun _ _ => False) (fun r t' => r = none ∧ t' = t)
+      (dispatchInterrupt (t.regs .cur_privilege)) t →
+    EvA img (fun _ _ => False) (fun r t' => r = .F_Base w ∧ t' = t1) (fetch ()) t →
+    EvA img (fun _ _ => False) (fun x t' => x = ins ∧ t' = t1) (ext_decode w) t1 →
+    EvA img (fun _ _ => False) (fun x t' => x = false ∧ t' = t1) (is_landing_pad_expected ()) t1 →
+    t1.regs .PC = pc →
+    AxCert.Cert img dok kind (fun _ _ _ => False) (fun s x t' => x = RETIRE_SUCCESS ∧ Qx s t')
+      ⟨d, .BInf, r⟩ (execute ins) (t1.setReg .nextPC (BitVec.addInt pc 4)) →
+    AxCert.Cert img dok kind (fun _ _ _ => False)
+      (fun s x t' => x = .Step_Execute (RETIRE_SUCCESS, zero_extend (m := 32) w) ∧ Qx s t')
+      ⟨d, .BInf, r⟩ (run_hart_active 0) t := by
+  cases hw : sfAnnB 32 w
+  · exact CertHartActiveBaseT img dok kind t t1 w ins pc d r Qx hw
+  · exact AxCert4.CertHartActiveBaseTSf img dok kind t t1 w ins pc d r Qx hw
 
 theorem CertTryStepActive (t : ExecSt) (b : Bool) (bits : BitVec 32) (d : Cdata) (r : Bool)
     (Qx Qf : Cst → ExecSt → Prop) :

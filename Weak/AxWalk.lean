@@ -43,6 +43,9 @@ region-form embedding `CertWPOfCertW`.
    (`pDwr`, `pXwr`, `pWxwr`) take `v` with `req.value = some v`, record
    `WeakInterpProj.wbytes n v` and continue at `.Ok (some true)` (Rocq `inl None`); read answers
    are `.Ok (wordOfBytes n vs, none)`.
+   Q19 (provisional, as `AxCert` deviation 10): the Lean-only constructor `pSf` (an SFENCE.VMA
+   announce, `sfAnnB n w = true`: the marker fence, one row item `k ↦ k + 1`, `ws` kept), so
+   that `CertWPOfCertW` covers `CertW.wSf`.
 2. THE KIT on one error type (as `AxCert` deviation 4): `CertWPTryCatch` is about
    `PreSail.tryCatchAll`; `CertWPLiftRAny` / `CertWPLiftR` are stated on
    `ExceptT.run (liftM m : SailME R X)` (result `.ok x ↦ Q`, `.error _` excluded; failure nodes
@@ -62,8 +65,8 @@ region-form embedding `CertWPOfCertW`.
 `pWr`, `p_mrd` `pMrd`, `p_end` `pEnd`, `p_drd` `pDrd`, `p_dwr` `pDwr`, `p_fence` `pFence`, `p_xrd`
 `pXrd`, `p_xwr` `pXwr`, `p_ia` `pIa`, `p_ba` `pBa`, `p_co` `pCo`, `p_tl` `pTl`, `p_te` `pTe`,
 `p_rx` `pRx`, `p_ts` `pTs`, `p_tx` `pTx`, `p_cc` `pCc`, `p_msg` `pMsg`, `p_gcc` `pGcc`, `p_ext`
-`pExt`, `p_wrd` `pWrd`, `p_wxrd` `pWxrd`, `p_wxwr` `pWxwr`; Lean-only `pIf`), `CertWP_mono`
-`CertWPMono`, `CertWP_bind` `CertWPBind`, `CertWP_bind0` `CertWPBind0`, `CertWP_fact`
+`pExt`, `p_wrd` `pWrd`, `p_wxrd` `pWxrd`, `p_wxwr` `pWxwr`; Lean-only `pIf`, `pSf`),
+`CertWP_mono` `CertWPMono`, `CertWP_bind` `CertWPBind`, `CertWP_bind0` `CertWPBind0`, `CertWP_fact`
 `CertWPFact`, `CertWP_ret` `CertWPRet`, `CertWP_read_reg` `CertWPReadReg`, `CertWP_write_reg`
 `CertWPWriteReg`, `CertWP_try_catch` `CertWPTryCatch`, `CertWP_liftR_any` `CertWPLiftRAny`,
 `CertWP_liftR` `CertWPLiftR`, `CertWP_catch_early_return` `CertWPCatchEarlyReturn`,
@@ -72,7 +75,7 @@ region-form embedding `CertWPOfCertW`.
 `CertWP_of_CertW` `CertWPOfCertW`.  None is in the duplicated-name table.
 
 **Dropped:** nothing (Rocq 1 inductive + 3 definitions + 16 lemmas; Lean the same, + the
-Lean-only constructor `pIf`).  **Not ported:** the section-local Ltac `certwp_ctor` (Lean proofs
+Lean-only constructors `pIf`, `pSf`).  **Not ported:** the section-local Ltac `certwp_ctor` (Lean proofs
 name the constructor per case) and the `Print Assumptions` lines.
 -/
 import Weak.AxDataX9
@@ -199,6 +202,13 @@ inductive CertWP (img : Image) (dok wok : Int → Nat → Prop) (kind : Dkind)
       (t : ExecSt) :
       sfAnnB n w = false → CertWP img dok wok kind pR pX wpin xpin QE Q ws s k (kk ()) t →
       CertWP img dok wok kind pR pX wpin xpin QE Q ws s k (.impure (.ok (.instrAnnounce n w)) kk) t
+  /-- (Lean-only, Q19) the SFENCE.VMA announce: the marker fence, one row item -/
+  | pSf (ws : List (Nat × Wev)) (d : Cdata) (b : Bud) (r : Bool) (k : Nat) (n : Nat)
+      (w : BitVec n) (kk : Unit → SailM X) (t : ExecSt) :
+      sfAnnB n w = true →
+      CertWP img dok wok kind pR pX wpin xpin QE Q ws ⟨d, b, r⟩ (k + 1) (kk ()) t →
+      CertWP img dok wok kind pR pX wpin xpin QE Q ws ⟨d, bsucc b, r⟩ k
+        (.impure (.ok (.instrAnnounce n w)) kk) t
   | pBa (ws : List (Nat × Wev)) (s : Cst) (k : Nat) (n : Nat) (a : BitVec n) (kk : Unit → SailM X)
       (t : ExecSt) :
       CertWP img dok wok kind pR pX wpin xpin QE Q ws s k (kk ()) t →
@@ -315,6 +325,7 @@ theorem CertWPMono {X : Type}
   | pXwr ws aq rvs b r k n va req kk t v h1 h2 h3 h4 h5 _ ih =>
     exact .pXwr ws aq rvs b r k n va req kk t v h1 h2 h3 h4 h5 ih
   | pIa ws s k n w kk t hs _ ih => exact .pIa ws s k n w kk t hs ih
+  | pSf ws d b r k n w kk t hs _ ih => exact .pSf ws d b r k n w kk t hs ih
   | pBa ws s k n a kk t _ ih => exact .pBa ws s k n a kk t ih
   | pCo ws s k c kk t _ ih => exact .pCo ws s k c kk t ih
   | pTl ws s k c kk t _ ih => exact .pTl ws s k c kk t ih
@@ -361,6 +372,7 @@ theorem CertWPBind {X Y : Type}
   | pXwr ws aq rvs b r k n va req kk t v h1 h2 h3 h4 h5 _ ih =>
     exact .pXwr ws aq rvs b r k n va req _ t v h1 h2 h3 h4 h5 ih
   | pIa ws s k n w kk t hs _ ih => exact .pIa ws s k n w _ t hs ih
+  | pSf ws d b r k n w kk t hs _ ih => exact .pSf ws d b r k n w _ t hs ih
   | pBa ws s k n a kk t _ ih => exact .pBa ws s k n a _ t ih
   | pCo ws s k c kk t _ ih => exact .pCo ws s k c _ t ih
   | pTl ws s k c kk t _ ih => exact .pTl ws s k c _ t ih
@@ -454,6 +466,7 @@ theorem CertWPTryCatch {X : Type}
   | pXwr ws aq rvs b r k n va req kk t v h1 h2 h3 h4 h5 _ ih =>
     exact .pXwr ws aq rvs b r k n va req _ t v h1 h2 h3 h4 h5 ih
   | pIa ws s k n w kk t hs _ ih => exact .pIa ws s k n w _ t hs ih
+  | pSf ws d b r k n w kk t hs _ ih => exact .pSf ws d b r k n w _ t hs ih
   | pBa ws s k n a kk t _ ih => exact .pBa ws s k n a _ t ih
   | pCo ws s k c kk t _ ih => exact .pCo ws s k c _ t ih
   | pTl ws s k c kk t _ ih => exact .pTl ws s k c _ t ih
@@ -677,6 +690,8 @@ theorem CertWPOfCertW (img : Image) (dok wok : Int → Nat → Prop) (kind : Dki
   | wXwr ws aq rvs b r n va req kk t v h1 h2 h3 h4 h5 _ ih =>
     intro wsp k hm; exact .pXwr _ _ _ _ _ _ _ _ _ _ _ _ h1 h2 h3 h4 h5 (ih wsp (k + 1) hm)
   | wIa ws s n w kk t hs _ ih => intro wsp k hm; exact .pIa _ _ _ _ _ _ _ hs (ih wsp k hm)
+  | wSf ws d b r n w kk t hs _ ih =>
+    intro wsp k hm; exact .pSf _ _ _ _ _ _ _ _ _ hs (ih wsp (k + 1) hm)
   | wBa ws s n a kk t _ ih => intro wsp k hm; exact .pBa _ _ _ _ _ _ _ (ih wsp k hm)
   | wCo ws s c kk t _ ih => intro wsp k hm; exact .pCo _ _ _ _ _ _ (ih wsp k hm)
   | wTl ws s c kk t _ ih => intro wsp k hm; exact .pTl _ _ _ _ _ _ (ih wsp k hm)

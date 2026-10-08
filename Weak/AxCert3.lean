@@ -31,7 +31,9 @@ The image excludes the data doubleword (data are not text).
    `akIfetch = false` (as `Cert.cDrd`).
 2. THE PINS (`AxCert` deviation 2, `AxSymMem4` deviation 2): a pin read (`sig_seip` or
    `sig_meip`, `AxRunClose.pinReg`) is answered with both pins `0#1`, then both `1#1`; a pin
-   write is `false`.  Q7: an `instrAnnounce` with `sfAnnB n w` is `false`.
+   write is `false`.  Q19: an `instrAnnounce` is accepted whatever its word — an SFENCE.VMA
+   announce (`sfAnnB n w`) is certified by `Cert.cSf` (at `BInf` the budget is unchanged), any
+   other by `Cert.cIa` (Q7 had the checker reject the sfence announce).
 3. LEAN-SAIL (`AxCert` deviation 5): data / exclusive writes need `req.value = some v` (else
    `false`), record `WeakInterpProj.wbytes n v` and are answered `.Ok (some true)`; reads are
    answered `.Ok (wordOfBytes n vs, none)`; a failure node is `false` (QE is `False`).
@@ -132,8 +134,7 @@ def certb {X : Type} (img : Image) (dokb : Int → Nat → Bool) (kind : Dkind)
       match ebarPark bk with
       | none => certb img dokb kind vs0 Qb (k ()) d (relpUpd (ebarLabel bk) r) t
       | some _ => false
-    | .instrAnnounce n w, k =>
-      if sfAnnB n w then false else certb img dokb kind vs0 Qb (k ()) d r t
+    | .instrAnnounce _ _, k => certb img dokb kind vs0 Qb (k ()) d r t
     | .branchAnnounce _ _, k => certb img dokb kind vs0 Qb (k ()) d r t
     | .cacheOp _, k => certb img dokb kind vs0 Qb (k ()) d r t
     | .tlbi _, k => certb img dokb kind vs0 Qb (k ()) d r t
@@ -198,11 +199,7 @@ theorem certbIndep {X : Type} (img : Image) (dokb : Int → Nat → Bool) (kind 
         split
         · exact ih _ vs vs' d _ t hd
         · rfl
-      case instrAnnounce n w' =>
-        simp only [certb]
-        split
-        · rfl
-        · exact ih _ vs vs' d r t hd
+      case instrAnnounce n w' => exact ih _ vs vs' d r t hd
       case branchAnnounce n a => exact ih _ vs vs' d r t hd
       case cacheOp c => exact ih _ vs vs' d r t hd
       case tlbi c => exact ih _ vs vs' d r t hd
@@ -353,12 +350,8 @@ theorem certbSound {X : Type} (img : Image) (dokb : Int → Nat → Bool) (kind 
           exact hb'
       case instrAnnounce n w =>
         cases hs : sfAnnB n w
-        · refine .cIa _ n w k t hs (ih _ _ _ _ ?_)
-          intro vs0 hl
-          have hb' := hb vs0 hl
-          simp only [certb, hs, Bool.false_eq_true, ↓reduceIte] at hb'
-          exact hb'
-        · simp [certb, hs] at h0
+        · exact .cIa _ n w k t hs (ih _ _ _ _ fun vs0 hl => hb vs0 hl)
+        · exact .cSf d .BInf r n w k t hs (ih _ _ _ _ fun vs0 hl => hb vs0 hl)
       case branchAnnounce n a => exact .cBa _ n a k t (ih _ _ _ _ fun vs0 hl => hb vs0 hl)
       case cacheOp c => exact .cCo _ c k t (ih _ _ _ _ fun vs0 hl => hb vs0 hl)
       case tlbi c => exact .cTl _ c k t (ih _ _ _ _ fun vs0 hl => hb vs0 hl)
