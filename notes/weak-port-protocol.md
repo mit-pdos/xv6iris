@@ -321,3 +321,4 @@ Rocq→Lean name map only.
 - AxSpinU3: `AxSpinU3.gwixPos`, `uHandoff`, `uDistinct`; `nthByte`/`wbytesLookup` on `BitVec 32` need `(n := 4)`/`(m := 4)`.
 - AxSpinAp (Q18 provisional option 1): `pca (base : Nat) (off : Int)`, `allocpidText base`; Ap2–Ap9 build on the base parameter (text facts unconnected to the Lean image).
 - AxSpinVA3: FEC stepping kit `AxSpinVA3.f*` + tactic `ax_spin_va3_go`; `AxSpinVA3.fcMrdEndAt` (key as argument); `FTranslateAddrImg` takes `AxSpineOk6.pmpOk t.regs` + `t.regs .pma_regions = bootPMA`.
+- AxEpiRetFwd: `epiRetSound2Fwd` (drops `Hlob_gmo`; covers store forwarding), `epiRetSound2FwdStronger`, `raceRetNoWpd1Fwd`, `okRetFwd`. Since Stage C `tierAAstep` = `astepAnyNfGv` and each step is an `rstep (· = GD)` step: Rocq proofs that run adequacy at a trivial instance just to get a pure end-state fact can apply a forward-reachability lemma to the run instead (`AxEpiRetFwd.rstepOfGv`/`rtcOfRun`).
