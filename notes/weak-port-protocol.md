@@ -300,3 +300,4 @@ Rocq→Lean name map only.
 - AxSpinH7: `gs7*` capstone; avoid local names that shadow globals (`Hent` is `Weak.Hent`).
 - Owner 00:2x: weekly pool — full speed, accept a stall until Sun 06:00 (park green).
 - AxSpinE (AxSpinE2–E8, AxSpinPO*): STAGE C COUNT SHIFT — a fetch no longer consumes a row item: `cntFetchBase4SGen = ntr` (Rocq +1), `fetchHitS`/`fetch4HitS` post `b = b'`, `CertHartActive{Rvc,Base}B` `BFin b → BFin b`, `AxSpinE.spineCertB` starts at `BFin (e + b)` (Rocq `e + b + 1`) — DROP the per-instruction `+1` in Rocq position arithmetic. `textOkB` base arm carries `sfAnnB 32 w = false`. BFin kit `AxSpinE.cRUseB`/`cFactUseB`, `AxSpinE.certOfEvBF`. Anonymous `h.2` on an `∃` passes elaboration but fails in the kernel ("invalid projection") — destructure.
+- AxWalk4: probe walk at `pT` (`QPreset`/`QAd` literal walker-event lists); section vars `wok μ t a w σs`; discharge AxWalk3 `PTranslateTLBMiss*` hyps with named args `(H0i := …)`.
