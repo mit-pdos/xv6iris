@@ -185,3 +185,8 @@ The real dependency order among the Stage C files comes from the DAG.
   2. Launch the ready set: AxSymCtl, AxSymMem, AxSpineOk4, AxDataX, AxSpinProt5, AxSpinProt4 (+ whatever sched.py lists).
   3. RESUME the parked partials: AxEpiSound3, AxScRun3 (`weak-orch/parked/`, PROGRESS files inside).
 - **Lessons from today:** never pre-warn about the limit in launch prompts (workers stop early); reslot or depcheck right before every launch; workers must grep the tip for every new short name.
+
+## Update 2026-10-07 20:02: wind-down at 95%; next reset Thu 00:00
+
+- Done ~413/537. Winding down: AxSymMem3 (w3), AxEpiRet (w1, may touch AxCjrReach), AxWalk3 (w4) → PROGRESS files; park and RESUME at reset.
+- At the reset: (1) RESUME the three parked files; (2) Q16 rework worker (AxSymCtl5: EvB "fetch with no image bytes ⇒ stuck" constructor + capstone); (3) launch the ready set: AxDataX7 (CRITICAL chain), AxWalk7, AxPtwModel, AxDataX5, AxDataX8, AxRelease7, AxRelease8, AxSpinH5, AxSpinH3, AxSpinX6 + whatever sched.py lists. Use weak-orch/prep.sh in the same step as each launch.
