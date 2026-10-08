@@ -198,3 +198,10 @@ The real dependency order among the Stage C files comes from the DAG.
 - Open owner questions to ask at next status: Q18 (allocpid inlined), Q19 (Cert sfence arm), INFO-DROP AxEpiRetFwd (14 trivial-instance decls).
 - 01:1x wind-down: parked in weak-orch/parked/: AxSpinE6 (8/13; Q20 on Xx_ret), Q19 (11 files green in w5; merge blocked only by AxCertP2 needing `cSf` cases in `AxCertP2.cinv` (CInvO announce arm) and in the bridge induction at ~line 902 — use `AxCert2.wpdSfNodeM`; a pinned bridge may need a twin like `AxCondM2.wpdPinSf`), AxSymMem3 (resume). At 05:00: FIRST a worker in w5 to add the AxCertP2 cSf cases and merge Q19 (11 files + AxCertP2); then E6 resume (Q20 provisional), AxCertP3, AxSpinXP, AxSpinAp6, AxSpinHd6/6b/6c + sched.py.
 - AxSymMem3 resume: cause of 300 s found (see protocol KERNEL BLOW-UP); fix plan in parked/AxSymMem3/PROGRESS; Q17 not started.
+
+## Update 2026-10-08 01:2x: owner answers Q18–Q20; plan for the 05:00 window
+1. w5: AxCertP2 `cSf` cases, then merge Q19 (11 parked files + AxCertP2).
+2. Q20 DESIGN CONSULT (one fresh Fable advisor, advisory only): how to make diverted fetches outside kernel text no-image fetches so FirstRd/frNf make them stuck — which image (graph `gxImg` vs `imgS σi`) must be restricted to kernel text, what premises AxSpinE3 (`wpdOffrowM` HGimg)/E4/E5/E6 change, impact on merged files. Then one rework worker, then resume AxSpinE6 (parked) and continue E8 → AxSpinPO*.
+3. Q18: one worker designs + reworks the Ap line against allocproc's inlined copy (Ap..Ap5 rework, then Ap6..Ap9), cross-checking every word against Xv6/KernelImage.lean.
+4. AxSymMem3 resume (perf fix per protocol KERNEL BLOW-UP; Q17 wp_cpuid_c).
+5. Ready set: AxCertP3, AxSpinXP, AxSpinHd6/6b/6c (+ sched.py); AxSpinAp6 HELD for Q18.
