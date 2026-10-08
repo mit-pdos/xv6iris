@@ -30,8 +30,8 @@ Kernel words: this file states no instruction word.  The offsets above were cros
 0x80000c64, jal holding 0x80000c6a, amoswap 0x80000c74, jal mycpu 0x80000c7c, c.sd a0,16(s1)
 0x80000c80).  NOTE: the 4-byte `jal holding` at acquire + 0x12 = 0x80000c6a is 2 mod 4 (the other
 4-byte words + 0x0c / + 0x1c / + 0x24 are 4-aligned) — `AxSpinAq.acquireText`'s conjunct
-`textAt4S … (pac 0x12) Wa12` demands `is_aligned_vaddr pc 4`, so it is unsatisfiable in this tree
-(as `AxSpinE8f.mycpuTextFalse`; open Q22).  Not used here.
+`textAt4S … (pac 0x12) Wa12` was unsatisfiable while `textAt4S` demanded a 4-aligned pc; the Q22
+rework generalised `textAt4S` to 2-aligned pcs (`AxDataX6`), so it is satisfiable now.  Not used here.
 
 ## Deviations from Rocq
 

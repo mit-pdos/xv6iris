@@ -20,20 +20,16 @@ APPLIED at the instance.  `hinj8` (canonical `Hinj`: a canonical VA translating 
 under `tT` IS 0x80000000) and `hstv8` (VA 0 is unmapped).  Everything closed by kernel
 computation on the literal forms.
 
-## THE FINDING (Lean only): `wpdMycpu` is VACUOUS in this tree
+## Q22 (Lean only): `wpdMycpu` is NOT vacuous
 
-`AxSpinE8f.mycpuTextFalse : ∀ σi T, ¬ mycpuText σi T`.  KERNEL DRIFT (`AxSpinE7` deviation 1)
-moved `mycpu` to 0x8000195c, so its two 4-byte words (`auipc` at `pcm 0x0e` = 0x8000196a, `addi`
-at `pcm 0x12` = 0x8000196e) sit at pcs that are 2 mod 4 (Rocq: 0x800018f4 / 0x800018f8, 4-aligned),
-while `textAt4S` (AxDataX6, the only 4-byte text predicate `textOkB`/`tokB` accept) demands
-`is_aligned_vaddr pc 4 = true`.  So `AxSpinE8.wpdMycpu`'s premise `Htxt : mycpuText σi T` is
-unsatisfiable and the theorem holds vacuously — and so does every caller that supplies `Htxt`
-(AxSpinHd*, AxSpinPO3, AxSpinAp, …, per their own `mycpuText` premises).  Rocq's `Htxt8` and
-`cert_a` are therefore FALSE / unprovable here and are DROPPED (deviation 1); the other twelve
-(compressed) text facts DO hold at the instance (`AxSpinE8f.Htxt8Rvc`), and every OTHER premise
-of `wpdMycpu` holds (`AxSpinE8f.wpdMycpuPremises`).  The fix is upstream (owner question): a
-2-aligned 4-byte text predicate / `textOkB` arm (the two-halfword fetch of WeakFetch2) for
-AxSpinE7's `tok0e`/`tok12` and the `mycpuText` definition.
+KERNEL DRIFT (`AxSpinE7` deviation 1) moved `mycpu` to 0x8000195c, so its two 4-byte words
+(`auipc` at `pcm 0x0e` = 0x8000196a, `addi` at `pcm 0x12` = 0x8000196e) sit at pcs that are 2 mod 4
+(Rocq: 4-aligned).  Before the Q22 rework `textAt4S` demanded a 4-aligned pc and this file proved
+`mycpuText` unsatisfiable (`mycpuTextFalse`, now DELETED).  With `textAt4S` generalised to the
+2-aligned arm (`AxDataX6` deviation 6), `AxSpinE8f.mycpuTextOf` proves `mycpuText σ8 tT` (twelve
+compressed words by `textAtT4`/`textAtT2`, the two 4-byte words by `textAt4T2`), Rocq's `Htxt8`
+is restored, and Rocq's `cert_a` (`AxSpinE8f.certA`: `wpdMycpu` APPLIED at the instance, every
+premise discharged) type-checks — the non-vacuity certificate proper.
 
 ## Deviations from Rocq
 
@@ -43,14 +39,15 @@ AxSpinE7's `tok0e`/`tok12` and the `mycpuText` definition.
      administrative), `il8` lists 5 positions (Rocq 19); `growG` is the 5-item graph row
      (`rowM` with the reads' sources filled in);
    * `Hrow8` is the Stage C `RowMycpu 0 … (paZ Pra8) (paZ Ps08)` (no `pret`/`nret`);
-   * `wpd_mycpu_premises` ↦ `AxSpinE8f.wpdMycpuPremises` over the LEAN `wpdMycpu`'s premises:
-     the `mycpuText` conjunct is removed (unsatisfiable, see the finding), Rocq's `Hinj`/`Hstv`
-     conjuncts are replaced by the Option V pins `Hval` (`AxSpinE8f.hval8`: the reload's graph
-     value at (0, 0+2) is `stBytes 8 ret8`) and `Hret` (`AxSpinE8f.hret8`);
-   * `Htxt8` DROPPED (false: `mycpuTextFalse`), replaced by `Htxt8Rvc` (its twelve true
-     conjuncts); `cert_a` DROPPED (it is `wpdMycpu` applied, which needs `Htxt8`; Rocq's other
-     residual hypothesis `va_first_read` is gone in Lean anyway).  Neither has a downstream user
-     (grep of the Rocq tree).
+   * `wpd_mycpu_premises` ↦ `AxSpinE8f.wpdMycpuPremises` over the LEAN `wpdMycpu`'s premises
+     (`mycpuText` included, Q22): Rocq's `Hinj`/`Hstv` conjuncts are replaced by the Option V
+     pins `Hval` (`AxSpinE8f.hval8`: the reload's graph value at (0, 0+2) is `stBytes 8 ret8`)
+     and `Hret` (`AxSpinE8f.hret8`);
+   * `cert_a` ↦ `AxSpinE8f.certA`: no `va_first_read` hypothesis (gone in Lean, Q20'); the
+     continuation at `0 + 4` (Rocq `0 + 18`), the reload annotations at (0, 0+2) / (0, 0+3)
+     (Rocq 13 / 15), Stage C positions; `hlc` generic (Rocq `HasNoLc`).
+   * Q22 (see above): `Htxt8` is RESTORED (via the Lean-only `mycpuTextOf`); the Lean-only
+     `Htxt8Rvc` (its twelve compressed conjuncts, from the pre-Q22 finding) is kept.
 2. `hinj8`, `hstv8`, `stvec8`, `stv8` are TRUE and ported, but have no consumer under Q20'
    (`wpdMycpu` dropped `Hinj`/`Hstv`/`stv`).  `hinj8` uses `AxSpinE8e.svpnUnsigned`/`zShift39`/
    `lo11Unsigned` as Rocq does.
@@ -89,13 +86,12 @@ duplicated-name table).  `σ8` `σ8`, `L0leaf` `L0leaf`, `L1leaf` `L1leaf`, `P2`
 `Hnt_ra8` `HntRa8`, `Hnt_s08` `HntS08`, `Hslots8` `Hslots8`, `ret8` `ret8`, `stv8` `stv8`,
 `uint9_inj` `uint9Inj`, `pte_valid_0` `pteValid0`, `canon_eq` `canonEq`, `fetch_pa_unsigned`
 `fetchPaUnsigned`, `hinj8` `hinj8`, `hstv8` `hstv8`, `wpd_mycpu_premises` `wpdMycpuPremises`,
-`HΨmid8` `HΨmid8`.  Lean-only: `GD8` (Rocq notation), `mycpuTextFalse`, `Htxt8Rvc`, `chkT`,
-`textAtT4`, `textAtT2`, `readsOffImg`, `entEqB`, `entEqBSound`, `tlbChk`, `tlbChkSound`, `dataD`,
+`HΨmid8` `HΨmid8`, `Htxt8` `Htxt8`, `cert_a` `certA`.  Lean-only: `GD8` (Rocq notation), `mycpuTextOf`,
+`textAt4T2` (Q22), `Htxt8Rvc`, `chkT`, `textAtT4`, `textAtT2`, `readsOffImg`, `entEqB`, `entEqBSound`, `tlbChk`, `tlbChkSound`, `dataD`,
 `chkDS`, `chkDL`, `paRa8`, `paS08`, `hval8`, `hret8` (+ macro `ax_spin_e8f_txt2`).
 
-**Dropped:** `Htxt8` (FALSE in this tree: `mycpuTextFalse`) and `cert_a` (needs `Htxt8`) —
-deviation 1; the local instances `f8_pol`/`f8_G` (inlined); the Ltacs (deviation 4).  Rocq 82
-definitions/lemmas + 2 instances; Lean 80 ported + 18 Lean-only (+ 1 macro).
+**Dropped:** the local instances `f8_pol`/`f8_G` (inlined); the Ltacs (deviation 4).  Rocq 82
+definitions/lemmas + 2 instances; Lean 82 ported + 19 Lean-only (+ 1 macro).
 -/
 import Weak.AxSpinE8d
 import Weak.AxSpinE8e
@@ -281,13 +277,41 @@ theorem AxSpinE8f.Htxt8Rvc :
     textAtS AxSpinE8f.σ8 AxSpinE8f.tT (pcm 0x1e) (AxSpinE7.hw 0x8082) := by
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> ax_spin_e8f_txt2
 
-/-- (Lean-only, THE FINDING, deviation 1) `mycpuText` is UNSATISFIABLE in this tree: the two
-4-byte words sit at `pcm 0x0e` = 0x8000196a and `pcm 0x12` = 0x8000196e (kernel drift: `mycpu` =
-0x8000195c), which are 2 mod 4, while `textAt4S` demands `is_aligned_vaddr pc 4`. -/
-theorem AxSpinE8f.mycpuTextFalse (σi : ExecSt) (T : PTree) : ¬ mycpuText σi T := by
-  intro H
-  obtain ⟨-, -, -, -, -, -, -, ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, Hal, -⟩, -⟩ := H
-  exact absurd Hal (by decide +kernel)
+/-- (Lean-only, Q22) `textAt4S` at a 2-aligned (`pc ≡ 2 mod 4`) pc on mycpu's page: the
+4-byte twin of `textAtT2`. -/
+theorem AxSpinE8f.textAt4T2 (pc : BitVec 64) (w32 : BitVec 32)
+    (H : WeakKpt.svpnOf pc = AxSpinE8f.vpnT ∧
+      (pc != sign_extend (m := 64) (Sail.BitVec.extractLsb pc 38 0)) = false ∧
+      (Sail.BitVec.access pc 0 != 0#1) = false ∧
+      isRVC (Sail.BitVec.extractLsb w32 15 0) = false ∧
+      is_aligned_vaddr (.Virtaddr pc) 4 = false ∧
+      (Sail.BitVec.access pc 1 != 0#1) = true ∧
+      (Sail.BitVec.extractLsb pc 11 1 != 0x7ff#11) = true ∧
+      inRam (AxSpinE6.fetchPa AxSpinE8f.L1leaf pc) 4 ∧
+      is_aligned_paddr (.Physaddr (AxSpinE6.fetchPa AxSpinE8f.L1leaf pc)) 2 = true ∧
+      (∀ j, j < 4 → AxSpinE8f.σ8.mem (AxSpinE6.fetchPa AxSpinE8f.L1leaf pc + BitVec.ofNat 64 j) =
+        some (nthByte (n := 4) w32 j))) :
+    textAt4S AxSpinE8f.σ8 AxSpinE8f.tT pc w32 := by
+  obtain ⟨hv, hc, hb0, hrvc, hal, h1, hns, hr, ha, hb⟩ := H
+  unfold textAt4S
+  rw [hv]
+  exact ⟨AxSpinE8f.P2, AxSpinE8f.P1, AxSpinE8f.L1leaf, AxSpinE6.fetchPa AxSpinE8f.L1leaf pc,
+    AxSpinE8f.mapsT, AxSpinE8f.slot2T, AxSpinE8f.slot1T, AxSpinE8f.slot0T, AxSpinE8f.chkT,
+    by decide +kernel, by unfold ptePbmt0; decide +kernel, hc, rfl, hb0, hrvc, hr,
+    by rw [if_neg (by rw [hal]; decide)]; exact ⟨h1, ha, hns⟩, hb⟩
+
+/-- (Lean-only, Q22 — replaces the refutation `mycpuTextFalse`) `mycpuText` HOLDS at the
+instance: the twelve compressed words by `textAtT4`/`textAtT2`, the two 4-byte words at
+`pcm 0x0e` / `pcm 0x12` (2 mod 4) by `textAt4T2`. -/
+theorem AxSpinE8f.mycpuTextOf : mycpuText AxSpinE8f.σ8 AxSpinE8f.tT := by
+  unfold mycpuText
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+    first
+    | ax_spin_e8f_txt2
+    | exact AxSpinE8f.textAt4T2 _ _ (by decide +kernel)
+
+/-- Rocq `Htxt8` (restored by Q22). -/
+theorem AxSpinE8f.Htxt8 : mycpuText AxSpinE8f.σ8 AxSpinE8f.tT := AxSpinE8f.mycpuTextOf
 
 /-! # 3. The graph -/
 
@@ -739,11 +763,10 @@ theorem AxSpinE8f.hval8 :
 /-- (Lean-only, deviation 1) `Hret`: the return address is 2-aligned. -/
 theorem AxSpinE8f.hret8 : jalrTgt 0#12 AxSpinE8f.ret8 = AxSpinE8f.ret8 := by decide +kernel
 
-/-! # 8. ALL PURE PREMISES AT ONCE (deviation 1: except `mycpuText`) -/
+/-! # 8. ALL PURE PREMISES AT ONCE -/
 
 /-- Rocq `wpd_mycpu_premises`, restated for the Lean `wpdMycpu` (deviation 1): every pure
-premise holds at the instance EXCEPT `Htxt : mycpuText σ8 tT`, which is unsatisfiable in this
-tree (`AxSpinE8f.mycpuTextFalse`; its twelve compressed conjuncts hold, `AxSpinE8f.Htxt8Rvc`).
+premise holds at the instance, `Htxt : mycpuText σ8 tT` included (Q22: `AxSpinE8f.Htxt8`).
 Rocq's `Hinj`/`Hstv` conjuncts (premises dropped from `wpdMycpu` by Q20') are replaced by the
 Option V pins `Hval`/`Hret`; `hinj8`/`hstv8` are still proved above. -/
 theorem AxSpinE8f.wpdMycpuPremises :
@@ -751,7 +774,7 @@ theorem AxSpinE8f.wpdMycpuPremises :
     _get_Satp64_Mode (Mk_Satp64 AxSpinE8f.satp8) = 8#4 ∧
     zero_extend (m := 16) (satp_to_asid AxSpinE8f.satp8) = 0#16 ∧
     BitVec.setWidth 44 (satp_to_ppn AxSpinE8f.satp8) = AxSpinE8f.tT.base ∧
-    textFixed AxSpinE8f.GD8 0 (imgS AxSpinE8f.σ8) ∧
+    textFixed AxSpinE8f.GD8 0 (imgS AxSpinE8f.σ8) ∧ mycpuText AxSpinE8f.σ8 AxSpinE8f.tT ∧
     (RowMycpu 0 (AxOpsem.grow AxSpinE8f.GD8 0) (paZ AxSpinE8f.Pra8) (paZ AxSpinE8f.Ps08) ∧
      rowW8 (AxOpsem.grow AxSpinE8f.GD8 0) ∧
      noRmw8 (AxOpsem.grow AxSpinE8f.GD8 0) (paZ AxSpinE8f.Pra8) ∧
@@ -772,13 +795,13 @@ theorem AxSpinE8f.wpdMycpuPremises :
      graphValue AxSpinE8f.GD8 (0, 0 + 2) = some (stBytes 8 AxSpinE8f.ret8) ∧
      jalrTgt 0#12 AxSpinE8f.ret8 = AxSpinE8f.ret8) :=
   ⟨AxSpinE8f.HL8, AxSpinE8f.Hcons8, AxSpinE8f.Hmode8, AxSpinE8f.Hasid8, AxSpinE8f.Hppn8,
-    AxSpinE8f.Hfix8, AxSpinE8f.Hrow8, AxSpinE8f.Hw8_8, AxSpinE8f.noRmw8_8 _,
+    AxSpinE8f.Hfix8, AxSpinE8f.Htxt8, AxSpinE8f.Hrow8, AxSpinE8f.Hw8_8, AxSpinE8f.noRmw8_8 _,
     AxSpinE8f.noRmw8_8 _, AxSpinE8f.Hc08, AxSpinE8f.HPC08, AxSpinE8f.Hhit08, AxSpinE8f.HdaSRa8,
     AxSpinE8f.HdaLRa8, AxSpinE8f.HhRa8, AxSpinE8f.HdaSS08, AxSpinE8f.HdaLS08, AxSpinE8f.HhS08,
     AxSpinE8f.HprRa8, AxSpinE8f.HntRa8, AxSpinE8f.HprS08, AxSpinE8f.HntS08, AxSpinE8f.Hslots8,
     AxSpinE8f.hval8, AxSpinE8f.hret8⟩
 
-/-! # 9. The post premise (`cert_a` DROPPED, deviation 1) -/
+/-! # 9. The post premise and `cert_a` (restored by Q22) -/
 
 /-- Rocq `HΨmid8`. -/
 theorem AxSpinE8f.HΨmid8 {GF : BundledGFunctors.{0,0,0}} [AxannotGS GF] [AxSpinX.Xv6G GF] (nm : Xv6N) :
@@ -787,5 +810,44 @@ theorem AxSpinE8f.HΨmid8 {GF : BundledGFunctors.{0,0,0}} [AxannotGS GF] [AxSpin
   intro s _ _
   letI : AxirisG GF := AxSpinX2.xG AxSpinE8f.L8 AxSpinE8f.GT8 nm
   exact postLiftingTrue _ 0 s .rfl
+
+/-- Rocq `cert_a` (restored by Q22): `wpdMycpu` APPLIED at the instance — every premise
+discharged (Rocq's residual hypothesis `va_first_read` is gone in Lean: Q20' Option V), only the
+continuation remains. -/
+theorem AxSpinE8f.certA {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [InvGS_gen hlc GF]
+    [AxannotGS GF] [AxSpinX.Xv6G GF] (nm : Xv6N) (cpu : CPU) (ib0 : Ibch) :
+    ⊢ (∀ (vra vs0 : List (BitVec 8)) (rs' : RegFile) (ib' : Ibch),
+        ⌜ctrlOkSW AxSpinE8f.tT AxSpinE8f.satp8 rs' ∧ rs' .PC = AxSpinE8f.ret8 ∧
+          rs' .tlb = AxSpinE8d.rsE .tlb ∧
+          gprVal rs' AxSpinE8.r10 = AxSpinE8.mycpuRet (gprVal AxSpinE8d.rsE AxSpinE8.r4) ∧
+          gprVal rs' AxSpinE8.r2 = gprVal AxSpinE8d.rsE AxSpinE8.r2 ∧
+          vra.length = 8 ∧ vs0.length = 8 ∧
+          gprVal rs' AxSpinE8.r1 = ldRes false 8 vra ∧ gprVal rs' AxSpinE8.r8 = ldRes false 8 vs0 ∧
+          (∀ r : BitVec 5, r.toNat ≠ 1 → r.toNat ≠ 2 → r.toNat ≠ 8 → r.toNat ≠ 10 →
+            r.toNat ≠ 15 → gprVal rs' r = gprVal AxSpinE8d.rsE r) ∧
+          graphData AxSpinE8f.GD8 (0, 0) = some (stBytes 8 (gprVal AxSpinE8d.rsE AxSpinE8.r1)) ∧
+          graphData AxSpinE8f.GD8 (0, 0 + 1) = some (stBytes 8 (gprVal AxSpinE8d.rsE AxSpinE8.r8)) ∧
+          graphValue AxSpinE8f.GD8 (0, 0 + 2) = some vra ∧
+          graphValue AxSpinE8f.GD8 (0, 0 + 3) = some vs0⌝ -∗
+        AxAnnot.annotOwn (GF := GF) (0, 0 + 2)
+          iprop(⌜RLfact AxSpinE8f.GT8 0 (paZ AxSpinE8f.Pra8) (0 + 2)
+            (stBytes 8 (gprVal AxSpinE8d.rsE AxSpinE8.r1))⌝) -∗
+        AxAnnot.annotOwn (GF := GF) (0, 0 + 3)
+          iprop(⌜RLfact AxSpinE8f.GT8 0 (paZ AxSpinE8f.Ps08) (0 + 3)
+            (stBytes 8 (gprVal AxSpinE8d.rsE AxSpinE8.r8))⌝) -∗
+        @wpdM hlc GF _ (AxSpinX2.xG AxSpinE8f.L8 AxSpinE8f.GT8 nm) (xv6Pol AxSpinE8f.GT8)
+          rvwmoCatConsistent .MaybeStuck 0 ⟨.PHart cpu (.pure ()) rs' none ib', 0 + 4⟩
+          (fun _ => iprop(True))) -∗
+      @wpdM hlc GF _ (AxSpinX2.xG AxSpinE8f.L8 AxSpinE8f.GT8 nm) (xv6Pol AxSpinE8f.GT8)
+        rvwmoCatConsistent .MaybeStuck 0 ⟨.PHart cpu (.pure ()) AxSpinE8d.rsE none ib0, 0⟩
+        (fun _ => iprop(True)) :=
+  wpdMycpu (hlc := hlc) AxSpinE8f.L8 AxSpinE8f.GT8 nm AxSpinE8f.HL8 AxSpinE8f.Hcons8 AxSpinE8f.σ8
+    AxSpinE8f.tT AxSpinE8f.satp8 AxSpinE8f.Hmode8 AxSpinE8f.Hasid8 AxSpinE8f.Hppn8 0 cpu
+    AxSpinE8f.Hfix8 AxSpinE8f.Htxt8 (fun _ => iprop(True)) (AxSpinE8f.HΨmid8 nm) 0 AxSpinE8d.rsE ib0
+    AxSpinE8f.ret8 AxSpinE8f.Pra8 AxSpinE8f.Ps08 AxSpinE8f.Hrow8 AxSpinE8f.Hw8_8
+    (AxSpinE8f.noRmw8_8 _) (AxSpinE8f.noRmw8_8 _) AxSpinE8f.Hc08 AxSpinE8f.HPC08 AxSpinE8f.Hhit08
+    AxSpinE8f.HdaSRa8 AxSpinE8f.HdaLRa8 AxSpinE8f.HhRa8 AxSpinE8f.HdaSS08 AxSpinE8f.HdaLS08
+    AxSpinE8f.HhS08 AxSpinE8f.HprRa8 AxSpinE8f.HntRa8 AxSpinE8f.HprS08 AxSpinE8f.HntS08
+    AxSpinE8f.Hslots8 AxSpinE8f.hval8 AxSpinE8f.hret8
 
 end Weak

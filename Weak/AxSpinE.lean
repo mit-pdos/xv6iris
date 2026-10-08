@@ -52,6 +52,11 @@ SCOPE (as Rocq): WARM TLB only (a cold fetch consumes the walk's reads and may e
 5. `CertExecACnt` states the run at `⟨t.regs, σ.mem, t.dev⟩` and the post at
    `⟨s1.regs, t.mem, t.dev⟩`, as Rocq.
 
+6. Q22 (`AxDataX6` deviation 6): `textAt4S` now also covers a 2-aligned pc, so `fetch4HitS`
+   (statement unchanged) case-splits on `is_aligned_vaddr pc 4`; its 2-arm uses the Lean-only
+   `cntFetchBase2SGen` (the count twin of `execAFetchBase2SGen`: `= ntr1 + ntr2`, the two
+   translations' reads) and, on a hit, both translations (`pc`, `pc + 2`: same page) hit.
+
 **Rocq → Lean name map.**  `cnt_fetch_Base_4_S_gen` `cntFetchBase4SGen`, `mstate_ext`
 `mstateExt`, `hitW` `hitW`, `hitW_agree` `hitWAgree`, `fetch_hit_S` `fetchHitS`, `fetch4_hit_S`
 `fetch4HitS`, `Cert_nrd` `CertNrd`, `Cert_EvBc` `CertEvBc`, `Cert_execA_cnt` `CertExecACnt`,
@@ -63,7 +68,9 @@ name: also AxSymEngine3), `CertB_of_CertC` `CertBOfCertC`.  Lean-only (file-qual
 `AxSpinE.cFactUseB` (the `BFin` twins of `AxCert4.cRUse` / `cFactUse`: an `EvA` fact of a
 read-free tree keeps the budget).
 
-**Dropped:** nothing (Rocq 18 definitions/lemmas + 2 Ltacs; Lean 18 + 3 Lean-only).
+Lean-only (Q22, deviation 6): `cntFetchBase2SGen`.
+
+**Dropped:** nothing (Rocq 18 definitions/lemmas + 2 Ltacs; Lean 18 + 4 Lean-only).
 **Not ported:** the Ltacs `nseipE`, `lk` (deviation 3, 4); the `Print Assumptions` lines (the
 lint's axiom check covers them).
 -/
@@ -116,6 +123,74 @@ theorem cntFetchBase4SGen (va pa : BitVec 64) (w : BitVec 32) (s s1 : ExecSt)
     execACurrentlyEnabledZiccif, AxSymCtl4.cntCurrentlyEnabledZiccif, hfb, hfbc, hrvc, ↓reduceIte,
     Bool.false_eq_true, Functions.not, Nat.reduceMul, BitVec.setWidth_eq, Nat.add_zero,
     Nat.zero_add]
+
+/-- (Lean-only, Q22) the `cntA` twin of `execAFetchBase2SGen`: a 2-aligned non-compressed
+fetch counts its two translations' reads (Stage C: the two halfword reads count 0). -/
+theorem cntFetchBase2SGen (va pal pah : BitVec 64) (w : BitVec 32) (s s1 s2 : ExecSt)
+    (regl regh : PMA_Region) (ntr1 ntr2 : Nat) (hpc : s.regs .PC = va) (hpc1 : s1.regs .PC = va)
+    (hmisaC : (_get_Misa_C (s.regs .misa) == 1#1) = true)
+    (hbit0 : (Sail.BitVec.access va 0 != 0#1) = false)
+    (hbit1 : (Sail.BitVec.access va 1 != 0#1) = true)
+    (hvalign4 : is_aligned_vaddr (.Virtaddr va) 4 = false)
+    (htr1 : execA (translateAddr (.Virtaddr va) (.InstructionFetch ())) s
+      = some (.Ok (.Physaddr pal, .PBMT_PMA, ()), s1))
+    (htrc1 : cntA (translateAddr (.Virtaddr va) (.InstructionFetch ())) s = ntr1)
+    (htr2 : execA (translateAddr (.Virtaddr (Sail.BitVec.addInt va 2)) (.InstructionFetch ())) s1
+      = some (.Ok (.Physaddr pah, .PBMT_PMA, ()), s2))
+    (htrc2 : cntA (translateAddr (.Virtaddr (Sail.BitVec.addInt va 2)) (.InstructionFetch ())) s1
+      = ntr2)
+    (hAl : pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (s1.regs .pmpcfg_n)[0]!) = .TOR)
+    (hltl : zopz0zKzJ_u (zeros (n := 64)) (s1.regs .pmpaddr_n)[0]! = false)
+    (hrl : pmpRangeMatch ((zeros (n := 64)).toNat * 4) ((s1.regs .pmpaddr_n)[0]!.toNat * 4) pal.toNat
+      (to_bits (l := 64) 2).toNat = .PMP_Match)
+    (hXl : (_get_Pmpcfg_ent_X (s1.regs .pmpcfg_n)[0]! == 1#1) = true)
+    (hml : matching_pma_region (s1.regs .pma_regions) (.Physaddr pal) 2 = some regl)
+    (hall : is_aligned_paddr (.Physaddr pal) 2 = true)
+    (hxl : (override_PMA regl.attributes .PBMT_PMA).executable = true)
+    (hcl : exec (within_clint (.Physaddr pal) 2) s1 = some (false, s1))
+    (hsigl : exec (within_sig (.Physaddr pal) 2) s1 = some (false, s1))
+    (hhl : exec (within_htif_readable (.Physaddr pal) 2) s1 = some (false, s1))
+    (hdevl : devAddr pal = false) (hwfl : paZ pal + 2 ≤ 2 ^ 64)
+    (hbl : BytesAt s1 pal 2 (Sail.BitVec.extractLsb w 15 0))
+    (hprivl : s1.regs .cur_privilege = .Supervisor)
+    (hAh : pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (s2.regs .pmpcfg_n)[0]!) = .TOR)
+    (hlth : zopz0zKzJ_u (zeros (n := 64)) (s2.regs .pmpaddr_n)[0]! = false)
+    (hrh : pmpRangeMatch ((zeros (n := 64)).toNat * 4) ((s2.regs .pmpaddr_n)[0]!.toNat * 4) pah.toNat
+      (to_bits (l := 64) 2).toNat = .PMP_Match)
+    (hXh : (_get_Pmpcfg_ent_X (s2.regs .pmpcfg_n)[0]! == 1#1) = true)
+    (hmh : matching_pma_region (s2.regs .pma_regions) (.Physaddr pah) 2 = some regh)
+    (halh : is_aligned_paddr (.Physaddr pah) 2 = true)
+    (hxh : (override_PMA regh.attributes .PBMT_PMA).executable = true)
+    (hch : exec (within_clint (.Physaddr pah) 2) s2 = some (false, s2))
+    (hsigh : exec (within_sig (.Physaddr pah) 2) s2 = some (false, s2))
+    (hhh : exec (within_htif_readable (.Physaddr pah) 2) s2 = some (false, s2))
+    (hdevh : devAddr pah = false) (hwfh : paZ pah + 2 ≤ 2 ^ 64)
+    (hbh : BytesAt s2 pah 2 (Sail.BitVec.extractLsb w 31 16))
+    (hprivh : s2.regs .cur_privilege = .Supervisor)
+    (hnot : isRVC (Sail.BitVec.extractLsb w 15 0) = false) :
+    cntA (fetch ()) s = ntr1 + ntr2 := by
+  have hmr1 := execAMemReadFetch2S .PBMT_PMA pal regl _ s1 hAl hltl hrl hXl hml hall hxl hcl hsigl
+    hhl hdevl hwfl hbl hprivl
+  have hmrc1 := cntMemReadFetch2S .PBMT_PMA pal regl _ s1 hAl hltl hrl hXl hml hall hxl hcl hsigl
+    hhl hdevl hwfl hbl hprivl
+  have hmr2 := execAMemReadFetch2S .PBMT_PMA pah regh _ s2 hAh hlth hrh hXh hmh halh hxh hch hsigh
+    hhh hdevh hwfh hbh hprivh
+  have hmrc2 := cntMemReadFetch2S .PBMT_PMA pah regh _ s2 hAh hlth hrh hXh hmh halh hxh hch hsigh
+    hhh hdevh hwfh hbh hprivh
+  have hfb1 := AxSpineOk3.execAFetchBytesOk va va pal 2 .PBMT_PMA _ s s1 htr1 hmr1
+  have hfbc1 := AxSymCtl4.cntFetchBytesOk va va pal 2 .PBMT_PMA _ s s1 ntr1 0 htr1 htrc1 hmr1 hmrc1
+  have hfb2 := AxSpineOk3.execAFetchBytesOk va (Sail.BitVec.addInt va 2) pah 2 .PBMT_PMA _ s1 s2
+    htr2 hmr2
+  have hfbc2 := AxSymCtl4.cntFetchBytesOk va (Sail.BitVec.addInt va 2) pah 2 .PBMT_PMA _ s1 s2 ntr2 0
+    htr2 htrc2 hmr2 hmrc2
+  have hzca := execACurrentlyEnabledZca s hmisaC
+  unfold fetch ext_fetch_check_pc get_config_rvfi
+  rw [cntACatchEarlyReturn]
+  simp (config := { decide := true }) only [AxSymCtl4.cntARBind, execARBind, cntARLiftR,
+    execARLiftR, execARReturnRFwd, cntARReturnR, readReg, PreSail.readReg, PreSail.emit, execA,
+    cntA, hpc, hpc1, hbit0, hbit1, hvalign4, hzca, AxSymCtl4.cntCurrentlyEnabledZca, hfb1, hfbc1,
+    hfb2, hfbc2, hnot, ↓reduceIte, Bool.false_eq_true, Functions.not, Bool.not_true, Nat.reduceMul,
+    BitVec.setWidth_eq, Nat.add_zero, Nat.zero_add]
 
 /-! # 2. The WARM fetch: state unchanged (Stage C: no row item) -/
 
@@ -215,7 +290,7 @@ theorem fetch4HitS (hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = 8#4)
     ∀ b, EvB (imgS σi) (fun _ _ => False)
       (fun b' r t' => b = b' ∧ r = .F_Base w32 ∧ t' = t) (fetch ()) t b := by
   intro hc hPC
-    ⟨p2, p1, w, pa, hmaps, hs2, hs1, hs0, hchk, hupd, hpb, hcanon, hout, hal4, hnRVC, hram, halp,
+    ⟨p2, p1, w, pa, hmaps, hs2, hs1, hs0, hchk, hupd, hpb, hcanon, hout, hb0, hnRVC, hram, hal,
       hbytes⟩ hhit
   let σ : ExecSt := ⟨t.regs, σi.mem, t.dev⟩
   have hc0 := hc
@@ -237,13 +312,47 @@ theorem fetch4HitS (hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = 8#4)
   have hhit' : tlbHitv (σ.regs .tlb) (WeakKpt.svpnOf pc) = true := hhit
   rw [hhit'] at htr htrc
   simp only [↓reduceIte] at htr htrc
-  obtain ⟨region, hrange, hm, hx, hcl, hsig, hh, hdev, hwf⟩ :=
-    ramFetchFacts T satp0 σ pa 4 hc (by decide) (by decide) (by decide) hram
   have hb' : BytesAt σ pa 4 w32 := fun j hj => hbytes j hj
-  have hf := execAFetchBase4SGen pc pa w32 σ σ region hPC hal4 htr hA hord hrange hX hm halp hx
-    hcl hsig hh hdev hwf hb' hpriv hnRVC
-  have hfc := cntFetchBase4SGen pc pa w32 σ σ region _ hPC hal4 htr htrc hA hord hrange hX hm halp
-    hx hcl hsig hh hdev hwf hb' hpriv hnRVC
+  have hf : execA (fetch ()) σ = some (.F_Base w32, σ) ∧ cntA (fetch ()) σ = 0 := by
+    cases hal4 : is_aligned_vaddr (.Virtaddr pc) 4
+    · rw [hal4] at hal
+      simp only [Bool.false_eq_true, ↓reduceIte] at hal
+      obtain ⟨hb1, halp, hns⟩ := hal
+      have hv2 := AxDataX6.svpnOfAdd2 pc hns
+      obtain ⟨htr2, htrc2⟩ := cntTranslateAddrImg (.InstructionFetch ()) .Supervisor T.base
+        (Sail.BitVec.addInt pc 2) w (pa + 2#64) satp0 T (σ.regs .tlb) p2 p1 σ hchk hupd
+        (AxDataX6.canonAdd2 pc hcanon hns) (by rw [AxDataX6.paAdd2 _ pc hns, hout]) hpb rfl
+        (by rw [hv2]; exact hmaps) htlbx (by rw [hv2]; exact hs2') (by rw [hv2]; exact hs1')
+        (by rw [hv2]; exact hs0') hmisa hmenv hhtif hpriv htm heff hss hsatp hppn hasid rfl hA hord
+        hR hcov hpmar
+      rw [hv2, hhit'] at htr2 htrc2
+      simp only [↓reduceIte] at htr2 htrc2
+      obtain ⟨hraml, hramh⟩ := AxDataX6.inRamHi pa hram
+      obtain ⟨regl, hrl, hml, hxl, hcll, hsigl, hhl, hdevl, hwfl⟩ :=
+        ramFetchFacts T satp0 σ pa 2 hc (by decide) (by decide) (by decide) hraml
+      obtain ⟨regh, hrh, hmh, hxh, hclh, hsigh, hhh, hdevh, hwfh⟩ :=
+        ramFetchFacts T satp0 σ (pa + 2#64) 2 hc (by decide) (by decide) (by decide) hramh
+      have hmC : (_get_Misa_C (σ.regs .misa) == 1#1) = true := by
+        show (_get_Misa_C (t.regs .misa) == 1#1) = true
+        rw [hmisa]; decide
+      have halh := AxDataX6.alignedPaddr2Add2 pa hram halp
+      have hbl := AxDataX6.bytesAtLo _ _ _ hb'
+      have hbh := AxDataX6.bytesAtHi _ _ _ hb'
+      exact ⟨execAFetchBase2SGen pc pa (pa + 2#64) w32 σ σ σ regl regh hPC hPC hmC hb0 hb1 hal4
+          htr htr2 hA hord hrl hX hml halp hxl hcll hsigl hhl hdevl hwfl hbl hpriv hA hord hrh hX
+          hmh halh hxh hclh hsigh hhh hdevh hwfh hbh hpriv hnRVC,
+        cntFetchBase2SGen pc pa (pa + 2#64) w32 σ σ σ regl regh _ _ hPC hPC hmC hb0 hb1 hal4
+          htr htrc htr2 htrc2 hA hord hrl hX hml halp hxl hcll hsigl hhl hdevl hwfl hbl hpriv hA
+          hord hrh hX hmh halh hxh hclh hsigh hhh hdevh hwfh hbh hpriv hnRVC⟩
+    · rw [hal4] at hal
+      simp only [↓reduceIte] at hal
+      obtain ⟨region, hrange, hm, hx, hcl, hsig, hh, hdev, hwf⟩ :=
+        ramFetchFacts T satp0 σ pa 4 hc (by decide) (by decide) (by decide) hram
+      exact ⟨execAFetchBase4SGen pc pa w32 σ σ region hPC hal4 htr hA hord hrange hX hm hal hx
+          hcl hsig hh hdev hwf hb' hpriv hnRVC,
+        cntFetchBase4SGen pc pa w32 σ σ region _ hPC hal4 htr htrc hA hord hrange hX hm hal
+          hx hcl hsig hh hdev hwf hb' hpriv hnRVC⟩
+  obtain ⟨hf, hfc⟩ := hf
   intro b
   have hE := execAEvB (fetch ()) σ _ _ hf t rfl b
   refine EvBMono (imgS σi) _ _ _ _ (fetch ()) t b (fun _ _ hf => hf) ?_ hE

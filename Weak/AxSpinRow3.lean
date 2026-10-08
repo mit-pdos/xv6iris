@@ -62,13 +62,14 @@ on `Xv6.Kernel.textTree`, and `AxSpinRow3.storeDecode`, `rfl` on the decoder ove
    `s1r` := `AxSpinCtl.r5 9`; the Ltac `uint_c` and the section notations are inlined.
 5. `releaseWpd6` is a theorem stated by `type_of%` of the partial application (Rocq
    `Definition release_wpd6 := λ …`).
-6. FINDING (Q22, Lean only): this tree's release has its three 4-byte lock words at
-   release+0x12 / +0x16 / +0x1a = 0x80000cf2 / cf6 / cfa, which are 2 mod 4, while `insAt3`'s
-   `textAt4S` demands a 4-aligned pc (Rocq's build: 4-aligned).  `AxSpinRow3.relStoreTextFalse`:
-   `insAt3` is FALSE at those pcs, so the `rli_12` / `rli_16` / `rli_1a` facts (in `instrW4` /
-   `instrW5` / `instrW6` form) are unsatisfiable and `releaseWpd4/5/6` are vacuous on the real
-   image until the Q22 rework (2-aligned 4-byte text) lands.  The pure parts (`p612` / `p616` /
-   `p61a`) are unaffected.
+6. Q22 (Lean only): this tree's release has its three 4-byte lock words at release+0x12 /
+   +0x16 / +0x1a = 0x80000cf2 / cf6 / cfa, which are 2 mod 4 (Rocq's build: 4-aligned).  Since
+   the Q22 rework `textAt4S` covers the 2-aligned arm (`AxDataX6` deviation 6), so the earlier
+   refutation `relStoreTextFalse` is DELETED and replaced by the positive instance
+   `AxSpinRow3.relStoreTextOf`: the three `textAt4S` facts hold at the release image `σR`
+   (`AxSpinE8f.σ8` + the three words, `relWords`' encodings; page table `AxSpinE8f.tT`, page
+   0x80000 VA = PA), via `AxSpinRow3.textRel`.  The pure parts (`p612` / `p616` / `p61a`) are
+   unaffected.
 7. INLINED allocpid (AxSpinCtl deviation 2b): the Rocq RESIDUALS' "release's c.sdsp s1 at
    +0x06 spills allocpid's LOADED pid" does not hold in this tree — release is entered with
    allocproc's s1 as acquire+0x2e restored it (`AxSpinCtl.d3RelSpillDataSrc`).  `p606` (a fact
@@ -82,17 +83,19 @@ on `Xv6.Kernel.textTree`, and `AxSpinRow3.storeDecode`, `rfl` on the decoder ove
 `cretSlotUniformExRel`, `row_base` `rowBase`, `instr6` `instr6`, `instr6_store` `instr6Store`,
 `instrW6` `instrW6`, `w_sdlk6` `wSdlk6`, `w_swfin6` `wSwfin6`, `release_wpd6` `releaseWpd6`;
 section premise `Hoff_lk` `HoffLk`; λ-bound `w_cret` `wCret6`.  None is in the duplicated-name
-table.  Lean-only (file-qualified): `AxSpinRow3.s1rToNat`, `relWords`, `storeDecode`, `relStoreTextFalse`,
+table.  Lean-only (file-qualified): `AxSpinRow3.s1rToNat`, `relWords`, `storeDecode`, `relMem`,
+`σR`, `textRel`, `relStoreTextOf`,
 `instrW6Sp`, `instrW6Row`, `baseOf`; premise `wBrTaken` (AxSpinCtl3's).
 
 Build: ~2.8 s (VM).
 
-**Dropped:** nothing (Rocq 21 definitions/lemmas; Lean 21 + 7 Lean-only).  **Not ported:** the
+**Dropped:** nothing (Rocq 21 definitions/lemmas; Lean 21 + 10 Lean-only).  **Not ported:** the
 Ltacs `uint_c` / `off` / `on_` (inlined), the section notations, the `Check` / `Print
 Assumptions` lines (the lint's axiom check covers them).
 -/
 import Weak.AxSpinCtl3
 import Weak.AxSpinRow2
+import Weak.AxSpinE8f
 
 namespace Weak
 
@@ -271,15 +274,53 @@ theorem AxSpinRow3.storeDecode :
       some (false, .STORE (0#12, .Regidx 0#5, .Regidx 9#5, 4), i0)) :=
   ⟨⟨_, rfl⟩, ⟨_, rfl⟩, ⟨_, rfl⟩⟩
 
-/-- (Lean-only, deviation 6 — Q22) the three 4-byte lock words sit at pcs that are 2 mod 4, so
-`insAt3` (whose `textAt4S` demands a 4-aligned pc) is FALSE there. -/
-theorem AxSpinRow3.relStoreTextFalse (σi : ExecSt) (T : PTree) (satp0 : BitVec 64)
-    (ins : instruction) :
-    ¬ insAt3 σi T satp0 (relAt 0x12) ins ∧ ¬ insAt3 σi T satp0 (relAt 0x16) ins ∧
-    ¬ insAt3 σi T satp0 (relAt 0x1a) ins := by
-  refine ⟨?_, ?_, ?_⟩ <;>
-  · rintro ⟨_, ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, Hal, _⟩, _⟩
-    exact absurd Hal (by decide +kernel)
+/-- (Lean-only, deviation 6 — Q22) the release image: `AxSpinE8f.σ8` (page table `tT`, VA = PA
+pages 0x80000 / 0x80001) with release's three 4-byte lock words (`relWords`: 0x0004b823,
+0x0310000f, 0x0004a023, little-endian) at release+0x12 .. +0x1d. -/
+def AxSpinRow3.relMem (a : BitVec 64) : Option (BitVec 8) :=
+  if 0x80000cf2 ≤ a.toNat ∧ a.toNat < 0x80000cfe then
+    some (BitVec.ofNat 8 ((0x0004a0230310000f0004b823 : Nat) >>> (8 * (a.toNat - 0x80000cf2))))
+  else AxSpinE8f.σ8.mem a
+
+/-- (Lean-only, deviation 6 — Q22) the release image state. -/
+def AxSpinRow3.σR : ExecSt := ⟨AxSpinE8f.σ8.regs, AxSpinRow3.relMem, AxSpinE8f.σ8.dev⟩
+
+/-- (Lean-only, Q22) `textAt4S` at a 2-aligned pc on page 0x80000 of `σR` (the E8f
+`textAt4T2` pattern, at `vpnD` / `L0leaf`). -/
+theorem AxSpinRow3.textRel (pc : BitVec 64) (w32 : BitVec 32)
+    (H : WeakKpt.svpnOf pc = AxSpinE8f.vpnD ∧
+      (pc != sign_extend (m := 64) (Sail.BitVec.extractLsb pc 38 0)) = false ∧
+      (Sail.BitVec.access pc 0 != 0#1) = false ∧
+      isRVC (Sail.BitVec.extractLsb w32 15 0) = false ∧
+      is_aligned_vaddr (.Virtaddr pc) 4 = false ∧
+      (Sail.BitVec.access pc 1 != 0#1) = true ∧
+      (Sail.BitVec.extractLsb pc 11 1 != 0x7ff#11) = true ∧
+      inRam (AxSpinE6.fetchPa AxSpinE8f.L0leaf pc) 4 ∧
+      is_aligned_paddr (.Physaddr (AxSpinE6.fetchPa AxSpinE8f.L0leaf pc)) 2 = true ∧
+      (∀ j, j < 4 → AxSpinRow3.σR.mem (AxSpinE6.fetchPa AxSpinE8f.L0leaf pc + BitVec.ofNat 64 j) =
+        some (nthByte (n := 4) w32 j))) :
+    textAt4S AxSpinRow3.σR AxSpinE8f.tT pc w32 := by
+  obtain ⟨hv, hc, hb0, hrvc, hal, h1, hns, hr, ha, hb⟩ := H
+  unfold textAt4S
+  rw [hv]
+  refine ⟨AxSpinE8f.P2, AxSpinE8f.P1, AxSpinE8f.L0leaf, AxSpinE6.fetchPa AxSpinE8f.L0leaf pc,
+    AxSpinE8f.mapsD, ⟨by unfold BytesAt; decide +kernel, by decide +kernel, by decide +kernel⟩,
+    ⟨by unfold BytesAt; decide +kernel, by decide +kernel, by decide +kernel⟩,
+    ⟨by unfold BytesAt; decide +kernel, by decide +kernel, by decide +kernel⟩, ?_,
+    by decide +kernel, by unfold ptePbmt0; decide +kernel, hc, rfl, hb0, hrvc, hr,
+    by rw [if_neg (by rw [hal]; decide)]; exact ⟨h1, ha, hns⟩, hb⟩
+  intro mxr dosum s
+  cases mxr <;> cases dosum <;> ax_epi_ledger_krfl
+
+/-- (Lean-only, deviation 6 — Q22; replaces the refutation `relStoreTextFalse`) the three
+4-byte lock words' `textAt4S` facts HOLD at the release image: the generalised (2-aligned)
+`textAt4S` covers release+0x12 / +0x16 / +0x1a (2 mod 4). -/
+theorem AxSpinRow3.relStoreTextOf :
+    textAt4S AxSpinRow3.σR AxSpinE8f.tT (relAt 0x12) 0x0004b823#32 ∧
+    textAt4S AxSpinRow3.σR AxSpinE8f.tT (relAt 0x16) 0x0310000f#32 ∧
+    textAt4S AxSpinRow3.σR AxSpinE8f.tT (relAt 0x1a) 0x0004a023#32 :=
+  ⟨AxSpinRow3.textRel _ _ (by decide +kernel), AxSpinRow3.textRel _ _ (by decide +kernel),
+    AxSpinRow3.textRel _ _ (by decide +kernel)⟩
 
 /-! # 2. `instr6` and `releaseWpd6` -/
 
