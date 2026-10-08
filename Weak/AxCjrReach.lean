@@ -50,7 +50,10 @@ state at the row end is `good` (Lean: or still a `chkPre` boundary, deviation 1(
        `ram := λ _ _, true` of `chkNext`/`chkPost` (any RAM read is a row-end exit) is unsound;
        they use `AxCjrReach.dataRead` (Lean-only: the node is a NON-fetch RAM read, which IS
        stuck at the row end).  A `chkNext` walk therefore cannot pass the next instruction's
-       fetch.  OPEN for AxEpiRet (reported).
+       fetch.  Q11 (AxEpiRet port): `chk`'s `memWrite` arm now delegates to `ram` (with
+       `!devAddr`, like `memRead`), `chkPnode` has a third (memWrite) disjunct, and `dataRead`
+       also accepts a non-exclusive store (`!akLatest`: stuck at the row end) — the memWrite
+       exit.  The existing `ram`s (`ramPre`) still reject stores.
    (e) `fetchSucc` takes `Hfe : akIfetch = true`, the pin and the image facts in place of Rocq's
        `Hvals : wlRvals l = vs` (a fetch label `LIFetch` has `wlRvals = []`; its bytes come
        from the pin, `AxCjrWpd.pinnedBytes`).
@@ -267,7 +270,7 @@ def chk (Q ram : SailM Unit → RegFile → Bool) (ret : RegFile → Bool) :
     | .cycleCount, k => chk Q ram ret (k ()) rs
     | .message _, k => chk Q ram ret (k ()) rs
     | .getCycleCount, k => chk Q ram ret (k (0 : Nat)) rs
-    | .memWrite .., _ => false
+    | .memWrite n va req, k => !devAddr req.pa && ram (.impure (.ok (.memWrite n va req)) k) rs
     | .barrier _, _ => false
     | .choose _, _ => false
     | .readRam .., _ => false
@@ -347,6 +350,9 @@ theorem chkAgree (Q ram : SailM Unit → RegFile → Bool) (ret : RegFile → Bo
       case memRead n va req =>
         simp only [chk]
         rw [HQ _ _ _ hag, Hram _ _ _ hag]
+      case memWrite n va req =>
+        simp only [chk]
+        rw [HQ _ _ _ hag, Hram _ _ _ hag]
       all_goals first
         | (simp only [chk]; rw [HQ _ _ _ hag]; done)
         | (simp only [chk]; rw [HQ _ _ _ hag, ih _ _ _ hag])
@@ -374,7 +380,11 @@ theorem chkPnode (Q ram : SailM Unit → RegFile → Bool) (ret : RegFile → Bo
     (∃ (n va : Nat) (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
        (KK : Result (BitVec (8 * n) × Option Bool) Arch.abort → SailM Unit),
        m = .impure (.ok (.memRead n va req)) KK ∧ devAddr req.pa = false ∧ ram m rs = true ∧
-       (lbAdmin true l → (classify req.access_kind).akIfetch = true)) := by
+       (lbAdmin true l → (classify req.access_kind).akIfetch = true)) ∨
+    (∃ (n va : Nat) (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
+       (KK : Result (Option Bool) Arch.abort → SailM Unit),
+       m = .impure (.ok (.memWrite n va req)) KK ∧ devAddr req.pa = false ∧ ram m rs = true ∧
+       (lbAdmin true l → (classify req.access_kind).akLatest = true)) := by
   intro hc hs
   cases m with
   | pure y =>
@@ -406,13 +416,26 @@ theorem chkPnode (Q ram : SailM Unit → RegFile → Bool) (ret : RegFile → Bo
       case memRead n va req =>
         simp only [chk, Bool.and_eq_true, Bool.not_eq_true'] at hc
         obtain ⟨-, hd, hram⟩ := hc
-        refine .inr ⟨n, va, req, k, rfl, hd, hram, ?_⟩
+        refine .inr (.inl ⟨n, va, req, k, rfl, hd, hram, ?_⟩)
         intro hadm
         simp only [pnodeStep, hd, Bool.false_eq_true, ↓reduceIte] at hs
         rcases hs with ⟨hif, -⟩ | ⟨-, ⟨-, w, tvs, -, -, rfl, -⟩ | ⟨-, w, tvs, -, -, rfl, -⟩⟩
         · exact hif
         · exact hadm.elim
         · exact hadm.elim
+      case memWrite n va req =>
+        simp only [chk, Bool.and_eq_true, Bool.not_eq_true'] at hc
+        obtain ⟨-, hd, hram⟩ := hc
+        refine .inr (.inr ⟨n, va, req, k, rfl, hd, hram, ?_⟩)
+        intro hadm
+        simp only [pnodeStep, hd, Bool.false_eq_true, ↓reduceIte] at hs
+        cases hv : req.value with
+        | none => rw [hv] at hs; exact hs.elim
+        | some v =>
+          rw [hv] at hs
+          rcases hs with ⟨-, ⟨-, rfl, -⟩ | ⟨hl, -⟩⟩
+          · exact hadm.elim
+          · exact hl
       case instrAnnounce n w =>
         simp only [chk, Bool.and_eq_true, Bool.not_eq_true'] at hc
         obtain ⟨-, hsf, hc⟩ := hc
@@ -531,6 +554,7 @@ noncomputable def QPost (m : SailM Unit) (rs : RegFile) : Bool :=
 def AxCjrReach.dataRead (m : SailM Unit) : Bool :=
   match m with
   | .impure (.ok (.memRead _ _ req)) _ => !(classify req.access_kind).akIfetch
+  | .impure (.ok (.memWrite _ _ req)) _ => !(classify req.access_kind).akLatest
   | _ => false
 
 def chkNext : SailM Unit → RegFile → Bool :=
@@ -667,15 +691,18 @@ theorem AxCjrReach.InvStep
       obtain ⟨m', ors, fn', oib, obar, rfl, hn⟩ := pstepProgHart cpu m rs ib d l p' d' hps
       rcases Hc with Hc | Hc | Hc
       · rcases chkPnode _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hc hn with
-          ⟨-, rfl, Hc' | ⟨y, -, hr, -⟩⟩ | ⟨n, va, req, KK, rfl, hdev, hram, hif⟩
+          ⟨-, rfl, Hc' | ⟨y, -, hr, -⟩⟩ | ⟨n, va, req, KK, rfl, hdev, hram, hif⟩ |
+          ⟨n, va, req, KK, rfl, -, hram, -⟩
         · exact ⟨cpu, m', ors.getD rs, oib.getD ib, .inl ⟨rfl, Hc'⟩⟩
         · exact (Bool.false_ne_true hr).elim
         · obtain ⟨hp, Hc'⟩ := fetchSucc base vs good Nd cpu n va req KK rs ib d l _ d' _ hdev hram
             (hif hadm) hps HG.1 Hpin
           rw [hp]
           exact ⟨cpu, _, rs, ib, .inr ⟨rfl, .inl Hc'⟩⟩
+        · exact absurd hram (by simp [ramPre])
       · rcases chkPnode _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hc hn with
-          ⟨-, rfl, Hc' | ⟨y, -, hr, rfl, tk, rfl⟩⟩ | ⟨n, va, req, KK, rfl, -, hram, hif⟩
+          ⟨-, rfl, Hc' | ⟨y, -, hr, rfl, tk, rfl⟩⟩ | ⟨n, va, req, KK, rfl, -, hram, hif⟩ |
+          ⟨n, va, req, KK, rfl, -, hram, hif⟩
         · exact ⟨cpu, m', ors.getD rs, oib.getD ib, .inr ⟨rfl, .inl Hc'⟩⟩
         · simp only [Bool.and_eq_true] at hr
           refine ⟨cpu, riscvStep tk, rs, oib.getD ib, .inr ⟨rfl, .inr ?_⟩⟩
@@ -685,10 +712,17 @@ theorem AxCjrReach.InvStep
         · simp only [AxCjrReach.dataRead, Bool.not_eq_true'] at hram
           rw [hif hadm] at hram
           exact Bool.noConfusion hram
+        · simp only [AxCjrReach.dataRead, Bool.not_eq_true'] at hram
+          rw [hif hadm] at hram
+          exact Bool.noConfusion hram
       · rcases chkPnode _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hc hn with
-          ⟨-, rfl, Hc' | ⟨y, -, hr, -⟩⟩ | ⟨n, va, req, KK, rfl, -, hram, hif⟩
+          ⟨-, rfl, Hc' | ⟨y, -, hr, -⟩⟩ | ⟨n, va, req, KK, rfl, -, hram, hif⟩ |
+          ⟨n, va, req, KK, rfl, -, hram, hif⟩
         · exact ⟨cpu, m', ors.getD rs, oib.getD ib, .inr ⟨rfl, .inr Hc'⟩⟩
         · exact (Bool.false_ne_true hr).elim
+        · simp only [AxCjrReach.dataRead, Bool.not_eq_true'] at hram
+          rw [hif hadm] at hram
+          exact Bool.noConfusion hram
         · simp only [AxCjrReach.dataRead, Bool.not_eq_true'] at hram
           rw [hif hadm] at hram
           exact Bool.noConfusion hram
