@@ -290,3 +290,4 @@ Rocq→Lean name map only.
 - AxSpinX6: hart A twin of AxSpinX5 hart B (`wA6`…`AxSpinX6.wpdA`, race twin `AxSpinX6.wpdRTriv`).
 - AxRelease8: `dc0a`…`dc28` (same runRead recipe as AxRelease7). `EvAOfRfF img _ True.intro …` fails with an unsolved tree — `refine EvAOfRfF img _ ?_ t _ t (execExecuteCX … t)` then `exact True.intro`.
 - AxSpinH3: WPds from handle leaves — state each leaf as a Lean `have` with simple program states (`hStore vx`, `2` not `1 + 1`), then `iapply Hk $$ Hx [Hc] %rs`. `lean-gcp` does not forward stdin (write scratch files on the VM inside `bash -c`).
+- AxDataX7 (AxLeafS): `CertExecuteAMOSWAP` and the AMO chain at the `AxCert.Cert` level (not via XKit); widths `vmemWidth w`; `AxDataX7.cRUse himg (a := ()) rfl` closes the concrete-width assert inside `execute_AMO`; `AxDataX7.readKindFlagsX` keeps lemmas generic in `aq`.
