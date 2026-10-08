@@ -331,3 +331,4 @@ Rocq→Lean name map only.
 - AxSpinE5: XBk instance premises at Ixv6 (`HGX`, `HtextX`, `HflowX`, `HlocX`) at `AxSpinX2.xG L GT nm`/`xv6Pol GT` with graph `gtAdGd GT`; slot flows `FstSlot`/`FldSlot`; `naWfEmpty L GT nm`. (The Stage C off-row concern is NOT in E5 — watch E6+.)
 - AxSpinAm: finite-budget AMO chain `XB*` (copy of `AxLeafS.CertExecuteAMOSWAPX` with AxSpinE2 kit), `CertBAmoswapS`, `tokAmo`, `AxSpinAm.cRUseNrd`. AxSpinHd2–5: `htokXX`; `ke_XXXX` lemmas need no port (ExecSC `execExecuteC*` or `fun _ => rfl`).
 - AxSpinPOd/POd2/POt1–6: 4-byte `tw4*` = `tokB … (by decide) rfF… (WkEntryNew.execAnyCfg _ _ walkM walkS)`; compressed `tw*` via AxSpinE7b recipe; c.sw/c.andi/c.lw expansions `fun _ => rfl`.
+- AxCertP2: `AxCertP2.wpdOfCertP`/`wpdInstrOfCertP`, `AxCertP2.cinv` (Weak.cinv exists), `AxCertP2.isR` (Weak.isR exists); `rdCons`/`FamDrd`/`PFMrd` take `Hnf` after akLatest; `AxCertP2.rdIf`/`PFIf` for `cIf`.
