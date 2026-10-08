@@ -22,6 +22,28 @@ no pid collision) is `+0x44 auipc a3`, `+0x48 lw a3,1998(a3)` (THE READ, row `k`
 `k + 67`, `PC = +0x94`.  As in Rocq the row pinning is a TEMPORARY ASSUMPTION (owner decision
 2026-10-03): `RowAllocpidBody` fixes the path and the data addresses; ownership carries the values.
 
+## Stage 2 P-FORM (Lean-only; notes/weak-lb-thm2-stage2.md §B, §C row `AxSpinAp9`, Q-S2-1/2)
+
+`RowAllocpidBodyP k row pnp ppid` is `RowAllocpidBody` on a PREFIX row: the shape as
+`RowShP` (AxSpinRowP; each of the 67 items that is PRESENT is matched, no length), the read
+identities verbatim (vacuous at absent positions); `AxSpinAp9.rowBodyPOfFull`: full ⇒ prefix.
+`wpdAllocpidCsP` is the same script as `wpdAllocpidCs` with one `by_cases` on `LEN ≤ position`
+at each boundary where the row may end — `k`, `k + 1`, and, inside the 64-round scan induction
+`AxSpinAp9.scanLoopP`, each round's start `k + 1 + j` and the boundary after its read
+`k + 2 + j`; then `k + 65`, `k + 66`, `k + 67` (the other leaf calls at the same position reuse
+the bound).  Every end case is the WINDOWED, RESOURCE-FREE hook (orchestrator's exact form):
+  `HΨend : ∀ k', k ≤ k' → k' ≤ k + 67 → (grow (gtAdGd GT) i).length ≤ k' →
+     ∀ pr : Pexv6, ⊢ wpdM … .MaybeStuck i ⟨pr, k'⟩ Ψ`
+(the caller instantiates it by `AxSpinApA.wpdEndAnn` + `postLiftingTrue`).  The CS has NO
+designated cut, so no end arm is proved here.  GUARDED premises (design §A "guarded pins"): the
+two that name position `k` and are not vacuous at an absent position — `Hpo` (writes po-before
+`(i, k)` are mo-before it) and the `RNp` anchor `e ∈ lobp (i, k)` — are stated under
+`k < LEN`; `Hone`, `Hnowrap`, `Hncoll` are `∀ … = some …` forms, already vacuous, kept verbatim.
+The continuation (unchanged) is reached only on rows with `k + 67 < LEN`.  `wpdAllocpidCs` and
+`AxSpinAp9.scanLoop` keep their exact statements and are now corollaries (guards discharged,
+hook vacuous under `k + 67 < LEN`).  HONESTY: no new pin; the P-form premises are implied by
+the stage-1 ones.
+
 ## Deviations from Rocq
 
 1. KERNEL INLINING (Q18).  `a5v` is the nextpid STORE base `pca 0x82 + auipc 8` (= nextpid − 1936;
@@ -71,13 +93,16 @@ instances `x9_pol`, `x9_G` are inlined.  Lean-only (file-qualified): `AxSpinAp9.
 `AxSpinAp9.sext32Inj`, `AxSpinAp9.ldResInj`, `AxSpinAp9.sext32Ne1000`, `AxSpinAp9.ldResNe1000`,
 `AxSpinAp9.st4Ld`, `AxSpinAp9.a5vVaNp`, `AxSpinAp9.li1000`, `AxSpinAp9.xxLdWG` (XxLdW generic in
 `is_rvc`, explicit premises), `AxSpinAp9.scanLoop` (the 64-round scan by induction); + 1 local
-macro.
+macro.  Stage 2 (Lean-only): `RowAllocpidBodyP`, `wpdAllocpidCsP`, `AxSpinAp9.scanLoopP`,
+`AxSpinAp9.rowBodyPOfFull`, `AxSpinAp9.bRdP`, `AxSpinAp9.bWrP` (new short names grepped absent);
+reused `RowShP`/`rowShPOfSh`/`rowShPAt` (AxSpinRowP), `AxSpinAp8.FldMWFrame`.
 
 **Dropped:** nothing (Rocq 10 definitions/lemmas + 2 local instances, inlined; Lean 10 + 18
-Lean-only).
+Lean-only, + 6 stage-2 Lean-only).
 -/
 import Weak.AxSpinAp8
 import Weak.AxSpinAp6
+import Weak.AxSpinRowP
 
 namespace Weak
 
@@ -173,6 +198,37 @@ theorem AxSpinAp9.rdLoad (GD : Gdexec) (i : Agent) (k : Nat) (pnp : Int) (vs : L
     subst Hv
     exact ⟨ts, by rw [wbytesWordOfBytes 4 vs3 Hlen]; exact Hlb⟩
 
+
+/-! # 2b. The PREFIX twin of the body's row piece (stage 2) -/
+
+/-- (stage 2) `RowAllocpidBody` on a PREFIX row: the shape as `RowShP` (each of the 67 items
+that is PRESENT is matched; no length), the read identities verbatim (already vacuous at absent
+positions). -/
+def RowAllocpidBodyP (k : Nat) (row : List Lbl) (pnp ppid : Int) : Prop :=
+  RowShP k row (apBodySh pnp ppid) ∧
+  (∀ lb, row[k]? = some lb → aident lb = .IRead false pnp 4) ∧
+  (∀ j, j < 64 → ∀ lb, row[k + 1 + j]? = some lb →
+    aident lb = .IRead false (AxSpinAp7.scanAddr j) 4)
+
+/-- (Lean-only) a full row piece is a prefix row piece. -/
+theorem AxSpinAp9.rowBodyPOfFull {k : Nat} {row : List Lbl} {pnp ppid : Int} :
+    RowAllocpidBody k row pnp ppid → RowAllocpidBodyP k row pnp ppid :=
+  fun HR => ⟨rowShPOfSh HR.1, HR.2.1, HR.2.2⟩
+
+/-- (Lean-only) `bRd` on a prefix row whose position `k` is present. -/
+theorem AxSpinAp9.bRdP (k : Nat) (row : List Lbl) (pnp ppid : Int)
+    (HR : RowAllocpidBodyP k row pnp ppid) (Hk : k < row.length) :
+    ∃ lb, row[k]? = some lb ∧ aident lb = .IRead false pnp 4 := by
+  obtain ⟨lb, Hlb, _⟩ := rowShPAt (j := 0) (it := .RL pnp 4) HR.1 rfl (by omega)
+  rw [Nat.add_zero] at Hlb
+  exact ⟨lb, Hlb, HR.2.1 lb Hlb⟩
+
+/-- (Lean-only) `AxSpinAp7.bWr` on a prefix row whose position `k + 65` is present. -/
+theorem AxSpinAp9.bWrP (k : Nat) (row : List Lbl) (pnp ppid : Int)
+    (HR : RowAllocpidBodyP k row pnp ppid) (Hk : k + 65 < row.length) :
+    ∃ vw cls, row[k + 65]? = some (.LStore false pnp vw cls) ∧ vw.length = 4 := by
+  obtain ⟨lb, Hlb, vw, cls, rfl, Hl⟩ := rowShPAt (j := 65) (it := .RS pnp 4) HR.1 rfl Hk
+  exact ⟨vw, cls, Hlb, Hl⟩
 
 /-! # 3. Byte facts of the 4-byte loads (Lean-only) -/
 
@@ -320,10 +376,16 @@ include HL Hcons hmode hasid hppn Hfix Htxt HΨmid in
 number `n` of remaining rounds: round `j` runs at row position `k + 1 + j` with `a5 = &proc[j]`
 (`c.lw a4,48(a5)` reads `proc[j].pid` through the value-agnostic flow `AxSpinAp8.FldMWScan`;
 `beq a4,a3` falls through by the no-collision pin; `addi a5,a5,376`; `bne a5,a2` loops back
-for `j < 63` and falls through at `j = 63`). -/
-theorem AxSpinAp9.scanLoop (k : Nat) (pnp ppid : Int)
-    (HR : RowAllocpidBody k (AxOpsem.grow (gtAdGd GT) i) pnp ppid)
-    (Hlen : k + 67 < (AxOpsem.grow (gtAdGd GT) i).length)
+for `j < 63` and falls through at `j = 63`).  STAGE-2 P-FORM: on a PREFIX row
+(`RowAllocpidBodyP`, no length premise) the row may end at any round — at the start of round `j`
+(`LEN ≤ k + 1 + j`) or right after its read (`LEN ≤ k + 2 + j`); those ends are discharged by the
+windowed, resource-free hook `HΨend`. -/
+theorem AxSpinAp9.scanLoopP (k : Nat) (pnp ppid : Int)
+    (HR : RowAllocpidBodyP k (AxOpsem.grow (gtAdGd GT) i) pnp ppid)
+    (HΨend : ∀ k' : Nat, k ≤ k' → k' ≤ k + 67 → (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
+      ∀ pr : Pexv6,
+        ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+          ⟨pr, k'⟩ Ψ)
     (Pscan : Nat → BitVec 64) (rsB : RegFile) (vs : List (BitVec 8))
     (Hsc : ∀ j, j < 64 → dataAtS σi T (.Load .Data) (AxSpinAp9.scanVa j) 4 (Pscan j) ∧
       paZ (Pscan j) = AxSpinAp7.scanAddr j ∧ hitW rsB (AxSpinAp9.scanVa j))
@@ -352,7 +414,12 @@ theorem AxSpinAp9.scanLoop (k : Nat) (pnp ppid : Int)
   obtain ⟨Hda, Hpa, Hhv⟩ := Hsc j hj
   have XR := XxReg (hlc := hlc) (GF := GF) L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ
     HΨmid
-  have F0 := AxSpinAp8.FldMWScan (hlc := hlc) (GF := GF) L GT nm HL Hcons i k pnp ppid HR j hj
+  have F0 := AxSpinAp8.FldMWFrame (hlc := hlc) (GF := GF) L GT nm HL Hcons i
+    (AxSpinAp7.scanAddr j) 4 (k + 1 + j) (k + 1 + j + 1) (by
+      intro k' lb aq rl m Hw Hlb Hid
+      obtain rfl : k' = k + 1 + j := by omega
+      rw [HR.2.2 j hj lb Hlb] at Hid
+      cases Hid)
   rw [← Hpa] at F0
   have Hnormw : ∀ (lb : Lbl) (aq rl : Bool) (n : Nat),
       (AxOpsem.grow (gtAdGd GT) i)[k + 1 + j]? = some lb →
@@ -361,6 +428,10 @@ theorem AxSpinAp9.scanLoop (k : Nat) (pnp ppid : Int)
     rw [HR.2.2 j hj lb Hlb] at Hid
     cases Hid
   iintro K
+  -- row end at the start of round j
+  by_cases Ej : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 1 + j
+  · iclear K
+    iapply (HΨend _ (by omega) (by omega) Ej _)
   ihave F := F0
   -- ---- + 0x74: c.lw a4,48(a5) (row k+1+j) ----
   iapply (AxSpinAp9.xxLdWG L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
@@ -370,6 +441,10 @@ theorem AxSpinAp9.scanLoop (k : Nat) (pnp ppid : Int)
     (atok74 σi T satp0 Htxt) (by decide) AxSpinAp9.vw4 (by decide) (by decide)
     (by rw [H15]; rfl) Hda (hitWAgree rsB rs _ Htl Hhv) Hnormw (by omega)) $$ F
   iintro %v %rs1 %ib1 %_ %HG1 %Hgv1 -
+  -- row end right after round j's read
+  by_cases Ej1 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 1 + j + 1
+  · iclear K
+    iapply (HΨend _ (by omega) (by omega) Ej1 _)
   have HF1 := stepRegs T satp0 _ rs _ _ _ _ _ rs1 (fun _ => rfl) HG1
   have HPC1 : rs1 .PC = pca 0x76 := by rw [gbPc T satp0 _ _ _ _ _ _ HG1]; decide
   have Htl1 : rs1 .tlb = rsB .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG1).trans Htl
@@ -489,25 +564,60 @@ theorem AxSpinAp9.scanLoop (k : Nat) (pnp ppid : Int)
       (gbPc T satp0 _ _ _ _ _ _ HG4) ((gbTlb T satp0 _ _ _ _ _ _ HG4).trans Htl3)
       (fun r h14 h15 => (HF4 r).trans (Hkeep3 r h14 h15)) ((HF4 _).trans H15')) $$ K
 
+set_option maxHeartbeats 1600000 in
+include HL Hcons hmode hasid hppn Hfix Htxt HΨmid in
+/-- (Lean-only) THE PID-COLLISION SCAN on a FULL row piece (stage-1 statement), the corollary of
+`AxSpinAp9.scanLoopP`: under `k + 67 < LEN` the hook's end case is impossible. -/
+theorem AxSpinAp9.scanLoop (k : Nat) (pnp ppid : Int)
+    (HR : RowAllocpidBody k (AxOpsem.grow (gtAdGd GT) i) pnp ppid)
+    (Hlen : k + 67 < (AxOpsem.grow (gtAdGd GT) i).length)
+    (Pscan : Nat → BitVec 64) (rsB : RegFile) (vs : List (BitVec 8))
+    (Hsc : ∀ j, j < 64 → dataAtS σi T (.Load .Data) (AxSpinAp9.scanVa j) 4 (Pscan j) ∧
+      paZ (Pscan j) = AxSpinAp7.scanAddr j ∧ hitW rsB (AxSpinAp9.scanVa j))
+    (Hhit : hitW rsB (pca 0x44))
+    (Hncoll : ∀ j, j < 64 → ∀ v, graphValue (gtAdGd GT) (i, k + 1 + j) = some v →
+      (wordOfBytes 4 v : BitVec 32) ≠ wordOfBytes 4 vs)
+    (H13 : gprVal rsB 13#5 = ldRes false 4 vs) (H12 : gprVal rsB 12#5 = AxSpinAp9.a5j 64) :
+    ∀ n j, j + n = 64 → 0 < n → ∀ (rs : RegFile) (ib : Ibch),
+      ctrlOkSW T satp0 rs → rs .PC = pca 0x74 → rs .tlb = rsB .tlb →
+      (∀ r, r ≠ 14#5 → r ≠ 15#5 → gprVal rs r = gprVal rsB r) →
+      gprVal rs 15#5 = AxSpinAp9.a5j j →
+      ⊢ (∀ (rs' : RegFile) (ib' : Ibch),
+          ⌜ctrlOkSW T satp0 rs' ∧ rs' .PC = pca 0x82 ∧ rs' .tlb = rsB .tlb ∧
+            (∀ r, r ≠ 14#5 → r ≠ 15#5 → gprVal rs' r = gprVal rsB r) ∧
+            gprVal rs' 15#5 = AxSpinAp9.a5j 64⌝ -∗
+          @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+            ⟨.PHart cpu (.pure ()) rs' none ib', k + 65⟩ Ψ) -∗
+        @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+          ⟨.PHart cpu (.pure ()) rs none ib, k + 1 + j⟩ Ψ :=
+  AxSpinAp9.scanLoopP (hlc := hlc) (GF := GF) L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu
+    Hfix Htxt Ψ HΨmid k pnp ppid (AxSpinAp9.rowBodyPOfFull HR)
+    (fun _ _ h2 h3 _ => absurd h3 (by omega)) Pscan rsB vs Hsc Hhit Hncoll H13 H12
+
 /-! # 5. THE THEOREM -/
 
 set_option maxHeartbeats 1600000 in
 include HL Hcons hmode hasid hppn Hfix Htxt HΨmid in
-/-- Rocq `wpd_allocpid_cs` (retargeted, Q18): the inlined allocpid's critical-section body from
+/-- STAGE-2 P-FORM of Rocq `wpd_allocpid_cs` (retargeted, Q18): the inlined allocpid's critical-section body from
 `allocproc + 0x44` (acquire's return) to `allocproc + 0x94` (`jal release`), at the joint instance
 Ixv6, interrupts off, warm TLB.  Row piece `RowAllocpidBody k` (67 items: the nextpid read at
 `k`, the 64 scan reads at `k + 1 + j`, the nextpid write at `k + 65`, the `p->pid` write at
 `k + 66`); the continuation is at `k + 67`.  The normal path is pinned by value premises
 (Q18b): the read pid is not 1000 and no scan read sees it.  The `p->pid` store flow `Opid` is
-the caller's (Q18c). -/
-theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 64)
+the caller's (Q18c).  PREFIX row (`RowAllocpidBodyP`, no length premise): a `by_cases` on
+`LEN ≤ position` at each boundary where the row may end (`k`, `k + 1`, each scan round's start
+and read in `AxSpinAp9.scanLoopP`, `k + 65`, `k + 66`, `k + 67`); every such end is discharged
+by the WINDOWED, RESOURCE-FREE hook `HΨend` (window `[k, k + 67]`; the CS has no designated
+cut).  The two premises naming position `k` that are not vacuous at an absent position
+(`Hpo`, the anchor `e ∈ lobp (i, k)`) are GUARDED by `k < LEN`; the continuation is reached
+only when `k + 67 < LEN`. -/
+theorem wpdAllocpidCsP (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 64)
     (Pscan : Nat → BitVec 64) (e : Geid) (Opid : Nat → List (BitVec 8) → IProp GF) :
     -- the row
-    RowAllocpidBody k (AxOpsem.grow (gtAdGd GT) i) (paZ Pnp) (paZ Ppid) →
-    k + 67 < (AxOpsem.grow (gtAdGd GT) i).length →
+    RowAllocpidBodyP k (AxOpsem.grow (gtAdGd GT) i) (paZ Pnp) (paZ Ppid) →
     (∀ (k' : Nat) (lb : Lbl) (rl : Bool) (m : Nat), (AxOpsem.grow (gtAdGd GT) i)[k']? = some lb →
       aidentWr (aident lb) = some (rl, paZ Pnp, m) → k' = k + 65) →
-    (∀ w a v', a ∈ npb L → gwritesByte (gtAdGd GT).gdG w a v' →
+    (k < (AxOpsem.grow (gtAdGd GT) i).length → ∀ w a v', a ∈ npb L → gwritesByte (gtAdGd GT).gdG w a v' →
       WeakRvwmoGraph.gpo (gtAdGd GT).gdG w (i, k) → gmoLt (gtAdGd GT).gdG w (i, k)) →
     (∀ vs, graphValue (gtAdGd GT) (i, k) = some vs →
       (wordOfBytes 4 vs : BitVec 32) ≠ 1000#32 ∧ (wordOfBytes 4 vs : BitVec 32).toNat + 1 < 2 ^ 32) →
@@ -527,7 +637,13 @@ theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 
     dataAtS σi T (.Store .Data) (gprVal rs0 9#5 + sign_extend (m := 64) 48#12) 4 Ppid →
     hitW rs0 (gprVal rs0 9#5 + sign_extend (m := 64) 48#12) →
     -- the anchor of `RNp`
-    e ∈ @Axpol.lobp (xv6Pol GT) (gtAdGd GT) (i, k) →
+    (k < (AxOpsem.grow (gtAdGd GT) i).length →
+      e ∈ @Axpol.lobp (xv6Pol GT) (gtAdGd GT) (i, k)) →
+    -- the row-end hook (stage 2, design §B / Q-S2-2; windowed, resource-free)
+    (∀ k' : Nat, k ≤ k' → k' ≤ k + 67 → (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
+      ∀ pr : Pexv6,
+        ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+          ⟨pr, k'⟩ Ψ) →
     ⊢ AxAnnot.annotOwn e (RNp L nm.xnH nm.xnM nm.xnI (gtAdGd GT) e) -∗
       @FstM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent (dokAtP (paZ Ppid) 4) i
         Opid -∗
@@ -553,7 +669,7 @@ theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 
           ⟨.PHart cpu (.pure ()) rs' none ib', k + 67⟩ Ψ) -∗
       @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
         ⟨.PHart cpu (.pure ()) rs0 none ib0, k⟩ Ψ := by
-  intro HR Hlen Hone Hpo Hnowrap Hncoll Hc0 HPC0 Hhit0 Hnp Hntx HdaL HdaS Hhv Hsc HdaP HhvP He
+  intro HR Hone Hpo Hnowrap Hncoll Hc0 HPC0 Hhit0 Hnp Hntx HdaL HdaS Hhv Hsc HdaP HhvP He HΨend
   have XR := XxReg (hlc := hlc) (GF := GF) L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu
     Hfix Ψ HΨmid
   have XS := XxStF (hlc := hlc) (GF := GF) L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu
@@ -562,8 +678,12 @@ theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 
     intro lb Hlb
     rw [← Hnp]
     exact HR.2.1 lb Hlb
+  -- row end at k
+  by_cases E0 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k
+  · iintro - - -
+    iapply (HΨend _ (by omega) (by omega) E0 _)
   have FN := FldMWNp (hlc := hlc) (GF := GF) L GT nm HL Hcons i e k k (k + 1)
-    (fun k' h hne => absurd (by omega) hne) Hkr He Hpo
+    (fun k' h hne => absurd (by omega) hne) Hkr (He (by omega)) (Hpo (by omega))
   rw [← Hnp] at FN
   iintro HRN Fpid C
   ihave F := FN $$ HRN
@@ -592,6 +712,10 @@ theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 
   iintro %vs %rs2 %ib2 %Hlvs %HG2 %Hgv
   rw [OLd, if_pos rfl]
   iintro ⟨HNP, Hsrc⟩
+  -- row end at k + 1
+  by_cases E1 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 1
+  · iclear HNP Hsrc Fpid C
+    iapply (HΨend _ (by omega) (by omega) E1 _)
   have HF2 := stepRegs T satp0 _ rs1 _ _ _ _ _ rs2 HF1 HG2
   have HPC2 : rs2 .PC = pca 0x4c := by rw [gbPc T satp0 _ _ _ _ _ _ HG2]; decide
   have Htl2 : rs2 .tlb = rs0 .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG2).trans Htl1
@@ -751,8 +875,8 @@ theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 
   have H13 : gprVal rs12 13#5 = ldRes false 4 vs := by rw [HF12]; ax_spin_ap9_zsimp
   have H12 : gprVal rs12 12#5 = AxSpinAp9.a5j 64 := by rw [HF12]; ax_spin_ap9_zsimp
   have H15 : gprVal rs12 15#5 = AxSpinAp9.a5j 0 := by rw [HF12]; ax_spin_ap9_zsimp
-  have SL := AxSpinAp9.scanLoop (hlc := hlc) (GF := GF) L GT nm HL Hcons σi T satp0 hmode hasid
-    hppn i cpu Hfix Htxt Ψ HΨmid k (paZ Pnp) (paZ Ppid) HR Hlen Pscan rs12 vs
+  have SL := AxSpinAp9.scanLoopP (hlc := hlc) (GF := GF) L GT nm HL Hcons σi T satp0 hmode hasid
+    hppn i cpu Hfix Htxt Ψ HΨmid k (paZ Pnp) (paZ Ppid) HR HΨend Pscan rs12 vs
     (fun j hj => ⟨(Hsc j hj).1, (Hsc j hj).2.1, hitWAgree rs0 rs12 _ Htl12 (Hsc j hj).2.2⟩)
     (hitWAgree rs0 rs12 _ Htl12 Hhit0) (Hncoll vs Hgv) H13 H12 64 0 rfl (by omega) rs12 ib12
     (gbCtrl T satp0 _ _ _ _ _ _ HG12) HPC12 rfl (fun _ _ _ => rfl) H15
@@ -760,6 +884,10 @@ theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 
   iapply SL
   iintro %rs13 %ib13 %⟨Hc13, HPC13, Htl13', Hkeep13, H15_13⟩
   have Htl13 : rs13 .tlb = rs0 .tlb := Htl13'.trans Htl12
+  -- row end at k + 65 (after the scan)
+  by_cases E65 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 65
+  · iclear HNP Hsrc Fpid C
+    iapply (HΨend _ (by omega) (by omega) E65 _)
   -- ---- + 0x82: auipc a5,0x8 (k+65) ----
   iapply (XR _ rs13 (k + 65) (pca 0x82) false ap82 none (some (15#5, pca 0x82 + auipcOff 8#20))
     (retxRefl cpu rs13 (k + 65) ib13) Hc13 HPC13
@@ -776,7 +904,7 @@ theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 
     ax_spin_ap9_zsimp
     rw [Hkeep13 11#5 (by decide) (by decide), HF12]
     ax_spin_ap9_zsimp
-  obtain ⟨lb0, Hlb0, _⟩ := bRd k _ _ _ HR
+  obtain ⟨lb0, Hlb0, _⟩ := AxSpinAp9.bRdP k _ _ _ HR (by omega)
   have P1 := AxSpinAp9.rdLoad (gtAdGd GT) i k L.xlNp vs Hkr ⟨lb0, Hlb0⟩ Hgv
   have P2 : ∀ (k' : Nat) (lb : Lbl) (rl : Bool) (m : Nat),
       (AxOpsem.grow (gtAdGd GT) i)[k']? = some lb →
@@ -787,7 +915,7 @@ theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 
   have P3 : ∃ vw cls, (AxOpsem.grow (gtAdGd GT) i)[k + 65]? = some (.LStore false L.xlNp vw cls) ∧
       vw.length = 4 := by
     rw [← Hnp]
-    exact AxSpinAp7.bWr k _ _ _ HR
+    exact AxSpinAp9.bWrP k _ _ _ HR (by omega)
   have FS := FstMNp (hlc := hlc) (GF := GF) L GT nm HL Hcons i k (k + 65) (wordOfBytes 4 vs)
     (by omega) P1 P2 P3 Hnwr
   rw [← Hnp] at FS
@@ -807,6 +935,10 @@ theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 
   have HPC15 : rs15 .PC = pca 0x8a := by rw [gbPc T satp0 _ _ _ _ _ _ HG15]; decide
   have Htl15 : rs15 .tlb = rs0 .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG15).trans Htl14
   rw [show k + 65 + 1 = k + 66 by omega]
+  -- row end at k + 66
+  by_cases E66 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 66
+  · iclear HRN65 HFR Hsrc Fpid C
+    iapply (HΨend _ (by omega) (by omega) E66 _)
   -- ---- + 0x8a: c.sw a3,48(s1) — the `p->pid` WRITE (k+66) ----
   have E9 : gprVal rs15 9#5 = gprVal rs0 9#5 := by
     rw [HF15]
@@ -832,12 +964,16 @@ theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 
   have HPC16 : rs16 .PC = pca 0x8c := by rw [gbPc T satp0 _ _ _ _ _ _ HG16]; decide
   have Htl16 : rs16 .tlb = rs0 .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG16).trans Htl15
   rw [show k + 66 + 1 = k + 67 by omega]
+  -- row end at k + 67 (the continuation is reached only when `k + 67 < LEN`)
+  by_cases E67 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 67
+  · iclear HOp HRN65 HFR Hsrc C
+    iapply (HΨend _ (by omega) (by omega) E67 _)
   -- ---- + 0x8c: auipc a0,0x11 (k+67) ----
   iapply (XR _ rs16 (k + 67) (pca 0x8c) false ap8c none (some (10#5, pca 0x8c + auipcOff 17#20))
     (retxRefl cpu rs16 (k + 67) ib16) (gbCtrl T satp0 _ _ _ _ _ _ HG16) HPC16
     (hitWSvpn rs16 (pca 0x8c) (pca 0x44) (by decide) (hitWAgree rs0 rs16 _ Htl16 Hhit0))
     (atok8c σi T satp0 Htxt) (AxSpinE8.owOkSome 10#5 _ (by decide)) rfFAp8c
-    (certAuipc _ rs16 (pca 0x8c) false 10#5 17#20 (by decide)) Hlen)
+    (certAuipc _ rs16 (pca 0x8c) false 10#5 17#20 (by decide)) (by omega))
   iintro %rs17 %ib17 %HG17
   have HF17 := stepRegs T satp0 _ rs16 _ _ _ _ _ rs17 HF16 HG17
   have HPC17 : rs17 .PC = pca 0x90 := by rw [gbPc T satp0 _ _ _ _ _ _ HG17]; decide
@@ -854,7 +990,7 @@ theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 
   iapply (XR _ rs17 (k + 67) (pca 0x90) false ap90 none _
     (retxRefl cpu rs17 (k + 67) ib17) (gbCtrl T satp0 _ _ _ _ _ _ HG17) HPC17
     (hitWSvpn rs17 (pca 0x90) (pca 0x44) (by decide) (hitWAgree rs0 rs17 _ Htl17 Hhit0))
-    (atok90 σi T satp0 Htxt) (AxSpinE8.owOkSome 10#5 _ (by decide)) rfFAp90 Hc18 Hlen)
+    (atok90 σi T satp0 Htxt) (AxSpinE8.owOkSome 10#5 _ (by decide)) rfFAp90 Hc18 (by omega))
   iintro %rs' %ib' %HG'
   have HF' := stepRegs T satp0 _ rs17 _ _ _ _ _ rs' HF17 HG'
   have Hkeep : ∀ r : BitVec 5, r.toNat ≠ 10 → r.toNat ≠ 11 → r.toNat ≠ 12 → r.toNat ≠ 13 →
@@ -915,6 +1051,71 @@ theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 
       rw [Hkeep13 16#5 (by decide) (by decide), HF12]
       ax_spin_ap9_zsimp
   iapply C $$ %vs %rs' %ib' %Hfin Hsrc HRN65 HFR HOp
+
+
+set_option maxHeartbeats 1600000 in
+include HL Hcons hmode hasid hppn Hfix Htxt HΨmid in
+/-- Rocq `wpd_allocpid_cs` (retargeted, Q18), stage-1 statement on a FULL row piece: the
+corollary of `wpdAllocpidCsP` (`RowAllocpidBody ⇒ RowAllocpidBodyP`; the guards are discharged
+unconditionally; under `k + 67 < LEN` the hook's end case is impossible). -/
+theorem wpdAllocpidCs (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pnp Ppid : BitVec 64)
+    (Pscan : Nat → BitVec 64) (e : Geid) (Opid : Nat → List (BitVec 8) → IProp GF) :
+    -- the row
+    RowAllocpidBody k (AxOpsem.grow (gtAdGd GT) i) (paZ Pnp) (paZ Ppid) →
+    k + 67 < (AxOpsem.grow (gtAdGd GT) i).length →
+    (∀ (k' : Nat) (lb : Lbl) (rl : Bool) (m : Nat), (AxOpsem.grow (gtAdGd GT) i)[k']? = some lb →
+      aidentWr (aident lb) = some (rl, paZ Pnp, m) → k' = k + 65) →
+    (∀ w a v', a ∈ npb L → gwritesByte (gtAdGd GT).gdG w a v' →
+      WeakRvwmoGraph.gpo (gtAdGd GT).gdG w (i, k) → gmoLt (gtAdGd GT).gdG w (i, k)) →
+    (∀ vs, graphValue (gtAdGd GT) (i, k) = some vs →
+      (wordOfBytes 4 vs : BitVec 32) ≠ 1000#32 ∧ (wordOfBytes 4 vs : BitVec 32).toNat + 1 < 2 ^ 32) →
+    (∀ vs, graphValue (gtAdGd GT) (i, k) = some vs → ∀ j, j < 64 → ∀ v,
+      graphValue (gtAdGd GT) (i, k + 1 + j) = some v →
+      (wordOfBytes 4 v : BitVec 32) ≠ wordOfBytes 4 vs) →
+    -- the entry state
+    ctrlOkSW T satp0 rs0 → rs0 .PC = pca 0x44 → hitW rs0 (pca 0x44) →
+    -- nextpid
+    paZ Pnp = L.xlNp → ¬ L.xlText (paZ Pnp) →
+    dataAtS σi T (.Load .Data) vaNp 4 Pnp → dataAtS σi T (.Store .Data) vaNp 4 Pnp →
+    hitW rs0 vaNp →
+    -- the scanned `proc[j].pid` fields
+    (∀ j, j < 64 → dataAtS σi T (.Load .Data) (AxSpinAp9.scanVa j) 4 (Pscan j) ∧
+      paZ (Pscan j) = AxSpinAp7.scanAddr j ∧ hitW rs0 (AxSpinAp9.scanVa j)) →
+    -- `p->pid` (`s1 = p`)
+    dataAtS σi T (.Store .Data) (gprVal rs0 9#5 + sign_extend (m := 64) 48#12) 4 Ppid →
+    hitW rs0 (gprVal rs0 9#5 + sign_extend (m := 64) 48#12) →
+    -- the anchor of `RNp`
+    e ∈ @Axpol.lobp (xv6Pol GT) (gtAdGd GT) (i, k) →
+    ⊢ AxAnnot.annotOwn e (RNp L nm.xnH nm.xnM nm.xnI (gtAdGd GT) e) -∗
+      @FstM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent (dokAtP (paZ Ppid) 4) i
+        Opid -∗
+      (∀ (vs : List (BitVec 8)) (rs' : RegFile) (ib' : Ibch),
+        ⌜ctrlOkSW T satp0 rs' ∧ rs' .PC = pca 0x94 ∧ rs' .tlb = rs0 .tlb ∧ vs.length = 4 ∧
+          graphValue (gtAdGd GT) (i, k) = some vs ∧
+          gprVal rs' 13#5 = ldRes false 4 vs ∧
+          gprVal rs' 11#5 = AxSpinAp7.addiw1 (ldRes false 4 vs) ∧
+          gprVal rs' 15#5 = a5v ∧
+          gprVal rs' 10#5 = BitVec.ofNat 64 KernelSyms.«pid_lock» ∧
+          gprVal rs' 12#5 = BitVec.ofNat 64 KernelSyms.«tickslock» ∧
+          gprVal rs' 16#5 = BitVec.ofNat 64 1000 ∧
+          (∀ r : BitVec 5, r.toNat ≠ 10 → r.toNat ≠ 11 → r.toNat ≠ 12 → r.toNat ≠ 13 →
+            r.toNat ≠ 14 → r.toNat ≠ 15 → r.toNat ≠ 16 → gprVal rs' r = gprVal rs0 r) ∧
+          graphData (gtAdGd GT) (i, k + 65) = some (WeakInterpProj.wbytes 4
+            (@HAdd.hAdd (BitVec 32) (BitVec 32) (BitVec 32) _ (wordOfBytes 4 vs) one32)) ∧
+          graphData (gtAdGd GT) (i, k + 66) = some (WeakInterpProj.wbytes 4 (wordOfBytes 4 vs))⌝ -∗
+        AxAnnot.annotOwn (i, k) iprop(⌜npSrc (gtAdGd GT).gdG L (i, k) e⌝) -∗
+        AxAnnot.annotOwn (i, k + 65) (RNp L nm.xnH nm.xnM nm.xnI (gtAdGd GT) (i, k + 65)) -∗
+        AxAnnot.annotOwn (i, k + 65) (FRAG nm (wordOfBytes 4 vs)) -∗
+        Opid (k + 66) (WeakInterpProj.wbytes 4 (wordOfBytes 4 vs)) -∗
+        @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+          ⟨.PHart cpu (.pure ()) rs' none ib', k + 67⟩ Ψ) -∗
+      @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+        ⟨.PHart cpu (.pure ()) rs0 none ib0, k⟩ Ψ := by
+  intro HR Hlen Hone Hpo Hnowrap Hncoll Hc0 HPC0 Hhit0 Hnp Hntx HdaL HdaS Hhv Hsc HdaP HhvP He
+  exact wpdAllocpidCsP (hlc := hlc) (GF := GF) L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu
+    Hfix Htxt Ψ HΨmid k rs0 ib0 Pnp Ppid Pscan e Opid (AxSpinAp9.rowBodyPOfFull HR) Hone
+    (fun _ => Hpo) Hnowrap Hncoll Hc0 HPC0 Hhit0 Hnp Hntx HdaL HdaS Hhv Hsc HdaP HhvP (fun _ => He)
+    (fun _ _ h2 h3 _ => absurd h3 (by omega))
 
 end cs
 
