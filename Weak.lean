@@ -449,5 +449,6 @@ import Weak.AxEpiRetb
 import Weak.AxWalk7
 import Weak.AxDataX5
 import Weak.AxPtwModel
+import Weak.AxDataX8
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
