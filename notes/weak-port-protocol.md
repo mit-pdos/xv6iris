@@ -286,3 +286,4 @@ Rocq→Lean name map only.
 - Owner answers 20:1x: Q16 add an EvB "fetch with no image bytes ⇒ stuck" case (+ the 3 register-only steps) and close AxSymCtl5's capstone; Q17 port `wp_cpuid_c` against the Lean cpuid interface (AxReuseProbe kctx/frame2) at AxSymMem3 resume.
 - AxWalk7: `wpdOfCertPosM`/`wpdOfCertPos` (Cert → CertWP with empty walker region: `wok := fun _ _ => False`, `wpin = xpin = True`, `AxWalk7.wfrEmpty`/`wfwEmpty`).
 - AxDataX5: `spineCertXT` (TLB-framed spineCertX; `sfAnnB 32 w = false` after `textAt4 pc w`). AxPtwModel: `ptwModelAt`, `tierAAdequacyPtwGmo`/`L` (no T), `wpdOfCertWPPtw*`.
+- AxDataX8 (AxWalk4/6, AxLeafS3, AxSfence2): probe data side `nvVa`, `dvpn`, `dW`, `ExecDLdNv`/`ExecDStNv`/`ExecDLdNvRun`, `nvPmpW`, `nvCtrlOkSW`; `AxDataX8.imm8`. AxRelease7: `dc00…dc08` via `AxRelease7.dcOf` (kernel `runRead` decode at `drefMisa` + `execOfRunRead`; footprint by `rff_auto` after literal pruning) — AxRelease8 copies it.
