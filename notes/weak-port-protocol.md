@@ -353,3 +353,4 @@ Rocq→Lean name map only.
 - AxSpinAm3 (AxSpinAm4): `XBkWP` (window k ≤ k' < k+e, `CResWP … k (k+e)`), `AxSpinAm3.XAmo`/`XxAmoswap` (RMW at row item k, `FstRmwW … k (k+1)`, `Hnk` dropped), `HagreeX`, `OutWR`, `FstRmwWRow`.
 - AxSpinVA8: `chainFaultUnmapped0/1/2` end at `.ENf` (stvec outside image); in-image stvec via `AxSpinVA8.faultUnmapped{0,1,2}Step`; `invFalse` restated for the Lean walk test.
 - AxCondM3 (AxRelease, AxSpinRow2): `insAt3` carries `sfAnnB 32 w32 = false`; `AxCondM3.amoswapStored` (= amoStv 4) / `amoswapLoaded` (= sign_extend); `CondGate3`, `amoRule3`; hart `cid` explicit. `nomatch` does not see through `fenceRwWIns` — unfold then `cases`.
+- AxSpinAp6 (retargeted): `atok38`…`atok94` (27), `rfFAp*` (23), `AxSpinAp6.rfFJal` (any link reg), `AxSpinAp6.rfFBtype`. rfF over an instruction: `cases` the regidx args first, then `show execute_X`.
