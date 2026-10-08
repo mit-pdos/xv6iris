@@ -59,7 +59,9 @@ NEW Lean file (no Rocq source: the Rocq development stopped before the capstone)
 §3 `AllocPins GD i q` (Option V return / arm pins + the Q18b pins), one named field per pin,
    at the positions the leaves state them (PO4 `wpdPushOff`, HdC `holdingFromAcquire'`/
    `holdingFromRelease'`, E8 `wpdMycpu`, Ap9 `wpdAllocpidCs`, PO6 `wpdPopOff`); the return
-   addresses' `jalrTgt` fixpoints `AxSpinT2a.jalrRets`; `AxSpinT2a.mycpuRetHart` (`mycpu`'s
+   addresses' `jalrTgt` fixpoints `AxSpinT2a.jalrRets`; (added by AxSpinApA, 2026-10-08:
+   the extra Option V pins the composed callees take — `poS1`, `hdS1`, `aqS1`, `rhCpu`, `rhS1`,
+   `rlS1`; see AxSpinApA's header); `AxSpinT2a.mycpuRetHart` (`mycpu`'s
    result at `tp = hartId c` is `cpuAddr c`), `AxSpinT2a.hresZero`.
 §4 POSTS.  `t2Post GD L nm i q s = ⌜¬ midState s⌝ -∗ ∃ w, ⌜pidOf = some (wbytes 4 w) ∧ a3 =
    sext32 w ∧ npSrc (read) (claim)⌝ ∗ FRAG nm w`; `t2Phi` (A, B: `t2Post`; else `True`) at
@@ -581,6 +583,24 @@ structure AllocPins (GD : Gdexec) (i : Agent) (q : T2Prm) : Prop where
     some (stBytes 8 (AxSpinHdB.prl 0x22))
   /-- release's return -/
   rlRet : graphValue GD (i, t2KRr q) = some (stBytes 8 (pca 0x98))
+  /-- (AxSpinApA) push_off's s1 reload (acquire's `lk`, AxSpinAq2's extra pin) -/
+  poS1 : graphValue GD (i, t2KPoT q + 8) =
+    some (stBytes 8 (BitVec.ofNat 64 KernelSyms.«pid_lock»))
+  /-- (AxSpinApA) holding's s1 reload on acquire's call (AxSpinAq2's extra pin) -/
+  hdS1 : q.hb = true → graphValue GD (i, t2KHd q + 11) =
+    some (stBytes 8 (BitVec.ofNat 64 KernelSyms.«pid_lock»))
+  /-- (AxSpinApA) acquire's s1 reload returns acquire's s1 spill (`p`; the critical section's
+  `p->pid` base) -/
+  aqS1 : graphValue GD (i, t2KMy q + 7) = graphData GD (i, 2)
+  /-- (AxSpinApA) holding's lk->cpu read on release's call returns this cpu (AxSpinRl4b's `Hvcpu`,
+  the value form of `rhArm`) -/
+  rhCpu : graphValue GD (i, t2KRh q + 4) = some (stBytes 8 (cpuAddr (cpuOf i)))
+  /-- (AxSpinApA) holding's s1 reload on release's call (AxSpinRl4b's `Hvs1`) -/
+  rhS1 : graphValue GD (i, t2KRh q + 11) =
+    some (stBytes 8 (BitVec.ofNat 64 KernelSyms.«pid_lock»))
+  /-- (AxSpinApA) release's s1 reload returns release's s1 spill (`p`; the terminal store's
+  base) -/
+  rlS1 : graphValue GD (i, t2KRr q + 2) = graphData GD (i, t2KRl q + 2)
 
 /-- The return addresses are `jalr` fixpoints (the leaves' `Hret`). -/
 theorem AxSpinT2a.jalrRets :
