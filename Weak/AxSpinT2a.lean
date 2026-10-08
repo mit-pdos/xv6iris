@@ -40,12 +40,20 @@ NEW Lean file (no Rocq source: the Rocq development stopped before the capstone)
    spin items' exact labels, RMW class `WCexcl` — the honest class, `AxSpinRl1.rowClsHonest`;
    restated from `WCplain` 2026-10-08, AxSpinAmX) ∧ `t2CpuVals` (every lk->cpu write is a plain 8-byte store of
    `cvx i` or 0 — orchestrator ruling for AxSpinRl2's `CpuWin`; true on real rows, the data is
-   fixed by the code).  Projections:
+   fixed by the code) ∧ `t2RelVals` (release's lock-word store `sw zero,0(s1)` at
+   `relKw (t2KRl q)` writes `z4` — AxSpinRl3's `Hst`, deviation 2 there).  NEITHER value condition
+   follows from the shape: `RS`/`RSc` items pin address, width (and for `RSc` the class) but not
+   the store data.  Projections:
    `allocAcquire` (AxSpinAqr's `RowAcquire 0 …`), `allocBody`, `allocRelease` (Rl1's
    `RowRelease`), `allocTerm`, `allocPush`/`allocTailSh`/`allocSpinSh` and the length facts;
    `allocSpinRmw`, `allocCpuVals`, `allocCpuWin` (AxSpinRl2's `CpuWin` from the family + the
    anchor's lob facts); whole-row facts `allocItem` (every row item matches a segment item), `allocW8` (`rowW8`),
-   `allocNoRmwn` (the only RMWs are the 4-byte ones on `pid_lock`).
+   `allocNoRmwn` (the only RMWs are the 4-byte ones on `pid_lock`); `allocRelVals`, `allocRelZ4`
+   (XxSwRelRel's `Hst`: `row[relKw (t2KRl q)]? = some (.LStore false zLk z4 .WCrel)`).
+   AxSpinRl3's `Hone` window is DERIVED from the shape (§5 end): `allocRelWin` — after the claim
+   `t2KA q` the only lock-word write is at `relKw (t2KRl q)`, given that hart `i`'s private
+   ranges miss `pid_lock` (`AxSpinT2a.privNeLk` from `T2LayHyp`); `allocRelWinC` states it in
+   XxSwRelRel's exact form (anchor `relKc (t2KRl q)`, `L.xlLk` with `hL`).
    `t2Complete GD i S p := ∃ q, allocFull (grow GD i) q i S p`; `pidOf GD i q` = the data of the
    `p->pid` store.
 §3 `AllocPins GD i q` (Option V return / arm pins + the Q18b pins), one named field per pin,
@@ -240,15 +248,22 @@ def t2CpuVals (row : List Lbl) (i : Agent) : Prop :=
     ∃ vw cls, lb = .LStore false (AxSpinT2a.zLk + 16) vw cls ∧
       (vw = cvx i ∨ vw = List.replicate 8 b0)
 
+/-- The RELEASING-STORE ROW VALUE CONDITION (AxSpinRl3's `Hst`, deviation 2 there): release's
+`sw zero,0(s1)` at `relKw (t2KRl q)` writes `z4`.  NOT a consequence of the shape — the shape item
+`RSc zLk 4 .WCrel` pins the address, width and class but not the data; true on real rows (the
+store writes `x0`; the positional bridge itself demands `graphData = stBytes 4 0 = z4`). -/
+def t2RelVals (row : List Lbl) (q : T2Prm) : Prop :=
+  ∀ vw cls, row[relKw (t2KRl q)]? = some (.LStore false AxSpinT2a.zLk vw cls) → vw = AxSpinX4.z4
+
 /-- THE ROW FAMILY (one hart): the shape, the exact length, holding's lock bits on both calls,
 the spin values and labels (`AxSpinAq1.spinRmw`), the body's plain reads, the lk->cpu store
-values. -/
+values, the releasing store's value. -/
 def allocFull (row : List Lbl) (q : T2Prm) (i : Agent) (S p : Int) : Prop :=
   RowShX 0 row (allocSeg q i S p) ∧ row.length = t2Len q ∧
   lkBranch row (t2KHd q) q.hb ∧ spinVals row (t2KSp q) q.n ∧
   lkBranch row (t2KRh q) true ∧
   RowAllocpidBody (t2KBd q) row AxSpinT2a.zNp (p + 48) ∧
-  AxSpinAq1.spinRmw row (t2KSp q) q.n AxSpinT2a.zLk ∧ t2CpuVals row i
+  AxSpinAq1.spinRmw row (t2KSp q) q.n AxSpinT2a.zLk ∧ t2CpuVals row i ∧ t2RelVals row q
 
 /-- Design `complete i`: hart `i`'s row is in the family. -/
 def t2Complete (GD : Gdexec) (i : Agent) (S p : Int) : Prop :=
@@ -341,7 +356,10 @@ theorem allocBody : RowAllocpidBody (t2KBd q) row AxSpinT2a.zNp (p + 48) := HF.2
 theorem allocSpinRmw : AxSpinAq1.spinRmw row (t2KSp q) q.n AxSpinT2a.zLk := HF.2.2.2.2.2.2.1
 
 /-- the lk->cpu store values. -/
-theorem allocCpuVals : t2CpuVals row i := HF.2.2.2.2.2.2.2
+theorem allocCpuVals : t2CpuVals row i := HF.2.2.2.2.2.2.2.1
+
+/-- the releasing store's value. -/
+theorem allocRelVals : t2RelVals row q := HF.2.2.2.2.2.2.2.2
 
 /-- release's row (AxSpinRl1) at `t2KRl q`. -/
 theorem allocRelease :
@@ -351,6 +369,15 @@ theorem allocRelease :
   refine ⟨(AxSpinT2a.segParts HF.1).2.2.2.2.2.2.1, HF.2.2.2.2.1, ?_⟩
   rw [HF.2.1]
   exact AxSpinT2a.kTLen q
+
+/-- AxSpinRl3 `XxSwRelRel`'s `Hst`: release's lock-word store is the `WCrel` store of `z4`
+(class from the shape, `rowReleaseRel`; data from `t2RelVals`). -/
+theorem allocRelZ4 :
+    row[relKw (t2KRl q)]? = some (.LStore false AxSpinT2a.zLk AxSpinX4.z4 .WCrel) := by
+  obtain ⟨vw, Hlb, -⟩ := rowReleaseRel (allocRelease HF)
+  have Hz := allocRelVals HF vw .WCrel Hlb
+  rw [Hz] at Hlb
+  exact Hlb
 
 /-- the terminal `sw a5,24(s1)`. -/
 theorem allocTerm :
@@ -933,6 +960,233 @@ theorem AxSpinT2a.layHypReal :
 /-- NON-VACUITY: the layout hypotheses hold at the real kernel symbols. -/
 theorem xlayXv6Real : xlayOk (xlayXv6 0 1 2 AxSpinT2a.sEx AxSpinT2a.pEx (fun _ => False)) :=
   xlayXv6Ok _ _ _ _ _ _ AxSpinT2a.layHypReal
+
+/-! ## The releasing store's window (AxSpinRl3's `Hone`), from the shape -/
+
+/-- (Lean-only) the write base of a segment item (`none` for reads / fences). -/
+def AxSpinT2a.xWa : Rxitem → Option Int
+  | .it (.RS pa _) => some pa
+  | .RSc pa _ _ => some pa
+  | .RM _ _ pa _ => some pa
+  | _ => none
+
+/-- (Lean-only) a write matching a segment item writes at the item's base. -/
+theorem AxSpinT2a.xWaOf (x : Rxitem) (lb : Lbl) (rl : Bool) (pa : Int) (n : Nat) :
+    xshape x lb → aidentWr (aident lb) = some (rl, pa, n) → AxSpinT2a.xWa x = some pa := by
+  intro Hs Hw
+  cases x with
+  | it it =>
+    cases it with
+    | RF n' => obtain ⟨aq, b', E⟩ := Hs; rw [E] at Hw; cases Hw
+    | RP pb n' => obtain ⟨aq, E⟩ := Hs; rw [E] at Hw; cases Hw
+    | RL pb n' => obtain ⟨aq, E⟩ := Hs; rw [E] at Hw; cases Hw
+    | RS pb n' =>
+      obtain ⟨vw, cls, rfl, -⟩ := Hs
+      simp only [aident, aidentWr, Option.some.injEq, Prod.mk.injEq] at Hw
+      obtain ⟨_, rfl, _⟩ := Hw
+      rfl
+  | RB pr pw sr sw => rw [Hs] at Hw; cases Hw
+  | RSc pb n' cls =>
+    obtain ⟨vw, rfl, -⟩ := Hs
+    simp only [aident, aidentWr, Option.some.injEq, Prod.mk.injEq] at Hw
+    obtain ⟨_, rfl, _⟩ := Hw
+    rfl
+  | RM aq rl' pb n' =>
+    rw [Hs] at Hw
+    simp only [aidentWr, Option.some.injEq, Prod.mk.injEq] at Hw
+    obtain ⟨_, rfl, _⟩ := Hw
+    rfl
+
+/-- (Lean-only) the private bytes of a layout hart miss the lock word's base. -/
+theorem AxSpinT2a.privNeLk (A B C : Agent) (S p : Agent → Int) (ptp : Int → Prop)
+    (H : T2LayHyp A B C S p ptp) (j : Agent) (hj : j = A ∨ j = B ∨ j = C) :
+    ∀ a, AxSpinT2a.privZ (S j) (p j) j a → a ≠ AxSpinT2a.zLk := by
+  intro a hz
+  obtain ⟨m, hm, hpm, hS1, hS2, hj8, hz'⟩ := AxSpinT2a.privBounds A B C S p ptp H a j
+    ((AxSpinT2a.privIff A B C S p ptp a j).2 ⟨hj, hz⟩)
+  have v1 : AxSpinT2a.zLk = 0x80012500 := rfl
+  rw [v1]
+  omega
+
+section relwin
+variable {row : List Lbl} {q : T2Prm} {i : Agent} {S p : Int}
+
+/-- (Lean-only) the segment around the releasing store: the prefix through the claim, the
+items up to the fence, the store, the rest. -/
+theorem AxSpinT2a.segSplit :
+    allocSeg q i S p =
+      ((aqHead (S - 8) (S - 16) (S - 24)).map .it ++
+        ((poSh q.b (S - 40) (S - 48) (S - 56) (S - 72) (S - 80) (cpuZ i + 120)
+          (cpuZ i + 124)).map .it ++
+        ((holdShB q.hb AxSpinT2a.zLk (AxSpinT2a.zLk + 16) (S - 40) (S - 48) (S - 56) (S - 72)
+          (S - 80)).map .it ++
+        List.replicate (q.n + 1) (Rxitem.RM true false AxSpinT2a.zLk 4)))) ++
+      (((aqTail (S - 40) (S - 48) (AxSpinT2a.zLk + 16) (S - 8) (S - 16) (S - 24)).map .it ++
+        ((apBodySh AxSpinT2a.zNp (p + 48)).map .it ++
+        ((relHead (S - 8) (S - 16) (S - 24)).map .it ++
+        ((holdShB true AxSpinT2a.zLk (AxSpinT2a.zLk + 16) (S - 40) (S - 48) (S - 56) (S - 72)
+          (S - 80)).map .it ++
+        [Rxitem.it (.RS (AxSpinT2a.zLk + 16) 8), .RB true true false true])))) ++
+      (Rxitem.RSc AxSpinT2a.zLk 4 .WCrel ::
+        ((ppSh q.c (S - 40) (S - 48) (S - 56) (S - 64) (cpuZ i + 120) (cpuZ i + 124)).map .it ++
+        ((relTail (S - 8) (S - 16) (S - 24)).map .it ++ [Rxitem.it (.RS (p + 24) 4)])))) := by
+  simp only [allocSeg, relSh, List.append_assoc, List.cons_append, List.nil_append]
+
+/-- (Lean-only) no item of a list writes the lock word's base. -/
+def AxSpinT2a.noLk (l : List Rxitem) : Prop := ∀ x ∈ l, AxSpinT2a.xWa x ≠ some AxSpinT2a.zLk
+
+theorem AxSpinT2a.noLkMap (l : List Ritem) :
+    (∀ pa n, Ritem.RS pa n ∈ l → pa ≠ AxSpinT2a.zLk) → AxSpinT2a.noLk (l.map .it) := by
+  intro H x hx
+  obtain ⟨it, hit, rfl⟩ := List.mem_map.1 hx
+  cases it with
+  | RS pa n => intro e; exact H _ _ hit (Option.some.inj e)
+  | _ => intro e; cases e
+
+theorem AxSpinT2a.noLkApp (l1 l2 : List Rxitem) :
+    AxSpinT2a.noLk l1 → AxSpinT2a.noLk l2 → AxSpinT2a.noLk (l1 ++ l2) := by
+  intro H1 H2 x hx
+  rcases List.mem_append.1 hx with h | h
+  · exact H1 x h
+  · exact H2 x h
+
+variable (Hpz : ∀ a, AxSpinT2a.privZ S p i a → a ≠ AxSpinT2a.zLk)
+include Hpz
+
+theorem AxSpinT2a.midNoLk :
+    AxSpinT2a.noLk
+      ((aqTail (S - 40) (S - 48) (AxSpinT2a.zLk + 16) (S - 8) (S - 16) (S - 24)).map .it ++
+        ((apBodySh AxSpinT2a.zNp (p + 48)).map .it ++
+        ((relHead (S - 8) (S - 16) (S - 24)).map .it ++
+        ((holdShB true AxSpinT2a.zLk (AxSpinT2a.zLk + 16) (S - 40) (S - 48) (S - 56) (S - 72)
+          (S - 80)).map .it ++
+        [Rxitem.it (.RS (AxSpinT2a.zLk + 16) 8), .RB true true false true])))) := by
+  have hs : ∀ d : Int, 1 ≤ d → d ≤ 80 → S - d ≠ AxSpinT2a.zLk := fun d h1 h2 =>
+    Hpz _ (by unfold AxSpinT2a.privZ; omega)
+  have hl : AxSpinT2a.zLk + 16 ≠ AxSpinT2a.zLk := by omega
+  refine AxSpinT2a.noLkApp _ _ (AxSpinT2a.noLkMap _ ?_) (AxSpinT2a.noLkApp _ _
+    (AxSpinT2a.noLkMap _ ?_) (AxSpinT2a.noLkApp _ _ (AxSpinT2a.noLkMap _ ?_)
+    (AxSpinT2a.noLkApp _ _ (AxSpinT2a.noLkMap _ ?_) ?_)))
+  · intro pa n h
+    simp only [aqTail, mycSh, List.cons_append, List.nil_append, List.mem_cons,
+      List.not_mem_nil, or_false, reduceCtorEq, Ritem.RS.injEq, false_or] at h
+    rcases h with ⟨rfl, -⟩ | ⟨rfl, -⟩ | ⟨rfl, -⟩
+    · exact hs 40 (by omega) (by omega)
+    · exact hs 48 (by omega) (by omega)
+    · exact hl
+  · intro pa n h
+    simp only [apBodySh, List.mem_cons, List.mem_append, List.mem_map, List.not_mem_nil,
+      or_false, reduceCtorEq, Ritem.RS.injEq, false_or, and_false, exists_false] at h
+    rcases h with ⟨rfl, -⟩ | ⟨rfl, -⟩
+    · decide
+    · exact Hpz _ (by unfold AxSpinT2a.privZ; omega)
+  · intro pa n h
+    simp only [relHead, List.mem_cons, List.not_mem_nil, or_false, Ritem.RS.injEq] at h
+    rcases h with ⟨rfl, -⟩ | ⟨rfl, -⟩ | ⟨rfl, -⟩
+    · exact hs 8 (by omega) (by omega)
+    · exact hs 16 (by omega) (by omega)
+    · exact hs 24 (by omega) (by omega)
+  · intro pa n h
+    simp only [holdShB, mycSh, ↓reduceIte, List.cons_append, List.nil_append, List.mem_cons,
+      List.not_mem_nil, or_false, reduceCtorEq, Ritem.RS.injEq, false_or] at h
+    rcases h with ⟨rfl, -⟩ | ⟨rfl, -⟩ | ⟨rfl, -⟩ | ⟨rfl, -⟩ | ⟨rfl, -⟩
+    · exact hs 40 (by omega) (by omega)
+    · exact hs 48 (by omega) (by omega)
+    · exact hs 56 (by omega) (by omega)
+    · exact hs 72 (by omega) (by omega)
+    · exact hs 80 (by omega) (by omega)
+  · intro x hx
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hx
+    rcases hx with rfl | rfl
+    · intro e; exact hl (Option.some.inj e)
+    · intro e; cases e
+
+theorem AxSpinT2a.endNoLk :
+    AxSpinT2a.noLk
+      ((ppSh q.c (S - 40) (S - 48) (S - 56) (S - 64) (cpuZ i + 120) (cpuZ i + 124)).map .it ++
+        ((relTail (S - 8) (S - 16) (S - 24)).map .it ++ [Rxitem.it (.RS (p + 24) 4)])) := by
+  have hs : ∀ d : Int, 1 ≤ d → d ≤ 80 → S - d ≠ AxSpinT2a.zLk := fun d h1 h2 =>
+    Hpz _ (by unfold AxSpinT2a.privZ; omega)
+  refine AxSpinT2a.noLkApp _ _ (AxSpinT2a.noLkMap _ ?_) (AxSpinT2a.noLkApp _ _
+    (AxSpinT2a.noLkMap _ ?_) (AxSpinT2a.noLkMap [Ritem.RS (p + 24) 4] ?_))
+  · intro pa n h
+    cases hc : q.c <;>
+    simp only [hc, ppSh, ppHead, ppMid, ppTail, mycSh, ↓reduceIte, Bool.false_eq_true,
+      List.cons_append, List.nil_append, List.mem_cons, List.not_mem_nil, or_false,
+      reduceCtorEq, Ritem.RS.injEq, false_or] at h <;>
+    rcases h with ⟨rfl, -⟩ | ⟨rfl, -⟩ | ⟨rfl, -⟩ | ⟨rfl, -⟩ | ⟨rfl, -⟩ <;>
+    first
+      | exact hs 40 (by omega) (by omega) | exact hs 48 (by omega) (by omega)
+      | exact hs 56 (by omega) (by omega) | exact hs 64 (by omega) (by omega)
+      | exact Hpz _ (by unfold AxSpinT2a.privZ; omega)
+  · intro pa n h
+    simp only [relTail, List.mem_cons, List.not_mem_nil, or_false, reduceCtorEq] at h
+  · intro pa n h
+    simp only [List.mem_cons, List.not_mem_nil, or_false, Ritem.RS.injEq] at h
+    obtain ⟨rfl, -⟩ := h
+    exact Hpz _ (by unfold AxSpinT2a.privZ; omega)
+
+variable (HF : allocFull row q i S p)
+include HF
+
+/-- AxSpinRl3's `Hone` window, DERIVED FROM THE SHAPE (given that hart `i`'s private bytes miss
+the lock word, `AxSpinT2a.privNeLk` from `T2LayHyp`): after the claim, the only lock-word write
+of the row is release's `sw zero,0(s1)` at `relKw (t2KRl q)`. -/
+theorem allocRelWin (k' : Nat) (lb : Lbl) (rl : Bool) (n : Nat) :
+    t2KA q < k' → row[k']? = some lb → aidentWr (aident lb) = some (rl, AxSpinT2a.zLk, n) →
+    k' = relKw (t2KRl q) := by
+  intro hk Hk Hw
+  obtain ⟨x, Hx, Hs⟩ := allocItem HF k' lb Hk
+  have Hwa := AxSpinT2a.xWaOf x lb rl _ n Hs Hw
+  rw [AxSpinT2a.segSplit] at Hx
+  have Hpre : ((aqHead (S - 8) (S - 16) (S - 24)).map Rxitem.it ++
+        ((poSh q.b (S - 40) (S - 48) (S - 56) (S - 72) (S - 80) (cpuZ i + 120)
+          (cpuZ i + 124)).map Rxitem.it ++
+        ((holdShB q.hb AxSpinT2a.zLk (AxSpinT2a.zLk + 16) (S - 40) (S - 48) (S - 56) (S - 72)
+          (S - 80)).map Rxitem.it ++
+        List.replicate (q.n + 1) (Rxitem.RM true false AxSpinT2a.zLk 4)))).length =
+      t2KA q + 1 := by
+    simp only [List.length_append, List.length_map, AxSpinT2a.aqHeadLen, AxSpinT2a.poShLen,
+      holdShBLen, List.length_replicate, t2KA, aqKA, aqKh, aqKp, holdLen]
+    omega
+  rw [List.getElem?_append_right (by omega), Hpre] at Hx
+  have Hmid := AxSpinT2a.midNoLk (i := i) Hpz
+  have Hend := AxSpinT2a.endNoLk (q := q) Hpz
+  have hml : ((aqTail (S - 40) (S - 48) (AxSpinT2a.zLk + 16) (S - 8) (S - 16) (S - 24)).map
+        Rxitem.it ++
+        ((apBodySh AxSpinT2a.zNp (p + 48)).map Rxitem.it ++
+        ((relHead (S - 8) (S - 16) (S - 24)).map Rxitem.it ++
+        ((holdShB true AxSpinT2a.zLk (AxSpinT2a.zLk + 16) (S - 40) (S - 48) (S - 56) (S - 72)
+          (S - 80)).map Rxitem.it ++
+        [Rxitem.it (.RS (AxSpinT2a.zLk + 16) 8), .RB true true false true])))).length = 92 := by
+    simp only [List.length_append, List.length_map, aqTailLen, AxSpinAp7.apBodyShLen, relHead,
+      holdShBLen, holdLen, ↓reduceIte, List.length_cons, List.length_nil]
+  have hkw : relKw (t2KRl q) = t2KA q + 1 + 92 := by
+    simp only [relKw, t2KRl, t2KBd, t2KMy, t2KA, aqKm, aqKA]; omega
+  rcases Nat.lt_or_ge (k' - (t2KA q + 1)) 92 with h1 | h1
+  · rw [List.getElem?_append_left (by omega)] at Hx
+    exact absurd Hwa (Hmid x (List.mem_of_getElem? Hx))
+  rw [List.getElem?_append_right (by omega), hml] at Hx
+  rcases Nat.lt_or_ge 0 (k' - (t2KA q + 1) - 92) with h2 | h2
+  · rw [show k' - (t2KA q + 1) - 92 = (k' - (t2KA q + 1) - 92 - 1) + 1 by omega,
+      List.getElem?_cons_succ] at Hx
+    exact absurd Hwa (Hend x (List.mem_of_getElem? Hx))
+  · omega
+
+/-- AxSpinRl3 `XxSwRelRel`'s `Hone` verbatim (anchor = release's `sd zero,16(s1)`), at a layout
+whose lock word is `pid_lock` (`hL`; `rfl` for `xlayXv6`). -/
+theorem allocRelWinC (L : Xlay) (hL : L.xlLk = AxSpinT2a.zLk) (k' : Nat) (lb : Lbl) (rl : Bool)
+    (n : Nat) :
+    relKc (t2KRl q) < k' → row[k']? = some lb → aidentWr (aident lb) = some (rl, L.xlLk, n) →
+    k' = relKw (t2KRl q) := by
+  intro hk Hk Hw
+  rw [hL] at Hw
+  refine allocRelWin Hpz HF k' lb rl n ?_ Hk Hw
+  have := AxSpinT2a.kAlt q
+  simp only [relKc, t2KRl] at hk
+  omega
+
+end relwin
 
 /-! # 6. The entry condition -/
 
