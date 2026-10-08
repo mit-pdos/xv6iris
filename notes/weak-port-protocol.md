@@ -296,3 +296,6 @@ Rocq→Lean name map only.
 - AxLeafS (lock leaves): `CertXTAmoswapS` (owner `owAmo rd`) = AMO X-certificate at `ctrlOkSW`; spine instances at the data regime `SpineOkTSW`/`SpineFetch4TSW`/`SpineOkISIW`; `accAmo` abbrev; `amoStv`/`amoLdv`. For an exact AMO post replay `CertExecuteAMOSWAP` with `CertMemWriteValueX` at the exact `wrb w (amoStv w …)`.
 - AxSpinH6: n-byte leaves as Lean `have`s with folded addresses + unreduced continuations; split a full handle with `hdlwSplit … (Qp.half 1) (Qp.half 1)` + `rw [Qp.half_add_half] at h`.
 - AxWalk3: complete (`AxWalk3.p*` CertWP kit + `ax_walk3_go`; walk lemmas on `pt_walk … 0/1`; `AxWalk3.tlbFill`). `update_PTE_Bits` width arg is `if 39 = 32 then 32 else 64` — use `erw`. `ax_walk3_go` silently stops on `readReg menvcfg` (continuation typed `BitVec 64`): plain `refine AxWalk3.pFactRead ?_ ?_`.
+- AxLeafS2 (S-mode X leaves at `ctrlOkSW`): `CertXTAnd`, `XCertT`, `XLoadS` (`XLdS`/`XLwS`), `XStoreS` (`XSdS`/`XSwS`), `XAmoswapS`, `ctrlOkSWPriv`, `XFenceSW`; each takes `Hsf : sfAnnB 32 w = false` after `Htx`. `type_of%` wrapper theorems don't pull in section variables used only in the body — `include … in` them.
+- AxSpinH7: `gs7*` capstone; avoid local names that shadow globals (`Hent` is `Weak.Hent`).
+- Owner 00:2x: weekly pool — full speed, accept a stall until Sun 06:00 (park green).
