@@ -351,3 +351,4 @@ Rocq→Lean name map only.
 - AxSpinHd7 (HdA/HdB/Hd9/HdC): `XxLdO` = `XxLdP` with `AxSpinE4.XBk`; `dokAt`, `AxSpinHd7.vw4`, `XLd`, `OutR`, `FldMRow`, `dflowOMono` — AxSpinXP has primed copies.
 - AxSpinPOm: mstatus-tracking engine variant `CertBm`/`spineCertBm`/`XBkm`/`XxRegm` (copies of AxSpinE/E4/E6 with the mstatus fact), `CertBmQ0a`/`CertBmP0c`.
 - AxSpinAm3 (AxSpinAm4): `XBkWP` (window k ≤ k' < k+e, `CResWP … k (k+e)`), `AxSpinAm3.XAmo`/`XxAmoswap` (RMW at row item k, `FstRmwW … k (k+1)`, `Hnk` dropped), `HagreeX`, `OutWR`, `FstRmwWRow`.
+- AxSpinVA8: `chainFaultUnmapped0/1/2` end at `.ENf` (stvec outside image); in-image stvec via `AxSpinVA8.faultUnmapped{0,1,2}Step`; `invFalse` restated for the Lean walk test.
