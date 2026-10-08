@@ -13,8 +13,10 @@ Anything I could not confirm by reading or grepping is marked **unverified**.
   2-hart spill/reload races, lock handoff, a lock-protected counter, and real xv6 `mycpu` /
   `holding` / `push_off` / `pop_off` / `release`; (c) operational invariants on a litmus machine
   and on the promising machine.
-- **Caveat on (b).** The real-code WPds for `mycpu` and everything that calls it are currently
-  **vacuous** (Q22: 4-byte words at 2-mod-4 pcs; `Weak/AxSpinE8f.lean:287`). They also pin
+- **Caveat on (b).** Q22 (4-byte words at 2-mod-4 pcs made the mycpu/push_off/pop_off/acquire/
+  allocpid/release text premises unsatisfiable) is FIXED (update 2026-10-08, §2 N3): `wpdMycpu` is
+  applied with every premise discharged (`AxSpinE8f.certA`) and the other text premises are shown
+  satisfiable (`Weak/AxSpinTextCerts.lean`, `AxSpinRow3.relStoreTextOf`). The WPds still pin
   control flow by graph-value premises (Option V), and they leave several leaves as λ-bound slots.
 - **Not provable (14 items, §2).** Self-modifying code, load→load address dependencies, MMIO
   ordering, LR/SC with failing SC, liveness, unpinned racy control flow, IRIW/SB-fenced in the
@@ -119,8 +121,8 @@ given that the per-hart runs of the opax LTS cover the rows (`tierAAdequacy`,
   ⌜False⌝ (`instr4Rli10False`, `Weak/AxSpinCtl.lean:323`). `releaseWpd5` replaces it, but
   `w_cret`, `w_hold`, `w_pop` and the stack/cpu ownership lemmas are still λ-bound
   (`Weak/AxSpinCtl3.lean:18-21`). The full acquire is not closed. Its row shape and text facts
-  exist (`Weak/AxSpinAqr.lean`), but `acquireText` is unsatisfiable under Q22
-  (`notes/weak-port-protocol.md:387`).
+  exist (`Weak/AxSpinAqr.lean`); `acquireText` is satisfiable since the Q22 fix
+  (`AxSpinTextCerts.acquireTextOf`).
 
 ### 1(c) Operational
 
@@ -158,14 +160,14 @@ given that the per-hart runs of the opax LTS cover the rows (`tierAAdequacy`,
   the general rule-13 edge is recorded (`rowDepsTR13Masked`, `Weak/AxDeps.lean:757`), and sRVWMO
   omits that rule (`Weak/WeakAxiomatic3.lean:2065-2067`). Forbidding MP+addr therefore cannot be
   derived from dependency edges. This is the sound direction: the model is weaker than RVWMO here.
-- **N3. 4-byte instructions at 2-mod-4 pcs (Q22).** `textAt4S` requires
-  `is_aligned_vaddr pc 4` (`Weak/AxDataX6.lean:80-92`), so text facts at such pcs are false.
-  Examples: mycpu's `auipc`/`addi` at 0x8000196a/0x8000196e (`Weak/AxSpinE8f.lean:25-28`) and
-  acquire+0x12 `jal holding` at 0x80000c6a (oq:46). Roughly half of this kernel's 4-byte words
-  are 2 mod 4 (`notes/weak-port-resume.md:211`). Owner ruling: fix it with a 2-aligned 4-byte
-  text predicate (oq:48); that work is in progress (`notes/weak-port-resume.md:216`). Whether
-  release+0x1e `jal pop_off` (0x80000cfe, 2 mod 4) makes `releaseWpd5`'s text slot unsatisfiable
-  is **unverified** and belongs to the Q22 sweep.
+- **N3. (RESOLVED 2026-10-08) 4-byte instructions at 2-mod-4 pcs (Q22).** `textAt4S` used to
+  require `is_aligned_vaddr pc 4`, so text facts at ~half of this kernel's 4-byte words (mycpu,
+  push_off, pop_off+0x16, acquire+0x12, the inlined allocpid, release's lock words) were false.
+  Fixed in place (`Weak/AxDataX6.lean`, `textAt4S`): the 2-mod-4 arm models Sail's two halfword
+  fetches, under a no-page-straddle conjunct (owner Q22a). What remains unprovable: a 4-byte
+  instruction straddling a page boundary (in this kernel only `log_write+0x34`, unused by the weak
+  line). Acceptance: `AxSpinE8f.mycpuTextOf`/`certA`, `AxSpinRow3.relStoreTextOf`,
+  `AxSpinTextCerts.{pushOff,popOff,acquire,allocpid}TextOf`.
 - **N4. Control flow that depends on racy or diverted values without value pins.** Under Stage C a
   diverted return into mapped text is not stuck (Q20, oq:35), so the "diverted ⇒ stuck" verdicts
   cannot be proved. Rocq's `Xx_ret` shape is provable only vacuously
