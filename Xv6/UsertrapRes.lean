@@ -391,7 +391,7 @@ def utBlock (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) :
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
   @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V ∗
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
-  actCnt pa V.ev ∗
+  actCnt pa V.ev ∗ pownHalf pa V.pown ∗
   @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
   @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
   procGenAt curCtx pa pid V.gen ∗ pageCredit procSpare ∗
@@ -407,13 +407,13 @@ theorem utBlock_join (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊣⊢ procPrivFd γ pa pid V M := by
   unfold utBlock procPrivFd procPrivCoreNoctxAt procPrivBareAt
   constructor
-  · iintro ⟨⟨%h, Hpid, Hf, %hlz, Hev, Hc, Hr, Hg, Hcr, #Hfc, Ho⟩, Hpt, Htf⟩
-    iframe Hpid Hf Hc Hr Hg Hcr Ho Hpt Htf Hev Hfc
+  · iintro ⟨⟨%h, Hpid, Hf, %hlz, Hev, Hpo, Hc, Hr, Hg, Hcr, #Hfc, Ho⟩, Hpt, Htf⟩
+    iframe Hpid Hf Hc Hr Hg Hcr Ho Hpt Htf Hev Hpo Hfc
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
-  · iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htf, %hlz, Hev⟩, Hc, Hr, Hg, Hcr, #Hfc⟩, Ho⟩
-    iframe Hpid Hf Hc Hr Hg Hcr Ho Hpt Htf Hev Hfc
+  · iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htf, %hlz, Hev, Hpo⟩, Hc, Hr, Hg, Hcr, #Hfc⟩, Ho⟩
+    iframe Hpid Hf Hc Hr Hg Hcr Ho Hpt Htf Hev Hpo Hfc
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
@@ -638,11 +638,11 @@ theorem utResBare_fsCur (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) 
       fsCurOk V.fsc ∗ utResBare cpu Rsys P ksp V sts cs pid := by
   unfold utResBare utOwnBare utBlock
   iintro ⟨%N, %hN, #Htfk, Hcl, #Hcaps, Hb, Hfd, Hir,
-    ⟨%hb, Hpid, Hfl, %hlz, Hact, Hcwd, Hroot, Hgen, Hcr, #Hfc, Hof⟩, Hrest⟩
+    ⟨%hb, Hpid, Hfl, %hlz, Hact, Hpo, Hcwd, Hroot, Hgen, Hcr, #Hfc, Hof⟩, Hrest⟩
   isplitl []
   · iexact Hfc
   iexists N
-  iframe Htfk Hcl Hcaps Hb Hfd Hir Hpid Hfl Hact Hcwd Hroot Hgen Hcr Hfc Hof Hrest
+  iframe Htfk Hcl Hcaps Hb Hfd Hir Hpid Hfl Hact Hpo Hcwd Hroot Hgen Hcr Hfc Hof Hrest
   ipureintro; exact ⟨hN, hb, hlz⟩
 
 /-- (NI M3 private files FS-2e-b) **THE CURSOR MOVED** (the trap loop's, at
@@ -654,7 +654,7 @@ theorem utResBare_fsc (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) (P
       utResBare cpu Rsys P ksp { V with fsc := c } sts cs pid := by
   unfold utResBare utOwnBare utBlock
   iintro #Hc ⟨%N, %hN, #Htfk, Hcl, #Hcaps, Hb, Hfd, Hir,
-    ⟨%hb, Hpid, Hfl, %hlz, Hact, Hcwd, Hroot, Hgen, Hcr, -, Hof⟩, Hrest⟩
+    ⟨%hb, Hpid, Hfl, %hlz, Hact, Hpo, Hcwd, Hroot, Hgen, Hcr, -, Hof⟩, Hrest⟩
   have e1 : utTfk (GF := GF) cpu ksp { V with fsc := c } = utTfk cpu ksp V := rfl
   have e2 : ∀ (pa : BitVec 64) (dq : DFrac), @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa dq
       { V with fsc := c } = @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa dq V := fun _ _ => rfl
@@ -676,6 +676,8 @@ theorem utResBare_fsc (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) (P
     · ipureintro; exact hlz
     isplitl [Hact]
     · iexact Hact
+    isplitl [Hpo]
+    · iexact Hpo
     isplitl [Hcwd]
     · iexact Hcwd
     isplitl [Hroot]

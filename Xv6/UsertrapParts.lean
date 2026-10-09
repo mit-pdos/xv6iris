@@ -233,7 +233,7 @@ def utOuts (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 
 
 /-- Off the ecall every answer is owed nothing. -/
 theorem utOuts_quiet (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)
-    (cs2 : ExtTreeSet GName compare) (h : A.sc ≠ uecallScause) :
+    (cs2 : ExtTreeSet GName compare) (h : A.sc ≠ uecallScause) (hpo : V2.pown = A.V.pown) :
     ⊢ utOuts (hlc := hlc) (GF := GF) A V2 M2 sts2 cs2 := by
   unfold utOuts
   isplitl []
@@ -244,7 +244,7 @@ theorem utOuts_quiet (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 
   · iapply utWaitOut_quiet _ _ _ _ _ _ _ _ _ h
   isplitl []
   · iapply utSysOut_quiet _ _ _ _ _ _ _ _ _ _ _ _ _ _ h
-  · iapply utEvOut_nonecall _ _ _ _ _ _ _ _ _ _ h
+  · iapply utEvOut_nonecall _ _ _ _ _ _ _ _ _ _ h hpo
 
 /-- **The evidence survives a kernel-word rewrite** (it reads the record's
 `a0` and image only). -/
@@ -261,7 +261,10 @@ theorem utEvOut_retf (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitV
     simp only [ha]
     exact h
   unfold utEvOut
-  iintro H %hc
+  iintro ⟨%hn, H⟩
+  isplitl []
+  · ipureintro; exact hn
+  iintro %hc
   ispecialize H $$ %hc
   icases H with (%hq | ⟨%k, %ι, #Ha, #Hl, %hr⟩)
   · ileft; ipureintro; exact hq

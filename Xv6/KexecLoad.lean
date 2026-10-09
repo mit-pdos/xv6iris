@@ -194,7 +194,7 @@ block's `pvSecc`.  This pays `execSlotPre`'s mask row. -/
 theorem kexecOk_secc (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat) (alen : Nat → Nat)
     (hne : r ≠ 0xFFFFFFFFFFFFFFFF#64) (hok : kexecOk V V' r entry spv szv' na alen) :
     V'.pvSecc = V.pvSecc := by
-  rcases hok with ⟨hr, -⟩ | ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, hsc⟩
+  rcases hok with ⟨hr, -⟩ | ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, hsc, -⟩
   · exact absurd hr hne
   · exact hsc
 

@@ -121,7 +121,9 @@ def kexecOkWin (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat) (alen
   V'.pvLazy = false ∧
   V'.kstack = V.kstack ∧
   V'.context = V.context ∧
-  V'.pvSecc = V.pvSecc
+  V'.pvSecc = V.pvSecc ∧
+  -- (NI M4 pids P-3) the own fork count is the slot's: exec keeps it
+  V'.pown = V.pown
 
 /-- **Rocq `kexec_ok_q`**: `kexecOk` with the caller's claim `Q entry` added to
 the success arm. -/

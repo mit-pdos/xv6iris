@@ -303,7 +303,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
        wordPointsTo (pSecc pa) 8 (DFrac.own 1) V.pvSecc ∗
        wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root) ∗
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
-      actCnt pa V.ev
+      actCnt pa V.ev ∗ pownHalf pa V.pown
       from by unfold procPrivBareAt procFieldsNoOfile; iintro H; iexact H) $$ Hcore
     with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, HPt, HTf, %hlz, Hev⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ⊢

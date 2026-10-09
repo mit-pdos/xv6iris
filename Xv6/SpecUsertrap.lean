@@ -341,23 +341,30 @@ number cites nothing, or the arm's citation at era `k`'s anchor; the kill
 disjunct is gone (F5: a killed wait's round never reaches the post). -/
 def utEvOut (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState)
     (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) : IProp GF :=
-  iprop(⌜sc = uecallScause⌝ -∗
-    (⌜syscNum (utSysRec sep V) ≠ USYS_uptime ∧ syscNum (utSysRec sep V) ≠ USYS_wait ∧
+  -- (NI M4 pids P-3) off the ecall the own count is kept (only fork moves it)
+  iprop(⌜sc ≠ uecallScause → V'.pown = V.pown⌝ ∗ (⌜sc = uecallScause⌝ -∗
+    (⌜(syscNum (utSysRec sep V) ≠ USYS_uptime ∧ syscNum (utSysRec sep V) ≠ USYS_wait ∧
         syscNum (utSysRec sep V) ≠ USYS_fork ∧ syscNum (utSysRec sep V) ≠ USYS_sbrk ∧
         syscNum (utSysRec sep V) ≠ USYS_write ∧ syscNum (utSysRec sep V) ≠ USYS_close ∧
         syscNum (utSysRec sep V) ≠ USYS_dup ∧ syscNum (utSysRec sep V) ≠ USYS_read ∧
         syscNum (utSysRec sep V) ≠ USYS_chdir ∧ syscNum (utSysRec sep V) ≠ USYS_mkdir ∧
-        syscNum (utSysRec sep V) ≠ USYS_open⌝ ∨
+        syscNum (utSysRec sep V) ≠ USYS_open) ∧ V'.pown = (utSysRec sep V).pown⌝ ∨
       (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
         niIotaLbs (niNamesHere (GF := GF)) ι ∗
         ⌜syscEvRow (utSysRec sep V) V' (syscImg (utSysRec sep V) M) (syscImg V' M') cs cs' sts sts' ι ∧
-          fsPast (utSysRec sep V).fsc ι⌝)))
+          fsPast (utSysRec sep V).fsc ι ∧ pownRow (utSysRec sep V).pown V'.pown ι ∧
+          (syscNum (utSysRec sep V) ≠ USYS_fork → V'.pown = (utSysRec sep V).pown)⌝))))
 
-/-- Off the ecall the evidence is owed nothing. -/
+/-- Off the ecall the evidence is owed nothing (NI M4 pids P-3: but the own
+count, kept). -/
 theorem utEvOut_nonecall (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState)
-    (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (h : sc ≠ uecallScause) :
+    (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (h : sc ≠ uecallScause)
+    (hpo : V'.pown = V.pown) :
     ⊢ utEvOut (hlc := hlc) (GF := GF) sc sep V M sts sts' V' M' cs cs' := by
-  unfold utEvOut; iintro %hc; exact absurd hc h
+  unfold utEvOut
+  isplitl []
+  · ipureintro; exact fun _ => hpo
+  · iintro %hc; exact absurd hc h
 
 end Ev
 

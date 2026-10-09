@@ -385,7 +385,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   unfold mnProcBoot
   icases Hpb with ⟨Hhart, Hps, Hsf, Hlk, Hrows⟩
   unfold childrenBootRows
-  icases Hrows with ⟨Hchb, Horph, Hpra, Hpled, Htk, Hzled, Hzsa, Hsla, Hsoa, Hsoe, Hslots⟩
+  icases Hrows with ⟨Hchb, Horph, Hpra, Hpled, Hpoh, Htk, Hzled, Hzsa, Hsla, Hsoa, Hsoe, Hslots⟩
   unfold mnWorldB
   icases Hw with ⟨#Htbl, #Hp0, #Hp1, #Hr0, #Hr1, #Hecho, #Hi0, #Hi1, #Hplic, #Hpe, #Hkml, #Htr, #Hwire,
     #Hanc, #Hcert, #Hseam, #Hcinv⟩
@@ -402,7 +402,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   ihave Hsoe := soElem_boot (List.range NPROC) $$ [$Hsli $Hsoe]
   ihave Hins := mn_slots_zip Γ pas $$ [$Hready $Hpub $Hhart $Hps $Hsf $Hlk $Hstk $Hslots $Hsoe]
   imod mn_procsInv hct startedPrimary (k.withRegs R1) Γ t pas hok $$ [$Hk $Hsmap $Hins] with ⟨Hk, #Hpinv⟩
-  imod mn_pidWait_born startedPrimary (k.withRegs R1) $$ [$Hk $Hpli $Hwli $Hnpid $Hpq $Hpra $Hpled $Hpar $Hchb $Horph $Hzled $Hzsa]
+  imod mn_pidWait_born startedPrimary (k.withRegs R1) $$ [$Hk $Hpli $Hwli $Hnpid $Hpq $Hpra $Hpled $Hpoh $Hpar $Hchb $Horph $Hzled $Hzsa]
     with ⟨Hk, ⟨%γp, #Hpidl⟩, ⟨%γw, #Hwaitl⟩⟩
   -- the cons lock and the console bundles
   imod mn_consLock startedPrimary (k.withRegs R1) γc γl0 γ0 cn hcn hcne hcons

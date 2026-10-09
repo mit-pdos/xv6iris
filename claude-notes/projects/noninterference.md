@@ -8834,6 +8834,96 @@ fourteen earlier roots and `xv6NiPhi` are byte-identical (`xv6NiDetQ`'s text unt
   lint (15 roots), check-gen (20 ok), audit (15 PASS), tcb (the new entry), reports (coverage as
   baseline), vtest, test-tools.
 
+### M4 pids P-3 as landed (2026-10-09)
+
+Lane `lane/pid`, one commit on P-2 (71fdc3b40).  THE OWN FORK COUNT IS DERIVED: `xv6NiDetP` (MODIFIED IN
+PLACE, the design's F9; still the fifteenth root, same name) takes its positions WITHOUT the own count
+(`NiStep.detInP := detIn.map NiPos.noPown`) and ONE new premise right after the first keys',
+`firstPown q κs₁ F₁ = firstPown q κs₂ F₂` (the origin datum); every other line of its statement is P-2's.
+`xv6NiDetQ`, `xv6NiDet`, `xv6NiPhi` and the other thirteen roots are byte-identical in text.  Two
+design-level choices, as the brief made them: `xv6NiDetP` modified in place, and the own count made a FIELD
+of the citation (`UIota.pown`) stamped by EVERY citing arm, so the derivation lives outside `niDet_runs`.
+
+- **The resource.** `SlotGen`: `WchG.wpoName`, `pownHalf pa c` (half of a slot-generation element at the
+  third name), `pownHalf_agree/_whole/_update`, `pownHalf_rows_split` (the boot).  `ProcPriv.pown : Nat := 0`
+  (LAST); `pownHalf pa V.pown` rides right after `actCnt pa V.ev` in every block form that carries the
+  counter (`procPrivBareAt`, `procPriv`, `procPrivNoctxAt`, `procDormant`/`Noctx`, `EitherDefs`' three,
+  `utBlock`, `freeprocIn`/`fpKeep`, kexit's and kfork's spelled-out frames), the dormant seal takes
+  `pownHalf pa 0`.  `PidLock.pidLedger` carries `pid_lock`'s halves at the ledger's own counts
+  (`pownHalves_acc/_congr`); `pownLend act c := ⌜act = 0⌝ ∨ pownHalf act c`; `pidLedger_alloc` takes the
+  lend, agrees and steps both halves at the found arm, hands back `pownLend act (c + 1)` and
+  `pidAllocRcpt act c pid := ∃ h, pidReceipt h (PAlloc act pid) ∗ ⌜pid = pidPickS act h ∧ pid =
+  pidPickN act c⌝`; `pidLedger_cap` reads the agreement (`c = PIDQ`).  The boot mints the third map in
+  `childrenRes_alloc` and splits it: the payload's list beside `pidLedAuth []` (to `mn_pidRes_boot`), the
+  per-slot half in the slot row beside `actCnt` (to the dormant seal).
+- **allocproc/kfork.** `SpecAllocproc` (both forms): `pownLend k.proc c` in; the led post's null arm
+  `(sFullRcpt act ∨ (pidCapRcpt act ∗ ⌜c = PIDQ⌝)) ∗ pownLend act c`, its found arm `pidAllocRcpt act c pid ∗
+  pownLend act (c + 1) ∗ sOccRcpt j`; the un-led continuation gets `∃ c', pownLend k.proc c'`.  The child's
+  record takes the dormant block's `pown`.  `ProofAllocproc` threads the lend through `allocproc_cells` →
+  `ap_scan` → `ap_found` (the cap arm reads the agreement, the join steps it).  `SpecKfork`: the record
+  conjunct `∃ k' p', ⌜V.ev ≤ k' ∧ kforkPown V rv p'⌝ ∗ procPrivFd … { V.updEv k' with pown := p' } …`
+  (`kforkPown`: `V.pown` at `-1`, `V.pown + 1` otherwise); the success arm's `pidAllocRcpt (procAddr j)
+  V.pown rv ∗ (∃ i', sOccRcpt i')`, the cap's `pidCapRcpt … ∗ ⌜V.pown = PIDQ⌝`.  `ProofKfork` lends the
+  half (`procPrivNoctxAt_evPoAcc`, `kf_pown_out`) and carries it beside the counter (`kfOfileΨ`).  freeproc
+  and kexit carry the half to the dormant block at the record's count.
+- **The rows and the arms.** `PidEv.pidPickN`, `pidPickS := pidPickN act (ownAllocs act h)`;
+  `UsysDet.UIota.pown` a LAST field (the P-1 def deleted), `usysForkPid := pidPickN ι.act ι.pown`,
+  `ledP := { ledQ with pev := [] }` (`ledP0` deleted), `usysDet_pev` by `rfl`, `usysDet_ownP` at `[]`;
+  `UIota.pstep` (deviation 1).  `SyscallDefs.pownRow`, `syscEvRow_pown`; `syscEvOut`'s quiet and kill
+  disjuncts carry `V'.pown = V.pown`, its citing disjunct `pownRow V.pown V'.pown ι ∧ (syscNum V ≠ fork →
+  V'.pown = V.pown)`; `syscEvOut_cite` (every non-fork arm) stamps `{ ι with sev := [], pown := V.pown }`,
+  `syscEvOut_citeF` (fork's three citations).  `utEvOut` carries the same, and off the ecall `V'.pown =
+  V.pown`.  exec: `kexecOk`/`kexecOkWin`/`SyscExecKeep` gain `V'.pown = V.pown`; sbrk `sysSbrkOk_pown`.
+- **The trap loop.** `Uround := … × (Nat × Nat) × (Nat × Nat)` (the window, then the own-count pair);
+  `uhistPownFrom`/`uhistPownEnd`/`_snoc`/`_prefix`; `uhistEnc W0 c0 h` encodes the start's own count,
+  `uhistAuth/Lb γ W0 c0 h`, `uhistLb_agree` agrees on it; `uhistAt Wr c p`; `urcRut` parks `uhistAt Wr
+  V.fsc V.pown`; `urc_exit` files `(V.pown, V'.pown)` with `niPownRow`; the first resume allocates at
+  `V.pown`.
+- **The filing.** `NiLedger.niPownRow`; `NiUh := GName × (Uvis × Nat) × List Uround`; `NiEntry.origin j W0
+  c0 p γ`; `niFitEv`'s round arm `niPownRow c n ∧ uhistPownFrom u.2.1.2 u.2.2`; `niUhFits` origin `W =
+  W0.1 ∧ c = W0.2`, round `∃ w n, … ∧ niWinRow c w ∧ niPownRow c n`; `niUserChain`: `∃ W0 c0 H, … ∧
+  uhistPownFrom c0 H ∧ (origins → W = W0 ∧ c = c0) ∧ (rounds → ∃ w n, …)`; `niUhInv`/`niUhSt` over `Uvis
+  × Nat`.  `niR_pure`'s statement is unchanged.
+- **The derivation** (`NiTrace` §10b, pure): `firstPown`, `NiEntry.pstepOf`, `niPownRun` (the own-count
+  run along filings), `niPownRun_of_hist` (from the key history's pairs), `niPownRun_filter` (the skeleton
+  keeps it: a filing off the skeleton cites nothing), `niPstep_eq` (equal own-count-free positions below
+  comparable histories cite one slot prefix, hence one step), `niPownRun_prefix` (two runs from one count),
+  `niPownOf_chain` (P-2's `detInPo` prefix from `detInP`, `firstPown` and `niBelowP`).  `niRun_hist`
+  factored out of `niRun_of`.  P-2's `NiStep.detInP`/`niTwoRunDetP` renamed `detInPo`/`niTwoRunDetPo`;
+  the new `niTwoRunDetP` is `niTwoRunDetPo` applied to `niPownOf_chain`.  `niDetLedP`'s `EH := UIota.ledP`.
+- **DEVIATIONS from the brief.**
+  1. **`pstep` reads the SLOT prefix, not the family prefix.**  The brief's `pstep` (the cited `zev` ending
+     in `ZFork act`) is false at wait: wait's reap and copyout citations cite the family prefix BEFORE the
+     reap, which ends in the caller's own earlier `ZFork` whenever it forked after its zombie child exited
+     (fork A, A exits, fork B, wait: the prefix ends in `ZFork act … B`), where `pownRow` would demand a
+     step at a round that allocates nothing.  So a successful fork ALSO cites its child's placement: the
+     slot ledger's prefix ending in allocproc's `SOcc` (new `SlotLed.sOccRcpt`, out of `soElem_occ` →
+     `pstateWhole_occ` → `ap_pstate_used` → `allocprocPostLed`'s found arm → `kforkRetLed`), and `pstep ι
+     := 1` iff `ι.sev` ends in `SOcc`.  No new position or history: `sev` is compared already (scope 18:
+     slot occupancy NOT closed).
+  2. Off fork the stamp also cuts the citation's slot prefix to `[]` (`niIotaLbs_stamp`; no non-fork arm
+     cited one), so `pstep = 0` there by construction; `syscEvOut_cite` takes `syscNum V ≠ fork` and
+     `V'.pown = V.pown` instead of a `pownRow`, fork uses `syscEvOut_citeF` with the `pownRow`.
+  3. The citing disjunct also carries `syscNum ≠ fork → V'.pown = V.pown`, and `utEvOut` an off-ecall
+     `V'.pown = V.pown`: the trap loop must conclude the count kept at every round that files no citation
+     (off the ecall, and at an ecall outside the citing set whose evidence happens to be a citation).
+  4. `pidAllocRcpt`'s count fact is `pid = pidPickN act c` (not `ownAllocs act h = c`): at the init arm
+     (`act = 0`) the count means nothing and `pidPickN 0 c = 1` for every `c`.
+  5. exec's result relation (`kexecOk`, `kexecOkWin`) and `SyscExecKeep` state `V'.pown = V.pown` (exec's
+     record kept the field; the relation did not say so).
+  6. `UIota.ledP0`, `PidEv.ownAllocs_replicate` deleted; `UIota.ledP_pown` is `rfl`.
+- **For the earlier roots (honest).**  Their statements are byte-identical, but their positions
+  (`NiStep.detIn`, `detInQ`) now read the citation's STAMPED own count at every citation (P-2: the cited pid
+  prefix's own count, determined by their pid positions and histories) and, at a successful fork, the
+  placement's slot-prefix length: their schedule hypothesis compares those too.  Inherent in "the own count
+  is a field" (and deviation 1); `xv6NiDetP` supersedes them.
+- **Honest scope 18** rewritten (`NiTrace`; `LinkNiAdequacy`'s header and docstring): CLOSED the pid order;
+  DERIVED the own count at each citation; CONCEDED one origin datum per incarnation (`firstPown`), the actor
+  and the slot-full bit; NOT closed as before (a successful fork now also cites its placement).
+- **Baselines:** `tools/ci/roots.txt`'s `xv6NiDetP` line; `tools/audit/baseline.json` and
+  `tools/tcb/expected.json` unchanged (`tcb.sh` reports no module, axiom or opaque move for any root; audit: the same three axioms and three opaques).
+- **Gate:** `tools/ci/run_all.sh`, all 11 steps from the warm cache (lint, check-gen 20 ok, build, audit 15 PASS, tcb, reports, vtest, test-tools).  No `sorry`.  63 Lean files touched.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
@@ -9254,7 +9344,7 @@ quotas DESIGNED (2026-10-05, "M3 quotas design" above: the break quota + pipe ca
 
 quotas landed (Q-0..Q-3; Q-4/Q-5 optional); private files landed through FS-2f (xv6NiDetQ is the result; xv6NiFs designed-but-blocked, FS-2g scoped); M3 ENDED 2026-10-06 by owner decision
 
-M4 pids DESIGNED (2026-10-09, "M4 pids design" above: pids partitioned by the parent's slot with a per-slot quota, 22 C lines on the quota kernel, measured ±4 over 123 symbols with no data motion, run under qemu; `xv6NiDetP` without the pid history; ≈ 0.6 BE); RULED 2026-10-09 (owner: "go ahead with P-R1 (a), the rest as recommended": **P-R1 (a)** a second commit on `verified-quota`, the pin moves to it (`975109bc6f8b74e446412a2ceffaf12d0a891765` = c1fd3cc7 + the 22-line patch verbatim, committed in the local clone; the owner pushes); P-R2 (A) the parent-slot partition; P-R3 the `+52` hole, initialised in `procinit`; P-R4 `PIDQ = 2^25 − 1`; P-R5 `PIDMAX := 2^31 − 1` in C and Lean; P-R6 no slot-budget bundling; P-R7 the own count a position, P-3 optional; P-R8 a new root `xv6NiDetP` beside `xv6NiDetQ`; P-R9 P-0 → P-1 → P-2, one worktree (`/shared/xv6iris-pid`, branch `lane/pid`), the full gate at each landing).  Lane P-0 OPENED 2026-10-09 (an Opus lane: the pid ELF reproduced in the worktree, md5 `1e253624…`; `fs.img` byte-identical); P-0, P-1, P-2 LANDED 2026-10-09 (xv6NiDetP the fifteenth root; P-3 optional)
+M4 pids DESIGNED (2026-10-09, "M4 pids design" above: pids partitioned by the parent's slot with a per-slot quota, 22 C lines on the quota kernel, measured ±4 over 123 symbols with no data motion, run under qemu; `xv6NiDetP` without the pid history; ≈ 0.6 BE); RULED 2026-10-09 (owner: "go ahead with P-R1 (a), the rest as recommended": **P-R1 (a)** a second commit on `verified-quota`, the pin moves to it (`975109bc6f8b74e446412a2ceffaf12d0a891765` = c1fd3cc7 + the 22-line patch verbatim, committed in the local clone; the owner pushes); P-R2 (A) the parent-slot partition; P-R3 the `+52` hole, initialised in `procinit`; P-R4 `PIDQ = 2^25 − 1`; P-R5 `PIDMAX := 2^31 − 1` in C and Lean; P-R6 no slot-budget bundling; P-R7 the own count a position, P-3 optional; P-R8 a new root `xv6NiDetP` beside `xv6NiDetQ`; P-R9 P-0 → P-1 → P-2, one worktree (`/shared/xv6iris-pid`, branch `lane/pid`), the full gate at each landing).  Lane P-0 OPENED 2026-10-09 (an Opus lane: the pid ELF reproduced in the worktree, md5 `1e253624…`; `fs.img` byte-identical); P-0, P-1, P-2 LANDED 2026-10-09 (xv6NiDetP the fifteenth root; P-3 optional); P-3 LANDED 2026-10-09 (the own count derived; one origin datum `firstPown`)
 
 private files DESIGNED (2026-10-05, "M3 private files design" above: a per-era fs-event ledger appended by the fire lemmas, computed rows, the footprint theorem `xv6NiFs`; chroot not the partition; ≈ 2.8 BE, FS-L alone ≈ 0.05); awaiting rulings FS-R1…R10
 

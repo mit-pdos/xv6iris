@@ -761,12 +761,14 @@ slot-generation wholes, each beside its event counter at 0 (design
 ni-strong-instance.md §7; Rocq `children_boot_rows`) and its T2 element at
 `none` (main hands it to the slot's UNUSED payload). -/
 def childrenBootRows : IProp GF :=
-  iprop(childrenResBoot ∗ orphansOwn ∅ ∗ pidRegAuth ∅ ∗ pidLedAuth [] ∗ tickCnt 0 ∗ zombLedAuth [] ∗
+  iprop(childrenResBoot ∗ orphansOwn ∅ ∗ pidRegAuth ∅ ∗ pidLedAuth [] ∗
+    -- (NI M4 pids P-3) `pid_lock`'s half of every slot's own-count agreement, at 0
+    ([∗list] i ∈ List.range NPROC, pownHalf (procAddr i) 0) ∗ tickCnt 0 ∗ zombLedAuth [] ∗
     zsAuth (fun _ => none) ∗ slotLedAuth [] ∗ soAuth [] ∗
     ([∗list] i ∈ List.range NPROC, soOwn (procAddr i) false) ∗
     [∗list] i ∈ List.range NPROC, ∃ γ0 g : GName,
       chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (.own 1) g ∗ actCnt (procAddr i) 0 ∗
-        zsElem (procAddr i) none)
+        pownHalf (procAddr i) 0 ∗ zsElem (procAddr i) none)
 
 /-- ...and init's saved pid, minted WHOLE at a junk value (Rocq
 `children_boot`) -/
@@ -1013,6 +1015,12 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF] [Xv6G GF]
     (waitInv_procAddr_nodup hinj)
   simp only [BigSepL.bigSepL_map] at hact
   imod hact with ⟨%γact, Hact⟩
+  -- ...and (NI M4 pids P-3) the NPROC own-count agreements, each at 0: the
+  -- slot-generation camera's boot map at a third name
+  have hpo := slotGen_rows_alloc (GF := GF) 0 ((List.range NPROC).map procAddr)
+    (waitInv_procAddr_nodup hinj)
+  simp only [BigSepL.bigSepL_map] at hpo
+  imod hpo with ⟨%γpo, Hpo⟩
   imod ghost_map_alloc_empty (GF := GF) (K := Int) (V := GName) (H := IntMapF) with ⟨%γpr, Hpr⟩
   imod iOwn_alloc (GF := GF) (F := constOF IpidUR)
     (some (DFracAgree.mk (.own 1) (⟨0#32⟩ : DiscreteO (BitVec 32)))) (ipid_one_valid 0#32)
@@ -1047,9 +1055,17 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF] [Xv6G GF]
   iexists ({ wchName := γ, worphName := γo, wsgName := γsg, wprName := γpr, wipName := γip,
              npidName := γnp, wtkName := γtk, wplName := γpl, wzlName := γzl,
              wactName := γact, wzsName := γzs, wslName := γsl, wsoName := γso,
-             wkcName := γkc, wnpName := γnt } : WchG GF)
+             wkcName := γkc, wnpName := γnt, wpoName := γpo } : WchG GF)
   isplitl []
   · ipureintro; rfl
+  -- (NI M4 pids P-3) each agreement, split into its two halves
+  have hsplit := @pownHalf_rows_split GF
+    ({ wchName := γ, worphName := γo, wsgName := γsg, wprName := γpr, wipName := γip,
+       npidName := γnp, wtkName := γtk, wplName := γpl, wzlName := γzl,
+       wactName := γact, wzsName := γzs, wslName := γsl, wsoName := γso,
+       wkcName := γkc, wnpName := γnt, wpoName := γpo } : WchG GF) (List.range NPROC)
+  ihave Hpo := hsplit $$ Hpo
+  icases Hpo with ⟨Hpo, Hpo'⟩
   unfold childrenBoot childrenBootRows childrenResBoot childrenOwnAt orphansOwn pidRegAuth
     pidLedAuth zombLedAuth initPidTok nextpidPend tickCnt zsAuth slotLedAuth soAuth soOwn
     credBoot credAuth pageCredit npTicketAuth
@@ -1068,6 +1084,8 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF] [Xv6G GF]
     · iexact Hpr
     isplitl [Hpl]
     · iexact Hpl
+    isplitl [Hpo']
+    · iexact Hpo'
     isplitl [Htk]
     · iexact Htk
     isplitl [Hzl]
@@ -1084,10 +1102,14 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF] [Xv6G GF]
       ipureintro; exact hso.1
     isplitl [Horows]
     · iexact Horows
-    ihave Hact := BigSepL.bigSepL_sep_eqv.mpr $$ [Hact Hzrows]
+    ihave Hpz := BigSepL.bigSepL_sep_eqv.mpr $$ [Hpo Hzrows]
+    · isplitl [Hpo]
+      · iexact Hpo
+      · iexact Hzrows
+    ihave Hact := BigSepL.bigSepL_sep_eqv.mpr $$ [Hact Hpz]
     · isplitl [Hact]
       · iexact Hact
-      · iexact Hzrows
+      · iexact Hpz
     ihave Hsg := BigSepL.bigSepL_sep_eqv.mpr $$ [Hsg Hact]
     · isplitl [Hsg]
       · iexact Hsg
@@ -1099,7 +1121,7 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF] [Xv6G GF]
     iapply BigSepL.bigSepL_mono _ $$ H
     intro k i _
     unfold chFrag slotGen actCnt actOne zsElem
-    iintro ⟨Hr, Hs, Ha, Hz⟩
+    iintro ⟨Hr, Hs, Ha, Hp, Hz⟩
     iexists i, 0
     isplitl [Hr]
     · iexact Hr
@@ -1107,6 +1129,8 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF] [Xv6G GF]
     · iexact Hs
     isplitl [Ha]
     · iexact Ha
+    isplitl [Hp]
+    · iexact Hp
     · iexact Hz
   · iframe Hnp Hka Hkf Hnt
 

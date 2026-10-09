@@ -120,16 +120,74 @@ register by its live set -- AND (NI M4 pids P-0) to the payload's counters
 and cells (`pidTieS`), the history well formed (`pevWf`).  Context-free, so
 the payload is still a `CtxMorph`. -/
 def pidLedger (npids pids : Nat → BitVec 32) (R : IntMapF GName) : IProp GF := iprop%
-  ∃ h : List Pev, pidLedAuth h ∗ ⌜liveOf h = PartialMap.dom R ∧ pidTieS npids pids h ∧ pevWf h⌝
+  ∃ h : List Pev, pidLedAuth h ∗ ⌜liveOf h = PartialMap.dom R ∧ pidTieS npids pids h ∧ pevWf h⌝ ∗
+    -- (NI M4 pids P-3) the payload's half of every slot's own-count agreement, at the history's
+    ([∗list] j ∈ List.range NPROC, pownHalf (procAddr j) (ownAllocs (procAddr j) h))
+
+/-- (NI M4 pids P-3) **THE OWN-COUNT LEND**: what allocproc takes from its
+caller, keyed by the running proc word -- the slot's half of the own-count
+agreement at the caller's record's count, or the fact that there is no actor
+(the boot hart, `act = 0`). -/
+def pownLend (act : BitVec 64) (c : Nat) : IProp GF := iprop(⌜act = 0#64⌝ ∨ pownHalf act c)
+
+theorem pownLend_zero (c : Nat) : ⊢@{IProp GF} pownLend 0#64 c := by
+  unfold pownLend; ileft; ipureintro; rfl
+
+theorem pownLend_of_half (act : BitVec 64) (c : Nat) : pownHalf (GF := GF) act c ⊢ pownLend act c := by
+  unfold pownLend; iintro H; iright; iexact H
+
+theorem pownLend_back (act : BitVec 64) (c : Nat) (h : act ≠ 0#64) :
+    pownLend (GF := GF) act c ⊢ pownHalf act c := by
+  unfold pownLend; iintro (%hz | H)
+  · exact absurd hz h
+  · iexact H
 
 /-- THE ALLOCATION RECEIPT: the `PAlloc`'s prefix, and the pid it was bound
-to give (NI M4 pids: `PidEv.pidPickS` of the actor at that prefix). -/
-def pidAllocRcpt (act : BitVec 64) (pid : BitVec 32) : IProp GF := iprop%
-  ∃ h : List Pev, pidReceipt h (.PAlloc act pid) ∗ ⌜pid.toNat = pidPickS act h⌝
+to give (NI M4 pids: `PidEv.pidPickS` of the actor at that prefix) -- (P-3)
+which is the partition's pick at the caller's own count `c` (`pidPickN`: the
+lent half agreed with the ledger's own count of the actor). -/
+def pidAllocRcpt (act : BitVec 64) (c : Nat) (pid : BitVec 32) : IProp GF := iprop%
+  ∃ h : List Pev, pidReceipt h (.PAlloc act pid) ∗ ⌜pid.toNat = pidPickS act h ∧ pid.toNat = pidPickN act c⌝
 
-instance pidAllocRcpt_persistent (act : BitVec 64) (pid : BitVec 32) :
-    Persistent (pidAllocRcpt (GF := GF) act pid) := by
+instance pidAllocRcpt_persistent (act : BitVec 64) (c : Nat) (pid : BitVec 32) :
+    Persistent (pidAllocRcpt (GF := GF) act c pid) := by
   unfold pidAllocRcpt; infer_instance
+
+/-- (NI M4 pids P-3) The payload's halves, one slot's taken out; put back at a
+history that moved no other slot's own count. -/
+theorem pownHalves_acc (h : List Pev) (m : Nat) (hm : m < NPROC) :
+    ([∗list] j ∈ List.range NPROC, pownHalf (GF := GF) (procAddr j) (ownAllocs (procAddr j) h)) ⊢
+      pownHalf (procAddr m) (ownAllocs (procAddr m) h) ∗
+      ∀ h' : List Pev, ⌜∀ j, j < NPROC → j ≠ m → ownAllocs (procAddr j) h' = ownAllocs (procAddr j) h⌝ -∗
+        pownHalf (procAddr m) (ownAllocs (procAddr m) h') -∗
+        [∗list] j ∈ List.range NPROC, pownHalf (procAddr j) (ownAllocs (procAddr j) h') := by
+  have hl : (List.range NPROC)[m]? = some m := List.getElem?_range hm
+  iintro H
+  icases BigSepL.bigSepL_lookup_acc_impl hl $$ H with ⟨Hm, Hc⟩
+  iframe Hm
+  iintro %h' %ho Hm'
+  ispecialize Hc $$ %(fun (_ : Nat) (y : Nat) => pownHalf (GF := GF) (procAddr y) (ownAllocs (procAddr y) h'))
+  iapply Hc $$ [] Hm'
+  imodintro
+  iintro %k %y %hy %hk H
+  have hkn : k < NPROC := by
+    have := (List.getElem?_eq_some_iff.mp hy).1; simpa using this
+  have hy' : y = k := by
+    rw [List.getElem?_range hkn] at hy
+    exact (Option.some.inj hy).symm
+  subst hy'
+  have e := ho y hkn hk
+  iapply (show pownHalf (GF := GF) (procAddr y) (ownAllocs (procAddr y) h) ⊢
+    pownHalf (procAddr y) (ownAllocs (procAddr y) h') from by rw [e]) $$ H
+
+/-- (NI M4 pids P-3) The payload's halves at a history that moved no own count. -/
+theorem pownHalves_congr (h h' : List Pev) (ho : ∀ j, j < NPROC → ownAllocs (procAddr j) h' = ownAllocs (procAddr j) h) :
+    ([∗list] j ∈ List.range NPROC, pownHalf (GF := GF) (procAddr j) (ownAllocs (procAddr j) h)) ⊢
+      [∗list] j ∈ List.range NPROC, pownHalf (procAddr j) (ownAllocs (procAddr j) h') := by
+  apply BigSepL.bigSepL_mono
+  intro k y hy
+  have hyn : y < NPROC := List.mem_range.mp (List.mem_of_getElem? hy)
+  rw [ho y hyn]
 
 /-- THE CAP'S RECEIPT (NI M4 pids): a prefix of the ledger at which the
 actor's share is spent (the own count is monotone and capped, so a lower
@@ -184,11 +242,16 @@ Each mirrors the register step it rides beside (`SlotGen.pidReg_insert` /
 /-- The boot's: the empty history is the boot payload's ledger -- every
 counter at its slot (procinit's), every cell 0, the empty register (Rocq
 `pid_ledger_empty`). -/
-theorem pidLedger_empty : pidLedAuth (GF := GF) [] ⊢ pidLedger npidsInit (fun _ => 0#32) ∅ := by
+theorem pidLedger_empty :
+    pidLedAuth (GF := GF) [] ∗ ([∗list] j ∈ List.range NPROC, pownHalf (procAddr j) 0) ⊢
+      pidLedger npidsInit (fun _ => 0#32) ∅ := by
   unfold pidLedger
-  iintro Ha
+  iintro ⟨Ha, Hh⟩
   iexists []
   iframe Ha
+  isplitr [Hh]
+  rotate_left
+  · simp only [ownAllocs_nil]; iexact Hh
   ipureintro
   refine ⟨by rw [pidDom_empty]; rfl, ⟨fun j hj => ⟨?_, by simp [ownAllocs_nil]⟩, fun z => ?_⟩, pevWf_nil⟩
   · unfold npidsInit; rw [ownAllocs_nil, BitVec.toNat_ofNat]; unfold NPROC at hj ⊢; omega
@@ -208,7 +271,7 @@ theorem pidLedger_facts (npids pids : Nat → BitVec 32) (R : IntMapF GName) :
     pidLedger (GF := GF) npids pids R ⊢ ⌜∀ m, m < NPROC → (npids m).toNat < 2 ^ 31 ∧
       ((npids m).toNat ≤ 2 ^ 31 - 65 → ∀ j, j < NPROC → (pids j).toNat ≠ (npids m).toNat + NPROC)⌝ := by
   unfold pidLedger
-  iintro ⟨%h, -, %⟨-, ⟨hnp, hcells⟩, hw⟩⟩
+  iintro ⟨%h, -, %⟨-, ⟨hnp, hcells⟩, hw⟩, -⟩
   ipureintro
   intro m hm
   refine ⟨?_, fun _ j hj he => ?_⟩
@@ -217,7 +280,7 @@ theorem pidLedger_facts (npids pids : Nat → BitVec 32) (R : IntMapF GName) :
     omega
   · obtain ⟨hfr, -⟩ := pidPickS_fresh (act := procAddr m) hw hm rfl
     have hpk : pidPickS (procAddr m) h = (npids m).toNat + NPROC := by
-      unfold pidPickS
+      unfold pidPickS pidPickN
       rw [if_neg (procAddr_nonzero hm), slotOf_procAddr hm, (hnp m hm).1]
       unfold NPROC; omega
     apply hfr
@@ -227,18 +290,30 @@ theorem pidLedger_facts (npids pids : Nat → BitVec 32) (R : IntMapF GName) :
 /-- THE CAP'S STEP (NI M4 pids): at the counter's quota test, the actor's
 share is spent at the opened history; the receipt is a lower bound of it. -/
 theorem pidLedger_cap (npids pids : Nat → BitVec 32) (R : IntMapF GName) (m : Nat) (hm : m < NPROC)
-    (hcap : 2 ^ 31 - 65 < (npids m).toNat) :
-    pidLedger (GF := GF) npids pids R ⊢ pidLedger npids pids R ∗ pidCapRcpt (procAddr m) := by
+    (hcap : 2 ^ 31 - 65 < (npids m).toNat) (c : Nat) :
+    pidLedger (GF := GF) npids pids R ∗ pownHalf (procAddr m) c ⊢
+      pidLedger npids pids R ∗ pownHalf (procAddr m) c ∗ pidCapRcpt (procAddr m) ∗ ⌜c = PIDQ⌝ := by
   unfold pidLedger pidCapRcpt
-  iintro ⟨%h, Ha, %⟨hl, ht, hw⟩⟩
+  iintro ⟨⟨%h, Ha, %⟨hl, ht, hw⟩, Hh⟩, Hc⟩
   icases pidLedAuth_lb h $$ Ha with ⟨Ha, #Hlb⟩
-  isplitl [Ha]
+  icases pownHalves_acc h m hm $$ Hh with ⟨Hm, Hback⟩
+  ihave %he := pownHalf_agree (procAddr m) _ c $$ [Hm Hc]
+  · iframe Hm Hc
+  have hq : ownAllocs (procAddr m) h = PIDQ := (pidTieS_cap ht hm).1 hcap
+  isplitl [Ha Hm Hback]
   · iexists h
     iframe Ha
-    ipureintro; exact ⟨hl, ht, hw⟩
+    isplitr
+    · ipureintro; exact ⟨hl, ht, hw⟩
+    iapply Hback $$ %h [] Hm
+    ipureintro; intro _ _ _; rfl
+  isplitl [Hc]
+  · iexact Hc
+  isplitl []
   · iexists h
     iframe Hlb
-    ipureintro; exact (pidTieS_cap ht hm).1 hcap
+    ipureintro; exact hq
+  · ipureintro; rw [← he, hq]
 
 /-- allocproc's, at the register's insert (Rocq `pid_ledger_alloc`; NI M4
 pids P-0): the store of `pid` into slot `n`'s empty cell -- and, on the
@@ -253,28 +328,63 @@ theorem pidLedger_alloc (npids npids' pids pids' : Nat → BitVec 32) (n : Nat)
     (hother : ∀ i, i ≠ n → pids' i = pids i)
     (harm : (act = 0#64 ∧ pid = 1#32 ∧ npids' = npids) ∨
       (∃ m, m < NPROC ∧ act = procAddr m ∧ (npids m).toNat ≤ 2 ^ 31 - 65 ∧
-        pid.toNat = (npids m).toNat + NPROC ∧ npids' m = pid ∧ ∀ i, i ≠ m → npids' i = npids i)) :
-    pidLedger (GF := GF) npids pids R ⊢
+        pid.toNat = (npids m).toNat + NPROC ∧ npids' m = pid ∧ ∀ i, i ≠ m → npids' i = npids i)) (c : Nat) :
+    pidLedger (GF := GF) npids pids R ∗ pownLend act c ⊢
       |==> (pidLedger npids' pids' (PartialMap.insert R (pid.toNat : Int) g) ∗
-        pidAllocRcpt act pid) := by
+        pownLend act (c + 1) ∗ pidAllocRcpt act c pid) := by
   unfold pidLedger pidAllocRcpt pidReceipt
-  iintro ⟨%h, Ha, %⟨hl, ⟨hnp, hcells⟩, hw⟩⟩
+  iintro ⟨⟨%h, Ha, %⟨hl, ⟨hnp, hcells⟩, hw⟩, Hh⟩, Hlend⟩
   -- the pick, read on the opened history
   have hpick : pid.toNat = pidPickS act h := by
     rcases harm with ⟨rfl, rfl, -⟩ | ⟨m, hm, rfl, -, hp, -, -⟩
-    · unfold pidPickS; rw [if_pos rfl]; rfl
-    · unfold pidPickS
+    · unfold pidPickS pidPickN; rw [if_pos rfl]; rfl
+    · unfold pidPickS pidPickN
       rw [if_neg (procAddr_nonzero hm), slotOf_procAddr hm, hp, (hnp m hm).1]
       unfold NPROC; omega
   have hact : pevActOk act := by
     rcases harm with ⟨rfl, -, -⟩ | ⟨m, hm, rfl, -⟩
     · exact Or.inl rfl
     · exact Or.inr ⟨m, hm, rfl⟩
+  -- (NI M4 pids P-3) the own counts after the append: the actor's moved by one, no other slot's
+  have hoth : ∀ j, j < NPROC → procAddr j ≠ act →
+      ownAllocs (procAddr j) (h ++ [.PAlloc act pid]) = ownAllocs (procAddr j) h :=
+    fun j _ hne => ownAllocs_snoc_alloc_other _ _ h pid (fun e => hne e.symm)
+  -- (NI M4 pids P-3) the halves: at the found arm the lend agrees with the payload's and both step
+  ihave Hpo : iprop(|==> (([∗list] j ∈ List.range NPROC, pownHalf (GF := GF) (procAddr j)
+      (ownAllocs (procAddr j) (h ++ [.PAlloc act pid]))) ∗ pownLend act (c + 1) ∗
+      ⌜pid.toNat = pidPickN act c⌝)) $$ [Hh Hlend]
+  · rcases harm with ⟨rfl, rfl, -⟩ | ⟨m, hm, rfl, -, hp, -, -⟩
+    · iclear Hlend
+      imodintro
+      isplitl [Hh]
+      · iapply pownHalves_congr h _ (fun j hj => hoth j hj (procAddr_nonzero hj)) $$ Hh
+      isplitl []
+      · iapply pownLend_zero
+      · ipureintro; unfold pidPickN; rw [if_pos rfl]; rfl
+    · ihave Hl := pownLend_back (procAddr m) c (procAddr_nonzero hm) $$ Hlend
+      icases pownHalves_acc h m hm $$ Hh with ⟨Hm, Hback⟩
+      ihave %he := pownHalf_agree (procAddr m) _ c $$ [Hm Hl]
+      · iframe Hm Hl
+      imod pownHalf_update (procAddr m) _ (c + 1) $$ [Hm Hl] with ⟨Hm, Hl⟩
+      · rw [he]; iframe Hm Hl
+      imodintro
+      isplitl [Hm Hback]
+      · iapply Hback $$ %(h ++ [.PAlloc (procAddr m) pid]) [] [Hm]
+        · ipureintro
+          intro j hj hjm
+          exact hoth j hj (fun e => hjm (procAddr_inj hj hm e))
+        · rw [ownAllocs_snoc_alloc_self, he]; iexact Hm
+      isplitl [Hl]
+      · iapply pownLend_of_half; iexact Hl
+      · ipureintro
+        rw [← he, hpick]; rfl
+  imod Hpo with ⟨Hh, Hlend, %hpickN⟩
   imod pidLedAuth_grow h (.PAlloc act pid) $$ Ha with ⟨Ha, #Hb⟩
   imodintro
-  isplitl [Ha]
+  iframe Hlend
+  isplitl [Ha Hh]
   · iexists h ++ [.PAlloc act pid]
-    iframe Ha
+    iframe Ha Hh
     ipureintro
     refine ⟨by rw [liveOf_snoc_alloc_dom _ h act pid hl, pidDom_insert], ⟨fun j hj => ?_, fun z => ?_⟩,
       pevWf_snoc_alloc h act pid hw hpick hact⟩
@@ -307,7 +417,7 @@ theorem pidLedger_alloc (npids npids' pids pids' : Nat → BitVec 32) (n : Nat)
   · iexists h
     iframe Hb
     ipureintro
-    exact hpick
+    exact ⟨hpick, hpickN⟩
 
 /-- freeproc's, at the register's delete (Rocq `pid_ledger_free`; the tie NI
 M2-G2a): slot `j`'s cell, the only one holding `pid` (`pidsOk`), is
@@ -320,12 +430,15 @@ theorem pidLedger_free (npids pids pids' : Nat → BitVec 32) (j : Nat)
       |==> (pidLedger npids pids' (PartialMap.delete R (pid.toNat : Int)) ∗
         ∃ h, pidReceipt h (.PFree act pid)) := by
   unfold pidLedger pidReceipt
-  iintro ⟨%h, Ha, %⟨hl, ⟨hnp, hcells⟩, hw⟩⟩
+  iintro ⟨%h, Ha, %⟨hl, ⟨hnp, hcells⟩, hw⟩, Hh⟩
   imod pidLedAuth_grow h (.PFree act pid) $$ Ha with ⟨Ha, #Hb⟩
   imodintro
-  isplitl [Ha]
+  isplitl [Ha Hh]
   · iexists h ++ [.PFree act pid]
     iframe Ha
+    isplitr [Hh]
+    rotate_left
+    · iapply pownHalves_congr h _ (fun j _ => ownAllocs_snoc_free _ _ h pid) $$ Hh
     ipureintro
     refine ⟨by rw [liveOf_snoc_free_dom _ h act pid hl, pidDom_delete],
       ⟨fun i hi => by rw [ownAllocs_snoc_free]; exact hnp i hi, fun z => ?_⟩, pevWf_snoc_free h act pid hw⟩

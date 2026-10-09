@@ -415,12 +415,12 @@ rest are the single-camera instances above, the era registry included. -/
 the final theorem; here at arbitrary names, to show they add no camera) -/
 
 /-- `WchG` at given names, over the one `WchGpre` instance. -/
-@[reducible] def xv6GF_wchG (γch γor γsg γpr γip γnp γtk γpl γzl γact γzs γsl γso γkc γnt : GName) :
+@[reducible] def xv6GF_wchG (γch γor γsg γpr γip γnp γtk γpl γzl γact γzs γsl γso γkc γnt γpo : GName) :
     WchG xv6GF :=
   { toWchGpre := xv6GF_wchGpre, wchName := γch, worphName := γor, wsgName := γsg,
     wprName := γpr, wipName := γip, npidName := γnp, wtkName := γtk, wplName := γpl,
     wzlName := γzl, wactName := γact, wzsName := γzs, wslName := γsl, wsoName := γso,
-    wkcName := γkc, wnpName := γnt }
+    wkcName := γkc, wnpName := γnt, wpoName := γpo }
 
 /-- The slot supplies' names. -/
 @[reducible] def xv6GF_fdslotG (γ : GName) : FdslotG xv6GF := ⟨γ⟩

@@ -202,7 +202,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
        wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc ∗
        wordPointsTo (pRoot (procAddr j)) 8 (DFrac.own 1) V.root) ∗
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
-      actCnt (procAddr j) V.ev ∗
+      (actCnt (procAddr j) V.ev ∗ pownHalf (procAddr j) V.pown) ∗
       (cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ procGenAt curCtx (procAddr j) pid V.gen ∗
         pageCredit procSpare ∗ fsCurOk V.fsc)
       from by unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile; iintro ⟨⟨H1, H2, H3, H4, H5, H6, H8⟩, H7⟩; iframe) $$ Hcore

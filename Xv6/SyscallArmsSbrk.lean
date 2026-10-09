@@ -445,6 +445,19 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- (NI M4 pids P-3) sbrk keeps the own count: every arm of its post is the
+entry record with the break, table or lazy bit moved. -/
+theorem sysSbrkOk_pown {V V' : ProcPriv} {M M' : Nat → List (BitVec 8)} {v0 v1 r : BitVec 64}
+    (h : sysSbrkOk V V' M M' v0 v1 r) : V'.pown = V.pown := by
+  rcases h with ⟨-, rfl, -⟩ | ⟨-, -, ⟨-, hg⟩ | ⟨-, -, -, e, -⟩⟩
+  · rfl
+  · obtain ⟨h0, hp, hn⟩ := hg
+    rcases Int.lt_trichotomy (sysSbrkArg v0).toInt 0 with hlt | heq | hgt
+    · obtain ⟨-, e, -⟩ := hn hlt; rw [e]
+    · obtain ⟨-, e, -⟩ := h0 heq; rw [e]
+    · rcases hp hgt with ⟨-, e, -⟩ | ⟨-, -, e, -⟩ <;> rw [e]
+  · rw [e]
+
 /-- **sbrk's citation** (NI M2-G3b, rulings G3-R1/R3; NI M3 quotas Q-2): at
 EVERY sbrk ecall, the boot prefix at the actor -- the row reads no ledger
 (a `-1` is the key's quota overrun).  The row is `sbrkArm_fits` at the
@@ -455,7 +468,7 @@ theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (sts :
     (v0 v1 r : BitVec 64) (hn : syscNum V = 12) (hw0 : tfW V.tf (tfArgIdx 0) = v0)
     (hw1 : tfW V.tf (tfArgIdx 1) = v1) (hszb : V.sz.toNat ≤ uvmMaxsz)
     (hok : sysSbrkOk V V2 M M2 v0 v1 r) (ha : syscA0 V' = r) (hsz : V'.sz = V2.sz)
-    (hlz : V'.pvLazy = V2.pvLazy) :
+    (hlz : V'.pvLazy = V2.pvLazy) (hpo : V'.pown = V.pown) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
       |==> syscEvOut (hlc := hlc) V M sts sts' V' M' cs cs gn := by
   have hrow : ∀ ι : UIota, syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs sts sts' ι := by
@@ -472,7 +485,8 @@ theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (sts :
   iintro #Ha
   imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
   imodintro
-  iapply syscEvOut_cite V M sts sts' V' M' cs cs gn ke { UIota.boot with act := act } (hrow _) (fsPast_nil _ _ rfl) $$ Ha Hl
+  iapply syscEvOut_cite V M sts sts' V' M' cs cs gn ke { UIota.boot with act := act } (hrow _) (fsPast_nil _ _ rfl)
+    (by rw [hn]; decide) hpo $$ Ha Hl
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 12, `sys_sbrk`** (Rocq `sysc_arm_sbrk`; the whole block, D16). -/
@@ -540,7 +554,7 @@ theorem syscall_arm_sbrk (SS : SYSSBRK)
   iapply wpLoop_bupd
   imod syscArmSbrk_ev V V' M M' sts (syscStore (V'.updEv k') (R2 10#5)) M' cs gn (procAddr j) ke v0 v1 (R2 10#5)
     hn12 hw0 hw1 (Nat.le_trans hszb uQuota_le_uvmMaxsz) hok (syscStore_a0 _ _ (by show tfArgIdx 0 < V'.tf.length; rw [htf, hl]; decide))
-    rfl rfl $$ Hanc with #Hev
+    rfl rfl (by have e := sysSbrkOk_pown hok; exact e) $$ Hanc with #Hev
   imodintro
   unfold syscallRet syscallAddr at *
   -- the block at sbrk's raised event count (permit sweep L1a): the rows do

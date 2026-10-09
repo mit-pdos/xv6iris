@@ -245,7 +245,8 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (hEX : UtExitElim (hlc 
   iapply (HA A cpu A.k R3 ((utV1 A).updEv kv) A.M A.sts A.cs hok (utBase_refl _) hp3 ((utA_rows_entry A hok hne).updEv kv hevq))
     $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hres $Hlive $Hkont]
   iframe #
-  iapply utOuts_quiet _ _ _ _ _ hne
+  iapply utOuts_quiet _ _ _ _ _ hne ?_
+  rfl
 
 end Arm56
 

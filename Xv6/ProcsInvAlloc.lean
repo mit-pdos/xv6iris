@@ -69,7 +69,7 @@ def procsInvSlot [CurCtx] (Γ : SchedNames) (i : Nat) : IProp GF := iprop%
   (∃ h : CPU, hartFull Γ i h) ∗ pstateFull Γ i UNUSED ∗ pavSlot Γ (procAddr i) UNUSED ∗
   lockFreeTok (Γ.lock i) ∗ stackOwn (kstackVa i + 4096#64) 512 ∗
   (∃ γ0 g : GName, chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗
-    actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none) ∗
+    actCnt (procAddr i) 0 ∗ pownHalf (procAddr i) 0 ∗ zsElem (procAddr i) none) ∗
   soElem (hlc := hlc) (procAddr i) false
 
 /-- **One slot sealed** (Rocq pass 3's body): its payload at UNUSED, and
@@ -85,13 +85,13 @@ theorem procsInv_alloc_slot [X : CurCtx] (hT : curTier = KTier.kpt) (cpu : CPU) 
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   unfold procsInvSlot procReady procFieldsOut lockInited
   iintro ⟨Hrun, ⟨⟨⟨-, Hfresh⟩, Hst, Hks⟩, #Hc0, #Hc16, Hpre⟩, ⟨%ch, Hch⟩, ⟨%kl, %xs, %pid, Hpub⟩,
-    ⟨%h, Hhart⟩, Hps, Hpav, Hfree, Hstk, ⟨%γ0, %g, Hrow, Hsg, Hev, Hzs⟩, Hso⟩
+    ⟨%h, Hhart⟩, Hps, Hpav, Hfree, Hstk, ⟨%γ0, %g, Hrow, Hsg, Hev, Hpo, Hzs⟩, Hso⟩
   ihave Hks := (show wordPointsTo (GF := GF) (procAddr i + 64#64) 8 (DFrac.own 1) (kstackVa i) ⊢
       wordPointsTo (pKstack (procAddr i)) 8 (DFrac.own 1) (kstackVa i) from .rfl) $$ Hks
   ihave Hst := (show wordPointsTo (GF := GF) (procAddr i + 24#64) 4 (DFrac.own 1) 0#32 ⊢
       wordPointsTo (pState (procAddr i)) 4 (DFrac.own 1) UNUSED from .rfl) $$ Hst
-  ihave Hdorm := hseal γ0 g $$ [Hpre Hks Hstk Hrow Hsg Hev]
-  · iframe Hpre Hks Hstk Hrow Hsg Hev
+  ihave Hdorm := hseal γ0 g $$ [Hpre Hks Hstk Hrow Hsg Hev Hpo]
+  · iframe Hpre Hks Hstk Hrow Hsg Hev Hpo
   icases pstate_split Γ i UNUSED $$ Hps with ⟨Hp1, Hp2⟩
   ihave Hp1 := pstateAt_intro Γ i _ UNUSED hi $$ Hp1
   ihave Hp2 := pstateAt_intro Γ i _ UNUSED hi $$ Hp2

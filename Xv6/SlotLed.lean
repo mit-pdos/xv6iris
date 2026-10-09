@@ -237,10 +237,20 @@ def slotScan (n : Nat) : IProp GF :=
 theorem slotScan_zero : ⊢@{IProp GF} slotScan (hlc := hlc) 0 := by
   unfold slotScan; iintro; ileft; ipureintro; rfl
 
+/-- (NI M4 pids P-3) **THE PLACEMENT'S RECEIPT**: a lower bound of the slot
+ledger ending in slot `j`'s occupancy event -- what a successful fork cites
+(its child's placement, `UsysDet.UIota.pstep`). -/
+def sOccRcpt (j : Nat) : IProp GF := iprop(∃ h : List Sev, slotLedLb (h ++ [.SOcc j]))
+
+instance sOccRcpt_persistent (j : Nat) : Persistent (sOccRcpt (GF := GF) j) := by
+  unfold sOccRcpt; infer_instance
+
 /-- **ALLOCPROC'S USED STORE** (slot `j`): append `SOcc j`, the element
-becomes occupied.  Unlabelled: no permit step. -/
+becomes occupied, and (NI M4 pids P-3) the append's receipt.  Unlabelled: no
+permit step. -/
 theorem soElem_occ (j : Nat) (hj : j < NPROC) (b : Bool) :
-    soElem (hlc := hlc) (GF := GF) (procAddr j) b ⊢ |={⊤}=> soElem (hlc := hlc) (procAddr j) true := by
+    soElem (hlc := hlc) (GF := GF) (procAddr j) b ⊢
+      |={⊤}=> (soElem (hlc := hlc) (procAddr j) true ∗ sOccRcpt j) := by
   unfold soElem slotLedInv
   iintro ⟨#Hinv, He⟩
   iinv Hinv with Hbody Hclose
@@ -250,7 +260,7 @@ theorem soElem_occ (j : Nat) (hj : j < NPROC) (b : Bool) :
   imod soAuth_step h (.SOcc j) j hj b true (fun i => rfl) $$ [Hs He] with ⟨Hs, He⟩
   · iframe Hs He
   unfold slotLedAuth
-  imod MonoList.auth_own_update_app (WchG.wslName GF) [Sev.SOcc j] $$ Ha with ⟨Ha, -⟩
+  imod MonoList.auth_own_update_app (WchG.wslName GF) [Sev.SOcc j] $$ Ha with ⟨Ha, #Hlb⟩
   imod Hclose $$ [Ha Hs]
   · inext
     try unfold slotLedBody
@@ -260,6 +270,9 @@ theorem soElem_occ (j : Nat) (hj : j < NPROC) (b : Bool) :
     ipureintro; exact sevWf_snoc_occ j hwf
   imodintro
   iframe Hinv He
+  unfold sOccRcpt slotLedLb
+  iexists h
+  iexact Hlb
 
 /-- **FREEPROC'S UNUSED STORE** (slot `j`): append `SVac j`, the element
 becomes vacant.  Unlabelled: no permit step. -/

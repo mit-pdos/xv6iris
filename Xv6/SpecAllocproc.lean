@@ -176,22 +176,34 @@ Q-2 -- once sealed both kallocs are paid out of the slot's share and never
 null (Q-1).  (F2) The FOUND arm also
 carries the allocator ledger's receipt of the trapframe `kalloc`
 (`kAllocRcpt γk act`: the round's first `kalloc`, labelled by the actor).
+(NI M4 pids P-3) THE OWN-COUNT LEND `pownLend act c` (the caller's half of
+its slot's own-count agreement, `PidLock.pownLend`; `⌜act = 0⌝` at boot)
+comes back at `c` on the null arm -- the cap's reason then also says `c =
+PIDQ` -- and at `c + 1` on the found arm, whose pid receipt is the pick at
+`c` (`pidAllocRcpt act c pid`) and which also carries the child's
+placement (`SlotLed.sOccRcpt j`, the `SOcc` of the USED store).  The child
+record's `pown` is the dormant block's (the slot's count).
 Its pure parts are `allocprocPost`'s.
-`allocprocPostLed_post` drops the receipts. -/
+`allocprocPostLed_post` drops the receipts and hands the lend back. -/
 def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
-    (tk : Bool) (Q : Int → IProp GF) (act : BitVec 64) (r : BitVec 64) :
+    (tk : Bool) (Q : Int → IProp GF) (act : BitVec 64) (c : Nat) (r : BitVec 64) :
     IProp GF := iprop%
   (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
       ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗
     (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗
     -- THE NULL ARM'S REASONS (NI joint fork lane F1; NI M3 quotas Q-2; NI M4
-    -- pids): the scan's exhaustion, or the actor's spent pid share
-    (sFullRcpt act ∨ pidCapRcpt act) ∗
+    -- pids): the scan's exhaustion, or the actor's spent pid share -- (P-3) at
+    -- the lent own count
+    (sFullRcpt act ∨ (pidCapRcpt act ∗ ⌜c = PIDQ⌝)) ∗
+    -- (NI M4 pids P-3) the own-count lend, back unmoved
+    pownLend act c ∗
     ∃ on' : Option Nat, ⌜on' = on ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
   (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
-    pidAllocRcpt act pid ∗
+    pidAllocRcpt act c pid ∗
+    -- (NI M4 pids P-3) the own-count lend, stepped, and the placement's receipt
+    pownLend act (c + 1) ∗ sOccRcpt j ∗
     -- THE TRAPFRAME `kalloc`'S RECEIPT (NI joint fork lane F2): the round's
     -- first allocator event, `KAlloc act`
     kAllocRcpt γk act ∗
@@ -211,14 +223,19 @@ def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 theorem allocprocPostLed_post {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
-    (tk : Bool) (Q : Int → IProp GF) (act : BitVec 64) (r : BitVec 64) :
-    allocprocPostLed (GF := GF) Γ γ cpu γk on pav tk Q act r ⊢ allocprocPost Γ γ cpu γk on pav tk Q r := by
+    (tk : Bool) (Q : Int → IProp GF) (act : BitVec 64) (c : Nat) (r : BitVec 64) :
+    allocprocPostLed (GF := GF) Γ γ cpu γk on pav tk Q act c r ⊢
+      allocprocPost Γ γ cpu γk on pav tk Q r ∗ ∃ c' : Nat, pownLend act c' := by
   unfold allocprocPostLed allocprocPost
-  iintro (⟨Hp, Hpav, -, Hon⟩ | ⟨%j, %ch, %pid, %V, %M, %g, -, -, Hfound⟩)
-  · ileft; iframe Hp Hpav Hon
-  · iright
-    iexists j, ch, pid, V, M, g
-    iexact Hfound
+  iintro (⟨Hp, Hpav, -, Hpl, Hon⟩ | ⟨%j, %ch, %pid, %V, %M, %g, -, Hpl, -, -, Hfound⟩)
+  · isplitr [Hpl]
+    · ileft; iframe Hp Hpav Hon
+    · iexists c; iexact Hpl
+  · isplitr [Hpl]
+    · iright
+      iexists j, ch, pid, V, M, g
+      iexact Hfound
+    · iexists c + 1; iexact Hpl
 
 /-- **WP of `allocproc`**, at either entry `SIE`.  On success it returns
 holding `p->lock`, and with it the arm its `acquire` paid out
@@ -232,11 +249,11 @@ def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) (ke : Nat)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) (hcnt : ∀ x, on = some x → procPagetableNodes + 2 ≤ x)
-    (hact : apActorOk pav tk k.proc) : Prop :=
+    (hact : apActorOk pav tk k.proc) (c : Nat) : Prop :=
   kctx cpu k ∗ pcIs cpu allocprocAddr ∗ procsInv Γ ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗
   procsAvailAt Γ pav tk ∗ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗
-  actLend k.proc ke ∗
+  actLend k.proc ke ∗ pownLend k.proc c ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     ((⌜R' 10#5 = 0#64⌝ ∗ kctx cpu' ((k.withSpie spie spp).withRegs R')) ∨
@@ -244,6 +261,7 @@ def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
       sieArm cpu' k.sie k.proc)) -∗
     pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
+    (∃ c' : Nat, pownLend k.proc c') -∗
     allocprocPost Γ γ cpu' γk on pav tk Q (R' 10#5) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
@@ -258,11 +276,11 @@ def wp_allocproc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) (ke : Nat)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) (hcnt : ∀ x, on = some x → procPagetableNodes + 2 ≤ x)
-    (hact : apActorOk pav tk k.proc) : Prop :=
+    (hact : apActorOk pav tk k.proc) (c : Nat) : Prop :=
   kctx cpu k ∗ pcIs cpu allocprocAddr ∗ procsInv Γ ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗
   procsAvailAt Γ pav tk ∗ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗
-  actLend k.proc ke ∗
+  actLend k.proc ke ∗ pownLend k.proc c ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     ((⌜R' 10#5 = 0#64⌝ ∗ kctx cpu' ((k.withSpie spie spp).withRegs R')) ∨
@@ -270,7 +288,7 @@ def wp_allocproc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
       sieArm cpu' k.sie k.proc)) -∗
     pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
-    allocprocPostLed Γ γ cpu' γk on pav tk Q k.proc (R' 10#5) -∗
+    allocprocPostLed Γ γ cpu' γk on pav tk Q k.proc c (R' 10#5) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
@@ -280,12 +298,12 @@ structure ALLOCPROC : Prop where
   wp_allocproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx] (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
-    (ke : Nat) hnoff hK hlk hlp hlq htier hcnt hact,
-    wp_allocproc_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q ke hnoff hK hlk hlp hlq htier hcnt hact
+    (ke : Nat) hnoff hK hlk hlp hlq htier hcnt hact (c : Nat),
+    wp_allocproc_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q ke hnoff hK hlk hlp hlq htier hcnt hact c
   wp_allocproc_led : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx] (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
-    (ke : Nat) hnoff hK hlk hlp hlq htier hcnt hact,
-    wp_allocproc_led_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q ke hnoff hK hlk hlp hlq htier hcnt hact
+    (ke : Nat) hnoff hK hlk hlp hlq htier hcnt hact (c : Nat),
+    wp_allocproc_led_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q ke hnoff hK hlk hlp hlq htier hcnt hact c
 
 end Xv6

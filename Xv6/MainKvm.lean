@@ -255,7 +255,7 @@ def mnSlotIn [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) (i : Nat) : IP
   hartFull Γ i startedPrimary ∗ pstateFull Γ i UNUSED ∗ slotFree Γ (procAddr i) ∗
   lockFreeTok (Γ.lock i) ∗ byteBuf (pageAddr (pas i)) (DFrac.own 1) (List.replicate 4096 5#8) ∗
   (∃ γ0 g : GName, chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗
-    actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none) ∗
+    actCnt (procAddr i) 0 ∗ pownHalf (procAddr i) 0 ∗ zsElem (procAddr i) none) ∗
   soElem (hlc := hlc) (procAddr i) false
 
 theorem mn_unused_isUnused : isUnused UNUSED := by decide
@@ -293,7 +293,7 @@ theorem mn_slots_zip [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) :
     kstackPages pas ∗
     ([∗list] i ∈ List.range NPROC, ∃ γ0 g : GName,
       chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0 ∗
-        zsElem (procAddr i) none) ∗
+        pownHalf (procAddr i) 0 ∗ zsElem (procAddr i) none) ∗
     ([∗list] i ∈ List.range NPROC, soElem (hlc := hlc) (procAddr i) false)
     ⊢ [∗list] i ∈ List.range NPROC, mnSlotIn (GF := GF) Γ pas i := by
   unfold kstackPages mnSlotIn
@@ -301,12 +301,12 @@ theorem mn_slots_zip [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) :
   iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9⟩
   ihave H8 := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)
     (Φ := fun _ i => iprop(∃ γ0 g : GName, chFrag (GF := GF) γ0 (procAddr i) ∅ ∗
-      slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none))
+      slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0 ∗ pownHalf (procAddr i) 0 ∗ zsElem (procAddr i) none))
     (Ψ := fun _ i => iprop(soElem (hlc := hlc) (GF := GF) (procAddr i) false))).2 $$ [$H8 $H9]
   ihave H := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)
     (Φ := fun _ i => iprop(byteBuf (GF := GF) (pageAddr (pas i)) (DFrac.own 1) (List.replicate 4096 5#8)))
     (Ψ := fun _ i => iprop((∃ γ0 g : GName, chFrag (GF := GF) γ0 (procAddr i) ∅ ∗
-      slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none) ∗
+      slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0 ∗ pownHalf (procAddr i) 0 ∗ zsElem (procAddr i) none) ∗
       soElem (hlc := hlc) (GF := GF) (procAddr i) false))).2 $$ [$H7 $H8]
   ihave H := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)
     (Φ := fun _ i => iprop(lockFreeTok (GF := GF) (Γ.lock i))) (Ψ := fun _ _ => _)).2 $$ [$H6 $H]
@@ -372,10 +372,12 @@ registration map empty, and the pid ledger at the empty history
 theorem mn_pidRes_boot [CurCtx] :
     ([∗list] i ∈ List.range NPROC, npidInit (GF := GF) i) ∗
     ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
-    pidRegAuth ∅ ∗ pidLedAuth [] ⊢ pidLockPay curCtx := by
+    pidRegAuth ∅ ∗ pidLedAuth [] ∗ ([∗list] i ∈ List.range NPROC, pownHalf (procAddr i) 0) ⊢
+      pidLockPay curCtx := by
   unfold pidLockPay pidLockResAt
-  iintro ⟨Hn, Hp, Ha, Hl⟩
-  ihave Hl := pidLedger_empty $$ Hl
+  iintro ⟨Hn, Hp, Ha, Hl, Hpo⟩
+  ihave Hl := pidLedger_empty $$ [Hl Hpo]
+  · iframe Hl Hpo
   iexists npidsInit, (fun _ => 0#32)
   isplitr
   · ipureintro
@@ -406,19 +408,20 @@ theorem mn_pidWait_born [CurCtx] (cpu : CPU) (k : KCtx) :
     kctx cpu k ∗ lockInited pidLockAddr nextpidNameAddr ∗ lockInited waitLockAddr waitLockNameAddr ∗
     ([∗list] i ∈ List.range NPROC, npidInit i) ∗
     ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
-    pidRegAuth ∅ ∗ pidLedAuth [] ∗ parentsResAt curCtx ∗ childrenResBoot ∗ orphansOwn ∅ ∗
+    pidRegAuth ∅ ∗ pidLedAuth [] ∗ ([∗list] i ∈ List.range NPROC, pownHalf (procAddr i) 0) ∗
+    parentsResAt curCtx ∗ childrenResBoot ∗ orphansOwn ∅ ∗
     zombLedAuth [] ∗ zsAuth (fun _ => none)
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗
       (∃ γp : GName, isLock γp pidLockAddr "nextpid" pidLockPay) ∗
       (∃ γw : GName, isLock γw waitLockAddr "wait_lock" waitLockPay)) := by
-  iintro ⟨Hk, Hpl, Hwl, Hn, Hp, Ha, Hled, Hpar, Hch, Ho, Hzl, Hzs⟩
+  iintro ⟨Hk, Hpl, Hwl, Hn, Hp, Ha, Hled, Hpoh, Hpar, Hch, Ho, Hzl, Hzs⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases mn_pidLock_kmap $$ HS with ⟨#Hp0, #Hp16⟩
   icases mn_waitLock_kmap $$ HS with ⟨#Hw0, #Hw16⟩
   unfold lockInited
   icases Hpl with ⟨-, Hpf⟩
   icases Hwl with ⟨-, Hwf⟩
-  ihave HR := mn_pidRes_boot $$ [$Hn $Hp $Ha $Hled]
+  ihave HR := mn_pidRes_boot $$ [$Hn $Hp $Ha $Hled $Hpoh]
   imod kctx_newlock cpu k pidLockAddr "nextpid" pidLockPay $$ [$Hk $HR $Hpf $Hp0 $Hp16] with ⟨Hk, Hpid⟩
   ihave HW := waitRes_alloc curCtx $$ [$Hpar $Hch $Ho $Hzl $Hzs]
   ihave HW : iprop(waitLockPay (GF := GF) curCtx) $$ [HW]

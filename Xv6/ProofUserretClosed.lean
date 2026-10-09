@@ -88,20 +88,21 @@ theorem userretClosed_proof (UT : USERTRAP) (UV : USERVEC) (UR : USERRET) : USER
     -- THE INCARNATION'S KEY HISTORY (NI M3 U-2b, design/ni-uhist.md D2): born
     -- here, empty, at its start key -- the key this first resume resumes
     iapply wpLoop_bupd
-    imod (uhistAuth_alloc (GF := GF) (uvisOf V M sts gn cs pid)) with ⟨%γh, Huh, #Hulb⟩
+    -- (NI M4 pids P-3) at the record's own count: the origin datum
+    imod (uhistAuth_alloc (GF := GF) (uvisOf V M sts gn cs pid) V.pown) with ⟨%γh, Huh, #Hulb⟩
     -- ...its evidence (NI M2-X1: `NiFitIs.evidNone`; NI M3 U-2b: the
     -- history's registration, its lower bound at the start key)
     have hfo : niFitEv none (.uEnter cpu (satpOf KTier.kpt P.root) sep (tfGprs V.tf)) none
-        (γh, uvisOf V M sts gn cs pid, []) :=
+        (γh, (uvisOf V M sts gn cs pid, V.pown), []) :=
       ⟨rfl, rfl, cpu, _, sep, rfl, hsep⟩
     ihave #Hev := NiFitIs.evidNone (hlc := hlc) (GF := GF) _ _ hfo $$ [Hulb]
     · unfold niUhRes; iexact Hulb
-    ihave Huh : uhistAt (GF := GF) (uvisOf V M sts gn cs pid) V.fsc $$ [Huh]
+    ihave Huh : uhistAt (GF := GF) (uvisOf V M sts gn cs pid) V.fsc V.pown $$ [Huh]
     · unfold uhistAt
-      iexists γh, uvisOf V M sts gn cs pid, []
+      iexists γh, uvisOf V M sts gn cs pid, V.pown, []
       iframe Huh
       ipureintro
-      exact ⟨uhistWf_nil, trivial, rfl, V.fsc, trivial, rfl⟩
+      exact ⟨uhistWf_nil, trivial, rfl, ⟨V.fsc, trivial, rfl⟩, trivial, rfl⟩
     imodintro
     iapply HRS
     unfold uRcptOpt uClaimFor uClaimForRaw

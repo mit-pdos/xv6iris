@@ -59,7 +59,7 @@ def procPrivBareAt [Xv6G GF] [WchG GF] (ξ : CtxId) (pa : BitVec 64) (pid : BitV
   @procPtAt hlc GF _ _ _ ⟨ξ, KTier.kpt⟩ V.upt M ∗
   @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
-  actCnt pa V.ev
+  actCnt pa V.ev ∗ pownHalf pa V.pown
 
 /-- (NI M3 private files FS-2e-b) the fs cursor is not a cell: the bare
 block does not read it. -/
@@ -81,10 +81,10 @@ theorem procPrivBareAt_evAcc [Xv6G GF] [WchG GF] (ξ : CtxId) (pa : BitVec 64) (
       actCnt pa V.ev ∗ (∀ k : Nat, actCnt pa k -∗ procPrivBareAt ξ pa pid (V.updEv k) M) := by
   unfold procPrivBareAt
   simp only [ProcPriv.updEv, procFieldsNoOfile_updEv]
-  iintro ⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩
+  iintro ⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev, Hpo⟩
   iframe Hev
   iintro %k Hev
-  iframe Hpid Hf Hpt Htfp Hev
+  iframe Hpid Hf Hpt Htfp Hev Hpo
   ipureintro; exact ⟨hf, hlz⟩
 
 end Xv6

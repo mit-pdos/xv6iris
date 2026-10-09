@@ -403,7 +403,7 @@ def fpKeep [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (BitVec 8)) (c : 
   byteBuf (pName pa) (DFrac.own 1) nm ∗
   wordPointsTo (pSecc pa) 8 (DFrac.own 1) V.pvSecc ∗
   wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗
-  dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗
+  dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗ pownHalf pa V.pown ∗
   stackOwn (V.kstack + 4096#64) 512 ∗ pageCredit c
 
 /-- The kept bundle's credits move by their number (NI M3 quotas Q-1). -/
@@ -414,8 +414,8 @@ theorem fpKeep_congr [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (BitVec
 theorem fpKeep_add [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (BitVec 8)) (c d : Nat) :
     fpKeep (GF := GF) pa V nm c ∗ pageCredit d ⊢ fpKeep pa V nm (c + d) := by
   unfold fpKeep
-  iintro ⟨⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, Hc⟩, Hd⟩
-  iframe H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11
+  iintro ⟨⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H10', H11, Hc⟩, Hd⟩
+  iframe H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H10' H11
   iapply pageCredit_join $$ [Hc Hd]
   iframe
 
@@ -461,7 +461,7 @@ theorem fp_dormant_intro [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (Bi
     ⊢ procDormant pa UNUSED := by
   have hUZ : ¬ (UNUSED = ZOMBIE) := by decide
   unfold fpKeep procDormant procFields pnameCells dormantSpace
-  iintro ⟨Hpid, Hsz, Hpt, Htf, ⟨Hks, Hctx, Hof, Hcwd, Hnm, Hsc, Hrt, Hal, Hch, Hev, Hst, Hcr⟩, Hsg, Hxs⟩
+  iintro ⟨Hpid, Hsz, Hpt, Htf, ⟨Hks, Hctx, Hof, Hcwd, Hnm, Hsc, Hrt, Hal, Hch, Hev, Hpo, Hst, Hcr⟩, Hsg, Hxs⟩
   isplitl []
   · ipureintro; exact Or.inl rfl
   -- the zeroed block is at the lazy bit SET (Rocq freeproc's dormant block:
@@ -476,7 +476,7 @@ theorem fp_dormant_intro [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (Bi
     refine ⟨hof, hcwd, hroot, ?_, rfl⟩
     simp only [uvmMaxsz]
     decide
-  iframe Hpid Hks Hsz Hpt Htf Hctx Hof Hcwd Hsc Hrt Hal Hch Hev Hst Hsg Hcr
+  iframe Hpid Hks Hsz Hpt Htf Hctx Hof Hcwd Hsc Hrt Hal Hch Hev Hpo Hst Hsg Hcr
   isplitl [Hnm]
   · isplitl []
     · ipureintro; exact hnm
@@ -1139,7 +1139,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
     simp only [freeprocAddr]
     unfold freeprocIn freeprocGen procFields pnameCells
     iintro ⟨Hk, Hpc, #Hlkk, Hav, #Hlkp, Hheld,
-      ⟨%hpure, Hpriv, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, ⟨%hpnwf, Hnamebuf⟩, Hsc, Hrt⟩, Hal, Hch, Hev, Hstack, Htfarm,
+      ⟨%hpure, Hpriv, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, ⟨%hpnwf, Hnamebuf⟩, Hsc, Hrt⟩, Hal, Hch, Hev, Hpo, Hstack, Htfarm,
         Hptarm, Hcr⟩, ⟨Hsg, Hrr, %xsv, Hxsb⟩, Hlend, HPhi0⟩
     obtain ⟨hof, hcwd, hroot⟩ := hpure
     have hnm : V.name.length = PNAMELEN := hpnwf.1
@@ -1173,7 +1173,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
     case' _ => unfold fpPub; iframe
     ihave Hkeep : fpKeep (procAddr j) V V.name
         (procSpare + (if V.trapframe = 0#64 then 1 else 0) + (if V.pagetable = 0#64 then ptW else 0))
-      $$ [Hks Hctx Hof Hcwd Hnamebuf Hsc Hrt Hal Hch Hev Hstack Hcr]
+      $$ [Hks Hctx Hof Hcwd Hnamebuf Hsc Hrt Hal Hch Hev Hpo Hstack Hcr]
     case' _ => unfold fpKeep; iframe
     ihave HPhi := wpNext_at k.sie k.proc cpu cpu _ (fun _ => rfl) $$ HPhi0
     -- the prologue

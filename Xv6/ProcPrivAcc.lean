@@ -366,14 +366,14 @@ theorem procPrivFd_copyEv (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V
         @procPtAt hlc GF _ _ _ ⟨curCtx, KTier.kpt⟩ P' M' -∗ actCnt pa k -∗
         procPrivFd γ pa pid { V.updEv k with upt := P' } M') := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev, Hpo⟩, Hc⟩, Ho⟩
   ihave Hpg := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.1 $$ Hpg
   iframe Hs Hpg Hpt Hev
   iintro %P' %M' %k %hx Hs Hpg Hpt Hev
   ihave Hpg := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.1.symm $$ Hpg
   ihave Htfp := (show @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [hx.1.2.1]) $$ Htfp
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev Hpo
   isplitl []
   · ipureintro
     exact ⟨h.1, UMemL.umBelow_extSz h.2.1 hx, by rw [hx.1.1]; exact h.2.2.1,
@@ -731,7 +731,7 @@ theorem procPrivFdRes_trapframeEv (r : Nat) (γ : FileNames) (pa : BitVec 64) (p
           (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) -∗ actCnt pa k -∗
         procPrivFdRes r γ pa pid (V.updEv k) M) := by
   unfold procPrivFdRes procPrivCoreResAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev, Hpo⟩, Hc⟩, Ho⟩
   ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2 $$ Htf
   icases procPrivAcc_split curCtx _ 8 1 _ $$ Htf with ⟨Htf, Htf2⟩
   icases procPrivAcc_split curCtx _ 8 (1 : Qp).half _ $$ Htf with ⟨Htf, Htf1⟩
@@ -742,7 +742,7 @@ theorem procPrivFdRes_trapframeEv (r : Nat) (γ : FileNames) (pa : BitVec 64) (p
   ihave Htf := procPrivAcc_join curCtx _ 8 1 _ $$ [Htf Htf2]
   · iframe
   ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2.symm $$ Htf
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev Hpo
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

@@ -172,9 +172,11 @@ RESUMED at: the cause, the resumed key `Wr`, the trapped key `W`, the key
 the round left `W'` (design "M3 ustep design" (c): `sc × Wr × W × W'`;
 deviation 2: Lean's product nests to the right, `e.1`, `e.2.1`, `e.2.2.1`,
 `e.2.2.2.1`); (NI M3 private files FS-2e-b) and THE ROUND'S FS WINDOW `w`
-(`e.2.2.2.2`): the caller's fs cursor before the round and after it (the
-cited fs prefix's length at a round citing a nonempty one, else unmoved). -/
-abbrev Uround : Type := BitVec 64 × Uvis × Uvis × Uvis × (Nat × Nat)
+(`e.2.2.2.2.1`): the caller's fs cursor before the round and after it (the
+cited fs prefix's length at a round citing a nonempty one, else unmoved);
+(NI M4 pids P-3) and THE ROUND'S OWN-COUNT PAIR `n` (`e.2.2.2.2.2`): the
+record's own fork count before the round and after it. -/
+abbrev Uround : Type := BitVec 64 × Uvis × Uvis × Uvis × (Nat × Nat) × (Nat × Nat)
 
 /-- **Rocq `round_ok_keys`**: the round relation at the two keys, spelled
 exactly as `UexecApply.uexecRet_roundSlot_of`'s hypothesis is at
@@ -191,8 +193,8 @@ def uhistWf (h : List Uround) : Prop := ∀ e ∈ h, roundOkKeys e.1 e.2.2.1 e.2
 theorem uhistWf_nil : uhistWf [] := fun _ he => absurd he List.not_mem_nil
 
 /-- **Rocq `uhist_wf_snoc`**. -/
-theorem uhistWf_snoc {h : List Uround} {sc : BitVec 64} {Wr W W' : Uvis} {w : Nat × Nat} (hh : uhistWf h)
-    (hr : roundOkKeys sc W W') : uhistWf (h ++ [(sc, Wr, W, W', w)]) := by
+theorem uhistWf_snoc {h : List Uround} {sc : BitVec 64} {Wr W W' : Uvis} {w n : Nat × Nat} (hh : uhistWf h)
+    (hr : roundOkKeys sc W W') : uhistWf (h ++ [(sc, Wr, W, W', w, n)]) := by
   intro e he
   rcases List.mem_append.mp he with he | he
   · exact hh e he
@@ -231,16 +233,16 @@ theorem uhistTail_snoc (W0 : Uvis) (h : List Uround) (e : Uround) :
   | cons a h ih => exact ih a.2.2.2.1
 
 /-- **The chain grows by one round**: resumed at the tail, landed by `ulands`. -/
-theorem uhistChain_snoc {W0 : Uvis} {h : List Uround} {sc : BitVec 64} {W W' : Uvis} {w : Nat × Nat}
+theorem uhistChain_snoc {W0 : Uvis} {h : List Uround} {sc : BitVec 64} {W W' : Uvis} {w n : Nat × Nat}
     (hc : uhistChain W0 h) (hl : Ustep.ulands (uhistTail W0 h) sc W) :
-    uhistChain W0 (h ++ [(sc, uhistTail W0 h, W, W', w)]) := by
+    uhistChain W0 (h ++ [(sc, uhistTail W0 h, W, W', w, n)]) := by
   induction h generalizing W0 with
   | nil => exact ⟨rfl, hl, trivial⟩
   | cons a h ih => exact ⟨hc.1, hc.2.1, ih hc.2.2 hl⟩
 
 /-- The last round of a chain: resumed at the previous tail, landed by `ulands`. -/
-theorem uhistChain_last {W0 : Uvis} {h : List Uround} {sc : BitVec 64} {Wr W W' : Uvis} {w : Nat × Nat}
-    (hc : uhistChain W0 (h ++ [(sc, Wr, W, W', w)])) : Wr = uhistTail W0 h ∧ Ustep.ulands Wr sc W := by
+theorem uhistChain_last {W0 : Uvis} {h : List Uround} {sc : BitVec 64} {Wr W W' : Uvis} {w n : Nat × Nat}
+    (hc : uhistChain W0 (h ++ [(sc, Wr, W, W', w, n)])) : Wr = uhistTail W0 h ∧ Ustep.ulands Wr sc W := by
   induction h generalizing W0 with
   | nil => exact ⟨hc.1, hc.2.1⟩
   | cons a h ih => exact ih hc.2.2
@@ -250,19 +252,19 @@ theorem uhistChain_last {W0 : Uvis} {h : List Uround} {sc : BitVec 64} {Wr W W' 
 and does not move backwards. -/
 def uhistWinFrom (c : Nat) : List Uround → Prop
   | [] => True
-  | e :: h => e.2.2.2.2.1 = c ∧ c ≤ e.2.2.2.2.2 ∧ uhistWinFrom e.2.2.2.2.2 h
+  | e :: h => e.2.2.2.2.1.1 = c ∧ c ≤ e.2.2.2.2.1.2 ∧ uhistWinFrom e.2.2.2.2.1.2 h
 
 /-- the cursor after the history: the last window's end, or the start -/
 def uhistEnd (c : Nat) : List Uround → Nat
   | [] => c
-  | e :: h => uhistEnd e.2.2.2.2.2 h
+  | e :: h => uhistEnd e.2.2.2.2.1.2 h
 
 /-- the windows chain of a history, from some start -/
 def uhistWinOk (h : List Uround) : Prop := ∃ c, uhistWinFrom c h
 
 theorem uhistWinFrom_snoc {c : Nat} {h : List Uround} (e : Uround) (hw : uhistWinFrom c h)
-    (h1 : e.2.2.2.2.1 = uhistEnd c h) (h2 : uhistEnd c h ≤ e.2.2.2.2.2) :
-    uhistWinFrom c (h ++ [e]) ∧ uhistEnd c (h ++ [e]) = e.2.2.2.2.2 := by
+    (h1 : e.2.2.2.2.1.1 = uhistEnd c h) (h2 : uhistEnd c h ≤ e.2.2.2.2.1.2) :
+    uhistWinFrom c (h ++ [e]) ∧ uhistEnd c (h ++ [e]) = e.2.2.2.2.1.2 := by
   induction h generalizing c with
   | nil => exact ⟨⟨h1, h2, trivial⟩, rfl⟩
   | cons a h ih =>
@@ -273,13 +275,13 @@ theorem uhistWinFrom_snoc {c : Nat} {h : List Uround} (e : Uround) (hw : uhistWi
 /-- **THE WINDOWS ORDER**: in a chained history an earlier round's window
 ends at or before a later round's starts -/
 theorem uhistWinFrom_order : ∀ {c : Nat} {h : List Uround} (_ : uhistWinFrom c h) {n n' : Nat} {e e' : Uround},
-    h[n]? = some e → h[n']? = some e' → n < n' → e.2.2.2.2.2 ≤ e'.2.2.2.2.1
+    h[n]? = some e → h[n']? = some e' → n < n' → e.2.2.2.2.1.2 ≤ e'.2.2.2.2.1.1
   | _, [], _, _, _, _, _, he, _, _ => by simp at he
   | c, a :: h, hw, n, n', e, e', he, he', hlt => by
     obtain ⟨-, -, hrest⟩ := hw
     -- every window of the tail starts at or after the head's end
     have hge : ∀ {c' : Nat} {t : List Uround}, uhistWinFrom c' t → ∀ {m : Nat} {x : Uround},
-        t[m]? = some x → c' ≤ x.2.2.2.2.1 := by
+        t[m]? = some x → c' ≤ x.2.2.2.2.1.1 := by
       intro c' t ht m x hx
       induction t generalizing c' m with
       | nil => simp at hx
@@ -302,6 +304,36 @@ theorem uhistWinFrom_order : ∀ {c : Nat} {h : List Uround} (_ : uhistWinFrom c
         simp at he he'
         exact uhistWinFrom_order hrest he he' (by omega)
 
+/-- (NI M4 pids P-3) **THE OWN-COUNT CHAIN**: from the count `c`, each
+round's pair starts where the previous one ended (`c` first).  No
+monotonicity: the derivation reads the steps off the citations. -/
+def uhistPownFrom (c : Nat) : List Uround → Prop
+  | [] => True
+  | e :: h => e.2.2.2.2.2.1 = c ∧ uhistPownFrom e.2.2.2.2.2.2 h
+
+/-- the own count after the history: the last pair's end, or the start -/
+def uhistPownEnd (c : Nat) : List Uround → Nat
+  | [] => c
+  | e :: h => uhistPownEnd e.2.2.2.2.2.2 h
+
+theorem uhistPownFrom_snoc {c : Nat} {h : List Uround} (e : Uround) (hw : uhistPownFrom c h)
+    (h1 : e.2.2.2.2.2.1 = uhistPownEnd c h) :
+    uhistPownFrom c (h ++ [e]) ∧ uhistPownEnd c (h ++ [e]) = e.2.2.2.2.2.2 := by
+  induction h generalizing c with
+  | nil => exact ⟨⟨h1, trivial⟩, rfl⟩
+  | cons a h ih =>
+    obtain ⟨ha1, hrest⟩ := hw
+    obtain ⟨ih1, ih2⟩ := ih hrest h1
+    exact ⟨⟨ha1, ih1⟩, ih2⟩
+
+theorem uhistPownFrom_prefix {c : Nat} : ∀ {h h' : List Uround}, h <+: h' → uhistPownFrom c h' →
+    uhistPownFrom c h
+  | [], _, _, _ => trivial
+  | _ :: _, [], hp, _ => absurd hp.length_le (by simp)
+  | a :: h, b :: h', hp, hw => by
+    obtain ⟨rfl, hp'⟩ := List.cons_prefix_cons.mp hp
+    exact ⟨hw.1, uhistPownFrom_prefix hp' hw.2⟩
+
 /-- A placeholder key (the start key of a chain no filing cites). -/
 instance : Inhabited Uvis := ⟨⟨[], fun _ => none, fun _ => none, 0, [], 0, 0, ∅, 0, false, 0⟩⟩
 
@@ -312,8 +344,9 @@ section Uhist
 variable {GF : BundledGFunctors} [Xv6G GF]
 open UledEnc
 
-/-- The encoded history: the start key, then the rounds. -/
-def uhistEnc (W0 : Uvis) (h : List Uround) : List Uled := enc W0 :: h.map enc
+/-- The encoded history: the start key (NI M4 pids P-3: with the start's own
+count), then the rounds. -/
+def uhistEnc (W0 : Uvis) (c0 : Nat) (h : List Uround) : List Uled := enc (W0, c0) :: h.map enc
 
 theorem map_enc_prefix {α : Type} [UledEnc α] : ∀ {l l' : List α}, l.map enc <+: l'.map enc → l <+: l'
   | [], _, _ => List.nil_prefix
@@ -325,33 +358,34 @@ theorem map_enc_prefix {α : Type} [UledEnc α] : ∀ {l l' : List α}, l.map en
 
 /-- Two encoded histories, prefix-comparable, have one start key and
 comparable rounds. -/
-theorem uhistEnc_prefix {W0 W0' : Uvis} {h h' : List Uround} (hp : uhistEnc W0 h <+: uhistEnc W0' h') :
-    W0 = W0' ∧ h <+: h' := by
+theorem uhistEnc_prefix {W0 W0' : Uvis} {c0 c0' : Nat} {h h' : List Uround}
+    (hp : uhistEnc W0 c0 h <+: uhistEnc W0' c0' h') : W0 = W0' ∧ c0 = c0' ∧ h <+: h' := by
   unfold uhistEnc at hp
   obtain ⟨h1, h2⟩ := List.cons_prefix_cons.mp hp
-  exact ⟨enc_inj h1, map_enc_prefix h2⟩
+  have e := enc_inj h1
+  exact ⟨congrArg Prod.fst e, congrArg Prod.snd e, map_enc_prefix h2⟩
 
 /-- **Rocq `uhist_auth`**: the authoritative history at its start key, its
 rounds encoded. -/
-def uhistAuth (γ : GName) (W0 : Uvis) (h : List Uround) : IProp GF := γ ↪●ML (uhistEnc W0 h)
+def uhistAuth (γ : GName) (W0 : Uvis) (c0 : Nat) (h : List Uround) : IProp GF := γ ↪●ML (uhistEnc W0 c0 h)
 /-- **Rocq `uhist_lb`**: a lower bound of the history, at its start key. -/
-def uhistLb (γ : GName) (W0 : Uvis) (h : List Uround) : IProp GF := γ ↪◯ML (uhistEnc W0 h)
+def uhistLb (γ : GName) (W0 : Uvis) (c0 : Nat) (h : List Uround) : IProp GF := γ ↪◯ML (uhistEnc W0 c0 h)
 
-instance uhistLb_persistent (γ : GName) (W0 : Uvis) (h : List Uround) :
-    Persistent (uhistLb (GF := GF) γ W0 h) := by
+instance uhistLb_persistent (γ : GName) (W0 : Uvis) (c0 : Nat) (h : List Uround) :
+    Persistent (uhistLb (GF := GF) γ W0 c0 h) := by
   unfold uhistLb; infer_instance
 
-instance uhistLb_timeless (γ : GName) (W0 : Uvis) (h : List Uround) :
-    Timeless (uhistLb (GF := GF) γ W0 h) := by
+instance uhistLb_timeless (γ : GName) (W0 : Uvis) (c0 : Nat) (h : List Uround) :
+    Timeless (uhistLb (GF := GF) γ W0 c0 h) := by
   unfold uhistLb; infer_instance
 
-instance uhistAuth_timeless (γ : GName) (W0 : Uvis) (h : List Uround) :
-    Timeless (uhistAuth (GF := GF) γ W0 h) := by
+instance uhistAuth_timeless (γ : GName) (W0 : Uvis) (c0 : Nat) (h : List Uround) :
+    Timeless (uhistAuth (GF := GF) γ W0 c0 h) := by
   unfold uhistAuth; infer_instance
 
 /-- **Rocq `uhist_grow`**. -/
-theorem uhistAuth_grow (γ : GName) (W0 : Uvis) (h : List Uround) (e : Uround) :
-    uhistAuth (GF := GF) γ W0 h ⊢ |==> (uhistAuth γ W0 (h ++ [e]) ∗ uhistLb γ W0 (h ++ [e])) := by
+theorem uhistAuth_grow (γ : GName) (W0 : Uvis) (c0 : Nat) (h : List Uround) (e : Uround) :
+    uhistAuth (GF := GF) γ W0 c0 h ⊢ |==> (uhistAuth γ W0 c0 (h ++ [e]) ∗ uhistLb γ W0 c0 (h ++ [e])) := by
   unfold uhistAuth uhistLb uhistEnc
   rw [List.map_append, List.map_singleton, ← List.cons_append]
   iintro Ha
@@ -360,35 +394,37 @@ theorem uhistAuth_grow (γ : GName) (W0 : Uvis) (h : List Uround) (e : Uround) :
 /-- **The birth** (NI M3 U-2b: at the start key, at the incarnation's first
 resume, `ProofUserretClosed.userretClosed_proof`), with its first lower
 bound. -/
-theorem uhistAuth_alloc (W0 : Uvis) :
-    ⊢ |==> ∃ γ : GName, uhistAuth (GF := GF) γ W0 [] ∗ uhistLb γ W0 [] := by
+theorem uhistAuth_alloc (W0 : Uvis) (c0 : Nat) :
+    ⊢ |==> ∃ γ : GName, uhistAuth (GF := GF) γ W0 c0 [] ∗ uhistLb γ W0 c0 [] := by
   unfold uhistAuth uhistLb
-  imod MonoList.own_alloc (GF := GF) (uhistEnc W0 []) with ⟨%γ, Ha, Hl⟩
+  imod MonoList.own_alloc (GF := GF) (uhistEnc W0 c0 []) with ⟨%γ, Ha, Hl⟩
   imodintro
   iexists γ
   iframe Ha Hl
 
 /-- **Two lower bounds of one history agree** on its start key, and their
 rounds are prefix-comparable (`MonoList.lb_own_valid`). -/
-theorem uhistLb_agree (γ : GName) (W0 W0' : Uvis) (h h' : List Uround) :
-    uhistLb (GF := GF) γ W0 h ∗ uhistLb γ W0' h' ⊢ ⌜W0 = W0' ∧ (h <+: h' ∨ h' <+: h)⌝ := by
+theorem uhistLb_agree (γ : GName) (W0 W0' : Uvis) (c0 c0' : Nat) (h h' : List Uround) :
+    uhistLb (GF := GF) γ W0 c0 h ∗ uhistLb γ W0' c0' h' ⊢ ⌜W0 = W0' ∧ c0 = c0' ∧ (h <+: h' ∨ h' <+: h)⌝ := by
   unfold uhistLb
   iintro ⟨H1, H2⟩
-  ihave %hv := MonoList.lb_own_valid γ (uhistEnc W0 h) (uhistEnc W0' h') $$ H1 H2
+  ihave %hv := MonoList.lb_own_valid γ (uhistEnc W0 c0 h) (uhistEnc W0' c0' h') $$ H1 H2
   ipureintro
   rcases hv with hv | hv
-  · obtain ⟨h1, h2⟩ := uhistEnc_prefix hv; exact ⟨h1, Or.inl h2⟩
-  · obtain ⟨h1, h2⟩ := uhistEnc_prefix hv; exact ⟨h1.symm, Or.inr h2⟩
+  · obtain ⟨h1, h2, h3⟩ := uhistEnc_prefix hv; exact ⟨h1, h2, Or.inl h3⟩
+  · obtain ⟨h1, h2, h3⟩ := uhistEnc_prefix hv; exact ⟨h1.symm, h2.symm, Or.inr h3⟩
 
 /-- **THE HISTORY AT THE KEY IT RESUMES** (NI M3 U-2b): the trap loop's
 carrier while the process runs (`UserretClosedDefs.urcRut`) -- the
 authority, every round lawful, the chain from the start key, and its tail
 the resumed key `Wr` (the next round's `Wr`, exactly). -/
-def uhistAt (Wr : Uvis) (c : Nat) : IProp GF :=
-  iprop(∃ (γ : GName) (W0 : Uvis) (h : List Uround), uhistAuth γ W0 h ∗
+def uhistAt (Wr : Uvis) (c p : Nat) : IProp GF :=
+  iprop(∃ (γ : GName) (W0 : Uvis) (p0 : Nat) (h : List Uround), uhistAuth γ W0 p0 h ∗
     ⌜uhistWf h ∧ uhistChain W0 h ∧ uhistTail W0 h = Wr ∧
       -- (NI M3 private files FS-2e-b) the windows chain, ending at the cursor `c`
-      ∃ c0, uhistWinFrom c0 h ∧ uhistEnd c0 h = c⌝)
+      (∃ c0, uhistWinFrom c0 h ∧ uhistEnd c0 h = c) ∧
+      -- (NI M4 pids P-3) the own-count chain from the start's, ending at the record's `p`
+      uhistPownFrom p0 h ∧ uhistPownEnd p0 h = p⌝)
 
 end Uhist
 

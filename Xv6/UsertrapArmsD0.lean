@@ -283,7 +283,8 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
     iapply (HA A cpu A.k R1 _ _ A.sts A.cs hok (utBase_refl _) hp1 hrows)
       $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hown $Hres $Hkont]
     iframe #
-    iapply utOuts_quiet _ _ _ _ _ hne
+    iapply utOuts_quiet _ _ _ _ _ hne ?_
+    rfl
 
 end ArmD0
 

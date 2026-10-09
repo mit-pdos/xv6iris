@@ -200,7 +200,7 @@ theorem kx_dormant_build (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
       @procDormantNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE := by
   unfold procPrivNoctxAt procDormantNoctx genHalvesDorm
   simp only [ite_true]
-  iintro ⟨⟨%hpure, Hpid, Hfields, Hpt, Htf, -, Hev⟩, Hal, Hch, Hstk, Hgh, ⟨%xsv, Hxs, Hesc, Hzs⟩, Hspare⟩
+  iintro ⟨⟨%hpure, Hpid, Hfields, Hpt, Htf, -, Hev, Hpo⟩, Hal, Hch, Hstk, Hgh, ⟨%xsv, Hxs, Hesc, Hzs⟩, Hspare⟩
   isplitl []
   · ipureintro; trivial
   -- THE PARK RAISES THE LAZY BIT (Rocq `proc_priv_to_dormant_zombie`'s
@@ -210,7 +210,7 @@ theorem kx_dormant_build (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
   simp only [procFieldsNoctx_pvLazy, dormantSpace_pvLazy]
   isplitl []
   · ipureintro; exact ⟨hof, hcwd, hroot, Nat.le_trans hpure.1 uQuota_le_uvmMaxsz, trivial⟩
-  iframe Hpid Hfields Hal Hch Hev Hgh
+  iframe Hpid Hfields Hal Hch Hev Hpo Hgh
   isplitl [Hxs Hesc Hzs]
   · iexists xsv
     iframe Hxs Hesc Hzs
@@ -330,7 +330,7 @@ theorem kx_core_lend (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat 
         (∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend pa k1) -∗
         ∃ V1 : ProcPriv, ⌜evAfter V V1⌝ ∗ procPrivCoreUnmarkedAt curCtx pa pid V1 M) := by
   unfold procPrivCoreUnmarkedAt procPrivBareAt pidPriv
-  iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩
+  iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev, Hpo⟩, Hcw⟩
   icases procPrivAcc_split curCtx _ 4 (1 : Qp).half _ $$ Hpid with ⟨Hpid, Hpid1⟩
   icases actLend_borrow pa V.ev $$ Hev with ⟨Hl, Hlb⟩
   iframe Hpid Hl
@@ -343,7 +343,7 @@ theorem kx_core_lend (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat 
   · ipureintro; exact ⟨k2, hk2, rfl⟩
   ihave Hf := (show @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V ⊢
       @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) (V.updEv k2) from .rfl) $$ Hf
-  iframe Hpid Hf Hpt Htfp Hcw Hev
+  iframe Hpid Hf Hpt Htfp Hcw Hev Hpo
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz
@@ -856,7 +856,7 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
     rootRefAt V.root V.rti ∗ (procGenUnmarkedAt curCtx (procAddr j) pid V.gen ∗ pageCredit procSpare) ∗
     pnameCells (procAddr j) (DFrac.own 1) V.name ∗
     wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc ∗
-    procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ actCnt (procAddr j) V.ev ∗
+    procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ actCnt (procAddr j) V.ev ∗ pownHalf (procAddr j) V.pown ∗
     stackOwn (spval + 48#64) 6 ∗
     (stackOwn (spval + 48#64) ((trapRes eb + availval) + 6) -∗ stackOwn (V.kstack + 4096#64) 512) ∗
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
@@ -873,7 +873,7 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
   obtain ⟨hKi, hKb, -, -⟩ := filecloseSlots_callees
   have hKe : 8 + endOpSlots ≤ k.avail := hKf
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hpe, #Hrdy, Hbs, Hofile, Hfds, Hfsp, Hirc, Hirs, Hpid, Hks, Hsz, Hpg, Htf,
-    Hcwd, Hrt, Hrtr, ⟨Hgen, Hspare⟩, Hname, Hsc, HPt, HTf, Hev, Hframe, Hcloser, #Hwl, #Hid, Hch, #Hmy, HQ⟩
+    Hcwd, Hrt, Hrtr, ⟨Hgen, Hspare⟩, Hname, Hsc, HPt, HTf, Hev, Hpo, Hframe, Hcloser, #Hwl, #Hid, Hch, #Hmy, HQ⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans hf.2.2.2.1
   subst ht0
@@ -1335,15 +1335,15 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
       wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc ∗
       wordPointsTo (pRoot (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
       ofileCells (procAddr j) (DFrac.own 1) (List.replicate NOFILE 0#64) ∗
-      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ actCnt (procAddr j) (V.ev + 1) ⊢
+      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ actCnt (procAddr j) (V.ev + 1) ∗ pownHalf (procAddr j) V.pown ⊢
       procPrivNoctxAt (GF := GF) ξ0 (procAddr j) pid
         { V with ofile := List.replicate NOFILE 0#64, cwd := 0#64, root := 0#64, ev := V.ev + 1 } M from by
     unfold procPrivNoctxAt procFieldsNoctx
-    iintro ⟨Hpid, Hks, Hsz, Hpg, Htf, Hcwd, Hname, Hsc, Hrt, Hofile, HPt, HTf, Hev⟩
+    iintro ⟨Hpid, Hks, Hsz, Hpg, Htf, Hcwd, Hname, Hsc, Hrt, Hofile, HPt, HTf, Hev, Hpo⟩
     isplitl []
     · ipureintro; exact hV
     iframe
-    ipureintro; exact hlz) $$ [$Hpid $Hks $Hsz $Hpg $Htf $Hcwd $Hname $Hsc $Hrt $Hofile $HPt $HTf $Hev]
+    ipureintro; exact hlz) $$ [$Hpid $Hks $Hsz $Hpg $Htf $Hcwd $Hname $Hsc $Hrt $Hofile $HPt $HTf $Hev $Hpo]
   ihave Hwand : (stackOwn (GF := GF) spval (trapRes k.sie + availval) -∗ parkPay (procAddr j) ZOMBIE)
     $$ [Hpriv Hframe Hal Hch Hcloser Hgh Hxpark Hspare]
   case' _ =>
@@ -1415,7 +1415,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
     wordPointsTo (pRoot (procAddr j)) 8 (DFrac.own 1) V.root ∗ rootRefAt V.root V.rti ∗
     pnameCells (procAddr j) (DFrac.own 1) V.name ∗
     wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc ∗
-    procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ actCnt (procAddr j) V.ev ∗
+    procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ actCnt (procAddr j) V.ev ∗ pownHalf (procAddr j) V.pown ∗
     stackOwn (spval + 48#64) 6 ∗
     (stackOwn (spval + 48#64) ((trapRes eb + availval) + 6) -∗ stackOwn (V.kstack + 4096#64) 512) ∗
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
@@ -1432,7 +1432,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   obtain ⟨hKi, hKb, -, -⟩ := filecloseSlots_callees
   have hKe : 8 + endOpSlots ≤ k.avail := hKf
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hpe, #Hrdy, Hbs, Hofile, Hfds, Hfsp, Hirs, Hpid, Hks, Hsz, Hpg, Htf,
-    Hcwd, Hcwr, Hgen, Hrt, Hrtr, Hname, Hsc, HPt, HTf, Hev, Hframe, Hcloser, #Hwl, #Hid, Hch, #Hmy, HQ⟩
+    Hcwd, Hcwr, Hgen, Hrt, Hrtr, Hname, Hsc, HPt, HTf, Hev, Hpo, Hframe, Hcloser, #Hwl, #Hid, Hch, #Hmy, HQ⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans hf.2.2.2.1
   subst ht0
@@ -1527,7 +1527,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   iapply (kx_rest_root AC RE RP WU SC BO IP EO Γ γw j hj pid V M ip cs Q k.sie status spval availval hV hlz
     cpu _ hf3')
   iframe Hk Hpc Hte Hce Hbs Hofile Hfds Hfsp Hir2 Hirs Hpid Hks Hsz Hpg Htf Hcwd Hrt Hrtr Hgen Hname Hsc HPt HTf
-    Hev Hframe Hcloser Hch HQ
+    Hev Hpo Hframe Hcloser Hch HQ
   iframe Hpinv Hpe Hrdy Hwl Hid Hmy
 
 /-- The emptied array: every slot null, owning its fd unit (the authority
@@ -1586,7 +1586,7 @@ theorem kx_after_loop (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP
   obtain ⟨kv, hkv, rfl⟩ := hV1
   iunfold procPrivCoreUnmarkedAt, procPrivBareAt, procFieldsNoOfile at Hcore
   unfold filecloseFsEnv
-  icases Hcore with ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hname, Hsc, Hrt⟩, HPt, HTf, %hlz, Hev⟩, Hcwr, Hrtr, Hgen0,
+  icases Hcore with ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hname, Hsc, Hrt⟩, HPt, HTf, %hlz, Hev, Hpo⟩, Hcwr, Hrtr, Hgen0,
     Hspare0, -⟩
   -- (NI M3 private files FS-2e-b) the dying process's fs cursor is dropped
   ihave Hgen := (show procGenUnmarkedAt (GF := GF) curCtx (procAddr j) pid (V.updEv kv).gen ∗ pageCredit procSpare
@@ -1601,7 +1601,7 @@ theorem kx_after_loop (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP
   · iframe
   iapply (kx_rest AC RE RP WU SC BO IP EO Γ γw j hj pid (V.updEv kv) M ip cs Q eb status spval availval hV hlz
     c' kk hkk)
-  iframe Hk Hpc Hte Hce Hbs Hofile Hfds Hfsp Hirs Hpid Hks Hsz Hpg Htf Hcwd Hcwr Hrt Hrtr Hgen Hname Hsc HPt HTf Hframe Hev
+  iframe Hk Hpc Hte Hce Hbs Hofile Hfds Hfsp Hirs Hpid Hks Hsz Hpg Htf Hcwd Hcwr Hrt Hrtr Hgen Hname Hsc HPt HTf Hframe Hev Hpo
     Hcloser Hch HQ
   iframe Hpinv Hpe Hrdy Hwl Hinit Hmy
 

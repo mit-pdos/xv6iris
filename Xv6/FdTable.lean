@@ -774,13 +774,13 @@ theorem procPrivCoreNoctxAt_pidLend (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 
         ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ procPrivCoreNoctxAt ξ pa pid (V.updEv k2) M) := by
   unfold procPrivCoreNoctxAt procPrivBareAt
   simp only [ProcPriv.updEv, procFieldsNoOfile_updEv]
-  iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hcw, Hrt, Hg⟩
+  iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev, Hpo⟩, Hcw, Hrt, Hg⟩
   icases actLend_borrow pa V.ev $$ Hev with ⟨Hl, Hlb⟩
   iframe Hpid Hl
   iintro Hpid ⟨%k1, %hk1, Hl⟩
   icases Hlb $$ %k1 %hk1 Hl with ⟨%k2, %hk2, Hev⟩
   iexists k2
-  iframe Hpid Hf Hpt Htfp Hev Hcw Hrt Hg
+  iframe Hpid Hf Hpt Htfp Hev Hpo Hcw Hrt Hg
   isplitl []
   · ipureintro; exact hk2
   isplitl []

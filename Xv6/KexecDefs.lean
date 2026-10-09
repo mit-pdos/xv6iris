@@ -281,7 +281,9 @@ def kexecOk (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat) (alen : 
    -- ...AND THE MASK IS KEPT (xv6 7b2c1b1b; Rocq `kexec_ok`'s last row): exec
    -- does not touch `p->seccomp`, so a masked process stays masked across
    -- exec, which is the whole point of the mask.
-   V'.pvSecc = V.pvSecc)
+   V'.pvSecc = V.pvSecc ∧
+   -- (NI M4 pids P-3) ...AND THE OWN FORK COUNT: the slot's, which exec keeps.
+   V'.pown = V.pown)
 
 /-! ## THE FILE SYSTEM FABRIC, as one bundle
 

@@ -184,7 +184,8 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
     iapply (HF A cpu R1 (utV1 A) A.M A.sts A.cs hok hpins1 (utA_rows_entry A hok hne)
       (utA_live_ne A _ _ hne)) $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hown $Hko $Hkont]
     iframe #
-    iapply utOuts_quiet _ _ _ _ _ hne
+    iapply utOuts_quiet _ _ _ _ _ hne ?_
+    rfl
   · -- killed: +0xf2 j +0xf6 ; li a0,-1 ; jal kexit
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0xf0#64) true 12#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.sys_open_walk_beqz_om, hk0, utA_decide_False]

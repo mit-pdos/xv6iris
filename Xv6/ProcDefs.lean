@@ -156,8 +156,17 @@ structure ProcPriv where
   (`FdTable.fsCurOk`); the class's fs syscalls land their events past it and
   move it to the cited prefix's length.  Born at 0 (userinit's record, the
   default), copied by kfork (the child's first round lands past its parent's
-  cursor), kept by exec and every other `{ V with … }` update.  LAST. -/
+  cursor), kept by exec and every other `{ V with … }` update. -/
   fsc : Nat := 0
+  /-- **The slot's own fork count** (NI M4 pids P-3): the allocations this
+  SLOT has made (`PidEv.ownAllocs (procAddr j) h` of the pid ledger).  A
+  GHOST FIELD, NOT A CELL, as `ev`: half of the slot's own-count agreement
+  rides the block at it (`SlotGen.pownHalf pa V.pown`, beside the event
+  counter), the other half `pid_lock`'s payload; kfork steps it at a
+  successful fork; allocproc's child record takes it FROM THE DORMANT BLOCK
+  (the slot's count: its earlier occupants' children), and exec, freeproc
+  (back to dormant) and every `{ V with … }` update keep it.  LAST. -/
+  pown : Nat := 0
 
 /-- The event counter's ghost write (Rocq `upd_ev`): the permit's holder
 steps it once per actor-labelled append (design ni-strong-instance.md §7). -/
@@ -254,7 +263,7 @@ def procPriv [Xv6G GF] [WchG GF] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPri
   procPtAt V.upt M ∗
   tfPageAt V.upt.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
-  actCnt pa V.ev
+  actCnt pa V.ev ∗ pownHalf pa V.pown
 
 /-! ## Dormant slots (Rocq `proc_dormant`, `proc_slots`) -/
 
@@ -380,7 +389,7 @@ def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
       V.pvLazy = true⌝ ∗
     wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFields pa (DFrac.own 1) V ∗
-    dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗
+    dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗ pownHalf pa V.pown ∗
     genHalvesDorm pa pid V.gen st ∗
     (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv ∗
       (if st = ZOMBIE then exitTok V.gen pid (xstateVal xsv) ∗ zsElem pa (some (pid, xstateVal xsv))
@@ -440,14 +449,15 @@ row's and the generation's names and at `ev := 0` (Rocq G: the seal takes
 the `.bss` carve left is junk until then). -/
 theorem procDormantPrestk_seal (pa : BitVec 64) (ks : BitVec 64) (γ0 g : GName) :
     procDormantPrestk (GF := GF) pa ∗ wordPointsTo (pKstack pa) 8 (DFrac.own 1) ks ∗
-      stackOwn (ks + 4096#64) 512 ∗ chFrag γ0 pa ∅ ∗ slotGen pa (DFrac.own 1) g ∗ actCnt pa 0 ⊢
+      stackOwn (ks + 4096#64) 512 ∗ chFrag γ0 pa ∅ ∗ slotGen pa (DFrac.own 1) g ∗ actCnt pa 0 ∗
+      pownHalf pa 0 ⊢
       procDormant pa UNUSED := by
   unfold procDormantPrestk procDormantNofd procDormant
-  iintro ⟨⟨⟨%V, %pid, %hV, Hpid, Hf, ⟨%xsv, Hxs⟩⟩, Hfd, Hir, Hbs, Hcr⟩, Hks, Hstk, Hch, Hsg, Hev⟩
+  iintro ⟨⟨⟨%V, %pid, %hV, Hpid, Hf, ⟨%xsv, Hxs⟩⟩, Hfd, Hir, Hbs, Hcr⟩, Hks, Hstk, Hch, Hsg, Hev, Hpo⟩
   obtain ⟨hof, hcwd, hroot, hlz, hpg, htf, hsz, hpid⟩ := hV
   isplitl []
   · ipureintro; exact Or.inl rfl
-  iexists { V with kstack := ks, chg := γ0, gen := g, ev := 0 }, pid
+  iexists { V with kstack := ks, chg := γ0, gen := g, ev := 0, pown := 0 }, pid
   isplitl []
   · ipureintro
     refine ⟨hof, hcwd, hroot, ?_, hlz⟩
@@ -465,7 +475,7 @@ theorem procDormantPrestk_seal (pa : BitVec 64) (ks : BitVec 64) (γ0 g : GName)
     iapply fdSlots_to_list (List.replicate NOFILE (0#64 : BitVec 64))
     rw [List.length_replicate]
     iexact Hfd
-  iframe Hch Hev
+  iframe Hch Hev Hpo
   isplitl [Hsg]
   · unfold genHalvesDorm
     rw [if_neg (show ¬ (UNUSED = ZOMBIE) by decide)]

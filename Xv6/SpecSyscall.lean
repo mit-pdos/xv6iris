@@ -473,14 +473,20 @@ byte), so usertrap can cite the boot prefix for it at any status pointer.
 Persistent. -/
 def syscEvOut (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) : IProp GF :=
-  iprop(⌜syscNum V ≠ USYS_uptime ∧ syscNum V ≠ USYS_wait ∧ syscNum V ≠ USYS_fork ∧
+  iprop(⌜(syscNum V ≠ USYS_uptime ∧ syscNum V ≠ USYS_wait ∧ syscNum V ≠ USYS_fork ∧
       syscNum V ≠ USYS_sbrk ∧ syscNum V ≠ USYS_write ∧ syscNum V ≠ USYS_close ∧ syscNum V ≠ USYS_dup ∧
-      syscNum V ≠ USYS_read ∧ syscNum V ≠ USYS_chdir ∧ syscNum V ≠ USYS_mkdir ∧ syscNum V ≠ USYS_open⌝ ∨
+      syscNum V ≠ USYS_read ∧ syscNum V ≠ USYS_chdir ∧ syscNum V ≠ USYS_mkdir ∧ syscNum V ≠ USYS_open) ∧
+      -- (NI M4 pids P-3) the own count kept
+      V'.pown = V.pown⌝ ∨
     (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
       niIotaLbs (niNamesHere (GF := GF)) ι ∗
-      -- (NI M3 private files FS-2e-b) the citation lies past the caller's fs cursor
-      ⌜syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts sts' ι ∧ fsPast V.fsc ι⌝) ∨
-    (⌜syscNum V = USYS_wait ∧ syscA0 V' = -1#64 ∧ cs' = cs ∧ syscImg V' M' = syscImg V M⌝ ∗
+      -- (NI M3 private files FS-2e-b) the citation lies past the caller's fs cursor; (NI M4
+      -- pids P-3) it carries the record's own count, and the round moved it by its own
+      -- allocations
+      ⌜syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts sts' ι ∧ fsPast V.fsc ι ∧
+        pownRow V.pown V'.pown ι ∧ (syscNum V ≠ USYS_fork → V'.pown = V.pown)⌝) ∨
+    (⌜syscNum V = USYS_wait ∧ syscA0 V' = -1#64 ∧ cs' = cs ∧ syscImg V' M' = syscImg V M ∧
+      V'.pown = V.pown⌝ ∗
       killShot gn))
 
 instance syscEvOut_persistent (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState) (V' : ProcPriv)
@@ -494,7 +500,7 @@ M3 FS-L and FS-2a write's, close's, dup's and read's (the hypotheses default
 by `decide` at the arm's literal number). -/
 theorem syscEvOut_quiet (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (n : Int)
-    (hnum : syscNum V = n) (h14 : n ≠ 14 := by decide) (h3 : n ≠ 3 := by decide)
+    (hnum : syscNum V = n) (hpo : V'.pown = V.pown) (h14 : n ≠ 14 := by decide) (h3 : n ≠ 3 := by decide)
     (h1 : n ≠ 1 := by decide) (h12 : n ≠ 12 := by decide) (h16 : n ≠ 16 := by decide)
     (h21 : n ≠ 21 := by decide) (h10 : n ≠ 10 := by decide) (h5 : n ≠ 5 := by decide)
     (h9 : n ≠ 9 := by decide) (h20 : n ≠ 20 := by decide) (h15 : n ≠ 15 := by decide) :
@@ -503,12 +509,36 @@ theorem syscEvOut_quiet (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' :
   ileft
   ipureintro
   rw [hnum]
-  exact ⟨h14, h3, h1, h12, h16, h21, h10, h5, h9, h20, h15⟩
+  exact ⟨⟨h14, h3, h1, h12, h16, h21, h10, h5, h9, h20, h15⟩, hpo⟩
 
-/-- **The deposit at a citation** (NI M2-X2). -/
+/-- **The deposit at a citation** (NI M2-X2), (NI M4 pids P-3) AT THE
+RECORD'S OWN COUNT: off fork the citation is filed with its own-count field
+stamped `V.pown` and its slot prefix cut to `[]` (`niIotaLbs_stamp`; off fork
+the row reads neither: `syscEvRow_pown`) -- so it allocates nothing
+(`UIota.pstep` is `0`), and the round keeps the count (`hpo`). -/
 theorem syscEvOut_cite (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (k : Nat) (ι : UIota)
-    (h : syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts sts' ι) (hp : fsPast V.fsc ι) :
+    (h : syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts sts' ι) (hp : fsPast V.fsc ι)
+    (hnf : syscNum V ≠ USYS_fork) (hpo : V'.pown = V.pown) :
+    MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ⊢
+      niIotaLbs (niNamesHere (GF := GF)) ι -∗
+      syscEvOut (hlc := hlc) (GF := GF) V M sts sts' V' M' cs cs' gn := by
+  unfold syscEvOut
+  iintro #Ha #Hl
+  iright; ileft
+  iexists k, { ι with sev := [], pown := V.pown }
+  iframe Ha
+  isplitl []
+  · iapply niIotaLbs_stamp $$ Hl
+  ipureintro
+  exact ⟨syscEvRow_pown V.pown hnf h, hp, ⟨rfl, hpo⟩, fun _ => hpo⟩
+
+/-- (NI M4 pids P-3) **Fork's deposit at a citation**: the citation carries
+the record's own count itself, and the row's own-count step (`pownRow`). -/
+theorem syscEvOut_citeF (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : List FdState) (V' : ProcPriv)
+    (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (k : Nat) (ι : UIota)
+    (h : syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts sts' ι) (hp : fsPast V.fsc ι)
+    (hpo : pownRow V.pown V'.pown ι) (hq : syscNum V ≠ USYS_fork → V'.pown = V.pown) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ⊢
       niIotaLbs (niNamesHere (GF := GF)) ι -∗
       syscEvOut (hlc := hlc) (GF := GF) V M sts sts' V' M' cs cs' gn := by
@@ -517,7 +547,7 @@ theorem syscEvOut_cite (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : 
   iright; ileft
   iexists k, ι
   iframe Ha Hl
-  ipureintro; exact ⟨h, hp⟩
+  ipureintro; exact ⟨h, hp, hpo, hq⟩
 
 /-- **The returning continuation** (Rocq `sysc_hcont_ty`'s body, the left
 conjunct of the exit slot): at every hart, every `(V', M')`, descriptor

@@ -989,7 +989,8 @@ theorem syscall_arm_read (SR : SYSREAD)
     exact ⟨h1, h2, h3, by rw [hn5]; exact h4 _ _ _, h5⟩
   imodintro
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts
-    (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) M1 cs cs V.gen ke _ hrow hpast $$ Hanc Hl
+    (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) M1 cs cs V.gen ke _ hrow hpast
+    (by rw [hn5]; decide) rfl $$ Hanc Hl
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
     (({ V with upt := P' } : ProcPriv).updEv k') M1 sts cs hj hproc hK htier hpins2 hs2'
     (hrows.updEv k') 5 hn5 (by decide) (by decide) (by decide))
@@ -1135,7 +1136,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
     imodintro
     ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts
       (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M) cs cs V.gen ke
-      _ hrow hpast $$ Hanc Hl
+      _ hrow hpast (by rw [hn16]; decide) rfl $$ Hanc Hl
     iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
       (({ V with upt := P' } : ProcPriv).updEv k') (viewFaulted V.upt P' M) sts cs hj hproc hK htier
       hpins2 hs2' (hrows.updEv k') 16 hn16 (by decide) (by decide) (by decide))
@@ -1175,7 +1176,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
   imodintro
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts
     (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M) cs cs V.gen ke
-    _ hrow (fsPast_nil _ _ hfe.1 hfe.2) $$ Hanc Hl
+    _ hrow (fsPast_nil _ _ hfe.1 hfe.2) (by rw [hn16]; decide) rfl $$ Hanc Hl
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
     (({ V with upt := P' } : ProcPriv).updEv k') (viewFaulted V.upt P' M) sts cs hj hproc hK htier
     hpins2 hs2' (hrows.updEv k') 16 hn16 (by decide) (by decide) (by decide))

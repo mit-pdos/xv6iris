@@ -785,6 +785,8 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
     rcases hdisj with ⟨-, rfl⟩ | ⟨hr, ipv, i, rfl⟩
     · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, Or.inr rfl, rfl⟩
     · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, Or.inl ⟨rfl, by rw [hr]; rfl⟩, rfl⟩
+  have hpo1 : V1.pown = V.pown := by
+    rcases hdisj with ⟨-, rfl⟩ | ⟨hr, ipv, i, rfl⟩ <;> rfl
   obtain ⟨hup, htf, hsz, hlz, hfdg, hchg, hgen, hks, hcwi, hsc⟩ := hV1
   have hs2' : R2 18#5 = pageAddr V1.upt.tfp := by
     rw [hcs.2.2.2.1.trans hs2, hup, hext.1.2.1]
@@ -806,7 +808,7 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   imod syscChdir_cite (GF := GF) V V1 M (viewFaulted V.upt P' M) sts cs (R2 10#5) (procAddr j) hn9
     (by rw [htf, hl]; decide) hd' $$ HLk with ⟨%ι, #Hl, %hrow⟩
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts (syscStore V1 (R2 10#5)) (viewFaulted V.upt P' M)
-    cs cs gn ke ι hrow.1 hrow.2 $$ Hanc Hl
+    cs cs gn ke ι hrow.1 hrow.2 (by rw [hn9]; decide) hpo1 $$ Hanc Hl
   imodintro
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f V1
@@ -909,7 +911,8 @@ theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (hlc := hlc) (
   · iapply syscForkOut_ne; rw [hn]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hn
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hn ?_
+    rfl
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_link`** (table index 19). -/
@@ -989,7 +992,8 @@ theorem syscall_arm_link (SL : SYSLINK) (hdep : SyscDepLink (hlc := hlc) (GF := 
   · iapply syscForkOut_ne; rw [hn]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hn
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hn ?_
+    rfl
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_mkdir`** (table index 20). -/
@@ -1061,7 +1065,7 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
     (procAddr j) _ _ hn (by show tfArgIdx 0 < V.tf.length; rw [hl]; decide) hmret rfl rfl $$ Hmr with
     ⟨%ι, #Hl, %hrow⟩
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts (syscStore { V.updEv k' with upt := P' } (R2 10#5))
-    (viewFaulted V.upt P' M) cs cs gn ke ι hrow.1 hrow.2 $$ Hanc Hl
+    (viewFaulted V.upt P' M) cs cs gn ke ι hrow.1 hrow.2 (by rw [hn]; decide) rfl $$ Hanc Hl
   imodintro
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f { V.updEv k' with upt := P' }
@@ -1159,7 +1163,8 @@ theorem syscall_arm_mknod (SN : SYSMKNOD) (hdep : SyscDepMknod (hlc := hlc) (GF 
   · iapply syscForkOut_ne; rw [hn]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hn
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hn ?_
+    rfl
 
 /-- **Rocq `proc_priv_states_agree`, at every row** (deviation 4): the
 block's descriptor array and the fragments at its own ghost agree on which
@@ -1326,6 +1331,8 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
     rcases hrow with ⟨-, rfl, -⟩ | ⟨fd, l, kk, rb, wb, t, -, -, rfl, -⟩
     · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
     · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  have hpo1 : V1.pown = V.pown := by
+    rcases hrow with ⟨-, rfl, -⟩ | ⟨fd, l, kk, rb, wb, t, -, -, rfl, -⟩ <;> rfl
   obtain ⟨hup, htf, hsz, hlz, hfdg, hchg, hgen, hks, hcwi, hsc⟩ := hV1
   icases syscPath_ofileAgreeKeep γ (procAddr j) pid V1 (viewFaulted V.upt P' M) V.fdg hfdg sts' $$
     [Hpriv Hfr] with ⟨%hag, Hpriv, Hfr⟩
@@ -1351,7 +1358,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   imod syscOpen_cite (GF := GF) V V1 M (viewFaulted V.upt P' M) sts sts' cs (R2 10#5) (procAddr j) hn
     (by rw [htf, hl]; decide) (syscOpen_low hn hfdrow) $$ HLr with ⟨%ι, #Hl, %hev⟩
   ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts sts' (syscStore V1 (R2 10#5))
-    (viewFaulted V.upt P' M) cs cs gn ke ι hev.1 hev.2 $$ Hanc Hl
+    (viewFaulted V.upt P' M) cs cs gn ke ι hev.1 hev.2 (by rw [hn]; decide) hpo1 $$ Hanc Hl
   imodintro
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f V1

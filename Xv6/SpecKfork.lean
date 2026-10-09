@@ -114,6 +114,13 @@ ledger's receipt of the parent store (`zombReceipt hz (ZFork (procAddr j) i
 rv γc)`) at the same generation `γc`; `KFORK.wp_kfork_led_eb` states it, and
 the landed `wp_kfork_eb` is its corollary (`kforkRetLed_ret`).
 
+(NI M4 pids P-3) THE OWN FORK COUNT: kfork lends the parent's half of its
+slot's own-count agreement (the block's `pownHalf (procAddr j) V.pown`) to
+allocproc and takes the block back at `pown := V.pown + 1` on success,
+`V.pown` on `-1` (`kforkPown`); the success receipt is the pick at
+`V.pown` and the child's placement (`SlotLed.sOccRcpt`), the cap's reason
+says `V.pown = PIDQ`.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.ParkCap
@@ -137,6 +144,12 @@ pid, which `allocproc` minted in `[1, PIDMAX]`. -/
 def kforkAns (rv : BitVec 32) : Prop :=
   rv = -1#32 ∨ (1 ≤ rv.toNat ∧ rv.toNat ≤ PIDMAX)
 
+/-- (NI M4 pids P-3) **THE OWN COUNT kfork LEAVES**: the record's, moved by
+one exactly at a successful fork (the parent's half of the slot's own-count
+agreement, stepped by allocproc's found arm). -/
+def kforkPown (V : ProcPriv) (rv : BitVec 32) (p' : Nat) : Prop :=
+  (rv = -1#32 → p' = V.pown) ∧ (rv ≠ -1#32 → p' = V.pown + 1)
+
 /-- What `kfork` hands back besides the context (Rocq `kfork_post`): the
 caller's block and its descriptor states, VERBATIM (kfork only reads them),
 and THE CALLER'S CHILDREN ROW -- back at `csP` on the `-1` arm (no child was
@@ -158,7 +171,8 @@ def kforkRet {hlc : HasLC} {GF : BundledGFunctors}
     (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (stsP : List FdState) (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF)
     (rv : BitVec 32) : IProp GF := iprop%
-  (∃ k' : Nat, ⌜V.ev ≤ k'⌝ ∗ procPrivFd γ (procAddr j) pid (V.updEv k') M) ∗ fdFrags V.fdg stsP ∗
+  (∃ k' p' : Nat, ⌜V.ev ≤ k' ∧ kforkPown V rv p'⌝ ∗ procPrivFd γ (procAddr j) pid { V.updEv k' with pown := p' } M) ∗
+    fdFrags V.fdg stsP ∗
   ((⌜rv = -1#32⌝ ∗ chFrag V.chg (procAddr j) csP ∗ Rc) ∨
    (∃ γc : GName, ⌜1 ≤ rv.toNat ∧ rv.toNat ≤ PIDMAX⌝ ∗ ⌜γc ∉ csP⌝ ∗ childTok γc rv Q ∗
       chFrag V.chg (procAddr j) (csP ∪ {γc})))
@@ -191,15 +205,19 @@ def kforkRetLed {hlc : HasLC} {GF : BundledGFunctors}
     (γ : FileNames) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (stsP : List FdState) (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF)
     (rv : BitVec 32) : IProp GF := iprop%
-  (∃ k' : Nat, ⌜V.ev ≤ k'⌝ ∗ procPrivFd γ (procAddr j) pid (V.updEv k') M) ∗ fdFrags V.fdg stsP ∗
+  (∃ k' p' : Nat, ⌜V.ev ≤ k' ∧ kforkPown V rv p'⌝ ∗ procPrivFd γ (procAddr j) pid { V.updEv k' with pown := p' } M) ∗
+    fdFrags V.fdg stsP ∗
   ((⌜rv = -1#32⌝ ∗ chFrag V.chg (procAddr j) csP ∗ Rc ∗
       -- THE REASONS (NI joint fork lane F1; NI M3 quotas Q-2; NI M4 pids):
-      -- allocproc's scan exhaustion, or the parent's spent pid share
-      (sFullRcpt (procAddr j) ∨ pidCapRcpt (procAddr j))) ∨
+      -- allocproc's scan exhaustion, or the parent's spent pid share (P-3: at
+      -- the record's own count)
+      (sFullRcpt (procAddr j) ∨ (pidCapRcpt (procAddr j) ∗ ⌜V.pown = PIDQ⌝))) ∨
    (∃ γc : GName, ⌜1 ≤ rv.toNat ∧ rv.toNat ≤ PIDMAX⌝ ∗ ⌜γc ∉ csP⌝ ∗ childTok γc rv Q ∗
       chFrag V.chg (procAddr j) (csP ∪ {γc}) ∗
-      -- THE TWO RECEIPTS (NI M2-G2b)
-      pidAllocRcpt (procAddr j) rv ∗
+      -- THE TWO RECEIPTS (NI M2-G2b), the pid's at the record's own count (P-3)
+      pidAllocRcpt (procAddr j) V.pown rv ∗
+      -- (NI M4 pids P-3) THE CHILD'S PLACEMENT, the slot ledger's `SOcc`
+      (∃ i' : Nat, sOccRcpt i') ∗
       -- THE TRAPFRAME `kalloc`'S RECEIPT (NI joint fork lane F2): allocproc's
       -- first `kalloc`, `KAlloc (procAddr j)`
       kAllocRcpt γk (procAddr j) ∗
@@ -216,7 +234,7 @@ theorem kforkRetLed_ret {hlc : HasLC} {GF : BundledGFunctors}
     (rv : BitVec 32) :
     kforkRetLed γ γk j pid V M stsP Q csP Rc rv ⊢ kforkRet γ j pid V M stsP Q csP Rc rv := by
   unfold kforkRetLed kforkRet
-  iintro ⟨H1, H2, (⟨Hr, Hc, HR, -⟩ | ⟨%γc, %h1, %h2, Ht, Hc, -, -, -⟩)⟩
+  iintro ⟨H1, H2, (⟨Hr, Hc, HR, -⟩ | ⟨%γc, %h1, %h2, Ht, Hc, -, -, -, -⟩)⟩
   · iframe H1 H2
     ileft; iframe Hr Hc HR
   · iframe H1 H2

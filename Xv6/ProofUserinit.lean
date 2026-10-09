@@ -291,7 +291,7 @@ theorem ui_allocproc (AP : ALLOCPROC) (Γ : SchedNames) (γ : FileNames) (c : CP
   have hact : apActorOk pav tk k'.proc :=
     ⟨fun _ => hp0, fun h => absurd (h.symm.trans hboot) (by decide)⟩
   have h := AP.wp_allocproc (hlc := hlc) (GF := GF) Γ γ c k' γl γp γk on pav tk Q 0 hnoff hK hlk hlp hlq htier hcnt
-    hact
+    hact 0
   unfold wp_allocproc_body at h
   simp only [allocprocAddr] at h
   iintro ⟨Hk, Hpc, #Hpi, #Hkm, #Hpl, Hav, Hpav, #HKw, Hnext⟩
@@ -302,8 +302,11 @@ theorem ui_allocproc (AP : ALLOCPROC) (Γ : SchedNames) (γ : FileNames) (c : CP
   -- it hands back is dropped
   isplitr
   · rw [hp0]; iapply actLend_zero
+  -- (NI M4 pids P-3) and the own-count lend likewise
+  isplitr
+  · rw [hp0]; iapply pownLend_zero
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %hsp Hd Hpc - Hpost %hcs
+  iintro %cpu' HK %spie %spp %R' %hsp Hd Hpc - - Hpost %hcs
   -- the success arm's `sieArm` (the acquire's pay) is not needed here
   icases Hd with (⟨%h0, Hk⟩ | ⟨%h1, Hk, _⟩)
   · iapply HK $$ %spie %spp %R' %hsp [Hk] Hpc Hpost %hcs

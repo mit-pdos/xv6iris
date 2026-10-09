@@ -81,6 +81,15 @@ theorem SyscRows.updEv {V : ProcPriv} {M : Nat → List (BitVec 8)} {V' : ProcPr
   ⟨h.mem, h.fd, h.pipe, h.ch, h.ret, h.tf, h.upt, h.sz, h.lazy, h.tfp, h.fdg, h.chg, h.gen, h.cwi,
     h.sbrk, h.fork, h.read, h.pid, h.ks, h.secc, h.uptime, h.wait⟩
 
+/-- (NI M4 pids P-3) ...and at a moved own count (fork's success): no row
+reads the ghost field. -/
+theorem SyscRows.updPown {V : ProcPriv} {M : Nat → List (BitVec 8)} {V' : ProcPriv}
+    {M' : Nat → List (BitVec 8)} {sts sts' : List FdState} {cs cs' : ExtTreeSet GName compare}
+    {pid : BitVec 32} (p : Nat) (h : SyscRows V M V' M' sts sts' cs cs' pid) :
+    SyscRows V M { V' with pown := p } M' sts sts' cs cs' pid :=
+  ⟨h.mem, h.fd, h.pipe, h.ch, h.ret, h.tf, h.upt, h.sz, h.lazy, h.tfp, h.fdg, h.chg, h.gen, h.cwi,
+    h.sbrk, h.fork, h.read, h.pid, h.ks, h.secc, h.uptime, h.wait⟩
+
 /-- **The rows of an entry that moved nothing but a0** (Rocq's
 `sysc_mem_ok_quiet` / `sysc_fd_ok_refl_at` / `sysc_pipe_ok_quiet` /
 `sysc_ch_ok_refl` / `sysc_*_ne` at one arm): kill, getpid, pause, uptime,

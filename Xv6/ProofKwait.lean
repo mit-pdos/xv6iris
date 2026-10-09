@@ -393,7 +393,7 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) (pid0 : BitVec 32) :
         ∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv ∗
           exitTok V.gen pid0 (xstateVal xsv) ∗ zsElem pa (some (pid0, xstateVal xsv)) := by
   unfold procDormant
-  iintro ⟨Hq, %_, %V, %pid, %⟨hof, hcwd, hroot, hsz, -⟩, Hpid, Hfields, Hal, Hch, Hev, Hgh, Hxs, Hspace⟩
+  iintro ⟨Hq, %_, %V, %pid, %⟨hof, hcwd, hroot, hsz, -⟩, Hpid, Hfields, Hal, Hch, Hev, Hpo, Hgh, Hxs, Hspace⟩
   icases (show wordPointsTo (GF := GF) (pPid pa) 4 pidPub pid0 ∗ wordPointsTo (pPid pa) 4 pidPriv pid ⊢
       ⌜pid0 = pid⌝ ∗ wordPointsTo (pPid pa) 4 pidPub pid0 ∗ wordPointsTo (pPid pa) 4 pidPriv pid from by
     unfold pidPub pidPriv; exact wordPointsTo_agree_keep _ _ _ _ _ _) $$ [Hq Hpid] with ⟨%hpe, Hq, Hpid⟩
@@ -416,13 +416,13 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) (pid0 : BitVec 32) :
   have hptne : V.pagetable ≠ 0#64 := by rw [hpt]; exact Xv6.PtRun.pageValid_ne_zero _ hrootv
   iframe Hq
   iexists V, M
-  isplitl [Hpid Hfields Hal Hch Hev Hstack Htf Hpt Hcr]
+  isplitl [Hpid Hfields Hal Hch Hev Hpo Hstack Htf Hpt Hcr]
   · unfold freeprocIn
     rw [if_neg htfne, if_neg hptne, if_neg htfne, if_neg hptne]
     isplitl []
     · ipureintro; exact ⟨hof, hcwd, hroot⟩
     ihave Hcr := pageCredit_congr procSpare (procSpare + 0 + 0) rfl $$ Hcr
-    iframe Hpid Hfields Hal Hch Hev Hstack Hcr
+    iframe Hpid Hfields Hal Hch Hev Hpo Hstack Hcr
     isplitl [Htf]
     · isplitl []
       · ipureintro; exact ⟨htf, by rw [htf]; exact htfv⟩
@@ -744,7 +744,7 @@ theorem kw_peek_ghost (j n : Nat) (hj : j < NPROC) (hn : n < NPROC)
       procDormant (procAddr n) ZOMBIE := by
   have hpj : procAddr j ≠ 0#64 := procAddr_nonzero hj
   unfold kwWRest procDormant
-  iintro ⟨⟨%gs, %m, %O, Hch, Ho, Hci, Hfam⟩, Hxs, %hst, %V, %pid, %hV, Hpid, Hf, Hal, Hchf, Hev, Hgh,
+  iintro ⟨⟨%gs, %m, %O, Hch, Ho, Hci, Hfam⟩, Hxs, %hst, %V, %pid, %hV, Hpid, Hf, Hal, Hchf, Hev, Hpo, Hgh,
     ⟨%xsv, Hxb, Hz⟩, Hsp⟩
   rw [if_pos rfl]
   icases Hz with ⟨Hesc, Hzs⟩
@@ -777,7 +777,7 @@ theorem kw_peek_ghost (j n : Nat) (hj : j < NPROC) (hn : n < NPROC)
   isplitl []
   · ipureintro; exact hst
   iexists V, pid
-  iframe Hpid Hf Hal Hchf Hev Hgh Hsp
+  iframe Hpid Hf Hal Hchf Hev Hpo Hgh Hsp
   isplitl []
   · ipureintro; exact hV
   iexists xs
@@ -893,7 +893,7 @@ theorem kw_priv_copy_ev (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
         actCnt pa k' -∗
         procPrivNoctxAt curCtx pa pid { V.updEv k' with upt := P' } M') := by
   unfold procPrivNoctxAt procFieldsNoctx
-  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hspace, Htfp, %hlz, Hev⟩
+  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hspace, Htfp, %hlz, Hev, Hpo⟩
   isplitl []
   · ipureintro; exact hf
   iframe Hszc Hpgc Hspace Hev
@@ -901,7 +901,7 @@ theorem kw_priv_copy_ev (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
   have htfp : P'.tfp = V.upt.tfp := hext.1.2.1
   ihave Htfp := (show @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [htfp]) $$ Htfp
-  iframe Hpid Hks Hszc Hpgc Htfc Hof Hcwd Hnm Hsc Hrt Hspace Htfp Hev
+  iframe Hpid Hks Hszc Hpgc Htfc Hof Hcwd Hnm Hsc Hrt Hspace Htfp Hev Hpo
   isplitl []
   · ipureintro
     exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, by rw [hext.1.1]; exact hf.2.2.1,

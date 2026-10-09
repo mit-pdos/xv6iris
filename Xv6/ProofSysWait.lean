@@ -234,7 +234,7 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
        wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc ∗
        wordPointsTo (pRoot (procAddr j)) 8 (DFrac.own 1) V.root) ∗
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
-      actCnt (procAddr j) V.ev
+      actCnt (procAddr j) V.ev ∗ pownHalf (procAddr j) V.pown
       from by unfold procPrivNoctxAt procFieldsNoctx; iintro H; iexact H) $$ Hblk
     with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hof, Hcwd, Hnm, Hsc, Hrt⟩, HPt, HTf, %hlz, Hev⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ⊢

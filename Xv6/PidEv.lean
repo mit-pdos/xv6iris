@@ -118,9 +118,15 @@ def isAllocOf (act : BitVec 64) : Pev → Bool
 /-- The allocations actor `act` made in `h`: its OWN fork count. -/
 def ownAllocs (act : BitVec 64) (h : List Pev) : Nat := h.countP (isAllocOf act)
 
-/-- **THE PARTITION**: the pid the kernel is bound to give actor `act` after `h`. -/
-def pidPickS (act : BitVec 64) (h : List Pev) : Nat :=
-  if act = 0#64 then 1 else slotOf act + NPROC * (ownAllocs act h + 1)
+/-- (NI M4 pids P-3) **THE PARTITION AT AN OWN COUNT**: the pid the kernel
+hands actor `act` whose own allocation count is `c` -- what fork's row reads
+(`UsysDet.usysForkPid`: the citation's own count, a field). -/
+def pidPickN (act : BitVec 64) (c : Nat) : Nat :=
+  if act = 0#64 then 1 else slotOf act + NPROC * (c + 1)
+
+/-- **THE PARTITION**: the pid the kernel is bound to give actor `act` after
+`h` -- the pick at the actor's own count in `h`. -/
+def pidPickS (act : BitVec 64) (h : List Pev) : Nat := pidPickN act (ownAllocs act h)
 
 /-- An actor word the kernel can hold: no process (`0`, the boot hart before
 the scheduler) or a slot's address. -/
@@ -165,17 +171,11 @@ theorem ownAllocs_take_lt (act : BitVec 64) (h : List Pev) (i : Nat) (p : BitVec
     omega
   omega
 
-/-- (NI M4 pids P-1) A canonical list of `n` allocations by `act` counts `n`:
-the own count is all `UsysDet.UIota.ledP` keeps of the pid prefix. -/
-theorem ownAllocs_replicate (act : BitVec 64) (n : Nat) (p : BitVec 32) :
-    ownAllocs act (List.replicate n (.PAlloc act p)) = n := by
-  unfold ownAllocs; rw [List.countP_replicate]; simp [isAllocOf]
-
 /-- (NI M4 pids P-1) The partition's pick reads the history through the own
 count only. -/
 theorem pidPickS_congr {act : BitVec 64} {h h' : List Pev} (hc : ownAllocs act h = ownAllocs act h') :
     pidPickS act h = pidPickS act h' := by
-  unfold pidPickS; rw [hc]
+  unfold pidPickS pidPickN; rw [hc]
 
 theorem pevWf_nil : pevWf [] := by
   intro i a p h; simp at h
@@ -239,16 +239,16 @@ theorem pidPickS_fresh {h : List Pev} {act : BitVec 64} {j : Nat} (hw : pevWf h)
     ¬ liveOf h (pidPickS act h : Int) ∧ pidPickS act h ≠ 1 := by
   have hne : act ≠ 0#64 := by rw [ha]; exact procAddr_nonzero hj
   have hpk : pidPickS act h = j + NPROC * (ownAllocs act h + 1) := by
-    unfold pidPickS; rw [if_neg hne, ha, slotOf_procAddr hj]
+    unfold pidPickS pidPickN; rw [if_neg hne, ha, slotOf_procAddr hj]
   refine ⟨fun hl => ?_, by rw [hpk]; unfold NPROC; omega⟩
   obtain ⟨i, b, q, hi, hz⟩ := liveOf_alloc h _ hl
   obtain ⟨hq, hb⟩ := hw i b q hi
   have hzq : pidPickS act h = q.toNat := by exact_mod_cast hz
   rcases hb with rfl | ⟨j', hj', rfl⟩
-  · unfold pidPickS at hq; rw [if_pos rfl] at hq
+  · unfold pidPickS pidPickN at hq; rw [if_pos rfl] at hq
     rw [hpk] at hzq; unfold NPROC at hzq; omega
   · have hq' : q.toNat = j' + NPROC * (ownAllocs (procAddr j') (h.take i) + 1) := by
-      unfold pidPickS at hq; rw [if_neg (procAddr_nonzero hj'), slotOf_procAddr hj'] at hq; exact hq
+      unfold pidPickS pidPickN at hq; rw [if_neg (procAddr_nonzero hj'), slotOf_procAddr hj'] at hq; exact hq
     rw [hpk, hq'] at hzq
     unfold NPROC at hzq hj hj'
     have hjj : j = j' := by omega
@@ -260,7 +260,7 @@ theorem pidPickS_fresh {h : List Pev} {act : BitVec 64} {j : Nat} (hw : pevWf h)
 /-- Under the quota the pick is a positive `int`: at most `PIDMAX`. -/
 theorem pidPickS_le {h : List Pev} {act : BitVec 64} {j : Nat} (hj : j < NPROC) (ha : act = procAddr j)
     (hc : ownAllocs act h < PIDQ) : pidPickS act h ≤ PIDMAX := by
-  unfold pidPickS
+  unfold pidPickS pidPickN
   rw [if_neg (by rw [ha]; exact procAddr_nonzero hj), ha, slotOf_procAddr hj]
   rw [ha] at hc
   unfold PIDQ at hc; unfold PIDMAX NPROC; unfold NPROC at hj

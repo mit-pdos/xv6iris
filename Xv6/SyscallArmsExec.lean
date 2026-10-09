@@ -93,15 +93,15 @@ def SyscDepExec : Prop :=
 theorem syscExec_kexecOk_facts (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat)
     (alen : Nat → Nat) (hne : r ≠ 0xFFFFFFFFFFFFFFFF#64) (hok : kexecOk V V' r entry spv szv' na alen) :
     r = BitVec.ofNat 64 na ∧ V'.upt.tfp = V.upt.tfp ∧ V'.fdg = V.fdg ∧ V'.cwi = V.cwi ∧
-      V'.gen = V.gen ∧ V'.chg = V.chg ∧ V'.kstack = V.kstack ∧ V'.pvSecc = V.pvSecc := by
-  rcases hok with ⟨hr, -⟩ | ⟨hr, -, -, -, -, htfp, -, -, hfdg, -, hcwi, hgen, hchg, -, -, -, -, hks, -, hsc⟩
+      V'.gen = V.gen ∧ V'.chg = V.chg ∧ V'.kstack = V.kstack ∧ V'.pvSecc = V.pvSecc ∧ V'.pown = V.pown := by
+  rcases hok with ⟨hr, -⟩ | ⟨hr, -, -, -, -, htfp, -, -, hfdg, -, hcwi, hgen, hchg, -, -, -, -, hks, -, hsc, hpo⟩
   · exact absurd hr hne
-  · exact ⟨hr, htfp, hfdg, hcwi, hgen, hchg, hks, hsc⟩
+  · exact ⟨hr, htfp, hfdg, hcwi, hgen, hchg, hks, hsc, hpo⟩
 
 /-- The six record facts the shared tail needs of the returned block. -/
 def SyscExecKeep (V V' : ProcPriv) : Prop :=
   V'.upt.tfp = V.upt.tfp ∧ V'.fdg = V.fdg ∧ V'.chg = V.chg ∧ V'.gen = V.gen ∧ V'.cwi = V.cwi ∧
-    V'.kstack = V.kstack ∧ V'.pvSecc = V.pvSecc
+    V'.kstack = V.kstack ∧ V'.pvSecc = V.pvSecc ∧ V'.pown = V.pown
 
 /-- A successful exec's slot is at the record after the a0 store (Rocq
 `exec_key`'s shape). -/
@@ -140,7 +140,7 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
     subst hM hr
     ihave Hrf := sysExecPostFail_refund (hlc := hlc) _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hfail
     isplitr
-    · ipureintro; exact ⟨htfp0, rfl, rfl, rfl, rfl, rfl, rfl⟩
+    · ipureintro; exact ⟨htfp0, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
     isplitr
     · unfold syscExecOut
       iintro %_
@@ -167,10 +167,10 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
         ipureintro; exact ⟨hne, hk⟩
     icases Hs with ⟨%entry, %spv, %szv', %hk, Hslot⟩
     obtain ⟨hne, hok⟩ := hk
-    obtain ⟨hr, htfp, hfdg, hcwi, hgen, hchg, hks, hsc⟩ :=
+    obtain ⟨hr, htfp, hfdg, hcwi, hgen, hchg, hks, hsc, hpo⟩ :=
       syscExec_kexecOk_facts _ V' r entry spv szv' na alen hne hok
     isplitr
-    · ipureintro; exact ⟨htfp.trans htfp0, hfdg, hchg, hgen, hcwi, hks, hsc⟩
+    · ipureintro; exact ⟨htfp.trans htfp0, hfdg, hchg, hgen, hcwi, hks, hsc, hpo⟩
     isplitl [Hslot]
     · unfold syscExecOut
       iintro %_
@@ -201,7 +201,7 @@ theorem syscRows_exec (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPri
     (r : BitVec 64) (hn : syscNum V = USYS_exec) (hk : SyscExecKeep V V') :
     SyscRows V M (syscStore V' r) M' sts sts cs cs pid := by
   have hne : ∀ m : Int, (7 : Int) ≠ m → syscNum V ≠ m := fun m h => by rw [hn]; exact h
-  obtain ⟨htfp, hfdg, hchg, hgen, hcwi, hks, hsc⟩ := hk
+  obtain ⟨htfp, hfdg, hchg, hgen, hcwi, hks, hsc, -⟩ := hk
   exact ⟨syscMemOk_exec V _ _ _ hn, syscFdOk_refl_at V _ sts 7 hn (by decide) (by decide) (by decide)
       (by decide), syscPipeOk_quiet V _ _ _ sts sts (hne 4 (by decide)), syscChOk_refl V cs,
     hne 2 (by decide), Or.inl hn, Or.inl hn, Or.inl hn, Or.inl hn, htfp, hfdg, hchg, hgen,
@@ -300,7 +300,8 @@ theorem syscall_arm_exec (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF
   · iapply syscForkOut_ne; rw [hn7]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn7]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hn7
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hn7 ?_
+    exact hkeep.2.2.2.2.2.2.2
 
 end
 
@@ -621,11 +622,12 @@ theorem syscall_fallback (PK : PRINTK)
   · iapply syscForkOut_ne; exact hne 1 (by decide) (by decide)
   isplitr
   · iapply syscWaitOut_ne; exact hne 3 (by decide) (by decide)
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ (syscNum V) rfl (hne 14 (by decide) (by decide))
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ (syscNum V) rfl ?_ (hne 14 (by decide) (by decide))
       (hne 3 (by decide) (by decide)) (hne 1 (by decide) (by decide)) (hne 12 (by decide) (by decide))
       (hne 16 (by decide) (by decide)) (hne 21 (by decide) (by decide)) (hne 10 (by decide) (by decide))
       (hne 5 (by decide) (by decide)) (hne 9 (by decide) (by decide)) (hne 20 (by decide) (by decide))
       (hne 15 (by decide) (by decide))
+    rfl
 
 set_option maxHeartbeats 4000000 in
 /-- **THE BLOCKED ARM** (xv6 7b2c1b1b; Rocq `sysc_blocked`): the mask's bit
@@ -693,7 +695,8 @@ theorem syscall_blocked
   · iapply syscForkOut_ne; rw [hblk]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hblk]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hblk
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hblk ?_
+    rfl
 
 end
 

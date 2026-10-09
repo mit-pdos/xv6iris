@@ -43,7 +43,7 @@ disjunct carries it -- the column kept, no status bytes -- at any status
 pointer).  Such a round never resumes (usertrap's +0xa6 check takes the
 shot), so the citation is never filed. -/
 theorem ut_evOut_of (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)
-    (cs2 : ExtTreeSet GName compare) (ke : Nat) (act : BitVec 64) :
+    (cs2 : ExtTreeSet GName compare) (ke : Nat) (act : BitVec 64) (hsc : A.sc = uecallScause) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
       syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M A.sts sts2 V2 M2 A.cs cs2 A.gn -∗
       |==> utEvOut (hlc := hlc) A.sc A.sep A.V A.M A.sts sts2 V2 M2 A.cs cs2 := by
@@ -51,28 +51,35 @@ theorem ut_evOut_of (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8
   unfold syscEvOut utEvOut
   icases He with (%hq | ⟨%k, %ι, #Hk, #Hl, %hr⟩ | ⟨%hk, -⟩)
   · imodintro
+    isplitl []
+    · ipureintro; intro hne; exact absurd hsc hne
     iintro %_
     ileft; ipureintro; exact hq
   · imodintro
+    isplitl []
+    · ipureintro; intro hne; exact absurd hsc hne
     iintro %_
     iright
     iexists k, ι
     iframe Hk Hl
     ipureintro; exact hr
-  · obtain ⟨hw, hm1, hc, hi⟩ := hk
+  · obtain ⟨hw, hm1, hc, hi, hpo⟩ := hk
     imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
+    ihave #Hl := niIotaLbs_pown _ _ (utSysRec A.sep A.V).pown $$ Hl
     imodintro
+    isplitl []
+    · ipureintro; intro hne; exact absurd hsc hne
     iintro %_
     iright
-    iexists ke, { UIota.boot with act := act }
+    iexists ke, { UIota.boot with act := act, pown := (utSysRec A.sep A.V).pown }
     iframe Ha Hl
     ipureintro
     refine ⟨⟨fun h => absurd (hw.symm.trans h) (by decide), fun _ _ => ?_,
       fun h => absurd (hw.symm.trans h) (by decide), fun h => absurd (hw.symm.trans h) (by decide),
       fun h => absurd (hw.symm.trans h) (by decide), fun h => absurd (hw.symm.trans h) (by decide),
       fun h => absurd (hw.symm.trans h) (by decide), fun h => absurd (hw.symm.trans h) (by decide),
-      syscEvFs_at hw⟩, fsPast_nil _ _ rfl⟩
-    show usysWaitFitsAt _ _ _ _ { UIota.boot with act := act } _ _ _
+      syscEvFs_at hw⟩, fsPast_nil _ _ rfl, ⟨rfl, hpo⟩, fun _ => hpo⟩
+    show usysWaitFitsAt _ _ _ _ { UIota.boot with act := act, pown := (utSysRec A.sep A.V).pown } _ _ _
     unfold usysWaitFitsAt UIota.reap
     dsimp only [UIota.boot]
     rw [zLowest_nil]
@@ -138,7 +145,7 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA :
   -- anchor off the environment, the dispatcher's citation re-spelled
   icases syscallEnv_anchor_keep PT Γ A.N.f $$ Henv with ⟨⟨%ke, #Hanc⟩, Henv⟩
   iapply wpLoop_bupd
-  imod ut_evOut_of A V2 M2 sts2 cs2 ke (procAddr A.j) $$ Hanc Heo with Hev
+  imod ut_evOut_of A V2 M2 sts2 cs2 ke (procAddr A.j) hsc $$ Hanc Heo with Hev
   imodintro
   ihave Houts := ut90_outs A V2 M2 sts2 cs2 $$ [Hxo Hso Hfo Hwo Hev]
   · iframe Hxo Hso Hfo Hwo Hev

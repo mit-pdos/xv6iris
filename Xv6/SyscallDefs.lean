@@ -164,6 +164,12 @@ round's own fs events `ι.fout` lie in the window past `c`, the cited prefix
 ending in their last (`NiFs.fevOwn`). -/
 def fsPast (c : Nat) (ι : UIota) : Prop := (ι.fev = [] ∨ c < ι.fev.length) ∧ fevOwn (ι.fev.drop c) ι.fout
 
+/-- (NI M4 pids P-3) **THE OWN COUNT AT A CITATION**: the citation carries
+the record's own fork count `c` before the round (`ι.pown`, stamped by every
+citing arm) and the record leaves the round at `c'`, moved by the round's own
+allocations (`UIota.pstep`: one at a successful fork, else none). -/
+def pownRow (c c' : Nat) (ι : UIota) : Prop := ι.pown = c ∧ c' = c + ι.pstep
+
 /-- a citation of no fs event, owning none, lies past every cursor -/
 theorem fsPast_nil (c : Nat) (ι : UIota) (h : ι.fev = []) (hf : ι.fout = [] := by rfl) : fsPast c ι := by
   refine ⟨Or.inl h, ?_⟩; rw [hf]; exact fevOwn_nil _
@@ -302,7 +308,7 @@ def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName c
   (syscNum V = USYS_fork →
     tfW V'.tf (tfArgIdx 0) = usysForkAns ι ∧
     (forkOk ι → (∃ (hz : List Zev) (i : Nat),
-        ι.zev = hz ++ [.ZFork ι.act i (BitVec.ofNat 32 (pidPickS ι.act ι.pev)) (usysForkGen ι)]) ∧
+        ι.zev = hz ++ [.ZFork ι.act i (BitVec.ofNat 32 (pidPickN ι.act ι.pown)) (usysForkGen ι)]) ∧
       cs' = cs ∪ {usysForkGen ι}) ∧
     (¬ forkOk ι → (ι.sFull ∨ ι.pown = PIDQ) ∧ cs' = cs)) ∧
   (syscNum V = USYS_sbrk →
@@ -317,6 +323,16 @@ def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName c
   (syscNum V = USYS_dup → sts.length = NOFILE ∧
     tfW V'.tf (tfArgIdx 0) = usysDupAns (usysFdAt sts (tfW V.tf (tfArgIdx 0))) (fdLowestClosed sts)) ∧
   syscEvFs V V' img img' sts sts' ι
+
+/-- (NI M4 pids P-3) **Off fork, the row does not read the own count**: a
+citation's row holds at it with its own-count field set to anything (only
+fork's clause reads `ι.pown`, through `forkOk` and `usysForkPid`). -/
+theorem syscEvRow_pown {V V' : ProcPriv} {img img' : ElfMem} {cs cs' : ExtTreeSet GName compare}
+    {sts sts' : List FdState} {ι : UIota} (c : Nat) (hnf : syscNum V ≠ USYS_fork)
+    (h : syscEvRow V V' img img' cs cs' sts sts' ι) :
+    syscEvRow V V' img img' cs cs' sts sts' { ι with sev := [], pown := c } := by
+  obtain ⟨h1, h2, -, h4, h5, h6, h7, h8, h9⟩ := h
+  exact ⟨h1, h2, fun h => absurd h hnf, h4, h5, h6, h7, h8, h9⟩
 
 /-! ## §2 The dispatch table -/
 

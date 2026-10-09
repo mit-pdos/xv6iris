@@ -81,7 +81,7 @@ def procPrivRun (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
   procPtAt V.upt M ∗
   tfPageAt V.upt.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
-  actCnt pa V.ev
+  actCnt pa V.ev ∗ pownHalf pa V.pown
 
 /-- The private block of a running process at the descriptor `P'` (the
 table the lazy pages `vmfault` filled in under `copyout`/`copyin` grew
@@ -95,7 +95,7 @@ def procPrivExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
   procPtAt P' M' ∗
   tfPageAt P'.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝ ∗
-  actCnt pa V.ev
+  actCnt pa V.ev ∗ pownHalf pa V.pown
 
 /-- ... and, at the kernel-page-table context, `procPrivBareAt` there. -/
 theorem procPrivExt_eq (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
@@ -444,7 +444,7 @@ def ecRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
   wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗
   tfPageAt P.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree P.um V.sz⌝ ∗
-  actCnt pa V.ev
+  actCnt pa V.ev ∗ pownHalf pa V.pown
 
 theorem ec_priv_split [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) :
@@ -488,7 +488,7 @@ theorem ecRest_lend [CurCtx] (p pa : BitVec 64) (hp : p = pa) (pid : BitVec 32) 
         ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ ecRest pa pid (V.updEv k2) P) := by
   subst p
   unfold ecRest
-  iintro ⟨Hpid, Hks, Htfc, Hcwd, Hnm, Hsc, Hrt, Htfp, %hlz, Hev⟩
+  iintro ⟨Hpid, Hks, Htfc, Hcwd, Hnm, Hsc, Hrt, Htfp, %hlz, Hev, Hpo⟩
   icases actLend_borrow pa V.ev $$ Hev with ⟨Hl, Hlb⟩
   iframe Hl
   iintro ⟨%k1, %hk1, Hl⟩

@@ -117,6 +117,7 @@ theorem syscall_arm_chroot (SCR : SYSCHROOT)
     rcases hdisj with rfl | ⟨ipv, z, rfl⟩
     · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
     · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  have hpo1 : V1.pown = V.pown := by rcases hdisj with rfl | ⟨ipv, z, rfl⟩ <;> rfl
   obtain ⟨hup, htf, hsz, hlz, hfdg, hchg, hgen, hks, hcwi, hsc⟩ := hV1
   have hs2' : R2 18#5 = pageAddr V1.upt.tfp := by
     rw [hcs.2.2.2.1.trans hs2, hup, hext.1.2.1]
@@ -137,7 +138,8 @@ theorem syscall_arm_chroot (SCR : SYSCHROOT)
   · iapply syscForkOut_ne; rw [hn24]; decide
   isplitr
   · iapply syscWaitOut_ne; rw [hn24]; decide
-  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hn24
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ _ _ hn24 ?_
+    exact hpo1
 
 end
 

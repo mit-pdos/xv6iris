@@ -300,6 +300,13 @@ class WchG (GF : BundledGFunctors) extends WchGpre GF where
   (`KcredDefs.npTicketAuth` in `npipelock`'s payload, one `npTicket 1` per
   live pipe), born in `WaitInvTies.childrenRes_alloc` at `0`. -/
   wnpName : GName
+  /-- (NI M4 pids P-3) THE PER-SLOT OWN-COUNT AGREEMENT'S NAME: the
+  slot-generation camera at a third name holds, per slot, a `Nat` split in two
+  halves (`pownHalf`): one rides the slot's process (or dormant) block at its
+  record's `pown`, the other `pid_lock`'s payload at the pid ledger's own
+  count of the slot.  Born at 0 in `WaitInvTies.childrenRes_alloc`.  No camera
+  rides with it (deviation 9). -/
+  wpoName : GName
 
 /-- AN EIGHTH (Rocq `qeighth`, deviation 2). -/
 abbrev qeighth : Qp := Qp.quarter.half
@@ -479,6 +486,63 @@ theorem actCnt_update (pa : BitVec 64) (k k' : Nat) :
 theorem actCnt_step (pa : BitVec 64) (k : Nat) :
     actCnt (GF := GF) pa k ⊢ |==> actCnt pa (k + 1) :=
   actCnt_update pa k (k + 1)
+
+/-! ## The slot's own fork count (NI M4 pids P-3)
+
+An AGREEMENT, not a counter: two halves of one slot-generation element at the
+name `wpoName`, one in the slot's block at the record's `pown`, one in
+`pid_lock`'s payload at the pid ledger's own count of the slot
+(`PidLock.pidLedger`).  allocproc's found arm, run by the slot's process,
+brings its half (`PidLock.pownLend`), reads the agreement and steps both. -/
+
+/-- **HALF THE SLOT'S OWN-COUNT AGREEMENT** at count `c`. -/
+def pownHalf (pa : BitVec 64) (c : Nat) : IProp GF :=
+  iOwn (F := constOF SgenUR) (WchG.wpoName GF) (sgOne pa (.own (1 : Qp).half) c)
+
+instance pownHalf_timeless (pa : BitVec 64) (c : Nat) : Timeless (pownHalf (GF := GF) pa c) := by
+  unfold pownHalf; infer_instance
+
+/-- The two halves agree. -/
+theorem pownHalf_agree (pa : BitVec 64) (c c' : Nat) :
+    pownHalf (GF := GF) pa c ∗ pownHalf pa c' ⊢ ⌜c = c'⌝ := by
+  unfold pownHalf sgOne
+  iintro ⟨H1, H2⟩
+  icombine H1 H2 gives %Hv
+  ipureintro
+  rw [Heap.singleton_op_singleton, Heap.singleton_valid_iff] at Hv
+  obtain ⟨-, hg⟩ := DFracAgree.op_valid.mp Hv
+  exact congrArg DiscreteO.car hg
+
+/-- The two halves are the whole. -/
+theorem pownHalf_whole (pa : BitVec 64) (c : Nat) :
+    pownHalf (GF := GF) pa c ∗ pownHalf pa c ⊣⊢
+      iOwn (F := constOF SgenUR) (WchG.wpoName GF) (sgOne pa (.own 1) c) := by
+  unfold pownHalf
+  have e : sgOne pa (.own 1) c = sgOne pa (.own (1 : Qp).half) c • sgOne pa (.own (1 : Qp).half) c := by
+    rw [sg_one_op, DFrac.op_own, Qp.half_add_half]
+  rw [e]
+  exact ⟨iOwn_op.2, iOwn_op.1⟩
+
+/-- **THE STEP**: both halves, together, move to any count. -/
+theorem pownHalf_update (pa : BitVec 64) (c c' : Nat) :
+    pownHalf (GF := GF) pa c ∗ pownHalf pa c ⊢ |==> (pownHalf pa c' ∗ pownHalf pa c') := by
+  iintro H
+  ihave H := (pownHalf_whole pa c).1 $$ H
+  imod (show iOwn (GF := GF) (F := constOF SgenUR) (WchG.wpoName GF) (sgOne pa (.own 1) c) ⊢
+      |==> iOwn (F := constOF SgenUR) (WchG.wpoName GF) (sgOne pa (.own 1) c') from by
+    unfold sgOne
+    exact iOwn_update (Heap.singleton_update
+      (Update.exclusive (sg_el_valid _ _ DFrac.valid_own_one)))) $$ H with H
+  imodintro
+  iapply (pownHalf_whole pa c').2 $$ H
+
+/-- (NI M4 pids P-3) THE BOOT'S SPLIT: each slot's whole agreement at 0
+into its two halves (one for the dormant block, one for `pid_lock`). -/
+theorem pownHalf_rows_split (l : List Nat) :
+    ([∗list] i ∈ l, iOwn (GF := GF) (F := constOF SgenUR) (WchG.wpoName GF) (sgOne (procAddr i) (.own 1) 0)) ⊢
+      ([∗list] i ∈ l, pownHalf (procAddr i) 0) ∗ ([∗list] i ∈ l, pownHalf (procAddr i) 0) := by
+  refine (BigSepL.bigSepL_mono (fun _ => (pownHalf_whole _ _).2)).trans ?_
+  exact BigSepL.bigSepL_sep_eqv.1
 
 /-- **THE LEND** (Rocq `act_lend`, design ni-strong-instance.md §7): what a
 contract on the permit cone takes from its caller, keyed by the running
