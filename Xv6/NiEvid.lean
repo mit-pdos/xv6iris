@@ -86,6 +86,14 @@ def niBelowQ (ι H : UIota) : Prop :=
   ι.pev <+: H.pev ∧ ι.zev <+: H.zev ∧ ι.ticks ≤ H.ticks ∧ ι.sev <+: H.sev ∧ ι.cacc <+: H.cacc ∧
     ι.fev <+: H.fev
 
+/-- (NI M4 pids P-2) **`niBelowQ` without the pid conjunct**: ι's family
+and slot prefixes, fs-event prefix and console stream are prefixes of H's,
+its count at most H's; neither the allocator nor the pid ledgers are
+compared (on the pid kernel the rows read the pid history only through the
+caller's own fork count, a position: `UsysDet.usysDet_ownP`). -/
+def niBelowP (ι H : UIota) : Prop :=
+  ι.zev <+: H.zev ∧ ι.ticks ≤ H.ticks ∧ ι.sev <+: H.sev ∧ ι.cacc <+: H.cacc ∧ ι.fev <+: H.fev
+
 /-- **The join**: the longer list per ledger, the larger count; H's actor. -/
 def niJoin (H ι : UIota) : UIota :=
   ⟨niLonger H.kev ι.kev, niLonger H.pev ι.pev, niLonger H.zev ι.zev, max H.ticks ι.ticks, H.act,

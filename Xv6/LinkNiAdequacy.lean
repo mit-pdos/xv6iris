@@ -49,6 +49,14 @@ booted, `fs.img` on its disk) -- and its pure corollaries over runs.
   (`verified-quota`) no class row reads the allocator ledger
   (`UsysDet.usysDet_ledQ`), so the allocator order leaves both hypotheses
   (`NiTrace` scope 14).
+* **`xv6NiDetP`** (NI M4 pids P-2, rulings P-R7/R8; the fifteenth root):
+  `xv6NiDetQ` WITHOUT THE PID HISTORY -- the cited positions compared
+  without their pid length but with the caller's OWN fork count
+  (`NiStep.detInP`) and the histories by `niBelowP` (no allocator, no pid
+  conjunct), at the SAME `xv6NiPhi`.  On the pid kernel (`verified-quota`
+  975109bc: pids partitioned by the parent's slot) no class row reads the
+  pid history beyond the own count (`UsysDet.usysDet_ownP`), so the pid
+  order leaves both hypotheses (`NiTrace` scope 18).
 
 A `Link` file because it consumes `ProofUser` (tools/check_layering.sh).
 
@@ -69,7 +77,10 @@ ride the step, `NiTrace` scope 15) and (NI M3 FS-2a) read on a readable
 inode descriptor of a regular file and write on a writable inode
 descriptor at a lazy-free key whose buffer is mapped (answers derived
 from the cited fs-event prefix, the offsets and verdicts recorded as
-given, `NiTrace` scope 16); every
+given, `NiTrace` scope 16); (NI M4 pids, `xv6NiDetP`) fork's answer
+reads the pid history only through the caller's own fork count, a
+position, and the pid order leaves the hypotheses (`NiTrace` scope 18);
+every
 filing spent a distinct claim minted
 before its enter (`niOneShot`, W2d); the mask and actor are carried per
 filing; uptime's, wait's, fork's and sbrk's answers are derived from the
@@ -263,6 +274,35 @@ theorem xv6NiDetQ {hlc : HasLC}
     fun q ho₁ ho₂ hg₁ hg₂ hc hns hk hpos hH =>
       niTwoRunDetQ hF₁ hC₁ hU₁ hF₂ hC₂ hU₂ q ho₁ ho₂ hg₁ hg₂ hc hns hk hpos hH⟩
 
+/-- **(NI M4 pids) The pid channel is closed**: `xv6NiDetQ` WITHOUT the pid history -- neither its
+history (`niBelowP`) nor its position (`detInP`: the cited pid prefix's length erased, the caller's OWN
+fork count kept).  An incarnation's ecall skeleton and console output are a prefix of the other run's
+whatever every other actor forked, exited or reaped. -/
+theorem xv6NiDetP {hlc : HasLC}
+    (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
+    (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
+    (n₁ n₂ : Nat) (κs₁ κs₂ : List Obs) (t₁ t₂ : List Expr) (g₁' g₂' : GState)
+    (hsteps₁ : ([Expr.power], g₁) -<κs₁>->ₜₚ^[n₁] (t₁, g₁'))
+    (hsteps₂ : ([Expr.power], g₂) -<κs₂>->ₜₚ^[n₂] (t₂, g₂')) :
+    ∃ F₁ F₂, niOk κs₁ F₁ ∧ niOneShot κs₁ F₁ ∧ niChain F₁ (niHist F₁) ∧ niUserChain F₁ ∧
+      niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ niUserChain F₂ ∧ ∀ q : NiInc,
+      NiOneOrigin q κs₁ F₁ → NiOneOrigin q κs₂ F₂ →
+      NiGapFree q κs₁ F₁ → NiGapFree q κs₂ F₂ →
+      NiInClass (utrace q κs₁ F₁) → NiNoStuck q κs₁ F₁ →
+      firstKey q κs₁ F₁ = firstKey q κs₂ F₂ →
+      ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.detInP <+:
+        ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.detInP →
+      (∀ k, niBelowP (niHistLed F₁ k) (niHistLed F₂ k)) →
+      ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.view <+:
+          ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.view ∧
+        ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.outBytes <+:
+          ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.outBytes := by
+  obtain ⟨-, F₁, hF₁, h1₁, hC₁, hU₁, -⟩ := xv6NiAdequacy (hlc := hlc) g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
+  obtain ⟨-, F₂, hF₂, h1₂, hC₂, hU₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
+  exact ⟨F₁, F₂, hF₁, h1₁, hC₁, hU₁, hF₂, h1₂, hC₂, hU₂,
+    fun q ho₁ ho₂ hg₁ hg₂ hc hns hk hpos hH =>
+      niTwoRunDetP hF₁ hC₁ hU₁ hF₂ hC₂ hU₂ q ho₁ ho₂ hg₁ hg₂ hc hns hk hpos hH⟩
+
 /-- **THE STRONG INSTANCE**: in a run from a booting machine, at the filing
 its ledger witnesses, every incarnation's steps before its first ecall
 replay their exits (`NiTrace.niStrongInstance`; T's
@@ -285,3 +325,4 @@ end Xv6
 #print axioms Xv6.xv6NiPrefix
 #print axioms Xv6.xv6NiDet
 #print axioms Xv6.xv6NiDetQ
+#print axioms Xv6.xv6NiDetP

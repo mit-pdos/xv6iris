@@ -8792,6 +8792,48 @@ byte-identical (`Xv6/LinkNiAdequacy.lean` untouched).  THE CLOSURE holds as desi
   lint (14 roots), check-gen (20 ok), audit (PASS), tcb, reports (coverage as baseline), vtest,
   test-tools.  No baseline moved.
 
+### M4 pids P-2 as landed (2026-10-09)
+
+Lane `lane/pid`, one commit on P-1.  The pid channel is CLOSED: `xv6NiDetP`, the fifteenth root.  The
+fourteen earlier roots and `xv6NiPhi` are byte-identical (`xv6NiDetQ`'s text untouched).
+
+- **`NiEvid`:** `niBelowP ι H := ι.zev <+: H.zev ∧ ι.ticks ≤ H.ticks ∧ ι.sev <+: H.sev ∧ ι.cacc <+:
+  H.cacc ∧ ι.fev <+: H.fev` (`niBelowQ` without the pev conjunct).
+- **`NiTrace`:** `NiPos` gains a LAST field `pown : Nat := 0` (the caller's own fork count, a
+  position); `UIota.pos` sets it to `ι.pown`; three `obtain`s on `NiPos.mk.injEq` take one more `-`
+  (`niBelow_pos`, `niBelow_posQ`, the family form's `famPos` lemma).  `NiPos.noPev p := { p.noKev with
+  pev := 0 }`, `NiStep.detInP := detIn.map noPev`, `detInP_eq_detBy`.  `NiDetReading` gains `EH` (the
+  HISTORY's erasure; `hP` compares `EH H₁ = EH H₂`); `citeBy_erase`, `niDet_runs`, `niTwoRunDetBy` take
+  `hH` at `D.EH` (mechanical: used only through `hP`); `niDetLed`/`niDetLedQ` set `EH` to their `E`, so
+  `niTwoRunDet`/`niTwoRunDetQ` are text-unchanged.  `niBelow_posP` (equal pid-free positions below one
+  `ledP0` history give one `ledP`: `ledP0` from the zev/sev/fev prefixes, ticks, actor, root; then
+  `ledP = { ledP0 with pev := replicate pown (PAlloc act 0) }` by `show`, rewritten with the equal
+  `ledP0`, own count and actor).  `niDetLedP` (`ps := (ι.pos k).noPev`, `E := ledP`, `EH := ledP0`,
+  `hE := (usysDet_ownP …).symm`, `hEf := rfl`, `hP := niBelow_posP`).  `niTwoRunDetP`: `niTwoRunDetBy
+  niDetLedP` at the hybrid history `{ niHist F₂ k with kev, pev, cacc := run 1's }` (its `ledP0` is run
+  2's by `rfl`; run 1's citations below it by `hC₁` for pev/kev/cacc and `hH`'s `niBelowP` for the rest).
+- **`LinkNiAdequacy.xv6NiDetP`:** `xv6NiDetQ`'s binders and premises byte for byte with `detInP` /
+  `niBelowP`, the same witnesses, `niTwoRunDetP` at the end; `#print axioms`; the header's root list and
+  honest-scope paragraph point at scope 18.
+- **Honest scope 18** (`NiTrace`): the design's text (closed: the pid order; conceded by the positions:
+  the own count at each fork round, the actor, the slot-full bit, the count at origin as the partition's
+  residue; not closed: slots, ticks, family, console, schedule, regime, one origin, no gaps; new reading:
+  fork's `-1` at the cap; pids in `[1, 2^31 − 1]`, never reused).
+- **Baselines:** `tools/ci/roots.txt` (the fifteenth line); `tools/audit/baseline.json` (the same three
+  axioms and three opaques as every root); `tools/tcb/expected.json` (a stub entry, then `tcb.sh
+  --update`: one new entry whose module set, axioms and opaques equal `xv6NiDetQ`'s; no existing entry
+  moved).
+- **Deviations:** none of substance.  `NiPos.pown` has the design's default `:= 0` (unused: every
+  constructor site is `UIota.pos`).
+- **For P-3 (deriving the own count):** the only consumer of `NiPos.pown` is `niBelow_posP` (via
+  `ledP`'s replicate length); the only row reading it is fork (`forkOk`, `pidPickS`), so a P-3 that ties
+  each fork citation's `ι.pown` to a trap-loop counter can replace the position by an origin datum
+  without touching `usysDet_ownP`.  Non-fork citations also carry `pown` in their positions (the cited
+  prefix's own count), which nothing reads: P-3 may erase it there (or derive it the same way).
+- **Gate:** `tools/ci/run_all.sh`, all 11 steps from a clean proof build (`rm -rf .lake/build`; build 259 s):
+  lint (15 roots), check-gen (20 ok), audit (15 PASS), tcb (the new entry), reports (coverage as
+  baseline), vtest, test-tools.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
@@ -9212,7 +9254,7 @@ quotas DESIGNED (2026-10-05, "M3 quotas design" above: the break quota + pipe ca
 
 quotas landed (Q-0..Q-3; Q-4/Q-5 optional); private files landed through FS-2f (xv6NiDetQ is the result; xv6NiFs designed-but-blocked, FS-2g scoped); M3 ENDED 2026-10-06 by owner decision
 
-M4 pids DESIGNED (2026-10-09, "M4 pids design" above: pids partitioned by the parent's slot with a per-slot quota, 22 C lines on the quota kernel, measured ±4 over 123 symbols with no data motion, run under qemu; `xv6NiDetP` without the pid history; ≈ 0.6 BE); RULED 2026-10-09 (owner: "go ahead with P-R1 (a), the rest as recommended": **P-R1 (a)** a second commit on `verified-quota`, the pin moves to it (`975109bc6f8b74e446412a2ceffaf12d0a891765` = c1fd3cc7 + the 22-line patch verbatim, committed in the local clone; the owner pushes); P-R2 (A) the parent-slot partition; P-R3 the `+52` hole, initialised in `procinit`; P-R4 `PIDQ = 2^25 − 1`; P-R5 `PIDMAX := 2^31 − 1` in C and Lean; P-R6 no slot-budget bundling; P-R7 the own count a position, P-3 optional; P-R8 a new root `xv6NiDetP` beside `xv6NiDetQ`; P-R9 P-0 → P-1 → P-2, one worktree (`/shared/xv6iris-pid`, branch `lane/pid`), the full gate at each landing).  Lane P-0 OPENED 2026-10-09 (an Opus lane: the pid ELF reproduced in the worktree, md5 `1e253624…`; `fs.img` byte-identical)
+M4 pids DESIGNED (2026-10-09, "M4 pids design" above: pids partitioned by the parent's slot with a per-slot quota, 22 C lines on the quota kernel, measured ±4 over 123 symbols with no data motion, run under qemu; `xv6NiDetP` without the pid history; ≈ 0.6 BE); RULED 2026-10-09 (owner: "go ahead with P-R1 (a), the rest as recommended": **P-R1 (a)** a second commit on `verified-quota`, the pin moves to it (`975109bc6f8b74e446412a2ceffaf12d0a891765` = c1fd3cc7 + the 22-line patch verbatim, committed in the local clone; the owner pushes); P-R2 (A) the parent-slot partition; P-R3 the `+52` hole, initialised in `procinit`; P-R4 `PIDQ = 2^25 − 1`; P-R5 `PIDMAX := 2^31 − 1` in C and Lean; P-R6 no slot-budget bundling; P-R7 the own count a position, P-3 optional; P-R8 a new root `xv6NiDetP` beside `xv6NiDetQ`; P-R9 P-0 → P-1 → P-2, one worktree (`/shared/xv6iris-pid`, branch `lane/pid`), the full gate at each landing).  Lane P-0 OPENED 2026-10-09 (an Opus lane: the pid ELF reproduced in the worktree, md5 `1e253624…`; `fs.img` byte-identical); P-0, P-1, P-2 LANDED 2026-10-09 (xv6NiDetP the fifteenth root; P-3 optional)
 
 private files DESIGNED (2026-10-05, "M3 private files design" above: a per-era fs-event ledger appended by the fire lemmas, computed rows, the footprint theorem `xv6NiFs`; chroot not the partition; ≈ 2.8 BE, FS-L alone ≈ 0.05); awaiting rulings FS-R1…R10
 
