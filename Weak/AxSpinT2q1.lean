@@ -29,8 +29,11 @@ Lean-only (no Rocq source).
   `¬ t2Cut GD 0 (sZ 0) (pEx 0) ∧ ¬ t2Cut GD 1 (sZ 1) (pEx 1) ∧
    npSrc GD.gdG L (0, t2KBd q0) (0, t2KA q0) ∧ npSrc GD.gdG L (1, t2KBd q0) (1, t2KA q0) ∧
    t2Complete GD 0 … ∧ t2Complete GD 1 … ∧ pidOf GD 0 q0 ≠ pidOf GD 1 q0 ∧
-   pidOf GD 0 q0 = some (wbytes 4 1#32) ∧ pidOf GD 1 q0 = some (wbytes 4 2#32)`
-— the cut conjuncts, the `npSrc` conjuncts and `≠` come from `allocpidOpen2` (its `t2Complete →`
+   pidOf GD 0 q0 = some (wbytes 4 1#32) ∧ pidOf GD 1 q0 = some (wbytes 4 2#32) ∧
+   ∃ sA sB, (A's run reaches sA) ∧ (B's run reaches sB) ∧
+     gprOf sA 13 = some (sext32 1#32) ∧ gprOf sB 13 = some (sext32 2#32)`
+(P4: `a3` holds the pid at the runs' final states; `Htxt2` discharged by
+`AxSpinTail2X.tailText2X`) — the cut conjuncts, the `npSrc` conjuncts and `≠` come from `allocpidOpen2` (its `t2Complete →`
 premises discharged by `AxSpinT2c1.completeG`, so not vacuous); the pid words are
 `AxSpinT2c.pidLit`.
 
@@ -60,6 +63,7 @@ Names: `allocpidOpen2Cert` (Lean-only, grepped absent); helpers in the namespace
 import Weak.AxSpinT2b2
 import Weak.AxSpinT2c
 import Weak.AxSpinT2p1
+import Weak.AxSpinTail2X
 
 namespace Weak
 
@@ -132,7 +136,14 @@ theorem allocpidOpen2Cert :
     t2Complete (gtAdGd (gT3 [emsA, emsB, emsC])) 1 (sZ 1) (AxSpinT2a.pEx 1) ∧
     pidOf (gtAdGd (gT3 [emsA, emsB, emsC])) 0 q0 ≠ pidOf (gtAdGd (gT3 [emsA, emsB, emsC])) 1 q0 ∧
     pidOf (gtAdGd (gT3 [emsA, emsB, emsC])) 0 q0 = some (WeakInterpProj.wbytes 4 1#32) ∧
-    pidOf (gtAdGd (gT3 [emsA, emsB, emsC])) 1 q0 = some (WeakInterpProj.wbytes 4 2#32) := by
+    pidOf (gtAdGd (gT3 [emsA, emsB, emsC])) 1 q0 = some (WeakInterpProj.wbytes 4 2#32) ∧
+    ∃ sA sB : Athread,
+      (∃ n, ∀ (_ : AxannotGS AxSpinX7.xv6GF) (nm : Xv6N),
+        nsteps (tierAAstep (gtAdGd (gT3 [emsA, emsB, emsC])) nm 0) n (s0X 0) sA) ∧
+      (∃ n, ∀ (_ : AxannotGS AxSpinX7.xv6GF) (nm : Xv6N),
+        nsteps (tierAAstep (gtAdGd (gT3 [emsA, emsB, emsC])) nm 1) n (s0X 1) sB) ∧
+      AxSpinT2a.gprOf sA 13#5 = some (AxSpinT2a.sext32 1#32) ∧
+      AxSpinT2a.gprOf sB 13#5 = some (AxSpinT2a.sext32 2#32) := by
   obtain ⟨uA, rsA, ibA, -, okA, runA'⟩ := runA
   obtain ⟨uB, rsB, ibB, -, okB, runB'⟩ := runB
   obtain ⟨uC, rsC, ibC, -, okC, runC'⟩ := runC
@@ -168,7 +179,7 @@ theorem allocpidOpen2Cert :
     s0X sN (pick3 nA nB nC) HconsT Hcl (hartsX _) layHyp3 (al3 0) (al3 1)
     (imgClb _ _ rfl) (by decide) (imgNp _ _ rfl) (imgNoffG _)
     acquireTextX mycpuTextX pushOffTextX holdingTextX popOffTextX releaseTextX allocpidTextX
-    tailTextX (textFixedX _ 0 (by decide)) (textFixedX _ 1 (by decide)) hmode hasid hppn
+    tailTextX AxSpinTail2X.tailText2X (textFixedX _ 0 (by decide)) (textFixedX _ 1 (by decide)) hmode hasid hppn
     (mapOk3 0 (by decide)) (mapOk3 1 (by decide))
     (preG _ 0 (by decide)) (preG _ 1 (by decide)) (pins2G _ 0 (by decide)) (pins2G _ 1 (by decide))
     (entryOkE 0 (by decide)) (entryOkE 1 (by decide)) rfl Hrun Hend
@@ -177,8 +188,19 @@ theorem allocpidOpen2Cert :
   obtain ⟨Hcut, HsA, HsB, Hpid⟩ := H
   have HcA := completeG [emsA, emsB, emsC] 0 (by decide)
   have HcB := completeG [emsA, emsB, emsC] 1 (by decide)
-  obtain ⟨Hne, -⟩ := Hpid HcA HcB
+  obtain ⟨Hne, -, wA, wB, HpA, HpB, HgA, HgB, -⟩ := Hpid HcA HcB
   obtain ⟨Hp0, Hp1, -⟩ := pidLit [emsA, emsB, emsC]
-  exact ⟨Hcut 0 (by simp), Hcut 1 (by simp), HsA HcA, HsB HcB, HcA, HcB, Hne, Hp0, Hp1⟩
+  have EwA : wA = 1#32 := by
+    have h := congrArg (fun x => Option.map (wordOfBytes 4) x) (HpA.symm.trans Hp0)
+    simp only [Option.map_some, wordOfBytesWbytes, Option.some.injEq] at h
+    exact h
+  have EwB : wB = 2#32 := by
+    have h := congrArg (fun x => Option.map (wordOfBytes 4) x) (HpB.symm.trans Hp1)
+    simp only [Option.map_some, wordOfBytesWbytes, Option.some.injEq] at h
+    exact h
+  subst EwA EwB
+  exact ⟨Hcut 0 (by simp), Hcut 1 (by simp), (HsA HcA).1, (HsB HcB).1, HcA, HcB, Hne, Hp0, Hp1,
+    sN 0, sN 1, ⟨pick3 nA nB nC 0, fun Ha nm => Hrun Ha nm 0 (by simp)⟩,
+    ⟨pick3 nA nB nC 1, fun Ha nm => Hrun Ha nm 1 (by simp)⟩, HgA, HgB⟩
 
 end Weak

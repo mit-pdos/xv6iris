@@ -62,6 +62,7 @@ Names: `allocpidPrefixCert` (Lean-only, grepped absent); helpers `Weak.AxSpinT2q
 import Weak.AxSpinT2b2
 import Weak.AxSpinT2p1c
 import Weak.AxSpinT2e3
+import Weak.AxSpinTail2X
 
 namespace Weak
 
@@ -134,7 +135,7 @@ theorem allocpidPrefixCert :
     AxSpinT2q2.imgClbAm (by decide) AxSpinT2q2.imgNpAm HimgN
     AxSpinT2c5.acquireTextX AxSpinT2c5.mycpuTextX AxSpinT2c5.pushOffTextX
     AxSpinT2c5.holdingTextX AxSpinT2c5.popOffTextX AxSpinT2c5.releaseTextX
-    AxSpinT2c5.allocpidTextX AxSpinT2c5.tailTextX
+    AxSpinT2c5.allocpidTextX AxSpinT2c5.tailTextX AxSpinTail2X.tailText2X
     (textFixed1 _ 0 (by decide)) (textFixed1 _ 1 (by decide))
     satpXFacts.1 satpXFacts.2.1 satpXFacts.2.2
     (AxSpinT2c5.mapOk3 0 (by decide)) (AxSpinT2c5.mapOk3 1 (by decide))

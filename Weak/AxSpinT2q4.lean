@@ -95,6 +95,7 @@ theorem allocpidStkRaceUnprovable (GT : GdexecT) (A B C : Agent) (Sf pf : Agent 
     (Htxa : acquireText σi T) (Htxm : mycpuText σi T) (Htxp : pushOffText σi T)
     (Htxh : holdingText σi T) (Htxq : popOffText σi T) (Htxr : releaseText σi T)
     (Htxc : allocpidText σi T) (Htxt : AxSpinApA.tailText σi T)
+    (Htxt2 : AxSpinApA.tailText2 σi T)
     (HfixA : textFixed (gtAdGd GT) A (imgS σi)) (HfixB : textFixed (gtAdGd GT) B (imgS σi))
     (hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = 8#4)
     (hasid : zero_extend (m := 16) (satp_to_asid satp0) = 0#16)
@@ -155,7 +156,7 @@ theorem allocpidStkRaceUnprovable (GT : GdexecT) (A B C : Agent) (Sf pf : Agent 
     exact HwpC nm
   obtain ⟨Hnc, -⟩ := allocpidOpen2 GT A B C Sf pf ptp qA qB σi T satp0 n0
     (AxSpinT2b.over C sC0 s0) (AxSpinT2b.over C sCN sN) (AxSpinT2b.over C 1 n) HconsT Hcl Hharts
-    HLay HalA HalB Himgc Hn0 Himgn HimgN Htxa Htxm Htxp Htxh Htxq Htxr Htxc Htxt HfixA HfixB
+    HLay HalA HalB Himgc Hn0 Himgn HimgN Htxa Htxm Htxp Htxh Htxq Htxr Htxc Htxt Htxt2 HfixA HfixB
     hmode hasid hppn HmapA HmapB HpreA HpreB HpinsA HpinsB
     (by rw [AxSpinT2b.overNe _ _ _ _ hAC]; exact HentA)
     (by rw [AxSpinT2b.overNe _ _ _ _ hBC]; exact HentB)
@@ -206,7 +207,7 @@ theorem allocpidStkRaceCert :
     (AxSpinT2p3.imgNpS AxSpinT2q4.emsStk AxSpinT2q3.lay hN) HimgN
     AxSpinT2c5.acquireTextX AxSpinT2c5.mycpuTextX AxSpinT2c5.pushOffTextX
     AxSpinT2c5.holdingTextX AxSpinT2c5.popOffTextX AxSpinT2c5.releaseTextX
-    AxSpinT2c5.allocpidTextX AxSpinT2c5.tailTextX
+    AxSpinT2c5.allocpidTextX AxSpinT2c5.tailTextX AxSpinTail2X.tailText2X
     (AxSpinT2p3.textFixedS AxSpinT2q4.emsStk 0 (by decide))
     (AxSpinT2p3.textFixedS AxSpinT2q4.emsStk 1 (by decide))
     satpXFacts.1 satpXFacts.2.1 satpXFacts.2.2

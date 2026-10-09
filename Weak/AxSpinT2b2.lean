@@ -15,11 +15,20 @@ continues past a gate — panic or reload — took the normal arm), with the pin
 constrained ONLY by the iProp premise `HwpC`.  Conclusion, with `GD = gtAdGd GT`:
 ```
   (∀ i, i ∈ [A, B] → ¬ t2Cut GD i (Sf i) (pf i)) ∧                                  -- NO PANIC
-  (t2Complete GD A (Sf A) (pf A) → npSrc GD.gdG L (A, t2KBd qA) (A, t2KA qA)) ∧
-  (t2Complete GD B (Sf B) (pf B) → npSrc GD.gdG L (B, t2KBd qB) (B, t2KA qB)) ∧
+  (t2Complete GD A (Sf A) (pf A) → npSrc GD.gdG L (A, t2KBd qA) (A, t2KA qA) ∧
+     ∃ wA, pidOf GD A qA = some (wbytes 4 wA) ∧ gprOf (sN A) 13#5 = some (sext32 wA)) ∧
+  (t2Complete GD B (Sf B) (pf B) → npSrc GD.gdG L (B, t2KBd qB) (B, t2KA qB) ∧
+     ∃ wB, pidOf GD B qB = some (wbytes 4 wB) ∧ gprOf (sN B) 13#5 = some (sext32 wB)) ∧
   (t2Complete A → t2Complete B → pidOf GD A qA ≠ pidOf GD B qB ∧
-     ∃ wA wB, pidOf GD A qA = some (wbytes 4 wA) ∧ pidOf GD B qB = some (wbytes 4 wB) ∧ wA ≠ wB)
+     gprOf (sN A) 13#5 ≠ gprOf (sN B) 13#5 ∧
+     ∃ wA wB, pidOf GD A qA = some (wbytes 4 wA) ∧ pidOf GD B qB = some (wbytes 4 wB) ∧
+       gprOf (sN A) 13#5 = some (sext32 wA) ∧ gprOf (sN B) 13#5 = some (sext32 wB) ∧ wA ≠ wB)
 ```
+(P4, Q-T2-14 RESOLVED 2026-10-09: on a complete row the pid word is also in `a3` (x13) at the
+run's FINAL state `sN i` — whichever instruction boundary past the terminal store the hart
+stopped at: `allocproc + 0x9c`, `kalloc + 0`, or `kalloc + 2`, where kalloc's `c.sdsp ra` is a
+store with no row item, so the hart is stuck there.  `sext32` is injective
+(`AxSpinAp9.sext32Inj`), so the two harts' `a3` differ.)
 `t2Cut GD i S p` (AxSpinT2f) = hart `i`'s row is a family row that ENDS at a designated cut whose
 gate read took the OFF arm: `aq` (acquire's holding, long arm, `lk->cpu` = this cpu ⇒ panic),
 `rlS` (release's holding reads `lk->locked` = 0 ⇒ panic), `rlL` (release's holding reads
@@ -48,7 +57,8 @@ As stage 1 (`AxSpinT2b.allocpidOpen`): `tierAAdequacyAnnGateJointT` at `AxSpinX7
 `AxSpinApB.t2PostP`, bundle `AxSpinApB.Hyp2` from `AxSpinApB.hypXv6P`) and `HwpC`, lifted to the
 per-hart post `AxSpinT2b2.phiP` by `AxSpinWit.tierAWpdMono`.  `Hjoint` = `AxSpinT2b2.jointP`: the
 posts at the non-mid final states give the q-indexed cut conjuncts `¬ t2CutAt`, and on complete
-rows (`LEN = t2Len q`) the stage-1 facts; `AxSpinT2a.fragNe` (issued-fragment exclusivity,
+rows (`LEN = t2Len q`) the stage-1 facts and `a3 = sext32 w` at the final state (`conclP` takes
+`sN`); `AxSpinT2a.fragNe` (issued-fragment exclusivity,
 position-independent) gives `wA ≠ wB` when both are complete.  Bridges to the design's
 q-free statement: `AxSpinApB.notCutOfAt` (`¬ t2CutAt row q` ⇒ `¬ t2Cut`, via `cutDet`) and
 `AxSpinT2b2.qDet` (a complete row of the family fixes the parameters: `t2Complete` ⇒
@@ -70,6 +80,11 @@ AllocPins` → `AllocPins2`; NEW explicit premises (each also glossed at the bin
   deposits `clSrcFull` (`AxSpinX2.fxCpuRacyS`, `ORacy`), and `AxSpinT2h.cutAq` derives
   `AxSpinT2g.clSrcAligned` from it.  The former premises `HsrcAlA`/`HsrcAlB` are GONE.
 * `Himgc` (the `lk->cpu` image is 0) — unchanged from stage 1, now ALSO used by `cutAq`.
+* `Htxt2 : AxSpinApA.tailText2 σi T` (NEW, P4) — the text of the three instructions the hart
+  runs past the row end (`allocproc + 0x9c` `jal kalloc`, `kalloc + 0` `c.addi sp,sp,-32`,
+  `kalloc + 2` `c.sdsp ra,24(sp)`); certified on the capstone image by
+  `AxSpinTail2X.tailText2X`.  No new pin: kalloc's `ra` slot `S − 8` is already covered by
+  `MapOk` / `Warm` (the stack window `[S − 80, S)`).
 * `Hwlt` (writers of `lk->cpu` are harts `< NCPU`), required by `wpdAllocpidSeg2E`, is NOT a
   premise here: it is DERIVED from `Hharts` + `T2LayHyp.ncpu` (`AxSpinT2g.writerLt`).
 Everything else (`HconsT`, `Hcl`, `Hharts`, `HLay`, `HalA/B`, `Hn0`, `Himgn`, the eight text
@@ -152,7 +167,12 @@ IMAGE NOTE (stage 1's): `σi` must be a text + page-table image (as `AxSpinTextC
 1. The npSrc conjunct is stated per hart (`t2Complete A → npSrc … qA`, `t2Complete B → …`) rather
    than `∀ i ∈ [A, B]` — the parameters `qA`/`qB` are per hart.
 2. `Hwlt` is derived (see above), not a premise (stronger than the assignment's list).
-3. Post `t2PostP` is `a3`-free (stage 1's Q-T2-14 ruling, AxSpinApA FINDING).
+3. (P4, Q-T2-14 RESOLVED) Post `t2PostP` now carries `a3 = sext32 w` on complete rows (stage 1's
+   `a3`-free ruling is lifted): the post is proved at every state past the row end by the walk
+   `AxSpinTailW.walk` (`AxSpinRowEnd.XxRegEnd` × 2 + the stuck `XxStEnd`).  STATEMENT CHANGE
+   (owner-approved, P4): premise `Htxt2` added; the complete-row conjuncts gain the `a3` facts and
+   the both-complete conjunct `gprOf (sN A) 13 ≠ gprOf (sN B) 13`; the per-hart conjuncts are now
+   `npSrc … ∧ ∃ w, pidOf … ∧ gprOf …` (were `npSrc …`).
 4. Theorem 1 keeps the phantom C in the layout (stage 1 deviation 5).
 5. Audit roots: `Weak.allocpidOpen2`, `Weak.allocpid2Distinct2` registered (`tools/ci/roots-weak.txt`,
    `tools/audit/baseline-weak.json`, `tools/ci/audit.sh --weak` modules / build line).
@@ -162,7 +182,7 @@ IMAGE NOTE (stage 1's): `σi` must be a text + page-table image (as `AxSpinTextC
 `entryOk`/`entryK0`/`t2Complete`/`pidOf`/`AxSpinT2a.fragNe`/`AxSpinT2a.hartLt` (AxSpinT2a),
 `allocPre`/`AllocPins2`/`HimgNoff`/`t2Cut`/`t2CutAt`/`AxSpinT2f.coreOfPre`/`qEqFull`
 (AxSpinT2f), `AxSpinT2g.writerLt`,
-`AxSpinApB.wpdAllocpidSeg2E`/`hypXv6P`/`t2PostP`/`notCutOfAt`, `AxSpinT2b.initCs`/`distinct`/
+`AxSpinApB.wpdAllocpidSeg2E`/`hypXv6P`/`t2PostP`/`notCutOfAt`, `AxSpinAp9.sext32Inj`, `AxSpinT2b.initCs`/`distinct`/
 `mem3`/`pidNe`/`over`/`overSelf`/`overNe`/`wpdEmpty`, `AxSpinJ2.bigSepLTriple`,
 `AxSpinWit.tierAWpdMono`, `catTAd`, `nsteps_O`.
 
@@ -204,19 +224,24 @@ def AxSpinT2b2.phiP (GD : Gdexec) (L : Xlay) (A B : Agent) (qA qB : T2Prm) :
     if i = A then AxSpinApB.t2PostP GD L nm A qA s
     else if i = B then AxSpinApB.t2PostP GD L nm B qB s else iprop(True)
 
-/-- The joint conclusion, q-indexed: no cut row; complete rows give pid + `npSrc`; both
-complete give distinct words. -/
-def AxSpinT2b2.conclP (GD : Gdexec) (L : Xlay) (A B : Agent) (qA qB : T2Prm) : Prop :=
+/-- The joint conclusion, q-indexed, at the final states `sN`: no cut row; complete rows give
+pid + `npSrc` + `a3` (= `sext32` of the pid word, P4); both complete give distinct words. -/
+def AxSpinT2b2.conclP (GD : Gdexec) (L : Xlay) (A B : Agent) (qA qB : T2Prm)
+    (sN : Agent → Athread) : Prop :=
   ¬ t2CutAt (AxOpsem.grow GD A) qA A ∧ ¬ t2CutAt (AxOpsem.grow GD B) qB B ∧
   ((AxOpsem.grow GD A).length = t2Len qA → ∃ wA : BitVec 32,
     pidOf GD A qA = some (WeakInterpProj.wbytes 4 wA) ∧
-      npSrc GD.gdG L (A, t2KBd qA) (A, t2KA qA)) ∧
+      npSrc GD.gdG L (A, t2KBd qA) (A, t2KA qA) ∧
+      AxSpinT2a.gprOf (sN A) 13#5 = some (AxSpinT2a.sext32 wA)) ∧
   ((AxOpsem.grow GD B).length = t2Len qB → ∃ wB : BitVec 32,
     pidOf GD B qB = some (WeakInterpProj.wbytes 4 wB) ∧
-      npSrc GD.gdG L (B, t2KBd qB) (B, t2KA qB)) ∧
+      npSrc GD.gdG L (B, t2KBd qB) (B, t2KA qB) ∧
+      AxSpinT2a.gprOf (sN B) 13#5 = some (AxSpinT2a.sext32 wB)) ∧
   ((AxOpsem.grow GD A).length = t2Len qA → (AxOpsem.grow GD B).length = t2Len qB →
     ∃ wA wB : BitVec 32, pidOf GD A qA = some (WeakInterpProj.wbytes 4 wA) ∧
-      pidOf GD B qB = some (WeakInterpProj.wbytes 4 wB) ∧ wA ≠ wB)
+      pidOf GD B qB = some (WeakInterpProj.wbytes 4 wB) ∧
+      AxSpinT2a.gprOf (sN A) 13#5 = some (AxSpinT2a.sext32 wA) ∧
+      AxSpinT2a.gprOf (sN B) 13#5 = some (AxSpinT2a.sext32 wB) ∧ wA ≠ wB)
 
 theorem AxSpinT2b2.phiPA (GD : Gdexec) (L : Xlay) (A B : Agent) (qA qB : T2Prm)
     (Hinv : InvGS_gen .hasNoLC AxSpinX7.xv6GF) (Hann : AxannotGS AxSpinX7.xv6GF) (nm : Xv6N)
@@ -242,7 +267,7 @@ theorem AxSpinT2b2.jointP (GD : Gdexec) (L : Xlay) (A B C : Agent) (qA qB : T2Pr
     (sN : Agent → Athread) (hAB : A ≠ B) (hmA : ¬ midState (sN A)) (hmB : ¬ midState (sN B))
     (Hinv : InvGS_gen .hasNoLC AxSpinX7.xv6GF) (Hann : AxannotGS AxSpinX7.xv6GF) (nm : Xv6N) :
     ⊢ ([∗list] i ∈ [A, B, C], AxSpinT2b2.phiP GD L A B qA qB Hinv Hann nm i (sN i)) ==∗
-      ⌜AxSpinT2b2.conclP GD L A B qA qB⌝ := by
+      ⌜AxSpinT2b2.conclP GD L A B qA qB sN⌝ := by
   have Htri : ([∗list] i ∈ [A, B, C], AxSpinT2b2.phiP GD L A B qA qB Hinv Hann nm i (sN i)) ⊢
       AxSpinApB.t2PostP (GF := AxSpinX7.xv6GF) GD L nm A qA (sN A) ∗
         AxSpinApB.t2PostP (GF := AxSpinX7.xv6GF) GD L nm B qB (sN B) := by
@@ -270,7 +295,7 @@ theorem AxSpinT2b2.jointP (GD : Gdexec) (L : Xlay) (A B C : Agent) (qA qB : T2Pr
       imodintro
       ipureintro
       exact ⟨HcA, HcB, fun _ => ⟨wA, HwA⟩, fun _ => ⟨wB, HwB⟩,
-        fun _ _ => ⟨wA, wB, HwA.1, HwB.1, Hne⟩⟩
+        fun _ _ => ⟨wA, wB, HwA.1, HwB.1, HwA.2.2, HwB.2.2, Hne⟩⟩
     · ihave HKA := HKA $$ %hA
       icases HKA with ⟨%wA, %HwA, -⟩
       imodintro
@@ -324,6 +349,9 @@ theorem allocpidOpen2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int) (pt
     (Htxa : acquireText σi T) (Htxm : mycpuText σi T) (Htxp : pushOffText σi T)
     (Htxh : holdingText σi T) (Htxq : popOffText σi T) (Htxr : releaseText σi T)
     (Htxc : allocpidText σi T) (Htxt : AxSpinApA.tailText σi T)
+    -- TEXT (NEW, P4): the walk past the row end — allocproc + 0x9c `jal kalloc`, kalloc + 0
+    -- `c.addi sp,sp,-32`, kalloc + 2 `c.sdsp ra,24(sp)` (where the hart stops)
+    (Htxt2 : AxSpinApA.tailText2 σi T)
     -- TEXT: A's / B's reads of `σi`'s domain return `σi`'s bytes, which are in the graph image
     (HfixA : textFixed (gtAdGd GT) A (imgS σi)) (HfixB : textFixed (gtAdGd GT) B (imgS σi))
     -- TRANSLATION: Sv39 satp, ASID 0, root = `T`
@@ -358,14 +386,21 @@ theorem allocpidOpen2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int) (pt
           (protXv6 (xlayXv6 A B C Sf pf ptp)) nm (s0 C) .MaybeStuck C (fun _ => iprop(True))) :
     (∀ i, i ∈ [A, B] → ¬ t2Cut (gtAdGd GT) i (Sf i) (pf i)) ∧
     (t2Complete (gtAdGd GT) A (Sf A) (pf A) →
-      npSrc (gtAdGd GT).gdG (xlayXv6 A B C Sf pf ptp) (A, t2KBd qA) (A, t2KA qA)) ∧
+      npSrc (gtAdGd GT).gdG (xlayXv6 A B C Sf pf ptp) (A, t2KBd qA) (A, t2KA qA) ∧
+      ∃ wA : BitVec 32, pidOf (gtAdGd GT) A qA = some (WeakInterpProj.wbytes 4 wA) ∧
+        AxSpinT2a.gprOf (sN A) 13#5 = some (AxSpinT2a.sext32 wA)) ∧
     (t2Complete (gtAdGd GT) B (Sf B) (pf B) →
-      npSrc (gtAdGd GT).gdG (xlayXv6 A B C Sf pf ptp) (B, t2KBd qB) (B, t2KA qB)) ∧
+      npSrc (gtAdGd GT).gdG (xlayXv6 A B C Sf pf ptp) (B, t2KBd qB) (B, t2KA qB) ∧
+      ∃ wB : BitVec 32, pidOf (gtAdGd GT) B qB = some (WeakInterpProj.wbytes 4 wB) ∧
+        AxSpinT2a.gprOf (sN B) 13#5 = some (AxSpinT2a.sext32 wB)) ∧
     (t2Complete (gtAdGd GT) A (Sf A) (pf A) → t2Complete (gtAdGd GT) B (Sf B) (pf B) →
       pidOf (gtAdGd GT) A qA ≠ pidOf (gtAdGd GT) B qB ∧
+      AxSpinT2a.gprOf (sN A) 13#5 ≠ AxSpinT2a.gprOf (sN B) 13#5 ∧
       ∃ wA wB : BitVec 32,
         pidOf (gtAdGd GT) A qA = some (WeakInterpProj.wbytes 4 wA) ∧
-        pidOf (gtAdGd GT) B qB = some (WeakInterpProj.wbytes 4 wB) ∧ wA ≠ wB) := by
+        pidOf (gtAdGd GT) B qB = some (WeakInterpProj.wbytes 4 wB) ∧
+        AxSpinT2a.gprOf (sN A) 13#5 = some (AxSpinT2a.sext32 wA) ∧
+        AxSpinT2a.gprOf (sN B) 13#5 = some (AxSpinT2a.sext32 wB) ∧ wA ≠ wB) := by
   obtain ⟨hAB, hAC, hBC⟩ := AxSpinT2b.distinct HLay
   have Hcons := catTAd GT HconsT
   have HL := xlayXv6Ok A B C Sf pf ptp HLay
@@ -375,9 +410,9 @@ theorem allocpidOpen2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int) (pt
     AxSpinT2g.writerLt (gtAdGd GT).gdG Hcons.1 [A, B, C] Hharts
       (fun j hj => AxSpinT2a.hartLt A B C Sf pf ptp HLay j (AxSpinT2b.mem3 hj)) w a v hw
   have HyA := AxSpinApB.hypXv6P A B C Sf pf ptp HLay GT σi T A qA (.inl rfl) HalA HpreA HpinsA
-    HimgN HmapA Htxa Htxm Htxp Htxh Htxq Htxr Htxc Htxt HfixA
+    HimgN HmapA Htxa Htxm Htxp Htxh Htxq Htxr Htxc Htxt Htxt2 HfixA
   have HyB := AxSpinApB.hypXv6P A B C Sf pf ptp HLay GT σi T B qB (.inr rfl) HalB HpreB HpinsB
-    HimgN HmapB Htxa Htxm Htxp Htxh Htxq Htxr Htxc Htxt HfixB
+    HimgN HmapB Htxa Htxm Htxp Htxh Htxq Htxr Htxc Htxt Htxt2 HfixB
   have Hk0 : ∀ i, i ∈ [A, B, C] → (s0 i).atK = 0 := by
     intro i Hi
     rcases AxSpinT2b.mem3 Hi with rfl | rfl | rfl
@@ -432,7 +467,7 @@ theorem allocpidOpen2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int) (pt
       (nm : Xv6N),
       ⊢ ([∗list] i ∈ [A, B, C], AxSpinT2b2.phiP (gtAdGd GT) (xlayXv6 A B C Sf pf ptp) A B qA qB
           Hinv Hann nm i (sN i)) ==∗
-        ⌜AxSpinT2b2.conclP (gtAdGd GT) (xlayXv6 A B C Sf pf ptp) A B qA qB⌝ := by
+        ⌜AxSpinT2b2.conclP (gtAdGd GT) (xlayXv6 A B C Sf pf ptp) A B qA qB sN⌝ := by
     intro Hinv Hann nm
     exact AxSpinT2b2.jointP (gtAdGd GT) (xlayXv6 A B C Sf pf ptp) A B C qA qB sN hAB HfinA HfinB
       Hinv Hann nm
@@ -444,16 +479,22 @@ theorem allocpidOpen2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int) (pt
       Himgn)
     (xv6Hok GT HconsT Hcl)
   obtain ⟨HcA, HcB, HnA, HnB, Hd⟩ := HP
-  refine ⟨?_, fun h => (HnA (AxSpinT2b2.lenOfComplete HpreA h)).choose_spec.2,
-    fun h => (HnB (AxSpinT2b2.lenOfComplete HpreB h)).choose_spec.2, fun hA hB => ?_⟩
+  refine ⟨?_, fun h => ?_, fun h => ?_, fun hA hB => ?_⟩
   · intro i hi
     simp only [List.mem_cons, List.not_mem_nil, or_false] at hi
     rcases hi with rfl | rfl
     · exact AxSpinApB.notCutOfAt HpreA HcA
     · exact AxSpinApB.notCutOfAt HpreB HcB
-  · obtain ⟨wA, wB, HpA, HpB, Hne⟩ :=
+  · obtain ⟨wA, HpA, HsA, HgA⟩ := HnA (AxSpinT2b2.lenOfComplete HpreA h)
+    exact ⟨HsA, wA, HpA, HgA⟩
+  · obtain ⟨wB, HpB, HsB, HgB⟩ := HnB (AxSpinT2b2.lenOfComplete HpreB h)
+    exact ⟨HsB, wB, HpB, HgB⟩
+  · obtain ⟨wA, wB, HpA, HpB, HgA, HgB, Hne⟩ :=
       Hd (AxSpinT2b2.lenOfComplete HpreA hA) (AxSpinT2b2.lenOfComplete HpreB hB)
-    exact ⟨AxSpinT2b.pidNe _ _ wA wB HpA HpB Hne, wA, wB, HpA, HpB, Hne⟩
+    refine ⟨AxSpinT2b.pidNe _ _ wA wB HpA HpB Hne, ?_, wA, wB, HpA, HpB, HgA, HgB, Hne⟩
+    rw [HgA, HgB]
+    intro h
+    exact Hne (AxSpinAp9.sext32Inj _ _ (Option.some.inj h))
 
 /-! # 4. THEOREM 1, the corollary with an empty-row C -/
 
@@ -486,6 +527,7 @@ theorem allocpid2Distinct2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int
     (Htxa : acquireText σi T) (Htxm : mycpuText σi T) (Htxp : pushOffText σi T)
     (Htxh : holdingText σi T) (Htxq : popOffText σi T) (Htxr : releaseText σi T)
     (Htxc : allocpidText σi T) (Htxt : AxSpinApA.tailText σi T)
+    (Htxt2 : AxSpinApA.tailText2 σi T)
     (HfixA : textFixed (gtAdGd GT) A (imgS σi)) (HfixB : textFixed (gtAdGd GT) B (imgS σi))
     -- TRANSLATION: as Theorem 2
     (hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = 8#4)
@@ -506,14 +548,21 @@ theorem allocpid2Distinct2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int
     (HfinA : ¬ midState (sN A)) (HfinB : ¬ midState (sN B)) :
     (∀ i, i ∈ [A, B] → ¬ t2Cut (gtAdGd GT) i (Sf i) (pf i)) ∧
     (t2Complete (gtAdGd GT) A (Sf A) (pf A) →
-      npSrc (gtAdGd GT).gdG (xlayXv6 A B C Sf pf ptp) (A, t2KBd qA) (A, t2KA qA)) ∧
+      npSrc (gtAdGd GT).gdG (xlayXv6 A B C Sf pf ptp) (A, t2KBd qA) (A, t2KA qA) ∧
+      ∃ wA : BitVec 32, pidOf (gtAdGd GT) A qA = some (WeakInterpProj.wbytes 4 wA) ∧
+        AxSpinT2a.gprOf (sN A) 13#5 = some (AxSpinT2a.sext32 wA)) ∧
     (t2Complete (gtAdGd GT) B (Sf B) (pf B) →
-      npSrc (gtAdGd GT).gdG (xlayXv6 A B C Sf pf ptp) (B, t2KBd qB) (B, t2KA qB)) ∧
+      npSrc (gtAdGd GT).gdG (xlayXv6 A B C Sf pf ptp) (B, t2KBd qB) (B, t2KA qB) ∧
+      ∃ wB : BitVec 32, pidOf (gtAdGd GT) B qB = some (WeakInterpProj.wbytes 4 wB) ∧
+        AxSpinT2a.gprOf (sN B) 13#5 = some (AxSpinT2a.sext32 wB)) ∧
     (t2Complete (gtAdGd GT) A (Sf A) (pf A) → t2Complete (gtAdGd GT) B (Sf B) (pf B) →
       pidOf (gtAdGd GT) A qA ≠ pidOf (gtAdGd GT) B qB ∧
+      AxSpinT2a.gprOf (sN A) 13#5 ≠ AxSpinT2a.gprOf (sN B) 13#5 ∧
       ∃ wA wB : BitVec 32,
         pidOf (gtAdGd GT) A qA = some (WeakInterpProj.wbytes 4 wA) ∧
-        pidOf (gtAdGd GT) B qB = some (WeakInterpProj.wbytes 4 wB) ∧ wA ≠ wB) := by
+        pidOf (gtAdGd GT) B qB = some (WeakInterpProj.wbytes 4 wB) ∧
+        AxSpinT2a.gprOf (sN A) 13#5 = some (AxSpinT2a.sext32 wA) ∧
+        AxSpinT2a.gprOf (sN B) 13#5 = some (AxSpinT2a.sext32 wB) ∧ wA ≠ wB) := by
   obtain ⟨hAB, hAC, hBC⟩ := AxSpinT2b.distinct HLay
   -- C's (empty) run: it starts and ends at position 0 and takes no step
   let sC : Athread := ⟨(s0 A).atP, 0⟩
@@ -555,9 +604,10 @@ theorem allocpid2Distinct2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int
     intro Hinv Hann nm
     rw [AxSpinT2b.overSelf]
     exact AxSpinT2b.wpdEmpty (xlayXv6 A B C Sf pf ptp) GT nm C HrowC (s0 A).atP _
-  exact allocpidOpen2 GT A B C Sf pf ptp qA qB σi T satp0 n0 (AxSpinT2b.over C sC s0)
+  have H := allocpidOpen2 GT A B C Sf pf ptp qA qB σi T satp0 n0 (AxSpinT2b.over C sC s0)
     (AxSpinT2b.over C sC sN) (AxSpinT2b.over C 0 n) HconsT Hcl Hharts3 HLay HalA HalB Himgc Hn0
-    Himgn HimgN Htxa Htxm Htxp Htxh Htxq Htxr Htxc Htxt HfixA HfixB hmode hasid hppn HmapA HmapB
+    Himgn HimgN Htxa Htxm Htxp Htxh Htxq Htxr Htxc Htxt Htxt2 HfixA HfixB hmode hasid hppn HmapA
+    HmapB
     HpreA HpreB HpinsA HpinsB
     (by rw [AxSpinT2b.overNe _ _ _ _ hAC]; exact HentA)
     (by rw [AxSpinT2b.overNe _ _ _ _ hBC]; exact HentB)
@@ -566,5 +616,7 @@ theorem allocpid2Distinct2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int
     (by rw [AxSpinT2b.overNe _ _ _ _ hAC]; exact HfinA)
     (by rw [AxSpinT2b.overNe _ _ _ _ hBC]; exact HfinB)
     HwpC
+  rw [AxSpinT2b.overNe _ _ _ _ hAC, AxSpinT2b.overNe _ _ _ _ hBC] at H
+  exact H
 
 end Weak

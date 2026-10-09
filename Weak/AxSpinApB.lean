@@ -22,8 +22,9 @@ NEW Lean file (no Rocq source; Rocq's ID-8 prefix family is the model).  `AxSpin
    image premise (`∃ v, noffImgOk img i v`, the hart's instance of `HimgNoff`, Q-S2-3); the
    bundle lemmas `dat`/`hitStk`/`slot`/`fld`/`ntxOf` re-stated on it.
 §3 THE POST `AxSpinApB.t2PostP GD L nm i q s` := `⌜¬ midState s⌝ -∗ ⌜¬ t2CutAt (grow GD i) q i⌝ ∗
-   (⌜LEN = t2Len q⌝ -∗ ∃ w, ⌜pidOf = wbytes 4 w ∧ npSrc⌝ ∗ FRAG nm w)` (= `t2PostS` + the cut
-   conjunct; complete rows give the stage-1 post).  `postP` (free at an incomplete no-cut end),
+   (⌜LEN = t2Len q⌝ -∗ ∃ w, ⌜pidOf = wbytes 4 w ∧ npSrc ∧ gprOf s 13 = some (sext32 w)⌝ ∗
+   FRAG nm w)` (= `t2PostS` + the cut conjunct + (P4) `a3`; complete rows give stage 1's
+   original `t2Post`).  `postP` (free at an incomplete no-cut end),
    `postCut` (free at a designated cut whose gate took the normal arm, given `hr`: no reload
    misread at the row end), `postSMidP`.
    ROW ENDS: `AxSpinApB.wpdPast` — from `k0 ≥ LEN`, `WPd ⟨pr, k0⟩ Φ` for a PURE post demanded only
@@ -40,8 +41,10 @@ NEW Lean file (no Rocq source; Rocq's ID-8 prefix family is the model).  `AxSpin
      `KppI ← cutPpIF` (push_off's two genesis annotations `AxSpinT2h.genF` as the FRAME), pop_off's
      reloads `rlN := some (sw noff)`, `rlI := if q.b then some (sw intena) else none` (labels from
      `KAcqP`), → `c.li` → the terminal store; continuation at `t2Len q` with `LEN = t2Len q`;
-   `AxSpinApB.segCsP` — `wpdAllocpidCsP` (window without cuts) → `segRelP`; at the complete end the
-     `npSrc` / `FRAG` annotations are read back (`AxSpinApA.wpdEnd2`);
+   `AxSpinApB.segCsP` — `wpdAllocpidCsP` (window without cuts) → `segRelP`; at the complete end
+     (P4) THE WALK PAST THE ROW END `AxSpinTailW.walk` (`jal kalloc`, kalloc's `c.addi sp` at the
+     row end, the stuck `c.sdsp ra`): at each of its three boundaries the `npSrc` / `FRAG`
+     annotations are read back (`AxSpinTailW.postAnn2`) and `a3` is still the loaded pid word;
    **`wpdAllocpidSeg2`** — `auipc`/`addi`/`jal acquire` → `AxSpinAq2.wpdAcquireG` (cut `aq` ←
      `AxSpinApB.cutAqR`; every gate by `gateBody`, the non-panic arm past the cut from `allocPre`'s
      gate; `KAcqG`'s genesis
@@ -63,7 +66,11 @@ NEW Lean file (no Rocq source; Rocq's ID-8 prefix family is the model).  `AxSpin
 2. The post is q-INDEXED (`t2CutAt row q i`, `LEN = t2Len q`) rather than the design's
    `¬ t2Cut GD i` / `t2Complete GD i`; `notCutOfAt` (+ `cutDet`) and `fullOfPre` are the bridges
    (AxSpinT2f deviation 2: `t2Cut` quantifies `q` inside the family).
-3. The `a3` conjunct is not in the post (as stage 1: `AxSpinApA` FINDING, `PROGRESS-AxSpinApA.md`).
+3. (P4, 2026-10-09) The `a3` conjunct IS in the post on complete rows (stage 1's `AxSpinApA`
+   FINDING is lifted by the row-end leaves `AxSpinRowEnd.XxRegEnd`/`XxStEnd`).  STATEMENT
+   CHANGES: `t2PostP` (+ `gprOf s 13 = some (sext32 w)`), `Hyp2` (+ field `txt2 :
+   AxSpinApA.tailText2`, so `hypXv6P` / `hyp2OfHyp` take it), `segRelP`'s continuation (+ `sp = S`,
+   from release's `sp` conjunct).
 4. Pins: exactly `AllocPins2` = `{npNowrap, npNcoll, ppArm}` (Q18b, the selector `ppArm`; all
    hart `i`'s own reads).  `hdArm`/`rhArm`/`rhCpu`/`ppGe`/`ppInt` and release's lock bit are NOT
    premises: on the normal arm they come from `allocPre`'s gate conjunct, at the cut they are
@@ -113,6 +120,7 @@ NEW Lean file (no Rocq source; Rocq's ID-8 prefix family is the model).  `AxSpin
 -/
 import Weak.AxSpinApA
 import Weak.AxSpinT2h
+import Weak.AxSpinTailW
 
 namespace Weak
 
@@ -863,6 +871,7 @@ structure AxSpinApB.Hyp2 (L : Xlay) (GT : GdexecT) (σi : ExecSt) (T : PTree) (i
   txr : releaseText σi T
   txc : allocpidText σi T
   txt : AxSpinApA.tailText σi T
+  txt2 : AxSpinApA.tailText2 σi T
   fix : textFixed (gtAdGd GT) i (imgS σi)
 
 section bundles
@@ -948,7 +957,8 @@ def AxSpinApB.t2PostP {GF : BundledGFunctors} [AxSpinX.Xv6G GF] (GD : Gdexec) (L
   iprop(⌜¬ midState s⌝ -∗ ⌜¬ t2CutAt (AxOpsem.grow GD i) q i⌝ ∗
     (⌜(AxOpsem.grow GD i).length = t2Len q⌝ -∗ ∃ w : BitVec 32,
       ⌜pidOf GD i q = some (WeakInterpProj.wbytes 4 w) ∧
-        npSrc GD.gdG L (i, t2KBd q) (i, t2KA q)⌝ ∗ FRAG nm w))
+        npSrc GD.gdG L (i, t2KBd q) (i, t2KA q) ∧
+        AxSpinT2a.gprOf s 13#5 = some (AxSpinT2a.sext32 w)⌝ ∗ FRAG nm w))
 
 /-- The post at an INCOMPLETE row end that is no cut row is free. -/
 theorem AxSpinApB.postP {GF : BundledGFunctors} [AxSpinX.Xv6G GF] (GD : Gdexec) (L : Xlay)
@@ -1204,7 +1214,8 @@ theorem AxSpinApB.segRelP (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T
         (t2KPoT q + 4) -∗
       (∀ (rs' : RegFile) (ib' : Ibch),
         ⌜ctrlOkSW T satp0 rs' ∧ rs' .PC = pca 0x9c ∧ rs' .tlb = rsR .tlb ∧
-          gprVal rs' 13#5 = gprVal rsR 13#5 ∧ (AxOpsem.grow (gtAdGd GT) i).length = t2Len q⌝ -∗
+          gprVal rs' 13#5 = gprVal rsR 13#5 ∧ (AxOpsem.grow (gtAdGd GT) i).length = t2Len q ∧
+          gprVal rs' 2#5 = BitVec.ofInt 64 S⌝ -∗
         @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨.PHart cpu (.pure ()) rs' none ib', t2Len q⟩ (AxSpinApB.t2PostP (gtAdGd GT) L nm i q)) -∗
       @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
@@ -1563,7 +1574,7 @@ theorem AxSpinApB.segRelP (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T
         (AxSpinT2h.gatePpI _ i q q.c hg rfl) s) hc))
     $$ Hil HLK HW HNp HGF
   iintro %vra %vs0 %vs1 %rs1 %ib1 %Hf %Hgs - - - - - - -
-  obtain ⟨Hc1, HPC1, Htl1, -, -, -, -, -, -, -, E91, Hkeep1, -, -, Hgd2, -, -, Hgv2⟩ := Hf
+  obtain ⟨Hc1, HPC1, Htl1, E21, -, -, -, -, -, -, E91, Hkeep1, -, -, Hgd2, -, -, Hgv2⟩ := Hf
   have Evs1 : vs1 = stBytes 8 (BitVec.ofInt 64 p) := by
     cases g
     · exact ((Hg2 rfl).2 (by rw [Hgd2, EJ9])).elim
@@ -1596,6 +1607,8 @@ theorem AxSpinApB.segRelP (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T
   have Hw2 := AxSpinApA.warmTlb rsR rs2 i S p Htl2 Hw
   have E92 : gprVal rs2 9#5 = BitVec.ofInt 64 p := by rw [HF2]; ax_spin_apb_zsimp; exact E91
   have E132 : gprVal rs2 13#5 = gprVal rsR 13#5 := by rw [HF2]; ax_spin_apb_zsimp; exact E131
+  have E22 : gprVal rs2 2#5 = BitVec.ofInt 64 S := by
+    rw [HF2]; ax_spin_apb_zsimp; exact E21.trans EJ2
   have Eva : gprVal rs2 9#5 + sign_extend (m := 64) 24#12 = BitVec.ofInt 64 (p + 24) := by
     rw [E92]; exact AxSpinApA.vaEq _ _ _ _ AxSpinApA.i24Of rfl
   ihave Fp := FstMPriv (hlc := hlc) (GF := GF) L GT nm HL Hcons i
@@ -1628,9 +1641,10 @@ theorem AxSpinApB.segRelP (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T
   iapply K $$ %rs3 %ib3
   ipureintro
   refine ⟨gbCtrl T satp0 _ _ _ _ _ _ HG3, ?_, (gbTlb T satp0 _ _ _ _ _ _ HG3).trans Htl2, ?_,
-    by omega⟩
+    by omega, ?_⟩
   · rw [gbPc T satp0 _ _ _ _ _ _ HG3]; decide
   · rw [stepRegs0 T satp0 _ rs2 _ _ _ rs3 (fun _ => rfl) HG3]; exact E132
+  · rw [stepRegs0 T satp0 _ rs2 _ _ _ rs3 (fun _ => rfl) HG3]; exact E22
 
 
 set_option maxHeartbeats 3200000 in
@@ -1764,27 +1778,40 @@ theorem AxSpinApB.segCsP (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T 
       (by decide)).trans E9)
     E101 Hkw HlN HlI HgvN) $$ Hil HLK HW HRN65 HGF
   iintro %rs2 %ib2 %Hf2
-  obtain ⟨-, -, -, -, hlen⟩ := Hf2
-  -- THE COMPLETE ROW END: read back the nextpid source and the issued fragment
-  ihave W := (AxSpinApA.wpdEnd2 L GT nm i (t2Len q) (by omega) (i, t2KBd q) (i, t2KBd q + 65)
-    rfl rfl (by intro h; have := congrArg Prod.snd h; simp at this)
-    iprop(⌜npSrc (gtAdGd GT).gdG L (i, t2KBd q) (i, t2KA q)⌝) (FRAG nm (wordOfBytes 4 vs))
-    (AxSpinApB.t2PostP (gtAdGd GT) L nm i q)
-    (by
-      intro s
-      unfold AxSpinApB.t2PostP
-      iintro ⟨HF, %Hs⟩ %_
-      isplitr
-      · ipureintro
-        exact notCutAtOfLen (fun j hj => by have := AxSpinT2f.cutPosLen j q; omega)
-          (fun x hx => by have := AxSpinT2f.rlPosLen x q; omega)
-      · iintro %_
-        iexists (wordOfBytes 4 vs)
+  obtain ⟨Hc2, HPC2, Htl2, E132, hlen, E22⟩ := Hf2
+  have Hw2 := AxSpinApA.warmTlb rsC rs2 i S p (Htl2.trans Htl1) Hw
+  have Hsl := AxSpinApB.slot H rs2 Hw2 8 (by omega) (by omega) (by omega)
+  -- THE COMPLETE ROW END: the walk past it (P4) — `jal kalloc`, `c.addi sp`, the stuck
+  -- `c.sdsp ra`; at every boundary the nextpid source and the issued fragment are read back
+  -- and `a3` is the loaded pid word
+  iapply (AxSpinTailW.walk L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu H.fix _ HΦmid S
+    iprop(AxAnnot.annotOwn (i, t2KBd q)
+        iprop(⌜npSrc (gtAdGd GT).gdG L (i, t2KBd q) (i, t2KA q)⌝) ∗
+      AxAnnot.annotOwn (i, t2KBd q + 65) (FRAG nm (wordOfBytes 4 vs)))
+    (AxSpinT2a.sext32 (wordOfBytes 4 vs)) rs2 ib2 (t2Len q) H.txt2 Hc2 HPC2
+    (E132.trans E131) E22
+    (AxSpinApA.hitTxt rs2 Hw2 _ (by decide) (by decide))
+    (AxSpinApA.hitTxt rs2 Hw2 _ (by decide) (by decide))
+    (AxSpinApA.hitTxt rs2 Hw2 _ (by decide) (by decide))
+    Hsl.2.2.1 Hsl.1 hlen.symm
+    (fun s1 Hg1 => AxSpinTailW.postAnn2 L GT nm i (i, t2KBd q) (i, t2KBd q + 65) rfl rfl
+      (by intro h; have := congrArg Prod.snd h; simp at this) _ _ _ s1
+      (by
+        unfold AxSpinApB.t2PostP
+        iintro ⟨HF, %Hs⟩ %_
         isplitr
         · ipureintro
-          exact ⟨Hgd66, Hs⟩
-        · iexact HF)) $$ Hsrc HFR
-  iapply W
+          exact notCutAtOfLen (fun j hj => by have := AxSpinT2f.cutPosLen j q; omega)
+            (fun x hx => by have := AxSpinT2f.rlPosLen x q; omega)
+        · iintro %_
+          iexists (wordOfBytes 4 vs)
+          isplitr
+          · ipureintro
+            exact ⟨Hgd66, Hs, Hg1⟩
+          · iexact HF)))
+  isplitl [Hsrc]
+  · iexact Hsrc
+  · iexact HFR
 
 set_option maxHeartbeats 6400000 in
 include HL Hcons hmode hasid hppn in
@@ -2108,6 +2135,7 @@ theorem AxSpinApB.hypXv6P (A B C : Agent) (Sf pf : Agent → Int) (ptp : Int →
     (Htxa : acquireText σi T) (Htxm : mycpuText σi T) (Htxp : pushOffText σi T)
     (Htxh : holdingText σi T) (Htxq : popOffText σi T) (Htxr : releaseText σi T)
     (Htxc : allocpidText σi T) (Htxt : AxSpinApA.tailText σi T)
+    (Htxt2 : AxSpinApA.tailText2 σi T)
     (Hfix : textFixed (gtAdGd GT) i (imgS σi)) :
     AxSpinApB.Hyp2 (xlayXv6 A B C Sf pf ptp) GT σi T i q (Sf i) (pf i) where
   pre := Hpre
@@ -2131,13 +2159,15 @@ theorem AxSpinApB.hypXv6P (A B C : Agent) (Sf pf : Agent → Int) (ptp : Int →
   txr := Htxr
   txc := Htxc
   txt := Htxt
+  txt2 := Htxt2
   fix := Hfix
 
 /-- Stage 1's bundle (with the five gates from stage 1's pins) is a stage-2 bundle, given the
 noff image premise. -/
 theorem AxSpinApB.hyp2OfHyp {L : Xlay} {GT : GdexecT} {σi : ExecSt} {T : PTree} {i : Agent}
     {q : T2Prm} {S p : Int} (H : AxSpinApA.Hyp L GT σi T i q S p)
-    (Himg : ∃ v, noffImgOk (gtAdGd GT).gdG.gxImg i v) : AxSpinApB.Hyp2 L GT σi T i q S p where
+    (Himg : ∃ v, noffImgOk (gtAdGd GT).gdG.gxImg i v) (Htxt2 : AxSpinApA.tailText2 σi T) :
+    AxSpinApB.Hyp2 L GT σi T i q S p where
   pre := preOfFullPins H.full H.pins
   pins := pins2OfPins H.pins
   imgN := Himg
@@ -2155,6 +2185,7 @@ theorem AxSpinApB.hyp2OfHyp {L : Xlay} {GT : GdexecT} {σi : ExecSt} {T : PTree}
   txr := H.txr
   txc := H.txc
   txt := H.txt
+  txt2 := Htxt2
   fix := H.fix
 
 /-- The post's cut conjunct (q-indexed) gives the design's `¬ t2Cut` (determinacy, `cutDet`). -/
