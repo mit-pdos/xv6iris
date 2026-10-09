@@ -620,5 +620,6 @@ import Weak.AxSpinTailW
 import Weak.CatOfMinusSpike
 import Weak.W13Spike
 import Weak.PfRunShape
+import Weak.SrvwmoXv6Witness
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
