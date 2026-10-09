@@ -79,7 +79,10 @@ in Rocq's AxSpinU2/U4.
    and `okw1` gains the conjunct `a ∉ clb Lx` (Rocq: any `a ∈ XO`), so `HOw1`/`wpdSdOwn1` cover
    one-byte nextpid stores only (a one-byte lk->cpu store is no longer a protocol write; neither
    is used by a certificate or a later file).  `fxuNpIncr` discharges `xoSide`'s new `clFull`
-   premise by `AxSpinX2.clFullNpb` (statement unchanged).
+   premise by `AxSpinX2.clFullNpb` (statement unchanged).  THE TWIN (Lean-only, owner request):
+   `AxSpinU.fxuWriteCpu8` is the generic owned FULL-WIDTH lk->cpu write (an `sd` at
+   `L.xlLk + 16` of `cvx w.1` or 0: annotation `RCpu e` ⇒ `RVL (clb L) w vs`; `clFull`/`cpuOk`
+   discharged via `AxSpinX2.fxCpuWrite`), with `AxSpinU.okwCpu8`/`AxSpinU.HOwCpu8` at `Lx`.
 
 **Rocq → Lean name map.**  `src_at` `srcAt`, `np_src` `npSrc`, `last_fst` `lastFst`, `Rv_retie`
 `RvRetie`, `RVL_retie` `RVLRetie`, `Rv_read_src` `RvReadSrc`, `NPh` `NPh`, `FRAG` `FRAG`, `O1`
@@ -93,10 +96,11 @@ in Rocq's AxSpinU2/U4.
 `wpd_reacquire_x` `wpdReacquireX`, `wpd_acquire_fail_x` `wpdAcquireFailX`, `wpd_release_x`
 `wpdReleaseX`, `wpd_lk_held_x` `wpdLkHeldX`.  No duplicated Rocq names.
 Lean-only (file-qualified): `AxSpinU.rvlNpSrc` (`fxu_np_read`'s inner `iAssert`: every byte of
-the nextpid word has the source fact).
+the nextpid word has the source fact); `AxSpinU.fxuWriteCpu8`, `AxSpinU.okwCpu8`,
+`AxSpinU.HOwCpu8` (deviation 7's full-width twin of `fxuWrite1`/`okw1`/`HOw1`).
 
 **Dropped:** none (41 Rocq decls incl. the 4 local instances `ur_pol`/`ur_G`/`ux_pol`/`ux_G`
-(inlined); 38 Lean = 37 + 1 Lean-only).
+(inlined); 41 Lean = 37 + 4 Lean-only).
 -/
 import Weak.AxSpinH5
 import Weak.AxSpinX5
@@ -471,6 +475,57 @@ theorem fxuWrite1 (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
     intro v0 Hv0
     exact Option.some.inj Hv0
 
+/-- (Lean-only, Q-S2-B) The TWIN of `fxuWrite1` for lk->cpu: the owned FULL-WIDTH write of all
+8 bytes `clb L` (an `sd` at `L.xlLk + 16`) of a value the protocol admits (`cvx w.1`, the
+writer's cpu pointer, or 0); `clFull` and `cpuOk` are discharged from the label and the value
+(by `AxSpinX2.fxCpuWrite`). -/
+theorem AxSpinU.fxuWriteCpu8 (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
+    (Hcons : rvwmoCatConsistent (gtAdGd GT)) (w e : Geid) (vs : List (BitVec 8))
+    (cls : WmClass) :
+    gxLbl (gtAdGd GT).gdG w = some (.LStore false (L.xlLk + 16) vs cls) →
+    (vs = cvx w.1 ∨ vs = List.replicate 8 b0) → gmoLt (gtAdGd GT).gdG e w →
+    ⊢ @flowEqDyn hlc GF _ (AxSpinX2.xG L GT nm) (gtAdGd GT) w
+        (@Axpol.sPol (xv6Pol GT) (gtAdGd GT) w)
+        ({[e := RCpu L nm.xnH (gtAdGd GT) e]} : Mea GF) (RVL nm.xnH (gtAdGd GT) (clb L) w vs) := by
+  intro Hl Hv Hew
+  obtain ⟨Hw, Hsg⟩ := gwbStoren _ _ _ _ _ Hl
+  have Hisw : gisW (gtAdGd GT).gdG w = true := by unfold gisW; rw [Hl]; rfl
+  have Hlen : vs.length = 8 := by
+    rcases Hv with rfl | rfl
+    · exact cvxLength _
+    · exact List.length_replicate
+  have Hall : ∀ (j : Nat) a v, (clb L)[j]? = some a → vs[j]? = some v →
+      gwritesByte (gtAdGd GT).gdG w a v := by
+    intro j a v Hj Hv'
+    have Hj' : (clRange (L.xlLk + 16) 8)[j]? = some a := Hj
+    obtain ⟨rfl, -⟩ := AxSpinX4.clRangeLookup _ _ _ _ Hj'
+    exact Hw j v Hv'
+  have Honly : ∀ a v, gwritesByte (gtAdGd GT).gdG w a v → a ∈ clb L := by
+    intro a v Hw'
+    obtain ⟨j, Hj, rfl⟩ := Hsg a v Hw'
+    have hj := (List.getElem?_eq_some_iff.1 Hj).1
+    rw [Hlen] at hj
+    unfold clb
+    rw [inClr]
+    omega
+  have Hw0 : ⊢ ([∗map] Rin ∈ ({[e := RCpu L nm.xnH (gtAdGd GT) e]} : Mea GF), Rin) -∗
+      iprop(True ∗ ∃ vold, RVL nm.xnH (gtAdGd GT) (clb L) e vold) := by
+    iintro H
+    ihave H := (BigSepM.bigSepM_singleton (M := GMapF Geid)).1 $$ H
+    isplitr
+    · itrivial
+    · iunfold RCpu at H
+      iexact H
+  ihave Hw := Hw0
+  ihave Hfe := (fxCpuWrite (hlc := hlc) L GT nm HL Hcons w e vs iprop(True)
+    ({[e := RCpu L nm.xnH (gtAdGd GT) e]} : Mea GF) Hisw Hew Hv Hall Honly) $$ Hw
+  iapply (@flowEqDynMono hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) (gtAdGd GT) w _ _
+    iprop(True ∗ RVL nm.xnH (gtAdGd GT) (clb L) w vs) (RVL nm.xnH (gtAdGd GT) (clb L) w vs))
+    $$ [] Hfe
+  inext
+  iintro ⟨-, H⟩
+  iexact H
+
 /-- The one-byte owned read (the generic interface's `HOr`). -/
 theorem fxuRead1 (L : Xlay) (GT : GdexecT) (nm : Xv6N) (_HL : xlayOk L)
     (Hcons : rvwmoCatConsistent (gtAdGd GT)) (r e : Geid) (a : Int) (t : Nat) (v : BitVec 8)
@@ -543,6 +598,11 @@ theorem uxPolIntro (GT : GdexecT) (e r : Geid) (l : Lbl) :
 def okw1 (GT : GdexecT) (w : Geid) (a : Int) (_b : BitVec 8) : Prop :=
   a ∈ XO Lx ∧ a ∉ clb Lx ∧ cpuOk (clb Lx) cvx (gtAdGd GT).gdG w
 
+/-- (Lean-only, Q-S2-B) the policy side condition of `AxSpinU.HOwCpu8`: the 8-byte lk->cpu value
+is the writer's cpu pointer or 0 (exactly what `cpuOk` admits for a full-width write). -/
+def AxSpinU.okwCpu8 (_GT : GdexecT) (w : Geid) (vs : List (BitVec 8)) : Prop :=
+  vs = cvx w.1 ∨ vs = List.replicate 8 b0
+
 def okr1 (_r : Geid) (a : Int) : Prop := a ∈ XO Lx
 
 section leavesX
@@ -574,6 +634,17 @@ theorem HOw1 (GT : GdexecT) (nm : Xv6N) (Hcons : rvwmoCatConsistent (gtAdGd GT))
         (@Axpol.sPol (xv6Pol GT) (gtAdGd GT) w)
         ({[e := O1 nm (gtAdGd GT) a e mv]} : Mea GF) (O1 nm (gtAdGd GT) a w (some b)) :=
   fun Hl ⟨HaX, Hnc, Hok⟩ Hew => fxuWrite1 Lx GT nm LxOk Hcons w e a b cls mv Hl HaX Hnc Hok Hew
+
+/-- (Lean-only, Q-S2-B) `AxSpinU.fxuWriteCpu8` at Ixv6 (the full-width twin of `HOw1`). -/
+theorem AxSpinU.HOwCpu8 (GT : GdexecT) (nm : Xv6N) (Hcons : rvwmoCatConsistent (gtAdGd GT))
+    (w e : Geid) (vs : List (BitVec 8)) (cls : WmClass) :
+    gxLbl (gtAdGd GT).gdG w = some (.LStore false (Lx.xlLk + 16) vs cls) →
+    AxSpinU.okwCpu8 GT w vs → gmoLt (gtAdGd GT).gdG e w →
+    ⊢ @flowEqDyn hlc GF _ (AxSpinX2.xG Lx GT nm) (gtAdGd GT) w
+        (@Axpol.sPol (xv6Pol GT) (gtAdGd GT) w)
+        ({[e := RCpu Lx nm.xnH (gtAdGd GT) e]} : Mea GF)
+        (RVL nm.xnH (gtAdGd GT) (clb Lx) w vs) :=
+  fun Hl Hok Hew => AxSpinU.fxuWriteCpu8 Lx GT nm LxOk Hcons w e vs cls Hl Hok Hew
 
 theorem HOr1 (GT : GdexecT) (nm : Xv6N) (Hcons : rvwmoCatConsistent (gtAdGd GT)) (r e : Geid)
     (a : Int) (t : Nat) (v : BitVec 8) (mv : Option (BitVec 8)) :
