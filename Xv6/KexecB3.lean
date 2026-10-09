@@ -726,7 +726,7 @@ theorem kxcB3_stub (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (
 theorem kxcB3_br_f2p : KA.«kexec» + 0x178#64 + BitVec.signExtend 64 2096744#21 = KA.«flags2perm» := by
   decide
 theorem kxcB3_ret_170 : jumpPc (KA.«kexec» + 0x178#64 + 4#64) = KA.«kexec» + 0x178#64 + 4#64 := by decide
-theorem kxcB3_br_uvma : KA.«kexec» + 0x184#64 + BitVec.signExtend 64 2082760#21 = KA.«uvmalloc» := by
+theorem kxcB3_br_uvma : KA.«kexec» + 0x184#64 + BitVec.signExtend 64 2082764#21 = KA.«uvmalloc» := by
   decide
 theorem kxcB3_ret_17c : jumpPc (KA.«kexec» + 0x184#64 + 4#64) = KA.«kexec» + 0x184#64 + 4#64 := by decide
 
@@ -1172,7 +1172,7 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   -- +0x17c  jal uvmalloc, the block's event counter lent to it (permit
   -- sweep L1a, Rocq `proc_priv_ev_lend`)
   icases procPrivFdRes_evLend 0 A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
-  iapply (kxcB2_call_uvmalloc UV Γ cpu k A spie spp _ (KA.«kexec» + 0x184#64) 2082760#21 kxcB3_br_uvma
+  iapply (kxcB2_call_uvmalloc UV Γ cpu k A spie spp _ (KA.«kexec» + 0x184#64) 2082764#21 kxcB3_br_uvma
       kxcB3_ret_17c P Mi A.V.ev hK hnoff (by simp [RegMap.set_apply, a22])
       (by simpa [RegMap.set_apply, a18] using hbelow) (by simpa [RegMap.set_apply, a18] using hcov)
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hf2p];

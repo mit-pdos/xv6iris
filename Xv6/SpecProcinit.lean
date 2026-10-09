@@ -9,13 +9,20 @@ public contract, stated once, in the kernel execution context.
         initlock(&p->lock, "proc");
         p->state  = UNUSED;
         p->kstack = KSTACK((int)(p - proc));
+        p->npid = (int)(p - proc);
       }
     }
 
+(NI M4 pids: the last line, the slot's pid partition counter `p->npid`
+(`ProcGeom.pNpid`), is the `verified-quota` pid commit's.)
+
 THE CELLS: the caller brings the three words of each lock (whatever they
-hold), the state and kstack words, and gets back the name words, `lkFresh`
-for every lock (the lock is made once its payload is chosen), the state
-words at `0` and the kstack words at their addresses.  The function needs
+hold), the state, kstack and (NI M4 pids) `npid` words, and gets back the
+name words, `lkFresh` for every lock (the lock is made once its payload is
+chosen), the state words at `0`, the kstack words at their addresses and the
+`npid` words at their slot indices (`npidInit i`, handed back as a SEPARATE
+big-op beside `procReady`: they are `pid_lock`'s, which `main` seals over
+them, not the slot lock's).  The function needs
 10 of the caller's stack slots (its frame of 8, then `initlock`'s 2) and
 returns them; the callee-saved registers are preserved.
 
@@ -80,18 +87,24 @@ def lockWords (lk : BitVec 64) (vlock : BitVec 32) (vname vcpu : BitVec 64) : IP
 def lockInited (lk name : BitVec 64) : IProp GF := iprop%
   wordPointsTo (lk + 8#64) 8 (DFrac.own 1) name ∗ lkFresh lk
 
-/-- Process `i`'s fields `procinit` touches, before. -/
+/-- Process `i`'s fields `procinit` touches, before (NI M4 pids: with the
+`npid` word). -/
 def procFieldsIn (i : Nat) : IProp GF := iprop%
-  ∃ (vlock : BitVec 32) (vname vcpu : BitVec 64) (vstate : BitVec 32) (vks : BitVec 64),
+  ∃ (vlock : BitVec 32) (vname vcpu : BitVec 64) (vstate : BitVec 32) (vks : BitVec 64) (vnp : BitVec 32),
     lockWords (procAddr i) vlock vname vcpu ∗
     wordPointsTo (procAddr i + 24#64) 4 (DFrac.own 1) vstate ∗
-    wordPointsTo (procAddr i + 64#64) 8 (DFrac.own 1) vks
+    wordPointsTo (procAddr i + 64#64) 8 (DFrac.own 1) vks ∗
+    wordPointsTo (pNpid (procAddr i)) 4 (DFrac.own 1) vnp
 
 /-- Process `i`'s fields after: lock initialised, `state = UNUSED`, `kstack = KSTACK(i)`. -/
 def procFieldsOut (i : Nat) : IProp GF := iprop%
   lockInited (procAddr i) procNameAddr ∗
   wordPointsTo (procAddr i + 24#64) 4 (DFrac.own 1) 0#32 ∗
   wordPointsTo (procAddr i + 64#64) 8 (DFrac.own 1) (kstackVa i)
+
+/-- Process `i`'s pid partition counter after: `p->npid = i` (NI M4 pids). -/
+def npidInit (i : Nat) : IProp GF := iprop%
+  wordPointsTo (pNpid (procAddr i)) 4 (DFrac.own 1) (BitVec.ofNat 32 i)
 
 end
 
@@ -124,6 +137,7 @@ def wp_procinit_body (cpu : CPU) (k : KCtx) (hK : 10 ≤ k.avail) : Prop :=
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     lockInited pidLockAddr nextpidNameAddr -∗ lockInited waitLockAddr waitLockNameAddr -∗
     ([∗list] i ∈ List.range NPROC, procReady i) -∗
+    ([∗list] i ∈ List.range NPROC, npidInit i) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

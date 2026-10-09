@@ -50,10 +50,10 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Call targets and return addresses -/
 
-theorem namex_br_myproc : KA.«namex» + 0xffffffffffffdf42#64 = KA.«myproc» := by decide
+theorem namex_br_myproc : KA.«namex» + 0xffffffffffffdf4a#64 = KA.«myproc» := by decide
 theorem namex_br_idup : KA.«namex» + 0xfffffffffffff8f2#64 = KA.«idup» := by decide
 theorem namex_br_iunlock : KA.«namex» + 0xfffffffffffff9d6#64 = KA.«iunlock» := by decide
-theorem namex_br_memmove : KA.«namex» + 0xffffffffffffd33e#64 = KA.«memmove» := by decide
+theorem namex_br_memmove : KA.«namex» + 0xffffffffffffd342#64 = KA.«memmove» := by decide
 theorem namex_br_ilock : KA.«namex» + 0xfffffffffffff928#64 = KA.«ilock» := by decide
 theorem namex_br_dirlookup : KA.«namex» + 0xffffffffffffff10#64 = KA.«dirlookup» := by decide
 theorem namex_br_iput : KA.«namex» + 0xfffffffffffffaaa#64 = KA.«iput» := by decide

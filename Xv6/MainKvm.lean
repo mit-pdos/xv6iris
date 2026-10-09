@@ -212,7 +212,8 @@ theorem mn_procinit (PR : PROCINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
     pageCredit (NPROC * slotShare) ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 126#64) -∗
       lockInited pidLockAddr nextpidNameAddr -∗ lockInited waitLockAddr waitLockNameAddr -∗
-      ([∗list] i ∈ List.range NPROC, procReady i) -∗ wpLoop cpu)
+      ([∗list] i ∈ List.range NPROC, procReady i) -∗
+      ([∗list] i ∈ List.range NPROC, npidInit i) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hpl, Hwl, Hraw, Hfd, Hir, Hbs, Hcr, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -228,9 +229,9 @@ theorem mn_procinit (PR : PROCINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
   iframe Hk Hpc Hpl Hwl Hraw Hfd Hir Hbs Hcr
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
-  iintro %R' Hk Hpc Hpid Hwait Hready %_
+  iintro %R' Hk Hpc Hpid Hwait Hready Hnpid %_
   simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_7e]
-  iapply HΦ $$ %R' Hk Hpc Hpid Hwait Hready
+  iapply HΦ $$ %R' Hk Hpc Hpid Hwait Hready Hnpid
 
 /-- A byte buffer travels to the kernel table. -/
 theorem mn_byteBuf_toKpt (X : CurCtx) (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) :
@@ -364,27 +365,26 @@ theorem mn_waitLock_kmap [CurCtx] :
   · iapply kmapStatic_rw waitLockAddr (by decide) $$ HS
   · iapply kmapStatic_rw (waitLockAddr + 16#64) (by decide) $$ HS
 
-/-- The `nextpid` lock's payload at boot: `nextpid = 1`, every pid cell at
-`0`, the registration map empty, and the pid ledger at the empty history
+/-- The pid lock's payload at boot (NI M4 pids): every slot's partition
+counter at its index (procinit's `npidInit`), every pid cell at `0`, the
+registration map empty, and the pid ledger at the empty history
 (`PidLock.pidLedger_empty`, NI-LEDGER-REST). -/
 theorem mn_pidRes_boot [CurCtx] :
-    wordPointsTo (GF := GF) nextpidAddr 4 (DFrac.own 1) 1#32 ∗
+    ([∗list] i ∈ List.range NPROC, npidInit (GF := GF) i) ∗
     ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
     pidRegAuth ∅ ∗ pidLedAuth [] ⊢ pidLockPay curCtx := by
   unfold pidLockPay pidLockResAt
   iintro ⟨Hn, Hp, Ha, Hl⟩
   ihave Hl := pidLedger_empty $$ Hl
-  iexists 1#32, (fun _ => 0#32)
+  iexists npidsInit, (fun _ => 0#32)
   isplitr
   · ipureintro
-    refine ⟨by decide, by decide, ?_⟩
     intro j1 j2 _ _ h; exact absurd rfl h
   isplitl [Hn]
-  · rw [wordAtN_cur]; iexact Hn
+  · unfold npidInit npidsInit
+    iapply BigSepL.bigSepL_mono_of_forall (fun {_ _} => (show _ ⊢ _ from by rw [wordAtN_cur])) $$ Hn
   isplitl [Hp]
   · iapply BigSepL.bigSepL_mono_of_forall (fun {_ _} => (show _ ⊢ _ from by rw [wordAtN_cur])) $$ Hp
-  isplitr
-  · ileft; ipureintro; rfl
   iexists ∅
   isplitr
   · ipureintro; exact pidRegDom_empty _
@@ -396,15 +396,15 @@ theorem mn_pidRes_boot [CurCtx] :
 
 set_option maxHeartbeats 4000000 in
 /-- **The `nextpid` and `wait_lock` locks, born** (Rocq's two `newlock`s
-after procinit): over `nextpid_res` (the `.data` word at its pinned `1`,
-`pid_lock`'s quarter of every pid cell, the empty registration map, the
-empty pid ledger) and
+after procinit): over `nextpid_res` (NI M4 pids: every slot's partition
+counter at its index, `pid_lock`'s quarter of every pid cell, the empty
+registration map, the empty pid ledger) and
 over `wait_res` (the parent cells, the children map, no orphans, the zombie
 ledger at the empty history, and -- NI M2-G1b -- the family ledger's T2
 authority at the all-`none` column). -/
 theorem mn_pidWait_born [CurCtx] (cpu : CPU) (k : KCtx) :
     kctx cpu k ∗ lockInited pidLockAddr nextpidNameAddr ∗ lockInited waitLockAddr waitLockNameAddr ∗
-    wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32 ∗
+    ([∗list] i ∈ List.range NPROC, npidInit i) ∗
     ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
     pidRegAuth ∅ ∗ pidLedAuth [] ∗ parentsResAt curCtx ∗ childrenResBoot ∗ orphansOwn ∅ ∗
     zombLedAuth [] ∗ zsAuth (fun _ => none)

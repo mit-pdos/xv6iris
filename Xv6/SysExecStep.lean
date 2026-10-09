@@ -62,7 +62,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 theorem sys_exec_br_fetchaddr : KA.«sys_exec» + 0xffffffffffffd26c#64 = KA.«fetchaddr» := by decide
-theorem sys_exec_br_kalloc : KA.«sys_exec» + 0xffffffffffffb540#64 = KA.«kalloc» := by decide
+theorem sys_exec_br_kalloc : KA.«sys_exec» + 0xffffffffffffb544#64 = KA.«kalloc» := by decide
 theorem sys_exec_br_fetchstr : KA.«sys_exec» + 0xffffffffffffd2b6#64 = KA.«fetchstr» := by decide
 theorem sys_exec_ret_66 : jumpPc (KA.«sys_exec» + 0x66#64) = KA.«sys_exec» + 0x66#64 := by decide
 theorem sys_exec_ret_74 : jumpPc (KA.«sys_exec» + 0x74#64) = KA.«sys_exec» + 0x74#64 := by decide
@@ -324,7 +324,7 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
   simp only [sysExecAddr]
   ihave #Hrdy := sysExecEnv_ready Γ A $$ Henv
   -- +0x70  jal kalloc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x70#64) false 2077904#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x70#64) false 2077908#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_kalloc]
   iintro Hk Hpc
   -- the block's counter, lent to kalloc (permit sweep L3b): the event costs

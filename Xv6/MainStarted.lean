@@ -120,7 +120,7 @@ theorem mn_sched (SCH : SCHEDULER) (KV : KERNELVEC) [Y : CurCtx] (hY : curTier =
     icases Hcaps with ⟨-, -, -, -, -, -, -, -, -, -, -, HP⟩
     iexact HP
   -- +0x3e  jal scheduler
-  k_step (wp_s_jal cpu _ (KA.«main» + 62#64) false 3884#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 62#64) false 3880#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ms_scheduler_br]
   iintro Hk Hpc
   have hsch := SCH.wp_scheduler (hlc := hlc) (GF := GF) Γ cpu

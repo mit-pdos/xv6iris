@@ -216,7 +216,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-! ## One iteration of the scan -/
 
 set_option maxHeartbeats 4000000 in
-/-- The body at `0x800020da` (`reparent+0x34`) for slot `i`: read `pp->parent`,
+/-- The body at `0x800020d6` (`reparent+0x34`) for slot `i`: read `pp->parent`,
 compare with `p`, and on a hit set `pp->parent = initproc` and call
 `wakeup(initproc)`; then the cursor step and the termination test. -/
 theorem reparent_br_ffffffffffffff9a : KA.«reparent» + 0xffffffffffffff9a#64 = KA.«wakeup» := by decide
@@ -309,7 +309,7 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
     have g9 : RW 9#5 = procAddr i := b9.trans h9
     have g19 : RW 19#5 = KA.«tickslock» := b19.trans h19
     have hpinW : k.sie = false ∨ k.proc = 0#64 → cW = cur := fun h => (hpW h).trans (hpinCall h)
-    -- c.j 0x800020d2
+    -- c.j 0x800020ce
     k_step_gen (wp_s_j cW _ (KA.«reparent» + 0x44#64) true 2097128#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
     iintro Hk Hpc
@@ -371,7 +371,7 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
 /-! ## The loop -/
 
 set_option maxHeartbeats 4000000 in
-/-- The scan from `0x800020da` with `i` slots behind it runs to the epilogue
+/-- The scan from `0x800020d6` with `i` slots behind it runs to the epilogue
 at `(KernelSyms.«reparent» + 0x46)`.  A bounded loop by induction on a `fuel`, the hart quantified
 inside (the thread may migrate at every `wakeup`). -/
 theorem rp_loop (WK : WAKEUP) [CurCtx]
@@ -472,7 +472,7 @@ theorem rpFrame_join [CurCtx] (sp v0 v1 v2 v3 v4 v5 : BitVec 64) :
   unfold rpFrame; iintro H; iexact H
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x800020ec`: restore `ra`, `s0`, `s1`..`s4`, pop the
+/-- The epilogue at `0x800020e8`: restore `ra`, `s0`, `s1`..`s4`, pop the
 frame, return.  The payload passes through untouched. -/
 theorem rp_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (rr : Nat → BitVec 64)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cur = cpu) (hK : 6 ≤ k.avail)
@@ -542,23 +542,23 @@ theorem rp_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (rr : Nat → BitVec 64)
 
 /-- `&proc[0]`, folded out of `auipc s1,0x10; addi s1,s1,1964`. -/
 theorem rp_proc0_addr :
-    KA.«reparent» + 0x1088a#64 = KA.«proc» := by decide
+    KA.«reparent» + 0x1088e#64 = KA.«proc» := by decide
 
 /-- `&initproc`, folded out of `auipc s4,0x8; addi s4,s4,620`. -/
 theorem rp_init_addr :
-    KA.«reparent» + 0x836a#64 = KA.«initproc» := by decide
+    KA.«reparent» + 0x836e#64 = KA.«initproc» := by decide
 
 /-- `&proc[NPROC]`, folded out of `auipc s3,0x16; addi s3,s3,412`. -/
 theorem rp_sent_addr :
-    KA.«reparent» + 0x1668a#64 = KA.«tickslock» := by decide
+    KA.«reparent» + 0x1668e#64 = KA.«tickslock» := by decide
 
 theorem rp_init_addr_fold : initprocAddr = KA.«initproc» := rfl
 
-theorem reparent_br_1668a : KA.«reparent» + 0x1668a#64 = KA.«tickslock» := by decide
+theorem reparent_br_1668e : KA.«reparent» + 0x1668e#64 = KA.«tickslock» := by decide
 
-theorem reparent_br_836a : KA.«reparent» + 0x836a#64 = KA.«initproc» := by decide
+theorem reparent_br_836e : KA.«reparent» + 0x836e#64 = KA.«initproc» := by decide
 
-theorem reparent_br_1088a : KA.«reparent» + 0x1088a#64 = KA.«proc» := by decide
+theorem reparent_br_1088e : KA.«reparent» + 0x1088e#64 = KA.«proc» := by decide
 
 set_option maxHeartbeats 8000000 in
 /-- **`reparent` meets its specification.** -/
@@ -606,20 +606,20 @@ theorem reparent_proof (WK : WAKEUP) : REPARENT :=
   k_step_gen (wp_s_auipc c9 _ (KA.«reparent» + 0x12#64) false 17#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c10 _ (KA.«reparent» + 0x16#64) false 2168#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [reparent_br_1088a, rp_proc0_addr] next c11 hp11
+  k_step_gen (wp_s_addi c10 _ (KA.«reparent» + 0x16#64) false 2172#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [reparent_br_1088e, rp_proc0_addr] next c11 hp11
   iintro Hk Hpc
   k_step_gen (wp_s_auipc c11 _ (KA.«reparent» + 0x1a#64) false 8#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c12 _ (KA.«reparent» + 0x1e#64) false 848#12 20#5 20#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [reparent_br_836a, rp_init_addr] next c13 hp13
+  k_step_gen (wp_s_addi c12 _ (KA.«reparent» + 0x1e#64) false 852#12 20#5 20#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [reparent_br_836e, rp_init_addr] next c13 hp13
   iintro Hk Hpc
   k_step_gen (wp_s_auipc c13 _ (KA.«reparent» + 0x22#64) false 22#20 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c14 _ (KA.«reparent» + 0x26#64) false 1640#12 19#5 19#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [reparent_br_1668a, rp_sent_addr] next c15 hp15
+  k_step_gen (wp_s_addi c14 _ (KA.«reparent» + 0x26#64) false 1644#12 19#5 19#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [reparent_br_1668e, rp_sent_addr] next c15 hp15
   iintro Hk Hpc
   k_step_gen (wp_s_j c15 _ (KA.«reparent» + 0x2a#64) true 10#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
@@ -637,7 +637,7 @@ theorem reparent_proof (WK : WAKEUP) : REPARENT :=
     k.spie k.spp _ ?g9 ?g18 ?g19 ?g20 c16) $$ [- $Hk $Hpc $HW]
   rotate_right 1
   · iframe #
-    -- the exit at 0x800020ec and the epilogue
+    -- the exit at 0x800020e8 and the epilogue
     iapply wpNext_intro_pin
     iintro %cE %hpE %spie2 %spp2 %R2 %hsp2 Hk Hpc HW %hkept
     ihave Hframe := rpFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)

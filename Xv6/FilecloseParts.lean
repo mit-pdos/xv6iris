@@ -44,17 +44,17 @@ theorem fc_ret_ae : jumpPc (KA.«fileclose» + 0xae#64) = (KA.«fileclose» + 0x
 theorem fc_ret_b4 : jumpPc (KA.«fileclose» + 0xb4#64) = (KA.«fileclose» + 0xb4#64) := by decide
 theorem fc_ret_b8 : jumpPc (KA.«fileclose» + 0xb8#64) = (KA.«fileclose» + 0xb8#64) := by decide
 
-theorem fc_lock_416a : KA.«fileclose» + 0x1e732#64 = ftableAddr := by
+theorem fc_lock_416a : KA.«fileclose» + 0x1e736#64 = ftableAddr := by
   unfold ftableAddr; decide
-theorem fc_lock_41a6 : KA.«fileclose» + 0x1e732#64 = ftableAddr := by
+theorem fc_lock_41a6 : KA.«fileclose» + 0x1e736#64 = ftableAddr := by
   unfold ftableAddr; decide
-theorem fc_lock_41e0 : KA.«fileclose» + 0x1e732#64 = ftableAddr := by
+theorem fc_lock_41e0 : KA.«fileclose» + 0x1e736#64 = ftableAddr := by
   unfold ftableAddr; decide
 
 theorem fileclose_br_438 : KA.«fileclose» + 0x438#64 = KA.«pipeclose» := by decide
-theorem fileclose_br_ffffffffffffc9fa : KA.«fileclose» + 0xffffffffffffc9fa#64 = KA.«release» := by decide
-theorem fileclose_br_ffffffffffffc972 : KA.«fileclose» + 0xffffffffffffc972#64 = KA.«acquire» := by decide
-theorem fileclose_br_1e732 : KA.«fileclose» + 0x1e732#64 = ftableAddr := by decide
+theorem fileclose_br_ffffffffffffc9fe : KA.«fileclose» + 0xffffffffffffc9fe#64 = KA.«release» := by decide
+theorem fileclose_br_ffffffffffffc976 : KA.«fileclose» + 0xffffffffffffc976#64 = KA.«acquire» := by decide
+theorem fileclose_br_1e736 : KA.«fileclose» + 0x1e736#64 = ftableAddr := by decide
 theorem fileclose_br_begin_op : KA.«fileclose» + 0xfffffffffffffb46#64 = KA.«begin_op» := by decide
 theorem fileclose_br_iput : KA.«fileclose» + 0xfffffffffffff1fe#64 = KA.«iput» := by decide
 theorem fileclose_br_end_op : KA.«fileclose» + 0xfffffffffffffbd2#64 = KA.«end_op» := by decide

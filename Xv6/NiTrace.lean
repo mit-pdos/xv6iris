@@ -133,7 +133,7 @@ its observable form, and the strong instance.
    (X-R2) -- is a ghost witness inside it.  What M2-X exports: (i) every
    class answer FACTORS through `usysDet` at a prefix of ONE history per
    (era, ledger), consistently across all incarnations' rounds of the run
-   (two forks' pids are `pidPick` of comparable prefixes; a wait's `zLowest`
+   (two forks' pids are partition picks, `pidPickS` (NI M4 pids), of comparable prefixes; a wait's `zLowest`
    is consistent with every other citation of the family ledger) -- a
    cross-round constraint the old readings could not state; (ii) the
    two-run hypothesis names ι (positions as inputs, histories as `hH`).
@@ -162,18 +162,20 @@ its observable form, and the strong instance.
    NI M3 quotas Q-2 on the `verified-quota` kernel): in the class at every
    key, its answer is `usysForkAns ι`, read off M0's row `usysDetFork` at the
    cited ι (`niDetRow_fork`).  What it is derived FROM: the pid history at
-   the cited position (`pidPick`: the global allocation count since boot mod
-   `PIDMAX` and the live pids just past the counter, the pids FAILED forks
-   consumed included -- a fork that fails after the scan found a slot still
-   advances the counter, `PAlloc; PFree`) and the slot ledger's `SFull` at
+   the cited position (NI M4 pids, on the pid kernel: `pidPickS`, the
+   actor's slot plus `NPROC` times its own allocation count plus one, and
+   the quota's `-1` once that count is `PIDQ` -- the actor's own count in
+   the cited prefix; lane P-1 re-states this item) and the slot ledger's `SFull` at
    the cited position, which the ledger's invariant (`sevWf`, read through
    `SlotLed.sFullRcpt`'s window) allows only after every slot was occupied at
-   some instant of the round's scan window.  `forkOk ι := ¬ ι.sFull`: fork
+   some instant of the round's scan window.  `forkOk ι := ¬ ι.sFull ∧
+   ownAllocs ι.act ι.pev < PIDQ` (NI M4 pids): fork
    DECLASSIFIES THE PID HISTORY AND `SFull` ONLY.  What `H` CONCEDES: the
    global slot-occupancy timeline (`SOcc`/`SVac`, unlabelled, with slot
    indices), the scan outcomes and the other actors' pid events.  The kernel's
    cited row demands a POSITIVE reason on `-1` (`SyscallDefs.syscEvRow`: the
-   cited slot prefix ends in the actor's `SFull`, ruling JF-R5), so neither
+   cited slot prefix ends in the actor's `SFull`, ruling JF-R5, or -- NI M4
+   pids -- the cited pid prefix spends the actor's share), so neither
    the free boot prefix nor an empty citation can explain a `-1`; on success
    the cited `ZFork`'s generation is the child's.  The reason is the KERNEL's
    (it decides which ι the arm may cite and so which ι the filing records);
@@ -187,7 +189,8 @@ its observable form, and the strong instance.
    key does not carry); on the quota kernel every kalloc on fork's path is
    paid out of a credit (the slot's share, the child table's weight; Q-1) and
    is never null, so the allocator event left the row (`forkOk`), the kernel
-   row (`kforkRetLed`'s `-1` arm: `sFullRcpt` alone) and the citation.  The
+   row (`kforkRetLed`'s `-1` arm: `sFullRcpt`, or since NI M4 pids the pid
+   cap's `pidCapRcpt`) and the citation.  The
    allocator's prefix still rides the citation's positions (`NiPos.kev`, `0`
    at every fork citation) and the history hypothesis of the roots before
    `xv6NiDetQ`; `UsysDet.usysDet_ledQ` says no class row reads it (scope 14).
@@ -301,7 +304,8 @@ its observable form, and the strong instance.
    member's fork, exit and reap are co-recorded in the GLOBAL ledgers
    (`PAlloc`/`SOcc`/`KAlloc` beside `ZFork`, `PFree`/`SVac`/`KFree`s beside
    `ZReap`), and `pev`, `kev`, `sev` and the ticks stay global (`pidPick`
-   reads the whole pid history; the allocator and the slot scan are shared),
+   read the whole pid history -- NI M4 pids: `pidPickS` reads the actor's
+   own count; the allocator and the slot scan are shared),
    so the family form restricts only the FAMILY LEDGER: other families'
    `ZExit` timing and the zev positions their events occupy drop out of the
    hypotheses.  The new content is one pure lemma, `zLowest_zevIn`: WAIT
@@ -387,11 +391,13 @@ its observable form, and the strong instance.
    image ending past 760 KiB, `pipe()` the 51st live pipe -- the last two
    are NEW GLOBAL READINGS outside the class (pipes are parked; exec is out).
    WHAT REMAINS in the hypotheses: the pid order (`pev`: fork's pid is
-   `pidPick`), slot occupancy (`sev`: fork's `-1`), the ticks (uptime), the
+   `pidPickS` of the cited prefix since NI M4 pids), slot occupancy (`sev`: fork's `-1`), the ticks (uptime), the
    family ledger (`zev`: wait), the console stream (`cacc`), the schedule
    (positions), the regime, one origin, no gaps.  Pid and slot quotas were
    REJECTED as not minimal (ruling Q-R6: each needs a `struct proc` field
-   and a key field; parent-relative pids change the user API).  The sizing
+   and a key field; parent-relative pids change the user API) -- NI M4 pids
+   later took the pid partition with a per-slot quota (`verified-quota`'s
+   pid commit; no key field).  The sizing
    `64 * slotShare + NPIPE ≤ freePagesAfterBoot` is a proved arithmetic fact
    about this image (`QuotaFit.totalFits`), not an assumption.
 15. **The fd table is the caller's own** (NI M3 FS-L, rulings FS-R4,
@@ -651,7 +657,8 @@ def NiEntry.pid : NiEntry → BitVec 32
   | .round _ _ _ _ _ W' .. => W'.pid
 
 /-- **An incarnation**: an era (the boot count) and a pid.  Pids are not
-reused within an era (`nextpid` only grows; wrap-around is M2-G2's tie) and
+reused within an era (NI M4 pids: the partition never reuses one; the
+pre-M4 counter's wrap-around was M2-G2's tie) and
 restart across eras, hence the pair. -/
 abbrev NiInc := Nat × BitVec 32
 
@@ -873,8 +880,9 @@ three clauses): the exit is an exit, the enter an enter, and
   CITED tick count; wait's at a null status pointer or (NI M2-G1e) with the
   key's lazy bit off, `usysWaitAns` at the CITED prefix and the key's status
   window `win`; (NI joint fork lane F3) fork's `usysForkAns` at the CITED
-  prefix -- `pidPick` of the cited pid prefix when the cited slot prefix
-  does not end in the actor's `SFull`, `-1` otherwise (NI M3 quotas Q-2: no
+  prefix -- `pidPickS` of the actor at the cited pid prefix when the cited
+  slot prefix does not end in the actor's `SFull` and (NI M4 pids) the
+  actor's own count is below `PIDQ`, `-1` otherwise (NI M3 quotas Q-2: no
   allocator reading); (NI M2-G3) sbrk's `usysSbrkAns` at the step's break
   `sz`, the exit's `a0`/`a1` and the CITED prefix -- `-1` at the key's quota
   overrun (NI M3 quotas Q-2: a function of the key), the old break
@@ -2225,7 +2233,7 @@ def NiFamActs (r : BitVec 32) (tr : List NiStep) : Prop :=
 def niForkChild (h : List Obs) : NiEntry → Option (NiInc × NiInc)
   | f@(.round _ j _ _ W _ (some (_, ι)) _ _) =>
     if uvisNum (uvisRun W) = USYS_fork ∧ forkOk ι then
-      some (incOf h f, (obsBoots (h.take j), BitVec.ofNat 32 (pidPick PIDMAX ι.pev)))
+      some (incOf h f, (obsBoots (h.take j), BitVec.ofNat 32 (pidPickS ι.act ι.pev)))
     else none
   | _ => none
 

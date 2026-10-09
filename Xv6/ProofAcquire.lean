@@ -88,7 +88,7 @@ set_option maxHeartbeats 4000000 in
 /-- `acquire` from its `mv a0,s1` on, with interrupts off, from the context
 `kb` push_off left (its lock name not yet held): holding's check, the spin,
 `mycpu`, the owner store, the epilogue. -/
-theorem acquire_br_d04 : KA.«acquire» + 0xd04#64 = KA.«mycpu» := by decide
+theorem acquire_br_d08 : KA.«acquire» + 0xd08#64 = KA.«mycpu» := by decide
 
 theorem acquire_br_ffffffffffffff9a : KA.«acquire» + 0xffffffffffffff9a#64 = KA.«holding» := by decide
 
@@ -160,7 +160,7 @@ theorem acquire_body (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : BundledGFun
   iintro %R' Hk Hpc %hR' Hpre HR Hheld Hview
   k_norm
   -- jal mycpu
-  k_step (wp_s_jal cpu _ (KA.«acquire» + 0x24#64) false 3296#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquire_br_d04]
+  k_step (wp_s_jal cpu _ (KA.«acquire» + 0x24#64) false 3300#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquire_br_d08]
   iintro Hk Hpc
   have hmc : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 2 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu KA.«mycpu» ∗
@@ -436,7 +436,7 @@ theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : Bundled
   iintro %R' Hk Hpc %hR' Hpre HR Hheld Hview Hcred
   k_norm
   -- jal mycpu
-  k_step (wp_s_jal cpu _ (KA.«acquire» + 0x24#64) false 3296#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquire_br_d04]
+  k_step (wp_s_jal cpu _ (KA.«acquire» + 0x24#64) false 3300#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquire_br_d08]
   iintro Hk Hpc
   have hmc : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 2 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu KA.«mycpu» ∗

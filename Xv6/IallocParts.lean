@@ -34,20 +34,20 @@ open LeanRV64D
 /-! ## Addresses -/
 
 /-- `auipc a4,0x1d ; lw a4,1972(a4)` at `+0x08`: `sb.ninodes`. -/
-theorem ialloc_a_ninodes : KA.«ialloc» + 0x1dc22#64 = sbNinodes := by unfold sbNinodes; decide
+theorem ialloc_a_ninodes : KA.«ialloc» + 0x1dc26#64 = sbNinodes := by unfold sbNinodes; decide
 /-- `auipc s4,0x1d ; addi s4,s4,1928` at `+0x28`: `&sb`. -/
-theorem ialloc_a_sb : KA.«ialloc» + 0x1dc16#64 = KA.«sb» := by decide
+theorem ialloc_a_sb : KA.«ialloc» + 0x1dc1a#64 = KA.«sb» := by decide
 theorem ialloc_ist_addr : KA.«sb» + 24#64 = sbInodestart := rfl
 theorem ialloc_nin_addr : KA.«sb» + 12#64 = sbNinodes := rfl
 /-- `auipc a0,0x4 ; addi a0,a0,606` at `+0x72`: the format string. -/
-theorem ialloc_a_fmt : KA.«ialloc» + 0x425e#64 = KStr.«ialloc: no inodes\n» := by decide
+theorem ialloc_a_fmt : KA.«ialloc» + 0x4262#64 = KStr.«ialloc: no inodes\n» := by decide
 
 /-! ## Call targets and return addresses -/
 
 theorem ialloc_br_bread : KA.«ialloc» + 0xFFFFFFFFFFFFFAD8#64 = KA.«bread» := by decide
 theorem ialloc_br_brelse : KA.«ialloc» + 0xFFFFFFFFFFFFFBE0#64 = KA.«brelse» := by decide
-theorem ialloc_br_printk : KA.«ialloc» + 0xffffffffffffd334#64 = KA.«printk» := by decide
-theorem ialloc_br_memset : KA.«ialloc» + 0xffffffffffffdb26#64 = KA.«memset» := by decide
+theorem ialloc_br_printk : KA.«ialloc» + 0xffffffffffffd338#64 = KA.«printk» := by decide
+theorem ialloc_br_memset : KA.«ialloc» + 0xffffffffffffdb2a#64 = KA.«memset» := by decide
 theorem ialloc_br_logwrite : KA.«ialloc» + 0xde8#64 = KA.«log_write» := by decide
 theorem ialloc_br_iget : KA.«ialloc» + 0xFFFFFFFFFFFFFDD2#64 = KA.«iget» := by decide
 

@@ -42,13 +42,13 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 set_option linter.unusedSimpArgs false
 
-theorem fkr_br_prepare_return : KA.«forkret» + 2994#64 = KA.«prepare_return» := by
+theorem fkr_br_prepare_return : KA.«forkret» + 2986#64 = KA.«prepare_return» := by
   decide
 
 theorem fkr_ret58' : jumpPc (KA.«forkret» + 88#64) = KA.«forkret» + 0x58#64 := by decide
 
 theorem fkr_userret_va' :
-    jumpPc (KA.«forkret» + (18158#64 + (-(KA.«forkret» + 18002#64) + 274877902848#64))) = userretVa := by
+    jumpPc (KA.«forkret» + (18154#64 + (-(KA.«forkret» + 17998#64) + 274877902848#64))) = userretVa := by
   decide
 
 /-- **MAKE_SATP** (`(pa >> 12) | (8L << 60)`), at a page address. -/
@@ -161,7 +161,7 @@ theorem fkr_tail [X : CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k : KCtx) (γ : F
   iintro ⟨Hk, Hpc, Hte, Hce, Hpv, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x54  jal prepare_return
-  k_step_gen (wp_s_jal c _ (KA.«forkret» + 0x54#64) false 2910#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c _ (KA.«forkret» + 0x54#64) false 2902#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fkr_br_prepare_return] next c1 hp1
   iintro Hk Hpc
   have hp1' : k.sie = false → c1 = c := fun h => hp1 (Or.inl h)
@@ -217,14 +217,14 @@ theorem fkr_tail [X : CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k : KCtx) (γ : F
   k_step (wp_s_auipc c2 _ (KA.«forkret» + 0x64#64) false 4#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c2 _ (KA.«forkret» + 0x68#64) false 1674#12 15#5 15#5 (by decide))
+  k_step (wp_s_addi c2 _ (KA.«forkret» + 0x68#64) false 1670#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x6c  auipc a3,0x4 ; +0x70 addi a3,a3,1498
   k_step (wp_s_auipc c2 _ (KA.«forkret» + 0x6c#64) false 4#20 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c2 _ (KA.«forkret» + 0x70#64) false 1510#12 13#5 13#5 (by decide))
+  k_step (wp_s_addi c2 _ (KA.«forkret» + 0x70#64) false 1506#12 13#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x74  sub a5,a5,a3 ; +0x76 add a5,a5,a4

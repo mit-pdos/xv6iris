@@ -32,8 +32,8 @@ the rest at `X.toKpt`, SpecMain deviation 5):
   ring's bytes and three index words at zero, with the four ghost rows of
   `consGhostsBoot`, are `consResAt cn curCtx`; `bootCarveProc_consBoot`
   hands the reader and clean tokens through;
-* §7 `.data` (Rocq `main_data_raw`, UART pins): `first = 1`,
-  `nextpid = 1` (`bootCarveProc_first` / `bootCarveProc_nextpid`), and each
+* §7 `.data` (Rocq `main_data_raw`, UART pins): `first = 1`
+  (`bootCarveProc_first`; NI M4 pids: `nextpid` is gone), and each
   port's `uarts[i]` cells -- the two `.data` words persisted DISCARDED
   (`uartBaseWord` / `uartRxWord`) and the transmit lock's raw words
   (`bootCarveProc_uartCells`); `bootCarveProc_uartRaw` assembles
@@ -44,7 +44,7 @@ the rest at `X.toKpt`, SpecMain deviation 5):
   symbol (the order of cuts over `.bss`; `cons` and `kmem` are cut at 24,
   their lock rows being Bare-tier), `bcpDataWindows` cuts `[_data, GOT)`
   (what `BootCarveHart.bootCarve_gotRo` hands back) into `first` /
-  `nextpid` / `uarts[0]` / `uarts[1]`; `bootCarveProc_mainGlobalsRaw`
+  `uarts[0]` / `uarts[1]`; `bootCarveProc_mainGlobalsRaw`
   places this file's rows (`bcpProcRows`) among the other agents' in
   `mainGlobalsRaw`'s order (`bootCarveProc_mainGlobalsRaw`).
 
@@ -179,7 +179,7 @@ theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
   icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 40) (P + 44) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hkl, H⟩
   icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 44) (P + 48) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hxs, H⟩
   icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 48) (P + 52) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hpid, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 52) (P + 56) (P + 376) (by omega) (by omega)).1 $$ H with ⟨-, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 52) (P + 56) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hnp, H⟩
   icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 56) (P + 64) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hpar, H⟩
   icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 64) (P + 72) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hks, H⟩
   icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 72) (P + 80) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hsz, H⟩
@@ -197,6 +197,7 @@ theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
   ihave Hkl := bootBss_wordAt (GF := GF) (pKilled pa) 4 (P + 40) (P + 44) (o 40 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hkl
   ihave Hxs := bootBss_wordAt (GF := GF) (pXstate pa) 4 (P + 44) (P + 48) (o 44 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hxs
   ihave Hpid := bootBss_wordAt (GF := GF) (pPid pa) 4 (P + 48) (P + 52) (o 48 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hpid
+  ihave Hnp := bootBss_wordAt (GF := GF) (pNpid pa) 4 (P + 52) (P + 56) (o 52 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hnp
   ihave Hpar := bootBss_wordAt (GF := GF) (pParent pa) 8 (P + 56) (P + 64) (o 56 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hpar
   ihave Hks := bootBss_wordAt (GF := GF) (pa + 64#64) 8 (P + 64) (P + 72) (o 64 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hks
   ihave Hsz := bootBss_wordAt (GF := GF) (pSz pa) 8 (P + 72) (P + 80) (o 72 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hsz
@@ -216,10 +217,10 @@ theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
   icases hq $$ Hpid with ⟨Hpid2, Hpid3⟩
   icases wordPointsTo_halves_split (GF := GF) (pXstate pa) 4 0#32 $$ Hxs with ⟨Hxs1, Hxs2⟩
   ihave Hkp := hkill
-  isplitl [Hlk Hst Hks Hpid1 Hsz Hpg Htf Hctx Hof Hcwd Hnm Hsc Hrt Hxs1]
-  · isplitl [Hlk Hst Hks]
-    · iexists 0#32, 0#64, 0#64, 0#32, 0#64
-      iframe Hlk Hst Hks
+  isplitl [Hlk Hst Hks Hnp Hpid1 Hsz Hpg Htf Hctx Hof Hcwd Hnm Hsc Hrt Hxs1]
+  · isplitl [Hlk Hst Hks Hnp]
+    · iexists 0#32, 0#64, 0#64, 0#32, 0#64, 0#32
+      iframe Hlk Hst Hks Hnp
     · iexists bcpBootPriv, 0#32
       simp only [bcpBootPriv]
       isplitr
@@ -527,7 +528,7 @@ theorem bootCarveProc_consBoot [CurCtx] (cn : ConsNames) :
 
 end cons
 
-/-! ## §7 `.data`: `first`, `nextpid`, the UART table -/
+/-! ## §7 `.data`: `first`, the UART table -/
 
 section data
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -566,14 +567,6 @@ theorem bootCarveProc_first [CurCtx] :
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«first_1» (MachCSL.KernelSyms.«first_1» + 4) -∗
       wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 :=
   bcp_dataWord firstAddr 0x8000a380 4 1#32 rfl (by omega) (by omega) (by omega) (by omega)
-    (by decide)
-
-/-- **`nextpid = 1`** (Rocq `main_data_raw`'s second row). -/
-theorem bootCarveProc_nextpid [CurCtx] :
-    kmapStatic (GF := GF) ⊢
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«nextpid» (MachCSL.KernelSyms.«nextpid» + 4) -∗
-      wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32 :=
-  bcp_dataWord nextpidAddr 0x8000a384 4 1#32 rfl (by omega) (by omega) (by omega) (by omega)
     (by decide)
 
 /-- `&uarts[i]`, as a number. -/
@@ -753,20 +746,18 @@ theorem bcpBssWindows (m : MemF Hist) :
 
 /-- **`.data`, cut** (the `.data` half of Rocq `boot_bss_carve` /
 `main_data_raw`): the part below the GOT (`BootCarveHart.bootCarve_gotRo`
-hands back `[_data, GOT)`) is `first`, `nextpid` and the two `uarts[]`
-records. -/
+hands back `[_data, GOT)`) is `first` and the two `uarts[]` records (NI M4
+pids: `nextpid`'s word is gone; the padding before `uarts` is dropped). -/
 theorem bcpDataWindows (m : MemF Hist) :
     bootRan (GF := GF) m MachCSL.KernelSyms.«_data» 0x8000a3e8 ⊢
       bootRan m MachCSL.KernelSyms.«first_1» (MachCSL.KernelSyms.«first_1» + 4) ∗
-      bootRan m MachCSL.KernelSyms.«nextpid» (MachCSL.KernelSyms.«nextpid» + 4) ∗
       bootRan m (bcpUart .uart0) (bcpUart .uart0 + 40) ∗
       bootRan m (bcpUart .uart1) (bcpUart .uart1 + 40) := by
   iintro H
   icases bcp_take m _ MachCSL.KernelSyms.«first_1» (MachCSL.KernelSyms.«first_1» + 4) _ (by decide) (by decide) (by decide) $$ H with ⟨H0, H⟩
-  icases bcp_take m _ MachCSL.KernelSyms.«nextpid» (MachCSL.KernelSyms.«nextpid» + 4) _ (by decide) (by decide) (by decide) $$ H with ⟨H1, H⟩
   icases bcp_take m _ (bcpUart .uart0) (bcpUart .uart0 + 40) _ (by decide) (by decide) (by decide) $$ H with ⟨H2, H⟩
   icases bcp_take m _ (bcpUart .uart1) (bcpUart .uart1 + 40) _ (by decide) (by decide) (by decide) $$ H with ⟨H3, -⟩
-  iframe H0 H1 H2 H3
+  iframe H0 H2 H3
 
 end windows
 

@@ -8639,6 +8639,126 @@ Risks:
 - **P-R9 Order:** P-0 → P-1 → P-2 (→ P-3); one worktree; the full gate (`run_all.sh`) at each landing.
 
 
+### M4 pids P-0 as landed (2026-10-09)
+
+Lane `lane/pid`, one commit on `lean-quota` 290f9ee68.  Nothing ticked; the fourteen root statements
+(`Xv6/LinkNiAdequacy.lean`, `tools/ci/roots.txt`) are byte-identical (the file is untouched).
+
+- **The kernel.** `verified-quota` = b72cbac1 + c1fd3cc7 (NI M3 quotas) + ONE commit
+  `975109bc6f8b74e446412a2ceffaf12d0a891765` ("pids: partitioned by the parent's slot with a per-slot
+  quota (verified-quota)"; 22 C lines in `param.h`, `proc.h`, `proc.c`, the design's patch verbatim).
+  It lives in the worktree's gitignored `xv6-riscv/`; pushing it is the owner's.  NEW ELF md5
+  `1e253624d66edf3a5ac445c963239cb9` (the design's measured candidate, byte for byte); `fs.img`
+  rebuilt `81df3e0293356b57467bbf173d4497a1` (= the pinned one: no user program uses `PIDMAX`).
+  Re-dumped at `975109bc (branch verified-quota)`: `KernelImage`/`KernelTree`/`KernelData`/`KernelElf`,
+  and `FsImgRaw` at `975109bc` (content identical, header only); the user images keep their b72cbac1
+  headers.  `check-gen` 20 ok, `check-gen-kernel` ok.
+- **The measured shift (as designed):** 123 of 197 text symbols moved or resized.
+
+  | delta | symbols | resized |
+  |---|---|---|
+  | +0 | `_entry` .. `proc_mapstacks` | |
+  | +0 | `procinit` | 0xb0 → 0xb4 |
+  | +4 | 8: `cpuid` .. `allocproc` | `allocproc` 0x100 → 0xf8 |
+  | −4 | 114: `userinit` .. `sys_pipe` | |
+  | +0 | `kernelvec` onward | |
+
+  `nextpid` (`.data` 0x8000a384) is gone; no other data/bss/rodata symbol moved; `.eh_frame` 0x2b24
+  kept; `.rodata`'s `syscalls[]` content and argraw's jump-table entries (relative to the moved
+  `argraw`) moved, carried by the re-dump.
+- **The relayout:** `tools/rebase_kernel.py` literal (53 files) + `--fixup` (0) + `--fixup
+  Xv6/KernelData.lean` (0) + `--symbolic` (193 files; 473 offsets, 544 immediates, 162 renames), one
+  intervals file:
+
+      procinit:+0x84:x,+0x94:+0x4
+      allocproc:+0x38:+0x6,+0x44:x,+0x8a:-0x22,+0xe0:-0x8
+      balloc:+0x0:+0x0
+      sys_pipe:+0x0:+0x0
+
+  210 relayout files beside the 5 generated ones (250 files in the commit with the content and the
+  pins).  By hand: the four `forkret` double-literal folds (`ForkretParts.fkr_first_addr'`,
+  `ForkretBoot.fkr_first_addr2`, `ForkretExec.fkr_init_addr`/`fkr_msg_addr`: the addi half −4),
+  `SysExecFree`'s two argument-list `kfree` jal immediates (+4), `ArgLemmas`' argraw jump table
+  (`argrawEntry` −4 each, its `.rodata` bytes), and `allocproc`'s scan branch into the found arm
+  (`ap_scan_acq`: `+0x38`, which the boundary interval had mapped to `+0x3e`).  `MainStarted`'s fold
+  needed nothing (`main` and `started` did not move).
+- **The two shapes.**
+  - `procinit`: gcc computes `p - proc` once (`mulw a5,a5,s2`, the low-word product) and keeps it for
+    the new `sw a5,52(s1)`; the `KSTACK` arithmetic moved to `a4`/`a3`.  `ProofProcinit.pi_iter`
+    re-proved on the new registers with a NEW machine rule `MachCSL.wp_s_mulw`
+    (`execSpecF_mulw`, `mulw_to_bits` from Sail's `execute_MULW`) and `pi_h3w`/`pi_h10`.
+    `procFieldsIn i` gains the `npid` word (at any value; the slot carve, `bootCarveProc_slot`, now
+    keeps the `+52` hole's bytes); the cells come back as a separate big-op `npidInit i` (`p->npid =
+    i`) beside `procReady` in `wp_procinit_body`'s continuation, and `MainKvm.mn_pidRes_boot` seals
+    them into `pid_lock`'s payload at `npidsInit`.
+  - `allocproc`: the scan of `allocpid` (≈ 400 lines: the pure facts, the inner scan, the outer
+    loop) is DELETED; the pid section is straight-line (`ap_found` from `+0x38`): `myproc()`
+    (`ap_myproc_call`, the generic contract at `SIE = 0`), `acquire(&pid_lock)`, the payload opened
+    and the ledger read once (`PidLock.pidLedger_facts`: every counter below `2^31`, and under the
+    cap the counter plus `NPROC` held by no cell -- `PidEv.pidPickS_fresh` on the tie), then three
+    arms: CAP (`2^31 − 65 < npid`, signed `blt`: `pidLedger_cap`'s receipt, the payload back
+    unchanged, `release(&pid_lock)`, `release(&p->lock)` -- `ap_cap_rel`, `ap_scan_rel` at the cap
+    pcs -- and the null tail with `pidCapRcpt`), INIT (`myproc() == 0`: `li a4,1`) and FOUND
+    (`addiw`, `sw npid`); the two allocating arms meet at the `p->pid` store through a cut
+    (`ap_join`: a wand over the pid, the counters after and the registers), whose body is the old
+    found arm from the store on (the mint, `pidLedger_alloc` -- now with the arm as a disjunction --
+    the payload with `npids'`, release, USED, kalloc, ...).  `ALLOCPROC`'s proof takes `MYPROC`
+    (`LinkAllocproc.Allocproc MP …`; `LinkMain`/`LinkSyscall` pass `Myproc`).
+- **The payload and the ledger (`PidLock`, in place).** `pidLockResAt`: the 64 `npid` cells WHOLE,
+  the `pid` quarters, `pidRegDom`/`pidRegAuth`, `pidLedger npids pids R` (`pidTieS` + `pevWf`), and
+  the cell mark `(∀ j, pids j ≠ 1) ∨ nextpidShot`; the counter word and its mark are gone.
+  `pidAllocRcpt act pid := ∃ h, pidReceipt h (PAlloc act pid) ∗ ⌜pid = pidPickS act h⌝`; NEW
+  `pidCapRcpt act := ∃ h, pidLedLb h ∗ ⌜ownAllocs act h = PIDQ⌝`.  `PidEv`: `PIDQ`, `isAllocOf`,
+  `ownAllocs` (a `countP`), `pidPickS`, `pevActOk`, `pevWf`, the snoc lemmas, `liveOf_alloc`,
+  `pidPickS_fresh`, `pidPickS_le`; `nextOf`/`nextStep`/`liveB`/`cycAt`/`pidPick` and
+  `PidLock.pidNext` deleted (nothing referenced them after the lane).  `ProcGeom`: `PIDMAX := 2^31 −
+  1`, `pNpid`, `slotOf`, `slotOf_procAddr`; `SlotGen.genPidMax := 2^31 − 1`.  The `[1, PIDMAX]` rows
+  are textually unchanged; three proofs computed with `1000` (`UkSeccDefs.secc_pid_blt/ne0`,
+  `UserChildren.sext32_rng_not_neg1`, `SyscallArmsFork.syscArmFork_ans`) now say `2^31 − 1`.
+- **The specs.** `allocprocPostLed`'s null arm: `sFullRcpt act ∨ pidCapRcpt act`; both
+  `wp_allocproc_body` and `wp_allocproc_led_body` take `hact : apActorOk pav tk k.proc`
+  (`ProofUserinit.ui_allocproc` from `k.proc = 0` and `pavBoot = true`, `ProofKfork` from
+  `k.proc = procAddr j`, `pav = none`).  `kforkRetLed`'s −1 arm: `sFullRcpt (procAddr j) ∨
+  pidCapRcpt (procAddr j)` (`kf_postLed_reason`); `SpecSysFork`/`ProofSysFork` relay it unchanged.
+  `allocprocPost` (un-led) keeps its text.
+- **The rows (the minimum for green).** `UsysDet.usysForkPid ι := signExtend 64 (ofNat 32
+  (pidPickS ι.act ι.pev))`, `forkOk ι := ¬ ι.sFull ∧ ownAllocs ι.act ι.pev < PIDQ`;
+  `SyscallDefs.syscEvRow`'s fork clause at `pidPickS ι.act ι.pev`, its −1 reason `ι.sFull ∨
+  ownAllocs ι.act ι.pev = PIDQ`; `SyscallArmsFork.syscArmFork_ev` takes `act ≠ 0` and the answer's
+  range (the cited own count is below `PIDQ` because the pick is at most `PIDMAX`), `syscArmFork_evNeg`
+  cites either reason (the cap at `{boot with pev := h, zev := [], act}`).  `NiTrace.niForkChild`
+  names `pidPickS ι.act ι.pev`.  `usysForkAns`, `usysDetFork`, `usysDet_fork`, `usysDetRet_fork` and
+  Q-3's `usysDet_ledQ` are textually unchanged and still close (`rfl`).
+- **Prose.** False sentences fixed minimally: `NiTrace` scope items 8/9 area, the family-partition
+  item, the M3 scope's "what remains" and the `NiInc` docstring; `UsysDet`'s header, deviation 6
+  and `usysDet_mem`; `ProcAvail.pavSpent`, `SpecUserinit`'s header (F12), `SlotGen`'s token section,
+  the boot carve's `.data` lists, `KernelData`'s kept docstring.  Scope 18 is P-2's.
+- **Deviations from the design.**
+  1. The shift map: the design's `allocproc` intervals (`+0x78:−0x8` for the tail) were wrong; the
+     aligned disassembly gives `+0x38:+0x6` (the `pid_lock` acquire behind the new `jal myproc`),
+     `+0x44:x`, `+0x8a:−0x22` (the store, release, and everything to the epilogue) and `+0xe0:−0x8`
+     (the two `freeproc` arms).  `procinit`'s region is `+0x84..+0x93` (`x`), `+0x94:+0x4`.
+  2. The boot discriminator is `apActorOk pav tk act := (pavBoot → act = 0) ∧ (¬ pavBoot → pav = none
+     ∧ ∃ j < NPROC, act = procAddr j)`, not `act = 0 ↔ boot`: the found arm loads the CALLER's
+     counter cell (it must be a slot's), and the cap arm's `0` must satisfy the un-led null arm's
+     `pav = none ∨ pav = some 0`.  Both callers supply it as is; the un-led body takes it too (it is
+     the led proof's corollary).
+  3. `pevWf`'s actor conjunct is `pevActOk a` (0 or a slot's address) instead of `a = 0 → i = 0`:
+     freshness needs every allocating actor to be a slot (the residue argument), and init's pid 1
+     is fresh by the payload's cell mark, not by its position; nothing reads init's position.
+  4. `pidTieS` also bounds each own count by `PIDQ` (the signed quota test is the cap only below
+     it).  `pidPickS_fresh` takes `act = procAddr j` (the design: `act ≠ 0 ∧ slotOf act < NPROC`).
+  5. `procFieldsOut` is unchanged; the `npid` cells are a separate post big-op (`npidInit`), since
+     `procReady` (which contains `procFieldsOut`) is consumed whole by the slot locks' seal.
+- **Gate:** `tools/ci/run_all.sh`, all 11 steps from a clean proof build (`rm -rf .lake/build`;
+  build 279 s on 32 cores): lint, check-gen (20 ok), audit (14 PASS), tcb (module set, axioms and
+  opaques as `tools/tcb/expected.json`), reports (coverage as baseline), vtest, test-tools.  No
+  baseline moved (`baseline.json`, `expected.json`, `coverage_*.txt`, `roots.txt` untouched).
+- **What P-1 absorbs:** `UIota.pown`, `ledP`/`ledP0`, THE CLOSURE `usysDet_ownP` (the rows above
+  read `pev` only through `ownAllocs ι.act` and `pidPickS ι.act`, so a canonical list of the own
+  count's length reproduces them), scope 8's re-statement; `usysDet_mem`'s fork range can use
+  `PidEv.pidPickS_le`.  P-2: `NiPos.pown`, `detInP`, `niBelowP`, the fifteenth root, scope 18.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

@@ -7,7 +7,10 @@ and `wait_lock`, the cursor set-up (the process table's address, the magic
 multiplier the compiler divides `sizeof(struct proc)` with, the trampoline
 and the end of the table), then the body as a loop by induction on the
 processes left: one `initlock`, one `sw` of `UNUSED` and the `KSTACK(i)`
-computation per process.  Stated at either interrupt index, as `initlock`
+computation per process -- and (NI M4 pids) the store of the slot index
+into `p->npid`, which gcc folds into the `KSTACK` arithmetic: `(p - proc)`
+is computed ONCE by `mulw` into `a5` (the `KSTACK` shift then works in
+`a4`/`a3`), and `sw a5,52(s1)` stores it.  Stated at either interrupt index, as `initlock`
 is; `initlock` never touches the interrupt state, so the exit context is
 the plain `k.withRegs R'`.
 -/
@@ -87,6 +90,37 @@ theorem pi_h3 (i : Nat) (hi : i < 64) :
   rw [BitVec.toNat_mul, Xv6.bcOfNatToNat (47 * i) (by omega), Xv6.bcOfNatToNat i (by omega),
     Xv6.bcOfNatToNat 5887258746928580303 (by omega)]
   omega
+
+/-- (NI M4 pids) The same division as a `mulw`: the low words' product is
+the slot index, sign-extended. -/
+theorem pi_h3w (i : Nat) (hi : i < 64) :
+    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 (47 * i)) * 1736263375#32) =
+      BitVec.ofNat 64 i := by
+  have e1 : BitVec.extractLsb' 0 32 (BitVec.ofNat 64 (47 * i)) = BitVec.ofNat 32 (47 * i) := by
+    apply BitVec.eq_of_toNat_eq
+    rw [BitVec.extractLsb'_toNat, Xv6.bcOfNatToNat (47 * i) (by omega), Nat.shiftRight_zero,
+      BitVec.toNat_ofNat]
+  have e3 : BitVec.ofNat 32 (47 * i) * 1736263375#32 = BitVec.ofNat 32 i := by
+    apply BitVec.eq_of_toNat_eq
+    rw [BitVec.toNat_mul, BitVec.toNat_ofNat, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
+    omega
+  rw [e1, e3]
+  have ht : (BitVec.ofNat 32 i).toNat = i := by rw [BitVec.toNat_ofNat]; omega
+  have hmsb : (BitVec.ofNat 32 i).msb = false := by
+    simp only [BitVec.msb_eq_decide, ht, decide_eq_false_iff_not, Nat.not_le]
+    omega
+  rw [BitVec.signExtend_eq_setWidth_of_msb_false hmsb]
+  apply BitVec.eq_of_toNat_eq
+  rw [BitVec.toNat_setWidth, ht, Xv6.bcOfNatToNat i (by omega)]
+  omega
+
+/-- (NI M4 pids) `sw a5,52(s1)` stores the slot index. -/
+theorem pi_h10 (i : Nat) (hi : i < 64) :
+    BitVec.extractLsb' 0 32 (BitVec.ofNat 64 i) = BitVec.ofNat 32 i := by
+  apply BitVec.eq_of_toNat_eq
+  rw [BitVec.extractLsb'_toNat, Xv6.bcOfNatToNat i (by omega), Nat.shiftRight_zero, BitVec.toNat_ofNat]
+
+theorem pi_npid (pa : BitVec 64) : pa + 52#64 = pNpid pa := rfl
 
 theorem pi_h4 (i : Nat) (hi : i < 64) :
     (BitVec.ofNat 64 i) <<< 13 = BitVec.ofNat 64 (8192 * i) := by
@@ -335,20 +369,23 @@ theorem pi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
 
 theorem pi_in_open [CurCtx] (i : Nat) :
     procFieldsIn (GF := GF) i ⊢
-      iprop(∃ (vlock : BitVec 32) (vname vcpu : BitVec 64) (vstate : BitVec 32) (vks : BitVec 64),
+      iprop(∃ (vlock : BitVec 32) (vname vcpu : BitVec 64) (vstate : BitVec 32) (vks : BitVec 64)
+          (vnp : BitVec 32),
         kmapId (procAddr i) ∗ kmapId (procAddr i + 16#64) ∗
         wordPointsTo (procAddr i) 4 (DFrac.own 1) vlock ∗
         wordPointsTo (procAddr i + 8#64) 8 (DFrac.own 1) vname ∗
         wordPointsTo (procAddr i + 16#64) 8 (DFrac.own 1) vcpu ∗
         wordPointsTo (procAddr i + 24#64) 4 (DFrac.own 1) vstate ∗
-        wordPointsTo (procAddr i + 64#64) 8 (DFrac.own 1) vks) := by
+        wordPointsTo (procAddr i + 64#64) 8 (DFrac.own 1) vks ∗
+        wordPointsTo (pNpid (procAddr i)) 4 (DFrac.own 1) vnp) := by
   unfold procFieldsIn lockWords
-  iintro ⟨%vlock, %vname, %vcpu, %vstate, %vks, ⟨#H1, #H2, H3, H4, H5⟩, H6, H7⟩
+  iintro ⟨%vlock, %vname, %vcpu, %vstate, %vks, %vnp, ⟨#H1, #H2, H3, H4, H5⟩, H6, H7, H8⟩
   iexists vlock
   iexists vname
   iexists vcpu
   iexists vstate
   iexists vks
+  iexists vnp
   iframe
   iframe #
 
@@ -367,11 +404,15 @@ theorem pi_range_in_cons [CurCtx] (i n : Nat) :
   rw [show List.range' i (n + 1) = i :: List.range' (i + 1) n from rfl]
   exact BigSepL.bigSepL_cons.1
 
+/-- One process's cells after the body: `procFieldsOut` and (NI M4 pids) the
+`npid` word at the slot index. -/
+def piOut [CurCtx] (i : Nat) : IProp GF := iprop(procFieldsOut i ∗ npidInit i)
+
 theorem pi_range_out_cons [CurCtx] (i n : Nat) :
-    iprop(procFieldsOut (GF := GF) i ∗ [∗list] j ∈ List.range' (i + 1) n, procFieldsOut j) ⊢
-      [∗list] j ∈ List.range' i (n + 1), procFieldsOut (GF := GF) j := by
+    iprop(piOut (GF := GF) i ∗ [∗list] j ∈ List.range' (i + 1) n, piOut j) ⊢
+      [∗list] j ∈ List.range' i (n + 1), piOut (GF := GF) j := by
   rw [show List.range' i (n + 1) = i :: List.range' (i + 1) n from rfl]
-  exact (BigSepL.bigSepL_cons (Φ := fun _ (j : Nat) => procFieldsOut (GF := GF) j)).2
+  exact (BigSepL.bigSepL_cons (Φ := fun _ (j : Nat) => piOut (GF := GF) j)).2
 
 /-! ## One iteration -/
 
@@ -391,14 +432,14 @@ theorem pi_iter (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail)
     procFieldsIn i ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ R2 : RegMap,
       kctx cpu' ((k.pushed 8).withRegs R2) -∗
-      pcIs cpu' (if i + 1 = 64 then (KA.«procinit» + 0x9c#64) else (KA.«procinit» + 0x72#64)) -∗
-      procFieldsOut i -∗
+      pcIs cpu' (if i + 1 = 64 then (KA.«procinit» + 0xa0#64) else (KA.«procinit» + 0x72#64)) -∗
+      piOut i -∗
       ⌜piKept R R2 ∧ R2 9#5 = procAddr (i + 1)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   iintro ⟨Hk, Hpc, Hin, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases pi_in_open i $$ Hin with
-    ⟨%vlock, %vname, %vcpu, %vstate, %vks, #Hid0, #Hid16, Hlk, Hnm, Hcp, Hst, Hks⟩
+    ⟨%vlock, %vname, %vcpu, %vstate, %vks, %vnp, #Hid0, #Hid16, Hlk, Hnm, Hcp, Hst, Hks, Hnp⟩
   -- c.mv a1,s6 ; c.mv a0,s1 ; jal ra, initlock
   k_step_gen (wp_s_add cur _ (KA.«procinit» + 0x72#64) true 11#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22] next c1 hp1
@@ -441,39 +482,53 @@ theorem pi_iter (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail)
   k_step_gen (wp_s_srai c6 _ (KA.«procinit» + 0x82#64) true 3#6 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_h2 i hi] next c7 hp7
   iintro Hk Hpc
-  k_step_gen (wp_s_mul c7 _ (KA.«procinit» + 0x84#64) false 15#5 15#5 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g18, pi_h3 i hi] next c8 hp8
+  -- (NI M4 pids) mulw a5,a5,s2 : a5 = i, kept for the npid store
+  k_step_gen (wp_s_mulw c7 _ (KA.«procinit» + 0x84#64) false 15#5 15#5 18#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g18, pi_h3w i hi] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c8 _ (KA.«procinit» + 0x88#64) true 13#6 15#5 15#5 (by decide))
+  -- slli a4,a5,0xd
+  k_step_gen (wp_s_slli c8 _ (KA.«procinit» + 0x88#64) false 13#6 14#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_h4 i hi] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c9 _ (KA.«procinit» + 0x8a#64) true 2#20 14#5 (by decide))
+  -- c.lui a3,0x2
+  k_step_gen (wp_s_lui c9 _ (KA.«procinit» + 0x8c#64) true 2#20 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_addw c10 _ (KA.«procinit» + 0x8c#64) true 15#5 15#5 14#5 (by decide))
+  -- c.addw a4,a4,a3
+  k_step_gen (wp_s_addw c10 _ (KA.«procinit» + 0x8e#64) true 14#5 14#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [pi_h5 i hi, pi_h6, pi_h7 i hi, pi_h8 i hi] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_sub c11 _ (KA.«procinit» + 0x8e#64) false 15#5 19#5 15#5 (by decide))
+  -- sub a4,s3,a4
+  k_step_gen (wp_s_sub c11 _ (KA.«procinit» + 0x90#64) false 14#5 19#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g19, pi_h9 i] next c12 hp12
   iintro Hk Hpc
-  -- c.sd a5,64(s1)
-  k_step_gen (wp_s_sd c12 _ (KA.«procinit» + 0x92#64) true 64#12 9#5 15#5 (by decide) vks)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9] next c13 hp13
+  -- c.sd a4,64(s1)
+  k_step_gen (wp_s_sd c12 _ (KA.«procinit» + 0x94#64) true 64#12 9#5 14#5 (by decide) vks)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9] next c12' hp12'
   iintro Hk Hpc Hks
+  -- (NI M4 pids) c.sw a5,52(s1) : p->npid = i
+  k_step_gen (wp_s_sw c12' _ (KA.«procinit» + 0x96#64) true 52#12 9#5 15#5 (by decide) vnp)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9, pi_npid, pi_h10 i hi] next c13 hp13
+  iintro Hk Hpc Hnp
   -- addi s1,s1,376 ; bne s1,s4
-  k_step_gen (wp_s_addi c13 _ (KA.«procinit» + 0x94#64) false 376#12 9#5 9#5 (by decide))
+  k_step_gen (wp_s_addi c13 _ (KA.«procinit» + 0x98#64) false 376#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [g9, pi_cursor i] next c14 hp14
   iintro Hk Hpc
-  k_step_gen (wp_s_branch c14 _ (KA.«procinit» + 0x98#64) false 8154#13 9#5 20#5 (by decide) bop.BNE)
+  k_step_gen (wp_s_branch c14 _ (KA.«procinit» + 0x9c#64) false 8150#13 9#5 20#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [g20, pi_bne_last i hi] next c15 hp15
   iintro Hk Hpc
-  ihave Hout := pi_out_close i $$ [Hnm Hfresh Hst Hks]
-  case' _ => iframe
+  ihave Hout : piOut (GF := GF) i $$ [Hnm Hfresh Hst Hks Hnp]
+  case' _ =>
+    unfold piOut npidInit
+    isplitl [Hnm Hfresh Hst Hks]
+    · iapply pi_out_close i
+      iframe
+    · iexact Hnp
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c15 = cur := fun h =>
-    (hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h)))))))))))))))
+    (hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12' h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h))))))))))))))))
   ihave HΦ' := wpNext_at _ _ _ c15 _ hpinZ $$ HΦ
   iapply HΦ' $$ %_ Hk Hpc Hout
   ipureintro
@@ -509,7 +564,7 @@ theorem pi_lockInited_close [CurCtx] (lk nm : BitVec 64) :
 
 set_option maxHeartbeats 4000000 in
 /-- The loop from `0x8000190a` with `i` processes done (`fuel + 1` left)
-runs to the epilogue at `(KernelSyms.«procinit» + 0x9c)`. -/
+runs to the epilogue at `(KernelSyms.«procinit» + 0xa0)`. -/
 theorem pi_loop (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail) (fuel : Nat) :
     ∀ (i : Nat) (_ : i + fuel + 1 = 64) (R : RegMap)
       (_ : R 9#5 = procAddr i) (_ : R 18#5 = 5887258746928580303#64)
@@ -519,8 +574,8 @@ theorem pi_loop (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail) (fuel 
     kctx cur ((k.pushed 8).withRegs R) ∗ pcIs cur (KA.«procinit» + 0x72#64) ∗
     ([∗list] j ∈ List.range' i (fuel + 1), procFieldsIn j) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ R2 : RegMap,
-      kctx cpu' ((k.pushed 8).withRegs R2) -∗ pcIs cpu' (KA.«procinit» + 0x9c#64) -∗
-      ([∗list] j ∈ List.range' i (fuel + 1), procFieldsOut j) -∗
+      kctx cpu' ((k.pushed 8).withRegs R2) -∗ pcIs cpu' (KA.«procinit» + 0xa0#64) -∗
+      ([∗list] j ∈ List.range' i (fuel + 1), piOut j) -∗
       ⌜piKept R R2⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   induction fuel with
@@ -594,7 +649,7 @@ def procinitCellsBody {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     lockInited pidLockAddr nextpidNameAddr -∗ lockInited waitLockAddr waitLockNameAddr -∗
-    ([∗list] i ∈ List.range 64, procFieldsOut i) -∗
+    ([∗list] i ∈ List.range 64, piOut i) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
@@ -750,7 +805,7 @@ theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors} [Ma
     case' _ => iframe
     have hpinE : k.sie = false ∨ k.proc = 0#64 → cE = cpu := fun h =>
       (hpE h).trans ((hp29 h).trans ((hp28 h).trans ((hp27 h).trans ((hp26 h).trans ((hp25 h).trans ((hp22 h).trans ((hp21 h).trans ((hp20 h).trans ((hp19 h).trans ((hp18 h).trans ((hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hpB h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hpA h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h))))))))))))))))))))))))))))))
-    iapply (pi_epilogue cE k (KA.«procinit» + 0x9c#64) hK8 R3 hk2 (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
+    iapply (pi_epilogue cE k (KA.«procinit» + 0xa0#64) hK8 R3 hk2 (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
       (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)) $$ [- $Hk $Hpc]
     k_code (text_instr _ _ _ _ rfl rfl) Htext
     k_norm_g
@@ -809,10 +864,10 @@ theorem pi_claims (i : Nat) :
     procFieldsIn (GF := GF) i ⊢
       procFieldsIn i ∗ (kmapId (procAddr i) ∗ kmapId (procAddr i + 16#64)) := by
   unfold procFieldsIn lockWords
-  iintro ⟨%vl, %vn, %vc, %vs, %vk, ⟨#H1, #H2, Hl, Hn, Hc⟩, Hs, Hk⟩
-  isplitl [Hl Hn Hc Hs Hk]
-  · iexists vl, vn, vc, vs, vk
-    iframe H1 H2 Hl Hn Hc Hs Hk
+  iintro ⟨%vl, %vn, %vc, %vs, %vk, %vp, ⟨#H1, #H2, Hl, Hn, Hc⟩, Hs, Hk, Hp⟩
+  isplitl [Hl Hn Hc Hs Hk Hp]
+  · iexists vl, vn, vc, vs, vk, vp
+    iframe H1 H2 Hl Hn Hc Hs Hk Hp
   · isplitl []
     · iexact H1
     · iexact H2
@@ -872,9 +927,10 @@ theorem procinit_proof (IL : INITLOCK) : PROCINIT :=
   iframe Hk Hpc Hpid Hwait Hin
   iapply wpNext_mono $$ HΦ
   iintro %cpu' HK %R' Hk Hpc Hp Hw Hout %hcs
-  ihave Hout := (show ([∗list] i ∈ List.range 64, procFieldsOut (GF := GF) i) ⊢
-      [∗list] i ∈ List.range NPROC, procFieldsOut (GF := GF) i from .rfl) $$ Hout
-  iapply HK $$ %R' Hk Hpc Hp Hw [Hout Hc Hd Hf Hr Hb Hcr]
+  ihave Hout := (show ([∗list] i ∈ List.range 64, piOut (GF := GF) i) ⊢
+      [∗list] i ∈ List.range NPROC, iprop(procFieldsOut (GF := GF) i ∗ npidInit i) from .rfl) $$ Hout
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Hout with ⟨Hout, Hnp⟩
+  iapply HK $$ %R' Hk Hpc Hp Hw [Hout Hc Hd Hf Hr Hb Hcr] Hnp
   · iapply pi_route
     iframe Hout Hc Hd Hf Hr Hb Hcr
   ipureintro; exact hcs⟩

@@ -21,7 +21,7 @@ BLOCKED (not stated here): everything keyed on `SpecMain` (W8-I, not
 started) -- Rocq's `boot_main_locks_raw`, `boot_cons_res`, `boot_disk_slots`,
 `boot_inode_entries`, `boot_file_entries`, `boot_log_raw`, `boot_procs_raw`,
 `boot_ctx_cells`/`boot_own_ctx`/`boot_proc_name`/`boot_ofile_cells`, the
-`.data` rows (`first`, `nextpid`, `uarts`; see BootCarve deviation 2) -- and
+`.data` rows (`first`, `uarts`; see BootCarve deviation 2) -- and
 the order of cuts over `.bss` that `main_globals_raw` fixes.  The generic
 cell lemmas `bootBss_cellAt(_ex)` / `bootBss_wordAt` are what those carves
 are written with.

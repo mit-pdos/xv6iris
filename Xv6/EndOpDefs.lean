@@ -36,24 +36,24 @@ set_option linter.unusedSimpArgs false
 All SIX `auipc`/`addi` pairs that materialise `&log` (`+0x0c`, `+0x2a`,
 `+0x42`, `+0x7a`, `+0x86`, `+0xac`) normalise to the same offset. -/
 
-theorem eo_log : KA.«end_op» + 0x1ea18#64 = logAddr := by unfold logAddr; decide
+theorem eo_log : KA.«end_op» + 0x1ea1c#64 = logAddr := by unfold logAddr; decide
 /-- `auipc s5,0x1e ; addi s5,s5,1438` at `+0xa4`: `&log.lh.block[0]`. -/
-theorem eo_lhb0 : KA.«end_op» + 0x1ea48#64 = lhBlock 0 := by decide
+theorem eo_lhb0 : KA.«end_op» + 0x1ea4c#64 = lhBlock 0 := by decide
 /-- `auipc a5,0x1e ; sw zero,1328(a5)` at `+0x10e`: `&log.lh.n`. -/
-theorem eo_lhn : KA.«end_op» + 0x1ea44#64 = lhNAddr := by decide
+theorem eo_lhn : KA.«end_op» + 0x1ea48#64 = lhNAddr := by decide
 
 theorem eo_o_start : logAddr + 24#64 = lStart := rfl
 theorem eo_o_cmt : logAddr + 32#64 = lCmt := rfl
 theorem eo_o_dev : logAddr + 36#64 = lDev := rfl
 theorem eo_o_nc : logAddr + 40#64 = lNcommit := rfl
 
-theorem eo_br_acq : KA.«end_op» + 0xffffffffffffcda0#64 = KA.«acquire» := by decide
-theorem eo_br_rel : KA.«end_op» + 0xffffffffffffce28#64 = KA.«release» := by decide
+theorem eo_br_acq : KA.«end_op» + 0xffffffffffffcda4#64 = KA.«acquire» := by decide
+theorem eo_br_rel : KA.«end_op» + 0xffffffffffffce2c#64 = KA.«release» := by decide
 theorem eo_br_wk : KA.«end_op» + 0xffffffffffffe188#64 = KA.«wakeup» := by decide
 theorem eo_br_bread : KA.«end_op» + 0xffffffffffffee12#64 = KA.«bread» := by decide
 theorem eo_br_bwrite : KA.«end_op» + 0xffffffffffffeee8#64 = KA.«bwrite» := by decide
 theorem eo_br_brelse : KA.«end_op» + 0xffffffffffffef1a#64 = KA.«brelse» := by decide
-theorem eo_br_memmove : KA.«end_op» + 0xffffffffffffcec0#64 = KA.«memmove» := by decide
+theorem eo_br_memmove : KA.«end_op» + 0xffffffffffffcec4#64 = KA.«memmove» := by decide
 theorem eo_br_wh : KA.«end_op» + 0xfffffffffffffdc8#64 = KA.«write_head» := by decide
 theorem eo_br_it : KA.«end_op» + 0xfffffffffffffe26#64 = KA.«install_trans» := by decide
 

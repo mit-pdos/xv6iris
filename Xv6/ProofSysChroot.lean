@@ -505,7 +505,7 @@ theorem sys_chroot_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI)
         ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFF60#64)).set 8#5 (k.regs 2#5))) from .rfl) $$ Hk
   have hp0 := sys_chroot_pins_entry k
   -- +0x0a  jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0xa#64) false 2081716#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0xa#64) false 2081724#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chroot_br_myproc]
   iintro Hk Hpc
   have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)

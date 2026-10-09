@@ -125,14 +125,14 @@ theorem pa_u_1f : BitVec.signExtend 64 (31#20 ++ 0#12) = 0x1f000#64 := by decide
 theorem pa_u_6 : BitVec.signExtend 64 (6#20 ++ 0#12) = 0x6000#64 := by decide
 /-- `&npipelock`, folded out of each `auipc a0,0x1f; addi a0,a0,<off>` pair
 (`+0x2a`, `+0x52`, `+0xc8`). -/
-theorem pa_npipelock_addr : KA.«pipealloc» + 0x1f3b6#64 = npipelockAddr := by
+theorem pa_npipelock_addr : KA.«pipealloc» + 0x1f3ba#64 = npipelockAddr := by
   unfold npipelockAddr; decide
 /-- `&npipe`, folded out of `auipc a5,0x6; lw a5,-564(a5)` and
 `auipc a4,0x6; sw a5,-584(a4)`. -/
-theorem pa_npipe_addr : KA.«pipealloc» + 0x5e02#64 = npipeAddr := by
+theorem pa_npipe_addr : KA.«pipealloc» + 0x5e06#64 = npipeAddr := by
   unfold npipeAddr; decide
-theorem pipealloc_br_acquire : KA.«pipealloc» + 0xffffffffffffc63e#64 = KA.«acquire» := by decide
-theorem pipealloc_br_release : KA.«pipealloc» + 0xffffffffffffc6c6#64 = KA.«release» := by decide
+theorem pipealloc_br_acquire : KA.«pipealloc» + 0xffffffffffffc642#64 = KA.«acquire» := by decide
+theorem pipealloc_br_release : KA.«pipealloc» + 0xffffffffffffc6ca#64 = KA.«release» := by decide
 
 /-- `npipe >= NPIPE` (`li a4,49 ; blt a4,a5`) on the sign-extended counter. -/
 theorem pa_cap_blt (n : BitVec 32) :
@@ -505,7 +505,7 @@ theorem pa_exit_pin (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames)
 /-! ## The bad tail from `(KernelSyms.«pipealloc» + 0xdc)`: close `*f1` if taken, return -1 -/
 
 set_option maxHeartbeats 16000000 in
-/-- From `0x800046b2` with `*f0`'s reference already closed (its unit in
+/-- From `0x800046ae` with `*f0`'s reference already closed (its unit in
 hand) and `*f1`'s content described by `fileallocPost` (`0`, or a slot whose
 exclusive closed reference we hold): `ld a5,*f1 ; li a0,-1 ; beqz a5 -> exit`
 or `mv a0,a5 ; jal fileclose ; li a0,-1 ; exit`. -/
@@ -744,9 +744,9 @@ closed references in hand) and a page `pi` in `a0 = s3` (spilled `s3` at
 `8(sp)`): save `s4`, write the
 pipe's four words, `initlock`, give birth to the pipe, publish the two ends
 into the two files, return 0. -/
-theorem pipealloc_br_initlock : KA.«pipealloc» + 0xffffffffffffc5be#64 = KA.«initlock» := by decide
+theorem pipealloc_br_initlock : KA.«pipealloc» + 0xffffffffffffc5c2#64 = KA.«initlock» := by decide
 
-theorem pipealloc_br_2fa6 : KA.«pipealloc» + 0x2fa6#64 = KStr.«pipe» := by decide
+theorem pipealloc_br_2faa : KA.«pipealloc» + 0x2faa#64 = KStr.«pipe» := by decide
 
 theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames) (on : Option Nat)
     (pidv : BitVec 32) (dqp : DFrac) (ke : Nat)
@@ -818,10 +818,10 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
   k_step_gen (wp_s_auipc c6 _ (KA.«pipealloc» + 0x7a#64) false 0x3#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c7 _ (KA.«pipealloc» + 0x7e#64) false 3884#12 11#5 11#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipealloc_br_2fa6] next c8 hp8
+  k_step_gen (wp_s_addi c7 _ (KA.«pipealloc» + 0x7e#64) false 3888#12 11#5 11#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipealloc_br_2faa] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c8 _ (KA.«pipealloc» + 0x82#64) false 2082108#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c8 _ (KA.«pipealloc» + 0x82#64) false 2082112#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipealloc_br_initlock] next c9 hp9
   iintro Hk Hpc
   iapply (pa_initlock IL c9 _ vl vn vc ?hKi) $$ [- $Hk $Hpc]
@@ -1062,7 +1062,7 @@ end
 
 /-! ## The function -/
 
-theorem pipealloc_br_ffffffffffffc564 : KA.«pipealloc» + 0xffffffffffffc564#64 = KA.«kalloc» := by decide
+theorem pipealloc_br_ffffffffffffc568 : KA.«pipealloc» + 0xffffffffffffc568#64 = KA.«kalloc» := by decide
 
 theorem pipealloc_br_fffffffffffffc28 : KA.«pipealloc» + 0xfffffffffffffc28#64 = KA.«filealloc» := by decide
 
@@ -1228,10 +1228,10 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
       k_step_gen (wp_s_auipc c13 _ (KA.«pipealloc» + 0x2a#64) false 31#20 10#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_u_1f] next c14 hp14
       iintro Hk Hpc
-      k_step_gen (wp_s_addi c14 _ (KA.«pipealloc» + 0x2e#64) false 908#12 10#5 10#5 (by decide))
+      k_step_gen (wp_s_addi c14 _ (KA.«pipealloc» + 0x2e#64) false 912#12 10#5 10#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_npipelock_addr] next c15 hp15
       iintro Hk Hpc
-      k_step_gen (wp_s_jal c15 _ (KA.«pipealloc» + 0x32#64) false 2082316#21 1#5 (by decide))
+      k_step_gen (wp_s_jal c15 _ (KA.«pipealloc» + 0x32#64) false 2082320#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipealloc_br_acquire] next c16 hp16
       iintro Hk Hpc
       have hwf2 : (k.withSpie spie2 spp2).wf := hwf
@@ -1256,7 +1256,7 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
       k_step_gen (wp_s_auipc c17 _ (KA.«pipealloc» + 0x36#64) false 6#20 15#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_u_6] next c18 hp18
       iintro Hk Hpc
-      k_step_gen (wp_s_lw c18 _ (KA.«pipealloc» + 0x3a#64) false 3532#12 15#5 15#5
+      k_step_gen (wp_s_lw c18 _ (KA.«pipealloc» + 0x3a#64) false 3536#12 15#5 15#5
           (by decide) (by decide) (DFrac.own 1) n0)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_npipe_addr] next c19 hp19
       iintro Hk Hpc Hcnt
@@ -1282,10 +1282,10 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
         k_step_gen (wp_s_auipc c21 _ (KA.«pipealloc» + 0xc8#64) false 31#20 10#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_u_1f] next c22 hp22
         iintro Hk Hpc
-        k_step_gen (wp_s_addi c22 _ (KA.«pipealloc» + 0xcc#64) false 750#12 10#5 10#5 (by decide))
+        k_step_gen (wp_s_addi c22 _ (KA.«pipealloc» + 0xcc#64) false 754#12 10#5 10#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_npipelock_addr] next c23 hp23
         iintro Hk Hpc
-        k_step_gen (wp_s_jal c23 _ (KA.«pipealloc» + 0xd0#64) false 2082294#21 1#5 (by decide))
+        k_step_gen (wp_s_jal c23 _ (KA.«pipealloc» + 0xd0#64) false 2082298#21 1#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipealloc_br_release] next c24 hp24
         iintro Hk Hpc
         have e2417 : c24 = c17 :=
@@ -1352,7 +1352,7 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
         k_step_gen (wp_s_auipc c23 _ (KA.«pipealloc» + 0x4a#64) false 6#20 14#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_u_6] next c24 hp24
         iintro Hk Hpc
-        k_step_gen (wp_s_sw c24 _ (KA.«pipealloc» + 0x4e#64) false 3512#12 14#5 15#5 (by decide) n0)
+        k_step_gen (wp_s_sw c24 _ (KA.«pipealloc» + 0x4e#64) false 3516#12 14#5 15#5 (by decide) n0)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_npipe_addr] next c25 hp25
         iintro Hk Hpc Hcnt
         -- (NI M3 quotas Q-1) the share pays the buffer's page and mints its ticket
@@ -1365,10 +1365,10 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
         k_step_gen (wp_s_auipc c25 _ (KA.«pipealloc» + 0x52#64) false 31#20 10#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_u_1f] next c26 hp26
         iintro Hk Hpc
-        k_step_gen (wp_s_addi c26 _ (KA.«pipealloc» + 0x56#64) false 868#12 10#5 10#5 (by decide))
+        k_step_gen (wp_s_addi c26 _ (KA.«pipealloc» + 0x56#64) false 872#12 10#5 10#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_npipelock_addr] next c27 hp27
         iintro Hk Hpc
-        k_step_gen (wp_s_jal c27 _ (KA.«pipealloc» + 0x5a#64) false 2082412#21 1#5 (by decide))
+        k_step_gen (wp_s_jal c27 _ (KA.«pipealloc» + 0x5a#64) false 2082416#21 1#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipealloc_br_release] next c28 hp28
         iintro Hk Hpc
         have e2817 : c28 = c17 :=
@@ -1404,8 +1404,8 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
         unfold calleeSaved at hcs5
         k_norm_g at hcs5
         obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs5
-        k_step_gen (wp_s_jal c29 _ (KA.«pipealloc» + 0x5e#64) false 2082054#21 1#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipealloc_br_ffffffffffffc564] next c30 hp30
+        k_step_gen (wp_s_jal c29 _ (KA.«pipealloc» + 0x5e#64) false 2082058#21 1#5 (by decide))
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipealloc_br_ffffffffffffc568] next c30 hp30
         iintro Hk Hpc
         icases Hlend with ⟨%k4, %hk4, Hlend⟩
         ihave Hav := pa_pay γk on $$ [Hav Hcr]

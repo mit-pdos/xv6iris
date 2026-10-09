@@ -9,7 +9,7 @@ hart has a thread of control, out of the owned half of the boot image
 * §1 THE GOT WORD, DISCARDED (BootHart deviation 1's producer, at `dq =
   DFrac.discard`, Rocq `mb_ld_ea ↦ₚ₈□ v_stack0`): `bootCarve_gotRo` persists
   the eight GOT bytes out of `.data` (handing back the two sides of `.data`
-  for the `first`/`nextpid`/`uarts` rows), `bootRo_ctxBytes` reads a
+  for the `first`/`uarts` rows), `bootRo_ctxBytes` reads a
   persisted image window at ANY context, and `bootGot_word` is the M-mode
   cell `Xv6.wp_boot_body` takes, at the hart's own context.  One persistent
   row, `bootGotRo`, serves all eight harts.

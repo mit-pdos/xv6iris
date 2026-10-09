@@ -13,15 +13,17 @@ be made one today.
   actor, the caller's slot address, with the readings the rows are
   functional in (the count, `zLowest` at the actor, and fork's: the LAST
   cited slot event `sFull` -- NI M3 quotas Q-2: no allocator event any
-  more --, `pidPick` of the pid prefix, the last `ZFork`'s generation).  These are the ledgers'
+  more --, the partition's pick `pidPickS` of the actor at the pid prefix
+  and its own count (NI M4 pids), the last `ZFork`'s generation).  These are the ledgers'
   contents and the caller's own placement, never another process's
   outcome.
 * §2 THE PRIVATE CLASS and `usysDet n W ι`: exit (no resume), getpid (the
   key's own pid), uptime (the tick count of `ι`) and (G1d) wait (the family
   ledger's lowest zombie child of the caller, `zLowest ι.zev ι.act`, through
   the key's STATUS WINDOW `uwaitWin`, NI M2-G1e) and (NI joint fork lane F3)
-  fork (`usysForkAns ι`: `pidPick` of the cited pid prefix when the cited
-  slot prefix does not end in the actor's `SFull`, else `-1` -- NI M3
+  fork (`usysForkAns ι`: `pidPickS ι.act` of the cited pid prefix when the
+  cited slot prefix does not end in the actor's `SFull` and (NI M4 pids) the
+  actor's own count is below `PIDQ`, else `-1` -- NI M3
   quotas Q-2: the allocator no longer decides it; the children set grown by
   the cited `ZFork`'s generation on success) and (NI M2-G3) sbrk
   (`usysSbrkAns`: `-1` at the key's quota overrun -- NI M3 quotas Q-2: the
@@ -96,8 +98,8 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
   read by sbrk at all.
 * **fork (1): RE-ADMITTED BY THE JOINT FORK LANE** (F1-F3, design "Joint
   fork lane design (2026-10-04)").  W3 found the pid unexplained (G2 closed
-  it: the counter tie and first-ness make it `pidPick` of the cited pid
-  prefix) and the `-1` dependent on proc-SLOT exhaustion and on the
+  it: the counter tie and first-ness made it `pidPick` of the cited pid
+  prefix; NI M4 pids: the partition makes it `pidPickS` of the actor) and the `-1` dependent on proc-SLOT exhaustion and on the
   kallocs of allocproc and uvmcopy.  Every kalloc on fork's path is fatal
   when null and labelled with the parent's slot, so the round's outcome is
   ONE decisive allocator event (ruling JF-R1): the trapframe's `KAlloc act`
@@ -205,10 +207,10 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
    reaped; `usysDetWait`'s middle arm.
 6. (NI joint fork lane F3) **`usysDet_mem`'s fork arm takes the answer's
    range as a premise** (`hfr`, as wait's `hwr`), not the design's
-   `pidPick_range`: `PidEv.pidPick`'s unreachable fallback (no candidate
-   free) is the counter `nextOf`, which is not range-bounded on an
-   arbitrary history (a `PAlloc` of an out-of-range pid steps it past
-   `PIDMAX`); in the kernel the pid ledger's tie keeps it in range.
+   `pidPick_range`: the pick is not range-bounded on an arbitrary history
+   (NI M4 pids: `pidPickS` passes `PIDMAX` once the own count reaches
+   `PIDQ`, where `forkOk` fails); in the kernel the pid ledger's tie keeps
+   it in range.
    `usysDetFork` is ONE bump at `usysForkAns ι` with the children set an
    `if forkOk` (the design's two bumps under one `if`; equal).
 -/
@@ -323,14 +325,18 @@ instance (ι : UIota) : Decidable ι.sFull := decidable_of_iff _ (UIota.sFull_if
 
 /-- **Fork succeeded** at the cited prefix: the cited slot event is not the
 actor's exhaustion (NI M3 quotas Q-2: the allocator conjunct `ι.kOk` is
-gone -- a credited kalloc is never null). -/
-def forkOk (ι : UIota) : Prop := ¬ ι.sFull
+gone -- a credited kalloc is never null) and (NI M4 pids) the actor's pid
+share is not spent at the cited pid prefix (its own count below `PIDQ`). -/
+def forkOk (ι : UIota) : Prop := ¬ ι.sFull ∧ ownAllocs ι.act ι.pev < PIDQ
 
 instance (ι : UIota) : Decidable (forkOk ι) := by unfold forkOk; infer_instance
 
-/-- **The pid a successful fork answers** (NI M2-G2): the cited pid prefix's
-`pidPick` -- the counter tie and first-ness -- sign-extended. -/
-def usysForkPid (ι : UIota) : BitVec 64 := BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX ι.pev))
+/-- **The pid a successful fork answers** (NI M2-G2; NI M4 pids): the
+partition's pick for the actor at the cited pid prefix (`PidEv.pidPickS`:
+the actor's slot plus `NPROC` times its own allocation count plus one),
+sign-extended. -/
+def usysForkPid (ι : UIota) : BitVec 64 :=
+  BitVec.signExtend 64 (BitVec.ofNat 32 (pidPickS ι.act ι.pev))
 
 /-- **Fork's answer at a cited prefix**: the pid on success, `-1` otherwise. -/
 def usysForkAns (ι : UIota) : BitVec 64 := if forkOk ι then usysForkPid ι else -1#64
@@ -1984,8 +1990,8 @@ at its own answer -- `usysMemOk` at `usysDet`'s image, map, break and lazy
 bit; at wait (NI G1d) given that the answer has wait's shape (`hwr`: a
 history whose zombie pids are in range), at fork (NI joint fork lane F3)
 fork's (`hfr`: a cited pid prefix whose pick is in `[1, PIDMAX]` -- the pid
-ledger's counter tie keeps it there; `pidPick`'s unreachable fallback, the
-counter itself, is not range-bounded on an arbitrary list). -/
+ledger's partition tie keeps it there; the pick itself is not range-bounded
+on an arbitrary list). -/
 theorem usysDet_mem {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
     (hwr : n = USYS_wait → usysWaitRet (usysDetRet n W ι))
     (hfr : n = USYS_fork → usysDetRet n W ι = -1#64 ∨

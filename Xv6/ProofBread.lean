@@ -64,10 +64,10 @@ theorem bread_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB)
   k_step_e (wp_s_auipc cpu _ (KA.«bread» + 0x12#64) false 0x16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«bread» + 0x16#64) false 2668#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«bread» + 0x16#64) false 2672#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_lock]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«bread» + 0x1a#64) false 2088820#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«bread» + 0x1a#64) false 2088824#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_acq]
   iintro Hk Hpc
   iapply (bc_acquire AC cpu _ γl γ V ?qa ?qn ?qK ?ql) $$ [- $Hk $Hpc $Hlk]
@@ -117,17 +117,17 @@ theorem bread_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB)
   icases bcacheLru_headNext_acc curCtx bhead (ord.map bnode) $$ Hlru with ⟨Hhn, Hlcl⟩
   ihave Hhn := (show wordAtN (GF := GF) curCtx (bNext bhead) 8 (DFrac.own 1)
         (bhd bhead (ord.map bnode)) ⊢
-      wordPointsTo (KA.«bread» + 0x1dd36#64) 8 (DFrac.own 1) (bnode kk0) from by
+      wordPointsTo (KA.«bread» + 0x1dd3a#64) 8 (DFrac.own 1) (bnode kk0) from by
     rw [wordAtN_cur, bd_hnext, hsplit0]; rfl) $$ Hhn
   -- auipc s1,0x1e ; ld s1,-1870(s1)
   k_step (wp_s_auipc cpu _ (KA.«bread» + 0x1e#64) false 0x1e#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_ld cpu _ (KA.«bread» + 0x22#64) false 3352#12 9#5 9#5 (by decide) (by decide)
+  k_step (wp_s_ld cpu _ (KA.«bread» + 0x22#64) false 3356#12 9#5 9#5 (by decide) (by decide)
       (DFrac.own 1) (bnode kk0))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hhn
-  ihave Hhn := (show wordPointsTo (GF := GF) (KA.«bread» + 0x1dd36#64) 8 (DFrac.own 1)
+  ihave Hhn := (show wordPointsTo (GF := GF) (KA.«bread» + 0x1dd3a#64) 8 (DFrac.own 1)
         (bnode kk0) ⊢
       wordAtN curCtx (bNext bhead) 8 (DFrac.own 1) (bhd bhead (ord.map bnode)) from by
     rw [wordAtN_cur, bd_hnext, hsplit0]; rfl) $$ Hhn
@@ -138,7 +138,7 @@ theorem bread_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB)
   k_step (wp_s_auipc cpu _ (KA.«bread» + 0x26#64) false 0x1e#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«bread» + 0x2a#64) false 3264#12 15#5 15#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«bread» + 0x2a#64) false 3268#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_head]
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«bread» + 0x2e#64) false 54#13 9#5 15#5 (by decide) bop.BEQ)
@@ -232,16 +232,16 @@ theorem bread_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB)
     icases bcacheLru_headPrev_acc curCtx bhead (ord.map bnode) $$ Hlru with ⟨Hhp, Hlcl⟩
     ihave Hhp := (show wordAtN (GF := GF) curCtx (bPrev bhead) 8 (DFrac.own 1)
           (blast (ord.map bnode) bhead) ⊢
-        wordPointsTo (KA.«bread» + 0x1dd2e#64) 8 (DFrac.own 1) (bnode klast) from by
+        wordPointsTo (KA.«bread» + 0x1dd32#64) 8 (DFrac.own 1) (bnode klast) from by
       rw [wordAtN_cur, bd_hprev, hsplitL, bd_blast_map]) $$ Hhp
     k_step (wp_s_auipc cpu _ (KA.«bread» + 0x64#64) false 0x1e#20 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_ld cpu _ (KA.«bread» + 0x68#64) false 3274#12 9#5 9#5 (by decide) (by decide)
+    k_step (wp_s_ld cpu _ (KA.«bread» + 0x68#64) false 3278#12 9#5 9#5 (by decide) (by decide)
         (DFrac.own 1) (bnode klast))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc Hhp
-    ihave Hhp := (show wordPointsTo (GF := GF) (KA.«bread» + 0x1dd2e#64) 8 (DFrac.own 1)
+    ihave Hhp := (show wordPointsTo (GF := GF) (KA.«bread» + 0x1dd32#64) 8 (DFrac.own 1)
           (bnode klast) ⊢
         wordAtN curCtx (bPrev bhead) 8 (DFrac.own 1) (blast (ord.map bnode) bhead) from by
       rw [wordAtN_cur, bd_hprev, hsplitL, bd_blast_map]) $$ Hhp
@@ -251,7 +251,7 @@ theorem bread_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB)
     k_step (wp_s_auipc cpu _ (KA.«bread» + 0x6c#64) false 0x1e#20 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_addi cpu _ (KA.«bread» + 0x70#64) false 3194#12 15#5 15#5 (by decide))
+    k_step (wp_s_addi cpu _ (KA.«bread» + 0x70#64) false 3198#12 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_head]
     iintro Hk Hpc
     k_step (wp_s_branch cpu _ (KA.«bread» + 0x74#64) false 16#13 9#5 15#5 (by decide) bop.BEQ)
@@ -302,10 +302,10 @@ theorem bread_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB)
       k_step (wp_s_auipc cpu _ (KA.«bread» + 0x84#64) false 0x4#20 10#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step (wp_s_addi cpu _ (KA.«bread» + 0x88#64) false 1650#12 10#5 10#5 (by decide))
+      k_step (wp_s_addi cpu _ (KA.«bread» + 0x88#64) false 1654#12 10#5 10#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_msg]
       iintro Hk Hpc
-      k_step (wp_s_jal cpu _ (KA.«bread» + 0x8c#64) false 2087650#21 1#5 (by decide))
+      k_step (wp_s_jal cpu _ (KA.«bread» + 0x8c#64) false 2087654#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_panic]
       iintro Hk Hpc
       iapply (bd_panic PA cpu _ (by k_norm) ?pk ?pn ?pp ?pu) $$ [- $Hk $Hpc $Hpe $Hmsg]

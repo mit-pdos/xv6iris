@@ -79,7 +79,7 @@ theorem sched_prologue [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (h
 /-! ## The `tp` arithmetic -/
 
 
-theorem sched_br_10614 : KA.«sched» + 0x10614#64 = KA.«pid_lock» := by decide
+theorem sched_br_10618 : KA.«sched» + 0x10618#64 = KA.«pid_lock» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- `mv a5,tp; sext.w a5,a5; slli a5,a5,7; auipc a4,0x10; addi a4,a4,1320;
@@ -104,8 +104,8 @@ theorem sched_tp_noff [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) :
   k_step (wp_s_auipc cpu _ (KA.«sched» + 0x20#64) false 16#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [BitVec.reduceAppend]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«sched» + 0x24#64) false 1524#12 14#5 14#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_br_10614]
+  k_step (wp_s_addi cpu _ (KA.«sched» + 0x24#64) false 1528#12 14#5 14#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_br_10618]
   iintro Hk Hpc
   k_step (wp_s_add cpu _ (KA.«sched» + 0x28#64) true 15#5 15#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.hart_shift]
@@ -137,8 +137,8 @@ theorem sched_tp_intena [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) :
   k_step (wp_s_auipc cpu _ (KA.«sched» + 0x46#64) false 16#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [BitVec.reduceAppend]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«sched» + 0x4a#64) false 1486#12 18#5 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_br_10614]
+  k_step (wp_s_addi cpu _ (KA.«sched» + 0x4a#64) false 1490#12 18#5 18#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_br_10618]
   iintro Hk Hpc
   k_step (wp_s_addiw cpu _ (KA.«sched» + 0x4e#64) true 0#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -163,7 +163,7 @@ set_option maxHeartbeats 4000000 in
 /-- `mv a5,tp; sext.w a5,a5; slli a5,a5,7; addi a5,a5,8; auipc a1,0x10;
 addi a1,a1,1304; add a1,a1,a5; addi a0,s1,96`: the two `swtch` arguments,
 `a0 = &p->context` and `a1 = &cpus[hartid].context`. -/
-theorem sched_br_10644 : KA.«sched» + 0x10644#64 = KA.«cpus» := by decide
+theorem sched_br_10648 : KA.«sched» + 0x10648#64 = KA.«cpus» := by decide
 
 theorem sched_tp_ctx [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) :
     kctx (GF := GF) cpu k ∗ pcIs cpu (KA.«sched» + 0x58#64) ∗
@@ -188,8 +188,8 @@ theorem sched_tp_ctx [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) :
   k_step (wp_s_auipc cpu _ (KA.«sched» + 0x60#64) false 16#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [BitVec.reduceAppend]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«sched» + 0x64#64) false 1508#12 11#5 11#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_br_10644]
+  k_step (wp_s_addi cpu _ (KA.«sched» + 0x64#64) false 1512#12 11#5 11#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_br_10648]
   iintro Hk Hpc
   k_step (wp_s_add cpu _ (KA.«sched» + 0x68#64) true 11#5 11#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -379,9 +379,9 @@ theorem kctx_drain [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
 
 theorem sched_br_5ca : KA.«sched» + 0x5ca#64 = KA.«swtch» := by decide
 
-theorem sched_br_ffffffffffffed06 : KA.«sched» + 0xffffffffffffed06#64 = KA.«holding» := by decide
+theorem sched_br_ffffffffffffed0a : KA.«sched» + 0xffffffffffffed0a#64 = KA.«holding» := by decide
 
-theorem sched_br_fffffffffffffa90 : KA.«sched» + 0xfffffffffffffa90#64 = KA.«myproc» := by decide
+theorem sched_br_fffffffffffffa98 : KA.«sched» + 0xfffffffffffffa98#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`sched` meets its specification.** -/
@@ -408,8 +408,8 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
   iintro Hk Hpc Hframe
   k_norm
   -- jal myproc
-  k_step (wp_s_jal cpu _ (KA.«sched» + 0xe#64) false 2095746#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_br_fffffffffffffa90]
+  k_step (wp_s_jal cpu _ (KA.«sched» + 0xe#64) false 2095754#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_br_fffffffffffffa98]
   iintro Hk Hpc
   -- myproc()
   have hmp : ∀ (k' : KCtx) (_ : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail),
@@ -446,8 +446,8 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, h10, hproc]
   iintro Hk Hpc
   -- jal holding
-  k_step (wp_s_jal cpu _ (KA.«sched» + 0x14#64) false 2092274#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_br_ffffffffffffed06]
+  k_step (wp_s_jal cpu _ (KA.«sched» + 0x14#64) false 2092278#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_br_ffffffffffffed0a]
   iintro Hk Hpc
   have hho : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 6 ≤ k'.avail) (pa : BitVec 64)
       (ha0 : k'.regs 10#5 = pa),

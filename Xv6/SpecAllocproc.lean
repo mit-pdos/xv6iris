@@ -1,7 +1,10 @@
 /-
 Specification of `allocproc` (kernel/proc.c): the scan for an UNUSED slot
 (each lock taken and released in turn), then, holding its lock: a fresh
-pid (the inlined `allocpid`, under `pid_lock`), USED, a trapframe page
+pid (the inlined `allocpid`, under `pid_lock`; NI M4 pids: the PARTITION --
+`myproc()`'s slot hands out its counter plus `NPROC`, init (no current
+process) gets 1, and a slot whose share is spent makes allocproc return 0
+with the slot left UNUSED), USED, a trapframe page
 from `kalloc`, a user table from `proc_pagetable`, the context zeroed
 with `ra = forkret` and `sp = kstack + PGSIZE`; the failure tails run
 `freeproc` and return `0` with the lock released.  Uncounted (`on`);
@@ -35,6 +38,18 @@ actor of the pid append allocproc makes) and hand it back at a count no
 lower (`∃ k' ≥ ke`), right after the return pc (Rocq: after `pc_is`); the
 proof frames it through for now.
 
+## The actor (NI M4 pids, F12/F13)
+
+allocpid now reads `myproc()`: the hart's proc word `k.proc`.  Both forms
+take the BOOT DISCRIMINATOR `apActorOk pav tk k.proc`: in the boot regime
+(`pavBoot pav tk`, userinit) the actor is 0 and the init arm hands out pid 1
+(firing the one-shot `nextpidShot`); otherwise the regime is sealed
+(`pav = none`) and the actor is a slot's address (kfork's `myproc()`), whose
+partition counter the found arm bumps.  (The design's premise was `act = 0
+↔ boot`; the sealed side also names the slot and the regime: the counter
+cell is the slot's, and the cap arm's `0` must read as "no information" in
+the null arm, `pav = none`.)
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.ProcAvail
@@ -50,6 +65,12 @@ open LeanRV64D
 def allocprocAddr : BitVec 64 := KA.«allocproc»
 def forkretAddr : BitVec 64 := KA.«forkret»
 def allocprocSlots : Nat := 48
+
+/-- THE BOOT DISCRIMINATOR (NI M4 pids F13): the actor agrees with the
+regime -- no process in the boot regime, a slot's address in the sealed one. -/
+def apActorOk (pav : Option Nat) (tk : Bool) (act : BitVec 64) : Prop :=
+  (pavBoot pav tk = true → act = 0#64) ∧
+  (pavBoot pav tk = false → pav = none ∧ ∃ j, j < NPROC ∧ act = procAddr j)
 
 /-- The private block `allocproc` builds: no files, no cwd, no root
 (chroot: `p->root` is the cwd's twin), size 0, an empty space, the context
@@ -111,10 +132,11 @@ what deregisters the pid.
 
 THE LEDGER'S BOOT-ERA TOKEN (Rocq `procs_avail_at op tk`, lane
 TRAP-ROWS-4): the counted caller (`userinit`) hands `nextpidPend`, which
-refutes `pid_lock`'s payload marks and so pins the pid to the literal 1;
-the sealed one hands the shot and init's registration, which refutes the
-candidate 1.  Both come back as `pavSpent` once the pid section ran (the
-null arm, which returns before it, hands the ledger back as it came). -/
+refutes `pid_lock`'s payload mark (no slot holds pid 1) and is shot by the
+init arm that hands out the literal 1 (NI M4 pids); the sealed one hands
+the shot and init's registration, and its pid is a slot's partition pick,
+never 1.  Both come back as `pavSpent` once the pid section ran (the null
+arms -- the scan's, and the cap arm's -- hand the ledger back as it came). -/
 def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
@@ -141,15 +163,17 @@ ni-pid-ledger.md D4, ruling R4): a COPY, comments stripped (read them on the
 original above), whose FOUND arm also carries the pid ledger's RECEIPT of
 the allocation -- `PAlloc act pid` appended right after some history `h`,
 the actor `act` being the hart's proc word, and (NI M2-G2a) `pid` the pid
-the kernel was bound to give after `h` (`PidLock.pidAllocRcpt`: `pid =
-pidPick PIDMAX h`).  The null arm never reached a registration; since the
-joint fork lane F1 it carries, as its reason, the slot-occupancy ledger's
-exhaustion receipt (`SlotLed.sFullRcpt act`: `SFull act k0` appended with
-the scan's window) when the scan found no UNUSED slot -- its ONLY reason
-since NI M3 quotas Q-2: the joint fork lane F2's other disjunct, the null
-`kalloc`'s receipt (`kNullRcpt γk act`, the trapframe's or
-`proc_pagetable`'s), is gone -- once sealed both kallocs are paid out of
-the slot's share and never null (Q-1).  (F2) The FOUND arm also
+the kernel was bound to give after `h` (`PidLock.pidAllocRcpt`: NI M4
+pids, `pid = pidPickS act h`, the partition's pick).  The null arm never
+reached a registration; since the joint fork lane F1 it carries, as its
+reason, the slot-occupancy ledger's exhaustion receipt (`SlotLed.sFullRcpt
+act`: `SFull act k0` appended with the scan's window) when the scan found no
+UNUSED slot, OR (NI M4 pids) the pid ledger's cap receipt (`PidLock.pidCapRcpt
+act`: the actor's share `PIDQ` is spent) when allocpid refused -- the joint
+fork lane F2's other disjunct, the null `kalloc`'s receipt (`kNullRcpt γk
+act`, the trapframe's or `proc_pagetable`'s), is gone since NI M3 quotas
+Q-2 -- once sealed both kallocs are paid out of the slot's share and never
+null (Q-1).  (F2) The FOUND arm also
 carries the allocator ledger's receipt of the trapframe `kalloc`
 (`kAllocRcpt γk act`: the round's first `kalloc`, labelled by the actor).
 Its pure parts are `allocprocPost`'s.
@@ -162,9 +186,9 @@ def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
       ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗
     (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗
-    -- THE NULL ARM'S REASON (NI joint fork lane F1; NI M3 quotas Q-2): the
-    -- scan's exhaustion (the null `kalloc`'s receipt left with the credits)
-    sFullRcpt act ∗
+    -- THE NULL ARM'S REASONS (NI joint fork lane F1; NI M3 quotas Q-2; NI M4
+    -- pids): the scan's exhaustion, or the actor's spent pid share
+    (sFullRcpt act ∨ pidCapRcpt act) ∗
     ∃ on' : Option Nat, ⌜on' = on ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
   (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
     pidAllocRcpt act pid ∗
@@ -207,7 +231,8 @@ def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
     (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) (ke : Nat)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
-    (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) (hcnt : ∀ x, on = some x → procPagetableNodes + 2 ≤ x) : Prop :=
+    (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) (hcnt : ∀ x, on = some x → procPagetableNodes + 2 ≤ x)
+    (hact : apActorOk pav tk k.proc) : Prop :=
   kctx cpu k ∗ pcIs cpu allocprocAddr ∗ procsInv Γ ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗
   procsAvailAt Γ pav tk ∗ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗
@@ -232,7 +257,8 @@ def wp_allocproc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
     (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) (ke : Nat)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
-    (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) (hcnt : ∀ x, on = some x → procPagetableNodes + 2 ≤ x) : Prop :=
+    (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) (hcnt : ∀ x, on = some x → procPagetableNodes + 2 ≤ x)
+    (hact : apActorOk pav tk k.proc) : Prop :=
   kctx cpu k ∗ pcIs cpu allocprocAddr ∗ procsInv Γ ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗
   procsAvailAt Γ pav tk ∗ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗
@@ -254,12 +280,12 @@ structure ALLOCPROC : Prop where
   wp_allocproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx] (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
-    (ke : Nat) hnoff hK hlk hlp hlq htier hcnt,
-    wp_allocproc_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q ke hnoff hK hlk hlp hlq htier hcnt
+    (ke : Nat) hnoff hK hlk hlp hlq htier hcnt hact,
+    wp_allocproc_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q ke hnoff hK hlk hlp hlq htier hcnt hact
   wp_allocproc_led : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx] (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
-    (ke : Nat) hnoff hK hlk hlp hlq htier hcnt,
-    wp_allocproc_led_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q ke hnoff hK hlk hlp hlq htier hcnt
+    (ke : Nat) hnoff hK hlk hlp hlq htier hcnt hact,
+    wp_allocproc_led_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q ke hnoff hK hlk hlp hlq htier hcnt hact
 
 end Xv6

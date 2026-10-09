@@ -332,13 +332,13 @@ theorem syscFb_kinds : pkKinds syscFbFmt = [PkKind.num, PkKind.str, PkKind.num] 
   unfold syscFbFmt; decide
 
 /-- `jal ra,printk` at `+0x4e`. -/
-theorem syscFb_jal_tgt : KA.«syscall» + 0x62#64 + BitVec.signExtend 64 (0x1fdb2e#21) = KA.«printk» := by
+theorem syscFb_jal_tgt : KA.«syscall» + 0x62#64 + BitVec.signExtend 64 (0x1fdb32#21) = KA.«printk» := by
   decide
 
 /-- The format string (`auipc`/`addi` at `+0x46`/`+0x4a`), printk (`jal` at
 `+0x4e`) and the return pc, as the normaliser leaves them. -/
-theorem syscFb_fmt_norm : KA.«syscall» + 18938#64 = KStr.«%d %s: unknown sys call %d\n» := by decide
-theorem syscFb_printk_norm : KA.«syscall» + 18446744073709542288#64 = KA.«printk» := by decide
+theorem syscFb_fmt_norm : KA.«syscall» + 18942#64 = KStr.«%d %s: unknown sys call %d\n» := by decide
+theorem syscFb_printk_norm : KA.«syscall» + 18446744073709542292#64 = KA.«printk» := by decide
 theorem syscFb_ret_norm : jumpPc (KA.«syscall» + 102#64) = KA.«syscall» + 102#64 := by decide
 
 /-- The three varargs `p->pid, p->name, num` (Rocq `sysc_descs_mk`). -/
@@ -537,11 +537,11 @@ theorem syscall_fallback (PK : PRINTK)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x4a  addi a0,a0,-1570
-  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x5e#64) false 0x9a0#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x5e#64) false 0x9a4#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x4e  jal ra,printk
-  k_step_e (wp_s_jal cpu _ (KA.«syscall» + 0x62#64) false 0x1fdb2e#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«syscall» + 0x62#64) false 0x1fdb32#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscFb_jal_tgt]
   iintro Hk Hpc
   k_norm_g [syscFb_printk_norm]

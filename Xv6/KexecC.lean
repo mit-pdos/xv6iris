@@ -228,7 +228,7 @@ theorem kxcC_vec_rows {fb ef : List (BitVec 8)} {P P' : UPtd} {Mi M' : Nat → L
 
 /-! ## §3 THE CLOSE (Rocq `kxc_c_close`) -/
 
-theorem kxcC_br_copyout2 : KA.«kexec» + 0x29c#64 + BitVec.signExtend 64 2083140#21 = KA.«copyout» := by
+theorem kxcC_br_copyout2 : KA.«kexec» + 0x29c#64 + BitVec.signExtend 64 2083144#21 = KA.«copyout» := by
   decide
 theorem kxcC_ret_294 : jumpPc (KA.«kexec» + 0x29c#64 + 4#64) = KA.«kexec» + 0x29c#64 + 4#64 := by
   decide
@@ -446,7 +446,7 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
         (kxcVecBytes (fun j => BitVec.ofInt 64 (kxcSp (sz1.toNat : Int) A.alen (j + 1))) ci) from .rfl) $$ Hv
   -- +0x294  jal copyout, the block's event counter lent to it (permit sweep L1b)
   icases procPrivFdRes_evLend 0 A.γ k.proc A.pidv V1 A.M $$ Hpriv with ⟨Hlend, Hpback⟩
-  iapply (kxcC_call_copyout Γ CO cpu k A spie spp _ (KA.«kexec» + 0x29c#64) 2083140#21 kxcC_br_copyout2
+  iapply (kxcC_call_copyout Γ CO cpu k A spie spp _ (KA.«kexec» + 0x29c#64) 2083144#21 kxcC_br_copyout2
       kxcC_ret_294 P Mi (DFrac.own 1)
       (kxcVecBytes (fun j => BitVec.ofInt 64 (kxcSp (sz1.toNat : Int) A.alen (j + 1))) ci)
       (kxcUstackBuf (k.regs 2#5)) V1.ev hK hnoff ?c13 ?c10 ?c11 ?c14 (by rw [kxcVecBytes_length]; omega))

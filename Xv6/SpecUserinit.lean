@@ -12,8 +12,11 @@ Specification of `userinit` (kernel/proc.c), the first process:
 
 BOOT CODE: it runs on the boot hart before any scheduler does, so there
 is no process on this hart (`k.proc = 0`), no claim and no parking.  All
-of its callees are fine with that -- `allocproc` never calls `myproc` and
-is generic in the interrupt index; `igetroot` (`SpecIgetroot`, upstream
+of its callees are fine with that -- `allocproc` is generic in the
+interrupt index, and the `myproc` its inlined allocpid calls (NI M4 pids)
+reads the hart's proc word from the context with no process resource
+(`SpecMyproc`), so at boot it returns 0 and allocproc takes its init arm
+(pid 1; the boot discriminator `apActorOk`, discharged from `k.proc = 0`); `igetroot` (`SpecIgetroot`, upstream
 b72cbac1, which replaced the `namei("/")` root corner, chroot.md §5) is
 `iget(ROOTDEV, ROOTINO)` behind a frame -- no process, no transaction,
 nothing to sleep on; `idup` is the inode cache's `ref++` under its spinlock.

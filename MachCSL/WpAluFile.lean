@@ -240,6 +240,58 @@ theorem execSpecF_mul (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 6
   conf_intro HmConf
   iapply HΦ $$ HmConf HPC HnextPC HF
 
+/-- `mulw`'s product: the wrapping product of the low words (the
+`to_bits_truncate` of their signed product). -/
+theorem mulw_to_bits (a b : BitVec 32) :
+    (to_bits_truncate (l := 32) (a.toInt * b.toInt) : BitVec 32) = a * b := by
+  simp only [to_bits_truncate, Sail.get_slice_int]
+  have : a * b = BitVec.ofInt 32 (a.toInt * b.toInt) := by
+    rw [BitVec.ofInt_mul, BitVec.ofInt_toInt, BitVec.ofInt_toInt]
+  rw [this]
+  generalize a.toInt * b.toInt = z
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.extractLsb'_toNat, BitVec.toNat_ofInt, Nat.shiftRight_zero]
+  have h1 : ((z % ((2 ^ (0 + 32 + 1) : Nat) : Int)).toNat : Int) = z % ((2 ^ (0 + 32 + 1) : Nat) : Int) :=
+    Int.toNat_of_nonneg (Int.emod_nonneg _ (by decide))
+  have h2 : ((z % ((2 ^ 32 : Nat) : Int)).toNat : Int) = z % ((2 ^ 32 : Nat) : Int) :=
+    Int.toNat_of_nonneg (Int.emod_nonneg _ (by decide))
+  simp only [Nat.reducePow, Nat.reduceAdd] at h1 h2 ⊢
+  omega
+
+set_option maxHeartbeats 4000000 in
+/-- `mulw rd, rs1, rs2` (NI M4 pids: procinit's loop body). -/
+theorem execSpecF_mulw (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (rd rs1 rs2 : BitVec 5)
+    (hrd : rd ≠ 0#5) (R : RegMap) (p : Privilege := Privilege.Supervisor) :
+    execSpecPP (GF := GF) cpu dq p c p c
+      (instruction.MULW (regidx.Regidx rs2, regidx.Regidx rs1, regidx.Regidx rd))
+      pc npc₀ npc₀ (gprFile cpu R)
+      (gprFile cpu (RegMap.set R rd (BitVec.signExtend 64
+        (BitVec.extractLsb' 0 32 (RegMap.get R rs1) * BitVec.extractLsb' 0 32 (RegMap.get R rs2))))) := by
+  intro Φ
+  iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
+  conf_cases HmConf
+  unfold execute
+  swp_run 30
+  iapply swp_bind
+  iapply swp_rX_file
+  iframe
+  iintro HF
+  swp_run 30
+  iapply swp_bind
+  iapply swp_rX_file
+  iframe
+  iintro HF
+  swp_run 30
+  simp only [mulw_to_bits]
+  iapply swp_bind
+  iapply swp_wX_file (hrd := hrd)
+  iframe
+  inext
+  iintro HF
+  swp_run 10
+  conf_intro HmConf
+  iapply HΦ $$ HmConf HPC HnextPC HF
+
 set_option maxHeartbeats 4000000 in
 /-- `lui rd, imm` (also `c.lui`). -/
 theorem execSpecF_lui (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 20)

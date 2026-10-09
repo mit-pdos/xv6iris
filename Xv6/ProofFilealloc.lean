@@ -35,15 +35,15 @@ theorem fa_ret_40d0 : jumpPc (KA.«filealloc» + 0x16#64) = (KA.«filealloc» + 
 theorem fa_ret_40f8 : jumpPc (KA.«filealloc» + 0x3e#64) = (KA.«filealloc» + 0x3e#64) := by decide
 theorem fa_ret_410c : jumpPc (KA.«filealloc» + 0x52#64) = (KA.«filealloc» + 0x52#64) := by decide
 
-theorem fa_lock_40c4 : KA.«filealloc» + 0x1e7d6#64 = ftableAddr := by
+theorem fa_lock_40c4 : KA.«filealloc» + 0x1e7da#64 = ftableAddr := by
   unfold ftableAddr; decide
-theorem fa_lock_40ec : KA.«filealloc» + 0x1e7d6#64 = ftableAddr := by
+theorem fa_lock_40ec : KA.«filealloc» + 0x1e7da#64 = ftableAddr := by
   unfold ftableAddr; decide
-theorem fa_lock_4100 : KA.«filealloc» + 0x1e7d6#64 = ftableAddr := by
+theorem fa_lock_4100 : KA.«filealloc» + 0x1e7da#64 = ftableAddr := by
   unfold ftableAddr; decide
-theorem fa_s1_40d0 : KA.«filealloc» + 0x1e7ee#64 = fnode 0 := by
+theorem fa_s1_40d0 : KA.«filealloc» + 0x1e7f2#64 = fnode 0 := by
   rw [fnode_zero]; decide
-theorem fa_end_40d8 : KA.«filealloc» + 0x1f78e#64 = fnode NFILE := by
+theorem fa_end_40d8 : KA.«filealloc» + 0x1f792#64 = fnode NFILE := by
   rw [fnode_end]; decide
 theorem fa_ext1 : BitVec.extractLsb' 0 32 (0#64 + BitVec.signExtend 64 1#12) = 1#32 := by decide
 
@@ -53,7 +53,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-! ## The shared tail: `mv a0,s1` and the epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- From `0x80004294` at hart `c` with `s1 = v`: `mv a0,s1`, the epilogue,
+/-- From `0x80004290` at hart `c` with `s1 = v`: `mv a0,s1`, the epilogue,
 and the caller's continuation (ProofKalloc.ka_tail). -/
 theorem fa_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (v : BitVec 64)
     (KR : RegMap) (hregs : kb.regs = KR)
@@ -124,9 +124,9 @@ set_option maxHeartbeats 16000000 in
 /-- Entry `kk` (`s1 = fnode kk`, `kk < NFILE`): `lw a5,4(s1)`; free → take
 it, release, return it; else `addi s1,s1,40; bne s1,a4` → either the loop
 continuation (`Hloop`, when `kk + 1 < NFILE`) or the full arm. -/
-theorem filealloc_br_ffffffffffffca9e : KA.«filealloc» + 0xffffffffffffca9e#64 = KA.«release» := by decide
+theorem filealloc_br_ffffffffffffcaa2 : KA.«filealloc» + 0xffffffffffffcaa2#64 = KA.«release» := by decide
 
-theorem filealloc_br_1e7d6 : KA.«filealloc» + 0x1e7d6#64 = ftableAddr := by decide
+theorem filealloc_br_1e7da : KA.«filealloc» + 0x1e7da#64 = ftableAddr := by decide
 
 theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (hwf : k.wf) (hK : 14 ≤ k.avail) (hlk : "ftable" ∉ k.locks) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -238,11 +238,11 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
     k_step (wp_s_auipc c _ (KA.«filealloc» + 0x46#64) false 0x1e#20 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_addi c _ (KA.«filealloc» + 0x4a#64) false 1936#12 10#5 10#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_1e7d6, fa_lock_4100]
+    k_step (wp_s_addi c _ (KA.«filealloc» + 0x4a#64) false 1940#12 10#5 10#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_1e7da, fa_lock_4100]
     iintro Hk Hpc
-    k_step (wp_s_jal c _ (KA.«filealloc» + 0x4e#64) false 2083408#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_ffffffffffffca9e]
+    k_step (wp_s_jal c _ (KA.«filealloc» + 0x4e#64) false 2083412#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_ffffffffffffcaa2]
     iintro Hk Hpc
     iapply (fa_release RE c _ γl γ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]
     rotate_right 1
@@ -307,11 +307,11 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
       k_step (wp_s_auipc c _ (KA.«filealloc» + 0x32#64) false 0x1e#20 10#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step (wp_s_addi c _ (KA.«filealloc» + 0x36#64) false 1956#12 10#5 10#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_1e7d6, fa_lock_40ec]
+      k_step (wp_s_addi c _ (KA.«filealloc» + 0x36#64) false 1960#12 10#5 10#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_1e7da, fa_lock_40ec]
       iintro Hk Hpc
-      k_step (wp_s_jal c _ (KA.«filealloc» + 0x3a#64) false 2083428#21 1#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_ffffffffffffca9e]
+      k_step (wp_s_jal c _ (KA.«filealloc» + 0x3a#64) false 2083432#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_ffffffffffffcaa2]
       iintro Hk Hpc
       iapply (fa_release RE c _ γl γ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]
       rotate_right 1
@@ -419,11 +419,11 @@ end
 
 /-! ## filealloc -/
 
-theorem filealloc_br_ffffffffffffca16 : KA.«filealloc» + 0xffffffffffffca16#64 = KA.«acquire» := by decide
+theorem filealloc_br_ffffffffffffca1a : KA.«filealloc» + 0xffffffffffffca1a#64 = KA.«acquire» := by decide
 
-theorem filealloc_br_1f78e : KA.«filealloc» + 0x1f78e#64 = fnode NFILE := by decide
+theorem filealloc_br_1f792 : KA.«filealloc» + 0x1f792#64 = fnode NFILE := by decide
 
-theorem filealloc_br_1e7ee : KA.«filealloc» + 0x1e7ee#64 = fnode 0 := by decide
+theorem filealloc_br_1e7f2 : KA.«filealloc» + 0x1e7f2#64 = fnode 0 := by decide
 
 set_option maxHeartbeats 16000000 in
 theorem filealloc_proof (AC : ACQUIRE) (RE : RELEASE) : FILEALLOC := ⟨
@@ -448,11 +448,11 @@ theorem filealloc_proof (AC : ACQUIRE) (RE : RELEASE) : FILEALLOC := ⟨
   k_step_gen (wp_s_auipc c1 _ (KA.«filealloc» + 0xa#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ (KA.«filealloc» + 0xe#64) false 1996#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_1e7d6, fa_lock_40c4] next c3 hp3
+  k_step_gen (wp_s_addi c2 _ (KA.«filealloc» + 0xe#64) false 2000#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_1e7da, fa_lock_40c4] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c3 _ (KA.«filealloc» + 0x12#64) false 2083332#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_ffffffffffffca16] next c4 hp4
+  k_step_gen (wp_s_jal c3 _ (KA.«filealloc» + 0x12#64) false 2083336#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_ffffffffffffca1a] next c4 hp4
   iintro Hk Hpc
   iapply (fa_acquire AC c4 _ γl γ ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -476,14 +476,14 @@ theorem filealloc_proof (AC : ACQUIRE) (RE : RELEASE) : FILEALLOC := ⟨
   k_step (wp_s_auipc c _ (KA.«filealloc» + 0x16#64) false 0x1e#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«filealloc» + 0x1a#64) false 2008#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_1e7ee, fa_s1_40d0]
+  k_step (wp_s_addi c _ (KA.«filealloc» + 0x1a#64) false 2012#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_1e7f2, fa_s1_40d0]
   iintro Hk Hpc
   k_step (wp_s_auipc c _ (KA.«filealloc» + 0x1e#64) false 0x1f#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«filealloc» + 0x22#64) false 1904#12 14#5 14#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_1f78e, fa_end_40d8]
+  k_step (wp_s_addi c _ (KA.«filealloc» + 0x22#64) false 1908#12 14#5 14#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filealloc_br_1f792, fa_end_40d8]
   iintro Hk Hpc
   icases ftableRes_elim γ curCtx $$ HR with ⟨%M, %nx, %Ls, Ha, %⟨hfresh, hok⟩, Hs⟩
   iapply (fa_scan RE cpu c k γl γ hwf hK hlk hnoff spie spp hsp hpin5 M nx hfresh (NFILE - 1) 0 _ Ls

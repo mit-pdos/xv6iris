@@ -26,7 +26,7 @@ nothing else.  None of them touches a contract.
 * §4  THE K SPLIT: every callee runs at `avail - 10`.
 * §5  The `dp->nlink++` wrap refutation (the reason (L4) exists).
 
-**Offsets.**  This image's (`KA.«create»` = 0x80004dde, 356 bytes); they
+**Offsets.**  This image's (`KA.«create»` = 0x80004dda, 356 bytes); they
 agree with Rocq's post-117c0e7 `CodeCreate.v` (the jal immediates, e.g.
 2090038 / 2090398 at +0xa8 / +0xb0, are Rocq's).  Rocq's header prose
 quotes pre-gate offsets in places; the code is the reference.
@@ -159,10 +159,10 @@ theorem createSetf_type_nz (dn : Dinode) (mj mn nl : BitVec 16) (h : dn.diType.t
 /-! ## §2  The two name literals -/
 
 /-- `auipc a1,0x3` + `addi a1,a1,-1982` at `+0xfc`: `"."`. -/
-theorem create_dot_addr : KA.«create» + 0x280a#64 = KStr.«.» := by decide
+theorem create_dot_addr : KA.«create» + 0x280e#64 = KStr.«.» := by decide
 
 /-- `auipc a1,0x3` + `addi a1,a1,-1994` at `+0x110`: `".."`. -/
-theorem create_dotdot_addr : KA.«create» + 0x26fa#64 = KStr.«..» := by decide
+theorem create_dotdot_addr : KA.«create» + 0x26fe#64 = KStr.«..» := by decide
 
 /-- The fourteen bytes `"."`'s window actually holds (0x800075e8): `"."`,
 then the head of `"unlink"` eight bytes on.  OWNERSHIP is of all fourteen, so the

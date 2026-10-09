@@ -50,6 +50,10 @@ def pChan (pa : BitVec 64) : BitVec 64 := pa + 32#64
 def pKilled (pa : BitVec 64) : BitVec 64 := pa + 40#64
 def pXstate (pa : BitVec 64) : BitVec 64 := pa + 44#64
 def pPid (pa : BitVec 64) : BitVec 64 := pa + 48#64
+/-- `&p->npid` (NI M4 pids, the `verified-quota` pid commit): the slot's pid
+partition counter, the last pid the slot handed out (`pid_lock`'s), in the
+padding hole after `pid`. -/
+def pNpid (pa : BitVec 64) : BitVec 64 := pa + 52#64
 def pParent (pa : BitVec 64) : BitVec 64 := pa + 56#64
 def pKstack (pa : BitVec 64) : BitVec 64 := pa + 64#64
 def pSz (pa : BitVec 64) : BitVec 64 := pa + 72#64
@@ -75,9 +79,11 @@ def RUNNABLE : BitVec 32 := 3#32
 def RUNNING : BitVec 32 := 4#32
 def ZOMBIE : BitVec 32 := 5#32
 
-/-- `PIDMAX` (kernel/param.h; Rocq `ProcGeom.PIDMAX`): the pid counter's
-bound, allocpid's retry range. -/
-def PIDMAX : Nat := 1000
+/-- `PIDMAX` (kernel/param.h; Rocq `ProcGeom.PIDMAX`): the largest pid.
+NI M4 pids: `0x7fffffff` (was 1000, the wrapping scan's range); pids are
+partitioned by the parent's slot and never reused, and `allocpid`'s cap is
+`npid > PIDMAX - NPROC`. -/
+def PIDMAX : Nat := 2 ^ 31 - 1
 
 /-- The exit status a `p->xstate` word reads as (Rocq `ProcGeom.xstate_val`:
 the signed value of the 32-bit cell). -/
@@ -139,6 +145,19 @@ theorem procAddr_nonzero {j : Nat} (hj : j < NPROC) : procAddr j ≠ 0#64 := by
   rw [procAddr_toNat j hj] at this
   simp only [BitVec.toNat_ofNat] at this
   have hpos : 0 < KernelSyms.«proc» := by decide
+  omega
+
+/-- The slot of an actor word (NI M4 pids): `slotOf (procAddr j) = j`
+(`slotOf_procAddr`). -/
+def slotOf (a : BitVec 64) : Nat := (a - procsAddr).toNat / procSize
+
+theorem slotOf_procAddr {j : Nat} (hj : j < NPROC) : slotOf (procAddr j) = j := by
+  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 376 * j := by
+    simp only [BitVec.toNat_ofNat, procSize]
+    exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
+  unfold slotOf procAddr
+  rw [show procsAddr + BitVec.ofNat 64 (procSize * j) - procsAddr = BitVec.ofNat 64 (procSize * j) by
+    bv_omega, h1, procSize]
   omega
 
 /-- `&p->context` determines the slot. -/

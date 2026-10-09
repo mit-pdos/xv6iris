@@ -259,8 +259,8 @@ theorem procsAvail_seal (Γ : SchedNames) (n : Nat) :
 
 The ledger also carries `pid_lock`'s BOOT-ERA TOKEN (`SlotGen.nextpidPend`)
 while it is counted and the first allocation has not run: that is what
-refutes the payload's two marks (`PidLock.pidLockResAt`) and pins init's
-pid to the literal 1.  Everywhere else -- the sealed regime, or the counted
+refutes the payload's boot mark (`PidLock.pidLockResAt`; NI M4 pids: the
+counter's mark went with `nextpid`) and pins init's pid to the literal 1.  Everywhere else -- the sealed regime, or the counted
 one after the first allocation -- it carries the shot and init's permanent
 registration (`npidDone`).  `procsAvail` above is Rocq's `pav_core`. -/
 
@@ -295,8 +295,8 @@ theorem procsAvailAt_tok (Γ : SchedNames) (on : Option Nat) (t : Bool) :
   unfold procsAvailAt
   cases on <;> exact .rfl
 
-/-- Rocq `pav_spent`: the ledger with its token SHOT (allocproc's store to
-`nextpid`). -/
+/-- Rocq `pav_spent`: the ledger with its token SHOT (by allocproc's init
+arm, NI M4 pids). -/
 def pavSpent (Γ : SchedNames) (on : Option Nat) : IProp GF :=
   iprop(procsAvail Γ on ∗ nextpidShot)
 

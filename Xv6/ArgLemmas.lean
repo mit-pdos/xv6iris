@@ -81,17 +81,17 @@ theorem word8_join4 (a : BitVec 64) (lo hi : BitVec 32) (hal : a.toNat % 8 = 0) 
 
 /-! ## argraw's jump table -/
 
-/-- The table base (`auipc a4,0x5 ; addi a4,a4,-234` at `argraw + 0x18`). -/
+/-- The table base (`auipc a4,0x5 ; addi a4,a4,-230` at `argraw + 0x18`). -/
 def argrawTbl : BitVec 64 := (KA.«etext» + 0x778#64)
 
 /-- Entry `i`: the case body's displacement from the table base. -/
 def argrawEntry : Nat → BitVec 32
-  | 0 => 0xffffb0fa#32
-  | 1 => 0xffffb108#32
-  | 2 => 0xffffb10e#32
-  | 3 => 0xffffb114#32
-  | 4 => 0xffffb11a#32
-  | _ => 0xffffb120#32
+  | 0 => 0xffffb0f6#32
+  | 1 => 0xffffb104#32
+  | 2 => 0xffffb10a#32
+  | 3 => 0xffffb110#32
+  | 4 => 0xffffb116#32
+  | _ => 0xffffb11c#32
 
 /-- The case body entry `i` lands on: `argraw + 0x28`, then `+0x36, +0x3c, ...`. -/
 def argrawCase : Nat → BitVec 64
@@ -134,12 +134,12 @@ theorem argraw_tbl_word (i : Nat) (hi : i < 6) :
     kmapStatic (GF := GF) ⊢ kernelData -∗
       wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * i)) 4 DFrac.discard (argrawEntry i) := by
   match i, hi with
-  | 0, _ => exact argraw_tbl_word_of 0 0xfa#8 0xb0#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
-  | 1, _ => exact argraw_tbl_word_of 1 0x08#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
-  | 2, _ => exact argraw_tbl_word_of 2 0x0e#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
-  | 3, _ => exact argraw_tbl_word_of 3 0x14#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
-  | 4, _ => exact argraw_tbl_word_of 4 0x1a#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
-  | 5, _ => exact argraw_tbl_word_of 5 0x20#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 0, _ => exact argraw_tbl_word_of 0 0xf6#8 0xb0#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 1, _ => exact argraw_tbl_word_of 1 0x04#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 2, _ => exact argraw_tbl_word_of 2 0x0a#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 3, _ => exact argraw_tbl_word_of 3 0x10#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 4, _ => exact argraw_tbl_word_of 4 0x16#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 5, _ => exact argraw_tbl_word_of 5 0x1c#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
 
 end
 

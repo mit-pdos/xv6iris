@@ -80,7 +80,7 @@ set_option linter.unusedSimpArgs false
 
 /-! ## The branch targets and return addresses of phase A's calls -/
 
-theorem kxcA_br_myproc : KA.«kexec» + 0x20#64 + BitVec.signExtend 64 2084730#21 = KA.«myproc» := by
+theorem kxcA_br_myproc : KA.«kexec» + 0x20#64 + BitVec.signExtend 64 2084738#21 = KA.«myproc» := by
   decide
 theorem kxcA_ret_24 : jumpPc (KA.«kexec» + 0x20#64 + 4#64) = KA.«kexec» + 0x20#64 + 4#64 := by decide
 theorem kxcA_br_beginop : KA.«kexec» + 0x26#64 + BitVec.signExtend 64 2094116#21 = KA.«begin_op» := by

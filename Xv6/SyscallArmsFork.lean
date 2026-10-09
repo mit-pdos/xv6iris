@@ -62,7 +62,7 @@ theorem syscArmFork_ans (rv : BitVec 32) (h : kforkAns rv) :
   · left; subst h; decide
   · right
     rw [BitVec.toInt_signExtend_of_le (by decide)]
-    have hP : PIDMAX = 1000 := rfl
+    have hP : PIDMAX = 2 ^ 31 - 1 := rfl
     rw [BitVec.toInt_eq_toNat_cond]
     have : 2 * rv.toNat < 2 ^ 32 := by omega
     simp only [this, if_true]
@@ -125,23 +125,32 @@ theorem syscArmFork_out (f : UexecSG.sfam GF) (V : ProcPriv) (j : Nat)
 /-- **FORK'S CITATION ON SUCCESS** (NI M2-X2 with G2b; NI joint fork lane
 F3; NI M3 quotas Q-2): out of the led answer's pid and family receipts and
 the era's anchor, the round's ledger evidence -- the pid ledger's prefix
-BEFORE the round's `PAlloc` (the pid is `pidPick` of it,
-`PidLock.pidAllocRcpt`) and the family ledger's prefix ENDING in the round's
-`ZFork` at the child's generation (G2 F5), at the caller's slot.  `forkOk`
-holds at it: the cited slot prefix is `[]`.  (Q-2) The allocator prefix is
+BEFORE the round's `PAlloc` (the pid is the partition's pick `pidPickS act`
+of it, `PidLock.pidAllocRcpt`, NI M4 pids) and the family ledger's prefix
+ENDING in the round's `ZFork` at the child's generation (G2 F5), at the
+caller's slot.  `forkOk` holds at it: the cited slot prefix is `[]`, and the
+actor's own count is below the quota (the pid is in range, `hrng`).  (Q-2) The allocator prefix is
 no longer cited: the trapframe's `KAlloc` decides nothing on the quota
 kernel (the led answer still carries its receipt; no row reads it). -/
 theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) {sts' : List FdState} (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (gn : GName) (rv : BitVec 32)
     (γc : GName) (act : BitVec 64) (ke : Nat)
-    (hn : syscNum V = 1) (ha : syscA0 V' = BitVec.signExtend 64 rv) :
+    (hn : syscNum V = 1) (ha : syscA0 V' = BitVec.signExtend 64 rv) (hact0 : act ≠ 0#64)
+    (hrng : rv.toNat ≤ PIDMAX) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
       pidAllocRcpt act rv -∗
       (∃ (hz : List Zev) (i : Nat), zombReceipt hz (.ZFork act i rv γc)) -∗
       |==> syscEvOut (hlc := hlc) V M sts sts' V' M' cs (cs ∪ {γc}) gn := by
   unfold pidAllocRcpt
   iintro #Ha ⟨%h, #Hp, %hpick⟩ ⟨%hz, %i, #Hz⟩
-  have hrv : BitVec.ofNat 32 (pidPick PIDMAX h) = rv := by rw [← hpick]; exact BitVec.ofNat_toNat _ _
+  have hrv : BitVec.ofNat 32 (pidPickS act h) = rv := by rw [← hpick]; exact BitVec.ofNat_toNat _ _
+  -- (NI M4 pids) the actor's own count is below the quota: its pick is in range
+  have hown : ownAllocs act h < PIDQ := by
+    have e := hpick
+    unfold pidPickS at e
+    rw [if_neg hact0] at e
+    unfold PIDQ; unfold PIDMAX at hrng; unfold NPROC at e
+    omega
   ihave #Hp' := (show pidReceipt (GF := GF) h (.PAlloc act rv) ⊢ WchG.wplName GF ↪◯ML h from by
     unfold pidReceipt pidLedLb
     iintro #H
@@ -158,6 +167,7 @@ theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     { UIota.boot with pev := h, zev := hz ++ [.ZFork act i rv γc], act := act }
     ?_ (fsPast_nil _ _ rfl) $$ Ha Hl
   have hok : forkOk { UIota.boot with pev := h, zev := hz ++ [.ZFork act i rv γc], act := act } := by
+    refine ⟨?_, hown⟩
     rintro ⟨k0, hk0⟩
     exact absurd hk0 (by simp [UIota.boot])
   have hgen : usysForkGen { UIota.boot with pev := h, zev := hz ++ [.ZFork act i rv γc], act := act } =
@@ -173,47 +183,69 @@ theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     fun h' => absurd (hn.symm.trans h') (by decide), syscEvFs_at hn⟩
   · unfold usysForkAns usysForkPid
     rw [if_pos hok]
-    show tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX h))
+    show tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 (BitVec.ofNat 32 (pidPickS act h))
     rw [hrv]; exact ha
   · rw [hgen]
-    show hz ++ [Zev.ZFork act i rv γc] = hz ++ [.ZFork act i (BitVec.ofNat 32 (pidPick PIDMAX h)) γc]
+    show hz ++ [Zev.ZFork act i rv γc] = hz ++ [.ZFork act i (BitVec.ofNat 32 (pidPickS act h)) γc]
     rw [hrv]
   · rw [hgen]
 
 /-- **FORK'S CITATION ON `-1`** (NI joint fork lane F3, ruling JF-R5; NI M3
-quotas Q-2): the POSITIVE REASON the led answer's `-1` arm carries, as the
-cited prefix -- the slot ledger's ending in the scan's `SFull`
-(`SlotLed.sFullRcpt`), at the caller's slot; no pid or family prefix
-(ruling JF-R4).  (Q-2) The allocator prefix ending in a `KNull` is no
-longer a reason: on the quota kernel every kalloc on fork's path is paid
-out of a credit and never null. -/
+quotas Q-2; NI M4 pids): the POSITIVE REASON the led answer's `-1` arm
+carries, as the cited prefix -- the slot ledger's ending in the scan's
+`SFull` (`SlotLed.sFullRcpt`), or (NI M4 pids) the pid ledger's prefix at
+which the actor's share is spent (`PidLock.pidCapRcpt`), at the caller's
+slot; no family prefix (ruling JF-R4).  (Q-2) The allocator prefix ending in
+a `KNull` is no longer a reason: on the quota kernel every kalloc on fork's
+path is paid out of a credit and never null. -/
 theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) {sts' : List FdState} (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (gn : GName) (act : BitVec 64)
     (ke : Nat) (hn : syscNum V = 1) (ha : syscA0 V' = -1#64) :
     MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
-      sFullRcpt act -∗
+      (sFullRcpt act ∨ pidCapRcpt act) -∗
       |==> syscEvOut (hlc := hlc) V M sts sts' V' M' cs cs gn := by
-  iintro #Ha Hs
-  unfold sFullRcpt slotLedLb
-  icases Hs with ⟨%hs, %k0, #Hs, %-⟩
-  ihave #Hs' := (show (WchG.wslName GF ↪◯ML (hs ++ [Sev.SFull act k0])) ⊢@{IProp GF}
-      ((niNamesHere (GF := GF)).getD 4 0) ↪◯ML (hs ++ [.SFull act k0]) from .rfl) $$ Hs
-  imod niIotaLbs_sev (GF := GF) (niNamesHere (GF := GF)) (hs ++ [.SFull act k0]) act $$ Hs' with #Hl
-  imodintro
-  iapply syscEvOut_cite V M sts sts' V' M' cs cs gn ke { UIota.boot with sev := hs ++ [.SFull act k0], act := act }
-    ?_ (fsPast_nil _ _ rfl) $$ Ha Hl
-  have hfull : UIota.sFull { UIota.boot with sev := hs ++ [.SFull act k0], act := act } :=
-    ⟨k0, by show (hs ++ [Sev.SFull act k0]).getLast? = some (.SFull act k0); simp⟩
-  have hnok : ¬ forkOk { UIota.boot with sev := hs ++ [.SFull act k0], act := act } :=
-    fun hok => hok hfull
-  refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
-    fun _ => ⟨?_, fun h' => absurd h' hnok, fun _ => ⟨hfull, rfl⟩⟩,
-    fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
-    fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
-    fun h' => absurd (hn.symm.trans h') (by decide), syscEvFs_at hn⟩
-  unfold usysForkAns
-  rw [if_neg hnok]
-  exact ha
+  iintro #Ha (Hs | Hc)
+  · unfold sFullRcpt slotLedLb
+    icases Hs with ⟨%hs, %k0, #Hs, %-⟩
+    ihave #Hs' := (show (WchG.wslName GF ↪◯ML (hs ++ [Sev.SFull act k0])) ⊢@{IProp GF}
+        ((niNamesHere (GF := GF)).getD 4 0) ↪◯ML (hs ++ [.SFull act k0]) from .rfl) $$ Hs
+    imod niIotaLbs_sev (GF := GF) (niNamesHere (GF := GF)) (hs ++ [.SFull act k0]) act $$ Hs' with #Hl
+    imodintro
+    iapply syscEvOut_cite V M sts sts' V' M' cs cs gn ke { UIota.boot with sev := hs ++ [.SFull act k0], act := act }
+      ?_ (fsPast_nil _ _ rfl) $$ Ha Hl
+    have hfull : UIota.sFull { UIota.boot with sev := hs ++ [.SFull act k0], act := act } :=
+      ⟨k0, by show (hs ++ [Sev.SFull act k0]).getLast? = some (.SFull act k0); simp⟩
+    have hnok : ¬ forkOk { UIota.boot with sev := hs ++ [.SFull act k0], act := act } :=
+      fun hok => hok.1 hfull
+    refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
+      fun _ => ⟨?_, fun h' => absurd h' hnok, fun _ => ⟨Or.inl hfull, rfl⟩⟩,
+      fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
+      fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
+      fun h' => absurd (hn.symm.trans h') (by decide), syscEvFs_at hn⟩
+    unfold usysForkAns
+    rw [if_neg hnok]
+    exact ha
+  · -- (NI M4 pids) the cap: the pid prefix at which the actor's share is spent
+    unfold pidCapRcpt pidLedLb
+    icases Hc with ⟨%h, #Hp, %hcap⟩
+    ihave #Hp' := (show (WchG.wplName GF ↪◯ML h) ⊢@{IProp GF} ((niNamesHere (GF := GF)).getD 1 0) ↪◯ML h
+      from .rfl) $$ Hp
+    imod MonoList.lb_own_nil (GF := GF) (α := Zev) ((niNamesHere (GF := GF)).getD 2 0) with #Hz0
+    imod niIotaLbs_pz (GF := GF) (niNamesHere (GF := GF)) h [] act $$ [Hp' Hz0] with #Hl
+    · iframe Hp' Hz0
+    imodintro
+    iapply syscEvOut_cite V M sts sts' V' M' cs cs gn ke { UIota.boot with pev := h, zev := [], act := act }
+      ?_ (fsPast_nil _ _ rfl) $$ Ha Hl
+    have hnok : ¬ forkOk { UIota.boot with pev := h, zev := [], act := act } :=
+      fun hok => absurd hok.2 (by show ¬ ownAllocs act h < PIDQ; omega)
+    refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
+      fun _ => ⟨?_, fun h' => absurd h' hnok, fun _ => ⟨Or.inr hcap, rfl⟩⟩,
+      fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
+      fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
+      fun h' => absurd (hn.symm.trans h') (by decide), syscEvFs_at hn⟩
+    unfold usysForkAns
+    rw [if_neg hnok]
+    exact ha
 
 /-- The syscall side's park rows (the park world, the ticks and nextpid
 locks, the console), off the environment. -/
@@ -338,7 +370,7 @@ theorem syscall_arm_fork (SF : SYSFORK)
       (by rw [ha0]; exact syscArmFork_ans rv hans)
     iapply wpLoop_bupd
     imod syscArmFork_ev V M sts (syscStore (V.updEv k') (R2 10#5)) M cs gn rv γc (procAddr j) ke hn1
-      (by rw [hsa (V.updEv k') rfl, ha0]) $$ Hanc Hrc Hzr with #Hev
+      (by rw [hsa (V.updEv k') rfl, ha0]) (procAddr_nonzero hj) hr.2 $$ Hanc Hrc Hzr with #Hev
     imodintro
     unfold syscallRet syscallAddr at *
     iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f (V.updEv k') M sts

@@ -23,7 +23,7 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Constants and register bookkeeping -/
 
-/-- `argraw` returns to `0x80002946`. -/
+/-- `argraw` returns to `0x80002942`. -/
 theorem ai_ret_2870 : jumpPc (KA.«argint» + 0x10#64) = (KA.«argint» + 0x10#64) := by
   decide
 

@@ -190,7 +190,7 @@ while a failing wait returns the all-ones one. -/
 theorem sext32_rng_not_neg1 (w : BitVec 32) (h : 1 ≤ w.toNat ∧ w.toNat ≤ genPidMax) :
     BitVec.signExtend 64 w ≠ -1#64 := by
   unfold genPidMax at h
-  have hle : w ≤ 1000#32 := by
+  have hle : w ≤ 2147483647#32 := by
     rw [BitVec.le_def]; simpa using h.2
   clear h
   bv_decide

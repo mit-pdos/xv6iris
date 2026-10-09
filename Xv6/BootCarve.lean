@@ -53,7 +53,7 @@ DEVIATIONS from Rocq (none process-layer):
    (`MachCSL.bootImage`, Rocq `RiscvLang.boot_image`), so `BootImage` is a
    theorem (`bootImage_wf`), not a premise, and no carve lemma takes an
    image argument.
-2. `.data` (`first`, `nextpid`, `uarts`), `.got` and `.got.plt` are in
+2. `.data` (`first`, `uarts`; NI M4 pids: `nextpid` is gone), `.got` and `.got.plt` are in
    `BootImage.data` (`Kernel.dataInit`, 136 bytes, emitted by
    tools/gen_kernel_data.py, spanning `[_data, _bss)`).
    Its consumers are `main`'s bundles (SpecMain).  `.eh_frame` (read-only,
@@ -361,7 +361,7 @@ structure BootImage (image : Mem) : Prop where
   /-- the GOT slot `_entry` loads `&stack0` from -/
   got : bootImgHas image stack0Slot 8 KA.«stack0»
   /-- the initialized writable image `[_data, _bss)` (`.data`: `first`,
-  `nextpid`, `uarts`; `.got`; `.got.plt`) -/
+  `uarts`; `.got`; `.got.plt`) -/
   data : ∀ p ∈ Kernel.dataInit, bootImgHas image (BitVec.ofNat 64 p.1) 1 (BitVec.ofNat 8 p.2)
   /-- `.bss` is zero-filled -/
   bss : ∀ a : PAddr, MachCSL.KernelSyms.«_bss» ≤ a.toNat → a.toNat < MachCSL.KernelSyms.«end» →

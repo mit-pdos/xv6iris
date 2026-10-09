@@ -68,7 +68,7 @@ party that threads a lock's gname.
      `optionUR (dfrac_agreeR (leibnizO (mword 32)))`).
 2. **`qeighth` is `Qp.quarter.half`** (Rocq `(1/4)/2`, a notation because
    stdpp's `Qp` numerals stop at 4).
-3. **`PIDMAX` is `genPidMax`, a literal `1000`** (Rocq `ProcGeom.PIDMAX`).
+3. **`PIDMAX` is `genPidMax`, a literal `2 ^ 31 - 1`** (Rocq `ProcGeom.PIDMAX`; NI M4 pids, was `1000`).
    Lean's `PIDMAX` is `Xv6/ProcGeom.lean`'s, which this file imports;
    `genPidMax = PIDMAX` holds by `rfl`.
 4. **The pid register's domain fact (`pidRegDom`) is over the FUNCTION
@@ -305,7 +305,7 @@ class WchG (GF : BundledGFunctors) extends WchGpre GF where
 abbrev qeighth : Qp := Qp.quarter.half
 
 /-- Rocq `PIDMAX` (deviation 3). -/
-def genPidMax : Nat := 1000
+def genPidMax : Nat := 2 ^ 31 - 1
 
 /-! ## The element, and the map the boot mint hands out -/
 
@@ -887,8 +887,9 @@ theorem initPid_seal (p : BitVec 32) : initPidTok (GF := GF) p ⊢ |==> initPidI
 
 /-! ## The pid counter's boot-era token (lane TRAP-ROWS-4, B1b)
 
-init's pid is the LITERAL 1 (the C carves `int nextpid = 1`, userinit's
-allocproc is the first allocation).  A ONE-SHOT rather than an exact-value
+init's pid is the LITERAL 1 (NI M4 pids: allocpid's init arm, `myproc()
+== 0`, userinit's allocproc being the first allocation; the pre-M4 C carved
+`int nextpid = 1`).  A ONE-SHOT rather than an exact-value
 mirror: `nextpidPend` (WHOLE, carried by the proc ledger's counted regime)
 refutes the payload's right disjunct; `nextpidShot` (DISCARDED, carried by
 every sealed ledger) is what a token-less caller re-establishes the payload
@@ -915,7 +916,7 @@ theorem nextpid_pend_shot : nextpidPend (GF := GF) ∗ nextpidShot ⊢ False := 
   have := DFrac.valid_own_op_discard.mp hv
   simp at this
 
-/-- ...and the one-way step allocproc takes at its store to `nextpid` -/
+/-- ...and the one-way step allocproc takes at its init arm (NI M4 pids) -/
 theorem nextpid_shoot : nextpidPend (GF := GF) ⊢ |==> nextpidShot := by
   unfold nextpidPend nextpidShot
   exact iOwn_update (Update.option _ _ DFracAgree.persist)

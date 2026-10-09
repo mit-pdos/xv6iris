@@ -54,11 +54,11 @@ open LeanRV64D
 /-! ## The constants the code computes -/
 
 /-- `auipc a1,0x1d; lw a1,1784(a1)` reads `sb.inodestart`. -/
-theorem iu_sb_addr : KA.«iupdate» + 0x1db72#64 = sbInodestart := by
+theorem iu_sb_addr : KA.«iupdate» + 0x1db76#64 = sbInodestart := by
   unfold sbInodestart; decide
 
 theorem iu_br_bread : KA.«iupdate» + 0xFFFFFFFFFFFFFA1C#64 = KA.«bread» := by decide
-theorem iu_br_memmove : KA.«iupdate» + 0xffffffffffffdaca#64 = KA.«memmove» := by decide
+theorem iu_br_memmove : KA.«iupdate» + 0xffffffffffffdace#64 = KA.«memmove» := by decide
 theorem iu_br_logwrite : KA.«iupdate» + 0xd2c#64 = KA.«log_write» := by decide
 theorem iu_br_brelse : KA.«iupdate» + 0xFFFFFFFFFFFFFB24#64 = KA.«brelse» := by decide
 

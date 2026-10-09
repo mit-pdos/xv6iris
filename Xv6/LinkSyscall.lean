@@ -81,7 +81,7 @@ theorem Syscall : SYSCALL_XV6 :=
   let FC := FilecloseClosed
   let PFP := ProcFreepagetable UM UF
   let FP := Freeproc KF PFP AC RE
-  let AL := Allocproc AC RE KAL MS (ProcPagetable (Uvmcreate KAL MS) MA UM UF) FP
+  let AL := Allocproc Myproc AC RE KAL MS (ProcPagetable (Uvmcreate KAL MS) MA UM UF) FP
   let KFK := Kfork Myproc AC RE AL (Uvmcopy WalkNoalloc KAL KF Memmove MA UM) FP Safestrcpy
   syscall_proof Myproc Printk
     (SysFork KFK) SysExitClosed (SysWait AA (Kwait Myproc AC RE CO FP Killed SP SL))

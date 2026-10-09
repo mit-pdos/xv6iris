@@ -86,10 +86,12 @@ so build on a machine sized for it.
 `lake-manifest.json`, lean-sail vendored.  `tools/ci/toolchain_check.sh` checks that the three
 toolchain files, the manifest and the fetched packages agree; CI runs it first.
 
-**Images.** The kernel image and `fs.img` are xv6-riscv `c1fd3cc7` (branch `verified-quota`:
-`b72cbac1`, the tip of `verified`, plus one commit adding the NI M3 memory quota -- a break quota
-`MAXUSZ`, a pipe-buffer cap `NPIPE`, `scounteren = 0`; `claude-notes/kernel-defects.md`); the user
-programs are byte-identical at both and keep their `b72cbac1` headers.  The dumps (`tools/dump_kernel.py`, `tools/dump_elf_image.py`,
+**Images.** The kernel image and `fs.img` are xv6-riscv `975109bc` (branch `verified-quota`:
+`b72cbac1`, the tip of `verified`, plus two commits: `c1fd3cc7`, the NI M3 memory quota -- a break
+quota `MAXUSZ`, a pipe-buffer cap `NPIPE`, `scounteren = 0` -- and `975109bc`, the NI M4 pid
+partition -- pids partitioned by the parent's slot with a per-slot quota, `PIDMAX = 2^31 - 1`,
+`nextpid` gone; `claude-notes/kernel-defects.md`); the user programs are byte-identical at all three
+and keep their `b72cbac1` headers.  The dumps (`tools/dump_kernel.py`, `tools/dump_elf_image.py`,
 `tools/dump_user_elf.py`, `tools/gen_*`) are checked in with their source revision and md5 in their
 headers; `make check-gen` regenerates everything derivable without an ELF or `sail` and fails on any
 difference, and `make check-gen-kernel KERNEL=…` re-dumps the kernel from the pinned ELF.  Proofs name

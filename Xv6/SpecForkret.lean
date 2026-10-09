@@ -17,7 +17,7 @@ independently of its proof.
       ((void (*)(uint64))(TRAMPOLINE + (userret - trampoline)))(satp);
     }
 
-@ `KA.«forkret»` (0x800019ae in the image, 52 instructions).  The image is
+@ `KA.«forkret»` (0x800019b2 in the image, 52 instructions).  The image is
 xv6 3e9926ea: `first` is read and written NON-atomically, with no fences.
 
 It is the entry point every process is BORN at: `allocproc` writes

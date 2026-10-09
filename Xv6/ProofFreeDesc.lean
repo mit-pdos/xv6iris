@@ -52,7 +52,7 @@ theorem fd_free0_addr : KA.«free_desc» + 0x1e0d4#64 = aFree 0 := by
   decide
 
 
-theorem fd_br_wakeup : KA.«free_desc» + 0xffffffffffffc714#64 = KA.«wakeup» := by decide
+theorem fd_br_wakeup : KA.«free_desc» + 0xffffffffffffc710#64 = KA.«wakeup» := by decide
 
 /-- The context comes back from `wakeup` with `SPIE`/`SPP` unchanged. -/
 theorem fd_withSpie (k : KCtx) (m : Nat) : (k.pushed m).withSpie k.spie k.spp = k.pushed m := rfl
@@ -246,7 +246,7 @@ theorem free_desc_proof (WK : WAKEUP) : FREE_DESC :=
   k_step (wp_s_addi cpu _ (KA.«free_desc» + 0x4e#64) false 138#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fd_free0_addr]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«free_desc» + 0x52#64) false 2082498#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«free_desc» + 0x52#64) false 2082494#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fd_br_wakeup]
   iintro Hk Hpc
   iapply (fd_wakeup WK Γ cpu _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]

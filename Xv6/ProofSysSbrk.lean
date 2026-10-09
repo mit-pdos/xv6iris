@@ -66,7 +66,7 @@ set_option linter.unusedSimpArgs false
 /-! ## Constants, branches, contexts -/
 
 theorem sys_sbrk_br_argint : KA.«sys_sbrk» + 0xfffffffffffffeb8#64 = KA.«argint» := by decide
-theorem sys_sbrk_br_myproc : KA.«sys_sbrk» + 0xffffffffffffeefe#64 = KA.«myproc» := by decide
+theorem sys_sbrk_br_myproc : KA.«sys_sbrk» + 0xffffffffffffef06#64 = KA.«myproc» := by decide
 theorem sys_sbrk_br_growproc : KA.«sys_sbrk» + 0xfffffffffffff236#64 = KA.«growproc» := by decide
 
 theorem sys_sbrk_ret_14 : jumpPc (KA.«sys_sbrk» + 0x14#64) = KA.«sys_sbrk» + 0x14#64 := by decide
@@ -574,7 +574,7 @@ theorem sys_sbrk_lazy (MP : MYPROC) (c : CPU) (k : KCtx) (γl : GName) (γk : Km
     with [KCtx.rget_eq, h9, Xv6.UPtAlloc.bltu_neg (sysSbrkArg v0 + V.sz) V.sz (by omega)] next c8 hp8
   iintro Hk Hpc
   -- jal myproc
-  k_step_gen (wp_s_jal c8 _ (KA.«sys_sbrk» + 0x58#64) false 2092710#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c8 _ (KA.«sys_sbrk» + 0x58#64) false 2092718#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [sys_sbrk_br_myproc] next c9 hp9
   iintro Hk Hpc
   ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp9 h).trans ((hp8 h).trans (hp7 h))) $$ HΦ
@@ -846,7 +846,7 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
   k_norm_g at hcs2
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs2
   -- jal myproc ; ld s1,72(a0)
-  k_step_gen (wp_s_jal c9 _ (KA.«sys_sbrk» + 0x1e#64) false 2092768#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c9 _ (KA.«sys_sbrk» + 0x1e#64) false 2092776#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_sbrk_br_myproc] next c10 hp10
   iintro Hk Hpc
   ihave HΦ := wpNext_shift _ _ _ _ _ hp10 $$ HΦ

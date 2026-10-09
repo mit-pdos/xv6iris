@@ -27,11 +27,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-! ## `either_copyin` -/
 
-theorem either_copyin_br_ffffffffffffe9b2 : KA.«either_copyin» + 0xffffffffffffe9b2#64 = KA.«memmove» := by decide
+theorem either_copyin_br_ffffffffffffe9b6 : KA.«either_copyin» + 0xffffffffffffe9b6#64 = KA.«memmove» := by decide
 
-theorem either_copyin_br_fffffffffffff2c2 : KA.«either_copyin» + 0xfffffffffffff2c2#64 = KA.«copyin» := by decide
+theorem either_copyin_br_fffffffffffff2c6 : KA.«either_copyin» + 0xfffffffffffff2c6#64 = KA.«copyin» := by decide
 
-theorem either_copyin_br_fffffffffffff5b6 : KA.«either_copyin» + 0xfffffffffffff5b6#64 = KA.«myproc» := by decide
+theorem either_copyin_br_fffffffffffff5be : KA.«either_copyin» + 0xfffffffffffff5be#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_COPYIN :=
@@ -85,8 +85,8 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
   -- jal myproc
-  k_step_gen (wp_s_jal c12 _ (KA.«either_copyin» + 0x18#64) false 2094494#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [either_copyin_br_fffffffffffff5b6] next c13 hp13
+  k_step_gen (wp_s_jal c12 _ (KA.«either_copyin» + 0x18#64) false 2094502#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [either_copyin_br_fffffffffffff5be] next c13 hp13
   iintro Hk Hpc
   k_norm_g
   -- myproc()
@@ -138,8 +138,8 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hpa, pSz, pPagetable] next c20 hp20
     iintro Hk Hpc Hpg
-    k_step_gen (wp_s_jal c20 _ (KA.«either_copyin» + 0x28#64) false 2093722#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [either_copyin_br_fffffffffffff2c2] next c21 hp21
+    k_step_gen (wp_s_jal c20 _ (KA.«either_copyin» + 0x28#64) false 2093726#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [either_copyin_br_fffffffffffff2c6] next c21 hp21
     iintro Hk Hpc
     k_norm_g
     -- copyin(p->pagetable, p->sz, dst, src, len)
@@ -245,8 +245,8 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     k_step_gen (wp_s_add c17 _ (KA.«either_copyin» + 0x42#64) true 10#5 0#5 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c18 _ (KA.«either_copyin» + 0x44#64) false 2091374#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [either_copyin_br_ffffffffffffe9b2] next c19 hp19
+    k_step_gen (wp_s_jal c18 _ (KA.«either_copyin» + 0x44#64) false 2091378#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [either_copyin_br_ffffffffffffe9b6] next c19 hp19
     iintro Hk Hpc
     k_norm_g
     -- memmove(dst, src, len)

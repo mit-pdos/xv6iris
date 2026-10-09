@@ -82,15 +82,15 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 set_option linter.unusedSimpArgs false
 
-theorem kxcC_br_myproc : KA.«kexec» + 0x1b6#64 + BitVec.signExtend 64 2084324#21 = KA.«myproc» := by
+theorem kxcC_br_myproc : KA.«kexec» + 0x1b6#64 + BitVec.signExtend 64 2084332#21 = KA.«myproc» := by
   decide
 theorem kxcC_ret_1ae : jumpPc (KA.«kexec» + 0x1b6#64 + 4#64) = KA.«kexec» + 0x1b6#64 + 4#64 := by
   decide
-theorem kxcC_br_uvmalloc : KA.«kexec» + 0x1d6#64 + BitVec.signExtend 64 2082678#21 = KA.«uvmalloc» := by
+theorem kxcC_br_uvmalloc : KA.«kexec» + 0x1d6#64 + BitVec.signExtend 64 2082682#21 = KA.«uvmalloc» := by
   decide
 theorem kxcC_ret_1ce : jumpPc (KA.«kexec» + 0x1d6#64 + 4#64) = KA.«kexec» + 0x1d6#64 + 4#64 := by
   decide
-theorem kxcC_br_uvmclear : KA.«kexec» + 0x204#64 + BitVec.signExtend 64 2083098#21 = KA.«uvmclear» := by
+theorem kxcC_br_uvmclear : KA.«kexec» + 0x204#64 + BitVec.signExtend 64 2083102#21 = KA.«uvmclear» := by
   decide
 theorem kxcC_ret_1fc : jumpPc (KA.«kexec» + 0x204#64 + 4#64) = KA.«kexec» + 0x204#64 + 4#64 := by
   decide
@@ -283,7 +283,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22]
   iintro Hk Hpc
   -- +0x1fc  jal uvmclear
-  iapply (kxcC_call_uvmclear UC cpu k spie spp _ (KA.«kexec» + 0x204#64) 2083098#21 kxcC_br_uvmclear
+  iapply (kxcC_call_uvmclear UC cpu k spie spp _ (KA.«kexec» + 0x204#64) 2083102#21 kxcC_br_uvmclear
       kxcC_ret_1fc P' M' _ hK ?cr ?cv ?cm)
     $$ [- $Hk $Hpc $Hte $Hce $Hpt]
   case cr => simp [RegMap.set_apply, hok.1.1]
@@ -458,7 +458,7 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
   have hpg := kxcC_pgru_le_maxsz hwf hcov
   have hszv : szv.toNat ≤ uvmMaxsz := le_trans (UPtAlloc.pgRoundUpN_ge _) hpg
   -- +0x1ae  jal myproc
-  iapply (kxcC_call_myproc MP cpu k spie spp R (KA.«kexec» + 0x1b6#64) 2084324#21 kxcC_br_myproc
+  iapply (kxcC_call_myproc MP cpu k spie spp R (KA.«kexec» + 0x1b6#64) 2084332#21 kxcC_br_myproc
       kxcC_ret_1ae hK hnoff)
     $$ [- $Hk $Hpc $Hte $Hce]
   isplitr
@@ -529,7 +529,7 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
   -- +0x1ce  jal uvmalloc, the block's event counter lent to it (permit
   -- sweep L1a, Rocq `proc_priv_ev_lend`)
   icases procPrivFdRes_evLend 0 A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
-  iapply (kxc_call_uvmalloc UA Γ cpu k A spie1 spp1 _ (KA.«kexec» + 0x1d6#64) 2082678#21
+  iapply (kxc_call_uvmalloc UA Γ cpu k A spie1 spp1 _ (KA.«kexec» + 0x1d6#64) 2082682#21
       kxcC_br_uvmalloc kxcC_ret_1ce P Mi A.V.ev hK hnoff ?ur ?uo ?un ?up ?uf ?uq)
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend]
   case ur => simp [RegMap.set_apply]

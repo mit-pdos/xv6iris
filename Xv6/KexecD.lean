@@ -389,10 +389,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-theorem kxd_br_ss : KA.«kexec» + 0x2e0#64 + BitVec.signExtend 64 2081194#21 = KA.«safestrcpy» := by
+theorem kxd_br_ss : KA.«kexec» + 0x2e0#64 + BitVec.signExtend 64 2081198#21 = KA.«safestrcpy» := by
   decide
 theorem kxd_ret_ss : jumpPc (KA.«kexec» + 0x2e0#64 + 4#64) = KA.«kexec» + 0x2e0#64 + 4#64 := by decide
-theorem kxd_br_pfp : KA.«kexec» + 0x304#64 + BitVec.signExtend 64 2084322#21 =
+theorem kxd_br_pfp : KA.«kexec» + 0x304#64 + BitVec.signExtend 64 2084330#21 =
     KA.«proc_freepagetable» := by decide
 theorem kxd_ret_pfp : jumpPc (KA.«kexec» + 0x304#64 + 4#64) = KA.«kexec» + 0x304#64 + 4#64 := by
   decide
@@ -497,7 +497,7 @@ theorem kxd_commit1 (SS : SAFESTRCPY_SRC) (cpu : CPU) (k : KCtx) (A : KexecArgs)
     rw [List.getElem?_drop, show q + (A.plen - q) = A.plen by omega,
       bview_lookup _ _ _ (by omega), hterm]
   -- +0x2d8  jal safestrcpy
-  iapply (kxd_call_ss SS cpu k spie spp _ (KA.«kexec» + 0x2e0#64) 2081194#21 kxd_br_ss kxd_ret_ss
+  iapply (kxd_call_ss SS cpu k spie spp _ (KA.«kexec» + 0x2e0#64) 2081198#21 kxd_br_ss kxd_ret_ss
       (pName k.proc) (k.regs 10#5 + BitVec.ofNat 64 q) V.name ((bview (A.plen + 1) A.pfun).drop q)
       A.dqpv hK (by simp [RegMap.set_apply, pName]) (by simp [RegMap.set_apply])
       (by simp [RegMap.set_apply]) (by rw [hnl]; rfl) hsrc)
@@ -632,7 +632,7 @@ theorem kxd_commit2 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k 
   icases procPrivFdRes_evLend 0 A.γ k.proc A.pidv
       (kxdV3 V P sz1 ((V.tf.set tfEpcIdx (kxqEntry ef)).set kxcTfSpIdx spv)) Mi $$ Hpriv
     with ⟨Hlend, Hpback⟩
-  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x304#64) 2084322#21 kxd_br_pfp
+  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x304#64) 2084330#21 kxd_br_pfp
       kxd_ret_pfp V.upt A.M (kxdV3 V P sz1 ((V.tf.set tfEpcIdx (kxqEntry ef)).set kxcTfSpIdx spv)).ev
       hK hnoff (by simp [RegMap.set_apply])
       (by simpa [RegMap.set_apply] using Nat.le_trans hszo uQuota_le_uvmMaxsz)

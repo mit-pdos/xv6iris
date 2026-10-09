@@ -36,6 +36,23 @@ User-visible: sbrk past 768 KiB, an exec image ending past 760 KiB and the 51st
 live pipe fail; usertests' big-memory cases would fail (nothing here runs them).
 Every upstream bump rebases the one commit (about 0.05 BE).
 
+**And a second commit, the pid partition (NI M4 pids P-0, 2026-10-09; owner
+ruling P-R1 (a)):** `verified-quota` is now c1fd3cc7 + `975109bc` ("pids:
+partitioned by the parent's slot with a per-slot quota"; 22 C lines in
+`param.h`, `proc.h`, `proc.c`), closing the pid-name channel:
+
+- `proc.h`: `int npid` in the padding hole after `pid` (`+52`; no stride or
+  offset change), the slot's partition counter, under `pid_lock`.
+- `procinit`: `p->npid = (int)(p - proc)`; `nextpid` is deleted.
+- `allocpid` (inlined in `allocproc`): `myproc() == 0` (userinit) gets pid 1;
+  otherwise `pp->npid > PIDMAX - NPROC` refuses (`allocproc` releases
+  `p->lock` and returns 0, the slot still UNUSED), else `pp->npid += NPROC`
+  is the pid.  `param.h`: `PIDMAX 0x7fffffff`.
+
+User-visible: pids are large (`slot + 64·k`) and never reused; a slot that
+created `2^25 − 1` children forks no more (`-1`).  The two commits rebase
+together at every upstream bump (about 0.05 BE more).
+
 ## How to tell a kernel defect from a spec problem
 
 **The tell is scaffolding.**

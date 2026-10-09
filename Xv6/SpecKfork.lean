@@ -167,7 +167,8 @@ def kforkRet {hlc : HasLC} {GF : BundledGFunctors}
 M2-X2): `kforkRet` whose success arm also carries, at the SAME generation
 `γc` (G2 F5), the pid ledger's ALLOCATION RECEIPT of the child's pid
 (`PidLock.pidAllocRcpt`: the `PAlloc` the inlined allocpid appended, at the
-caller's slot `procAddr j`, and the pid `pidPick` of the prefix before it)
+caller's slot `procAddr j`, and (NI M4 pids) the pid `pidPickS (procAddr j)`
+of the prefix before it, the partition's pick)
 and the family ledger's RECEIPT of the parent store (`zombReceipt hz (ZFork
 (procAddr j) i rv γc)`, `ProofKfork.kf_wait_fork`).  Both receipts are
 persistent; `kforkRetLed_ret` drops them.
@@ -176,7 +177,8 @@ persistent; `kforkRetLed_ret` drops them.
 DECISIVE RECEIPT, at the allocator names `γk`: the success arm carries the
 trapframe `kalloc`'s `kAllocRcpt γk (procAddr j)` (read by no NI row since
 NI M3 quotas Q-2), the `-1` arm its reason, the scan's exhaustion (F1's
-`sFullRcpt (procAddr j)`) -- ALONE since NI M3 quotas Q-2: F2's other
+`sFullRcpt (procAddr j)`) or (NI M4 pids) the caller's spent pid share
+(`PidLock.pidCapRcpt (procAddr j)`) -- since NI M3 quotas Q-2 F2's other
 disjunct, the null `kalloc`'s `kNullRcpt γk (procAddr j)` (allocproc's
 trapframe or `proc_pagetable` page, or uvmcopy's page or `walk` node), is
 gone, every such kalloc being paid out of the slot's share or the child
@@ -191,9 +193,9 @@ def kforkRetLed {hlc : HasLC} {GF : BundledGFunctors}
     (rv : BitVec 32) : IProp GF := iprop%
   (∃ k' : Nat, ⌜V.ev ≤ k'⌝ ∗ procPrivFd γ (procAddr j) pid (V.updEv k') M) ∗ fdFrags V.fdg stsP ∗
   ((⌜rv = -1#32⌝ ∗ chFrag V.chg (procAddr j) csP ∗ Rc ∗
-      -- THE REASON (NI joint fork lane F1; NI M3 quotas Q-2): allocproc's
-      -- scan exhaustion
-      sFullRcpt (procAddr j)) ∨
+      -- THE REASONS (NI joint fork lane F1; NI M3 quotas Q-2; NI M4 pids):
+      -- allocproc's scan exhaustion, or the parent's spent pid share
+      (sFullRcpt (procAddr j) ∨ pidCapRcpt (procAddr j))) ∨
    (∃ γc : GName, ⌜1 ≤ rv.toNat ∧ rv.toNat ≤ PIDMAX⌝ ∗ ⌜γc ∉ csP⌝ ∗ childTok γc rv Q ∗
       chFrag V.chg (procAddr j) (csP ∪ {γc}) ∗
       -- THE TWO RECEIPTS (NI M2-G2b)

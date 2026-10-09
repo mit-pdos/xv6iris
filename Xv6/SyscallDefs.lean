@@ -268,11 +268,14 @@ entry's permission view gives (`UsysDet.usysWaitFitsAt` at `permOf V.upt.um
 V.sz`: the reap, the window's prefix with nothing reaped, or `-1` with
 nothing moved); fork's (NI joint fork lane F3) `UsysDet.usysForkAns ι` --
 on success (`forkOk ι`: the cited slot prefix does not end in the actor's
-`SFull`) the pid `pidPick` of `ι`'s pid prefix, `ι`'s family prefix ending
+`SFull`, and -- NI M4 pids -- the actor's own count in `ι`'s pid prefix is
+below the quota `PIDQ`) the pid `pidPickS ι.act` of `ι`'s pid prefix (the
+partition's pick), `ι`'s family prefix ending
 in the round's `ZFork` of that pid at the generation the children column
 gained; on `-1` a POSITIVE reason (ruling JF-R5; NI M3 quotas Q-2: the
 cited slot prefix ends in the actor's `SFull` -- the allocator's `KNull`
-is gone, a credited kalloc is never null) and the column kept; sbrk's (NI
+is gone, a credited kalloc is never null; NI M4 pids: or the actor's own
+count in the cited pid prefix is at the quota) and the column kept; sbrk's (NI
 M2-G3) `UsysDet.usysSbrkFitsAt` at the entry's break, argument words and
 lazy bit -- the answer, the break and the lazy bit after, `-1` only at the
 key's quota overrun (NI M3 quotas Q-2: it reads no ledger; the boot prefix
@@ -299,9 +302,9 @@ def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName c
   (syscNum V = USYS_fork →
     tfW V'.tf (tfArgIdx 0) = usysForkAns ι ∧
     (forkOk ι → (∃ (hz : List Zev) (i : Nat),
-        ι.zev = hz ++ [.ZFork ι.act i (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) (usysForkGen ι)]) ∧
+        ι.zev = hz ++ [.ZFork ι.act i (BitVec.ofNat 32 (pidPickS ι.act ι.pev)) (usysForkGen ι)]) ∧
       cs' = cs ∪ {usysForkGen ι}) ∧
-    (¬ forkOk ι → ι.sFull ∧ cs' = cs)) ∧
+    (¬ forkOk ι → (ι.sFull ∨ ownAllocs ι.act ι.pev = PIDQ) ∧ cs' = cs)) ∧
   (syscNum V = USYS_sbrk →
     usysSbrkFitsAt V.sz.toNat (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) V.pvLazy ι
       (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy) ∧

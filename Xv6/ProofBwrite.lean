@@ -33,7 +33,7 @@ theorem bw_ret_12 : jumpPc (KA.«bwrite» + 0x12#64) = (KA.«bwrite» + 0x12#64)
 theorem bw_ret_1c : jumpPc (KA.«bwrite» + 0x1c#64) = (KA.«bwrite» + 0x1c#64) := by decide
 
 theorem bw_br_hold : KA.«bwrite» + 0x1434#64 = KA.«holdingsleep» := by decide
-theorem bw_br_vdr : KA.«bwrite» + 0x2dca#64 = KA.«virtio_disk_rw» := by decide
+theorem bw_br_vdr : KA.«bwrite» + 0x2dce#64 = KA.«virtio_disk_rw» := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -185,7 +185,7 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   k_step_e (wp_s_add cpu _ (KA.«bwrite» + 0x16#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«bwrite» + 0x18#64) false 11698#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«bwrite» + 0x18#64) false 11702#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bw_br_vdr]
   iintro Hk Hpc
   iapply (bw_vdr VR Γ cpu _ V γdl pd pav pu j kk bno bs bsd Q k.sie k.proc (by k_norm_g)

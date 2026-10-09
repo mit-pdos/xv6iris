@@ -53,23 +53,23 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 /-! ## The constants the code computes -/
 
 /-- `auipc a5,0x1f ; lw a5,-2024(a5)` at `+0x00`. -/
-theorem it_a_lhN : KA.«install_trans» + 0x1ec1e#64 = lhNAddr := by decide
+theorem it_a_lhN : KA.«install_trans» + 0x1ec22#64 = lhNAddr := by decide
 /-- `auipc s5,0x1e ; addi s5,s5,2038` at `+0x26`. -/
-theorem it_a_lhb0 : KA.«install_trans» + 0x1ec22#64 = lhBlock 0 := by decide
+theorem it_a_lhb0 : KA.«install_trans» + 0x1ec26#64 = lhBlock 0 := by decide
 /-- `auipc s8,0x4 ; addi s8,s8,-1860` at `+0x30`. -/
 theorem it_a_fmt :
-    KA.«install_trans» + 0x3822#64 = KStr.«recovering tail %d dst %d\n» := by decide
+    KA.«install_trans» + 0x3826#64 = KStr.«recovering tail %d dst %d\n» := by decide
 /-- `auipc s4,0x1e ; addi s4,s4,1972` at `+0x38`. -/
-theorem it_a_log : KA.«install_trans» + 0x1ebf2#64 = logAddr := by decide
+theorem it_a_log : KA.«install_trans» + 0x1ebf6#64 = logAddr := by decide
 
 theorem it_br_printk :
-    KA.«install_trans» + 0xffffffffffffc848#64 = KA.«printk» := by decide
+    KA.«install_trans» + 0xffffffffffffc84c#64 = KA.«printk» := by decide
 theorem it_br_brelse :
     KA.«install_trans» + 0xfffffffffffff0f4#64 = KA.«brelse» := by decide
 theorem it_br_bread :
     KA.«install_trans» + 0xffffffffffffefec#64 = KA.«bread» := by decide
 theorem it_br_memmove :
-    KA.«install_trans» + 0xffffffffffffd09a#64 = KA.«memmove» := by decide
+    KA.«install_trans» + 0xffffffffffffd09e#64 = KA.«memmove» := by decide
 theorem it_br_bunpin :
     KA.«install_trans» + 0xfffffffffffff1ac#64 = KA.«bunpin» := by decide
 theorem it_br_bwrite :
@@ -951,7 +951,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   k_step_e (wp_s_add cpu _ (KA.«install_trans» + 0x4c#64) true 10#5 0#5 24#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g24]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«install_trans» + 0x4e#64) false 2082810#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«install_trans» + 0x4e#64) false 2082814#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_br_printk]
   iintro Hk Hpc
   ihave Hfmt := it_cstr_fmt $$ HS HD
@@ -1162,7 +1162,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x98#64) false 88#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hcs2b, Xv6.vdrw3_bufData]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«install_trans» + 0x9c#64) false 2084862#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«install_trans» + 0x9c#64) false 2084866#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_br_memmove]
   iintro Hk Hpc
   iapply (it_memmove MM cpu _ (Lw t) bsD BSIZE (DFrac.own 1) (aBufData (bnode kkL))
@@ -1634,7 +1634,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x98#64) false 88#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hcs2b, Xv6.vdrw3_bufData]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«install_trans» + 0x9c#64) false 2084862#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«install_trans» + 0x9c#64) false 2084866#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_br_memmove]
   iintro Hk Hpc
   iapply (it_memmove MM cpu _ (Lw t) (Lw t) BSIZE (DFrac.own 1) (aBufData (bnode kkL))
@@ -2024,7 +2024,7 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
   k_step_e (wp_s_auipc c0 _ KA.«install_trans» false 0x1f#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq_withRegs]
   iintro Hk Hpc
-  k_step_e (wp_s_lw cpu _ (KA.«install_trans» + 0x4#64) false 3102#12 15#5 15#5 (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«install_trans» + 0x4#64) false 3106#12 15#5 15#5 (by decide)
       (by decide) (DFrac.own 1) (BitVec.ofNat 32 n))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.setReg_eq_withRegs, it_a_lhN]
@@ -2108,7 +2108,7 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
     k_step_e (wp_s_auipc cpu _ (KA.«install_trans» + 0x26#64) false 0x1f#20 21#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x2a#64) false 3068#12 21#5 21#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x2a#64) false 3072#12 21#5 21#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_a_lhb0]
     iintro Hk Hpc
     k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x2e#64) true 0#12 19#5 0#5 (by decide))
@@ -2117,13 +2117,13 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
     k_step_e (wp_s_auipc cpu _ (KA.«install_trans» + 0x30#64) false 0x3#20 24#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x34#64) false 2034#12 24#5 24#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x34#64) false 2038#12 24#5 24#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_a_fmt]
     iintro Hk Hpc
     k_step_e (wp_s_auipc cpu _ (KA.«install_trans» + 0x38#64) false 0x1f#20 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x3c#64) false 3002#12 20#5 20#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x3c#64) false 3006#12 20#5 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_a_log]
     iintro Hk Hpc
     k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x40#64) false 1024#12 23#5 0#5 (by decide))

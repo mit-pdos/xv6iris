@@ -297,15 +297,15 @@ end
 
 /-! ## §4 ONE ITERATION (Rocq `kxc_argv_step`) -/
 
-theorem kxcC_br_strlen1 : KA.«kexec» + 0x220#64 + BitVec.signExtend 64 2081440#21 = KA.«strlen» := by
+theorem kxcC_br_strlen1 : KA.«kexec» + 0x220#64 + BitVec.signExtend 64 2081444#21 = KA.«strlen» := by
   decide
 theorem kxcC_ret_218 : jumpPc (KA.«kexec» + 0x220#64 + 4#64) = KA.«kexec» + 0x220#64 + 4#64 := by
   decide
-theorem kxcC_br_strlen2 : KA.«kexec» + 0x23e#64 + BitVec.signExtend 64 2081410#21 = KA.«strlen» := by
+theorem kxcC_br_strlen2 : KA.«kexec» + 0x23e#64 + BitVec.signExtend 64 2081414#21 = KA.«strlen» := by
   decide
 theorem kxcC_ret_236 : jumpPc (KA.«kexec» + 0x23e#64 + 4#64) = KA.«kexec» + 0x23e#64 + 4#64 := by
   decide
-theorem kxcC_br_copyout1 : KA.«kexec» + 0x24e#64 + BitVec.signExtend 64 2083218#21 = KA.«copyout» := by
+theorem kxcC_br_copyout1 : KA.«kexec» + 0x24e#64 + BitVec.signExtend 64 2083222#21 = KA.«copyout» := by
   decide
 theorem kxcC_ret_246 : jumpPc (KA.«kexec» + 0x24e#64 + 4#64) = KA.«kexec» + 0x24e#64 + 4#64 := by
   decide
@@ -551,7 +551,7 @@ theorem kxc_argv_step (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
     ⟨Hs, Hsrest⟩
   ihave Hs := (kxcC_cstr_of (A.avf ci) A.dqas (A.alen ci) (A.afun ci) hnul hnz).1 $$ Hs
   -- +0x218  jal strlen
-  iapply (kxcC_call_strlen SL cpu k spie spp R (KA.«kexec» + 0x220#64) 2081440#21 kxcC_br_strlen1
+  iapply (kxcC_call_strlen SL cpu k spie spp R (KA.«kexec» + 0x220#64) 2081444#21 kxcC_br_strlen1
       kxcC_ret_218 (bview (A.alen ci) (A.afun ci)) A.dqas (A.avf ci) hK
       (by rw [bview_length]; omega) h10)
     $$ [- $Hk $Hpc $Hte $Hce $Hs]
@@ -642,7 +642,7 @@ theorem kxc_argv_step (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
   k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x23c#64) true 10#5 0#5 25#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  iapply (kxcC_call_strlen SL cpu k spie spp _ (KA.«kexec» + 0x23e#64) 2081410#21 kxcC_br_strlen2
+  iapply (kxcC_call_strlen SL cpu k spie spp _ (KA.«kexec» + 0x23e#64) 2081414#21 kxcC_br_strlen2
       kxcC_ret_236 (bview (A.alen ci) (A.afun ci)) A.dqas (A.avf ci) hK
       (by rw [bview_length]; omega) (by simp [RegMap.set_apply]))
     $$ [- $Hk $Hpc $Hte $Hce $Hs]
@@ -675,7 +675,7 @@ theorem kxc_argv_step (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
   -- the block's event counter, lent to copyout (permit sweep L1b)
   icases Hpriv with ⟨%V1, %hV1, Hpriv⟩
   icases procPrivFdRes_evLend 0 A.γ k.proc A.pidv V1 A.M $$ Hpriv with ⟨Hlend, Hpback⟩
-  iapply (kxcC_call_copyout Γ CO cpu k A spie spp _ (KA.«kexec» + 0x24e#64) 2083218#21 kxcC_br_copyout1
+  iapply (kxcC_call_copyout Γ CO cpu k A spie spp _ (KA.«kexec» + 0x24e#64) 2083222#21 kxcC_br_copyout1
       kxcC_ret_246 P Mi A.dqas (bview (A.alen ci + 1) (A.afun ci)) (A.avf ci) V1.ev hK hnoff
       (by simp [RegMap.set_apply]) (by simp [RegMap.set_apply]) (by simp [RegMap.set_apply]; omega)
       (by simp [RegMap.set_apply, bview_length, BitVec.ofNat_add]) (by rw [bview_length]; omega))

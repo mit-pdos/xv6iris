@@ -22,9 +22,9 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## `killed` -/
 
-theorem killed_br_ffffffffffffea9a : KA.«killed» + 0xffffffffffffea9a#64 = KA.«release» := by decide
+theorem killed_br_ffffffffffffea9e : KA.«killed» + 0xffffffffffffea9e#64 = KA.«release» := by decide
 
-theorem killed_br_ffffffffffffea12 : KA.«killed» + 0xffffffffffffea12#64 = KA.«acquire» := by decide
+theorem killed_br_ffffffffffffea16 : KA.«killed» + 0xffffffffffffea16#64 = KA.«acquire» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`killed` meets its specification.** -/
@@ -55,8 +55,8 @@ theorem killed_proof (AC : ACQUIRE) (RE : RELEASE) : KILLED :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   -- jal ra, acquire
-  k_step_gen (wp_s_jal c2 _ (KA.«killed» + 0xe#64) false 2091524#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [killed_br_ffffffffffffea12] next c3 hp3
+  k_step_gen (wp_s_jal c2 _ (KA.«killed» + 0xe#64) false 2091528#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [killed_br_ffffffffffffea16] next c3 hp3
   iintro Hk Hpc
   iapply (kl_acquire AC c3 _ (Γ.lock j) (procLockPay Γ j) ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -95,8 +95,8 @@ theorem killed_proof (AC : ACQUIRE) (RE : RELEASE) : KILLED :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9]
   iintro Hk Hpc
   -- jal ra, release
-  k_step (wp_s_jal c _ (KA.«killed» + 0x18#64) false 2091650#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [killed_br_ffffffffffffea9a]
+  k_step (wp_s_jal c _ (KA.«killed» + 0x18#64) false 2091654#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [killed_br_ffffffffffffea9e]
   iintro Hk Hpc
   ihave Hrest := kl_rest_intro ξ0 (procAddr j) kl xs pid $$ [Hkilled Hxs Hpid Hkp]
   case' _ => simp only [pKilled, pXstate, pPid]; iframe

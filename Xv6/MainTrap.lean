@@ -37,9 +37,9 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-theorem mn_br_7e : KA.«main» + 5714#64 = KA.«trapinit» := by decide
+theorem mn_br_7e : KA.«main» + 5710#64 = KA.«trapinit» := by decide
 theorem mn_ret_82 : jumpPc (KA.«main» + 130#64) = KA.«main» + 130#64 := by decide
-theorem mn_br_82 : KA.«main» + 5750#64 = KA.«trapinithart» := by decide
+theorem mn_br_82 : KA.«main» + 5746#64 = KA.«trapinithart» := by decide
 theorem mn_ret_86 : jumpPc (KA.«main» + 134#64) = KA.«main» + 134#64 := by decide
 theorem mn_br_86 : KA.«main» + 18880#64 = KA.«plicinit» := by decide
 theorem mn_ret_8a : jumpPc (KA.«main» + 138#64) = KA.«main» + 138#64 := by decide
@@ -64,7 +64,7 @@ theorem mn_trapinit [WchG GF] (TI : TRAPINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #H0, #H16, Hw, Hn, Hc, Hlf, Hres, Htk, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step (wp_s_jal cpu _ (KA.«main» + 126#64) false 5588#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 126#64) false 5584#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_7e]
   iintro Hk Hpc
   have hti := TI.wp_trapinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 130#64)))
@@ -98,7 +98,7 @@ theorem mn_trapinithart (TIH : TRAPINITHART) [CurCtx] (cpu : CPU) (k : KCtx) (R0
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, ⟨%tv0, Hstv⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step (wp_s_jal cpu _ (KA.«main» + 130#64) false 5620#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 130#64) false 5616#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_82]
   iintro Hk Hpc
   have htih := TIH.wp_trapinithart (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 134#64)))

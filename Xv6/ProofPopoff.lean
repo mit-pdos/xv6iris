@@ -83,7 +83,7 @@ theorem withCpu_popOff2_one (k : KCtx) (R : RegMap) (h : k.noff = 1) (hi : k.int
     ((k.pushed 2).withRegs R).withCpu R 0 false = (k.popOff.pushed 2).withRegs R := by
   rw [← hi, ← withCpu_popOff2, h]
 
-theorem pop_off_br_cc4 : KA.«pop_off» + 0xcc4#64 = KA.«mycpu» := by decide
+theorem pop_off_br_cc8 : KA.«pop_off» + 0xcc8#64 = KA.«mycpu» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hnoff hK hlks reen hreen hon => by
@@ -102,7 +102,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
   inext
   iintro Hk Hpc Hframe
   -- jal mycpu
-  k_step (wp_s_jal cpu _ (KA.«pop_off» + 0x8#64) false 3260#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pop_off_br_cc4]
+  k_step (wp_s_jal cpu _ (KA.«pop_off» + 0x8#64) false 3264#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pop_off_br_cc8]
   iintro Hk Hpc
   have hm := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu ((k.pushed 2).withRegs
       (((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)).set 8#5 (k.regs 2#5)).set 1#5 (KA.«pop_off» + 0xc#64)))

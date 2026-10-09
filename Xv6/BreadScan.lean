@@ -675,10 +675,10 @@ theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
   k_step (wp_s_auipc c _ (KA.«bread» + 0x4e#64) false 0x16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«bread» + 0x52#64) false 2608#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«bread» + 0x52#64) false 2612#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«bread» + 0x56#64) false 2088896#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«bread» + 0x56#64) false 2088900#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_rel]
   iintro Hk Hpc
   -- the release takes back the arm the entry acquire paid out; the complement stays
@@ -998,10 +998,10 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
   k_step (wp_s_auipc c _ (KA.«bread» + 0xa0#64) false 0x16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«bread» + 0xa4#64) false 2526#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«bread» + 0xa4#64) false 2530#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«bread» + 0xa8#64) false 2088814#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«bread» + 0xa8#64) false 2088818#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_rel]
   iintro Hk Hpc
   -- the release takes back the arm the entry acquire paid out; the complement stays

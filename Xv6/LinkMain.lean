@@ -32,6 +32,7 @@ import Xv6.LinkVirtioDiskInit
 import Xv6.LinkUserinit
 import Xv6.LinkForkretParkPaid
 import Xv6.LinkScheduler
+import Xv6.LinkMyproc
 
 namespace Xv6
 
@@ -50,7 +51,7 @@ theorem Main : MAIN :=
   let UM := Uvmunmap WalkNoalloc KF
   let UF := Uvmfree (UvmunmapBare WalkNoalloc KF) (Freewalk KF)
   let FP := Freeproc KF (ProcFreepagetable UM UF) AC RE
-  let AL := Allocproc AC RE KAL MS (ProcPagetable (Uvmcreate KAL MS) (MappagesAny W) UM UF) FP
+  let AL := Allocproc Myproc AC RE KAL MS (ProcPagetable (Uvmcreate KAL MS) (MappagesAny W) UM UF) FP
   main_proof Cpuid Consoleinit (Printkinit IL) Printk (Kinit IL (Freerange KF))
     (Kvminit (Kvmmake KAL MS KM (ProcMapstacks KAL KM))) Kvminithart (Procinit IL) (Trapinit IL)
     Trapinithart Plicinit Plicinithart (Binit IL (Initsleeplock IL)) (Iinit IL (Initsleeplock IL))

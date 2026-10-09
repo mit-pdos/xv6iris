@@ -218,7 +218,7 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
-/-- From `0x80004d84` (the descriptor found, `*pfd` already handled):
+/-- From `0x80004d80` (the descriptor found, `*pfd` already handled):
 `li a0,0 ; if (pf) *pf = f ; epilogue`. -/
 theorem af_pf_tail (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (v : BitVec 64) (oldfd : BitVec 32) (oldf : BitVec 64)
@@ -270,7 +270,7 @@ theorem af_pf_tail (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa :
 
 end
 
-theorem argfd_br_ffffffffffffcc38 : KA.«argfd» + 0xffffffffffffcc38#64 = KA.«myproc» := by decide
+theorem argfd_br_ffffffffffffcc40 : KA.«argfd» + 0xffffffffffffcc40#64 = KA.«myproc» := by decide
 
 theorem argfd_br_ffffffffffffdbf2 : KA.«argfd» + 0xffffffffffffdbf2#64 = KA.«argint» := by decide
 
@@ -383,8 +383,8 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
     k_step_gen (wp_s_branch c8 _ (KA.«argfd» + 0x1e#64) false 52#13 15#5 14#5 (by decide) bop.BLTU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [af_li15, af_bltu_in _ hr.1 hr.2] next c9 hp9
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c9 _ (KA.«argfd» + 0x22#64) false 2083862#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [argfd_br_ffffffffffffcc38] next c10 hp10
+    k_step_gen (wp_s_jal c9 _ (KA.«argfd» + 0x22#64) false 2083870#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [argfd_br_ffffffffffffcc40] next c10 hp10
     iintro Hk Hpc
     iapply (af_myproc MP c10 _ ?hnm ?hKm) $$ [- $Hk $Hpc]
     rotate_right 1

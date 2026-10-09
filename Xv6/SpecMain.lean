@@ -28,7 +28,8 @@ spelling).  The boot hart is handed:
   raw per-hart cells (`mainHartRaw`, shared with the secondary arm);
 * the raw static globals the init sequence writes (`mainLocksBare` /
   `mainLocksRaw`, `mainGlobalsBare` / `mainGlobalsRaw`, `mainSbRaw`,
-  `mainLogRaw`), `first = 1`, `nextpid = 1`;
+  `mainLogRaw`), `first = 1` (NI M4 pids: `nextpid` is gone; the pid
+  partition counters are procinit's, in the proc table);
 * the boot-hart TOKENS over the device fabric (both UARTs' transmitter,
   receipt, receive token and high-water halves, the unfrozen DLAB half,
   the disk's configuration half and protocol ghosts), which exists from
@@ -332,7 +333,6 @@ def wp_main_boot_body [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG G
   mainLocksRaw (Y := X.toKpt) ∗ mainGlobalsRaw (Y := X.toKpt) cn ∗
   mainSbRaw (Y := X.toKpt) ∗ mainLogRaw (Y := X.toKpt) ∗
   @wordPointsTo hlc GF _ X.toKpt firstAddr 4 (DFrac.own 1) 1#32 ∗
-  @wordPointsTo hlc GF _ X.toKpt nextpidAddr 4 (DFrac.own 1) 1#32 ∗
   -- the proc table's boot ghosts
   ([∗list] i ∈ List.range NPROC, hartFull Γ i startedPrimary) ∗
   ([∗list] i ∈ List.range NPROC, pstateFull Γ i UNUSED) ∗

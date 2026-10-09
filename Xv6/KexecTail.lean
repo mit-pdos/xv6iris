@@ -990,7 +990,7 @@ theorem kxc_call_pfp (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k
   ipureintro
   simpa using hcs
 
-theorem kxc_br_pfp_1da : KA.«kexec» + 0x1e2#64 + BitVec.signExtend 64 2084612#21 =
+theorem kxc_br_pfp_1da : KA.«kexec» + 0x1e2#64 + BitVec.signExtend 64 2084620#21 =
     KA.«proc_freepagetable» := by decide
 theorem kxc_ret_1da : jumpPc (KA.«kexec» + 0x1e2#64 + 4#64) = KA.«kexec» + 0x1e2#64 + 4#64 := by
   decide
@@ -1037,7 +1037,7 @@ theorem kxc_bad_1d6 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   -- +0x1da  jal proc_freepagetable, the block's event counter lent to the
   -- frees (permit sweep L1a, Rocq `proc_priv_ev_lend`)
   icases procPrivFdRes_evLend 0 A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
-  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x1e2#64) 2084612#21 kxc_br_pfp_1da
+  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x1e2#64) 2084620#21 kxc_br_pfp_1da
       kxc_ret_1da P Mi A.V.ev hK hnoff (by simp [RegMap.set_apply, h22]) (by simpa [RegMap.set_apply, h24] using hsz)
       (by simpa [RegMap.set_apply, h24] using hbelow))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend]

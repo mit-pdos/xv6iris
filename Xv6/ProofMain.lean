@@ -299,7 +299,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [WchG GF] [Appcfg GF] [FileG GF]
 
 /-- **The kernel-tier rows phase B spends** (procinit's, the proc table's
-public cells, the `nextpid` / `wait_lock` / `tickslock` payloads, the
+public cells, the `pid_lock` / `wait_lock` / `tickslock` payloads, the
 console ring). -/
 def mnKptB [Y : CurCtx] (cn : ConsNames) : IProp GF := iprop%
   mainLkRaw pidLockAddr ∗ mainLkRaw waitLockAddr ∗
@@ -315,8 +315,7 @@ def mnKptB [Y : CurCtx] (cn : ConsNames) : IProp GF := iprop%
   parentsResAt curCtx ∗
   fdSlots (NPROC * (NOFILE + FDSPARE)) ∗ irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗ bslots (NPROC * 3) ∗
   pageCredit (NPROC * slotShare) ∗
-  ticksResAt curCtx ∗ consResAt cn curCtx ∗ consCleanTok cn ∗
-  wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32
+  ticksResAt curCtx ∗ consResAt cn curCtx ∗ consCleanTok cn
 
 /-- The proc table's boot ghosts. -/
 def mnProcBoot (Γ : SchedNames) : IProp GF := iprop%
@@ -382,7 +381,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
     Hgh, Hcells, Hpav, Hipt, Hbundle, Hrdr, Hco, Hinv, Hprim, Hrec, Hbare, Hcsrs, Hfree⟩
   unfold mnKptB
   icases HB with ⟨Hpl, Hwl, #Ht0, #Ht16, ⟨%tvl, %tvn, %tvc, Htw, Htn, Htc⟩, Hraw, Hpub, Hpq, Hpar, Hfd, Hir,
-    Hbs, Hcr, Htres, Hcres, Hclean, Hnp⟩
+    Hbs, Hcr, Htres, Hcres, Hclean⟩
   unfold mnProcBoot
   icases Hpb with ⟨Hhart, Hps, Hsf, Hlk, Hrows⟩
   unfold childrenBootRows
@@ -395,15 +394,15 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   -- +0x7a  procinit
   iapply (mn_procinit PR startedPrimary k R0 hsie hsl.1)
   iframe Hk Hpc Hpl Hwl Hraw Hfd Hir Hbs Hcr
-  iintro %R1 Hk Hpc Hpli Hwli Hready
-  -- the proc table's invariant, the nextpid and wait locks
+  iintro %R1 Hk Hpc Hpli Hwli Hready Hnpid
+  -- the proc table's invariant, the pid and wait locks
   iapply wpLoop_fupd
   -- the slot-occupancy ledger's invariant, and each slot's element (NI joint fork lane F1)
   imod slotLed_alloc (hlc := hlc) ⊤ $$ [$Hsla $Hsoa] with #Hsli
   ihave Hsoe := soElem_boot (List.range NPROC) $$ [$Hsli $Hsoe]
   ihave Hins := mn_slots_zip Γ pas $$ [$Hready $Hpub $Hhart $Hps $Hsf $Hlk $Hstk $Hslots $Hsoe]
   imod mn_procsInv hct startedPrimary (k.withRegs R1) Γ t pas hok $$ [$Hk $Hsmap $Hins] with ⟨Hk, #Hpinv⟩
-  imod mn_pidWait_born startedPrimary (k.withRegs R1) $$ [$Hk $Hpli $Hwli $Hnp $Hpq $Hpra $Hpled $Hpar $Hchb $Horph $Hzled $Hzsa]
+  imod mn_pidWait_born startedPrimary (k.withRegs R1) $$ [$Hk $Hpli $Hwli $Hnpid $Hpq $Hpra $Hpled $Hpar $Hchb $Horph $Hzled $Hzsa]
     with ⟨Hk, ⟨%γp, #Hpidl⟩, ⟨%γw, #Hwaitl⟩⟩
   -- the cons lock and the console bundles
   imod mn_consLock startedPrimary (k.withRegs R1) γc γl0 γ0 cn hcn hcne hcons
@@ -444,13 +443,13 @@ set_option maxHeartbeats 4000000 in
 /-- SpecMain's kernel-tier rows, cut into the phases' groups. -/
 theorem mn_splitKpt [Y : CurCtx] (cn : ConsNames) :
     mainLocksRaw ∗ mainGlobalsRaw cn ∗ mainSbRaw ∗ mainLogRaw ∗
-    wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗ wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32
+    wordPointsTo firstAddr 4 (DFrac.own 1) 1#32
     ⊢ mnKptB (GF := GF) cn ∗ mnKptFs ∗ consReader cn 0 := by
   unfold mainLocksRaw mainGlobalsRaw mnKptB mnKptFs
   iintro ⟨⟨Hpl, Hwl, #Ht0, #Ht16, Ht, Hbl, Hil, Hfl, Hnpr⟩,
     ⟨Hraw, Hpub, Hpq, Hpar, Hfd, Hir, Hfent, Hirf, Hbs, Hcr, Hinit, Htres, Hhead, Hbin, Hbss, Hsin, Hient,
-      Hcres, Hrdr, Hcl⟩, Hsb, Hlog, Hfw, Hnp⟩
-  iframe Hpl Hwl Ht0 Ht16 Ht Hraw Hpub Hpq Hpar Hfd Hir Hbs Hcr Htres Hcres Hcl Hnp
+      Hcres, Hrdr, Hcl⟩, Hsb, Hlog, Hfw⟩
+  iframe Hpl Hwl Ht0 Ht16 Ht Hraw Hpub Hpq Hpar Hfd Hir Hbs Hcr Htres Hcres Hcl
   iframe Hbl Hhead Hbin Hbss Hil Hsin Hient Hfl Hfent Hirf Hnpr Hinit Hsb Hlog Hfw Hrdr
 
 theorem mn_mainSlots_ge : 114 ≤ mainSlots := by
@@ -477,7 +476,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   unfold wp_main_boot_body mainHartRaw mainLocksBare mainGlobalsBare mainAddr
   iintro ⟨Hk, Hpc, Hfree, ⟨Htlb, Hcsrs⟩, #Hinv, Hprim, #Hrec, #Hecho,
     ⟨#Hc0, #Hc16, ⟨%vcl, %vcn, %vcc, Hcw, Hcn, Hcc⟩, Hpr, #Hkm0, #Hkm16, ⟨%vkl, %vkn, %vkc, Hkw, Hkn, Hkc⟩⟩,
-    ⟨⟨%dr, %dw, Hdr, Hdw⟩, Hdrest, Hfl, ⟨%kpt0, Hkpt0⟩⟩, HLraw, HGraw, Hsb, Hlog, Hfw, Hnp,
+    ⟨⟨%dr, %dw, Hdr, Hdw⟩, Hdrest, Hfl, ⟨%kpt0, Hkpt0⟩⟩, HLraw, HGraw, Hsb, Hlog, Hfw,
     Hhart, Hps, Hpav, Hsf, Hchb, Hγc, Hγl0, Hγl1, Hγt, Hlks, Hsup, Hmir, Hirb, Hira, Hbs, #Hcert, #Hseam, #Hcinv,
     Hbundle, Hco, #Hu0, #Hu1, #Hplic, #Hdinv, #Hcrash, #Hwire, #Hanc, Hur0, Hur1, Hcfg, Hgh, Hcells, Hroot, Hauth,
     Hpages⟩
@@ -598,7 +597,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
     from .rfl) $$ Hsmap
   -- the kernel-tier rows, grouped
   icases mn_splitKpt (GF := GF) (Y := ⟨ξ, KTier.kpt⟩) fscCons
-    $$ [$HLraw $HGraw $Hsb $Hlog $Hfw $Hnp] with ⟨HB, HFs, Hrdr⟩
+    $$ [$HLraw $HGraw $Hsb $Hlog $Hfw] with ⟨HB, HFs, Hrdr⟩
   icases childrenBoot_split $$ Hchb with ⟨Hipt, Hrows⟩
   -- Phase B, at the kernel tier
   iapply (mn_phaseB PR TI TIH PLI PLIH BI II FI VD UI SCH KVE ξ (Y := ⟨ξ, KTier.kpt⟩) rfl Γ γ0 γ1 γc γl0 γl1

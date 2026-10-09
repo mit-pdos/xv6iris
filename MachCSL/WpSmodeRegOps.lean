@@ -164,6 +164,19 @@ theorem wp_s_mul [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
   wpLoop_k_setReg cpu k pc _ is_rvc _ rd hrd _
     (fun cpu' c _ _ _ => execSpecF_mul cpu' (DFrac.own 1) c pc _ rd rs1 rs2 hrd.1 (tpPin cpu' k.regs))
 
+/-- `mulw rd, rs1, rs2` (NI M4 pids: procinit's loop body). -/
+theorem wp_s_mulw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
+    (pc : BitVec 64) (is_rvc : Bool) (rd rs1 rs2 : BitVec 5) (hrd : rdOk rd) :
+    instr (GF := GF) pc is_rvc (instruction.MULW (regidx.Regidx rs2, regidx.Regidx rs1, regidx.Regidx rd)) ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctxL lent cpu' (k.setReg rd (BitVec.signExtend 64
+          (BitVec.extractLsb' 0 32 (k.rget cpu' rs1) * BitVec.extractLsb' 0 32 (k.rget cpu' rs2)))) -∗
+        pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu :=
+  wpLoop_k_setReg cpu k pc _ is_rvc _ rd hrd _
+    (fun cpu' c _ _ _ => execSpecF_mulw cpu' (DFrac.own 1) c pc _ rd rs1 rs2 hrd.1 (tpPin cpu' k.regs))
+
 /-- `lui rd, imm` (also `c.lui`). -/
 theorem wp_s_lui [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 20) (rd : BitVec 5) (hrd : rdOk rd) :

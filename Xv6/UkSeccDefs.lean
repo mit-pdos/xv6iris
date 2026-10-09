@@ -163,7 +163,7 @@ theorem secc_pid_sext (pidv : BitVec 32) (h : 1 ≤ pidv.toNat ∧ pidv.toNat �
 theorem secc_pid_blt (pidv : BitVec 32) (h : 1 ≤ pidv.toNat ∧ pidv.toNat ≤ PIDMAX) :
     ukBtaken .BLT (BitVec.signExtend 64 pidv) 0#64 = false := by
   rw [secc_pid_sext pidv h]
-  have hlt : pidv.toNat ≤ 1000 := h.2
+  have hlt : pidv.toNat ≤ 2 ^ 31 - 1 := h.2
   simp only [ukBtaken, zopz0zI_s]
   have : (BitVec.ofNat 64 pidv.toNat).toInt = pidv.toNat := by
     rw [BitVec.toInt_eq_toNat_of_lt] <;> simp <;> omega
@@ -173,7 +173,7 @@ theorem secc_pid_blt (pidv : BitVec 32) (h : 1 ≤ pidv.toNat ∧ pidv.toNat ≤
 theorem secc_pid_ne0 (pidv : BitVec 32) (h : 1 ≤ pidv.toNat ∧ pidv.toNat ≤ PIDMAX) :
     ukBtaken .BNE (BitVec.signExtend 64 pidv) 0#64 = true := by
   rw [secc_pid_sext pidv h]
-  have hlt : pidv.toNat ≤ 1000 := h.2
+  have hlt : pidv.toNat ≤ 2 ^ 31 - 1 := h.2
   simp only [ukBtaken, bne_iff_ne, ne_eq]
   intro he
   have := congrArg BitVec.toNat he

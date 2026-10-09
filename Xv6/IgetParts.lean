@@ -175,17 +175,17 @@ open LeanRV64D
 /-! ## Constants the code computes -/
 
 /-- `&itable.lock`, from all three `auipc a0,0x1e ; addi a0,a0,_` pairs. -/
-theorem ig_lock : KA.«iget» + 122468#64 = itableLock := by unfold itableLock; decide
+theorem ig_lock : KA.«iget» + 122472#64 = itableLock := by unfold itableLock; decide
 /-- `&itable.inode[0]`, the cursor's start. -/
-theorem ig_s1_0 : KA.«iget» + 122492#64 = ientry 0 := by decide
+theorem ig_s1_0 : KA.«iget» + 122496#64 = ientry 0 := by decide
 /-- `&itable.inode[NINODE]`, which IS the next symbol `log` (`ientry_sentinel`). -/
-theorem ig_a3_log : KA.«iget» + 129292#64 = KA.«log» := by decide
+theorem ig_a3_log : KA.«iget» + 129296#64 = KA.«log» := by decide
 /-- The `"iget: no inodes"` literal. -/
-theorem ig_msg : KA.«iget» + 0x443c#64 = KStr.«iget: no inodes» := by decide
+theorem ig_msg : KA.«iget» + 0x4440#64 = KStr.«iget: no inodes» := by decide
 
-theorem ig_br_acq : KA.«iget» + 0xffffffffffffdc94#64 = KA.«acquire» := by decide
-theorem ig_br_rel : KA.«iget» + 0xffffffffffffdd1c#64 = KA.«release» := by decide
-theorem ig_br_panic : KA.«iget» + 0xffffffffffffd874#64 = KA.«panic» := by decide
+theorem ig_br_acq : KA.«iget» + 0xffffffffffffdc98#64 = KA.«acquire» := by decide
+theorem ig_br_rel : KA.«iget» + 0xffffffffffffdd20#64 = KA.«release» := by decide
+theorem ig_br_panic : KA.«iget» + 0xffffffffffffd878#64 = KA.«panic» := by decide
 
 theorem ig_ret_20 : jumpPc (KA.«iget» + 0x20#64) = (KA.«iget» + 0x20#64) := by decide
 theorem ig_ret_66 : jumpPc (KA.«iget» + 0x66#64) = (KA.«iget» + 0x66#64) := by decide

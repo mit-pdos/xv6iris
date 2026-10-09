@@ -51,7 +51,7 @@ set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
-theorem sys_chroot_br_myproc : KA.«sys_chroot» + 0xffffffffffffc3be#64 = KA.«myproc» := by decide
+theorem sys_chroot_br_myproc : KA.«sys_chroot» + 0xffffffffffffc3c6#64 = KA.«myproc» := by decide
 theorem sys_chroot_br_begin_op : KA.«sys_chroot» + 0xffffffffffffe86e#64 = KA.«begin_op» := by decide
 theorem sys_chroot_br_argstr : KA.«sys_chroot» + 0xffffffffffffd3b0#64 = KA.«argstr» := by decide
 theorem sys_chroot_br_namei : KA.«sys_chroot» + 0xffffffffffffe678#64 = KA.«namei» := by decide

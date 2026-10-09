@@ -38,7 +38,7 @@ open LeanRV64D
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-- The call `jal cpuid` at `+0x08`. -/
-theorem ph_cpuid_br : KA.«plicinithart» + 0xffffffffffffc09e#64 = KA.«cpuid» := by decide
+theorem ph_cpuid_br : KA.«plicinithart» + 0xffffffffffffc0a2#64 = KA.«cpuid» := by decide
 
 /-- The return address of that call. -/
 theorem ph_jump_0c : jumpPc (KA.«plicinithart» + 0xc#64) = KA.«plicinithart» + 0xc#64 := by decide
@@ -79,7 +79,7 @@ theorem plicinithart_proof (CI : CPUID) : PLICINITHART :=
   inext
   iintro Hk Hpc Hframe
   -- +0x08  jal cpuid
-  k_step (wp_s_jal cpu _ (KA.«plicinithart» + 0x8#64) false 2080918#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«plicinithart» + 0x8#64) false 2080922#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ph_cpuid_br]
   iintro Hk Hpc
   iapply (ph_call_cpuid CI cpu _ ?hs2 ?hK2) $$ [- $Hk $Hpc]

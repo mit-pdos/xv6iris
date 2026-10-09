@@ -198,13 +198,13 @@ immediate exactly as `wp_s_branch`/`wp_s_j` take it (`BitVec 13` / `BitVec
 21`), and the auipc/addi lemmas the `auipc` `imm20 ++ 0#12` shift plus the
 `addi` sign-extended 12-bit immediate. -/
 
-/-- `beq a0,zero,0x80001e2c` at `0x80001d2c` (allocproc failed). -/
+/-- `beq a0,zero,0x80001e28` at `0x80001d28` (allocproc failed). -/
 theorem kf_br_allocfail : (KA.«kfork» + 0x16#64) + BitVec.signExtend 64 (264#13) = (KA.«kfork» + 0x11e#64) := by decide
 
-/-- `c.j 0x80001dac` at `0x80001d90` (into the ofile loop). -/
+/-- `c.j 0x80001da8` at `0x80001d8c` (into the ofile loop). -/
 theorem kf_j_intoof : (KA.«kfork» + 0x7a#64) + BitVec.signExtend 64 (28#21) = (KA.«kfork» + 0x96#64) := by decide
 
-/-- `c.j 0x80001e1e` at `0x80001e2e` (allocproc-fail tail to the epilogue). -/
+/-- `c.j 0x80001e1a` at `0x80001e2a` (allocproc-fail tail to the epilogue). -/
 theorem kf_j_allocfail : (KA.«kfork» + 0x120#64) + BitVec.signExtend 64 (-16#21) = (KA.«kfork» + 0x110#64) := by decide
 
 /-! ## Trapframe-copy arithmetic (the 9-chunk word loop)
@@ -410,7 +410,7 @@ theorem kfTfPres_trans [CurCtx] (cpu : CPU) (k1 k2 k3 : KCtx)
     a7.trans b7, a8.trans b8, a9.trans b9, a10.trans b10, a11.trans b11, a12.trans b12, a13.trans b13,
     fun r hr => (a14 r hr).trans (b14 r hr)⟩
 
-/-- One chunk (four words) of the trapframe copy loop, `0x80001d60`..`0x80001d78`. -/
+/-- One chunk (four words) of the trapframe copy loop, `0x80001d5c`..`0x80001d74`. -/
 theorem kf_tf_chunk [CurCtx] (cpu : CPU) (bo bn : BitVec 44) (Ptf C0 : List (BitVec 64))
     (hPlen : Ptf.length = 36) (hClen : C0.length = 36) (i : Nat) (hi : i < 9)
     (kc : KCtx) (hsie : kc.sie = false)
@@ -654,7 +654,7 @@ theorem kf_step_bne [CurCtx] (cpu : CPU) (k' : KCtx) (hsie : k'.sie = false)
   · rw [← hpe]; iexact Hpc
   iapply HΦ $$ Hk Hpc
 
-/-- The whole trapframe copy loop, `0x80001d60`..`0x80001d78` iterated 9
+/-- The whole trapframe copy loop, `0x80001d5c`..`0x80001d74` iterated 9
 times, exiting at `(KernelSyms.«kfork» + 0x66)` with the child page holding the parent's
 36 words. -/
 theorem kf_tf_loop [CurCtx] (cpu : CPU) (bo bn : BitVec 44) (Ptf C0 : List (BitVec 64))
@@ -711,7 +711,7 @@ theorem kf_tf_loop [CurCtx] (cpu : CPU) (bo bn : BitVec 44) (Ptf C0 : List (BitV
     iframe Hk Hpc Hpar Hchild
     iintro %kf %hsf %h15 %h14 %h13 %hpres Hk Hpc Hpar Hchild
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-    -- bne a5,a3 : taken back to 0x80001d60 (a5 ≠ a3)
+    -- bne a5,a3 : taken back to 0x80001d5c (a5 ≠ a3)
     have hane : kf.rget cpu 15#5 ≠ kf.rget cpu 13#5 := by
       rw [h15, h13, ha3]; exact kf_tf_cursor_ne (pageAddr bo) i hi
     have htrue : bcond bop.BNE (kf.rget cpu 15#5) (kf.rget cpu 13#5) = true := Xv6.ci_bne_ne _ _ hane
@@ -1690,7 +1690,7 @@ theorem kf_imm_m64 : BitVec.signExtend 64 (4032#12) = -(8#64 * BitVec.ofNat 64 8
 theorem kf_imm_p64 : BitVec.signExtend 64 (64#12) = 8#64 * BitVec.ofNat 64 8 := by decide
 
 set_option maxHeartbeats 8000000 in
-/-- **kfork's custom 8-slot epilogue** from `0x80001e1e`, at either entry
+/-- **kfork's custom 8-slot epilogue** from `0x80001e1a`, at either entry
 `SIE`: `k` is the entry context, `a`/`b` the `SPIE`/`SPP` the frame now
 carries. -/
 theorem kf_epilogue [CurCtx] (j : Nat) (B : BitVec 32 → IProp GF)
@@ -1998,17 +1998,17 @@ theorem kf_acq_g [CurCtx] (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : GName) (lk 
   exact h
 
 set_option maxHeartbeats 8000000 in
-/-- **kfork's publish** from `0x80001dba`: `np->cwd = idup(p->cwd)`,
+/-- **kfork's publish** from `0x80001db6`: `np->cwd = idup(p->cwd)`,
 `safestrcpy(np->name,p->name,16)`, `pid = np->pid`, then the three lock
 windows that install the child RUNNABLE, then the epilogue returning `pid`.
 The parent block is returned unchanged. -/
-theorem kfork_br_ffffffffffffef42 : KA.«kfork» + 0xffffffffffffef42#64 = KA.«acquire» := by decide
+theorem kfork_br_ffffffffffffef46 : KA.«kfork» + 0xffffffffffffef46#64 = KA.«acquire» := by decide
 
-theorem kfork_br_10802 : KA.«kfork» + 0x10802#64 = KA.«wait_lock» := by decide
+theorem kfork_br_10806 : KA.«kfork» + 0x10806#64 = KA.«wait_lock» := by decide
 
-theorem kfork_br_ffffffffffffefca : KA.«kfork» + 0xffffffffffffefca#64 = KA.«release» := by decide
+theorem kfork_br_ffffffffffffefce : KA.«kfork» + 0xffffffffffffefce#64 = KA.«release» := by decide
 
-theorem kfork_br_fffffffffffff156 : KA.«kfork» + 0xfffffffffffff156#64 = KA.«safestrcpy» := by decide
+theorem kfork_br_fffffffffffff15a : KA.«kfork» + 0xfffffffffffff15a#64 = KA.«safestrcpy» := by decide
 
 theorem kfork_br_1616 : KA.«kfork» + 0x1616#64 = KA.«idup» := by decide
 
@@ -2147,7 +2147,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
   k_step (wp_s_ld cpu k' (KA.«kfork» + 0xa4#64) false 336#12 10#5 21#5 (by decide) (by decide) (DFrac.own 1) V.cwd)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, h21', hsie', hp']
   iintro Hk Hpc Hcwd_p
-  -- jal idup (0x80001dbe -> 0x8000332c), ra := 0x80001dc2
+  -- jal idup (0x80001dba -> 0x80003328), ra := 0x80001dbe
   k_step (wp_s_jal cpu _ (KA.«kfork» + 0xa8#64) false 5486#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kfork_br_1616, KCtx.setReg_sie, KCtx.setReg_proc, hsie', hp']
   iintro Hk Hpc
@@ -2202,7 +2202,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_withRegs', KCtx.withRegs_sie, KCtx.setReg_sie, hsie', KCtx.withRegs_proc, KCtx.setReg_proc, hp', hRid21]
   iintro Hk Hpc Hrt_p
-  -- jal idup (0x80001dca -> 0x8000332c), ra := 0x80001dce
+  -- jal idup (0x80001dc6 -> 0x80003328), ra := 0x80001dca
   k_step (wp_s_jal cpu _ (KA.«kfork» + 0xb4#64) false 5474#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [kfork_br_1616, KCtx.setReg_sie, KCtx.withRegs_sie, KCtx.setReg_proc, KCtx.withRegs_proc, hsie', hp']
@@ -2294,10 +2294,10 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
     iapply wpNext_off_intro
     iintro %R' Hk Hpc Hd Hs %hpost
     iapply Hcont $$ %R' Hk Hpc Hd Hs %hpost
-  -- jal safestrcpy (0x80001ddc -> 0x80000e6c), ra := 0x80001de0
-  k_step (wp_s_jal cpu _ (KA.«kfork» + 0xc6#64) false 2093200#21 1#5 (by decide))
+  -- jal safestrcpy (0x80001dd8 -> 0x80000e6c), ra := 0x80001ddc
+  k_step (wp_s_jal cpu _ (KA.«kfork» + 0xc6#64) false 2093204#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [kfork_br_fffffffffffff156, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', KCtx.withRegs_proc, KCtx.setReg_proc, hp']
+    with [kfork_br_fffffffffffff15a, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', KCtx.withRegs_proc, KCtx.setReg_proc, hp']
   iintro Hk Hpc
   iapply (hss _ ?hsk ?hK2 ?hn16 ?ha0 ?ha1 (KA.«kfork» + 0xca#64) ?hret V_c.name V.name hwfc.1 hwfp.1) $$ [- $Hk $Hpc $HbufC $HbufP]
   rotate_right 1
@@ -2473,10 +2473,10 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
     iframe HstateW Hpl Hchan Hslots Hrest
   ihave Hlockres := (show procLockResAt Γ curCtx (procAddr i) ⊢ procLockPay Γ i curCtx
     from by unfold procLockPay; iintro H; iexact H) $$ Hlockres
-  -- jal release (0x80001de6 -> 0x80000ce0), ra := 0x80001dea
-  k_step (wp_s_jal cpu _ (KA.«kfork» + 0xd8#64) false 2092786#21 1#5 (by decide))
+  -- jal release (0x80001de2 -> 0x80000ce0), ra := 0x80001de6
+  k_step (wp_s_jal cpu _ (KA.«kfork» + 0xd8#64) false 2092790#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [kfork_br_ffffffffffffefca, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', KCtx.withRegs_proc, KCtx.setReg_proc, hp']
+    with [kfork_br_ffffffffffffefce, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', KCtx.withRegs_proc, KCtx.setReg_proc, hp']
   iintro Hk Hpc
   ihave #HlkI := procsInv_lookup Γ i hi $$ Hpinv
   -- release(&np->lock) at USED, re-enabling interrupts when the entry had
@@ -2518,14 +2518,14 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
       $$ [- $Hk $Hpc]
       with [KCtx.withLocks_sie, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', Bool.or_false, KCtx.withLocks_proc, KCtx.withRegs_proc, KCtx.setReg_proc, hp']
     iintro Hk Hpc
-    kf_gstep cpu (wp_s_addi cpu _ (KA.«kfork» + 0xe0#64) false 1830#12 10#5 10#5 (by decide))
+    kf_gstep cpu (wp_s_addi cpu _ (KA.«kfork» + 0xe0#64) false 1834#12 10#5 10#5 (by decide))
       $$ [- $Hk $Hpc]
-      with [kfork_br_10802, KCtx.rget_withRegs', KCtx.withLocks_sie, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', Bool.or_false, KCtx.withLocks_proc, KCtx.withRegs_proc, KCtx.setReg_proc, hp']
+      with [kfork_br_10806, KCtx.rget_withRegs', KCtx.withLocks_sie, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', Bool.or_false, KCtx.withLocks_proc, KCtx.withRegs_proc, KCtx.setReg_proc, hp']
     iintro Hk Hpc
-    -- jal acquire (0x80001df2 -> 0x80000c58), ra := 0x80001df6
-    kf_gstep cpu (wp_s_jal cpu _ (KA.«kfork» + 0xe4#64) false 2092638#21 1#5 (by decide))
+    -- jal acquire (0x80001dee -> 0x80000c58), ra := 0x80001df2
+    kf_gstep cpu (wp_s_jal cpu _ (KA.«kfork» + 0xe4#64) false 2092642#21 1#5 (by decide))
       $$ [- $Hk $Hpc]
-      with [kfork_br_ffffffffffffef42, KCtx.withLocks_sie, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', Bool.or_false, KCtx.withLocks_proc, KCtx.withRegs_proc, KCtx.setReg_proc, hp']
+      with [kfork_br_ffffffffffffef46, KCtx.withLocks_sie, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', Bool.or_false, KCtx.withLocks_proc, KCtx.withRegs_proc, KCtx.setReg_proc, hp']
     iintro Hk Hpc
     iapply (kf_acq_g AC cpu _ γw waitLockAddr ?hWaddr "wait_lock" waitLockPay
       ?hWnoff ?hWK ?hWs) $$ [- $Hk $Hpc $Hwl]
@@ -2609,13 +2609,13 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [KCtx.withLocks_sie, KCtx.pushOffAt_sie, KCtx.withLocks_proc, KCtx.pushOffAt_proc, hp']
     iintro Hk Hpc
-    k_step (wp_s_addi cpu _ (KA.«kfork» + 0xf0#64) false 1814#12 10#5 10#5 (by decide))
+    k_step (wp_s_addi cpu _ (KA.«kfork» + 0xf0#64) false 1818#12 10#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [kfork_br_10802, KCtx.rget_withRegs', KCtx.withLocks_sie, KCtx.pushOffAt_sie, KCtx.withLocks_proc, KCtx.pushOffAt_proc, hp']
+      with [kfork_br_10806, KCtx.rget_withRegs', KCtx.withLocks_sie, KCtx.pushOffAt_sie, KCtx.withLocks_proc, KCtx.pushOffAt_proc, hp']
     iintro Hk Hpc
-    k_step (wp_s_jal cpu _ (KA.«kfork» + 0xf4#64) false 2092758#21 1#5 (by decide))
+    k_step (wp_s_jal cpu _ (KA.«kfork» + 0xf4#64) false 2092762#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [kfork_br_ffffffffffffefca, KCtx.withLocks_sie, KCtx.pushOffAt_sie, KCtx.withLocks_proc, KCtx.pushOffAt_proc, hp']
+      with [kfork_br_ffffffffffffefce, KCtx.withLocks_sie, KCtx.pushOffAt_sie, KCtx.withLocks_proc, KCtx.pushOffAt_proc, hp']
     iintro Hk Hpc
     iapply (kf_rel_at RE cpu _ γw waitLockAddr ?hW2addr "wait_lock" waitLockPay
       ?hW2sie ?hW2noff ?hW2K k.sie ?hW2reen ?hW2on) $$ [- $Hk $Hpc $Hwl $Hlocked $Hwaitpay]
@@ -2652,9 +2652,9 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
         $$ [- $Hk $Hpc]
         with [KCtx.rget_withRegs', KCtx.rget_zero, KCtx.withLocks_sie, KCtx.pushOffAt_sie, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', Bool.or_false, KCtx.withLocks_proc, KCtx.pushOffAt_proc, KCtx.withRegs_proc, KCtx.setReg_proc, hp', hR7_19]
       iintro Hk Hpc
-      kf_gstep cpu (wp_s_jal cpu _ (KA.«kfork» + 0xfa#64) false 2092616#21 1#5 (by decide))
+      kf_gstep cpu (wp_s_jal cpu _ (KA.«kfork» + 0xfa#64) false 2092620#21 1#5 (by decide))
         $$ [- $Hk $Hpc]
-        with [kfork_br_ffffffffffffef42, KCtx.withLocks_sie, KCtx.pushOffAt_sie, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', Bool.or_false, KCtx.withLocks_proc, KCtx.pushOffAt_proc, KCtx.withRegs_proc, KCtx.setReg_proc, hp']
+        with [kfork_br_ffffffffffffef46, KCtx.withLocks_sie, KCtx.pushOffAt_sie, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', Bool.or_false, KCtx.withLocks_proc, KCtx.pushOffAt_proc, KCtx.withRegs_proc, KCtx.setReg_proc, hp']
       iintro Hk Hpc
       iapply (kf_acq_g AC cpu _ (Γ.lock i) (procAddr i) ?hA2addr "proc" (procLockPay Γ i)
         ?hA2noff ?hA2K ?hA2s) $$ [- $Hk $Hpc $HlkI]
@@ -2740,9 +2740,9 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [KCtx.rget_withRegs', KCtx.rget_zero, KCtx.withLocks_sie, KCtx.withRegs_sie, KCtx.pushOffAt_sie, KCtx.withLocks_proc, KCtx.withRegs_proc, KCtx.pushOffAt_proc, hp', hR8_19]
       iintro Hk Hpc
-      k_step (wp_s_jal cpu _ (KA.«kfork» + 0x106#64) false 2092740#21 1#5 (by decide))
+      k_step (wp_s_jal cpu _ (KA.«kfork» + 0x106#64) false 2092744#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [kfork_br_ffffffffffffefca, KCtx.withLocks_sie, KCtx.withRegs_sie, KCtx.pushOffAt_sie, KCtx.withLocks_proc, KCtx.withRegs_proc, KCtx.pushOffAt_proc, hp']
+        with [kfork_br_ffffffffffffefce, KCtx.withLocks_sie, KCtx.withRegs_sie, KCtx.pushOffAt_sie, KCtx.withLocks_proc, KCtx.withRegs_proc, KCtx.pushOffAt_proc, hp']
       iintro Hk Hpc
       iapply (kf_rel_at RE cpu _ (Γ.lock i) (procAddr i) ?hA3addr "proc" (procLockPay Γ i)
         ?hA3sie ?hA3noff ?hA3K k.sie ?hA3reen ?hA3on) $$ [- $Hk $Hpc $HlkI $Hlocked2 $HlockresR]
@@ -2926,18 +2926,18 @@ theorem kf_postLed_reason {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (c : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
     (tk : Bool) (Q : Int → IProp GF) (a : BitVec 64) (r : BitVec 64) (hr : r = 0#64) :
-    allocprocPostLed (GF := GF) Γ γ c γk on pav tk Q a r ⊢ sFullRcpt a := by
+    allocprocPostLed (GF := GF) Γ γ c γk on pav tk Q a r ⊢ sFullRcpt a ∨ pidCapRcpt a := by
   unfold allocprocPostLed
   iintro (⟨-, -, H, -⟩ | ⟨%j, %ch, %pid, %V, %M, %g, -, -, %hp, -⟩)
   · iexact H
   · exfalso
     exact procAddr_nonzero hp.2.1 (hp.1.symm.trans hr)
 
-theorem kfork_br_fffffffffffff750 : KA.«kfork» + 0xfffffffffffff750#64 = KA.«uvmcopy» := by decide
+theorem kfork_br_fffffffffffff754 : KA.«kfork» + 0xfffffffffffff754#64 = KA.«uvmcopy» := by decide
 
-theorem kfork_br_fffffffffffffe5c : KA.«kfork» + 0xfffffffffffffe5c#64 = KA.«allocproc» := by decide
+theorem kfork_br_fffffffffffffe64 : KA.«kfork» + 0xfffffffffffffe64#64 = KA.«allocproc» := by decide
 
-theorem kfork_br_fffffffffffffc66 : KA.«kfork» + 0xfffffffffffffc66#64 = KA.«myproc» := by decide
+theorem kfork_br_fffffffffffffc6e : KA.«kfork» + 0xfffffffffffffc6e#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 8000000 in
 /-- **THE LED `kfork`** (NI M2-G2b): the proof, on allocproc's led twin, with
@@ -2945,7 +2945,7 @@ the pid receipt and `kf_wait_fork`'s family receipt kept to the success
 epilogue (`kforkRetLed`).  (NI joint fork lane F2) allocproc's trapframe
 `kAllocRcpt` rides beside the pid receipt (`kfOfileΨ`); the `-1` tail keeps
 allocproc's reason (`kf_postLed_reason`: the scan's `SFull`, NI M3 quotas
-Q-2) -- persistent past `release`.  (Q-2) uvmcopy's `-1` tail is gone: the
+Q-2, or the pid cap's receipt, NI M4 pids) -- persistent past `release`.  (Q-2) uvmcopy's `-1` tail is gone: the
 copy is paid out of the child table's credits and never fails. -/
 theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
     (UV : UVMCOPY) (FP : FREEPROC) (FD : FILEDUP) (ID : IDUP) (SS : SAFESTRCPY)
@@ -3001,9 +3001,9 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
     kf_gstep cpu (wp_s_addi cpu _ (KA.«kfork» + 0xa#64) true 64#12 8#5 2#5 (by decide))
       $$ [- $Hk $Hpc] with []
     iintro Hk Hpc
-    -- jal myproc (0x80001d22 -> 0x8000197c)
-    kf_gstep cpu (wp_s_jal cpu _ (KA.«kfork» + 0xc#64) false 2096218#21 1#5 (by decide))
-      $$ [- $Hk $Hpc] with [kfork_br_fffffffffffffc66]
+    -- jal myproc (0x80001d1e -> 0x80001980)
+    kf_gstep cpu (wp_s_jal cpu _ (KA.«kfork» + 0xc#64) false 2096226#21 1#5 (by decide))
+      $$ [- $Hk $Hpc] with [kfork_br_fffffffffffffc6e]
     iintro Hk Hpc
     have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)
     unfold wp_myproc_body at hmp
@@ -3025,9 +3025,9 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
     kf_gstep cpu (wp_s_add cpu _ (KA.«kfork» + 0x10#64) true 21#5 0#5 10#5 (by decide))
       $$ [- $Hk $Hpc] with [KCtx.rget_eq, h10, KCtx.rget_zero]
     iintro Hk Hpc
-    -- jal allocproc (0x80001d28 -> 0x80001b72), ra := 0x80001d2c
-    kf_gstep cpu (wp_s_jal cpu _ (KA.«kfork» + 0x12#64) false 2096714#21 1#5 (by decide))
-      $$ [- $Hk $Hpc] with [kfork_br_fffffffffffffe5c]
+    -- jal allocproc (0x80001d24 -> 0x80001b76), ra := 0x80001d28
+    kf_gstep cpu (wp_s_jal cpu _ (KA.«kfork» + 0x12#64) false 2096722#21 1#5 (by decide))
+      $$ [- $Hk $Hpc] with [kfork_br_fffffffffffffe64]
     iintro Hk Hpc
     -- (NI M2-G2b) THE LED allocproc: its found arm's pid receipt rides to the
     -- led answer
@@ -3038,7 +3038,8 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
     -- forking process is the actor of the child's pid allocation
     icases procPrivNoctxAt_evAcc (GF := GF) curCtx (procAddr j) pid V M $$ Hpriv with ⟨Hcnt, Hpback⟩
     -- the steady regime (`procsAvailAt Γ none false`), at the caller's payload `Q`
-    iapply (hal Γ γ cpu _ γl γp γk none none false Q V.ev ?hnA ?hKA ?hlkA ?hlpA ?hlqA ?htA (fun _ h => nomatch h))
+    iapply (hal Γ γ cpu _ γl γp γk none none false Q V.ev ?hnA ?hKA ?hlkA ?hlpA ?hlqA ?htA (fun _ h => nomatch h)
+        ?hactA)
       $$ [- $Hk $Hpc $Hpinv $Hkm $Hpl $Hkav $Hpav $Hkw]
     rotate_right 1
     case hnA => k_norm_g [KCtx.setReg_noff]; omega
@@ -3047,6 +3048,11 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
     case hlpA => k_norm_g [KCtx.setReg_locks, hlocks]; exact List.not_mem_nil
     case hlqA => k_norm_g [KCtx.setReg_locks, hlocks]; exact List.not_mem_nil
     case htA => k_norm_g [KCtx.setReg_tier, htier]
+    -- THE BOOT DISCRIMINATOR (NI M4 pids F13): the sealed regime, the parent's slot
+    case hactA =>
+      refine ⟨fun h => absurd h (by decide), fun _ => ⟨rfl, j, hj, ?_⟩⟩
+      k_norm_g [KCtx.setReg_proc]
+      exact hproc
     isplitl [Hcnt]
     · iapply (kf_lend_out (GF := GF) _ (procAddr j) V.ev (by k_norm_g [KCtx.setReg_proc]; exact hproc))
       iexact Hcnt
@@ -3056,7 +3062,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
       (by k_norm_g [KCtx.setReg_proc]; exact hproc) $$ Hl1
     ihave Hpriv := Hpback $$ %k1 Hcnt
     icases Hdisj with (⟨%hr0, Hk⟩ | ⟨%hrne, Hk, Harm0⟩)
-    · -- allocproc failed (r = 0): beq taken to 0x80001e2c, return -1
+    · -- allocproc failed (r = 0): beq taken to 0x80001e28, return -1
       -- its reason (NI joint fork lane F2), on to the led answer
       ihave Hpost := kf_postLed_act Γ γ cpu γk none none false Q _ (procAddr j) (R2 10#5)
         (by k_norm_g [KCtx.setReg_proc]; exact hproc) $$ Hpost
@@ -3067,7 +3073,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
       unfold calleeSaved at hcs2
       k_norm_g [KCtx.setReg_regs, RegMap.set_apply, KCtx.withRegs_regs] at hcs2
       obtain ⟨b2_2, b2_8, b2_9, b2_18, b2_19, b2_20, b2_21, b2_22, b2_23, b2_24, b2_25, b2_26, b2_27⟩ := hcs2
-      -- beq a0,zero,0x80001e2c (taken, a0 = 0)
+      -- beq a0,zero,0x80001e28 (taken, a0 = 0)
       kf_gstep cpu (wp_s_branch cpu _ (KA.«kfork» + 0x16#64) false 264#13 10#5 0#5 (by decide) bop.BEQ)
         $$ [- $Hk $Hpc]
         with [Xv6.co_ite_beq, KCtx.rget_eq, KCtx.rget_zero, hr0, kf_br_allocfail]
@@ -3076,7 +3082,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
       kf_gstep cpu (wp_s_addi cpu _ (KA.«kfork» + 0x11e#64) true 4095#12 9#5 0#5 (by decide))
         $$ [- $Hk $Hpc] with [KCtx.rget_zero]
       iintro Hk Hpc
-      -- c.j 0x80001e1e
+      -- c.j 0x80001e1a
       kf_gstep cpu (wp_s_j cpu _ (KA.«kfork» + 0x120#64) true 2097136#21)
         $$ [- $Hk $Hpc] with [kf_j_allocfail]
       iintro Hk Hpc
@@ -3142,7 +3148,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
           (⌜R2 10#5 = 0#64 ∧ (((none : Option Nat) = none ∨ (none : Option Nat) = some 0) ∨
               ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub none g))⌝ ∗
             (procsAvailAt Γ none false ∨ pavSpent Γ none) ∗
-            sFullRcpt (procAddr j) ∗
+            (sFullRcpt (procAddr j) ∨ pidCapRcpt (procAddr j)) ∗
             ∃ on' : Option Nat, ⌜on' = none ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
           (∃ (i : Nat) (ch : BitVec 64) (pid_c : BitVec 32) (V_c : ProcPriv) (M_c : Nat → List (BitVec 8))
               (gc : Nat),
@@ -3253,9 +3259,9 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
       k_step (wp_s_ld cpu _ (KA.«kfork» + 0x24#64) false 80#12 10#5 21#5 (by decide) (by decide) (DFrac.own 1) V.pagetable)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, b2_21]
       iintro Hk Hpc Hpg_p
-      -- jal uvmcopy (0x80001d3e -> 0x80001466), ra := 0x80001d42
-      k_step (wp_s_jal cpu _ (KA.«kfork» + 0x28#64) false 2094888#21 1#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kfork_br_fffffffffffff750]
+      -- jal uvmcopy (0x80001d3a -> 0x80001466), ra := 0x80001d3e
+      k_step (wp_s_jal cpu _ (KA.«kfork» + 0x28#64) false 2094892#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kfork_br_fffffffffffff754]
       iintro Hk Hpc
       have huv : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31)
           (hK' : 42 ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
@@ -3325,7 +3331,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
         obtain ⟨c3_2, c3_8, c3_9, c3_18, c3_19, c3_20, c3_21, c3_22, c3_23, c3_24, c3_25, c3_26, c3_27⟩ := hcs3
         have hsp3 : R3 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 := c3_2.trans hR2sp
         have h21 : R3 21#5 = procAddr j := c3_21.trans b2_21
-        -- blt a0,zero (NOT taken: a0 = R3 10 = 0), fall to 0x80001d46
+        -- blt a0,zero (NOT taken: a0 = R3 10 = 0), fall to 0x80001d42
         k_step (wp_s_branch cpu _ (KA.«kfork» + 0x2c#64) false 80#13 10#5 0#5 (by decide) bop.BLT)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [h0uv, kf_blt_zero]
@@ -3417,7 +3423,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
           k_step (wp_s_addi cpu _ (KA.«kfork» + 0x76#64) false 336#12 20#5 21#5 (by decide))
             from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_sie, hsf]
           iintro Hk Hpc
-          -- c.j 0x80001dac (into the ofile loop)
+          -- c.j 0x80001da8 (into the ofile loop)
           k_step (wp_s_j cpu _ (KA.«kfork» + 0x7a#64) true 28#21)
             from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kf_j_intoof, KCtx.setReg_sie, hsf]
           iintro Hk Hpc

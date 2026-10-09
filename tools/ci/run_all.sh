@@ -197,9 +197,10 @@ step_tcb() { tools/ci/tcb.sh; }
 step_reports() {
   # Source-file attribution for the coverage report: best effort, never
   # built, and the numbers do not depend on it (tools/ci/reports.sh).  The
-  # images are pinned at `verified-quota` (b72cbac1 + the NI M3 quota commit,
-  # the dump headers); until that branch is published, fall back to its
-  # parent `verified` (the same files, 34 lines apart).
+  # images are pinned at `verified-quota` 975109bc (b72cbac1 + the NI M3 quota
+  # commit c1fd3cc7 + the NI M4 pid commit, the dump headers); until that
+  # branch is published, fall back to its parent `verified` (the same files,
+  # 56 lines apart).
   if [ ! -d xv6-riscv ]; then
     timeout 60 git clone -q --depth 1 --branch verified-quota https://github.com/mit-pdos/xv6-riscv xv6-riscv \
       || timeout 60 git clone -q --depth 1 --branch verified https://github.com/mit-pdos/xv6-riscv xv6-riscv \

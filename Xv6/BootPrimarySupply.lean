@@ -31,7 +31,6 @@ def bootPrimarySupply [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG G
   mainLocksRaw (Y := X.toKpt) ∗ mainGlobalsRaw (Y := X.toKpt) cn ∗
   mainSbRaw (Y := X.toKpt) ∗ mainLogRaw (Y := X.toKpt) ∗
   @wordPointsTo hlc GF _ X.toKpt firstAddr 4 (DFrac.own 1) 1#32 ∗
-  @wordPointsTo hlc GF _ X.toKpt nextpidAddr 4 (DFrac.own 1) 1#32 ∗
   ([∗list] i ∈ List.range NPROC, hartFull Γ i startedPrimary) ∗
   ([∗list] i ∈ List.range NPROC, pstateFull Γ i UNUSED) ∗
   procsAvailAt Γ (some NPROC) true ∗

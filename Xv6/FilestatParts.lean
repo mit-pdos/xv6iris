@@ -47,11 +47,11 @@ open LeanRV64D
 
 /-! ## Call targets, return addresses -/
 
-theorem filestat_br_myproc : KA.«filestat» + 0xffffffffffffd5d4#64 = KA.«myproc» := by decide
+theorem filestat_br_myproc : KA.«filestat» + 0xffffffffffffd5dc#64 = KA.«myproc» := by decide
 theorem filestat_br_ilock : KA.«filestat» + 0xffffffffffffefba#64 = KA.«ilock» := by decide
 theorem filestat_br_stati : KA.«filestat» + 0xfffffffffffff366#64 = KA.«stati» := by decide
 theorem filestat_br_iunlock : KA.«filestat» + 0xfffffffffffff068#64 = KA.«iunlock» := by decide
-theorem filestat_br_copyout : KA.«filestat» + 0xffffffffffffd21a#64 = KA.«copyout» := by decide
+theorem filestat_br_copyout : KA.«filestat» + 0xffffffffffffd21e#64 = KA.«copyout» := by decide
 
 theorem filestat_ret_14 : jumpPc (KA.«filestat» + 0x14#64) = KA.«filestat» + 0x14#64 := by decide
 theorem filestat_ret_2a : jumpPc (KA.«filestat» + 0x2a#64) = KA.«filestat» + 0x2a#64 := by decide

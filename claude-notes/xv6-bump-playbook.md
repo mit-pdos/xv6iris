@@ -289,6 +289,32 @@ from `pipewrite`, `+122` from `argfd`; `kernelvec`'s alignment absorbed 10 bytes
   byte-identical.
 - **Recheck every jal whose return address is an insertion point** (§3's rule): Q-0's
   `pipeclose` `kfree` return `+0x5c` was mapped to `+0x82`.
+- **(NI M4 pids P-0) A qemu run WRITES the disk image** (the log, usertests' files):
+  compare images rebuilt fresh after the change, never the image a run used.
+- **A BRANCH TARGET on an interval boundary is mapped by the new interval, which is
+  wrong when the new code starts BEFORE the old first instruction there**: P-0's
+  `allocproc` scan branched to `+0x38` (old allocpid entry); the interval
+  `+0x38:+0x6` (the `pid_lock` acquire moved behind the new `jal myproc`) mapped the
+  target to `+0x3e`, while the new code is entered at `+0x38`.  Fix the target by
+  hand (`ap_scan_acq`'s found pc).
+- **The dry run's "instruction stream changed" can be an objdump artefact**: P-0's
+  `balloc` gained a `# 1058 <_entry-...>` comment on an unchanged `lbu`, and
+  `sys_pipe`, now 4 bytes shorter at the end of its alignment slot, showed the
+  padding `unimp` -- offsets identical.  An identity interval (`f:+0x0:+0x0`)
+  routes them silently.
+- **The design's shift map is a hypothesis, the disassembly is the map**: the M4
+  design read `allocproc`'s tail as `-0x8`; the aligned streams gave `-0x22` (the
+  rewritten section is 0x22 bytes shorter) with `-0x8` only for the two `freeproc`
+  arms behind the new cap and init arms.
+- **A register re-allocation that merges two values is not a rename**: `procinit`'s
+  `mul a5` became `mulw a5` so that one value (`p - proc`) serves both the
+  `KSTACK` arithmetic (now in `a4`/`a3`) and the new `sw a5,52(s1)`; it needed a
+  NEW machine rule (`MachCSL.wp_s_mulw`, from `execute_MULW`).
+- **Deleting a `.data` symbol cuts its carve window out of every boot statement**:
+  `nextpid`'s word rode `bcpDataWindows` → `bootShared_image` → `bsKptWin` →
+  `bootShared_kptRows` → `bootSupplyCore`/`bootPrimarySupply` → `SpecMain` →
+  `ProofMain` → `MainKvm`, and every positional destructuring of those bundles
+  (`H1 … H39`, `W1 … W17`, including `SystemBootEra.xv6Era_coreTies`) renumbers.
 
 ## 3. The relayout (the cheap 90%)
 

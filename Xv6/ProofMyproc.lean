@@ -25,19 +25,19 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 hart's `128 * id`, plus the load's `48`. -/
 theorem myproc_cpu_addr (cpu : CPU) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (hartId cpu)) <<< 7 +
-      (KA.«myproc» + 0x10bb4#64) = aCpuProc cpu := by
+      (KA.«myproc» + 0x10bb0#64) = aCpuProc cpu := by
   rw [MachCSL.hart_shift]
-  have hcp : KA.«myproc» + 0x10bb4#64 = KA.«cpus» := by decide
+  have hcp : KA.«myproc» + 0x10bb0#64 = KA.«cpus» := by decide
   rw [hcp]
   unfold aCpuProc cpuAddr procOff cpuSize
   have hb : (KernelGeom.cpusBase : BitVec 64) = KA.«cpus» := rfl
   rw [hb, BitVec.add_comm, BitVec.add_zero]
 
-theorem myproc_br_fffffffffffff31c : KA.«myproc» + 0xfffffffffffff31c#64 = KA.«pop_off» := by decide
+theorem myproc_br_fffffffffffff318 : KA.«myproc» + 0xfffffffffffff318#64 = KA.«pop_off» := by decide
 
-theorem myproc_br_10b84 : KA.«myproc» + 0x10b84#64 = KA.«pid_lock» := by decide
+theorem myproc_br_10b80 : KA.«myproc» + 0x10b80#64 = KA.«pid_lock» := by decide
 
-theorem myproc_br_fffffffffffff2a2 : KA.«myproc» + 0xfffffffffffff2a2#64 = KA.«push_off» := by decide
+theorem myproc_br_fffffffffffff29e : KA.«myproc» + 0xfffffffffffff29e#64 = KA.«push_off» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ _ cpu k hnoff hK => by
@@ -56,8 +56,8 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- jal push_off
-  k_step_gen (wp_s_jal c1 _ (KA.«myproc» + 0xa#64) false 2093720#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [myproc_br_fffffffffffff2a2] next c2 hp2
+  k_step_gen (wp_s_jal c1 _ (KA.«myproc» + 0xa#64) false 2093716#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    $$ [- $Hk $Hpc] with [myproc_br_fffffffffffff29e] next c2 hp2
   iintro Hk Hpc
   -- push_off (its contract, unfolded, at the callee's context)
   have hpu : ∀ (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 6 ≤ k'.avail),
@@ -101,7 +101,7 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
 
   iintro Hk Hpc
   -- addi a4,a4,-1334
-  k_step (wp_s_addi c3 _ (KA.«myproc» + 0x18#64) false 2928#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [myproc_br_10b84]
+  k_step (wp_s_addi c3 _ (KA.«myproc» + 0x18#64) false 2924#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [myproc_br_10b80]
 
   iintro Hk Hpc
   -- add a5,a5,a4
@@ -117,7 +117,7 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   k_step (wp_s_add c3 _ (KA.«myproc» + 0x20#64) true 9#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal pop_off
-  k_step (wp_s_jal c3 _ (KA.«myproc» + 0x22#64) false 2093818#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [myproc_br_fffffffffffff31c]
+  k_step (wp_s_jal c3 _ (KA.«myproc» + 0x22#64) false 2093814#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [myproc_br_fffffffffffff318]
   iintro Hk Hpc
   -- pop_off (its contract, unfolded, at the callee's context)
   have hpo : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff)
