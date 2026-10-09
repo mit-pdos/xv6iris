@@ -67,7 +67,10 @@ NEW Lean file (no Rocq source; Rocq's ID-8 prefix family is the model).
    rlGateOk x row q` (a row that CONTINUES past a gate — panic or reload — took the normal arm).
    Accessors `AxSpinT2f.gatesOf`/`brOf`/`rlGatesOf`.  NOT in `allocPre`: stage 1's
    `lkBranch row (t2KRh q) true` (it is the `rlS` gate).
-   THE CUTS: `rlCutAt row q := ∃ x, LEN = rlPos x q ∧ ¬ rlGateOk x row q`;
+   THE CUTS: `rlCutAt row q := ∃ x, LEN = rlPos x q ∧ ¬ rlEndOk x row q` — the ROW-END reload
+   gate `rlEndOk` is `rlGateOk` with `rlEndExp` for `rlExp`, which differs only at holding's two
+   `s1` reloads (`hdS1` / `rhS1`: expected = the spill's own row data `wd row (t2KHd q + 3)` /
+   `wd row (t2KRh q + 3)`, deviation 10);
    `t2CutAt row q i := (∃ j, LEN = cutPos j q ∧ ¬ t2GateOk j row q i) ∨ rlCutAt row q`;
    `t2Cut GD i S p := ∃ q, allocPre (grow GD i) q i S p ∧ t2CutAt (grow GD i) q i`.  Its three
    readings, stated separately: `entersPanic` (a panic gate `j ≠ ppI` failed), `intrOnCut` (the
@@ -89,15 +92,11 @@ NEW Lean file (no Rocq source; Rocq's ID-8 prefix family is the model).
    `rhCpu`, `ppGe`, `ppInt` (derived on the normal arm / refuted at the cut by D4 readback in
    AxSpinT2h), MINUS the 18 RELOAD pins (now `allocPre`'s reload gates) and MINUS the selector
    `poArm` (now `allocPre`'s `poBranch`, `AxSpinT2f.poArmOf`).  Kept: `npNowrap`, `npNcoll`
-   (Q18b), `ppArm` (selects `q.c`), and the INTERIM premise
-   `rlEnd : ∀ x, LEN = rlPos x q → rlGateOk x (grow GD i) q` — a row that ENDS right after a
-   reload read the spill there.  `rlEnd` exists because the leaf P-forms (E8, PO4, HdA/Hd9, Aq2,
-   PO6, Rl4b) still take the GUARDED pins `kr < LEN → graphValue (i, kr) = vw`, which `allocPre`'s
-   gate gives only for `kr + 1 < LEN`; THE BRIDGE `AxSpinT2f.pinOf` (`allocPre` + `rlEnd` ⇒ the
-   old guarded pin; `AxSpinT2f.pinOfD` for the two `graphData` forms) supplies them.  When the
-   leaf lanes take `AxSpinT2i.Gate` (whose body is `AxSpinT2f.gateBody`, from `allocPre` ALONE),
-   the row end `kr + 1` is REFUTED by `cutReload` and `rlEnd` is deleted.  `pins2OfPins :
-   AllocPins GD i q → AllocPins2 GD i q`; `AxSpinT2f.notRlCutOf` (`rlEnd` ⇒ `¬ rlCutAt`).
+   (Q18b) and `ppArm` (selects `q.c`).  (P1 finish, owner ruling 2026-10-09: the former INTERIM
+   row-end premise `rlEnd` and its bridges `AxSpinT2f.pinOf`/`pinOfD`/`notRlCutOf` are DELETED:
+   the leaf lanes take `AxSpinT2i.Gate`, whose body is `AxSpinT2f.gateBody` — from `allocPre`
+   ALONE — and hand the reload's value to their row-end hook (`AxSpinE8.EndRl`), so a reload cut
+   at a row end is REFUTED in AxSpinApB.)  `pins2OfPins : AllocPins GD i q → AllocPins2 GD i q`.
 §6 IMAGE.  `noffImgOk img i v`: `cpus[cpuOf i].noff`'s image bytes (`cpuZ i + 120 .. +123`) hold
    the 32-bit word `v`, with `0 ≤ v < 2^31 − 1` (pop_off's `noff < 1` test reads `v + 1`, so this
    is exactly what keeps `bge` from firing; xv6-true: `noff ∈ {0,1,2}` at allocproc).  Premise
@@ -131,10 +130,19 @@ NEW Lean file (no Rocq source; Rocq's ID-8 prefix family is the model).
    `Option` so the two spill-data reloads share the definition (`some e = some vs` for a literal).
 8. (P1) `poArm` is DROPPED from `AllocPins2` (redundant with `allocPre`'s `poBranch`,
    `AxSpinT2f.poArmOf`); `ppArm` is kept (`c` is not determined by `allocPre`'s value conditions).
-9. (P1, INTERIM, see §5) `AllocPins2.rlEnd`: until the leaf lanes switch to gates, a row that ends
-   exactly at `rlPos x q` with a wrong reload is EXCLUDED by this premise rather than refuted, so
-   `¬ t2Cut`'s reload reading (`¬ reloadMis`) is, for now, a consequence of `rlEnd` (plus the
-   gates of `allocPre` for rows that continue).  The 18 positional pins are gone.
+9. (P1 finish, 2026-10-09) The INTERIM `AllocPins2.rlEnd` is DELETED (§5): `¬ t2Cut`'s reload
+   reading (`¬ reloadMis`) is now PROVED for every family row (AxSpinApB: the leaves' value hook
+   at a reload's row end, the `RLfact` annotations at holding's two long-arm ends).
+10. (P1 finish) `rlCutAt` uses the ROW-END gate `rlEndOk` (expectation `rlEndExp`), NOT
+   `rlGateOk`: at `hdS1` / `rhS1` a reload is a misread iff it read something other than ITS
+   SPILL'S ROW DATA (`wd row (t2KHd q + 3)` / `wd row (t2KRh q + 3)`), not the literal
+   `pid_lock` bytes of `rlExp`.  Why: those two row ends are `cutPos .aq` / `cutPos .rlL`, which the
+   leaves (`wpdAcquireG`'s `Kaq`, `wpdReleaseG`'s `KrlL`) hand over as holding's `KLongEnd` for an
+   ARBITRARY entry register file — the `s1` reload's `RLfact` there says "reload = the spill of
+   that register", which is the row data, and nothing ties it to `pid_lock` before holding runs.
+   The CONTINUING-row gate in `allocPre` stays literal (`rlGateOk`, what the leaves' literal
+   `Gate`s need).  On every real row the spill IS `pid_lock` (acquire/release's `s1` = the lock)
+   and the two readings coincide; for the other 16 reloads `rlEndExp = rlExp` (by `rfl`).
 
 HONESTY.  Definitions and row arithmetic; nothing about values is proved here.  The prefix-closure
 caveat (a real panicking hart continues into `panic()` → MMIO, outside the graph tier; the family
@@ -150,7 +158,7 @@ cuts BEFORE the off arm's first event) is informal (design §B, Q-S2-6).  A row 
 `ppSh` (AxSpinPO6), `lblValue`/`graphValue`/`graphData` (AxWp), `lblData` (AxOpsem); proofs of
 the reload cuts from the (deleted) additive draft AxSpinT2f3.  New short names (`RowShXP`,
 `rowShXP*`, `rowShXOfXP`, `T2Cj`, `cutPos`, `t2GateOk`, `T2Rj`, `rlKr`, `rlPos`, `rlOn`, `rlExp`,
-`rlGateOk`, `allocPre`, `rlCutAt`, `t2CutAt`, `t2Cut`, `entersPanic`, `intrOnCut`, `reloadMis`,
+`rlGateOk`, `rlEndExp`, `rlEndOk`, `allocPre`, `rlCutAt`, `t2CutAt`, `t2Cut`, `entersPanic`, `intrOnCut`, `reloadMis`,
 `cutIff`, `preOfFull`, `preOfFullPins`, `fullOfPre`, `cutDet`, `notCutAtOfLen`, `notCutAtOfGates`,
 `notCutOfLen`, `notCutOfGates`, `cutNotFull`, `AllocPins2`, `pins2OfPins`, `noffImgOk`,
 `HimgNoff`) grepped absent from the tree; Lean-only helpers are `AxSpinT2f.*`.
@@ -406,6 +414,38 @@ def rlExp : T2Rj → List Lbl → T2Prm → Option (List (BitVec 8))
 def rlGateOk (x : T2Rj) (row : List Lbl) (q : T2Prm) : Prop :=
   rlOn x q = true → ∀ vs, AxSpinT2f.rv row (rlKr x q) = some vs → rlExp x row q = some vs
 
+/-- (P1 VALUE HOOK) THE ROW-END EXPECTATION: the bytes a reload at the row's END must have read
+for the row NOT to be a reload cut — `rlExp`, except holding's two `s1` reloads `hdS1` / `rhS1`,
+which are expected to read their SPILL'S OWN ROW DATA (`wd row (t2KHd q + 3)` / `wd row (t2KRh q +
+3)`, holding's `sd s1` at `k + 3`): at those two row ends (`cutPos .aq` / `cutPos .rlL`, holding's
+long-arm end continuation `KLongEnd`) the leaves hand over only the reload's `RLfact` annotation
+(reload bytes = spill bytes) for an ARBITRARY holding-entry register file, so the spill's bytes
+are known only as row data (header §2, deviation 10). -/
+def rlEndExp : T2Rj → List Lbl → T2Prm → Option (List (BitVec 8))
+  | .poMy1, row, q => rlExp .poMy1 row q
+  | .poMy2, row, q => rlExp .poMy2 row q
+  | .poMy3, row, q => rlExp .poMy3 row q
+  | .poRet, row, q => rlExp .poRet row q
+  | .poS1, row, q => rlExp .poS1 row q
+  | .hdMy, row, q => rlExp .hdMy row q
+  | .hdRet, row, q => rlExp .hdRet row q
+  | .hdS1, row, q => AxSpinT2f.wd row (t2KHd q + 3)
+  | .aqMy, row, q => rlExp .aqMy row q
+  | .aqRet, row, q => rlExp .aqRet row q
+  | .aqS1, row, q => rlExp .aqS1 row q
+  | .rhMy, row, q => rlExp .rhMy row q
+  | .rhRet, row, q => rlExp .rhRet row q
+  | .rhS1, row, q => AxSpinT2f.wd row (t2KRh q + 3)
+  | .ppMy, row, q => rlExp .ppMy row q
+  | .ppRet, row, q => rlExp .ppRet row q
+  | .rlRet, row, q => rlExp .rlRet row q
+  | .rlS1, row, q => rlExp .rlS1 row q
+
+/-- THE ROW-END RELOAD GATE (what `rlCutAt` negates): the reload (if on the path and present) read
+`rlEndExp` ("did not misread", the row-end reading of `rlGateOk`). -/
+def rlEndOk (x : T2Rj) (row : List Lbl) (q : T2Prm) : Prop :=
+  rlOn x q = true → ∀ vs, AxSpinT2f.rv row (rlKr x q) = some vs → rlEndExp x row q = some vs
+
 /-- (Lean-only) unfold every segment position, split the `if`s, `omega`. -/
 local macro "ax_spin_t2f_pos" : tactic =>
   `(tactic| ((try simp only [rlPos, rlKr, t2Len, t2KT, relKe, t2KPoT, t2KPo, t2KHd, t2KSp,
@@ -483,7 +523,7 @@ end acc
 
 /-- The row ends right after a reload (on the path) that read a value other than its spill. -/
 def rlCutAt (row : List Lbl) (q : T2Prm) : Prop :=
-  ∃ x, row.length = rlPos x q ∧ ¬ rlGateOk x row q
+  ∃ x, row.length = rlPos x q ∧ ¬ rlEndOk x row q
 
 /-- The row (with parameters `q`) ENDS at a designated cut whose gate took the off arm: a panic /
 `intr_on` gate `j`, or a reload `x` that misread.  Classified by WHICH GATE FAILED (a row end may
@@ -1017,7 +1057,7 @@ theorem notCutAtOfLen {row : List Lbl} {q : T2Prm} {i : Agent}
 row. -/
 theorem notCutAtOfGates {row : List Lbl} {q : T2Prm} {i : Agent}
     (h : ∀ j, row.length = cutPos j q → t2GateOk j row q i)
-    (hr : ∀ x, row.length = rlPos x q → rlGateOk x row q) : ¬ t2CutAt row q i := by
+    (hr : ∀ x, row.length = rlPos x q → rlEndOk x row q) : ¬ t2CutAt row q i := by
   rintro (⟨j, hL, hG⟩ | ⟨x, hL, hG⟩)
   · exact hG (h j hL)
   · exact hG (hr x hL)
@@ -1026,7 +1066,7 @@ theorem notCutAtOfGates {row : List Lbl} {q : T2Prm} {i : Agent}
 theorem notCutOfGates {GD : Gdexec} {i : Agent} {q : T2Prm} {S p : Int}
     (H : allocPre (AxOpsem.grow GD i) q i S p)
     (h : ∀ j, (AxOpsem.grow GD i).length = cutPos j q → t2GateOk j (AxOpsem.grow GD i) q i)
-    (hr : ∀ x, (AxOpsem.grow GD i).length = rlPos x q → rlGateOk x (AxOpsem.grow GD i) q) :
+    (hr : ∀ x, (AxOpsem.grow GD i).length = rlPos x q → rlEndOk x (AxOpsem.grow GD i) q) :
     ¬ t2Cut GD i S p := by
   rintro ⟨q', H', Hc⟩
   exact notCutAtOfGates h hr (cutDet H H' Hc)
@@ -1058,9 +1098,9 @@ theorem AxSpinT2f.notCutOfComplete {GD : Gdexec} {i : Agent} {S p : Int} :
 /-! # 5. The guarded pins -/
 
 /-- Stage 1's `AllocPins` MINUS the five panic / `intr_on` arm pins (`hdArm`, `rhArm`, `rhCpu`,
-`ppGe`, `ppInt`), the 18 RELOAD pins (now `allocPre`'s reload gates) and the selector `poArm`
-(now `allocPre`'s `poBranch`; `AxSpinT2f.poArmOf`).  Kept: the Q18b scope pins, the selector
-`ppArm`, and the INTERIM row-end reload premise `rlEnd` (see the header, §5). -/
+`ppGe`, `ppInt`), the 18 RELOAD pins (now `allocPre`'s reload gates; at a row end the reload
+misread is REFUTED, P1 VALUE HOOK) and the selector `poArm` (now `allocPre`'s `poBranch`;
+`AxSpinT2f.poArmOf`).  Kept: the Q18b scope pins and the selector `ppArm`. -/
 structure AllocPins2 (GD : Gdexec) (i : Agent) (q : T2Prm) : Prop where
   /-- Q18b: the nextpid read is not 1000 and does not wrap -/
   npNowrap : ∀ vs, graphValue GD (i, t2KBd q) = some vs →
@@ -1071,9 +1111,6 @@ structure AllocPins2 (GD : Gdexec) (i : Agent) (q : T2Prm) : Prop where
   /-- pop_off's arm `c` -/
   ppArm : ∀ vn, graphValue GD (i, t2KPp q + 6) = some vn →
     (addiwm1 (ldRes false 4 vn) != zero_reg) = q.c
-  /-- INTERIM (until the leaf lanes take `AxSpinT2i.Gate`): a row that ENDS right after a
-  reload read the spill there (vacuous unless `LEN = rlPos x q`) -/
-  rlEnd : ∀ x, (AxOpsem.grow GD i).length = rlPos x q → rlGateOk x (AxOpsem.grow GD i) q
 
 /-- Stage 1's pins give the guarded ones. -/
 theorem pins2OfPins {GD : Gdexec} {i : Agent} {q : T2Prm} (HP : AllocPins GD i q) :
@@ -1081,39 +1118,6 @@ theorem pins2OfPins {GD : Gdexec} {i : Agent} {q : T2Prm} (HP : AllocPins GD i q
   npNowrap := HP.npNowrap
   npNcoll := HP.npNcoll
   ppArm := HP.ppArm
-  rlEnd x _ := AxSpinT2f.rlGatesOfPins HP x
-
-/-- `¬ reloadMis` from the interim premise `rlEnd` (the q-indexed reload part). -/
-theorem AxSpinT2f.notRlCutOf {GD : Gdexec} {i : Agent} {q : T2Prm} (HP : AllocPins2 GD i q) :
-    ¬ rlCutAt (AxOpsem.grow GD i) q :=
-  fun ⟨x, hL, hG⟩ => hG (HP.rlEnd x hL)
-
-/-- THE BRIDGE for the leaf P-forms that still take guarded pins: `allocPre`'s reload gate (the
-row continues past the reload) and `rlEnd` (it ends right after it) give the old guarded pin
-`kr < LEN → graphValue (i, kr) = expected`. -/
-theorem AxSpinT2f.pinOf {GD : Gdexec} {i : Agent} {q : T2Prm} {S p : Int}
-    (H : allocPre (AxOpsem.grow GD i) q i S p) (HP : AllocPins2 GD i q) (x : T2Rj)
-    (hon : rlOn x q = true) :
-    rlKr x q < (AxOpsem.grow GD i).length →
-      graphValue GD (i, rlKr x q) = rlExp x (AxOpsem.grow GD i) q := by
-  intro hk
-  obtain ⟨vs, hv⟩ := AxSpinT2f.rlRd H x hon hk
-  have G : rlGateOk x (AxOpsem.grow GD i) q := by
-    by_cases h : rlPos x q < (AxOpsem.grow GD i).length
-    · exact AxSpinT2f.rlGatesOf H x h
-    · exact HP.rlEnd x (by unfold rlPos at h ⊢; omega)
-  rw [AxSpinT2f.gvGrow, hv]
-  exact (G hon vs hv).symm
-
-/-- `pinOf` for the two spill-data reloads, in stage 1's `graphData` form. -/
-theorem AxSpinT2f.pinOfD {GD : Gdexec} {i : Agent} {q : T2Prm} {S p : Int}
-    (H : allocPre (AxOpsem.grow GD i) q i S p) (HP : AllocPins2 GD i q) :
-    (t2KMy q + 7 < (AxOpsem.grow GD i).length →
-      graphValue GD (i, t2KMy q + 7) = graphData GD (i, 2)) ∧
-    (t2KRr q + 2 < (AxOpsem.grow GD i).length →
-      graphValue GD (i, t2KRr q + 2) = graphData GD (i, t2KRl q + 2)) :=
-  ⟨fun hk => (AxSpinT2f.pinOf H HP .aqS1 rfl hk).trans (AxSpinT2f.wdGrow GD i 2).symm,
-   fun hk => (AxSpinT2f.pinOf H HP .rlS1 rfl hk).trans (AxSpinT2f.wdGrow GD i _).symm⟩
 
 /-- The GATE form for the leaf lanes: exactly the body of `AxSpinT2i.Gate GT i (rlKr x q) vw` at
 `GD = gtAdGd GT` ("a row that continues past the reload read the spill"), from `allocPre` alone

@@ -80,7 +80,7 @@ include hh
 theorem preG : allocPre (AxOpsem.grow (gtAdGd (gT3 E)) h) q0 h (sZ h) (AxSpinT2a.pEx h) :=
   preOfFullPins (fullG E h hh) (pinsG E h hh)
 
-/-- **`AllocPins2`**: the kept pins (Q18b, `ppArm`, the interim `rlEnd`), from stage 1's. -/
+/-- **`AllocPins2`**: the kept pins (Q18b, `ppArm`), from stage 1's. -/
 theorem pins2G : AllocPins2 (gtAdGd (gT3 E)) h q0 := pins2OfPins (pinsG E h hh)
 
 end prem

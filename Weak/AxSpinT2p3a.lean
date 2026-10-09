@@ -9,7 +9,7 @@ emission) and on it every premise the computation half supplies, with `t2Cut A` 
 `reloadMis` at `.poMy1`.
 
 Lean-only (no Rocq source).  Design `notes/weak-lb-thm2-pins.md` §P1 (p-stk); template
-`AxSpinT2p2a`.  The reductio through `allocpidOpen2` is the later capstone's.
+`AxSpinT2p2a`.  The reductio through `allocpidOpen2` is `AxSpinT2q4`.
 
 ## What this file proves
 
@@ -20,17 +20,17 @@ gStk` (GENERIC `graphOfSc` lemmas); `hartsStk`; `runStkA` (A's RUN premise on `g
 `AxEpiRun.st (cpuOf 0) (.pure ()) (regsE 0) ibNone 0` to the row end, `.pure`, `¬ midState`);
 `runStkB` (the phantom: 0 steps, row end 0); `runStkC` (C's run `⟨hp cpu rcMS zeroRegs, 0⟩ →
 ⟨hp cpu hlt zeroRegs, 1⟩` in 1 `astepAnyNfGv` step, row end 1); and the bundle **`stkCert`**:
-  `allocPre (grow (gtAdGd gStk) 0) q0 0 (sZ 0) (pEx 0)` ∧ A's three non-interim `AllocPins2`
-  fields (`npNowrap`, `npNcoll`, `ppArm`, verbatim) ∧ `LEN A = rlPos .poMy1 q0` ∧
-  `¬ rlGateOk .poMy1 (grow …) q0` ∧ `reloadMis …` ∧ `t2Cut (gtAdGd gStk) 0 (sZ 0) (pEx 0)` ∧
+  `allocPre (grow (gtAdGd gStk) 0) q0 0 (sZ 0) (pEx 0)` ∧ `AllocPins2 (gtAdGd gStk) 0 q0` ∧
+  `LEN A = rlPos .poMy1 q0` ∧
+  `¬ rlEndOk .poMy1 (grow …) q0` ∧ `reloadMis …` ∧ `t2Cut (gtAdGd gStk) 0 (sZ 0) (pEx 0)` ∧
   `¬ entersPanic …` ∧ `¬ intrOnCut …` ∧ `¬ t2Complete …` ∧
   (B: `allocPre (grow (gtAdGd gStk) 1) q0 1 …` ∧ `AllocPins2 … 1 q0` ∧ `¬ t2Cut … 1 …`) ∧
   `HimgNoff` ∧ `grow (gtAdGd gStk) 2 = rcRowS`.
-Plus `notPinsStk : ¬ AllocPins2 (gtAdGd gStk) 0 q0` (the interim `rlEnd`; `AxSpinT2p3` header).
+Plus `pinsStk : AllocPins2 (gtAdGd gStk) 0 q0` (`AxSpinT2p3.pinsAS`; P1 finish: it replaces the
+former `notPinsStk`, the interim `rlEnd` being deleted).
 
 ## Pins / honesty
-* Every proof mentioning `drvA` / `emsA` goes through `runA`.  Scope and the `AllocPins2`
-  deviation as `AxSpinT2p3`.
+* Every proof mentioning `drvA` / `emsA` goes through `runA`.  Scope as `AxSpinT2p3`.
 
 Reused: `AxSpinT2p1.drvG`/`chkG`/`runOfChkG`/`catOf`/`ctrlOf`, `AxSpinT2p3.*`,
 `AxSpinT2c1.emsOf`/`finNotMid`.  Names: Lean-only, `Weak.AxSpinT2p3a.*`.
@@ -99,24 +99,18 @@ theorem runStkC (cpu : CPU) :
     (AxOpsem.grow (gtAdGd gStk) 2).length = 1 :=
   ⟨rcRunS cpu _ 2 (growCS _), by unfold gStk; rw [growCS]; rfl⟩
 
-/-- HONEST: the merged `AllocPins2` (interim `rlEnd`) excludes A's row on the concrete graph. -/
-theorem notPinsStk : ¬ AllocPins2 (gtAdGd gStk) 0 q0 := notPinsAS _
+/-- **`AllocPins2`** for A on the concrete graph (the three kept fields). -/
+theorem pinsStk : AllocPins2 (gtAdGd gStk) 0 q0 := pinsAS _
 
 /-- **THE (p-stk) CERTIFICATE, premise bundle**: on the concrete graph A is a family row (with
-the non-interim guarded pins) whose `.poMy1` reload read C's planted value — `t2Cut` via
+its guarded pins `AllocPins2`) whose `.poMy1` reload read C's planted value — `t2Cut` via
 `reloadMis`, no panic / `intr_on` cut; the phantom B is a (trivial) family row at no cut; the
 image premise holds; C's row is the racer's. -/
 theorem stkCert :
     allocPre (AxOpsem.grow (gtAdGd gStk) 0) q0 0 (sZ 0) (AxSpinT2a.pEx 0) ∧
-    (∀ vs, graphValue (gtAdGd gStk) (0, t2KBd q0) = some vs →
-      (wordOfBytes 4 vs : BitVec 32) ≠ 1000#32 ∧ (wordOfBytes 4 vs : BitVec 32).toNat + 1 < 2 ^ 32) ∧
-    (∀ vs, graphValue (gtAdGd gStk) (0, t2KBd q0) = some vs → ∀ j, j < 64 → ∀ v,
-      graphValue (gtAdGd gStk) (0, t2KBd q0 + 1 + j) = some v →
-        (wordOfBytes 4 v : BitVec 32) ≠ wordOfBytes 4 vs) ∧
-    (∀ vn, graphValue (gtAdGd gStk) (0, t2KPp q0 + 6) = some vn →
-      (addiwm1 (ldRes false 4 vn) != zero_reg) = q0.c) ∧
+    AllocPins2 (gtAdGd gStk) 0 q0 ∧
     (AxOpsem.grow (gtAdGd gStk) 0).length = rlPos .poMy1 q0 ∧
-    ¬ rlGateOk .poMy1 (AxOpsem.grow (gtAdGd gStk) 0) q0 ∧
+    ¬ rlEndOk .poMy1 (AxOpsem.grow (gtAdGd gStk) 0) q0 ∧
     reloadMis (gtAdGd gStk) 0 (sZ 0) (AxSpinT2a.pEx 0) ∧
     t2Cut (gtAdGd gStk) 0 (sZ 0) (AxSpinT2a.pEx 0) ∧
     ¬ entersPanic (gtAdGd gStk) 0 (sZ 0) (AxSpinT2a.pEx 0) ∧
@@ -126,7 +120,7 @@ theorem stkCert :
     AllocPins2 (gtAdGd gStk) 1 q0 ∧ ¬ t2Cut (gtAdGd gStk) 1 (sZ 1) (AxSpinT2a.pEx 1) ∧
     HimgNoff (gtAdGd gStk).gdG.gxImg 0 1 ∧
     AxOpsem.grow (gtAdGd gStk) 2 = rcRowS :=
-  ⟨preAS _, npNowrapAS _, npNcollAS _, ppArmAS _,
+  ⟨preAS _, pinsStk,
     by unfold gStk; rw [growAS]; exact sizesS.2.2, gateAS _, misAS _, cutAS _,
     notPanicAS _, notIntrAS _, notCompleteAS _, preBS _, pinsBS _, notCutBS _, imgNoffS _,
     growCS _⟩

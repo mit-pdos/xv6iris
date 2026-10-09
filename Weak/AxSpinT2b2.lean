@@ -30,7 +30,11 @@ one of the 18 RELOADS (`T2Rj`: the return-address and `s1` reloads) having read 
 its spill (`reloadMis`).  `cutIff : t2Cut ↔ entersPanic ∨ intrOnCut ∨ reloadMis`.  `¬ t2Cut`
 therefore says: neither A nor B enters `panic()` (nor `intr_on`), and NO RELOAD of A or B reads
 anything but its spill (no diverted `c.ret`, no wrong lock address), on any covered execution —
-the reload part currently via the INTERIM premise `AllocPins2.rlEnd` (see PINS KEPT).
+ALL THREE READINGS PROVED (P1 finish, owner ruling 2026-10-09): the panic / `intr_on` arms by D4
+readback (AxSpinT2h), the reload misreads by the leaves' value hooks and the reloads' `RLfact`
+annotations (AxSpinApB; `cutIff` splits the conclusion into `¬ entersPanic ∧ ¬ intrOnCut ∧
+¬ reloadMis`).  (At holding's two `s1` reloads the row-end expectation is the spill's row data,
+AxSpinT2f deviation 10.)
 
 **`allocpid2Distinct2`** (Theorem 1) — the corollary with C's row EMPTY (owner ruling Q-T2-11):
 C is a phantom agent of the layout with `grow C = []`, empty run, `HwpC` by `AxSpinT2b.wpdEmpty`.
@@ -72,18 +76,22 @@ Everything else (`HconsT`, `Hcl`, `Hharts`, `HLay`, `HalA/B`, `Hn0`, `Himgn`, th
 premises, `HfixA/B`, translation, `HmapA/B`, `HentA/B`, `HkC`, `Hrun`, `Hend`, `HfinA/B`, `HwpC`)
 is verbatim stage 1.
 
-PINS REMOVED (no longer premises; on the normal arm they follow from `allocPre`'s gate conjuncts,
-at a cut they are refuted by D4 readback in AxSpinT2h's arms `cutAq`/`cutRelS`/`cutRelL`/
-`cutPpNF`/`cutPpIF`):
-`hdArm` (acquire's holding long arm), `rhArm` and `rhCpu` (release's holding `lk->cpu` read = this
-cpu), `ppGe` (`noff ≥ 1`), `ppInt` (intena = 0 on the `c = false` arm), and `allocFull`'s
-conjunct `lkBranch row (t2KRh q) true` (release's holding lock bit, now the `rlS` gate).
-P1 (owner ruling 2026-10-08) ALSO REMOVED — the 18 positional RELOAD pins of the former
-`AllocPins2` (Option V return-address reloads `poMy1 poMy2 poMy3 poRet hdRets(2) aqMy aqRet
-rhRets(2) ppMy ppRet rlRet` and `s1` reloads `poS1 hdS1 aqS1 rhS1 rlS1`): a row that CONTINUES
-past a reload read its spill by `allocPre`'s reload-gate conjunct (`∀ x, rlPos x q < LEN →
-rlGateOk x row q`, AxSpinT2f §2–3); and the selector `poArm` (now `allocPre`'s `poBranch`,
-`AxSpinT2f.poArmOf`).
+PINS REMOVED (no longer premises):
+* the FIVE PANIC / `intr_on` ARM pins `hdArm` (acquire's holding long arm), `rhArm` and `rhCpu`
+  (release's holding `lk->cpu` read = this cpu), `ppGe` (`noff ≥ 1`), `ppInt` (intena = 0 on the
+  `c = false` arm) — on the normal arm they follow from `allocPre`'s gate conjuncts, at a cut they
+  are refuted by D4 readback in AxSpinT2h's arms `cutAq`/`cutRelS`/`cutRelL`/`cutPpNF`/`cutPpIF`;
+* RELEASE'S LOCK BIT, `allocFull`'s conjunct `lkBranch row (t2KRh q) true` (now the `rlS` gate);
+* the 18 positional RELOAD pins (Option V return-address reloads `poMy1 poMy2 poMy3 poRet
+  hdRets(2) aqMy aqRet rhRets(2) ppMy ppRet rlRet` and `s1` reloads `poS1 hdS1 aqS1 rhS1 rlS1`):
+  a row that CONTINUES past a reload read its spill by `allocPre`'s reload-gate conjunct
+  (`∀ x, rlPos x q < LEN → rlGateOk x row q`, AxSpinT2f §2–3), which gives the leaves'
+  `AxSpinT2i.Gate`s (`AxSpinT2f.gateBody`);
+* the selector `poArm` (now `allocPre`'s `poBranch`, `AxSpinT2f.poArmOf`);
+* the INTERIM row-end premise `rlEnd` ("a row that ends right after a reload read the spill
+  there") — DELETED: a row ending right after a misread reload is REFUTED (AxSpinApB: the leaves'
+  row-end hooks carry the reload's value, `AxSpinE8.EndRl`; at holding's long-arm ends the `s1`
+  reload's `RLfact`), so `¬ reloadMis` is a theorem, not an assumption.
 
 PINS KEPT — `AllocPins2 GD i q` (AxSpinT2f §5), VERBATIM:
 ```
@@ -93,21 +101,12 @@ PINS KEPT — `AllocPins2 GD i q` (AxSpinT2f §5), VERBATIM:
     graphValue GD (i, t2KBd q + 1 + j) = some v → (wordOfBytes 4 v : BitVec 32) ≠ wordOfBytes 4 vs
   ppArm : ∀ vn, graphValue GD (i, t2KPp q + 6) = some vn →
     (addiwm1 (ldRes false 4 vn) != zero_reg) = q.c
-  rlEnd : ∀ x, (AxOpsem.grow GD i).length = rlPos x q → rlGateOk x (AxOpsem.grow GD i) q
 ```
-(`LEN = (grow GD i).length`.)  Classification: Q18b scope pins `npNowrap`, `npNcoll`; the selector
-`ppArm` (chooses `q.c`); and the INTERIM row-end premise `rlEnd` — "a row that ENDS right after a
-reload read the spill there" (vacuous unless `LEN = rlPos x q = kr + 1`).  HONEST STATUS of the
-reload reading: the leaf P-forms (AxSpinE8, PO4, HdA/Hd9, Aq2, PO6, Rl4b) still take guarded pins
-`kr < LEN → graphValue (i, kr) = vw`; ApB supplies them from `allocPre`'s gate (`kr + 1 < LEN`)
-and `rlEnd` (`kr + 1 = LEN`) through `AxSpinT2f.pinOf`.  So today `¬ reloadMis` (the reload part
-of conjunct 1) is a consequence of `rlEnd`, not proved by readback; when the leaf lanes take
-`AxSpinT2i.Gate` (from `allocPre` alone, `AxSpinT2f.gateBody`) the row end `kr + 1` is REFUTED by
-`cutReload` and `rlEnd` is deleted.  The gain already in: 18 positional pins (constraining every
-present reload) → one premise at the single possible row end.  The value conditions inside
-`allocPre` (`t2CpuVals`, `t2RelVals`, `spinRmwP`'s data, `lkBranch (t2KHd q) q.hb`,
-`spinValsP`, the body's read identities, `poBranch`) are stage 1's, restricted to present
-positions: code-fixed store data and path selectors (AxSpinT2b header, verbatim there).
+Classification: Q18b scope pins `npNowrap`, `npNcoll`; the selector `ppArm` (chooses `q.c`).
+KEPT inside `allocPre`, VERBATIM stage 1's restricted to present positions: the STORE-VALUE
+conditions and path selectors `t2CpuVals` (acquire's `lk->cpu` store data), `t2RelVals`
+(release's stores), `spinRmwP`'s RMW data, `lkBranch (t2KHd q) q.hb`, `spinValsP`, the body's read
+identities, `poBranch` (code-fixed store data and path selectors; AxSpinT2b header).
 
 ## Prefix closure (informal, Q-S2-6)
 
@@ -132,6 +131,14 @@ refutation of `aq` uses the deposit's `clSrcFull` (protocol full-width lk->cpu w
 `Himgc`; `rlS`/`rlL` use the holder's own
 deposits (`OHeld`/`OOwn`); `ppN`/`ppI` use pop_off's private reads of push_off's stores and
 `HimgNoff`.
+
+WHY THE ROWS STAY ON THE CODE PATH (P1): control flow is carried by return addresses and the
+lock pointer that the hart SPILLS to its own stack and RELOADS; STACK OWNERSHIP (the private
+slots, `slot8`, and the reloads' `RLfact` annotations: a reload reads exactly what its spill
+wrote) is what keeps a row on the row family — a reload cut is refuted by readback, so no premise
+pins a reloaded value.  The (p-stk) negative certificate (AxSpinT2q4) shows the ownership is
+load-bearing: a C that overwrites A's `ra` spill makes A take a reload cut, and such a C has no
+WPd against `protXv6`.
 
 What the theorems do NOT say: anything about a row outside the family (diverted control flow or
 addresses, a pinned value that differs, a nextpid of 1000 / wrapping / colliding — the Q18b pins
@@ -286,7 +293,7 @@ set_option maxHeartbeats 1600000 in
 run the inlined allocpid of xv6's `allocproc` on rows of the PREFIX family, hart C is an
 ARBITRARY program verified against the joint protocol (`HwpC`, the only iProp premise).  Then
 neither A nor B ends at a taken panic / `intr_on` arm or right after a misread reload
-(`¬ t2Cut`; the reload part via the interim `AllocPins2.rlEnd`), complete rows' nextpid reads
+(`¬ t2Cut`, all three readings proved), complete rows' nextpid reads
 are sourced by the gmo-latest nextpid write before their claim, and if both rows are complete
 the stored pids are distinct.  Premises glossed one per line; the kept pins are verbatim in the
 file header. -/
@@ -329,8 +336,8 @@ theorem allocpidOpen2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int) (pt
     -- panic or reload — only on the normal arm)
     (HpreA : allocPre (AxOpsem.grow (gtAdGd GT) A) qA A (Sf A) (pf A))
     (HpreB : allocPre (AxOpsem.grow (gtAdGd GT) B) qB B (Sf B) (pf B))
-    -- PINS (NEW): Q18b + `ppArm` + the interim row-end reload premise `rlEnd` (header);
-    -- panic arms, the 18 reload pins and `poArm` removed
+    -- PINS (NEW): Q18b + `ppArm` (header); panic arms, release's lock bit, the 18 reload pins,
+    -- `poArm` and `rlEnd` removed
     (HpinsA : AllocPins2 (gtAdGd GT) A qA) (HpinsB : AllocPins2 (gtAdGd GT) B qB)
     -- ENTRY: A / B start at allocproc + 0x38, S-mode, SIE = 0, sp / s1 / tp set, warm TLB
     (HentA : entryOk T satp0 A (Sf A) (pf A) (s0 A))

@@ -8,8 +8,8 @@ OTHER mycpu return site) into that spill slot (`sd` 8 bytes, A's PRIVATE stack);
 `ld ra, 8(sp)` (item 8 = `rlKr .poMy1 q`) reads C's value, so the row — ended right after the
 reload, `LEN = 9 = rlPos .poMy1 q` — is a `.poMy1` RELOAD CUT (`rlCutAt`, `reloadMis`, hence
 `t2Cut A`).  B (1) is a phantom (empty row).  The reductio through `allocpidOpen2` (conjunct 1
-`¬ t2Cut A`) that makes C's `HwpC` unprovable at `protXv6` (stack window private) is NOT here
-(later capstone).
+`¬ t2Cut A`) that makes C's `HwpC` unprovable at `protXv6` (stack window private) is
+`AxSpinT2q4`.
 
 Lean-only (no Rocq source).  Design `notes/weak-lb-thm2-pins.md` §P1 ("(p-stk)", Q-P1-4), the
 row-integrity analogue of (p-lk) (`AxSpinT2p2*`, `AxSpinT2q3`).  Modules: `AxSpinT2p3` (this:
@@ -18,18 +18,13 @@ premise bundle).  CHOICE OF RELOAD: `.poMy1` is the cheapest (9 events: acquire'
 push_off's 3, mycpu's 2, the reload); every other reload lies past push_off's `noff` read
 (`AxSpinT2f.rlPosGe`).
 
-## DEVIATION: `AllocPins2` for A is NOT provable (interim `rlEnd`) — please confirm
+## `AllocPins2` for A (P1 finish, 2026-10-09)
 
-The assignment asks for `AllocPins2 (gtAdGd G) 0 q` on the cut row.  The merged `AllocPins2`
-still carries the INTERIM field `rlEnd : ∀ x, LEN = rlPos x q → rlGateOk x (grow GD i) q`
-(AxSpinT2f §5, open_questions INFO-P1: deleted once Aq2/Rl4b/ApB take the gate forms), which
-says exactly that the row is NOT a reload cut; `AxSpinT2f.notRlCutOf` makes it contradict
-`rlCutAt`.  So this file proves `notPinsAS : ¬ AllocPins2 (gtAdGd (gTS E)) 0 q0` (honestly: the
-interim premise EXCLUDES this row) and the three OTHER fields separately, in their exact
-`AllocPins2` statements: `npNowrapAS`, `npNcollAS`, `ppArmAS` (vacuous: the nextpid / pop_off
-reads lie past the row end).  Once `rlEnd` is deleted, `AllocPins2 … 0 q0` is `⟨npNowrapAS E,
-npNcollAS E, ppArmAS E⟩`.  B's `AllocPins2` (empty row) holds in full (`pinsBS`).
-See `PROGRESS-AxSpinT2p3.md`.
+The INTERIM field `rlEnd` (which excluded every reload-cut row) is DELETED from `AllocPins2`
+(AxSpinT2f §5), so A's pins are now the three kept fields: **`pinsAS : AllocPins2 (gtAdGd (gTS E))
+0 q0 := ⟨npNowrapAS E, npNcollAS E, ppArmAS E⟩`** (each vacuous: the nextpid / pop_off reads lie
+past the row end).  (Formerly `notPinsAS : ¬ AllocPins2 …`, the honest report that the interim
+premise excluded this row; `PROGRESS-AxSpinT2p3.md`.)  B's `AllocPins2` (empty row): `pinsBS`.
 
 ## What this file proves
 
@@ -48,11 +43,12 @@ push_off's and mycpu's spills, values the entry registers' — then the reload o
   THE SPILL / RELOAD FACTS: `spillLitS` (item 6 writes `stBytes 8 (ppo 0x14)` at `rapaX` — the
     spill is right), `reloadLitS` (item 8 reads `rapaX`, value `wbytes 8 wX`), `misLitS`
     (`wbytes 8 wX ≠ stBytes 8 (ppo 0x14)`), `rfAS` (A's reload sources C's store `(2, 0)`);
-  THE CUT: `gateAS : ¬ rlGateOk .poMy1 (grow …) q0`, `rlCutAS : rlCutAt (grow …) q0`,
+  THE CUT: `gateAS : ¬ rlEndOk .poMy1 (grow …) q0` (the ROW-END gate, = `rlGateOk` at
+    `.poMy1`), `rlCutAS : rlCutAt (grow …) q0`,
     **`misAS : reloadMis (gtAdGd (gTS E)) 0 (sZ 0) (pEx 0)`**, **`cutAS : t2Cut …`** (via
     `AxSpinT2f.reloadCut`), `cutAtAS : t2CutAt (grow …) q0 0`; it is NO panic / `intr_on` cut
     (`notPanicAS`, `notIntrAS`, for every family parameters); `notCompleteAS`;
-  A's pins: `npNowrapAS`, `npNcollAS`, `ppArmAS`, and `notPinsAS` (deviation above);
+  A's pins: `npNowrapAS`, `npNcollAS`, `ppArmAS`, bundled as `pinsAS : AllocPins2 …`;
   phantom B: `preBS`, `pinsBS`, `notCutBS`, `notCompleteBS`;
   `honestAS`, `textFixedS` (h < 3), `imgNoffS` (`HimgNoff`), `imgClbS` (`Himgc`), `imgNpS`
   (`Himgn`, n0 = 1), `hartsS`.
@@ -74,7 +70,7 @@ Reused: `AxSpinT2p1.*` (checkers `preB`/`pins2B`/`offCutsB`, `growOf`, `rowAt`, 
 `himgNoff`), `AxSpinT2c1.img`/`dec`/`q0`/`sZ`/`hartOkB`/`valAt`/`gvRow`, `AxSpinT2c5.readsOffB`/
 `imgAgree`/`imgClb`/`imgNp`/`σX`, `stv`/`hp`/`zeroRegs`/`nrunWrite`/`hlt` (AxSpinX3/X4,
 AxClsStep2), `AxSpinPO.ppo`, `rlCutAt`/`reloadMis`/`t2Cut`/`AllocPins2`/`notCutOfLen`/
-`AxSpinT2f.reloadCut`/`notRlCutOf`/`notCutOfComplete`/`cutPosGe`/`kEqs` (AxSpinT2f), `grfAtBSpec`
+`AxSpinT2f.reloadCut`/`notCutOfComplete`/`cutPosGe`/`kEqs`/`rlEndOk`/`rlEndExp` (AxSpinT2f), `grfAtBSpec`
 (AxGraphDec).  Names: Lean-only, `Weak.AxSpinT2p3.*` (grepped absent).
 -/
 import Weak.AxSpinT2p1
@@ -207,11 +203,11 @@ theorem preAS : allocPre (AxOpsem.grow (gtAdGd (gTS E)) 0) q0 0 (sZ 0) (AxSpinT2
   rw [growAS]; exact AxSpinT2p1.preOfB _ _ _ _ _ preLitS.1
 
 /-- **The `.poMy1` reload gate is FLIPPED** on A's row: mycpu's `ra` reload read C's `wX`. -/
-theorem gateAS : ¬ rlGateOk .poMy1 (AxOpsem.grow (gtAdGd (gTS E)) 0) q0 := by
+theorem gateAS : ¬ rlEndOk .poMy1 (AxOpsem.grow (gtAdGd (gTS E)) 0) q0 := by
   rw [growAS]
   intro h
   have H := h rfl _ reloadLitS.2.1
-  simp only [rlExp, Option.some.injEq] at H
+  simp only [rlEndExp, rlExp, Option.some.injEq] at H
   exact misLitS H.symm
 
 /-- A's row is a RELOAD CUT row (`LEN = rlPos .poMy1 q0`, gate failed). -/
@@ -258,7 +254,7 @@ theorem rfAS : grfAt (gtAdGd (gTS E)).gdG (paZ rapaX) (2, 0) (0, rlKr .poMy1 q0)
   rw [gtGEqS]
   exact (grfAtBSpec _ _ _ _).1 rfLitS
 
-/-! ## A's guarded pins (see the DEVIATION in the header) -/
+/-! ## A's guarded pins (header "`AllocPins2` for A") -/
 
 /-- `AllocPins2.npNowrap` for A (vacuous: the nextpid read is past the row end). -/
 theorem npNowrapAS : ∀ vs, graphValue (gtAdGd (gTS E)) (0, t2KBd q0) = some vs →
@@ -282,9 +278,8 @@ theorem ppArmAS : ∀ vn, graphValue (gtAdGd (gTS E)) (0, t2KPp q0 + 6) = some v
   rw [AxSpinT2c1.gvRow, growAS, valPastS _ (by decide)] at hv
   cases hv
 
-/-- HONEST: the merged `AllocPins2` (with its INTERIM `rlEnd`) EXCLUDES this row. -/
-theorem notPinsAS : ¬ AllocPins2 (gtAdGd (gTS E)) 0 q0 :=
-  fun HP => AxSpinT2f.notRlCutOf HP (rlCutAS E)
+/-- **`AllocPins2`** for A (the three kept fields; P1: no row-end reload premise any more). -/
+theorem pinsAS : AllocPins2 (gtAdGd (gTS E)) 0 q0 := ⟨npNowrapAS E, npNcollAS E, ppArmAS E⟩
 
 /-! ## The phantom B (empty row) -/
 

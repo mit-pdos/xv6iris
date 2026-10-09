@@ -24,7 +24,7 @@ is NOT here (later capstone).
 (→ `rlGateOk` / the reload gate conjunct, over the list `AxSpinT2p1.allRj`),
 `AxSpinT2p1.poBranchB` (→ `AxSpinT2f.poBranch`), `AxSpinT2p1.preB` → `allocPre`
 (`AxSpinT2p1.preOfB`); `AxSpinT2p1.gv1` (a position-guarded value pin) and
-`AxSpinT2p1.pins2B` → `AllocPins2` (`AxSpinT2p1.pins2OfB`: Q18b, `ppArm`, `rlEnd`).  `AxSpinT2p1.notComplete`: a family
+`AxSpinT2p1.pins2B` → `AllocPins2` (`AxSpinT2p1.pins2OfB`: Q18b, `ppArm`).  `AxSpinT2p1.notComplete`: a family
 row that passes holding's lock read and is shorter than `t2KSp q + 108` is NOT `t2Complete`
 (for EVERY parameters: `AxSpinT2f.bDet`/`hbDet` fix `b`/`hb`, and every complete row is at least
 `t2KSp + 108` long); `AxSpinT2p1.notCompleteNil`; `AxSpinT2p1.offCutsB` (the row end is no cut
@@ -50,7 +50,7 @@ continuation B is in; `c` is not yet determined by the prefix and is fixed `fals
     lock-bit / spin / body / RMW / cpu / release value conditions, and the gates: A passes no
     gate (`hb = false`), B passes the `aq` gate: `lk->cpu` = A's cpu ≠ B's);
   `pinsA1`/`pinsB1`: `AllocPins2 (gtAdGd (gT1 E)) h q` (Q18b on nextpid 1 live on A's row;
-    `ppArm` and the interim `rlEnd` vacuous: neither row ends at a reload cut).  The 18 reload
+    `ppArm` vacuous; the former interim `rlEnd` is deleted, AxSpinT2f §5).  The 18 reload
     VALUES are now `allocPre`'s reload gates (`rlGatesB`), checked on every reload the rows
     continue past (on A's row: Option V returns and s1 reloads up to `t2KBd`; on B's row:
     holding's `hdMy`/`hdRet`/`hdS1` on its long arm);
@@ -274,22 +274,21 @@ theorem AxSpinT2p1.gv1Of {row : List Lbl} {k : Nat} {x : Option (List (BitVec 8)
     decide_eq_true_eq] at h
   exact h
 
-/-- `AllocPins2` as a Bool, on the row (Q18b, `ppArm`, and the interim `rlEnd`). -/
+/-- `AllocPins2` as a Bool, on the row (Q18b, `ppArm`). -/
 def AxSpinT2p1.pins2B (row : List Lbl) (q : T2Prm) (_i : Agent) : Bool :=
   optAll (valAt row (t2KBd q)) (fun vs => !decide ((wordOfBytes 4 vs : BitVec 32) = 1000#32) &&
     decide ((wordOfBytes 4 vs : BitVec 32).toNat + 1 < 2 ^ 32)) &&
   optAll (valAt row (t2KBd q)) (fun vs => (List.range 64).all fun j =>
     optAll (valAt row (t2KBd q + 1 + j))
       (fun v => !decide ((wordOfBytes 4 v : BitVec 32) = wordOfBytes 4 vs))) &&
-  optAll (valAt row (t2KPp q + 6)) (fun vn => decide ((addiwm1 (ldRes false 4 vn) != zero_reg) = q.c)) &&
-  AxSpinT2p1.allRj.all fun x => !decide (row.length = rlPos x q) || AxSpinT2p1.rlGateB x row q
+  optAll (valAt row (t2KPp q + 6)) (fun vn => decide ((addiwm1 (ldRes false 4 vn) != zero_reg) = q.c))
 
 /-- **Soundness of `pins2B`.** -/
 theorem AxSpinT2p1.pins2OfB (GD : Gdexec) (i : Agent) (q : T2Prm) :
     AxSpinT2p1.pins2B (AxOpsem.grow GD i) q i = true → AllocPins2 GD i q := by
   intro h
   simp only [AxSpinT2p1.pins2B, Bool.and_eq_true, and_assoc] at h
-  obtain ⟨h9, h10, h13, h20⟩ := h
+  obtain ⟨h9, h10, h13⟩ := h
   have gv := gvRow GD i
   refine
     { npNowrap := fun vs hv => by
@@ -302,11 +301,7 @@ theorem AxSpinT2p1.pins2OfB (GD : Gdexec) (i : Agent) (q : T2Prm) :
         have h2' := optAllOf (List.all_eq_true.1 h1' j (List.mem_range.2 hj)) v
           (by rw [← gv]; exact hv')
         simpa using h2'
-      ppArm := fun vn hv => of_decide_eq_true (optAllOf h13 vn (by rw [← gv]; exact hv))
-      rlEnd := fun x hx => by
-        have h1 := List.all_eq_true.1 h20 x (AxSpinT2p1.memRj x)
-        simp only [hx, decide_true, Bool.not_true, Bool.false_or] at h1
-        exact AxSpinT2p1.rlGateOfB x _ q h1 }
+      ppArm := fun vn hv => of_decide_eq_true (optAllOf h13 vn (by rw [← gv]; exact hv)) }
 
 /-- A family row that stops before release (`< t2KSp q + 108`) and passes holding's lock read
 is NOT complete (for ANY parameters: push_off's arm and holding's lock bit are fixed by the row,

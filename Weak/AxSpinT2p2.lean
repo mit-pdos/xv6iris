@@ -210,7 +210,7 @@ variable (E : List (List Eitem))
 theorem preA2 : allocPre (AxOpsem.grow (gtAdGd (gT2 E)) 0) qA2 0 (sZ 0) (AxSpinT2a.pEx 0) := by
   rw [growA2]; exact AxSpinT2p1.preOfB _ _ _ _ _ preLit2.1
 
-/-- **`AllocPins2`** for A (Q18b / `ppArm` vacuous; `rlEnd` live: the row ends at `37 = rlPos .hdS1
+/-- **`AllocPins2`** for A (Q18b / `ppArm` vacuous; the row ends at `37 = rlPos .hdS1
 qA2`, holding's s1 reload read `pid_lock`). -/
 theorem pinsA2 : AllocPins2 (gtAdGd (gT2 E)) 0 qA2 := by
   apply AxSpinT2p1.pins2OfB; rw [growA2]; exact pinsLit2.1
