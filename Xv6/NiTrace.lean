@@ -161,18 +161,24 @@ its observable form, and the strong instance.
 8. **fork is DERIVED** (NI joint fork lane F3, rulings JF-R1…R7; re-cut by
    NI M3 quotas Q-2 on the `verified-quota` kernel): in the class at every
    key, its answer is `usysForkAns ι`, read off M0's row `usysDetFork` at the
-   cited ι (`niDetRow_fork`).  What it is derived FROM: the pid history at
-   the cited position (NI M4 pids, on the pid kernel: `pidPickS`, the
-   actor's slot plus `NPROC` times its own allocation count plus one, and
-   the quota's `-1` once that count is `PIDQ` -- the actor's own count in
-   the cited prefix; lane P-1 re-states this item) and the slot ledger's `SFull` at
-   the cited position, which the ledger's invariant (`sevWf`, read through
-   `SlotLed.sFullRcpt`'s window) allows only after every slot was occupied at
-   some instant of the round's scan window.  `forkOk ι := ¬ ι.sFull ∧
-   ownAllocs ι.act ι.pev < PIDQ` (NI M4 pids): fork
-   DECLASSIFIES THE PID HISTORY AND `SFull` ONLY.  What `H` CONCEDES: the
+   cited ι (`niDetRow_fork`).  What it is derived FROM (NI M4 pids P-1, on
+   the pid kernel `verified-quota` 975109bc): the caller's OWN FORK COUNT
+   at the citation, `ι.pown` (the actor's allocations in the cited pid
+   prefix) -- the pid is `pidPickS ι.act`, `slot + NPROC·(own + 1)`, the
+   actor's slot plus `NPROC` times its own count plus one -- and the slot
+   ledger's `SFull` at the cited position, which the ledger's invariant
+   (`sevWf`, read through `SlotLed.sFullRcpt`'s window) allows only after
+   every slot was occupied at some instant of the round's scan window.
+   `forkOk ι := ¬ ι.sFull ∧ ι.pown < PIDQ`: the `-1` is the cited `SFull`
+   or the own count at the cap `PIDQ`.  THE PID ORDER IS NOT READ: every
+   other actor's allocations and frees, the live set and the counter leave
+   the row (`UsysDet.usysDet_ownP`: M0's row at ι is its row at `ι.ledP`,
+   whose pid prefix is a canonical list of the own count's length; false on
+   c1fd3cc7, whose fork read `pidPick` of the whole cited prefix).  Fork
+   DECLASSIFIES THE OWN COUNT AND `SFull` ONLY.  What `H` CONCEDES: the
    global slot-occupancy timeline (`SOcc`/`SVac`, unlabelled, with slot
-   indices), the scan outcomes and the other actors' pid events.  The kernel's
+   indices), the scan outcomes and the pid history, which the history
+   hypotheses of the roots through `xv6NiDetQ` still compare.  The kernel's
    cited row demands a POSITIVE reason on `-1` (`SyscallDefs.syscEvRow`: the
    cited slot prefix ends in the actor's `SFull`, ruling JF-R5, or -- NI M4
    pids -- the cited pid prefix spends the actor's share), so neither

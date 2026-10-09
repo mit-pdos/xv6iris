@@ -165,6 +165,18 @@ theorem ownAllocs_take_lt (act : BitVec 64) (h : List Pev) (i : Nat) (p : BitVec
     omega
   omega
 
+/-- (NI M4 pids P-1) A canonical list of `n` allocations by `act` counts `n`:
+the own count is all `UsysDet.UIota.ledP` keeps of the pid prefix. -/
+theorem ownAllocs_replicate (act : BitVec 64) (n : Nat) (p : BitVec 32) :
+    ownAllocs act (List.replicate n (.PAlloc act p)) = n := by
+  unfold ownAllocs; rw [List.countP_replicate]; simp [isAllocOf]
+
+/-- (NI M4 pids P-1) The partition's pick reads the history through the own
+count only. -/
+theorem pidPickS_congr {act : BitVec 64} {h h' : List Pev} (hc : ownAllocs act h = ownAllocs act h') :
+    pidPickS act h = pidPickS act h' := by
+  unfold pidPickS; rw [hc]
+
 theorem pevWf_nil : pevWf [] := by
   intro i a p h; simp at h
 

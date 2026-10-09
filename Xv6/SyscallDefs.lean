@@ -268,7 +268,7 @@ entry's permission view gives (`UsysDet.usysWaitFitsAt` at `permOf V.upt.um
 V.sz`: the reap, the window's prefix with nothing reaped, or `-1` with
 nothing moved); fork's (NI joint fork lane F3) `UsysDet.usysForkAns ι` --
 on success (`forkOk ι`: the cited slot prefix does not end in the actor's
-`SFull`, and -- NI M4 pids -- the actor's own count in `ι`'s pid prefix is
+`SFull`, and -- NI M4 pids -- the actor's own count `ι.pown` in `ι`'s pid prefix is
 below the quota `PIDQ`) the pid `pidPickS ι.act` of `ι`'s pid prefix (the
 partition's pick), `ι`'s family prefix ending
 in the round's `ZFork` of that pid at the generation the children column
@@ -304,7 +304,7 @@ def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName c
     (forkOk ι → (∃ (hz : List Zev) (i : Nat),
         ι.zev = hz ++ [.ZFork ι.act i (BitVec.ofNat 32 (pidPickS ι.act ι.pev)) (usysForkGen ι)]) ∧
       cs' = cs ∪ {usysForkGen ι}) ∧
-    (¬ forkOk ι → (ι.sFull ∨ ownAllocs ι.act ι.pev = PIDQ) ∧ cs' = cs)) ∧
+    (¬ forkOk ι → (ι.sFull ∨ ι.pown = PIDQ) ∧ cs' = cs)) ∧
   (syscNum V = USYS_sbrk →
     usysSbrkFitsAt V.sz.toNat (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) V.pvLazy ι
       (tfW V'.tf (tfArgIdx 0)) V'.sz.toNat V'.pvLazy) ∧

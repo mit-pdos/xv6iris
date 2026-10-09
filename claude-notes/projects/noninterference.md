@@ -8759,6 +8759,39 @@ Lane `lane/pid`, one commit on `lean-quota` 290f9ee68.  Nothing ticked; the four
   count's length reproduces them), scope 8's re-statement; `usysDet_mem`'s fork range can use
   `PidEv.pidPickS_le`.  P-2: `NiPos.pown`, `detInP`, `niBelowP`, the fifteenth root, scope 18.
 
+### M4 pids P-1 as landed (2026-10-09)
+
+Lane `lane/pid`, one commit on P-0 (89cd85867).  Nothing ticked; the fourteen root statements are
+byte-identical (`Xv6/LinkNiAdequacy.lean` untouched).  THE CLOSURE holds as designed.
+
+- **`PidEv`:** `ownAllocs_replicate act n p : ownAllocs act (List.replicate n (.PAlloc act p)) = n`
+  (`List.countP_replicate`); `pidPickS_congr : ownAllocs act h = ownAllocs act h' → pidPickS act h =
+  pidPickS act h'` (the pick reads the history through the own count only).
+- **`UsysDet` (in place):** `UIota.pown ι := ownAllocs ι.act ι.pev`; `forkOk ι := ¬ ι.sFull ∧ ι.pown <
+  PIDQ`; `usysForkPid` already read `pidPickS ι.act ι.pev` (P-0) and is unchanged, as are `usysForkAns`,
+  `usysDetFork`, `usysDet_fork`, `usysDetRet_fork` and `usysDet_ledQ`.  `UIota.ledP ι := { ι.ledQ with pev
+  := List.replicate ι.pown (.PAlloc ι.act 0#32) }`, `UIota.ledP0 ι := { ι.ledQ with pev := [] }`,
+  `UIota.ledP_act` (`rfl`), `UIota.ledP_pown` (`ownAllocs_replicate`).
+- **THE CLOSURE** `usysDet_ownP (n : Int) (W : Uvis) (ι : UIota) : usysDet n W ι = usysDet n W ι.ledP`:
+  `usysDet_ledQ`, then a general lemma `usysDet_pev n W ι h (hc : ownAllocs ι.act h = ι.pown) : usysDet n
+  W { ι with pev := h } = usysDet n W ι` at `ι.ledQ`.  Its proof: `forkOk` agrees (the own count),
+  `usysForkPid` agrees (`pidPickS_congr`), hence `usysForkAns`; then `unfold usysDet usysDetFork
+  usysDetRet`, `rw` the answer everywhere, split on `forkOk` for the children set, and the rest is `rfl`.
+  ONLY FORK reads `pown` (in `forkOk` and through `pidPickS`); no other row reads `pev` at all.  Unlike
+  Q-3's `usysDet_ledQ` the branches cannot be closed by `rfl` one by one: the quiet members' bump reads
+  `usysDetRet n` at an unknown `n`, whose fork arm is `usysForkAns`, so the answer is rewritten first.
+- **`SyscallDefs.syscEvRow`'s fork clause:** the `-1` reason `ι.sFull ∨ ι.pown = PIDQ` (was `ownAllocs
+  ι.act ι.pev = PIDQ`; definitionally equal, `SyscallArmsFork` untouched).
+- **Honest scope 8** (`NiTrace`) restated: fork's pid is `slot + NPROC·(own + 1)` at the citation's own
+  count, its `-1` the cited `SFull` or the own count at the cap `PIDQ`; the pid order is not read
+  (`usysDet_ownP`); the histories of the roots through `xv6NiDetQ` still compare it.
+- **Not done:** `usysDet_mem`'s `hfr` stays a premise -- `pidPickS_le` needs the actor to be a slot
+  address (`act = procAddr j`), which an arbitrary `ι` does not give, so discharging it would add a
+  premise, not remove one.
+- **Gate:** `tools/ci/run_all.sh`, all 11 steps from a clean proof build (`rm -rf .lake/build`; build 254 s):
+  lint (14 roots), check-gen (20 ok), audit (PASS), tcb, reports (coverage as baseline), vtest,
+  test-tools.  No baseline moved.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

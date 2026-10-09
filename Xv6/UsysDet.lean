@@ -274,6 +274,24 @@ def UIota.led (ι : UIota) : UIota := { ι with cacc := [], cpos := [], fpos := 
 answer reads on the quota kernel (`usysDet_ledQ`). -/
 def UIota.ledQ (ι : UIota) : UIota := { ι.led with kev := [] }
 
+/-- (NI M4 pids P-1) **The caller's OWN fork count at the citation**: the
+allocations the actor made in the cited pid prefix (`PidEv.ownAllocs`) --
+all fork's row reads of the pid history on the pid kernel (`usysDet_ownP`). -/
+def UIota.pown (ι : UIota) : Nat := ownAllocs ι.act ι.pev
+
+/-- (NI M4 pids P-1) **The ledger part without the allocator and with the pid
+history reduced to the OWN COUNT** (a canonical list of that length, labelled
+with the actor): what every answer reads on the pid kernel (`usysDet_ownP`). -/
+def UIota.ledP (ι : UIota) : UIota := { ι.ledQ with pev := List.replicate ι.pown (.PAlloc ι.act 0#32) }
+
+/-- (NI M4 pids P-1) **The history part the two-run hypothesis compares**: the
+ledger part with no allocator and no pid history at all (`xv6NiDetP`). -/
+def UIota.ledP0 (ι : UIota) : UIota := { ι.ledQ with pev := [] }
+
+theorem UIota.ledP_act (ι : UIota) : ι.ledP.act = ι.act := rfl
+
+theorem UIota.ledP_pown (ι : UIota) : ι.ledP.pown = ι.pown := ownAllocs_replicate _ _ _
+
 instance : Inhabited UIota := ⟨UIota.boot⟩
 
 /-- **The family ledger's reading at the actor** (NI G1d): the lowest zombie
@@ -327,7 +345,7 @@ instance (ι : UIota) : Decidable ι.sFull := decidable_of_iff _ (UIota.sFull_if
 actor's exhaustion (NI M3 quotas Q-2: the allocator conjunct `ι.kOk` is
 gone -- a credited kalloc is never null) and (NI M4 pids) the actor's pid
 share is not spent at the cited pid prefix (its own count below `PIDQ`). -/
-def forkOk (ι : UIota) : Prop := ¬ ι.sFull ∧ ownAllocs ι.act ι.pev < PIDQ
+def forkOk (ι : UIota) : Prop := ¬ ι.sFull ∧ ι.pown < PIDQ
 
 instance (ι : UIota) : Decidable (forkOk ι) := by unfold forkOk; infer_instance
 
@@ -1605,6 +1623,45 @@ theorem usysDet_ledQ (n : Int) (W : Uvis) (ι : UIota) : usysDet n W ι = usysDe
   rw [if_neg hs, if_neg hs]
   -- the quiet members (getpid, uptime's tick count, the console write, pause) and the rest
   rfl
+
+/-- (NI M4 pids P-1) **M0's row reads the pid history through the own count
+only**: two citations that differ only in their pid prefix, with the same own
+count of the actor, have one row.  Every member but fork reads no `pev`
+(`rfl`); fork reads it in `forkOk` (`ι.pown < PIDQ`) and `usysForkPid`
+(`pidPickS ι.act`, a function of the own count: `PidEv.pidPickS_congr`). -/
+theorem usysDet_pev (n : Int) (W : Uvis) (ι : UIota) (h : List Pev)
+    (hc : ownAllocs ι.act h = ι.pown) : usysDet n W { ι with pev := h } = usysDet n W ι := by
+  have hok : forkOk { ι with pev := h } ↔ forkOk ι := by
+    unfold forkOk
+    exact and_congr Iff.rfl (by show ownAllocs ι.act h < PIDQ ↔ ι.pown < PIDQ; rw [hc])
+  have hpid : usysForkPid { ι with pev := h } = usysForkPid ι := by
+    unfold usysForkPid; exact congrArg _ (congrArg _ (pidPickS_congr hc))
+  have hans : usysForkAns { ι with pev := h } = usysForkAns ι := by
+    unfold usysForkAns; rw [hpid]
+    by_cases hk : forkOk ι
+    · rw [if_pos (hok.mpr hk), if_pos hk]
+    · rw [if_neg (mt hok.mp hk), if_neg hk]
+  -- fork's answer and children set (in `usysDetFork`, and in `usysDetRet`'s fork arm) read the
+  -- pid prefix through the own count; no other member reads it
+  unfold usysDet usysDetFork usysDetRet
+  rw [hans]
+  by_cases hk : forkOk ι
+  · rw [if_pos (hok.mpr hk), if_pos hk]; rfl
+  · rw [if_neg (mt hok.mp hk), if_neg hk]; rfl
+
+/-- **THE CLOSURE** (NI M4 pids P-1, design "M4 pids design (2026-10-09)"):
+no class row reads the pid history beyond the caller's OWN fork count -- M0's
+row at `ι` is its row at `ι.ledP`, `ι`'s ledger part without the allocator
+(`usysDet_ledQ`) whose pid prefix is a canonical list of `ι.pown` allocations
+by the actor (`UIota.ledP_pown`).  Per member: fork reads the pid prefix in
+`forkOk` (the own count below `PIDQ`) and in `usysForkPid` (`pidPickS ι.act`,
+the slot plus `NPROC` times the own count plus one); every other member reads
+no pid prefix (`usysDet_pev`).  FALSE on c1fd3cc7, whose fork answered
+`pidPick` of the whole cited prefix (the global cyclic scan). -/
+theorem usysDet_ownP (n : Int) (W : Uvis) (ι : UIota) : usysDet n W ι = usysDet n W ι.ledP := by
+  rw [usysDet_ledQ n W ι]
+  exact (usysDet_pev n W ι.ledQ (List.replicate ι.pown (.PAlloc ι.act 0#32))
+    (ownAllocs_replicate ι.act ι.pown 0#32)).symm
 
 /-- **wait's fit, at the key's readings** (NI G1d; NI M2-G1e): the answer
 `r`, the children set `cs'` and the image `M'` are the ones the family
