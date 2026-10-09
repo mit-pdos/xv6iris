@@ -95,6 +95,8 @@ theorem CertWPOfCertPos (img : Image) (dok wok : Int → Nat → Prop) (kind : D
     exact .pIf ws s k n va req kk t vs h1 h2 h3 h4 (ih ws k HR HX)
   | cEnd d r n va req kk t h1 h2 h3 =>
     intro ws k _ _; exact .pEnd ws d r k n va req kk t h1 h2 h3
+  | cWrEnd d r n va req kk t h1 h2 =>
+    intro ws k _ _; exact .pWrEnd ws d r k n va req kk t h1 h2
   | cDrd b r n va req kk t h1 h2 h3 h4 h5 _ ih =>
     intro ws k HR HX
     obtain ⟨HR0, HR'⟩ := okFromSucc _ _ _ HR

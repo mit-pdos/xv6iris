@@ -63,6 +63,10 @@ region form is too coarse for whole-kernel use; the positional fix is expressibl
    `LFence false false false false` (`annLabelSf`) and banks the announced bits, so
    `AStepFence` is its only step (`AxCert2.sfAnnPstep`, `AxCert2.sfAnnAstepInv`), one row item,
    no flow, `Hloc` advancing the local interpretation; the continuation takes any `ib'`.
+7. (Lean-only, Theorem 2 / P4) the case of the Lean-only `Cert.cWrEnd` (AxCert deviation 11) is
+   the Lean-only `AxCert2.wpdStuckWriteM` (§2b) — the write twin of `wpdStuckReadM`: a plain
+   RAM write at the row end has no step (`storeNodePstep`: its only program step is the store,
+   whose `AStepWrite` needs a row item), so its post is `Hmid`'s (the write node is mid).
 
 **Rocq → Lean name map.**  `ebar_label_fence` `ebarLabelFence` (existing), `barrier_pstep`
 `barrierPstep`, `xread_pstep` `xreadPstep`, `xwrite_pstep` `xwritePstep`, `bpos` `AxCert2.bpos`
@@ -75,7 +79,7 @@ region form is too coarse for whole-kernel use; the positional fix is expressibl
 `wpdInstrOfCert`, notations `CFk` `CFk`, `CRes` `CRes`.
 
 **Dropped:** nothing (Rocq 22 definitions/lemmas + 2 notations; Lean 21 + `ebarLabelFence` reused,
-+ 2 abbrevs, + 7 Lean-only).  The section premise `Hntext` is dropped (deviation 1).
++ 2 abbrevs, + 8 Lean-only).  The section premise `Hntext` is dropped (deviation 1).
 **Not ported:** the Ltac `silent_psC` (↦ `AxSymEngine3.wpdSilentNode3M`) and the
 `Print Assumptions` lines (the lint's axiom check covers them).
 -/
@@ -928,6 +932,70 @@ theorem wpdDwrNodeM (n va : Nat)
   · iintro %Heq
     iapply (Hmid GD _ HGD (by exact trivial) Heq)
 
+/-! # 2b. (Lean-only, deviation 7) THE STUCK WRITE: a plain RAM write at the row end -/
+
+section stuckWrite
+variable {hlc : HasLC} {GF : BundledGFunctors} [InvGS_gen hlc GF] [AxirisG GF] [Axpol]
+
+/-- (Lean-only, P4) A plain RAM WRITE at the row end is stuck: no row item ⇒ no `AStepWrite`, and
+a plain store node has no other program step (`storeNodePstep`); the write node is a `midState`,
+so the post is `Hmid`'s.  The write twin of `wpdStuckReadM` (AxSymCtl); the bridge case of
+`AxCert.Cert.cWrEnd`. -/
+theorem AxCert2.wpdStuckWriteM (M : Gdexec → Prop) (i : Agent) (Φ : Athread → IProp GF)
+    (cpu : CPU) (G : Gdexec → Prop)
+    (HG : ∀ GD, M GD → AxirisG.gconstInterp (GF := GF) GD ⊢ ⌜G GD⌝)
+    (Hmid : ∀ GD s, G GD → midState s → s.atK = (AxOpsem.grow GD i).length →
+      ⊢ postLifting Φ i s)
+    (kend : Nat) (HGl : ∀ GD, G GD → (AxOpsem.grow GD i).length = kend) (n va : Nat)
+    (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
+    (KK : Result (Option Bool) Arch.abort → SailM Unit) (ib : Ibch)
+    (A : RegFile → Prop)
+    (HA : ∀ rs rs', A rs → regsAgree AxRunClose.pinReg rs' rs → A rs')
+    (Hdev : devAddr req.pa = false) (Hlat : (classify req.access_kind).akLatest = false) :
+    ∀ rs, A rs →
+    ⊢ wpdM M .MaybeStuck i ⟨.PHart cpu (.impure (.ok (.memWrite n va req)) KK) rs none ib, kend⟩ Φ := by
+  intro rs HAr
+  let P : Athread → Prop := fun s => ∃ rs1 ib1,
+    s = ⟨.PHart cpu (.impure (.ok (.memWrite n va req)) KK) rs1 none ib1, kend⟩ ∧ A rs1
+  have Hnord : ∀ GD s1 id K, G GD → P s1 → ¬ areadStep (AxOpsem.grow GD i) s1 id K := by
+    rintro GD s1 id K - ⟨rs1, ib1, rfl, -⟩
+    exact AxEpiLedgerSd.storeNoRead _ cpu n va req KK rs1 ib1 kend id K Hdev Hlat
+  have Hclos : ∀ GD s1 l s2, G GD → P s1 → AxOpsem.astepProg (AxOpsem.grow GD i) s1 l s2 →
+      wlWdata l = none ∧ s2.atK = s1.atK ∧ (P s2 ∨ False) := by
+    rintro GD s1 l s2 HGD ⟨rs1, ib1, rfl, -⟩ Hst
+    exfalso
+    cases Hst with
+    | AStepAdmin _ _ d _ p' d' hadm hps =>
+      obtain ⟨v, -, rfl, -⟩ := storeNodePstep cpu n va req KK rs1 ib1 d l p' d' Hdev Hlat hps
+      exact (hadm : False).elim
+    | AStepWrite _ _ d _ lb p' d' hrow _ _ _ _ =>
+      rw [List.getElem?_eq_none (by rw [HGl GD HGD]; exact Nat.le_refl _)] at hrow
+      cases hrow
+    | AStepFence _ _ d _ lb p' d' _ hf _ hps =>
+      obtain ⟨v, -, rfl, -⟩ := storeNodePstep cpu n va req KK rs1 ib1 d l p' d' Hdev Hlat hps
+      simp [wlFence] at hf
+  have Hwire : ∀ s1 s2, P s1 → awire s1 s2 → P s2 ∨ False := by
+    rintro s1 s2 ⟨rs1, ib1, rfl, HA1⟩ Hw
+    obtain ⟨hk, hp⟩ := awireAeqv _ _ Hw
+    obtain ⟨p2, k2⟩ := s2
+    simp only at hk hp
+    subst hk
+    cases p2 with
+    | PDisk _ => exact hp.elim
+    | PHart c m2 rs2 fn2 ib2 =>
+      obtain ⟨rfl, rfl, rfl, rfl, hag⟩ := hp
+      exact .inl ⟨rs2, ib2, rfl, HA rs1 rs2 HA1 hag⟩
+  iapply (wpdOfClosedRunGM M i G P (fun _ => False) Φ HG Hnord (fun GD s1 l s2 h1 h2 h3 _ => Hclos GD s1 l s2 h1 h2 h3) Hwire) $$
+    %⟨.PHart cpu (.impure (.ok (.memWrite n va req)) KK) rs none ib, kend⟩ %⟨rs, ib, rfl, HAr⟩
+  isplit
+  · iintro %s2 %H
+    exact H.elim
+  · iintro %GD %s1 %HGD %HP1 %Heq
+    obtain ⟨rs1, ib1, rfl, -⟩ := HP1
+    iapply (Hmid GD _ HGD (by exact trivial) Heq)
+
+end stuckWrite
+
 /-! # 3. THE BRIDGE -/
 
 include HG Hmid Htext Hflow Hloc HnoRmw HnoSplit in
@@ -1003,6 +1071,13 @@ theorem wpdOfCertM (Q : Cst → Unit → ExecSt → Prop) (m : SailM Unit) (s : 
     iapply (wpdStuckReadM M i Φ cpu G HG Hmid kk (fun GD h => Hb' GD h) n va req k ib
       (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
       (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hlat Hnf rs Hag)
+  | cWrEnd d r n va req k t Hdev Hlat =>
+    intro rs ib kk Hag Hb
+    have Hb' : ∀ GD, G GD → (AxOpsem.grow GD i).length = kk + 0 := Hb
+    iintro - -
+    iapply (AxCert2.wpdStuckWriteM M i Φ cpu G HG Hmid kk (fun GD h => Hb' GD h) n va req k ib
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hlat rs Hag)
   | cDrd b r n va req k t Hkd Hdev Hlat Hnf Hdok _ IH =>
     intro rs ib kk Hag Hb
     have hconv : CResM M dok kind i Out .CPend ⊢ FldM M dok i Out := by

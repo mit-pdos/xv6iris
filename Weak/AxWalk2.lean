@@ -418,6 +418,13 @@ theorem wpdOfCertWPM (Q : List (Nat × Wev) → Cst → Nat → Unit → ExecSt 
     iapply (wpdStuckReadM M i Φ cpu G HG Hmid k (fun GD h => Hb' GD h) n va req kk ib
       (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
       (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hlat Hnf rs Hag)
+  | pWrEnd ws d r k n va req kk t Hdev Hlat =>
+    intro rs ib Hag Hb
+    have Hb' : ∀ GD, G GD → (AxOpsem.grow GD i).length = k + 0 := Hb
+    iintro - - - - -
+    iapply (AxCert2.wpdStuckWriteM M i Φ cpu G HG Hmid k (fun GD h => Hb' GD h) n va req kk ib
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hlat rs Hag)
   | pDrd ws b r k n va req kk t Hkd Hdev Hlat Hnf Hdok Hp _ ih =>
     intro rs ib Hag Hb
     have hconv : CResM M dok kind i Out .CPend ⊢ FldM M dok i Out := by

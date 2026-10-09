@@ -59,6 +59,12 @@ wrapper `AxCertP2.wpdInstrOfCertP`.
    split an announce on `sfAnnB` (the sfence arm consumes like a fence).  The bridge gains a `cSf`
    arm via `AxCert2.wpdSfNodeM` (no pin refutation: `CResK` carries no pin).  Lean-only,
    file-qualified: `AxCertP2.annCons` (the announce inversion) and `AxCertP2.PFSf` (the `PF` step).
+6. (Lean-only, Theorem 2 / P4; AxCert deviation 11) `Cert.cWrEnd` (a plain write at `BFin 0`, the
+   row end): `CInvO`'s `memWrite` arm is a disjunction — the consuming write (`cDwr`/`cXwr`, as
+   before) or the stuck write (`csB = BFin 0`, `akLatest = false`).  `wrCons` therefore takes
+   `0 < b` (STATEMENT CHANGE; its only users are `FamBound` / `FamRBound` here), and `FamBound` /
+   `FamRBound` split a write on the budget (at `a = 0` the shift `FamStepP0`, as a read).  The
+   bridge's `cWrEnd` arm is `AxCert2.wpdStuckWriteM`.
 
 **Rocq → Lean name map.**  `CInvO` `CInvO`, `CInv` `CInv`, `cinv` `AxCertP2.cinv` (`Weak.cinv`
 exists in WeakRvwmoCert3), `Qc` `Qc`, `FamP` `FamP`, `isR` `AxCertP2.isR` (`Weak.isR` exists in WeakAxiomatic), `v0` `v0`, `img_bytes_len`
@@ -115,8 +121,9 @@ def CInvO {X : Type} (QE : Cst → Sail.Error exception → ExecSt → Prop)
          ∀ vs : List (BitVec 8), vs.length = n →
            ∃ aq, AxCert.Cert img dok kind QE Q ⟨.CRmwR aq vs, s.csB, s.csR⟩
              (k (.Ok (wordOfBytes n vs, none))) t)
-  | .ok (.memWrite _ _ _), k =>
-      ∃ b' d', s.csB = bsucc b' ∧ AxCert.Cert img dok kind QE Q ⟨d', b', false⟩ (k (.Ok (some true))) t
+  | .ok (.memWrite _ _ req), k =>
+      (∃ b' d', s.csB = bsucc b' ∧ AxCert.Cert img dok kind QE Q ⟨d', b', false⟩ (k (.Ok (some true))) t)
+      ∨ (s.csB = .BFin 0 ∧ (classify req.access_kind).akLatest = false)
   | .ok (.readRam _ _ _), _ => False
   | .ok (.writeRam _ _ _ _), _ => False
   | .ok (.barrier bk), k =>
@@ -157,11 +164,12 @@ theorem AxCertP2.cinv {X : Type} {QE : Cst → Sail.Error exception → ExecSt �
   | cEnd d r n va req k t _ h2 h3 => exact Or.inr (Or.inr (Or.inl ⟨rfl, h2, h3⟩))
   | cDrd b r n va req k t _ _ h2 h3 _ h =>
     exact Or.inr (Or.inr (Or.inr (Or.inl ⟨b, rfl, rfl, h2, h3, h⟩)))
-  | cDwr b r n va req k t v _ _ _ _ _ h => exact ⟨b, _, rfl, h⟩
+  | cDwr b r n va req k t v _ _ _ _ _ h => exact Or.inl ⟨b, _, rfl, h⟩
   | cFence d b r bk k t _ h => exact ⟨b, rfl, h⟩
   | cXrd b r n va req k t _ _ h2 _ h =>
     exact Or.inr (Or.inr (Or.inr (Or.inr ⟨rfl, h2, fun vs hl => ⟨_, h vs hl⟩⟩)))
-  | cXwr aq rvs b r n va req k t v _ _ _ _ _ h => exact ⟨b, _, rfl, h⟩
+  | cXwr aq rvs b r n va req k t v _ _ _ _ _ h => exact Or.inl ⟨b, _, rfl, h⟩
+  | cWrEnd d r n va req k t _ h2 => exact Or.inr ⟨rfl, h2⟩
   | cIa s n w k t hs h => exact Or.inl ⟨hs, h⟩
   | cSf d b r n w k t hs h => exact Or.inr ⟨hs, b, rfl, h⟩
   | cBa s _ _ k t h => exact h
@@ -291,9 +299,13 @@ theorem wrCons {X : Type} {QE : Cst → Sail.Error exception → ExecSt → Prop
     {req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak}
     {k : Result (Option Bool) Arch.abort → SailM X} {t : ExecSt} :
     AxCert.Cert img dok kind QE Q ⟨d, .BFin b, r⟩ (.impure (.ok (.memWrite n va req)) k) t →
+    0 < b →
     ∃ b' d', b = b' + 1 ∧ AxCert.Cert img dok kind QE Q ⟨d', .BFin b', false⟩ (k (.Ok (some true))) t := by
-  intro H
-  obtain ⟨b', d', Hb, H⟩ := AxCertP2.cinv img dok kind H
+  intro H Hb0
+  obtain ⟨b', d', Hb, H⟩ | ⟨Hb, -⟩ := AxCertP2.cinv img dok kind H
+  case inr =>
+    simp only [Bud.BFin.injEq] at Hb
+    omega
   cases b' with
   | BInf => cases Hb
   | BFin b' =>
@@ -414,15 +426,22 @@ theorem FamBound {X : Type} (m : SailM X) :
                 exact ⟨d', r', trivial, H⟩) HF)
               omega
       case memWrite n va req =>
-        obtain ⟨d0, r0, -, Hc0⟩ := HF 0
-        obtain ⟨a', -, Ha, -⟩ := wrCons img dok kind Hc0
-        obtain rfl : a = a' + 1 := by omega
-        have := IH (Result.Ok (some true)) t a' c (FamStepP img dok kind _ _ _ _ t t (a' + 1) a' c (by
-          intro d rr j _ Hc
-          obtain ⟨b', d', Hb, H⟩ := wrCons img dok kind Hc
-          obtain rfl : b' = a' + j := by omega
-          exact ⟨d', false, trivial, H⟩) HF)
-        omega
+        cases a with
+        | zero =>
+          exfalso
+          have := IH (Result.Ok (some true)) t 0 (c + 1) (FamStepP0 img dok kind _ _ _ _ t t c (by
+            intro d rr j _ Hc
+            obtain ⟨b', d', Hb, H⟩ := wrCons img dok kind Hc (Nat.succ_pos j)
+            obtain rfl : b' = j := by omega
+            exact ⟨d', false, trivial, H⟩) HF)
+          omega
+        | succ a' =>
+          have := IH (Result.Ok (some true)) t a' c (FamStepP img dok kind _ _ _ _ t t (a' + 1) a' c (by
+            intro d rr j _ Hc
+            obtain ⟨b', d', Hb, H⟩ := wrCons img dok kind Hc (by omega)
+            obtain rfl : b' = a' + j := by omega
+            exact ⟨d', false, trivial, H⟩) HF)
+          omega
       case barrier bk =>
         obtain ⟨d0, r0, -, Hc0⟩ := HF 0
         obtain ⟨a', Ha, -⟩ := fenceCons img dok kind Hc0
@@ -540,15 +559,22 @@ theorem FamRBound {X : Type} (m : SailM X) :
                 exact hstep d rr j (a + j) Hd Hc) HF)
               omega
       case memWrite n va req =>
-        obtain ⟨d0, r0, -, Hc0⟩ := HF 0
-        obtain ⟨a', -, Ha, -⟩ := wrCons img dok kind Hc0
-        obtain rfl : a = a' + 1 := by omega
-        have := FamBound img dok kind (k (Result.Ok (some true))) t a' c (FamStepP img dok kind _ _ _ _ t t (a' + 1) a' c (by
-          intro d rr j _ Hc
-          obtain ⟨b', d', Hb, H⟩ := wrCons img dok kind Hc
-          obtain rfl : b' = a' + j := by omega
-          exact ⟨d', false, trivial, H⟩) HF)
-        omega
+        cases a with
+        | zero =>
+          exfalso
+          have := (fun x => FamBound img dok kind (k x)) (Result.Ok (some true)) t 0 (c + 1) (FamStepP0 img dok kind _ _ _ _ t t c (by
+            intro d rr j _ Hc
+            obtain ⟨b', d', Hb, H⟩ := wrCons img dok kind Hc (Nat.succ_pos j)
+            obtain rfl : b' = j := by omega
+            exact ⟨d', false, trivial, H⟩) HF)
+          omega
+        | succ a' =>
+          have := (fun x => FamBound img dok kind (k x)) (Result.Ok (some true)) t a' c (FamStepP img dok kind _ _ _ _ t t (a' + 1) a' c (by
+            intro d rr j _ Hc
+            obtain ⟨b', d', Hb, H⟩ := wrCons img dok kind Hc (by omega)
+            obtain rfl : b' = a' + j := by omega
+            exact ⟨d', false, trivial, H⟩) HF)
+          omega
       case barrier bk =>
         obtain ⟨d0, r0, -, Hc0⟩ := HF 0
         obtain ⟨a', Ha, -⟩ := fenceCons img dok kind Hc0
@@ -875,6 +901,13 @@ theorem AxCertP2.wpdOfCertP (Q : Cst → Unit → ExecSt → Prop) (m : SailM Un
       k ib
       (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
       (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hlat Hnf rs Hag)
+  | cWrEnd d r n va req k t Hdev Hlat =>
+    intro _ rs ib kk Hag Hb _
+    have Hb' : ∀ GD, G GD → (AxOpsem.grow GD i).length = kk + 0 := Hb
+    iintro - -
+    iapply (AxCert2.wpdStuckWriteM rvwmoCatConsistent i Φ cpu G HG Hmid kk (fun GD h => Hb' GD h) n va req k ib
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hlat rs Hag)
   | cDrd b r n va req k t Hkd Hdev Hlat Hnf Hdok _ IH =>
     -- THE DATA READ: positioned inside the window
     intro HPF rs ib kk Hag Hb Hk0

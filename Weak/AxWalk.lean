@@ -289,6 +289,14 @@ inductive CertWP (img : Image) (dok wok : Int → Nat → Prop) (kind : Dkind)
         (kk (.Ok (some true))) t →
       CertWP img dok wok kind pR pX wpin xpin QE Q ws ⟨d, bsucc b, r⟩ k
         (.impure (.ok (.memWrite n va req)) kk) t
+  /-- (Lean-only, P4; as `AxCert.Cert.cWrEnd`) the row has ended: a plain RAM write there is
+  stuck -/
+  | pWrEnd (ws : List (Nat × Wev)) (d : Cdata) (r : Bool) (k : Nat) (n va : Nat)
+      (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
+      (kk : Result (Option Bool) Arch.abort → SailM X) (t : ExecSt) :
+      devAddr req.pa = false → (classify req.access_kind).akLatest = false →
+      CertWP img dok wok kind pR pX wpin xpin QE Q ws ⟨d, .BFin 0, r⟩ k
+        (.impure (.ok (.memWrite n va req)) kk) t
 
 /-! # 3. The kit -/
 
@@ -315,6 +323,7 @@ theorem CertWPMono {X : Type}
   | pIf ws s k n va req kk t vs h1 h2 h3 h4 _ ih =>
     exact .pIf ws s k n va req kk t vs h1 h2 h3 h4 ih
   | pEnd ws d r k n va req kk t h1 h2 h3 => exact .pEnd ws d r k n va req kk t h1 h2 h3
+  | pWrEnd ws d r k n va req kk t h1 h2 => exact .pWrEnd ws d r k n va req kk t h1 h2
   | pDrd ws b r k n va req kk t h1 h2 h3 h4 h5 h6 _ ih =>
     exact .pDrd ws b r k n va req kk t h1 h2 h3 h4 h5 h6 ih
   | pDwr ws b r k n va req kk t v h1 h2 h3 h4 h5 _ ih =>
@@ -362,6 +371,7 @@ theorem CertWPBind {X Y : Type}
   | pIf ws s k n va req kk t vs h1 h2 h3 h4 _ ih =>
     exact .pIf ws s k n va req _ t vs h1 h2 h3 h4 ih
   | pEnd ws d r k n va req kk t h1 h2 h3 => exact .pEnd ws d r k n va req _ t h1 h2 h3
+  | pWrEnd ws d r k n va req kk t h1 h2 => exact .pWrEnd ws d r k n va req _ t h1 h2
   | pDrd ws b r k n va req kk t h1 h2 h3 h4 h5 h6 _ ih =>
     exact .pDrd ws b r k n va req _ t h1 h2 h3 h4 h5 h6 ih
   | pDwr ws b r k n va req kk t v h1 h2 h3 h4 h5 _ ih =>
@@ -456,6 +466,7 @@ theorem CertWPTryCatch {X : Type}
   | pIf ws s k n va req kk t vs h1 h2 h3 h4 _ ih =>
     exact .pIf ws s k n va req _ t vs h1 h2 h3 h4 ih
   | pEnd ws d r k n va req kk t h1 h2 h3 => exact .pEnd ws d r k n va req _ t h1 h2 h3
+  | pWrEnd ws d r k n va req kk t h1 h2 => exact .pWrEnd ws d r k n va req _ t h1 h2
   | pDrd ws b r k n va req kk t h1 h2 h3 h4 h5 h6 _ ih =>
     exact .pDrd ws b r k n va req _ t h1 h2 h3 h4 h5 h6 ih
   | pDwr ws b r k n va req kk t v h1 h2 h3 h4 h5 _ ih =>
@@ -676,6 +687,8 @@ theorem CertWPOfCertW (img : Image) (dok wok : Int → Nat → Prop) (kind : Dki
     intro wsp k hm; exact .pIf _ _ _ _ _ _ _ _ _ h1 h2 h3 h4 (ih wsp k hm)
   | wEnd ws d r n va req kk t h1 h2 h3 =>
     intro wsp k _; exact .pEnd _ _ _ _ _ _ _ _ _ h1 h2 h3
+  | wWrEnd ws d r n va req kk t h1 h2 =>
+    intro wsp k _; exact .pWrEnd _ _ _ _ _ _ _ _ _ h1 h2
   | wDrd ws b r n va req kk t h1 h2 h3 h4 h5 _ ih =>
     intro wsp k hm
     exact .pDrd _ _ _ _ _ _ _ _ _ h1 h2 h3 h4 h5 (HR k).1

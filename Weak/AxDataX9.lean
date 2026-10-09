@@ -239,6 +239,13 @@ inductive CertW (img : Image) (dok wok : Int → Nat → Prop) (kind : Dkind) {X
       CertW img dok wok kind QE Q (ws ++ [.WRmw (paZ req.pa) rvs (WeakInterpProj.wbytes n v)])
         ⟨d, b, r⟩ (k (.Ok (some true))) t →
       CertW img dok wok kind QE Q ws ⟨d, bsucc b, r⟩ (.impure (.ok (.memWrite n va req)) k) t
+  /-- (Lean-only, P4; as `AxCert.Cert.cWrEnd`) the row has ended: a plain RAM write there is
+  stuck -/
+  | wWrEnd (ws : List Wev) (d : Cdata) (r : Bool) (n va : Nat)
+      (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
+      (k : Result (Option Bool) Arch.abort → SailM X) (t : ExecSt) :
+      devAddr req.pa = false → (classify req.access_kind).akLatest = false →
+      CertW img dok wok kind QE Q ws ⟨d, .BFin 0, r⟩ (.impure (.ok (.memWrite n va req)) k) t
 
 section certw
 variable (img : Image) (dok wok : Int → Nat → Prop) (kind : Dkind)
@@ -259,6 +266,7 @@ theorem CertWMono {X : Type} (QE QE' : List Wev → Cst → Sail.Error exception
     exact .wMrd ws d b r n va req k t vs h1 h2 h3 h4 ih
   | wIf ws s n va req k t vs h1 h2 h3 h4 _ ih => exact .wIf ws s n va req k t vs h1 h2 h3 h4 ih
   | wEnd ws d r n va req k t h1 h2 h3 => exact .wEnd ws d r n va req k t h1 h2 h3
+  | wWrEnd ws d r n va req k t h1 h2 => exact .wWrEnd ws d r n va req k t h1 h2
   | wDrd ws b r n va req k t h1 h2 h3 h4 h5 _ ih =>
     exact .wDrd ws b r n va req k t h1 h2 h3 h4 h5 ih
   | wDwr ws b r n va req k t v h1 h2 h3 h4 h5 _ ih =>
@@ -301,6 +309,7 @@ theorem CertWBind {X Y : Type} (QE : List Wev → Cst → Sail.Error exception �
     exact .wMrd ws d b r n va req _ t vs h1 h2 h3 h4 ih
   | wIf ws s n va req k t vs h1 h2 h3 h4 _ ih => exact .wIf ws s n va req _ t vs h1 h2 h3 h4 ih
   | wEnd ws d r n va req k t h1 h2 h3 => exact .wEnd ws d r n va req _ t h1 h2 h3
+  | wWrEnd ws d r n va req k t h1 h2 => exact .wWrEnd ws d r n va req _ t h1 h2
   | wDrd ws b r n va req k t h1 h2 h3 h4 h5 _ ih =>
     exact .wDrd ws b r n va req _ t h1 h2 h3 h4 h5 ih
   | wDwr ws b r n va req k t v h1 h2 h3 h4 h5 _ ih =>
@@ -347,6 +356,7 @@ theorem CertWOfCert (img : Image) (dok wok : Int → Nat → Prop) (kind : Dkind
     exact .wMrd ws d b r n va req k t vs h1 h2 h3 h4 ih
   | cIf s n va req k t vs h1 h2 h3 h4 _ ih => exact .wIf ws s n va req k t vs h1 h2 h3 h4 ih
   | cEnd d r n va req k t h1 h2 h3 => exact .wEnd ws d r n va req k t h1 h2 h3
+  | cWrEnd d r n va req k t h1 h2 => exact .wWrEnd ws d r n va req k t h1 h2
   | cDrd b r n va req k t h1 h2 h3 h4 h5 _ ih =>
     exact .wDrd ws b r n va req k t h1 h2 h3 h4 h5 ih
   | cDwr b r n va req k t v h1 h2 h3 h4 h5 _ ih =>

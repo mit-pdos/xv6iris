@@ -77,6 +77,10 @@ The WPd bridge is `AxCert2`.
    (`bsucc`, as `cFence`) and leaves the data event and the release flag unchanged (the
    all-false fence arms nothing).  Rocq has no counterpart (there the marker is the fetch row
    item).  Its bridge case is `AxCert2.wpdSfNodeM`.
+11. (Lean-only, Theorem 2 / P4, owner Q-P4-1) the constructor `Cert.cWrEnd` is the WRITE twin
+   of `cEnd`: at `BFin 0` (the row has ended) a plain (`akLatest = false`) RAM write is accepted
+   without continuation — it is stuck (no row item ⇒ no `AStepWrite`).  Its bridge case is
+   `AxCert2.wpdStuckWriteM`.  Rocq has no counterpart.
 
 **Rocq → Lean name map.**  `bud` `Bud` (`BInf`, `BFin`), `bsucc` `bsucc`, `dkind` `Dkind`
 (`DKLd`, `DKSt`, `DKRmw`), `cdata` `Cdata` (`CPend`, `CLd`, `CSt`, `CRmwR`, `CRmw`), `cst` `Cst`
@@ -84,7 +88,7 @@ The WPd bridge is `AxCert2`.
 (constructors `c_ret` `cRet`, `c_rd` `cRd`, `c_wr` `cWr`, `c_mrd` `cMrd`, `c_end` `cEnd`, `c_drd`
 `cDrd`, `c_dwr` `cDwr`, `c_fence` `cFence`, `c_xrd` `cXrd`, `c_xwr` `cXwr`, `c_ia` `cIa`, `c_ba`
 `cBa`, `c_co` `cCo`, `c_tl` `cTl`, `c_te` `cTe`, `c_rx` `cRx`, `c_ts` `cTs`, `c_tx` `cTx`, `c_cc`
-`cCc`, `c_msg` `cMsg`, `c_gcc` `cGcc`, `c_ext` `cExt`; Lean-only `cIf`, `cSf`), `Cert_mono`
+`cCc`, `c_msg` `cMsg`, `c_gcc` `cGcc`, `c_ext` `cExt`; Lean-only `cIf`, `cSf`, `cWrEnd`), `Cert_mono`
 `CertMono`, `Cert_bind` `CertBind`, `Cert_bind0` `CertBind0`, `Cert_fact` `CertFact`, `Cert_ret` `CertRet`,
 `Cert_read_reg` `CertReadReg`, `Cert_write_reg` `CertWriteReg`, `Cert_try_catch` `CertTryCatch`,
 `Cert_liftR_any` `CertLiftRAny`, `Cert_catch_early_return` `CertCatchEarlyReturn`, `Cert_of_EvA`
@@ -95,7 +99,7 @@ The WPd bridge is `AxCert2`.
 `wclsRmwNorl`.  None is in the duplicated-name table.
 
 **Dropped:** nothing (Rocq 32 definitions/lemmas; Lean 32, + the Lean-only constructors `cIf`,
-`cSf`).
+`cSf`, `cWrEnd`).
 **Not ported:** the section-local Ltac `cert_ctor` (Lean proofs name the constructor per case).
 -/
 import Weak.AxSymCtlb
@@ -271,6 +275,13 @@ inductive Cert (img : Image) (dok : Int → Nat → Prop) (kind : Dkind) {X : Ty
       Cert img dok kind QE Q s (.impure (.ok .getCycleCount) k) t
   | cExt (s : Cst) (e : Sail.Error exception) (k : Empty → SailM X) (t : ExecSt) :
       QE s e t → Cert img dok kind QE Q s (.impure (.error e) k) t
+  /-- (Lean-only, deviation 11) the row has ended: a plain RAM WRITE there is stuck (the write
+  twin of `cEnd`) -/
+  | cWrEnd (d : Cdata) (r : Bool) (n va : Nat)
+      (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
+      (k : Result (Option Bool) Arch.abort → SailM X) (t : ExecSt) :
+      devAddr req.pa = false → (classify req.access_kind).akLatest = false →
+      Cert img dok kind QE Q ⟨d, .BFin 0, r⟩ (.impure (.ok (.memWrite n va req)) k) t
 
 end AxCert
 
@@ -292,6 +303,7 @@ theorem CertMono {X : Type} (QE QE' : Cst → Sail.Error exception → ExecSt �
   | cMrd d b r n va req k t vs h1 h2 h3 h4 _ ih => exact .cMrd d b r n va req k t vs h1 h2 h3 h4 ih
   | cIf s n va req k t vs h1 h2 h3 h4 _ ih => exact .cIf s n va req k t vs h1 h2 h3 h4 ih
   | cEnd d r n va req k t h1 h2 h3 => exact .cEnd d r n va req k t h1 h2 h3
+  | cWrEnd d r n va req k t h1 h2 => exact .cWrEnd d r n va req k t h1 h2
   | cDrd b r n va req k t h1 h2 h3 h4 h5 _ ih => exact .cDrd b r n va req k t h1 h2 h3 h4 h5 ih
   | cDwr b r n va req k t v h1 h2 h3 h4 h5 _ ih => exact .cDwr b r n va req k t v h1 h2 h3 h4 h5 ih
   | cFence d b r bk k t h1 _ ih => exact .cFence d b r bk k t h1 ih
@@ -324,6 +336,7 @@ theorem CertBind {X Y : Type} (QE : Cst → Sail.Error exception → ExecSt → 
   | cMrd d b r n va req k t vs h1 h2 h3 h4 _ ih => exact .cMrd d b r n va req _ t vs h1 h2 h3 h4 ih
   | cIf s n va req k t vs h1 h2 h3 h4 _ ih => exact .cIf s n va req _ t vs h1 h2 h3 h4 ih
   | cEnd d r n va req k t h1 h2 h3 => exact .cEnd d r n va req _ t h1 h2 h3
+  | cWrEnd d r n va req k t h1 h2 => exact .cWrEnd d r n va req _ t h1 h2
   | cDrd b r n va req k t h1 h2 h3 h4 h5 _ ih => exact .cDrd b r n va req _ t h1 h2 h3 h4 h5 ih
   | cDwr b r n va req k t v h1 h2 h3 h4 h5 _ ih => exact .cDwr b r n va req _ t v h1 h2 h3 h4 h5 ih
   | cFence d b r bk k t h1 _ ih => exact .cFence d b r bk _ t h1 ih
@@ -390,6 +403,7 @@ theorem CertTryCatch {X : Type} (QE1 QE2 : Cst → Sail.Error exception → Exec
   | cMrd d b r n va req k t vs h1 h2 h3 h4 _ ih => exact .cMrd d b r n va req _ t vs h1 h2 h3 h4 ih
   | cIf s n va req k t vs h1 h2 h3 h4 _ ih => exact .cIf s n va req _ t vs h1 h2 h3 h4 ih
   | cEnd d r n va req k t h1 h2 h3 => exact .cEnd d r n va req _ t h1 h2 h3
+  | cWrEnd d r n va req k t h1 h2 => exact .cWrEnd d r n va req _ t h1 h2
   | cDrd b r n va req k t h1 h2 h3 h4 h5 _ ih => exact .cDrd b r n va req _ t h1 h2 h3 h4 h5 ih
   | cDwr b r n va req k t v h1 h2 h3 h4 h5 _ ih => exact .cDwr b r n va req _ t v h1 h2 h3 h4 h5 ih
   | cFence d b r bk k t h1 _ ih => exact .cFence d b r bk _ t h1 ih

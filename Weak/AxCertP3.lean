@@ -376,6 +376,13 @@ theorem wpdOfCertW (Q : Cst → Unit → ExecSt → Prop) (m : SailM Unit) (s : 
       k ib
       (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
       (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hlat Hnf rs Hag)
+  | cWrEnd d r n va req k t Hdev Hlat =>
+    intro _ rs ib kk Hag Hb _
+    have Hb' : ∀ GD, G GD → (AxOpsem.grow GD i).length = kk + 0 := Hb
+    iintro - -
+    iapply (AxCert2.wpdStuckWriteM rvwmoCatConsistent i Φ cpu G HG Hmid kk (fun GD h => Hb' GD h) n va req k ib
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hlat rs Hag)
   | cDrd b r n va req k t Hkd Hdev Hlat Hnf Hdok _ IH =>
     -- THE DATA READ: positioned inside the window
     intro HPF rs ib kk Hag Hb Hk0

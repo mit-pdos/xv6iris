@@ -517,6 +517,13 @@ theorem AxSpinAm2.wpdOfCertWP (Q : Cst → Unit → ExecSt → Prop) (m : SailM 
       k ib
       (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
       (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hlat Hnf rs Hag)
+  | cWrEnd d r n va req k t Hdev Hlat =>
+    intro _ rs ib kk Hag Hb _
+    have Hb' : ∀ GD, G GD → (AxOpsem.grow GD i).length = kk + 0 := Hb
+    iintro - -
+    iapply (AxCert2.wpdStuckWriteM rvwmoCatConsistent i Φ cpu G HG Hmid kk (fun GD h => Hb' GD h) n va req k ib
+      (fun rs1 => regsAgree AxRunClose.pinReg rs1 t.regs)
+      (fun _ _ h1 h2 => regsAgreeTrans _ _ _ _ h2 h1) Hdev Hlat rs Hag)
   | cDrd b r n va req k t Hkd => cases Hkd
   | cDwr b r n va req k t v Hkd => cases Hkd
   | cFence d b r bk k t Hpark _ IH =>
