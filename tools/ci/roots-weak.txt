@@ -12,3 +12,4 @@ Weak.allocpid2Distinct2       # THEOREM 1, stage 2: its corollary with no third 
 Weak.allocpidOpenCert         # CERTIFICATE (a'): Theorem 2 applied to the concrete 3-hart run, no hypotheses (AxSpinT2c)
 Weak.allocpidOpen2Cert        # CERTIFICATE (a'), stage 2: allocpidOpen2 applied to the concrete 3-hart run (no cut, nextpid source, pids 1 != 2), no hypotheses (AxSpinT2q1)
 Weak.allocpidRaceCert         # CERTIFICATE (b): an unlocked nextpid racer has no WPd against the xv6 protocol, on a concrete race graph (AxSpinT2e3)
+Weak.allocpidLkRaceCert       # CERTIFICATE (p-lk): a lock-forging racer has no WPd against the xv6 protocol, refuted through no-panic, on a concrete cut graph (AxSpinT2q3)

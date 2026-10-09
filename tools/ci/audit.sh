@@ -41,14 +41,14 @@ for a in "$@"; do
 done
 if [ "$weak" -eq 1 ]; then
   export XV6_CI_OUT="$XV6_CI_OUT/weak"
-  export XV6_AUDIT_MODULES="Weak.AxSpinT2b,Weak.AxSpinT2b2,Weak.AxSpinT2c,Weak.AxSpinT2e3,Weak.AxSpinT2q1"
+  export XV6_AUDIT_MODULES="Weak.AxSpinT2b,Weak.AxSpinT2b2,Weak.AxSpinT2c,Weak.AxSpinT2e3,Weak.AxSpinT2q1,Weak.AxSpinT2q3"
   export XV6_AUDIT_BASELINE="tools/audit/baseline-weak.json"
 fi
 mkdir -p "$XV6_CI_OUT"
 rm -f "$XV6_CI_OUT/audit.json" "$XV6_CI_OUT/audit.md"
 
 if [ "$build" -eq 1 ]; then
-  if [ "$weak" -eq 1 ]; then lake build Weak.AxSpinT2b Weak.AxSpinT2b2 Weak.AxSpinT2c Weak.AxSpinT2e3 Weak.AxSpinT2q1; else lake build Xv6 MachCSL; fi
+  if [ "$weak" -eq 1 ]; then lake build Weak.AxSpinT2b Weak.AxSpinT2b2 Weak.AxSpinT2c Weak.AxSpinT2e3 Weak.AxSpinT2q1 Weak.AxSpinT2q3; else lake build Xv6 MachCSL; fi
 fi
 
 rc=0
