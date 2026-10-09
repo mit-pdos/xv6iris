@@ -54,12 +54,13 @@ AllocPins` → `AllocPins2`; NEW explicit premises (each also glossed at the bin
   `0 ≤ v < 2^31 − 1` for `i ∈ {A, B}` (Q-S2-3, named scope premise; xv6-true: `noff ∈ {0,1,2}`
   at allocproc).  pop_off's `noff < 1` test reads `v + 1` (D4: its own push_off store), so this
   is exactly what refutes `ppN` (and, with `poArm`, `ppI`).
-* `HsrcAlA`/`HsrcAlB : AxSpinT2g.clSrcAligned (clb L) GD.gdG (i, t2KHd q_i + 4)` — every write
-  that A's (B's) acquire-time racy `ld lk->cpu` takes a `lk->cpu` byte from writes all 8 bytes.
-  **OWNER QUESTION Q-S2-B (byte mixing) is OPEN**: the `aq` refutation is per byte (`rdFact`),
-  and without source alignment two writers' bytes could mix into this cpu's address; the
-  alternative (Option (A), `AxSpinT2g.srcAlignedOfAligned`) derives it from a global alignment
-  of `lk->cpu` writes, which is a statement about C.  Until the owner rules, it is a premise.
+* NO source-alignment premise: **Q-S2-B (byte mixing) RESOLVED BY THE PROTOCOL** (owner ruling
+  2026-10-08).  The `aq` refutation is per byte (`rdFact`), and without source alignment two
+  writers' bytes could mix into this cpu's address.  Instead of a premise about C's writes,
+  `protXv6` itself now requires every `lk->cpu` write to be full-width (σ conjunct `CLFULL`,
+  AxSpinX deviation 8; xv6's writers are the 8-byte `sd`s of acquire/release), the racy read
+  deposits `clSrcFull` (`AxSpinX2.fxCpuRacyS`, `ORacy`), and `AxSpinT2h.cutAq` derives
+  `AxSpinT2g.clSrcAligned` from it.  The former premises `HsrcAlA`/`HsrcAlB` are GONE.
 * `Himgc` (the `lk->cpu` image is 0) — unchanged from stage 1, now ALSO used by `cutAq`.
 * `Hwlt` (writers of `lk->cpu` are harts `< NCPU`), required by `wpdAllocpidSeg2E`, is NOT a
   premise here: it is DERIVED from `Hharts` + `T2LayHyp.ncpu` (`AxSpinT2g.writerLt`).
@@ -137,7 +138,8 @@ lock makes A's acquire-time holding read `lk->cpu` = A's cpu and A take the `aq`
 premises of A are all satisfiable on such a graph, so `¬ t2Cut A` would be FALSE — the reductio
 (certificate p-lk, design §C row `AxSpinT2e2` / AxSpinT2p2) shows that such a C's WPd is
 UNPROVABLE against `protXv6` (while provable against the trivial protocol, p-triv).  The
-refutation of `aq` uses `HsrcAl` (OPEN Q-S2-B) and `Himgc`; `rlS`/`rlL` use the holder's own
+refutation of `aq` uses the deposit's `clSrcFull` (protocol full-width lk->cpu writes, Q-S2-B) and
+`Himgc`; `rlS`/`rlL` use the holder's own
 deposits (`OHeld`/`OOwn`); `ppN`/`ppI` use pop_off's private reads of push_off's stores and
 `HimgNoff`.
 
@@ -162,7 +164,7 @@ IMAGE NOTE (stage 1's): `σi` must be a text + page-table image (as `AxSpinTextC
 `xv6AxpolWf`/`protXv6`/`clb`/`npb` (AxSpinX), `AxSpinX7.xv6GF`, `xlayXv6`/`xlayXv6Ok`/`T2LayHyp`/
 `entryOk`/`entryK0`/`t2Complete`/`pidOf`/`AxSpinT2a.fragNe`/`AxSpinT2a.hartLt` (AxSpinT2a),
 `allocPre`/`AllocPins2`/`HimgNoff`/`t2Cut`/`t2CutAt`/`AxSpinT2f.coreOfPre`/`coreOfFull`/`bDet`/
-`hbDet`/`nDet`/`cDet`/`kEqs` (AxSpinT2f), `AxSpinT2g.clSrcAligned`/`writerLt`,
+`hbDet`/`nDet`/`cDet`/`kEqs` (AxSpinT2f), `AxSpinT2g.writerLt`,
 `AxSpinApB.wpdAllocpidSeg2E`/`hypXv6P`/`t2PostP`/`notCutOfAt`, `AxSpinT2b.initCs`/`distinct`/
 `mem3`/`pidNe`/`over`/`overSelf`/`overNe`/`wpdEmpty`, `AxSpinJ2.bigSepLTriple`,
 `AxSpinWit.tierAWpdMono`, `catTAd`, `nsteps_O`.
@@ -362,12 +364,6 @@ theorem allocpidOpen2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int) (pt
     (HpreB : allocPre (AxOpsem.grow (gtAdGd GT) B) qB B (Sf B) (pf B))
     -- PINS (NEW): the guarded Option V + Q18b pins of A and B, panic arms removed (header)
     (HpinsA : AllocPins2 (gtAdGd GT) A qA) (HpinsB : AllocPins2 (gtAdGd GT) B qB)
-    -- OWNER QUESTION Q-S2-B OPEN (byte mixing): every write A's / B's acquire-time racy
-    -- `ld lk->cpu` takes a `lk->cpu` byte from writes all 8 bytes of `lk->cpu`
-    (HsrcAlA : AxSpinT2g.clSrcAligned (clb (xlayXv6 A B C Sf pf ptp)) (gtAdGd GT).gdG
-      (A, t2KHd qA + 4))
-    (HsrcAlB : AxSpinT2g.clSrcAligned (clb (xlayXv6 A B C Sf pf ptp)) (gtAdGd GT).gdG
-      (B, t2KHd qB + 4))
     -- ENTRY: A / B start at allocproc + 0x38, S-mode, SIE = 0, sp / s1 / tp set, warm TLB
     (HentA : entryOk T satp0 A (Sf A) (pf A) (s0 A))
     (HentB : entryOk T satp0 B (Sf B) (pf B) (s0 B))
@@ -423,14 +419,14 @@ theorem allocpidOpen2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int) (pt
     intro Hinv Hann nm
     have WA := (AxSpinApB.wpdAllocpidSeg2E (hlc := .hasNoLC) (GF := AxSpinX7.xv6GF)
       (xlayXv6 A B C Sf pf ptp) GT nm HL Hcons σi T satp0 hmode hasid hppn A qA (Sf A) (pf A)
-      HyA Himgc Hwlt HsrcAlA (s0 A) HentA).trans (wand_mono .rfl (wand_mono .rfl
+      HyA Himgc Hwlt (s0 A) HentA).trans (wand_mono .rfl (wand_mono .rfl
         (AxSpinWit.tierAWpdMono (hlc := .hasNoLC) (pol := xv6Pol GT) (gtAdGd GT) Xv6N Unit
           (protXv6 (xlayXv6 A B C Sf pf ptp)) nm (s0 A) .MaybeStuck A _
           (AxSpinT2b2.phiP (gtAdGd GT) (xlayXv6 A B C Sf pf ptp) A B qA qB Hinv Hann nm A)
           (fun s => by rw [AxSpinT2b2.phiPA]))))
     have WB := (AxSpinApB.wpdAllocpidSeg2E (hlc := .hasNoLC) (GF := AxSpinX7.xv6GF)
       (xlayXv6 A B C Sf pf ptp) GT nm HL Hcons σi T satp0 hmode hasid hppn B qB (Sf B) (pf B)
-      HyB Himgc Hwlt HsrcAlB (s0 B) HentB).trans (wand_mono .rfl (wand_mono .rfl
+      HyB Himgc Hwlt (s0 B) HentB).trans (wand_mono .rfl (wand_mono .rfl
         (AxSpinWit.tierAWpdMono (hlc := .hasNoLC) (pol := xv6Pol GT) (gtAdGd GT) Xv6N Unit
           (protXv6 (xlayXv6 A B C Sf pf ptp)) nm (s0 B) .MaybeStuck B _
           (AxSpinT2b2.phiP (gtAdGd GT) (xlayXv6 A B C Sf pf ptp) A B qA qB Hinv Hann nm B)
@@ -525,11 +521,6 @@ theorem allocpid2Distinct2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int
     (HpreA : allocPre (AxOpsem.grow (gtAdGd GT) A) qA A (Sf A) (pf A))
     (HpreB : allocPre (AxOpsem.grow (gtAdGd GT) B) qB B (Sf B) (pf B))
     (HpinsA : AllocPins2 (gtAdGd GT) A qA) (HpinsB : AllocPins2 (gtAdGd GT) B qB)
-    -- OWNER QUESTION Q-S2-B OPEN (byte mixing): as Theorem 2
-    (HsrcAlA : AxSpinT2g.clSrcAligned (clb (xlayXv6 A B C Sf pf ptp)) (gtAdGd GT).gdG
-      (A, t2KHd qA + 4))
-    (HsrcAlB : AxSpinT2g.clSrcAligned (clb (xlayXv6 A B C Sf pf ptp)) (gtAdGd GT).gdG
-      (B, t2KHd qB + 4))
     -- ENTRY: as Theorem 2
     (HentA : entryOk T satp0 A (Sf A) (pf A) (s0 A))
     (HentB : entryOk T satp0 B (Sf B) (pf B) (s0 B))
@@ -592,7 +583,7 @@ theorem allocpid2Distinct2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int
   exact allocpidOpen2 GT A B C Sf pf ptp qA qB σi T satp0 n0 (AxSpinT2b.over C sC s0)
     (AxSpinT2b.over C sC sN) (AxSpinT2b.over C 0 n) HconsT Hcl Hharts3 HLay HalA HalB Himgc Hn0
     Himgn HimgN Htxa Htxm Htxp Htxh Htxq Htxr Htxc Htxt HfixA HfixB hmode hasid hppn HmapA HmapB
-    HpreA HpreB HpinsA HpinsB HsrcAlA HsrcAlB
+    HpreA HpreB HpinsA HpinsB
     (by rw [AxSpinT2b.overNe _ _ _ _ hAC]; exact HentA)
     (by rw [AxSpinT2b.overNe _ _ _ _ hBC]; exact HentB)
     (by rw [AxSpinT2b.overSelf])

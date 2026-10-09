@@ -51,9 +51,11 @@ NEW Lean file (no Rocq source; Rocq's ID-8 prefix family is the model).  `AxSpin
 
 ## Deviations from the design / honesty / open points
 
-1. **OWNER QUESTION Q-S2-B OPEN (byte mixing).**  `wpdAllocpidSeg2` carries `cutAq`'s explicit,
-   named premise `HsrcAl : AxSpinT2g.clSrcAligned (clb L) G (i, t2KHd q + 4)` (AxSpinT2h deviation
-   1).  Two more explicit graph premises come with `cutAq`: `Himgc` (the `lk->cpu` image is 0, as
+1. **Q-S2-B RESOLVED BY THE PROTOCOL (byte mixing; owner ruling 2026-10-08).**  `protXv6`
+   requires full-width lk->cpu writes (AxSpinX deviation 8) and `cutAq` derives the racy read's
+   source alignment from the `ORacy` deposit (AxSpinT2h deviation 1), so the former premise
+   `HsrcAl` is GONE from `wpdAllocpidSeg2` / `wpdAllocpidSeg2E` (statement change).  Two explicit
+   graph premises come with `cutAq`: `Himgc` (the `lk->cpu` image is 0, as
    stage 1's capstone premise) and `Hwlt` (writers of `lk->cpu` are harts `< NCPU`,
    `AxSpinT2g`'s writer lemma supplies it from the gmo).
 2. The post is q-INDEXED (`t2CutAt row q i`, `LEN = t2Len q`) rather than the design's
@@ -1408,13 +1410,11 @@ in AxSpinT2h's arms), and a COMPLETE row gives the stage-1 post (pid, `npSrc`, `
 Compositions: `AxSpinAq2.wpdAcquireP` (cut `aq` ← `cutAq`), `wpdAllocpidCsP`, `wpdReleaseP`
 (cuts ← `cutRelS`/`cutRelL`/`cutPpNF`/`cutPpIF`, push_off's genesis annotations as the frame);
 every other row end is the resource-free hook `AxSpinApB.hookP`.  Explicit premises beyond the
-bundle: the lk->cpu image is 0 (`Himgc`), its writers are harts (`Hwlt`), and — OWNER QUESTION
-Q-S2-B (byte mixing) OPEN — `HsrcAl` (`AxSpinT2g.clSrcAligned` at acquire's racy `ld lk->cpu`). -/
+bundle: the lk->cpu image is 0 (`Himgc`) and its writers are harts (`Hwlt`) (Q-S2-B is resolved
+by the protocol: no source-alignment premise). -/
 theorem wpdAllocpidSeg2 (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T i q S p)
     (Himgc : ∀ a, a ∈ clb L → (gtAdGd GT).gdG.gxImg a = some b0)
     (Hwlt : ∀ w a v, a ∈ clb L → gwritesByte (gtAdGd GT).gdG w a v → w.1 < NCPU)
-    -- OWNER QUESTION Q-S2-B (byte mixing): the racy read's lk->cpu sources are full-width
-    (HsrcAl : AxSpinT2g.clSrcAligned (clb L) (gtAdGd GT).gdG (i, t2KHd q + 4))
     (rs0 : RegFile) (ib0 : Ibch) :
     ctrlOkSW T satp0 rs0 → rs0 .PC = pca 0x38 → AxSpinApA.Warm rs0 i S p →
     gprVal rs0 2#5 = BitVec.ofInt 64 S → gprVal rs0 4#5 = hartId (cpuOf i) →
@@ -1608,7 +1608,6 @@ theorem wpdAllocpidSeg2 (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T i
         rw [inClr, H.hLk] at Ha
         unfold dj at this
         omega)
-      HsrcAl
       (fun hL hg s => AxSpinApB.postCut (gtAdGd GT) L nm i q .aq (by rw [hL]; rfl)
         (AxSpinT2h.gateAq _ i q hg) s))
     (fun k' h1 h2 h3 h4 pr => AxSpinApB.hookP L GT nm i q k'
@@ -1676,9 +1675,7 @@ theorem AxSpinApB.wpdAllocpidSeg2E (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : x
     (hppn : BitVec.setWidth 44 (satp_to_ppn satp0) = T.base) (i : Agent) (q : T2Prm)
     (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T i q S p)
     (Himgc : ∀ a, a ∈ clb L → (gtAdGd GT).gdG.gxImg a = some b0)
-    (Hwlt : ∀ w a v, a ∈ clb L → gwritesByte (gtAdGd GT).gdG w a v → w.1 < NCPU)
-    -- OWNER QUESTION Q-S2-B (byte mixing)
-    (HsrcAl : AxSpinT2g.clSrcAligned (clb L) (gtAdGd GT).gdG (i, t2KHd q + 4)) (s : Athread) :
+    (Hwlt : ∀ w a v, a ∈ clb L → gwritesByte (gtAdGd GT).gdG w a v → w.1 < NCPU) (s : Athread) :
     entryOk T satp0 i S p s →
     ⊢ isLock nm.xnReg L.xlLk (RPid L nm.xnH nm.xnM nm.xnI (gtAdGd GT)) -∗
       notheld nm.xnReg L.xlLk i -∗
@@ -1686,7 +1683,7 @@ theorem AxSpinApB.wpdAllocpidSeg2E (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : x
         (AxSpinApB.t2PostP (gtAdGd GT) L nm i q) := by
   rintro ⟨rs, ib, rfl, Hc, HPC, E2, E9, E4, Hw⟩
   exact wpdAllocpidSeg2 L GT nm HL Hcons σi T satp0 hmode hasid hppn i (cpuOf i) q S p H Himgc
-    Hwlt HsrcAl rs ib Hc HPC Hw E2 E4 E9
+    Hwlt rs ib Hc HPC Hw E2 E4 E9
 
 end segE
 

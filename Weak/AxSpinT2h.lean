@@ -15,7 +15,7 @@ the fact refutes the flipped gate (pure lemmas of `AxSpinT2g`), so the gate took
 and the caller's resource-free premise `HΨ` ("LEN = cutPos ∧ gate normal ⇒ Ψ") closes the post.
 
 | arm       | P-form premise shape          | deposit read back                    | refutation (pure)               |
-| `cutAq`   | `KLongEnd … True (ORacy …(k+4))` | `rdFact (clb L) cvx G (i, k+4)`  | `AxSpinT2g.cpuReadNotMineSrc` (= `racyNotMine`, aq-generic) |
+| `cutAq`   | `KLongEnd … True (ORacy …(k+4))` | `rdFact … ∧ clSrcFull L G (i, k+4)` | `AxSpinT2g.cpuReadNotMineSrc` (= `racyNotMine`, aq-generic) |
 | `cutRelS` | `KShortEnd … (OHeld … k ∗ handle)` | `OHeld`'s `∀ t b, greadsByte … → b ≠ b0` | `heldNonzero`'s argument     |
 | `cutRelL` | `KLongEnd … (OHeld …) (OOwn …(k+4))` | `OOwn`'s bytes = `wbytes 8 val` | `ownIsMine`'s argument        |
 | `cutPpN`  | `KppN` (PO5/PO6)              | `rlFact4` at `k+6` (push_off's `sw noff`) | `AxSpinT2g.noffPop`         |
@@ -32,12 +32,12 @@ loaded bytes are the image word `BitVec.ofInt 32 v` with `toNat < 2³¹ − 1`.
 
 ## Deviations / honesty / open points
 
-1. **Q-S2-B OPEN (byte mixing, `AxSpinT2g` header risk 1).**  `cutAq` carries the explicit, named
-   premise `AxSpinT2g.clSrcAligned (clb L) G (i, k + 4)` ("every write the racy `ld lk->cpu` takes
-   a byte from touches all 8 `lk->cpu` bytes").  Without it the statement is FALSE as a pure graph
-   statement (protXv6 lets a lock holder `sb` one byte of its own `cvx`).  The owner chooses (A) a
-   graph premise (`clAligned`, discharged by `AxSpinT2g.srcAlignedOfAligned`) or (B) a protocol
-   strengthening; nothing here weakens the arm silently.
+1. **Q-S2-B RESOLVED BY THE PROTOCOL (owner ruling 2026-10-08, byte mixing, `AxSpinT2g` header
+   risk 1).**  `protXv6` now requires every lk->cpu write to be full-width (σ conjunct `CLFULL`,
+   AxSpinX deviation 8) and `ORacy` deposits `rdFact ∧ clSrcFull` (`AxSpinX2.fxCpuRacyS`).
+   `cutAq` reads both back and derives `AxSpinT2g.clSrcAligned (clb L) G (i, k + 4)` by
+   `AxSpinT2g.srcAlignedOfFull` from `clSrcFull` and its own no-own-write premise; the former
+   explicit premise `HsrcAl` is GONE (statement change of `cutAq`).
 2. **The end lemma is COPIED** (`AxSpinT2h.wpdEndAnn` = `AxSpinApA.wpdEndAnn`, same statement and
    proof): AxSpinApA imports AxSpinAq2/AxSpinRl4b and will import this file (the ApA P-form), so
    importing it here would be a cycle.  `AxSpinApA.rowEndShape` is copied likewise
@@ -573,9 +573,9 @@ variable (L : Xlay) (GT : GdexecT) (nm : Xv6N) (Hcons : rvwmoCatConsistent (gtAd
 include Hcons in
 /-- **`aq`** (acquire's holding, LONG arm: the racy `ld lk->cpu` at `k + 4`; the row ends at
 `k + 12 = cutPos .aq q` before `c.bnez a0,panic`): the `ORacy` deposit refutes "read this hart's
-own cpu" — `KLongEnd` as `holdingFromAcquireP` exposes it.  **OWNER QUESTION Q-S2-B OPEN:**
-`HsrcAl` (`AxSpinT2g.clSrcAligned`, the read's lk->cpu sources are full-width) is an explicit
-premise (deviation 1). -/
+own cpu" — `KLongEnd` as `holdingFromAcquireP` exposes it.  Q-S2-B RESOLVED by the protocol
+(deviation 1): the deposit's `clSrcFull` + the no-own-write premise give `clSrcAligned`
+(`AxSpinT2g.srcAlignedOfFull`). -/
 theorem cutAq (i : Agent) (k : Nat) (rs0 : RegFile) (Pra Ps0 Ps1 Pram Ps0m : BitVec 64)
     (Ψ : Athread → IProp GF) :
     (k + 4 < (AxOpsem.grow (gtAdGd GT) i).length →
@@ -585,8 +585,6 @@ theorem cutAq (i : Agent) (k : Nat) (rs0 : RegFile) (Pra Ps0 Ps1 Pram Ps0m : Bit
     (∀ w a v, a ∈ clb L → gwritesByte (gtAdGd GT).gdG w a v → w.1 < NCPU) →
     (∀ w a v, a ∈ clb L → gwritesByte (gtAdGd GT).gdG w a v →
       WeakRvwmoGraph.gpo (gtAdGd GT).gdG w (i, k + 4) → False) →
-    -- OWNER QUESTION Q-S2-B (byte mixing): the racy read's lk->cpu sources are full-width
-    (HsrcAl : AxSpinT2g.clSrcAligned (clb L) (gtAdGd GT).gdG (i, k + 4)) →
     -- the caller's post at the cut, given the NORMAL arm
     ((AxOpsem.grow (gtAdGd GT) i).length = k + 12 →
       (∀ vs, graphValue (gtAdGd GT) (i, k + 4) = some vs →
@@ -594,13 +592,15 @@ theorem cutAq (i : Agent) (k : Nat) (rs0 : RegFile) (Pra Ps0 Ps1 Pram Ps0m : Bit
       ∀ s, ⊢ Ψ s) →
     ⊢ KLongEnd (hlc := hlc) L GT nm i Ψ k rs0 Pra Ps0 Ps1 Pram Ps0m (fun _ => iprop(True))
         (ORacy L GT i (k + 4)) := by
-  intro Hrd Himgc Hi Hwlt Hns Hsa HΨ
+  intro Hrd Himgc Hi Hwlt Hns HΨ
   unfold KLongEnd ORacy
   iintro %vlk %vcpu %vram %vs0m %vra %vs0 %vs1 %pr %Hp - Hc - - - - -
   have hL : (AxOpsem.grow (gtAdGd GT) i).length = k + 12 := Hp.1
-  iapply (AxSpinT2h.wpdEnd1 L GT nm i (k + 12) (by omega) (i, k + 4) rfl _ Ψ
+  iapply (AxSpinT2h.wpdEnd1 L GT nm i (k + 12) (by omega) (i, k + 4) rfl
+    (rdFact (clb L) cvx (gtAdGd GT).gdG (i, k + 4) ∧ clSrcFull L (gtAdGd GT).gdG (i, k + 4)) Ψ
     (fun HF s => HΨ hL (AxSpinT2h.racyGate L (gtAdGd GT) Hcons i (k + 4) (Hrd (by omega))
-      Himgc Hi Hwlt Hns Hsa HF) s) pr)
+      Himgc Hi Hwlt Hns (AxSpinT2g.srcAlignedOfFull L (gtAdGd GT).gdG (i, k + 4) Hcons.2.2.1
+        HF.2 Hns) HF.1) s) pr)
   iexact Hc
 
 include Hcons in

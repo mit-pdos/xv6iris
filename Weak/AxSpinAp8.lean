@@ -289,7 +289,7 @@ theorem FstMNp (i : Agent) (kr ks : Nat) (w8 : BitVec 32) :
         iexact HR
     have Hfe0 := fxRVLWrite L GT nm HL Hcons (i, k) (i, kr) (npb L) data iprop(True)
       ({[(i, kr) := NPh L GT nm (i, kr) w8]} : Mea GF) Hisw (a8Gmo GT _ _ Hin) Hlen Hall Honly
-      (npbXO L) Hok
+      (npbXO L) Hok (AxSpinX2.clFullNpb L HL _ (i, k) Honly)
     ihave Hw0 := Hsing
     ihave Hfe1 := Hfe0
     ihave Hfe := Hfe1 $$ Hw0

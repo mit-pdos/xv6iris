@@ -13,7 +13,7 @@ write, `rdPlain` / `nwOfLoad`):
 * `FldMFrame` — any plain read, nothing deposited (`fxRead`): the NON-HOLDER's lw of
   `lk->locked` (acquire);
 * `FldMRacy` — the NON-HOLDER's ld of `lk->cpu` (`fxCpuRacy`): deposits Φ_cpu's `rdFact` at the
-  read (`ORacy`);
+  read (`ORacy`; Lean-only, Q-S2-B: `AxSpinX2.fxCpuRacyS`, also `clSrcFull` — see deviation 4);
 * `FldMLkheld` — the HOLDER's lw of `lk->locked` (`fxLkreadHeld`, `locked` drawn from the claim's
   annotation, ppo rule 5): deposits `locked ∗ Q` back and ⌜every byte read at lk ≠ 0⌝ at the read
   (`OHeld`);
@@ -59,6 +59,10 @@ fix is AxSpinXP / AxSpinHdC).
    Hcons`, `ORacy L GT`, `OHeld L GT nm`, `OOwn L GT nm`, the `FldM*` rules `L GT nm HL Hcons`,
    §2 as `AxSpinHdA.wpdHolding`).
 3. The trailing `Print Assumptions` lines are not ported (the lint's axiom check covers them).
+4. Q-S2-B (owner ruling 2026-10-08, protocol full-width lk->cpu writes): `ORacy` deposits
+   `rdFact ∧ clSrcFull L G (i, k)` (Rocq: `rdFact` only); `FldMRacy` runs
+   `AxSpinX2.fxCpuRacyS` (Rocq `fx_cpu_racy`).  `clSrcFull` comes from `protXv6`'s new σ
+   conjunct `CLFULL` (AxSpinX deviation 8).
 
 **Rocq → Lean name map.**  `pac` `AxSpinHdB.pac`, `prl` `AxSpinHdB.prl` (short generic names:
 file-qualified; not in the duplicated-name table), `rd_plain` `rdPlain`, `nw_of_load`
@@ -237,12 +241,15 @@ theorem FldMFrame (i : Agent) (pa : Int) (n : Nat) :
   iintro -
   itrivial
 
-/-- Rocq `ORacy`: the racy read's deposit, Φ_cpu's `rdFact` at the read. -/
+/-- Rocq `ORacy`: the racy read's deposit, Φ_cpu's `rdFact` at the read — and (Lean-only,
+Q-S2-B) `clSrcFull`: its gmo-earlier lk->cpu sources are full-width (`AxSpinX2.fxCpuRacyS`). -/
 def ORacy (i : Agent) (k : Nat) (_v : List (BitVec 8)) : IProp GF :=
-  AxAnnot.annotOwn (i, k) iprop(⌜rdFact (clb L) cvx (gtAdGd GT).gdG (i, k)⌝)
+  AxAnnot.annotOwn (i, k)
+    iprop(⌜rdFact (clb L) cvx (gtAdGd GT).gdG (i, k) ∧ clSrcFull L (gtAdGd GT).gdG (i, k)⌝)
 
 include HL Hcons in
-/-- Rocq `FldM_racy`: the non-holder's lk->cpu read deposits Φ_cpu's `rdFact`. -/
+/-- Rocq `FldM_racy`: the non-holder's lk->cpu read deposits Φ_cpu's `rdFact` (and, Lean-only,
+`clSrcFull`). -/
 theorem FldMRacy (i : Agent) (pa : Int) (n : Nat) :
     (∀ (k' : Nat) (lb : Lbl) (aq rl : Bool) (m : Nat),
       (AxOpsem.grow (gtAdGd GT) i)[k']? = some lb → aident lb = .IRmw aq rl pa m → m ≠ n) →
@@ -255,7 +262,7 @@ theorem FldMRacy (i : Agent) (pa : Int) (n : Nat) :
   subst Heq
   obtain ⟨⟨rfl, rfl⟩, Hrd⟩ := Hd
   obtain ⟨aq, ts, vs, Hlb, -⟩ := rdPlain GT i _ _ k Hnormw Hrd
-  ihave Hfe := fxCpuRacy L GT nm HL Hcons (i, k) (nwOfLoad GT i k _ _ _ _ Hlb)
+  ihave Hfe := AxSpinX2.fxCpuRacyS L GT nm HL Hcons (i, k) (nwOfLoad GT i k _ _ _ _ Hlb)
   iapply (dflowOPlain L GT nm i k _ _) $$ Hfe
   iintro H
   unfold ORacy

@@ -25,13 +25,14 @@ Proof: C's run / row end / start position are DERIVED from `HrowC` (`AxSpinT2p2.
 lock word and `lk->cpu`, then A runs push_off + acquire's `holding`, takes the LONG arm, reads its
 own cpu from C's `sd`, and its row ends at `c.bnez a0, panic` = `cutPos .aq qA2`; B is a phantom
 with an empty row), every premise of `allocpidLkRaceUnprovable` is discharged: the bundle
-`AxSpinT2p2a.cutCert` (`allocPre`/`AllocPins2` for A and B, `t2Cut A`, `HimgNoff`, A's `HsrcAl`
-by `srcAl2`, `HrowC`), `catLk`/`ctrlLk`/`hartsLk`, `runLkA`/`runLkB`, image (`imgClb2`, nextpid
+`AxSpinT2p2a.cutCert` (`allocPre`/`AllocPins2` for A and B, `t2Cut A`, `HimgNoff`, `HrowC`; its
+`srcAl2` conjunct is no longer consumed: Q-S2-B is resolved by the protocol),
+`catLk`/`ctrlLk`/`hartsLk`, `runLkA`/`runLkB`, image (`imgClb2`, nextpid
 = 1 by `AxSpinT2c5.imgNp`), text (`AxSpinT2c5.*TextX`, `textFixed2`), translation
 (`AxSpinT2pt.satpXFacts`, `AxSpinT2c5.mapOk3`), layout (`AxSpinT2c1.layHyp3`/`sZAl`), entry
-(`AxSpinT2e3.entryR`), boundary (`AxSpinT2c1.finNotMid`); B's `HsrcAl` is vacuous (empty row,
-`AxSpinT2q3.srcAlNil`).  So conjunct 1 of `allocpidOpen2` is NON-VACUOUS: a protocol-violating C
-makes A enter the panic branch, and it is `HwpC` that rules this out.
+(`AxSpinT2e3.entryR`), boundary (`AxSpinT2c1.finNotMid`).  So conjunct 1 of `allocpidOpen2` is
+NON-VACUOUS: a protocol-violating C makes A enter the panic branch, and it is `HwpC` that rules
+this out.
 
 **(p-triv): `allocpidLkRaceTrivial`.**  For every graph with C's row the racer's, the SAME
 program at the SAME start state (policy `xv6Pol GT`, functors `xv6GF`, post `True`) IS provable
@@ -47,7 +48,10 @@ framework or the racer's run.
 * Inherited scope of the concrete graph: `AxSpinT2p2`/`AxSpinT2p2a`/`AxSpinT2pt`/`AxSpinT2c1`
   headers (kvmmake-shaped `tX`, warm TLB, image models text / page tables / nextpid).  Prefix
   closure stays informal (Q-S2-6, `AxSpinT2b2` header): the cut row is a covered execution.
-* `allocpidOpen2`'s Q-S2-B premises `HsrcAlA`/`HsrcAlB` hold on `gLk` (proved, not assumed).
+* Q-S2-B (2026-10-08): `allocpidOpen2` no longer has source-alignment premises (protocol
+  full-width lk->cpu writes, AxSpinX deviation 8), so none are discharged here; the racer's two
+  stores (`sw` lock word, 8-byte `sd` lk->cpu) are licensed-shape writes, its WPd still fails on
+  ownership.
 * No drive is re-run here: A's run comes from `AxSpinT2p2a.runLkA` (read-back of `chkA`).
 
 Reused (by name): `allocpidOpen2` (AxSpinT2b2), `AxSpinT2b.over`/`overSelf`/`overNe`/`mem3`/
@@ -69,14 +73,6 @@ open LeanRV64D LeanRV64D.Functions
 open AxSpinT2pt
 
 /-! # 1. Helpers -/
-
-/-- `clSrcAligned` at any position of an EMPTY row is vacuous (no read there). -/
-theorem AxSpinT2q3.srcAlNil (GD : Gdexec) (Cl : List Int) (i k : Nat)
-    (h : AxOpsem.grow GD i = []) : AxSpinT2g.clSrcAligned Cl GD.gdG (i, k) := by
-  intro a t v w _ Hr
-  obtain ⟨l, base, ts, vs, j, hl, -⟩ := Hr
-  rw [gxLblGrow, h] at hl
-  simp at hl
 
 /-! # 2. (p-lk), abstract: the reductio through `allocpidOpen2` -/
 
@@ -107,10 +103,6 @@ theorem allocpidLkRaceUnprovable (GT : GdexecT) (A B C : Agent) (Sf pf : Agent �
     (HpreA : allocPre (AxOpsem.grow (gtAdGd GT) A) qA A (Sf A) (pf A))
     (HpreB : allocPre (AxOpsem.grow (gtAdGd GT) B) qB B (Sf B) (pf B))
     (HpinsA : AllocPins2 (gtAdGd GT) A qA) (HpinsB : AllocPins2 (gtAdGd GT) B qB)
-    (HsrcAlA : AxSpinT2g.clSrcAligned (clb (xlayXv6 A B C Sf pf ptp)) (gtAdGd GT).gdG
-      (A, t2KHd qA + 4))
-    (HsrcAlB : AxSpinT2g.clSrcAligned (clb (xlayXv6 A B C Sf pf ptp)) (gtAdGd GT).gdG
-      (B, t2KHd qB + 4))
     (HentA : entryOk T satp0 A (Sf A) (pf A) (s0 A))
     (HentB : entryOk T satp0 B (Sf B) (pf B) (s0 B))
     (Hrun : ∀ (_ : AxannotGS AxSpinX7.xv6GF) (nm : Xv6N) i, i ∈ [A, B] →
@@ -164,7 +156,7 @@ theorem allocpidLkRaceUnprovable (GT : GdexecT) (A B C : Agent) (Sf pf : Agent �
   obtain ⟨Hnc, -⟩ := allocpidOpen2 GT A B C Sf pf ptp qA qB σi T satp0 n0
     (AxSpinT2b.over C sC0 s0) (AxSpinT2b.over C sCN sN) (AxSpinT2b.over C 2 n) HconsT Hcl Hharts
     HLay HalA HalB Himgc Hn0 Himgn HimgN Htxa Htxm Htxp Htxh Htxq Htxr Htxc Htxt HfixA HfixB
-    hmode hasid hppn HmapA HmapB HpreA HpreB HpinsA HpinsB HsrcAlA HsrcAlB
+    hmode hasid hppn HmapA HmapB HpreA HpreB HpinsA HpinsB
     (by rw [AxSpinT2b.overNe _ _ _ _ hAC]; exact HentA)
     (by rw [AxSpinT2b.overNe _ _ _ _ hBC]; exact HentB)
     (by rw [AxSpinT2b.overSelf])
@@ -214,7 +206,7 @@ theorem allocpidLkRaceCert :
   obtain ⟨uA, rsA, ibA, nA, HnA, HfA⟩ := AxSpinT2p2a.runLkA
   have hL : AxSpinT2q3.lay.xlLk = AxSpinT2a.zLk := rfl
   have hN : AxSpinT2q3.lay.xlNp = AxSpinT2a.zNp := rfl
-  obtain ⟨HpreA, HpinsA, -, -, HcutA, -, -, HpreB, HpinsB, -, HimgN, HsrcAlA, HrowC⟩ :=
+  obtain ⟨HpreA, HpinsA, -, -, HcutA, -, -, HpreB, HpinsB, -, HimgN, -, HrowC⟩ :=
     AxSpinT2p2a.cutCert AxSpinT2q3.lay hL
   have HlenB : (AxOpsem.grow (gtAdGd AxSpinT2p2a.gLk) 1) = [] := AxSpinT2p2.growB2 _
   exact allocpidLkRaceUnprovable AxSpinT2p2a.gLk 0 1 2 AxSpinT2c1.sZ AxSpinT2a.pEx
@@ -235,8 +227,7 @@ theorem allocpidLkRaceCert :
     (AxSpinT2p2.textFixed2 AxSpinT2q3.emsLk 1 (by decide))
     satpXFacts.1 satpXFacts.2.1 satpXFacts.2.2
     (AxSpinT2c5.mapOk3 0 (by decide)) (AxSpinT2c5.mapOk3 1 (by decide))
-    HpreA HpreB HpinsA HpinsB HsrcAlA
-    (AxSpinT2q3.srcAlNil _ _ 1 _ HlenB)
+    HpreA HpreB HpinsA HpinsB
     (AxSpinT2e3.entryR 0 (by decide)) (AxSpinT2e3.entryR 1 (by decide))
     (fun _ nm i hi => by
       simp only [List.mem_cons, List.not_mem_nil, or_false] at hi

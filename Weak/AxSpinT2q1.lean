@@ -19,11 +19,11 @@ Lean-only (no Rocq source).
   `pins2G : AllocPins2 (gtAdGd (gT3 E)) h q0` (`pins2OfPins` on `pinsG`);
   `imgNoffG : HimgNoff (gtAdGd (gT3 E)).gdG.gxImg 0 1` (`cpus[].noff = 0` in the graph image,
     `AxSpinT2p1.himgNoff`);
-  `srcAlG : AxSpinT2g.clSrcAligned (clb L) (gtAdGd (gT3 E)).gdG (h, t2KHd q0 + 4)` for h ∈ {0, 1}
-    (Q-S2-B premises `HsrcAlA` / `HsrcAlB`): ONE `decide +kernel` of `AxSpinT2p1.srcAlB` on the
-    untagged graph `gR3` (rows E-independent, `gtGEq3`) — on this serial run every `lk->cpu`
-    write is acquire's full 8-byte `sd`; also the global option-(A) form `clAlG : clAligned (clb L)`
-    (every `lk->cpu` write of the graph is full-width), by `AxSpinT2p1.clAlB`.
+  (Q-S2-B, 2026-10-08: the capstone's source-alignment premises `HsrcAlA`/`HsrcAlB` are gone —
+    protocol full-width lk->cpu writes, AxSpinX deviation 8 — and their discharge `srcAlG` with
+    it); kept, informational: `clAlG : clAligned (clb L)` (every `lk->cpu` write of the graph is
+    acquire's full 8-byte `sd`), ONE `decide +kernel` of `AxSpinT2p1.clAlB` on the untagged
+    graph `gR3` (rows E-independent, `gtGEq3`).
 §2 **`allocpidOpen2Cert`** (NO hypotheses), at `GD = gtAdGd (gT3 [emsA, emsB, emsC])`,
 `L = xlayXv6 0 1 2 sZ pEx ptpX`:
   `¬ t2Cut GD 0 (sZ 0) (pEx 0) ∧ ¬ t2Cut GD 1 (sZ 1) (pEx 1) ∧
@@ -38,18 +38,18 @@ premises discharged by `AxSpinT2c1.completeG`, so not vacuous); the pid words ar
 
 * No drive is re-evaluated: every fact about `drvA/B/C` / `emsA/B/C` comes through
   `AxSpinT2c2.runA` / `AxSpinT2c3.runB` / `AxSpinT2c4.runC` (read-backs over a variable drive
-  result); the kernel checks `srcAlLit` / `clAlLit` evaluate only the untagged literal graph
+  result); the kernel check `clAlLit` evaluates only the untagged literal graph
   `gR3` (no emission).
 * On full rows `¬ t2Cut` is also derivable WITHOUT the capstone (`AxSpinT2f.notCutOfComplete`);
   the certificate's content is that ALL of `allocpidOpen2`'s premises (incl. the new
-  `HimgNoff`, `HsrcAl*`, guarded pins) are jointly satisfiable on a real-machine run.  It does
+  `HimgNoff`, guarded pins) are jointly satisfiable on a real-machine run.  It does
   not exercise C's freedom (C is the same allocpid) nor the prefix family (rows are complete):
   those are certificates (p-lk) (AxSpinT2p2*) and (a-) (AxSpinT2p1*).
 * Scope inherited from (a′) (AxSpinT2c header): `tX` kvmmake-shaped with A = D preset, warm TLB,
   image = text / tables / nextpid.
 
 Reused: `allocpidOpen2` (AxSpinT2b2), `preOfFullPins`/`pins2OfPins`/`HimgNoff` (AxSpinT2f),
-`AxSpinT2g.clSrcAligned`, `AxSpinT2p1.srcAlB`/`srcAlOfB`/`clAlB`/`clAlOfB`/`clbEq`/`himgNoff`,
+`AxSpinT2p1.clAlB`/`clAlOfB`/`clbEq`/`himgNoff`,
 `AxSpinT2c.s0X`/`satpE`/`entryOkE`/`hartsX`/`pick3*`/`stAtK`/`wpdC`/`pidLit`, `AxSpinT2c1.*`
 (`gT3`, `rows3`, `il3`, `rowsFixed`, `cat3`, `ctrl3`, `fullG`, `pinsG`, `completeG`, `layHyp3`,
 `finNotMid`, `img`, `sZ`, `q0`, `ptpX`), `AxSpinT2c5.*` (text premises, `textFixedX`, `mapOk3`,
@@ -96,28 +96,12 @@ theorem gtGEq3 (E : List (List Eitem)) : (gT3 E).gtG = gR3 := by
   show (⟨fun a => some (img a), scProg rows3 (sim img rows3 il3).sOut, il3⟩ : Gexec) = gR3
   rw [rowsFixed]; rfl
 
-/-- The source-alignment checks at A's and B's acquire-holding `lk->cpu` read position. -/
-theorem srcAlLit :
-    AxSpinT2p1.srcAlB gR3 (clRange (AxSpinT2a.zLk + 16) 8) (0, t2KHd q0 + 4) = true ∧
-    AxSpinT2p1.srcAlB gR3 (clRange (AxSpinT2a.zLk + 16) 8) (1, t2KHd q0 + 4) = true := by
-  constructor <;> decide +kernel
-
 /-- Every `lk->cpu` write of (a′)'s graph is full-width (acquire's `sd`). -/
 theorem clAlLit : AxSpinT2p1.clAlB gR3 (clRange (AxSpinT2a.zLk + 16) 8) = true := by
   decide +kernel
 
-/-- **Q-S2-B premises `HsrcAlA` / `HsrcAlB`** on (a′)'s graph. -/
-theorem srcAlG (E : List (List Eitem)) (L : Xlay) (hL : L.xlLk = AxSpinT2a.zLk) (h : Agent)
-    (hh : h = 0 ∨ h = 1) :
-    AxSpinT2g.clSrcAligned (clb L) (gtAdGd (gT3 E)).gdG (h, t2KHd q0 + 4) := by
-  rw [AxSpinT2p1.clbEq L hL]
-  show AxSpinT2g.clSrcAligned _ (gT3 E).gtG _
-  rw [gtGEq3]
-  rcases hh with rfl | rfl
-  · exact AxSpinT2p1.srcAlOfB _ _ _ srcAlLit.1
-  · exact AxSpinT2p1.srcAlOfB _ _ _ srcAlLit.2
-
-/-- … and the global option-(A) form `clAligned` (every `lk->cpu` write is full-width). -/
+/-- The global form `clAligned` (every `lk->cpu` write of (a′)'s graph is full-width — the
+run's writes have the shape `protXv6`'s `CLFULL` demands; informational since Q-S2-B). -/
 theorem clAlG (E : List (List Eitem)) (L : Xlay) (hL : L.xlLk = AxSpinT2a.zLk) :
     clAligned (clb L) (gtAdGd (gT3 E)).gdG := by
   rw [AxSpinT2p1.clbEq L hL]
@@ -187,7 +171,6 @@ theorem allocpidOpen2Cert :
     tailTextX (textFixedX _ 0 (by decide)) (textFixedX _ 1 (by decide)) hmode hasid hppn
     (mapOk3 0 (by decide)) (mapOk3 1 (by decide))
     (preG _ 0 (by decide)) (preG _ 1 (by decide)) (pins2G _ 0 (by decide)) (pins2G _ 1 (by decide))
-    (srcAlG _ _ rfl 0 (.inl rfl)) (srcAlG _ _ rfl 1 (.inr rfl))
     (entryOkE 0 (by decide)) (entryOkE 1 (by decide)) rfl Hrun Hend
     (by rw [hsN, pick3Z]; exact finNotMid _ _ _ _ _) (by rw [hsN, pick3O]; exact finNotMid _ _ _ _ _)
     (fun nm => wpdC _ nm (catTAd _ HconsT))

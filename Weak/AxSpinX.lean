@@ -54,6 +54,14 @@ FINDINGS 1-4 and the extension points: see the Rocq header (unchanged by the por
    `stackOwn` (MachCSL/Xv6 have unrelated `kernelText`/`cpuOwn`/`stackOwn`, and Weak files
    `open MachCSL`).
 7. The trailing `Print Assumptions` commands are not ported.
+8. **Q-S2-B (owner ruling 2026-10-08): FULL-WIDTH lk->cpu WRITES are part of the protocol.**
+   `protXv6`'s pure conjunct is `WC ∧ CPUOK ∧ WOK ∧ CLFULL L GD.gdG s` (Rocq: the first three),
+   `CLFULL L G s := ∀ e ∈ s, clFull L G e`, `clFull L G e` := "a write touching one byte of
+   `clb L` touches all 8".  Without it a lock holder could `sb` one byte of its `cvx` (Rocq's
+   per-byte `CPUOK`/`WOK` admit it), mixing bytes of two harts' values at a racy read.  Every
+   write rule discharges it (AxSpinX2: xv6's lk->cpu writers are the 8-byte `sd`s of
+   `fxCpuWrite`; nextpid / lock-word / private writes miss `clb`); `xv6HobAlloc` starts it at ∅.
+   Lean-only: `clFull`, `CLFULL`, `AxSpinX.clFullNo`, `AxSpinX.CLFULLInsert`.
 
 **Rocq → Lean name map.**  `xlay` `Xlay` (fields `xlLk xlNp xlHarts xlStk xlCpuf xlRo xlText`),
 `lwb` `lwb`, `clb` `clb`, `npb` `npb`, `XO` `XO`, `priv` `priv`, `wok` `wok`, `xlay_ok`
@@ -76,7 +84,7 @@ Lean-only (file-qualified): `AxSpinX.rvlSnaps` (`RVL_write`'s inner `big_sepL_bu
 list induction), `AxSpinX.histInOfCov` (`Rv_read`'s inner `iAssert`: every covered write is in
 the auth's history).
 
-**Dropped:** none (58 Rocq decls; 60 Lean = 58 + 2 Lean-only).
+**Dropped:** none (58 Rocq decls; 64 Lean = 58 + 2 Lean-only + 4 Q-S2-B Lean-only).
 -/
 import Weak.AxSpinProt6
 import MachCSL.Lock
@@ -217,6 +225,28 @@ theorem WOKInsert (L : Xlay) (G : Gexec) (s : GSet Geid) (e : Geid) :
   · rw [elemOfSingleton.1 h] at Hw ⊢
     exact He a v Hw
   · exact H e' a v h Hw
+
+/-- (Lean-only, Q-S2-B) FULL-WIDTH lk->cpu writes: a write touching one byte of `clb L` touches
+ALL 8 (xv6 writes lk->cpu only by an aligned `sd`: acquire's `lk->cpu = mycpu()`, release's
+`lk->cpu = 0`). -/
+def clFull (L : Xlay) (G : Gexec) (e : Geid) : Prop :=
+  ∀ a v, a ∈ clb L → gwritesByte G e a v → ∀ a', a' ∈ clb L → ∃ v', gwritesByte G e a' v'
+
+/-- (Lean-only, Q-S2-B) σ's pure conjunct: every processed event is `clFull`. -/
+def CLFULL (L : Xlay) (G : Gexec) (s : GSet Geid) : Prop := ∀ e, e ∈ s → clFull L G e
+
+/-- (Lean-only) a write missing `clb L` is `clFull` (vacuously). -/
+theorem AxSpinX.clFullNo (L : Xlay) (G : Gexec) (e : Geid) :
+    (∀ a v, a ∈ clb L → ¬ gwritesByte G e a v) → clFull L G e :=
+  fun H a v Ha Hw => absurd Hw (H a v Ha)
+
+theorem AxSpinX.CLFULLInsert (L : Xlay) (G : Gexec) (s : GSet Geid) (e : Geid) :
+    CLFULL L G s → clFull L G e → CLFULL L G (({e} : GSet Geid) ∪ s) := by
+  intro H He e' Hin
+  rcases elemOfUnion.1 Hin with h | h
+  · rw [elemOfSingleton.1 h]
+    exact He
+  · exact H e' h
 
 def hwfx (GD : Gdexec) (a : Int) (H : List Hent) : Prop :=
   (∀ p, p ∈ H → gwritesByte GD.gdG p.1 a p.2) ∧ chainWith (gmoLt GD.gdG) (H.map Prod.fst)
@@ -598,7 +628,7 @@ def issuedFrag (γ : GName) (x : Int) : IProp GF :=
 variable (L : Xlay)
 
 def protXv6 (nm : Xv6N) (GD : Gdexec) (_ : Unit) (s : GSet Geid) : IProp GF :=
-  iprop(⌜WC GD.gdG s ∧ CPUOK (clb L) cvx GD.gdG s ∧ WOK L GD.gdG s⌝ ∗
+  iprop(⌜WC GD.gdG s ∧ CPUOK (clb L) cvx GD.gdG s ∧ WOK L GD.gdG s ∧ CLFULL L GD.gdG s⌝ ∗
     ownInv (XO L) nm.xnH GD s ∗ lkInv nm.xnReg L.xlLk GD s)
 
 /-- nextpid's component: exact value `v` (0 ≤ v < 2³²), ●mono, the issued set below `v`.
@@ -727,7 +757,7 @@ theorem xv6HobAlloc (GD : Gdexec) (n0 : Int) :
     isplitr
     · ipureintro
       exact ⟨fun e w He => absurd He notElemOfEmpty, fun w Hw => absurd Hw notElemOfEmpty,
-        fun e a v He => absurd He notElemOfEmpty⟩
+        fun e a v He => absurd He notElemOfEmpty, fun e He => absurd He notElemOfEmpty⟩
     isplitr [Hinv]
     · unfold ownInv
       iapply BigSepS.bigSepS_empty.2

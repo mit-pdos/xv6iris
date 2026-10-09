@@ -49,6 +49,16 @@ RULES, by class:
    unfolded.
 4. `R_np_unfold` is `.rfl` (as in Rocq, `done`).
 5. The trailing `Print Assumptions` commands are not ported.
+6. **Q-S2-B (owner ruling 2026-10-08, AxSpinX deviation 8): full-width lk->cpu writes.**
+   `wrsOk L GT e` gains the conjunct `clFull L (gtAdGd GT).gdG e`; `fxBuild` (now derived from
+   the Lean-only `AxSpinX2.fxBuildF`, whose step also receives σ's `CLFULL`) re-establishes
+   `CLFULL`.  STATEMENT CHANGES (premise added): `xoSide` and `fxRVLWrite` take
+   `clFull L (gtAdGd GT).gdG w` (owned writes of a sub-range of `clb` are no longer rules);
+   `fxCpuWrite` (8-byte `sd`) and `fxNpWrite`/`fxNpIncr` (`npb`, `AxSpinX2.clFullNpb`)
+   discharge it internally (statements unchanged).  Lean-only: `AxSpinX2.clFullNpb`,
+   `clSrcFull` (the racy read's source-width fact), `AxSpinX2.fxBuildF`,
+   `AxSpinX2.fxReadFactF`, `AxSpinX2.fxCpuRacyS` (`fxCpuRacy`'s deposit plus `clSrcFull`;
+   `fxCpuRacy` itself is unchanged).
 
 **Rocq → Lean name map.**  `ppo1_gmo` `ppo1Gmo`, `lbl_of_w` `lblOfW`, `lbl_of_r` `lblOfR`,
 `same_hart_gmo_po` `sameHartGmoPo`, `priv_src` `privSrc`, `priv_read_val` `privReadVal`,
@@ -63,7 +73,9 @@ RULES, by class:
 `fx_priv_write` `fxPrivWrite`, `fx_priv_read` `fxPrivRead`, `fx_priv_readn` `fxPrivReadn`,
 `fx_priv_read0` `fxPrivRead0`, `fx_ro_read` `fxRoRead`, `fx_ro_readn` `fxRoReadn`, `R_npv`
 `RNpv`, `R_np_unfold` `RNpUnfold`, `fx_np_read` `fxNpRead`, `fx_np_incr` `fxNpIncr`,
-`fx_blocked` `fxBlocked`.  No duplicated Rocq names; no Lean-only helpers.
+`fx_blocked` `fxBlocked`.  No duplicated Rocq names; Lean-only (Q-S2-B, deviation 6):
+`AxSpinX2.clFullNpb`, `clSrcFull`, `AxSpinX2.fxBuildF`, `AxSpinX2.fxReadFactF`,
+`AxSpinX2.fxCpuRacyS`.
 
 **Dropped:** none (45 Rocq decls incl. the local instances `x_pol`/`x_G`; `x_pol` inlined as
 `xv6Pol GT`; 44 Lean).
@@ -315,7 +327,18 @@ end npGhost
   shG (gtAdGd GT) Xv6N Unit (protXv6 L) nm
 
 def wrsOk (L : Xlay) (GT : GdexecT) (e : Geid) : Prop :=
-  ∀ a v, gwritesByte (gtAdGd GT).gdG e a v → wok L a e.1
+  (∀ a v, gwritesByte (gtAdGd GT).gdG e a v → wok L a e.1) ∧ clFull L (gtAdGd GT).gdG e
+
+/-- (Lean-only, Q-S2-B) a write of `npb L` bytes only is `clFull` (vacuously). -/
+theorem AxSpinX2.clFullNpb (L : Xlay) (HL : xlayOk L) (G : Gexec) (e : Geid) :
+    (∀ a v, gwritesByte G e a v → a ∈ npb L) → clFull L G e :=
+  fun Honly => AxSpinX.clFullNo L G e fun a v Ha Hw => clbNpbDisj L HL a Ha (Honly a v Hw)
+
+/-- (Lean-only, Q-S2-B) THE RACY READ's SOURCE-WIDTH FACT: every write gmo-before `r` that `r`
+reads a `clb L` byte from is `clFull` (deposited by `fxCpuRacyS`). -/
+def clSrcFull (L : Xlay) (G : Gexec) (r : Geid) : Prop :=
+  ∀ a t v w, a ∈ clb L → greadsByte G r a t v → gwriteAt G t = some w → gmoLt G w r →
+    clFull L G w
 
 /-- nextpid inside the critical section, with Theorem 2's ghosts: `RNp` unfolded at its value
 `v`. -/
@@ -334,12 +357,12 @@ section rulesX
 variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [InvGS_gen hlc GF] [AxannotGS GF]
   [AxSpinX.Xv6G GF]
 
-/-- THE BUILDER. -/
-theorem fxBuild (L : Xlay) (GT : GdexecT) (nm : Xv6N) (e : Geid) (flowIn : Mea GF)
+/-- THE BUILDER, full form (Lean-only, Q-S2-B): the event's step also receives σ's `CLFULL`. -/
+theorem AxSpinX2.fxBuildF (L : Xlay) (GT : GdexecT) (nm : Xv6N) (e : Geid) (flowIn : Mea GF)
     (R : IProp GF) :
     ⊢ (∀ s : GSet Geid, ⌜e ∉ s⌝ -∗ ⌜WC (gtAdGd GT).gdG s⌝ -∗ ⌜WPh (gtAdGd GT).gdG s e⌝ -∗
         ⌜spSpol GT (gtAdGd GT) e ⊆ s⌝ -∗ ⌜CPUOK (clb L) cvx (gtAdGd GT).gdG s⌝ -∗
-        ⌜WOK L (gtAdGd GT).gdG s⌝ -∗
+        ⌜WOK L (gtAdGd GT).gdG s⌝ -∗ ⌜CLFULL L (gtAdGd GT).gdG s⌝ -∗
         ownInv (XO L) nm.xnH (gtAdGd GT) s -∗ lkInv nm.xnReg L.xlLk (gtAdGd GT) s -∗
         ([∗map] Rin ∈ flowIn, Rin) ==∗
         ▷ |==> (⌜cpuOk (clb L) cvx (gtAdGd GT).gdG e ∧ wrsOk L GT e⌝ ∗
@@ -355,8 +378,8 @@ theorem fxBuild (L : Xlay) (GT : GdexecT) (nm : Xv6N) (e : Geid) (flowIn : Mea G
     protXv6 L nm (gtAdGd GT) σ s from .rfl) $$ Hob
   unfold protXv6
   icases Hob with ⟨%Hp, Ho, Hl⟩
-  obtain ⟨Hwc, Hok, Hwok⟩ := Hp
-  imod H $$ %s %Hnin %Hwc %Hwp %Hsub %Hok %Hwok Ho Hl Hfi with H
+  obtain ⟨Hwc, Hok, Hwok, Hcf⟩ := Hp
+  imod H $$ %s %Hnin %Hwc %Hwp %Hsub %Hok %Hwok %Hcf Ho Hl Hfi with H
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hclose
   inext
@@ -372,11 +395,29 @@ theorem fxBuild (L : Xlay) (GT : GdexecT) (nm : Xv6N) (e : Geid) (flowIn : Mea G
     isplitr
     · ipureintro
       exact ⟨WCInsert _ s e Hwc Hwp, CPUOKInsert (clb L) cvx _ s e Hok He.1,
-        WOKInsert L _ s e Hwok He.2⟩
+        WOKInsert L _ s e Hwok He.2.1, AxSpinX.CLFULLInsert L _ s e Hcf He.2.2⟩
     isplitl [Ho]
     · iexact Ho
     · iexact Hl
   · iexact HR
+
+/-- THE BUILDER. -/
+theorem fxBuild (L : Xlay) (GT : GdexecT) (nm : Xv6N) (e : Geid) (flowIn : Mea GF)
+    (R : IProp GF) :
+    ⊢ (∀ s : GSet Geid, ⌜e ∉ s⌝ -∗ ⌜WC (gtAdGd GT).gdG s⌝ -∗ ⌜WPh (gtAdGd GT).gdG s e⌝ -∗
+        ⌜spSpol GT (gtAdGd GT) e ⊆ s⌝ -∗ ⌜CPUOK (clb L) cvx (gtAdGd GT).gdG s⌝ -∗
+        ⌜WOK L (gtAdGd GT).gdG s⌝ -∗
+        ownInv (XO L) nm.xnH (gtAdGd GT) s -∗ lkInv nm.xnReg L.xlLk (gtAdGd GT) s -∗
+        ([∗map] Rin ∈ flowIn, Rin) ==∗
+        ▷ |==> (⌜cpuOk (clb L) cvx (gtAdGd GT).gdG e ∧ wrsOk L GT e⌝ ∗
+          ownInv (XO L) nm.xnH (gtAdGd GT) (({e} : GSet Geid) ∪ s) ∗
+          lkInv nm.xnReg L.xlLk (gtAdGd GT) (({e} : GSet Geid) ∪ s) ∗ R)) -∗
+      @flowEqDyn hlc GF _ (AxSpinX2.xG L GT nm) (gtAdGd GT) e
+        (@Axpol.sPol (xv6Pol GT) (gtAdGd GT) e) flowIn R := by
+  iintro H
+  iapply AxSpinX2.fxBuildF
+  iintro %s %Hn %Hwc %Hwp %Hsub %Hok %Hwok %_ Ho Hl Hfi
+  iapply H $$ %s %Hn %Hwc %Hwp %Hsub %Hok %Hwok Ho Hl Hfi
 
 /-! ## side conditions, per write shape -/
 
@@ -386,7 +427,7 @@ theorem nwSide (L : Xlay) (GT : GdexecT) (e : Geid) : gisW (gtAdGd GT).gdG e = f
   intro Hnw
   have Hn : ∀ a v, ¬ gwritesByte (gtAdGd GT).gdG e a v := AxSpinProt6.nwb _ e Hnw
   exact ⟨fun a v _ => Hn a v, cpuOkNw _ _ _ e (fun a v _ => Hn a v),
-    fun a v Hw => absurd Hw (Hn a v)⟩
+    fun a v Hw => absurd Hw (Hn a v), AxSpinX.clFullNo L _ e (fun a v _ => Hn a v)⟩
 
 theorem lwSide (L : Xlay) (GT : GdexecT) (HL : xlayOk L) (e : Geid) :
     (∀ a v, gwritesByte (gtAdGd GT).gdG e a v → a ∈ lwb L) →
@@ -399,14 +440,15 @@ theorem lwSide (L : Xlay) (GT : GdexecT) (HL : xlayOk L) (e : Geid) :
   · apply cpuOkNw
     intro a v Ha Hw
     exact lwbNotinXO L HL a (Hsg a v Hw) (clbXO L a Ha)
-  · intro a v Hw
-    exact Or.inl (Hsg a v Hw)
+  · refine ⟨fun a v Hw => Or.inl (Hsg a v Hw), AxSpinX.clFullNo L _ e fun a v Ha Hw => ?_⟩
+    exact lwbNotinXO L HL a (Hsg a v Hw) (clbXO L a Ha)
 
 theorem xoSide (L : Xlay) (GT : GdexecT) (HL : xlayOk L) (e : Geid) (Cw : List Int) :
     (∀ a v, gwritesByte (gtAdGd GT).gdG e a v → a ∈ Cw) → (∀ a, a ∈ Cw → a ∈ XO L) →
+    clFull L (gtAdGd GT).gdG e →
     (∀ v, ¬ gwritesByte (gtAdGd GT).gdG e L.xlLk v) ∧ wrsOk L GT e := by
-  intro Hsg HX
-  refine ⟨?_, ?_⟩
+  intro Hsg HX Hcf
+  refine ⟨?_, ?_, Hcf⟩
   · intro v Hw
     exact lkNotinXO L HL (HX _ (Hsg L.xlLk v Hw))
   · intro a v Hw
@@ -427,8 +469,8 @@ theorem privSide (L : Xlay) (GT : GdexecT) (HL : xlayOk L) (e : Geid) :
   · apply cpuOkNw
     intro a v Ha Hw
     exact (Hpl a e.1 (Hsg a v Hw)).2 (clbXO L a Ha)
-  · intro a v Hw
-    exact Or.inr (Or.inr (Hsg a v Hw))
+  · refine ⟨fun a v Hw => Or.inr (Or.inr (Hsg a v Hw)), AxSpinX.clFullNo L _ e fun a v Ha Hw => ?_⟩
+    exact (Hpl a e.1 (Hsg a v Hw)).2 (clbXO L a Ha)
 
 /-! ## LOCK WORD -/
 
@@ -713,13 +755,13 @@ theorem fxRVLWrite (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
     gisW (gtAdGd GT).gdG w = true → gmoLt (gtAdGd GT).gdG e w → vs.length = Cw.length →
     (∀ (j : Nat) a v, Cw[j]? = some a → vs[j]? = some v → gwritesByte (gtAdGd GT).gdG w a v) →
     (∀ a v, gwritesByte (gtAdGd GT).gdG w a v → a ∈ Cw) → (∀ a, a ∈ Cw → a ∈ XO L) →
-    cpuOk (clb L) cvx (gtAdGd GT).gdG w →
+    cpuOk (clb L) cvx (gtAdGd GT).gdG w → clFull L (gtAdGd GT).gdG w →
     ⊢ (([∗map] Rin ∈ flowIn, Rin) -∗ Q ∗ ∃ vold, RVL nm.xnH (gtAdGd GT) Cw e vold) -∗
       @flowEqDyn hlc GF _ (AxSpinX2.xG L GT nm) (gtAdGd GT) w
         (@Axpol.sPol (xv6Pol GT) (gtAdGd GT) w) flowIn
         iprop(Q ∗ RVL nm.xnH (gtAdGd GT) Cw w vs) := by
-  intro Hisw Hew Hlen Hall Honly HX Hok
-  obtain ⟨Hnlk, Hwk⟩ := xoSide L GT HL w Cw Honly HX
+  intro Hisw Hew Hlen Hall Honly HX Hok Hcf
+  obtain ⟨Hnlk, Hwk⟩ := xoSide L GT HL w Cw Honly HX Hcf
   iintro Hfi
   iapply fxBuild
   iintro %s %Hn %_ %_ %_ %_ %_ Ho Hl Hin
@@ -775,8 +817,15 @@ theorem fxCpuWrite (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
     · left
       rw [hc]
       exact Hw
+  have Hcf : clFull L (gtAdGd GT).gdG w := by
+    intro _ _ _ _ a' Ha'
+    obtain ⟨j, Hj⟩ := List.getElem?_of_mem Ha'
+    have hjl : j < vs.length := by
+      rw [Hlen]
+      exact (List.getElem?_eq_some_iff.1 Hj).1
+    exact ⟨_, Hall j a' _ Hj (List.getElem?_eq_getElem hjl)⟩
   exact fxRVLWrite L GT nm HL Hcons w e (clb L) vs Q flowIn Hisw Hew Hlen Hall Honly (clbXO L)
-    Hok
+    Hok Hcf
 
 /-- nextpid: the owned write (exact value). -/
 theorem fxNpWrite (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
@@ -799,7 +848,7 @@ theorem fxNpWrite (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
     intro a v Ha Hw
     exact clbNpbDisj L HL a Ha (Honly a v Hw)
   exact fxRVLWrite L GT nm HL Hcons w e (npb L) vs Q flowIn Hisw Hew Hlen' Hall Honly (npbXO L)
-    Hok
+    Hok (AxSpinX2.clFullNpb L HL _ w Honly)
 
 /-- (b)/(e) THE OWNED LAST-VALUE READ (gmo case): the handle drawn through `flowIn` at an
 anchor `e` gmo-before `r`; deposits the handle back and the read values AT THE READ. -/
@@ -881,6 +930,65 @@ theorem fxCpuRacy (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
     · exact Or.inr ⟨Heq, Hvis⟩
     · refine Or.inl ⟨Heq, Hok w (Hwp w (WeakRvwmoGraph.gwritesByteGisW _ _ _ _ Hw) ?_)⟩
       exact catGrfeGmo (gtAdGd GT) w r Hcons ⟨⟨a, j + 1, v, Hrd, Hat⟩, Heq⟩
+
+/-- (Lean-only, Q-S2-B) `fxReadFact` whose fact may also use σ's `CLFULL`. -/
+theorem AxSpinX2.fxReadFactF (L : Xlay) (GT : GdexecT) (nm : Xv6N) (_HL : xlayOk L)
+    (Hcons : rvwmoCatConsistent (gtAdGd GT)) (r : Geid) (P : Prop) :
+    gisW (gtAdGd GT).gdG r = false →
+    (∀ s, WC (gtAdGd GT).gdG s → WPh (gtAdGd GT).gdG s r →
+      CPUOK (clb L) cvx (gtAdGd GT).gdG s → WOK L (gtAdGd GT).gdG s →
+      CLFULL L (gtAdGd GT).gdG s → r ∉ s → P) →
+    ⊢ @flowEqDyn hlc GF _ (AxSpinX2.xG L GT nm) (gtAdGd GT) r
+        (@Axpol.sPol (xv6Pol GT) (gtAdGd GT) r) (∅ : Mea GF) iprop(⌜P⌝) := by
+  intro Hnw HP
+  obtain ⟨Hnx, Hok, Hwk⟩ := nwSide L GT r Hnw
+  iapply AxSpinX2.fxBuildF
+  iintro %s %Hn %Hwc %Hwp %_ %Hcok %Hwok %Hcf Ho Hl _
+  imodintro
+  inext
+  imodintro
+  isplitr
+  · ipureintro
+    exact ⟨Hok, Hwk⟩
+  isplitl [Ho]
+  · iapply (ownInvOther (XO L) nm.xnH (gtAdGd GT) s r Hn Hnx) $$ Ho
+  isplitl [Hl]
+  · iapply (lkInvRead nm.xnReg L.xlLk (gtAdGd GT) s r Hcons Hwp Hn Hnw) $$ Hl
+  · ipureintro
+    exact HP s Hwc Hwp Hcok Hwok Hcf Hn
+
+/-- (Lean-only, Q-S2-B) THE RACY lk->cpu READ, strong form: `rdFact` AND `clSrcFull` (every
+gmo-earlier source of a lk->cpu byte read is a full-width write — σ's `CLFULL`) at the read. -/
+theorem AxSpinX2.fxCpuRacyS (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
+    (Hcons : rvwmoCatConsistent (gtAdGd GT)) (r : Geid) :
+    gisW (gtAdGd GT).gdG r = false →
+    ⊢ @flowEqDyn hlc GF _ (AxSpinX2.xG L GT nm) (gtAdGd GT) r
+        (@Axpol.sPol (xv6Pol GT) (gtAdGd GT) r) (∅ : Mea GF)
+        iprop(⌜rdFact (clb L) cvx (gtAdGd GT).gdG r ∧ clSrcFull L (gtAdGd GT).gdG r⌝) := by
+  intro Hnw
+  refine AxSpinX2.fxReadFactF L GT nm HL Hcons r _ Hnw ?_
+  intro s Hwc Hwp Hok _ Hcf _
+  refine ⟨?_, ?_⟩
+  · intro a t v _ Hrd
+    have Hs := (Hcons.2.2.1 r a t v Hrd).1
+    cases t with
+    | zero => exact Or.inl ⟨rfl, Hs⟩
+    | succ j =>
+      right
+      obtain ⟨w, Hat, Hw, Hvis⟩ := Hs
+      refine ⟨w, Hat, Hw, ?_⟩
+      by_cases Heq : w.1 = r.1
+      · exact Or.inr ⟨Heq, Hvis⟩
+      · refine Or.inl ⟨Heq, Hok w (Hwp w (WeakRvwmoGraph.gwritesByteGisW _ _ _ _ Hw) ?_)⟩
+        exact catGrfeGmo (gtAdGd GT) w r Hcons ⟨⟨a, j + 1, v, Hrd, Hat⟩, Heq⟩
+  · intro a t v w _ Hrd Hat Hlt
+    cases t with
+    | zero => cases Hat
+    | succ j =>
+      obtain ⟨w', Hat', Hw', -⟩ := (Hcons.2.2.1 r a (j + 1) v Hrd).1
+      rw [Hat] at Hat'
+      cases Hat'
+      exact Hcf w (Hwp w (WeakRvwmoGraph.gwritesByteGisW _ _ _ _ Hw') Hlt)
 
 /-! ## PRIVATE (stack words, struct-cpu fields) -/
 
@@ -1068,6 +1176,7 @@ theorem fxNpIncr (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
               (WeakInterpProj.wbytes 4 (BitVec.ofInt 32 v))[j]? = some b⌝) := by
   intro Hisw Hew Honly Hdata
   obtain ⟨Hnlk, Hwk⟩ := xoSide L GT HL w (npb L) Honly (npbXO L)
+    (AxSpinX2.clFullNpb L HL _ w Honly)
   have Hok : cpuOk (clb L) cvx (gtAdGd GT).gdG w := by
     apply cpuOkNw
     intro a v Ha Hw
@@ -1144,7 +1253,7 @@ theorem fxBlocked (L : Xlay) (GT : GdexecT) (nm : Xv6N) (e : Geid) (a : Int) (v 
     from .rfl) $$ Hob
   unfold protXv6
   icases Hob with ⟨%Hp, -, -⟩
-  exact (Hnok (Hp.2.2 e a v (elemOfUnionL (elemOfSingleton.2 rfl)) Hw)).elim
+  exact (Hnok (Hp.2.2.1 e a v (elemOfUnionL (elemOfSingleton.2 rfl)) Hw)).elim
 
 end rulesX
 

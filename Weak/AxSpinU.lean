@@ -74,6 +74,12 @@ in Rocq's AxSpinU2/U4.
    `AxSpinU.rvlNpSrc` used through `persistent_entails_left`; Rocq `vm_compute` facts by
    `decide +kernel`.
 6. The trailing `Print Assumptions` commands are not ported.
+7. Q-S2-B (owner ruling 2026-10-08, AxSpinX deviation 8: `protXv6` admits only FULL-WIDTH
+   lk->cpu writes).  STATEMENT CHANGE: the one-byte owned write `fxuWrite1` takes `a ∉ clb L`
+   and `okw1` gains the conjunct `a ∉ clb Lx` (Rocq: any `a ∈ XO`), so `HOw1`/`wpdSdOwn1` cover
+   one-byte nextpid stores only (a one-byte lk->cpu store is no longer a protocol write; neither
+   is used by a certificate or a later file).  `fxuNpIncr` discharges `xoSide`'s new `clFull`
+   premise by `AxSpinX2.clFullNpb` (statement unchanged).
 
 **Rocq → Lean name map.**  `src_at` `srcAt`, `np_src` `npSrc`, `last_fst` `lastFst`, `Rv_retie`
 `RvRetie`, `RVL_retie` `RVLRetie`, `Rv_read_src` `RvReadSrc`, `NPh` `NPh`, `FRAG` `FRAG`, `O1`
@@ -334,6 +340,7 @@ theorem fxuNpIncr (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
     rw [inClr]
     omega
   obtain ⟨Hnlk, Hwk⟩ := xoSide L GT HL w (npb L) Honly (npbXO L)
+    (AxSpinX2.clFullNpb L HL _ w Honly)
   have Hok : cpuOk (clb L) cvx (gtAdGd GT).gdG w := by
     apply cpuOkNw
     intro a v Ha Hw
@@ -397,12 +404,12 @@ theorem fxuNpIncr (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
 theorem fxuWrite1 (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
     (Hcons : rvwmoCatConsistent (gtAdGd GT)) (w e : Geid) (a : Int) (b : BitVec 8)
     (cls : WmClass) (mv : Option (BitVec 8)) :
-    gxLbl (gtAdGd GT).gdG w = some (.LStore false a [b] cls) → a ∈ XO L →
+    gxLbl (gtAdGd GT).gdG w = some (.LStore false a [b] cls) → a ∈ XO L → a ∉ clb L →
     cpuOk (clb L) cvx (gtAdGd GT).gdG w → gmoLt (gtAdGd GT).gdG e w →
     ⊢ @flowEqDyn hlc GF _ (AxSpinX2.xG L GT nm) (gtAdGd GT) w
         (@Axpol.sPol (xv6Pol GT) (gtAdGd GT) w)
         ({[e := O1 nm (gtAdGd GT) a e mv]} : Mea GF) (O1 nm (gtAdGd GT) a w (some b)) := by
-  intro Hl HaX Hok Hew
+  intro Hl HaX Hnc Hok Hew
   obtain ⟨Hw, Hsg⟩ := gwbStore _ _ _ _ _ Hl
   have Hisw : gisW (gtAdGd GT).gdG w = true := by unfold gisW; rw [Hl]; rfl
   have Hlen : [b].length = [a].length := rfl
@@ -442,7 +449,10 @@ theorem fxuWrite1 (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
         · iexact Ha
   ihave Hw := Hw0
   ihave Hfe := (fxRVLWrite (hlc := hlc) L GT nm HL Hcons w e [a] [b] iprop(True)
-    ({[e := O1 nm (gtAdGd GT) a e mv]} : Mea GF) Hisw Hew Hlen Hall Honly HX Hok) $$ Hw
+    ({[e := O1 nm (gtAdGd GT) a e mv]} : Mea GF) Hisw Hew Hlen Hall Honly HX Hok
+    (AxSpinX.clFullNo L _ w fun a' v' Ha' Hw' => by
+      rw [(Hsg a' v' Hw').1] at Ha'
+      exact Hnc Ha')) $$ Hw
   iapply (@flowEqDynMono hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) (gtAdGd GT) w _ _
     iprop(True ∗ RVL nm.xnH (gtAdGd GT) [a] w [b]) (O1 nm (gtAdGd GT) a w (some b))) $$ [] Hfe
   inext
@@ -531,7 +541,7 @@ theorem uxPolIntro (GT : GdexecT) (e r : Geid) (l : Lbl) :
   fun H1 H2 H3 H4 => lobpIntro (gtAdGd GT) e r l H1 H2 H3 H4
 
 def okw1 (GT : GdexecT) (w : Geid) (a : Int) (_b : BitVec 8) : Prop :=
-  a ∈ XO Lx ∧ cpuOk (clb Lx) cvx (gtAdGd GT).gdG w
+  a ∈ XO Lx ∧ a ∉ clb Lx ∧ cpuOk (clb Lx) cvx (gtAdGd GT).gdG w
 
 def okr1 (_r : Geid) (a : Int) : Prop := a ∈ XO Lx
 
@@ -563,7 +573,7 @@ theorem HOw1 (GT : GdexecT) (nm : Xv6N) (Hcons : rvwmoCatConsistent (gtAdGd GT))
     ⊢ @flowEqDyn hlc GF _ (AxSpinX2.xG Lx GT nm) (gtAdGd GT) w
         (@Axpol.sPol (xv6Pol GT) (gtAdGd GT) w)
         ({[e := O1 nm (gtAdGd GT) a e mv]} : Mea GF) (O1 nm (gtAdGd GT) a w (some b)) :=
-  fun Hl ⟨HaX, Hok⟩ Hew => fxuWrite1 Lx GT nm LxOk Hcons w e a b cls mv Hl HaX Hok Hew
+  fun Hl ⟨HaX, Hnc, Hok⟩ Hew => fxuWrite1 Lx GT nm LxOk Hcons w e a b cls mv Hl HaX Hnc Hok Hew
 
 theorem HOr1 (GT : GdexecT) (nm : Xv6N) (Hcons : rvwmoCatConsistent (gtAdGd GT)) (r e : Geid)
     (a : Int) (t : Nat) (v : BitVec 8) (mv : Option (BitVec 8)) :

@@ -27,6 +27,11 @@ latest clause is per byte; it yields one source only under ALIGNED writes, `clSi
 `clb`, deposited by `fxCpuRacy`).  The choice is an owner question: see
 `PROGRESS-AxSpinT2g.md`.  NOTHING in this file weakens the statement silently: the premise is a
 named hypothesis of `racyNotMine`.
+**RESOLVED (owner ruling Q-S2-B, 2026-10-08): option (B).**  `protXv6` now carries the σ
+conjunct `CLFULL` (AxSpinX deviation 8: every lk->cpu write is full-width) and `ORacy` deposits
+`clSrcFull` (`AxSpinX2.fxCpuRacyS`); `AxSpinT2g.srcAlignedOfFull` turns it (+ no own lk->cpu
+write po-before, already a premise of the aq arm) into `clSrcAligned`, so `AxSpinT2h.cutAq` and
+the capstone no longer carry it.  `racyNotMine` keeps the pure premise (it is a graph lemma).
 
 **(2) PO5's NOFF FLOW — MATERIALISES (as the design anticipated).**  pop_off's `lw a5,120(a0)`
 (PO5:395, `XL4`) and pop_off's intena load (PO6:180, `XL4`) and push_off's noff loads (PO1:395, PO3:284) all run
@@ -60,7 +65,8 @@ drops nothing of that kind today because it deposits nothing).  The pure consume
   alignment needed only of the read's SOURCES and the value table injective only at the
   writers); `racyNotMine` (aq): `rdFact` + `Himgc` + writers are harts < NCPU + no own
   lk->cpu write po-before + `clSrcAligned` ⇒ `ldRes false 8 vs ≠ cpuAddr (cpuOf i)`;
-  `racyNotMineAl` (the option-(A) corollary from `clAligned`); position / writer helpers
+  `racyNotMineAl` (the option-(A) corollary from `clAligned`); `srcAlignedOfFull` (option (B):
+  `clSrcFull` + no own write po-before ⇒ `clSrcAligned`); position / writer helpers
   `noOwnBefore`, `writerInGmo`, `writerLt`.
 §4 noff / intena: `subw1` (= PO5's `addiwm1` BY `rfl`; restated so PO5/PO6 may import this
   file), `noffPop` (ppN: pop_off's noff = image + 1, so `bge zero,a5` falls through iff
@@ -231,6 +237,29 @@ theorem AxSpinT2g.srcAlignedOfAligned (G : Gexec) (r : Geid) :
     rw [Hat] at Hat'
     cases Hat'
     exact Hal w a v Ha Hw'
+
+end racy
+
+/-- Q-S2-B RESOLVED (option B, protocol): the racy read's deposit `clSrcFull` (protXv6's
+full-width `CLFULL`, via `AxSpinX2.fxCpuRacyS`) + "no own lk->cpu write po-before the read"
+give `clSrcAligned` (a visible source is gmo-before — full-width — or po-before — excluded). -/
+theorem AxSpinT2g.srcAlignedOfFull (L : Xlay) (G : Gexec) (r : Geid) :
+    gloadValue G → clSrcFull L G r →
+    (∀ w a v, a ∈ clb L → gwritesByte G w a v → WeakRvwmoGraph.gpo G w r → False) →
+    AxSpinT2g.clSrcAligned (clb L) G r := by
+  intro Hlv Hsf Hns a t v w Ha Hr Hat
+  cases t with
+  | zero => cases Hat
+  | succ j =>
+    obtain ⟨w', Hat', Hw', Hvis⟩ := (Hlv r a (j + 1) v Hr).1
+    rw [Hat] at Hat'
+    cases Hat'
+    rcases Hvis with Hlt | Hpo
+    · exact Hsf a (j + 1) v w Ha Hr Hat Hlt a v Ha Hw'
+    · exact (Hns w a v Ha Hw' Hpo).elim
+
+section racy
+variable (Cl : List Int) (cv : Agent → List (BitVec 8))
 
 /-- THE 8 BYTES HAVE ONE SOURCE: under source alignment, every `Cl` byte `r` reads is read at
 the same write index (gloadValue's co-maximality clause). -/

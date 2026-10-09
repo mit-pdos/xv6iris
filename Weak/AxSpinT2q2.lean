@@ -39,9 +39,9 @@ Premises of `allocpid2Distinct2` (A, B, C = 0, 1, 2; `Sf = sZ`, `pf = pEx`, `ptp
 * text / translation: AxSpinT2c5's eight text facts, `mapOk3`, `AxSpinT2pt.satpXFacts`,
   `textFixed` = `AxSpinT2p1.textFixed1`;
 * rows / pins: `prefixWitness` (`allocPre`, `AllocPins2`);
-* `HsrcAlA`/`HsrcAlB` (OPEN owner question Q-S2-B, a premise of the capstone): DISCHARGED here
-  from AxSpinT2p1's `clAl1` (every `lk->cpu` write of this graph — A's acquire `sd` — is
-  full-width) by `AxSpinT2g.srcAlignedOfAligned` with `gloadValue` from `catAm`;
+* (Q-S2-B, 2026-10-08: the capstone no longer has the source-alignment premises
+  `HsrcAlA`/`HsrcAlB` — protocol full-width lk->cpu writes, AxSpinX deviation 8 — so nothing is
+  discharged for them here);
 * entry: `AxSpinT2e3.entryR` (`entryOk`, incl. `ctrlOkSW`; graph-independent);
 * run: `AxSpinT2p1c.runAm` (step counts / final states chosen per hart; ends at the row end,
   `¬ midState`).
@@ -55,8 +55,7 @@ Premises of `allocpid2Distinct2` (A, B, C = 0, 1, 2; `Sf = sZ`, `pf = pEx`, `ptp
 * Prefix closure stays informal (Q-S2-6): the cut-off rows are simply the graph's rows.
 
 Reused: `allocpid2Distinct2` (AxSpinT2b2), `AxSpinT2p1c.gAm`/`catAm`/`ctrlAm`/`runAm`/
-`prefixWitness`, `AxSpinT2p1.growC1`/`clAl1`/`textFixed1`/`il1`, `AxSpinT2g.srcAlignedOfAligned`,
-`catTAd`, `AxSpinT2e3.entryR`, `AxSpinT2c1.layHyp3`/`sZ`/`q0`/`ptpX`, `AxSpinT2c5.*` (text,
+`prefixWitness`, `AxSpinT2p1.growC1`/`textFixed1`/`il1`, `catTAd`, `AxSpinT2e3.entryR`, `AxSpinT2c1.layHyp3`/`sZ`/`q0`/`ptpX`, `AxSpinT2c5.*` (text,
 `mapOk3`, `al3`, `imgClb`, `imgNp`, `σX`), `AxSpinT2pt.satpXFacts`.
 Names: `allocpidPrefixCert` (Lean-only, grepped absent); helpers `Weak.AxSpinT2q2.*`.
 -/
@@ -104,11 +103,6 @@ theorem harts2 : ∀ e, e ∈ gAm.gtG.gxGmo → e.1 ∈ [(0 : Agent), 1] := by
   have H : il1.all (fun e : Geid => decide (e.1 ∈ [(0 : Agent), 1])) = true := by decide +kernel
   exact of_decide_eq_true (List.all_eq_true.1 H e he)
 
-/-- Q-S2-B's `clSrcAligned` at a read of the prefix-witness graph, from `clAligned` (`clAl1`). -/
-theorem srcAl (r : Geid) : AxSpinT2g.clSrcAligned (clb lay) (gtAdGd gAm).gdG r :=
-  AxSpinT2g.srcAlignedOfAligned (clb lay) (gtAdGd gAm).gdG r (catTAd _ catAm).2.2.1
-    (AxSpinT2p1.clAl1 _ lay rfl)
-
 theorem stK (cpu : CPU) (m : SailM Unit) (rs : RegFile) (ib : Ibch) (k : Nat) :
     (AxEpiRun.st cpu m rs ib k).atK = k := rfl
 
@@ -144,7 +138,7 @@ theorem allocpidPrefixCert :
     (textFixed1 _ 0 (by decide)) (textFixed1 _ 1 (by decide))
     satpXFacts.1 satpXFacts.2.1 satpXFacts.2.2
     (AxSpinT2c5.mapOk3 0 (by decide)) (AxSpinT2c5.mapOk3 1 (by decide))
-    HpA HpB HqA HqB (AxSpinT2q2.srcAl _) (AxSpinT2q2.srcAl _)
+    HpA HpB HqA HqB
     (AxSpinT2e3.entryR 0 (by decide)) (AxSpinT2e3.entryR 1 (by decide))
     (fun _ nm i hi => by
       simp only [List.mem_cons, List.not_mem_nil, or_false] at hi

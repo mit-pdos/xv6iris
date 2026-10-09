@@ -143,8 +143,8 @@ theorem protL3Lx {GF : BundledGFunctors} [AxSpinX.Xv6G GF] (nm : Xv6N) (GD : Gde
     (s : GSet Geid) :
     protXv6 (GF := GF) AxSpinJ2.L3 nm GD σ s ⊢ protXv6 Lx nm GD σ s := by
   unfold protXv6
-  exact sep_mono (pure_mono fun ⟨Hwc, Hcpu, Hwok⟩ =>
-    ⟨Hwc, Hcpu, fun e a v He Hw => wokL3Lx a e.1 (Hwok e a v He Hw)⟩) .rfl
+  exact sep_mono (pure_mono fun ⟨Hwc, Hcpu, Hwok, Hcf⟩ =>
+    ⟨Hwc, Hcpu, fun e a v He Hw => wokL3Lx a e.1 (Hwok e a v He Hw), Hcf⟩) .rfl
 
 /-- The allocation at harts `[A, B, C]`, into the `Ixv6` protocol state. -/
 theorem xv6HobAlloc3 {GF : BundledGFunctors} [AxSpinX.Xv6G GF] (GD : Gdexec) (n0 : Int) :
