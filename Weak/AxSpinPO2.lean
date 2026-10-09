@@ -54,6 +54,13 @@ reached only when `u + 5 < LEN`.  `wpdPoInt` keeps its exact statement and is th
 (same slot; `ppo 0x30` = the `ra` the `jal mycpu` at `+ 0x2c` sets); mycpu runs as
 `wpdMycpuG`.  `wpdPoIntP` = `wpdPoIntG` ∘ `AxSpinT2i.gateOfPinG` (statement unchanged).
 
+## P1 VALUE HOOK (Lean-only; the shape is AxSpinE8's header "P1 VALUE HOOK")
+
+`wpdPoIntG`'s hook takes `AxSpinE8.EndRl GT i [(u + 2,
+  some (stBytes 8 (ppo 0x30)))] k'` (its one gate)
+before `∀ pr`; mycpu's value hook is handed that entry (`Era1`).  Nothing else changed;
+`wpdPoIntP`/`wpdPoInt` unchanged.
+
 ## Deviations from Rocq
 
 1. O2 STAGE C / Q20' (provisional Option V; protocol "Cross-file facts" Q20', AxSpinPOr,
@@ -158,9 +165,9 @@ theorem wpdPoIntG (u : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pmra Pms0 Pi : BitVec 
     dj (paZ Pms0) 8 (paZ Pmra) 8 →
     -- mycpu's ra reload GATE (P1)
     AxSpinT2i.Gate GT i (u + 2) (stBytes 8 (AxSpinPO.ppo 0x30)) →
-    -- the row-end hook (stage 2, design §B / Q-S2-2; windowed)
+    -- the row-end hook (stage 2, design §B / Q-S2-2; windowed; P1 VALUE HOOK)
     (∀ k' : Nat, u ≤ k' → k' ≤ u + 5 → (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
-      ∀ pr : Pexv6,
+      AxSpinE8.EndRl GT i [(u + 2, some (stBytes 8 (AxSpinPO.ppo 0x30)))] k' → ∀ pr : Pexv6,
         ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨pr, k'⟩ Ψ) →
     ⊢ (∀ (rs' : RegFile) (ib' : Ibch),
@@ -183,7 +190,7 @@ theorem wpdPoIntG (u : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pmra Pms0 Pi : BitVec 
   -- row end at u
   by_cases E0 : (AxOpsem.grow (gtAdGd GT) i).length ≤ u
   · iclear C
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   obtain ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, T2c, T30, T34, T36, T38⟩ :=
     Htxp
   have XR := XxReg L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
@@ -233,7 +240,7 @@ theorem wpdPoIntG (u : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pmra Pms0 Pi : BitVec 
     (by rw [Evs0]; exact hitWAgree rs0 rs1 _ Htl1 Hh_ms0)
     Hpr_mra Hnt_mra Hpr_ms0 Hnt_ms0 (by unfold dj at Hdm; omega)
     (by rw [Era1]; exact Hgate30) (by rw [Era1]; decide)
-    (fun k' h1 h2 h3 => HΨend k' h1 (by omega) h3))
+    (fun k' h1 h2 h3 hv => HΨend k' h1 (by omega) h3 (by rw [Era1] at hv; exact hv)))
   iintro %vmra %vms0 %rs2 %ib2 %HM - -
   obtain ⟨Hc2, HPC2', Htl2', Ha02, Hsp2, -, -, -, -, Hkeep2, -, -, -, -⟩ := HM
   have HPC2 : rs2 .PC = AxSpinPO.ppo 0x30 := HPC2'.trans Era1
@@ -247,7 +254,7 @@ theorem wpdPoIntG (u : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pmra Pms0 Pi : BitVec 
   -- row end at u + 4
   by_cases E4 : (AxOpsem.grow (gtAdGd GT) i).length ≤ u + 4
   · iclear C
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   -- ---- + 0x30: srli a5,s1,1 (u+4) ----
   iapply (XR _ rs2 (u + 4) (AxSpinPO.ppo 0x30) false q30 none
     (some (15#5, shift_bits_right (gprVal rs2 9#5)
@@ -303,7 +310,7 @@ theorem wpdPoIntG (u : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pmra Pms0 Pi : BitVec 
   -- row end at u + 5
   by_cases E5 : (AxOpsem.grow (gtAdGd GT) i).length ≤ u + 5
   · iclear C
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   have HF5 := stepRegs0 T satp0 _ rs4 _ _ _ rs5 HF4 HG5
   have HPC5 : rs5 .PC = AxSpinPO.ppo 0x38 := by rw [gbPc T satp0 _ _ _ _ _ _ HG5]; decide
   have Htl5 : rs5 .tlb = rs0 .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG5).trans Htl4
@@ -397,7 +404,7 @@ theorem wpdPoIntP (u : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pmra Pms0 Pi : BitVec 
   intro HR Hw8 Hnr_mra Hnr_ms0 Hwle Hc0 HPC0 Hhit0 HhitM Hs1 HSIE Bmra Bms0 Bi Hdm Hval30 HΨend
   exact wpdPoIntG L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxm Htxp Ψ HΨmid
     u rs0 ib0 Pmra Pms0 Pi m HR Hw8 Hnr_mra Hnr_ms0 Hwle Hc0 HPC0 Hhit0 HhitM Hs1 HSIE
-    Bmra Bms0 Bi Hdm (AxSpinT2i.gateOfPinG Hval30) HΨend
+    Bmra Bms0 Bi Hdm (AxSpinT2i.gateOfPinG Hval30) (fun k' h1 h2 h3 _ => HΨend k' h1 h2 h3)
 
 set_option maxHeartbeats 1600000 in
 include HL Hcons hmode hasid hppn Hfix Htxm Htxp HΨmid in

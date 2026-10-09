@@ -83,6 +83,23 @@ statement unchanged); `wpdRelease` as before.  HONESTY: `wpdReleaseG` has no rel
 literal return address; the remaining value pins are `Hvcpu` (rlL), `Hvge`/`Hvc`/`Hvz`
 (pop_off's arm / ppN / ppI value facts).
 
+## P1 VALUE HOOK (Lean-only; the shape is AxSpinE8's header "P1 VALUE HOOK")
+
+`wpdReleaseG`'s hook takes, after `LEN ≤ k'` and before `∀ pr`, `AxSpinE8.EndRl GT i ((if hb then
+[(relKh k + 7, some (stBytes 8 (pch 0x1a))), (relKh k + 9, some (stBytes 8 (prl 0x10))),
+(relKh k + 11, some (stBytes 8 (gprVal rs0 r10)))] else []) ++ ([(relKp k + 4, some (stBytes 8
+(ppp 0x0c))), (relKp k + 8 + (if c then 0 else 1), some (stBytes 8 (prl 0x22)))] ++ ((relKr k c,
+some (stBytes 8 (gprVal rs0 r1))) :: [(relKr k c + 2, graphData (gtAdGd GT) (i, k + 2))]))) k'` —
+its seven gates (`rhMy`/`rhRet`/`rhS1` on holding's long arm, `ppMy`/`ppRet`, `rlRet`, `rlS1`); the
+`rlS1` entry is DATA-RELATIVE (the s1 spill's own row data, T2f's `rlExp .rlS1 = wd row (t2KRl q +
+2)`).  Nothing else in its statement changed.  `AxSpinRl4b.wpdReleaseGr`: the same list with
+`(relKr k c, some (stBytes 8 ret))` and the `rlS1` entry under its flag `gs` (`if gs then [...] else
+[]`), plus the NEW premise `stBytes 8 ret ≠ stBytes 8 (gprVal rs0 r1) → relKr k c < LEN →
+graphValue (i, relKr k c) = some (stBytes 8 ret)` after `Hret` (`wpdReleaseG`: vacuous;
+`wpdReleaseP`: its guarded pin).  The `s1` check was already before the `relKe` row end.  The
+callees' value hooks (`wpdRelHeadG`, `wpdPopOffG`) are handed their entries (`Era2` for pop_off's
+link).  `wpdReleaseP`/`wpdRelease` unchanged.
+
 ## Pins and row premises (honesty notes)
 
 1. GRAPH-VALUE PINS (Q20', provisional Option V): `wpdRelHead`'s four (holding's two return
@@ -287,11 +304,24 @@ theorem AxSpinRl4b.wpdReleaseGr (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : I
     (c = false → AxSpinPO5.rlOk4 (AxOpsem.grow (gtAdGd GT) i) (paZ Qi) (relKp k + 8) rlI) →
     -- P1: release's own ra reload GATE (against `ret`) and, on `gs`, its s1 reload GATE
     AxSpinT2i.Gate GT i (relKr k c) (stBytes 8 ret) → jalrTgt 0#12 ret = ret →
+    -- (P1 VALUE HOOK) a `ret` that is not the spill's: the guarded pin (`wpdReleaseP`'s)
+    (stBytes 8 ret ≠ stBytes 8 (gprVal rs0 AxSpinE8.r1) →
+      relKr k c < (AxOpsem.grow (gtAdGd GT) i).length →
+      graphValue (gtAdGd GT) (i, relKr k c) = some (stBytes 8 ret)) →
     (gs = true → AxSpinT2i.Gate GT i (relKr k c + 2) (stBytes 8 (gprVal rs0 AxSpinHd8.r9))) →
     -- the row-end hook (windowed; NOT at the four designated cuts)
     (∀ k' : Nat, k ≤ k' → k' ≤ relKe k c → (hb = false → k' ≠ relKh k + 1) →
       k' ≠ relKh k + 12 → k' ≠ relKp k + 7 → (c = false → k' ≠ relKp k + 9) →
-      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' → ∀ pr : Pexv6,
+      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
+      -- (P1 VALUE HOOK: holding's, pop_off's and release's own gates)
+      AxSpinE8.EndRl GT i ((if hb then [(relKh k + 7, some (stBytes 8 (pch 0x1a))),
+          (relKh k + 9, some (stBytes 8 (AxSpinHdB.prl 0x10))),
+          (relKh k + 11, some (stBytes 8 (gprVal rs0 AxSpinE8.r10)))] else []) ++
+        ([(relKp k + 4, some (stBytes 8 (ppp 0x0c))),
+          (relKp k + 8 + (if c then 0 else 1), some (stBytes 8 (AxSpinHdB.prl 0x22)))] ++
+          ((relKr k c, some (stBytes 8 ret)) :: (if gs then [(relKr k c + 2,
+            graphData (gtAdGd GT) (i, k + 2))] else [])))) k' →
+      ∀ pr : Pexv6,
         ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨pr, k'⟩ Ψ) →
     -- the designated cut rlS (hb = false: row ends right after holding's lw)
@@ -361,13 +391,19 @@ theorem AxSpinRl4b.wpdReleaseGr (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : I
     Bqra Bqs0 Bqmra Bqms0 Bqn Bqi HdjQ
     Hhlk Hhlc HdaLlk HntLk HdaSlk HpaLk HdaLcl HpaCl HntCl HdaScl HpaClS
     Hkc Hkck Hnl Hkw Hkwk Hnoint HwinW HwinR HrelZ4 HrelOnly Hks Hksm
-    Hvm Hvr Hvcpu Hvs1 Hval0c Hvge Hvc Hvz Hvalr HrlN HrlI HvalR Hret Hgs HΨend KrlS KrlL KppN KppI
+    Hvm Hvr Hvcpu Hvs1 Hval0c Hvge Hvc Hvz Hvalr HrlN HrlI HvalR Hret HsP Hgs HΨend KrlS KrlL KppN KppI
   have Htxr' := Htxr
   obtain ⟨-, -, -, -, -, -, -, -, -, -, -, T1e, T22, T24, T26, T28, T2a⟩ := Htxr'
   have XR := XxReg L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
   have XL := XxLd L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
   have XT := XxRet L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
   have Hpl : 10 ≤ ppLen c := by unfold ppLen; split <;> omega
+  have Hq1 : relKh k = k + 3 := rfl
+  have Hq2 : relKw k = k + 17 := rfl
+  have Hq3 : relKp k = k + 18 := rfl
+  have Hq4 : relKr k c = relKp k + ppLen c := rfl
+  have Hq5 : relKe k c = relKr k c + 3 := rfl
+  have Hq6 := AxSpinRl4b.popEnd k c
   have HdaL_ra := Bra.2.1
   have Hh_ra := Bra.2.2.1
   have Hpr_ra := Bra.2.2.2.1
@@ -388,9 +424,10 @@ theorem AxSpinRl4b.wpdReleaseGr (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : I
     HR Hw8 Hnr1 Hnr2 Hnr3 Hnr4 Hnr5 HnrCl Hc0 HPC0 Hhit0 HhitM Bra Bs0 Bs1 Bh1 Bh2 Bh3 Bh4 Bh5 Hdisj
     Hhlk Hhlc HdaLlk HntLk HdaSlk HpaLk HdaLcl HpaCl HntCl HdaScl HpaClS
     Hkc Hkck Hnl Hkw Hkwk Hnoint HwinW HwinR HrelZ4 HrelOnly Hks Hksm Hvm Hvr Hvcpu Hvs1
-    (fun k' h1 h2 h3 h4 h5 pr => HΨend k' h1 (by simp only [relKw, relKe, relKr, relKp] at h2 ⊢; omega)
+    (fun k' h1 h2 h3 h4 h5 hv pr => HΨend k' h1 (by simp only [relKw, relKe, relKr, relKp] at h2 ⊢; omega)
       h3 h4 (by simp only [relKw, relKp] at h2 ⊢; omega)
-      (fun _ => by simp only [relKw, relKp] at h2 ⊢; omega) h5 pr) KrlS KrlL)
+      (fun _ => by simp only [relKw, relKp] at h2 ⊢; omega) h5
+      (AxSpinE8.endRlAppend hv (by ax_spin_e8_endrl_split)) pr) KrlS KrlL)
     $$ Hil Hcl Hwl Hnp
   iintro %rs1 %ib1 %HH Hnh
   obtain ⟨Hc1, HPC1, Htl1, Esp1, Es11, Ekeep1, Hgd0, Hgd1, Hgd2⟩ := HH
@@ -401,7 +438,7 @@ theorem AxSpinRl4b.wpdReleaseGr (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : I
     iclear Hnh
     iapply (HΨend _ (by simp only [relKp]; omega) (by simp only [relKe, relKr, relKp]; omega)
       (fun _ => by simp only [relKp, relKh]; omega) (by simp only [relKp, relKh]; omega)
-      (by omega) (fun _ => by omega) Ep _)
+      (by omega) (fun _ => by omega) Ep (by ax_spin_e8_endrl) _)
   -- ---- + 0x1e: jal ra,pop_off (relKp k) ----
   have Hcj : CertC (ctrlOkSW T satp0) rs1 (AxSpinHdB.prl 0x1e) false rl1e (some (ppp 0))
       (some (1#5, BitVec.addInt (AxSpinHdB.prl 0x1e) (incr false))) := by
@@ -454,10 +491,12 @@ theorem AxSpinRl4b.wpdReleaseGr (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : I
     (by rw [Etp2]; exact fld4Tlb σi T L i rs0 rs2 _ _ Htl2 Bqn)
     (by rw [Etp2]; exact fld4Tlb σi T L i rs0 rs2 _ _ Htl2 Bqi)
     HdjQ Hval0c Hvge Hvc Hvz (by rw [Era2]; exact Hvalr) (by rw [Era2]; decide) HrlN HrlI
-    (fun k' h1 h2 h3 h4 h5 pr => HΨend k' (by simp only [relKp] at h1 ⊢; omega)
+    (fun k' h1 h2 h3 h4 h5 hv pr => HΨend k' (by simp only [relKp] at h1 ⊢; omega)
       (by rw [AxSpinRl4b.popEnd] at h2; simp only [relKe]; omega)
       (fun _ => by simp only [relKp, relKh] at h1 ⊢; omega)
-      (by simp only [relKp, relKh] at h1 ⊢; omega) h3 h4 h5 pr) KppN KppI) $$ HF
+      (by simp only [relKp, relKh] at h1 ⊢; omega) h3 h4 h5
+      (AxSpinE8.endRlAppend (by ax_spin_e8_endrl_split) (AxSpinE8.endRlAppend
+        (by rw [Era2] at hv; exact hv) (by ax_spin_e8_endrl_split))) pr) KppN KppI) $$ HF
   iintro %vn %vi %vra' %vs0' %rs3 %ib3 %HP - - HF HaN HaI
   obtain ⟨Hc3, HPC3, Htl3', Esp3, Ea03, -, -, Ekeep3, -⟩ := HP
   rw [Era2] at HPC3
@@ -475,7 +514,8 @@ theorem AxSpinRl4b.wpdReleaseGr (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : I
     iapply (HΨend _ (by simp only [relKr, relKp]; omega) (by simp only [relKe]; omega)
       (fun _ => by simp only [relKr, relKp, relKh]; omega)
       (by simp only [relKr, relKp, relKh]; omega) (by simp only [relKr]; omega)
-      (fun _ => by simp only [relKr]; omega) Er0 _)
+      (fun _ => by simp only [relKr]; omega) Er0
+        (by ax_spin_e8_endrl) _)
   -- the spills' row labels (all present: k + 2 < relKr k c < LEN)
   have HRh := rowShOfP (AxSpinRl4.relPHead HR)
     (by simp only [relHead, List.length_cons, List.length_nil, relKr, relKp] at Er0 ⊢; omega)
@@ -527,13 +567,10 @@ theorem AxSpinRl4b.wpdReleaseGr (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : I
       rw [show k + (18 + ppLen c) = relKr k c by simp only [relKr, relKp]; omega] at Hlbr
       iapply (AxSpinT2i.cutReloadG L GT nm Hcons i (relKr k c) (paZ Pra) _ vra Ψ
         ⟨lbr, Hlbr, Hshr⟩ Hlra Hgv0 Hv HvalR _) $$ H0
-    · have Hend := AxSpinT2i.lenOfGate HvalR Hgv0 Hv
-      iclear H0
-      iapply (HΨend _ (by simp only [relKr, relKp]; omega) (by simp only [relKe]; omega)
-        (fun _ => by simp only [relKr, relKp, relKh]; omega)
-        (by simp only [relKr, relKp, relKh]; omega) (by simp only [relKr]; omega)
-        (fun _ => by simp only [relKr]; omega) Hend _)
+    · -- `ret`'s bytes are not the spill's (only from `wpdReleaseP`): the guarded pin refutes
+      exact absurd (Hgv0.symm.trans (HsP Hs (by omega))) (fun h => Hv (Option.some.inj h))
   have Hvra : vra = stBytes 8 ret := Classical.byContradiction Hv
+  have Hgv0r : graphValue (gtAdGd GT) (i, relKr k c) = some (stBytes 8 ret) := Hvra ▸ Hgv0
   have HF4 := stepRegs T satp0 _ rs3 _ _ _ _ _ rs4 HF3 HG4
   have HPC4 : rs4 .PC = AxSpinHdB.prl 0x24 := by rw [gbPc T satp0 _ _ _ _ _ _ HG4]; decide
   have Htl4 : rs4 .tlb = rs0 .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG4).trans Htl3
@@ -548,7 +585,8 @@ theorem AxSpinRl4b.wpdReleaseGr (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : I
     iapply (HΨend _ (by simp only [relKr, relKp]; omega) (by simp only [relKe]; omega)
       (fun _ => by simp only [relKr, relKp, relKh]; omega)
       (by simp only [relKr, relKp, relKh]; omega) (by simp only [relKr]; omega)
-      (fun _ => by simp only [relKr]; omega) Er1 _)
+      (fun _ => by simp only [relKr]; omega) Er1
+        (by ax_spin_e8_endrl) _)
   have NW1 := AxSpinRl4.relPNowr 1 (by decide) (paZ Ps0) 8 HR (by omega)
     (by
       simp only [List.drop_succ_cons, List.drop_zero, List.mem_cons, List.not_mem_nil, or_false,
@@ -582,7 +620,8 @@ theorem AxSpinRl4b.wpdReleaseGr (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : I
     iapply (HΨend _ (by simp only [relKr, relKp]; omega) (by simp only [relKe]; omega)
       (fun _ => by simp only [relKr, relKp, relKh]; omega)
       (by simp only [relKr, relKp, relKh]; omega) (by simp only [relKr]; omega)
-      (fun _ => by simp only [relKr]; omega) Er2 _)
+      (fun _ => by simp only [relKr]; omega) Er2
+        (by ax_spin_e8_endrl) _)
   have NW2 := AxSpinRl4.relPNowr 2 (by decide) (paZ Ps1) 8 HR (by omega)
     (by intro q hq; simp at hq)
     (HdjW _ (by simp))
@@ -614,6 +653,9 @@ theorem AxSpinRl4b.wpdReleaseGr (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : I
       ⟨lbr, Hlbr, Hshr⟩ Hls1 Hgv2 Hv1.2 (Hgs Hv1.1) _) $$ H2
   have Hvs1g : gs = true → vs1 = stBytes 8 (gprVal rs0 AxSpinHd8.r9) :=
     fun h => Classical.byContradiction fun hn => Hv1 ⟨h, hn⟩
+  have Hgv2r : gs = true →
+      graphValue (gtAdGd GT) (i, relKr k c + 2) = graphData (gtAdGd GT) (i, k + 2) := fun hg => by
+    rw [Hgv2, Hvs1g hg, Hgd2]
   have HF6 := stepRegs T satp0 _ rs5 _ _ _ _ _ rs6 HF5 HG6
   have HPC6 : rs6 .PC = AxSpinHdB.prl 0x28 := by rw [gbPc T satp0 _ _ _ _ _ _ HG6]; decide
   have Htl6 : rs6 .tlb = rs0 .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG6).trans Htl5
@@ -631,7 +673,9 @@ theorem AxSpinRl4b.wpdReleaseGr (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : I
     iapply (HΨend _ (by simp only [relKe, relKr, relKp]; omega) (Nat.le_refl _)
       (fun _ => by simp only [relKe, relKr, relKp, relKh]; omega)
       (by simp only [relKe, relKr, relKp, relKh]; omega) (by simp only [relKe, relKr]; omega)
-      (fun _ => by simp only [relKe, relKr]; omega) Ee _)
+      (fun _ => by simp only [relKe, relKr]; omega) Ee (by
+        ax_spin_e8_endrl_split
+        exact Hgv2r ‹_›) _)
   -- ---- + 0x28: c.addi16sp sp,32 (relKe k c) ----
   have Hc7 := certAddi (ctrlOkSW T satp0) rs6 (AxSpinHdB.prl 0x28) true 2#5 2#5
     (caddi16spImm 2#6) (by decide)
@@ -833,7 +877,16 @@ theorem wpdReleaseG (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
     -- the row-end hook (windowed; NOT at the four designated cuts)
     (∀ k' : Nat, k ≤ k' → k' ≤ relKe k c → (hb = false → k' ≠ relKh k + 1) →
       k' ≠ relKh k + 12 → k' ≠ relKp k + 7 → (c = false → k' ≠ relKp k + 9) →
-      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' → ∀ pr : Pexv6,
+      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
+      -- (P1 VALUE HOOK: holding's, pop_off's and release's own gates)
+      AxSpinE8.EndRl GT i ((if hb then [(relKh k + 7, some (stBytes 8 (pch 0x1a))),
+          (relKh k + 9, some (stBytes 8 (AxSpinHdB.prl 0x10))),
+          (relKh k + 11, some (stBytes 8 (gprVal rs0 AxSpinE8.r10)))] else []) ++
+        ([(relKp k + 4, some (stBytes 8 (ppp 0x0c))),
+          (relKp k + 8 + (if c then 0 else 1), some (stBytes 8 (AxSpinHdB.prl 0x22)))] ++
+          ((relKr k c, some (stBytes 8 (gprVal rs0 AxSpinE8.r1))) :: [(relKr k c + 2,
+            graphData (gtAdGd GT) (i, k + 2))]))) k' →
+      ∀ pr : Pexv6,
         ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨pr, k'⟩ Ψ) →
     -- the designated cut rlS (hb = false: row ends right after holding's lw)
@@ -914,8 +967,8 @@ theorem wpdReleaseG (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
     Bqra Bqs0 Bqmra Bqms0 Bqn Bqi HdjQ
     Hhlk Hhlc HdaLlk HntLk HdaSlk HpaLk HdaLcl HpaCl HntCl HdaScl HpaClS
     Hkc Hkck Hnl Hkw Hkwk Hnoint HwinW HwinR HrelZ4 HrelOnly Hks Hksm
-    Hvm Hvr Hvcpu Hvs1 Hval0c Hvge Hvc Hvz Hvalr HrlN HrlI HvalR Hret (fun _ => Hgs1)
-    HΨend KrlS KrlL KppN KppI) $$ Hil Hcl Hwl Hnp HF
+    Hvm Hvr Hvcpu Hvs1 Hval0c Hvge Hvc Hvz Hvalr HrlN HrlI HvalR Hret (fun h => absurd rfl h)
+    (fun _ => Hgs1) HΨend KrlS KrlL KppN KppI) $$ Hil Hcl Hwl Hnp HF
   iintro %vra %vs0 %vs1 %rs' %ib' %H %H1 Hnh H0 H1' H2 HF HaN HaI
   iapply C $$ %vra %vs0 %vs1 %rs' %ib' %H %(H1 rfl) Hnh H0 H1' H2 HF HaN HaI
 
@@ -1146,7 +1199,8 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
     Hkc Hkck Hnl Hkw Hkwk Hnoint HwinW HwinR HrelZ4 HrelOnly Hks Hksm
     (AxSpinT2i.gateOfPinG Hvm) (AxSpinT2i.gateOfPinG Hvr) Hvcpu (AxSpinT2i.gateOfPinG Hvs1)
     (AxSpinT2i.gateOfPinG Hval0c) Hvge Hvc Hvz (AxSpinT2i.gateOfPinG Hvalr) HrlN HrlI
-    (AxSpinT2i.gateOfPinG HvalR) Hret (fun h => nomatch h) HΨend KrlS KrlL KppN KppI)
+    (AxSpinT2i.gateOfPinG HvalR) Hret (fun _ => HvalR) (fun h => nomatch h)
+    (fun k' h1 h2 h3 h4 h5 h6 h7 _ => HΨend k' h1 h2 h3 h4 h5 h6 h7) KrlS KrlL KppN KppI)
     $$ Hil Hcl Hwl Hnp HF
   iintro %vra %vs0 %vs1 %rs' %ib' %H %- Hnh H0 H1 H2 HF HaN HaI
   iapply C $$ %vra %vs0 %vs1 %rs' %ib' %H Hnh H0 H1 H2 HF HaN HaI

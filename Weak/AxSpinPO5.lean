@@ -85,6 +85,13 @@ value at `k + 5`.  The cut arm `KppN` is unchanged.  `wpdPpHeadP` = `wpdPpHeadG`
 `AxSpinT2i.gateOfPinG` (statement unchanged), `wpdPpHead` = `wpdPpHeadP` as before.  HONESTY:
 `wpdPpHeadG` has no reload pin; the noff pins `Hvge`/`Hvc` are value (not reload) pins and stay.
 
+## P1 VALUE HOOK (Lean-only; the shape is AxSpinE8's header "P1 VALUE HOOK")
+
+`wpdPpHeadG`'s hook takes `AxSpinE8.EndRl GT i [(k + 4,
+  some (stBytes 8 (ppp 0x0c)))] k'` before `∀ pr`
+(after the `k' ≠ k + 7` exclusion and `LEN ≤ k'`; its one gate, handed on to `wpdMycpuG` via
+`Era5`).  Nothing else changed; `wpdPpHeadP`/`wpdPpHead` unchanged.
+
 ## Deviations from Rocq
 
 1. O2 STAGE C / Q20' (provisional Option V; protocol "Cross-file facts" Q20', AxSpinPOr,
@@ -354,7 +361,7 @@ theorem wpdPpHeadG (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
     AxSpinPO5.rlOk4 (AxOpsem.grow (gtAdGd GT) i) (paZ Pn) (k + 6) rlN →
     -- the row-end hook (windowed; NOT at the designated cut `k + 7`)
     (∀ k' : Nat, k ≤ k' → k' ≤ k + 8 → k' ≠ k + 7 → (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
-      ∀ pr : Pexv6,
+      AxSpinE8.EndRl GT i [(k + 4, some (stBytes 8 (ppp 0x0c)))] k' → ∀ pr : Pexv6,
         ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨pr, k'⟩ Ψ) →
     -- the designated cut ppN (row ends right after the noff load)
@@ -392,7 +399,7 @@ theorem wpdPpHeadG (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
   by_cases E0 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k
   · iclear C
     iclear HF
-    iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   obtain ⟨T00, T02, T04, T06, T08, T0c, T10, T12, T14, T16, T1a, T1c, T1e, -⟩ := Htxq
   have XR := XxReg L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
   have XS := XxSt L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
@@ -431,7 +438,7 @@ theorem wpdPpHeadG (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
   by_cases E1 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 1
   · iclear C
     iclear HF
-    iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   -- ---- + 0x04: c.sdsp s0,0(sp) (spill at k+1) ----
   iapply (XS _ rs2 (k + 1) (ppp 0x04) true AxSpinE8.immS0 8#5 2#5
     (AxSpinE8.sp1Of (gprVal rs0 AxSpinE8.r2) + sign_extend (m := 64) AxSpinE8.immS0) Ps0
@@ -447,7 +454,7 @@ theorem wpdPpHeadG (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
   by_cases E2 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 2
   · iclear C
     iclear HF
-    iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   -- ---- + 0x06: c.addi4spn s0,sp,16 (k+2) ----
   have Hc4 := certAddi (ctrlOkSW T satp0) rs3 (ppp 0x06) true 2#5 8#5 (caddi4spnImm 4#8)
     (by decide)
@@ -508,7 +515,8 @@ theorem wpdPpHeadG (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
     (by rw [Evs0]; exact hitWAgree rs0 rs5 _ Htl5 Hh_ms0)
     Hpr_mra Hnt_mra Hpr_ms0 Hnt_ms0 (by unfold dj at Hdm; omega)
     (by rw [Era5, show k + 2 + 2 = k + 4 by omega]; exact Hgate0c) (by rw [Era5]; decide)
-    (fun k' h1 h2 h3 pr => HΨend k' (by omega) (by omega) (by omega) h3 pr)
+    (fun k' h1 h2 h3 hv pr => HΨend k' (by omega) (by omega) (by omega) h3
+      (by rw [Era5, show k + 2 + 2 = k + 4 by omega] at hv; exact hv) pr)
   rw [show k + 2 + 4 = k + 6 by omega] at WM'
   iapply WM'
   iintro %vmra %vms0 %rs6 %ib6 %HM - -
@@ -521,7 +529,7 @@ theorem wpdPpHeadG (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
   by_cases E6 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 6
   · iclear C
     iclear HF
-    iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   -- ---- + 0x0c: csrr a5,sstatus (k+6) ----
   have HSIE : (_get_Mstatus_SIE (rs6 .mstatus) == 1#1) = false := by
     obtain ⟨⟨-, -, -, -, -, -, -, -, H, -⟩, -⟩ := Hc6
@@ -659,7 +667,7 @@ theorem wpdPpHeadG (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
   · iclear C
     iclear HF
     iclear HaN
-    iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   -- ---- + 0x1e: c.bnez a5 — the noff load's VALUE picks the arm (k+8) ----
   have Hc : (addiwm1 (ldRes false 4 vn) != zero_reg) = c := Hvc vn Hgv6
   have Hcb := certBTYPE (ctrlOkSW T satp0) (AxSpinE6.ctlRegimeSW T satp0) rs13
@@ -806,7 +814,8 @@ theorem wpdPpHeadP (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
     Hval0c Hvge Hvc HrlN HΨend KppN
   exact wpdPpHeadG L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxm Htxq Ψ HΨmid
     k c rs0 ib0 Pra Ps0 Pmra Pms0 Pn rlN F HR Hw8 Hnr_mra Hnr_ms0 Hwle Hnrn Hc0 HPC0 Hhit0 HhitM
-    Bra Bs0 Bmra Bms0 Bn Hdm (AxSpinT2i.gateOfPinG Hval0c) Hvge Hvc HrlN HΨend KppN
+    Bra Bs0 Bmra Bms0 Bn Hdm (AxSpinT2i.gateOfPinG Hval0c) Hvge Hvc HrlN
+    (fun k' h1 h2 h3 h4 _ => HΨend k' h1 h2 h3 h4) KppN
 
 include HL Hcons hmode hasid hppn Hfix Htxm Htxq HΨmid in
 /-- Rocq `wpd_pp_head` (deviation 1: Stage C positions; value pins `Hval0c`/`Hvge`/`Hvc`

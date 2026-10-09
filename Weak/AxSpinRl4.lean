@@ -106,6 +106,16 @@ the corollary `wpdRelHeadG ∘ AxSpinT2i.gateOfPinG` ×3 (statement unchanged; n
 address, so no separate `…Gr` core is needed); `wpdRelHead` as before.  HONESTY: `wpdRelHeadG`
 has no reload pin; `Hvcpu` remains (the rlL gate).
 
+## P1 VALUE HOOK (Lean-only; the shape is AxSpinE8's header "P1 VALUE HOOK")
+
+`wpdRelHeadG`'s hook takes, after `LEN ≤ k'` and before `∀ pr`, `AxSpinE8.EndRl GT i (if hb then
+[(relKh k + 7, some (stBytes 8 (pch 0x1a))), (relKh k + 9, some (stBytes 8 (prl 0x10))),
+(relKh k + 11, some (stBytes 8 (gprVal rs0 r10)))] else []) k'` (its three gates `rhMy` / `rhRet`
+/ `rhS1`, on holding's long arm; holding's value hook `holdingFromReleaseG` is handed them via
+`Era7'`/`Es17`; the `rhS1` row end `relKh k + 12` is the designated cut `rlL`, outside the hook,
+whose arm `KrlL` receives the values and annotations as before).  Nothing else in its statement
+changed; `wpdRelHeadP`/`wpdRelHead` unchanged.
+
 ## Pins and row premises (honesty notes)
 
 1. GRAPH-VALUE PINS (Q20', provisional Option V; the theorem proves nothing about a graph whose
@@ -842,8 +852,13 @@ theorem wpdRelHeadG (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
     -- P1: holding's s1 reload GATE (release's s1 = the lock address a0)
     AxSpinT2i.Gate GT i (relKh k + 11) (stBytes 8 (gprVal rs0 AxSpinE8.r10)) →
     -- the row-end hook (windowed; NOT at the designated cuts)
+    -- (P1 VALUE HOOK: holding's three gates, on its long arm)
     (∀ k' : Nat, k ≤ k' → k' ≤ relKw k → (hb = false → k' ≠ relKh k + 1) →
-      k' ≠ relKh k + 12 → (AxOpsem.grow (gtAdGd GT) i).length ≤ k' → ∀ pr : Pexv6,
+      k' ≠ relKh k + 12 → (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
+      AxSpinE8.EndRl GT i (if hb then [(relKh k + 7, some (stBytes 8 (pch 0x1a))),
+        (relKh k + 9, some (stBytes 8 (AxSpinHdB.prl 0x10))),
+        (relKh k + 11, some (stBytes 8 (gprVal rs0 AxSpinE8.r10)))] else []) k' →
+      ∀ pr : Pexv6,
         ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨pr, k'⟩ Ψ) →
     -- the designated cut rlS (hb = false: row ends right after holding's lw)
@@ -899,7 +914,8 @@ theorem wpdRelHeadG (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
     iclear Hnp
     iclear C
     iapply (HΨend _ (Nat.le_refl _) (by simp only [relKw]; omega)
-      (fun _ => by simp only [relKh]; omega) (by simp only [relKh]; omega) E0 _)
+      (fun _ => by simp only [relKh]; omega) (by simp only [relKh]; omega) E0
+        (by simp only [relKh, relKf, relKw]; ax_spin_e8_endrl) _)
   -- ---- + 0x00: c.addi sp,-32 (row position k) ----
   iapply (XR _ rs0 k (AxSpinHdB.prl 0x00) true q00 none
     (some (2#5, spo (gprVal rs0 AxSpinE8.r2)))
@@ -932,7 +948,8 @@ theorem wpdRelHeadG (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
     iclear Hnp
     iclear C
     iapply (HΨend _ (by omega) (by simp only [relKw]; omega)
-      (fun _ => by simp only [relKh]; omega) (by simp only [relKh]; omega) E1 _)
+      (fun _ => by simp only [relKh]; omega) (by simp only [relKh]; omega) E1
+        (by simp only [relKh, relKf, relKw]; ax_spin_e8_endrl) _)
   -- ---- + 0x04: c.sdsp s0,16(sp) (spill at k+1) ----
   iapply (XS _ rs2 (k + 1) (AxSpinHdB.prl 0x04) true AxSpinPO3.imm16 8#5 2#5
     (spo (gprVal rs0 AxSpinE8.r2) + sign_extend (m := 64) AxSpinPO3.imm16) Ps0
@@ -953,7 +970,8 @@ theorem wpdRelHeadG (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
     iclear Hnp
     iclear C
     iapply (HΨend _ (by omega) (by simp only [relKw]; omega)
-      (fun _ => by simp only [relKh]; omega) (by simp only [relKh]; omega) E2 _)
+      (fun _ => by simp only [relKh]; omega) (by simp only [relKh]; omega) E2
+        (by simp only [relKh, relKf, relKw]; ax_spin_e8_endrl) _)
   -- ---- + 0x06: c.sdsp s1,8(sp) (spill at k+2) ----
   iapply (XS _ rs3 (k + 2) (AxSpinHdB.prl 0x06) true AxSpinPO3.imm8 9#5 2#5
     (spo (gprVal rs0 AxSpinE8.r2) + sign_extend (m := 64) AxSpinPO3.imm8) Ps1
@@ -972,7 +990,8 @@ theorem wpdRelHeadG (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
     iclear Hnp
     iclear C
     iapply (HΨend _ (by omega) (by simp only [relKw]; omega)
-      (fun _ => by simp only [relKh]; omega) (by simp only [relKh]; omega) E3 _)
+      (fun _ => by simp only [relKh]; omega) (by simp only [relKh]; omega) E3
+        (by simp only [relKh, relKf, relKw]; ax_spin_e8_endrl) _)
   have Hlt3 : relKh k < (AxOpsem.grow (gtAdGd GT) i).length := by simp only [relKh]; omega
   -- ---- + 0x08: c.addi4spn s0,sp,32 (k+3) ----
   have Hc5 := certAddi (ctrlOkSW T satp0) rs4 (AxSpinHdB.prl 0x08) true 2#5 8#5
@@ -1070,11 +1089,12 @@ theorem wpdRelHeadG (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
     (by rw [Era7, Era7'])
     (by rw [Ea07]; exact HdaLcl) HpaCl HntCl HnrCl (Hkw Hlt3) Hkwk Hnoint
     (by rw [Ea07]; exact HdaLlk) HntLk (Hkc Hlt3) Hkck Hnl
-    (fun k' h1 h2 h3 pr => HΨend k' (by simp only [relKh] at h1; omega)
+    (fun k' h1 h2 h3 hv pr => HΨend k' (by simp only [relKh] at h1; omega)
       (by cases hb <;> simp only [↓reduceIte, Bool.false_eq_true, relKh] at h2 <;>
         simp only [relKw] <;> omega)
       (fun hf => by subst hf; simp only [↓reduceIte, Bool.false_eq_true] at h2; omega)
-      (by cases hb <;> simp only [↓reduceIte, Bool.false_eq_true] at h2 <;> omega) h3 pr)
+      (by cases hb <;> simp only [↓reduceIte, Bool.false_eq_true] at h2 <;> omega) h3
+      (by rw [Era7', Es17] at hv; exact hv) pr)
   rw [show k + 3 = relKh k from rfl]
   cases hb with
   | false =>
@@ -1189,7 +1209,8 @@ theorem wpdRelHeadG (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
       iclear Hnp
       iclear C
       iapply (HΨend _ (by simp only [relKf]; omega) (by simp only [relKf, relKw]; omega)
-        (fun h => nomatch h) (by simp only [relKf, relKh]; omega) Ef _)
+        (fun h => nomatch h) (by simp only [relKf, relKh]; omega) Ef
+        (by simp only [relKh, relKf, relKw]; ax_spin_e8_endrl) _)
     -- ---- + 0x16: fence rw,w (relKf k) ----
     iapply (XxFence L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
       _ rs10 (relKf k) (AxSpinHdB.prl 0x16) (retxRefl cpu rs10 (relKf k) ib10)
@@ -1207,7 +1228,8 @@ theorem wpdRelHeadG (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
       iclear Hnp
       iclear C
       iapply (HΨend _ (by simp only [relKw]; omega) (Nat.le_refl _)
-        (fun h => nomatch h) (by simp only [relKw, relKh]; omega) Ew _)
+        (fun h => nomatch h) (by simp only [relKw, relKh]; omega) Ew
+        (by simp only [relKh, relKf, relKw]; ax_spin_e8_endrl) _)
     have Hltw : relKw k < (AxOpsem.grow (gtAdGd GT) i).length := by omega
     -- ---- + 0x1a: sw zero,0(s1) — THE RELEASING STORE (relKw k) ----
     iapply (AxSpinRl4.xxSwRelRelP L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
@@ -1370,7 +1392,8 @@ theorem wpdRelHeadP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
         ⟨.PHart cpu (.pure ()) rs0 none ib0, k⟩ Ψ := by
   intro HR Hw8 Hnr1 Hnr2 Hnr3 Hnr4 Hnr5 HnrCl Hc0 HPC0 Hhit0 HhitM Bra Bs0 Bs1 Bh1 Bh2 Bh3 Bh4 Bh5
     Hdisj Hhlk Hhlc HdaLlk HntLk HdaSlk HpaLk HdaLcl HpaCl HntCl HdaScl HpaClS
-    Hkc Hkck Hnl Hkw Hkwk Hnoint HwinW HwinR HrelZ4 HrelOnly Hks Hksm Hvm Hvr Hvcpu Hvs1
+    Hkc Hkck Hnl Hkw Hkwk Hnoint HwinW HwinR HrelZ4 HrelOnly Hks Hksm Hvm Hvr Hvcpu Hvs1 HΨend
+    KrlS KrlL
   exact wpdRelHeadG L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxm Htxh Htxr Ψ
     HΨmid k c hb rs0 ib0 Pra Ps0 Ps1 Hra Hs0 Hs1 Hram Hs0m Pcl PclS Plk PlkS plk qra qs0 qmra
     qms0 pn pint kc kw ks val cls Qc Qw tsc rvsc wvsc clsc HR Hw8 Hnr1
@@ -1378,6 +1401,7 @@ theorem wpdRelHeadP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
     Hhlk Hhlc HdaLlk HntLk HdaSlk HpaLk HdaLcl HpaCl HntCl HdaScl HpaClS
     Hkc Hkck Hnl Hkw Hkwk Hnoint HwinW HwinR HrelZ4 HrelOnly Hks Hksm
     (AxSpinT2i.gateOfPinG Hvm) (AxSpinT2i.gateOfPinG Hvr) Hvcpu (AxSpinT2i.gateOfPinG Hvs1)
+    (fun k' h1 h2 h3 h4 h5 _ => HΨend k' h1 h2 h3 h4 h5) KrlS KrlL
 
 
 set_option maxHeartbeats 1600000 in

@@ -76,6 +76,19 @@ continuations `KShortEnd`/`KLongEnd` (designated panic cuts) are unchanged; a ro
 s1 gate needs no cut arm.  HONESTY: `wpdHoldingG` has no reload pin; mycpu's and holding's wrong-ra
 rows at `k + 8` / `k + 10` are refuted by `cutReloadG`.
 
+## P1 VALUE HOOK (Lean-only; the shape is AxSpinE8's header "P1 VALUE HOOK")
+
+* `wpdHoldingG`'s hook (window `[k, if hb then k + 11 else k]`) takes, before `∀ pr`,
+  `AxSpinE8.EndRl GT i (if hb then [(k + 7, some (stBytes 8 (pch 0x1a))), (k + 9,
+    some (stBytes 8 (gprVal rs0
+  r1))), (k + 11, some (stBytes 8 (gprVal rs0 r9)))] else []) k'` (its three gates; the `k + 11` entry is
+  vacuous inside the window — its row end `k + 12` is `KLongEnd`, which receives the `s1` value and
+  annotation as before).  Nothing else in its statement changed.
+* `AxSpinHdA.wpdHoldingGr`'s hook takes `EndRl GT i (if hb then [(k + 7, …), (k + 9, some (stBytes
+  8 ret))] else []) k'`, and the core gains `hb = true → stBytes 8 ret ≠ stBytes 8 (gprVal rs0 r1) →
+  k + 9 < LEN → graphValue (i, k + 9) = some (stBytes 8 ret)` after the pin block (handed to
+  `AxSpinHd9.holdProGr`; G: vacuous, P: its guarded pin).  `wpdHoldingP`/`wpdHolding` unchanged.
+
 ## Deviations from Rocq
 
 1. O2 STAGE C / Q20' (provisional Option V; as `AxSpinHd8.holdEpi` / `AxSpinHd9.holdPro`):
@@ -372,9 +385,18 @@ theorem AxSpinHdA.wpdHoldingGr (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (hb : Bool
         AxSpinT2i.Gate GT i (k + 7) (stBytes 8 (pch 0x1a)) ∧
         AxSpinT2i.Gate GT i (k + 9) (stBytes 8 ret) ∧ jalrTgt 0#12 ret = ret
       else jalrTgt 0#12 (gprVal rs0 AxSpinE8.r1) = ret) →
+    -- (P1 VALUE HOOK) a `ret` that is not the spill's: the guarded pin (`wpdHoldingP`'s)
+    (hb = true → stBytes 8 ret ≠ stBytes 8 (gprVal rs0 AxSpinE8.r1) →
+      k + 9 < (AxOpsem.grow (gtAdGd GT) i).length →
+      graphValue (gtAdGd GT) (i, k + 9) = some (stBytes 8 ret)) →
     -- the row-end hook (stage 2, design §B / Q-S2-2), over the window [k, k + 11] / [k, k]
+    -- (P1 VALUE HOOK)
     (∀ k' : Nat, k ≤ k' → k' ≤ (if hb then k + 11 else k) →
-      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' → ∀ pr : Pexv6,
+      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
+      AxSpinE8.EndRl GT i
+        (if hb then [(k + 7, some (stBytes 8 (pch 0x1a))), (k + 9,
+          some (stBytes 8 ret))] else []) k' →
+      ∀ pr : Pexv6,
         ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨pr, k'⟩ Ψ) →
     -- the caller's two load leaves and continuation
@@ -393,14 +415,14 @@ theorem AxSpinHdA.wpdHoldingGr (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (hb : Bool
   intro HR Hw8 Hnr_ra Hnr_s0 Hnr_s1 Hnr_ram Hnr_s0m Hc0 HPC0 Hhit0 Hhm0 Hhlk Hhlc
     HdaS_ra HdaL_ra Hh_ra HdaS_s0 HdaL_s0 Hh_s0 HdaS_s1 HdaL_s1 Hh_s1
     HdaS_ram HdaL_ram Hh_ram HdaS_s0m HdaL_s0m Hh_s0m
-    Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hpr_ram Hnt_ram Hpr_s0m Hnt_s0m HD Hpin HΨend
+    Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hpr_ram Hnt_ram Hpr_s0m Hnt_s0m HD Hpin HsP HΨend
   have XR := XxReg L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
   have XT := XxRet L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
   obtain ⟨Hbr0, HRp⟩ := HR
   -- row end at k (before the lw)
   by_cases E0 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k
   · iintro - -
-    iapply (HΨend _ (Nat.le_refl _) (by split <;> omega) E0 _)
+    iapply (HΨend _ (Nat.le_refl _) (by split <;> omega) E0 (by ax_spin_e8_endrl) _)
   have Hbr := Hbr0 (by omega)
   cases hb <;> simp only [↓reduceIte, Bool.false_eq_true] at Hpin HRp HΨend ⊢ <;>
     unfold XLd <;> iintro Hlk C
@@ -424,7 +446,7 @@ theorem AxSpinHdA.wpdHoldingGr (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (hb : Bool
            exact ⟨by omega, Hlvlk, Hgv1⟩)
         | (iclear Ho
            iclear C
-           iapply (HΨend _ (by omega) (by omega) E1 _))
+           iapply (HΨend _ (by omega) (by omega) E1 (by ax_spin_e8_endrl) _))
     have Hlen1 : k + 1 < (AxOpsem.grow (gtAdGd GT) i).length := by omega
     have HF1 := stepRegs T satp0 _ rs0 _ _ _ _ _ rs1 (fun _ => rfl) HG1
     have HPC1 : rs1 .PC = pch 0x02 := by rw [gbPc T satp0 _ _ _ _ _ _ HG1]; decide
@@ -547,7 +569,8 @@ theorem AxSpinHdA.wpdHoldingGr (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (hb : Bool
       HdaS_ram HdaL_ram (hitWAgree rs0 rs2 _ Htl2 Hh_ram)
       HdaS_s0m HdaL_s0m (hitWAgree rs0 rs2 _ Htl2 Hh_s0m)
       Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hpr_ram Hnt_ram Hpr_s0m Hnt_s0m
-      Hvalm Hval Hret (fun k' h1 h2 h3 pr => HΨend k' (by omega) (by omega) h3 pr)) $$ Hcpu
+      Hvalm Hval Hret (HsP rfl)
+      (fun k' h1 h2 h3 hv pr => HΨend k' (by omega) (by omega) h3 hv pr)) $$ Hcpu
     isplit
     · iintro %Hlt %vcpu %vram %vs0m %vra %vs0 %vs1 %rs' %ib' %⟨Hc', HPC', Htl', Ha0', Hsp', Hlvcpu,
         Hlvram, Hlvs0m, Hlvra, Hlvs0, Hlvs1, Hr1', Hr8', Hr9', Hkeep', Hgv4, Hgd1, Hgd2, Hgd3, Hgd5,
@@ -659,7 +682,8 @@ theorem wpdHoldingP (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (hb : Bool) (ret : Bi
       HdaS_ra HdaL_ra Hh_ra HdaS_s0 HdaL_s0 Hh_s0 HdaS_s1 HdaL_s1 Hh_s1
       HdaS_ram HdaL_ram Hh_ram HdaS_s0m HdaL_s0m Hh_s0m
       Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hpr_ram Hnt_ram Hpr_s0m Hnt_s0m HD
-      (by simp only [Bool.false_eq_true, ↓reduceIte] at Hpin ⊢; exact Hpin) HΨend
+      (by simp only [Bool.false_eq_true, ↓reduceIte] at Hpin ⊢; exact Hpin) (fun h => nomatch h)
+      (fun k' h1 h2 h3 _ => HΨend k' h1 h2 h3)
     simp only [Bool.false_eq_true, ↓reduceIte] at W ⊢
     exact W
   · simp only [↓reduceIte] at Hpin
@@ -671,7 +695,8 @@ theorem wpdHoldingP (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (hb : Bool) (ret : Bi
       HdaS_ram HdaL_ram Hh_ram HdaS_s0m HdaL_s0m Hh_s0m
       Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hpr_ram Hnt_ram Hpr_s0m Hnt_s0m HD
       (by simp only [↓reduceIte]
-          exact ⟨AxSpinT2i.gateOfPinG Hvalm, AxSpinT2i.gateOfPinG Hval, Hret⟩) HΨend
+          exact ⟨AxSpinT2i.gateOfPinG Hvalm, AxSpinT2i.gateOfPinG Hval, Hret⟩) (fun _ _ => Hval)
+      (fun k' h1 h2 h3 _ => HΨend k' h1 h2 h3)
     simp only [↓reduceIte] at W ⊢
     iintro Hlk C
     iapply W $$ Hlk
@@ -746,8 +771,13 @@ theorem wpdHoldingG (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (hb : Bool)
     -- the return address is the entry ra (2-aligned)
     jalrTgt 0#12 (gprVal rs0 AxSpinE8.r1) = gprVal rs0 AxSpinE8.r1 →
     -- the row-end hook (stage 2, design §B / Q-S2-2), over the window [k, k + 11] / [k, k]
+    -- (P1 VALUE HOOK: the long arm's three gates)
     (∀ k' : Nat, k ≤ k' → k' ≤ (if hb then k + 11 else k) →
-      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' → ∀ pr : Pexv6,
+      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
+      AxSpinE8.EndRl GT i (if hb then [(k + 7, some (stBytes 8 (pch 0x1a))),
+        (k + 9, some (stBytes 8 (gprVal rs0 AxSpinE8.r1))),
+        (k + 11, some (stBytes 8 (gprVal rs0 AxSpinHd8.r9)))] else []) k' →
+      ∀ pr : Pexv6,
         ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨pr, k'⟩ Ψ) →
     -- the caller's two load leaves and continuation
@@ -773,7 +803,8 @@ theorem wpdHoldingG (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (hb : Bool)
       HdaS_ra HdaL_ra Hh_ra HdaS_s0 HdaL_s0 Hh_s0 HdaS_s1 HdaL_s1 Hh_s1
       HdaS_ram HdaL_ram Hh_ram HdaS_s0m HdaL_s0m Hh_s0m
       Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hpr_ram Hnt_ram Hpr_s0m Hnt_s0m HD
-      (by simp only [Bool.false_eq_true, ↓reduceIte]; exact Hret) HΨend
+      (by simp only [Bool.false_eq_true, ↓reduceIte]; exact Hret) (fun h => nomatch h)
+      (fun k' h1 h2 h3 _ => HΨend k' h1 h2 h3 (AxSpinE8.endRlIte fun h => nomatch h))
     simp only [Bool.false_eq_true, ↓reduceIte] at W ⊢
     exact W
   · obtain ⟨G7, G9, G11⟩ := Hg rfl
@@ -783,7 +814,13 @@ theorem wpdHoldingG (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (hb : Bool)
       HdaS_ra HdaL_ra Hh_ra HdaS_s0 HdaL_s0 Hh_s0 HdaS_s1 HdaL_s1 Hh_s1
       HdaS_ram HdaL_ram Hh_ram HdaS_s0m HdaL_s0m Hh_s0m
       Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hpr_ram Hnt_ram Hpr_s0m Hnt_s0m HD
-      (by simp only [↓reduceIte]; exact ⟨G7, G9, Hret⟩) HΨend
+      (by simp only [↓reduceIte]; exact ⟨G7, G9, Hret⟩) (fun _ h => absurd rfl h)
+      (fun k' h1 h2 h3 hv => HΨend k' h1 h2 h3 (AxSpinE8.endRlIte fun _ => by
+        have hv' := AxSpinE8.endRlIteOf hv rfl
+        simp only [↓reduceIte] at h2
+        exact AxSpinE8.endRlCons (AxSpinE8.endRlHead hv') (AxSpinE8.endRlCons
+          (AxSpinE8.endRlHead (AxSpinE8.endRlTail hv'))
+          (AxSpinE8.endRlCons (fun he => absurd he (by omega)) (AxSpinE8.endRlNil _ _ _)))))
     simp only [↓reduceIte] at W ⊢
     iintro Hlk C
     iapply W $$ Hlk

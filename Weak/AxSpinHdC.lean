@@ -41,6 +41,14 @@ caller WITH their readback deposits, in the continuations (not dropped as affine
 `holdingFromAcquire'` / `holdingFromRelease'` keep their exact statements as corollaries (now of
 the P-forms; full row ⇒ hook and end continuations vacuous).
 
+## P1 VALUE HOOK (Lean-only; the shape is AxSpinE8's header "P1 VALUE HOOK")
+
+`holdingFromAcquireG` / `holdingFromReleaseG`'s hooks take `wpdHoldingG`'s value premise
+`AxSpinE8.EndRl GT i (if hb then [(k + 7, some (stBytes 8 (pch 0x1a))), (k + 9,
+  some (stBytes 8 (gprVal rs0
+r1))), (k + 11, some (stBytes 8 (gprVal rs0 r9)))] else []) k'` before `∀ pr` (passed through unchanged);
+nothing else in their statements changed.  The P-forms are unchanged.
+
 ## P1 GATE FORM (Lean-only; notes/weak-lb-thm2-pins.md §P1)
 
 `holdingFromAcquireG` / `holdingFromReleaseG` = `holdingFromAcquireP` / `holdingFromReleaseP` on
@@ -881,7 +889,11 @@ theorem holdingFromAcquireG (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (hb : Bool)
     ¬ L.xlText (paZ Plk) →
     -- the row-end hook (stage 2, design §B / Q-S2-2)
     (∀ k' : Nat, k ≤ k' → k' ≤ (if hb then k + 11 else k) →
-      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' → ∀ pr : Pexv6,
+      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
+      AxSpinE8.EndRl GT i (if hb then [(k + 7, some (stBytes 8 (pch 0x1a))),
+        (k + 9, some (stBytes 8 (gprVal rs0 AxSpinE8.r1))),
+        (k + 11, some (stBytes 8 (gprVal rs0 AxSpinHd8.r9)))] else []) k' →
+      ∀ pr : Pexv6,
         ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨pr, k'⟩ Ψ) →
     ⊢ (if hb then
@@ -1020,7 +1032,11 @@ theorem holdingFromReleaseG (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (hb : Bool)
     nolk L.xlLk (gtAdGd GT).gdG (i, kc) (i, k) →
     -- the row-end hook (stage 2, design §B / Q-S2-2)
     (∀ k' : Nat, k ≤ k' → k' ≤ (if hb then k + 11 else k) →
-      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' → ∀ pr : Pexv6,
+      (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
+      AxSpinE8.EndRl GT i (if hb then [(k + 7, some (stBytes 8 (pch 0x1a))),
+        (k + 9, some (stBytes 8 (gprVal rs0 AxSpinE8.r1))),
+        (k + 11, some (stBytes 8 (gprVal rs0 AxSpinHd8.r9)))] else []) k' →
+      ∀ pr : Pexv6,
         ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨pr, k'⟩ Ψ) →
     ⊢ AxAnnot.annotOwn (i, kc) iprop(locked nm.xnReg L.xlLk i (i, kc) ∗ Qc) -∗

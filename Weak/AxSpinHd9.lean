@@ -43,6 +43,15 @@ is holding + 0x1a from holding's own `jal`, so mycpu's return pin is gone) and
 `AxSpinT2i.Gate GT i (k + 9) (stBytes 8 ret)` (fed to `AxSpinHd8.holdEpiGr`); main continuation
 prefixed by `⌜k + 12 < LEN⌝ -∗`.  `holdProP` = core ∘ `gateOfPinG` (statement unchanged).
 
+## P1 VALUE HOOK (Lean-only; the shape is AxSpinE8's header "P1 VALUE HOOK")
+
+`AxSpinHd9.holdProGr`'s hook (window `[k + 1, k + 11]`) takes `AxSpinE8.EndRl GT i [(k + 7,
+  some (stBytes 8 (pch 0x1a))), (k + 9,
+    some (stBytes 8 ret))] k'` before `∀ pr` (its two gates; handed on to
+`wpdMycpuG` / `AxSpinHd8.holdEpiGr`), and the core gains `stBytes 8 ret ≠ stBytes 8 (gprVal rs r1)
+→ k + 9 < LEN → graphValue (i, k + 9) = some (stBytes 8 ret)` after `Hret` (passed to
+`holdEpiGr`; `holdProP`: its guarded pin).  `holdProP`/`holdPro` unchanged.
+
 ## Deviations from Rocq
 
 1. O2 STAGE C / Q20' (provisional Option V; as `AxSpinE8.wpdMycpu` and `AxSpinHd8.holdEpi`):
@@ -197,8 +206,14 @@ theorem AxSpinHd9.holdProGr (k : Nat) (rs : RegFile) (ib : Ibch) (ret : BitVec 6
     -- the two return addresses (P1: the ra reload GATES; mycpu's against holding + 0x1a)
     AxSpinT2i.Gate GT i (k + 7) (stBytes 8 (pch 0x1a)) →
     AxSpinT2i.Gate GT i (k + 9) (stBytes 8 ret) → jalrTgt 0#12 ret = ret →
+    -- (P1 VALUE HOOK) a `ret` that is not the spill's: the guarded pin (`holdProP`'s)
+    (stBytes 8 ret ≠ stBytes 8 (gprVal rs AxSpinE8.r1) →
+      k + 9 < (AxOpsem.grow (gtAdGd GT) i).length →
+      graphValue (gtAdGd GT) (i, k + 9) = some (stBytes 8 ret)) →
     -- the row-end hook (stage 2, design §B / Q-S2-2), over the window [k + 1, k + 11]
+    -- (P1 VALUE HOOK)
     (∀ k' : Nat, k + 1 ≤ k' → k' ≤ k + 11 → (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
+      AxSpinE8.EndRl GT i [(k + 7, some (stBytes 8 (pch 0x1a))), (k + 9, some (stBytes 8 ret))] k' →
       ∀ pr : Pexv6,
         ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨pr, k'⟩ Ψ) →
@@ -273,7 +288,7 @@ theorem AxSpinHd9.holdProGr (k : Nat) (rs : RegFile) (ib : Ibch) (ret : BitVec 6
   intro HR Hw8 Hnr_ra Hnr_s0 Hnr_s1 Hnr_ram Hnr_s0m HD Hc0 HPC0 Hhit0 Hhm0 Hhlc
     HdaS_ra HdaL_ra Hh_ra HdaS_s0 HdaL_s0 Hh_s0 HdaS_s1 HdaL_s1 Hh_s1
     HdaS_ram HdaL_ram Hh_ram HdaS_s0m HdaL_s0m Hh_s0m
-    Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hpr_ram Hnt_ram Hpr_s0m Hnt_s0m Hvalm Hval Hret HΨend
+    Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hpr_ram Hnt_ram Hpr_s0m Hnt_s0m Hvalm Hval Hret HsP HΨend
   unfold XLd
   iintro Hcpu C
   have HR' := HR
@@ -282,7 +297,7 @@ theorem AxSpinHd9.holdProGr (k : Nat) (rs : RegFile) (ib : Ibch) (ret : BitVec 6
   by_cases E1 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 1
   · iclear Hcpu
     iclear C
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   have XR := XxReg L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
   have XS := XxSt L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
   -- ---- 0x08: c.addi sp,-32 (k+1) ----
@@ -306,7 +321,7 @@ theorem AxSpinHd9.holdProGr (k : Nat) (rs : RegFile) (ib : Ibch) (ret : BitVec 6
   by_cases E2 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 1 + 1
   · iclear Hcpu
     iclear C
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   have HF2 := stepRegs0 T satp0 _ rs1 _ _ _ rs2 HF1 HG2
   have HPC2 : rs2 .PC = pch 0x0c := by rw [gbPc T satp0 _ _ _ _ _ _ HG2]; decide
   have Htl2 : rs2 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG2).trans Htl1
@@ -322,7 +337,7 @@ theorem AxSpinHd9.holdProGr (k : Nat) (rs : RegFile) (ib : Ibch) (ret : BitVec 6
   by_cases E3 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 2 + 1
   · iclear Hcpu
     iclear C
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   have HF3 := stepRegs0 T satp0 _ rs2 _ _ _ rs3 HF2 HG3
   have HPC3 : rs3 .PC = pch 0x0e := by rw [gbPc T satp0 _ _ _ _ _ _ HG3]; decide
   have Htl3 : rs3 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG3).trans Htl2
@@ -338,7 +353,7 @@ theorem AxSpinHd9.holdProGr (k : Nat) (rs : RegFile) (ib : Ibch) (ret : BitVec 6
   by_cases E4 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 3 + 1
   · iclear Hcpu
     iclear C
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   have HF4 := stepRegs0 T satp0 _ rs3 _ _ _ rs4 HF3 HG4
   have HPC4 : rs4 .PC = pch 0x10 := by rw [gbPc T satp0 _ _ _ _ _ _ HG4]; decide
   have Htl4 : rs4 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG4).trans Htl3
@@ -370,7 +385,7 @@ theorem AxSpinHd9.holdProGr (k : Nat) (rs : RegFile) (ib : Ibch) (ret : BitVec 6
   by_cases E5 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 4 + 1
   · iclear Ho
     iclear C
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   have HF6 := stepRegs T satp0 _ rs5 _ _ _ _ _ rs6 HF5 HG6
   have HPC6 : rs6 .PC = pch 0x14 := by rw [gbPc T satp0 _ _ _ _ _ _ HG6]; decide
   have Htl6 : rs6 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG6).trans Htl5
@@ -432,7 +447,10 @@ theorem AxSpinHd9.holdProGr (k : Nat) (rs : RegFile) (ib : Ibch) (ret : BitVec 6
     (by unfold AxSpinE8.vaS0; rw [Hsp8]; exact hitWAgree rs rs8 _ Htl8 Hh_s0m)
     Hpr_ram Hnt_ram Hpr_s0m Hnt_s0m (slotsDisjAt _ 4 3 _ _ HD (by decide) rfl rfl)
     (by rw [Hra8, show k + 5 + 2 = k + 7 by omega]; exact Hvalm) (by rw [Hra8]; decide)
-    (fun k' h1 h2 h3 pr => HΨend k' (by omega) (by omega) h3 pr)
+    (fun k' h1 h2 h3 hv pr => HΨend k' (by omega) (by omega) h3 (by
+      rw [Hra8, show k + 5 + 2 = k + 7 by omega] at hv
+      ax_spin_e8_endrl_split
+      exact AxSpinE8.endRlHead hv ‹_›) pr)
   rw [Hra8, Hs08, show k + 5 + 1 = k + 6 by omega, show k + 5 + 2 = k + 7 by omega,
     show k + 5 + 3 = k + 8 by omega, show k + 5 + 4 = k + 9 by omega] at WM
   iapply WM
@@ -453,8 +471,10 @@ theorem AxSpinHd9.holdProGr (k : Nat) (rs : RegFile) (ib : Ibch) (ret : BitVec 6
     HR Hnr_ra Hnr_s0 Hnr_s1 HD Hgd1' Hgd2' Hgd3' Hc9 HPC9 (hitWAgree rs rs9 _ Htl9' Hhit0) Hsp9'
     HdaL_ra (hitWAgree rs rs9 _ Htl9' Hh_ra) HdaL_s0 (hitWAgree rs rs9 _ Htl9' Hh_s0)
     HdaL_s1 (hitWAgree rs rs9 _ Htl9' Hh_s1)
-    Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hval Hret
-    (fun k' h1 h2 h3 pr => HΨend k' (by omega) (by omega) h3 pr))
+    Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hval Hret HsP
+    (fun k' h1 h2 h3 hv pr => HΨend k' (by omega) (by omega) h3 (by
+      ax_spin_e8_endrl_split
+      exact AxSpinE8.endRlHead hv ‹_›) pr))
   isplit
   · icases C with ⟨C, -⟩
     iintro %Hlt %vra %vs0 %vs1 %rs' %ib' %⟨Hc', HPC', Htl', Ha0', Hsp', Hlvra, Hlvs0, Hlvs1, Hr1',
@@ -619,7 +639,8 @@ theorem holdProP (k : Nat) (rs : RegFile) (ib : Ibch) (ret : BitVec 64) (plk pcl
     HdaS_ra HdaL_ra Hh_ra HdaS_s0 HdaL_s0 Hh_s0 HdaS_s1 HdaL_s1 Hh_s1
     HdaS_ram HdaL_ram Hh_ram HdaS_s0m HdaL_s0m Hh_s0m
     Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hpr_ram Hnt_ram Hpr_s0m Hnt_s0m
-    (AxSpinT2i.gateOfPinG Hvalm) (AxSpinT2i.gateOfPinG Hval) Hret HΨend) $$ Hcpu
+    (AxSpinT2i.gateOfPinG Hvalm) (AxSpinT2i.gateOfPinG Hval) Hret (fun _ => Hval)
+    (fun k' h1 h2 h3 _ => HΨend k' h1 h2 h3)) $$ Hcpu
   isplit
   · icases C with ⟨C, -⟩
     iintro %-

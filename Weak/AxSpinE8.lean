@@ -72,6 +72,34 @@ gate, readback contradicts the value); for `wpdMycpuP`'s free `ret` ≠ entry ra
 unchanged), `wpdMycpu` = `wpdMycpuP` as before.  HONESTY: `wpdMycpuG` has no return-address pin;
 the s0 reload (k + 3) never had one (its value is only reported).
 
+## P1 VALUE HOOK (Lean-only; orchestrator ruling "option A", PROGRESS-AxSpinApB-P1.md)
+
+THE SHAPE, shared by every gate form (`…G` / `…Gr`) of the leaf lanes (AxSpinE8, PO1–PO6,
+Hd8/Hd9/HdA/HdC, Aq1/Aq2, Rl4/Rl4b): the windowed row-end hook gains ONE pure premise, last
+before `∀ pr`,
+  `HΨend : ∀ k', klo ≤ k' → k' ≤ khi → (designated-cut exclusions, if any) → LEN ≤ k' →
+     AxSpinE8.EndRl GT i rls k' → ∀ pr : Pexv6, ⊢ wpdM … .MaybeStuck i ⟨pr, k'⟩ Ψ`
+with **`AxSpinE8.EndRl GT i rls k' := ∀ kr ov, (kr, ov) ∈ rls → k' = kr + 1 →
+graphValue (gtAdGd GT) (i, kr) = ov`** (`rls : List (Nat × Option (List (BitVec 8)))`) and `rls`
+the lemma's literal list of its GATED reloads `(reload position, expected value)` — exactly the
+`(kr, some vw)` of its `AxSpinT2i.Gate GT i kr vw` premises, own and passed on to callees; the two
+`s1` reloads gated against their spill's ROW DATA (`aqS1`, `rlS1`) appear DATA-RELATIVE as
+`(kr, graphData (gtAdGd GT) (i, ks))` (= T2f's `rlExp … = wd row ks` via `wdGrow`) (a caller's list is the union of its callees' and its own,
+written out flat; conditional reloads appear as `if b then [(kr, vw)] else []`).  At a reload's
+row end `kr + 1` the leaf passes the value it has just checked (the equal branch of its
+`by_cases`); at every other row end the premise is vacuous for that entry (`k' ≠ kr + 1`).
+Vocabulary: `AxSpinE8.endRlNil`/`endRlCons`/`endRlHead`/`endRlTail`/`endRlAppend`/`endRlAppL`/
+`endRlAppR`/`endRlIte`/`endRlIteOf`, macro `ax_spin_e8_endrl` (literal lists: `omega` for the
+impossible entries, `assumption` for the checked values).  The P-forms and the full-row forms keep
+their exact statements: an old hook IS a value hook (`fun k' h1 h2 h3 _ => HΨend k' h1 h2 h3`).
+Here: `rls = [(k + 2, some (stBytes 8 ret))]` in `AxSpinE8.wpdMycpuGr` (the hook at `k + 3` gets the
+ra reload's value, `Hvra`), `[(k + 2,
+  some (stBytes 8 (gprVal rs0 r1)))]` in `wpdMycpuG`.  `wpdMycpuGr` gains
+the premise `stBytes 8 ret ≠ stBytes 8 (gprVal rs0 r1) → k + 2 < LEN → graphValue (i, k + 2) =
+some (stBytes 8 ret)` (right after `Hret`; `wpdMycpuG`: vacuous, `wpdMycpuP`: its guarded pin): the
+wrong-value arm for a `ret` that is not the spill is now closed by that pin instead of calling the
+hook at `k + 3` without the value.  `wpdMycpuG`'s statement differs from before ONLY in the hook.
+
 ## Deviations from Rocq
 
 1. O2 STAGE C / Q20' (provisional Option V; protocol "Cross-file facts" Q20' entry):
@@ -337,6 +365,92 @@ theorem AxSpinE8.ldResStBytes8 (v : BitVec 64) : ldRes false 8 (stBytes 8 v) = v
   ext j hj
   simp [Sail.BitVec.signExtend, Sail.BitVec.extractLsb, hj]
 
+/-! # P1 VALUE HOOK vocabulary (Lean-only; header "P1 VALUE HOOK") -/
+
+/-- (Lean-only, P1 VALUE HOOK) at the row end `k'`, every listed reload `(kr, vw)` (row position,
+expected value — `some` of the spill bytes, or the spill's own row data `graphData (i, ks)`) that
+ends right before `k'` (`k' = kr + 1`) read it: `graphValue (i, kr) = vw`.  The gate forms' row-end
+hooks take it as their last pure premise; `rls` is the lemma's list of gated reloads. -/
+def AxSpinE8.EndRl (GT : GdexecT) (i : Agent) (rls : List (Nat × Option (List (BitVec 8))))
+    (k' : Nat) : Prop :=
+  ∀ kr vw, (kr, vw) ∈ rls → k' = kr + 1 → graphValue (gtAdGd GT) (i, kr) = vw
+
+theorem AxSpinE8.endRlNil (GT : GdexecT) (i : Agent) (k' : Nat) : AxSpinE8.EndRl GT i [] k' :=
+  fun _ _ h => absurd h List.not_mem_nil
+
+theorem AxSpinE8.endRlCons {GT : GdexecT} {i : Agent} {kr : Nat} {vw : Option (List (BitVec 8))}
+    {rls : List (Nat × Option (List (BitVec 8)))} {k' : Nat}
+    (h : k' = kr + 1 → graphValue (gtAdGd GT) (i, kr) = vw)
+    (t : AxSpinE8.EndRl GT i rls k') : AxSpinE8.EndRl GT i ((kr, vw) :: rls) k' := by
+  intro kr' vw' hm he
+  rcases List.mem_cons.1 hm with h' | h'
+  · simp only [Prod.mk.injEq] at h'
+    obtain ⟨rfl, rfl⟩ := h'
+    exact h he
+  · exact t _ _ h' he
+
+theorem AxSpinE8.endRlHead {GT : GdexecT} {i : Agent} {kr : Nat} {vw : Option (List (BitVec 8))}
+    {rls : List (Nat × Option (List (BitVec 8)))} {k' : Nat}
+    (H : AxSpinE8.EndRl GT i ((kr, vw) :: rls) k') :
+    k' = kr + 1 → graphValue (gtAdGd GT) (i, kr) = vw :=
+  H kr vw List.mem_cons_self
+
+theorem AxSpinE8.endRlTail {GT : GdexecT} {i : Agent} {x : Nat × Option (List (BitVec 8))}
+    {rls : List (Nat × Option (List (BitVec 8)))} {k' : Nat}
+    (H : AxSpinE8.EndRl GT i (x :: rls) k') : AxSpinE8.EndRl GT i rls k' :=
+  fun kr vw hm he => H kr vw (List.mem_cons_of_mem _ hm) he
+
+theorem AxSpinE8.endRlAppend {GT : GdexecT} {i : Agent} {l1 l2 : List (Nat × Option (List (BitVec 8)))}
+    {k' : Nat} (h1 : AxSpinE8.EndRl GT i l1 k') (h2 : AxSpinE8.EndRl GT i l2 k') :
+    AxSpinE8.EndRl GT i (l1 ++ l2) k' := by
+  intro kr vw hm he
+  rcases List.mem_append.1 hm with h | h
+  · exact h1 _ _ h he
+  · exact h2 _ _ h he
+
+theorem AxSpinE8.endRlAppL {GT : GdexecT} {i : Agent} {l1 l2 : List (Nat × Option (List (BitVec 8)))}
+    {k' : Nat} (H : AxSpinE8.EndRl GT i (l1 ++ l2) k') : AxSpinE8.EndRl GT i l1 k' :=
+  fun kr vw hm he => H kr vw (List.mem_append_left _ hm) he
+
+theorem AxSpinE8.endRlAppR {GT : GdexecT} {i : Agent} {l1 l2 : List (Nat × Option (List (BitVec 8)))}
+    {k' : Nat} (H : AxSpinE8.EndRl GT i (l1 ++ l2) k') : AxSpinE8.EndRl GT i l2 k' :=
+  fun kr vw hm he => H kr vw (List.mem_append_right _ hm) he
+
+theorem AxSpinE8.endRlIte {GT : GdexecT} {i : Agent} {b : Bool} {l : List (Nat × Option (List (BitVec 8)))}
+    {k' : Nat} (h : b = true → AxSpinE8.EndRl GT i l k') :
+    AxSpinE8.EndRl GT i (if b then l else []) k' := by
+  cases b
+  · exact AxSpinE8.endRlNil GT i k'
+  · exact h rfl
+
+theorem AxSpinE8.endRlIteOf {GT : GdexecT} {i : Agent} {b : Bool}
+    {l : List (Nat × Option (List (BitVec 8)))} {k' : Nat}
+    (H : AxSpinE8.EndRl GT i (if b then l else []) k') (hb : b = true) :
+    AxSpinE8.EndRl GT i l k' := by
+  subst hb
+  exact H
+
+/-- (Lean-only) a true Boolean guard picks the `then` branch (for `omega` on guarded positions). -/
+theorem AxSpinE8.iteT {b : Bool} {α : Type} {x y : α} (hb : b = true) :
+    (if b then x else y) = x := by
+  subst hb; rfl
+
+/-- (Lean-only, P1 VALUE HOOK) split `AxSpinE8.EndRl GT i [(kr₁, vw₁), …] k'` for a literal list
+(also `++` and `if b then … else []`) entry by entry; an entry whose `k' = kr + 1` is impossible
+is closed by `omega` (inside a guard `b = true`, `omega` also knows `(if b then 5 else 0) = 5` and
+`(if b then 0 else 1) = 0`), the others are left (`graphValue … = some vw`, `k' = kr + 1` intro'd). -/
+macro "ax_spin_e8_endrl_split" : tactic =>
+  `(tactic| ((repeat' (first | exact AxSpinE8.endRlNil _ _ _ |
+      refine AxSpinE8.endRlCons (fun _ => ?_) ?_ | refine AxSpinE8.endRlAppend ?_ ?_ |
+      refine AxSpinE8.endRlIte (fun hb => absurd hb (by decide)) |
+      (refine AxSpinE8.endRlIte (fun hb => ?_);
+       have := AxSpinE8.iteT (x := (5 : Nat)) (y := 0) hb;
+       have := AxSpinE8.iteT (x := (0 : Nat)) (y := 1) hb))) <;> try (exfalso; omega)))
+
+/-- (Lean-only) `ax_spin_e8_endrl_split`, then `assumption` on every remaining entry. -/
+macro "ax_spin_e8_endrl" : tactic =>
+  `(tactic| (ax_spin_e8_endrl_split <;> assumption))
+
 section mycpu
 variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [InvGS_gen hlc GF] [AxannotGS GF]
   [AxSpinX.Xv6G GF]
@@ -377,11 +491,15 @@ theorem AxSpinE8.wpdMycpuGr (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec
     (∀ j : Nat, j < 8 → priv L (paZ Pra + (j : Int)) i) → ¬ L.xlText (paZ Pra) →
     (∀ j : Nat, j < 8 → priv L (paZ Ps0 + (j : Int)) i) → ¬ L.xlText (paZ Ps0) →
     (paZ Ps0 + 8 ≤ paZ Pra ∨ paZ Pra + 8 ≤ paZ Ps0) →
-    -- the return address (P1: the reload GATE against `ret`'s bytes)
+    -- the return address (P1: the reload GATE against `ret`'s bytes; when `ret`'s bytes are not
+    -- the spill's, the guarded pin — `wpdMycpuP`'s — closes the wrong-value arm)
     AxSpinT2i.Gate GT i (k + 2) (stBytes 8 ret) → jalrTgt 0#12 ret = ret →
-    -- the row-end hook (stage 2, design §B / Q-S2-2)
+    (stBytes 8 ret ≠ stBytes 8 (gprVal rs0 AxSpinE8.r1) →
+      k + 2 < (AxOpsem.grow (gtAdGd GT) i).length →
+      graphValue (gtAdGd GT) (i, k + 2) = some (stBytes 8 ret)) →
+    -- the row-end hook (stage 2, design §B / Q-S2-2; P1 VALUE HOOK)
     (∀ k' : Nat, k ≤ k' → k' ≤ k + 4 → (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
-      ∀ pr : Pexv6,
+      AxSpinE8.EndRl GT i [(k + 2, some (stBytes 8 ret))] k' → ∀ pr : Pexv6,
         ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨pr, k'⟩ Ψ) →
     ⊢ (∀ (vra vs0 : List (BitVec 8)) (rs' : RegFile) (ib' : Ibch),
@@ -405,13 +523,13 @@ theorem AxSpinE8.wpdMycpuGr (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec
       @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
         ⟨.PHart cpu (.pure ()) rs0 none ib0, k⟩ Ψ := by
   intro HR Hw8 Hnr_ra Hnr_s0 Hc0 HPC0 Hhit0 HdaS_ra HdaL_ra Hh_ra HdaS_s0 HdaL_s0 Hh_s0
-    Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hslots Hgate Hret HΨend
+    Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hslots Hgate Hret HsP HΨend
   have Hsh := HR
   iintro C
   -- row end at k
   by_cases E0 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k
   · iclear C
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   have XR := XxReg L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
   have XS := XxSt L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
   have XL := XxLd L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
@@ -440,7 +558,7 @@ theorem AxSpinE8.wpdMycpuGr (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec
   -- row end at k + 1
   by_cases E1 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 1
   · iclear C
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   -- ---- 0x04: c.sdsp s0,0(sp) (spill at k+1) ----
   iapply (XS _ rs2 (k + 1) (pcm 0x04) true AxSpinE8.immS0 8#5 2#5 (AxSpinE8.vaS0 rs0) Ps0
     (retxRefl cpu rs2 (k + 1) ib2) (gbCtrl T satp0 _ _ _ _ _ _ HG2) HPC2
@@ -454,7 +572,7 @@ theorem AxSpinE8.wpdMycpuGr (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec
   -- row end at k + 2
   by_cases E2 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 2
   · iclear C
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   -- ---- 0x06: c.addi4spn s0,sp,16 (k+2) ----
   have Hc4 := certAddi (ctrlOkSW T satp0) rs3 (pcm 0x06) true 2#5 8#5 (caddi4spnImm 4#8)
     (by decide)
@@ -576,10 +694,10 @@ theorem AxSpinE8.wpdMycpuGr (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec
       iapply (AxSpinT2i.cutReloadG L GT nm Hcons i (k + 2) (paZ Pra)
         (stBytes 8 (gprVal rs0 AxSpinE8.r1)) vra Ψ ⟨lb2, Hlb2, aq2, Hid2⟩ Hlvw0 Hgv2 Hv Hgate
         _) $$ H2
-    · have Hend := AxSpinT2i.lenOfGate Hgate Hgv2 Hv
-      iclear H2
-      iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    · -- `ret`'s bytes are not the spill's (only from `wpdMycpuP`): the guarded pin refutes
+      exact absurd (Hgv2.symm.trans (HsP Hs (by omega))) (fun h => Hv (Option.some.inj h))
   have Hvra : vra = stBytes 8 ret := Classical.byContradiction Hv
+  have Hgv2r : graphValue (gtAdGd GT) (i, k + 2) = some (stBytes 8 ret) := Hvra ▸ Hgv2
   have HF11 := stepRegs T satp0 _ rs10 _ _ _ _ _ rs11 HF10 HG11
   have HPC11 : rs11 .PC = pcm 0x1a := by rw [gbPc T satp0 _ _ _ _ _ _ HG11]; decide
   have Htl11 : rs11 .tlb = rs0 .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG11).trans Htl10
@@ -587,7 +705,7 @@ theorem AxSpinE8.wpdMycpuGr (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec
   by_cases E3 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 2 + 1
   · iclear C
     iclear H2
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   -- ---- 0x1a: c.ldsp s0,0(sp) — the RELOAD of s0's spill (k+3) ----
   iapply (XL _ rs11 (k + 2 + 1) (pcm 0x1a) true AxSpinE8.immS0 2#5 8#5 (AxSpinE8.vaS0 rs0) Ps0
     (k + 1) vws0 cls1 (retxRefl cpu rs11 (k + 2 + 1) ib11) (gbCtrl T satp0 _ _ _ _ _ _ HG11)
@@ -610,7 +728,7 @@ theorem AxSpinE8.wpdMycpuGr (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec
   · iclear C
     iclear H2
     iclear H3
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+    iapply (HΨend _ (by omega) (by omega) (by omega) (by ax_spin_e8_endrl) _)
   -- ---- 0x1c: c.addi sp,16 (k+4) ----
   have Hc13 := certAddi (ctrlOkSW T satp0) rs12 (pcm 0x1c) true 2#5 2#5
     (sign_extend (m := 12) (16#6)) (by decide)
@@ -698,9 +816,9 @@ theorem wpdMycpuG (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pra Ps0 : BitVec 64) :
     -- the return address (P1: the reload GATE; `ret` is the entry ra, Q-P1-2)
     AxSpinT2i.Gate GT i (k + 2) (stBytes 8 (gprVal rs0 AxSpinE8.r1)) →
     jalrTgt 0#12 (gprVal rs0 AxSpinE8.r1) = gprVal rs0 AxSpinE8.r1 →
-    -- the row-end hook (stage 2, design §B / Q-S2-2)
+    -- the row-end hook (stage 2, design §B / Q-S2-2; P1 VALUE HOOK)
     (∀ k' : Nat, k ≤ k' → k' ≤ k + 4 → (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
-      ∀ pr : Pexv6,
+      AxSpinE8.EndRl GT i [(k + 2, some (stBytes 8 (gprVal rs0 AxSpinE8.r1)))] k' → ∀ pr : Pexv6,
         ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
           ⟨pr, k'⟩ Ψ) →
     ⊢ (∀ (vra vs0 : List (BitVec 8)) (rs' : RegFile) (ib' : Ibch),
@@ -723,8 +841,12 @@ theorem wpdMycpuG (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (Pra Ps0 : BitVec 64) :
           ⟨.PHart cpu (.pure ()) rs' none ib', k + 4⟩ Ψ) -∗
       @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
         ⟨.PHart cpu (.pure ()) rs0 none ib0, k⟩ Ψ :=
+  fun HR Hw8 Hnr_ra Hnr_s0 Hc0 HPC0 Hhit0 HdaS_ra HdaL_ra Hh_ra HdaS_s0 HdaL_s0 Hh_s0
+      Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hslots Hgate Hret HΨend =>
   AxSpinE8.wpdMycpuGr L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxt Ψ HΨmid k rs0 ib0
-    (gprVal rs0 AxSpinE8.r1) Pra Ps0
+    (gprVal rs0 AxSpinE8.r1) Pra Ps0 HR Hw8 Hnr_ra Hnr_s0 Hc0 HPC0 Hhit0 HdaS_ra HdaL_ra Hh_ra
+    HdaS_s0 HdaL_s0 Hh_s0 Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hslots Hgate Hret (fun h => absurd rfl h)
+    HΨend
 
 include HL Hcons hmode hasid hppn Hfix Htxt HΨmid in
 /-- (Lean-only, stage 2) THE P-FORM of `wpdMycpu` on a PREFIX row (`RowMycpuP`; the `Hval` pin
@@ -779,7 +901,8 @@ theorem wpdMycpuP (k : Nat) (rs0 : RegFile) (ib0 : Ibch) (ret : BitVec 64) (Pra 
     Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hslots Hval Hret HΨend
   exact AxSpinE8.wpdMycpuGr L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxt Ψ HΨmid k rs0 ib0
     ret Pra Ps0 HR Hw8 Hnr_ra Hnr_s0 Hc0 HPC0 Hhit0 HdaS_ra HdaL_ra Hh_ra HdaS_s0 HdaL_s0 Hh_s0
-    Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hslots (AxSpinT2i.gateOfPinG Hval) Hret HΨend
+    Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hslots (AxSpinT2i.gateOfPinG Hval) Hret (fun _ => Hval)
+    (fun k' h1 h2 h3 _ => HΨend k' h1 h2 h3)
 
 include HL Hcons hmode hasid hppn Hfix Htxt HΨmid in
 /-- Rocq `wpd_mycpu` (deviation 1: Stage C positions, `Hval`/`Hret` replace the return-fetch
