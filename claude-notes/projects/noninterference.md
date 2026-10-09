@@ -8150,6 +8150,495 @@ arm); − `fsLedLb_prefix`, `fsEvRcpt_of_lb` (deleted, unused); + `fevOn_fouts` 
 events at the fixing prefix), `fevStatOf` (fstat, out of the class), `fevRun_prefix` ("FS-4 reaches"). `run_all.sh`:
 all 11 steps pass.
 
+### M4 pids design (2026-10-09)
+
+Design pass (owner, 2026-10-08, after the Nickel comparison: "go ahead with the pid design pass").  No code
+landed and `xv6-riscv/` was not touched: the quota kernel was cloned at the pin (`verified-quota` c1fd3cc7) into
+a SCRATCH directory, rebuilt (md5 `710adf1e…`, the header's: the toolchain reproduces the pin, playbook §2a step
+1), and ONE candidate patch was built there, MEASURED from the two symbol tables, and RUN under qemu (a pid
+probe program and the fork/pid usertests).  The Lean shapes were read off the tree (`PidEv`, `PidLock`,
+`SpecAllocproc`/`ProofAllocproc`, `SpecKfork`, `SyscallDefs`, `SyscallArmsFork`, `UsysDet`, `NiEvid`,
+`NiTrace`, `ProcGeom`, `SlotGen`, `ProcAvail`, `SpecProcinit`, `SpecUserinit`, `SpecMyproc`) and are not
+shape-checked.  The rulings P-R1…P-R9 at the end, P-R1 the OWNER's, are needed before a lane starts.
+
+**Short version.**
+- **One kernel change closes the pid-name channel: pids PARTITIONED BY THE PARENT'S SLOT.**  Slot `j` hands
+  its children `j + NPROC`, `j + 2·NPROC`, … from a per-slot counter that never wraps and never resets (it
+  survives the slot's reuse); `init` is 1; a slot's share is `2^25 − 1` children, after which its forks return
+  `−1` (a PID QUOTA).  This is Nickel §5's "statically assign predetermined quotas … allowing processes to
+  allocate only a predetermined number of identifiers for child processes" and NiKOS's "statically partitions
+  identifiers among processes" (§7), i.e. mCertiKOS's design.  22 C lines in 3 files: no new function, no API
+  change (`wait`, `kill`, `getpid` keep absolute pids), no `struct proc` STRIDE change (the counter fills the
+  padding hole after `pid`), NO DATA SYMBOL MOVES (`nextpid`'s cell is deleted and its neighbour `uarts` is
+  16-aligned), `.eh_frame` keeps its size, the user programs and `fs.img` are byte-identical.
+- **What fork's answer then reads:** the caller's own slot (the citation's ACTOR, a position already) and ITS
+  OWN FORK COUNT.  The global pid history (`pev`: every actor's allocations and frees, the live set, the
+  counter) leaves both hypotheses, as `kev` did in Q-3.  **The theorem: `xv6NiDetP`, the fifteenth root** =
+  `xv6NiDetQ` with `pev` erased from the histories (`niBelowP`) and the cited pid-prefix LENGTH replaced in the
+  positions by the OWN COUNT (`NiPos.pown`).  Every other root and `xv6NiPhi` stay byte-identical.
+- The own count is a POSITION in P-2 (hypothesised, like uptime's tick count); DERIVING it (the count at
+  origin plus the incarnation's own successful forks) is the optional P-3, the fs-cursor pattern (FS-2e-b).
+- **Measured shift:** 123 of 197 text symbols move, all by ±4 bytes (`procinit` +4, re-registered loop body;
+  `allocproc` 0x100 → 0xf8 with `allocpid` rewritten in place; `kernelvec` onward absorbed).  A larger window
+  than Q-0's (86) with smaller deltas; no data symbol, no `.rodata` address moves.
+- **Cost ≈ 0.6 BE** (P-0 ≈ 0.4: the commit, image, relayout, two reshapes, the payload; P-1 ≈ 0.12: rows and
+  receipts; P-2 ≈ 0.05: the root), P-3 optional ≈ 0.15; ≈ 0.05 BE at every later upstream bump.
+- **Not bundled:** the slot budget (quota design F8) shares this window (all of it is in `proc.c`, and a second
+  padding hole at `+28` takes its field) and would save its own relayout, but its proof is ≈ 1 BE on the
+  key-field arity path (P-R6).  The kill check: FAM-1b still blocked (quota F9).
+
+- **OWNER DECISION (P-R1):** a second commit on the fork branch `verified-quota` (the pin moves to it; the
+  branch name is then inaccurate -- `verified-ni` is the owner's rename if wanted).  Recommended: yes.  The
+  cheapest alternative, no kernel change, is a pure corollary that closes nothing (F14).
+
+**Findings.**
+- **F1 (the pin reproduces; the candidate).**  `make kernel/kernel` at c1fd3cc7 with Ubuntu
+  `riscv64-linux-gnu-gcc` 15.2 gives md5 `710adf1e5d0961bf32b8123165d71ce7` (`MachCSL/KernelElf.lean`'s
+  header).  The candidate ELF is `1e253624d66edf3a5ac445c963239cb9`.  `fs.img` rebuilt fresh at both is
+  `81df3e0293356b57467bbf173d4497a1` (Q-0's), the 22 user binaries byte-identical (`param.h`'s `PIDMAX` is used
+  by no user program; `proc.h` is kernel-only).  NOTE for the playbook: a qemu run WRITES the disk image (the
+  log, usertests' files), so compare images rebuilt after the run, never the run's.
+- **F2 (the channel today).**  `UsysDet.usysForkPid ι = pidPick PIDMAX ι.pev`: fork's answer is the first free
+  pid of the cyclic scan from the GLOBAL counter, so it reveals how many allocations every actor made since the
+  counter was last seen (mod 1000) and which pids are live just past it (G2 F6).  `H` concedes the whole pid
+  order (`niBelowQ`'s `pev` conjunct) and the positions the cited prefix's length.  This is the first example
+  of Nickel §2 ("Resource names": `spawn` with sequential identifiers) and the one NiStar/NiKOS designs close
+  by partitioned names.
+- **F3 (three designs; (A) recommended).**
+  - **(A) Parent-slot partition** (this pass).  `pid = j + NPROC·c`, `j` the PARENT's slot, `c` the parent
+    slot's monotone counter.  The answer is a function of the caller's slot and its own fork count; the only
+    non-own datum is the counter's value at the incarnation's origin (how many children all EARLIER occupants
+    of the slot made -- the same residue NiKOS's static partition has when a process id is reused), which
+    enters as the first fork round's position (P-2) or an origin datum (P-3).
+  - **(B) Slot-generation pids** (`pid = child's slot + NPROC × the slot's reuse count`): no counter in the
+    key, the pid a function of the slot ledger alone, the cheapest proof -- but the channel only MOVES: the
+    child's slot is the first-UNUSED scan's choice, i.e. placement, which reveals other actors' forks and
+    exits.  Rejected.
+  - **(C) Parent-relative pids** (quota design F7): a user-visible API change (`wait`/`kill`/`getpid` speak
+    relative ids).  Rejected.
+- **F4 (the encoding, init, the cap, freshness).**
+  - `pid = j + NPROC·c` with `c ∈ [1, 2^25 − 1]`: the largest pid is `63 + 64·(2^25 − 1) = 2^31 − 1`, so pids
+    stay positive `int`s; `(pid mod 64, pid div 64)` decodes `(j, c)`.
+  - `init` is 1: `allocpid`'s `myproc() == 0` arm.  The hart's proc word is 0 exactly on the boot hart before
+    the scheduler (`SpecUserinit`'s `k.proc = 0`); every later `allocproc` runs in `kfork` at `k.proc =
+    procAddr j ≠ 0`.  1 collides with nothing (children's pids are ≥ 64).
+  - THE CAP: `pp->npid > PIDMAX − NPROC` refuses the fork.  With `npid = j + 64·c`, `PIDMAX = 2^31 − 1`: `j +
+    64c > 2^31 − 65 ⟺ c ≥ 2^25 − 1` for EVERY `j ≤ 63` (`63 + 64c > 2^31 − 65 ⟺ 64c > 2^31 − 128 ⟺ c >
+    2^25 − 2`; `64c > 2^31 − 65 ⟺ c ≥ 2^25 − 1`), so the cap is the uniform own count `PIDQ := 2^25 − 1` and
+    the counter never overflows (no signed wrap, no scan).  A slot that has created 33,554,431 children forks
+    no more: Nickel's "predetermined number of identifiers".
+  - FRESHNESS is a pure lemma, not a scan: on a well-formed history (`pevWf h`: every `PAlloc act p` in `h`
+    has `p = pidPickS act (its prefix)`, and `act = 0` only at `h = []`), `pidPickS act h` was never allocated
+    before (every earlier pid of actor `act` is smaller, every other actor's has a different residue mod 64,
+    init's is 1 < 64), hence is not live, hence is not in the register (`SlotGen.pidRegAuth`) and not in any
+    cell (`pidsOk` follows).  The ledger's authority maintains `pevWf` (both append sites keep it; `PFree`
+    trivially).
+  - `PIDMAX`: `1000` → `0x7fffffff` in `param.h` (the wrap is gone with the scan); in Lean
+    `ProcGeom.PIDMAX` and `SlotGen.genPidMax` become `2^31 − 1`, so every `[1, PIDMAX]` row and lemma (37
+    files name the vocabulary: `genHalvesAt`, `UsysMemOk`'s wait and fork ranges, `UexecRet`, `UkFork`,
+    `ProofShFork1`, `UkSeccDefs.secc_pid_sext/blt/ne0`, `UshForkDefs.ushf_pid_lt_Z31`, `InitMainLoop` 321) is
+    TEXTUALLY UNCHANGED and still true (their proofs are `unfold PIDMAX; omega`).  `PidLock.pidNext` and
+    `pidNext_toNat` (the wrap at `1000#32`) are deleted.
+- **F5 (storage; the measured shift; the `.eh_frame` check).**
+  - `struct proc` (DWARF at the pin): `pid` at `+48`, `parent` at `+56`: a 4-byte PADDING HOLE at `+52` takes
+    `int npid`; `sizeof` stays 376, no field offset moves, no stride change (the playbook's `--proc-fields`
+    path is not taken).  `ProcGeom` gains `pNpid pa := pa + 52#64`.  (The other hole, `+28` after `state`,
+    is the slot budget's if it ever comes.)
+  - The counter is the COMBINED "last pid this slot handed out": initialised in `procinit`'s loop to the slot
+    index (which the loop already holds in a register for `KSTACK`), bumped by `NPROC` at each fork.  So
+    `allocpid` is one `addiw` and two stores, and no division by `sizeof(struct proc)` appears anywhere new.
+  - `nextpid` DELETED: `.data` keeps every other symbol in place (`first.1` 0x8000a380, `uarts` 0x8000a390 is
+    16-aligned, the GOT 0x8000a3e0), `.bss` is untouched, `end` unchanged.  The one `.data` symbol gone takes
+    `PidLock.nextpidAddr`, its carve window (`BootCarveProc`/`BootShared`/`BootPrimarySupply`), the
+    `ap_nextpid_*` bridges and `SpecMain`/`ProofMain`/`MainKvm`'s mentions with it (8 files).  The `initlock`
+    name string `"nextpid"` stays (the call is unchanged).
+  - The measured shift (`nm -n -S`, grouped by delta):
+
+    | delta | symbols | resized |
+    |---|---|---|
+    | +0 | 60: `_entry` .. `proc_mapstacks` | |
+    | +0 | `procinit` | 0xb0 → 0xb4 (the `sw a5,52(s1)`; the loop body RE-REGISTERED: `mul` → `mulw`, `a5` → `a4`/`a3`) |
+    | +4 | 7: `cpuid` .. `freeproc` | |
+    | +4 | `allocproc` | 0x100 → 0xf8 (`allocpid` rewritten +0x38..+0x76; the tail −8; the cap arm at +0xbe, the init arm at +0xd4) |
+    | −4 | 114: `userinit` .. `sys_pipe` | |
+    | +0 | 14: `kernelvec` .. `etext` | (alignment absorbs) |
+
+    In all 123 of 197 text symbols move or resize, by ±4.  `.text`, `.rodata`, `.eh_frame` (0x2b24: `allocpid`
+    is still inlined, no new FDE), `.data`, `.bss` keep their sizes and addresses; `.rodata`'s `syscalls[]`
+    CONTENT moves (the `sys_*` pointers), as in Q-0.  In the tree: 508 files name some window symbol (the
+    loose bound; Q-0: 407), 166 name symbols of different deltas on some line (Q-0: 101; it touched 191
+    files).  Estimate: 250–300 files for the relayout, the tools' uniform-delta sweep covering nearly all.
+  - The two reshapes, for the `--intervals` file: `procinit` `+0x84..+0x96` is a reshape (register names, not
+    an insertion: the loop body's proof is re-done, `--skip` and by hand); `allocproc` `+0x38..+0x76` is
+    rewritten (the proof's pid section is rewritten anyway), `+0x78..+0xb2` is the old `+0x80..+0xba` shifted
+    −8, the two `freeproc` arms likewise, and the two new arms are new code.  Three spellings were NOT tried
+    in scratch because the first kept `.eh_frame`; the playbook's check (`objdump -h` size) was the gate.
+- **F6 (behaviour under qemu).**  A probe program (`pidt`: fork, grandchild, print) on the candidate:
+  `init` 1; `sh` 64 (init's slot 0 + 64); sh's children 65 then 129 (slot 1 + 64, + 128); their children 66/67
+  then 130/131 …; after a slot had served three children its next is +256 (the counter PERSISTS across
+  reuse, as freshness needs).  usertests `forkfork`, `forkforkfork`, `exitwait`, `reparent`, `reparent2`,
+  `twochildren`, `killstatus`, `preempt`, `exitiput`, `bigwrite`, `pipe1`, `stacktest`, plus `forktest` and
+  `zombie`: all OK; `usertests -q`: 43 OK up to `sbrkmuch`, the quota kernel's known refusal (quota F4), where
+  the quick suite stops.  Pids are now large numbers (`stacktest`'s kill message read `pid=205379` = slot 3
+  + 64·3209): `kill N` from sh is unchanged, `procdump` prints them.
+- **F7 (the Lean shapes, per file).**
+  - `PidEv` (pure, grows): `ownAllocs act h` (the `PAlloc act _` count), `pidPickS act h := if act = 0 then 1
+    else slotOf act + NPROC * (ownAllocs act h + 1)` (`slotOf (procAddr j) = j`, from `ProcGeom`), `pevWf`,
+    the snoc equations, `pidPickS_fresh : pevWf h → ¬ liveOf h (pidPickS act h)` (and `≠ 1` when `act ≠ 0`),
+    `pidPickS_le : ownAllocs act h < PIDQ → pidPickS act h ≤ 2^31 − 1`.  `nextOf`/`nextStep`/`cycAt`/`pidPick`
+    stay for G2's lemmas until the dead-code pass removes them.
+  - `PidLock` (in place, deviation 2's style): the payload drops the `nextpid` word and its mark `(np = 1 ∨
+    nextpidShot)`, GAINS the 64 `npid` cells `wordAtN ξ (pNpid (procAddr j)) 4 (DFrac.own 1) (npids j)` and
+    the tie `pidTieS npids pids h := (∀ j < NPROC, (npids j).toNat = j + NPROC * ownAllocs (procAddr j) h) ∧
+    (∀ z, liveOf h z ↔ pidCells pids z)`, and `pidLedger` carries `pevWf h`; `pidAllocRcpt act pid := ∃ h,
+    pidReceipt h (.PAlloc act pid) ∗ ⌜pid.toNat = pidPickS act h⌝`; NEW `pidCapRcpt act := ∃ h, pidLedLb h ∗
+    ⌜ownAllocs act h = PIDQ⌝` (persistent; the count is monotone and capped, so the fact outlives the prefix).
+    The mark `(∀ j, pids j ≠ 1 ∨ nextpidShot)` stays; `nextpidShot` is now fired at the init arm (F13).
+  - `SpecProcinit`: `procFieldsOut i` gains `wordPointsTo (pNpid (procAddr i)) 4 (DFrac.own 1) (BitVec.ofNat
+    32 i)`; the 64 cells reach `pid_lock`'s seal in `main` (`MainKvm`'s `pidLockPay`), initialised, as the
+    `pid` cells do at 0.  `ProofProcinit`'s loop body is re-proved for the new registers.
+  - `SpecAllocproc`/`ProofAllocproc`: the scan of `allocpid` (§§ "allocpid: pure facts" … "the retry loop",
+    ≈ 400 lines) is DELETED; the pid section becomes straight-line: `myproc` (its contract is generic in
+    `k.proc`, `SpecMyproc`; nested in `p->lock`'s push_off), `acquire(&pid_lock)`, the init arm (`act = 0`:
+    pid 1, the shot fired, `pevWf`'s `h = []` from the mark), the cap arm (`release` twice, return 0, the
+    null post with `pidCapRcpt act`), the found arm (load, compare, `addiw`, two stores, the receipt).
+    `allocprocPostLed`'s null arm: `sFullRcpt act ∨ pidCapRcpt act` (two reasons for `r = 0`); its found
+    arm's `pidAllocRcpt act pid` at the new fact; the spec gains the boot discriminator premise `(pavBoot pav
+    tk → act = 0#64) ∧ (¬ pavBoot pav tk → act ≠ 0#64)` (F13).  `allocprocPost` (the un-led post) keeps its
+    text.
+  - `SpecKfork`/`ProofKfork`: `kforkRetLed`'s `−1` arm `sFullRcpt (procAddr j) ∨ pidCapRcpt (procAddr j)`;
+    `SpecSysFork`/`ProofSysFork` relay it.
+  - `SyscallDefs.syscEvRow`'s fork clause: the `ZFork`'s pid is `BitVec.ofNat 32 (pidPickS ι.act ι.pev)`, the
+    `−1` reason `ι.sFull ∨ ι.pown = PIDQ`; `SyscallArmsFork` reads the receipt into it (`pidAllocRcpt`'s
+    `h` is the cited prefix, as today).
+  - `UsysDet` (P-1, in place): `UIota.pown ι := ownAllocs ι.act ι.pev`; `usysForkPid ι := signExtend 64
+    (BitVec.ofNat 32 (pidPickS ι.act ι.pev))`; `forkOk ι := ¬ ι.sFull ∧ ι.pown < PIDQ`; `usysForkAns`,
+    `usysDetFork`, `usysDet_fork`, `usysDetRet_fork` textually unchanged; THE CLOSURE `usysDet_ownP`: the rows
+    read `pev` only through the own count (`usysDet n W ι = usysDet n W ι.ledP`, `ledP` below).
+  - `ProcAvail`: `pavSpent`'s "allocproc's store to `nextpid`" becomes "allocproc's init arm"; text otherwise
+    unchanged.  `SpecUserinit`'s header note "`allocproc` never calls `myproc`" is corrected (F12).
+- **F8 (the theorem; scope 18).**  See "The theorem" below.
+- **F9 (P-3, optional: the own count DERIVED).**  The count at round `k` is the count at origin plus the
+  incarnation's successful fork rounds before `k`: between two of its rounds nobody appends `PAlloc act`
+  (allocproc runs in the caller's thread; the slot is the incarnation's).  That is the kernel's bookkeeping,
+  not a ledger fact (a citation is a persistent lower bound), exactly as FS-2e-b's fs cursor: the trap loop
+  carries the own count after the incarnation's last fork round beside `uhist`, the fork arm ties the
+  citation's `pown` to it, the filing records it, `niR_pure` yields `pown_k = pown_0 + forks before k`, and
+  `xv6NiDetP`'s positions drop `pown` for ONE origin datum (the origin filing records the slot's count at
+  the first resume).  ≈ 0.15 BE; after it fork's answer is a function of the first key, the actor and the
+  trace, nothing cited.
+- **F10 (the upgrade path: a key field).**  Carrying the count in `Uvis` (`W.nf`) makes fork's answer
+  textually key-functional (`usysForkAns W act`) with no citation and no position: the ≈ 40-file arity path
+  (playbook §4i).  It buys nothing P-3 does not, and the slot budget (quota F8) needs the same path, so if the
+  budget is ever taken the two share it.  Not now.
+- **F11 (bundling the slot budget).**  Its C (`kfork` splits, `kwait`/`kexit` refund, `userinit` seeds, a
+  field in the `+28` hole) is inside this window, so ONE commit pays ONE relayout (≈ 0.35 BE saved).  Its
+  proof (a table-wide sum invariant, the `Uvis` field, kfork/kwait/kexit/userinit reshapes) is ≈ 1 BE on top.
+  Recommended: not bundled unless the owner commits to the budget now (P-R6); the saving is real and recorded.
+- **F12 (`myproc` at boot).**  `SpecUserinit` says "`allocproc` never calls `myproc`" (its argument that boot
+  needs no process).  The candidate calls it: `SpecMyproc.wp_myproc_body` returns `k.proc` at either `SIE`
+  from the context's `cpuOwn`, with no process resource, so at boot it returns 0 under the hypothesis userinit
+  already states (`k.proc = 0`, `SIE = 0`); inside `p->lock`'s push_off the pair is the ordinary nested case.
+  The note is corrected, the argument unchanged.
+- **F13 (the boot one-shot).**  `nextpidShot` (`SlotGen`) was "fired by the first allocation's store to
+  `nextpid`" and discharges the payload's two boot marks; `pavSpent`/`npidDone`/`pavBoot` carry it.  With no
+  store: the shot fires at the init arm (`act = 0`), the counter mark `(np = 1 ∨ shot)` goes with the counter,
+  the cell mark `(∀ j, pids j ≠ 1 ∨ shot)` stays and is what refutes a second pid 1.  The spec's discriminator
+  `if pavBoot pav tk then pid = 1 else pid ≠ 1` keeps its text; its proof now needs the caller's actor to
+  agree with the regime (`act = 0 ↔ pavBoot pav tk`, a premise userinit and kfork discharge: `k.proc = 0` at
+  boot, `k.proc = procAddr j` in kfork).  The ghost keeps its name.
+- **F14 (the cheapest alternative, no kernel change, closes nothing).**  An incarnation that never forks cites
+  no `pev` position; a corollary with the premise "LOW never forked" shows where the pid enters the trace and
+  closes nothing.
+
+**The kernel change (P-R1…R5; NOT applied; a patch against c1fd3cc7, built, measured and run in scratch).**
+
+```diff
+diff --git a/kernel/param.h b/kernel/param.h
+index a156177..60b8c2b 100644
+--- a/kernel/param.h
++++ b/kernel/param.h
+@@ -12,6 +12,6 @@
+ #define FSSIZE      2000              // size of file system in blocks
+ #define MAXPATH     128               // maximum file path name
+ #define USERSTACK   1                 // user stack pages
+-#define PIDMAX      1000              // highest PID
++#define PIDMAX      0x7fffffff        // highest PID (pids are partitioned by slot, never reused)
+ #define MAXUSZ      (192 * 4096)      // memory quota: the largest user break
+ #define NPIPE       (NFILE / 2)       // memory quota: pipe buffers at once
+diff --git a/kernel/proc.c b/kernel/proc.c
+index 406b96d..d7cb1d9 100644
+--- a/kernel/proc.c
++++ b/kernel/proc.c
+@@ -12,7 +12,6 @@ struct proc proc[NPROC];
+ 
+ struct proc *initproc;
+ 
+-int nextpid = 1;
+ struct spinlock pid_lock;
+ 
+ extern void forkret(void);
+@@ -55,6 +54,7 @@ procinit(void)
+     initlock(&p->lock, "proc");
+     p->state = UNUSED;
+     p->kstack = KSTACK((int)(p - proc));
++    p->npid = (int)(p - proc);
+   }
+ }
+ 
+@@ -89,24 +89,29 @@ myproc(void)
+   return p;
+ }
+ 
+-static void
++// Hand p a pid.  Pids are partitioned by the parent's slot j: slot j
++// hands out j + NPROC, j + 2*NPROC, ... and never reuses one; userinit
++// (no parent) gets 1.  Fails (-1) when the slot's share is exhausted.
++static int
+ allocpid(struct proc *p)
+ {
+-  struct proc *q;
++  struct proc *pp = myproc();
+   int pid;
+ 
+   acquire(&pid_lock);
+-  for (;;) {
+-    pid = nextpid;
+-    nextpid = (pid == PIDMAX) ? 1 : pid + 1;
+-    for (q = proc; q < &proc[NPROC]; q++)
+-      if (q->pid == pid)
+-        break;
+-    if (q == &proc[NPROC])
+-      break;
++  if (pp == 0) {
++    pid = 1;
++  } else {
++    if (pp->npid > PIDMAX - NPROC) {
++      release(&pid_lock);
++      return -1;
++    }
++    pp->npid += NPROC;
++    pid = pp->npid;
+   }
+   p->pid = pid;
+   release(&pid_lock);
++  return 0;
+ }
+ 
+ // Look in the process table for an UNUSED proc.
+@@ -129,7 +134,10 @@ allocproc(void)
+   return 0;
+ 
+ found:
+-  allocpid(p);
++  if (allocpid(p) < 0) {
++    release(&p->lock);
++    return 0;
++  }
+   p->state = USED;
+ 
+   // Allocate a trapframe page.
+diff --git a/kernel/proc.h b/kernel/proc.h
+index 0d8e095..416442d 100644
+--- a/kernel/proc.h
++++ b/kernel/proc.h
+@@ -88,6 +88,7 @@ struct proc {
+   int killed;           // If non-zero, have been killed
+   int xstate;           // Exit status to be returned to parent's wait
+   int pid;              // Process ID
++  int npid;             // pid partition: the last pid this slot handed out (pid_lock)
+ 
+   // wait_lock must be held when using this:
+   struct proc *parent; // Parent process
+```
+
+Notes on the patch:
+- `myproc()` runs BEFORE `acquire(&pid_lock)` (gcc hoisted it), inside `p->lock`'s push_off.
+- The cap arm releases `pid_lock` then `p->lock` and returns 0 with the slot still UNUSED and `p->pid` 0:
+  `freeproc` is not called (nothing was allocated), so no `PFree` of a pid 0 is ever appended.
+- `pp->npid` is read and written under `pid_lock` only; the cell is the payload's (the parent's `p->lock` is
+  not held, and need not be: the cell is not in the parent's block).
+- `PIDMAX`'s only remaining C use is the cap; `1000` is gone everywhere.
+
+**Proposed Lean definitions (verbatim sketches; P-0/P-1/P-2).**
+
+    -- Xv6/ProcGeom.lean (P-0)
+    def PIDMAX : Nat := 2 ^ 31 - 1               -- was 1000; SlotGen.genPidMax likewise
+    def pNpid (pa : BitVec 64) : BitVec 64 := pa + 52#64
+    /-- the slot of an actor word: `slotOf (procAddr j) = j` -/
+    def slotOf (a : BitVec 64) : Nat := (a - procsAddr).toNat / procSize
+
+    -- Xv6/PidEv.lean (P-0)
+    /-- a slot's pid quota: the children it may ever create -/
+    def PIDQ : Nat := 2 ^ 25 - 1
+    def ownAllocs (act : BitVec 64) (h : List Pev) : Nat :=
+      (h.filter fun e => match e with | .PAlloc a _ => a == act | _ => false).length
+    /-- THE PARTITION: the pid the kernel is bound to give actor `act` after `h`. -/
+    def pidPickS (act : BitVec 64) (h : List Pev) : Nat :=
+      if act = 0#64 then 1 else slotOf act + NPROC * (ownAllocs act h + 1)
+    /-- a well-formed history: every allocation is the partition's at its prefix; `init`'s is the first event -/
+    def pevWf (h : List Pev) : Prop :=
+      ∀ i a p, h[i]? = some (.PAlloc a p) → p.toNat = pidPickS a (h.take i) ∧ (a = 0#64 → i = 0)
+    theorem pidPickS_fresh (hw : pevWf h) (ha : act ≠ 0#64) (hs : slotOf act < NPROC) :
+        ¬ liveOf h (pidPickS act h : Int) ∧ pidPickS act h ≠ 1
+    theorem pidPickS_le (hc : ownAllocs act h < PIDQ) (hs : slotOf act < NPROC) : pidPickS act h ≤ PIDMAX
+
+    -- Xv6/PidLock.lean (P-0, IN PLACE)
+    def pidTieS (npids : Nat → BitVec 32) (pids : Nat → BitVec 32) (h : List Pev) : Prop :=
+      (∀ j, j < NPROC → (npids j).toNat = j + NPROC * ownAllocs (procAddr j) h) ∧
+      ∀ z : Nat, liveOf h (z : Int) ↔ pidCells pids z
+    def pidLedger (npids pids : Nat → BitVec 32) (R : IntMapF GName) : IProp GF := iprop%
+      ∃ h : List Pev, pidLedAuth h ∗ ⌜liveOf h = PartialMap.dom R ∧ pidTieS npids pids h ∧ pevWf h⌝
+    def pidAllocRcpt (act : BitVec 64) (pid : BitVec 32) : IProp GF := iprop%
+      ∃ h : List Pev, pidReceipt h (.PAlloc act pid) ∗ ⌜pid.toNat = pidPickS act h⌝
+    /-- THE CAP'S RECEIPT: the actor's share is spent (monotone, so a lower bound suffices). -/
+    def pidCapRcpt (act : BitVec 64) : IProp GF := iprop% ∃ h : List Pev, pidLedLb h ∗ ⌜ownAllocs act h = PIDQ⌝
+    def pidLockResAt [CurCtx] (ξ : CtxId) : IProp GF := iprop%
+      ∃ (npids pids : Nat → BitVec 32), ⌜pidsOk pids⌝ ∗
+        ([∗list] j ∈ List.range NPROC, wordAtN ξ (pNpid (procAddr j)) 4 (DFrac.own 1) (npids j)) ∗
+        ([∗list] j ∈ List.range NPROC, wordAtN ξ (pPid (procAddr j)) 4 pidLockQ (pids j)) ∗
+        ∃ R : IntMapF GName, ⌜pidRegDom R pids⌝ ∗ pidRegAuth R ∗ pidLedger npids pids R ∗
+          (⌜∀ j, j < NPROC → (pids j).toNat ≠ 1⌝ ∨ nextpidShot)
+
+    -- Xv6/SpecAllocproc.lean (P-0): the null arm's reasons
+    --   ... ∗ (sFullRcpt act ∨ pidCapRcpt act) ∗ ...
+    -- Xv6/SpecKfork.lean (P-0): kforkRetLed's -1 arm
+    --   (⌜rv = -1#32⌝ ∗ chFrag … ∗ Rc ∗ (sFullRcpt (procAddr j) ∨ pidCapRcpt (procAddr j)))
+
+    -- Xv6/UsysDet.lean (P-1, IN PLACE)
+    def UIota.pown (ι : UIota) : Nat := ownAllocs ι.act ι.pev
+    def usysForkPid (ι : UIota) : BitVec 64 := BitVec.signExtend 64 (BitVec.ofNat 32 (pidPickS ι.act ι.pev))
+    def forkOk (ι : UIota) : Prop := ¬ ι.sFull ∧ ι.pown < PIDQ
+    -- SyscallDefs.syscEvRow, fork: … ZFork ι.act i (BitVec.ofNat 32 (pidPickS ι.act ι.pev)) … ∧
+    --   (¬ forkOk ι → (ι.sFull ∨ ι.pown = PIDQ) ∧ cs' = cs)
+    /-- the ledger part without the allocator and with `pev` reduced to the OWN COUNT (a canonical list of
+    that length: what every answer reads of it on the pid kernel) -/
+    def UIota.ledP (ι : UIota) : UIota := { ι.ledQ with pev := List.replicate ι.pown (.PAlloc ι.act 0#32) }
+    /-- the history part the two-run hypothesis compares: no allocator, no pid history at all -/
+    def UIota.ledP0 (ι : UIota) : UIota := { ι.ledQ with pev := [] }
+    /-- **THE CLOSURE** (false on c1fd3cc7: fork read `pidPick` of the whole prefix). -/
+    theorem usysDet_ownP (n : Int) (W : Uvis) (ι : UIota) : usysDet n W ι = usysDet n W ι.ledP
+
+    -- Xv6/NiEvid.lean (P-2)
+    /-- `niBelowQ` without the pid conjunct. -/
+    def niBelowP (ι H : UIota) : Prop :=
+      ι.zev <+: H.zev ∧ ι.ticks ≤ H.ticks ∧ ι.sev <+: H.sev ∧ ι.cacc <+: H.cacc ∧ ι.fev <+: H.fev
+
+    -- Xv6/NiTrace.lean (P-2)
+    structure NiPos where … ; pown : Nat := 0      -- LAST; `UIota.pos` sets it to `ι.pown`
+    def NiPos.noPev (p : NiPos) : NiPos := { p.noKev with pev := 0 }
+    def NiStep.detInP (s : NiStep) : Option NiPos := s.detIn.map NiPos.noPev   -- keeps `pown`
+    -- NiDetReading gains `EH : UIota → UIota` (the HISTORY's erasure; `E` the citation's) and
+    --   hP : niBelow ι₁ H₁ → niBelow ι₂ H₂ → EH H₁ = EH H₂ → ps k ι₁ = ps k ι₂ → E ι₁ = E ι₂;
+    -- niDetLed/niDetLedQ set EH := E; niDet_runs and niTwoRunDetBy take hH at EH.
+    def niDetLedP : NiDetReading where
+      ps k ι := (ι.pos k).noPev
+      E := UIota.ledP
+      EH := UIota.ledP0
+      hE := fun n W ι => (usysDet_ownP n W ι).symm
+      hP := fun h₁ h₂ hH hp => niBelow_posP h₁ h₂ hH hp   -- equal zev/sev/cacc/fev lengths below equal lists,
+                                                         -- equal ticks, actor and own count ⇒ equal `ledP`
+    theorem niTwoRunDetP … (hpos : … detInP …) (hH : ∀ k, niBelowP (niHistLed F₁ k) (niHistLed F₂ k)) : …
+
+**The theorem (P-2; verbatim).**  `niTwoRunDetP` is `niTwoRunDetQ` with `hpos` at `detInP` and `hH` at
+`niBelowP`, an instance of `niTwoRunDetBy niDetLedP`.  The root, in `LinkNiAdequacy` beside `xv6NiDetQ`, has
+`xv6NiDetQ`'s binders and adequacy premises byte for byte, and the SAME `xv6NiPhi` (the closure is in the rows
+and the receipt, not the filing):
+
+    /-- **(NI M4 pids) The pid channel is closed**: `xv6NiDetQ` WITHOUT the pid history -- neither its
+    history (`niBelowP`) nor its position (`detInP`: the cited pid prefix's length erased, the caller's OWN
+    fork count kept).  An incarnation's ecall skeleton and console output are a prefix of the other run's
+    whatever every other actor forked, exited or reaped. -/
+    theorem xv6NiDetP … :
+        ∃ F₁ F₂, niOk κs₁ F₁ ∧ niOneShot κs₁ F₁ ∧ niChain F₁ (niHist F₁) ∧ niUserChain F₁ ∧
+          niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ niUserChain F₂ ∧ ∀ q : NiInc,
+          NiOneOrigin q κs₁ F₁ → NiOneOrigin q κs₂ F₂ →
+          NiGapFree q κs₁ F₁ → NiGapFree q κs₂ F₂ →
+          NiInClass (utrace q κs₁ F₁) → NiNoStuck q κs₁ F₁ →
+          firstKey q κs₁ F₁ = firstKey q κs₂ F₂ →
+          ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.detInP <+:
+            ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.detInP →
+          (∀ k, niBelowP (niHistLed F₁ k) (niHistLed F₂ k)) →
+          ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.view <+:
+              ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.view ∧
+            ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.outBytes <+:
+              ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.outBytes
+
+Why it is the theorem that the change closes a channel: on c1fd3cc7 the statement is false of the kernel.  Take
+two runs that differ only in another actor's forks before LOW's first fork: LOW's answers differ (`pidPick` of
+different prefixes), and the only hypotheses that told them apart were `pev`'s history and length, both gone.
+On the pid kernel no class row reads `pev` beyond the own count (`usysDet_ownP`).  `xv6NiDetQ` stays
+(byte-identical, still true, weaker than the new root).
+
+Honest scope 18 (to be written into `NiTrace` by P-2):
+- CLOSED: the pid order.  Every other actor's allocations and frees, the live set and the counter leave both
+  hypotheses.  fork's pid is `slot + NPROC·(own + 1)` at the citation's own count; fork's `−1` is the cited
+  `SFull` or the own count at the cap `PIDQ`.
+- CONCEDED, by the positions: the caller's own fork count at each fork round (derivable in principle: the
+  count at origin plus the incarnation's own successful forks; P-3 derives it) and, as before, the actor (the
+  caller's slot) and the slot-full bit.  The count at origin is the residue of the partition: how many
+  children the slot's earlier occupants made (NiKOS's residue on id reuse).
+- NOT closed: slot occupancy (`sev`: fork's `−1`, placement), the ticks, the family ledger (`zev`: wait,
+  whose reaped pid is the child's), the console stream, the schedule, the regime, one origin, no gaps.
+- NEW reading, in the class: fork's `−1` at the pid cap (a function of the own count).  Nothing new outside
+  the class.
+- Pids are no longer small: `[1, 2^31 − 1]`, and a pid is never reused in a kernel's lifetime.
+
+**Lanes.**  One worktree, in sequence; P-3 optional after P-2.  A BUMP-EQUIVALENT (BE) is the chroot bump.
+
+| Lane | Content | Files (est.) | Lines (est.) | BE |
+|---|---|---|---|---|
+| **P-0 the commit, the image, the relayout, the payload** | The patch as ONE commit on `verified-quota` (P-R1); rebuild, `tools/dump_kernel.py --rev`, `gen_kernel_data.py`, `check-gen-kernel`; the pin headers and README move; `tools/rebase_kernel.py` literal + `--fixup` + `--symbolic` with ONE `--intervals` file (`procinit:+0x84..+0x96` reshaped, `allocproc:+0x38..+0x76` rewritten, `+0x78:−0x8`, the arms) over the 123-symbol window; `nextpid`'s cell gone (8 files: `nextpidAddr`, the carve window, the `ap_nextpid_*` bridges, `SpecMain`/`ProofMain`/`MainKvm`); `pNpid`, `slotOf`, `PIDMAX := 2^31 − 1`, `genPidMax`; `PidEv`'s partition vocabulary; `PidLock`'s payload in place (`pidTieS`, `pevWf`, `pidCapRcpt`, the counter mark gone); `SpecProcinit`'s `procFieldsOut` + the loop re-proved; `ProofAllocproc`: the scan deleted (≈ 400 lines), the straight-line pid section, the init and cap arms, the actor premise; `allocprocPostLed`'s null arm `sFullRcpt ∨ pidCapRcpt`; `kforkRetLed`'s `−1` arm; `ProcAvail`'s text; `SpecUserinit`'s note. | ≈ 250–300 relayout, ≈ 15 content | ≈ ±1.5k relayout; +0.6k/−0.8k content | ≈ 0.4 |
+| **P-1 the rows** | `UIota.pown`, `usysForkPid`, `forkOk`, `syscEvRow`'s fork clause, `SyscallArmsFork`, `UIota.ledP`/`ledP0`, THE CLOSURE `usysDet_ownP`; scope 8 rewritten. | ≈ 8 | ≈ 0.4k | ≈ 0.12 |
+| **P-2 the root** | `NiPos.pown`/`noPev`, `NiStep.detInP`, `niBelowP`, `NiDetReading.EH` (the two instances at `EH := E`), `niDetLedP`, `niBelow_posP`, `niTwoRunDetP`, `LinkNiAdequacy.xv6NiDetP` (the fifteenth root); `roots.txt` + `baseline.json`; `tcb.sh --update`; scope 18. | 5 | ≈ 0.3k | ≈ 0.05 |
+| P-3 (optional) the own count derived | The per-incarnation fork count carried by the trap loop beside `uhist` (FS-2e-b's cursor pattern), tied at the fork arm, filed, `niR_pure`'s order; `xv6NiDetP`'s positions without `pown`, one origin datum. | ≈ 12 | ≈ 0.8k | ≈ 0.15 |
+
+**Total:** P-0..P-2 ≈ 0.6 BE; with P-3 ≈ 0.75 BE.  Every later upstream bump re-applies the 22 lines and the two
+shape lanes: ≈ 0.05 BE recurring.  P-0 alone changes no NI statement (the fourteen roots stay byte-identical;
+`usysForkPid`'s body moves only in P-1).  The channel closes at P-2.
+
+Risks:
+- (R1) `procinit`'s loop body is RE-REGISTERED by gcc (not an insertion): its proof is re-done for the new
+  register names, and `--symbolic` must `--skip` it.  Small (one loop) but by hand.
+- (R2) The boot discriminator: `allocproc`'s led spec gains `act = 0 ↔ pavBoot pav tk`.  `ProofUserinit` has
+  `k.proc = 0`; `ProofKfork` has `k.proc = procAddr j` (its `myproc`).  If a caller lacks the fact, the init
+  arm cannot fire the shot.
+- (R3) `pevWf` is a new conjunct of `pidLedger`: both append sites keep it (`PFree` trivially, `PAlloc` by the
+  receipt's fact); `pidsOk` (distinct nonzero cells) must now be DERIVED from freshness and the register at the
+  store (today the scan's verdict), the one new pure argument in `ProofAllocproc`'s found arm.
+- (R4) `PIDMAX`'s redefinition: any proof computing with the literal (`pidNext`'s `1000#32`, deleted;
+  `InitMainLoop` 321's `omega`) is checked by the build; the `[1, PIDMAX]` rows' CONTENT weakens (a pid below
+  `2^31`, no longer below 1001), which nothing downstream used beyond sign-extension and nonzeroness.
+- (R5) The window is the largest since the chroot bump (123 symbols, 508 files naming one); the deltas are
+  uniform ±4, which the tools sweep, but 166 files have mixed-delta lines (Q-0: 101).
+- (R6) `fs.img`'s dump: byte-identical, so `FsImgFiles`/`FsImgFilesInit` do not move; verify with
+  `check-gen` after the re-dump (the kernel-only change still regenerates `KernelImage`/`KernelData`/
+  `KernelElf`).
+
+**RULINGS REQUESTED (P-R1…P-R9).**
+- **P-R1 (OWNER DECISION) The kernel change at all, and where?**
+  - (a) A SECOND commit on the fork branch `verified-quota` (= c1fd3cc7 + this patch); the pin (`KernelImage`,
+    `KernelElf`, README, the CI attribution clone's `--branch`) moves to it.  Recommended.
+  - (b) The same under a new branch name (`verified-ni`): the owner's rename, no proof difference.
+  - (c) No kernel change: F14's corollary, closes nothing.
+- **P-R2 The encoding:** (A) the parent-slot partition `j + NPROC·c`, init 1 (recommended); (B) slot-generation
+  pids (cheaper, closes nothing: F3); (C) parent-relative pids (API change).
+- **P-R3 The counter's home:** the `struct proc` hole at `+52`, initialised in `procinit` to the slot index
+  (recommended: no stride, no new symbol, no division); a global `.bss` array (256 bytes: every `.bss` symbol
+  after `proc.o` moves, a data relayout); lazy initialisation with the division in `allocpid`.
+- **P-R4 The cap:** `PIDQ = 2^25 − 1` children per slot, fork `−1` beyond (recommended; the alternative, a
+  wrapping counter, breaks freshness and the pid register).
+- **P-R5 `PIDMAX := 2^31 − 1`** in C and Lean, every `[1, PIDMAX]` row textually unchanged (recommended); or a
+  new name and a sweep of the 37 files.
+- **P-R6 Bundle the slot budget (quota F8) into the same commit?**  No (recommended: ≈ 1 BE of proof it does
+  not need now); yes (saves ≈ 0.35 BE of relayout later; needs the key-field path).
+- **P-R7 The own count:** a position in P-2 with P-3 optional (recommended); P-3 mandatory before the root;
+  the `Uvis` field (F10).
+- **P-R8 The root:** a new root `xv6NiDetP` at the same `xv6NiPhi`, `xv6NiDetQ` kept (recommended); or
+  `xv6NiDetQ` restated in place (one fewer root, the Q-3 statement lost).
+- **P-R9 Order:** P-0 → P-1 → P-2 (→ P-3); one worktree; the full gate (`run_all.sh`) at each landing.
+
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
@@ -8569,6 +9058,8 @@ ustep landed (U-1..U-3; U-4 totality later); next: quotas
 quotas DESIGNED (2026-10-05, "M3 quotas design" above: the break quota + pipe cap + `scounteren`, one commit on a fork of the pin; `xv6NiDetQ` without the allocator; ≈ 1.0 BE); awaiting the OWNER's Q-R1 and rulings Q-R2…R10
 
 quotas landed (Q-0..Q-3; Q-4/Q-5 optional); private files landed through FS-2f (xv6NiDetQ is the result; xv6NiFs designed-but-blocked, FS-2g scoped); M3 ENDED 2026-10-06 by owner decision
+
+M4 pids DESIGNED (2026-10-09, "M4 pids design" above: pids partitioned by the parent's slot with a per-slot quota, 22 C lines on the quota kernel, measured ±4 over 123 symbols with no data motion, run under qemu; `xv6NiDetP` without the pid history; ≈ 0.6 BE); awaiting the OWNER's P-R1 and rulings P-R2…R9
 
 private files DESIGNED (2026-10-05, "M3 private files design" above: a per-era fs-event ledger appended by the fire lemmas, computed rows, the footprint theorem `xv6NiFs`; chroot not the partition; ≈ 2.8 BE, FS-L alone ≈ 0.05); awaiting rulings FS-R1…R10
 
