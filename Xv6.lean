@@ -1624,6 +1624,7 @@ import Xv6.ProofUser
 import Xv6.LinkSystemAdequacyClosed
 import Xv6.NiAdequacy
 import Xv6.LinkNiAdequacy
+import Xv6.AllocprocTrace
 import Xv6.UkCatTree
 import Xv6.ExecEntry
 import Xv6.ExecBundle
