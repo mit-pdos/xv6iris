@@ -201,7 +201,7 @@ theorem gateLit2 : AxSpinT2f.rv rowA2 (t2KHd qA2 + 4) = some (cvx 0) ∧
 theorem lockLit2 : AxSpinT2f.rv rowA2 (t2KHd qA2) = some (WeakInterpProj.wbytes 4 (BitVec.ofNat (8 * 4) 1)) := by
   decide +kernel
 
-theorem offLit2 : AxSpinT2p1.offCutsB 0 q0 = true := by decide
+theorem offLit2 : AxSpinT2p1.offCutsB 0 q0 = true := by decide +kernel
 
 section prem
 variable (E : List (List Eitem))
@@ -210,7 +210,8 @@ variable (E : List (List Eitem))
 theorem preA2 : allocPre (AxOpsem.grow (gtAdGd (gT2 E)) 0) qA2 0 (sZ 0) (AxSpinT2a.pEx 0) := by
   rw [growA2]; exact AxSpinT2p1.preOfB _ _ _ _ _ preLit2.1
 
-/-- **`AllocPins2`** for A (incl. holding's `hdRets`/`hdS1` on the long arm, all live). -/
+/-- **`AllocPins2`** for A (Q18b / `ppArm` vacuous; `rlEnd` live: the row ends at `37 = rlPos .hdS1
+qA2`, holding's s1 reload read `pid_lock`). -/
 theorem pinsA2 : AllocPins2 (gtAdGd (gT2 E)) 0 qA2 := by
   apply AxSpinT2p1.pins2OfB; rw [growA2]; exact pinsLit2.1
 
@@ -226,7 +227,7 @@ theorem cutA2 : t2CutAt (AxOpsem.grow (gtAdGd (gT2 E)) 0) qA2 0 ∧
     t2Cut (gtAdGd (gT2 E)) 0 (sZ 0) (AxSpinT2a.pEx 0) := by
   have hL : (AxOpsem.grow (gtAdGd (gT2 E)) 0).length = cutPos .aq qA2 := by
     rw [growA2]; exact sizes2.2.2
-  exact ⟨⟨.aq, hL, gateA2 E⟩, ⟨qA2, preA2 E, .aq, hL, gateA2 E⟩⟩
+  exact ⟨Or.inl ⟨.aq, hL, gateA2 E⟩, ⟨qA2, preA2 E, Or.inl ⟨.aq, hL, gateA2 E⟩⟩⟩
 
 /-- … and it is a PANIC cut (`entersPanic`: `j = aq ≠ ppI`). -/
 theorem panicA2 : entersPanic (gtAdGd (gT2 E)) 0 (sZ 0) (AxSpinT2a.pEx 0) :=
@@ -250,7 +251,8 @@ theorem pinsB2 : AllocPins2 (gtAdGd (gT2 E)) 1 q0 := by
   apply AxSpinT2p1.pins2OfB; rw [growB2]; exact pinsLit2.2
 
 theorem notCutB2 : ¬ t2Cut (gtAdGd (gT2 E)) 1 (sZ 1) (AxSpinT2a.pEx 1) :=
-  notCutOfLen (preB2 E) (by rw [growB2]; exact AxSpinT2p1.offCutsOf offLit2)
+  notCutOfLen (preB2 E) (by rw [growB2]; exact (AxSpinT2p1.offCutsOf offLit2).1)
+    (by rw [growB2]; exact (AxSpinT2p1.offCutsOf offLit2).2)
 
 theorem notCompleteB2 : ¬ t2Complete (gtAdGd (gT2 E)) 1 (sZ 1) (AxSpinT2a.pEx 1) :=
   AxSpinT2p1.notCompleteNil (growB2 E)

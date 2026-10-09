@@ -49,6 +49,15 @@ graph values and annotations — `k + 12` is where the CALLER's (acquire's / rel
 branch is decided (designated cuts `aq` / `rlL`; their arms are proved in `AxSpinT2h`).  The
 `Hval` pin is guarded (`k + 9 < LEN →`).  `holdEpi` keeps its exact statement as the corollary.
 
+## P1 GATE FORM (Lean-only; notes/weak-lb-thm2-pins.md §P1, as AxSpinE8's "P1 GATE FORM")
+
+`AxSpinHd8.holdEpiGr` is the shared gated core: `holdEpiP`'s premises with the ra pin replaced by
+`AxSpinT2i.Gate GT i (k + 9) (stBytes 8 ret)` (same slot), and the main continuation prefixed by
+`⌜k + 12 < LEN⌝ -∗`.  At the boundary `k + 10` a `by_cases` on the reloaded value: equal ⇒ the
+old script; else `AxSpinT2i.cutReloadG` with the reload's `RLfact` (when `ret`'s bytes are the
+spill `ra0`'s; the G call sites take `ret := ra0`), otherwise the hook.  `holdEpiP` = core ∘
+`AxSpinT2i.gateOfPinG` (statement unchanged).  HONESTY: no return-address pin left in the core.
+
 ## Deviations from Rocq
 
 1. O2 STAGE C / Q20' (provisional Option V; protocol "Cross-file facts" Q20' and AxSpinE8
@@ -92,7 +101,7 @@ also exists in Xv6/PipesDisc), `lk_branch` `lkBranch`, `Row_holding` `RowHolding
 `lshapeInv`, `mshape_inv` `mshapeInv`, `st8_wr` `st8Wr`, `rd_nowr` `rdNowr`, `hold_wr`
 `holdWr`, `fe2_facts` `fe2Facts`, `hold_epi` `holdEpi`; duplicated names (file-qualified)
 `r9` `AxSpinHd8.r9`, `imm24` `AxSpinHd8.imm24`, `imm16` `AxSpinHd8.imm16`, `imm8`
-`AxSpinHd8.imm8`, `rsp` `AxSpinHd8.rsp`.  Lean-only: `AxSpinHd8.rowHoldingPOfFull`; stage-2 P-form
+`AxSpinHd8.imm8`, `rsp` `AxSpinHd8.rsp`.  Lean-only: `AxSpinHd8.rowHoldingPOfFull`, `AxSpinHd8.holdEpiGr` (P1); stage-2 P-form
 (unqualified, grepped unique): `RowHoldingP`, `holdWrP`, `holdEpiP` (+ 1 local macro).
 
 **Dropped:** `ret_pin` (deviation 1: the return-fetch conjunct is gone; no other Rocq file uses
@@ -375,12 +384,289 @@ variable (HΨmid : ∀ s, midState s → s.atK = (AxOpsem.grow (gtAdGd GT) i).le
   ⊢ @postLifting GF (AxSpinX2.xG L GT nm) Ψ i s)
 
 include HL Hcons hmode hasid hppn Hfix Htxh HΨmid in
+/-- (Lean-only, P1) THE GATED CORE of `holdEpiP`: its script with the ra pin replaced by the reload
+GATE `AxSpinT2i.Gate GT i (k + 9) (stBytes 8 ret)` (`ret` still a parameter) and the main
+continuation additionally RECEIVING `k + 12 < LEN` (it is only reached past the end boundary).  At
+the ra reload's boundary `k + 10`: `by_cases` on the reloaded value — equal ⇒ the P-form script;
+else the gate gives `LEN ≤ k + 10` and the arm is `AxSpinT2i.cutReloadG` with the reload's
+`RLfact` when `ret`'s bytes are the spill's (`stBytes 8 ret = stBytes 8 ra0`; always so at the G
+call sites, `ret := ra0`), otherwise the hook `HΨend` at `k + 10` (only reachable from
+`holdEpiP`'s free `ret`). -/
+theorem AxSpinHd8.holdEpiGr (k : Nat) (rs : RegFile) (ib : Ibch) (ret : BitVec 64) (plk pcl : Int)
+    (Pra Ps0 Ps1 Pram Ps0m : BitVec 64) (hsp1 ra0 s00 s10 : BitVec 64) :
+    -- the row
+    RowHoldingP k (AxOpsem.grow (gtAdGd GT) i) true plk pcl (paZ Pra) (paZ Ps0) (paZ Ps1)
+      (paZ Pram) (paZ Ps0m) →
+    noRmw8 (AxOpsem.grow (gtAdGd GT) i) (paZ Pra) →
+    noRmw8 (AxOpsem.grow (gtAdGd GT) i) (paZ Ps0) →
+    noRmw8 (AxOpsem.grow (gtAdGd GT) i) (paZ Ps1) →
+    slotsDisj [paZ Pra, paZ Ps0, paZ Ps1, paZ Pram, paZ Ps0m] →
+    graphData (gtAdGd GT) (i, k + 1) = some (stBytes 8 ra0) →
+    graphData (gtAdGd GT) (i, k + 2) = some (stBytes 8 s00) →
+    graphData (gtAdGd GT) (i, k + 3) = some (stBytes 8 s10) →
+    -- the boundary state
+    ctrlOkSW T satp0 rs → rs .PC = pch 0x1a → hitW rs (pch 0) → gprVal rs AxSpinE8.r2 = hsp1 →
+    -- the three stack slots
+    dataAtS σi T (.Load .Data) (hsp1 + sign_extend (m := 64) AxSpinHd8.imm24) 8 Pra →
+    hitW rs (hsp1 + sign_extend (m := 64) AxSpinHd8.imm24) →
+    dataAtS σi T (.Load .Data) (hsp1 + sign_extend (m := 64) AxSpinHd8.imm16) 8 Ps0 →
+    hitW rs (hsp1 + sign_extend (m := 64) AxSpinHd8.imm16) →
+    dataAtS σi T (.Load .Data) (hsp1 + sign_extend (m := 64) AxSpinHd8.imm8) 8 Ps1 →
+    hitW rs (hsp1 + sign_extend (m := 64) AxSpinHd8.imm8) →
+    (∀ j : Nat, j < 8 → priv L (paZ Pra + (j : Int)) i) → ¬ L.xlText (paZ Pra) →
+    (∀ j : Nat, j < 8 → priv L (paZ Ps0 + (j : Int)) i) → ¬ L.xlText (paZ Ps0) →
+    (∀ j : Nat, j < 8 → priv L (paZ Ps1 + (j : Int)) i) → ¬ L.xlText (paZ Ps1) →
+    -- the return address (P1: the ra reload GATE against `ret`'s bytes)
+    AxSpinT2i.Gate GT i (k + 9) (stBytes 8 ret) → jalrTgt 0#12 ret = ret →
+    -- the row-end hook (stage 2, design §B / Q-S2-2), over the window [k + 9, k + 11]
+    (∀ k' : Nat, k + 9 ≤ k' → k' ≤ k + 11 → (AxOpsem.grow (gtAdGd GT) i).length ≤ k' →
+      ∀ pr : Pexv6,
+        ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+          ⟨pr, k'⟩ Ψ) →
+    ⊢ ((⌜k + 12 < (AxOpsem.grow (gtAdGd GT) i).length⌝ -∗
+        ∀ (vra vs0 vs1 : List (BitVec 8)) (rs' : RegFile) (ib' : Ibch),
+        ⌜ctrlOkSW T satp0 rs' ∧ rs' .PC = ret ∧ rs' .tlb = rs .tlb ∧
+          gprVal rs' AxSpinE8.r10 = hres (gprVal rs AxSpinHd8.r9) (gprVal rs AxSpinE8.r10) ∧
+          gprVal rs' AxSpinE8.r2 = hsp1 + sign_extend (m := 64) (caddi16spImm 2#6) ∧
+          vra.length = 8 ∧ vs0.length = 8 ∧ vs1.length = 8 ∧
+          gprVal rs' AxSpinE8.r1 = ldRes false 8 vra ∧ gprVal rs' AxSpinE8.r8 = ldRes false 8 vs0 ∧
+          gprVal rs' AxSpinHd8.r9 = ldRes false 8 vs1 ∧
+          (∀ r : BitVec 5, r.toNat ≠ 1 → r.toNat ≠ 2 → r.toNat ≠ 8 → r.toNat ≠ 9 →
+            r.toNat ≠ 10 → gprVal rs' r = gprVal rs r) ∧
+          graphValue (gtAdGd GT) (i, k + 9) = some vra ∧
+          graphValue (gtAdGd GT) (i, k + 10) = some vs0 ∧
+          graphValue (gtAdGd GT) (i, k + 11) = some vs1⌝ -∗
+        AxAnnot.annotOwn (GF := GF) (i, k + 9)
+          iprop(⌜RLfact GT i (paZ Pra) (k + 9) (stBytes 8 ra0)⌝) -∗
+        AxAnnot.annotOwn (GF := GF) (i, k + 10)
+          iprop(⌜RLfact GT i (paZ Ps0) (k + 10) (stBytes 8 s00)⌝) -∗
+        AxAnnot.annotOwn (GF := GF) (i, k + 11)
+          iprop(⌜RLfact GT i (paZ Ps1) (k + 11) (stBytes 8 s10)⌝) -∗
+        @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+          ⟨.PHart cpu (.pure ()) rs' none ib', k + 12⟩ Ψ) ∧
+      (∀ (vra vs0 vs1 : List (BitVec 8)) (pr : Pexv6),
+        ⌜(AxOpsem.grow (gtAdGd GT) i).length = k + 12 ∧
+          vra.length = 8 ∧ vs0.length = 8 ∧ vs1.length = 8 ∧
+          graphValue (gtAdGd GT) (i, k + 9) = some vra ∧
+          graphValue (gtAdGd GT) (i, k + 10) = some vs0 ∧
+          graphValue (gtAdGd GT) (i, k + 11) = some vs1⌝ -∗
+        AxAnnot.annotOwn (GF := GF) (i, k + 9)
+          iprop(⌜RLfact GT i (paZ Pra) (k + 9) (stBytes 8 ra0)⌝) -∗
+        AxAnnot.annotOwn (GF := GF) (i, k + 10)
+          iprop(⌜RLfact GT i (paZ Ps0) (k + 10) (stBytes 8 s00)⌝) -∗
+        AxAnnot.annotOwn (GF := GF) (i, k + 11)
+          iprop(⌜RLfact GT i (paZ Ps1) (k + 11) (stBytes 8 s10)⌝) -∗
+        @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+          ⟨pr, k + 12⟩ Ψ)) -∗
+      @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
+        ⟨.PHart cpu (.pure ()) rs none ib, k + 9⟩ Ψ := by
+  intro HR Hnr_ra Hnr_s0 Hnr_s1 HD Hd1 Hd2 Hd3 Hc0 HPC0 Hhit0 Hsp0 HdaL_ra Hh_ra HdaL_s0 Hh_s0
+    HdaL_s1 Hh_s1 Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hgate Hret HΨend
+  iintro C
+  -- row end at k + 9
+  by_cases E9 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 9
+  · iclear C
+    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+  have HW := holdWrP _ _ _ _ _ _ _ _ _ HR
+  obtain ⟨_, Hsh, _⟩ := HR
+  obtain ⟨lb9, Hlb9, aq9, Hid9⟩ := Hsh 9 (by omega) (by omega) (by omega)
+  unfold slotsDisj disj8 at HD
+  have XR := XxReg L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
+  have XL := XxLd L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
+  have XT := XxRet L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
+  -- the spills, as row labels
+  obtain ⟨lb1, Hlb1, vw1, cls1, rfl, Hlvw1⟩ := Hsh 1 (by omega) (by omega) (by omega)
+  obtain ⟨lb2, Hlb2, vw2, cls2, rfl, Hlvw2⟩ := Hsh 2 (by omega) (by omega) (by omega)
+  obtain ⟨lb3, Hlb3, vw3, cls3, rfl, Hlvw3⟩ := Hsh 3 (by omega) (by omega) (by omega)
+  have Hvw1 : vw1 = stBytes 8 ra0 := by
+    rw [graphData, AxWp.growLookup _ _ _ _ Hlb1] at Hd1
+    exact Option.some.inj Hd1
+  have Hvw2 : vw2 = stBytes 8 s00 := by
+    rw [graphData, AxWp.growLookup _ _ _ _ Hlb2] at Hd2
+    exact Option.some.inj Hd2
+  have Hvw3 : vw3 = stBytes 8 s10 := by
+    rw [graphData, AxWp.growLookup _ _ _ _ Hlb3] at Hd3
+    exact Option.some.inj Hd3
+  subst Hvw1 Hvw2 Hvw3
+  -- ---- 0x1a: sub a0,s1,a0 (k+9) ----
+  iapply (XR _ rs (k + 9) (pch 0x1a) false h1a _ _ (retxRefl cpu rs (k + 9) ib) Hc0 HPC0
+    (hitWSvpn rs (pch 0x1a) (pch 0) (by decide) Hhit0) (htok1a σi T satp0 Htxh)
+    (AxSpinE8.owOkSome 10#5 _ (by decide)) rfFH1a
+    (certSub _ rs (pch 0x1a) false 10#5 9#5 10#5 (by decide)) (by omega))
+  iintro %rs1 %ib1 %HG1
+  have HF1 := stepRegs T satp0 _ rs _ _ _ _ _ rs1 (fun _ => rfl) HG1
+  have HPC1 : rs1 .PC = pch 0x1e := by rw [gbPc T satp0 _ _ _ _ _ _ HG1]; decide
+  have Htl1 : rs1 .tlb = rs .tlb := gbTlb T satp0 _ _ _ _ _ _ HG1
+  -- ---- 0x1e: seqz a0,a0 (k+9) ----
+  have Hc1 := certSltiu (ctrlOkSW T satp0) rs1 (pch 0x1e) false 10#5 10#5 1#12 (by decide)
+  simp only [HF1] at Hc1
+  ax_spin_hd8_zsimp at Hc1
+  iapply (XR _ rs1 (k + 9) (pch 0x1e) false h1e _ _ (retxRefl cpu rs1 (k + 9) ib1)
+    (gbCtrl T satp0 _ _ _ _ _ _ HG1) HPC1
+    (hitWSvpn rs1 (pch 0x1e) (pch 0) (by decide) (hitWAgree rs rs1 _ Htl1 Hhit0))
+    (htok1e σi T satp0 Htxh) (AxSpinE8.owOkSome 10#5 _ (by decide)) rfFH1e Hc1 (by omega))
+  iintro %rs2 %ib2 %HG2
+  have HF2 := stepRegs T satp0 _ rs1 _ _ _ _ _ rs2 HF1 HG2
+  have HPC2 : rs2 .PC = pch 0x22 := by rw [gbPc T satp0 _ _ _ _ _ _ HG2]; decide
+  have Htl2 : rs2 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG2).trans Htl1
+  -- ---- 0x22: c.ldsp ra,24(sp) — RELOAD of ra's spill (k+1), at k+9 ----
+  iapply (XL _ rs2 (k + 9) (pch 0x22) true AxSpinHd8.imm24 2#5 1#5
+    (hsp1 + sign_extend (m := 64) AxSpinHd8.imm24) Pra (k + 1) (stBytes 8 ra0) cls1
+    (retxRefl cpu rs2 (k + 9) ib2) (gbCtrl T satp0 _ _ _ _ _ _ HG2) HPC2
+    (hitWSvpn rs2 (pch 0x22) (pch 0) (by decide) (hitWAgree rs rs2 _ Htl2 Hhit0))
+    (htok22 σi T satp0 Htxh) (by decide) (by rw [HF2]; ax_spin_hd8_zsimp; rw [← Hsp0])
+    HdaL_ra (hitWAgree rs rs2 _ Htl2 Hh_ra) Hpr_ra Hnt_ra Hnr_ra Hlb1 Hlvw1 (by omega) ?_
+    (by omega))
+  · intro k' lb' rl b m ⟨h1, h2⟩ Hl Hid
+    rw [show k' = k + (k' - k) by omega] at Hl
+    obtain ⟨rfl, Hc⟩ := HW (k' - k) lb' rl b m (by omega) Hl Hid
+    rcases Hc with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩
+    · omega
+    · rcases HD 0 1 _ _ (by decide) rfl rfl with h | h <;> omega
+    · rcases HD 0 2 _ _ (by decide) rfl rfl with h | h <;> omega
+    · rcases HD 0 3 _ _ (by decide) rfl rfl with h | h <;> omega
+    · rcases HD 0 4 _ _ (by decide) rfl rfl with h | h <;> omega
+  iintro %vra %rs3 %ib3 %Hlvra %HG3 %Hgv9 H9
+  -- P1 GATE at the ra reload's boundary k + 10: a wrong reloaded value ends the row there
+  by_cases Hv : ¬ vra = stBytes 8 ret
+  · iclear C
+    by_cases Hs : stBytes 8 ret = stBytes 8 ra0
+    · -- `ret`'s bytes are the spill's: the reload CUT refutes the arm (RLfact read back)
+      rw [Hs] at Hv Hgate
+      iapply (AxSpinT2i.cutReloadG L GT nm Hcons i (k + 9) (paZ Pra) (stBytes 8 ra0) vra Ψ
+        ⟨lb9, Hlb9, aq9, Hid9⟩ Hlvw1 Hgv9 Hv Hgate _) $$ H9
+    · have Hend := AxSpinT2i.lenOfGate Hgate Hgv9 Hv
+      iclear H9
+      iapply (HΨend _ (by omega) (by omega) (by omega) _)
+  have Hvra : vra = stBytes 8 ret := Classical.byContradiction Hv
+  -- row end at k + 10
+  by_cases E10 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 9 + 1
+  · iclear C
+    iclear H9
+    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+  have HF3 := stepRegs T satp0 _ rs2 _ _ _ _ _ rs3 HF2 HG3
+  have HPC3 : rs3 .PC = pch 0x24 := by rw [gbPc T satp0 _ _ _ _ _ _ HG3]; decide
+  have Htl3 : rs3 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG3).trans Htl2
+  -- ---- 0x24: c.ldsp s0,16(sp) — RELOAD of s0's spill (k+2), at k+10 ----
+  iapply (XL _ rs3 (k + 10) (pch 0x24) true AxSpinHd8.imm16 2#5 8#5
+    (hsp1 + sign_extend (m := 64) AxSpinHd8.imm16) Ps0 (k + 2) (stBytes 8 s00) cls2
+    (retxRefl cpu rs3 (k + 10) ib3) (gbCtrl T satp0 _ _ _ _ _ _ HG3) HPC3
+    (hitWSvpn rs3 (pch 0x24) (pch 0) (by decide) (hitWAgree rs rs3 _ Htl3 Hhit0))
+    (htok24 σi T satp0 Htxh) (by decide) (by rw [HF3]; ax_spin_hd8_zsimp; rw [← Hsp0])
+    HdaL_s0 (hitWAgree rs rs3 _ Htl3 Hh_s0) Hpr_s0 Hnt_s0 Hnr_s0 Hlb2 Hlvw2 (by omega) ?_
+    (by omega))
+  · intro k' lb' rl b m ⟨h1, h2⟩ Hl Hid
+    rw [show k' = k + (k' - k) by omega] at Hl
+    obtain ⟨rfl, Hc⟩ := HW (k' - k) lb' rl b m (by omega) Hl Hid
+    rcases Hc with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩
+    · omega
+    · omega
+    · rcases HD 1 2 _ _ (by decide) rfl rfl with h | h <;> omega
+    · rcases HD 1 3 _ _ (by decide) rfl rfl with h | h <;> omega
+    · rcases HD 1 4 _ _ (by decide) rfl rfl with h | h <;> omega
+  iintro %vs0 %rs4 %ib4 %Hlvs0 %HG4 %Hgv10 H10
+  -- row end at k + 11
+  by_cases E11 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 10 + 1
+  · iclear C
+    iclear H9
+    iclear H10
+    iapply (HΨend _ (by omega) (by omega) (by omega) _)
+  have HF4 := stepRegs T satp0 _ rs3 _ _ _ _ _ rs4 HF3 HG4
+  have HPC4 : rs4 .PC = pch 0x26 := by rw [gbPc T satp0 _ _ _ _ _ _ HG4]; decide
+  have Htl4 : rs4 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG4).trans Htl3
+  -- ---- 0x26: c.ldsp s1,8(sp) — RELOAD of s1's spill (k+3), at k+11 ----
+  iapply (XL _ rs4 (k + 11) (pch 0x26) true AxSpinHd8.imm8 2#5 9#5
+    (hsp1 + sign_extend (m := 64) AxSpinHd8.imm8) Ps1 (k + 3) (stBytes 8 s10) cls3
+    (retxRefl cpu rs4 (k + 11) ib4) (gbCtrl T satp0 _ _ _ _ _ _ HG4) HPC4
+    (hitWSvpn rs4 (pch 0x26) (pch 0) (by decide) (hitWAgree rs rs4 _ Htl4 Hhit0))
+    (htok26 σi T satp0 Htxh) (by decide) (by rw [HF4]; ax_spin_hd8_zsimp; rw [← Hsp0])
+    HdaL_s1 (hitWAgree rs rs4 _ Htl4 Hh_s1) Hpr_s1 Hnt_s1 Hnr_s1 Hlb3 Hlvw3 (by omega) ?_
+    (by omega))
+  · intro k' lb' rl b m ⟨h1, h2⟩ Hl Hid
+    rw [show k' = k + (k' - k) by omega] at Hl
+    obtain ⟨rfl, Hc⟩ := HW (k' - k) lb' rl b m (by omega) Hl Hid
+    rcases Hc with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩
+    · omega
+    · omega
+    · omega
+    · rcases HD 2 3 _ _ (by decide) rfl rfl with h | h <;> omega
+    · rcases HD 2 4 _ _ (by decide) rfl rfl with h | h <;> omega
+  iintro %vs1 %rs5 %ib5 %Hlvs1 %HG5 %Hgv11 H11
+  -- row end at k + 12: the END CONTINUATION (the caller's designated-cut boundary)
+  by_cases E12 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 11 + 1
+  · icases C with ⟨-, C⟩
+    iapply C $$ %vra %vs0 %vs1 %(.PHart cpu (.pure ()) rs5 none ib5 : Pexv6) [] H9 H10 H11
+    ipureintro
+    exact ⟨by omega, Hlvra, Hlvs0, Hlvs1, Hgv9, Hgv10, Hgv11⟩
+  icases C with ⟨C, -⟩
+  ispecialize C $$ %(show k + 12 < (AxOpsem.grow (gtAdGd GT) i).length by omega)
+  have HF5 := stepRegs T satp0 _ rs4 _ _ _ _ _ rs5 HF4 HG5
+  have HPC5 : rs5 .PC = pch 0x28 := by rw [gbPc T satp0 _ _ _ _ _ _ HG5]; decide
+  have Htl5 : rs5 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG5).trans Htl4
+  -- ---- 0x28: c.addi16sp sp,32 (k+12) ----
+  have Hc5 := certAddi (ctrlOkSW T satp0) rs5 (pch 0x28) true 2#5 2#5 (caddi16spImm 2#6)
+    (by decide)
+  simp only [HF5] at Hc5
+  ax_spin_hd8_zsimp at Hc5
+  iapply (XR _ rs5 (k + 12) (pch 0x28) true h28 _ _ (retxRefl cpu rs5 (k + 12) ib5)
+    (gbCtrl T satp0 _ _ _ _ _ _ HG5) HPC5
+    (hitWSvpn rs5 (pch 0x28) (pch 0) (by decide) (hitWAgree rs rs5 _ Htl5 Hhit0))
+    (htok28 σi T satp0 Htxh) (AxSpinE8.owOkSome 2#5 _ (by decide)) rfFH28 Hc5 (by omega))
+  iintro %rs6 %ib6 %HG6
+  have HF6 := stepRegs T satp0 _ rs5 _ _ _ _ _ rs6 HF5 HG6
+  have HPC6 : rs6 .PC = pch 0x2a := by rw [gbPc T satp0 _ _ _ _ _ _ HG6]; decide
+  have Htl6 : rs6 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG6).trans Htl5
+  -- ---- 0x2a: c.ret (k+12; Q20': no stuck branch, the target is the reloaded ra) ----
+  iapply (XT _ rs6 (k + 12) (pch 0x2a) (retxRefl cpu rs6 (k + 12) ib6)
+    (gbCtrl T satp0 _ _ _ _ _ _ HG6) HPC6
+    (hitWSvpn rs6 (pch 0x2a) (pch 0) (by decide) (hitWAgree rs rs6 _ Htl6 Hhit0))
+    (htok2a σi T satp0 Htxh) rfFH2a (by omega))
+  iintro %rs' %ib' %HGr
+  have HFr := stepRegs0 T satp0 _ rs6 _ _ _ rs' HF6 HGr
+  iapply C $$ %vra %vs0 %vs1 %rs' %ib' [] H9 H10 H11
+  ipureintro
+  refine ⟨gbCtrl T satp0 _ _ _ _ _ _ HGr, ?_, (gbTlb T satp0 _ _ _ _ _ _ HGr).trans Htl6, ?_, ?_,
+    Hlvra, Hlvs0, Hlvs1, ?_, ?_, ?_, ?_, Hgv9, Hgv10, Hgv11⟩
+  · -- PC = ret: the c.ret target is the reloaded ra (`Hvra`, the gate's equal arm)
+    rw [gbPc T satp0 _ _ _ _ _ _ HGr]
+    show jalrTgt 0#12 (gprVal rs6 1#5) = ret
+    rw [HF6]
+    ax_spin_hd8_zsimp
+    rw [Hvra, AxSpinE8.ldResStBytes8, Hret]
+  · -- a0 = seqz (s1 − a0)
+    rw [HFr]
+    ax_spin_hd8_zsimp
+    rfl
+  · -- sp restored
+    rw [HFr]
+    ax_spin_hd8_zsimp
+    rw [Hsp0]
+  · rw [HFr]
+    ax_spin_hd8_zsimp
+  · rw [HFr]
+    ax_spin_hd8_zsimp
+  · rw [HFr]
+    ax_spin_hd8_zsimp
+  · -- every other GPR kept
+    intro r Hr1 Hr2 Hr8 Hr9 Hr10
+    rw [HFr]
+    by_cases E0 : r.toNat = 0
+    · rw [AxSpinE8.updZero _ _ _ _ E0, AxSpinE8.gprValZero rs r E0]
+    · have n1 : r ≠ 1#5 := fun h => Hr1 (by rw [h]; rfl)
+      have n2 : r ≠ 2#5 := fun h => Hr2 (by rw [h]; rfl)
+      have n8 : r ≠ 8#5 := fun h => Hr8 (by rw [h]; rfl)
+      have n9 : r ≠ 9#5 := fun h => Hr9 (by rw [h]; rfl)
+      have n10 : r ≠ 10#5 := fun h => Hr10 (by rw [h]; rfl)
+      simp (disch := assumption) only [AxSpinE8.updOther]
+
+include HL Hcons hmode hasid hppn Hfix Htxh HΨmid in
 /-- (Lean-only, stage 2) THE P-FORM of `holdEpi` on a PREFIX row (`RowHoldingP`; the `Hval` pin
 guarded by `k + 9 < LEN`): a `by_cases` on `LEN ≤ position` at the epilogue's row positions
 `k + 9 .. k + 12`; the ends at `k + 9 .. k + 11` are the WINDOWED, RESOURCE-FREE hook `HΨend`
 (as `AxSpinE8.wpdMycpuP`); the end at `k + 12` (all three reloads done, before c.addi16sp — the
 boundary where the CALLER's panic branch is decided) is the second conjunct of the continuation,
-which RECEIVES the reloads' graph values and their three annotations (not dropped). -/
+which RECEIVES the reloads' graph values and their three annotations (not dropped).
+P1: the corollary of the gated core `AxSpinHd8.holdEpiGr` via `AxSpinT2i.gateOfPinG`. -/
 theorem holdEpiP (k : Nat) (rs : RegFile) (ib : Ibch) (ret : BitVec 64) (plk pcl : Int)
     (Pra Ps0 Ps1 Pram Ps0m : BitVec 64) (hsp1 ra0 s00 s10 : BitVec 64) :
     -- the row
@@ -452,188 +738,16 @@ theorem holdEpiP (k : Nat) (rs : RegFile) (ib : Ibch) (ret : BitVec 64) (plk pcl
   intro HR Hnr_ra Hnr_s0 Hnr_s1 HD Hd1 Hd2 Hd3 Hc0 HPC0 Hhit0 Hsp0 HdaL_ra Hh_ra HdaL_s0 Hh_s0
     HdaL_s1 Hh_s1 Hpr_ra Hnt_ra Hpr_s0 Hnt_s0 Hpr_s1 Hnt_s1 Hval Hret HΨend
   iintro C
-  -- row end at k + 9
-  by_cases E9 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 9
-  · iclear C
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
-  have HW := holdWrP _ _ _ _ _ _ _ _ _ HR
-  obtain ⟨_, Hsh, _⟩ := HR
-  unfold slotsDisj disj8 at HD
-  have XR := XxReg L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
-  have XL := XxLd L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
-  have XT := XxRet L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Ψ HΨmid
-  -- the spills, as row labels
-  obtain ⟨lb1, Hlb1, vw1, cls1, rfl, Hlvw1⟩ := Hsh 1 (by omega) (by omega) (by omega)
-  obtain ⟨lb2, Hlb2, vw2, cls2, rfl, Hlvw2⟩ := Hsh 2 (by omega) (by omega) (by omega)
-  obtain ⟨lb3, Hlb3, vw3, cls3, rfl, Hlvw3⟩ := Hsh 3 (by omega) (by omega) (by omega)
-  have Hvw1 : vw1 = stBytes 8 ra0 := by
-    rw [graphData, AxWp.growLookup _ _ _ _ Hlb1] at Hd1
-    exact Option.some.inj Hd1
-  have Hvw2 : vw2 = stBytes 8 s00 := by
-    rw [graphData, AxWp.growLookup _ _ _ _ Hlb2] at Hd2
-    exact Option.some.inj Hd2
-  have Hvw3 : vw3 = stBytes 8 s10 := by
-    rw [graphData, AxWp.growLookup _ _ _ _ Hlb3] at Hd3
-    exact Option.some.inj Hd3
-  subst Hvw1 Hvw2 Hvw3
-  -- ---- 0x1a: sub a0,s1,a0 (k+9) ----
-  iapply (XR _ rs (k + 9) (pch 0x1a) false h1a _ _ (retxRefl cpu rs (k + 9) ib) Hc0 HPC0
-    (hitWSvpn rs (pch 0x1a) (pch 0) (by decide) Hhit0) (htok1a σi T satp0 Htxh)
-    (AxSpinE8.owOkSome 10#5 _ (by decide)) rfFH1a
-    (certSub _ rs (pch 0x1a) false 10#5 9#5 10#5 (by decide)) (by omega))
-  iintro %rs1 %ib1 %HG1
-  have HF1 := stepRegs T satp0 _ rs _ _ _ _ _ rs1 (fun _ => rfl) HG1
-  have HPC1 : rs1 .PC = pch 0x1e := by rw [gbPc T satp0 _ _ _ _ _ _ HG1]; decide
-  have Htl1 : rs1 .tlb = rs .tlb := gbTlb T satp0 _ _ _ _ _ _ HG1
-  -- ---- 0x1e: seqz a0,a0 (k+9) ----
-  have Hc1 := certSltiu (ctrlOkSW T satp0) rs1 (pch 0x1e) false 10#5 10#5 1#12 (by decide)
-  simp only [HF1] at Hc1
-  ax_spin_hd8_zsimp at Hc1
-  iapply (XR _ rs1 (k + 9) (pch 0x1e) false h1e _ _ (retxRefl cpu rs1 (k + 9) ib1)
-    (gbCtrl T satp0 _ _ _ _ _ _ HG1) HPC1
-    (hitWSvpn rs1 (pch 0x1e) (pch 0) (by decide) (hitWAgree rs rs1 _ Htl1 Hhit0))
-    (htok1e σi T satp0 Htxh) (AxSpinE8.owOkSome 10#5 _ (by decide)) rfFH1e Hc1 (by omega))
-  iintro %rs2 %ib2 %HG2
-  have HF2 := stepRegs T satp0 _ rs1 _ _ _ _ _ rs2 HF1 HG2
-  have HPC2 : rs2 .PC = pch 0x22 := by rw [gbPc T satp0 _ _ _ _ _ _ HG2]; decide
-  have Htl2 : rs2 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG2).trans Htl1
-  -- ---- 0x22: c.ldsp ra,24(sp) — RELOAD of ra's spill (k+1), at k+9 ----
-  iapply (XL _ rs2 (k + 9) (pch 0x22) true AxSpinHd8.imm24 2#5 1#5
-    (hsp1 + sign_extend (m := 64) AxSpinHd8.imm24) Pra (k + 1) (stBytes 8 ra0) cls1
-    (retxRefl cpu rs2 (k + 9) ib2) (gbCtrl T satp0 _ _ _ _ _ _ HG2) HPC2
-    (hitWSvpn rs2 (pch 0x22) (pch 0) (by decide) (hitWAgree rs rs2 _ Htl2 Hhit0))
-    (htok22 σi T satp0 Htxh) (by decide) (by rw [HF2]; ax_spin_hd8_zsimp; rw [← Hsp0])
-    HdaL_ra (hitWAgree rs rs2 _ Htl2 Hh_ra) Hpr_ra Hnt_ra Hnr_ra Hlb1 Hlvw1 (by omega) ?_
-    (by omega))
-  · intro k' lb' rl b m ⟨h1, h2⟩ Hl Hid
-    rw [show k' = k + (k' - k) by omega] at Hl
-    obtain ⟨rfl, Hc⟩ := HW (k' - k) lb' rl b m (by omega) Hl Hid
-    rcases Hc with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩
-    · omega
-    · rcases HD 0 1 _ _ (by decide) rfl rfl with h | h <;> omega
-    · rcases HD 0 2 _ _ (by decide) rfl rfl with h | h <;> omega
-    · rcases HD 0 3 _ _ (by decide) rfl rfl with h | h <;> omega
-    · rcases HD 0 4 _ _ (by decide) rfl rfl with h | h <;> omega
-  iintro %vra %rs3 %ib3 %Hlvra %HG3 %Hgv9 H9
-  -- row end at k + 10
-  by_cases E10 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 9 + 1
-  · iclear C
-    iclear H9
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
-  have HF3 := stepRegs T satp0 _ rs2 _ _ _ _ _ rs3 HF2 HG3
-  have HPC3 : rs3 .PC = pch 0x24 := by rw [gbPc T satp0 _ _ _ _ _ _ HG3]; decide
-  have Htl3 : rs3 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG3).trans Htl2
-  -- ---- 0x24: c.ldsp s0,16(sp) — RELOAD of s0's spill (k+2), at k+10 ----
-  iapply (XL _ rs3 (k + 10) (pch 0x24) true AxSpinHd8.imm16 2#5 8#5
-    (hsp1 + sign_extend (m := 64) AxSpinHd8.imm16) Ps0 (k + 2) (stBytes 8 s00) cls2
-    (retxRefl cpu rs3 (k + 10) ib3) (gbCtrl T satp0 _ _ _ _ _ _ HG3) HPC3
-    (hitWSvpn rs3 (pch 0x24) (pch 0) (by decide) (hitWAgree rs rs3 _ Htl3 Hhit0))
-    (htok24 σi T satp0 Htxh) (by decide) (by rw [HF3]; ax_spin_hd8_zsimp; rw [← Hsp0])
-    HdaL_s0 (hitWAgree rs rs3 _ Htl3 Hh_s0) Hpr_s0 Hnt_s0 Hnr_s0 Hlb2 Hlvw2 (by omega) ?_
-    (by omega))
-  · intro k' lb' rl b m ⟨h1, h2⟩ Hl Hid
-    rw [show k' = k + (k' - k) by omega] at Hl
-    obtain ⟨rfl, Hc⟩ := HW (k' - k) lb' rl b m (by omega) Hl Hid
-    rcases Hc with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩
-    · omega
-    · omega
-    · rcases HD 1 2 _ _ (by decide) rfl rfl with h | h <;> omega
-    · rcases HD 1 3 _ _ (by decide) rfl rfl with h | h <;> omega
-    · rcases HD 1 4 _ _ (by decide) rfl rfl with h | h <;> omega
-  iintro %vs0 %rs4 %ib4 %Hlvs0 %HG4 %Hgv10 H10
-  -- row end at k + 11
-  by_cases E11 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 10 + 1
-  · iclear C
-    iclear H9
-    iclear H10
-    iapply (HΨend _ (by omega) (by omega) (by omega) _)
-  have HF4 := stepRegs T satp0 _ rs3 _ _ _ _ _ rs4 HF3 HG4
-  have HPC4 : rs4 .PC = pch 0x26 := by rw [gbPc T satp0 _ _ _ _ _ _ HG4]; decide
-  have Htl4 : rs4 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG4).trans Htl3
-  -- ---- 0x26: c.ldsp s1,8(sp) — RELOAD of s1's spill (k+3), at k+11 ----
-  iapply (XL _ rs4 (k + 11) (pch 0x26) true AxSpinHd8.imm8 2#5 9#5
-    (hsp1 + sign_extend (m := 64) AxSpinHd8.imm8) Ps1 (k + 3) (stBytes 8 s10) cls3
-    (retxRefl cpu rs4 (k + 11) ib4) (gbCtrl T satp0 _ _ _ _ _ _ HG4) HPC4
-    (hitWSvpn rs4 (pch 0x26) (pch 0) (by decide) (hitWAgree rs rs4 _ Htl4 Hhit0))
-    (htok26 σi T satp0 Htxh) (by decide) (by rw [HF4]; ax_spin_hd8_zsimp; rw [← Hsp0])
-    HdaL_s1 (hitWAgree rs rs4 _ Htl4 Hh_s1) Hpr_s1 Hnt_s1 Hnr_s1 Hlb3 Hlvw3 (by omega) ?_
-    (by omega))
-  · intro k' lb' rl b m ⟨h1, h2⟩ Hl Hid
-    rw [show k' = k + (k' - k) by omega] at Hl
-    obtain ⟨rfl, Hc⟩ := HW (k' - k) lb' rl b m (by omega) Hl Hid
-    rcases Hc with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩
-    · omega
-    · omega
-    · omega
-    · rcases HD 2 3 _ _ (by decide) rfl rfl with h | h <;> omega
-    · rcases HD 2 4 _ _ (by decide) rfl rfl with h | h <;> omega
-  iintro %vs1 %rs5 %ib5 %Hlvs1 %HG5 %Hgv11 H11
-  -- row end at k + 12: the END CONTINUATION (the caller's designated-cut boundary)
-  by_cases E12 : (AxOpsem.grow (gtAdGd GT) i).length ≤ k + 11 + 1
+  iapply (AxSpinHd8.holdEpiGr L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu Hfix Htxh Ψ HΨmid
+    k rs ib ret plk pcl Pra Ps0 Ps1 Pram Ps0m hsp1 ra0 s00 s10 HR Hnr_ra Hnr_s0 Hnr_s1 HD Hd1 Hd2
+    Hd3 Hc0 HPC0 Hhit0 Hsp0 HdaL_ra Hh_ra HdaL_s0 Hh_s0 HdaL_s1 Hh_s1 Hpr_ra Hnt_ra Hpr_s0 Hnt_s0
+    Hpr_s1 Hnt_s1 (AxSpinT2i.gateOfPinG Hval) Hret HΨend)
+  isplit
+  · icases C with ⟨C, -⟩
+    iintro %-
+    iexact C
   · icases C with ⟨-, C⟩
-    iapply C $$ %vra %vs0 %vs1 %(.PHart cpu (.pure ()) rs5 none ib5 : Pexv6) [] H9 H10 H11
-    ipureintro
-    exact ⟨by omega, Hlvra, Hlvs0, Hlvs1, Hgv9, Hgv10, Hgv11⟩
-  icases C with ⟨C, -⟩
-  have HF5 := stepRegs T satp0 _ rs4 _ _ _ _ _ rs5 HF4 HG5
-  have HPC5 : rs5 .PC = pch 0x28 := by rw [gbPc T satp0 _ _ _ _ _ _ HG5]; decide
-  have Htl5 : rs5 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG5).trans Htl4
-  -- ---- 0x28: c.addi16sp sp,32 (k+12) ----
-  have Hc5 := certAddi (ctrlOkSW T satp0) rs5 (pch 0x28) true 2#5 2#5 (caddi16spImm 2#6)
-    (by decide)
-  simp only [HF5] at Hc5
-  ax_spin_hd8_zsimp at Hc5
-  iapply (XR _ rs5 (k + 12) (pch 0x28) true h28 _ _ (retxRefl cpu rs5 (k + 12) ib5)
-    (gbCtrl T satp0 _ _ _ _ _ _ HG5) HPC5
-    (hitWSvpn rs5 (pch 0x28) (pch 0) (by decide) (hitWAgree rs rs5 _ Htl5 Hhit0))
-    (htok28 σi T satp0 Htxh) (AxSpinE8.owOkSome 2#5 _ (by decide)) rfFH28 Hc5 (by omega))
-  iintro %rs6 %ib6 %HG6
-  have HF6 := stepRegs T satp0 _ rs5 _ _ _ _ _ rs6 HF5 HG6
-  have HPC6 : rs6 .PC = pch 0x2a := by rw [gbPc T satp0 _ _ _ _ _ _ HG6]; decide
-  have Htl6 : rs6 .tlb = rs .tlb := (gbTlb T satp0 _ _ _ _ _ _ HG6).trans Htl5
-  -- ---- 0x2a: c.ret (k+12; Q20': no stuck branch, the target is the reloaded ra) ----
-  iapply (XT _ rs6 (k + 12) (pch 0x2a) (retxRefl cpu rs6 (k + 12) ib6)
-    (gbCtrl T satp0 _ _ _ _ _ _ HG6) HPC6
-    (hitWSvpn rs6 (pch 0x2a) (pch 0) (by decide) (hitWAgree rs rs6 _ Htl6 Hhit0))
-    (htok2a σi T satp0 Htxh) rfFH2a (by omega))
-  iintro %rs' %ib' %HGr
-  have HFr := stepRegs0 T satp0 _ rs6 _ _ _ rs' HF6 HGr
-  have Hvra : vra = stBytes 8 ret := Option.some.inj (Hgv9.symm.trans (Hval (by omega)))
-  iapply C $$ %vra %vs0 %vs1 %rs' %ib' [] H9 H10 H11
-  ipureintro
-  refine ⟨gbCtrl T satp0 _ _ _ _ _ _ HGr, ?_, (gbTlb T satp0 _ _ _ _ _ _ HGr).trans Htl6, ?_, ?_,
-    Hlvra, Hlvs0, Hlvs1, ?_, ?_, ?_, ?_, Hgv9, Hgv10, Hgv11⟩
-  · -- PC = ret: the c.ret target is the reloaded ra, pinned by `Hval`
-    rw [gbPc T satp0 _ _ _ _ _ _ HGr]
-    show jalrTgt 0#12 (gprVal rs6 1#5) = ret
-    rw [HF6]
-    ax_spin_hd8_zsimp
-    rw [Hvra, AxSpinE8.ldResStBytes8, Hret]
-  · -- a0 = seqz (s1 − a0)
-    rw [HFr]
-    ax_spin_hd8_zsimp
-    rfl
-  · -- sp restored
-    rw [HFr]
-    ax_spin_hd8_zsimp
-    rw [Hsp0]
-  · rw [HFr]
-    ax_spin_hd8_zsimp
-  · rw [HFr]
-    ax_spin_hd8_zsimp
-  · rw [HFr]
-    ax_spin_hd8_zsimp
-  · -- every other GPR kept
-    intro r Hr1 Hr2 Hr8 Hr9 Hr10
-    rw [HFr]
-    by_cases E0 : r.toNat = 0
-    · rw [AxSpinE8.updZero _ _ _ _ E0, AxSpinE8.gprValZero rs r E0]
-    · have n1 : r ≠ 1#5 := fun h => Hr1 (by rw [h]; rfl)
-      have n2 : r ≠ 2#5 := fun h => Hr2 (by rw [h]; rfl)
-      have n8 : r ≠ 8#5 := fun h => Hr8 (by rw [h]; rfl)
-      have n9 : r ≠ 9#5 := fun h => Hr9 (by rw [h]; rfl)
-      have n10 : r ≠ 10#5 := fun h => Hr10 (by rw [h]; rfl)
-      simp (disch := assumption) only [AxSpinE8.updOther]
+    iexact C
 
 
 include HL Hcons hmode hasid hppn Hfix Htxh HΨmid in

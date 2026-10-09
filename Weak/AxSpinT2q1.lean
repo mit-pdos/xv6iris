@@ -14,8 +14,8 @@ Lean-only (no Rocq source).
 
 §1 THE STAGE-2 PREMISES of (a′), at every emission `E` (`q = AxSpinT2c1.q0`, h ∈ {0, 1, 2}):
   `preG : allocPre (grow (gtAdGd (gT3 E)) h) q0 h (sZ h) (pEx h)` — stage 1's FULL rows are in the
-    prefix family (`preOfFullPins` on `AxSpinT2c1.fullG` / `pinsG`: the five gates are passed,
-    read off stage 1's pins);
+    prefix family (`preOfFullPins` on `AxSpinT2c1.fullG` / `pinsG`: the five panic / `intr_on`
+    gates, push_off's branch bit and the 18 reload gates are passed, read off stage 1's pins);
   `pins2G : AllocPins2 (gtAdGd (gT3 E)) h q0` (`pins2OfPins` on `pinsG`);
   `imgNoffG : HimgNoff (gtAdGd (gT3 E)).gdG.gxImg 0 1` (`cpus[].noff = 0` in the graph image,
     `AxSpinT2p1.himgNoff`);
@@ -76,11 +76,11 @@ section prem
 variable (E : List (List Eitem)) (h : Agent) (hh : h < 3)
 include hh
 
-/-- **`allocPre`**: (a′)'s full rows are in the prefix family (all five gates passed). -/
+/-- **`allocPre`**: (a′)'s full rows are in the prefix family (all gates passed). -/
 theorem preG : allocPre (AxOpsem.grow (gtAdGd (gT3 E)) h) q0 h (sZ h) (AxSpinT2a.pEx h) :=
   preOfFullPins (fullG E h hh) (pinsG E h hh)
 
-/-- **`AllocPins2`**: the guarded pins, from stage 1's. -/
+/-- **`AllocPins2`**: the kept pins (Q18b, `ppArm`, the interim `rlEnd`), from stage 1's. -/
 theorem pins2G : AllocPins2 (gtAdGd (gT3 E)) h q0 := pins2OfPins (pinsG E h hh)
 
 end prem

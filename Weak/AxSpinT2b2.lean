@@ -11,7 +11,7 @@ The stage-1 capstones `allocpidOpen` / `allocpid2Distinct` (AxSpinT2b) are untou
 **`allocpidOpen2`** (Theorem 2, stage 2, OPEN THIRD HART).  Harts A and B run the inlined allocpid
 segment from `allocproc + 0x38` (`entryOk`) on rows of the PREFIX family `allocPre` (AxSpinT2f: a
 row may stop anywhere — inside the spin loop, the scan, at a designated cut — as long as a row that
-continues past a gate took the normal arm), with the GUARDED pins `AllocPins2`; hart C is ARBITRARY,
+continues past a gate — panic or reload — took the normal arm), with the pins `AllocPins2`; hart C is ARBITRARY,
 constrained ONLY by the iProp premise `HwpC`.  Conclusion, with `GD = gtAdGd GT`:
 ```
   (∀ i, i ∈ [A, B] → ¬ t2Cut GD i (Sf i) (pf i)) ∧                                  -- NO PANIC
@@ -25,8 +25,12 @@ gate read took the OFF arm: `aq` (acquire's holding, long arm, `lk->cpu` = this 
 `rlS` (release's holding reads `lk->locked` = 0 ⇒ panic), `rlL` (release's holding reads
 `lk->cpu` ≠ this cpu ⇒ panic), `ppN` (pop_off's `noff < 1` ⇒ panic) — these four are
 `entersPanic` — and `ppI` (pop_off's `intena ≠ 0` on the `c = false` arm ⇒ `intr_on`, an off-path
-exit from the SIE = 0 regime, not a panic).  `¬ t2Cut` therefore says: neither A nor B enters
-`panic()` (nor `intr_on`) on any covered execution.
+exit from the SIE = 0 regime, not a panic) — OR (P1, owner ruling 2026-10-08) that ends right after
+one of the 18 RELOADS (`T2Rj`: the return-address and `s1` reloads) having read a value other than
+its spill (`reloadMis`).  `cutIff : t2Cut ↔ entersPanic ∨ intrOnCut ∨ reloadMis`.  `¬ t2Cut`
+therefore says: neither A nor B enters `panic()` (nor `intr_on`), and NO RELOAD of A or B reads
+anything but its spill (no diverted `c.ret`, no wrong lock address), on any covered execution —
+the reload part currently via the INTERIM premise `AllocPins2.rlEnd` (see PINS KEPT).
 
 **`allocpid2Distinct2`** (Theorem 1) — the corollary with C's row EMPTY (owner ruling Q-T2-11):
 C is a phantom agent of the layout with `grow C = []`, empty run, `HwpC` by `AxSpinT2b.wpdEmpty`.
@@ -44,7 +48,7 @@ rows (`LEN = t2Len q`) the stage-1 facts; `AxSpinT2a.fragNe` (issued-fragment ex
 position-independent) gives `wA ≠ wB` when both are complete.  Bridges to the design's
 q-free statement: `AxSpinApB.notCutOfAt` (`¬ t2CutAt row q` ⇒ `¬ t2Cut`, via `cutDet`) and
 `AxSpinT2b2.qDet` (a complete row of the family fixes the parameters: `t2Complete` ⇒
-`LEN = t2Len qA`, via AxSpinT2f's `bDet`/`hbDet`/`nDet`/`cDet`).
+`LEN = t2Len qA`, via `AxSpinT2f.qEqFull`: `bDet`/`hbDet`/`nDet`/`cDet`).
 
 ## What changed vs stage 1
 
@@ -68,56 +72,42 @@ Everything else (`HconsT`, `Hcl`, `Hharts`, `HLay`, `HalA/B`, `Hn0`, `Himgn`, th
 premises, `HfixA/B`, translation, `HmapA/B`, `HentA/B`, `HkC`, `Hrun`, `Hend`, `HfinA/B`, `HwpC`)
 is verbatim stage 1.
 
-PINS REMOVED (no longer premises; on the normal arm they follow from `allocPre`'s gate conjunct,
+PINS REMOVED (no longer premises; on the normal arm they follow from `allocPre`'s gate conjuncts,
 at a cut they are refuted by D4 readback in AxSpinT2h's arms `cutAq`/`cutRelS`/`cutRelL`/
 `cutPpNF`/`cutPpIF`):
 `hdArm` (acquire's holding long arm), `rhArm` and `rhCpu` (release's holding `lk->cpu` read = this
 cpu), `ppGe` (`noff ≥ 1`), `ppInt` (intena = 0 on the `c = false` arm), and `allocFull`'s
 conjunct `lkBranch row (t2KRh q) true` (release's holding lock bit, now the `rlS` gate).
+P1 (owner ruling 2026-10-08) ALSO REMOVED — the 18 positional RELOAD pins of the former
+`AllocPins2` (Option V return-address reloads `poMy1 poMy2 poMy3 poRet hdRets(2) aqMy aqRet
+rhRets(2) ppMy ppRet rlRet` and `s1` reloads `poS1 hdS1 aqS1 rhS1 rlS1`): a row that CONTINUES
+past a reload read its spill by `allocPre`'s reload-gate conjunct (`∀ x, rlPos x q < LEN →
+rlGateOk x row q`, AxSpinT2f §2–3); and the selector `poArm` (now `allocPre`'s `poBranch`,
+`AxSpinT2f.poArmOf`).
 
-PINS KEPT — `AllocPins2 GD i q` (AxSpinT2f §5), VERBATIM (positional pins guarded by their
-position, so the family is not empty below them):
+PINS KEPT — `AllocPins2 GD i q` (AxSpinT2f §5), VERBATIM:
 ```
-  poMy1 : t2KPo + 5 < LEN → graphValue GD (i, t2KPo + 5) = some (stBytes 8 (AxSpinPO.ppo 0x14))
-  poArm : ∀ vn, graphValue GD (i, t2KPo + 7) = some vn → (ldRes false 4 vn == zero_reg) = q.b
-  poMy2 : q.b = true → t2KPo + 10 < LEN →
-    graphValue GD (i, t2KPo + 10) = some (stBytes 8 (AxSpinPO.ppo 0x30))
-  poMy3 : t2KPoT q + 2 < LEN → graphValue GD (i, t2KPoT q + 2) = some (stBytes 8 (AxSpinPO.ppo 0x1c))
-  poRet : t2KPoT q + 6 < LEN → graphValue GD (i, t2KPoT q + 6) = some (stBytes 8 (AxSpinHdB.pac 0x10))
-  hdRets : q.hb = true →
-    (t2KHd q + 7 < LEN → graphValue GD (i, t2KHd q + 7) = some (stBytes 8 (pch 0x1a))) ∧
-    (t2KHd q + 9 < LEN → graphValue GD (i, t2KHd q + 9) = some (stBytes 8 (AxSpinHdB.pac 0x16)))
-  aqMy : t2KMy q + 2 < LEN → graphValue GD (i, t2KMy q + 2) = some (stBytes 8 (AxSpinHdB.pac 0x28))
-  aqRet : t2KMy q + 5 < LEN → graphValue GD (i, t2KMy q + 5) = some (stBytes 8 (pca 0x44))
   npNowrap : ∀ vs, graphValue GD (i, t2KBd q) = some vs →
     (wordOfBytes 4 vs : BitVec 32) ≠ 1000#32 ∧ (wordOfBytes 4 vs : BitVec 32).toNat + 1 < 2 ^ 32
   npNcoll : ∀ vs, graphValue GD (i, t2KBd q) = some vs → ∀ j, j < 64 → ∀ v,
     graphValue GD (i, t2KBd q + 1 + j) = some v → (wordOfBytes 4 v : BitVec 32) ≠ wordOfBytes 4 vs
-  rhRets : (t2KRh q + 7 < LEN → graphValue GD (i, t2KRh q + 7) = some (stBytes 8 (pch 0x1a))) ∧
-    (t2KRh q + 9 < LEN → graphValue GD (i, t2KRh q + 9) = some (stBytes 8 (AxSpinHdB.prl 0x10)))
-  ppMy : t2KPp q + 4 < LEN → graphValue GD (i, t2KPp q + 4) = some (stBytes 8 (ppp 0x0c))
   ppArm : ∀ vn, graphValue GD (i, t2KPp q + 6) = some vn →
     (addiwm1 (ldRes false 4 vn) != zero_reg) = q.c
-  ppRet : t2KPp q + 8 + (if q.c then 0 else 1) < LEN →
-    graphValue GD (i, t2KPp q + 8 + (if q.c then 0 else 1)) = some (stBytes 8 (AxSpinHdB.prl 0x22))
-  rlRet : t2KRr q < LEN → graphValue GD (i, t2KRr q) = some (stBytes 8 (pca 0x98))
-  poS1 : t2KPoT q + 8 < LEN →
-    graphValue GD (i, t2KPoT q + 8) = some (stBytes 8 (BitVec.ofNat 64 KernelSyms.«pid_lock»))
-  hdS1 : q.hb = true → t2KHd q + 11 < LEN →
-    graphValue GD (i, t2KHd q + 11) = some (stBytes 8 (BitVec.ofNat 64 KernelSyms.«pid_lock»))
-  aqS1 : t2KMy q + 7 < LEN → graphValue GD (i, t2KMy q + 7) = graphData GD (i, 2)
-  rhS1 : t2KRh q + 11 < LEN →
-    graphValue GD (i, t2KRh q + 11) = some (stBytes 8 (BitVec.ofNat 64 KernelSyms.«pid_lock»))
-  rlS1 : t2KRr q + 2 < LEN → graphValue GD (i, t2KRr q + 2) = graphData GD (i, t2KRl q + 2)
+  rlEnd : ∀ x, (AxOpsem.grow GD i).length = rlPos x q → rlGateOk x (AxOpsem.grow GD i) q
 ```
-(`LEN = (grow GD i).length`.)  Classification: Q18b scope pins `npNowrap`, `npNcoll`; Option V
-return-address reloads `poMy1 poMy2 poMy3 poRet hdRets aqMy aqRet rhRets ppMy ppRet rlRet` and `s1`
-reloads `poS1 hdS1 aqS1 rhS1 rlS1` (a WPd cannot branch on a reload's `RLfact` annotation mid-row,
-and a diverted `c.ret` into image text is not stuck under Stage C, Q20'; their discharge is the
-row-integrity lane, Q-S2-4); the selectors `poArm`, `ppArm` (choose `q.b`, `q.c`).  The value
-conditions inside `allocPre` (`t2CpuVals`, `t2RelVals`, `spinRmwP`'s data, `lkBranch (t2KHd q)
-q.hb`, `spinValsP`, the body's read identities) are stage 1's, restricted to present positions:
-code-fixed store data and path selectors (AxSpinT2b header, verbatim there).
+(`LEN = (grow GD i).length`.)  Classification: Q18b scope pins `npNowrap`, `npNcoll`; the selector
+`ppArm` (chooses `q.c`); and the INTERIM row-end premise `rlEnd` — "a row that ENDS right after a
+reload read the spill there" (vacuous unless `LEN = rlPos x q = kr + 1`).  HONEST STATUS of the
+reload reading: the leaf P-forms (AxSpinE8, PO4, HdA/Hd9, Aq2, PO6, Rl4b) still take guarded pins
+`kr < LEN → graphValue (i, kr) = vw`; ApB supplies them from `allocPre`'s gate (`kr + 1 < LEN`)
+and `rlEnd` (`kr + 1 = LEN`) through `AxSpinT2f.pinOf`.  So today `¬ reloadMis` (the reload part
+of conjunct 1) is a consequence of `rlEnd`, not proved by readback; when the leaf lanes take
+`AxSpinT2i.Gate` (from `allocPre` alone, `AxSpinT2f.gateBody`) the row end `kr + 1` is REFUTED by
+`cutReload` and `rlEnd` is deleted.  The gain already in: 18 positional pins (constraining every
+present reload) → one premise at the single possible row end.  The value conditions inside
+`allocPre` (`t2CpuVals`, `t2RelVals`, `spinRmwP`'s data, `lkBranch (t2KHd q) q.hb`,
+`spinValsP`, the body's read identities, `poBranch`) are stage 1's, restricted to present
+positions: code-fixed store data and path selectors (AxSpinT2b header, verbatim there).
 
 ## Prefix closure (informal, Q-S2-6)
 
@@ -163,8 +153,8 @@ IMAGE NOTE (stage 1's): `σi` must be a text + page-table image (as `AxSpinTextC
 **Reused** (by name): `tierAAdequacyAnnGateJointT` (AxSpinJ), `xv6Init`/`xv6HobAlloc`/`xv6Hok`/
 `xv6AxpolWf`/`protXv6`/`clb`/`npb` (AxSpinX), `AxSpinX7.xv6GF`, `xlayXv6`/`xlayXv6Ok`/`T2LayHyp`/
 `entryOk`/`entryK0`/`t2Complete`/`pidOf`/`AxSpinT2a.fragNe`/`AxSpinT2a.hartLt` (AxSpinT2a),
-`allocPre`/`AllocPins2`/`HimgNoff`/`t2Cut`/`t2CutAt`/`AxSpinT2f.coreOfPre`/`coreOfFull`/`bDet`/
-`hbDet`/`nDet`/`cDet`/`kEqs` (AxSpinT2f), `AxSpinT2g.writerLt`,
+`allocPre`/`AllocPins2`/`HimgNoff`/`t2Cut`/`t2CutAt`/`AxSpinT2f.coreOfPre`/`qEqFull`
+(AxSpinT2f), `AxSpinT2g.writerLt`,
 `AxSpinApB.wpdAllocpidSeg2E`/`hypXv6P`/`t2PostP`/`notCutOfAt`, `AxSpinT2b.initCs`/`distinct`/
 `mem3`/`pidNe`/`over`/`overSelf`/`overNe`/`wpdEmpty`, `AxSpinJ2.bigSepLTriple`,
 `AxSpinWit.tierAWpdMono`, `catTAd`, `nsteps_O`.
@@ -186,32 +176,8 @@ open LeanRV64D LeanRV64D.Functions
 /-- A COMPLETE row of the family fixes its parameters: a prefix-family row for `q` that is a
 full row for `q'` has `q = q'` (push_off's arm, holding's lock bit, the spins, pop_off's arm). -/
 theorem AxSpinT2b2.qDet {row : List Lbl} {q q' : T2Prm} {i : Agent} {S p : Int}
-    (H : allocPre row q i S p) (HF : allocFull row q' i S p) : q = q' := by
-  have C := AxSpinT2f.coreOfPre H
-  have C' := AxSpinT2f.coreOfFull HF
-  have hl : row.length = t2Len q' := HF.2.1
-  have hb := by
-    obtain ⟨k1, k2, k3, k4, k5, k6, k7, k8, k9⟩ := AxSpinT2f.kEqs q'
-    exact AxSpinT2f.bDet C C' (by omega)
-  obtain ⟨b, hb0, n, c⟩ := q
-  obtain ⟨b', hb', n', c'⟩ := q'
-  simp only at hb
-  subst hb
-  obtain ⟨k1, k2, k3, k4, k5, k6, k7, k8, k9⟩ := AxSpinT2f.kEqs ⟨b, hb', n', c'⟩
-  dsimp only at k1 k2 k3 k4 k5 k6 k7 k8 k9
-  have e1 : t2KHd ⟨b, hb0, n, c⟩ = t2KHd ⟨b, hb', n', c'⟩ := rfl
-  have hhb := AxSpinT2f.hbDet C C' (by omega)
-  subst hhb
-  have hn := AxSpinT2f.nDet C C' (by omega)
-  subst hn
-  have e2 : t2KPp ⟨b, hb0, n, c⟩ = t2KPp ⟨b, hb0, n, c'⟩ := rfl
-  cases c' with
-  | false =>
-    rw [AxSpinT2f.cDet C C' (by omega)]
-  | true =>
-    cases c with
-    | true => rfl
-    | false => exact absurd (AxSpinT2f.cDet C' C (by omega)) (by decide)
+    (H : allocPre row q i S p) (HF : allocFull row q' i S p) : q = q' :=
+  AxSpinT2f.qEqFull (AxSpinT2f.coreOfPre H) HF
 
 /-- `t2Complete` of a family row is `LEN = t2Len q` for the row's own parameters. -/
 theorem AxSpinT2b2.lenOfComplete {GD : Gdexec} {i : Agent} {q : T2Prm} {S p : Int}
@@ -319,7 +285,8 @@ set_option maxHeartbeats 1600000 in
 /-- **THEOREM 2 (`allocpidOpen2`, stage 2: no panic by D4 readback on prefix rows).**  Harts A, B
 run the inlined allocpid of xv6's `allocproc` on rows of the PREFIX family, hart C is an
 ARBITRARY program verified against the joint protocol (`HwpC`, the only iProp premise).  Then
-neither A nor B ends at a taken panic / `intr_on` arm (`¬ t2Cut`), complete rows' nextpid reads
+neither A nor B ends at a taken panic / `intr_on` arm or right after a misread reload
+(`¬ t2Cut`; the reload part via the interim `AllocPins2.rlEnd`), complete rows' nextpid reads
 are sourced by the gmo-latest nextpid write before their claim, and if both rows are complete
 the stored pids are distinct.  Premises glossed one per line; the kept pins are verbatim in the
 file header. -/
@@ -358,11 +325,12 @@ theorem allocpidOpen2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int) (pt
     (hppn : BitVec.setWidth 44 (satp_to_ppn satp0) = T.base)
     -- TRANSLATION: `T` maps A's / B's data ranges VA = PA (load / store / AMO)
     (HmapA : AxSpinApA.MapOk σi T A (Sf A) (pf A)) (HmapB : AxSpinApA.MapOk σi T B (Sf B) (pf B))
-    -- ROWS (NEW): A's / B's rows are in the PREFIX family (may stop anywhere; past a gate only
-    -- on the normal arm)
+    -- ROWS (NEW): A's / B's rows are in the PREFIX family (may stop anywhere; past a gate —
+    -- panic or reload — only on the normal arm)
     (HpreA : allocPre (AxOpsem.grow (gtAdGd GT) A) qA A (Sf A) (pf A))
     (HpreB : allocPre (AxOpsem.grow (gtAdGd GT) B) qB B (Sf B) (pf B))
-    -- PINS (NEW): the guarded Option V + Q18b pins of A and B, panic arms removed (header)
+    -- PINS (NEW): Q18b + `ppArm` + the interim row-end reload premise `rlEnd` (header);
+    -- panic arms, the 18 reload pins and `poArm` removed
     (HpinsA : AllocPins2 (gtAdGd GT) A qA) (HpinsB : AllocPins2 (gtAdGd GT) B qB)
     -- ENTRY: A / B start at allocproc + 0x38, S-mode, SIE = 0, sp / s1 / tp set, warm TLB
     (HentA : entryOk T satp0 A (Sf A) (pf A) (s0 A))
@@ -517,7 +485,7 @@ theorem allocpid2Distinct2 (GT : GdexecT) (A B C : Agent) (Sf pf : Agent → Int
     (hasid : zero_extend (m := 16) (satp_to_asid satp0) = 0#16)
     (hppn : BitVec.setWidth 44 (satp_to_ppn satp0) = T.base)
     (HmapA : AxSpinApA.MapOk σi T A (Sf A) (pf A)) (HmapB : AxSpinApA.MapOk σi T B (Sf B) (pf B))
-    -- ROWS and PINS: as Theorem 2 (prefix family, guarded pins; verbatim in the header)
+    -- ROWS and PINS: as Theorem 2 (prefix family, kept pins; verbatim in the header)
     (HpreA : allocPre (AxOpsem.grow (gtAdGd GT) A) qA A (Sf A) (pf A))
     (HpreB : allocPre (AxOpsem.grow (gtAdGd GT) B) qB B (Sf B) (pf B))
     (HpinsA : AllocPins2 (gtAdGd GT) A qA) (HpinsB : AllocPins2 (gtAdGd GT) B qB)

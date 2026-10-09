@@ -67,7 +67,7 @@ loaded bytes are the image word `BitVec.ofInt 32 v` with `toNat < 2³¹ − 1`.
    list form of `wpdEnd2P`; `annMap`/`annSep`): `AxSpinT2h.vpImg` (genesis + `noffImgOk` ⇒ image
    word) then `noffGate` / `noffArmZero` / `intenaGate`.  `cutPpI` additionally needs push_off's
    ARM: the first read `vn0` (genesis ⇒ the same image word) and the arm pin `(ldRes vn0 == 0) =
-   b` (AllocPins2's `poArm`), with `b = true → rlI = some (_, stBytes 4 0, _)`.  `cutPpN` /
+   b` (stage 1's `poArm`; on prefix rows `AxSpinT2f.poArmOf`), with `b = true → rlI = some (_, stBytes 4 0, _)`.  `cutPpN` /
    `cutPpI` (pure-`w` forms) are kept unchanged.
 6. `HΨ` is resource-free and receives `LEN = cutPos` and the gate (normal arm) in graph-value
    form; it is the designated-cut counterpart of the P-forms' resource-free hook (Q-S2-2).

@@ -24,7 +24,8 @@ NEW Lean file (no Rocq source; Rocq's ID-8 prefix family is the model).  `AxSpin
 §3 THE POST `AxSpinApB.t2PostP GD L nm i q s` := `⌜¬ midState s⌝ -∗ ⌜¬ t2CutAt (grow GD i) q i⌝ ∗
    (⌜LEN = t2Len q⌝ -∗ ∃ w, ⌜pidOf = wbytes 4 w ∧ npSrc⌝ ∗ FRAG nm w)` (= `t2PostS` + the cut
    conjunct; complete rows give the stage-1 post).  `postP` (free at an incomplete no-cut end),
-   `postCut` (free at a designated cut whose gate took the normal arm), `postSMidP`.
+   `postCut` (free at a designated cut whose gate took the normal arm, given `hr`: no reload
+   misread at the row end), `postSMidP`.
    ROW ENDS: `AxSpinApB.wpdPast` — from `k0 ≥ LEN`, `WPd ⟨pr, k0⟩ Φ` for a PURE post demanded only
    when `k0 = LEN` (past the row end every step is administrative and keeps the position, so the
    row-end clause is never reached when `k0 > LEN`); `AxSpinApB.hookP` — THE RESOURCE-FREE HOOK
@@ -62,10 +63,17 @@ NEW Lean file (no Rocq source; Rocq's ID-8 prefix family is the model).  `AxSpin
    `¬ t2Cut GD i` / `t2Complete GD i`; `notCutOfAt` (+ `cutDet`) and `fullOfPre` are the bridges
    (AxSpinT2f deviation 2: `t2Cut` quantifies `q` inside the family).
 3. The `a3` conjunct is not in the post (as stage 1: `AxSpinApA` FINDING, `PROGRESS-AxSpinApA.md`).
-4. Pins: exactly `AllocPins2` (guarded; Option V reload pins, Q18b, the selectors `poArm`/`ppArm`,
-   all hart `i`'s own reads).  `hdArm`/`rhArm`/`rhCpu`/`ppGe`/`ppInt` and release's lock bit are
-   NOT premises: on the normal arm they come from `allocPre`'s gate conjunct, at the cut they are
-   refuted by D4 readback (AxSpinT2h).  The theorem proves nothing about a graph whose pinned
+4. Pins: exactly `AllocPins2` (Q18b, the selector `ppArm`, the INTERIM row-end reload premise
+   `rlEnd`; all hart `i`'s own reads).  `hdArm`/`rhArm`/`rhCpu`/`ppGe`/`ppInt` and release's lock
+   bit are NOT premises: on the normal arm they come from `allocPre`'s gate conjunct, at the cut
+   they are refuted by D4 readback (AxSpinT2h).  P1 (owner ruling 2026-10-08): the 18 reload
+   pins and `poArm` are NOT premises either; the leaf P-forms still take the GUARDED reload pins
+   `kr < LEN → graphValue (i, kr) = vw`, supplied here by `AxSpinT2f.pinOf`/`pinOfD`
+   (`allocPre`'s reload gate for `kr + 1 < LEN`, `rlEnd` for `kr + 1 = LEN`), `poArm` by
+   `AxSpinT2f.poArmOf`.  The post's cut conjunct `¬ t2CutAt` now also covers the reload cuts;
+   at every row end its reload part is `rlEnd` (`hookP`/`postCut`/`notCutAt` take it as `hr`,
+   instantiated with `H.pins.rlEnd`).  When the leaves take `AxSpinT2i.Gate`, the reload row ends
+   are refuted by `cutReload` there and `rlEnd` goes.  The theorem proves nothing about a graph whose pinned
    values differ.  Prefix closure stays informal (design §B, Q-S2-6).
 5. pop_off's own spills' `nowr` is discharged inside `wpdPopOffP` (AxSpinPO6.rowShPNowr); what
    this file discharges are the `nowr` of pop_off's two optional RELOADS (`noffNowr`,
@@ -76,7 +84,8 @@ NEW Lean file (no Rocq source; Rocq's ID-8 prefix family is the model).  `AxSpin
 `genF`/`gateAq`/`gateRlS`/`gateRlL`/`gatePpN`/`gatePpI`/`RdAt`/`ldOfRd`/`stBytes4Len` (AxSpinT2h),
 `allocPre`/`AllocPins2`/`noffImgOk`/`HimgNoff`/`cutPos`/`t2GateOk`/`t2CutAt`/`segPartsP`/`kEqs`/
 `cutPosLen`/`cutPosInj`/`gvGrow`/`rdVal`/`notCutAtOfGates`/`notCutAtOfLen`/`cutDet`/
-`preOfFullPins`/`pins2OfPins` (AxSpinT2f), `AxSpinApA.*` (`WrAt`, `xWmOf`, `appCase`, `mapW`,
+`preOfFullPins`/`pins2OfPins`/`gatesOf`/`pinOf`/`pinOfD`/`poArmOf`/`rlPos`/`rlGateOk`/`rlPosLen`
+(AxSpinT2f), `AxSpinApA.*` (`WrAt`, `xWmOf`, `appCase`, `mapW`,
 `itRS`, `aqTailW`, `bodyW`, `get3`, `nums`, `Lay`, `MapOk`, `Warm`, address lemmas, `annotEntailX`,
 `sepTrue`, `wpdEnd2`, `rowEndShape`, `FstMPriv`, `tailText` tokens), `AxSpinRl4.rowHoldingPOf`/
 `gvLt`, `AxSpinRl2.lobpAcq`/`lobpCpuSt`/`lobpCpuLd`/`stBytes8`, `AxSpinT2a.*` (`segB`, `itB`, `xB`,
@@ -579,9 +588,10 @@ theorem AxSpinApB.gateRlSOf {row : List Lbl} {q : T2Prm} {i : Agent}
 theorem AxSpinApB.notCutAt {row : List Lbl} {q : T2Prm} {i : Agent} (k : Nat)
     (hk : row.length = k) (haq : q.hb = true → k ≠ t2KHd q + 12)
     (hrs : k = t2KRh q + 1 → t2GateOk .rlS row q i) (hrl : k ≠ t2KRh q + 12)
-    (hpn : k ≠ t2KPp q + 7) (hpi : q.c = false → k ≠ t2KPp q + 9) :
+    (hpn : k ≠ t2KPp q + 7) (hpi : q.c = false → k ≠ t2KPp q + 9)
+    (hr : ∀ x, row.length = rlPos x q → rlGateOk x row q) :
     ¬ t2CutAt row q i := by
-  apply notCutAtOfGates
+  refine notCutAtOfGates ?_ hr
   intro j hj
   rw [hk] at hj
   cases j with
@@ -716,11 +726,13 @@ theorem AxSpinApB.postP {GF : BundledGFunctors} [AxSpinX.Xv6G GF] (GD : Gdexec) 
 
 /-- The post at a DESIGNATED CUT whose gate took the normal arm is free. -/
 theorem AxSpinApB.postCut {GF : BundledGFunctors} [AxSpinX.Xv6G GF] (GD : Gdexec) (L : Xlay)
-    (nm : Xv6N) (i : Agent) (q : T2Prm) (j : T2Cj)
+    (nm : Xv6N) (i : Agent) (q : T2Prm)
+    (hr : ∀ x, (AxOpsem.grow GD i).length = rlPos x q → rlGateOk x (AxOpsem.grow GD i) q)
+    (j : T2Cj)
     (hL : (AxOpsem.grow GD i).length = cutPos j q) (hG : t2GateOk j (AxOpsem.grow GD i) q i)
     (s : Athread) : ⊢ AxSpinApB.t2PostP (GF := GF) GD L nm i q s := by
   refine AxSpinApB.postP GD L nm i q ?_ (by rw [hL]; exact AxSpinT2f.cutPosLen j q) s
-  apply notCutAtOfGates
+  refine notCutAtOfGates ?_ hr
   intro j' hj'
   have e := AxSpinT2f.cutPosInj (hL.symm.trans hj')
   subst e
@@ -798,6 +810,8 @@ theorem AxSpinApB.wpdPast (L : Xlay) (GT : GdexecT) (nm : Xv6N) (i : Agent) (k0 
 /-- THE RESOURCE-FREE HOOK for `t2PostP` (Q-S2-2): at a row position `k' < t2Len q` with
 `LEN ≤ k'`, unless `k'` is a designated cut whose gate may be flipped. -/
 theorem AxSpinApB.hookP (L : Xlay) (GT : GdexecT) (nm : Xv6N) (i : Agent) (q : T2Prm)
+    (hr : ∀ x, (AxOpsem.grow (gtAdGd GT) i).length = rlPos x q →
+      rlGateOk x (AxOpsem.grow (gtAdGd GT) i) q)
     (k' : Nat) (hlt : k' < t2Len q) (haq : q.hb = true → k' ≠ t2KHd q + 12)
     (hrs : k' = t2KRh q + 1 → t2GateOk .rlS (AxOpsem.grow (gtAdGd GT) i) q i)
     (hrl : k' ≠ t2KRh q + 12) (hpn : k' ≠ t2KPp q + 7) (hpi : q.c = false → k' ≠ t2KPp q + 9)
@@ -805,7 +819,7 @@ theorem AxSpinApB.hookP (L : Xlay) (GT : GdexecT) (nm : Xv6N) (i : Agent) (q : T
     ⊢ @wpdM hlc GF _ (AxSpinX2.xG L GT nm) (xv6Pol GT) rvwmoCatConsistent .MaybeStuck i
         ⟨pr, k'⟩ (AxSpinApB.t2PostP (gtAdGd GT) L nm i q) :=
   AxSpinApB.wpdPast L GT nm i k' hL _ (fun hk s => AxSpinApB.postP (gtAdGd GT) L nm i q
-    (AxSpinApB.notCutAt k' hk.symm haq hrs hrl hpn hpi) (by omega) s) pr
+    (AxSpinApB.notCutAt k' hk.symm haq hrs hrl hpn hpi hr) (by omega) s) pr
 
 end rowend
 
@@ -887,18 +901,20 @@ theorem AxSpinApB.segRelP (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T
     AxSpinApA.paZOf _ (by omega) (by omega)
   have hpi : paZ (BitVec.ofInt 64 (cpuZ i + 124)) = cpuZ i + 124 :=
     AxSpinApA.paZOf _ (by omega) (by omega)
-  have HG := Hpre.2.2.2.2.2.2.2.2
+  have HG := AxSpinT2f.gatesOf Hpre
   obtain ⟨-, Ppo, -, -, -, Pbd, Prl, -⟩ := AxSpinT2f.segPartsP Hpre.1
   obtain ⟨v, Himg⟩ := H.imgN
   have HΦmid := AxSpinApB.postSMidP (GF := GF) L GT nm i q
   have XR := XxReg L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu H.fix _ HΦmid
   have XS := XxStF L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu H.fix _ HΦmid
   have HP := H.pins
+  have PIN := AxSpinT2f.pinOf Hpre HP
+  have PIND := AxSpinT2f.pinOfD Hpre HP
   iintro #Hil HLK HW HNp HGF K
   -- row end at t2KRl
   by_cases E0 : (AxOpsem.grow (gtAdGd GT) i).length ≤ t2KRl q
   · iclear HLK HW HNp HGF K
-    iapply (AxSpinApB.hookP L GT nm i q (t2KRl q) (by omega) (fun _ => by omega)
+    iapply (AxSpinApB.hookP L GT nm i q H.pins.rlEnd (t2KRl q) (by omega) (fun _ => by omega)
       (fun h => absurd h (by omega)) (by omega) (by omega) (fun _ => by omega) E0 _)
   -- the claim's label (present: t2KA < t2KRl < LEN)
   obtain ⟨tA, rvsA, HrmA, -⟩ := Hpre.2.2.2.2.2.1 q.n (Nat.le_refl _) (by omega)
@@ -1110,21 +1126,21 @@ theorem AxSpinApB.segRelP (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T
       exact Hlb)
     (AxSpinApB.relWinCP Hpre H.lay L H.hLk)
     (by omega) (fun _ => ⟨lbS, HlbS, by rw [HlS]; rfl⟩)
-    HP.rhRets.1 HP.rhRets.2
+    (PIN .rhMy rfl) (PIN .rhRet rfl)
     (fun h12 => by
       rw [EJ4, AxSpinT2a.mycpuRetHart]
       obtain ⟨vs, hv, hl⟩ := AxSpinApB.gvRd _ i _ _ _ (RdL (by simp only [relKh] at h12 ⊢; omega))
       have G := HG .rlL (by simp only [cutPos, t2KRh, relKh] at h12 ⊢; omega) vs
         (by rw [← AxSpinT2f.gvGrow]; exact hv)
       rw [show relKh (t2KRl q) + 4 = t2KRh q + 4 from rfl, hv, ← G, AxSpinApB.st8 vs hl])
-    (by rw [EJ10]; exact HP.rhS1)
-    HP.ppMy
+    (by rw [EJ10]; exact PIN .rhS1 rfl)
+    (PIN .ppMy rfl)
     (fun h vn hv => HG .ppN (by simp only [cutPos, t2KPp] at h ⊢; omega) vn
       (by rw [← AxSpinT2f.gvGrow]; exact hv))
     HP.ppArm
     (fun hc h vi hv => HG .ppI (by simp only [cutPos, t2KPp] at h ⊢; omega) hc vi
       (by rw [← AxSpinT2f.gvGrow]; exact hv))
-    HP.ppRet
+    (PIN .ppRet rfl)
     (by
       simp only [AxSpinPO5.rlOk4]
       refine ⟨HlN, AxSpinT2h.stBytes4Len _, by simp only [relKp]; omega, ?_⟩
@@ -1138,8 +1154,8 @@ theorem AxSpinApB.segRelP (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T
         refine ⟨HlI hqb, AxSpinT2h.stBytes4Len _, by unfold t2KPo; simp only [relKp]; omega, ?_⟩
         rw [hpi]
         exact AxSpinApB.intenaNowr Hpre H.lay)
-    HP.rlRet AxSpinT2a.jalrRets.2.2.2.2.2.2
-    (fun k' h1 h2 h3 h4 h5 h6 h7 pr => AxSpinApB.hookP L GT nm i q k'
+    (PIN .rlRet rfl) AxSpinT2a.jalrRets.2.2.2.2.2.2
+    (fun k' h1 h2 h3 h4 h5 h6 h7 pr => AxSpinApB.hookP L GT nm i q H.pins.rlEnd k'
       (by simp only [t2Len, t2KT]; omega) (fun _ => by omega)
       (fun he => by
         cases hbR with
@@ -1152,7 +1168,7 @@ theorem AxSpinApB.segRelP (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T
         (AxSpinE8.mycpuRet (hartId (cpuOf i))) iprop(True) iprop(True)
         (AxSpinApB.t2PostP (gtAdGd GT) L nm i q)
         (fun h => by rw [H.hLk]; exact RdS h)
-        (fun hL hg s => AxSpinApB.postCut (gtAdGd GT) L nm i q .rlS (by rw [hL]; rfl)
+        (fun hL hg s => AxSpinApB.postCut (gtAdGd GT) L nm i q H.pins.rlEnd .rlS (by rw [hL]; rfl)
           (AxSpinT2h.gateRlS _ i q hg) s)))
     (fun _ rs _ _ => by
       iintro -
@@ -1163,28 +1179,28 @@ theorem AxSpinApB.segRelP (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T
         (AxSpinApB.t2PostP (gtAdGd GT) L nm i q)
         (AxSpinT2a.mycpuRetHart _)
         (fun h => by rw [H.hLk]; exact RdL h)
-        (fun hL hg s => AxSpinApB.postCut (gtAdGd GT) L nm i q .rlL (by rw [hL]; rfl)
+        (fun hL hg s => AxSpinApB.postCut (gtAdGd GT) L nm i q H.pins.rlEnd .rlL (by rw [hL]; rfl)
           (AxSpinT2h.gateRlL _ i q hg) s)))
     (cutPpNF L GT nm Hcons i (t2KPp q) (t2KPo + 7) (t2KPoT q + 4)
       (BitVec.ofInt 64 (cpuZ i + 120)) _ (t2KPoT q + 5) clsN vp v _ hpn Himg rfl
       (by unfold t2KPoT t2KPo at P9 ⊢; omega) (by rw [hpn]; exact RdN2) HgvN
       (fun h => by rw [hpn]; exact Rd6 h)
-      (fun hL hg s => AxSpinApB.postCut (gtAdGd GT) L nm i q .ppN (by rw [hL]; rfl)
+      (fun hL hg s => AxSpinApB.postCut (gtAdGd GT) L nm i q H.pins.rlEnd .ppN (by rw [hL]; rfl)
         (AxSpinT2h.gatePpN _ i q hg) s))
     (fun hc => cutPpIF L GT nm Hcons i (t2KPp q) (t2KPo + 7) (t2KPoT q + 4) q.c q.b
       (BitVec.ofInt 64 (cpuZ i + 120)) (BitVec.ofInt 64 (cpuZ i + 124)) _ _ (t2KPoT q + 5) clsN
       (t2KPo + 12) clsI vn0 vp v _ hpn Himg rfl (fun hb => by simp only [hb, ↓reduceIte])
       (by unfold t2KPoT t2KPo; omega) (by unfold t2KPoT t2KPo at P9 ⊢; omega)
-      (by rw [hpn]; exact Rd1) Hgv1 (HP.poArm vn0 Hgv1)
+      (by rw [hpn]; exact Rd1) Hgv1 (AxSpinT2f.poArmOf Hpre vn0 Hgv1)
       (by rw [hpn]; exact RdN2) HgvN HP.ppArm (fun h => by rw [hpn]; exact Rd6 h)
       (fun h => by rw [hpi]; exact Rd8 hc h)
-      (fun hL hg s => AxSpinApB.postCut (gtAdGd GT) L nm i q .ppI (by rw [hL]; rfl)
+      (fun hL hg s => AxSpinApB.postCut (gtAdGd GT) L nm i q H.pins.rlEnd .ppI (by rw [hL]; rfl)
         (AxSpinT2h.gatePpI _ i q q.c hg rfl) s) hc))
     $$ Hil HLK HW HNp HGF
   iintro %vra %vs0 %vs1 %rs1 %ib1 %Hf - - - - - - -
   obtain ⟨Hc1, HPC1, Htl1, -, -, -, -, -, -, -, E91, Hkeep1, -, -, Hgd2, -, -, Hgv2⟩ := Hf
   have Evs1 : vs1 = stBytes 8 (BitVec.ofInt 64 p) := by
-    have h := HP.rlS1 (AxSpinRl4.gvLt _ _ _ _ Hgv2)
+    have h := PIND.2 (AxSpinRl4.gvLt _ _ _ _ Hgv2)
     rw [show t2KRr q = relKr (t2KRl q) q.c from rfl, Hgv2, Hgd2, EJ9] at h
     exact Option.some.inj h
   rw [Evs1, AxSpinE8.ldResStBytes8] at E91
@@ -1196,7 +1212,7 @@ theorem AxSpinApB.segRelP (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T
   -- row end at relKe
   by_cases Ee : (AxOpsem.grow (gtAdGd GT) i).length ≤ relKe (t2KRl q) q.c
   · iclear K
-    iapply (AxSpinApB.hookP L GT nm i q _ (by omega) (fun _ => by omega)
+    iapply (AxSpinApB.hookP L GT nm i q H.pins.rlEnd _ (by omega) (fun _ => by omega)
       (fun h => absurd h (by omega)) (by omega) (by omega) (fun _ => by omega) Ee _)
   -- ---- + 0x98: c.li a5,1 (t2KT) ----
   iapply (XR _ rs1 (relKe (t2KRl q) q.c) (pca 0x98) true ap98 none _
@@ -1358,7 +1374,7 @@ theorem AxSpinApB.segCsP (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T 
         | _ => simp [aident] at HidR
       exact AxSpinRl2.lobpAcq GT Hcons i (t2KA q) (t2KBd q) _ lbR AxSpinT2a.zLk 4 HrmA rfl HlbR
         HmR (by omega))
-    (fun k' h1 h2 h3 pr => AxSpinApB.hookP L GT nm i q k' (by omega)
+    (fun k' h1 h2 h3 pr => AxSpinApB.hookP L GT nm i q H.pins.rlEnd k' (by omega)
       (fun hb => by
         have : holdLen q.hb = 12 := by simp [holdLen, hb]
         omega)
@@ -1391,6 +1407,7 @@ theorem AxSpinApB.segCsP (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T 
       isplitr
       · ipureintro
         exact notCutAtOfLen (fun j hj => by have := AxSpinT2f.cutPosLen j q; omega)
+          (fun x hx => by have := AxSpinT2f.rlPosLen x q; omega)
       · iintro %_
         iexists (wordOfBytes 4 vs)
         isplitr
@@ -1431,8 +1448,10 @@ theorem wpdAllocpidSeg2 (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T i
   have hBd := AxSpinT2a.kBdLen q
   have hpn : paZ (BitVec.ofInt 64 (cpuZ i + 120)) = cpuZ i + 120 :=
     AxSpinApA.paZOf _ (by omega) (by omega)
-  have HG := Hpre.2.2.2.2.2.2.2.2
+  have HG := AxSpinT2f.gatesOf Hpre
   have HP := H.pins
+  have PIN := AxSpinT2f.pinOf Hpre HP
+  have PIND := AxSpinT2f.pinOfD Hpre HP
   obtain ⟨-, -, Phd, -, -, -, -, -⟩ := AxSpinT2f.segPartsP Hpre.1
   have HΦmid := AxSpinApB.postSMidP (GF := GF) L GT nm i q
   have XR := XxReg L GT nm HL Hcons σi T satp0 hmode hasid hppn i cpu H.fix _ HΦmid
@@ -1446,7 +1465,7 @@ theorem wpdAllocpidSeg2 (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T i
   -- row end at 0
   by_cases E0 : (AxOpsem.grow (gtAdGd GT) i).length ≤ 0
   · iclear Hnh
-    iapply (AxSpinApB.hookP L GT nm i q 0 (by omega) (fun _ => by omega)
+    iapply (AxSpinApB.hookP L GT nm i q H.pins.rlEnd 0 (by omega) (fun _ => by omega)
       (fun h => absurd h (by omega)) (by omega) (by omega) (fun _ => by omega) E0 _)
   have hl0 : 0 < (AxOpsem.grow (gtAdGd GT) i).length := by omega
   -- ---- + 0x38: auipc a0,0x11 (row 0) ----
@@ -1583,16 +1602,16 @@ theorem wpdAllocpidSeg2 (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T i
       simp only [AxSpinAq2.djOut, List.mem_cons, List.not_mem_nil, _root_.or_false,
         forall_eq_or_imp, forall_eq, dj]
       omega)
-    HP.poMy1 HP.poArm HP.poMy2 HP.poMy3 HP.poRet (by rw [E310]; exact HP.poS1)
+    (PIN .poMy1 rfl) (AxSpinT2f.poArmOf Hpre) (fun hb => PIN .poMy2 hb) (PIN .poMy3 rfl)
+    (PIN .poRet rfl) (by rw [E310]; exact PIN .poS1 rfl)
     (by
       intro hb
-      obtain ⟨h7, h9⟩ := HP.hdRets hb
-      refine ⟨h7, h9, by rw [E310]; exact HP.hdS1 hb, ?_⟩
+      refine ⟨PIN .hdMy hb, PIN .hdRet hb, by rw [E310]; exact PIN .hdS1 hb, ?_⟩
       intro h12 vcpu Hv
       rw [E34, AxSpinT2a.mycpuRetHart]
       exact (AxSpinT2a.hresZero _ _).2 (HG .aq (by simp only [cutPos, t2KHd]; omega) hb vcpu
         (by rw [← AxSpinT2f.gvGrow]; exact Hv)))
-    HP.aqMy HP.aqRet AxSpinT2a.jalrRets.2.2.2.1
+    (PIN .aqMy rfl) (PIN .aqRet rfl) AxSpinT2a.jalrRets.2.2.2.1
     (fun hbt rsH => cutAq L GT nm Hcons i (aqKp 0 q.b) rsH
       (BitVec.ofInt 64 (S - 40)) (BitVec.ofInt 64 (S - 48)) (BitVec.ofInt 64 (S - 56))
       (BitVec.ofInt 64 (S - 72)) (BitVec.ofInt 64 (S - 80))
@@ -1608,9 +1627,9 @@ theorem wpdAllocpidSeg2 (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T i
         rw [inClr, H.hLk] at Ha
         unfold dj at this
         omega)
-      (fun hL hg s => AxSpinApB.postCut (gtAdGd GT) L nm i q .aq (by rw [hL]; rfl)
+      (fun hL hg s => AxSpinApB.postCut (gtAdGd GT) L nm i q H.pins.rlEnd .aq (by rw [hL]; rfl)
         (AxSpinT2h.gateAq _ i q hg) s))
-    (fun k' h1 h2 h3 h4 pr => AxSpinApB.hookP L GT nm i q k'
+    (fun k' h1 h2 h3 h4 pr => AxSpinApB.hookP L GT nm i q H.pins.rlEnd k'
       (by have h2' : k' ≤ t2KBd q := h2; omega) h3
       (fun he => absurd he (by have h2' : k' ≤ t2KBd q := h2; omega))
       (by have h2' : k' ≤ t2KBd q := h2; omega) (by have h2' : k' ≤ t2KBd q := h2; omega)
@@ -1633,7 +1652,7 @@ theorem wpdAllocpidSeg2 (q : T2Prm) (S p : Int) (H : AxSpinApB.Hyp2 L GT σi T i
       obtain ⟨c, hc⟩ := Hlbi hqb
       exact ⟨c, fun _ => hc⟩
   have Evs1 : vs1' = stBytes 8 (BitVec.ofInt 64 p) := by
-    have h := HP.aqS1 (AxSpinRl4.gvLt _ _ _ _ Hgv7)
+    have h := PIND.1 (AxSpinRl4.gvLt _ _ _ _ Hgv7)
     rw [Hgv7, show ((i, 2) : Geid) = (i, 0 + 2) from rfl, Hgd2, E39] at h
     exact Option.some.inj h
   rw [Evs1, AxSpinE8.ldResStBytes8] at Es1C

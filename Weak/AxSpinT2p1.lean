@@ -20,13 +20,15 @@ is NOT here (later capstone).
 
 §1 GENERIC SOUND CHECKERS (stage-2 twins of AxSpinT2c1 §4): `AxSpinT2p1.shGoP` (→ `RowShXP 0`),
 `AxSpinT2p1.spinValsPB` (→ `AxSpinT2f.spinValsP`), `AxSpinT2p1.spinRmwPB` (→ `spinRmwP`),
-`AxSpinT2p1.gateB`/`gatesB` (→ `t2GateOk` / the gate conjunct), `AxSpinT2p1.preB` → `allocPre`
+`AxSpinT2p1.gateB`/`gatesB` (→ `t2GateOk` / the gate conjunct), `AxSpinT2p1.rlGateB`/`rlGatesB`
+(→ `rlGateOk` / the reload gate conjunct, over the list `AxSpinT2p1.allRj`),
+`AxSpinT2p1.poBranchB` (→ `AxSpinT2f.poBranch`), `AxSpinT2p1.preB` → `allocPre`
 (`AxSpinT2p1.preOfB`); `AxSpinT2p1.gv1` (a position-guarded value pin) and
-`AxSpinT2p1.pins2B` → `AllocPins2` (`AxSpinT2p1.pins2OfB`).  `AxSpinT2p1.notComplete`: a family
+`AxSpinT2p1.pins2B` → `AllocPins2` (`AxSpinT2p1.pins2OfB`: Q18b, `ppArm`, `rlEnd`).  `AxSpinT2p1.notComplete`: a family
 row that passes holding's lock read and is shorter than `t2KSp q + 108` is NOT `t2Complete`
 (for EVERY parameters: `AxSpinT2f.bDet`/`hbDet` fix `b`/`hb`, and every complete row is at least
 `t2KSp + 108` long); `AxSpinT2p1.notCompleteNil`; `AxSpinT2p1.offCutsB` (the row end is no cut
-position).
+position, panic / `intr_on` or reload).
 §2 GENERIC GRAPH / RUN MACHINERY over a literal 3-hart schedule: `AxSpinT2p1.growOf` (the rows
 are the literal, from a `rowsFixed` fact), `emsCtrlOf`, `catOf` (GENERIC `graphOfScCatT`),
 `ctrlOf` (`graphOfScCtrlClosed`), `drvG` (`drive2` to the row end, then `finish2`), `chkG`,
@@ -47,9 +49,11 @@ continuation B is in; `c` is not yet determined by the prefix and is fixed `fals
   `preA1`/`preB1G`: `allocPre (grow (gtAdGd (gT1 E)) h) q h (sZ h) (pEx h)` (prefix shape,
     lock-bit / spin / body / RMW / cpu / release value conditions, and the gates: A passes no
     gate (`hb = false`), B passes the `aq` gate: `lk->cpu` = A's cpu ≠ B's);
-  `pinsA1`/`pinsB1`: `AllocPins2 (gtAdGd (gT1 E)) h q` (every guarded pin; on A's row the pins
-    up to `t2KBd + 65` are live — Option V returns, s1 reloads, Q18b on nextpid 1; on B's row the
-    pins up to the spin, incl. holding's `hdRets`/`hdS1` on its long arm);
+  `pinsA1`/`pinsB1`: `AllocPins2 (gtAdGd (gT1 E)) h q` (Q18b on nextpid 1 live on A's row;
+    `ppArm` and the interim `rlEnd` vacuous: neither row ends at a reload cut).  The 18 reload
+    VALUES are now `allocPre`'s reload gates (`rlGatesB`), checked on every reload the rows
+    continue past (on A's row: Option V returns and s1 reloads up to `t2KBd`; on B's row:
+    holding's `hdMy`/`hdRet`/`hdS1` on its long arm);
   `notCutA1`/`notCutB1`: `¬ t2Cut (gtAdGd (gT1 E)) h (sZ h) (pEx h)` (no row ends at a cut);
   `notCompleteA1`/`notCompleteB1`: `¬ t2Complete …` (BOTH incomplete);
   `honest1` (`rowClsHonest`), `textFixed1` (`textFixed … (imgS σX)` for h < 3), `imgNoff1`
@@ -192,22 +196,70 @@ theorem AxSpinT2p1.gatesOfB {row : List Lbl} {q : T2Prm} {i : Agent} :
   simp only [hj, decide_true, Bool.not_true, Bool.false_or] at h1
   exact AxSpinT2p1.gateOfB j row q i h1
 
+/-- The 18 reloads, as a list. -/
+def AxSpinT2p1.allRj : List T2Rj :=
+  [.poMy1, .poMy2, .poMy3, .poRet, .poS1, .hdMy, .hdRet, .hdS1, .aqMy, .aqRet, .aqS1, .rhMy,
+    .rhRet, .rhS1, .ppMy, .ppRet, .rlRet, .rlS1]
+
+theorem AxSpinT2p1.memRj (x : T2Rj) : x ∈ AxSpinT2p1.allRj := by
+  cases x <;> simp [AxSpinT2p1.allRj]
+
+/-- One reload gate as a Bool. -/
+def AxSpinT2p1.rlGateB (x : T2Rj) (row : List Lbl) (q : T2Prm) : Bool :=
+  !rlOn x q || optAll (AxSpinT2f.rv row (rlKr x q)) (fun vs => decide (rlExp x row q = some vs))
+
+theorem AxSpinT2p1.rlGateOfB (x : T2Rj) (row : List Lbl) (q : T2Prm) :
+    AxSpinT2p1.rlGateB x row q = true → rlGateOk x row q := by
+  intro h hon vs hv
+  simp only [AxSpinT2p1.rlGateB, hon, Bool.not_true, Bool.false_or] at h
+  simpa using optAllOf h vs hv
+
+/-- The reload gate conjunct of `allocPre` as a Bool. -/
+def AxSpinT2p1.rlGatesB (row : List Lbl) (q : T2Prm) : Bool :=
+  AxSpinT2p1.allRj.all fun x => !decide (rlPos x q < row.length) || AxSpinT2p1.rlGateB x row q
+
+theorem AxSpinT2p1.rlGatesOfB {row : List Lbl} {q : T2Prm} :
+    AxSpinT2p1.rlGatesB row q = true → ∀ x, rlPos x q < row.length → rlGateOk x row q := by
+  intro h x hx
+  have h1 := List.all_eq_true.1 h x (AxSpinT2p1.memRj x)
+  simp only [hx, decide_true, Bool.not_true, Bool.false_or] at h1
+  exact AxSpinT2p1.rlGateOfB x row q h1
+
+/-- push_off's branch bit `AxSpinT2f.poBranch` as a Bool. -/
+def AxSpinT2p1.poBranchB (row : List Lbl) (q : T2Prm) : Bool :=
+  !decide (t2KPo + 7 < row.length) ||
+  match AxSpinT2f.rv row (t2KPo + 7) with
+  | some vs => decide ((ldRes false 4 vs == zero_reg) = q.b)
+  | none => false
+
+theorem AxSpinT2p1.poBranchOfB {row : List Lbl} {q : T2Prm} :
+    AxSpinT2p1.poBranchB row q = true → AxSpinT2f.poBranch row q := by
+  intro h hl
+  simp only [AxSpinT2p1.poBranchB, hl, decide_true, Bool.not_true, Bool.false_or] at h
+  cases hv : AxSpinT2f.rv row (t2KPo + 7) with
+  | none => simp [hv] at h
+  | some vs =>
+    simp only [hv, decide_eq_true_eq] at h
+    exact ⟨vs, rfl, h⟩
+
 /-- `allocPre` as a Bool. -/
 def AxSpinT2p1.preB (row : List Lbl) (q : T2Prm) (i : Agent) (S p : Int) : Bool :=
   AxSpinT2p1.shGoP row (allocSeg q i S p) && (decide (row.length ≤ t2Len q) &&
   ((!decide (t2KHd q < row.length) || lkB row (t2KHd q) q.hb) &&
   (AxSpinT2p1.spinValsPB row (t2KSp q) q.n && (bodyB row (t2KBd q) AxSpinT2a.zNp &&
   (AxSpinT2p1.spinRmwPB row (t2KSp q) q.n AxSpinT2a.zLk && (cpuValsB row i &&
-  (relValsB row q && AxSpinT2p1.gatesB row q i)))))))
+  (relValsB row q && (AxSpinT2p1.gatesB row q i &&
+  (AxSpinT2p1.poBranchB row q && AxSpinT2p1.rlGatesB row q)))))))))
 
 /-- **Soundness of `preB`.** -/
 theorem AxSpinT2p1.preOfB (row : List Lbl) (q : T2Prm) (i : Agent) (S p : Int) :
     AxSpinT2p1.preB row q i S p = true → allocPre row q i S p := by
   intro h
   simp only [AxSpinT2p1.preB, Bool.and_eq_true, decide_eq_true_eq] at h
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9⟩ := h
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11⟩ := h
   refine ⟨AxSpinT2p1.shGoPSound _ _ h1, h2, fun hl => ?_, AxSpinT2p1.spinValsPOfB h4,
-    bodyOfB h5, AxSpinT2p1.spinRmwPOfB h6, cpuValsOfB h7, relValsOfB h8, AxSpinT2p1.gatesOfB h9⟩
+    bodyOfB h5, AxSpinT2p1.spinRmwPOfB h6, cpuValsOfB h7, relValsOfB h8, AxSpinT2p1.gatesOfB h9,
+    AxSpinT2p1.poBranchOfB h10, AxSpinT2p1.rlGatesOfB h11⟩
   simp only [hl, decide_true, Bool.not_true, Bool.false_or] at h3
   exact lkOfB h3
 
@@ -222,61 +274,25 @@ theorem AxSpinT2p1.gv1Of {row : List Lbl} {k : Nat} {x : Option (List (BitVec 8)
     decide_eq_true_eq] at h
   exact h
 
-/-- `AllocPins2` as a Bool, on the row. -/
-def AxSpinT2p1.pins2B (row : List Lbl) (q : T2Prm) (i : Agent) : Bool :=
-  AxSpinT2p1.gv1 row (t2KPo + 5) (some (stBytes 8 (AxSpinPO.ppo 0x14))) &&
-  optAll (valAt row (t2KPo + 7)) (fun vn => decide ((ldRes false 4 vn == zero_reg) = q.b)) &&
-  (!q.b || AxSpinT2p1.gv1 row (t2KPo + 10) (some (stBytes 8 (AxSpinPO.ppo 0x30)))) &&
-  AxSpinT2p1.gv1 row (t2KPoT q + 2) (some (stBytes 8 (AxSpinPO.ppo 0x1c))) &&
-  AxSpinT2p1.gv1 row (t2KPoT q + 6) (some (stBytes 8 (AxSpinHdB.pac 0x10))) &&
-  (!q.hb || (AxSpinT2p1.gv1 row (t2KHd q + 7) (some (stBytes 8 (pch 0x1a))) &&
-    AxSpinT2p1.gv1 row (t2KHd q + 9) (some (stBytes 8 (AxSpinHdB.pac 0x16))))) &&
-  AxSpinT2p1.gv1 row (t2KMy q + 2) (some (stBytes 8 (AxSpinHdB.pac 0x28))) &&
-  AxSpinT2p1.gv1 row (t2KMy q + 5) (some (stBytes 8 (pca 0x44))) &&
+/-- `AllocPins2` as a Bool, on the row (Q18b, `ppArm`, and the interim `rlEnd`). -/
+def AxSpinT2p1.pins2B (row : List Lbl) (q : T2Prm) (_i : Agent) : Bool :=
   optAll (valAt row (t2KBd q)) (fun vs => !decide ((wordOfBytes 4 vs : BitVec 32) = 1000#32) &&
     decide ((wordOfBytes 4 vs : BitVec 32).toNat + 1 < 2 ^ 32)) &&
   optAll (valAt row (t2KBd q)) (fun vs => (List.range 64).all fun j =>
     optAll (valAt row (t2KBd q + 1 + j))
       (fun v => !decide ((wordOfBytes 4 v : BitVec 32) = wordOfBytes 4 vs))) &&
-  AxSpinT2p1.gv1 row (t2KRh q + 7) (some (stBytes 8 (pch 0x1a))) &&
-  AxSpinT2p1.gv1 row (t2KRh q + 9) (some (stBytes 8 (AxSpinHdB.prl 0x10))) &&
-  AxSpinT2p1.gv1 row (t2KPp q + 4) (some (stBytes 8 (ppp 0x0c))) &&
   optAll (valAt row (t2KPp q + 6)) (fun vn => decide ((addiwm1 (ldRes false 4 vn) != zero_reg) = q.c)) &&
-  AxSpinT2p1.gv1 row (t2KPp q + 8 + (if q.c then 0 else 1)) (some (stBytes 8 (AxSpinHdB.prl 0x22))) &&
-  AxSpinT2p1.gv1 row (t2KRr q) (some (stBytes 8 (pca 0x98))) &&
-  AxSpinT2p1.gv1 row (t2KPoT q + 8) (some (stBytes 8 (BitVec.ofNat 64 KernelSyms.«pid_lock»))) &&
-  (!q.hb || AxSpinT2p1.gv1 row (t2KHd q + 11)
-    (some (stBytes 8 (BitVec.ofNat 64 KernelSyms.«pid_lock»)))) &&
-  AxSpinT2p1.gv1 row (t2KMy q + 7) ((row[2]?).bind lblData) &&
-  AxSpinT2p1.gv1 row (t2KRh q + 11) (some (stBytes 8 (BitVec.ofNat 64 KernelSyms.«pid_lock»))) &&
-  AxSpinT2p1.gv1 row (t2KRr q + 2) ((row[t2KRl q + 2]?).bind lblData)
+  AxSpinT2p1.allRj.all fun x => !decide (row.length = rlPos x q) || AxSpinT2p1.rlGateB x row q
 
 /-- **Soundness of `pins2B`.** -/
 theorem AxSpinT2p1.pins2OfB (GD : Gdexec) (i : Agent) (q : T2Prm) :
     AxSpinT2p1.pins2B (AxOpsem.grow GD i) q i = true → AllocPins2 GD i q := by
   intro h
   simp only [AxSpinT2p1.pins2B, Bool.and_eq_true, and_assoc] at h
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11a, h11b, h12, h13, h14, h15, h16, h17,
-    h18, h19, h20⟩ := h
+  obtain ⟨h9, h10, h13, h20⟩ := h
   have gv := gvRow GD i
-  have gd := gdRow GD i
   refine
-    { poMy1 := fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h1 hk
-      poArm := fun vn hv => of_decide_eq_true (optAllOf h2 vn (by rw [← gv]; exact hv))
-      poMy2 := fun hb hk => by
-        rw [hb] at h3
-        simp only [Bool.not_true, Bool.false_or] at h3
-        rw [gv]; exact AxSpinT2p1.gv1Of h3 hk
-      poMy3 := fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h4 hk
-      poRet := fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h5 hk
-      hdRets := fun hb => by
-        rw [hb] at h6
-        simp only [Bool.not_true, Bool.false_or, Bool.and_eq_true] at h6
-        exact ⟨fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h6.1 hk,
-          fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h6.2 hk⟩
-      aqMy := fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h7 hk
-      aqRet := fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h8 hk
-      npNowrap := fun vs hv => by
+    { npNowrap := fun vs hv => by
         have := optAllOf h9 vs (by rw [← gv]; exact hv)
         simp only [Bool.and_eq_true, Bool.not_eq_true', decide_eq_false_iff_not,
           decide_eq_true_eq] at this
@@ -286,20 +302,11 @@ theorem AxSpinT2p1.pins2OfB (GD : Gdexec) (i : Agent) (q : T2Prm) :
         have h2' := optAllOf (List.all_eq_true.1 h1' j (List.mem_range.2 hj)) v
           (by rw [← gv]; exact hv')
         simpa using h2'
-      rhRets := ⟨fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h11a hk,
-        fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h11b hk⟩
-      ppMy := fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h12 hk
       ppArm := fun vn hv => of_decide_eq_true (optAllOf h13 vn (by rw [← gv]; exact hv))
-      ppRet := fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h14 hk
-      rlRet := fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h15 hk
-      poS1 := fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h16 hk
-      hdS1 := fun hb hk => by
-        rw [hb] at h17
-        simp only [Bool.not_true, Bool.false_or] at h17
-        rw [gv]; exact AxSpinT2p1.gv1Of h17 hk
-      aqS1 := fun hk => by rw [gv, gd]; exact AxSpinT2p1.gv1Of h18 hk
-      rhS1 := fun hk => by rw [gv]; exact AxSpinT2p1.gv1Of h19 hk
-      rlS1 := fun hk => by rw [gv, gd]; exact AxSpinT2p1.gv1Of h20 hk }
+      rlEnd := fun x hx => by
+        have h1 := List.all_eq_true.1 h20 x (AxSpinT2p1.memRj x)
+        simp only [hx, decide_true, Bool.not_true, Bool.false_or] at h1
+        exact AxSpinT2p1.rlGateOfB x _ q h1 }
 
 /-- A family row that stops before release (`< t2KSp q + 108`) and passes holding's lock read
 is NOT complete (for ANY parameters: push_off's arm and holding's lock bit are fixed by the row,
@@ -333,15 +340,21 @@ theorem AxSpinT2p1.notCompleteNil {GD : Gdexec} {i : Agent} {S p : Int}
   simp only [List.length_nil] at L
   omega
 
-/-- A row ending at no cut position (as a Bool over the five cuts). -/
+/-- A row ending at no cut position (as a Bool over the five panic / `intr_on` cuts and the 18
+reload cuts). -/
 def AxSpinT2p1.offCutsB (len : Nat) (q : T2Prm) : Bool :=
-  [T2Cj.aq, .rlS, .rlL, .ppN, .ppI].all fun j => !decide (len = cutPos j q)
+  [T2Cj.aq, .rlS, .rlL, .ppN, .ppI].all (fun j => !decide (len = cutPos j q)) &&
+  AxSpinT2p1.allRj.all fun x => !decide (len = rlPos x q)
 
 theorem AxSpinT2p1.offCutsOf {len : Nat} {q : T2Prm} :
-    AxSpinT2p1.offCutsB len q = true → ∀ j, len ≠ cutPos j q := by
-  intro h j hj
-  have h1 := List.all_eq_true.1 h j (by cases j <;> simp)
-  simp [hj] at h1
+    AxSpinT2p1.offCutsB len q = true → (∀ j, len ≠ cutPos j q) ∧ ∀ x, len ≠ rlPos x q := by
+  intro h
+  simp only [AxSpinT2p1.offCutsB, Bool.and_eq_true] at h
+  refine ⟨fun j hj => ?_, fun x hx => ?_⟩
+  · have h1 := List.all_eq_true.1 h.1 j (by cases j <;> simp)
+    simp [hj] at h1
+  · have h1 := List.all_eq_true.1 h.2 x (AxSpinT2p1.memRj x)
+    simp [hx] at h1
 
 /-! # 2. Generic graph / run machinery over a literal schedule -/
 
@@ -589,7 +602,7 @@ theorem clsLit1 : rowClsOkB rowA1 = true ∧ rowClsOkB rowB1 = true := by
   constructor <;> decide +kernel
 
 theorem offLit1 : AxSpinT2p1.offCutsB 101 q0 = true ∧ AxSpinT2p1.offCutsB 38 qB1 = true := by
-  constructor <;> decide
+  constructor <;> decide +kernel
 
 section prem
 variable (E : List (List Eitem))
@@ -612,11 +625,13 @@ theorem pinsB1 : AllocPins2 (gtAdGd (gT1 E)) 1 qB1 := by
 
 /-- **`¬ t2Cut`** for A (its row ends at no designated cut). -/
 theorem notCutA1 : ¬ t2Cut (gtAdGd (gT1 E)) 0 (sZ 0) (AxSpinT2a.pEx 0) :=
-  notCutOfLen (preA1 E) (by rw [growA1, sizes1.1]; exact AxSpinT2p1.offCutsOf offLit1.1)
+  notCutOfLen (preA1 E) (by rw [growA1, sizes1.1]; exact (AxSpinT2p1.offCutsOf offLit1.1).1)
+    (by rw [growA1, sizes1.1]; exact (AxSpinT2p1.offCutsOf offLit1.1).2)
 
 /-- **`¬ t2Cut`** for B. -/
 theorem notCutB1 : ¬ t2Cut (gtAdGd (gT1 E)) 1 (sZ 1) (AxSpinT2a.pEx 1) :=
-  notCutOfLen (preB1G E) (by rw [growB1, sizes1.2.1]; exact AxSpinT2p1.offCutsOf offLit1.2)
+  notCutOfLen (preB1G E) (by rw [growB1, sizes1.2.1]; exact (AxSpinT2p1.offCutsOf offLit1.2).1)
+    (by rw [growB1, sizes1.2.1]; exact (AxSpinT2p1.offCutsOf offLit1.2).2)
 
 /-- **A is INCOMPLETE** (`t2Complete` false). -/
 theorem notCompleteA1 : ¬ t2Complete (gtAdGd (gT1 E)) 0 (sZ 0) (AxSpinT2a.pEx 0) :=
