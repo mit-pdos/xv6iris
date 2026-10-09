@@ -1,13 +1,15 @@
 # allocproc on RVWMO: target theorem, gap analysis, roadmap (design advisor, 2026-10-09)
 
-**Status: rev 8 = rev 7 + review R7 (4 required changes, tags [R7.n]; s2–s6 adopted, s1 not — see §D head).  The
-spike reports stay folded in; the provisional deviation [OWN.8-conflict] (D32, now in the weak-arm form (a′)) stands.
-[OWN.1–9] otherwise kept.**
-**One-liner [R6.s1][R7.2a]: the published quantifier is riscv.cat RVWMO with TAGGED dependencies
-(`rvwmoCatConsistentT`), plus an I/O-ordering PLATFORM assumption (`ioObAcyclic`: a hart's memory accesses po-before
-an MMIO access, and its STORES po-after it, are performed on that side of it; MMIO accesses and the disk agent's fabric
-moves are fabric-ordered — not an RVWMO or PMA guarantee) and a graph-tier Zifencei fetch model (`gzFetch`) — two named
-trusted-base items with no reference model.  Non-vacuity past boot is OPEN (D44) [R7.4].**
+**Status: rev 9 = rev 8 + owner rulings [OWN.10]–[OWN.12] (`../weak-orch/allocproc_revise3_extra.txt`): spike Lean
+files frozen as merged [OWN.10]; D44 RULED (i) → new Stage-2 item W14 [OWN.11]; FAITHFUL RVWMO I/O EVALUATED
+(§B(11b)) and found INFEASIBLE as the realization's ordering source — D32 RULED (a′), D37 RULED (a), the platform
+assumption restated as the RESIDUE over what the ISA gives [OWN.12].  [OWN.1–9] kept; no review since R7.**
+**One-liner [R6.s1][R7.2a][OWN.12]: the published quantifier is riscv.cat RVWMO with TAGGED dependencies
+(`rvwmoCatConsistentT`), plus an I/O-ordering PLATFORM assumption (`ioObAcyclic` (a′): BEYOND the ISA's FENCE i/o
+bits, dependencies, precise traps and the device models, a row's RAM accesses po-before an MMIO access and its RAM
+STORES po-after it are performed on that side of it; MMIO accesses and the disk agent's fabric moves are
+fabric-ordered — the residue is what QEMU TCG gives and RVWMO + PMAs do not) and a graph-tier Zifencei fetch model
+(`gzFetch`) — two named trusted-base items with no reference model.  Non-vacuity past boot: W14 (D44 (i), RULED).**
 History: rev 1 (2026-10-09) survey; rev 2 `…-review-R1.md` (11 req.; D8–D13); rev 3 `…-R2.md` (5 req., two
 [R2.n-alt]; D14–D19); rev 4 `…-R3.md` (4 req.; D20–D23) + [OWN.1–4]; rev 5 `…-R4.md` (5 req.; D25, D27, D28); rev 6
 `…-R5.md` (3 req.: quiescence VACUOUS → W13; W3 sibling root; `pairAdjacent`) + [OWN.5–9]; rev 7 (2026-10-09)
@@ -15,7 +17,9 @@ History: rev 1 (2026-10-09) survey; rev 2 `…-review-R1.md` (11 req.; D8–D13)
 (provisional); T2-1c′ LANDED, W13 = XL; fetches ADMINISTRATIVE (`gzFetch`, cut form); W5b owns `execProgOk'S`; D32–D43;
 rev 8 (2026-10-09) `…-R7.md` (4 req., s2–s6): `ioObAcyclic`'s `dv → read` arm DROPPED (a′); "strongly-ordered I/O"
 renamed (MMIO-as-fence, host-dependent); the disk agent's row a first-class W13 object; the user-fetch witness is
-INFEASIBLE by evaluation → non-vacuity past boot OPEN; D32/D37 revised, D44–D45.
+INFEASIBLE by evaluation → non-vacuity past boot OPEN; D32/D37 revised, D44–D45; rev 9 (2026-10-09) [OWN.10–12]:
+faithful I/O evaluated (§B(11b)) — infeasible, (a′) RULED with the residue reading; D37 (a) RULED; D44 (i) RULED →
+W14; spike files frozen; D46 NEW (the `ioOrdF` residue audit).
 
 **The kernel [OWN.4][R1.9]: xv6-riscv `b72cbac1`, branch `verified`** (`notes/STATUS.md:8-11`, `README.md:89-90`)
 = upstream plus (a) a per-process root (`p->root`, `sys_chroot`, `igetroot`, root-aware `dirlookup`/walk) and
@@ -27,8 +31,10 @@ Advisory only; read-only survey of `../xv6iris-weak` (`Weak/`, `Xv6/`, `MachCSL/
 `claude-notes/{completed,design}/*weak*`).  Sizes: S ≤ 300 lines, M ≤ 800, L ≤ 2k, XL = multi-week / many files.
 Unconfirmed claims are **unverified**.  Spike scratch files (build, no `sorry`): `Weak/CatOfMinusSpike.lean` (399),
 `Weak/W13Spike.lean` (145), `../xv6iris-weak-w3/Weak/GraphFetchSpike.lean` (226; `propext, Quot.sound` only) — the
-latter exists ONLY in the `-w3` workspace (its report is merged as `notes/W5dG-spike.md`); W5d-G's day-one step merges
-it as `Weak/GraphFetchSpike.lean`, and this plan's `GraphFetchSpike.lean:N` cites refer to that path [R7.s3].
+latter exists ONLY in the `-w3` workspace (its report is merged as `notes/W5dG-spike.md`).  **[OWN.10]: the two merged
+spike files STAY; NOTHING else is merged (GraphFetchSpike stays in `-w3`) until the plan is SATISFIED** — W5d-G's
+day-one merge step (§C) is gated on that verdict; this plan's `GraphFetchSpike.lean:N` cites refer to the `-w3` file
+until then [R7.s3].
 
 ## 0. The two findings that reshape the question
 
@@ -97,17 +103,18 @@ riscv.cat-tier validation of the handle-based lock protocol; do NOT extend it.
    **Panics are NOT excluded** (`panic` is a bare `wpLoop`, `Xv6/SpecPanic.lean:11-14`), **nor the two reducible
    spin arms** [R2.4]: `blockedStep` and the weak retry self-loop of a lost exclusive pair
    (`Weak/WeakEvInst.lean:360-364`).  "never panics" = "no `panic:` bytes in the UART trace" (`uartSentSub`,
-   `Xv6/UartTrace.lean:182`), M–L, new work — D9.  **Caveat until D44 (i) or (iii) lands** [R7.4b]: the planned
-   witnesses certify that the premise set is satisfiable only up to the first UART store (W13-wit) and the first disk
-   COMMIT (W13 (W) gate 2); no planned evidence shows a candidate REACHING `allocproc`, so (b) below is, as planned,
-   unsupported against vacuity — the header must say so if (ii) is chosen;
+   `Xv6/UartTrace.lean:182`), M–L, new work — D9.  **Caveat until W14 lands (D44 RULED (i) [OWN.11])** [R7.4b]: the
+   evaluation witnesses certify satisfiability only up to the first UART store (W13-wit) and the first disk COMMIT
+   (W13 (W) gate 2); the evidence that a candidate REACHES `allocproc` is W14's single-execution existence theorem
+   (§C Stage 2) — until it lands the header says "non-vacuity certified to the first UART store / disk COMMIT";
 6. axioms `propext`/`Classical.choice`/`Quot.sound` + `bv_decide` certificates + the three opaques
    (`tools/audit/baseline.json:11-14`), no `sorry`; trusted base named: Sail model, image dump, the TAGGED cat
    transcription and its tagged conformance text `gdexecQconfT` (new trusted-SURFACE text, reviewed against
    `rowDepsT`'s correction (5), `AxDeps.lean:56-60`) [R6.1], the graph-tier fetch model (W5d-G `gzFetch`, §B(4)(iii);
-   RULED [OWN.6]), the graph-tier I/O-ordering PLATFORM assumption (W13 `ioObAcyclic`, weak-arm form (a′): MMIO
-   accesses and disk fabric moves act as one-way fences for the issuing row's memory accesses and are fabric-ordered;
-   [OWN.8-conflict], D32 revised) [R4.2][R5.1][R6.3][R7.1][R7.2].
+   RULED [OWN.6]), the graph-tier I/O-ordering PLATFORM assumption (W13 `ioObAcyclic`, weak-arm form (a′), **RULED
+   [OWN.12] after the faithful evaluation §B(11b)**: MMIO accesses and disk fabric moves act as one-way fences for the
+   issuing row's RAM accesses and are fabric-ordered — stated as the residue over the ISA-given edges)
+   [R4.2][R5.1][R6.3][R7.1][R7.2].
 
 **Legitimately out of scope:** liveness/fairness, timing, mixed-size fidelity of the cat model (N10), MMIO
 ordering beyond the modelled devices, hardware outside the Sail model, power cycles (SINGLE ERA [R2.2]).
@@ -121,7 +128,7 @@ unpinned (M2), below.  *T-alloc-RVWMO (THE published claim)* [OWN.2][OWN.3][R3.1
   wbootFacts σ0 ∧ σ0.wggen = 0 ∧ (∃ ds, σ0.wgdev = ds.reset ∧ diskOf ds = fsImgDisk) ∧        -- the boot [R2.2]
   rvwmoCatConsistentT GT.gfGd ∧                                 -- riscv.cat, TAGGED deps (AxDeps.lean:208) [R6.1]
   ioObAcyclic (forgetF GT) ∧        -- I/O-ordering platform assumption, (a′) form: W13Spike.lean:83-95 with the
-                                    -- `.dv → .ev y` arm restricted to `gisW … y` [R6.3][R7.1][D32]
+                                    -- `.dv → .ev y` arm restricted to `gisW … y` [R6.3][R7.1]; D32 RULED [OWN.12]
   xv6ConfS (xboot σ0) (efInit σ0.wgdev) (imgZ σ0.wgimg) (xN σ0) GT                             -- xv6 is the program (†)
   →
   (a) the realizing MachCSL run (robustness W9–W11 → sRVWMO cand → T1 → pf run → W4, PREFIXED by PowerOn from
@@ -136,7 +143,8 @@ unpinned (M2), below.  *T-alloc-RVWMO (THE published claim)* [OWN.2][OWN.3][R3.1
 `forgetF`, `xv6ConfS`, `gfexecConfA`, `execProgOkA`, `execProgOk'S`, `pairAdjacent`, `candSca`, `candKfetch`,
 `textPristine`, `Gdexec.gdFetch`, `emZifencei`, `gzFetch`/`gzContrib`/`emFenceI` (scratch only), `rvwmoCoreD`,
 `rvwmoCatAD` (scratch only), `Ioev`/`ioOrd`/`ioObAcyclic` (scratch only, and the (a′) arm differs from the scratch),
-`badSeg`, `linCandSca`, `xv6RvwmoSafeModuloT`, `cycleKillA`, `pidPick_range`.
+`ioOrdF`/`emIoFence` (D46 (b) only, §B(11b)), `badSeg`, `linCandSca`, `xv6RvwmoSafeModuloT`, `cycleKillA`,
+`pidPick_range`, W14's `Weak/ExistWitness.lean`.
 (†) `xv6ConfS` is the SHAPED, UNPINNED, FABRIC-ORDERED, TAGGED conformance bundle [R5.1][R6.1][R6.3][R6.4]:
 `gfexecConfA` (W13 (I)/(W): per-hart `hartConff` emissions with TWO fabric endpoints, `Fab.lean:523-536`; dev blocks
 keyed by position `(i, k)` as their OWN admin-only trace steps, `execProgOkA`, not folded into the next tagged
@@ -149,38 +157,29 @@ LTS emits `LDev` for EVERY MMIO access (`Weak/WeakEvInst.lean:300-303,335-338`) 
 (`:484,502`); hart 0's `main` runs `consoleinit` FIRST (`Xv6/SpecMain.lean:7-10`) = `uartinitone`'s seven `WriteReg`s
 (`Xv6/SpecUartinitone.lean:6-13`), so `userinit → allocproc` is unreachable in EVERY quiescent `GD` (route-b: "HONEST
 MILESTONE", `weak-memory-route-b.md:1009-1020`); no `LDev`-emitting witness exists (`gfexecConfOfQconf`, `Fab.lean:648`).
-**`ioObAcyclic` REPLACES rev 6's `devAcyclic`** [R6.3][OWN.8-conflict]: the RULED literal axiom "`po ∪ rf ∪ gmo|W ∪
-dev` acyclic on the quantified graph" IS `gfexecConsistent'` (`Weak/WeakRvwmoLin2.lean:761-762`; `ptraceRel :124`);
-`po ∪ rf` acyclic = "no load buffering", `po ∪ gmo|W` acyclic = "no W→W reordering" — machine-checked `lbExcluded`
-(`Weak/W13Spike.lean:35`: the LB graph is `rvwmoCatConsistent` yet fails `gfexecConsistent' ⟨lbgd, []⟩` at an EMPTY
-fabric), contradicting [OWN.2]; and it subsumes the kill (`xv6RvwmoSafeModuloF`, `Capstone.lean:228-265`, carries no
-`l2Claim`/`walkSupply`) — a robustness ASSUMPTION, not a hardware model.  The spike's replacement, applied PROVISIONALLY in the WEAK-ARM form (a′) [R7.1]: `ioObAcyclic GF := ∀
-x, ¬ tc (ioOrd GF) x x` with `Ioev = ev e | dv i k` — `dv i k` = row `i`'s I/O node between its events `k-1` and `k`,
-`i` ranging over ALL `xN σ0 = NCPU + 1` rows, so the nodes are a hart's MMIO accesses AND the disk agent's START/COMMIT
-fabric moves (`pdiskProg`'s two `LDev` arms, `WeakEvInst.lean:484,502`) [R7.3a] — and `ioOrd` = `gmoLt` on events;
-`.ev x → .dv i k` for row `i`'s `gmem` events po-BEFORE the node (reads included: "performed before the I/O access");
-**`.dv i k → .ev y` ONLY for row `i`'s WRITES po-after it** (`gisW`; the spike's `W13Spike.lean:91` arm orders every
-po-later `gmem` event, reads too); fabric order (`gdevAdj`, or same-row `k < l`) between I/O nodes.  Why the read arm
-is dropped: (i) the strong model does NOT have it — `elabOk σ c LDev = True` (`WeakEvInst.lean:558`) moves no view, and
-TsoMem's MMIO arms touch only `devs` (`MachCSL/Lang.lean:356-358,372-375`), so a plain load po-after an MMIO access
-still reads at any `tvn ∈ [tv, top]` (`:363-367`): a STALE read after MMIO is a TsoMem behaviour under which the Iris
-proofs are sound (xv6 example: `printf`'s `pr.locking`/`panicked` read stale after a fabric-later UART store), and the
-spike's arm would make `GT` INEXISTENT for such rf/co/fabric (cycle `st_B → dv_B → dv_A → ld_A →(fr) st_B`); (ii) nothing
-needs it — in `ptraceRel = po ∪ rf ∪ gmo|W` (`Lin2.lean:124`) a read has no cross-hart OUT-edge, so every po-run of a
-trace cycle in (L) ends at a write (`gpow ⊆ racyD`, `Acyc.lean:192-199`) or a dev node (`iopo`-in), and (K)'s only
-consumed `dv →` arm is `dv → po-later WRITE`; the `read → dv` arm IS realization-necessary and stays.  The `gmem`
-guards on both hart arms exist because fences are not in gmo (`gwf`, `WeakRvwmoGraph.lean:171`; spike R4) [R7.s4].
-Free at an empty fabric (`ioObAcyclicNodev :109`, same rank function) so LB and W→W stay in the quantifier; admits the
-SC case (`w13fIoOk :116`); the owner's intent "the fabric order is realizable by the machine's own ordering"
-(`route-b.md:1040-1055`) is preserved; it does NOT assume `racyD` acyclicity — the kill still carries that.  For the
-disk row the `.ev → .dv` arm says "DMA writes (plain `LStore`s, drained by the device-side `LFence true true true
-true`, `:497-498`) are performed before COMMIT moves the fabric" — THE fact that makes DMA'd buffer data visible to a
-hart that observes completion through the fabric; the one place (T) carries disk correctness [R7.3].  `gdevAdj ⊆ gmo`
-(`Fab.lean:542-544`)
-is ALSO out (`scDevExcluded`/`scDevUnrealizable`, `W13Spike.lean:55,66`: a plain SC execution MMIO₀; MMIO₁; st x; ld
-x = 1 fails it and no `ptraceExt` trace visits the blocks in fabric order) — block-atomic folding of `LDev` into the
-next tagged step (`execProgOk'`, `WeakAxRealize.lean:373-386`) makes EVERY block-level dev condition exclude SC
-executions, hence the realization-interface change (I).  `candSca` is NOT a premise here:
+**`ioObAcyclic` REPLACES rev 6's `devAcyclic`** [R6.3][OWN.8-conflict]: [OWN.8]'s literal axiom IS `gfexecConsistent'`
+(`Weak/WeakRvwmoLin2.lean:761-762`), which forbids LB and W→W even at an EMPTY fabric (`lbExcluded`,
+`Weak/W13Spike.lean:35`) and subsumes the kill (`xv6RvwmoSafeModuloF`, `Capstone.lean:228-265`, carries no
+`l2Claim`/`walkSupply`) — a robustness ASSUMPTION, not a hardware model.  The replacement, RULED in the WEAK-ARM form
+(a′) [R7.1][OWN.12]: `ioObAcyclic GF := ∀ x, ¬ tc (ioOrd GF) x x` with `Ioev = ev e | dv i k` — `dv i k` = row `i`'s
+I/O node between its events `k-1` and `k`, `i` over ALL `xN σ0 = NCPU + 1` rows: a hart's MMIO accesses, the PLIC's
+pin delivery to a hart (`pstepPlic`, `WeakEvInst.lean:461`, also `LDev`) AND the disk agent's START/COMMIT fabric
+moves (`pdiskProg`'s two `LDev` arms, `:484,502`) [R7.3a]; `ioOrd` = `gmoLt` on events; `.ev x → .dv i k` for row `i`'s
+`gmem` events po-BEFORE the node (reads included); **`.dv i k → .ev y` ONLY for row `i`'s WRITES po-after it**
+(`gisW`; the spike's `W13Spike.lean:91` arm orders reads too); fabric order (`gdevAdj`, or same-row `k < l`) between
+I/O nodes.  The read arm is dropped because the strong model lacks it (`elabOk σ c LDev = True`, `WeakEvInst.lean:558`;
+TsoMem's MMIO arms touch only `devs`, `MachCSL/Lang.lean:356-358,372-375`, a later load still reads at any `tvn ∈ [tv,
+top]`, `:363-367`) and nothing needs it (reads have no cross-hart OUT-edge in `ptraceRel = po ∪ rf ∪ gmo|W`,
+`Lin2.lean:124`, so every po-run of a trace cycle ends at a write, `gpow ⊆ racyD`, `Acyc.lean:192-199`, or a dev node);
+**both remaining hart arms are REALIZATION-NECESSARY and neither is ISA-given on xv6's paths — §B(11b)**.  The `gmem`
+guards exist because fences are not in gmo (`gwf`, `WeakRvwmoGraph.lean:171`) [R7.s4].  Free at an empty fabric
+(`ioObAcyclicNodev :109`) so LB and W→W stay in the quantifier; admits the SC case (`w13fIoOk :116`); does NOT assume
+`racyD` acyclicity — the kill carries that.  For the disk row the `.ev → .dv` arm says "DMA writes (plain `LStore`s,
+drained by the device-side `LFence true true true true`, `:497-498`) are performed before COMMIT moves the fabric" —
+device-MODEL semantics, the one place (T) carries disk correctness [R7.3].  `gdevAdj ⊆ gmo` (`Fab.lean:542-544`) is
+ALSO out (`scDevExcluded`/`scDevUnrealizable`, `W13Spike.lean:55,66`): block-atomic folding of `LDev` into the next
+tagged step (`execProgOk'`, `WeakAxRealize.lean:373-386`) makes EVERY block-level dev condition exclude SC executions,
+hence the realization-interface change (I).  `candSca` is NOT a premise here:
 a `Cand` predicate, ill-typed on `GD`, DERIVED at Stage 2 from `gloadValue` (`linCandSca`, W11) [R4.4].  The
 conformance premise is genuine: the graph side alone yields only `execWf`-style facts; the program half is realized
 by `execWfPfRunProg` (`Weak/WeakAxRealize.lean:802-808`) [R1.5].  **The pin fixes WHAT a fetch answers, not WHERE it
@@ -253,19 +252,18 @@ label; (H2) `fence.i` completes the hart's earlier stores and reads before later
 sites come from the EMISSION, not the graph: `fence.i` and the Q7 `sfence.vma` marker share the label `LFence false
 false false false` (`WeakEvInst.lean:272-275`; `WeakEvLang.lean:418-419,745`), so `emFenceI em f` := the row item at
 `f` is that fence AND the latest `LInstr`/`LIFetch` in the admin block before it is `LInstr` (`emFenceISound`, M;
-D40).  Proved in the scratch: `fetchCutOk`, `fetchCutPrefix :63` (cut form = the pf/W5d check at the realizing prefix
-with ONE view), `fetchCutEdge :83`, `fetchRelOk`, `fetchRelCut :140`, `fetchPinCutOk :213`; stated: `gzFetch`,
+D40).  Scratch status: proved `fetchCutOk`, `fetchCutPrefix :63` (cut form = the pf/W5d check at the realizing
+prefix with ONE view), `fetchCutEdge :83`, `fetchRelOk`, `fetchRelCut :140`, `fetchPinCutOk :213`; stated `gzFetch`,
 `gzFetchCut`, `emZifencei`, `gfcut`, `gwlog`.  **Kernel-text instance**: tag 0, image bytes, no write ⇒ (Z1)–(Z3)
-vacuous; `candKfetch` + W3's history fact discharge `gzFetch` for every kernel fetch; kernel-only executions get an
-EMPTY fetch fragment — no new edges or kill arms.  Consumption: edges E1 src→nxw, E2 c→w', E3 src_l→w'_j, all `gmoLt`
-on `GD` by (Z2)/(Z3), stored as `Gdexec.gdFetch` (D42), `F_em ⊆ GD.gdFetch` in `xv6ConfS`; `rvwmoCatConsistentT`
-untouched; retime: `L ⊇ racyD ∪ F` + `grule14 GD'` give `fetchRelOk` at `GD'` (the contributor SET is rf/po-defined,
-hence retime-invariant — `normalizeOfAcyclic` renames write indices NON-monotonically, `WeakRvwmoTopo.lean:594-607`,
-so no max/cut condition transports), then `fetchRelCut` gives `gzFetchCut`; realize: replay the fetch just before
-`(i,k)`'s step, log = `gwlog.take gfcut` (`linPrefixLog`; `linCand`, `WeakRvwmoLin.lean:440-453`), itv `≤ lmax cs` by
-a floor bound, `fetchCutPrefix` gives `ifetchOk` and the single view `q`.  Measured sites: `pstepPin` 19 files/121,
-`emFetchImg` 10/41, `gdexecQconf` 18/124, `gdDeps` 31/133, `wlblRen` 3/41.  Sizes: W3 M–L [R5.2]; W5d L; W5d-G L
-(G1–G5; G6 shared with W11 (iii); G7 L in W11/W8); **XL risk R1 — hull closure**: `hullOk` is
+vacuous; `candKfetch` + W3's history fact discharge `gzFetch`; kernel-only executions get an EMPTY fetch fragment.
+Consumption (details `W5dG-spike.md`): edges E1 src→nxw, E2 c→w', E3 src_l→w'_j, `gmoLt` on `GD` by (Z2)/(Z3),
+stored as `Gdexec.gdFetch` (D42), `F_em ⊆ GD.gdFetch` in `xv6ConfS`; retime via `L ⊇ racyD ∪ F` (the contributor SET
+is rf/po-defined, hence retime-invariant — `normalizeOfAcyclic` renames write indices NON-monotonically,
+`WeakRvwmoTopo.lean:594-607`, so no max/cut condition transports); realize by replaying the fetch just before
+`(i,k)`'s step at log `gwlog.take gfcut` (`linPrefixLog`), `fetchCutPrefix` giving `ifetchOk` and the single view `q`.
+Measured sites: `pstepPin` 19 files/121, `emFetchImg` 10/41, `gdexecQconf` 18/124, `gdDeps` 31/133, `wlblRen` 3/41.
+Sizes: W3 M–L [R5.2]; W5d L; W5d-G L (G1–G5; G6 shared with W11 (iii); G7 L in W11/W8); **XL risk R1 — hull
+closure**: `hullOk` is
 rf-closed only (`WeakRvwmoHull.lean:557-560`) and knows nothing of fetch sources — a kept fetch whose next own write
 was cut away loses its source; fix (a, recommended): anchor sources to EVERY po-later memory access (E1′, a stronger
 but gmo-true (H3)), then "kept fetch ⇒ source kept" follows from racyD-closure (M if the cut selection is
@@ -278,9 +276,9 @@ ledger handles wrap/collision retries, `Xv6/ProofAllocproc.lean:16-24`; text fac
 **(9) THE gap: TsoMem is sRVWMO + reservation serialisation; the target is RVWMO proper** [R1.7][OWN.2].
 *Inventory of weaker models in the Lean tree.*  (α) `WeakMem` pf machine = sRVWMO operational (T1
 `srvwmoRealizable`, `Weak/WeakAxiomatic3.lean:2077`; T2 `t2Ev`, `Weak/WeakEvInst.lean:2046`) — TsoMem's strength
-class.  (β) `WeakPromise*` (`Weak/WeakPromise.lean:1-16`) — LB reachable; RVWMO fidelity BY INSPECTION only
-(`weak-memory-m6-robustness.md:42-48`).  (γ) PSO two-log machine: Rocq-only design; NOTHING in Lean.  (δ) Graphs: the
-tagged cat model (§A(3)), the untagged `rvwmoCatConsistent`, `rvwmoMinusDepsConsistent` (`WeakRvwmoGraph.lean:628`).
+class; (β) `WeakPromise*` (`Weak/WeakPromise.lean:1-16`) — LB reachable, RVWMO fidelity BY INSPECTION only; (γ) PSO
+two-log machine: Rocq-only design, NOTHING in Lean; (δ) graphs: the tagged cat model (§A(3)), the untagged
+`rvwmoCatConsistent`, `rvwmoMinusDepsConsistent` (`WeakRvwmoGraph.lean:628`).
 **`minusImpliesCat` (`Weak/AxGraphCat.lean:274`) runs the WRONG way for us**: RVWMO⁻ renders rules 1–3 as all of
 `gpoloc` (`WeakRvwmoGraph.lean:224-228`), ordering a write before its own po-later same-byte read — it FORBIDS
 store-buffer forwarding (N11, `AxGraphCat.lean:10-16`), so a theorem over RVWMO⁻ misses cat-consistent executions.
@@ -348,7 +346,7 @@ not on the path, optional de-risk of W8's export (D4).  **(9c)** promise-machine
   in §C Stage 2.  Sizes (✓ = spike-confirmed): W8 L–XL, W9a L (M–L + M ✓), W9b in W8, W10 M–L (**unverified**; L if it
   absorbs W12b), W11 L [R4.3], **W12 M–L ≈ 1.2–1.8k ✓**, **W12b M–L ≈ 0.5–1k ✓**, **W5d-G L ≈ 1.8–2.2k ✓ + XL risk
   R1**, **W13 XL ✓** (≈ the landed kill pipeline; 3.6k lines of Fab/FabInd/Lin2/Floor reused as is).  **Total: XL** —
-  multi-week, many files; W13 the bulk, W5d-G's hull closure the open risk, non-vacuity past boot OPEN (D44).
+  multi-week, many files; W13 the bulk, W5d-G's hull closure the open risk, non-vacuity at allocproc = W14 (D44 (i)).
 *Recommended:* (9d), staged after M2; the three spikes are DONE and CONFIRM D25 (a) [OWN.5], SHAPE D27 (a)
 [OWN.6], and REFUTE the literal [OWN.8] (D32); (9b) only if W8 wants a smaller model (D4); (9c) as D2′ fallback.
 
@@ -382,7 +380,8 @@ facts along the run; W5c must PRODUCE it (`execProgOk'Snoc`, `Weak/WeakRvwmoCert
 `execProgOk'`; an S-variant is needed).  At Stage 2 `RunData`/`cstOk`/`segStep`/`topoSupply`/`t2linSupply` (plain
 `execProgOk'` today) produce the S-variant — W11 (iii) [R4.3], one pass with W5d-G's G6 (`pstepPin` →
 `execProgOk'S`, 19 files / 121 sites: AxRealize 26, Supply 14, Cert 9, Cert2 8, Fab 7, Cert3 7, SrvwmoCapstone 6,
-CycWit 6, Cert4 6, AxAdequacy 6, Cert3b 5, LinInd/Lin2/FabInd 4, Capstone 3, Glue/ConfWit2 2, Glue2/AxRunGV 1).
+CycWit 6, Cert4 6, AxAdequacy 6, Cert3b 5, LinInd/Lin2/FabInd 4, Capstone 3, Glue/ConfWit2 2, Glue2/AxRunGV 1 —
+the one list; §C cites it).
 **[R3.4] (↓) fails on PLAIN LOADS even on shaped runs — tearing.**  WeakMem's `readable` is per byte
 (`Weak/WeakMem.lean:400-402`; `readOkD`, `WeakPromise.lean:183-188`; `rdOk`, `WeakAxiomatic.lean:122-130`), no axiom
 joins one label's bytes (N10); TsoMem reads every byte at ONE `tvn` (`Lang.lean:363-367`).  Counterexample: whole-word
@@ -421,24 +420,25 @@ TAGGED cat transcription** `rvwmoCatConsistentT` + the tagged conformance text `
 text; the untagged model's rule 12 is a strengthening of riscv.cat the tree marks UNSOUND — D33); **the graph-tier
 fetch model** (W5d-G `gzFetch`/`emZifencei`, readings (H1)–(H3), §B(4)(iii) — NO reference model, RVWMO has no
 instruction-fetch model; D27 RULED (a) [OWN.6]); **the graph-tier I/O-ordering PLATFORM assumption** (W13
-`ioObAcyclic`, (a′) form, §A(†)): riscv.cat's gmo extended with I/O nodes — a hart's MMIO accesses and the disk agent's
-START/COMMIT fabric moves — is acyclic, where a row's memory accesses po-before an I/O node are performed before it,
-its STORES po-after are performed after it, and I/O nodes are fabric-ordered; no reference model; [OWN.8-conflict], D32
-[R7.1b][R7.3a].  **What it asserts and is NOT** [R6.3ii][R7.2b]: each I/O access acts as a ONE-WAY FENCE between the
-issuing row's main-memory accesses and the fabric.  RISC-V's "strongly ordered" PMA orders a hart's I/O accesses within
-one channel AMONG THEMSELVES, not against main memory — the FENCE i/o bits exist for that — so "PMA strong ordering" is
-NOT a justification and is dropped (D37).  The image has 4 bare `fence` (iorw,iorw) words, all in virtio
-(`Xv6/KernelImage.lean:17300-17450`), `fence rw,w` ×2 (`:2361,2825`), `fence r,rw` ×1 (`:2747`), `fence.i` ×1
-(`:17614`): the virtio path's own fences are what justify RAM↔MMIO ordering THERE, xv6's UART and PLIC paths are NOT
-fence-ordered under RVWMO's text, and `LFence` has no i/o bits (`WeakAxiomatic.lean:90`), so neither the virtio fences
-nor a fence-discipline variant can be expressed at the graph tier [R7.1d] — under (a′) the virtio reads of
-`used->idx`/`b->disk` after the ACK MMIO are simply unordered at the graph tier, exactly as in TsoMem.  The platform
-named: hosts whose MMIO path performs the row's prior RAM accesses before the device sees the access (QEMU TCG:
-program-order execution per vCPU + the BQL around MMIO) — host-dependent.  **Trusted USES of it** [R6.s4][R7.2c]
-[R7.3d], list each site in the header: unlocked cross-hart PLIC claim/complete and `plicinithart` (real fabric races
-covered only by the one-way arms of (T)); the DMA-visibility reading on the disk row (DMA writes before COMMIT); the
-`printf`/panic racy flags `pr.locking`/`panicked` are NOT trusted uses under (a′) — their stale-read executions stay
-in the quantifier (under the spike's two-way form (a) they would be excluded).  **User-row gaps under [OWN.3]** [R6.2]:
+`ioObAcyclic`, (a′) form, §A(†); D32 RULED (a′), D37 RULED (a) [OWN.12]): riscv.cat's gmo extended with I/O nodes — a
+hart's MMIO accesses, PLIC pin deliveries and the disk agent's START/COMMIT fabric moves — is acyclic, where a row's
+RAM accesses po-before an I/O node are performed before it, its RAM STORES po-after are performed after it, and I/O
+nodes are fabric-ordered; no reference model [R7.1b][R7.3a].  **Stated as a RESIDUE** [OWN.12]: RVWMO + PMAs give some
+of these edges (§B(11b) (F1)–(F6): FENCE i/o bits, dependencies into a device store, precise traps, same-channel
+order, the device models); the ASSUMPTION is the rest — each I/O access acts as a ONE-WAY FENCE for the issuing row's
+RAM accesses even where no i/o fence, dependency or trap boundary orders them.  "PMA strong ordering" is NOT a
+justification (it orders I/O accesses within one channel among themselves, never against main memory; D37(c) dropped)
+[R6.3ii][R7.2b].  The platform named: hosts whose MMIO path performs the row's prior RAM accesses before the device
+sees the access and holds later RAM stores behind it (QEMU TCG: program-order execution per vCPU + the BQL around
+MMIO) — host-dependent.  **Trusted USES, per arm** [R6.s4][R7.2c][R7.3d][OWN.12], list in the header: the `x →po dv`
+arm for RAM STORES before an MMIO access — `plicinithart`/`plicinit`, `uartinitone`'s seven `WriteReg`s, the lock's
+store half and prior stores before `uartputc_sync`'s LSR read and before `virtio_disk_intr`'s STATUS read; the
+`dv →po w` arm for every device STORE not followed by a PO-fence — THR, NOTIFY (`0x80005c92`), `plic_complete`,
+`plicinithart` (only the ACK at `0x80005d52` is fence-covered); the unlocked cross-hart PLIC claim/complete races.
+NOT trusted uses: the pre-NOTIFY direction (xv6's two `fence iorw,iorw` give it), the post-ACK loads (the third
+fence), loads before an interrupt handler's claim (precise traps), dependency-pinned sources of a device store, the
+disk row's DMA-before-COMMIT (device model), and the `printf`/panic racy flags `pr.locking`/`panicked` (their
+stale-read executions stay in the quantifier).  **User-row gaps under [OWN.3]** [R6.2]:
 rule 7 RCpc (D35) and forwarded plain `LLoad aq` (D36),
 both vacuous for kernel rows.  Strengthenings carried INTERNALLY by TsoMem/sRVWMO (not in the published statement
 once (9d) lands): "stores never early"; reservation serialisation.  Machine-model choices: exactly 8 harts booted;
@@ -448,6 +448,67 @@ Svadu A/D write-back as a plain view-neutral LR/SC; DMA as a store-order agent; 
 direction for THOSE), litmus-checked only; the published quantifier IS cat (tagged) — D25 (a) RULED [OWN.5] and
 spike-CONFIRMED, W12 on the critical path, no RVWMO⁻ fallback; Sail fork `070832a1` with `-D SYMBOLIC`; the image
 dump.  Keep, list.
+**(11b) Faithful RVWMO I/O, evaluated [OWN.12] — verdict: INFEASIBLE as the realization's ordering source; (a′)
+RULED, restated as the residue; optional audit D46.**  Read-only evaluation; every claim about the ISA text is a
+reading of prose (riscv.cat has NO I/O events — a faithful I/O model is itself a NEW trusted-surface transcription).
+*What the ISA gives (`ioOrdF`, the faithful hart arms):* **(F1)** FENCE with i/o bits (Unpriv. §2.7: PI/PO/PR/PW ×
+SI/SO/SR/SW) — `fence iorw,iorw` orders every prior RAM and device access before every later one; **(F2)** PMA
+strongly-ordered channel: a hart's accesses to ONE I/O channel in program order among themselves (faithful minimum:
+one channel per device — UART0/UART1, PLIC, virtio; the CLINT never reaches the language, `Dev/Fabric.lean:10`,
+`timerinit` is Sstc CSR-only); same-address rules are vacuous RAM↔MMIO; **(F3)** dependencies: addr/data/ctrl into a
+device STORE (ppo 9–11; herd's `ctrl` reaches every po-later store after the dependent branch), addr into a device
+load; ctrl into a device LOAD is NOT ppo — the only basis is the PMA non-idempotency text ("no speculative access to a
+non-idempotent region"), a reading to be NAMED; **(F4)** aq/rl: the text orders "memory operations" — faithful = they
+do NOT order I/O; **(F5)** precise traps: earlier instructions COMPLETE before a trap is taken, so a load/AMO
+po-before an interrupt handler has its value before the handler's MMIO, a STORE need not be performed; **(F6)** the
+device rows' own order (virtio DRead/DWrite/DFence/COMMIT, `pdiskProg`; DMA reads at the TOP of the store order,
+`Dev/DevLang.lean:20-21`, `dmaView`, `Lang.lean:185,535`) and the fabric sequence `fab` are the device MODELS' —
+already trusted, not platform.  *What the realization needs (model-independent):* TsoMem and the pf machine run each
+row sequentially — a dev step sits at its po position, a store enters the log at its step, a load never reads from the
+future — so the realized trace is a linear extension of `po ∪ rf ∪ gmo'|W ∪ fab` over events ∪ dev nodes (Lin2's
+`ptraceRel` + (L)); hence `x →po dv` (any `gmem` x) and `dv →po w` are REALIZATION-NECESSARY on every row [R7.1iii].
+*(1) Paths and dependence.*  allocproc's own footprint touches MMIO only through `panic`/`printf` (`uartputc_sync`:
+LSR loads, THR store) and, with interrupts on during the `proc[]` scan (`wpNext`), through `devintr`'s PLIC
+claim/complete, `uartintr`, `virtio_disk_intr`; reaching it needs `consoleinit`/`uartinit`, `plicinit(hart)`,
+`virtio_disk_init`, and `fork → allocproc` needs `exec("/init")`'s disk I/O (`virtio_disk_rw` + the disk row).  The
+published CONCLUSIONS depend on NO memory↔MMIO ordering: TsoMem's MMIO arms move no view (`Lang.lean:356-358,372-375`),
+the Xv6 proofs read `fence iorw,iorw` as the MEMORY floor rule (`ProofVirtioDiskIntr.lean:92-99`, `wp_s_fence_iorw_
+iorw_floor`), DMA correctness comes from "stores never early + device reads at top" (F6), and no conclusion names the
+UART wire order (`uartSentSub` is D9; `xv6NiPhi`'s console rows count accepted bytes, `NiTrace.lean:198-203`).  What
+depends on the ordering is the REALIZATION of `GT`'s fabric sequence as a sequential trace.  *Decoder evidence:* Sail
+`execute_FENCE` keys on `extractLsb pred 1 0`/`succ 1 0` only (`model/Lean_RV64D/LeanRV64D/InstsEnd.lean:18299-18313`)
+— `0x0ff0000f` = `Barrier_RISCV_rw_rw`; `fenceDrains`/`fenceAcq` (`TsoMem.lean:356-364`), `ebarNow`
+(`WeakEvLang.lean:733-745`) and `ebarLabel` (`WeakEvInst.lean:272-275`) never see i/o bits; `LFence`'s four bits
+(`WeakAxiomatic.lean:90`) are `pr pw sr sw`.  The bits survive ONLY in the instruction word (`KernelImage.lean:17301,
+17311,17441,17451`), recoverable as W5d-G recovers `fence.i` (`emFenceI`): an emission-side `emIoFence` reading the
+`LIFetch` word — S–M, a fence FRAGMENT as graph data, not a label change.  So (F1) IS expressible.  *Per-path audit of
+xv6's faithful edges:* `virtio_disk_rw`: desc `sh` → `fence` (`0x80005c7a`) → avail `sh` → `fence` (`:5c8a`) →
+NOTIFY `sw zero,80(a5)` (`:5c92`, `0x10001050`) — `x →po dv` faithful (F1) ✓; after NOTIFY `lw a5,4(s3)` (`b->disk`),
+`sleep`'s stores, no fence — `dv →po w` ✗.  `virtio_disk_intr`: `acquire` → STATUS `lw a5,96(a5)` → ACK `sw a5,100(a4)`
+(`:5d52`) → `fence` (`:5d54`) → loads — `dv →po w` after ACK ✓ (F1); the acquire's store half and frame stores before
+STATUS ✗ ((F4): aq does not reach I/O).  `uartputc_sync`: LSR loads → THR store: ctrl ✓ (F3; same channel (F2));
+prior stores and the lock's store half → LSR ✗; THR → `release` (`fence rw,w; sw`) ✗ (no PO bit).  PLIC: pre-trap
+loads → claim ✓ (F5), pre-trap stores ✗; claim → handler stores ✓ (F3 ctrl), claim → `plic_complete` ✓ (data);
+`plicinithart`/`plicinit` boot stores → device stores ✗.  **So `dv(store) →po w` is ISA-given at exactly ONE xv6 site
+(the ACK) and `st →po dv` at exactly TWO (the pre-NOTIFY fences); every other arm instance is the residue.**
+*(2)/(3) Can the gap be closed without an assumption?*  No — the executions it admits are GENUINE RVWMO + I/O
+behaviours of the verified code, so no kill can refute them: **(X1)** `printf` under `pr.lock`: hart B's last THR
+store →po `release` →rf hart A's `acquire` →po A's THR store, with A's THR FABRIC-BEFORE B's — consistent with
+`ioOrdF` (no PO-fence after THR), unrealizable by any sequential trace (THR_B < rel_B < acq_A < THR_A vs `fab`); **(X2)**
+the same shape on the virtio channel, NOTIFY_A →po `release(vdisk_lock)` →rf `acquire`_B →(fence)→ NOTIFY_B →fab
+NOTIFY_A — the four virtio fences do not close it; **(X3)** a pre-trap store buffered past the handler's claim IS
+closed (the store was lock-protected, released before the trap, and the AMO read is trap-ordered (F5)) — PLIC claim
+cycles are killable; `plicinithart`'s boot stores are not (no reader, no fence).  Dropping `fab` from what the
+realization reproduces would need each device's answers to be invariant under the reorderings `ioOrdF` permits: the
+UART's LSR depends on the tx FIFO (`Dev/Uart.lean:88,132,184`), the PLIC's claim CLEARS pending (`Dev/Plic.lean:85-93`) —
+order-sensitive; a per-device commutation argument over `fab` (D38(c)'s flavour, xv6- and device-specific, XL) that
+also changes what the theorem says about devices.  Posted-MMIO arms in TsoMem re-open the driver proofs ((9a), XL×2).
+Stating (L)/(K)/W2 with `ioOrdF` in place of `ioOrd` is syntactically possible (same `Ioev`, arms replaced) but (L)'s
+existence FAILS at (X1)/(X2) — a faithful (L) needs the residue as a premise anyway, and the kill composes in `tc
+(ioOrdF ∪ residue) = tc ioOrd`.  **Hence (a′) stays [OWN.12]; what changes: the header and §B(11) state the residue
+and the per-arm trusted uses; D46 offers the machine-stated residue (W13 (F): `emIoFence` S–M + dependency edges into
+dev nodes M — `rowDepsT` drops `LDev` items, `AxDeps.lean:463`, and `pnodeStep`'s MMIO arms discard the read set,
+`oib = none`, `WeakEvInst.lean:300-304,335-338` — + trap-boundary edges S + `ioOrdF ⊆ ioOrd` M; header-only value).**
 **(12) Audit coverage and file layout** [R1.10].  `Xv6/` never imports `Weak/` (`lakefile.toml:2,27-41`).  Composition
 files live in `Weak/`, registered in `tools/ci/roots-weak.txt` + `tools/audit/baseline-weak.json` + `XV6_AUDIT_MODULES`
 (`tools/ci/audit.sh:44`), built by `--weak` CI over the whole `Xv6` adequacy cone (D13); pure-`Xv6/` items (W3, W8) go
@@ -516,7 +577,7 @@ milestones on the critical path of the target; Stage 2 is the target [OWN.2].
   satisfiability ONLY — not reaching `allocproc` (D44), and QUIESCENT (no `LDev`), so nothing about W13's bundle
   (W13-wit) [R5.s3].  Deps: W5b's predicate.
 - **The three spikes — DONE** (scratch files in the header; reports `notes/W12-spike.md`, `W13-spike.md`,
-  `W5dG-spike.md`).  W12: route (a) SOUND, gates 1–2 closed by hypothesis changes, (F1) TAGGED quantifier, (F2) gate 3
+  `W5dG-spike.md`; **[OWN.10]: the two merged scratch files stay, no further spike file is merged before SATISFIED**).  W12: route (a) SOUND, gates 1–2 closed by hypothesis changes, (F1) TAGGED quantifier, (F2) gate 3
   = W12b, witnesses via `catADOfMinus`; Q1–Q4 = D33–D36.  W13: vacuity CONFIRMED, T2-1c′ LANDED (`Lin2.lean:623,836,
   944,995,1012`), literal [OWN.8] REFUTED (`lbExcluded`), `gdevAdj ⊆ gmo` excludes SC, W13 = XL; Q-a..d = D32, D37,
   D38, D39.  W5d-G: fetch ADMINISTRATIVE, `gzFetch` + fetch fragment, L + XL risk R1, M2 clause = cut form; Q-G1..G4 =
@@ -569,7 +630,7 @@ milestones on the critical path of the target; Stage 2 is the target [OWN.2].
   new per-byte invariant.  Scheduled WITH W12 and BEFORE W10 (else W10 → L and absorbs it).
 - **W5d-G `Weak/GraphFetch*.lean`** (L ≈ 1.8–2.2k + XL risk R1; D27 RULED (a) [OWN.6]) [R4.2][R6.4b].  **Day one**
   [R7.s3]: merge `../xv6iris-weak-w3/Weak/GraphFetchSpike.lean` into this tree as `Weak/GraphFetchSpike.lean` (builds;
-  `propext, Quot.sound`) so the cites below resolve.  Then the spike's change list: **G1** `gzContrib`, `emFenceI` + `emFenceISound`, `emZifencei` in `xv6ConfS`/`gdexecQconf` replacing
+  `propext, Quot.sound`) so the cites below resolve — **only once the plan is SATISFIED [OWN.10]**.  Then the spike's change list: **G1** `gzContrib`, `emFenceI` + `emFenceISound`, `emZifencei` in `xv6ConfS`/`gdexecQconf` replacing
   `emFetchImg` (`WeakRvwmoSupply.lean:277-352`, `emFetchImgRen/Prefix` → retime/hull versions; `Fab.lean:516-522`;
   `WeakEvInst`/`WeakEvLang` lemma only) (M ≈ 350); **G2** tags = gmo indices — `wlblRen` renames `LIFetch` tags
   (reverts Q-C4, `WeakRvwmoConf.lean:57-66,147`), `pstepEvWren`/`projLblWren` `LIFetch` arms, M1 pin kept via `π 0 =
@@ -586,8 +647,11 @@ milestones on the critical path of the target; Stage 2 is the target [OWN.2].
   [R7.4]); W13 (W)'s two gates come first (without the disk row `exec("/init")` never completes).
 - **W13 `Weak/GraphFab*.lean`** (**XL**, spike-sized, six pieces; was L–XL) [R5.1][R6.3iii][OWN.8-conflict].
   **(T)** `Ioev`/`ioOrd`/`ioObAcyclic` + header text (S; the scratch's 60 lines moved to a merged file WITH the
-  `.dv → .ev y` arm restricted to `gisW` (a′) [R7.1c]; `ioObAcyclicNodev`/`w13fIoOk` re-prove by the same rank
-  functions).  I/O nodes = a hart's MMIO accesses AND the disk agent's START/COMMIT fabric moves; `i` ranges over
+  `.dv → .ev y` arm restricted to `gisW` (a′) [R7.1c], RULED [OWN.12]; `ioObAcyclicNodev`/`w13fIoOk` re-prove by the
+  same rank functions; the header text states the RESIDUE reading and the per-arm trusted uses of §B(11)).  **(F)**
+  OPTIONAL, D46 (b): the faithful sub-order `ioOrdF` as graph data — `emIoFence` (i/o bits decoded from the `LIFetch`
+  word, the `emFenceI` pattern), dependency edges into dev nodes (tagger extension), trap-boundary edges — and
+  `ioOrdF ⊆ ioOrd` (M–L total); no proof downstream consumes it.  I/O nodes = a hart's MMIO accesses AND the disk agent's START/COMMIT fabric moves; `i` ranges over
   `xN σ0 = NCPU + 1` rows [R7.3a]; both hart arms carry the `gmem` guard because fences are not in gmo (`gwf`,
   `WeakRvwmoGraph.lean:171`) [R7.s4].  **(I)** `execProgOkA`: the trace is over `Option Estep`-style items; an
   admin-only step for row `i` runs only `admStar` and MAY move the fabric — in scope: hart MMIO blocks AND the disk
@@ -615,6 +679,18 @@ milestones on the critical path of the target; Stage 2 is the target [OWN.2].
   changes the T1 interface (every `execProgOk'`
   consumer gets a sibling); R4 dev nodes adjacent to fences/non-`gmem` events (`gwf`, `WeakRvwmoGraph.lean:171`).
   Deps: W5c's `esil → admRun` bridge; W5b's shape clauses.
+- **W14 `Weak/ExistWitness.lean`** (NEW; D44 RULED (i) [OWN.11]; size L–XL, **unverified** until W2's per-label table
+  is in): the single-execution EXISTENCE theorem — ONE device-active TsoMem-side run (any `-<κs>->ₜₚ^[n]` run from
+  `PowerOn` that reaches `allocproc`, obtained from the SC tree's reachability, not by evaluation) is lifted to a
+  conformant cat candidate: a `GT` with `rvwmoCatConsistentT`, `ioObAcyclic`, `xv6ConfS` and a non-empty `gfDev`
+  whose realization is that run.  It is the (↑) direction of W2 for a SINGLE run (not receptiveness, D15): per label,
+  TsoMem step → pf step at the SC-like view (`tvn := top`), stores at the top, dev steps in trace order; the graph is
+  the trace's own (`gmo` = log order, `fab` = the dev steps' order), consistency by `linCand`-style construction, the
+  fetch clause by `fetchPinCutOk`/`gzFetch` at tag 0 for kernel text and the TsoMem `itv` for user text.  Certifies
+  non-vacuity AT `allocproc` (and past user code, [OWN.3]); until it lands the header carries D44's caveat.  Deps: W2's
+  `R` and table; W5b; W13 (I)/(W) (the A-bundle); W5d-G (the fetch clause).  Risk: the "reaches `allocproc`" fact is a
+  LIVENESS-flavoured reachability of the SC tree, which exports safety only — the run may have to be exhibited by a
+  dedicated SC-tree lemma ("some run reaches `userinit`'s `allocproc` call"), M–L on the Xv6 side, **unverified**.
 - **W8 `Xv6/AccessDiscipline.lean`** (L–XL; D24) [R4.3][R4.s3][R4.s4].  Export from the SC tree, per reachable
   MachCSL state (the `mmOk` idiom) on `MState`'s author log + per-byte histories (`MachCSL/Lang.lean:147-153`), in
   the vocabulary `protReg`/`badSeg` consume: (i) bytes a hart OWNS — no foreign writer (covers `PStack`/`PPerCpu`,
@@ -654,22 +730,25 @@ milestones on the critical path of the target; Stage 2 is the target [OWN.2].
 `Xv6/SystemSlot.lean`, a new link file, `roots.txt`/`baseline.json`/`tcb/expected.json` additions) [R5.2][R6.5c] —
 then W2 spike ∥ W1 ∥ W5b ∥ W5c; W5b's two statements on day one unblock W2 and W5c.  W1b waits for D10; W8 design
 starts after the W2 report (its export shape depends on `R`; the spike inputs are IN) [R4.s5][R6.4a].  Stage 2
-cannot start before D32–D39, D44, D45 are ruled (the published statement's shape depends on D32, D33, D38, D44).
+cannot start before D33–D36, D38, D39, D45 (and D46) are ruled; D32, D37, D44 are RULED [OWN.11][OWN.12] (the published
+statement's shape now depends on D33 and D38 only).
 
 ## D. Owner questions (recommended option first; RULED items kept for the record)
 
 [R7.s1] NOT adopted: the brief allows edits to this file only and requires every question with all its options kept,
 so RULED items stay here, tightened, rather than in an appendix.
-**The published statement depends on D32/D33/D38/D44; please rule first (D32, D37 REVISED by R7; D44, D45 NEW).**
-- **D32 = Q-X / Q-W13a (revised [R7.1]). [OWN.8-conflict]: the form of the dev-order trusted item** [R6.3].  The
-  literal [OWN.8] axiom is refuted by `lbExcluded` (`Weak/W13Spike.lean:35`); `ioObAcyclic` (a′) is applied
-  PROVISIONALLY in §A.  (a′) **`ioObAcyclic` with the `.dv i k → .ev y` arm restricted to WRITES (recommended: implied
-  by nothing the strong model lacks — `elabOk LDev = True`, TsoMem's MMIO arms move no view; sufficient for (L)/(K)/
-  realization; keeps the stale-read-after-MMIO executions TsoMem and hardware produce IN the quantifier)**; (a) the
-  spike's two-way form (`W13Spike.lean:83-95`; MMIO = full fence, EXCLUDES those executions, so `GT` does not exist
-  for some rf/co/fabric the strong model realizes); (b) [OWN.8]'s literal `po ∪ rf ∪ gmo|W ∪ dev` acyclic on the
-  quantified graph — drops LB and W→W, contradicting [OWN.2]; (c) the same on the internally normalized graph — not a
-  statement about the input, no trusted base; (d) `gdevAdj ⊆ gmo` — excludes SC executions (`scDevExcluded`).
+**The published statement depends on D33/D38 (D32, D37, D44 RULED [OWN.11][OWN.12]); please rule D33, D38, D45, D46.**
+- **D32 = Q-X / Q-W13a — RULED (a′) [OWN.12] after the faithful evaluation (§B(11b)).**  The literal [OWN.8] axiom is
+  refuted by `lbExcluded` (`Weak/W13Spike.lean:35`).  Options for the record: (a′) **`ioObAcyclic` with the `.dv i k →
+  .ev y` arm restricted to WRITES — RULED (implied by nothing the strong model lacks; both hart arms are
+  realization-necessary; stated as the residue over the ISA-given edges)**; (f) FAITHFUL `ioOrdF` alone (FENCE i/o
+  bits, dependencies, precise traps, PMA channels, device models; no platform assumption) — INFEASIBLE: the
+  realization needs the two arms on every row and xv6's UART/PLIC paths (and the post-NOTIFY virtio path) supply them
+  nowhere; genuine executions (X1)/(X2) have no sequential-trace realization, and dropping `fab` needs per-device
+  commutation (XL, device-specific); (a) the spike's two-way form (`W13Spike.lean:83-95`; MMIO = full fence, excludes
+  stale-read-after-MMIO executions the strong model realizes); (b) [OWN.8]'s literal `po ∪ rf ∪ gmo|W ∪ dev` acyclic
+  on the quantified graph — drops LB and W→W, contradicting [OWN.2]; (c) the same on the internally normalized graph —
+  not a statement about the input; (d) `gdevAdj ⊆ gmo` — excludes SC executions (`scDevExcluded`).
 - **D33 = Q-T / W12-Q1. The published model** [R6.1].  (a) **tagged `rvwmoCatConsistentT`, chain on `forget GT`
   (recommended; within [OWN.2]'s wording "rvwmoCatConsistent / the RVWMO axiomatic model in this tree")**; (b)
   untagged `rvwmoCatConsistent`, with "rule 12 also over ctrl/translation deps" NAMED as a strengthening of
@@ -685,24 +764,31 @@ so RULED items stay here, tightened, rather than in an appendix.
 - **D36 = Q-W / W12-Q4. Forwarded `LLoad aq`.**  (a) **a row side condition "no plain `LLoad aq`" (true for the
   kernel) (recommended)**; (b) change WeakMem's `fwdView` for aq, which ripples into T1; (c) accept it as a named gap
   for user code.
-- **D37 = Q-Y / Q-W13b (revised [R7.2]). Naming the platform assumption behind (T)** [R6.3ii].  (a) **"MMIO accesses
-  (and disk fabric moves) act as one-way fences for the issuing row" named as such, QEMU TCG (program-order vCPUs +
-  the BQL around MMIO) cited as the platform, host-dependent (recommended)**; (b) require fence-guarded MMIO — needs
-  i/o bits in `LFence` and an xv6 code change, which leaves the `verified` branch; (c) DROPPED as an option: "restrict
-  to platforms with PMA strong ordering" does not deliver (T) — the PMA orders I/O accesses among themselves, not
-  against main memory.
+- **D37 = Q-Y / Q-W13b — RULED (a) [OWN.12].**  (a) **"MMIO accesses (and disk fabric moves) act as one-way fences
+  for the issuing row — beyond what FENCE i/o bits, dependencies, precise traps and the device models already order"
+  named as such, QEMU TCG (program-order vCPUs + the BQL around MMIO) cited as the platform, host-dependent — RULED**;
+  (b) require fence-guarded MMIO — an xv6 code change (`fence o,w` after THR/NOTIFY/complete, `fence w,io` before
+  MMIO) which leaves the `verified` branch, and the graph tier would still need the fence fragment of D46; (c) DROPPED:
+  "restrict to platforms with PMA strong ordering" does not deliver (T).
 - **D44 ([R7.4]). Non-vacuity past boot.**  Every candidate reaching `userinit → allocproc` first runs `kinit`'s
   `freerange(PGROUNDUP(end), PHYSTOP)`: `end = 0x80023b10` (`KernelImage.lean:17935`), `physTop = 0x88000000`
   (`Xv6/KallocDefs.lean:71`) = 32,732 pages, each `kfree` a byte-granular 4 KiB `memset` (`Xv6/SpecMemset.lean:5-7`) —
   10^7–10^8 dynamic instructions, far beyond `esil`/`pevrunAdmRun` evaluation (W5c/W13-wit ≈ 100 instructions); the
-  "whole-boot replay" of D18 is INFEASIBLE, not XL.  (i) **a single-execution EXISTENCE theorem — ONE device-active
-  TsoMem-side execution lifted to a conformant cat candidate (the (↑) direction for a SINGLE run, not receptiveness;
-  sized by W2's per-label table; D15 revisited) as a Stage-2 item (recommended)**; (ii) publish with "non-vacuity
-  certified to the first UART store and first disk COMMIT only" in the header; (iii) a reduced-RAM image variant for
-  the witness only (not the published kernel; leaves `verified` for the witness, [OWN.4]).
-- **D45 ([R7.3]). The disk agent in (T).**  (a) **one `Ioev.dv` kind for hart MMIO and disk fabric moves
-  (recommended; matches `gfDev`'s `(i, k)` positions, the disk row being `i = NCPU`)**; (b) a separate `dma` node
-  kind with its own arms (clearer header, +S–M).
+  "whole-boot replay" of D18 is INFEASIBLE, not XL.  **RULED (i) [OWN.11] → W14 (§C Stage 2)**: (i) **a
+  single-execution EXISTENCE theorem — ONE device-active TsoMem-side execution lifted to a conformant cat candidate
+  (the (↑) direction for a SINGLE run, not receptiveness; sized by W2's per-label table; D15 revisited)**; (ii) publish
+  with "non-vacuity certified to the first UART store and first disk COMMIT only" in the header (the interim wording
+  until W14 lands); (iii) a reduced-RAM image variant for the witness only (not the published kernel, [OWN.4]).
+- **D45 ([R7.3]). The disk agent in (T).**  (a) **one `Ioev.dv` kind for hart MMIO, PLIC pin deliveries and disk
+  fabric moves (recommended; matches `gfDev`'s `(i, k)` positions, the disk row being `i = NCPU`)**; (b) a separate
+  `dma` node kind with its own arms (clearer header, +S–M).
+- **D46 (NEW [OWN.12]). Machine-stating the I/O residue.**  (a) **(a′) alone; the header lists the ISA-given edges and
+  the per-arm trusted uses in prose (§B(11)) (recommended: no proof consumes `ioOrdF`)**; (b) W13 (F): define `ioOrdF`
+  (fence fragment `emIoFence` from the `LIFetch` word, dependency edges into dev nodes, trap-boundary edges; named
+  readings (F3) non-idempotent I/O is non-speculative, (F5) precise traps) and prove `ioOrdF ⊆ ioOrd`, so the header's
+  residue is a theorem (M–L, header-only value; adds trusted-surface text of its own); (c) the fabric-free realization
+  (reproduce per-hart MMIO answers, not `fab`, via per-device commutation lemmas) — XL, device-specific, fails for the
+  PLIC's claim, NOT recommended.
 - **D38 = Q-Z / Q-W13c. The realization interface.**  (a) **admin-only trace steps `execProgOkA` (recommended;
   co-designed with W5b's `execProgOk'S`)**; (b) make MMIO a tagged inert-fence row event, in the style of the Q7
   sfence marker — changes `projLbl` and the emission proofs, which are merged files; (c) keep the folded model and
@@ -739,7 +825,7 @@ so RULED items stay here, tightened, rather than in an appendix.
   arm"; (b) no weak-side sentence; (c) weak-side `Reducible` (XL).  **D16** → D22.  **D17.** (Rec) header names the
   SC-failure model; (b) §B(11) only.
 - **D18** — RULED [OWN.3]: W5d (M2) and W5d-G in the target.  Residual: the user-fetch witness is NOT buildable by
-  evaluation [R7.4] → D44.  **D19.** (Rec) `execProgOk'S` (fused pairs) as a named premise; (b) a MachCSL change so
+  evaluation [R7.4] → D44 RULED (i) → W14.  **D19.** (Rec) `execProgOk'S` (fused pairs) as a named premise; (b) a MachCSL change so
   dangling reservations do not block (serial, L, **unverified**);
   (c) a user-mode fact — unavailable.  **D20.** (Rec) `candSca` named at M1/M2 ONLY, derived at Stage 2; (b) an
   atomicity axiom in sRVWMO — XL.  **D21.** (Rec) report M1 as "composition milestone, kernel-only by premise
@@ -751,7 +837,8 @@ so RULED items stay here, tightened, rather than in an appendix.
 - **D25** — RULED [OWN.5], spike-CONFIRMED: (a) cat-sound kill arms (`rsameC`/`gcrossE`, lock kit `*C`,
   `normalizeOfAcyclic` over the core), M–L; (b) dropped; (c) NOT accepted.  **D26. Stage-2 sequencing** [R4.s5]
   [R6.3].  (Rec) M1 → M2 → W13 (T)(I) + W5b co-design → {W12 ∥ W12b ∥ W5d-G G1–G5 ∥ W13 (L)(K)} ∥ W8 (after W2) →
-  W13 (R)(W) → W9a/W10 → W11; (b) start W8 with Stage 1 (risk: `R` not fixed).  **D27** — RULED [OWN.6], spike-SHAPED:
+  W13 (R)(W) → W9a/W10 → W11, with W14 after W2's table and W13 (I)/(W) (it needs the A-bundle); (b) start W8 with
+  Stage 1 (risk: `R` not fixed).  **D27** — RULED [OWN.6], spike-SHAPED:
   (a) `gzFetch`, admin form, D40–D43.  **D28** — RULED [OWN.7]: all 182 + 58 sites through W8.
 - **D29** [R5.1, Q-R] — RULED [OWN.8] "dev-order model in the trusted base, T2-1c′ in scope"; UPDATED by the spike
   [R6.3]: T2-1c′ is LANDED; the literal axiom is refuted → D32; `gdevAdj ⊆ gmo` rejected (`scDevExcluded`).  **D30** —
