@@ -28,6 +28,7 @@ import MachCSL.WpSmodeDev
 import MachCSL.SmodeDevDefs
 import MachCSL.Power
 import MachCSL.Adequacy
+import MachCSL.PowerText
 import MachCSL.SimpAttr
 import MachCSL.ModelFacts
 import MachCSL.SailHooks
