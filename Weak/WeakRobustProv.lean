@@ -178,7 +178,7 @@ def aevPost {D : Type} (σ : Nat → Nat) (ev : Aev D) (w : Wstate) : Wstate :=
             rl (srcsView w asrc) (srcsView w vsrc) base data.length (σ ts)
       | none => w
   | .LFence pr pw sr sw => fencePost w pr pw sr sw
-  | .LDev => w
+  | .LDev .. => w
   | .LRegW rd srcs => regwPost w rd (srcsView w srcs)
   | .LCtrl srcs => ctrlPost w (srcsView w srcs)
   | .LInstr => instrPost w
@@ -750,7 +750,7 @@ def laevPost {D : Type} (ev : Aev D) (S : Lstate) : Lstate :=
             rl (lsrcsView S asrc) (lsrcsView S vsrc) base data.length ts
       | none => S
   | .LFence pr pw sr sw => lfencePost S pr pw sr sw
-  | .LDev => S
+  | .LDev .. => S
   | .LRegW rd srcs => lregwPost S rd (lsrcsView S srcs)
   | .LCtrl srcs => lctrlPost S (lsrcsView S srcs)
   | .LInstr => linstrPost S

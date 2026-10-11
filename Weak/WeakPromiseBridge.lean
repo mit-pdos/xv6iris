@@ -389,10 +389,11 @@ inductive wpPfStep (i : Nat) : Wlabel → Wpcfg P D → Wpcfg P D → Prop
       wpPfStep i (.LFence pr pw sr sw) cfg
         ⟨cfg.pcImg, cfg.pcLog, d',
          cfg.pcAgs.set i ⟨st', fencePost ag.paWs pr pw sr sw, ag.paProm⟩⟩
-  | PFDev (cfg : Wpcfg P D) (ag : Wpagent P) (st' : P) (d' : D) :
+  | PFDev (cfg : Wpcfg P D) (ag : Wpagent P) {kd : IoKind} {ba : Int} {bs : List (BitVec 8)}
+      (st' : P) (d' : D) :
       cfg.pcAgs[i]? = some ag →
-      pstep ag.paSt cfg.pcDev .LDev st' d' →
-      wpPfStep i .LDev cfg
+      pstep ag.paSt cfg.pcDev (.LDev kd ba bs) st' d' →
+      wpPfStep i (.LDev kd ba bs) cfg
         ⟨cfg.pcImg, cfg.pcLog, d', cfg.pcAgs.set i ⟨st', ag.paWs, ag.paProm⟩⟩
   | PFRegW (cfg : Wpcfg P D) (ag : Wpagent P) (rd : Nat) (srcs : List Dsrc) (st' : P) (d' : D) :
       cfg.pcAgs[i]? = some ag →
@@ -534,7 +535,7 @@ def projLbl (k : WmClass) (l : Wlabel) : Option Lbl :=
   | .LRmw aq rl base tvs data _ _ =>
       some (.LRmw aq rl base (tvs.map Prod.fst) (tvs.map Prod.snd) data k)
   | .LFence pr pw sr sw => some (.LFence pr pw sr sw)
-  | .LDev => none
+  | .LDev .. => none
   | .LRegW _ _ => none
   | .LCtrl _ => none
   | .LInstr => none
@@ -958,6 +959,7 @@ def unprojLbl (lb : Lbl) : Wlabel :=
   | .LStore rl base vs _ => .LStore rl base vs [] []
   | .LFence pr pw sr sw => .LFence pr pw sr sw
   | .LRmw aq rl base ts rvs wvs _ => .LRmw aq rl base (ts.zip rvs) wvs [] []
+  | .LIo kd base vs => .LDev kd base vs
 
 /-- THE REVERSE BRIDGE'S ONE NEW PREMISE (G6a): the labelled classes are the
 ones `pcls` would have written. -/

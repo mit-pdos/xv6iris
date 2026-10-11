@@ -391,6 +391,7 @@ theorem wsrcOrWwit (G : Gexec) (n : Nat) (e : Geid) (lb : Lbl) :
   | LStore => left; intro _ _ _ _ hl0; rw [hl] at hl0; cases hl0
   | LFence => left; intro _ _ _ _ hl0; rw [hl] at hl0; cases hl0
   | LRmw => left; intro _ _ _ _ hl0; rw [hl] at hl0; cases hl0
+  | LIo => left; intro _ _ _ _ hl0; rw [hl] at hl0; cases hl0
 
 /-- THE GRAPH-SIDE DATUM the walk carries for the hart it is running. -/
 def wrowInLog (G : Gexec) (x : Nat) (n : Nat) : Prop :=
@@ -735,6 +736,7 @@ theorem wblkPolAt (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T : L
         exact certWriteOk c0 x rl base vs kc (WeakRvwmoFloor.gshape G hwf _ _ hl)
       | LFence pr pw sr sw => exact certFenceOk c0 x pr pw sr sw
       | LRmw => exact hrmw.elim
+      | LIo => exact (WeakRvwmoFloor.gshape G hwf _ _ hl).elim
     exact ⟨lb, l, rds, wrs, rs2', m', fn', ib', hblk2, hok,
       lblReidxWRefl lb, wclsOfPfx G (wwit G n) n x c0 lb hpfx hl hnW hix,
       .inl ⟨rfl, rfl, rfl, hag2⟩, fun _ => ⟨rfl, rfl, rfl, hag2⟩⟩
@@ -807,6 +809,7 @@ theorem wctxPres (G : Gexec) (d0 : Efab) (T : List Nat) (Nd : Nat → CPU → Sa
     | LLoad => cases hw
     | LFence => cases hw
     | LRmw => exact hrmw.elim
+    | LIo => cases hw
     | LStore rl base vs kc =>
       have hlb' : lb' = .LStore rl base vs kc := lblReidxWStore rl base vs kc lb' hri
       subst hlb'
@@ -854,7 +857,7 @@ theorem wlkSegOfCert (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T 
     wrdsFree d0 T →
     wndOk cpu d0 (wQ G d0 T Nd n x k0 kz) Nd →
     hemit (fun _ => d0) k0 ws0 rowseg (.PHart cpu m0 rs10 fn0 ib0) es pfin →
-    LDev ∉ es.map Prod.fst →
+    (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     WeakRvwmoCert2.esPin St.cstC.cdImg es →
     (∀ i lb, rowseg[i]? = some lb → wQ G d0 T Nd n x k0 kz (k0 + i) lb) →
     cstOk d0 St →

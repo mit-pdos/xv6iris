@@ -141,7 +141,7 @@ def lbReads (l : Wlabel) : List (Int × Nat) :=
   | LLoad _ _ base tvs _ => tvsReads base tvs
   | LRmw _ _ base tvs _ _ _ => tvsReads base tvs
   | LExLoad _ base tvs _ => tvsReads base tvs
-  | LSilent | LStore .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LExStore ..
+  | LSilent | LStore .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LExStore ..
   | LIFetch .. => []
 
 /-- THE ADDRESS-OPERAND LIST of a label (D2); `[]` on every label that has none. -/
@@ -152,14 +152,14 @@ def lbAsrc (l : Wlabel) : List Dsrc :=
   | LRmw _ _ _ _ _ asrc _ => asrc
   | LExLoad _ _ _ asrc => asrc
   | LExStore _ _ _ asrc _ => asrc
-  | LSilent | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LIFetch .. => []
+  | LSilent | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LIFetch .. => []
 
 /-- D-2r: THE READ-FLOOR OPERAND LIST — only a PLAIN load has one. -/
 def lbRasrc (l : Wlabel) : List Dsrc :=
   match l with
   | LLoad _ _ _ _ asrc => asrc
   | LStore .. | LRmw .. | LExLoad .. | LExStore ..
-  | LSilent | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LIFetch .. => []
+  | LSilent | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LIFetch .. => []
 
 theorem memTvsReads (base : Int) (tvs : List (Nat × BitVec 8)) (a : Int) (ts : Nat) :
     (a, ts) ∈ tvsReads base tvs ↔

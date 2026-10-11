@@ -583,6 +583,7 @@ def gshapeB (l : Lbl) : Bool :=
   | LRmw _ _ _ ts rvs wvs _ =>
       (match wvs with | [] => false | _ :: _ => true) &&
       decide (wvs.length = ts.length) && decide (rvs.length = ts.length)
+  | LIo .. => false
 
 theorem gshapeBSpec (l : Lbl) :
     gshapeB l = true →
@@ -591,13 +592,15 @@ theorem gshapeBSpec (l : Lbl) :
     | LStore _ _ vs _ => vs ≠ []
     | LFence _ _ _ _ => True
     | LRmw _ _ _ ts rvs wvs _ =>
-        wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length := by
+        wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
+    | LIo .. => False := by
   cases l with
   | LLoad _ _ ts vs => exact of_decide_eq_true
   | LStore _ _ vs _ => cases vs <;> simp [gshapeB]
   | LFence _ _ _ _ => intro _; trivial
   | LRmw _ _ _ ts rvs wvs _ =>
     cases wvs <;> simp [gshapeB]
+  | LIo => intro h; simp [gshapeB] at h
 
 def gwfB (G : Gexec) : Bool :=
   decide G.gxGmo.Nodup &&

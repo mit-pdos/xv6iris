@@ -129,7 +129,7 @@ Deviation 4 (Stage C): the fetch sits where `LInstr` sits. -/
 
 def lbAdmin (instr : Bool) (l : Wlabel) : Prop :=
   match l with
-  | .LSilent | .LDev | .LRegW .. | .LCtrl _ => True
+  | .LSilent | .LDev .. | .LRegW .. | .LCtrl _ => True
   | .LInstr | .LIFetch .. => instr = true
   | _ => False
 

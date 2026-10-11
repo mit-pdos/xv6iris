@@ -730,6 +730,7 @@ theorem cblkpIsW (cpu : CPU) (d0 : Efab) (ws : Wstate) (lb : Lbl) (l1 l2 : Wlabe
   | LStore => rfl
   | LFence => exact (hr trivial).elim
   | LRmw => rfl
+  | LIo => exact (hr trivial).elim
 
 theorem cpolpOfRmwfree (x : Nat) (cpu : CPU) (d0 : Efab) (T : List Nat)
     (Ctx : Nat → Cand → Prop) (Cls : Cand → Lbl → Prop) (Q : Nat → Lbl → Prop) :

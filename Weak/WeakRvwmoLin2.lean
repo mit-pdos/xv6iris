@@ -169,6 +169,7 @@ theorem glbRdLen (G : Gexec) (e : Geid) (l : Lbl) (base : Int) (ts : List Nat)
     simp only [lbRd, Option.some.injEq, Prod.mk.injEq] at hrd
     obtain ⟨-, rfl, rfl⟩ := hrd
     exact hs.2.2
+  | LIo => simp [lbRd] at hrd
 
 theorem gtracePrefixEv (G : Gexec) (c : Cand) (ev ev' : Nat → Geid) :
     (∀ p s, c.cdTr[p]? = some s → ev p = ev' p) →
@@ -242,6 +243,7 @@ theorem gtraceSnocStep (G : Gexec) (c : Cand) (ev : Nat → Geid) (i : Nat) (l :
     GtracePrefix G (candSnoc c ⟨i, l⟩) (evSnoc c ev (i, gcnt i c.cdTr)) := by
   intro hcons hc hgt hl hix hsrc
   cases l with
+  | LIo => exact (WeakRvwmoFloor.gshape G hcons.1 _ _ hl).elim
   | LLoad aq base ts vs =>
     exact gtraceSnocReadConsistent G c ev i aq base ts vs hcons hc hgt hl (hsrc base ts vs rfl)
   | LStore rl base vs kc =>

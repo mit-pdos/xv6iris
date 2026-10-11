@@ -176,7 +176,10 @@ def gwf (G : Gexec) : Prop :=
      | LStore _ _ vs _ => vs ≠ []
      | LFence _ _ _ _ => True
      | LRmw _ _ _ ts rvs wvs _ =>
-         wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length)
+         wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
+     -- W13 (E): the graph tier carries NO I/O-class event yet — `linCand` replays every event on
+     -- the machine, which has no `LIo` step until W13 (I)/(M) (then this arm becomes `True`)
+     | LIo .. => False)
 
 /-! # 3. RVWMO⁻: the kept ppo arms, load-value, atomicity -/
 
@@ -714,7 +717,8 @@ theorem gwfLblShape (G : Gexec) (e : Geid) (l : Lbl) :
     | LStore _ _ vs _ => vs ≠ []
     | LFence _ _ _ _ => True
     | LRmw _ _ _ ts rvs wvs _ =>
-        wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length := by
+        wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
+    | LIo .. => False := by
   intro hwf hl
   obtain ⟨_, _, hsh⟩ := hwf
   unfold gxLbl at hl
@@ -742,6 +746,7 @@ theorem greadByteWriteByte (G : Gexec) (e : Geid) (a : Int) (t : Nat) (v : BitVe
       simp only [lbRd, Option.some.injEq, Prod.mk.injEq] at hrd
       obtain ⟨rfl, rfl, rfl⟩ := hrd
       exact ⟨wvs, rfl, hsh'.2.1⟩
+    | LIo => simp [lbIsW] at hw
   obtain ⟨wvs, hwr, hlen⟩ := hwr
   have hj : j < wvs.length := by rw [hlen]; exact lookup_lt_Some ht
   obtain ⟨v', hv'⟩ := someOfIsSome (lookup_lt_is_Some_2 hj)

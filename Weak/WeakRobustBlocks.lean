@@ -121,14 +121,14 @@ open MachCSL MachCSL.Stdpp Iris.Std Wlabel
 def lbWrites (l : Wlabel) : Bool :=
   match l with
   | LStore .. | LRmw .. | LExStore .. => true
-  | LSilent | LLoad .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LExLoad ..
+  | LSilent | LLoad .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LExLoad ..
   | LIFetch .. => false
 
 /-- A label that READS (a fetch is not a reads-of source: deviation 4). -/
 def lbLoads (l : Wlabel) : Bool :=
   match l with
   | LLoad .. | LRmw .. | LExLoad .. => true
-  | LSilent | LStore .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LExStore ..
+  | LSilent | LStore .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LExStore ..
   | LIFetch .. => false
 
 /-- The shape conditions the promise-free store/rmw rules impose on a label; the
@@ -138,7 +138,7 @@ def lbOk (l : Wlabel) : Prop :=
   | LStore _ _ data _ _ => data ≠ []
   | LRmw _ _ _ tvs data _ _ => data ≠ [] ∧ tvs.length = data.length
   | LExLoad .. | LExStore .. => False
-  | LSilent | LLoad .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LIFetch .. => True
+  | LSilent | LLoad .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LIFetch .. => True
 
 theorem lookupInsertSelf {A : Type _} (l : List A) (i : Nat) (x y : A) :
     l[i]? = some y → (l.set i x)[i]? = some x :=

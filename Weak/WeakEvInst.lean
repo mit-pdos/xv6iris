@@ -225,7 +225,7 @@ def pclsEv (p : Pexv6) (l : Wlabel) (ws : Wstate) : WmClass :=
       match p with
       | .PHart _ m _ _ _ => pnodeWclass m ws
       | .PDisk _ => ddevClass ws
-  | LSilent | LLoad .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LExLoad ..
+  | LSilent | LLoad .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LExLoad ..
   | LIFetch .. => .WCplain
 
 /-- THE CLASS DID NOT MOVE (RMW split S3). -/
@@ -241,7 +241,8 @@ theorem pclsEvExstoreExcl (cpu : CPU) (n va : Nat)
 
 theorem pclsEvSilent (p : Pexv6) (ws : Wstate) : pclsEv p LSilent ws = .WCplain := rfl
 
-theorem pclsEvLdev (p : Pexv6) (ws : Wstate) : pclsEv p LDev ws = .WCplain := rfl
+theorem pclsEvLdev (p : Pexv6) (ws : Wstate) (kd : IoKind) (ba : Int) (bs : List (BitVec 8)) :
+    pclsEv p (LDev kd ba bs) ws = .WCplain := rfl
 
 theorem pclsEvFence (p : Pexv6) (ws : Wstate) (pr pw sr sw : Bool) :
     pclsEv p (LFence pr pw sr sw) ws = .WCplain := rfl
@@ -300,7 +301,8 @@ def pnodeStep (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevStates) (l : W
         if devAddr req.pa then
           -- MMIO READ — FABRIC-TOUCHING, hence `LDev`
           ∃ w : BitVec (8 * n),
-            devRead d req.pa n = some (w, d') ∧ l = LDev ∧ m' = k (.Ok (w, none)) ∧
+            devRead d req.pa n = some (w, d') ∧
+            l = LDev .rd (paZ req.pa) (WeakInterpProj.wbytes n w) ∧ m' = k (.Ok (w, none)) ∧
             ors = none ∧ fn' = none ∧ oib = none ∧ obar = none
         else
           -- O2: THE I-CACHE READ (no aq, no lat, no address sources)
@@ -335,7 +337,8 @@ def pnodeStep (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevStates) (l : W
           -- MMIO WRITE — FABRIC-TOUCHING, hence `LDev`
           match req.value with
           | some v =>
-              devWrite d req.pa n v = some d' ∧ l = LDev ∧ m' = k (.Ok (some true)) ∧
+              devWrite d req.pa n v = some d' ∧
+              l = LDev .wr (paZ req.pa) (WeakInterpProj.wbytes n v) ∧ m' = k (.Ok (some true)) ∧
               ors = none ∧ fn' = none ∧ oib = none ∧ obar = none
           | none => False
         else
@@ -464,7 +467,8 @@ def pstepPlic (cpu : CPU) (m : SailM Unit) (rs : RegFile)
     (d' : Efab) (oib : Option Ibch) (obar : Option barrier_kind) : Prop :=
   ∃ (mm b : Bool) (k : Unit → DevProg .plic),
     d.efPlic = .op (.setPin cpu mm b) k ∧
-    l = LDev ∧ m' = m ∧ fn' = fn ∧ d' = { d with efPlic := k () } ∧ oib = none ∧ obar = none ∧
+    l = LDev .dev 0 [] ∧ m' = m ∧ fn' = fn ∧ d' = { d with efPlic := k () } ∧ oib = none ∧
+    obar = none ∧
     ors = some (pinSet rs mm b)
 
 /-- The hart's own step moves only the device STATES of the fabric (deviation 5). -/
@@ -481,7 +485,7 @@ fabric arms (seven arms, deviation 5). -/
 def pdiskProg (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel) (dp' : Option (DM Dres))
     (d' : DevStates) : Prop :=
   -- START — reads the fabric
-  (dp = none ∧ l = LDev ∧ dp' = some (virtioProg (dvirtio d)) ∧ d' = d)
+  (dp = none ∧ l = LDev .dev 0 [] ∧ dp' = some (virtioProg (dvirtio d)) ∧ d' = d)
   ∨
   -- DRead — a hart's plain RAM read
   (∃ (pa : PAddr) (n : Nat) (aq : Bool) (k : List (BitVec 8) → DM Dres)
@@ -499,7 +503,7 @@ def pdiskProg (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel) (dp' : Option
   ∨
   -- COMMIT — moves the fabric
   (∃ delta : VirtioState → VirtioState,
-     dp = some (DRet (DDone delta)) ∧ l = LDev ∧ dp' = none ∧
+     dp = some (DRet (DDone delta)) ∧ l = LDev .dev 0 [] ∧ dp' = none ∧
      d' = setDvirtio d (delta (dvirtio d)))
   ∨
   -- the malformed chain (`LSilent`, not `LDev`)
@@ -513,7 +517,7 @@ def pdiskProg (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel) (dp' : Option
 UART program or of the PLIC program off a wire write, at the disk agent. -/
 def pdiskUart (dp : Option (DM Dres)) (d : Efab) (l : Wlabel) (dp' : Option (DM Dres))
     (d' : Efab) : Prop :=
-  dp' = dp ∧ l = LDev ∧
+  dp' = dp ∧ l = LDev .dev 0 [] ∧
   ((∃ (i : UartId) (m' : DevProg (.uart i)) (ds' : DevStates),
       fdevStep (.uart i) (efU d i) d.efDev m' ds' ∧ d' = efUset { d with efDev := ds' } i m') ∨
    (∃ (m' : DevProg .plic) (ds' : DevStates),
@@ -539,7 +543,7 @@ def pstepEv (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) : Prop 
 /-- THE FABRIC MARKER, a function of the LABEL alone. -/
 def pdevEv (_p : Pexv6) (l : Wlabel) (_p' : Pexv6) : Bool :=
   match l with
-  | LDev => true
+  | LDev .. => true
   | _ => false
 
 /-! ## 3. The memory half -/
@@ -555,7 +559,7 @@ def elabOk (σ : WGState) (c : CPU) (l : Wlabel) : Prop :=
       readOk (imgZ σ.wgimg) σ.wglog (σ.wgws c) aq false base tvs ∧
       exclOk σ.wglog c.val base tvs (σ.wglog.length + 1)
   | LFence .. => True
-  | LDev => True
+  | LDev .. => True
   | LRegW .. | LCtrl _ | LInstr => True
   | LExLoad aq base tvs _ => readOk (imgZ σ.wgimg) σ.wglog (σ.wgws c) aq false base tvs
   | LExStore _ base data _ _ =>
@@ -581,7 +585,7 @@ def elabWs (σ : WGState) (c : CPU) (l : Wlabel) : CPU → Wstate :=
         rl (srcsView (σ.wgws c) asrc) (srcsView (σ.wgws c) vsrc) base data.length
         (σ.wglog.length + 1))
   | LFence pr pw sr sw => updCpu σ.wgws c (fencePost (σ.wgws c) pr pw sr sw)
-  | LDev => σ.wgws
+  | LDev .. => σ.wgws
   | LRegW rd srcs => updCpu σ.wgws c (regwPost (σ.wgws c) rd (srcsView (σ.wgws c) srcs))
   | LCtrl srcs => updCpu σ.wgws c (ctrlPost (σ.wgws c) (srcsView (σ.wgws c) srcs))
   | LInstr => updCpu σ.wgws c (instrPost (σ.wgws c))
@@ -599,7 +603,7 @@ def elabLog (σ : WGState) (c : CPU) (l : Wlabel) (k : WmClass) : List Wmsg :=
   | LStore _ base data _ _ => σ.wglog ++ [⟨base, data, some c.val, k⟩]
   | LRmw _ _ base _ data _ _ => σ.wglog ++ [⟨base, data, some c.val, k⟩]
   | LExStore _ base data _ _ => σ.wglog ++ [⟨base, data, some c.val, k⟩]
-  | LSilent | LLoad .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LExLoad ..
+  | LSilent | LLoad .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LExLoad ..
   | LIFetch .. => σ.wglog
 
 /-- D3: the `eregsApply` twin for the announced bits. -/
@@ -626,7 +630,7 @@ def edlabOk (σ : WGState) (dws : Wstate) (l : Wlabel) : Prop :=
   | LLoad aq lat base tvs asrc => asrc = [] ∧ readOk (imgZ σ.wgimg) σ.wglog dws aq lat base tvs
   | LStore _ _ data asrc vsrc => asrc = [] ∧ vsrc = [] ∧ data ≠ []
   | LFence .. => True
-  | LDev => True
+  | LDev .. => True
   | LRmw .. => False
   | LRegW .. | LCtrl _ | LInstr => True
   | LExLoad .. | LExStore .. => False
@@ -642,7 +646,7 @@ def edlabWs (σ : WGState) (dws : Wstate) (l : Wlabel) : Wstate :=
       storePostRun (loadPostRun dws aq base (tvs.map Prod.fst)) rl base data.length
         (σ.wglog.length + 1)
   | LFence pr pw sr sw => fencePost dws pr pw sr sw
-  | LDev => dws
+  | LDev .. => dws
   | LRegW rd srcs => regwPost dws rd (srcsView dws srcs)
   | LCtrl srcs => ctrlPost dws (srcsView dws srcs)
   | LInstr => instrPost dws
@@ -655,7 +659,7 @@ def edlabLog (σ : WGState) (l : Wlabel) (k : WmClass) : List Wmsg :=
   | LStore _ base data _ _ => σ.wglog ++ [⟨base, data, some nDisk, k⟩]
   | LRmw _ _ base _ data _ _ => σ.wglog ++ [⟨base, data, some nDisk, k⟩]
   | LExStore _ base data _ _ => σ.wglog ++ [⟨base, data, some nDisk, k⟩]
-  | LSilent | LLoad .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LExLoad ..
+  | LSilent | LLoad .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LExLoad ..
   | LIFetch .. => σ.wglog
 
 def edlabApply (σ : WGState) (l : Wlabel) (k : WmClass) (d' : DevStates) : WGState :=
@@ -669,11 +673,11 @@ theorem elabApplySilent (σ : WGState) (c : CPU) (k : WmClass) :
 theorem elabApplyDev (σ : WGState) (c : CPU) (k : WmClass) (d' : DevStates) :
     elabApply σ c LSilent k none none none d' = ewgDev σ d' := rfl
 
-theorem elabApplyLdev (σ : WGState) (c : CPU) (k : WmClass) (d' : DevStates) :
-    elabApply σ c LDev k none none none d' = ewgDev σ d' := rfl
+theorem elabApplyLdev (σ : WGState) (c : CPU) (k : WmClass) (d' : DevStates) (kd : IoKind) (ba : Int) (bs : List (BitVec 8)) :
+    elabApply σ c (LDev kd ba bs) k none none none d' = ewgDev σ d' := rfl
 
-theorem elabApplyLdevReg (σ : WGState) (c : CPU) (k : WmClass) (rs' : RegFile) :
-    elabApply σ c LDev k (some rs') none none σ.wgdev = ewgReg σ c rs' := rfl
+theorem elabApplyLdevReg (σ : WGState) (c : CPU) (k : WmClass) (rs' : RegFile) (kd : IoKind) (ba : Int) (bs : List (BitVec 8)) :
+    elabApply σ c (LDev kd ba bs) k (some rs') none none σ.wgdev = ewgReg σ c rs' := rfl
 
 theorem elabApplyReg (σ : WGState) (c : CPU) (k : WmClass) (rs' : RegFile) :
     elabApply σ c LSilent k (some rs') none none σ.wgdev = ewgReg σ c rs' := rfl
@@ -749,7 +753,8 @@ theorem elabApplyBarrier (σ : WGState) (c : CPU) (k : WmClass) (b : barrier_kin
 
 theorem edlabApplySilent (σ : WGState) (k : WmClass) : edlabApply σ LSilent k σ.wgdev = σ := rfl
 
-theorem edlabApplyLdevId (σ : WGState) (k : WmClass) : edlabApply σ LDev k σ.wgdev = σ := rfl
+theorem edlabApplyLdevId (σ : WGState) (k : WmClass) (kd : IoKind) (ba : Int) (bs : List (BitVec 8)) :
+    edlabApply σ (LDev kd ba bs) k σ.wgdev = σ := rfl
 
 theorem edlabApplyLoadId (σ : WGState) (k : WmClass) (aq lat : Bool) (base : Int)
     (tvs : List (Nat × BitVec 8)) : edlabApply σ (LLoad aq lat base tvs []) k σ.wgdev = σ := rfl
@@ -760,8 +765,8 @@ theorem edlabApplyFenceId (σ : WGState) (k : WmClass) (pr pw sr sw : Bool) :
 theorem edlabApplyDev (σ : WGState) (k : WmClass) (d' : DevStates) :
     edlabApply σ LSilent k d' = ewgDev σ d' := rfl
 
-theorem edlabApplyLdev (σ : WGState) (k : WmClass) (d' : DevStates) :
-    edlabApply σ LDev k d' = ewgDev σ d' := rfl
+theorem edlabApplyLdev (σ : WGState) (k : WmClass) (d' : DevStates) (kd : IoKind) (ba : Int) (bs : List (BitVec 8)) :
+    edlabApply σ (LDev kd ba bs) k d' = ewgDev σ d' := rfl
 
 theorem edlabApplyStore (σ : WGState) (k : WmClass) (rl : Bool) (base : Int)
     (data : List (BitVec 8)) :
@@ -963,7 +968,8 @@ pin write. -/
 theorem eplicStepFactor (gen : Nat) {dv : DevId} (c : CPU) (mm b : Bool) (σ σ' : WGState)
     (efs : List WExpr) :
     wdevOpStep gen dv (.setPin c mm b) σ () σ' efs ↔
-    efs = [] ∧ σ' = elabApply σ c LDev .WCplain (some (pinSet (σ.wgregs c) mm b)) none none σ.wgdev := by
+    efs = [] ∧
+      σ' = elabApply σ c (LDev .dev 0 []) .WCplain (some (pinSet (σ.wgregs c) mm b)) none none σ.wgdev := by
   constructor
   · rintro ⟨rfl, rfl⟩
     refine ⟨rfl, ?_⟩
@@ -978,7 +984,7 @@ theorem pstepPlicPin (c : CPU) (mm b : Bool) (k : Unit → DevProg .plic) (rs : 
     (d : Efab) :
     d.efPlic = .op (.setPin c mm b) k →
     ∀ (m : SailM Unit) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch),
-      pstepPlic c m rs fn ib d LDev m (some (pinSet rs mm b)) fn { d with efPlic := k () } none
+      pstepPlic c m rs fn ib d (LDev .dev 0 []) m (some (pinSet rs mm b)) fn { d with efPlic := k () } none
         none :=
   fun hd _ _ _ => ⟨mm, b, k, hd, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
@@ -1099,7 +1105,7 @@ the wire write, a root device step IS `fdevStep`, σ-shape `edlabApply` of `LDev
 theorem euartStepFactor (gen : Nat) {dv : DevId} (m m' : DevProg dv) (σ σ' : WGState) :
     devNodePlain false m →
     (wdevStep gen dv rootTask m σ m' σ' [] ↔
-      ∃ d' : DevStates, fdevStep dv m σ.wgdev m' d' ∧ σ' = edlabApply σ LDev .WCplain d') := by
+      ∃ d' : DevStates, fdevStep dv m σ.wgdev m' d' ∧ σ' = edlabApply σ (LDev .dev 0 []) .WCplain d') := by
   intro hp
   constructor
   · intro h
@@ -1182,14 +1188,14 @@ theorem ediskStepFactor (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ :
   · rintro (⟨rfl, rfl, rfl⟩ | ⟨pa, n, aq, k, tvs, rfl, hlen, hrd, rfl, rfl⟩ |
       ⟨pa, bs, k, rfl, hne, rfl, rfl⟩ | ⟨k, rfl, rfl, rfl⟩ | ⟨delta, rfl, rfl, rfl⟩ |
       ⟨prog', rfl, hch, rfl, rfl⟩ | ⟨rfl, rfl, rfl⟩)
-    · exact ⟨LDev, _, _, rfl, Or.inl ⟨rfl, rfl, rfl, rfl⟩, trivial, rfl⟩
+    · exact ⟨LDev .dev 0 [], _, _, rfl, Or.inl ⟨rfl, rfl, rfl, rfl⟩, trivial, rfl⟩
     · exact ⟨LLoad aq false (paZ pa) tvs [], _, _, rfl,
         Or.inr (Or.inl ⟨pa, n, aq, k, tvs, rfl, hlen, rfl, rfl, rfl⟩), ⟨rfl, hrd⟩, rfl⟩
     · exact ⟨LStore false (paZ pa) bs [] [], _, _, rfl,
         Or.inr (Or.inr (Or.inl ⟨pa, bs, k, rfl, hne, rfl, rfl, rfl⟩)), ⟨rfl, rfl, hne⟩, rfl⟩
     · exact ⟨LFence true true true true, _, _, rfl,
         Or.inr (Or.inr (Or.inr (Or.inl ⟨k, rfl, rfl, rfl, rfl⟩))), trivial, rfl⟩
-    · exact ⟨LDev, none, _, rfl,
+    · exact ⟨LDev .dev 0 [], none, _, rfl,
         Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨delta, rfl, rfl, rfl, rfl⟩)))), trivial, rfl⟩
     · exact ⟨LSilent, _, _, rfl,
         Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨prog', rfl, hch, rfl, rfl, rfl⟩))))),
@@ -1229,8 +1235,9 @@ theorem euartStepPstepDisk (gen : Nat) (i : UartId) (F : Efab) (m' : DevProg (.u
     F.efDev = σ.wgdev → devNodePlain false (efU F i) →
     wdevStep gen (.uart i) rootTask (efU F i) σ m' σ' [] →
     ∃ d' : DevStates,
-      pstepDisk dp F LDev dp (efUset { F with efDev := d' } i m') ∧ edlabWs σ dws LDev = dws ∧
-      edlabOk σ dws LDev ∧ σ' = edlabApply σ LDev (pclsEv (.PDisk dp) LDev dws) d' := by
+      pstepDisk dp F (LDev .dev 0 []) dp (efUset { F with efDev := d' } i m') ∧
+      edlabWs σ dws (LDev .dev 0 []) = dws ∧ edlabOk σ dws (LDev .dev 0 []) ∧
+      σ' = edlabApply σ (LDev .dev 0 []) (pclsEv (.PDisk dp) (LDev .dev 0 []) dws) d' := by
   intro hF hp h
   obtain ⟨d', hf, hs⟩ := (euartStepFactor gen _ m' σ σ' hp).1 h
   rw [← hF] at hf
@@ -1243,8 +1250,9 @@ theorem eplicGateStepPstepDisk (gen : Nat) (F : Efab) (m' : DevProg .plic)
     F.efDev = σ.wgdev → devNodePlain false F.efPlic →
     wdevStep gen .plic rootTask F.efPlic σ m' σ' [] →
     ∃ d' : DevStates,
-      pstepDisk dp F LDev dp { F with efDev := d', efPlic := m' } ∧ edlabWs σ dws LDev = dws ∧
-      edlabOk σ dws LDev ∧ σ' = edlabApply σ LDev (pclsEv (.PDisk dp) LDev dws) d' := by
+      pstepDisk dp F (LDev .dev 0 []) dp { F with efDev := d', efPlic := m' } ∧
+      edlabWs σ dws (LDev .dev 0 []) = dws ∧ edlabOk σ dws (LDev .dev 0 []) ∧
+      σ' = edlabApply σ (LDev .dev 0 []) (pclsEv (.PDisk dp) (LDev .dev 0 []) dws) d' := by
   intro hF hp h
   obtain ⟨d', hf, hs⟩ := (euartStepFactor gen _ m' σ σ' hp).1 h
   rw [← hF] at hf
@@ -1276,10 +1284,10 @@ theorem eplicStepPstepHart (gen : Nat) (tid : TaskId) (c : CPU) (mm b : Bool)
     wdevStep gen .plic tid F.efPlic σ m' σ' efs →
     m' = k () ∧ efs = [] ∧
       (∀ (m : SailM Unit) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch),
-        pstepHart c m (σ.wgregs c) fn ib F LDev m (some (pinSet (σ.wgregs c) mm b)) fn
+        pstepHart c m (σ.wgregs c) fn ib F (LDev .dev 0 []) m (some (pinSet (σ.wgregs c) mm b)) fn
           { F with efPlic := k () } none none) ∧
-      elabOk σ c LDev ∧
-      σ' = elabApply σ c LDev .WCplain (some (pinSet (σ.wgregs c) mm b)) none none σ.wgdev := by
+      elabOk σ c (LDev .dev 0 []) ∧
+      σ' = elabApply σ c (LDev .dev 0 []) .WCplain (some (pinSet (σ.wgregs c) mm b)) none none σ.wgdev := by
   intro hF h
   rw [hF] at h
   rcases h with ⟨v, rfl, h⟩ | ⟨hb, -, -, -⟩
@@ -1299,7 +1307,7 @@ theorem pnodeStepCases (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevState
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
     (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
     pnodeStep m rs ib d l m' ors fn' d' oib obar →
-    l = LSilent ∨ l = LInstr ∨ l = LDev ∨ (∃ w, l = erwLabel w) ∨ (∃ b, l = ebarLabel b) ∨
+    l = LSilent ∨ l = LInstr ∨ (∃ kd ba bs, l = LDev kd ba bs) ∨ (∃ w, l = erwLabel w) ∨ (∃ b, l = ebarLabel b) ∨
       (∃ base tvs, l = LIFetch base tvs) ∨ (∃ aq base tvs, l = LLoad aq false base tvs []) ∨
       (∃ aq base tvs asrc, l = LExLoad aq base tvs asrc) ∨
       (∃ rl base data asrc vsrc, l = LStore rl base data asrc vsrc) ∨
@@ -1315,7 +1323,7 @@ theorem pnodeStepCases (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevState
     | memRead n va req =>
       simp only [pnodeStep] at h
       split at h
-      · obtain ⟨_, _, rfl, _⟩ := h; exact Or.inr (Or.inr (Or.inl rfl))
+      · obtain ⟨_, _, rfl, _⟩ := h; exact Or.inr (Or.inr (Or.inl ⟨_, _, _, rfl⟩))
       · rcases h with ⟨_, _, _, _, _, rfl, _⟩ | ⟨_, ⟨_, _, _, _, _, rfl, _⟩ | ⟨_, _, _, _, _, rfl, _⟩⟩
         · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨_, _, rfl⟩)))))
         · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨_, _, _, rfl⟩))))))
@@ -1325,7 +1333,7 @@ theorem pnodeStepCases (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevState
       simp only [pnodeStep] at h
       split at h
       · split at h
-        · obtain ⟨_, rfl, _⟩ := h; exact Or.inr (Or.inr (Or.inl rfl))
+        · obtain ⟨_, rfl, _⟩ := h; exact Or.inr (Or.inr (Or.inl ⟨_, _, _, rfl⟩))
         · exact h.elim
       · split at h
         · rcases h with ⟨_, ⟨_, rfl, _⟩ | ⟨_, ⟨rfl, _⟩ | ⟨rfl, _⟩⟩⟩
@@ -1361,7 +1369,7 @@ theorem pnodeStepLatFree (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevSta
     (obar : Option barrier_kind) :
     ¬ pnodeStep m rs ib d (LLoad aq true base tvs []) m' ors fn' d' oib obar := by
   intro h
-  rcases pnodeStepCases _ _ _ _ _ _ _ _ _ _ _ h with h | h | h | ⟨w, h⟩ | ⟨b, h⟩ |
+  rcases pnodeStepCases _ _ _ _ _ _ _ _ _ _ _ h with h | h | ⟨_, _, _, h⟩ | ⟨w, h⟩ | ⟨b, h⟩ |
     ⟨_, _, h⟩ | ⟨_, _, _, h⟩ | ⟨_, _, _, _, h⟩ | ⟨_, _, _, _, _, h⟩ | ⟨_, _, _, _, _, h⟩
   all_goals first
     | (cases h; done)
@@ -1514,7 +1522,7 @@ theorem pnodeStepNoRmw (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevState
     (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
     ¬ pnodeStep m rs ib d (LRmw aq rl base tvs data asrc vsrc) m' ors fn' d' oib obar := by
   intro h
-  rcases pnodeStepCases _ _ _ _ _ _ _ _ _ _ _ h with h | h | h | ⟨w, h⟩ | ⟨b, h⟩ |
+  rcases pnodeStepCases _ _ _ _ _ _ _ _ _ _ _ h with h | h | ⟨_, _, _, h⟩ | ⟨w, h⟩ | ⟨b, h⟩ |
     ⟨_, _, h⟩ | ⟨_, _, _, h⟩ | ⟨_, _, _, _, h⟩ | ⟨_, _, _, _, _, h⟩ | ⟨_, _, _, _, _, h⟩
   all_goals first
     | (cases h; done)
@@ -1585,7 +1593,7 @@ local macro "edev_sil" h:ident : tactic =>
 theorem pnodeStepDevFree (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevStates) (l : Wlabel)
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
     (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
-    pnodeStep m rs ib d l m' ors fn' d' oib obar → l ≠ LDev →
+    pnodeStep m rs ib d l m' ors fn' d' oib obar → (∀ kd ba bs, l ≠ LDev kd ba bs) →
     d' = d ∧ ∀ d0, pnodeStep m rs ib d0 l m' ors fn' d0 oib obar := by
   intro h
   match m, h with
@@ -1601,7 +1609,7 @@ theorem pnodeStepDevFree (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevSta
       intro hne
       simp only [pnodeStep] at h ⊢
       split at h
-      · obtain ⟨_, _, hl, _⟩ := h; exact absurd hl hne
+      · obtain ⟨_, _, hl, _⟩ := h; exact absurd hl (hne _ _ _)
       · rename_i hd
         simp only [hd, Bool.false_eq_true, ↓reduceIte]
         refine ⟨?_, fun d0 => ?_⟩
@@ -1618,7 +1626,7 @@ theorem pnodeStepDevFree (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevSta
       simp only [pnodeStep] at h ⊢
       split at h
       · split at h
-        · obtain ⟨_, hl, _⟩ := h; exact absurd hl hne
+        · obtain ⟨_, hl, _⟩ := h; exact absurd hl (hne _ _ _)
         · exact h.elim
       · rename_i hd
         simp only [hd, Bool.false_eq_true, ↓reduceIte]
@@ -1653,7 +1661,7 @@ theorem pstepNodeDevFree (cpu : CPU) (m : SailM Unit) (rs : RegFile)
     (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : DevStates) (l : Wlabel)
     (m' : SailM Unit) (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool))
     (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
-    pstepNode cpu m rs fn ib d l m' ors fn' d' oib obar → l ≠ LDev →
+    pstepNode cpu m rs fn ib d l m' ors fn' d' oib obar → (∀ kd ba bs, l ≠ LDev kd ba bs) →
     d' = d ∧ ∀ d0, pstepNode cpu m rs fn ib d0 l m' ors fn' d0 oib obar := by
   rcases fn with _ | ⟨pr, pw, sr, sw⟩
   · exact pnodeStepDevFree m rs ib d l m' ors fn' d' oib obar
@@ -1661,15 +1669,15 @@ theorem pstepNodeDevFree (cpu : CPU) (m : SailM Unit) (rs : RegFile)
 
 theorem pdiskProgDevFree (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel)
     (dp' : Option (DM Dres)) (d' : DevStates) :
-    pdiskProg dp d l dp' d' → l ≠ LDev → d' = d ∧ ∀ d0, pdiskProg dp d0 l dp' d0 := by
+    pdiskProg dp d l dp' d' → (∀ kd ba bs, l ≠ LDev kd ba bs) → d' = d ∧ ∀ d0, pdiskProg dp d0 l dp' d0 := by
   rintro (⟨_, hl, _⟩ | ⟨pa, n, aq, k, tvs, hdp, hlen, hl, hdp', rfl⟩ |
     ⟨pa, bs, k, hdp, hbs, hl, hdp', rfl⟩ | ⟨k, hdp, hl, hdp', rfl⟩ | ⟨_, _, hl, _⟩ |
     ⟨prog', hdp, hch, hl, hdp', rfl⟩ | ⟨hdp, hl, hdp', rfl⟩) hne
-  · exact absurd hl hne
+  · exact absurd hl (hne _ _ _)
   · exact ⟨rfl, fun _ => Or.inr (Or.inl ⟨pa, n, aq, k, tvs, hdp, hlen, hl, hdp', rfl⟩)⟩
   · exact ⟨rfl, fun _ => Or.inr (Or.inr (Or.inl ⟨pa, bs, k, hdp, hbs, hl, hdp', rfl⟩))⟩
   · exact ⟨rfl, fun _ => Or.inr (Or.inr (Or.inr (Or.inl ⟨k, hdp, hl, hdp', rfl⟩)))⟩
-  · exact absurd hl hne
+  · exact absurd hl (hne _ _ _)
   · exact ⟨rfl, fun _ => Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
       ⟨prog', hdp, hch, hl, hdp', rfl⟩)))))⟩
   · exact ⟨rfl, fun _ => Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
@@ -1677,22 +1685,22 @@ theorem pdiskProgDevFree (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel)
 
 theorem pstepDiskDevFree (dp : Option (DM Dres)) (d : Efab) (l : Wlabel)
     (dp' : Option (DM Dres)) (d' : Efab) :
-    pstepDisk dp d l dp' d' → l ≠ LDev → d' = d ∧ ∀ d0, pstepDisk dp d0 l dp' d0 := by
+    pstepDisk dp d l dp' d' → (∀ kd ba bs, l ≠ LDev kd ba bs) → d' = d ∧ ∀ d0, pstepDisk dp d0 l dp' d0 := by
   rintro (⟨h, hd⟩ | ⟨_, hl, _⟩) hne
   · obtain ⟨he, hall⟩ := pdiskProgDevFree dp _ l dp' _ h hne
     exact ⟨by rw [hd, he], fun d0 => Or.inl ⟨hall d0.efDev, rfl⟩⟩
-  · exact absurd hl hne
+  · exact absurd hl (hne _ _ _)
 
 theorem pdevEvOk : pdevOk pstepEv pdevEv := by
   intro p d l p' d' hs hm
-  have hne : l ≠ LDev := by
-    rintro rfl
+  have hne : ∀ kd ba bs, l ≠ LDev kd ba bs := by
+    rintro kd ba bs rfl
     exact absurd hm (by simp [pdevEv])
   cases p <;> cases p' <;> simp only [pstepEv] at hs ⊢
   · obtain ⟨rfl, ors, oib, obar, rfl, rfl, ⟨hn, hd⟩ | ⟨_, _, _, _, hl, _⟩⟩ := hs
     · obtain ⟨he, hall⟩ := pstepNodeDevFree _ _ _ _ _ _ _ _ _ _ _ _ _ hn hne
       exact ⟨by rw [hd, he], fun d0 => ⟨rfl, ors, oib, obar, rfl, rfl, Or.inl ⟨hall d0.efDev, rfl⟩⟩⟩
-    · exact absurd hl hne
+    · exact absurd hl (hne _ _ _)
   · exact pstepDiskDevFree _ _ _ _ _ hs hne
 
 /-- D3-2: THE LOAD-DEPENDENCY-FREEDOM OF THE INSTANCE (deviation D-8 of the Rocq tree). -/
@@ -1701,7 +1709,7 @@ theorem pnodeStepLdepfree (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevSt
     (d' : DevStates) (oib : Option Ibch) (obar : Option barrier_kind) :
     pnodeStep m rs ib d l m' ors fn' d' oib obar → lbLdepfree l := by
   intro h
-  rcases pnodeStepCases _ _ _ _ _ _ _ _ _ _ _ h with rfl | rfl | rfl | ⟨w, rfl⟩ | ⟨b, rfl⟩ |
+  rcases pnodeStepCases _ _ _ _ _ _ _ _ _ _ _ h with rfl | rfl | ⟨_, _, _, rfl⟩ | ⟨w, rfl⟩ | ⟨b, rfl⟩ |
     ⟨_, _, rfl⟩ | ⟨_, _, _, rfl⟩ | ⟨_, _, _, _, rfl⟩ | ⟨_, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, rfl⟩
   all_goals first
     | trivial

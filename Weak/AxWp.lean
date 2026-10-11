@@ -205,6 +205,7 @@ theorem areadStepGraphValue (GD : Gdexec) (i : Nat) (s : Athread) (id : AidentT)
   | LStore rl base vs k => simp [aident, aidentRd] at hrd
   | LFence pr pw sr sw => simp [aident, aidentRd] at hrd
   | LRmw aq rl base ts rvs wvs k => exact ⟨rvs, rfl, fun h => by simp [aident, aidentAdvRd] at h⟩
+  | LIo kd base vs => simp [aident, aidentRd] at hrd
 
 /-- ... and a write about to happen has graph data of the label's width. -/
 theorem astepProgGraphData (GD : Gdexec) (i : Nat)

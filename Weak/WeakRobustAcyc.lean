@@ -132,7 +132,7 @@ def WeakRobustAcyc.lbAq (l : Wlabel) : Bool :=
   | LLoad aq _ _ _ _ => aq
   | LRmw aq _ _ _ _ _ _ => aq
   | LExLoad aq _ _ _ => aq
-  | LSilent | LStore .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LExStore ..
+  | LSilent | LStore .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LExStore ..
   | LIFetch .. => false
 
 /-- Is the label a `fence r, rw`-or-stronger — `pr` and `sw`?  Exactly the two
@@ -140,7 +140,7 @@ bits `fencePost` needs to route `wVrOld` into `wVwNew`. -/
 def lbFencePrsw (l : Wlabel) : Prop :=
   match l with
   | LFence pr _ _ sw => pr = true ∧ sw = true
-  | LSilent | LLoad .. | LStore .. | LRmw .. | LDev | LRegW .. | LCtrl _ | LInstr
+  | LSilent | LLoad .. | LStore .. | LRmw .. | LDev .. | LRegW .. | LCtrl _ | LInstr
   | LExLoad .. | LExStore .. | LIFetch .. => False
 
 /-! ## DELIVERABLE 1: THE `fwdOwn` INVARIANT -/
@@ -397,7 +397,7 @@ def fulfilVext (ws : Wstate) (l : Wlabel) : Option Nat :=
           (ldvOf ws aq (srcsView ws asrc) base (tvs.map Prod.fst))))
   | LExStore rl _ _ asrc vsrc =>
       some (fulfilVpreD ws rl (max (max (srcsView ws asrc) (srcsView ws vsrc)) (resView ws)))
-  | LSilent | LLoad .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LExLoad ..
+  | LSilent | LLoad .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LExLoad ..
   | LIFetch .. => none
 
 /-- `wVwNew` is a lower bound of the EXT view. -/

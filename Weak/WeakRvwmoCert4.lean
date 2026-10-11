@@ -244,6 +244,7 @@ theorem gxhLblEq (G : Gexec) (cs : List Nat) (e : Geid) :
           simp only [lbRd, Option.some.injEq, Prod.mk.injEq] at hrd
           obtain ⟨-, rfl, rfl⟩ := hrd
           exact hsh.2.2
+        | LIo => simp [lbRd] at hrd
       apply fmapIdPointwise
       intro j t hj
       apply hrenId G cs t hnd hwc
@@ -262,6 +263,7 @@ theorem gxhLblEq (G : Gexec) (cs : List Nat) (e : Geid) :
     | LRmw aq rl base ts rvs wvs kc =>
       show some (Lbl.LRmw aq rl base (ts.map (hren G cs)) rvs wvs kc) = _
       rw [hts base ts rvs rfl]
+    | LIo => rfl
 
 /-! # 3. THE BRIDGE, AND WHY IT CANNOT BE DONE UP TO A RENAMING -/
 
@@ -510,7 +512,7 @@ theorem segStepOfSegment (x : Nat) (cpu : CPU) (d0 : Efab)
     (ib0 : Ibch) (St : CycState) (m20 : SailM Unit) (rs20 : RegFile)
     (fn20 : Ofence) (ib20 : Ibch) :
     hemit (fun _ => d0) k0 ws0 rowseg (.PHart cpu m0 rs10 fn0 ib0) es pfin →
-    LDev ∉ es.map Prod.fst →
+    (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     WeakRvwmoCert2.esPin St.cstC.cdImg es →
     (∀ i lb, rowseg[i]? = some lb → Q (k0 + i) lb) →
     cstOk d0 St →

@@ -128,6 +128,7 @@ theorem FldMWNp (i : Agent) (e : Geid) (kr lo hi : Nat) :
   cases lb with
   | LStore _ _ _ _ => simp [aident] at Hlb'
   | LFence _ _ _ _ => simp [aident] at Hlb'
+  | LIo _ _ _ => simp [aident] at Hlb'
   | LRmw _ _ _ _ _ _ _ => simp [aident] at Hlb'
   | LLoad aq' b ts vs =>
     simp only [aident, AidentT.IRead.injEq] at Hlb'
@@ -320,6 +321,7 @@ theorem AxSpinAp8.FldMWFrame (i : Agent) (pa : Int) (n lo hi : Nat) :
     | LLoad aq' b ts vs => exact nwOfLoad GT i k aq' b ts vs Hlb
     | LStore _ _ _ _ => simp [aident, aidentRd] at Hid
     | LFence _ _ _ _ => simp [aident, aidentRd] at Hid
+    | LIo _ _ _ => simp [aident, aidentRd] at Hid
     | LRmw aq' rl b ts rvs wvs cls =>
       simp only [aident, aidentRd, Option.some.injEq, Prod.mk.injEq] at Hid
       obtain ⟨rfl, rfl, Hn⟩ := Hid

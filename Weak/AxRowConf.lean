@@ -110,6 +110,7 @@ theorem rowEmittedFromRunSound (t1 t2 : Athread) :
       | LLoad => simp [aident] at hid
       | LFence => simp [aident] at hid
       | LRmw => simp [aident] at hid
+      | LIo => simp [aident] at hid
     exact .AStepWrite p k d _ lb p' d' hrow rfl hwl hwd hstep
   | RowEmitFence p k d l lb p' d' t' hrow hsome hidf hstep _ ih =>
     exact rtc_l (Or.inl ⟨_, .AStepFence p k d l lb p' d' hrow hsome hidf hstep⟩) ih

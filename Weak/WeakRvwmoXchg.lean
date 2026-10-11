@@ -727,6 +727,7 @@ def lblTswap (k1 : Nat) (l : Lbl) : Lbl :=
   | LStore rl base vs k => LStore rl base vs k
   | LFence pr pw sr sw => LFence pr pw sr sw
   | LRmw aq rl base ts rvs wvs k => LRmw aq rl base (ts.map (tswap k1)) rvs wvs k
+  | LIo kd base vs => LIo kd base vs
 
 /-! ## 8.1 Label-shape stability -/
 

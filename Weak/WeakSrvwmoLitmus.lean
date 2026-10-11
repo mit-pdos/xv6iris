@@ -286,6 +286,7 @@ theorem candShapeRd (c : Cand) (k : Nat) (s : Estep) (base : Int) (ts : List Nat
   | LRmw aq rl b t rv wv kc =>
     simp only [lbRd, Option.some.injEq, Prod.mk.injEq] at hrd
     obtain ⟨rfl, rfl, rfl⟩ := hrd; exact h.2.2
+  | LIo => simp [lbRd] at hrd
 
 /-- `WeakAxiomatic2.lbRdTsReads` without `execWf`. -/
 theorem candLbRdTsReads (c : Cand) (k : Nat) (s : Estep) (a : Int) (t : Nat) :

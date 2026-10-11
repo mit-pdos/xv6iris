@@ -694,6 +694,13 @@ theorem candWsFence (c : Cand) (k : Nat) (s : Estep) (pr pw sr sw : Bool) :
     ews (candExec c) (k + 1) s.esAg = fencePost (ews (candExec c) k s.esAg) pr pw sr sw := by
   intro hs hl; unfold ews; rw [candNext c k s hs, hl]; exact updWsEq _ _ _
 
+/-- W13 (E): the replay's `mnext` leaves the state at an I/O-class label. -/
+theorem candWsIo (c : Cand) (k : Nat) (s : Estep) (kd : IoKind) (base : Int)
+    (vs : List (BitVec 8)) :
+    c.cdTr[k]? = some s → s.esLb = LIo kd base vs →
+    ews (candExec c) (k + 1) s.esAg = ews (candExec c) k s.esAg := by
+  intro hs hl; unfold ews; rw [candNext c k s hs, hl]; rfl
+
 theorem candWsRmw (c : Cand) (k : Nat) (s : Estep) (aq rl : Bool) (base : Int) (ts : List Nat)
     (rvs wvs : List (BitVec 8)) (kc : WmClass) :
     c.cdTr[k]? = some s → s.esLb = LRmw aq rl base ts rvs wvs kc →
@@ -888,6 +895,7 @@ theorem candWsFwdW (c : Cand) (k : Nat) (s : Estep) (base : Int) (vs : List (Bit
     rw [candWsRmw c k s aq rl b0 ts0 rvs0 wvs0 kc hs hl]
     refine ⟨fun hin => storeRunFwdIn _ _ _ _ _ _ hin, fun hout => ?_⟩
     rw [storeRunFwdOut _ _ _ _ _ _ hout, loadPostRunFwd]
+  | LIo => rw [hl] at hwr; simp [lbWr] at hwr
 
 /-- A non-writing step moves neither the bank nor the write set. -/
 theorem candWsFwdNw (c : Cand) (k : Nat) (s : Estep) :
@@ -899,6 +907,7 @@ theorem candWsFwdNw (c : Cand) (k : Nat) (s : Estep) :
   | LStore => unfold esWmsg at hm; rw [hl] at hm; simp [lbWr] at hm
   | LFence p1 p2 p3 p4 => rw [candWsFence c k s p1 p2 p3 p4 hs hl]; exact fencePostFwd _ _ _ _ _
   | LRmw => unfold esWmsg at hm; rw [hl] at hm; simp [lbWr] at hm
+  | LIo kd0 b0 v0 => rw [candWsIo c k s kd0 b0 v0 hs hl]
 
 def bankdom (c : Cand) (k : Nat) (i : Nat) : Prop :=
   (∀ a tf vf, get? (ews 𝓔 k i).wFwd a = some (tf, vf) → vf = 0) ∧
@@ -1258,6 +1267,7 @@ theorem invStep (c : Cand) (hrft : axRfTotal 𝓔) (hcohax : axCoherence 𝓔) (
       exact invLoadFold c hrft hcohax hordax hrelax k s base ts rvs aq s.esAg hs rfl
         (by rw [hl]; rfl) hlenr (by rw [hl]; rfl)
         (fun a t v hr => by have := hnf a t v hr; rw [hl] at this; exact this) hinv
+    | LIo => rw [hl] at hsh; exact hsh.elim
   · unfold inv; rw [candWsNe c k s i hs hi]
     exact invwWk c k (k + 1) i _ (by omega) hinv
 
@@ -1397,6 +1407,7 @@ theorem candMstepOkAt (c : Cand) (hval : candValues c) (hrft : axRfTotal 𝓔)
     rw [hl] at hh
     exact ⟨hne0, hlenw, hh, candRmwLatest c hval hrft hatom n s base ts rvs hn hok hs
       (by rw [hl]; rfl) (by rw [hl]; rfl) hlenr⟩
+  | LIo => rw [hl] at hsh; exact hsh.elim
 
 theorem candMstepOk (c : Cand) (hval : candValues c) (hrft : axRfTotal 𝓔)
     (hcohax : axCoherence 𝓔) (hordax : axOrd 𝓔) (hrelax : axRelOrd 𝓔) (hshape : candShape c)

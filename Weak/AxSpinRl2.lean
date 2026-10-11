@@ -236,6 +236,7 @@ theorem AxSpinRl2.lobpAcq (i : Agent) (kA k : Nat) (la lb : Lbl) (base : Int) (n
   | LLoad _ _ _ _ => cases Hid
   | LStore _ _ _ _ => cases Hid
   | LFence _ _ _ _ => cases Hid
+  | LIo _ _ _ => cases Hid
   | LRmw aq rl b ts rvs wvs cls =>
     simp only [aident, AidentT.IRmw.injEq] at Hid
     obtain ⟨rfl, rfl, -, -⟩ := Hid

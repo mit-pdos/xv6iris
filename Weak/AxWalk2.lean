@@ -157,6 +157,9 @@ theorem wpdWxrdNodeM (dok : Int → Nat → Prop) (n va : Nat)
       | IFence _ _ _ _ =>
         rw [hid] at Hl0
         simp [aidentRd] at Hl0
+      | IIo _ _ _ =>
+        rw [hid] at Hl0
+        simp [aidentRd] at Hl0
     obtain ⟨aq0, rl0, Hid0⟩ := Hrmw
     have Had : aidentAdvRd (aident lb) = 0 := by rw [Hid0]; rfl
     simp only [Had, Nat.zero_ne_one, ↓reduceIte]

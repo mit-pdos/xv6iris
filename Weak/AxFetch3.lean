@@ -118,7 +118,8 @@ theorem afAdminRunToEnd (m : SailM Unit) :
             simp only [WeakEvLang.noSfAnn, if_pos hm, hdr] at hsf
             obtain ⟨ib2, hrtc⟩ := ih _ (s.setDev d0) ib s' hex hsf cpu kpos row
             refine ⟨ib2, ?_⟩
-            refine AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev d0 .LDev none none none kpos _
+            refine AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev d0
+              (.LDev .rd (paZ req.pa) (WeakInterpProj.wbytes n0 w0)) none none none kpos _
               hrtc ?_ trivial
             simp only [pnodeStep, hdevT, ↓reduceIte]
             exact ⟨w0, by simp [hdr]⟩
@@ -146,7 +147,8 @@ theorem afAdminRunToEnd (m : SailM Unit) :
               simp only [WeakEvLang.noSfAnn, hv, if_pos hm, hdw] at hsf
               obtain ⟨ib2, hrtc⟩ := ih _ (s.setDev d0) ib s' hex hsf cpu kpos row
               refine ⟨ib2, ?_⟩
-              refine AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev d0 .LDev none none none kpos
+              refine AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev d0
+                (.LDev .wr (paZ req.pa) (WeakInterpProj.wbytes n0 w)) none none none kpos
                 _ hrtc ?_ trivial
               simp only [pnodeStep, hdevT, hv, ↓reduceIte]
               simp [hdw]

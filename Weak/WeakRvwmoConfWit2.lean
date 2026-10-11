@@ -281,6 +281,7 @@ def lbShapeOk (l : Lbl) : Prop :=
   | .LStore _ _ vs _ => vs ≠ []
   | .LFence _ _ _ _ => True
   | .LRmw _ _ _ ts rvs wvs _ => wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
+  | .LIo .. => False
 
 section G2
 

@@ -137,7 +137,7 @@ writes succ (`sw`), exactly the pair `fencePostVwNewW` routes `wVwOld` into
 def lbFencePwsw (l : Wlabel) : Prop :=
   match l with
   | LFence _ pw _ sw => pw = true ∧ sw = true
-  | LSilent | LLoad .. | LStore .. | LRmw .. | LDev | LRegW .. | LCtrl _ | LInstr
+  | LSilent | LLoad .. | LStore .. | LRmw .. | LDev .. | LRegW .. | LCtrl _ | LInstr
   | LExLoad .. | LExStore .. | LIFetch .. => False
 
 /-! ## THE TWO NEW `astepOk` FACTS -/

@@ -218,6 +218,8 @@ def shapeInB (l : Lbl) : Bool :=
   match l with
   | .LStore _ _ vs _ => !decide (vs = [])
   | .LRmw _ _ _ _ _ wvs _ => !decide (wvs = [])
+  -- W13 (E): the SC-run builder accepts no I/O-class row item (`gwf` excludes them)
+  | .LIo .. => false
   | _ => true
 
 def shapesOkB (rows : List (List Lbl)) : Bool := rows.all (fun r => r.all shapeInB)
@@ -913,6 +915,7 @@ theorem fillRd (img : Int → BitVec 8) (M : MemT) (l : Lbl) (base : Int) (ts : 
     exact key _ hts.symm hvs.symm
   | LStore => simp [fill, lbRd] at hrd
   | LFence => simp [fill, lbRd] at hrd
+  | LIo => simp [fill, lbRd] at hrd
   | LRmw aq rl b ts0 rvs0 wvs0 c =>
     simp only [fill, lbRd, Option.some.injEq, Prod.mk.injEq] at hrd
     obtain ⟨rfl, hts, hvs⟩ := hrd
@@ -950,6 +953,7 @@ def AxScRun.gshape (l : Lbl) : Prop :=
   | .LStore _ _ vs _ => vs ≠ []
   | .LFence _ _ _ _ => True
   | .LRmw _ _ _ ts rvs wvs _ => wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
+  | .LIo .. => False
 
 theorem fillShape (img : Int → BitVec 8) (M : MemT) (l : Lbl) :
     shapeInB l = true → AxScRun.gshape (fill img M l) := by
@@ -957,6 +961,7 @@ theorem fillShape (img : Int → BitVec 8) (M : MemT) (l : Lbl) :
   | LLoad => intro _; simp [fill, AxScRun.gshape]
   | LStore => intro h; simpa [shapeInB, AxScRun.gshape, fill] using h
   | LFence => intro _; trivial
+  | LIo => intro h; simp [shapeInB] at h
   | LRmw =>
     intro h
     simp only [shapeInB, Bool.not_eq_eq_eq_not, Bool.not_true, decide_eq_false_iff_not] at h
@@ -1083,7 +1088,7 @@ theorem gGwf : shapesOkB rows = true → ilOkB rows il = true → gwf (graphOfSc
           | true => exact absurd ((ilOkMem rows il hok i k).2 h) hnin
         simp only [isAt, hl0] at hnm
         simp only [Option.getD_none]
-        cases l0 <;> simp_all [lbIsMem, lbIsR, lbIsW]
+        cases l0 <;> first | (simp [shapeInB] at hsh0; done) | simp_all [lbIsMem, lbIsR, lbIsW]
 
 theorem gPo : ilOkB rows il = true → scPoGmo (graphOfSc img rows il ems).gtG := by
   intro hok e1 e2 hpo hm1 hm2

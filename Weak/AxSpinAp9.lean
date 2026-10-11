@@ -187,6 +187,7 @@ theorem AxSpinAp9.rdLoad (GD : Gdexec) (i : Agent) (k : Nat) (pnp : Int) (vs : L
   cases lb with
   | LStore _ _ _ _ => simp [aident] at Hlb'
   | LFence _ _ _ _ => simp [aident] at Hlb'
+  | LIo _ _ _ => simp [aident] at Hlb'
   | LRmw _ _ _ _ _ _ _ => simp [aident] at Hlb'
   | LLoad aq' b ts vs3 =>
     simp only [aident, AidentT.IRead.injEq] at Hlb'

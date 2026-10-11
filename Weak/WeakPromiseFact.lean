@@ -129,7 +129,7 @@ def astepOk (img : Image) (log : List Wmsg) (i : Nat) (ag : Wpagent P) (l : Wlab
               rl (srcsView w asrc) (srcsView w vsrc) base data.length ts) ∧
         Dl = some ts
   | LFence pr pw sr sw => f = (fun w => fencePost w pr pw sr sw) ∧ Dl = none
-  | LDev => f = id ∧ Dl = none
+  | LDev .. => f = id ∧ Dl = none
   | LRegW rd srcs => f = (fun w => regwPost w rd (srcsView w srcs)) ∧ Dl = none
   | LCtrl srcs => f = (fun w => ctrlPost w (srcsView w srcs)) ∧ Dl = none
   | LInstr => f = instrPost ∧ Dl = none
@@ -241,7 +241,7 @@ theorem wpstepSplit (c c' : Wpcfg P D) :
     exact .inr ⟨i, _, wpAstep.WPAStep c ag st' d' (fun w => fencePost w pr pw sr sw) none hlk hps
       ⟨rfl, rfl⟩⟩
   | WPDev i ag st' d' hlk hps =>
-    exact .inr ⟨i, LDev, wpAstep.WPAStep c ag st' d' id none hlk hps ⟨rfl, rfl⟩⟩
+    exact .inr ⟨i, LDev _ _ _, wpAstep.WPAStep c ag st' d' id none hlk hps ⟨rfl, rfl⟩⟩
   | WPRegW i ag rd srcs st' d' hlk hps =>
     exact .inr ⟨i, _, wpAstep.WPAStep c ag st' d' (fun w => regwPost w rd (srcsView w srcs)) none
       hlk hps ⟨rfl, rfl⟩⟩

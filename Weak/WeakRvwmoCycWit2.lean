@@ -358,8 +358,8 @@ theorem WeakRvwmoCycWit2.w2BlkSubstG (A : Wlabel → Prop) (hA : ∀ l, A l → 
     (phrunPevrun cpu [l] [] wrsB annB _ rsa fna iba da m' rs' fn' ib' d0 hB)
   obtain ⟨tvs, -, -, hshape⟩ := hlblRealizesLoadShape _ ws aq base ts vs l hre
   obtain ⟨-, ors, oib, obar, hrs, hib, hhart⟩ := hst
-  have hnotd : l ≠ .LDev := by
-    rintro rfl
+  have hnotd : ∀ kd ba bs, l ≠ .LDev kd ba bs := by
+    rintro kd ba bs rfl
     rcases hshape with h | ⟨_, h⟩ <;> cases h
   rcases hhart with ⟨hnode, hd⟩ | hplic
   · cases fna with
@@ -386,7 +386,7 @@ theorem WeakRvwmoCycWit2.w2BlkSubstG (A : Wlabel → Prop) (hA : ∀ l, A l → 
         rs', none, ib', d0, [], wrsA, annA, rdsB2, wrsB2, annB2, hadm, hA',
         hlblRealizesLoad _ ws false (paZ evFlag) tvs2, hB2, rfl, rfl⟩
   · obtain ⟨_, _, _, _, hl, _⟩ := hplic
-    exact absurd hl hnotd
+    exact absurd hl (hnotd _ _ _)
 
 /-- THE BLOCK, RE-ANSWERED (Rocq's statement, at plain `cblk`). -/
 theorem w2BlkSubst (cpu : CPU) (d0 : Efab) (ws : Wstate) (aq : Bool) (base : Int)
@@ -453,8 +453,8 @@ theorem w2Hemit (cpu : CPU) (d0 : Efab) (t : Nat) (w : BitVec 32) (ib : Ibch) (r
     (w2P1 w cpu rs ib) (.ARnil _ _) (w2Realizes cpu rs ib _ t w) (w2Pstep cpu rs ib d0 t w)
     (.HEnil _ _ _)
 
-theorem w2Devfree (t : Nat) (w : BitVec 32) :
-    Wlabel.LDev ∉
+theorem w2Devfree (t : Nat) (w : BitVec 32) (kd : IoKind) (ba : Int) (bs : List (BitVec 8)) :
+    Wlabel.LDev kd ba bs ∉
       ([(.LLoad false false (paZ evFlag) (ldTvs t w) [], some 0)] : List Eitem).map Prod.fst := by
   simp
 

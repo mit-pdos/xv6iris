@@ -179,6 +179,7 @@ theorem epiReloadFwd (GD : Gdexec) (a : Int) (aq : Bool)
         simp only [Option.bind_some, lblData, Option.some.injEq] at Hdata
         exact ⟨b, by rw [← Hdata]; rfl⟩
       | LFence _ _ _ _ => simp [lblData] at Hdata
+      | LIo _ _ _ => simp [lblData] at Hdata
       | LRmw _ _ b _ _ wvs _ =>
         simp only [Option.bind_some, lblData, Option.some.injEq] at Hdata
         exact ⟨b, by rw [← Hdata]; rfl⟩

@@ -977,7 +977,7 @@ theorem readOkPf (hwf : ptracesWf pstep TS) (hwsi : ptracesWsInit TS) (hco : ∀
     ev.aeLb = l →
     (match l with
      | LLoad .. | LRmw .. | LExLoad .. => True
-     | LSilent | LStore .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LExStore ..
+     | LSilent | LStore .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LExStore ..
      | LIFetch .. => False) →
     lbReads l = tvsReads base tvs →
     readOkD TS.ptImg TS.ptLog ag.paWs (WeakRobustAcyc.lbAq l) lat base tvs
@@ -1452,11 +1452,11 @@ theorem QinvStep (hwf : ptracesWf pstep TS) (hwsi : ptracesWsInit TS) (hco : ∀
     · rw [← hWdef]; simp only [aevPost, hlbe]
     · rw [hstpost, hlogNone hgts]
       exact .PFFence cf _ pr pw sr sw st' dnew hcflk hpure
-  | LDev =>
+  | LDev kd ba bs =>
     -- the `LSilent` case verbatim, at `PFDev`
     obtain ⟨_, hts0⟩ := hok
     have hgts : gevTs TS e = none := by simp [gevTs, hgev, hts0]
-    refine ⟨_, qcfgStep pstep pcls TS DS img d0 ps hwf hwfl dn e T ev ag2 cf W .LDev dnew
+    refine ⟨_, qcfgStep pstep pcls TS DS img d0 ps hwf hwfl dn e T ev ag2 cf W (.LDev kd ba bs) dnew
       hq hnp hT hev hag2 hc0 ?_ hfab' ?_⟩
     · rw [← hWdef]; simp only [aevPost, hlbe]
     · rw [hstpost, hlogNone hgts]

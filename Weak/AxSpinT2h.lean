@@ -118,6 +118,7 @@ theorem AxSpinT2h.ldOfRd (GD : Gdexec) (i k : Nat) (pa : Int) (n : Nat) (vs : Li
     exact ⟨aq', ts, Hl, h3⟩
   | LStore _ _ _ _ => simp [aident] at Hid
   | LFence _ _ _ _ => simp [aident] at Hid
+  | LIo _ _ _ => simp [aident] at Hid
   | LRmw _ _ _ _ _ _ _ => simp [aident] at Hid
 
 /-- (aq-generic `loadnReads`) every byte of a load label is read. -/

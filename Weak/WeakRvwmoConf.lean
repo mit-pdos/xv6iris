@@ -148,7 +148,7 @@ def wlblRen (π : Nat → Nat) (l : Wlabel) : Wlabel :=
   | LSilent => LSilent
   | LStore rl base data asrc vsrc => LStore rl base data asrc vsrc
   | LFence pr pw sr sw => LFence pr pw sr sw
-  | LDev => LDev
+  | LDev kd ba bs => LDev kd ba bs
   | LRegW rd srcs => LRegW rd srcs
   | LCtrl srcs => LCtrl srcs
   | LInstr => LInstr
@@ -227,6 +227,8 @@ def lblPost (t : Nat) (ws : Wstate) (l : Lbl) : Wstate :=
   | .LFence pr pw sr sw => fencePost ws pr pw sr sw
   | .LRmw aq rl base ts _ wvs _ =>
       storePostRun (loadPostRun ws aq base ts) rl base wvs.length (t + 1)
+  -- W13 (E): an I/O-class event moves no view (as `elabWs`'s `LDev` arm)
+  | .LIo .. => ws
 
 def rowWsAux (t : Nat) (ws : Wstate) (r : List Lbl) : Wstate :=
   match r with
@@ -244,6 +246,7 @@ def lpostRelp (b : Bool) (l : Lbl) : Bool :=
   | .LStore _ _ vs _ => match vs with | [] => b | _ => false
   | .LFence _ pw _ sw => if (pw && sw) then true else b
   | .LRmw _ _ _ _ _ wvs _ => match wvs with | [] => b | _ => false
+  | .LIo .. => b
 
 theorem WeakRvwmoConf.loadPostRunRelp (ws : Wstate) (aq : Bool) (base : Int) (ts : List Nat) :
     (loadPostRun ws aq base ts).wRelp = ws.wRelp := by
@@ -271,6 +274,7 @@ theorem lblPostRelp (t : Nat) (ws : Wstate) (l : Lbl) :
     simp only [lblPost, lpostRelp]
     rw [storePostRunRelp]
     cases wvs <;> simp only [List.length_nil, List.length_cons, WeakRvwmoConf.loadPostRunRelp]
+  | LIo => rfl
 
 theorem rowWsAuxRelp (t : Nat) (ws : Wstate) (r : List Lbl) :
     (rowWsAux t ws r).wRelp = r.foldl lpostRelp ws.wRelp := by
@@ -492,7 +496,7 @@ def dedges (s : Dstate) (k : Nat) (asrc vsrc : List Dsrc) : List (Nat × Nat) :=
 
 def WeakRvwmoConf.dstep (s : Dstate) (it : Eitem) : Dstate × List (Nat × Nat) :=
   match it.1 with
-  | LSilent | LDev | LFence _ _ _ _ | LIFetch _ _ => (s, [])
+  | LSilent | LDev .. | LFence _ _ _ _ | LIFetch _ _ => (s, [])
   | LInstr => (⟨s.dsProv, [], s.dsCtl⟩, [])
   | LRegW rd srcs => (⟨dprovSet s.dsProv rd (dsrcsPos s srcs), s.dsLd, s.dsCtl⟩, [])
   | LCtrl srcs => (⟨s.dsProv, s.dsLd, s.dsCtl ++ dsrcsPos s srcs⟩, [])

@@ -519,7 +519,7 @@ theorem refuseStep (i : Nat) (l : Wlabel) (cS cS' cF : Wpcfg P D) :
       exact hpd R hR
   | PFDev cfg ag st' d' hlk hps =>
     obtain ⟨agF, hlke, ⟨hst, hpr, hws, hpd⟩, _⟩ := hags' i ag hlk
-    refine ⟨.LDev, _, wpPfStep.PFDev cF agF st' d' hlke
+    refine ⟨.LDev _ _ _, _, wpPfStep.PFDev cF agF st' d' hlke
       (by rw [hst, hdev]; exact refusePstep.RFKeep _ _ _ trivial hps), ?_⟩
     rw [himg, hlog, hpr]
     exact rfCfgUpd _ _ _ [] _ _ _ _ _ _ _ _ _ _ (List.append_nil _).symm hlen hags' hlk hlke

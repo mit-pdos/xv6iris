@@ -153,6 +153,7 @@ theorem AxSpinLd4P.ldOfRd (GT : GdexecT) (i : Agent) (pa : Int) (k : Nat) (lb : 
     exact ⟨ts, vs, rfl⟩
   | LStore _ _ _ _ => simp [aident, aidentRd] at Hid
   | LFence _ _ _ _ => simp [aident, aidentRd] at Hid
+  | LIo _ _ _ => simp [aident, aidentRd] at Hid
   | LRmw aq' rl b ts rvs wvs cls' =>
     simp only [aident, aidentRd, Option.some.injEq, Prod.mk.injEq] at Hid
     obtain ⟨rfl, rfl, Hn⟩ := Hid

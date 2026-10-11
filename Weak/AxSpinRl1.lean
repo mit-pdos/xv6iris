@@ -436,6 +436,7 @@ def relpLb (lb : Lbl) (r : Bool) : Bool :=
   | .LFence _ pw _ sw => if (pw && sw) then true else r
   | .LStore .. | .LRmw .. => false
   | .LLoad .. => r
+  | .LIo .. => r
 
 /-- The flag just before row item `k`. -/
 def relpAt (row : List Lbl) (k : Nat) : Bool :=

@@ -281,6 +281,9 @@ theorem wpdXrdPinP (n va : Nat)
       | IFence _ _ _ _ =>
         rw [hid] at Hl0
         simp [aidentRd] at Hl0
+      | IIo _ _ _ =>
+        rw [hid] at Hl0
+        simp [aidentRd] at Hl0
     obtain ⟨aq1, rl1, base1, n1, Hidr⟩ := Hrmw
     have Had : aidentAdvRd (aident lb) = 0 := by rw [Hidr]; rfl
     simp only [Had, Nat.zero_ne_one, ↓reduceIte]

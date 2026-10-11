@@ -385,10 +385,11 @@ def WeakRvwmoFloor.lstep (tw : Nat) (ws : Wstate) (l : Lbl) : Wstate :=
   | .LFence pr pw sr sw => fencePost ws pr pw sr sw
   | .LRmw aq rl base ts _ wvs _ =>
     storePostRun (loadPostRun ws aq base ts) rl base wvs.length tw
+  | .LIo .. => ws
 
 theorem mnextWsEq (σ : Mstate) (i : Nat) (l : Lbl) :
     (mnext σ i l).msWs i = WeakRvwmoFloor.lstep (σ.msLog.length + 1) (σ.msWs i) l := by
-  cases l <;> exact updWsEq _ _ _
+  cases l <;> first | exact updWsEq _ _ _ | rfl
 
 theorem lstepFwd0 (tw : Nat) (ws : Wstate) (l : Lbl) :
     fwd0 ws → fwd0 (WeakRvwmoFloor.lstep tw ws l) := by
@@ -398,6 +399,7 @@ theorem lstepFwd0 (tw : Nat) (ws : Wstate) (l : Lbl) :
   | LStore => exact fwd0StorePostRun _ _ _ _ _ h
   | LFence => exact fwd0FencePost _ _ _ _ _ h
   | LRmw => exact fwd0StorePostRun _ _ _ _ _ (fwd0LoadPostRun _ _ _ _ h)
+  | LIo => exact h
 
 /-! # 4. The graph side: the four ppo⁻ arms as ordering facts -/
 
@@ -409,7 +411,8 @@ theorem WeakRvwmoFloor.gshape (G : Gexec) (hwf : gwf G) (e : Geid) (l : Lbl) :
     | .LStore _ _ vs _ => vs ≠ []
     | .LFence _ _ _ _ => True
     | .LRmw _ _ _ ts rvs wvs _ =>
-        wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length :=
+        wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
+    | .LIo .. => False :=
   fun hl => gwfLblShape G e l hwf hl
 
 /-! ## 4.1 The ordering arms -/
@@ -667,6 +670,7 @@ theorem finvStep (G : Gexec) (hwf : gwf G) (hppo : gppoGmo G) (hlv : gloadValue 
     apply gvisUbOfWrite G r tw (r.1, k) hwf _ hord
     rw [← htw hw]; exact gwriteAtGwix G _ hg
   cases l with
+  | LIo => exact (WeakRvwmoFloor.gshape G hwf _ _ hl).elim
   | LLoad aq base ts vs =>
     -- ---------------- LLoad ----------------
     have hlen : vs.length = ts.length := WeakRvwmoFloor.gshape G hwf _ _ hl

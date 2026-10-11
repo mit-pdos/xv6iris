@@ -184,6 +184,7 @@ theorem runAtGraphValuesNfGv (GD : Gdexec) (i : Agent)
       | LLoad => simp [aident] at hid
       | LFence => simp [aident] at hid
       | LRmw => simp [aident] at hid
+      | LIo => simp [aident] at hid
     exact .AStepWrite p k d _ lb p' d' hrow rfl hwl hwd hstep
   | RunGVFence p k d l lb p' d' t' hrow hsome hidf hstep _ ih =>
     refine rtc_l (.ANFGVProg _ _ ⟨l, .AStepFence p k d l lb p' d' hrow hsome hidf hstep, ?_⟩) ih

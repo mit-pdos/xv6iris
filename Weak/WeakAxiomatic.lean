@@ -89,6 +89,11 @@ inductive Lbl where
   | LStore (rl : Bool) (base : Int) (vs : List (BitVec 8)) (k : WmClass)
   | LFence (pr pw sr sw : Bool)
   | LRmw (aq rl : Bool) (base : Int) (ts : List Nat) (rvs wvs : List (BitVec 8)) (k : WmClass)
+  /-- W13 (E) (D38 RULED (b′) [OWN.14], D47 RULED (a) [OWN.17]): an I/O-CLASS event — an MMIO
+  load (`rd`) / store (`wr`) of the bytes `vs` at `base`, or a device-side fabric move (`dev`).
+  It is NOT a RAM access: `lbRd`/`lbWr` are `none` and `lbIsR`/`lbIsW` `false`, so rf/co/fr,
+  load-value, atomicity and `gmsg` skip it BY CONSTRUCTION (the value is device-supplied). -/
+  | LIo (kind : IoKind) (base : Int) (vs : List (BitVec 8))
   deriving DecidableEq, Inhabited
 
 open Lbl
@@ -175,6 +180,12 @@ def lbAq (l : Lbl) : Bool :=
   | LRmw aq _ _ _ _ _ _ => aq
   | _ => false
 
+/-- W13 (E): the I/O-class label test (D47 (a): disjoint from `lbIsR`/`lbIsW`). -/
+def lbIsIo (l : Lbl) : Bool :=
+  match l with
+  | LIo .. => true
+  | _ => false
+
 /-- The INERT class the label's write half publishes (`WCplain` elsewhere). -/
 def lbCls (l : Lbl) : WmClass :=
   match l with
@@ -202,6 +213,7 @@ theorem lbIsWWr (l : Lbl) : lbIsW l = true → ∃ base vs, lbWr l = some (base,
   | LStore rl base vs k => intro _; exact ⟨base, vs, rfl⟩
   | LFence => intro h; simp [lbIsW] at h
   | LRmw aq rl base ts rvs wvs k => intro _; exact ⟨base, wvs, rfl⟩
+  | LIo => intro h; simp [lbIsW] at h
 
 theorem lbIsRRd (l : Lbl) : lbIsR l = true → ∃ base ts vs, lbRd l = some (base, ts, vs) := by
   cases l with
@@ -209,6 +221,7 @@ theorem lbIsRRd (l : Lbl) : lbIsR l = true → ∃ base ts vs, lbRd l = some (ba
   | LStore => intro h; simp [lbIsR] at h
   | LFence => intro h; simp [lbIsR] at h
   | LRmw aq rl base ts rvs wvs k => intro _; exact ⟨base, ts, rvs, rfl⟩
+  | LIo => intro h; simp [lbIsR] at h
 
 /-! ## Per-step facts -/
 
@@ -301,6 +314,15 @@ theorem execStepAt (E : Exec) (k : Nat) (s : Estep) :
   have h2 : E.exSt[k + 1]? = some E.exSt[k + 1] := List.getElem?_eq_getElem (by omega)
   rw [sttLookup _ _ _ h1, sttLookup _ _ _ h2]
   exact hstep k s _ _ hs h1 h2
+
+/-- W13 (E): an `execWf` run has no I/O-class step — `mstep` has no `LIo` arm (W13 (I) adds
+the inert one). -/
+theorem execStepNotIo (E : Exec) (k : Nat) (s : Estep) (kd : IoKind) (base : Int)
+    (vs : List (BitVec 8)) : execWf E → E.exTr[k]? = some s → s.esLb ≠ LIo kd base vs := by
+  intro hwf hs hl
+  have h := execStepAt E k s hwf hs
+  rw [hl] at h
+  cases h
 
 theorem execTrLookup (E : Exec) (k : Nat) : k < E.exTr.length → (E.exTr[k]?).isSome :=
   lookup_lt_is_Some_2
@@ -538,6 +560,7 @@ theorem lbRdCases (l : Lbl) (base : Int) (ts : List Nat) (vs : List (BitVec 8)) 
     intro h; simp only [lbRd, Option.some.injEq, Prod.mk.injEq] at h
     obtain ⟨rfl, rfl, rfl⟩ := h
     exact ⟨aq, rfl, .inr ⟨rl, wv, k, rfl⟩⟩
+  | LIo => intro h; simp [lbRd] at h
 
 theorem execRdOk (E : Exec) (k : Nat) (s : Estep) (base : Int) (ts : List Nat)
     (vs : List (BitVec 8)) :
@@ -862,6 +885,7 @@ theorem touchesCoh (E : Exec) (k : Nat) (s : Estep) (a : Int) (t : Nat) :
     · rw [evWritesAt E k s base wvs a hwf hs (by rw [hl]; rfl)] at hwr
       obtain ⟨j, hj, rfl⟩ := msgByteIndex base wvs _ _ a hwr
       exact storePostRunCoh _ _ _ _ _ _ hj
+  | LIo kd b v => exact absurd hl (execStepNotIo E k s kd b v hwf hs)
 
 theorem touchesCohLater (E : Exec) (k k' : Nat) (s : Estep) (a : Int) (t : Nat) :
     execWf E → E.exTr[k]? = some s → touches E k a t → k + 1 ≤ k' → k' ≤ E.exTr.length →
@@ -919,6 +943,7 @@ theorem lbRwRmw (l : Lbl) :
   | LStore => intro _ h; simp [lbIsR] at h
   | LFence => intro h; simp [lbIsW] at h
   | LRmw aq rl base ts rvs wvs k => intro _ _; exact ⟨aq, rl, base, ts, rvs, wvs, k, rfl⟩
+  | LIo => intro h; simp [lbIsW] at h
 
 theorem rmwReadLatest (E : Exec) (kr : Nat) (a : Int) (t : Nat) (v : BitVec 8) :
     execWf E → readsAt E kr a t v → isW E (ev_at kr) → latest (eimg E kr) (elog E kr) a t := by
@@ -1158,6 +1183,7 @@ theorem pubWVwOld (E : Exec) (k : Nat) (s : Estep) :
     cases wv0 with
     | nil => exact absurd rfl hne0
     | cons _ _ => simp
+  | LIo => rw [hl] at hw; simp [lbIsW] at hw
 
 /-! ### The forward-bank invariant: a bank entry is one of THIS agent's writes -/
 
@@ -1202,6 +1228,7 @@ theorem execFwdOk (E : Exec) (k : Nat) (i : Nat) :
         · exact ⟨k, s, by omega, hs, rfl, by rw [hl]; rfl, rfl⟩
         · rw [loadPostRunFwd] at hlk
           exact lift (ih (by omega) a tf vf hlk)
+      | LIo kd0 b0 v0 => exact absurd hl (execStepNotIo E k s kd0 b0 v0 hwf hs)
     · have hstep := execStepAt E k s hwf hs
       have hws : ews E (k + 1) i = ews E k i := mstepWsNe _ _ _ _ i hstep (Ne.symm hag)
       rw [hws] at hlk
@@ -1563,6 +1590,7 @@ theorem execWsBounded (E : Exec) (k : Nat) (i : Nat) :
           (evTsNext E k s hwf hs (by rw [hl]; rfl)).symm
         exact storePostRunBounded _ _ _ _ _ (elog E k).length _
           (loadPostRunBounded _ _ _ _ _ hb (rdOkTsBounded _ _ _ _ _ _ _ hrd)) (Nat.le_of_eq hts) hlen
+      | LIo kd0 b0 v0 => exact absurd hl (execStepNotIo E k s kd0 b0 v0 hwf hs)
     · have hws : ews E (k + 1) i = ews E k i := mstepWsNe _ _ _ _ i hstep hi
       rw [hws]
       exact wsBoundedMono _ _ _ hb hlen

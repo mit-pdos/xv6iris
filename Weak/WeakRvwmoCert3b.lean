@@ -323,7 +323,7 @@ theorem tailSilentRun (T : List Nat) (cpu : CPU) (d0 : Efab) (m : SailM Unit) :
 `d1 = {d with efDev := d1.efDev}`; the PLIC arm is refuted by its `LDev` label. -/
 theorem admStepNode (cpu : CPU) (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : Efab)
     (l : Wlabel) (p1 : Pexv6) (d1 : Efab) :
-    l ≠ LDev →
+    (∀ kd ba bs, l ≠ LDev kd ba bs) →
     pstepEv (.PHart cpu m rs none ib) d l p1 d1 →
     ∃ (m' : SailM Unit) (ors : Option RegFile) (fn' : Ofence) (oib : Option Ibch)
       (obar : Option barrier_kind),
@@ -337,13 +337,13 @@ theorem admStepNode (cpu : CPU) (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d :
     obtain ⟨rfl, ors, oib, obar, rfl, rfl, ⟨hn, hd⟩ | hp⟩ := hst
     · exact ⟨m1, ors, fn1, oib, obar, rfl, hn, hd⟩
     · obtain ⟨_, _, _, _, hl, _⟩ := hp
-      exact absurd hl hne
+      exact absurd hl (hne _ _ _)
 
 theorem tailSilentAdm (T : List Nat) (cpu : CPU) (ls : List Wlabel) (p pa : Pexv6)
     (d da : Efab) :
     admRun true p d ls pa da →
     ∀ (m : SailM Unit) (rs : RegFile) (ib : Ibch),
-      p = .PHart cpu m rs none ib → tailSilent T m → LDev ∉ ls →
+      p = .PHart cpu m rs none ib → tailSilent T m → (∀ kd ba bs, LDev kd ba bs ∉ ls) →
       (∃ (ma : SailM Unit) (rsa : RegFile) (iba : Ibch) (rds : List Nat) (wrs : List Register)
          (ann : Bool),
          pa = .PHart cpu ma rsa none iba ∧ da = d ∧ tailSilent T ma ∧
@@ -365,8 +365,9 @@ theorem tailSilentAdm (T : List Nat) (cpu : CPU) (ls : List Wlabel) (p pa : Pexv
   | ARcons p d l p1 d1 ls pa da _ hs hrun ih =>
     intro m rs ib hp hts hni
     subst hp
-    have hld : l ≠ LDev := fun h => hni (h ▸ List.mem_cons_self)
-    have hni' : LDev ∉ ls := fun h => hni (List.mem_cons_of_mem _ h)
+    have hld : (∀ kd ba bs, l ≠ LDev kd ba bs) := fun kd ba bs h => hni kd ba bs (h ▸ List.mem_cons_self)
+    have hni' : ∀ kd ba bs, LDev kd ba bs ∉ ls :=
+      fun kd ba bs h => hni kd ba bs (List.mem_cons_of_mem _ h)
     obtain ⟨m', ors, fn', oib, obar, rfl, hnst, hd⟩ := admStepNode cpu m rs ib d l p1 d1 hld hs
     cases hts with
     | tsRet y =>
@@ -405,7 +406,7 @@ theorem tailSilentNoLabel (T : List Nat) (cpu : CPU) (ma : SailM Unit) (rsa : Re
     ¬ lbAdmin true l →
     pstepEv (.PHart cpu ma rsa none iba) da l p' d' → False := by
   intro hts hna hst
-  have hld : l ≠ LDev := fun h => hna (by subst h; trivial)
+  have hld : (∀ kd ba bs, l ≠ LDev kd ba bs) := fun kd ba bs h => hna (by subst h; trivial)
   obtain ⟨m', ors, fn', oib, obar, _, hnst, _⟩ := admStepNode cpu ma rsa iba da l p' d' hld hst
   cases hts with
   | tsRet y =>
@@ -419,7 +420,7 @@ theorem witnessInstrTailSilent (T : List Nat) (cpu : CPU) (m : SailM Unit) (rs :
     (ib : Ibch) (d da : Efab) (ls : List Wlabel) (ma : SailM Unit) (rsa : RegFile) (fna : Ofence)
     (iba : Ibch) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
     tailSilent T m →
-    LDev ∉ ls →
+    (∀ kd ba bs, LDev kd ba bs ∉ ls) →
     admRun true (.PHart cpu m rs none ib) d ls (.PHart cpu ma rsa fna iba) da →
     ¬ lbAdmin true l →
     pstepEv (.PHart cpu ma rsa fna iba) da l p' d' →
@@ -542,7 +543,7 @@ theorem csyncAdvance (T : List Nat) (cpu : CPU) (d0 : Efab)
     (ls : List Wlabel) (ma : SailM Unit) (rsa : RegFile) (fna : Ofence) (iba : Ibch) (da : Efab)
     (l : Wlabel) (p' : Pexv6) (d' : Efab) :
     csync T m1 rs1 fn1 ib1 m2 rs2 fn2 ib2 →
-    LDev ∉ ls →
+    (∀ kd ba bs, LDev kd ba bs ∉ ls) →
     admRun true (.PHart cpu m1 rs1 fn1 ib1) d0 ls (.PHart cpu ma rsa fna iba) da →
     ¬ lbAdmin true l →
     pstepEv (.PHart cpu ma rsa fna iba) da l p' d' →
@@ -794,7 +795,7 @@ theorem certSegment'' (x : Nat) (cpu : CPU) (d0 : Efab) (Tf : Nat → List Nat)
     (k0 : Nat) (ws0 : Wstate) (rowseg : List Lbl) (p : Pexv6) (es : List Eitem)
     (pfin : Pexv6) :
     hemit (fun _ => d0) k0 ws0 rowseg p es pfin →
-    LDev ∉ es.map Prod.fst →
+    (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     (∀ i lb, rowseg[i]? = some lb → Q (k0 + i) lb) →
     ∀ m0 rs10 fn0 ib0, p = .PHart cpu m0 rs10 fn0 ib0 →
     Nd k0 m0 →
@@ -849,7 +850,7 @@ theorem certSegment'' (x : Nat) (cpu : CPU) (d0 : Efab) (Tf : Nat → List Nat)
     have hkk : k + (lb :: row).length = k + 1 + row.length := by
       rw [List.length_cons]; omega
     rw [eblockFst] at hdev
-    obtain ⟨hni, _, hdev'⟩ := notElemOfBlock _ _ _ _ hdev
+    obtain ⟨hni, _, hdev'⟩ := notDevOfBlock _ _ _ hdev
     obtain ⟨ma, rsa, fna, iba, rfl⟩ := admRunPhart true _ _ d0 ls da har cpu m0 rs10 fn0 ib0 rfl
     obtain ⟨m1, rs11, fn1, ib1, rfl⟩ := pstepEvPhart cpu ma rsa fna iba da l p' d0 hst
     obtain ⟨hpinls, hes'⟩ := WeakRvwmoCert2.esPinBlock c.cdImg ls l k es hes
@@ -925,8 +926,8 @@ theorem certSegment'' (x : Nat) (cpu : CPU) (d0 : Efab) (Tf : Nat → List Nat)
     have hkk : k + (lb :: row).length = k + 1 + row.length := by
       rw [List.length_cons]; omega
     rw [eblockFst, eblockFst] at hdev
-    obtain ⟨hni1, _, hdev1⟩ := notElemOfBlock _ _ _ _ hdev
-    obtain ⟨_, _, hdev'⟩ := notElemOfBlock _ _ _ _ hdev1
+    obtain ⟨hni1, _, hdev1⟩ := notDevOfBlock _ _ _ hdev
+    obtain ⟨_, _, hdev'⟩ := notDevOfBlock _ _ _ hdev1
     obtain ⟨ma, rsa, fna, iba, rfl⟩ :=
       admRunPhart true _ _ d0 ls1 da har1 cpu m0 rs10 fn0 ib0 rfl
     obtain ⟨mb, rsb, fnb, ibb, rfl⟩ := pstepEvPhart cpu ma rsa fna iba da l1 pm dm hst1

@@ -691,6 +691,8 @@ inductive IdentT where
   | IdStore (rl : Bool) (base : Int) (n : Nat) (k : WmClass)
   | IdFence (pr pw sr sw : Bool)
   | IdRmw (aq rl : Bool) (base : Int) (n : Nat) (k : WmClass)
+  /-- W13 (E): an I/O-class event's identity (kind, base, byte count). -/
+  | IdIo (kind : IoKind) (base : Int) (n : Nat)
   deriving DecidableEq
 
 def AxGraphCat.ident (l : Lbl) : IdentT :=
@@ -699,6 +701,7 @@ def AxGraphCat.ident (l : Lbl) : IdentT :=
   | LStore rl base vs k => .IdStore rl base vs.length k
   | LFence pr pw sr sw => .IdFence pr pw sr sw
   | LRmw aq rl base ts _ _ k => .IdRmw aq rl base ts.length k
+  | LIo kd base vs => .IdIo kd base vs.length
 
 def identAgree (rowExp rowReal : List Lbl) (j : Nat) : Prop :=
   (rowExp[j]?).map AxGraphCat.ident = (rowReal[j]?).map AxGraphCat.ident

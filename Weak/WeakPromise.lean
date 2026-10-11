@@ -83,7 +83,10 @@ inductive Wlabel where
   | LRmw (aq rl : Bool) (base : Int) (tvs : List (Nat × BitVec 8)) (data : List (BitVec 8))
       (asrc vsrc : List Dsrc)
   | LFence (pr pw sr sw : Bool)
-  | LDev
+  /-- The fabric marker, carrying the I/O event's payload (W13 (E), D47 (a)): the kind
+  (`rd`/`wr` = a hart's MMIO load/store, `dev` = a device-side fabric move, D49 (a)), the
+  base address and the bytes moved (`dev`: `0`/`[]`). -/
+  | LDev (kind : IoKind) (base : Int) (vs : List (BitVec 8))
   | LRegW (rd : Nat) (srcs : List Dsrc)
   | LCtrl (srcs : List Dsrc)
   | LInstr
@@ -99,7 +102,7 @@ open Wlabel
 /-- THE DEPENDENCY-FREE FRAGMENT OF THE LABEL ALPHABET. -/
 def lbDepfree (l : Wlabel) : Prop :=
   match l with
-  | LSilent | LFence .. | LDev | LIFetch .. => True
+  | LSilent | LFence .. | LDev .. | LIFetch .. => True
   | LLoad _ _ _ _ asrc => asrc = []
   | LStore _ _ _ asrc vsrc => asrc = [] ∧ vsrc = []
   | LRmw _ _ _ _ _ asrc vsrc => asrc = [] ∧ vsrc = []
@@ -671,9 +674,10 @@ inductive wpstep : Wpcfg P D → Wpcfg P D → Prop
       pstep ag.paSt cfg.pcDev (LFence pr pw sr sw) st' d' →
       wpstep cfg
         ⟨cfg.pcImg, cfg.pcLog, d', cfg.pcAgs.set i ⟨st', fencePost ag.paWs pr pw sr sw, ag.paProm⟩⟩
-  | WPDev (cfg : Wpcfg P D) (i : Nat) (ag : Wpagent P) (st' : P) (d' : D) :
+  | WPDev (cfg : Wpcfg P D) (i : Nat) (ag : Wpagent P) {kd : IoKind} {ba : Int}
+      {bs : List (BitVec 8)} (st' : P) (d' : D) :
       cfg.pcAgs[i]? = some ag →
-      pstep ag.paSt cfg.pcDev LDev st' d' →
+      pstep ag.paSt cfg.pcDev (LDev kd ba bs) st' d' →
       wpstep cfg ⟨cfg.pcImg, cfg.pcLog, d', cfg.pcAgs.set i ⟨st', ag.paWs, ag.paProm⟩⟩
   | WPRegW (cfg : Wpcfg P D) (i : Nat) (ag : Wpagent P) (rd : Nat) (srcs : List Dsrc) (st' : P)
       (d' : D) :

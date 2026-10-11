@@ -123,6 +123,15 @@ theorem notElemOfBlock {A : Type _} (x : A) (ls : List A) (l : A) (es : List A) 
   refine ⟨fun hin => h (List.mem_append_left _ hin), fun he => h (by simp [he]),
     fun hin => h (by simp [hin])⟩
 
+/-- W13 (E) (Lean-only): `notElemOfBlock` at every payload of the fabric marker. -/
+theorem notDevOfBlock (ls : List Wlabel) (l : Wlabel) (es : List Wlabel) :
+    (∀ kd ba bs, LDev kd ba bs ∉ ls ++ l :: es) →
+    (∀ kd ba bs, LDev kd ba bs ∉ ls) ∧ (∀ kd ba bs, l ≠ LDev kd ba bs) ∧
+      (∀ kd ba bs, LDev kd ba bs ∉ es) :=
+  fun h => ⟨fun kd ba bs => (notElemOfBlock _ _ _ _ (h kd ba bs)).1,
+    fun kd ba bs => (notElemOfBlock _ _ _ _ (h kd ba bs)).2.1,
+    fun kd ba bs => (notElemOfBlock _ _ _ _ (h kd ba bs)).2.2⟩
+
 /-- A FINITE choice principle, proved by induction (no axiom). -/
 theorem natBoundedChoice {A : Type _} (a0 : A) (P : Nat → A → Prop) (N : Nat) :
     (∀ i, i < N → ∃ a, P i a) → ∃ F : Nat → A, ∀ i, i < N → P i (F i) := by
@@ -152,37 +161,39 @@ theorem fmapSeqDefault {A : Type _} (x : A) (l : List A) :
 
 /-! ## 2. Fabric blindness of an `LDev`-free emission -/
 
-theorem pdevEvFalse (p : Pexv6) (l : Wlabel) (p' : Pexv6) : l ≠ LDev → pdevEv p l p' = false := by
+theorem pdevEvFalse (p : Pexv6) (l : Wlabel) (p' : Pexv6) :
+    (∀ kd ba bs, l ≠ LDev kd ba bs) → pdevEv p l p' = false := by
   intro h
-  cases l <;> first | rfl | exact absurd rfl h
+  cases l <;> first | rfl | exact absurd rfl (h _ _ _)
 
 theorem pstepEvDevfree (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
-    pstepEv p d l p' d' → l ≠ LDev → d' = d ∧ ∀ d0, pstepEv p d0 l p' d0 :=
+    pstepEv p d l p' d' → (∀ kd ba bs, l ≠ LDev kd ba bs) → d' = d ∧ ∀ d0, pstepEv p d0 l p' d0 :=
   fun hs hne => pdevEvOk p d l p' d' hs (pdevEvFalse p l p' hne)
 
 /-! ### 2.1 The administrative run -/
 
 theorem admRunDevfree (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
-    (d' : Efab) : admRun instr p d ls p' d' → LDev ∉ ls → d' = d := by
+    (d' : Efab) : admRun instr p d ls p' d' → (∀ kd ba bs, LDev kd ba bs ∉ ls) → d' = d := by
   intro h
   induction h with
   | ARnil => intro _; rfl
   | ARcons p d l p1 d1 ls p' d' _ hs _ ih =>
     intro hnd
-    have hne : l ≠ LDev := fun he => hnd (by simp [he])
+    have hne : (∀ kd ba bs, l ≠ LDev kd ba bs) := fun kd ba bs he => hnd kd ba bs (by simp [he])
     obtain ⟨hd, _⟩ := pstepEvDevfree _ _ _ _ _ hs hne
-    rw [ih (fun hin => hnd (List.mem_cons_of_mem _ hin)), hd]
+    rw [ih (fun kd ba bs hin => hnd kd ba bs (List.mem_cons_of_mem _ hin)), hd]
 
 theorem admRunRefab (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
-    (d' : Efab) : admRun instr p d ls p' d' → LDev ∉ ls →
+    (d' : Efab) : admRun instr p d ls p' d' → (∀ kd ba bs, LDev kd ba bs ∉ ls) →
     ∀ d0, admRun instr p d0 ls p' d0 := by
   intro h
   induction h with
   | ARnil p d => intro _ d0; exact .ARnil p d0
   | ARcons p d l p1 d1 ls p' d' ha hs _ ih =>
     intro hnd d0
-    have hne : l ≠ LDev := fun he => hnd (by simp [he])
-    have hrest : LDev ∉ ls := fun hin => hnd (List.mem_cons_of_mem _ hin)
+    have hne : (∀ kd ba bs, l ≠ LDev kd ba bs) := fun kd ba bs he => hnd kd ba bs (by simp [he])
+    have hrest : ∀ kd ba bs, LDev kd ba bs ∉ ls :=
+      fun kd ba bs hin => hnd kd ba bs (List.mem_cons_of_mem _ hin)
     obtain ⟨_, hall⟩ := pstepEvDevfree _ _ _ _ _ hs hne
     exact .ARcons p d0 l p1 d0 ls p' d0 ha (hall d0) (ih hrest d0)
 
@@ -190,7 +201,7 @@ theorem admRunRefab (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p'
 
 theorem hemitDevfreeConst (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
-    hemit dv k ws row p es pfin → LDev ∉ es.map Prod.fst →
+    hemit dv k ws row p es pfin → (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     ∀ j, k ≤ j → j ≤ k + row.length → dv j = dv k := by
   intro h
   induction h with
@@ -202,7 +213,7 @@ theorem hemitDevfreeConst (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : Lis
   | HEone k ws lb row p ls pa da l p' es pfin har _ hst _ ih =>
     intro hnd j hlo hhi
     rw [eblockFst] at hnd
-    obtain ⟨hne1, hnel, hrest⟩ := notElemOfBlock _ _ _ _ hnd
+    obtain ⟨hne1, hnel, hrest⟩ := notDevOfBlock _ _ _ hnd
     have hda : da = dv k := admRunDevfree _ _ _ _ _ _ har hne1
     obtain ⟨hd, _⟩ := pstepEvDevfree _ _ _ _ _ hst hnel
     have hsk : dv (k + 1) = dv k := by rw [hd, hda]
@@ -213,8 +224,8 @@ theorem hemitDevfreeConst (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : Lis
   | HEpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 _ hst1 har2 hst2 _ ih =>
     intro hnd j hlo hhi
     rw [eblockFst, eblockFst] at hnd
-    obtain ⟨hne1, hnel1, hnd2⟩ := notElemOfBlock _ _ _ _ hnd
-    obtain ⟨hne2, hnel2, hrest⟩ := notElemOfBlock _ _ _ _ hnd2
+    obtain ⟨hne1, hnel1, hnd2⟩ := notDevOfBlock _ _ _ hnd
+    obtain ⟨hne2, hnel2, hrest⟩ := notDevOfBlock _ _ _ hnd2
     have hda : da = dv k := admRunDevfree _ _ _ _ _ _ har1 hne1
     obtain ⟨hd1, _⟩ := pstepEvDevfree _ _ _ _ _ hst1 hnel1
     have hdm2 : dm2 = dm := admRunDevfree _ _ _ _ _ _ har2 hne2
@@ -229,7 +240,7 @@ theorem hemitDevfreeConst (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : Lis
 assignment CONSTANT on the block's index range, with no relation to `dv` at all). -/
 theorem hemitDevfreeRefab (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
-    hemit dv k ws row p es pfin → LDev ∉ es.map Prod.fst →
+    hemit dv k ws row p es pfin → (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     ∀ (dv' : Nat → Efab) (d0 : Efab),
       (∀ j, k ≤ j → j ≤ k + row.length → dv' j = d0) →
       hemit dv' k ws row p es pfin := by
@@ -239,7 +250,7 @@ theorem hemitDevfreeRefab (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : Lis
   | HEone k ws lb row p ls pa da l p' es pfin har hre hst _ ih =>
     intro hnd dv' d0 hc
     rw [eblockFst] at hnd
-    obtain ⟨hne1, hnel, hrest⟩ := notElemOfBlock _ _ _ _ hnd
+    obtain ⟨hne1, hnel, hrest⟩ := notDevOfBlock _ _ _ hnd
     obtain ⟨_, hall⟩ := pstepEvDevfree _ _ _ _ _ hst hnel
     refine .HEone k ws lb row p ls pa d0 l p' es pfin ?_ hre ?_ ?_
     · rw [hc k (Nat.le_refl _) (by simp)]
@@ -250,8 +261,8 @@ theorem hemitDevfreeRefab (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : Lis
   | HEpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2 hst2 _ ih =>
     intro hnd dv' d0 hc
     rw [eblockFst, eblockFst] at hnd
-    obtain ⟨hne1, hnel1, hnd2⟩ := notElemOfBlock _ _ _ _ hnd
-    obtain ⟨hne2, hnel2, hrest⟩ := notElemOfBlock _ _ _ _ hnd2
+    obtain ⟨hne1, hnel1, hnd2⟩ := notDevOfBlock _ _ _ hnd
+    obtain ⟨hne2, hnel2, hrest⟩ := notDevOfBlock _ _ _ hnd2
     obtain ⟨_, hall1⟩ := pstepEvDevfree _ _ _ _ _ hst1 hnel1
     obtain ⟨_, hall2⟩ := pstepEvDevfree _ _ _ _ _ hst2 hnel2
     refine .HEpair k ws lb row p ls1 pa d0 l1 pm d0 ls2 pm2 d0 l2 p' es pfin ?_ hre (hall1 d0)
@@ -264,13 +275,13 @@ theorem hemitDevfreeRefab (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : Lis
 
 theorem hemitDevfreeReindex (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
-    hemit dv k ws row p es pfin → LDev ∉ es.map Prod.fst →
+    hemit dv k ws row p es pfin → (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     ∀ d0 : Efab, hemit (fun _ => d0) k ws row p es pfin :=
   fun hem hnd d0 => hemitDevfreeRefab dv k ws row p es pfin hem hnd _ d0 (fun _ _ _ => rfl)
 
 /-! ## 3. The quiescent conformance bundle -/
 
-def emDevfree (em : Hemission) : Prop := LDev ∉ emLabels em
+def emDevfree (em : Hemission) : Prop := ∀ kd ba bs, LDev kd ba bs ∉ emLabels em
 
 /-- (Lean-only, deviation 2) Every administrative fetch item of the emission reads the booted
 image at timestamp 0 (`fetchPin` is `True` off the fetch). -/
@@ -314,21 +325,22 @@ theorem gdexecQconfConf (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Na
 
 /-! ### 3.1 `emDevfree` is stable under the two emission operations -/
 
-theorem wlblRenDev (π : Nat → Nat) (l : Wlabel) : wlblRen π l = LDev → l = LDev := by
+theorem wlblRenDev (π : Nat → Nat) (l : Wlabel) (kd : IoKind) (ba : Int) (bs : List (BitVec 8)) :
+    wlblRen π l = LDev kd ba bs → l = LDev kd ba bs := by
   cases l <;> simp [wlblRen]
 
 theorem emDevfreeRen (π : Nat → Nat) (em : Hemission) : emDevfree em → emDevfree (emRen π em) := by
   unfold emDevfree
   rw [emLabelsRen]
-  intro h hin
+  intro h kd ba bs hin
   obtain ⟨l, hl, heq⟩ := List.mem_map.1 hin
-  rw [wlblRenDev π l heq] at hl
-  exact h hl
+  rw [wlblRenDev π l kd ba bs heq] at hl
+  exact h kd ba bs hl
 
 theorem emDevfreePrefix (em em' : Hemission) :
     em'.emItems <+: em.emItems → emDevfree em → emDevfree em' := by
-  rintro ⟨t, ht⟩ h hin
-  apply h
+  rintro ⟨t, ht⟩ h kd ba bs hin
+  apply h kd ba bs
   unfold emLabels at hin ⊢
   rw [← ht, List.map_append]
   exact List.mem_append_left _ hin
@@ -691,6 +703,7 @@ theorem mnextWsRelp (σ : Mstate) (i : Nat) (l : Lbl) :
     simp only [mnext, updWsEq, lpostRelp]
     rw [storePostRunRelp]
     cases wvs <;> simp only [List.length_nil, List.length_cons, WeakRvwmoConf.loadPostRunRelp]
+  | LIo => rfl
 
 /-- THE BRIDGE. -/
 theorem candWsRelp (c : Cand) (i k : Nat) :

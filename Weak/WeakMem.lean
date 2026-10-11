@@ -103,6 +103,16 @@ inductive WmClass where
   | WCexcl
   deriving DecidableEq, Inhabited
 
+/-- W13 (E) (D45 RULED (a) [OWN.16]): the kind of an I/O-class event.  `rd`/`wr` are a hart's
+MMIO load/store; `dev` is a device-side fabric move (a PLIC pin delivery, a disk START/COMMIT, a
+UART-thread move — D49 RULED (a): emitted in the ISSUING row).  The ISA is silent on `dev`
+events (model-only, STRONGER than silence, D45). -/
+inductive IoKind where
+  | rd
+  | wr
+  | dev
+  deriving DecidableEq, Inhabited
+
 /-- One write event, covering `[wmPa, wmPa + |wmData|)`; `wmTid` names the
 appending agent; `wmAk` is the inert class field. -/
 structure Wmsg where

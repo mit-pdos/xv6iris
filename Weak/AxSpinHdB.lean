@@ -119,6 +119,7 @@ theorem rdPlain (i : Agent) (pa : Int) (n k : Nat) :
     exact ⟨aq', ts, vs, Hlb, rfl⟩
   | LStore _ _ _ _ => simp [aident, aidentRd] at Hid
   | LFence _ _ _ _ => simp [aident, aidentRd] at Hid
+  | LIo _ _ _ => simp [aident, aidentRd] at Hid
   | LRmw aq' rl b ts rvs wvs cls =>
     simp only [aident, aidentRd, Option.some.injEq, Prod.mk.injEq] at Hid
     obtain ⟨rfl, rfl, Hn⟩ := Hid

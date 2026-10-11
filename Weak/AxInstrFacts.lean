@@ -67,6 +67,7 @@ theorem hdataTotOfGraph (GD : Gdexec) (w : Geid) :
     | LStore rl base vs k => exact ⟨vs, rfl⟩
     | LFence => simp [lbIsW] at hisw
     | LRmw aq rl base ts rvs wvs k => exact ⟨wvs, rfl⟩
+    | LIo => simp [lbIsW] at hisw
 
 /-! # 2. `Hwdat_spec`: under `gwfWr1` -/
 
@@ -151,6 +152,7 @@ theorem hrdatSpecOfGraph (GD : Gdexec) (Hr1 : gwfRd1 GD.gdG) (r : Geid) (l : Lbl
     | LLoad aq b ts vs => simp only [lbRd, Option.some.injEq, Prod.mk.injEq] at hrd; obtain ⟨_, _, rfl⟩ := hrd; rfl
     | LStore => simp [lbRd] at hrd
     | LFence => simp [lbRd] at hrd
+    | LIo => simp [lbRd] at hrd
     | LRmw aq rl b ts rvs wvs k =>
       simp only [lbRd, Option.some.injEq, Prod.mk.injEq] at hrd; obtain ⟨_, _, rfl⟩ := hrd; rfl
   · exact ⟨l, base, [t0], [v0], 0, Hl, hrd, rfl, rfl, by unfold accAddr; simp⟩
@@ -179,6 +181,7 @@ theorem hrdatnSpecOfGraph (GD : Gdexec) (Hgwf : gwf GD.gdG) (r : Geid) (l : Lbl)
       obtain ⟨_, rfl, rfl⟩ := hrd; exact hshape
     | LStore => simp [lbRd] at hrd
     | LFence => simp [lbRd] at hrd
+    | LIo => simp [lbRd] at hrd
     | LRmw aq rl b ts' rvs' wvs' k =>
       simp only [lbRd, Option.some.injEq, Prod.mk.injEq] at hrd
       obtain ⟨_, rfl, rfl⟩ := hrd; exact hshape.2.2
@@ -194,6 +197,7 @@ theorem hrdatnSpecOfGraph (GD : Gdexec) (Hgwf : gwf GD.gdG) (r : Geid) (l : Lbl)
       simp only [lbRd, Option.some.injEq, Prod.mk.injEq] at hrd; obtain ⟨_, _, rfl⟩ := hrd; rfl
     | LStore => simp [lbRd] at hrd
     | LFence => simp [lbRd] at hrd
+    | LIo => simp [lbRd] at hrd
     | LRmw aq rl b ts' rvs' wvs' k =>
       simp only [lbRd, Option.some.injEq, Prod.mk.injEq] at hrd; obtain ⟨_, _, rfl⟩ := hrd; rfl
   · intro j t v hj

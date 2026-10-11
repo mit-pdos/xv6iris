@@ -306,6 +306,7 @@ def lblRen (π : Nat → Nat) (l : Lbl) : Lbl :=
   | LStore rl base vs k => LStore rl base vs k
   | LFence pr pw sr sw => LFence pr pw sr sw
   | LRmw aq rl base ts rvs wvs k => LRmw aq rl base (ts.map π) rvs wvs k
+  | LIo kd base vs => LIo kd base vs
 
 theorem lblRenTswap (k1 : Nat) (l : Lbl) : lblRen (tswap k1) l = lblTswap k1 l := by
   cases l <;> rfl

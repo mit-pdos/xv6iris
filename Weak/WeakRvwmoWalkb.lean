@@ -115,7 +115,7 @@ and pinned to the graph's image). -/
 def wemit (d0 : Efab) (G : Gexec) (x : Nat) (k : Nat) (p : Pexv6) : Prop :=
   ∃ (es : List Eitem) (pfin : Pexv6),
     hemit (fun _ => d0) k (rowWs (qrow G x) k) ((qrow G x).drop k) p es pfin ∧
-    LDev ∉ es.map Prod.fst ∧
+    (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) ∧
     WeakRvwmoCert2.esPin G.gxImg es
 
 /-- The walk state's process for a hart IS the emission's, off the taint. -/
@@ -199,6 +199,7 @@ theorem wcpolpAt (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu : CPU)
   | LLoad => exact absurd trivial hrmw
   | LStore => exact absurd trivial hrmw
   | LFence => exact absurd trivial hrmw
+  | LIo => exact absurd trivial hrmw
   | LRmw aq rl base ts rvs wvs kc =>
     obtain ⟨_, _, hlenr⟩ := WeakRvwmoFloor.gshape G hwf _ _ hl
     have hlenlog : (cdLogEnd c0).length = n := hpfx.1
@@ -444,6 +445,7 @@ theorem wblkPolAt' (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu : CP
       | LStore rl base vs kc =>
         exact certWriteOk c0 x rl base vs kc (WeakRvwmoFloor.gshape G hwf _ _ hl)
       | LFence pr pw sr sw => exact certFenceOk c0 x pr pw sr sw
+      | LIo => exact (WeakRvwmoFloor.gshape G hwf _ _ hl).elim
       | LRmw aq rl base ts rvs wvs kc =>
         -- THE FUSED RMW, served by 4.5b'
         obtain ⟨ev, hgt, _⟩ := hctx
@@ -636,7 +638,7 @@ theorem wlkSegOfCert2 (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu :
     (∀ k, tm k ⊆ tm (k + 1)) →
     wndOk cpu d0 (wQ' G W d0 tm Nd n x k0 kz) Nd →
     hemit (fun _ => d0) k0 ws0 rowseg (.PHart cpu m0 rs10 fn0 ib0) es pfin →
-    LDev ∉ es.map Prod.fst →
+    (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     WeakRvwmoCert2.esPin St.cstC.cdImg es →
     (∀ i lb, rowseg[i]? = some lb → wQ' G W d0 tm Nd n x k0 kz (k0 + i) lb) →
     cstOk d0 St →
@@ -927,10 +929,10 @@ theorem wlkStep'OfSupply (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec
   rw [hdd] at hem
   obtain ⟨pm, es1, es2, hem1, hem2, hessp⟩ :=
     hemitApp (fun _ => d0) k0 (rowWs (qrow G x) k0) _ _ _ es pfin hem
-  have hdev1 : LDev ∉ es1.map Prod.fst := fun hin =>
-    hdevf (by rw [hessp, List.map_append]; exact List.mem_append_left _ hin)
-  have hdev2 : LDev ∉ es2.map Prod.fst := fun hin =>
-    hdevf (by rw [hessp, List.map_append]; exact List.mem_append_right _ hin)
+  have hdev1 : ∀ kd ba bs, LDev kd ba bs ∉ es1.map Prod.fst := fun kd ba bs hin =>
+    hdevf kd ba bs (by rw [hessp, List.map_append]; exact List.mem_append_left _ hin)
+  have hdev2 : ∀ kd ba bs, LDev kd ba bs ∉ es2.map Prod.fst := fun kd ba bs hin =>
+    hdevf kd ba bs (by rw [hessp, List.map_append]; exact List.mem_append_right _ hin)
   have hpin1 : WeakRvwmoCert2.esPin St.cstC.cdImg es1 := fun l0 hin => by
     rw [himg]
     exact hpinf l0 (by rw [hessp, List.map_append]; exact List.mem_append_left _ hin)
@@ -1074,7 +1076,7 @@ theorem wemitOfQconf (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) 
     · rw [gdexecQconfImg boot d0 im nh GD hq]
       exact hfi
   | none =>
-    refine ⟨[], boot x, ?_, List.not_mem_nil, fun _ h => absurd h List.not_mem_nil⟩
+    refine ⟨[], boot x, ?_, fun _ _ _ => List.not_mem_nil, fun _ h => absurd h List.not_mem_nil⟩
     simp only [qrow, hrow, Option.getD_none, List.drop_nil]
     exact .HEnil _ _ _
 

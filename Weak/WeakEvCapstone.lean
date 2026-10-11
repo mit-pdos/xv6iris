@@ -145,7 +145,7 @@ variable (pcls : P → Wlabel → Wstate → WmClass)
 def pfOk (cfg : Wpcfg P D) (i : Nat) (ag : Wpagent P) (l : Wlabel) : Prop :=
   match l with
   | LSilent => True
-  | LDev => True
+  | LDev .. => True
   | LFence .. => True
   -- the LOAD keeps its pin (deviation D-8 of the Rocq tree)
   | LLoad aq lat base tvs asrc =>
@@ -171,7 +171,7 @@ def WeakEvCapstone.pfLog (cfg : Wpcfg P D) (i : Nat) (ag : Wpagent P) (l : Wlabe
       cfg.pcLog ++ [⟨base, data, some i, pcls ag.paSt (LRmw aq rl base tvs data asrc vsrc) ag.paWs⟩]
   | LExStore rl base data asrc vsrc =>
       cfg.pcLog ++ [⟨base, data, some i, pcls ag.paSt (LExStore rl base data asrc vsrc) ag.paWs⟩]
-  | LSilent | LLoad .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LExLoad ..
+  | LSilent | LLoad .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LExLoad ..
   | LIFetch .. => cfg.pcLog
 
 /-- The view effect of a pf step. -/
@@ -194,7 +194,7 @@ def pfWs (cfg : Wpcfg P D) (ag : Wpagent P) (l : Wlabel) : Wstate :=
   | LExStore rl base data asrc vsrc =>
       storePostRunD ag.paWs rl (srcsView ag.paWs asrc) (srcsView ag.paWs vsrc) base data.length
         (cfg.pcLog.length + 1)
-  | LSilent | LDev | LIFetch .. => ag.paWs
+  | LSilent | LDev .. | LIFetch .. => ag.paWs
 
 def pfCfg (cfg : Wpcfg P D) (i : Nat) (ag : Wpagent P) (l : Wlabel) (st' : P) (d' : D) :
     Wpcfg P D :=
@@ -522,8 +522,8 @@ theorem epHsetSelf (P : Epool) (c : CPU) : epHset P c (P.epH c) = P := by
 a PLIC gateway step at the disk agent, a wire write at its target hart. -/
 theorem ecfgOfUartStep (P : Epool) (σ : WGState) (i : UartId) (m' : DevProg (.uart i))
     (ds' : DevStates) (k : WmClass) :
-    ecfgOf (epUset P i m') (edlabApply σ LDev k ds')
-      = pfCfg pclsEv (ecfgOf P σ) nDisk (ediskAg P) LDev (.PDisk P.epDp)
+    ecfgOf (epUset P i m') (edlabApply σ (LDev .dev 0 []) k ds')
+      = pfCfg pclsEv (ecfgOf P σ) nDisk (ediskAg P) (LDev .dev 0 []) (.PDisk P.epDp)
           (efUset { efabOf P σ with efDev := ds' } i m') := by
   have hs : (eags P σ).set nDisk (ediskAg P) = eags P σ := listSetSelf _ _ _ (eagsDisk P σ)
   cases i
@@ -536,8 +536,8 @@ theorem ecfgOfUartStep (P : Epool) (σ : WGState) (i : UartId) (m' : DevProg (.u
 
 theorem ecfgOfPlicStep (P : Epool) (σ : WGState) (m' : DevProg .plic) (ds' : DevStates)
     (k : WmClass) :
-    ecfgOf (epPset P m') (edlabApply σ LDev k ds')
-      = pfCfg pclsEv (ecfgOf P σ) nDisk (ediskAg P) LDev (.PDisk P.epDp)
+    ecfgOf (epPset P m') (edlabApply σ (LDev .dev 0 []) k ds')
+      = pfCfg pclsEv (ecfgOf P σ) nDisk (ediskAg P) (LDev .dev 0 []) (.PDisk P.epDp)
           { efabOf P σ with efDev := ds', efPlic := m' } := by
   have hs : (eags P σ).set nDisk (ediskAg P) = eags P σ := listSetSelf _ _ _ (eagsDisk P σ)
   show (⟨imgZ σ.wgimg, σ.wglog, ⟨ds', P.epU0, P.epU1, m'⟩, eags P σ⟩ : Wpcfg Pexv6 Efab)
@@ -547,16 +547,16 @@ theorem ecfgOfPlicStep (P : Epool) (σ : WGState) (m' : DevProg .plic) (ds' : De
 theorem ecfgOfPinStep (P : Epool) (σ : WGState) (c : CPU) (mm b : Bool)
     (k : Unit → DevProg .plic) :
     ecfgOf (epPset P (k ()))
-        (elabApply σ c LDev .WCplain (some (pinSet (σ.wgregs c) mm b)) none none σ.wgdev)
-      = pfCfg pclsEv (ecfgOf P σ) c.val (ehartAg P σ c) LDev
+        (elabApply σ c (LDev .dev 0 []) .WCplain (some (pinSet (σ.wgregs c) mm b)) none none σ.wgdev)
+      = pfCfg pclsEv (ecfgOf P σ) c.val (ehartAg P σ c) (LDev .dev 0 [])
           (.PHart c (ehartM (P.epH c)) (pinSet (σ.wgregs c) mm b) (ehartFn (P.epH c)) (σ.wgib c))
           { efabOf P σ with efPlic := k () } := by
-  have he := ecfgOfHartUpd P σ c (P.epH c) LDev .WCplain (some (pinSet (σ.wgregs c) mm b)) none
+  have he := ecfgOfHartUpd P σ c (P.epH c) (LDev .dev 0 []) .WCplain (some (pinSet (σ.wgregs c) mm b)) none
     none σ.wgdev
   rw [epHsetSelf] at he
   have hag := congrArg Wpcfg.pcAgs he
   show (⟨imgZ σ.wgimg, σ.wglog, ⟨σ.wgdev, P.epU0, P.epU1, k ()⟩,
-      (ecfgOf P (elabApply σ c LDev .WCplain (some (pinSet (σ.wgregs c) mm b)) none none
+      (ecfgOf P (elabApply σ c (LDev .dev 0 []) .WCplain (some (pinSet (σ.wgregs c) mm b)) none none
         σ.wgdev)).pcAgs⟩ : Wpcfg Pexv6 Efab)
     = ⟨imgZ σ.wgimg, σ.wglog, ⟨σ.wgdev, P.epU0, P.epU1, k ()⟩,
        (eags P σ).set c.val
@@ -739,7 +739,7 @@ theorem wpPfStepEpfStep (i : Nat) (l : Wlabel) (P : Epool) (σ : WGState)
         obtain ⟨mm, b, k, hpl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ := hplic
         have hpl' : P.epPlic = .op (.setPin c mm b) k := hpl
         have hw : wdevStep P.epGen .plic rootTask P.epPlic σ (k ())
-            (elabApply σ c LDev .WCplain (some (pinSet (σ.wgregs c) mm b)) none none σ.wgdev) [] := by
+            (elabApply σ c (LDev .dev 0 []) .WCplain (some (pinSet (σ.wgregs c) mm b)) none none σ.wgdev) [] := by
           rw [hpl']
           exact Or.inl ⟨(), rfl, (eplicStepFactor P.epGen c mm b σ _ []).2 ⟨rfl, rfl⟩⟩
         have hs := epfStep.EPFPlic P σ _ (k ()) hl hw rfl
@@ -770,10 +770,10 @@ theorem wpPfStepEpfStep (i : Nat) (l : Wlabel) (P : Epool) (σ : WGState)
         obtain ⟨rfl, rfl, ⟨u, m', ds', hf, rfl⟩ | ⟨m', ds', hf, rfl⟩⟩ := huart
         · have hf' : fdevStep (.uart u) (epU P u) σ.wgdev m' ds' := by
             rw [← efUOf P σ u]; exact hf
-          have hs := epfStep.EPFUart u P σ (edlabApply σ LDev .WCplain ds') m' hl
+          have hs := epfStep.EPFUart u P σ (edlabApply σ (LDev .dev 0 []) .WCplain ds') m' hl
             (wdevOfFdevStep P.epGen (epU P u) m' σ ds' hf') rfl
           exact ⟨_, _, hs, ecfgOfUartStep P σ u m' ds' .WCplain⟩
-        · have hs := epfStep.EPFPlic P σ (edlabApply σ LDev .WCplain ds') m' hl
+        · have hs := epfStep.EPFPlic P σ (edlabApply σ (LDev .dev 0 []) .WCplain ds') m' hl
             (wdevOfFdevStep P.epGen P.epPlic m' σ ds' hf) rfl
           have hag : plicAgent P.epPlic = nDisk := plicAgentFdev hf
           rw [hag] at hs
@@ -956,20 +956,20 @@ theorem epfStepWpPfStep (i : Nat) (l : Wlabel) (ρ ρ' : Epool × WGState) :
       rw [efUOf]; exact hs
     obtain ⟨d', hdisk, -, -, rfl⟩ :=
       euartStepPstepDisk P.epGen u (efabOf P σ) m' P.epDp P.epDws σ σ' rfl hnp hs'
-    refine ⟨nDisk, LDev, ?_⟩
-    have h := wpPfStepIntro pstepEv pclsEv nDisk LDev (ecfgOf P σ) (ediskAg P) (.PDisk P.epDp) _
+    refine ⟨nDisk, (LDev .dev 0 []), ?_⟩
+    have h := wpPfStepIntro pstepEv pclsEv nDisk (LDev .dev 0 []) (ecfgOf P σ) (ediskAg P) (.PDisk P.epDp) _
       (eagsDisk P σ) hdisk trivial
     dsimp only
     rw [ecfgOfUartStep]
     exact h
   | EPFPlic P σ σ' m' hl hs hlog =>
     -- a PLIC step: the wire write at its target hart, the gateway at the disk
-    refine ⟨plicAgent P.epPlic, LDev, ?_⟩
+    refine ⟨plicAgent P.epPlic, (LDev .dev 0 []), ?_⟩
     dsimp only
     rcases devSetPinCases P.epPlic with ⟨c, mm, b, k, hpin⟩ | hnp
     · obtain ⟨rfl, -, hall, -, rfl⟩ :=
         eplicStepPstepHart P.epGen rootTask c mm b k (efabOf P σ) m' σ σ' [] hpin hs
-      have h := hartPfStep P σ c LDev (ehartM (P.epH c)) (some (pinSet (σ.wgregs c) mm b))
+      have h := hartPfStep P σ c (LDev .dev 0 []) (ehartM (P.epH c)) (some (pinSet (σ.wgregs c) mm b))
         (ehartFn (P.epH c)) { efabOf P σ with efPlic := k () } none none .WCplain (hall _ _ _)
         trivial rfl
       rw [hpin, ecfgOfPinStep P σ c mm b k]
@@ -978,7 +978,7 @@ theorem epfStepWpPfStep (i : Nat) (l : Wlabel) (ρ ρ' : Epool × WGState) :
         devNodePlainNoPin _ (devPlainNode hpl.2.2) hnp
       obtain ⟨d', hdisk, -, -, rfl⟩ :=
         eplicGateStepPstepDisk P.epGen (efabOf P σ) m' P.epDp P.epDws σ σ' rfl hnp' hs
-      have h := wpPfStepIntro pstepEv pclsEv nDisk LDev (ecfgOf P σ) (ediskAg P) (.PDisk P.epDp) _
+      have h := wpPfStepIntro pstepEv pclsEv nDisk (LDev .dev 0 []) (ecfgOf P σ) (ediskAg P) (.PDisk P.epDp) _
         (eagsDisk P σ) hdisk trivial
       have hag : plicAgent P.epPlic = nDisk := by
         cases hm : P.epPlic with

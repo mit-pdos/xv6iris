@@ -206,7 +206,7 @@ def rdLeaves (TS : Ptraces P D) (r : Gev) (a : Int) : List Nat :=
     | LLoad .. | LRmw .. | LExLoad .. =>
       lsrcsView (preLstate TS r) (lbRasrc l)
         ++ lfloor (preLstate TS r) (WeakRobustAcyc.lbAq l) a
-    | LSilent | LStore .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LExStore ..
+    | LSilent | LStore .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LExStore ..
     | LIFetch .. => []
   | none => []
 
@@ -991,7 +991,7 @@ theorem rdFloorWs (pstep : P → D → Wlabel → P → D → Prop) (TS : Ptrace
     gevLb TS r = some l →
     (match l with
      | LLoad .. | LRmw .. | LExLoad .. => True
-     | LSilent | LStore .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LExStore ..
+     | LSilent | LStore .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LExStore ..
      | LIFetch .. => False) →
     rdFloor TS r a
     = max (loadVpreD ag.paWs (WeakRobustAcyc.lbAq l) (srcsView ag.paWs (lbRasrc l)))

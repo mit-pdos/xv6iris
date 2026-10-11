@@ -152,7 +152,7 @@ theorem l3pAwireRsOnly (cpu : CPU) (m : SailM Unit) (rs : RegFile)
     ∃ rs', s' = .AThread (.PHart cpu m rs' fn ib) k := by
   rintro ⟨hk, d, d', hp⟩
   obtain ⟨-, cpu0, m0, rs0, fn0, ib0, mm, b, k0, hp0, -, -, hp'⟩ :=
-    pstepWireInv _ d LDev _ d' hp
+    pstepWireInv _ d (LDev .dev 0 []) _ d' hp
   cases hp0
   obtain ⟨p', k'⟩ := s'
   simp only at hk hp'

@@ -172,6 +172,8 @@ inductive AidentT where
   | IWrite (rl : Bool) (base : Int) (n : Nat)
   | IRmw (aq rl : Bool) (base : Int) (n : Nat)
   | IFence (pr pw sr sw : Bool)
+  /-- W13 (E): an I/O-class event (kind, base, byte count). -/
+  | IIo (kind : IoKind) (base : Int) (n : Nat)
   deriving DecidableEq
 
 def aident (lb : Lbl) : AidentT :=
@@ -180,6 +182,7 @@ def aident (lb : Lbl) : AidentT :=
   | .LStore rl base vs _ => .IWrite rl base vs.length
   | .LFence pr pw sr sw => .IFence pr pw sr sw
   | .LRmw aq rl base _ _ wvs _ => .IRmw aq rl base wvs.length
+  | .LIo kd base vs => .IIo kd base vs.length
 
 /-- The read half / write half / fence content of an identity. -/
 def aidentRd (id : AidentT) : Option (Bool × Int × Nat) :=
@@ -202,7 +205,7 @@ def aidentFence (id : AidentT) : Option (Bool × Bool × Bool × Bool) :=
 /-- The width, and how far the READ half moves the row position. -/
 def aidentN (id : AidentT) : Nat :=
   match id with
-  | .IRead _ _ n | .IWrite _ _ n | .IRmw _ _ _ n => n
+  | .IRead _ _ n | .IWrite _ _ n | .IRmw _ _ _ n | .IIo _ _ n => n
   | .IFence _ _ _ _ => 0
 
 def aidentAdvRd (id : AidentT) : Nat :=
@@ -354,6 +357,7 @@ def aidentOfCat (i : IdentT) : AidentT :=
   | .IdStore rl base n _ => .IWrite rl base n
   | .IdFence pr pw sr sw => .IFence pr pw sr sw
   | .IdRmw aq rl base n _ => .IRmw aq rl base n
+  | .IdIo kd base n => .IIo kd base n
 
 theorem aidentCat (G : Gexec) (e : Geid) (lb : Lbl) :
     gwf G → gxLbl G e = some lb → aident lb = aidentOfCat (AxGraphCat.ident lb) := by
@@ -408,7 +412,7 @@ theorem pstepEvSplit (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab
 it advances; the monad and the parked fence untouched; the pin set. -/
 theorem pstepWireInv (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
     pstepWire p d l p' d' →
-    l = LDev ∧
+    l = LDev .dev 0 [] ∧
     ∃ (cpu : CPU) (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool))
       (ib : Ibch) (mm b : Bool) (k : Unit → DevProg .plic),
       p = .PHart cpu m rs fn ib ∧ d.efPlic = .op (.setPin cpu mm b) k ∧
@@ -432,7 +436,7 @@ theorem pstepWireAlways (cpu : CPU) (m : SailM Unit) (rs : RegFile)
     (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (mm b : Bool)
     (k : Unit → DevProg .plic) :
     d.efPlic = .op (.setPin cpu mm b) k →
-    pstepWire (.PHart cpu m rs fn ib) d LDev (.PHart cpu m (pinSet rs mm b) fn ib)
+    pstepWire (.PHart cpu m rs fn ib) d (LDev .dev 0 []) (.PHart cpu m (pinSet rs mm b) fn ib)
       { d with efPlic := k () } :=
   fun hd => ⟨rfl, some (pinSet rs mm b), none, none, rfl, rfl,
     pstepPlicPin cpu mm b k rs d hd m fn ib⟩
@@ -712,7 +716,7 @@ theorem astepProgPstep (row : List Lbl)
 
 /-- The PLIC wire, as an opax step: position kept, program moved by `pstepWire`. -/
 def awire (s s' : Athread) : Prop :=
-  s'.atK = s.atK ∧ ∃ d d', pstepWire s.atP d LDev s'.atP d'
+  s'.atK = s.atK ∧ ∃ d d', pstepWire s.atP d (LDev .dev 0 []) s'.atP d'
 
 def astep (row : List Lbl) 
     (s s' : Athread) : Prop :=

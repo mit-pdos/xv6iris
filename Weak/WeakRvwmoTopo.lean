@@ -170,13 +170,15 @@ theorem WeakRvwmoTopo.lblRenShape (pi : Nat → Nat) (l : Lbl) :
      | LStore _ _ vs _ => vs ≠ []
      | LFence _ _ _ _ => True
      | LRmw _ _ _ ts rvs wvs _ =>
-         wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length) →
+         wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
+     | LIo .. => False) →
     (match lblRen pi l with
      | LLoad _ _ ts vs => vs.length = ts.length
      | LStore _ _ vs _ => vs ≠ []
      | LFence _ _ _ _ => True
      | LRmw _ _ _ ts rvs wvs _ =>
-         wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length) := by
+         wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
+     | LIo .. => False) := by
   intro h
   cases l <;> simp only [lblRen, List.length_map] at h ⊢ <;> exact h
 

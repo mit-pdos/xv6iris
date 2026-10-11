@@ -471,7 +471,7 @@ def wsegSupply (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (GD : Gdexec) : Prop
          (((qrow GD.gdG x).drop k0).take (kz - k0) ++
           [(gxLbl GD.gdG (x, kz)).getD (.LFence false false false false)])
          (.PHart cpu m0 rs10 fn0 ib0) es pfin →
-       LDev ∉ es.map Prod.fst ∧ Nd k0 cpu m0) ∧
+       (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) ∧ Nd k0 cpu m0) ∧
     -- THE WITNESS SET's side conditions
     cpolCtx GD.gdG (wwit GD.gdG n) x St.cstC ∧
     WPolocClosed GD.gdG (wwit GD.gdG n) ∧
@@ -507,6 +507,7 @@ theorem walkSegDataOfQconf (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh N
   | LLoad => exact absurd hlbw (by simp [lbIsW])
   | LFence => exact absurd hlbw (by simp [lbIsW])
   | LRmw => exact (show False from hlbr).elim
+  | LIo => exact absurd hlbw (by simp [lbIsW])
   | LStore rl base vs kc =>
   obtain ⟨p1, p2, es, hem, hpin⟩ :=
     WeakRvwmoWalk2.qconfSegTakePin boot d0 im nh GD x k0 kz _ hq hle hlb

@@ -165,7 +165,7 @@ def WeakRobustMain.lbRl (l : Wlabel) : Bool :=
   | LStore rl _ _ _ _ => rl
   | LRmw _ rl _ _ _ _ _ => rl
   | LExStore rl _ _ _ _ => rl
-  | LSilent | LLoad .. | LFence .. | LDev | LRegW .. | LCtrl _ | LInstr | LExLoad ..
+  | LSilent | LLoad .. | LFence .. | LDev .. | LRegW .. | LCtrl _ | LInstr | LExLoad ..
   | LIFetch .. => false
 
 /-! ### the per-byte folds -/

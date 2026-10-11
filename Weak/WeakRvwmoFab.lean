@@ -118,26 +118,26 @@ theorem orbFalseSplit (b1 b2 : Bool) : (b1 || b2) = false → b1 = false ∧ b2 
 
 def lbIsdev (l : Wlabel) : Bool :=
   match l with
-  | LDev => true
+  | LDev .. => true
   | _ => false
 
-theorem lbIsdevNe (l : Wlabel) : lbIsdev l = false → l ≠ LDev := by
-  intro h he; subst he; exact absurd h (by decide)
+theorem lbIsdevNe (l : Wlabel) : lbIsdev l = false → ∀ kd ba bs, l ≠ LDev kd ba bs := by
+  intro h kd ba bs he; subst he; simp [lbIsdev] at h
 
 def hasDev (ls : List Wlabel) : Bool :=
   match ls with
   | [] => false
   | l :: ls' => lbIsdev l || hasDev ls'
 
-theorem hasDevFalse (ls : List Wlabel) : hasDev ls = false → LDev ∉ ls := by
+theorem hasDevFalse (ls : List Wlabel) : hasDev ls = false → ∀ kd ba bs, LDev kd ba bs ∉ ls := by
   induction ls with
-  | nil => intro _ h; simp at h
+  | nil => intro _ _ _ _ h; simp at h
   | cons l ls ih =>
-    intro h hin
+    intro h kd ba bs hin
     obtain ⟨hl, hls⟩ := orbFalseSplit _ _ h
     rcases List.mem_cons.1 hin with he | hin'
-    · rw [← he] at hl; exact absurd hl (by decide)
-    · exact ih hls hin'
+    · rw [← he] at hl; simp [lbIsdev] at hl
+    · exact ih hls kd ba bs hin'
 
 /-- An administrative item belongs to the block of the NEAREST TAGGED ITEM AT OR AFTER IT;
 `pend` = "an `LDev` has been seen since the last tagged item". -/
@@ -182,15 +182,16 @@ theorem emDevTagNe (pend : Bool) (ls : List Wlabel) (l : Wlabel) (k n : Nat) (es
 
 /-- An `LDev`-free item list has no dev block. -/
 theorem emDevDevfree (k : Nat) (es : List Eitem) :
-    LDev ∉ es.map Prod.fst → emDev false k es = false := by
+    (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) → emDev false k es = false := by
   induction es with
   | nil => intro _; rfl
   | cons it es ih =>
     intro hnd
     obtain ⟨l, o⟩ := it
     have hl : lbIsdev l = false := by
-      cases l <;> first | rfl | exact absurd (List.mem_cons_self ..) hnd
-    have hrest : LDev ∉ es.map Prod.fst := fun hin => hnd (List.mem_cons_of_mem _ hin)
+      cases l <;> first | rfl | exact absurd (List.mem_cons_self ..) (hnd _ _ _)
+    have hrest : ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst :=
+      fun kd ba bs hin => hnd kd ba bs (List.mem_cons_of_mem _ hin)
     cases o with
     | some j =>
       show (if j = k then _ else _) = false
@@ -379,7 +380,7 @@ theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (k : Nat) (
         obtain ⟨hls, hl⟩ := orbFalseSplit _ _ hnd1
         obtain ⟨_, hls'⟩ := orbFalseSplit _ _ hls
         have hne := lbIsdevNe l hl
-        have hnl : LDev ∉ ls := hasDevFalse ls hls'
+        have hnl := hasDevFalse ls hls'
         have hda : da = dvi k := admRunDevfree _ _ _ _ _ _ har hnl
         obtain ⟨hd, hall⟩ := pstepEvDevfree _ _ _ _ _ hst hne
         refine ⟨by rw [hd, hda], fun d => ⟨pa, d, ?_, .inl ⟨l, hre, ?_, hql⟩⟩⟩
@@ -425,8 +426,8 @@ theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (k : Nat) (
         obtain ⟨hnd3, _⟩ := orbFalseSplit _ _ hnd2
         obtain ⟨hls2, hl2⟩ := orbFalseSplit _ _ hnd3
         obtain ⟨_, hls2'⟩ := orbFalseSplit _ _ hls2
-        have hn1 : LDev ∉ ls1 := hasDevFalse ls1 hls1'
-        have hn2 : LDev ∉ ls2 := hasDevFalse ls2 hls2'
+        have hn1 := hasDevFalse ls1 hls1'
+        have hn2 := hasDevFalse ls2 hls2'
         have hda : da = dvi k := admRunDevfree _ _ _ _ _ _ har1 hn1
         obtain ⟨hd1, hall1⟩ := pstepEvDevfree _ _ _ _ _ hst1 (lbIsdevNe _ hl1)
         have hdm2 : dm2 = dm := admRunDevfree _ _ _ _ _ _ har2 hn2

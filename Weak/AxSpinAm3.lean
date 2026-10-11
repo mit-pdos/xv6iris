@@ -352,6 +352,7 @@ theorem XxAmoswap (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
       | LLoad _ _ _ _ => simp [aident] at Hid
       | LStore _ _ _ _ => simp [aident] at Hid
       | LFence _ _ _ _ => simp [aident] at Hid
+      | LIo _ _ _ => simp [aident] at Hid
     iapply C $$ %vs %rs' %ib' %Hvs %HGB %Hrow HO
 
 end amoW

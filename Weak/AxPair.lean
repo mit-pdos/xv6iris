@@ -994,7 +994,7 @@ theorem tpddStep (T : List Nat) (cpu : CPU) (m1 m2 : SailM Unit) (rs1 rs2 : RegF
     tpdd T m1 m2 →
     dregAgree (fun n => n ∉ T) rs1 rs2 →
     (fn = none ∧ stopRead T m1 m2 rds) ∨
-    (fn = none ∧ l = LDev ∧ stopMmio m1 m2) ∨
+    (fn = none ∧ (∃ kd ba bs, l = LDev kd ba bs) ∧ stopMmio m1 m2) ∨
     (∃ (l2 : Wlabel) (m2' : SailM Unit) (ors2 : Option RegFile),
       pstepHw cpu m2 rs2 fn ib d l2 rds ws ann m2' ors2 fn' d' oib obar ∧
       lblModdata l l2 ∧
@@ -1059,7 +1059,7 @@ theorem tpddStep (T : List Nat) (cpu : CPU) (m1 m2 : SailM Unit) (rs1 rs2 : RegF
         | none => simp only [pnodeStep, hdev, hv, if_true] at hst
         | some v =>
           simp only [pnodeStep, hdev, hv, if_true] at hst
-          exact hst.2.1
+          exact ⟨_, _, _, hst.2.1⟩
   · -- THE PARKED FENCE: the node does not move
     obtain ⟨h1, rfl, rfl, h4, h5, h6, h7⟩ := hst
     exact Or.inr (Or.inr ⟨l, m2, none,
@@ -1098,7 +1098,7 @@ theorem pairIdentDd (T : List Nat) (cpu : CPU) (ls : List Wlabel) (rds : List Na
       dregAgree (fun n => n ∉ T) rsa rs2a ∧
       (lsb = [] ∨
        (fna = none ∧ ∃ rdsh rdsr, rdsb = rdsh ++ rdsr ∧ stopRead T ma m2a rdsh) ∨
-       (fna = none ∧ ∃ lsr, lsb = LDev :: lsr ∧ stopMmio ma m2a)) := by
+       (fna = none ∧ ∃ lsr kd ba bs, lsb = LDev kd ba bs :: lsr ∧ stopMmio ma m2a)) := by
   intro hrun
   induction hrun generalizing m2 rs2 with
   | nil m rs fn ib d =>
@@ -1110,15 +1110,15 @@ theorem pairIdentDd (T : List Nat) (cpu : CPU) (ls : List Wlabel) (rds : List Na
       hstep hrun' ih =>
     intro htp hag
     rcases tpddStep T cpu m m2 rs rs2 fn ib d l rds ws ann ma ors fn1 d1 oib obar hstep htp hag with
-      ⟨rfl, hstop⟩ | ⟨rfl, rfl, hstop⟩ | ⟨l2, mb1, orsb, hstepb, hmod, htp1, hagb⟩
+      ⟨rfl, hstop⟩ | ⟨rfl, ⟨kd, ba, bs, rfl⟩, hstop⟩ | ⟨l2, mb1, orsb, hstepb, hmod, htp1, hagb⟩
     · -- THE READ STOP: split here, the prefix is empty
       exact ⟨[], l :: ls, [], rds ++ rds', [], ws ++ ws', false, ann || ann', m, rs, none, ib, d,
         [], m2, rs2, rfl, rfl, rfl, by simp, phrun.nil _ _ _ _ _, phrun.more hstep hrun',
         List.Forall₂.nil, phrun.nil _ _ _ _ _, htp, hag, Or.inr (Or.inl ⟨rfl, rds, rds', rfl, hstop⟩)⟩
     · -- THE FABRIC STOP
-      exact ⟨[], LDev :: ls, [], rds ++ rds', [], ws ++ ws', false, ann || ann', m, rs, none, ib,
+      exact ⟨[], LDev kd ba bs :: ls, [], rds ++ rds', [], ws ++ ws', false, ann || ann', m, rs, none, ib,
         d, [], m2, rs2, rfl, rfl, rfl, by simp, phrun.nil _ _ _ _ _, phrun.more hstep hrun',
-        List.Forall₂.nil, phrun.nil _ _ _ _ _, htp, hag, Or.inr (Or.inr ⟨rfl, ls, rfl, hstop⟩)⟩
+        List.Forall₂.nil, phrun.nil _ _ _ _ _, htp, hag, Or.inr (Or.inr ⟨rfl, ls, kd, ba, bs, rfl, hstop⟩)⟩
     · -- PAIRED: one more step on the prefix
       obtain ⟨lsa, lsb, rdsa, rdsb, wsa, wsb, anna, annb, ma', rsa, fna, iba, da, ls2, m2b, rs2b,
         rfl, rfl, rfl, rfl, hruna, hrunb, hf2, hrun2, htpa, haga, hstop⟩ :=
@@ -1137,7 +1137,7 @@ theorem pairIdentDdFull (T : List Nat) (cpu : CPU) (ls : List Wlabel) (rds : Lis
     phrun cpu ls rds ws ann m1 rs1 fn ib d m1' rs1' fn' ib' d' →
     tpdd T m1 m2 →
     rdsOk (fun n => n ∉ T) rds →
-    LDev ∉ ls →
+    (∀ kd ba bs, LDev kd ba bs ∉ ls) →
     dregAgree (fun n => n ∉ T) rs1 rs2 →
     ∃ (ls2 : List Wlabel) (m2' : SailM Unit) (rs2' : RegFile),
       List.Forall₂ lblModdata ls ls2 ∧
@@ -1148,13 +1148,13 @@ theorem pairIdentDdFull (T : List Nat) (cpu : CPU) (ls : List Wlabel) (rds : Lis
     rfl, rfl, rfl, rfl, hruna, hrunb, hf2, hrun2, htpa, haga, hstop⟩ :=
     pairIdentDd T cpu ls rds ws ann m1 rs1 fn ib d m1' rs1' fn' ib' d' m2 rs2 hrun htp hag
   rcases hstop with rfl | ⟨-, rdsh, rdsr, rfl, r, k1, k2, n, -, -, -, hnT, rfl, -⟩ |
-    ⟨-, lsr, rfl, -⟩
+    ⟨-, lsr, kd, ba, bs, rfl, -⟩
   · cases hrunb
     simp only [List.append_nil, Bool.or_false]
     exact ⟨ls2, m2a, rs2a, hf2, hrun2, htpa, haga⟩
   · exact absurd hnT
       (hok n (List.mem_append_right _ (List.mem_append_left _ (List.mem_singleton_self _))))
-  · exact absurd (List.mem_append_right _ List.mem_cons_self) hdev
+  · exact absurd (List.mem_append_right _ List.mem_cons_self) (hdev kd ba bs)
 
 /-- THE RESUME PROTOCOL AT A READ STOP (deviation 4: also `obar = none`). -/
 theorem pairResumeDd (T : List Nat) (cpu : CPU) (m1 m2 : SailM Unit) (rs1 rs2 : RegFile)

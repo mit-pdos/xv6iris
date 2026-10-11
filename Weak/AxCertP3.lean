@@ -144,6 +144,7 @@ theorem wpdDrdNodeW (n va : Nat)
       | IRead _ _ _ => rfl
       | IWrite _ _ _ => rfl
       | IFence _ _ _ _ => rfl
+      | IIo _ _ _ => rfl
     simp only [Hadv0, ↓reduceIte]
     iintro %v %Hv %Hlenv
     obtain ⟨l, d, d', -, Hrv, Hps, Hk'⟩ := HK v Hlenv

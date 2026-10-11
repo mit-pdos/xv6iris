@@ -323,7 +323,7 @@ def elabelOk (σ : WGState) (c : CPU) (l : Wlabel) (σ' : WGState) : Prop :=
   | LFence pr pw sr sw =>
       σ'.wglog = σ.wglog ∧ σ'.wgws c = fencePost (σ.wgws c) pr pw sr sw
   -- THE FABRIC MARKER (M5): `LSilent`'s twin
-  | LDev => σ'.wglog = σ.wglog ∧ σ'.wgws c = σ.wgws c
+  | LDev .. => σ'.wglog = σ.wglog ∧ σ'.wgws c = σ.wgws c
   -- D3-2: the three dependency-only labels
   | LRegW rd srcs =>
       σ'.wglog = σ.wglog ∧ σ'.wgws c = regwPost (σ.wgws c) rd (srcsView (σ.wgws c) srcs)
@@ -361,7 +361,7 @@ def edlabelOk (P : Epool) (σ : WGState) (l : Wlabel) (dws' : Wstate) (σ' : WGS
       data ≠ [] ∧
       dws' = storePostRun P.epDws rl base data.length (σ.wglog.length + 1)
   | LFence pr pw sr sw => σ'.wglog = σ.wglog ∧ dws' = fencePost P.epDws pr pw sr sw
-  | LDev => σ'.wglog = σ.wglog ∧ dws' = P.epDws
+  | LDev .. => σ'.wglog = σ.wglog ∧ dws' = P.epDws
   | LRmw .. => False
   | LRegW .. | LCtrl _ | LInstr => False
   | LExLoad .. | LExStore .. => False
@@ -409,13 +409,13 @@ inductive epfStep : Nat → Wlabel → (Epool × WGState) → (Epool × WGState)
       ethreadLive σ P.epGen →
       wdevStep P.epGen (.uart i) rootTask (epU P i) σ m' σ' [] →
       σ'.wglog = σ.wglog →
-      epfStep nDisk .LDev (P, σ) (epUset P i m', σ')
+      epfStep nDisk (.LDev .dev 0 []) (P, σ) (epUset P i m', σ')
   /-- A PLIC step: the wire write at its target hart, the gateway at the disk (deviation 2). -/
   | EPFPlic (P : Epool) (σ σ' : WGState) (m' : DevProg .plic) :
       ethreadLive σ P.epGen →
       wdevStep P.epGen .plic rootTask P.epPlic σ m' σ' [] →
       σ'.wglog = σ.wglog →
-      epfStep (plicAgent P.epPlic) .LDev (P, σ) (epPset P m', σ')
+      epfStep (plicAgent P.epPlic) (.LDev .dev 0 []) (P, σ) (epPset P m', σ')
 
 def epfRun (ρ ρ' : Epool × WGState) : Prop := ∃ i l, epfStep i l ρ ρ'
 
@@ -636,7 +636,7 @@ theorem ecycleStepLabel (gen : Nat) (σ : WGState) (c : CPU) (m : SailM Unit)
         simp only [emonadStep, ecycleStep] at h
         split at h
         · obtain ⟨w, d', -, -, rfl⟩ := h
-          exact ⟨.LDev, rfl, rfl⟩
+          exact ⟨.LDev .rd (paZ req.pa) [], rfl, rfl⟩
         · rcases h with ⟨-, w, tvs, -, -, hif, -, rfl⟩ |
             ⟨-, ⟨-, w, tvs, -, -, hrd, -, rfl⟩ | ⟨-, w, tvs, -, -, hrd, -, rfl⟩⟩
           · -- O2: THE I-CACHE READ
@@ -649,7 +649,7 @@ theorem ecycleStepLabel (gen : Nat) (σ : WGState) (c : CPU) (m : SailM Unit)
         split at h
         · split at h
           · obtain ⟨d', -, -, rfl⟩ := h
-            exact ⟨.LDev, rfl, rfl⟩
+            exact ⟨.LDev .wr (paZ req.pa) [], rfl, rfl⟩
           · exact h.elim
         · split at h
           · rename_i v _
@@ -713,11 +713,11 @@ theorem ediskStepLabel (P : Epool) (σ : WGState) (e' : EExpr) (σ' : WGState) :
     ∃ l dp' dws', e' = .EDisk P.epGen dp' dws' ∧ edlabelOk P σ l dws' σ' := by
   rintro (⟨-, rfl, rfl⟩ | ⟨pa, n, aq, k, tvs, -, -, hrd, rfl, rfl⟩ | ⟨pa, bs, k, -, hne, rfl, rfl⟩ |
     ⟨k, -, rfl, rfl⟩ | ⟨delta, -, rfl, rfl⟩ | ⟨prog', -, -, rfl, rfl⟩ | ⟨-, rfl, rfl⟩)
-  · exact ⟨.LDev, _, _, rfl, rfl, rfl⟩
+  · exact ⟨.LDev .dev 0 [], _, _, rfl, rfl, rfl⟩
   · exact ⟨.LLoad aq false (paZ pa) tvs [], _, _, rfl, rfl, rfl, hrd, rfl, rfl⟩
   · exact ⟨.LStore false (paZ pa) bs [] [], _, _, rfl, rfl, rfl, ⟨_, rfl⟩, hne, rfl⟩
   · exact ⟨.LFence true true true true, _, _, rfl, rfl, rfl⟩
-  · exact ⟨.LDev, _, _, rfl, rfl, rfl⟩
+  · exact ⟨.LDev .dev 0 [], _, _, rfl, rfl, rfl⟩
   · exact ⟨.LSilent, _, _, rfl, rfl, rfl⟩
   · exact ⟨.LSilent, _, _, rfl, rfl, rfl⟩
 

@@ -699,6 +699,7 @@ theorem cpuValsOfB {row : List Lbl} {i : Agent} : cpuValsB row i = true → t2Cp
   cases lb with
   | LLoad aq a ts vs => simp [aident, aidentWr] at hw
   | LFence pr pw sr sw => simp [aident, aidentWr] at hw
+  | LIo _ _ _ => simp [aident, aidentWr] at hw
   | LStore rl' a vw cls =>
     simp only [aident, aidentWr, Option.some.injEq, Prod.mk.injEq] at hw
     obtain ⟨-, rfl, -⟩ := hw

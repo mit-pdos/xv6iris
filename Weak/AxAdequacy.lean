@@ -247,6 +247,7 @@ theorem areadStepRmwValue (GD : Gdexec) (i : Nat) (s : Athread) (id : AidentT)
   | LLoad aq base ts vs => simp [aident, aidentAdvRd] at hadv
   | LStore rl base vs k => simp [aident, aidentAdvRd] at hadv
   | LFence pr pw sr sw => simp [aident, aidentAdvRd] at hadv
+  | LIo kd base vs => simp [aident, aidentAdvRd] at hadv
   | LRmw aq rl base ts rvs wvs k =>
     refine ⟨rvs, ?_, ?_⟩
     · unfold graphValue

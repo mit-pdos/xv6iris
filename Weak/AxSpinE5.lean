@@ -78,6 +78,7 @@ theorem gwbIdent (G : Gexec) (e : Geid) (l : Lbl) (a : Int) (v : BitVec 8) :
   cases l with
   | LLoad _ _ _ _ => simp [lbWr] at Hwr
   | LFence _ _ _ _ => simp [lbWr] at Hwr
+  | LIo _ _ _ => simp [lbWr] at Hwr
   | LStore rl b0 vs0 cls =>
     simp only [lbWr, Option.some.injEq, Prod.mk.injEq] at Hwr
     obtain ⟨rfl, rfl⟩ := Hwr
@@ -265,6 +266,7 @@ theorem FldSlot (L : Xlay) (GT : GdexecT) (nm : Xv6N) (HL : xlayOk L)
       exact ⟨ts, vs, rfl⟩
     | LStore _ _ _ _ => simp [aident, aidentRd] at Hid
     | LFence _ _ _ _ => simp [aident, aidentRd] at Hid
+    | LIo _ _ _ => simp [aident, aidentRd] at Hid
     | LRmw aq' rl b ts rvs wvs cls' =>
       simp only [aident, aidentRd, Option.some.injEq, Prod.mk.injEq] at Hid
       obtain ⟨rfl, rfl, Hn⟩ := Hid

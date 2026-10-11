@@ -460,7 +460,7 @@ def dtAcc (s : DstateT) (xs : List Dsrc) : List Nat :=
 
 def dstepT (s : DstateT) (it : Eitem) : DstateT × List Redge :=
   match it.1 with
-  | LSilent | LDev | LFence _ _ _ _ | LIFetch _ _ => (s, [])
+  | LSilent | LDev .. | LFence _ _ _ _ | LIFetch _ _ => (s, [])
   | LInstr => (⟨s.dtProv, [], s.dtCtl, s.dtAdr⟩, [])
   | LRegW rd srcs =>
       (⟨dprovSet s.dtProv rd (dtsrcs s srcs), s.dtLd, s.dtCtl, s.dtAdr⟩, [])

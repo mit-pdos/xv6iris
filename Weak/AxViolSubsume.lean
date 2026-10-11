@@ -264,6 +264,7 @@ theorem execFwdLe (E : Exec) (k i : Nat) :
     | LRmw aq rl base ts rvs wvs kc =>
       rw [execWsRmw E k s aq rl base ts rvs wvs kc hwf hs hl]
       exact storePostRunFwdLe _ _ _ _ _ (loadPostRunFwdLe _ _ _ _ hf)
+    | LIo kd0 b0 v0 => exact absurd hl (execStepNotIo E k s kd0 b0 v0 hwf hs)
 
 /-- UPPER bounds for the floor after a step (the inverses of `loadPostRunCoh` /
 `storePostRunCoh`). -/
@@ -423,6 +424,7 @@ theorem cohTouched (E : Exec) (k j : Nat) (a : Int) (p : Nat) (m : Wmsg) :
     | LFence pr pw sr sw =>
       rw [execWsFence E k s pr pw sr sw hwf hs hl, AxViolSubsume.cohFencePost] at hcoh
       exact ihk hcoh
+    | LIo kd0 b0 v0 => exact absurd hl (execStepNotIo E k s kd0 b0 v0 hwf hs)
     | LRmw aq rl base ts rvs wvs kc =>
       -- write half, then read half
       rw [execWsRmw E k s aq rl base ts rvs wvs kc hwf hs hl] at hcoh

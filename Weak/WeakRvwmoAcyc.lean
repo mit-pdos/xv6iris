@@ -407,6 +407,7 @@ theorem lblRenRdInv (π : Nat → Nat) (l : Lbl) (base : Int) (ts' : List Nat)
     simp only [lblRen, lbRd, Option.some.injEq, Prod.mk.injEq] at h
     obtain ⟨rfl, rfl, rfl⟩ := h
     exact ⟨ts, rfl, rfl⟩
+  | LIo => simp [lblRen, lbRd] at h
 
 theorem rowsRelRdbInv (π : Nat → Nat) (G G' : Gexec) (e : Geid) (a : Int) (t' : Nat)
     (v : BitVec 8) :

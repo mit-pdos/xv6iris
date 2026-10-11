@@ -261,7 +261,7 @@ theorem AxSpinE8d.rdNodeAread (row : List Lbl) (k : Nat) (m : SailM Unit) (id : 
 /-- Rocq `lb_admin_b` (+ `LIFetch`: a fetch is administrative under Stage C). -/
 def AxSpinE8d.lbAdminB (l : Wlabel) : Bool :=
   match l with
-  | .LSilent | .LDev | .LRegW .. | .LCtrl _ | .LInstr | .LIFetch .. => true
+  | .LSilent | .LDev .. | .LRegW .. | .LCtrl _ | .LInstr | .LIFetch .. => true
   | _ => false
 
 theorem AxSpinE8d.lbAdminBSound (l : Wlabel) : AxSpinE8d.lbAdminB l = true → lbAdmin true l := by

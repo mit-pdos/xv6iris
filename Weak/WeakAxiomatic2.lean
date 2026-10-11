@@ -501,6 +501,7 @@ theorem pubWVRel (E : Exec) (k : Nat) (s : Estep) :
     cases wv0 with
     | nil => exact absurd rfl hne0
     | cons _ _ => simp
+  | LIo => rw [hl] at hw; simp [lbIsW] at hw
 
 /-- ... and it is still there when the acquire read runs. -/
 theorem relAcqVRel (E : Exec) (e1 : Ev) (t k2 : Nat) (s2 : Estep) :
@@ -661,6 +662,8 @@ def mnext (σ : Mstate) (i : Nat) (l : Lbl) : Mstate :=
      updWs σ.msWs i
        (storePostRun (loadPostRun (σ.msWs i) aq base ts) rl base wvs.length
          (σ.msLog.length + 1))⟩
+  -- W13 (E): no machine step yet (`mstepOk` is `False`; W13 (I) adds the inert `mstep` arm)
+  | LIo .. => σ
 
 def mstepOk (σ : Mstate) (i : Nat) (l : Lbl) : Prop :=
   match l with
@@ -671,6 +674,7 @@ def mstepOk (σ : Mstate) (i : Nat) (l : Lbl) : Prop :=
     wvs ≠ [] ∧ wvs.length = ts.length ∧
     rdOk σ.msImg σ.msLog (σ.msWs i) aq base ts rvs ∧
     rmwLatest σ.msImg σ.msLog base ts
+  | LIo .. => False
 
 theorem mstepOkStep (σ : Mstate) (i : Nat) (l : Lbl) : mstepOk σ i l → mstep σ i l (mnext σ i l) := by
   cases l with
@@ -679,6 +683,7 @@ theorem mstepOkStep (σ : Mstate) (i : Nat) (l : Lbl) : mstepOk σ i l → mstep
   | LFence pr pw sr sw => intro _; exact mstep.MStepFence pr pw sr sw
   | LRmw aq rl base ts rvs wvs k =>
     rintro ⟨hne, hlen, hrd, hlat⟩; exact mstep.MStepRmw aq rl base ts rvs wvs k hne hlen hrd hlat
+  | LIo => intro h; exact h.elim
 
 theorem mstepDet (σ : Mstate) (i : Nat) (l : Lbl) (σ' : Mstate) :
     mstep σ i l σ' → σ' = mnext σ i l ∧ mstepOk σ i l := by
@@ -873,6 +878,7 @@ theorem mnextBounded (σ : Mstate) (i : Nat) (l : Lbl) :
     exact updWsBounded _ _ _ _ (fun j => wsBoundedMono _ _ _ (hb j) (by omega))
       (storePostRunBounded _ _ _ _ _ σ.msLog.length _
         (loadPostRunBounded _ _ _ _ _ (hb i) (hrd base ts rvs rfl)) (Nat.le_refl _) (by omega))
+  | LIo => exact hb
 
 theorem candBoundedUpto (c : Cand) (n : Nat) :
     n ≤ c.cdTr.length →
@@ -904,6 +910,7 @@ theorem candBoundedUpto (c : Cand) (n : Nat) :
         simp only [lbRd, Option.some.injEq, Prod.mk.injEq] at hrd
         obtain ⟨rfl, rfl, rfl⟩ := hrd
         exact rdOkTsBounded _ _ _ _ _ _ _ hstep.2.2.1
+      | LIo => rw [hl] at hrd; simp [lbRd] at hrd
 
 /-! ## 7.5 Completeness for coherence-latest candidates (the SC fragment) -/
 
@@ -914,6 +921,8 @@ def candShape (c : Cand) : Prop :=
     | LStore _ _ vs _ => vs ≠ []
     | LFence .. => True
     | LRmw _ _ _ ts rvs wvs _ => wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
+    -- W13 (E): no machine step replays an I/O event yet (W13 (I))
+    | LIo .. => False
 
 def candValues (c : Cand) : Prop :=
   ∀ k s base ts vs, c.cdTr[k]? = some s → lbRd s.esLb = some (base, ts, vs) →
@@ -975,6 +984,7 @@ theorem scMstepOk (c : Cand) :
       rw [himg, hlog]
       intro j t hj
       exact hlat k s base ts rvs hs (by rw [hl]; rfl) j t hj
+    | LIo => rw [hl] at hshape; exact hshape.elim
 
 /-- THE COMPLETENESS THEOREM FOR THE SC FRAGMENT. -/
 theorem scCandReachable (c : Cand) :
@@ -992,7 +1002,7 @@ def rfeEv (E : Exec) (w r : Ev) : Prop :=
 
 theorem mnextWsNe (σ : Mstate) (i : Nat) (l : Lbl) (j : Nat) :
     j ≠ i → (mnext σ i l).msWs j = σ.msWs j := by
-  intro hne; cases l <;> exact updWsNe _ _ _ _ hne
+  intro hne; cases l <;> first | exact updWsNe _ _ _ _ hne | rfl
 
 /-- An agent that has not stepped yet still holds `wsInit`. -/
 theorem candWsUntouched (c : Cand) (i n : Nat) :

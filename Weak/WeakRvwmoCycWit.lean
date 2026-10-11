@@ -391,8 +391,8 @@ theorem WeakRvwmoCycWit.cyBlkSubstG (A : Wlabel → Prop) (hA : ∀ l, A l → l
     (phrunPevrun cpu [l] rdsB wrsB annB _ rsa fna iba da m' rs' fn' ib' d0 hB)
   obtain ⟨tvs, hf, -, hshape⟩ := hlblRealizesLoadShape _ ws aq base ts vs l hre
   obtain ⟨-, ors, oib, obar, hrs, hib, hhart⟩ := hst
-  have hnotd : l ≠ .LDev := by
-    rintro rfl
+  have hnotd : ∀ kd ba bs, l ≠ .LDev kd ba bs := by
+    rintro kd ba bs rfl
     rcases hshape with h | ⟨_, h⟩ <;> cases h
   rcases hhart with ⟨hnode, hd⟩ | hplic
   · cases fna with
@@ -421,7 +421,7 @@ theorem WeakRvwmoCycWit.cyBlkSubstG (A : Wlabel → Prop) (hA : ∀ l, A l → l
       · rw [hl] at hl0
         cases hl0
   · obtain ⟨_, _, _, _, hl, _⟩ := hplic
-    exact absurd hl hnotd
+    exact absurd hl (hnotd _ _ _)
 
 /-- `cblk`'s instance (Rocq's statement). -/
 theorem cyBlkSubst (aL aS : PAddr) (cpu : CPU) (d0 : Efab) (ws : Wstate) (aq : Bool)
