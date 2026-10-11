@@ -229,27 +229,18 @@ theorem abs_setReg (x : XState) (cpu : CPU) (r : Register) (v : RegisterType r) 
     | (show updCpu x.abs.regs cpu (XRegs.file ((x.hart cpu).regs.insert r v)) = _
        rw [XRegs.file_insert]; rfl)
 
-/-- The computable form of `HRead.afterLoad` (whose footprint test is
-classical). -/
-def afterLoadHR (hr : HRead) (pa : PAddr) (n : Nat) (tvn : Nat) : HRead :=
-  ⟨max hr.rv tvn,
-   fun a => if (List.range n).any (fun j => a == pa + BitVec.ofNat 64 j) then tvn else hr.coh a,
-   hr.acq⟩
+/-- The computable form of `HRead.afterLoad` (since the foreign-source stamp
+it is `HRead.afterLoad` itself: every footprint test is a `List.range` fold). -/
+def afterLoadHR (hr : HRead) (me : Agent) (pa : PAddr) (n : Nat) (tvn : Nat) (srcs : LoadSrcs) :
+    HRead :=
+  hr.afterLoad me pa n tvn srcs
 
-theorem afterLoadHR_eq (hr : HRead) (pa : PAddr) (n : Nat) (tvn : Nat) :
-    afterLoadHR hr pa n tvn = hr.afterLoad pa n tvn := by
-  unfold afterLoadHR HRead.afterLoad
-  congr 1
-  funext a
-  have : ((List.range n).any (fun j => a == pa + BitVec.ofNat 64 j) = true) ↔
-      ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j := by
-    simp [List.any_eq_true]
-  by_cases h : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j
-  · rw [if_pos (this.2 h), if_pos h]
-  · rw [if_neg (fun h' => h (this.1 h')), if_neg h]
+theorem afterLoadHR_eq (hr : HRead) (me : Agent) (pa : PAddr) (n : Nat) (tvn : Nat)
+    (srcs : LoadSrcs) : afterLoadHR hr me pa n tvn srcs = hr.afterLoad me pa n tvn srcs := rfl
 
 def afterLoad (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (tvn : Nat) : XState :=
-  x.setHart cpu { x.hart cpu with hr := afterLoadHR (x.hart cpu).hr pa n tvn }
+  x.setHart cpu { x.hart cpu with
+    hr := afterLoadHR (x.hart cpu).hr (hartAgent cpu) pa n tvn (x.mem.loadSrcs (hartAgent cpu) tvn pa n) }
 
 theorem abs_afterLoad (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (tvn : Nat) :
     (x.afterLoad cpu pa n tvn).abs = x.abs.afterLoad cpu pa n tvn := by
@@ -280,7 +271,7 @@ def store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (
   let h := x.hart cpu
   { x.setHart cpu { h with
       tv := if excl && h.hr.acq then x.log.length + 1 else h.tv,
-      hr := h.hr.clearAcq,
+      hr := h.hr.clearAcq.resetCoh pa n,
       resv := none } with
     mem := x.mem.writeBytes pa n w (x.log.length + 1) (hartAgent cpu),
     log := x.log ++ [hartAgent cpu] }
@@ -289,7 +280,7 @@ theorem abs_store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8
     (excl : Bool) : (x.store cpu pa n w excl).abs = x.abs.store cpu pa n w excl := by
   have h := abs_setHart x cpu { x.hart cpu with
       tv := if excl && (x.hart cpu).hr.acq then x.log.length + 1 else (x.hart cpu).tv,
-      hr := (x.hart cpu).hr.clearAcq,
+      hr := (x.hart cpu).hr.clearAcq.resetCoh pa n,
       resv := none }
   have hr := congrArg MState.regs h
   have ht := congrArg MState.tv h

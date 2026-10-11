@@ -19,9 +19,12 @@ A port of the Rocq prototype's TSO machine (`RiscvLang.mnode_step`,
   is visible when its timestamp is at most `tvn` **or the hart authored it**
   (store forwarding: a hart always sees its own latest store).  Plain loads
   do not move the floor (load–load reordering); they raise the hart's read
-  watermark `rv` and stamp the footprint's coherence floors (RVWMO ppo rule
-  2: a later load of the same byte cannot go back in time).  Plain stores
-  append at the top and move no view (store buffering).
+  watermark `rv` and stamp each footprint byte's coherence floor with the
+  timestamp of the entry it read, when that entry is FOREIGN (RVWMO ppo
+  rule 2: a later load of the same byte cannot go back past a write it
+  saw; an own store is visible at every position and constrains nothing).
+  Stores append at the top and move no view (store buffering); a hart's
+  store resets its footprint's coherence floors (rule 2's `po-loc-no-w`).
 * **Fences.**  A W→R edge drains: the floor passes the hart's own last
   store.  An R→R edge acquires: the floor passes the read watermark.  A
   fence with a W-only successor (`fence rw,w`, `w,w`, `r,w`) is a no-op:
@@ -118,6 +121,35 @@ def HEnt.visible (h : Agent) (tv : Nat) (e : HEnt) : Bool :=
 /-- The byte agent `h` reads at view `tv`: the latest visible entry. -/
 def Hist.read (h : Agent) (tv : Nat) (H : Hist) : Option (BitVec 8) :=
   (H.find? (HEnt.visible h tv)).map HEnt.v
+
+/-- The history entry agent `h` reads at view `tv`: `Hist.read`'s `find?`,
+the entry (author, timestamp, byte) returned rather than its byte. -/
+def Hist.readEnt (h : Agent) (tv : Nat) (H : Hist) : Option HEnt :=
+  H.find? (HEnt.visible h tv)
+
+theorem Hist.read_eq_readEnt (h : Agent) (tv : Nat) (H : Hist) :
+    Hist.read h tv H = (Hist.readEnt h tv H).map HEnt.v := rfl
+
+/-- The source agent `h` reads at view `tv`: the (author, timestamp) of the
+entry `Hist.readEnt` returns. -/
+def Hist.readSrc (h : Agent) (tv : Nat) (H : Hist) : Option (Agent × Nat) :=
+  (Hist.readEnt h tv H).map (fun e => (e.tid, e.t))
+
+/-- A source read by `h` that `h` did not author is at or below the view. -/
+theorem Hist.readSrc_foreign_le (h : Agent) (tv : Nat) (H : Hist) (tid t : Nat)
+    (hs : Hist.readSrc h tv H = some (tid, t)) (hne : tid ≠ h) : t ≤ tv := by
+  unfold Hist.readSrc Hist.readEnt at hs
+  cases hf : H.find? (HEnt.visible h tv) with
+  | none => rw [hf] at hs; cases hs
+  | some e =>
+    rw [hf] at hs
+    simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hs
+    obtain ⟨rfl, rfl⟩ := hs
+    have hv := List.find?_some hf
+    simp only [HEnt.visible, Bool.or_eq_true, decide_eq_true_eq] at hv
+    rcases hv with hv | hv
+    · exact hv
+    · exact absurd hv hne
 
 /-- The byte at the top of the store order (the flat cache). -/
 def Hist.top (H : Hist) : Option (BitVec 8) := H.head?.map HEnt.v
@@ -250,8 +282,9 @@ def othersReserve (resv : CPU → Option Resv) (cpu : CPU) (pa : PAddr) (n : Nat
 /-! ## The per-hart read side -/
 
 /-- A hart's read side: the read watermark (the highest view any load read
-at), the per-byte coherence floors (the view the byte was last read at), and
-the pending acquire bit of an exclusive read (applied by the paired write). -/
+at), the per-byte coherence floors (the largest timestamp of a FOREIGN entry
+a load read for the byte since the hart last stored to it), and the pending
+acquire bit of an exclusive read (applied by the paired write). -/
 structure HRead where
   rv : Nat
   coh : PAddr → Nat
@@ -263,12 +296,123 @@ def HRead.zero : HRead := ⟨0, fun _ => 0, false⟩
 def HRead.cohOk (hr : HRead) (pa : PAddr) (n : Nat) (tvn : Nat) : Prop :=
   ∀ j, j < n → hr.coh (pa + BitVec.ofNat 64 j) ≤ tvn
 
-open Classical in
-/-- After a plain load of the footprint at view `tvn`. -/
-noncomputable def HRead.afterLoad (hr : HRead) (pa : PAddr) (n : Nat) (tvn : Nat) : HRead :=
-  ⟨max hr.rv tvn,
-   fun a => if ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j then tvn else hr.coh a,
+instance (hr : HRead) (pa : PAddr) (n : Nat) (tvn : Nat) : Decidable (hr.cohOk pa n tvn) := by
+  unfold HRead.cohOk; infer_instance
+
+/-- **The per-byte sources of a plain load** (the stamp input of
+`HRead.afterLoad`): entry `j` is the (author, timestamp) of the history entry
+footprint byte `j` reads (`Hist.readSrc`), `none` for a byte with no
+history.  `MState.afterLoad` builds it from the memory (`FlatMem.loadSrcs`);
+the promise-free twin (`Weak.TsoShadow`) builds the same list from the pf log
+(author `wmTid`, timestamp = log position + 1). -/
+abbrev LoadSrcs := List (Option (Agent × Nat))
+
+/-- The coherence stamp byte `j` of a load by `me` contributes: its source's
+timestamp when the source is FOREIGN (authored by an agent other than `me`),
+0 when it is `me`'s own store (forwarded or below the view) or absent. -/
+def LoadSrcs.stampAt (srcs : LoadSrcs) (me : Agent) (j : Nat) : Nat :=
+  match srcs[j]? with
+  | some (some (tid, t)) => if tid = me then 0 else t
+  | _ => 0
+
+/-- The per-byte sources agent `h` reads at view `tv` from the footprint
+`pa .. pa+n-1`. -/
+def FlatMem.loadSrcs (m : FlatMem) (h : Agent) (tv : Nat) (pa : PAddr) (n : Nat) : LoadSrcs :=
+  (List.range n).map (fun j => (m[pa + BitVec.ofNat 64 j]?).bind (Hist.readSrc h tv))
+
+/-- Every foreign stamp of a load's sources is at or below its view. -/
+theorem FlatMem.loadSrcs_stampAt_le (m : FlatMem) (h : Agent) (tv : Nat) (pa : PAddr) (n j : Nat) :
+    (m.loadSrcs h tv pa n).stampAt h j ≤ tv := by
+  unfold LoadSrcs.stampAt FlatMem.loadSrcs
+  split
+  · rename_i tid t hs
+    split
+    · exact Nat.zero_le _
+    · rename_i hne
+      simp only [List.getElem?_map, Option.map_eq_some_iff] at hs
+      obtain ⟨k, hk, hs⟩ := hs
+      cases hH : m[pa + BitVec.ofNat 64 k]? with
+      | none => rw [hH] at hs; cases hs
+      | some H =>
+        rw [hH] at hs
+        exact Hist.readSrc_foreign_le h tv H tid t hs hne
+  · exact Nat.zero_le _
+
+/-- The stamp a load of the footprint `pa .. pa+n-1` puts on byte `a`: the
+largest foreign-source timestamp among the footprint bytes at `a` (0 off the
+footprint). -/
+def LoadSrcs.stamp (srcs : LoadSrcs) (me : Agent) (pa : PAddr) (n : Nat) (a : PAddr) : Nat :=
+  ((List.range n).map
+    (fun j => if a = pa + BitVec.ofNat 64 j then srcs.stampAt me j else 0)).foldr max 0
+
+/-- After a plain load by `me` of the footprint at view `tvn` with per-byte
+sources `srcs`: the watermark rises to `tvn`; each byte's coherence floor rises
+to its source's timestamp iff that source is FOREIGN (RVWMO ppo rule 2 orders
+two same-hart reads of a byte only when they return different writes, and an
+own store is visible at every position, so an own-sourced byte constrains no
+later read). -/
+def HRead.afterLoad (hr : HRead) (me : Agent) (pa : PAddr) (n : Nat) (tvn : Nat)
+    (srcs : LoadSrcs) : HRead :=
+  ⟨max hr.rv tvn, fun a => max (hr.coh a) (srcs.stamp me pa n a), hr.acq⟩
+
+/-- After a store of the footprint `pa .. pa+n-1` by the hart: the footprint's
+coherence floors reset to 0 (RVWMO ppo rule 2's `po-loc-no-w`: a write to the
+byte by the hart po-between two reads exempts them). -/
+def HRead.resetCoh (hr : HRead) (pa : PAddr) (n : Nat) : HRead :=
+  ⟨hr.rv, fun a => if (List.range n).any (fun j => a == pa + BitVec.ofNat 64 j) then 0 else hr.coh a,
    hr.acq⟩
+
+theorem TsoMem.foldrMax_le (l : List Nat) (B : Nat) (h : ∀ x ∈ l, x ≤ B) : l.foldr max 0 ≤ B := by
+  induction l with
+  | nil => simp
+  | cons x l ih =>
+    simp only [List.foldr_cons]
+    exact Nat.max_le.2 ⟨h x (by simp), ih (fun y hy => h y (by simp [hy]))⟩
+
+theorem TsoMem.le_foldrMax (l : List Nat) (x : Nat) (hx : x ∈ l) : x ≤ l.foldr max 0 := by
+  induction l with
+  | nil => simp at hx
+  | cons y l ih =>
+    simp only [List.foldr_cons]
+    rcases List.mem_cons.1 hx with rfl | hx
+    · exact Nat.le_max_left _ _
+    · exact Nat.le_trans (ih hx) (Nat.le_max_right _ _)
+
+/-- The stamp is bounded by any bound on the footprint's foreign stamps. -/
+theorem LoadSrcs.stamp_le (srcs : LoadSrcs) (me : Agent) (pa : PAddr) (n : Nat) (a : PAddr)
+    (B : Nat) (h : ∀ j, j < n → srcs.stampAt me j ≤ B) : srcs.stamp me pa n a ≤ B := by
+  unfold LoadSrcs.stamp
+  refine TsoMem.foldrMax_le _ _ (fun x hx => ?_)
+  obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hx
+  split
+  · exact h j (List.mem_range.1 hj)
+  · exact Nat.zero_le _
+
+/-- Footprint byte `j` of an access shorter than the address space is no other
+footprint byte. -/
+theorem TsoMem.footprint_inj (pa : PAddr) (n j j' : Nat) (hn : n < 2 ^ 64) (hj : j < n) (hj' : j' < n)
+    (h : pa + BitVec.ofNat 64 j = pa + BitVec.ofNat 64 j') : j = j' := by
+  have h1 := congrArg BitVec.toNat h
+  simp only [BitVec.toNat_add, BitVec.toNat_ofNat] at h1
+  rw [Nat.mod_eq_of_lt (a := j) (by omega), Nat.mod_eq_of_lt (a := j') (by omega)] at h1
+  omega
+
+/-- The stamp of footprint byte `j` is byte `j`'s own foreign stamp. -/
+theorem LoadSrcs.stamp_at (srcs : LoadSrcs) (me : Agent) (pa : PAddr) (n j : Nat)
+    (hn : n < 2 ^ 64) (hj : j < n) :
+    srcs.stamp me pa n (pa + BitVec.ofNat 64 j) = srcs.stampAt me j := by
+  apply Nat.le_antisymm
+  · unfold LoadSrcs.stamp
+    refine TsoMem.foldrMax_le _ _ (fun x hx => ?_)
+    obtain ⟨j', hj', rfl⟩ := List.mem_map.1 hx
+    split
+    · rename_i he
+      rw [TsoMem.footprint_inj pa n j j' hn hj (List.mem_range.1 hj') he]
+      exact Nat.le_refl _
+    · exact Nat.zero_le _
+  · unfold LoadSrcs.stamp
+    refine TsoMem.le_foldrMax _ _ (List.mem_map.2 ⟨j, List.mem_range.2 hj, ?_⟩)
+    simp
 
 /-- After an exclusive read at the top of the order. -/
 def HRead.afterExcl (hr : HRead) (top : Nat) (acq : Bool) : HRead := ⟨top, hr.coh, acq⟩

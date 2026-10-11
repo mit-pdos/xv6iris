@@ -1334,7 +1334,7 @@ theorem hartViews_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (
     simp only [updCpu, Bool.false_and]; split <;> simp_all
   have e2 : (σ.store cpu pa n w false).itv c = σ.itv c := rfl
   have e3 : ((σ.store cpu pa n w false).hr c).rv = (σ.hr c).rv := by
-    simp only [updCpu]; split <;> simp_all [HRead.clearAcq]
+    simp only [updCpu]; split <;> simp_all [HRead.clearAcq, HRead.resetCoh]
   rw [e1, e2, e3]
 
 /-- A plain store by a hart: the store order grows by the hart's message,
@@ -1360,7 +1360,7 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
   imodintro
   have hresv : resvMap (σ.store cpu pa n w false) =
       Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, false) :=
-    resvMap_upd σ _ cpu _ _ (by simp [updCpu, HRead.clearAcq])
+    resvMap_upd σ _ cpu _ _ (by simp [updCpu, HRead.clearAcq, HRead.resetCoh])
       (fun c hc => by simp [updCpu, hc])
   rw [hresv]
   iframe Hfrag Hresv

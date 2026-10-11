@@ -185,7 +185,7 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
   imodintro
   have hresv : resvMap (σ.store cpu pa n w true) =
       Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, false) :=
-    resvMap_upd σ _ cpu _ _ (by simp [updCpu, HRead.clearAcq])
+    resvMap_upd σ _ cpu _ _ (by simp [updCpu, HRead.clearAcq, HRead.resetCoh])
       (fun c hc => by simp [updCpu, hc])
   rw [hresv]
   iframe Hfrag Hresv
@@ -199,7 +199,7 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
         intro c hc
         simp [updCpu, hc]
       · iapply hartViewsAt_intro
-        simp only [updCpu, if_true, HRead.clearAcq, Bool.true_and, hres.2]
+        simp only [updCpu, if_true, HRead.clearAcq, HRead.resetCoh, Bool.true_and, hres.2]
         iframe Hv Hi Hr
     · ipureintro
       exact mmOk_store σ cpu pa n w true hram hno hmm

@@ -11,9 +11,13 @@ file proves the two hart-side witnesses and the parts of the per-label table tha
   after an acquire exclusive pair whose read takes timestamp `t` of the lock word, WeakMem's
   load floor is `t`, TsoMem's is the pair's write timestamp `top + 1`; a later plain load of
   another byte reads a value TsoMem cannot return.
-* `TsoOfPf.g2Run` / `TsoOfPf.tsoAfterLoadCoh` (G2, mixed-size coherence): TsoMem stamps EVERY
-  footprint byte's coherence floor with the load's view `tvn`; WeakMem stamps each byte with its
-  own timestamp; two overlapping loads of different footprints separate them.
+* `TsoOfPf.g2Run` / `TsoOfPf.tsoAfterLoadCoh` (G2, mixed-size coherence): the spike found that
+  TsoMem stamped EVERY footprint byte's coherence floor with the load's view `tvn` (two
+  overlapping loads of different footprints separated it from WeakMem).  W-COH (G2-Q (a′))
+  changed TsoMem: a load stamps a byte with its source's timestamp only when the source is
+  FOREIGN, and a hart's store resets its footprint's floors; `tsoAfterLoadCoh` states the new
+  stamp, `g2TsoSched` gives `g2Run` a TsoMem schedule, `g2OwnSched` realizes §B(10)'s own-store
+  candidate (`m0`/`w_c'`).
 * `TsoOfPf.fenceRow`: every non-`fence.i` barrier's TsoMem floor is below WeakMem's `wVrNew`
   given `R`'s three view inequalities (the fence spot checks).
 
@@ -167,11 +171,27 @@ theorem TsoOfPf.g1Tso (tvn : Nat) (h : TsoOfPf.g1Log.length ≤ tvn) :
 
 /-! ## 2. G2 — mixed-size coherence floors -/
 
-/-- TsoMem: a plain load stamps EVERY footprint byte's coherence floor with its view. -/
-theorem TsoOfPf.tsoAfterLoadCoh (hr : HRead) (pa : PAddr) (n tvn j : Nat) (hj : j < n) :
-    (hr.afterLoad pa n tvn).coh (pa + BitVec.ofNat 64 j) = tvn := by
+/-- TsoMem (G2-Q (a′), W-COH): a plain load by `me` stamps footprint byte `j`'s coherence
+floor with its source's timestamp `t` iff the source is FOREIGN (`max (hr.coh a) t`); an
+own-sourced (forwarded or below the view) or source-less byte keeps `hr.coh a`.  The per-byte
+input is `srcs : LoadSrcs` (`MState.afterLoad` passes `FlatMem.loadSrcs`; W5b′'s `tsoShadow`
+mirrors it from the pf log). -/
+theorem TsoOfPf.tsoAfterLoadCoh (hr : HRead) (me : Agent) (pa : PAddr) (n tvn j : Nat)
+    (srcs : LoadSrcs) (hn : n < 2 ^ 64) (hj : j < n) :
+    (∀ tid t, srcs[j]? = some (some (tid, t)) → tid ≠ me →
+      (hr.afterLoad me pa n tvn srcs).coh (pa + BitVec.ofNat 64 j) =
+        max (hr.coh (pa + BitVec.ofNat 64 j)) t) ∧
+    ((∀ tid t, srcs[j]? = some (some (tid, t)) → tid = me) →
+      (hr.afterLoad me pa n tvn srcs).coh (pa + BitVec.ofNat 64 j) =
+        hr.coh (pa + BitVec.ofNat 64 j)) := by
   simp only [HRead.afterLoad]
-  rw [if_pos ⟨j, hj, rfl⟩]
+  rw [LoadSrcs.stamp_at srcs me pa n j hn hj]
+  unfold LoadSrcs.stampAt
+  refine ⟨fun tid t hs hne => by rw [hs]; simp [hne], fun hown => ?_⟩
+  split
+  · rename_i tid t hs
+    rw [if_pos (hown tid t hs)]; simp
+  · simp
 
 
 /-- B stores `c := 1` (ts 1) then `a := 1` (ts 2); A loads the half-word `(a, b)` reading
@@ -209,9 +229,10 @@ theorem TsoOfPf.g2Run :
   case f4 => 
     refine ⟨0, by simp [TsoOfPf.cfg0], fun j t h => ?_⟩; tsoSca
 
-/-- TsoMem's side of G2: under `R`, the first load returns byte `a = 1` only at a view
-`tvn₁ ≥ 2`; it stamps byte `b`'s floor with `tvn₁` (`tsoAfterLoadCoh`), so the second load runs
-at a view `≥ 2`, where byte `c` reads 1, not the 0 the pf run returned. -/
+/-- The view facts of G2 under `R`: the first load returns byte `a = 1` only at a view
+`tvn₁ ≥ 2`, and at any view `≥ 2` byte `c` reads 1.  (Before W-COH the first load stamped byte
+`b`'s floor with `tvn₁`, forcing the second load to a view `≥ 2` where `c` reads 1, not the
+pf run's 0; under (a′) `b`'s image source stamps nothing — `g2TsoSched`.) -/
 theorem TsoOfPf.g2Tso :
     (∀ tvn, Hist.read 0 tvn (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2Log 0) = some 1#8 → 2 ≤ tvn) ∧
     (∀ tvn, 2 ≤ tvn → Hist.read 0 tvn (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2Log 2) = some 1#8) := by
@@ -222,6 +243,58 @@ theorem TsoOfPf.g2Tso :
   by_cases hl : 2 ≤ tvn
   · exact hl
   · rw [TsoOfPf.readLo 2 tvn (by omega)] at h; simp at h
+
+/-- **G2 closes under (a′)** (W-COH): `g2Run` HAS a TsoMem schedule.  Hart A (agent 0, floor
+0, no fence) loads `(a, b)` at view 2 reading `(1, 0)`; only `a`'s source is foreign (B's store
+at ts 2), `b`'s is the image entry at ts 0, so the second load of `(b, c)` is coherence-legal at
+view 0 and reads `(0, 0)` — the pf run's values. -/
+theorem TsoOfPf.g2TsoSched :
+    Hist.read 0 2 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2Log 0) = some 1#8 ∧
+    Hist.read 0 2 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2Log 1) = some 0#8 ∧
+    (HRead.zero.afterLoad 0 0#64 2 2
+        [Hist.readSrc 0 2 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2Log 0),
+         Hist.readSrc 0 2 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2Log 1)]).cohOk 1#64 2 0 ∧
+    Hist.read 0 0 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2Log 1) = some 0#8 ∧
+    Hist.read 0 0 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2Log 2) = some 0#8 := by
+  have ha : TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2Log 0 = [⟨2, 1, 1#8⟩, ⟨0, 0, 0#8⟩] := by decide
+  have hb : TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2Log 1 = [⟨0, 0, 0#8⟩] := by decide
+  have hc : TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2Log 2 = [⟨1, 1, 1#8⟩, ⟨0, 0, 0#8⟩] := by decide
+  rw [ha, hb, hc]
+  decide
+
+/-- §B(10)'s own-store candidate: B writes `c := 1` (`w_c`, ts 1), `c := 2` (`w_c'`, ts 2);
+A writes `a := 1` (`m0`, ts 3); B writes `d := 1` (`w_d`, ts 4); bytes `c = 0`, `a = 1`,
+`d = 2`. -/
+def TsoOfPf.mc1 : Wmsg := ⟨0, [1#8], some 1, .WCplain⟩
+def TsoOfPf.mc2 : Wmsg := ⟨0, [2#8], some 1, .WCplain⟩
+def TsoOfPf.m0 : Wmsg := ⟨1, [1#8], some 0, .WCplain⟩
+def TsoOfPf.md : Wmsg := ⟨2, [1#8], some 1, .WCplain⟩
+def TsoOfPf.g2OwnLog : List Wmsg := [TsoOfPf.mc1, TsoOfPf.mc2, TsoOfPf.m0, TsoOfPf.md]
+
+/-- **§B(10)'s own-store counterexample, realized** (W-COH, the foreign-only stamp): after
+A's store `m0` (which resets `coh a`), `r_prev = lh (a, d)` at view 4 reads `a` from its OWN
+`m0` and `d` from the foreign `w_d`, stamping only `d`; so `r = lh (c, a)` is coherence-legal at
+view 1 and byte `c` reads `w_c` (1), not `w_c'` (2).  Had `a`'s source been stamped (agent 9
+standing for a reader to whom `m0` is foreign), `r` would be illegal at view 1. -/
+theorem TsoOfPf.g2OwnSched :
+    Hist.read 0 4 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2OwnLog 1) = some 1#8 ∧
+    Hist.read 0 4 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2OwnLog 2) = some 1#8 ∧
+    ((HRead.zero.resetCoh 1#64 1).afterLoad 0 1#64 2 4
+        [Hist.readSrc 0 4 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2OwnLog 1),
+         Hist.readSrc 0 4 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2OwnLog 2)]).cohOk 0#64 2 1 ∧
+    Hist.read 0 1 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2OwnLog 0) = some 1#8 ∧
+    Hist.read 0 1 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2OwnLog 1) = some 1#8 ∧
+    ¬ ((HRead.zero.resetCoh 1#64 1).afterLoad 9 1#64 2 4
+        [Hist.readSrc 0 4 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2OwnLog 1),
+         Hist.readSrc 0 4 (TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2OwnLog 2)]).cohOk 0#64 2 1 := by
+  have hc : TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2OwnLog 0 =
+      [⟨2, 1, 2#8⟩, ⟨1, 1, 1#8⟩, ⟨0, 0, 0#8⟩] := by decide
+  have ha : TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2OwnLog 1 = [⟨3, 0, 1#8⟩, ⟨0, 0, 0#8⟩] := by
+    decide
+  have hd : TsoOfPf.histOf TsoOfPf.img0 TsoOfPf.g2OwnLog 2 = [⟨4, 1, 1#8⟩, ⟨0, 0, 0#8⟩] := by
+    decide
+  rw [hc, ha, hd]
+  decide
 
 /-! ## 3. The fence spot checks -/
 

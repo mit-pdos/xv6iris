@@ -123,10 +123,12 @@ abbrev updCpu' {α : Type} (f : DevId → α) (d : DevId) (x : α) : DevId → �
   fun d' => if d' = d then x else f d'
 
 /-- After a plain load of `n` bytes at `pa` at view `tvn`: the read side moves,
-nothing else. -/
-noncomputable abbrev MState.afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+nothing else; the coherence floors take the bytes' FOREIGN sources, read off
+the histories (`FlatMem.loadSrcs`). -/
+abbrev MState.afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
     (tvn : Nat) : MState :=
-  { σ with hr := updCpu σ.hr cpu ((σ.hr cpu).afterLoad pa n tvn) }
+  { σ with hr := updCpu σ.hr cpu ((σ.hr cpu).afterLoad (hartAgent cpu) pa n tvn
+      (σ.mem.loadSrcs (hartAgent cpu) tvn pa n)) }
 
 /-- After an exclusive read of `w` at `pa`: the watermark to the top, the
 floor to the top iff an acquire, the acquire bit recorded, the snapshot
@@ -143,13 +145,15 @@ abbrev MState.dropResv (σ : MState) (cpu : CPU) : MState :=
 
 /-- After a store of `w` at `pa` by `cpu`: the bytes' histories grow, the
 author log grows, the floor passes the store iff it is the write half of an
-acquire pair, the acquire bit and the reservation clear. -/
+acquire pair, the acquire bit and the reservation clear, and the footprint's
+coherence floors reset (plain AND exclusive: RVWMO ppo rule 2's `po-loc-no-w`
+counts every write of the hart). -/
 abbrev MState.store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (excl : Bool) : MState :=
   { σ with mem := σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu),
            log := σ.log ++ [hartAgent cpu],
            tv := updCpu σ.tv cpu (if excl && (σ.hr cpu).acq then σ.top + 1 else σ.tv cpu),
-           hr := updCpu σ.hr cpu (σ.hr cpu).clearAcq,
+           hr := updCpu σ.hr cpu ((σ.hr cpu).clearAcq.resetCoh pa n),
            resv := updCpu σ.resv cpu none }
 
 /-- After a fence: the floor per `fencePost`; `fence.i` raises the

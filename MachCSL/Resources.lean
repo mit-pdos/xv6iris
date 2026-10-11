@@ -798,9 +798,10 @@ theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv
     · simp only [HRead.afterLoad]; omega
     · intro a
       simp only [HRead.afterLoad]
-      split
-      · exact htv
-      · exact a4 a
+      have hs := LoadSrcs.stamp_le _ (hartAgent c) pa n a tvn
+        (fun j _ => FlatMem.loadSrcs_stampAt_le σ.mem (hartAgent c) tvn pa n j)
+      have := a4 a
+      omega
   · simp only [updCpu, hc, if_false]
     exact ⟨a1, a2, a3, a4⟩
 
@@ -836,8 +837,8 @@ theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec 
       simp only [updCpu, if_true, List.length_append, List.length_singleton]
       refine ⟨?_, by omega, ?_, ?_⟩
       · split <;> omega
-      · simp only [HRead.clearAcq]; omega
-      · intro a; simp only [HRead.clearAcq]; have := a4 a; omega
+      · simp only [HRead.resetCoh, HRead.clearAcq]; omega
+      · intro a; simp only [HRead.resetCoh, HRead.clearAcq]; have := a4 a; split <;> omega
     · simp only [updCpu, hc, if_false, List.length_append, List.length_singleton]
       exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
   · intro c r hr a v hav

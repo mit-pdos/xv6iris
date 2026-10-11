@@ -205,6 +205,15 @@ same `tvn` in program order); an AMO at its append.  Then:
   which is the case rule 2 exempts.  Recording the view rather than the
   timestamp read is observationally identical for that byte and needs no
   timestamp-of-the-read function.
+  **Superseded in the Lean MachCSL (W-COH, 2026-10-10, allocproc plan G2-Q
+  (a′)):** the footprint-wide view stamp was STRONGER than rule 2 for
+  mixed-size accesses (it constrains bytes whose source the load did not
+  read late) and outlived the hart's own stores.  Now a plain load stamps
+  `coh a := max (coh a) t_a` with byte `a`'s SOURCE timestamp, and only when
+  the source is FOREIGN (own stores are visible at every position, so an
+  own-sourced byte constrains nothing), and a store (plain or exclusive)
+  resets its footprint's `coh` to 0 (rule 2's `po-loc-no-w`).  CoRR for
+  foreign-written bytes is unchanged.
 - **ppo 4** (fences): R→R via `rv`; W→R via `own_pub` (the drain, as
   today); R→W, W→W free.
 - **ppo 5/6** (`.aq`/`.rl`): `.aq` = view to the top; `.rl` = nothing
