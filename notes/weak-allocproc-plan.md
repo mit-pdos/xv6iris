@@ -1,10 +1,18 @@
 # allocproc on RVWMO: target theorem, gap analysis, roadmap (design advisor, 2026-10-09)
 
-**Status: rev 16 = rev 15 + review R12 (2 required changes, tags [R12.1]–[R12.2]; s1–s5 adopted) + [OWN.21]–[OWN.23].**
+**Status: rev 17 = rev 16 + review R13 (2 required changes, tags [R13.1]–[R13.2]; s1–s5 adopted).**
+R13 (NOT SATISFIED) fixed two rev-16 texts, neither changing the published statement: **[R13.1]** the W-RSV (i-a)
+census missed the M-MODE lane — the 35 `wp_m_*` wrappers (`MachCSL/WpMmode*.lean`) carry no context bundle, so their
+STATEMENTS gain the fragment and `ProofEntry`/`ProofStart`/`ProofTimerinit` (68 applications) plus `SpecSpin`/
+`ProofSpin` are edited: **12 `Xv6/` files, not 8** (16 rules in 9 files; 25 MachCSL; size class L–XL UNCHANGED; (i-a)
+stays RULED [OWN.23] — the delta is RECORDED for the coordinator to report, §D W-RSV-Q); **[R13.2]** W2's hart
+`LLoad`/`LStore` rows' Lean is against the COMPILED `TsoMem` that W-COH changes, so those two rows finish after W-COH
+(the table and every other row launch now); W1b is RULED-in by [OWN.16] (c), not owner-gated.  History: R13 — (i-a)
+census + M-mode lane; Stage-1 launch set listed at the top of §C.
 R12 (NOT SATISFIED) fixed two rev-15 texts, neither changing the published statement: **[R12.1]** W-RSV's ghost cost —
 `wpLoop_restart` CANNOT be "re-stated over `ctxTok`": the cycle rules do not hold it (the fragment rides one layer up,
 in `kctx`/`uResvTok`), so form (i) threads `resvFragAny` through the cycle rules' STATEMENTS and their callers (16
-rules; 25 MachCSL + 8 `Xv6/` files; L–XL, one `Xv6`-cone rebuild) or moves it into an invariant — W-RSV is the LARGER
+rules; 25 MachCSL + 8 `Xv6/` files — 12 after [R13.1]; L–XL, one `Xv6`-cone rebuild) or moves it into an invariant — W-RSV is the LARGER
 serial MachCSL item, not "L, `Xv6/` untouched"; **[R12.2]** [OWN.21] applied, every "coordinator to confirm" gate
 removed, and the foreign-only stamp [R11.1-alt] named LOAD-BEARING for route (9d) (§B(10)).  **RULED [OWN.21]–[OWN.23]:
 G2-Q (a′) with BOTH components — reset CONFIRMED [OWN.21], foreign-only stamp RULED [OWN.23]; W-RSV-Q (i-a)
@@ -51,7 +59,8 @@ D7/D19/D20 + `candSca` alignment caveat, five cite paths; s1–s4) + Stage-0 res
 rev 13 W2 spike D7 STOP (G1–G3 redesign: `tsoShadow`/`candScaT`/`candDiskLat`, (R2′); G1-Q–G3-Q) + W3 DONE + [OWN.16] (W1-Q, Q-W3a, D41, D45 RULED);
 rev 14 (2026-10-10) R10 (4 req.: G2-Q (a) mis-specified → (a′)/(a‴); W11 (iv) under (b); W5b′ shadow threading; `GraphFetchSpike` lost; s1–s5) + [OWN.17–19] (G1-Q, G3-Q, D8–D9, D19 (b) → W-RSV, D20, D42–D43, D46–D52 RULED; G2-Q re-presented);
 rev 15 (2026-10-10) R11 (4 req.: (a′) + `coh` reset [R11.1] + foreign-only stamp [R11.1-alt]; W-RSV boundary clearing; `itvOf`; (F-dep) `asrc`; s1–s5) + [OWN.20] (G2-Q RULED (a′), applied CORRECTED; W-RSV-Q NEW);
-rev 16 (2026-10-10) R12 (2 req.: W-RSV ghost cost → (i-a)/(i-b), census 16 rules / 25 MachCSL + 8 `Xv6/` files, L–XL [R12.1]; [OWN.21] applied, gates removed, foreign-only stamp load-bearing for (9d) [R12.2]; s1–s5) + [OWN.21–23] (G2-Q (a′) BOTH components; W-RSV-Q RULED (i-a); D19 (b) stands; no OPEN question).
+rev 16 (2026-10-10) R12 (2 req.: W-RSV ghost cost → (i-a)/(i-b), census 16 rules / 25 MachCSL + 8 `Xv6/` files, L–XL [R12.1]; [OWN.21] applied, gates removed, foreign-only stamp load-bearing for (9d) [R12.2]; s1–s5) + [OWN.21–23] (G2-Q (a′) BOTH components; W-RSV-Q RULED (i-a); D19 (b) stands; no OPEN question);
+rev 17 (2026-10-10) R13 (2 req.: (i-a) census + M-mode lane — 35 `wp_m_*` statements, 12 `Xv6/` files, L–XL unchanged, (i-a) stays RULED, delta recorded [R13.1]; W2's hart `LLoad`/`LStore` rows after W-COH, W1b RULED-in [R13.2]; s1–s5; Stage-1 launch set at §C top).
 
 **The kernel [OWN.4][R1.9]: xv6-riscv `b72cbac1`, branch `verified`** (`notes/STATUS.md:8-11`, `README.md:89-90`)
 = upstream plus (a) a per-process root (`p->root`, `sys_chroot`, `igetroot`, root-aware `dirlookup`/walk) and
@@ -750,6 +759,16 @@ files live in `Weak/`, registered in `tools/ci/roots-weak.txt` + `tools/audit/ba
 Each stage ends in a theorem; "∥" = parallel (one Opus worker, one file each).  Stages 0–1b are INTERNAL
 milestones on the critical path of the target; Stage 2 is the target [OWN.2].
 
+**Stage-1 launch set [R13.2] (no owner gate remains, §D).**  MAY LAUNCH NOW, in parallel: **W5b′** (`Weak/TsoShadow.
+lean`, shadow-threaded) → **W2**'s acceptance TABLE (parametric in the `coh` stamp pair) and every instance-INDEPENDENT
+row's Lean (store-reservation side, exstore, fence, `fence.i`, fetch-M1, silent/regw/ctrl/dev, `DRead` under
+`candDiskLat`) plus `pfLoadRow`'s FlatMem ↔ `histOf` bulk; **W-COH** (serial MachCSL lane, G2-Q RULED); **W13 (E)**
+(D47–D52 RULED) then (T); **W5d-G G0** (re-creation) then G1–G5; **W1b** (RULED-in [OWN.16] (c); owner's schedule,
+D10).  WAITS FOR W-COH LANDING: W2's hart `LLoad` row (`afterLoad` post-state) and hart `LStore` row (`coh` RESET) —
+their `R-view` EQUALITY is against the COMPILED `MState.afterLoad`/`MState.store` (`Lang.lean:127-129,147-153`), which
+W-COH changes (and `HRead.afterLoad`'s signature) — S–M once it lands, no critical-path cost; W4 (the shadow's
+INSTANCE), hence W5/M1, W5d/M2; W-RSV (shared files, then also M1 per D26).
+
 **Stage 0 — RESULTS (2026-10-09): W3, W5b, W5c DONE; W1 interim DONE (W1-Q RULED (c)); W2 spike DONE → D7 STOP,
 redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Files: `../weak-orch/parked/PROGRESS-W1.md`,
 `PROGRESS-W3.md`, `../weak-orch/W5b-API.md`, `notes/W2-spike.md`.
@@ -774,20 +793,27 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   every filing row; `PidLock.pidTie` excludes it only inside Iris) and `poolEmpty` at `KNull` (receipts `kNullRcpt`/
   `kAllocRcpt`) → **folded into W1b** [OWN.16].  Record: tie β via `niRoundLaw`'s fork row (`NiTrace.lean:646`,
   `UsysDet.lean:293-302`) at the CITED prefix (D11); ledgers export no page address (`KallocEv.lean:45-52`) or slot index.
-- **W1b (owner-gated, L, serial; CARRIES W1-Q (c))**: `pidHistWf h` in `pidLedger` (live pids distinct), the `nextOf ≤
+- **W1b (RULED-in by [OWN.16] (c); schedule at the owner's discretion (D10) [R13.2]; L, serial; CARRIES W1-Q (c))**: `pidHistWf h` in `pidLedger` (live pids distinct), the `nextOf ≤
   PIDMAX` tie and `ι.kNull → poolEmpty` through `NiLedger` (`niFitEv`/`niEntryOk`, supplied at `SyscallArmsFork.
   syscArmFork_ev`/`_evNeg`); re-thread `ProofAllocproc`/`ProofFreeproc`; optionally addresses in `Kev`.  D10.
 - **W2 — SPIKE DONE, D7 STOP (`notes/W2-spike.md`; `Weak/TsoOfPf.lean` MERGED)** [R1.11][R2.3][R3.4][R6.4b][W2s].
   Verdict, gaps, corrections and the redesign in §B(10).  **W2 proper (L)** = `pfStepTso`: for every memory label a
   `wpPfStep` from an `R`-related state under `pairAdjacent` + `execProgOk'S` + `candScaT` + `candDiskLat` is 0 or 1
   TsoMem steps with the same bytes to a related state (`R-view` = equality through `tsoShadow`); `pfLoadRow` under (★)
-  (FlatMem ↔ `histOf`, the bulk).  **Launchable NOW (G1-Q (e), G3-Q (a″) RULED; [R10.1]+[R10.3] landed in rev 14)**:
-  **W5b′** (below) → the WHOLE table, PARAMETRIC in the `coh` stamp (a `stamp` PAIR argument of `tsoShadow` — load
-  stamp × store effect [R11.1]: today's footprint-`tvn` × none / the corrected (a′) foreign-source per byte × footprint
-  reset / (a‴) none × none): hart `LLoad` under `candScaT` ((★) discharged by it alone, §B(10) [R10.1]),
-  `DRead` under `candDiskLat`, the rows store/exstore/fence/`fence.i`/fetch-M1/silent/regw/ctrl/dev; the pair rows'
-  arguments per D19 (b) (§B(10)).  G2-Q (RULED (a′), BOTH components [OWN.20][OWN.23][R11.1]) fixes which INSTANCE W4
-  uses (the actual MachCSL `TsoMem` after W-COH), not W2's text.  **Acceptance** [R9.s4][R10.s5][R11.s4]: the (↓) table WITH its
+  (FlatMem ↔ `histOf`, the bulk).  **Launchable NOW (G1-Q (e), G3-Q (a″) RULED; [R10.1]+[R10.3] landed in rev 14)
+  [R13.2]**: **W5b′** (below) → the acceptance TABLE (PARAMETRIC in the `coh` stamp: a `stamp` PAIR argument of
+  `tsoShadow` — load stamp × store effect [R11.1]: today's footprint-`tvn` × none / the corrected (a′) foreign-source
+  per byte × footprint reset / (a‴) none × none) and every instance-INDEPENDENT row's Lean: the store-reservation side,
+  exstore (`afterExcl` keeps `coh`, `TsoMem.lean:273`), fence (`tv`/`itv` only, `:155-163`), `fence.i`, fetch-M1
+  (`LIFetch` reads only), silent/regw/ctrl/dev, `DRead` under `candDiskLat` (`dmaRead`/`storeDma` move no hart `hr`),
+  plus `pfLoadRow`'s FlatMem ↔ `histOf` bulk; the pair rows' arguments per D19 (b) (§B(10)).  **After W-COH lands**:
+  the hart `LLoad` row's `afterLoad` post-state ((★) discharged by `candScaT` alone, §B(10) [R10.1]) and the hart
+  `LStore` row's `coh` RESET — their `R-view` EQUALITY (`hr_T = hr_S` through `tsoShadow`) is against the COMPILED
+  `MState.afterLoad`/`MState.store` (`Lang.lean:127-129,147-153`; `HRead.afterLoad` footprint-`tvn` TODAY, `TsoMem.
+  lean:268-270`), which W-COH changes together with `HRead.afterLoad`'s SIGNATURE, so an arm stated over the old one
+  breaks (S–M once W-COH lands; W-COH is S–M and runs in parallel — no critical-path cost).  G2-Q (RULED (a′), BOTH
+  components [OWN.20][OWN.23][R11.1]) fixes which INSTANCE W4 uses (the actual MachCSL `TsoMem` after W-COH) and
+  those two rows' Lean, not the table's text.  **Acceptance** [R9.s4][R10.s5][R11.s4]: the (↓) table WITH its
   faithful/stronger/weaker column (owed since R9), including a row for the hart-`LStore` `coh` reset.
 - **W5b `Weak/PfRunShape.lean` — DONE** (625 lines, green; API `../weak-orch/W5b-API.md`) [R2.3(iii)][R3.2][R3.4]
   [R5.3][R6.4c].  Landed: `candKfetch :53`, `scaVis/scaByte/scaOk :61-72`, `execSca :78`, `candSca :85`, `pairAdjacent
@@ -849,8 +875,8 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
 - **The two SERIAL MachCSL items — both RULED, no gate left [OWN.21]–[OWN.23] (one worker, one `Xv6`-cone rebuild
   each).**  `Xv6/` NAMES neither reservations nor `coh` (census: `Xv6/*.lean` has no `othersReserve`/`blockedStep`/
   `resvMap`/`snapOf`/`cohOk`, only `SystemSlot.lean:64`'s comment on `mmOk`'s `resv_ok`) — true of NAMES, not of the
-  FILES a statement change touches: W-RSV (i-a) changes the cycle rules' statements and so edits the 8 `Xv6/` files
-  that apply them directly [R12.1].  Order: **W-COH first** (S–M, LAUNCHABLE, unblocks W4/M1), **W-RSV second** (L–XL —
+  FILES a statement change touches: W-RSV (i-a) changes the cycle rules' AND the 35 `wp_m_*` wrappers' statements and
+  so edits 12 `Xv6/` files (8 apply a cycle rule directly, 3 apply `wp_m_*`, `SpecSpin`) [R12.1][R13.1].  Order: **W-COH first** (S–M, LAUNCHABLE, unblocks W4/M1), **W-RSV second** (L–XL —
   the LARGER of the two [R12.1]); they overlap in `TsoMem`, `Lang`, `Resources`, `Wp`, `WpAtomic` — never in parallel.
   **W-COH — G2-Q RULED (a′) with BOTH components [OWN.20][OWN.21][OWN.23] (S–M; LAUNCHABLE NOW [R12.2])**: (1) the
   RESET — `MState.store` resets `coh` on its footprint (a new `HRead.resetCoh pa n` beside `clearAcq`, `TsoMem.lean:277`;
@@ -860,7 +886,10 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   fallback, had the owner declined, was a W8 transported census of that shape, M, **unverified** — MOOT).  [R12.s3]
   `MState.afterLoad`'s SIGNATURE is unchanged (`Lang.lean:127-129`: it has `σ.mem` in hand and computes each byte's
   source author/timestamp via `Hist.read`'s `find?`); only `HRead.afterLoad` (`TsoMem.lean:268-270`) gains the per-byte
-  stamp input — so the four `afterLoad`-only files (`Wp`, `WpAtomic`, `WpSmodeFenceFloor`, `UIcache`) re-prove only
+  stamp input.  [R13.s3] `Hist.read` returns the VALUE only (`TsoMem.lean:119-120`, `.map HEnt.v`); the foreign-only
+  stamp needs the ENTRY (`HEnt.tid`, `HEnt.t`) — add `Hist.readEnt` (the same `find?`, entry returned) beside it and
+  have `MState.afterLoad` build the per-byte `List (Option (Agent × Nat))` it hands to the new `HRead.afterLoad`; name
+  that input so W5b′'s `tsoShadow` mirrors it from the pf log (`wmTid`, position + 1; `WeakMem.lean:106-111`).  So the four `afterLoad`-only files (`Wp`, `WpAtomic`, `WpSmodeFenceFloor`, `UIcache`) re-prove only
   where they UNFOLD it; no Iris resource exposes `coh` (`hartViewsAt` carries `tv`/`itv`/`rv`, `memModelAt` = top,
   authors, views, `resvMap`, `mmOk`; `Resources.lean:938-951`).  Files: the 7 of §D G2-Q plus the
   store rules' `clearAcq`/`resvMap_upd` sites (`Wp.lean:1337,1363`, `WpAtomic.lean:188,202`, `mmOk_store`
@@ -891,25 +920,45 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   files; `UCycleSwp.lean:31` a comment); the fragment rides ONE LAYER UP — in `kctx` as `ctxToken` (`Ctx.lean:29-30`;
   `KCtx.lean:415,849,939`) and in user mode inside the walker frames as `uResvTok cpu rv := ∃ r, resvFragAny cpu r`
   (`URunRW.lean:501-502`, ≈ 30 mentions).  Two forms, both FAITHFUL (CSL plumbing, no semantics): **(i-a) RULED
-  [OWN.23]** — every cycle rule gains a `resvFragAny cpu r` premise and a `resvFrag cpu none b` post: 16 rules in 8 files
-  (`wpLoop_m_base/_rvc/_instrClk/_instrP/_instr` `WpCycle`; `wpLoop_s_base/_rvc` `WpSmodeCycleB32/Rvc`; `wpLoop_s_instr/
-  _instr_clk` `WpSmodeCycle`; `wpLoop_sT_base/_rvc` `WpSmodeCycleT`; `wpLoop_sT_instr` `WpSmodeSatpU.lean:280`;
-  `wpLoop_wait_wfi/_s_wfi_cycle` `WpSmodeWait`; `wpLoop_ucStep/_uwStep` `UCycleSwp`), and EVERY caller supplies it —
-  measured: **25 MachCSL files** mention a cycle rule (20 apply one directly: `WpSmodeCycle.lean:49,65`, `WpSmodeRules`,
-  `WpSmodeIntr`, `WpSmodeKpt`, `WpSmodeProc`, `WpSmodeSret`, `WpSmodeSwtch`, `WpSmodeTime`, `WpSmodeTrapCsr`, `WpStore`,
-  `WpLockSchema`, `WpSmodeLwKey`, four `WpMmode*` …; R12 counted ≈ 27) and **8 `Xv6/` files that apply cycle rules
-  DIRECTLY**: `ProofSpin.lean:43` (`wpLoop_m_instr`), `UserretPt.lean:52,130,177`, `UserretEntryPt.lean:63,113`,
-  `UservecPt.lean:55,129,212`, `UservecExitPt.lean:90,121,164,198` (`wpLoop_sT_instr`), `UserStepActive.lean:124`,
-  `UkEngine.lean:178` (`wpLoop_ucStep`), `UserStepWait.lean:34` (`wpLoop_uwStep`).  The fragment IS available at every
-  site (`UserretEntryPt.lean:164` frames `∃ r, resvFragAny cpu r` across `fence.i`; `kctx_cases` yields `Htok`,
-  `WpSmodeWait.lean:257`), and the kernel schema wrappers `wpLoop_k_*` (`WpSmodeRules.lean:52-60`, premise `kctxL lent
-  cpu k` ∋ `ctxToken`) can supply it INSIDE their proofs, so THEIR statements — and the rest of the `Xv6` cone, which
-  calls them — stay as they are: mechanical but WIDE, L–XL, one `Xv6`-cone rebuild.  **(i-b)** (recorded, not ruled) —
+  [OWN.23]** — every cycle rule gains a `resvFragAny cpu r` premise and a `resvFrag cpu none b` post: 16 rules in 9 files
+  [R13.s1] (`wpLoop_m_base/_rvc/_instrClk/_instrP/_instr` `WpCycle.lean:96,157,282,321,332`; `wpLoop_s_base/_rvc`
+  `WpSmodeCycleB32/Rvc`; `wpLoop_s_instr` `WpSmodeCycle.lean:29`; `wpLoop_s_instr_clk` `WpSmodeTime.lean:54`;
+  `wpLoop_sT_base/_rvc` `WpSmodeCycleT`; `wpLoop_sT_instr` `WpSmodeSatpU.lean:280`; `wpLoop_wait_wfi/_s_wfi_cycle`
+  `WpSmodeWait`; `wpLoop_ucStep/_uwStep` `UCycleSwp`); [R13.s2] the S-mode rules have TWO continuations (`▷ (… -∗ wpLoop
+  cpu) ∧ trapBranch cpu c tier root sie pc P`, `WpSmodeCycleB32.lean:33-36`; `trapBranch` `WpSmodeCycleBase.lean:77`),
+  so the `resvFrag cpu none b` post is delivered on BOTH arms (the trap handler re-forms `ctxToken cpu` on the same
+  hart) — and EVERY caller supplies it — measured [R13.1], BY LANE: **25 MachCSL files** mention a cycle rule (20 apply
+  one directly: `WpSmodeCycle.lean:49,65`, `WpSmodeRules`, `WpSmodeIntr`, `WpSmodeKpt`, `WpSmodeProc`, `WpSmodeSret`,
+  `WpSmodeSwtch`, `WpSmodeTime`, `WpSmodeTrapCsr`, `WpStore.lean:201,223` (`ctxTok` in scope), `WpLockSchema`,
+  `WpSmodeLwKey`, the five `WpMmode*` …; R12 counted ≈ 27).  (S-mode KERNEL lane) the schema wrappers `wpLoop_k_*`
+  (`WpSmodeRules.lean:52-60`, premise `kctxL lent cpu k`; `kctxP` holds `ctxToken cpu` for EITHER `lent`, `KCtx.lean:
+  839-850,925,931-952`; `ctxToken = ctxTok cpu curCtx :415` = `ownCtxAt ∗ ∃ r, resvFragAnyAt E cpu r`, `Ctx.lean:
+  298-299`) ABSORB the fragment inside their proofs — their statements and the `Xv6` cone above them (3 `wpLoop_k_*`
+  sites) stay.  (USER lane) `uFr` ∋ the walker `ctxTok` = `ownCtx ∗ uResvTok` (`UCycleSwp.lean:31-33`, `URunRW.lean:
+  501-502`) absorbs it likewise.  (M-MODE lane — MISSED by rev 16) the five `wpLoop_m_*` rules are stated over `mConf
+  cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ R ∗ P` with NO bundle (`WpCycle.lean:103-105`), and the **35 `wp_m_*`
+  wrappers** that apply them (`WpMmode.lean` 8, `WpMmodeAlu` 9, `WpMmodeCsr` 16, `WpMmodeCtl` 1, `WpMmodeMret` 1; 5 of
+  the 25 files; `grep -c "ctxTok\|resvFrag\|kctx"` = 0 in four, and in `WpMmode.lean` only `wp_m_ld_same` threads
+  `ctxTok cpu curCtx`, `:229-231,388-391` — [R13.s4] the TEMPLATE if a token is preferred to a bare fragment in M-mode)
+  have NOTHING to absorb it into: **34 statements gain `resvFragAny cpu r`/`resvFrag cpu none b` (or a new M-mode
+  token)**.  **`Xv6/` cost: 12 files** — the **8 that apply a cycle rule DIRECTLY**: `ProofSpin.lean:43`
+  (`wpLoop_m_instr`), `UserretPt.lean:52,130,177`, `UserretEntryPt.lean:63,113`, `UservecPt.lean:55,129,212`,
+  `UservecExitPt.lean:90,121,164,198` (`wpLoop_sT_instr`), `UserStepActive.lean:124`, `UkEngine.lean:178`
+  (`wpLoop_ucStep`), `UserStepWait.lean:34` (`wpLoop_uwStep`) — the fragment IS available at each (the trampoline files
+  frame `ctxTok cpu curCtx`, `UserretEntryPt.lean:164` frames `∃ r, resvFragAny cpu r` across `fence.i`; `kctx_cases`
+  yields `Htok`, `WpSmodeWait.lean:257`; `UkEngine.lean:125` extracts `ctxToken` from `Rut`); PLUS the `wp_m_*` callers
+  **`ProofEntry` (8 applications), `ProofStart` (39), `ProofTimerinit` (21)** — re-threaded at the PROOF level only,
+  their spec bodies already carry `ctxTok cpu curCtx` (`SpecEntry.lean:48`, `SpecStart.lean:62`, `SpecTimerinit.lean:
+  56`); PLUS **`SpecSpin.lean:34-42`'s `wp_spin_body`/`SPIN`** and `ProofSpin.lean:32-55`'s `wp_m_j`/`spin_loop`, which
+  hold NO token — a STATEMENT change, isolated (`SPIN.wp_spin`'s only consumer is `LinkSpin.lean:14`; `ProofBoot.lean:
+  27`/`SpecBoot.lean:75` use only the address `KA.«spin»`).  Mechanical but WIDE, L–XL (size class UNCHANGED by the
+  M-mode lane), one `Xv6`-cone rebuild.  **(i-b)** (recorded, not ruled) —
   move the per-hart `∃ r, resvFragAny cpu r` out of `ctxTok`/`uResvTok` into a per-hart INVARIANT opened by the boundary
   rule and by the three rules that consume the fragment explicitly (`swp_sail_mem_write_plain_au` `WpAtomic.lean:
   538-544`, `swp_sail_mem_read_excl_au :698-704`, `swp_sail_mem_write_excl_au :711-717`): the cycle rules stay, but
   `ctxTokAt` (`Ctx.lean:298-299`, 19 sites), `KCtx`'s `ctxToken`, `URunRW`'s `uResvTok` and every `ctxTok_cases/_intro`
-  user change — M–L, a context-token REDESIGN.  Form (ii) (the `inflight` flag) has the SAME ghost problem unless the
+  user change — M–L, a context-token REDESIGN; the cycle rules, the 35 `wp_m_*`, `wpLoop_k_*` and ALL of `Xv6/` stay
+  as they are, so (i-b)'s relative advantage GREW with [R13.1] (recorded for the owner, §D W-RSV-Q).  Form (ii) (the `inflight` flag) has the SAME ghost problem unless the
   flag is kept OUT of `ResvVal` — and then the exclusive-store rule cannot learn "in-flight" from a resource (`mmOk`'s
   clause "every reservation agrees with the top", `Resources.lean:781-782`, must weaken to in-flight reservations, and
   `memModel_store_excl :221-224` needs that fact) — so (ii) is NOT an escape hatch.  Devices are untouched by
@@ -927,7 +976,7 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   stays, no change); `MachGS.resvName` (`Resources.lean:122,433,475`; constructed by `Xv6/AppUnionPre.lean:89`,
   `Xv6/AppPreGS.lean:54`) UNCHANGED under form (i-a) (touched under (ii), whose `ResvVal` changes).  The bulk: `Wp`/`WpAtomic` re-proved
   against the invariant "reservations are in-flight", PLUS the (i-a) thread through 16 cycle-rule statements and their
-  25 MachCSL + 8 `Xv6/` caller files [R12.1].
+  25 MachCSL files (35 `wp_m_*` statements among them) + 12 `Xv6/` files [R12.1][R13.1].
   **Interaction with W2** (§B(10)): the `LStore`/`DWrite` rows get `¬ othersReserve`/`¬ anyReserve` from `pairAdjacent`
   ALONE (no in-flight foreign reservation can straddle a step); `LExStore` needs nothing of the own reservation
   (TsoMem never reads it [R11.2] (i)); the [R2.3-alt] failure mode (a STANDALONE `LExLoad`'s dangling reservation
@@ -1139,13 +1188,15 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
 **Stage 3 — AxSL tier: retired** [OWN.1].  One-paragraph note on Theorem 2 (D6).
 
 **Status of the launch [W2s][OWN.16–19][R10]:** W3, W5b, W5c DONE; W1 interim DONE (W1-Q RULED (c) → W1b); W2 spike
-DONE with D7 STOP.  **Now launchable**: W5b′ (`Weak/TsoShadow.lean`, shadow-threaded [R10.3]) → W2's WHOLE table
-(parametric in the `coh` stamp pair; G1-Q/G3-Q RULED) ∥ W1b (owner schedule, D10) ∥ W13 (E) (D47–D52 ALL RULED) then
+DONE with D7 STOP.  **Now launchable** (the Stage-1 launch set, §C top [R13.2]): W5b′ (`Weak/TsoShadow.lean`,
+shadow-threaded [R10.3]) → W2 (the parametric table and the instance-independent rows now; the hart `LLoad`/`LStore`
+post-states after W-COH; G1-Q/G3-Q RULED) ∥ W1b (RULED-in [OWN.16] (c), owner schedule, D10) ∥ W13 (E) (D47–D52 ALL RULED) then
 (T) (G3-Q RULED) ∥ W5d-G G0 (re-creation) then G1–G5 (D41–D43 RULED) ∥ **W-COH (G2-Q RULED (a′), BOTH components
 [OWN.20][OWN.21][OWN.23] — LAUNCHABLE NOW, no gate [R12.2]; serial MachCSL)**.  **Blocked on W-COH landing**: W4 (the
 shadow's INSTANCE), hence W5/M1, W5d/M2.  Resolved by [OWN.20][OWN.23]: W8's gate ((i)–(v) only), W11 (iv)'s form
 (graph-only).  **Serial MachCSL after W-COH → W4 → M1**: W-RSV (D19 (b), form (i-a) RULED [OWN.22][OWN.23]; L–XL, the
-LARGER serial item, one `Xv6`-cone rebuild [R12.1]) — it waits for W-COH (shared files), not for an owner.  The
+LARGER serial item, one `Xv6`-cone rebuild; 12 `Xv6/` files incl. the M-mode lane [R12.1][R13.1]) — it waits for
+W-COH (shared files) and for M1 (D26) [R13.s5], not for an owner.  The
 published statement's shape is FIXED (D32, D33, D37, D38, D44–D52 RULED [OWN.11–18]).  W13 (F-dep) after (E).  No owner
 question is OPEN (§D).
 
@@ -1407,9 +1458,10 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
   the atomicity axiom), WEAKER than Zalrsc for user LR/SC (a lost reservation's SC becomes a plain store, success by
   the opaque — TODAY's semantics already, [R11.2] (ii); sound direction), L–XL, SERIAL after W-COH (form (i-a) RULED
   [OWN.22][OWN.23]); the census (§C W-RSV) is 21 MachCSL files of blocking consumers [R11.s3] + the (i-a) thread: 16
-  cycle rules, 25 MachCSL + 8 `Xv6/` caller files [R12.1]; `Xv6/` NAMES no reservation except `UserretEntryPt.lean:
-  164`'s existential frag and the two `resvName := 0` literals, but 8 `Xv6/` files apply cycle rules whose statements
-  change; the
+  cycle rules in 9 files, 25 MachCSL files (35 `wp_m_*` wrapper STATEMENTS among them) + 12 `Xv6/` files [R12.1][R13.1];
+  `Xv6/` NAMES no reservation except `UserretEntryPt.lean:164`'s existential frag and the two `resvName := 0` literals,
+  but 8 `Xv6/` files apply cycle rules whose statements change, 3 (`ProofEntry`/`ProofStart`/`ProofTimerinit`) apply the
+  bundle-free `wp_m_*` wrappers (proof-level edits), and `SpecSpin`/`ProofSpin` gain the fragment in their statements; the
   Svadu A/D LR/SC in `WpPtWalk*` is in-flight (no risk, [R11.2] (iii)); (a, was
   Rec) **`execProgOk'S`'s fused pairs — a quantifier RESTRICTION** (executions with a dangling LR or a failing SC are
   outside the theorem; STRONGER as a premise) — STAYS for failing SCs, becomes RELAXABLE for dangling LRs once (b)
@@ -1424,18 +1476,44 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
   `Lang.lean:499-502`) and THREAD `resvFragAny` through the cycle rules' statements and their callers** — FAITHFUL
   (Zalrsc's "at any time"), equal to the pf twin (W2's `R-resv` exact); the machine change is one arm, all guards
   stay, `Resv`/`ResvVal` unchanged; the ghost update is the EXISTING `memModel_dropResv` (`WpAtomic.lean:49-51`); cost
-  L–XL = the §C W-RSV blocking census + 16 cycle-rule statements + 25 MachCSL + 8 `Xv6/` caller files, one `Xv6`-cone
-  rebuild (the `wpLoop_k_*` schema wrappers absorb the fragment from `kctx`, so the rest of the cone is untouched) —
-  [OWN.22] ruled (i), [OWN.23] re-ruled (i-a) at this cost; **(i-b)** the same machine change with the per-hart `∃ r,
+  L–XL = the §C W-RSV blocking census + 16 cycle-rule statements (9 files) + 25 MachCSL files INCLUDING the 35 `wp_m_*`
+  wrapper STATEMENTS + 12 `Xv6/` files (8 direct cycle-rule callers; `ProofEntry`/`ProofStart`/`ProofTimerinit` proofs
+  under `wp_m_*`; `SpecSpin` statement), one `Xv6`-cone rebuild [R13.1] — BY LANE: the S-mode kernel lane's
+  `wpLoop_k_*` wrappers and the user lane's `uFr`/`uResvTok` absorb the fragment (their callers stay); the M-mode lane
+  has no bundle, so its wrappers change statement (§C W-RSV) — [OWN.22] ruled (i), [OWN.23] re-ruled (i-a) at rev 16's
+  census (8 `Xv6/` files); **(i-b)** the same machine change with the per-hart `∃ r,
   resvFragAny cpu r` moved out of `ctxTok`/`uResvTok` into a per-hart invariant opened by the boundary rule and the
   three `swp_*_au` rules — FAITHFUL, L, a context-token REDESIGN (`ctxTokAt` 19 sites, `uResvTok` ≈ 30 mentions, every
-  `ctxTok_cases/_intro` user), cycle rules and `Xv6/` untouched — recorded; **(ii)** an `inflight : Bool` on the
+  `ctxTok_cases/_intro` user), cycle rules, `wp_m_*`, `wpLoop_k_*` and ALL of `Xv6/` untouched — recorded; **(ii)** an `inflight : Bool` on the
   reservation, cleared at retirement, plus "an overlapping foreign/DMA store INVALIDATES a non-in-flight reservation"
   — FAITHFUL (Zalrsc's named invalidation), rev 14's design made consistent, but the SAME ghost cost as (i-a) unless
   the flag leaves `ResvVal` — and then `mmOk`'s reservation clause (`Resources.lean:781-782`) and `memModel_store_excl
   :221-224` must learn "in-flight" without a resource; +M over (i-a) (`resvName`'s sites `Resources.lean:122,433,475`,
   `Xv6/AppUnionPre.lean:89`, `Xv6/AppPreGS.lean:54`, every `resvFrag` statement) — not an escape hatch.  Rev 15's "(i)
-  is L, `wpLoop_restart` re-stated over `ctxTok`, `Xv6/` untouched" was WRONG [R12.1].
+  is L, `wpLoop_restart` re-stated over `ctxTok`, `Xv6/` untouched" was WRONG [R12.1]; rev 16's "the rest of the `Xv6`
+  cone stays" was WRONG for the M-mode lane [R13.1].
+  **Census DELTA for the coordinator to report [R13.1] — (i-a) stays RULED; NOT re-opened (owner, 2026-10-10).**
+  *Plain language.*  Under (i-a) every "one instruction retires" proof rule must now hand over a small ghost
+  permission — the hart's RESERVATION FRAGMENT (`resvFragAny cpu r`: this hart's share of the ghost cell that mirrors
+  `σ.resv cpu`, the address the hart's last LR reserved, or none) — because retiring an instruction now clears that
+  cell.  Tiny example: hart 0 runs `lr.w` on `x`, then its `sc.w` is skipped (e.g. a trap); before W-RSV hart 1's store
+  to `x` is BLOCKED in TsoMem until hart 0 retires an SC; after W-RSV (i-a) hart 0's next instruction boundary clears
+  the reservation and hart 1's store proceeds.  Rev 16 priced the proof plumbing at 8 `Xv6/` files because the S-mode
+  kernel rules carry a CONTEXT BUNDLE (`kctx`, a package of per-hart ghost state that already contains the fragment),
+  so the Xv6 proofs above them need no change.  The M-MODE lane (boot code: `_entry`, `start`, `timerinit`, the `spin`
+  park loop — run before paging, in machine mode) has no such bundle: its 35 instruction rules (`wp_m_*`) must name
+  the fragment EXPLICITLY, so the three Xv6 proofs that apply them (68 applications) are re-threaded (their
+  specifications already hold the token, so only proof text changes) and the `spin` specification gains the token
+  (nothing imports it but `LinkSpin`).  *Why it matters for credibility:* nothing in the PUBLISHED statement changes
+  (the fragment is CSL plumbing; FAITHFUL under every form, §D D19); the delta is COST and schedule only — the owner
+  ruled (i-a) "at this cost" and the cost was understated by 4 files and 35 lemma statements, within the same L–XL
+  class.  *Per option:* **(i-a) as RULED** — 16 rules / 9 files, 25 MachCSL files incl. 35 `wp_m_*` statements, 12
+  `Xv6/` files, one cone rebuild; FAITHFUL; L–XL; unblocks M2 after M1 exactly as before.  **(i-b)** — a per-hart
+  reservation INVARIANT (a shared ghost assertion any rule may open) instead of a threaded fragment: `ctxTokAt`/
+  `uResvTok` redesign (M–L) but cycle rules, `wp_m_*`, `wpLoop_k_*` and all of `Xv6/` untouched; FAITHFUL; L; its
+  relative advantage grew by exactly this delta — RECORDED, not recommended over a standing ruling.  **(ii)** unchanged
+  (same ghost cost as (i-a)).  Recommendation: keep (i-a) RULED at the corrected census; the coordinator reports the
+  8 → 12 delta; the owner may re-rule to (i-b) at any time before W-RSV launches (serial after W-COH → W4 → M1).
 - **D20 — RULED (a) [OWN.19]. `candSca`** [R9.1].  Spec: RVWMO "Memory Model Primitives" — a NATURALLY ALIGNED load/store of ≤ XLEN bytes
   is single-copy atomic; a misaligned access may be split into byte operations, not SCA; Sail in this tree — `mem_read`
   splits misaligned accesses via `split_misaligned` (`Mem.lean:414,511,547`; `SplitAccessUtils.lean:256`), RAM PMA
@@ -1457,7 +1535,8 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
   LAUNCHABLE [OWN.23])} → W4 → M1 → W-RSV ((i-a) RULED [OWN.23]; L–XL, the LARGER serial MachCSL item, one `Xv6`-cone
   rebuild; W4 re-check, S) → M2 → W13 (M) (SERIAL: the `gmem` case splits touch every chain file) → {W12 ∥ W12b ∥ W5d-G
   G1–G5 ∥ W13 (I)(L)(K)(F-dep)} ∥ W8 (after W2) → W13 (R)(W) → W9a/W10 → W11, W14 after W2's table and W13 (I)/(W);
-  (b) start W8 with Stage 1 (risk: `R` not fixed).  [R12.1] W-RSV's L–XL lengthens the serial MachCSL lane (W-COH → W4
+  (b) start W8 with Stage 1 (risk: `R` not fixed).  [R13.2] W2 = instance-independent rows now; the hart `LLoad`/
+  `LStore` post-states after W-COH (S–M).  [R12.1] W-RSV's L–XL lengthens the serial MachCSL lane (W-COH → W4
   → M1 → W-RSV → M2); the graph lane is unaffected and W8 starts after W2, so the overall critical path moves to W-RSV
   only if it outlasts W13 (M) + (R) — W13 (XL) remains the expected bottleneck.
   **D27** — RULED [OWN.6], spike-SHAPED: `gzFetch`, admin form, D40–D43.  **D28** — RULED [OWN.7]: all 182 + 58 sites through W8.
