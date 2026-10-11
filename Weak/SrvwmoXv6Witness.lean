@@ -9,10 +9,20 @@ Lean-only (no Rocq source).
 `srvwmoXv6M1Satisfiable`: there is a booted weak state `σ0` (`wbootFacts`, generation 0, the
 disk `fsImgDisk` under a device reset), a candidate `c`, program states `pst` and a fabric `dv`
 satisfying EVERY premise of M1 (`srvwmoXv6M1Premises`): `srvwmoConsistent c`, the boot image,
-`pst 0 = epsInit σ0`, `dv 0 = efInit σ0.wgdev`, the SHAPED conformance `execProgOk'S` at the
-boot-image-pinned LTS `pstepPin (imgZ σ0.wgimg) pstepEv` with M1's fetch clause
-`candKfetch bcRoLo bcRoHi`, and `candSca c` — with a NONEMPTY trace.  The witness is hypothesis
-free.
+`pst 0 = epsInit σ0`, `dv 0 = efInit σ0.wgdev`, the SHAPED conformance WITH W5b′'s SHADOW
+CLAUSES `execProgOk'ST` (`Weak/TsoShadow.lean`) at the boot-image-pinned LTS
+`pstepPin (imgZ σ0.wgimg) pstepEv` with M1's fetch clause `candKfetch bcRoLo bcRoHi` and the
+RULED `coh` stamp `TsoShadow.cohSrc`, `candScaT cohSrc c` and `candDiskLat c` — with a NONEMPTY
+trace.  The witness is hypothesis free.
+
+W5-pre (plan §C W5: "the DEFINITION `srvwmoXv6M1Premises` is re-pointed"): the premise set was
+`… ∧ execProgOk'S … ∧ candSca c` (W5c); it is now `… ∧ execProgOk'ST … cohSrc … ∧ candScaT cohSrc
+c ∧ candDiskLat c` — STRONGER (`SrvwmoXv6Witness.m1PremisesS` recovers the old two conjuncts).
+`srvwmoXv6M1PfRun` now goes through the shadow-threaded replay `execWfPfRunPinShapedT` and returns
+a `pfRunST … cohSrc` run plus the projection lemma.  On the witness the new clauses hold
+trivially: the ONE load is the first step (the empty prefix's shadow is TsoMem's boot read side,
+floor 0: `SrvwmoXv6Witness.execScaTOne`) and is hart 0's, not the disk row's
+(`SrvwmoXv6Witness.execDiskLatNoDisk`).
 
 THE BLOCK.  `_entry`'s FIRST memory instruction, `ld sp,1000(sp)` at `0x80000004`
 (`Xv6/KernelImage.lean`, `textChunk0`), on hart 0 alone, from the boot landing file
@@ -36,12 +46,13 @@ THE S-VARIANT OF `execProgOk'Snoc` (`Weak/WeakRvwmoCert.lean`): `execProgOk'SSno
 leading star satisfies the fetch clause and whose plain load is single-copy atomic.
 
 CONSISTENCY via `snocReadConsistent` (`snocRdAdm`, `Cert.lean`): the image bytes at
-timestamp 0 over the empty log.  `candSca c` is `execProgOk'SSca` of the shaped premise.
+timestamp 0 over the empty log.  `candScaT cohSrc c` is `execProgOk'SSca` of the shaped premise
+lifted at floor 0.
 
 SCOPE.  Certifies satisfiability ONLY.  QUIESCENT: the fabric never moves (`dv` is constant,
 `efInit σ0.wgdev`; no `LDev` label); the run does not reach `allocproc` (D44), and says nothing
-about W13's bundle.  `srvwmoXv6M1PfRun` checks the premise set FEEDS W5b's replay
-(`execWfPfRunPinShaped`): every M1 premise set yields the shaped pf run.
+about W13's bundle.  `srvwmoXv6M1PfRun` checks the premise set FEEDS W5b′'s replay
+(`execWfPfRunPinShapedT`): every M1 premise set yields the shadow-threaded shaped pf run.
 
 ## Measurements (kernel, `decide +kernel`)
 
@@ -54,6 +65,7 @@ four stretches).  Node counts 106 / 16 / 106 / 96.  Image words: `0x0000a117` (`
 helpers file-qualified `SrvwmoXv6Witness.*`.
 -/
 import Weak.PfRunShape
+import Weak.TsoShadow
 import Weak.WeakRvwmoConfWit2
 import Weak.WeakRvwmoCert
 import Weak.WeakEvCapstone
@@ -575,39 +587,88 @@ theorem SrvwmoXv6Witness.entryRun (d : Efab) :
 
 /-! ## 4. M1's PREMISE SET -/
 
-/-- **M1's premise set** (plan §A, "M1/M2 (internal)"; §C W5): the boot facts transposed through
-`PowerOn` (`wbootFacts`, generation 0, `fs.img` on the disk of a reset fabric), the sRVWMO
-candidate, its boot image, the initial program states and fabric, the SHAPED conformance
-`execProgOk'S` at the boot-image-pinned LTS with M1's fetch clause `candKfetch bcRoLo bcRoHi`,
-and `candSca`. -/
+/-- **M1's premise set** (plan §A, "M1/M2 (internal)"; §C W5, W5b′): the boot facts transposed
+through `PowerOn` (`wbootFacts`, generation 0, `fs.img` on the disk of a reset fabric), the
+sRVWMO candidate, its boot image, the initial program states and fabric, the SHAPED conformance
+WITH THE SHADOW CLAUSES `execProgOk'ST` (W5b′, `Weak/TsoShadow.lean`) at the boot-image-pinned LTS
+with M1's fetch clause `candKfetch bcRoLo bcRoHi` and the RULED `coh` stamp `TsoShadow.cohSrc`
+(G2-Q (a′), both components [OWN.20][OWN.23]), and — displayed, though `execProgOk'ST` carries
+them — `candScaT cohSrc` (every plain load single-copy atomic AT OR ABOVE the TsoMem floor of the
+trace-prefix shadow, G1-Q (e)) and `candDiskLat` (disk-row loads read the latest write, G3-Q
+(a″)). -/
 def srvwmoXv6M1Premises (σ0 : WGState) (c : Cand) (pst : Nat → List Pexv6)
     (dv : Nat → Efab) : Prop :=
   wbootFacts σ0 ∧ σ0.wggen = 0 ∧
   (∃ ds : DevStates, σ0.wgdev = ds.reset ∧ diskOf ds = Xv6.fsImgDisk) ∧
   srvwmoConsistent c ∧ c.cdImg = imgZ σ0.wgimg ∧
   pst 0 = epsInit σ0 ∧ dv 0 = efInit σ0.wgdev ∧
-  execProgOk'S (pstepPin (imgZ σ0.wgimg) pstepEv) pclsEv
-    (candKfetch (Xv6.bcRoLo : Int) (Xv6.bcRoHi : Int)) pst dv (candExec c) ∧
-  candSca c
+  execProgOk'ST (pstepPin (imgZ σ0.wgimg) pstepEv) pclsEv
+    (candKfetch (Xv6.bcRoLo : Int) (Xv6.bcRoHi : Int)) TsoShadow.cohSrc pst dv (candExec c) ∧
+  candScaT TsoShadow.cohSrc c ∧ candDiskLat c
 
-/-- Every M1 premise set FEEDS W5b's replay: the shaped promise-free run from the booted
-initial configuration, `pairAdjacent`, ending at the supplied program states and fabric, matched
-to the candidate's last state. -/
+/-- The re-pointed premise set still carries the landed W5c conjuncts: `execProgOk'S` and
+`candSca`. -/
+theorem SrvwmoXv6Witness.m1PremisesS (σ0 : WGState) (c : Cand) (pst : Nat → List Pexv6)
+    (dv : Nat → Efab) :
+    srvwmoXv6M1Premises σ0 c pst dv →
+    execProgOk'S (pstepPin (imgZ σ0.wgimg) pstepEv) pclsEv
+      (candKfetch (Xv6.bcRoLo : Int) (Xv6.bcRoHi : Int)) pst dv (candExec c) ∧ candSca c :=
+  fun ⟨_, _, _, _, _, _, _, hprog, hsca, _⟩ =>
+    ⟨execProgOk'STForget _ _ _ _ _ _ _ hprog, candScaTSca _ _ hsca⟩
+
+/-- Every M1 premise set FEEDS W5b′'s shadow-threaded replay (`execWfPfRunPinShapedT`): the
+shaped promise-free run from the booted initial configuration whose every step carries
+`pfStepFactsT` at the `cohSrc` shadow of its step-list prefix, `pairAdjacent`, ending at the
+supplied program states and fabric, matched to the candidate's last state, its step-list shadow's
+memory component equal to the candidate's trace shadow (the projection lemma). -/
 theorem srvwmoXv6M1PfRun (σ0 : WGState) (c : Cand) (pst : Nat → List Pexv6) (dv : Nat → Efab) :
     srvwmoXv6M1Premises σ0 c pst dv →
     ∃ (cf : Wpcfg Pexv6 Efab) (st : List (Nat × Wlabel)),
-      pfRunS pstepEv pclsEv (candKfetch (Xv6.bcRoLo : Int) (Xv6.bcRoHi : Int))
+      pfRunST pstepEv pclsEv (candKfetch (Xv6.bcRoLo : Int) (Xv6.bcRoHi : Int)) TsoShadow.cohSrc
         (wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)) st cf ∧
       pairAdjacent st ∧
       cf.pcAgs.map Wpagent.paSt = pst c.cdTr.length ∧ cf.pcDev = dv c.cdTr.length ∧
-      cfgMatchd cf (stt (candExec c) c.cdTr.length) := by
-  rintro ⟨-, -, -, hcons, himg, hpst, hdv, hprog, -⟩
+      cfgMatchd cf (stt (candExec c) c.cdTr.length) ∧
+      ∀ i, (tsoShadow TsoShadow.cohSrc st i).mem =
+        shadowOf TsoShadow.cohSrc c.cdTr i := by
+  rintro ⟨-, -, -, hcons, himg, hpst, hdv, hprog, -, -⟩
   obtain ⟨hwf, -, heximg⟩ := srvwmoRealizable c hcons
-  obtain ⟨cf, st, hrun, hadj, h1, h2, h3⟩ :=
-    execWfPfRunPinShaped pstepEv pclsEv _ (imgZ σ0.wgimg) pst dv (candExec c) pclsEvEqr
-      (by rw [heximg, himg]) hwf hprog
+  obtain ⟨cf, st, hrun, hadj, h1, h2, h3, h4⟩ :=
+    execWfPfRunPinShapedT pstepEv pclsEv _ TsoShadow.cohSrc (imgZ σ0.wgimg) pst dv (candExec c)
+      pclsEvEqr (by rw [heximg, himg]) hwf hprog
   rw [heximg, himg, hpst, hdv] at hrun
-  exact ⟨cf, st, hrun, hadj, h1, h2, h3⟩
+  exact ⟨cf, st, hrun, hadj, h1, h2, h3, h4⟩
+
+/-! ### 4b. The shadow clauses on a one-step trace -/
+
+/-- The coherence floor of the all-zero map is 0. -/
+theorem SrvwmoXv6Witness.cohMaxZero (base : Int) :
+    ∀ n, TsoShadow.cohMax (fun _ => 0) base n = 0
+  | 0 => rfl
+  | n + 1 => by simp only [TsoShadow.cohMax, SrvwmoXv6Witness.cohMaxZero base n, Nat.max_self]
+
+/-- The FIRST step's floor is 0 (the shadow of the empty prefix is TsoMem's boot read side), so a
+single-copy-atomic first load is `scaOkT` under every stamp. -/
+theorem SrvwmoXv6Witness.scaOkTFirst (stamp : TsoShadow.CohStamp) (img : Image) (log : List Wmsg)
+    (i : Nat) (base : Int) (ts : List Nat) :
+    scaOk img log i base ts → scaOkT (shadowOf stamp [] i) img log i base ts :=
+  fun ⟨tvn, h1, h3⟩ => ⟨tvn, h1, by
+    show max 0 (TsoShadow.cohMax (fun _ => 0) base ts.length) ≤ tvn
+    rw [SrvwmoXv6Witness.cohMaxZero]; exact Nat.zero_le _, h3⟩
+
+/-- On a trace of at most one step, clause (iii) gives clause (iii)′ under every stamp. -/
+theorem SrvwmoXv6Witness.execScaTOne (stamp : TsoShadow.CohStamp) (E : Exec) :
+    E.exTr.length ≤ 1 → execSca E → execScaT stamp E := by
+  intro hl hsca k s hs aq base ts vs hlb
+  have hk : k = 0 := by have := lookup_lt_Some hs; omega
+  subst hk
+  rw [List.take_zero]
+  exact SrvwmoXv6Witness.scaOkTFirst stamp _ _ _ _ _ (hsca 0 s hs aq base ts vs hlb)
+
+/-- A trace with no disk-row (agent `NCPU`) step satisfies clause (iv) vacuously. -/
+theorem SrvwmoXv6Witness.execDiskLatNoDisk (E : Exec) :
+    (∀ (k : Nat) (s : Estep), E.exTr[k]? = some s → s.esAg ≠ NCPU) → execDiskLat E :=
+  fun h k s hs _ _ _ _ _ hi => absurd hi (h k s hs)
 
 /-! ## 5. THE WITNESS -/
 
@@ -715,12 +776,26 @@ theorem srvwmoXv6M1Satisfiable :
     SrvwmoXv6Witness.c0 0 _ _ _ ls SrvwmoXv6Witness.wlbl SrvwmoXv6Witness.lbl p' d0
     (fun _ => epsInit σ0) (fun _ => d0)
     (execProgOk'SNil _ _ _ _) hp hrun hfetch hsca trivial hre hld
+  -- the shadow clauses: ONE load, of hart 0, at the empty prefix (floor 0, not the disk row)
+  have hscaT : execScaT TsoShadow.cohSrc (candExec SrvwmoXv6Witness.cand) :=
+    SrvwmoXv6Witness.execScaTOne _ _
+      (Nat.le_of_eq rfl)
+      (execProgOk'SSca _ _ _ _ _ _ hprog)
+  have hlat : execDiskLat (candExec SrvwmoXv6Witness.cand) := by
+    refine SrvwmoXv6Witness.execDiskLatNoDisk _ (fun k s hs => ?_)
+    have hk : k = 0 := by have := lookup_lt_Some hs; simp_all [candExec, SrvwmoXv6Witness.cand,
+      candSnoc, SrvwmoXv6Witness.c0]
+    subst hk
+    change [(⟨0, SrvwmoXv6Witness.lbl⟩ : Estep)][0]? = some s at hs
+    simp only [List.getElem?_cons_zero, Option.some.injEq] at hs
+    subst hs
+    decide
   refine ⟨σ0, SrvwmoXv6Witness.cand, pstSnoc SrvwmoXv6Witness.c0 (fun _ => epsInit σ0) 0 p',
     dvSnoc SrvwmoXv6Witness.c0 (fun _ => d0) d0,
     ⟨SrvwmoXv6Witness.sigma0Boot, rfl, ⟨SrvwmoXv6Witness.ds, rfl, SrvwmoXv6Witness.dsDisk⟩,
       SrvwmoXv6Witness.candConsistent, rfl,
-      pstSnocLe _ _ _ _ 0 (Nat.le_refl _), dvSnocLe _ _ _ 0 (Nat.le_refl _), hprog,
-      execProgOk'SSca _ _ _ _ _ _ hprog⟩, ?_, ?_⟩
+      pstSnocLe _ _ _ _ 0 (Nat.le_refl _), dvSnocLe _ _ _ 0 (Nat.le_refl _),
+      ⟨hprog, hscaT, hlat⟩, hscaT, hlat⟩, ?_, ?_⟩
   · show [(⟨0, SrvwmoXv6Witness.lbl⟩ : Estep)] = _
     simp only [SrvwmoXv6Witness.lbl, SrvwmoXv6Witness.lPa]
   · intro k
