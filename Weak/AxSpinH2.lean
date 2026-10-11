@@ -393,7 +393,7 @@ theorem wpdReleaseGen (x : Int) (Cl : List Int) (cv : Agent → List (BitVec 8))
     dsimp only at Hi Hlt Hl
     rw [show ((ei, ek) : Geid) = (i, ek) from by rw [Hi]]
     have Hl' : gxLbl (gtAdGd GT).gdG (i, ek) = some l := by rw [gxLblGrow]; exact Hl
-    exact ⟨fenceGob (gtAdGd GT) i ek kf (kf + 1) l ya [b0] .WCrel Hl' Hmem Hlf Hls Hlt
+    exact ⟨fenceGob (gtAdGd GT) i ek kf (kf + 1) l ya [b0] .WCrel Hl' (WeakRvwmoGraph.gwfMemRW _ _ _ Hcons.1 Hl' Hmem) Hlf Hls Hlt
         (by omega),
       fenceLobp (gtAdGd GT) Hcons i ek kf (kf + 1) l ya [b0] .WCrel Hl' Hmem Hlf Hls Hlt
         (by omega)⟩

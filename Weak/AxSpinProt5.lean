@@ -117,7 +117,8 @@ theorem fenceLobp (Hcons : rvwmoCatConsistent GD) (i : Agent) (k1 kf k2 : Nat) (
     k1 < kf → kf < k2 → (i, k1) ∈ splLobp GD (i, k2) := by
   intro H1 Hm Hf H2 Hl1 Hl2
   exact lobpIntro GD _ _ _ H1 Hm (gpoRow GD i k1 k2 _ _ H1 H2 (by omega))
-    (gobGmo GD Hcons _ _ (fenceGob GD i k1 kf k2 l1 base vs cls H1 Hm Hf H2 Hl1 Hl2))
+    (gobGmo GD Hcons _ _ (fenceGob GD i k1 kf k2 l1 base vs cls H1
+      (WeakRvwmoGraph.gwfMemRW _ _ _ Hcons.1 H1 Hm) Hf H2 Hl1 Hl2))
 
 end ppo
 

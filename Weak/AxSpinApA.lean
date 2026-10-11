@@ -877,7 +877,7 @@ theorem AxSpinApA.scanOf (j : Nat) (hj : j < 64) :
 /-- (Lean-only) a row write is a memory event. -/
 theorem AxSpinApA.wrMem (lb : Lbl) (x : Bool × Int × Nat) :
     aidentWr (aident lb) = some x → lbIsMem lb = true := by
-  cases lb <;> simp [aident, aidentWr, lbIsMem, lbIsR, lbIsW]
+  cases lb <;> simp [aident, aidentWr, lbIsMem, lbIsR, lbIsW, lbIsIo]
 
 
 section seg

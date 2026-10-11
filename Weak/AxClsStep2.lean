@@ -1092,7 +1092,7 @@ theorem gmoCases (GD : Gdexec) (Hreal : progRealizes PMpb GD) (Hcons : rvwmoCatC
   rcases Hh with rfl | rfl
   · rcases row0Shape GD Hreal k l Hl with ⟨rfl, Hok⟩ | ⟨rfl, rfl⟩ | ⟨rfl, Hok⟩
     · exact .inl ⟨rfl, l, by rw [gxLblGrow]; exact Hl, Hok⟩
-    · simp [lbIsMem, lbIsR, lbIsW] at Hm
+    · simp [lbIsMem, lbIsR, lbIsW, lbIsIo] at Hm
     · exact .inr (.inl ⟨rfl, l, by rw [gxLblGrow]; exact Hl, Hok⟩)
   · rcases row1Shape GD Hreal k l Hl with ⟨rfl, ts, b, rfl⟩ | ⟨rfl, ⟨ts, b, rfl⟩, HR0⟩
     · exact .inr (.inr (.inl ⟨rfl, ts, b, by rw [gxLblGrow]; exact Hl⟩))

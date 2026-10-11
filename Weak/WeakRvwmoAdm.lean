@@ -876,7 +876,7 @@ theorem mp2Consistent : rvwmoMinusConsistent mp2 := by
       rcases mp2Lbl e l hl with ⟨rfl, _⟩ | ⟨rfl, _⟩ | ⟨rfl, rfl⟩
       · simp [mp2]
       · simp [mp2]
-      · simp [lbIsMem, lbIsR, lbIsW] at hm
+      · simp [lbIsMem, lbIsR, lbIsW, lbIsIo] at hm
   · intro i p k l hp hk
     rcases i with _ | _ | i <;> simp [mp2] at hp <;> subst hp
     · rcases k with _ | k <;> simp [evRow] at hk

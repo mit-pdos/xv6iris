@@ -114,7 +114,7 @@ theorem gisROfGmo (GD : Gdexec) (Hcons : rvwmoCatConsistent GD) (e : Geid)
   refine ⟨l, Hl, ?_⟩
   unfold gisW at Hnw
   simp only [Hl] at Hnw
-  unfold lbIsMem at Hm
+  have Hm := WeakRvwmoGraph.gwfMemRW _ _ _ Hcons.1 Hl Hm
   rw [Hnw, Bool.or_false] at Hm
   exact Hm
 

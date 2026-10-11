@@ -67,11 +67,11 @@ theorem sizeTakeGmo (l : List Geid) (n : Nat) :
 
 theorem aidentRdMem (lb : Lbl) (x : Bool × Int × Nat) :
     aidentRd (aident lb) = some x → lbIsMem lb = true := by
-  cases lb <;> simp [aident, aidentRd, lbIsMem, lbIsR, lbIsW]
+  cases lb <;> simp [aident, aidentRd, lbIsMem, lbIsR, lbIsW, lbIsIo]
 
 theorem aidentWrMem (lb : Lbl) (x : Bool × Int × Nat) :
     aidentWr (aident lb) = some x → lbIsMem lb = true := by
-  cases lb <;> simp [aident, aidentWr, lbIsMem, lbIsR, lbIsW]
+  cases lb <;> simp [aident, aidentWr, lbIsMem, lbIsR, lbIsW, lbIsIo]
 
 theorem rowInGmo (GD : Gdexec) (i k : Nat) (lb : Lbl) :
     gwf GD.gdG → (AxOpsem.grow GD i)[k]? = some lb → lbIsMem lb = true →

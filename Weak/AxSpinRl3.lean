@@ -268,7 +268,7 @@ theorem FstRel (i : Agent) (kf kw : Nat) (c a1 a2 e0 : Geid) (m : Mea GF) (cls :
       dsimp only at Hi Hlt' Hl
       rw [show ((ei, ek) : Geid) = (i, ek) from by rw [Hi]]
       have Hl' := lblOfRow _ _ _ _ Hl
-      exact ⟨fenceGob (gtAdGd GT) i ek kf k l _ _ _ Hl' Hmem Hlf Hls Hlt' Hlt,
+      exact ⟨fenceGob (gtAdGd GT) i ek kf k l _ _ _ Hl' (WeakRvwmoGraph.gwfMemRW _ _ _ Hcons.1 Hl' Hmem) Hlf Hls Hlt' Hlt,
         fenceLobp (gtAdGd GT) Hcons i ek kf k l _ _ _ Hl' Hmem Hlf Hls Hlt' Hlt⟩
     have Hsub : (FiniteMap.dom_set m : GSet Geid) ⊆
         @Axpol.lobp (xv6Pol GT) (gtAdGd GT) (i, k) := fun e He => (Hgob e He).2

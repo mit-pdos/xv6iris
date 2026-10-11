@@ -49,6 +49,10 @@ x-read's annotation), `wpdA` (the positive A), `wpdRTriv` (race A at the TRIVIAL
    x-write steps bridge `spinR xa nm GD e` and `Rx nm.1 xa GD e` by `.rfl` entailments.
    `ev_draw`'s `Hwf` (Rocq section hypothesis) is the explicit argument `Hwf : axpolWf`.
    The `wR*` sanity-twin lemmas take `GT`/`cpu`/`Hrow` explicitly (Rocq section context).
+5. W13 (M) (`gmem` covers I/O events, `WeakRvwmoGraph` deviation 6): `fenceGob`'s premise on the
+   po-earlier event is `(lbIsR l1 || lbIsW l1) = true` (Rocq: `lb_is_mem l1`) — rule 4 covers RAM
+   accesses only (D48 (a)); callers with an annotation-domain `lbIsMem` fact convert it by
+   `WeakRvwmoGraph.gwfMemRW` (the `LIo` shape arm of `gwf`).
 
 **Dropped:** none (55 Rocq decls; 57 Lean = 55 + 2 Lean-only).
 -/
@@ -388,7 +392,7 @@ theorem acqGob (i : Agent) (k1 k2 : Nat) (base : Int) (ts : List Nat) (rvs wvs :
 
 theorem fenceGob (i : Agent) (k1 kf k2 : Nat) (l1 : Lbl) (base : Int) (vs : List (BitVec 8))
     (cls : WmClass) :
-    gxLbl GD.gdG (i, k1) = some l1 → lbIsMem l1 = true →
+    gxLbl GD.gdG (i, k1) = some l1 → (lbIsR l1 || lbIsW l1) = true →
     gxLbl GD.gdG (i, kf) = some (.LFence true true false true) →
     gxLbl GD.gdG (i, k2) = some (.LStore false base vs cls) →
     k1 < kf → kf < k2 → gobCat GD (i, k1) (i, k2) := by
@@ -396,8 +400,7 @@ theorem fenceGob (i : Agent) (k1 kf k2 : Nat) (l1 : Lbl) (base : Int) (vs : List
   apply gobCatStep
   refine .inl (.inl (.inr (.inr (.inr (.inl ?_)))))
   refine ⟨true, true, false, true, ⟨rfl, by simp only; omega, kf, Hl1, Hl2, Hf⟩, ?_, ?_⟩
-  · unfold lbIsMem at Hm
-    cases Hr : lbIsR l1 with
+  · cases Hr : lbIsR l1 with
     | true => exact .inl ⟨⟨l1, H1, Hr⟩, rfl⟩
     | false =>
       rw [Hr, Bool.false_or] at Hm

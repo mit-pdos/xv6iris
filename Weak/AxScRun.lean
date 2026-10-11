@@ -1088,7 +1088,7 @@ theorem gGwf : shapesOkB rows = true → ilOkB rows il = true → gwf (graphOfSc
           | true => exact absurd ((ilOkMem rows il hok i k).2 h) hnin
         simp only [isAt, hl0] at hnm
         simp only [Option.getD_none]
-        cases l0 <;> first | (simp [shapeInB] at hsh0; done) | simp_all [lbIsMem, lbIsR, lbIsW]
+        cases l0 <;> first | (simp [shapeInB] at hsh0; done) | simp_all [lbIsMem, lbIsR, lbIsW, lbIsIo]
 
 theorem gPo : ilOkB rows il = true → scPoGmo (graphOfSc img rows il ems).gtG := by
   intro hok e1 e2 hpo hm1 hm2

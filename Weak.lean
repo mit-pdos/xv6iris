@@ -627,5 +627,6 @@ import Weak.GraphFetchSpike
 import Weak.PfStepTsoMem
 import Weak.PfStepTsoView
 import Weak.RvwmoXv6Sca
+import Weak.GraphFabResidue
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/

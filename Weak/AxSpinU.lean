@@ -1380,7 +1380,7 @@ theorem wpdReleaseX (GT : GdexecT) (nm : Xv6N) (cpu : CPU) (Hcons : rvwmoCatCons
     dsimp only at Hi Hlt Hl
     rw [show ((ei, ek) : Geid) = (i, ek) from by rw [Hi]]
     have Hl' : gxLbl (gtAdGd GT).gdG (i, ek) = some l := by rw [gxLblGrow]; exact Hl
-    exact ⟨fenceGob (gtAdGd GT) i ek kf (kf + 1) l _ _ _ Hl' Hmem Hlf Hls Hlt (by omega),
+    exact ⟨fenceGob (gtAdGd GT) i ek kf (kf + 1) l _ _ _ Hl' (WeakRvwmoGraph.gwfMemRW _ _ _ Hcons.1 Hl' Hmem) Hlf Hls Hlt (by omega),
       fenceLobp (gtAdGd GT) Hcons i ek kf (kf + 1) l _ _ _ Hl' Hmem Hlf Hls Hlt (by omega)⟩
   have HS := nshWrite (hlc := hlc) (pol := xv6Pol GT) (gtAdGd GT) Xv6N Unit (protXv6 Lx) nm cpu i
     Φ 4 lkpa lkpaRam zero32 m' (kf + 1) Hne2

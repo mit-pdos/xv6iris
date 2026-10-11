@@ -207,10 +207,12 @@ theorem astepProgNodataFenceGmem (GD : Gdexec) (i : Nat) (s : Athread) (l : Wlab
   | AStepFence p k d l lb p' d' hrow hs1 hid hs =>
     have hf : (aidentFence (aident lb)).isSome = true := by rw [← hid]; exact hs1
     obtain ⟨h1, h2⟩ := aidentFenceNotMem lb hf
+    have h3 : lbIsIo lb = false := by
+      cases lb <;> simp_all [aident, aidentFence, lbIsIo]
     show gmemB GD.gdG (i, k) = false
     unfold gmemB
     rw [AxWp.growLookup GD i k lb hrow]
-    simp [lbIsMem, h1, h2]
+    simp [lbIsMem, h1, h2, h3]
 
 /-- `naAtProgress`'s target is unaffected by an unannotated step. -/
 theorem eidsBeforeKOrSkip (GD : Gdexec) (i k k' : Nat) :

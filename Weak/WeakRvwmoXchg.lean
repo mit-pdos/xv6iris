@@ -397,7 +397,8 @@ theorem gswapUpperIsRead (G : Gexec) (r : Geid) :
   obtain ⟨l, hl, hm⟩ := gwfGmoMem G r hwf hin
   refine ⟨l, hl, ?_⟩
   simp only [gisW, hl] at hnw
-  simp only [lbIsMem, hnw, Bool.or_false] at hm
+  have hm := WeakRvwmoGraph.gwfMemRW G r l hwf hl hm
+  simp only [hnw, Bool.or_false] at hm
   exact hm
 
 theorem gswapReadDown (G : Gexec) (n : Nat) (x r : Geid) :

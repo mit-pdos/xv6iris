@@ -54,6 +54,11 @@ four-event LB execution is RVWMO⁻-consistent, so tier 2 is about a real gap.
    `gpos`/`gwix` values, `gwriteAt`) are `decide`.
 5. Lean-only helpers (no Rocq twin): `lbgLbl` (the four labels of `lbg`, the
    engine of every `lbg` case split).
+6. W13 (M) (plan `notes/weak-allocproc-plan.md` §C W13; D38 [OWN.14]): `lbIsMem`
+   (hence `gmem`, gmo, `gwf`'s membership clause) also holds of the I/O-class label
+   `Lbl.LIo` (`lbIsR l || lbIsW l || lbIsIo l`; Rocq: reads and writes only).  `lbIsR`/`lbIsW`
+   stay RAM-only.  Until W13 (I) flips `gwf`'s `LIo` shape arm (`False`, [OWN.27]) no `gwf`
+   graph has an I/O event.
 
 **Name map** (Rocq → Lean): `geid` ↦ `Geid`; `gexec` ↦ `Gexec` (`gx_img`/
 `gx_prog`/`gx_gmo` ↦ `gxImg`/`gxProg`/`gxGmo`); `gdexec` ↦ `Gdexec`
@@ -115,9 +120,10 @@ structure Gexec where
 
 def gxLbl (G : Gexec) (e : Geid) : Option Lbl := (G.gxProg[e.1]?).bind (fun p => p[e.2]?)
 
-/-- Memory events: reads and writes.  Fences are program events but not memory
+/-- Memory events: reads, writes and (W13 (M), D38 [OWN.14]) I/O-class accesses — `gmem :=
+lbIsMem || lbIsIo`, so I/O events are in gmo.  Fences are program events but not memory
 events — they are not in gmo. -/
-def lbIsMem (l : Lbl) : Bool := lbIsR l || lbIsW l
+def lbIsMem (l : Lbl) : Bool := lbIsR l || lbIsW l || lbIsIo l
 
 def gmem (G : Gexec) (e : Geid) : Prop := ∃ l, gxLbl G e = some l ∧ lbIsMem l = true
 
@@ -727,6 +733,23 @@ theorem gwfLblShape (G : Gexec) (e : Geid) (l : Lbl) :
   | some p =>
     rw [hp] at hl
     exact hsh e.1 p e.2 l hp hl
+
+/-- (Lean-only, W13 (M)) A `gwf` graph has no I/O-class event (its `LIo` shape arm is `False`
+until W13 (I), [OWN.27]). -/
+theorem WeakRvwmoGraph.gwfNoIo (G : Gexec) (e : Geid) (l : Lbl) :
+    gwf G → gxLbl G e = some l → lbIsIo l = false := by
+  intro hwf hl
+  have hsh := gwfLblShape G e l hwf hl
+  cases l <;> simp_all [lbIsIo]
+
+/-- (Lean-only, W13 (M)) In a `gwf` graph a memory event is a read or a write — the I/O case of
+"a `gmem` event is a read or a write" is refuted by the shape arm. -/
+theorem WeakRvwmoGraph.gwfMemRW (G : Gexec) (e : Geid) (l : Lbl) :
+    gwf G → gxLbl G e = some l → lbIsMem l = true → (lbIsR l || lbIsW l) = true := by
+  intro hwf hl hm
+  have := WeakRvwmoGraph.gwfNoIo G e l hwf hl
+  simp only [lbIsMem, this, Bool.or_false] at hm
+  exact hm
 
 /-! ## 8.3 A FUSED RMW'S READ FOOTPRINT IS ITS WRITE FOOTPRINT -/
 
