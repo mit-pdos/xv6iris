@@ -1,20 +1,26 @@
 # allocproc on RVWMO: target theorem, gap analysis, roadmap (design advisor, 2026-10-09)
 
-**Status: rev 24 = rev 23 + review R20 (3 required changes, tags [R20.n]; no alternatives) + [OWN.35] (Q-FIARM RULED
-(b)+(a′)) + RESULTS: W-DMA0 DONE (option (A)), W4 F1–F8 DONE (`Weak/MachOfPf.lean`, 1659), W11 (iv)b DONE (`Weak/
-RvwmoXv6ScaT.lean`, 792).**  What changed: **[R20.1]** `R-dev` on the OUT capture segment ABSORBS a hart reset — `pre₁`
-:= the status `DWriteDev`'s `pre` TRUNCATED before capture's `modify :517-518` (in-flight pre-check, identity on failure →
-`setPhase .fetched :526` → `taken` guard `:529`, identity when held): ONE formula for free / held / reset (rev 23's
-`setPhase .fetched (+ latch)` was FALSE from a STATUS := 0 on the segment until pf's abort); **[R20.2]** zero-length data
-phase: the IN fill `DWriteDev` and the OUT capture `DRead` are ELIDED when `r.len.toNat = 0` (today's `dreadData`/
-`dwriteData` shape), `DmWf` keeps `n ≠ 0`, (M5′)'s `n = 0` disjunct DROPPED, MachCSL's zero-width ops matched inside the
-next `DWriteDev`'s block; **[R20.3]** W11 (iv)b LANDED, §A "Names" fixed.  **[OWN.35]**: ONE named trusted premise
-`sailCycleOrder` (§A statement, §B(11)) — W4 delivered it as the parameter `MachOfPf.Hyps.fi :635`; the new item **W-SCO**
-(after M1) proves it for xv6's kernel text and demotes it there.  W4's open items: `winPristine` → W5 (via
-`powerInterp_textPristine`); F9 loosens `SimRel`'s device clause to `R-dev`.  Suggestions adopted: [R20.s1] (W-DMA0's
-record), [R20.s2] the `DFence` placement, [R20.s3] (ix) needs no §A(6) entry, [R20.s4] `sailCycleOrder`'s closed form,
-[R20.s5] cites (only `PfStepTso.lean:322-325`; its other four are off against the tip — NOT adopted).  **No OPEN owner
-question.**  History: rev 24 — R20 (3 req.) + [OWN.35] + W-DMA0, W4 F1–F8, W11 (iv)b DONE.
+**Status: rev 25 = rev 24 + review R21 (4 required changes, tags [R21.n]; no alternatives) + [OWN.36] (Q-W8-lane RULED
+(α)).**  What changed: **[R21.1]+[OWN.36]** W8 leaves the parallel launch set — a read-only **W8-design** spike (S) pins
+W8's export statement (= D24), the ledger's file/lane and whether a ledger-free (β) export covers W8 (i)/(iii); then **W8's
+ledger in the state interpretation is the next SERIAL MachCSL item, BEFORE W-RSV** (lane W-COH ✓ → W-DMA0 ✓ → W8 ledger
+→ M1 → W-RSV; §B(12), §C, D24, D26); **[R21.2]** Stage 2 consumes `linCandScaT`/`linCandScaTMinus` on the NORMALIZED `GD'`
+(rule 14 by construction), NOT `linCandScaTCatT` on `GT.gtG` (`grule14` fails on the LB/W→W graphs the quantifier
+admits); W12 (1) gains the producer `gppoCat6Gmo GD'.gdG` (unverified); **[R21.3]** zero-length IN is 1 → 5 (`:526`
+included); the single-burst invariant DROPPED (stale entries harmless under `R-dev`); F9 re-proves EVERY `SimRel.dev`
+consumer and checks `pre₁` against `pdiskUart` moves too; **[R21.4]** W5 CORE is CONDITIONAL on `Hyps.disk`
+(UNSATISFIABLE until W-DISK + F9): plumbing, not a milestone, not registered — M1 is registered/reported only at F9.
+Adopted: [R21.s1] `sailCycleOrder` in LABEL-LIST form (no shadow in the published premise), [R21.s2] W-SCO covers every
+2-aligned 4-byte word of the window, [R21.s3] the capture-`DRead` 1 → 0 case, [R21.s4] cites/stale text.  **No OPEN owner
+question.**  History: rev 25 — R21 (4 req.) + [OWN.36].
+**Rev 24 = rev 23 + R20 (3 req.) + [OWN.35] (Q-FIARM RULED (b)+(a′)) + W-DMA0 (A), W4 F1–F8 (`Weak/MachOfPf.lean`, 1659),
+W11 (iv)b (`Weak/RvwmoXv6ScaT.lean`, 792) DONE:** **[R20.1]** `R-dev` on the OUT capture segment ABSORBS a hart reset —
+`pre₁` := the status `DWriteDev`'s `pre` TRUNCATED before capture's `modify :517-518` (in-flight pre-check → `setPhase
+.fetched :526` → `taken` guard `:529`, identity arms): ONE formula for free / held / reset (rev 23's `setPhase .fetched (+
+latch)` was FALSE after a STATUS := 0); **[R20.2]** the zero-length data node ELIDED (`dreadData`/`dwriteData` shape),
+`DmWf` keeps `n ≠ 0`, (M5′)'s `n = 0` disjunct dropped; **[R20.3]** W11 (iv)b landed, Names fixed; **[OWN.35]** ONE named
+trusted premise `sailCycleOrder` (§A, §B(11); = `MachOfPf.Hyps.fi :635`), demoted for kernel text by **W-SCO** after M1;
+W4's open items `winPristine` → W5, F9 → `R-dev`.  s1–s4 adopted; s5 only `PfStepTso.lean:322-325`.
 **Rev 23** = rev 22 + R19 (3 req., all W-DISK binding text) + W2 CLOSE DONE (`pfStepTso` PROVED with the REPAIRED
 statement — rev 21's pinned text FALSE at the fetch row and at every `|log|`/`ownPub` row, VACUOUS inside an exclusive
 pair) + [OWN.34] (W-DMA0 via (A)) + Q-FIARM raised: **[R19.1]** "pf never drains" WITHDRAWN (`cacheView pf = cacheView M`
@@ -105,6 +111,7 @@ rev 21 (2026-10-11) R17 (4 req.: W-DISK FOLDING RULE (α) abort + single-burst i
 rev 22 (2026-10-11) R18 (4 req., all W-DISK binding text: payload path (A) — `cacheReq` folded, `R-dev` on `cacheView`, `completeOkPf` [R18.1]; interim `gfexecConf` `LDev`-free-disk-row clause, Fab family ≠ Supply family [R18.2]; in-flight pre-check first in `pre`, `R-dev` up to `pre₁` on the OUT capture segment, ABORT 1 → 0 [R18.3]; state-dependent `pa`/`bs`, snapshots where `serve` takes them [R18.4]; s2–s6; s1 deferred to W2 CLOSE); no OPEN owner question.
 rev 23 (2026-10-11) R19 (3 req., all W-DISK binding text: pf drains at the gate (`drainAll`), `completeOk` verbatim, `R-dev` FULL equality, `cache = []` outside capture → gate [R19.1]; state-receiving `DWriteDev` continuation, the idx write keeps `ui`/`c`, `DM.DPop` named [R19.2]; `pre₁` conditional on the `taken` guard [R19.3]; s1–s5) + W2 CLOSE DONE (`Weak/PfStepTso.lean`, the REPAIRED statement; item (3) → Q-FIARM) + [OWN.34] (W-DMA0 via option (A)); OPEN: Q-FIARM.
 rev 24 (2026-10-11) R20 (3 req.: reset-absorbing `pre₁` [R20.1]; zero-length data node ELIDED, `n ≠ 0` kept [R20.2]; W11 (iv)b LANDED + Names [R20.3]; s1–s5) + [OWN.35] (Q-FIARM RULED (b)+(a′): `sailCycleOrder` + W-SCO) + W-DMA0, W4 F1–F8 (`MachOfPf.lean`), W11 (iv)b (`RvwmoXv6ScaT.lean`) DONE; no OPEN owner question.
+rev 25 (2026-10-11) R21 (4 req.: W8 → W8-design spike + lane [R21.1]; Stage-2 `linCandScaT` on the normalized `GD'`, W12 (1) producer [R21.2]; IN 1 → 5, single-burst invariant dropped, F9 re-proves every `SimRel.dev` consumer [R21.3]; W5 CORE plumbing, not registered [R21.4]; s1–s4) + [OWN.36] (Q-W8-lane RULED (α): W8 ledger serial MachCSL before W-RSV); no OPEN owner question.
 
 **The kernel [OWN.4][R1.9]: xv6-riscv `b72cbac1`, branch `verified`** (`notes/STATUS.md:8-11`, `README.md:89-90`)
 = upstream plus (a) a per-process root (`p->root`, `sys_chroot`, `igetroot`, root-aware `dirlookup`/walk) and
@@ -161,8 +168,8 @@ PLANNED OUT — once §C W-RSV lands, `σ.resv cpu` is CLEARED at the hart's ins
 `Lang.lean:499-502`; the pf twin ALREADY does this: `instrPost … wRes := none`, `Weak/WeakMem.lean:720-721`), so a
 reservation blocks only within its issuing instruction (= the AMO's atomicity, FAITHFUL; Zalrsc permits invalidation
 at any time); the blocking ARMS stay (firing only against in-flight reservations [R12.s4]); the ghost side threads the
-hart's reservation fragment through the cycle rules and their callers — L–XL, the LARGER of the two serial MachCSL
-items [R12.1]; this list then reads "(i) + (iii)" and the "Honestly" line below drops "reservation serialisation"**;
+hart's reservation fragment through the cycle rules and their callers — L–XL, with W8's ledger [OWN.36] the largest
+serial MachCSL items [R12.1]; this list then reads "(i) + (iii)" and the "Honestly" line below drops "reservation serialisation"**;
 **(iii) [W2s] FOOTPRINT coherence stamping — LANDED OUT by W-COH (2026-10-11): `HRead.afterLoad` now stamps a byte's
 `coh` with its source timestamp ONLY for a FOREIGN-authored source (`Hist.readEnt`/`Hist.readSrc`, `MachCSL/TsoMem.
 lean:127-136`; `FlatMem.loadSrcs :320`; `HRead.afterLoad :354`), and `MState.store` RESETS its footprint
@@ -269,8 +276,9 @@ NOT published [OWN.2])*: the composed sRVWMO theorem, pinned/kernel-only (M1) th
   ioResidueGmo (forgetF GT) ∧          -- I/O-ordering platform assumption over I/O EVENTS: (R1)–(R3) ⊆ gmo, §A(†)
                                        -- (the (a′) arms of D32 [OWN.12], re-encoded per D38 [OWN.14])
   xv6ConfS (xboot σ0) (efInit σ0.wgdev) (imgZ σ0.wgimg) (xN σ0) GT                             -- xv6 is the program (†)
-  ∧ sailCycleOrder                     -- [OWN.35][R20.s4] CLOSED Prop on the Sail hart program (fetch → announce → execute,
-                                       -- Step.lean:331-404), §B(11); W-SCO demotes it for kernel text
+  ∧ sailCycleOrder                     -- [OWN.35][R21.s1] about the pf hart rows' LABEL LISTS (Sail's cycle as the event
+                                       -- instance labels it: fetch → announce → execute, Step.lean:331-404), §B(11);
+                                       -- W-SCO demotes it for kernel text
   →
   (a) the realizing MachCSL run (robustness W9–W11 → sRVWMO cand → T1 → pf run → W4, PREFIXED by PowerOn from
       the given disk) satisfies xv6FsAdequacy_closed's conclusions for ITS ONE ERA: Reducible (panics, two spin
@@ -339,7 +347,8 @@ merged file — workers must not grep for them**:
 `wpstep.WPIo` ((I)/(K)/(L)), **`projLbl .LDev … = some (.LIo …)` — STILL `none` at `WeakPromiseBridge.lean:538`
 [OWN.27]**, `pfLoadRow` (SUBSUMED by `pfLoadRowMem` + `rowLoad`), `linCandDiskLat` ((iv)c), `itvOf`/`itvStep` (W5d
 [R11.3]), `poolRel`/`HSafe` (plan words: W4 landed them as `SimRel`/`poolOf` and `Hyps.safe`), **`sailCycleOrder`
-([OWN.35]: today the field `MachOfPf.Hyps.fi`; W5 names it, §C W5)**, `Ioev`/`ioOrd`/`ioObAcyclic` (scratch,
+([OWN.35]: today the field `MachOfPf.Hyps.fi`; W5 names it in label-list form and derives `Hyps.fi` by a fold over
+`shStepF`, `TsoShadow.lean:310-318` [R21.s1], §C W5)**, `Ioev`/`ioOrd`/`ioObAcyclic` (scratch,
 SUPERSEDED), `execProgOkA`/`gfexecConfA` (RETIRED by D38), `ioOrdF`/`emIoFence` (D46 (b) only), `badSeg`,
 `xv6RvwmoSafeModuloT`, `Weak/ExistWitness.lean`, every W-DISK name (`DM.DWriteDev`/`DM.DPop` [R19.2]/`Dres.DStall`,
 the state-aware `pdevEv`, §C; `DGet` is WITHDRAWN [R16.1][OWN.32]).  [R20.3] `pfStepTso`, `linCandScaT`,
@@ -752,8 +761,11 @@ ones in `(t_j, tvn] ⊆ (t_j, tvn_sca]` by `scaByte` at `tvn_sca` once `F ≤ tv
 `scaVis`).  G2-Q does NOT enter (★): it decides whether `candScaT` is TRUE/DERIVABLE, i.e. which `coh` stamp the
 shadow replays.  **Stage-2 derivation (W11 (iv) `linCandScaT`) — LANDED [R20.3]** (`Weak/RvwmoXv6ScaT.lean:757`; premise
 set `gwf ∧ gppoCat6Gmo ∧ gloadValue ∧ grule14` on the linearized graph — rules 2, 4, 5 used, `gatomicity`/rule 12 not; NO
-separate `ptraceRel ⊇ gmo|W` statement: (iv)a's `linTvnScaLe :194` carries it; W11 (v)/W13 (L) consume `linCandScaTCatT
-:780` on `GT.gtG`): `tv` part — the SCA witness `tvn_sca := #writes
+separate `ptraceRel ⊇ gmo|W` statement: (iv)a's `linTvnScaLe :194` carries it; **[R21.2] W11 (v)/W13 (L) consume
+`linCandScaT :757` (or `linCandScaTMinus :787`) on the NORMALIZED hull graph `GD'` from `normalizeOfAcyclic` (rule 14 by
+construction, `WeakRvwmoTopo.lean:596-605`); `linCandScaTCatT :780` is a statement about the INPUT graph and is NOT on
+the Stage-2 path — its `grule14 GT.gtG` (`WeakRvwmoGraph.lean:266-267`) fails on every LB/W→W graph §A(3) admits; the
+premise `gppoCat6Gmo GD'.gdG` is W12 (1)'s new deliverable**): `tv` part — the SCA witness `tvn_sca := #writes
 gmo-before r` is a legal `scaOk` witness (`tvn_sca ≤ |log|` at `r`'s trace position: every `w <gmo r` has `w <gmo
 nxw(r)` by rule 14 on `GD'`, so `gwix w < gwix (nxw r)` and `w` sits in an earlier `rblocks` block, `Lin.lean:316,440`;
 bytes co-maximal by `gloadValue`); `tv_S` after an aq pair `= gwix(LRmw)` and `LRmw <gmo r` by rule 5 (`gacqPo`,
@@ -913,11 +925,14 @@ caveat); NO §A(6) entry needed [R20.s3]: a drain emits no label (`drain :429-43
 the used-element `pre`), so WHEN pf drains changes no graph event and excludes no graph — unlike (viii)**; Svadu A/D write-back as a plain
 view-neutral LR/SC; DMA as a store-order agent; TsoMem's instruction-fetch model (`MachCSL/TsoMem.lean:34-39`,
 `Lang.lean:360-362,155-163`) — beyond RVWMO's text (Zifencei); **[OWN.35] the named ISA-model premise
-`sailCycleOrder`** — a CLOSED proposition about the Sail hart program [R20.s4]: along every `pfRunST` run from
-`wpInit … (epsInit σ0)` (any `fok`, any `σ0`), at each own `.barrier Barrier_RISCV_i` node the shadow's `fiArm` is `true`
-and at each own sfence-marker announce it is `false` (the content of `MachOfPf.Hyps.fi :635`), i.e. "the Sail cycle
-fetches, then announces, then executes, and fetches nothing while executing" (`Step.lean:331-404`); FAITHFUL (true of
-the model by inspection; RVWMO/riscv.cat/Zifencei/PMAs silent on in-cycle order); a premise of `machRunOfPfRun`, M1, M2
+`sailCycleOrder`** — a closed proposition about the pf HART ROWS (Sail's cycle as the event instance labels it)
+[R20.s4][R21.s1]: along every `pfRunST` run from `wpInit … (epsInit σ0)` (any `fok`, any `σ0`), at each own `.barrier
+Barrier_RISCV_i` node the latest own `LInstr`/`LIFetch` step is `LInstr`, and at each own sfence-marker announce it is
+`LIFetch` — stated on the label list, NOT through `tsoShadow`'s internal `fiArm` bit (W5 derives `MachOfPf.Hyps.fi :635`
+from it by a one-fold lemma over `shStepF`, `TsoShadow.lean:310-318`), i.e. "the Sail cycle fetches, then announces,
+then executes, and fetches nothing while executing" (`Step.lean:331-404`); FAITHFUL (true of the model by inspection —
+R21's grep: no `execute_*` in `LeanRV64D/*.lean` uses `InstructionFetch`, only the Fetch/PMA/PTW/PMP sites;
+RVWMO/riscv.cat/Zifencei/PMAs silent on in-cycle order); a premise of `machRunOfPfRun`, M1, M2
 and §A's statement, the shape `bootImageSealed` has; W-SCO (after M1) PROVES it for xv6's kernel text, which removes it
 from M1; user rows (M2, the published theorem) keep it unless option (a) (all of `execute`, L–XL) is later taken; the SC-failure model (`Xv6/UserMemLrsc.lean:7-12`;
 D17); single era.  Fidelity: the cat transcription omits rules 6, 7-RCpc, 8 (sound direction for THOSE),
@@ -1007,10 +1022,11 @@ read set `depsOfIb ib.ibBits` ON THE LABEL, as `LExLoad`/`LStore`/`LExStore` car
 §C W13 (F-dep).**
 **(12) Audit coverage and file layout** [R1.10].  `Xv6/` never imports `Weak/` (`lakefile.toml:2,27-41`).  Composition
 files live in `Weak/`, registered in `tools/ci/roots-weak.txt` + `tools/audit/baseline-weak.json` + `XV6_AUDIT_MODULES`
-(`tools/ci/audit.sh:44`), built by `--weak` CI over the whole `Xv6` cone (D13); pure-`Xv6/` items (W3, W8) go to
+(`tools/ci/audit.sh:44`), built by `--weak` CI over the whole `Xv6` cone (D13); pure-`Xv6/` roots (W3; W8's export `Xv6/AccessDiscipline.lean` —
+its LEDGER is a serial MachCSL item, NOT `Xv6/`-only [R21.1][OWN.36], §C) go to
 `roots.txt`/`baseline.json` (`tools/ci/lint.sh` checks agreement).  [R14.1] A MachCSL change whose cone build is green
 can still break `Weak/` (`audit.sh:13-16`: "Weak/ is not in the Xv6/MachCSL build CI audits") and the `Vtest` lib
-(`lakefile.toml:43-49`, NOT a default target; `tools/ci/vtest.sh check`) — W-COH's and W-RSV's briefs REQUIRE `lake
+(`lakefile.toml:43-49`, NOT a default target; `tools/ci/vtest.sh check`) — W-COH's, the W8 ledger's and W-RSV's briefs REQUIRE `lake
 build Weak.TsoOfPf Vtest` (or the `--weak` lane + `vtest.sh check`) in their acceptance.  S.
 
 ## C. Roadmap
@@ -1037,22 +1053,24 @@ run + projection lemma, `srvwmoXv6M1Satisfiable :733`; W4 census D1/R5 "the prem
 items (1), (2), (4); item (3) `fiArm` → [OWN.35] `sailCycleOrder`, §D), **[R20.3] W11 (iv)b `linCandScaT :757`**
 (`Weak/RvwmoXv6ScaT.lean`, 792; + `linCandScaTCatT :780`/`linCandScaTMinus :787`), **W-DMA0** (option (A) [OWN.34]; §C
 W-DMA0 records the landed form), **W4 F1–F8** (`Weak/MachOfPf.lean`, 1659 — `machRunOfPfRun :1535`; §C W4 records what it
-leaves OPEN).  IN FLIGHT: none on this plan's lanes (rev 24).
-**MAY LAUNCH NOW (rev 24; no owner gate)**: **W-DISK** (E-D1 RULED (a) [OWN.29]; L–XL; `Weak/VirtioProg.lean` + the
+leaves OPEN).  IN FLIGHT: none on this plan's lanes (rev 25).
+**MAY LAUNCH NOW (rev 25; no owner gate)**: **W-DISK** (E-D1 RULED (a) [OWN.29]; L–XL; `Weak/VirtioProg.lean` + the
 `WeakEv*` disk arms + the `pdevEv`/devfree/`devQuiet` files; §C W-DISK carries the (M4)/(M9) MECHANISM [R16.1], [R17.1]'s
 FOLDING RULE, [R17.3]'s `devQuiet`, [R17.4]'s (viii), [R18.1]–[R18.4], [R19.1]–[R19.3] and NOW [R20.1] (reset-absorbing
-`pre₁`) + [R20.2] (zero-length data node elided) — launchable once this revision is accepted) ∥ **W5 CORE** (§C W5: M1's
+`pre₁`) + [R20.2] (zero-length data node elided) + [R21.3] (IN 1 → 5; no single-burst invariant) — launchable once this revision is accepted) ∥ **W5 CORE** (§C W5: M1's
 statement and every discharge EXCEPT `Hyps.disk` — HSafe, the fetch cut via `cutOfPristine` + `winPristine` from
 `powerInterp_textPristine`, `Hyps.tso` by `pfStepTsoProposed`, the boot bridge, `sailCycleOrder` as the named premise —
-with F9's `Hyps.disk` an explicit hypothesis; M) ∥ **W8** (its gate W2 CLOSE is MET and `R` = `rmem ∧ viewRel` is landed;
-D26; launch at the coordinator's discretion — L–XL).  **W13 (I)** after W-DISK only ((M) landed; (I)'s `gfDev` criterion
+with F9's `Hyps.disk` an explicit hypothesis; M; [R21.4] PLUMBING — conditional on `Hyps.disk`, UNSATISFIABLE until W-DISK
++ F9: not a milestone, not registered) ∥ **W8-design** (S, read-only [R21.1][OWN.36]; §C W8 — W8's ledger then launches as
+the next SERIAL MachCSL item, before W-RSV).  **W13 (I)** after W-DISK only ((M) landed; (I)'s `gfDev` criterion
 needs the fused `DWriteDev` in the tree, [R16.1 (iv)]).
 WAITS: **W4 F9** (disk rows) for W-DISK only (W-DMA0 DONE) — and F9 must loosen `SimRel`'s device clause (`efDev =
 σ.devs`, `MachOfPf.lean` header deviation 6) to `R-dev` (equality off the OUT capture segment, the [R20.1] `pre₁` form on
-it) and re-check the hart MMIO row against it; **M1 CLOSES** when F9 lands (W5 CORE instantiates `Hyps.disk`) — NO
+it) and re-prove EVERY consumer of `SimRel.dev` [R21.3 (c)] (§C W4 OPEN (b)); **M1 CLOSES** when F9 lands (W5 CORE instantiates `Hyps.disk`) — NO
 disk-free M1 variant: M1's premise set IS `srvwmoXv6M1Premises` (§A), whose `srvwmoXv6M1PfRun` runs contain disk-agent
 program steps (START is unguarded from `.PDisk none`, `WeakEvInst.lean:488`), so a "no disk step" premise would be a NEW candidate
-restriction, underivable at Stage 2 and dropped at M2 — not worth a second statement; **W-RSV** for M1 (D26); **W-SCO**
+restriction, underivable at Stage 2 and dropped at M2 — not worth a second statement; **W8 ledger** (serial MachCSL) for
+W8-design's review [OWN.36]; **W-RSV** for M1 AND the W8 ledger (D26); **W-SCO**
 (the [OWN.35] demotion) for M1; **W5d/M2** for M1; **W5d-G G1–G5** — their gate W13 (M) is MET (Q-W5dG-seq (a) [OWN.24]), but they edit the chain files
 beside W13 (I)/(K): launch after (I)'s brief fixes the `Fab`/`Supply` text (D26); **W11 (iv)c `linCandDiskLat`** for
 W13 (L)'s anchors; **W14** for W13 (I)/(W) + W5d-G (W2 CLOSE ✓).
@@ -1260,8 +1278,11 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   `LDev .dev 0 []` does not say which device moved).  **OPEN from W4**: (a) **`winPristine :1559`** (the kernel text window
   pristine in EVERY reachable powered MachCSL state) is the second hypothesis of M1's `cutOfPristine :1588` — assigned to
   **W5**, via `Xv6.powerInterp_textPristine` (`Xv6/TextPristine.lean:123`) on the W3 twin root; (b) **F9 must loosen
-  `SimRel`'s device clause** (`efDev = σ.devs`, header deviation 6) to `R-dev` ([R18.3]/[R20.1]) and re-check the hart
-  MMIO row against it.  `machRunOfPfRun`: a shaped `pfRunST` run from `wpInit (imgZ bootImage) (efInit
+  `SimRel`'s device clause** (`efDev = σ.devs`, header deviation 6) to `R-dev` ([R18.3]/[R20.1]) (+ the `isr`/`cfg`/`cap`
+  agreement every reader needs) and **re-prove EVERY consumer of `SimRel.dev` [R21.3 (c)]**: all `simNode` posts
+  `c'.pcDev.efDev = σ'.devs` (`MachOfPf.lean:869,906,918,935,943-958,989,1003,1061`), the MMIO arms (`:1007-1038`), `simDev`
+  (UART/PLIC gateway via `devStepOfFdev … hdev.symm`, `:1253,1266`, incl. moves taken ON the capture segment — `dp' = dp`,
+  `WeakEvInst.lean:519-525`) and `simWire` (`:1301-1339`) — S–M of re-proof in `MachOfPf.lean`.  `machRunOfPfRun`: a shaped `pfRunST` run from `wpInit (imgZ bootImage) (efInit
   ds.reset) (epsInit σ0)` (= `srvwmoXv6M1PfRun`'s configuration by `wbootFacts.2.1`; W5-pre re-points the premise set
   to `pfRunST` [W4c D1]), PREFIXED by ONE `PowerOn` step, is a `-<κs>->ₜₚ^[n]` MachCSL run — a forward simulation BY
   INDUCTION ON THE SHADOW-CARRYING STEP LIST (`pfRunST` is snoc-built, `TsoShadow.lean:584`; `R_mem`'s view part is
@@ -1318,13 +1339,16 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   in-flight pre-check (IDENTITY when `phase s h = none`: after a reset nothing is re-applied), then `setPhase .fetched
   :526`, then the `taken` guard `:529` (IDENTITY when `taken ≠ none`: MachCSL blocked, [R19.3]) — the moves MachCSL's
   program order forces BEFORE the `dmaRead` (`Virtio.lean:526,529,516`): the matched run
-  performs `:526` (+ `:529` + `:516` iff the latch is free) at pf's `DRead` — 1 → 3 when free, 1 → 1 when held (MachCSL
+  performs `:526` (+ `:529` + `:516` iff the latch is free) at pf's `DRead` — 1 → 3 when free, 1 → 0 when the request is
+  no longer in flight (a reset between the POP and the `DRead`: `pre₁` the identity; `:526` would resurrect) [R21.s3], 1 → 1 when held (MachCSL
   BLOCKED at `guard :529`, `DevLang.lean:125`/`devBlocked :563`; the `dmaRead` is never performed and pf's read value is
   unused — its status `DWriteDev` aborts on the same guard); `poolRel` records which case (the MachCSL task's position
   does); the other `DWriteDev`s have no `DRead` between the previous fabric step and them (IN: `fill`'s `get :489` is
   right before its `dmaWriteIf :491`; the used writes follow the gate and `get :542-544`), so equality holds there;
-  the clause holds on the WHOLE segment, every hart action included [R20.1]: non-reset MMIO writes (`write :296-323`:
-  `cfg` fields, `isr` ACK) commute with `pre₁` (disjoint fields — verified once by the worker), and a RESET (`write
+  the clause holds on the WHOLE segment, every hart action AND every disk-agent `pdiskUart` move included [R20.1][R21.3
+  (c)]: non-reset MMIO writes (`write :296-323`: `cfg` fields, `isr` ACK) commute with `pre₁` (disjoint fields — verified
+  once by the worker), UART/PLIC moves touch no `dvirtio` field and the PLIC gateway samples virtio's `irq` = `isr`, which
+  `pre₁` leaves untouched (rows close, but are RE-PROVED), and a RESET (`write
   :294-295` → `reset :260-262`, BOTH sides) is absorbed by the pre-check's identity arm (pf's status `DWriteDev` then
   aborts with `d' = d`, 1 → 0) — free / held / reset are ONE formula (rev 23's `setPhase .fetched (+ latch)` was FALSE
   from the reset until that abort: `alistSet :233-234` on the empty map resurrects).  Beside `R-dev` [R19.1 (c)]: **`cache = []` outside a capture → gate window** (pf: the only `cacheReq` is
@@ -1332,9 +1356,10 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   applied to EQUAL states on both sides at every capture and partial-sector lengths need no fact.  Under [R17.1]'s FOLDING
   RULE (α) the folded `modify`s/`guard`s run inside the next fabric step's `pre`; a failed folded guard ABORTS the burst,
   the MachCSL task left a never-again-scheduled zombie (or blocked), matched **1 → 0** [R18.3 (c)] — `devStep`'s blocked
-  arm (`Lang.lean:586` [R19.s2]; `devBlocked :561-569`; a stutter the schedule need not take) is never needed; plus the
-  **single-burst invariant** "`dvirtio.inflight` has at most one entry during a burst, none outside one" beside `R-dev`
-  [R17.1][R17.s5]; the multi-step expansions, `devrt.next`/TaskId/pool-append bookkeeping (13+k).  **Bookkeeping after
+  arm (`Lang.lean:586` [R19.s2]; `devBlocked :561-569`; a stutter the schedule need not take) is never needed; **NO
+  single-burst invariant [R21.3 (b)]** (rev 21's "at most one in-flight entry during a burst, none outside one" is false
+  without a driver fact — an idx own-guard SKIP or an (α) ABORT leaves stale entries; `R-dev`'s equality makes them
+  harmless, §C W-DISK); the multi-step expansions, `devrt.next`/TaskId/pool-append bookkeeping (13+k).  **Bookkeeping after
   [R19.1]–[R19.3] [R18.s3][R19.s1]** (supersedes [R16.s5]/[R17.s5]; the census's "1 → 4 + a NEW THREAD" row
   `W4-structural-census.md:250`): START `LDev` 1 → 2 (`chooseLt 3` = 0, `get :561`); avail-idx `DRead` 1 → 1 (`dma16`);
   ring `DRead` 1 → 1 (`dma16`); POP `DPop` 1 → 4 (`get :567`, `guard :576`, `fork :579`, `serve`'s `get :522` — the two
@@ -1342,7 +1367,7 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   restart after a POP (`pure ()` → `.pure` → `m' = body`, `:578-580`) is 0 → 1, folded into the POP (1 → 5) or the next
   START (1 → 3); OUT capture `DRead` 1 → 3 / 1 → 1 [R19.3]; each `DWriteDev` 1 → k (the `dmaWriteIf`/`dmaWriteStep` plus
   the `pre` moves NOT already performed at a `DRead`, k ≤ 5 — [R20.2] for `r.len = 0` the status write absorbs the
-  elided data phase: OUT 1 → 5, IN 1 → 4, §C W-DISK (M5)); **the drains 0 → 5k root-loop steps** (per cached sector:
+  elided data phase: OUT 1 → 5, IN 1 → 5 (`:526`, `:489`, `:491`, `:534`, `:536`) [R21.3 (a)], §C W-DISK (M5)); **the drains 0 → 5k root-loop steps** (per cached sector:
   `choose`(k = 1), `get`, `choose` j, `modify`, root restart `devStep :580`) INSERTED immediately before the used-element
   `pre`'s `guard :539` in the SAME block, so `completeOk` VERBATIM passes [R19.1 (a)]; a gate ABORT is 1 → 5k (the drains,
   then the blocked guard is never taken); a pre-check ABORT 1 → 0; own-guard SKIP 1 → 1 (`dmaWrite`'s skip arm
@@ -1460,12 +1485,13 @@ MECHANISM [R16.1] and records W-DISK-Q1/Q2/Q3 RULED [OWN.30]–[OWN.32]).**  *Sp
   entry — W-DISK-Q1 RULED (b) [OWN.30] → the standalone serial item W-DMA0 [R16.3]** (MachCSL's `storeDma pa 0` APPENDED a
   log entry while pf emits none — `DmWf`'s `bs ≠ []`; W-DMA0 DONE: `n = 0` appends nothing, `Lang.lean:181-193`);
   **[R20.2] the zero-length DATA PHASE is ELIDED** (today's shape: `dreadData pa 0 k = k []`, `dwriteData pa [] k = k`,
-  `VirtioProg.lean:913-923`): the IN fill `DWriteDev` and the OUT capture `DRead` are EMITTED only when `r.len.toNat ≠ 0`
+  `VirtioProg.lean:358-366`; `:913-923` are their `DmWf` lemmas [R21.s4]): the IN fill `DWriteDev` and the OUT capture `DRead` are EMITTED only when `r.len.toNat ≠ 0`
   (the continuation branches on the decoded `r`; `r.len` is RAM content — `fetch :471,:477` never tests it — so the
   branch is needed, not a driver fact); MachCSL's zero-width ops are matched INSIDE the next `DWriteDev`'s block — OUT:
   `:526, :529, :516` (`dmaRead r.buf 0`, `dmaView` vacuous), `:517` (`cacheReq` with `reqSpan r = 0` adds no entry,
-  `:368, :497`), `:536` — 1 → 5; IN: `get :489`, `dmaWriteIf r.buf 0 :491` (`ramBytes pa 0` vacuous, `storeDma pa 0` a
-  no-op AFTER W-DMA0), `:534`, `:536` — 1 → 4 ([R20.2] wrote "0 → 1" for the fill; its `get :489` is a second step); mark
+  `:368, :497`), `:536` — 1 → 5; IN: `:526` (the FOLDING RULE puts it in the fill's `pre`; with the fill elided it moves
+  here, and `R-dev`'s equality off the capture segment forbids performing it earlier), `get :489`, `dmaWriteIf r.buf 0
+  :491` (`ramBytes pa 0` vacuous, `storeDma pa 0` a no-op AFTER W-DMA0), `:534`, `:536` — 1 → 5 [R21.3 (a)] (rev 24: 1 → 4); mark
   EQUAL to MachCSL (a zero-length transfer is a no-op on both sides; virtio 1.x's text on zero-length buffers not checked
   in-tree); **(M5′) the `ramBytes` seam E-M5**: `pdiskProg`'s write arms mirror `dmaWrite`'s no-op arm (`ramBytes pa n ∧
   g … = some s' → LStore` / `¬ ramBytes (pa s) |bs s| ∨ g s = none → LSilent`, `dp' = some k`; the `n = 0` disjunct
@@ -1490,7 +1516,8 @@ MECHANISM [R16.1] and records W-DISK-Q1/Q2/Q3 RULED [OWN.30]–[OWN.32]).**  *Sp
   (a), not a re-read node; `DmWf` asks `(∀ s, (bs s).length = n ∧ n ≠ 0) ∧ ∀ s, DmWf (k s)` — fixed widths 1/8/2, the fill
   a NON-ZERO `r.len` ([R20.2]: the node is emitted only then)) — the pf twin of `DevM.dmaWriteStep` (`MachCSL/Dev/DevLang.lean:163-167`): `pdiskProg`'s arm reads the CURRENT
   fabric at the write — `(pre (dvirtio d)).2 = true ∧ g s = some s' ∧ ramBytes (pa s) |bs s| ∧ bs s ≠ [] → l = LStore false
-  (paZ (pa s)) (bs s) [] [] ∧ dp' = some (k s) ∧ d' = setDvirtio d s'`; **[R16.1-alt]** `g s = none ∨ ¬ ramBytes → l =
+  (paZ (pa s)) (bs s) [] [] ∧ dp' = some (k s) ∧ d' = setDvirtio d s'` (`bs s ≠ []` is redundant under `DmWf`'s `n ≠ 0`,
+  hence no `bs s = []` skip disjunct — harmless [R21.s4]); **[R16.1-alt]** `g s = none ∨ ¬ ramBytes → l =
   LSilent ∧ dp' = some (k s) ∧ d' = setDvirtio d s`
   (the own-guard SKIP keeps `pre`'s moves) — R16 wrote "the stall self-loop" for the `none` case, but MachCSL's `dmaWrite` with
   `g = none` SKIPS the write and CONTINUES (`Lang.lean:544`: `(g = none ∨ ¬ ramBytes pa n) ∧ σ' = σ`; DevLang's docstring
@@ -1513,14 +1540,16 @@ MECHANISM [R16.1] and records W-DISK-Q1/Q2/Q3 RULED [OWN.30]–[OWN.32]).**  *Sp
   capture's `modify :517-518` [R20.1]** (pre-check, identity when `phase s h = none` → `setPhase .fetched :526` → `taken`
   guard `:529`, identity when `taken ≠ none` [R19.3]): MachCSL's program order puts `:526` and `:529` BEFORE the `dmaRead :516`,
   and the `dmaRead` must be matched to pf's `DRead` (same step, else `latest`/top values differ), so the matched run
-  performs `:526` (+ `:529` + `:516` iff the latch is free) AT pf's `DRead` — 1 → 3 when free, 1 → 1 when held: `guard
+  performs `:526` (+ `:529` + `:516` iff the latch is free) AT pf's `DRead` — 1 → 3 when free, 1 → 0 when no longer in
+  flight [R21.s3], 1 → 1 when held: `guard
   :529` is `DevM.guard`, which BLOCKS when `taken ≠ none` (`DevLang.lean:125`; `devBlocked :563`), the `dmaRead` is never
   performed, pf's read value is unused and its status `DWriteDev` ABORTS on the same guard in its `pre` with `d' =
   setDvirtio d (pre s).1` = MachCSL's blocked state; `poolRel` records which case (the MachCSL task's position does).  No
   other `DWriteDev` has a `DRead` between the previous fabric step and it (IN: `fill`'s `get :489` is immediately before
   its `dmaWriteIf :491`; the used writes follow the gate and `get :542-544` directly), so equality holds there.  The
-  clause holds on the WHOLE segment, every hart action included [R20.1]: non-reset MMIO writes (`write :296-323`: `cfg`
-  fields, `isr` ACK) commute with `pre₁` (disjoint fields — the worker verifies this once), and a RESET (STATUS := 0,
+  clause holds on the WHOLE segment, every hart action and disk-agent `pdiskUart` move included [R20.1][R21.3 (c)]:
+  non-reset MMIO writes (`write :296-323`: `cfg` fields, `isr` ACK) commute with `pre₁` (disjoint fields — the worker
+  verifies this once), UART/PLIC moves leave `dvirtio` alone and sample `isr`, which `pre₁` does not touch, and a RESET (STATUS := 0,
   `write :294-295` → `reset :260-262` on BOTH sides; the matched MachCSL task sits at `:517` or blocked at `:529`) is
   absorbed by the pre-check's identity arm — pf's status `DWriteDev` then aborts with `d' = d`, 1 → 0; free / held /
   reset are ONE formula, `poolRel` still records the MachCSL task's position (rev 23's `setPhase .fetched (+ latch)`
@@ -1554,11 +1583,12 @@ MECHANISM [R16.1] and records W-DISK-Q1/Q2/Q3 RULED [OWN.30]–[OWN.32]).**  *Sp
   `completeOk`'s `wce` branch: with `wce = true` (a hart negotiating F_FLUSH — not xv6) MachCSL need not drain, but the
   matched run still MAY, so the block above is unconditional.  (Rev 22's warning stands in the other direction: folding
   `completeOk` verbatim WITHOUT a pf drain would skip every OUT request's used writes and xv6's `virtio_disk_rw` would
-  sleep forever on `b->disk` — a safe, write-dead disk.)  **Single-burst invariant** (F9, beside `R-dev`): `pdiskProg` holds ONE residual program and
-  STARTs only from `none` (`WeakEvInst.lean:485-488`), so one request is served per burst; every OTHER in-flight entry
-  is a zombie — none exists under the verified driver, where `inflight` has at most one entry during a burst and the
-  `taken` latch, `pushOk` and (M9)'s pop guard "a head already held" (`:571-578`) are never false; a folded guard fails
-  only once a zombie exists, which (α) handles.  **Snapshot [R18.4 (c)][R19.2]**: taken exactly where `serve` does — START
+  sleep forever on `b->disk` — a safe, write-dead disk.)  **In-flight entries [R21.3 (b)] (NO invariant needed)**:
+  `pdiskProg` holds ONE residual program and STARTs only from `none` (`WeakEvInst.lean:485-488`), so at most one
+  `inflight` entry belongs to a LIVE MachCSL task (the current burst's); every other entry's task is a never-scheduled
+  zombie (an (α) ABORT) or has FINISHED (an idx own-guard SKIP leaves `(h, .pushed)` while the task completes,
+  `Virtio.lean:552-554`, `Lang.lean:569-573`); `R-dev`'s equality makes such stale entries harmless (`pushOk`/`taken`/the
+  pop guard read the same map, both sides refuse/abort alike); under the verified driver none exists.  **Snapshot [R18.4 (c)][R19.2]**: taken exactly where `serve` does — START
   (root loop's `get :561`: `live`, avail/ring addresses, `seen`), POP (`serve`'s `get :522`: `cfg` for the descriptor
   addresses, via `DPop`'s continuation), the fill's `pre` (`get :489`: `cacheView`), the used-element `pre` (`get
   :542-544`: `usedIdx`, `cfg`, HANDED to the continuation and re-tested at the idx write); the simulation's SCHEDULING
@@ -1690,33 +1720,50 @@ MECHANISM [R16.1] and records W-DISK-Q1/Q2/Q3 RULED [OWN.30]–[OWN.32]).**  *Sp
   `xv6FsAdequacy_closed`, `xv6NiAdequacy`, `unionAdequacyClosed` (`Xv6/LinkUInitUnion.lean:163-164`), W3's root
   `xv6TextAdequacy_closed` ✓ and W1b (`allocprocTraceAns :402`, DONE) conclude; `κs` is W4's `pfObsOf` (E-S3).  Header:
   internal milestone, kernel-only by PREMISE (D21), loads SCA at or above the TsoMem floor by premise `candScaT`,
-  `sailCycleOrder` a named premise [OWN.35] (removed from M1 by W-SCO).  Registered per §B(12).  **Rev 24 split — W5
+  `sailCycleOrder` a named premise [OWN.35] (removed from M1 by W-SCO).  Registered per §B(12) ONLY at M1's CLOSE
+  [R21.4].  **Rev 24 split — W5
   CORE launchable NOW, M1 CLOSES after F9**: W5 CORE instantiates `MachOfPf.Hyps` (`MachOfPf.lean:620`) for `fok =
   candKfetch bcRoLo bcRoHi`: `tso` by `pfStepTsoProposed`, `safe` (HSafe) from `xv6FsAdequacy_closed`'s `Reducible`,
   `cut` by `cutOfPristine :1588` whose `winPristine :1559` hypothesis it proves for every reachable powered state from
   `Xv6.powerInterp_textPristine` (`Xv6/TextPristine.lean:123`, through the W3 twin `riscvPowerAdequacyT`) — W4's OPEN
-  item (a); `fi` = the DEFINITION `sailCycleOrder` (W5 states it as the closed Prop of §B(11), [R20.s4]); `disk` an
+  item (a); `fi` from the DEFINITION `sailCycleOrder` (W5 states it in the label-list form of §B(11) and derives
+  `Hyps.fi` by a one-fold lemma over `shStepF` [R20.s4][R21.s1]); `disk` an
   EXPLICIT hypothesis of the CORE theorem (F9's interface), so W5 CORE must consume `machRunOfPfRun` only through
   `MRun`/`pfObsOf` and NOT unfold `SimRel`'s device clause (F9 changes it).  NO disk-free M1 variant (§C top: M1's runs
-  contain disk-program steps).  Deps: W1b ✓, W3 ✓, W4 F1–F8 ✓, W5b ✓ + W5b′ ✓ + W5-pre ✓, W5c ✓, W-DMA0 ✓; the CLOSE:
+  contain disk-program steps).  **[R21.4] W5 CORE's theorem is CONDITIONAL on `Hyps.disk`, which is UNSATISFIABLE until
+  W-DISK (aligned program — today's used element is TWO 4-byte writes, `VirtioProg.lean:587-588`, vs MachCSL's ONE 8-byte
+  `dmaWriteIf`, `Virtio.lean:546-548`, so any completed request breaks `R-hist`) and F9 (`R-dev` — full `SimRel.dev`
+  equality fails on the OUT capture segment, [R20.1]) land.  It is PLUMBING, NOT a milestone: NOT registered in
+  `roots-weak.txt`/`baseline-weak.json`, not counted in status %; its acceptance = the four discharges (`tso` by
+  `pfStepTsoProposed`, HSafe and `winPristine` from `xv6TextAdequacy_closed`, `cut` by `cutOfPristine`) + the statement
+  checked to use `SimRel` only through `MRun`/`pfObsOf`/`cutOfPristine`'s three fields (`pow`/`mem`/`auth`).  M1 is
+  registered and reported only when F9 discharges `Hyps.disk`.  W5 CORE also corrects `MachOfPf.lean`'s header deviation 3
+  ("its owner is OPEN", `:58-60`) to [OWN.35].**  Deps: W1b ✓, W3 ✓, W4 F1–F8 ✓, W5b ✓ + W5b′ ✓ + W5-pre ✓, W5c ✓, W-DMA0 ✓; the CLOSE:
   F9 (W-DISK).
 
 - **W-SCO — `sailCycleOrder` PROVED for xv6's kernel text (NEW rev 24, Q-FIARM RULED (b)+(a′) [OWN.35]; AFTER M1;
   M–L, unverified).**  Q-FIARM's (a′): the cycle is `ucDispatch` → `fetch ()` → `ucAfterFetch fr` by equations
   (`MachCSL/UCycleDefs.lean:11-17`, `uc_runHartActive_eq`), whose first event after the fetch is the announce
   (`Step.lean:340/:377`); the "no fetch during execute" half per decoded instruction, for the words M1's runs can execute
-  (`candKfetch`'s pristine window, the words W4's HSafe decode meets).  Delivers `sailCycleOrder` restricted to
+  — **[R21.s2] EVERY 2-aligned 4-byte word of `[bcRoLo, bcRoHi)`**, which includes `.rodata`/`.eh_frame`
+  (`Xv6/LinkTextAdequacy.lean:8-9`): HSafe does not confine the pc to `.text`, so data decoded as instructions is in scope;
+  the plan's choice is this whole-window per-word lemma (precedent: Q22's 2-aligned `textAt4S`, `AxSpinTextCerts`), NOT a
+  new pc-in-`.text` export from the SC tree (recorded alternative).  Delivers `sailCycleOrder` restricted to
   `candKfetch` runs as a THEOREM, M1 loses the premise; M2 and §A's statement KEEP it for user text (any instruction)
   unless option (a) (all of `execute`, L–XL) is later taken — §B(11).  Corrects `PfStepTsoView.lean`'s header deviation
   (4).  Risk: a `SailM` residual invariant between the announce and the barrier node (new machinery).
-- **The THREE SERIAL MachCSL items — all RULED, no gate left [OWN.21]–[OWN.23][OWN.30] (one worker, one `Xv6`-cone
-  rebuild each): W-COH ✓ → W-DMA0 ✓ → (M1) → W-RSV [R16.3].**  `Xv6/` NAMES neither reservations nor `coh` (census:
+- **The FOUR SERIAL MachCSL items — all RULED, no gate left [OWN.21]–[OWN.23][OWN.30][OWN.36] (one worker, one
+  `Xv6`-cone rebuild each): W-COH ✓ → W-DMA0 ✓ → W8 ledger → (M1) → W-RSV [R16.3][R21.1].**  **W8 ledger** (L–XL; Q-W8-lane
+  RULED (α) [OWN.36]; launches after W8-design is reviewed, §C W8): edits `Resources.lean`'s `memModelAt :938-951` beside
+  `mmOk :779-785` and every `Wp*` memory rule (`Wp`, `WpAtomic`, `WpDma*`) — the files W-RSV rewrites, so it lands FIRST
+  and W-RSV rebases on it; it shares no file with W-DISK/W5 CORE/F9 (`Weak/`-only) if W8-design keeps it ghost-only
+  (`MState` unchanged); if it is not done when M1 closes, W-RSV WAITS (recorded risk: the critical path moves).  `Xv6/` NAMES neither reservations nor `coh` (census:
   `Xv6/*.lean` has no `othersReserve`/`blockedStep`/`resvMap`/`snapOf`/`cohOk`, only `SystemSlot.lean:64`'s comment on
   `mmOk`'s `resv_ok`) — true of NAMES, not of the FILES a statement change touches: W-RSV (i-a) changes the cycle rules'
   AND the 35 `wp_m_*` wrappers' statements and so edits 12 `Xv6/` files (8 apply a cycle rule directly, 3 apply
   `wp_m_*`, `SpecSpin`) [R12.1][R13.1].  Order: **W-COH first — DONE (merged 2026-10-11 09:23, build 3814 jobs,
-  lint/audit/tcb ok)**, **W-DMA0 — DONE 2026-10-11** (option (A)), **W-RSV last** (L–XL — the LARGEST [R12.1]; waits for M1
-  per D26, not for a file conflict).  Rev 19's "(b) best folded into W-RSV's brief" is WITHDRAWN [R16.3]: W-RSV waits
+  lint/audit/tcb ok)**, **W-DMA0 — DONE 2026-10-11** (option (A)), **W8 ledger** next [OWN.36], **W-RSV last** (L–XL
+  [R12.1]; waits for M1 per D26 and for the W8 ledger by file overlap).  Rev 19's "(b) best folded into W-RSV's brief" is WITHDRAWN [R16.3]: W-RSV waits
   for M1 (D26), M1 = W5 needs W4 F9, F9 needs the `storeDma` change to prove `R-log` across a 0-length DMA write — so
   folding (b) into W-RSV puts F9 → M1 → W-RSV → (b) → F9 in a CYCLE.
   **W-DMA0 — `MState.storeDma pa 0 w` is a NO-OP (S, serial MachCSL — DONE 2026-10-11 via option (A) [OWN.34]; W-DISK-Q1
@@ -1911,7 +1958,10 @@ MECHANISM [R16.1] and records W-DISK-Q1/Q2/Q3 RULED [OWN.30]–[OWN.32]).**  *Sp
 - **W12 `Weak/CatLin*.lean`** (M–L ≈ 1.2–1.8k, spike-sized; D25 RULED (a) [OWN.5]) [R6.1iii] — the spike's design:
   (1) core predicate `rvwmoCoreD GD := gwf ∧ gloadValue ∧ gatomicity ∧ gdepsWf`; restate `topoLinearizes`' section
   variable, `topoExists`, `racyDMem`, `normalizeOfAcyclic(')`, `topoSupply`, `hullRealizable*`, `hullRun`,
-  `topoLinearizesF` over it (statement edits, S); (2) kill definitions from the scratch's §0–§3 — `rvwmoCatAD GD ad`
+  `topoLinearizesF` over it (statement edits, S); **[R21.2] the restated `normalizeOfAcyclic` ALSO concludes
+  `gppoCat6Gmo GD'.gdG`** (the topo order extends the cat chain's `racyD`, which must contain `gppoCat6` — today's `racy`
+  has a `gppo` arm, `racyD :200`/`rtRacy :207-211` in `WeakRvwmoAcyc.lean`; or keep RVWMO⁻ on `GD'` if `racyD` keeps `gppo`) — **unverified**, S–M;
+  the producer of `linCandScaT`'s premise at Stage 2; (2) kill definitions from the scratch's §0–§3 — `rvwmoCatAD GD ad`
   (cat's six arms, lv, atomicity, deps, rule 12 over `ad ⊆ gdDeps`; entries `catADOfCatT` on `forget GT` with `ad :=
   gtAd`, `catADOfCat`, `catADOfMinus`), `rsameC`/`gcrossE`, `segPinC` as a same-hart CHAIN of `pinStep`s with the
   rule-12 forward case `segPinCForward` (why `ad` must be TAGGED), `CertC`/`chainC`/`cycleKillArmsC`, the lock kit
@@ -2124,11 +2174,20 @@ MECHANISM [R16.1] and records W-DISK-Q1/Q2/Q3 RULED [OWN.30]–[OWN.32]).**  *Sp
   top, I/O events at their trace positions) so the graph is the trace's own (`gmo` = trace order of writes and I/O
   events, `fab` = its I/O restriction; (R1)–(R3) by construction) and SC ⊆ RVWMO makes it cat-consistent TRIVIALLY
   [R8.s3]; the fetch clause by `fetchPinCutOk`/`gzFetch` at tag 0 (kernel text) and the TsoMem `itv` (user text).
-  Certifies non-vacuity AT `allocproc` ([OWN.3]); until it lands the header carries D44's caveat.  Deps: W2 CLOSE (`R` =
-  `rmem ∧ viewRel`, landed; the composition pending), W-DISK (the disk rows it certifies are the ALIGNED program's) and
+  Certifies non-vacuity AT `allocproc` ([OWN.3]); until it lands the header carries D44's caveat.  Deps: W2 CLOSE ✓
+  (`pfStepTso` landed [R21.s4]), W-DISK (the disk rows it certifies are the ALIGNED program's) and
   table; W5b ✓; W13 (E)/(I)/(W); W5d-G.  Risk: "reaches `allocproc`" is LIVENESS-flavoured reachability of the SC tree,
   which exports safety only — a dedicated SC-tree lemma ("some run reaches `userinit`'s `allocproc` call") may be needed, M–L, **unverified**.
-- **W8 `Xv6/AccessDiscipline.lean`** (L–XL; D24) [R4.3][R4.s3][R4.s4].  Export from the SC tree, per reachable
+- **W8 `Xv6/AccessDiscipline.lean` + its state-interpretation LEDGER** (L–XL; D24) [R4.3][R4.s3][R4.s4]; **[R21.1]
+  Q-W8-lane RULED (α) [OWN.36]: W8-DESIGN first, then the ledger as the next SERIAL MachCSL item, before W-RSV.**
+  **W8-design** (S, read-only; reviewed before W8 proper) pins: (1) **the export statement** (fixes D24) — a Lean skeleton
+  over `MState`'s per-byte histories (`HEnt.tid`/`HEnt.t`) and the author log for (i) ownership, (ii) lock-protected
+  access, (iii) no foreign owned-unpublished message, checked against how W11 (i) `badSeg`/(ii) `protReg` consume it
+  through `rmem`'s `R-log`/`R-hist` (`PfStepTsoMem.lean:57,62`); (2) **the ledger's file/lane** — ghost-only in
+  `memModelAt` (`MState`/`Lang.lean` unchanged, so W4's `SimRel` and W2a's `rmem` are untouched), or name the machine
+  field and its `Weak/` cost; (3) **whether a ledger-free (β) export** (D24 (c): W9a's static pin check + ownership
+  facts proved in `Xv6/` at adequacy) covers (i)/(iii) — if so W8 SPLITS: (i)/(iii) an `Xv6/`-only parallel item, (ii)
+  the ledger.  Export from the SC tree, per reachable
   MachCSL state (the `mmOk` idiom) on `MState`'s author log + per-byte histories (`MachCSL/Lang.lean:147-153`), in
   the vocabulary `protReg`/`badSeg` consume: (i) bytes a hart OWNS — no foreign writer (covers `PStack`/`PPerCpu`,
   the 58 `own = true` witnesses; `gen_weak_pins.py --check` as the audit); (ii) a protected access under a held lock
@@ -2137,13 +2196,14 @@ MECHANISM [R16.1] and records W-DISK-Q1/Q2/Q3 RULED [OWN.30]–[OWN.32]).**  *Sp
   wpublished :399-400`; `Weak/WeakViolation.lean:9-15`) — HART authors only, DMA exempt, mirroring `violationHart`
   (`WeakRobust.lean:100-107`); (iv) ALL 182 `PCall`/`PResidue` sites and the 58 sp-frame witnesses classified into
   (i)–(iii) (W9b; D28 RULED (a) [OWN.7]); (v) user-text page ownership for W5d-G's G7.  A ledger threaded through the
-  MachCSL memory rules — mechanical but wide; ownership residue ~5 idioms (`swtch` reloads, trapframe loads off `a0`,
+  MachCSL memory rules (`Wp`, `WpAtomic`, `WpDma*`, beside `mmOk`) — mechanical but wide, one ≈ 0.73M-line `Xv6`-cone
+  rebuild, the `--weak` lane in acceptance (§B(12)); ownership residue ~5 idioms (`swtch` reloads, trapframe loads off `a0`,
   user-table walks, boot-published globals).  Exports hold on FORWARDING graphs.  **Design gate — G2-Q only [W2s]
   [R10.1][R10.2] — RESOLVED by G2-Q (a′) [OWN.20][OWN.23]** [R4.s5][R6.4a]: (★) is NOT a W8 export under any option
   (discharged by `candScaT`, §B(10)); under the RULED (a′) W8 owes (i)–(v) only.  Recorded: under (b) W8 would have
   gained **(vi) the MIXED-SIZE census** (po-ordered OVERLAPPING loads of DIFFERENT footprints on a concurrently
   written byte; expected vacuous, **unverified**) feeding W11 (iv) through `R`'s log identification — MOOT.  Deps: W2 CLOSE
-  (`R` = `rmem ∧ viewRel`, landed 2026-10-11; the composition `pfStepTso` pending, S–M).  [W13c] W8's (ii) must cover
+  ✓ (`rmem ∧ viewRel` and `pfStepTso` landed [R21.s4]); W8 proper: W8-design reviewed.  [W13c] W8's (ii) must cover
   `lk->cpu` under ITS OWN lock (`wprotAt`; `KernelPins.lean:255` classifies `0x80000c04` `PResidue`) — (K)'s `ioSegPinned`
   precondition (ii) relies on the same export (§C W13 R5).
 - **W9a `Weak/WeakRvwmoPinBridge3.lean`** (L = M–L + M [R6.1]) [R4.1].  R-3: a `pstepEv` run's items are grouped per
@@ -2165,7 +2225,8 @@ MECHANISM [R16.1] and records W-DISK-Q1/Q2/Q3 RULED [OWN.30]–[OWN.32]).**  *Sp
   gmo-before `r`, `gwixLeTvnSca :116`, `tvnScaMono :133`, the named linearization facts `linGmoEmitBefore :144`/
   `linLogEmitted :172` (W13 (L) re-proves only those), `linTvnScaLe :194`, `linScaOk :241`, `linCandSca :314`; no
   exhaustive `Lbl`/`Wlabel` match)** (S) [R4.4] **+ (iv)b `linCandScaT` — DONE [R20.3] (`Weak/RvwmoXv6ScaT.lean`, 792,
-  `Weak.lean:632`: `linCandScaT :757`, `linCandScaTCatT :780` on `GT.gtG` — what W11 (v)/W13 (L) consume —,
+  `Weak.lean:632`: `linCandScaT :757` — what W11 (v)/W13 (L) consume, on the NORMALIZED `GD'` (premise producer W12 (1))
+  [R21.2] —, `linCandScaTCatT :780` (input graph; NOT on the Stage-2 path),
   `linCandScaTMinus :787`; premises `gwf`/`gppoCat6Gmo`/`gloadValue`/`grule14`, rules 2/4/5, no `gatomicity`/rule 12, `LIo`
   handled without `gwf`'s interim arm) and (iv)c `linCandDiskLat` (after W13 (L)) [W2s][R10.2]**: the §B(10) derivations — the SCA
   witness is the load's gmo position, ≥ the pair's position by rule 5/4 and the gmo|W log order (`ptraceRel`); the
@@ -2180,25 +2241,27 @@ MECHANISM [R16.1] and records W-DISK-Q1/Q2/Q3 RULED [OWN.30]–[OWN.32]).**  *Sp
 
 **Stage 3 — AxSL tier: retired** [OWN.1].  One-paragraph note on Theorem 2 (D6).
 
-**Status of the launch (rev 24, 2026-10-11) [W2s][OWN.16–35]:** DONE — W3, W5b, W5c, W1b (+ follow-up + (A)), W5b′,
+**Status of the launch (rev 25, 2026-10-11) [W2s][OWN.16–36]:** DONE — W3, W5b, W5c, W1b (+ follow-up + (A)), W5b′,
 W-COH, W5d-G G0, W2a, W2b, **W13 (T)+(M)** (`GraphFabResidue.lean`, `lbIsMem`), **W5-pre**, **W11 (iv)a** [R16.4], **W2
 CLOSE** (`Weak/PfStepTso.lean`; item (3) → `sailCycleOrder` [OWN.35]), **W11 (iv)b** (`Weak/RvwmoXv6ScaT.lean` [R20.3]),
 **W-DMA0** (option (A), `hzero` form), **W4 F1–F8** (`Weak/MachOfPf.lean`, `machRunOfPfRun`); the W2 spike (D7 STOP,
 redesigned); W13 (E) PARTIAL (alphabet merged, three lines → (I)); censuses W4/W13 landed.  IN FLIGHT: none.  **Now
 launchable** (§C top): W-DISK (L–XL; after this revision's review — the brief carries [R16.1], [R17.1], [R17.3], [R17.4],
-[R18.1]–[R18.4], [R19.1]–[R19.3] and [R20.1]–[R20.2]) ∥ W5 CORE (M; M1 parametric in F9's `Hyps.disk`, discharging
-`winPristine`) ∥ W8 (gate W2 CLOSE MET; coordinator's call).  **Gated**: W4 F9 on W-DISK (and loosens `SimRel`'s device
-clause to `R-dev`); M1's CLOSE on F9; W-SCO and W-RSV on M1; W13 (I) on W-DISK (the fused `DWriteDev` and state-aware
+[R18.1]–[R18.4], [R19.1]–[R19.3], [R20.1]–[R20.2] and [R21.3]) ∥ W5 CORE (M; M1 parametric in F9's `Hyps.disk`,
+discharging `winPristine`; PLUMBING, not counted or registered until F9 [R21.4]) ∥ W8-design (S, read-only [R21.1][OWN.36]).
+**Gated**: the W8 ledger (serial MachCSL) on W8-design's review [OWN.36]; W4 F9 on W-DISK (loosens `SimRel`'s device
+clause to `R-dev`, re-proves every `SimRel.dev` consumer [R21.3 (c)]); M1's CLOSE on F9; W-SCO on M1; W-RSV on M1 and the
+W8 ledger; W13 (I) on W-DISK (the fused `DWriteDev` and state-aware
 `pdevEv` are its inputs); W5d/M2 on M1; W5d-G G1–G5 — gate W13 (M) MET, launched after (I)'s brief fixes the
 `Fab`/`Supply` text (D26); W14 on W13 (I)/(W) + W5d-G; W11 (iv)c on W13 (L).  **Serial MachCSL**:
-W-COH DONE → W-DMA0 DONE → W-RSV after M1 (D19 (b), form (i-a) RULED [OWN.22][OWN.23]; L–XL, one `Xv6`-cone rebuild; 12 `Xv6/`
+W-COH DONE → W-DMA0 DONE → W8 ledger [OWN.36] → W-RSV after M1 (D19 (b), form (i-a) RULED [OWN.22][OWN.23]; L–XL, one `Xv6`-cone rebuild; 12 `Xv6/`
 files incl. the M-mode lane [R12.1][R13.1]) — W-RSV waits for M1 (D26), not for an owner.  The published statement's
 shape is FIXED (D32, D33, D37, D38, D44–D52 RULED [OWN.11–18]); W-DISK changes the DEVICE MODEL under it toward the
 model of record, not the statement — `gdexecQconfT`/`xv6ConfS` gain ONE sentence ("one RAM store per completed request
 is a fabric move" [OWN.31]) and the disk row ONE more `dev` event per request (the pop [OWN.32]); the pf disk row's
 SEQUENTIAL service is a named strengthening (§B(11) (viii)) — a concurrent pf disk agent is the follow-up after M2
 [OWN.33].  W13 (F-dep) after
-(I).  **OPEN owner questions: NONE** — Q-FIARM RULED (b)+(a′) [OWN.35]; W-DISK-Q1–Q4 RULED [OWN.30]–[OWN.33], W-DMA0's
+(I).  **OPEN owner questions: NONE** — Q-W8-lane RULED (α) [OWN.36]; Q-FIARM RULED (b)+(a′) [OWN.35]; W-DISK-Q1–Q4 RULED [OWN.30]–[OWN.33], W-DMA0's
 route RULED (A) [OWN.34].
 
 ## D. Owner questions (recommended first; RULED items kept, tightened — [R7.s1]'s appendix NOT adopted: this file only)
@@ -2215,7 +2278,9 @@ step, no pure re-read node [OWN.32] — all three recorded first below, "RULED a
 21): W-DISK-Q4 = (c) sequential pf disk now, named §B(11) (viii); a concurrent pf disk agent = named follow-up after M2
 [OWN.33]; RULED 2026-10-11 (rev 23): W-DMA0's route = (A), the `n ≠ 0` premise on the DMA lease rule's `dmaWrite`
 constructors [OWN.34] (recorded below, §C W-DMA0); RULED 2026-10-11 (rev 24): **Q-FIARM = (b)+(a′) [OWN.35]** — ONE named
-trusted premise `sailCycleOrder`, demoted for kernel text by W-SCO after M1 (FIRST below).  OPEN: NONE.**  R20 (rev 24)
+trusted premise `sailCycleOrder`, demoted for kernel text by W-SCO after M1; RULED 2026-10-11 (rev 25): **Q-W8-lane = (α)
+[OWN.36]** — W8-design spike, then W8's ledger as the next serial MachCSL item before W-RSV (FIRST below; raised by R21,
+whose [R21.2]–[R21.4] are plan text in the sound direction and raised nothing else).  OPEN: NONE.**  R20 (rev 24)
 raised NO owner question ([R20.1]–[R20.2] are pf-internal device-model engineering in the SOUND direction, pf ⊆ MachCSL:
 RVWMO, riscv.cat and this tree's Sail model have no device-internal events, Zifencei/PMAs are silent, virtio 1.x is
 silent on reset-time bookkeeping and — unverified in-tree — on zero-length buffers; eliding a zero-length transfer is
@@ -2238,13 +2303,47 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
 (`LeanRV64D/Defs.lean:549-566`); the platform table types `[0x2000000, 0x12000000)` `IOMemory`, non-idempotent
 (`MachCSL/Platform.lean:220-239`; RAM `MainMemory :240-254`), consulted only through `matching_pma_ram`
 (`PlatformFacts.lean:24`); Sail has NO device/DMA model (`MachCSL/Dev/*.lean`); PMA strong ordering is within ONE channel only.**
+- **Q-W8-lane — RULED (α) [OWN.36] (rev 25; raised by R21 [R21.1]).  Which proof lane does W8 — the export of xv6's
+  per-access discipline — run on?**  *Ruling as applied:* a read-only **W8-design** spike first (pins W8's export
+  statement = D24, the ledger's file/lane, and whether a ledger-free (β) export covers W8 (i)/(iii)); then W8's ledger in
+  the state interpretation is the next serial MachCSL item, BEFORE W-RSV: lane W-COH ✓ → W-DMA0 ✓ → W8 ledger → M1 →
+  W-RSV (§C, D24, D26).  The question as asked:  *Spec (FIRST).*  Not a memory-model question: RVWMO, riscv.cat, the
+  Sail model in this tree, Zifencei and the PMAs say nothing about how a PROOF organises its ghost state — every option is
+  FAITHFUL (none changes the published statement or its quantifier).  *Plain language.*  The robustness argument (route
+  (9d), the step that turns "xv6 is correct on the strong model" into "xv6 is correct on RVWMO") needs facts about HOW xv6
+  touches memory — e.g. "this byte is hart 2's stack, so no other hart writes it", or "this read of `p->state` happens
+  while `p->lock` is held".  Only the existing SC (strong-model) proofs know these facts, so a new export, **W8**, must
+  state them as a property of every reachable machine state.  *Tiny example.*  Hart 0 reads `proc[3].state` at
+  `allocproc+0x40` holding `proc[3].lock`; hart 5 writes that byte only under the same lock.  The final theorem's
+  CYCLE-KILL (the proof step that rules out the weak-memory executions xv6 could not survive — e.g. hart 0 reading a
+  stale `state` that hart 5 overwrote before releasing the lock) needs the state-level fact "every write to that byte in
+  its history was made by a holder of `proc[3].lock`" — W8's (ii).  *Definitions.*  **Serial MachCSL lane**: the
+  one-at-a-time queue of changes to the machine model's proof rules (`MachCSL/`); each change forces a rebuild of the
+  ≈ 0.73M-line kernel proof cone, so two such changes in parallel collide.  Done: W-COH (coherence stamping), W-DMA0
+  (zero-length DMA).  Queued: **W-RSV** (clearing LR/SC reservations at instruction boundaries), after M1.  **M1**: the
+  first internal composed theorem (xv6 on sRVWMO = RVWMO with stores never performed early, kernel-only).  **State-interpretation
+  ledger**: a ghost record kept beside the machine state and updated by every memory rule, as the invariant `mmOk`
+  (`MachCSL/Resources.lean:779-785`) is today.  **`badSeg`/`protReg`**: the robustness proof's two consumers of W8's
+  facts (W11 (i)/(ii)), read through the log identification `R` (`PfStepTsoMem.lean:57,62`).  *Why it matters.*  Nothing
+  in the theorem changes; it is schedule and rework: W8 (L–XL) and W-RSV (L–XL) both edit the memory rules (`Wp`,
+  `WpAtomic`, `Resources.lean`), and whichever lands second redoes its edits — rev 24 launched W8 "in parallel" while
+  calling it `Xv6/`-only, which was wrong.  *Options (recommended first).*  **(α) RULED — ledger in the state
+  interpretation (D24's recommendation) as the next serial MachCSL item, before W-RSV, after a read-only W8-design
+  spike.**  Concretely: `memModelAt` gains the ledger, every `Wp*` memory rule maintains it, the cone is rebuilt once.
+  FAITHFUL.  Cost: S (spike) + L–XL on the serial lane NOW (idle until M1).  Unblocks W11 (i)/(ii) early.  Risk: if it is
+  not done when M1 closes, W-RSV waits and the critical path moves.  **(α′) the same, after W-RSV**: no collision; delays
+  W8 by W-RSV's length — matters only if W8 becomes the bottleneck (W13, XL, is expected to be).  FAITHFUL.  **(β) an
+  export derived WITHOUT touching the rules** (D24 (c): W9a's static pin check + ownership facts proved inside `Xv6/` at
+  adequacy): FAITHFUL; parallel now, no cone rebuild; cost and feasibility **unverified** — (ii)'s lock-protection facts
+  may not be derivable without a ledger; risk: a partial export, the rest a ledger later.  *Recommendation (R21):* (α) with
+  the spike first; if the spike shows (β) suffices for (i)/(iii), split W8 accordingly — RULED as recommended.
 - **Q-FIARM — RULED (b)+(a′) [OWN.35] (rev 24; raised rev 23 by W2 CLOSE's day-one finding, `../weak-orch/parked/
   PROGRESS-W2CLOSE.md`).  Where does the proof get the fact "a hart's `fence.i` barrier comes AFTER its instruction's
   announce, and the announce AFTER its fetch"?**  *Ruling as applied:* ONE named trusted premise `sailCycleOrder` on
   `machRunOfPfRun` / M1 / M2 and §A's statement, listed in §B(11); W4 landed it as `MachOfPf.Hyps.fi :635`; [R20.s4] its
   FORM is a CLOSED proposition over every `pfRunST` run from `wpInit … (epsInit σ0)` (all `fok`, `σ0`) — the realized pf
   run is existential in §A's conclusion, so a per-run side condition could not appear there — the shape `bootImageSealed`
-  has; after M1, **W-SCO** (§C) proves it for xv6's kernel text ((a′), M–L) and demotes it from M1; M2/§A keep it for user
+  has, stated on the hart rows' LABEL LISTS, not on the shadow's `fiArm` [R21.s1]; after M1, **W-SCO** (§C) proves it for xv6's kernel text ((a′), M–L) and demotes it from M1; M2/§A keep it for user
   text unless (a) is later taken.  The question as asked:  *Spec (FIRST).*  RVWMO and riscv.cat order MEMORY operations; they say nothing about the ORDER OF EVENTS
   INSIDE one instruction's execution cycle (fetch, announce, execute are not RVWMO notions).  Zifencei says a `fence.i`
   orders the hart's earlier stores before its LATER instruction fetches — WHAT the fence does, not WHEN in the cycle the
@@ -2457,7 +2556,7 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
   (one per popped request), a step picks any; `R-dev`/`poolRel` map each to a MachCSL `serve` task — EQUAL to MachCSL
   (interleaving admitted, completion order free), still STRONGER than virtio only by (R1)–(R3)'s one-row coupling (D51);
   cost M–L inside W-DISK (the `DM` list, `ediskStep`'s arms, `WeakEvDisk`'s per-node rules re-indexed) + M in W4 F9 (the
-  `13+k` thread map becomes real; the single-burst invariant goes and [R17.1]'s abort does real work); unblocks a more
+  `13+k` thread map becomes real; the rev-21 single-burst invariant (dropped by [R21.3 (b)]) is moot and [R17.1]'s abort does real work); unblocks a more
   credible device model; risk: W-DISK grows toward XL and delays F9/M1.  **(c) RULED — (a) now, (b) as a NAMED follow-up
   after M2**: the published statement's SHAPE is the same either way; (b) later replaces the pf device model under it.
   *Recorded:* (a) alone, (b) now (rejected: M–L on the critical path to M1).
@@ -2551,7 +2650,7 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
   log is gmo-ordered.  Sail: `execute_AMO` (`InstsEnd.lean:18663`) issues `mem_write_ea … aq`/`mem_read … aq`, the
   access kind carries the bit (`AS_rel_or_acq`, `PhysMemInterface.lean:315,364`), NO view semantics (the memory model
   is external).  Zifencei/PMAs: silent.  Options: (e) **`candScaT` — SCA at a view ≥ `tsoShadow`'s floor** (§B(10)) —
-  FAITHFUL at Stage 2: DERIVED (`linCandScaT`, LANDED [R20.3]: `gppoCat6Gmo` + `grule14`, rules 2/4/5) given G2-Q (a′)/(a‴), or (b) + W8 (vi)
+  FAITHFUL at Stage 2: DERIVED (`linCandScaT`, LANDED [R20.3]: `gppoCat6Gmo` + `grule14`, rules 2/4/5, consumed on the NORMALIZED `GD'` — NOT `linCandScaTCatT` on `GT.gtG` [R21.2]) given G2-Q (a′)/(a‴), or (b) + W8 (vi)
   transported [R10.2]; a PREMISE at M1/M2 only (restricts the candidate's log order to a gmo-extension); cost W5b′
   S–M + W11 (iv) M (S–M under (a‴)); re-opens nothing (RULED); (a) D7 (Rec):
   WeakMem's aq exclusive read takes TsoMem's view (`wVrNew := |log|`) — STRONGER pf machine; T1 `srvwmoRealizable`
@@ -2806,21 +2905,24 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
 - **D21.** (Rec) report M1 as
   "composition milestone, kernel-only by premise `candKfetch`, loads SCA by premise `candSca`"; (b) nothing before M2.
   **D22.** (Rec) the `_entry` first-load witness gates M1 (SATISFIABLE, QUIESCENT, not reaching `allocproc`); (b)
-  follow-up.  **D23.** (Rec) W1 via `xv6NiPhi` (S–M); (b) the rev-3 ledger hook (M).  **D24. W8's export form.**  (Rec)
-  a per-state predicate on `g.m` + a ghost access ledger exported like `mmOk`, in `protReg`/`badSeg`'s vocabulary;
-  (b) a new `Obs` per access; (c) trace-free from W9a's check + ownership facts.
+  follow-up.  **D23.** (Rec) W1 via `xv6NiPhi` (S–M); (b) the rev-3 ledger hook (M).  **D24. W8's export form — PINNED by W8-design [R21.1][OWN.36]**
+  (provisional until then).  (Rec) a per-state predicate on `g.m` + a ghost access ledger exported like `mmOk`, in
+  `protReg`/`badSeg`'s vocabulary — its LANE RULED (α) [OWN.36]: serial MachCSL, before W-RSV; (b) a new `Obs` per
+  access; (c) trace-free from W9a's check + ownership facts — W8-design checks whether (c) covers (i)/(iii).
 - **D25** — RULED [OWN.5], spike-CONFIRMED: (a) cat-sound kill arms (`rsameC`/`gcrossE`, lock kit `*C`,
   `normalizeOfAcyclic` over the core), M–L.  **D26. Stage-2 sequencing** [R4.s5][R6.3][W2s][R10][R11] — rev 19 state:
   the Stage-1 brace {W5b′ ∥ W1b ∥ W13 (E) ∥ W5d-G G0 ∥ W-COH} is DONE (W13 (E) partial per [OWN.27]), W2a/W2b DONE,
   W13 (T)+(M), W5-pre, W11 (iv)a DONE (rev 20 [R16.4]).  (Rec) **{W2 CLOSE ✓ ∥ W4 F1–F8 ✓ ∥ W11 (iv)b ✓ ∥ W-DMA0 ✓ (rev 24)} → {W-DISK
-  ∥ W5 CORE} → W4 F9 (after W-DISK [R16.3]) → M1 CLOSE → {W-SCO [OWN.35] ∥ W-RSV}** ((i-a)
+  ∥ W5 CORE (plumbing [R21.4]) ∥ W8-design} → {W4 F9 (after W-DISK [R16.3]) ∥ W8 ledger (serial MachCSL [OWN.36])} → M1
+  CLOSE → {W-SCO [OWN.35] ∥ W-RSV (after the W8 ledger)}** ((i-a)
   RULED [OWN.23]; L–XL, the LARGEST serial MachCSL item, one `Xv6`-cone rebuild; W4 re-check, S) **→ M2; graph lane:
   W13 (I) (after W-DISK; M on the fabric side [R16.1]) → {W12 ∥ W12b ∥ W5d-G G1–G5 (gate (M) MET [OWN.24]; after (I)'s
-  `Fab`/`Supply` text is fixed, to keep those files single-writer) ∥ W13 (L)(K)(F-dep)} ∥ W8 (after W2 CLOSE) → W13
+  `Fab`/`Supply` text is fixed, to keep those files single-writer) ∥ W13 (L)(K)(F-dep)} → W13
   (R)(W) → W9a/W10 → W11, W14 after W2 CLOSE and W13 (I)/(W)**; (b) start W8 with Stage 1 (risk: `R` not fixed — now
-  MOOT: `R` = `rmem ∧ viewRel` is landed, only the composition is pending).  [R14.3][OWN.24] W5d-G G1–G5 HERE, after
-  W13 (M) — landed; sequenced behind (I)'s brief for file hygiene only.  [R12.1] W-RSV's L–XL lengthens the serial
-  MachCSL lane (W-DMA0 → W4 → M1 → W-RSV → M2); the graph lane is unaffected and W8 starts after W2 CLOSE, so the
+  MOOT: `R` and `pfStepTso` are landed [R21.s4]).  [R14.3][OWN.24] W5d-G G1–G5 HERE, after
+  W13 (M) — landed; sequenced behind (I)'s brief for file hygiene only.  [R12.1][OWN.36] W-RSV's L–XL lengthens the serial
+  MachCSL lane (W-DMA0 ✓ → W8 ledger → M1 → W-RSV → M2); the W8 ledger uses the lane while it idles until M1 (if it
+  outlasts W-DISK + F9, W-RSV waits); the graph lane is unaffected, so the
   overall critical path moves to W-RSV only if it outlasts W13 (I) + (R) — W13 (XL) remains the expected bottleneck;
   W-DISK (L–XL) sits on W4 F9 → M1's path and on W13 (I)'s, so it launches with this revision's acceptance.
   **Q-W5dG-seq — RULED (a) [OWN.24] (raised by R14): when do W5d-G's G1–G5 start?**  *Spec*: not a semantics question
