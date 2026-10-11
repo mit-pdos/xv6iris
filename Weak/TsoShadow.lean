@@ -2,8 +2,8 @@
 Weak: **the TsoMem view SHADOW over a pf step list** (allocproc plan W5b′, §B(10) "The redesign",
 §C Stage 0 "W5b′"; reviews [R10.3], [R11.1], [R11.3]).
 
-Lean-only (no Rocq source).  TsoMem's per-hart READ SIDE (`tv`, `rv`, `coh`, `acq`;
-`MachCSL/Lang.lean:127-163`, `MachCSL/TsoMem.lean:253-277`) is REPLAYED deterministically over a
+Lean-only (no Rocq source).  TsoMem's per-hart READ SIDE (`tv`, `rv`, `coh`, `acq`, and the
+instruction view `itv`; `MachCSL/Lang.lean:127-163`, `MachCSL/TsoMem.lean:253-277`) is REPLAYED deterministically over a
 promise-free run's STEP LIST: the shadow is a function of the step-list PREFIX, not of the
 configuration ([R10.3]: fences, plain loads and acquire pairs move the read side and leave no
 trace in `pcLog`).  A plain load runs at the MINIMAL legal view
@@ -16,10 +16,17 @@ trace in `pcLog`).  A plain load runs at the MINIMAL legal view
   `coh a := max (coh a) t_a` for a FOREIGN-sourced byte only; a store RESETS its footprint to 0),
   `cohOff` ((a‴): no coherence floor).  The load stamp's per-byte input is
   `List (Option (Agent × Nat))` — byte `j`'s (author, timestamp), mirrored from the pf log
-  (`wmTid`, position + 1), `none` for an image byte (timestamp 0, where any stamp is a no-op).
-* **Memory fields only** ([R11.3]): `itv` is NOT part of the shadow (`fence.i` and the
-  `sfence.vma` marker are the same `LFence false×4`; W5d's `itvOf`).  Both move no memory field
-  here (`TsoShadow.ShSt.fenceNoSucc`).
+  (`wmTid`, position + 1), `some (0, 0)` for an image byte (`TsoOfPf.histOf`'s image entry, author
+  0 at timestamp 0) — the same input W-COH's `FlatMem.loadSrcs`/`Hist.readSrc` builds.
+* **`itv` on the STEP LIST only** (plan §C W5b′, §B(4)(iii)(ii), §B(10) `R-view`): the step-list
+  shadow `tsoShadow` is `ShFull` = the memory fields `ShSt` + `itv` (+ `fiArm`, the bookkeeping
+  bit of `emFenceI`'s criterion).  `itv` moves only at an own `LFence false×4` whose latest own
+  `LInstr`/`LIFetch` step is `LInstr` (fence.i: boundary `LInstr`, fetch, announce `LInstr`,
+  barrier; the `sfence.vma` marker: boundary `LInstr`, fetch, marker — `notes/W5dG-spike.md`
+  `emFenceI`): `itv := max itv (fencePost true false tv rv ownPub)`, MachCSL's `fence.i` arm
+  (`Lang.lean:155-163`).  The TRACE shadow `shadowOf` stays MEMORY-ONLY ([R11.3]: the two
+  `LFence false×4` are indistinguishable in `E.exTr`; W5d's `itvOf` carries `itv` there).
+  Neither `LFence false×4` moves a memory field (`TsoShadow.ShSt.fenceNoSucc`).
 * `scaOkT`/`execScaT`/`candScaT` (G1-Q RULED (e) [OWN.17]): `scaOk` plus `F ≤ tvn` at the shadow
   of the trace prefix (`shadowOf (E.exTr.take k)`, computed from `E.exTr`: `LRmw aq`, the
   `LFence` bits, `LStore` for the store effect, the log authors for foreign-ness and `ownPub`).
@@ -29,13 +36,18 @@ trace in `pcLog`).  A plain load runs at the MINIMAL legal view
   `pfStepFactsT` / `pfRunST`: the labelled run whose every step carries, besides `pfStepFacts`,
   `scaOkT` at the shadow of the step-list PREFIX before it and `diskLatOk`.
 * **The re-proved replay** `execPrefixPfRunProgShapedT` (the snoc of `execPrefixPfRunProgShaped`
-  with the shadow threaded): it also returns the PROJECTION LEMMA `tsoRun st = shadowRun
-  (E.exTr.take n)` — the step-list shadow (admin steps inert, an exclusive pair block = the fused
-  `LRmw`) equals the trace shadow, authors included.  Whole-trace and pinned (M1) forms.
+  with the shadow threaded): it also returns the PROJECTION LEMMA `memOf (tsoRun st) = shadowRun
+  (E.exTr.take n)` — the step-list shadow's MEMORY component (admin steps inert, an exclusive pair
+  block = the fused `LRmw`) equals the trace shadow, authors included.  Whole-trace and pinned
+  (M1) forms.
 * Spot checks (the redesign's two gaps, now as shadow facts): `TsoShadow.g1NotScaT` (G1: after
-  the `.aq` pair the shadow floor is the pair's write position 2, so the spike's stale load is
-  `scaOk` but NOT `scaOkT`, under every stamp); `TsoShadow.g2ScaTSrc` / `TsoShadow.g2NotScaTFoot`
-  (G2: the spike's mixed-size pair is `scaOkT` under (a′) and NOT under today's footprint stamp).
+  the `.aq` pair the prefix shadow's floor is the pair's write position 2, so the spike's stale
+  load is `scaOk` but NOT `scaOkT` at that prefix, under every stamp) and the run-level
+  `TsoShadow.g1NoRunT` (no `pfRunST` follows `g1St`); `TsoShadow.g2ScaTSrc` /
+  `TsoShadow.g2NotScaTFoot` (G2: the spike's mixed-size pair is `scaOkT` under (a′) and NOT under
+  today's footprint stamp) and the run-level `TsoShadow.g2RunT` (a `pfRunST` under (a′) follows
+  `g2St`, both loads `scaOkT`); `TsoShadow.itvFenceI` / `TsoShadow.itvSfence` (`itv` rises at
+  `fence.i`, not at the `sfence.vma` marker).
 
 Deviations from the plan's text: (1) the shadow is indexed by the AGENT `Nat` (a `CPU` is
 `hartAgent c`; the disk row's shadow exists and is unused); (2) `Weak/PfRunShape.lean` is NOT
@@ -155,9 +167,10 @@ structure ShSt where
 def ShSt.zero : ShSt := ⟨0, 0, fun _ => 0, false⟩
 
 /-- Byte source: (author, timestamp) of log message `t` (authors `au`, timestamp = position + 1);
-`none` for the image (timestamp 0). -/
+`some (0, 0)` for the image (timestamp 0: `TsoOfPf.histOf`'s image entry has author 0, as W-COH's
+`Hist.readSrc` reads it). -/
 def shSrc (au : List Nat) (t : Nat) : Option (Nat × Nat) :=
-  if t = 0 then none else (au[t - 1]?).map (fun a => (a, t))
+  if t = 0 then some (0, 0) else (au[t - 1]?).map (fun a => (a, t))
 
 /-- The largest FOREIGN source timestamp of a footprint (viewer `i`). -/
 def shForeign (i : Nat) : List (Option (Nat × Nat)) → Nat
@@ -265,14 +278,74 @@ def shStep (stamp : CohStamp) (i : Nat) (au : List Nat) (sh : ShSt) (l : Wlabel)
   | .LExStore _ base data _ _ => sh.store stamp au.length true base data.length
   | _ => sh
 
-/-- One step of the fold: the authors grow by a writing step's agent; the viewer's read side
-moves on its own steps only. -/
+/-- One step of the MEMORY fold: the authors grow by a writing step's agent; the viewer's read
+side moves on its own steps only. -/
 def shAct (stamp : CohStamp) (i : Nat) (x : List Nat × ShSt) (y : Nat × Wlabel) : List Nat × ShSt :=
   (if lbWrites y.2 then x.1 ++ [y.1] else x.1, if y.1 = i then shStep stamp i x.1 x.2 y.2 else x.2)
 
-/-- The shadow fold over a step list, from the empty log and the boot read side. -/
-def tsoRun (stamp : CohStamp) (i : Nat) (st : List (Nat × Wlabel)) : List Nat × ShSt :=
+/-- The memory-field fold over a step list, from the empty log and the boot read side. -/
+def tsoRunM (stamp : CohStamp) (i : Nat) (st : List (Nat × Wlabel)) : List Nat × ShSt :=
   st.foldl (shAct stamp i) ([], ShSt.zero)
+
+/-- THE STEP-LIST SHADOW's state: the memory fields, the instruction view `itv`, and `fiArm`
+(`emFenceI`'s criterion: the latest own `LInstr`/`LIFetch` step was `LInstr`). -/
+structure ShFull where
+  mem : ShSt
+  itv : Nat
+  fiArm : Bool
+
+/-- Boot: TsoMem's `itv = 0`. -/
+def ShFull.zero : ShFull := ⟨ShSt.zero, 0, false⟩
+
+/-- The all-false fence label (`fence.i`'s and the `sfence.vma` marker's). -/
+def lbFenceZero (l : Wlabel) : Bool :=
+  match l with
+  | .LFence false false false false => true
+  | _ => false
+
+/-- The viewer's own step on the full shadow: the memory step; `itv` raised at a `fence.i`
+(`lbFenceZero` with `fiArm`) to `max itv (fencePost true false tv rv ownPub)` at the PRE-step
+`tv`/`rv` (MachCSL's `fence.i` arm, `Lang.lean:155-163`); `fiArm` set by `LInstr`, cleared by
+`LIFetch`. -/
+def shStepF (stamp : CohStamp) (i : Nat) (au : List Nat) (f : ShFull) (l : Wlabel) : ShFull :=
+  ⟨shStep stamp i au f.mem l,
+   if lbFenceZero l && f.fiArm then
+     max f.itv (MachCSL.fencePost true false f.mem.tv f.mem.rv (MachCSL.ownPub i au))
+   else f.itv,
+   match l with
+   | .LInstr => true
+   | .LIFetch .. => false
+   | _ => f.fiArm⟩
+
+/-- One step of the full fold. -/
+def shActF (stamp : CohStamp) (i : Nat) (x : List Nat × ShFull) (y : Nat × Wlabel) :
+    List Nat × ShFull :=
+  (if lbWrites y.2 then x.1 ++ [y.1] else x.1, if y.1 = i then shStepF stamp i x.1 x.2 y.2 else x.2)
+
+/-- The step-list shadow fold (authors, full shadow). -/
+def tsoRun (stamp : CohStamp) (i : Nat) (st : List (Nat × Wlabel)) : List Nat × ShFull :=
+  st.foldl (shActF stamp i) ([], ShFull.zero)
+
+/-- The memory component of a full fold state. -/
+def memOf (x : List Nat × ShFull) : List Nat × ShSt := (x.1, x.2.mem)
+
+theorem memOfShActF (stamp : CohStamp) (i : Nat) (x : List Nat × ShFull) (y : Nat × Wlabel) :
+    memOf (shActF stamp i x y) = shAct stamp i (memOf x) y := by
+  obtain ⟨au, f⟩ := x
+  obtain ⟨j, l⟩ := y
+  by_cases hj : j = i <;> simp [memOf, shActF, shAct, shStepF, hj]
+
+theorem memOfFoldl (stamp : CohStamp) (i : Nat) :
+    ∀ (st : List (Nat × Wlabel)) (x : List Nat × ShFull),
+      memOf (st.foldl (shActF stamp i) x) = st.foldl (shAct stamp i) (memOf x)
+  | [], _ => rfl
+  | y :: st, x => by
+    rw [List.foldl_cons, List.foldl_cons, memOfFoldl stamp i st, memOfShActF]
+
+/-- The full fold's memory component IS the memory fold. -/
+theorem tsoRunMem (stamp : CohStamp) (i : Nat) (st : List (Nat × Wlabel)) :
+    memOf (tsoRun stamp i st) = tsoRunM stamp i st :=
+  memOfFoldl stamp i st _
 
 /-- The authors of a step list's writes, in order. -/
 def stAuthors (st : List (Nat × Wlabel)) : List Nat :=
@@ -280,14 +353,17 @@ def stAuthors (st : List (Nat × Wlabel)) : List Nat :=
 
 /-! ## (4) The trace shadow (computable from `E.exTr`) -/
 
+-- the wildcard arm is unused today; W13 (E)'s `Lbl.LIo` joins through it without a rebase
+set_option match.ignoreUnusedAlts true in
 /-- The trace twin of `shStep` over the axiomatic alphabet (an `LRmw` = exclusive read then
-exclusive write). -/
+exclusive write; any other label moves nothing). -/
 def shStepL (stamp : CohStamp) (i : Nat) (au : List Nat) (sh : ShSt) (lb : Lbl) : ShSt :=
   match lb with
   | .LLoad _ base ts _ => sh.load stamp i base (ts.map (shSrc au))
   | .LStore _ base vs _ => sh.store stamp au.length false base vs.length
   | .LFence pr pw sr sw => sh.fence (MachCSL.ownPub i au) pr pw sr sw
   | .LRmw aq _ base _ _ wvs _ => (sh.excl au.length aq).store stamp au.length true base wvs.length
+  | _ => sh
 
 def shActL (stamp : CohStamp) (i : Nat) (x : List Nat × ShSt) (s : Estep) : List Nat × ShSt :=
   (if lbIsW s.esLb then x.1 ++ [s.esAg] else x.1,
@@ -302,13 +378,13 @@ def stAuthorsL (tr : List Estep) : List Nat :=
 /-! ## (5) The fold laws: admin steps inert, fused steps = their projection, a pair block = the
 fused `LRmw` -/
 
-theorem tsoRunSnoc (stamp : CohStamp) (i : Nat) (st : List (Nat × Wlabel)) (y : Nat × Wlabel) :
-    tsoRun stamp i (st ++ [y]) = shAct stamp i (tsoRun stamp i st) y := by
-  simp [tsoRun, List.foldl_append]
+theorem tsoRunMSnoc (stamp : CohStamp) (i : Nat) (st : List (Nat × Wlabel)) (y : Nat × Wlabel) :
+    tsoRunM stamp i (st ++ [y]) = shAct stamp i (tsoRunM stamp i st) y := by
+  simp [tsoRunM, List.foldl_append]
 
-theorem tsoRunApp (stamp : CohStamp) (i : Nat) (st b : List (Nat × Wlabel)) :
-    tsoRun stamp i (st ++ b) = b.foldl (shAct stamp i) (tsoRun stamp i st) := by
-  simp [tsoRun, List.foldl_append]
+theorem tsoRunMApp (stamp : CohStamp) (i : Nat) (st b : List (Nat × Wlabel)) :
+    tsoRunM stamp i (st ++ b) = b.foldl (shAct stamp i) (tsoRunM stamp i st) := by
+  simp [tsoRunM, List.foldl_append]
 
 theorem shadowRunSnoc (stamp : CohStamp) (i : Nat) (tr : List Estep) (s : Estep) :
     shadowRun stamp i (tr ++ [s]) = shActL stamp i (shadowRun stamp i tr) s := by
@@ -363,9 +439,13 @@ theorem foldlAuthors (stamp : CohStamp) (i : Nat) :
     rw [foldlAuthors stamp i st]
     cases h : lbWrites y.2 <;> simp [stAuthors, h]
 
+theorem tsoRunMAuthors (stamp : CohStamp) (i : Nat) (st : List (Nat × Wlabel)) :
+    (tsoRunM stamp i st).1 = stAuthors st := by
+  simp [tsoRunM, foldlAuthors]
+
 theorem tsoRunAuthors (stamp : CohStamp) (i : Nat) (st : List (Nat × Wlabel)) :
     (tsoRun stamp i st).1 = stAuthors st := by
-  simp [tsoRun, foldlAuthors]
+  rw [← tsoRunMAuthors stamp i st, ← tsoRunMem]; rfl
 
 theorem foldlAuthorsL (stamp : CohStamp) (i : Nat) :
     ∀ (tr : List Estep) (au : List Nat) (sh : ShSt),
@@ -415,12 +495,16 @@ open TsoShadow
 
 /-! ## (6) THE SHADOW and the strengthened clauses -/
 
-/-- THE TsoMem VIEW SHADOW of agent `i` after the step list `st` (memory fields), PARAMETRIC in
-the `coh` stamp pair. -/
-def tsoShadow (stamp : CohStamp) (st : List (Nat × Wlabel)) (i : Nat) : ShSt :=
+/-- THE TsoMem VIEW SHADOW of agent `i` after the step list `st`: `(tv, rv, coh, acq)` in
+`.mem`, and `.itv`; PARAMETRIC in the `coh` stamp pair. -/
+def tsoShadow (stamp : CohStamp) (st : List (Nat × Wlabel)) (i : Nat) : ShFull :=
   (tsoRun stamp i st).2
 
-/-- The trace shadow of agent `i` after the trace prefix `tr`. -/
+theorem tsoShadowMem (stamp : CohStamp) (st : List (Nat × Wlabel)) (i : Nat) :
+    (tsoShadow stamp st i).mem = (tsoRunM stamp i st).2 := by
+  rw [← tsoRunMem]; rfl
+
+/-- The trace shadow of agent `i` after the trace prefix `tr` (MEMORY fields only [R11.3]). -/
 def shadowOf (stamp : CohStamp) (tr : List Estep) (i : Nat) : ShSt :=
   (shadowRun stamp i tr).2
 
@@ -484,7 +568,7 @@ the pre-configuration `c` (image, log). -/
 def pfLoadFactsT (st : List (Nat × Wlabel)) (c : Wpcfg P D) (i : Nat) (l : Wlabel) : Prop :=
   match l with
   | .LLoad _ _ base tvs _ =>
-    scaOkT (tsoShadow stamp st i) c.pcImg c.pcLog i base (tvs.map Prod.fst) ∧
+    scaOkT (tsoShadow stamp st i).mem c.pcImg c.pcLog i base (tvs.map Prod.fst) ∧
     diskLatOk c.pcImg c.pcLog i base (tvs.map Prod.fst)
   | _ => True
 
@@ -571,8 +655,8 @@ theorem pfRunSAuthors (c c' : Wpcfg P D) (st : List (Nat × Wlabel)) :
 /-- THE SHAPED REPLAY WITH THE SHADOW THREADED (the snoc of `execPrefixPfRunProgShaped`
 re-proved).  Under `execProgOk'ST`, every prefix of an `execWf` execution is the projection of a
 labelled pf run whose step list is `pairAdjacent`, whose every step carries `pfStepFactsT` at its
-prefix, and whose step-list shadow (authors included) IS the trace shadow of the prefix — the
-projection lemma. -/
+prefix, and whose step-list shadow's MEMORY component (authors included) IS the trace shadow of
+the prefix — the projection lemma (`itv` is the step list's own; W5d ties it to `itvOf`). -/
 theorem execPrefixPfRunProgShapedT (pst : Nat → List P) (dv : Nat → D) (E : Exec) (n : Nat) :
     pclsEqr pcls → pstepPinned (exImg E) pstep →
     execWf E → execProgOk'ST pstep pcls fok stamp pst dv E →
@@ -582,7 +666,7 @@ theorem execPrefixPfRunProgShapedT (pst : Nat → List P) (dv : Nat → D) (E : 
       pairAdjacent st ∧
       c.pcAgs.map Wpagent.paSt = pst n ∧ c.pcDev = dv n ∧
       cfgMatchd c (stt E n) ∧
-      ∀ i, tsoRun stamp i st = shadowRun stamp i (E.exTr.take n) := by
+      ∀ i, memOf (tsoRun stamp i st) = shadowRun stamp i (E.exTr.take n) := by
   intro hce hpin hE hprT
   obtain ⟨hpr, hscaT, hlat⟩ := hprT
   induction n with
@@ -590,7 +674,7 @@ theorem execPrefixPfRunProgShapedT (pst : Nat → List P) (dv : Nat → D) (E : 
     intro _
     refine ⟨wpInit (exImg E) (dv 0) (pst 0), [], pfRunST.nil, pairAdjacentNil,
       by simp [wpInit, List.map_map, Function.comp_def], rfl, ⟨rfl, execLogInit E hE, ?_⟩,
-      fun i => by simp [tsoRun, shadowRun]⟩
+      fun i => by simp [tsoRun, shadowRun, memOf, ShFull.zero]⟩
     intro i ag hlk
     simp only [wpInit, List.getElem?_map] at hlk
     cases hp : (pst 0)[i]? with
@@ -602,7 +686,9 @@ theorem execPrefixPfRunProgShapedT (pst : Nat → List P) (dv : Nat → D) (E : 
       exact wsEqrRefl _
   | succ n ih =>
     intro hn
-    obtain ⟨c, st, hrun, hadj, hst, hdev, hm, hsh⟩ := ih (by omega)
+    obtain ⟨c, st, hrun, hadj, hst, hdev, hm, hsh0⟩ := ih (by omega)
+    have hsh : ∀ i, tsoRunM stamp i st = shadowRun stamp i (E.exTr.take n) :=
+      fun i => (tsoRunMem stamp i st).symm.trans (hsh0 i)
     obtain ⟨s, hs⟩ := someOfIsSome (execTrLookup E n (by omega))
     have hms := execStepAt E n s hE hs
     have htake : E.exTr.take (n + 1) = E.exTr.take n ++ [s] := by
@@ -634,10 +720,10 @@ theorem execPrefixPfRunProgShapedT (pst : Nat → List P) (dv : Nat → D) (E : 
         cases l <;> simp_all [lbAdmin, lbFused])
     have hrunA := pfRunSTApp pstep pcls fok stamp _ _ _ _ _ hrun hrun0
       (fun y hy => lbAdminNotLoad true y.2 (hadmL y hy))
-    have hshA : ∀ i, tsoRun stamp i (st ++ ls.map (fun l => (s.esAg, l)))
+    have hshA : ∀ i, tsoRunM stamp i (st ++ ls.map (fun l => (s.esAg, l)))
         = shadowRun stamp i (E.exTr.take n) := by
       intro i
-      rw [tsoRunApp, foldlAdmin stamp i true _ _ hadmL]
+      rw [tsoRunMApp, foldlAdmin stamp i true _ _ hadmL]
       exact hsh i
     rcases hsup with ⟨l, hfu, hre, hps⟩ | ⟨pm, dm, ls2, pm2, dm2, l1, l2, hre, hps1, hstar2, hps2⟩
     · obtain ⟨c2, hstep, hm2, hst2, hdev2⟩ :=
@@ -660,9 +746,9 @@ theorem execPrefixPfRunProgShapedT (pst : Nat → List P) (dv : Nat → D) (E : 
         | LLoad aq lat base tvs asrc =>
           have hpr' := hre.2.2.2
           simp only [projLbl, Option.some.injEq] at hpr'
-          show scaOkT (tsoShadow stamp _ s.esAg) c0.pcImg c0.pcLog s.esAg base (tvs.map Prod.fst) ∧
-            diskLatOk c0.pcImg c0.pcLog s.esAg base (tvs.map Prod.fst)
-          rw [← hm0.1, ← hm0.2.1, tsoShadow, hshA]
+          show scaOkT (tsoShadow stamp _ s.esAg).mem c0.pcImg c0.pcLog s.esAg base
+              (tvs.map Prod.fst) ∧ diskLatOk c0.pcImg c0.pcLog s.esAg base (tvs.map Prod.fst)
+          rw [← hm0.1, ← hm0.2.1, tsoShadowMem, hshA]
           exact ⟨hscaT n s hs aq base _ _ hpr'.symm, hlat n s hs aq base _ _ hpr'.symm⟩
         | _ => trivial
       refine ⟨c2, (st ++ ls.map (fun l => (s.esAg, l))) ++ [(s.esAg, l)],
@@ -672,7 +758,7 @@ theorem execPrefixPfRunProgShapedT (pst : Nat → List P) (dv : Nat → D) (E : 
             simp only [List.mem_singleton] at hx; subst hx; exact hfu))
       · rw [hst2, hfm0, hst, list_insert_insert, ← hnext]
       · intro i
-        rw [tsoRunSnoc, hshA i, htake, shadowRunSnoc]
+        rw [tsoRunMem, tsoRunMSnoc, hshA i, htake, shadowRunSnoc]
         exact shActFused stamp i _ s.esAg l _ s.esLb hfu hre.2.2.2
     · obtain ⟨c2, hstep, hadjP, hm2, hst2, hdev2⟩ :=
         mstepWpPfStepPairS pstep pcls fok (stt E n) (stt E (n + 1)) s.esAg s.esLb c0 ag0 pa pm pm2
@@ -696,7 +782,7 @@ theorem execPrefixPfRunProgShapedT (pst : Nat → List P) (dv : Nat → D) (E : 
         pairAdjacentApp _ _ (pairAdjacentApp _ _ hadj hadm0) hadjP, ?_, hdev2, hm2, ?_⟩
       · rw [hst2, hfm0, hst, list_insert_insert, ← hnext]
       · intro i
-        rw [tsoRunApp, hshA i, htake, shadowRunSnoc]
+        rw [tsoRunMem, tsoRunMApp, hshA i, htake, shadowRunSnoc]
         exact shRunPair stamp i _ s aq rl base tvs data a1 a2 v2 _ _ false hadm2 hlb
 
 /-- The whole trace. -/
@@ -708,13 +794,14 @@ theorem execWfPfRunProgShapedT (pst : Nat → List P) (dv : Nat → D) (E : Exec
       pairAdjacent st ∧
       c.pcAgs.map Wpagent.paSt = pst E.exTr.length ∧ c.pcDev = dv E.exTr.length ∧
       cfgMatchd c (stt E E.exTr.length) ∧
-      ∀ i, tsoShadow stamp st i = shadowOf stamp E.exTr i := by
+      ∀ i, (tsoShadow stamp st i).mem = shadowOf stamp E.exTr i := by
   intro hce hpin hE hpr
   obtain ⟨c, st, h1, h2, h3, h4, h5, h6⟩ :=
     execPrefixPfRunProgShapedT pstep pcls fok stamp pst dv E E.exTr.length hce hpin hE hpr
       (Nat.le_refl _)
   refine ⟨c, st, h1, h2, h3, h4, h5, fun i => ?_⟩
-  simp only [tsoShadow, shadowOf, h6 i, List.take_length]
+  have := congrArg Prod.snd (h6 i)
+  simpa only [tsoShadow, shadowOf, memOf, List.take_length] using this
 
 /-- The replay of a PINNED shaped supply with the shadow clauses, projected to the unpinned LTS
 (the M1 form). -/
@@ -726,7 +813,7 @@ theorem execWfPfRunPinShapedT (img : Image) (pst : Nat → List P) (dv : Nat →
       pairAdjacent st ∧
       c.pcAgs.map Wpagent.paSt = pst E.exTr.length ∧ c.pcDev = dv E.exTr.length ∧
       cfgMatchd c (stt E E.exTr.length) ∧
-      ∀ i, tsoShadow stamp st i = shadowOf stamp E.exTr i := by
+      ∀ i, (tsoShadow stamp st i).mem = shadowOf stamp E.exTr i := by
   intro hce himg hE hpr
   subst himg
   obtain ⟨c, st, h1, h2, h3, h4, h5, h6⟩ :=
@@ -736,13 +823,43 @@ theorem execWfPfRunPinShapedT (img : Image) (pst : Nat → List P) (dv : Nat →
 
 end shapeT
 
-/-! ## (8) Spot checks: the spike's G1 / G2 runs against the shadow -/
+/-! ## (8) Spot checks: the spike's G1 / G2 runs against the shadow; `itv` at `fence.i` -/
 
 namespace TsoShadow
 
+/-- The message a step appends when every class is `k`. -/
+def msgOf (k : WmClass) (y : Nat × Wlabel) : Option Wmsg :=
+  match y.2 with
+  | .LStore _ base data _ _ => some ⟨base, data, some y.1, k⟩
+  | .LRmw _ _ base _ data _ _ => some ⟨base, data, some y.1, k⟩
+  | .LExStore _ base data _ _ => some ⟨base, data, some y.1, k⟩
+  | _ => none
+
+/-- Under a constant class function, a step keeps the image and appends `msgOf`. -/
+theorem wpPfStepLogK {P D : Type} (pstep : P → D → Wlabel → P → D → Prop)
+    (pcls : P → Wlabel → Wstate → WmClass) (k : WmClass) (hk : ∀ p l w, pcls p l w = k)
+    (i : Nat) (l : Wlabel) (c1 c2 : Wpcfg P D) (h : wpPfStep pstep pcls i l c1 c2) :
+    c2.pcImg = c1.pcImg ∧ c2.pcLog = c1.pcLog ++ (msgOf k (i, l)).toList := by
+  cases h <;> simp_all [msgOf]
+
+theorem pfRunSLogK {P D : Type} (pstep : P → D → Wlabel → P → D → Prop)
+    (pcls : P → Wlabel → Wstate → WmClass)
+    (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop) (k : WmClass)
+    (hk : ∀ p l w, pcls p l w = k) (c c' : Wpcfg P D) (st : List (Nat × Wlabel)) :
+    pfRunS pstep pcls fok c st c' →
+    c'.pcImg = c.pcImg ∧ c'.pcLog = c.pcLog ++ st.filterMap (msgOf k) := by
+  intro h
+  induction h with
+  | nil => simp
+  | snoc c1 c2 st i l _ hs _ ih =>
+    obtain ⟨h1, h2⟩ := wpPfStepLogK pstep pcls k hk i l c1 c2 hs
+    refine ⟨h1.trans ih.1, ?_⟩
+    rw [h2, ih.2, List.filterMap_append, List.append_assoc]
+    cases hm : msgOf k (i, l) <;> simp [hm]
+
 /-- G1, the shadow side: after B's store and A's `.aq` exclusive pair, A's floor is the pair's
 write position 2 (TsoMem's `top + 1`, `TsoOfPf.tsoAqPairTv`), under EVERY stamp. -/
-theorem g1Tv (stamp : CohStamp) : (tsoShadow stamp (TsoOfPf.g1St.take 3) 0).tv = 2 := rfl
+theorem g1Tv (stamp : CohStamp) : (tsoShadow stamp (TsoOfPf.g1St.take 3) 0).mem.tv = 2 := rfl
 
 /-- G1's final load (byte 0 from the IMAGE) is single-copy atomic at view 0 ... -/
 theorem g1Sca : scaOk TsoOfPf.img0 TsoOfPf.g1Log 0 0 [0] := by
@@ -756,26 +873,57 @@ theorem g1Sca : scaOk TsoOfPf.img0 TsoOfPf.g1Log 0 0 [0] := by
   · simp_all [scaVis, TsoOfPf.g1Log, TsoOfPf.mx]
   · simp_all [logByte, msgByte, accAddr, TsoOfPf.g1Log, TsoOfPf.mx, TsoOfPf.my]
 
-/-- ... but NOT at or above the shadow's floor: `candScaT` excludes the G1 run (G1-Q (e)). -/
+/-- ... but NOT `scaOkT` at the shadow of its step-list PREFIX (`g1St.take 3`), under every stamp:
+every view at or above that floor (2) sees B's store to byte 0.  The run-level consequence is
+`g1NoRunT`. -/
 theorem g1NotScaT (stamp : CohStamp) :
-    ¬ scaOkT (tsoShadow stamp (TsoOfPf.g1St.take 3) 0) TsoOfPf.img0 TsoOfPf.g1Log 0 0 [0] := by
+    ¬ scaOkT (tsoShadow stamp (TsoOfPf.g1St.take 3) 0).mem TsoOfPf.img0 TsoOfPf.g1Log 0 0 [0] := by
   rintro ⟨tvn, _, hF, hb⟩
   have h2 : 2 ≤ tvn := by
-    have := (shFloorGe (tsoShadow stamp (TsoOfPf.g1St.take 3) 0) 0 [0].length).1
+    have := (shFloorGe (tsoShadow stamp (TsoOfPf.g1St.take 3) 0).mem 0 [0].length).1
     rw [g1Tv] at this; omega
   obtain ⟨_, _, hlater⟩ := hb 0 0 rfl
   exact hlater 1 (by omega) (by decide) (Or.inl (by omega))
 
+/-- RUN LEVEL, G1: NO shadow-threaded run follows the spike's G1 step list (whatever the fetch
+clause and the stamp) — although a `pfRunS` does (`TsoOfPf.g1Run`). -/
+theorem g1NoRunT (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
+    (stamp : CohStamp) :
+    ¬ ∃ c, pfRunST TsoOfPf.anyStep TsoOfPf.anyCls fok stamp TsoOfPf.cfg0 TsoOfPf.g1St c := by
+  rintro ⟨c, h⟩
+  obtain ⟨c1, _, hr1, _, _, hl⟩ :=
+    pfRunSTFacts _ _ fok stamp _ _ _ h (TsoOfPf.g1St.take 3) 0
+      (.LLoad false false 0 [(0, 0#8)] []) [] rfl
+  obtain ⟨himg, hlog⟩ := pfRunSLogK _ _ fok .WCplain (fun _ _ _ => rfl) _ _ _
+    (pfRunSTForget _ _ fok stamp _ _ _ hr1)
+  have himg' : c1.pcImg = TsoOfPf.img0 := himg
+  have hlog' : c1.pcLog = TsoOfPf.g1Log := by rw [hlog]; rfl
+  have h1 := hl.1
+  rw [himg', hlog'] at h1
+  exact g1NotScaT stamp h1
+
 /-- G2 under (a′): the first load stamps only its FOREIGN byte `a` (with 2); the second load's
 footprint `(b, c)` keeps floor 0. -/
-theorem g2FloorSrc : shFloor (tsoShadow cohSrc (TsoOfPf.g2St.take 3) 0) 1 2 = 0 := by decide
+theorem g2FloorSrc : shFloor (tsoShadow cohSrc (TsoOfPf.g2St.take 3) 0).mem 1 2 = 0 := by decide
 
 /-- G2 under today's footprint stamp: byte `b` is stamped with the first load's view 2. -/
-theorem g2FloorFoot : shFloor (tsoShadow cohFoot (TsoOfPf.g2St.take 3) 0) 1 2 = 2 := by decide
+theorem g2FloorFoot : shFloor (tsoShadow cohFoot (TsoOfPf.g2St.take 3) 0).mem 1 2 = 2 := by decide
 
-/-- G2's second load reading `(b, c) = (0, 0)` is `scaOkT` under (a′) ... -/
+/-- G2's first load reading `(a, b) = (1, 0)` is `scaOkT` at view 2 (its prefix shadow is
+untouched: only B ran), under (a′) ... -/
+theorem g2Ld1ScaTSrc :
+    scaOkT (tsoShadow cohSrc (TsoOfPf.g2St.take 2) 0).mem TsoOfPf.img0 TsoOfPf.g2Log 0 0 [2, 0] := by
+  refine ⟨2, by decide, by show shFloor _ 0 2 ≤ 2; decide, fun j t h => ?_⟩
+  rcases j with _ | _ | j <;> simp at h <;> subst h
+  all_goals refine ⟨by decide, Or.inl (by decide), TsoOfPf.later _ _ _ _ _ _ ?_⟩
+  all_goals intro tq h1 h2 hs hv
+  all_goals simp only [TsoOfPf.g2Log, List.length_cons, List.length_nil] at h2
+  all_goals rcases (show tq = 1 ∨ tq = 2 by omega) with rfl | rfl
+  all_goals simp_all [logByte, msgByte, accAddr, TsoOfPf.g2Log, TsoOfPf.mc, TsoOfPf.ma]
+
+/-- ... and its second load reading `(b, c) = (0, 0)` is `scaOkT` under (a′) ... -/
 theorem g2ScaTSrc :
-    scaOkT (tsoShadow cohSrc (TsoOfPf.g2St.take 3) 0) TsoOfPf.img0 TsoOfPf.g2Log 0 1 [0, 0] := by
+    scaOkT (tsoShadow cohSrc (TsoOfPf.g2St.take 3) 0).mem TsoOfPf.img0 TsoOfPf.g2Log 0 1 [0, 0] := by
   refine ⟨0, by decide, by show shFloor _ 1 2 ≤ 0; rw [g2FloorSrc]; exact Nat.le_refl 0,
     fun j t h => ?_⟩
   rcases j with _ | _ | j <;> simp at h <;> subst h
@@ -787,12 +935,61 @@ theorem g2ScaTSrc :
 
 /-- ... and NOT under today's footprint stamp (the spike's `g2Tso`, as a shadow fact). -/
 theorem g2NotScaTFoot :
-    ¬ scaOkT (tsoShadow cohFoot (TsoOfPf.g2St.take 3) 0) TsoOfPf.img0 TsoOfPf.g2Log 0 1 [0, 0] := by
+    ¬ scaOkT (tsoShadow cohFoot (TsoOfPf.g2St.take 3) 0).mem TsoOfPf.img0 TsoOfPf.g2Log 0 1 [0, 0] := by
   rintro ⟨tvn, _, hF, hb⟩
   change shFloor _ 1 2 ≤ tvn at hF
   rw [g2FloorFoot] at hF
   obtain ⟨_, _, hlater⟩ := hb 1 0 rfl
   exact hlater 1 (by omega) (by decide) (Or.inl (by omega))
+
+-- The G2 run's per-byte read obligations (`readOkD`), by evaluation (`TsoOfPf`'s local recipe).
+set_option hygiene false in
+local macro "tsoShRd" : tactic => `(tactic| (intro j t v h; rcases j with _ | _ | j <;> simp at h <;>
+  (obtain ⟨rfl, rfl⟩ := h) <;>
+  exact ⟨by decide, ⟨by decide, TsoOfPf.notWritesInLe _ _ _ _ (by decide)⟩, by simp⟩))
+
+/-- RUN LEVEL, G2: under (a′) a shadow-threaded run follows the spike's G2 step list, BOTH loads
+`scaOkT` at their prefix shadows (`g2Ld1ScaTSrc`, `g2ScaTSrc`). -/
+theorem g2RunT :
+    ∃ c, pfRunST TsoOfPf.anyStep TsoOfPf.anyCls (candKfetch 0 0) cohSrc TsoOfPf.cfg0
+      TsoOfPf.g2St c := by
+  refine ⟨_, pfRunST.snoc _ _
+    [(1, .LStore false 2 [1#8] [] []), (1, .LStore false 0 [1#8] [] []),
+     (0, .LLoad false false 0 [(2, 1#8), (0, 0#8)] [])] 0
+    (.LLoad false false 1 [(0, 0#8), (0, 0#8)] [])
+    (pfRunST.snoc _ _ [(1, .LStore false 2 [1#8] [] []), (1, .LStore false 0 [1#8] [] [])] 0
+      (.LLoad false false 0 [(2, 1#8), (0, 0#8)] [])
+      (pfRunST.snoc _ _ [(1, .LStore false 2 [1#8] [] [])] 1 (.LStore false 0 [1#8] [] [])
+        (pfRunST.snoc _ _ [] 1 (.LStore false 2 [1#8] [] []) pfRunST.nil
+          (wpPfStep.PFStore TsoOfPf.cfg0 ⟨(), wsInit, ∅⟩ false 2 [1#8] [] [] .WCplain () ()
+            rfl trivial (by simp) rfl) trivial trivial)
+        (wpPfStep.PFStore _ _ false 0 [1#8] [] [] .WCplain () () rfl trivial (by simp) rfl)
+        trivial trivial)
+      (wpPfStep.PFLoad _ ⟨(), wsInit, ∅⟩ false false 0 [(2, 1#8), (0, 0#8)] [] () () rfl
+        trivial ?r3) ?f3 ?l3)
+    (wpPfStep.PFLoad _ _ false false 1 [(0, 0#8), (0, 0#8)] [] () () rfl trivial ?r4) ?f4 ?l4⟩
+  case r3 => tsoShRd
+  case r4 => tsoShRd
+  case f3 => exact scaOkTSca _ _ _ _ _ _ g2Ld1ScaTSrc
+  case l3 => exact ⟨g2Ld1ScaTSrc, fun h => absurd h (by decide)⟩
+  case f4 => exact scaOkTSca _ _ _ _ _ _ g2ScaTSrc
+  case l4 => exact ⟨g2ScaTSrc, fun h => absurd h (by decide)⟩
+
+/-- `fence.i` (boundary `LInstr`, fetch, announce `LInstr`, a silent step, the all-false barrier)
+after an own store at timestamp 1: `itv` rises to the store (`ownPub`). -/
+def fiSt : List (Nat × Wlabel) :=
+  [(0, .LStore false 0 [1#8] [] []), (0, .LInstr), (0, .LIFetch 0 []), (0, .LInstr), (0, .LSilent),
+   (0, .LFence false false false false)]
+
+/-- The `sfence.vma` marker (boundary `LInstr`, fetch, the all-false marker) after the same store:
+`itv` stays. -/
+def sfSt : List (Nat × Wlabel) :=
+  [(0, .LStore false 0 [1#8] [] []), (0, .LInstr), (0, .LIFetch 0 []),
+   (0, .LFence false false false false)]
+
+theorem itvFenceI (stamp : CohStamp) : (tsoShadow stamp fiSt 0).itv = 1 := rfl
+
+theorem itvSfence (stamp : CohStamp) : (tsoShadow stamp sfSt 0).itv = 0 := rfl
 
 end TsoShadow
 
