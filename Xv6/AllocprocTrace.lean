@@ -39,6 +39,12 @@ range lemma for `PidEv.pidPick` the plan asks W1 to prove.
   pid / allocator history per era, not about independently fabricable
   per-round prefixes.  `AllocprocTrace.forkPev_comparable`: two fork rounds
   of one era cite prefix-comparable pid histories.
+* (W1b follow-up, [OWN.28] (A)) **`AllocprocTrace.forkHist_spec`**: era
+  `k`'s FORK history `AllocprocTrace.forkHist F k` (the longest pid prefix
+  a fork round of era `k` cites) is a prefix of `(niHist F k).pev`, well
+  formed (`pidHistWf PIDMAX`), contains every era-`k` fork citation's pid
+  prefix, and its live pids are pairwise distinct -- "live pids pairwise
+  distinct" ACROSS the era's forks; `allocprocTraceAns` exports it.
 
 ## Deviations from the plan's statement ([R6.5d])
 
@@ -51,17 +57,18 @@ range lemma for `PidEv.pidPick` the plan asks W1 to prove.
    their citation from `UIota.boot`, so in the runs the kernel produces a
    `-1` fork cites the empty pid prefix (pick `1`); the trace-level
    statement only knows what `usysForkTie` and fork's row say of `ι`.
-4. (W1b follow-up, see `PROGRESS-W1bfix.md`) "live pids pairwise distinct"
-   is exported at every fork citation, and the citations of one era are
-   prefixes of one history (the chain), but `pidHistWf PIDMAX
-   (niHist F k).pev` for the era's JOINED history is NOT derivable from the
-   NI conclusion: the join is over ALL citations, and only a fork round's
-   filing (`NiLedger.niForkTie`) constrains its cited pid prefix -- the
-   uptime / wait / sbrk / write rows never read `ι.pev`.
 2. `allocprocTraceAns`, not `allocprocTrace`: the landed name is kept
    (plan §A "Names"), strengthened in place.
 3. `pidHistWf` takes the bound as an explicit parameter (`PidEv`'s
    convention for `nextOf`/`pidPick`), instantiated at `PIDMAX`.
+4. (W1b follow-up, ruled (A) [OWN.28]) "live pids pairwise distinct" is
+   stated for the era's FORK history `AllocprocTrace.forkHist F k` (the
+   join of the pid prefixes era `k`'s fork rounds cite), not for the era's
+   joined history `(niHist F k).pev`: the latter's well-formedness is NOT
+   derivable from the NI conclusion -- `niHist` joins ALL citations, and
+   only a fork round's filing (`NiLedger.niForkTie`) constrains its cited
+   pid prefix (the uptime / wait / sbrk / write rows never read `ι.pev`).
+   Not covered: pid-ledger events after the last fork citation of the era.
 
 Lean-only (no Rocq source).  Helpers are file-qualified `AllocprocTrace.*`.
 -/
@@ -247,6 +254,14 @@ def AllocprocTrace.ans : NiStep → BitVec 64
   | .origin .. => 0#64
   | .round _ _ _ _ _ _ _ e _ => enterA0 e
 
+/-- (W1b follow-up, [OWN.28] (A)) A filing's FORK citation of era `k`: the
+pid prefix a fork ecall round of era `k` cites (`none` for every other
+filing). -/
+def AllocprocTrace.forkCite (k : Nat) : NiEntry → Option (List Pev)
+  | .round _ _ sc _ W _ (some (k', ι)) _ _ =>
+    if k' = k ∧ sc = uecallScause ∧ uvisNum (uvisRun W) = USYS_fork then some ι.pev else none
+  | _ => none
+
 /-- **A filed fork round answers `usysForkAns` of its citation, the answer
 has fork's row** (`niDetRow_fork`; the range from the round's `roundOkKeys`),
 **and the citation carries the ledger ties** (W1b: the filing's
@@ -254,15 +269,16 @@ has fork's row** (`niDetRow_fork`; the range from the round's `roundOkKeys`),
 theorem AllocprocTrace.forkStep {h : List Obs} {F : List NiEntry} (hF : niOk h F) {q : NiInc}
     {s : NiStep} (hs : s ∈ utrace q h F) (hfk : AllocprocTrace.isFork s) :
     ∃ k ι, s.cite = some (k, ι) ∧ AllocprocTrace.ans s = usysForkAns ι ∧
-      AllocprocTrace.forkRet (usysForkAns ι) ∧ usysForkTie ι := by
+      AllocprocTrace.forkRet (usysForkAns ι) ∧ usysForkTie ι ∧
+      ∃ f ∈ F, AllocprocTrace.forkCite k f = some ι.pev := by
   obtain ⟨f, hfF, -, hfs⟩ := mem_utrace hs
   have hf := hF.1 f hfF
-  match f, hf, hfs with
-  | .origin j W0 .., _, hfs =>
+  match f, hfF, hf, hfs with
+  | .origin j W0 .., _, _, hfs =>
     simp only [niStepOf] at hfs
     obtain ⟨e, -, rfl⟩ := Option.map_eq_some_iff.mp hfs
     exact hfk.elim
-  | .round i j sc _ W W' c _ _, hf, hfs =>
+  | .round i j sc _ W W' c _ _, hfF, hf, hfs =>
     obtain ⟨-, ⟨x, hx, cpu, sa, rfl⟩, ⟨e, he, cpu', sa', ep', rfl, -⟩, hr, -, -, -, hcit, hdet, -, -, -, -,
       htie⟩ := hf
     simp only [niStepOf, hx, he, Option.some.injEq] at hfs
@@ -274,7 +290,7 @@ theorem AllocprocTrace.forkStep {h : List Obs} {F : List NiEntry} (hF : niOk h F
     have hf' : uvisNum (uvisRun W) = USYS_fork := (uvisNum_run_gprs W).trans hnumf
     obtain ⟨k, ι, rfl⟩ := niCiting_some hcit hsc (Or.inr (Or.inr (Or.inl hf')))
     have hans := niDetRow_fork hdet hsc hf'
-    refine ⟨k, ι, rfl, hans, ?_, htie hsc hf'⟩
+    refine ⟨k, ι, rfl, hans, ?_, htie hsc hf', _, hfF, by simp [AllocprocTrace.forkCite, hsc, hf']⟩
     have hnum := gprsNum_tfGprs W (retPc (tfW W.tf tfEpcIdx))
     rw [hsc] at hr
     rcases uroundOk_ecall hr with ⟨hexec, -⟩ | ⟨-, r, ⟨hb1, -⟩, hm, -⟩
@@ -287,6 +303,81 @@ theorem AllocprocTrace.forkStep {h : List Obs} {F : List NiEntry} (hF : niOk h F
         if_neg (by decide), if_neg (by decide), if_pos rfl] at hm
       rw [← hans, ha0]
       exact hm.1
+
+/-! ## §5b THE ERA'S FORK HISTORY (W1b follow-up, [OWN.28] (A))
+
+`niHist F k` joins ALL of era `k`'s citations, and only fork rounds file
+`pidHistWf` at theirs (`NiLedger.niForkTie`), so the joined pid history's
+well-formedness is not derivable.  The FORK-joined one is: the longest of
+the pid prefixes era `k`'s fork rounds cite.  Under the chain all of them
+are prefixes of `(niHist F k).pev`, so they are pairwise comparable, the
+fold picks the longest, and every one is a prefix of it. -/
+
+/-- **The era's fork history**: the `niLonger` join of the pid prefixes
+era `k`'s fork rounds cite, from `[]`. -/
+def AllocprocTrace.forkHist (F : List NiEntry) (k : Nat) : List Pev :=
+  (F.filterMap (AllocprocTrace.forkCite k)).foldl niLonger []
+
+/-- The `niLonger` fold of lists that are all prefixes of `B` and satisfy
+`P` (closed under the choice `niLonger` makes): the result is a prefix of
+`B`, satisfies `P`, extends the start and every folded list. -/
+theorem AllocprocTrace.foldLonger_spec {α : Type _} {B : List α} {P : List α → Prop} :
+    ∀ (L : List (List α)) (G : List α), G <+: B → P G → (∀ p ∈ L, p <+: B ∧ P p) →
+      L.foldl niLonger G <+: B ∧ P (L.foldl niLonger G) ∧ G <+: L.foldl niLonger G ∧
+        ∀ p ∈ L, p <+: L.foldl niLonger G
+  | [], G, hG, hP, _ => ⟨hG, hP, List.prefix_refl G, fun _ hp => absurd hp List.not_mem_nil⟩
+  | p :: L, G, hG, hP, hL => by
+    rw [List.foldl_cons]
+    obtain ⟨hpB, hpP⟩ := hL p List.mem_cons_self
+    have hc := List.prefix_or_prefix_of_prefix hG hpB
+    have hP' : P (niLonger G p) := by unfold niLonger; split <;> assumption
+    obtain ⟨g1, g2, g3, g4⟩ := AllocprocTrace.foldLonger_spec L (niLonger G p) (niLonger_le hG hpB) hP'
+      (fun p' hp' => hL p' (List.mem_cons_of_mem _ hp'))
+    refine ⟨g1, g2, (niLonger_left hc).trans g3, fun p' hp' => ?_⟩
+    rcases List.mem_cons.mp hp' with rfl | hp'
+    · exact (niLonger_right hc).trans g3
+    · exact g4 p' hp'
+
+/-- A fork citation of a valid chained filing: below the era's joined pid
+history, and well formed (the filing's `niForkTie`). -/
+theorem AllocprocTrace.forkCite_facts {h : List Obs} {F : List NiEntry} (hF : niOk h F)
+    (hC : niChain F (niHist F)) {k : Nat} {f : NiEntry} (hf : f ∈ F) {p : List Pev}
+    (hp : AllocprocTrace.forkCite k f = some p) : p <+: (niHist F k).pev ∧ pidHistWf PIDMAX p := by
+  cases f with
+  | origin => simp [AllocprocTrace.forkCite] at hp
+  | round i j sc Wr W W' c γ kk =>
+    cases c with
+    | none => simp [AllocprocTrace.forkCite] at hp
+    | some c =>
+      obtain ⟨k', ι⟩ := c
+      simp only [AllocprocTrace.forkCite] at hp
+      split at hp
+      · rename_i hcond
+        obtain ⟨rfl, hsc, hnum⟩ := hcond
+        cases hp
+        have htie := (hF.1 _ hf).2.2.2.2.2.2.2.2.2.2.2.2.2 hsc hnum
+        exact ⟨(hC _ hf k' ι rfl).1, htie.1⟩
+      · exact absurd hp (by simp)
+
+/-- **THE ERA'S FORK HISTORY** ([OWN.28] (A)): at a valid chained filing,
+era `k`'s fork history is a prefix of its joined pid history, well formed
+(`pidHistWf PIDMAX`), contains every pid prefix a fork round of era `k`
+cites, and its live pids are pairwise distinct (`liveList` has no
+duplicates and is `liveOf`). -/
+theorem AllocprocTrace.forkHist_spec {h : List Obs} {F : List NiEntry} (hF : niOk h F)
+    (hC : niChain F (niHist F)) (k : Nat) :
+    AllocprocTrace.forkHist F k <+: (niHist F k).pev ∧ pidHistWf PIDMAX (AllocprocTrace.forkHist F k) ∧
+      (∀ f ∈ F, ∀ p, AllocprocTrace.forkCite k f = some p → p <+: AllocprocTrace.forkHist F k) ∧
+      (AllocprocTrace.liveList (AllocprocTrace.forkHist F k)).Nodup ∧
+      (∀ z : Nat, z ∈ AllocprocTrace.liveList (AllocprocTrace.forkHist F k) ↔
+        liveOf (AllocprocTrace.forkHist F k) (z : Int)) := by
+  obtain ⟨g1, g2, -, g4⟩ := AllocprocTrace.foldLonger_spec (B := (niHist F k).pev)
+    (P := pidHistWf PIDMAX) (F.filterMap (AllocprocTrace.forkCite k)) [] (List.nil_prefix)
+    (pidHistWf_nil PIDMAX) (fun p hp => by
+      obtain ⟨f, hf, hfp⟩ := List.mem_filterMap.mp hp
+      exact AllocprocTrace.forkCite_facts hF hC hf hfp)
+  obtain ⟨hnd, hmem⟩ := pidHistWf_nodup PIDMAX _ g2
+  exact ⟨g1, g2, fun f hf p hfp => g4 p (List.mem_filterMap.mpr ⟨f, hf, hfp⟩), hnd, hmem⟩
 
 /-! ## §6 THE THEOREM -/
 
@@ -304,14 +395,23 @@ a prefix `ι` and
 * the cited allocator prefix's decisive event is the pool's state: the
   pool was empty before a `KNull` and non-empty before a `KAlloc`;
 * (W1b follow-up) the filing is a chain (`niChain F (niHist F)`) and the
-  citation is below its era's joined history `niHist F k`. -/
+  citation is below its era's joined history `niHist F k`;
+* ([OWN.28] (A)) every era's fork history `AllocprocTrace.forkHist F k` is
+  a prefix of `(niHist F k).pev`, well formed, with pairwise distinct live
+  pids, and the round's cited pid prefix is a prefix of it. -/
 theorem allocprocTraceAns {hlc : HasLC}
     (g : GState) (Hgen0 : g.gen = 0) (Hpow : g.pow = false) (Hdisk : diskOf g.m.devs = fsImgDisk)
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
     ∃ F, niOk κs F ∧ niOneShot κs F ∧ niChain F (niHist F) ∧
+      (∀ k, AllocprocTrace.forkHist F k <+: (niHist F k).pev ∧
+        pidHistWf PIDMAX (AllocprocTrace.forkHist F k) ∧
+        (AllocprocTrace.liveList (AllocprocTrace.forkHist F k)).Nodup ∧
+        (∀ z : Nat, z ∈ AllocprocTrace.liveList (AllocprocTrace.forkHist F k) ↔
+          liveOf (AllocprocTrace.forkHist F k) (z : Int))) ∧
       ∀ q : NiInc, ∀ s ∈ utrace q κs F, AllocprocTrace.isFork s →
-      ∃ k ι, s.cite = some (k, ι) ∧ niBelow ι (niHist F k) ∧ AllocprocTrace.ans s = usysForkAns ι ∧
+      ∃ k ι, s.cite = some (k, ι) ∧ niBelow ι (niHist F k) ∧ ι.pev <+: AllocprocTrace.forkHist F k ∧
+        AllocprocTrace.ans s = usysForkAns ι ∧
         AllocprocTrace.forkRet (usysForkAns ι) ∧
         (1 ≤ pidPick PIDMAX ι.pev ∧ pidPick PIDMAX ι.pev ≤ PIDMAX) ∧ nextOf PIDMAX ι.pev ≤ PIDMAX ∧
         (forkOk ι → ¬ liveOf ι.pev (pidPick PIDMAX ι.pev : Int)) ∧
@@ -319,13 +419,16 @@ theorem allocprocTraceAns {hlc : HasLC}
         (∀ z : Nat, z ∈ AllocprocTrace.liveList ι.pev ↔ liveOf ι.pev (z : Int)) ∧
         (ι.kNull → poolEmpty ι.kev.dropLast) ∧ (ι.kOk → ¬ poolEmpty ι.kev.dropLast) := by
   obtain ⟨-, F, hF, h1, hC, -⟩ := xv6NiAdequacy (hlc := hlc) g Hgen0 Hpow Hdisk n κs t2 g2 hsteps
-  refine ⟨F, hF, h1, hC, fun q s hs hfk => ?_⟩
-  obtain ⟨k, ι, hc, ha, hr, hwf, hnl, hkn, hko⟩ := AllocprocTrace.forkStep hF hs hfk
+  refine ⟨F, hF, h1, hC, fun k => ?_, fun q s hs hfk => ?_⟩
+  · obtain ⟨g1, g2, -, g4, g5⟩ := AllocprocTrace.forkHist_spec hF hC k
+    exact ⟨g1, g2, g4, g5⟩
+  obtain ⟨k, ι, hc, ha, hr, ⟨hwf, hnl, hkn, hko⟩, f', hf'F, hf'c⟩ := AllocprocTrace.forkStep hF hs hfk
+  have hfh := (AllocprocTrace.forkHist_spec hF hC k).2.2.1 f' hf'F _ hf'c
   obtain ⟨f, hfF, -, hfs⟩ := mem_utrace hs
   have hbl : niBelow ι (niHist F k) := hC f hfF k ι ((niStepOf_cite hfs).symm.trans hc)
   have hnx := pidHistWf_nextOf PIDMAX ι.pev (by decide) hwf
   obtain ⟨hnd, hmem⟩ := pidHistWf_nodup PIDMAX ι.pev hwf
-  exact ⟨k, ι, hc, hbl, ha, hr, pidPick_range PIDMAX ι.pev (by decide) hnx, hnx, hnl, hwf, hnd, hmem, hkn,
+  exact ⟨k, ι, hc, hbl, hfh, ha, hr, pidPick_range PIDMAX ι.pev (by decide) hnx, hnx, hnl, hwf, hnd, hmem, hkn,
     hko⟩
 
 /-- (W1b follow-up) Two citations below one era's joined history cite
@@ -340,4 +443,5 @@ end Xv6
 #print axioms Xv6.pidPick_range
 #print axioms Xv6.pidPick_badHist
 #print axioms Xv6.pidHistWf_nodup
+#print axioms Xv6.AllocprocTrace.forkHist_spec
 #print axioms Xv6.allocprocTraceAns
