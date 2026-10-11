@@ -311,10 +311,10 @@ theorem abs_fence (x : XState) (cpu : CPU) (b : barrier_kind) :
   rw [fence, abs_setHart]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
-/-- A DMA write by the disk. -/
+/-- A DMA write by the disk (a zero-byte one is a no-op, as `MState.storeDma`). -/
 def storeDma (x : XState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : XState :=
-  { x with mem := x.mem.writeBytes pa n w (x.log.length + 1) diskAgent,
-           log := x.log ++ [diskAgent] }
+  { x with mem := if n = 0 then x.mem else x.mem.writeBytes pa n w (x.log.length + 1) diskAgent,
+           log := if n = 0 then x.log else x.log ++ [diskAgent] }
 
 theorem abs_storeDma (x : XState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
     (x.storeDma pa n w).abs = x.abs.storeDma pa n w := rfl

@@ -185,7 +185,11 @@ every silent arm gets `rv' = rv /\ coh' = coh`).
   `coh' = coh`.  `fence.i` unchanged: `itv' = max itv (fence_post h log true tv)`
   — a bare `fence.i` after an unfenced flag load may still fetch stale
   code, which is what RVWMO+Zifencei says.
-- **Devices**: unchanged (view pinned at the top, RULING 2).
+- **Devices**: unchanged (view pinned at the top, RULING 2).  (Later, W-DMA0,
+  2026-10-11: a ZERO-BYTE DMA write is a no-op — `MState.storeDma pa 0 w = σ`,
+  no log entry — since RVWMO's gmo has no operation for a zero-byte access;
+  the program-logic rules `DevM.LeaseL/LeaseV/LeaseD.dmaWrite` gained a
+  last, receipt-free `hzero` premise that discharges itself at a nonzero `n`.)
 
 ### 2.3 Why this is the right shape (the RVWMO argument)
 

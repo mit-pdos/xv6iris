@@ -114,13 +114,18 @@ inductive DevM.LeaseV {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] {S T
       LeaseV R Lt Ce C (.op (.dmaRead pa n) k)
   /-- The guarded DMA write.  `g s = some s'` is the store AND the device's
   own move in one transition, so the continuation re-establishes the
-  invariant at the NEW state `s'`. -/
+  invariant at the NEW state `s'`.  A zero-byte write appends nothing and
+  mints no receipt: `hzero` (last, self-discharging at a nonzero numeral
+  `n`) is that case, receipt-free. -/
   | dmaWrite (C C' : IProp GF) (g : S → Option S) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
       (k : Unit → DevM S T Unit)
       (hlease : ∀ s s', g s = some s' →
         (iprop(C ∗ R s) ⊢ dmaWriteLease pa n w (iprop(|==> (R s' ∗ C')))))
       (hfalse : ∀ s, g s = none → (iprop(C ∗ R s) ⊢ |==> (R s ∗ C')))
-      (hk : LeaseV R Lt Ce C' (k ())) : LeaseV R Lt Ce C (.op (.dmaWrite g pa n w) k)
+      (hk : LeaseV R Lt Ce C' (k ()))
+      (hzero : n = 0 → ∀ s s', g s = some s' → (iprop(C ∗ R s) ⊢ |==> (R s' ∗ C')) := by
+        first | (intro hn0; exact absurd hn0 (Nat.ne_of_gt (Nat.le_of_ble_eq_true rfl))) | (intro hn0; omega)) :
+      LeaseV R Lt Ce C (.op (.dmaWrite g pa n w) k)
   /-- Forking: the context splits, and the new task gets `Lt t`. -/
   | fork (C C' : IProp GF) (t : T) (k : TaskId → DevM S T Unit)
       (hsplit : C ⊢ iprop(C' ∗ Lt t))
@@ -134,7 +139,9 @@ theorem DevM.LeaseV.dmaWriteIf {S T : Type} {R : S → IProp GF} {Lt : T → IPr
     (hlease : ∀ s, g s = true →
       (iprop(C ∗ R s) ⊢ dmaWriteLease pa n w (iprop(|==> (R s ∗ C')))))
     (hfalse : ∀ s, g s = false → (iprop(C ∗ R s) ⊢ |==> (R s ∗ C')))
-    (hk : DevM.LeaseV R Lt Ce C' (k ())) :
+    (hk : DevM.LeaseV R Lt Ce C' (k ()))
+    (hzero : n = 0 → ∀ s, g s = true → (iprop(C ∗ R s) ⊢ |==> (R s ∗ C')) := by
+      first | (intro hn0; exact absurd hn0 (Nat.ne_of_gt (Nat.le_of_ble_eq_true rfl))) | (intro hn0; omega)) :
     DevM.LeaseV R Lt Ce C (.op (.dmaWrite (fun s => if g s then some s else none) pa n w) k) :=
   DevM.LeaseV.dmaWrite C C' _ pa n w k
     (fun s s' hg => by
@@ -146,6 +153,10 @@ theorem DevM.LeaseV.dmaWriteIf {S T : Type} {R : S → IProp GF} {Lt : T → IPr
       · exact absurd hg (by simp)
       · rename_i hb; exact hfalse s (by simpa using hb))
     hk
+    (fun hn0 s s' hg => by
+      split at hg
+      · rename_i hb; cases hg; exact hzero hn0 s hb
+      · exact absurd hg (by simp))
 
 /-- A device whose ROOT LOOP is derivable from `Cr` and gives `Cr` back at
 the end of every iteration -- so the root may hold one exclusive resource
@@ -171,8 +182,8 @@ theorem leaseV_of_leaseL {S T : Type} (R : S → IProp GF) (Lt : T → IProp GF)
   | step C C' g k hs hk ih => exact .step C C' g k hs ih
   | get C C' k hknow hk ih => exact .get C C' k hknow ih
   | dmaRead C pa n Q k hpin hk ih => exact .dmaRead C pa n Q k hpin ih
-  | dmaWrite C C' g pa n w k hlease hfalse hk ih =>
-    exact .dmaWrite C C' g pa n w k hlease hfalse ih
+  | dmaWrite C C' g pa n w k hlease hfalse hk hzero ih =>
+    exact .dmaWrite C C' g pa n w k hlease hfalse ih hzero
   | fork C C' t k hsplit hk ih => exact .fork C C' t k hsplit ih
 
 end MachCSL

@@ -858,10 +858,14 @@ theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec 
 /-- The disk's DMA write: the bytes' histories grow and the author log grows
 exactly as for a hart store (the disk agent is pinned to the top of the
 order), and no hart's views move.  The footprint must be DRAM, and no hart
-may reserve a byte of it. -/
+may reserve a byte of it.  A zero-byte write is the identity
+(`MState.storeDma_zero`). -/
 theorem mmOk_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (hram : ramBytes pa n) (hno : ¬ anyReserve σ.resv pa n) (h : mmOk σ) :
     mmOk (σ.storeDma pa n w) := by
+  by_cases hn : n = 0
+  · rw [MState.storeDma_zero σ pa n w hn]; exact h
+  rw [MState.storeDma_of_ne σ pa n w hn]
   obtain ⟨h1, h2, h3, h4, h5⟩ := h
   refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4, h5⟩
   · intro a H hget

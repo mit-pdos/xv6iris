@@ -52,7 +52,7 @@ so the disk serves its requests concurrently and completes them in any
 order.  A hart's memory access below the DRAM bank is an MMIO transaction
 routed to the device whose window it hits (`devRead`/`devWrite`); the disk's
 DMA reads see the top of the store order and its DMA writes append there as
-the disk agent (`MState.storeDma`), blocked while a hart reserves a byte of
+the disk agent (`MState.storeDma`; a zero-byte DMA write appends nothing), blocked while a hart reserves a byte of
 the footprint; the PLIC drives the harts' external-interrupt pins
 (`sig_seip`/`sig_meip`) through the wire primitive.
 -/
@@ -168,10 +168,39 @@ abbrev MState.fence (σ : MState) (cpu : CPU) (b : barrier_kind) : MState :=
 
 /-- After a DMA write of `w` at `pa` by the disk: the bytes' histories grow,
 the author log grows; no hart's views move (the device is pinned to the top
-of the order). -/
+of the order).
+
+A ZERO-BYTE DMA write (`n = 0`) is a NO-OP: no log entry, no history
+change.  RVWMO's global memory order is over the primitive loads and stores
+memory instructions generate, and a zero-byte access generates none (Sail
+has no DMA model; its own `mem_write_value` keeps `0 < width` in the source
+docstring).  An empty entry would be a model artifact: an extra timestamp
+no memory operation owns.  The case split sits inside the two moving
+fields, so every field the store does not move is still definitionally
+`σ`'s. -/
 abbrev MState.storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : MState :=
-  { σ with mem := σ.mem.writeBytes pa n w (σ.top + 1) diskAgent,
-           log := σ.log ++ [diskAgent] }
+  { σ with mem := if n = 0 then σ.mem else σ.mem.writeBytes pa n w (σ.top + 1) diskAgent,
+           log := if n = 0 then σ.log else σ.log ++ [diskAgent] }
+
+/-- A zero-byte DMA write is the identity. -/
+theorem MState.storeDma_zero (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hn : n = 0) : σ.storeDma pa n w = σ := by
+  subst hn; rfl
+
+/-- A DMA write of at least one byte appends the disk's entry. -/
+theorem MState.storeDma_of_ne (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hn : n ≠ 0) : σ.storeDma pa n w =
+      { σ with mem := σ.mem.writeBytes pa n w (σ.top + 1) diskAgent,
+               log := σ.log ++ [diskAgent] } := by
+  simp only [MState.storeDma, if_neg hn]
+
+theorem MState.storeDma_mem_of_ne (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hn : n ≠ 0) : (σ.storeDma pa n w).mem = σ.mem.writeBytes pa n w (σ.top + 1) diskAgent := by
+  simp only [if_neg hn]
+
+theorem MState.storeDma_log_of_ne (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hn : n ≠ 0) : (σ.storeDma pa n w).log = σ.log ++ [diskAgent] := by
+  simp only [if_neg hn]
 
 /-- Every byte of the `n`-byte footprint at `pa` is a device address: the
 access is an MMIO transaction.  The footprint form (rather than `devAddr pa`

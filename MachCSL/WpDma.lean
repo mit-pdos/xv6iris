@@ -4,7 +4,10 @@ MachCSL: the DMA tier.
 A device's DMA write is the one store the machine takes that is *not* a
 hart's: `MState.storeDma` appends the disk agent's entry at the top of the
 single store order, moves no hart's view, and touches neither the registers
-nor the device states.  This file is the memory-side half of the disk's
+nor the device states (a ZERO-BYTE DMA write appends nothing and is the
+identity, `MState.storeDma_zero`; the ghost update below is for a write of
+at least one byte, and the zero-byte case is `DevM.LeaseD.dmaWrite`'s
+receipt-free `hzero`).  This file is the memory-side half of the disk's
 verification: the ghost update that mirrors that step (`machInterp_storeDma`),
 the derivation of its DRAM side condition from the cells themselves
 (`histBytes_ramBytes`), and the fact that pins what a DMA *read* may
@@ -60,9 +63,11 @@ whose authorship and position become persistent facts.  No reservation
 moves (the step is blocked while a hart reserves a byte of the footprint,
 so the firing arm has `¬ anyReserve`), and no hart's view moves.  Strictly
 simpler than `memModel_store_plain`: there is no reservation fragment to
-consume and no view big-sep to take apart. -/
+consume and no view big-sep to take apart.  The write is of at least one
+byte (`hn`): a zero-byte DMA write appends nothing (`MState.storeDma_zero`),
+so there is no position to mint receipts for. -/
 theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (hram : ramBytes pa n) (hno : ¬ anyReserve σ.resv pa n) :
+    (hram : ramBytes pa n) (hno : ¬ anyReserve σ.resv pa n) (hn : n ≠ 0) :
     memModelAt E σ ⊢@{IProp GF} |==>
       (memModelAt E (σ.storeDma pa n w) ∗
        authoredByAt E (σ.top + 1) diskAgent ∗ topLbAt E (σ.top + 1)) := by
@@ -78,8 +83,8 @@ theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
   iframe Hresv
   isplitl [Htop Hauth Hviews]
   · rw [show (σ.storeDma pa n w).top = σ.top + 1 by
-          simp [MState.top],
-        show (σ.storeDma pa n w).log = σ.log ++ [diskAgent] from rfl, authMap_snoc]
+          simp [MState.top, hn],
+        MState.storeDma_log_of_ne σ pa n w hn, authMap_snoc]
     iframe Htop Hauth
     isplitl [Hviews]
     · rw [BigSepL.bigSepL_eq (fun {_ c} _ => hartViews_storeDma E σ pa n w c)]
@@ -113,15 +118,15 @@ theorem histBytes_ramBytes (σ : MState) (pa : PAddr) (n : Nat) (dqs : Nat → D
   ipureintro
   exact ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
 
-/-- Re-assembling the interpretation after a DMA write: the registers and
-the device states are literally the same propositions. -/
-theorem machInterp_of_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+/-- Re-assembling the interpretation after a DMA write of at least one byte:
+the registers and the device states are literally the same propositions. -/
+theorem machInterp_of_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hn : n ≠ 0) :
     ([∗list] cpu ∈ cpus, regInterp cpu (σ.regs cpu)) ∗
       genHeapInterp (σ.mem.writeBytes pa n w (σ.top + 1) diskAgent) ∗
       memModel (σ.storeDma pa n w) ∗ devInterp σ.devs ⊢@{IProp GF}
     machInterp (σ.storeDma pa n w) := by
-  iintro H
-  iexact H
+  rw [MState.storeDma_of_ne σ pa n w hn]
 
 /-- A position the client holds a top-bound for is below the machine's
 store-order top, hence strictly below the position a store about to
@@ -138,9 +143,11 @@ theorem machInterp_topLb (σ : MState) (K : Nat) :
 the raw histories at full ownership -- the disk's store moves the machine's
 interpretation, grows the histories by the disk's entry at the next
 position, and hands back the two persistent receipts that let a hart later
-raise its floor past the write. -/
+raise its floor past the write.  The write is of at least one byte (`hn`):
+a zero-byte DMA write is the identity (`MState.storeDma_zero`) and mints
+nothing. -/
 theorem machInterp_storeDma (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → Hist)
-    (w : BitVec (8 * n)) (hno : ¬ anyReserve σ.resv pa n) :
+    (w : BitVec (8 * n)) (hno : ¬ anyReserve σ.resv pa n) (hn : n ≠ 0) :
     machInterp (GF := GF) σ ∗ histBytes pa n (fun _ => DFrac.own 1) Hs ⊢ |==>
       (machInterp (σ.storeDma pa n w) ∗
        histBytes pa n (fun _ => DFrac.own 1) (pushed Hs (σ.top + 1) diskAgent w) ∗
@@ -150,10 +157,10 @@ theorem machInterp_storeDma (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → H
   · iapply histBytes_ramBytes σ pa n _ Hs $$ [Hmem Hmm Hb]
     iframe
   imod histBytes_update σ.mem pa n Hs (σ.top + 1) diskAgent w $$ [$Hmem $Hb] with ⟨Hmem, Hb⟩
-  imod memModel_storeDma _ σ pa n w hram hno $$ Hmm with ⟨Hmm, #Hau, #Htop⟩
+  imod memModel_storeDma _ σ pa n w hram hno hn $$ Hmm with ⟨Hmm, #Hau, #Htop⟩
   imodintro
   iframe Hb Hau Htop
-  iapply machInterp_of_storeDma σ pa n w
+  iapply machInterp_of_storeDma σ pa n w hn
   iframe Hregs Hmem Hmm Hdev
 
 /-! ## The value form of a lease -/

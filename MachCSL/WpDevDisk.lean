@@ -143,13 +143,18 @@ inductive DevM.LeaseD {S T : Type} (dk : S → Nat → BitVec 8) (Env : IProp GF
       (hpin : ∀ s, iprop(C ∗ R s) ⊢ dmaReadPinV pa n (Q s) (fun w => iprop(R s ∗ C' w)))
       (hk : ∀ v, (∃ s, Q s v) → LeaseD dk Env E R Lt Ce (C' v) (k v)) :
       LeaseD dk Env E R Lt Ce C (.op (.dmaRead pa n) k)
+  /-- The guarded DMA write.  A zero-byte write appends nothing
+  (`MState.storeDma_zero`) and mints no receipt: `hzero` is that case,
+  receipt-free, last, and self-discharging at a nonzero numeral `n`. -/
   | dmaWrite (C C' : IProp GF) (g : S → Option S) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
       (k : Unit → DevM S T Unit)
       (hlease : ∀ s s', g s = some s' →
         (iprop(C ∗ R s) ⊢ dmaWriteLease pa n w (iprop(|==> (R s' ∗ C')))))
       (hfalse : ∀ s, g s = none → (iprop(C ∗ R s) ⊢ |==> (R s ∗ C')))
       (hdk : ∀ s s', g s = some s' → dk s' = dk s)
-      (hk : LeaseD dk Env E R Lt Ce C' (k ())) :
+      (hk : LeaseD dk Env E R Lt Ce C' (k ()))
+      (hzero : n = 0 → ∀ s s', g s = some s' → (iprop(C ∗ R s) ⊢ |==> (R s' ∗ C')) := by
+        first | (intro hn0; exact absurd hn0 (Nat.ne_of_gt (Nat.le_of_ble_eq_true rfl))) | (intro hn0; omega)) :
       LeaseD dk Env E R Lt Ce C (.op (.dmaWrite g pa n w) k)
   | fork (C C' : IProp GF) (t : T) (k : TaskId → DevM S T Unit)
       (hsplit : C ⊢ iprop(C' ∗ Lt t))
@@ -178,9 +183,10 @@ theorem leaseD_of_leaseV {S T : Type} (dk : S → Nat → BitVec 8) (Env : IProp
   | dmaReadV C pa n Q C' k hpin _ ih =>
     cases hk with
     | op _ _ _ _ hk' => exact .dmaReadV C pa n Q C' k hpin (fun v hv => ih v hv (hk' v))
-  | dmaWrite C C' g pa n w k hlease hfalse _ ih =>
+  | dmaWrite C C' g pa n w k hlease hfalse _ hzero ih =>
     cases hk with
-    | op _ _ _ hw' hk' => exact .dmaWrite C C' g pa n w k hlease hfalse (hw' g pa n w rfl) (ih (hk' ()))
+    | op _ _ _ hw' hk' =>
+      exact .dmaWrite C C' g pa n w k hlease hfalse (hw' g pa n w rfl) (ih (hk' ())) hzero
   | fork C C' t k hsplit _ ih =>
     cases hk with
     | op _ _ _ _ hk' => exact .fork C C' t k hsplit (fun tid => ih tid (hk' tid))
@@ -519,15 +525,36 @@ theorem wpDev_dmaD (N : Namespace) (Env : IProp GF) [Persistent Env]
       isplitl [HC]
       · iapply hmk _ _ hm' $$ IH HC
       · exact BigSepL.bigSepL_nil_intro
-  | dmaWrite _ C' g pa n w k hlease hfalse hdk hk =>
+  | dmaWrite _ C' g pa n w k hlease hfalse hdk hk hzero =>
     disk_first_leg
     have hm' : DevM.LeaseD virtioDisk Env (⊤ \ ↑N) R Lt (if tid = rootTask then Cr else iprop(True)) C
-        (.op (.dmaWrite g pa n w) k) := .dmaWrite _ C' g pa n w k hlease hfalse hdk hk
+        (.op (.dmaWrite g pa n w) k) := .dmaWrite _ C' g pa n w k hlease hfalse hdk hk hzero
     rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
     · obtain ⟨rfl, rfl, hcase⟩ := hop
       cases v
       rcases hcase with ⟨s', hgt, _, hram, hnr, rfl⟩ | ⟨hsk, hσn⟩
-      · -- the write fires, and the device's own state moves with it
+      · by_cases hn0 : n = 0
+        · -- a zero-byte write: the store is the identity, only the device moves
+          rw [MState.storeDma_zero σ pa n w hn0]
+          imod (devUpdateAt _ .virtio (σ.devs.st .virtio) (σ.devs.st .virtio) s') $$ [Hauth Hfrag]
+            with ⟨Hauth, Hfrag⟩
+          · iframe
+          imod (hzero hn0 _ _ hgt) $$ [HC HR] with ⟨HR, HC⟩
+          · iframe HC HR
+          ihave Hcl := Hclose $$ [Hfrag HR]
+          case' _ => inext; iexists s'; iframe Hfrag HR
+          imod Hcl
+          imodintro
+          try unfold diskLend
+          rw [diskOf_setDev_virtio, hdk _ _ hgt,
+            show virtioDisk (σ.devs.st .virtio) = diskOf σ.devs from rfl]
+          iframe Hdk Hst
+          isplitl [Hauth Hσclose]
+          · iapply Hσclose $$ %s' Hauth
+          isplitl [HC]
+          · iapply hmk _ _ hk $$ IH HC
+          · exact BigSepL.bigSepL_nil_intro
+        -- the write fires, and the device's own state moves with it
         rw [MState.storeDma_setDev]
         imod (devUpdateAt _ .virtio (σ.devs.st .virtio) (σ.devs.st .virtio) s') $$ [Hauth Hfrag]
           with ⟨Hauth, Hfrag⟩
@@ -541,7 +568,7 @@ theorem wpDev_dmaD (N : Namespace) (Env : IProp GF) [Persistent Env]
         ihave %hkb : ⌜Kb ≤ (σ.setDev .virtio s').top⌝ $$ [Hσ Htlb]
         · iapply machInterp_topLb (σ.setDev .virtio s') Kb
           iframe Hσ Htlb
-        imod machInterp_storeDma (σ.setDev .virtio s') pa n Hs w hnr $$ [$Hσ $Hb]
+        imod machInterp_storeDma (σ.setDev .virtio s') pa n Hs w hnr hn0 $$ [$Hσ $Hb]
           with ⟨Hσ, Hb, #Hau, #Htop⟩
         ihave Hrc := Hback $$ %((σ.setDev .virtio s').top + 1) Hb Hau Htop
           %(by omega : Kb < (σ.setDev .virtio s').top + 1)

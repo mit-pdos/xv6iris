@@ -111,6 +111,12 @@ inductive DevM.LeaseL {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] {S T
   `hfalse` obligation is that case, and the `¬ ramBytes` case of
   `devOpStep` is refuted by the lease's own footprint.
 
+  A ZERO-BYTE write appends nothing (`MState.storeDma_zero`), so the machine
+  mints no receipt the lease's continuation could be fired with: `hzero` is
+  that case, a receipt-free obligation.  It comes LAST and discharges itself
+  whenever `n` is a nonzero numeral (or reduces to one), so a derivation of a
+  program that never writes zero bytes need not mention it.
+
   THE GUARD MOVES THE STATE.  `g s = some s'` is the store AND the device's
   own move, in one transition: the continuation re-establishes the
   invariant at the NEW state `s'`, so a device may publish a value and
@@ -129,7 +135,10 @@ inductive DevM.LeaseL {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] {S T
       (hlease : ∀ s s', g s = some s' →
         (iprop(C ∗ R s) ⊢ dmaWriteLease pa n w (iprop(|==> (R s' ∗ C')))))
       (hfalse : ∀ s, g s = none → (iprop(C ∗ R s) ⊢ |==> (R s ∗ C')))
-      (hk : LeaseL R Lt Ce C' (k ())) : LeaseL R Lt Ce C (.op (.dmaWrite g pa n w) k)
+      (hk : LeaseL R Lt Ce C' (k ()))
+      (hzero : n = 0 → ∀ s s', g s = some s' → (iprop(C ∗ R s) ⊢ |==> (R s' ∗ C')) := by
+        first | (intro hn0; exact absurd hn0 (Nat.ne_of_gt (Nat.le_of_ble_eq_true rfl))) | (intro hn0; omega)) :
+      LeaseL R Lt Ce C (.op (.dmaWrite g pa n w) k)
   /-- Forking: the context splits, and the new task gets `Lt t`. -/
   | fork (C C' : IProp GF) (t : T) (k : TaskId → DevM S T Unit)
       (hsplit : C ⊢ iprop(C' ∗ Lt t))
@@ -144,7 +153,9 @@ theorem DevM.LeaseL.dmaWriteIf {S T : Type} {R : S → IProp GF} {Lt : T → IPr
     (hlease : ∀ s, g s = true →
       (iprop(C ∗ R s) ⊢ dmaWriteLease pa n w (iprop(|==> (R s ∗ C')))))
     (hfalse : ∀ s, g s = false → (iprop(C ∗ R s) ⊢ |==> (R s ∗ C')))
-    (hk : DevM.LeaseL R Lt Ce C' (k ())) :
+    (hk : DevM.LeaseL R Lt Ce C' (k ()))
+    (hzero : n = 0 → ∀ s, g s = true → (iprop(C ∗ R s) ⊢ |==> (R s ∗ C')) := by
+      first | (intro hn0; exact absurd hn0 (Nat.ne_of_gt (Nat.le_of_ble_eq_true rfl))) | (intro hn0; omega)) :
     DevM.LeaseL R Lt Ce C (.op (.dmaWrite (fun s => if g s then some s else none) pa n w) k) :=
   DevM.LeaseL.dmaWrite C C' _ pa n w k
     (fun s s' hg => by
@@ -156,6 +167,10 @@ theorem DevM.LeaseL.dmaWriteIf {S T : Type} {R : S → IProp GF} {Lt : T → IPr
       · exact absurd hg (by simp)
       · rename_i hb; exact hfalse s (by simpa using hb))
     hk
+    (fun hn0 s s' hg => by
+      split at hg
+      · rename_i hb; cases hg; exact hzero hn0 s hb
+      · exact absurd hg (by simp))
 
 /-- A device whose ROOT LOOP is derivable from `Cr` and gives `Cr` back at
 the end of every iteration -- so the root may hold one exclusive resource
