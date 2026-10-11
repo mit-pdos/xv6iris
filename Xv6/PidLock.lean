@@ -23,6 +23,14 @@ payload owns (one snapshot), so the scan's verdicts are verdicts on the
 history, and the allocation hands back `pidAllocRcpt`: the `PAlloc`'s prefix,
 and the pid the kernel was bound to give from it (`PidEv.pidPick`).
 
+THE HISTORY'S WELL-FORMEDNESS (weak-allocproc W1b, Lean-only, review
+[R1.3] (ii)): the ledger also keeps `pidHistWf PIDMAX h` (`PidEv` §8: every
+allocation of the history was the pick of its prefix, in `[1, PIDMAX]`, not
+live there), and the allocation receipt carries it for the history its
+`PAlloc` ends.  `pidLedger_alloc` establishes the new allocation's lawfulness from
+the scan's verdicts it already takes; the three steps' statements are
+unchanged.
+
 ## Deviations from Rocq (the ledger)
 
 1. The tie is an equality of PREDICATES on `Int` (`PidEv` deviation 2):
@@ -111,12 +119,16 @@ register by its live set -- AND (NI M2-G2a, rulings G2-R1/R2) to the
 payload's counter and cells (`pidTie`).  Context-free, so the payload is
 still a `CtxMorph`. -/
 def pidLedger (np : BitVec 32) (pids : Nat → BitVec 32) (R : IntMapF GName) : IProp GF := iprop%
-  ∃ h : List Pev, pidLedAuth h ∗ ⌜liveOf h = PartialMap.dom R ∧ pidTie np pids h⌝
+  ∃ h : List Pev, pidLedAuth h ∗ ⌜liveOf h = PartialMap.dom R ∧ pidTie np pids h ∧ pidHistWf PIDMAX h⌝
 
 /-- THE ALLOCATION RECEIPT: the `PAlloc`'s prefix, and the pid it was bound
-to give (`PidEv.pidPick` of that prefix). -/
+to give (`PidEv.pidPick` of that prefix) -- and (weak-allocproc W1b) the
+well-formedness of the history it ends (`PidEv.pidHistWf`: every allocation
+lawful at its prefix, this one included -- the pid not live at `h`, the
+prefix's live pids distinct, its counter in range). -/
 def pidAllocRcpt (act : BitVec 64) (pid : BitVec 32) : IProp GF := iprop%
-  ∃ h : List Pev, pidReceipt h (.PAlloc act pid) ∗ ⌜pid.toNat = pidPick PIDMAX h⌝
+  ∃ h : List Pev, pidReceipt h (.PAlloc act pid) ∗
+    ⌜pid.toNat = pidPick PIDMAX h ∧ pidHistWf PIDMAX (h ++ [.PAlloc act pid])⌝
 
 instance pidAllocRcpt_persistent (act : BitVec 64) (pid : BitVec 32) :
     Persistent (pidAllocRcpt (GF := GF) act pid) := by
@@ -171,7 +183,7 @@ theorem pidLedger_empty : pidLedAuth (GF := GF) [] ⊢ pidLedger 1#32 (fun _ => 
   iexists []
   iframe Ha
   ipureintro
-  refine ⟨by rw [pidDom_empty]; rfl, rfl, fun z => ?_⟩
+  refine ⟨by rw [pidDom_empty]; rfl, ⟨rfl, fun z => ?_⟩, pidHistWf_nil PIDMAX⟩
   simp only [liveOf, List.foldl_nil, pidCells, BitVec.toNat_ofNat, false_iff, not_and, not_exists]
   intro hz j _ h0
   exact hz (by rw [← h0])
@@ -192,7 +204,7 @@ theorem pidLedger_alloc (np : BitVec 32) (pids pids' : Nat → BitVec 32) (n : N
       |==> (pidLedger (pidNext pid) pids' (PartialMap.insert R (pid.toNat : Int) g) ∗
         pidAllocRcpt act pid) := by
   unfold pidLedger pidAllocRcpt pidReceipt
-  iintro ⟨%h, Ha, %⟨hl, hnp, hcells⟩⟩
+  iintro ⟨%h, Ha, %⟨hl, ⟨hnp, hcells⟩, hwf⟩⟩
   -- the pick, read on the opened history
   have hpick : pid.toNat = pidPick PIDMAX h := by
     obtain ⟨k, hk, hbefore⟩ := hfirst
@@ -202,13 +214,20 @@ theorem pidLedger_alloc (np : BitVec 32) (pids pids' : Nat → BitVec 32) (n : N
     rw [← hk, hcells]
     rintro ⟨_, j, hj, hpj⟩
     exact hno j hj (BitVec.eq_of_toNat_eq hpj)
+  -- (weak-allocproc W1b) the allocation is lawful at the opened history
+  have hok : pidAllocOk PIDMAX h pid := by
+    refine ⟨hpick, hlo, hhi, ?_⟩
+    rw [hcells]
+    rintro ⟨_, j, hj, hpj⟩
+    exact hno j hj (BitVec.eq_of_toNat_eq hpj)
+  have hwf' := pidHistWf_snoc_alloc PIDMAX h act pid hwf hok
   imod pidLedAuth_grow h (.PAlloc act pid) $$ Ha with ⟨Ha, #Hb⟩
   imodintro
   isplitl [Ha]
   · iexists h ++ [.PAlloc act pid]
     iframe Ha
     ipureintro
-    refine ⟨by rw [liveOf_snoc_alloc_dom _ h act pid hl, pidDom_insert], ?_, fun z => ?_⟩
+    refine ⟨by rw [liveOf_snoc_alloc_dom _ h act pid hl, pidDom_insert], ⟨?_, fun z => ?_⟩, hwf'⟩
     · rw [nextOf_snoc_alloc, pidNext_toNat pid hhi]
     · rw [liveOf_snoc_alloc]
       simp only [Int.ofNat_inj, hcells, pidCells]
@@ -224,7 +243,7 @@ theorem pidLedger_alloc (np : BitVec 32) (pids pids' : Nat → BitVec 32) (n : N
   · iexists h
     iframe Hb
     ipureintro
-    exact hpick
+    exact ⟨hpick, hwf'⟩
 
 /-- freeproc's, at the register's delete (Rocq `pid_ledger_free`; the tie NI
 M2-G2a): slot `j`'s cell, the only one holding `pid` (`pidsOk`), is
@@ -237,14 +256,15 @@ theorem pidLedger_free (np : BitVec 32) (pids pids' : Nat → BitVec 32) (j : Na
       |==> (pidLedger np pids' (PartialMap.delete R (pid.toNat : Int)) ∗
         ∃ h, pidReceipt h (.PFree act pid)) := by
   unfold pidLedger pidReceipt
-  iintro ⟨%h, Ha, %⟨hl, hnp, hcells⟩⟩
+  iintro ⟨%h, Ha, %⟨hl, ⟨hnp, hcells⟩, hwf⟩⟩
   imod pidLedAuth_grow h (.PFree act pid) $$ Ha with ⟨Ha, #Hb⟩
   imodintro
   isplitl [Ha]
   · iexists h ++ [.PFree act pid]
     iframe Ha
     ipureintro
-    refine ⟨by rw [liveOf_snoc_free_dom _ h act pid hl, pidDom_delete], ?_, fun z => ?_⟩
+    refine ⟨by rw [liveOf_snoc_free_dom _ h act pid hl, pidDom_delete], ⟨?_, fun z => ?_⟩,
+      pidHistWf_snoc_free PIDMAX h act pid hwf⟩
     · rw [nextOf_snoc_free]; exact hnp
     · rw [liveOf_snoc_free]
       simp only [hcells, pidCells, ne_eq, Int.ofNat_inj]

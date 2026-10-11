@@ -148,7 +148,7 @@ theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' :
     exact h'
   have hF : uvisNum (uvisRun W) = USYS_fork → usysForkFitsAt (uvisRun W).ch ι (tfW V'.tf (tfArgIdx 0)) cs' := by
     intro h
-    obtain ⟨ha, hok, hnok⟩ := hf (hnum.trans h)
+    obtain ⟨ha, hok, hnok, -⟩ := hf (hnum.trans h)
     refine ⟨ha, ?_⟩
     show cs' = if forkOk ι then W.ch ∪ {usysForkGen ι} else W.ch
     rw [hch]
@@ -207,6 +207,18 @@ theorem urc_niOutRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
     niOutRow sc W (uvisOf V' M' sts' gn cs' pid) (some (k, ι)) := by
   intro _ hw hcons
   exact (urc_evRow W V Mp V' M' cs cs' W.fd ι hl hch hsc hM hpi hsz hlz rfl hev).2.2.2.2.2 hw hcons
+
+/-- **THE FORK CITATION'S LEDGER TIES, FILED** (weak-allocproc W1b): the
+round's `niForkTie` at its citation, off the cited row's fork clause (the
+arm's `UsysDet.usysForkTie`). -/
+theorem urc_niForkTie (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (sc : BitVec 64)
+    (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (sts : List FdState)
+    (k : Nat) (ι : UIota) (hl : V.tf.length = 36) (hsc : W.secc = V.pvSecc)
+    (hev : syscEvRow (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) V'
+      (syscImg (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) Mp) (syscImg V' M') cs cs' sts ι) :
+    niForkTie sc W (some (k, ι)) := by
+  intro _ hfk
+  exact (hev.2.2.1 ((urc_num_run W V hl hsc).trans hfk)).2.2.2
 
 /-- **pause's answer at the trapped key's run frame** (NI M3 no-kill K1):
 usertrap's live row (`UexecRet.uexecLiveOk`'s pause clause) read at the

@@ -23,6 +23,10 @@ ghost state, no gname.
 
 Design: `claude-notes/design/ni-pid-ledger.md` (§2 D1, §3 W1).
 
+§8 (weak-allocproc W1b, Lean-only): `pidHistWf pidmax h`, every allocation
+of the history lawful at its prefix (`pidAllocOk`: the pick, in range, not
+live), with its nil/snoc steps and their converse.
+
 ## Deviations from Rocq
 
 1. Names: `pev`/`pev_pid`/`live_of`/`next_of` are
@@ -209,5 +213,65 @@ theorem pidPick_spec (pidmax : Nat) (h : List Pev) (k : Nat) (hp : 0 < pidmax)
   rw [pidPick_find pidmax k _ hk
     (fun i hi => by simp only [Bool.not_eq_false', liveB_iff]; exact hbefore i hi)
     (by simp only [Bool.not_eq_true']; exact Bool.eq_false_iff.2 (fun h' => hat ((liveB_iff _ _).1 h')))]
+
+/-! ## 8. THE HISTORY'S WELL-FORMEDNESS (weak-allocproc W1b, review [R1.3] (ii))
+
+The kernel's allocations are LAWFUL at their prefixes: every `PAlloc a p`
+in the history handed out the pick of the history before it
+(`pidPick`), a pid in `[1, pidmax]`, not live there.  The pid ledger keeps
+it for the whole history (`PidLock.pidLedger`), the allocation receipt for
+its prefix (`PidLock.pidAllocRcpt`); `AllocprocTrace.pidHistWf_nodup` reads
+it as "live pids pairwise distinct" and `AllocprocTrace.pidHistWf_nextOf`
+as the counter tie `nextOf pidmax h ≤ pidmax`.  Frees are unconstrained (a
+free of a pid not live moves neither reading). -/
+
+/-- An allocation of `p` after `pre` is lawful: the pick, in `[1, pidmax]`,
+not live. -/
+def pidAllocOk (pidmax : Nat) (pre : List Pev) (p : BitVec 32) : Prop :=
+  p.toNat = pidPick pidmax pre ∧ 1 ≤ p.toNat ∧ p.toNat ≤ pidmax ∧ ¬ liveOf pre (p.toNat : Int)
+
+/-- **Every allocation of `h` is lawful at its prefix.** -/
+def pidHistWf (pidmax : Nat) (h : List Pev) : Prop :=
+  ∀ (n : Nat) (a : BitVec 64) (p : BitVec 32), h[n]? = some (.PAlloc a p) → pidAllocOk pidmax (h.take n) p
+
+theorem pidHistWf_nil (pidmax : Nat) : pidHistWf pidmax [] := by
+  intro n a p hn; simp at hn
+
+/-- One more event: lawful if, when it is an allocation, it is lawful at
+`h`. -/
+theorem pidHistWf_snoc (pidmax : Nat) (h : List Pev) (e : Pev) (hw : pidHistWf pidmax h)
+    (he : ∀ a p, e = .PAlloc a p → pidAllocOk pidmax h p) : pidHistWf pidmax (h ++ [e]) := by
+  intro n a p hn
+  by_cases hlt : n < h.length
+  · rw [List.getElem?_append_left hlt] at hn
+    rw [List.take_append_of_le_length (Nat.le_of_lt hlt)]
+    exact hw n a p hn
+  · rw [List.getElem?_append_right (Nat.le_of_not_lt hlt)] at hn
+    have h1 := (List.getElem?_eq_some_iff.mp hn).1
+    simp only [List.length_singleton] at h1
+    have hn' : n = h.length := by omega
+    subst hn'
+    simp only [Nat.sub_self, List.getElem?_cons_zero, Option.some.injEq] at hn
+    rw [List.take_left]
+    exact he a p hn
+
+theorem pidHistWf_snoc_alloc (pidmax : Nat) (h : List Pev) (a : BitVec 64) (p : BitVec 32)
+    (hw : pidHistWf pidmax h) (hp : pidAllocOk pidmax h p) : pidHistWf pidmax (h ++ [.PAlloc a p]) :=
+  pidHistWf_snoc pidmax h _ hw (fun _ _ he => by cases he; exact hp)
+
+theorem pidHistWf_snoc_free (pidmax : Nat) (h : List Pev) (a : BitVec 64) (p : BitVec 32)
+    (hw : pidHistWf pidmax h) : pidHistWf pidmax (h ++ [.PFree a p]) :=
+  pidHistWf_snoc pidmax h _ hw (fun _ _ he => by cases he)
+
+/-- The converse: a well-formed history's prefix is well formed, and its
+last allocation lawful there. -/
+theorem pidHistWf_snoc_inv (pidmax : Nat) (h : List Pev) (e : Pev) (hw : pidHistWf pidmax (h ++ [e])) :
+    pidHistWf pidmax h ∧ ∀ a p, e = .PAlloc a p → pidAllocOk pidmax h p := by
+  refine ⟨fun n a p hn => ?_, fun a p he => ?_⟩
+  · have hlt : n < h.length := (List.getElem?_eq_some_iff.mp hn).1
+    have := hw n a p (by rw [List.getElem?_append_left hlt]; exact hn)
+    rwa [List.take_append_of_le_length (Nat.le_of_lt hlt)] at this
+  · have := hw h.length a p (by rw [List.getElem?_append_right (Nat.le_refl _)]; simp [he])
+    rwa [List.take_left] at this
 
 end Xv6

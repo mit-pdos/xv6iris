@@ -308,6 +308,20 @@ def usysForkGen (ι : UIota) : GName :=
   | some (.ZFork _ _ _ γ) => γ
   | _ => 0
 
+/-- **The fork citation's ledger ties** (weak-allocproc W1b, W1-Q RULED (c)):
+the cited pid prefix is well formed (`PidEv.pidHistWf`: every allocation in
+it lawful at its own prefix -- live pids pairwise distinct, the counter in
+`[1, PIDMAX]`), on success the pick is not live at it (the allocation the
+round made is lawful too: the child's pid is distinct from every live
+pid), and the cited allocator prefix's decisive event is the pool's state
+before it -- a `KNull` at an empty pool, a `KAlloc` at a non-empty one (the
+receipts `KallocDefs.kNullRcpt`/`kAllocRcpt`).  Not a row of `usysDet`: the
+kernel's arm cites it beside fork's row (`SyscallDefs.syscEvRow`), the
+filing carries it (`NiLedger.niForkTie`). -/
+def usysForkTie (ι : UIota) : Prop :=
+  pidHistWf PIDMAX ι.pev ∧ (forkOk ι → ¬ liveOf ι.pev (pidPick PIDMAX ι.pev : Int)) ∧
+    (ι.kNull → poolEmpty ι.kev.dropLast) ∧ (ι.kOk → ¬ poolEmpty ι.kev.dropLast)
+
 /-! ## §2 The class and the function -/
 
 /-- The members whose round moves NOTHING but `a0` (getpid, uptime, NI

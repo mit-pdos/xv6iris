@@ -21,7 +21,11 @@ contract, crossing `k.sie`) from the dispatch's rows, per the frozen recipe
   ending in the `ZFork`, and -- NI joint fork lane F3 -- the allocator
   prefix ending in the trapframe's `KAlloc`); on `-1` the answer's POSITIVE
   REASON, the allocator prefix ending in the round's `KNull` or the slot
-  ledger's ending in the scan's `SFull` (`syscArmFork_evNeg`).
+  ledger's ending in the scan's `SFull` (`syscArmFork_evNeg`).  (weak-allocproc
+  W1b) Both also cite the prefix's ledger ties `UsysDet.usysForkTie` from
+  the receipts' facts: the pid receipt's well-formed history (the prefix's
+  `pidHistWf`, the pick not live at it), `poolEmpty` before the `KNull`,
+  not before the `KAlloc`.
 
 * The park (W8-P2): kfork's `kforkPark` rows out of the environment --
   printk's credentials, the park world with the syscall side's rows
@@ -139,7 +143,7 @@ theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
       (∃ (hz : List Zev) (i : Nat), zombReceipt hz (.ZFork act i rv γc)) -∗
       |==> syscEvOut (hlc := hlc) V M sts V' M' cs (cs ∪ {γc}) gn := by
   unfold pidAllocRcpt kAllocRcpt ledReceipt
-  iintro #Ha ⟨%h, #Hp, %hpick⟩ ⟨%hk, #Hk, %-⟩ ⟨%hz, %i, #Hz⟩
+  iintro #Ha ⟨%h, #Hp, %⟨hpick, hwfp⟩⟩ ⟨%hk, #Hk, %hkne⟩ ⟨%hz, %i, #Hz⟩
   have hrv : BitVec.ofNat 32 (pidPick PIDMAX h) = rv := by rw [← hpick]; exact BitVec.ofNat_toNat _ _
   ihave #Hp' := (show pidReceipt (GF := GF) h (.PAlloc act rv) ⊢ WchG.wplName GF ↪◯ML h from by
     unfold pidReceipt pidLedLb
@@ -172,8 +176,20 @@ theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     show (match (hz ++ [Zev.ZFork act i rv γc]).getLast? with
       | some (.ZFork _ _ _ γ) => γ | _ => 0) = γc
     simp
+  -- (weak-allocproc W1b) the ledger ties: the receipt's prefix well formed,
+  -- the trapframe's `KAlloc` at a non-empty pool
+  have htie : usysForkTie
+      { UIota.boot with pev := h, zev := hz ++ [.ZFork act i rv γc], kev := hk ++ [.KAlloc act], act := act } := by
+    obtain ⟨hwfh, hlaw⟩ := pidHistWf_snoc_inv PIDMAX h _ hwfp
+    refine ⟨hwfh, fun _ => ?_, fun hnull => ?_, fun _ => ?_⟩
+    · show ¬ liveOf h (pidPick PIDMAX h : Int)
+      rw [← hpick]; exact (hlaw act rv rfl).2.2.2
+    · have h2 : (hk ++ [Kev.KAlloc act]).getLast? = some (.KNull act) := hnull
+      simp at h2
+    · show ¬ poolEmpty (hk ++ [Kev.KAlloc act]).dropLast
+      rw [List.dropLast_concat]; exact hkne
   refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
-    fun _ => ⟨?_, fun _ => ⟨⟨hz, i, ?_⟩, ?_⟩, fun h' => absurd hok h'⟩,
+    fun _ => ⟨?_, fun _ => ⟨⟨hz, i, ?_⟩, ?_⟩, fun h' => absurd hok h', htie⟩,
     fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
     fun h' => absurd (hn.symm.trans h') (by decide)⟩
   · unfold usysForkAns usysForkPid
@@ -201,7 +217,7 @@ theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : Li
   iintro #Ha Hr
   icases Hr with (Hk | Hs)
   · unfold kNullRcpt ledReceipt
-    icases Hk with ⟨%hk, #Hk, %-⟩
+    icases Hk with ⟨%hk, #Hk, %hkem⟩
     ihave #Hk' := (show ledLb (GF := GF) fsReadyKmem.pend (hk ++ [.KNull act]) ⊢
         ((niNamesHere (GF := GF)).getD 3 0) ↪◯ML (hk ++ [.KNull act]) from .rfl) $$ Hk
     imod niIotaLbs_kev (GF := GF) (niNamesHere (GF := GF)) (hk ++ [.KNull act]) act $$ Hk' with #Hl
@@ -215,8 +231,16 @@ theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : Li
       rintro ⟨hok, -⟩
       have h2 : (hk ++ [Kev.KNull act]).getLast? = some (.KAlloc act) := hok
       simp at h2
+    -- (weak-allocproc W1b) the ledger ties: no pid prefix, the `KNull` at an
+    -- empty pool
+    have htie : usysForkTie { UIota.boot with kev := hk ++ [.KNull act], act := act } := by
+      refine ⟨pidHistWf_nil PIDMAX, fun h' => absurd h' hnok, fun _ => ?_, fun hko => ?_⟩
+      · show poolEmpty (hk ++ [Kev.KNull act]).dropLast
+        rw [List.dropLast_concat]; exact hkem
+      · have h2 : (hk ++ [Kev.KNull act]).getLast? = some (.KAlloc act) := hko
+        simp at h2
     refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
-      fun _ => ⟨?_, fun h' => absurd h' hnok, fun _ => ⟨Or.inl hnull, rfl⟩⟩,
+      fun _ => ⟨?_, fun h' => absurd h' hnok, fun _ => ⟨Or.inl hnull, rfl⟩, htie⟩,
       fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
       fun h' => absurd (hn.symm.trans h') (by decide)⟩
     unfold usysForkAns
@@ -234,8 +258,15 @@ theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : Li
       ⟨k0, by show (hs ++ [Sev.SFull act k0]).getLast? = some (.SFull act k0); simp⟩
     have hnok : ¬ forkOk { UIota.boot with sev := hs ++ [.SFull act k0], act := act } :=
       fun hok => hok.2 hfull
+    -- (weak-allocproc W1b) the ledger ties: no pid or allocator prefix
+    have htie : usysForkTie { UIota.boot with sev := hs ++ [.SFull act k0], act := act } := by
+      refine ⟨pidHistWf_nil PIDMAX, fun h' => absurd h' hnok, fun hnull => ?_, fun hko => ?_⟩
+      · have h2 : ([] : List Kev).getLast? = some (.KNull act) := hnull
+        simp at h2
+      · have h2 : ([] : List Kev).getLast? = some (.KAlloc act) := hko
+        simp at h2
     refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
-      fun _ => ⟨?_, fun h' => absurd h' hnok, fun _ => ⟨Or.inr hfull, rfl⟩⟩,
+      fun _ => ⟨?_, fun h' => absurd h' hnok, fun _ => ⟨Or.inr hfull, rfl⟩, htie⟩,
       fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
       fun h' => absurd (hn.symm.trans h') (by decide)⟩
     unfold usysForkAns

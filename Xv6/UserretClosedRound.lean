@@ -19,8 +19,9 @@ back (the kernel obligation `ukb`'s body), through
     the evidence          (NI M2-X2) usertrap's `utEvOut`: at a citing number
                           the round cites its era and prefix, M0's row at
                           it (`urc_niDetRow`, `uexecRet_roundDet`; fork's
-                          answer among it since NI joint fork lane F3);
-                          `NiFitIs.evid`
+                          answer among it since NI joint fork lane F3) and
+                          (weak-allocproc W1b) fork's ledger ties
+                          (`urc_niForkTie`); `NiFitIs.evid`
     the resume            UserretClosedResume.urc_resume (userret, steps C/D)
 
 back to the next round, under the loop hypothesis `▷ urcLoop`.
@@ -217,7 +218,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
             niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
             ⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩,
             hdet, urc_niOutRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hM hpi hsz hch hlz hsc hev,
-            ⟨hktr, hdet⟩, rfl, huc'⟩
+            ⟨hktr, hdet⟩, urc_niForkTie W V Mp sc V' M' cs cs' _ ke ι hl hsc hev, rfl, huc'⟩
         iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ (some (ke, ι)) _ hfe
         unfold niCiteRes niCiteResRaw niUhRes
         isplitr
@@ -232,7 +233,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
           niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
           ⟨fun h => absurd h hcit, fun h => absurd h (by simp)⟩, trivial, trivial,
           ⟨hktr, urc_keyBoot W V Mp sc V' M' sts' gn cs cs' pid hl hlw hM hpi hsz hcw hgn hch hpid hlz hsc hround
-            hchk hfde hrp hlive hcit⟩, rfl, huc'⟩
+            hchk hfde hrp hlive hcit⟩, trivial, rfl, huc'⟩
       iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ none _ hfe
       unfold niCiteRes niCiteResRaw niUhRes
       isplitl []

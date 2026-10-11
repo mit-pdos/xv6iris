@@ -13,6 +13,9 @@ incarnation's first key).
   of an entry's evidence (`MachFixedGS.uFit`'s Xv6 reading, ruling O2),
   with the round's getpid row (`niPidRow`, M2-W2d) and wait row
   (`niWaitRow`, NI G1d: the answer's shape, carried by the round).
+* §2 (weak-allocproc W1b) `niForkTie`: at a fork ecall the cited prefix's
+  ledger ties (`UsysDet.usysForkTie`), filed beside `niKeyRow` in
+  `niFitEv` and `niEntryOk`.
 * §3 `NiEntry` (NI M3 U-2b: an origin names its key history, a round its
   resumed key, history and index), `niOk h F` (every filing is valid in `h`, every enter in `h`
   is filed once): the ledger's pure fact (ruling O6: `∃ F`); `niOk_snoc`
@@ -217,6 +220,17 @@ def niOutRow (sc : BitVec 64) (W W' : Uvis) : Option (Nat × UIota) → Prop
       usysOutAt ι (uwriteRun (uvisRun W).M (tfW (uvisRun W).tf (tfArgIdx 1)) (uwriteCntOf (tfW W'.tf (tfArgIdx 0))))
   | none => True
 
+/-- **THE FORK CITATION'S LEDGER TIES, FILED** (weak-allocproc W1b, W1-Q
+RULED (c)): at a fork ecall the cited prefix carries `UsysDet.usysForkTie`
+-- its pid prefix well formed (live pids distinct, the counter in `[1,
+PIDMAX]`), its decisive allocator event the pool's state (`KNull` at an
+empty pool, `KAlloc` at a non-empty one).  Supplied by the kernel's fork
+arm (`SyscallArmsFork.syscArmFork_ev`/`_evNeg`, the receipts' facts),
+carried by the cited row (`SyscallDefs.syscEvRow`). -/
+def niForkTie (sc : BitVec 64) (W : Uvis) : Option (Nat × UIota) → Prop
+  | some (_, ι) => sc = uecallScause → uvisNum (uvisRun W) = USYS_fork → usysForkTie ι
+  | none => True
+
 /-- **THE USER'S PART OF A ROUND** (NI M3 U-2b, design (d)): the trapped
 key is where the pure user run from the RESUMED key may trap
 (`Ustep.ulands`: reachable from `Wr` by `ustep`, at an ecall only where
@@ -255,7 +269,7 @@ def niFitEv : Option (Nat × Obs) → Obs → Option (Nat × UIota) → NiUh →
   | some (_, x), e, c, u => ∃ (sc : BitVec 64) (Wr W W' : Uvis) (hp : List Uround),
       exitFits x sc W ∧ enterFits e W' ∧ roundOkKeys sc W W' ∧ W'.pid = W.pid ∧
       niPidRow sc W W' ∧ niWaitRow sc W W' ∧ (niCiting sc W ↔ c.isSome) ∧
-      niDetRow sc W W' c ∧ niOutRow sc W W' c ∧ niKeyRow sc W W' c ∧
+      niDetRow sc W W' c ∧ niOutRow sc W W' c ∧ niKeyRow sc W W' c ∧ niForkTie sc W c ∧
       u.2.2 = hp ++ [(sc, Wr, W, W')] ∧ uhistChain u.2.1 u.2.2
 
 /-! ## §3 The filing -/
@@ -312,7 +326,7 @@ def niEntryOk (h : List Obs) : NiEntry → Prop
       niPidRow sc W W' ∧ niWaitRow sc W W' ∧
       (niCiting sc W ↔ cite.isSome) ∧ niDetRow sc W W' cite ∧ niOutRow sc W W' cite ∧
       (∀ k ι, cite = some (k, ι) → k ≤ obsBoots (h.take j)) ∧
-      niUserRow Wr sc W ∧ niKeyRow sc W W' cite
+      niUserRow Wr sc W ∧ niKeyRow sc W W' cite ∧ niForkTie sc W cite
 
 /-- **THE LEDGER'S FACT**: every filing is valid, and every enter in `h` is
 filed exactly once (`∃!`, spelled out). -/
@@ -341,12 +355,12 @@ theorem niEntryOk_snoc {h : List Obs} {f : NiEntry} (e : Obs) (hf : niEntryOk h 
     obtain ⟨e', he', hfit⟩ := hf
     exact ⟨e', by rw [List.getElem?_append_left hlt']; exact he', hfit⟩
   | round i j sc Wr W W' c γ k =>
-    obtain ⟨hij, ⟨x, hx, hxf⟩, ⟨e', he', hef⟩, hr, hp, hq, hw, hci, hd, ho, hb, hu, hk⟩ := hf
+    obtain ⟨hij, ⟨x, hx, hxf⟩, ⟨e', he', hef⟩, hr, hp, hq, hw, hci, hd, ho, hb, hu, hk, hft⟩ := hf
     have hlt' : j < h.length := hlt
     have htk : (h ++ [e]).take j = h.take j := List.take_append_of_le_length (by omega)
     exact ⟨hij, ⟨x, by rw [List.getElem?_append_left (by omega)]; exact hx, hxf⟩,
       ⟨e', by rw [List.getElem?_append_left hlt']; exact he', hef⟩, hr, hp, hq, hw, hci, hd, ho,
-      by rw [htk]; exact hb, hu, hk⟩
+      by rw [htk]; exact hb, hu, hk, hft⟩
 
 /-- The new last position reads the appended event. -/
 theorem niLast {h : List Obs} {e e' : Obs} {j : Nat} (hj : (h ++ [e])[j]? = some e')
@@ -403,11 +417,11 @@ theorem niFiling_ok {h : List Obs} {e : Obs} {ox : Option (Nat × Obs)} {c : Opt
     exact ⟨u.2.1, 0#64, u.2.1, u.2.1, u.2.1, 0, ⟨e, hlast, hW0⟩, rfl, rfl, rfl⟩
   | some ix =>
     obtain ⟨i, x⟩ := ix
-    obtain ⟨sc, Wr, W, W', hp, hx, hen, hr, hpd, hq, hw, hci, hd, ho, hk, hu, hch⟩ := hfit
+    obtain ⟨sc, Wr, W, W', hp, hx, hen, hr, hpd, hq, hw, hci, hd, ho, hk, hft, hu, hch⟩ := hfit
     obtain ⟨hi, hxi⟩ := hrc i x rfl
     have hl := (uhistChain_last (hu ▸ hch)).2
     refine ⟨W, sc, Wr, W, W', hp.length, ⟨hi, ⟨x, by rw [List.getElem?_append_left hi]; exact hxi, hx⟩,
-      ⟨e, hlast, hen⟩, hr, hpd, hq, hw, hci, hd, ho, fun k ι hk => ?_, hl, hk⟩, rfl, rfl, ?_⟩
+      ⟨e, hlast, hen⟩, hr, hpd, hq, hw, hci, hd, ho, fun k ι hk => ?_, hl, hk, hft⟩, rfl, rfl, ?_⟩
     · show k ≤ obsBoots ((h ++ [e]).take h.length)
       rw [List.take_left]
       exact hcb k ι hk
@@ -1586,7 +1600,7 @@ theorem niR_enter (γ γe : GName) (h : List Obs) (e : Obs) (ox : Option (Nat ×
     | none => obtain ⟨-, hnil, -⟩ := hfe; rw [hnil]; trivial
     | some ix =>
       obtain ⟨i, x⟩ := ix
-      obtain ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, hch⟩ := hfe
+      obtain ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, hch⟩ := hfe
       exact hch
   ihave Hu := niUhSt_file F (niFiling h ox W0 (k / 2) sc Wr W W' c u.1 n) u.1 u.2.1 u.2.2 huch huh hufit
     $$ [Hur Hu]

@@ -2179,7 +2179,7 @@ theorem niDet_runs {h₁ h₂ : List Obs} {H₁ H₂ : Nat → UIota} (hH : ∀ 
     | .origin .. :: _, _, hr₁, _, _, _, _, _ => exact hr₁.elim
     | .round i j sc Wr W W' c γ k :: rs₁', hn, hr₁, hok₁, hst, hcl, hb₁, hpos =>
       have hf := hok₁ _ (List.mem_cons_self ..)
-      obtain ⟨-, -, -, -, -, -, -, -, -, -, -, hu, hkr⟩ := id hf
+      obtain ⟨-, -, -, -, -, -, -, -, -, -, -, hu, hkr, -⟩ := id hf
       have hu : Ustep.ulands C₁ sc W := by rw [← hr₁.1]; exact hu
       have tl : ∀ {P : NiEntry → Prop}, (∀ f ∈ NiEntry.round i j sc Wr W W' c γ k :: rs₁', P f) →
           ∀ f ∈ rs₁', P f := fun hP f hf => hP f (List.mem_cons_of_mem _ hf)
@@ -2191,7 +2191,7 @@ theorem niDet_runs {h₁ h₂ : List Obs} {H₁ H₂ : Nat → UIota} (hH : ∀ 
         | .origin .. :: _, _, hr₂, _, _, _ => exact hr₂.elim
         | .round i₂ j₂ sc₂ Wr₂ W₂ W₂' c₂ γ₂ k₂ :: rs₂', hn, hr₂, hok₂, hb₂, hpos =>
           have hf₂ := hok₂ _ (List.mem_cons_self ..)
-          obtain ⟨-, -, -, -, -, -, -, -, -, -, -, hu₂, hkr₂⟩ := id hf₂
+          obtain ⟨-, -, -, -, -, -, -, -, -, -, -, hu₂, hkr₂, -⟩ := id hf₂
           have hu₂ : Ustep.ulands C₂ sc₂ W₂ := by rw [← hr₂.1]; exact hu₂
           have tl₂ : ∀ {P : NiEntry → Prop}, (∀ f ∈ NiEntry.round i₂ j₂ sc₂ Wr₂ W₂ W₂' c₂ γ₂ k₂ :: rs₂', P f) →
               ∀ f ∈ rs₂', P f := fun hP f hf => hP f (List.mem_cons_of_mem _ hf)
