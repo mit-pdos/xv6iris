@@ -318,7 +318,6 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
-omit [MachGS GF] in
 /-- **The exit slot, at any hart** (deviation 2, Rocq `sysc_exit_retarget`):
 the process address is nonzero, so the crossing's pin is vacuous. -/
 theorem syscall_post_at (p : BitVec 64) (hp : p ≠ 0#64) (c0 c : CPU) (K : CPU → IProp GF) :

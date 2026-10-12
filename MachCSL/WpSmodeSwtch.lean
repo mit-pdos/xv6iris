@@ -68,11 +68,11 @@ theorem wp_s_ld_sp [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
       rw [hsie] at hs
       exact absurd hs Bool.false_ne_true
     inext
-    iintro HmConf Hclock Hpc HT HQ
+    iintro HmConf Hclock Hpc HT HQ Hlc
     unfold transTok
     icases HT with ⟨Htrans, Htok⟩
     icases HQ with ⟨HF, Hw⟩
-    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ Hlc
     ihave HConf := kConf_intro cpu' curTier k.root k.sie k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
     ihave Hstack := (show stackOwn (GF := GF) k.sp (trapRes k.sie + k.avail) ⊢ stackOwn k.sp k.avail by
       rw [hsie, trapRes_off]) $$ Hstack

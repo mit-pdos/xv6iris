@@ -241,10 +241,14 @@ the goal is just `Entails' e (wpNext sie p cpu K)` and the context stays as it
 is.  `k_next_off` / `k_next_pin c hp` refine it by the two lemmas below and
 beta-reduce the continuation, which is what the proof-mode tactics left. -/
 
-omit [MachGS GF] in
 theorem entails'_wpNext_off {e : IProp GF} {p : BitVec 64} {cpu : CPU} {K : CPU → IProp GF}
     (h : Entails' e (K cpu)) : Entails' e (wpNext false p cpu K) :=
   (show e ⊢ K cpu from h).trans (wpNext_off_intro p cpu K)
+
+/-- `entails'_wpNext_off`, keeping the step's credit in the goal (`k_next_off_lc`). -/
+theorem entails'_wpNext_off_lc {e : IProp GF} {p : BitVec 64} {cpu : CPU} {K : CPU → IProp GF}
+    (h : Entails' e iprop(£ 1 -∗ K cpu)) : Entails' e (wpNext false p cpu K) :=
+  (show e ⊢ iprop(£ 1 -∗ K cpu) from h).trans (wpNext_off_intro_lc p cpu K)
 
 open Lean Elab Tactic Meta in
 /-- Beta-reduce the conclusion of the main (proof-mode) goal. -/
@@ -265,6 +269,13 @@ open Lean Elab Tactic Meta in
 /-- `iapply wpNext_off_intro`, by `entails'_wpNext_off`. -/
 elab "k_next_off" : tactic => do
   withPlainCtx <| evalTactic (← `(tactic| refine MachCSL.entails'_wpNext_off ?_))
+  betaConcl
+
+open Lean Elab Tactic Meta in
+/-- `k_next_off`, keeping the step's credit as the hypothesis `hlc`. -/
+elab "k_next_off_lc " hlc:ident : tactic => do
+  withPlainCtx <| evalTactic (← `(tactic| refine MachCSL.entails'_wpNext_off_lc ?_))
+  evalTactic (← `(tactic| iintro $hlc:ident))
   betaConcl
 
 /-- One instruction: apply its rule (written with `?hs` for the
@@ -320,25 +331,29 @@ macro_rules
                k_next_off
                try (case hs => k_norm)))
 
-omit [MachGS GF] in
 /-- `wpNext` by its definition: the continuation at every hart the
-pinning allows. -/
+pinning allows (the step's credit dropped). -/
 theorem wpNext_intro_pin (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
     (∀ cpu', ⌜sie = false ∨ p = 0#64 → cpu' = cpu⌝ -∗ K cpu') ⊢ wpNext sie p cpu K := by
   unfold wpNext
-  iintro H %cpu' %h
+  iintro H %cpu' %h _
   iapply H $$ %cpu' %h
 
-omit [MachGS GF] in
+/-- `wpNext_intro_pin`, keeping the step's credit. -/
+theorem wpNext_intro_pin_lc (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
+    (∀ cpu', ⌜sie = false ∨ p = 0#64 → cpu' = cpu⌝ -∗ £ 1 -∗ K cpu') ⊢ wpNext sie p cpu K := by
+  unfold wpNext
+  iintro H %cpu' %h Hlc
+  iapply H $$ %cpu' %h Hlc
+
 /-- The pinning composes: a continuation for the harts pinned to `cpu` is
 one for the harts pinned to a hart pinned to `cpu`. -/
 theorem wpNext_shift (sie : Bool) (p : BitVec 64) (cpu cpu' : CPU) (K : CPU → IProp GF)
     (h : sie = false ∨ p = 0#64 → cpu' = cpu) : wpNext sie p cpu K ⊢ wpNext sie p cpu' K := by
   unfold wpNext
-  iintro H %c %hc
-  iapply H $$ %c %(fun hh => (hc hh).trans (h hh))
+  iintro H %c %hc Hlc
+  iapply H $$ %c %(fun hh => (hc hh).trans (h hh)) Hlc
 
-omit [MachGS GF] in
 theorem entails'_wpNext_pin {e : IProp GF} {sie : Bool} {p : BitVec 64} {cpu : CPU}
     {K : CPU → IProp GF} (h : ∀ c, (sie = false ∨ p = 0#64 → c = cpu) → Entails' e (K c)) :
     Entails' e (wpNext sie p cpu K) := by
@@ -348,10 +363,29 @@ theorem entails'_wpNext_pin {e : IProp GF} {sie : Bool} {p : BitVec 64} {cpu : C
   iapply (show e ⊢ K c from h c hc)
   iexact He
 
+/-- `entails'_wpNext_pin`, keeping the step's credit in the goal (`k_next_pin_lc`). -/
+theorem entails'_wpNext_pin_lc {e : IProp GF} {sie : Bool} {p : BitVec 64} {cpu : CPU}
+    {K : CPU → IProp GF}
+    (h : ∀ c, (sie = false ∨ p = 0#64 → c = cpu) → Entails' e iprop(£ 1 -∗ K c)) :
+    Entails' e (wpNext sie p cpu K) := by
+  show e ⊢ wpNext sie p cpu K
+  refine Entails.trans ?_ (wpNext_intro_pin_lc sie p cpu K)
+  iintro He %c %hc
+  iapply (show e ⊢ iprop(£ 1 -∗ K c) from h c hc)
+  iexact He
+
 open Lean Elab Tactic Meta in
 /-- `iapply wpNext_intro_pin; iintro %c %hp`, by `entails'_wpNext_pin`. -/
 elab "k_next_pin " c:ident hp:ident : tactic => do
   withPlainCtx <| evalTactic (← `(tactic| refine MachCSL.entails'_wpNext_pin fun $c $hp => ?_))
+  betaConcl
+
+open Lean Elab Tactic Meta in
+/-- `k_next_pin`, keeping the step's credit as the hypothesis `hlc`
+(`iapply wpNext_intro_pin_lc; iintro %c %hp hlc`). -/
+elab "k_next_pin_lc " c:ident hp:ident hlc:ident : tactic => do
+  withPlainCtx <| evalTactic (← `(tactic| refine MachCSL.entails'_wpNext_pin_lc fun $c $hp => ?_))
+  evalTactic (← `(tactic| iintro $hlc:ident))
   betaConcl
 
 /-- `k_step` at either `SIE`: the continuation is introduced at a fresh
@@ -484,6 +518,131 @@ macro_rules
     `(tactic| (k_next_pin cpu hpin
                k_ext_move))
 
+/-! ### The step macros keeping the credit (`… £ Hlc`)
+
+The forms above drop the step's later credit at the continuation's
+introduction (`k_next_off` / `k_next_pin`).  The `£ Hlc` forms keep it as
+the hypothesis `Hlc : £ 1`: for the step before the proof pays its own
+`wpNext` (`wpNext_at … $$ HΦ Hlc`), or before a later it has to strip. -/
+
+syntax "k_step" term:max " $$ " specPat " £ " ident : tactic
+syntax "k_step" term:max " $$ " specPat " with " "[" term,* "]" " £ " ident : tactic
+syntax "k_step" term:max " from " term:max ident " $$ " specPat " £ " ident : tactic
+syntax "k_step" term:max " from " term:max ident " $$ " specPat " with " "[" term,* "]" " £ " ident : tactic
+
+set_option hygiene false in
+macro_rules
+  | `(tactic| k_step $rule:term $$ $pat:specPat £ $hlc:ident) =>
+    `(tactic| k_step $rule:term $$ $pat:specPat with [] £ $hlc)
+  | `(tactic| k_step $rule:term $$ $pat:specPat with [$extra,*] £ $hlc:ident) =>
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
+               rotate_right 1
+               iframe #
+               k_norm_goal [hsie, $extra,*]
+               iframe
+               first
+                 | inext_goal
+                 | (k_norm [$extra,*]; iframe; inext_goal)
+               k_next_off_lc $hlc
+               try (case hs => k_norm)))
+  | `(tactic| k_step $rule:term from $code:term $ht:ident $$ $pat:specPat £ $hlc:ident) =>
+    `(tactic| k_step $rule:term from $code:term $ht:ident $$ $pat:specPat with [] £ $hlc)
+  | `(tactic| k_step $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*] £ $hlc:ident) =>
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
+               rotate_right 1
+               k_code $code:term $ht:ident
+               iframe #
+               k_norm_goal [hsie, $extra,*]
+               iframe
+               first
+                 | inext_goal
+                 | (k_norm [$extra,*]; iframe; inext_goal)
+               k_next_off_lc $hlc
+               try (case hs => k_norm)))
+
+syntax "k_step_gen" term:max " $$ " specPat " next " ident ident " £ " ident : tactic
+syntax "k_step_gen" term:max " $$ " specPat " with " "[" term,* "]" " next " ident ident " £ " ident : tactic
+syntax "k_step_gen" term:max " from " term:max ident " $$ " specPat " next " ident ident " £ " ident : tactic
+syntax "k_step_gen" term:max " from " term:max ident " $$ " specPat " with " "[" term,* "]" " next " ident ident " £ " ident : tactic
+
+set_option hygiene false in
+macro_rules
+  | `(tactic| k_step_gen $rule:term $$ $pat:specPat next $c:ident $hp:ident £ $hlc:ident) =>
+    `(tactic| k_step_gen $rule:term $$ $pat:specPat with [] next $c $hp £ $hlc)
+  | `(tactic| k_step_gen $rule:term $$ $pat:specPat with [$extra,*] next $c:ident $hp:ident £ $hlc:ident) =>
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
+               rotate_right 1
+               iframe #
+               k_norm_goal [$extra,*]
+               iframe
+               first
+                 | inext_goal
+                 | (k_norm_g [$extra,*]; iframe; inext_goal)
+               k_next_pin_lc $c $hp $hlc
+               k_norm_g [$extra,*]
+               try (case hs => k_norm_g)))
+  | `(tactic| k_step_gen $rule:term from $code:term $ht:ident $$ $pat:specPat next $c:ident $hp:ident £ $hlc:ident) =>
+    `(tactic| k_step_gen $rule:term from $code:term $ht:ident $$ $pat:specPat with [] next $c $hp £ $hlc)
+  | `(tactic| k_step_gen $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*] next $c:ident $hp:ident £ $hlc:ident) =>
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
+               rotate_right 1
+               k_code $code:term $ht:ident
+               iframe #
+               k_norm_goal [$extra,*]
+               iframe
+               first
+                 | inext_goal
+                 | (k_norm_g [$extra,*]; iframe; inext_goal)
+               k_next_pin_lc $c $hp $hlc
+               k_norm_g [$extra,*]
+               try (case hs => k_norm_g)))
+
+syntax "k_step_e" term:max " $$ " specPat " £ " ident : tactic
+syntax "k_step_e" term:max " $$ " specPat " with " "[" term,* "]" " £ " ident : tactic
+syntax "k_step_e" term:max " from " term:max ident " $$ " specPat " £ " ident : tactic
+syntax "k_step_e" term:max " from " term:max ident " $$ " specPat " with " "[" term,* "]" " £ " ident : tactic
+
+set_option hygiene false in
+macro_rules
+  | `(tactic| k_step_e $rule:term $$ $pat:specPat £ $hlc:ident) =>
+    `(tactic| k_step_e $rule:term $$ $pat:specPat with [] £ $hlc)
+  | `(tactic| k_step_e $rule:term $$ $pat:specPat with [$extra,*] £ $hlc:ident) =>
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
+               rotate_right 1
+               iframe #
+               k_norm_goal [$extra,*]
+               iframe
+               first
+                 | inext_goal
+                 | (k_norm_g [$extra,*]; iframe; inext_goal)
+               k_next_pin_lc cpu hpin $hlc
+               k_ext_move
+               k_norm_g [$extra,*]
+               try (case hs => k_norm_g)))
+  | `(tactic| k_step_e $rule:term from $code:term $ht:ident $$ $pat:specPat £ $hlc:ident) =>
+    `(tactic| k_step_e $rule:term from $code:term $ht:ident $$ $pat:specPat with [] £ $hlc)
+  | `(tactic| k_step_e $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*] £ $hlc:ident) =>
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
+               rotate_right 1
+               k_code $code:term $ht:ident
+               iframe #
+               k_norm_goal [$extra,*]
+               iframe
+               first
+                 | inext_goal
+                 | (k_norm_g [$extra,*]; iframe; inext_goal)
+               k_next_pin_lc cpu hpin $hlc
+               k_ext_move
+               k_norm_g [$extra,*]
+               try (case hs => k_norm_g)))
+
+syntax "k_next_e" " £ " ident : tactic
+set_option hygiene false in
+macro_rules
+  | `(tactic| k_next_e £ $hlc:ident) =>
+    `(tactic| (k_next_pin_lc cpu hpin $hlc
+               k_ext_move))
+
 set_option maxHeartbeats 4000000 in
 /-- The standard prologue at `pc`: push two slots, save `ra`/`s0`, `s0 := sp₀`. -/
 theorem wp_prologue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
@@ -517,7 +676,8 @@ theorem wp_prologue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
 
 set_option maxHeartbeats 4000000 in
 /-- The standard epilogue at `pc`: restore `ra`/`s0`, pop, return.  The body
-left the context at `(k.pushed 2).withRegs R` with `sp` untouched. -/
+left the context at `(k.pushed 2).withRegs R` with `sp` untouched.  The `ret`'s
+credit is handed to the continuation (an epilogue precedes the proof's payment). -/
 theorem wp_epilogue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (hK : 2 ≤ k.avail) (R : RegMap)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64) (ra s0 : BitVec 64) :
@@ -527,7 +687,7 @@ theorem wp_epilogue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     instr (GF := GF) (pc + 6#64) true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) ∗
     kctxL lent cpu ((k.pushed 2).withRegs R) ∗ pcIs cpu pc ∗ frame2 (k.regs 2#5) ra s0 ∗
     ▷ (kctxL lent cpu (k.withRegs (((R.set 1#5 ra).set 8#5 s0).set 2#5 (k.regs 2#5))) -∗
-        pcIs cpu (jumpPc ra) -∗ wpLoop cpu)
+        pcIs cpu (jumpPc ra) -∗ £ 1 -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   unfold frame2
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, Hk, Hpc, ⟨Hf8, Hf16⟩, HΦ⟩
@@ -542,9 +702,9 @@ theorem wp_epilogue2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   k_step (wp_s_pop cpu _ (pc + 4#64) true 16#12 2 imm_p16) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2]
   iintro Hk Hpc
-  k_step (wp_s_ret cpu _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc]
+  k_step (wp_s_ret cpu _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
-  iapply HΦ $$ Hk Hpc
+  iapply HΦ $$ Hk Hpc Hlc
 
 /-! ## The four-slot frame with `s1` saved -/
 
@@ -608,7 +768,7 @@ theorem wp_epilogue4s1 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
     instr (GF := GF) (pc + 8#64) true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) ∗
     kctxL lent cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu pc ∗ frame4s1 (k.regs 2#5) ra s0 s1 ∗
     ▷ (kctxL lent cpu (k.withRegs ((((R.set 1#5 ra).set 8#5 s0).set 9#5 s1).set 2#5 (k.regs 2#5))) -∗
-        pcIs cpu (jumpPc ra) -∗ wpLoop cpu)
+        pcIs cpu (jumpPc ra) -∗ £ 1 -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   unfold frame4s1
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, Hk, Hpc, ⟨Hf8, Hf16, Hf24, %w₄, Hf32⟩, HΦ⟩
@@ -626,9 +786,9 @@ theorem wp_epilogue4s1 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
   k_step (wp_s_pop cpu _ (pc + 6#64) true 32#12 4 imm_p32) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2]
   iintro Hk Hpc
-  k_step (wp_s_ret cpu _ (pc + 8#64) true 1#5) $$ [- $Hk $Hpc]
+  k_step (wp_s_ret cpu _ (pc + 8#64) true 1#5) $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
-  iapply HΦ $$ Hk Hpc
+  iapply HΦ $$ Hk Hpc Hlc
 
 
 /-! ## The frames at either `SIE` -/
@@ -659,10 +819,10 @@ theorem wp_prologue2_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k :
   iintro Hk Hpc Hf8
   k_step_gen (wp_s_sd c2 _ (pc + 4#64) true 0#12 2#5 8#5 (by decide) w₂) $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc Hf16
-  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 16#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 16#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
   k_norm_g
-  ihave HΦ' := wpNext_at _ _ _ c4 _ (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c4 _ (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16]
   unfold frame2
   iframe
@@ -694,9 +854,9 @@ theorem wp_epilogue2_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k :
   k_step_gen (wp_s_pop c2 _ (pc + 4#64) true 16#12 2 imm_p16) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c3 _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_ret c3 _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
-  ihave HΦ' := wpNext_at _ _ _ c4 _ (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c4 _ (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 set_option maxHeartbeats 4000000 in
@@ -727,11 +887,11 @@ theorem wp_prologue4s1_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
   iintro Hk Hpc Hf16
   k_step_gen (wp_s_sd c3 _ (pc + 6#64) true 8#12 2#5 9#5 (by decide) w₃) $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc Hf24
-  k_step_gen (wp_s_addi c4 _ (pc + 8#64) true 32#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c5 hp5
+  k_step_gen (wp_s_addi c4 _ (pc + 8#64) true 32#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c5 hp5 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c5 _
-    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ
+    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32]
   unfold frame4s1
   iframe
@@ -767,10 +927,10 @@ theorem wp_epilogue4s1_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
   k_step_gen (wp_s_pop c3 _ (pc + 6#64) true 32#12 4 imm_p32) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c4 _ (pc + 8#64) true 1#5) $$ [- $Hk $Hpc] next c5 hp5
+  k_step_gen (wp_s_ret c4 _ (pc + 8#64) true 1#5) $$ [- $Hk $Hpc] next c5 hp5 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c5 _
-    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ
+    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 end MachCSL
@@ -824,11 +984,11 @@ theorem wp_prologue4s2_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
   iintro Hk Hpc Hf24
   k_step_gen (wp_s_sd c4 _ (pc + 8#64) true 0#12 2#5 18#5 (by decide) w₄) $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc Hf32
-  k_step_gen (wp_s_addi c5 _ (pc + 10#64) true 32#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c6 hp6
+  k_step_gen (wp_s_addi c5 _ (pc + 10#64) true 32#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c6 hp6 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c6 _
-    (fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))) $$ HΦ
+    (fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32]
   unfold frame4s2
   iframe
@@ -869,10 +1029,10 @@ theorem wp_epilogue4s2_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
   k_step_gen (wp_s_pop c4 _ (pc + 8#64) true 32#12 4 imm_p32) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c5 hp5
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c5 _ (pc + 10#64) true 1#5) $$ [- $Hk $Hpc] next c6 hp6
+  k_step_gen (wp_s_ret c5 _ (pc + 10#64) true 1#5) $$ [- $Hk $Hpc] next c6 hp6 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c6 _
-    (fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))) $$ HΦ
+    (fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 end MachCSL

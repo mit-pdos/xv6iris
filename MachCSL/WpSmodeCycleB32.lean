@@ -31,7 +31,7 @@ theorem wpLoop_s_base [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root :
     confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ clockCells cpu ∗ pcIs cpu pc ∗ transTok cpu tier root ∗
     R ∗ P ∗
     (▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor c' -∗ clockCells cpu -∗ pcIs cpu npc -∗
-        transTok cpu tier root -∗ R -∗ Q -∗ wpLoop cpu) ∧
+        transTok cpu tier root -∗ R -∗ Q -∗ £ 1 -∗ wpLoop cpu) ∧
       trapBranch cpu c tier root sie pc P)
     ⊢ wpLoop cpu := by
   have hp' : Privilege.Supervisor = Privilege.Machine ∨ Privilege.Supervisor = Privilege.Supervisor := Or.inr rfl
@@ -39,9 +39,10 @@ theorem wpLoop_s_base [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root :
   ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
     clockCells_cases _ $$ Hclock
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
-  iapply wpLoop_restart
+  iapply wpLoop_restart_lc
   iintro %tick
   inext
+  iintro Hlc
   unfold riscvStep
   iapply swp_wpHart
   conf_cases HmConf

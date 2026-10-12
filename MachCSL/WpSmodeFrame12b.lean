@@ -282,13 +282,13 @@ theorem wp_prologue12s8_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
   iintro Hk Hpc Hf72
   k_step_gen (wp_s_sd c10 _ (pc + 20#64) true 16#12 2#5 24#5 (by decide) w₁₀) $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc Hf80
-  k_step_gen (wp_s_addi c11 _ (pc + 22#64) true 96#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c12 hp12
+  k_step_gen (wp_s_addi c11 _ (pc + 22#64) true 96#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c12 hp12 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c12 _
     (fun h => (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans
       ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans
-        ((hp2 h).trans (hp1 h)))))))))))) $$ HΦ
+        ((hp2 h).trans (hp1 h)))))))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64 Hf72 Hf80 Hf88 Hf96]
   iexists w₁₁, w₁₂
   unfold frame12s8 frame12
@@ -363,13 +363,13 @@ theorem wp_epilogue12s8_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
   k_step_gen (wp_s_pop c10 _ (pc + 20#64) true 96#12 12 imm_p96) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c11 _ (pc + 22#64) true 1#5) $$ [- $Hk $Hpc] next c12 hp12
+  k_step_gen (wp_s_ret c11 _ (pc + 22#64) true 1#5) $$ [- $Hk $Hpc] next c12 hp12 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c12 _
     (fun h => (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans
       ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans
-        ((hp2 h).trans (hp1 h)))))))))))) $$ HΦ
+        ((hp2 h).trans (hp1 h)))))))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 -- `wordPointsTo_split8`/`_align`/`_join8` live in `MachCSL.Frame12Defs`.

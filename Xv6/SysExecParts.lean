@@ -946,7 +946,6 @@ def sysExecBadSt (k : KCtx) (A : SysExecArgs) (spie spp : Bool) (R : RegMap) (P 
     (∃ w : BitVec 64, wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) w) ∗
     sysExecArgvArr (k.regs 2#5) (sysExecArgvL pg t) ∗ sysExecPages pg afun 0 t)
 
-omit [MachGS GF] in
 /-- The contract's `wpNext` continuation, HART-FREE (a `true` crossing at a
 process pins nothing; `SysOpenParts.sys_open_post_pin`). -/
 theorem sys_exec_post_pin (k : KCtx) (A : SysExecArgs) (hS : SysExecStatic k A) (cpu : CPU)

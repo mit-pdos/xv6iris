@@ -84,11 +84,11 @@ theorem wpLoop_k_proc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
     iintro %hs
     exact absurd hs Bool.false_ne_true
   inext
-  iintro HmConf Hclock Hpc HT ⟨HF, HQ⟩
+  iintro HmConf Hclock Hpc HT ⟨HF, HQ⟩ Hlc
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
   ihave Hcells := Hclose $$ HQ
-  ihave HΦ' := wpNext_off _ _ _ $$ HΦ
+  ihave HΦ' := wpNext_off _ _ _ $$ HΦ Hlc
   ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   iapply HΦ' $$ [HConf HF Hstack Htrans Hcells Hlocks Hcsrs Htok Hclock] Hpc
   iapply (kctx_intro' cpu (k.withProc p') (KCtx.wf_withProc k p' hwf))

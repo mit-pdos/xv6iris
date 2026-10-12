@@ -91,7 +91,7 @@ theorem wp_s_csrw_satp_kpt (X : CurCtx) [KernelGeom] [KernelImage GF] {lent : Bo
     iintro %hs
     exact absurd hs Bool.false_ne_true
   inext
-  iintro HmConf Hclock Hpc HT HF
+  iintro HmConf Hclock Hpc HT HF _
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
   simp only [hct, transSlotAt] at *

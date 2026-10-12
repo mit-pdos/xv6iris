@@ -66,11 +66,11 @@ theorem wp_prologue8s1_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
   iintro Hk Hpc Hf16
   k_step_gen (wp_s_sd c3 _ (pc + 6#64) true 40#12 2#5 9#5 (by decide) w₃) $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc Hf24
-  k_step_gen (wp_s_addi c4 _ (pc + 8#64) true 64#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c5 hp5
+  k_step_gen (wp_s_addi c4 _ (pc + 8#64) true 64#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c5 hp5 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c5 _
-    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ
+    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64]
   unfold frame8s1 frame8rest
   iframe Hf8 Hf16 Hf24
@@ -117,10 +117,10 @@ theorem wp_epilogue8s1_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
   k_step_gen (wp_s_pop c3 _ (pc + 6#64) true 64#12 8 imm_p64) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c4 _ (pc + 8#64) true 1#5) $$ [- $Hk $Hpc] next c5 hp5
+  k_step_gen (wp_s_ret c4 _ (pc + 8#64) true 1#5) $$ [- $Hk $Hpc] next c5 hp5 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c5 _
-    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ
+    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 /-! ## The eight-slot frame with only `ra`/`s0` saved (sys_pause's) -/
@@ -163,11 +163,11 @@ theorem wp_prologue8s0_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
   iintro Hk Hpc Hf8
   k_step_gen (wp_s_sd c2 _ (pc + 4#64) true 48#12 2#5 8#5 (by decide) w₂) $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc Hf16
-  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 64#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 64#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c4 _
-    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64]
   unfold frame8s0 frame8s0rest frame8rest
   iframe Hf8 Hf16
@@ -211,10 +211,10 @@ theorem wp_epilogue8s0_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
   k_step_gen (wp_s_pop c2 _ (pc + 4#64) true 64#12 8 imm_p64) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c3 _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_ret c3 _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c4 _
-    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 /-! ## The eight-slot frame with `s1`–`s5` saved eagerly (uartputc_sync's) -/
@@ -275,12 +275,12 @@ theorem wp_prologue8s5_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
   iintro Hk Hpc Hf48
   k_step_gen (wp_s_sd c7 _ (pc + 14#64) true 8#12 2#5 21#5 (by decide) w₇) $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc Hf56
-  k_step_gen (wp_s_addi c8 _ (pc + 16#64) true 64#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c9 hp9
+  k_step_gen (wp_s_addi c8 _ (pc + 16#64) true 64#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c9 hp9 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c9 _
     (fun h => (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
-      ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))))) $$ HΦ
+      ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64]
   unfold frame8s5
   iframe Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56
@@ -339,11 +339,11 @@ theorem wp_epilogue8s5_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
   k_step_gen (wp_s_pop c7 _ (pc + 14#64) true 64#12 8 imm_p64) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c8 _ (pc + 16#64) true 1#5) $$ [- $Hk $Hpc] next c9 hp9
+  k_step_gen (wp_s_ret c8 _ (pc + 16#64) true 1#5) $$ [- $Hk $Hpc] next c9 hp9 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c9 _
     (fun h => (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
-      ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))))) $$ HΦ
+      ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 end MachCSL
