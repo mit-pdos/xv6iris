@@ -244,7 +244,7 @@ theorem redirK_inum (g : FileGn) (r : FileAppNames) (heq : fileAppIs (hlc := hlc
   · imodintro
     iintro %av Hd Hp
     subst heq
-    imod (filePred_timeless (hlc := hlc) (GF := GF) g.fgnCl r av).timeless $$ Hp with Hp
+    imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) g.fgnCl r av)).mp $$ Hp with Hp
     ihave ⟨Hp, Hd, Hres⟩ := fileDeedInum_acc (hlc := hlc) g.fgnCl r av (s.insert nm (i, [])) nm i []
       (by simp) (by simp [lineMax]) $$ Hd Hp
     imodintro

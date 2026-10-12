@@ -101,7 +101,7 @@ theorem fileXferBoot (c : FileFixed) (gen : Nat) (r : FileAppNames) (av : Aview)
   subst hr
   iintro Hst Hnew #Hreg #Hls0 #HF Hp
   iapply bupd_except0_elim
-  imod (filePred_timeless (hlc := hlc) (GF := GF) c _ av).timeless $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c _ av)).mp $$ Hp with Hp
   imodintro
   ihave ⟨He, Hrest⟩ := filePred_split c _ av $$ Hp
   have hex := echoXferBoot (hlc := hlc) (GF := GF) c.ffEcho (gen + 1)

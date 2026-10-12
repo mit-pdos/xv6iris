@@ -236,6 +236,7 @@ theorem bc_kinitBase : kinitBase = BitVec.ofNat 64 0x80024000 := by decide
 `kinitPages` pages. -/
 theorem bc_kinit_span : 0x80024000 + 4096 * kinitPages = ramEnd := by decide
 
+set_option linter.iris.multipleSIdx false in -- the linter overflows the recursion limit on this statement (Lean 4.34)
 /-- **kinit's page run** (Rocq `boot_kinit_run` / `boot_pg_run_own`): the
 RAM from `PGROUNDUP(end)` to `PHYSTOP` is `freerange`'s `pageRange`, each
 page owned at the image's contents. -/

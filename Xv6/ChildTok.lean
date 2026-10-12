@@ -565,7 +565,7 @@ a fancy update, a WP step -- does). -/
 theorem gen_pay_timeless (γ : GName) (pid : BitVec 32) (Q : Int → IProp GF) (xs : Int)
     [Timeless (Q xs)] :
     childTok γ pid Q ∗ exitTok γ pid xs ⊢ ◇ Q xs :=
-  (gen_pay γ pid Q xs).trans Timeless.timeless
+  (gen_pay γ pid Q xs).trans timeless_except0.mp
 
 /-! ## The mint, the choice, and the split -/
 

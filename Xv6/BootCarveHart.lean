@@ -276,6 +276,7 @@ theorem bh_range_two (n : Nat) : List.range (n + 2) = 0 :: 1 :: (List.range n).m
   rw [List.range_succ_eq_map, List.range_succ_eq_map, List.map_cons, List.map_map]
   rfl
 
+set_option linter.iris.multipleSIdx false in -- the linter overflows the recursion limit on this statement (Lean 4.34)
 /-- **The bridge's stack premise, reassembled** (Rocq `boot_entry_bridge`'s
 stack frame): `timerinit`'s two words, as `wp_boot_body` hands them back
 (`sp₀ - 24`, `sp₀ - 32`), in front of the other 508 words, are the

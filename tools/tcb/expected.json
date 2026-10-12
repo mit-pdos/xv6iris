@@ -1,7 +1,6 @@
 {"theorems":
  [{"opaques":
-   ["Iris.COFE.OFunctor.Fix.Impl.Tower.iso",
-    "Iris.fixpointP",
+   ["Iris.fixpointP",
     "LeanRV64D.Functions.xv6_resv_is_valid",
     "LeanRV64D.Functions.xv6_resv_matches",
     "MachCSL.bootImageSealed",
@@ -124,10 +123,9 @@
     "Sail.ConcurrencyInterfaceV1",
     "Sail.IntRange",
     "Sail.Sail"],
-   "axioms": ["Quot.sound"]},
+   "axioms": ["Classical.choice", "Quot.sound"]},
   {"opaques":
-   ["Iris.COFE.OFunctor.Fix.Impl.Tower.iso",
-    "Iris.fixpointP",
+   ["Iris.fixpointP",
     "LeanRV64D.Functions.xv6_resv_is_valid",
     "LeanRV64D.Functions.xv6_resv_matches",
     "MachCSL.bootImageSealed",
@@ -334,10 +332,9 @@
     "Xv6.UserExec",
     "Xv6.VirtioQueue",
     "Xv6.ZombEv"],
-   "axioms": ["Quot.sound"]},
+   "axioms": ["Classical.choice", "Quot.sound"]},
   {"opaques":
-   ["Iris.COFE.OFunctor.Fix.Impl.Tower.iso",
-    "Iris.fixpointP",
+   ["Iris.fixpointP",
     "LeanRV64D.Functions.xv6_resv_is_valid",
     "LeanRV64D.Functions.xv6_resv_matches",
     "MachCSL.bootImageSealed",
@@ -501,7 +498,7 @@
     "Xv6.SystemSlot",
     "Xv6.UPtDefs",
     "Xv6.UserExec"],
-   "axioms": ["Quot.sound"]},
+   "axioms": ["Classical.choice", "Quot.sound"]},
   {"opaques":
    ["LeanRV64D.Functions.xv6_resv_is_valid",
     "LeanRV64D.Functions.xv6_resv_matches",
@@ -643,8 +640,7 @@
     "Xv6.SystemSlot"],
    "axioms": ["Quot.sound"]},
   {"opaques":
-   ["Iris.COFE.OFunctor.Fix.Impl.Tower.iso",
-    "Iris.fixpointP",
+   ["Iris.fixpointP",
     "LeanRV64D.Functions.xv6_resv_is_valid",
     "LeanRV64D.Functions.xv6_resv_matches",
     "MachCSL.bootImageSealed",
@@ -781,7 +777,7 @@
     "Xv6.SpecUser",
     "Xv6.UPtDefs",
     "Xv6.UserExec"],
-   "axioms": ["Quot.sound"]},
+   "axioms": ["Classical.choice", "Quot.sound"]},
   {"opaques":
    ["LeanRV64D.Functions.xv6_resv_is_valid",
     "LeanRV64D.Functions.xv6_resv_matches",
