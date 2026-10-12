@@ -129,14 +129,17 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
 def fileEraPin (g : FileGn) (k : Nat) (v : FileEra) : IProp GF :=
   ghost_map_elem g.fgnEra DFrac.discard k v
 
+omit [MachGS GF] in
 instance fileEraPin_persistent (g : FileGn) (k : Nat) (v : FileEra) :
     Persistent (fileEraPin (GF := GF) g k v) := by
   unfold fileEraPin; infer_instance
 
+omit [MachGS GF] in
 instance fileEraPin_timeless (g : FileGn) (k : Nat) (v : FileEra) :
     Timeless (fileEraPin (GF := GF) g k v) := by
   unfold fileEraPin; infer_instance
 
+omit [MachGS GF] in
 theorem fileEraPin_agree (g : FileGn) (k : Nat) (v v' : FileEra) :
     fileEraPin (GF := GF) g k v ∗ fileEraPin g k v' ⊢ ⌜v = v'⌝ := by
   unfold fileEraPin
@@ -198,10 +201,13 @@ instance f0Bl_persistent (g : FileGn) (v : FileEra) (s : Fstate) :
 instance f0Bl_timeless (g : FileGn) (v : FileEra) (s : Fstate) :
     Timeless (f0Bl (GF := GF) g v s) := by
   unfold f0Bl; infer_instance
+omit [MachGS GF] in
 instance f0Fd_persistent (v : FileEra) (s : Fstate) : Persistent (f0Fd (GF := GF) v s) := by
   unfold f0Fd; infer_instance
+omit [MachGS GF] in
 instance f0Fd_timeless (v : FileEra) (s : Fstate) : Timeless (f0Fd (GF := GF) v s) := by
   unfold f0Fd; infer_instance
+omit [MachGS GF] in
 instance f0fAuth_timeless (v : FileEra) (l : List Fstate) : Timeless (f0fAuth (GF := GF) v l) := by
   unfold f0fAuth; infer_instance
 instance f0Lb_persistent (g : FileGn) (v : FileEra) (s : Fstate) :
@@ -210,6 +216,7 @@ instance f0Lb_persistent (g : FileGn) (v : FileEra) (s : Fstate) :
 instance f0Lb_timeless (g : FileGn) (v : FileEra) (s : Fstate) :
     Timeless (f0Lb (GF := GF) g v s) := by
   unfold f0Lb; infer_instance
+omit [MachGS GF] in
 instance f0Auth_timeless (v : FileEra) (l : List Fstate) : Timeless (f0Auth (GF := GF) v l) := by
   unfold f0Auth; infer_instance
 
@@ -219,6 +226,7 @@ theorem f0Lb_bl (g : FileGn) (v : FileEra) (s0 : Fstate) :
   iintro ⟨H, -⟩
   iexact H
 
+omit [MachGS GF] in
 /-- The lower bound READS the era's boot state: a one-element lower bound of a
 list of length at most one pins the list (Rocq `f0f_auth_lb_agree`). -/
 theorem f0fAuth_lb_agree (v : FileEra) (f0 : Option Fstate) (s : Fstate) :
@@ -252,6 +260,7 @@ theorem f0Lb_agree (g : FileGn) (v : FileEra) (s s' : Fstate) :
   · iexact H1
   · iexact H2
 
+omit [MachGS GF] in
 /-- Rocq `f0f_lb_get`. -/
 theorem f0fLb_get (v : FileEra) (s : Fstate) :
     f0fAuth (GF := GF) v [s] ⊢ f0fAuth v [s] ∗ f0Fd v s := by
@@ -270,6 +279,7 @@ theorem f0File (g : FileGn) (v : FileEra) (s : Fstate) :
   imodintro
   iframe Hl Hbt
 
+omit [MachGS GF] in
 /-- THE ERA'S FIRST PROCESS BYTE FILES THAT STATE INTO THE CLAIM (Rocq
 `f0f_file`). -/
 theorem f0fFile (v : FileEra) (s : Fstate) :
@@ -302,16 +312,20 @@ def fcpAuth (v : FileEra) (ls : List FlLine) : IProp GF :=
 def fcpPin (v : FileEra) (ls : List FlLine) : IProp GF :=
   MonoList.auth_own v.feCp DFrac.discard ls
 
+omit [MachGS GF] in
 instance fcpAuth_timeless (v : FileEra) (ls : List FlLine) :
     Timeless (fcpAuth (GF := GF) v ls) := by
   unfold fcpAuth; infer_instance
+omit [MachGS GF] in
 instance fcpPin_timeless (v : FileEra) (ls : List FlLine) :
     Timeless (fcpPin (GF := GF) v ls) := by
   unfold fcpPin; infer_instance
+omit [MachGS GF] in
 instance fcpPin_persistent (v : FileEra) (ls : List FlLine) :
     Persistent (fcpPin (GF := GF) v ls) := by
   unfold fcpPin; infer_instance
 
+omit [MachGS GF] in
 /-- The transport SETS the copy's list (Rocq `fcp_set`). -/
 theorem fcp_set (v : FileEra) (ls : List FlLine) :
     fcpAuth (GF := GF) v [] ⊢ |==> fcpPin v ls := by
@@ -320,6 +334,7 @@ theorem fcp_set (v : FileEra) (ls : List FlLine) :
   imod MonoList.auth_own_update v.feCp ls (List.nil_prefix) $$ H with ⟨H, -⟩
   iapply MonoList.auth_own_persist $$ H
 
+omit [MachGS GF] in
 /-- Rocq `fcp_pin_agree`. -/
 theorem fcpPin_agree (v : FileEra) (ls ls' : List FlLine) :
     fcpPin (GF := GF) v ls ∗ fcpPin v ls' ⊢ ⌜ls = ls'⌝ := by
@@ -337,17 +352,21 @@ def f0Typed (g : FileGn) (s : Fstate) : IProp GF :=
   iprop(⌜s = ∅⌝ ∨ ∃ ls : List FlLine,
     flLb g.fgnCl ls ∗ ⌜∀ N bs, s[N]? = some bs → uname N ∧ fBytesTyped (flRedirs ls) N bs⌝)
 
+omit [MachGS GF] in
 instance f0Typed_persistent (g : FileGn) (s : Fstate) : Persistent (f0Typed (GF := GF) g s) := by
   unfold f0Typed; infer_instance
+omit [MachGS GF] in
 instance f0Typed_timeless (g : FileGn) (s : Fstate) : Timeless (f0Typed (GF := GF) g s) := by
   unfold f0Typed; infer_instance
 
+omit [MachGS GF] in
 theorem f0Typed_none (g : FileGn) : ⊢ f0Typed (GF := GF) g ∅ := by
   unfold f0Typed
   ileft
   ipureintro
   rfl
 
+omit [MachGS GF] in
 /-- The deed's typed witness, as the ledger's (Rocq `f0_typed_of_f_typed`). -/
 theorem f0Typed_of_fTyped (g : FileGn) (s : Dst) :
     fTyped (GF := GF) g.fgnCl s ⊢ f0Typed g (dstContent s) := by

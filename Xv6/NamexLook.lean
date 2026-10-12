@@ -100,8 +100,10 @@ theorem namexLvlFacts_fail {k : KCtx} {A : NamexArgs} {R R' : RegMap} {o2 ik : N
   obtain ⟨hA, hB, hn, -⟩ := hf.hbud
   exact ⟨h20.trans r20, h2.trans r2, h27.trans r27, hf.hik, hf.hnib, hA, hB, hn, hf.hW, hf.hSb⟩
 
+omit [MachGS GF] in
 theorem namex_bslots3_split (γ : BcacheNames) :
     bslots (GF := GF) 3 ⊢ bslot ∗ bslots 2 := bslots_uncons 2
+omit [MachGS GF] in
 theorem namex_bslots3_join (γ : BcacheNames) :
     bslot (GF := GF) ∗ bslots 2 ⊢ bslots 3 := bslots_cons 2
 

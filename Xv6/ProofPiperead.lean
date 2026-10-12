@@ -887,6 +887,7 @@ theorem pr_getD_bang (acc : List (BitVec 8)) (j : Nat) : acc.getD j 0#8 = acc[j]
     rw [getElem!_pos acc j hlt, hv]
     rfl
 
+omit [MachGS GF] in
 /-- THE READ END IS OPEN (Rocq `pr_ro_open`), both inputs kept. -/
 theorem pr_ro_keep (γp : PipeNames) (w : Bool) (ro : BitVec 32) (q : Qp) (hw : w = false) :
     pipeEndstate (GF := GF) γp false ro ∗ pipeRef γp w q ⊢
@@ -894,6 +895,7 @@ theorem pr_ro_keep (γp : PipeNames) (w : Bool) (ro : BitVec 32) (q : Qp) (hw : 
   (and_intro (by iintro ⟨Hs, Hr⟩; iapply prRo_open γp w ro q hw $$ Hs Hr) .rfl).trans
     persistent_and_sep_mp
 
+omit [MachGS GF] in
 /-- The generation halves lent to the kill check: the registration eighth and
 the incarnation's marker, and the way back. -/
 theorem pr_gen_lend (pa : BitVec 64) (pid : BitVec 32) (g : GName) :

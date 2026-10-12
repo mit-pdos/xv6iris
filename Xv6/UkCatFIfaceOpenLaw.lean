@@ -35,6 +35,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- The ledger's length, keeping the ledger. -/
 theorem ustd_len_keep (γf : GName) (l : List FdState) :
     ustd (GF := GF) γf l ⊢ ⌜l.length = NSTD⌝ ∗ ustd γf l :=

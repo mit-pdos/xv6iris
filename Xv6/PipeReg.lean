@@ -153,6 +153,7 @@ theorem fileclose_cpays_of_regs (sts : List FdState) :
 
 /-! ## 5.  THE TABLE'S ROWS, as a big-op the run can carry -/
 
+omit [MachGS GF] in
 /-- Rocq `fd_rows_insert`: a row set into a table of rows. -/
 theorem fdRows_insert (R : FdState → IProp GF) :
     ∀ (l : List FdState) (k : Nat) (st : FdState),
@@ -171,6 +172,7 @@ theorem fdRows_insert (R : FdState → IProp GF) :
     iframe Hh
     iapply fdRows_insert R l k st $$ Ht Hst
 
+omit [MachGS GF] in
 /-- Rocq `fd_rows_lookup`: a persistent row read out of the table. -/
 theorem fdRows_lookup (R : FdState → IProp GF) [hp : ∀ s, Persistent (R s)] (l : List FdState)
     (k : Nat) (st : FdState) (hk : l[k]? = some st) :

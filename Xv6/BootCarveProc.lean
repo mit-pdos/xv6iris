@@ -294,6 +294,7 @@ end proc
 section bare
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
+omit [MachGS GF] in
 theorem bcp_range10 (E : Nat → IProp GF) :
     ([∗list] i ∈ List.range 10, E i) ⊢ E 0 ∗ E 1 ∗ E 2 ∗ E 3 ∗ E 4 ∗ E 5 ∗ E 6 ∗ E 7 ∗ E 8 ∗ E 9 := by
   rw [show List.range 10 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] from rfl]

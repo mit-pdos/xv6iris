@@ -249,6 +249,7 @@ section LoopApply
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
+omit [MachGS GF] in
 /-- **Rocq `uexec_ret_F_returning`**: THE RETURNING ARM, FACTORED -- the
 generic returning continuation at a slot family `S`, instantiated at the
 return value the round bound and re-keyed onto the resume key.  THE RETURN
@@ -610,6 +611,7 @@ answer. -/
 def uexecRetDetF (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : Uvis) : IProp GF :=
   iprop(∀ ι : UIota, spostAt X n f W (usysDetRet n W ι) W.M W.fd W.cwd W.ch -∗ X (usysDet n W ι))
 
+omit [MachGS GF] in
 /-- **The landed arm IS the functional arm at the class** (deviation 6): the
 relational continuation `uexecRetContF` at getpid / uptime and the policy
 `uexecRetDetF` are the same proposition -- the program proving either proves

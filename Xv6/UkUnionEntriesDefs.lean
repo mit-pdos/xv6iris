@@ -162,10 +162,12 @@ theorem ueCatHyps (UL : UK_LEAVES)
   ⟨cat_stub_read UL N, cat_stub_write UL N, cat_stub_open UL N, cat_stub_close UL N, cat_stub_exit UL N,
     ue_lawW hlic, ue_lawR hlic, ue_lawC, ue_lawO⟩
 
+omit [MachGS GF] in
 /-- **Rocq `ue_echo_code_persistent`** (a theorem, passed explicitly). -/
 theorem ue_echo_code_persistent (N : UkNames GF) : Persistent (echoProg N).code := by
   unfold echoProg; infer_instance
 
+omit [MachGS GF] in
 /-- **Rocq `ue_cat_code_persistent`** (a theorem, passed explicitly). -/
 theorem ue_cat_code_persistent (N : UkNames GF) : Persistent (catProg N).code := by
   unfold catProg; infer_instance

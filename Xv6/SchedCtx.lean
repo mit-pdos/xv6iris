@@ -187,6 +187,7 @@ abbrev hartHlf (Γ : SchedNames) (j : Nat) (h : CPU) : IProp GF := hartOwn (GF :
 /-- The whole tag: what a slot that nobody runs holds. -/
 abbrev hartFull (Γ : SchedNames) (j : Nat) (h : CPU) : IProp GF := hartOwn (GF := GF) Γ j 1 h
 
+omit [MachGS GF] in
 theorem hartOwn_agree (Γ : SchedNames) (j : Nat) (q1 q2 : Qp) (h1 h2 : CPU) :
     hartOwn (GF := GF) Γ j q1 h1 ∗ hartOwn Γ j q2 h2 ⊢ ⌜h1 = h2⌝ := by
   unfold hartOwn
@@ -194,12 +195,14 @@ theorem hartOwn_agree (Γ : SchedNames) (j : Nat) (q1 q2 : Qp) (h1 h2 : CPU) :
   ihave %h := ghost_var_agree _ _ _ _ _ $$ H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem hartOwn_split (Γ : SchedNames) (j : Nat) (q1 q2 : Qp) (h : CPU) :
     hartOwn (GF := GF) Γ j (q1 + q2) h ⊢ hartOwn Γ j q1 h ∗ hartOwn Γ j q2 h := by
   unfold hartOwn
   iintro H
   iapply ghost_var_split _ _ _ _ $$ H
 
+omit [MachGS GF] in
 theorem hartOwn_join (Γ : SchedNames) (j : Nat) (q1 q2 : Qp) (h : CPU) :
     hartOwn (GF := GF) Γ j q1 h ∗ hartOwn Γ j q2 h ⊢ hartOwn Γ j (q1 + q2) h := by
   unfold hartOwn
@@ -207,18 +210,21 @@ theorem hartOwn_join (Γ : SchedNames) (j : Nat) (q1 q2 : Qp) (h : CPU) :
   icombine H1 H2 as H
   iexact H
 
+omit [MachGS GF] in
 theorem hart_split (Γ : SchedNames) (j : Nat) (hh : CPU) :
     hartFull (GF := GF) Γ j hh ⊢ hartHlf Γ j hh ∗ hartHlf Γ j hh := by
   have e := hartOwn_split (GF := GF) Γ j (1 : Qp).half (1 : Qp).half hh
   rw [Qp.half_add_half] at e
   exact e
 
+omit [MachGS GF] in
 theorem hart_join (Γ : SchedNames) (j : Nat) (hh : CPU) :
     hartHlf (GF := GF) Γ j hh ∗ hartHlf Γ j hh ⊢ hartFull Γ j hh := by
   have e := hartOwn_join (GF := GF) Γ j (1 : Qp).half (1 : Qp).half hh
   rw [Qp.half_add_half] at e
   exact e
 
+omit [MachGS GF] in
 /-- **The hart tag of a slot nobody runs retargets**: the whole tag is the
 right to say which hart the slot's thread will resume on (the scheduler
 takes it at a dispatch). -/
@@ -230,6 +236,7 @@ theorem hart_update (Γ : SchedNames) (j : Nat) (h h' : CPU) :
   imodintro
   iexact Hg
 
+omit [MachGS GF] in
 /-- A half and a whole tag cannot both exist. -/
 theorem hart_excl (Γ : SchedNames) (j : Nat) (h h' : CPU) :
     hartHlf (GF := GF) Γ j h ∗ hartFull Γ j h' ⊢ False := by
@@ -246,6 +253,7 @@ def hartAt (Γ : SchedNames) (pa : BitVec 64) (q : Qp) (h : CPU) : IProp GF := i
 def hartAtAny (Γ : SchedNames) (pa : BitVec 64) : IProp GF := iprop%
   ∃ h : CPU, hartAt Γ pa 1 h
 
+omit [MachGS GF] in
 theorem hartAt_intro (Γ : SchedNames) (j : Nat) (q : Qp) (h : CPU) (hj : j < NPROC) :
     hartOwn (GF := GF) Γ j q h ⊢ hartAt Γ (procAddr j) q h := by
   unfold hartAt
@@ -254,6 +262,7 @@ theorem hartAt_intro (Γ : SchedNames) (j : Nat) (q : Qp) (h : CPU) (hj : j < NP
   iframe H
   ipureintro; exact ⟨rfl, hj⟩
 
+omit [MachGS GF] in
 theorem hartAt_elim (Γ : SchedNames) (j : Nat) (q : Qp) (h : CPU) (hj : j < NPROC) :
     hartAt (GF := GF) Γ (procAddr j) q h ⊢ hartOwn Γ j q h := by
   unfold hartAt
@@ -262,6 +271,7 @@ theorem hartAt_elim (Γ : SchedNames) (j : Nat) (q : Qp) (h : CPU) (hj : j < NPR
   subst hjj
   iexact H
 
+omit [MachGS GF] in
 theorem hartAtAny_intro (Γ : SchedNames) (j : Nat) (h : CPU) (hj : j < NPROC) :
     hartFull (GF := GF) Γ j h ⊢ hartAtAny Γ (procAddr j) := by
   unfold hartAtAny
@@ -269,6 +279,7 @@ theorem hartAtAny_intro (Γ : SchedNames) (j : Nat) (h : CPU) (hj : j < NPROC) :
   iexists h
   iapply hartAt_intro Γ j 1 h hj $$ H
 
+omit [MachGS GF] in
 theorem hartAtAny_elim (Γ : SchedNames) (j : Nat) (hj : j < NPROC) :
     hartAtAny (GF := GF) Γ (procAddr j) ⊢ ∃ h : CPU, hartFull Γ j h := by
   unfold hartAtAny
@@ -286,6 +297,7 @@ abbrev pstateHlf (Γ : SchedNames) (j : Nat) (st : BitVec 32) : IProp GF :=
 abbrev pstateFull (Γ : SchedNames) (j : Nat) (st : BitVec 32) : IProp GF :=
   pstateOwn (GF := GF) Γ j 1 st
 
+omit [MachGS GF] in
 theorem pstateOwn_agree (Γ : SchedNames) (j : Nat) (q1 q2 : Qp) (s1 s2 : BitVec 32) :
     pstateOwn (GF := GF) Γ j q1 s1 ∗ pstateOwn Γ j q2 s2 ⊢ ⌜s1 = s2⌝ := by
   unfold pstateOwn
@@ -293,12 +305,14 @@ theorem pstateOwn_agree (Γ : SchedNames) (j : Nat) (q1 q2 : Qp) (s1 s2 : BitVec
   ihave %h := ghost_var_agree _ _ _ _ _ $$ H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem pstateOwn_split (Γ : SchedNames) (j : Nat) (q1 q2 : Qp) (st : BitVec 32) :
     pstateOwn (GF := GF) Γ j (q1 + q2) st ⊢ pstateOwn Γ j q1 st ∗ pstateOwn Γ j q2 st := by
   unfold pstateOwn
   iintro H
   iapply ghost_var_split _ _ _ _ $$ H
 
+omit [MachGS GF] in
 theorem pstateOwn_join (Γ : SchedNames) (j : Nat) (q1 q2 : Qp) (st : BitVec 32) :
     pstateOwn (GF := GF) Γ j q1 st ∗ pstateOwn Γ j q2 st ⊢ pstateOwn Γ j (q1 + q2) st := by
   unfold pstateOwn
@@ -306,6 +320,7 @@ theorem pstateOwn_join (Γ : SchedNames) (j : Nat) (q1 q2 : Qp) (st : BitVec 32)
   icombine H1 H2 as H
   iexact H
 
+omit [MachGS GF] in
 theorem pstate_split (Γ : SchedNames) (j : Nat) (st : BitVec 32) :
     pstateFull (GF := GF) Γ j st ⊢ pstateHlf Γ j st ∗ pstateHlf Γ j st := by
   have e := pstateOwn_split (GF := GF) Γ j (1 : Qp).half (1 : Qp).half st
@@ -319,6 +334,7 @@ def pstateAt (Γ : SchedNames) (pa : BitVec 64) (q : Qp) (st : BitVec 32) : IPro
 abbrev pstateAtHlf (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) : IProp GF :=
   pstateAt (GF := GF) Γ pa (1 : Qp).half st
 
+omit [MachGS GF] in
 theorem pstateAt_intro (Γ : SchedNames) (j : Nat) (q : Qp) (st : BitVec 32) (hj : j < NPROC) :
     pstateOwn (GF := GF) Γ j q st ⊢ pstateAt Γ (procAddr j) q st := by
   unfold pstateAt
@@ -327,6 +343,7 @@ theorem pstateAt_intro (Γ : SchedNames) (j : Nat) (q : Qp) (st : BitVec 32) (hj
   iframe H
   ipureintro; exact ⟨rfl, hj⟩
 
+omit [MachGS GF] in
 theorem pstateAt_elim (Γ : SchedNames) (j : Nat) (q : Qp) (st : BitVec 32) (hj : j < NPROC) :
     pstateAt (GF := GF) Γ (procAddr j) q st ⊢ pstateOwn Γ j q st := by
   unfold pstateAt
@@ -351,6 +368,7 @@ state, with the slot's occupancy element (NI joint fork lane F1). -/
 def pstateWhole (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   pstateAt Γ pa 1 st ∗ soElem pa (occBit st)
 
+omit [MachGS GF] in
 /-- **The split at release** (Rocq `pstate_whole_split`): the lock's share
 comes off, and on a claimed state the claimant's half is left over. -/
 theorem pstateAt_split (Γ : SchedNames) (pa : BitVec 64) (q1 q2 : Qp) (st : BitVec 32) :
@@ -362,6 +380,7 @@ theorem pstateAt_split (Γ : SchedNames) (pa : BitVec 64) (q1 q2 : Qp) (st : Bit
   · iexists j; iframe Hg1; ipureintro; exact hj
   · iexists j; iframe Hg2; ipureintro; exact hj
 
+omit [MachGS GF] in
 theorem pstateAt_join (Γ : SchedNames) (pa : BitVec 64) (q1 q2 : Qp) (st : BitVec 32) :
     pstateAt (GF := GF) Γ pa q1 st ∗ pstateAt Γ pa q2 st ⊢ pstateAt Γ pa (q1 + q2) st := by
   unfold pstateAt
@@ -480,11 +499,13 @@ proc `j` at `p`, whose state mirror says RUNNING and whose hart tag says
 def procClaim (Γ : SchedNames) (cpu : CPU) (p : BitVec 64) : IProp GF := iprop%
   ⌜p = 0#64⌝ ∨ ∃ j : Nat, ⌜j < NPROC ∧ p = procAddr j⌝ ∗ pstateHlf Γ j RUNNING ∗ hartHlf Γ j cpu
 
+omit [MachGS GF] in
 theorem procClaim_idle (Γ : SchedNames) (cpu : CPU) : ⊢ procClaim (GF := GF) Γ cpu 0#64 := by
   unfold procClaim
   ileft
   ipureintro; rfl
 
+omit [MachGS GF] in
 theorem procClaim_intro (Γ : SchedNames) (cpu : CPU) (j : Nat) (hj : j < NPROC) :
     pstateHlf (GF := GF) Γ j RUNNING ∗ hartHlf Γ j cpu ⊢ procClaim Γ cpu (procAddr j) := by
   unfold procClaim
@@ -494,6 +515,7 @@ theorem procClaim_intro (Γ : SchedNames) (cpu : CPU) (j : Nat) (hj : j < NPROC)
   iframe Hs Hh
   ipureintro; exact ⟨hj, rfl⟩
 
+omit [MachGS GF] in
 theorem procClaim_elim (Γ : SchedNames) (cpu : CPU) (j : Nat) (hj : j < NPROC) :
     procClaim (GF := GF) Γ cpu (procAddr j) ⊢ pstateHlf Γ j RUNNING ∗ hartHlf Γ j cpu := by
   unfold procClaim
@@ -1251,13 +1273,17 @@ def slotUsed (Γ : SchedNames) (pa : BitVec 64) : IProp GF := (Γ.used pa) ↪VA
 /-- The slot's half of a never-allocated slot's ghost. -/
 def slotFree (Γ : SchedNames) (pa : BitVec 64) : IProp GF := (Γ.used pa) ↪VAR{.own (1 : Qp).half} (0 : Nat)
 
+omit [MachGS GF] in
 instance slotUsed_persistent (Γ : SchedNames) (pa : BitVec 64) : Persistent (slotUsed (GF := GF) Γ pa) := by
   unfold slotUsed; infer_instance
+omit [MachGS GF] in
 instance slotUsed_timeless (Γ : SchedNames) (pa : BitVec 64) : Timeless (slotUsed (GF := GF) Γ pa) := by
   unfold slotUsed; infer_instance
+omit [MachGS GF] in
 instance slotFree_timeless (Γ : SchedNames) (pa : BitVec 64) : Timeless (slotFree (GF := GF) Γ pa) := by
   unfold slotFree; infer_instance
 
+omit [MachGS GF] in
 /-- A never-allocated slot is not allocated. -/
 theorem slotFree_used_excl (Γ : SchedNames) (pa : BitVec 64) :
     slotFree (GF := GF) Γ pa ∗ slotUsed Γ pa ⊢ False := by
@@ -1266,6 +1292,7 @@ theorem slotFree_used_excl (Γ : SchedNames) (pa : BitVec 64) :
   ihave %h := ghost_var_agree (Γ.used pa) (0 : Nat) _ (1 : Nat) _ $$ Hf Hu
   exact absurd h (by decide)
 
+omit [MachGS GF] in
 /-- Both halves mint the marker. -/
 theorem slot_mint (Γ : SchedNames) (pa : BitVec 64) :
     slotFree (GF := GF) Γ pa ∗ slotFree Γ pa ⊢ |==> slotUsed Γ pa := by
@@ -1282,22 +1309,27 @@ other arm the marker. -/
 def pavSlot (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   if isUnused st then (slotFree Γ pa ∨ slotUsed Γ pa) else slotUsed Γ pa
 
+omit [MachGS GF] in
 theorem pavSlot_used (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) (h : ¬ isUnused st) :
     pavSlot (GF := GF) Γ pa st ⊢ slotUsed Γ pa := by
   unfold pavSlot; rw [if_neg h]
 
+omit [MachGS GF] in
 theorem pavSlot_intro (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) (h : ¬ isUnused st) :
     slotUsed (GF := GF) Γ pa ⊢ pavSlot Γ pa st := by
   unfold pavSlot; rw [if_neg h]
 
+omit [MachGS GF] in
 theorem pavSlot_unused_elim (Γ : SchedNames) (pa : BitVec 64) :
     pavSlot (GF := GF) Γ pa UNUSED ⊢ slotFree Γ pa ∨ slotUsed Γ pa := by
   unfold pavSlot; rw [if_pos (show isUnused UNUSED from rfl)]
 
+omit [MachGS GF] in
 theorem pavSlot_unused_intro (Γ : SchedNames) (pa : BitVec 64) :
     (slotFree (GF := GF) Γ pa ∨ slotUsed Γ pa) ⊢ pavSlot Γ pa UNUSED := by
   unfold pavSlot; rw [if_pos (show isUnused UNUSED from rfl)]
 
+omit [MachGS GF] in
 theorem pavSlot_unused_of_used (Γ : SchedNames) (pa : BitVec 64) :
     slotUsed (GF := GF) Γ pa ⊢ pavSlot Γ pa UNUSED := by
   iintro H; iapply pavSlot_unused_intro; iright; iexact H

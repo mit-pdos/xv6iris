@@ -53,10 +53,12 @@ def ushpiPay (t dst : Nat) (c : Ushcmd) (wa wb : BitVec 32) : GName → GName �
   fun gt gd _ => iprop(ushJtab gt ∗ ushCmd gd t c ∗ ubytes gd dst 4 (nthByte (n := 4) wa) ∗
     ubytes gd (dst + 4) 4 (nthByte (n := 4) wb))
 
+omit [MachGS GF] in
 instance ushpiPay_forkable (t dst : Nat) (c : Ushcmd) (wa wb : BitVec 32) :
     Forkable (GF := GF) (ushpiPay t dst c wa wb) :=
   forkable_ushPaypipe t dst (dst + 4) c wa wb
 
+omit [MachGS GF] in
 /-- fork1's answer, the children set taken out (Rocq's inline
 `iAssert (∃ S1, ush_fork_ans … ∗ uch S1)`). -/
 theorem ushpi_fans (N : UkNames GF) (Sc : ExtTreeSet GName compare) (Q : Int → IProp GF) (Rc : IProp GF)

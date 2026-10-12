@@ -511,11 +511,14 @@ def icRegd [Icfg] (k : Nat) (r : SlotReg IcBid IcX) : IProp GF := slotdHalf (icf
 /-- Rocq's `ic_regp`. -/
 def icRegp [Icfg] (k : Nat) (s : L2Reg IcBid) : IProp GF := slotpHalf (icfgBox k) s
 
+omit [MachGS GF] in
 instance icCnt_timeless [Icfg] (k c : Nat) : Timeless (icCnt (GF := GF) k c) := by
   unfold icCnt; infer_instance
+omit [MachGS GF] in
 instance icRegd_timeless [Icfg] (k : Nat) (r : SlotReg IcBid IcX) :
     Timeless (icRegd (GF := GF) k r) := by
   unfold icRegd; infer_instance
+omit [MachGS GF] in
 instance icRegp_timeless [Icfg] (k : Nat) (s : L2Reg IcBid) :
     Timeless (icRegp (GF := GF) k s) := by
   unfold icRegp; infer_instance
@@ -603,6 +606,7 @@ instance icDeposit2_timeless [Icfg] [CurCtx] (k : Nat) (d : IcDep) :
   unfold icDeposit2
   rcases icDepId d with _ | ⟨dev, inum⟩ <;> dsimp only <;> infer_instance
 
+omit [MachGS GF] in
 instance icPayLive_timeless [Icfg] (k : Nat) (d : IcDep) :
     Timeless (icPayLive (GF := GF) k d) := by
   cases d <;> simp only [icPayLive] <;> first | infer_instance | (unfold liveGen; infer_instance)
@@ -623,6 +627,7 @@ theorem icDepMass_ofShr (d : IcDep) (s : Qp) (dev inum : BitVec 32) (g : GName) 
     (h : icDepShr d = some (s, dev, inum, g, lo)) : icDepMass d = s := by
   cases d <;> simp_all [icDepShr, icDepMass]
 
+omit [MachGS GF] in
 /-- Rocq's `ic_pay_live_of_shr`. -/
 theorem icPayLive_ofShr [Icfg] (k : Nat) (d : IcDep) (s : Qp) (dev inum : BitVec 32) (g : GName)
     (lo : Nat) (h : icDepShr d = some (s, dev, inum, g, lo)) :

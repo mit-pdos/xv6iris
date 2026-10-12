@@ -336,6 +336,7 @@ theorem rd_pid_eq {a b : BitVec 64} (h : a = b) (q : DFrac) (v : BitVec 32) :
     wordPointsTo (GF := GF) (pPid a) 4 q v ⊢ wordPointsTo (pPid b) 4 q v := by
   subst h; exact .rfl
 
+omit [MachGS GF] in
 /-- A view with `fsView`'s two fields IS `fsView` of its own geometry (a copy
 of `Xv6.bm_view_eq`, BmapDefs). -/
 theorem rd_view_eq (V : BioView GF) (γfs : FsNames) (hcl : V.clean = fsMclean γfs)

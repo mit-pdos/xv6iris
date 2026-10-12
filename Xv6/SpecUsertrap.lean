@@ -319,11 +319,13 @@ theorem utExecOut_quiet (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (B
     ⊢ utExecOut (GF := GF) sc sep V M V' M' sts sts' gn cs pid := by
   unfold utExecOut; iintro %hc; exact absurd hc h
 
+omit [MachGS GF] in
 theorem utForkOut_quiet (f : sfam GF) (sc sep : BitVec 64) (V : ProcPriv) (r : BitVec 64)
     (cs cs' : ExtTreeSet GName compare) (h : sc ≠ uecallScause) :
     ⊢ utForkOut f sc sep V r cs cs' := by
   unfold utForkOut; iintro %hc; exact absurd hc h
 
+omit [MachGS GF] in
 theorem utWaitOut_quiet (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (M' : ElfMem)
     (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) (pidv : BitVec 32) (h : sc ≠ uecallScause) :
     ⊢ utWaitOut (GF := GF) sc sep V M M' r cs cs' pidv := by

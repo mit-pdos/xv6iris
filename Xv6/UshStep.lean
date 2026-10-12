@@ -447,9 +447,11 @@ theorem ushS_store (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm
 def ushSaved (γd : GName) (sb : Nat) (vs : List (BitVec 64)) : IProp GF :=
   iprop([∗list] i ↦ v ∈ vs, uword γd (sb - 8 * (i + 1)) v)
 
+omit [MachGS GF] in
 theorem ushSaved_nil (γd : GName) (sb : Nat) : ushSaved (GF := GF) γd sb [] ⊣⊢ emp := by
   unfold ushSaved; exact BigSepL.bigSepL_nil
 
+omit [MachGS GF] in
 theorem ushSaved_cons (γd : GName) (sb : Nat) (v : BitVec 64) (vs : List (BitVec 64)) (h8 : 8 ≤ sb) :
     ushSaved (GF := GF) γd sb (v :: vs) ⊣⊢ uword γd (sb - 8) v ∗ ushSaved γd (sb - 8) vs := by
   unfold ushSaved
@@ -458,16 +460,19 @@ theorem ushSaved_cons (γd : GName) (sb : Nat) (v : BitVec 64) (vs : List (BitVe
   · rw [show sb - 8 * (i + 1 + 1) = sb - 8 - 8 * (i + 1) by omega]
   · rw [show sb - 8 * (i + 1 + 1) = sb - 8 - 8 * (i + 1) by omega]
 
+omit [MachGS GF] in
 /-- A frame's words, forgetting its alignment facts. -/
 theorem ush_ustack_body (γd : GName) (sp : BitVec 64) (n : Nat) :
     ustack (GF := GF) γd sp n ⊢ ustackBody γd sp n := by
   unfold ustack; iintro ⟨-, H⟩; iexact H
 
+omit [MachGS GF] in
 /-- The free-stack body at one word. -/
 theorem ush_body_one (γd : GName) (sp : BitVec 64) :
     ustackBody (GF := GF) γd sp 1 ⊣⊢ ∃ w : BitVec 64, uword γd (sp.toNat - 8) w := by
   unfold ustackBody; simp only [List.range_one]; exact BigSepL.bigSepL_singleton
 
+omit [MachGS GF] in
 /-- The free-stack body, one word peeled off the top. -/
 theorem ush_body_succ (γd : GName) (sp : BitVec 64) (n : Nat) (hroom : 8 * (n + 1) ≤ sp.toNat) :
     ustackBody (GF := GF) γd sp (n + 1) ⊣⊢
@@ -487,6 +492,7 @@ theorem ush_body_succ (γd : GName) (sp : BitVec 64) (n : Nat) (hroom : 8 * (n +
     iframe H2
     iapply e1.2 $$ H1
 
+omit [MachGS GF] in
 /-- Saved words forget their values: they are free-stack words again. -/
 theorem ushSaved_body (γd : GName) : ∀ (vs : List (BitVec 64)) (sb : BitVec 64), 8 * vs.length ≤ sb.toNat →
     ushSaved (GF := GF) γd sb.toNat vs ⊢ ustackBody γd sb vs.length

@@ -190,6 +190,7 @@ def fhTaint (T Kc Sup : IProp GF) (N : UkNames GF) (held : FdSet) : IProp GF :=
     ∃ (l : List FdState) (hm : FhMapF FdState),
       ustd N.fd l ∗ ⌜fhHeldOk held l hm⌝ ∗ [∗map] fd ↦ st ∈ hm, ufd N.fd fd.toNat st)
 
+omit [MachGS GF] in
 /-- **Rocq `fh_hm_fresh`**: a handle the kernel handed back is none the
 taint holds. -/
 theorem fh_hm_fresh (N : UkNames GF) (hm : FhMapF FdState) (k : Nat) (st : FdState) :

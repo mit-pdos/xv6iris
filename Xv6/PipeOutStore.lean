@@ -55,22 +55,28 @@ def gcsFrozen (k : Nat) (v : EraPins) (l : List Nat) : IProp GF :=
 
 variable {R}
 
+omit [MachGS GF] in
 instance gopen_persistent (k : Nat) (v : EraPins) (l : List Nat) :
     Persistent (gopen R k v l) := by
   unfold gopen; infer_instance
+omit [MachGS GF] in
 instance gopen_timeless [∀ k v I a, Timeless (R k v I a)] (k : Nat) (v : EraPins)
     (l : List Nat) : Timeless (gopen R k v l) := by
   unfold gopen; infer_instance
+omit [MachGS GF] in
 instance gpcs_timeless [∀ k v I a, Timeless (R k v I a)] (k : Nat) (v : EraPins)
     (l : List Nat) (fz : Bool) : Timeless (gpcs R k v l fz) := by
   unfold gpcs; infer_instance
+omit [MachGS GF] in
 instance gcsFrozen_persistent [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : EraPins)
     (l : List Nat) : Persistent (gcsFrozen R k v l) := by
   unfold gcsFrozen; infer_instance
+omit [MachGS GF] in
 instance gcsFrozen_timeless [∀ k v I a, Timeless (R k v I a)] (k : Nat) (v : EraPins)
     (l : List Nat) : Timeless (gcsFrozen R k v l) := by
   unfold gcsFrozen; infer_instance
 
+omit [MachGS GF] in
 /-- Rocq `gpcs_lb_prefix`. -/
 theorem gpcsLb_prefix (k : Nat) (v : EraPins) (l l' : List Nat) (fz : Bool) :
     ⊢ gpcs R k v l fz -∗ csLb v l' -∗ ⌜l' <+: l⌝ := by
@@ -79,6 +85,7 @@ theorem gpcsLb_prefix (k : Nat) (v : EraPins) (l l' : List Nat) (fz : Bool) :
   iapply pcs_lb_prefix v l l' fz $$ [H H']
   iframe H H'
 
+omit [MachGS GF] in
 /-- Rocq `gpcs_lb_get`. -/
 theorem gpcsLb_get (k : Nat) (v : EraPins) (l : List Nat) (fz : Bool) :
     gpcs R k v l fz ⊢ gpcs R k v l fz ∗ csLb v l := by
@@ -87,6 +94,7 @@ theorem gpcsLb_get (k : Nat) (v : EraPins) (l : List Nat) (fz : Bool) :
   ihave ⟨H, #Hl⟩ := pcs_lb_get v l fz $$ H
   iframe H Hs Ho Hl
 
+omit [MachGS GF] in
 /-- the authority hands out its store and the open round's payload (the
 drain's reading, Rocq's `gpcs_store` / `gpcs_open` on a kept hypothesis) -/
 theorem gpcs_store_open [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : EraPins)
@@ -99,6 +107,7 @@ theorem gpcs_store_open [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : Era
   unfold gopen
   iexact Ho
 
+omit [MachGS GF] in
 /-- Rocq `gpcs_of_gcs`. -/
 theorem gpcs_of_gcs (k : Nat) (v : EraPins) (l : List Nat) (fz : Bool) (hf : fz = false) :
     ⊢ gcsAuth R k v l -∗ gopen R k v l -∗ gpcs R k v l fz := by
@@ -107,6 +116,7 @@ theorem gpcs_of_gcs (k : Nat) (v : EraPins) (l : List Nat) (fz : Bool) (hf : fz 
   ihave H := pcs_of_auth v l fz hf $$ H
   iframe H Hs Ho
 
+omit [MachGS GF] in
 /-- THE FILING (Rocq `gpcs_file`): the open round's payload, at its
 alternative, joins the store. -/
 theorem gpcs_file [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : EraPins) (l : List Nat)
@@ -123,6 +133,7 @@ theorem gpcs_file [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : EraPins) 
   iapply gcsAuth_grow k v l a J $$ Hg HR HJ
   ipureintro; exact hnJ
 
+omit [MachGS GF] in
 /-- Rocq `gcs_frozen_prefix`. -/
 theorem gcsFrozen_prefix (k : Nat) (v : EraPins) (l l' : List Nat) :
     ⊢ gcsFrozen R k v l -∗ csLb v l' -∗ ⌜l' <+: l⌝ := by
@@ -131,6 +142,7 @@ theorem gcsFrozen_prefix (k : Nat) (v : EraPins) (l l' : List Nat) :
   iapply csFrozen_prefix v l l' $$ [H H']
   iframe H H'
 
+omit [MachGS GF] in
 /-- Rocq `gcs_frozen_cs`. -/
 theorem gcsFrozen_cs (k : Nat) (v : EraPins) (l : List Nat) :
     gcsFrozen R k v l ⊢ csFrozen v l := by
@@ -138,6 +150,7 @@ theorem gcsFrozen_cs (k : Nat) (v : EraPins) (l : List Nat) :
   iintro ⟨H, -⟩
   iexact H
 
+omit [MachGS GF] in
 /-- Rocq `gcs_frozen_store`. -/
 theorem gcsFrozen_store (k : Nat) (v : EraPins) (l : List Nat) :
     gcsFrozen R k v l ⊢ gstore R k v l := by
@@ -145,6 +158,7 @@ theorem gcsFrozen_store (k : Nat) (v : EraPins) (l : List Nat) :
   iintro ⟨-, H⟩
   iexact H
 
+omit [MachGS GF] in
 /-- Rocq `gcs_freeze`. -/
 theorem gcs_freeze (k : Nat) (v : EraPins) (l : List Nat) :
     gcsAuth R k v l ⊢ |==> gcsFrozen R k v l := by
@@ -154,6 +168,7 @@ theorem gcs_freeze (k : Nat) (v : EraPins) (l : List Nat) :
   imodintro
   iframe H Hs
 
+omit [MachGS GF] in
 /-- Rocq `gpcs_freeze`. -/
 theorem gpcs_freeze (k : Nat) (v : EraPins) (l : List Nat) (fz : Bool) :
     gpcs R k v l fz ⊢ |==> (gpcs R k v l true ∗ csFrozen v l) := by

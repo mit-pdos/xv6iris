@@ -51,6 +51,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
+omit [MachGS GF] in
 /-- A name TABLE, minted one key at a time: for any per-name resource that a
 fresh name can be allocated at, a function from keys to names carrying the
 resource at the first `n` keys.  The key map need only be injective on
@@ -89,6 +90,7 @@ theorem procBoot_names {K : Type} [DecidableEq K] (key : Nat → K) (N : Nat)
     rw [heq, hγ]
     iframe Hf Hγ
 
+omit [MachGS GF] in
 /-- The Nat-keyed table (the index is the key). -/
 theorem procBoot_namesNat (P : Nat → GName → IProp GF)
     (halloc : ∀ j, ⊢ |==> ∃ γ : GName, P j γ) (n : Nat) :

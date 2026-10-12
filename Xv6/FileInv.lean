@@ -234,6 +234,7 @@ theorem ftableOk_alloc (M : RegMapF (Nat × Qp)) (Ls : Nat → List (Nat × Qp))
 
 /-! ## The fd tokens -/
 
+omit [MachGS GF] in
 /-- A whole reference element as its two halves. -/
 theorem fref_halves (γ : FileNames) (id : Nat) (v : Nat × Qp) :
     (γ.ref ↪◯MAP[id] v) ⊢@{IProp GF}

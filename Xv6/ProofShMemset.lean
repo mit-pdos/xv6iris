@@ -66,6 +66,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- The empty run. -/
 theorem ushMs_nil (γd : GName) (a : Nat) (g : Nat → BitVec 8) : ⊢ ubytes (GF := GF) γd a 0 g := by
   show ⊢ ubytesq (GF := GF) γd (DFrac.own 1) a 0 g

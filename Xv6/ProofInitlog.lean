@@ -341,6 +341,7 @@ section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- The stocked pool: the batch's thirty-two plus `initlog`'s working
 pair. -/
 theorem il_slots_split (γ : BcacheNames) :

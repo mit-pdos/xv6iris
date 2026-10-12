@@ -54,6 +54,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG 
 
 /-! ## The era map's two moves -/
 
+omit [MachGS GF] in
 /-- An event that starts no era leaves the map exactly where it was (Rocq
 `pin_map_step`). -/
 theorem pinMap_step (γ : EchoGn) (h : List Obs) (e : Obs) (he : obsBoots [e] = 0) :
@@ -62,6 +63,7 @@ theorem pinMap_step (γ : EchoGn) (h : List Obs) (e : Obs) (he : obsBoots [e] = 
   unfold pinMap
   rw [hb]
 
+omit [MachGS GF] in
 /-- ...and the POWER-ON mints the era's pin (Rocq `pin_map_on`): the insert
 is legal because the map's bound says every era ever founded is at most
 `obsBoots h`, and this one is its successor. -/

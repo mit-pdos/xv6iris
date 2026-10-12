@@ -396,6 +396,7 @@ theorem invPure_reap (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMap) (
         exact mem_diff.mpr ⟨horph, fun h => hne (mem_singleton.mp h)⟩
       · rw [orphRow_insert_ne O pj (ps k') _ (Ne.symm e)]; exact horph
 
+omit [MachGS GF] in
 /-- `P ⊢ ⌜φ⌝` read without spending `P` (the Rocq proofs read pure
 conclusions off the payload and keep it). -/
 theorem waitInv_keep {P : IProp GF} {φ : Prop} (h : P ⊢ ⌜φ⌝) : P ⊢ ⌜φ⌝ ∗ P :=
@@ -589,6 +590,7 @@ T1 and T2's authority. -/
 def famLedAt (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev) : IProp GF :=
   iprop(zombLedAuth h ∗ ⌜famTie ps gs h⌝ ∗ zsAuth (fun k => (famOf h k).zomb))
 
+omit [MachGS GF] in
 /-- T1, read off the ledger and kept. -/
 theorem famLedAt_tie (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev) :
     famLedAt (GF := GF) ps gs h ⊢ ⌜famTie ps gs h⌝ ∗ famLedAt ps gs h := by
@@ -599,6 +601,7 @@ theorem famLedAt_tie (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev
   iframe Hzl Hzs
   ipureintro; exact hT
 
+omit [MachGS GF] in
 /-- T2: a slot's element reads the fold's zombie column (both kept). -/
 theorem famLedAt_lookup (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev) (k : Nat)
     (hk : k < NPROC) (v : Option (BitVec 32 × Int)) :
@@ -613,6 +616,7 @@ theorem famLedAt_lookup (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List 
   iframe Hzl Hzs He
   ipureintro; exact hT
 
+omit [MachGS GF] in
 /-- The decision's lower bound: the authority's own history, as a
 persistent snapshot (kwait's no-children arm cites it). -/
 theorem famLedAt_lb (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev) :
@@ -631,6 +635,7 @@ elements sit in the slots' own lock payloads. -/
 def famLed (ps : Nat → BitVec 64) (gs : Nat → GName) : IProp GF :=
   iprop(∃ h : List Zev, famLedAt ps gs h)
 
+omit [MachGS GF] in
 /-- BOOT: the empty history, every cell 0, every column entry `none`. -/
 theorem famLed_boot (ps : Nat → BitVec 64) (gs : Nat → GName) (hz : ∀ k < NPROC, ps k = 0#64) :
     zombLedAuth (GF := GF) [] ∗ zsAuth (fun _ => none) ⊢ famLed ps gs := by
@@ -646,6 +651,7 @@ theorem famLed_boot (ps : Nat → BitVec 64) (gs : Nat → GName) (hz : ∀ k < 
   · iapply (zsAuth_congr (GF := GF) (fun _ => none) (fun k => (famOf [] k).zomb) (fun _ _ => rfl))
     iexact Hzs
 
+omit [MachGS GF] in
 /-- **KFORK** (`np->parent = p`, slot `i`): appends `ZFork pa i pid g`; the
 cell and the generation follow the fold (T1); the zombie column does not
 move (ZombEv deviation 5), so T2's authority is untouched. -/
@@ -675,6 +681,7 @@ theorem famLed_fork (ps : Nat → BitVec 64) (gs : Nat → GName) (i : Nat) (pa 
       · simp [famStep, e]
   · iexists h; unfold zombReceipt; iexact Hlb
 
+omit [MachGS GF] in
 /-- **KEXIT** (`reparent(p)`, then the ZOMBIE store, one critical section):
 appends `ZExit (procAddr j) pid xs ip`; the cells are `reparent`'s (T1), and
 the exiting slot's element moves `none → some (pid, xs)` (T2). -/
@@ -716,6 +723,7 @@ theorem famLed_exit (ps : Nat → BitVec 64) (gs : Nat → GName) (j : Nat) (hj 
       simp only [e, if_false, famStep, e']
       split <;> rfl
 
+omit [MachGS GF] in
 /-- **KWAIT** (`pp->parent = 0` and the reap, slot `n`): appends `ZReap act n
 pid`; the cell is 0 (T1), and the slot's element moves to `none` (T2), to be
 put back at the UNUSED re-close after `freeproc`.  Stated at the named

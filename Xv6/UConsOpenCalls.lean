@@ -101,6 +101,7 @@ theorem consOpen_post_pre (f : Xfam GF) (omo : OffMode) (P Pmiss : Nat → Nat �
         -∗ R) :=
   wand_mono (consOpen_post_ent f omo P Pmiss Fo Ft hf m pv W rv M' fdv' cw' cs' hk0 hk1 hcw ha0 ha1) .rfl
 
+omit [MachGS GF] in
 /-- The console arm's ledger reading: the receipt's TYPE at the slot the
 ledger's `uallocV` decided (Rocq's inline block in
 `init_open_console_leaf_holds`). -/

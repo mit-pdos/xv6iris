@@ -226,6 +226,7 @@ history `h`, whose window from `k0` covers every slot. -/
 def sFullRcpt (act : BitVec 64) : IProp GF :=
   iprop(∃ (h : List Sev) (k0 : Nat), slotLedLb (h ++ [.SFull act k0]) ∗ ⌜sevWindow h k0⌝)
 
+omit [MachGS GF] in
 instance sFullRcpt_persistent (act : BitVec 64) : Persistent (sFullRcpt (GF := GF) act) := by
   unfold sFullRcpt; infer_instance
 

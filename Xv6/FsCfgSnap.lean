@@ -89,6 +89,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 
 /-! ## Staging 1.  The top map's fragments, routed -/
 
+omit [MachGS GF] in
 /-- A map big-op over the state's inodes, read at a set of inums the state
 names (the general form of `snapLinks_toSet`). -/
 theorem snapBigSepM_toSet (Φ : Nat → FsNode → IProp GF) (S : FsStateRec)
@@ -345,6 +346,7 @@ theorem fsCfgSnap_fs [Icfg] (E : CoPset) (γv : DiskNames) (dk : Nat → BitVec 
   ipureintro
   exact fsC0_lookup dk cov
 
+omit [MachGS GF] in
 /-- One slot's identification cell, at its dummy values, as kit 1's
 existential row. -/
 theorem fsCfgSnap_icIdEx (cn : IcNames) (k : Nat) :

@@ -98,12 +98,15 @@ def ushSbq (N : UkNames GF) (tx : Bool) (dq : DFrac) (a : Nat) (b : BitVec 8) : 
 def ushSstr (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) : IProp GF :=
   if tx then utextStr N.t a len f else ustr N.d dq a len f
 
+omit [MachGS GF] in
 theorem ushSstr_false (N : UkNames GF) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) :
     ushSstr N false dq a len f = ustr N.d dq a len f := rfl
 
+omit [MachGS GF] in
 theorem ushSstr_true (N : UkNames GF) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) :
     ushSstr N true dq a len f = utextStr N.t a len f := rfl
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_sstr_nonul`**. -/
 theorem ushSstr_nonul (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) :
     ushSstr N tx dq a len f ⊢ ⌜∀ j, j < len → f j ≠ ubyte0⌝ := by
@@ -111,6 +114,7 @@ theorem ushSstr_nonul (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f
   · exact ustr_nonul N.d dq a len f
   · exact utextStr_nonul N.t a len f
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_sstr_byte`**: one body byte, out and back (the give-back is
 kept in the text case so one script serves both halves). -/
 theorem ushSstr_byte (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) (j : Nat)
@@ -126,6 +130,7 @@ theorem ushSstr_byte (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f 
     · iapply utextStr_byte N.t a len f j hj $$ H
     · iintro -; iexact H
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_sstr_nul`**. -/
 theorem ushSstr_nul (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) :
     ushSstr N tx dq a len f ⊢

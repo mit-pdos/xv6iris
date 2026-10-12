@@ -539,6 +539,7 @@ end Page
 section BigOp
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
+omit [MachGS GF] in
 /-- One element of a big-op over `List.range NPROC`, and the rest. -/
 theorem ap_bigop_split (Φ : Nat → IProp GF) (n : Nat) (hn : n < NPROC) :
     ([∗list] j ∈ List.range NPROC, Φ j) ⊣⊢
@@ -546,6 +547,7 @@ theorem ap_bigop_split (Φ : Nat → IProp GF) (n : Nat) (hn : n < NPROC) :
   have hget : (List.range NPROC)[n]? = some n := by rw [List.getElem?_range hn]
   exact BigSepL.bigSepL_delete_cond (Φ := fun _ (y : Nat) => Φ y) hget
 
+omit [MachGS GF] in
 /-- The rest does not look at the element that changed. -/
 theorem ap_bigop_rest_eq (Φ Ψ : Nat → IProp GF) (n : Nat) (h : ∀ j, j ≠ n → Φ j = Ψ j) :
     ([∗list] k ↦ y ∈ List.range NPROC, if k = n then emp else Φ y) =
@@ -560,6 +562,7 @@ theorem ap_bigop_rest_eq (Φ Ψ : Nat → IProp GF) (n : Nat) (h : ∀ j, j ≠ 
   · rw [if_pos he, if_pos he]
   · rw [if_neg he, if_neg he, h x he]
 
+omit [MachGS GF] in
 /-- Read one element of the big-op and put it back. -/
 theorem ap_bigop_lookup (Φ : Nat → IProp GF) (n : Nat) (hn : n < NPROC) :
     ([∗list] j ∈ List.range NPROC, Φ j) ⊢ Φ n ∗ (Φ n -∗ [∗list] j ∈ List.range NPROC, Φ j) := by
@@ -570,6 +573,7 @@ theorem ap_bigop_lookup (Φ : Nat → IProp GF) (n : Nat) (hn : n < NPROC) :
   iapply (ap_bigop_split Φ n hn).2
   iframe H1 H2
 
+omit [MachGS GF] in
 /-- Replace one element of the big-op. -/
 theorem ap_bigop_upd (Φ Ψ : Nat → IProp GF) (n : Nat) (hn : n < NPROC)
     (h : ∀ j, j ≠ n → Φ j = Ψ j) :
@@ -1594,6 +1598,7 @@ end State
 section Fail
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- Forget the free-page count (copy of `ProofProcPagetable.pp_avail_none`). -/
 theorem ap_avail_none (γk : KmemNames) (on : Option Nat) :
     kallocAvail (GF := GF) γk on ⊢ |==> kallocAvail γk none := by
@@ -1623,6 +1628,7 @@ theorem ap_slots_unused_intro (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
 theorem ap_pavDec_none : pavDec none = none := rfl
 theorem ap_pavDec_some (n : Nat) : pavDec (some n) = some (n - 1) := rfl
 
+omit [MachGS GF] in
 /-- The markers the scan has read so far, one more. -/
 theorem ap_marks_snoc (Γ : SchedNames) (n : Nat) :
     ([∗list] j ∈ List.range n, slotUsed (GF := GF) Γ (procAddr j)) ∗ slotUsed Γ (procAddr n) ⊢

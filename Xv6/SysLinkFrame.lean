@@ -485,18 +485,23 @@ theorem sys_link_exit (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF)
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     iexact Harms
 
+omit [MachGS GF] in
 /-- The reference ledger's regroupings (Rocq `sl_ir3`, `iref_slots_combine`). -/
 theorem sys_link_ir_split :
     irefSlots (GF := GF) sysLinkIrefs ⊢ irefSlots 2 ∗ irefSlot := (irefSlots_op 2 1).1
 
+omit [MachGS GF] in
 theorem sys_link_ir_21 :
     irefSlots (GF := GF) 2 ∗ irefSlot ⊢ irefSlots sysLinkIrefs := (irefSlots_op 2 1).2
 
+omit [MachGS GF] in
 theorem sys_link_ir_11 : irefSlot (GF := GF) ∗ irefSlot ⊢ irefSlots 2 := (irefSlots_op 1 1).2
 
+omit [MachGS GF] in
 theorem sys_link_ir_2s1 :
     irefSlots (GF := GF) 2 ∗ irefSlots 1 ⊢ irefSlots sysLinkIrefs := (irefSlots_op 2 1).2
 
+omit [MachGS GF] in
 theorem sys_link_ir_1s1 : irefSlots (GF := GF) 1 ∗ irefSlot ⊢ irefSlots 2 := (irefSlots_op 1 1).2
 
 /-- The out bundle, assembled (every exit's last ghost step). -/

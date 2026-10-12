@@ -126,15 +126,19 @@ def ushCmd (g : GName) : Nat → Ushcmd → IProp GF
   | t, .back c1 => iprop(⌜0 < t ∧ t < 2 ^ 38⌝ ∗ ⌜t % 8 = 0⌝ ∗ ushW32 g t (ushTy (.back c1)) ∗
       (∃ q : Nat, ushPtr g (t + 8) q ∗ ushCmd g q c1))
 
+omit [MachGS GF] in
 instance ushW32_persistent (g : GName) (a : Nat) (v : Int) : Persistent (ushW32 (GF := GF) g a v) := by
   unfold ushW32; infer_instance
 
+omit [MachGS GF] in
 instance ushPtr_persistent (g : GName) (a p : Nat) : Persistent (ushPtr (GF := GF) g a p) := by
   unfold ushPtr; infer_instance
 
+omit [MachGS GF] in
 instance ushStr_persistent (g : GName) (x : UArg) : Persistent (ushStr (GF := GF) g x) := by
   unfold ushStr; infer_instance
 
+omit [MachGS GF] in
 /-- Rocq `ush_cmd_persistent` (by the tree's own recursion). -/
 theorem ushCmd_pers (g : GName) : ∀ (c : Ushcmd) (t : Nat), Persistent (ushCmd (GF := GF) g t c)
   | .exec args, t => by simp only [ushCmd]; infer_instance
@@ -153,20 +157,24 @@ theorem ushCmd_pers (g : GName) : ∀ (c : Ushcmd) (t : Nat), Persistent (ushCmd
     have := fun q => ushCmd_pers g c1 q
     simp only [ushCmd]; infer_instance
 
+omit [MachGS GF] in
 instance ushCmd_persistent (g : GName) (t : Nat) (c : Ushcmd) : Persistent (ushCmd (GF := GF) g t c) :=
   ushCmd_pers g c t
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_addr`**. -/
 theorem ushCmd_addr (g : GName) (t : Nat) (c : Ushcmd) :
     ushCmd (GF := GF) g t c ⊢ ⌜(0 < t ∧ t < 2 ^ 38) ∧ t % 8 = 0⌝ := by
   cases c <;> (simp only [ushCmd]; iintro ⟨%h1, %h2, -⟩; ipureintro; exact ⟨h1, h2⟩)
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_type`**. -/
 theorem ushCmd_type (g : GName) (t : Nat) (c : Ushcmd) : ushCmd (GF := GF) g t c ⊢ ushW32 g t (ushTy c) := by
   cases c <;> (simp only [ushCmd]; iintro ⟨-, -, #H, -⟩; iexact H)
 
 /-! ## §2a The tree crosses a fork -/
 
+omit [MachGS GF] in
 /-- sh's image, as its segment's run (the `UkSeccDefs.secc_code_run` pattern). -/
 theorem ushCode_run (γ : GName) :
     ushCode (GF := GF) γ ⊣⊢
@@ -205,24 +213,29 @@ theorem ushCode_run (γ : GName) :
       iexact H
     · exact absurd hab (by simp)
 
+omit [MachGS GF] in
 /-- **Rocq `forkable_shk_code`** (= `forkable_shk_rodata`, deviation 2). -/
 instance forkable_ushCode : Forkable (GF := GF) (fun γt _ _ => ushCode γt) :=
   Forkable_ext _ _ (fun γt _ _ => (ushCode_run γt).symm) (forkable_utext_map _)
 
+omit [MachGS GF] in
 /-- Rocq `forkable_ush_w32`. -/
 instance forkable_ushW32 (a : Nat) (v : Int) : Forkable (GF := GF) (fun _ g _ => ushW32 g a v) :=
   Forkable_ext _ _ (fun _ _ _ => .rfl) (forkable_ubytesq_disc a 4 _)
 
+omit [MachGS GF] in
 /-- Rocq `forkable_ush_ptr`. -/
 instance forkable_ushPtr (a p : Nat) : Forkable (GF := GF) (fun _ g _ => ushPtr g a p) :=
   Forkable_ext _ _ (fun _ _ _ => .rfl) (forkable_uwordq_disc a _)
 
+omit [MachGS GF] in
 /-- Rocq `forkable_ush_str`. -/
 instance forkable_ushStr (x : UArg) : Forkable (GF := GF) (fun _ g _ => ushStr g x) :=
   Forkable_ext _ _ (fun _ _ _ => by unfold ushStr; exact .rfl)
     (forkable_sep (GF := GF) (fun _ _ _ => iprop(⌜0 < x.ptr ∧ x.ptr < 2 ^ 38⌝))
       (fun _ g _ => ustr g DFrac.discard x.ptr x.len x.bytes) (hP := forkable_pure _))
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_forkable`**: the tree crosses a fork (by the tree's own
 recursion). -/
 theorem ushCmd_forkable : ∀ (c : Ushcmd) (t : Nat), Forkable (GF := GF) (fun _ g _ => ushCmd g t c)
@@ -245,14 +258,17 @@ theorem ushCmd_forkable : ∀ (c : Ushcmd) (t : Nat), Forkable (GF := GF) (fun _
     have := fun q => ushCmd_forkable c1 q
     exact Forkable_ext _ _ (fun _ _ _ => by simp only [ushCmd]; exact .rfl) inferInstance
 
+omit [MachGS GF] in
 /-- Rocq `forkable_ush_jrow`. -/
 instance forkable_ushJrow (k : Nat) : Forkable (GF := GF) (fun g _ _ => ushJrow g k) :=
   Forkable_ext _ _ (fun _ _ _ => by unfold ushJrow; exact .rfl) (forkable_utext_run _ 4 _)
 
+omit [MachGS GF] in
 /-- Rocq `forkable_ush_jtab`. -/
 instance forkable_ushJtab : Forkable (GF := GF) (fun g _ _ => ushJtab g) :=
   Forkable_ext _ _ (fun _ _ _ => by unfold ushJtab; exact .rfl) inferInstance
 
+omit [MachGS GF] in
 /-- **Rocq `ush_jtab_row`**: the row a node selects. -/
 theorem ushJtab_row (g : GName) (c : Ushcmd) : ushJtab (GF := GF) g ⊢ ushJrow g (ushTy c).toNat := by
   cases c
@@ -262,12 +278,14 @@ theorem ushJtab_row (g : GName) (c : Ushcmd) : ushJtab (GF := GF) g ⊢ ushJrow 
   · show ushJtab g ⊢ ushJrow g 4; unfold ushJtab; iintro ⟨-, -, -, #H, -⟩; iexact H
   · show ushJtab g ⊢ ushJrow g 5; unfold ushJtab; iintro ⟨-, -, -, -, #H, -⟩; iexact H
 
+omit [MachGS GF] in
 /-- **Rocq `forkable_ush_pay`**: the payload the forking arms carry. -/
 theorem forkable_ushPay (t : Nat) (c : Ushcmd) :
     Forkable (GF := GF) (fun gt gd _ => iprop(ushJtab gt ∗ ushCmd gd t c)) := by
   have := ushCmd_forkable (GF := GF) c t
   exact forkable_sep (fun gt _ _ => ushJtab gt) (fun _ gd _ => ushCmd gd t c)
 
+omit [MachGS GF] in
 /-- **Rocq `forkable_ush_paypipe`**: …and the PIPE arm's, with the two
 halves of `p[2]`. -/
 theorem forkable_ushPaypipe (t a b : Nat) (c : Ushcmd) (w0 w1 : BitVec 32) :
@@ -278,6 +296,7 @@ theorem forkable_ushPaypipe (t a b : Nat) (c : Ushcmd) (w0 w1 : BitVec 32) :
 
 /-! ## §8 What each node kind hands its arm -/
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_exec`**. -/
 theorem ushCmd_exec (g : GName) (t : Nat) (args : List UArg) :
     ushCmd (GF := GF) g t (.exec args) ⊢
@@ -286,6 +305,7 @@ theorem ushCmd_exec (g : GName) (t : Nat) (args : List UArg) :
   iintro ⟨-, -, -, #A, #B, #C⟩
   iframe A B C
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_redir`**. -/
 theorem ushCmd_redir (g : GName) (t : Nat) (c1 : Ushcmd) (file : UArg) (mode fd : Int) :
     ushCmd (GF := GF) g t (.redir c1 file mode fd) ⊢
@@ -295,6 +315,7 @@ theorem ushCmd_redir (g : GName) (t : Nat) (c1 : Ushcmd) (file : UArg) (mode fd 
   iintro ⟨-, -, -, #A, #B, #C, #D, #E⟩
   iframe A B C D E
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_pipe`**. -/
 theorem ushCmd_pipe (g : GName) (t : Nat) (l r : Ushcmd) :
     ushCmd (GF := GF) g t (.pipe l r) ⊢
@@ -303,6 +324,7 @@ theorem ushCmd_pipe (g : GName) (t : Nat) (l r : Ushcmd) :
   iintro ⟨-, -, -, #A, #B⟩
   iframe A B
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_list`**. -/
 theorem ushCmd_list (g : GName) (t : Nat) (l r : Ushcmd) :
     ushCmd (GF := GF) g t (.list l r) ⊢
@@ -311,6 +333,7 @@ theorem ushCmd_list (g : GName) (t : Nat) (l r : Ushcmd) :
   iintro ⟨-, -, -, #A, #B⟩
   iframe A B
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_back`**. -/
 theorem ushCmd_back (g : GName) (t : Nat) (c1 : Ushcmd) :
     ushCmd (GF := GF) g t (.back c1) ⊢ ∃ q : Nat, ushPtr g (t + 8) q ∗ ushCmd g q c1 := by
@@ -318,6 +341,7 @@ theorem ushCmd_back (g : GName) (t : Nat) (c1 : Ushcmd) :
   iintro ⟨-, -, -, #A⟩
   iexact A
 
+omit [MachGS GF] in
 /-- **Rocq `ush_argv0`**: argv[0], which the EXEC arm's null test reads. -/
 theorem ushArgv0 (g : GName) (t : Nat) (args : List UArg) :
     ushCmd (GF := GF) g t (.exec args) ⊢
@@ -355,6 +379,7 @@ def ushDiagRes (g : GName) (pc : Nat) (m : RegMap) : IProp GF :=
   else if pc = 0x10e then iprop(∃ x : UArg, ushPtr g ((m.get 9#5).toNat + 16) x.ptr ∗ ushStr g x)
   else iprop(emp)
 
+omit [MachGS GF] in
 /-- **Rocq `ush_diag_res_panic`**. -/
 theorem ushDiagRes_panic (g : GName) (m : RegMap) : ushDiagRes (GF := GF) g User.Sh.Sym.«panic» m = iprop(emp) := by
   unfold ushDiagRes; rfl

@@ -334,6 +334,7 @@ def iputPin (k tid : Nat) (qtx : Qp) : IProp GF :=
 
 /-! ## The transaction share's arithmetic -/
 
+omit [MachGS GF] in
 theorem iput_txPin_join (t : Nat) (q1 q2 : Qp) :
     txPin (GF := GF) icfgLog t q1 ∗ txPin icfgLog t q2 ⊢ txPin icfgLog t (q1 + q2) := by
   unfold txPin
@@ -342,6 +343,7 @@ theorem iput_txPin_join (t : Nat) (q1 q2 : Qp) :
   iapply h.2
   iexact H
 
+omit [MachGS GF] in
 theorem iput_txPin_split (t : Nat) (q1 q2 : Qp) :
     txPin (GF := GF) icfgLog t (q1 + q2) ⊢ txPin icfgLog t q1 ∗ txPin icfgLog t q2 := by
   unfold txPin

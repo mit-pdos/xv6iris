@@ -68,6 +68,7 @@ open Sail LeanRV64D LeanRV64D.Functions
 section helpers
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
+omit [MachGS GF] in
 /-- A big separating conjunction, converted element-wise under a persistent
 premise. -/
 theorem ub_sepL_wand {X : Type} (P : IProp GF) [Persistent P] (l : List X) (Φ Ψ : X → IProp GF)
@@ -78,6 +79,7 @@ theorem ub_sepL_wand {X : Type} (P : IProp GF) [Persistent P] (l : List X) (Φ �
   iintro %k %x %hk HΦ
   iapply (h x (List.mem_of_getElem? hk)) $$ HP HΦ
 
+omit [MachGS GF] in
 /-- An indexed big separating conjunction over a list, as one over its
 indices. -/
 theorem ub_sepL_idx (Φ : Nat → BitVec 8 → IProp GF) : ∀ bs : List (BitVec 8),

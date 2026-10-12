@@ -145,6 +145,7 @@ instance wlast_timeless (oc : Option Nat) : Timeless (D.wlast oc) := by
   cases oc <;> simp only [PdRound.wlast] <;> infer_instance
 instance wst_timeless (w : Wid) : Timeless (D.wst w) := by
   cases w <;> simp only [PdRound.wst] <;> infer_instance
+omit [MachGS GF] in
 instance ptkV_timeless0 (T : IProp GF) [Timeless T] (v : EraPins) (I : List (BitVec 8)) (k : Nat) :
     Timeless (ptkV T v I k) := by
   unfold ptkV; infer_instance

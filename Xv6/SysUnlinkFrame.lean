@@ -677,6 +677,7 @@ theorem sys_unlink_exit (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   iexact Harms
 
+omit [MachGS GF] in
 theorem sys_unlink_ir_11 : irefSlot (GF := GF) ∗ irefSlot ⊢ irefSlots sysUnlinkSlots :=
   (irefSlots_op 1 1).2
 

@@ -169,6 +169,7 @@ def crPrice (Wd : IProp GF) : Option Nat → IProp GF
   | some _ => iprop(⌜True⌝)
   | none => consDirtyCred Wd
 
+omit [MachGS GF] in
 instance crPrice_persistent (Wd : IProp GF) (ord : Option Nat) :
     Persistent (crPrice (GF := GF) Wd ord) := by
   cases ord <;> unfold crPrice <;> infer_instance

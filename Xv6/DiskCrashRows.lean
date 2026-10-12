@@ -79,6 +79,7 @@ theorem crashRow_del_isSome (l : List (Nat × List (BitVec 8))) (k k' : Nat) :
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
 
+omit [MachGS GF] in
 theorem crashRow_congr (γ : DiskNames) (v v' : VirtioState) (i : Nat) (s : HState) (b : SByte)
     (hph : Virtio.phase v' (BitVec.ofNat 16 i) = Virtio.phase v (BitVec.ofNat 16 i))
     (hca : ∀ c : Chain, s = .active c → ∀ j, j < SPB →
@@ -99,6 +100,7 @@ theorem crashRow_congr (γ : DiskNames) (v v' : VirtioState) (i : Nat) (s : HSta
   | inactive => rfl
   | member _ => rfl
 
+omit [MachGS GF] in
 theorem crashRows_congr (γ : DiskNames) (v v' : VirtioState) (st : Nat → HState)
     (sb : Nat → SByte) (hph : ∀ hh : BitVec 16, Virtio.phase v' hh = Virtio.phase v hh)
     (hca : v'.cache = v.cache) :
@@ -108,6 +110,7 @@ theorem crashRows_congr (γ : DiskNames) (v v' : VirtioState) (st : Nat → HSta
   exact funext fun _ => funext fun j =>
     crashRow_congr (GF := GF) γ v v' j (st j) (sb j) (hph _) (fun c _ jj _ => by rw [hca])
 
+omit [MachGS GF] in
 /-- **One row, and the rest.** -/
 theorem crashRows_acc (γ : DiskNames) (v v' : VirtioState) (st st' : Nat → HState)
     (sb sb' : Nat → SByte) (i : Nat) (hi : i < NUM)
@@ -127,6 +130,7 @@ theorem crashRows_acc (γ : DiskNames) (v v' : VirtioState) (st st' : Nat → HS
       cases hjk
       exact heq k hk hne)
 
+omit [MachGS GF] in
 /-- A capped write's row: DONE once no sector is cached, else owing the
 cached ones. -/
 theorem crashRow_capped (γ : DiskNames) (v : VirtioState) (i : Nat) (c : Chain) (b : SByte)
@@ -137,6 +141,7 @@ theorem crashRow_capped (γ : DiskNames) (v : VirtioState) (i : Nat) (c : Chain)
       else crashPermPend γ.cperm c.kq (chainWr c) (rowCached v c) := by
   cases h : rowCached v c <;> simp [crashRow, rowDoneB, rowCap, rowTodo, hph, hd, hpc, h]
 
+omit [MachGS GF] in
 /-- No row of an unarmed head holds anything. -/
 theorem crashRows_none (γ : DiskNames) (v : VirtioState) (st : Nat → HState) (sb : Nat → SByte)
     (hst : ∀ i, (st i).isActive = false) : ⊢@{IProp GF} crashRows γ v st sb := by
@@ -153,6 +158,7 @@ theorem crashRows_none (γ : DiskNames) (v : VirtioState) (st : Nat → HState) 
 
 /-! ## The row across a request's life -/
 
+omit [MachGS GF] in
 /-- Before the pop: the whole obligation is owed. -/
 theorem crashRow_unpopped (γ : DiskNames) (v : VirtioState) (i : Nat) (c : Chain)
     (hph : Virtio.phase v (BitVec.ofNat 16 i) = none) :
@@ -162,6 +168,7 @@ theorem crashRow_unpopped (γ : DiskNames) (v : VirtioState) (i : Nat) (c : Chai
   cases hd : c.dwr <;>
     simp [crashRow, rowDoneB, rowPopped, rowCap, rowTodo, hph, hd]
 
+omit [MachGS GF] in
 /-- Just popped: a read's leaf is spent, a write still owes its block. -/
 theorem crashRow_popped (γ : DiskNames) (v : VirtioState) (i : Nat) (c : Chain) (b : SByte)
     (hph : Virtio.phase v (BitVec.ofNat 16 i) = some .popped) :
@@ -172,6 +179,7 @@ theorem crashRow_popped (γ : DiskNames) (v : VirtioState) (i : Nat) (c : Chain)
   cases hd : c.dwr <;>
     simp [crashRow, rowDoneB, rowPopped, rowCap, rowTodo, hph, hd, postCap]
 
+omit [MachGS GF] in
 /-- In flight, from one phase to another of the same data-phase side, the
 status marker free to move: the row does not move. -/
 theorem crashRow_inflight (γ : DiskNames) (v v' : VirtioState) (i : Nat) (s : HState)
@@ -196,6 +204,7 @@ theorem crashRow_inflight (γ : DiskNames) (v v' : VirtioState) (i : Nat) (s : H
   | inactive => rfl
   | member _ => rfl
 
+omit [MachGS GF] in
 /-- The capture: from `.fetched` to `.served` with the block's sectors
 cached, a write still owes every sector. -/
 theorem crashRow_capture (γ : DiskNames) (v v' : VirtioState) (i : Nat) (c : Chain)
@@ -209,6 +218,7 @@ theorem crashRow_capture (γ : DiskNames) (v v' : VirtioState) (i : Nat) (c : Ch
       SPB_eq]
   · simp [crashRow, rowDoneB, rowPopped, rowCap, rowTodo, h1, h2, hd]
 
+omit [MachGS GF] in
 /-- The completion: out of flight, its status marker at a completed value. -/
 theorem crashRow_complete (γ : DiskNames) (v v' : VirtioState) (i : Nat) (s : HState)
     (b : SByte) (ph : VPhase) (hb : b ≠ SByte.free)
@@ -223,6 +233,7 @@ theorem crashRow_complete (γ : DiskNames) (v v' : VirtioState) (i : Nat) (s : H
   | inactive => rfl
   | member _ => rfl
 
+omit [MachGS GF] in
 /-- After the completion, with none of its sectors cached: the DONE token. -/
 theorem crashRow_collected (γ : DiskNames) (v : VirtioState) (i : Nat) (c : Chain) (b : SByte)
     (hb : b ≠ SByte.free) (hph : Virtio.phase v (BitVec.ofNat 16 i) = none)

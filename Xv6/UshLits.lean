@@ -57,6 +57,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogS
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (Std.ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_lit_str`**: a checked literal is a text-half string. -/
 theorem ushLit_str (N : UkNames GF) (dq : DFrac) (base len : Nat) (h : ushLitOk base len = true)
     (hl : len < 2 ^ 31) : ushCode N.t ⊢ ushSstr N true dq base len (ushLit base) := by

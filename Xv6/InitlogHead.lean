@@ -485,6 +485,7 @@ theorem il_read_head {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- A range-indexed family of per-index existentials IS one list of values
 (Rocq's `il_sepL_exist`). -/
 theorem il_list_of_range {A : Type} [Inhabited A] (Φ : Nat → A → IProp GF) (n : Nat) :
@@ -507,6 +508,7 @@ theorem il_list_of_range {A : Type} [Inhabited A] (Φ : Nat → A → IProp GF) 
     Option.map_some, Option.getD_some]
   exact .rfl
 
+omit [MachGS GF] in
 /-- ...and back. -/
 theorem il_range_of_list {A : Type} [Inhabited A] (Φ : Nat → A → IProp GF) (C : List A) :
     ([∗list] i ↦ a ∈ C, Φ i a) ⊢ [∗list] i ∈ List.range C.length, ∃ a : A, Φ i a := by
@@ -518,6 +520,7 @@ theorem il_range_of_list {A : Type} [Inhabited A] (Φ : Nat → A → IProp GF) 
   iexists _
   iexact H
 
+omit [MachGS GF] in
 /-- The log slots' client halves, named as one function, with what the
 logged view says of them (Rocq's `il_fsb_all`). -/
 theorem il_slots_agree (γfs : FsNames) (L : BlockMap) (logstart : Nat)
@@ -545,6 +548,7 @@ theorem il_slots_agree (γfs : FsNames) (L : BlockMap) (logstart : Nat)
     iapply BigSepL.bigSepL_cons.2
     iframe Hb Hl
 
+omit [MachGS GF] in
 /-- A range-indexed big-op over the first `n` indices, as a big-op over a
 length-`n` list whose elements it ignores. -/
 theorem il_range_list_ignore {A : Type} (Ψ : Nat → IProp GF) (W : List A) (n : Nat)

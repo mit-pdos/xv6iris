@@ -27,6 +27,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogS
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
+omit [MachGS GF] in
 /-- main's four-word frame, opened (nothing is given back: main never
 returns). -/
 theorem kinit_ustack_four (γd : GName) (sp : BitVec 64) :

@@ -27,6 +27,7 @@ section PipeOutSeal
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
+omit [MachGS GF] in
 /-- The era is born with BOTH halves of the round ghost at a round nobody is
 writing (Rocq `blk_alloc`). -/
 theorem blkAlloc : ⊢@{IProp GF} |==> ∃ (w : PipeEra) (gb : GName),
@@ -40,6 +41,7 @@ theorem blkAlloc : ⊢@{IProp GF} |==> ∃ (w : PipeEra) (gb : GName),
   rw [List.map_nil]
   iframe Ha Hr Hc
 
+omit [MachGS GF] in
 /-- Rocq `pera_map_step`. -/
 theorem peraMap_step (g : PipeGn) (h : List Obs) (e : Obs) (he : obsBoots [e] = 0) :
     peraMap (GF := GF) g h ⊢ peraMap g (h ++ [e]) := by
@@ -47,6 +49,7 @@ theorem peraMap_step (g : PipeGn) (h : List Obs) (e : Obs) (he : obsBoots [e] = 
   unfold peraMap
   rw [hb]
 
+omit [MachGS GF] in
 /-- Rocq `pera_map_on`. -/
 theorem peraMap_on (g : PipeGn) (h : List Obs) (w : PipeEra) :
     peraMap (GF := GF) g h ⊢

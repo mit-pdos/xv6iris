@@ -90,6 +90,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG 
 
 /-! ## S1 THE INPUT READINGS -/
 
+omit [MachGS GF] in
 /-- A reading from its persistent core (deviation 1). -/
 theorem uinp_of0 {P R : IProp GF} [Persistent R] (h : P ⊢ R) : ⊢ P -∗ P ∗ R := by
   iintro H

@@ -1377,6 +1377,7 @@ theorem lw_closeA (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
   unfold bioLocked
   iframe Hhold Hpay
 
+omit [MachGS GF] in
 /-- The junk run of `lh.block[]`, split at its head (the slot the append
 writes) -- and joined back one shorter. -/
 theorem lw_range_shift (Φ : Nat → IProp GF) (m s : Nat) :

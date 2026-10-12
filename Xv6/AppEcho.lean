@@ -93,6 +93,7 @@ def consState (r : EchoNames) (av : Aview) : IProp GF :=
     ∨ (∃ i : Nat, ⌜consPresentAt i av⌝ ∗ consKey r ∗ consShot r i)
     ∨ (⌜consAbsent av⌝ ∗ consTok r ∗ consSealTok r))
 
+omit [MachGS GF] in
 instance consState_timeless (r : EchoNames) (av : Aview) :
     Timeless (consState (GF := GF) r av) := by
   unfold consState; infer_instance
@@ -357,6 +358,7 @@ number `k`, which this resource does not read. -/
 def echoBoot (_γ : EchoGn) (_k : Nat) (r : EchoNames) : IProp GF :=
   iprop(consKey r ∨ ∃ i : Nat, consMade r i)
 
+omit [MachGS GF] in
 instance echoBoot_timeless (γ : EchoGn) (k : Nat) (r : EchoNames) :
     Timeless (echoBoot (GF := GF) γ k r) := by
   unfold echoBoot; infer_instance

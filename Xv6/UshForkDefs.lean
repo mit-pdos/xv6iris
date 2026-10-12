@@ -143,6 +143,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
 def ushfPay (f : Nat → BitVec 8) : GName → GName → GName → IProp GF :=
   fun gt gd _ => iprop(ushCode gt ∗ ushJtab gt ∗ ushlDat gd ∗ ubytes gd shBuf shNbuf f)
 
+omit [MachGS GF] in
 /-- **Rocq `forkable_ushf_pay`**. -/
 instance ushfPay_forkable (f : Nat → BitVec 8) : Forkable (GF := GF) (ushfPay f) := by
   have h1 : Forkable (GF := GF) (fun _ gd _ => ushlDat gd) := by
@@ -157,6 +158,7 @@ instance ushfPay_forkable (f : Nat → BitVec 8) : Forkable (GF := GF) (ushfPay 
 the credential after the block, and nothing else. -/
 def ushfWq (X : UshCtx GF) (I : List (BitVec 8)) : IProp GF := X.Wc I 0
 
+omit [MachGS GF] in
 instance ushfWq_timeless (X : UshCtx GF) [hW : ∀ I p, Timeless (X.Wc I p)] (I : List (BitVec 8)) :
     Timeless (ushfWq X I) := by
   unfold ushfWq; infer_instance
@@ -199,6 +201,7 @@ def ushfFans (Sc : ExtTreeSet GName compare) (Q : Int → IProp GF)
     (Sw : ExtTreeSet GName compare) : IProp GF :=
   iprop(∃ (γ : GName) (pidc : BitVec 32), ⌜Sw = Sc ∪ {γ}⌝ ∗ childTok γ pidc Q)
 
+omit [MachGS GF] in
 /-- **Rocq `ushf_wait_empty`**: the set after the wait is empty again. -/
 theorem ushf_wait_empty (Q : Int → IProp GF) (Sw Sw' : ExtTreeSet GName compare)
     (ret : BitVec 64) (pidv : BitVec 32) (hne : pidv ≠ 1#32) (hm1 : ret = -1#64 → Sw' = ∅) :

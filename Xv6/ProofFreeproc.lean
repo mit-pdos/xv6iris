@@ -279,12 +279,14 @@ theorem pidsOk_clear (pids : Nat → BitVec 32) (j : Nat) (h : pidsOk pids) :
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
+omit [MachGS GF] in
 /-- `pidReg_lookup`, keeping both sides. -/
 theorem fp_pidReg_lookup_keep (R : IntMapF GName) (pid : BitVec 32) (dq : DFrac) (g : GName) :
     pidRegAuth (GF := GF) R ∗ pidReg pid dq g ⊢
       (pidRegAuth R ∗ pidReg pid dq g) ∗ ⌜get? R (pid.toNat : Int) = some g⌝ :=
   persistent_entails_left (pidReg_lookup R pid dq g)
 
+omit [MachGS GF] in
 /-- **The registration dies** (Rocq `ProofFreeproc.v`, the `p->pid = 0`
 critical section): with `pid_lock`'s authority in hand, the 3/4 share of
 the registration looks the key up (so `pid ≠ 0`, `pidRegDom`), `p->lock`'s
@@ -872,6 +874,7 @@ theorem fp_kfree (KF : KFREE) [CurCtx]
     ⊢ wpLoop (GF := GF) c :=
   uc_kfree_lend_call KF c k' γl γk on ke hnoff' hK' hlk' hp'
 
+omit [MachGS GF] in
 /-- `availInc none = none`, at the resource level. -/
 theorem fp_avail_reduce [CurCtx] (γk : KmemNames) :
     kallocAvail (GF := GF) γk (availInc none) ⊢ kallocAvail γk none := by

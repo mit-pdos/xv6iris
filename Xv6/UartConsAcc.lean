@@ -37,6 +37,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
+omit [MachGS GF] in
 theorem uartLogm_agree (γ : UartNames) (q1 q2 : Qp) (L1 L2 : List LogEntry) :
     uartLogm (GF := GF) γ q1 L1 ∗ uartLogm γ q2 L2 ⊢ ⌜L1 = L2⌝ ∗ uartLogm γ q1 L1 ∗ uartLogm γ q2 L2 := by
   unfold uartLogm
@@ -45,6 +46,7 @@ theorem uartLogm_agree (γ : UartNames) (q1 q2 : Qp) (L1 L2 : List LogEntry) :
   iframe H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem uartLogm_update (γ : UartNames) (L1 L2 L' : List LogEntry) :
     uartLogm (GF := GF) γ (1 : Qp).half L1 ∗ uartLogm γ (1 : Qp).half L2 ⊢
       |==> (uartLogm γ (1 : Qp).half L' ∗ uartLogm γ (1 : Qp).half L') := by
@@ -52,6 +54,7 @@ theorem uartLogm_update (γ : UartNames) (L1 L2 L' : List LogEntry) :
   iintro ⟨H1, H2⟩
   iapply ghost_var_update_halves L' γ.logm L1 L2 $$ H1 H2
 
+omit [MachGS GF] in
 theorem uartDeliv_agree (γ : UartNames) (q1 q2 : Qp) (d1 d2 : List (List Obs × BitVec 8)) :
     uartDeliv (GF := GF) γ q1 d1 ∗ uartDeliv γ q2 d2 ⊢ ⌜d1 = d2⌝ ∗ uartDeliv γ q1 d1 ∗ uartDeliv γ q2 d2 := by
   unfold uartDeliv
@@ -60,6 +63,7 @@ theorem uartDeliv_agree (γ : UartNames) (q1 q2 : Qp) (d1 d2 : List (List Obs ×
   iframe H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem uartDeliv_update (γ : UartNames) (d1 d2 d' : List (List Obs × BitVec 8)) :
     uartDeliv (GF := GF) γ (1 : Qp).half d1 ∗ uartDeliv γ (1 : Qp).half d2 ⊢
       |==> (uartDeliv γ (1 : Qp).half d' ∗ uartDeliv γ (1 : Qp).half d') := by
@@ -87,6 +91,7 @@ def consDropPay (γ : UartNames) (c : BitVec 8) (cs : List (BitVec 8)) (Q : IPro
       uartLogm γ (1 : Qp).half L ∗ uartDlcnt γ (1 : Qp).half n ∗
       (uartLogm γ (1 : Qp).half L -∗ uartDlcnt γ (1 : Qp).half n -∗ Q))
 
+omit [MachGS GF] in
 /-- The payment, read at the CLAIM's own log and delivered list: the pure
 arm is already in the boundary's terms; the resource arm's two halves agree
 with the invariant's, which turns the caller's `L`/`n` into the claim's. -/

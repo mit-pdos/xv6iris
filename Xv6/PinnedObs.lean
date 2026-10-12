@@ -143,10 +143,12 @@ cursor came in tainted must still answer the miss, holding only `T`. -/
 def pobsMissTaint (T : IProp GF) (Pmiss : Nat → Nat → IProp GF) : IProp GF :=
   iprop(□ ∀ (k d : Nat), T -∗ Pmiss k d)
 
+omit [MachGS GF] in
 instance pobsMissTaint_persistent (T : IProp GF) (Pmiss : Nat → Nat → IProp GF) :
     Persistent (pobsMissTaint T Pmiss) := by
   unfold pobsMissTaint; infer_instance
 
+omit [MachGS GF] in
 /-- **Rocq `pobs_miss_taint_Pmiss`**. -/
 theorem pobsMissTaint_Pmiss (T : IProp GF) : ⊢ pobsMissTaint T (pobsPmiss T) := by
   unfold pobsMissTaint pobsPmiss
@@ -163,10 +165,12 @@ def pobsRecv (Pin : Aview → Prop) (T : IProp GF) (v : Aview) (i : Nat) (a : An
 def pobsFo (Pin : Aview → Prop) (T : IProp GF) : Pfam GF (Aview → Nat → Anode → IProp GF) :=
   pfamTriv (pobsRecv Pin T)
 
+omit [MachGS GF] in
 instance pobsP_persistent (T : IProp GF) [Persistent T] (hops : List Nat) (k d : Nat) :
     Persistent (pobsP T hops k d) := by
   unfold pobsP; infer_instance
 
+omit [MachGS GF] in
 instance pobsRecv_persistent (Pin : Aview → Prop) (T : IProp GF) [Persistent T] (v : Aview)
     (i : Nat) (a : Anode) : Persistent (pobsRecv Pin T v i a) := by
   unfold pobsRecv; infer_instance
@@ -331,6 +335,7 @@ theorem pobs_walk (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persis
 
 /-! ## 6.  THE NODE -/
 
+omit [MachGS GF] in
 /-- **Rocq `pobs_node`**: THE IDENTIFICATION -- the terminal cursor says the
 observed inum is the pin's, the receipt's row is a row of a view the pin
 holds of, and the pin says what that row is. -/
@@ -397,10 +402,12 @@ entry must answer the miss out of `K`. -/
 def pobsMissHold (K : IProp GF) (Pmiss : Nat → Nat → IProp GF) : IProp GF :=
   iprop(□ ∀ (k d : Nat), K -∗ Pmiss k d)
 
+omit [MachGS GF] in
 instance pobsMissHold_persistent (K : IProp GF) (Pmiss : Nat → Nat → IProp GF) :
     Persistent (pobsMissHold K Pmiss) := by
   unfold pobsMissHold; infer_instance
 
+omit [MachGS GF] in
 /-- **Rocq `pobs_miss_hold_ref`**. -/
 theorem pobsMissHold_ref (T K : IProp GF) : ⊢ pobsMissHold K (pobsPmissRef T K) := by
   unfold pobsMissHold pobsPmissRef
@@ -408,6 +415,7 @@ theorem pobsMissHold_ref (T K : IProp GF) : ⊢ pobsMissHold K (pobsPmissRef T K
   iintro %k %d H
   ileft; iexact H
 
+omit [MachGS GF] in
 /-- **Rocq `pobs_miss_taint_ref`**. -/
 theorem pobsMissTaint_ref (T K : IProp GF) : ⊢ pobsMissTaint T (pobsPmissRef T K) := by
   unfold pobsMissTaint pobsPmissRef
@@ -415,6 +423,7 @@ theorem pobsMissTaint_ref (T K : IProp GF) : ⊢ pobsMissTaint T (pobsPmissRef T
   iintro %k %d H
   iright; iexact H
 
+omit [MachGS GF] in
 /-- **Rocq `pobs_dead_term_lin`**: at any hop but the first the cursor IS the
 taint. -/
 theorem pobs_dead_term_lin (T K : IProp GF) (d0 n d : Nat) (hn : n ≠ 0) :
@@ -537,6 +546,7 @@ theorem pobs_walk_dead_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF
         imodintro
         iexact Hmt
 
+omit [MachGS GF] in
 /-- **Rocq `pobs_dead_cursor_refund`**: the cursor at any hop gives `K` back,
 or the taint. -/
 theorem pobs_dead_cursor_refund (T K : IProp GF) (d0 k d : Nat) :
@@ -546,6 +556,7 @@ theorem pobs_dead_cursor_refund (T K : IProp GF) (d0 k d : Nat) :
   · ileft; iexact HK
   · iright; iexact HT
 
+omit [MachGS GF] in
 /-- **Rocq `pobs_dead_miss_refund`**. -/
 theorem pobs_dead_miss_refund (T K : IProp GF) (k d : Nat) :
     ⊢ pobsPmissRef T K k d -∗ iprop(K ∨ T) := by

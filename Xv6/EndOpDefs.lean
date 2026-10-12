@@ -386,6 +386,7 @@ and `bigSepL_append` do all the work. -/
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- An INDEXED row over a list, read as a `List.range` row: the values are
 forgotten and only the position survives. -/
 theorem eo_idx_range {A : Type} :
@@ -412,6 +413,7 @@ theorem eo_idx_range {A : Type} :
     · rw [BigSepL.bigSepL_map (PROP := IProp GF) (Φ := fun _ (i : Nat) => Q i) Nat.succ]
       iexact H2
 
+omit [MachGS GF] in
 /-- Two adjacent `List.range` rows, concatenated. -/
 theorem eo_range_split (Q : Nat → IProp GF) (a : Nat) :
     ∀ b : Nat, ([∗list] i ∈ List.range a, Q i) ∗ ([∗list] i ∈ List.range b, Q (a + i)) ⊢
@@ -435,6 +437,7 @@ theorem eo_range_split (Q : Nat → IProp GF) (a : Nat) :
         (BigSepL.bigSepL_append (Φ := fun _ (i : Nat) => Q i)).2)
     iframe H12 H3
 
+omit [MachGS GF] in
 /-- ...and the other direction, one entry at a time: the copy loop's peel. -/
 theorem eo_range_peel (Q : Nat → IProp GF) (t m : Nat) (ht : t < m) :
     ([∗list] i ∈ List.range (m - t), Q (t + i)) ⊢
@@ -455,6 +458,7 @@ theorem eo_range_peel (Q : Nat → IProp GF) (t m : Nat) (ht : t < m) :
       (fun {kk} {xx} _ => by rw [show t + Nat.succ xx = t + 1 + xx from by omega]))
     iexact H2
 
+omit [MachGS GF] in
 /-- ...and the push onto the installed prefix. -/
 theorem eo_range_push (Q : Nat → IProp GF) (t : Nat) :
     ([∗list] i ∈ List.range t, Q i) ∗ Q t ⊢ [∗list] i ∈ List.range (t + 1), Q i := by
@@ -568,6 +572,7 @@ theorem eo_cov_perm : ∀ (l c : List Nat), c.Nodup → l.Nodup → (∀ x ∈ l
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsBlocksG GF]
 
+omit [MachGS GF] in
 /-- **The pin halves, split along the write set and rejoined ALL FALSE**
 (Rocq's `eo_cov_split` + `eo_cov_join`, as one accessor). -/
 theorem eo_cov_split (γfs : FsNames) (c l : List Nat) (hc : c.Nodup) (hl : l.Nodup)

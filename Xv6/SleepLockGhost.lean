@@ -55,8 +55,10 @@ def slhTok (γ : GName) (q : Qp) : IProp GF := iOwn (F := SlhRF) γ (◯ (some (
 /-- The total outstanding; `none` is the authoritative zero. -/
 def slhAuth (γ : GName) (t : Option Qp) : IProp GF := iOwn (F := SlhRF) γ (● slhOf t)
 
+omit [MachGS GF] in
 instance slhTok_timeless (γ : GName) (q : Qp) : Timeless (slhTok (GF := GF) γ q) := by
   unfold slhTok; infer_instance
+omit [MachGS GF] in
 instance slhAuth_timeless (γ : GName) (t : Option Qp) : Timeless (slhAuth (GF := GF) γ t) := by
   unfold slhAuth; infer_instance
 
@@ -68,6 +70,7 @@ theorem slh_some_op_none (q : Qp) :
 
 theorem slh_add_comm (p q : Qp) : p + q = q + p := Subtype.ext (Rat.add_comm ..)
 
+omit [MachGS GF] in
 /-- Shares split and join. -/
 theorem slhTok_split (γ : GName) (p q : Qp) :
     slhTok (GF := GF) γ (p + q) ⊣⊢ slhTok γ p ∗ slhTok γ q := by
@@ -75,9 +78,11 @@ theorem slhTok_split (γ : GName) (p q : Qp) :
   rw [← slh_some_op, Auth.frag_op]
   exact iOwn_op
 
+omit [MachGS GF] in
 theorem slhTok_join (γ : GName) (p q : Qp) :
     slhTok (GF := GF) γ p ∗ slhTok γ q ⊢ slhTok γ (p + q) := (slhTok_split γ p q).2
 
+omit [MachGS GF] in
 /-- THE AUTHORITATIVE ZERO REFUTES EVERY SHARE. -/
 theorem slhAuth_none_no_tok (γ : GName) (q : Qp) :
     slhAuth (GF := GF) γ none ∗ slhTok γ q ⊢ False := by
@@ -90,6 +95,7 @@ theorem slhAuth_none_no_tok (γ : GName) (q : Qp) :
   · cases h
   · cases hb
 
+omit [MachGS GF] in
 /-- Minting the first share from the zero. -/
 theorem slh_mint_none (γ : GName) (q : Qp) :
     slhAuth (GF := GF) γ none ⊢ |==> (slhAuth γ (some q) ∗ slhTok γ q) := by
@@ -102,6 +108,7 @@ theorem slh_mint_none (γ : GName) (q : Qp) :
   imodintro
   iframe Ha Ht
 
+omit [MachGS GF] in
 /-- Minting a further share. -/
 theorem slh_mint (γ : GName) (t q : Qp) :
     slhAuth (GF := GF) γ (some t) ⊢ |==> (slhAuth γ (some (t + q)) ∗ slhTok γ q) := by
@@ -118,6 +125,7 @@ theorem slh_mint (γ : GName) (t q : Qp) :
   imodintro
   iframe Ha Ht
 
+omit [MachGS GF] in
 /-- A share comes back. -/
 theorem slh_return (γ : GName) (t q : Qp) :
     slhAuth (GF := GF) γ (some (t + q)) ∗ slhTok γ q ⊢ |==> slhAuth γ (some t) := by
@@ -133,6 +141,7 @@ theorem slh_return (γ : GName) (t q : Qp) :
   imodintro
   iexact Ha
 
+omit [MachGS GF] in
 /-- ...and the LAST one restores the authoritative zero. -/
 theorem slh_return_last (γ : GName) (q : Qp) :
     slhAuth (GF := GF) γ (some q) ∗ slhTok γ q ⊢ |==> slhAuth γ none := by
@@ -146,6 +155,7 @@ theorem slh_return_last (γ : GName) (q : Qp) :
   imodintro
   iexact Ha
 
+omit [MachGS GF] in
 /-- The counting ghost of an unbuilt tracked sleeplock: the zero. -/
 theorem slhAuth_alloc : ⊢@{IProp GF} |==> ∃ γ : GName, slhAuth γ none := by
   imod iOwn_alloc (F := SlhRF) (● (none : Option UFrac)) with ⟨%γ, H⟩

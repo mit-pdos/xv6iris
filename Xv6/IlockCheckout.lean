@@ -43,6 +43,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF]
   [OffboxBoxG GF] [Appcfg GF]
 
+omit [MachGS GF] in
 /-- Two slices of one slot agree, both kept (`liveGenlo_agree`'s keeping
 form; IcacheRefGhost's own is private). -/
 theorem il_liveGenlo_agree [Icfg] (k : Nat) (s1 : Qp) (g1 : GName) (lo1 : Nat)

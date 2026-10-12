@@ -175,6 +175,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG 
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- The parse's tree, read at the stages the node law walks (a cast; the
 producer's words abstract). -/
 theorem ushCmd_stages (γ : GName) (q sa len : Nat) (gb : Nat → BitVec 8) (pw : List (List (BitVec 8)))

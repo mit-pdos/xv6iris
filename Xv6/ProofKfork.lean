@@ -958,6 +958,7 @@ theorem kfChild_congr [CurCtx] (γ : FileNames) (γd : GName) (pa : BitVec 64) (
   · rw [if_pos hi, if_pos (by omega)]
   · rw [if_neg hi, if_neg (by omega)]
 
+omit [MachGS GF] in
 theorem kfFrag_congr [CurCtx] (γd : GName) (fd i : Nat) (st : FdState) (h : i ≠ fd) :
     kfFrag (GF := GF) γd fd i st ⊢ kfFrag γd (fd + 1) i st := by
   unfold kfFrag
@@ -997,6 +998,7 @@ theorem kfChild_open [CurCtx] (γ : FileNames) (γd : GName) (pa : BitVec 64) (f
   iapply ofileSlot_file γ γd pa fd kk q st hk hst
   iframe Hc Hr Ha
 
+omit [MachGS GF] in
 /-- A key-indexed big-op is a list-indexed one over any list of its length. -/
 theorem kf_range_list [CurCtx] {A : Type _} (P : Nat → IProp GF) (l : List A) (d : A) :
     ([∗list] i ∈ List.range l.length, P i) ⊢ [∗list] i ↦ _x ∈ l, P i := by
@@ -1977,6 +1979,7 @@ theorem kf_freeproc [CurCtx] (FP : FREEPROC) (Γ : SchedNames) (c : CPU) (k' : K
   exact h
 
 set_option maxHeartbeats 1000000 in
+omit [MachGS GF] in
 /-- THE PARENT'S LEND, at the call context's proc word (permit sweep L1a):
 the counter goes out as the lend at any `p` the context names as the
 parent's slot. -/
@@ -1984,6 +1987,7 @@ theorem kf_lend_out (p pa : BitVec 64) (kc : Nat) (hp : p = pa) :
     actCnt (GF := GF) pa kc ⊢ actLend p kc := by
   subst hp; exact actLend_of_cnt _ kc
 
+omit [MachGS GF] in
 /-- ...and back: at a nonzero slot the lend IS the counter. -/
 theorem kf_lend_back (p pa : BitVec 64) (kc : Nat) (hpa : pa ≠ 0#64) (hp : p = pa) :
     actLend (GF := GF) p kc ⊢ actCnt pa kc := by
@@ -2059,6 +2063,7 @@ theorem kf_uvmcopyOk_umBelow (Pold Pnew Pnew' : UPtd) (Mold Mnew Mnew' : Nat →
     have hm := hok.2.1 k hk
     rw [hm.1, hempty k] at hg; exact absurd hg (by simp)
 
+omit [MachGS GF] in
 /-- Half-mirror agreement: two lock-halves of the same slot carry the same
 state (used to pin the re-acquired lock to the state we kept aside). -/
 theorem kf_pstateAtHlf_agree (Γ : SchedNames) (j : Nat) (hj : j < NPROC) (s1 s2 : BitVec 32) :

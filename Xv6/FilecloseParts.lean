@@ -289,6 +289,7 @@ theorem fc_pipeclose [CurCtx] (PC : PIPECLOSE) (Γ : SchedNames) (c : CPU) (k' :
 
 /-! ## The exit: the epilogue at `(KernelSyms.«fileclose» + 0x8e)` -/
 
+omit [MachGS GF] in
 /-- **THE LEND, HANDED BACK AT A RAISED COUNT** (permit sweep L1b): the
 `SlotGen.actLend_cont_frame` of a lend that came back from a callee (here
 pipeclose) at `k1 ≥ ke` -- the continuation that takes the lend back is

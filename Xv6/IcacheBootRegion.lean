@@ -698,6 +698,7 @@ section IcacheBootPool
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
+omit [MachGS GF] in
 /-- THE POOL'S KEYS ARE THE `BitVec` ROUND TRIP, and the ledger's are plain
 `Nat`: `ipoolRows` indexes the pool row at `BitVec.ofNat 32 z`, so its
 `icntHalf` and `ifreezeOff` conjuncts sit at `(BitVec.ofNat 32 z).toNat`,

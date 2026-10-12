@@ -50,6 +50,7 @@ theorem kernelText_instr (k : Kernel.KInstr) (h : k ∈ Kernel.text) :
   icases BigSepL.bigSepL_lookup hi $$ H with H
   iexact H
 
+omit [MachGS GF] in
 /-- A contiguous sublist of a big separating conjunction (the rest is dropped). -/
 theorem bigSepL_drop_take {A : Type} (Φ : A → IProp GF) (l : List A) (i n : Nat) :
     ([∗list] x ∈ l, Φ x) ⊢ [∗list] x ∈ (l.drop i).take n, Φ x := by

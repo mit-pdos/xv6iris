@@ -86,6 +86,7 @@ theorem shRedirs_head (UL : UK_LEAVES) (SP : SH_PEEK) (N : UkNames GF) (h : CPU)
   · ipureintro; rw [hcs 21#5 rfl]; ureg
   · ipureintro; exact ha0
 
+omit [MachGS GF] in
 /-- A cell at a nonzero address holds its word. -/
 theorem ushCell_word (N : UkNames GF) (p : Nat) (v : BitVec 64) (hp : 0 < p) :
     ushCell N p v ⊢ uword N.d p v := by
@@ -94,6 +95,7 @@ theorem ushCell_word (N : UkNames GF) (p : Nat) (v : BitVec 64) (hp : 0 < p) :
   · exact absurd h0 (by omega)
   · iexact H
 
+omit [MachGS GF] in
 /-- ...and a word is a cell. -/
 theorem ushCell_of_word (N : UkNames GF) (p : Nat) (v : BitVec 64) (hp : 0 < p ∧ p % 8 = 0 ∧ p + 8 < 2 ^ 64) :
     uword N.d p v ⊢ ushCell N p v := by
@@ -102,6 +104,7 @@ theorem ushCell_of_word (N : UkNames GF) (p : Nat) (v : BitVec 64) (hp : 0 < p �
   · ipureintro; exact hp
   · iexact H
 
+omit [MachGS GF] in
 /-- NULL is a cell. -/
 theorem ushCell_null (N : UkNames GF) (v : BitVec 64) : ⊢ ushCell N 0 v := by
   unfold ushCell; iintro; ileft; ipureintro; rfl

@@ -31,6 +31,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- An eight-word frame, closed (the pop's premise). -/
 theorem ushm_ustack8_intro (γd : GName) (sp : BitVec 64) (hal : sp.toNat % 8 = 0) (hlo : 64 ≤ sp.toNat) :
     ⊢ (∃ w : BitVec 64, uword (GF := GF) γd (sp.toNat - 8) w) -∗ (∃ w : BitVec 64, uword γd (sp.toNat - 16) w) -∗

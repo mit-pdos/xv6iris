@@ -182,6 +182,7 @@ instance offHdr_timeless (γo : GName) (k : Nat) (x : Unit) (ξ : CtxId) :
     Timeless (offHdr (GF := GF) γo k x ξ) := by
   unfold offHdr offResident wordAtN; infer_instance
 
+omit [MachGS GF] in
 instance offRest_timeless (x : Unit) (ξ : CtxId) : Timeless (offRest (GF := GF) x ξ) := by
   unfold offRest; infer_instance
 
@@ -286,10 +287,12 @@ def offSetAuth (on : OffNames) (i : Nat) (L : OffSet) : IProp GF :=
 def offMember (on : OffNames) (i : Nat) (γ : BoxNames) : IProp GF :=
   iOwn (F := constOF OffSetUR) (on.set i) (◯ (LeibnizSet.valid ({γ} : OffSet)))
 
+omit [MachGS GF] in
 instance offMember_persistent (on : OffNames) (i : Nat) (γ : BoxNames) :
     Persistent (offMember (GF := GF) on i γ) := by
   unfold offMember; infer_instance
 
+omit [MachGS GF] in
 /-- A member is in the authority's set (Rocq's inline `own_valid_2` +
 `auth_both_valid_discrete` + `gset_included` step). -/
 theorem offMember_elem (on : OffNames) (i : Nat) (L : OffSet) (γ : BoxNames) :
@@ -301,6 +304,7 @@ theorem offMember_elem (on : OffNames) (i : Nat) (L : OffSet) (γ : BoxNames) :
   have hincl := (Auth.auth_both_valid_discrete.mp Hv).1
   exact (LeibnizSet.included_iff_subset _ _).1 hincl γ (LawfulSet.mem_singleton.2 rfl)
 
+omit [MachGS GF] in
 /-- The append: the authority grows by `γ`, and `γ`'s membership is minted
 (Rocq's inline `auth_update_alloc, gset_local_update` + `auth_frag_mono`). -/
 theorem offSetAuth_insert (on : OffNames) (i : Nat) (L : OffSet) (γ : BoxNames) :

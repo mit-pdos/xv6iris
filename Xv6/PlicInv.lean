@@ -677,6 +677,7 @@ theorem plic_claim_au (γ0 γ1 : UartNames) (hrt : Nat) (hh : hrt < NCPU) :
   · ipureintro; exact plic_claim_ret_ok p (Plic.sctx hrt) hokp
   · iframe Hw10 Hw12
 
+omit [MachGS GF] in
 /-- Re-index a wand on the claim's answer from the 32-bit value to its
 `toNat` (what `Plic.complete` takes). -/
 theorem plic_wand_conv (P : IProp GF) (w : BitVec 32) (i : Nat)

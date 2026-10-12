@@ -121,10 +121,12 @@ def fdSt (γd : GName) (fd : Nat) (st : FdState) : IProp GF :=
 def fdStAuth (γd : GName) (fd : Nat) (st : FdState) : IProp GF :=
   fdStAt γd fd (.own (1 : Qp).half) st
 
+omit [MachGS GF] in
 instance fdStAt_timeless (γd : GName) (fd : Nat) (dq : DFrac) (st : FdState) :
     Timeless (fdStAt (GF := GF) γd fd dq st) := by
   unfold fdStAt; infer_instance
 
+omit [MachGS GF] in
 /-- Two shares of one key agree (Rocq `fd_st_at_agree`). -/
 theorem fdStAt_agree (γd : GName) (fd : Nat) (dq1 dq2 : DFrac) (st st' : FdState) :
     fdStAt (GF := GF) γd fd dq1 st ∗ fdStAt γd fd dq2 st' ⊢ ⌜st = st'⌝ := by
@@ -136,11 +138,13 @@ theorem fdStAt_agree (γd : GName) (fd : Nat) (dq1 dq2 : DFrac) (st st' : FdStat
   have h := (DFracAgree.op_valid.mp Hv).2
   exact congrArg (fun x : DiscreteO FdState => x.car) h
 
+omit [MachGS GF] in
 theorem fdSt_agree (γd : GName) (fd : Nat) (st st' : FdState) :
     fdStAuth (GF := GF) γd fd st ∗ fdSt γd fd st' ⊢ ⌜st = st'⌝ := by
   unfold fdStAuth fdSt
   exact fdStAt_agree γd fd _ _ st st'
 
+omit [MachGS GF] in
 /-- The same, keeping both halves. -/
 theorem fdSt_agree' (γd : GName) (fd : Nat) (st st' : FdState) :
     fdStAuth (GF := GF) γd fd st ∗ fdSt γd fd st' ⊢ ⌜st = st'⌝ ∗ fdStAuth γd fd st ∗ fdSt γd fd st' := by
@@ -154,6 +158,7 @@ theorem fdSt_agree' (γd : GName) (fd : Nat) (st st' : FdState) :
 abbrev fdstElt (dq : DFrac) (st : FdState) : DFracAgree.DFracAgreeR (DiscreteO FdState) :=
   DFracAgree.mk dq ⟨st⟩
 
+omit [MachGS GF] in
 /-- Both halves move the state (Rocq `fd_st_both_update`). -/
 theorem fdSt_update (γd : GName) (fd : Nat) (st st' st'' : FdState) :
     fdStAuth (GF := GF) γd fd st ∗ fdSt γd fd st' ⊢ |==> (fdStAuth γd fd st'' ∗ fdSt γd fd st'') := by
@@ -170,6 +175,7 @@ theorem fdSt_update (γd : GName) (fd : Nat) (st st' st'' : FdState) :
   imodintro
   iapply iOwn_op.1 $$ H
 
+omit [MachGS GF] in
 /-- The whole key splits into the two halves. -/
 theorem fdSt_halves (γd : GName) (fd : Nat) (st : FdState) :
     fdStAt (GF := GF) γd fd (.own 1) st ⊢ fdStAuth γd fd st ∗ fdSt γd fd st := by
@@ -199,6 +205,7 @@ theorem fdstMap0_valid : ∀ n : Nat, ✓ fdstMap0 n
   | 0 => Heap.valid_empty
   | n + 1 => Heap.insert_valid (DFracAgree.mk_valid.mpr DFrac.valid_own_one) (fdstMap0_valid n)
 
+omit [MachGS GF] in
 /-- Mint a fresh incarnation's descriptor table: `n` closed descriptors,
 each key WHOLE (Rocq `fd_st_alloc`). -/
 theorem fdSt_alloc (n : Nat) :
@@ -854,6 +861,7 @@ theorem procOfilesOwe_cells_acc (γ : FileNames) (γd : GName) (pa : BitVec 64) 
 /-! ## The null table a fresh incarnation is born with (Rocq
 `ProcInv.proc_dormant_unused`'s mint, `proc_ofiles_null_split`) -/
 
+omit [MachGS GF] in
 /-- The two halves of a key make it whole again (`fdSt_halves` backwards). -/
 theorem fdSt_join (γd : GName) (fd : Nat) (st : FdState) :
     fdStAuth (GF := GF) γd fd st ∗ fdSt γd fd st ⊢ fdStAt γd fd (.own 1) st := by

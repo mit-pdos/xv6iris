@@ -617,6 +617,7 @@ theorem createFound_env_ftop (Γ : SchedNames) (A : CreateFoundArgs) :
   iintro ⟨-, -, -, -, -, -, -, -, -, -, #Hinv, -, -⟩
   iapply iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hinv
 
+omit [MachGS GF] in
 theorem createFound_slots_split (ns : Nat) (h : createIrefSlots ≤ ns) :
     irefSlots (GF := GF) ns ⊢ irefSlots 2 ∗ irefSlots (ns - 2) := by
   have e := create_ns_split ns h

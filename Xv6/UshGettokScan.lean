@@ -97,9 +97,11 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 theorem ushG_toS (N : UkNames GF) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) :
     ustr N.d dq a len f ⊢ ushSstr N false dq a len f := by rw [ushSstr_false]
 
+omit [MachGS GF] in
 theorem ushG_ofS (N : UkNames GF) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) :
     ushSstr N false dq a len f ⊢ ustr N.d dq a len f := by rw [ushSstr_false]
 

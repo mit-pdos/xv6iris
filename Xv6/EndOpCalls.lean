@@ -252,6 +252,7 @@ section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- Two cache authorities cannot coexist.  This is what refutes the
 `committing = 0` arm at the commit's re-acquire: the committer HOLDS the
 batch, so the lock's payload cannot also carry one. -/

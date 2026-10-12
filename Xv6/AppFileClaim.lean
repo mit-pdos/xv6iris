@@ -72,6 +72,7 @@ def fEscLive (c : FileFixed) (r : FileAppNames) (av : Aview) : IProp GF :=
 def fState (c : FileFixed) (r : FileAppNames) (av : Aview) : IProp GF :=
   iprop((fEscWrap r ∗ fCore c r av) ∨ fEscLive c r av)
 
+omit [MachGS GF] in
 instance fCore_timeless (c : FileFixed) (r : FileAppNames) (av : Aview) :
     Timeless (fCore (GF := GF) c r av) := by
   unfold fCore; infer_instance
@@ -88,6 +89,7 @@ instance fState_timeless (c : FileFixed) (r : FileAppNames) (av : Aview) :
     Timeless (fState (GF := GF) c r av) := by
   unfold fState; infer_instance
 
+omit [MachGS GF] in
 /-- The core, built at the exact arm (Rocq `f_core_exact`). -/
 theorem fCore_exact (c : FileFixed) (r : FileAppNames) (av : Aview) (s : Dst)
     (hok : fOk av s) :

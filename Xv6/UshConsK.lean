@@ -142,10 +142,12 @@ console is absent (or the taint).  `AppEcho.echoConsNever_law` verbatim. -/
 def shConsNeverLaw (T K : IProp GF) : IProp GF :=
   iprop(□ (K -∗ □ (∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜consAbsent v⌝ ∨ T))))
 
+omit [MachGS GF] in
 /-- Rocq `sh_cons_never_law_persistent`. -/
 instance shConsNeverLaw_persistent (T K : IProp GF) : Persistent (shConsNeverLaw T K) := by
   unfold shConsNeverLaw; infer_instance
 
+omit [MachGS GF] in
 /-- **Rocq `sh_cons_abs_law_of_never`**: the law, in the linear form
 `UConsOpen`'s dead walk takes (`UInitCons.init_cons_abs_law`, unfolded). -/
 theorem shConsAbsLaw_of_never (T K : IProp GF) [Persistent K] :

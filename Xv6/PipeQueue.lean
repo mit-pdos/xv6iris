@@ -83,11 +83,14 @@ that created the pipe, and what its links are built out of (Rocq
 def pipeQfrag (γ : GName) (s : PipeSt) : IProp GF :=
   iOwn (F := constOF (ExclAuthR (A := PipeSt))) γ (◯E s)
 
+omit [MachGS GF] in
 instance pipeQauth_timeless (γ : GName) (s : PipeSt) : Timeless (pipeQauth (GF := GF) γ s) := by
   unfold pipeQauth; infer_instance
+omit [MachGS GF] in
 instance pipeQfrag_timeless (γ : GName) (s : PipeSt) : Timeless (pipeQfrag (GF := GF) γ s) := by
   unfold pipeQfrag; infer_instance
 
+omit [MachGS GF] in
 /-- Minted by the pipe's birth at the birth state, beside the two ends
 (Rocq `pipe_queue_alloc`). -/
 theorem pipeQueue_alloc : ⊢@{IProp GF} |==> ∃ γ : GName, pipeQauth γ pst0 ∗ pipeQfrag γ pst0 := by
@@ -99,6 +102,7 @@ theorem pipeQueue_alloc : ⊢@{IProp GF} |==> ∃ γ : GName, pipeQauth γ pst0 
   iexists γ
   iapply iOwn_op.1 $$ H
 
+omit [MachGS GF] in
 /-- The fragment IS the state (Rocq `pipe_queue_agree`). -/
 theorem pipeQueue_agree (γ : GName) (s s' : PipeSt) :
     pipeQauth (GF := GF) γ s -∗ pipeQfrag γ s' -∗ ⌜s' = s⌝ := by
@@ -108,6 +112,7 @@ theorem pipeQueue_agree (γ : GName) (s s' : PipeSt) :
   ipureintro
   exact (ExclAuth.agree Hv).symm
 
+omit [MachGS GF] in
 /-- THE ONE STEP, and it needs both halves (Rocq `pipe_queue_update`). -/
 theorem pipeQueue_update (γ : GName) (s s' s'' : PipeSt) :
     pipeQauth (GF := GF) γ s -∗ pipeQfrag γ s' ==∗ pipeQauth γ s'' ∗ pipeQfrag γ s'' := by

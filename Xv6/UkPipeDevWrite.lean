@@ -111,6 +111,7 @@ theorem pipe_wpay_halted [IcacheG GF] [PipeProtoG GF] (pn : PNames) (γp : PipeN
     rw [hro'] at hro
     exact (Bool.false_ne_true hro).elim
 
+omit [MachGS GF] in
 /-- **Rocq `pdev_usrc_ok`**: the source reading at a run the hole handed
 over, in either half. -/
 theorem pdev_usrc_ok (N : UkNames GF) (M : ElfMem) (pmv : Nat → Option UPerm) (sz : Nat)

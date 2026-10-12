@@ -46,6 +46,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 section RetContGen
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF]
 
+omit [MachGS GF] in
 /-- the returning arm at a number whose post the caller does not read,
 stated over the ABSTRACT class (a kernel-cheap intro: the class's post is
 never introduced at the concrete instance) -/
@@ -61,6 +62,7 @@ theorem uexecRetContGen_quiet (X : Uvis → IProp GF) (n : Int) (f : UexecSG.sfa
   subst hg'
   iapply H $$ %r %M' %π' %szv' %fdv' %cw' %cs' %lz' %secc' %hfd %hsc
 
+omit [MachGS GF] in
 /-- ...and at a number whose post it reads -/
 theorem uexecRetContGen_post (X : Uvis → IProp GF) (n : Int) (f : UexecSG.sfam GF) (W : Uvis)
     (CH : BitVec 64 → ExtTreeSet GName compare → IProp GF) :

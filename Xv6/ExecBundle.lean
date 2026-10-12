@@ -69,6 +69,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
 
 /-! ## 2.  THE SLOT PIECE, AT ONE ARGUMENT SHAPE -/
 
+omit [MachGS GF] in
 /-- **Rocq `exec_slot_of_entry_at`**: ARM (a) IDENTIFIES THE FILE and arm (b)
 is REFUTED, both from the SAME step -- the observed node IS the caller's
 file, so (a)'s constructor answers from `kexecImageOk f` and (b)'s `¬
@@ -102,6 +103,7 @@ theorem execSlot_of_entryAt (X : Uvis → IProp GF) (T : IProp GF) (Pfin : Nat �
 
 /-! ## 3.  THE SLOT PIECE AT THE SYSCALL BOUNDARY -/
 
+omit [MachGS GF] in
 /-- **Rocq `sys_exec_slot_of_entry`**: `sysExecSlotPre` quantifies the path
 and the argument shape under the caller's two readings.  THE PATH READING IS
 A FUNCTION of `(M, pv)` (`argPathOf_uniq`), so `Pfin` is the cursor at THAT

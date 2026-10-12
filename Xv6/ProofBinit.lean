@@ -134,22 +134,26 @@ def biRest [CurCtx] (j : Nat) : IProp GF := iprop%
 
 /-! ## List surgery -/
 
+omit [MachGS GF] in
 theorem bi_snoc [CurCtx] (P : Nat → IProp GF) (n : Nat) :
     ([∗list] j ∈ List.range n, P j) ∗ P n ⊢ [∗list] j ∈ List.range (n + 1), P j := by
   rw [List.range_succ]
   exact (BigSepL.bigSepL_snoc (Φ := fun _ j => P j)).2
 
+omit [MachGS GF] in
 theorem bi_unsnoc [CurCtx] (P : Nat → IProp GF) (n : Nat) :
     ([∗list] j ∈ List.range (n + 1), P j) ⊢ ([∗list] j ∈ List.range n, P j) ∗ P n := by
   rw [List.range_succ]
   exact (BigSepL.bigSepL_snoc (Φ := fun _ j => P j)).1
 
+omit [MachGS GF] in
 theorem bi_peel0 [CurCtx] (P : Nat → IProp GF) (n : Nat) :
     ([∗list] j ∈ List.range (n + 1), P j) ⊢ P 0 ∗ [∗list] j ∈ List.range n, P (j + 1) := by
   rw [List.range_succ_eq_map]
   refine (BigSepL.bigSepL_cons (Φ := fun _ j => P j)).1.trans ?_
   rw [BigSepL.bigSepL_map Nat.succ]
 
+omit [MachGS GF] in
 /-- The buffers the loop has not reached yet, as a `List.range'` so that one
 peels off by `rfl`. -/
 theorem bi_peelIn [CurCtx] (P : Nat → IProp GF) (i n : Nat) :
@@ -538,6 +542,7 @@ theorem bi_hn0 [CurCtx] :
       wordPointsTo (GF := GF) (KA.«bcache» + 0x82b8#64) 8 (DFrac.own 1) (bufNextVal 0) := by
   rw [bi_node_zero]
 
+omit [MachGS GF] in
 /-- The caller's list of buffers, as the loop wants it. -/
 theorem bi_range0 [CurCtx] (P : Nat → IProp GF) :
     ([∗list] j ∈ List.range 30, P j) ⊢ [∗list] j ∈ List.range' 0 (29 + 1), P j := by

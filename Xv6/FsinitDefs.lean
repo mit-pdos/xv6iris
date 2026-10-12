@@ -264,6 +264,7 @@ end
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF]
 
+omit [MachGS GF] in
 /-- Rocq's `initlog_dirty_all_false`: every covered block's pin half is
 `false`, so the authority says so too. -/
 theorem fsinit_dirty_all_false (γfs : FsNames) (D : RegMapF Bool) :

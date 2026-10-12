@@ -64,6 +64,7 @@ def unionHk (A : FileFixed → FileAppNames → Aview → IProp GF) (c : FileFix
     ▷ A c r' (absView I) -∗ ▷ A c r (absView I) -∗ unionTk c k ==∗
       ◇ (▷ A c r' (absView I) ∗ ▷ A c r (absView I) ∗ unionTk c k ∗ Q))
 
+omit [MachGS GF] in
 /-- A later absorbed into a basic update whose result is under `◇` (Rocq
 `bupd_except_0_elim`). -/
 theorem bupd_except0_elim (P : IProp GF) : iprop(◇ (|==> ◇ P)) ⊢ iprop(|==> ◇ P) :=
@@ -97,6 +98,7 @@ theorem fState_deedOk (c : FileFixed) (r : FileAppNames) (av : Aview) (s : Dst) 
     iexfalso
     iapply fdeed_whole_excl r s s0 $$ Hd Hwh
 
+omit [MachGS GF] in
 /-- The run registry at two equal eras. -/
 theorem runReg_agree_at (c : FileFixed) (k k' : Nat) (p d p' d' : GName) (hk : k = k') :
     ⊢@{IProp GF} runReg c k p d -∗ runReg c k' p' d' -∗ ⌜p = p' ∧ d = d'⌝ := by

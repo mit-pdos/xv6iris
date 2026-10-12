@@ -45,6 +45,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
 
 /-! ## The era's boot-state record, allocated -/
 
+omit [MachGS GF] in
 /-- ...AT THE ON-ARM: the era's record at the ledger's list `base` and floor
 `floor` (Rocq `f0_alloc`, sync SY3-A3bc/A4). -/
 theorem f0Alloc (base : List FlLine) (floor : List Srec) :
@@ -64,6 +65,7 @@ theorem f0Alloc (base : List FlLine) (floor : List Srec) :
 
 /-! ## The second per-era map's two moves -/
 
+omit [MachGS GF] in
 /-- Rocq `f0_map_step`. -/
 theorem f0Map_step (g : FileGn) (h : List Obs) (e : Obs) (he : obsBoots [e] = 0) :
     f0Map (GF := GF) g h ⊢ f0Map g (h ++ [e]) := by
@@ -71,6 +73,7 @@ theorem f0Map_step (g : FileGn) (h : List Obs) (e : Obs) (he : obsBoots [e] = 0)
   unfold f0Map
   rw [hb]
 
+omit [MachGS GF] in
 /-- Rocq `f0_map_on`. -/
 theorem f0Map_on (g : FileGn) (h : List Obs) (vf : FileEra) :
     f0Map (GF := GF) g h ⊢
@@ -158,6 +161,7 @@ theorem f0Pinned_drain (g : FileGn) (h : List Obs) (b : BitVec 8) (u1 : List Fst
 
 /-! ## The line list's growth -/
 
+omit [MachGS GF] in
 /-- The line list grows by whatever the new input completed (Rocq
 `fl_auth_grow_pre`). -/
 theorem flAuth_grow_pre (g : FileGn) (ls ls' : List FlLine) (hp : ls <+: ls') :

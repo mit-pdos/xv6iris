@@ -242,19 +242,24 @@ def pipeRef (γp : PipeNames) (w : Bool) (q : Qp) : IProp GF :=
 that end is closed and its reference has come home. -/
 def pipeEndFull (γp : PipeNames) (w : Bool) : IProp GF := pipeRef γp w 1
 
+omit [MachGS GF] in
 instance pipeRef_timeless (γp : PipeNames) (w : Bool) (q : Qp) :
     Timeless (pipeRef (GF := GF) γp w q) := by unfold pipeRef; infer_instance
+omit [MachGS GF] in
 instance pipeEndFull_timeless (γp : PipeNames) (w : Bool) :
     Timeless (pipeEndFull (GF := GF) γp w) := by unfold pipeEndFull; infer_instance
 
+omit [MachGS GF] in
 instance pipeRef_fractional (γp : PipeNames) (w : Bool) :
     Fractional (PROP := IProp GF) (fun q => pipeRef γp w q) := by
   unfold pipeRef; infer_instance
 
+omit [MachGS GF] in
 theorem pipeRef_split (γp : PipeNames) (w : Bool) (q1 q2 : Qp) :
     pipeRef (GF := GF) γp w (q1 + q2) ⊣⊢ pipeRef γp w q1 ∗ pipeRef γp w q2 :=
   (ghost_var_fractional (GF := GF) (pnEnd γp w) ()).fractional q1 q2
 
+omit [MachGS GF] in
 /-- The whole point of the `q = 1` state: nobody else holds any of this end. -/
 theorem pipeEndFull_excl (γp : PipeNames) (w : Bool) (q : Qp) :
     pipeEndFull (GF := GF) γp w -∗ pipeRef γp w q -∗ False := by
@@ -271,13 +276,17 @@ an end spends it -- by discarding the fraction -- yielding the persistent
 def pipeOpenmark (γp : PipeNames) (w : Bool) : IProp GF := (pnMark γp w) ↪VAR ()
 def pipeShut (γp : PipeNames) (w : Bool) : IProp GF := (pnMark γp w) ↪VAR{.discard} ()
 
+omit [MachGS GF] in
 instance pipeOpenmark_timeless (γp : PipeNames) (w : Bool) :
     Timeless (pipeOpenmark (GF := GF) γp w) := by unfold pipeOpenmark; infer_instance
+omit [MachGS GF] in
 instance pipeShut_persistent (γp : PipeNames) (w : Bool) :
     Persistent (pipeShut (GF := GF) γp w) := by unfold pipeShut; infer_instance
+omit [MachGS GF] in
 instance pipeShut_timeless (γp : PipeNames) (w : Bool) :
     Timeless (pipeShut (GF := GF) γp w) := by unfold pipeShut; infer_instance
 
+omit [MachGS GF] in
 theorem pipeShut_openmark (γp : PipeNames) (w : Bool) :
     pipeShut (GF := GF) γp w -∗ pipeOpenmark γp w -∗ False := by
   unfold pipeShut pipeOpenmark
@@ -285,6 +294,7 @@ theorem pipeShut_openmark (γp : PipeNames) (w : Bool) :
   ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ H2 H1
   exact absurd hv.1 (by simp [DFrac.valid_own_op_discard])
 
+omit [MachGS GF] in
 theorem pipeOpenmark_shut (γp : PipeNames) (w : Bool) :
     pipeOpenmark (GF := GF) γp w ==∗ pipeShut γp w := by
   unfold pipeOpenmark pipeShut
@@ -297,9 +307,11 @@ def pipeEndstate (γp : PipeNames) (w : Bool) (v : BitVec 32) : IProp GF := ipro
   (⌜pflagOpen v⌝ ∗ pipeOpenmark γp w) ∨
   (⌜v = 0#32⌝ ∗ pipeEndFull γp w ∗ pipeShut γp w)
 
+omit [MachGS GF] in
 instance pipeEndstate_timeless (γp : PipeNames) (w : Bool) (v : BitVec 32) :
     Timeless (pipeEndstate (GF := GF) γp w v) := by unfold pipeEndstate; infer_instance
 
+omit [MachGS GF] in
 theorem pipeEndstate_open_intro (γp : PipeNames) (w : Bool) (v : BitVec 32) (h : pflagOpen v) :
     pipeOpenmark (GF := GF) γp w -∗ pipeEndstate γp w v := by
   unfold pipeEndstate
@@ -309,6 +321,7 @@ theorem pipeEndstate_open_intro (γp : PipeNames) (w : Bool) (v : BitVec 32) (h 
   · ipureintro; exact h
   · iexact Hm
 
+omit [MachGS GF] in
 /-- Holding ANY share of an end proves its flag is nonzero. -/
 theorem pipeEndstate_holder (γp : PipeNames) (w : Bool) (v : BitVec 32) (q : Qp) :
     pipeEndstate (GF := GF) γp w v -∗ pipeRef γp w q -∗ ⌜pflagOpen v⌝ := by
@@ -318,6 +331,7 @@ theorem pipeEndstate_holder (γp : PipeNames) (w : Bool) (v : BitVec 32) (q : Qp
   · ipureintro; exact Hop
   · iexfalso; iapply (pipeEndFull_excl γp w q) $$ Hfull Hq
 
+omit [MachGS GF] in
 /-- pipeclose closing its own end: the reference goes home, the marker is
 spent, and the receipt comes out. -/
 theorem pipeEndstate_shut (γp : PipeNames) (w : Bool) (v : BitVec 32) :
@@ -336,6 +350,7 @@ theorem pipeEndstate_shut (γp : PipeNames) (w : Bool) (v : BitVec 32) :
     · iexact Hshut
   · iexfalso; iapply (pipeEndFull_excl γp w 1) $$ Hhome Hfull
 
+omit [MachGS GF] in
 /-- THE receipt in action: it says its end is shut, and hands over that end's
 reference -- without disturbing the invariant, since it is persistent. -/
 theorem pipeEndstate_shut_elim (γp : PipeNames) (w : Bool) (v : BitVec 32) :
@@ -349,6 +364,7 @@ theorem pipeEndstate_shut_elim (γp : PipeNames) (w : Bool) (v : BitVec 32) :
     · ipureintro; exact Hz
     · iexact Hfull
 
+omit [MachGS GF] in
 /-- pipeclose reading the OTHER end's flag and finding it shut: the receipt is
 persistent, so the invariant keeps its copy and the closer walks away with
 one, leaving the endstate exactly as it found it. -/

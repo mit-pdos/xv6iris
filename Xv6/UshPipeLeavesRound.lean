@@ -56,6 +56,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- **Rocq `ush_fork_ans_grows`**: an answer that is not `-1` GREW the
 caller's children set. -/
 theorem ush_fork_ans_grows (Rc : IProp GF) (Q : Int → IProp GF) (r : BitVec 64) (Sa Sb : ExtTreeSet GName compare)

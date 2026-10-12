@@ -127,6 +127,7 @@ theorem ut_disp_env (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64) (hΓ : A.N.Γ =
   iintro ⟨Hfr, Hep, Htv, Hstv, Hcl, ⟨#Hp, #He, #Hpe, #Hw, #Hft, #Hr, #Hig, #Hic⟩, Hrest⟩
   iframe He Hfr Hep Htv Hstv Hcl Hp Hpe Hw Hft Hr Hig Hic Hrest
 
+omit [MachGS GF] in
 /-- The persistent pay row, out of the deposit. -/
 theorem ut_pay_of (A : UtArgs GF) (hgn : A.gn = A.V.gen) :
     utPayIn (GF := GF) A.f A.sc A.sep A.V ⊢ utPay A := by

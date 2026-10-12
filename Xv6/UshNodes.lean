@@ -73,17 +73,20 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
 
 /-! ## §2 Byte runs -/
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_peel0`**. -/
 theorem ush_peel0 (γd : GName) (a k n : Nat) :
     ubytes (GF := GF) γd a (k + n) (fun _ => ubyte0) ⊢
       ubytes γd a k (fun _ => ubyte0) ∗ ubytes γd (a + k) n (fun _ => ubyte0) :=
   (ubytes_app γd a k n _).1
 
+omit [MachGS GF] in
 /-- Eight zero bytes are the zero word. -/
 theorem ush_zero_word (γd : GName) (a : Nat) :
     ubytes (GF := GF) γd a 8 (fun _ => ubyte0) ⊢ uword γd a 0#64 :=
   Xv6.ubytes_ext γd a 8 _ _ (fun j _ => (ush_nthByte_zero j).symm)
 
+omit [MachGS GF] in
 /-- `k` zero words out of a zero run. -/
 theorem ush_zero_words (γd : GName) (base : Nat) : ∀ k : Nat,
     ubytes (GF := GF) γd base (8 * k) (fun _ => ubyte0) ⊢
@@ -97,6 +100,7 @@ theorem ush_zero_words (γd : GName) (base : Nat) : ∀ k : Nat,
     refine (sep_mono (ush_zero_words γd base k) (ush_zero_word γd (base + 8 * k))).trans ?_
     exact (uRange_succ (fun i => uword (GF := GF) γd (base + 8 * i) 0#64) k).2
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_slots_nil0`**: a zeroed argv vector is ten NULL slots. -/
 theorem ush_slots_nil0 (N : UkNames GF) (s0 base : Nat) (sel : Nat × Nat → Nat) :
     ubytes N.d base 80 (fun _ => ubyte0) ⊢ [∗list] i ∈ List.range 10, ushSlot0 N s0 base [] sel i := by
@@ -105,6 +109,7 @@ theorem ush_slots_nil0 (N : UkNames GF) (s0 base : Nat) (sel : Nat × Nat → Na
 
 /-! ## §3 The slots -/
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_slots_weaken`**. -/
 theorem ush_slots_weaken (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × Nat)) (sel : Nat × Nat → Nat) :
     ([∗list] i ∈ List.range 10, ushSlot0 N s0 base toks sel i) ⊢
@@ -120,6 +125,7 @@ theorem ush_slots_weaken (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × N
     · exact .rfl
     · iintro H; iexists 0#64; iexact H
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_exec_pre_at`**. -/
 theorem ush_exec_pre_at (N : UkNames GF) (s0 p : Nat) (toks : List (Nat × Nat)) :
     ushExecPre N s0 p toks ⊢ ushExecAt N s0 p toks := by
@@ -133,6 +139,7 @@ theorem ush_exec_pre_at (N : UkNames GF) (s0 p : Nat) (toks : List (Nat × Nat))
   · iapply ush_slots_weaken $$ Ha
   · iapply ush_slots_weaken $$ He
 
+omit [MachGS GF] in
 /-- One element of a big-op over `List.range n`, out, and a pointwise-equal
 predicate back. -/
 theorem ush_range_acc (n i : Nat) (hi : i < n) (P Q : Nat → IProp GF) (hPQ : ∀ j, j < n → j ≠ i → P j = Q j) :
@@ -149,6 +156,7 @@ theorem ush_range_acc (n i : Nat) (hi : i < n) (P Q : Nat → IProp GF) (hPQ : �
   have e := hPQ _ hlt hne
   iapply (show P _ ⊢ Q _ from e ▸ .rfl) $$ HP
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_slots_cap`**: the NULL cap after the tokens, out and back. -/
 theorem ush_slots_cap (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × Nat)) (sel : Nat × Nat → Nat)
     (hlen : toks.length < 10) :
@@ -160,6 +168,7 @@ theorem ush_slots_cap (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × Nat)
   refine (ush_range_acc 10 toks.length hlen _ _ (fun _ _ _ => rfl)).trans ?_
   rw [e]
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_slots_upd`**: the cap, out, and a token's slot back -- the
 vector now for `done ++ [tk]`. -/
 theorem ush_slots_upd (N : UkNames GF) (s0 base : Nat) (done : List (Nat × Nat)) (tk : Nat × Nat)
@@ -179,6 +188,7 @@ theorem ush_slots_upd (N : UkNames GF) (s0 base : Nat) (done : List (Nat × Nat)
 
 /-! ## §4 The nodes closed into the tree -/
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_redir_close`**. -/
 theorem ush_redir_close (N : UkNames GF) (s0 t pc q eq : Nat) (mode fd : Int) (c : UshpCmd) :
     ushRedirNode N s0 t pc q eq mode fd ∗ ushTree N s0 pc c ⊢ ushTree N s0 t (.redir c q eq mode fd) := by
@@ -192,6 +202,7 @@ theorem ush_redir_close (N : UkNames GF) (s0 t pc q eq : Nat) (mode fd : Int) (c
   · iframe Hty Hpad
   · iexists pc; iframe Hpc Hc
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_pipe_close`**. -/
 theorem ush_pipe_close (N : UkNames GF) (s0 t pl pr : Nat) (l r : UshpCmd) :
     ushPipeNode N t pl pr ∗ ushTree N s0 pl l ∗ ushTree N s0 pr r ⊢ ushTree N s0 t (.pipe l r) := by

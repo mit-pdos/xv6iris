@@ -187,9 +187,11 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 
 /-! ## The transmit token -/
 
+omit [MachGS GF] in
 theorem uw_txRes_intro (γ : UartNames) (l : List (BitVec 8)) : txOwn (GF := GF) γ l ⊢ txRes γ := by
   unfold txRes txOwn; iintro H; iexists l; iexact H
 
+omit [MachGS GF] in
 theorem uw_txRes_elim (γ : UartNames) : txRes (GF := GF) γ ⊢ ∃ l : List (BitVec 8), txOwn γ l := by
   unfold txRes txOwn; iintro H; iexact H
 

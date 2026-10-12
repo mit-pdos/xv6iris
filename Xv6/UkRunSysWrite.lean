@@ -122,7 +122,7 @@ theorem udepwfK_std (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fd
   iintro %M %pm %sz %fdv %cw %gn %cs %pidv %htake %_ Hmy Hheap Hufd
   iapply H $$ %M %pm %sz %fdv %cw %gn %cs %pidv %htake Hmy Hheap Hufd
 
-omit [CtokG GF] [UexecSG GF] [UprogSG GF] in
+omit [CtokG GF] [UexecSG GF] [UprogSG GF] [MachGS GF] in
 /-- **Rocq `uheap_text_bytes`**: a text run is the image's, on fetchable
 pages, below MAXVA. -/
 theorem uheap_text_bytes (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz a : Nat)
@@ -144,7 +144,7 @@ theorem uheap_text_bytes (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
     · subst hjn; exact hhi
     · exact hlo j (by omega)
 
-omit [CtokG GF] [UexecSG GF] [UprogSG GF] in
+omit [CtokG GF] [UexecSG GF] [UprogSG GF] [MachGS GF] in
 /-- **Rocq `usrc_ok_utext`**. -/
 theorem usrcOk_utext (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (ua : BitVec 64)
     (nb : Nat) (f : Nat → BitVec 8) :
@@ -303,7 +303,7 @@ theorem wp_uk_ecall_write_chain_txt (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) 
   ihave Hstd := ustdAt_ustd N.fd l v $$ Hstd
   iapply Hcont $$ %h' %r %W %cw' %cs' %ha0 %ha1 %ha2 %htk %hlz %hsrc Hstd Hbs' Hpost Hrun
 
-omit [CtokG GF] [UexecSG GF] [UprogSG GF] in
+omit [CtokG GF] [UexecSG GF] [UprogSG GF] [MachGS GF] in
 /-- **Rocq `usrc_ok_ubytesq`**: a DATA run the program owns is the image's
 and readable-mapped (writable pages, no lazy page). -/
 theorem usrcOk_ubytesq (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (dq : DFrac)

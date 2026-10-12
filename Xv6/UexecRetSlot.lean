@@ -98,6 +98,7 @@ section Ne
 variable (k : Nat) (X Y : Uvis → IProp GF) (HX : ∀ W, X W ≡{k}≡ Y W)
 include HX
 
+omit [MachGS GF] in
 theorem uexecForkParentF_ne (W : Uvis) (Q : Int → IProp GF) (Rc : IProp GF) :
     uexecForkParentF X W Q Rc ≡{k}≡ uexecForkParentF Y W Q Rc := by
   unfold uexecForkParentF
@@ -111,6 +112,7 @@ theorem uexecForkF_ne (W : Uvis) (f : sfam GF) : uexecForkF X W f ≡{k}≡ uexe
   exact BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl
     (BI.wand_ne.ne .rfl (HX _)))))
 
+omit [MachGS GF] in
 theorem uexecRetContGen_ne (n : Int) (f : sfam GF) (W : Uvis)
     (CH : BitVec 64 → ExtTreeSet GName compare → IProp GF) :
     uexecRetContGen X n f W CH ≡{k}≡ uexecRetContGen Y n f W CH := by

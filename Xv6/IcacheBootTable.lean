@@ -335,6 +335,7 @@ theorem ientryRaw_split [CurCtx] :
 
 /-! ### THE BOOT STEP -/
 
+omit [MachGS GF] in
 /-- `icId` is a plain ghost variable, so a WHOLE one is not merely
 flippable but writable outright (Rocq's `Local ic_id_set`).
 `icacheBootAt` spends exactly this: it is handed the era's blind family

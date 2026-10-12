@@ -61,10 +61,12 @@ def uimgView (N : UkNames GF) (Img : ElfMem) : IProp GF :=
   iprop(□ (∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat),
     uheap N.t N.d N.s M pm sz -∗ ⌜∀ (a : Nat) (b : BitVec 8), Img a = some b → M a = some b⌝))
 
+omit [MachGS GF] in
 /-- **Rocq `uimg_view_persistent`**. -/
 instance uimgView_persistent (N : UkNames GF) (Img : ElfMem) : Persistent (uimgView (GF := GF) N Img) := by
   unfold uimgView; infer_instance
 
+omit [MachGS GF] in
 /-- **Rocq `uimg_view_sub`**: the reading, in `UConsOpen.cons_ro_sub`'s own
 shape. -/
 theorem uimgView_sub (N : UkNames GF) (Img M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) :
@@ -74,6 +76,7 @@ theorem uimgView_sub (N : UkNames GF) (Img M : ElfMem) (pm : Nat → Option UPer
   iintro Hh #Hv
   iapply Hv $$ %M %pm %sz Hh
 
+omit [MachGS GF] in
 /-- A per-byte reading of every byte of `Img` is a pure submap fact. -/
 theorem uimgView_pure (P : IProp GF) (Img M : ElfMem)
     (key : ∀ (a : Nat) (b : BitVec 8), Img a = some b → P ⊢ ⌜M a = some b⌝) :
@@ -84,6 +87,7 @@ theorem uimgView_pure (P : IProp GF) (Img M : ElfMem)
   · exact (key a b hs).trans (pure_mono fun h _ => h)
   · exact pure_intro fun h => absurd h hs
 
+omit [MachGS GF] in
 /-- **Rocq `uimg_view_text`**: THE TEXT HALF supplies the view. -/
 theorem uimgView_text (N : UkNames GF) (Img : ElfMem) :
     User.utextImg (utext N.t) Img ⊢ uimgView N Img := by

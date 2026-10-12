@@ -520,6 +520,7 @@ def creFtKept (Kt : Nat → IProp GF) (i : Nat)
     Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF) :=
   ⟨Ft.pfRecv, iprop(Ft.pfRefund ∗ Kt i)⟩
 
+omit [MachGS GF] in
 /-- The kept family's receipt IS the caller's (Rocq's `socr_ft_recv`, by
 `reflexivity`; stated once here for the rewrites at the fire and the arm
 builders). -/

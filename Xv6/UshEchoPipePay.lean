@@ -89,6 +89,7 @@ theorem shExecPathOfX_holds_field :
         ∀ Mv, imgAgrees M Mv → argPathOf Mv (BitVec.ofNat 64 s0).toNat ws[0]! :=
   fun ws => shExecPathOfX_holds ws
 
+omit [MachGS GF] in
 /-- `UshExecPinEcho.image_entry_pay_mono` (Rocq
 `UShEchoPipePay.image_entry_pay_mono`). -/
 theorem imageEntryPayMono_field :

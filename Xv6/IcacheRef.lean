@@ -245,6 +245,7 @@ end Ident
 section SlhHalve
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
+omit [MachGS GF] in
 theorem slhTok_halve_i [Icfg] (k : Nat) (q : Qp) :
     slhTok (GF := GF) (icfgIsl k) q ⊢ slhTok (icfgIsl k) q.half ∗ slhTok (icfgIsl k) q.half := by
   have h := (slhTok_split (GF := GF) (icfgIsl k) q.half q.half).1
@@ -258,6 +259,7 @@ end SlhHalve
 section Fracc
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
 
+omit [MachGS GF] in
 /-- The agreement, keeping both slices. -/
 theorem liveGenlo_agree_keep' [Icfg] (k : Nat) (s1 : Qp) (g1 : GName) (lo1 : Nat)
     (s2 : Qp) (g2 : GName) (lo2 : Nat) :
@@ -265,6 +267,7 @@ theorem liveGenlo_agree_keep' [Icfg] (k : Nat) (s1 : Qp) (g1 : GName) (lo1 : Nat
       (liveGenlo k s1 g1 lo1 ∗ liveGenlo k s2 g2 lo2) ∗ ⌜g1 = g2 ∧ lo1 = lo2⌝ :=
   persistent_entails_left (liveGenlo_agree k s1 g1 lo1 s2 g2 lo2)
 
+omit [MachGS GF] in
 /-- The identity fraction is at most one: the liveness slice says so. -/
 theorem liveGenlo_le1 [Icfg] (k : Nat) (s : Qp) (g : GName) (lo : Nat) :
     liveGenlo (GF := GF) k s g lo ⊢ ⌜s.val ≤ 1⌝ := by
@@ -273,6 +276,7 @@ theorem liveGenlo_le1 [Icfg] (k : Nat) (s : Qp) (g : GName) (lo : Nat) :
   rw [Qp.half_add_half] at h
   exact h
 
+omit [MachGS GF] in
 theorem liveGenlo_le1_keep [Icfg] (k : Nat) (s : Qp) (g : GName) (lo : Nat) :
     liveGenlo (GF := GF) k s g lo ⊢ liveGenlo k s g lo ∗ ⌜s.val ≤ 1⌝ :=
   persistent_entails_left (liveGenlo_le1 k s g lo)

@@ -512,6 +512,7 @@ def ipoolTkey [Icfg] (T : RegMapF (Nat × Qp)) : IProp GF :=
 def ipoolTransit [Icfg] (T : RegMapF (Nat × Qp)) : IProp GF :=
   txPins (H := RegMapF) icfgLog T
 
+omit [MachGS GF] in
 instance ipoolTransit_timeless [Icfg] (T : RegMapF (Nat × Qp)) :
     Timeless (ipoolTransit (GF := GF) T) := by
   unfold ipoolTransit; infer_instance
@@ -562,18 +563,22 @@ def crpRow [Icfg] (γi : GName) (z : Nat) (v : Icorpse) : IProp GF :=
 def ipoolCorpse [Icfg] (γi : GName) (K : RegMapF Icorpse) : IProp GF :=
   iprop([∗map] z ↦ v ∈ K, crpRow γi z v)
 
+omit [MachGS GF] in
 instance crpRow_timeless [Icfg] (γi : GName) (z : Nat) (v : Icorpse) :
     Timeless (crpRow (GF := GF) γi z v) := by
   cases v <;> unfold crpRow <;> infer_instance
 
+omit [MachGS GF] in
 instance ipoolCorpse_timeless [Icfg] (γi : GName) (K : RegMapF Icorpse) :
     Timeless (ipoolCorpse (GF := GF) γi K) := by
   unfold ipoolCorpse; infer_instance
 
+omit [MachGS GF] in
 instance ipoolCkey_timeless [Icfg] (K : RegMapF Icorpse) :
     Timeless (ipoolCkey (GF := GF) K) := by
   unfold ipoolCkey; infer_instance
 
+omit [MachGS GF] in
 /-- THE WHOLE LEDGER, REFUTED ROW BY ROW: a corpse whose deposit has not run
 parks a POSITIVE share of the freeing transaction's element, and at a commit
 the WAL's authority for that map is empty -- so every row is an `imark` and
@@ -600,6 +605,7 @@ theorem ipoolCorpse_noOps [Icfg] (γi : GName) (K : RegMapF Icorpse) :
       iapply txPin_noOps $$ [Ha Hp]
       iframe
 
+omit [MachGS GF] in
 /-- ...and the reading the collection takes off that: the rows ARE the
 markers, one per `X` inum (Rocq's `ipool_corpse_marks`). -/
 theorem ipoolCorpse_marks [Icfg] (γi : GName) (K : RegMapF Icorpse)
@@ -621,10 +627,12 @@ theorem ipoolCorpse_marks [Icfg] (γi : GName) (K : RegMapF Icorpse)
 def icIds (cn : IcNames) (ids : List (Bool × BitVec 32 × BitVec 32)) : IProp GF :=
   iprop([∗list] k ↦ p ∈ ids, icId cn k Qp.quarter p.1 p.2.1 p.2.2)
 
+omit [MachGS GF] in
 instance icIds_timeless (cn : IcNames) (ids : List (Bool × BitVec 32 × BitVec 32)) :
     Timeless (icIds (GF := GF) cn ids) := by
   unfold icIds; infer_instance
 
+omit [MachGS GF] in
 /-- The pool's quarter of one slot, out and back (Rocq's `ic_ids_acc`). -/
 theorem icIds_acc (cn : IcNames) (ids : List (Bool × BitVec 32 × BitVec 32)) (k : Nat)
     (v : Bool) (d n : BitVec 32) (hk : ids[k]? = some (v, d, n)) :
@@ -641,6 +649,7 @@ theorem icIds_acc (cn : IcNames) (ids : List (Bool × BitVec 32 × BitVec 32)) (
   · iintro %v' %d' %n' Hq'
     iapply Hback $$ %(v', d', n') Hq'
 
+omit [MachGS GF] in
 /-- Rocq's `ic_ids_of_intro`. -/
 theorem icIdsOf_intro (cn : IcNames) (dvs : Nat → BitVec 32 × BitVec 32) :
     ([∗list] k ∈ List.range NINODE, icId (GF := GF) cn k Qp.quarter false (dvs k).1 (dvs k).2) ⊢
@@ -707,15 +716,18 @@ theorem ipoolExts_insert [Icfg] (γfs : FsNames) (γi : GName) (cov : ExtTreeSet
     (Φ := fun z => ipoolExt (GF := GF) γfs γi cov logstart (BitVec.ofNat 32 z))
     (S := ExtTreeSet Nat compare)).2 .rfl
 
+omit [MachGS GF] in
 theorem ipoolTransit_empty [Icfg] : ⊢ ipoolTransit (GF := GF) (∅ : RegMapF (Nat × Qp)) := by
   unfold ipoolTransit txPins
   exact BigSepM.bigSepM_empty.2
 
+omit [MachGS GF] in
 theorem ipoolCorpse_empty [Icfg] (γi : GName) :
     ⊢ ipoolCorpse (GF := GF) γi (∅ : RegMapF Icorpse) := by
   unfold ipoolCorpse
   exact BigSepM.bigSepM_empty.2
 
+omit [MachGS GF] in
 theorem ipoolTransit_singleton [Icfg] (z t : Nat) (q : Qp) :
     ipoolTransit (GF := GF) (PartialMap.singleton z (t, q) : RegMapF (Nat × Qp)) ⊣⊢
       txPin icfgLog t q := by
@@ -724,6 +736,7 @@ theorem ipoolTransit_singleton [Icfg] (z t : Nat) (q : Qp) :
 
 /-! ### The identity, a quarter at a time -/
 
+omit [MachGS GF] in
 /-- Rocq's `ic_id_join`. -/
 theorem icId_join (cn : IcNames) (k : Nat) (q1 q2 : Qp) (v : Bool) (d n : BitVec 32) :
     icId (GF := GF) cn k q1 v d n ⊢ icId cn k q2 v d n -∗ icId cn k (q1 + q2) v d n := by
@@ -733,6 +746,7 @@ theorem icId_join (cn : IcNames) (k : Nat) (q1 q2 : Qp) (v : Bool) (d n : BitVec
   iapply hj.2
   iframe H1 H2
 
+omit [MachGS GF] in
 /-- Rocq's `ic_id_split_q`. -/
 theorem icId_splitQ (cn : IcNames) (k : Nat) (q1 q2 : Qp) (v : Bool) (d n : BitVec 32) :
     icId (GF := GF) cn k (q1 + q2) v d n ⊢ icId cn k q1 v d n ∗ icId cn k q2 v d n := by
@@ -740,6 +754,7 @@ theorem icId_splitQ (cn : IcNames) (k : Nat) (q1 q2 : Qp) (v : Bool) (d n : BitV
   iintro H
   iapply ghost_var_split (cn.id k) (v, d, n) q1 q2 $$ H
 
+omit [MachGS GF] in
 /-- Rocq's `ic_id_quarters_join`. -/
 theorem icId_quartersJoin (cn : IcNames) (k : Nat) (v : Bool) (d n : BitVec 32) :
     icId (GF := GF) cn k Qp.quarter v d n ⊢ icId cn k Qp.quarter v d n -∗
@@ -747,6 +762,7 @@ theorem icId_quartersJoin (cn : IcNames) (k : Nat) (v : Bool) (d n : BitVec 32) 
   rw [← Xv6.ctok_quarter_add_quarter]
   exact icId_join cn k Qp.quarter Qp.quarter v d n
 
+omit [MachGS GF] in
 /-- Rocq's `ic_id_quarters_split`. -/
 theorem icId_quartersSplit (cn : IcNames) (k : Nat) (v : Bool) (d n : BitVec 32) :
     icId (GF := GF) cn k (1 : Qp).half v d n ⊢
@@ -834,54 +850,63 @@ theorem ipool_intro [Icfg] (γfs : FsNames) (γi : GName) (cov : ExtTreeSet Nat 
 
 /-! ### The keys and the ledger authority, as the movers use them -/
 
+omit [MachGS GF] in
 theorem ipoolKey_agree [Icfg] (A B : ExtTreeSet Nat compare) :
     ipoolKey (GF := GF) A ⊢ ipoolKey B -∗ ⌜A = B⌝ := by
   unfold ipoolKey
   iintro H1 H2
   iapply ghost_var_agree icfgPool A _ B _ $$ H1 H2
 
+omit [MachGS GF] in
 theorem ipoolKey_update [Icfg] (A B C : ExtTreeSet Nat compare) :
     ipoolKey (GF := GF) A ⊢ ipoolKey B -∗ |==> (ipoolKey C ∗ ipoolKey C) := by
   unfold ipoolKey
   iintro H1 H2
   iapply ghost_var_update_halves C icfgPool A B $$ H1 H2
 
+omit [MachGS GF] in
 theorem ipoolXkey_agree [Icfg] (A B : ExtTreeSet Nat compare) :
     ipoolXkey (GF := GF) A ⊢ ipoolXkey B -∗ ⌜A = B⌝ := by
   unfold ipoolXkey
   iintro H1 H2
   iapply ghost_var_agree icfgPext A _ B _ $$ H1 H2
 
+omit [MachGS GF] in
 theorem ipoolXkey_update [Icfg] (A B C : ExtTreeSet Nat compare) :
     ipoolXkey (GF := GF) A ⊢ ipoolXkey B -∗ |==> (ipoolXkey C ∗ ipoolXkey C) := by
   unfold ipoolXkey
   iintro H1 H2
   iapply ghost_var_update_halves C icfgPext A B $$ H1 H2
 
+omit [MachGS GF] in
 theorem ipoolTkey_agree [Icfg] (A B : RegMapF (Nat × Qp)) :
     ipoolTkey (GF := GF) A ⊢ ipoolTkey B -∗ ⌜A = B⌝ := by
   unfold ipoolTkey
   iintro H1 H2
   iapply ghost_var_agree icfgPtrn A _ B _ $$ H1 H2
 
+omit [MachGS GF] in
 theorem ipoolTkey_update [Icfg] (A B C : RegMapF (Nat × Qp)) :
     ipoolTkey (GF := GF) A ⊢ ipoolTkey B -∗ |==> (ipoolTkey C ∗ ipoolTkey C) := by
   unfold ipoolTkey
   iintro H1 H2
   iapply ghost_var_update_halves C icfgPtrn A B $$ H1 H2
 
+omit [MachGS GF] in
 theorem ipoolCkey_lookup [Icfg] (K : RegMapF Icorpse) (z : Nat) (v : Icorpse) :
     ipoolCkey (GF := GF) K ⊢ crpElem z v -∗ ⌜PartialMap.get? K z = some v⌝ := by
   unfold ipoolCkey crpElem
   iintro H1 H2
   iapply ghost_map_lookup $$ H1 H2
 
+omit [MachGS GF] in
 theorem ipoolCkey_delete [Icfg] (K : RegMapF Icorpse) (z : Nat) (v : Icorpse) :
     ipoolCkey (GF := GF) K ⊢ crpElem z v -∗ |==> ipoolCkey (PartialMap.delete K z) := by
   unfold ipoolCkey crpElem
   iintro H1 H2
   iapply ghost_map_delete z v $$ H1 H2
 
+omit [MachGS GF] in
 theorem ipoolCkey_insert [Icfg] (K : RegMapF Icorpse) (z : Nat) (v : Icorpse)
     (h : PartialMap.get? K z = none) :
     ipoolCkey (GF := GF) K ⊢ |==> (ipoolCkey (PartialMap.insert K z v) ∗ crpElem z v) := by
@@ -889,6 +914,7 @@ theorem ipoolCkey_insert [Icfg] (K : RegMapF Icorpse) (z : Nat) (v : Icorpse)
   iintro H
   iapply ghost_map_insert z v h $$ H
 
+omit [MachGS GF] in
 theorem ipoolCkey_update [Icfg] (K : RegMapF Icorpse) (z : Nat) (v w : Icorpse) :
     ipoolCkey (GF := GF) K ⊢ crpElem z v -∗
       |==> (ipoolCkey (PartialMap.insert K z w) ∗ crpElem z w) := by
@@ -896,18 +922,21 @@ theorem ipoolCkey_update [Icfg] (K : RegMapF Icorpse) (z : Nat) (v w : Icorpse) 
   iintro H1 H2
   iapply ghost_map_update w $$ H1 H2
 
+omit [MachGS GF] in
 /-- A deposited corpse's row out of the ledger: it IS the marker. -/
 theorem ipoolCorpse_deleteDep [Icfg] (γi : GName) (K : RegMapF Icorpse) (z : Nat)
     (h : PartialMap.get? K z = some .crpDep) :
     ipoolCorpse (GF := GF) γi K ⊢ imark γi (z : Int) ∗ ipoolCorpse γi (PartialMap.delete K z) :=
   (BigSepM.bigSepM_delete (Φ := fun z v => crpRow (GF := GF) γi z v) h).1
 
+omit [MachGS GF] in
 /-- A pre-deposit corpse's row out of the ledger: it IS the parked share. -/
 theorem ipoolCorpse_deletePre [Icfg] (γi : GName) (K : RegMapF Icorpse) (z t : Nat) (q : Qp)
     (h : PartialMap.get? K z = some (.crpPre t q)) :
     ipoolCorpse (GF := GF) γi K ⊢ txPin icfgLog t q ∗ ipoolCorpse γi (PartialMap.delete K z) :=
   (BigSepM.bigSepM_delete (Φ := fun z v => crpRow (GF := GF) γi z v) h).1
 
+omit [MachGS GF] in
 /-- A fresh pre-deposit row into the ledger. -/
 theorem ipoolCorpse_insertPre [Icfg] (γi : GName) (K : RegMapF Icorpse) (z t : Nat) (q : Qp)
     (h : PartialMap.get? K z = none) :
@@ -915,6 +944,7 @@ theorem ipoolCorpse_insertPre [Icfg] (γi : GName) (K : RegMapF Icorpse) (z t : 
       ipoolCorpse γi (PartialMap.insert K z (.crpPre t q)) :=
   (BigSepM.bigSepM_insert (Φ := fun z v => crpRow (GF := GF) γi z v) (x := .crpPre t q) h).2
 
+omit [MachGS GF] in
 /-- A row flipped to deposited: the marker replaces whatever stood there. -/
 theorem ipoolCorpse_insertDep [Icfg] (γi : GName) (K : RegMapF Icorpse) (z : Nat) :
     imark (GF := GF) γi (z : Int) ∗ ipoolCorpse γi (PartialMap.delete K z) ⊢

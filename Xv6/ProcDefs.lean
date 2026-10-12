@@ -307,6 +307,7 @@ def dormantAllow : IProp GF := iprop%
   ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
   fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3
 
+omit [MachGS GF] in
 instance dormantAllow_timeless : Timeless (dormantAllow (GF := GF)) := by
   unfold dormantAllow; infer_instance
 
@@ -320,6 +321,7 @@ only, so they cross a context move untouched. -/
 def liveAllow : IProp GF := iprop%
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗ bslots 3
 
+omit [MachGS GF] in
 instance liveAllow_timeless : Timeless (liveAllow (GF := GF)) := by
   unfold liveAllow; infer_instance
 

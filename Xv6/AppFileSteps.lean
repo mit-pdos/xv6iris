@@ -47,6 +47,7 @@ section AppFileSteps
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
+omit [MachGS GF] in
 /-- The console's state is carried across a move that leaves the console
 where it was (Rocq `cons_state_mono`). -/
 theorem consState_mono (r1 : EchoNames) (av av' : Aview)
@@ -71,6 +72,7 @@ theorem consState_mono (r1 : EchoNames) (av av' : Aview)
     iframe Htok Hseal
     ipureintro; exact hab h
 
+omit [MachGS GF] in
 /-- Rocq `f_core_mono`. -/
 theorem fCore_mono (c : FileFixed) (r : FileAppNames) (av av' : Aview)
     (hok : ∀ s, fOk av s → fOk av' s) :
@@ -128,6 +130,7 @@ theorem fileStep_free (c : FileFixed) (r : FileAppNames) (av av' : Aview)
   · iapply syncClaim_same c r av av'
       (by unfold fcontOf; rw [fOk_fcontent av s0 hok0, fOk_fcontent av' s0 (hok s0 hok0)]) $$ Hsy
 
+omit [MachGS GF] in
 /-- A permit at the deed's contents, read at the views' files. -/
 theorem syncRedir_eq (c : FileFixed) (r : FileAppNames) (S1 S1' S2 S2' : Fstate)
     (h1 : S1 = S2) (h2 : S1' = S2') :

@@ -66,12 +66,14 @@ theorem ut_yield [ClaimIs GF Γ] (YI : YIELD) (c : CPU) (k' : KCtx) (j : Nat)
   simp only [yieldAddr] at h
   exact h
 
+omit [MachGS GF] in
 /-- The base's slot budget: 512 with the trap reserve. -/
 theorem ut_base_avail {Γ : SchedNames} {A : UtArgs GF} {kb : KCtx} (hok : UtOk Γ A) (hb : utBase A.k kb) :
     trapRes kb.sie + kb.avail = 512 := by
   have := utBase_avail hb
   rw [this, hok.hctx.1, hok.havail]; rfl
 
+omit [MachGS GF] in
 theorem ut_base_avail_ge {Γ : SchedNames} {A : UtArgs GF} {kb : KCtx} (hok : UtOk Γ A) (hb : utBase A.k kb) :
     422 ≤ kb.avail := by
   have h := ut_base_avail hok hb

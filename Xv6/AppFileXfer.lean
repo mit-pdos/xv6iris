@@ -67,16 +67,19 @@ theorem fState_recEq (c : FileFixed) (r r' : FileAppNames) (av : Aview)
   subst h1 h2 h3 h4 h5
   exact .rfl
 
+omit [MachGS GF] in
 /-- The fresh names' resources, read at another record with the same deed,
 ticket and escrow names. -/
 theorem escAuth_recEq (r r' : FileAppNames) (h : r.fnEsc = r'.fnEsc) :
     escAuth (GF := GF) r [] ⊢ escAuth r' [] := by
   unfold escAuth; rw [h]
 
+omit [MachGS GF] in
 theorem fdeed_recEq (r r' : FileAppNames) (s : Dst) (h : r.fnDeed = r'.fnDeed) :
     fdeed (GF := GF) r s ⊢ fdeed r' s := by
   unfold fdeed; rw [h]
 
+omit [MachGS GF] in
 theorem ftkt_recEq (r r' : FileAppNames) (s : Dst) (h : r.fnTkt = r'.fnTkt) :
     ftkt (GF := GF) r s ⊢ ftkt r' s := by
   unfold ftkt; rw [h]

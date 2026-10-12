@@ -249,6 +249,7 @@ theorem diskProto_congr_mem (γ : DiskNames) (v v' : VirtioState)
 
 /-! ### The pop -/
 
+omit [MachGS GF] in
 theorem diskCfgFrozen_auth_agree (γ : DiskNames) (c c' : VirtioCfg) :
     ⊢@{IProp GF} diskCfgFrozen γ c -∗ diskCfgAuth γ c' -∗ ⌜c = c'⌝ := by
   unfold diskCfgFrozen diskCfgAuth
@@ -847,6 +848,7 @@ theorem capOk_capture (v : VirtioState) (st : Nat → HState) (sb : Nat → SByt
 
 /-! ### The four DMA writes -/
 
+omit [MachGS GF] in
 theorem permTok_lookup (γ : DiskNames) (pm : RegMapF PermVal) (k : Nat) (h : BitVec 16)
     (c : Chain) (p : Option VPhase) (u : Option (BitVec 16 × Bool)) :
     ⊢@{IProp GF} permAuth γ pm -∗ permTok γ k h c p u -∗
@@ -1241,6 +1243,7 @@ theorem diskProto_open_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
       epOk_congr v v st pm pm' dl ring lo np stg (fun _ => rfl)
         hpure'.2.2.2.2.2.2 e15, e16, e17, e18⟩
 
+omit [MachGS GF] in
 /-- What a permit says about the head it names: a descriptor of the queue,
 armed with the chain the permit records. -/
 theorem perm_state (γ : DiskNames) (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState)
@@ -1699,6 +1702,7 @@ is in the live branch of `Virtio.body`. -/
 def diskUp (γ : DiskNames) : IProp GF := iprop%
   ∃ c0 : VirtioCfg, diskCfgFrozen γ c0 ∗ ⌜Virtio.live c0 = true ∧ c0.qnum.toNat = NUM⌝
 
+omit [MachGS GF] in
 instance diskUp_persistent (γ : DiskNames) : Persistent (diskUp (GF := GF) γ) := by
   unfold diskUp diskCfgFrozen
   infer_instance
@@ -1710,6 +1714,7 @@ to cope with a free descriptor. -/
 def diskTaskRes (γ : DiskNames) : Virtio.VTask → IProp GF
   | .serve h => iprop(diskUp γ ∗ ∃ (k : Nat) (c : Chain), permTok γ k h c none none)
 
+omit [MachGS GF] in
 theorem diskTaskRes_serve (γ : DiskNames) (h : BitVec 16) :
     diskTaskRes (GF := GF) γ (.serve h) =
       iprop(diskUp γ ∗ ∃ (k : Nat) (c : Chain), permTok γ k h c none none) := rfl
@@ -1774,6 +1779,7 @@ def serveCtx (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : 
     (s : VirtioState) (p : Option VPhase) (u : Option (BitVec 16 × Bool)) : IProp GF := iprop%
   diskCfgFrozen γ c0 ∗ ⌜s.cfg = c0⌝ ∗ permTok γ key h c p u
 
+omit [MachGS GF] in
 theorem serveCtx_cfg (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : Nat) (c : Chain)
     (s : VirtioState) (p : Option VPhase) (u : Option (BitVec 16 × Bool)) :
     serveCtx (GF := GF) γ h c0 key c s p u ⊢ ⌜s.cfg = c0⌝ := by
@@ -3141,12 +3147,14 @@ def bodyKnow (γ : DiskNames) (s : VirtioState) (lo : Nat) (c0 : VirtioCfg) : IP
     (⌜Virtio.live s.cfg = false⌝ ∨
       (diskCfgFrozen γ c0 ∗ ⌜s.cfg = c0 ∧ Virtio.live c0 = true ∧ c0.qnum.toNat = NUM⌝))
 
+omit [MachGS GF] in
 theorem bodyKnow_root (γ : DiskNames) (s : VirtioState) (lo : Nat) (c0 : VirtioCfg) :
     bodyKnow (GF := GF) γ s lo c0 ⊢ diskRoot γ := by
   unfold bodyKnow
   iintro ⟨Hlot, _, _⟩
   iapply diskLoTok_root γ lo $$ Hlot
 
+omit [MachGS GF] in
 /-- In the live branch the disjunction collapses. -/
 theorem bodyKnow_live (γ : DiskNames) (s : VirtioState) (lo : Nat) (c0 : VirtioCfg)
     (hlive : Virtio.live s.cfg = true) :
@@ -3160,6 +3168,7 @@ theorem bodyKnow_live (γ : DiskNames) (s : VirtioState) (lo : Nat) (c0 : Virtio
   · iframe Hlot Hfr
     ipureintro; exact ⟨hsn, hp⟩
 
+omit [MachGS GF] in
 theorem bodyKnow_seen (γ : DiskNames) (s : VirtioState) (lo : Nat) (c0 : VirtioCfg) :
     bodyKnow (GF := GF) γ s lo c0 ⊢ ⌜s.seen = wrap16 lo⌝ := by
   unfold bodyKnow
@@ -3236,6 +3245,7 @@ theorem toNat_ofNat16 (i : Nat) (h : i < NUM) : (BitVec.ofNat 16 i).toNat = i :=
   unfold NUM at h
   omega
 
+omit [MachGS GF] in
 theorem bodyKnow_mk (γ : DiskNames) (v : VirtioState) (lo : Nat) (c0 : VirtioCfg)
     (hsn : v.seen = wrap16 lo) (hcfg : v.cfg = c0) (hlive : Virtio.live c0 = true)
     (hqnum : c0.qnum.toNat = NUM) :

@@ -465,8 +465,10 @@ theorem kxcA_call_readi (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
   ipureintro
   exact ⟨hle, hiok', hrl, hdok, hdix, hdoc, hduq⟩
 
+omit [MachGS GF] in
 theorem kxcA_ite_t (X Y : IProp GF) : (if true = true then X else Y) ⊢ X := by
   simp only [ite_true]; exact .rfl
+omit [MachGS GF] in
 theorem kxcA_ite_f (X Y : IProp GF) : (if false = true then X else Y) ⊢ Y := by
   simp only [Bool.false_eq_true, ite_false]; exact .rfl
 

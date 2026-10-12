@@ -80,6 +80,7 @@ def udepwAtRefRIds (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (c : Nat) (R :
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗ urunIds N cs pidv ∗
       sbundlePayRefR (uslot) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
 
+omit [MachGS GF] in
 /-- The cwd agreement, as a wand (the halves are kept by the pure reading). -/
 theorem ucwd_agree_w (γc : GName) (c c' : Nat) :
     ⊢@{IProp GF} ucwdAuth γc c -∗ ucwd γc c' -∗ ⌜c = c'⌝ := by

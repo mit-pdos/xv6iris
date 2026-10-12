@@ -44,6 +44,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
 
 /-! ## §1 The seam -/
 
+omit [MachGS GF] in
 /-- **Rocq `ushq_tree_pipe_elim`**: a parser PIPE node, taken apart. -/
 theorem ushq_tree_pipe_elim (N : UkNames GF) (s0 p : Nat) (l r : UshpCmd) :
     ushTree N s0 p (.pipe l r) ⊢

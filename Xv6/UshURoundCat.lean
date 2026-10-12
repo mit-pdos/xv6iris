@@ -101,6 +101,7 @@ patterns need it). -/
 instance ushURound_catSlot_persistent (T : IProp GF) : Persistent (shCatSlot T) := by
   unfold shCatSlot; infer_instance
 
+omit [MachGS GF] in
 /-- The content's C-int bound, off the claim's typing of it. -/
 theorem ucat_short_of_typed (c : FileFixed) (s : Dst) (nm : List (BitVec 8)) :
     fTyped (GF := GF) c s ⊢ ⌜∀ (i : Nat) (bs : List (BitVec 8)), s[nm]? = some (i, bs) → (bs.length : Int) < 2 ^ 31⌝ := by

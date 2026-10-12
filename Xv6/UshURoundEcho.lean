@@ -133,10 +133,12 @@ theorem ushDeedAt_open (ug : UnionGn) (r : FileAppNames)
           ∗ ⌜uwild (ul I) = false⌝ ∗ urpos ug r I)
         ∨ fileTaint ug.ugnFile.fgnCl) := .rfl
 
+omit [MachGS GF] in
 /-- The holder's pair, as the deed's half and the ticket. -/
 theorem ufown_split (r : FileAppNames) (s : Dst) :
     fown (GF := GF) r s ⊢ iprop(fdq r (1 : Qp).half s ∗ ftkt r s) := .rfl
 
+omit [MachGS GF] in
 /-- ...and back. -/
 theorem ufown_join (r : FileAppNames) (s : Dst) :
     iprop(fdq (GF := GF) r (1 : Qp).half s ∗ ftkt r s) ⊢ fown r s := .rfl

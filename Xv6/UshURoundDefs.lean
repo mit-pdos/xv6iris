@@ -454,6 +454,7 @@ theorem uWcf_taint (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (Bi
     · iapply uHcltaint ug s0 I 3 v $$ Hpin HT
     · iapply ush_pre_taint ug r s0 I $$ HT
 
+omit [MachGS GF] in
 /-- **Rocq `ucs_lb_prefix_len`**: two lower bounds of one choice list line up. -/
 theorem ucs_lb_prefix_len (v : EraPins) (cs cs' : List Nat) (hl : cs'.length ≤ cs.length) :
     ⊢ csLb (GF := GF) v cs -∗ csLb v cs' -∗ ⌜cs' <+: cs⌝ := by
@@ -468,6 +469,7 @@ theorem ucs_lb_prefix_len (v : EraPins) (cs cs' : List Nat) (hl : cs'.length ≤
     exact List.prefix_refl _
   · exact hp
 
+omit [MachGS GF] in
 /-- **Rocq `ucs_lb_agree_len`**: ...and at equal length they AGREE. -/
 theorem ucs_lb_agree_len (v : EraPins) (cs cs' : List Nat) (hl : cs.length = cs'.length) :
     ⊢ csLb (GF := GF) v cs -∗ csLb v cs' -∗ ⌜cs = cs'⌝ := by

@@ -230,6 +230,7 @@ Three refutations about ONE fact: a half of `offGv` is not derivable from
 anything persistent, because the whole ghost refutes a second half.  (Rocq
 states them as `Example`s; they are theorems here.) -/
 
+omit [MachGS GF] in
 /-- Rocq's `off_gv_whole_half`: whole plus half is not valid. -/
 theorem offGv_whole_half (γo : GName) (q : Qp) (z z' : Int) :
     ⊢@{IProp GF} offGv γo 1 z -∗ offGv γo q z' -∗ False := by

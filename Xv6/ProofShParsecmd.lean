@@ -54,6 +54,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_ustr_bytes`**: an owned string is its `len + 1` bytes, the
 terminator included. -/
 theorem ush_ustr_bytes (γd : GName) (a len : Nat) (f : Nat → BitVec 8) :

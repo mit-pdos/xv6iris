@@ -217,6 +217,7 @@ def creChildKept (Γ : FsViewNames GF) (vom : BitVec 64)
   if omTrunc vom then pfAt (aunarmOfArm Γ appE Farm) Fun
   else creChildUnfired Γ (.AFile []) Farm Fun
 
+omit [MachGS GF] in
 /-- Rocq `cre_rcpt_kept_of`. -/
 theorem creRcptKept_of (vom : BitVec 64) (F : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (av : Aview) (d : Nat) (nm : Fname) (i : Nat) :

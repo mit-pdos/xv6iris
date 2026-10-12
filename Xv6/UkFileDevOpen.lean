@@ -33,6 +33,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG 
 
 namespace UkFileDev
 
+omit [MachGS GF] in
 /-- THE STRING'S CELLS ARE IN THE IMAGE (deviation 5): at any per-cell
 predicate the heap reads, the boxed cells and terminator put the string's
 image under the heap's. -/
@@ -57,6 +58,7 @@ theorem fdev_cells_img (Φ : Nat → BitVec 8 → IProp GF) (H : IProp GF) (M : 
   · exact (key a b hs).trans (pure_mono fun h _ => h)
   · exact pure_intro fun h => absurd h hs
 
+omit [MachGS GF] in
 /-- The path at either half is persistent (the data half at the discarded
 fraction). -/
 instance fdev_upathAt_persistent (N : UkNames GF) (tx : Bool) (pv n : Nat) (f : Nat → BitVec 8) :
@@ -64,6 +66,7 @@ instance fdev_upathAt_persistent (N : UkNames GF) (tx : Bool) (pv n : Nat) (f : 
   unfold upathAt
   cases tx <;> simp only [Bool.false_eq_true, ↓reduceIte] <;> infer_instance
 
+omit [MachGS GF] in
 /-- **Rocq `fdev_path_view`**: the path at a persistent reading is a boxed
 view of its image, at a name of any length, off either half. -/
 theorem fdev_path_view (N : UkNames GF) (tx : Bool) (pv n : Nat) (f : Nat → BitVec 8) :
@@ -105,6 +108,7 @@ theorem fdev_path_view (N : UkNames GF) (tx : Bool) (pv n : Nat) (f : Nat → Bi
     · imodintro; iexact Hs
     · imodintro; iexact Hz
 
+omit [MachGS GF] in
 /-- `open_ans_ok` off the ledger a tainted open hands back. -/
 theorem fdev_open_ans_ok (gf : GName) (l : List FdState) (rv : BitVec 64) :
     ukOpenTaintFd (GF := GF) gf l rv ⊢ ⌜openAnsOk rv⌝ := by
@@ -118,6 +122,7 @@ theorem fdev_open_ans_ok (gf : GName) (l : List FdState) (rv : BitVec 64) :
   · ipureintro
     left; rw [hr]; exact fdev_m1
 
+omit [MachGS GF] in
 /-- ...keeping the ledger. -/
 theorem fdev_open_ans_ok_keep (gf : GName) (l : List FdState) (rv : BitVec 64) :
     ukOpenTaintFd (GF := GF) gf l rv ⊢ ⌜openAnsOk rv⌝ ∗ ukOpenTaintFd gf l rv :=

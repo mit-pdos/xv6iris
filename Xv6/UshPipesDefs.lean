@@ -156,13 +156,17 @@ def osP (γo : GName) : IProp GF := shotPending γo
 /-- **Rocq `osS`**: the shot. -/
 def osS (γo : GName) : IProp GF := shotDone γo
 
+omit [MachGS GF] in
 instance osP_timeless (γo : GName) : Timeless (osP (GF := GF) γo) := by
   unfold osP; infer_instance
+omit [MachGS GF] in
 instance osS_timeless (γo : GName) : Timeless (osS (GF := GF) γo) := by
   unfold osS; infer_instance
+omit [MachGS GF] in
 instance osS_persistent (γo : GName) : Persistent (osS (GF := GF) γo) := by
   unfold osS; infer_instance
 
+omit [MachGS GF] in
 /-- **Rocq `os_excl`**. -/
 theorem os_excl (γo : GName) : ⊢ osP (GF := GF) γo -∗ osS γo -∗ False := by
   unfold osP osS
@@ -172,12 +176,14 @@ theorem os_excl (γo : GName) : ⊢ osP (GF := GF) γo -∗ osS γo -∗ False :
   · iexact H1
   · iexact H2
 
+omit [MachGS GF] in
 /-- **Rocq `os_shoot`**. -/
 theorem os_shoot (γo : GName) : ⊢ osP (GF := GF) γo ==∗ osS γo := by
   unfold osP osS
   iintro H
   iapply shot_fire γo $$ H
 
+omit [MachGS GF] in
 /-- **Rocq `os_alloc`**. -/
 theorem os_alloc : ⊢@{IProp GF} |==> ∃ γo, osP γo := by
   unfold osP

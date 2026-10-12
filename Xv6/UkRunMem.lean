@@ -90,6 +90,7 @@ def UkDataAcc (M : ElfMem) (pm : Nat → Option UPerm) (a k : Nat) {n : Nat} (w 
   ukStoreOk pm (BitVec.ofNat 64 a) ∧ ukAccessOk M (BitVec.ofNat 64 a) k ∧ a < uCap ∧
     ∀ j, j < k → M (a + j) = some (nthByte w j)
 
+omit [MachGS GF] in
 /-- **Rocq `uheap_access`**: every premise a data leaf asks for, off ONE run
 of bytes plus its alignment. -/
 theorem ukAccess_of_data (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (dq : DFrac)
@@ -111,6 +112,7 @@ def UkTextAcc (M : ElfMem) (pm : Nat → Option UPerm) (a k : Nat) {n : Nat} (w 
   ukTextOk pm (BitVec.ofNat 64 a) ∧ ukAccessOk M (BitVec.ofNat 64 a) k ∧ a < uCap ∧
     ∀ j, j < k → M (a + j) = some (nthByte w j)
 
+omit [MachGS GF] in
 /-- **Rocq `uheap_text_access`**: the same off a run of the TEXT half, whose
 page is X and, by the heap's invariant, not W. -/
 theorem ukAccess_of_text (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat)
@@ -172,6 +174,7 @@ theorem urun_step_mem (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (
   unfold urun
   iexact Hcont
 
+omit [MachGS GF] in
 /-- A one-byte run is the byte. -/
 theorem ubytesq_one (γd : GName) (dq : DFrac) (a : Nat) (f : Nat → BitVec 8) :
     ubytesq (GF := GF) γd dq a 1 f ⊣⊢ ubyteq γd dq a (f 0) := by
@@ -181,6 +184,7 @@ theorem ubytesq_one (γd : GName) (dq : DFrac) (a : Nat) (f : Nat → BitVec 8) 
   rw [Nat.add_zero]
   exact .rfl
 
+omit [MachGS GF] in
 /-- A one-byte text run is the byte. -/
 theorem utextRun_one (γt : GName) (a : Nat) (f : Nat → BitVec 8) :
     ([∗list] j ∈ List.range 1, utext (GF := GF) γt (a + j) (f j)) ⊣⊢ utext γt a (f 0) := by

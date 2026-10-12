@@ -17,6 +17,7 @@ section SysExecNe
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [CtokG GF]
 
+omit [MachGS GF] in
 /-- **Rocq `sys_exec_slot_pre_ne`**. -/
 theorem sysExecSlotPre_ne (n : Nat) (S S' : Uvis → IProp GF) (Q : Int → IProp GF)
     (P : Nat → Nat → IProp GF) (Φo : Aview → Nat → Anode → IProp GF) (cw : Nat) (secc : BitVec 64)

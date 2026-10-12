@@ -92,6 +92,7 @@ theorem ka_al8 (p : BitVec 64) (h : p &&& 0xfff#64 = 0#64) : p.toNat % 8 = 0 := 
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- `kmemAuth_agree`, curried. -/
 theorem kmemAuth_agree' (γk : KmemNames) (n : Nat) (on : Option Nat) :
     kallocAvail (GF := GF) γk on ⊢ kmemAuth γk n -∗
@@ -100,6 +101,7 @@ theorem kmemAuth_agree' (γk : KmemNames) (n : Nat) (on : Option Nat) :
   iapply (kmemAuth_agree γk n on)
   iframe
 
+omit [MachGS GF] in
 /-- `kmemAuth_dec`, curried. -/
 theorem kmemAuth_dec' (γk : KmemNames) (n : Nat) (on : Option Nat) (act : BitVec 64) :
     kallocAvail (GF := GF) γk on ⊢ kmemAuth γk (n + 1) -∗
@@ -109,6 +111,7 @@ theorem kmemAuth_dec' (γk : KmemNames) (n : Nat) (on : Option Nat) (act : BitVe
   iapply (kmemAuth_dec γk n on act)
   iframe
 
+omit [MachGS GF] in
 /-- `kmemAuth_null`, curried. -/
 theorem kmemAuth_null' (γk : KmemNames) (on : Option Nat) (act : BitVec 64) :
     kallocAvail (GF := GF) γk on ⊢ kmemAuth γk 0 -∗

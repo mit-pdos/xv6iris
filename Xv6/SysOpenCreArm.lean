@@ -104,10 +104,12 @@ def sysOpenCrP (i0 : Nat) : Nat → Nat → IProp GF :=
 /-- ...and the trivial one, for the miss side (Rocq's `socr_Pm`). -/
 def sysOpenCrPm : Nat → Nat → IProp GF := fun _ _ => iprop(True)
 
+omit [MachGS GF] in
 /-- Rocq's `socr_P_tag`. -/
 theorem sysOpenCrP_tag (i0 k d : Nat) : sysOpenCrP (GF := GF) i0 k d ⊢ ⌜d = i0⌝ := by
   unfold sysOpenCrP; exact .rfl
 
+omit [MachGS GF] in
 /-- What the tail asks of the cursor at its entry: the tag, kept (Rocq's
 `socr_cur`). -/
 theorem sys_open_cr_cur (vom : BitVec 64) (i0 k : Nat) :
@@ -208,6 +210,7 @@ abbrev sysOpenCrA (A : SysOpenArgs GF) (P Pmiss : Nat → Nat → IProp GF)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : SysOpenArgs GF :=
   { A with P := P, Pmiss := Pmiss, Fo := Fo, Ft := Ft }
 
+omit [MachGS GF] in
 /-- The shimmed record keeps the contract's static premises (the seal's
 instantiation of the join at `sysOpenCrA`). -/
 theorem sysOpenCrA_static (k : KCtx) (A : SysOpenArgs GF) (P Pmiss : Nat → Nat → IProp GF)
@@ -224,6 +227,7 @@ hand, and everything below the join only ever needs the commit AT THAT INUM
 (`SysOpenDefs.openTruncAt`).  What the permit takes is exactly what the
 residue then stops carrying, which is why the two are built by one lemma. -/
 
+omit [MachGS GF] in
 /-- The cursor, split at the truncate's key (deviation 4). -/
 theorem sys_open_cr_cur_split (vom : BitVec 64) (P : Nat → Nat → IProp GF) (k d : Nat) :
     P k d ⊢ curKept vom P k d ∗ (if omTrunc vom then P k d else iprop(emp)) := by
@@ -240,6 +244,7 @@ theorem sys_open_cr_cur_split (vom : BitVec 64) (P : Nat → Nat → IProp GF) (
     · iexact H
     · iempintro
 
+omit [MachGS GF] in
 /-- A fired receipt, split at the truncate's key (deviation 4). -/
 theorem sys_open_cr_rcpt_split (vom : BitVec 64) (F : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (av : Aview) (d : Nat) (nm : Fname) (i : Nat) :
@@ -411,6 +416,7 @@ theorem sys_open_cr_exists_key (Γ : FsViewNames GF) (vom : BitVec 64) (Nm : Fna
 
 /-! ## 3.  THE TWO OBSERVATION SEEDS -/
 
+omit [MachGS GF] in
 /-- The FRESH tail's receipt costs NOTHING (Rocq's `socr_obs_pure`). -/
 theorem sys_open_cr_obs_pure (i0 : Nat) (n0 : FsNode) :
     ⊢ sysOpenObs (GF := GF) (sysOpenCrFoPure i0 (absRow n0)) i0 n0 := by
@@ -420,6 +426,7 @@ theorem sys_open_cr_obs_pure (i0 : Nat) (n0 : FsNode) :
   · ipureintro; exact arowAt_witness i0 (absRow n0)
   · ipureintro; exact ⟨rfl, rfl⟩
 
+omit [MachGS GF] in
 /-- ...and the EXISTS tail's is the real fire, tagged (Rocq's
 `socr_obs_tag`). -/
 theorem sys_open_cr_obs_tag (i0 : Nat) (n0 : FsNode) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) :
@@ -435,6 +442,7 @@ theorem sys_open_cr_obs_tag (i0 : Nat) (n0 : FsNode) (Fo : Pfam GF (Aview → Na
 
 /-! ## 4.  RECOVERING THE PIECES FROM THE PLAIN FOLD -/
 
+omit [MachGS GF] in
 /-- The tag permit, under the reading of argument 0: paid for nothing. -/
 theorem sys_open_cr_term_arg (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (i0 : Nat) :
     ⊢ if omTrunc vom then truncTermArg (GF := GF) Mim pv (sysOpenCrP i0) i0 else iprop(emp) := by
@@ -446,6 +454,7 @@ theorem sys_open_cr_term_arg (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : B
   · simp only [if_neg hv]
     iempintro
 
+omit [MachGS GF] in
 /-- ...and at one path. -/
 theorem sys_open_cr_term_at (pl : List (BitVec 8)) (vom : BitVec 64) (i0 : Nat) :
     ⊢ if omTrunc vom then truncTermAt (GF := GF) pl (sysOpenCrP i0) i0 else iprop(emp) := by
@@ -499,6 +508,7 @@ theorem sys_open_cr_res_of_fail (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : 
 
 /-! ## 5.  RECOVERING THE DESCRIPTOR FROM THE PLAIN OK -/
 
+omit [MachGS GF] in
 /-- The `if omTrunc vom` receipt moved under its key (deviation 4). -/
 theorem sys_open_cr_ite (b : Bool) (X Y : IProp GF) (h : X ⊢ Y) :
     (if b then X else iprop(emp)) ⊢ (if b then Y else iprop(emp)) := by

@@ -82,6 +82,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_jrow_of`** (deviation 2): a walked row's four bytes, off the
 text. -/
 theorem ushNulRow_text (γt : GName) {ty : Int} {row : Nat} {rowv : BitVec 32} {arm : Nat}
@@ -91,6 +92,7 @@ theorem ushNulRow_text (γt : GName) {ty : Int} {row : Nat} {rowv : BitVec 32} {
 
 /-! ## §2 The line and the argv vectors -/
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_bytes_upd`**: one byte of a run, out, and the run back with
 it replaced. -/
 theorem ush_bytes_upd (γd : GName) (a n : Nat) (g : Nat → BitVec 8) (j : Nat) (hj : j < n) :
@@ -118,6 +120,7 @@ theorem ush_bytes_upd (γd : GName) (a n : Nat) (g : Nat → BitVec 8) (j : Nat)
   · simp only [ushpSetb, if_true]
     iexact Hc
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_slot_read`**: one argv slot, out and back. -/
 theorem ushSlots_acc (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × Nat)) (sel : Nat × Nat → Nat) (i : Nat)
     (hi : i < 10) :
@@ -133,6 +136,7 @@ theorem ushSlots_acc (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × Nat))
   rw [uRange_set_self]
   iexact H
 
+omit [MachGS GF] in
 /-- A token's slot. -/
 theorem ushSlots_some (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × Nat)) (sel : Nat × Nat → Nat) (i : Nat)
     (tk : Nat × Nat) (h : toks[i]? = some tk) (hi : i < 10) :
@@ -143,6 +147,7 @@ theorem ushSlots_some (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × Nat)
     simp only [ushSlot, h]
   rw [← e]; exact ushSlots_acc N s0 base toks sel i hi
 
+omit [MachGS GF] in
 /-- The NULL cap after the last token. -/
 theorem ushSlots_cap (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × Nat)) (sel : Nat × Nat → Nat)
     (hl : toks.length < 10) :

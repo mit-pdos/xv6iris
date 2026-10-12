@@ -274,6 +274,7 @@ theorem sys_open_stores_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs GF Γ]
   iexists u'
   iapply logOpS_opb icfgLog u' Sb' $$ HopS
 
+omit [MachGS GF] in
 /-- The fired observation, read at a FILE's row (Rocq's
 `rewrite /so_obs (opf_era_file_row …)`). -/
 theorem sys_open_stores_obs_file (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (i : Nat)

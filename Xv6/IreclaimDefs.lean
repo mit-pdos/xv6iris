@@ -511,9 +511,11 @@ section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [DiskG GF] [CurCtx]
 
+omit [MachGS GF] in
 theorem ireclaim_slots_join3 (γ : BcacheNames) : bslot (GF := GF) ∗ bslots 2 ⊢ bslots 3 :=
   bslots_cons 2
 
+omit [MachGS GF] in
 theorem ireclaim_slots_split3 (γ : BcacheNames) : bslots (GF := GF) 3 ⊢ bslot ∗ bslots 2 :=
   bslots_uncons 2
 

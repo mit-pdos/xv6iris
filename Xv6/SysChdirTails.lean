@@ -103,6 +103,7 @@ theorem sys_chdir_held_open (v : BitVec 64) (z : Nat) :
   isplitr; · ipureintro; exact h2
   ipureintro; exact h3
 
+omit [MachGS GF] in
 /-- The reference ledger's regrouping (Rocq `iref_slots_combine 1 1`). -/
 theorem sys_chdir_ir_11 : irefSlot (GF := GF) ∗ irefSlots 1 ⊢ irefSlots 2 := (irefSlots_op 1 1).2
 

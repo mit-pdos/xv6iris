@@ -144,6 +144,7 @@ variable [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- **Rocq `cons_ro_sub`**, keeping the heap (`UkFileOpen.uimgView_sub_keep`
 at this file's class context: that one's section binds the file claims'
 cameras). -/

@@ -523,6 +523,7 @@ Rocq gets both from `BioDefs.bslots_op`, the resource algebra's own
 tokens, which is exactly what `Xv6.bslots_cons` already establishes.  So
 both directions are inductions over the second count. -/
 
+omit [MachGS GF] in
 theorem dsSlots_split [CurCtx] (γ : BcacheNames) (a c : Nat) :
     bslots (GF := GF) (a + c) ⊢ iprop(bslots a ∗ bslots c) := by
   induction c with
@@ -540,6 +541,7 @@ theorem dsSlots_split [CurCtx] (γ : BcacheNames) (a c : Nat) :
     · iapply bslots_cons c
       iframe Hs Hc
 
+omit [MachGS GF] in
 theorem dsSlots_join [CurCtx] (γ : BcacheNames) (a c : Nat) :
     bslots (GF := GF) a ⊢ iprop(bslots c -∗ bslots (a + c)) := by
   induction c with

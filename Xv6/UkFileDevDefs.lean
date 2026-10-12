@@ -306,6 +306,7 @@ theorem fdev_path_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (
     iintro Hrun ⟨-, -, Hs, -⟩
     iapply fdev_ubytes_bnd N h m pc avail _ pv n f hn $$ Hrun Hs
 
+omit [MachGS GF] in
 /-- **Rocq `fdev_ubyteq_op`**: one data byte at a product fraction is the
 two pieces. -/
 theorem fdev_ubyteq_op (γd : GName) (dq1 dq2 : DFrac) (a : Nat) (b : BitVec 8) :
@@ -316,6 +317,7 @@ theorem fdev_ubyteq_op (γd : GName) (dq1 dq2 : DFrac) (a : Nat) (b : BitVec 8) 
   refine .trans ?_ (congrArg (iOwn γd) HeapView.frag_op_eqv)
   exact congrArg (iOwn γd) (congrArg (HeapView.Frag a (dq1 • dq2)) Agree.idemp.symm)
 
+omit [MachGS GF] in
 /-- ...and a run of them. -/
 theorem fdev_ubytesq_op (γd : GName) (dq1 dq2 : DFrac) (a n : Nat) (f : Nat → BitVec 8) :
     ubytesq (GF := GF) γd (dq1 • dq2) a n f ⊣⊢ ubytesq γd dq1 a n f ∗ ubytesq γd dq2 a n f := by
@@ -323,6 +325,7 @@ theorem fdev_ubytesq_op (γd : GName) (dq1 dq2 : DFrac) (a n : Nat) (f : Nat →
   exact ⟨(BigSepL.bigSepL_mono fun _ => (fdev_ubyteq_op γd dq1 dq2 _ _).1).trans BigSepL.bigSepL_sep_eqv.1,
     BigSepL.bigSepL_sep_eqv.2.trans (BigSepL.bigSepL_mono fun _ => (fdev_ubyteq_op γd dq1 dq2 _ _).2)⟩
 
+omit [MachGS GF] in
 /-- **Rocq `fdev_src_op`**: a source run splits -- the text half is
 persistent, the data half byte by byte. -/
 theorem fdev_src_op (N : UkNames GF) (tx : Bool) (dq1 dq2 : DFrac) (ua n : Nat) (f : Nat → BitVec 8) :
@@ -336,6 +339,7 @@ theorem fdev_src_op (N : UkNames GF) (tx : Bool) (dq1 dq2 : DFrac) (ua n : Nat) 
     simp only [Bool.false_eq_true, ↓reduceIte]
     exact fdev_ubytesq_op N.d dq1 dq2 ua n f
 
+omit [MachGS GF] in
 /-- **Rocq `fdev_src_ok`**: the source's two rows at the key's image, off
 either piece (Rocq `UkRunSys.usrc_ok_utext` / `usrc_ok_ubytesq`, landed; the
 data row at the break's bound, UkRunSysWrite deviation 5). -/

@@ -75,6 +75,7 @@ def bsdNameRows [WchG GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] (Γ : SchedN
   irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗ irefSlots NFILE ∗ irefSlots IREFBOOT ∗ irefSlotsAuth ∗
   bslots (NPROC * 3) ∗ bslots mainBslotsFs
 
+omit [MachGS GF] in
 /-- The bio supply's two shares (the rest is dropped, deviation 3). -/
 theorem bsd_bslots_split [BioslotG GF] :
     bslots (GF := GF) BSLOTS ⊢ bslots (NPROC * 3) ∗ bslots mainBslotsFs := by
@@ -83,6 +84,7 @@ theorem bsd_bslots_split [BioslotG GF] :
   icases bslots_split _ _ $$ H with ⟨H, -⟩
   iapply bslots_split _ _ $$ H
 
+omit [MachGS GF] in
 /-- The iref supply's three shares and its authority. -/
 theorem bsd_irefSlots_split [IrefslotG GF] :
     irefSlots (GF := GF) IREFSLOTS ⊢

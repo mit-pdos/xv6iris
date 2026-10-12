@@ -32,6 +32,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
 theorem kgrep_blt0 (r : BitVec 64) : ukBtaken .BLT r 0#64 = decide (r.toInt < 0) := by
   simp only [ukBtaken, zopz0zI_s, BitVec.toInt_zero]
 
+omit [MachGS GF] in
 /-- `grepProg` unfolded, folded back. -/
 theorem grepProg_lit (γt : GName) : (⟨grepCode γt, User.Grep.Sym.«write», User.Grep.Sym.«read», User.Grep.Sym.«open»,
     User.Grep.Sym.«close», User.Grep.Sym.«exit»⟩ : Uprog GF) = grepProg γt := rfl

@@ -42,6 +42,7 @@ section PinnedExecBundle
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [Icfg] [CtokG GF]
 
+omit [MachGS GF] in
 /-- **Rocq `pobs_node_id`**: THE PIN AS A SUPPLIER OF (W)'s THIRD PIECE --
 `pobs_node` proves it from the pin and says one thing more (the INUM is the
 pin's) that exec never reads, so the step down is the projection. -/

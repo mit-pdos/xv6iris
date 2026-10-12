@@ -163,6 +163,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
+omit [MachGS GF] in
 /-- The block layer's view at the ambient names: what BEGIN_OP / END_OP /
 READI's generic `V` is instantiated at.  Its fields are the ambient ones by
 `rfl`, which discharges those contracts' `hdev`/`hcl`/`hdt`. -/
@@ -241,6 +242,7 @@ fsinit's EXCLUSIVE boot-shelter token is shot into the persistent sealed
 regime; after this no second seal is possible and no boot-shaped resource
 survives.  `fs_ready_pre` / `fs_ready_establish` wait for fsinit (header). -/
 
+omit [MachGS GF] in
 /-- Rocq `fs_ready_seal`. -/
 theorem fsReady_seal [Icfg] : iregBoot (GF := GF) ⊢ |==> iregOpen := by
   unfold iregBoot iregOpen

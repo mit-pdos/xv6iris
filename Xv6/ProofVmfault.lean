@@ -52,6 +52,7 @@ theorem vmfault_br_fffffffffffff638 : KA.«vmfault» + 0xfffffffffffff638#64 = K
 
 theorem vmfault_br_ffffffffffffffe4 : KA.«vmfault» + 0xffffffffffffffe4#64 = KA.«ismapped» := by decide
 
+omit [MachGS GF] in
 /-- **A quiet arm returns the lend untouched** (permit sweep T): at `k' = ke`
 the quiet conjunct holds whatever the arm. -/
 theorem vf_lend_quiet (p : BitVec 64) (q : Prop) (ke : Nat) :
@@ -62,6 +63,7 @@ theorem vf_lend_quiet (p : BitVec 64) (q : Prop) (ke : Nat) :
   ipureintro
   exact ⟨Nat.le_refl ke, fun _ => rfl⟩
 
+omit [MachGS GF] in
 /-- **The allocating arm owes no quiet conjunct** (permit sweep T): its
 condition refutes the quiet one. -/
 theorem vf_lend_alloc (p : BitVec 64) {q : Prop} (hq : ¬ q) (ke : Nat) :

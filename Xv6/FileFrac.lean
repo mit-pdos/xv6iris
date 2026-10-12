@@ -93,12 +93,14 @@ theorem fileCore_merge (k : Nat) (q1 q2 : Qp) (pn : FPNames) (C : FContent) :
     fileCore (GF := GF) k q1 pn C ∗ fileCore k q2 pn C ⊢ fileCore k (q1 + q2) pn C :=
   (fileCore_split k q1 q2 pn C).2
 
+omit [MachGS GF] in
 theorem fpayTok_split (γ : FileNames) (k : Nat) (q1 q2 : Qp) (pn : FPNames) :
     fpayTok (GF := GF) γ k (q1 + q2) pn ⊢ fpayTok γ k q1 pn ∗ fpayTok γ k q2 pn := by
   unfold fpayTok
   iintro H
   iapply ghost_var_split (γ.pay k) pn q1 q2 $$ H
 
+omit [MachGS GF] in
 theorem fpayTok_merge (γ : FileNames) (k : Nat) (q1 q2 : Qp) (pn1 pn2 : FPNames) :
     fpayTok (GF := GF) γ k q1 pn1 ∗ fpayTok γ k q2 pn2 ⊢ fpayTok γ k (q1 + q2) pn1 ∗ ⌜pn1 = pn2⌝ := by
   unfold fpayTok
@@ -157,6 +159,7 @@ theorem fileRef_elim (γ : FileNames) (k : Nat) (q : Qp) (st : FdState) :
 
 /-! ## Keys of the lock's halves are in the map -/
 
+omit [MachGS GF] in
 theorem frefRest_keys (γ : FileNames) (M : RegMapF (Nat × Qp)) (k : Nat) (L : List (Nat × Qp)) :
     (γ.ref ↪●MAP M) ∗ ([∗list] e ∈ L, frefRest (GF := GF) γ k e) ⊢
       (γ.ref ↪●MAP M) ∗ ([∗list] e ∈ L, frefRest γ k e) ∗
@@ -255,6 +258,7 @@ theorem dup_fresh (M : RegMapF (Nat × Qp)) (nx id : Nat) (v : Nat × Qp)
     LawfulPartialMap.get?_insert_ne (show id ≠ i by omega)]
   exact hfresh i (by omega)
 
+omit [MachGS GF] in
 /-- `filedup`'s ghost step on the table: the reference `id ↦ (k, q)` (our
 half, and the lock's, in the slot's list at position `s`/`t`) becomes
 `id ↦ (k, q/2)` and a fresh `nx ↦ (k, q/2)`; the caller keeps one half of
@@ -356,6 +360,7 @@ theorem close_fresh (M : RegMapF (Nat × Qp)) (nx id : Nat)
   · subst h; exact LawfulPartialMap.get?_delete_eq rfl
   · rw [LawfulPartialMap.get?_delete_ne h]; exact hfresh i hi
 
+omit [MachGS GF] in
 /-- `fileclose`'s ghost step on the table: the reference `id ↦ (k, q)` (our
 half and the lock's) is deleted; slot `k`'s list loses it. -/
 theorem file_close_step (γ : FileNames) (M : RegMapF (Nat × Qp)) (Ls : Nat → List (Nat × Qp))
@@ -484,6 +489,7 @@ theorem fileRest_join (γ : FileNames) (k : Nat) (s t : List (Nat × Qp)) (id : 
 
 /-! ## `pipealloc`: publishing a payload -/
 
+omit [MachGS GF] in
 /-- The exclusive holder installs the payload's names with no lock in hand. -/
 theorem fpayTok_update (γ : FileNames) (k : Nat) (pn pn' : FPNames) :
     fpayTok (GF := GF) γ k 1 pn ⊢ |==> fpayTok γ k 1 pn' := by

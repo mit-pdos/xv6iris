@@ -763,6 +763,7 @@ theorem frz_slot_kill_pinw [Icfg] (Eo : CoPset) (k : Nat) (qs s' : Qp) (g : GNam
       · iframe
       exact (qp_one_add_not_le s' hb).elim
 
+omit [MachGS GF] in
 /-- The whole selector, from the arm's `½` and the park's `½`. -/
 theorem frzsel_halves [Icfg] (k : Nat) (b : Bool) :
     frzsel (GF := GF) k (1 : Qp).half b ∗ frzsel k (1 : Qp).half b ⊢ frzsel k 1 b := by
@@ -776,6 +777,7 @@ private theorem frzsel_unhalves [Icfg] (k : Nat) (b : Bool) :
   rw [Qp.half_add_half] at h
   exact h
 
+omit [MachGS GF] in
 /-- The whole liveness unit gathered from the reference's `q`, the pool
 residual `c` and the escrow's `½`. -/
 theorem liveGenlo_gather3 [Icfg] (k : Nat) (q c : Qp) (g : GName) (lo : Nat)
@@ -899,6 +901,7 @@ theorem live_slot_regen_pinw [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     · iframe
     exact (qp_one_add_not_le qt hb).elim
 
+omit [MachGS GF] in
 /-- The up-count's arm move at the merged slot: the handed-out slice comes
 off the norm residual, at the slot's own `(g, lo)`. -/
 theorem pinw_arm_split [Icfg] (qt qn c : Qp) (k : Nat) (g : GName) (lo : Nat)
@@ -965,9 +968,11 @@ def frzPark [Icfg] (k z : Nat) : IProp GF :=
   iprop((frzmH z false ∗ frzsel k (1 : Qp).half false ∗ hpnFull k none)
         ∨ (frzmH z true ∗ frzsel k (1 : Qp).half.half true))
 
+omit [MachGS GF] in
 instance frzPark_timeless [Icfg] (k z : Nat) : Timeless (frzPark (GF := GF) k z) := by
   unfold frzPark; infer_instance
 
+omit [MachGS GF] in
 theorem frzPark_intro_on [Icfg] (k z : Nat) :
     frzmH (GF := GF) z true ∗ frzsel k (1 : Qp).half.half true ⊢ frzPark k z := by
   unfold frzPark
@@ -975,6 +980,7 @@ theorem frzPark_intro_on [Icfg] (k z : Nat) :
   iright
   iexact H
 
+omit [MachGS GF] in
 theorem frzPark_intro_off [Icfg] (k z : Nat) :
     frzmH (GF := GF) z false ∗ frzsel k (1 : Qp).half false ∗ hpnFull k none ⊢ frzPark k z := by
   unfold frzPark

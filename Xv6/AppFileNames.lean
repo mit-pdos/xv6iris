@@ -174,18 +174,22 @@ def flAuth (c : FileFixed) (ls : List FlLine) : IProp GF :=
 def flLb (c : FileFixed) (ls : List FlLine) : IProp GF :=
   MonoList.lb_own c.ffFl ls
 
+omit [MachGS GF] in
 instance flLb_persistent (c : FileFixed) (ls : List FlLine) :
     Persistent (flLb (GF := GF) c ls) := by
   unfold flLb; infer_instance
 
+omit [MachGS GF] in
 instance flLb_timeless (c : FileFixed) (ls : List FlLine) :
     Timeless (flLb (GF := GF) c ls) := by
   unfold flLb; infer_instance
 
+omit [MachGS GF] in
 instance flAuth_timeless (c : FileFixed) (ls : List FlLine) :
     Timeless (flAuth (GF := GF) c ls) := by
   unfold flAuth; infer_instance
 
+omit [MachGS GF] in
 /-- Two lower bounds of one list are comparable (Rocq `fl_lb_lb`). -/
 theorem flLb_lb (c : FileFixed) (ls ls' : List FlLine) :
     ⊢@{IProp GF} flLb c ls -∗ flLb c ls' -∗ ⌜ls <+: ls' ∨ ls' <+: ls⌝ := by

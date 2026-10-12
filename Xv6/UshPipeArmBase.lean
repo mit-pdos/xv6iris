@@ -117,6 +117,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
 
 /-! ## §3 The two handles, as a map (Rocq `ushpi_hs_in/out`) -/
 
+omit [MachGS GF] in
 /-- **Rocq `ushpi_hs_in`**. -/
 theorem ushpi_hs_in (γf : GName) (a b : Nat) (sa sb : FdState) (hab : a ≠ b) :
     ufd (GF := GF) γf a sa ∗ ufd γf b sb ⊢ [∗map] fd ↦ st ∈ ushpiHs a b sa sb, ufd γf fd st := by
@@ -124,6 +125,7 @@ theorem ushpi_hs_in (γf : GName) (a b : Nat) (sa sb : FdState) (hab : a ≠ b) 
   exact (sep_mono_right BigSepM.bigSepM_singleton.2).trans
     (BigSepM.bigSepM_insert (LawfulPartialMap.get?_singleton_ne (Ne.symm hab))).2
 
+omit [MachGS GF] in
 /-- **Rocq `ushpi_hs_out`**. -/
 theorem ushpi_hs_out (γf : GName) (a b : Nat) (sa sb : FdState) (hab : a ≠ b) :
     ([∗map] fd ↦ st ∈ ushpiHs a b sa sb, ufd (GF := GF) γf fd st) ⊢ ufd γf a sa ∗ ufd γf b sb := by
@@ -131,6 +133,7 @@ theorem ushpi_hs_out (γf : GName) (a b : Nat) (sa sb : FdState) (hab : a ≠ b)
   refine (BigSepM.bigSepM_insert (LawfulPartialMap.get?_singleton_ne (Ne.symm hab))).1.trans ?_
   exact sep_mono_right BigSepM.bigSepM_singleton.1
 
+omit [MachGS GF] in
 /-- **Rocq `ushpi_own_hi`**: a claim above the standard streams is the handle. -/
 theorem ushpi_own_hi (γf : GName) (l : List FdState) (fd : Nat) (st : FdState) (hge : NSTD ≤ fd) :
     ufdOwn (GF := GF) γf l fd st ⊢ ufd γf fd st := by

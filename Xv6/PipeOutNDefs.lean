@@ -144,6 +144,7 @@ theorem pwcBlkV_timeless (g : PipeGn) (M : LModel) (PIN : Nat → EraPins → IP
 def ptkV (T : IProp GF) (v : EraPins) (I : List (BitVec 8)) (_k : Nat) : IProp GF :=
   iprop(csFrozenAt v (nlines I - 1) ∨ T)
 
+omit [MachGS GF] in
 theorem ptkV_persistent (T : IProp GF) [hT : Persistent T] (v : EraPins) (I : List (BitVec 8))
     (k : Nat) : Persistent (ptkV T v I k) := by
   unfold ptkV; infer_instance

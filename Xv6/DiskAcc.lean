@@ -190,6 +190,7 @@ theorem vwrite_ack (v : VirtioState) (w : BitVec 32) :
 
 /-! ## The configuration tracker -/
 
+omit [MachGS GF] in
 /-- The invariant's half and the driver's half agree. -/
 theorem diskCfg_auth_own_agree (γ : DiskNames) (c c' : VirtioCfg) :
     ⊢@{IProp GF} diskCfgAuth γ c' -∗ diskCfgOwn γ c -∗ ⌜c' = c⌝ := by
@@ -198,6 +199,7 @@ theorem diskCfg_auth_own_agree (γ : DiskNames) (c c' : VirtioCfg) :
   ihave %h := ghost_var_agree γ.cfg _ _ _ _ $$ H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 /-- The FROZEN configuration and the driver's half agree: holding
 `diskCfgOwn γ c` with `live c = false` after the device has gone live is
 impossible, which is what refutes the live arm in every dead accessor. -/
@@ -559,6 +561,7 @@ theorem diskGeom_cfg [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) :
   ipureintro
   exact ⟨hg.1, hg.2.1, hg.2.2.1, hg.2.2.2.1, hg.2.2.2.2.1⟩
 
+omit [MachGS GF] in
 theorem diskPub_agree (γ : DiskNames) (n n' : Nat) :
     ⊢@{IProp GF} diskPubAuth γ n -∗ diskPub γ n' -∗ ⌜n = n'⌝ := by
   unfold diskPubAuth diskPub
@@ -566,6 +569,7 @@ theorem diskPub_agree (γ : DiskNames) (n n' : Nat) :
   ihave %h := ghost_var_agree γ.np _ _ _ _ $$ H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 /-- Updating the published count: BOTH halves move, so a bump of
 `avail->idx` is only possible with the payload's `diskPub` in hand. -/
 theorem diskPub_update (γ : DiskNames) (n n' m : Nat) :
@@ -641,6 +645,7 @@ theorem diskProto_avail_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) 
       ⟨hq.2.2.2.2.2.2.1, e15.2.1, e15.2.2.1, e15.2.2.2⟩, e16, e17, e18.1, e18.2.1,
       hq.2.2.2.2.2.2.2⟩
 
+omit [MachGS GF] in
 /-- One receipt authority, read off the eight. -/
 theorem headAuth_acc (γ : DiskNames) (st : Nat → HState) (i : Nat) (hi : i < NUM) :
     iprop([∗list] j ∈ List.range NUM, headAuth (GF := GF) γ j (st j)) ⊢
@@ -648,6 +653,7 @@ theorem headAuth_acc (γ : DiskNames) (st : Nat → HState) (i : Nat) (hi : i < 
         [∗list] j ∈ List.range NUM, headAuth γ j (st j)) :=
   BigSepL.bigSepL_mem_acc (Φ := fun j => headAuth (GF := GF) γ j (st j)) (range_mem i NUM hi)
 
+omit [MachGS GF] in
 /-- What a slot's receipt is, as ANY fragment of the driver's half sees
 it.  The fraction is generic because an in-flight slot's half is split
 (`Xv6.slotTok`): the interrupt handler reads the slot out of the lock
@@ -662,6 +668,7 @@ theorem headTokF_state (γ : DiskNames) (q : Qp) (st : Nat → HState) (i : Nat)
   ihave %he := ghost_var_agree (γ.head i) _ _ _ _ $$ Hai Ht
   ipureintro; exact he
 
+omit [MachGS GF] in
 /-- What a slot's receipt is, as the driver's half sees it. -/
 theorem headTok_state (γ : DiskNames) (st : Nat → HState) (i : Nat) (s : HState) (hi : i < NUM) :
     ⊢@{IProp GF} (iprop([∗list] j ∈ List.range NUM, headAuth γ j (st j))) -∗
@@ -1025,6 +1032,7 @@ theorem ctxBytes_dmaOwn (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     ctxBytes (GF := GF) ξ pa n (DFrac.own 1) w ⊢ dmaOwn pa n :=
   ctxBytes_forget ξ pa n (DFrac.own 1) w
 
+omit [MachGS GF] in
 /-- Splitting a big separating conjunction in two. -/
 theorem bigSepL_sep2 {A : Type} (l : List A) (F P Q : Nat → A → IProp GF)
     (h : ∀ k x, F k x ⊢ iprop(P k x ∗ Q k x)) :
@@ -1033,6 +1041,7 @@ theorem bigSepL_sep2 {A : Type} (l : List A) (F P Q : Nat → A → IProp GF)
   (BigSepL.bigSepL_mono_of_forall (Ψ := fun k x => iprop(P k x ∗ Q k x))
     (fun {k x} => h k x)).trans BigSepL.bigSepL_sep_eqv.1
 
+omit [MachGS GF] in
 /-- ... and in three. -/
 theorem bigSepL_sep3 {A : Type} (l : List A) (F P Q R : Nat → A → IProp GF)
     (h : ∀ k x, F k x ⊢ iprop(P k x ∗ (Q k x ∗ R k x))) :
@@ -1049,6 +1058,7 @@ abbrev stInit : Nat → HState := fun _ => .inactive
 /-- The ring function of the empty queue. -/
 abbrev ringInit : Nat → Nat := fun _ => 0
 
+omit [MachGS GF] in
 /-- **Freezing the configuration.**  The invariant's half and the driver's
 half together are the whole ghost variable, so the flip may move it to the
 live `c'` and then DISCARD it: after that no one can move it again, which
@@ -1641,6 +1651,7 @@ SUB-RANGE tier arithmetic -- the 4/4/8 split of the header, the 512/512
 split of `b->data`, the `byteBuf`/`wordPointsTo` bridge to the raw tier --
 is `Xv6/DiskTier.lean` and `MachCSL/WpDmaCtx2.lean`. -/
 
+omit [MachGS GF] in
 /-- Both halves of a receipt move together. -/
 theorem headTok_update (γ : DiskNames) (i : Nat) (s s' t : HState) :
     headAuth (GF := GF) γ i s ∗ headTok γ i s' ⊢ |==> (headAuth γ i t ∗ headTok γ i t) := by
@@ -2389,6 +2400,7 @@ theorem head_ofNat (hh : BitVec 16) (i : Nat) (hi : i < NUM) (h : hh.toNat = i) 
   unfold NUM at hi
   omega
 
+omit [MachGS GF] in
 /-- **The floor of a READ completion carries down to an earlier one**: the
 counters are the log's indices and the positions follow them. -/
 theorem diskWm_pos_le (γ : DiskNames) (dl dl0 : List UsedRec) (pm : RegMapF PermVal)

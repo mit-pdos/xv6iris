@@ -68,11 +68,14 @@ def slHtok (γ : GName) (q : Qp) : IProp GF := γ ↪VAR{.own (1 : Qp).half} q
 /-- The authority that pins it, riding with the deposit inside the lock. -/
 def slHauth (γ : GName) (q : Qp) : IProp GF := γ ↪VAR{.own (1 : Qp).half} q
 
+omit [MachGS GF] in
 instance slHtok_timeless (γ : GName) (q : Qp) : Timeless (slHtok (GF := GF) γ q) := by
   unfold slHtok; infer_instance
+omit [MachGS GF] in
 instance slHauth_timeless (γ : GName) (q : Qp) : Timeless (slHauth (GF := GF) γ q) := by
   unfold slHauth; infer_instance
 
+omit [MachGS GF] in
 /-- THE PINNING LAW: the deposit's authority agrees with the holder's token. -/
 theorem slH_agree (γ : GName) (q q' : Qp) :
     slHauth (GF := GF) γ q ∗ slHtok γ q' ⊢ ⌜q = q'⌝ := by
@@ -81,6 +84,7 @@ theorem slH_agree (γ : GName) (q q' : Qp) :
   ihave %h := ghost_var_agree γ q _ q' _ $$ Ha Ht
   ipureintro; exact h
 
+omit [MachGS GF] in
 /-- Re-targeting: whoever holds both halves may set the fraction. -/
 theorem slH_update (γ : GName) (q q' q'' : Qp) :
     slHauth (GF := GF) γ q ∗ slHtok γ q' ⊢ |==> (slHauth γ q'' ∗ slHtok γ q'') := by
@@ -88,6 +92,7 @@ theorem slH_update (γ : GName) (q q' q'' : Qp) :
   iintro ⟨Ha, Ht⟩
   iapply ghost_var_update_halves q'' γ q q' $$ Ha Ht
 
+omit [MachGS GF] in
 /-- The whole variable splits into the two halves. -/
 theorem slH_halves (γ : GName) (q : Qp) :
     (γ ↪VAR q) ⊢@{IProp GF} slHauth γ q ∗ slHtok γ q := by
@@ -97,6 +102,7 @@ theorem slH_halves (γ : GName) (q : Qp) :
   rw [Qp.half_add_half] at h
   iapply h.1 $$ H
 
+omit [MachGS GF] in
 /-- ...and join back. -/
 theorem slH_join (γ : GName) (q : Qp) :
     slHauth (GF := GF) γ q ∗ slHtok γ q ⊢ γ ↪VAR q := by
@@ -106,6 +112,7 @@ theorem slH_join (γ : GName) (q : Qp) :
   rw [Qp.half_add_half] at h
   iapply h.2 $$ H
 
+omit [MachGS GF] in
 /-- Two tokens cannot coexist with an authority: three halves. -/
 theorem slHtok_excl (γ : GName) (q q' : Qp) :
     slHtok (GF := GF) γ q ∗ slHauth γ q' ∗ slHtok γ q' ⊢ False := by
@@ -353,6 +360,7 @@ theorem slFree_retarget [CurCtx] (γ : GName) (slk : BitVec 64) (q0 q : Qp) :
 
 /-! ## Construction: `initsleeplock`'s output becomes a sleeplock -/
 
+omit [MachGS GF] in
 /-- The ghost of an unbuilt sleeplock: the idle holder pair. -/
 theorem slh_ghost_alloc :
     ⊢@{IProp GF} |==> ∃ γ : GName, slHauth γ 1 ∗ slHtok γ 1 := by

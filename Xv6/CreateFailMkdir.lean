@@ -77,6 +77,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
+omit [MachGS GF] in
 /-- The quarters the two `iunlockput`s hand back make a half. -/
 theorem createFailMkdir_quarters (t : Nat) :
     txPin (GF := GF) icfgLog t Qp.quarter ⊢ txPin icfgLog t Qp.quarter -∗

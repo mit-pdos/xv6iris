@@ -176,6 +176,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 /-- The trace so far has `tr` as a prefix (persistent). -/
 def uartSent (γ : UartNames) (tr : List (BitVec 8)) : IProp GF := MonoList.lb_own γ.acc tr
 
+omit [MachGS GF] in
 instance uartSent_persistent (γ : UartNames) (tr : List (BitVec 8)) : Persistent (uartSent (GF := GF) γ tr) := by
   unfold uartSent; infer_instance
 
@@ -184,10 +185,12 @@ the printing cone (other harts may interleave their bytes). -/
 def uartSentSub (γ : UartNames) (bs : List (BitVec 8)) : IProp GF := iprop%
   ∃ tr : List (BitVec 8), uartSent γ tr ∗ ⌜bs.Sublist tr⌝
 
+omit [MachGS GF] in
 instance uartSentSub_persistent (γ : UartNames) (bs : List (BitVec 8)) :
     Persistent (uartSentSub (GF := GF) γ bs) := by
   unfold uartSentSub; infer_instance
 
+omit [MachGS GF] in
 theorem uartSentSub_of_sent (γ : UartNames) (tr : List (BitVec 8)) :
     uartSent (GF := GF) γ tr ⊢ uartSentSub γ tr := by
   unfold uartSentSub
@@ -196,6 +199,7 @@ theorem uartSentSub_of_sent (γ : UartNames) (tr : List (BitVec 8)) :
   iframe H
   ipureintro; exact List.Sublist.refl tr
 
+omit [MachGS GF] in
 theorem uartSentSub_nil (γ : UartNames) (bs : List (BitVec 8)) :
     uartSentSub (GF := GF) γ bs ⊢ uartSentSub γ [] := by
   unfold uartSentSub
@@ -210,6 +214,7 @@ def uartSentRun (γ : UartNames) (L0 : List (BitVec 8)) (ps : List Nat) (cs : Li
   iprop(∃ L : List (BitVec 8), uartSent γ L ∗
     ⌜L0 <+: L ∧ ps.map (fun p => L[p]?) = cs.map some ∧ ps.Pairwise (· < ·) ∧ ∀ p ∈ ps, L0.length ≤ p⌝)
 
+omit [MachGS GF] in
 instance uartSentRun_persistent (γ : UartNames) (L0 : List (BitVec 8)) (ps : List Nat) (cs : List (BitVec 8)) :
     Persistent (uartSentRun (GF := GF) γ L0 ps cs) := by
   unfold uartSentRun; infer_instance
@@ -269,6 +274,7 @@ theorem sentRunAt_snoc {L0 L l : List (BitVec 8)} {ps : List Nat} {cs : List (Bi
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
+omit [MachGS GF] in
 theorem uartSentRun_intro (γ : UartNames) (L0 L : List (BitVec 8)) (ps : List Nat) (cs : List (BitVec 8))
     (h : sentRunAt L0 L ps cs) : uartSent (GF := GF) γ L ⊢ uartSentRun γ L0 ps cs := by
   unfold uartSentRun
@@ -277,6 +283,7 @@ theorem uartSentRun_intro (γ : UartNames) (L0 L : List (BitVec 8)) (ps : List N
   iframe H
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem uartSentRun_elim (γ : UartNames) (L0 : List (BitVec 8)) (ps : List Nat) (cs : List (BitVec 8)) :
     uartSentRun (GF := GF) γ L0 ps cs ⊢ ∃ L, uartSent γ L ∗ ⌜sentRunAt L0 L ps cs⌝ := by
   unfold uartSentRun
@@ -285,11 +292,13 @@ theorem uartSentRun_elim (γ : UartNames) (L0 : List (BitVec 8)) (ps : List Nat)
   iframe H
   ipureintro; exact h
 
+omit [MachGS GF] in
 /-- the empty run, at a stream bound already held -/
 theorem uartSentRun_nil (γ : UartNames) (L0 : List (BitVec 8)) :
     uartSent (GF := GF) γ L0 ⊢ uartSentRun γ L0 [] [] :=
   uartSentRun_intro γ L0 L0 [] [] (sentRunAt_nil L0)
 
+omit [MachGS GF] in
 /-- the runs of two chunks chain (the second started at the first's stream) -/
 theorem uartSentRun_app (γ : UartNames) (L0 L : List (BitVec 8)) (ps ps2 : List Nat) (cs cs2 : List (BitVec 8))
     (h : sentRunAt L0 L ps cs) :
@@ -299,6 +308,7 @@ theorem uartSentRun_app (γ : UartNames) (L0 L : List (BitVec 8)) (ps ps2 : List
   iapply uartSentRun_intro γ L0 L' _ _ (sentRunAt_app h h2)
   iexact H
 
+omit [MachGS GF] in
 /-- the empty stream's lower bound, from any sublist witness -/
 theorem uartSent_nil_of_sub (γ : UartNames) (bs : List (BitVec 8)) :
     uartSentSub (GF := GF) γ bs ⊢ uartSent γ [] := by

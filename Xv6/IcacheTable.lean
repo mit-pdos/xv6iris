@@ -1091,6 +1091,7 @@ end IcacheEnvMorph
 section IcacheEscrowAlloc
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
 
+omit [MachGS GF] in
 /-- THE CHECKOUT DESCRIPTOR's family (§14.8), at `depNone`: at boot no
 entry is checked out, and a whole variable at the neutral descriptor IS
 `icTok` (Rocq's `ic_dep_fun_alloc`, deviation 7). -/
@@ -1104,6 +1105,7 @@ theorem icDepFunAlloc (n : Nat) :
       iexists γ
       iexact H) n
 
+omit [MachGS GF] in
 /-- THE IDENTIFICATION ghost's family (§13.8), at `false`: every entry
 starts empty; each variable comes out WHOLE, so the caller splits it into
 the escrow's half and the table's (Rocq's `ic_id_fun_alloc`). -/
@@ -1117,6 +1119,7 @@ theorem icIdFunAlloc (dvs : Nat → BitVec 32 × BitVec 32) (n : Nat) :
       iexists γ
       iexact H) n
 
+omit [MachGS GF] in
 /-- The whole layer's names (Rocq's `ic_names_alloc`): NINODE checkout
 tokens, NINODE descriptor variables and NINODE identification variables
 (all `false` -- every entry starts empty), all fresh. -/

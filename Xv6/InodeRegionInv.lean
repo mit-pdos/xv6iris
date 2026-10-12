@@ -335,9 +335,11 @@ def iregRegistry [Icfg] (nib : Nat) : IProp GF :=
     ⌜∀ z : Nat, z < 16 * nib → (PartialMap.get? mr z).isSome⌝ ∗
     (icfgReg ↪●MAP mr))
 
+omit [MachGS GF] in
 instance iregRegistry_timeless [Icfg] (nib : Nat) : Timeless (iregRegistry (GF := GF) nib) := by
   unfold iregRegistry; infer_instance
 
+omit [MachGS GF] in
 /-- Boot assembles the registry from the EMPTY `icfgReg` auth
 (`icfgAlloc`'s new hand-out): it bulk-inserts a fully-covering map and
 calls this.  Parametric over the map so the caller (IcacheBoot, where
@@ -425,6 +427,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG
 def iregParked [Icfg] (e : IregArmEnt) : IProp GF :=
   txPin icfgLog e.1 e.2.1
 
+omit [MachGS GF] in
 instance iregParked_timeless [Icfg] (e : IregArmEnt) : Timeless (iregParked (GF := GF) e) := by
   unfold iregParked; infer_instance
 
@@ -435,6 +438,7 @@ share, so no lemma below has to guess either. -/
 def iregArmed [Icfg] (k t : Nat) (q : Qp) (S : Std.ExtTreeSet Nat compare) : IProp GF :=
   icfgLk ↪◯MAP[k] ((t, q, S) : IregArmEnt)
 
+omit [MachGS GF] in
 instance iregArmed_timeless [Icfg] (k t : Nat) (q : Qp) (S : Std.ExtTreeSet Nat compare) :
     Timeless (iregArmed (GF := GF) k t q S) := by
   unfold iregArmed; infer_instance
@@ -470,6 +474,7 @@ instance ftopInv_persistent [Icfg] (γfs : FsNames) :
     Persistent (ftopInv (GF := GF) γfs) := by
   unfold ftopInv; infer_instance
 
+omit [MachGS GF] in
 instance ftopBody_timeless [Icfg] (γfs : FsNames) : Timeless (ftopBody (GF := GF) γfs) := by
   unfold ftopBody; infer_instance
 
@@ -503,6 +508,7 @@ theorem iregArm_fresh (A : RegMapF IregArmEnt) : ∃ k, PartialMap.get? A k = no
   refine ⟨k, LawfulFiniteMap.toList_get?_none.1 fun v hv => hk ?_⟩
   exact List.mem_map.2 ⟨(k, v), hv, rfl⟩
 
+omit [MachGS GF] in
 /-- The parked row moves with a retag of its entry's inum set. -/
 theorem iregParked_retag [Icfg] (A : RegMapF IregArmEnt) (k t : Nat) (q : Qp)
     (S S' : Std.ExtTreeSet Nat compare) (hA : PartialMap.get? A k = some (t, q, S)) :
@@ -512,6 +518,7 @@ theorem iregParked_retag [Icfg] (A : RegMapF IregArmEnt) (k t : Nat) (q : Qp)
     (BigSepM.bigSepM_insert_delete (Φ := fun _ e => iregParked (GF := GF) e)
       (x := ((t, q, S') : IregArmEnt))).2
 
+omit [MachGS GF] in
 /-- The parked row IS the transaction pin (the raw `ln_tx` element). -/
 theorem iregParked_elem [Icfg] (t : Nat) (q : Qp) (S : Std.ExtTreeSet Nat compare) :
     iregParked (GF := GF) ((t, q, S) : IregArmEnt) ⊣⊢ txPin icfgLog t q :=

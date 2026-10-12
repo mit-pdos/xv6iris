@@ -110,6 +110,7 @@ end uDEq
 
 /-! ## The nodes' names -/
 
+omit [MachGS GF] in
 /-- **Rocq `pls_nodes_alloc`**: THE NODES' NAMES, a pipe and two one-shot
 names per node (deviation 3). -/
 theorem pls_nodes_alloc : ∀ n : Nat,

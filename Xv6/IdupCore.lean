@@ -68,6 +68,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
   [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
   [FsLinkG GF] [Appcfg GF]
 
+omit [MachGS GF] in
 /-- Under RULING C' the one flavour a rest home holds is the plain one. -/
 theorem id_runit_of_any [Icfg] (z : Nat) : runitAny (GF := GF) z ⊢ runit false z := .rfl
 

@@ -463,14 +463,19 @@ theorem uartBody_intro' (i : UartId) (γ : UartNames) (u u' : UartState)
   iintro ⟨H1, H2, H3, H4, H5, H6⟩
   iframe
 
+omit [MachGS GF] in
 theorem sentAuth_lcr (γ : UartNames) (u : UartState) (x : BitVec 8) :
     sentAuth (GF := GF) γ { u with lcr := x } = sentAuth γ u := rfl
+omit [MachGS GF] in
 theorem outAuth_lcr (γ : UartNames) (u : UartState) (x : BitVec 8) :
     outAuth (GF := GF) γ { u with lcr := x } = outAuth γ u := rfl
+omit [MachGS GF] in
 theorem txAuth_lcr (γ : UartNames) (u : UartState) (x : BitVec 8) :
     txAuth (GF := GF) γ { u with lcr := x } = txAuth γ u := rfl
+omit [MachGS GF] in
 theorem outAuth_thr (γ : UartNames) (u : UartState) (t : List (BitVec 8)) (f : Bool) :
     outAuth (GF := GF) γ { u with tx := t, thri := f } = outAuth γ u := rfl
+omit [MachGS GF] in
 theorem dlabAuth_thr (γ : UartNames) (u : UartState) (t : List (BitVec 8)) (f : Bool) :
     dlabAuth (GF := GF) γ { u with tx := t, thri := f } = dlabAuth γ u := rfl
 
@@ -590,6 +595,7 @@ theorem thr_write_au (i : UartId) (γ : UartNames) (l bs : List (BitVec 8)) (b :
   rw [hacc] at hbs
   exact hbs.append_right [b]
 
+omit [MachGS GF] in
 /-- a lower bound of the accepted trace is a prefix of it -/
 theorem sentAuth_sent_prefix (γ : UartNames) (u : UartState) (L0 : List (BitVec 8)) :
     sentAuth (GF := GF) γ u ∗ uartSent γ L0 ⊢ ⌜L0 <+: Uart.acc u⌝ ∗ sentAuth γ u := by
@@ -1203,15 +1209,19 @@ def uartPreinit (γ : UartNames) : IProp GF := γ.init ↪VAR{.own 1} false
 client of the PLIC's slots. -/
 def uartInited (γ : UartNames) : IProp GF := γ.init ↪VAR{.discard} true
 
+omit [MachGS GF] in
 instance uartInited_persistent (γ : UartNames) : Persistent (uartInited (GF := GF) γ) := by
   unfold uartInited; infer_instance
 
+omit [MachGS GF] in
 instance uartPreinit_timeless (γ : UartNames) : Timeless (uartPreinit (GF := GF) γ) := by
   unfold uartPreinit; infer_instance
 
+omit [MachGS GF] in
 instance uartInited_timeless (γ : UartNames) : Timeless (uartInited (GF := GF) γ) := by
   unfold uartInited; infer_instance
 
+omit [MachGS GF] in
 /-- The two regimes exclude each other: the ghost variable cannot be both
 `false` and `true`. -/
 theorem uartPreinit_inited_False (γ : UartNames) :
@@ -1221,6 +1231,7 @@ theorem uartPreinit_inited_False (γ : UartNames) :
   ihave %h := ghost_var_agree γ.init false (.own 1) true .discard $$ H1 H2
   exact absurd h (by decide)
 
+omit [MachGS GF] in
 /-- **The flip**: the boot client spends the whole variable and mints the
 persistent marker.  One-way: after this no update is possible. -/
 theorem uartPreinit_deposit (γ : UartNames) :

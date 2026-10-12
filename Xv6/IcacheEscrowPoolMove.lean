@@ -682,6 +682,7 @@ theorem ipoolInvAcc [Icfg] (E : CoPset) (cn : IcNames) (γfs : FsNames) (γi : G
   iapply ipoolBody_intro cn γfs γi cov logstart nib O X T ids K hlen hrow hdk
   iframe
 
+omit [MachGS GF] in
 /-- The transit ledger at a commit is empty (`txPins_noOps`, curried). -/
 theorem ipoolTransit_noOps [Icfg] (T : RegMapF (Nat × Qp)) :
     logTxAuth (GF := GF) icfgLog (∅ : RegMapF Unit) ⊢ ipoolTransit T -∗ ⌜T = ∅⌝ := by

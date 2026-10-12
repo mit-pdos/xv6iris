@@ -116,6 +116,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
+omit [MachGS GF] in
 /-- Two FULL `dinodeAt`s name distinct inums (Rocq's `dinode_at_excl` case
 split), both handed back. -/
 theorem sys_unlink_dinode_ne (γi : GName) (i1 i2 : BitVec 32) (dn1 dn2 : Dinode) :

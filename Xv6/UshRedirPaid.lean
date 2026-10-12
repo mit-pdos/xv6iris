@@ -131,6 +131,7 @@ theorem wp_kshd_openfail_paid (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF
 
 /-! ## S2 The name as the image the open reads -/
 
+omit [MachGS GF] in
 /-- **Rocq `ushr_fname_img`** (deviation 2): the node's file string, as a
 run the open reads the path `nm` off. -/
 theorem ushr_fname_img (γd : GName) (x : UArg) (nm : List (BitVec 8)) (hu : uname nm) (hlen : x.len = nm.length)

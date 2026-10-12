@@ -170,6 +170,7 @@ theorem udep_exit_regs (W : Uvis) (Q : Int → IProp GF) :
   iintro Hr ⟨#Hs, -, -, %hlaw, -⟩
   iapply (hlaw W Q) $$ Hs Hr
 
+omit [MachGS GF] in
 /-- **Rocq `srow_regs_nopipe`**: a table that holds no pipe registers itself. -/
 theorem srow_regs_nopipe : ∀ (fdv : List FdState), fdvNopipe fdv →
     ⊢ [∗list] st ∈ fdv, UexecSG.srowReg (GF := GF) st
@@ -262,6 +263,7 @@ theorem urunNopipe_regs (fdv : List FdState) :
 theorem urunNopipe_intro (fdv : List FdState) (h : fdvNopipe fdv) : ⊢ urunNopipe (GF := GF) fdv :=
   (srow_regs_nopipe fdv h).trans (urunNopipe_regs fdv)
 
+omit [MachGS GF] in
 /-- **Rocq `urun_nopipe_regs_insert`**: a row overwritten by a registered one. -/
 theorem urunNopipe_regs_insert :
     ∀ (fdv : List FdState) (k : Nat) (st : FdState),
@@ -281,11 +283,13 @@ theorem urunNopipe_regs_insert :
     iframe Hh
     iapply urunNopipe_regs_insert l k st $$ Hst Ht
 
+omit [MachGS GF] in
 /-- Rocq `urun_nopipe_regs_lookup`. -/
 theorem urunNopipe_regs_lookup (fdv : List FdState) (k : Nat) (st : FdState) (hk : fdv[k]? = some st) :
     ([∗list] s ∈ fdv, UexecSG.srowReg (GF := GF) s) ⊢ UexecSG.srowReg st :=
   BigSepL.bigSepL_lookup (Φ := fun _ s => UexecSG.srowReg (GF := GF) s) hk
 
+omit [MachGS GF] in
 /-- Rocq `urun_nopipe_regs_lookup_total` (the total lookup is `getD … closed`). -/
 theorem urunNopipe_regs_lookup_total (fdv : List FdState) (k : Nat) :
     ([∗list] s ∈ fdv, UexecSG.srowReg (GF := GF) s) ⊢ UexecSG.srowReg (fdv.getD k .closed) := by
@@ -511,13 +515,16 @@ def udepwfStd (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : U
 def urunIds (N : UkNames GF) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) : IProp GF :=
   iprop(uchAuth N.ch cs ∗ upidAuth N.pid (pidv.toNat : Int))
 
+omit [MachGS GF] in
 instance urunIds_timeless (N : UkNames GF) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) :
     Timeless (urunIds N cs pidv) := by unfold urunIds; infer_instance
 
+omit [MachGS GF] in
 /-- Rocq `urun_ids_intro`. -/
 theorem urunIds_intro (N : UkNames GF) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) :
     uchAuth (GF := GF) N.ch cs ∗ upidAuth N.pid (pidv.toNat : Int) ⊢ urunIds N cs pidv := .rfl
 
+omit [MachGS GF] in
 /-- **Rocq `urun_ids_ch`**: the children half, LENT. -/
 theorem urunIds_ch (N : UkNames GF) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) :
     urunIds N cs pidv ⊢ uchAuth N.ch cs ∗ ∀ cs' : ExtTreeSet GName compare, uchAuth N.ch cs' -∗ urunIds N cs' pidv := by
@@ -527,6 +534,7 @@ theorem urunIds_ch (N : UkNames GF) (cs : ExtTreeSet GName compare) (pidv : BitV
   iintro %cs' Hch
   iframe Hch Hpid
 
+omit [MachGS GF] in
 /-- **Rocq `urun_ids_pid`**: the pid half, LENT. -/
 theorem urunIds_pid (N : UkNames GF) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) :
     urunIds N cs pidv ⊢ upidAuth N.pid (pidv.toNat : Int) ∗ (upidAuth N.pid (pidv.toNat : Int) -∗ urunIds N cs pidv) := by

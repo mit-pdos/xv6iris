@@ -26,6 +26,7 @@ section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- The converse of `Xv6.eo_idx_range`: a `List.range` row read back as an
 INDEXED row over a list of the same length. -/
 theorem eo_range_idx {A : Type} :
@@ -68,6 +69,7 @@ section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- The slot pool is additive (`install_trans` hands back `2 + n` units at
 once, and they have to rejoin the rest). -/
 theorem bslots_add (γ : BcacheNames) : ∀ (m n : Nat),
@@ -88,6 +90,7 @@ theorem bslots_add (γ : BcacheNames) : ∀ (m n : Nat),
     iapply bslots_cons (m + n)
     iframe Hu H
 
+omit [MachGS GF] in
 /-- The commit's per-entry row, assembled for `install_trans`: the slot's
 client half at the content the copy loop wrote, and the home block's pin
 half (still set -- `log_write`'s `bpin` minted it). -/
@@ -102,6 +105,7 @@ theorem eo_rows_pack (γfs : FsNames) (ls : Nat) (W : List (BitVec 32))
     (Ψ := fun (_ : Nat) (w : BitVec 32) => fsDirtyHalf γfs w.toNat v) (l := W)).2
   iexact H
 
+omit [MachGS GF] in
 theorem eo_rows_unpack (γfs : FsNames) (ls : Nat) (W : List (BitVec 32))
     (Lw : Nat → List (BitVec 8)) (v : Bool) :
     ([∗list] i ↦ w ∈ W, fsChalf (GF := GF) γfs (logSlotBno ls i) (Lw i) ∗
@@ -114,6 +118,7 @@ theorem eo_rows_unpack (γfs : FsNames) (ls : Nat) (W : List (BitVec 32))
     (Ψ := fun (_ : Nat) (w : BitVec 32) => fsDirtyHalf γfs w.toNat v) (l := W)).1
   iexact H
 
+omit [MachGS GF] in
 /-- The home blocks' pin halves, read off the `cov` row through the map. -/
 theorem eo_dirty_of_map (γfs : FsNames) (W : List (BitVec 32)) (v : Bool) :
     ([∗list] b ∈ W.map (fun w => w.toNat), fsDirtyHalf (GF := GF) γfs b v) ⊢
@@ -121,6 +126,7 @@ theorem eo_dirty_of_map (γfs : FsNames) (W : List (BitVec 32)) (v : Bool) :
   rw [BigSepL.bigSepL_map (PROP := IProp GF)
     (Φ := fun (_ : Nat) (b : Nat) => fsDirtyHalf γfs b v) (fun w : BitVec 32 => w.toNat)]
 
+omit [MachGS GF] in
 theorem eo_dirty_to_map (γfs : FsNames) (W : List (BitVec 32)) (v : Bool) :
     ([∗list] i ↦ w ∈ W, fsDirtyHalf (GF := GF) γfs w.toNat v) ⊢
       [∗list] b ∈ W.map (fun w => w.toNat), fsDirtyHalf γfs b v := by

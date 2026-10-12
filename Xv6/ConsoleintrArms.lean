@@ -699,6 +699,7 @@ theorem ci_drop_gh_full (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (b
   imodintro
   iframe Hlgh Harm Hgh
 
+omit [MachGS GF] in
 theorem ci_hiOut_of (γ : UartNames) (hb : List Obs) (hh : Option (List Obs)) (hx : ohistExt hh hb) :
     rxHi (GF := GF) γ (1 : Qp).half hh ⊢ ciHiOut γ hb := by
   unfold ciHiOut

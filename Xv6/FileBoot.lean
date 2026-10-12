@@ -105,6 +105,7 @@ theorem fileBoot_offFree_of_word (ξ : CtxId) (k : Nat) (v : BitVec 32) :
   have hjr : j < 4 := List.mem_range.mp (List.mem_of_getElem? hj)
   iapply ctxByte_byteMapped4 ξ (aFoff k) ppn _ j hjr hal hpin hlt hram $$ Hcl Hj
 
+omit [MachGS GF] in
 /-- **The table's ghosts, minted** (Rocq `ftable_ghosts_alloc`): the
 reference map's authority at `∅` and one payload-names variable per slot,
 whole. -/

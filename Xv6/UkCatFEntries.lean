@@ -113,6 +113,7 @@ structure CfeCtx where
   claims (discharged by `hfpFileOpen_holds` at the fs tier's classes) -/
   FO : HfpFileOpenP (GF := GF)
 
+omit [MachGS GF] in
 /-- Rocq `cfe_cat_code_persistent`. -/
 theorem cfe_code_persistent (N' : UkNames GF) : Persistent (catProg N').code := by
   unfold catProg; infer_instance

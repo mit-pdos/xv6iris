@@ -280,6 +280,7 @@ theorem execArms_landed_keep (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewName
   · iapply (execArms_landed) $$ H
   · iexact H
 
+omit [MachGS GF] in
 /-- **Rocq `exec_post_ok_recv`: THE SLOT OUT OF A SUCCESS, whichever arm
 fired**, with the landed `a0 ≠ -1`. -/
 theorem execPostOk_recv (Fs : Pfam GF (Uvis → IProp GF)) (na : Nat) (alen : Nat → Nat)

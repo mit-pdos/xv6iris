@@ -43,6 +43,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
 
 /-! ## §0 helpers (deviation 1) -/
 
+omit [MachGS GF] in
 /-- Two pins of one era agree (`EchoOut.eraPin_agree`, curried). -/
 theorem uera_pin_agree (γ : EchoGn) (k : Nat) (v v' : EraPins) :
     ⊢ eraPin (GF := GF) γ k v -∗ eraPin γ k v' -∗ ⌜v = v'⌝ := by

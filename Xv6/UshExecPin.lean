@@ -81,12 +81,14 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_exec_ext`**: THE NODE IS READ FIELD BY FIELD. -/
 theorem ushCmdExecExt (g : GName) (t : Nat) (args args' : List UArg) (h : List.Forall₂ uargEqv args args') :
     ushCmd (GF := GF) g t (.exec args) ⊣⊢ ushCmd g t (.exec args') := by
   obtain rfl := uargEqv_forall2_eq h
   exact .rfl
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_rebase`**: the node the parser built for a stage's words
 at their line offset `c` IS the word list's node at the shifted base
 (deviation 4). -/
@@ -95,6 +97,7 @@ theorem ushCmdRebase (g : GName) (t s0 : Nat) (gs : Nat → BitVec 8) (c : Nat) 
       ushCmd g t (.exec (ushArgs (s0 + c) (fun j => gs (c + j)) (ushEchoToks ws))) :=
   ushCmdExecExt g t _ _ (ushArgsRebase s0 gs c (wlToks ws))
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_rebase_l`**. -/
 theorem ushCmdRebaseL (g : GName) (t s0 : Nat) (gs : Nat → BitVec 8) (c : Nat) (ws : List (List (BitVec 8))) :
     ushCmd (GF := GF) g t (.exec (ushArgs s0 gs (ushqRebase c (wlToks ws)))) ⊢

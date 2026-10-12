@@ -38,6 +38,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- A cell's address is a machine word. -/
 theorem ushG_cell_bnd (N : UkNames GF) (p : Nat) (v : BitVec 64) :
     ushCell N p v ⊢ ⌜p < 2 ^ 64⌝ ∗ ushCell N p v := by

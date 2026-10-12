@@ -246,6 +246,7 @@ theorem filestat_env_in (st : FdState) (h : fstatStInode st) :
   · exact .rfl
   · exact .rfl
 
+omit [MachGS GF] in
 /-- ... and closed (Rocq ProofFilestat's `fst_env_out_in`). -/
 theorem filestat_env_out_in (st : FdState) (h : fstatStInode st) :
     filestatFsOut (GF := GF) ⊢ filestatEnvOut st := by

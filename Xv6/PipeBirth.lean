@@ -244,6 +244,7 @@ theorem pageOwn_pipeRaw (pi : BitVec 64) (hpv : pageValid pi) :
 
 /-! ## The pipe's ghost names -/
 
+omit [MachGS GF] in
 /-- **The pipe's five ghosts** (the Lean port of Rocq `pipe_ends_alloc`):
 one reference and one open-marker per end, and the byte queue at its birth
 state, authority and fragment. -/

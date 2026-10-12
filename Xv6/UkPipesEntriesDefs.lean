@@ -118,12 +118,15 @@ theorem pok (N' : UkNames GF) (P : Uprog GF) (γreg : GName) (kds : List (Nat ×
   hsup := X.hsup
   hpc := hpc
 
+omit [MachGS GF] in
 theorem cat_code_persistent (N' : UkNames GF) : Persistent (catProg N').code := by
   unfold catProg; infer_instance
 
+omit [MachGS GF] in
 theorem grep_code_persistent (N' : UkNames GF) : Persistent (grepProg (GF := GF) N'.t).code := by
   unfold grepProg grepCode; infer_instance
 
+omit [MachGS GF] in
 theorem echo_code_persistent (N' : UkNames GF) : Persistent (echoProg N').code := by
   unfold echoProg; infer_instance
 

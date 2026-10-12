@@ -65,6 +65,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
 
 /-! ## §2 Stack frames -/
 
+omit [MachGS GF] in
 /-- A two-word frame, opened (Rocq `ustack_2`). -/
 theorem ustack_two (γd : GName) (sp : BitVec 64) :
     ustack (GF := GF) γd sp 2 ⊣⊢ ⌜sp.toNat % 8 = 0 ∧ 8 * 2 ≤ sp.toNat⌝ ∗
@@ -85,6 +86,7 @@ theorem ustack_two (γd : GName) (sp : BitVec 64) :
     iapply BigSepL.bigSepL_nil.2
     iempintro
 
+omit [MachGS GF] in
 /-- An eight-word frame, opened (main's spill area; nothing is given back,
 main never returns). -/
 theorem ustack_eight (γd : GName) (sp : BitVec 64) :

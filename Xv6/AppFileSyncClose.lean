@@ -183,10 +183,12 @@ def syncRedir (c : FileFixed) (r : FileAppNames) (S S' : Fstate) : IProp GF :=
     ∗ ⌜n = ls_w.length⌝ ∗ ⌜S' = S.insert N (subseq (echoChunks ws) sel)⌝
     ∗ flLb c ls_w ∗ fposq r n)
 
+omit [MachGS GF] in
 instance syncRedir_timeless (c : FileFixed) (r : FileAppNames) (S S' : Fstate) :
     Timeless (syncRedir (GF := GF) c r S S') := by
   unfold syncRedir; infer_instance
 
+omit [MachGS GF] in
 /-- The permit, built (Rocq: `rewrite /sync_redir; iExists …; iFrame`). -/
 theorem syncRedir_intro (c : FileFixed) (r : FileAppNames) (S S' : Fstate) (ls_w : List FlLine)
     (ws : List (List (BitVec 8))) (N : List (BitVec 8)) (sel : List Nat)

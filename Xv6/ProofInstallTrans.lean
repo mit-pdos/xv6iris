@@ -449,6 +449,7 @@ def itExcAt (γfs : FsNames) (recovering : Bool) (Xexc : List Nat)
     (Wl : List Nat) : IProp GF :=
   if recovering then excOwn γfs.exc (excDelMany Xexc Wl) else iprop(emp)
 
+omit [MachGS GF] in
 /-- On the COMMIT arm the handle is `emp` at every cursor, so the cursor is
 free. -/
 theorem itExcAt_false (γfs : FsNames) (Xexc l l' : List Nat) :
@@ -458,6 +459,7 @@ theorem itExcAt_false (γfs : FsNames) (Xexc l l' : List Nat) :
   iintro H; iexact H
 
 set_option maxRecDepth 100000 in
+omit [MachGS GF] in
 /-- The cursor's shift when the loop steps. -/
 theorem itRow_shift (γfs : FsNames) (recovering : Bool) (logstart : Nat) (Lw : Nat → List (BitVec 8))
     (t : Nat) (l : List (BitVec 32)) :
@@ -467,6 +469,7 @@ theorem itRow_shift (γfs : FsNames) (recovering : Bool) (logstart : Nat) (Lw : 
   intro i w _
   rw [show t + (i + 1) = t + 1 + i from by omega]
 
+omit [MachGS GF] in
 /-- Peel entry `t` off the not-yet-installed rows. -/
 theorem itRow_uncons (γfs : FsNames) (recovering : Bool) (logstart : Nat) (Lw : Nat → List (BitVec 8))
     (W : List (BitVec 32)) (t : Nat) (wt : BitVec 32) (htlen : t < W.length)
@@ -483,6 +486,7 @@ theorem itRow_uncons (γfs : FsNames) (recovering : Bool) (logstart : Nat) (Lw :
   · iexact H1
   · iexact H2
 
+omit [MachGS GF] in
 /-- ...and push it onto the installed ones. -/
 theorem itRow_snoc (γfs : FsNames) (recovering : Bool) (logstart : Nat) (Lw : Nat → List (BitVec 8))
     (W : List (BitVec 32)) (t : Nat) (wt : BitVec 32) (htlen : t < W.length)

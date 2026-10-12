@@ -26,6 +26,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG 
 
 namespace UkFileDev
 
+omit [MachGS GF] in
 /-- **Rocq `fdev_ustd_key_agree`**: the ledger's agreement with the key's
 table at a standard slot. -/
 theorem fdev_ustd_key_agree (N : UkNames GF) (l : List FdState) (fd : Nat) (st : FdState) (v0 : BitVec 64)
@@ -36,6 +37,7 @@ theorem fdev_ustd_key_agree (N : UkNames GF) (l : List FdState) (fd : Nat) (st :
   ipureintro
   exact std_fd_st_of_key v0 fdv l fd st h0 hs ht hl
 
+omit [MachGS GF] in
 /-- **Rocq `UkReadRows.ufd_key_agree`**: a tail handle's agreement with the
 key's table. -/
 theorem fdev_ufd_key_agree (N : UkNames GF) (fd : Nat) (st : FdState) (v0 : BitVec 64) (fdv : List FdState)

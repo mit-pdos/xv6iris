@@ -68,6 +68,7 @@ instance f0cw_timeless (g : FileGn) (k : Nat) (s : Fstate) :
     Timeless (f0cw (GF := GF) g k s) := by
   unfold f0cw; infer_instance
 
+omit [MachGS GF] in
 /-- `eraPin_agree` in the curried form the parameter records ask for. -/
 theorem fileOut_eraPin_agree (γ : EchoGn) (k : Nat) (v v' : EraPins) :
     ⊢ eraPin (GF := GF) γ k v -∗ eraPin γ k v' -∗ ⌜v = v'⌝ := by
@@ -166,6 +167,7 @@ theorem f0wa_file (g : FileGn) (k : Nat) (s0 : Fstate) :
     unfold f0Lb
     iframe Hp Hbl Hfd
 
+omit [MachGS GF] in
 /-- The file keeps no ledger of its process stream (Rocq `file_gext_grow`). -/
 theorem fileGextGrow (_k : Nat) (_l : List (BitVec 8)) (_b : BitVec 8) :
     ⊢ (emp : IProp GF) ==∗ emp := by
@@ -255,6 +257,7 @@ theorem fturnFile (g : FileGn) (k : Nat) (s0 : Fstate) :
 def f0Map (g : FileGn) (h : List Obs) : IProp GF :=
   iprop(∃ Mf : RegMapF FileEra, (g.fgnEra ↪●MAP Mf) ∗ ⌜pinDom Mf (obsBoots h)⌝)
 
+omit [MachGS GF] in
 instance f0Map_timeless (g : FileGn) (h : List Obs) : Timeless (f0Map (GF := GF) g h) := by
   unfold f0Map; infer_instance
 

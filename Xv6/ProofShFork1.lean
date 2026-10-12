@@ -60,11 +60,13 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- The saved frame, as a payload. -/
 theorem forkable_ushSaved (sb : Nat) (vs : List (BitVec 64)) : Forkable (GF := GF) (fun _ gd _ => ushSaved gd sb vs) :=
   Forkable_ext _ _ (fun _ _ _ => by unfold ushSaved; exact .rfl)
     (forkable_bigSepL vs (fun i v _ gd _ => uword gd (sb - 8 * (i + 1)) v) (fun _ v => forkable_uword _ v))
 
+omit [MachGS GF] in
 /-- `ushFork1Ans`, introduced from the fork stub's inline answer. -/
 theorem ushFork1Ans_intro (N : UkNames GF) (Sc : ExtTreeSet GName compare) (Q : Int → IProp GF) (Rc : IProp GF)
     (r : BitVec 64) :
@@ -74,6 +76,7 @@ theorem ushFork1Ans_intro (N : UkNames GF) (Sc : ExtTreeSet GName compare) (Q : 
       ⊢ ushFork1Ans N Sc Q Rc r := by
   unfold ushFork1Ans; exact .rfl
 
+omit [MachGS GF] in
 /-- ...and read back. -/
 theorem ushFork1Ans_elim (N : UkNames GF) (Sc : ExtTreeSet GName compare) (Q : Int → IProp GF) (Rc : IProp GF)
     (r : BitVec 64) :

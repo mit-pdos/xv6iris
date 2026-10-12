@@ -116,6 +116,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_redirs_at_app`**: the chain built so far, extended by the
 chain one turn's parseredirs built around its root. -/
 theorem ushRedirsAt_app (N : UkNames GF) (s0 t0 t1 : Nat) :
@@ -131,10 +132,12 @@ theorem ushRedirsAt_app (N : UkNames GF) (s0 t0 t1 : Nat) :
     iapply ushRedirsAt_app N s0 t0 t1 rs0 rs1 p1 $$ [Hr H]
     iframe
 
+omit [MachGS GF] in
 /-- The type word does not look at the tokens. -/
 theorem ushTypeAt_exec (N : UkNames GF) (p : Nat) (a b : List (Nat × Nat)) :
     ushTypeAt N p (.exec a) = ushTypeAt N p (.exec b) := rfl
 
+omit [MachGS GF] in
 /-- The node under construction, one token longer (Rocq `ushp_slots_upd`
 twice, argv and eargv). -/
 theorem ushPex_pre_upd (N : UkNames GF) (s0 p : Nat) (done : List (Nat × Nat)) (tk : Nat × Nat)
@@ -158,6 +161,7 @@ theorem ushPex_pre_upd (N : UkNames GF) (s0 p : Nat) (done : List (Nat × Nat)) 
   · iapply Hacl $$ Ha
   · iapply Hecl $$ He
 
+omit [MachGS GF] in
 /-- A frame split at a named floor (the body on top, the rest below). -/
 theorem ushPex_split (γd : GName) (sp : BitVec 64) (k n b : Nat) (hb : b = sp.toNat - 8 * k)
     (hroom : 8 * (k + n) ≤ sp.toNat) :
@@ -169,6 +173,7 @@ theorem ushPex_split (γd : GName) (sp : BitVec 64) (k n b : Nat) (hb : b = sp.t
   iframe H2
   iapply ush_ustack_body $$ H1
 
+omit [MachGS GF] in
 /-- ...and its join. -/
 theorem ushPex_join (γd : GName) (sp : BitVec 64) (k n b : Nat) (hb : b = sp.toNat - 8 * k)
     (hal : sp.toNat % 8 = 0) (hroom : 8 * (k + n) ≤ sp.toNat) :
@@ -183,6 +188,7 @@ theorem ushPex_join (γd : GName) (sp : BitVec 64) (k n b : Nat) (hb : b = sp.to
   · ipureintro; exact ⟨hal, by omega⟩
   · iexact H1
 
+omit [MachGS GF] in
 /-- The node's NULL caps at `argc`, out, and the finished node back
 (Rocq `ushp_slots_cap` twice and `ushp_exec_pre_at`). -/
 theorem ushPex_pre_cap (N : UkNames GF) (s0 p : Nat) (toks : List (Nat × Nat)) :

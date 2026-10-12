@@ -56,12 +56,14 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 
 /-! ## 0.  Two readings (deviation 4) -/
 
+omit [MachGS GF] in
 /-- At `omTrunc vom = false` the kept cursor is the cursor. -/
 theorem pinned_open_cur_whole (vom : BitVec 64) (P : Nat → Nat → IProp GF) (k d : Nat)
     (htr : omTrunc vom = false) : curKept vom P k d ⊢ P k d := by
   unfold curKept
   rw [if_neg (by simp [htr])]
 
+omit [MachGS GF] in
 /-- An `if` on a key known to be `true`. -/
 theorem pinned_open_ite_t (b : Bool) (X Y : IProp GF) (hb : b = true) :
     (if b then X else Y) ⊢ X := by

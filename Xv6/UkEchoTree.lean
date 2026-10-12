@@ -80,9 +80,12 @@ def echoProg (N : UkNames GF) : Uprog GF :=
   ⟨ukCode N.t User.Echo.code.byte, User.Echo.Sym.«write», User.Echo.Sym.«read», User.Echo.Sym.«open»,
     User.Echo.Sym.«close», User.Echo.Sym.«exit»⟩
 
+omit [MachGS GF] in
 theorem echoProg_code (N : UkNames GF) : (echoProg N).code = ukCode N.t User.Echo.code.byte := rfl
+omit [MachGS GF] in
 theorem echoProg_write (N : UkNames GF) : (echoProg N).write = User.Echo.Sym.«write» := rfl
 
+omit [MachGS GF] in
 /-- Rocq `echo_prog_code_persistent`. -/
 instance echoProg_code_persistent (N : UkNames GF) : Persistent (echoProg N).code := by
   rw [echoProg_code]; infer_instance
@@ -104,6 +107,7 @@ theorem echoTp_wr (N : UkNames GF) (P : Uprog GF) (fd : Int) (bs : Bytes) (k : I
 
 /-! ## §1 echo's sources, as the hole wants them -/
 
+omit [MachGS GF] in
 /-- **Rocq `usrc_arg`**: argv's string `i`, as a DATA source (deviation 5). -/
 theorem usrc_arg (N : UkNames GF) (av : Nat) (args : List UArg) (i : Nat) (g : UArg)
     (hg : args[i]? = some g) :
@@ -116,6 +120,7 @@ theorem usrc_arg (N : UkNames GF) (av : Nat) (args : List UArg) (i : Nat) (g : U
   imodintro
   iexact Hb
 
+omit [MachGS GF] in
 /-- **Rocq `usrc_lit`**: a `.rodata` byte, as a TEXT source (deviations 1, 5). -/
 theorem usrc_lit (N : UkNames GF) (a : Nat) (b : BitVec 8) (h : User.Echo.code.byte a = some b) :
     ukCode (GF := GF) N.t User.Echo.code.byte ⊢ □ usrcAt N true DFrac.discard a 1 (fun _ => b) := by

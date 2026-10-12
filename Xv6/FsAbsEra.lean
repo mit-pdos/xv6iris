@@ -260,10 +260,12 @@ def elend (Γ : FsViewNames GF) (d : Nat) (dq : DFrac) (ents : Std.ExtTreeMap Fn
   iprop(∃ n : FsNode, topFragQ Γ dq d n ∗
     ⌜fnIsDir n = true ∧ dirEntries n = ents ∧ fnNlink n ≠ 0⌝)
 
+omit [MachGS GF] in
 instance elend_timeless (Γ : FsViewNames GF) (d : Nat) (dq : DFrac)
     (ents : Std.ExtTreeMap Fname Nat compare) : Timeless (elend Γ d dq ents) := by
   unfold elend; infer_instance
 
+omit [MachGS GF] in
 /-- Rocq's `elend_frag`. -/
 theorem elend_frag (Γ : FsViewNames GF) (d : Nat) (dq : DFrac)
     (ents : Std.ExtTreeMap Fname Nat compare) :
@@ -273,6 +275,7 @@ theorem elend_frag (Γ : FsViewNames GF) (d : Nat) (dq : DFrac)
   iexists n
   iexact H
 
+omit [MachGS GF] in
 /-- the lend carries LIVENESS too (Rocq's `elend_intro`; E2-V2). -/
 theorem elend_intro (Γ : FsViewNames GF) (d : Nat) (dq : DFrac) (n : FsNode)
     (hd : fnIsDir n = true) (hnl : fnNlink n ≠ 0) :
@@ -286,6 +289,7 @@ theorem elend_intro (Γ : FsViewNames GF) (d : Nat) (dq : DFrac) (n : FsNode)
 
 /-! ### The split and the pin (need only the top map) -/
 
+omit [MachGS GF] in
 /-- THE SPLIT THE FIRE RIDES ON: the walk lends HALF and keeps HALF (Rocq's
 `era_half_split`). -/
 theorem eraHalf_split (Γ : FsViewNames GF) (d : Nat) (n : FsNode) :

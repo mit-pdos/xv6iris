@@ -104,6 +104,7 @@ theorem wp_kinit_write_chain_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m :
   · ipureintro; rw [← e 11#5 (by decide)]; exact hnf
   · rw [← e 11#5 (by decide)]; iexact Hbuf
 
+omit [MachGS GF] in
 /-- **Rocq `ubyte_run_one`**: one byte is the one-byte run. -/
 theorem ubyte_run_one (γd : GName) (a : Nat) (b : BitVec 8) :
     ubyte (GF := GF) γd a b ⊣⊢ ubytesq γd (DFrac.own 1) a 1 (fun _ => b) := by
@@ -121,11 +122,13 @@ theorem ubyte_run_one (γd : GName) (a : Nat) (b : BitVec 8) :
     icases h.1 $$ H with ⟨-, H⟩
     iexact H
 
+omit [MachGS GF] in
 /-- **Rocq `ubyte_to_run`**. -/
 theorem ubyte_to_run (γd : GName) (a : Nat) (b : BitVec 8) :
     ⊢@{IProp GF} ubyte γd a b -∗ ubytesq γd (DFrac.own 1) a 1 (fun _ => b) := by
   iintro H; iapply (ubyte_run_one γd a b).1 $$ H
 
+omit [MachGS GF] in
 /-- **Rocq `ubyte_of_run`**. -/
 theorem ubyte_of_run (γd : GName) (a : Nat) (b : BitVec 8) :
     ⊢@{IProp GF} ubytesq γd (DFrac.own 1) a 1 (fun _ => b) -∗ ubyte γd a b := by

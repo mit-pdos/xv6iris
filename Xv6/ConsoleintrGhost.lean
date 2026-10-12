@@ -349,6 +349,7 @@ def ciHiOut (γ : UartNames) (hb : List Obs) : IProp GF := iprop%
 def ciHiKill (γ : UartNames) (hb : List Obs) : IProp GF := iprop%
   ∃ hh' : Option (List Obs), rxHi γ (1 : Qp).half hh' ∗ ⌜ohistExt hh' hb⌝
 
+omit [MachGS GF] in
 theorem ciHiKill_out (γ : UartNames) (hb : List Obs) :
     ciHiKill (GF := GF) γ hb ⊢ ciHiOut γ hb := by
   unfold ciHiKill ciHiOut
@@ -357,6 +358,7 @@ theorem ciHiKill_out (γ : UartNames) (hb : List Obs) :
   iframe Hhi
   ipureintro; exact ohistLe_of_ext hh' hb hx
 
+omit [MachGS GF] in
 theorem ciHiOut_some (γ : UartNames) (hb : List Obs) :
     rxHi (GF := GF) γ (1 : Qp).half (some hb) ⊢ ciHiOut γ hb := by
   unfold ciHiOut

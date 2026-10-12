@@ -86,11 +86,13 @@ def axHopAns (rt : Nat) (P Pmiss : Nat → Nat → IProp GF) (k d : Nat) (s : Fn
     (ents : Std.ExtTreeMap Fname Nat compare) : IProp GF :=
   if s = DOTDOT ∧ d = rt then P (k + 1) d else axHopNext P Pmiss k d ents[s]?
 
+omit [MachGS GF] in
 theorem axHopAns_self (rt : Nat) (P Pmiss : Nat → Nat → IProp GF) (k d : Nat) (s : Fname)
     (ents : Std.ExtTreeMap Fname Nat compare) (hs : s = DOTDOT) (hd : d = rt) :
     axHopAns rt P Pmiss k d s ents = P (k + 1) d := by
   unfold axHopAns; rw [if_pos ⟨hs, hd⟩]
 
+omit [MachGS GF] in
 theorem axHopAns_rec (rt : Nat) (P Pmiss : Nat → Nat → IProp GF) (k d : Nat) (s : Fname)
     (ents : Std.ExtTreeMap Fname Nat compare) (hns : ¬(s = DOTDOT ∧ d = rt)) :
     axHopAns rt P Pmiss k d s ents = axHopNext P Pmiss k d ents[s]? := by

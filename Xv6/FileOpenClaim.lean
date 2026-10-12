@@ -263,6 +263,7 @@ theorem fileAppStep_free_at (c : FileFixed) (r : FileAppNames) (i : Nat)
 
 /-! ## §3e'. What the claim says at a view nobody holds a fraction at -/
 
+omit [MachGS GF] in
 /-- THE WHOLE PURE READING, off ONE arm's typed witness (Rocq
 `fclaim_free_of`). -/
 theorem fclaimFree_of (c : FileFixed) (v : Aview) (s : Dst) (hpins : fileFsPure v)

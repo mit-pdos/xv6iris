@@ -111,6 +111,7 @@ theorem file_f0bw_of_boot (g : FileGn) (s0 : Fstate) :
       · iexact Hvf
       · iexact Hbl
 
+omit [MachGS GF] in
 /-- The typed witness's content is an ok file state (deviation 9; Rocq's
 inline pure leg of `file_f0pre_at_of_bw`). -/
 theorem fileBoot_fstateOk (c : FileFixed) (s : Dst) : fTyped (GF := GF) c s ⊢ ⌜fstateOk (dstContent s)⌝ := by

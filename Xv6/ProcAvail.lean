@@ -105,6 +105,7 @@ def procsAvailSome (Γ : SchedNames) (n : Nat) : IProp GF := iprop%
 def pavBody (Γ : SchedNames) : IProp GF := iprop%
   [∗list] j ∈ List.range NPROC, (slotFree Γ (procAddr j) ∨ slotUsed Γ (procAddr j))
 
+omit [MachGS GF] in
 instance pavBody_timeless (Γ : SchedNames) : Timeless (pavBody (GF := GF) Γ) := by
   unfold pavBody
   exact BigSepL.bigSepL_timeless (fun _ => inferInstance)
@@ -269,6 +270,7 @@ registration (`npidDone`).  `procsAvail` above is Rocq's `pav_core`. -/
 /-- Rocq `npid_done`. -/
 def npidDone : IProp GF := iprop(nextpidShot ∗ initReg)
 
+omit [MachGS GF] in
 instance npidDone_persistent : Persistent (npidDone (GF := GF)) := by
   unfold npidDone; infer_instance
 

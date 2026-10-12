@@ -350,6 +350,7 @@ def SyscSpostEmp : Prop :=
 
 variable (f : sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
 
+omit [MachGS GF] in
 /-- Rocq `sysc_fork_out_ne`. -/
 theorem syscForkOut_ne (r : BitVec 64) (cs cs' : ExtTreeSet GName compare)
     (h : syscNum V ≠ USYS_fork) : ⊢ syscForkOut f V r cs cs' := by
@@ -357,6 +358,7 @@ theorem syscForkOut_ne (r : BitVec 64) (cs cs' : ExtTreeSet GName compare)
   iintro %hc
   exact absurd hc h
 
+omit [MachGS GF] in
 /-- Rocq `sysc_wait_out_ne`. -/
 theorem syscWaitOut_ne (M' : ElfMem) (r : BitVec 64) (cs cs' : ExtTreeSet GName compare)
     (pidv : BitVec 32) (h : syscNum V ≠ USYS_wait) :
@@ -365,6 +367,7 @@ theorem syscWaitOut_ne (M' : ElfMem) (r : BitVec 64) (cs cs' : ExtTreeSet GName 
   iintro %hc
   exact absurd hc h
 
+omit [MachGS GF] in
 /-- Rocq `sysc_wait_out_of`: the answer kwait returned, re-keyed at the a0
 WORD. -/
 theorem syscWaitOut_of (M' : ElfMem) (r : BitVec 64) (rv xw : BitVec 32)
@@ -419,6 +422,7 @@ theorem syscSysOut_fork (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitV
   iintro %n %hg
   exact absurd (hg.1.symm.trans hk) hg.2.2
 
+omit [MachGS GF] in
 /-- **The payment at exit** (Rocq `sysc_arm_exit`'s unfolding of
 `upay_at`): the payload and its payment at the status the trapframe
 carries -- what sys_exit's `myPay V.gen Q ∗ Q (exitXs V.tf)` takes at

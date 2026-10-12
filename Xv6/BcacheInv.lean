@@ -1597,6 +1597,7 @@ theorem bslotAt_intro (γ : BcacheNames) (ξ : CtxId) (k : Nat) (L : List Nat)
 
 /-! ## The authority and the lock's halves -/
 
+omit [MachGS GF] in
 theorem brefRest_keys (γ : BcacheNames) (M : RegMapF Nat) (k : Nat) (L : List Nat) :
     (γ.ref ↪●MAP M) ∗ ([∗list] id ∈ L, brefRest (GF := GF) γ k id) ⊢
       (γ.ref ↪●MAP M) ∗ ([∗list] id ∈ L, brefRest γ k id) ∗
@@ -1625,6 +1626,7 @@ theorem brefRest_keys (γ : BcacheNames) (M : RegMapF Nat) (k : Nat) (L : List N
       · exact he
       · exact ht f hf
 
+omit [MachGS GF] in
 /-- A whole reference element as its two halves. -/
 theorem bref_halves (γ : BcacheNames) (id : Nat) (v : Nat) :
     (γ.ref ↪◯MAP[id] v) ⊢@{IProp GF}
@@ -1658,6 +1660,7 @@ theorem bpin_fresh (M : RegMapF Nat) (nx k : Nat)
   rw [LawfulPartialMap.get?_insert_ne (show nx ≠ i by omega)]
   exact hfresh i (by omega)
 
+omit [MachGS GF] in
 /-- **`bpin`'s ghost step**: a fresh reference `nx ↦ k` is minted; the caller
 keeps one half (`brefTok`, the count half of `bref`), the lock the other. -/
 theorem bref_alloc_step (γ : BcacheNames) (M : RegMapF Nat) (nx k : Nat) (L : List Nat)
@@ -1717,6 +1720,7 @@ theorem bunpin_nodup (s t : List Nat) (id : Nat) (hnd : (s ++ id :: t).Nodup) : 
   obtain ⟨-, ht⟩ := List.nodup_cons.1 hidt
   exact List.nodup_append.2 ⟨hs, ht, fun a ha b hb => hdis a ha b (List.mem_cons_of_mem _ hb)⟩
 
+omit [MachGS GF] in
 /-- **`bunpin`'s ghost step**: the reference `id ↦ k` (our half and the
 lock's) is deleted; slot `k`'s list loses it. -/
 theorem bref_free_step (γ : BcacheNames) (M : RegMapF Nat) (s t : List Nat) (id k : Nat) :

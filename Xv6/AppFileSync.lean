@@ -65,16 +65,20 @@ def slAuth (γ : GName) (q : Qp) (Ls : List Srec) : IProp GF :=
 def slLb (γ : GName) (Ls : List Srec) : IProp GF :=
   MonoList.lb_own γ Ls
 
+omit [MachGS GF] in
 instance slAuth_timeless (γ : GName) (q : Qp) (Ls : List Srec) :
     Timeless (slAuth (GF := GF) γ q Ls) := by
   unfold slAuth; infer_instance
 
+omit [MachGS GF] in
 instance slLb_timeless (γ : GName) (Ls : List Srec) : Timeless (slLb (GF := GF) γ Ls) := by
   unfold slLb; infer_instance
 
+omit [MachGS GF] in
 instance slLb_persistent (γ : GName) (Ls : List Srec) : Persistent (slLb (GF := GF) γ Ls) := by
   unfold slLb; infer_instance
 
+omit [MachGS GF] in
 /-- Rocq `sl_auth_agree` (at two equal names: the name equation stays
 pure). -/
 theorem slAuth_agree (γ γ' : GName) (q q' : Qp) (Ls Ls' : List Srec) (hγ : γ = γ') :
@@ -85,6 +89,7 @@ theorem slAuth_agree (γ γ' : GName) (q q' : Qp) (Ls Ls' : List Srec) (hγ : γ
   ihave %h := MonoList.auth_own_agree γ _ _ Ls Ls' $$ H1 H2
   ipureintro; exact h.2
 
+omit [MachGS GF] in
 /-- Rocq `sl_auth_lb_prefix`. -/
 theorem slAuth_lb_prefix (γ : GName) (q : Qp) (Ls Ls' : List Srec) :
     ⊢@{IProp GF} slAuth γ q Ls -∗ slLb γ Ls' -∗ ⌜Ls' <+: Ls⌝ := by
@@ -93,6 +98,7 @@ theorem slAuth_lb_prefix (γ : GName) (q : Qp) (Ls Ls' : List Srec) :
   ihave %h := MonoList.auth_lb_own_valid γ _ Ls Ls' $$ H1 H2
   ipureintro; exact h.2
 
+omit [MachGS GF] in
 /-- The full authority excludes any other share (Rocq `sl_auth_1_excl`). -/
 theorem slAuth_1_excl (γ : GName) (q : Qp) (Ls Ls' : List Srec) :
     ⊢@{IProp GF} slAuth γ 1 Ls -∗ slAuth γ q Ls' -∗ False := by
@@ -101,12 +107,14 @@ theorem slAuth_1_excl (γ : GName) (q : Qp) (Ls Ls' : List Srec) :
   ihave %h := MonoList.auth_own_agree γ _ _ Ls Ls' $$ H1 H2
   exact absurd (DFrac.valid_own_op h.1) (by simp)
 
+omit [MachGS GF] in
 /-- Rocq `sl_lb_get`. -/
 theorem slLb_get (γ : GName) (q : Qp) (Ls : List Srec) :
     ⊢@{IProp GF} slAuth γ q Ls -∗ slLb γ Ls := by
   unfold slAuth slLb
   exact MonoList.lb_own_get γ _ Ls
 
+omit [MachGS GF] in
 /-- Rocq `sl_auth_update`. -/
 theorem slAuth_update (γ : GName) (Ls Ls' : List Srec) (hp : Ls <+: Ls') :
     ⊢@{IProp GF} slAuth γ 1 Ls ==∗ slAuth γ 1 Ls' := by
@@ -116,6 +124,7 @@ theorem slAuth_update (γ : GName) (Ls Ls' : List Srec) (hp : Ls <+: Ls') :
   imodintro
   iexact H
 
+omit [MachGS GF] in
 /-- Rocq `sl_auth_split`, left to right. -/
 theorem slAuth_split (γ : GName) (q1 q2 : Qp) (Ls : List Srec) :
     ⊢@{IProp GF} slAuth γ (q1 + q2) Ls -∗ slAuth γ q1 Ls ∗ slAuth γ q2 Ls := by
@@ -125,6 +134,7 @@ theorem slAuth_split (γ : GName) (q1 q2 : Qp) (Ls : List Srec) :
   iintro H
   iapply e.mp $$ H
 
+omit [MachGS GF] in
 /-- Rocq `sl_auth_split`, right to left. -/
 theorem slAuth_join (γ : GName) (q1 q2 : Qp) (Ls : List Srec) :
     ⊢@{IProp GF} slAuth γ q1 Ls -∗ slAuth γ q2 Ls -∗ slAuth γ (q1 + q2) Ls := by
@@ -137,6 +147,7 @@ theorem slAuth_join (γ : GName) (q1 q2 : Qp) (Ls : List Srec) :
   · iexact H1
   · iexact H2
 
+omit [MachGS GF] in
 /-- The era's three shares, `½ + ¼ + ¼` (Rocq `sl_auth_join3`). -/
 theorem slAuth_join3 (γ : GName) (Ls : List Srec) :
     ⊢@{IProp GF} slAuth γ (1 : Qp).half Ls -∗ slAuth γ (1 : Qp).half.half Ls -∗
@@ -149,6 +160,7 @@ theorem slAuth_join3 (γ : GName) (Ls : List Srec) :
   rw [Qp.half_add_half] at hh
   iapply hh $$ H1 H23
 
+omit [MachGS GF] in
 /-- Rocq `sl_auth_split3_1`. -/
 theorem slAuth_split3 (γ : GName) (Ls : List Srec) :
     ⊢@{IProp GF} slAuth γ 1 Ls -∗
@@ -162,6 +174,7 @@ theorem slAuth_split3 (γ : GName) (Ls : List Srec) :
   ihave ⟨H2, H3⟩ := hq $$ H23
   iframe H1 H2 H3
 
+omit [MachGS GF] in
 /-- A fresh list, full authority at `[]`. -/
 theorem slAuth_alloc : ⊢@{IProp GF} |==> ∃ γ : GName, slAuth γ 1 [] := by
   unfold slAuth
@@ -325,6 +338,7 @@ theorem unionTkb_intro (c : FileFixed) (k : Nat) (γ : GName) (Ls : List Srec) :
   iexists γ, Ls
   iframe H1 H2 H3
 
+omit [MachGS GF] in
 /-- Two lower bounds of the line list, and one covering both (Rocq
 `fl_lb_join`). -/
 theorem flLb_join (c : FileFixed) (ls ls' : List FlLine) :

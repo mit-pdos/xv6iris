@@ -571,6 +571,7 @@ def kwAns (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTreeSet GName comp
     waitAnsLed rv (xstateVal xw) cs cs' V.gen nullst pid (procAddr j) a0 V.upt P' d ∗
     kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs')
 
+omit [MachGS GF] in
 /-- The three `-1` exits: the row does not move, the reason is `waitWhyLed`
 (NI G1c: the no-children reason carries the ledger's reading). -/
 theorem kw_ans_neg_ghost (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTreeSet GName compare)
@@ -583,6 +584,7 @@ theorem kw_ans_neg_ghost (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTre
   iframe Hkg Hrow
   iapply waitAnsLed_neg (xstateVal xw) cs V.gen nullst pid (procAddr j) a0 V.upt P' d $$ Hwhy
 
+omit [MachGS GF] in
 /-- `genPid` agrees with an escrow's `exitTok` on the pid. -/
 theorem kw_genPid_exitTok (g : GName) (pide pid0 : BitVec 32) (xs : Int) :
     genPid (GF := GF) g pide ∗ exitTok g pid0 xs ⊢ ⌜pide = pid0⌝ := by

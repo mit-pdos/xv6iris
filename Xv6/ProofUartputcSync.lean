@@ -92,12 +92,14 @@ theorem ups_filter_cons (s : String) (l : List String) (h : s ∉ l) :
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
+omit [MachGS GF] in
 theorem ups_txRes_elim [CurCtx] (γ : UartNames) :
     txRes (GF := GF) γ ⊢ ∃ l : List (BitVec 8), txOwn γ l := by
   unfold txRes txOwn
   iintro H
   iexact H
 
+omit [MachGS GF] in
 theorem ups_txRes_intro [CurCtx] (γ : UartNames) (l : List (BitVec 8)) :
     txOwn (GF := GF) γ l ⊢ txRes γ := by
   unfold txRes txOwn

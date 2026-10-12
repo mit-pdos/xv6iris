@@ -215,6 +215,7 @@ theorem mn_ret_4a : jumpPc (KA.«main» + 74#64) = KA.«main» + 74#64 := by dec
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
+omit [MachGS GF] in
 /-- A port's transmitter token is its transmit lock's payload. -/
 theorem mn_txRes_of_own (γ : UartNames) (l : List (BitVec 8)) : txOwn (GF := GF) γ l ⊢ txRes γ := by
   unfold txRes txOwn

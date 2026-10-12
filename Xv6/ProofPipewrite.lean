@@ -230,6 +230,7 @@ theorem pw_kill_lend (j : Nat) (pid : BitVec 32) (gn : GName) :
   unfold pwKillOut
   iframe Hq Hr Hs Hqp Hrg Ht
 
+omit [MachGS GF] in
 /-- The generation halves, opened for the lend. -/
 theorem pw_gen_open (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
     genHalvesPriv (GF := GF) pa pid g ⊢
@@ -260,6 +261,7 @@ theorem pw_priv_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat �
   iframe Hp Hf Ht Htf Hev
   ipureintro; exact hl
 
+omit [MachGS GF] in
 /-- THE WRITE END IS OPEN, with the two pieces kept (`PipeQstep.pwWo_open`). -/
 theorem pw_wo_keep (γp : PipeNames) (w : Bool) (wo : BitVec 32) (q : Qp) (hw : w = true) :
     pipeEndstate (GF := GF) γp true wo ∗ pipeRef γp w q ⊢

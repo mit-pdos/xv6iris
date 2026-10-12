@@ -65,10 +65,15 @@ def catProg (N : UkNames GF) : Uprog GF :=
   ⟨ukCode N.t User.Cat.code.byte, User.Cat.Sym.«write», User.Cat.Sym.«read», User.Cat.Sym.«open»,
     User.Cat.Sym.«close», User.Cat.Sym.«exit»⟩
 
+omit [MachGS GF] in
 theorem catProg_code (N : UkNames GF) : (catProg N).code = ukCode N.t User.Cat.code.byte := rfl
+omit [MachGS GF] in
 theorem catProg_write (N : UkNames GF) : (catProg N).write = User.Cat.Sym.«write» := rfl
+omit [MachGS GF] in
 theorem catProg_read (N : UkNames GF) : (catProg N).read = User.Cat.Sym.«read» := rfl
+omit [MachGS GF] in
 theorem catProg_open (N : UkNames GF) : (catProg N).open = User.Cat.Sym.«open» := rfl
+omit [MachGS GF] in
 theorem catProg_close (N : UkNames GF) : (catProg N).close = User.Cat.Sym.«close» := rfl
 
 /-! ## §1 the exit hole IS cat's -/
@@ -86,10 +91,12 @@ theorem catTreePay_exit_ent (N : UkNames GF) (s : Int) :
     ⊢ treePay N (catProg N) (exit_ s) -∗ kcatExit N s := by
   rw [catTreePay_exit]; iintro H; iexact H
 
+omit [MachGS GF] in
 /-- **Rocq `usrc_at_data`**. -/
 theorem catUsrcAt_data (N : UkNames GF) (dq : DFrac) (a n : Nat) (f : Nat → BitVec 8) :
     usrcAt N false dq a n f = ubytesq N.d dq a n f := rfl
 
+omit [MachGS GF] in
 theorem catUpathAt_data (N : UkNames GF) (pv n : Nat) (f : Nat → BitVec 8) :
     upathAt N false pv n f = ustr N.d DFrac.discard pv n f := rfl
 
@@ -223,6 +230,7 @@ theorem kcatDgOpen_tree (N : UkNames GF) (g : UArg) :
 
 /-! ## §3 the round: one unfolding of `catLoop` -/
 
+omit [MachGS GF] in
 /-- **Rocq `ubytes_split512`**. -/
 theorem ubytes_split512 (γd : GName) (a nb : Nat) (g : Nat → BitVec 8) (h : nb ≤ 512) :
     ubytes (GF := GF) γd a 512 g ⊣⊢ ubytes γd a nb g ∗ ubytes γd (a + nb) (512 - nb) (fun j => g (nb + j)) := by
@@ -230,6 +238,7 @@ theorem ubytes_split512 (γd : GName) (a nb : Nat) (g : Nat → BitVec 8) (h : n
   rwa [Nat.add_sub_cancel' h] at H
 
 set_option maxRecDepth 20000 in
+omit [MachGS GF] in
 /-- The join back (`maxRecDepth`: the `512` literal's run is compared
 elementwise by the unifier). -/
 theorem ubytes_join512 (γd : GName) (a nb : Nat) (g : Nat → BitVec 8) (h : nb ≤ 512) :

@@ -157,6 +157,7 @@ theorem imgMap_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (av 
   ihave Hb := (BigSepM.bigSepM_lookup (Φ := fun ad x => ubyteq (GF := GF) N.d DFrac.discard ad x) hb) $$ Himg
   iapply urun_ubyte_bnd N h m pc av _ a b $$ Hrun Hb
 
+omit [MachGS GF] in
 theorem imgMap_sub (N : UkNames GF) (Img : RegMapF (BitVec 8)) (M : ElfMem) (pm : Nat → Option UPerm)
     (sz : Nat) :
     iprop(uheap N.t N.d N.s M pm sz ∗ □ ([∗map] ad ↦ x ∈ Img, ubyteq (GF := GF) N.d DFrac.discard ad x)) ⊢
@@ -175,6 +176,7 @@ theorem imgMap_sub (N : UkNames GF) (Img : RegMapF (BitVec 8)) (M : ElfMem) (pm 
   · exact (key a b hs).trans (pure_mono fun h _ => h)
   · exact pure_intro fun h => absurd h hs
 
+omit [MachGS GF] in
 /-- The name's bytes, at the discarded fraction, are a boxed view of their
 image (deviation 4). -/
 theorem imgMap_view (N : UkNames GF) (Img : RegMapF (BitVec 8)) :

@@ -130,6 +130,7 @@ section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
+omit [MachGS GF] in
 theorem iput_ofl_slots3 [CurCtx] (γ : BcacheNames) :
     bslots (GF := GF) 3 ⊢ bslot ∗ bslot ∗ bslot := by
   unfold bslot
@@ -138,6 +139,7 @@ theorem iput_ofl_slots3 [CurCtx] (γ : BcacheNames) :
   icases dsSlots_split γ 1 1 $$ H2 with ⟨H2, H3⟩
   iframe
 
+omit [MachGS GF] in
 theorem iput_ofl_slots3_join [CurCtx] (γ : BcacheNames) :
     bslot (GF := GF) ∗ bslot ∗ bslot ⊢ bslots 3 := by
   unfold bslot

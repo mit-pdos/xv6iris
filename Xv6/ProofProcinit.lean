@@ -787,6 +787,7 @@ section Route
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- `n` shares of `m` units, one per slot. -/
 theorem pi_supply_split (S : Nat → IProp GF) (hs : ∀ a b, S (a + b) ⊢ S a ∗ S b) (m : Nat) :
     ∀ n : Nat, S (n * m) ⊢ [∗list] _i ∈ List.range n, S m

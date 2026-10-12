@@ -183,6 +183,7 @@ def udepwfKs (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : Ue
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
       UexecSG.sbundleAt (uslot) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
 
+omit [MachGS GF] in
 /-- **Rocq `UkRunSys.usrc_ok_utext`** at a `Nat` start (deviation 6; the
 landed `usrcOk_utext` is at a word start `ua.toNat`). -/
 theorem pdev_usrcOk_utext (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (ua nb : Nat)
@@ -203,6 +204,7 @@ theorem pdev_usrcOk_utext (γt γd γs : GName) (M : ElfMem) (pm : Nat → Optio
   apply ukText_rmapped P sz _ hwf
   rw [hpm]; exact (hb j hj).2.1
 
+omit [MachGS GF] in
 /-- **Rocq `UkRunSys.usrc_ok_ubytesq`** at a `Nat` start (deviation 6; the
 landed `usrcOk_ubytesq` is at a word start `ua.toNat`). -/
 theorem pdev_usrcOk_ubytesq (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (dq : DFrac)

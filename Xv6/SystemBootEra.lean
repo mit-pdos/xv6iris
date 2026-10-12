@@ -148,6 +148,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [IcboxG GF] [SleepLockG GF] [Appcfg GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
   [Fscfg] [Icfg]
 
+omit [MachGS GF] in
 /-- A per-hart family, glued back at the boot hart (Rocq `big_sepL_cpu_glue`). -/
 theorem xv6Era_glue (Φ : CPU → IProp GF) :
     Φ startedPrimary ∗ ([∗list] c ∈ cpus.tail, Φ c) ⊢ [∗list] c ∈ cpus, Φ c := by

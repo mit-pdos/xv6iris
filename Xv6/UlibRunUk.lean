@@ -166,6 +166,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
 /-- One half of the hart variable `γ`, at hart `h`. -/
 def ulibHart (γ : GName) (h : CPU) : IProp GF := ghost_var (A := Nat) γ (DFrac.own (1 : Qp).half) h.val
 
+omit [MachGS GF] in
 theorem ulibHart_agree (γ : GName) (h h0 : CPU) :
     ⊢@{IProp GF} ulibHart γ h -∗ ulibHart γ h0 -∗ ⌜h = h0⌝ := by
   unfold ulibHart
@@ -174,12 +175,14 @@ theorem ulibHart_agree (γ : GName) (h h0 : CPU) :
   ipureintro
   exact Fin.ext e
 
+omit [MachGS GF] in
 theorem ulibHart_move (γ : GName) (h h0 h' : CPU) :
     ⊢@{IProp GF} ulibHart γ h -∗ ulibHart γ h0 ==∗ ulibHart γ h' ∗ ulibHart γ h' := by
   unfold ulibHart
   iintro H1 H2
   iapply ghost_var_update_halves $$ H1 H2
 
+omit [MachGS GF] in
 theorem ulibHart_alloc (h : CPU) : ⊢@{IProp GF} |==> ∃ γ, ulibHart γ h ∗ ulibHart γ h := by
   imod ghost_var_alloc (GF := GF) (A := Nat) h.val with ⟨%γ, H⟩
   imodintro
@@ -401,16 +404,19 @@ theorem ulibUk_va (m : RegMap) (rs1 : BitVec 5) (imm : BitVec 12) (a : Nat)
     m.get rs1 + BitVec.signExtend 64 imm = BitVec.ofNat 64 a := by
   rw [ha, ulibRget_eq, Xv6.ofNat_toNat_pc]
 
+omit [MachGS GF] in
 theorem ulibUk_byteF (γd : GName) (dq : DFrac) (a : Nat) (f : Nat → BitVec 8) (c : BitVec 8) (hf : f 0 = c) :
     ubyteq (GF := GF) γd dq a c ⊣⊢ ubytesq γd dq a 1 f := by
   refine BiEntails.trans ?_ (ubytesq_one γd dq a f).symm
   rw [hf]
   exact .rfl
 
+omit [MachGS GF] in
 theorem ulibUk_byte1 (γd : GName) (dq : DFrac) (a : Nat) (b : BitVec 8) :
     ubyteq (GF := GF) γd dq a b ⊣⊢ ubytesq γd dq a 1 (nthByte (n := 1) b) :=
   ulibUk_byteF γd dq a _ b (nthByte_one b)
 
+omit [MachGS GF] in
 theorem ulibUk_body_succ (γd : GName) (sp : BitVec 64) (k d : Nat) (hd : d = 8 * (k + 1)) :
     ustackBody (GF := GF) γd sp (k + 1) ⊣⊢ ustackBody γd sp k ∗ ∃ w : BitVec 64, uword γd (sp.toNat - d) w := by
   subst hd
@@ -418,6 +424,7 @@ theorem ulibUk_body_succ (γd : GName) (sp : BitVec 64) (k d : Nat) (hd : d = 8 
   rw [List.range_succ]
   exact BigSepL.bigSepL_snoc
 
+omit [MachGS GF] in
 theorem ulibUk_body_zero (γd : GName) (sp : BitVec 64) : ustackBody (GF := GF) γd sp 0 ⊣⊢ emp := by
   unfold ustackBody; simp only [List.range_zero]; exact BigSepL.bigSepL_nil
 
@@ -644,6 +651,7 @@ end Leaves
 
 /-! ## §6 The stack and the text -/
 
+omit [MachGS GF] in
 theorem ulibUk_utext_instr (t0 : User.UTextTree) (img : ElfMem) (hok : User.UTextOk t0 img)
     (t : User.UTextTree) (pc : BitVec 64) (rvc : Bool) (i : instruction) (h : uTextDecode t pc = some (rvc, i)) :
     iprop(⌜t = t0⌝ ∗ ukCode N.t img) ⊢ uinstrIs (GF := GF) N.t pc rvc i := by

@@ -50,6 +50,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
 
 /-! ## 1b. The line list -/
 
+omit [MachGS GF] in
 /-- Rocq `fl_auth_lb`. -/
 theorem flAuth_lb (c : FileFixed) (ls : List FlLine) :
     flAuth (GF := GF) c ls ⊢ flAuth c ls ∗ flLb c ls := by
@@ -58,6 +59,7 @@ theorem flAuth_lb (c : FileFixed) (ls : List FlLine) :
   ihave #Hl := MonoList.lb_own_get $$ H
   iframe H Hl
 
+omit [MachGS GF] in
 /-- Rocq `fl_lb_prefix`. -/
 theorem flLb_prefix (c : FileFixed) (ls ls' : List FlLine) :
     ⊢@{IProp GF} flAuth c ls -∗ flLb c ls' -∗ ⌜ls' <+: ls⌝ := by

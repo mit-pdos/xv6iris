@@ -94,10 +94,12 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
 /-- **Rocq `ush_std`**: the standard streams at an ok view, or the taint. -/
 def ushStd (N : UkNames GF) (X : UshCtx GF) (l : List FdState) : IProp GF := ustdOk X.T N.fd l
 
+omit [MachGS GF] in
 /-- **Rocq `ush_std_ustd`**. -/
 theorem ushStd_ustd (N : UkNames GF) (X : UshCtx GF) (l : List FdState) : ushStd N X l ⊢ ustd N.fd l :=
   ustdOk_ustd X.T N.fd l
 
+omit [MachGS GF] in
 /-- **Rocq `ush_std_len`**. -/
 theorem ushStd_len (N : UkNames GF) (X : UshCtx GF) (l : List FdState) : ushStd N X l ⊢ ⌜l.length = NSTD⌝ :=
   (ushStd_ustd N X l).trans (ustd_len N.fd l)
@@ -579,6 +581,7 @@ theorem ushGenRun (N : UkNames GF) (X : UshCtx GF) (h : CPU) (m : RegMap) (pc : 
 def ushUalloc (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (fd : Nat) (st : FdState) : IProp GF :=
   iprop(∃ w : List FdState, (⌜ushViewOk w⌝ ∨ X.T) ∗ uallocV N.fd l fd st w)
 
+omit [MachGS GF] in
 /-- **Rocq `ush_ualloc_std`**. -/
 theorem ushUalloc_std (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (fd k : Nat) (st : FdState)
     (hk : fdLowestClosed l = some k) :
@@ -592,6 +595,7 @@ theorem ushUalloc_std (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (fd k 
     iexists w
     iframe
 
+omit [MachGS GF] in
 /-- **Rocq `ush_ualloc_hi`**. -/
 theorem ushUalloc_hi (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (fd : Nat) (st : FdState)
     (hk : fdLowestClosed l = none) :
@@ -752,11 +756,13 @@ def ushRestLineAt (X : UshCtx GF) (D : Uline → Prop) (ws : List (List (BitVec 
   iprop((∀ len : Nat, ⌜∀ j, j < len → f (k + j) ≠ ubyte0⌝ -∗ ⌜f (k + len) = ubyte0⌝ -∗
       ⌜∃ l : Uline, D l ∧ ulineWs l = ws ∧ ushLineAt l f k len⌝) ∨ X.T)
 
+omit [MachGS GF] in
 instance ushRestLineAt_persistent (X : UshCtx GF) [Persistent X.T] (D : Uline → Prop)
     (ws : List (List (BitVec 8))) (f : Nat → BitVec 8) (k : Nat) :
     Persistent (ushRestLineAt X D ws f k) := by
   unfold ushRestLineAt; infer_instance
 
+omit [MachGS GF] in
 /-- **Rocq `ush_rest_line_at_taint`**. -/
 theorem ushRestLineAt_taint (X : UshCtx GF) (D : Uline → Prop) (ws : List (List (BitVec 8))) (f : Nat → BitVec 8)
     (k : Nat) : X.T ⊢ ushRestLineAt X D ws f k := by
@@ -770,6 +776,7 @@ theorem ushRestLineAt_taint (X : UshCtx GF) (D : Uline → Prop) (ws : List (Lis
 def ushJrow (γ : GName) (k : Nat) : IProp GF :=
   iprop([∗list] j ∈ List.range 4, utext γ (ushJtabA + 4 * k + j) (nthByte (n := 4) (ushJent k) j))
 
+omit [MachGS GF] in
 instance ushJrow_persistent (γ : GName) (k : Nat) : Persistent (ushJrow (GF := GF) γ k) := by
   unfold ushJrow; infer_instance
 
@@ -777,9 +784,11 @@ instance ushJrow_persistent (γ : GName) (k : Nat) : Persistent (ushJrow (GF := 
 def ushJtab (γ : GName) : IProp GF :=
   iprop(ushJrow γ 1 ∗ ushJrow γ 2 ∗ ushJrow γ 3 ∗ ushJrow γ 4 ∗ ushJrow γ 5 ∗ ushCode γ)
 
+omit [MachGS GF] in
 instance ushJtab_persistent (γ : GName) : Persistent (ushJtab (GF := GF) γ) := by
   unfold ushJtab; infer_instance
 
+omit [MachGS GF] in
 /-- **Rocq `ush_jtab_of_rodata`**: the table off sh's own image. -/
 theorem ushJtab_of_rodata (γ : GName) : ushCode (GF := GF) γ ⊢ ushJtab γ := by
   have hrow : ∀ k : Nat, k ∈ [1, 2, 3, 4, 5] → ushCode (GF := GF) γ ⊢ ushJrow γ k := fun k hk => by
@@ -827,6 +836,7 @@ def ushlDat (γ : GName) : IProp GF :=
   iprop(ustr γ .discard ushWsA 5 ushpWsF ∗ ustr γ .discard ushSymA 7 ushpSymF ∗ uword γ ushmFreep 0#64 ∗
     ∃ fb : Nat → BitVec 8, ubytes γ ushmBase 16 fb)
 
+omit [MachGS GF] in
 /-- **Rocq `ushl_fresh_of_dat`**. -/
 theorem ushlFresh_of_dat (N : UkNames GF) (sz : Nat) :
     ⊢ ushlDat N.d -∗ usz N.s sz -∗

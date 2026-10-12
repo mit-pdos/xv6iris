@@ -20,6 +20,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogS
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
+omit [MachGS GF] in
 /-- A two-word frame, opened (init's `start`; nothing is given back). -/
 theorem kinit_ustack_two (γd : GName) (sp : BitVec 64) :
     ustack (GF := GF) γd sp 2 ⊢

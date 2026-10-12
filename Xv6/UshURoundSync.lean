@@ -80,6 +80,7 @@ theorem usync_line_facts (I : List (BitVec 8)) (hlws : ulineWs .LSync = lastWs I
 
 /-! ## S2y THE sync CHILD -/
 
+omit [MachGS GF] in
 /-- **Rocq `image_entry_lend`** (`UShUModSync.v`, local): an entry is
 contravariant in its lend. -/
 theorem imageEntry_lend (f : ElfBytes) (M : Nat → List (BitVec 8)) (av : BitVec 64)

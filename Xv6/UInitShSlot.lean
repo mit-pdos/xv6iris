@@ -82,6 +82,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogS
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- A code segment held as a text image is part of the heap's image. -/
 theorem ukCode_uimgSub (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (m : ElfMem) :
     ⊢@{IProp GF} uheap γt γd γs M pm sz -∗ ukCode γt m -∗ ⌜uimgSub m M⌝ := by
@@ -98,6 +99,7 @@ theorem ukCode_uimgSub (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option U
   ipureintro
   exact h.1
 
+omit [MachGS GF] in
 /-- The children set the authority names, against the process's fragment. -/
 theorem urunIds_ch_eq (N : UkNames GF) (cs S : ExtTreeSet GName compare) (pidv : BitVec 32) :
     ⊢ urunIds N cs pidv -∗ uch N.ch S -∗ ⌜cs = S⌝ := by
@@ -109,6 +111,7 @@ theorem urunIds_ch_eq (N : UkNames GF) (cs S : ExtTreeSet GName compare) (pidv :
   · iexact Hch
   · iexact Hc
 
+omit [MachGS GF] in
 /-- ...and the pid. -/
 theorem urunIds_pid_eq (N : UkNames GF) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (p : Int) :
     ⊢ urunIds N cs pidv -∗ upid N.pid p -∗ ⌜(pidv.toNat : Int) = p⌝ := by
@@ -160,6 +163,7 @@ instance initShSlot_persistent (T Pay : IProp GF) [Persistent Pay] :
     Persistent (initShSlot T Pay) := by
   unfold initShSlot initShSlotCore; infer_instance
 
+omit [MachGS GF] in
 /-- **Rocq `sh_pins_of_fs_pure`**: the projection /sh's own pinned exec
 wants. -/
 theorem sh_pins_of_fs_pure (T : IProp GF) :
@@ -179,6 +183,7 @@ theorem sh_pins_of_fs_pure (T : IProp GF) :
 
 /-! ## 2.  SH'S ENTRY, AS THE NAMED OBLIGATION (E) -/
 
+omit [MachGS GF] in
 /-- Rocq `ush_fd0`'s persistence (an instance Rocq derives by `apply _`). -/
 instance initSh_ushFd0_persistent (X : UshCtx GF) [Persistent X.T] (l : List FdState) :
     Persistent (ushFd0 X l) := by

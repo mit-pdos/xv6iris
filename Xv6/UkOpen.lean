@@ -222,6 +222,7 @@ theorem ukTextPage_eq [CurCtx] (K : Nat) (a : PAddr) (bs : List (BitVec 8)) :
   rw [BigSepL.bigSepL_map]
   exact ub_sepL_idx (fun j x => ctxByteX curCtx K (a + BitVec.ofNat 64 j) (DFrac.own 1) x) bs
 
+omit [MachGS GF] in
 /-- One page's `if`, split into its data and text halves. -/
 theorem ukPage_split (c : Bool) (X D : IProp GF) :
     (if c then X else D) ⊣⊢ iprop((if c then iprop(emp) else D) ∗ (if c then X else iprop(emp))) := by

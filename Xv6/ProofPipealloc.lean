@@ -139,6 +139,7 @@ abbrev paCont (k : KCtx) (γ : FileNames) (γk : KmemNames) (on : Option Nat) (p
     pipeallocPost γ γk on (k.regs 10#5) (k.regs 11#5) (R' 10#5) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗ irefSlot -∗ wpLoop cpu')
 
+omit [MachGS GF] in
 /-- The `true` crossing moves along any hart pinning (the process pin alone
 suffices). -/
 theorem pa_next_shift (k : KCtx) (cpu c : CPU) (K : CPU → IProp GF)

@@ -66,6 +66,7 @@ to `obsBoots h` registered (deviation 3). -/
 def unionReg (ug : UnionGn) (h : List Obs) : IProp GF :=
   iprop(∃ R : RegMapF GName, syncRegAuth ug.ugnFile.fgnCl R ∗ ⌜pinDom R (obsBoots h)⌝)
 
+omit [MachGS GF] in
 instance unionReg_timeless (ug : UnionGn) (h : List Obs) :
     Timeless (unionReg (GF := GF) ug h) := by
   unfold unionReg; infer_instance
@@ -75,8 +76,10 @@ sync history; it rides the ledger's TAINT arm (cleanup C). -/
 def unionFloor (ug : UnionGn) : IProp GF :=
   iprop(∃ F : List Srec, slLb ug.ugnFile.fgnCl.ffHist F)
 
+omit [MachGS GF] in
 instance unionFloor_persistent (ug : UnionGn) : Persistent (unionFloor (GF := GF) ug) := by
   unfold unionFloor; infer_instance
+omit [MachGS GF] in
 instance unionFloor_timeless (ug : UnionGn) : Timeless (unionFloor (GF := GF) ug) := by
   unfold unionFloor; infer_instance
 
@@ -87,9 +90,11 @@ noncomputable def unionBase (ug : UnionGn) (h : List Obs) : IProp GF :=
   iprop(⌜obsBoots h = 0⌝
     ∨ ∃ vf : FileEra, fileEraPin ug.ugnFile (obsBoots h) vf ∗ ⌜ulinesOf h = vf.feBase ++ ulastCyc h⌝)
 
+omit [MachGS GF] in
 instance unionBase_persistent (ug : UnionGn) (h : List Obs) :
     Persistent (unionBase (GF := GF) ug h) := by
   unfold unionBase; infer_instance
+omit [MachGS GF] in
 instance unionBase_timeless (ug : UnionGn) (h : List Obs) :
     Timeless (unionBase (GF := GF) ug h) := by
   unfold unionBase; infer_instance
@@ -171,6 +176,7 @@ def uturnI (ug : UnionGn) (k : Nat) : IProp GF :=
     fileEraPin ug.ugnFile k vf ∗ fcpPin vf ls ∗ ⌜ls <+: vf.feBase⌝
     ∗ flLb ug.ugnFile.fgnCl vf.feBase)
 
+omit [MachGS GF] in
 instance unionTn_timeless (ug : UnionGn) (k : Nat) : Timeless (unionTn (GF := GF) ug k) := by
   unfold unionTn; infer_instance
 instance uturn_timeless (ug : UnionGn) (k : Nat) : Timeless (uturn (GF := GF) ug k) := by

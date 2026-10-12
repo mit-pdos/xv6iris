@@ -74,6 +74,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
 
 /-! ## The body's end-of-file shot (deviation 3 of `PipeProto`; Rocq inline) -/
 
+omit [MachGS GF] in
 /-- AT AN END-OF-FILE WITH THE READ END OPEN, the reader's snapshot is
 shot at the state's contents: the read-open premise refutes (P4)'s shot
 arm, so its token is PENDING and the snapshot TAKES it; already shot, the
@@ -121,10 +122,12 @@ def pipeRQe (pn : PNames) (L : List (BitVec 8)) (c : Nat) (acc : List (BitVec 8)
     IProp GF :=
   iprop(pipeRQ pn L c acc ∗ (⌜pstEof s⌝ -∗ eofShot pn (L.take (c + acc.length))))
 
+omit [MachGS GF] in
 theorem pipeRQ_eq (pn : PNames) (L : List (BitVec 8)) (c : Nat) (acc : List (BitVec 8)) :
     pipeRQ (GF := GF) pn L c acc ⊣⊢
       rcur pn (c + acc.length) ∗ ⌜acc = (L.drop c).take acc.length⌝ := .rfl
 
+omit [MachGS GF] in
 instance pipeRQ_timeless (pn : PNames) (L : List (BitVec 8)) (c : Nat) (acc : List (BitVec 8)) :
     Timeless (pipeRQ (GF := GF) pn L c acc) := by
   unfold pipeRQ; infer_instance
@@ -282,6 +285,7 @@ theorem pipeExclWtokLbU (E : CoPset) (pn : PNames) (γp : PipeNames) (L : List (
 
 /-! ## 6.  sh's end-of-round reading -/
 
+omit [MachGS GF] in
 /-- PRan (Rocq `pipe_body_ranU`): the writer's lower bound and (P1) pin the
 contents to the line, and (P3) says the snapshot IS the contents. -/
 theorem pipeBody_ranU (pn : PNames) (γp : PipeNames) (L w : List (BitVec 8)) (U : IProp GF) :
@@ -294,6 +298,7 @@ theorem pipeBody_ranU (pn : PNames) (γp : PipeNames) (L w : List (BitVec 8)) (U
   rw [hw.1]
   exact hpre.eq_of_length (Nat.le_antisymm hpre.length_le hL.length_le)
 
+omit [MachGS GF] in
 /-- PExecL (Rocq `pipe_body_execLU`): the start token back forces the pipe
 empty, and the snapshot too. -/
 theorem pipeBody_execLU (pn : PNames) (γp : PipeNames) (L w : List (BitVec 8)) (U : IProp GF) :
@@ -306,6 +311,7 @@ theorem pipeBody_execLU (pn : PNames) (γp : PipeNames) (L w : List (BitVec 8)) 
   rw [hw.1]
   exact List.length_eq_zero_iff.mp hlen
 
+omit [MachGS GF] in
 /-- PExecR (Rocq `pipe_body_shortU`): a writer back MID-LINE at cursor `c`
 pins the frozen contents to the line's first `c` bytes. -/
 theorem pipeBody_shortU (pn : PNames) (γp : PipeNames) (L w : List (BitVec 8)) (U : IProp GF)
@@ -323,6 +329,7 @@ payload, the side told by which exclusive token came back. -/
 def pipeQc (pn : PNames) (PL PR : IProp GF) : IProp GF :=
   iprop((sideL pn ∗ PL) ∨ (sideR pn ∗ PR))
 
+omit [MachGS GF] in
 /-- ...AND TWO ANSWERS CANNOT BOTH BE THE SAME SIDE (Rocq `pipe_Qc_two`). -/
 theorem pipeQc_two (pn : PNames) (PL PR : IProp GF) :
     pipeQc pn PL PR ⊢ pipeQc pn PL PR -∗ (sideL pn ∗ PL) ∗ (sideR pn ∗ PR) := by
@@ -425,14 +432,18 @@ def rdFinal (pn : PNames) : RdOut → IProp GF
   | RdEof D => eofShot pn D
   | RdGone => iprop(True)
 
+omit [MachGS GF] in
 instance rdFinal_persistent (pn : PNames) (o : RdOut) : Persistent (rdFinal (GF := GF) pn o) := by
   cases o <;> unfold rdFinal <;> infer_instance
+omit [MachGS GF] in
 instance rdFinal_timeless (pn : PNames) (o : RdOut) : Timeless (rdFinal (GF := GF) pn o) := by
   cases o <;> unfold rdFinal <;> infer_instance
+omit [MachGS GF] in
 instance wrFinal_timeless (pn : PNames) (L : List (BitVec 8)) (o : WrOut) :
     Timeless (wrFinal (GF := GF) pn L o) := by
   cases o <;> unfold wrFinal <;> infer_instance
 
+omit [MachGS GF] in
 /-- (P1) through the history (Rocq `pipe_body_lb_inU`). -/
 theorem pipeBody_lbInU (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U : IProp GF)
     (D : List (BitVec 8)) :
@@ -442,6 +453,7 @@ theorem pipeBody_lbInU (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U 
   ihave %hD := pwsLb_prefix $$ Hh Hlb
   ipureintro; exact hD.trans hpre
 
+omit [MachGS GF] in
 /-- (P1) through (P3) (Rocq `pipe_body_eof_inU`). -/
 theorem pipeBody_eofInU (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U : IProp GF)
     (w : List (BitVec 8)) :
@@ -452,6 +464,7 @@ theorem pipeBody_eofInU (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U
   ipureintro; rw [hw.1]; exact hpre
 
 open WrOut RdOut in
+omit [MachGS GF] in
 /-- THE NODE'S READING, INSIDE THE BODY (Rocq `node_body_readingU`): any
 writer outcome and any reader outcome the two ends hold together PAIR --
 five combinations by (P1)-(P3), the sixth (halted writer beside an
@@ -519,9 +532,11 @@ def flowU (L : List (BitVec 8)) : Option PNames → IProp GF
   | none => iprop(True)
   | some p => pwsLb p (L.take 1)
 
+omit [MachGS GF] in
 instance flowU_persistent (L : List (BitVec 8)) (prev : Option PNames) :
     Persistent (flowU (GF := GF) L prev) := by
   cases prev <;> unfold flowU <;> infer_instance
+omit [MachGS GF] in
 instance flowU_timeless (L : List (BitVec 8)) (prev : Option PNames) :
     Timeless (flowU (GF := GF) L prev) := by
   cases prev <;> unfold flowU <;> infer_instance
@@ -532,9 +547,11 @@ def flowF (L : List (BitVec 8)) (g : List (BitVec 8) → List (BitVec 8)) : Opti
   | none => iprop(True)
   | some p => iprop(pwsLb p (L.take 1) ∗ ⌜g L = L⌝)
 
+omit [MachGS GF] in
 instance flowF_persistent (L : List (BitVec 8)) (g : List (BitVec 8) → List (BitVec 8))
     (prev : Option PNames) : Persistent (flowF (GF := GF) L g prev) := by
   cases prev <;> unfold flowF <;> infer_instance
+omit [MachGS GF] in
 instance flowF_timeless (L : List (BitVec 8)) (g : List (BitVec 8) → List (BitVec 8))
     (prev : Option PNames) : Timeless (flowF (GF := GF) L g prev) := by
   cases prev <;> unfold flowF <;> infer_instance

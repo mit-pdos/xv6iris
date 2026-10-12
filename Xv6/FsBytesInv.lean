@@ -538,6 +538,7 @@ theorem fsBytes_agree (E : CoPset) (gL gc gX : GName)
 `Xv6.fsCache_join` / `Xv6.fsCache_split` state these at an `Xv6.FsNames`;
 this file's crossings take the cache's gname raw, exactly as Rocq's do. -/
 
+omit [MachGS GF] in
 theorem cacheJoin (gc : GName) (b : Nat) (bs bs' : List (BitVec 8)) :
     (gc ↪◯MAP[b]{DFrac.own (1 : Qp).half} bs) ∗
     (gc ↪◯MAP[b]{DFrac.own (1 : Qp).half} bs') ⊢@{IProp GF}
@@ -552,6 +553,7 @@ theorem cacheJoin (gc : GName) (b : Nat) (bs bs' : List (BitVec 8)) :
     iexact Hfull
   · ipureintro; exact he.symm
 
+omit [MachGS GF] in
 theorem cacheSplit (gc : GName) (b : Nat) (bs : List (BitVec 8)) :
     (gc ↪◯MAP[b] bs) ⊢@{IProp GF}
       (gc ↪◯MAP[b]{DFrac.own (1 : Qp).half} bs) ∗

@@ -113,22 +113,27 @@ def escLb (r : FileAppNames) (h : List EscRec) : IProp GF :=
 def escWit (r : FileAppNames) (n : Nat) (s : Dst) (g : GName) : IProp GF :=
   iprop(∃ h : List EscRec, escLb r h ∗ ⌜h[n]? = some (s, g)⌝)
 
+omit [MachGS GF] in
 instance escLb_persistent (r : FileAppNames) (h : List EscRec) :
     Persistent (escLb (GF := GF) r h) := by
   unfold escLb; infer_instance
 
+omit [MachGS GF] in
 instance escWit_persistent (r : FileAppNames) (n : Nat) (s : Dst) (g : GName) :
     Persistent (escWit (GF := GF) r n s g) := by
   unfold escWit escLb; infer_instance
 
+omit [MachGS GF] in
 instance escAuth_timeless (r : FileAppNames) (h : List EscRec) :
     Timeless (escAuth (GF := GF) r h) := by
   unfold escAuth; infer_instance
 
+omit [MachGS GF] in
 instance escWit_timeless (r : FileAppNames) (n : Nat) (s : Dst) (g : GName) :
     Timeless (escWit (GF := GF) r n s g) := by
   unfold escWit escLb; infer_instance
 
+omit [MachGS GF] in
 /-- Rocq `esc_wit_lookup`. -/
 theorem escWit_lookup (r : FileAppNames) (h : List EscRec) (n : Nat) (s : Dst) (g : GName) :
     ⊢@{IProp GF} escAuth r h -∗ escWit r n s g -∗ ⌜h[n]? = some (s, g)⌝ := by
@@ -139,6 +144,7 @@ theorem escWit_lookup (r : FileAppNames) (h : List EscRec) (n : Nat) (s : Dst) (
   ipureintro
   exact MonoList.prefix_getElem? hv.2 hn
 
+omit [MachGS GF] in
 /-- Rocq `esc_auth_grow`. -/
 theorem escAuth_grow (r : FileAppNames) (h : List EscRec) (s : Dst) (g : GName) :
     ⊢@{IProp GF} escAuth r h ==∗ escAuth r (h ++ [(s, g)]) ∗ escWit r h.length s g := by
@@ -219,6 +225,7 @@ instance escKey_timeless (c : FileFixed) (r : FileAppNames) (n : Nat) (s : Dst) 
     Timeless (escKey (GF := GF) c r n s g) := by
   unfold escKey; infer_instance
 
+omit [MachGS GF] in
 /-- Fresh names, both halves of both ghosts, at any value, and the escrow
 ledger EMPTY (Rocq `fnames_alloc`).  The SYNC PART's data (`fnSync`,
 `fnEra`, `fnRole`) is the caller's: it names ghosts the caller owns.  The

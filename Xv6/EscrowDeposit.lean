@@ -128,6 +128,7 @@ theorem iregSlotRest_registry [Icfg] (γi : GName) (γfs : FsNames) (inodestart 
   iintro Hreg
   iframe
 
+omit [MachGS GF] in
 /-- The registry's rebind at a covered inum keeps the coverage. -/
 theorem iregRegistry_rebind [Icfg] (nib z : Nat) (ge gr ge0 gr0 : GName) :
     iregRegistry (GF := GF) nib ⊢ regFull z ge0 gr0 ==∗ (iregRegistry nib ∗ regFull z ge gr) := by

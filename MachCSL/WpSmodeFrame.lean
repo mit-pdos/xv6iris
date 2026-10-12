@@ -241,6 +241,7 @@ the goal is just `Entails' e (wpNext sie p cpu K)` and the context stays as it
 is.  `k_next_off` / `k_next_pin c hp` refine it by the two lemmas below and
 beta-reduce the continuation, which is what the proof-mode tactics left. -/
 
+omit [MachGS GF] in
 theorem entails'_wpNext_off {e : IProp GF} {p : BitVec 64} {cpu : CPU} {K : CPU → IProp GF}
     (h : Entails' e (K cpu)) : Entails' e (wpNext false p cpu K) :=
   (show e ⊢ K cpu from h).trans (wpNext_off_intro p cpu K)
@@ -319,6 +320,7 @@ macro_rules
                k_next_off
                try (case hs => k_norm)))
 
+omit [MachGS GF] in
 /-- `wpNext` by its definition: the continuation at every hart the
 pinning allows. -/
 theorem wpNext_intro_pin (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
@@ -327,6 +329,7 @@ theorem wpNext_intro_pin (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → I
   iintro H %cpu' %h
   iapply H $$ %cpu' %h
 
+omit [MachGS GF] in
 /-- The pinning composes: a continuation for the harts pinned to `cpu` is
 one for the harts pinned to a hart pinned to `cpu`. -/
 theorem wpNext_shift (sie : Bool) (p : BitVec 64) (cpu cpu' : CPU) (K : CPU → IProp GF)
@@ -335,6 +338,7 @@ theorem wpNext_shift (sie : Bool) (p : BitVec 64) (cpu cpu' : CPU) (K : CPU → 
   iintro H %c %hc
   iapply H $$ %c %(fun hh => (hc hh).trans (h hh))
 
+omit [MachGS GF] in
 theorem entails'_wpNext_pin {e : IProp GF} {sie : Bool} {p : BitVec 64} {cpu : CPU}
     {K : CPU → IProp GF} (h : ∀ c, (sie = false ∨ p = 0#64 → c = cpu) → Entails' e (K c)) :
     Entails' e (wpNext sie p cpu K) := by

@@ -120,6 +120,7 @@ theorem ucparams_gcPIN (ug : UnionGn) :
 theorem ucparams_gcW (ug : UnionGn) :
     (ucparams (GF := GF) ug).gcW = f0cw ug.ugnFile := rfl
 
+omit [MachGS GF] in
 /-- The byte ledger's growth, in the record's field form (`pext_grow`). -/
 theorem uwaGextGrow (ug : UnionGn) (k : Nat) (l : List (BitVec 8)) (b : BitVec 8) :
     ⊢ pext (GF := GF) (ugnPipe ug) k l ==∗ pext (ugnPipe ug) k (l ++ [b]) := by

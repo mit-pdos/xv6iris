@@ -353,6 +353,7 @@ theorem dirUniq_ofLocal (i : Nat) (n : FsNode) (hl : InodeLocal i n) :
 section SnapLinks
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsBlocksG GF] [FsLinkG GF]
 
+omit [MachGS GF] in
 /-- **Rocq `snap_links_to_set`** (deviation 4): the state's link family,
 read at the region's inums (the state's domain CONTAINS the region,
 `skRegdom`). -/

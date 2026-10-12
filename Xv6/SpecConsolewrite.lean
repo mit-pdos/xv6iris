@@ -192,10 +192,12 @@ def consOutAt (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i
   iprop(∃ ps : List Nat, uartSentRun γ [] ps
     ((List.range i).map fun j => umemByte M (ua + BitVec.ofNat 64 j).toNat))
 
+omit [MachGS GF] in
 instance consOutAt_persistent (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i : Nat) :
     Persistent (consOutAt (GF := GF) γ M ua i) := by
   unfold consOutAt; infer_instance
 
+omit [MachGS GF] in
 /-- consolewrite's run, opened at its stream -/
 theorem consOutAt_elim (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i : Nat) :
     consOutAt (GF := GF) γ M ua i ⊢ ∃ ps L, uartSent γ L ∗
@@ -207,6 +209,7 @@ theorem consOutAt_elim (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitV
   iframe H
   ipureintro; exact h
 
+omit [MachGS GF] in
 /-- a pushed run's first `j` bytes were pushed -/
 theorem consOutAt_take (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i j : Nat) (hj : j ≤ i) :
     consOutAt (GF := GF) γ M ua i ⊢ consOutAt γ M ua j := by
@@ -221,6 +224,7 @@ theorem consOutAt_take (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitV
   iapply uartSentRun_intro γ [] L _ _ (sentRunAt_take h j)
   iexact H
 
+omit [MachGS GF] in
 /-- nothing pushed yet -/
 theorem consOutAt_zero (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) :
     uartSent (GF := GF) γ [] ⊢ consOutAt γ M ua 0 := by

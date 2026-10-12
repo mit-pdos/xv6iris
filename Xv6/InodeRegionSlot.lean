@@ -238,6 +238,7 @@ def izrcpt [Icfg] (z : Nat) (d : Dinode) (v : Nat) : IProp GF :=
 def iregEp [Icfg] (z : Nat) (d : Dinode) : IProp GF :=
   iprop(∃ v : Nat, iepAuth z v ∗ logEpochLb icfgLog v ∗ izrcpt z d v)
 
+omit [MachGS GF] in
 instance izrcpt_timeless [Icfg] (z : Nat) (d : Dinode) (v : Nat) :
     Timeless (izrcpt (GF := GF) z d v) := by
   unfold izrcpt; infer_instance
@@ -245,6 +246,7 @@ instance izrcpt_timeless [Icfg] (z : Nat) (d : Dinode) (v : Nat) :
 instance iregEp_timeless [Icfg] (z : Nat) (d : Dinode) : Timeless (iregEp (GF := GF) z d) := by
   unfold iregEp; infer_instance
 
+omit [MachGS GF] in
 /-- The receipt's vacuous reading at a NONZERO count. -/
 theorem izrcpt_nz [Icfg] (z : Nat) (d : Dinode) (v : Nat) (h : d.diNlink.toNat ≠ 0) :
     ⊢ izrcpt (GF := GF) z d v := by

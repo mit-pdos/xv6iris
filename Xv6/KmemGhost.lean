@@ -23,6 +23,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
+omit [MachGS GF] in
 /-- Fresh allocator ghosts: the client tracks a count of `0`, the allocator
 holds its half and the empty ledger. -/
 theorem kmemGhost_alloc : ⊢@{IProp GF} |==> ∃ γk : KmemNames, kallocAvail γk (some 0) ∗ kmemAuth γk 0 := by

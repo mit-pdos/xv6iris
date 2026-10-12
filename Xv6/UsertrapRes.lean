@@ -687,6 +687,7 @@ def parkOwn : IProp GF := iprop(bslots 3)
 /-- **Rocq `ut_park_caps`** (deviation 8): the parker's context-free row. -/
 def utParkCaps (N : UtNames) : IProp GF := initGen N.ip 1#32
 
+omit [MachGS GF] in
 instance utParkCaps_persistent (N : UtNames) : Persistent (utParkCaps (GF := GF) N) := by
   unfold utParkCaps; infer_instance
 

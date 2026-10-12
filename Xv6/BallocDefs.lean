@@ -327,9 +327,11 @@ section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [DiskG GF] [CurCtx]
 
+omit [MachGS GF] in
 theorem ba_slots_join2 (γ : BcacheNames) : bslot (GF := GF) ∗ bslot ⊢ bslots 2 :=
   bslots_cons 1
 
+omit [MachGS GF] in
 theorem ba_slots_split2 (γ : BcacheNames) : bslots (GF := GF) 2 ⊢ bslot ∗ bslot :=
   bslots_uncons 1
 

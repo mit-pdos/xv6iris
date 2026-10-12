@@ -557,6 +557,7 @@ theorem cw_run_snoc (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i nn : Nat) 
   simp only [List.getElem_map, List.getElem_range, Function.comp]
   exact hat d _ (List.getElem?_eq_getElem h2)
 
+omit [MachGS GF] in
 /-- ...and grown by the chunk `uartwrite` pushed from that stream -/
 theorem consOutAt_snoc (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i nn : Nat)
     (bs : List (BitVec 8)) (ps : List Nat) (L : List (BitVec 8))

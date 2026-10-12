@@ -670,6 +670,7 @@ theorem kx_procPubRest_join (pa : BitVec 64) (kl xs pid : BitVec 32) :
 
 /-! ### D8 ghost steps of the lock section (Rocq `kx_park`'s ghost half) -/
 
+omit [MachGS GF] in
 /-- a pure consequence, keeping its source -/
 theorem kx_keep_pure {P : IProp GF} {φ : Prop} (h : P ⊢ ⌜φ⌝) : P ⊢ ⌜φ⌝ ∗ P :=
   (BI.and_intro h .rfl).trans (pure_elim_left fun hφ => by
@@ -678,6 +679,7 @@ theorem kx_keep_pure {P : IProp GF} {φ : Prop} (h : P ⊢ ⌜φ⌝) : P ⊢ ⌜
     · ipureintro; exact hφ
     · iexact H)
 
+omit [MachGS GF] in
 /-- THE CHILDREN MOVE under `wait_lock` (Rocq `kx_park`: `children_own_lookup`,
 `children_own_upd … cs ∅`, `orphans_add`): the dying process's row is
 emptied and its set goes into `ip`'s orphan column. -/

@@ -131,6 +131,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 theorem utD0_ukill (sc : BitVec 64) (h : sc = 13#64 ∨ sc = 15#64) : ukillSc sc := by
   rcases h with h | h <;> subst h <;> decide
 
+omit [MachGS GF] in
 /-- **The fill's record carries the round's rows** (the transparent fill:
 the image and the permission view unmoved). -/
 theorem utD0_rows {Γ : SchedNames} (A : UtArgs GF) (hok : UtOk Γ A) (hne : A.sc ≠ uecallScause)

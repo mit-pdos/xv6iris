@@ -337,6 +337,7 @@ theorem kxcC_range_set (n i : Nat) (h : i < n) : (List.range n).set i i = List.r
     · subst_vars; simp
     · rfl
 
+omit [MachGS GF] in
 /-- Element `i` of a `[∗list]` over `List.range n`, READ-ONLY. -/
 theorem kxcC_range_acc (Φ : Nat → IProp GF) (n i : Nat) (h : i < n) :
     ([∗list] j ∈ List.range n, Φ j) ⊢ Φ i ∗ (Φ i -∗ [∗list] j ∈ List.range n, Φ j) := by

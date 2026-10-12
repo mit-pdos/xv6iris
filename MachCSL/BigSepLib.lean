@@ -20,6 +20,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
+omit [MachGS GF] in
 /-- Rocq's `fun_of_big` (`BioInv.tok_fun_alloc`'s trick in the other
 direction): a big-op of EXISTENTIALS yields ONE function of the index.
 Over `List.range n` (Rocq's start index `j` is always 0 at its uses). -/

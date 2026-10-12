@@ -47,6 +47,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
+omit [MachGS GF] in
 /-- The two local words, opened. -/
 theorem ushGets_locOpen (γd : GName) (s : BitVec 64) (spz : Nat) (hs : s.toNat = spz - 80) (h96 : 96 ≤ spz) :
     ustack (GF := GF) γd s 2 ⊢ (∃ w : BitVec 64, uword γd (spz - 88) w) ∗ (∃ w : BitVec 64, uword γd (spz - 96) w) := by
@@ -56,6 +57,7 @@ theorem ushGets_locOpen (γd : GName) (s : BitVec 64) (spz : Nat) (hs : s.toNat 
   rw [show spz - 80 - 8 * (0 + 1) = spz - 88 by omega, show spz - 80 - 8 * (1 + 1) = spz - 96 by omega]
   iframe
 
+omit [MachGS GF] in
 /-- ...and closed. -/
 theorem ushGets_locClose (γd : GName) (s : BitVec 64) (spz : Nat) (hs : s.toNat = spz - 80) (h96 : 96 ≤ spz)
     (hal : spz % 8 = 0) :
@@ -71,6 +73,7 @@ theorem ushGets_locClose (γd : GName) (s : BitVec 64) (spz : Nat) (hs : s.toNat
   iapply BigSepL.bigSepL_nil.2
   iempintro
 
+omit [MachGS GF] in
 /-- The local byte, split off its word (deviation 2). -/
 theorem ushGets_byteOpen (γd : GName) (spz : Nat) (h96 : 96 ≤ spz) :
     (∃ w : BitVec 64, uword (GF := GF) γd (spz - 88) w) ⊢

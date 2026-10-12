@@ -278,6 +278,7 @@ theorem ss_hook_list (oQ : Option (IProp GF)) :
     iframe H
     exact BigSepL.bigSepL_nil_intro
 
+omit [MachGS GF] in
 /-- The ghost commit's receipts as the optional `Q`. -/
 theorem ss_q_list (oQ : Option (IProp GF)) :
     ([∗list] Q ∈ oQ.toList, Q) ⊢ qOpt (GF := GF) oQ := by

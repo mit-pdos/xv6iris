@@ -199,6 +199,7 @@ theorem spostAt_mknod_elim_at (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (
 def initConsMknodFam (Pv : Aview → Prop) (T K : IProp GF) (r : EchoNames) (Q : Int → IProp GF) : Xfam GF :=
   xfamMknod (initMkP T) (initMkFarm echoFsPure Pv T K) (initMkFun T K) (initMkFok (consMade r) T K) Q
 
+omit [MachGS GF] in
 /-- The family's six row-17 fields (`rfl`, stated so the kernel never
 unfolds the arms to compare them). -/
 theorem initConsMknodFam_fields (Pv : Aview → Prop) (T K : IProp GF) (r : EchoNames) (Q : Int → IProp GF) :

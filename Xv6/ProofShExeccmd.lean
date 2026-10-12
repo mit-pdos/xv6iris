@@ -31,6 +31,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- The zeroed node, the type word stored: an EXEC node with no tokens. -/
 theorem ush_exec_pre_nil (N : UkNames GF) (s0 p : Nat) (hp : 0 < p) (hp8 : p % 8 = 0) :
     ubytes N.d p 4 (nthByte (n := 4) (BitVec.ofInt 32 (ushpTy (.exec [])))) ∗

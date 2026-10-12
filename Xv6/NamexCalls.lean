@@ -57,9 +57,11 @@ def namexLk (A : NamexArgs) (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum 
   ityShot g dn.diType ∗ ifreezeOff inum.toNat ∗
   inodeRefShortGenlo ik (q.half + q.half) q.half icfgDev inum g lo ∗ runitAny inum.toNat
 
+omit [MachGS GF] in
 theorem namex_lic_plain (g : GName) (z : Nat) :
     runitAny (GF := GF) z ⊢ iregWdLic .plainK g z := .rfl
 
+omit [MachGS GF] in
 theorem namex_back_plain (g : GName) (z : Nat) :
     iregWdBack (GF := GF) .plainK g z ⊢ runitAny z := .rfl
 

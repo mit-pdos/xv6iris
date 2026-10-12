@@ -50,6 +50,7 @@ def redirK (omo : OffMode) (c : FileFixed) (r : FileAppNames) (Nf : Fname) (s : 
     (ty : FdType) : IProp GF :=
   fileOpenFdK omo c r Nf s np ty
 
+omit [MachGS GF] in
 /-- **Rocq `uimg_view_sub`**, keeping the heap. -/
 theorem uimgView_sub_keep (N : UkNames GF) (Img M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) :
     ⊢ uimgView N Img -∗ uheap N.t N.d N.s M pm sz -∗

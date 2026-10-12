@@ -174,26 +174,32 @@ def gcsAuth (k : Nat) (v : EraPins) (cs : List Nat) : IProp GF :=
 
 variable {R}
 
+omit [MachGS GF] in
 instance gitem_persistent [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : EraPins) (i : Nat)
     (I : List (BitVec 8)) (a : Nat) : Persistent (gitem R k v i I a) := by
   unfold gitem; infer_instance
+omit [MachGS GF] in
 instance gitem_timeless [∀ k v I a, Timeless (R k v I a)] (k : Nat) (v : EraPins) (i : Nat)
     (I : List (BitVec 8)) (a : Nat) : Timeless (gitem R k v i I a) := by
   unfold gitem; infer_instance
 
+omit [MachGS GF] in
 /-- Rocq `gstore_persistent`. -/
 instance gstore_persistent [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : EraPins)
     (cs : List Nat) : Persistent (gstore R k v cs) := by
   unfold gstore; infer_instance
+omit [MachGS GF] in
 /-- Rocq `gstore_timeless`. -/
 instance gstore_timeless [∀ k v I a, Timeless (R k v I a)] (k : Nat) (v : EraPins)
     (cs : List Nat) : Timeless (gstore R k v cs) := by
   unfold gstore; infer_instance
+omit [MachGS GF] in
 /-- Rocq `gcs_auth_timeless`. -/
 instance gcsAuth_timeless [∀ k v I a, Timeless (R k v I a)] (k : Nat) (v : EraPins)
     (cs : List Nat) : Timeless (gcsAuth R k v cs) := by
   unfold gcsAuth; infer_instance
 
+omit [MachGS GF] in
 /-- Rocq `gstore_nil`. -/
 theorem gstore_nil (k : Nat) (v : EraPins) : ⊢ gstore R k v [] := by
   unfold gstore
@@ -214,6 +220,7 @@ theorem gstore_idx_last (cs : List Nat) (a : Nat) : (cs ++ [a])[cs.length]! = a 
   rw [List.getElem!_eq_getElem?_getD, List.getElem?_append_right (Nat.le_refl _), Nat.sub_self]
   rfl
 
+omit [MachGS GF] in
 /-- Rocq `gstore_snoc`. -/
 theorem gstore_snoc [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : EraPins) (cs : List Nat)
     (I : List (BitVec 8)) (a : Nat) :
@@ -241,6 +248,7 @@ theorem gstore_snoc [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : EraPins
     · iexact Hs2
     · iexact Hl
 
+omit [MachGS GF] in
 /-- Rocq `gcs_lb_prefix`. -/
 theorem gcsLb_prefix (k : Nat) (v : EraPins) (l l' : List Nat) :
     ⊢ gcsAuth R k v l -∗ csLb v l' -∗ ⌜l' <+: l⌝ := by
@@ -249,6 +257,7 @@ theorem gcsLb_prefix (k : Nat) (v : EraPins) (l l' : List Nat) :
   iapply csLb_prefix v l l' $$ [H H']
   iframe H H'
 
+omit [MachGS GF] in
 /-- Rocq `gcs_lb_get`. -/
 theorem gcsLb_get (k : Nat) (v : EraPins) (l : List Nat) :
     gcsAuth R k v l ⊢ gcsAuth R k v l ∗ csLb v l := by
@@ -257,6 +266,7 @@ theorem gcsLb_get (k : Nat) (v : EraPins) (l : List Nat) :
   ihave ⟨H, #Hl⟩ := csLb_get v l $$ H
   iframe H Hs Hl
 
+omit [MachGS GF] in
 /-- Rocq `gcs_auth_grow`. -/
 theorem gcsAuth_grow [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : EraPins) (l : List Nat)
     (a : Nat) (I : List (BitVec 8)) :
@@ -271,12 +281,14 @@ theorem gcsAuth_grow [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : EraPin
   iapply Hs2
   ipureintro; exact hn
 
+omit [MachGS GF] in
 /-- the store, unfolded (Rocq's `iDestruct "Hst" as (Is) "[%HIs #Hitems]"`) -/
 theorem gstore_items (k : Nat) (v : EraPins) (l : List Nat) :
     gstore R k v l ⊢ ∃ Is : List (List (BitVec 8)), ⌜Is.length = l.length⌝ ∗
       [∗list] i ↦ J ∈ Is, gitem R k v i J l[i]! := by
   unfold gstore; exact .rfl
 
+omit [MachGS GF] in
 /-- the authority hands out its store, unfolded (the drains' reading of
 `gcs_auth`'s second half, Rocq's `iDestruct "Hcs" as "[Hcs #Hst]"`) -/
 theorem gcsAuth_store [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : EraPins) (l : List Nat) :
@@ -400,6 +412,7 @@ instance gcl_timeless (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (A : GenW
     (k : Nat) (ho : List Obs) (H : ConsHist) : Timeless (gcl M G sd A k ho H) := by
   unfold gcl; infer_instance
 
+omit [MachGS GF] in
 /-- `cs_lb` only weakens (Rocq `gop_cs_lb_weaken`) -/
 theorem gopCsLb_weaken (v : EraPins) (l l' : List Nat) (hp : l' <+: l) :
     csLb (GF := GF) v l ⊢ csLb v l' := by
@@ -416,18 +429,21 @@ theorem gopTurn_agree (v : EraPins) (P P' : Nat) :
   iapply turn_agree v P P' $$ [H1 H2]
   iframe H1 H2
 
+omit [MachGS GF] in
 theorem gopPsLb_prefix (v : EraPins) (l l' : List Nat) :
     ⊢ psAuth (GF := GF) v l -∗ psLb v l' -∗ ⌜l' <+: l⌝ := by
   iintro H1 H2
   iapply psLb_prefix v l l' $$ [H1 H2]
   iframe H1 H2
 
+omit [MachGS GF] in
 theorem gopInpLb_le (v : EraPins) (D : List (List Obs × BitVec 8)) (I : List (BitVec 8)) :
     ⊢ dlListAuth (GF := GF) v D -∗ inpLb v I -∗ ⌜I <+: D.map Prod.snd⌝ := by
   iintro H1 H2
   iapply inpLb_le v D I $$ [H1 H2]
   iframe H1 H2
 
+omit [MachGS GF] in
 /-- EVERY FILED ROUND'S INPUT IS DELIVERED (the drains' `HIdl`, Rocq's
 `big_sepL_lookup` + `inp_lb_le` under `iAssert`): over any family whose
 items carry their input's lower bound. -/
@@ -453,6 +469,7 @@ theorem gitemsInp_prefix (v : EraPins) (D : List (List Obs × BitVec 8))
     · exact h1
     · exact h2 I h
 
+omit [MachGS GF] in
 /-- an item's input lower bound (the `hΦ` of `gitemsInp_prefix`) -/
 theorem gitem_inpLb (R : Nat → EraPins → List (BitVec 8) → Nat → IProp GF)
     [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : EraPins) (i : Nat)
@@ -461,6 +478,7 @@ theorem gitem_inpLb (R : Nat → EraPins → List (BitVec 8) → Nat → IProp G
   iintro ⟨-, #H, -⟩
   iexact H
 
+omit [MachGS GF] in
 theorem gopDlCnt_agree (v : EraPins) (q1 q2 : Qp) (n1 n2 : Nat) :
     ⊢ dlCnt (GF := GF) v q1 n1 -∗ dlCnt v q2 n2 -∗ ⌜n1 = n2⌝ := by
   iintro H1 H2

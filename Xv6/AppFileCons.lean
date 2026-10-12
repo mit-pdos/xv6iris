@@ -224,6 +224,7 @@ def consFlag (r : FileAppNames) (jo : Option Nat) : IProp GF :=
   | some j => consMade r.fnCons j
   | none => consNever r.fnCons
 
+omit [MachGS GF] in
 instance consFlag_persistent (r : FileAppNames) (jo : Option Nat) :
     Persistent (consFlag (GF := GF) r jo) := by
   cases jo <;> unfold consFlag <;> infer_instance

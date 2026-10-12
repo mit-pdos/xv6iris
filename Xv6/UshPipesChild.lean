@@ -93,6 +93,7 @@ theorem wp_ushChildPipesG (UL : UK_LEAVES) (SP : SH_PARSECMD) (N : UkNames GF) (
   rw [show 8 + (6 + (6 + (16 + (24 + (8 + (rest.length * 6 + k)))))) = 68 + (rest.length * 6 + k) by omega]
   iapply Hk $$ %h4 %_ %p %ha04 Hcmd Hws Hsy HM3 Hcp Hrun
 
+omit [MachGS GF] in
 /-- **Rocq `ushq_um_usz`**: every link after the first holds the break the
 pipe arm wants. -/
 theorem ushq_um_usz (N : UkNames GF) (sz j : Nat) : ⊢ ushqUm N sz (j + 1) -∗ usz N.s (sz + 65536) := by

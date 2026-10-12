@@ -54,6 +54,7 @@ theorem iput_lk_ci_live (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 ×
   rw [← hciwf.1, mem_mdom] at h1
   exact Option.isSome_iff_exists.mp h1
 
+omit [MachGS GF] in
 theorem iput_lk_ent_eq {P Q : IProp GF} (h : P = Q) : P ⊢ Q := h ▸ .rfl
 
 theorem iput_lk_env_parts (Γ : SchedNames) [ClaimIs GF Γ] (γl : GName)

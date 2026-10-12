@@ -109,6 +109,7 @@ theorem swp_barrier_k (cpu : CPU) (bk : barrier_kind) {X : Type}
   inext
   iexact H
 
+omit [MachGS GF] in
 /-- Continue after an event: the later is used up by the event. -/
 theorem laterIf_of_later (b : Bool) (Q : IProp GF) : Q ⊢ laterIf b Q := by
   cases b

@@ -151,6 +151,7 @@ Rocq's `tok_fun_alloc` / `seq_fun_alloc`: the thirty ghosts are allocated
 one at a time and collected into a `Nat → _` function, so that the names
 exist BEFORE `Xv6.BcacheNames` does. -/
 
+omit [MachGS GF] in
 /-- The pure-ghost form (the checkout tokens). -/
 theorem bd_funAlloc {A : Type} [Inhabited A] (P : Nat → A → IProp GF)
     (halloc : ∀ j : Nat, ⊢ |==> ∃ a : A, P j a) :
@@ -332,6 +333,7 @@ theorem bd_rows_split (γ : BcacheNames) (V : BioView GF) (bx : Nat → BoxNames
       · iapply BigSepL.bigSepL_singleton.2
         iexact Hcn
 
+omit [MachGS GF] in
 /-- The pool at boot: no buffer caches anything (every blockno cell is `0`,
 which the view does not cover). -/
 theorem bioPool_boot (V : BioView GF) (h0 : (0 : Nat) ∉ V.cov) :

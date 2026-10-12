@@ -175,14 +175,18 @@ def kallocAvail (γk : KmemNames) : Option Nat → IProp GF
   | some n => iprop((γk.pend ↪VAR ()) ∗ (γk.cnt ↪VAR{.own (1 : Qp).half} n))
   | none => iprop(γk.pend ↪VAR{.discard} ())
 
+omit [MachGS GF] in
 theorem kallocAvail_some (γk : KmemNames) (n : Nat) :
     kallocAvail (GF := GF) γk (some n) = iprop((γk.pend ↪VAR ()) ∗ (γk.cnt ↪VAR{.own (1 : Qp).half} n)) := rfl
+omit [MachGS GF] in
 theorem kallocAvail_none (γk : KmemNames) :
     kallocAvail (GF := GF) γk none = iprop(γk.pend ↪VAR{.discard} ()) := rfl
 
+omit [MachGS GF] in
 instance kallocAvail_none_persistent (γk : KmemNames) : Persistent (kallocAvail (GF := GF) γk none) := by
   unfold kallocAvail; infer_instance
 
+omit [MachGS GF] in
 /-- Forgetting the count. -/
 theorem kallocAvail_seal (γk : KmemNames) (n : Nat) :
     kallocAvail (GF := GF) γk (some n) ⊢ |==> kallocAvail γk none := by
@@ -197,9 +201,11 @@ def ledAuth (γe : GName) (h : List Kev) : IProp GF := γe ↪●ML h
 /-- A lower bound of the ledger (Rocq `led_lb`). -/
 def ledLb (γe : GName) (h : List Kev) : IProp GF := γe ↪◯ML h
 
+omit [MachGS GF] in
 instance ledLb_persistent (γe : GName) (h : List Kev) : Persistent (ledLb (GF := GF) γe h) := by
   unfold ledLb; infer_instance
 
+omit [MachGS GF] in
 theorem ledAuth_grow (γe : GName) (h : List Kev) (e : Kev) :
     ledAuth (GF := GF) γe h ⊢ |==> (ledAuth γe (h ++ [e]) ∗ ledLb γe (h ++ [e])) := by
   unfold ledAuth ledLb
@@ -213,6 +219,7 @@ name `γk.pend` in the ledger's camera, deviation 1). -/
 def ledReceipt (γk : KmemNames) (h : List Kev) (e : Kev) : IProp GF :=
   ledLb γk.pend (h ++ [e])
 
+omit [MachGS GF] in
 instance ledReceipt_persistent (γk : KmemNames) (h : List Kev) (e : Kev) :
     Persistent (ledReceipt (GF := GF) γk h e) := by
   unfold ledReceipt; infer_instance
@@ -222,6 +229,7 @@ authoritative history and the tie. -/
 def kmemLedger (γk : KmemNames) (npages : Nat) : IProp GF := iprop%
   ∃ h : List Kev, ledAuth γk.pend h ∗ ⌜npages + allocs h = frees h⌝
 
+omit [MachGS GF] in
 /-- `kalloc`'s append: the history at the call was NONEMPTY. -/
 theorem kmemLedger_alloc (γk : KmemNames) (n : Nat) (act : BitVec 64) :
     kmemLedger (GF := GF) γk (n + 1) ⊢
@@ -239,6 +247,7 @@ theorem kmemLedger_alloc (γk : KmemNames) (n : Nat) (act : BitVec 64) :
     · iexact Hb
     · ipureintro; exact tie_nonempty n h ht
 
+omit [MachGS GF] in
 /-- `kalloc`'s null arm: the count stays at `0`, the history was EMPTY. -/
 theorem kmemLedger_null (γk : KmemNames) (act : BitVec 64) :
     kmemLedger (GF := GF) γk 0 ⊢
@@ -256,6 +265,7 @@ theorem kmemLedger_null (γk : KmemNames) (act : BitVec 64) :
     · iexact Hb
     · ipureintro; exact tie_empty h ht
 
+omit [MachGS GF] in
 /-- `kfree`'s append. -/
 theorem kmemLedger_free (γk : KmemNames) (n : Nat) (act : BitVec 64) :
     kmemLedger (GF := GF) γk n ⊢
@@ -290,10 +300,12 @@ at which the pool was not empty. -/
 def kAllocRcpt (γk : KmemNames) (act : BitVec 64) : IProp GF := iprop%
   ∃ h, ledReceipt γk h (.KAlloc act) ∗ ⌜¬ poolEmpty h⌝
 
+omit [MachGS GF] in
 instance kNullRcpt_persistent (γk : KmemNames) (act : BitVec 64) :
     Persistent (kNullRcpt (GF := GF) γk act) := by
   unfold kNullRcpt; infer_instance
 
+omit [MachGS GF] in
 instance kAllocRcpt_persistent (γk : KmemNames) (act : BitVec 64) :
     Persistent (kAllocRcpt (GF := GF) γk act) := by
   unfold kAllocRcpt; infer_instance
@@ -303,14 +315,17 @@ at `r = 0`, the allocation receipt otherwise. -/
 def kRcpt (γk : KmemNames) (act r : BitVec 64) : IProp GF :=
   if r = 0#64 then kNullRcpt γk act else kAllocRcpt γk act
 
+omit [MachGS GF] in
 instance kRcpt_persistent (γk : KmemNames) (act r : BitVec 64) :
     Persistent (kRcpt (GF := GF) γk act r) := by
   unfold kRcpt; split <;> infer_instance
 
+omit [MachGS GF] in
 theorem kRcpt_null (γk : KmemNames) (act r : BitVec 64) (hr : r = 0#64) :
     kRcpt (GF := GF) γk act r = kNullRcpt γk act := by
   unfold kRcpt; rw [if_pos hr]
 
+omit [MachGS GF] in
 theorem kRcpt_page (γk : KmemNames) (act r : BitVec 64) (hr : r ≠ 0#64) :
     kRcpt (GF := GF) γk act r = kAllocRcpt γk act := by
   unfold kRcpt; rw [if_neg hr]
@@ -342,6 +357,7 @@ instance instCtxMorphKmemRes [CurCtx] (γk : KmemNames) : CtxMorph (GF := GF) (k
       (fun _ => @instCtxMorphSep GF _ _ _ inferInstance
         (@instCtxMorphSep GF _ _ _ inferInstance (instCtxMorphConst _))))
 
+omit [MachGS GF] in
 /-- The client's count agrees with the allocator's, and the pair steps together. -/
 theorem kmemCnt_inc (γk : KmemNames) (n : Nat) (on : Option Nat) :
     kallocAvail (GF := GF) γk on ∗ kmemCnt γk n ⊢
@@ -372,6 +388,7 @@ theorem kmemCnt_inc (γk : KmemNames) (n : Nat) (on : Option Nat) :
     · ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ Hp Hs
       exact absurd hv.1 (by simp [DFrac.valid_own_op_discard])
 
+omit [MachGS GF] in
 theorem kmemCnt_dec (γk : KmemNames) (n : Nat) (on : Option Nat) :
     kallocAvail (GF := GF) γk on ∗ kmemCnt γk (n + 1) ⊢
       |==> (⌜∀ m, on = some m → m = n + 1⌝ ∗ kallocAvail γk (availDec on) ∗ kmemCnt γk n) := by
@@ -401,6 +418,7 @@ theorem kmemCnt_dec (γk : KmemNames) (n : Nat) (on : Option Nat) :
     · ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ Hp Hs
       exact absurd hv.1 (by simp [DFrac.valid_own_op_discard])
 
+omit [MachGS GF] in
 /-- The client's count, if tracked, is the allocator's. -/
 theorem kmemCnt_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
     kallocAvail (GF := GF) γk on ∗ kmemCnt γk n ⊢
@@ -425,6 +443,7 @@ theorem kmemCnt_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
     · ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ Hp Hs
       exact absurd hv.1 (by simp [DFrac.valid_own_op_discard])
 
+omit [MachGS GF] in
 /-- `kfree`'s ghost step (Rocq `kmem_avail_inc`): the client's count agrees
 with the allocator's, the pair steps up, and the actor's `KFree` is
 appended to the ledger. -/
@@ -441,6 +460,7 @@ theorem kmemAuth_inc (γk : KmemNames) (n : Nat) (on : Option Nat) (act : BitVec
   · ipureintro; exact hag
   iframe
 
+omit [MachGS GF] in
 /-- `kalloc`'s ghost step (Rocq `kmem_avail_dec`): pop one page off the
 count and append the actor's `KAlloc`; the history at the call was
 nonempty. -/
@@ -457,6 +477,7 @@ theorem kmemAuth_dec (γk : KmemNames) (n : Nat) (on : Option Nat) (act : BitVec
   · ipureintro; exact hag
   iframe
 
+omit [MachGS GF] in
 /-- `kalloc`'s null arm (Rocq `kmem_avail_null`, new with the ledger): the
 count stays at `0`, the actor's `KNull` is appended, and the history at
 the call was empty. -/
@@ -470,6 +491,7 @@ theorem kmemAuth_null (γk : KmemNames) (on : Option Nat) (act : BitVec 64) :
   imodintro
   iframe
 
+omit [MachGS GF] in
 /-- The client's count, if tracked, is the allocator's. -/
 theorem kmemAuth_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
     kallocAvail (GF := GF) γk on ∗ kmemAuth γk n ⊢

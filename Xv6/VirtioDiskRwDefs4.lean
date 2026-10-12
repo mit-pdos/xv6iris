@@ -502,6 +502,7 @@ theorem vdrw6_fd (FD : FREE_DESC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γ : 
   iapply h
   iframe Hk Hpc Hpi Hgeom Hf Hd HΦ
 
+omit [MachGS GF] in
 /-- With interrupts off the continuation is at THIS hart, whatever the
 `wpNext` flag says. -/
 theorem wpNext_here (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :

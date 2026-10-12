@@ -76,6 +76,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
 
 /-! ## Allocation helpers -/
 
+omit [MachGS GF] in
 theorem diskBoot_rangeCongr (Φ Ψ : Nat → IProp GF) :
     ∀ n : Nat, (∀ k, k < n → Φ k = Ψ k) →
       (([∗list] k ∈ List.range n, Φ k) ⊢ [∗list] k ∈ List.range n, Ψ k) := by
@@ -85,6 +86,7 @@ theorem diskBoot_rangeCongr (Φ Ψ : Nat → IProp GF) :
   have hx : x < n := List.mem_range.1 (List.mem_of_getElem? hk)
   rw [h x hx]
 
+omit [MachGS GF] in
 /-- A ghost variable, born split in halves. -/
 theorem diskBoot_gvHalves {A : Type} [GhostVarG GF A] (a : A) :
     ⊢@{IProp GF} |==> ∃ γ : GName,
@@ -97,6 +99,7 @@ theorem diskBoot_gvHalves {A : Type} [GhostVarG GF A] (a : A) :
   iexists γ
   iframe H1 H2
 
+omit [MachGS GF] in
 /-- The per-descriptor receipts: one ghost per index, both halves at
 `.inactive`, collected into a `Nat → GName` (Rocq `seq_fun_alloc`). -/
 theorem diskBoot_headAlloc :
@@ -130,6 +133,7 @@ theorem diskBoot_headAlloc :
       simp only [reduceIte]
       iexact Ha
 
+omit [MachGS GF] in
 /-- **THE ERA'S BLOCK IMAGE, grown one block at a time**: the map holds
 exactly blocks `0 .. n-1`, at `B`, and every block's fragment comes out. -/
 theorem diskBoot_imgGrow (gi : GName) (B : Nat → List (BitVec 8)) :

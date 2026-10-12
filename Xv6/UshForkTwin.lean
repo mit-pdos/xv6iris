@@ -59,6 +59,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
 
 /-! ## Helpers -/
 
+omit [MachGS GF] in
 /-- What the fork left in the parent's hand, beside the set it grew to. -/
 theorem ushf_fansOf (N : UkNames GF) (Q : Int → IProp GF) (Rc : IProp GF) (r : BitVec 64) (hr : r ≠ -1#64) :
     ushFork1Ans N ∅ Q Rc r ⊢ ∃ Sw : ExtTreeSet GName compare, uch N.ch Sw ∗ ushfFans ∅ Q Sw := by
@@ -71,6 +72,7 @@ theorem ushf_fansOf (N : UkNames GF) (Q : Int → IProp GF) (Rc : IProp GF) (r :
     iframe Htok
     ipureintro; rfl
 
+omit [MachGS GF] in
 /-- `ushf_wait_empty`, the two answers kept. -/
 theorem ushf_wait_empty_keep (Q : Int → IProp GF) (Sw Sw' : ExtTreeSet GName compare)
     (ret : BitVec 64) (pidv : BitVec 32) (hne : pidv ≠ 1#32) (hm1 : ret = -1#64 → Sw' = ∅) :
@@ -83,6 +85,7 @@ theorem ushf_wait_empty_keep (Q : Int → IProp GF) (Sw Sw' : ExtTreeSet GName c
     iframe H
     ipureintro; exact h
 
+omit [MachGS GF] in
 /-- The child's escrow, redeemed at a status-independent payload. -/
 theorem ush_redeem_const (γ : GName) (pidc rv : BitVec 32) (xs : Int) (P : IProp GF) :
     childTok γ pidc (fun _ => P) ∗ exitTok γ rv xs ⊢ ▷ P := by

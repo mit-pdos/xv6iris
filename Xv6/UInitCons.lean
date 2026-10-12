@@ -611,6 +611,7 @@ theorem init_cons_mknod_bundle (γfs : FsNames) (rt : Nat) (Pure : Aview → Pro
   · unfold initMkFun
     ipureintro; trivial
 
+omit [MachGS GF] in
 /-- The arm piece's refund at `initMkFarm` is the key. -/
 theorem initMkFarm_refund (AU : (Aview → Nat → IProp GF) → IProp GF) (Pure Pv : Aview → Prop)
     (T K : IProp GF) : pfAt AU (initMkFarm Pure Pv T K) ⊢ K :=

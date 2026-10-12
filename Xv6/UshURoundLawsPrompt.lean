@@ -63,6 +63,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG 
 
 /-! ## §0 helpers (deviation 2) -/
 
+omit [MachGS GF] in
 /-- The writers' halves, their terminal facts split off. -/
 theorem udone_split (γc γm : Wid → GName) (sw : Wid → List (BitVec 8)) :
     ∀ l : List Wid,
@@ -97,6 +98,7 @@ theorem udone_split (γc γm : Wid → GName) (sw : Wid → List (BitVec 8)) :
       · exact ht
       · exact hl w hw
 
+omit [MachGS GF] in
 /-- Every writer at its whole source, as one source function. -/
 theorem udone_all (l : List Wid) (hnd : l.Nodup) (γc γm : Wid → GName) :
     ([∗list] w ∈ l, ∃ s : List (BitVec 8), wcurN (GF := GF) γc w (1 : Qp).half s.length

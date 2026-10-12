@@ -471,9 +471,11 @@ def diskCfgOwn (γ : DiskNames) (c : VirtioCfg) : IProp GF := γ.cfg ↪VAR{.own
 /-- The configuration, frozen: persistent, and unique. -/
 def diskCfgFrozen (γ : DiskNames) (c : VirtioCfg) : IProp GF := γ.cfg ↪VAR{.discard} c
 
+omit [MachGS GF] in
 instance diskCfgFrozen_persistent (γ : DiskNames) (c : VirtioCfg) :
     Persistent (diskCfgFrozen (GF := GF) γ c) := by unfold diskCfgFrozen; infer_instance
 
+omit [MachGS GF] in
 theorem diskCfgFrozen_agree (γ : DiskNames) (c c' : VirtioCfg) :
     diskCfgFrozen (GF := GF) γ c ∗ diskCfgFrozen γ c' ⊢ ⌜c = c'⌝ := by
   unfold diskCfgFrozen
@@ -508,11 +510,14 @@ arming, and the payload's own quarter names no chain the sleeper knows.
 def headTokQ (γ : DiskNames) (i : Nat) (s : HState) : IProp GF :=
   headTokF γ (1 : Qp).half.half i s
 
+omit [MachGS GF] in
 instance headTokF_timeless (γ : DiskNames) (q : Qp) (i : Nat) (s : HState) :
     Timeless (headTokF (GF := GF) γ q i s) := by unfold headTokF; infer_instance
+omit [MachGS GF] in
 instance headTokQ_timeless (γ : DiskNames) (i : Nat) (s : HState) :
     Timeless (headTokQ (GF := GF) γ i s) := by unfold headTokQ; infer_instance
 
+omit [MachGS GF] in
 theorem headTokF_agree (γ : DiskNames) (q q' : Qp) (i : Nat) (s s' : HState) :
     headTokF (GF := GF) γ q i s ∗ headTokF γ q' i s' ⊢ ⌜s = s'⌝ := by
   unfold headTokF
@@ -520,6 +525,7 @@ theorem headTokF_agree (γ : DiskNames) (q q' : Qp) (i : Nat) (s s' : HState) :
   ihave %h := ghost_var_agree (γ.head i) _ _ _ _ $$ H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 /-- The two quarters ARE the half. -/
 theorem headTok_split (γ : DiskNames) (i : Nat) (s : HState) :
     headTok (GF := GF) γ i s ⊣⊢ headTokQ γ i s ∗ headTokQ γ i s := by
@@ -529,24 +535,29 @@ theorem headTok_split (γ : DiskNames) (i : Nat) (s : HState) :
   rw [Qp.half_add_half] at h
   exact h
 
+omit [MachGS GF] in
 theorem headTok_toQ (γ : DiskNames) (i : Nat) (s : HState) :
     headTok (GF := GF) γ i s ⊢ headTokQ γ i s ∗ headTokQ γ i s :=
   (headTok_split γ i s).1
 
+omit [MachGS GF] in
 theorem headTokQ_join (γ : DiskNames) (i : Nat) (s : HState) :
     headTokQ (GF := GF) γ i s ∗ headTokQ γ i s ⊢ headTok γ i s :=
   (headTok_split γ i s).2
 
+omit [MachGS GF] in
 /-- Two quarters at states the holder has not compared are at the SAME
 state, and they join. -/
 theorem headTokQ_agree (γ : DiskNames) (i : Nat) (s s' : HState) :
     headTokQ (GF := GF) γ i s ∗ headTokQ γ i s' ⊢ ⌜s = s'⌝ :=
   headTokF_agree γ _ _ i s s'
 
+omit [MachGS GF] in
 theorem headTok_headTokQ_agree (γ : DiskNames) (i : Nat) (s s' : HState) :
     headTok (GF := GF) γ i s ∗ headTokQ γ i s' ⊢ ⌜s = s'⌝ :=
   headTokF_agree γ (1 : Qp).half (1 : Qp).half.half i s s'
 
+omit [MachGS GF] in
 theorem headTokQ_join' (γ : DiskNames) (i : Nat) (s s' : HState) :
     headTokQ (GF := GF) γ i s ∗ headTokQ γ i s' ⊢ ⌜s = s'⌝ ∗ headTok γ i s := by
   iintro ⟨H1, H2⟩
@@ -578,11 +589,14 @@ def diskBlockQ (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) : IProp GF :=
 def diskBlockT (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) : IProp GF :=
   γ.img ↪◯MAP[bno]{DFrac.own Qp.threeQuarters} bs
 
+omit [MachGS GF] in
 instance diskBlockQ_timeless (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) :
     Timeless (diskBlockQ (GF := GF) γ bno bs) := by unfold diskBlockQ; infer_instance
+omit [MachGS GF] in
 instance diskBlockT_timeless (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) :
     Timeless (diskBlockT (GF := GF) γ bno bs) := by unfold diskBlockT; infer_instance
 
+omit [MachGS GF] in
 theorem diskBlock_split (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) :
     diskBlock (GF := GF) γ bno bs ⊢ diskBlockT γ bno bs ∗ diskBlockQ γ bno bs := by
   unfold diskBlock diskBlockT diskBlockQ
@@ -594,6 +608,7 @@ theorem diskBlock_split (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) :
     exact Qp.quarter_add_threeQuarters] at h
   exact h.1
 
+omit [MachGS GF] in
 theorem diskBlock_join (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) :
     iprop(diskBlockT (GF := GF) γ bno bs ∗ diskBlockQ γ bno bs) ⊢ diskBlock γ bno bs := by
   unfold diskBlock diskBlockT diskBlockQ
@@ -605,6 +620,7 @@ theorem diskBlock_join (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) :
     exact Qp.quarter_add_threeQuarters] at h
   exact h.2
 
+omit [MachGS GF] in
 theorem diskBlockQ_agree (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno : Nat)
     (bs : List (BitVec 8)) :
     ⊢@{IProp GF} imgAuth γ m -∗ diskBlockQ γ bno bs -∗ ⌜PartialMap.get? m bno = some bs⌝ := by
@@ -613,6 +629,7 @@ theorem diskBlockQ_agree (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno :
   ihave %h := ghost_map_lookup $$ H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem diskBlock_agree' (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno : Nat)
     (bs : List (BitVec 8)) :
     ⊢@{IProp GF} imgAuth γ m -∗ diskBlock γ bno bs -∗ ⌜PartialMap.get? m bno = some bs⌝ := by
@@ -621,6 +638,7 @@ theorem diskBlock_agree' (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno :
   ihave %h := ghost_map_lookup $$ H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 /-- **The block's fragment, moved.**  `Xv6.disk_publish` deposits the
 chain's PAYLOAD in the row: the disk's bytes for a READ (which is what
 the driver handed in), the driver's for a WRITE (which the collect hands
@@ -710,6 +728,7 @@ def diskReadAt (γ : DiskNames) (n : Nat) : IProp GF := γ.nr ↪VAR{.own (1 : Q
 /-- The handler watermark: the INVARIANT's half. -/
 def diskReadAtAuth (γ : DiskNames) (n : Nat) : IProp GF := γ.nr ↪VAR{.own (1 : Qp).half} n
 
+omit [MachGS GF] in
 theorem diskReadAt_agree (γ : DiskNames) (n n' : Nat) :
     ⊢@{IProp GF} diskReadAtAuth γ n -∗ diskReadAt γ n' -∗ ⌜n = n'⌝ := by
   unfold diskReadAtAuth diskReadAt
@@ -728,6 +747,7 @@ def diskStage (γ : DiskNames) (s : Option Nat) : IProp GF := γ.stage ↪VAR{.o
 def diskStageAuth (γ : DiskNames) (s : Option Nat) : IProp GF :=
   γ.stage ↪VAR{.own (1 : Qp).half} s
 
+omit [MachGS GF] in
 theorem diskStage_agree (γ : DiskNames) (s s' : Option Nat) :
     ⊢@{IProp GF} diskStageAuth γ s -∗ diskStage γ s' -∗ ⌜s = s'⌝ := by
   unfold diskStageAuth diskStage
@@ -735,6 +755,7 @@ theorem diskStage_agree (γ : DiskNames) (s s' : Option Nat) :
   ihave %h := ghost_var_agree γ.stage _ _ _ _ $$ H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem diskReadAt_update (γ : DiskNames) (n n' t : Nat) :
     diskReadAtAuth (GF := GF) γ n ∗ diskReadAt γ n' ⊢
       |==> (diskReadAtAuth γ t ∗ diskReadAt γ t) := by
@@ -742,6 +763,7 @@ theorem diskReadAt_update (γ : DiskNames) (n n' t : Nat) :
   iintro ⟨H1, H2⟩
   iapply ghost_var_update_halves t γ.nr _ _ $$ H1 H2
 
+omit [MachGS GF] in
 theorem diskStage_update (γ : DiskNames) (s s' t : Option Nat) :
     diskStageAuth (GF := GF) γ s ∗ diskStage γ s' ⊢
       |==> (diskStageAuth γ t ∗ diskStage γ t) := by
@@ -769,12 +791,14 @@ def diskLoTok (γ : DiskNames) (n : Nat) : IProp GF := γ.lo ↪VAR{.own (1 : Qp
 pop counter, held across every iteration of `Virtio.body`. -/
 def diskRoot (γ : DiskNames) : IProp GF := iprop% ∃ n : Nat, diskLoTok γ n
 
+omit [MachGS GF] in
 theorem diskLoTok_root (γ : DiskNames) (n : Nat) : diskLoTok (GF := GF) γ n ⊢ diskRoot γ := by
   unfold diskRoot
   iintro H
   iexists n
   iexact H
 
+omit [MachGS GF] in
 theorem diskLo_agree (γ : DiskNames) (n n' : Nat) :
     ⊢@{IProp GF} diskLoAuth γ n -∗ diskLoTok γ n' -∗ ⌜n = n'⌝ := by
   unfold diskLoAuth diskLoTok
@@ -782,6 +806,7 @@ theorem diskLo_agree (γ : DiskNames) (n n' : Nat) :
   ihave %h := ghost_var_agree γ.lo _ _ _ _ $$ H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem diskLo_update (γ : DiskNames) (n n' m : Nat) :
     diskLoAuth (GF := GF) γ n ∗ diskLoTok γ n' ⊢ |==> (diskLoAuth γ m ∗ diskLoTok γ m) := by
   unfold diskLoAuth diskLoTok
@@ -808,12 +833,15 @@ def posAuth (γ : DiskNames) (l : List Nat) : IProp GF := iprop%
 /-- **Position `p` was published with head `i`** (persistent). -/
 def posRec (γ : DiskNames) (p i : Nat) : IProp GF := MonoList.idx_own γ.pos p i
 
+omit [MachGS GF] in
 instance posRec_persistent (γ : DiskNames) (p i : Nat) :
     Persistent (posRec (GF := GF) γ p i) := by unfold posRec MonoList.idx_own; infer_instance
 
+omit [MachGS GF] in
 instance posAuth_timeless (γ : DiskNames) (l : List Nat) :
     Timeless (posAuth (GF := GF) γ l) := by unfold posAuth; infer_instance
 
+omit [MachGS GF] in
 theorem posRec_lookup (γ : DiskNames) (l : List Nat) (p i : Nat) :
     ⊢@{IProp GF} posAuth γ l -∗ posRec γ p i -∗ ⌜l[p]? = some i⌝ := by
   unfold posAuth posRec
@@ -821,6 +849,7 @@ theorem posRec_lookup (γ : DiskNames) (l : List Nat) (p i : Nat) :
   icases H1 with ⟨Ha, _⟩
   iapply MonoList.auth_idx_lookup γ.pos _ l p i $$ Ha H2
 
+omit [MachGS GF] in
 /-- **A record comes out for free**: the snapshot beside the authority is
 persistent, so no update is needed. -/
 theorem posRec_get (γ : DiskNames) (l : List Nat) (p i : Nat) (h : l[p]? = some i) :
@@ -831,6 +860,7 @@ theorem posRec_get (γ : DiskNames) (l : List Nat) (p i : Nat) (h : l[p]? = some
   iapply MonoList.idx_own_get γ.pos p i h
   iexact Hlb
 
+omit [MachGS GF] in
 /-- PUBLISHING appends one head. -/
 theorem posAuth_append (γ : DiskNames) (l : List Nat) (i : Nat) :
     posAuth (GF := GF) γ l ⊢ |==> posAuth γ (l ++ [i]) := by
@@ -1147,12 +1177,15 @@ def doneAuth (γ : DiskNames) (l : List UsedRec) : IProp GF := iprop%
 (persistent). -/
 def doneRec (γ : DiskNames) (k : Nat) (r : UsedRec) : IProp GF := MonoList.idx_own γ.done k r
 
+omit [MachGS GF] in
 instance doneRec_persistent (γ : DiskNames) (k : Nat) (r : UsedRec) :
     Persistent (doneRec (GF := GF) γ k r) := by unfold doneRec MonoList.idx_own; infer_instance
 
+omit [MachGS GF] in
 instance doneAuth_timeless (γ : DiskNames) (l : List UsedRec) :
     Timeless (doneAuth (GF := GF) γ l) := by unfold doneAuth; infer_instance
 
+omit [MachGS GF] in
 theorem doneRec_lookup (γ : DiskNames) (l : List UsedRec) (k : Nat) (r : UsedRec) :
     ⊢@{IProp GF} doneAuth γ l -∗ doneRec γ k r -∗ ⌜l[k]? = some r⌝ := by
   unfold doneAuth doneRec
@@ -1160,6 +1193,7 @@ theorem doneRec_lookup (γ : DiskNames) (l : List UsedRec) (k : Nat) (r : UsedRe
   icases H1 with ⟨Ha, _⟩
   iapply MonoList.auth_idx_lookup γ.done _ l k r $$ Ha H2
 
+omit [MachGS GF] in
 theorem doneRec_get (γ : DiskNames) (l : List UsedRec) (k : Nat) (r : UsedRec)
     (h : l[k]? = some r) : doneAuth (GF := GF) γ l ⊢ doneAuth γ l ∗ doneRec γ k r := by
   unfold doneAuth doneRec
@@ -1168,6 +1202,7 @@ theorem doneRec_get (γ : DiskNames) (l : List UsedRec) (k : Nat) (r : UsedRec)
   iapply MonoList.idx_own_get γ.done k r h
   iexact Hlb
 
+omit [MachGS GF] in
 /-- **Catching the ghost list up with the device's log.** -/
 theorem doneAuth_sync (γ : DiskNames) (l l' : List UsedRec) (h : l <+: l') :
     doneAuth (GF := GF) γ l ⊢ |==> doneAuth γ l' := by
@@ -1297,9 +1332,11 @@ def diskBaseAuth (γ : DiskNames) (b : Nat) : IProp GF := γ.base ↪VAR{.own 1}
 /-- The same, frozen at the flip (persistent). -/
 def diskBaseFrozen (γ : DiskNames) (b : Nat) : IProp GF := γ.base ↪VAR{.discard} b
 
+omit [MachGS GF] in
 instance diskBaseFrozen_persistent (γ : DiskNames) (b : Nat) :
     Persistent (diskBaseFrozen (GF := GF) γ b) := by unfold diskBaseFrozen; infer_instance
 
+omit [MachGS GF] in
 theorem diskBase_freeze (γ : DiskNames) (b b' : Nat) :
     diskBaseAuth (GF := GF) γ b ⊢ |==> diskBaseFrozen γ b' := by
   unfold diskBaseAuth diskBaseFrozen
@@ -1309,6 +1346,7 @@ theorem diskBase_freeze (γ : DiskNames) (b b' : Nat) :
   imodintro
   iexact H
 
+omit [MachGS GF] in
 theorem diskBaseFrozen_agree (γ : DiskNames) (b b' : Nat) :
     ⊢@{IProp GF} diskBaseFrozen γ b -∗ diskBaseFrozen γ b' -∗ ⌜b = b'⌝ := by
   unfold diskBaseFrozen
@@ -1331,9 +1369,11 @@ def diskWm (γ : DiskNames) (n F : Nat) : IProp GF := iprop%
   (∃ b : Nat, diskBaseFrozen γ b ∗ ⌜b ≤ F⌝) ∗
   (⌜n = 0⌝ ∨ ∃ (k m t hd ep : Nat), doneRec γ k (m, t, hd, ep) ∗ ⌜n ≤ m ∧ t ≤ F⌝)
 
+omit [MachGS GF] in
 instance diskWm_persistent (γ : DiskNames) (n F : Nat) :
     Persistent (diskWm (GF := GF) γ n F) := by unfold diskWm; infer_instance
 
+omit [MachGS GF] in
 theorem diskWm_base (γ : DiskNames) (n F : Nat) :
     diskWm (GF := GF) γ n F ⊢ ∃ b : Nat, diskBaseFrozen γ b ∗ ⌜b ≤ F⌝ := by
   unfold diskWm
@@ -1348,6 +1388,7 @@ for a head whose request has NOT completed. -/
 def headDone (γ : DiskNames) (n h : Nat) : IProp GF := iprop%
   ∃ (k t ep : Nat), doneRec γ k (n, t, h, ep)
 
+omit [MachGS GF] in
 instance headDone_persistent (γ : DiskNames) (n h : Nat) :
     Persistent (headDone (GF := GF) γ n h) := by unfold headDone; infer_instance
 
@@ -1363,9 +1404,11 @@ arming of a head ever carries a given epoch. -/
 def headDoneE (γ : DiskNames) (n h ep : Nat) : IProp GF := iprop%
   ∃ (k t : Nat), doneRec γ k (n, t, h, ep)
 
+omit [MachGS GF] in
 instance headDoneE_persistent (γ : DiskNames) (n h ep : Nat) :
     Persistent (headDoneE (GF := GF) γ n h ep) := by unfold headDoneE; infer_instance
 
+omit [MachGS GF] in
 /-- The log entry an epoch-indexed record names. -/
 theorem headDoneE_lookup (γ : DiskNames) (l : List UsedRec) (n h ep : Nat) :
     ⊢@{IProp GF} doneAuth γ l -∗ headDoneE γ n h ep -∗
@@ -1385,9 +1428,11 @@ the log's arithmetic lives -- is what produces it. -/
 def headDoneAt (γ : DiskNames) (n t h : Nat) : IProp GF := iprop%
   ∃ (k ep : Nat), doneRec γ k (n, t, h, ep)
 
+omit [MachGS GF] in
 instance headDoneAt_persistent (γ : DiskNames) (n t h : Nat) :
     Persistent (headDoneAt (GF := GF) γ n t h) := by unfold headDoneAt; infer_instance
 
+omit [MachGS GF] in
 theorem headDoneAt_mk (γ : DiskNames) (n t h k ep : Nat) :
     doneRec (GF := GF) γ k (n, t, h, ep) ⊢ headDoneAt γ n t h := by
   unfold headDoneAt
@@ -1395,6 +1440,7 @@ theorem headDoneAt_mk (γ : DiskNames) (n t h k ep : Nat) :
   iexists k, ep
   iexact H
 
+omit [MachGS GF] in
 /-- The same, keeping the epoch: what the handler mints for the sleeper. -/
 theorem headDoneE_mk (γ : DiskNames) (n t h k ep : Nat) :
     doneRec (GF := GF) γ k (n, t, h, ep) ⊢ headDoneE γ n h ep := by
@@ -1403,6 +1449,7 @@ theorem headDoneE_mk (γ : DiskNames) (n t h k ep : Nat) :
   iexists k, t
   iexact H
 
+omit [MachGS GF] in
 theorem headDoneAt_headDone (γ : DiskNames) (n t h : Nat) :
     headDoneAt (GF := GF) γ n t h ⊢ headDone γ n h := by
   unfold headDoneAt headDone
@@ -1410,6 +1457,7 @@ theorem headDoneAt_headDone (γ : DiskNames) (n t h : Nat) :
   iexists k, t, ep
   iexact H
 
+omit [MachGS GF] in
 /-- The log entry a positioned record names. -/
 theorem headDoneAt_lookup (γ : DiskNames) (l : List UsedRec) (n t h : Nat) :
     ⊢@{IProp GF} doneAuth γ l -∗ headDoneAt γ n t h -∗
@@ -1436,9 +1484,11 @@ rather than assumed. -/
 def headRead (γ : DiskNames) (h nr : Nat) : IProp GF := iprop%
   □ (∀ n : Nat, headDone γ n h -∗ ⌜n ≤ nr⌝)
 
+omit [MachGS GF] in
 instance headRead_persistent (γ : DiskNames) (h nr : Nat) :
     Persistent (headRead (GF := GF) γ h nr) := by unfold headRead; infer_instance
 
+omit [MachGS GF] in
 /-- **The credential at the base**: a watermark of zero needs only the
 bound on the zeroing stores. -/
 theorem diskWm_zero (γ : DiskNames) (F b : Nat) (hb : b ≤ F) :
@@ -1452,6 +1502,7 @@ theorem diskWm_zero (γ : DiskNames) (F b : Nat) (hb : b ≤ F) :
   · ileft
     ipureintro; rfl
 
+omit [MachGS GF] in
 theorem diskWm_mono (γ : DiskNames) (n n' F F' : Nat) (hn : n' ≤ n) (hF : F ≤ F') :
     diskWm (GF := GF) γ n F ⊢ diskWm γ n' F' := by
   unfold diskWm
@@ -1468,6 +1519,7 @@ theorem diskWm_mono (γ : DiskNames) (n n' F F' : Nat) (hn : n' ≤ n) (hF : F �
     ipureintro
     exact ⟨by omega, by omega⟩
 
+omit [MachGS GF] in
 /-- **What the credential says about the log**: the write that published
 the watermark is in it, at a position the floor has passed. -/
 theorem diskWm_mem (γ : DiskNames) (nr F : Nat) (dl dl0 : List UsedRec) (hpre : dl0 <+: dl) :
@@ -2532,6 +2584,7 @@ of the protocol changes ONE entry of one of them.  This is the accessor
 that does it; the `∀`-quantified variant lives in `Xv6/PtOwnLemmas.lean`,
 which this file may not import. -/
 
+omit [MachGS GF] in
 theorem diskBig_upd_acc {α : Type} (l : List α) (n : Nat) (i : α)
     (hidx : l[n]? = some i) (Φ Ψ : α → IProp GF)
     (heq : ∀ (k : Nat) (j : α), l[k]? = some j → k ≠ n → Ψ j = Φ j) :
@@ -2555,6 +2608,7 @@ theorem diskBig_upd_acc {α : Type} (l : List α) (n : Nat) (i : α)
   · iapply hmono
     iexact Hrest
 
+omit [MachGS GF] in
 /-- Replacing the entry of index `n` in a big-op over `List.range NUM`. -/
 theorem diskRange_acc (n : Nat) (hn : n < NUM) (Φ Ψ : Nat → IProp GF)
     (heq : ∀ j, j ≠ n → Ψ j = Φ j) :
@@ -3812,6 +3866,7 @@ theorem headRes_acc (γ : DiskNames) (pd : PAddr) (st : Nat → HState) (i : Nat
         [∗list] j ∈ List.range NUM, headRes γ pd j (st j)) :=
   BigSepL.bigSepL_mem_acc (Φ := fun j => headRes (GF := GF) γ pd j (st j)) (range_mem i NUM hi)
 
+omit [MachGS GF] in
 /-- **Two DISTINCT entries of a big-op, borrowed at once.**  What an
 exclusivity argument between two indices needs: `bigSepL_delete_cond`
 opens one entry, and the residual it leaves is the big-op with that index
@@ -4243,6 +4298,7 @@ def crashRow (γ : DiskNames) (v : VirtioState) (i : Nat) (s : HState) (b : SByt
     else crashPermPend γ.cperm c.kq (chainWr c) (rowTodo v i c b)
   | _ => iprop(emp)
 
+omit [MachGS GF] in
 instance crashRow_timeless (γ : DiskNames) (v : VirtioState) (i : Nat) (s : HState) (b : SByte) :
     Timeless (crashRow (GF := GF) γ v i s b) := by
   cases s with
@@ -4257,6 +4313,7 @@ instance crashRow_timeless (γ : DiskNames) (v : VirtioState) (i : Nat) (s : HSt
 def crashRows (γ : DiskNames) (v : VirtioState) (st : Nat → HState) (sb : Nat → SByte) :
     IProp GF := iprop% [∗list] j ∈ List.range NUM, crashRow γ v j (st j) (sb j)
 
+omit [MachGS GF] in
 instance crashRows_timeless (γ : DiskNames) (v : VirtioState) (st : Nat → HState)
     (sb : Nat → SByte) : Timeless (crashRows (GF := GF) γ v st sb) := by
   unfold crashRows; infer_instance
@@ -4376,6 +4433,7 @@ instance diskDead_timeless (γ : DiskNames) (v : VirtioState) (pm : RegMapF Perm
   unfold diskDead diskCfgAuth diskLoAuth diskStageAuth imgAuth diskBaseAuth diskReadAtAuth
   infer_instance
 
+omit [MachGS GF] in
 instance permAuth_timeless (γ : DiskNames) (pm : RegMapF PermVal) :
     Timeless (permAuth (GF := GF) γ pm) := by unfold permAuth; infer_instance
 
@@ -4680,17 +4738,22 @@ def slotQ : HState → Qp
   | .active _ => (1 : Qp).half.half
   | .member _ => (1 : Qp).half.half
 
+omit [MachGS GF] in
 theorem slotTok_eq (γ : DiskNames) (i : Nat) (s : HState) :
     slotTok (GF := GF) γ i s = headTokF γ (slotQ s) i s := by
   cases s <;> rfl
 
+omit [MachGS GF] in
 theorem slotTok_inactive (γ : DiskNames) (i : Nat) :
     slotTok (GF := GF) γ i .inactive = headTok γ i .inactive := rfl
+omit [MachGS GF] in
 theorem slotTok_active (γ : DiskNames) (i : Nat) (c : Chain) :
     slotTok (GF := GF) γ i (.active c) = headTokQ γ i (.active c) := rfl
+omit [MachGS GF] in
 theorem slotTok_member (γ : DiskNames) (i h : Nat) :
     slotTok (GF := GF) γ i (.member h) = headTokQ γ i (.member h) := rfl
 
+omit [MachGS GF] in
 instance slotTok_timeless (γ : DiskNames) (i : Nat) (s : HState) :
     Timeless (slotTok (GF := GF) γ i s) := by
   cases s with
@@ -4698,6 +4761,7 @@ instance slotTok_timeless (γ : DiskNames) (i : Nat) (s : HState) :
   | active c => show Timeless (headTokQ (GF := GF) γ i (.active c)); infer_instance
   | member h => show Timeless (headTokQ (GF := GF) γ i (.member h)); infer_instance
 
+omit [MachGS GF] in
 /-- **The payload's receipt and an outside QUARTER agree and join.**  The
 whole point of the split: the woken publisher's quarter pins the slot's
 state, and the two pieces make the driver's half the collect must own to

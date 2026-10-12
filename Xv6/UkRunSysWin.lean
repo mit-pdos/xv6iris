@@ -144,6 +144,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- **Rocq `ubytes_ext`**: two names for the same run. -/
 theorem ubytes_ext (γd : GName) (a n : Nat) (f g : Nat → BitVec 8) (h : ∀ j, j < n → f j = g j) :
     ubytes (GF := GF) γd a n f ⊢ ubytes γd a n g := by
@@ -152,6 +153,7 @@ theorem ubytes_ext (γd : GName) (a n : Nat) (f g : Nat → BitVec 8) (h : ∀ j
     have hx' : x < n := List.mem_range.1 (List.mem_of_getElem? hx)
     rw [h x hx']
 
+omit [MachGS GF] in
 /-- **Rocq `ubytes_split`**: `ubytes_app` at a prefix length. -/
 theorem ubytes_split (γd : GName) (a kb nb : Nat) (f : Nat → BitVec 8) (hk : kb ≤ nb) :
     ubytes (GF := GF) γd a nb f ⊣⊢ ubytes γd a kb f ∗ ubytes γd (a + kb) (nb - kb) (fun j => f (kb + j)) := by
@@ -243,6 +245,7 @@ theorem urun_ubytes_bound (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 6
   · exact .inl hn
   · have := (hb 0 (by omega)).2.2; exact .inr (by omega)
 
+omit [MachGS GF] in
 /-- An empty run is at every address. -/
 theorem ubytes_rebase (γd : GName) (a b n : Nat) (f : Nat → BitVec 8) (h : n = 0 ∨ a = b) :
     ubytes (GF := GF) γd a n f ⊢ ubytes γd b n f := by

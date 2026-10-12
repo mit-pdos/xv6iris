@@ -199,6 +199,7 @@ theorem bootShared_cpus : cpus = startedPrimary :: cpus.tail := rfl
 /-- The other harts are not the boot hart. -/
 theorem bootShared_tail_ne : ∀ c ∈ cpus.tail, c ≠ startedPrimary := by decide
 
+omit [MachGS GF] in
 /-- A per-hart family, peeled at the boot hart. -/
 theorem bootShared_peel (Φ : CPU → IProp GF) :
     ([∗list] c ∈ cpus, Φ c) ⊢ Φ startedPrimary ∗ [∗list] c ∈ cpus.tail, Φ c := by

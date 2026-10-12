@@ -78,6 +78,7 @@ theorem iregLinkNz_open [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inod
   iapply Hclose
   iapply (iregSlotRest_close_same γi γfs inodestart nib inum m ds hwf hcp) $$ Hrest Ha Hrec Hslot
 
+omit [MachGS GF] in
 /-- The caller's `dinodeAt` IS the slot's record (ghost-map agreement). -/
 theorem iregLinkNz_rec (γi : GName) (m : IregMapF Dinode) (inum : BitVec 32) (dn d : Dinode)
     (hmd : PartialMap.get? m (inum.toNat : Int) = some d) :

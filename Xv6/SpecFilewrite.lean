@@ -466,22 +466,26 @@ def fwConsOut (st : FdState) (γu : UartNames) (M : Nat → List (BitVec 8)) (ua
   iprop(⌜∀ rb, st ≠ .open rb true (.device CONSOLE)⌝ ∨ ⌜r = -1#64⌝ ∨
     ∃ i : Nat, ⌜r = BitVec.ofNat 64 i⌝ ∗ consOutAt γu M ua i)
 
+omit [MachGS GF] in
 instance fwConsOut_persistent (st : FdState) (γu : UartNames) (M : Nat → List (BitVec 8)) (ua r : BitVec 64) :
     Persistent (fwConsOut (GF := GF) st γu M ua r) := by
   unfold fwConsOut; infer_instance
 
+omit [MachGS GF] in
 /-- every state but a writable console descriptor relays nothing -/
 theorem fwConsOut_off (st : FdState) (γu : UartNames) (M : Nat → List (BitVec 8)) (ua r : BitVec 64)
     (h : ∀ rb, st ≠ .open rb true (.device CONSOLE)) : ⊢ fwConsOut (GF := GF) st γu M ua r := by
   unfold fwConsOut
   ileft; ipureintro; exact h
 
+omit [MachGS GF] in
 /-- the −1 answer relays nothing -/
 theorem fwConsOut_neg (st : FdState) (γu : UartNames) (M : Nat → List (BitVec 8)) (ua r : BitVec 64)
     (h : r = -1#64) : ⊢ fwConsOut (GF := GF) st γu M ua r := by
   unfold fwConsOut
   iright; ileft; ipureintro; exact h
 
+omit [MachGS GF] in
 /-- consolewrite's run, relayed at its count -/
 theorem fwConsOut_cons (st : FdState) (γu : UartNames) (M : Nat → List (BitVec 8)) (ua r : BitVec 64) (i : Nat)
     (h : r = BitVec.ofNat 64 i) : consOutAt (GF := GF) γu M ua i ⊢ fwConsOut st γu M ua r := by
@@ -492,6 +496,7 @@ theorem fwConsOut_cons (st : FdState) (γu : UartNames) (M : Nat → List (BitVe
   iframe H
   ipureintro; exact h
 
+omit [MachGS GF] in
 /-- Rocq `write_cons_arms_ret`. -/
 theorem writeConsArms_ret (P : UPtd) (ua : BitVec 64) (Q : Nat → IProp GF) (n : Int) (r : BitVec 64) :
     writeConsArms P ua Q n r ⊢ ⌜filewriteRet n r⌝ := by
@@ -501,6 +506,7 @@ theorem writeConsArms_ret (P : UPtd) (ua : BitVec 64) (Q : Nat → IProp GF) (n 
   · ipureintro; exact Or.inr ⟨(k : Int), h.1, by omega, by have := h.2.1; omega⟩
   · ipureintro; rw [h.1]; exact filewriteRet_m1 n
 
+omit [MachGS GF] in
 /-- THE CALLEE'S POST, IN THE ARMS' VOCABULARY (Rocq
 `write_cons_arms_of_cursor`): the FD_DEVICE arm relays consolewrite's count
 untouched, so it IS the cursor's index. -/

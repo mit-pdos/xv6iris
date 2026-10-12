@@ -412,6 +412,7 @@ theorem pteCell_seal [CurCtx] (addr c : BitVec 64) (hct : curTier = KTier.bare) 
   · iexact Hcell
   · iexact Hkeys
 
+omit [MachGS GF] in
 /-- The choice that turns a big-op of existential functions into ONE
 function of the list index. -/
 theorem bigSepL_exists_fun {A : Type} :

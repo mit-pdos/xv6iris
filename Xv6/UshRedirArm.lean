@@ -63,10 +63,12 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- A read-only field, as the bytes a load reads. -/
 theorem ushW32_bytes (g : GName) (a : Nat) (v : Int) :
     ushW32 (GF := GF) g a v ⊢ ubytesq g DFrac.discard a 4 (nthByte (n := 4) (BitVec.ofInt 32 v)) := .rfl
 
+omit [MachGS GF] in
 /-- A read-only pointer slot, as the word a load reads. -/
 theorem ushPtr_word (g : GName) (a p : Nat) :
     ushPtr (GF := GF) g a p ⊢ uwordq g DFrac.discard a (BitVec.ofNat 64 p) := .rfl

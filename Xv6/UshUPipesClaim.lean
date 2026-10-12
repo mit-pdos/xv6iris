@@ -148,6 +148,7 @@ theorem usup (ug : UnionGn) (r : FileAppNames)
   iintro !> #Ht
   iapply h $$ Ht
 
+omit [MachGS GF] in
 /-- **Rocq `udeed_typed`**: the deed's typing -- a well-formed state, and a
 short content. -/
 theorem udeed_typed (c : FileFixed) (s : Dst) :

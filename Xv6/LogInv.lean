@@ -303,10 +303,12 @@ indexing.  Persistent in both arms. -/
 def logCredit (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 b : Nat) : IProp GF :=
   if cr then iprop(⌜b ∈ Sb⌝ ∨ (∃ e : Nat, loggedAt γ e b ∗ ⌜e0 ≤ e⌝)) else iprop(emp)
 
+omit [MachGS GF] in
 instance logCredit_persistent (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 b : Nat) :
     Persistent (logCredit (GF := GF) γ cr Sb e0 b) := by
   unfold logCredit; cases cr <;> simp only [Bool.false_eq_true, if_false, if_true] <;> infer_instance
 
+omit [MachGS GF] in
 /-- The OWN-SET claimant's conversion. -/
 theorem logCredit_own (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 b : Nat)
     (h : cr = true → b ∈ Sb) : ⊢ logCredit (GF := GF) γ cr Sb e0 b := by
@@ -319,6 +321,7 @@ theorem logCredit_own (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 b : Nat)
     ipureintro
     exact h rfl
 
+omit [MachGS GF] in
 /-- The GROUP claimant's: a witness at least as new as my op's birth. -/
 theorem logCredit_group (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 e b : Nat) (hle : e0 ≤ e) :
     loggedAt (GF := GF) γ e b ⊢ logCredit γ cr Sb e0 b := by
@@ -333,6 +336,7 @@ theorem logCredit_group (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 e b : Na
     · iexact Hw
     · ipureintro; exact hle
 
+omit [MachGS GF] in
 /-- SET-MONOTONE, exactly as the pure claim it generalises is. -/
 theorem logCredit_mono (γ : LogNames) (cr : Bool) (Sb Sb' : List Nat) (e0 b : Nat)
     (hsub : ∀ x ∈ Sb, x ∈ Sb') :

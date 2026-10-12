@@ -161,6 +161,7 @@ theorem bf_hold_bytes (γ : BcacheNames) (V : BioView GF) (kk : Nat) (pidv dev b
   · ipureintro; exact hl'
   iframe Hb Hd Hby'
 
+omit [MachGS GF] in
 /-- The two slot units, one for bread's reference and one for log_write's
 (Rocq's `iu_slots_split 1 1` / `iu_slots_join 1 1`). -/
 theorem bf_slots_split (γ : BcacheNames) :
@@ -168,6 +169,7 @@ theorem bf_slots_split (γ : BcacheNames) :
   unfold bslot
   exact dsSlots_split γ 1 1
 
+omit [MachGS GF] in
 theorem bf_slots_join (γ : BcacheNames) :
     bslot (GF := GF) ∗ bslot ⊢ bslots 2 := by
   unfold bslot

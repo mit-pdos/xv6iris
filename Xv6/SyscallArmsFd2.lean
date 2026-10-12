@@ -130,6 +130,7 @@ theorem usysOutAt_nil (ι : UIota) (hp : ι.cpos = []) (img : ElfMem) (a : BitVe
   rw [hp, if_pos rfl]
   exact ⟨rfl, List.Pairwise.nil⟩
 
+omit [MachGS GF] in
 /-- **THE WRITE ARM'S CITATION** (NI M3 NI-OUT): off a writable console, or at
 the −1 answer, the boot prefix at the actor; else the console stream's prefix
 `L` and the run's indices `ps` in it (`consOutAt` at the era's console name),

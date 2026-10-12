@@ -121,6 +121,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG 
 
 local notation "SGX" => uexecSGXv6
 
+omit [MachGS GF] in
 /-- **Rocq `ubyteq_op`**: one byte at `dq1 • dq2` is one at each. -/
 theorem ubyteq_op (γ : GName) (dq1 dq2 : DFrac) (a : Nat) (b : BitVec 8) :
     ubyteq (GF := GF) γ (dq1 • dq2) a b ⊣⊢ ubyteq γ dq1 a b ∗ ubyteq γ dq2 a b := by
@@ -131,6 +132,7 @@ theorem ubyteq_op (γ : GName) (dq1 dq2 : DFrac) (a : Nat) (b : BitVec 8) :
   refine congrArg (iOwn γ) (congrArg (HeapView.Frag a (dq1 • dq2)) ?_)
   exact Agree.idemp.symm
 
+omit [MachGS GF] in
 /-- **Rocq `ubytesq_op`**. -/
 theorem ubytesq_op (γ : GName) (dq1 dq2 : DFrac) (a : Nat) :
     ∀ (n : Nat) (f : Nat → BitVec 8),
@@ -144,13 +146,16 @@ theorem ubytesq_op (γ : GName) (dq1 dq2 : DFrac) (a : Nat) :
     exact (ubytesq_succ γ _ a n f).trans ((sep_congr ih (ubyteq_op γ dq1 dq2 (a + n) (f n))).trans
       (sep_sep_sep_comm.trans (sep_congr (ubytesq_succ γ _ a n f).symm (ubytesq_succ γ _ a n f).symm)))
 
+omit [MachGS GF] in
 theorem ukco_usrcAt_tx (N : UkNames GF) (dq : DFrac) (ua n : Nat) (f : Nat → BitVec 8) :
     usrcAt N true dq ua n f = iprop([∗list] j ∈ List.range n, utext N.t (ua + j) (f j)) :=
   rfl
 
+omit [MachGS GF] in
 theorem ukco_usrcAt_data (N : UkNames GF) (dq : DFrac) (ua n : Nat) (f : Nat → BitVec 8) :
     usrcAt N false dq ua n f = ubytesq N.d dq ua n f := rfl
 
+omit [MachGS GF] in
 /-- **Rocq `usrc_at_split`**: a source run is two runs at half the fraction
 (the text half is persistent and is simply duplicated). -/
 theorem usrcAt_split (N : UkNames GF) (tx : Bool) (dq : DFrac) (ua n : Nat) (f : Nat → BitVec 8) :
@@ -163,6 +168,7 @@ theorem usrcAt_split (N : UkNames GF) (tx : Bool) (dq : DFrac) (ua n : Nat) (f :
   · rw [ukco_usrcAt_tx, ukco_usrcAt_tx]
     exact persistent_sep_dup
 
+omit [MachGS GF] in
 /-- **Rocq `usrc_at_rebase`**: the empty run is at every address. -/
 theorem usrcAt_rebase (N : UkNames GF) (tx : Bool) (dq : DFrac) (ua ua' n : Nat) (f : Nat → BitVec 8)
     (h : n = 0 ∨ ua = ua') :
@@ -172,6 +178,7 @@ theorem usrcAt_rebase (N : UkNames GF) (tx : Bool) (dq : DFrac) (ua ua' n : Nat)
     cases tx <;> simp
   · exact .rfl
 
+omit [MachGS GF] in
 /-- A text run's bytes are the image's, fetchable, below MAXVA (Rocq
 `UkRunSys.uheap_text_bytes`, read along the run). -/
 theorem ukco_uheap_text_run (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz a : Nat)
@@ -211,6 +218,7 @@ theorem urun_usrcAt_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     intro j hj
     exact (hb j hj).2
 
+omit [MachGS GF] in
 /-- **Rocq `usrc_at_wat`**: the chain's per-byte premise, off either half. -/
 theorem usrcAt_wat (N : UkNames GF) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (tx : Bool)
     (dq : DFrac) (ua : BitVec 64) (n : Nat) (f : Nat → BitVec 8) :

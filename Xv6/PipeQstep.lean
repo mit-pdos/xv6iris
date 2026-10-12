@@ -106,6 +106,7 @@ theorem pwChain_wlink (γ : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64
   iintro H
   iapply H $$ %b %hb
 
+omit [MachGS GF] in
 /-- THE WRITE END IS OPEN, from the caller's own credential (Rocq
 `pw_wo_open`): the contract pins the end to the write one. -/
 theorem pwWo_open (γp : PipeNames) (w : Bool) (wo : BitVec 32) (q : Qp) (hw : w = true) :
@@ -284,6 +285,7 @@ theorem prChain_rlink (γ : GName) (Q : List (BitVec 8) → IProp GF)
   rw [show nn - acc.length = (nn - (acc.length + 1)) + 1 by omega, pipeRchain.eq_2]
   exact and_elim_r.trans and_elim_r
 
+omit [MachGS GF] in
 /-- THE READ END IS OPEN, from the caller's own credential (Rocq
 `pr_ro_open`, lane PIPE-RO): the contract pins the end to the read one. -/
 theorem prRo_open (γp : PipeNames) (w : Bool) (ro : BitVec 32) (q : Qp) (hw : w = false) :
@@ -291,6 +293,7 @@ theorem prRo_open (γp : PipeNames) (w : Bool) (ro : BitVec 32) (q : Qp) (hw : w
   subst hw
   exact pipeEndstate_holder γp false ro q
 
+omit [MachGS GF] in
 /-- The request was met (Rocq `pr_noobs_met`). -/
 theorem prNoobs_met (P : UPtd) (addr : BitVec 64) (Rk : IProp GF) (nn d : Nat) (hd : d = nn) :
     ⊢ pipeRstopNoobs P addr Rk nn d (BitVec.ofNat 64 d) := by
@@ -298,6 +301,7 @@ theorem prNoobs_met (P : UPtd) (addr : BitVec 64) (Rk : IProp GF) (nn d : Nat) (
   ileft
   ipureintro; exact ⟨hd, rfl⟩
 
+omit [MachGS GF] in
 /-- The copy-out of byte `d` faulted (Rocq `pr_noobs_fault`). -/
 theorem prNoobs_fault (P : UPtd) (addr : BitVec 64) (Rk : IProp GF) (nn d : Nat) (r : BitVec 64)
     (h1 : d < nn) (h2 : ¬ uvaWmapped P (addr + BitVec.ofNat 64 d).toNat)
@@ -307,6 +311,7 @@ theorem prNoobs_fault (P : UPtd) (addr : BitVec 64) (Rk : IProp GF) (nn d : Nat)
   iright; ileft
   ipureintro; exact ⟨h1, h2, h3⟩
 
+omit [MachGS GF] in
 /-- The reader was killed while it waited (Rocq `pr_noobs_kill`). -/
 theorem prNoobs_kill (P : UPtd) (addr : BitVec 64) (Rk : IProp GF) (nn : Nat) :
     Rk ⊢ pipeRstopNoobs P addr Rk nn 0 (-1#64) := by

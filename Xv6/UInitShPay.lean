@@ -91,6 +91,7 @@ def shPayState (Rsh : GName → GName → GName → IProp GF) (n0 : Nat) : IProp
         (udataLo W'.M W'.perm W'.sz), ubyte γd k b) -∗
     |==> ∃ f : Nat → BitVec 8, Rsh γt γd γs ∗ ubytes γd shBuf shNbuf f)
 
+omit [MachGS GF] in
 instance shPayState_persistent (Rsh : GName → GName → GName → IProp GF) (n0 : Nat) :
     Persistent (shPayState Rsh n0) := by
   unfold shPayState; infer_instance
@@ -178,6 +179,7 @@ theorem sh_pay_of_parts_at (Dl : Uline → Prop) (T : IProp GF) (Cr : ConsCred G
 
 /-! ## 2.  THE CARVE: sh's static state and its line buffer (deviation 4) -/
 
+omit [MachGS GF] in
 /-- **Rocq `umap_window`**: a window of a map, in and out. -/
 theorem umap_window (g : GName) (D : RegMapF (BitVec 8)) (lo hi : Nat) :
     ([∗map] k ↦ b ∈ D, ubyte (GF := GF) g k b) ⊢
@@ -185,6 +187,7 @@ theorem umap_window (g : GName) (D : RegMapF (BitVec 8)) (lo hi : Nat) :
       ([∗map] k ↦ b ∈ PartialMap.filter (fun k _ => !decide (lo ≤ k ∧ k < hi)) D, ubyte g k b) :=
   umap_split_pred g D (fun k => decide (lo ≤ k ∧ k < hi))
 
+omit [MachGS GF] in
 /-- **Rocq `ubytes_of_window`**. -/
 theorem ubytes_of_window (g : GName) (D : RegMapF (BitVec 8)) (lo hi a n : Nat) (f : Nat → BitVec 8)
     (hr : ∀ j, j < n → lo ≤ a + j ∧ a + j < hi) (hD : ∀ j, j < n → get? D (a + j) = some (f j)) :
@@ -192,6 +195,7 @@ theorem ubytes_of_window (g : GName) (D : RegMapF (BitVec 8)) (lo hi a n : Nat) 
       ubytes g a n f :=
   ubytes_of_map g a n _ f (fun j hj => umap_win_lookup D lo hi (a + j) (f j) (hr j hj) (hD j hj))
 
+omit [MachGS GF] in
 /-- **Rocq `ustr_of_window`**. -/
 theorem ustr_of_window (g : GName) (D : RegMapF (BitVec 8)) (lo hi a len : Nat) (f : Nat → BitVec 8)
     (hne : ∀ j, j < len → f j ≠ ubyte0) (hlen : len < 2 ^ 31) (hr : ∀ j, j ≤ len → lo ≤ a + j ∧ a + j < hi)
@@ -206,9 +210,11 @@ theorem ustr_of_window (g : GName) (D : RegMapF (BitVec 8)) (lo hi a len : Nat) 
 def shRsh : GName → GName → GName → IProp GF :=
   fun _ γd γs => iprop(ushlDat γd ∗ usz γs (kexecSz User.Sh.elf))
 
+omit [MachGS GF] in
 /-- A break read at an equal number. -/
 theorem usz_cast (γs : GName) {a b : Nat} (h : a = b) : usz (GF := GF) γs a ⊢ usz γs b := h ▸ .rfl
 
+omit [MachGS GF] in
 /-- The window predicates of the carve (the key's two facts, abstract). -/
 theorem shRsh_of_window (γt γd γs : GName) (D0 : RegMapF (BitVec 8)) (sz : Nat)
     (hsz : sz = kexecSz User.Sh.elf)
@@ -291,6 +297,7 @@ theorem shRsh_of_window (γt γd γs : GName) (D0 : RegMapF (BitVec 8)) (sz : Na
     · iapply usz_cast γs hsz $$ Hszf
   · iapply ubytes_of_window γd _ shBuf (shBuf + 100) shBuf shNbuf _ rbuf hbufb $$ Wbuf
 
+omit [MachGS GF] in
 /-- **Rocq `sh_pay_state_holds`**: sh's state payload at `sh_Rsh`, slack 0. -/
 theorem sh_pay_state_holds : ⊢ shPayState (GF := GF) shRsh 0 := by
   unfold shPayState

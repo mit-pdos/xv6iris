@@ -88,6 +88,7 @@ section Small
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
+omit [MachGS GF] in
 /-- The two quarter shares the `depTx` descriptors parked join into a half
 (Rocq's `log_tx_add … Qp.quarter_quarter`). -/
 theorem createFail_txPin_quarters (γ : LogNames) (t : Nat) :
