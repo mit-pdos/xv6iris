@@ -67,6 +67,8 @@ HONEST LIMITS (unchanged): the reload leaf is proved but not exercised by a cert
 
 **Dropped:** none (21 Rocq decls = 18 + the local instances `mgG`/`l6_pol`/`l6_G` (inlined);
 18 Lean).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** the release lemmas' anchor-domain premise is `(lbIsR l || lbIsW l) = true` (was `lbIsMem l = true`): `gwf` admits I/O events, which `fence rw,w` does not order (RVWMO; D48).
 -/
 import Weak.AxSpinH2
 import Weak.AxSpinH4
@@ -720,7 +722,7 @@ theorem wpdReleaseGen6 (xw : Int) (nw : Nat) (Cl : List Int) (cv : Agent → Lis
     (AxOpsem.grow (gtAdGd GT) i)[kf]? = some (.LFence true true false true) →
     (AxOpsem.grow (gtAdGd GT) i)[kf + 1]? = some (.LStore false ya [b0] .WCrel) →
     (∀ e, e ∈ (FiniteMap.dom_set m : GSet Geid) → e.1 = i ∧ e.2 < kf ∧
-      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ lbIsMem l = true) →
+      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     ⊢ isLock nm.2 ya (spinR6 (clRange xw nw) Cl nm (gtAdGd GT)) -∗
       ([∗map] e ↦ P ∈ m, AxAnnot.annotOwn e P) -∗
       (([∗map] P ∈ m, P) -∗
@@ -746,7 +748,7 @@ theorem wpdReleaseGen6 (xw : Int) (nw : Nat) (Cl : List Int) (cv : Agent → Lis
     dsimp only at Hi Hlt Hl
     rw [show ((ei, ek) : Geid) = (i, ek) from by rw [Hi]]
     have Hl' : gxLbl (gtAdGd GT).gdG (i, ek) = some l := by rw [gxLblGrow]; exact Hl
-    exact ⟨fenceGob (gtAdGd GT) i ek kf (kf + 1) l ya [b0] .WCrel Hl' (WeakRvwmoGraph.gwfMemRW _ _ _ Hcons.1 Hl' Hmem) Hlf Hls Hlt
+    exact ⟨fenceGob (gtAdGd GT) i ek kf (kf + 1) l ya [b0] .WCrel Hl' Hmem Hlf Hls Hlt
         (by omega),
       fenceLobp (gtAdGd GT) Hcons i ek kf (kf + 1) l ya [b0] .WCrel Hl' Hmem Hlf Hls Hlt
         (by omega)⟩
@@ -858,7 +860,7 @@ theorem wpdReleaseH6 (xw : Int) (nw : Nat) (Cl : List Int) (cv : Agent → List 
     (AxOpsem.grow (gtAdGd GT) i)[kf + 1]? = some (.LStore false ya [b0] .WCrel) →
     c ≠ ex →
     (∀ e, e = c ∨ e = ex → e.1 = i ∧ e.2 < kf ∧
-      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ lbIsMem l = true) →
+      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     ⊢ isLock nm.2 ya (spinR6 (clRange xw nw) Cl nm (gtAdGd GT)) -∗
       AxAnnot.annotOwn c iprop(locked nm.2 ya i c ∗ RL nm.1 (gtAdGd GT) Cl c) -∗
       hdlw GT nm 1 xw nw ex vs -∗
@@ -874,7 +876,7 @@ theorem wpdReleaseH6 (xw : Int) (nw : Nat) (Cl : List Int) (cv : Agent → List 
       ({[ex := RbN (GF := GF) nm.1 (gtAdGd GT) 1 (clRange xw nw) ex vs]} : Mea GF) c
       iprop(locked nm.2 ya i c ∗ RL nm.1 (gtAdGd GT) Cl c)) : GSet Geid) →
       e.1 = i ∧ e.2 < kf ∧
-        ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ lbIsMem l = true := by
+        ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true := by
     intro e He
     rw [domInsert, domSingleton] at He
     apply Hev
@@ -948,7 +950,7 @@ theorem wpdReleaseH6Same (xw : Int) (nw : Nat) (Cl : List Int) (cv : Agent → L
     (AxOpsem.grow (gtAdGd GT) i)[kf]? = some (.LFence true true false true) →
     (AxOpsem.grow (gtAdGd GT) i)[kf + 1]? = some (.LStore false ya [b0] .WCrel) →
     (c.1 = i ∧ c.2 < kf ∧
-      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[c.2]? = some l ∧ lbIsMem l = true) →
+      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[c.2]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     ⊢ isLock nm.2 ya (spinR6 (clRange xw nw) Cl nm (gtAdGd GT)) -∗
       AxAnnot.annotOwn c iprop(locked nm.2 ya i c ∗ RL nm.1 (gtAdGd GT) Cl c) -∗
       hdlw GT nm 1 xw nw c vs -∗
@@ -962,7 +964,7 @@ theorem wpdReleaseH6Same (xw : Int) (nw : Nat) (Cl : List Int) (cv : Agent → L
       RL nm.1 (gtAdGd GT) Cl c) ∗ RbN nm.1 (gtAdGd GT) 1 (clRange xw nw) c vs)]} : Mea GF) :
       GSet Geid) →
       e.1 = i ∧ e.2 < kf ∧
-        ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ lbIsMem l = true := by
+        ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true := by
     intro e He
     rw [domSingleton] at He
     rw [elemOfSingleton.1 He]

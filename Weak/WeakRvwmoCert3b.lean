@@ -94,6 +94,8 @@ prefix (`ctracePrefixEmpty`, `cpolCtxEmpty`), the floor at a real first read
 
 **Dropped:** none (Rocq §5–§6: 50 declarations + the `img0` notation, which is the literal
 `fun _ => none`; Lean 50 + 1 helper).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `LDev` is no longer administrative (the PLIC wire is an `LDev` step available at any hart state), so `tailSilentNoLabel`, `witnessInstrTailSilent` and `csyncAdvance` take the premise that the realizing label is not `LDev` (supplied at the callers by `notDevOfBlock`, from the emission's `LDev`-freedom).
 -/
 import Weak.WeakRvwmoCert3
 
@@ -403,10 +405,9 @@ theorem tailSilentAdm (T : List Nat) (cpu : CPU) (ls : List Wlabel) (p pa : Pexv
 theorem tailSilentNoLabel (T : List Nat) (cpu : CPU) (ma : SailM Unit) (rsa : RegFile)
     (iba : Ibch) (da : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
     tailSilent T ma →
-    ¬ lbAdmin true l →
+    ¬ lbAdmin true l → (∀ kd ba bs, l ≠ LDev kd ba bs) →
     pstepEv (.PHart cpu ma rsa none iba) da l p' d' → False := by
-  intro hts hna hst
-  have hld : (∀ kd ba bs, l ≠ LDev kd ba bs) := fun kd ba bs h => hna (by subst h; trivial)
+  intro hts hna hld hst
   obtain ⟨m', ors, fn', oib, obar, _, hnst, _⟩ := admStepNode cpu ma rsa iba da l p' d' hld hst
   cases hts with
   | tsRet y =>
@@ -422,7 +423,7 @@ theorem witnessInstrTailSilent (T : List Nat) (cpu : CPU) (m : SailM Unit) (rs :
     tailSilent T m →
     (∀ kd ba bs, LDev kd ba bs ∉ ls) →
     admRun true (.PHart cpu m rs none ib) d ls (.PHart cpu ma rsa fna iba) da →
-    ¬ lbAdmin true l →
+    ¬ lbAdmin true l → (∀ kd ba bs, l ≠ LDev kd ba bs) →
     pstepEv (.PHart cpu ma rsa fna iba) da l p' d' →
     ∃ (ls1 ls2 : List Wlabel) (rds1 : List Nat) (wrs1 : List Register) (ann1 : Bool)
       (rsb : RegFile) (ibb : Ibch) (tick : Bool),
@@ -431,11 +432,11 @@ theorem witnessInstrTailSilent (T : List Nat) (cpu : CPU) (m : SailM Unit) (rs :
       (∀ r, r ∈ wrs1 → ∃ n, eregNum r = some n ∧ n ∈ T) ∧
       admRun true (.PHart cpu (riscvStep tick) rsb none ibNone) d ls2
         (.PHart cpu ma rsa fna iba) da := by
-  intro hts hni hadm hre hst
+  intro hts hni hadm hre hld hst
   rcases tailSilentAdm T cpu ls _ _ d da hadm m rs ib rfl hts hni with
     ⟨ma2, rsa2, iba2, _, _, _, heq, rfl, htsa, _, _⟩ | h
   · cases heq
-    exact (tailSilentNoLabel T cpu _ _ _ _ l p' d' htsa hre hst).elim
+    exact (tailSilentNoLabel T cpu _ _ _ _ l p' d' htsa hre hld hst).elim
   · exact h
 
 theorem WeakRvwmoCert3.phrunApp {cpu : CPU} {ls1 : List Wlabel} {rds1 : List Nat}
@@ -545,7 +546,7 @@ theorem csyncAdvance (T : List Nat) (cpu : CPU) (d0 : Efab)
     csync T m1 rs1 fn1 ib1 m2 rs2 fn2 ib2 →
     (∀ kd ba bs, LDev kd ba bs ∉ ls) →
     admRun true (.PHart cpu m1 rs1 fn1 ib1) d0 ls (.PHart cpu ma rsa fna iba) da →
-    ¬ lbAdmin true l →
+    ¬ lbAdmin true l → (∀ kd ba bs, l ≠ LDev kd ba bs) →
     pstepEv (.PHart cpu ma rsa fna iba) da l p' d' →
     ∃ (mc : SailM Unit) (rs1c rs2c : RegFile) (fnc : Ofence) (ibc : Ibch)
       (lsc lspre lsq : List Wlabel) (rdsp rdsq : List Nat) (wrsp wrsq : List Register)
@@ -558,14 +559,14 @@ theorem csyncAdvance (T : List Nat) (cpu : CPU) (d0 : Efab)
       dregAgree (fun n => n ∉ T) rs1c rs2c ∧
       (∀ l0, l0 ∈ lsc → l0 ∈ ls) ∧
       (∀ l0, l0 ∈ lspre → ∀ im, WeakAxRealize.fetchPin im l0) := by
-  rintro (⟨rfl, rfl, rfl, hag⟩ | ⟨rfl, rfl, hts1, hts2, hag⟩) hni hadm hre hst
+  rintro (⟨rfl, rfl, rfl, hag⟩ | ⟨rfl, rfl, hts1, hts2, hag⟩) hni hadm hre hld hst
   · exact ⟨_, rs1, rs2, _, _, ls, [], [], [], [], [], [], false, false, hadm,
       fun _ h => absurd h List.not_mem_nil, phrun.nil _ _ _ _ _,
       fun _ h => absurd h List.not_mem_nil, phrun.nil _ _ _ _ _, hag, fun _ h => h,
       fun _ h => absurd h List.not_mem_nil⟩
   · obtain ⟨ls1, ls2, rds1, wrs1, ann1, rsb, ibb, tick, hsp, hrun1, hws1, hadm2⟩ :=
       witnessInstrTailSilent T cpu m1 rs1 ib1 d0 da ls ma rsa fna iba l p' d' hts1 hni hadm hre
-        hst
+        hld hst
     obtain ⟨lsq, rdsq, wrsq, annq, rs2b, ib2b, hadmq, _, hrunq, hwsq, hpinq⟩ :=
       tailSilentRun T cpu d0 m2 hts2 rs2 ib2
     have hadm1 : ∀ l0, l0 ∈ ls1 → lbAdmin true l0 := fun l0 hl0 =>
@@ -850,14 +851,14 @@ theorem certSegment'' (x : Nat) (cpu : CPU) (d0 : Efab) (Tf : Nat → List Nat)
     have hkk : k + (lb :: row).length = k + 1 + row.length := by
       rw [List.length_cons]; omega
     rw [eblockFst] at hdev
-    obtain ⟨hni, _, hdev'⟩ := notDevOfBlock _ _ _ hdev
+    obtain ⟨hni, hlnd, hdev'⟩ := notDevOfBlock _ _ _ hdev
     obtain ⟨ma, rsa, fna, iba, rfl⟩ := admRunPhart true _ _ d0 ls da har cpu m0 rs10 fn0 ib0 rfl
     obtain ⟨m1, rs11, fn1, ib1, rfl⟩ := pstepEvPhart cpu ma rsa fna iba da l p' d0 hst
     obtain ⟨hpinls, hes'⟩ := WeakRvwmoCert2.esPinBlock c.cdImg ls l k es hes
     obtain ⟨mc, rs1c, rs2c, fnc, ibc, lsc, lspre, lsq, rdsp, rdsq, wrsp, wrsq, annp, annq, hadmc,
       hadmpre, hrunpre, hadmq, hrunq, hagc, hsub, hpinpre⟩ :=
       csyncAdvance (Tf k) cpu d0 m0 rs10 fn0 ib0 m20 rs20 fn20 ib20 ls ma rsa fna iba da l _ _
-        hsync hni har (hlblRealizesNotadm _ _ _ _ true hre) hst
+        hsync hni har (hlblRealizesNotadm _ _ _ _ true hre) hlnd hst
     obtain ⟨rds, wrs, hblkp⟩ := WeakRvwmoCert2.cblkIntroPin c.cdImg cpu d0 ws lb l lsc
       (.PHart cpu ma rsa fna iba) da mc rs1c fnc ibc m1 rs11 fn1 ib1 hadmc
       (fun l0 h => hpinls l0 (hsub l0 h)) hre hst
@@ -926,7 +927,7 @@ theorem certSegment'' (x : Nat) (cpu : CPU) (d0 : Efab) (Tf : Nat → List Nat)
     have hkk : k + (lb :: row).length = k + 1 + row.length := by
       rw [List.length_cons]; omega
     rw [eblockFst, eblockFst] at hdev
-    obtain ⟨hni1, _, hdev1⟩ := notDevOfBlock _ _ _ hdev
+    obtain ⟨hni1, hl1nd, hdev1⟩ := notDevOfBlock _ _ _ hdev
     obtain ⟨_, _, hdev'⟩ := notDevOfBlock _ _ _ hdev1
     obtain ⟨ma, rsa, fna, iba, rfl⟩ :=
       admRunPhart true _ _ d0 ls1 da har1 cpu m0 rs10 fn0 ib0 rfl
@@ -939,7 +940,7 @@ theorem certSegment'' (x : Nat) (cpu : CPU) (d0 : Efab) (Tf : Nat → List Nat)
     obtain ⟨mc, rs1c, rs2c, fnc, ibc, lsc, lspre, lsq, rdsp, rdsq, wrsp, wrsq, annp, annq, hadmc,
       hadmpre, hrunpre, hadmq, hrunq, hagc, hsub, hpinpre⟩ :=
       csyncAdvance (Tf k) cpu d0 m0 rs10 fn0 ib0 m20 rs20 fn20 ib20 ls1 ma rsa fna iba da l1 _ _
-        hsync hni1 har1 (hlblRealizesPairNotadm _ _ _ _ _ _ true hre) hst1
+        hsync hni1 har1 (hlblRealizesPairNotadm _ _ _ _ _ _ true hre) hl1nd hst1
     obtain ⟨rds, wrs, hblkp⟩ := WeakRvwmoCert3.cblkpIntroPin c.cdImg cpu d0 ws lb l1 l2 lsc
       (.PHart cpu ma rsa fna iba) da (.PHart cpu mb rsb fnb ibb) dm ls2
       (.PHart cpu mc2 rsc2 fnc2 ibc2) dm2 mc rs1c fnc ibc m1 rs11 fn1 ib1 hadmc

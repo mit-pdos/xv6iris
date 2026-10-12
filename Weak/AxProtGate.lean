@@ -97,6 +97,8 @@ keeping the `grfAt` half); §6 `wpReadOwnedTok` (the WP read obligation from the
 
 **Not ported:** the section `Let`s `Hwf`/`Hnd_gmo` (inlined as `Hcons.1`/`Hcons.1.1`) and the
 `Print Assumptions` audits (the lint's axiom check covers them).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `gwf` admits I/O events (in gmo, neither reads nor writes), so the assembly's "a non-write gmo event is a read" (`gisROfGmo`) needs the event to be non-I/O: `gisROfGmo` takes it per event, and the theorems that use it (`flowEqReadPure'`, `flowEqEaOfRead'`, `distributeFirstWrites'`, `axprotAdequateGhost'`, `rownIsOwnedLastWrite`, `rownNoneNoOwnedLastWrite`, `axprotgatePhiOwnedEntails`, `axprotgateGateFactsOwned`, `wpReadOwnedTok*`, `gateDeliversExpected*`, `axprotgateNaPureGlobalFwd`, `axprotgateGateFactsFwd`, `axprotgatePhiOwnedFwdHolds`) take the graph-level premise `HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false` (none of them is in the registered roots' cone).
 -/
 import Weak.AxProtCov3
 
@@ -108,14 +110,14 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Std.PartialMap MachCSL MachCSL.St
 
 /-- `r ∈ gxGmo` and not a write: `r`'s label is an actual READ (the corrected `HrdatSpec` domain). -/
 theorem gisROfGmo (GD : Gdexec) (Hcons : rvwmoCatConsistent GD) (e : Geid)
-    (Hin : e ∈ GD.gdG.gxGmo) (Hnw : gisW GD.gdG e = false) :
+    (Hin : e ∈ GD.gdG.gxGmo) (Hnw : gisW GD.gdG e = false)
+    (Hnio : ∀ l, gxLbl GD.gdG e = some l → lbIsIo l = false) :
     ∃ l, gxLbl GD.gdG e = some l ∧ lbIsR l = true := by
   obtain ⟨l, Hl, Hm⟩ := (Hcons.1.2.1 e).1 Hin
   refine ⟨l, Hl, ?_⟩
   unfold gisW at Hnw
   simp only [Hl] at Hnw
-  have Hm := WeakRvwmoGraph.gwfMemRW _ _ _ Hcons.1 Hl Hm
-  rw [Hnw, Bool.or_false] at Hm
+  simp only [lbIsMem, Hnw, Bool.or_false, Hnio l Hl] at Hm
   exact Hm
 
 /-! ## 1.1 The chain machinery (`AxProtCov3`'s, deviation 2) -/
@@ -338,6 +340,7 @@ theorem greadsByteRealValue (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
     exact congrArg Prod.snd ((HwdatSpec wl a v (WeakRvwmoGraph.gwritesByteGisW _ _ _ _ Hwb0)).1 Hwb0)
 
 theorem flowEqReadPure' (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false)
     (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
@@ -349,7 +352,7 @@ theorem flowEqReadPure' (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
     match rown GD rdat r with
     | some wl => graphValue GD r = some [(wdat wl).2]
     | none => True := by
-  obtain ⟨l, Hl, Hisr⟩ := gisROfGmo GD Hcons r Hin Hnw
+  obtain ⟨l, Hl, Hisr⟩ := gisROfGmo GD Hcons r Hin Hnw (HnoIo r)
   obtain ⟨Hgvv, Hgb⟩ := HrdatSpec r l Hl Hisr
   unfold rown
   cases Hro : gwriteAt GD.gdG (rdat r).2.1 with
@@ -361,7 +364,8 @@ theorem flowEqReadPure' (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
 theorem flowEqEaOfRead' (γ : GName)
     (Hob_eq : ∀ (GD : Gdexec) (σ : AxirisG.obSt GF) (s : GSet Geid),
       AxirisG.obStInterp GD σ s ⊣⊢ protInv γ GD s)
-    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD) (wdat : Geid → Int × BitVec 8)
+    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false) (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
     (rdat : Geid → Int × Nat × BitVec 8)
@@ -373,7 +377,7 @@ theorem flowEqEaOfRead' (γ : GName)
   have hea : AxProtGate.eaVal (GF := GF) γ GD wdat e0 = ∅ := by
     unfold AxProtGate.eaVal AxProtCov3.eaVal; simp only [Hnw, Bool.false_eq_true, ↓reduceIte]
   have hna : (iprop(emp) : IProp GF) ⊢ AxProtGate.naVal' γ GD wdat rdat e0 := by
-    have hp := flowEqReadPure' GD Hcons wdat HwdatSpec rdat HrdatSpec e0 Hin Hnw
+    have hp := flowEqReadPure' GD Hcons HnoIo wdat HwdatSpec rdat HrdatSpec e0 Hin Hnw
     unfold AxProtGate.naVal'
     simp only [Hnw, Bool.false_eq_true, ↓reduceIte]
     revert hp
@@ -426,7 +430,8 @@ theorem flowEqEaOfWriteFirst' (γ : GName)
 theorem distributeFirstWrites' (γ : GName)
     (Hob_eq : ∀ (GD : Gdexec) (σ : AxirisG.obSt GF) (s : GSet Geid),
       AxirisG.obStInterp GD σ s ⊣⊢ protInv γ GD s)
-    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD) (wdat : Geid → Int × BitVec 8)
+    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false) (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
     (HdataTot : ∀ w, gisW GD.gdG w = true → ∃ data, graphData GD w = some data)
@@ -450,7 +455,7 @@ theorem distributeFirstWrites' (γ : GName)
         (wdat w).1 ∈ Xk := fun w hw h1 h2 => Hcov w (List.mem_cons.2 (Or.inr hw)) h1 h2
     cases Hisw : gisW GD.gdG e0
     · exact emp_sep.2.trans (sep_mono
-        (flowEqEaOfRead' γ Hob_eq GD Hcons wdat HwdatSpec rdat HrdatSpec e0
+        (flowEqEaOfRead' γ Hob_eq GD Hcons HnoIo wdat HwdatSpec rdat HrdatSpec e0
           (Hgmo e0 (List.mem_cons.2 (Or.inl rfl))) Hisw)
         (ih Xk Hnd' Hgmo' Hcov'))
     · cases Himm : axprotImmpred GD e0 with
@@ -541,7 +546,8 @@ theorem AxProtGate.todoAtEq (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatConsiste
 theorem axprotAdequateGhost' (γ : GName)
     (Hob_eq : ∀ (GD : Gdexec) (σ : AxirisG.obSt GF) (s : GSet Geid),
       AxirisG.obStInterp GD σ s ⊣⊢ protInv γ GD s)
-    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD) (wdat : Geid → Int × BitVec 8)
+    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false) (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
     (HdataTot : ∀ w, gisW GD.gdG w = true → ∃ data, graphData GD w = some data)
@@ -572,7 +578,7 @@ theorem axprotAdequateGhost' (γ : GName)
   have Htodo : ([∗set] a ∈ (LawfulSet.ofList ((gwrites GD.gdG).map fun w => (wdat w).1) :
         GSet Int), histAuth (GF := GF) γ a 1 []) ⊢
       ordEaTodoL GD (AxProtGate.eaOf γ GD wdat) (AxProtGate.naOf' γ GD wdat rdat) st.sProc 0 := by
-    refine (distributeFirstWrites' γ Hob_eq GD Hcons wdat HwdatSpec HdataTot rdat HrdatSpec
+    refine (distributeFirstWrites' γ Hob_eq GD Hcons HnoIo wdat HwdatSpec HdataTot rdat HrdatSpec
       GD.gdG.gxGmo _ HGw.1 (fun _ h => h) Hcov0).trans ?_
     unfold ordEaTodoL
     simp only [List.drop_zero]
@@ -736,6 +742,7 @@ theorem ownedLastWriteUniq (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
   exact gwixInj _ _ _ Hcons.1.1 Hw1w Hw2w (by omega)
 
 theorem rownIsOwnedLastWrite (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false)
     (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
@@ -748,11 +755,12 @@ theorem rownIsOwnedLastWrite (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
     (Hnofwd : ∀ w' v', gwritesByte GD.gdG w' (rdat r).1 v' → WeakRvwmoGraph.gpo GD.gdG w' r →
       gmoLt GD.gdG w' r) :
     ownedLastWrite GD wdat (rdat r).1 r wl := by
-  obtain ⟨l, Hl, Hisr⟩ := gisROfGmo GD Hcons r Hin Hnw
+  obtain ⟨l, Hl, Hisr⟩ := gisROfGmo GD Hcons r Hin Hnw (HnoIo r)
   obtain ⟨_, Hgb⟩ := HrdatSpec r l Hl Hisr
   exact greadsByteOwnedLastWrite GD Hcons wdat HwdatSpec r _ _ _ wl Hnofwd Hgb Hro
 
 theorem rownNoneNoOwnedLastWrite (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false)
     (wdat : Geid → Int × BitVec 8) (rdat : Geid → Int × Nat × BitVec 8)
     (HrdatSpec : ∀ r l, gxLbl GD.gdG r = some l → lbIsR l = true →
       graphValue GD r = some [(rdat r).2.2] ∧
@@ -760,7 +768,7 @@ theorem rownNoneNoOwnedLastWrite (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
     (r : Geid) (Hin : r ∈ GD.gdG.gxGmo) (Hnw : gisW GD.gdG r = false) (wl : Geid)
     (Hro : rown GD rdat r = none) :
     ¬ ownedLastWrite GD wdat (rdat r).1 r wl := by
-  obtain ⟨l, Hl, Hisr⟩ := gisROfGmo GD Hcons r Hin Hnw
+  obtain ⟨l, Hl, Hisr⟩ := gisROfGmo GD Hcons r Hin Hnw (HnoIo r)
   obtain ⟨_, Hgb⟩ := HrdatSpec r l Hl Hisr
   exact greadsByteNoOwnedLastWrite GD Hcons wdat r _ _ _ wl Hgb Hro
 
@@ -771,6 +779,7 @@ def axprotgatePhiOwned (GD : Gdexec) (wdat : Geid → Int × BitVec 8)
   else ∀ wl, ownedLastWrite GD wdat (rdat e).1 e wl → graphValue GD e = some [(wdat wl).2]
 
 theorem axprotgatePhiOwnedEntails (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false)
     (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
@@ -789,12 +798,12 @@ theorem axprotgatePhiOwnedEntails (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
     | some wl0 =>
       intro Hgvv wl Hown
       have Heq := ownedLastWriteUniq GD Hcons wdat _ e wl wl0 Hown
-        (rownIsOwnedLastWrite GD Hcons wdat HwdatSpec rdat HrdatSpec e Hin Hisw wl0 Hro Hnofwd)
+        (rownIsOwnedLastWrite GD Hcons HnoIo wdat HwdatSpec rdat HrdatSpec e Hin Hisw wl0 Hro Hnofwd)
       rw [Heq]
       exact Hgvv
     | none =>
       intro _ wl Hown
-      exact absurd Hown (rownNoneNoOwnedLastWrite GD Hcons wdat rdat HrdatSpec e Hin Hisw wl Hro)
+      exact absurd Hown (rownNoneNoOwnedLastWrite GD Hcons HnoIo wdat rdat HrdatSpec e Hin Hisw wl Hro)
   · simp only [↓reduceIte]
     exact id
 
@@ -803,6 +812,7 @@ section gateOwned
 variable {GF : BundledGFunctors} [AxlogG GF Hent]
 
 theorem axprotgateGateFactsOwned (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false)
     (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
@@ -828,7 +838,7 @@ theorem axprotgateGateFactsOwned (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatCon
   iintro HR
   ihave %Hφ := Hpure $$ HR
   ipureintro
-  exact axprotgatePhiOwnedEntails GD Hcons wdat HwdatSpec rdat HrdatSpec e Hin
+  exact axprotgatePhiOwnedEntails GD Hcons HnoIo wdat HwdatSpec rdat HrdatSpec e Hin
     (Hnofwd e (rdat e).1) Hφ
 
 end gateOwned
@@ -930,7 +940,8 @@ theorem AxProtGate.naSplittingWfEmpty (sLob : GSet Geid) (na : Mea GF) :
 theorem wpReadOwnedTok [Axpol] (γ : GName)
     (Hob_eq : ∀ (GD : Gdexec) (σ : AxirisG.obSt GF) (s : GSet Geid),
       AxirisG.obStInterp GD σ s ⊣⊢ protInv γ GD s)
-    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD) (wdat : Geid → Int × BitVec 8)
+    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false) (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
     (rdat : Geid → Int × Nat × BitVec 8)
@@ -967,11 +978,11 @@ theorem wpReadOwnedTok [Axpol] (γ : GName)
       wpEvStep GD i k (fun v : List (BitVec 8) => v.length = 1)
         (fun v => graphValue GD (i, k) = some v) (fun _ => k'0) Ψ := by
   have Hphi : axprotgatePhi GD wdat rdat (i, k) := by
-    have h0 := flowEqReadPure' GD Hcons wdat HwdatSpec rdat HrdatSpec (i, k) Hrgmo Hnw
+    have h0 := flowEqReadPure' GD Hcons HnoIo wdat HwdatSpec rdat HrdatSpec (i, k) Hrgmo Hnw
     unfold axprotgatePhi
     simp only [Hnw, Bool.false_eq_true, ↓reduceIte]
     exact h0
-  have Hpo := axprotgatePhiOwnedEntails GD Hcons wdat HwdatSpec rdat HrdatSpec (i, k) Hrgmo
+  have Hpo := axprotgatePhiOwnedEntails GD Hcons HnoIo wdat HwdatSpec rdat HrdatSpec (i, k) Hrgmo
     Hnofwd_a Hphi
   unfold axprotgatePhiOwned at Hpo
   simp only [Hnw, Bool.false_eq_true, ↓reduceIte] at Hpo
@@ -1028,6 +1039,7 @@ section deliver
 variable {GF : BundledGFunctors} [AxlogG GF Hent]
 
 theorem gateDeliversExpected (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false)
     (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
@@ -1048,7 +1060,7 @@ theorem gateDeliversExpected (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatConsist
     (Hown : ownedLastWrite GD wdat (rdat r).1 r wl) :
     ∃ R, get? (AxProtGate.naOf' (GF := GF) γ GD wdat rdat) r = some R ∧
       (R ⊢ iprop(⌜graphValue GD r = some [vl]⌝)) := by
-  obtain ⟨R, Hlook, Hpure⟩ := axprotgateGateFactsOwned (GF := GF) γ GD Hcons wdat HwdatSpec rdat
+  obtain ⟨R, Hlook, Hpure⟩ := axprotgateGateFactsOwned (GF := GF) γ GD Hcons HnoIo wdat HwdatSpec rdat
     HrdatSpec i 0 s0 srcs st Hrun Hfull Hdone Hmem Hnofwd r Hr_src
   refine ⟨R, Hlook, ?_⟩
   have Hveq := AxProtGate.lastVal GD wdat HwdatSpec _ Hl wl vl Hwr Hlast
@@ -1160,6 +1172,7 @@ def axprotgatePhiOwnedFwd (GD : Gdexec) (wdat : Geid → Int × BitVec 8)
   else ∀ wl, ownedExpectedWrite GD wdat (rdat e).1 e wl → graphValue GD e = some [(wdat wl).2]
 
 theorem axprotgatePhiOwnedFwdHolds (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false)
     (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
@@ -1174,7 +1187,7 @@ theorem axprotgatePhiOwnedFwdHolds (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
   cases Hisw : gisW GD.gdG e
   · simp only [Bool.false_eq_true, ↓reduceIte]
     intro wl Hown
-    obtain ⟨l, Hl, Hisr⟩ := gisROfGmo GD Hcons e Hin Hisw
+    obtain ⟨l, Hl, Hisr⟩ := gisROfGmo GD Hcons e Hin Hisw (HnoIo e)
     obtain ⟨Hgvv, Hgb⟩ := HrdatSpec e l Hl Hisr
     cases Ht0 : (rdat e).2.1 with
     | zero =>
@@ -1202,6 +1215,7 @@ section gateFwd
 variable {GF : BundledGFunctors} [AxlogG GF Hent]
 
 theorem axprotgateNaPureGlobalFwd (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false)
     (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
@@ -1219,9 +1233,10 @@ theorem axprotgateNaPureGlobalFwd (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatCo
   refine ⟨AxProtGate.naVal' γ GD wdat rdat e, AxProtGate.naOfLookup' γ GD Hcons wdat rdat e hin, ?_⟩
   unfold annotPure
   exact pure_intro
-    (axprotgatePhiOwnedFwdHolds GD Hcons wdat HwdatSpec HdataTot rdat HrdatSpec e hin)
+    (axprotgatePhiOwnedFwdHolds GD Hcons HnoIo wdat HwdatSpec HdataTot rdat HrdatSpec e hin)
 
 theorem axprotgateGateFactsFwd (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false)
     (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
@@ -1237,11 +1252,12 @@ theorem axprotgateGateFactsFwd (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatConsi
     gateFacts (AxProtGate.naOf' (GF := GF) γ GD wdat rdat) (gateSrcs i s0 srcs)
       (axprotgatePhiOwnedFwd GD wdat rdat) :=
   gateFactsOfDomPure _ _ _
-    (axprotgateNaPureGlobalFwd γ GD Hcons wdat HwdatSpec HdataTot rdat HrdatSpec)
+    (axprotgateNaPureGlobalFwd γ GD Hcons HnoIo wdat HwdatSpec HdataTot rdat HrdatSpec)
     (gateSrcsDomOfSched GD Hcons st Hrun Hfull Hdone _
       (AxProtGate.domOfRun γ GD Hcons wdat rdat st Hrun Hfull Hdone) _ Hmem)
 
 theorem gateDeliversExpectedFwd (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false)
     (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
@@ -1261,7 +1277,7 @@ theorem gateDeliversExpectedFwd (γ : GName) (GD : Gdexec) (Hcons : rvwmoCatCons
     (Hown : ownedExpectedWrite GD wdat (rdat r).1 r wl) :
     ∃ R, get? (AxProtGate.naOf' (GF := GF) γ GD wdat rdat) r = some R ∧
       (R ⊢ iprop(⌜graphValue GD r = some [vl]⌝)) := by
-  obtain ⟨R, Hlook, Hpure⟩ := axprotgateGateFactsFwd (GF := GF) γ GD Hcons wdat HwdatSpec HdataTot
+  obtain ⟨R, Hlook, Hpure⟩ := axprotgateGateFactsFwd (GF := GF) γ GD Hcons HnoIo wdat HwdatSpec HdataTot
     rdat HrdatSpec i 0 s0 srcs st Hrun Hfull Hdone Hmem r Hr_src
   refine ⟨R, Hlook, ?_⟩
   have Hveq := AxProtGate.lastVal GD wdat HwdatSpec _ Hl wl vl Hwr Hlast
@@ -1336,7 +1352,8 @@ theorem flowEqOwnedReadOwnedFwd (γ : GName)
 theorem wpReadOwnedTokFwd [Axpol] (γ : GName)
     (Hob_eq : ∀ (GD : Gdexec) (σ : AxirisG.obSt GF) (s : GSet Geid),
       AxirisG.obStInterp GD σ s ⊣⊢ protInv γ GD s)
-    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD) (wdat : Geid → Int × BitVec 8)
+    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false) (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
     (HdataTot : ∀ w, gisW GD.gdG w = true → ∃ data, graphData GD w = some data)
@@ -1371,7 +1388,7 @@ theorem wpReadOwnedTokFwd [Axpol] (γ : GName)
       (∀ v : List (BitVec 8), ⌜v.length = 1⌝ -∗ Ψ v) -∗
       wpEvStep GD i k (fun v : List (BitVec 8) => v.length = 1)
         (fun v => graphValue GD (i, k) = some v) (fun _ => k'0) Ψ := by
-  have Hpo := axprotgatePhiOwnedFwdHolds GD Hcons wdat HwdatSpec HdataTot rdat HrdatSpec (i, k)
+  have Hpo := axprotgatePhiOwnedFwdHolds GD Hcons HnoIo wdat HwdatSpec HdataTot rdat HrdatSpec (i, k)
     Hrgmo
   unfold axprotgatePhiOwnedFwd at Hpo
   simp only [Hnw, Bool.false_eq_true, ↓reduceIte] at Hpo
@@ -1442,7 +1459,8 @@ theorem annotAllocAtProgressSkel (GD : Gdexec) (i : Agent) (k : Nat) (P : IProp 
 theorem wpReadOwnedTokSkel [Axpol] (γ : GName)
     (Hob_eq : ∀ (GD : Gdexec) (σ : @AxirisG.obSt GF (skelAxirisG γg Φp)) (s : GSet Geid),
       AxirisG.obStInterp (self := skelAxirisG γg Φp) GD σ s ⊣⊢ protInv γ GD s)
-    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD) (wdat : Geid → Int × BitVec 8)
+    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false) (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
     (rdat : Geid → Int × Nat × BitVec 8)
@@ -1475,14 +1493,15 @@ theorem wpReadOwnedTokSkel [Axpol] (γ : GName)
       @wpEvStep hlc GF _ (skelAxirisG γg Φp) _ (List (BitVec 8)) GD i k
         (fun v : List (BitVec 8) => v.length = 1)
         (fun v => graphValue GD (i, k) = some v) (fun _ => k'0) Ψ :=
-  wpReadOwnedTok (axG := skelAxirisG γg Φp) γ Hob_eq GD Hcons wdat HwdatSpec rdat HrdatSpec
+  wpReadOwnedTok (axG := skelAxirisG γg Φp) γ Hob_eq GD Hcons HnoIo wdat HwdatSpec rdat HrdatSpec
     i k k'0 ls' Hl S wl vl Ψ Hrgmo Hnw Hwr Hch Hown Hlast Hrd Hcase Hpref Hnofwd_a
     (annotAllocAtProgressSkel γg Φp GD i k _)
 
 theorem wpReadOwnedTokSkelFwd [Axpol] (γ : GName)
     (Hob_eq : ∀ (GD : Gdexec) (σ : @AxirisG.obSt GF (skelAxirisG γg Φp)) (s : GSet Geid),
       AxirisG.obStInterp (self := skelAxirisG γg Φp) GD σ s ⊣⊢ protInv γ GD s)
-    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD) (wdat : Geid → Int × BitVec 8)
+    (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false) (wdat : Geid → Int × BitVec 8)
     (HwdatSpec : ∀ w a v, gisW GD.gdG w = true →
       (gwritesByte GD.gdG w a v ↔ (a, v) = wdat w))
     (HdataTot : ∀ w, gisW GD.gdG w = true → ∃ data, graphData GD w = some data)
@@ -1514,7 +1533,7 @@ theorem wpReadOwnedTokSkelFwd [Axpol] (γ : GName)
       @wpEvStep hlc GF _ (skelAxirisG γg Φp) _ (List (BitVec 8)) GD i k
         (fun v : List (BitVec 8) => v.length = 1)
         (fun v => graphValue GD (i, k) = some v) (fun _ => k'0) Ψ :=
-  wpReadOwnedTokFwd (axG := skelAxirisG γg Φp) γ Hob_eq GD Hcons wdat HwdatSpec HdataTot rdat
+  wpReadOwnedTokFwd (axG := skelAxirisG γg Φp) γ Hob_eq GD Hcons HnoIo wdat HwdatSpec HdataTot rdat
     HrdatSpec i k k'0 ls' Hl S wl vl Ψ Hrgmo Hnw Hwr Hch Hown Hlast Hrd Hcase Hpref
     (annotAllocAtProgressSkel γg Φp GD i k _)
 

@@ -90,6 +90,8 @@ Lean-only (file-qualified): `WeakRvwmoConfWit2.ldWordKw`, `WeakRvwmoConfWit2.ldD
 `WeakRvwmoConfWit2.wbytesLookupInv` (the byte inversions Rocq does by `destruct j`).
 
 **Dropped:** nothing (Rocq 72 declarations; Lean 72 + 9 Lean-only).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `lbShapeOk`'s `LIo` arm is `True` (`gwf`'s flip).
 -/
 import Weak.WeakRvwmoConfWit
 import Weak.KernelSitesDef
@@ -281,7 +283,7 @@ def lbShapeOk (l : Lbl) : Prop :=
   | .LStore _ _ vs _ => vs ≠ []
   | .LFence _ _ _ _ => True
   | .LRmw _ _ _ ts rvs wvs _ => wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
-  | .LIo .. => False
+  | .LIo .. => True
 
 section G2
 

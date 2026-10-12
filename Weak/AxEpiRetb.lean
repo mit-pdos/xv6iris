@@ -328,9 +328,9 @@ theorem stageAgree (k : Nat) (m : SailM Unit) (rs rs' : RegFile)
 /-! ## The step lemmas -/
 
 /-- Admin labels have no graph halves. -/
-theorem adminHalves (l : Wlabel) (h : lbAdmin true l) :
+theorem adminHalves (l : Wlabel) (h : AxOpsem.lbAdminAx true l) :
     wlRd l = none ∧ wlWr l = none ∧ wlFence l = none := by
-  cases l <;> simp_all [lbAdmin, wlRd, wlWr, wlFence]
+  cases l <;> simp_all [AxOpsem.lbAdminAx, wlRd, wlWr, wlFence]
 
 /-- Only a register write writes the register file. -/
 theorem orsCases (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevStates) (l : Wlabel)
@@ -408,7 +408,7 @@ theorem memReadStep (cpu : CPU) (n va : Nat)
     ((classify req.access_kind).akIfetch = true ∧ ∃ tvs : List (Nat × BitVec 8),
         tvs.length = n ∧ l = .LIFetch (paZ req.pa) tvs ∧
         p' = .PHart cpu (KK (.Ok (wordOfBytes n (tvs.map Prod.snd), none))) rs none ib) ∨
-    ((classify req.access_kind).akIfetch = false ∧ ¬ lbAdmin true l ∧ wlWr l = none ∧
+    ((classify req.access_kind).akIfetch = false ∧ ¬ AxOpsem.lbAdminAx true l ∧ wlWr l = none ∧
         wlFence l = none ∧
         p' = .PHart cpu (KK (.Ok (wordOfBytes n (wlRvals l), none))) rs none ib) := by
   cases hfe : (classify req.access_kind).akIfetch
@@ -422,11 +422,11 @@ theorem memReadStep (cpu : CPU) (n va : Nat)
           ⟨-, w, tvs, hlen, hby, rfl, rfl, rfl, rfl, -, rfl, -⟩⟩
       · rw [hfe] at hif
         exact absurd hif Bool.false_ne_true
-      · refine ⟨by simp [lbAdmin], rfl, rfl, ?_⟩
+      · refine ⟨by simp [AxOpsem.lbAdminAx], rfl, rfl, ?_⟩
         simp only [wlRvals]
         rw [← bytesWordEq n w tvs hlen hby]
         rfl
-      · refine ⟨by simp [lbAdmin], rfl, rfl, ?_⟩
+      · refine ⟨by simp [AxOpsem.lbAdminAx], rfl, rfl, ?_⟩
         simp only [wlRvals]
         rw [← bytesWordEq n w tvs hlen hby]
         rfl

@@ -48,6 +48,8 @@ violation-monotonicity lemmas.
    flattened: each lemma takes exactly the context items its Rocq proof uses,
    in section order (as Rocq's section closing does).
 6. The smoke tests' closed `vm_compute` side conditions are `decide`/`rfl`.
+8. W13 (I) (`gwf`'s `LIo` shape arm flipped to `True`): `gswapUpperIsRead` takes the premise
+   that `r` is not an I/O-class event (Rocq: none — no I/O events in its graphs).
 7. Lean-only helper (no Rocq twin): `sidxSpec`, the three-way case analysis
    of `sidx` that every arithmetic proof here (Rocq: `repeat case_bool_decide;
    lia`) is run through.
@@ -390,15 +392,16 @@ theorem gswapGwix (G : Gexec) (n : Nat) (x r : Geid) :
 
 `r` sits at gmo position `n + 1` and `x` at `n`; `r` moves DOWN past `x`. -/
 
-/-- `r` is a read, for free. -/
+/-- `r` is a read, for free — W13 (I) (deviation 8): once it is not an I/O-class event (`gwf`
+admits `LIo` events, which are in gmo but neither reads nor writes). -/
 theorem gswapUpperIsRead (G : Gexec) (r : Geid) :
-    gwf G → r ∈ G.gxGmo → gisW G r = false → glblIs G r lbIsR := by
-  intro hwf hin hnw
+    gwf G → r ∈ G.gxGmo → gisW G r = false →
+    (∀ l, gxLbl G r = some l → lbIsIo l = false) → glblIs G r lbIsR := by
+  intro hwf hin hnw hnio
   obtain ⟨l, hl, hm⟩ := gwfGmoMem G r hwf hin
   refine ⟨l, hl, ?_⟩
   simp only [gisW, hl] at hnw
-  have hm := WeakRvwmoGraph.gwfMemRW G r l hwf hl hm
-  simp only [hnw, Bool.or_false] at hm
+  simp only [lbIsMem, hnw, Bool.or_false, hnio l hl] at hm
   exact hm
 
 theorem gswapReadDown (G : Gexec) (n : Nat) (x r : Geid) :

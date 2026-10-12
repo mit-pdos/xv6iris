@@ -65,6 +65,8 @@ theorem.
 Lean-only (deviation 4): `WeakRvwmoWalkb.candEmptyWs`.
 
 **Dropped:** none (§4.5–§4.6: Rocq 57 declarations; Lean 58 = 57 + the 1 Lean-only).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** the `LIo` arm of the true route's `mstepOk` is `trivial` (was refuted by `gwf`'s `False` arm).
 -/
 import Weak.WeakRvwmoWalk
 
@@ -445,7 +447,7 @@ theorem wblkPolAt' (G : Gexec) (W : Geid → Prop) (n : Nat) (x : Nat) (cpu : CP
       | LStore rl base vs kc =>
         exact certWriteOk c0 x rl base vs kc (WeakRvwmoFloor.gshape G hwf _ _ hl)
       | LFence pr pw sr sw => exact certFenceOk c0 x pr pw sr sw
-      | LIo => exact (WeakRvwmoFloor.gshape G hwf _ _ hl).elim
+      | LIo => trivial
       | LRmw aq rl base ts rvs wvs kc =>
         -- THE FUSED RMW, served by 4.5b'
         obtain ⟨ev, hgt, _⟩ := hctx

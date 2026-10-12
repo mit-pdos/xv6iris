@@ -129,7 +129,7 @@ theorem kreachRdNode (pin : Wlabel → Prop) (cpu : CPU) (n va : Nat)
     rcases hst with ⟨-, d, l, d', hadm, -, hps⟩ | ⟨hk, d, d', hw⟩
     · exfalso
       obtain ⟨tvs, -, rfl, -⟩ := fetchNodePstep cpu n va req KK rs1 ib d l p3 d' hdev hlat hps
-      simp [rdLabel, hnf, lbAdmin] at hadm
+      simp [rdLabel, hnf, AxOpsem.lbAdminAx] at hadm
     · obtain ⟨-, cpu', m', rs', fn', ib', mm, b, kk, hp, -, -, hp'⟩ := pstepWireInv _ _ _ _ _ hw
       dsimp only at hp hp' hk
       cases hp
@@ -153,7 +153,7 @@ theorem kreachWrNode (pin : Wlabel → Prop) (cpu : CPU) (n va : Nat)
     rcases hst with ⟨-, d, l, d', hadm, -, hps⟩ | ⟨hk, d, d', hw⟩
     · exfalso
       obtain ⟨v, -, rfl, -⟩ := storeNodePstep cpu n va req KK rs1 ib d l p3 d' hdev hlat hps
-      simp [lbAdmin] at hadm
+      simp [AxOpsem.lbAdminAx] at hadm
     · obtain ⟨-, cpu', m', rs', fn', ib', mm, b, kk, hp, -, -, hp'⟩ := pstepWireInv _ _ _ _ _ hw
       dsimp only at hp hp' hk
       cases hp
@@ -467,14 +467,14 @@ theorem FirstRdStep (v : BitVec 64) (m : SailM Unit) (t : ExecSt)
     (H : FirstRd img (P v) (Qv C stv) m t) :
     Off v → ∀ rs ib, regsAgree AxRunClose.pinReg rs t.regs →
     ∀ d l p' d', pstepProg (.PHart cpu m rs none ib) d l p' d' →
-      (lbAdmin true l → WeakAxRealize.fetchPin img l → FRS img C P stv Off cpu k ⟨p', k⟩) ∧
-      (¬ lbAdmin true l → Foff P Off l) := by
+      (AxOpsem.lbAdminAx true l → WeakAxRealize.fetchPin img l → FRS img C P stv Off cpu k ⟨p', k⟩) ∧
+      (¬ AxOpsem.lbAdminAx true l → Foff P Off l) := by
   intro Hoff rs ib Hag d l p' d' Hps
   cases H with
   | frRet t HQ =>
     -- `.pure ()`: back to a boundary at the trap vector
     obtain ⟨rfl, tick, rfl⟩ := retPstepInv cpu rs ib d l p' d' Hps
-    refine ⟨fun _ _ => ?_, fun Hn => (Hn (by simp [lbAdmin])).elim⟩
+    refine ⟨fun _ _ => ?_, fun Hn => (Hn (by simp [AxOpsem.lbAdminAx])).elim⟩
     obtain ⟨Hc, Hpc⟩ := HQ
     refine frsOfBoundary img C P stv HVA Off cpu k rs ibNone tick (HC _ _ Hc Hag) ?_
     rw [Hag .PC (AxSymEngine2.notPin _ (by decide) (by decide)), Hpc]
@@ -482,7 +482,7 @@ theorem FirstRdStep (v : BitVec 64) (m : SailM Unit) (t : ExecSt)
   | frRd r kk t H1 H2 =>
     obtain ⟨rfl, rfl⟩ := pstepRdInv cpu r kk rs ib d l p' d' Hps
     refine ⟨fun _ _ => ⟨rfl, .inr ⟨kk (rs r), rs, ibRd ib r, t, v, rfl, Hag, Hoff, ?_⟩⟩,
-      fun Hn => (Hn (by simp [lbAdmin])).elim⟩
+      fun Hn => (Hn (by simp [AxOpsem.lbAdminAx])).elim⟩
     by_cases hp : AxRunClose.pinReg r
     · exact H1 hp _
     · rw [Hag r hp]; exact H2 hp
@@ -494,11 +494,11 @@ theorem FirstRdStep (v : BitVec 64) (m : SailM Unit) (t : ExecSt)
     -- THE FIRST READ
     obtain ⟨tvs, Htl, rfl, -⟩ := fetchNodePstep cpu n0 va req kk rs ib d l p' d' Hdev Hlat Hps
     simp only [rdLabel, Hnf, Bool.false_eq_true, ↓reduceIte]
-    refine ⟨fun Ha => by simp [lbAdmin] at Ha, fun _ => ?_⟩
+    refine ⟨fun Ha => by simp [AxOpsem.lbAdminAx] at Ha, fun _ => ?_⟩
     exact ⟨_, _, tvs, v, rfl, Hoff, by rw [Htl]; exact HP⟩
   | frIf n0 va req kk t vs Hdev Hif Himg Hk =>
     obtain ⟨tvs, Htl, rfl, rfl⟩ := AxCjrWpd.fetchStepInv cpu n0 va req kk rs ib d l p' d' Hdev Hif Hps
-    refine ⟨fun _ Hpin => ?_, fun Hn => (Hn (by simp [lbAdmin])).elim⟩
+    refine ⟨fun _ Hpin => ?_, fun Hn => (Hn (by simp [AxOpsem.lbAdminAx])).elim⟩
     obtain ⟨Hvl, Hvs⟩ := imgBytesSpec img _ _ vs Himg
     have Hsnd := AxCjrWpd.pinnedBytes img (paZ req.pa) tvs vs (by omega)
       (fun j hj => Hvs j (by omega)) Hpin
@@ -507,7 +507,7 @@ theorem FirstRdStep (v : BitVec 64) (m : SailM Unit) (t : ExecSt)
   | frNf n0 va req kk t Hdev Hif Himg =>
     obtain ⟨tvs, Htl, rfl, -⟩ := AxCjrWpd.fetchStepInv cpu n0 va req kk rs ib d l p' d' Hdev Hif Hps
     exact ⟨fun _ Hpin => (AxSpinVA.noPinOfImgNone img _ _ tvs Himg Htl Hpin).elim,
-      fun Hn => (Hn (by simp [lbAdmin])).elim⟩
+      fun Hn => (Hn (by simp [AxOpsem.lbAdminAx])).elim⟩
   | frIa n0 w kk t Hs Hk =>
     obtain ⟨m', ors, fn', oib, obar, dv, hn, rfl⟩ := AxSpinE3.nodeStepInv cpu _ rs ib d l p' d' Hps
     obtain ⟨rfl, rfl, rfl, rfl, -, rfl, -⟩ := hn
@@ -521,7 +521,7 @@ theorem FirstRdStep (v : BitVec 64) (m : SailM Unit) (t : ExecSt)
     obtain ⟨m', ors, fn', oib, obar, dv, hn, rfl⟩ := AxSpinE3.nodeStepInv cpu _ rs ib d l p' d' Hps
     obtain ⟨rfl, rfl, rfl, rfl, -, rfl, -⟩ := hn
     exact ⟨fun _ _ => ⟨rfl, .inr ⟨_, rs, ib, t, v, rfl, Hag, Hoff, Hk⟩⟩,
-      fun Hn => (Hn (by simp [lbAdmin])).elim⟩
+      fun Hn => (Hn (by simp [AxOpsem.lbAdminAx])).elim⟩
 
 include HC HVA Hstv in
 theorem frsClosed (s s' : Athread) :
@@ -565,7 +565,7 @@ theorem firstEvOffrow (s : Athread) :
   intro d l p' d' Hps Hna
   obtain ⟨-, ⟨rs, ib, Hp, -, -⟩ | ⟨m, rs, ib, t, v, Hp, Hag, Ho, Hfr⟩⟩ := Hs2 <;> rw [Hp] at Hps
   · obtain ⟨rfl, -⟩ := retPstepInv cpu rs ib d l p' d' Hps
-    exact (Hna (by simp [lbAdmin])).elim
+    exact (Hna (by simp [AxOpsem.lbAdminAx])).elim
   · exact (FirstRdStep img C HC P stv HVA Off Hstv cpu k v m t Hfr Ho rs ib Hag d l p' d' Hps).2 Hna
 
 include HC HVA Hstv in

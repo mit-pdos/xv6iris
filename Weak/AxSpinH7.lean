@@ -57,6 +57,8 @@ Lean-only (file-qualified): `AxSpinH7.relMap`, `AxSpinH7.cS0`/`cSN`/`cN`/`cPost`
 **Dropped:** the local instance `g7_G` (inlined), the §5 `Check`/`Print Assumptions` lines (the
 lint's axiom check covers them).  (22 Rocq items = 21 decls + 1 instance; 26 Lean = 21 + 5
 Lean-only.)
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** the release lemmas' anchor-domain premise is `(lbIsR l || lbIsW l) = true` (was `lbIsMem l = true`): `gwf` admits I/O events, which `fence rw,w` does not order (RVWMO; D48).
 -/
 import Weak.AxSpinH6
 
@@ -246,7 +248,7 @@ theorem wpdB7 (GT : GdexecT) (nm : spinN) (cpu : CPU) (Hcons : rvwmoCatConsisten
     lookupSingletonNe (by decide)
   have Hdom : ∀ e, e ∈ (FiniteMap.dom_set (AxSpinH7.relMap (GF := GF) GT nm) : GSet Geid) →
       e.1 = hB ∧ e.2 < 2 ∧
-        ∃ l, (AxOpsem.grow (gtAdGd GT) hB)[e.2]? = some l ∧ lbIsMem l = true := by
+        ∃ l, (AxOpsem.grow (gtAdGd GT) hB)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true := by
     intro e He
     rw [domInsert, domSingleton] at He
     rcases elemOfUnion.1 He with h | h

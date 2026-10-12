@@ -64,6 +64,8 @@ kept as the comment at the end.
 `promiseFreeCompleteClean`, `promiseFreeCompleteLocal`, `srvwmoRealizable`,
 `ceRlTrueInconsistent`, `ceRlStaleReachable`, `ceRlBlocked`,
 `ceFwdNotPubClean`, `ceFwdReachable`.
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `promiseFreeCompleteClean` (statement unchanged) carries the inert `LIo` step: `invStep`'s and `candMstepOkAt`'s `LIo` arms (the replay state is unchanged, `candWsIo`).
 -/
 import Weak.WeakAxiomatic2
 
@@ -694,7 +696,8 @@ theorem candWsFence (c : Cand) (k : Nat) (s : Estep) (pr pw sr sw : Bool) :
     ews (candExec c) (k + 1) s.esAg = fencePost (ews (candExec c) k s.esAg) pr pw sr sw := by
   intro hs hl; unfold ews; rw [candNext c k s hs, hl]; exact updWsEq _ _ _
 
-/-- W13 (E): the replay's `mnext` leaves the state at an I/O-class label. -/
+/-- W13 (E)/(I): the replay's `mnext` (the inert `mstep.MStepIo`) leaves the state at an
+I/O-class label. -/
 theorem candWsIo (c : Cand) (k : Nat) (s : Estep) (kd : IoKind) (base : Int)
     (vs : List (BitVec 8)) :
     c.cdTr[k]? = some s → s.esLb = LIo kd base vs →
@@ -1267,7 +1270,9 @@ theorem invStep (c : Cand) (hrft : axRfTotal 𝓔) (hcohax : axCoherence 𝓔) (
       exact invLoadFold c hrft hcohax hordax hrelax k s base ts rvs aq s.esAg hs rfl
         (by rw [hl]; rfl) hlenr (by rw [hl]; rfl)
         (fun a t v hr => by have := hnf a t v hr; rw [hl] at this; exact this) hinv
-    | LIo => rw [hl] at hsh; exact hsh.elim
+    | LIo kd base vs =>
+      rw [candWsIo c k s kd base vs hs hl]
+      exact invwWk c k (k + 1) _ _ (by omega) hinv
   · unfold inv; rw [candWsNe c k s i hs hi]
     exact invwWk c k (k + 1) i _ (by omega) hinv
 
@@ -1407,7 +1412,7 @@ theorem candMstepOkAt (c : Cand) (hval : candValues c) (hrft : axRfTotal 𝓔)
     rw [hl] at hh
     exact ⟨hne0, hlenw, hh, candRmwLatest c hval hrft hatom n s base ts rvs hn hok hs
       (by rw [hl]; rfl) (by rw [hl]; rfl) hlenr⟩
-  | LIo => rw [hl] at hsh; exact hsh.elim
+  | LIo => trivial
 
 theorem candMstepOk (c : Cand) (hval : candValues c) (hrft : axRfTotal 𝓔)
     (hcohax : axCoherence 𝓔) (hordax : axOrd 𝓔) (hrelax : axRelOrd 𝓔) (hshape : candShape c)

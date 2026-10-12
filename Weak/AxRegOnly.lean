@@ -12,7 +12,7 @@ Rocq: `iris/AxRegOnly.v` @ xxvzwolszwmp (334 lines).
   `AxOpsem.astepProg` step labelled `LInstr` to `.PHart cpu (riscvStep tick) rs none ibNone` AT
   THE SAME ROW POSITION.  It is `WeakEvInst.pnodeStep`'s boundary (`.pure _`) arm (the reset point:
   no register write, no device change, the announced-bits bank reset to `ibNone`) routed by
-  `pstepNode` (unparked) and realized as an `AStepAdmin` (`lbAdmin true LInstr` is the `instr =
+  `pstepNode` (unparked) and realized as an `AStepAdmin` (`AxOpsem.lbAdminAx true LInstr` is the `instr =
   true` arm).  The register file `rs` is carried UNCHANGED across the splice.  This is the splice
   point between one row run's landing `.pure ()` and the next row run's `riscvStep tick` start.
 * (a) `afRegonlyRowRun`: `AxFetch3.afCjrRowRun` with the JALR-specific `execute` derivation

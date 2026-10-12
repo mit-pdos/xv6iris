@@ -51,6 +51,8 @@ kept as the comment at the end; slice 3 (`WeakAxiomatic3`) discharges it.
 **Statements checked** (by hand, against Rocq): all of them; in particular
 `promiseFreeObAcyclic`, `promiseFreeGmo`, `soundRelOrd`, `candReachable`,
 `scCandReachable`, `evRfeCoFrCyclic`.
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `mstepOk`'s and `candShape`'s `LIo` arms are `True` (they were `False` under W13 (E)); `mstepOkStep`/`mstepDet` take the `MStepIo` arm.
 -/
 import Weak.WeakAxiomatic
 
@@ -662,7 +664,7 @@ def mnext (σ : Mstate) (i : Nat) (l : Lbl) : Mstate :=
      updWs σ.msWs i
        (storePostRun (loadPostRun (σ.msWs i) aq base ts) rl base wvs.length
          (σ.msLog.length + 1))⟩
-  -- W13 (E): no machine step yet (`mstepOk` is `False`; W13 (I) adds the inert `mstep` arm)
+  -- W13 (I): the inert I/O-class step (`mstep.MStepIo`)
   | LIo .. => σ
 
 def mstepOk (σ : Mstate) (i : Nat) (l : Lbl) : Prop :=
@@ -674,7 +676,7 @@ def mstepOk (σ : Mstate) (i : Nat) (l : Lbl) : Prop :=
     wvs ≠ [] ∧ wvs.length = ts.length ∧
     rdOk σ.msImg σ.msLog (σ.msWs i) aq base ts rvs ∧
     rmwLatest σ.msImg σ.msLog base ts
-  | LIo .. => False
+  | LIo .. => True
 
 theorem mstepOkStep (σ : Mstate) (i : Nat) (l : Lbl) : mstepOk σ i l → mstep σ i l (mnext σ i l) := by
   cases l with
@@ -683,7 +685,7 @@ theorem mstepOkStep (σ : Mstate) (i : Nat) (l : Lbl) : mstepOk σ i l → mstep
   | LFence pr pw sr sw => intro _; exact mstep.MStepFence pr pw sr sw
   | LRmw aq rl base ts rvs wvs k =>
     rintro ⟨hne, hlen, hrd, hlat⟩; exact mstep.MStepRmw aq rl base ts rvs wvs k hne hlen hrd hlat
-  | LIo => intro h; exact h.elim
+  | LIo kd base vs => intro _; exact mstep.MStepIo kd base vs
 
 theorem mstepDet (σ : Mstate) (i : Nat) (l : Lbl) (σ' : Mstate) :
     mstep σ i l σ' → σ' = mnext σ i l ∧ mstepOk σ i l := by
@@ -693,6 +695,7 @@ theorem mstepDet (σ : Mstate) (i : Nat) (l : Lbl) (σ' : Mstate) :
   | MStepStore _ _ _ _ h => exact ⟨rfl, h⟩
   | MStepFence => exact ⟨rfl, trivial⟩
   | MStepRmw _ _ _ _ _ _ _ h1 h2 h3 h4 => exact ⟨rfl, h1, h2, h3, h4⟩
+  | MStepIo => exact ⟨rfl, trivial⟩
 
 /-! ## 7.2 The replay -/
 
@@ -921,8 +924,8 @@ def candShape (c : Cand) : Prop :=
     | LStore _ _ vs _ => vs ≠ []
     | LFence .. => True
     | LRmw _ _ _ ts rvs wvs _ => wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
-    -- W13 (E): no machine step replays an I/O event yet (W13 (I))
-    | LIo .. => False
+    -- W13 (I): an I/O-class event replays as the inert `mstep.MStepIo`
+    | LIo .. => True
 
 def candValues (c : Cand) : Prop :=
   ∀ k s base ts vs, c.cdTr[k]? = some s → lbRd s.esLb = some (base, ts, vs) →
@@ -984,7 +987,7 @@ theorem scMstepOk (c : Cand) :
       rw [himg, hlog]
       intro j t hj
       exact hlat k s base ts rvs hs (by rw [hl]; rfl) j t hj
-    | LIo => rw [hl] at hshape; exact hshape.elim
+    | LIo => trivial
 
 /-- THE COMPLETENESS THEOREM FOR THE SC FRAGMENT. -/
 theorem scCandReachable (c : Cand) :

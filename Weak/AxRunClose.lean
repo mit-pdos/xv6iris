@@ -148,18 +148,18 @@ theorem pstepProgNd (p : Pexv6) (d1 : Efab) (l1 : Wlabel) (p1 : Pexv6) (d1' : Ef
 /-- An admin-labelled `astepProg` step keeps `atK` (local copy of `AxInstr`'s
 `astep_prog_admin_k`). -/
 theorem astepProgAdminK' (row : List Lbl) (s : Athread) (l : Wlabel) (s' : Athread) :
-    AxOpsem.astepProg row s l s' → lbAdmin true l → s'.atK = s.atK := by
+    AxOpsem.astepProg row s l s' → AxOpsem.lbAdminAx true l → s'.atK = s.atK := by
   intro h hadm
   cases h with
   | AStepAdmin => rfl
   | AStepWrite _ _ _ _ _ _ _ _ hwr =>
-    cases l <;> simp [wlWr, lbAdmin] at hwr hadm
+    cases l <;> simp [wlWr, AxOpsem.lbAdminAx] at hwr hadm
   | AStepFence _ _ _ _ _ _ _ _ hf =>
-    cases l <;> simp [wlFence, lbAdmin] at hf hadm
+    cases l <;> simp [wlFence, AxOpsem.lbAdminAx] at hf hadm
 
 /-- A `atK`-keeping step is `AStepAdmin`. -/
 theorem astepProgKeepAdmin (row : List Lbl) (s : Athread) (l : Wlabel) (s' : Athread) :
-    AxOpsem.astepProg row s l s' → s'.atK = s.atK → lbAdmin true l := by
+    AxOpsem.astepProg row s l s' → s'.atK = s.atK → AxOpsem.lbAdminAx true l := by
   intro h hk
   cases h with
   | AStepAdmin _ _ _ _ _ _ hadm => exact hadm
@@ -174,7 +174,7 @@ theorem astepProgAdmDet (row1 row2 : List Lbl) (t : Athread) (l1 : Wlabel) (t1 :
     anodeOk t →
     AxOpsem.astepProg row1 t l1 t1 → t1.atK = t.atK →
     AxOpsem.astepProg row2 t l2 t2 →
-    l2 = l1 ∧ t2 = t1 ∧ lbAdmin true l1 := by
+    l2 = l1 ∧ t2 = t1 ∧ AxOpsem.lbAdminAx true l1 := by
   intro hok H1 hk1 H2
   have hadm := astepProgKeepAdmin row1 _ _ _ H1 hk1
   obtain ⟨d1, d1', P1⟩ := astepProgPstep row1 _ _ _ H1
@@ -188,11 +188,11 @@ theorem astepProgAdmDet (row1 row2 : List Lbl) (t : Athread) (l1 : Wlabel) (t1 :
   subst hp
   rw [hk1, hk2]
 
-theorem AxRunClose.lbAdminWdata (l : Wlabel) : lbAdmin true l → wlWdata l = none := by
-  cases l <;> simp [lbAdmin, wlWdata]
+theorem AxRunClose.lbAdminWdata (l : Wlabel) : AxOpsem.lbAdminAx true l → wlWdata l = none := by
+  cases l <;> simp [AxOpsem.lbAdminAx, wlWdata]
 
-theorem lbAdminRd (l : Wlabel) : lbAdmin true l → wlRd l = none := by
-  cases l <;> simp [lbAdmin, wlRd]
+theorem lbAdminRd (l : Wlabel) : AxOpsem.lbAdminAx true l → wlRd l = none := by
+  cases l <;> simp [AxOpsem.lbAdminAx, wlRd]
 
 /-! # 2. Pin insensitivity -/
 

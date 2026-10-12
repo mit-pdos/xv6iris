@@ -215,7 +215,7 @@ theorem astepProgGraphData (GD : Gdexec) (i : Nat)
   intro h hdata
   cases h with
   | AStepAdmin p k d l p' d' ha hs =>
-    cases l <;> simp [lbAdmin, wlWdata] at ha hdata
+    cases l <;> simp [AxOpsem.lbAdminAx, wlWdata] at ha hdata
   | AStepWrite p k d l lb p' d' hrow hs1 hid hdat hs =>
     refine ⟨data, ?_, rfl⟩
     unfold graphData

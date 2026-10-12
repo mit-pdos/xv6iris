@@ -58,6 +58,8 @@ obligations) are prose, kept as the comment before `rdOkTsBounded`.
 **Statements checked** (diffed against Rocq by hand): all of them; in
 particular `promiseFreeSound`, `soundCoherence`, `soundOrd`, `execSnoc`,
 `execNil`, `execWsBounded`, `evpreMono`.
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `mstep` gains the INERT I/O-class arm `MStepIo` (`mstep σ i (LIo kd base vs) σ`: no message, no view move; the value is device-supplied, [OWN.14]); `execStepNotIo` is RETIRED (an `execWf` run may now step an I/O event) and the per-label inductions take an `LIo` arm through the Lean-only `WeakAxiomatic.mstepIoInv`/`WeakAxiomatic.execSttIo`/`WeakAxiomatic.execWsIo`.
 -/
 import Weak.WeakMem
 
@@ -162,6 +164,11 @@ inductive mstep (σ : Mstate) (i : Nat) : Lbl → Mstate → Prop where
          updWs σ.msWs i
            (storePostRun (loadPostRun (σ.msWs i) aq base ts) rl base wvs.length
              (σ.msLog.length + 1))⟩
+  /-- W13 (I) ([OWN.14][OWN.27]): THE INERT I/O-CLASS STEP — an MMIO access / device-side
+  fabric move is its own event, but the machine state is untouched (no message, no view
+  move: the value is device-supplied, so rf/co/fr and load-value skip it). -/
+  | MStepIo (kd : IoKind) (base : Int) (vs : List (BitVec 8)) :
+      mstep σ i (LIo kd base vs) σ
 
 /-- Label classification. -/
 def lbIsW (l : Lbl) : Bool :=
@@ -243,6 +250,7 @@ theorem mstepLogW (σ : Mstate) (i : Nat) (l : Lbl) (σ' : Mstate) :
   | MStepStore rl base vs k hne => exact ⟨base, vs, rfl, hne, rfl⟩
   | MStepFence => simp [lbIsW] at hw
   | MStepRmw aq rl base ts rvs wvs k hne _ _ _ => exact ⟨base, wvs, rfl, hne, rfl⟩
+  | MStepIo => simp [lbIsW] at hw
 
 theorem mstepLogPrefix (σ : Mstate) (i : Nat) (l : Lbl) (σ' : Mstate) :
     mstep σ i l σ' → σ.msLog <+: σ'.msLog := by
@@ -255,7 +263,7 @@ theorem mstepLogPrefix (σ : Mstate) (i : Nat) (l : Lbl) (σ' : Mstate) :
 theorem mstepWsNe (σ : Mstate) (i : Nat) (l : Lbl) (σ' : Mstate) (j : Nat) :
     mstep σ i l σ' → j ≠ i → σ'.msWs j = σ.msWs j := by
   intro hs hne
-  cases hs <;> exact updWsNe _ _ _ _ hne
+  cases hs <;> first | exact updWsNe _ _ _ _ hne | rfl
 
 theorem mstepWsLe (σ : Mstate) (i : Nat) (l : Lbl) (σ' : Mstate) (j : Nat) :
     mstep σ i l σ' → wsLe (σ.msWs j) (σ'.msWs j) := by
@@ -269,6 +277,7 @@ theorem mstepWsLe (σ : Mstate) (i : Nat) (l : Lbl) (σ' : Mstate) (j : Nat) :
     | MStepRmw =>
       show wsLe _ (updWs _ _ _ _); rw [updWsEq]
       exact wsLeTrans (loadPostRunLe _ _ _ _) (storePostRunLe _ _ _ _ _)
+    | MStepIo => exact wsLeRefl _
   · rw [mstepWsNe _ _ _ _ _ hs hj]; exact wsLeRefl _
 
 /-! ## Executions
@@ -314,15 +323,6 @@ theorem execStepAt (E : Exec) (k : Nat) (s : Estep) :
   have h2 : E.exSt[k + 1]? = some E.exSt[k + 1] := List.getElem?_eq_getElem (by omega)
   rw [sttLookup _ _ _ h1, sttLookup _ _ _ h2]
   exact hstep k s _ _ hs h1 h2
-
-/-- W13 (E): an `execWf` run has no I/O-class step — `mstep` has no `LIo` arm (W13 (I) adds
-the inert one). -/
-theorem execStepNotIo (E : Exec) (k : Nat) (s : Estep) (kd : IoKind) (base : Int)
-    (vs : List (BitVec 8)) : execWf E → E.exTr[k]? = some s → s.esLb ≠ LIo kd base vs := by
-  intro hwf hs hl
-  have h := execStepAt E k s hwf hs
-  rw [hl] at h
-  cases h
 
 theorem execTrLookup (E : Exec) (k : Nat) : k < E.exTr.length → (E.exTr[k]?).isSome :=
   lookup_lt_is_Some_2
@@ -822,6 +822,26 @@ theorem execWsRmw (E : Exec) (k : Nat) (s : Estep) (aq rl : Bool) (base : Int) (
   rw [hl] at hstep
   exact mstepWsRmw _ _ _ _ _ _ _ _ _ _ hstep
 
+/-- W13 (I): the inert I/O-class step's inversion. -/
+theorem WeakAxiomatic.mstepIoInv (σ : Mstate) (i : Nat) (kd : IoKind) (base : Int) (vs : List (BitVec 8))
+    (σ' : Mstate) : mstep σ i (LIo kd base vs) σ' → σ' = σ := by
+  intro h; cases h; rfl
+
+/-- W13 (I): an I/O-class step leaves the machine state as it is (`MStepIo` is inert). -/
+theorem WeakAxiomatic.execSttIo (E : Exec) (k : Nat) (s : Estep) (kd : IoKind) (base : Int)
+    (vs : List (BitVec 8)) :
+    execWf E → E.exTr[k]? = some s → s.esLb = LIo kd base vs → stt E (k + 1) = stt E k := by
+  intro hwf hs hl
+  have hstep := execStepAt E k s hwf hs
+  rw [hl] at hstep
+  exact WeakAxiomatic.mstepIoInv _ _ _ _ _ _ hstep
+
+theorem WeakAxiomatic.execWsIo (E : Exec) (k : Nat) (s : Estep) (kd : IoKind) (base : Int)
+    (vs : List (BitVec 8)) (j : Nat) :
+    execWf E → E.exTr[k]? = some s → s.esLb = LIo kd base vs → ews E (k + 1) j = ews E k j := by
+  intro hwf hs hl
+  unfold ews; rw [WeakAxiomatic.execSttIo E k s kd base vs hwf hs hl]
+
 /-- A byte inside a message's range is byte `j` of it. -/
 theorem msgByteIndex (base : Int) (vs : List (BitVec 8)) (tid : Option Nat) (k : WmClass)
     (a : Int) :
@@ -885,7 +905,11 @@ theorem touchesCoh (E : Exec) (k : Nat) (s : Estep) (a : Int) (t : Nat) :
     · rw [evWritesAt E k s base wvs a hwf hs (by rw [hl]; rfl)] at hwr
       obtain ⟨j, hj, rfl⟩ := msgByteIndex base wvs _ _ a hwr
       exact storePostRunCoh _ _ _ _ _ _ hj
-  | LIo kd b v => exact absurd hl (execStepNotIo E k s kd b v hwf hs)
+  | LIo kd b v =>
+    rcases ht with ⟨v, hr⟩ | ⟨⟨s', hs', hw⟩, _, _⟩
+    · obtain ⟨s', _, _, _, _, hs', hrd, _⟩ := hr
+      rw [hs] at hs'; cases hs'; rw [hl] at hrd; simp [lbRd] at hrd
+    · rw [hs] at hs'; cases hs'; rw [hl] at hw; simp [lbIsW] at hw
 
 theorem touchesCohLater (E : Exec) (k k' : Nat) (s : Estep) (a : Int) (t : Nat) :
     execWf E → E.exTr[k]? = some s → touches E k a t → k + 1 ≤ k' → k' ≤ E.exTr.length →
@@ -1228,7 +1252,9 @@ theorem execFwdOk (E : Exec) (k : Nat) (i : Nat) :
         · exact ⟨k, s, by omega, hs, rfl, by rw [hl]; rfl, rfl⟩
         · rw [loadPostRunFwd] at hlk
           exact lift (ih (by omega) a tf vf hlk)
-      | LIo kd0 b0 v0 => exact absurd hl (execStepNotIo E k s kd0 b0 v0 hwf hs)
+      | LIo kd0 b0 v0 =>
+        rw [WeakAxiomatic.execWsIo E k s kd0 b0 v0 _ hwf hs hl] at hlk
+        exact lift (ih (by omega) a tf vf hlk)
     · have hstep := execStepAt E k s hwf hs
       have hws : ews E (k + 1) i = ews E k i := mstepWsNe _ _ _ _ i hstep (Ne.symm hag)
       rw [hws] at hlk
@@ -1590,7 +1616,9 @@ theorem execWsBounded (E : Exec) (k : Nat) (i : Nat) :
           (evTsNext E k s hwf hs (by rw [hl]; rfl)).symm
         exact storePostRunBounded _ _ _ _ _ (elog E k).length _
           (loadPostRunBounded _ _ _ _ _ hb (rdOkTsBounded _ _ _ _ _ _ _ hrd)) (Nat.le_of_eq hts) hlen
-      | LIo kd0 b0 v0 => exact absurd hl (execStepNotIo E k s kd0 b0 v0 hwf hs)
+      | LIo kd0 b0 v0 =>
+        rw [WeakAxiomatic.execWsIo E k s kd0 b0 v0 _ hwf hs hl]
+        exact wsBoundedMono _ _ _ hb hlen
     · have hws : ews E (k + 1) i = ews E k i := mstepWsNe _ _ _ _ i hstep hi
       rw [hws]
       exact wsBoundedMono _ _ _ hb hlen

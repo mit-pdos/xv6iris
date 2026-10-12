@@ -37,7 +37,7 @@ FACTS THE NEXT LAYER MUST KNOW (Rocq (1)–(6)).
 (3) INSTRUCTION FETCH.  Rocq: the fetch is a row event (an `LLoad false …` row item), realized
     either through `areadStep` or by `AStepFetch` (answered by the oracle `fetchImg` on the text
     region `T`).  Lean (O2 Stage C, deviation 2): the fetch is an ADMINISTRATIVE label — no row
-    item, no oracle; it is an `AStepAdmin` step (`lbAdmin true (LIFetch ..)`).
+    item, no oracle; it is an `AStepAdmin` step (`AxOpsem.lbAdminAx true (LIFetch ..)`).
 (4) `terminated s := False` (harts never terminate; row exhaustion is `reducible`'s
     row-extension clause).
 (5) SOURCES ARE NOT IN THE ROW IDENTITY: `AxOpsem.astepProg` is INDEXED BY THE INSTANCE LABEL;
@@ -144,6 +144,8 @@ Q7 (owner ruling, `notes/weak-port-q7-sfence.md` route (a), Lean-only): `pnodeSt
 
 **Not ported:** `fetch_answers`, `AStep_fetch`, `wt_T`, `wt_img`, `wt_fT`, `wt_fimg` (deleted by
 O2 Stage C, owner Q-C2; deviation 2); the `Print Assumptions` block is replaced by the lint.
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** THE RETIRED OPAX TIER KEEPS MMIO ADMINISTRATIVE: `WeakAxRealize.lbAdmin` dropped `LDev` (MMIO accesses are I/O-class graph events, [OWN.27]); this tier's `AStepAdmin` reads `AxOpsem.lbAdminAx` (= the pre-(I) alphabet, `LDev` included; every `Ax*` file's former `lbAdmin` is `AxOpsem.lbAdminAx`, a semantics-preserving rename), bridged from the graph tier's by `AxOpsem.lbAdminAxOf`.  The tier has no I/O row item, so `hemitAstepAux`/`hemitAstep`/`hartConfCoverage` take the premise that the emission is `LDev`-free.
 -/
 import Weak.WeakRvwmoConf
 import Weak.AxGraphCat
@@ -684,11 +686,25 @@ theorem pstepProgMemreadLbl (cpu : CPU) (n va : Nat)
 
 /-! ## 4. The opax step relations -/
 
+/-- (W13 (I), deviation 5) THE RETIRED TIER'S ADMINISTRATIVE ALPHABET: the pre-(I) graph-tier
+`lbAdmin`, fabric marker INCLUDED.  W13 (I) dropped `LDev` from `WeakAxRealize.lbAdmin` (an MMIO
+access is now an I/O-class graph event, [OWN.27]); the opax tier keeps its MMIO accesses as
+position-keeping administrative steps, exactly as before (it sees no I/O row item). -/
+def AxOpsem.lbAdminAx (instr : Bool) (l : Wlabel) : Prop :=
+  match l with
+  | .LSilent | .LDev .. | .LRegW .. | .LCtrl _ => True
+  | .LInstr | .LIFetch .. => instr = true
+  | _ => False
+
+/-- The graph tier's alphabet is a sub-alphabet of the retired tier's. -/
+theorem AxOpsem.lbAdminAxOf (instr : Bool) (l : Wlabel) : lbAdmin instr l → AxOpsem.lbAdminAx instr l := by
+  cases l <;> simp [lbAdmin, AxOpsem.lbAdminAx]
+
 /-- (A) EVERYTHING BUT READS, program arms only, INDEXED BY THE INSTANCE LABEL (Rocq fact 5).
-A fetch is an ADMINISTRATIVE step (`AStepAdmin` at `lbAdmin true (LIFetch ..)`; deviation 2). -/
+A fetch is an ADMINISTRATIVE step (`AStepAdmin` at `AxOpsem.lbAdminAx true (LIFetch ..)`; deviation 2). -/
 inductive AxOpsem.astepProg (row : List Lbl)  : Athread → Wlabel → Athread → Prop where
   | AStepAdmin (p : Pexv6) (k : Nat) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
-      lbAdmin true l →
+      AxOpsem.lbAdminAx true l →
       pstepProg p d l p' d' →
       AxOpsem.astepProg row ⟨p, k⟩ l ⟨p', k⟩
   | AStepWrite (p : Pexv6) (k : Nat) (d : Efab) (l : Wlabel) (lb : Lbl) (p' : Pexv6)
@@ -1015,8 +1031,8 @@ theorem admRunAstep (row : List Lbl)
     rcases (pstepEvSplit p d l p1 d1).1 hs with hs | hw
     · refine .inl ⟨l, AxOpsem.astepProg.AStepAdmin p k d l p1 d1 ?_ hs⟩
       cases instr
-      · exact lbAdminMono true l ha
-      · exact ha
+      · exact AxOpsem.lbAdminAxOf true l (lbAdminMono true l ha)
+      · exact AxOpsem.lbAdminAxOf true l ha
     · obtain ⟨rfl, _⟩ := pstepWireInv _ _ _ _ _ hw
       exact .inr ⟨rfl, d, d1, hw⟩
 
@@ -1025,12 +1041,20 @@ theorem hemitAstepAux (row : List Lbl)
     (pfin : Pexv6) :
     hemit dv k ws rrow p es pfin →
     (∀ j, rrow[j]? = row[k + j]?) →
+    (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     nsteps (astepAny row) es.length ⟨p, k⟩ ⟨pfin, k + rrow.length⟩ := by
   intro h
   induction h with
-  | HEnil k ws p => intro _; exact nsteps_O _
+  | HEnil k ws p => intro _ _; exact nsteps_O _
   | HEone k ws lb rrow' p ls pa da l p' es pfin har hre hst _ ih =>
-    intro hrow
+    intro hrow hnd
+    have hndl : ∀ kd ba bs, l ≠ LDev kd ba bs := fun kd ba bs he =>
+      hnd kd ba bs (List.mem_map.2 ⟨(l, some k), List.mem_append_right _ List.mem_cons_self,
+        by rw [he]⟩)
+    have hnd' : ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst := fun kd ba bs hin => by
+      obtain ⟨x, hx, hxe⟩ := List.mem_map.1 hin
+      exact hnd kd ba bs (List.mem_map.2 ⟨x, List.mem_append_right _ (List.mem_cons_of_mem _ hx),
+        hxe⟩)
     have hlb : row[k]? = some lb := by
       have h0 := hrow 0
       simp only [List.getElem?_cons_zero, Nat.add_zero] at h0
@@ -1065,21 +1089,25 @@ theorem hemitAstepAux (row : List Lbl)
           exact absurd hst (pstepEvNoRmw _ _ _ _ _ _ _ _ _ _ _)
         | LExStore => exact False.elim hnb
         | LSilent => simp [projLbl] at hpr
-        | LDev => simp [projLbl] at hpr
+        | LDev kd ba bs => exact absurd rfl (hndl kd ba bs)
         | LRegW => simp [projLbl] at hpr
         | LCtrl => simp [projLbl] at hpr
         | LInstr => simp [projLbl] at hpr
       · obtain ⟨rfl, _⟩ := pstepWireInv _ _ _ _ _ hw
-        simp [projLbl] at hpr
+        exact absurd rfl (hndl _ _ _)
     have e1 : (eadm ls ++ (l, some k) :: es).length = ls.length + (es.length + 1) := by
       simp [eadm]
     have e2 : k + (lb :: rrow').length = k + 1 + rrow'.length := by
       simp only [List.length_cons]; omega
     rw [e1, e2]
-    exact nsteps_trans har' (nsteps_l hstep (ih hrow'))
+    exact nsteps_trans har' (nsteps_l hstep (ih hrow' hnd'))
   | HEpair k ws lb rrow' p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2
       hst2 _ ih =>
-    intro hrow
+    intro hrow hnd
+    have hnd' : ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst := fun kd ba bs hin => by
+      obtain ⟨x, hx, hxe⟩ := List.mem_map.1 hin
+      exact hnd kd ba bs (List.mem_map.2 ⟨x, List.mem_append_right _ (List.mem_cons_of_mem _
+        (List.mem_append_right _ (List.mem_cons_of_mem _ hx))), hxe⟩)
     have hlb : row[k]? = some lb := by
       have h0 := hrow 0
       simp only [List.getElem?_cons_zero, Nat.add_zero] at h0
@@ -1114,24 +1142,24 @@ theorem hemitAstepAux (row : List Lbl)
       simp only [List.length_cons]; omega
     rw [e1, e2]
     exact nsteps_trans har1' (nsteps_trans (nsteps_l hs1 (nsteps_O _))
-      (nsteps_trans har2' (nsteps_l hs2 (ih hrow'))))
+      (nsteps_trans har2' (nsteps_l hs2 (ih hrow' hnd'))))
 
 /-- THE RELATION TO THE TREE: a conformant emission is an opax run of one step per emission
 item, from position 0 to the row's end. -/
 theorem hemitAstep (row : List Lbl)  (i : Nat)
     (p0 : Pexv6) (dv : Nat → Efab) (em : Hemission) :
-    hartConf i row p0 dv em →
+    hartConf i row p0 dv em → (∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
     nsteps (astepAny row) em.emItems.length ⟨p0, 0⟩ ⟨em.emFin, row.length⟩ := by
-  intro h
-  have := hemitAstepAux row dv 0 wsInit row p0 _ _ h (fun j => by rw [Nat.zero_add])
+  intro h hnd
+  have := hemitAstepAux row dv 0 wsInit row p0 _ _ h (fun j => by rw [Nat.zero_add]) hnd
   rwa [Nat.zero_add] at this
 
 theorem hartConfCoverage (row : List Lbl) 
     (i : Nat) (p0 : Pexv6) (dv : Nat → Efab) (em : Hemission) :
-    hartConf i row p0 dv em →
+    hartConf i row p0 dv em → (∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
     ∀ j, consumed row ⟨p0, 0⟩ ⟨em.emFin, row.length⟩ j ↔ j < row.length := by
-  intro h
-  exact coverageOfRow row _ _ (rtc_nsteps_2 (hemitAstep row i p0 dv em h))
+  intro h hnd
+  exact coverageOfRow row _ _ (rtc_nsteps_2 (hemitAstep row i p0 dv em h hnd))
 
 /-! ## 6. Non-vacuity: a hand-built two-event program -/
 
@@ -1259,7 +1287,7 @@ theorem wtStuckEmptyRow (cpu : CPU) (rs : RegFile) (s' : Athread) :
     | .AStepAdmin _ _ d l _ _ ha hs =>
       obtain ⟨hrd, _⟩ := pstepProgMemreadLbl cpu 4 64 wtRreq (fun ans => wtM2 (wtVal ans)) rs
         ibNone d l _ _ wtPaRam rfl hs
-      cases l <;> simp_all [wlRd, lbAdmin]
+      cases l <;> simp_all [wlRd, AxOpsem.lbAdminAx]
     | .AStepWrite _ _ _ _ _ _ _ hrow _ _ _ _ => simp at hrow
     | .AStepFence _ _ _ _ _ _ _ hrow _ _ _ => simp at hrow
   · simp at hrow
@@ -1344,6 +1372,7 @@ theorem wtHartConf (i : Nat) (cpu : CPU) (rs : RegFile) (w0 : BitVec (8 * 4)) :
 theorem wtHemitAstep (i : Nat) (cpu : CPU) (rs : RegFile) (w0 : BitVec (8 * 4)) :
     nsteps (astepAny (wtRow w0 w0)) 2 ⟨wtP0 cpu rs, 0⟩ ⟨wtP2 cpu rs, 2⟩ :=
   hemitAstep _ i _ wtDv _ (wtHartConf i cpu rs w0)
+    (by intro kd ba bs h; simp [emLabels, wtItems] at h)
 
 end OpaxWit
 

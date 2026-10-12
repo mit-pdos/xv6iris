@@ -51,7 +51,9 @@ parked half (`fnOk`).
 * F8 `simRun`: forward induction over the record (`contROfRun` turns the snoc-built `pfRunST` into
   it; the look-ahead (4) needs the record's tail).
 * M1 (`cutOfPristine`): `Hyps.cut` at `fok = candKfetch lo hi` from a MachCSL-side pristine window
-  (`winPristine`, W3's `textPristine` read through `textWin_get`).
+  (`winPristine`, W3's `textPristine` read through `textWin_get`), through the two factored steps
+  `noWriteOfPristine` (no log message writes a window byte) and `fetchIsImage` (an admissible
+  fetch of unwritten bytes reads the image at timestamp 0) — W-SCO [R28.2] reuses both.
 
 **Parameters** (`Hyps`): `tso` = W2 CLOSE's `pfStepTso` in the ADOPTED shape (`pfStepTsoStmt`, a
 verbatim copy of `PfStepTso.proposedStmt`); `safe` = HSafe (E-S1); `cut` = the fetch cut at every
@@ -67,7 +69,7 @@ parameter is DISCHARGED (`simDisk`).
    their prose missed (the boundary `LInstr`, a register write labelled `LSilent`, the PLIC wire
    at a parked fence or at the boundary, the disk agent's UART/PLIC moves).
 3. Item (3) (`fiArm`) is a PARAMETER (`Hyps.fi`, stated over every `pfRunST` run from the boot
-   configuration): W2 CLOSE disowned it (a fact of Sail's event order inside `try_step`, not of
+   configuration, at a related boot-reachable MachCSL state — `cut`'s shape, W-SCO [R28.2]): W2 CLOSE disowned it (a fact of Sail's event order inside `try_step`, not of
    the step list); Q-FIARM RULED [OWN.35]: it is the named trusted premise `sailCycleOrder`
    (`Weak/SrvwmoXv6Adequacy.lean`, `fiOfSco`), to be proved for xv6's kernel text after M1.
 4. The fetch cut is a PARAMETER over related, boot-reachable states (`Hyps.cut`), discharged at
@@ -653,7 +655,9 @@ theorem memFrame {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {i :
   MachCSL state reachable from boot (M1: from `candKfetch` and the pristine kernel text; M2:
   W5d's cut form);
 * `fi` — plan item (3): `fiArm` at `fence.i` / the `sfence.vma` marker, along every run from
-  `c0` (a fact of the Sail model's event order; [OWN.35]: the named premise `sailCycleOrder`).
+  `c0` (a fact of the Sail model's event order; [OWN.35]: the named premise `sailCycleOrder`),
+  at a related MachCSL state reachable from boot — the `cut` shape [R28.2], so that a
+  kernel-text discharge (W-SCO) can pin the fetched words to the image through `SimRel`.
 The disk rows are `simDisk`, no longer a parameter. -/
 structure Hyps (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
     (g0 : GState) (c0 : Wpcfg Pexv6 Efab) : Prop where
@@ -670,8 +674,10 @@ structure Hyps (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVe
       ∃ q, (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).itv ≤ q ∧ q ≤ c.pcLog.length ∧
         ifetchOk c.pcImg c.pcLog q base tvs ∧
         ∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) → t ≤ q
-  fi : ∀ (st : List (Nat × Wlabel)) (c : Wpcfg Pexv6 Efab),
-    pfRunST pstepEv pclsEv fok TsoShadow.cohSrc c0 st c →
+  fi : ∀ (st : List (Nat × Wlabel)) (c : Wpcfg Pexv6 Efab) (t : List Expr) (g : GState) (n : Nat)
+      (κ : List Obs),
+    pfRunST pstepEv pclsEv fok TsoShadow.cohSrc c0 st c → MRun n ([Expr.power], g0) κ (t, g) →
+    SimRel c st t g →
     ∀ (cpu : CPU) (o : Outcome Register RegisterType) (k : o.ret → SailM Unit) (rs : RegFile)
       (ib : Ibch) (ws : Wstate) (pr : GSet Nat),
       c.pcAgs[cpu.val]? = some ⟨.PHart cpu (.impure (.ok o) k) rs none ib, ws, pr⟩ →
@@ -1032,7 +1038,7 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
       (List.mem_of_getElem? (by rw [ht]; exact poolHart H c.pcDev vs cpu))
     rw [hm] at hred
     obtain ⟨hrbR, hrbW⟩ := ramOfSafe hred hlive (notOthers hmem hadj)
-    obtain ⟨hfi1, hfi2⟩ := hH.fi st c hrun cpu o k (g.m.regs cpu) ib ws pr hlkc
+    obtain ⟨hfi1, hfi2⟩ := hH.fi st c t g n κ hrun hreach hR0 cpu o k (g.m.regs cpu) ib ws pr hlkc
     have hps : pstepEv (.PHart cpu (.impure (.ok o) k) (g.m.regs cpu) none ib) c.pcDev l
         (.PHart cpu m' (ors.getD (g.m.regs cpu)) fn' (oib.getD ib)) c'.pcDev :=
       ⟨rfl, ors, oib, obar, rfl, rfl, Or.inl ⟨hn, hd⟩⟩
@@ -2900,10 +2906,56 @@ theorem histNoWrite (img : Image) (log : List Wmsg) (a : Int) (v : BitVec 8)
     rw [h] at hmem
     simp at hmem
 
+/-- **No log message writes a pristine-window byte** (factored out of `cutOfPristine`,
+W-SCO [R28.2]): when the MachCSL state related to `c` keeps `[lo, hi) ⊆ DRAM` pristine, the
+`R-hist` link of `SimRel` makes every window byte's history the image entry alone, so no message
+of `c.pcLog` writes it. -/
+theorem noWriteOfPristine (lo hi : Nat) (hlo : ramBase ≤ lo) (hhi : hi ≤ ramEnd)
+    {c : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)} {t : List Expr} {g : GState}
+    (hR : SimRel c st t g) (hwin : winPristine lo hi g) :
+    ∀ a : Int, (lo : Int) ≤ a → a < (hi : Int) →
+      ∀ i : Nat, c.pcLog[i]?.bind (fun m => msgByte m a) = none := by
+  intro a h1 h2
+  simp only [ramBase] at hlo
+  simp only [ramEnd] at hhi
+  have hpa : (BitVec.ofNat 64 a.toNat).toNat = a.toNat := by
+    rw [BitVec.toNat_ofNat]
+    apply Nat.mod_eq_of_lt
+    omega
+  have hram : inRam (BitVec.ofNat 64 a.toNat) 1 := by
+    simp only [inRam, hpa, ramBase, ramEnd]
+    omega
+  obtain ⟨v, hv⟩ := hwin (BitVec.ofNat 64 a.toNat) (by omega) (by omega)
+  have hh := hR.mem.2.2.1.1 _ hram
+  rw [hv] at hh
+  have hz : paZ (BitVec.ofNat 64 a.toNat) = a := by
+    simp only [paZ, hpa]
+    omega
+  rw [hz] at hh
+  exact histNoWrite _ _ _ _ (Option.some.inj hh).symm
+
+/-- **`fetchIsImage`** (factored out of `cutOfPristine`, W-SCO [R28.2]): an admissible fetch
+(`ifetchOk`, at any instruction view) of bytes no message of the log writes reads every byte at
+timestamp `0`, i.e. the IMAGE's byte. -/
+theorem fetchIsImage (img : Image) (log : List Wmsg) (itv : Nat) (base : Int)
+    (tvs : List (Nat × BitVec 8)) (hif : ifetchOk img log itv base tvs)
+    (hnw : ∀ j, j < tvs.length →
+      ∀ i : Nat, log[i]?.bind (fun m => msgByte m (base + (j : Int))) = none) :
+    ∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) →
+      t = 0 ∧ logByte img log 0 (base + (j : Int)) = some v := by
+  intro j t v hj
+  obtain ⟨hlb, -⟩ := hif j t v hj
+  cases t with
+  | zero => exact ⟨rfl, hlb⟩
+  | succ i =>
+    exfalso
+    rw [logByteS, hnw j (lookup_lt_Some hj) i] at hlb
+    cases hlb
+
 /-- **M1's fetch cut** (`Hyps.cut` at `fok = candKfetch lo hi`): when every MachCSL state reachable
 from boot keeps the window `[lo, hi) ⊆ DRAM` pristine (W5: `Xv6.powerInterp_textPristine`), a
-fetch inside the window reads image bytes no log message ever wrote, so ANY cut works — take the
-shadow's `itv` (TsoMem's own instruction view). -/
+fetch inside the window reads image bytes no log message ever wrote (`noWriteOfPristine`,
+`fetchIsImage`), so ANY cut works — take the shadow's `itv` (TsoMem's own instruction view). -/
 theorem cutOfPristine (lo hi : Nat) (hlo : ramBase ≤ lo) (hhi : hi ≤ ramEnd)
     (g0 : GState) (c0 : Wpcfg Pexv6 Efab)
     (htext : ∀ (n : Nat) (κs : List Obs) (t : List Expr) (g : GState),
@@ -2928,32 +2980,9 @@ theorem cutOfPristine (lo hi : Nat) (hlo : ramBase ≤ lo) (hhi : hi ≤ ramEnd)
       ∀ i : Nat, c.pcLog[i]?.bind (fun m => msgByte m (base + (j : Int))) = none := by
     intro j hj
     obtain ⟨h1, h2⟩ := hf j hj
-    simp only [ramBase] at hlo
-    simp only [ramEnd] at hhi
-    have hpa : (BitVec.ofNat 64 (base + (j : Int)).toNat).toNat = (base + (j : Int)).toNat := by
-      rw [BitVec.toNat_ofNat]
-      apply Nat.mod_eq_of_lt
-      omega
-    have hram : inRam (BitVec.ofNat 64 (base + (j : Int)).toNat) 1 := by
-      simp only [inRam, hpa, ramBase, ramEnd]
-      omega
-    obtain ⟨v, hv⟩ := hwin (BitVec.ofNat 64 (base + (j : Int)).toNat) (by omega) (by omega)
-    have hh := hR.mem.2.2.1.1 _ hram
-    rw [hv] at hh
-    have hz : paZ (BitVec.ofNat 64 (base + (j : Int)).toNat) = base + (j : Int) := by
-      simp only [paZ, hpa]
-      omega
-    rw [hz] at hh
-    exact histNoWrite _ _ _ _ (Option.some.inj hh).symm
-  have ht0 : ∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) → t = 0 := by
-    intro j t v hj
-    obtain ⟨hlb, -⟩ := hif j t v hj
-    cases t with
-    | zero => rfl
-    | succ i =>
-      exfalso
-      rw [logByteS, hnw j (lookup_lt_Some hj) i] at hlb
-      cases hlb
+    exact noWriteOfPristine lo hi hlo hhi hR hwin _ h1 h2
+  have ht0 : ∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) → t = 0 :=
+    fun j t v hj => (fetchIsImage _ _ _ _ _ hif hnw j t v hj).1
   have hbound : (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).itv ≤ c.pcLog.length := by
     have h1 := (tsoShadowBound TsoShadow.cohSrc cohSrcOk (hartAgent cpu) st).2
     have h2 := congrArg List.length hR.auth
@@ -2976,4 +3005,5 @@ end Weak
 
 #print axioms Weak.MachOfPf.machRunOfPfRun
 #print axioms Weak.MachOfPf.cutOfPristine
+#print axioms Weak.MachOfPf.fetchIsImage
 #print axioms Weak.MachOfPf.simDisk

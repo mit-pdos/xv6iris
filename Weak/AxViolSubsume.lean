@@ -95,6 +95,8 @@ theorem then yields `gdviolationHart 2 viol2` (`wcdGraphViol2`), the witness
 `wcfgViolation`; `subsume_sat` ↦ `subsumeSat`.
 
 **Not ported:** nothing.
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** the two `LIo` arms (formerly refuted by the retired `execStepNotIo`) use `WeakAxiomatic.execWsIo` (the inert step keeps every `Wstate`).
 -/
 import Weak.WeakRobustMain
 import Weak.WeakAxiomatic3
@@ -264,7 +266,7 @@ theorem execFwdLe (E : Exec) (k i : Nat) :
     | LRmw aq rl base ts rvs wvs kc =>
       rw [execWsRmw E k s aq rl base ts rvs wvs kc hwf hs hl]
       exact storePostRunFwdLe _ _ _ _ _ (loadPostRunFwdLe _ _ _ _ hf)
-    | LIo kd0 b0 v0 => exact absurd hl (execStepNotIo E k s kd0 b0 v0 hwf hs)
+    | LIo kd0 b0 v0 => rw [WeakAxiomatic.execWsIo E k s kd0 b0 v0 _ hwf hs hl]; exact hf
 
 /-- UPPER bounds for the floor after a step (the inverses of `loadPostRunCoh` /
 `storePostRunCoh`). -/
@@ -424,7 +426,9 @@ theorem cohTouched (E : Exec) (k j : Nat) (a : Int) (p : Nat) (m : Wmsg) :
     | LFence pr pw sr sw =>
       rw [execWsFence E k s pr pw sr sw hwf hs hl, AxViolSubsume.cohFencePost] at hcoh
       exact ihk hcoh
-    | LIo kd0 b0 v0 => exact absurd hl (execStepNotIo E k s kd0 b0 v0 hwf hs)
+    | LIo kd0 b0 v0 =>
+      rw [WeakAxiomatic.execWsIo E k s kd0 b0 v0 _ hwf hs hl] at hcoh
+      exact ihk hcoh
     | LRmw aq rl base ts rvs wvs kc =>
       -- write half, then read half
       rw [execWsRmw E k s aq rl base ts rvs wvs kc hwf hs hl] at hcoh

@@ -131,6 +131,8 @@ link).  `wpdReleaseP`/`wpdRelease` unchanged.
 `AxSpinPO5.rlOk4`/`ann4O`, `rowShOfP` (AxSpinRowP).  P1: `wpdRelHeadG` (AxSpinRl4), `wpdPopOffG`
 (AxSpinPO6), `AxSpinT2i.Gate`/`gateOfPinG`/`lenOfGate`/`cutReloadG` (AxSpinT2i).  New names grepped
 absent (`wpdReleaseP`; P1: `wpdReleaseG`, `AxSpinRl4b.wpdReleaseGr`).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** the release lemmas' anchor-domain premise is `(lbIsR l || lbIsW l) = true` (was `lbIsMem l = true`): `gwf` admits I/O events, which `fence rw,w` does not order (RVWMO; D48).
 -/
 import Weak.AxSpinRl4
 import Weak.AxSpinPO6
@@ -277,7 +279,7 @@ theorem AxSpinRl4b.wpdReleaseGr (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : I
       aidentWr (aident lb) = some (rl, L.xlLk, n) → k' = relKw k) →
     -- the nextpid anchor (allocpid's store, before release)
     ks < k → (relKw k < (AxOpsem.grow (gtAdGd GT) i).length →
-      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ lbIsMem l = true) →
+      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     -- P1: holding's reload GATES (mycpu's ra, holding's ra = release's jal link)
     AxSpinT2i.Gate GT i (relKh k + 7) (stBytes 8 (pch 0x1a)) →
     AxSpinT2i.Gate GT i (relKh k + 9) (stBytes 8 (AxSpinHdB.prl 0x10)) →
@@ -845,7 +847,7 @@ theorem wpdReleaseG (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
       aidentWr (aident lb) = some (rl, L.xlLk, n) → k' = relKw k) →
     -- the nextpid anchor (allocpid's store, before release)
     ks < k → (relKw k < (AxOpsem.grow (gtAdGd GT) i).length →
-      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ lbIsMem l = true) →
+      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     -- P1: holding's reload GATES (mycpu's ra, holding's ra = release's jal link)
     AxSpinT2i.Gate GT i (relKh k + 7) (stBytes 8 (pch 0x1a)) →
     AxSpinT2i.Gate GT i (relKh k + 9) (stBytes 8 (AxSpinHdB.prl 0x10)) →
@@ -1083,7 +1085,7 @@ theorem wpdReleaseP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : 
       aidentWr (aident lb) = some (rl, L.xlLk, n) → k' = relKw k) →
     -- the nextpid anchor (allocpid's store, before release)
     ks < k → (relKw k < (AxOpsem.grow (gtAdGd GT) i).length →
-      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ lbIsMem l = true) →
+      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     -- GRAPH-VALUE PINS (Q20' Option V), guarded: holding's
     (relKh k + 7 < (AxOpsem.grow (gtAdGd GT) i).length →
       graphValue (gtAdGd GT) (i, relKh k + 7) = some (stBytes 8 (pch 0x1a))) →
@@ -1305,7 +1307,7 @@ theorem wpdRelease (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch) (ret : BitV
       (AxOpsem.grow (gtAdGd GT) i)[k']? = some lb →
       aidentWr (aident lb) = some (rl, L.xlLk, n) → k' = relKw k) →
     -- the nextpid anchor (allocpid's store, before release)
-    ks < k → (∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ lbIsMem l = true) →
+    ks < k → (∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     -- GRAPH-VALUE PINS (Q20' Option V): holding's
     graphValue (gtAdGd GT) (i, relKh k + 7) = some (stBytes 8 (pch 0x1a)) →
     graphValue (gtAdGd GT) (i, relKh k + 9) = some (stBytes 8 (AxSpinHdB.prl 0x10)) →

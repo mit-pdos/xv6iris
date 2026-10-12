@@ -223,7 +223,7 @@ theorem flowEqDynExistsSingleton {A : Type} (k : Geid) (Pk Q : A → IProp GF) (
 theorem astepProgRowEndShape (row : List Lbl) (s : Athread) (l : Wlabel) (s' : Athread)
     (Hnone : row[s.atK]? = none) :
     AxOpsem.astepProg row s l s' →
-    lbAdmin true l ∧ s'.atK = s.atK ∧ ∃ d d', pstepProg s.atP d l s'.atP d' := by
+    AxOpsem.lbAdminAx true l ∧ s'.atK = s.atK ∧ ∃ d d', pstepProg s.atP d l s'.atP d' := by
   intro h
   cases h with
   | AStepAdmin _ _ d _ _ d' hadm hs => exact ⟨hadm, rfl, d, d', hs⟩
@@ -236,8 +236,8 @@ theorem astepProgRowEndShape (row : List Lbl) (s : Athread) (l : Wlabel) (s' : A
     rw [Hnone] at hlk
     cases hlk
 
-theorem lbAdminWlWdataNone (l : Wlabel) : lbAdmin true l → wlWdata l = none := by
-  cases l <;> simp [lbAdmin, wlWdata]
+theorem lbAdminWlWdataNone (l : Wlabel) : AxOpsem.lbAdminAx true l → wlWdata l = none := by
+  cases l <;> simp [AxOpsem.lbAdminAx, wlWdata]
 
 /-- 1.2 THE ROW-END TRIVIALITY: past the writer's row, every step is administrative and the
 postcondition is `True`; one Löb over the whole program state. -/
@@ -396,7 +396,7 @@ theorem astepProgPlainWriteInv (pa : PAddr) (Hdev : devAddr pa = false) (val : B
     simp only at Heqp Heqk
     subst Heqp Heqk
     obtain ⟨rfl, -, -⟩ := l3pWritePlainDet cpu pa Hdev val KK rs ibNone d l p' d' hst
-    simp [lbAdmin] at hadm
+    simp [AxOpsem.lbAdminAx] at hadm
   | AStepWrite p k0 d l0 lb p' d' _ _ _ _ hst =>
     simp only at Heqp Heqk
     subst Heqp Heqk
@@ -420,7 +420,7 @@ theorem astepProgFenceInv (KK : Unit → SailM Unit) (rs : RegFile) (k : Nat) (s
     simp only at Heqp Heqk
     subst Heqp Heqk
     obtain ⟨rfl, -, -⟩ := l3pFenceDet cpu KK rs ibNone d l p' d' hst
-    simp [lbAdmin] at hadm
+    simp [AxOpsem.lbAdminAx] at hadm
   | AStepWrite p k0 d l0 lb p' d' _ hwr _ _ hst =>
     simp only at Heqp Heqk
     subst Heqp Heqk
@@ -1109,7 +1109,7 @@ theorem astepProgWrite0Inv (HLram : devAddr Lpa = false) (rs : RegFile) (s : Ath
     subst Heqp Heqk
     rcases l3pWriteExclDet cpu Lpa HLram b1 (fun _ => wM2 Lpa xpa v) rs ibNone d l p' d' hst with
       ⟨rfl, -, -⟩ | ⟨rfl, rfl, -⟩
-    · simp [lbAdmin] at hadm
+    · simp [AxOpsem.lbAdminAx] at hadm
     · exact .inr ⟨rfl, rfl⟩
   | AStepWrite p k0 d l lb p' d' _ hwr _ _ hst =>
     simp only at Heqp Heqk

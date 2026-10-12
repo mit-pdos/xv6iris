@@ -88,6 +88,8 @@ atomicity clause) is a comment only.  A LEAF: nothing imports this file.
 `gtrace_prefix_empty` `gtracePrefixEmpty`, `gtrace_snoc_read_image` `gtraceSnocReadImage`.
 
 **Dropped:** nothing (Rocq 72 declarations; Lean 72, no Lean-only helpers).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `WeakRvwmoFloor.gshape`'s `LIo` arm is `True` (`gwf`'s flip); `finvStep` gains the inert `LIo` arm.
 -/
 import Weak.WeakRvwmoCert
 
@@ -412,7 +414,7 @@ theorem WeakRvwmoFloor.gshape (G : Gexec) (hwf : gwf G) (e : Geid) (l : Lbl) :
     | .LFence _ _ _ _ => True
     | .LRmw _ _ _ ts rvs wvs _ =>
         wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
-    | .LIo .. => False :=
+    | .LIo .. => True :=
   fun hl => gwfLblShape G e l hwf hl
 
 /-! ## 4.1 The ordering arms -/
@@ -670,7 +672,11 @@ theorem finvStep (G : Gexec) (hwf : gwf G) (hppo : gppoGmo G) (hlv : gloadValue 
     apply gvisUbOfWrite G r tw (r.1, k) hwf _ hord
     rw [← htw hw]; exact gwriteAtGwix G _ hg
   cases l with
-  | LIo => exact (WeakRvwmoFloor.gshape G hwf _ _ hl).elim
+  | LIo kd base vs =>
+    -- ---------------- LIo (W13 (I)): the inert I/O-class step ----------------
+    simp only [finv, WeakRvwmoFloor.lstep]
+    exact ⟨hfw, hcoh, hrn, fun hah => hrel (ahookS G r k hah),
+      fun hfh => hro (fhookS G r k true hfh), fun hfh => hwo (fhookS G r k false hfh)⟩
   | LLoad aq base ts vs =>
     -- ---------------- LLoad ----------------
     have hlen : vs.length = ts.length := WeakRvwmoFloor.gshape G hwf _ _ hl

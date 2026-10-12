@@ -93,6 +93,8 @@ violation-free (`ergHullLinearizes`, `ergHullBeatsRestr`).
 **Not ported:** nothing.
 
 **Statements checked** (by hand, against Rocq): all of them.
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `WeakRvwmoHull.lblRenShape`'s `LIo` arms are `True` (`gwf`'s flip).
 -/
 import Weak.WeakRvwmoRestr
 import Weak.WeakRvwmoAcyc
@@ -165,14 +167,14 @@ theorem WeakRvwmoHull.lblRenShape (π : Nat → Nat) (l : Lbl) :
      | LFence _ _ _ _ => True
      | LRmw _ _ _ ts rvs wvs _ =>
          wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
-     | LIo .. => False) →
+     | LIo .. => True) →
     (match lblRen π l with
      | LLoad _ _ ts vs => vs.length = ts.length
      | LStore _ _ vs _ => vs ≠ []
      | LFence _ _ _ _ => True
      | LRmw _ _ _ ts rvs wvs _ =>
          wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
-     | LIo .. => False) := by
+     | LIo .. => True) := by
   intro h
   cases l <;> simp only [lblRen, List.length_map] <;> exact h
 

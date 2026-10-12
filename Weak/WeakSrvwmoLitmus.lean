@@ -85,6 +85,8 @@ per shape `X ∈ {sb, mpn, mpw, amo}`: `X_P`/`X_tr`/`X_cd`/`X_tr_inv`/
 comments at the end.
 
 **Statements checked** (by hand, against Rocq): all of them.
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `candShapeOfWf` takes the `MStepIo` arm.
 -/
 import Weak.WeakAxiomatic3
 import Weak.WeakLitmus
@@ -246,6 +248,7 @@ theorem candShapeOfWf (c : Cand) : execWf (candExec c) → candShape c := by
   | MStepStore _ _ _ _ h => exact h
   | MStepFence => trivial
   | MStepRmw _ _ _ _ _ _ _ h1 h2 h3 _ => exact ⟨h1, h2, h3.1⟩
+  | MStepIo => trivial
 
 theorem candValuesOfWf (c : Cand) : execWf (candExec c) → candValues c := by
   intro hwf k s base ts vs hs hrd j t v hj hv

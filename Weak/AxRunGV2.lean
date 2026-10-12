@@ -30,7 +30,7 @@ Rocq: `iris/AxRunGV2.v` @ xxvzwolszwmp.
    Write/fence labels are pinned trivially (`fetchPin` is `True` off `LIFetch`), but an ADMIN
    step may now be a fetch, so `admRunAstepGv`, `hemitRunAtGraphValuesAux`,
    `hemitRunAtGraphValues` and `hemitRunAtGraphValuesRtc` take the extra premise
-   `hpin : ∀ p d l p' d', pstepProg p d l p' d' → lbAdmin true l →
+   `hpin : ∀ p d l p' d', pstepProg p d l p' d' → AxOpsem.lbAdminAx true l →
    WeakAxRealize.fetchPin GD.gdG.gxImg l` (exactly `AxRunGV.runAtGraphValuesNfGv`'s; discharged
    from the pinned LTS, cf. `AxAdequacy.astepProgNfOfPinned`).  No Rocq file uses these lemmas
    (AxLock3Prog only imports the file).
@@ -49,6 +49,8 @@ Rocq: `iris/AxRunGV2.v` @ xxvzwolszwmp.
 `hemitRunAtGraphValuesRtc`.
 
 **Dropped:** only the `Print Assumptions` lines (the lint's axiom check covers them).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `hemitRunAtGraphValuesAux`/`hemitRunAtGraphValues`/`hemitRunAtGraphValuesRtc` take the premise that the emission is `LDev`-free (the opax tier has no I/O row item, `AxOpsem`'s W13 (I) note).
 -/
 import Weak.AxRunGV
 
@@ -100,7 +102,7 @@ theorem emReadsAtGraphValuesWitness (p0 : Pexv6) (dv : Nat → Efab) :
 fixed row position — program steps as `AStepAdmin` (pinned by `hpin`, deviation 1), wire steps
 via `ANFGVWire`. -/
 theorem admRunAstepGv
-    (hpin : ∀ p d l p' d', pstepProg p d l p' d' → lbAdmin true l →
+    (hpin : ∀ p d l p' d', pstepProg p d l p' d' → AxOpsem.lbAdminAx true l →
       WeakAxRealize.fetchPin GD.gdG.gxImg l)
     (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6) (d' : Efab)
     (k : Nat) :
@@ -111,10 +113,10 @@ theorem admRunAstepGv
   | ARcons p d l p1 d1 ls p' d' ha hs _ ih =>
     refine nsteps_l ?_ ih
     rcases (pstepEvSplit p d l p1 d1).1 hs with hs | hw
-    · have ha' : lbAdmin true l := by
+    · have ha' : AxOpsem.lbAdminAx true l := by
         cases instr
-        · exact lbAdminMono true l ha
-        · exact ha
+        · exact AxOpsem.lbAdminAxOf true l (lbAdminMono true l ha)
+        · exact AxOpsem.lbAdminAxOf true l ha
       exact .ANFGVProg _ _ ⟨l, AxOpsem.astepProg.AStepAdmin p k d l p1 d1 ha' hs,
         hpin p d l p1 d1 hs ha'⟩
     · obtain ⟨rfl, _⟩ := pstepWireInv _ _ _ _ _ hw
@@ -146,19 +148,27 @@ theorem readBlockGv (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab)
 /-- THE MAIN INDUCTION: `hemitAstepAux`'s case split, retyped into `astepAnyNfGv` with the read
 arm pinned by `itemsGv`. -/
 theorem hemitRunAtGraphValuesAux
-    (hpin : ∀ p d l p' d', pstepProg p d l p' d' → lbAdmin true l →
+    (hpin : ∀ p d l p' d', pstepProg p d l p' d' → AxOpsem.lbAdminAx true l →
       WeakAxRealize.fetchPin GD.gdG.gxImg l)
     (dv : Nat → Efab) (k : Nat) (ws : Wstate) (rrow : List Lbl) (p : Pexv6) (es : List Eitem)
     (pfin : Pexv6) :
     hemit dv k ws rrow p es pfin →
     (∀ j, rrow[j]? = (AxOpsem.grow GD i)[k + j]?) →
     itemsGv GD i es →
+    (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     nsteps (astepAnyNfGv GD i) es.length ⟨p, k⟩ ⟨pfin, k + rrow.length⟩ := by
   intro h
   induction h with
-  | HEnil k ws p => intro _ _; exact nsteps_O _
+  | HEnil k ws p => intro _ _ _; exact nsteps_O _
   | HEone k ws lb rrow' p ls pa da l p' es pfin har hre hst _ ih =>
-    intro hrow hgv
+    intro hrow hgv hnd
+    have hndl : ∀ kd ba bs, l ≠ LDev kd ba bs := fun kd ba bs he =>
+      hnd kd ba bs (List.mem_map.2 ⟨(l, some k), List.mem_append_right _ List.mem_cons_self,
+        by rw [he]⟩)
+    have hnd' : ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst := fun kd ba bs hin => by
+      obtain ⟨x, hx, hxe⟩ := List.mem_map.1 hin
+      exact hnd kd ba bs (List.mem_map.2 ⟨x, List.mem_append_right _ (List.mem_cons_of_mem _ hx),
+        hxe⟩)
     have hlb : (AxOpsem.grow GD i)[k]? = some lb := by
       have h0 := hrow 0
       simp only [List.getElem?_cons_zero, Nat.add_zero] at h0
@@ -197,21 +207,25 @@ theorem hemitRunAtGraphValuesAux
           exact absurd hst (pstepEvNoRmw _ _ _ _ _ _ _ _ _ _ _)
         | LExStore => exact False.elim hnb
         | LSilent => simp [projLbl] at hpr
-        | LDev => simp [projLbl] at hpr
+        | LDev kd ba bs => exact absurd rfl (hndl kd ba bs)
         | LRegW => simp [projLbl] at hpr
         | LCtrl => simp [projLbl] at hpr
         | LInstr => simp [projLbl] at hpr
       · obtain ⟨rfl, _⟩ := pstepWireInv _ _ _ _ _ hw
-        simp [projLbl] at hpr
+        exact absurd rfl (hndl _ _ _)
     have e1 : (eadm ls ++ (l, some k) :: es).length = ls.length + (es.length + 1) := by
       simp [eadm]
     have e2 : k + (lb :: rrow').length = k + 1 + rrow'.length := by
       simp only [List.length_cons]; omega
     rw [e1, e2]
-    exact nsteps_trans har' (nsteps_l hstep (ih hrow' hgvT))
+    exact nsteps_trans har' (nsteps_l hstep (ih hrow' hgvT hnd'))
   | HEpair k ws lb rrow' p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2
       hst2 _ ih =>
-    intro hrow hgv
+    intro hrow hgv hnd
+    have hnd' : ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst := fun kd ba bs hin => by
+      obtain ⟨x, hx, hxe⟩ := List.mem_map.1 hin
+      exact hnd kd ba bs (List.mem_map.2 ⟨x, List.mem_append_right _ (List.mem_cons_of_mem _
+        (List.mem_append_right _ (List.mem_cons_of_mem _ hx))), hxe⟩)
     have hlb : (AxOpsem.grow GD i)[k]? = some lb := by
       have h0 := hrow 0
       simp only [List.getElem?_cons_zero, Nat.add_zero] at h0
@@ -255,31 +269,33 @@ theorem hemitRunAtGraphValuesAux
       simp only [List.length_cons]; omega
     rw [e1, e2]
     exact nsteps_trans har1' (nsteps_trans (nsteps_l hs1 (nsteps_O _))
-      (nsteps_trans har2' (nsteps_l hs2 (ih hrow' hgvT))))
+      (nsteps_trans har2' (nsteps_l hs2 (ih hrow' hgvT hnd'))))
 
 /-! ## 2.1 The `hartConf` specialization -/
 
 theorem hemitRunAtGraphValues
-    (hpin : ∀ p d l p' d', pstepProg p d l p' d' → lbAdmin true l →
+    (hpin : ∀ p d l p' d', pstepProg p d l p' d' → AxOpsem.lbAdminAx true l →
       WeakAxRealize.fetchPin GD.gdG.gxImg l)
     (p0 : Pexv6) (dv : Nat → Efab) (em : Hemission) :
     hartConf i (AxOpsem.grow GD i) p0 dv em →
     emReadsAtGraphValues GD i em →
+    (∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
     nsteps (astepAnyNfGv GD i) em.emItems.length ⟨p0, 0⟩
       ⟨em.emFin, (AxOpsem.grow GD i).length⟩ := by
-  intro h hgv
+  intro h hgv hnd
   have := hemitRunAtGraphValuesAux GD i hpin dv 0 wsInit (AxOpsem.grow GD i) p0 _ _ h
-    (fun j => by rw [Nat.zero_add]) hgv
+    (fun j => by rw [Nat.zero_add]) hgv hnd
   rwa [Nat.zero_add] at this
 
 theorem hemitRunAtGraphValuesRtc
-    (hpin : ∀ p d l p' d', pstepProg p d l p' d' → lbAdmin true l →
+    (hpin : ∀ p d l p' d', pstepProg p d l p' d' → AxOpsem.lbAdminAx true l →
       WeakAxRealize.fetchPin GD.gdG.gxImg l)
     (p0 : Pexv6) (dv : Nat → Efab) (em : Hemission) :
     hartConf i (AxOpsem.grow GD i) p0 dv em →
     emReadsAtGraphValues GD i em →
+    (∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
     rtc (astepAnyNfGv GD i) ⟨p0, 0⟩ ⟨em.emFin, (AxOpsem.grow GD i).length⟩ :=
-  fun h hgv => rtc_nsteps_2 (hemitRunAtGraphValues GD i hpin p0 dv em h hgv)
+  fun h hgv hnd => rtc_nsteps_2 (hemitRunAtGraphValues GD i hpin p0 dv em h hgv hnd)
 
 end RunGV2
 

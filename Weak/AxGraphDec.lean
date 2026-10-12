@@ -90,6 +90,8 @@ graph `LLoad` read like any other; nothing in this file distinguishes it.
 
 **Not ported:** nothing (the §7 `Print Assumptions` block has no Lean twin; the
 lint's axiom check covers it).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `gshapeB`'s / `gshapeBSpec`'s `LIo` arms are `true`/`True` (`gwf`'s flip).
 -/
 import Weak.WeakRvwmoDec
 import Weak.AxGraph
@@ -583,7 +585,7 @@ def gshapeB (l : Lbl) : Bool :=
   | LRmw _ _ _ ts rvs wvs _ =>
       (match wvs with | [] => false | _ :: _ => true) &&
       decide (wvs.length = ts.length) && decide (rvs.length = ts.length)
-  | LIo .. => false
+  | LIo .. => true
 
 theorem gshapeBSpec (l : Lbl) :
     gshapeB l = true →
@@ -593,14 +595,14 @@ theorem gshapeBSpec (l : Lbl) :
     | LFence _ _ _ _ => True
     | LRmw _ _ _ ts rvs wvs _ =>
         wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
-    | LIo .. => False := by
+    | LIo .. => True := by
   cases l with
   | LLoad _ _ ts vs => exact of_decide_eq_true
   | LStore _ _ vs _ => cases vs <;> simp [gshapeB]
   | LFence _ _ _ _ => intro _; trivial
   | LRmw _ _ _ ts rvs wvs _ =>
     cases wvs <;> simp [gshapeB]
-  | LIo => intro h; simp [gshapeB] at h
+  | LIo => intro _; trivial
 
 def gwfB (G : Gexec) : Bool :=
   decide G.gxGmo.Nodup &&

@@ -47,7 +47,7 @@ affected lemmas take as a premise.
    - `awpFetch` IS THE ADMIN SKIP.  Rocq: `awp_owned_read` at `Rtok := True` over an
      `aread_step` (the fetch was a row `LLoad` item answered by the oracle), hence dependent on
      `AxInstrTargets` through `t_owned_read`.  Lean: a fetch is an `AStepAdmin` step at
-     `lbAdmin true (LIFetch base tvs)` that keeps the row position; `awpFetch` takes that step
+     `AxOpsem.lbAdminAx true (LIFetch base tvs)` that keeps the row position; `awpFetch` takes that step
      `AxOpsem.astepProg (AxOpsem.grow GD i) s (.LIFetch base tvs) a`, the wire hypothesis of
      `awpAdminStep`, and the PINNED exclusivity (owner Q8): `∀ GD', rvwmoCatConsistent GD' →
      gconstInterp GD' ⊢ ⌜AxInstr.aadminExclPin GD'.gdG.gxImg s a⌝` — only fetches of the
@@ -152,16 +152,16 @@ theorem acertMono (GD : Gdexec) (i : Nat) (e : Geid) (rs : RegFile) (dv : DevSta
 /-! # 2. Silent/admin batching -/
 
 /-- An administrative label is not a write. -/
-theorem AxInstr.lbAdminWlWr (l : Wlabel) : lbAdmin true l → (wlWr l).isSome = false := by
-  cases l <;> simp [lbAdmin, wlWr]
+theorem AxInstr.lbAdminWlWr (l : Wlabel) : AxOpsem.lbAdminAx true l → (wlWr l).isSome = false := by
+  cases l <;> simp [AxOpsem.lbAdminAx, wlWr]
 
 /-- An administrative label is not a fence. -/
-theorem AxInstr.lbAdminWlFence (l : Wlabel) : lbAdmin true l → (wlFence l).isSome = false := by
-  cases l <;> simp [lbAdmin, wlFence]
+theorem AxInstr.lbAdminWlFence (l : Wlabel) : AxOpsem.lbAdminAx true l → (wlFence l).isSome = false := by
+  cases l <;> simp [AxOpsem.lbAdminAx, wlFence]
 
 /-- An admin-labelled `astepProg` step preserves the row position. -/
 theorem astepProgAdminK (row : List Lbl) (s : Athread) (l : Wlabel) (s' : Athread) :
-    AxOpsem.astepProg row s l s' → lbAdmin true l → s'.atK = s.atK := by
+    AxOpsem.astepProg row s l s' → AxOpsem.lbAdminAx true l → s'.atK = s.atK := by
   intro h hadm
   cases h with
   | AStepAdmin => rfl
@@ -179,7 +179,7 @@ def aadminExcl (s a : Athread) : Prop :=
   (∀ row l s'', AxOpsem.astepProg row s l s'' → s'' = a ∧ wlWdata l = none)
 
 def aadminRel (s a : Athread) : Prop :=
-  (∃ row l, AxOpsem.astepProg row s l a ∧ lbAdmin true l) ∧ aadminExcl s a
+  (∃ row l, AxOpsem.astepProg row s l a ∧ AxOpsem.lbAdminAx true l) ∧ aadminExcl s a
 
 def arunAdmin (_GD : Gdexec) (_i : Agent) : Athread → Athread → Prop :=
   rtc aadminRel
@@ -391,7 +391,7 @@ theorem AxInstr.aadminExclPinOf (img : Image) (s a : Athread) :
 `gconstInterp`, as Rocq's `fetch_gd_ok`-style premises). -/
 theorem AxInstr.awpAdminStepPin (i : Agent) (s a : Athread) (Φ : Athread → IProp GF)
     (st : Stuckness) (row : List Lbl) (l : Wlabel) :
-    AxOpsem.astepProg row s l a → lbAdmin true l →
+    AxOpsem.astepProg row s l a → AxOpsem.lbAdminAx true l →
     (∀ GD', rvwmoCatConsistent GD' →
       AxirisG.gconstInterp (GF := GF) GD' ⊢ ⌜AxInstr.aadminExclPin GD'.gdG.gxImg s a⌝) →
     ⊢ (□ ∀ s'', ⌜awire s s''⌝ -∗ AxWp.wp st i s'' Φ) -∗
@@ -443,7 +443,7 @@ theorem AxInstr.awpAdminStepPin (i : Agent) (s a : Athread) (Φ : Athread → IP
     exact Hw
 
 /-- ITEM 5, THE FETCH STEP.  The fetch has no protocol content and no graph event: it is an
-`AStepAdmin` step at `lbAdmin true (LIFetch base tvs)` keeping the row position, so the WP
+`AStepAdmin` step at `AxOpsem.lbAdminAx true (LIFetch base tvs)` keeping the row position, so the WP
 passes straight to the post-fetch state.  The exclusivity is the PINNED one (Q8): only the
 fetches of the image's bytes must land at `a`. -/
 theorem awpFetch (GD : Gdexec) (i : Agent) (s a : Athread) (base : Int)

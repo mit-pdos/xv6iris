@@ -58,15 +58,15 @@ state at the row end is `good` (Lean: or still a `chkPre` boundary, deviation 1(
    (e) `fetchSucc` takes `Hfe : akIfetch = true`, the pin and the image facts in place of Rocq's
        `Hvals : wlRvals l = vs` (a fetch label `LIFetch` has `wlRvals = []`; its bytes come
        from the pin, `AxCjrWpd.pinnedBytes`).
-   (f) `chkPnode`'s RAM disjunct concludes `lbAdmin true l → akIfetch = true` (Rocq:
-       `¬ lbAdmin true l`; the Lean fetch arm IS admin).
+   (f) `chkPnode`'s RAM disjunct concludes `AxOpsem.lbAdminAx true l → akIfetch = true` (Rocq:
+       `¬ AxOpsem.lbAdminAx true l`; the Lean fetch arm IS admin).
 2. THE PINS (AxRunClose deviation 1): `regs_agree seip_reg` ↦ `regsAgree AxRunClose.pinReg`
    (the Lean wire writes `sig_seip` OR `sig_meip`).  `chk` answers a read of EITHER pin both
    ways, from `AxCjrReach.pinAns rs b` (Lean-only: both pins set to `b`; Rocq:
    `register_set sig_seip b rs`); `diverge` answers pin reads from `pinAns rs 0#1`.
    `lookupSetSeipAgree` is stated over `pinAns`.  `seipInsens` keeps its Rocq name.
 3. Q7 (sfence marker): `chk`'s announce arm also checks `sfAnnB n w = false` (the sfence
-   announce is a graph event, not an admin step), so `chkPnode` keeps Rocq's `lbAdmin true l`.
+   announce is a graph event, not an admin step), so `chkPnode` keeps Rocq's `AxOpsem.lbAdminAx true l`.
    Certificates over concrete monads are unaffected (no sfence in the walked regions).
 4. TYPES: `M unit` ↦ `SailM Unit`, `regstate` ↦ `RegFile`, `Interface.Ret` ↦ `.pure`,
    `Interface.ReadReq.t n` ↦ `Mem_read_request n va …` (new bound `va`), `inl (w, None)` ↦
@@ -375,17 +375,17 @@ theorem chkPnode (Q ram : SailM Unit → RegFile → Bool) (ret : RegFile → Bo
     (ors : Option RegFile) (fn' : Option (Bool × Bool × Bool × Bool)) (d' : DevStates)
     (oib : Option Ibch) (obar : Option barrier_kind) :
     chk Q ram ret m rs = true → pnodeStep m rs ib d l m' ors fn' d' oib obar →
-    (lbAdmin true l ∧ fn' = none ∧
+    (AxOpsem.lbAdminAx true l ∧ fn' = none ∧
       (chk Q ram ret m' (ors.getD rs) = true ∨
        (∃ y, m = .pure y ∧ ret rs = true ∧ ors = none ∧ ∃ tk, m' = riscvStep tk))) ∨
     (∃ (n va : Nat) (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
        (KK : Result (BitVec (8 * n) × Option Bool) Arch.abort → SailM Unit),
        m = .impure (.ok (.memRead n va req)) KK ∧ devAddr req.pa = false ∧ ram m rs = true ∧
-       (lbAdmin true l → (classify req.access_kind).akIfetch = true)) ∨
+       (AxOpsem.lbAdminAx true l → (classify req.access_kind).akIfetch = true)) ∨
     (∃ (n va : Nat) (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
        (KK : Result (Option Bool) Arch.abort → SailM Unit),
        m = .impure (.ok (.memWrite n va req)) KK ∧ devAddr req.pa = false ∧ ram m rs = true ∧
-       (lbAdmin true l → (classify req.access_kind).akLatest = true)) := by
+       (AxOpsem.lbAdminAx true l → (classify req.access_kind).akLatest = true)) := by
   intro hc hs
   cases m with
   | pure y =>

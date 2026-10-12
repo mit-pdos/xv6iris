@@ -63,6 +63,8 @@ PROVED
 **Dropped:** the local instances `hb_pol`/`hb_G` (inlined), the Ltac `harts_tac` (deviation 4),
 the §5 `Check`/`Print Assumptions` lines (the lint's axiom check covers them).  (36 Rocq items =
 33 decls + 2 instances + 1 Ltac; 37 Lean = 33 + 4 Lean-only.)
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** the release lemmas' anchor-domain premise is `(lbIsR l || lbIsW l) = true` (was `lbIsMem l = true`): `gwf` admits I/O events, which `fence rw,w` does not order (RVWMO; D48).
 -/
 import Weak.AxSpinH2
 import Weak.AxClsStep2b
@@ -232,7 +234,7 @@ theorem wpdH (GT : GdexecT) (nm : spinN) (cpu : CPU) (Hcons : rvwmoCatConsistent
     have Hce : ((hB, 0) : Geid) ≠ e' := by
       rcases He' with rfl | rfl <;> decide
     have Hev : ∀ e : Geid, e = (hB, 0) ∨ e = e' → e.1 = hB ∧ e.2 < 4 ∧
-        ∃ l, (AxOpsem.grow (gtAdGd GT) hB)[e.2]? = some l ∧ lbIsMem l = true := by
+        ∃ l, (AxOpsem.grow (gtAdGd GT) hB)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true := by
       intro e He
       rcases He with rfl | rfl
       · exact ⟨rfl, by decide, _, by rw [Hrow]; rfl, rfl⟩

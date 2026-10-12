@@ -101,6 +101,8 @@ the nextpid word has the source fact); `AxSpinU.fxuWriteCpu8`, `AxSpinU.okwCpu8`
 
 **Dropped:** none (41 Rocq decls incl. the 4 local instances `ur_pol`/`ur_G`/`ux_pol`/`ux_G`
 (inlined); 41 Lean = 37 + 4 Lean-only).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** the release lemmas' anchor-domain premise is `(lbIsR l || lbIsW l) = true` (was `lbIsMem l = true`): `gwf` admits I/O events, which `fence rw,w` does not order (RVWMO; D48).
 -/
 import Weak.AxSpinH5
 import Weak.AxSpinX5
@@ -1360,7 +1362,7 @@ theorem wpdReleaseX (GT : GdexecT) (nm : Xv6N) (cpu : CPU) (Hcons : rvwmoCatCons
     (AxOpsem.grow (gtAdGd GT) i)[kf]? = some (.LFence true true false true) →
     (AxOpsem.grow (gtAdGd GT) i)[kf + 1]? = some (.LStore false (paZ lkpa) AxSpinX4.z4 .WCrel) →
     (∀ e, e ∈ (FiniteMap.dom_set m : GSet Geid) → e.1 = i ∧ e.2 < kf ∧
-      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ lbIsMem l = true) →
+      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     a1 ∈ (FiniteMap.dom_set m : GSet Geid) → a2 ∈ (FiniteMap.dom_set m : GSet Geid) →
     ⊢ ISL -∗ ([∗map] e ↦ P ∈ m, AxAnnot.annotOwn e P) -∗
       (([∗map] P ∈ m, P) -∗ LK i c ∗ RCPU a1 ∗ RNP a2) -∗
@@ -1380,7 +1382,7 @@ theorem wpdReleaseX (GT : GdexecT) (nm : Xv6N) (cpu : CPU) (Hcons : rvwmoCatCons
     dsimp only at Hi Hlt Hl
     rw [show ((ei, ek) : Geid) = (i, ek) from by rw [Hi]]
     have Hl' : gxLbl (gtAdGd GT).gdG (i, ek) = some l := by rw [gxLblGrow]; exact Hl
-    exact ⟨fenceGob (gtAdGd GT) i ek kf (kf + 1) l _ _ _ Hl' (WeakRvwmoGraph.gwfMemRW _ _ _ Hcons.1 Hl' Hmem) Hlf Hls Hlt (by omega),
+    exact ⟨fenceGob (gtAdGd GT) i ek kf (kf + 1) l _ _ _ Hl' Hmem Hlf Hls Hlt (by omega),
       fenceLobp (gtAdGd GT) Hcons i ek kf (kf + 1) l _ _ _ Hl' Hmem Hlf Hls Hlt (by omega)⟩
   have HS := nshWrite (hlc := hlc) (pol := xv6Pol GT) (gtAdGd GT) Xv6N Unit (protXv6 Lx) nm cpu i
     Φ 4 lkpa lkpaRam zero32 m' (kf + 1) Hne2

@@ -313,7 +313,7 @@ theorem wpdAdminNode3M (m : SailM Unit) (Hm : isNext m) (kk : Nat) (A : RegFile 
     (N : Athread → Prop)
     (HA : ∀ rs rs', A rs → regsAgree AxRunClose.pinReg rs' rs → A rs')
     (Hps : ∀ rs ib d l p' d', A rs → pstepProg (.PHart cpu m rs none ib) d l p' d' →
-       lbAdmin true l ∧ N ⟨p', kk⟩) :
+       AxOpsem.lbAdminAx true l ∧ N ⟨p', kk⟩) :
     ∀ rs ib, A rs →
     ⊢ (∀ s2, ⌜N s2⌝ -∗ wpdM M .MaybeStuck i s2 Φ) -∗
       wpdM M .MaybeStuck i ⟨.PHart cpu m rs none ib, kk⟩ Φ := by
@@ -569,7 +569,7 @@ include HG Hmid in
 /-- (Lean-only, as `AxSymEngine.wpdSilentNode`) a silent node, fine row-end form. -/
 theorem AxSymEngine3.wpdSilentNode3M (m m1 : SailM Unit) (Hm : isNext m) (kk : Nat) (t : ExecSt)
     (H : ∀ rs ib d l m' ors fn' d' oib obar, pnodeStep m rs ib d l m' ors fn' d' oib obar →
-      lbAdmin true l ∧ m' = m1 ∧ ors = none ∧ fn' = none) :
+      AxOpsem.lbAdminAx true l ∧ m' = m1 ∧ ors = none ∧ fn' = none) :
     ∀ rs ib, regsAgree AxRunClose.pinReg rs t.regs →
     ⊢ (∀ rs1 ib1, ⌜regsAgree AxRunClose.pinReg rs1 t.regs⌝ -∗
          wpdM M .MaybeStuck i ⟨.PHart cpu m1 rs1 none ib1, kk⟩ Φ) -∗
@@ -746,7 +746,7 @@ theorem wpdAdminNode3 (m : SailM Unit) (Hm : isNext m) (kk : Nat) (A : RegFile �
     (N : Athread → Prop)
     (HA : ∀ rs rs', A rs → regsAgree AxRunClose.pinReg rs' rs → A rs')
     (Hps : ∀ rs ib d l p' d', A rs → pstepProg (.PHart cpu m rs none ib) d l p' d' →
-       lbAdmin true l ∧ N ⟨p', kk⟩) :
+       AxOpsem.lbAdminAx true l ∧ N ⟨p', kk⟩) :
     ∀ rs ib, A rs →
     ⊢ (∀ s2, ⌜N s2⌝ -∗ wpd .MaybeStuck i s2 Φ) -∗
       wpd .MaybeStuck i ⟨.PHart cpu m rs none ib, kk⟩ Φ :=

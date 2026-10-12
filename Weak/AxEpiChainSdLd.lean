@@ -108,7 +108,7 @@ theorem astepProgRetShape (row : List Lbl) (c : CPU) (rs : RegFile) (ib : Ibch) 
 past the row end, every program step is administrative and keeps the position. -/
 theorem AxEpiChainSdLd.astepProgRowEndShape' (row : List Lbl) (s : Athread) (l : Wlabel)
     (s' : Athread) (Hnone : row[s.atK]? = none) :
-    AxOpsem.astepProg row s l s' → lbAdmin true l ∧ s'.atK = s.atK := by
+    AxOpsem.astepProg row s l s' → AxOpsem.lbAdminAx true l ∧ s'.atK = s.atK := by
   intro h
   cases h with
   | AStepAdmin p k d l p' d' hadm _ => exact ⟨hadm, rfl⟩

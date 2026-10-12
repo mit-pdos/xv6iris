@@ -311,7 +311,7 @@ theorem AxSpinT2h.gatePpI (GD : Gdexec) (i : Agent) (q : T2Prm) (c : Bool) :
 the position. -/
 theorem AxSpinT2h.rowEndShape (row : List Lbl) (s : Athread) (l : Wlabel) (s' : Athread)
     (Hnone : row[s.atK]? = none) :
-    AxOpsem.astepProg row s l s' → lbAdmin true l ∧ s'.atK = s.atK := by
+    AxOpsem.astepProg row s l s' → AxOpsem.lbAdminAx true l ∧ s'.atK = s.atK := by
   intro h
   cases h with
   | AStepAdmin p k d l p' d' hadm hst => exact ⟨hadm, rfl⟩

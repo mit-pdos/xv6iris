@@ -113,6 +113,8 @@ matchd}` ↦ `cfgEqr{Refl,Trans,Matchd}`; `proj_ws` ↦ `projWs`; `proj_st` ↦
 **Statements checked** (by hand, against Rocq): all of them; the changed ones
 are listed under deviation 6 (`wpPfStep` (+ arm), `projLbl` (+ arm),
 `wpPfStepMstep`, `bridgeStep`, `bridgeRun`, `wpPfBridge`, `wpPfBridgeLog`).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `projLbl (LDev kd base vs) = some (LIo kd base vs)` (was `none`, [OWN.27]); `wpPfStepMstep`'s `PFDev` arm replays `mstep.MStepIo` (so `wpPfBridge`, statement unchanged, carries I/O events); the reverse `mstepWpPfStep` replays `MStepIo` as `PFDev`.
 -/
 import Weak.WeakAxiomatic
 import Weak.WeakPromiseFact
@@ -524,9 +526,11 @@ theorem wpPfBehavior (img : Image) (d0 : D) (ps : List P) (c : Wpcfg P D) :
 
 /-! ### (B) The projections -/
 
-/-- `LSilent`, `LDev` and the dependency-only labels have no image (the
-axiomatic execution skips them); `k` is the class the pf step's append
-stamped; the split labels project to the axiomatic PLAIN load / store. -/
+/-- `LSilent` and the dependency-only labels have no image (the axiomatic
+execution skips them); `k` is the class the pf step's append stamped; the split
+labels project to the axiomatic PLAIN load / store.  W13 (I) ([OWN.14][OWN.27]):
+the fabric marker `LDev kd base vs` projects to the I/O-class EVENT
+`LIo kd base vs` (its own graph event, replayed by the inert `mstep.MStepIo`). -/
 def projLbl (k : WmClass) (l : Wlabel) : Option Lbl :=
   match l with
   | .LSilent => none
@@ -535,7 +539,7 @@ def projLbl (k : WmClass) (l : Wlabel) : Option Lbl :=
   | .LRmw aq rl base tvs data _ _ =>
       some (.LRmw aq rl base (tvs.map Prod.fst) (tvs.map Prod.snd) data k)
   | .LFence pr pw sr sw => some (.LFence pr pw sr sw)
-  | .LDev .. => none
+  | .LDev kd base vs => some (.LIo kd base vs)
   | .LRegW _ _ => none
   | .LCtrl _ => none
   | .LInstr => none
@@ -849,8 +853,11 @@ theorem wpPfStepMstep (i : Nat) (l : Wlabel) (c c' : Wpcfg P D) (σ : Mstate) :
     exact cfgMatchdUpdGen _ _ _ _ i ag st' _ _ f _ hf hlk
       (by rw [updWsEq]; exact wsEqrFencePost _ _ _ _ _ _ (hf i ag hlk))
       (fun j hne => updWsNe _ _ _ _ hne)
-  | PFDev c ag st' d' hlk _ =>
-    exact ⟨.WCplain,
+  | @PFDev c ag kd ba bs st' d' hlk _ =>
+    -- W13 (I): the I/O-class event, replayed by the inert `mstep.MStepIo`
+    refine ⟨.WCplain, ?_⟩
+    dsimp only [projLbl]
+    exact ⟨_, mstep.MStepIo kd ba bs,
       cfgMatchdUpdGen _ _ _ _ i ag st' ag.paWs ag.paProm f f hf hlk (hf i ag hlk) (fun _ _ => rfl)⟩
   -- the three dependency-only arms are excluded outright
   | PFRegW => exact (hdf : False).elim
@@ -1067,6 +1074,11 @@ theorem mstepWpPfStep (σ σ' : Mstate) (i : Nat) (lb : Lbl) (c : Wpcfg P D) :
     · dsimp only
       rw [srcsViewNil, loadPostRunD0, storePostRunD0, List.map_fst_zip (by omega), hf i ag hlk]
       exact hmatch _ _ _ _
+  | MStepIo kd base vs =>
+    -- W13 (I): the inert I/O-class event is the fabric marker's projection
+    refine ⟨_, wpPfStep.PFDev c ag ag.paSt c.pcDev hlk (hpf _ _ _ _), ?_, hst _ _⟩
+    exact cfgMatchUpdGen _ _ _ _ i ag ag.paSt ag.paWs ag.paProm f f hf hlk (hf i ag hlk)
+      (fun _ _ => rfl)
 
 theorem execPrefixPfRun (ps : List P) (d0 : D) (E : Exec) (n : Nat) :
     progFree pstep → execWf E → execClsOk pcls ps E →

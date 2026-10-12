@@ -36,7 +36,7 @@ strictly earlier memory events (`lobp GD (i,k) ⊆ eidsBefore GD i k`), passed e
    (List.filter …)`.  `invGS_gen HasNoLc Σ` ↦ `[InvGS_gen hlc GF]` for any `hlc` (as AxWp
    deviation 6).  Wand chains `A -∗ B -∗ C` are stated `⊢ A -∗ B -∗ C` (AxWp deviation 7).
 2. O2 STAGE C (`notes/weak-port-o2-stageC.md` §D, "opax lifting") — THE HEADER FINDING CLOSES.
-   There is no `AStepFetch`: a fetch is an `AStepAdmin` step at `lbAdmin true (LIFetch ..)`
+   There is no `AStepFetch`: a fetch is an `AStepAdmin` step at `AxOpsem.lbAdminAx true (LIFetch ..)`
    (AxOpsem deviation 2), handled by `wpSkipStep` with `atK` unchanged, like every other
    administrative label.  So Rocq's `wlabel_is_fetch` (the label filter its multi-step lemmas
    were to use to exclude the `AStepFetch` arm, and that `AxAdequacy`'s `astep_any_nf` uses) is
@@ -603,7 +603,7 @@ theorem astepProgWdataSk (row : List Lbl) (s : Athread) (l : Wlabel) (s' : Athre
   intro h hwd
   cases h with
   | AStepAdmin p k d l p' d' ha hs =>
-    cases l <;> simp [lbAdmin, wlWdata] at ha hwd
+    cases l <;> simp [AxOpsem.lbAdminAx, wlWdata] at ha hwd
   | AStepWrite => rfl
   | AStepFence p k d l lb p' d' hrow hs1 hid hs =>
     cases l <;> simp [wlFence, wlWdata] at hs1 hwd

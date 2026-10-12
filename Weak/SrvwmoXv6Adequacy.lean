@@ -223,7 +223,7 @@ theorem SrvwmoXv6Adequacy.m1Hyps (σ0 : WGState) (g0 : GState) (hg0 : g0.gen = 0
     (Xv6.xv6FsAdequacy_closed (hlc := Iris.HasLC.hasLC) g0 hg0 hp0 hfs n κs t g hm).1
   cut := MachOfPf.cutOfPristine Xv6.bcRoLo Xv6.bcRoHi (Nat.le_refl _) SrvwmoXv6Adequacy.bcRoHiLe
     g0 _ (SrvwmoXv6Adequacy.winOfText g0 hg0 hp0 hfs)
-  fi := SrvwmoXv6Adequacy.fiOfSco hsco _ σ0
+  fi := fun st c _ _ _ _ hrun _ _ => SrvwmoXv6Adequacy.fiOfSco hsco _ σ0 st c hrun
 
 /-- The MachCSL machine-off state `srvwmoXv6M1Core` starts from exists for every M1 premise set
 (from the premises' `ds`): the extra boot hypotheses are never vacuous. -/

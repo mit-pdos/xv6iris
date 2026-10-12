@@ -264,8 +264,8 @@ def AxSpinE8d.lbAdminB (l : Wlabel) : Bool :=
   | .LSilent | .LDev .. | .LRegW .. | .LCtrl _ | .LInstr | .LIFetch .. => true
   | _ => false
 
-theorem AxSpinE8d.lbAdminBSound (l : Wlabel) : AxSpinE8d.lbAdminB l = true → lbAdmin true l := by
-  cases l <;> simp [AxSpinE8d.lbAdminB, lbAdmin]
+theorem AxSpinE8d.lbAdminBSound (l : Wlabel) : AxSpinE8d.lbAdminB l = true → AxOpsem.lbAdminAx true l := by
+  cases l <;> simp [AxSpinE8d.lbAdminB, AxOpsem.lbAdminAx]
 
 /-- Rocq `wr_fit`. -/
 def AxSpinE8d.wrFit (row : List Lbl) (k : Nat) (l : Wlabel) : Bool :=

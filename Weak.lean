@@ -632,5 +632,6 @@ import Weak.PfStepTso
 import Weak.RvwmoXv6ScaT
 import Weak.MachOfPf
 import Weak.SrvwmoXv6Adequacy
+import Weak.SailCycleOrderK
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/

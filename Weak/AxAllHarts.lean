@@ -326,7 +326,7 @@ arbitrary `axGA2`. -/
 theorem AxAllHarts.astepProgRowEndShape' (row : List Lbl) (s : Athread) (l : Wlabel)
     (s' : Athread) (Hnone : row[s.atK]? = none) :
     AxOpsem.astepProg row s l s' →
-    lbAdmin true l ∧ s'.atK = s.atK ∧ ∃ d d', pstepProg s.atP d l s'.atP d' := by
+    AxOpsem.lbAdminAx true l ∧ s'.atK = s.atK ∧ ∃ d d', pstepProg s.atP d l s'.atP d' := by
   intro h
   cases h with
   | AStepAdmin p k d l p' d' hadm hst => exact ⟨hadm, rfl, d, d', hst⟩
@@ -339,8 +339,8 @@ theorem AxAllHarts.astepProgRowEndShape' (row : List Lbl) (s : Athread) (l : Wla
     rw [hlk] at Hnone
     cases Hnone
 
-theorem AxAllHarts.lbAdminWlWdataNone' (l : Wlabel) : lbAdmin true l → wlWdata l = none := by
-  cases l <;> simp [lbAdmin, wlWdata]
+theorem AxAllHarts.lbAdminWlWdataNone' (l : Wlabel) : AxOpsem.lbAdminAx true l → wlWdata l = none := by
+  cases l <;> simp [AxOpsem.lbAdminAx, wlWdata]
 
 section Idle
 variable {GF : BundledGFunctors.{0,0,0}} {hlc : HasLC} [InvGS_gen hlc GF] [Axpol]

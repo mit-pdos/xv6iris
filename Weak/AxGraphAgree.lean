@@ -18,7 +18,7 @@ ld8 landing shape).  The three `wpPreStepDef` conjuncts:
     The `wpEvStep` is built from the caller's `∀ v` continuation by `wpReadStepAllWand` and
     re-targeted to the arbitrary `K'` by `wpEvStepExt`.
 (b) EVERY OTHER PROGRAM STEP: every program step at the node is read-labelled, so `AStepAdmin`
-    (`lbAdmin` is `False` on a load), `AStepWrite`/`AStepFence` (`wlWr`/`wlFence` are `none`) are
+    (`AxOpsem.lbAdminAx` is `False` on a load), `AStepWrite`/`AStepFence` (`wlWr`/`wlFence` are `none`) are
     impossible.  (Rocq also has `AStepFetch`, absorbed into the `∀ v` continuation; see
     deviation 2.)
 (c) THE PLIC WIRE: from the caller's "wire already handled" premise.

@@ -524,7 +524,7 @@ theorem rmwWriteInv (row : List Lbl) (pa : PAddr) (Hdev : devAddr pa = false) (v
     cases hs
     rcases l3pWriteExclDet cpu pa Hdev val _ rs ibNone d _ _ _ Hps with
       ⟨rfl, -, -⟩ | ⟨rfl, rfl, -⟩
-    · simp [lbAdmin] at Hadm
+    · simp [AxOpsem.lbAdminAx] at Hadm
     · exact .inr ⟨rfl, rfl⟩
   | AStepWrite p k0 d l0 lb p' d' Hlk Hwr Heqwr Hwdat Hps =>
     cases hs

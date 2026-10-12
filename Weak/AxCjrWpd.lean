@@ -78,14 +78,14 @@ open Wlabel
 
 /-! # 1. GENERIC: an `epure` run off the pins is a `gstep` run -/
 
-theorem AxCjrWpd.erwLabelAdmin (ek : ErwKind) : lbAdmin true (erwLabel ek) := by
+theorem AxCjrWpd.erwLabelAdmin (ek : ErwKind) : AxOpsem.lbAdminAx true (erwLabel ek) := by
   cases ek <;> trivial
 
 /-- (Lean-only) One `gstep` at an `nodeOk` monad node, from its `pnodeStep` at one fabric. -/
 theorem AxCjrWpd.gstepNode (cpu : CPU) (m m' : SailM Unit) (rs : RegFile) (ib : Ibch) (k : Nat)
     (l : Wlabel) (ors : Option RegFile) (oib : Option Ibch) (obar : Option barrier_kind)
     (d : Efab) :
-    nodeOk m → lbAdmin true l →
+    nodeOk m → AxOpsem.lbAdminAx true l →
     pnodeStep m rs ib d.efDev l m' ors none d.efDev oib obar →
     gstep ⟨.PHart cpu m rs none ib, k⟩ ⟨.PHart cpu m' (ors.getD rs) none (oib.getD ib), k⟩ :=
   fun hok hadm h =>

@@ -26,7 +26,7 @@ the invariant "strictly before the run's end".
 1. O2 STAGE C (fetch = admin step).  Rocq's header notes that a FETCH is realised through
    clause (a) as an ordinary read, so a segment covered by the lemma must START AFTER the
    instruction's fetch.  In Lean (AxOpsem deviation 2) a fetch is an `AStepAdmin` step at
-   `lbAdmin true (LIFetch ..)`: no row item, `wlWdata = none`, `atK` kept.  So `Hnord` no longer
+   `AxOpsem.lbAdminAx true (LIFetch ..)`: no row item, `wlWdata = none`, `atK` kept.  So `Hnord` no longer
    speaks of fetches at all, and a fetch inside the segment is simply one more `Hclos` step
    (clause (b)); the "start after the fetch" side condition is vacuous.  Statements unchanged
    (owner Q8: clause (b) now also hands a `fetchPin` premise, which the proof ignores — `Hclos`

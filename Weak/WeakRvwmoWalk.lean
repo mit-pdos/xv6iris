@@ -81,6 +81,8 @@ the empty trace over `G.gxImg` with `pst` constantly `boot <$> seq 0 N`.
 `bool_decide_eq_true_2`/`bool_decide_eq_false_2` rewrites).
 
 **Dropped:** none (§1–§4: Rocq 60 declarations; Lean 62 = 60 + the 2 Lean-only).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** the `LIo` arm of the true route's `mstepOk` is `trivial` (was refuted by `gwf`'s `False` arm).
 -/
 import Weak.WeakRvwmoGlue2
 
@@ -736,7 +738,7 @@ theorem wblkPolAt (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T : L
         exact certWriteOk c0 x rl base vs kc (WeakRvwmoFloor.gshape G hwf _ _ hl)
       | LFence pr pw sr sw => exact certFenceOk c0 x pr pw sr sw
       | LRmw => exact hrmw.elim
-      | LIo => exact (WeakRvwmoFloor.gshape G hwf _ _ hl).elim
+      | LIo => trivial
     exact ⟨lb, l, rds, wrs, rs2', m', fn', ib', hblk2, hok,
       lblReidxWRefl lb, wclsOfPfx G (wwit G n) n x c0 lb hpfx hl hnW hix,
       .inl ⟨rfl, rfl, rfl, hag2⟩, fun _ => ⟨rfl, rfl, rfl, hag2⟩⟩

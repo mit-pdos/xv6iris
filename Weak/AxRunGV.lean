@@ -21,13 +21,13 @@ Rocq: `iris/AxRunGV.v` @ xxvzwolszwmp.
 1. O2 STAGE C (AxRowConf deviation 1): no `T`/`img` oracle parameters anywhere —
    `astep_own_any_incl`, `run_at_graph_values_row_emitted`, `_sound`, `_coverage` lose them
    (`astepOwn`/`astepAny`/`consumed`/`rowEmittedFromRun` have none).  Rocq's fetch discussion
-   (the omitted `RowEmitFetch` arm) is moot: a fetch is an `lbAdmin true (LIFetch ..)` label, so
+   (the omitted `RowEmitFetch` arm) is moot: a fetch is an `AxOpsem.lbAdminAx true (LIFetch ..)` label, so
    it is a `RunGVAdmin` step.
 2. OWNER Q8 (AxAdequacy deviation 2): `astepAnyNfGv`'s program arm is `astepProgNf … img`,
    which carries the boot-image pin `WeakAxRealize.fetchPin GD.gdG.gxImg l` in place of Rocq's
    `wlabel_is_fetch l = false`.  Write/fence labels are pinned trivially (`fetchPin` is `True`
    off `LIFetch`), but an ADMIN step may now be a fetch, so `runAtGraphValuesNfGv` takes the
-   extra premise `hpin : ∀ p d l p' d', pstepProg p d l p' d' → lbAdmin true l →
+   extra premise `hpin : ∀ p d l p' d', pstepProg p d l p' d' → AxOpsem.lbAdminAx true l →
    WeakAxRealize.fetchPin GD.gdG.gxImg l` (the admin steps of the program LTS are pinned; the
    graph tier's LTS `pstepPin img pstepEv` supplies it, cf. `AxAdequacy.astepProgNfOfPinned`).
    No Rocq file uses `run_at_graph_values_nf_gv`.
@@ -86,7 +86,7 @@ inductive runAtGraphValues : Athread → Athread → Prop where
       runAtGraphValues ⟨p, k⟩ t'
   | RunGVAdmin (p : Pexv6) (k : Nat) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab)
       (t' : Athread) :
-      lbAdmin true l →
+      AxOpsem.lbAdminAx true l →
       pstepProg p d l p' d' →
       runAtGraphValues ⟨p', k⟩ t' →
       runAtGraphValues ⟨p, k⟩ t'
@@ -165,7 +165,7 @@ end RunGV
 /-- The run unfolds to an `rtc` of graph-pinned single steps (deviation 2: the admin steps of the
 program LTS are image-pinned, `hpin`). -/
 theorem runAtGraphValuesNfGv (GD : Gdexec) (i : Agent)
-    (hpin : ∀ p d l p' d', pstepProg p d l p' d' → lbAdmin true l →
+    (hpin : ∀ p d l p' d', pstepProg p d l p' d' → AxOpsem.lbAdminAx true l →
       WeakAxRealize.fetchPin GD.gdG.gxImg l)
     (s t' : Athread) :
     runAtGraphValues GD i s t' → rtc (astepAnyNfGv GD i) s t' := by

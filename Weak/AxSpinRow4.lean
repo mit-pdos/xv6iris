@@ -83,7 +83,7 @@ theorem cretOffKreach (pin : Wlabel → Prop) (cpu : CPU) (rs : RegFile) (s2 : A
         ibNone d l _ d' wtPaRam wtLat Hps
       have hc : classify wtRreq.access_kind = ⟨false, false, false⟩ := wtAkPlain
       subst hl
-      simp [rdLabel, lbAdmin, hc] at Hadm
+      simp [rdLabel, AxOpsem.lbAdminAx, hc] at Hadm
     · obtain ⟨-, cpu', m', rs'', fn', ib', mm, b, k, Hp, -, -, Hp'⟩ :=
         pstepWireInv _ _ _ _ _ Hw
       simp only at Hp Hk Hp'

@@ -280,17 +280,17 @@ def hinvC (Ks : List ekey) (m : SailM Unit) (rs : RegFile) : Prop :=
   ∃ n t, regsAgree AxRunClose.pinReg rs t.regs ∧
     FEC img QT (fun Ks' _ t' => BFEC img n Ks' t') Ks m t
 
-theorem AxSpinVA.erwLabelAdmin (k : ErwKind) : lbAdmin true (erwLabel k) :=
+theorem AxSpinVA.erwLabelAdmin (k : ErwKind) : AxOpsem.lbAdminAx true (erwLabel k) :=
   AxCjrWpd.erwLabelAdmin k
 
-theorem ebarLabelNotAdmin (b : barrier_kind) : ¬ lbAdmin true (ebarLabel b) := by
+theorem ebarLabelNotAdmin (b : barrier_kind) : ¬ AxOpsem.lbAdminAx true (ebarLabel b) := by
   unfold ebarLabel
-  rcases ebarNow b with _ | ⟨_, _, _, _⟩ <;> simp [lbAdmin]
+  rcases ebarNow b with _ | ⟨_, _, _, _⟩ <;> simp [AxOpsem.lbAdminAx]
 
 /-- (Lean-only) A non-sfence announce is administrative. -/
 theorem AxSpinVA.annAdmin (n : Nat) (w : BitVec n) (h : sfAnnB n w = false) :
-    lbAdmin true (annLabel n w) := by
-  simp [annLabel, h, lbAdmin]
+    AxOpsem.lbAdminAx true (annLabel n w) := by
+  simp [annLabel, h, AxOpsem.lbAdminAx]
 
 /-- (Lean-only, Q13) A mapM in `Option` that fails has a failing entry. -/
 theorem AxSpinVA.mapMNone {α β : Type} (f : α → Option β) :
@@ -325,17 +325,17 @@ theorem hinvCStep (Ks : List ekey) (m : SailM Unit) (rs : RegFile) (ib : Ibch) (
     (fn' : Option (Bool × Bool × Bool × Bool)) (d' : DevStates) (oib : Option Ibch)
     (obar : Option barrier_kind) :
     hinvC img Ks m rs → pnodeStep m rs ib d l m' ors fn' d' oib obar →
-    (lbAdmin true l → WeakAxRealize.fetchPin img l → fn' = none ∧ hinvC img Ks m' (ors.getD rs)) ∧
-    (¬ lbAdmin true l → ∃ e Ks', Ks = e :: Ks' ∧ lkey l = some e ∧
+    (AxOpsem.lbAdminAx true l → WeakAxRealize.fetchPin img l → fn' = none ∧ hinvC img Ks m' (ors.getD rs)) ∧
+    (¬ AxOpsem.lbAdminAx true l → ∃ e Ks', Ks = e :: Ks' ∧ lkey l = some e ∧
       (Ks' ≠ [] → ∀ x, wlRd l = some x → imgBytes img x.2.1 x.2.2 = some (wlRvals l) →
         fn' = none ∧ ors = none ∧ hinvC img Ks' m' rs)) := by
   rintro ⟨n, t0, Hag, H⟩ Hps
   -- the silent-node pattern: an admin step to the continuation, same chain, same state
   have silent : ∀ (k' : SailM Unit), FEC img QT (fun Ks' _ t' => BFEC img n Ks' t') Ks k' t0 →
       (l = LSilent ∧ m' = k' ∧ ors = none ∧ fn' = none ∧ d' = d ∧ oib = none ∧ obar = none) →
-      (lbAdmin true l → WeakAxRealize.fetchPin img l →
+      (AxOpsem.lbAdminAx true l → WeakAxRealize.fetchPin img l →
           fn' = none ∧ hinvC img Ks m' (ors.getD rs)) ∧
-      (¬ lbAdmin true l → ∃ e Ks', Ks = e :: Ks' ∧ lkey l = some e ∧
+      (¬ AxOpsem.lbAdminAx true l → ∃ e Ks', Ks = e :: Ks' ∧ lkey l = some e ∧
         (Ks' ≠ [] → ∀ x, wlRd l = some x → imgBytes img x.2.1 x.2.2 = some (wlRvals l) →
           fn' = none ∧ ors = none ∧ hinvC img Ks' m' rs)) := by
     rintro k' Hk ⟨rfl, rfl, rfl, rfl, -, -, -⟩
@@ -443,7 +443,7 @@ def hthr (Ks : List ekey) (p : Pexv6) : Prop :=
   ∃ cpu m rs ib, p = .PHart cpu m rs none ib ∧ hinvC img Ks m rs
 
 theorem hthrAdmin (Ks : List ekey) (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
-    hthr img Ks p → pstepProg p d l p' d' → lbAdmin true l → WeakAxRealize.fetchPin img l →
+    hthr img Ks p → pstepProg p d l p' d' → AxOpsem.lbAdminAx true l → WeakAxRealize.fetchPin img l →
     hthr img Ks p' := by
   rintro ⟨cpu, m, rs, ib, rfl, H⟩ Hps Hadm Hpin
   cases p' with
@@ -490,7 +490,7 @@ theorem hthrFirst (e : ekey) (Ks : List ekey) (p : Pexv6) (k : Nat) :
 inductive ireach : Pexv6 → Nat → Pexv6 → Prop where
   | irRefl (p : Pexv6) : ireach p 0 p
   | irAdmin (p p' : Pexv6) (i : Nat) (p'' : Pexv6) :
-      (∃ d l d', lbAdmin true l ∧ WeakAxRealize.fetchPin img l ∧ pstepProg p d l p' d') →
+      (∃ d l d', AxOpsem.lbAdminAx true l ∧ WeakAxRealize.fetchPin img l ∧ pstepProg p d l p' d') →
       ireach p' i p'' → ireach p i p''
   | irWire (p p' : Pexv6) (i : Nat) (p'' : Pexv6) :
       (∃ d l d', pstepWire p d l p' d') → ireach p' i p'' → ireach p i p''
@@ -527,7 +527,7 @@ theorem chainFirst (Ks : List ekey) (p : Pexv6) (i : Nat) (p' : Pexv6) (e : ekey
     | PDisk _ => exact Hps.elim
     | PHart cpu' m' rs' fn' ib' =>
       obtain ⟨rfl, ors, oib, obar, rfl, rfl, Hn, -⟩ := Hps
-      have Hna : ¬ lbAdmin true l := rdNotAdmin l x Hx
+      have Hna : ¬ AxOpsem.lbAdminAx true l := rdNotAdmin l x Hx
       obtain ⟨e0, Ks', rfl, -, Hc⟩ := (hinvCStep img _ _ _ _ _ _ _ _ _ _ _ _ H Hn).2 Hna
       simp only [List.getElem?_cons_succ] at He
       have HKs' : Ks' ≠ [] := by rintro rfl; simp at He

@@ -62,6 +62,14 @@ bridge's `execPrefixPfRun` / `execWfPfRun`).
    `pstepPinSub`, `pstepPinned`, `pstepPinPinned`, `wpPfStepPinSub`,
    `wpPfRunPinSub`, `progFreeExecProgOkPin`, `execWfPfRunPin` (the replay of a
    pinned supply, projected to the unpinned LTS).
+5. W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); D38 RULED [OWN.14], [OWN.27]):
+   an MMIO access / device-side fabric move is an I/O-CLASS EVENT.  `projLbl (LDev kd b vs)
+   = some (LIo kd b vs)` (bridge), so `LDev` is DROPPED from `lbAdmin` (the admin alphabet is
+   still exactly what `projLbl` sends to `none`); `lblRealizes` is unchanged in text and now
+   admits the fabric marker as a LEFT-ARM realizing step of its `LIo` event
+   (`lblRealizesUnproj`/`lblRealizesIntro`/`mstepWpPfStepProg` gain the `LDev`/`MStepIo`
+   arm, replayed as `PFDev`); `admStepPf` loses its `LDev` arm.  `execProgOk'` is UNCHANGED in
+   statement: the I/O step's fabric endpoints are the supply's `dv k → dv (k + 1)`.
 
 **Rocq → Lean name map.**  `lb_nobarex` ↦ `lbNobarex`; `lb_rfoldfree` ↦
 `lbRfoldfree`; `lb_depfree_rfoldfree` ↦ `lbDepfreeRfoldfree`;
@@ -125,11 +133,13 @@ theorem lbFusedNobarex (l : Wlabel) : lbFused l → lbNobarex l := by
 
 Exactly the labels `projLbl` sends to `none`; the Boolean index is `LInstr`'s
 (`instrPost` clears `wRes`, so the intra-pair star runs at `instr := false`).
-Deviation 4 (Stage C): the fetch sits where `LInstr` sits. -/
+Deviation 4 (Stage C): the fetch sits where `LInstr` sits.  Deviation 7 (W13 (I),
+[OWN.27]): the fabric marker `LDev` is NO LONGER administrative — it projects to the
+I/O-class event `LIo` and is a REALIZING step of its own. -/
 
 def lbAdmin (instr : Bool) (l : Wlabel) : Prop :=
   match l with
-  | .LSilent | .LDev .. | .LRegW .. | .LCtrl _ => True
+  | .LSilent | .LRegW .. | .LCtrl _ => True
   | .LInstr | .LIFetch .. => instr = true
   | _ => False
 
@@ -271,6 +281,11 @@ theorem lblRealizesUnproj (p : P) (σ : Mstate) (i : Nat) (lb : Lbl) (l : Wlabel
     simp only [projLbl, Option.some.injEq] at hpr
     subst hpr
     exact ⟨rfl, trivial⟩
+  | LDev kd base vs =>
+    -- W13 (I): the fabric marker realizes its own I/O-class event
+    simp only [projLbl, Option.some.injEq] at hpr
+    subst hpr
+    exact ⟨rfl, trivial⟩
   | _ => simp [projLbl, lbFused] at hpr hfu
 
 /-- The converse, at a label the axiomatic side actually stepped with. -/
@@ -296,6 +311,7 @@ theorem lblRealizesIntro (p : P) (σ σ' : Mstate) (i : Nat) (lb : Lbl) :
     simp only [unprojLbl, projLbl]
     rw [List.map_fst_zip (by omega), List.map_snd_zip (by omega), hck]
     rfl
+  | MStepIo kd base vs => exact ⟨trivial, trivial, trivial, rfl⟩
 
 /-! ## (1b) THE PAIR (A3(iv)): one axiomatic rmw, two machine steps
 
@@ -451,10 +467,6 @@ theorem admStepPf (instr : Bool) (c : Wpcfg P D) (i : Nat) (ag : Wpagent P) (l :
   | LSilent =>
     obtain ⟨h1, h2, h3⟩ := hpkg ag.paWs d' (wsEqrRefl _)
     exact ⟨_, _, wpPfStep.PFSilent c ag p' d' hlk hps, h1, rfl, h2, rfl, wsEqrRefl _,
-      fun _ => rfl, h3⟩
-  | LDev =>
-    obtain ⟨h1, h2, h3⟩ := hpkg ag.paWs d' (wsEqrRefl _)
-    exact ⟨_, _, wpPfStep.PFDev c ag p' d' hlk hps, h1, rfl, h2, rfl, wsEqrRefl _,
       fun _ => rfl, h3⟩
   | LRegW rd srcs =>
     obtain ⟨h1, h2, h3⟩ :=
@@ -635,6 +647,14 @@ theorem mstepWpPfStepProg (σ σ' : Mstate) (i : Nat) (lb : Lbl) (c : Wpcfg P D)
         hst _ _ _, rfl⟩
       exact hmatch _ _ _ _ _ _ (by rw [updWsEq]; exact wsEqrExloadPostRunD _ _ _ _ _ _ hew)
         (fun j hne => updWsNe _ _ _ _ hne)
+  | LDev kd base vs =>
+    -- W13 (I): THE I/O-CLASS EVENT — the fabric marker realizes `LIo`, replayed inertly
+    simp only [projLbl, Option.some.injEq] at hpr
+    subst hpr
+    cases hms with
+    | MStepIo _ _ _ =>
+      refine ⟨_, wpPfStep.PFDev c ag p' dn hlk hps, ?_, hst _ _ _, rfl⟩
+      exact hmatch _ _ _ _ _ _ hew (fun _ _ => rfl)
   | _ => simp [lbNobarex, projLbl] at hnb hpr
 
 /-! ## (5b) The PAIR step (A3(iv))

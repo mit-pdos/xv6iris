@@ -22,7 +22,7 @@ evaluation of `drive` from `probeRegs pcSd` (`driveGsdldOk`).
 
 1. O2 STAGE C (fetches are not graph events; `AxEpiSdLdSat`/`AxEpiAdeq` deviation 1): Rocq's
    driver answered the two instruction fetches from the ROW (text `LLoad`s, via `ANFGVRead`).  In
-   Lean an `akIfetch` read is an ADMIN step (`lbAdmin true (LIFetch ..)`), and `astepProgNf`
+   Lean an `akIfetch` read is an ADMIN step (`AxOpsem.lbAdminAx true (LIFetch ..)`), and `astepProgNf`
    carries the boot-image pin `WeakAxRealize.fetchPin GD.gdG.gxImg l`.  So `nodeStep`/`drive`
    take the image `img` (first argument) and answer a fetch of `n` bytes at `paZ pa` with the
    image bytes at timestamp 0 (`AxEpiRun.imgRead`; stuck if any byte is unmapped), position
@@ -179,7 +179,7 @@ theorem growGxLbl (GD : Gdexec) (i k : Nat) (lb : Lbl) :
     (AxOpsem.grow GD i)[k]? = some lb → gxLbl GD.gdG (i, k) = some lb :=
   AxWp.growLookup GD i k lb
 
-theorem AxEpiRun.lbAdminErw (w : ErwKind) : lbAdmin true (erwLabel w) := by
+theorem AxEpiRun.lbAdminErw (w : ErwKind) : AxOpsem.lbAdminAx true (erwLabel w) := by
   cases w <;> trivial
 
 section sound
@@ -189,7 +189,7 @@ theorem nfAdmin (cpu : CPU) (m : SailM Unit) (rs : RegFile) (ib : Ibch) (k : Nat
     (m' : SailM Unit) (ors : Option RegFile) (oib : Option Ibch) (obar : Option barrier_kind)
     (rs' : RegFile) (ib' : Ibch) :
     pnodeStep m rs ib OpaxWit.wtD0.efDev l m' ors none OpaxWit.wtD0.efDev oib obar →
-    lbAdmin true l → WeakAxRealize.fetchPin GD.gdG.gxImg l →
+    AxOpsem.lbAdminAx true l → WeakAxRealize.fetchPin GD.gdG.gxImg l →
     rs' = ors.getD rs → ib' = oib.getD ib →
     astepAnyNfGv GD i (AxEpiRun.st cpu m rs ib k) (AxEpiRun.st cpu m' rs' ib' k) := by
   intro Hn Hadm Hpin hrs hib

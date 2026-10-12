@@ -241,7 +241,7 @@ theorem nwriteInv (row : List Lbl) (n : Nat) (pa : PAddr) (Hdev : devAddr pa = f
   | AStepAdmin p k0 d l0 p' d' Hadm Hps =>
     cases hs
     obtain ⟨rfl, -, -⟩ := nwritePlainDet cpu n pa Hdev val _ rs ibNone d _ _ _ Hps
-    simp [lbAdmin] at Hadm
+    simp [AxOpsem.lbAdminAx] at Hadm
   | AStepWrite p k0 d l0 lb p' d' _ _ _ _ Hps =>
     cases hs
     obtain ⟨rfl, rfl, -⟩ := nwritePlainDet cpu n pa Hdev val _ rs ibNone d _ _ _ Hps
@@ -282,7 +282,7 @@ theorem nxwriteInv (row : List Lbl) (n : Nat) (pa : PAddr) (Hdev : devAddr pa = 
     cases hs
     rcases nwriteExclDet cpu n pa Hdev val _ rs ibNone d _ _ _ Hps with
       ⟨rfl, -, -⟩ | ⟨rfl, rfl, -⟩
-    · simp [lbAdmin] at Hadm
+    · simp [AxOpsem.lbAdminAx] at Hadm
     · exact .inr ⟨rfl, rfl⟩
   | AStepWrite p k0 d l0 lb p' d' Hlk Hwr Heqwr Hwdat Hps =>
     cases hs

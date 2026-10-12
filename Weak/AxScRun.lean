@@ -106,6 +106,8 @@ mp_bad_il}` `ScRunSanity.{mpRows, r5, mpEms, mpIl, mp, mpInputs, mpCtrl, mpCatT,
 mpDeps, mpReads, mpScB, mpBadIl}`.
 
 **Dropped:** nothing.
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `shapeInB` accepts an `LIo` row item and `AxScRun.gshape`'s `LIo` arm is `True` (`gwf`'s flip).
 -/
 import Weak.AxScCat
 import Weak.AxSpinGate
@@ -218,8 +220,7 @@ def shapeInB (l : Lbl) : Bool :=
   match l with
   | .LStore _ _ vs _ => !decide (vs = [])
   | .LRmw _ _ _ _ _ wvs _ => !decide (wvs = [])
-  -- W13 (E): the SC-run builder accepts no I/O-class row item (`gwf` excludes them)
-  | .LIo .. => false
+  -- W13 (I): an I/O-class row item is accepted (`gwf`'s `LIo` shape arm is `True`)
   | _ => true
 
 def shapesOkB (rows : List (List Lbl)) : Bool := rows.all (fun r => r.all shapeInB)
@@ -953,7 +954,7 @@ def AxScRun.gshape (l : Lbl) : Prop :=
   | .LStore _ _ vs _ => vs ≠ []
   | .LFence _ _ _ _ => True
   | .LRmw _ _ _ ts rvs wvs _ => wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
-  | .LIo .. => False
+  | .LIo .. => True
 
 theorem fillShape (img : Int → BitVec 8) (M : MemT) (l : Lbl) :
     shapeInB l = true → AxScRun.gshape (fill img M l) := by
@@ -961,7 +962,7 @@ theorem fillShape (img : Int → BitVec 8) (M : MemT) (l : Lbl) :
   | LLoad => intro _; simp [fill, AxScRun.gshape]
   | LStore => intro h; simpa [shapeInB, AxScRun.gshape, fill] using h
   | LFence => intro _; trivial
-  | LIo => intro h; simp [shapeInB] at h
+  | LIo => intro _; simp [fill, AxScRun.gshape]
   | LRmw =>
     intro h
     simp only [shapeInB, Bool.not_eq_eq_eq_not, Bool.not_true, decide_eq_false_iff_not] at h

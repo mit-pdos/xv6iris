@@ -46,6 +46,8 @@ purely syntactic fact (`naOfnDom`, via `mapOfFunLookupSome`/`None`); no `axprotA
 
 **Not ported:** the section `Let`s `Hwf`/`Hnd_gmo` (inlined as `Hcons.1`/`Hcons.1.1`) and the
 `Print Assumptions` audits.
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `axprotgatePhiNHolds` (and its users here) take `AxProtGate`'s `HnoIo` premise (`gwf` admits I/O events).
 -/
 import Weak.AxProtBytes
 
@@ -68,6 +70,7 @@ def axprotgatePhiN (GD : Gdexec) (rdatn : Geid → Int × List (Nat × BitVec 8)
     graphValue GD e = some Vs
 
 theorem axprotgatePhiNHolds (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
+    (HnoIo : ∀ e l, gxLbl GD.gdG e = some l → lbIsIo l = false)
     (HdataTot : ∀ w, gisW GD.gdG w = true → ∃ data, graphData GD w = some data)
     (rdatn : Geid → Int × List (Nat × BitVec 8))
     (HrdatnSpec : ∀ r l, gxLbl GD.gdG r = some l → lbIsR l = true →
@@ -79,7 +82,7 @@ theorem axprotgatePhiNHolds (GD : Gdexec) (Hcons : rvwmoCatConsistent GD)
   cases Hisw : gisW GD.gdG e
   · simp only [Bool.false_eq_true, ↓reduceIte]
     intro Hs Vs Hvals Hlen HPall
-    obtain ⟨l, Hl, Hisr⟩ := gisROfGmo GD Hcons e Hin Hisw
+    obtain ⟨l, Hl, Hisr⟩ := gisROfGmo GD Hcons e Hin Hisw (HnoIo e)
     obtain ⟨Hgv, Hconn⟩ := HrdatnSpec e l Hl Hisr
     have HlenV : Hs.length = Vs.length := Hvals.length_eq
     have Heq : (rdatn e).2.map Prod.snd = Vs := by

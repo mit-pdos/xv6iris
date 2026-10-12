@@ -42,7 +42,7 @@ natural `gobCat`-predecessor choice satisfies it.
    step first, as Rocq).  `invGS_gen HasNoLc Σ` ↦ `[InvGS_gen hlc GF]` for any `hlc` (as AxWp
    deviation 6).  Wand chains `A -∗ B -∗ C` are stated `⊢ A -∗ B -∗ C` (AxWp deviation 7).
 2. O2 STAGE C (`notes/weak-port-o2-stageC.md` §D) + OWNER Q8 — THE FETCH EXCLUSION BECOMES THE
-   IMAGE PIN.  There is no `AStepFetch`: a fetch is an `AStepAdmin` step (`lbAdmin true (LIFetch
+   IMAGE PIN.  There is no `AStepFetch`: a fetch is an `AStepAdmin` step (`AxOpsem.lbAdminAx true (LIFetch
    ..)`), handled by `wpSkipStep` with `atK` unchanged like every administrative label.  Rocq's
    `wlabel_is_fetch l = false` conjunct of `astep_prog_nf` is replaced by the boot-image pin
    `WeakAxRealize.fetchPin img l` (AxLifting deviation 2): `astepProgNf row img s s'` is
@@ -180,7 +180,7 @@ theorem astepProgWdataGmem (GD : Gdexec) (i : Nat) (s : Athread) (l : Wlabel) (s
   intro h hwd
   cases h with
   | AStepAdmin p k d l p' d' ha hs =>
-    cases l <;> simp [lbAdmin, wlWdata] at ha hwd
+    cases l <;> simp [AxOpsem.lbAdminAx, wlWdata] at ha hwd
   | AStepWrite p k d l lb p' d' hrow hs1 hid hdat hs =>
     have hw : (aidentWr (aident lb)).isSome = true := by rw [← hid]; exact hs1
     show gmemB GD.gdG (i, k) = true

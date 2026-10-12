@@ -57,6 +57,8 @@ Lean-only (file-qualified): `AxSpinU2.m5`, `AxSpinU2.m3` (the readback / release
 
 **Dropped:** none (26 Rocq decls incl. the 3 local instances `shUG`/`uw_pol`/`uw_G` (inlined)
 and the `zv` Ltac (inlined); 24 Lean = 22 + 2 Lean-only).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** the release lemmas' anchor-domain premise is `(lbIsR l || lbIsW l) = true` (was `lbIsMem l = true`): `gwf` admits I/O events, which `fence rw,w` does not order (RVWMO; D48).
 -/
 import Weak.AxSpinU
 
@@ -339,7 +341,7 @@ theorem wU3 (GT : GdexecT) (nm : Xv6N) (cpu : CPU) (Hcons : rvwmoCatConsistent (
     lookupSingletonNe (by simp)
   have Hdom : ∀ e, e ∈ (FiniteMap.dom_set (AxSpinU2.m3 (GF := GF) GT nm i) : GSet Geid) →
       e.1 = i ∧ e.2 < 3 ∧
-        ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ lbIsMem l = true := by
+        ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true := by
     intro e He
     unfold AxSpinU2.m3 at He
     rw [domInsert, domSingleton] at He

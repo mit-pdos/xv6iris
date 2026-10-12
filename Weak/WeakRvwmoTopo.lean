@@ -70,6 +70,8 @@ conclusion from acyclicity alone.  A LEAF: nothing imports this file.
 
 **Not ported:** nothing (the three `Print Assumptions` are commands, not
 declarations).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `WeakRvwmoTopo.lblRenShape`'s `LIo` arms are `True` (`gwf`'s flip).
 -/
 import Weak.WeakMem
 import Weak.WeakAxiomatic
@@ -171,14 +173,14 @@ theorem WeakRvwmoTopo.lblRenShape (pi : Nat → Nat) (l : Lbl) :
      | LFence _ _ _ _ => True
      | LRmw _ _ _ ts rvs wvs _ =>
          wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
-     | LIo .. => False) →
+     | LIo .. => True) →
     (match lblRen pi l with
      | LLoad _ _ ts vs => vs.length = ts.length
      | LStore _ _ vs _ => vs ≠ []
      | LFence _ _ _ _ => True
      | LRmw _ _ _ ts rvs wvs _ =>
          wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
-     | LIo .. => False) := by
+     | LIo .. => True) := by
   intro h
   cases l <;> simp only [lblRen, List.length_map] at h ⊢ <;> exact h
 

@@ -664,7 +664,7 @@ theorem AxTokLedgerMp.wpdSkipStepOfLater' (γ : GName) (i : Agent) (k' : Nat) (�
 theorem AxTokLedgerMp.astepProgRowEndShape' (row : List Lbl) (s : Athread) (l : Wlabel)
     (s' : Athread) (Hnone : row[s.atK]? = none) :
     AxOpsem.astepProg row s l s' →
-    lbAdmin true l ∧ s'.atK = s.atK ∧ ∃ d d', pstepProg s.atP d l s'.atP d' := by
+    AxOpsem.lbAdminAx true l ∧ s'.atK = s.atK ∧ ∃ d d', pstepProg s.atP d l s'.atP d' := by
   intro h
   cases h with
   | AStepAdmin p k d l p' d' hadm hst => exact ⟨hadm, rfl, d, d', hst⟩
@@ -677,8 +677,8 @@ theorem AxTokLedgerMp.astepProgRowEndShape' (row : List Lbl) (s : Athread) (l : 
     rw [hlk] at Hnone
     cases Hnone
 
-theorem AxTokLedgerMp.lbAdminWlWdataNone' (l : Wlabel) : lbAdmin true l → wlWdata l = none := by
-  cases l <;> simp [lbAdmin, wlWdata]
+theorem AxTokLedgerMp.lbAdminWlWdataNone' (l : Wlabel) : AxOpsem.lbAdminAx true l → wlWdata l = none := by
+  cases l <;> simp [AxOpsem.lbAdminAx, wlWdata]
 
 theorem wpdRowEndTriv' (γ : GName) (i : Agent) (k0 : Nat)
     (Hend : (AxOpsem.grow AxTokLedgerMp.mpr i).length ≤ k0) (p : Pexv6) :
@@ -807,7 +807,7 @@ theorem astepWriteInv (cpu : CPU) (i : Agent) (pa : PAddr) (Hdev : devAddr pa = 
     simp only at Heqp
     subst Heqp
     obtain ⟨rfl, -, -⟩ := l3pWritePlainDet cpu pa Hdev val _ rs ibNone d _ _ _ Hps
-    simp [lbAdmin] at Hadm
+    simp [AxOpsem.lbAdminAx] at Hadm
   | AStepWrite p k0 d l0 lb p' d' _ _ _ _ Hps =>
     simp only at Heqp Heqk
     subst Heqp Heqk
@@ -831,7 +831,7 @@ theorem astepFenceInv (cpu : CPU) (i : Agent) (m' : SailM Unit) (rs : RegFile) (
     simp only at Heqp
     subst Heqp
     obtain ⟨rfl, -, -⟩ := l3pFenceDet cpu _ rs ibNone d _ _ _ Hps
-    simp [lbAdmin] at Hadm
+    simp [AxOpsem.lbAdminAx] at Hadm
   | AStepWrite p k0 d l0 lb p' d' _ Hwr _ _ Hps =>
     simp only at Heqp
     subst Heqp

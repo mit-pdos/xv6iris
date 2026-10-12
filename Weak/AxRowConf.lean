@@ -26,7 +26,7 @@ As in Rocq, `epilogue_consecutive_ret_conf` (step 1b) is NOT proved here.
 1. O2 STAGE C (fetches are not graph events; `AxOpsem` deviation 2): Rocq's constructor
    `RowEmitFetch` (a fetch consuming the row's `LLoad false …` item, answered by the oracle
    `fetch_answers T img`) is DROPPED, and with it the section parameters `T`/`img` (deleted
-   from `astepOwn` by Q-C2).  A fetch is now an administrative label (`lbAdmin true (LIFetch
+   from `astepOwn` by Q-C2).  A fetch is now an administrative label (`AxOpsem.lbAdminAx true (LIFetch
    ..)`), so a run's fetches are `RowEmitAdmin` steps; no row item is consumed.  The
    extraction lemmas lose their (contradictory) fetch case.
 2. NAMES: camelCase; `l !! k` ↦ `l[k]?`; `S k` ↦ `k + 1`; `is_Some o` ↦ `o.isSome = true`;
@@ -81,7 +81,7 @@ inductive rowEmittedFromRun : Athread → Athread → Prop where
       rowEmittedFromRun ⟨p, k⟩ t'
   | RowEmitAdmin (p : Pexv6) (k : Nat) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab)
       (t' : Athread) :
-      lbAdmin true l →
+      AxOpsem.lbAdminAx true l →
       pstepProg p d l p' d' →
       rowEmittedFromRun ⟨p', k⟩ t' →
       rowEmittedFromRun ⟨p, k⟩ t'

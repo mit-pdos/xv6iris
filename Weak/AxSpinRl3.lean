@@ -73,6 +73,8 @@ NEW Lean file (no Rocq source: Rocq's `AxSpinRs`/`AxSpinRl*` were never written)
 `inClr`, `zero32Byte0`, `AxSpinX5.addZero`, `lblOfRow`, `xv6AxpolWf`, `HGX`,
 `AxSpinWit.localTrue`, `flowEqDynMono`, `RowRelease`/`relK*`/`rowReleaseFence`/`rowReleaseItem`/
 `rowReleaseCpu`/`rowReleaseLen` (AxSpinRl1).  New names grepped absent from the tree.
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** the release lemmas' anchor-domain premise is `(lbIsR l || lbIsW l) = true` (was `lbIsMem l = true`: `gwf` admits I/O events, which `fence rw,w` does not order, D48); `AxSpinRl3.memOfRead` concludes the RAM form.
 -/
 import Weak.AxSpinRl2
 
@@ -102,7 +104,7 @@ theorem AxSpinRl3.stBytesZero : stBytes 4 (0#64) = AxSpinX4.z4 := by
 
 /-- (Lean-only) a read row label is a memory event. -/
 theorem AxSpinRl3.memOfRead (lb : Lbl) (aq : Bool) (b : Int) (n : Nat) :
-    aident lb = .IRead aq b n → lbIsMem lb = true := by
+    aident lb = .IRead aq b n → (lbIsR lb || lbIsW lb) = true := by
   intro h
   cases lb <;> first | rfl | simp [aident] at h
 
@@ -223,7 +225,7 @@ theorem FstRel (i : Agent) (kf kw : Nat) (c a1 a2 e0 : Geid) (m : Mea GF) (cls :
     (AxOpsem.grow (gtAdGd GT) i)[kf]? = some (.LFence true true false true) →
     (AxOpsem.grow (gtAdGd GT) i)[kw]? = some (.LStore false L.xlLk AxSpinX4.z4 cls) →
     (∀ e, e ∈ (FiniteMap.dom_set m : GSet Geid) → e.1 = i ∧ e.2 < kf ∧
-      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ lbIsMem l = true) →
+      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     a1 ∈ (FiniteMap.dom_set m : GSet Geid) → a2 ∈ (FiniteMap.dom_set m : GSet Geid) →
     e0 ∈ (FiniteMap.dom_set m : GSet Geid) →
     (∀ (k' : Nat) (lb : Lbl) (rl : Bool) (n : Nat), e0.2 < k' →
@@ -268,7 +270,7 @@ theorem FstRel (i : Agent) (kf kw : Nat) (c a1 a2 e0 : Geid) (m : Mea GF) (cls :
       dsimp only at Hi Hlt' Hl
       rw [show ((ei, ek) : Geid) = (i, ek) from by rw [Hi]]
       have Hl' := lblOfRow _ _ _ _ Hl
-      exact ⟨fenceGob (gtAdGd GT) i ek kf k l _ _ _ Hl' (WeakRvwmoGraph.gwfMemRW _ _ _ Hcons.1 Hl' Hmem) Hlf Hls Hlt' Hlt,
+      exact ⟨fenceGob (gtAdGd GT) i ek kf k l _ _ _ Hl' Hmem Hlf Hls Hlt' Hlt,
         fenceLobp (gtAdGd GT) Hcons i ek kf k l _ _ _ Hl' Hmem Hlf Hls Hlt' Hlt⟩
     have Hsub : (FiniteMap.dom_set m : GSet Geid) ⊆
         @Axpol.lobp (xv6Pol GT) (gtAdGd GT) (i, k) := fun e He => (Hgob e He).2
@@ -328,7 +330,7 @@ theorem XxSwRel (s : Athread) (rs : RegFile) (k : Nat) (pc : BitVec 64) (is_rvc 
     (AxOpsem.grow (gtAdGd GT) i)[kf]? = some (.LFence true true false true) →
     (AxOpsem.grow (gtAdGd GT) i)[k]? = some (.LStore false L.xlLk AxSpinX4.z4 cls) →
     (∀ e, e ∈ (FiniteMap.dom_set m : GSet Geid) → e.1 = i ∧ e.2 < kf ∧
-      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ lbIsMem l = true) →
+      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     a1 ∈ (FiniteMap.dom_set m : GSet Geid) → a2 ∈ (FiniteMap.dom_set m : GSet Geid) →
     e0 ∈ (FiniteMap.dom_set m : GSet Geid) →
     (∀ (k' : Nat) (lb : Lbl) (rl : Bool) (n : Nat), e0.2 < k' →
@@ -386,7 +388,7 @@ theorem XxSwRelRel (kr : Nat) (c : Bool)
       pra ps0 ps1 plk pcl hra hs0 hs1 hram hs0m qra qs0 qmra qms0 pn pint →
     (AxOpsem.grow (gtAdGd GT) i)[relKw kr]? =
       some (.LStore false L.xlLk AxSpinX4.z4 .WCrel) →
-    ks < kr → (∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ lbIsMem l = true) →
+    ks < kr → (∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     (∀ (k' : Nat) (lb : Lbl) (rl : Bool) (n : Nat), relKc kr < k' →
       (AxOpsem.grow (gtAdGd GT) i)[k']? = some lb →
       aidentWr (aident lb) = some (rl, L.xlLk, n) → k' = relKw kr) →
@@ -439,14 +441,14 @@ theorem XxSwRelRel (kr : Nat) (c : Bool)
     simp only [m]
     rw [domInsert, domInsert, domSingleton]
     exact elemOfUnion.2 (Or.inr (elemOfUnion.2 (Or.inr (elemOfSingleton.2 rfl))))
-  have Hmh : ∃ l, (AxOpsem.grow (gtAdGd GT) i)[relKh kr]? = some l ∧ lbIsMem l = true := by
+  have Hmh : ∃ l, (AxOpsem.grow (gtAdGd GT) i)[relKh kr]? = some l ∧ (lbIsR l || lbIsW l) = true := by
     obtain ⟨lb, Hlb, aq, Hs⟩ := rowReleaseItem 3 (.it (.RL plk 4)) HR (by cases c <;> rfl)
     exact ⟨lb, Hlb, AxSpinRl3.memOfRead lb aq plk 4 Hs⟩
-  have Hmc : ∃ l, (AxOpsem.grow (gtAdGd GT) i)[relKc kr]? = some l ∧ lbIsMem l = true := by
+  have Hmc : ∃ l, (AxOpsem.grow (gtAdGd GT) i)[relKc kr]? = some l ∧ (lbIsR l || lbIsW l) = true := by
     obtain ⟨vw, cls, Hlb, -⟩ := rowReleaseCpu HR
     exact ⟨_, Hlb, rfl⟩
   have Hdom : ∀ e, e ∈ (FiniteMap.dom_set m : GSet Geid) → e.1 = i ∧ e.2 < relKf kr ∧
-      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ lbIsMem l = true := by
+      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true := by
     intro e He
     rcases Hdm e He with rfl | rfl | rfl
     · exact ⟨rfl, by simp only [relKh, relKf]; omega, Hmh⟩

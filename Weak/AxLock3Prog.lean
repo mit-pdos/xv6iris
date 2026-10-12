@@ -28,7 +28,7 @@ also has the `LSilent` retry self-loop (`pnodeStep`'s `memWrite` arm) — stated
 (`l3pWriteExclRetry`, `l3pWriteExclDet`), not hidden.
 
 READER'S RECORDED VALUE: the loaded byte `vB` is written into GPR `x10` by a hand-built
-`regWrite` (always administrative: `lbAdmin true (erwLabel _)`), so the final register file
+`regWrite` (always administrative: `AxOpsem.lbAdminAx true (erwLabel _)`), so the final register file
 carries `vB` literally.
 
 **Fetches.** None: the programs are hand-built monad terms with no fetch node; every label of
@@ -253,8 +253,8 @@ theorem l3pFenceDet :
 
 /-- 1.5 A `memRead` node never steps by anything but a read: read labels are disjoint from
 admin / write / fence labels. -/
-theorem l3pRdExclAdmin (l : Wlabel) : (wlRd l).isSome = true → lbAdmin true l → False := by
-  cases l <;> simp [wlRd, lbAdmin]
+theorem l3pRdExclAdmin (l : Wlabel) : (wlRd l).isSome = true → AxOpsem.lbAdminAx true l → False := by
+  cases l <;> simp [wlRd, AxOpsem.lbAdminAx]
 
 theorem l3pRdExclWr (l : Wlabel) : (wlRd l).isSome = true → (wlWr l).isSome = true → False := by
   cases l <;> simp [wlRd, wlWr]
@@ -266,7 +266,7 @@ theorem l3pRdExclFence (l : Wlabel) :
 /-- `AxOpsem.astepProg`'s own shape, at arbitrary indices (deviation 2: three disjuncts). -/
 theorem l3pAstepProgShape (row : List Lbl) (s : Athread) (l : Wlabel) (s' : Athread) :
     AxOpsem.astepProg row s l s' →
-    lbAdmin true l ∨ (wlWr l).isSome = true ∨ (wlFence l).isSome = true := by
+    AxOpsem.lbAdminAx true l ∨ (wlWr l).isSome = true ∨ (wlFence l).isSome = true := by
   intro h
   cases h with
   | AStepAdmin _ _ _ _ _ _ hadm _ => exact .inl hadm

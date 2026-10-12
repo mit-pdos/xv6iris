@@ -75,24 +75,24 @@ def rowStuckR (pin : Wlabel → Prop) (row : List Lbl) (s : Athread) : Prop :=
   ∀ s2, rtc (AxSpinRow.astepPin pin row) s s2 →
     s2.atK = s.atK ∧ s.atK < row.length ∧
     (∀ id K, ¬ areadStep row s2 id K) ∧
-    (∀ l s3, AxOpsem.astepProg row s2 l s3 → pin l → lbAdmin true l)
+    (∀ l s3, AxOpsem.astepProg row s2 l s3 → pin l → AxOpsem.lbAdminAx true l)
 
-theorem AxSpinRow.lbAdminWdata (l : Wlabel) : lbAdmin true l → wlWdata l = none := by
-  cases l <;> simp [lbAdmin, wlWdata]
+theorem AxSpinRow.lbAdminWdata (l : Wlabel) : AxOpsem.lbAdminAx true l → wlWdata l = none := by
+  cases l <;> simp [AxOpsem.lbAdminAx, wlWdata]
 
-theorem rdNotAdmin (l : Wlabel) (x : Bool × Int × Nat) : wlRd l = some x → ¬ lbAdmin true l := by
-  cases l <;> simp [wlRd, lbAdmin]
+theorem rdNotAdmin (l : Wlabel) (x : Bool × Int × Nat) : wlRd l = some x → ¬ AxOpsem.lbAdminAx true l := by
+  cases l <;> simp [wlRd, AxOpsem.lbAdminAx]
 
-theorem wrNotAdmin (l : Wlabel) (x : Bool × Int × Nat) : wlWr l = some x → ¬ lbAdmin true l := by
-  cases l <;> simp [wlWr, lbAdmin]
+theorem wrNotAdmin (l : Wlabel) (x : Bool × Int × Nat) : wlWr l = some x → ¬ AxOpsem.lbAdminAx true l := by
+  cases l <;> simp [wlWr, AxOpsem.lbAdminAx]
 
 theorem fenceNotAdmin (l : Wlabel) (x : Bool × Bool × Bool × Bool) :
-    wlFence l = some x → ¬ lbAdmin true l := by
-  cases l <;> simp [wlFence, lbAdmin]
+    wlFence l = some x → ¬ AxOpsem.lbAdminAx true l := by
+  cases l <;> simp [wlFence, AxOpsem.lbAdminAx]
 
 /-- An administrative step does not look at the row. -/
 theorem adminAnyRow (row : List Lbl) (s : Athread) (l : Wlabel) (s' : Athread) :
-    AxOpsem.astepProg row s l s' → lbAdmin true l →
+    AxOpsem.astepProg row s l s' → AxOpsem.lbAdminAx true l →
     ∀ row', AxOpsem.astepProg row' s l s' := by
   intro H Hadm row'
   cases H with
@@ -180,14 +180,14 @@ def fits (l : Wlabel) (lb : Lbl) : Prop :=
 
 /-- A `pin`ned administrative program step or a wire (both keep the position; row-free). -/
 def kstep0 (pin : Wlabel → Prop) (a b : Athread) : Prop :=
-  (b.atK = a.atK ∧ ∃ d l d', lbAdmin true l ∧ pin l ∧ pstepProg a.atP d l b.atP d') ∨
+  (b.atK = a.atK ∧ ∃ d l d', AxOpsem.lbAdminAx true l ∧ pin l ∧ pstepProg a.atP d l b.atP d') ∨
   awire a b
 
 /-- ROW-FREE: from `s` (along pinned administrative steps and wires), the next
 non-administrative label is in `F`. -/
 def firstEv (pin : Wlabel → Prop) (F : Wlabel → Prop) (s : Athread) : Prop :=
   ∀ s2, rtc (kstep0 pin) s s2 →
-    ∀ d l p' d', pstepProg s2.atP d l p' d' → ¬ lbAdmin true l → F l
+    ∀ d l p' d', pstepProg s2.atP d l p' d' → ¬ AxOpsem.lbAdminAx true l → F l
 
 /-- ROW-ONLY: no label of `F` fits the row item at `k`. -/
 def rowRejects (row : List Lbl) (k : Nat) (F : Wlabel → Prop) : Prop :=
@@ -207,7 +207,7 @@ theorem rowStuckOfFirst (pin : Wlabel → Prop) (row : List Lbl) (s : Athread)
   intro Hfe Hrej Hlt
   have Hkey : ∀ s2, rtc (kstep0 pin) s s2 →
       (∀ id K, ¬ areadStep row s2 id K) ∧
-      (∀ l s3, AxOpsem.astepProg row s2 l s3 → pin l → lbAdmin true l ∧ kstep0 pin s2 s3) := by
+      (∀ l s3, AxOpsem.astepProg row s2 l s3 → pin l → AxOpsem.lbAdminAx true l ∧ kstep0 pin s2 s3) := by
     intro s2 Hr
     have Hk2 := kstep0K pin _ _ Hr
     refine ⟨?_, ?_⟩

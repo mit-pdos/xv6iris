@@ -360,7 +360,7 @@ theorem pstepRdInv (cpu : CPU) (r : Register) (k : RegisterType r → SailM Unit
 theorem pstepWrInv (cpu : CPU) (r : Register) (v : RegisterType r) (k : PUnit → SailM Unit)
     (rs : RegFile) (ib : Ibch) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
     pstepProg (.PHart cpu (.impure (.ok (.regWrite r v)) k) rs none ib) d l p' d' →
-    lbAdmin true l ∧ p' = .PHart cpu (k PUnit.unit) (rs.set r v) none ib := by
+    AxOpsem.lbAdminAx true l ∧ p' = .PHart cpu (k PUnit.unit) (rs.set r v) none ib := by
   cases p' with
   | PDisk _ => intro h; exact h.elim
   | PHart c' m' rs' fn' ib' =>
@@ -372,9 +372,9 @@ theorem pstepWrInv (cpu : CPU) (r : Register) (v : RegisterType r) (k : PUnit �
 writes no register steps (in the program half) to `m1` at the same registers. -/
 theorem AxSymEngine.silentPs (cpu : CPU) (m m1 : SailM Unit)
     (H : ∀ rs ib d l m' ors fn' d' oib obar, pnodeStep m rs ib d l m' ors fn' d' oib obar →
-      lbAdmin true l ∧ m' = m1 ∧ ors = none ∧ fn' = none) :
+      AxOpsem.lbAdminAx true l ∧ m' = m1 ∧ ors = none ∧ fn' = none) :
     ∀ rs ib d l p' d', pstepProg (.PHart cpu m rs none ib) d l p' d' →
-      lbAdmin true l ∧ ∃ ib1, p' = .PHart cpu m1 rs none ib1 := by
+      AxOpsem.lbAdminAx true l ∧ ∃ ib1, p' = .PHart cpu m1 rs none ib1 := by
   intro rs ib d l p' d' h
   cases p' with
   | PDisk _ => exact h.elim
@@ -400,7 +400,7 @@ lands in `N`; the wire keeps the class. -/
 theorem wpdAdminNode (m : SailM Unit) (kk : Nat) (A : RegFile → Prop) (N : Athread → Prop)
     (HA : ∀ rs rs', A rs → regsAgree AxRunClose.pinReg rs' rs → A rs')
     (Hps : ∀ rs ib d l p' d', A rs → pstepProg (.PHart cpu m rs none ib) d l p' d' →
-       lbAdmin true l ∧ N ⟨p', kk⟩) :
+       AxOpsem.lbAdminAx true l ∧ N ⟨p', kk⟩) :
     ∀ rs ib, A rs →
     ⊢ (∀ s2, ⌜N s2⌝ -∗ wpd .MaybeStuck i s2 Φ) -∗
       wpd .MaybeStuck i ⟨.PHart cpu m rs none ib, kk⟩ Φ := by
@@ -662,7 +662,7 @@ include Hend in
 over the agreement class of a state `t`. -/
 theorem AxSymEngine.wpdSilentNode (m m1 : SailM Unit) (kk : Nat) (t : ExecSt)
     (H : ∀ rs ib d l m' ors fn' d' oib obar, pnodeStep m rs ib d l m' ors fn' d' oib obar →
-      lbAdmin true l ∧ m' = m1 ∧ ors = none ∧ fn' = none) :
+      AxOpsem.lbAdminAx true l ∧ m' = m1 ∧ ors = none ∧ fn' = none) :
     ∀ rs ib, regsAgree AxRunClose.pinReg rs t.regs →
     ⊢ (∀ rs1 ib1, ⌜regsAgree AxRunClose.pinReg rs1 t.regs⌝ -∗
          wpd .MaybeStuck i ⟨.PHart cpu m1 rs1 none ib1, kk⟩ Φ) -∗

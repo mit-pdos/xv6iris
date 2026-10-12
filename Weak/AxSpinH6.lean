@@ -67,6 +67,8 @@ PROVED
 **Dropped:** the local instance `g6_G` (inlined), the Ltac `harts6_tac` (deviation 4), the §5
 `Check`/`Print Assumptions` lines (the lint's axiom check covers them).  (50 Rocq items = 48 decls
 + 1 instance + 1 Ltac; 52 Lean = 48 + 4 Lean-only.)
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** the release lemmas' anchor-domain premise is `(lbIsR l || lbIsW l) = true` (was `lbIsMem l = true`): `gwf` admits I/O events, which `fence rw,w` does not order (RVWMO; D48).
 -/
 import Weak.AxSpinH5
 import Weak.AxClsStep2b
@@ -255,7 +257,7 @@ theorem wpdA6 (GT : GdexecT) (nm : spinN) (cpu : CPU) (Hcons : rvwmoCatConsisten
       (fenceM (relM hlt)) .WCplain (hA, 0) [] _ (by rw [Hlen]; decide) (by rw [Hrow]; rfl)
       (fun b Hb => XS6X b Hb) Hin1
   have Hev : ∀ e : Geid, e = (hA, 0) ∨ e = (hA, 1) → e.1 = hA ∧ e.2 < 2 ∧
-      ∃ l, (AxOpsem.grow (gtAdGd GT) hA)[e.2]? = some l ∧ lbIsMem l = true := by
+      ∃ l, (AxOpsem.grow (gtAdGd GT) hA)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true := by
     intro e He
     rcases He with rfl | rfl
     · exact ⟨rfl, by decide, _, by rw [Hrow]; rfl, rfl⟩
@@ -401,7 +403,7 @@ theorem wpdG6 (GT : GdexecT) (nm : spinN) (cpu : CPU) (Hcons : rvwmoCatConsisten
       (by decide) Hin31 Hin32
   -- release: `locked` + lk->cpu from the claim, the word from the store
   have Hev : ∀ e : Geid, e = (hB, 0) ∨ e = (hB, 3) → e.1 = hB ∧ e.2 < 4 ∧
-      ∃ l, (AxOpsem.grow (gtAdGd GT) hB)[e.2]? = some l ∧ lbIsMem l = true := by
+      ∃ l, (AxOpsem.grow (gtAdGd GT) hB)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true := by
     intro e He
     rcases He with rfl | rfl
     · exact ⟨rfl, by decide, _, by rw [Hrow]; rfl, rfl⟩

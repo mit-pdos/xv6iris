@@ -50,7 +50,7 @@ Rocq: an instruction's fetch is a ROW ITEM (`LLoad false pc … [0;0;0;0]`, iden
 `af_fetch_ident pc = IRead false pc 4`), realized by `AStep_fetch` answered by the oracle
 `fetch_answers T img`; an `ld`/`sd` row is `[fetch @ k; data @ S k]`.  Lean (owner Q-C1/Q-C2,
 `AxOpsem` deviation 2): a fetch is an ADMINISTRATIVE step — `AStepAdmin` at
-`lbAdmin true (LIFetch base tvs)` — that KEEPS the row position; there is no fetch row item, no
+`AxOpsem.lbAdminAx true (LIFetch base tvs)` — that KEEPS the row position; there is no fetch row item, no
 fetch identity, no oracle, and the `T`/`img` parameters of every opax relation are gone.  So in
 the whole AxFetch port:
 - `af_astep_fetch_of_memread` ↦ `afAstepFetchOfMemread`: the fetch node (a RAM `memRead` whose
@@ -178,7 +178,7 @@ hand-built-witness technique GENERICALLY (any request / continuation / registers
 
 ### 2.0 THE REGISTER-TOWER PEEL: `execEff` (functional) ⇒ `pnodeStep`/`astepProg` (small step) -/
 
-theorem erwLabelLbAdmin (ek : ErwKind) : lbAdmin true (erwLabel ek) := by
+theorem erwLabelLbAdmin (ek : ErwKind) : AxOpsem.lbAdminAx true (erwLabel ek) := by
   cases ek <;> trivial
 
 /-- (Lean-only) ONE admin `pnodeStep` (unparked hart) in front of an opax run; the successor is
@@ -188,7 +188,7 @@ theorem AxFetch1.admPrepend (row : List Lbl) (cpu : CPU) (m m' : SailM Unit) (rs
     (obar : Option barrier_kind) (kpos : Nat) (T : Athread) :
     rtc (fun t1 t2 => ∃ l, AxOpsem.astepProg row t1 l t2)
       ⟨.PHart cpu m' (ors.getD rs) none (oib.getD ib), kpos⟩ T →
-    pnodeStep m rs ib dd l m' ors none dd' oib obar → lbAdmin true l →
+    pnodeStep m rs ib dd l m' ors none dd' oib obar → AxOpsem.lbAdminAx true l →
     rtc (fun t1 t2 => ∃ l, AxOpsem.astepProg row t1 l t2) ⟨.PHart cpu m rs none ib, kpos⟩ T :=
   fun h hn hl =>
     rtc_l ⟨l, .AStepAdmin _ kpos (efInit dd) l (.PHart cpu m' (ors.getD rs) none (oib.getD ib))
@@ -542,7 +542,7 @@ theorem afAreadStepOfMemread (row : List Lbl) (cpu : CPU) (n va : Nat)
   rw [hvs]; rfl
 
 /-- THE FETCH, generic (O2 Stage C, deviation 2): from a hart at a RAM `memRead` node with
-`akIfetch = true`, ONE administrative opax step (`AStepAdmin` at `lbAdmin true (LIFetch ..)`)
+`akIfetch = true`, ONE administrative opax step (`AStepAdmin` at `AxOpsem.lbAdminAx true (LIFetch ..)`)
 that KEEPS the row position — no row item, no identity, no oracle. -/
 theorem afAstepFetchOfMemread (row : List Lbl) (cpu : CPU) (n va : Nat)
     (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)

@@ -152,7 +152,7 @@ theorem writeInv2 (row : List Lbl) (pa : PAddr) (Hdev : devAddr pa = false) (val
   | AStepAdmin p k0 d l0 p' d' Hadm Hps =>
     cases hs
     obtain ⟨rfl, -, -⟩ := l3pWritePlainDet cpu pa Hdev val _ rs ibNone d _ _ _ Hps
-    simp [lbAdmin] at Hadm
+    simp [AxOpsem.lbAdminAx] at Hadm
   | AStepWrite p k0 d l0 lb p' d' Hlk _ Heqwr Hwdat Hps =>
     cases hs
     obtain ⟨rfl, rfl, -⟩ := l3pWritePlainDet cpu pa Hdev val _ rs ibNone d _ _ _ Hps
@@ -179,7 +179,7 @@ theorem fenceInv2 (row : List Lbl) (m' : SailM Unit) (rs : RegFile) (k : Nat) (l
   | AStepAdmin p k0 d l0 p' d' Hadm Hps =>
     cases hs
     obtain ⟨rfl, -, -⟩ := l3pFenceDet cpu _ rs ibNone d _ _ _ Hps
-    simp [lbAdmin] at Hadm
+    simp [AxOpsem.lbAdminAx] at Hadm
   | AStepWrite p k0 d l0 lb p' d' _ Hwr _ _ Hps =>
     cases hs
     obtain ⟨rfl, -, -⟩ := l3pFenceDet cpu _ rs ibNone d _ _ _ Hps

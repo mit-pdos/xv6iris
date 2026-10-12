@@ -1514,7 +1514,7 @@ end seg
 program step is administrative and keeps the position. -/
 theorem AxSpinApA.rowEndShape (row : List Lbl) (s : Athread) (l : Wlabel) (s' : Athread)
     (Hnone : row[s.atK]? = none) :
-    AxOpsem.astepProg row s l s' → lbAdmin true l ∧ s'.atK = s.atK := by
+    AxOpsem.astepProg row s l s' → AxOpsem.lbAdminAx true l ∧ s'.atK = s.atK := by
   intro h
   cases h with
   | AStepAdmin p k d l p' d' hadm hst => exact ⟨hadm, rfl⟩

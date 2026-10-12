@@ -49,9 +49,9 @@ It does NOT assume `racyD` acyclicity — the cycle kill carries that.  The rank
 **Status of the surrounding model at this file's landing.**  Statement text is final.  W13 (M):
 `gmem` holds of I/O events (`lbIsMem l = lbIsR l || lbIsW l || lbIsIo l`, `WeakRvwmoGraph`
 deviation 6), so they are in gmo; `gfIoDev` is the bundle clause `gisIo (i, k) ↔ (i, k) ∈ gfDev`
-(§3.1).  Until W13 (I) flips `gwf`'s `LIo` shape arm, `projLbl`, and `lblRealizes*` ([OWN.27]),
-no `gwf` graph carries an `LIo` event and the item is satisfied for free
-(`GraphFabResidue.ioResidueGwfInterim`).  `forgetF`/`GfexecT` (W13 (I)/(W)) do not exist yet: the item is stated on the
+(§3.1).  W13 (I) ([OWN.27]) flipped `gwf`'s `LIo` shape arm, `projLbl` and `lblRealizes*`, so a
+`gwf` graph may now carry `LIo` events; the interim lemma `ioResidueGwfInterim` (the item for free
+on every `gwf` graph, true only while that arm was `False`) is RETIRED with the flip.  `forgetF`/`GfexecT` (W13 (W)) do not exist yet: the item is stated on the
 untagged fabric bundle `Gfexec`, which is what `ioResidueGmo (forgetF GT)` instantiates.
 
 Names (plan text): `gisIo`, `gisR`, `gfBefore`, `ioResidue`, `ioResidueGmo`, `ioResidueNodev`,
@@ -182,17 +182,6 @@ theorem GraphFabResidue.gfIoDevNodev (GD : Gdexec) :
     (∀ e, gisIo GD.gdG e = false) → gfIoDev ⟨GD, []⟩ := by
   intro hno i row _ k _
   simp [hno]
-
-/-- INTERIM (until W13 (I) flips `gwf`'s `LIo` shape arm, [OWN.27]): a `gwf` graph has no I/O
-event, so the item holds at any fabric list. -/
-theorem GraphFabResidue.ioResidueGwfInterim (GF : Gfexec) :
-    gwf GF.gfGd.gdG → ioResidueGmo GF := by
-  intro hwf
-  refine ioResidueNodev GF (fun e => ?_)
-  unfold gisIo
-  rcases hl : gxLbl GF.gfGd.gdG e with _ | l
-  · rfl
-  · exact WeakRvwmoGraph.gwfNoIo _ e l hwf hl
 
 /-! ## 4. The re-encoded `w13f`: the SC case is admitted (W13 (T) acceptance)
 

@@ -66,6 +66,8 @@ not needed); §6 the rank trace is a `ptraceExt` (`glinPtraceExt`), non-vacuity 
 `fconfSupply'`, `fconf_trace_realize` `fconfTraceRealize`.
 
 **Dropped:** nothing (Rocq 69 declarations; Lean 69 + 3 helpers).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `gtraceSnocStep` gains the inert `LIo` arm (`snocConsistent` at `mstepOk … = True`).
 -/
 import Weak.WeakRvwmoFloor
 import Weak.WeakRvwmoFabInd
@@ -246,7 +248,10 @@ theorem gtraceSnocStep (G : Gexec) (c : Cand) (ev : Nat → Geid) (i : Nat) (l :
     GtracePrefix G (candSnoc c ⟨i, l⟩) (evSnoc c ev (i, gcnt i c.cdTr)) := by
   intro hcons hc hgt hl hix hsrc
   cases l with
-  | LIo => exact (WeakRvwmoFloor.gshape G hcons.1 _ _ hl).elim
+  | LIo kd base vs =>
+    -- W13 (I): the inert I/O-class event (`mstepOk` is `True`, `mstep.MStepIo`)
+    exact ⟨snocConsistent c _ hc trivial,
+      gtracePrefixSnoc G c ev i _ hcons.1 hgt hl (fun h => by simp [lbIsW] at h)⟩
   | LLoad aq base ts vs =>
     exact gtraceSnocReadConsistent G c ev i aq base ts vs hcons hc hgt hl (hsrc base ts vs rfl)
   | LStore rl base vs kc =>

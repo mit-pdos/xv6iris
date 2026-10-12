@@ -225,7 +225,7 @@ theorem n0OkSeipRead (cpu : CPU) (k0 : RegisterType Register.sig_seip → SailM 
 
 /-! # 3. Walking helpers -/
 
-theorem erwLabelLbAdmin' (ek : ErwKind) : lbAdmin true (erwLabel ek) := by
+theorem erwLabelLbAdmin' (ek : ErwKind) : AxOpsem.lbAdminAx true (erwLabel ek) := by
   cases ek <;> trivial
 
 /-- One admin step at a `nodeOk` node is a `gstep`. -/
@@ -233,7 +233,7 @@ theorem gstepOfPnode (cpu : CPU) (m : SailM Unit) (rs : RegFile) (ib : Ibch) (kk
     (l : Wlabel) (m' : SailM Unit) (ors : Option RegFile) (oib : Option Ibch)
     (obar : Option barrier_kind) :
     pnodeStep m rs ib OpaxWit.wtD0.efDev l m' ors none OpaxWit.wtD0.efDev oib obar →
-    nodeOk m → lbAdmin true l →
+    nodeOk m → AxOpsem.lbAdminAx true l →
     gstep ⟨.PHart cpu m rs none ib, kk⟩ ⟨.PHart cpu m' (ors.getD rs) none (oib.getD ib), kk⟩ := by
   intro hn hok hadm
   exact ⟨hok, rfl, [], l,

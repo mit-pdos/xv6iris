@@ -57,8 +57,9 @@ four-event LB execution is RVWMO⁻-consistent, so tier 2 is about a real gap.
 6. W13 (M) (plan `notes/weak-allocproc-plan.md` §C W13; D38 [OWN.14]): `lbIsMem`
    (hence `gmem`, gmo, `gwf`'s membership clause) also holds of the I/O-class label
    `Lbl.LIo` (`lbIsR l || lbIsW l || lbIsIo l`; Rocq: reads and writes only).  `lbIsR`/`lbIsW`
-   stay RAM-only.  Until W13 (I) flips `gwf`'s `LIo` shape arm (`False`, [OWN.27]) no `gwf`
-   graph has an I/O event.
+   stay RAM-only.  W13 (I) ([OWN.27]) flips `gwf`'s `LIo` shape arm to `True` (it was `False`
+   under W13 (E)/(M)), so a `gwf` graph may carry I/O events; the (M)-era helpers
+   `gwfNoIo`/`gwfMemRW` are retired with the `False` arm.
 
 **Name map** (Rocq → Lean): `geid` ↦ `Geid`; `gexec` ↦ `Gexec` (`gx_img`/
 `gx_prog`/`gx_gmo` ↦ `gxImg`/`gxProg`/`gxGmo`); `gdexec` ↦ `Gdexec`
@@ -183,9 +184,9 @@ def gwf (G : Gexec) : Prop :=
      | LFence _ _ _ _ => True
      | LRmw _ _ _ ts rvs wvs _ =>
          wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
-     -- W13 (E): the graph tier carries NO I/O-class event yet — `linCand` replays every event on
-     -- the machine, which has no `LIo` step until W13 (I)/(M) (then this arm becomes `True`)
-     | LIo .. => False)
+     -- W13 (I): an I/O-class event has no shape constraint (`linCand` replays it as the inert
+     -- `mstep.MStepIo`)
+     | LIo .. => True)
 
 /-! # 3. RVWMO⁻: the kept ppo arms, load-value, atomicity -/
 
@@ -724,7 +725,7 @@ theorem gwfLblShape (G : Gexec) (e : Geid) (l : Lbl) :
     | LFence _ _ _ _ => True
     | LRmw _ _ _ ts rvs wvs _ =>
         wvs ≠ [] ∧ wvs.length = ts.length ∧ rvs.length = ts.length
-    | LIo .. => False := by
+    | LIo .. => True := by
   intro hwf hl
   obtain ⟨_, _, hsh⟩ := hwf
   unfold gxLbl at hl
@@ -734,22 +735,10 @@ theorem gwfLblShape (G : Gexec) (e : Geid) (l : Lbl) :
     rw [hp] at hl
     exact hsh e.1 p e.2 l hp hl
 
-/-- (Lean-only, W13 (M)) A `gwf` graph has no I/O-class event (its `LIo` shape arm is `False`
-until W13 (I), [OWN.27]). -/
-theorem WeakRvwmoGraph.gwfNoIo (G : Gexec) (e : Geid) (l : Lbl) :
-    gwf G → gxLbl G e = some l → lbIsIo l = false := by
-  intro hwf hl
-  have hsh := gwfLblShape G e l hwf hl
-  cases l <;> simp_all [lbIsIo]
-
-/-- (Lean-only, W13 (M)) In a `gwf` graph a memory event is a read or a write — the I/O case of
-"a `gmem` event is a read or a write" is refuted by the shape arm. -/
-theorem WeakRvwmoGraph.gwfMemRW (G : Gexec) (e : Geid) (l : Lbl) :
-    gwf G → gxLbl G e = some l → lbIsMem l = true → (lbIsR l || lbIsW l) = true := by
-  intro hwf hl hm
-  have := WeakRvwmoGraph.gwfNoIo G e l hwf hl
-  simp only [lbIsMem, this, Bool.or_false] at hm
-  exact hm
+/-- (Lean-only, W13 (I)) A RAM read or write is a memory event (`lbIsMem` also holds of the
+I/O class, so the converse is false once `gwf` admits `LIo`). -/
+theorem WeakRvwmoGraph.lbIsMemOfRW (l : Lbl) : (lbIsR l || lbIsW l) = true → lbIsMem l = true := by
+  intro h; simp [lbIsMem, h]
 
 /-! ## 8.3 A FUSED RMW'S READ FOOTPRINT IS ITS WRITE FOOTPRINT -/
 

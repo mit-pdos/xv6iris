@@ -178,7 +178,7 @@ theorem AxSpinT2i.lenOfGate {GT : GdexecT} {i : Agent} {kr : Nat} {vw vs : List 
 the position. -/
 theorem AxSpinT2i.rowEndShape (row : List Lbl) (s : Athread) (l : Wlabel) (s' : Athread)
     (Hnone : row[s.atK]? = none) :
-    AxOpsem.astepProg row s l s' → lbAdmin true l ∧ s'.atK = s.atK := by
+    AxOpsem.astepProg row s l s' → AxOpsem.lbAdminAx true l ∧ s'.atK = s.atK := by
   intro h
   cases h with
   | AStepAdmin p k d l p' d' hadm hst => exact ⟨hadm, rfl⟩

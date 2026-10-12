@@ -161,6 +161,8 @@ Stage 2: `holdingFromReleaseP`/`KShortEnd`/`KLongEnd` (AxSpinHdC/HdA), `XxSdCpu`
 P1: `holdingFromReleaseG`/`KLongG` (AxSpinHdC/HdA), `AxSpinT2i.Gate`/`gateOfPinG` (AxSpinT2i).
 All new names grepped absent from the tree (stage 2: `RowReleaseP`, `wpdRelHeadP`, and the
 file-qualified `AxSpinRl4.*` helpers; P1: `wpdRelHeadG`).
+
+**W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** the release lemmas' anchor-domain premise is `(lbIsR l || lbIsW l) = true` (was `lbIsMem l = true`): `gwf` admits I/O events, which `fence rw,w` does not order (RVWMO; D48).
 -/
 import Weak.AxSpinRl3
 import Weak.AxSpinHdC
@@ -526,7 +528,7 @@ theorem AxSpinRl4.relPHolding :
 /-- (Lean-only) holding's lw is a memory event (when present). -/
 theorem AxSpinRl4.relPLk :
     RowReleaseP k c hb row pra ps0 ps1 plk pcl hra hs0 hs1 hram hs0m qra qs0 qmra qms0 pn pint →
-    relKh k < row.length → ∃ l, row[relKh k]? = some l ∧ lbIsMem l = true := by
+    relKh k < row.length → ∃ l, row[relKh k]? = some l ∧ (lbIsR l || lbIsW l) = true := by
   intro H hk
   obtain ⟨lb, Hlb, aq, Hs⟩ := H.1 3 (.it (.RL plk 4)) (by cases c <;> rfl) hk
   exact ⟨lb, Hlb, AxSpinRl3.memOfRead lb aq plk 4 Hs⟩
@@ -644,13 +646,13 @@ theorem AxSpinRl4.xxSwRelRelP (kr : Nat)
     (s : Athread) (rs : RegFile) (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12)
     (rs2 rs1 : BitVec 5) (va pa : BitVec 64) (kc ks : Nat) (vs : List (BitVec 8))
     (Ql Qc : IProp GF) :
-    (∃ l, (AxOpsem.grow (gtAdGd GT) i)[relKh kr]? = some l ∧ lbIsMem l = true) →
-    (∃ l, (AxOpsem.grow (gtAdGd GT) i)[relKc kr]? = some l ∧ lbIsMem l = true) →
+    (∃ l, (AxOpsem.grow (gtAdGd GT) i)[relKh kr]? = some l ∧ (lbIsR l || lbIsW l) = true) →
+    (∃ l, (AxOpsem.grow (gtAdGd GT) i)[relKc kr]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     (AxOpsem.grow (gtAdGd GT) i)[relKf kr]? = some (.LFence true true false true) →
     relKw kr + 1 ≤ (AxOpsem.grow (gtAdGd GT) i).length →
     (AxOpsem.grow (gtAdGd GT) i)[relKw kr]? =
       some (.LStore false L.xlLk AxSpinX4.z4 .WCrel) →
-    ks < kr → (∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ lbIsMem l = true) →
+    ks < kr → (∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     (∀ (k' : Nat) (lb : Lbl) (rl : Bool) (n : Nat), relKc kr < k' →
       (AxOpsem.grow (gtAdGd GT) i)[k']? = some lb →
       aidentWr (aident lb) = some (rl, L.xlLk, n) → k' = relKw kr) →
@@ -700,7 +702,7 @@ theorem AxSpinRl4.xxSwRelRelP (kr : Nat)
     rw [domInsert, domInsert, domSingleton]
     exact elemOfUnion.2 (Or.inr (elemOfUnion.2 (Or.inr (elemOfSingleton.2 rfl))))
   have Hdom : ∀ e, e ∈ (FiniteMap.dom_set m : GSet Geid) → e.1 = i ∧ e.2 < relKf kr ∧
-      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ lbIsMem l = true := by
+      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[e.2]? = some l ∧ (lbIsR l || lbIsW l) = true := by
     intro e He
     rcases Hdm e He with rfl | rfl | rfl
     · exact ⟨rfl, by simp only [relKh, relKf]; omega, Hmh⟩
@@ -841,7 +843,7 @@ theorem wpdRelHeadG (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
       aidentWr (aident lb) = some (rl, L.xlLk, n) → k' = relKw k) →
     -- the nextpid anchor (allocpid's store, before release)
     ks < k → (relKw k < (AxOpsem.grow (gtAdGd GT) i).length →
-      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ lbIsMem l = true) →
+      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     -- P1: holding's reload GATES (mycpu's ra, holding's ra = release's jal link)
     AxSpinT2i.Gate GT i (relKh k + 7) (stBytes 8 (pch 0x1a)) →
     AxSpinT2i.Gate GT i (relKh k + 9) (stBytes 8 (AxSpinHdB.prl 0x10)) →
@@ -1341,7 +1343,7 @@ theorem wpdRelHeadP (k : Nat) (c hb : Bool) (rs0 : RegFile) (ib0 : Ibch)
       aidentWr (aident lb) = some (rl, L.xlLk, n) → k' = relKw k) →
     -- the nextpid anchor (allocpid's store, before release)
     ks < k → (relKw k < (AxOpsem.grow (gtAdGd GT) i).length →
-      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ lbIsMem l = true) →
+      ∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     -- GRAPH-VALUE PINS (Q20' Option V), guarded by position
     (relKh k + 7 < (AxOpsem.grow (gtAdGd GT) i).length →
       graphValue (gtAdGd GT) (i, relKh k + 7) = some (stBytes 8 (pch 0x1a))) →
@@ -1476,7 +1478,7 @@ theorem wpdRelHead (k : Nat) (c : Bool) (rs0 : RegFile) (ib0 : Ibch)
       (AxOpsem.grow (gtAdGd GT) i)[k']? = some lb →
       aidentWr (aident lb) = some (rl, L.xlLk, n) → k' = relKw k) →
     -- the nextpid anchor (allocpid's store, before release)
-    ks < k → (∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ lbIsMem l = true) →
+    ks < k → (∃ l, (AxOpsem.grow (gtAdGd GT) i)[ks]? = some l ∧ (lbIsR l || lbIsW l) = true) →
     -- GRAPH-VALUE PINS (Q20' Option V)
     graphValue (gtAdGd GT) (i, relKh k + 7) = some (stBytes 8 (pch 0x1a)) →
     graphValue (gtAdGd GT) (i, relKh k + 9) = some (stBytes 8 (AxSpinHdB.prl 0x10)) →

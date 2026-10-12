@@ -789,7 +789,7 @@ theorem astepProgWrite0RelInv (HLram : devAddr Lpa = false) (rs : RegFile) (s : 
     subst Heqp Heqk
     rcases l3pWriteExclDet cpu Lpa HLram b1 (fun _ => rM2 Lpa xpa) rs ibNone d l p' d' hst with
       ⟨rfl, -, -⟩ | ⟨rfl, rfl, -⟩
-    · simp [lbAdmin] at hadm
+    · simp [AxOpsem.lbAdminAx] at hadm
     · exact .inr ⟨rfl, rfl⟩
   | AStepWrite p k0 d l lb p' d' _ hwr _ _ hst =>
     simp only at Heqp Heqk
