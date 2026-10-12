@@ -1,6 +1,18 @@
 # allocproc on RVWMO: target theorem, gap analysis, roadmap (design advisor, 2026-10-09)
 
-**Status: rev 33 (2026-10-12) = rev 32 + review R29 (2 required changes, tags [R29.n]; NOT SATISFIED — both S text, proof
+**Status: rev 34 (2026-10-12) = rev 33 + review R30 (1 required change, tag [R30.1]; NOT SATISFIED — S text in W5d's first
+commit, proof organisation, no design or memory-model change; adopted [R30.s1], [R30.s3], [R30.s6]).**  What changed:
+**[R30.1]** rev 33 still put `itvOf` and its recurrence/frame condition into `execProgOk'S` UNGUARDED — `fcutT` sees one `itv`
+and cannot guard them, so a fixed `itvOf` at M1 would strengthen M1's premise and an `∃ itvOf` would need an unplanned choice
+lemma; now a SECOND per-index parameter `fcutE` (inside `execProgOk'S`'s existential beside `fetchesOk`, `PfRunShape.lean:247-262`)
+carries them, `True` at M1, and `itvOf` is a FREE variable of `srvwmoXv6M2Premises`, a parameter of no shared definition (M1's
+content unchanged BY CONSTRUCTION; M1 replay lemmas at both trivial instances; §B(4)(iii), §C top, §C W5d).  Adopted: **[R30.s1]**
+`PfStepTso.lean` (`pfRunSTAuthors :527-536`) joins W5d's edited files; **[R30.s3]** `sailCycleOrder` is stated AT the trivial
+`fcutT` (≡ `∀ fcutT` via `pfRunSTForgetCut`); **[R30.s6]** `pfLoadFactsTNonload` is `:579-581`.  [R30.s2]/[R30.s5] handed to the
+W5d worker at launch; [R30.s4] touches W-SCO's running brief — deferred to its merge review.  No new owner question (R30: none
+missing; every option FAITHFUL — RVWMO/Sail/Zifencei/PMAs silent on premise threading).  History: rev 34 — R30 (1 req., 0 alt;
+s1, s3, s6 adopted; s2, s5 to W5d at launch; s4 to W-SCO merge review).
+**Rev 33 (2026-10-12) = rev 32 + review R29 (2 required changes, tags [R29.n]; NOT SATISFIED — both S text, proof
 organisation and record-keeping, no design or memory-model change; adopted suggestions [R29.s1], [R29.s5]; [R29.s4] confirmed).**
 What changed: **[R29.1]** W5d's carrier for the M2 cut clause as pinned by [R28.4] could not be executed — `Hyps.cut`
 (`MachOfPf.lean:664-671`) takes the UN-threaded `pfStepFacts` and never sees a `pfStepFactsT` clause; a non-trivial `.LIFetch` arm
@@ -312,6 +324,7 @@ rev 29 (2026-10-12) R25 (3 req.: `Cust.pte` + `pteDiscAt` + the `chainOkAt` exem
 rev 31 (2026-10-12) W4 F9 DONE (`Weak/MachOfPfDisk.lean` 1290 + `MachOfPf.lean` 2979: `simDisk`, `R-dev` = `diskSide`/`devAgree`, `cacheWf`, `devrt` untracked, no disk hypothesis) + W5 CORE DONE (`Weak/SrvwmoXv6Adequacy.lean` 318: `srvwmoXv6M1Core` = premises + `g0` boot facts + `sailCycleOrder`; M1 PROVED, registration = the W5 CLOSE-OUT) + the `enumToBitVec` import-hygiene fix + R-ctx DONE (`notes/W8-Rctx.md`: F0 per-author vector bound, 31 rows, none RESISTS, X1–X5, 4 outside sites + 31 consumer files, the `"log"` lock) + [OWN.38] (Q-R1 (a) vector bound; W8 (f2-ctx) ≈ 6.5–9.5k, 12 MachCSL + ≈ 52 `Xv6/`, 3–4 rebuilds) + [OWN.39] (Q-R2 (a) user PTEs under the `pte-key` arm) + [OWN.40] (OUT capture STALLS on a wrapping buffer, §B(11) (x)); OPEN: Q-RSV-order.
 rev 32 (2026-10-12) R28 (5 req., all S text: W5 CLOSE-OUT's exact `baseline-weak.json` entry [R28.1]; W-SCO's `Hyps.fi` widened to `cut`'s shape + `fetchIsImage` [R28.2]; shared-file LANDING ORDER CLOSE-OUT → W-SCO → W5d [R28.3]; `fok` stays 5-ary, `itvOf` via `pfStepFactsT` [R28.4]; lane order + W-RSV Launch (rev 32) [R28.5]; s1–s8 adopted) + [OWN.41] (Q-RSV-order RULED (b): W8-β′ → W-RSV → W8 (f2-ctx)).
 rev 33 (2026-10-12) R29 (2 req., both S text: W5d's M2 cut clause carried by the new trivially-instantiated parameter `fcutT` as `pfRunST.snoc`'s third fact `pfCutFactsT` — M1's statement TEXT changes, its entry does not; W5d's parameter threading is its FIRST commit, after W-SCO's `Hyps.fi` widening [R29.1]; the stale serial-lane sentence → W8-β′ → W-RSV → W8 (f2-ctx) [R29.2]; s1 (`fetchIsImage` PAST-fetch recipe, NOTE in W-SCO) + s5 adopted; s2/s3 deferred to the running workers' merge review).
+rev 34 (2026-10-12) R30 (1 req., S text: `itvOf` free in `srvwmoXv6M2Premises`, its cut/recurrence/frame carried by a second per-index parameter `fcutE`, `True` at M1 — no shared definition gains a non-trivial conjunct [R30.1]; s1/s3/s6 adopted).
 
 **The kernel [OWN.4][R1.9]: xv6-riscv `b72cbac1`, branch `verified`** (`notes/STATUS.md:8-11`, `README.md:89-90`)
 = upstream plus (a) a per-process root (`p->root`, `sys_chroot`, `igetroot`, root-aware `dirlookup`/walk) and
@@ -762,8 +775,9 @@ W5d's `itvOf`, NOT by the Exec-trace shadow [R11.3]**: `fence.i` and the Q7 `sfe
 it (`WeakAxRealize.lean:129-133`), so both reach `E.exTr` as indistinguishable `Estep`s; `emFenceI`'s criterion needs
 the admin block `ls`, which is existential PER INDEX inside `execProgOk'S` (`PfRunShape.lean:242-262`), and `fok` has
 no `itv` argument (`fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop`, `:232,242`).  W5d therefore
-adds a per-row, per-step `itvOf : Nat → Nat → Nat` to `execProgOk'S`, DRIVEN by the index's REALIZING label (`s.esLb =
-LFence false×4` on the left arm) and CONSTRAINED inside each index's conjunct, where `ls` IS in scope (`fetchesOk … ls`,
+defines a per-row, per-step `itvOf : Nat → Nat → Nat` as a FREE variable of M2's premise set `srvwmoXv6M2Premises` — NOT a
+parameter of `execProgOk'S`/`execProgOk'ST`/`pfRunST` [R30.1] — DRIVEN by the index's REALIZING label (`s.esLb = LFence false×4`
+on the left arm) and constrained in M2's INSTANCE of `fcutE` (below), per index, where `ls` IS in scope (`fetchesOk … ls`,
 `PfRunShape.lean:232-234`) — `ls` serves ONLY to tell `fence.i` from the `sfence.vma` marker by `emFenceI`'s criterion
 (the marker's star ends in `LIFetch`, `fence.i`'s in the announce `LInstr`, `W5dG-spike.md:115-117`): `itvOf (k+1)
 s.esAg = itvStep (itvOf k s.esAg) (tv, rv of the memory-field shadow at k) pub ls` with `pub = ownPub` from the log
@@ -778,20 +792,35 @@ R28's carrier ("a `.LIFetch` arm of `pfLoadFactsT`, `itvOf k i ≤ q` a conjunct
 (`MachOfPf.lean:664-671`) takes the UN-threaded `pfStepFacts fok` and must conclude `(tsoShadow cohSrc st i).itv ≤ q` for the SAME
 `q` as `ifetchOk` — not derivable from a 5-ary `fok_cut`, and `max q itv` does not repair it (`ifetchByteOk … (max t itv')`,
 `WeakPromise.lean:220-222`, is STRONGER at a larger `itv'`); (2) `pfLoadFactsT`'s fetch arm is `| _ => True` (`TsoShadow.lean:
-568-573`) and EVERY fetch of M1's run enters `pfRunST` through `pfRunSTApp :622-632` via `pfLoadFactsTNonload :581-583`
+568-573`) and EVERY fetch of M1's run enters `pfRunST` through `pfRunSTApp :622-632` via `pfLoadFactsTNonload :579-581`
 (fetches are admin-star labels, `lbIsLoad = false`), so a non-trivial arm breaks `execWfPfRunPinShapedT :808` and
 `srvwmoXv6M1PfRun` unless proved pf-side — impossible for an `itv`-aware clause (its content is `textPristine`, pf-visible only
 through `SimRel`, [R28.2]); (3) a conjunct of `execProgOk'S` STRENGTHENS M1's premise and re-proves `srvwmoXv6M1Satisfiable
 :733`.  So: `pfRunST.snoc` gains a THIRD fact `pfCutFactsT fcutT stamp st c i l := ∀ base tvs, l = .LIFetch base tvs → fcutT
 (tsoShadow stamp st i).itv c.pcImg c.pcLog i base tvs` beside `pfStepFacts`/`pfLoadFactsT` (`TsoShadow.lean:584-590`),
-`execProgOk'ST` the Exec-level twin with `itvOf k i` in the per-index clause where `ls` is in scope (`PfRunShape.lean:232-234`),
-`contR.cons` (`MachOfPf.lean:518-522`) and `simNode` (beside `hfT :886`) carry it, `MachOfPf.Hyps` is parametrised by `fcutT`
+**[R30.1] the Exec-level twin is a SECOND parameter `fcutE : Nat → Nat → List Wlabel → Mstate → Prop`, per INDEX** — one conjunct
+`fcutE k s.esAg ls (stt E k)` INSIDE `execProgOk'S`'s per-index existential beside `fetchesOk fok (stt E k) s.esAg ls`
+(`PfRunShape.lean:247-262`, sharing that index's `ls`; `fcutT` sees ONE `itv` and cannot guard the recurrence); M1: `fcutE :=
+fun _ _ _ _ => True`; M2: `fcutE k ag ls σ := (∀ base tvs, .LIFetch base tvs ∈ ls → fcutT_M2 (itvOf k ag) σ.msImg σ.msLog ag base
+tvs) ∧ itvOf (k+1) ag = itvStep (itvOf k ag) (shadowOf cohSrc (E.exTr.take k) ag).tv/.rv (ownPub ag …) ls ∧ ∀ i ≠ ag, itvOf (k+1) i
+= itvOf k i`, `itvOf` bound in `srvwmoXv6M2Premises`.  **Every new conjunct of a SHARED definition (`execProgOk'S`, `execProgOk'ST`,
+`pfRunST.snoc`, `contR.cons`, `Hyps`) is a parameter instance that is `True` at M1 — `itvOf`, its recurrence and frame condition
+included — so M1's content is unchanged BY CONSTRUCTION (no choice lemma `execProgOk'S → ∃ itvOf, …`), and `itvOf` is a parameter
+of NO shared definition** (a fixed `itvOf` at M1 would FALSIFY the recurrence after an own store + `fence.i`, `Lang.lean:161-166`,
+shrinking M1's candidate set; the worker may pick another guard shape iff the bold sentence holds).  The M1 replay lemmas
+(`execPrefixPfRunProgShapedT :660`, `execWfPfRunProgShapedT :789`, `execWfPfRunPinShapedT :808`) are stated at BOTH trivial
+instances (`pfRunSTApp`'s step discharges `pfCutFactsT` by `trivial`); the M2 replay `execWfPfRunProgF` (W5d's new file) turns
+`fcutE`'s instance into `pfCutFactsT`'s per-fetch fact with `∀ i, (tsoShadow cohSrc st i).itv = itvOf n i` a replay invariant
+beside the `.mem` projection;
+`contR.cons` (`MachOfPf.lean:518-522`) and `simNode` (beside `hfT :886`) carry `pfCutFactsT`, `MachOfPf.Hyps` is parametrised by `fcutT`
 and `cut` receives `pfCutFactsT fcutT cohSrc st c (hartAgent cpu) (.LIFetch base tvs)` (passed at `:1043`).  **M1 instantiates
 `fcutT := fun _ _ _ _ _ _ => True`** — `pfLoadFactsTNonload`, `pfRunSTApp`, `execWfPfRunPinShapedT`, `srvwmoXv6M1PfRun`,
-`srvwmoXv6M1Satisfiable`, `cutOfPristine`, `machRunOfPfRun`, `sailCycleOrder :113` (`∀ fcutT` as it does `∀ fok`) and
-`srvwmoXv6M1Core` gain the trivial instance: **M1's statement TEXT changes; its content, name, `axioms`/`opaques` entry do not**.
+`srvwmoXv6M1Satisfiable`, `cutOfPristine`, `machRunOfPfRun`, `sailCycleOrder :113` (STATED AT the trivial instance [R30.s3] — equivalent to `∀ fcutT` via a one-line `pfRunSTForgetCut`,
+twin of `pfRunSTForget :591-597`; text closest to today's, W-SCO's `sailCycleOrderK` adapts by that lemma alone) and
+`srvwmoXv6M1Core` gain the trivial instance: **M1's statement TEXT changes; its content, name, `axioms`/`opaques` entry do not**
+(both parameters; `itvOf` appears in no shared definition [R30.1]).
 M2: `fcutT itv img log i base tvs := ∃ q, itv ≤ q ∧ q ≤ |log| ∧ ifetchOk img log q base tvs ∧ ∀ byte, t ≤ q`; `Hyps.cut` at M2
-is the step's `pfCutFactsT` verbatim; lemma: the step-list `tsoShadow`'s `itv` equals `itvOf` along the replay.  FAITHFUL
+is the step's `pfCutFactsT` verbatim; the `itv = itvOf` replay invariant (above) is the M2-side lemma.  FAITHFUL
 (proof organisation; the published quantifier, trusted base and conclusions unchanged).  Over-approximating (every `LFence false×4` raises `itv`) is not derivable at Stage 2 (`gzFetch` uses the
 EMISSION's `fence.i` sites); under-approximating (`itv = 0`) breaks W4's `LIFetch` row (TsoMem fetches at `itv ≤ tvn`,
 `Lang.lean:360-362`).  M1's `candKfetch` is unaffected.
@@ -1392,7 +1421,7 @@ W-SCO ("the named premise `sailCycleOrder` [OWN.35]; `sailCycleOrderK_holds` (W-
 NOT touch `PfStepTsoView.lean`'s header; **W-SCO's registration** (`roots-weak.txt`/`baseline-weak.json`/`audit.sh:44,51`; entry =
 the core's with the per-word lemma's certificates counted) is its CLOSE step, rebased on the merged CLOSE-OUT; **W-SCO's `Hyps.fi`
 widening [R28.2]** is its FIRST commit (`MachOfPf.lean` + ONE line of `SrvwmoXv6Adequacy.lean:213`); **[R29.1] W5d's `fcutT`
-parameter threading (§B(4)(iii); S–M, ≈ 150–300 lines of signatures and trivial instances) is W5d's FIRST commit**, rebased on
+(+ per-index `fcutE` [R30.1], both `True` at M1) parameter threading (§B(4)(iii); S–M, ≈ 150–300 lines of signatures and trivial instances) is W5d's FIRST commit**, rebased on
 the widening, landing BEFORE W-SCO states `sailCycleOrderK`/`srvwmoXv6M1` (W-SCO then states them over the parametrised
 `pfRunST` at M1's trivial instance; if W5d's commit is late, W-SCO states them over the current type and W5d adapts — S either
 way); the W5 CLOSE-OUT is unaffected (registration by NAME; M1's statement TEXT changes, its entry does not).  **WAITS**: **W-RSV** for W8-β′'s MERGE **[OWN.41][R28.5]** (Q-RSV-order RULED
@@ -2600,17 +2629,19 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   stable) — **[R29.1] the cut clause is carried by the new parameter `fcutT` (§B(4)(iii), binding)**: R28's carrier (`.LIFetch`
   arm of `pfLoadFactsT` + an `execProgOk'S` conjunct, "`Hyps.cut` from `pfStepFactsT`'s two conjuncts") does not type-check
   against `Hyps.cut` (`MachOfPf.lean:664-671` takes the UN-threaded `pfStepFacts`), breaks `pfLoadFactsTNonload`/`pfRunSTApp`
-  (`TsoShadow.lean:581-583,622-632`, M1's run construction) and strengthens M1's premise.  **FIRST commit (S–M, ≈ 150–300 lines)**:
+  (`TsoShadow.lean:579-581,622-632`, M1's run construction) and strengthens M1's premise.  **FIRST commit (S–M, ≈ 150–300 lines)**:
   `pfCutFactsT fcutT stamp st c i l := ∀ base tvs, l = .LIFetch base tvs → fcutT (tsoShadow stamp st i).itv c.pcImg c.pcLog i base
-  tvs` as `pfRunST.snoc`'s third fact (`TsoShadow.lean:584-590`), the Exec twin in `execProgOk'ST` (`itvOf k i`, `ls` in scope),
+  tvs` as `pfRunST.snoc`'s third fact (`TsoShadow.lean:584-590`), **[R30.1] the Exec twin is the SECOND parameter `fcutE`** (per index, inside `execProgOk'S`'s existential beside `fetchesOk`;
+M1 `True`; M2 carries `itvOf`'s cut, recurrence and frame condition, `itvOf` free in `srvwmoXv6M2Premises` — §B(4)(iii), binding:
+nothing non-trivial enters M1's premise, `itvOf` is no shared parameter; M1 replay lemmas at both trivial instances),
   `contR.cons`/`simNode` carry it, `MachOfPf.Hyps fcutT …` with `cut` receiving it (passed at `:1043`), `cutOfPristine`,
-  `machRunOfPfRun`, `sailCycleOrder :113` (`∀ fcutT`), `srvwmoXv6M1Premises`/`srvwmoXv6M1PfRun`/`srvwmoXv6M1Satisfiable`
+  `machRunOfPfRun`, `sailCycleOrder :113` (at the trivial instance [R30.s3]), `srvwmoXv6M1Premises`/`srvwmoXv6M1PfRun`/`srvwmoXv6M1Satisfiable`
   (`SrvwmoXv6Witness.lean:272,280,599-607,624,733`), `m1Hyps :203-213`, `srvwmoXv6M1Core :276-284` at the trivial instance
   `fun _ _ _ _ _ _ => True`.  **Files edited beyond the new file**: `PfRunShape.lean`, `TsoShadow.lean`, `MachOfPf.lean`,
   `SrvwmoXv6Witness.lean`, `SrvwmoXv6Adequacy.lean` (trivial instances; M1's statement TEXT changes, its content, name and
-  `axioms`/`opaques` entry do not — the W5 CLOSE-OUT's registration stands; one `Xv6`-free `Weak` rebuild); `PfStepTso.lean`/
-  `PfStepTsoView.lean` only if `proposedStmt` (`PfStepTso.lean:102-124`) is re-pointed — it need not be: clause (3) `:115-118`
-  already states the cut conclusion as a hypothesis.  Then M2: `fcutT itv img log i base tvs := ∃ q, itv ≤ q ∧ q ≤ |log| ∧
+  `axioms`/`opaques` entry do not (both parameters [R30.1]) — the W5 CLOSE-OUT's registration stands; one `Xv6`-free `Weak` rebuild); `PfStepTso.lean`
+  (`pfRunSTAuthors :527-536`'s binder/`_` [R30.s1]; `proposedStmt :102-124` NOT re-pointed — clause (3) `:115-118` already states
+  the cut conclusion as a hypothesis; `PfStepTsoView.lean` untouched).  Then M2: `fcutT itv img log i base tvs := ∃ q, itv ≤ q ∧ q ≤ |log| ∧
   ifetchOk img log q base tvs ∧ ∀ byte, t ≤ q`, `fok := fun _ _ _ _ _ => True` or `fok_cut` (worker's choice); `Hyps.cut` at M2 is
   the step's `pfCutFactsT` verbatim (the M2 twin of `cutOfPristine`, no MachCSL side).  Landing: after W-SCO's `Hyps.fi` widening,
   before W-SCO states `sailCycleOrderK`/`srvwmoXv6M1` (§C top).  **[R28.3]** `m2Hyps` instantiates `MachOfPf.Hyps`; if W-SCO's
