@@ -37,9 +37,10 @@ not needed); §6 the rank trace is a `ptraceExt` (`glinPtraceExt`), non-vacuity 
    `WeakRvwmoLin2.devLbl` (the "every dev event is labelled" fact Rocq inlines twice), and the
    local `where`-auxiliary `ptraceRelMem.gwriteAtInv'`.
 5. §8's `Print Assumptions` audit is dropped (the lint's axiom/sorry ban is the audit).
-6. W-DISK (`WeakRvwmoFab` deviation 4): `fconfSupply'` and `fconfTraceRealize` take the boot
-   pool's QUIET hypothesis `∀ i, i < N → devQuiet (boot i)` (the disk between bursts), passed to
-   `fconfSupply`.
+6. W13 (I) (`WeakRvwmoFab` deviation 5; supersedes W-DISK's quiet-boot hypothesis): the bundle
+   is `gfexecConfIO` (membership by fabric CONTACT [OWN.43]); `fconfSupply'` and
+   `fconfTraceRealize` take NO start-state hypothesis (W-DISK's `∀ i, i < N → devQuiet (boot i)`
+   is gone: a non-member block is contact-free, hence fabric-blind at any start).
 
 **Rocq → Lean name map.**  `before_index` `beforeIndex`, `elem_of_take_lookup`
 `elemOfTakeLookup`, `filter_all` `WeakRvwmoLin2.filterAll`, `filter_take_S` `filterTakeS`,
@@ -992,7 +993,7 @@ theorem trDevOrderedOfPtrace (GF : Gfexec) (L : List Geid) :
 
 /-- (Lean-only helper) every fabric event of a conformant bundle is labelled. -/
 theorem WeakRvwmoLin2.devLbl (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec) :
-    gfexecConf boot d0 fab GF →
+    gfexecConfIO boot d0 fab GF →
     ∀ e, e ∈ GF.gfDev → (gxLbl GF.gfGd.gdG e).isSome = true := by
   intro hconf e he
   obtain ⟨n, hn⟩ := elem_of_list_lookup_1 he
@@ -1004,29 +1005,26 @@ theorem WeakRvwmoLin2.devLbl (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → E
 /-- (Deviation 3: at the pinned LTS.) -/
 theorem fconfSupply' (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec)
     (N : Nat) (L : List Geid) :
-    gfexecConf boot d0 fab GF →
+    gfexecConfIO boot d0 fab GF →
     rvwmoMinusConsistent GF.gfGd.gdG →
     ptraceExt GF.gfGd.gdG L →
     (∀ (m n : Nat) e e', m < n → GF.gfDev[m]? = some e → GF.gfDev[n]? = some e' → before L e e') →
     GF.gfGd.gdG.gxProg.length ≤ N →
-    (∀ i, i < N → devQuiet (boot i)) →
     ∃ pst : Nat → List Pexv6,
       pst 0 = (List.range' 0 N).map boot ∧
       fab (dcnt GF (candOf GF.gfGd.gdG L).cdTr 0) = d0 ∧
       execProgOk' (pstepPin GF.gfGd.gdG.gxImg pstepEv) pclsEv pst (fun k => fab (dcnt GF (candOf GF.gfGd.gdG L).cdTr k))
         (candExec (candOf GF.gfGd.gdG L)) := by
-  intro hconf _ hext hord hN hquiet
+  intro hconf _ hext hord hN
   exact fconfSupply (candOf GF.gfGd.gdG L) boot d0 fab GF N hconf (fun i => trowEq _ L hext i) hN
     (trDevOrderedOfPtrace GF L hext hconf.2.1 (WeakRvwmoLin2.devLbl boot d0 fab GF hconf) hord)
-    hquiet
 
 /-- THE DELIVERABLE (deviation 3: the supply at the pinned LTS). -/
 theorem fconfTraceRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec)
     (N : Nat) :
     gfexecConsistent' GF →
-    gfexecConf boot d0 fab GF →
+    gfexecConfIO boot d0 fab GF →
     GF.gfGd.gdG.gxProg.length ≤ N →
-    (∀ i, i < N → devQuiet (boot i)) →
     ∃ L : List Geid,
       srvwmoConsistent (candOf GF.gfGd.gdG L) ∧
       (candOf GF.gfGd.gdG L).cdImg = GF.gfGd.gdG.gxImg ∧
@@ -1041,10 +1039,10 @@ theorem fconfTraceRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab
         execProgOk' (pstepPin GF.gfGd.gdG.gxImg pstepEv) pclsEv pst
           (fun k => fab (dcnt GF (candOf GF.gfGd.gdG L).cdTr k))
           (candExec (candOf GF.gfGd.gdG L)) := by
-  intro hc' hconf hN hquiet
+  intro hc' hconf hN
   have hcons : rvwmoMinusConsistent GF.gfGd.gdG := hc'.1.1
   obtain ⟨L, hext, hord⟩ := ptraceExistsF GF hc' (WeakRvwmoLin2.devLbl boot d0 fab GF hconf)
   obtain ⟨h1, h2, h3, h4⟩ := gtraceLinearizationMin _ L hcons hext
-  exact ⟨L, h1, h2, h3, h4, fconfSupply' boot d0 fab GF N L hconf hcons hext hord hN hquiet⟩
+  exact ⟨L, h1, h2, h3, h4, fconfSupply' boot d0 fab GF N L hconf hcons hext hord hN⟩
 
 end Weak

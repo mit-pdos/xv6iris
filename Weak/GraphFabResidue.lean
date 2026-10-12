@@ -48,8 +48,10 @@ It does NOT assume `racyD` acyclicity — the cycle kill carries that.  The rank
 
 **Status of the surrounding model at this file's landing.**  Statement text is final.  W13 (M):
 `gmem` holds of I/O events (`lbIsMem l = lbIsR l || lbIsW l || lbIsIo l`, `WeakRvwmoGraph`
-deviation 6), so they are in gmo; `gfIoDev` is the bundle clause `gisIo (i, k) ↔ (i, k) ∈ gfDev`
-(§3.1).  W13 (I) ([OWN.27]) flipped `gwf`'s `LIo` shape arm, `projLbl` and `lblRealizes*`, so a
+deviation 6), so they are in gmo.  W13 (I)'s bundle half ([OWN.43]): `gfIoDev` (§3.1) is the
+GRAPH-VISIBLE half of `gfexecConfIO`'s membership-by-fabric-CONTACT clause, `gisIo (i, k) →
+(i, k) ∈ gfDev` (`GraphFabResidue.gfIoDevOfConf`), superseding (M)'s interim `↔`; `gisIo` itself
+moved to `WeakRvwmoFab` (the bundle names it).  W13 (I) ([OWN.27]) flipped `gwf`'s `LIo` shape arm, `projLbl` and `lblRealizes*`, so a
 `gwf` graph may now carry `LIo` events; the interim lemma `ioResidueGwfInterim` (the item for free
 on every `gwf` graph, true only while that arm was `False`) is RETIRED with the flip.  `forgetF`/`GfexecT` (W13 (W)) do not exist yet: the item is stated on the
 untagged fabric bundle `Gfexec`, which is what `ioResidueGmo (forgetF GT)` instantiates.
@@ -67,11 +69,7 @@ open Lbl
 
 /-! ## 1. The event classifiers and the fabric order -/
 
-/-- An I/O-class event (`Lbl.LIo`, any kind). -/
-def gisIo (G : Gexec) (e : Geid) : Bool :=
-  match gxLbl G e with
-  | some l => lbIsIo l
-  | none => false
+-- `gisIo` (an I/O-class event, `Lbl.LIo`, any kind) is `WeakRvwmoFab`'s (W13 (I)).
 
 /-- A RAM read event (`lbIsR`: `LLoad`/`LRmw`; never an I/O event, D47 (a)). -/
 def gisR (G : Gexec) (e : Geid) : Bool :=
@@ -166,22 +164,31 @@ theorem ioResidueAcyclic (GF : Gfexec) :
         · exact Nat.lt_trans ih (h _ _ hs).2.2
   exact Nat.lt_irrefl _ (key x x hx)
 
-/-! ## 3.1 W13 (M): the bundle clause, and the interim state
+/-! ## 3.1 W13 (I): the bundle's I/O-by-class clause
 
-`gfIoDev` is the clause `gisIo (i, k) ↔ (i, k) ∈ gfDev` that the fabric-aware conformance bundles
-gain (§A(†): `xv6ConfS` on `gfexecConfIO`, W13 (I)/(W); `gdexecQconfT`, W12) in place of
-`isDevBlock em k ↔ (i, k) ∈ gfDev` (`gfexecConf`).  Neither bundle exists yet, so the clause is
-stated here as a predicate for them to include. -/
+`gfIoDev` is the GRAPH-VISIBLE half of `gfexecConfIO`'s membership clause (fabric CONTACT,
+[OWN.43]): every I/O-class event is a `gfDev` member.  The converse is FALSE by design: the
+non-I/O members (blocks that move or read the fabric, e.g. the disk's `DWriteDev` stores) are read
+off the emission's endpoints and contact bits, which the graph does not carry.  W13 (M)'s interim
+form `gisIo (i, k) ↔ (i, k) ∈ gfDev` (unsatisfiable once a fabric-moving RAM store is a member)
+is superseded. -/
 
 def gfIoDev (GF : Gfexec) : Prop :=
   ∀ (i : Nat) (row : List Lbl), GF.gfGd.gdG.gxProg[i]? = some row →
-    ∀ k, k < row.length → (gisIo GF.gfGd.gdG (i, k) = true ↔ (i, k) ∈ GF.gfDev)
+    ∀ k, k < row.length → gisIo GF.gfGd.gdG (i, k) = true → (i, k) ∈ GF.gfDev
 
 /-- With no I/O event, the empty fabric list satisfies the clause. -/
 theorem GraphFabResidue.gfIoDevNodev (GD : Gdexec) :
     (∀ e, gisIo GD.gdG e = false) → gfIoDev ⟨GD, []⟩ := by
-  intro hno i row _ k _
-  simp [hno]
+  intro hno i row _ k _ h
+  simp [hno] at h
+
+/-- The bundle gives the clause (its first membership disjunct). -/
+theorem GraphFabResidue.gfIoDevOfConf (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
+    (GF : Gfexec) : gfexecConfIO boot d0 fab GF → gfIoDev GF := by
+  rintro ⟨_, _, _, hc⟩ i row hrow k hk hio
+  obtain ⟨_, _, _, _, _, hiff, _⟩ := hc i row hrow
+  exact (hiff k hk).2 (Or.inl hio)
 
 /-! ## 4. The re-encoded `w13f`: the SC case is admitted (W13 (T) acceptance)
 

@@ -6,7 +6,7 @@ Rocq: `iris/WeakRvwmoFabInd.v` @ xxvzwolszwmp.
 ## The Rocq header, in substance
 
 Design `claude-notes/design/weak-memory-route-b.md` §4d.4 (B1b).  `WeakRvwmoFab` lands the
-fabric-order bundle (`gfexecConf`) and its consistency restriction (`gfHullConsistent`); its §8
+fabric-order bundle (`gfexecConfIO`, W13 (I)) and its consistency restriction (`gfHullConsistent`); its §8
 closing comment enumerates FIVE obligations (O1–O5) for the CONFORMANCE restriction and a
 `cycle_kill` mirror.  This file discharges them:
 
@@ -33,8 +33,8 @@ closing comment enumerates FIVE obligations (O1–O5) for the CONFORMANCE restri
    `RacyD` ↦ `racyD`; `tc_mono` ↦ `tcMono`.  `dev_state` ↦ `Efab` (the event instance's fabric,
    `WeakEvPf` deviation 9 / owner decision Q1).
 2. O2 / STAGE C — THE PINNED LTS (`WeakRvwmoFab` deviation 2; owner ruling Q-C1).
-   `gfexecConf` carries `emFetchImg GF.gfGd.gdG.gxImg em` per row; `gfexecConfRen` /
-   `gfexecConfHull` transport it (`emFetchImgRen`, `emFetchImgPrefix`; the image is fixed by the
+   `gfexecConfIO` carries `emZifencei GF.gfGd.gdG.gxImg em` (content `emFetchImg`) per row;
+   `gfexecConfRen` / `gfexecConfHull` transport it (`emFetchImgRen`, `emFetchImgPrefix`; the image is fixed by the
    renaming and the hull).  `fconfSupply` supplies the trace at the PINNED LTS, so the supply
    conjunct of `fconfRealize`, `hullRealizableOfAcyclicF` and `t2linSupplyF` is Rocq's
    `trDevOrdered GF' c → ∃ pst, …` with `exec_prog_ok' pstep_ev …` read as
@@ -43,10 +43,16 @@ closing comment enumerates FIVE obligations (O1–O5) for the CONFORMANCE restri
    linearization ↦ the Lean-only `WeakRvwmoFabInd.lbgGlinEids` (`decide +kernel`) plus `rfl`;
    Lean-only `WeakRvwmoFabInd.eadmTag` (administrative items carry no tag).  Rocq's
    `Print Assumptions` audit is not reproduced (the lint bans axioms).
-4. W-DISK (`WeakRvwmoFab` deviation 4): `gfexecConfRen` / `gfexecConfHull` transport the
-   INTERIM `LDev`-free disk-row clause (`emDevfreeRen`, `emDevfreePrefix`); `fconfRealize`,
-   `hullRealizableOfAcyclicF` and `t2linSupplyF` take the boot pool's QUIET hypothesis
-   `∀ i, i < N → devQuiet (boot i)`, passed to `fconfSupply`.
+4. W13 (I) (`WeakRvwmoFab` deviation 5, superseding W-DISK's note): the bundle is `gfexecConfIO`
+   (membership by fabric CONTACT [OWN.43]).  `hemitf` / `hartConff` carry the contact bits `tq`:
+   `hemitfRen` / `hartConffRen` / `hemitfTagLt` / `hemitfTagGe` / `hemitfPrefix` /
+   `hartConffPrefix` / `hartConffRowDepsLt` take `tq` (unchanged otherwise; Lean-only
+   `WeakRvwmoFabInd.pdevEvRen`, `WeakRvwmoFabInd.admRunTRen`).  `gfexecConfRen` /
+   `gfexecConfHull` transport the contact clause (the I/O class is blind to the renaming and to the
+   cut below it: Lean-only `WeakRvwmoFabInd.lbIsIoRen`, `WeakRvwmoFabInd.gisIoMapRow`; the
+   endpoints and bits are the row's own); the interim disk-row clause and its transport are GONE.
+   `fconfRealize`, `hullRealizableOfAcyclicF` and `t2linSupplyF` take NO quiet-boot hypothesis;
+   `cycleKillOfF` takes `∀ i, devQuiet (boot i)` (for `gfexecConfOfQconf`).
 
 **Rocq → Lean name map.**  `hemitf_ren` `hemitfRen`, `hart_conff_ren` `hartConffRen`,
 `hemitf_tag_lt` `hemitfTagLt`, `hemitf_tag_ge` `hemitfTagGe`, `hemitf_prefix` `hemitfPrefix`,
@@ -77,37 +83,59 @@ open MachCSL MachCSL.Stdpp Iris.Std
 
 /-! ### 1.1 O2: the normalization orbit -/
 
-theorem hemitfRen (π : Nat → Nat) (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate)
-    (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
-    hemitf dvi dvo k ws row p es pfin →
+/-- (Lean-only, W13 (I)) The contact marker is blind to the ts renaming. -/
+theorem WeakRvwmoFabInd.pdevEvRen (π : Nat → Nat) (p : Pexv6) (l : Wlabel) (p' : Pexv6) :
+    pdevEv p (wlblRen π l) p' = pdevEv p l p' := by
+  cases l <;> rfl
+
+/-- (Lean-only, W13 (I)) `admRunRen` with the contact bit. -/
+theorem WeakRvwmoFabInd.admRunTRen (π : Nat → Nat) (instr : Bool) (p : Pexv6) (d : Efab)
+    (ls : List Wlabel) (p' : Pexv6) (d' : Efab) (b : Bool) :
+    WeakRvwmoFab.admRunT instr p d ls p' d' b →
+    WeakRvwmoFab.admRunT instr p d (ls.map (wlblRen π)) p' d' b := by
+  intro h
+  induction h with
+  | ATnil p d => exact .ATnil p d
+  | ATcons p d l p1 d1 ls p' d' b ha hs _ ih =>
+    rw [List.map_cons, wlblRenAdmin π instr l ha]
+    exact .ATcons p d l p1 d1 _ p' d' b ha hs ih
+
+theorem hemitfRen (π : Nat → Nat) (dvi dvo : Nat → Efab) (tq : Nat → Bool) (k : Nat)
+    (ws : Wstate) (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
+    hemitf dvi dvo tq k ws row p es pfin →
     ∀ ws', ws'.wRelp = ws.wRelp →
-    hemitf dvi dvo k ws' (row.map (lblRen π)) p (es.map (eitemRen π)) pfin := by
+    hemitf dvi dvo tq k ws' (row.map (lblRen π)) p (es.map (eitemRen π)) pfin := by
   intro h
   induction h with
   | HFnil k ws p => intro _ _; exact .HFnil _ _ _
-  | HFone k ws lb row p ls pa da l p' es pfin har hre hst _ ih =>
+  | HFone k ws lb row p ls pa da l p' es pfin b har hre hst htq _ ih =>
     intro ws' hrelp
     rw [eitemRenBlock, List.map_cons]
     have hlat := hre.2.1
     have hrf := hre.2.2.1
-    exact .HFone _ _ _ _ _ _ _ _ _ _ _ _ (admRunRen π true _ _ _ _ _ har)
+    exact .HFone _ _ _ _ _ _ _ _ _ _ _ _ _ (WeakRvwmoFabInd.admRunTRen π true _ _ _ _ _ _ har)
       (hlblRealizesRen π pa ws ws' lb l hrelp hre) (pstepEvWren π _ _ _ _ _ hlat hrf hst)
+      (by rw [WeakRvwmoFabInd.pdevEvRen]; exact htq)
       (ih _ (lblPostRelpRen π k ws ws' lb hrelp))
-  | HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2 hst2 _
-      ih =>
+  | HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin b1 b2 har1 hre hst1 har2
+      hst2 htq _ ih =>
     intro ws' hrelp
     rw [eitemRenBlock, eitemRenBlock, List.map_cons]
     have hre' := hlblRealizesPairRen π pa pm2 ws ws' lb l1 l2 hrelp hre
     obtain ⟨aq, rl, base, tvs, data, asrc1, asrc2, vsrc2, rfl, rfl, _, _, _⟩ := hre
-    exact .HFpair _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ (admRunRen π true _ _ _ _ _ har1) hre'
-      (pstepEvWren π _ _ _ _ _ trivial trivial hst1) (admRunRen π false _ _ _ _ _ har2)
+    exact .HFpair _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+      (WeakRvwmoFabInd.admRunTRen π true _ _ _ _ _ _ har1) hre'
+      (pstepEvWren π _ _ _ _ _ trivial trivial hst1)
+      (WeakRvwmoFabInd.admRunTRen π false _ _ _ _ _ _ har2)
       (pstepEvWren π _ _ _ _ _ trivial trivial hst2)
+      (by rw [WeakRvwmoFabInd.pdevEvRen, WeakRvwmoFabInd.pdevEvRen]; exact htq)
       (ih _ (lblPostRelpRen π k ws ws' _ hrelp))
 
 theorem hartConffRen (π : Nat → Nat) (i : Nat) (row : List Lbl) (p0 : Pexv6)
-    (dvi dvo : Nat → Efab) (em : Hemission) :
-    hartConff i row p0 dvi dvo em → hartConff i (row.map (lblRen π)) p0 dvi dvo (emRen π em) :=
-  fun hem => hemitfRen π dvi dvo 0 wsInit row p0 _ _ hem wsInit rfl
+    (dvi dvo : Nat → Efab) (tq : Nat → Bool) (em : Hemission) :
+    hartConff i row p0 dvi dvo tq em →
+    hartConff i (row.map (lblRen π)) p0 dvi dvo tq (emRen π em) :=
+  fun hem => hemitfRen π dvi dvo tq 0 wsInit row p0 _ _ hem wsInit rfl
 
 /-! ### 1.2 Tag monotonicity -/
 
@@ -119,14 +147,14 @@ theorem WeakRvwmoFabInd.eadmTag (ls : List Wlabel) (it : Eitem) : it ∈ eadm ls
   rfl
 
 /-- Every tag in the item list of `hemitf … k …` is a row position SHIFTED BY `k`. -/
-theorem hemitfTagLt (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
-    (p : Pexv6) (es : List Eitem) (pfin : Pexv6) (it : Eitem) (j : Nat) :
-    hemitf dvi dvo k ws row p es pfin → it ∈ es → it.2 = some j →
+theorem hemitfTagLt (dvi dvo : Nat → Efab) (tq : Nat → Bool) (k : Nat) (ws : Wstate)
+    (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) (it : Eitem) (j : Nat) :
+    hemitf dvi dvo tq k ws row p es pfin → it ∈ es → it.2 = some j →
     k ≤ j ∧ j - k < row.length := by
   intro h
   induction h with
   | HFnil k ws p => intro hit; simp at hit
-  | HFone k ws lb row p ls pa da l p' es pfin _ _ _ _ ih =>
+  | HFone k ws lb row p ls pa da l p' es pfin _ _ _ _ _ _ ih =>
     intro hit hj
     rcases List.mem_append.1 hit with h | h
     · rw [WeakRvwmoFabInd.eadmTag ls it h] at hj; cases hj
@@ -138,7 +166,7 @@ theorem hemitfTagLt (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : List
       · obtain ⟨h1, h2⟩ := ih h hj
         simp only [List.length_cons]
         omega
-  | HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin _ _ _ _ _ _ ih =>
+  | HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin _ _ _ _ _ _ _ _ _ ih =>
     intro hit hj
     rcases List.mem_append.1 hit with h | h
     · rw [WeakRvwmoFabInd.eadmTag ls1 it h] at hj; cases hj
@@ -158,18 +186,18 @@ theorem hemitfTagLt (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : List
             simp only [List.length_cons]
             omega
 
-theorem hemitfTagGe (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
-    (p : Pexv6) (es : List Eitem) (pfin : Pexv6) (it : Eitem) (j : Nat) :
-    hemitf dvi dvo k ws row p es pfin → it ∈ es → it.2 = some j → k ≤ j :=
-  fun hem hit hj => (hemitfTagLt dvi dvo k ws row p es pfin it j hem hit hj).1
+theorem hemitfTagGe (dvi dvo : Nat → Efab) (tq : Nat → Bool) (k : Nat) (ws : Wstate)
+    (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) (it : Eitem) (j : Nat) :
+    hemitf dvi dvo tq k ws row p es pfin → it ∈ es → it.2 = some j → k ≤ j :=
+  fun hem hit hj => (hemitfTagLt dvi dvo tq k ws row p es pfin it j hem hit hj).1
 
 /-! ### 1.3 O1: prefix restriction, with the dropped tail's tags bounded -/
 
-theorem hemitfPrefix (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
-    (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
-    hemitf dvi dvo k ws row p es pfin →
+theorem hemitfPrefix (dvi dvo : Nat → Efab) (tq : Nat → Bool) (k : Nat) (ws : Wstate)
+    (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
+    hemitf dvi dvo tq k ws row p es pfin →
     ∀ n, ∃ es1 es2 pfin', es = es1 ++ es2 ∧
-      hemitf dvi dvo k ws (row.take n) p es1 pfin' ∧
+      hemitf dvi dvo tq k ws (row.take n) p es1 pfin' ∧
       (∀ it j, it ∈ es2 → it.2 = some j → k + n ≤ j) := by
   intro h
   induction h with
@@ -177,37 +205,37 @@ theorem hemitfPrefix (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : Lis
     intro n
     exact ⟨[], [], p, rfl, by rw [List.take_nil]; exact .HFnil _ _ _,
       fun it j hit => by simp at hit⟩
-  | HFone k ws lb row p ls pa da l p' es pfin har hre hst hem ih =>
+  | HFone k ws lb row p ls pa da l p' es pfin b har hre hst htq hem ih =>
     intro n
     cases n with
     | zero =>
       refine ⟨[], eadm ls ++ (l, some k) :: es, p, rfl, .HFnil _ _ _, fun it j hit hj => ?_⟩
-      have := hemitfTagGe dvi dvo k ws (lb :: row) p _ pfin it j
-        (.HFone _ _ _ _ _ _ _ _ _ _ _ _ har hre hst hem) hit hj
+      have := hemitfTagGe dvi dvo tq k ws (lb :: row) p _ pfin it j
+        (.HFone _ _ _ _ _ _ _ _ _ _ _ _ _ har hre hst htq hem) hit hj
       omega
     | succ n =>
       obtain ⟨es1, es2, pfin', rfl, hem', hbnd⟩ := ih n
       refine ⟨eadm ls ++ (l, some k) :: es1, es2, pfin', by simp, ?_, fun it j hit hj => ?_⟩
       · rw [List.take_succ_cons]
-        exact .HFone _ _ _ _ _ _ _ _ _ _ _ _ har hre hst hem'
+        exact .HFone _ _ _ _ _ _ _ _ _ _ _ _ _ har hre hst htq hem'
       · have := hbnd it j hit hj
         omega
-  | HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2 hst2 hem
-      ih =>
+  | HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin b1 b2 har1 hre hst1 har2 hst2
+      htq hem ih =>
     intro n
     cases n with
     | zero =>
       refine ⟨[], eadm ls1 ++ (l1, some k) :: (eadm ls2 ++ (l2, some k) :: es), p, rfl,
         .HFnil _ _ _, fun it j hit hj => ?_⟩
-      have := hemitfTagGe dvi dvo k ws (lb :: row) p _ pfin it j
-        (.HFpair _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ har1 hre hst1 har2 hst2 hem) hit hj
+      have := hemitfTagGe dvi dvo tq k ws (lb :: row) p _ pfin it j
+        (.HFpair _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ har1 hre hst1 har2 hst2 htq hem) hit hj
       omega
     | succ n =>
       obtain ⟨es1, es2, pfin', rfl, hem', hbnd⟩ := ih n
       refine ⟨eadm ls1 ++ (l1, some k) :: (eadm ls2 ++ (l2, some k) :: es1), es2, pfin',
         by simp, ?_, fun it j hit hj => ?_⟩
       · rw [List.take_succ_cons]
-        exact .HFpair _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ har1 hre hst1 har2 hst2 hem'
+        exact .HFpair _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ har1 hre hst1 har2 hst2 htq hem'
       · have := hbnd it j hit hj
         omega
 
@@ -253,13 +281,13 @@ theorem emDevAppNoTag (k : Nat) (es1 es2 : List Eitem) :
 
 /-- THE PREFIX RESTRICTION, with the dev blocks below the cut AGREEING. -/
 theorem hartConffPrefix (i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Nat → Efab)
-    (em : Hemission) (n : Nat) :
-    hartConff i row p0 dvi dvo em →
-    ∃ em', hartConff i (row.take n) p0 dvi dvo em' ∧
+    (tq : Nat → Bool) (em : Hemission) (n : Nat) :
+    hartConff i row p0 dvi dvo tq em →
+    ∃ em', hartConff i (row.take n) p0 dvi dvo tq em' ∧
       em'.emItems <+: em.emItems ∧
       (∀ k, k < n → (isDevBlock em' k ↔ isDevBlock em k)) := by
   intro hem
-  obtain ⟨es1, es2, pfin', heq, hem', hbnd⟩ := hemitfPrefix _ _ _ _ _ _ _ _ hem n
+  obtain ⟨es1, es2, pfin', heq, hem', hbnd⟩ := hemitfPrefix _ _ _ _ _ _ _ _ _ hem n
   refine ⟨⟨es1, pfin'⟩, hem', ⟨es2, heq.symm⟩, fun k hk => ?_⟩
   show emDev false k es1 = true ↔ emDev false k em.emItems = true
   rw [heq, emDevAppNoTag k es1 es2 (fun it hit hj => by have := hbnd it k hit hj; omega)]
@@ -272,18 +300,34 @@ theorem isDevBlockRen (π : Nat → Nat) (em : Hemission) (k : Nat) :
 
 /-- A `rowDeps` edge of an emission of `row` names row positions of `row`. -/
 theorem hartConffRowDepsLt (i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Nat → Efab)
-    (em : Hemission) (jk : Nat × Nat) :
-    hartConff i row p0 dvi dvo em → jk ∈ rowDeps em.emItems →
+    (tq : Nat → Bool) (em : Hemission) (jk : Nat × Nat) :
+    hartConff i row p0 dvi dvo tq em → jk ∈ rowDeps em.emItems →
     jk.1 < row.length ∧ jk.2 < row.length := by
   intro hem hjk
-  have hem' : hemitf dvi dvo 0 wsInit row p0 em.emItems em.emFin := hem
+  have hem' : hemitf dvi dvo tq 0 wsInit row p0 em.emItems em.emFin := hem
   obtain ⟨it, hit, hpos, _⟩ := rowDepsSrc _ _ hjk
   obtain ⟨it', hit', hpos', _⟩ := rowDepsTgt _ _ hjk
-  have h1 := (hemitfTagLt _ _ _ _ _ _ _ _ it jk.1 hem' hit hpos).2
-  have h2 := (hemitfTagLt _ _ _ _ _ _ _ _ it' jk.2 hem' hit' hpos').2
+  have h1 := (hemitfTagLt _ _ _ _ _ _ _ _ _ it jk.1 hem' hit hpos).2
+  have h2 := (hemitfTagLt _ _ _ _ _ _ _ _ _ it' jk.2 hem' hit' hpos').2
   omega
 
 /-! ## 3. O4/O5: the conformance restrictions -/
+
+/-- (Lean-only, W13 (I)) The I/O class is blind to the ts renaming. -/
+theorem WeakRvwmoFabInd.lbIsIoRen (π : Nat → Nat) (l : Lbl) : lbIsIo (lblRen π l) = lbIsIo l := by
+  cases l <;> rfl
+
+/-- (Lean-only, W13 (I)) `gisIo` is preserved by a row map that renames its labels at `k`. -/
+theorem WeakRvwmoFabInd.gisIoMapRow (π : Nat → Nat) (G G' : Gexec) (i k : Nat)
+    (row row' : List Lbl) :
+    G.gxProg[i]? = some row → G'.gxProg[i]? = some row' →
+    row'[k]? = (row[k]?).map (lblRen π) → k < row.length →
+    gisIo G' (i, k) = gisIo G (i, k) := by
+  intro hrow hrow' hk hlt
+  obtain ⟨lb, hlb⟩ : ∃ lb, row[k]? = some lb := ⟨_, List.getElem?_eq_getElem hlt⟩
+  rw [hlb] at hk
+  rw [WeakRvwmoFab.gisIoRow G i k row lb hrow hlb,
+    WeakRvwmoFab.gisIoRow G' i k row' (lblRen π lb) hrow' hk, WeakRvwmoFabInd.lbIsIoRen]
 
 /-! ### 3.1 The normalization orbit -/
 
@@ -292,7 +336,7 @@ theorem gfexecConfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : Efab)
     rowsRel π GF.gfGd.gdG GF'.gfGd.gdG →
     GF'.gfGd.gdDeps = GF.gfGd.gdDeps →
     GF'.gfDev = GF.gfDev →
-    gfexecConf boot d0 fab GF → gfexecConf boot d0 fab GF' := by
+    gfexecConfIO boot d0 fab GF → gfexecConfIO boot d0 fab GF' := by
   rintro hrr hdeps hdev ⟨h0, hnd, hbnd, hc⟩
   refine ⟨h0, by rw [hdev]; exact hnd, ?_, ?_⟩
   · intro n i k hn
@@ -308,12 +352,13 @@ theorem gfexecConfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : Efab)
       rw [hrow0] at hrow'
       simp only [Option.map_some, Option.some.injEq] at hrow'
       subst hrow'
-      obtain ⟨em, dvi, dvo, hem, hiff, hpin, hfi, hdep, hdisk⟩ := hc i row hrow0
-      refine ⟨emRen π em, dvi, dvo, hartConffRen π i row (boot i) dvi dvo em hem, ?_, ?_, ?_, ?_,
-        fun dp hp => emDevfreeRen π em (hdisk dp hp)⟩
+      obtain ⟨em, dvi, dvo, tq, hem, hiff, hpin, hfi, hdep⟩ := hc i row hrow0
+      refine ⟨emRen π em, dvi, dvo, tq, hartConffRen π i row (boot i) dvi dvo tq em hem, ?_, ?_, ?_,
+        ?_⟩
       · intro k hk
         rw [List.length_map] at hk
-        rw [hdev, isDevBlockRen]
+        rw [hdev, WeakRvwmoFabInd.gisIoMapRow π GF.gfGd.gdG GF'.gfGd.gdG i k row
+          (row.map (lblRen π)) hrow0 (rowsRelRow π _ _ i row hrr hrow0) (List.getElem?_map ..) hk]
         exact hiff k hk
       · intro k n hn
         rw [hdev] at hn
@@ -334,8 +379,8 @@ theorem gfexecConfHull (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     gfexecConsistent GF →
     dclosed cs GF.gfDev →
     hullOk GF.gfGd.gdG cs →
-    gfexecConf boot d0 fab GF →
-    gfexecConf boot d0 fab (gfHull GF cs) := by
+    gfexecConfIO boot d0 fab GF →
+    gfexecConfIO boot d0 fab (gfHull GF cs) := by
   rintro _ hdc _ ⟨h0, hnd, hbnd, hc⟩
   refine ⟨h0, List.Nodup.sublist (List.filter_sublist) hnd, ?_, ?_⟩
   · intro n i k hn
@@ -364,18 +409,24 @@ theorem gfexecConfHull (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
         rw [hrow] at hrow'
         simp only [Option.bind_some, Option.some.injEq] at hrow'
         subst hrow'
-        obtain ⟨em, dvi, dvo, hem, hiff, hpin, hfi, hdep, hdisk⟩ := hc i row hrow
-        obtain ⟨em', hem', hpre, hdevb⟩ := hartConffPrefix i row (boot i) dvi dvo em c hem
-        refine ⟨emRen (hren GF.gfGd.gdG cs) em', dvi, dvo,
-          hartConffRen _ _ _ _ _ _ _ hem', ?_, ?_, ?_, ?_,
-          fun dp hp => emDevfreeRen _ em' (emDevfreePrefix em em' hpre (hdisk dp hp))⟩
+        obtain ⟨em, dvi, dvo, tq, hem, hiff, hpin, hfi, hdep⟩ := hc i row hrow
+        obtain ⟨em', hem', hpre, _⟩ := hartConffPrefix i row (boot i) dvi dvo tq em c hem
+        refine ⟨emRen (hren GF.gfGd.gdG cs) em', dvi, dvo, tq,
+          hartConffRen _ _ _ _ _ _ _ _ hem', ?_, ?_, ?_, ?_⟩
         · intro k hk
           rw [List.length_map, List.length_take] at hk
           have hkc : k < c := by omega
-          rw [isDevBlockRen, hdevb k hkc, hiff k (by omega)]
-          show (i, k) ∈ GF.gfDev ↔ (i, k) ∈ GF.gfDev.filter (gcut cs)
+          have hrowH : (gfHull GF cs).gfGd.gdG.gxProg[i]? =
+              some ((row.take c).map (lblRen (hren GF.gfGd.gdG cs))) := by
+            show (gxHull GF.gfGd.gdG cs).gxProg[i]? = _
+            rw [gxhProgLookup, hcs, hrow]
+            rfl
+          rw [WeakRvwmoFabInd.gisIoMapRow (hren GF.gfGd.gdG cs) GF.gfGd.gdG (gfHull GF cs).gfGd.gdG
+            i k row _ hrow hrowH (by rw [List.getElem?_map, List.getElem?_take_of_lt hkc]) (by omega)]
+          rw [← hiff k (by omega)]
+          show (i, k) ∈ GF.gfDev.filter (gcut cs) ↔ (i, k) ∈ GF.gfDev
           rw [List.mem_filter]
-          exact ⟨fun h => ⟨h, gcutIntro cs (i, k) c hcs hkc⟩, fun h => h.1⟩
+          exact ⟨fun h => h.1, fun h => ⟨h, gcutIntro cs (i, k) c hcs hkc⟩⟩
         · intro k n hn
           exact hpin k n (gfHullDevLookup GF cs n (i, k) hdc hn)
         · exact emFetchImgRen _ _ em' (emFetchImgPrefix _ em em' hpre hfi)
@@ -383,7 +434,7 @@ theorem gfexecConfHull (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
           simp only [emRen] at hjk
           rw [rowDepsRen] at hjk
           obtain ⟨hlt1, hlt2⟩ :=
-            hartConffRowDepsLt i (row.take c) (boot i) dvi dvo em' jk hem' hjk
+            hartConffRowDepsLt i (row.take c) (boot i) dvi dvo tq em' jk hem' hjk
           rw [List.length_take] at hlt1 hlt2
           replace hlt1 : jk.1 < c := by omega
           replace hlt2 : jk.2 < c := by omega
@@ -403,7 +454,7 @@ theorem gfHullEventsLt (GF : Gfexec) (cs : List Nat) :
 def cycleKillF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) : Prop :=
   ∀ GF : Gfexec,
     gfexecConsistent GF →
-    gfexecConf boot d0 fab GF →
+    gfexecConfIO boot d0 fab GF →
     (∀ cs, properCutF GF cs → ∀ x, ¬ tc (racyF (gfHull GF cs)) x x) →
     ∀ x, tc (racyF GF) x x → False
 
@@ -419,16 +470,15 @@ def trDevOrdered (GF : Gfexec) (c : Cand) : Prop :=
 theorem fconfRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     (GF : Gfexec) (N : Nat) :
     gfexecConsistent GF →
-    gfexecConf boot d0 fab GF →
+    gfexecConfIO boot d0 fab GF →
     (∀ x, ¬ tc (racyF GF) x x) →
     GF.gfGd.gdG.gxProg.length ≤ N →
-    (∀ i, i < N → devQuiet (boot i)) →
     ∃ (c : Cand) (pi : Nat → Nat) (GF' : Gfexec),
       srvwmoConsistent c ∧
       c.cdImg = GF.gfGd.gdG.gxImg ∧
       rowsRel pi GF.gfGd.gdG GF'.gfGd.gdG ∧
       GF'.gfDev = GF.gfDev ∧
-      gfexecConf boot d0 fab GF' ∧
+      gfexecConfIO boot d0 fab GF' ∧
       (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) =
         (GF'.gfGd.gdG.gxProg[i]?).getD []) ∧
       (trDevOrdered GF' c →
@@ -436,19 +486,19 @@ theorem fconfRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
           pst 0 = (List.range' 0 N).map boot ∧
           execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun k => fab (dcnt GF' c.cdTr k))
             (candExec c)) := by
-  intro hc hconf hacy hN hquiet
+  intro hc hconf hacy hN
   have hcons : rvwmoMinusDepsConsistent GF.gfGd := hc.1
   have hacyD : ∀ x, ¬ tc (racyD GF.gfGd) x x := fun x hcyc =>
     hacy x (tcMono _ _ x x (fun a b h => Or.inl h) hcyc)
   obtain ⟨GD', pi, hcons', h14, hrr, hdeps, _⟩ :=
     normalizeOfAcyclic GF.gfGd hcons (fun x y => racyDDec _ x y) hacyD
-  have hconf' : gfexecConf boot d0 fab ⟨GD', GF.gfDev⟩ :=
+  have hconf' : gfexecConfIO boot d0 fab ⟨GD', GF.gfDev⟩ :=
     gfexecConfRen pi boot d0 fab GF ⟨GD', GF.gfDev⟩ hrr hdeps rfl hconf
   obtain ⟨c, hsr, himg, hrow, _⟩ := rule14Linearization GD'.gdG hcons'.1 h14
   refine ⟨c, pi, ⟨GD', GF.gfDev⟩, hsr, ?_, hrr, rfl, hconf', hrow, fun hord => ?_⟩
   · rw [himg, rowsRelImg pi _ _ hrr]
   · obtain ⟨pst, hpst0, _, hprg⟩ := fconfSupply c boot d0 fab ⟨GD', GF.gfDev⟩ N hconf' hrow
-      (by rw [rowsRelNharts pi _ _ hrr]; exact hN) hord hquiet
+      (by rw [rowsRelNharts pi _ _ hrr]; exact hN) hord
     refine ⟨pst, hpst0, ?_⟩
     rw [himg]
     exact hprg
@@ -458,16 +508,15 @@ theorem fconfRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
 theorem hullRealizableOfAcyclicF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     (GF : Gfexec) (cs : List Nat) (N : Nat) :
     gfexecConsistent GF →
-    gfexecConf boot d0 fab GF →
+    gfexecConfIO boot d0 fab GF →
     properCutF GF cs →
     (∀ x, ¬ tc (racyF (gfHull GF cs)) x x) →
     GF.gfGd.gdG.gxProg.length ≤ N →
-    (∀ i, i < N → devQuiet (boot i)) →
     ∃ (c : Cand) (pi : Nat → Nat) (GF' : Gfexec),
       srvwmoConsistent c ∧
       c.cdImg = GF.gfGd.gdG.gxImg ∧
       GF'.gfDev = (gfHull GF cs).gfDev ∧
-      gfexecConf boot d0 fab GF' ∧
+      gfexecConfIO boot d0 fab GF' ∧
       (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) =
         (((gxHull GF.gfGd.gdG cs).gxProg[i]?).getD []).map (lblRen pi)) ∧
       (trDevOrdered GF' c →
@@ -475,17 +524,17 @@ theorem hullRealizableOfAcyclicF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat �
           pst 0 = (List.range' 0 N).map boot ∧
           execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun k => fab (dcnt GF' c.cdTr k))
             (candExec c)) := by
-  intro hc hconf hpc hacy hN hquiet
+  intro hc hconf hpc hacy hN
   have hok : hullOk GF.gfGd.gdG cs := properCutOk _ _ hpc.1
   have hch : gfexecConsistent (gfHull GF cs) := gfHullConsistent GF cs hc hok hpc.2
-  have hcnf : gfexecConf boot d0 fab (gfHull GF cs) :=
+  have hcnf : gfexecConfIO boot d0 fab (gfHull GF cs) :=
     gfexecConfHull boot d0 fab GF cs hc hpc.2 hok hconf
   have hNh : (gfHull GF cs).gfGd.gdG.gxProg.length ≤ N := by
     have := gxhNharts GF.gfGd.gdG cs
     change (gxHull GF.gfGd.gdG cs).gxProg.length ≤ N
     omega
   obtain ⟨c, pi, GF', hsr, himg, hrr, hdev, hconf', hrow, hsup⟩ :=
-    fconfRealize boot d0 fab (gfHull GF cs) N hch hcnf hacy hNh hquiet
+    fconfRealize boot d0 fab (gfHull GF cs) N hch hcnf hacy hNh
   refine ⟨c, pi, GF', hsr, himg.trans (gxhImg _ _), hdev, hconf', fun i => ?_, hsup⟩
   rw [hrow i, hrr.2.1, List.getElem?_map]
   change (Option.map _ ((gxHull GF.gfGd.gdG cs).gxProg[i]?)).getD [] = _
@@ -498,7 +547,7 @@ theorem t2linAuxF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) :
     ∀ (n : Nat) (GF : Gfexec),
       (gevs' GF.gfGd.gdG).length ≤ n →
       gfexecConsistent GF →
-      gfexecConf boot d0 fab GF →
+      gfexecConfIO boot d0 fab GF →
       ∀ x, ¬ tc (racyF GF) x x := by
   intro hk n
   induction n with
@@ -522,7 +571,7 @@ theorem t2linOfCycleKillF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab
     cycleKillF boot d0 fab →
     ∀ GF : Gfexec,
       gfexecConsistent GF →
-      gfexecConf boot d0 fab GF →
+      gfexecConfIO boot d0 fab GF →
       ∀ x, ¬ tc (racyF GF) x x :=
   fun hk GF => t2linAuxF boot d0 fab hk (gevs' GF.gfGd.gdG).length GF (Nat.le_refl _)
 
@@ -532,23 +581,21 @@ theorem t2linSupplyF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     (GF : Gfexec) (N : Nat) :
     cycleKillF boot d0 fab →
     gfexecConsistent GF →
-    gfexecConf boot d0 fab GF →
+    gfexecConfIO boot d0 fab GF →
     GF.gfGd.gdG.gxProg.length ≤ N →
-    (∀ i, i < N → devQuiet (boot i)) →
     ∃ (c : Cand) (pi : Nat → Nat) (GF' : Gfexec),
       srvwmoConsistent c ∧
       c.cdImg = GF.gfGd.gdG.gxImg ∧
       GF'.gfDev = GF.gfDev ∧
-      gfexecConf boot d0 fab GF' ∧
+      gfexecConfIO boot d0 fab GF' ∧
       (trDevOrdered GF' c →
         ∃ pst : Nat → List Pexv6,
           pst 0 = (List.range' 0 N).map boot ∧
           execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun k => fab (dcnt GF' c.cdTr k))
             (candExec c)) := by
-  intro hk hcons hconf hN hquiet
+  intro hk hcons hconf hN
   obtain ⟨c, pi, GF', hsr, himg, _, hdev, hconf', _, hsup⟩ :=
     fconfRealize boot d0 fab GF N hcons hconf (t2linOfCycleKillF boot d0 fab hk GF hcons hconf) hN
-      hquiet
   exact ⟨c, pi, GF', hsr, himg, hdev, hconf', hsup⟩
 
 /-! ## 5. THE DEV-ORDER FINDING -/
@@ -617,12 +664,14 @@ theorem linCrossHartGmoReversed :
 
 /-! ## 6. Non-vacuity: the two skeletons are the same skeleton -/
 
+/-- (W13 (I): at QUIET boot states, `gfexecConfOfQconf`'s hypothesis.) -/
 theorem cycleKillOfF (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) :
+    (∀ i, devQuiet (boot i)) →
     cycleKillF boot d0 (fun _ => d0) → cycleKill boot d0 im nh := by
-  intro hkF GD hcons hq hhull x hcyc
+  intro hquiet hkF GD hcons hq hhull x hcyc
   have hc : gfexecConsistent ⟨GD, []⟩ :=
     ⟨hcons, fun a b ⟨n, ha, _⟩ => by simp at ha⟩
-  refine hkF ⟨GD, []⟩ hc (gfexecConfOfQconf boot d0 im nh GD hq) ?_ x ?_
+  refine hkF ⟨GD, []⟩ hc (gfexecConfOfQconf boot d0 im nh GD hq hquiet) ?_ x ?_
   · rintro cs ⟨hpc, _⟩ y hcy
     refine hhull cs hpc y (tcMono _ _ y y ?_ hcy)
     rintro a b (hab | ⟨n, ha, _⟩)

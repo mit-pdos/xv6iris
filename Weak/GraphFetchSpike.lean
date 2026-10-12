@@ -81,11 +81,15 @@ R10. Binder types the report's Lean leaves implicit are filled in (`emZifencei`'
     `accAddr`'s addressing).
 
 **Deviations.**  None from the report's Lean except R7 (docstring only) and R8 (the slot
-function).  Lean-only helpers are file-qualified (`GraphFetchSpike.*`).
+function).  Lean-only helpers are file-qualified (`GraphFetchSpike.*`).  RENAME (W13 (I), review
+R32 [R32.3]): the report's `emZifencei` is `GraphFetchSpike.emZifencei` here -- the unqualified
+`Weak.emZifencei` is the fetch-clause SLOT of the fabric bundle `gfexecConfIO`
+(`WeakRvwmoFab.lean`, content `emFetchImg` until W5d-G G1 fills it with this definition's).
 
 **Out of scope (G1–G7, after W13 (M) [OWN.24]).**  `emFenceI`/`emFenceISound`, `xv6ConfS`'s use
-of `emZifencei` in place of `emFetchImg`, `Gdexec.gdFetch`, the gwlog/gwix bridge, retime, hull
-closure (the report's risk R1), `linPrefixLog`, the floor bound.
+of `GraphFetchSpike.emZifencei` as the content of the `emZifencei` slot (W13 (I)),
+`Gdexec.gdFetch`, the gwlog/gwix bridge, retime, hull closure (the report's risk R1),
+`linPrefixLog`, the floor bound.
 -/
 import Weak.WeakRvwmoConf
 import Weak.WeakRvwmoLin
@@ -309,7 +313,8 @@ theorem GraphFetchSpike.emSlotAdm (ls : List Wlabel) (l : Wlabel) (k : Nat) (es 
 
 /-- `xv6ConfS`'s fetch clause: every administrative fetch item satisfies `gzFetch` at its row
 slot. -/
-def emZifencei (G : Gexec) (C : Nat → Geid → Prop) (i : Nat) (em : Hemission) : Prop :=
+def GraphFetchSpike.emZifencei (G : Gexec) (C : Nat → Geid → Prop) (i : Nat) (em : Hemission) :
+    Prop :=
   ∀ (n : Nat) (base : Int) (tvs : List (Nat × BitVec 8)),
     em.emItems[n]? = some (Wlabel.LIFetch base tvs, none) →
     gzFetch G (C (GraphFetchSpike.emSlot em.emItems n)) i (GraphFetchSpike.emSlot em.emItems n)

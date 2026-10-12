@@ -29,7 +29,7 @@ embeds (`hartConfHemitf`, `dvo := dv ∘ succ`).
 
 WHAT IS HERE.  §2 dev blocks (`emDev`, `isDevBlock`); §3 `hemitf`, `hartConff`, the embedding and
 `hemitfStates` (per block the `hblk` fact plus, for a non-dev block, fabric preservation and full
-blindness); §4 the bundle `Gfexec` / `gfexecConf`; §5 the model arm (`gdevAdj`,
+blindness); §4 the bundle `Gfexec` / `gfexecConfIO` (W13 (I), deviation 5); §5 the model arm (`gdevAdj`,
 `gfexecConsistent`, `racyF`, `rfAcyclic`, decidability, `linExtF`, `topoLinearizesF`,
 `linExtFDevBefore`, `topoExistsF`); §6 non-vacuity (`gfexecConfOfQconf`: B1b-1's bundle embeds
 with `gfDev = []`; a witness with a non-empty `gfDev` is not available — no `LDev`-emitting run
@@ -42,10 +42,12 @@ A LEAF: nothing imports this file.
 
 ## WeakEvInst device arms used
 
-NONE directly.  The file reaches the device semantics only through `WeakRvwmoSupply`'s
-`pstepEvDevfree`, `admRunDevfree`, `admRunRefab` (which rest on `WeakEvInst.pdevEv` /
-`pdevEvOk`; `WeakRvwmoSupply.pdevEvFalse` needs `pdevEv p l p' = false` for `l ≠ LDev` FROM A
-QUIET STATE, `devQuiet p`, W-DISK -- deviation 4) and `WeakRvwmoSupply.devQuietStep`.
+W13 (I) (deviation 5): the fabric MARKER `WeakEvInst.pdevEv` and its law `WeakEvInst.pdevEvOk`
+(a `pdevEv`-false step is fabric-preserving and fabric-blind) are used DIRECTLY -- `hemitf`
+records each block's contact bit and the non-member folding rests on `pdevEvOk` alone, at any
+start state.  The quiet-row lemmas `WeakRvwmoSupply.pdevEvFalse` / `devQuietStep` (W-DISK) are
+used only to relate contact to the label-based `emDev` on a quiet row
+(`WeakRvwmoFab.hemitfQuietTq`: `hartConfNoGap`, `gfexecConfOfQconf`).
 `pstepEv` / `pclsEv` / `Pexv6.PDisk` are named only as the parameters of `execProgOk'` and as a
 dummy default.
 
@@ -59,9 +61,11 @@ dummy default.
    programs, `WeakEvPf` deviation 9 / owner decision Q1).
 2. O2 / STAGE C — THE FETCH IS ADMINISTRATIVE, PINNED TO THE BOOT IMAGE, exactly as in
    `WeakRvwmoSupply` (its deviation 2; owner ruling Q-C1, `notes/weak-port-o2-stageC.md` §B).
-   - `gfexecConf` gains, per row, the clause `emFetchImg GF.gfGd.gdG.gxImg em` (every fetch
-     item of the emission reads the graph's image at timestamp 0), between the fabric clause and
-     the deps clause; `gfexecConfOfQconf` takes it from `gdexecQconf`'s.
+   - `gfexecConfIO` gains, per row, the clause `emZifencei GF.gfGd.gdG.gxImg em` (W13 (I)
+     [R28.s5]: the stage-C `emFetchImg` under the plan's slot name -- every fetch item of the
+     emission reads the graph's image at timestamp 0; W5d-G G1 gives the slot its Zifencei
+     content), between the fabric clause and the deps clause; `gfexecConfOfQconf` takes it from
+     `gdexecQconf`'s.
    - Lean-only `WeakRvwmoFab.pstepQ Q` (`pstepEv` restricted to labels satisfying `Q`;
      `pstepQ (WeakAxRealize.fetchPin im)` is `pstepPin im pstepEv`, `WeakRvwmoFab.pstepQPin`),
      `WeakRvwmoFab.admRunQ`, `hblkQ Q` (`hblk` at `pstepQ Q`), `hblkQHblk`, `hemitfStatesQ`,
@@ -77,7 +81,8 @@ dummy default.
    `seq`); `linExtFDevBefore` inducts on the gap `n - (m+1)` as Rocq does.  Rocq's
    `Print Assumptions` audit is not reproduced (the lint bans axioms).  Lean-only helper
    `lbIsdevRen` (the per-label step of `hasDevRen` / `emDevRen`).
-4. W-DISK (plan `notes/weak-allocproc-plan.md` §C "W-DISK", [R17.3][R18.2]): under the
+4. W-DISK (plan `notes/weak-allocproc-plan.md` §C "W-DISK", [R17.3][R18.2]; SUPERSEDED by
+   deviation 5 -- kept as the record): under the
    STATE-AWARE `WeakEvInst.pdevEv` a disk block can move the fabric with no `LDev` in it (a
    `DWriteDev` store / skip / abort), so Rocq's `hemitfStates` family -- stated for an ARBITRARY
    start -- is FALSE for a device-active disk row.  (b) `hemitfStatesQ`, `hemitfStates`,
@@ -90,6 +95,28 @@ dummy default.
    pattern); `fconfRowsPin` / `fconfRows` take `devQuiet (boot i)` and extract the rest from (a);
    `fconfSupply` takes `∀ i, i < N → devQuiet (boot i)` (discharged at the boot pool
    `epsInit`).  `gfexecConfOfQconf` supplies (a) from `gdexecQconf`'s `emDevfree`.
+5. **W13 (I) — MEMBERSHIP BY FABRIC CONTACT** (plan §C W13 (I) bundle half, ruling [OWN.43],
+   superseding [R22.2]; `PROGRESS-W13I.md`).  The bundle is `gfexecConfIO` (Rocq's
+   `gfexec_conf`, restated; `gfexecConf` is DELETED): its `isDevBlock em k ↔ (i, k) ∈ gfDev`
+   clause is REPLACED by `(i, k) ∈ gfDev ↔ gisIo (i, k) ∨ dvi k ≠ dvo k ∨ tq k`, and W-DISK's
+   INTERIM `.PDisk` `LDev`-free clause (deviation 4 (a)) is DELETED.  `tq k` is the block's
+   fabric-CONTACT bit, recorded by `hemitf` (a third parameter beside `dvi`/`dvo`): each
+   administrative run is a Lean-only `WeakRvwmoFab.admRunT` (the `admRun` that also returns
+   "some step is `pdevEv`-true"), and each tagged constructor fixes `tq k` to the OR of the
+   block's bits.  Consequences: `hartConff` takes `tq`; `hemitHemitf` / `hartConfHemitf` produce
+   the bits (`∃ tq`, read off the derivation; `WeakRvwmoFab.hemitfTqCongr`); `hemitfStatesQ`,
+   `hemitfStates`, `hartConffStatesQ`, `hartConffStates` LOSE deviation 4 (b)'s quiet-row
+   hypothesis and classify by contact -- `tq k = false` gives fabric preservation, NOT I/O-class
+   (`WeakRvwmoFab.realizesIoTouch`: an `LIo` event is realized by an `LDev` step), and the
+   `hblkQ … d d` folding at EVERY fabric `d` (the folding GENERALIZED, from `pdevEvOk`);
+   `fconfRowsPin` DERIVES its non-member conjunct from contact, and `fconfRowsPin` / `fconfRows` /
+   `fconfSupply` take NO quiet-boot hypothesis; `hartConfNoGap`'s statement is unchanged (proof via
+   `WeakRvwmoFab.hemitfQuietTq`); `gfexecConfOfQconf` takes `∀ i, devQuiet (boot i)` (a quiescent
+   emission from inside a disk burst touches the fabric with no `LDev`).  `gisIo` moved here from
+   `GraphFabResidue`.  Marks: FAITHFUL to RVWMO (no ISA order added -- RVWMO/Sail/Zifencei/PMAs
+   have no device-internal events; `gfDev` is device-model/trusted-surface text, D45/D49 class),
+   EQUAL to [R22.2] on every xv6 run, STRONGER as generic trusted text only by unreachable
+   non-moving fabric-touching blocks ((R3) orders them).  `supplyOfFconf` is unchanged.
 
 **Rocq → Lean name map.**  `orb_false_split` `orbFalseSplit`, `lb_isdev` `lbIsdev`,
 `lb_isdev_ne` `lbIsdevNe`, `has_dev` `hasDev`, `has_dev_false` `hasDevFalse`, `em_dev` `emDev`,
@@ -100,7 +127,7 @@ dummy default.
 `hemit_hemitf` `hemitHemitf`, `hart_conf_hemitf` `hartConfHemitf`, `hblk` `hblk`,
 `hblock_hblk` `hblockHblk`, `hemitf_states` `hemitfStates`, `hart_conff_states`
 `hartConffStates`, `hart_conf_no_gap` `hartConfNoGap`, `gfexec` `Gfexec` (`GFExec`, `gf_gd`
-`gfGd`, `gf_dev` `gfDev`), `gfexec_conf` `gfexecConf`, `gdev_adj` `gdevAdj`,
+`gfGd`, `gf_dev` `gfDev`), `gfexec_conf` `gfexecConfIO` (deviation 5), `gdev_adj` `gdevAdj`,
 `gfexec_consistent` `gfexecConsistent`, `RacyF` `racyF`, `RF_gmo` `WeakRvwmoFab.rfGmo` (a Lean-side clash with `Weak.rfGmo`), `tc_RF_gmo`
 `tcRfGmo`, `RF_acyclic` `rfAcyclic`, `gdev_adj_dec` `gdevAdjDec`, `racyF_dec` `racyFDec`,
 `lin_extF` `linExtF`, `lin_extF_lin_extD` `linExtFLinExtD`, `topo_linearizes_F`
@@ -248,50 +275,162 @@ theorem emDevRen (π : Nat → Nat) (pend : Bool) (k : Nat) (es : List Eitem) :
       show emDev (pend || lbIsdev (wlblRen π l)) k (es.map (eitemRen π)) = _
       rw [lbIsdevRen, ih]; rfl
 
-/-! ## 3. `hemitf`: the emission with two fabric endpoints -/
+/-! ## 3. `hemitf`: the emission with two fabric endpoints and per-item fabric CONTACT -/
 
-inductive hemitf (dvi dvo : Nat → Efab) :
+/-- (Lean-only, W13 (I) [OWN.43]) The label-carrying administrative run that RECORDS its fabric
+CONTACT: the last index is `true` iff some step of the run is `pdevEv`-true. -/
+inductive WeakRvwmoFab.admRunT (instr : Bool) :
+    Pexv6 → Efab → List Wlabel → Pexv6 → Efab → Bool → Prop where
+  | ATnil (p : Pexv6) (d : Efab) : WeakRvwmoFab.admRunT instr p d [] p d false
+  | ATcons (p : Pexv6) (d : Efab) (l : Wlabel) (p1 : Pexv6) (d1 : Efab)
+      (ls : List Wlabel) (p' : Pexv6) (d' : Efab) (b : Bool) :
+      lbAdmin instr l → pstepEv p d l p1 d1 →
+      WeakRvwmoFab.admRunT instr p1 d1 ls p' d' b →
+      WeakRvwmoFab.admRunT instr p d (l :: ls) p' d' (pdevEv p l p1 || b)
+
+/-- (Lean-only, W13 (I)) Forgetting the contact bit. -/
+theorem WeakRvwmoFab.admRunTRun (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel)
+    (p' : Pexv6) (d' : Efab) (b : Bool) :
+    WeakRvwmoFab.admRunT instr p d ls p' d' b → admRun instr p d ls p' d' := by
+  intro h
+  induction h with
+  | ATnil p d => exact .ARnil p d
+  | ATcons p d l p1 d1 ls p' d' b ha hs _ ih => exact .ARcons p d l p1 d1 ls p' d' ha hs ih
+
+/-- (Lean-only, W13 (I)) Every run has its contact bit. -/
+theorem WeakRvwmoFab.admRunTOfRun (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel)
+    (p' : Pexv6) (d' : Efab) :
+    admRun instr p d ls p' d' → ∃ b, WeakRvwmoFab.admRunT instr p d ls p' d' b := by
+  intro h
+  induction h with
+  | ARnil p d => exact ⟨false, .ATnil p d⟩
+  | ARcons p d l p1 d1 ls p' d' ha hs _ ih =>
+    obtain ⟨b, hb⟩ := ih
+    exact ⟨_, .ATcons p d l p1 d1 ls p' d' b ha hs hb⟩
+
+/-- (Lean-only, W13 (I)) THE GENERALIZED FOLDING, one run: a CONTACT-FREE run is
+fabric-preserving and fabric-BLIND (`WeakEvInst.pdevEvOk`) -- at any start state. -/
+theorem WeakRvwmoFab.admRunTQuiet (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel)
+    (p' : Pexv6) (d' : Efab) (b : Bool) :
+    WeakRvwmoFab.admRunT instr p d ls p' d' b → b = false →
+    d' = d ∧ ∀ d0, WeakRvwmoFab.admRunT instr p d0 ls p' d0 false := by
+  intro h
+  induction h with
+  | ATnil p d => intro _; exact ⟨rfl, fun d0 => .ATnil p d0⟩
+  | ATcons p d l p1 d1 ls p' d' b ha hs _ ih =>
+    intro hb
+    obtain ⟨hl, hb'⟩ := Bool.or_eq_false_iff.mp hb
+    obtain ⟨hd1, hall⟩ := pdevEvOk p d l p1 d1 hs hl
+    obtain ⟨hd', hall'⟩ := ih hb'
+    refine ⟨by rw [hd', hd1], fun d0 => ?_⟩
+    have h := WeakRvwmoFab.admRunT.ATcons p d0 l p1 d0 ls p' d0 false ha (hall d0) (hall' d0)
+    rw [hl] at h
+    exact h
+
+/-- (Lean-only, W13 (I)) An `LDev`-free run from a QUIET state (`devQuiet`, W-DISK) is
+contact-free. -/
+theorem WeakRvwmoFab.admRunTFalse (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel)
+    (p' : Pexv6) (d' : Efab) (b : Bool) :
+    WeakRvwmoFab.admRunT instr p d ls p' d' b → devQuiet p →
+    (∀ kd ba bs, LDev kd ba bs ∉ ls) → b = false := by
+  intro h
+  induction h with
+  | ATnil => intro _ _; rfl
+  | ATcons p d l p1 d1 ls p' d' b _ hs _ ih =>
+    intro hq hnd
+    have hne : ∀ kd ba bs, l ≠ LDev kd ba bs := fun kd ba bs he => hnd kd ba bs (by simp [he])
+    have h1 := pdevEvFalse p l p1 hq hne
+    have h2 := ih (devQuietStep _ _ _ _ _ hs hne hq)
+      (fun kd ba bs hin => hnd kd ba bs (List.mem_cons_of_mem _ hin))
+    simp only [h1, h2, Bool.or_self]
+
+/-- (Lean-only, W13 (I)) An I/O-class row event is realized by an `LDev` step (`projLbl`), which
+is `pdevEv`-true: an I/O item is a fabric CONTACT by class. -/
+theorem WeakRvwmoFab.realizesIoTouch (p : Pexv6) (ws : Wstate) (lb : Lbl) (l : Wlabel)
+    (p' : Pexv6) : hlblRealizes p ws lb l → lbIsIo lb = true → pdevEv p l p' = true := by
+  rintro ⟨_, _, _, hpr⟩ hio
+  cases l <;> simp only [projLbl, Option.some.injEq, reduceCtorEq] at hpr <;>
+    first | rfl | (subst hpr; simp [lbIsIo] at hio)
+
+/-- The emission with the block's two fabric endpoints `dvi k → dvo k` AND (W13 (I) [OWN.43],
+deviation 5) its fabric CONTACT bit `tq k`: `true` iff some step of the block (admin run +
+tagged step(s)) is `pdevEv`-true. -/
+inductive hemitf (dvi dvo : Nat → Efab) (tq : Nat → Bool) :
     Nat → Wstate → List Lbl → Pexv6 → List Eitem → Pexv6 → Prop where
-  | HFnil (k : Nat) (ws : Wstate) (p : Pexv6) : hemitf dvi dvo k ws [] p [] p
+  | HFnil (k : Nat) (ws : Wstate) (p : Pexv6) : hemitf dvi dvo tq k ws [] p [] p
   | HFone (k : Nat) (ws : Wstate) (lb : Lbl) (row : List Lbl) (p : Pexv6) (ls : List Wlabel)
-      (pa : Pexv6) (da : Efab) (l : Wlabel) (p' : Pexv6) (es : List Eitem) (pfin : Pexv6) :
-      admRun true p (dvi k) ls pa da →
+      (pa : Pexv6) (da : Efab) (l : Wlabel) (p' : Pexv6) (es : List Eitem) (pfin : Pexv6)
+      (b : Bool) :
+      WeakRvwmoFab.admRunT true p (dvi k) ls pa da b →
       hlblRealizes pa ws lb l →
       pstepEv pa da l p' (dvo k) →
-      hemitf dvi dvo (k + 1) (lblPost k ws lb) row p' es pfin →
-      hemitf dvi dvo k ws (lb :: row) p (eadm ls ++ (l, some k) :: es) pfin
+      tq k = (b || pdevEv pa l p') →
+      hemitf dvi dvo tq (k + 1) (lblPost k ws lb) row p' es pfin →
+      hemitf dvi dvo tq k ws (lb :: row) p (eadm ls ++ (l, some k) :: es) pfin
   | HFpair (k : Nat) (ws : Wstate) (lb : Lbl) (row : List Lbl) (p : Pexv6) (ls1 : List Wlabel)
       (pa : Pexv6) (da : Efab) (l1 : Wlabel) (pm : Pexv6) (dm : Efab)
       (ls2 : List Wlabel) (pm2 : Pexv6) (dm2 : Efab) (l2 : Wlabel) (p' : Pexv6)
-      (es : List Eitem) (pfin : Pexv6) :
-      admRun true p (dvi k) ls1 pa da →
+      (es : List Eitem) (pfin : Pexv6) (b1 b2 : Bool) :
+      WeakRvwmoFab.admRunT true p (dvi k) ls1 pa da b1 →
       hlblRealizesPair pa pm2 ws lb l1 l2 →
       pstepEv pa da l1 pm dm →
-      admRun false pm dm ls2 pm2 dm2 →
+      WeakRvwmoFab.admRunT false pm dm ls2 pm2 dm2 b2 →
       pstepEv pm2 dm2 l2 p' (dvo k) →
-      hemitf dvi dvo (k + 1) (lblPost k ws lb) row p' es pfin →
-      hemitf dvi dvo k ws (lb :: row) p
+      tq k = (((b1 || pdevEv pa l1 pm) || b2) || pdevEv pm2 l2 p') →
+      hemitf dvi dvo tq (k + 1) (lblPost k ws lb) row p' es pfin →
+      hemitf dvi dvo tq k ws (lb :: row) p
         (eadm ls1 ++ (l1, some k) :: (eadm ls2 ++ (l2, some k) :: es)) pfin
 
 def hartConff (_i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Nat → Efab)
-    (em : Hemission) : Prop :=
-  hemitf dvi dvo 0 wsInit row p0 em.emItems em.emFin
+    (tq : Nat → Bool) (em : Hemission) : Prop :=
+  hemitf dvi dvo tq 0 wsInit row p0 em.emItems em.emFin
 
-/-- THE EMBEDDING: the landed one-fabric emission is the case `dvo = dv ∘ succ`. -/
-theorem hemitHemitf (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl) (p : Pexv6)
-    (es : List Eitem) (pfin : Pexv6) :
-    hemit dv k ws row p es pfin → hemitf dv (fun n => dv (n + 1)) k ws row p es pfin := by
+/-- (Lean-only, W13 (I)) The contact bits are read only at the emission's own positions. -/
+theorem WeakRvwmoFab.hemitfTqCongr (dvi dvo : Nat → Efab) (tq tq' : Nat → Bool) (k : Nat)
+    (ws : Wstate) (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
+    hemitf dvi dvo tq k ws row p es pfin → (∀ n, k ≤ n → tq' n = tq n) →
+    hemitf dvi dvo tq' k ws row p es pfin := by
   intro h
   induction h with
-  | HEnil k ws p => exact .HFnil k ws p
+  | HFnil k ws p => intro _; exact .HFnil k ws p
+  | HFone k ws lb row p ls pa da l p' es pfin b har hre hst htq _ ih =>
+    intro hag
+    exact .HFone k ws lb row p ls pa da l p' es pfin b har hre hst
+      (by rw [hag k (Nat.le_refl _)]; exact htq) (ih (fun n hn => hag n (by omega)))
+  | HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin b1 b2 har1 hre hst1 har2
+      hst2 htq _ ih =>
+    intro hag
+    exact .HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin b1 b2 har1 hre hst1
+      har2 hst2 (by rw [hag k (Nat.le_refl _)]; exact htq) (ih (fun n hn => hag n (by omega)))
+
+/-- THE EMBEDDING: the landed one-fabric emission is the case `dvo = dv ∘ succ` (W13 (I): with
+the contact bits read off the derivation). -/
+theorem hemitHemitf (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl) (p : Pexv6)
+    (es : List Eitem) (pfin : Pexv6) :
+    hemit dv k ws row p es pfin → ∃ tq, hemitf dv (fun n => dv (n + 1)) tq k ws row p es pfin := by
+  intro h
+  induction h with
+  | HEnil k ws p => exact ⟨fun _ => false, .HFnil k ws p⟩
   | HEone k ws lb row p ls pa da l p' es pfin har hre hst _ ih =>
-    exact .HFone k ws lb row p ls pa da l p' es pfin har hre hst ih
+    obtain ⟨tq, htq⟩ := ih
+    obtain ⟨b, hb⟩ := WeakRvwmoFab.admRunTOfRun _ _ _ _ _ _ har
+    refine ⟨fun n => if n = k then (b || pdevEv pa l p') else tq n,
+      .HFone k ws lb row p ls pa da l p' es pfin b hb hre hst (by simp) ?_⟩
+    exact WeakRvwmoFab.hemitfTqCongr _ _ _ _ _ _ _ _ _ _ htq
+      (fun n hn => by simp only [if_neg (show n ≠ k by omega)])
   | HEpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2 hst2 _ ih =>
-    exact .HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2
-      hst2 ih
+    obtain ⟨tq, htq⟩ := ih
+    obtain ⟨b1, hb1⟩ := WeakRvwmoFab.admRunTOfRun _ _ _ _ _ _ har1
+    obtain ⟨b2, hb2⟩ := WeakRvwmoFab.admRunTOfRun _ _ _ _ _ _ har2
+    refine ⟨fun n => if n = k then (((b1 || pdevEv pa l1 pm) || b2) || pdevEv pm2 l2 p')
+      else tq n, .HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin b1 b2 hb1 hre
+        hst1 hb2 hst2 (by simp) ?_⟩
+    exact WeakRvwmoFab.hemitfTqCongr _ _ _ _ _ _ _ _ _ _ htq
+      (fun n hn => by simp only [if_neg (show n ≠ k by omega)])
 
 theorem hartConfHemitf (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab)
-    (em : Hemission) : hartConf i row p0 dv em → hartConff i row p0 dv (fun n => dv (n + 1)) em :=
+    (em : Hemission) :
+    hartConf i row p0 dv em → ∃ tq, hartConff i row p0 dv (fun n => dv (n + 1)) tq em :=
   hemitHemitf _ _ _ _ _ _ _
 
 /-! ### 3.1 The block, with its two fabric endpoints explicit -/
@@ -354,7 +493,7 @@ theorem hblockHblk (dv : Nat → Efab) (k : Nat) (ws : Wstate) (lb : Lbl) (p p' 
     hblock dv k ws lb p p' ↔ hblk (dv k) (dv (k + 1)) ws lb p p' :=
   Iff.rfl
 
-/-! ### 3.2 The state extraction, with block classification -/
+/-! ### 3.2 The state extraction, with block classification by CONTACT -/
 
 /-- (Lean-only, W-DISK) One step keeps the QUIET-ROW invariant: a quiet start stays quiet when
 a disk start's label is `LDev`-free, and a disk state comes only from a disk state. -/
@@ -392,36 +531,36 @@ theorem WeakRvwmoFab.quietAdm (instr : Bool) (p : Pexv6) (d : Efab) (ls : List W
     exact hk1 dp1 hp1
 
 /-- (Lean-only, deviation 2) `hemitfStates` at `pstepQ Q`, from an emission whose labels
-satisfy `Q`. -/
-theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate)
-    (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
-    hemitf dvi dvo k ws row p es pfin → (∀ x, x ∈ es.map Prod.fst → Q x) →
-    devQuiet p ∧ (∀ dp, p = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
+satisfy `Q`.  (W13 (I), deviation 5: NO start-state hypothesis -- a block whose contact bit is
+`false` is fabric-preserving, not I/O-class, and replayable at ANY fabric: the GENERALIZED
+`∀ d` folding, from `pdevEvOk`.) -/
+theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (tq : Nat → Bool) (k : Nat)
+    (ws : Wstate) (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
+    hemitf dvi dvo tq k ws row p es pfin → (∀ x, x ∈ es.map Prod.fst → Q x) →
     ∃ f : Nat → Pexv6, f 0 = p ∧
       ∀ n lb, row[n]? = some lb →
         hblkQ Q (dvi (n + k)) (dvo (n + k)) (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))
-        ∧ (emDev false (n + k) es = false →
-           dvo (n + k) = dvi (n + k) ∧
+        ∧ (tq (n + k) = false →
+           dvo (n + k) = dvi (n + k) ∧ lbIsIo lb = false ∧
            ∀ d, hblkQ Q d d (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))) := by
   intro h
   induction h with
-  | HFnil k ws p => intro _ _; exact ⟨fun _ => p, rfl, fun n lb hn => by simp at hn⟩
-  | HFone k ws lb row p ls pa da l p' es pfin har hre hst _ ih =>
-    intro hq ⟨hdq, hdk⟩
-    rw [eblockFst] at hq hdk
+  | HFnil k ws p => intro _; exact ⟨fun _ => p, rfl, fun n lb hn => by simp at hn⟩
+  | HFone k ws lb row p ls pa da l p' es pfin b har hre hst htq _ ih =>
+    intro hq
+    rw [eblockFst] at hq
     have hqls : ∀ x, x ∈ ls → Q x := fun x hx => hq x (List.mem_append_left _ hx)
     have hql : Q l := hq l (List.mem_append_right _ List.mem_cons_self)
-    obtain ⟨hqa, hka⟩ := WeakRvwmoFab.quietAdm _ _ _ _ _ _ har hdq
-      (fun dp hp kd ba bs hin => hdk dp hp kd ba bs (List.mem_append_left _ hin))
-    obtain ⟨hq', hk'⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hst hqa (fun dpa hpa kd ba bs he => by
-      obtain ⟨dp, hp⟩ := hka dpa hpa
-      exact hdk dp hp kd ba bs (List.mem_append_right _ (by rw [he]; exact List.mem_cons_self)))
+    have har' := WeakRvwmoFab.admRunTRun _ _ _ _ _ _ _ har
+    have hio : pdevEv pa l p' = false → lbIsIo lb = false := by
+      intro hpl
+      cases hc : lbIsIo lb with
+      | false => rfl
+      | true =>
+        rw [WeakRvwmoFab.realizesIoTouch pa ws lb l p' hre hc] at hpl
+        exact absurd hpl (by decide)
     obtain ⟨f', hf0, hf⟩ :=
       ih (fun x hx => hq x (List.mem_append_right _ (List.mem_cons_of_mem _ hx)))
-        ⟨hq', fun dp' hp' kd ba bs hin => by
-          obtain ⟨dpa, hpa⟩ := hk' dp' hp'
-          obtain ⟨dp, hp⟩ := hka dpa hpa
-          exact hdk dp hp kd ba bs (List.mem_append_right _ (List.mem_cons_of_mem _ hin))⟩
     refine ⟨fun n => match n with | 0 => p | n' + 1 => f' n', rfl, ?_⟩
     intro n lb0 hn
     cases n with
@@ -429,44 +568,168 @@ theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (k : Nat) (
       simp only [List.getElem?_cons_zero, Option.some.injEq] at hn
       subst hn
       rw [Nat.zero_add]
-      refine ⟨⟨pa, da, WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ har hqls,
+      refine ⟨⟨pa, da, WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ har' hqls,
         .inl ⟨l, hre, ?_, hql⟩⟩, ?_⟩
       · show pstepEv pa da l (f' 0) (dvo k)
         rw [hf0]; exact hst
-      · intro hnd
-        rw [emDevTagEq] at hnd
-        obtain ⟨hnd1, _⟩ := orbFalseSplit _ _ hnd
-        obtain ⟨hls, hl⟩ := orbFalseSplit _ _ hnd1
-        obtain ⟨_, hls'⟩ := orbFalseSplit _ _ hls
-        have hne := lbIsdevNe l hl
-        have hnl := hasDevFalse ls hls'
-        have hda : da = dvi k := admRunDevfree _ _ _ _ _ _ har hdq hnl
-        obtain ⟨hd, hall⟩ := pstepEvDevfree _ _ _ _ _ hqa hst hne
-        refine ⟨by rw [hd, hda], fun d => ⟨pa, d, ?_, .inl ⟨l, hre, ?_, hql⟩⟩⟩
-        · exact WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har hdq hnl d) hqls
+      · intro hk
+        rw [hk] at htq
+        obtain ⟨hb, hpl⟩ := Bool.or_eq_false_iff.mp htq.symm
+        obtain ⟨hda, hall0⟩ := WeakRvwmoFab.admRunTQuiet _ _ _ _ _ _ _ har hb
+        obtain ⟨hd, hall⟩ := pdevEvOk pa da l p' (dvo k) hst hpl
+        refine ⟨by rw [hd, hda], hio hpl, fun d => ⟨pa, d, ?_, .inl ⟨l, hre, ?_, hql⟩⟩⟩
+        · exact WeakRvwmoFab.admRunQ Q _ _ _ _ _ _
+            (WeakRvwmoFab.admRunTRun _ _ _ _ _ _ _ (hall0 d)) hqls
         · show pstepEv pa d l (f' 0) d
           rw [hf0]; exact hall d
     | succ n =>
       simp only [List.getElem?_cons_succ] at hn
       have e : n + 1 + k = n + (k + 1) := by omega
       rw [e]
-      obtain ⟨h1, h2⟩ := hf n lb0 hn
-      refine ⟨h1, ?_⟩
-      rw [emDevTagNe false ls l k (n + (k + 1)) es (by omega)]
-      exact h2
-  | HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2 hst2 _ ih =>
-    intro hq ⟨hdq, hdk⟩
-    rw [eblockFst, eblockFst] at hq hdk
+      exact hf n lb0 hn
+  | HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin b1 b2 har1 hre hst1 har2
+      hst2 htq _ ih =>
+    intro hq
+    rw [eblockFst, eblockFst] at hq
     have hq1 : ∀ x, x ∈ ls1 → Q x := fun x hx => hq x (List.mem_append_left _ hx)
     have hql1 : Q l1 := hq l1 (List.mem_append_right _ List.mem_cons_self)
     have h2' : ∀ x, x ∈ ls2 ++ l2 :: es.map Prod.fst → Q x :=
       fun x hx => hq x (List.mem_append_right _ (List.mem_cons_of_mem _ hx))
     have hq2 : ∀ x, x ∈ ls2 → Q x := fun x hx => h2' x (List.mem_append_left _ hx)
     have hql2 : Q l2 := h2' l2 (List.mem_append_right _ List.mem_cons_self)
-    -- the quiet-row invariant along the block
+    have har1' := WeakRvwmoFab.admRunTRun _ _ _ _ _ _ _ har1
+    have har2' := WeakRvwmoFab.admRunTRun _ _ _ _ _ _ _ har2
+    -- an exclusive pair realizes an `LRmw`: never I/O-class
+    have hio : lbIsIo lb = false := by
+      obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, hlb⟩ := hre
+      rw [hlb]; rfl
+    obtain ⟨f', hf0, hf⟩ :=
+      ih (fun x hx => h2' x (List.mem_append_right _ (List.mem_cons_of_mem _ hx)))
+    refine ⟨fun n => match n with | 0 => p | n' + 1 => f' n', rfl, ?_⟩
+    intro n lb0 hn
+    cases n with
+    | zero =>
+      simp only [List.getElem?_cons_zero, Option.some.injEq] at hn
+      subst hn
+      rw [Nat.zero_add]
+      refine ⟨⟨pa, da, WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ har1' hq1,
+        .inr ⟨pm, dm, pm2, dm2, l1, l2, hre, ⟨hst1, hql1⟩,
+          WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ har2' hq2, ?_, hql2⟩⟩, ?_⟩
+      · show pstepEv pm2 dm2 l2 (f' 0) (dvo k)
+        rw [hf0]; exact hst2
+      · intro hk
+        rw [hk] at htq
+        have htq' := htq.symm
+        simp only [Bool.or_eq_false_iff] at htq'
+        obtain ⟨⟨⟨hb1, hp1⟩, hb2⟩, hp2⟩ := htq'
+        obtain ⟨hda, hall1a⟩ := WeakRvwmoFab.admRunTQuiet _ _ _ _ _ _ _ har1 hb1
+        obtain ⟨hdm, hall1⟩ := pdevEvOk pa da l1 pm dm hst1 hp1
+        obtain ⟨hdm2, hall2a⟩ := WeakRvwmoFab.admRunTQuiet _ _ _ _ _ _ _ har2 hb2
+        obtain ⟨hd2, hall2⟩ := pdevEvOk pm2 dm2 l2 p' (dvo k) hst2 hp2
+        refine ⟨by rw [hd2, hdm2, hdm, hda], hio, fun d =>
+          ⟨pa, d, WeakRvwmoFab.admRunQ Q _ _ _ _ _ _
+              (WeakRvwmoFab.admRunTRun _ _ _ _ _ _ _ (hall1a d)) hq1,
+            .inr ⟨pm, d, pm2, d, l1, l2, hre, ⟨hall1 d, hql1⟩,
+              WeakRvwmoFab.admRunQ Q _ _ _ _ _ _
+                (WeakRvwmoFab.admRunTRun _ _ _ _ _ _ _ (hall2a d)) hq2,
+              ?_, hql2⟩⟩⟩
+        show pstepEv pm2 d l2 (f' 0) d
+        rw [hf0]; exact hall2 d
+    | succ n =>
+      simp only [List.getElem?_cons_succ] at hn
+      have e : n + 1 + k = n + (k + 1) := by omega
+      rw [e]
+      exact hf n lb0 hn
+
+theorem hemitfStates (dvi dvo : Nat → Efab) (tq : Nat → Bool) (k : Nat) (ws : Wstate)
+    (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
+    hemitf dvi dvo tq k ws row p es pfin →
+    ∃ f : Nat → Pexv6, f 0 = p ∧
+      ∀ n lb, row[n]? = some lb →
+        hblk (dvi (n + k)) (dvo (n + k)) (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))
+        ∧ (tq (n + k) = false →
+           dvo (n + k) = dvi (n + k) ∧ lbIsIo lb = false ∧
+           ∀ d, hblk d d (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))) := by
+  intro hem
+  obtain ⟨f, hf0, hf⟩ :=
+    hemitfStatesQ (fun _ => True) dvi dvo tq k ws row p es pfin hem (fun _ _ => trivial)
+  refine ⟨f, hf0, fun n lb hn => ?_⟩
+  obtain ⟨h1, h2⟩ := hf n lb hn
+  refine ⟨hblkQHblk _ _ _ _ _ _ _ h1, fun htq => ?_⟩
+  obtain ⟨h3, h4, h5⟩ := h2 htq
+  exact ⟨h3, h4, fun d => hblkQHblk _ _ _ _ _ _ _ (h5 d)⟩
+
+/-- (Lean-only, deviation 2) `hartConffStates` at `pstepQ Q`. -/
+theorem hartConffStatesQ (Q : Wlabel → Prop) (i : Nat) (row : List Lbl) (p0 : Pexv6)
+    (dvi dvo : Nat → Efab) (tq : Nat → Bool) (em : Hemission) :
+    hartConff i row p0 dvi dvo tq em → (∀ x, x ∈ emLabels em → Q x) →
+    ∃ f : Nat → Pexv6, f 0 = p0 ∧
+      ∀ n lb, row[n]? = some lb →
+        hblkQ Q (dvi n) (dvo n) (rowWs row n) lb (f n) (f (n + 1))
+        ∧ (tq n = false →
+           dvo n = dvi n ∧ lbIsIo lb = false ∧
+           ∀ d, hblkQ Q d d (rowWs row n) lb (f n) (f (n + 1))) :=
+  fun hem hq => hemitfStatesQ Q _ _ _ _ _ _ _ _ _ hem hq
+
+theorem hartConffStates (i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Nat → Efab)
+    (tq : Nat → Bool) (em : Hemission) :
+    hartConff i row p0 dvi dvo tq em →
+    ∃ f : Nat → Pexv6, f 0 = p0 ∧
+      ∀ n lb, row[n]? = some lb →
+        hblk (dvi n) (dvo n) (rowWs row n) lb (f n) (f (n + 1))
+        ∧ (tq n = false →
+           dvo n = dvi n ∧ lbIsIo lb = false ∧
+           ∀ d, hblk d d (rowWs row n) lb (f n) (f (n + 1))) :=
+  fun hem => hemitfStates _ _ _ _ _ _ _ _ _ hem
+
+/-- (Lean-only, W13 (I)) On a QUIET ROW (W-DISK's hypothesis: a hart row, or a disk row that
+starts between bursts and emits no `LDev`) the label-based classification still decides contact:
+a block that is not a dev block (`emDev`) is contact-free. -/
+theorem WeakRvwmoFab.hemitfQuietTq (dvi dvo : Nat → Efab) (tq : Nat → Bool) (k : Nat)
+    (ws : Wstate) (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
+    hemitf dvi dvo tq k ws row p es pfin →
+    devQuiet p ∧ (∀ dp, p = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
+    ∀ n, n < row.length → emDev false (n + k) es = false → tq (n + k) = false := by
+  intro h
+  induction h with
+  | HFnil k ws p => intro _ n hn; simp at hn
+  | HFone k ws lb row p ls pa da l p' es pfin b har hre hst htq _ ih =>
+    intro ⟨hdq, hdk⟩ n hn hnd
+    rw [eblockFst] at hdk
+    have har' := WeakRvwmoFab.admRunTRun _ _ _ _ _ _ _ har
+    obtain ⟨hqa, hka⟩ := WeakRvwmoFab.quietAdm _ _ _ _ _ _ har' hdq
+      (fun dp hp kd ba bs hin => hdk dp hp kd ba bs (List.mem_append_left _ hin))
+    obtain ⟨hq', hk'⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hst hqa (fun dpa hpa kd ba bs he => by
+      obtain ⟨dp, hp⟩ := hka dpa hpa
+      exact hdk dp hp kd ba bs (List.mem_append_right _ (by rw [he]; exact List.mem_cons_self)))
+    cases n with
+    | zero =>
+      rw [Nat.zero_add] at hnd ⊢
+      rw [emDevTagEq] at hnd
+      obtain ⟨hnd1, _⟩ := orbFalseSplit _ _ hnd
+      obtain ⟨hls, hl⟩ := orbFalseSplit _ _ hnd1
+      obtain ⟨_, hls'⟩ := orbFalseSplit _ _ hls
+      have hb := WeakRvwmoFab.admRunTFalse _ _ _ _ _ _ _ har hdq (hasDevFalse ls hls')
+      have hpl := pdevEvFalse pa l p' hqa (lbIsdevNe l hl)
+      simp only [htq, hb, hpl, Bool.or_self]
+    | succ n =>
+      have e : n + 1 + k = n + (k + 1) := by omega
+      rw [e] at hnd ⊢
+      rw [emDevTagNe false ls l k (n + (k + 1)) es (by omega)] at hnd
+      exact ih ⟨hq', fun dp' hp' kd ba bs hin => by
+          obtain ⟨dpa, hpa⟩ := hk' dp' hp'
+          obtain ⟨dp, hp⟩ := hka dpa hpa
+          exact hdk dp hp kd ba bs (List.mem_append_right _ (List.mem_cons_of_mem _ hin))⟩ n
+        (by simp only [List.length_cons] at hn; omega) hnd
+  | HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin b1 b2 har1 hre hst1 har2
+      hst2 htq _ ih =>
+    intro ⟨hdq, hdk⟩ n hn hnd
+    rw [eblockFst, eblockFst] at hdk
+    have har1' := WeakRvwmoFab.admRunTRun _ _ _ _ _ _ _ har1
+    have har2' := WeakRvwmoFab.admRunTRun _ _ _ _ _ _ _ har2
     have hdk2 : ∀ dp, p = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ ls2 ++ l2 :: es.map Prod.fst :=
       fun dp hp kd ba bs hin => hdk dp hp kd ba bs (List.mem_append_right _ (List.mem_cons_of_mem _ hin))
-    obtain ⟨hqa, hka⟩ := WeakRvwmoFab.quietAdm _ _ _ _ _ _ har1 hdq
+    obtain ⟨hqa, hka⟩ := WeakRvwmoFab.quietAdm _ _ _ _ _ _ har1' hdq
       (fun dp hp kd ba bs hin => hdk dp hp kd ba bs (List.mem_append_left _ hin))
     obtain ⟨hqm, hkm⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hst1 hqa (fun dpa hpa kd ba bs he => by
       obtain ⟨dp, hp⟩ := hka dpa hpa
@@ -474,7 +737,7 @@ theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (k : Nat) (
     have hkm' : ∀ dpm, pm = .PDisk dpm → ∃ dp, p = .PDisk dp := fun dpm hpm => by
       obtain ⟨dpa, hpa⟩ := hkm dpm hpm
       exact hka dpa hpa
-    obtain ⟨hqm2, hkm2⟩ := WeakRvwmoFab.quietAdm _ _ _ _ _ _ har2 hqm
+    obtain ⟨hqm2, hkm2⟩ := WeakRvwmoFab.quietAdm _ _ _ _ _ _ har2' hqm
       (fun dpm hpm kd ba bs hin => by
         obtain ⟨dp, hp⟩ := hkm' dpm hpm
         exact hdk2 dp hp kd ba bs (List.mem_append_left _ hin))
@@ -484,110 +747,31 @@ theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (k : Nat) (
     obtain ⟨hq', hk'⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hst2 hqm2 (fun dpm hpm kd ba bs he => by
       obtain ⟨dp, hp⟩ := hkm2' dpm hpm
       exact hdk2 dp hp kd ba bs (List.mem_append_right _ (by rw [he]; exact List.mem_cons_self)))
-    obtain ⟨f', hf0, hf⟩ :=
-      ih (fun x hx => h2' x (List.mem_append_right _ (List.mem_cons_of_mem _ hx)))
-        ⟨hq', fun dp' hp' kd ba bs hin => by
-          obtain ⟨dpm, hpm⟩ := hk' dp' hp'
-          obtain ⟨dp, hp⟩ := hkm2' dpm hpm
-          exact hdk2 dp hp kd ba bs (List.mem_append_right _ (List.mem_cons_of_mem _ hin))⟩
-    refine ⟨fun n => match n with | 0 => p | n' + 1 => f' n', rfl, ?_⟩
-    intro n lb0 hn
     cases n with
     | zero =>
-      simp only [List.getElem?_cons_zero, Option.some.injEq] at hn
-      subst hn
-      rw [Nat.zero_add]
-      refine ⟨⟨pa, da, WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ har1 hq1,
-        .inr ⟨pm, dm, pm2, dm2, l1, l2, hre, ⟨hst1, hql1⟩,
-          WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ har2 hq2, ?_, hql2⟩⟩, ?_⟩
-      · show pstepEv pm2 dm2 l2 (f' 0) (dvo k)
-        rw [hf0]; exact hst2
-      · intro hnd
-        rw [emDevTagEq, emDevTagEq] at hnd
-        obtain ⟨hnd1, hnd2⟩ := orbFalseSplit _ _ hnd
-        obtain ⟨hls1, hl1⟩ := orbFalseSplit _ _ hnd1
-        obtain ⟨_, hls1'⟩ := orbFalseSplit _ _ hls1
-        obtain ⟨hnd3, _⟩ := orbFalseSplit _ _ hnd2
-        obtain ⟨hls2, hl2⟩ := orbFalseSplit _ _ hnd3
-        obtain ⟨_, hls2'⟩ := orbFalseSplit _ _ hls2
-        have hn1 := hasDevFalse ls1 hls1'
-        have hn2 := hasDevFalse ls2 hls2'
-        have hda : da = dvi k := admRunDevfree _ _ _ _ _ _ har1 hdq hn1
-        obtain ⟨hd1, hall1⟩ := pstepEvDevfree _ _ _ _ _ hqa hst1 (lbIsdevNe _ hl1)
-        have hdm2 : dm2 = dm := admRunDevfree _ _ _ _ _ _ har2 hqm hn2
-        obtain ⟨hd2, hall2⟩ := pstepEvDevfree _ _ _ _ _ hqm2 hst2 (lbIsdevNe _ hl2)
-        refine ⟨by rw [hd2, hdm2, hd1, hda], fun d =>
-          ⟨pa, d, WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har1 hdq hn1 d) hq1,
-            .inr ⟨pm, d, pm2, d, l1, l2, hre, ⟨hall1 d, hql1⟩,
-              WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har2 hqm hn2 d) hq2,
-              ?_, hql2⟩⟩⟩
-        show pstepEv pm2 d l2 (f' 0) d
-        rw [hf0]; exact hall2 d
+      rw [Nat.zero_add] at hnd ⊢
+      rw [emDevTagEq, emDevTagEq] at hnd
+      obtain ⟨hnd1, hnd2⟩ := orbFalseSplit _ _ hnd
+      obtain ⟨hls1, hl1⟩ := orbFalseSplit _ _ hnd1
+      obtain ⟨_, hls1'⟩ := orbFalseSplit _ _ hls1
+      obtain ⟨hnd3, _⟩ := orbFalseSplit _ _ hnd2
+      obtain ⟨hls2, hl2⟩ := orbFalseSplit _ _ hnd3
+      obtain ⟨_, hls2'⟩ := orbFalseSplit _ _ hls2
+      have hb1 := WeakRvwmoFab.admRunTFalse _ _ _ _ _ _ _ har1 hdq (hasDevFalse ls1 hls1')
+      have hp1 := pdevEvFalse pa l1 pm hqa (lbIsdevNe l1 hl1)
+      have hb2 := WeakRvwmoFab.admRunTFalse _ _ _ _ _ _ _ har2 hqm (hasDevFalse ls2 hls2')
+      have hp2 := pdevEvFalse pm2 l2 p' hqm2 (lbIsdevNe l2 hl2)
+      simp only [htq, hb1, hp1, hb2, hp2, Bool.or_self]
     | succ n =>
-      simp only [List.getElem?_cons_succ] at hn
       have e : n + 1 + k = n + (k + 1) := by omega
-      rw [e]
-      obtain ⟨h1, h2⟩ := hf n lb0 hn
-      refine ⟨h1, ?_⟩
+      rw [e] at hnd ⊢
       rw [emDevTagNe false ls1 l1 k (n + (k + 1)) _ (by omega),
-        emDevTagNe false ls2 l2 k (n + (k + 1)) es (by omega)]
-      exact h2
-
-theorem hemitfStates (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
-    (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
-    hemitf dvi dvo k ws row p es pfin →
-    devQuiet p ∧ (∀ dp, p = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
-    ∃ f : Nat → Pexv6, f 0 = p ∧
-      ∀ n lb, row[n]? = some lb →
-        hblk (dvi (n + k)) (dvo (n + k)) (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))
-        ∧ (emDev false (n + k) es = false →
-           dvo (n + k) = dvi (n + k) ∧
-           ∀ d, hblk d d (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))) := by
-  intro hem hdq
-  obtain ⟨f, hf0, hf⟩ :=
-    hemitfStatesQ (fun _ => True) dvi dvo k ws row p es pfin hem (fun _ _ => trivial) hdq
-  refine ⟨f, hf0, fun n lb hn => ?_⟩
-  obtain ⟨h1, h2⟩ := hf n lb hn
-  refine ⟨hblkQHblk _ _ _ _ _ _ _ h1, fun hnd => ?_⟩
-  obtain ⟨h3, h4⟩ := h2 hnd
-  exact ⟨h3, fun d => hblkQHblk _ _ _ _ _ _ _ (h4 d)⟩
-
-/-- (Lean-only, deviation 2) `hartConffStates` at `pstepQ Q`. -/
-theorem hartConffStatesQ (Q : Wlabel → Prop) (i : Nat) (row : List Lbl) (p0 : Pexv6)
-    (dvi dvo : Nat → Efab) (em : Hemission) :
-    hartConff i row p0 dvi dvo em → (∀ x, x ∈ emLabels em → Q x) →
-    devQuiet p0 ∧ (∀ dp, p0 = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
-    ∃ f : Nat → Pexv6, f 0 = p0 ∧
-      ∀ n lb, row[n]? = some lb →
-        hblkQ Q (dvi n) (dvo n) (rowWs row n) lb (f n) (f (n + 1))
-        ∧ (¬ isDevBlock em n →
-           dvo n = dvi n ∧
-           ∀ d, hblkQ Q d d (rowWs row n) lb (f n) (f (n + 1))) := by
-  intro hem hq hdq
-  obtain ⟨f, hf0, hf⟩ := hemitfStatesQ Q _ _ _ _ _ _ _ _ hem hq hdq
-  refine ⟨f, hf0, fun n lb hn => ?_⟩
-  obtain ⟨h1, h2⟩ := hf n lb hn
-  refine ⟨h1, fun hnd => h2 ?_⟩
-  exact Bool.eq_false_iff.2 hnd
-
-theorem hartConffStates (i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Nat → Efab)
-    (em : Hemission) :
-    hartConff i row p0 dvi dvo em →
-    devQuiet p0 ∧ (∀ dp, p0 = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
-    ∃ f : Nat → Pexv6, f 0 = p0 ∧
-      ∀ n lb, row[n]? = some lb →
-        hblk (dvi n) (dvo n) (rowWs row n) lb (f n) (f (n + 1))
-        ∧ (¬ isDevBlock em n →
-           dvo n = dvi n ∧
-           ∀ d, hblk d d (rowWs row n) lb (f n) (f (n + 1))) := by
-  intro hem hdq
-  obtain ⟨f, hf0, hf⟩ :=
-    hartConffStatesQ (fun _ => True) i row p0 dvi dvo em hem (fun _ _ => trivial) hdq
-  refine ⟨f, hf0, fun n lb hn => ?_⟩
-  obtain ⟨h1, h2⟩ := hf n lb hn
-  refine ⟨hblkQHblk _ _ _ _ _ _ _ h1, fun hnd => ?_⟩
-  obtain ⟨h3, h4⟩ := h2 hnd
-  exact ⟨h3, fun d => hblkQHblk _ _ _ _ _ _ _ (h4 d)⟩
+        emDevTagNe false ls2 l2 k (n + (k + 1)) es (by omega)] at hnd
+      exact ih ⟨hq', fun dp' hp' kd ba bs hin => by
+          obtain ⟨dpm, hpm⟩ := hk' dp' hp'
+          obtain ⟨dp, hp⟩ := hkm2' dpm hpm
+          exact hdk2 dp hp kd ba bs (List.mem_append_right _ (List.mem_cons_of_mem _ hin))⟩ n
+        (by simp only [List.length_cons] at hn; omega) hnd
 
 /-! ### 3.3 The obstruction, machine-checked -/
 
@@ -597,9 +781,12 @@ theorem hartConfNoGap (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab
     devQuiet p0 ∧ (∀ dp, p0 = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
     row[n]? = some lb → ¬ isDevBlock em n → dv (n + 1) = dv n := by
   intro hem hdq hn hnd
-  obtain ⟨f, _, hf⟩ := hartConffStates i row p0 dv (fun m => dv (m + 1)) em
-    (hartConfHemitf i row p0 dv em hem) hdq
-  exact ((hf n lb hn).2 hnd).1
+  obtain ⟨tq, hemf⟩ := hartConfHemitf i row p0 dv em hem
+  obtain ⟨_, _, hf⟩ := hartConffStates i row p0 dv (fun m => dv (m + 1)) tq em hemf
+  have htq : tq n = false :=
+    WeakRvwmoFab.hemitfQuietTq _ _ _ _ _ _ _ _ _ hemf hdq n (lookup_lt_Some hn)
+      (Bool.eq_false_iff.2 hnd)
+  exact ((hf n lb hn).2 htq).1
 
 /-! ## 4. The bundle -/
 
@@ -608,30 +795,66 @@ structure Gfexec where
   gfGd : Gdexec
   gfDev : List Geid
 
-/-- The fabric bundle (deviation 2: each emission's fetches are pinned to the graph's image,
-`emFetchImg GF.gfGd.gdG.gxImg em`, between the fabric clause and the deps clause).
+/-- An I/O-class event (`Lbl.LIo`, any kind).  (W13 (I): moved here from `GraphFabResidue`, whose
+residue still uses it, so that the bundle's membership clause can name it.) -/
+def gisIo (G : Gexec) (e : Geid) : Bool :=
+  match gxLbl G e with
+  | some l => lbIsIo l
+  | none => false
 
-W-DISK (deviation 4): the LAST per-row clause is the INTERIM "a `.PDisk` row's emission is
-`LDev`-free" (`emDevfree em` whenever `boot i` is the disk) -- **deleted by W13 (I)**, which
-replaces the `isDevBlock` clause by the endpoint criterion `(i,k) ∈ gfDev ↔ (gisIo (i,k) = true ∨
-dvi k ≠ dvo k)`.  Until then this INTERNAL bundle is VACUOUS for a device-active disk row (a
-disk row from `.PDisk none` emits START, an `LDev`, before anything else) -- the
-`ioResidueGwfInterim` pattern; the published bundle is W13 (I)'s. -/
-def gfexecConf (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec) :
+/-- (Lean-only, W13 (I)) `gisIo` read off a row. -/
+theorem WeakRvwmoFab.gisIoRow (G : Gexec) (i k : Nat) (row : List Lbl) (lb : Lbl) :
+    G.gxProg[i]? = some row → row[k]? = some lb → gisIo G (i, k) = lbIsIo lb := by
+  intro hrow hlb
+  unfold gisIo gxLbl
+  rw [hrow]
+  simp only [Option.bind_some, hlb]
+
+/-- THE FETCH CLAUSE'S SLOT (W13 (I) [R28.s5]: a RENAME only).  `xv6ConfS`'s `emZifencei`
+(§A(†)), here with the content of the stage-C clause `emFetchImg` (every fetch item of the
+emission reads the graph's image at timestamp 0); W5d-G G1 fills in its Zifencei content (the
+spike's `GraphFetchSpike.emZifencei`) AFTER W13 (I), keeping this file single-writer (D26). -/
+def emZifencei (im : Image) (em : Hemission) : Prop := emFetchImg im em
+
+/-- **THE FABRIC BUNDLE `gfexecConfIO`** (W13 (I), deviation 5; Rocq's `gfexec_conf` with its
+`isDevBlock` clause replaced and W-DISK's interim disk-row clause deleted).
+
+Per row: an emission `em` with the blocks' fabric endpoints `dvi k → dvo k` and CONTACT bits
+`tq k` (`hartConff`), and
+
+* **MEMBERSHIP BY FABRIC CONTACT [OWN.43]** (superseding [R22.2]'s two-disjunct form):
+  `(i, k) ∈ gfDev ↔ gisIo (i, k) ∨ dvi k ≠ dvo k ∨ tq k` -- every I/O-class event BY CLASS (its
+  value depends on the fabric at its position even when it moves nothing), every block that MOVES
+  the fabric, and every block with a `pdevEv`-true step (a block that READS the fabric without
+  moving it, e.g. a disk `DWriteDev` store at an identity guard, is a member).  Hence every
+  NON-member block is `pdevEv`-quiet, so fabric-preserving AND fabric-BLIND
+  (`WeakEvInst.pdevEvOk`) -- which is what `supplyOfFconf`'s replay at the global fabric
+  `fab ∘ dcnt` needs (`fconfRowsPin`);
+* the members' endpoints pinned to the global fabric trace `fab` in `gfDev`'s order;
+* the fetch clause `emZifencei` (W5d-G's slot, content `emFetchImg` until G1);
+* the row's dependency edges in `gdDeps`.
+
+TRUSTED-SURFACE MARKS (§A(†), rev 35).  RVWMO / riscv.cat / Sail have NO device-internal events;
+Zifencei and the PMAs are silent; virtio 1.x says nothing about when the device re-reads its
+state.  `gfDev` and (R1)–(R3) are device-MODEL / trusted-surface text (D45/D49 class), and no ISA
+order is at stake: the contact criterion is FAITHFUL to RVWMO (it adds no ISA order), EQUAL to
+[R22.2] on every xv6 run, and STRONGER than [R22.2] as generic trusted text only by unreachable
+non-moving fabric-touching blocks, which (R3) then orders (`PROGRESS-W13I.md`; plan §D
+Q-GFDEV-contact). -/
+def gfexecConfIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec) :
     Prop :=
   fab 0 = d0 ∧
   GF.gfDev.Nodup ∧
   (∀ (n i k : Nat), GF.gfDev[n]? = some (i, k) →
      ∃ row, GF.gfGd.gdG.gxProg[i]? = some row ∧ k < row.length) ∧
   (∀ (i : Nat) (row : List Lbl), GF.gfGd.gdG.gxProg[i]? = some row →
-     ∃ (em : Hemission) (dvi dvo : Nat → Efab),
-       hartConff i row (boot i) dvi dvo em ∧
-       (∀ k : Nat, k < row.length → (isDevBlock em k ↔ (i, k) ∈ GF.gfDev)) ∧
+     ∃ (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
+       hartConff i row (boot i) dvi dvo tq em ∧
+       (∀ k : Nat, k < row.length →
+          ((i, k) ∈ GF.gfDev ↔ (gisIo GF.gfGd.gdG (i, k) = true ∨ dvi k ≠ dvo k ∨ tq k = true))) ∧
        (∀ (k n : Nat), GF.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1)) ∧
-       emFetchImg GF.gfGd.gdG.gxImg em ∧
-       (∀ jk, jk ∈ rowDeps em.emItems → ((i, jk.1), (i, jk.2)) ∈ GF.gfGd.gdDeps) ∧
-       -- INTERIM (W-DISK [R18.2]; DELETED BY W13 (I)): a disk row's emission is `LDev`-free
-       (∀ dp, boot i = .PDisk dp → emDevfree em))
+       emZifencei GF.gfGd.gdG.gxImg em ∧
+       (∀ jk, jk ∈ rowDeps em.emItems → ((i, jk.1), (i, jk.2)) ∈ GF.gfGd.gdDeps))
 
 /-! ## 5. The model arm -/
 
@@ -744,21 +967,36 @@ theorem topoExistsF (GF : Gfexec) :
 
 /-! ## 6. Non-vacuity: B1b-1's bundle embeds -/
 
+/-- (W13 (I), deviation 5: at QUIET boot states -- a quiescent emission from a disk state inside
+a burst can touch the fabric with no `LDev`, and then the empty fabric list is not the contact
+list.) -/
 theorem gfexecConfOfQconf (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) :
-    gdexecQconf boot d0 im nh GD → gfexecConf boot d0 (fun _ => d0) ⟨GD, []⟩ := by
-  intro hq0
+    gdexecQconf boot d0 im nh GD → (∀ i, devQuiet (boot i)) →
+    gfexecConfIO boot d0 (fun _ => d0) ⟨GD, []⟩ := by
+  intro hq0 hquiet
   have hq := gdexecQconfRows _ _ _ _ _ hq0
   refine ⟨rfl, List.nodup_nil, fun n i k hn => by simp at hn, ?_⟩
   intro i row hrow
   obtain ⟨em, hem, hdf, hfi, hdep⟩ := hq i row hrow
-  refine ⟨em, fun _ => d0, fun _ => d0, hartConfHemitf i row (boot i) (fun _ => d0) em hem,
-    ?_, fun k n hn => by simp at hn, by rw [gdexecQconfImg _ _ _ _ _ hq0]; exact hfi, hdep,
-    fun _ _ => hdf⟩
-  intro k _
+  obtain ⟨tq, hemf⟩ := hartConfHemitf i row (boot i) (fun _ => d0) em hem
+  refine ⟨em, fun _ => d0, fun _ => d0, tq, hemf, ?_, fun k n hn => by simp at hn,
+    by rw [gdexecQconfImg _ _ _ _ _ hq0]; exact hfi, hdep⟩
+  intro k hk
+  have htq : tq k = false :=
+    WeakRvwmoFab.hemitfQuietTq _ _ _ _ _ _ _ _ _ hemf ⟨hquiet i, fun _ _ => hdf⟩ k hk
+      (emDevDevfree k em.emItems hdf)
+  obtain ⟨_, _, hf⟩ := hartConffStates i row (boot i) _ _ tq em hemf
+  obtain ⟨lb, hlb⟩ : ∃ lb, row[k]? = some lb := ⟨_, List.getElem?_eq_getElem hk⟩
+  have hgio : gisIo GD.gdG (i, k) = false := by
+    rw [WeakRvwmoFab.gisIoRow GD.gdG i k row lb hrow hlb]
+    exact ((hf k lb hlb).2 htq).2.1
   constructor
-  · intro hd; exact absurd hd (emDevfreeNoDevBlock em k hdf)
   · intro hin; simp at hin
+  · rintro (h | h | h)
+    · rw [hgio] at h; exact absurd h (by decide)
+    · exact absurd rfl h
+    · rw [htq] at h; exact absurd h (by decide)
 
 /-! ## 7. The supply at a moving fabric -/
 
@@ -792,7 +1030,8 @@ theorem supplyOfFconf (c : Cand) (boot : Nat → Pexv6) (fab : Nat → Efab) (GF
     (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) = rows i) →
     -- ... over the agents below `N` ...
     (∀ i, N ≤ i → rows i = []) →
-    -- ... every row emits, its dev blocks pinned to `fab`, its non-dev blocks fabric-blind
+    -- ... every row emits, its member blocks pinned to `fab`, its non-member blocks
+    -- fabric-blind -- the `∀ d` folding (W13 (I): derived from CONTACT, `fconfRowsPin`)
     -- (Lean-only: its fetches pinned to `im`) ...
     (∀ i, i < N → ∃ f : Nat → Pexv6, f 0 = boot i ∧
        ∀ n lb, (rows i)[n]? = some lb →
@@ -880,13 +1119,13 @@ theorem supplyOfFconf (c : Cand) (boot : Nat → Pexv6) (fab : Nat → Efab) (GF
 
 /-! ### 7.1 The bundle supplies `supplyOfFconf`'s third hypothesis -/
 
-/-- (Lean-only, deviation 2) `fconfRows` at the pinned LTS: the bundle's `emFetchImg` clause
-pins the blocks to the graph's image. -/
+/-- (Lean-only, deviation 2) `fconfRows` at the pinned LTS: the bundle's `emZifencei` clause
+pins the blocks to the graph's image.  (W13 (I), deviation 5: the non-member conjunct -- the
+`∀ d` folding -- is DERIVED from contact: a non-member's contact bit is `false`.) -/
 theorem fconfRowsPin (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec)
     (i : Nat) (row : List Lbl) :
-    gfexecConf boot d0 fab GF →
+    gfexecConfIO boot d0 fab GF →
     GF.gfGd.gdG.gxProg[i]? = some row →
-    devQuiet (boot i) →
     ∃ f : Nat → Pexv6, f 0 = boot i ∧
       ∀ n lb, row[n]? = some lb →
         (∀ m, GF.gfDev[m]? = some (i, n) →
@@ -894,29 +1133,31 @@ theorem fconfRowsPin (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF
                 (f n) (f (n + 1)))
         ∧ ((i, n) ∉ GF.gfDev →
            ∀ d, hblkQ (WeakAxRealize.fetchPin GF.gfGd.gdG.gxImg) d d (rowWs row n) lb (f n) (f (n + 1))) := by
-  rintro ⟨_, _, _, hc⟩ hrow hq
-  obtain ⟨em, dvi, dvo, hem, hiff, hpin, hfi, _, hdisk⟩ := hc i row hrow
-  obtain ⟨f, hf0, hf⟩ := hartConffStatesQ _ i row (boot i) dvi dvo em hem hfi ⟨hq, hdisk⟩
+  rintro ⟨_, _, _, hc⟩ hrow
+  obtain ⟨em, dvi, dvo, tq, hem, hiff, hpin, hfi, _⟩ := hc i row hrow
+  obtain ⟨f, hf0, hf⟩ := hartConffStatesQ _ i row (boot i) dvi dvo tq em hem hfi
   refine ⟨f, hf0, fun n lb hn => ?_⟩
   obtain ⟨h1, h2⟩ := hf n lb hn
   refine ⟨fun m hm => ?_, fun hnin d => ?_⟩
   · obtain ⟨hi, ho⟩ := hpin n m hm
     rw [← hi, ← ho]; exact h1
-  · have hnd : ¬ isDevBlock em n := fun hd => hnin ((hiff n (lookup_lt_Some hn)).1 hd)
-    exact (h2 hnd).2 d
+  · have htq : tq n = false := by
+      cases h : tq n with
+      | false => rfl
+      | true => exact absurd ((hiff n (lookup_lt_Some hn)).2 (Or.inr (Or.inr h))) hnin
+    exact (h2 htq).2.2 d
 
 theorem fconfRows (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec)
     (i : Nat) (row : List Lbl) :
-    gfexecConf boot d0 fab GF →
+    gfexecConfIO boot d0 fab GF →
     GF.gfGd.gdG.gxProg[i]? = some row →
-    devQuiet (boot i) →
     ∃ f : Nat → Pexv6, f 0 = boot i ∧
       ∀ n lb, row[n]? = some lb →
         (∀ m, GF.gfDev[m]? = some (i, n) →
               hblk (fab m) (fab (m + 1)) (rowWs row n) lb (f n) (f (n + 1)))
         ∧ ((i, n) ∉ GF.gfDev → ∀ d, hblk d d (rowWs row n) lb (f n) (f (n + 1))) := by
-  intro hconf hrow hq
-  obtain ⟨f, hf0, hf⟩ := fconfRowsPin boot d0 fab GF i row hconf hrow hq
+  intro hconf hrow
+  obtain ⟨f, hf0, hf⟩ := fconfRowsPin boot d0 fab GF i row hconf hrow
   refine ⟨f, hf0, fun n lb hn => ?_⟩
   obtain ⟨h1, h2⟩ := hf n lb hn
   exact ⟨fun m hm => hblkQHblk _ _ _ _ _ _ _ (h1 m hm),
@@ -927,20 +1168,19 @@ theorem fconfRows (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : 
 at `d0`. -/
 theorem fconfSupply (c : Cand) (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     (GF : Gfexec) (N : Nat) :
-    gfexecConf boot d0 fab GF →
+    gfexecConfIO boot d0 fab GF →
     (∀ i, (c.cdTr.filter (fun s => decide (s.esAg = i))).map (fun s => s.esLb) =
         (GF.gfGd.gdG.gxProg[i]?).getD []) →
     GF.gfGd.gdG.gxProg.length ≤ N →
     (∀ k s, c.cdTr[k]? = some s →
        (s.esAg, tcnt s.esAg (c.cdTr.take k)) ∈ GF.gfDev →
        GF.gfDev[dcnt GF c.cdTr k]? = some (s.esAg, tcnt s.esAg (c.cdTr.take k))) →
-    (∀ i, i < N → devQuiet (boot i)) →
     ∃ pst : Nat → List Pexv6,
       pst 0 = (List.range' 0 N).map boot ∧
       (fun k => fab (dcnt GF c.cdTr k)) 0 = d0 ∧
       execProgOk' (pstepPin GF.gfGd.gdG.gxImg pstepEv) pclsEv pst
         (fun k => fab (dcnt GF c.cdTr k)) (candExec c) := by
-  intro hconf hrows hN hord hquiet
+  intro hconf hrows hN hord
   obtain ⟨pst, hpst0, hprog⟩ := supplyOfFconf c boot fab GF
     (fun i => (GF.gfGd.gdG.gxProg[i]?).getD []) N GF.gfGd.gdG.gxImg hrows
     (fun i hi => progRowNil _ _ (by omega))
@@ -949,7 +1189,6 @@ theorem fconfSupply (c : Cand) (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat →
       cases e : GF.gfGd.gdG.gxProg[i]? with
       | some row =>
         obtain ⟨f, hf0, hf⟩ := fconfRowsPin boot d0 fab GF i row hconf e
-          (hquiet i (Nat.lt_of_lt_of_le (lookup_lt_Some e) hN))
         exact ⟨f, hf0, hf⟩
       | none =>
         refine ⟨fun _ => boot i, rfl, ?_⟩
