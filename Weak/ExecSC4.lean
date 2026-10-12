@@ -59,9 +59,15 @@ WpMmodeLeafBase: `exec_mem_write_ea` ↦ `execMemWriteEa`,
 `execCheckedMemWriteRam`, `execMemWriteEaRam`, `execMemWriteValueRam`.
 
 **Dropped**: none of the names the weak tier uses.
+
+**Import hygiene.**  `bv_decide` adds the auxiliary definitions
+`page_based_mem_type.enumToBitVec` / `mem_payload.enumToBitVec` for the enums it meets; two
+modules that each add them cannot be imported together.  `MachCSL.UTlb` adds them first; this
+file depends on it, so `bv_decide` reuses its copies (as `MachCSL.BvEnumSatp` does for `SATPMode`).
 -/
 import Weak.ExecSC3
 import MachCSL.WpTrap
+import MachCSL.UTlb
 
 namespace Weak
 

@@ -94,10 +94,17 @@ Lean-only (file-qualified `AxDataX.*`): `substArg`, `cRBind`, `cRLift`, `cFact`,
 
 **Dropped:** the Ltac `nseipK` (deviation 6).  No definition or lemma dropped (Rocq 6
 definitions + 24 lemmas; Lean 30 + `XKit` + 19 Lean-only + 1 tactic).
+
+**Import hygiene.**  `bv_decide` adds the auxiliary definitions `SATPMode.enumToBitVec` /
+`Register.enumToBitVec` for the enums it meets; two modules that each add them cannot be imported
+together.  `MachCSL.BvEnumSatp` and `Xv6.UkFetchFact` add them first, so they are imported here
+and `bv_decide` reuses their copies.
 -/
 import Weak.AxSpineOk3
 import Weak.AxSymEngine2
 import Weak.ExecSC8
+import MachCSL.BvEnumSatp
+import Xv6.UkFetchFact
 
 namespace Weak
 
