@@ -1,6 +1,23 @@
 # allocproc on RVWMO: target theorem, gap analysis, roadmap (design advisor, 2026-10-09)
 
-**Status: rev 28 (2026-10-12) = rev 27 (SATISFIED by R24) + W-DISK DONE + the W8-design results (`notes/W8-design.md`,
+**Status: rev 29 (2026-10-12) = rev 28 + review R25 (3 required changes, tags [R25.n]; no alternatives).**  What changed:
+**[R25.1]** `chainOkAt` as pinned was FALSE on kernel page-table-entry bytes — the hardware A/D write-back is an EXCLUSIVE
+store by the walking hart (`WpPtWalk.lean:3-7,455-470`) that every other hart's walk PLAIN-reads and `coh`-stamps
+(`Lang.lean:373-375,400`, `TsoMem.lean:354-356`) with no sync chain (`KptInv.lean:4-8`; Svadu ON: `menvcfg = ADUE | STCE`,
+`SpecStart.lean:29,40`): the export gains `Cust.pte`, `chainOkAt` exempts it, a new clause **`pteDiscAt`** (every post-boot
+kernel-PTE entry an A/D variant of the canonical value, `KptInv.pteVariant`) joins `xv6AccessDisc`; R-ctx tables the walker
+as a NAMED `pte-key` arm; the W13 census's "`kernel_pagetable` non-racy" line becomes row C6; `:492`'s "`menvcfg = 0`" corrected
+(FIOM = 0 still holds).  **[R25.2]** W8-β′'s acceptance is pinned to THREE Lean statements — the MachCSL `reservedOk σ reg`
+conjunct beside `⌜mmOk σ⌝`, the `Xv6/` extraction `powerInterp_accessDiscβ` on `powerInterp_textPristine`'s pattern, and
+**the (r2) sibling root `xv6DiscAdequacy_closed` NOW at the β′ conjunction** (`xv6AccessDisc` provisionally `lockWordDiscAt ∧
+cpuStaticAt`, W8 (f2-ctx) only STRENGTHENS it) — so "unblocks W13 (K)" is true at the root level; β′ re-sized M–L ≈ 1.1–2k.
+**[R25.3]** R-ctx's file list is 21 files (+ `Xv6/ProofSwtch.lean`'s `kctx_move_in/out` ×5 = the `swtch` handoff door, +
+`Xv6/PipeBirth.lean`'s `lock_pay_born` = the only dynamic lock birth); counts corrected (`ctx_move` 1, `kctx_move_*` 6,
+`lock_pay_born` 1); its table gains handoff and walker rows.  Adopted [R25.s1]–[R25.s6] (cites `:502`, NEW `SrvwmoXv6Adequacy`,
+`tools/tcb/expected.json`, `lkFresh` 30 files, `Dres :269-273`, the `userret` `fence.i` image fact behind `utextDiscAt`,
+Q-HOLDING (c) touches `lk->locked` too).  No owner question (R25: none missing; [R25.1] is FAITHFUL export shape, not a
+memory-model choice — Spec line in §C W8).  W4 F9 and W5 CORE briefs UNCHANGED (launchable per R25).  History: rev 29 — R25 (3 req.).
+**Rev 28 (2026-10-12) = rev 27 (SATISFIED by R24) + W-DISK DONE + the W8-design results (`notes/W8-design.md`,
 `notes/xv6-holding-race.md`) + [OWN.37] (Q-W8-feed RULED (a)).**  What changed: **(1) W-DISK LANDED** (merged at the tip:
 `Weak/VirtioProg.lean` REWRITTEN to the aligned program — 672 lines, `DM` = `DRet`/`DRead`/`DFence`/`DWriteDev`/`DPop`,
 `virtioProg :438`, `drainAll :323`, `popState :319`, `preCaptureHead :338` (= `pre₁`), `dusedTail :394`, `virtioProgWf :661`;
@@ -25,7 +42,7 @@ hypothesis is threaded as **`∀ i, i < N → devQuiet (boot i)`** (`WeakRvwmoFa
 §A(†), §B(11)'s pf-drift entry and §C W-DISK are marked RESOLVED where they stand (the binding text is kept as the record);
 **W4 F9 is UNBLOCKED.**  **(2) W8 restructured per [OWN.37]** (§C W8, §D Q-W8-feed; the W8-design spike is DONE, read-only,
 nothing built): the export is the PURE per-state predicate **`xv6AccessDisc σ`** (`Xv6/AccessDiscipline.lean`, text pinned
-from W8-design §1 in §C W8 — `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt ∧ cpuProcDiscAt ∧ utextDiscAt`; D24 FIXED), reached
+from W8-design §1 in §C W8 — `chainOkAt ∧ lockWordDiscAt ∧ pteDiscAt ∧ cpuStaticAt ∧ cpuProcDiscAt ∧ utextDiscAt` [R25.1]; D24 FIXED), reached
 through the SIBLING ROOT **(r2) `Xv6.xv6DiscAdequacy_closed`** on the W3 pattern ((r1) is NOT available: the predicate is
 xv6-specific and an existential registry inside `mmOk` lets the chain run through a non-lock word); a ledger-free (β) export
 covers only the lock-layer words and `cpus[h]` — so W8 is **three items**: **W8-β′** (M, ≈ 0.8–1.5k; `cpuStaticAt` +
@@ -310,7 +327,7 @@ riscv.cat-tier validation of the handle-based lock protocol; do NOT extend it.
    for them BY CONSTRUCTION — the appendix "I/O Ordering": "For I/O, the load value axiom and atomicity axiom in
    general do not apply" [R8.s1]).  W→W reordering and load buffering ALLOWED; every strengthening NAMED;
 4. page tables live: shared kernel table with concurrent hardware A/D write-back (`MachCSL/KptInv.lean:39,85`;
-   TLB `MachCSL/UTlb.lean`), fresh user table private until published;
+   TLB `MachCSL/UTlb.lean`; in W8's export it lands as `pteDiscAt`, §C W8 [R25.1]), fresh user table private until published;
 5. the conclusion is functional AND safety [R1.2][R1.9]: returned slot `&proc[j]`, `j < NPROC`, `p->lock` held,
    `state = USED`, `pid ∈ [1, PIDMAX]` distinct from every live pid, fresh trapframe page (`kalloc`'s fill of
    `5`, `Xv6/SpecKalloc.lean:69`, via `procPrivNocwd`, `SpecAllocproc.lean:131`), fresh user table with
@@ -488,8 +505,9 @@ atomicity and the log message `gmsg` (`Lin.lean:463`) ignore I/O events BY CONST
 [OWN.14]); `lbIsR`/`lbIsW` stay RAM-only, so rule 4 (`gfenceCovers`, `Graph.lean:204-209`) and rule 7 skip them —
 Sail's `execute_FENCE` keys on `extractLsb pred 1 0` only (`InstsEnd.lean:18299-18313`), after `effective_fence_set`
 (`BaseInsts.lean:568-573`), which with FIOM = 1 ORs the i/o bits INTO the memory bits and never the reverse — so the
-i/o bits produce NO I/O ordering in Sail unconditionally, and never reach `LFence` at all because xv6 boots with
-`menvcfg = 0` (`BootBoard.lean:30`; `start()` sets only STCE) [R8.3d]; the graph can give I/O events NO fence edge
+i/o bits produce NO I/O ordering in Sail unconditionally, and never reach `LFence` at all because xv6 powers on with
+`menvcfg = 0` (`BootBoard.lean:30`) and `start()` sets `menvcfg = ADUE | STCE` (`Xv6/SpecStart.lean:29,40`; FIOM = 0, so
+the i/o bits still never reach `LFence`) [R8.3d][R25.1 (e)]; the graph can give I/O events NO fence edge
 (D48); rules 1–3 give none (`gaccesses` is byte-footprint based); rule 5 `gacqPo`'s `gmem e2` (`:214-215`) DOES
 order an acquire read before a later I/O event — a strengthening the appendix's condition (c1) EXCLUDES (quoted in
 §B(11b)), subsumed by (R1), vacuous as a trusted use — D52 RULED (a) [OWN.18]; **dependency edges through `LIo` are
@@ -561,7 +579,7 @@ Legend: *need* = needed for T-alloc-RVWMO; *route* = (M) machine tier / (A) AxSL
 **(1) AxSL tier not composed with the machine tier.**  Route (A) only (retired): XL; Theorem 2 = validation (D6).
 **(2) Page tables.**  Route (M): CLOSED — kernel table a live shared invariant with A/D variants (`KptInv.pteVariant`),
 `utlbOk` "up to A/D" (`MachCSL/UTlb.lean:17-21`) [R1.s3]; user-table pages fresh owned memory (`pptPost`), published
-at `satp` + `sfence.vma`; Svadu write-back named in §B(11).  S.  **(3) SIE = 0, 3 harts, no devices/DMA.**  Route (M):
+at `satp` + `sfence.vma`; Svadu write-back named in §B(11) and carried by W8's `pteDiscAt` (§C W8 [R25.1]).  S.  **(3) SIE = 0, 3 harts, no devices/DMA.**  Route (M):
 CLOSED (`KCtx.sie`, `wpNext`, `NCPU = 8`, DMA at the store order).  Graph tier: OPEN — the quiescent bundle has NO
 devices; the fabric bundle is W13 (§A(†)) [R5.1].
 
@@ -1138,7 +1156,7 @@ read set `depsOfIb ib.ibBits` ON THE LABEL, as `LExLoad`/`LStore`/`LExStore` car
 files live in `Weak/`, registered in `tools/ci/roots-weak.txt` + `tools/audit/baseline-weak.json` + `XV6_AUDIT_MODULES`
 (`tools/ci/audit.sh:44`), built by `--weak` CI over the whole `Xv6` cone (D13); pure-`Xv6/` roots (W3; W8's export `Xv6/AccessDiscipline.lean` and its
 (r2) sibling root `xv6DiscAdequacy_closed` [OWN.37] — W8-β′ and W8 (f2-ctx) are serial MachCSL items, NOT `Xv6/`-only
-[R21.1][OWN.36][OWN.37], §C) go to `roots.txt`/`baseline.json`/`tcb/expected.json` (`tools/ci/lint.sh` checks agreement).  [R14.1] A MachCSL change whose cone build is green
+[R21.1][OWN.36][OWN.37], §C) go to `roots.txt`/`baseline.json`/`tools/tcb/expected.json` [R25.s2] (`tools/ci/lint.sh` checks agreement).  [R14.1] A MachCSL change whose cone build is green
 can still break `Weak/` (`audit.sh:13-16`: "Weak/ is not in the Xv6/MachCSL build CI audits") and the `Vtest` lib
 (`lakefile.toml:43-49`, NOT a default target; `tools/ci/vtest.sh check`) — W-COH's, W8-β′'s, W8 (f2-ctx)'s and W-RSV's briefs REQUIRE `lake
 build Weak.TsoOfPf Vtest` (or the `--weak` lane + `vtest.sh check`) in their acceptance.  S.
@@ -1179,14 +1197,28 @@ device clause to `R-dev` = full `dvirtio` equality off the OUT capture segment, 
 outside capture → gate; re-proves EVERY `SimRel.dev` consumer [R21.3 (c)]; §C W4) ∥ **W8-β′** (M ≈ 0.8–1.5k, SERIAL MachCSL —
 the first item of the lane since W-DMA0: a MachCSL "reserved region" (the state interpretation holds half of each reserved
 byte's points-to, so a generic rule's own-1 cell cannot name one) for `cpus[h]` and the lock layer's own words registered at
-lock birth (`lkFresh`, `Lock.lean:727`; `lock_pay_born :488`), yielding `cpuStaticAt` + `lockWordDiscAt`; 6–8 MachCSL files
-(`Resources`, `Lock`, `WpLock`, `LockBornHook`, `KCtx`, the cpu-cell rule file) + ≤ 30 `Xv6/`; ONE cone rebuild; unblocks
-W13 (K)'s `lk->cpu` precondition; §C W8) ∥ **R-ctx** (S, READ-ONLY, no build: the gate of W8 (f2-ctx) — re-justify each of the
-≈ 35 TSO-leaky context-law uses in the 19 `Xv6/` files of W8-design §3.4 (`ctx_absorb` 6 uses/3 files, `ownCtx_floor_view`
-8/4, `ctxStamped_raise` 5/2, `lockHook_llb` 13/10, `ownCtx_key_vis` 3/2; transports `ctx_unstamp` 1, `ctx_park` 3, `ctx_move`
-5, `lock_pay_*` 3) by a sync chain or the device-key arm — the bcache/icache/sleeplock floors (`SpecRelease.lean:164-169`,
-`BcacheLock.lean:132`, `SpecAcquire.lean:96-103`) and the virtio completion floors (`DiskInvDefs`, `ProofVirtioDiskIntr`);
-output: per use CHAINED / DEVICE-KEY / RESISTS (→ (f1) for that part); §C W8) ∥ **W5 CORE** (§C W5: M1's
+lock birth (`lkFresh`, `Lock.lean:727`; `lock_pay_born :488`); **[R25.2] THREE Lean deliverables**: (i) the MachCSL invariant
+`⌜reservedOk σ reg⌝` beside `⌜mmOk σ⌝` in `memModelAt` (`Resources.lean:951-956`) — per registered region (`cpus[h]`'s cells
+`KCtx.lean:556-560`; each registered lock's two words `Lock.lean:590-597`) every post-registration entry is by the region's
+structural author, re-established by the dedicated rules ONLY; (ii) the `Xv6/` extraction `powerInterp_accessDiscβ :
+powerInterp g ⊢ … -∗ ⌜g.pow = true → lockWordDiscAt g.m ∧ cpuStaticAt g.m⌝` on `powerInterp_textPristine`'s pattern
+(`Xv6/TextPristine.lean:122-123`), with the registry agreement (MachCSL registry ⊆ `xv6LockWord σ`) as its `Xv6/` side;
+(iii) **the (r2) sibling root `xv6DiscAdequacy_closed` NOW**, with `xv6AccessDisc` provisionally `:= lockWordDiscAt ∧
+cpuStaticAt` (registered in `roots.txt`/`baseline.json`/`tools/tcb/expected.json` per §B(12); W8 (f2-ctx) only STRENGTHENS
+the conjunction) — so W13 (K)'s `lk->cpu` precondition is unblocked at the ROOT level, not just as a statement; 6–8 MachCSL
+files (`Resources`, `Lock`, `WpLock`, `LockBornHook`, `KCtx`, the cpu-cell rule file) + ≤ 30 `Xv6/` + the twin; M–L ≈ 1.1–2k;
+ONE cone rebuild; §C W8) ∥ **R-ctx** (S, READ-ONLY, no build: the gate of W8 (f2-ctx) — re-justify each of the
+≈ 35 TSO-leaky context-law uses in the **21** `Xv6/` files of W8-design §3.4 + `Xv6/ProofSwtch.lean` + `Xv6/PipeBirth.lean`
+[R25.3] (`ctx_absorb` 6 uses/3 files, `ownCtx_floor_view` 8/4, `ctxStamped_raise` 5/2, `lockHook_llb` 13/10, `ownCtx_key_vis`
+3/2; transports `ctx_unstamp` 1, `ctx_park` 3, `ctx_move` 1 (`ProofForkretPark.lean:250`), `kctx_move_in/out` 6
+(`ProofSwtch.lean:251,253,268,270,274` — the `swtch` payload transport, the (f2-ctx) `p->lock` hop site — + `ProofScheduler.lean:
+1000`), `lock_pay_born` 1 (`PipeBirth.lean:303` — the only post-boot lock birth, β′'s cancellable-lock/reclaim case)) by a
+sync chain, the device-key arm, or the **`pte-key` arm** [R25.1 (c)] (the A/D write-back `WpPtWalk.lean:455-470`/`Xv6/TransPt.lean`
+and the walk's plain PTE read are EXEMPT from the chain invariant, covered by `pteDiscAt` — tabled as such, NOT as RESISTS) —
+the bcache/icache/sleeplock floors (`SpecRelease.lean:164-169`, `BcacheLock.lean:132`, `SpecAcquire.lean:96-103`) and the
+virtio completion floors (`DiskInvDefs`, `ProofVirtioDiskIntr`); output: per use CHAINED / DEVICE-KEY / PTE-KEY / RESISTS
+(→ (f1) for that part), plus a row for the `swtch` handoff (CHAINED via the `p->lock` hop or RESISTS) and one for the walker;
+§C W8) ∥ **W5 CORE** (§C W5: M1's
 statement and every discharge EXCEPT `Hyps.disk` — HSafe, the fetch cut via `cutOfPristine` + `winPristine` from
 `powerInterp_textPristine`, `Hyps.tso` by `pfStepTsoProposed`, the boot bridge, `sailCycleOrder` as the named premise —
 with F9's `Hyps.disk` an explicit hypothesis; M; [R21.4] PLUMBING — conditional on `Hyps.disk`, UNSATISFIABLE until F9
@@ -1198,9 +1230,9 @@ WAITS: **W8 (f2-ctx)** for W8-β′ (lands first, same lane) AND the R-ctx check
 σ.devs`, `MachOfPf.lean` header deviation 6) to `R-dev` (equality off the OUT capture segment, the [R20.1] `pre₁` form on
 it) and re-prove EVERY consumer of `SimRel.dev` [R21.3 (c)] (§C W4 OPEN (b)); **M1 CLOSES** when F9 lands (W5 CORE instantiates `Hyps.disk`) — NO
 disk-free M1 variant: M1's premise set IS `srvwmoXv6M1Premises` (§A), whose `srvwmoXv6M1PfRun` runs contain disk-agent
-program steps (START is unguarded from `.PDisk none`, `WeakEvInst.lean:488`), so a "no disk step" premise would be a NEW candidate
+program steps (START is unguarded from `.PDisk none`, `WeakEvInst.lean:502` [R25.s1]), so a "no disk step" premise would be a NEW candidate
 restriction, underivable at Stage 2 and dropped at M2 — not worth a second statement; **M1 does NOT wait for W8 — EXACTLY**: M1 CLOSE = W5 CORE's theorem with `Hyps.disk` discharged by W4 F9; its files are
-`Weak/`-only (`Weak/SrvwmoXv6Adequacy.lean`, `Weak/MachOfPf.lean`); its inputs are `machRunOfPfRun` ✓, `pfStepTso` ✓, the SC
+`Weak/`-only (`Weak/SrvwmoXv6Adequacy.lean` — NEW, created by W5 CORE [R25.s2] —, `Weak/MachOfPf.lean`); its inputs are `machRunOfPfRun` ✓, `pfStepTso` ✓, the SC
 roots `xv6FsAdequacy_closed`/`xv6TextAdequacy_closed` (whose STATEMENTS W8-β′/W8 do not change — they edit the state
 interpretation and the context layer, `MState`/`Lang.lean` untouched, W8-design §0 item 2) and W-DISK ✓; `srvwmoXv6M1Premises`
 names NO access discipline, and W8's export is consumed only by W11 (i)/(ii) and W13 (K) at Stage 2.  So M1 closes IN
@@ -1529,7 +1561,7 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   ALIGN the weak-side `virtioProg` to MachCSL's `Virtio.body`/`serve` (L–XL; NEW rev 19; rev 20 added the (M4)/(M9) MECHANISM
   [R16.1] and recorded W-DISK-Q1/Q2/Q3 RULED [OWN.30]–[OWN.32]).**  **LANDED — the record** (the binding text below is KEPT as
   what the worker built against): `Weak/VirtioProg.lean` 672 lines (was 979) — `DM` = `DRet`/`DRead`/`DFence`/**`DWriteDev pre
-  g pa bs k`**/**`DPop h k`** (`:257-266`), `Dres` = `DIdle`/`DStall` (`:271-273`), `DmWf :279` (`∀ s, (bs s).length = n ∧ n ≠ 0`,
+  g pa bs k`**/**`DPop h k`** (`:257-266`), `Dres` = `DIdle`/`DStall` (`:269-273` [R25.s5]), `DmWf :279` (`∀ s, (bs s).length = n ∧ n ≠ 0`,
   `pop`'s `∀ s, DmWf (k s)`), `popState :319`, **`drainAll :323`**, **`preCaptureHead :338`** (= the plan's `pre₁`: pre-check →
   `.fetched` → `taken` guard, truncated before the cache move), `dusedTail :394` (… `DFence` → used-idx `DWriteDev` with
   `serve`'s guard VERBATIM), **`virtioProg :438`**, `runVirtioProg :524` (re-stated as the flat-run shape lemma), `virtioProgWf
@@ -1944,14 +1976,16 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   (4).  Risk: a `SailM` residual invariant between the announce and the barrier node (new machinery).
 - **The SERIAL MachCSL items — all RULED, no gate left [OWN.21]–[OWN.23][OWN.30][OWN.36][OWN.37] (one worker at a time;
   one `Xv6`-cone rebuild each, W8 (f2-ctx) 2–4): W-COH ✓ → W-DMA0 ✓ → W8-β′ → W8 (f2-ctx) → (M1 as W-RSV's gate marker,
-  NOT a MachCSL item — it closes in parallel, §C top) → W-RSV [R16.3][R21.1][OWN.37].**  **W8-β′** (M ≈ 0.8–1.5k; the
+  NOT a MachCSL item — it closes in parallel, §C top) → W-RSV [R16.3][R21.1][OWN.37].**  **W8-β′** (M–L ≈ 1.1–2k [R25.2]; the
   reserved-region change + lock registry in `Resources.lean`/`Lock.lean`/`WpLock.lean`/`LockBornHook.lean`/`KCtx.lean` + the
-  cpu-cell rule file; ≤ 30 `Xv6/` files if `lkFresh`'s modality changes (29 files) and ≈ 11 cpu-cell rule uses; ONE rebuild;
-  launches NOW) then **W8 (f2-ctx)** (L–XL ≈ 5–8.5k; [OWN.36]'s one-rebuild sizing SUPERSEDED by [OWN.37]: refines the CLEAN
+  cpu-cell rule file, the `reservedOk` conjunct, the `powerInterp_accessDiscβ` extraction AND the (r2) twin
+  `xv6DiscAdequacy_closed` at the provisional conjunction (the twin paid ONCE; ≈ +0.3–0.5k — its rebuild then buys a
+  ROOT-level fact); ≤ 30 `Xv6/` files if `lkFresh`'s modality changes (30 files [R25.s3]) and ≈ 11 cpu-cell rule uses; ONE rebuild;
+  launches NOW) then **W8 (f2-ctx)** (L–XL ≈ 4–6.5k after β′ takes the twin [R25.2]; [OWN.36]'s one-rebuild sizing SUPERSEDED by [OWN.37]: refines the CLEAN
   context key so it carries a sync chain — `Ctx.lean`, `CtxLaws.lean` (`ctx_unstamp :552`, `ctx_move :848`, `ctx_park`/
   `ctx_resume :760,788`, `ctx_stamp :520`, `ctx_absorb :479`, `ctxStamped_raise :577`), `Lock.lean`, `WpLock.lean`,
   `SwtchCtx`, `KCtxMove`, `CtxBox`, `LockBornHook`, `WpDma`, `WpDmaCtx`, `WpSmodeLwKey` + the load rules' internals — 11
-  MachCSL files, 8,477 lines; 19 `Xv6/` files that use the TSO-leaky laws directly, up to 43 more through `ctxFloor` (108
+  MachCSL files, 8,477 lines; 21 `Xv6/` files that use the TSO-leaky/transport laws directly (incl. `ProofSwtch`, `PipeBirth` [R25.3]), up to 43 more through `ctxFloor` (108
   uses); 2–4 full-cone rebuilds; gated on R-ctx, §C W8): the files W-RSV rewrites (`Resources.lean`, the load rules,
   `WpLock.lean`), so BOTH land before W-RSV, which rebases on them; neither shares a file with F9/W5 CORE (`Weak/`-only) —
   `MState`/`Lang.lean` are unchanged (W8-design §0 item 2), so W4's `SimRel` and W2a's `rmem` are untouched; if W8 is not
@@ -2374,10 +2408,14 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   `filewrite`) — covered UNIFORMLY by L-IO, no per-site list possible or needed.  Windows end at the next `amoswap.w.aq`
   (or a `PW∧SR` fence with a RAM write between — only the four virtio `0x0ff0000f`; `fence rw,w` `0x80000cf6` does not
   close one); `holding()` runs BEFORE the amoswap inside `acquire`, so every window holds a C1 read AND a C2 read (both racy, both
-  lock-layer bytes under `lockWordDiscAt` [rev 28]).  Excluded as
+  lock-layer bytes under `lockWordDiscAt` [rev 28]); **C6 [R25.1 (d)] kernel PTE reads by the WALKER** (every fetch/load/store
+  translation in the window) — RACY against other harts' hardware A/D write-backs (`KptInv.lean:4-8`; Svadu ON,
+  `SpecStart.lean:29,40`), the source is `.WCexcl` (`WeakKptStale.lean:26`), so never a `badSeg` source; the walker is
+  variant-insensitive (`WeakKptStale`'s racy-absorption theorem); covered by `pteDiscAt`, no chain needed.  Excluded as
   non-racy (no concurrent writer): own stack/trapframe page, own `cpus[tp]`, `uarts[i].base/.rx` (`DFrac.discard`,
-  `Xv6/UartInv.lean:63-69`), `digits`/format literals, `disk.desc/avail/used` (`diskGeom`), `kernel_pagetable`,
-  `p->trapframe` of the running process, everything hart 0 reads during boot.  Verdict: R5 is NOT a STOP for this image;
+  `Xv6/UartInv.lean:63-69`), `digits`/format literals, `disk.desc/avail/used` (`diskGeom`) (NOT `kernel_pagetable`'s entries —
+  moved to C6 [R25.1]: `KptInv.lean:4-8` says every hart's hardware writes them), `p->trapframe` of the running process,
+  everything hart 0 reads during boot.  Verdict: R5 is NOT a STOP for this image;
   it becomes (K)'s `ioSegPinned` lemma + the two checks; **R6** the `gmem`
   case splits of (M).  Deps: W5c's `esilAdmRun` ✓; W5b's shape clauses ✓; `AxDevGraph.lean` (`Dlbl :134-142`, `dstep
   :152`, `DevConsistent :226-236`) as the device-step precedent for the `dev`-kind replay (its separate-row encoding is NOT what [OWN.14] rules).
@@ -2468,31 +2506,58 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   (`Xv6/BootCarveHart.lean:81,84`); `bootEnd σ` = the timestamp of hart 0's release store to `started` (`0x8000a400`).  Lean
   skeleton (`Xv6/AccessDiscipline.lean`, names grep-checked free; W8-design §1 is the binding text):
   ```
-  inductive Cust | hart (h : CPU) | proc (j : Nat) | prot (b : PAddr) | lockw (b : PAddr) | ro | free
+  inductive Cust | hart (h : CPU) | proc (j : Nat) | prot (b : PAddr) | lockw (b : PAddr) | pte | ro | free   -- [R25.1 (a)] `pte`: the kernel
+      -- table's pages, reachable from the root `MachCSL.KernelSyms.kernel_pagetable` (`Xv6/BootCarveProc.lean:348`, the `kptOn t M` tree);
+      -- user-table pages stay `.proc j` (their A/D write-backs are by the RUNNING hart, chained by the `p->lock` hop like the kstack) — the
+      -- W8 (f2-ctx) worker decides whether `.pte` must also cover them (recorded as an open design point, not a gate)
   def custAt [KernelGeom] (σ : MState) (a : PAddr) (t : Nat) : Cust          -- kstack pages off KSTACK(j) leaves, trapframe/user pages off proc j
   def syncPath (σ : MState) (A : CPU) (t : Nat) (B : CPU) (τ : Nat) : Prop   -- hops (b_k, r_k, a_k): a zero write to lock word b_k by the
       -- releaser at r_k, the fold installing the next hart at the acquire write a_k; t < r_0, releaser 0 = A, releaser k+1 =
       -- acquirer k, last acquirer = B, last a_k < τ; OR the boot hop (A = 0, t ≤ bootEnd σ, B's acquire load of `started` saw it)
   /-- (iii+): hart j's FOREIGN-source coh stamp at a (TsoMem.lean:354-356; reset at own stores :361-363) names a sync-chained
-      entry; DMA authors exempt (e.tid < NCPU, as violationHart); LOCK-LAYER bytes exempt (lockWordDiscAt covers them). -/
+      entry; DMA authors exempt (e.tid < NCPU, as violationHart); LOCK-LAYER bytes exempt (lockWordDiscAt covers them);
+      KERNEL-PTE bytes exempt [R25.1 (a)] (pteDiscAt covers them: the hardware A/D write-back is a foreign hart's EXCLUSIVE
+      store that every other hart's walk plain-reads and coh-stamps with NO chain — WpPtWalk.lean:455-470, Lang.lean:373-375,400). -/
   def chainOkAt [KernelGeom] (σ : MState) : Prop :=
     ∀ (j : CPU) (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≠ 0 →
       e.t = (σ.hr j).coh a → (hA : e.tid < NCPU) → e.tid ≠ hartAgent j →
-      (∀ b, custAt σ a e.t ≠ .lockw b) → syncPath σ ⟨e.tid, hA⟩ e.t j (σ.top + 1)
+      (∀ b, custAt σ a e.t ≠ .lockw b) → custAt σ a e.t ≠ .pte → syncPath σ ⟨e.tid, hA⟩ e.t j (σ.top + 1)
   def lockWordDiscAt [KernelGeom] (σ : MState) : Prop     -- lockWordAt/lkCpuAt per registered lock (Lock.lean:53-56,18-22)
+  /-- [R25.1 (a)] every post-boot entry on a kernel-table PTE byte is an A/D VARIANT (KptInv.pteVariant :38-41, the σ-form of
+      kptBody :85's pin) of the entry's canonical value, authored by a hart (e.tid < NCPU) — the walk's write-back, never a
+      remap; consumed ONLY by the walker's racy absorption (WeakKptStale), never by badSeg (the write-back is .WCexcl). -/
+  def pteDiscAt [KernelGeom] (σ : MState) : Prop
   def cpuStaticAt [KernelGeom] (σ : MState) : Prop :=      -- PPerCpu (β′): cpus[h]'s bytes written only by h after power-on
     ∀ (h : CPU) (a : PAddr) (H : Hist) (e : HEnt), custAt σ a e.t = .hart h → σ.mem[a]? = some H → e ∈ H → e.t ≠ 0 → e.tid = hartAgent h
   def cpuProcDiscAt [KernelGeom] (σ : MState) : Prop      -- c->proc moves only under the target proc's lock
   def utextDiscAt [KernelGeom] (σ : MState) : Prop        -- (v): entries on proc j's executable user pages precede its owner's last fence.i
-  def xv6AccessDisc [KernelGeom] (σ : MState) : Prop :=
-    chainOkAt σ ∧ lockWordDiscAt σ ∧ cpuStaticAt σ ∧ cpuProcDiscAt σ ∧ utextDiscAt σ
+      -- [R25.s4] credible because the VERIFIED BRANCH's `userret` executes `fence.i` after the `satp` switch (`Xv6/KernelImage.lean:17614`,
+      -- `0x8000609c`; `SpecUserret.lean:6` "the icache sees the process image") — the image's ONLY `fence.i`, so the clause holds on every
+      -- return to user mode after a migration; upstream xv6 has NO such fence — an IMAGE FACT of this branch, to be named in W8's header
+  def xv6AccessDisc [KernelGeom] (σ : MState) : Prop :=   -- [R25.1 (a)] pteDiscAt added; W8-β′ exports the provisional
+    chainOkAt σ ∧ lockWordDiscAt σ ∧ pteDiscAt σ ∧ cpuStaticAt σ ∧ cpuProcDiscAt σ ∧ utextDiscAt σ   -- `lockWordDiscAt ∧ cpuStaticAt` [R25.2]
   theorem xv6DiscAdequacy_closed {hlc : HasLC} (g : GState) (Hgen0 : g.gen = 0) (Hpow : g.pow = false)
       (Hdisk : diskOf g.m.devs = fsImgDisk) (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
       (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
       (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ (g2.pow = true → AccessDiscipline.xv6AccessDisc g2.m)   -- the W3 pattern, LinkTextAdequacy.lean:26-31
   ```
-  (iii+) covers (i) static and dynamic, (ii) and (iii) for every cross-hart rf edge into a read; the plan's (iii) is its
-  corollary off the lock layer; the [R23.1] "third shape" is its single-lock instance ([R24.s4] example: A's `sched` prologue
+  **[R25.1] W8-design §1's `chainOkAt`/`Cust`/`xv6AccessDisc` text is SUPERSEDED by the skeleton above at the three `pte` points**
+  (the note is not re-edited; this block is binding).  *Spec, for the record (NOT an owner question — every form of the PTE
+  clause is FAITHFUL: an INTERNAL predicate's shape, the published quantifier and conclusions unchanged).*  RVWMO orders
+  implicit page-table accesses by `SFENCE.VMA`, not by `FENCE`; the privileged spec makes the A/D update atomic w.r.t. other
+  accesses to the PTE; the Sail model in this tree performs it as `read_pte_exclusive`/`write_pte_conditional`
+  (`WpPtWalk.lean:3-7,156-165`, `exclWriteAU`) and the walk's read as a plain `PageTableEntry` load (`:48-57`, `coh`-stamping
+  `Lang.lean:400`, `TsoMem.lean:354-356`); Zifencei/PMAs silent.  *Reachable counterexample to the rev-28 text.*  Kernel text
+  pages first executed AFTER boot (`sysfile.c`, `exec.c`, `pipe.c`; `A` is per 4 KiB page): hart `k` first-executes the
+  `sys_open` page at `t₁ > bootEnd σ` — its fetch walk writes `A` back (`.WCexcl`, author `k`); hart `m`, in user mode since
+  before `t₁`, traps and its fetch walk of the same page plain-reads `k`'s variant with NO intervening acquire by `m` (the
+  `syscall` → `sys_open` fetches precede `m`'s first `acquire`), so `(σ.hr m).coh a = t₁`, `e.tid = k ≠ m`, no `syncPath` —
+  rev 28's `chainOkAt` false on a run the SC tree certifies (`KptInv` admits exactly this interleaving; same for `D` on
+  kernel-data pages first written post-boot).  Nothing downstream needs the chain: the write-back is `.WCexcl`
+  (`WeakKptStale.lean:26`), so W11's `badSeg` (a `.WCplain` source) is vacuous there, and the walker's value-insensitivity
+  is `WeakKptStale`'s racy-absorption theorem (landed).
+  (iii+) covers (i) static and dynamic, (ii) and (iii) for every cross-hart rf edge into a read off the lock layer and the
+  kernel table; the plan's (iii) is its corollary off those; the [R23.1] "third shape" is its single-lock instance ([R24.s4] example: A's `sched` prologue
   pushes on `p->kstack`, A's scheduler `c->proc = 0; release`, B `acquire; c->proc = p; swtch`, `sched+0x7e..+0x86`
   (`KernelPins.lean:549-553`) loads A's words — ONE hop; same shape at `kernelvec+0x28..`, `:1671-1673`).  [R24.s6] initial
   owners: `stack0_h`/`cpus[h]` by `h` from power-on; `kstack_j` `none` until the first `c->proc := &proc[j]`, its boot-era writes
@@ -2507,7 +2572,14 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   `sched+0x54`; stores through `wp_s_sd_proc` 3, `wp_s_sw_noff_lend` 2, `wp_s_sw_intena` 2, `wp_s_lw_noff` 4 — ≈ 11 uses,
   **unverified**: a proof storing `c->proc`/`noff`/`intena` through plain `wp_s_sd`/`wp_s_sw` would also need an edit) and the
   lock layer's own words (`lkFresh`, `Lock.lean:727`; `lock_pay_born :488`; `lockWordAt`/`lkCpuAt` already proved per lock,
-  `:590-597`) → `cpuStaticAt` + `lockWordDiscAt`, what W13 (K) needs.  NOT `stack0`: written by the generic rules in the BOOT
+  `:590-597`) → `cpuStaticAt` + `lockWordDiscAt`, what W13 (K) needs — **delivered as the three Lean statements of §C top
+  [R25.2]: (i) `⌜reservedOk σ reg⌝` (MachCSL, beside `⌜mmOk σ⌝` in `memModelAt`; `Xv6/` cannot be imported by MachCSL, so the
+  invariant MUST be MachCSL-side), (ii) `powerInterp_accessDiscβ` (`Xv6/`, the registry-agreement extraction), (iii) the (r2)
+  twin at the provisional conjunction** — without (iii) β′'s facts reach NO root and W13 (K)'s realizing-run fact would arrive
+  only with W8 (f2-ctx) (L–XL, gated).  RECOMMENDED and APPLIED: the twin at β′ — paid once, settles W8-design §8's "no PowerOn
+  hook" point early (β′'s facts live in the state interpretation, so the twin should need only the extraction, the cheap case),
+  and makes "unblocks W13 (K)" true.  Recorded alternative (not taken): twin in W8 (f2-ctx), in which case β′ unblocks only the
+  STATEMENT of (K)'s precondition and the ≤ 1.8k twin moves to the lane's risk line.  NOT `stack0`: written by the generic rules in the BOOT
   bucket's 26 functions and the 41 BOTH-bucket functions whose proofs are shared with `p->kstack` — so [R24.s1]'s "static part
   splits off" does NOT hold and W8 does NOT split into an `Xv6/`-only item.  **The 1,034 `PStack` sites [R24.s2]**: BOOT
   (`stack0` only, static) 26 fns / **82** sites (`proc_mapstacks` 10, `procinit` 8, `freerange`/`binit` 6, …); PROC
@@ -2537,9 +2609,19 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   load rule then establishes `chainOkAt` at its post-state GENERICALLY from the key it already consumes — no custody, no
   `Xv6/` site feed; migration and lock transfer are both hops.  **R-ctx (the gate, S, read-only)**: the ≈ 35 TSO-leaky uses are
   DESIGNED to mint floors above the releaser's own view (`SpecRelease.lean:164-169`, `BcacheLock.lean:132`,
-  `SpecAcquire.lean:96-103`); each must be re-justified by a chain or the device-key arm (bcache/icache/sleeplock floors; the
-  virtio completion floors in `DiskInvDefs`/`ProofVirtioDiskIntr`) — whether every one can is **unverified**; a use needing a
-  cross-lock fact the TSO proof never tracked sends THAT part to (f1).  **(f1) — per-site custody (the fallback per part)**:
+  `SpecAcquire.lean:96-103`); each must be re-justified by a chain, the device-key arm, or the **`pte-key` arm [R25.1 (c)]**
+  (the A/D write-back `WpPtWalk.lean:455-470`/`Xv6/TransPt.lean` and the walk's plain PTE read: exempt from the chain invariant,
+  covered by `pteDiscAt`; the walker's own rules CANNOT re-establish a chain — the write-back needs no key and the read raises
+  `coh` outside any chain — so without this named arm R-ctx would miss the walker or table it as RESISTS for the wrong reason)
+  (bcache/icache/sleeplock floors; the virtio completion floors in `DiskInvDefs`/`ProofVirtioDiskIntr`) — whether every one can
+  is **unverified**; a use needing a cross-lock fact the TSO proof never tracked sends THAT part to (f1).  **[R25.3] The file list
+  is 21, not 19**: W8-design §3.4's 19 + `Xv6/ProofSwtch.lean` (`kctx_move_in/out` ×5, `:251,253,268,270,274` — `ctxCells`,
+  `stackOwn` and the context payload cross the hart boundary HERE; the (f2-ctx) `p_j->lock` hop "supplied at the 3 `wp_swtch`
+  sites" is concatenated across exactly this transport, so a check that never opens the file cannot say whether the hop is
+  expressible) + `Xv6/PipeBirth.lean` (`lock_pay_born :303` — the only lock born after boot, hence β′'s only cancellable-lock/
+  reclaim registry case, W8-design §4); transport counts corrected: `ctx_move` 1 (`ProofForkretPark.lean:250`), `kctx_move_in/out`
+  6 (`ProofSwtch` 5 + `ProofScheduler.lean:1000`), `lock_pay_born` 1 (the other four `lock_pay_*` hits are prose); the output
+  table gains a `swtch`-handoff row (CHAINED via the `p->lock` hop / RESISTS) and a walker row (PTE-KEY).  **(f1) — per-site custody (the fallback per part)**:
   every `Xv6/` store application justifies `custAt` = writer (`wp_s_sd` 634, `wp_s_sw` 118, `wp_s_sb` 42, `wp_s_sh` 34, ≈ 60
   specialised) and every load at the 1,219 unpinned sites (`wp_s_ld` 839, `wp_s_lw` 245, `wp_s_lbu` 50, `wp_s_lh` 40, `wp_s_lhu`
   21, `wp_s_lwu` 3) — ≈ 2,153 applications in 309 files + a `KCtx` stack-region link through `procinit`/`allocproc`/
@@ -2553,20 +2635,30 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   against [OWN.9]'s precedent.  (r2) = the sibling root `Xv6.xv6DiscAdequacy_closed` on the W3 pattern (`PowerText.lean` 734,
   `BootSharedText` 250, `SystemBootEraText` 196, `SystemAdequacyText` 580, `LinkTextAdequacy` 35 = 1,795 lines the UPPER
   bound; likely lower — W8's facts sit in the state interpretation, so the twin probably needs only the final extraction, no
-  PowerOn hook, **unverified**) + `roots.txt`/`baseline.json`/`tcb/expected.json` entries; the registry agreement (MachCSL ghost
-  registry ⊆ `xv6LockWord σ`) a small `Xv6/` invariant inside the twin.
-  *(6) Sizes.*  **W8-β′** M ≈ 0.8–1.5k, 6–8 MachCSL + ≤ 30 `Xv6/`, 1 full cone (MachCSL 78k + `Xv6` ≈ 0.66M lines), serial
-  MachCSL.  **W8 (f2-ctx)** ≈ 3–5k core + `AccessDiscipline.lean` ≈ 0.5–0.8k + root twin ≤ 1.8k → **≈ 5–8.5k**; 11 MachCSL +
-  19–62 `Xv6/` + 5 twin files; **2–4 full-cone rebuilds**; serial MachCSL before W-RSV.  **(f1)** ≈ 10–15k, ≥ 320 files, many
+  PowerOn hook, **unverified**) + `roots.txt`/`baseline.json`/`tools/tcb/expected.json` entries; the registry agreement (MachCSL ghost
+  registry ⊆ `xv6LockWord σ`) a small `Xv6/` invariant inside the twin — **the twin is BUILT BY W8-β′ [R25.2]** (W8-design §5's
+  "inside the twin" placed it under W8 (f2-ctx); superseded here).
+  *(6) Sizes.*  **W8-β′** M–L ≈ 1.1–2k [R25.2] (rev 28's 0.8–1.5k + the (r2) twin ≈ 0.3–0.5k at the provisional conjunction),
+  6–8 MachCSL + ≤ 30 `Xv6/` + the twin files, 1 full cone (MachCSL 78k + `Xv6` ≈ 0.66M lines), serial
+  MachCSL.  **W8 (f2-ctx)** ≈ 3–5k core + `AccessDiscipline.lean` ≈ 0.5–0.8k (now incl. `pteDiscAt` [R25.1]) + STRENGTHENING the
+  β′ twin's conjunction ≤ 0.3k (was: root twin ≤ 1.8k) → **≈ 4–6.5k**; 11 MachCSL + 21–62 `Xv6/` [R25.3] + the twin files;
+  **2–4 full-cone rebuilds**; serial MachCSL before W-RSV.  **(f1)** ≈ 10–15k, ≥ 320 files, many
   rebuilds (per resisting part only).  **(T)** trusted premise: S, WEAKER — NOT taken.  Plus, in every case: W11 gains a
   **`chainHyps`** kill arm (`csChained` generalised over `syncPath`, M, **unverified**) and W9b's table classifies the 182 + 58
   sites.  *Consumers*: W11 (i) `badSeg` refuted at the realizing run from `chainOkAt` (+ the static release-site fact `fence
   rw,w; sw`, W9a, through `R`'s log identification), `lk->cpu` reads through `lockWordDiscAt`; W11 (ii) `wlpAt`/`wlpAlt` off
   `lockWordDiscAt` through `rhist`, `wprotAt` only for registered bytes, the stack kill via `chainHyps` (§C W11); W13 (K)'s
-  `ioSegPinned` (ii) on `lockWordDiscAt`; W5d-G G7 on `utextDiscAt`.  *Acceptance*: W8-β′ — `cpuStaticAt`/`lockWordDiscAt`
-  stated in `Xv6/AccessDiscipline.lean` and PROVED invariant through the reserved-region rules, `lake build Xv6 MachCSL Weak
-  Vtest` ([R14.1]), `--weak` audit unchanged; R-ctx — a per-use table (CHAINED / DEVICE-KEY / RESISTS) in `notes/W8-Rctx.md`,
-  no Lean edit; W8 (f2-ctx) — `xv6AccessDisc` exported by `xv6DiscAdequacy_closed` (registered per §B(12)), the chain
+  `ioSegPinned` (ii) on `lockWordDiscAt`; W5d-G G7 on `utextDiscAt`; the walker's racy absorption (`WeakKptStale`) on
+  `pteDiscAt` [R25.1].  *Acceptance*: **W8-β′ [R25.2] — THREE named Lean statements**: (i) `MachCSL.reservedOk σ reg` a conjunct
+  of `memModelAt` (`Resources.lean:951-956`, beside `⌜mmOk σ⌝`; re-established by the dedicated cpu-cell and lock rules only — the
+  half-points-to mechanism of W8-design §4 keeps the generic rules out), (ii) `Xv6.powerInterp_accessDiscβ : powerInterp g ⊢ … -∗
+  ⌜g.pow = true → lockWordDiscAt g.m ∧ cpuStaticAt g.m⌝` in `Xv6/AccessDiscipline.lean` (`lockWordDiscAt`/`cpuStaticAt` stated
+  there), (iii) `Xv6.xv6DiscAdequacy_closed` with `xv6AccessDisc` provisionally `:= lockWordDiscAt ∧ cpuStaticAt` (the skeleton's
+  conjunction is the (f2-ctx) target), registered in `roots.txt`/`baseline.json`/`tools/tcb/expected.json`, axiom set =
+  `xv6FsAdequacy_closed`'s; `lake build Xv6 MachCSL Weak Vtest` ([R14.1]), `--weak` audit unchanged; R-ctx — a per-use table
+  (CHAINED / DEVICE-KEY / PTE-KEY / RESISTS) over the 21 files in `notes/W8-Rctx.md`, with the `swtch`-handoff and walker rows
+  [R25.1 (c)][R25.3], no Lean edit; W8 (f2-ctx) — the FULL `xv6AccessDisc` (incl. `chainOkAt` with the `.pte` exemption and
+  `pteDiscAt`) exported by the SAME root `xv6DiscAdequacy_closed` (statement strengthened, registration unchanged), the chain
   invariant on the clean key named, every R-ctx RESISTS part listed with its (f1) treatment, axiom set = `xv6FsAdequacy_closed`'s.
   *Unverified points* (W8-design §8): (f2-ctx) soundness and the `Xv6/` fallout (R-ctx); the `chainHyps` arm; no PowerOn hook
   in the (r2) twin; `custAt`'s σ-derivability for pipe locks and user pages; `xv6LockWord` enumerating every spinlock; the
@@ -2589,7 +2681,9 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   release-site fact `fence rw,w; sw`, W9a, carried by `R`'s log identification); **[rev 28] lock-layer bytes are EXEMPT from
   `chainOkAt` and routed through `lockWordDiscAt`**: the `holding+0x12` read of `lk->cpu` IS a foreign owned-unpublished source
   for a non-holder, so `badSeg` is refuted there not by a chain but by `lkCpu_read_not_mine` (the value only feeds the `==
-  mycpu()` compare; no hart reads its own pointer) — a NEW lock-layer `badSeg` arm (S); derive the global `¬ Bad`.  (ii)
+  mycpu()` compare; no hart reads its own pointer) — a NEW lock-layer `badSeg` arm (S); **PTE bytes need NO arm [R25.1 (b)]** —
+  the hardware A/D write-back is `.WCexcl` (`WeakKptStale.lean:26`), never a `badSeg` source; `pteDiscAt` is consumed only by the
+  walker's racy absorption (`WeakKptStale`), not here; derive the global `¬ Bad`.  (ii)
   `protReg P log` (`:364-368`) is a fold over the LOG — transfers through `R`'s log identification once W8 exports (ii) (D24):
   `wlpAt`/`wlpAlt` (`WeakGhost.lean:543-545,699-701`) read off `lockWordDiscAt` through `rhist`; `wprotAt` (`:1040-1044`) only
   for the registered bytes still killed by `csHyps`; the cross-hart kill INTO a process-stack read uses a NEW **`chainHyps`**
@@ -2625,9 +2719,10 @@ CLOSE** (`Weak/PfStepTso.lean`; item (3) → `sailCycleOrder` [OWN.35]), **W11 (
 **W-DMA0** (option (A), `hzero` form), **W4 F1–F8** (`Weak/MachOfPf.lean`, `machRunOfPfRun`); the W2 spike (D7 STOP,
 redesigned); W13 (E) PARTIAL (alphabet merged, three lines → (I)); censuses W4/W13 landed.  IN FLIGHT: none.  **Now
 launchable** (§C top; no owner gate): **W4 F9** (L; `R-dev` = full `dvirtio` equality off the OUT capture segment,
-`preCaptureHead` on it; re-proves every `SimRel.dev` consumer [R21.3 (c)]) ∥ **W8-β′** (M; serial MachCSL — the lane's next
-item; `cpuStaticAt` + `lockWordDiscAt`; unblocks W13 (K)) ∥ **R-ctx** (S; read-only check of the ≈ 35 TSO-leaky uses — W8
-(f2-ctx)'s gate) ∥ **W5 CORE** (M; M1 parametric in F9's `Hyps.disk`, discharging `winPristine`; PLUMBING, not counted or
+`preCaptureHead` on it; re-proves every `SimRel.dev` consumer [R21.3 (c)]) ∥ **W8-β′** (M–L; serial MachCSL — the lane's next
+item; `reservedOk` + `powerInterp_accessDiscβ` + the (r2) twin at `lockWordDiscAt ∧ cpuStaticAt` [R25.2]; unblocks W13 (K) at
+the root level) ∥ **R-ctx** (S; read-only check of the ≈ 35 TSO-leaky uses in 21 files incl. the `swtch` door and the walker's
+`pte-key` arm [R25.1][R25.3] — W8 (f2-ctx)'s gate) ∥ **W5 CORE** (M; M1 parametric in F9's `Hyps.disk`, discharging `winPristine`; PLUMBING, not counted or
 registered until F9 [R21.4]).  **W13 (I)**: gate MET (W-DISK ✓), next in the graph lane when a worker is free.
 **Gated**: W8 (f2-ctx) (serial MachCSL, L–XL, 2–4 rebuilds) on W8-β′ AND R-ctx [OWN.37]; M1's CLOSE on F9 + W5 CORE (NOT on
 W8 — `Weak/`-only, no W8 fact in its premise set; it closes in parallel, §C top); W-SCO on M1; W-RSV on M1 AND W8 (f2-ctx);
@@ -2778,7 +2873,9 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
   RESTRICTION on a behaviour xv6 exhibits on every contended acquire — STRONGER and FALSE to the kernel; rejected.  **(c) fix
   xv6** (`__atomic_load_n`/`__atomic_store_n` relaxed on `lk->cpu` — same machine code — or drop `holding()` from
   `acquire`): the C11 cure; changes the object of study against [OWN.4] (and the compiled image would be identical for the
-  first form, so it buys the proof nothing); recorded, not applied.  *Report:* (a) is the only consistent reading; no ruling
+  first form, so it buys the proof nothing); [R25.s6] the SAME racy-read pattern exists at `holding+0x0` on `lk->locked` (C1 in
+  the census table, covered by `lockWordDiscAt`'s word clause), so (c) would have to touch BOTH fields or drop the `holding()`
+  call; recorded, not applied.  *Report:* (a) is the only consistent reading; no ruling
   needed unless the owner wants (c) recorded as a kernel follow-up.
 - **Q-GFDEV-delta — REPORT level, no gate (rev 26; raised by R22 [R22.2]): a wording delta of [OWN.31]/[OWN.32] — which
   disk-row items count as fabric transactions in the published conformance premise.**  *Spec (FIRST).*  The RVWMO chapter
@@ -3429,7 +3526,9 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
   predicate `xv6AccessDisc σ` on `MState` (`mmOk` idiom; NO ghost ledger in the export — ownership is σ-derived: `kOwnerAt`
   from `cpus[h].proc`, the lock holder by the alternation fold `lkHolderAt`, the static carves; §C W8 has the Lean text),
   consumed by `badSeg`/`protReg` through `R`'s log identification; the FEED is (f2-ctx) [OWN.37] (chain-carrying context
-  tokens), with W8-β′ for the lock-layer words and `cpus[h]`; the ROOT is (r2).  History: (Rec) a per-state predicate on
+  tokens), with W8-β′ for the lock-layer words and `cpus[h]`; the ROOT is (r2) — **built by W8-β′ at the provisional conjunction
+  `lockWordDiscAt ∧ cpuStaticAt`, strengthened by W8 (f2-ctx) [R25.2]**; `chainOkAt` EXEMPTS kernel-PTE bytes and the clause
+  `pteDiscAt` covers the hardware A/D write-back [R25.1].  History: (Rec) a per-state predicate on
   `g.m` + a ghost access ledger exported like `mmOk`, in `protReg`/`badSeg`'s vocabulary — its LANE RULED (α) [OWN.36]:
   serial MachCSL, before W-RSV; **[R22.1]** W8-design also pins
   the FEEDING path (f1)/(f2)/(f3) and the ROOT path — (r1) `mmOk`/`xv6TracePure` (text unchanged, meaning strengthened) or
