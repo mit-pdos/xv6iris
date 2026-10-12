@@ -55,17 +55,21 @@ proper, the project's remaining content; (R-2) `walkSupply` — the certificatio
    are DELETED; the only fetch premise left is the efetchItvOk fetch-view premise (deviation 3,
    Q4).  Conclusions are Rocq's.
 5. PROOFS: Rocq's scripts.  `defaultLookupSeq` by `List.ext_getElem`.
+6. W-DISK (`WeakRvwmoFab` deviation 4): `xv6RvwmoSafeModuloF`'s statement is UNCHANGED; its
+   proof discharges `fconfTraceRealize`'s new quiet-boot hypothesis from the boot tie
+   `(List.range' 0 N).map boot = epsInit σ0` by the Lean-only `WeakRvwmoCapstone.epsInitQuiet`
+   (the boot pool's harts, and the disk at `.PDisk none`).
 
 **Rocq → Lean name map.**  `default_lookup_seq` `defaultLookupSeq`, `xboot` `xboot`, `xN` `xN`,
 `xboot_seq` `xbootSeq`, `xv6_rvwmo_safe_modulo_gen` `xv6RvwmoSafeModuloGen`,
 `xv6_rvwmo_safe_modulo` `xv6RvwmoSafeModulo`, `xv6_rvwmo_safe_modulo_F` `xv6RvwmoSafeModuloF`,
 `model_premises_nonvacuous` `modelPremisesNonvacuous`, `model_premises_nonvacuous'`
 `modelPremisesNonvacuous'`.
-Lean-only (file-qualified): `WeakRvwmoCapstone.execProgOkPinSub`.
+Lean-only (file-qualified): `WeakRvwmoCapstone.execProgOkPinSub`, `WeakRvwmoCapstone.epsInitQuiet`.
 
 **File-qualified Rocq names:** none (no name of this file is in `notes/weak-port-dupnames.json`).
 
-**Dropped:** none (Rocq 9 declarations; Lean 10 = 9 + the 1 Lean-only).
+**Dropped:** none (Rocq 9 declarations; Lean 11 = 9 + the 2 Lean-only).
 -/
 import Weak.WeakRvwmoGlue2
 import Weak.WeakSrvwmoCapstone
@@ -224,6 +228,12 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode
 open Language.Notation PrimStep
 open LeanRV64D
 
+/-- (Lean-only, W-DISK) The boot pool is QUIET: its harts, and the disk between bursts. -/
+theorem WeakRvwmoCapstone.epsInitQuiet (σ : WGState) (p : Pexv6) (hp : p ∈ epsInit σ) :
+    devQuiet p := by
+  simp only [epsInit, List.mem_append, List.mem_map, List.mem_singleton] at hp
+  rcases hp with ⟨c, _, rfl⟩ | rfl <;> trivial
+
 /-- Rocq `xv6_rvwmo_safe_modulo_F` (deviations 1-4). -/
 theorem xv6RvwmoSafeModuloF (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc GF]
     [WeakGpreS GF]
@@ -254,8 +264,12 @@ theorem xv6RvwmoSafeModuloF (hlc : HasLC) (GF : BundledGFunctors) [MachGpreS hlc
       (epowerFork gen, σ0) -·->ₜₚ* (t2, σ2) → e2 ∈ t2 → Reducible (e2, σ2)) := by
   intro hfr hb1 hb2 hwp hcov hc' hconf himg hN
   obtain ⟨hgen, hpow, hgen0, hlog, hws⟩ := hfr
+  -- W-DISK: the boot pool is quiet (`devQuiet`, `WeakRvwmoFab` deviation 4)
+  have hquiet : ∀ i, i < N → devQuiet (boot i) := fun i hi =>
+    WeakRvwmoCapstone.epsInitQuiet σ0 (boot i)
+      (by rw [← hb1]; exact List.mem_map.2 ⟨i, by simp [List.mem_range'_1, hi], rfl⟩)
   obtain ⟨L, hsr, hcimg, _, _, pst, hp0, hd0, hok⟩ :=
-    fconfTraceRealize boot d0 fab GX N hc' hconf hN
+    fconfTraceRealize boot d0 fab GX N hc' hconf hN hquiet
   rw [himg] at hok
   have himg' : (candOf GX.gfGd.gdG L).cdImg = imgZ σ0.wgimg := by rw [hcimg, himg]
   have hpst0 : pst 0 = epsInit σ0 := by rw [hp0, hb1]

@@ -44,7 +44,8 @@ A LEAF: nothing imports this file.
 
 NONE directly.  The file reaches the device semantics only through `WeakRvwmoSupply`'s
 `pstepEvDevfree`, `admRunDevfree`, `admRunRefab` (which rest on `WeakEvInst.pdevEv` /
-`pdevEvOk`; `WeakRvwmoSupply.pdevEvFalse` needs `pdevEv p l p' = false` for `l ≠ LDev`).
+`pdevEvOk`; `WeakRvwmoSupply.pdevEvFalse` needs `pdevEv p l p' = false` for `l ≠ LDev` FROM A
+QUIET STATE, `devQuiet p`, W-DISK -- deviation 4) and `WeakRvwmoSupply.devQuietStep`.
 `pstepEv` / `pclsEv` / `Pexv6.PDisk` are named only as the parameters of `execProgOk'` and as a
 dummy default.
 
@@ -76,6 +77,19 @@ dummy default.
    `seq`); `linExtFDevBefore` inducts on the gap `n - (m+1)` as Rocq does.  Rocq's
    `Print Assumptions` audit is not reproduced (the lint bans axioms).  Lean-only helper
    `lbIsdevRen` (the per-label step of `hasDevRen` / `emDevRen`).
+4. W-DISK (plan `notes/weak-allocproc-plan.md` §C "W-DISK", [R17.3][R18.2]): under the
+   STATE-AWARE `WeakEvInst.pdevEv` a disk block can move the fabric with no `LDev` in it (a
+   `DWriteDev` store / skip / abort), so Rocq's `hemitfStates` family -- stated for an ARBITRARY
+   start -- is FALSE for a device-active disk row.  (b) `hemitfStatesQ`, `hemitfStates`,
+   `hartConffStatesQ`, `hartConffStates`, `hartConfNoGap` take the QUIET-ROW hypothesis
+   `devQuiet p ∧ (∀ dp, p = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ labels)` (a hart row is
+   unconstrained; a disk row must be `LDev`-free), carried by the induction through the
+   Lean-only `WeakRvwmoFab.quietStep` / `WeakRvwmoFab.quietAdm`; (a) `gfexecConf` gains the
+   INTERIM per-row clause `boot i = .PDisk dp → emDevfree em` (DELETED BY W13 (I); until then
+   the internal bundle is vacuous for a device-active disk row, the `ioResidueGwfInterim`
+   pattern); `fconfRowsPin` / `fconfRows` take `devQuiet (boot i)` and extract the rest from (a);
+   `fconfSupply` takes `∀ i, i < N → devQuiet (boot i)` (discharged at the boot pool
+   `epsInit`).  `gfexecConfOfQconf` supplies (a) from `gdexecQconf`'s `emDevfree`.
 
 **Rocq → Lean name map.**  `orb_false_split` `orbFalseSplit`, `lb_isdev` `lbIsdev`,
 `lb_isdev_ne` `lbIsdevNe`, `has_dev` `hasDev`, `has_dev_false` `hasDevFalse`, `em_dev` `emDev`,
@@ -342,11 +356,47 @@ theorem hblockHblk (dv : Nat → Efab) (k : Nat) (ws : Wstate) (lb : Lbl) (p p' 
 
 /-! ### 3.2 The state extraction, with block classification -/
 
+/-- (Lean-only, W-DISK) One step keeps the QUIET-ROW invariant: a quiet start stays quiet when
+a disk start's label is `LDev`-free, and a disk state comes only from a disk state. -/
+theorem WeakRvwmoFab.quietStep (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
+    pstepEv p d l p' d' → devQuiet p → (∀ dp, p = .PDisk dp → ∀ kd ba bs, l ≠ LDev kd ba bs) →
+    devQuiet p' ∧ (∀ dp', p' = .PDisk dp' → ∃ dp, p = .PDisk dp) := by
+  intro hs hq hnd
+  cases p with
+  | PHart =>
+    cases p' with
+    | PHart => exact ⟨trivial, fun _ h => nomatch h⟩
+    | PDisk => exact hs.elim
+  | PDisk dp =>
+    cases p' with
+    | PHart => exact hs.elim
+    | PDisk dp' => exact ⟨devQuietStep _ _ _ _ _ hs (hnd dp rfl) hq, fun _ _ => ⟨dp, rfl⟩⟩
+
+/-- (Lean-only, W-DISK) ... and so does an administrative run. -/
+theorem WeakRvwmoFab.quietAdm (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
+    (d' : Efab) : admRun instr p d ls p' d' → devQuiet p →
+    (∀ dp, p = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ ls) →
+    devQuiet p' ∧ (∀ dp', p' = .PDisk dp' → ∃ dp, p = .PDisk dp) := by
+  intro h
+  induction h with
+  | ARnil p d => intro hq _; exact ⟨hq, fun dp' h => ⟨dp', h⟩⟩
+  | ARcons p d l p1 d1 ls p' d' _ hs _ ih =>
+    intro hq hnd
+    obtain ⟨hq1, hk1⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hs hq
+      (fun dp hp kd ba bs he => hnd dp hp kd ba bs (by simp [he]))
+    obtain ⟨hq', hk'⟩ := ih hq1 (fun dp1 hp1 kd ba bs hin => by
+      obtain ⟨dp, hp⟩ := hk1 dp1 hp1
+      exact hnd dp hp kd ba bs (List.mem_cons_of_mem _ hin))
+    refine ⟨hq', fun dp' hp' => ?_⟩
+    obtain ⟨dp1, hp1⟩ := hk' dp' hp'
+    exact hk1 dp1 hp1
+
 /-- (Lean-only, deviation 2) `hemitfStates` at `pstepQ Q`, from an emission whose labels
 satisfy `Q`. -/
 theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate)
     (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
     hemitf dvi dvo k ws row p es pfin → (∀ x, x ∈ es.map Prod.fst → Q x) →
+    devQuiet p ∧ (∀ dp, p = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     ∃ f : Nat → Pexv6, f 0 = p ∧
       ∀ n lb, row[n]? = some lb →
         hblkQ Q (dvi (n + k)) (dvo (n + k)) (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))
@@ -355,14 +405,23 @@ theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (k : Nat) (
            ∀ d, hblkQ Q d d (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))) := by
   intro h
   induction h with
-  | HFnil k ws p => intro _; exact ⟨fun _ => p, rfl, fun n lb hn => by simp at hn⟩
+  | HFnil k ws p => intro _ _; exact ⟨fun _ => p, rfl, fun n lb hn => by simp at hn⟩
   | HFone k ws lb row p ls pa da l p' es pfin har hre hst _ ih =>
-    intro hq
-    rw [eblockFst] at hq
+    intro hq ⟨hdq, hdk⟩
+    rw [eblockFst] at hq hdk
     have hqls : ∀ x, x ∈ ls → Q x := fun x hx => hq x (List.mem_append_left _ hx)
     have hql : Q l := hq l (List.mem_append_right _ List.mem_cons_self)
+    obtain ⟨hqa, hka⟩ := WeakRvwmoFab.quietAdm _ _ _ _ _ _ har hdq
+      (fun dp hp kd ba bs hin => hdk dp hp kd ba bs (List.mem_append_left _ hin))
+    obtain ⟨hq', hk'⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hst hqa (fun dpa hpa kd ba bs he => by
+      obtain ⟨dp, hp⟩ := hka dpa hpa
+      exact hdk dp hp kd ba bs (List.mem_append_right _ (by rw [he]; exact List.mem_cons_self)))
     obtain ⟨f', hf0, hf⟩ :=
       ih (fun x hx => hq x (List.mem_append_right _ (List.mem_cons_of_mem _ hx)))
+        ⟨hq', fun dp' hp' kd ba bs hin => by
+          obtain ⟨dpa, hpa⟩ := hk' dp' hp'
+          obtain ⟨dp, hp⟩ := hka dpa hpa
+          exact hdk dp hp kd ba bs (List.mem_append_right _ (List.mem_cons_of_mem _ hin))⟩
     refine ⟨fun n => match n with | 0 => p | n' + 1 => f' n', rfl, ?_⟩
     intro n lb0 hn
     cases n with
@@ -381,10 +440,10 @@ theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (k : Nat) (
         obtain ⟨_, hls'⟩ := orbFalseSplit _ _ hls
         have hne := lbIsdevNe l hl
         have hnl := hasDevFalse ls hls'
-        have hda : da = dvi k := admRunDevfree _ _ _ _ _ _ har hnl
-        obtain ⟨hd, hall⟩ := pstepEvDevfree _ _ _ _ _ hst hne
+        have hda : da = dvi k := admRunDevfree _ _ _ _ _ _ har hdq hnl
+        obtain ⟨hd, hall⟩ := pstepEvDevfree _ _ _ _ _ hqa hst hne
         refine ⟨by rw [hd, hda], fun d => ⟨pa, d, ?_, .inl ⟨l, hre, ?_, hql⟩⟩⟩
-        · exact WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har hnl d) hqls
+        · exact WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har hdq hnl d) hqls
         · show pstepEv pa d l (f' 0) d
           rw [hf0]; exact hall d
     | succ n =>
@@ -396,16 +455,41 @@ theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (k : Nat) (
       rw [emDevTagNe false ls l k (n + (k + 1)) es (by omega)]
       exact h2
   | HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2 hst2 _ ih =>
-    intro hq
-    rw [eblockFst, eblockFst] at hq
+    intro hq ⟨hdq, hdk⟩
+    rw [eblockFst, eblockFst] at hq hdk
     have hq1 : ∀ x, x ∈ ls1 → Q x := fun x hx => hq x (List.mem_append_left _ hx)
     have hql1 : Q l1 := hq l1 (List.mem_append_right _ List.mem_cons_self)
     have h2' : ∀ x, x ∈ ls2 ++ l2 :: es.map Prod.fst → Q x :=
       fun x hx => hq x (List.mem_append_right _ (List.mem_cons_of_mem _ hx))
     have hq2 : ∀ x, x ∈ ls2 → Q x := fun x hx => h2' x (List.mem_append_left _ hx)
     have hql2 : Q l2 := h2' l2 (List.mem_append_right _ List.mem_cons_self)
+    -- the quiet-row invariant along the block
+    have hdk2 : ∀ dp, p = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ ls2 ++ l2 :: es.map Prod.fst :=
+      fun dp hp kd ba bs hin => hdk dp hp kd ba bs (List.mem_append_right _ (List.mem_cons_of_mem _ hin))
+    obtain ⟨hqa, hka⟩ := WeakRvwmoFab.quietAdm _ _ _ _ _ _ har1 hdq
+      (fun dp hp kd ba bs hin => hdk dp hp kd ba bs (List.mem_append_left _ hin))
+    obtain ⟨hqm, hkm⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hst1 hqa (fun dpa hpa kd ba bs he => by
+      obtain ⟨dp, hp⟩ := hka dpa hpa
+      exact hdk dp hp kd ba bs (List.mem_append_right _ (by rw [he]; exact List.mem_cons_self)))
+    have hkm' : ∀ dpm, pm = .PDisk dpm → ∃ dp, p = .PDisk dp := fun dpm hpm => by
+      obtain ⟨dpa, hpa⟩ := hkm dpm hpm
+      exact hka dpa hpa
+    obtain ⟨hqm2, hkm2⟩ := WeakRvwmoFab.quietAdm _ _ _ _ _ _ har2 hqm
+      (fun dpm hpm kd ba bs hin => by
+        obtain ⟨dp, hp⟩ := hkm' dpm hpm
+        exact hdk2 dp hp kd ba bs (List.mem_append_left _ hin))
+    have hkm2' : ∀ dpm, pm2 = .PDisk dpm → ∃ dp, p = .PDisk dp := fun dpm hpm => by
+      obtain ⟨dpm1, hpm1⟩ := hkm2 dpm hpm
+      exact hkm' dpm1 hpm1
+    obtain ⟨hq', hk'⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hst2 hqm2 (fun dpm hpm kd ba bs he => by
+      obtain ⟨dp, hp⟩ := hkm2' dpm hpm
+      exact hdk2 dp hp kd ba bs (List.mem_append_right _ (by rw [he]; exact List.mem_cons_self)))
     obtain ⟨f', hf0, hf⟩ :=
       ih (fun x hx => h2' x (List.mem_append_right _ (List.mem_cons_of_mem _ hx)))
+        ⟨hq', fun dp' hp' kd ba bs hin => by
+          obtain ⟨dpm, hpm⟩ := hk' dp' hp'
+          obtain ⟨dp, hp⟩ := hkm2' dpm hpm
+          exact hdk2 dp hp kd ba bs (List.mem_append_right _ (List.mem_cons_of_mem _ hin))⟩
     refine ⟨fun n => match n with | 0 => p | n' + 1 => f' n', rfl, ?_⟩
     intro n lb0 hn
     cases n with
@@ -428,14 +512,14 @@ theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (k : Nat) (
         obtain ⟨_, hls2'⟩ := orbFalseSplit _ _ hls2
         have hn1 := hasDevFalse ls1 hls1'
         have hn2 := hasDevFalse ls2 hls2'
-        have hda : da = dvi k := admRunDevfree _ _ _ _ _ _ har1 hn1
-        obtain ⟨hd1, hall1⟩ := pstepEvDevfree _ _ _ _ _ hst1 (lbIsdevNe _ hl1)
-        have hdm2 : dm2 = dm := admRunDevfree _ _ _ _ _ _ har2 hn2
-        obtain ⟨hd2, hall2⟩ := pstepEvDevfree _ _ _ _ _ hst2 (lbIsdevNe _ hl2)
+        have hda : da = dvi k := admRunDevfree _ _ _ _ _ _ har1 hdq hn1
+        obtain ⟨hd1, hall1⟩ := pstepEvDevfree _ _ _ _ _ hqa hst1 (lbIsdevNe _ hl1)
+        have hdm2 : dm2 = dm := admRunDevfree _ _ _ _ _ _ har2 hqm hn2
+        obtain ⟨hd2, hall2⟩ := pstepEvDevfree _ _ _ _ _ hqm2 hst2 (lbIsdevNe _ hl2)
         refine ⟨by rw [hd2, hdm2, hd1, hda], fun d =>
-          ⟨pa, d, WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har1 hn1 d) hq1,
+          ⟨pa, d, WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har1 hdq hn1 d) hq1,
             .inr ⟨pm, d, pm2, d, l1, l2, hre, ⟨hall1 d, hql1⟩,
-              WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har2 hn2 d) hq2,
+              WeakRvwmoFab.admRunQ Q _ _ _ _ _ _ (admRunRefab _ _ _ _ _ _ har2 hqm hn2 d) hq2,
               ?_, hql2⟩⟩⟩
         show pstepEv pm2 d l2 (f' 0) d
         rw [hf0]; exact hall2 d
@@ -452,15 +536,16 @@ theorem hemitfStatesQ (Q : Wlabel → Prop) (dvi dvo : Nat → Efab) (k : Nat) (
 theorem hemitfStates (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
     hemitf dvi dvo k ws row p es pfin →
+    devQuiet p ∧ (∀ dp, p = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     ∃ f : Nat → Pexv6, f 0 = p ∧
       ∀ n lb, row[n]? = some lb →
         hblk (dvi (n + k)) (dvo (n + k)) (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))
         ∧ (emDev false (n + k) es = false →
            dvo (n + k) = dvi (n + k) ∧
            ∀ d, hblk d d (rowWsAux k ws (row.take n)) lb (f n) (f (n + 1))) := by
-  intro hem
+  intro hem hdq
   obtain ⟨f, hf0, hf⟩ :=
-    hemitfStatesQ (fun _ => True) dvi dvo k ws row p es pfin hem (fun _ _ => trivial)
+    hemitfStatesQ (fun _ => True) dvi dvo k ws row p es pfin hem (fun _ _ => trivial) hdq
   refine ⟨f, hf0, fun n lb hn => ?_⟩
   obtain ⟨h1, h2⟩ := hf n lb hn
   refine ⟨hblkQHblk _ _ _ _ _ _ _ h1, fun hnd => ?_⟩
@@ -471,14 +556,15 @@ theorem hemitfStates (dvi dvo : Nat → Efab) (k : Nat) (ws : Wstate) (row : Lis
 theorem hartConffStatesQ (Q : Wlabel → Prop) (i : Nat) (row : List Lbl) (p0 : Pexv6)
     (dvi dvo : Nat → Efab) (em : Hemission) :
     hartConff i row p0 dvi dvo em → (∀ x, x ∈ emLabels em → Q x) →
+    devQuiet p0 ∧ (∀ dp, p0 = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
     ∃ f : Nat → Pexv6, f 0 = p0 ∧
       ∀ n lb, row[n]? = some lb →
         hblkQ Q (dvi n) (dvo n) (rowWs row n) lb (f n) (f (n + 1))
         ∧ (¬ isDevBlock em n →
            dvo n = dvi n ∧
            ∀ d, hblkQ Q d d (rowWs row n) lb (f n) (f (n + 1))) := by
-  intro hem hq
-  obtain ⟨f, hf0, hf⟩ := hemitfStatesQ Q _ _ _ _ _ _ _ _ hem hq
+  intro hem hq hdq
+  obtain ⟨f, hf0, hf⟩ := hemitfStatesQ Q _ _ _ _ _ _ _ _ hem hq hdq
   refine ⟨f, hf0, fun n lb hn => ?_⟩
   obtain ⟨h1, h2⟩ := hf n lb hn
   refine ⟨h1, fun hnd => h2 ?_⟩
@@ -487,15 +573,16 @@ theorem hartConffStatesQ (Q : Wlabel → Prop) (i : Nat) (row : List Lbl) (p0 : 
 theorem hartConffStates (i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Nat → Efab)
     (em : Hemission) :
     hartConff i row p0 dvi dvo em →
+    devQuiet p0 ∧ (∀ dp, p0 = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
     ∃ f : Nat → Pexv6, f 0 = p0 ∧
       ∀ n lb, row[n]? = some lb →
         hblk (dvi n) (dvo n) (rowWs row n) lb (f n) (f (n + 1))
         ∧ (¬ isDevBlock em n →
            dvo n = dvi n ∧
            ∀ d, hblk d d (rowWs row n) lb (f n) (f (n + 1))) := by
-  intro hem
+  intro hem hdq
   obtain ⟨f, hf0, hf⟩ :=
-    hartConffStatesQ (fun _ => True) i row p0 dvi dvo em hem (fun _ _ => trivial)
+    hartConffStatesQ (fun _ => True) i row p0 dvi dvo em hem (fun _ _ => trivial) hdq
   refine ⟨f, hf0, fun n lb hn => ?_⟩
   obtain ⟨h1, h2⟩ := hf n lb hn
   refine ⟨hblkQHblk _ _ _ _ _ _ _ h1, fun hnd => ?_⟩
@@ -506,10 +593,12 @@ theorem hartConffStates (i : Nat) (row : List Lbl) (p0 : Pexv6) (dvi dvo : Nat �
 
 theorem hartConfNoGap (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab)
     (em : Hemission) (n : Nat) (lb : Lbl) :
-    hartConf i row p0 dv em → row[n]? = some lb → ¬ isDevBlock em n → dv (n + 1) = dv n := by
-  intro hem hn hnd
+    hartConf i row p0 dv em →
+    devQuiet p0 ∧ (∀ dp, p0 = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
+    row[n]? = some lb → ¬ isDevBlock em n → dv (n + 1) = dv n := by
+  intro hem hdq hn hnd
   obtain ⟨f, _, hf⟩ := hartConffStates i row p0 dv (fun m => dv (m + 1)) em
-    (hartConfHemitf i row p0 dv em hem)
+    (hartConfHemitf i row p0 dv em hem) hdq
   exact ((hf n lb hn).2 hnd).1
 
 /-! ## 4. The bundle -/
@@ -520,7 +609,14 @@ structure Gfexec where
   gfDev : List Geid
 
 /-- The fabric bundle (deviation 2: each emission's fetches are pinned to the graph's image,
-`emFetchImg GF.gfGd.gdG.gxImg em`, between the fabric clause and the deps clause). -/
+`emFetchImg GF.gfGd.gdG.gxImg em`, between the fabric clause and the deps clause).
+
+W-DISK (deviation 4): the LAST per-row clause is the INTERIM "a `.PDisk` row's emission is
+`LDev`-free" (`emDevfree em` whenever `boot i` is the disk) -- **deleted by W13 (I)**, which
+replaces the `isDevBlock` clause by the endpoint criterion `(i,k) ∈ gfDev ↔ (gisIo (i,k) = true ∨
+dvi k ≠ dvo k)`.  Until then this INTERNAL bundle is VACUOUS for a device-active disk row (a
+disk row from `.PDisk none` emits START, an `LDev`, before anything else) -- the
+`ioResidueGwfInterim` pattern; the published bundle is W13 (I)'s. -/
 def gfexecConf (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec) :
     Prop :=
   fab 0 = d0 ∧
@@ -533,7 +629,9 @@ def gfexecConf (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfe
        (∀ k : Nat, k < row.length → (isDevBlock em k ↔ (i, k) ∈ GF.gfDev)) ∧
        (∀ (k n : Nat), GF.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1)) ∧
        emFetchImg GF.gfGd.gdG.gxImg em ∧
-       (∀ jk, jk ∈ rowDeps em.emItems → ((i, jk.1), (i, jk.2)) ∈ GF.gfGd.gdDeps))
+       (∀ jk, jk ∈ rowDeps em.emItems → ((i, jk.1), (i, jk.2)) ∈ GF.gfGd.gdDeps) ∧
+       -- INTERIM (W-DISK [R18.2]; DELETED BY W13 (I)): a disk row's emission is `LDev`-free
+       (∀ dp, boot i = .PDisk dp → emDevfree em))
 
 /-! ## 5. The model arm -/
 
@@ -655,7 +753,8 @@ theorem gfexecConfOfQconf (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : 
   intro i row hrow
   obtain ⟨em, hem, hdf, hfi, hdep⟩ := hq i row hrow
   refine ⟨em, fun _ => d0, fun _ => d0, hartConfHemitf i row (boot i) (fun _ => d0) em hem,
-    ?_, fun k n hn => by simp at hn, by rw [gdexecQconfImg _ _ _ _ _ hq0]; exact hfi, hdep⟩
+    ?_, fun k n hn => by simp at hn, by rw [gdexecQconfImg _ _ _ _ _ hq0]; exact hfi, hdep,
+    fun _ _ => hdf⟩
   intro k _
   constructor
   · intro hd; exact absurd hd (emDevfreeNoDevBlock em k hdf)
@@ -787,6 +886,7 @@ theorem fconfRowsPin (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF
     (i : Nat) (row : List Lbl) :
     gfexecConf boot d0 fab GF →
     GF.gfGd.gdG.gxProg[i]? = some row →
+    devQuiet (boot i) →
     ∃ f : Nat → Pexv6, f 0 = boot i ∧
       ∀ n lb, row[n]? = some lb →
         (∀ m, GF.gfDev[m]? = some (i, n) →
@@ -794,9 +894,9 @@ theorem fconfRowsPin (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF
                 (f n) (f (n + 1)))
         ∧ ((i, n) ∉ GF.gfDev →
            ∀ d, hblkQ (WeakAxRealize.fetchPin GF.gfGd.gdG.gxImg) d d (rowWs row n) lb (f n) (f (n + 1))) := by
-  rintro ⟨_, _, _, hc⟩ hrow
-  obtain ⟨em, dvi, dvo, hem, hiff, hpin, hfi, _⟩ := hc i row hrow
-  obtain ⟨f, hf0, hf⟩ := hartConffStatesQ _ i row (boot i) dvi dvo em hem hfi
+  rintro ⟨_, _, _, hc⟩ hrow hq
+  obtain ⟨em, dvi, dvo, hem, hiff, hpin, hfi, _, hdisk⟩ := hc i row hrow
+  obtain ⟨f, hf0, hf⟩ := hartConffStatesQ _ i row (boot i) dvi dvo em hem hfi ⟨hq, hdisk⟩
   refine ⟨f, hf0, fun n lb hn => ?_⟩
   obtain ⟨h1, h2⟩ := hf n lb hn
   refine ⟨fun m hm => ?_, fun hnin d => ?_⟩
@@ -809,13 +909,14 @@ theorem fconfRows (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : 
     (i : Nat) (row : List Lbl) :
     gfexecConf boot d0 fab GF →
     GF.gfGd.gdG.gxProg[i]? = some row →
+    devQuiet (boot i) →
     ∃ f : Nat → Pexv6, f 0 = boot i ∧
       ∀ n lb, row[n]? = some lb →
         (∀ m, GF.gfDev[m]? = some (i, n) →
               hblk (fab m) (fab (m + 1)) (rowWs row n) lb (f n) (f (n + 1)))
         ∧ ((i, n) ∉ GF.gfDev → ∀ d, hblk d d (rowWs row n) lb (f n) (f (n + 1))) := by
-  intro hconf hrow
-  obtain ⟨f, hf0, hf⟩ := fconfRowsPin boot d0 fab GF i row hconf hrow
+  intro hconf hrow hq
+  obtain ⟨f, hf0, hf⟩ := fconfRowsPin boot d0 fab GF i row hconf hrow hq
   refine ⟨f, hf0, fun n lb hn => ?_⟩
   obtain ⟨h1, h2⟩ := hf n lb hn
   exact ⟨fun m hm => hblkQHblk _ _ _ _ _ _ _ (h1 m hm),
@@ -833,12 +934,13 @@ theorem fconfSupply (c : Cand) (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat →
     (∀ k s, c.cdTr[k]? = some s →
        (s.esAg, tcnt s.esAg (c.cdTr.take k)) ∈ GF.gfDev →
        GF.gfDev[dcnt GF c.cdTr k]? = some (s.esAg, tcnt s.esAg (c.cdTr.take k))) →
+    (∀ i, i < N → devQuiet (boot i)) →
     ∃ pst : Nat → List Pexv6,
       pst 0 = (List.range' 0 N).map boot ∧
       (fun k => fab (dcnt GF c.cdTr k)) 0 = d0 ∧
       execProgOk' (pstepPin GF.gfGd.gdG.gxImg pstepEv) pclsEv pst
         (fun k => fab (dcnt GF c.cdTr k)) (candExec c) := by
-  intro hconf hrows hN hord
+  intro hconf hrows hN hord hquiet
   obtain ⟨pst, hpst0, hprog⟩ := supplyOfFconf c boot fab GF
     (fun i => (GF.gfGd.gdG.gxProg[i]?).getD []) N GF.gfGd.gdG.gxImg hrows
     (fun i hi => progRowNil _ _ (by omega))
@@ -847,6 +949,7 @@ theorem fconfSupply (c : Cand) (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat →
       cases e : GF.gfGd.gdG.gxProg[i]? with
       | some row =>
         obtain ⟨f, hf0, hf⟩ := fconfRowsPin boot d0 fab GF i row hconf e
+          (hquiet i (Nat.lt_of_lt_of_le (lookup_lt_Some e) hN))
         exact ⟨f, hf0, hf⟩
       | none =>
         refine ⟨fun _ => boot i, rfl, ?_⟩

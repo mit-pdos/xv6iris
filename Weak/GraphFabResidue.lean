@@ -10,8 +10,12 @@ order: gmo is already total over the memory events, and `ioResidueGmo GF` says t
 — lies inside gmo.  The four arms (`x` before `y`, `gpo` = same row, program order):
 
 * **(R1)** `gpo x y ∧ gmem x ∧ ¬ gisIo x ∧ gisIo y` — a row's RAM accesses (READS included)
-  po-before an I/O event.  On the disk row (`y.1 = NCPU`) this is "DMA writes are gmo-before
-  COMMIT": device-MODEL semantics, the one place (T) carries disk correctness [R7.3].
+  po-before an I/O event.  On the disk row (`y.1 = NCPU`) this was "DMA writes are gmo-before
+  COMMIT": device-MODEL semantics, the one place (T) carries disk correctness [R7.3].  Since W-DISK
+  (`Weak/VirtioProg.lean`, [OWN.31][OWN.32]) there is no COMMIT event: the completion rides the
+  used-idx RAM STORE, ordered after the request's DMA writes by the device-side `DFence` (rule 4)
+  and the single order, and (R1)'s disk use shrinks to the START event, the ring POP event (the
+  avail-index / ring reads po-before it) and the UART/PLIC moves.  The text of (R1) is unchanged.
 * **(R2)** `gpo x y ∧ gisIo x ∧ gisW y` — an I/O event po-before a RAM WRITE (`grule14`'s shape).
   RAM READS po-after an I/O event stay UNORDERED on hart rows (the (a′) point [R7.1]).
 * **(R2′)** `gpo x y ∧ gisIo x ∧ gisR y ∧ y.1 = NCPU` — an I/O event po-before a DISK-ROW RAM read

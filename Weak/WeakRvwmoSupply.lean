@@ -71,6 +71,14 @@ WHAT IS HERE.
 4. Lean-only helpers: `filterTakeSucc` (the `take (k+1)` step of a filter), `fetchPinRen`,
    and deviation 2's `emFetchImg`/`emFetchImgRen`/`emFetchImgPrefix`/`admRunPin`/`hblockPin`/
    `hblockPinHblock`/`hemitStatesPin`/`hartConfStatesPin`.
+5. W-DISK (plan `notes/weak-allocproc-plan.md` §C "W-DISK", [R17.3]): `WeakEvInst.pdevEv` is
+   STATE-AWARE (a disk at a `DWriteDev` node moves the fabric under an `LDev`-free label), so
+   Rocq's §2 statements quantified over an arbitrary start `p` are FALSE as stated.  They gain the
+   START-STATE hypothesis `devQuiet p` (the Lean-only `devQuiet`: the disk between bursts, any
+   hart), kept along an `LDev`-free run by `devQuietStep` / `admRunQuiet`: `pdevEvFalse` (a NEW
+   proof by cases on `p`), `pstepEvDevfree`, `admRunDevfree`, `admRunRefab`,
+   `hemitDevfreeConst`, `hemitDevfreeRefab`, `hemitDevfreeReindex`.  The quiescent bundle's
+   consumers do not use them (its supply reads the fabric off `fun _ => d0` directly).
 
 **Rocq → Lean name map.**  `eadm_fst` `eadmFst`, `eblock_fst` `eblockFst`, `not_elem_of_block`
 `notElemOfBlock`, `nat_bounded_choice` `natBoundedChoice`, `fmap_seq_default` `fmapSeqDefault`,
@@ -161,123 +169,191 @@ theorem fmapSeqDefault {A : Type _} (x : A) (l : List A) :
 
 /-! ## 2. Fabric blindness of an `LDev`-free emission -/
 
+/-- **THE START-STATE HYPOTHESIS** (W-DISK, plan [R17.3]): the disk agent is BETWEEN bursts
+(no residual program); a hart state is always quiet.  Under W-DISK's state-aware `pdevEv` an
+`LDev`-free disk step MOVES the fabric at a `DWriteDev` node, so the fabric-blindness lemmas
+below quantify over quiet starts only (discharged at the boot pool `epsInit`, whose disk is
+`.PDisk none`). -/
+def devQuiet : Pexv6 → Prop
+  | .PDisk (some _) => False
+  | _ => True
+
+/-- No START, no burst: every arm out of `.PDisk none` (START, the UART / PLIC moves) is
+`LDev`, so an `LDev`-free step keeps the state quiet. -/
+theorem devQuietStep (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
+    pstepEv p d l p' d' → (∀ kd ba bs, l ≠ LDev kd ba bs) → devQuiet p → devQuiet p' := by
+  intro hs hne hq
+  cases p with
+  | PHart cpu m rs fn ib =>
+    cases p' with
+    | PHart => trivial
+    | PDisk => exact hs.elim
+  | PDisk dp =>
+    cases dp with
+    | some _ => exact hq.elim
+    | none =>
+      cases p' with
+      | PHart => exact hs.elim
+      | PDisk dp' =>
+        exfalso
+        rcases hs with ⟨h, -⟩ | ⟨_, hl, _⟩
+        · rcases h with ⟨_, hl, _⟩ | ⟨_, _, _, _, _, hdp, _⟩ | ⟨_, hdp, _⟩ |
+            ⟨_, _, _, _, _, _, _, hdp, _⟩ | ⟨_, _, _, _, _, _, hdp, _⟩ |
+            ⟨_, _, _, _, _, _, hdp, _⟩ | ⟨_, _, hdp, _⟩ | ⟨_, _, hdp, _⟩ | ⟨hdp, _⟩ | ⟨hdp, _⟩
+          · exact hne _ _ _ hl
+          all_goals exact nomatch hdp
+        · exact hne _ _ _ hl
+
+/-- The marker vanishes on an `LDev`-free step FROM A QUIET STATE (W-DISK: a new proof by
+cases on `p`; the label alone no longer decides it). -/
 theorem pdevEvFalse (p : Pexv6) (l : Wlabel) (p' : Pexv6) :
-    (∀ kd ba bs, l ≠ LDev kd ba bs) → pdevEv p l p' = false := by
-  intro h
-  cases l <;> first | rfl | exact absurd rfl (h _ _ _)
+    devQuiet p → (∀ kd ba bs, l ≠ LDev kd ba bs) → pdevEv p l p' = false := by
+  intro hq h
+  cases p with
+  | PHart => cases l <;> first | rfl | exact absurd rfl (h _ _ _)
+  | PDisk dp =>
+    cases dp with
+    | some _ => exact hq.elim
+    | none => cases l <;> first | rfl | exact absurd rfl (h _ _ _)
 
 theorem pstepEvDevfree (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
-    pstepEv p d l p' d' → (∀ kd ba bs, l ≠ LDev kd ba bs) → d' = d ∧ ∀ d0, pstepEv p d0 l p' d0 :=
-  fun hs hne => pdevEvOk p d l p' d' hs (pdevEvFalse p l p' hne)
+    devQuiet p → pstepEv p d l p' d' → (∀ kd ba bs, l ≠ LDev kd ba bs) →
+    d' = d ∧ ∀ d0, pstepEv p d0 l p' d0 :=
+  fun hq hs hne => pdevEvOk p d l p' d' hs (pdevEvFalse p l p' hq hne)
 
 /-! ### 2.1 The administrative run -/
 
-theorem admRunDevfree (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
-    (d' : Efab) : admRun instr p d ls p' d' → (∀ kd ba bs, LDev kd ba bs ∉ ls) → d' = d := by
+/-- (Lean-only, W-DISK) An `LDev`-free administrative run keeps the state quiet. -/
+theorem admRunQuiet (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
+    (d' : Efab) : admRun instr p d ls p' d' → (∀ kd ba bs, LDev kd ba bs ∉ ls) →
+    devQuiet p → devQuiet p' := by
   intro h
   induction h with
-  | ARnil => intro _; rfl
+  | ARnil => intro _ hq; exact hq
   | ARcons p d l p1 d1 ls p' d' _ hs _ ih =>
-    intro hnd
+    intro hnd hq
     have hne : (∀ kd ba bs, l ≠ LDev kd ba bs) := fun kd ba bs he => hnd kd ba bs (by simp [he])
-    obtain ⟨hd, _⟩ := pstepEvDevfree _ _ _ _ _ hs hne
-    rw [ih (fun kd ba bs hin => hnd kd ba bs (List.mem_cons_of_mem _ hin)), hd]
+    exact ih (fun kd ba bs hin => hnd kd ba bs (List.mem_cons_of_mem _ hin))
+      (devQuietStep _ _ _ _ _ hs hne hq)
+
+theorem admRunDevfree (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
+    (d' : Efab) : admRun instr p d ls p' d' → devQuiet p → (∀ kd ba bs, LDev kd ba bs ∉ ls) →
+    d' = d := by
+  intro h
+  induction h with
+  | ARnil => intro _ _; rfl
+  | ARcons p d l p1 d1 ls p' d' _ hs _ ih =>
+    intro hq hnd
+    have hne : (∀ kd ba bs, l ≠ LDev kd ba bs) := fun kd ba bs he => hnd kd ba bs (by simp [he])
+    obtain ⟨hd, _⟩ := pstepEvDevfree _ _ _ _ _ hq hs hne
+    rw [ih (devQuietStep _ _ _ _ _ hs hne hq)
+      (fun kd ba bs hin => hnd kd ba bs (List.mem_cons_of_mem _ hin)), hd]
 
 theorem admRunRefab (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
-    (d' : Efab) : admRun instr p d ls p' d' → (∀ kd ba bs, LDev kd ba bs ∉ ls) →
+    (d' : Efab) : admRun instr p d ls p' d' → devQuiet p → (∀ kd ba bs, LDev kd ba bs ∉ ls) →
     ∀ d0, admRun instr p d0 ls p' d0 := by
   intro h
   induction h with
-  | ARnil p d => intro _ d0; exact .ARnil p d0
+  | ARnil p d => intro _ _ d0; exact .ARnil p d0
   | ARcons p d l p1 d1 ls p' d' ha hs _ ih =>
-    intro hnd d0
+    intro hq hnd d0
     have hne : (∀ kd ba bs, l ≠ LDev kd ba bs) := fun kd ba bs he => hnd kd ba bs (by simp [he])
     have hrest : ∀ kd ba bs, LDev kd ba bs ∉ ls :=
       fun kd ba bs hin => hnd kd ba bs (List.mem_cons_of_mem _ hin)
-    obtain ⟨_, hall⟩ := pstepEvDevfree _ _ _ _ _ hs hne
-    exact .ARcons p d0 l p1 d0 ls p' d0 ha (hall d0) (ih hrest d0)
+    obtain ⟨_, hall⟩ := pstepEvDevfree _ _ _ _ _ hq hs hne
+    exact .ARcons p d0 l p1 d0 ls p' d0 ha (hall d0) (ih (devQuietStep _ _ _ _ _ hs hne hq) hrest d0)
 
 /-! ### 2.2 The emission -/
 
 theorem hemitDevfreeConst (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
-    hemit dv k ws row p es pfin → (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
+    hemit dv k ws row p es pfin → devQuiet p → (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     ∀ j, k ≤ j → j ≤ k + row.length → dv j = dv k := by
   intro h
   induction h with
   | HEnil k ws p =>
-    intro _ j hlo hhi
+    intro _ _ j hlo hhi
     simp only [List.length_nil, Nat.add_zero] at hhi
     have : j = k := by omega
     subst this; rfl
   | HEone k ws lb row p ls pa da l p' es pfin har _ hst _ ih =>
-    intro hnd j hlo hhi
+    intro hq hnd j hlo hhi
     rw [eblockFst] at hnd
     obtain ⟨hne1, hnel, hrest⟩ := notDevOfBlock _ _ _ hnd
-    have hda : da = dv k := admRunDevfree _ _ _ _ _ _ har hne1
-    obtain ⟨hd, _⟩ := pstepEvDevfree _ _ _ _ _ hst hnel
+    have hda : da = dv k := admRunDevfree _ _ _ _ _ _ har hq hne1
+    have hqa := admRunQuiet _ _ _ _ _ _ har hne1 hq
+    obtain ⟨hd, _⟩ := pstepEvDevfree _ _ _ _ _ hqa hst hnel
     have hsk : dv (k + 1) = dv k := by rw [hd, hda]
     by_cases hjk : j = k
     · subst hjk; rfl
     · simp only [List.length_cons] at hhi
-      rw [ih hrest j (by omega) (by omega), hsk]
+      rw [ih (devQuietStep _ _ _ _ _ hst hnel hqa) hrest j (by omega) (by omega), hsk]
   | HEpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 _ hst1 har2 hst2 _ ih =>
-    intro hnd j hlo hhi
+    intro hq hnd j hlo hhi
     rw [eblockFst, eblockFst] at hnd
     obtain ⟨hne1, hnel1, hnd2⟩ := notDevOfBlock _ _ _ hnd
     obtain ⟨hne2, hnel2, hrest⟩ := notDevOfBlock _ _ _ hnd2
-    have hda : da = dv k := admRunDevfree _ _ _ _ _ _ har1 hne1
-    obtain ⟨hd1, _⟩ := pstepEvDevfree _ _ _ _ _ hst1 hnel1
-    have hdm2 : dm2 = dm := admRunDevfree _ _ _ _ _ _ har2 hne2
-    obtain ⟨hd2, _⟩ := pstepEvDevfree _ _ _ _ _ hst2 hnel2
+    have hda : da = dv k := admRunDevfree _ _ _ _ _ _ har1 hq hne1
+    have hqa := admRunQuiet _ _ _ _ _ _ har1 hne1 hq
+    obtain ⟨hd1, _⟩ := pstepEvDevfree _ _ _ _ _ hqa hst1 hnel1
+    have hqm := devQuietStep _ _ _ _ _ hst1 hnel1 hqa
+    have hdm2 : dm2 = dm := admRunDevfree _ _ _ _ _ _ har2 hqm hne2
+    have hqm2 := admRunQuiet _ _ _ _ _ _ har2 hne2 hqm
+    obtain ⟨hd2, _⟩ := pstepEvDevfree _ _ _ _ _ hqm2 hst2 hnel2
     have hsk : dv (k + 1) = dv k := by rw [hd2, hdm2, hd1, hda]
     by_cases hjk : j = k
     · subst hjk; rfl
     · simp only [List.length_cons] at hhi
-      rw [ih hrest j (by omega) (by omega), hsk]
+      rw [ih (devQuietStep _ _ _ _ _ hst2 hnel2 hqm2) hrest j (by omega) (by omega), hsk]
 
 /-- THE REFABRICATION (Rocq's recorded STATEMENT CORRECTION: the emission replays at any fabric
 assignment CONSTANT on the block's index range, with no relation to `dv` at all). -/
 theorem hemitDevfreeRefab (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
-    hemit dv k ws row p es pfin → (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
+    hemit dv k ws row p es pfin → devQuiet p → (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     ∀ (dv' : Nat → Efab) (d0 : Efab),
       (∀ j, k ≤ j → j ≤ k + row.length → dv' j = d0) →
       hemit dv' k ws row p es pfin := by
   intro h
   induction h with
-  | HEnil k ws p => intro _ dv' d0 _; exact .HEnil k ws p
+  | HEnil k ws p => intro _ _ dv' d0 _; exact .HEnil k ws p
   | HEone k ws lb row p ls pa da l p' es pfin har hre hst _ ih =>
-    intro hnd dv' d0 hc
+    intro hq hnd dv' d0 hc
     rw [eblockFst] at hnd
     obtain ⟨hne1, hnel, hrest⟩ := notDevOfBlock _ _ _ hnd
-    obtain ⟨_, hall⟩ := pstepEvDevfree _ _ _ _ _ hst hnel
+    have hqa := admRunQuiet _ _ _ _ _ _ har hne1 hq
+    obtain ⟨_, hall⟩ := pstepEvDevfree _ _ _ _ _ hqa hst hnel
     refine .HEone k ws lb row p ls pa d0 l p' es pfin ?_ hre ?_ ?_
     · rw [hc k (Nat.le_refl _) (by simp)]
-      exact admRunRefab _ _ _ _ _ _ har hne1 d0
+      exact admRunRefab _ _ _ _ _ _ har hq hne1 d0
     · rw [hc (k + 1) (by omega) (by simp only [List.length_cons]; omega)]
       exact hall d0
-    · exact ih hrest dv' d0 (fun j hlo hhi => hc j (by omega) (by simp only [List.length_cons]; omega))
+    · exact ih (devQuietStep _ _ _ _ _ hst hnel hqa) hrest dv' d0
+        (fun j hlo hhi => hc j (by omega) (by simp only [List.length_cons]; omega))
   | HEpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2 hst2 _ ih =>
-    intro hnd dv' d0 hc
+    intro hq hnd dv' d0 hc
     rw [eblockFst, eblockFst] at hnd
     obtain ⟨hne1, hnel1, hnd2⟩ := notDevOfBlock _ _ _ hnd
     obtain ⟨hne2, hnel2, hrest⟩ := notDevOfBlock _ _ _ hnd2
-    obtain ⟨_, hall1⟩ := pstepEvDevfree _ _ _ _ _ hst1 hnel1
-    obtain ⟨_, hall2⟩ := pstepEvDevfree _ _ _ _ _ hst2 hnel2
+    have hqa := admRunQuiet _ _ _ _ _ _ har1 hne1 hq
+    obtain ⟨_, hall1⟩ := pstepEvDevfree _ _ _ _ _ hqa hst1 hnel1
+    have hqm := devQuietStep _ _ _ _ _ hst1 hnel1 hqa
+    have hqm2 := admRunQuiet _ _ _ _ _ _ har2 hne2 hqm
+    obtain ⟨_, hall2⟩ := pstepEvDevfree _ _ _ _ _ hqm2 hst2 hnel2
     refine .HEpair k ws lb row p ls1 pa d0 l1 pm d0 ls2 pm2 d0 l2 p' es pfin ?_ hre (hall1 d0)
-      (admRunRefab _ _ _ _ _ _ har2 hne2 d0) ?_ ?_
+      (admRunRefab _ _ _ _ _ _ har2 hqm hne2 d0) ?_ ?_
     · rw [hc k (Nat.le_refl _) (by simp)]
-      exact admRunRefab _ _ _ _ _ _ har1 hne1 d0
+      exact admRunRefab _ _ _ _ _ _ har1 hq hne1 d0
     · rw [hc (k + 1) (by omega) (by simp only [List.length_cons]; omega)]
       exact hall2 d0
-    · exact ih hrest dv' d0 (fun j hlo hhi => hc j (by omega) (by simp only [List.length_cons]; omega))
+    · exact ih (devQuietStep _ _ _ _ _ hst2 hnel2 hqm2) hrest dv' d0
+        (fun j hlo hhi => hc j (by omega) (by simp only [List.length_cons]; omega))
 
 theorem hemitDevfreeReindex (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
     (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
-    hemit dv k ws row p es pfin → (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
+    hemit dv k ws row p es pfin → devQuiet p → (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
     ∀ d0 : Efab, hemit (fun _ => d0) k ws row p es pfin :=
-  fun hem hnd d0 => hemitDevfreeRefab dv k ws row p es pfin hem hnd _ d0 (fun _ _ _ => rfl)
+  fun hem hq hnd d0 => hemitDevfreeRefab dv k ws row p es pfin hem hq hnd _ d0 (fun _ _ _ => rfl)
 
 /-! ## 3. The quiescent conformance bundle -/
 

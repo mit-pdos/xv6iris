@@ -37,6 +37,9 @@ not needed); §6 the rank trace is a `ptraceExt` (`glinPtraceExt`), non-vacuity 
    `WeakRvwmoLin2.devLbl` (the "every dev event is labelled" fact Rocq inlines twice), and the
    local `where`-auxiliary `ptraceRelMem.gwriteAtInv'`.
 5. §8's `Print Assumptions` audit is dropped (the lint's axiom/sorry ban is the audit).
+6. W-DISK (`WeakRvwmoFab` deviation 4): `fconfSupply'` and `fconfTraceRealize` take the boot
+   pool's QUIET hypothesis `∀ i, i < N → devQuiet (boot i)` (the disk between bursts), passed to
+   `fconfSupply`.
 
 **Rocq → Lean name map.**  `before_index` `beforeIndex`, `elem_of_take_lookup`
 `elemOfTakeLookup`, `filter_all` `WeakRvwmoLin2.filterAll`, `filter_take_S` `filterTakeS`,
@@ -1001,14 +1004,16 @@ theorem fconfSupply' (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF
     ptraceExt GF.gfGd.gdG L →
     (∀ (m n : Nat) e e', m < n → GF.gfDev[m]? = some e → GF.gfDev[n]? = some e' → before L e e') →
     GF.gfGd.gdG.gxProg.length ≤ N →
+    (∀ i, i < N → devQuiet (boot i)) →
     ∃ pst : Nat → List Pexv6,
       pst 0 = (List.range' 0 N).map boot ∧
       fab (dcnt GF (candOf GF.gfGd.gdG L).cdTr 0) = d0 ∧
       execProgOk' (pstepPin GF.gfGd.gdG.gxImg pstepEv) pclsEv pst (fun k => fab (dcnt GF (candOf GF.gfGd.gdG L).cdTr k))
         (candExec (candOf GF.gfGd.gdG L)) := by
-  intro hconf _ hext hord hN
+  intro hconf _ hext hord hN hquiet
   exact fconfSupply (candOf GF.gfGd.gdG L) boot d0 fab GF N hconf (fun i => trowEq _ L hext i) hN
     (trDevOrderedOfPtrace GF L hext hconf.2.1 (WeakRvwmoLin2.devLbl boot d0 fab GF hconf) hord)
+    hquiet
 
 /-- THE DELIVERABLE (deviation 3: the supply at the pinned LTS). -/
 theorem fconfTraceRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec)
@@ -1016,6 +1021,7 @@ theorem fconfTraceRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab
     gfexecConsistent' GF →
     gfexecConf boot d0 fab GF →
     GF.gfGd.gdG.gxProg.length ≤ N →
+    (∀ i, i < N → devQuiet (boot i)) →
     ∃ L : List Geid,
       srvwmoConsistent (candOf GF.gfGd.gdG L) ∧
       (candOf GF.gfGd.gdG L).cdImg = GF.gfGd.gdG.gxImg ∧
@@ -1030,10 +1036,10 @@ theorem fconfTraceRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab
         execProgOk' (pstepPin GF.gfGd.gdG.gxImg pstepEv) pclsEv pst
           (fun k => fab (dcnt GF (candOf GF.gfGd.gdG L).cdTr k))
           (candExec (candOf GF.gfGd.gdG L)) := by
-  intro hc' hconf hN
+  intro hc' hconf hN hquiet
   have hcons : rvwmoMinusConsistent GF.gfGd.gdG := hc'.1.1
   obtain ⟨L, hext, hord⟩ := ptraceExistsF GF hc' (WeakRvwmoLin2.devLbl boot d0 fab GF hconf)
   obtain ⟨h1, h2, h3, h4⟩ := gtraceLinearizationMin _ L hcons hext
-  exact ⟨L, h1, h2, h3, h4, fconfSupply' boot d0 fab GF N L hconf hcons hext hord hN⟩
+  exact ⟨L, h1, h2, h3, h4, fconfSupply' boot d0 fab GF N L hconf hcons hext hord hN hquiet⟩
 
 end Weak

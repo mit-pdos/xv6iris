@@ -27,15 +27,18 @@ hart's residual monad and parked fence, the disk's residual device program) plus
 σ-components that are agent-private or fabric-shared but label-invisible — the hart's REGISTERS
 and the DEVICE FABRIC.  The memory half owns the log and the `Wstate`s.
 
-THE FABRIC MARKER `LDev` (M5): every arm that READS OR MOVES the device fabric carries `LDev`,
-whose memory half is `LSilent`'s verbatim (hart side: the MMIO read/write and the PLIC wire; disk
-side: START, COMMIT and the device threads).  `pdevEv` reads the marker off the label alone, and
-`pdevEvOk` discharges `WeakPromiseFact.pdevOk`.  The `DWild` arm is `LSilent`, NOT `LDev` (it reads
-and moves nothing; marking it would put a spurious device event into the replay's device order).
+THE FABRIC MARKER (M5, made STATE-AWARE by W-DISK): every LABELLED arm that reads or moves the
+device fabric carries `LDev`, whose memory half is `LSilent`'s verbatim (hart side: the MMIO
+read/write and the PLIC wire; disk side: START, the ring POP and the device threads).  W-DISK
+(deviation 10) adds the disk's FABRIC-MOVING WRITES `DWriteDev`, whose label is the RAM store
+`LStore` (or `LSilent` on a skip / abort) and whose step MOVES the fabric (the completion rides
+the used-index store, [OWN.31]); so `pdevEv p l p'` is `LDev`-ness of `l` OR "`p` is the disk at
+a `DWriteDev` node" -- the signature `P → Wlabel → P → Bool` always allowed it, and `pdevEvOk`
+discharges `WeakPromiseFact.pdevOk` for it.  The stall self-loop is `LSilent` and moves nothing.
 
-THE DISK IS AN ORDINARY AGENT (M5): `DRead` is a plain RAM read (`LLoad aq false`), `DWrite` a RAM
-write (`LStore false`), `DFence` a `fence rw,rw` (`LFence true true true true`); `pclsEv` at the
-disk is `WeakEvLang.ddevClass ws`.
+THE DISK IS AN ORDINARY AGENT (M5): `DRead` is a plain RAM read (`LLoad aq false`), a
+`DWriteDev` store a RAM write (`LStore false`), `DFence` a `fence rw,rw` (`LFence true true true
+true`); `pclsEv` at the disk is `WeakEvLang.ddevClass ws`.
 
 TWO RECORDED DEVIATIONS FROM THE COMMISSIONED SHAPE (Rocq (D1)/(D2)):
 (D1) the register update is an `Option RegFile` (`none` = unchanged), so every §5 equation is a
@@ -139,6 +142,17 @@ bits by `WeakDeps.depsOfIb` (`edeps`).
 9. PROOFS: per-arm case analysis on the `Outcome` constructor (Rocq: `destruct oc; try
    esil_case; try estuck_case`); the Rocq Ltacs `efac4`/`esil_case`/`estuck_case` are the local
    macros `esil_case`/`estuck_case` (plus `edev_sil` for `pnodeStepDevFree`).
+
+10. W-DISK (plan `notes/weak-allocproc-plan.md` §C "W-DISK"; `Weak/VirtioProg.lean`): `pdiskProg`
+   has TEN arms, mirroring `WeakEvLang.ediskStep` (its deviation 14): START, `DRead`, `DFence`,
+   a `DWriteDev`'s STORE (`LStore`, `d' = setDvirtio d s'`, under `ramBytes` of the footprint --
+   MachCSL's `dmaWrite` arms, (M5′)), OWN-GUARD SKIP and ABORT (`LSilent`, `d' = setDvirtio d s`
+   for the folded state `s`), the `DPop` refusal and pop (`LDev .dev 0 []`), the stall
+   self-loop and `DIdle`.  Rocq's COMMIT and malformed-chain arms are retired.  `pdevEv` is
+   state-aware (header); `pdiskProgDevFree` / `pstepDiskDevFree` take the extra hypothesis "not
+   at a `DWriteDev` node" and `pdevEvOk` is re-proved (its statement unchanged).  Lean-only
+   `WeakEvInst.pdiskProgLabel` (the five label shapes of the disk program, from which
+   lat-freedom, `noRmw`, dependency-freedom, exclusivity- and fetch-freedom are read off).
 
 **File-qualified names:** none (no name of this file is in `notes/weak-port-dupnames.json`).
 
@@ -480,8 +494,8 @@ def pstepHart (cpu : CPU) (m : SailM Unit) (rs : RegFile)
     d' = { d with efDev := d'.efDev }) ∨
   pstepPlic cpu m rs fn ib d l m' ors fn' d' oib obar
 
-/-- THE DISK AGENT (M5): one disjunct per node of the residual device program plus the two
-fabric arms (seven arms, deviation 5). -/
+/-- THE DISK AGENT (M5, W-DISK): one disjunct per outcome of a node of the residual device
+program (ten arms, deviation 10).  Every `DWriteDev` / `DPop` arm reads the CURRENT fabric. -/
 def pdiskProg (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel) (dp' : Option (DM Dres))
     (d' : DevStates) : Prop :=
   -- START — reads the fabric
@@ -493,25 +507,70 @@ def pdiskProg (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel) (dp' : Option
      dp = some (DRead pa n aq k) ∧ tvs.length = n ∧ l = LLoad aq false (paZ pa) tvs [] ∧
      dp' = some (k (tvs.map Prod.snd)) ∧ d' = d)
   ∨
-  -- DWrite — a hart's RAM write
-  (∃ (pa : PAddr) (bs : List (BitVec 8)) (k : DM Dres),
-     dp = some (DWrite pa bs k) ∧ bs ≠ [] ∧ l = LStore false (paZ pa) bs [] [] ∧
-     dp' = some k ∧ d' = d)
-  ∨
   -- DFence — the device-side write barrier
   (∃ k : DM Dres, dp = some (DFence k) ∧ l = LFence true true true true ∧ dp' = some k ∧ d' = d)
   ∨
-  -- COMMIT — moves the fabric
-  (∃ delta : VirtioState → VirtioState,
-     dp = some (DRet (DDone delta)) ∧ l = LDev .dev 0 [] ∧ dp' = none ∧
-     d' = setDvirtio d (delta (dvirtio d)))
+  -- DWriteDev, THE STORE — a hart's RAM write AND the fabric move
+  (∃ (pre : VirtioState → VirtioState × Bool) (g : VirtioState → Option VirtioState)
+      (pa : VirtioState → PAddr) (bs : VirtioState → List (BitVec 8)) (k : VirtioState → DM Dres)
+      (s s' : VirtioState),
+     dp = some (DWriteDev pre g pa bs k) ∧ pre (dvirtio d) = (s, true) ∧ g s = some s' ∧
+     ramBytes (pa s) (bs s).length ∧ bs s ≠ [] ∧ l = LStore false (paZ (pa s)) (bs s) [] [] ∧
+     dp' = some (k s) ∧ d' = setDvirtio d s')
   ∨
-  -- the malformed chain (`LSilent`, not `LDev`)
-  (∃ prog' : DM Dres,
-     dp = some (DRet DWild) ∧ DmWildChain prog' ∧ l = LSilent ∧ dp' = some prog' ∧ d' = d)
+  -- DWriteDev, THE OWN-GUARD SKIP — silent, the folded moves stay
+  (∃ (pre : VirtioState → VirtioState × Bool) (g : VirtioState → Option VirtioState)
+      (pa : VirtioState → PAddr) (bs : VirtioState → List (BitVec 8)) (k : VirtioState → DM Dres)
+      (s : VirtioState),
+     dp = some (DWriteDev pre g pa bs k) ∧ pre (dvirtio d) = (s, true) ∧
+     (g s = none ∨ ¬ ramBytes (pa s) (bs s).length) ∧ l = LSilent ∧ dp' = some (k s) ∧
+     d' = setDvirtio d s)
   ∨
-  -- nothing pending
+  -- DWriteDev, THE ABORT — silent, the burst ends with the moves made before the failing guard
+  (∃ (pre : VirtioState → VirtioState × Bool) (g : VirtioState → Option VirtioState)
+      (pa : VirtioState → PAddr) (bs : VirtioState → List (BitVec 8)) (k : VirtioState → DM Dres)
+      (s : VirtioState),
+     dp = some (DWriteDev pre g pa bs k) ∧ pre (dvirtio d) = (s, false) ∧ l = LSilent ∧
+     dp' = none ∧ d' = setDvirtio d s)
+  ∨
+  -- DPop, REFUSED — reads the fabric
+  (∃ (h : BitVec 16) (k : VirtioState → DM Dres),
+     dp = some (DPop h k) ∧ (Virtio.phase (dvirtio d) h).isSome = true ∧ l = LDev .dev 0 [] ∧
+     dp' = none ∧ d' = d)
+  ∨
+  -- DPop — moves the fabric
+  (∃ (h : BitVec 16) (k : VirtioState → DM Dres),
+     dp = some (DPop h k) ∧ (Virtio.phase (dvirtio d) h).isSome = false ∧ l = LDev .dev 0 [] ∧
+     dp' = some (k (VirtioProg.popState (dvirtio d) h)) ∧
+     d' = setDvirtio d (VirtioProg.popState (dvirtio d) h))
+  ∨
+  -- the stalled request (`LSilent` self-loop)
+  (dp = some (DRet DStall) ∧ l = LSilent ∧ dp' = some (DRet DStall) ∧ d' = d)
+  ∨
+  -- nothing (more) to do
   (dp = some (DRet DIdle) ∧ l = LSilent ∧ dp' = none ∧ d' = d)
+
+/-- (Lean-only, deviation 10) The disk program's FIVE label shapes. -/
+theorem WeakEvInst.pdiskProgLabel (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel)
+    (dp' : Option (DM Dres)) (d' : DevStates) :
+    pdiskProg dp d l dp' d' →
+    l = LDev .dev 0 [] ∨ (∃ aq base tvs, l = LLoad aq false base tvs []) ∨
+    l = LFence true true true true ∨ (∃ base data, l = LStore false base data [] []) ∨
+    l = LSilent := by
+  rintro (⟨_, rfl, _⟩ | ⟨_, _, _, _, _, _, _, rfl, _⟩ | ⟨_, _, rfl, _⟩ |
+    ⟨_, _, _, _, _, _, _, _, _, _, _, _, rfl, _⟩ | ⟨_, _, _, _, _, _, _, _, _, rfl, _⟩ |
+    ⟨_, _, _, _, _, _, _, _, rfl, _⟩ | ⟨_, _, _, _, rfl, _⟩ | ⟨_, _, _, _, rfl, _⟩ |
+    ⟨_, rfl, _⟩ | ⟨_, rfl, _⟩)
+  · exact Or.inl rfl
+  · exact Or.inr (Or.inl ⟨_, _, _, rfl⟩)
+  · exact Or.inr (Or.inr (Or.inl rfl))
+  · exact Or.inr (Or.inr (Or.inr (Or.inl ⟨_, _, rfl⟩)))
+  · exact Or.inr (Or.inr (Or.inr (Or.inr rfl)))
+  · exact Or.inr (Or.inr (Or.inr (Or.inr rfl)))
+  · exact Or.inl rfl
+  · exact Or.inl rfl
+  · exact Or.inr (Or.inr (Or.inr (Or.inr rfl)))
+  · exact Or.inr (Or.inr (Or.inr (Or.inr rfl)))
 
 /-- THE DEVICE THREADS' FABRIC MOVE (Rocq: the UART thread; deviation 5): one `fdevStep` of a
 UART program or of the PLIC program off a wire write, at the disk agent. -/
@@ -540,11 +599,15 @@ def pstepEv (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) : Prop 
   | .PDisk dp, .PDisk dp' => pstepDisk dp d l dp' d'
   | _, _ => False
 
-/-- THE FABRIC MARKER, a function of the LABEL alone. -/
-def pdevEv (_p : Pexv6) (l : Wlabel) (_p' : Pexv6) : Bool :=
-  match l with
-  | LDev .. => true
-  | _ => false
+/-- THE FABRIC MARKER, STATE-AWARE (W-DISK, deviation 10): an `LDev` label, or the disk at a
+fabric-moving write. -/
+def pdevEv (p : Pexv6) (l : Wlabel) (_p' : Pexv6) : Bool :=
+  (match l with
+   | LDev .. => true
+   | _ => false) ||
+  (match p with
+   | .PDisk (some (DWriteDev ..)) => true
+   | _ => false)
 
 /-! ## 3. The memory half -/
 
@@ -1175,7 +1238,7 @@ theorem plicBodyPlain : DevPlain true (devSig .plic).body := by
     refine devPlainBind (devPlainLift .get trivial) (fun p => ?_)
     exact devPlainLift _ rfl
 
-/-- THE DISK THREAD (M5), arm for arm. -/
+/-- THE DISK THREAD (M5, W-DISK), arm for arm. -/
 theorem ediskStepFactor (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ : WGState)
     (e' : EExpr) (σ' : WGState) :
     ediskStep gen dp dws σ e' σ' ↔
@@ -1185,35 +1248,55 @@ theorem ediskStepFactor (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ :
       edlabOk σ dws l ∧
       σ' = edlabApply σ l (pclsEv (.PDisk dp) l dws) d' := by
   constructor
-  · rintro (⟨rfl, rfl, rfl⟩ | ⟨pa, n, aq, k, tvs, rfl, hlen, hrd, rfl, rfl⟩ |
-      ⟨pa, bs, k, rfl, hne, rfl, rfl⟩ | ⟨k, rfl, rfl, rfl⟩ | ⟨delta, rfl, rfl, rfl⟩ |
-      ⟨prog', rfl, hch, rfl, rfl⟩ | ⟨rfl, rfl, rfl⟩)
+  · rintro (⟨rfl, rfl, rfl⟩ | ⟨pa, n, aq, k, tvs, rfl, hlen, hrd, rfl, rfl⟩ | ⟨k, rfl, rfl, rfl⟩ |
+      ⟨pre, g, pa, bs, k, s, s', rfl, hpre, hg, hram, hne, rfl, rfl⟩ |
+      ⟨pre, g, pa, bs, k, s, rfl, hpre, hor, rfl, rfl⟩ | ⟨pre, g, pa, bs, k, s, rfl, hpre, rfl, rfl⟩ |
+      ⟨h, k, rfl, hph, rfl, rfl⟩ | ⟨h, k, rfl, hph, rfl, rfl⟩ | ⟨rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl⟩)
     · exact ⟨LDev .dev 0 [], _, _, rfl, Or.inl ⟨rfl, rfl, rfl, rfl⟩, trivial, rfl⟩
     · exact ⟨LLoad aq false (paZ pa) tvs [], _, _, rfl,
         Or.inr (Or.inl ⟨pa, n, aq, k, tvs, rfl, hlen, rfl, rfl, rfl⟩), ⟨rfl, hrd⟩, rfl⟩
-    · exact ⟨LStore false (paZ pa) bs [] [], _, _, rfl,
-        Or.inr (Or.inr (Or.inl ⟨pa, bs, k, rfl, hne, rfl, rfl, rfl⟩)), ⟨rfl, rfl, hne⟩, rfl⟩
     · exact ⟨LFence true true true true, _, _, rfl,
-        Or.inr (Or.inr (Or.inr (Or.inl ⟨k, rfl, rfl, rfl, rfl⟩))), trivial, rfl⟩
-    · exact ⟨LDev .dev 0 [], none, _, rfl,
-        Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨delta, rfl, rfl, rfl, rfl⟩)))), trivial, rfl⟩
+        Or.inr (Or.inr (Or.inl ⟨k, rfl, rfl, rfl, rfl⟩)), trivial, rfl⟩
+    · exact ⟨LStore false (paZ (pa s)) (bs s) [] [], _, _, rfl,
+        Or.inr (Or.inr (Or.inr (Or.inl
+          ⟨pre, g, pa, bs, k, s, s', rfl, hpre, hg, hram, hne, rfl, rfl, rfl⟩))),
+        ⟨rfl, rfl, hne⟩, rfl⟩
     · exact ⟨LSilent, _, _, rfl,
-        Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨prog', rfl, hch, rfl, rfl, rfl⟩))))),
+        Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨pre, g, pa, bs, k, s, rfl, hpre, hor, rfl, rfl, rfl⟩)))),
         trivial, rfl⟩
-    · exact ⟨LSilent, none, _, rfl,
-        Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ⟨rfl, rfl, rfl, rfl⟩))))), trivial, rfl⟩
+    · exact ⟨LSilent, _, _, rfl,
+        Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
+          ⟨pre, g, pa, bs, k, s, rfl, hpre, rfl, rfl, rfl⟩))))), trivial, rfl⟩
+    · exact ⟨LDev .dev 0 [], _, _, rfl,
+        Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨h, k, rfl, hph, rfl, rfl, rfl⟩)))))),
+        trivial, rfl⟩
+    · exact ⟨LDev .dev 0 [], _, _, rfl,
+        Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
+          ⟨h, k, rfl, hph, rfl, rfl, rfl⟩))))))), trivial, rfl⟩
+    · exact ⟨LSilent, _, _, rfl,
+        Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
+          ⟨rfl, rfl, rfl, rfl⟩)))))))), trivial, rfl⟩
+    · exact ⟨LSilent, _, _, rfl,
+        Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+          ⟨rfl, rfl, rfl, rfl⟩)))))))), trivial, rfl⟩
   · rintro ⟨l, dp', d', rfl,
-      (⟨rfl, rfl, rfl, rfl⟩ | ⟨pa, n, aq, k, tvs, rfl, hlen, rfl, rfl, rfl⟩ |
-       ⟨pa, bs, k, rfl, hne, rfl, rfl, rfl⟩ | ⟨k, rfl, rfl, rfl, rfl⟩ |
-       ⟨delta, rfl, rfl, rfl, rfl⟩ | ⟨prog', rfl, hch, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩),
+      (⟨rfl, rfl, rfl, rfl⟩ | ⟨pa, n, aq, k, tvs, rfl, hlen, rfl, rfl, rfl⟩ | ⟨k, rfl, rfl, rfl, rfl⟩ |
+       ⟨pre, g, pa, bs, k, s, s', rfl, hpre, hg, hram, hne, rfl, rfl, rfl⟩ |
+       ⟨pre, g, pa, bs, k, s, rfl, hpre, hor, rfl, rfl, rfl⟩ |
+       ⟨pre, g, pa, bs, k, s, rfl, hpre, rfl, rfl, rfl⟩ |
+       ⟨h, k, rfl, hph, rfl, rfl, rfl⟩ | ⟨h, k, rfl, hph, rfl, rfl, rfl⟩ |
+       ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩),
       hok, rfl⟩
     · exact Or.inl ⟨rfl, rfl, rfl⟩
     · exact Or.inr (Or.inl ⟨pa, n, aq, k, tvs, rfl, hlen, hok.2, rfl, rfl⟩)
-    · exact Or.inr (Or.inr (Or.inl ⟨pa, bs, k, rfl, hne, rfl, rfl⟩))
-    · exact Or.inr (Or.inr (Or.inr (Or.inl ⟨k, rfl, rfl, rfl⟩)))
-    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨delta, rfl, rfl, rfl⟩))))
-    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨prog', rfl, hch, rfl, rfl⟩)))))
-    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ⟨rfl, rfl, rfl⟩)))))
+    · exact Or.inr (Or.inr (Or.inl ⟨k, rfl, rfl, rfl⟩))
+    · exact Or.inr (Or.inr (Or.inr (Or.inl ⟨pre, g, pa, bs, k, s, s', rfl, hpre, hg, hram, hne, rfl, rfl⟩)))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨pre, g, pa, bs, k, s, rfl, hpre, hor, rfl, rfl⟩))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨pre, g, pa, bs, k, s, rfl, hpre, rfl, rfl⟩)))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨h, k, rfl, hph, rfl, rfl⟩))))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨h, k, rfl, hph, rfl, rfl⟩)))))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨rfl, rfl, rfl⟩))))))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ⟨rfl, rfl, rfl⟩))))))))
 
 /-- The disk relation at the `pstepDisk` shape (at any fabric over σ's device states). -/
 theorem ediskStepPstepDisk (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ : WGState)
@@ -1400,9 +1483,9 @@ theorem pstepHartLatFree (cpu : CPU) (m : SailM Unit) (rs : RegFile)
 theorem pdiskProgLatFree (dp : Option (DM Dres)) (d : DevStates) (aq : Bool) (base : Int)
     (tvs : List (Nat × BitVec 8)) (dp' : Option (DM Dres)) (d' : DevStates) :
     ¬ pdiskProg dp d (LLoad aq true base tvs []) dp' d' := by
-  rintro (⟨_, h, _⟩ | ⟨_, _, _, _, _, _, _, h, _⟩ | ⟨_, _, _, _, _, h, _⟩ | ⟨_, _, h, _⟩ |
-    ⟨_, _, h, _⟩ | ⟨_, _, _, h, _⟩ | ⟨_, h, _⟩)
-  all_goals (cases h; done)
+  intro h
+  rcases WeakEvInst.pdiskProgLabel _ _ _ _ _ h with h | ⟨_, _, _, h⟩ | h | ⟨_, _, h⟩ | h <;>
+    cases h
 
 theorem pstepDiskLatFree (dp : Option (DM Dres)) (d : Efab) (aq : Bool) (base : Int)
     (tvs : List (Nat × BitVec 8)) (dp' : Option (DM Dres)) (d' : Efab) :
@@ -1416,8 +1499,10 @@ theorem pstepDiskNoRmw (dp : Option (DM Dres)) (d : Efab) (aq rl : Bool) (base :
     (tvs : List (Nat × BitVec 8)) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
     (dp' : Option (DM Dres)) (d' : Efab) :
     ¬ pstepDisk dp d (LRmw aq rl base tvs data asrc vsrc) dp' d' := by
-  rintro (⟨(⟨_, h, _⟩ | ⟨_, _, _, _, _, _, _, h, _⟩ | ⟨_, _, _, _, _, h, _⟩ | ⟨_, _, h, _⟩ |
-    ⟨_, _, h, _⟩ | ⟨_, _, _, h, _⟩ | ⟨_, h, _⟩), -⟩ | ⟨_, h, _⟩) <;> exact nomatch h
+  rintro (⟨h, -⟩ | ⟨_, h, _⟩)
+  · rcases WeakEvInst.pdiskProgLabel _ _ _ _ _ h with h | ⟨_, _, _, h⟩ | h | ⟨_, _, h⟩ | h <;>
+      exact nomatch h
+  · exact nomatch h
 
 /-- THE TIMESTAMP-OBLIVIOUSNESS of the disk's own load. -/
 theorem pdiskProgTsLoad (dp : Option (DM Dres)) (d : DevStates) (aq : Bool) (base : Int)
@@ -1425,8 +1510,10 @@ theorem pdiskProgTsLoad (dp : Option (DM Dres)) (d : DevStates) (aq : Bool) (bas
     pdiskProg dp d (LLoad aq false base tvs []) dp' d' →
     tvs'.map Prod.snd = tvs.map Prod.snd →
     pdiskProg dp d (LLoad aq false base tvs' []) dp' d' := by
-  rintro (⟨_, h, _⟩ | ⟨pa, n, aq0, k, tvs0, hdp, hlen, h, hdp', hd⟩ | ⟨_, _, _, _, _, h, _⟩ |
-    ⟨_, _, h, _⟩ | ⟨_, _, h, _⟩ | ⟨_, _, _, h, _⟩ | ⟨_, h, _⟩) hts
+  rintro (⟨_, h, _⟩ | ⟨pa, n, aq0, k, tvs0, hdp, hlen, h, hdp', hd⟩ | ⟨_, _, h, _⟩ |
+    ⟨_, _, _, _, _, _, _, _, _, _, _, _, h, _⟩ | ⟨_, _, _, _, _, _, _, _, _, h, _⟩ |
+    ⟨_, _, _, _, _, _, _, _, h, _⟩ | ⟨_, _, _, _, h, _⟩ | ⟨_, _, _, _, h, _⟩ |
+    ⟨_, h, _⟩ | ⟨_, h, _⟩) hts
   all_goals try (cases h; done)
   have hlen' : tvs'.length = tvs.length := lenOfSnd hts
   injection h with h1 _ h3 h4
@@ -1667,41 +1754,55 @@ theorem pstepNodeDevFree (cpu : CPU) (m : SailM Unit) (rs : RegFile)
   · exact pnodeStepDevFree m rs ib d l m' ors fn' d' oib obar
   · intro h; edev_sil h
 
+/-- Off a `DWriteDev` node, an `LDev`-free disk step neither moves nor reads the fabric
+(W-DISK, deviation 10: the `DWriteDev` arms move it under `LStore` / `LSilent`). -/
 theorem pdiskProgDevFree (dp : Option (DM Dres)) (d : DevStates) (l : Wlabel)
     (dp' : Option (DM Dres)) (d' : DevStates) :
-    pdiskProg dp d l dp' d' → (∀ kd ba bs, l ≠ LDev kd ba bs) → d' = d ∧ ∀ d0, pdiskProg dp d0 l dp' d0 := by
-  rintro (⟨_, hl, _⟩ | ⟨pa, n, aq, k, tvs, hdp, hlen, hl, hdp', rfl⟩ |
-    ⟨pa, bs, k, hdp, hbs, hl, hdp', rfl⟩ | ⟨k, hdp, hl, hdp', rfl⟩ | ⟨_, _, hl, _⟩ |
-    ⟨prog', hdp, hch, hl, hdp', rfl⟩ | ⟨hdp, hl, hdp', rfl⟩) hne
+    pdiskProg dp d l dp' d' → (∀ kd ba bs, l ≠ LDev kd ba bs) →
+    (∀ pre g pa bs k, dp ≠ some (DWriteDev pre g pa bs k)) →
+    d' = d ∧ ∀ d0, pdiskProg dp d0 l dp' d0 := by
+  rintro (⟨_, hl, _⟩ | ⟨pa, n, aq, k, tvs, hdp, hlen, hl, hdp', rfl⟩ | ⟨k, hdp, hl, hdp', rfl⟩ |
+    ⟨pre, g, pa, bs, k, _, _, hdp, _⟩ | ⟨pre, g, pa, bs, k, _, hdp, _⟩ |
+    ⟨pre, g, pa, bs, k, _, hdp, _⟩ | ⟨_, _, _, _, hl, _⟩ | ⟨_, _, _, _, hl, _⟩ |
+    ⟨hdp, hl, hdp', rfl⟩ | ⟨hdp, hl, hdp', rfl⟩) hne hnw
   · exact absurd hl (hne _ _ _)
   · exact ⟨rfl, fun _ => Or.inr (Or.inl ⟨pa, n, aq, k, tvs, hdp, hlen, hl, hdp', rfl⟩)⟩
-  · exact ⟨rfl, fun _ => Or.inr (Or.inr (Or.inl ⟨pa, bs, k, hdp, hbs, hl, hdp', rfl⟩))⟩
-  · exact ⟨rfl, fun _ => Or.inr (Or.inr (Or.inr (Or.inl ⟨k, hdp, hl, hdp', rfl⟩)))⟩
+  · exact ⟨rfl, fun _ => Or.inr (Or.inr (Or.inl ⟨k, hdp, hl, hdp', rfl⟩))⟩
+  · exact absurd hdp (hnw pre g pa bs k)
+  · exact absurd hdp (hnw pre g pa bs k)
+  · exact absurd hdp (hnw pre g pa bs k)
   · exact absurd hl (hne _ _ _)
-  · exact ⟨rfl, fun _ => Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
-      ⟨prog', hdp, hch, hl, hdp', rfl⟩)))))⟩
-  · exact ⟨rfl, fun _ => Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
-      ⟨hdp, hl, hdp', rfl⟩)))))⟩
+  · exact absurd hl (hne _ _ _)
+  · exact ⟨rfl, fun _ => Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
+      ⟨hdp, hl, hdp', rfl⟩))))))))⟩
+  · exact ⟨rfl, fun _ => Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+      ⟨hdp, hl, hdp', rfl⟩))))))))⟩
 
 theorem pstepDiskDevFree (dp : Option (DM Dres)) (d : Efab) (l : Wlabel)
     (dp' : Option (DM Dres)) (d' : Efab) :
-    pstepDisk dp d l dp' d' → (∀ kd ba bs, l ≠ LDev kd ba bs) → d' = d ∧ ∀ d0, pstepDisk dp d0 l dp' d0 := by
-  rintro (⟨h, hd⟩ | ⟨_, hl, _⟩) hne
-  · obtain ⟨he, hall⟩ := pdiskProgDevFree dp _ l dp' _ h hne
+    pstepDisk dp d l dp' d' → (∀ kd ba bs, l ≠ LDev kd ba bs) →
+    (∀ pre g pa bs k, dp ≠ some (DWriteDev pre g pa bs k)) →
+    d' = d ∧ ∀ d0, pstepDisk dp d0 l dp' d0 := by
+  rintro (⟨h, hd⟩ | ⟨_, hl, _⟩) hne hnw
+  · obtain ⟨he, hall⟩ := pdiskProgDevFree dp _ l dp' _ h hne hnw
     exact ⟨by rw [hd, he], fun d0 => Or.inl ⟨hall d0.efDev, rfl⟩⟩
   · exact absurd hl (hne _ _ _)
 
+/-- THE STATE-AWARE MARKER IS SOUND (statement unchanged by W-DISK). -/
 theorem pdevEvOk : pdevOk pstepEv pdevEv := by
   intro p d l p' d' hs hm
+  obtain ⟨hml, hmp⟩ := Bool.or_eq_false_iff.mp hm
   have hne : ∀ kd ba bs, l ≠ LDev kd ba bs := by
     rintro kd ba bs rfl
-    exact absurd hm (by simp [pdevEv])
+    exact absurd hml (by simp)
   cases p <;> cases p' <;> simp only [pstepEv] at hs ⊢
   · obtain ⟨rfl, ors, oib, obar, rfl, rfl, ⟨hn, hd⟩ | ⟨_, _, _, _, hl, _⟩⟩ := hs
     · obtain ⟨he, hall⟩ := pstepNodeDevFree _ _ _ _ _ _ _ _ _ _ _ _ _ hn hne
       exact ⟨by rw [hd, he], fun d0 => ⟨rfl, ors, oib, obar, rfl, rfl, Or.inl ⟨hall d0.efDev, rfl⟩⟩⟩
     · exact absurd hl (hne _ _ _)
-  · exact pstepDiskDevFree _ _ _ _ _ hs hne
+  · refine pstepDiskDevFree _ _ _ _ _ hs hne ?_
+    rintro pre g pa bs k rfl
+    exact absurd hmp (by simp)
 
 /-- D3-2: THE LOAD-DEPENDENCY-FREEDOM OF THE INSTANCE (deviation D-8 of the Rocq tree). -/
 theorem pnodeStepLdepfree (m : SailM Unit) (rs : RegFile) (ib : Ibch) (d : DevStates) (l : Wlabel)
@@ -1744,9 +1845,10 @@ theorem pstepHartLdepfree (cpu : CPU) (m : SailM Unit) (rs : RegFile)
 
 theorem pstepDiskDepfree (dp : Option (DM Dres)) (d : Efab) (l : Wlabel)
     (dp' : Option (DM Dres)) (d' : Efab) : pstepDisk dp d l dp' d' → lbDepfree l := by
-  rintro (⟨(⟨_, rfl, _⟩ | ⟨_, _, _, _, _, _, _, rfl, _⟩ | ⟨_, _, _, _, _, rfl, _⟩ | ⟨_, _, rfl, _⟩ |
-    ⟨_, _, rfl, _⟩ | ⟨_, _, _, rfl, _⟩ | ⟨_, rfl, _⟩), -⟩ | ⟨_, rfl, _⟩) <;>
-    first | trivial | rfl | exact ⟨rfl, rfl⟩
+  rintro (⟨h, -⟩ | ⟨_, rfl, _⟩)
+  · rcases WeakEvInst.pdiskProgLabel _ _ _ _ _ h with rfl | ⟨_, _, _, rfl⟩ | rfl | ⟨_, _, rfl⟩ | rfl <;>
+      first | trivial | rfl | exact ⟨rfl, rfl⟩
+  · trivial
 
 theorem pstepEvLdepfree (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
     pstepEv p d l p' d' → lbLdepfree l := by
@@ -1759,15 +1861,19 @@ theorem pstepEvLdepfree (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : E
 /-- THE RMW SPLIT: the device program has no exclusive access at all. -/
 theorem pstepDiskNoEx (dp : Option (DM Dres)) (d : Efab) (l : Wlabel)
     (dp' : Option (DM Dres)) (d' : Efab) : pstepDisk dp d l dp' d' → lbFused l := by
-  rintro (⟨(⟨_, rfl, _⟩ | ⟨_, _, _, _, _, _, _, rfl, _⟩ | ⟨_, _, _, _, _, rfl, _⟩ | ⟨_, _, rfl, _⟩ |
-    ⟨_, _, rfl, _⟩ | ⟨_, _, _, rfl, _⟩ | ⟨_, rfl, _⟩), -⟩ | ⟨_, rfl, _⟩) <;> trivial
+  rintro (⟨h, -⟩ | ⟨_, rfl, _⟩)
+  · rcases WeakEvInst.pdiskProgLabel _ _ _ _ _ h with rfl | ⟨_, _, _, rfl⟩ | rfl | ⟨_, _, rfl⟩ | rfl <;>
+      trivial
+  · trivial
 
 /-- O2 (Lean-only, deviation 8): ... and never fetches. -/
 theorem pstepDiskNoFetch (dp : Option (DM Dres)) (d : Efab) (base : Int)
     (tvs : List (Nat × BitVec 8)) (dp' : Option (DM Dres)) (d' : Efab) :
     ¬ pstepDisk dp d (LIFetch base tvs) dp' d' := by
-  rintro (⟨(⟨_, h, _⟩ | ⟨_, _, _, _, _, _, _, h, _⟩ | ⟨_, _, _, _, _, h, _⟩ | ⟨_, _, h, _⟩ |
-    ⟨_, _, h, _⟩ | ⟨_, _, _, h, _⟩ | ⟨_, h, _⟩), -⟩ | ⟨_, h, _⟩) <;> exact nomatch h
+  rintro (⟨h, -⟩ | ⟨_, h, _⟩)
+  · rcases WeakEvInst.pdiskProgLabel _ _ _ _ _ h with h | ⟨_, _, _, h⟩ | h | ⟨_, _, h⟩ | h <;>
+      exact nomatch h
+  · exact nomatch h
 
 /-! ### THE RMW SPLIT (S4): timestamp-obliviousness of the exclusive read -/
 

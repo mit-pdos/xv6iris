@@ -54,8 +54,10 @@ LAYOUT.  Hart `c` at pool position and agent index `c.val`; the disk is agent `n
      `DevProg` may syntactically hold a `dmaWrite`; the board's UART/PLIC bodies never do).
      These are the `LDev` label's log clause, made explicit.  `epfStepErased` is unaffected
      (the language step is the same one).
-   - `edisk_step`'s PLIC-latch arm does not exist (WeakEvLang deviation 2), so `ediskStepLabel`
-     has seven arms; the latch is an `EPFPlic` step at agent `nDisk`.
+   - `edisk_step`'s PLIC-latch arm does not exist (WeakEvLang deviation 2); the latch is an
+     `EPFPlic` step at agent `nDisk`.  W-DISK (WeakEvLang deviation 14): `ediskStepLabel` and
+     `ediskStepEra` range over the ten arms of the aligned disk program (a `DWriteDev` store
+     is `LStore`, its skip / abort and the stall `LSilent`, a `DPop` `LDev`).
    - `epool_list_uart_lookup` ↦ `epoolListUartLookup` (per `UartId`); Lean-only
      `epoolListPlicLookup`, `epoolListUset`, `epoolListPset`, `epoolListTailGet`,
      `epoolListTailSet` (the shared index arithmetic).  Rocq's `epf_step_erased` PLIC case
@@ -422,8 +424,10 @@ def epfRun (ρ ρ' : Epool × WGState) : Prop := ∃ i l, epfStep i l ρ ρ'
 /-- The disk's step keeps the era (Lean-only). -/
 theorem ediskStepEra (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ : WGState) (e' : EExpr)
     (σ' : WGState) : ediskStep gen dp dws σ e' σ' → σ'.wgpow = σ.wgpow ∧ σ'.wggen = σ.wggen := by
-  rintro (⟨-, -, rfl⟩ | ⟨pa, n, aq, k, tvs, -, -, -, -, rfl⟩ | ⟨pa, bs, k, -, -, -, rfl⟩ |
-    ⟨k, -, -, rfl⟩ | ⟨delta, -, -, rfl⟩ | ⟨prog', -, -, -, rfl⟩ | ⟨-, -, rfl⟩) <;>
+  rintro (⟨-, -, rfl⟩ | ⟨_, _, _, _, _, -, -, -, -, rfl⟩ | ⟨_, -, -, rfl⟩ |
+    ⟨_, _, _, _, _, _, _, -, -, -, -, -, -, rfl⟩ | ⟨_, _, _, _, _, _, -, -, -, -, rfl⟩ |
+    ⟨_, _, _, _, _, _, -, -, -, rfl⟩ | ⟨_, _, -, -, -, rfl⟩ | ⟨_, _, -, -, -, rfl⟩ |
+    ⟨-, -, rfl⟩ | ⟨-, -, rfl⟩) <;>
     exact ⟨rfl, rfl⟩
 
 /-- THE ERA IS FIXED across the pf machine. -/
@@ -707,16 +711,22 @@ theorem ecycleStepLabel (gen : Nat) (σ : WGState) (c : CPU) (m : SailM Unit)
       | readRam _ _ _ => exact h.elim
       | writeRam _ _ _ _ => exact h.elim
 
-/-- THE DISK'S LABEL, one per arm of the M5 device program (seven arms, deviation 2). -/
+/-- THE DISK'S LABEL, one per arm of the device program (W-DISK: ten arms, `WeakEvLang`
+deviation 14). -/
 theorem ediskStepLabel (P : Epool) (σ : WGState) (e' : EExpr) (σ' : WGState) :
     ediskStep P.epGen P.epDp P.epDws σ e' σ' →
     ∃ l dp' dws', e' = .EDisk P.epGen dp' dws' ∧ edlabelOk P σ l dws' σ' := by
-  rintro (⟨-, rfl, rfl⟩ | ⟨pa, n, aq, k, tvs, -, -, hrd, rfl, rfl⟩ | ⟨pa, bs, k, -, hne, rfl, rfl⟩ |
-    ⟨k, -, rfl, rfl⟩ | ⟨delta, -, rfl, rfl⟩ | ⟨prog', -, -, rfl, rfl⟩ | ⟨-, rfl, rfl⟩)
+  rintro (⟨-, rfl, rfl⟩ | ⟨pa, n, aq, k, tvs, -, -, hrd, rfl, rfl⟩ | ⟨k, -, rfl, rfl⟩ |
+    ⟨pre, g, pa, bs, k, s, s', -, -, -, -, hne, rfl, rfl⟩ | ⟨pre, g, pa, bs, k, s, -, -, -, rfl, rfl⟩ |
+    ⟨pre, g, pa, bs, k, s, -, -, rfl, rfl⟩ | ⟨h, k, -, -, rfl, rfl⟩ | ⟨h, k, -, -, rfl, rfl⟩ |
+    ⟨-, rfl, rfl⟩ | ⟨-, rfl, rfl⟩)
   · exact ⟨.LDev .dev 0 [], _, _, rfl, rfl, rfl⟩
   · exact ⟨.LLoad aq false (paZ pa) tvs [], _, _, rfl, rfl, rfl, hrd, rfl, rfl⟩
-  · exact ⟨.LStore false (paZ pa) bs [] [], _, _, rfl, rfl, rfl, ⟨_, rfl⟩, hne, rfl⟩
   · exact ⟨.LFence true true true true, _, _, rfl, rfl, rfl⟩
+  · exact ⟨.LStore false (paZ (pa s)) (bs s) [] [], _, _, rfl, rfl, rfl, ⟨_, rfl⟩, hne, rfl⟩
+  · exact ⟨.LSilent, _, _, rfl, rfl, rfl⟩
+  · exact ⟨.LSilent, _, _, rfl, rfl, rfl⟩
+  · exact ⟨.LDev .dev 0 [], _, _, rfl, rfl, rfl⟩
   · exact ⟨.LDev .dev 0 [], _, _, rfl, rfl, rfl⟩
   · exact ⟨.LSilent, _, _, rfl, rfl, rfl⟩
   · exact ⟨.LSilent, _, _, rfl, rfl, rfl⟩

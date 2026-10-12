@@ -20,9 +20,14 @@ Main results (all `Weak.PfStepTsoMem.*`):
 * the memory rows: `pfLoadRowMem` (hart plain load: TsoMem `readBytes` at any view `tvn ≤ tvn₀`
   under which the bytes stay visible), `pfStoreRowMem` (hart `LStore`/`LExStore`, ONE lemma, the
   exclusivity a parameter), `pfExLoadRowMem` (exclusive read: top bytes + reservation),
-  `pfDReadRowMem` (disk `DRead` under `candDiskLat`'s `latest`), `pfDWriteRowMem` (disk `DWrite`),
+  `pfDReadRowMem` (disk `DRead` under `candDiskLat`'s `latest`), `pfDWriteRowMem` (a disk store),
   `pfFetchRowMemM1` (pristine fetch, any view), `pfFetchRowMemCut` (a fetch at a cut `q`, a memory
   helper only), `pfFrameRowMem` (every other label leaves the memory fields alone).
+* W-DISK (plan §C "W-DISK"): the disk's writes are `DWriteDev`s, whose step moves the fabric too
+  -- `pfDWriteDevRowMem` (the STORE: TsoMem's `storeDma` followed by the device's own `setDev`,
+  `dmaWrite`'s moving guard) and `pfDSkipRowMem` (the SKIP / ABORT, label `LSilent`: `setDev`
+  only); both are corollaries of `pfDWriteRowMem` / `pfFrameRowMem` (a device move touches no
+  memory field).
 
 Deviations from the brief's statement shapes (each an extra ADDRESS/LOG hypothesis without which
 the statement is false):
@@ -664,7 +669,7 @@ theorem pfDReadRowMem {P D : Type} (c : Wpcfg P D) (st : List (Nat × Wlabel)) (
     exact Option.some.inj hbt
   · rw [hR.2.2.1.2 _ hin] at hbt; cases hbt
 
-/-- **(13)** Disk `DWrite`: no hart reserves the footprint, and the TsoMem DMA store is
+/-- **(13)** Disk store (a `DWriteDev` STORE without its fabric move, see (13′)): no hart reserves the footprint, and the TsoMem DMA store is
 related. -/
 theorem pfDWriteRowMem {P D : Type} (pstep : P → D → Wlabel → P → D → Prop)
     (pcls : P → Wlabel → Wstate → WmClass) (c c' : Wpcfg P D) (st rest : List (Nat × Wlabel))
@@ -687,6 +692,24 @@ theorem pfDWriteRowMem {P D : Type} (pstep : P → D → Wlabel → P → D → 
   subst hb
   exact rmemAppend c c' st _ σ σ' pa n w data diskAgent k hR himg hlog (Nat.le_refl _) hram hd
     hbytes hmem hlg (fun c0 => by rw [hres]; exact hnone c0)
+
+/-- **(13′)** (W-DISK) Disk `DWriteDev` STORE: the TsoMem DMA store WITH the device's own move
+(`(σ.storeDma pa n w).setDev d s'`, a nonzero width) is related. -/
+theorem pfDWriteDevRowMem {P D : Type} (pstep : P → D → Wlabel → P → D → Prop)
+    (pcls : P → Wlabel → Wstate → WmClass) (c c' : Wpcfg P D) (st rest : List (Nat × Wlabel))
+    (σ : MState) (rl : Bool) (base : Int) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
+    (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (d : DevId) (s' : DevSt d) (hR : rmem c st σ)
+    (hstep : wpPfStep pstep pcls NCPU (.LStore rl base data asrc vsrc) c c')
+    (hadj : pairAdjacent (st ++ (NCPU, .LStore rl base data asrc vsrc) :: rest))
+    (hb : base = paZ pa) (hram : ramBytes pa n) (hd : data.length = n) (hn : n ≠ 0)
+    (hbytes : ∀ j, j < n → data[j]? = some (nthByte w j)) :
+    ¬ anyReserve σ.resv pa n ∧
+      rmem c' (st ++ [(NCPU, .LStore rl base data asrc vsrc)]) ((σ.storeDma pa n w).setDev d s') := by
+  obtain ⟨h1, h2⟩ := pfDWriteRowMem pstep pcls c c' st rest σ rl base data asrc vsrc pa n w hR hstep
+    hadj hb hram hd hbytes
+  refine ⟨h1, h2 _ (MState.storeDma_mem_of_ne σ pa n w hn) ?_ rfl⟩
+  show (if n = 0 then σ.log else σ.log ++ [diskAgent]) = _
+  rw [if_neg hn]
 
 /-- **(14)** M1 fetch of PRISTINE bytes (no log message writes them, a hypothesis): the i-cache
 agent reads the pf bytes at every view. -/
@@ -777,5 +800,15 @@ theorem pfFrameRowMem {P D : Type} (pstep : P → D → Wlabel → P → D → P
   · obtain ⟨hj, hadm | ⟨rl, b, d, asr, vs, rfl⟩⟩ := midPairOther st rest i _ l hadj h
     · exact Or.inr (midPairSnoc st _ i l h hj hadm)
     · exact absurd hl (by simp [frameLbl])
+
+/-- **(16′)** (W-DISK) Disk `DWriteDev` SKIP / ABORT (label `LSilent`): the TsoMem state with the
+device's own move only is related. -/
+theorem pfDSkipRowMem {P D : Type} (pstep : P → D → Wlabel → P → D → Prop)
+    (pcls : P → Wlabel → Wstate → WmClass) (c c' : Wpcfg P D) (st rest : List (Nat × Wlabel))
+    (σ : MState) (i : Nat) (d : DevId) (s : DevSt d) (hR : rmem c st σ)
+    (hstep : wpPfStep pstep pcls i .LSilent c c') (hadj : pairAdjacent (st ++ (i, .LSilent) :: rest)) :
+    c'.pcLog = c.pcLog ∧ c'.pcImg = c.pcImg ∧ rmem c' (st ++ [(i, .LSilent)]) (σ.setDev d s) := by
+  obtain ⟨h1, h2, h3⟩ := pfFrameRowMem pstep pcls c c' st rest σ i .LSilent hR hstep trivial hadj
+  exact ⟨h1, h2, h3 _ rfl rfl rfl⟩
 
 end Weak.PfStepTsoMem

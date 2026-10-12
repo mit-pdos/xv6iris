@@ -42,7 +42,8 @@ bytes into a related state (✓), conditionally (cond.), or not applicable.
 | hart `LLoad` (plain, `pa` in RAM) | `afterLoad cpu pa n tvn` | `tvn := minView` = `max(F, max_{foreign j} t_j)`: `tv ≤ tvn ≤ top`, `cohOk` (and `tvn ≤` every `scaOkT` witness: `minViewLeSca`) | `rowLoad` (`cohSrc`) | ✓ iff (★), discharged by `candScaT` (bytes: W2a) | faithful: the foreign-only stamp is rule 2 exactly ([OWN.23]); `candScaT` is FAITHFUL at Stage 2 (derived, G1-Q (e)) and ISA-faithful for naturally aligned loads (D20) — STRONGER only as a premise on a misaligned load (N10, out of scope) |
 | disk `DRead` (`LLoad aq false` by agent `NCPU`) | `dmaRead`, `σ' = σ` | none on views (the TOP: `dmaView`) | `viewRelForeign` (`diskNotHart`) | ✓ under `candDiskLat` (bytes: W2a) | STRONGER: reads at the top — the device model of record over the appendix's DEVICE sentence (G3, F6; G3-Q (a″) [OWN.17]) |
 | hart `LStore` | `store cpu pa n w false` | none on views (append at the top) | `rowStore` (`cohSrc`) | ✓ (`¬ othersReserve`: W2a) | the `coh` RESET is faithful (rule 2's `po-loc-no-w`, [R11.1][OWN.21]); `resv := none` faithful (Zalrsc); the single store order is STRONGER (no W→W reordering / load buffering, §0 F1 (i)) |
-| disk `DWrite` (`LStore false` by agent `NCPU`) | `storeDma` (`setDev`), no hart view moves | none | `viewRelForeign` (+ `sameReadStoreDma`) | ✓ (`¬ anyReserve`: W2a) | faithful for the views; DMA at the top is the named device model (F6) |
+| disk `DWriteDev` STORE (`LStore false` by agent `NCPU`; W-DISK: the fabric delta in the same step) | `storeDma` + `setDev` (`dmaWrite`'s moving guard), no hart view moves | none | `rowDiskWrite` = `viewRelForeign` (+ `sameReadStoreDma`, `sameReadSetDev`) | ✓ (`¬ anyReserve`: W2a) | faithful for the views; DMA at the top is the named device model (F6) |
+| disk `DWriteDev` SKIP / ABORT (`LSilent`), `DPop` (`LDev`) (W-DISK) | `setDev` only (`dmaWrite`'s no-op arm with the folded moves; the guard-pop) | none | `rowDiskDevMove` = `viewRelForeign` (+ `sameReadSetDev`) | ✓ | views faithful (no memory event) |
 | `LExLoad aq` | `afterExcl cpu pa n w aq` | none (reads the top) | `rowExLoad` (any stamp) | views ✓ given `R-view` equality (bytes `topBytes`: W2a) | `tv := top` iff `aq`, `rv := top`: FAITHFUL once the log is gmo-ordered (rule 5 / rule 4, G1/G1′ under `candScaT`, G1-Q (e)); the reservation's blocking is STRONGER (D19, until W-RSV) |
 | `LExStore rl` | `store cpu pa n w true` | none | `rowExStore` (`cohSrc`) | ✓ | `tv := top + 1` iff the pair is `aq`: faithful (rule 5, as above); `coh` reset faithful ([R14.s3]); `resv := none` faithful |
 | `LFence pr pw sr sw` (`ebarNow b`, the 10 non-`fence.i` kinds incl. `fence.tso`) | `fence cpu b` | none | `rowFence` (any stamp) | ✓ | faithful for the R-successor kinds (rule 4: a W→R edge drains, an R→R edge acquires); the W-successor kinds (`rw,w`, `w,w`, `r,w`) are no-ops because the single order is STRONGER (D7 (i)) |
@@ -50,10 +51,10 @@ bytes into a related state (✓), conditionally (cond.), or not applicable.
 | `LFence` false×4 = the `sfence.vma` marker (`¬ fiArm`) | `instrAnnounce`, `σ' = σ` | none | `rowSfenceMarker` (any stamp) | ✓ | faithful (no RVWMO ordering of data, [OWN.15]) |
 | parked `fence rw,w` (`fence.tso`'s park; no label) | 0 steps | none | — (`ShSt.fenceNoSucc`) | ✓ | STRONGER globally (W→W free from the single order, D7 (i)) |
 | `LDev` (hart MMIO `rd`/`wr`, any payload) | MMIO arm, `σ' = {σ with devs}` | none | `viewRelInert` (+ `sameReadDevs`) | ✓ (`R-dev`: W4) | views faithful; I/O ordering is the named platform assumption `ioResidueGmo` (W13, STRONGER than RVWMO + PMAs) |
-| `LDev` (disk START/COMMIT, device moves, PLIC pins) | device-thread steps (`setDev`/`setRt`/`setReg`) | none | `viewRelInert` / `viewRelForeign` (+ `sameRead*`) | structural (D51) | views faithful |
+| `LDev` (disk START, device moves, PLIC pins) | device-thread steps (`setDev`/`setRt`/`setReg`) | none | `viewRelInert` / `viewRelForeign` (+ `sameRead*`) | structural (D51) | views faithful |
 | `LRmw` | none | — | — | N/A (`pstepEv` never emits it) | — |
 
-The rows' arguments per D19 (b) (§B(10)): the hart `LStore`/disk `DWrite` need `¬ othersReserve`
+The rows' arguments per D19 (b) (§B(10)): the hart `LStore`/disk store need `¬ othersReserve`
 / `¬ anyReserve` only against in-flight reservations (W2a, from `pairAdjacent`); `LExStore` needs
 nothing of the own reservation.
 
@@ -264,7 +265,7 @@ theorem diskNotHart (c : CPU) : diskAgent ≠ hartAgent c := by
   rw [← h] at h1
   exact Nat.lt_irrefl _ h1
 
-/-- **Non-hart rows** (the disk agent's `DRead` = `dmaRead`, `DWrite` = `storeDma`, its `DFence`
+/-- **Non-hart rows** (the disk agent's `DRead` = `dmaRead`, `DWriteDev` = `storeDma` + `setDev`, its `DFence`
 and `LDev` moves): no hart's shadow moves, no hart's read side moves. -/
 theorem viewRelForeign (stamp : CohStamp) (σ σ' : MState) (st : List (Nat × Wlabel)) (j : Nat)
     (l : Wlabel) (hj : ∀ c : CPU, j ≠ hartAgent c) (hrel : viewRel stamp σ st)
@@ -792,8 +793,8 @@ theorem rowDiskRead (stamp : CohStamp) (σ : MState) (st : List (Nat × Wlabel))
     viewRel stamp σ (st ++ [(diskAgent, .LLoad aq false base tvs [])]) :=
   viewRelForeign stamp σ σ st _ _ diskNotHart hrel (sameReadRefl σ)
 
-/-- **ROW: disk `DWrite`** (agent `NCPU`, `LStore false`; TsoMem's `storeDma` with the device's
-own move `setDev`; ANY stamp). -/
+/-- **ROW: disk `DWriteDev` store** (agent `NCPU`, `LStore false`; TsoMem's `storeDma` with the
+device's own move `setDev` -- W-DISK's fabric delta rides the same step; ANY stamp). -/
 theorem rowDiskWrite (stamp : CohStamp) (σ : MState) (st : List (Nat × Wlabel)) (pa : PAddr)
     (n : Nat) (w : BitVec (8 * n)) (d : DevId) (s : DevSt d) (base : Int)
     (data : List (BitVec 8)) (hrel : viewRel stamp σ st) :
@@ -801,6 +802,13 @@ theorem rowDiskWrite (stamp : CohStamp) (σ : MState) (st : List (Nat × Wlabel)
       (st ++ [(diskAgent, .LStore false base data [] [])]) :=
   viewRelForeign stamp σ _ st _ _ diskNotHart hrel
     (sameReadTrans (sameReadStoreDma σ pa n w) (sameReadSetDev _ d s))
+
+/-- **ROW: disk `DWriteDev` skip / abort, `DPop`** (W-DISK; agent `NCPU`, label `LSilent` /
+`LDev`; the device's own move `setDev` only; ANY stamp). -/
+theorem rowDiskDevMove (stamp : CohStamp) (σ : MState) (st : List (Nat × Wlabel)) (l : Wlabel)
+    (d : DevId) (s : DevSt d) (hrel : viewRel stamp σ st) :
+    viewRel stamp (σ.setDev d s) (st ++ [(diskAgent, l)]) :=
+  viewRelForeign stamp σ _ st _ _ diskNotHart hrel (sameReadSetDev σ d s)
 
 end PfStepTsoView
 

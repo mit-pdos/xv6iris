@@ -647,8 +647,9 @@ theorem pstepProgReadCont (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' :
   | .PDisk dp, .PDisk dp', h =>
     rcases h with ⟨hp, hd⟩ | ⟨_, rfl, _⟩
     · rcases hp with ⟨_, rfl, _⟩ | ⟨pa, n, aq, k, tvs, rfl, hlen, rfl, rfl, hd'⟩ |
-        ⟨_, _, _, _, _, rfl, _⟩ | ⟨_, _, rfl, _⟩ | ⟨_, _, rfl, _⟩ | ⟨_, _, _, rfl, _⟩ |
-        ⟨_, rfl, _⟩
+        ⟨_, _, rfl, _⟩ | ⟨_, _, _, _, _, _, _, _, _, _, _, _, rfl, _⟩ |
+        ⟨_, _, _, _, _, _, _, _, _, rfl, _⟩ | ⟨_, _, _, _, _, _, _, _, rfl, _⟩ |
+        ⟨_, _, _, _, rfl, _⟩ | ⟨_, _, _, _, rfl, _⟩ | ⟨_, rfl, _⟩ | ⟨_, rfl, _⟩
       · simp [wlRd] at hrd
       · refine ⟨fun vs => .PDisk (some (k vs)), rfl, ?_, ?_⟩
         · rw [hd, hd']

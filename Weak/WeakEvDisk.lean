@@ -20,17 +20,18 @@ node at its own `Wstate`.
     rule's continuation is quantified over the reached plic state `p0` with the witness
     `plicLatched p p0`, ▷-guarded, and invoked lazily at mask ⊤ after the step.
 (C) READ ENABLEDNESS: `ewpDiskRead` takes a persistent, pure-concluding enabledness extractor.
-(D) NO `DRet DWild` RULE (deliberate: a driver proof must make that node unreachable).
-(E) `ewpDiskWrite` hands the client `wlatInterp img log` and demands
+(D) NO RULE FOR THE STALLED REQUEST `DRet DStall` (deliberate, as Rocq's for its malformed-chain
+    node: a driver proof must make that node unreachable).
+(E) The store rule hands the client `wlatInterp img log` and demands
     `wlatInterp img (log ++ [⟨paZ pa, bs, some nDisk, ddevClass dws⟩])` back.
 
 ## Deviations from Rocq
 
 1. THE LATCH ARM IS ABSENT (forced by `Weak/WeakEvLang.lean` deviation 2: in Lean the PLIC
    program itself samples the virtio level and latches it, so the latch is a step of the
-   `EDev .plic` thread and `ediskStep` has seven arms).  Consequences, all statements otherwise
+   `EDev .plic` thread and `ediskStep` has no latch arm).  Consequences, all statements otherwise
    Rocq's:
-   - `ediskNolatch` IS `ediskStep` (the same seven arms); `ediskLatchArm` is `False`, so
+   - `ediskNolatch` IS `ediskStep` (the same arms); `ediskLatchArm` is `False`, so
      `ediskStepSplit` holds as stated.
    - `ewpEdiskLatch` keeps Rocq's statement (the `plicFrag p` premise, the `p0` quantifier, the
      `plicLatched p p0` witness, the ▷-guarded lazy continuation) but its proof needs no Löb:
@@ -47,6 +48,17 @@ node at its own `Wstate`.
    `dvirtio`/`set_dvirtio` ↦ `WeakEvLang`'s Lean-only `dvirtio`/`setDvirtio`.
 4. `ewg_dev_id` is `rfl` (structure eta).  `plic_latched_refl` (a `Reflexive` instance) is the
    theorem `plicLatchedRefl`.
+5. W-DISK (`WeakEvLang` deviation 14, `Weak/VirtioProg.lean`): the disk program's plain write and
+   its COMMIT are gone, so Rocq's `ewp_disk_write` and `ewp_disk_commit` are RETIRED; their
+   successors are the rules of the FABRIC-MOVING WRITE `DWriteDev pre g pa bs k`, one per
+   outcome, each taking the virtio fragment `v` (the outcome is a pure function of `v`):
+   `ewpDiskWriteDevStore` (`pre v = (s, true)`, `g s = some s'`, DRAM footprint: the log append
+   of `ewp_disk_write` AND the fabric move of `ewp_disk_commit`, in one step),
+   `ewpDiskWriteDevSkip` (silent, the fabric at `s`, the program goes on at `k s`),
+   `ewpDiskWriteDevAbort` (silent, the fabric at `s`, the burst ends); and of the RING POP:
+   `ewpDiskPop` (the fabric at `VirtioProg.popState v h`) and `ewpDiskPopRefused` (nothing moves,
+   the burst ends).  `ewpDiskStart` / `Read` / `Fence` / `Idle` keep their statements (the arm
+   patterns follow the ten-arm `ediskStep`).
 
 **File-qualified names:** `WeakEvDisk.weakStateInterpLat` (duplicated with `WeakGhost`).
 
@@ -57,12 +69,13 @@ node at its own `Wstate`.
 `weak_state_interp_dma` `weakStateInterpDma`, `ewp_edisk` `ewpEdisk`, `plic_latched`
 `plicLatched`, `plic_latched_refl` `plicLatchedRefl`, `ewp_edisk_latch` `ewpEdiskLatch`,
 `ewp_disk_start` `ewpDiskStart`, `ewp_disk_read` `ewpDiskRead`, `ewp_disk_write` `ewpDiskWrite`,
-`ewp_disk_fence` `ewpDiskFence`, `ewp_disk_commit` `ewpDiskCommit`, `ewp_disk_idle`
-`ewpDiskIdle`.
+`ewp_disk_fence` `ewpDiskFence`, `ewp_disk_idle` `ewpDiskIdle`; `ewp_disk_write`,
+`ewp_disk_commit` retired (deviation 5).
 Lean-only: `ediskDevIdx`, `ediskDevIdxGet`, `ediskDevIdxNe`, `ediskDevStatesSetSelf`,
-`ediskDevAcc`, `ediskDevAccRo`.
+`ediskDevAcc`, `ediskDevAccRo`; W-DISK (deviation 5): `weakStateInterpDmaDev`, `ewpDiskWriteDevStore`,
+`ewpDiskWriteDevSkip`, `ewpDiskWriteDevAbort`, `ewpDiskPop`, `ewpDiskPopRefused`.
 
-**Dropped:** none.
+**Dropped:** `ewp_disk_write`, `ewp_disk_commit` (deviation 5: their nodes no longer exist).
 
 **Statements checked** (by hand, against Rocq): all; the changed ones are the deviations above.
 -/
@@ -76,7 +89,7 @@ open LeanRV64D
 
 /-! ## 1. The step relation, split at the latch -/
 
-/-- The seven PROGRAM arms of the disk's step (deviation 1: all of `ediskStep`). -/
+/-- The PROGRAM arms of the disk's step (deviation 1: all of `ediskStep`). -/
 def ediskNolatch (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ : WGState) (e' : EExpr)
     (σ' : WGState) : Prop :=
   ediskStep gen dp dws σ e' σ'
@@ -266,6 +279,16 @@ theorem weakStateInterpDma (σ : WGState) :
     · exact Hms m h
   iframe Hgr Hdev Hlog Hlat Hws
 
+/-- (Lean-only, W-DISK) THE DMA APPEND after a fabric move: `weakStateInterpDma` at `ewgDev σ D`,
+read at σ's log and image (a store of a `DWriteDev` moves both). -/
+theorem weakStateInterpDmaDev (σ : WGState) (D : DevStates) :
+    weakStateInterp (hlc := hlc) (GF := GF) (ewgDev σ D) ⊢
+      ⌜wlogWf σ.wglog⌝ ∗ wlogAuth (GF := GF) σ.wglog ∗ wlatInterp (GF := GF) σ.wgimg σ.wglog ∗
+      (∀ ms : List Wmsg, ⌜wlogWf ms⌝ -∗
+        wlogAuth (GF := GF) (σ.wglog ++ ms) -∗ wlatInterp (GF := GF) σ.wgimg (σ.wglog ++ ms) -∗
+        weakStateInterp (hlc := hlc) (GF := GF) (ewgDev (ewgLog σ (σ.wglog ++ ms)) D)) :=
+  weakStateInterpDma (ewgDev σ D)
+
 end interp
 
 /-! ## 3. The core lifting rule — the twin of `WeakEvLift.ewpEcycle` -/
@@ -355,7 +378,7 @@ theorem ewpEdiskLatch (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (p : Pl
 
 end latch
 
-/-! ## 5. The per-node rules (no rule for `DRet DWild`, header (D)) -/
+/-! ## 5. The per-node rules (no rule for `DRet DStall`, header (D)) -/
 
 section rules
 
@@ -387,8 +410,9 @@ theorem ewpDiskStart (gen : Nat) (dws : Wstate) (v : VirtioState) (p : PlicState
   · imodintro
     iintro %p0 %σ %e' %σ' %Hlt %Hstep Hp Hv Hcont Hσ
     unfold ediskNolatch ediskStep at Hstep
-    rcases Hstep with ⟨-, rfl, hσ⟩ | ⟨_, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ |
-      ⟨_, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ | ⟨⟨⟩, -⟩
+    rcases Hstep with ⟨-, rfl, hσ⟩ | ⟨_, _, _, _, _, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ |
+      ⟨_, _, _, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, _, _, _, ⟨⟩, -⟩ |
+      ⟨_, _, ⟨⟩, -⟩ | ⟨_, _, ⟨⟩, -⟩ | ⟨⟨⟩, -⟩ | ⟨⟨⟩, -⟩
     subst σ'
     icases weakStateInterpDevRo σ $$ Hσ with ⟨Hd, Hcl⟩
     icases ediskDevAccRo σ.wgdev .virtio $$ Hd with ⟨Hva, Hdcl⟩
@@ -447,8 +471,9 @@ theorem ewpDiskRead (gen : Nat) (dws : Wstate) (pa : PAddr) (n : Nat) (aq : Bool
   · imodintro
     iintro %p0 %σ %e' %σ' %Hlt %Hstep Hp HEN Hcont Hσ
     unfold ediskNolatch ediskStep at Hstep
-    rcases Hstep with ⟨⟨⟩, -⟩ | ⟨_, _, _, _, tvs, ⟨⟩, hlen, hrd, rfl, hσ⟩ | ⟨_, _, _, ⟨⟩, -⟩ |
-      ⟨_, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ | ⟨⟨⟩, -⟩
+    rcases Hstep with ⟨⟨⟩, -⟩ | ⟨_, _, _, _, tvs, ⟨⟩, hlen, hrd, rfl, hσ⟩ | ⟨_, ⟨⟩, -⟩ |
+      ⟨_, _, _, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, _, _, _, ⟨⟩, -⟩ |
+      ⟨_, _, ⟨⟩, -⟩ | ⟨_, _, ⟨⟩, -⟩ | ⟨⟨⟩, -⟩ | ⟨⟨⟩, -⟩
     subst σ'
     icases WeakEvDisk.weakStateInterpLat σ $$ Hσ with ⟨%Hwf, Hlog, Hlat, Hcl⟩
     icases wlogSnapshot σ.wglog $$ Hlog with ⟨Hlog, #Hlb⟩
@@ -458,59 +483,6 @@ theorem ewpDiskRead (gen : Nat) (dws : Wstate) (pa : PAddr) (n : Nat) (aq : Bool
     · iapply Hcl $$ Hlog Hlat
     · iexact Hwp
   · iframe Hp HEN Hcont
-
-/-- 5c. THE DEVICE WRITE — the log append, at `dws`. -/
-theorem ewpDiskWrite (gen : Nat) (dws : Wstate) (pa : PAddr) (bs : List (BitVec 8)) (kk : DM Dres)
-    (p : PlicState) :
-    gen = 0 →
-    bs ≠ [] →
-    paZ pa + (bs.length : Int) ≤ 18446744073709551616 →
-    devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p ∗
-    ▷ (∀ (σ : WGState) (p0 : PlicState),
-        ⌜plicLatched p p0⌝ -∗ ⌜wlogWf σ.wglog⌝ -∗ wlogLb (GF := GF) σ.wglog -∗
-        devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗
-        wlatInterp (GF := GF) σ.wgimg σ.wglog ={⊤}=∗
-        wlatInterp (GF := GF) σ.wgimg (σ.wglog ++ [⟨paZ pa, bs, some nDisk, ddevClass dws⟩]) ∗
-        ewpTriv (hlc := hlc) (GF := GF) ⊤
-          (.EDisk gen (some kk) (storePostRun dws false (paZ pa) bs.length (σ.wglog.length + 1)))) ⊢
-    ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen (some (DWrite pa bs kk)) dws) := by
-  intro hgen hne hfit
-  iintro ⟨Hp, Hcont⟩
-  iapply ewpEdiskLatch gen (some (DWrite pa bs kk)) dws p iprop(emp)
-    (iprop(∀ (σ : WGState) (p0 : PlicState),
-        ⌜plicLatched p p0⌝ -∗ ⌜wlogWf σ.wglog⌝ -∗ wlogLb (GF := GF) σ.wglog -∗
-        devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗
-        wlatInterp (GF := GF) σ.wgimg σ.wglog ={⊤}=∗
-        wlatInterp (GF := GF) σ.wgimg (σ.wglog ++ [⟨paZ pa, bs, some nDisk, ddevClass dws⟩]) ∗
-        ewpTriv (hlc := hlc) (GF := GF) ⊤
-          (.EDisk gen (some kk)
-            (storePostRun dws false (paZ pa) bs.length (σ.wglog.length + 1))))) hgen
-  isplitr
-  · imodintro
-    iintro %σ _ _
-    ipureintro
-    exact ⟨_, _, Or.inr (Or.inr (Or.inl ⟨pa, bs, kk, rfl, hne, rfl, rfl⟩))⟩
-  isplitr
-  · imodintro
-    iintro %p0 %σ %e' %σ' %Hlt %Hstep Hp _ Hcont Hσ
-    unfold ediskNolatch ediskStep at Hstep
-    rcases Hstep with ⟨⟨⟩, -⟩ | ⟨_, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, ⟨⟩, -, rfl, rfl⟩ |
-      ⟨_, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ | ⟨⟨⟩, -⟩
-    icases weakStateInterpDma σ $$ Hσ with ⟨%Hwf, Hlog, Hlat, Hcl⟩
-    icases wlogSnapshot σ.wglog $$ Hlog with ⟨Hlog, #Hlb⟩
-    imod wlogUpdate σ.wglog [⟨paZ pa, bs, some nDisk, ddevClass dws⟩] $$ Hlog with Hlog
-    imod Hcont $$ %σ %p0 %Hlt %Hwf Hlb Hp Hlat with ⟨Hlat, Hwp⟩
-    have hmwf : wlogWf [(⟨paZ pa, bs, some nDisk, ddevClass dws⟩ : Wmsg)] := by
-      intro m hm
-      rw [List.mem_singleton] at hm
-      subst hm
-      show 0 ≤ paZ pa ∧ paZ pa + (bs.length : Int) ≤ 18446744073709551616
-      exact ⟨by unfold paZ; omega, hfit⟩
-    imodintro
-    isplitl [Hcl Hlog Hlat]
-    · iapply Hcl $$ %_ %hmwf Hlog Hlat
-    · iexact Hwp
-  · iframe Hp Hcont
 
 /-- 5d. THE DEVICE FENCE — pure, `fence rw,rw` at `dws`. -/
 theorem ewpDiskFence (gen : Nat) (dws : Wstate) (kk : DM Dres) (p : PlicState) :
@@ -532,63 +504,313 @@ theorem ewpDiskFence (gen : Nat) (dws : Wstate) (kk : DM Dres) (p : PlicState) :
   · imodintro
     iintro %σ _ _
     ipureintro
-    exact ⟨_, _, Or.inr (Or.inr (Or.inr (Or.inl ⟨kk, rfl, rfl, rfl⟩)))⟩
+    exact ⟨_, _, Or.inr (Or.inr (Or.inl ⟨kk, rfl, rfl, rfl⟩))⟩
   isplitr
   · imodintro
     iintro %p0 %σ %e' %σ' %Hlt %Hstep Hp _ Hcont Hσ
     unfold ediskNolatch ediskStep at Hstep
-    rcases Hstep with ⟨⟨⟩, -⟩ | ⟨_, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, ⟨⟩, -⟩ |
-      ⟨_, ⟨⟩, rfl, hσ⟩ | ⟨_, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ | ⟨⟨⟩, -⟩
+    rcases Hstep with ⟨⟨⟩, -⟩ | ⟨_, _, _, _, _, ⟨⟩, -⟩ | ⟨_, ⟨⟩, rfl, hσ⟩ |
+      ⟨_, _, _, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, _, _, _, ⟨⟩, -⟩ |
+      ⟨_, _, ⟨⟩, -⟩ | ⟨_, _, ⟨⟩, -⟩ | ⟨⟨⟩, -⟩ | ⟨⟨⟩, -⟩
     subst σ'
     imodintro
     iframe Hσ
     iapply Hcont $$ %p0 %Hlt Hp
   · iframe Hp Hcont
 
-/-- 5e. THE COMMIT (`DRet (DDone δ)`): apply the burst's delta to the CURRENT fabric state. -/
-theorem ewpDiskCommit (gen : Nat) (dws : Wstate) (delta : VirtioState → VirtioState)
-    (v : VirtioState) (p : PlicState) :
-    gen = 0 →
-    devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v ∗
-    devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p ∗
-    ▷ (∀ p0 : PlicState, ⌜plicLatched p p0⌝ -∗
-        devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗
-        devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio (delta v) -∗
-        ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen none dws)) ⊢
-    ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen (some (DRet (DDone delta))) dws) := by
-  intro hgen
+/-- 5c. THE FABRIC-MOVING WRITE, STORE OUTCOME (W-DISK): the folded part passes at the fabric
+`v` the disk holds the fragment of, the own guard answers `s'`, the footprint is DRAM -- the log
+append (header (E)) AND the fabric move to `s'`, in one step. -/
+theorem ewpDiskWriteDevStore (gen : Nat) (dws : Wstate) (pre : VirtioState → VirtioState × Bool)
+    (g : VirtioState → Option VirtioState) (pa : VirtioState → PAddr)
+    (bs : VirtioState → List (BitVec 8)) (kk : VirtioState → DM Dres) (v s s' : VirtioState)
+    (p : PlicState) :
+    gen = 0 → pre v = (s, true) → g s = some s' → ramBytes (pa s) (bs s).length → bs s ≠ [] →
+    paZ (pa s) + ((bs s).length : Int) ≤ 18446744073709551616 →
+    devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v ∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p ∗
+    ▷ (∀ (σ : WGState) (p0 : PlicState),
+        ⌜plicLatched p p0⌝ -∗ ⌜wlogWf σ.wglog⌝ -∗ wlogLb (GF := GF) σ.wglog -∗
+        devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio s' -∗
+        wlatInterp (GF := GF) σ.wgimg σ.wglog ={⊤}=∗
+        wlatInterp (GF := GF) σ.wgimg (σ.wglog ++ [⟨paZ (pa s), bs s, some nDisk, ddevClass dws⟩]) ∗
+        ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen (some (kk s))
+          (storePostRun dws false (paZ (pa s)) (bs s).length (σ.wglog.length + 1)))) ⊢
+    ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen (some (DWriteDev pre g pa bs kk)) dws) := by
+  intro hgen hpre hg hram hne hfit
   iintro ⟨Hv, Hp, Hcont⟩
-  iapply ewpEdiskLatch gen (some (DRet (DDone delta))) dws p
-    (devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v)
-    (iprop(∀ p0 : PlicState, ⌜plicLatched p p0⌝ -∗
-        devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗
-        devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio (delta v) -∗
-        ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen none dws))) hgen
+  iapply ewpEdiskLatch gen (some (DWriteDev pre g pa bs kk)) dws p (devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v)
+    (iprop(∀ (σ : WGState) (p0 : PlicState),
+        ⌜plicLatched p p0⌝ -∗ ⌜wlogWf σ.wglog⌝ -∗ wlogLb (GF := GF) σ.wglog -∗
+        devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio s' -∗
+        wlatInterp (GF := GF) σ.wgimg σ.wglog ={⊤}=∗
+        wlatInterp (GF := GF) σ.wgimg (σ.wglog ++ [⟨paZ (pa s), bs s, some nDisk, ddevClass dws⟩]) ∗
+        ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen (some (kk s))
+          (storePostRun dws false (paZ (pa s)) (bs s).length (σ.wglog.length + 1))))) hgen
   isplitr
   · imodintro
-    iintro %σ _ _
+    iintro %σ Hv Hσ
+    icases weakStateInterpDevRo σ $$ Hσ with ⟨Hd, -⟩
+    icases ediskDevAccRo σ.wgdev .virtio $$ Hd with ⟨Hva, -⟩
+    ihave %hv := devAgreeAt _ .virtio _ _ $$ [Hva Hv]
+    · iframe Hva Hv
     ipureintro
-    exact ⟨_, _, Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨delta, rfl, rfl, rfl⟩))))⟩
+    subst hv
+    exact ⟨_, _, Or.inr (Or.inr (Or.inr (Or.inl
+      ⟨pre, g, pa, bs, kk, s, s', rfl, hpre, hg, hram, hne, rfl, rfl⟩)))⟩
   isplitr
   · imodintro
     iintro %p0 %σ %e' %σ' %Hlt %Hstep Hp Hv Hcont Hσ
-    unfold ediskNolatch ediskStep at Hstep
-    rcases Hstep with ⟨⟨⟩, -⟩ | ⟨_, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, ⟨⟩, -⟩ |
-      ⟨_, ⟨⟩, -⟩ | ⟨_, ⟨⟩, rfl, rfl⟩ | ⟨_, ⟨⟩, -⟩ | ⟨⟨⟩, -⟩
     icases weakStateInterpDev σ $$ Hσ with ⟨Hd, Hcl⟩
     icases ediskDevAcc σ.wgdev .virtio $$ Hd with ⟨Hva, Hdcl⟩
     ihave %hv := devAgreeAt _ .virtio _ _ $$ [Hva Hv]
     · iframe Hva Hv
     subst hv
-    unfold dvirtio setDvirtio
-    imod devUpdateAt _ .virtio _ _ (delta (σ.wgdev.st .virtio)) $$ [Hva Hv] with ⟨Hva, Hv⟩
+    unfold ediskNolatch ediskStep at Hstep
+    rcases Hstep with ⟨⟨⟩, -⟩ | ⟨_, _, _, _, _, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ |
+      ⟨_, _, _, _, _, s0, s0', ⟨⟩, hpre0, hg0, -, -, rfl, rfl⟩ |
+      ⟨_, _, _, _, _, s0, ⟨⟩, hpre0, hor, -⟩ | ⟨_, _, _, _, _, s0, ⟨⟩, hpre0, -⟩ |
+      ⟨_, _, ⟨⟩, -⟩ | ⟨_, _, ⟨⟩, -⟩ | ⟨⟨⟩, -⟩ | ⟨⟨⟩, -⟩
+    · have h1 : (s0, true) = (s, true) := hpre0.symm.trans hpre
+      cases h1
+      have h2 : some s0' = some s' := hg0.symm.trans hg
+      cases h2
+      imod devUpdateAt _ .virtio _ _ s' $$ [Hva Hv] with ⟨Hva, Hv⟩
+      · iframe Hva Hv
+      ispecialize Hdcl $$ %s' Hva
+      ispecialize Hcl $$ %(σ.wgdev.set .virtio s') Hdcl
+      icases weakStateInterpDmaDev σ (σ.wgdev.set .virtio s') $$ Hcl with ⟨%Hwf, Hlog, Hlat, Hcl⟩
+      unfold setDvirtio
+      icases wlogSnapshot σ.wglog $$ Hlog with ⟨Hlog, #Hlb⟩
+      imod wlogUpdate σ.wglog [⟨paZ (pa s), bs s, some nDisk, ddevClass dws⟩] $$ Hlog with Hlog
+      imod Hcont $$ %σ %p0 %Hlt %Hwf Hlb Hp Hv Hlat with ⟨Hlat, Hwp⟩
+      have hmwf : wlogWf [(⟨paZ (pa s), bs s, some nDisk, ddevClass dws⟩ : Wmsg)] := by
+        intro m hm
+        rw [List.mem_singleton] at hm
+        subst hm
+        show 0 ≤ paZ (pa s) ∧ paZ (pa s) + ((bs s).length : Int) ≤ 18446744073709551616
+        exact ⟨by unfold paZ; omega, hfit⟩
+      imodintro
+      isplitl [Hcl Hlog Hlat]
+      · iapply Hcl $$ %_ %hmwf Hlog Hlat
+      · iexact Hwp
+    · have h1 : (s0, true) = (s, true) := hpre0.symm.trans hpre
+      cases h1
+      rcases hor with hn | hn
+      · rw [hg] at hn; cases hn
+      · exact absurd hram hn
+    · have h1 : (s0, false) = (s, true) := hpre0.symm.trans hpre
+      cases h1
+  · iframe Hv Hp Hcont
+
+/-- 5c′. ... THE OWN-GUARD SKIP: the folded part passes, the own guard declines (or the
+footprint is not DRAM) -- silent, the fabric becomes the folded state `s`, the program goes on. -/
+theorem ewpDiskWriteDevSkip (gen : Nat) (dws : Wstate) (pre : VirtioState → VirtioState × Bool)
+    (g : VirtioState → Option VirtioState) (pa : VirtioState → PAddr)
+    (bs : VirtioState → List (BitVec 8)) (kk : VirtioState → DM Dres) (v s : VirtioState)
+    (p : PlicState) :
+    gen = 0 → pre v = (s, true) → (g s = none ∨ ¬ ramBytes (pa s) (bs s).length) →
+    devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v ∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p ∗
+    ▷ (∀ p0 : PlicState, ⌜plicLatched p p0⌝ -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio s -∗
+        ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen (some (kk s)) dws)) ⊢
+    ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen (some (DWriteDev pre g pa bs kk)) dws) := by
+  intro hgen hpre hor
+  iintro ⟨Hv, Hp, Hcont⟩
+  iapply ewpEdiskLatch gen (some (DWriteDev pre g pa bs kk)) dws p (devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v)
+    (iprop(∀ p0 : PlicState, ⌜plicLatched p p0⌝ -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio s -∗
+        ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen (some (kk s)) dws))) hgen
+  isplitr
+  · imodintro
+    iintro %σ Hv Hσ
+    icases weakStateInterpDevRo σ $$ Hσ with ⟨Hd, -⟩
+    icases ediskDevAccRo σ.wgdev .virtio $$ Hd with ⟨Hva, -⟩
+    ihave %hv := devAgreeAt _ .virtio _ _ $$ [Hva Hv]
     · iframe Hva Hv
-    imodintro
-    isplitl [Hcl Hdcl Hva]
-    · iapply Hcl $$ %(σ.wgdev.set .virtio (delta (σ.wgdev.st .virtio)))
-      iapply Hdcl $$ %(delta (σ.wgdev.st .virtio)) Hva
-    · iapply Hcont $$ %p0 %Hlt Hp Hv
-  · iframe Hp Hv Hcont
+    ipureintro
+    subst hv
+    exact ⟨_, _, Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
+      ⟨pre, g, pa, bs, kk, s, rfl, hpre, hor, rfl, rfl⟩))))⟩
+  isplitr
+  · imodintro
+    iintro %p0 %σ %e' %σ' %Hlt %Hstep Hp Hv Hcont Hσ
+    icases weakStateInterpDev σ $$ Hσ with ⟨Hd, Hcl⟩
+    icases ediskDevAcc σ.wgdev .virtio $$ Hd with ⟨Hva, Hdcl⟩
+    ihave %hv := devAgreeAt _ .virtio _ _ $$ [Hva Hv]
+    · iframe Hva Hv
+    subst hv
+    unfold ediskNolatch ediskStep at Hstep
+    rcases Hstep with ⟨⟨⟩, -⟩ | ⟨_, _, _, _, _, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ |
+      ⟨_, _, _, _, _, s0, s0', ⟨⟩, hpre0, hg0, hram0, -⟩ |
+      ⟨_, _, _, _, _, s0, ⟨⟩, hpre0, -, rfl, rfl⟩ | ⟨_, _, _, _, _, s0, ⟨⟩, hpre0, -⟩ |
+      ⟨_, _, ⟨⟩, -⟩ | ⟨_, _, ⟨⟩, -⟩ | ⟨⟨⟩, -⟩ | ⟨⟨⟩, -⟩
+    · have h1 : (s0, true) = (s, true) := hpre0.symm.trans hpre
+      cases h1
+      rcases hor with hn | hn
+      · rw [hn] at hg0; cases hg0
+      · exact absurd hram0 hn
+    · have h1 : (s0, true) = (s, true) := hpre0.symm.trans hpre
+      cases h1
+      unfold setDvirtio
+      imod devUpdateAt _ .virtio _ _ s $$ [Hva Hv] with ⟨Hva, Hv⟩
+      · iframe Hva Hv
+      imodintro
+      isplitl [Hcl Hdcl Hva]
+      · iapply Hcl $$ %(σ.wgdev.set .virtio s)
+        iapply Hdcl $$ %s Hva
+      · iapply Hcont $$ %p0 %Hlt Hp Hv
+    · have h1 : (s0, false) = (s, true) := hpre0.symm.trans hpre
+      cases h1
+  · iframe Hv Hp Hcont
+
+/-- 5c″. ... THE ABORT: a folded guard fails -- silent, the burst ends with the fabric at the
+folded state `s` (MachCSL's task blocked at the guard). -/
+theorem ewpDiskWriteDevAbort (gen : Nat) (dws : Wstate) (pre : VirtioState → VirtioState × Bool)
+    (g : VirtioState → Option VirtioState) (pa : VirtioState → PAddr)
+    (bs : VirtioState → List (BitVec 8)) (kk : VirtioState → DM Dres) (v s : VirtioState)
+    (p : PlicState) :
+    gen = 0 → pre v = (s, false) →
+    devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v ∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p ∗
+    ▷ (∀ p0 : PlicState, ⌜plicLatched p p0⌝ -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio s -∗
+        ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen none dws)) ⊢
+    ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen (some (DWriteDev pre g pa bs kk)) dws) := by
+  intro hgen hpre
+  iintro ⟨Hv, Hp, Hcont⟩
+  iapply ewpEdiskLatch gen (some (DWriteDev pre g pa bs kk)) dws p (devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v)
+    (iprop(∀ p0 : PlicState, ⌜plicLatched p p0⌝ -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio s -∗
+        ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen none dws))) hgen
+  isplitr
+  · imodintro
+    iintro %σ Hv Hσ
+    icases weakStateInterpDevRo σ $$ Hσ with ⟨Hd, -⟩
+    icases ediskDevAccRo σ.wgdev .virtio $$ Hd with ⟨Hva, -⟩
+    ihave %hv := devAgreeAt _ .virtio _ _ $$ [Hva Hv]
+    · iframe Hva Hv
+    ipureintro
+    subst hv
+    exact ⟨_, _, Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
+      ⟨pre, g, pa, bs, kk, s, rfl, hpre, rfl, rfl⟩)))))⟩
+  isplitr
+  · imodintro
+    iintro %p0 %σ %e' %σ' %Hlt %Hstep Hp Hv Hcont Hσ
+    icases weakStateInterpDev σ $$ Hσ with ⟨Hd, Hcl⟩
+    icases ediskDevAcc σ.wgdev .virtio $$ Hd with ⟨Hva, Hdcl⟩
+    ihave %hv := devAgreeAt _ .virtio _ _ $$ [Hva Hv]
+    · iframe Hva Hv
+    subst hv
+    unfold ediskNolatch ediskStep at Hstep
+    rcases Hstep with ⟨⟨⟩, -⟩ | ⟨_, _, _, _, _, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ |
+      ⟨_, _, _, _, _, s0, s0', ⟨⟩, hpre0, -⟩ |
+      ⟨_, _, _, _, _, s0, ⟨⟩, hpre0, -⟩ | ⟨_, _, _, _, _, s0, ⟨⟩, hpre0, rfl, rfl⟩ |
+      ⟨_, _, ⟨⟩, -⟩ | ⟨_, _, ⟨⟩, -⟩ | ⟨⟨⟩, -⟩ | ⟨⟨⟩, -⟩
+    · have h1 : (s0, true) = (s, false) := hpre0.symm.trans hpre
+      cases h1
+    · have h1 : (s0, true) = (s, false) := hpre0.symm.trans hpre
+      cases h1
+    · have h1 : (s0, false) = (s, false) := hpre0.symm.trans hpre
+      cases h1
+      unfold setDvirtio
+      imod devUpdateAt _ .virtio _ _ s $$ [Hva Hv] with ⟨Hva, Hv⟩
+      · iframe Hva Hv
+      imodintro
+      isplitl [Hcl Hdcl Hva]
+      · iapply Hcl $$ %(σ.wgdev.set .virtio s)
+        iapply Hdcl $$ %s Hva
+      · iapply Hcont $$ %p0 %Hlt Hp Hv
+  · iframe Hv Hp Hcont
+
+/-- 5e. THE RING POP (`DPop h k`, W-DISK): the head is not in flight at the fabric `v` -- it goes
+in flight, `seen + 1` (`VirtioProg.popState`), and the program continues at the popped state. -/
+theorem ewpDiskPop (gen : Nat) (dws : Wstate) (h : BitVec 16) (kk : VirtioState → DM Dres)
+    (v : VirtioState) (p : PlicState) :
+    gen = 0 → (Virtio.phase v h).isSome = false →
+    devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v ∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p ∗
+    ▷ (∀ p0 : PlicState, ⌜plicLatched p p0⌝ -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗
+        devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio (VirtioProg.popState v h) -∗
+        ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen (some (kk (VirtioProg.popState v h))) dws)) ⊢
+    ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen (some (DPop h kk)) dws) := by
+  intro hgen hph
+  iintro ⟨Hv, Hp, Hcont⟩
+  iapply ewpEdiskLatch gen (some (DPop h kk)) dws p (devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v)
+    (iprop(∀ p0 : PlicState, ⌜plicLatched p p0⌝ -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗
+        devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio (VirtioProg.popState v h) -∗
+        ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen (some (kk (VirtioProg.popState v h))) dws))) hgen
+  isplitr
+  · imodintro
+    iintro %σ Hv Hσ
+    icases weakStateInterpDevRo σ $$ Hσ with ⟨Hd, -⟩
+    icases ediskDevAccRo σ.wgdev .virtio $$ Hd with ⟨Hva, -⟩
+    ihave %hv := devAgreeAt _ .virtio _ _ $$ [Hva Hv]
+    · iframe Hva Hv
+    ipureintro
+    subst hv
+    exact ⟨_, _, Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
+      ⟨h, kk, rfl, hph, rfl, rfl⟩)))))))⟩
+  isplitr
+  · imodintro
+    iintro %p0 %σ %e' %σ' %Hlt %Hstep Hp Hv Hcont Hσ
+    icases weakStateInterpDev σ $$ Hσ with ⟨Hd, Hcl⟩
+    icases ediskDevAcc σ.wgdev .virtio $$ Hd with ⟨Hva, Hdcl⟩
+    ihave %hv := devAgreeAt _ .virtio _ _ $$ [Hva Hv]
+    · iframe Hva Hv
+    subst hv
+    unfold ediskNolatch ediskStep at Hstep
+    rcases Hstep with ⟨⟨⟩, -⟩ | ⟨_, _, _, _, _, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ |
+      ⟨_, _, _, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, _, _, _, ⟨⟩, -⟩ |
+      ⟨_, _, ⟨⟩, hph0, -⟩ | ⟨_, _, ⟨⟩, -, rfl, rfl⟩ | ⟨⟨⟩, -⟩ | ⟨⟨⟩, -⟩
+    · exact absurd (hph0.symm.trans hph) (by decide)
+    · unfold dvirtio setDvirtio
+      imod devUpdateAt _ .virtio _ _ (VirtioProg.popState (σ.wgdev.st .virtio) h) $$ [Hva Hv]
+        with ⟨Hva, Hv⟩
+      · iframe Hva Hv
+      imodintro
+      isplitl [Hcl Hdcl Hva]
+      · iapply Hcl $$ %(σ.wgdev.set .virtio (VirtioProg.popState (σ.wgdev.st .virtio) h))
+        iapply Hdcl $$ %(VirtioProg.popState (σ.wgdev.st .virtio) h) Hva
+      · iapply Hcont $$ %p0 %Hlt Hp Hv
+  · iframe Hv Hp Hcont
+
+/-- 5e′. ... REFUSED: the head is already in flight at `v` -- nothing moves, the burst ends. -/
+theorem ewpDiskPopRefused (gen : Nat) (dws : Wstate) (h : BitVec 16) (kk : VirtioState → DM Dres)
+    (v : VirtioState) (p : PlicState) :
+    gen = 0 → (Virtio.phase v h).isSome = true →
+    devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v ∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p ∗
+    ▷ (∀ p0 : PlicState, ⌜plicLatched p p0⌝ -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v -∗
+        ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen none dws)) ⊢
+    ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen (some (DPop h kk)) dws) := by
+  intro hgen hph
+  iintro ⟨Hv, Hp, Hcont⟩
+  iapply ewpEdiskLatch gen (some (DPop h kk)) dws p (devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v)
+    (iprop(∀ p0 : PlicState, ⌜plicLatched p p0⌝ -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .plic p0 -∗ devFragAt (hlc := hlc) (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) .virtio v -∗
+        ewpTriv (hlc := hlc) (GF := GF) ⊤ (.EDisk gen none dws))) hgen
+  isplitr
+  · imodintro
+    iintro %σ Hv Hσ
+    icases weakStateInterpDevRo σ $$ Hσ with ⟨Hd, -⟩
+    icases ediskDevAccRo σ.wgdev .virtio $$ Hd with ⟨Hva, -⟩
+    ihave %hv := devAgreeAt _ .virtio _ _ $$ [Hva Hv]
+    · iframe Hva Hv
+    ipureintro
+    subst hv
+    exact ⟨_, _, Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
+      ⟨h, kk, rfl, hph, rfl, rfl⟩))))))⟩
+  isplitr
+  · imodintro
+    iintro %p0 %σ %e' %σ' %Hlt %Hstep Hp Hv Hcont Hσ
+    icases weakStateInterpDevRo σ $$ Hσ with ⟨Hd, Hcl⟩
+    icases ediskDevAccRo σ.wgdev .virtio $$ Hd with ⟨Hva, Hdcl⟩
+    ihave %hv := devAgreeAt _ .virtio _ _ $$ [Hva Hv]
+    · iframe Hva Hv
+    subst hv
+    unfold ediskNolatch ediskStep at Hstep
+    rcases Hstep with ⟨⟨⟩, -⟩ | ⟨_, _, _, _, _, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ |
+      ⟨_, _, _, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, _, _, _, ⟨⟩, -⟩ |
+      ⟨_, _, ⟨⟩, -, rfl, rfl⟩ | ⟨_, _, ⟨⟩, hph0, -⟩ | ⟨⟨⟩, -⟩ | ⟨⟨⟩, -⟩
+    · imodintro
+      isplitl [Hcl Hdcl Hva]
+      · iapply Hcl
+        iapply Hdcl $$ Hva
+      · iapply Hcont $$ %p0 %Hlt Hp Hv
+    · exact absurd (hph.symm.trans hph0) (by decide)
+  · iframe Hv Hp Hcont
 
 /-- 5f. IDLE (`DRet DIdle`): nothing was pending; back to the start. -/
 theorem ewpDiskIdle (gen : Nat) (dws : Wstate) (p : PlicState) :
@@ -608,13 +830,15 @@ theorem ewpDiskIdle (gen : Nat) (dws : Wstate) (p : PlicState) :
   · imodintro
     iintro %σ _ _
     ipureintro
-    exact ⟨_, _, Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ⟨rfl, rfl, rfl⟩)))))⟩
+    exact ⟨_, _, Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+      ⟨rfl, rfl, rfl⟩))))))))⟩
   isplitr
   · imodintro
     iintro %p0 %σ %e' %σ' %Hlt %Hstep Hp _ Hcont Hσ
     unfold ediskNolatch ediskStep at Hstep
-    rcases Hstep with ⟨⟨⟩, -⟩ | ⟨_, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, ⟨⟩, -⟩ |
-      ⟨_, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ | ⟨-, rfl, hσ⟩
+    rcases Hstep with ⟨⟨⟩, -⟩ | ⟨_, _, _, _, _, ⟨⟩, -⟩ | ⟨_, ⟨⟩, -⟩ |
+      ⟨_, _, _, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, _, _, _, ⟨⟩, -⟩ | ⟨_, _, _, _, _, _, ⟨⟩, -⟩ |
+      ⟨_, _, ⟨⟩, -⟩ | ⟨_, _, ⟨⟩, -⟩ | ⟨⟨⟩, -⟩ | ⟨-, rfl, hσ⟩
     subst σ'
     imodintro
     iframe Hσ

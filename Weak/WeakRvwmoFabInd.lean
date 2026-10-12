@@ -43,6 +43,10 @@ closing comment enumerates FIVE obligations (O1–O5) for the CONFORMANCE restri
    linearization ↦ the Lean-only `WeakRvwmoFabInd.lbgGlinEids` (`decide +kernel`) plus `rfl`;
    Lean-only `WeakRvwmoFabInd.eadmTag` (administrative items carry no tag).  Rocq's
    `Print Assumptions` audit is not reproduced (the lint bans axioms).
+4. W-DISK (`WeakRvwmoFab` deviation 4): `gfexecConfRen` / `gfexecConfHull` transport the
+   INTERIM `LDev`-free disk-row clause (`emDevfreeRen`, `emDevfreePrefix`); `fconfRealize`,
+   `hullRealizableOfAcyclicF` and `t2linSupplyF` take the boot pool's QUIET hypothesis
+   `∀ i, i < N → devQuiet (boot i)`, passed to `fconfSupply`.
 
 **Rocq → Lean name map.**  `hemitf_ren` `hemitfRen`, `hart_conff_ren` `hartConffRen`,
 `hemitf_tag_lt` `hemitfTagLt`, `hemitf_tag_ge` `hemitfTagGe`, `hemitf_prefix` `hemitfPrefix`,
@@ -304,8 +308,9 @@ theorem gfexecConfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : Efab)
       rw [hrow0] at hrow'
       simp only [Option.map_some, Option.some.injEq] at hrow'
       subst hrow'
-      obtain ⟨em, dvi, dvo, hem, hiff, hpin, hfi, hdep⟩ := hc i row hrow0
-      refine ⟨emRen π em, dvi, dvo, hartConffRen π i row (boot i) dvi dvo em hem, ?_, ?_, ?_, ?_⟩
+      obtain ⟨em, dvi, dvo, hem, hiff, hpin, hfi, hdep, hdisk⟩ := hc i row hrow0
+      refine ⟨emRen π em, dvi, dvo, hartConffRen π i row (boot i) dvi dvo em hem, ?_, ?_, ?_, ?_,
+        fun dp hp => emDevfreeRen π em (hdisk dp hp)⟩
       · intro k hk
         rw [List.length_map] at hk
         rw [hdev, isDevBlockRen]
@@ -359,10 +364,11 @@ theorem gfexecConfHull (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
         rw [hrow] at hrow'
         simp only [Option.bind_some, Option.some.injEq] at hrow'
         subst hrow'
-        obtain ⟨em, dvi, dvo, hem, hiff, hpin, hfi, hdep⟩ := hc i row hrow
+        obtain ⟨em, dvi, dvo, hem, hiff, hpin, hfi, hdep, hdisk⟩ := hc i row hrow
         obtain ⟨em', hem', hpre, hdevb⟩ := hartConffPrefix i row (boot i) dvi dvo em c hem
         refine ⟨emRen (hren GF.gfGd.gdG cs) em', dvi, dvo,
-          hartConffRen _ _ _ _ _ _ _ hem', ?_, ?_, ?_, ?_⟩
+          hartConffRen _ _ _ _ _ _ _ hem', ?_, ?_, ?_, ?_,
+          fun dp hp => emDevfreeRen _ em' (emDevfreePrefix em em' hpre (hdisk dp hp))⟩
         · intro k hk
           rw [List.length_map, List.length_take] at hk
           have hkc : k < c := by omega
@@ -416,6 +422,7 @@ theorem fconfRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     gfexecConf boot d0 fab GF →
     (∀ x, ¬ tc (racyF GF) x x) →
     GF.gfGd.gdG.gxProg.length ≤ N →
+    (∀ i, i < N → devQuiet (boot i)) →
     ∃ (c : Cand) (pi : Nat → Nat) (GF' : Gfexec),
       srvwmoConsistent c ∧
       c.cdImg = GF.gfGd.gdG.gxImg ∧
@@ -429,7 +436,7 @@ theorem fconfRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
           pst 0 = (List.range' 0 N).map boot ∧
           execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun k => fab (dcnt GF' c.cdTr k))
             (candExec c)) := by
-  intro hc hconf hacy hN
+  intro hc hconf hacy hN hquiet
   have hcons : rvwmoMinusDepsConsistent GF.gfGd := hc.1
   have hacyD : ∀ x, ¬ tc (racyD GF.gfGd) x x := fun x hcyc =>
     hacy x (tcMono _ _ x x (fun a b h => Or.inl h) hcyc)
@@ -441,7 +448,7 @@ theorem fconfRealize (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
   refine ⟨c, pi, ⟨GD', GF.gfDev⟩, hsr, ?_, hrr, rfl, hconf', hrow, fun hord => ?_⟩
   · rw [himg, rowsRelImg pi _ _ hrr]
   · obtain ⟨pst, hpst0, _, hprg⟩ := fconfSupply c boot d0 fab ⟨GD', GF.gfDev⟩ N hconf' hrow
-      (by rw [rowsRelNharts pi _ _ hrr]; exact hN) hord
+      (by rw [rowsRelNharts pi _ _ hrr]; exact hN) hord hquiet
     refine ⟨pst, hpst0, ?_⟩
     rw [himg]
     exact hprg
@@ -455,6 +462,7 @@ theorem hullRealizableOfAcyclicF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat �
     properCutF GF cs →
     (∀ x, ¬ tc (racyF (gfHull GF cs)) x x) →
     GF.gfGd.gdG.gxProg.length ≤ N →
+    (∀ i, i < N → devQuiet (boot i)) →
     ∃ (c : Cand) (pi : Nat → Nat) (GF' : Gfexec),
       srvwmoConsistent c ∧
       c.cdImg = GF.gfGd.gdG.gxImg ∧
@@ -467,7 +475,7 @@ theorem hullRealizableOfAcyclicF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat �
           pst 0 = (List.range' 0 N).map boot ∧
           execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun k => fab (dcnt GF' c.cdTr k))
             (candExec c)) := by
-  intro hc hconf hpc hacy hN
+  intro hc hconf hpc hacy hN hquiet
   have hok : hullOk GF.gfGd.gdG cs := properCutOk _ _ hpc.1
   have hch : gfexecConsistent (gfHull GF cs) := gfHullConsistent GF cs hc hok hpc.2
   have hcnf : gfexecConf boot d0 fab (gfHull GF cs) :=
@@ -477,7 +485,7 @@ theorem hullRealizableOfAcyclicF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat �
     change (gxHull GF.gfGd.gdG cs).gxProg.length ≤ N
     omega
   obtain ⟨c, pi, GF', hsr, himg, hrr, hdev, hconf', hrow, hsup⟩ :=
-    fconfRealize boot d0 fab (gfHull GF cs) N hch hcnf hacy hNh
+    fconfRealize boot d0 fab (gfHull GF cs) N hch hcnf hacy hNh hquiet
   refine ⟨c, pi, GF', hsr, himg.trans (gxhImg _ _), hdev, hconf', fun i => ?_, hsup⟩
   rw [hrow i, hrr.2.1, List.getElem?_map]
   change (Option.map _ ((gxHull GF.gfGd.gdG cs).gxProg[i]?)).getD [] = _
@@ -526,6 +534,7 @@ theorem t2linSupplyF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     gfexecConsistent GF →
     gfexecConf boot d0 fab GF →
     GF.gfGd.gdG.gxProg.length ≤ N →
+    (∀ i, i < N → devQuiet (boot i)) →
     ∃ (c : Cand) (pi : Nat → Nat) (GF' : Gfexec),
       srvwmoConsistent c ∧
       c.cdImg = GF.gfGd.gdG.gxImg ∧
@@ -536,9 +545,10 @@ theorem t2linSupplyF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
           pst 0 = (List.range' 0 N).map boot ∧
           execProgOk' (pstepPin c.cdImg pstepEv) pclsEv pst (fun k => fab (dcnt GF' c.cdTr k))
             (candExec c)) := by
-  intro hk hcons hconf hN
+  intro hk hcons hconf hN hquiet
   obtain ⟨c, pi, GF', hsr, himg, _, hdev, hconf', _, hsup⟩ :=
     fconfRealize boot d0 fab GF N hcons hconf (t2linOfCycleKillF boot d0 fab hk GF hcons hconf) hN
+      hquiet
   exact ⟨c, pi, GF', hsr, himg, hdev, hconf', hsup⟩
 
 /-! ## 5. THE DEV-ORDER FINDING -/

@@ -58,7 +58,7 @@ RECORDED DECISIONS (Rocq D1–D5):
    - The disk's PLIC LATCH arm (Rocq's eighth `edisk_step` disjunct, `plic_latch` on
      `dev_irq_level virtio_irq_id`) is DROPPED: in Lean the PLIC program itself `sample`s every
      source's level (`devLevel`, which for the disk is `(devSig .virtio).irq`) and latches it,
-     so the latch is a step of the `EDev .plic` thread.  `edisk_step` has seven arms.
+     so the latch is a step of the `EDev .plic` thread (the disk arms: deviation 14).
    - `eprim_step_{uart,plic}_inv` ↦ `eprimStepDevInv`; `eprim_step_{uart,plic}_dead` ↦
      `eprimStepDevDead`; `eprim_step_uart_idle` ↦ `eprimStepDevLive` (a live device thread
      always steps, `wdevStepTotal`); `eprim_step_plic_wire` ↦ `eprimStepDevSetPin` (the wire
@@ -119,6 +119,15 @@ RECORDED DECISIONS (Rocq D1–D5):
    stated with WeakLang's clauses.
 13. The power-off successor `WGState … (S gen) false …` is `{ σ with wggen := σ.wggen + 1,
    wgpow := false }` (keeps WeakLang's Lean-only `wgitv`/`wgrt`).
+14. W-DISK (plan `notes/weak-allocproc-plan.md` §C "W-DISK", [OWN.29]–[OWN.32]): the disk runs the
+   program ALIGNED to MachCSL's `Virtio.serve` (`Weak/VirtioProg.lean`), so `ediskStep`'s arms are
+   START, `DRead`, `DFence`, the three outcomes of a `DWriteDev` (STORE: the log append AND the
+   fabric move `setDvirtio σ.wgdev s'` in one step, under `ramBytes` of the footprint; OWN-GUARD
+   SKIP and ABORT: silent, the fabric becomes the folded state), the two of a `DPop` (refused;
+   the pop `VirtioProg.popState`), the stall self-loop and `DIdle`.  Rocq's COMMIT arm (`DDone`)
+   and its malformed-chain arm with the arbitrary store chain `dm_wild_chain` /
+   `dm_wild_chain_wf` are RETIRED (not ported any more); `ediskStepWf`, `ediskStepWs` and
+   `eprimStepDiskReducible` are re-proved over the new arms.  Lean-only `setDvirtioSelf`.
 
 **File-qualified names:** none (no name of this file is in `notes/weak-port-dupnames.json`).
 
@@ -140,8 +149,7 @@ test `erw_of_<x>` `erwOf<X>` (e.g. `erw_of_lw_rd` `erwOfLwRd`, `erw_of_csrrci_ss
 `ebarPark`, `efence_apply` `efenceApply`, `efence_barrier_post` `efenceBarrierPost`,
 `efence_apply_le` `efenceApplyLe`, `emonad_step` `emonadStep`, `ecycle_step` `ecycleStep`,
 `ddev_ak` `ddevAk`, `ddev_class` `ddevClass`, `ddev_class_eq` `ddevClassEq`, `ddev_ak_plain`
-`ddevAkPlain`, `dm_wild_chain` `DmWildChain` (`dm_wild_ret`/`dm_wild_write` `.ret`/`.write`),
-`dm_wild_chain_wf` `dmWildChainWf`, `edisk_step` `ediskStep`, `edp_wf` `edpWf`, `edp_wf_none`
+`ddevAkPlain`, `edisk_step` `ediskStep` (re-stated by W-DISK, deviation 14), `edp_wf` `edpWf`, `edp_wf_none`
 `edpWfNone`, `eboot_shape` `ebootShape`, `ethread_live` `ethreadLive`,
 `ethread_live_wthread_live` `ethreadLiveWthreadLive`, `eprim_step` `eprimStep`,
 `weak_ev_lang_mixin` `weakEvLangMixin`, `weak_ev_lang` `weakEvLang`, `eprim_step_loop_inv`
@@ -910,20 +918,21 @@ theorem ddevClassEq (ws : Wstate) : ddevClass ws = if ws.wRelp then .WCrel else 
 
 theorem ddevAkPlain : ddevAk = classify (.AK_explicit ⟨.AV_plain, .AS_normal⟩) := rfl
 
-/-- THE MALFORMED-CHAIN RESIDUE (assumption 4): an arbitrary chain of ordinary stores. -/
-inductive DmWildChain : DM Dres → Prop where
-  | ret : DmWildChain (DRet DIdle)
-  | write (pa : PAddr) (bs : List (BitVec 8)) (k : DM Dres) :
-      bs ≠ [] → DmWildChain k → DmWildChain (DWrite pa bs k)
+/-- The fabric write-back of the disk's own state is the identity (Lean-only). -/
+theorem setDvirtioSelf (ds : DevStates) : setDvirtio ds (dvirtio ds) = ds := by
+  cases ds with
+  | mk st =>
+    simp only [setDvirtio, dvirtio, DevStates.set, DevStates.mk.injEq]
+    funext d'
+    split
+    · next h => subst h; rfl
+    · rfl
 
-theorem dmWildChainWf (p : DM Dres) : DmWildChain p → DmWf p := by
-  intro h
-  induction h with
-  | ret => exact DmWf.ret _
-  | write pa bs k hne _ ih => exact DmWf.write pa bs k hne ih
-
-/-- THE DISK'S STEP: one arm per node of the residual program, plus the two fabric arms
-(start, commit); the PLIC latch is the PLIC program's (deviation 2). -/
+/-- THE DISK'S STEP (W-DISK): one arm per node of the residual program -- START, `DRead`,
+`DFence`, the three outcomes of a `DWriteDev` (store / own-guard skip / abort), the two of a
+`DPop` (refused / pop), the stall self-loop and the idle end (`Weak/VirtioProg.lean` header);
+the PLIC latch is the PLIC program's (deviation 2).  Every `DWriteDev` / `DPop` arm reads the
+CURRENT fabric `dvirtio σ.wgdev`; a store sets BOTH the log and the fabric. -/
 def ediskStep (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ : WGState) (e' : EExpr)
     (σ' : WGState) : Prop :=
   -- START: read the fabric's virtio state and elaborate the program (FABRIC-TOUCHING)
@@ -937,27 +946,52 @@ def ediskStep (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ : WGState) 
      e' = .EDisk gen (some (k (tvs.map Prod.snd))) (loadPostRun dws aq (paZ pa) (tvs.map Prod.fst)) ∧
      σ' = σ)
   ∨
-  -- DWrite: EXACTLY the hart's RAM-write arm, at `dws`, tid `some nDisk`, class `ddevClass`
-  (∃ (pa : PAddr) (bs : List (BitVec 8)) (k : DM Dres),
-     dp = some (DWrite pa bs k) ∧ bs ≠ [] ∧
-     e' = .EDisk gen (some k) (storePostRun dws false (paZ pa) bs.length (σ.wglog.length + 1)) ∧
-     σ' = ewgLog σ (σ.wglog ++ [⟨paZ pa, bs, some nDisk, ddevClass dws⟩]))
-  ∨
   -- DFence: the device-side write barrier, `fence rw,rw`
   (∃ k : DM Dres,
      dp = some (DFence k) ∧ e' = .EDisk gen (some k) (Weak.fencePost dws true true true true) ∧
      σ' = σ)
   ∨
-  -- COMMIT: apply the burst's delta to the CURRENT fabric state (FABRIC-TOUCHING)
-  (∃ delta : VirtioState → VirtioState,
-     dp = some (DRet (DDone delta)) ∧ e' = .EDisk gen none dws ∧
-     σ' = ewgDev σ (setDvirtio σ.wgdev (delta (dvirtio σ.wgdev))))
+  -- DWriteDev, THE STORE: the folded part passes, the own guard answers, the footprint is DRAM;
+  -- the hart's RAM-write arm at `dws` (tid `some nDisk`, class `ddevClass`) AND the fabric move
+  (∃ (pre : VirtioState → VirtioState × Bool) (g : VirtioState → Option VirtioState)
+      (pa : VirtioState → PAddr) (bs : VirtioState → List (BitVec 8)) (k : VirtioState → DM Dres)
+      (s s' : VirtioState),
+     dp = some (DWriteDev pre g pa bs k) ∧ pre (dvirtio σ.wgdev) = (s, true) ∧ g s = some s' ∧
+     ramBytes (pa s) (bs s).length ∧ bs s ≠ [] ∧
+     e' = .EDisk gen (some (k s)) (storePostRun dws false (paZ (pa s)) (bs s).length (σ.wglog.length + 1)) ∧
+     σ' = ewgDev (ewgLog σ (σ.wglog ++ [⟨paZ (pa s), bs s, some nDisk, ddevClass dws⟩]))
+       (setDvirtio σ.wgdev s'))
   ∨
-  -- DWild: the malformed chain becomes an arbitrary store chain
-  (∃ prog' : DM Dres,
-     dp = some (DRet DWild) ∧ DmWildChain prog' ∧ e' = .EDisk gen (some prog') dws ∧ σ' = σ)
+  -- DWriteDev, THE OWN-GUARD SKIP: the folded moves stay, nothing is written, the program goes on
+  (∃ (pre : VirtioState → VirtioState × Bool) (g : VirtioState → Option VirtioState)
+      (pa : VirtioState → PAddr) (bs : VirtioState → List (BitVec 8)) (k : VirtioState → DM Dres)
+      (s : VirtioState),
+     dp = some (DWriteDev pre g pa bs k) ∧ pre (dvirtio σ.wgdev) = (s, true) ∧
+     (g s = none ∨ ¬ ramBytes (pa s) (bs s).length) ∧
+     e' = .EDisk gen (some (k s)) dws ∧ σ' = ewgDev σ (setDvirtio σ.wgdev s))
   ∨
-  -- nothing pending
+  -- DWriteDev, THE ABORT: a folded guard fails, the burst ends with the moves made before it
+  (∃ (pre : VirtioState → VirtioState × Bool) (g : VirtioState → Option VirtioState)
+      (pa : VirtioState → PAddr) (bs : VirtioState → List (BitVec 8)) (k : VirtioState → DM Dres)
+      (s : VirtioState),
+     dp = some (DWriteDev pre g pa bs k) ∧ pre (dvirtio σ.wgdev) = (s, false) ∧
+     e' = .EDisk gen none dws ∧ σ' = ewgDev σ (setDvirtio σ.wgdev s))
+  ∨
+  -- DPop, REFUSED: the head is already in flight; back to the start (FABRIC-TOUCHING)
+  (∃ (h : BitVec 16) (k : VirtioState → DM Dres),
+     dp = some (DPop h k) ∧ (Virtio.phase (dvirtio σ.wgdev) h).isSome = true ∧
+     e' = .EDisk gen none dws ∧ σ' = σ)
+  ∨
+  -- DPop: the head goes in flight, `seen + 1` (FABRIC-MOVING)
+  (∃ (h : BitVec 16) (k : VirtioState → DM Dres),
+     dp = some (DPop h k) ∧ (Virtio.phase (dvirtio σ.wgdev) h).isSome = false ∧
+     e' = .EDisk gen (some (k (VirtioProg.popState (dvirtio σ.wgdev) h))) dws ∧
+     σ' = ewgDev σ (setDvirtio σ.wgdev (VirtioProg.popState (dvirtio σ.wgdev) h)))
+  ∨
+  -- the stalled request: a silent self-loop
+  (dp = some (DRet DStall) ∧ e' = .EDisk gen (some (DRet DStall)) dws ∧ σ' = σ)
+  ∨
+  -- nothing (more) to do
   (dp = some (DRet DIdle) ∧ e' = .EDisk gen none dws ∧ σ' = σ)
 
 /-- THE RESIDUAL PROGRAM'S WELL-FORMEDNESS. -/
@@ -1271,8 +1305,10 @@ theorem edevStepWs (gen : Nat) (d : DevId) (tid : TaskId) (m m' : DevProg d) (σ
 
 theorem ediskStepWs (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ : WGState)
     (e' : EExpr) (σ' : WGState) : ediskStep gen dp dws σ e' σ' → σ'.wgws = σ.wgws := by
-  rintro (⟨-, -, rfl⟩ | ⟨pa, n, aq, k, tvs, -, -, -, -, rfl⟩ | ⟨pa, bs, k, -, -, -, rfl⟩ |
-    ⟨k, -, -, rfl⟩ | ⟨delta, -, -, rfl⟩ | ⟨prog', -, -, -, rfl⟩ | ⟨-, -, rfl⟩) <;> rfl
+  rintro (⟨-, -, rfl⟩ | ⟨_, _, _, _, _, -, -, -, -, rfl⟩ | ⟨_, -, -, rfl⟩ |
+    ⟨_, _, _, _, _, _, _, -, -, -, -, -, -, rfl⟩ | ⟨_, _, _, _, _, _, -, -, -, -, rfl⟩ |
+    ⟨_, _, _, _, _, _, -, -, -, rfl⟩ | ⟨_, _, -, -, -, rfl⟩ | ⟨_, _, -, -, -, rfl⟩ |
+    ⟨-, -, rfl⟩ | ⟨-, -, rfl⟩) <;> rfl
 
 /-! ## 10. Reducibility helpers -/
 
@@ -1326,24 +1362,34 @@ theorem ediskStepWf (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ : WGS
     edpWf dp → ediskStep gen dp dws σ e' σ' →
     ∃ dp' dws', e' = .EDisk gen dp' dws' ∧ edpWf dp' := by
   intro hwf h
-  rcases h with ⟨-, rfl, -⟩ | ⟨pa, n, aq, k, tvs, rfl, -, -, rfl, -⟩ | ⟨pa, bs, k, rfl, -, rfl, -⟩ |
-    ⟨k, rfl, rfl, -⟩ | ⟨delta, -, rfl, -⟩ | ⟨prog', -, hch, rfl, -⟩ | ⟨-, rfl, -⟩
+  rcases h with ⟨-, rfl, -⟩ | ⟨pa, n, aq, k, tvs, rfl, -, -, rfl, -⟩ | ⟨k, rfl, rfl, -⟩ |
+    ⟨pre, g, pa, bs, k, s, s', rfl, -, -, -, -, rfl, -⟩ |
+    ⟨pre, g, pa, bs, k, s, rfl, -, -, rfl, -⟩ | ⟨pre, g, pa, bs, k, s, rfl, -, rfl, -⟩ |
+    ⟨h, k, rfl, -, rfl, -⟩ | ⟨h, k, rfl, -, rfl, -⟩ | ⟨rfl, rfl, -⟩ | ⟨-, rfl, -⟩
   · exact ⟨_, _, rfl, virtioProgWf _⟩
   · have hw : DmWf (DRead pa n aq k) := hwf
     cases hw with
     | read _ _ _ _ _ hk => exact ⟨_, _, rfl, hk _⟩
-  · have hw : DmWf (DWrite pa bs k) := hwf
-    cases hw with
-    | write _ _ _ _ hk => exact ⟨_, _, rfl, hk⟩
   · have hw : DmWf (DFence k) := hwf
     cases hw with
     | fence _ hk => exact ⟨_, _, rfl, hk⟩
+  · have hw : DmWf (DWriteDev pre g pa bs k) := hwf
+    cases hw with
+    | writeDev _ _ _ _ _ _ _ _ hk => exact ⟨_, _, rfl, hk _⟩
+  · have hw : DmWf (DWriteDev pre g pa bs k) := hwf
+    cases hw with
+    | writeDev _ _ _ _ _ _ _ _ hk => exact ⟨_, _, rfl, hk _⟩
   · exact ⟨_, _, rfl, trivial⟩
-  · exact ⟨_, _, rfl, dmWildChainWf _ hch⟩
+  · exact ⟨_, _, rfl, trivial⟩
+  · have hw : DmWf (DPop h k) := hwf
+    cases hw with
+    | pop _ _ hk => exact ⟨_, _, rfl, hk _⟩
+  · exact ⟨_, _, rfl, DmWf.ret _⟩
   · exact ⟨_, _, rfl, trivial⟩
 
 /-- THE DISK IS REDUCIBLE except at a `DRead` (whose answerability is the driver's
-obligation, not a property of the language). -/
+obligation, not a property of the language): a `DWriteDev` always takes one of its three
+outcomes, a `DPop` one of its two, a stall loops. -/
 theorem eprimStepDiskReducible (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate) (σ : WGState) :
     ethreadLive σ gen → edpWf dp →
     (∀ pa n aq k, dp ≠ some (DRead pa n aq k)) →
@@ -1354,20 +1400,48 @@ theorem eprimStepDiskReducible (gen : Nat) (dp : Option (DM Dres)) (dws : Wstate
     fun e' σ' hs => ⟨e', σ', rfl, rfl, Or.inl ⟨hl, hs⟩⟩
   match dp, hwf, hnr, hstep with
   | none, _, _, hstep => exact hstep _ _ (Or.inl ⟨rfl, rfl, rfl⟩)
-  | some (DRet (DDone delta)), _, _, hstep =>
-    exact hstep _ _ (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨delta, rfl, rfl, rfl⟩)))))
-  | some (DRet DWild), _, _, hstep =>
-    exact hstep _ _
-      (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨DRet DIdle, rfl, .ret, rfl, rfl⟩))))))
   | some (DRet DIdle), _, _, hstep =>
-    exact hstep _ _ (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ⟨rfl, rfl, rfl⟩))))))
+    exact hstep _ _ (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+      ⟨rfl, rfl, rfl⟩)))))))))
+  | some (DRet DStall), _, _, hstep =>
+    exact hstep _ _ (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
+      ⟨rfl, rfl, rfl⟩)))))))))
   | some (DRead pa n aq k), _, hnr, _ => exact absurd rfl (hnr pa n aq k)
-  | some (DWrite pa bs k), hwf, _, hstep =>
-    have hw : DmWf (DWrite pa bs k) := hwf
-    cases hw with
-    | write _ _ _ hne _ =>
-      exact hstep _ _ (Or.inr (Or.inr (Or.inl ⟨pa, bs, k, rfl, hne, rfl, rfl⟩)))
   | some (DFence k), _, _, hstep =>
-    exact hstep _ _ (Or.inr (Or.inr (Or.inr (Or.inl ⟨k, rfl, rfl, rfl⟩))))
+    exact hstep _ _ (Or.inr (Or.inr (Or.inl ⟨k, rfl, rfl, rfl⟩)))
+  | some (DWriteDev pre g pa bs k), hwf, _, hstep =>
+    have hw : DmWf (DWriteDev pre g pa bs k) := hwf
+    cases hw with
+    | writeDev _ _ _ _ _ n hn hlen _ =>
+      rcases hpre : pre (dvirtio σ.wgdev) with ⟨s, b⟩
+      cases b with
+      | false =>
+        exact hstep _ _ (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
+          ⟨pre, g, pa, bs, k, s, rfl, hpre, rfl, rfl⟩))))))
+      | true =>
+        by_cases hw : (∃ s', g s = some s') ∧ ramBytes (pa s) (bs s).length
+        · obtain ⟨⟨s', hg⟩, hram⟩ := hw
+          have hne : bs s ≠ [] := by
+            intro he
+            have := hlen s
+            rw [he] at this
+            exact hn this.symm
+          exact hstep _ _ (Or.inr (Or.inr (Or.inr (Or.inl
+            ⟨pre, g, pa, bs, k, s, s', rfl, hpre, hg, hram, hne, rfl, rfl⟩))))
+        · have hor : g s = none ∨ ¬ ramBytes (pa s) (bs s).length := by
+            by_cases hram : ramBytes (pa s) (bs s).length
+            · left
+              cases hg : g s with
+              | none => rfl
+              | some s' => exact absurd ⟨⟨s', hg⟩, hram⟩ hw
+            · exact Or.inr hram
+          exact hstep _ _ (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
+            ⟨pre, g, pa, bs, k, s, rfl, hpre, hor, rfl, rfl⟩)))))
+  | some (DPop h k), _, _, hstep =>
+    by_cases hph : (Virtio.phase (dvirtio σ.wgdev) h).isSome = true
+    · exact hstep _ _ (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
+        ⟨h, k, rfl, hph, rfl, rfl⟩)))))))
+    · exact hstep _ _ (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
+        ⟨h, k, rfl, by simpa using hph, rfl, rfl⟩))))))))
 
 end Weak
