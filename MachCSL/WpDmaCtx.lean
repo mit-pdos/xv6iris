@@ -31,12 +31,12 @@ namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 -- The fraction and split arithmetic lives in `MachCSL.DmaCtxSplit`.
 
 section ambient
-variable [MachGS hlc GF]
+variable [MachGS GF]
 
 /-- **Rebuilding a context window out of the raw window a STORE returned.**
 The hart's own store position is not a floor -- the hart's view does not
@@ -44,7 +44,7 @@ reach its own buffered store -- but it IS a key of its running context
 (`MachCSL.ctx_key_mint`), which is all `ctxByte` asks for. -/
 theorem ctxBytes_of_keyed (ξ : CtxId) (pa : PAddr) (dq : DFrac) (t : Nat) (ag : Agent)
     (Hs : Nat → Hist) (bs : Nat → BitVec 8) :
-    ∀ n : Nat, keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ∗
+    ∀ n : Nat, keyAt (MachGS.era (GF := GF)) ξ t ∗
         ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dq} (⟨t, ag, bs j⟩ :: Hs j))
       ⊢@{IProp GF} [∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) dq (bs j)
   | 0 => by

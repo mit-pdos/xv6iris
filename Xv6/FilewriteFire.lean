@@ -102,7 +102,7 @@ end Join
 /-! ## 2.  The fire -/
 
 section Fire
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [FsBytesG GF] [OffboxG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 set_option maxHeartbeats 8000000 in
@@ -132,15 +132,15 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
       (a0 = BitVec.ofNat 64 tot ∧ off ≤ dn.diSize.toNat ∧
         dn'.diSize.toNat = max (off + tot) dn.diSize.toNat))
     (hchunk : ubytesAt Mimg (ua + BitVec.ofNat 64 t) (wrfRun wrote tot)) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗
+    ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗
       topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) -∗
-      offLink (hlc := hlc) γo (off : Int) -∗
-      fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p 0 ={⊤}=∗
+      offLink γo (off : Int) -∗
+      fwrSt om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p 0 ={⊤}=∗
         topFrag (fsGammaL fscFs) inum.toNat (eraNode dn' bm' data') ∗
-        offLink (hlc := hlc) γo ((off + tot : Nat) : Int) ∗
-        ((⌜tot = c⌝ ∗ fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
+        offLink γo ((off + tot : Nat) : Int) ∗
+        ((⌜tot = c⌝ ∗ fwrSt om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
          (⌜tot < c⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
-           fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p x)) := by
+           fwrSt om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p x)) := by
   have hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ ⊤ := CoPset.subseteq_top
   have hnz : fnType (eraNode dn bm data) ≠ 0 := opfEra_file_typed dn bm data hty
   have hrow := opfEra_file_row dn bm data hty
@@ -258,7 +258,7 @@ end Fire
 /-! ## 3.  The lock-held ghost steps, before and after writei -/
 
 section Held
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -289,7 +289,7 @@ theorem fwr_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo :
           dinodeAt fscIreg inum dn ∗ inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗
           inodeBlocks fscFs bm data ∗ topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) ∗
           wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) v ∗
-          offLink (hlc := hlc) γo (v.toNat : Int) ∗ fwrOut ik fk q γb γo m T0 Tr) := by
+          offLink γo (v.toNat : Int) ∗ fwrOut ik fk q γb γo m T0 Tr) := by
   iintro ⟨Hrun, #Hflr, Hat, Hrows, Hload, #Hshot', #Hshot⟩
   ihave %htyeq := ityShot_agree g dn.diType ty $$ [Hshot' Hshot]
   · iframe #
@@ -354,19 +354,19 @@ theorem fwr_post_ghost (om : OffMode) (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : 
     (hchunk : ubytesAt Mimg (ua + BitVec.ofNat 64 t) (wrfRun wrote tot))
     (hok' : inodeOk fscCov fscLogst dn' bm' data') (hrl' : inodeRecLocal dn')
     (hnd' : dn'.diType.toNat ≠ T_DIR_z) (hdn0 : dn0' = dn') :
-    ownCtx cpu curCtx ∗ fsReady (hlc := hlc) ∗
+    ownCtx cpu curCtx ∗ fsReady ∗
       topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) ∗
-      offLink (hlc := hlc) γo (v.toNat : Int) ∗
-      fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p 0 ∗
+      offLink γo (v.toNat : Int) ∗
+      fwrSt om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p 0 ∗
       wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (filerwOffW v tot) ∗
       fwrOut (GF := GF) ik fk q γb γo m T0 Tr ∗
       dinodeAt fscIreg inum dn0' ∗ inodeMeta (ientry ik) dn' ∗ inodeMap fscFs (ientry ik) bm' ∗
       inodeBlocks fscFs bm' data' ⊢
       |={⊤}=> ownCtx cpu curCtx ∗ offFd fk q γb γo C ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
         icLoaded fscFs fscIreg fscCov fscLogst ik inum dn' bm' ∗
-        ((⌜tot = c⌝ ∗ fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
+        ((⌜tot = c⌝ ∗ fwrSt om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
          (⌜tot < c⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
-           fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p x)) := by
+           fwrSt om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p x)) := by
   have hloc : InodeLocal inum.toNat (eraNode dn' bm' data') :=
     inodeLocal_ofOkRec inum.toNat fscCov fscLogst dn' bm' data' hok' hrl'
       (dirUniq_not_dir dn' data' hnd') (dirDotsIx_not_dir inum.toNat dn' data' hnd')

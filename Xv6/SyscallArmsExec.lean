@@ -72,7 +72,7 @@ set_option linter.unusedSimpArgs false
 /-! ## §1 The exec deposit law and the arms' pure reading -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -84,10 +84,10 @@ pair `⟨uslot, sexecRefund f⟩`, read in the key's page view. -/
 def SyscDepExec : Prop :=
   ∀ (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32),
-    UexecSG.sbundleAt (uslot (hlc := hlc)) USYS_exec f (uvisOf V M sts gn cs pid) ⊢
+    UexecSG.sbundleAt (uslot) USYS_exec f (uvisOf V M sts gn cs pid) ⊢
       myPay gn (UexecSG.sexitPay f) ∗
       ∃ (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)),
-        sysExecAuPre (hlc := hlc) ⟨uslot (hlc := hlc), UexecSG.sexecRefund f⟩ (fsGammaL fscFs) fscFs
+        sysExecAuPre ⟨uslot, UexecSG.sexecRefund f⟩ (fsGammaL fscFs) fscFs
           V.rti V.cwi V.pvSecc (UexecSG.sexitPay f) P Pmiss Fo (viewLazy V.upt V.sz M)
           (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) sts cs pid
 
@@ -121,16 +121,16 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
     (r : BitVec 64) (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) :
     ((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter { V.updEv k' with upt := P' } V' ∧
         M' = viewFaulted V.upt P' M⌝ ∗
-        sysExecPostFail (hlc := hlc) ⟨uslot (hlc := hlc), UexecSG.sexecRefund f⟩ (fsGammaL fscFs) fscFs
+        sysExecPostFail ⟨uslot, UexecSG.sexecRefund f⟩ (fsGammaL fscFs) fscFs
           V.rti V.cwi V.pvSecc (UexecSG.sexitPay f) P Pmiss Fo (viewLazy V.upt V.sz M)
           (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) sts cs pid) ∨
      (∃ (pl : List (BitVec 8)) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8),
         ⌜argPathOf (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat pl⌝ ∗
         ⌜execArgsOf (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 1)) na alen afun⌝ ∗
-        execPostOk ⟨uslot (hlc := hlc), UexecSG.sexecRefund f⟩ na alen afun sts gn cs pid
+        execPostOk ⟨uslot, UexecSG.sexecRefund f⟩ na alen afun sts gn cs pid
           { V.updEv k' with upt := P' } V' M' r)) ⊢
       ⌜SyscExecKeep V V'⌝ ∗
-      syscExecOut (hlc := hlc) V M (syscStore V' r) M' sts sts gn cs pid ∗
+      syscExecOut V M (syscStore V' r) M' sts sts gn cs pid ∗
       (⌜r = BitVec.ofInt 64 (-1)⌝ -∗ UexecSG.sexecRefund f) := by
   have htfp0 : P'.tfp = V.upt.tfp := hext.1.2.1
   have hm1 : BitVec.ofInt 64 (-1) = 0xFFFFFFFFFFFFFFFF#64 := by decide
@@ -140,7 +140,7 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
     -- (permit sweep L1a): no row reads the count
     obtain ⟨kx, -, rfl⟩ := hV
     subst hM hr
-    ihave Hrf := sysExecPostFail_refund (hlc := hlc) _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hfail
+    ihave Hrf := sysExecPostFail_refund _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hfail
     isplitr
     · ipureintro; exact ⟨htfp0, rfl, rfl, rfl, rfl, rfl, rfl⟩
     isplitr
@@ -157,7 +157,7 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
     -- both success arms: the same slot, the same facts
     ihave Hs : iprop(∃ (entry spv szv' : BitVec 64),
         ⌜r ≠ 0xFFFFFFFFFFFFFFFF#64 ∧ kexecOk { V.updEv k' with upt := P' } V' r entry spv szv' na alen⌝ ∗
-        uslot (hlc := hlc) (execKey V' M' sts gn cs pid na)) $$ [Hok]
+        uslot (execKey V' M' sts gn cs pid na)) $$ [Hok]
     · icases Hok with (⟨%f0, %nl, -, -, %hkx, -, Hslot⟩ | ⟨-, %hkx, Hslot⟩)
       · obtain ⟨e, spv, szv', -, hne, hk⟩ := hkx
         iexists _, spv, szv'
@@ -187,7 +187,7 @@ end
 /-! ## §2 The exec arm -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -221,9 +221,9 @@ theorem syscTf_get (tf : List (BitVec 64)) (hl : tf.length = 36) (i : Nat) (hi :
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 7, `sys_exec`** (Rocq `sysc_arm_exec`). -/
-theorem syscall_arm_exec (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF))
+theorem syscall_arm_exec (SE : SYSEXEC) (hD : SyscDepExec (GF := GF))
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -253,8 +253,8 @@ theorem syscall_arm_exec (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF
   ihave Hir := (show irefSlots (GF := GF) IREFSPARE ⊢ irefSlots 2 ∗ irefSlots 2 from
     irefSlots_split 2 2) $$ Hir
   icases Hir with ⟨Hir2, Hire⟩
-  have hX := SE.wp_sys_exec_eb (hlc := hlc) (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
-    γ j pd pav pu _ _ pid V M sts gn cs ⟨uslot (hlc := hlc), UexecSG.sexecRefund f⟩ (UexecSG.sexitPay f)
+  have hX := SE.wp_sys_exec_eb (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
+    γ j pd pav pu _ _ pid V M sts gn cs ⟨uslot, UexecSG.sexecRefund f⟩ (UexecSG.sexitPay f)
     P Pmiss Fo ?hK ?hn ?ht hj ?hp hv0 hv1
   case hK => k_norm_g; unfold syscallSlots syscallFrame at hK; omega
   case hn => simp only [KCtx.withRegs_noff, KCtx.pushed_noff, KCtx.withSpie_noff]; exact hnoff
@@ -309,7 +309,7 @@ end
 /-! ## §3 The printk fallback -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -379,7 +379,7 @@ theorem syscFb_printk (PK : PRINTK) (c : CPU) (k' : KCtx) (γpr γl : GName) (γ
       cstr (k'.regs 10#5) dqf fm -∗ cstr (k'.regs 12#5) dq s -∗
       uartSentSub γd (bs ++ cs) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := PK.wp_printk (hlc := hlc) (GF := GF) c k' γpr γl γd bs dqf fm
+  have h := PK.wp_printk (GF := GF) c k' γpr γl γd bs dqf fm
     [PkArgDesc.num, PkArgDesc.str dq s, PkArgDesc.num] hK hflen
     (by rw [hkinds]; simp only [List.map_cons, List.map_nil, PkArgDesc.kind])
     (by simp only [List.length_cons, List.length_nil]; omega) hnoff hpr huart
@@ -491,7 +491,7 @@ set_option maxHeartbeats 4000000 in
 /-- **THE PRINTK FALLBACK** (Rocq `sysc_fallback`). -/
 theorem syscall_fallback (PK : PRINTK)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -634,7 +634,7 @@ epilogue` -- the unknown-number call's contract (the fallback's rows at
 number 0), minus the diagnostic. -/
 theorem syscall_blocked
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -700,7 +700,7 @@ end
 /-! ## §4 The 24-way split (Rocq `sysc_arm_dispatch`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -711,7 +711,7 @@ body.  The seal instantiates it with `fun hnum => syscall_arm_<name> … hnum
 hpins hs1 hs2 hra`. -/
 def SyscArmAt (n : Nat)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -727,9 +727,9 @@ def SyscArmAt (n : Nat)
 /-- **Rocq `sysc_arm_dispatch`'s case split**: every table index `1 ≤ n ≤ 24`
 has its arm -- the 23 others as hypotheses (deviation 4), exec discharged
 here from `SYSEXEC` and its deposit law. -/
-theorem syscall_arms_all (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF))
+theorem syscall_arms_all (SE : SYSEXEC) (hD : SyscDepExec (GF := GF))
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)

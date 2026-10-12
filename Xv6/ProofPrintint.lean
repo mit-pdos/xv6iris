@@ -81,7 +81,7 @@ theorem pi_lt_pow20 (x : BitVec 64) : x.toNat < 10 ^ 20 := by
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-! ## The byte buffer carved out of three frame slots -/
 
@@ -585,7 +585,7 @@ theorem pi_prputc_call (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (kb : KCtx) (Rc : Reg
   iintro ⟨#Hi, Hk, Hpc, #Htx, Hsent, HΦ⟩
   k_step (wp_s_jal cpu _ pc false imm 1#5 (by decide)) $$ [- $Hk $Hpc] with [htgt]
   iintro Hk Hpc
-  have h := PP.wp_prputc (hlc := hlc) (GF := GF) cpu (kb.withRegs (Rc.set 1#5 (pc + 4#64))) γl γd bs
+  have h := PP.wp_prputc (GF := GF) cpu (kb.withRegs (Rc.set 1#5 (pc + 4#64))) γl γd bs
     (by k_norm) (by k_norm; exact hK) (by k_norm; exact hnoff) (by k_norm; exact huart)
   unfold wp_prputc_body at h
   iapply h
@@ -1080,7 +1080,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem printint_proof (PP : PRPUTC) : PRINTINT :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γd bs hsie hK hbase hnoff huart => by
+  ⟨fun {GF} _ _ _ cpu k γl γd bs hsie hK hbase hnoff huart => by
   unfold wp_printint_body
   iintro ⟨Hk, Hpc, #Htx, Hsent, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩

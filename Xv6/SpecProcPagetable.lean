@@ -41,14 +41,14 @@ def procPagetableSlots : Nat := 40
 def procPagetableNodes : Nat := 3
 
 /-- `proc_pagetable`'s result: the space `⟨root, tfp, ∅⟩` at `root`, or `0`. -/
-def pptPost {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def pptPost {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (γk : KmemNames) (on : Option Nat) (act : BitVec 64) (tfp : BitVec 44) (r : BitVec 64) : IProp GF := iprop%
   (∃ (root : BitVec 44) (M : Nat → List (BitVec 8)),
     ⌜r = pageAddr root⌝ ∗ procPtAt ⟨root, tfp, ∅⟩ M ∗ kallocAvail γk (availSub on procPagetableNodes)) ∨
   (⌜r = 0#64 ∧ ∃ n, n ≤ procPagetableNodes ∧ availZero (availSub on n)⌝ ∗ kallocAvail γk none ∗
     kNullRcpt γk act)
 
-def wp_proc_pagetable_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_proc_pagetable_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (tf : BitVec 64) (dq : DFrac) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : procPagetableSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (htf : tf &&& 0xfff#64 = 0#64) (htfv : pageValid tf) : Prop :=
@@ -64,8 +64,8 @@ def wp_proc_pagetable_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
   ⊢ wpLoop (GF := GF) cpu
 
 structure PROC_PAGETABLE : Prop where
-  wp_proc_pagetable : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_proc_pagetable : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat) (tf : BitVec 64) (dq : DFrac) (ke : Nat) hnoff hK hlk htf htfv,
-    wp_proc_pagetable_body (hlc := hlc) (GF := GF) cpu k γl γk on tf dq ke hnoff hK hlk htf htfv
+    wp_proc_pagetable_body (GF := GF) cpu k γl γk on tf dq ke hnoff hK hlk htf htfv
 
 end Xv6

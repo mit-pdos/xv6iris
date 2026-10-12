@@ -24,7 +24,7 @@ namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
+variable {GF : BundledGFunctors.{0}}
 
 /-! ## Addresses -/
 
@@ -87,12 +87,12 @@ theorem tierPin_id (t : KTier) (va : BitVec 64) (h : va.toNat < 2 ^ 39) :
 /-! ## The mapping ghost map -/
 
 section ghost
-variable [MachGS hlc GF]
+variable [MachGS GF]
 
 /-- The kernel mapping's element: `vpn` maps by the canonical leaf `v`
 (persistent: the table is never unmapped). -/
 def kmapAt (vpn : BitVec 27) (v : BitVec 64) : IProp GF := iprop%
-  MachGS.kmapName (hlc := hlc) (GF := GF) ↪◯MAP[vpn.toNat]{.discard} v
+  MachGS.kmapName (GF := GF) ↪◯MAP[vpn.toNat]{.discard} v
 
 instance kmapAt_persistent (vpn : BitVec 27) (v : BitVec 64) : Persistent (kmapAt (GF := GF) vpn v) := by
   unfold kmapAt; infer_instance
@@ -125,7 +125,7 @@ class KernelMap where
     k < 2 ^ 27 ∧ ∃ perm : KPerm, v = kLeaf (idPpn (BitVec.ofNat 27 k)) perm 0#1 0#1
 
 section fixed
-variable [MachFixedGS hlc GF]
+variable [MachFixedGS GF]
 
 /-- The static claims of era `E`: the persistent element of every static
 entry.  Stated as a quantifier, not as a big-op over the map: the proof
@@ -167,10 +167,10 @@ theorem regmap_get?_eq {V : Type} (m : RegMapF V) (k : Nat) :
     Iris.Std.PartialMap.get? (M := RegMapF) m k = m[k]? := rfl
 
 section ambient
-variable [MachGS hlc GF] [KernelMap]
+variable [MachGS GF] [KernelMap]
 
 /-- The static claims at the ambient era. -/
-abbrev kmapStatic : IProp GF := kmapStaticAt (MachGS.era (hlc := hlc) (GF := GF))
+abbrev kmapStatic : IProp GF := kmapStaticAt (MachGS.era (GF := GF))
 
 /-- A static entry's claim. -/
 theorem kmapStatic_at (vpn : BitVec 27) (v : BitVec 64)

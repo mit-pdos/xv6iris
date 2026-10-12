@@ -43,16 +43,16 @@ theorem frd_ret_nat (n : Int) (d : Nat) (hd : (d : Int) ≤ max 0 n) :
   Or.inr ⟨d, by rw [BitVec.ofInt_natCast], by omega, hd⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The environment's output at a pipe and at an inode (by computation). -/
-theorem frd_envout_pipe (r w : Bool) (γp : PipeNames) : ⊢ filereadEnvOut (hlc := hlc) (GF := GF) (.open r w (.pipe γp)) :=
+theorem frd_envout_pipe (r w : Bool) (γp : PipeNames) : ⊢ filereadEnvOut (GF := GF) (.open r w (.pipe γp)) :=
   .rfl
 theorem frd_envout_inode (r w : Bool) (i : Nat) (γo : GName) (om : OffMode) :
-    bslot ⊢ filereadEnvOut (hlc := hlc) (GF := GF) (.open r w (.inode i γo om)) := .rfl
+    bslot ⊢ filereadEnvOut (GF := GF) (.open r w (.inode i γo om)) := .rfl
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0xb4 .. +0xb8`: THE -1 EXIT** (Rocq `fr_m1j`): `a5 := -1`, `s2 :=
@@ -92,7 +92,7 @@ theorem frd_exit_m1 (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (v18 w
 set_option maxHeartbeats 16000000 in
 /-- **`+0x6a .. +0x76`: THE PIPE ARM** (Rocq's `+0x64 .. +0x70`):
 `c.ld a0,16(a0)`, piperead, `c.mv s2,a0`, the lazy restores, `c.j`. -/
-theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γ : FileNames) (fk : Nat)
     (q : Qp) (C : FContent) (wb : Bool) (γp : PipeNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (γkl : GName) (γk : KmemNames) (n : Int)
@@ -112,8 +112,8 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open true wb (.pipe γp)) ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗ P ∗
     -- THE PIPE ARM'S INPUT: the reader's links over the byte queue, or the taint
-    pipeRpay (hlc := hlc) γp.pnQueue Rp Rpe n.toNat ∗
-    frdK (hlc := hlc) k γ fk q (.open true wb (.pipe γp)) j pid V M n F Rd Rin Rp Rpe P
+    pipeRpay γp.pnQueue Rp Rpe n.toNat ∗
+    frdK k γ fk q (.open true wb (.pipe γp)) j pid V M n F Rd Rin Rp Rpe P
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + readiSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by unfold readiSlots bmapSlots ballocSlots breadSlots panicSlots at hK'; omega

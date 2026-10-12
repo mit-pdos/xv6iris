@@ -42,12 +42,12 @@ namespace MachCSL
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
+variable {GF : BundledGFunctors.{0}}
 
 /-! ## Receipts, at an explicit era -/
 
 section era
-variable [MachFixedGS hlc GF] (E : EraGS)
+variable [MachFixedGS GF] (E : EraGS)
 
 /-- The store order has reached `K` (persistent; free at 0). -/
 def topLbAt (K : Nat) : IProp GF := iprop(⌜K = 0⌝ ∨ MonoNat.lb_own E.topName (.ofNat K))
@@ -174,7 +174,7 @@ class CurCtx where
 export CurCtx (curCtx curTier)
 
 section fixed
-variable [MachFixedGS hlc GF]
+variable [MachFixedGS GF]
 
 /-- ξ's bound has passed `t` (persistent; free at 0: the boot image's
 timestamp is under every bound). -/
@@ -186,7 +186,7 @@ def dirtyIn (ξ : CtxId) (t : Nat) (h : CPU) : IProp GF := ξ.dirty ↪◯MAP[t]
 
 /-- The justification of timestamp `t` at ξ: clean, or dirty with the
 machine's authorship receipt. -/
-def keyAt [MachFixedGS hlc GF] (E : EraGS) (ξ : CtxId) (t : Nat) : IProp GF := iprop%
+def keyAt [MachFixedGS GF] (E : EraGS) (ξ : CtxId) (t : Nat) : IProp GF := iprop%
   ctxFloor ξ t ∨ ∃ h : CPU, dirtyIn ξ t h ∗ authoredByAt E t (hartAgent h)
 
 /-- ξ's authorities at fraction `q`: bound `B`, dirty set `D`. -/
@@ -306,22 +306,22 @@ end fixed
 /-! ## The ambient forms -/
 
 section ambient
-variable [MachGS hlc GF]
+variable [MachGS GF]
 
-abbrev topLb (K : Nat) : IProp GF := topLbAt (MachGS.era (hlc := hlc) (GF := GF)) K
-abbrev viewLb (cpu : CPU) (K : Nat) : IProp GF := viewLbAt (MachGS.era (hlc := hlc) (GF := GF)) cpu K
-abbrev iviewLb (cpu : CPU) (K : Nat) : IProp GF := iviewLbAt (MachGS.era (hlc := hlc) (GF := GF)) cpu K
-abbrev rviewLb (cpu : CPU) (K : Nat) : IProp GF := rviewLbAt (MachGS.era (hlc := hlc) (GF := GF)) cpu K
-abbrev authoredBy (t : Nat) (h : Agent) : IProp GF := authoredByAt (MachGS.era (hlc := hlc) (GF := GF)) t h
+abbrev topLb (K : Nat) : IProp GF := topLbAt (MachGS.era (GF := GF)) K
+abbrev viewLb (cpu : CPU) (K : Nat) : IProp GF := viewLbAt (MachGS.era (GF := GF)) cpu K
+abbrev iviewLb (cpu : CPU) (K : Nat) : IProp GF := iviewLbAt (MachGS.era (GF := GF)) cpu K
+abbrev rviewLb (cpu : CPU) (K : Nat) : IProp GF := rviewLbAt (MachGS.era (GF := GF)) cpu K
+abbrev authoredBy (t : Nat) (h : Agent) : IProp GF := authoredByAt (MachGS.era (GF := GF)) t h
 abbrev resvFrag (cpu : CPU) (r : Option Resv) (b : Bool) : IProp GF :=
-  resvFragAt (MachGS.era (hlc := hlc) (GF := GF)) cpu r b
+  resvFragAt (MachGS.era (GF := GF)) cpu r b
 abbrev resvFragAny (cpu : CPU) (r : Option Resv) : IProp GF :=
-  resvFragAnyAt (MachGS.era (hlc := hlc) (GF := GF)) cpu r
-abbrev ownCtx (cpu : CPU) (ξ : CtxId) : IProp GF := ownCtxAt (MachGS.era (hlc := hlc) (GF := GF)) cpu ξ
-abbrev ctxTok (cpu : CPU) (ξ : CtxId) : IProp GF := ctxTokAt (MachGS.era (hlc := hlc) (GF := GF)) cpu ξ
+  resvFragAnyAt (MachGS.era (GF := GF)) cpu r
+abbrev ownCtx (cpu : CPU) (ξ : CtxId) : IProp GF := ownCtxAt (MachGS.era (GF := GF)) cpu ξ
+abbrev ctxTok (cpu : CPU) (ξ : CtxId) : IProp GF := ctxTokAt (MachGS.era (GF := GF)) cpu ξ
 abbrev lockSet (cpu : CPU) (locks : List String) : IProp GF :=
-  lockSetAt (MachGS.era (hlc := hlc) (GF := GF)) cpu locks
-abbrev lkIn (cpu : CPU) (s : String) : IProp GF := lkInAt (MachGS.era (hlc := hlc) (GF := GF)) cpu s
+  lockSetAt (MachGS.era (GF := GF)) cpu locks
+abbrev lkIn (cpu : CPU) (s : String) : IProp GF := lkInAt (MachGS.era (GF := GF)) cpu s
 
 /-- The held set contains the locks of its elements. -/
 theorem lockSet_lkIn (cpu : CPU) (locks : List String) (s : String) :
@@ -376,15 +376,15 @@ instance (t : Nat) (h : Agent) : Persistent (PROP := IProp GF) (authoredBy t h) 
 theorem ownCtx_cases (cpu : CPU) (ξ : CtxId) :
     ownCtx cpu ξ ⊢@{IProp GF}
       ∃ (B K W : Nat) (D : RegMapF CPU),
-        ctxAt ξ 1 B D ∗ viewLbAt (MachGS.era (hlc := hlc) (GF := GF)) cpu K ∗ ⌜B ≤ K⌝ ∗
-        topLbAt (MachGS.era (hlc := hlc) (GF := GF)) W ∗ ⌜dirtyOk cpu B W D⌝ ∗
-        dirtyElems (MachGS.era (hlc := hlc) (GF := GF)) ξ D := by
+        ctxAt ξ 1 B D ∗ viewLbAt (MachGS.era (GF := GF)) cpu K ∗ ⌜B ≤ K⌝ ∗
+        topLbAt (MachGS.era (GF := GF)) W ∗ ⌜dirtyOk cpu B W D⌝ ∗
+        dirtyElems (MachGS.era (GF := GF)) ξ D := by
   unfold ownCtx ownCtxAt; iintro H; iexact H
 
 theorem ownCtx_intro (cpu : CPU) (ξ : CtxId) (B K W : Nat) (D : RegMapF CPU) :
-    ctxAt ξ 1 B D ∗ viewLbAt (MachGS.era (hlc := hlc) (GF := GF)) cpu K ∗ ⌜B ≤ K⌝ ∗
-      topLbAt (MachGS.era (hlc := hlc) (GF := GF)) W ∗ ⌜dirtyOk cpu B W D⌝ ∗
-      dirtyElems (MachGS.era (hlc := hlc) (GF := GF)) ξ D ⊢@{IProp GF} ownCtx cpu ξ := by
+    ctxAt ξ 1 B D ∗ viewLbAt (MachGS.era (GF := GF)) cpu K ∗ ⌜B ≤ K⌝ ∗
+      topLbAt (MachGS.era (GF := GF)) W ∗ ⌜dirtyOk cpu B W D⌝ ∗
+      dirtyElems (MachGS.era (GF := GF)) ξ D ⊢@{IProp GF} ownCtx cpu ξ := by
   unfold ownCtx ownCtxAt
   iintro H
   iexists B, K, W, D
@@ -430,7 +430,7 @@ theorem ctxTok_introB (cpu : CPU) (ξ : CtxId) (r : Option Resv) (b : Bool) :
 /-- The byte at `a` holds `v`, justified at context ξ: its latest write is at
 a timestamp ξ can see (the prototype's `ctx_phys_pointsto`). -/
 def ctxByte (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) : IProp GF := iprop%
-  ∃ (e : HEnt) (H : Hist), a ↦ₕ{dq} (e :: H) ∗ ⌜e.v = v⌝ ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ e.t
+  ∃ (e : HEnt) (H : Hist), a ↦ₕ{dq} (e :: H) ∗ ⌜e.v = v⌝ ∗ keyAt (MachGS.era (GF := GF)) ξ e.t
 
 /-- The byte at `a` is the boot image's `v`, never written (persistent;
 readable by every agent at every view; the prototype's `pristine_elem`). -/
@@ -448,11 +448,11 @@ instance (a : PAddr) (v : BitVec 8) : Timeless (PROP := IProp GF) (imgByte a v) 
 theorem ctxByte_cases (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
     ctxByte ξ a dq v ⊢@{IProp GF}
       ∃ (e : HEnt) (H : Hist), a ↦ₕ{dq} (e :: H) ∗ ⌜e.v = v⌝ ∗
-        keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ e.t := by
+        keyAt (MachGS.era (GF := GF)) ξ e.t := by
   unfold ctxByte; iintro H; iexact H
 
 theorem ctxByte_intro (ξ : CtxId) (a : PAddr) (dq : DFrac) (e : HEnt) (H : Hist) :
-    a ↦ₕ{dq} (e :: H) ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ e.t ⊢@{IProp GF}
+    a ↦ₕ{dq} (e :: H) ∗ keyAt (MachGS.era (GF := GF)) ξ e.t ⊢@{IProp GF}
       ctxByte ξ a dq e.v := by
   unfold ctxByte
   iintro ⟨Hpt, Hkey⟩

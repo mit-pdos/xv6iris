@@ -40,7 +40,7 @@ theorem writei_ret_6e : jumpPc (KA.«writei» + 0x6e#64) = KA.«writei» + 0x6e#
 theorem writei_ret_74 : jumpPc (KA.«writei» + 0x74#64) = KA.«writei» + 0x74#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -61,7 +61,7 @@ set_option maxHeartbeats 16000000 in
 `log_write(bp)` -- THE FIX -- then `brelse(bp)`, and out to the size test
 with the chunk as the disturbed region. -/
 theorem writei_iter_fail (IU : IUPDATE) (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (A : WiArgs) (hA : WiFactsEb k A)
     (W tot : Nat) (bmI : Blkmap) (dataI : Nat → List (BitVec 8)) (wroteI : Nat → BitVec 8)
     (PI : UPtd) (nI : Nat) (SI : List Nat) (bm2 : Blkmap) (data2 : Nat → List (BitVec 8))
@@ -217,7 +217,7 @@ set_option maxHeartbeats 16000000 in
 `log_write(bp)`, `brelse(bp)`, `tot += m; off += m; src += m`, and the
 `bgeu s3,s6`: out to the size test or back to the head. -/
 theorem writei_iter_ok (IU : IUPDATE) (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (A : WiArgs) (hA : WiFactsEb k A)
     (W tot : Nat) (bmI : Blkmap) (dataI : Nat → List (BitVec 8)) (wroteI : Nat → BitVec 8)
     (PI : UPtd) (nI : Nat) (SI : List Nat) (bm2 : Blkmap) (data2 : Nat → List (BitVec 8))
@@ -533,7 +533,7 @@ set_option maxHeartbeats 16000000 in
 of the held buffer, `either_copyin`, the buffer re-formed at the spliced
 bytes, and the `beq a0,s8` to the success or the failure arm. -/
 theorem writei_iter_copy (IU : IUPDATE) (LW : LOG_WRITE) (BE : BRELSE) (EC : EITHER_COPYIN)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (A : WiArgs) (hA : WiFactsEb k A)
     (W tot : Nat) (bmI : Blkmap) (dataI : Nat → List (BitVec 8)) (wroteI : Nat → BitVec 8)
     (PI : UPtd) (nI : Nat) (SI : List Nat) (bm2 : Blkmap) (data2 : Nat → List (BitVec 8))

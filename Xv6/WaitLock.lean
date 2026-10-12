@@ -25,7 +25,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 -- the lock's name string is `"wait_lock"`.
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The payload of `wait_lock` at context `ξ`: the `parent` word of every
 process. -/

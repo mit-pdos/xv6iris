@@ -64,7 +64,7 @@ theorem entry_sym_addr : KA.«_entry» = 0x80000000#64 := by decide
 /-! ## §1 A register file's cells, with the taken registers named -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
+variable {GF : BundledGFunctors.{0}}
 
 /-- The file's register map with the registers in `ex` deleted. -/
 def regMapEx (f : RegFile) (ex : List Register) : RegMapF RegVal :=
@@ -87,7 +87,7 @@ theorem regMapEx_get (f : RegFile) (ex : List Register) (r : Register) (h : r �
     rw [regMapEx_cons, LawfulPartialMap.get?_delete_ne (fun e => ha (regIdx_injective e))]
     exact ih hex
 
-variable [MachFixedGS hlc GF]
+variable [MachFixedGS GF]
 
 /-- **The file's cells, the registers in `ex` taken.** -/
 def regCellsEx (γ : GName) (f : RegFile) (ex : List Register) : IProp GF := iprop%
@@ -142,15 +142,15 @@ theorem regCellsEx_takeList (γ : GName) (f : RegFile) (rs ex : List Register)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- `Xv6.regCellsEx_takeList` at the ambient era's hart `cpu`, with the
 taken cells spelled `r ↦ᵣ[cpu] _`. -/
 theorem regCellsEx_takeListAt (cpu : CPU) (f : RegFile) (rs ex : List Register)
     (hnd : rs.Nodup) (h : ∀ r ∈ rs, r ∉ ex) :
-    regCellsEx (GF := GF) (regName (hlc := hlc) (GF := GF) cpu) f ex ⊢
+    regCellsEx (GF := GF) (regName (GF := GF) cpu) f ex ⊢
       ([∗list] r ∈ rs, regPointsTo (GF := GF) cpu r (DFrac.own 1) (f r)) ∗
-      regCellsEx (regName (hlc := hlc) (GF := GF) cpu) f (rs.reverse ++ ex) :=
+      regCellsEx (regName (GF := GF) cpu) f (rs.reverse ++ ex) :=
   regCellsEx_takeList _ f rs ex hnd h
 
 end
@@ -164,7 +164,7 @@ def bootConfRegs : List Register :=
    .menvcfg, .mcounteren, .mtimecmp, .stimecmp, .pmpcfg_n, .pmpaddr_n] ++ hwRegs
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **The reset configuration cells ARE `mBoot`** (Rocq `hw_config_intro` +
 `mmode_config_intro`): every register `MachCSL.confCells` names is pinned by

@@ -372,10 +372,11 @@ open Sail LeanRV64D LeanRV64D.Functions
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## Updating one element of a big separating conjunction -/
 
+omit [MachGS GF] in
 /-- Read element `i` of a big-op over a list and put a (possibly different)
 resource back in its place, the rest of the list being untouched. -/
 theorem bigSepL_upd_acc {α β : Type _} (l : List α) (n : Nat) (i : α)
@@ -733,6 +734,7 @@ theorem pageWord_excl [CurCtx] (b : BitVec 44) :
   · iexact H1
   · iexact H2
 
+omit [MachGS GF] in
 theorem bigSepL_nodup_of_excl {α : Type _} (l : List α) (Φ : α → IProp GF)
     (hex : ∀ x : α, iprop(Φ x ∗ Φ x) ⊢ (False : IProp GF)) :
     ([∗list] x ∈ l, Φ x) ⊢ ⌜l.Nodup⌝ := by

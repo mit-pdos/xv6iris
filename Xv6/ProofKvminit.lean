@@ -33,7 +33,7 @@ theorem kvi_root_117c :
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
 
 /-! ## The callee, at its entry address -/
 
@@ -53,7 +53,7 @@ theorem kvi_kvmmake_call (KV : KVMMAKE) [CurCtx] (c : CPU) (k' : KCtx)
       kallocAvail γk (some (nb - kvmmakeCount)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = pageAddr t.base ∧ kvmTableOk t pas⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KV.wp_kvmmake (hlc := hlc) (GF := GF) c k' γl γk nb hnoff hK hlk hcount hp0
+  have h := KV.wp_kvmmake (GF := GF) c k' γl γk nb hnoff hK hlk hcount hp0
   unfold wp_kvmmake_body at h
   simp only [kvmmakeAddr] at h
   exact h
@@ -66,7 +66,7 @@ theorem kvminit_br_91ea : KA.«kvminit» + 0x91ea#64 = kernelPagetableAddr := by
 
 set_option maxHeartbeats 4000000 in
 theorem kvminit_proof (KV : KVMMAKE) : KVMINIT :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk nb v0 hnoff hK hlk hcount hp0 => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk nb v0 hnoff hK hlk hcount hp0 => by
   unfold wp_kvminit_body
   simp only [kvminitAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hword, HΦ⟩

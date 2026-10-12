@@ -99,9 +99,10 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
+omit [MachGS GF] in
 instance diskBlock_timeless (γd : DiskNames) (b : Nat) (bs : List (BitVec 8)) :
     Timeless (diskBlock (GF := GF) γd b bs) := by unfold diskBlock; infer_instance
 
@@ -305,6 +306,7 @@ theorem bufSlotRegs_elim (γbk : BoxNames) (tl : Nat) (dev bno : BitVec 32) :
   iframe Hrd
   iexact Htd
 
+omit [MachGS GF] in
 theorem bufSlpDep_intro (γ : BcacheNames) (k T' : Nat) (ξ : CtxId) :
     bufTok (GF := GF) γ k ∗ slotpHalf (γ.box k) (⟨T', none⟩ : L2Reg BufId) ⊢
       bufSlpDep γ k T' ξ := by
@@ -583,6 +585,7 @@ def bufBoxRaw (γbk : BoxNames) : IProp GF := iprop%
   (∃ r0 : SlotReg BufId BufX, γbk.slotd ↪VAR r0) ∗
   slotpHalf γbk (⟨0, none⟩ : L2Reg BufId)
 
+omit [MachGS GF] in
 /-- The L2 register's OTHER half comes out beside the raw bundle: it is what
 the buffer's SLEEPLOCK is sealed over (`Xv6.bufSlpRaw`), and the sleeplocks
 must exist before `Xv6.BcacheNames` does. -/
@@ -668,6 +671,7 @@ theorem bufEscrow_allocRowAt (γ : BcacheNames) (V : BioView GF) (γbk : BoxName
   · ipureintro; exact ⟨rfl, rfl, rfl⟩
   · iexact Htb
 
+omit [MachGS GF] in
 /-- A big-sep over `List.range n` only sees indices below `n`. -/
 theorem bigSepL_range_congr (Φ Ψ : Nat → IProp GF) :
     ∀ n : Nat, (∀ k, k < n → Φ k = Ψ k) →

@@ -26,7 +26,7 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section UkRunSysQuiet
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -39,8 +39,8 @@ theorem wp_uk_ecall_quiet (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMa
     (h8 : n ≠ USYS_fstat) (hcl : n ≠ USYS_close) (hdp : n ≠ USYS_dup) (hop : n ≠ USYS_open)
     (hcd : n ≠ USYS_chdir) (hrng : 0 ≤ n ∧ n < 64) (h23 : n ≠ USYS_seccomp)
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ udepw (hlc := hlc) N m pc n -∗
-      (∀ (h' : CPU) (r : BitVec 64), urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ udepw N m pc n -∗
+      (∀ (h' : CPU) (r : BitVec 64), urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hcont
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun
@@ -67,7 +67,7 @@ theorem wp_uk_ecall_quiet (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMa
 passes, and the exit row off the run's own rows; no return. -/
 theorem wp_uk_ecall_exit (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (avail : Nat) (hn : usysno m = USYS_exit) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ N.pay (uexitst m) -∗ urun (hlc := hlc) N h m pc avail -∗ wpLoop h := by
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ N.pay (uexitst m) -∗ urun N h m pc avail -∗ wpLoop h := by
   iintro #Hi Hpay Hrun
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun
   iintro %M %pm %sz %fdv %cw %gn %cs %pidv %_ - - - - - #Hmy #Hdep #Hrows

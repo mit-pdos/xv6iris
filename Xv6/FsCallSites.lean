@@ -35,14 +35,14 @@ open LeanRV64D
 /-! ## `bread` and `brelse` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `bread(dev, bno)` at its call site, at EITHER entry `SIE` (`BREAD.wp_bread_eb`): the
 trap-CSR complement at a named index `s` (so a caller's `trapCsrsExt c k.sie` frames
 syntactically against a context whose `sie` only normalises to `k.sie`). -/
-theorem bread_call_eb (BR : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem bread_call_eb (BR : BREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
     (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
@@ -65,7 +65,7 @@ theorem bread_call_eb (BR : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
       bioLocked γb V kk pidv dev bno bs bsd d -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := BR.wp_bread_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j pidv dev bno dqp
+  have h := BR.wp_bread_eb (GF := GF) Γ c k' γl γb V γdl pd pav pu j pidv dev bno dqp
     hj hproc hK hnoff htier hbno hcov hdev hpd ha0 ha1
   unfold wp_bread_eb_body at h
   simp only [breadAddr] at h
@@ -90,7 +90,7 @@ theorem brelse_call (BE : BRELSE) (Γ : SchedNames)
       bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj
-  have h := BE.wp_brelse (hlc := hlc) (GF := GF) Γ c k' γl γb V kk pidv dev bno dqp bs bsd d
+  have h := BE.wp_brelse (GF := GF) Γ c k' γl γb V kk pidv dev bno dqp bs bsd d
     hnoff hK hlk hsl hp htier hkk ha0
   unfold wp_brelse_body at h
   simp only [brelseAddr] at h
@@ -101,7 +101,7 @@ end
 /-! ## `log_write`, generic form -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- `log_write(b)` at its call site: the whole-block, generic form (the
@@ -130,7 +130,7 @@ theorem log_write_gen_call (LW : LOG_WRITE)
       bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hb
-  have h := LW.wp_log_write_gen (hlc := hlc) (GF := GF) c k' γ γl γb V γfs logstart dev kk pidv
+  have h := LW.wp_log_write_gen (GF := GF) c k' γ γl γb V γfs logstart dev kk pidv
     bno bs bsl bsd d u cr Sb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hcredit
   unfold wp_log_write_gen_body at h
   simp only [logWriteAddr] at h
@@ -141,7 +141,7 @@ end
 /-! ## `memset(p, 0, n)` and `printk(msg)` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `memset(dst, 0, n)`: the `n` bytes at `dst` come back zeroed. -/
@@ -157,7 +157,7 @@ theorem memset_zero_call (MS : MEMSET) (c : CPU) (k' : KCtx) (olds : List (BitVe
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hdst
-  have h := MS.wp_memset (hlc := hlc) (GF := GF) c k' olds n hK hn hn32 hl
+  have h := MS.wp_memset (GF := GF) c k' olds n hK hn hn32 hl
   unfold wp_memset_body at h
   simp only [memsetAddr, h11] at h
   iintro ⟨Hk, Hpc, Hb, Hn⟩
@@ -174,7 +174,7 @@ theorem memset_zero_call (MS : MEMSET) (c : CPU) (k' : KCtx) (olds : List (BitVe
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `printk(msg)` with no varargs: the credentials are `panicEnv`'s, the
@@ -195,7 +195,7 @@ theorem printk_msg_call (PK : PRINTK) (c : CPU) (k' : KCtx) (msg : BitVec 64)
   icases (show panicEnv (GF := GF) ⊢ ∃ (γpr γlp : GName) (γd : UartNames),
       isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γlp γd ∗ uartSentSub γd [] from by
     unfold panicEnv; iintro H; iexact H) $$ Hpe with ⟨%γpr, %γlp, %γd, #Hlk, #Htx, #Hsent⟩
-  have h := PK.wp_printk (hlc := hlc) (GF := GF) c k' γpr γlp γd [] DFrac.discard f
+  have h := PK.wp_printk (GF := GF) c k' γpr γlp γd [] DFrac.discard f
     [] hK hflen (by rw [hkinds]; rfl) (by decide) hnoff hpr huart
   unfold wp_printk_body at h
   simp only [printkAddr, ha0] at h

@@ -145,7 +145,7 @@ def offBoxN : Namespace := ndot nroot "xv6offbox"
 
 /-- The set big-op re-indexes elementwise (it IS the list big-op over the
 set's elements: `bigOpS_bigOpL`).  Deviation 5. -/
-theorem ctxMorph_bigSepS {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+theorem ctxMorph_bigSepS {GF : BundledGFunctors.{0}} [MachGS GF]
     {S A : Type} [LawfulFiniteSet S A] (L : S) (Φ : A → CtxId → IProp GF)
     (h : ∀ x, CtxMorph (GF := GF) (Φ x)) :
     CtxMorph (GF := GF) (fun ξ => iprop([∗set] x ∈ L, Φ x ξ)) := by
@@ -156,7 +156,7 @@ theorem ctxMorph_bigSepS {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
   exact ctxMorph_bigSepL (FiniteSet.toList (A := A) L) (fun _ x ξ => Φ x ξ) (fun (_ : Nat) (x : A) => h x)
 
 section OffBox
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
   [OffboxBoxG GF] [CurCtx]
 
 /-! ## The instance's parameters
@@ -182,6 +182,7 @@ instance offHdr_timeless (γo : GName) (k : Nat) (x : Unit) (ξ : CtxId) :
     Timeless (offHdr (GF := GF) γo k x ξ) := by
   unfold offHdr offResident wordAtN; infer_instance
 
+omit [MachGS GF] in
 instance offRest_timeless (x : Unit) (ξ : CtxId) : Timeless (offRest (GF := GF) x ξ) := by
   unfold offRest; infer_instance
 
@@ -286,10 +287,12 @@ def offSetAuth (on : OffNames) (i : Nat) (L : OffSet) : IProp GF :=
 def offMember (on : OffNames) (i : Nat) (γ : BoxNames) : IProp GF :=
   iOwn (F := constOF OffSetUR) (on.set i) (◯ (LeibnizSet.valid ({γ} : OffSet)))
 
+omit [MachGS GF] in
 instance offMember_persistent (on : OffNames) (i : Nat) (γ : BoxNames) :
     Persistent (offMember (GF := GF) on i γ) := by
   unfold offMember; infer_instance
 
+omit [MachGS GF] in
 /-- A member is in the authority's set (Rocq's inline `own_valid_2` +
 `auth_both_valid_discrete` + `gset_included` step). -/
 theorem offMember_elem (on : OffNames) (i : Nat) (L : OffSet) (γ : BoxNames) :
@@ -301,6 +304,7 @@ theorem offMember_elem (on : OffNames) (i : Nat) (L : OffSet) (γ : BoxNames) :
   have hincl := (Auth.auth_both_valid_discrete.mp Hv).1
   exact (LeibnizSet.included_iff_subset _ _).1 hincl γ (LawfulSet.mem_singleton.2 rfl)
 
+omit [MachGS GF] in
 /-- The append: the authority grows by `γ`, and `γ`'s membership is minted
 (Rocq's inline `auth_update_alloc, gset_local_update` + `auth_frag_mono`). -/
 theorem offSetAuth_insert (on : OffNames) (i : Nat) (L : OffSet) (γ : BoxNames) :
@@ -343,7 +347,7 @@ instance offL2Row_morph (γ : BoxNames) (s : L2Reg Nat) : CtxMorph (offL2Row (GF
 
 instance offRows_morph (on : OffNames) (i : Nat) : CtxMorph (offRows (GF := GF) on i) := by
   unfold offRows
-  refine @instCtxMorphExists _ _ _ _ _ (fun L => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun L => ?_)
   have h := ctxMorph_bigSepS (GF := GF) L (fun γ ξ => iprop(∃ s : L2Reg Nat, offL2Row γ s ξ))
     (fun _ => inferInstance)
   infer_instance

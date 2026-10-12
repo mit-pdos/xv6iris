@@ -80,7 +80,7 @@ Rocq's header, kept because the reasons are the content:
    `ep_hops_is_mknod_hops` → `epHops_is_mknodHops`, and so on.
 6. **Sections 5-6 (the W-A append).**  Rocq's section-local
    `Require FsImg` / `Require Import FsAbsEra` is the file-level
-   `import Xv6.FsAbsEra`.  The binders are `[MachGS hlc GF] [FsTopG GF]
+   `import Xv6.FsAbsEra`.  The binders are `[MachGS GF] [FsTopG GF]
    [FsBytesG GF]` (what `elend`/`fsGammaL`/the fupd name; `FsAbsEra`
    deviation 5), not `SysMknodDefs`' whole Rocq list.  The walk
    predicates' `S k` is `k + 1`, inums `Nat`.  Rocq seals them
@@ -134,7 +134,7 @@ theorem mkfParent_row (dn dn' : Dinode) (bm bm' : Blkmap) (data data' : Nat → 
 /-! ## 3.  The read-only fire point, `ftopN` opened and closed -/
 
 section MknodFire
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-- THE READ-ONLY FIRE, at create's dirlookup(found) under the parent's lock
@@ -146,8 +146,8 @@ theorem mkfDlookup_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (d i : Nat) (nm : Fname) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hdir : fnIsDir n = true) (hnl : fnNlink n ≠ 0)
     (hnm : (dirEntries n)[nm]? = some i) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗
-      pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL γfs) appE) Fex -∗
+    ⊢@{IProp GF} ftopInv γfs -∗
+      pfAt (dlookupCommitAt (fsGammaL γfs) appE) Fex -∗
       topFragQ (fsGammaL γfs) dq d n ={E}=∗
         topFragQ (fsGammaL γfs) dq d n ∗
         ∃ av : Aview, ⌜PartialMap.get? av d = some ⟨.ADir (dirEntries n), fnNlink n⟩⌝ ∗
@@ -201,7 +201,7 @@ passes its block's `rti` and `cwi`); the hops are at `rt` too
 (`FsAbsWalk.axHop`'s self rule). -/
 
 section EraMknod
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
 
 /-- THE PARENT-PREFIX ONE-SHOT (Rocq's `npar_walk_pre_era`): one fupd,
 universally quantified over the fetched string, yielding the cursor at the
@@ -247,7 +247,7 @@ contract (`SpecNparEra`) consumes and produces.  Rocq's reading, kept:
 Rocq's `np_rootino_agree` is DROPPED (header deviation 7). -/
 
 section NparMknod
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
 
 /-- Rocq's `np_elems_is_mknod_parent_elems`. -/
 theorem npElems_is_nparElems (pl : List (BitVec 8)) : npElems pl = nparElems pl := rfl
@@ -263,7 +263,7 @@ theorem epHops_is_mknodHops (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat �
 fixed `pl` IS `nparWalkPreEra` specialised there -- a rename. -/
 theorem npStart_of_mknod (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) :
-    nparWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ⊢ epStart (hlc := hlc) γfs rt cw P Pmiss pl := by
+    nparWalkPreEra γfs rt cw P Pmiss ⊢ epStart γfs rt cw P Pmiss pl := by
   unfold nparWalkPreEra epStart
   rw [epHops_is_mknodHops]
   iintro Hpre %r %hr
@@ -341,7 +341,7 @@ theorem cafMade_row (ty major minor : BitVec 16) (bm : Blkmap) (data : Nat → L
 /-! ### 7.3  The success fire, fused with the parent-row retag -/
 
 section CreateFire2
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF] [Appcfg GF]
 
 /-- THE SUCCESS FIRE, FUSED WITH THE PARENT-ROW RETAG (Rocq's
@@ -363,11 +363,11 @@ theorem cafAcre_fire_nm [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat �
     (habsp' : absOf np' =
       some ⟨.ADir ((dirEntries np).insert nm i), fnNlink np + acreBump (cf d i)⟩)
     (habsc : absOf nc = some ⟨cf d i, 1⟩) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       -- THE NAME PREDICATE RIDES ALONG (INIT-FILE): the commit is
       -- `acreCommitAtGenNm` and the fire owes `Nm nm` beside the dot-name
       -- credential
-      pfAt (acreCommitAtGenNm (hlc := hlc) (fsGammaL γfs) appE cf Nm Pd Farm) Fok -∗
+      pfAt (acreCommitAtGenNm (fsGammaL γfs) appE cf Nm Pd Farm) Fok -∗
       creArmFired Farm i -∗
       -- THE PARENT CURSOR (TL-3K): READ by the commit and handed straight
       -- back, so the prover keeps the cursor its own post owes

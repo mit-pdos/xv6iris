@@ -39,10 +39,11 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF]
   [OffboxBoxG GF] [Appcfg GF]
 
+omit [MachGS GF] in
 /-- Two slices of one slot agree, both kept (`liveGenlo_agree`'s keeping
 form; IcacheRefGhost's own is private). -/
 theorem il_liveGenlo_agree [Icfg] (k : Nat) (s1 : Qp) (g1 : GName) (lo1 : Nat)
@@ -63,7 +64,7 @@ theorem il_checkout [Icfg] [Fscfg] [CurCtx] (cpu : CPU) (kk : Nat) (s : Qp) (dev
     (hshr : icDepShr d = some (s, dev, inum, g, lo))
     (hrdo : icDepRd d = true → ∃ ty : BitVec 16, o = .shotK ty)
     (hkk : kk < NINODE) (hm : qsum mst = s.val) (hKt : maxStamp mst ≤ Kt) :
-    icEscrow (GF := GF) fscIc fscFs fscIreg fscCov fscLogst kk ∗ itableInv (hlc := hlc) ∗
+    icEscrow (GF := GF) fscIc fscFs fscIreg fscCov fscLogst kk ∗ itableInv ∗
     ownCtx cpu curCtx ∗ ctxFloor curCtx Kt ∗ icSlp fscIc kk curCtx ∗
     inodeIdent kk (DFrac.own s) dev inum ∗ liveGenlo kk s g lo ∗
     reference (icfgBox kk) (some (dev, inum)) mst ∗ icDepSide d ∗ iregWdLic o g inum.toNat
@@ -137,7 +138,7 @@ theorem il_cached [Icfg] [Fscfg] [CurCtx] (kk : Nat) (s : Qp) (inum : BitVec 32)
     (hshr : icDepShr d = some (s, icfgDev, inum, g, lo))
     (hrdo : icDepRd d = true → ∃ ty : BitVec 16, o = .shotK ty)
     (hkk : kk < NINODE) (hnib : inum.toNat < 16 * icfgNib) :
-    itableInv (hlc := hlc) (GF := GF) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    itableInv (GF := GF) ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗
     icHdrHeld fscIc fscFs fscIreg fscCov fscLogst kk (icDepRd d) (some (icfgDev, inum))
       (.icLoaded gx dn bm) curCtx ∗ icRest kk (.icLoaded gx dn bm) curCtx ∗
     icDeposit2 kk d ∗ icDeposit fscIc kk d ∗ icTok fscIc kk ∗ iregWdLic o g inum.toNat
@@ -210,7 +211,7 @@ set_option maxHeartbeats 8000000 in
 theorem il_uncached [Icfg] [Fscfg] [CurCtx] (kk : Nat) (s : Qp) (inum : BitVec 32) (g gx : GName)
     (lo : Nat) (d : IcDep) (o : Ilkc)
     (hshr : icDepShr d = some (s, icfgDev, inum, g, lo)) (hkk : kk < NINODE) :
-    itableInv (hlc := hlc) (GF := GF) ∗
+    itableInv (GF := GF) ∗
     icHdrHeld fscIc fscFs fscIreg fscCov fscLogst kk (icDepRd d) (some (icfgDev, inum))
       (.icUnloaded gx) curCtx ∗ icRest kk (.icUnloaded gx) curCtx ∗
     icDeposit2 kk d ∗ icDeposit fscIc kk d ∗ icTok fscIc kk ∗ iregWdLic o g inum.toNat

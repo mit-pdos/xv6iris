@@ -167,7 +167,7 @@ theorem trapMstatusOk_utrapMs (e : BitVec 1) (ms : BitVec 64)
   · rw [utrapMs_SPIE]; exact hSIE
 
 section swp
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## §2 The tower at `cur_privilege = User`, generic in the cause -/
 

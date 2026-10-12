@@ -68,7 +68,7 @@ set_option maxHeartbeats 4000000 in
 lbu a4,-1(a5); bnez a4,e16`): with `a5 = s + i`, reads byte `i`, lands at
 `e16` if it is nonzero and at `e20` otherwise, at whichever hart the
 thread is on by then. -/
-theorem strlen_iter {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem strlen_iter {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (kb : KCtx)
     (s : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) (i : Nat) (b : BitVec 8) (hb : bs[i]? = some b)
     (R : RegMap) (h15 : R 15#5 = s + BitVec.ofNat 64 i) :
@@ -106,7 +106,7 @@ set_option maxHeartbeats 4000000 in
 /-- The loop from `e16` with `a5 = s + i` (`1 ≤ i ≤ n`) runs to `e20` with
 `a3 = s + n`; only `a3`, `a4`, `a5` change.  The hart is quantified inside
 the induction: each iteration may move the thread. -/
-theorem strlen_loop {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem strlen_loop {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (kb : KCtx)
     (s : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) (n : Nat) (hcstr : cstrAt bs n)
     (d : Nat) :
@@ -160,7 +160,7 @@ theorem strlen_loop {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [C
 /-! ## The function -/
 
 set_option maxHeartbeats 4000000 in
-theorem strlen_proof : STRLEN := ⟨fun {hlc GF} _ _ cpu k s dq hK hn31 => by
+theorem strlen_proof : STRLEN := ⟨fun {GF} _ _ cpu k s dq hK hn31 => by
   unfold wp_strlen_body
   iintro ⟨Hk, Hpc, Hcstr, HΦ⟩
   -- take the string apart: the loop runs over the raw terminated buffer

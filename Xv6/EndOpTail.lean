@@ -30,7 +30,7 @@ all at epochs `≤ E`, so at `E + 1` none of them can name a block of the new
 (empty) header -- which is exactly `logResAt`'s third registry clause. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 theorem eo_word_ex (a : BitVec 64) (v : BitVec 32) :
@@ -45,11 +45,11 @@ theorem eoOpen_quietAcc (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (L : BlockMap) (D : RegMapF Bool)
     (Lw : Nat → List (BitVec 8)) (t : Nat) (M : LogMirror)
     (hMhdr : lmHdr M ls = (0, [])) (hMtie : logMirrorTieBody M L cov ls []) :
-    eoOpen (GF := GF) γb γfs cov ls 0 [] L D Lw t ∗ logMirrorHalf (hlc := hlc) M ∗
+    eoOpen (GF := GF) γb γfs cov ls 0 [] L D Lw t ∗ logMirrorHalf M ∗
       logTxAuth γ (∅ : RegMapF Unit) ⊢
-      logQuiet (hlc := hlc) γ γfs cov ls L M ∗
-      (logQuiet (hlc := hlc) γ γfs cov ls L M -∗
-        eoOpen (GF := GF) γb γfs cov ls 0 [] L D Lw t ∗ logMirrorHalf (hlc := hlc) M ∗
+      logQuiet γ γfs cov ls L M ∗
+      (logQuiet γ γfs cov ls L M -∗
+        eoOpen (GF := GF) γb γfs cov ls 0 [] L D Lw t ∗ logMirrorHalf M ∗
         logTxAuth γ (∅ : RegMapF Unit)) := by
   iintro ⟨Hopen, Hmir, Htx⟩
   icases eoOpen_elim γb γfs cov ls 0 [] L D Lw t $$ Hopen
@@ -68,7 +68,7 @@ theorem eoOpen_quietAcc (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
 
 set_option maxHeartbeats 40000000 in
 theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (a b : Bool) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (L : BlockMap) (D : RegMapF Bool) (Lw : Nat → List (BitVec 8)) (t : Nat)
@@ -86,7 +86,7 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
     -- the era's mirror half at the clean picture, and THE ERA'S SYNC TOKEN,
     -- back from the commit (the header write's merge, or the empty-log path's
     -- right arm; sync K3-3), re-deposited below
-    logMirrorHalf (hlc := hlc) M ∗ eraSyncTok (hlc := hlc) (GF := GF) ∗
+    logMirrorHalf M ∗ eraSyncTok (GF := GF) ∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     eoFrameJ (k.regs 2#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗

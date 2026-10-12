@@ -56,7 +56,7 @@ open Std (ExtTreeSet)
 set_option synthInstance.maxSize 1024
 
 section UShURoundSecc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [FileOutG GF] [PipeOutG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -71,9 +71,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 wild slot is `useccTok` and its console claim `ucl`, whose wild law is
 `ucl_wild_lic`. -/
 theorem consLicenceAt_of_useccTok (ug : UnionGn)
-    (hwild : MachFixedGS.wild (hlc := hlc) (GF := GF) = useccTok (hlc := hlc) ug)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug) (k : Nat) :
-    MachFixedGS.wild (hlc := hlc) (GF := GF) k ⊢ consLicenceAt (hlc := hlc) (GF := GF) k := by
+    (hwild : MachFixedGS.wild (GF := GF) = useccTok ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug) (k : Nat) :
+    MachFixedGS.wild (GF := GF) k ⊢ consLicenceAt (GF := GF) k := by
   have hev : ∀ ev : ConsEv, wildEv ev → (∃ b, ev = .evOut b) ∨ (∃ ws, ev = .evRead ws) := by
     intro ev h
     cases ev <;> first | exact .inl ⟨_, rfl⟩ | exact .inr ⟨_, rfl⟩ | simp [wildEv] at h
@@ -87,19 +87,19 @@ theorem consLicenceAt_of_useccTok (ug : UnionGn)
 
 /-- The file family at index 3, opened. -/
 theorem uWcf3_open (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) :
-    uWcf (hlc := hlc) (GF := GF) ug r s0 I 3 ⊢
-      iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ ushPreAt (hlc := hlc) ug r s0 I) := .rfl
+    uWcf (GF := GF) ug r s0 I 3 ⊢
+      iprop(uWcl ug s0 I 3 ∗ ushPreAt ug r s0 I) := .rfl
 
 /-- /seccomp's slot's generic taint continuation. -/
 theorem ushSeccSlot_gen (T : IProp GF) :
-    ⊢ shSeccSlot (hlc := hlc) T -∗
-      □ (∀ (R : IProp GF) (W : Uvis), T -∗ myPay W.gen (fun _ => R) -∗ □ (uKillCred (hlc := hlc) -∗ R) -∗
-        uslot (hlc := hlc) W) :=
+    ⊢ shSeccSlot T -∗
+      □ (∀ (R : IProp GF) (W : Uvis), T -∗ myPay W.gen (fun _ => R) -∗ □ (uKillCred -∗ R) -∗
+        uslot W) :=
   ushPinSlot_gen era0SeccPins T
 
 /-- The wild shape holds the era's token. -/
 theorem useccompShape_tok (ug : UnionGn) (I : List (BitVec 8)) :
-    useccompShape (hlc := hlc) (GF := GF) ug I ⊢ useccTok (hlc := hlc) ug (genId (hlc := hlc) (GF := GF) + 1) := by
+    useccompShape (GF := GF) ug I ⊢ useccTok ug (genId (GF := GF) + 1) := by
   unfold useccompShape
   iintro ⟨#H, -⟩
   iapply useccTok_of_at ug _ I
@@ -110,24 +110,24 @@ theorem useccompShape_tok (ug : UnionGn) (I : List (BitVec 8)) :
 /-- **Rocq `usecc_execfail_law`**: the diagnostic through the era's licence,
 at any bytes. -/
 theorem usecc_execfail_law (UL : UK_LEAVES) (ug : UnionGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (I : List (BitVec 8)) (dg : List (BitVec 8)) (n : Nat) :
-    ⊢ ushExecfailLawAt (hlc := hlc) (GF := GF) dg n (useccompShape (hlc := hlc) ug I)
-        (useccompShape (hlc := hlc) ug I) := by
+    ⊢ ushExecfailLawAt (GF := GF) dg n (useccompShape ug I)
+        (useccompShape ug I) := by
   unfold ushExecfailLawAt
   imodintro
   iintro %N %l %hfd2 #Hsh
   obtain ⟨rb, hl2⟩ := hfd2
-  iexists (fun _ => useccompShape (hlc := hlc) ug I)
+  iexists (fun _ => useccompShape ug I)
   isplitr
   · iexact Hsh
   isplitr
   · imodintro
     iintro %p %b %hb %hlt
-    iapply kshW1_of_step UL N (useccompShape (hlc := hlc) ug I) (useccompShape (hlc := hlc) ug I) l rb b hl2
+    iapply kshW1_of_step UL N (useccompShape ug I) (useccompShape ug I) l rb b hl2
     imodintro
     iintro %Φ #Hs HΦ
-    iapply union_write_link_wild ug hcons (genId (hlc := hlc) (GF := GF) + 1) b Φ $$ [] [HΦ]
+    iapply union_write_link_wild ug hcons (genId (GF := GF) + 1) b Φ $$ [] [HΦ]
     · iapply useccompShape_tok ug I $$ Hs
     · iapply HΦ
       iexact Hsh
@@ -141,39 +141,39 @@ theorem usecc_exec_sup (UL : UK_LEAVES) (US : USER)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (PT : List (BitVec 8) → Nat → IProp GF) (PD : List (BitVec 8) → IProp GF)
-    (hwild : MachFixedGS.wild (hlc := hlc) (GF := GF) = useccTok (hlc := hlc) ug)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
-    (hrdw : ushRdwildOfShape (hlc := hlc) (GF := GF) ug)
+    (hwild : MachFixedGS.wild (GF := GF) = useccTok ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
+    (hrdw : ushRdwildOfShape (GF := GF) ug)
     (I : List (BitVec 8)) (wsx : List (List (BitVec 8))) (vw : List FdState)
-    (hok : seccOk wsx) (hvok : ushViewOk vw) {E : UshExecEnv (hlc := hlc) (GF := GF)} :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ shSeccSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
-      useccompShape (hlc := hlc) ug I -∗
+    (hok : seccOk wsx) (hvok : ushViewOk vw) {E : UshExecEnv (GF := GF)} :
+    ⊢ udep (GF := GF) -∗ shSeccSlot (fileTaint ug.ugnFile.fgnCl) -∗
+      useccompShape ug I -∗
       ushExecSupEchoAtV E (fun ld => ushFd0c ld ∧ ushFd1p ld ∧ ushFd2p ld) (ulineWs (.LSecc wsx))
-        (fun _ => (uWcu (hlc := hlc) ug r s0 PT PD I 0))
-        (useccompShape (hlc := hlc) ug I) vw := by
+        (fun _ => (uWcu ug r s0 PT PD I 0))
+        (useccompShape ug I) vw := by
   have hhead : (ulineWs (.LSecc wsx))[0]! = seccPl := by
     show (ulineWs (.LSecc wsx))[0]! = cmdSeccomp
     simp [ulineWs]
   unfold shSeccSlot
   iintro #Hdep #Hslot #Hsh
-  ihave #Hwp := (UexecGen US).uexec_wp_gen (hlc := hlc) (GF := GF)
-  ihave #HQ : iprop(□ ∀ _s : Int, (uWcu (hlc := hlc) ug r s0 PT PD I 0))
+  ihave #Hwp := (UexecGen US).uexec_wp_gen (GF := GF)
+  ihave #HQ : iprop(□ ∀ _s : Int, (uWcu ug r s0 PT PD I 0))
     $$ []
   · imodintro
     iintro %_
     iapply uWcu_wild ug r s0 PT PD I 0 $$ Hsh
   iapply shExecSupXOfEntryV (ushExecPinEcho_holds E) (fun ld => ushFd0c ld ∧ ushFd1p ld ∧ ushFd2p ld)
     (ulineWs (.LSecc wsx)) seccPl era0SeccPins [ROOTINO, SECC_INO] SECC_INO User.Seccomp.elf
-    (fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-    (uWcu (hlc := hlc) ug r s0 PT PD I 0)
-    (useccompShape (hlc := hlc) ug I) vw (usecc_ws_exec_ok wsx hok) hhead seccElfLoadable shSeccPinResolves
+    (fileTaint ug.ugnFile.fgnCl)
+    (uWcu ug r s0 PT PD I 0)
+    (useccompShape ug I) vw (usecc_ws_exec_ok wsx hok) hhead seccElfLoadable shSeccPinResolves
     $$ [] [] Hslot
   · imodintro
     iintro %M %Mv %sa %t %gn %sts %cs %pidv %himg %hag %hbytes %hlen %hrows %htab #Hnp
     obtain ⟨-, -, rb2, hr2⟩ := hrows
-    ihave #Hrows := ushViewSeccRows (hlc := hlc) (GF := GF) vw sts hvok htab
+    ihave #Hrows := ushViewSeccRows (GF := GF) vw sts hvok htab
     ihave He := seccImageEntry_of_leaves UL (consLicenceAt_of_useccTok ug hwild hcons) (ulineWs (.LSecc wsx)) M Mv sa t gn sts ROOTINO cs pidv
-      (fun _ => (uWcu (hlc := hlc) ug r s0 PT PD I 0)) rb2 hps
+      (fun _ => (uWcu ug r s0 PT PD I 0)) rb2 hps
       (usecc_ws_exec_ok wsx hok) himg hag hbytes hlen hr2 $$ HQ Hwp Hnp Hdep
     iapply imageEntryPayMono _ _ _ _ _ _ _ _ _ _ _ _ $$ [] He
     imodintro
@@ -193,14 +193,14 @@ theorem uHchild_secc (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (SC : S
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (PT : List (BitVec 8) → Nat → IProp GF) (PD : List (BitVec 8) → IProp GF) (γp : GName)
-    (hwild : MachFixedGS.wild (hlc := hlc) (GF := GF) = useccTok (hlc := hlc) ug)
-    (hrdw : ushRdwildOfShape (hlc := hlc) (GF := GF) ug)
-    (hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug) :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ shSeccSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
-      ushfChildLawAt (hlc := hlc) (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) ushDg useccLp 68 := by
+    (hwild : MachFixedGS.wild (GF := GF) = useccTok ug)
+    (hrdw : ushRdwildOfShape (GF := GF) ug)
+    (hkill : MachFixedGS.killCred (GF := GF) = fileTaint ug.ugnFile.fgnCl)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug) :
+    ⊢ udep (GF := GF) -∗ shSeccSlot (fileTaint ug.ugnFile.fgnCl) -∗
+      ushfChildLawAt (ushURoundCtx ug r s0 PT PD γp) ushDg useccLp 68 := by
   iintro #Hdep #Hslot
-  ihave #Hgen := ushSeccSlot_gen (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) $$ Hslot
+  ihave #Hgen := ushSeccSlot_gen (fileTaint ug.ugnFile.fgnCl) $$ Hslot
   unfold ushfChildLawAt
   dsimp only [ushfWq, ushStd, ushURoundCtx]
   imodintro
@@ -226,12 +226,12 @@ theorem uHchild_secc (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (SC : S
     ihave ⟨Hd, -⟩ := ushPreAt_open ug r s0 I $$ Hpre
     icases ushDeedAt_open ug r upreTie s0 I $$ Hd with (⟨%cs, %s, %v', -, -, -, -, -, %hnw, -⟩ | #HT)
     · exact absurd (hw.symm.trans hnw) (by decide)
-    · iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x99c)
+    · iapply urun_gen N' (fileTaint ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x99c)
         (68 + (8 + (ushDg + n))) (by decide) $$ [] HT Hrun
       imodintro
       iintro %W #HT' Hmy
       rw [hpeq]
-      iapply Hgen $$ %((uWcu (hlc := hlc) ug r s0 PT PD I 0))
+      iapply Hgen $$ %((uWcu ug r s0 PT PD I 0))
         %W HT' Hmy
       imodintro
       iintro #Hk
@@ -242,11 +242,11 @@ theorem uHchild_secc (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (SC : S
   icases Hstd with ⟨%vw, (%hvok | #HT), Hstd⟩
   · -- ---- THE WALK, at 8 more steps of budget than it needs ----
     have hc : UknConst N' := ukn_const_of_eq N' _ hpeq (fun _ _ => rfl)
-    have H := SC.wp_shChildXGen (ushURoundEnv (hlc := hlc) (GF := GF) UL HF) hps
+    have H := SC.wp_shChildXGen (ushURoundEnv (GF := GF) UL HF) hps
       (fun γ ld => ustdAt γ ld vw) (fun γ ld => ustdAt_ustd γ ld vw)
       (fun ld => ushFd0c ld ∧ ushFd1p ld ∧ ushFd2p ld) (ulineWs (.LSecc wsx)) altExecsecc
-      (fun _ => (uWcu (hlc := hlc) ug r s0 PT PD I 0))
-      (useccompShape (hlc := hlc) ug I) (useccompShape (hlc := hlc) ug I)
+      (fun _ => (uWcu ug r s0 PT PD I 0))
+      (useccompShape ug I) (useccompShape ug I)
       N' hc h m dw dv sa len gb sz ld (n + 8) hpeq hs1 (usecc_xline wsx gb len hlat)
       (usecc_execfail_bytes wsx) hsa hs64 hs38 hszlo hszal hszok hrows hrows.2.2
     dsimp only [ushURoundEnv, ushExecEnvOf] at H
@@ -266,12 +266,12 @@ theorem uHchild_secc (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (SC : S
       iintro -
       iapply uWcu_wild ug r s0 PT PD I 0 $$ Hsh
     · iexact Hsh
-  · iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x99c)
+  · iapply urun_gen N' (fileTaint ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x99c)
       (68 + (8 + (ushDg + n))) (by decide) $$ [] HT Hrun
     imodintro
     iintro %W #HT' Hmy
     rw [hpeq]
-    iapply Hgen $$ %((uWcu (hlc := hlc) ug r s0 PT PD I 0))
+    iapply Hgen $$ %((uWcu ug r s0 PT PD I 0))
       %W HT' Hmy
     imodintro
     iintro -

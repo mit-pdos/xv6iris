@@ -86,11 +86,11 @@ theorem greadStage (M : LModel) (ps cs : List Nat) (s : M.lmSt) (Iw E : List (Bi
     exact Nat.le_trans (nlines_prefix _ _ (Xv6.pop_prefix_of_removelast J Iw hJ hne)) hqle
 
 section read
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- the state witness's authority, with the writer's witness read off it
 where the state is filed (Rocq's inline `iAssert` of `gcl_step_read`) -/
-theorem greadWa (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa M G sd)
+theorem greadWa (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (A : GenWa M G sd)
     (k : Nat) (st : Option M.lmSt) :
     ⊢ A.gwa k st -∗ A.gwa k st ∗ (⌜st = none⌝ ∨ ∃ s1 : M.lmSt, ⌜st = some s1⌝ ∗ G.gcW k s1) := by
   cases st with
@@ -114,7 +114,7 @@ theorem greadTurnLb_get (v : EraPins) (P : Nat) :
   iframe H Hl
 
 /-- THE READ (Rocq `gcl_step_read`). -/
-theorem gclStep_read (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd : M.lmSt)
+theorem gclStep_read (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M) (sd : M.lmSt)
     (A : GenWa M G sd) (k : Nat) (v : EraPins) (n : Nat) (ho : List Obs) (CH : ConsHist)
     (ws : List (List Obs × BitVec 8)) (hread : readOk CH.chLog CH.chDl ws) :
     ⊢ G.gcPIN k v -∗ dlCnt v (1 : Qp).half n -∗ gcl M G sd A k ho CH ==∗

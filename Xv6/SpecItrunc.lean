@@ -160,7 +160,7 @@ was logged BY THIS CALL". -/
 def itBm (w : Bool) : Nat := if w then 1 else 0
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- **"THE BITMAP BLOCK'S LOG SLOT IS PAID FOR, and `u` units remain"**,
@@ -228,10 +228,10 @@ end
 
 /-- **WP of `itrunc(ip = a0)`, the credited set-form contract** (Rocq's
 `wp_itrunc_gen_body`).  See the header for the budget and the report. -/
-def wp_itrunc_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_itrunc_gen_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (data : Nat → List (BitVec 8))
@@ -281,7 +281,7 @@ def wp_itrunc_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
   -- the bitmap, with its free pool (persistent)
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
   -- THE INODE REGION, and this inum's (stale) on-disk record
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- THREE slot units: the indirect arm's bread holds one across the loop
   bslots 3 ∗
@@ -315,10 +315,10 @@ def wp_itrunc_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 /-- The eb-generic form of `wp_itrunc_gen_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_itrunc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_itrunc_gen_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (data : Nat → List (BitVec 8))
@@ -368,7 +368,7 @@ def wp_itrunc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
   -- the bitmap, with its free pool (persistent)
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
   -- THE INODE REGION, and this inum's (stale) on-disk record
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- THREE slot units: the indirect arm's bread holds one across the loop
   bslots 3 ∗
@@ -403,10 +403,10 @@ def wp_itrunc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
 `wp_itrunc_sconf`, which is not ported). -/
 structure ITRUNC : Prop where
   /-- the credited set-form contract -/
-  wp_itrunc_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_itrunc_gen_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (data : Nat → List (BitVec 8))
@@ -414,7 +414,7 @@ structure ITRUNC : Prop where
     (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac)
     hj hproc hK hnoff htier hcrb hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
     hsz hda hpd ha0,
-    wp_itrunc_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm data
+    wp_itrunc_gen_eb_body (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm data
       u Sb crb cru e0 pidv dqp dqd dqn dqb dqs
       hj hproc hK hnoff htier hcrb hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
       hsz hda hpd ha0
@@ -423,10 +423,10 @@ structure ITRUNC : Prop where
 `logOp γ (u + 2)` in -- one unit for the bitmap block, one for iupdate --
 and `u ≤ u' ≤ u + 1` out (iupdate always runs; the bitmap unit is spent only
 if the inode named a block at all). -/
-def wp_itrunc_sconf_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_itrunc_sconf_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (u : Nat)
@@ -455,7 +455,7 @@ def wp_itrunc_sconf_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
   wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   bslots 3 ∗
   -- THE RESERVATION: two units
@@ -480,10 +480,10 @@ def wp_itrunc_sconf_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 /-- The eb-generic form of `wp_itrunc_sconf_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_itrunc_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_itrunc_sconf_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (u : Nat)
@@ -512,7 +512,7 @@ def wp_itrunc_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
   wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   bslots 3 ∗
   -- THE RESERVATION: two units

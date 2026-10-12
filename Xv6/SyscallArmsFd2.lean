@@ -57,7 +57,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -130,6 +130,7 @@ theorem usysOutAt_nil (ι : UIota) (hp : ι.cpos = []) (img : ElfMem) (a : BitVe
   rw [hp, if_pos rfl]
   exact ⟨rfl, List.Pairwise.nil⟩
 
+omit [MachGS GF] in
 /-- **THE WRITE ARM'S CITATION** (NI M3 NI-OUT): off a writable console, or at
 the −1 answer, the boot prefix at the actor; else the console stream's prefix
 `L` and the run's indices `ps` in it (`consOutAt` at the era's console name),
@@ -185,8 +186,8 @@ set_option maxHeartbeats 4000000 in
 /-- **Arm 5, `sys_read`** (Rocq `sysc_arm_read`). -/
 theorem syscall_arm_read (SR : SYSREAD)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
-    (hDR : SyscDepRead (hlc := hlc) (GF := GF))
+    [ClaimIs GF Γ]
+    (hDR : SyscDepRead (GF := GF))
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -215,11 +216,11 @@ theorem syscall_arm_read (SR : SYSREAD)
   icases syscFd_agree γ (procAddr j) pid V M sts $$ [Hpriv Hfr] with ⟨%ha, Hpriv, Hfr⟩
   · iframe
   icases procPrivFd_facts γ (procAddr j) pid V M $$ Hpriv with ⟨Hpriv, %hfacts0⟩
-  ihave Hin := (show filereadIn (hlc := hlc) (GF := GF) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
+  ihave Hin := (show filereadIn (GF := GF) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
       (argZ (tfW V.tf (tfArgIdx 2))) F Rd Rin Rp Rpe P ⊢
-      sysReadIn (hlc := hlc) V (tfW V.tf (tfArgIdx 0)) sts (argZ (tfW V.tf (tfArgIdx 2))) F Rd Rin Rp Rpe P from by
+      sysReadIn V (tfW V.tf (tfArgIdx 0)) sts (argZ (tfW V.tf (tfArgIdx 2))) F Rd Rin Rp Rpe P from by
     unfold sysReadIn; rw [sysFdSt_key ha]) $$ Hin
-  have hRd := SR.wp_sys_read_eb (hlc := hlc) (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
+  have hRd := SR.wp_sys_read_eb (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     γ j pid V M sts (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))
     fscKalloc fsReadyKmem F Rd Rin Rp Rpe P
     (syscArg V hl 0 (by decide)) (syscArg V hl 1 (by decide)) (syscArg V hl 2 (by decide))
@@ -290,8 +291,8 @@ set_option maxHeartbeats 4000000 in
 /-- **Arm 16, `sys_write`** (Rocq `sysc_arm_write`). -/
 theorem syscall_arm_write (SW : SYSWRITE)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
-    (hDW : SyscDepWrite (hlc := hlc) (GF := GF))
+    [ClaimIs GF Γ]
+    (hDW : SyscDepWrite (GF := GF))
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -324,14 +325,14 @@ theorem syscall_arm_write (SW : SYSWRITE)
   icases procPrivFd_facts γ (procAddr j) pid V M $$ Hpriv with ⟨Hpriv, %hfacts⟩
   have htb : wrTb (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy V.upt :=
     wrTb_of_block V.upt V.sz V.pvLazy hfacts.2.2.2 hfacts.2.2.1
-  ihave Hin := (show filewriteIn (hlc := hlc) (GF := GF) (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
+  ihave Hin := (show filewriteIn (GF := GF) (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
       (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
       (argZ (tfW V.tf (tfArgIdx 2))) (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q Qe ⊢
-      sysWriteIn (hlc := hlc) (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy V (tfW V.tf (tfArgIdx 0))
+      sysWriteIn (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy V (tfW V.tf (tfArgIdx 0))
         sts (argZ (tfW V.tf (tfArgIdx 2)))
         (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q Qe from by
     unfold sysWriteIn; rw [sysFdSt_key ha]) $$ Hin
-  have hWr := SW.wp_sys_write_eb (hlc := hlc) (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
+  have hWr := SW.wp_sys_write_eb (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     γ j pid V M sts (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))
     fscKalloc fsReadyKmem γl fscUart Q Qe (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
     (syscArg V hl 0 (by decide)) (syscArg V hl 1 (by decide)) (syscArg V hl 2 (by decide))
@@ -407,7 +408,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
     · rw [ha0']
       exact hsix hcons
   imodintro
-  ihave #Hev := syscEvOut_cite (hlc := hlc) (GF := GF) V M sts
+  ihave #Hev := syscEvOut_cite (GF := GF) V M sts
     (syscStore (({ V with upt := P' } : ProcPriv).updEv k') (R2 10#5)) (viewFaulted V.upt P' M) cs cs V.gen ke
     _ hrow $$ Hanc Hl
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
@@ -423,8 +424,8 @@ set_option maxHeartbeats 4000000 in
 /-- **Arm 4, `sys_pipe`** (Rocq `sysc_arm_pipe`). -/
 theorem syscall_arm_pipe (SP : SYSPIPE)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
-    (hDP : SyscDepPipe (hlc := hlc) (GF := GF))
+    [ClaimIs GF Γ]
+    (hDP : SyscDepPipe (GF := GF))
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -455,7 +456,7 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
   icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
   icases syscFd_agree γ (procAddr j) pid V M sts $$ [Hpriv Hfr] with ⟨%ha, Hpriv, Hfr⟩
   · iframe
-  have hP := SP.wp_sys_pipe_eb (hlc := hlc) (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
+  have hP := SP.wp_sys_pipe_eb (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     γft γ (procAddr j) pid V M sts (tfW V.tf (tfArgIdx 0)) fscKalloc fsReadyKmem
     (syscArg V hl 0 (by decide)) ?hp ?ht ?hn ?hK
   case hp => k_norm_g; exact hproc

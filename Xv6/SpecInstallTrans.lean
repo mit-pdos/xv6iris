@@ -202,9 +202,9 @@ theorem itRecL_hit (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : Bl
 /-! ## The contract -/
 
 /-- **WP of `install_trans(recovering = a0)`**. -/
-def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_install_trans_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (recovering : Bool) (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
@@ -255,7 +255,7 @@ def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
   -- resource `Rt` -- entry `i` consumes `▷ Rt i` and its sequential permit
   -- returns `Rt (i + 1)`; the bytes are the log copy's `Lw i`
   □ (∀ (i : Nat) (w : BitVec 32), ⌜W[i]? = some w⌝ -∗ ⌜(Lw i).length = BSIZE⌝ -∗ ▷ Rt i -∗
-       diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * w.toNat, Lw i)) (Rt (i + 1))) ∗
+       diskSeqPermit (genId (GF := GF)) (some (1024 * w.toNat, Lw i)) (Rt (i + 1))) ∗
   ▷ Rt 0 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -280,9 +280,9 @@ def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
 /-- The eb-generic form of `wp_install_trans_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_install_trans_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_install_trans_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (recovering : Bool) (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
@@ -333,7 +333,7 @@ def wp_install_trans_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS h
   -- resource `Rt` -- entry `i` consumes `▷ Rt i` and its sequential permit
   -- returns `Rt (i + 1)`; the bytes are the log copy's `Lw i`
   □ (∀ (i : Nat) (w : BitVec 32), ⌜W[i]? = some w⌝ -∗ ⌜(Lw i).length = BSIZE⌝ -∗ ▷ Rt i -∗
-       diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * w.toNat, Lw i)) (Rt (i + 1))) ∗
+       diskSeqPermit (genId (GF := GF)) (some (1024 * w.toNat, Lw i)) (Rt (i + 1))) ∗
   ▷ Rt 0 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -357,9 +357,9 @@ def wp_install_trans_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS h
 
 /-- The interface of `install_trans`. -/
 structure INSTALL_TRANS : Prop where
-  wp_install_trans_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_install_trans_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (recovering : Bool) (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
@@ -367,7 +367,7 @@ structure INSTALL_TRANS : Prop where
     (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat) (Rt : Nat → IProp GF)
     hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
     hxexc hpd,
-    wp_install_trans_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
+    wp_install_trans_eb_body (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
       logstart dev recovering n W Lw L D pidv dqp homeL Xv Xexc Rt
       hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
       hxexc hpd

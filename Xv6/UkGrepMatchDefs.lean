@@ -203,7 +203,7 @@ end Stack
 /-! ## §5 THE TWO CONTRACTS, indexed by the pattern's length -/
 
 section Specs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -216,10 +216,10 @@ def grepMhSpec (lr : Nat) : Prop :=
     m.get 10#5 = BitVec.ofNat 64 ar → m.get 11#5 = BitVec.ofNat 64 ax →
     grepMhWords ((List.range lr).map fr) ≤ n →
     ⊢ grepCode N.t -∗ ustr N.d dqr ar lr fr -∗ ustr N.d dqt ax lt ft -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«matchhere») n -∗
+      urun N h m (BitVec.ofNat 64 User.Grep.Sym.«matchhere») n -∗
       (ustr N.d dqr ar lr fr -∗ ustr N.d dqt ax lt ft -∗ ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
         ⌜m'.get 10#5 = kgrepB01 (matchhere ((List.range lr).map fr) ((List.range lt).map ft))⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) n -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) n -∗ wpLoop h') -∗
       wpLoop h
 
 /-- **Rocq `ms_spec lr`**: matchstar(c, re, text) at a pattern of length
@@ -230,10 +230,10 @@ def grepMsSpec (lr : Nat) : Prop :=
     m.get 10#5 = BitVec.setWidth 64 c → m.get 11#5 = BitVec.ofNat 64 ar → m.get 12#5 = BitVec.ofNat 64 ax →
     grepMsWords ((List.range lr).map fr) ≤ n →
     ⊢ grepCode N.t -∗ ustr N.d dqr ar lr fr -∗ ustr N.d dqt ax lt ft -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«matchstar») n -∗
+      urun N h m (BitVec.ofNat 64 User.Grep.Sym.«matchstar») n -∗
       (ustr N.d dqr ar lr fr -∗ ustr N.d dqt ax lt ft -∗ ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
         ⌜m'.get 10#5 = kgrepB01 (matchstar c ((List.range lr).map fr) ((List.range lt).map ft))⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) n -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) n -∗ wpLoop h') -∗
       wpLoop h
 
 end Specs

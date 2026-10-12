@@ -142,11 +142,11 @@ theorem kexitSlots_eq : kexitSlots = 94 := by decide
 
 /-- **WP of `kexit`**: no continuation -- the thread parks as a ZOMBIE and
 is never resumed. -/
-def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_kexit_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (sts : List FdState) (Q : Int → IProp GF)
@@ -158,9 +158,9 @@ def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
   isFtable γl γ ∗ panicEnv ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
-  fsReady (hlc := hlc) ∗ bslots 3 ∗
+  fsReady ∗ bslots 3 ∗
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-  procPrivUnmarked γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ filecloseCpays (hlc := hlc) sts ∗
+  procPrivUnmarked γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ filecloseCpays sts ∗
   chFrag V.chg (procAddr j) cs ∗
   myPay V.gen Q ∗
   (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen)) ∗
@@ -169,11 +169,11 @@ def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6
 
 /-- **WP of `kexit`, at either entry `SIE`** (Rocq `wp_kexit_sconf_body`):
 the complement in, nothing out; depth 0 (so no spinlock held, `KCtx.wf`). -/
-def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_kexit_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (sts : List FdState) (Q : Int → IProp GF)
@@ -185,9 +185,9 @@ def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
   isFtable γl γ ∗ panicEnv ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
-  fsReady (hlc := hlc) ∗ bslots 3 ∗
+  fsReady ∗ bslots 3 ∗
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-  procPrivUnmarked γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ filecloseCpays (hlc := hlc) sts ∗
+  procPrivUnmarked γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ filecloseCpays sts ∗
   chFrag V.chg (procAddr j) cs ∗
   myPay V.gen Q ∗
   (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen)) ∗
@@ -196,16 +196,16 @@ def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `kexit`. -/
 structure KEXIT : Prop where
-  wp_kexit_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_kexit_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (sts : List FdState) (Q : Int → IProp GF)
     hj hproc hK hnoff htier,
-    wp_kexit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs sts Q
+    wp_kexit_eb_body (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs sts Q
       hj hproc hK hnoff htier
 
 end Xv6

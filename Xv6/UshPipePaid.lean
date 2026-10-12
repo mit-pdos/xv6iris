@@ -48,7 +48,7 @@ theorem ushq_pipe_msg_byte (p : Nat) (hp : p < 4) : ushLit 0x12b8 p = (wlLine dg
 theorem ushq_pipe_msg_nl : ushLit 0x1280 2 = (wlLine dgPipe)[4]! := by decide
 
 section UshPipePaid
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -58,9 +58,9 @@ theorem wp_kshd_panic_paid_at (SP : SH_PANIC) (N : UkNames GF) [UknConst N] (msg
     (Cr Cd : IProp GF) (l : List FdState) (h : CPU) (m : RegMap) (n : Nat) (hfd2 : ushFd2p l)
     (hmsg : (m.get 10#5).toNat = msg) (hnz : msg ≠ 0) (hok : ushLitOk msg 4 = true) (hlen : dg.length = 5)
     (hlo : ∀ p, p < 4 → ushLit msg p = dg[p]!) (hhi : ushLit 0x1280 2 = dg[4]!) :
-    ⊢ ushExecfailLawAt (hlc := hlc) dg 5 Cr Cd -∗ ushCode N.t -∗ ustd N.fd l -∗ Cr -∗
+    ⊢ ushExecfailLawAt dg 5 Cr Cd -∗ ushCode N.t -∗ ustd N.fd l -∗ Cr -∗
       (ustd N.fd l -∗ Cd -∗ N.pay (-1)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + n) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + n) -∗ wpLoop h := by
   have hlk : ∀ p, p < 5 → dg[p]? = some dg[p]! := fun p hp => by
     rw [List.getElem!_eq_getElem?_getD, List.getElem?_eq_getElem (by omega)]; rfl
   iintro #Hlaw #Hc Hstd HCr Hpay Hrun

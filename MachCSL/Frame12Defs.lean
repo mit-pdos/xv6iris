@@ -15,7 +15,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The twelve cells of a 96-byte frame, from `sp-8` down to `sp-96`. -/
 def frame12 [CurCtx] (sp v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 : BitVec 64) : IProp GF := iprop%

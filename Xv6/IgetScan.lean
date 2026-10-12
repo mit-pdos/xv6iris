@@ -81,7 +81,7 @@ theorem igScanInv_succ [Icfg] (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec
   · exact h i (by omega) v hv p hp
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -328,7 +328,7 @@ theorem ig_live (RH : RELEASE_HOOK) (PA : PANIC) (c cpu : CPU) (k : KCtx) (spie 
   icases ownCtx_floor_view c curCtx tst $$ [Hrun Hfl] with ⟨Hrun, ⟨%K, #HK, %htK⟩⟩
   · iframe Hrun Hfl
   ihave Hk := Hkback $$ Hrun
-  ihave HAU := iref_readAU_locked (hlc := hlc) c M j tst K [] hj ⟨_, hMj⟩ htK $$ [Hhalf Hst]
+  ihave HAU := iref_readAU_locked c M j tst K [] hj ⟨_, hMj⟩ htK $$ [Hhalf Hst]
   · iframe Hinv Hhalf Hst
     iapply BigSepL.bigSepL_nil.2; iempintro
   -- +0x44 c.lw a5,8(s1) : THE EXACT READ

@@ -53,7 +53,7 @@ def sncPost (bss bsd' : List (BitVec 8)) (n : Nat) : Prop :=
 /-- **WP of `strncpy`.**  `bsd` is the destination's `n` bytes (owned
 whole), `bss` the source (read only); afterwards the destination holds some
 `bsd'` satisfying `sncPost`, the source is unchanged, and `a0 = s`. -/
-def wp_strncpy_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_strncpy_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bsd bss : List (BitVec 8)) (n : Nat) (dq : DFrac)
     (hK : 2 ≤ k.avail) (hn : k.regs 12#5 = BitVec.ofNat 64 n) (hn31 : n < 2 ^ 31)
     (hld : bsd.length = n) (hls : n ≤ bss.length) : Prop :=
@@ -68,9 +68,9 @@ def wp_strncpy_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [C
 
 /-- The interface of `strncpy`. -/
 structure STRNCPY : Prop where
-  wp_strncpy : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+  wp_strncpy : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bsd bss : List (BitVec 8)) (n : Nat) (dq : DFrac)
     hK hn hn31 hld hls,
-    wp_strncpy_body (hlc := hlc) (GF := GF) cpu k bsd bss n dq hK hn hn31 hld hls
+    wp_strncpy_body (GF := GF) cpu k bsd bss n dq hK hn hn31 hld hls
 
 end Xv6

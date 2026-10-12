@@ -43,7 +43,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The transmit side (Rocq `uart_ghosts`) -/
 
@@ -68,13 +68,17 @@ def dlabOff (γ : UartNames) : IProp GF := γ.dlab ↪VAR{.discard} false
 def uartGhosts (γ : UartNames) (u : UartState) : IProp GF := iprop%
   sentAuth γ u ∗ outAuth γ u ∗ txAuth γ u ∗ dlabAuth γ u
 
+omit [MachGS GF] in
 instance outLb_persistent (γ : UartNames) (l : List (BitVec 8)) : Persistent (outLb (GF := GF) γ l) := by
   unfold outLb; infer_instance
+omit [MachGS GF] in
 instance dlabOff_persistent (γ : UartNames) : Persistent (dlabOff (GF := GF) γ) := by
   unfold dlabOff; infer_instance
+omit [MachGS GF] in
 instance uartGhosts_timeless (γ : UartNames) (u : UartState) : Timeless (uartGhosts (GF := GF) γ u) := by
   unfold uartGhosts sentAuth outAuth txAuth dlabAuth; infer_instance
 
+omit [MachGS GF] in
 /-- The transmit side is stated on the accepted trace, the transmitted prefix
 and the latch: a transition that keeps the three keeps it, and one that only
 extends the prefix moves it (the device's own steps, `uartRel`). -/
@@ -89,12 +93,14 @@ theorem uartGhosts_step (γ : UartNames) (u u' : UartState) (hacc : Uart.acc u' 
   imodintro
   iframe
 
+omit [MachGS GF] in
 theorem uartGhosts_eq (γ : UartNames) (u u' : UartState) (hacc : Uart.acc u' = Uart.acc u)
     (hout : u'.out = u.out) (hdl : Uart.dlab u' = Uart.dlab u) :
     uartGhosts (GF := GF) γ u' = uartGhosts γ u := by
   unfold uartGhosts sentAuth outAuth txAuth dlabAuth
   rw [hacc, hout, hdl]
 
+omit [MachGS GF] in
 theorem txOwn_agree (γ : UartNames) (u : UartState) (l : List (BitVec 8)) :
     txAuth (GF := GF) γ u ∗ txOwn γ l ⊢ ⌜Uart.acc u = l⌝ ∗ txAuth γ u ∗ txOwn γ l := by
   unfold txAuth txOwn
@@ -103,6 +109,7 @@ theorem txOwn_agree (γ : UartNames) (u : UartState) (l : List (BitVec 8)) :
   iframe H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem txOwn_update (γ : UartNames) (u : UartState) (l l' : List (BitVec 8)) (hacc : Uart.acc u = l) :
     txAuth (GF := GF) γ u ∗ txOwn γ l ⊢ |==> ∀ u' : UartState, ⌜Uart.acc u' = l'⌝ → txAuth γ u' ∗ txOwn γ l' := by
   unfold txAuth txOwn
@@ -114,6 +121,7 @@ theorem txOwn_update (γ : UartNames) (u : UartState) (l l' : List (BitVec 8)) (
   rw [h]
   iframe H1 H2
 
+omit [MachGS GF] in
 theorem outLb_prefix (γ : UartNames) (u : UartState) (l : List (BitVec 8)) :
     outAuth (GF := GF) γ u ∗ outLb γ l ⊢ ⌜l <+: u.out⌝ ∗ outAuth γ u := by
   unfold outAuth outLb
@@ -122,12 +130,14 @@ theorem outLb_prefix (γ : UartNames) (u : UartState) (l : List (BitVec 8)) :
   iframe H1
   ipureintro; exact h.2
 
+omit [MachGS GF] in
 theorem outLb_get (γ : UartNames) (u : UartState) : outAuth (GF := GF) γ u ⊢ outAuth γ u ∗ outLb γ u.out := by
   unfold outAuth outLb
   iintro H
   ihave #H' := MonoList.lb_own_get γ.out _ u.out $$ H
   iframe H H'
 
+omit [MachGS GF] in
 theorem dlabOff_agree (γ : UartNames) (u : UartState) :
     dlabAuth (GF := GF) γ u ∗ dlabOff γ ⊢ ⌜Uart.dlab u = false⌝ ∗ dlabAuth γ u := by
   unfold dlabAuth dlabOff
@@ -136,6 +146,7 @@ theorem dlabOff_agree (γ : UartNames) (u : UartState) :
   iframe H1
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem dlabOwn_agree (γ : UartNames) (u : UartState) (b : Bool) :
     dlabAuth (GF := GF) γ u ∗ dlabOwn γ b ⊢ ⌜Uart.dlab u = b⌝ ∗ dlabAuth γ u ∗ dlabOwn γ b := by
   unfold dlabAuth dlabOwn
@@ -144,6 +155,7 @@ theorem dlabOwn_agree (γ : UartNames) (u : UartState) (b : Bool) :
   iframe H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 /-- Moving the latch: both halves. -/
 theorem dlabOwn_update (γ : UartNames) (u : UartState) (b b' : Bool) (hb : Uart.dlab u = b) :
     dlabAuth (GF := GF) γ u ∗ dlabOwn γ b ⊢ |==> ∀ u' : UartState, ⌜Uart.dlab u' = b'⌝ → dlabAuth γ u' ∗ dlabOwn γ b' := by
@@ -156,12 +168,14 @@ theorem dlabOwn_update (γ : UartNames) (u : UartState) (b b' : Bool) (hb : Uart
   rw [h]
   iframe H1 H2
 
+omit [MachGS GF] in
 /-- The freeze: the driver's half, at `false`, becomes the persistent `dlabOff`. -/
 theorem dlabOwn_freeze (γ : UartNames) : dlabOwn (GF := GF) γ false ⊢ |==> dlabOff γ := by
   unfold dlabOwn dlabOff
   iintro H
   iapply ghost_var_persist $$ H
 
+omit [MachGS GF] in
 /-- What a caller's sublist witness says against the trace: it is a sublist
 of the current accepted trace. -/
 theorem uartSentSub_sub (γ : UartNames) (u : UartState) (bs : List (BitVec 8)) :
@@ -172,6 +186,7 @@ theorem uartSentSub_sub (γ : UartNames) (u : UartState) (bs : List (BitVec 8)) 
   iframe H1
   ipureintro; exact hsub.trans h.2.sublist
 
+omit [MachGS GF] in
 theorem sentAuth_append (γ : UartNames) (u u' : UartState) (b : BitVec 8) (h : Uart.acc u' = Uart.acc u ++ [b]) :
     sentAuth (GF := GF) γ u ⊢ |==> (sentAuth γ u' ∗ uartSent γ (Uart.acc u')) := by
   unfold sentAuth uartSent
@@ -216,25 +231,35 @@ def uartArm (γ : UartNames) (q : Qp) (a : Option ConsArm) : IProp GF := γ.arm 
 def inLogAuth (γ : UartNames) (L : List LogEntry) : IProp GF := γ.log ↪●ML L
 def inLogLb (γ : UartNames) (L : List LogEntry) : IProp GF := γ.log ↪◯ML L
 
+omit [MachGS GF] in
 instance rxInLb_persistent (γ : UartNames) (l : List (BitVec 8)) : Persistent (rxInLb (GF := GF) γ l) := by
   unfold rxInLb; infer_instance
+omit [MachGS GF] in
 instance inLogLb_persistent (γ : UartNames) (L : List LogEntry) : Persistent (inLogLb (GF := GF) γ L) := by
   unfold inLogLb; infer_instance
+omit [MachGS GF] in
 instance rxTok_timeless (γ : UartNames) (k : Nat) (hl : Option (List Obs)) :
     Timeless (rxTok (GF := GF) γ k hl) := by unfold rxTok; infer_instance
+omit [MachGS GF] in
 instance rxHi_timeless (γ : UartNames) (q : Qp) (hh : Option (List Obs)) :
     Timeless (rxHi (GF := GF) γ q hh) := by unfold rxHi; infer_instance
+omit [MachGS GF] in
 instance logHi_timeless (γ : UartNames) (q : Qp) (hh : Option (List Obs)) :
     Timeless (logHi (GF := GF) γ q hh) := by unfold logHi; infer_instance
+omit [MachGS GF] in
 instance uartDeliv_timeless (γ : UartNames) (q : Qp) (dv : List (List Obs × BitVec 8)) :
     Timeless (uartDeliv (GF := GF) γ q dv) := by unfold uartDeliv; infer_instance
+omit [MachGS GF] in
 instance uartLogm_timeless (γ : UartNames) (q : Qp) (L : List LogEntry) :
     Timeless (uartLogm (GF := GF) γ q L) := by unfold uartLogm; infer_instance
+omit [MachGS GF] in
 instance uartArm_timeless (γ : UartNames) (q : Qp) (a : Option ConsArm) :
     Timeless (uartArm (GF := GF) γ q a) := by unfold uartArm; infer_instance
+omit [MachGS GF] in
 instance inLogAuth_timeless (γ : UartNames) (L : List LogEntry) :
     Timeless (inLogAuth (GF := GF) γ L) := by unfold inLogAuth; infer_instance
 
+omit [MachGS GF] in
 theorem rxTok_agree (γ : UartNames) (k k' : Nat) (hl hl' : Option (List Obs)) :
     rxPopAuth (GF := GF) γ k' hl' ∗ rxTok γ k hl ⊢
       ⌜k' = k ∧ hl' = hl⌝ ∗ rxPopAuth γ k' hl' ∗ rxTok γ k hl := by
@@ -244,6 +269,7 @@ theorem rxTok_agree (γ : UartNames) (k k' : Nat) (hl hl' : Option (List Obs)) :
   iframe H1 H2
   ipureintro; exact Prod.mk.inj h
 
+omit [MachGS GF] in
 theorem rxTok_update (γ : UartNames) (k k' : Nat) (hl hl' : Option (List Obs)) :
     rxPopAuth (GF := GF) γ k hl ∗ rxTok γ k hl ⊢ |==> (rxPopAuth γ k' hl' ∗ rxTok γ k' hl') := by
   unfold rxPopAuth rxTok
@@ -252,6 +278,7 @@ theorem rxTok_update (γ : UartNames) (k k' : Nat) (hl hl' : Option (List Obs)) 
   imodintro
   iframe H1 H2
 
+omit [MachGS GF] in
 theorem rxInLb_prefix (γ : UartNames) (ins l : List (BitVec 8)) :
     rxInAuth (GF := GF) γ ins ∗ rxInLb γ l ⊢ ⌜l <+: ins⌝ ∗ rxInAuth γ ins := by
   unfold rxInAuth rxInLb
@@ -260,6 +287,7 @@ theorem rxInLb_prefix (γ : UartNames) (ins l : List (BitVec 8)) :
   iframe H1
   ipureintro; exact h.2
 
+omit [MachGS GF] in
 theorem rxInLb_get (γ : UartNames) (ins : List (BitVec 8)) :
     rxInAuth (GF := GF) γ ins ⊢ rxInAuth γ ins ∗ rxInLb γ ins := by
   unfold rxInAuth rxInLb
@@ -267,6 +295,7 @@ theorem rxInLb_get (γ : UartNames) (ins : List (BitVec 8)) :
   ihave #H' := MonoList.lb_own_get γ.rxin _ ins $$ H
   iframe H H'
 
+omit [MachGS GF] in
 theorem rxHi_agree (γ : UartNames) (q1 q2 : Qp) (h1 h2 : Option (List Obs)) :
     rxHi (GF := GF) γ q1 h1 ∗ rxHi γ q2 h2 ⊢ ⌜h1 = h2⌝ ∗ rxHi γ q1 h1 ∗ rxHi γ q2 h2 := by
   unfold rxHi
@@ -275,6 +304,7 @@ theorem rxHi_agree (γ : UartNames) (q1 q2 : Qp) (h1 h2 : Option (List Obs)) :
   iframe H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem rxHi_update (γ : UartNames) (h1 h2 h' : Option (List Obs)) :
     rxHi (GF := GF) γ (1 : Qp).half h1 ∗ rxHi γ (1 : Qp).half h2 ⊢
       |==> (rxHi γ (1 : Qp).half h' ∗ rxHi γ (1 : Qp).half h') := by
@@ -282,6 +312,7 @@ theorem rxHi_update (γ : UartNames) (h1 h2 h' : Option (List Obs)) :
   iintro ⟨H1, H2⟩
   iapply ghost_var_update_halves h' γ.rxhi h1 h2 $$ H1 H2
 
+omit [MachGS GF] in
 theorem logHi_agree (γ : UartNames) (q1 q2 : Qp) (h1 h2 : Option (List Obs)) :
     logHi (GF := GF) γ q1 h1 ∗ logHi γ q2 h2 ⊢ ⌜h1 = h2⌝ ∗ logHi γ q1 h1 ∗ logHi γ q2 h2 := by
   unfold logHi
@@ -290,6 +321,7 @@ theorem logHi_agree (γ : UartNames) (q1 q2 : Qp) (h1 h2 : Option (List Obs)) :
   iframe H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem logHi_update (γ : UartNames) (h1 h2 h' : Option (List Obs)) :
     logHi (GF := GF) γ (1 : Qp).half h1 ∗ logHi γ (1 : Qp).half h2 ⊢
       |==> (logHi γ (1 : Qp).half h' ∗ logHi γ (1 : Qp).half h') := by
@@ -297,6 +329,7 @@ theorem logHi_update (γ : UartNames) (h1 h2 h' : Option (List Obs)) :
   iintro ⟨H1, H2⟩
   iapply ghost_var_update_halves h' γ.loghi h1 h2 $$ H1 H2
 
+omit [MachGS GF] in
 theorem uartArm_agree (γ : UartNames) (q1 q2 : Qp) (a1 a2 : Option ConsArm) :
     uartArm (GF := GF) γ q1 a1 ∗ uartArm γ q2 a2 ⊢ ⌜a1 = a2⌝ ∗ uartArm γ q1 a1 ∗ uartArm γ q2 a2 := by
   unfold uartArm
@@ -305,6 +338,7 @@ theorem uartArm_agree (γ : UartNames) (q1 q2 : Qp) (a1 a2 : Option ConsArm) :
   iframe H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem uartArm_update (γ : UartNames) (a1 a2 a' : Option ConsArm) :
     uartArm (GF := GF) γ (1 : Qp).half a1 ∗ uartArm γ (1 : Qp).half a2 ⊢
       |==> (uartArm γ (1 : Qp).half a' ∗ uartArm γ (1 : Qp).half a') := by
@@ -312,6 +346,7 @@ theorem uartArm_update (γ : UartNames) (a1 a2 a' : Option ConsArm) :
   iintro ⟨H1, H2⟩
   iapply ghost_var_update_halves a' γ.arm a1 a2 $$ H1 H2
 
+omit [MachGS GF] in
 theorem inLogAuth_snoc (γ : UartNames) (L : List LogEntry) (e : LogEntry) :
     inLogAuth (GF := GF) γ L ⊢ |==> inLogAuth γ (L ++ [e]) := by
   unfold inLogAuth
@@ -422,8 +457,8 @@ STAMP, and THAT THE MACHINE WAS ON (Rocq relax-d2 lane K1: with the era
 stamp it makes one byte's open SEGMENT a prefix of a later byte's, which is
 how the flush's witness travels forward). -/
 def rxRider (i : UartId) (γ : UartNames) (h : List Obs) : IProp GF := iprop%
-  MachFixedGS.rxTag (hlc := hlc) (GF := GF) h ∗ obsHistLb h ∗ outLb γ (obsWire i (openSeg h)) ∗
-  ⌜obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ ∗ ⌜traceShape h true⌝
+  MachFixedGS.rxTag (GF := GF) h ∗ obsHistLb h ∗ outLb γ (obsWire i (openSeg h)) ∗
+  ⌜obsBoots h = genId (GF := GF) + 1⌝ ∗ ⌜traceShape h true⌝
 
 instance rxRider_persistent (i : UartId) (γ : UartNames) (h : List Obs) :
     Persistent (rxRider (GF := GF) i γ h) := by
@@ -436,7 +471,7 @@ instance rxRider_timeless (i : UartId) (γ : UartNames) (h : List Obs) :
 def uartCol (i : UartId) (γ : UartNames) (u : UartState) (ins : List (BitVec 8))
     (hs : List (List Obs)) (k : Nat) (hl ht : Option (List Obs)) : IProp GF := iprop%
   rxInAuth γ ins ∗ rxPopAuth γ k hl ∗ ([∗list] h ∈ hs, rxRider i γ h) ∗ obsHistLbO ht ∗
-  ⌜colTopEra (genId (hlc := hlc) (GF := GF) + 1) ht⌝ ∗ ⌜uartColOk i u ins hs k hl ht⌝
+  ⌜colTopEra (genId (GF := GF) + 1) ht⌝ ∗ ⌜uartColOk i u ins hs k hl ht⌝
 
 /-- THE COLUMN, as the invariant carries it (Rocq `uart_colE`). -/
 def uartColE (i : UartId) (γ : UartNames) (u : UartState) : IProp GF := iprop%
@@ -704,7 +739,7 @@ theorem uartCol_push (i : UartId) (γ : UartNames) (u u' : UartState) (ins : Lis
 console port's is the fixed record's `consRes`; the kernel's own port claims
 nothing. -/
 def chistAt : UartId → Nat → List Obs → ConsHist → IProp GF
-  | .uart0, k, ho, H => MachFixedGS.consRes (hlc := hlc) (GF := GF) k ho H
+  | .uart0, k, ho, H => MachFixedGS.consRes (GF := GF) k ho H
   | .uart1, _, _, _ => iprop(emp)
 
 instance chistAt_timeless (i : UartId) (k : Nat) (ho : List Obs) (H : ConsHist) :
@@ -734,10 +769,12 @@ one half in the port's claim at the delivered list's length, the other in
 the console ring's resource (`ConsoleInvDefs.consDlcnt`). -/
 def uartDlcnt (γ : UartNames) (q : Qp) (n : Nat) : IProp GF := γ.dlcnt ↪VAR{.own q} n
 
+omit [MachGS GF] in
 instance uartDlcnt_timeless (γ : UartNames) (q : Qp) (n : Nat) :
     Timeless (uartDlcnt (GF := GF) γ q n) := by
   unfold uartDlcnt; infer_instance
 
+omit [MachGS GF] in
 theorem uartDlcnt_agree (γ : UartNames) (q1 q2 : Qp) (n1 n2 : Nat) :
     uartDlcnt (GF := GF) γ q1 n1 ∗ uartDlcnt γ q2 n2 ⊢ ⌜n1 = n2⌝ ∗ uartDlcnt γ q1 n1 ∗ uartDlcnt γ q2 n2 := by
   unfold uartDlcnt
@@ -746,6 +783,7 @@ theorem uartDlcnt_agree (γ : UartNames) (q1 q2 : Qp) (n1 n2 : Nat) :
   iframe H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem uartDlcnt_update (γ : UartNames) (n1 n2 n' : Nat) :
     uartDlcnt (GF := GF) γ (1 : Qp).half n1 ∗ uartDlcnt γ (1 : Qp).half n2 ⊢
       |==> (uartDlcnt γ (1 : Qp).half n' ∗ uartDlcnt γ (1 : Qp).half n') := by
@@ -902,12 +940,12 @@ the machine's, the history's well-formedness, and THE LOG IS COMPLETE UP TO
 ITS TOP (`consLogIns`, relax-d2 lane K1). -/
 def consClaimAt (i : UartId) (γ : UartNames) (u : UartState) : IProp GF := iprop%
   ∃ (o : Option (List Obs)) (H : ConsHist),
-    obsHistLbO o ∗ chistAt i (genId (hlc := hlc) (GF := GF) + 1) (o.getD []) H ∗
+    obsHistLbO o ∗ chistAt i (genId (GF := GF) + 1) (o.getD []) H ∗
     logHi γ (1 : Qp).half (logTop H.chLog) ∗ uartDeliv γ (1 : Qp).half H.chDl ∗
     uartDlcnt γ (1 : Qp).half H.chDl.length ∗
     inLogAuth γ H.chLog ∗ uartLogm γ (1 : Qp).half H.chLog ∗ uartArm γ (1 : Qp).half H.chArm ∗
     ⌜H.chAcc = Uart.acc u⌝ ∗ ⌜consHistOk H⌝ ∗
-    ⌜consLogIns (genId (hlc := hlc) (GF := GF) + 1) i H.chLog⌝
+    ⌜consLogIns (genId (GF := GF) + 1) i H.chLog⌝
 
 instance consClaimAt_timeless (i : UartId) (γ : UartNames) (u : UartState) :
     Timeless (consClaimAt (GF := GF) i γ u) := by

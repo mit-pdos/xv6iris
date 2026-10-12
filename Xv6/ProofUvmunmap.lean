@@ -130,7 +130,7 @@ theorem unKept_trans {R R' R'' : RegMap} (h : unKept R R') (h' : unKept R' R'') 
     h'.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The allocator and the lend -/
 
@@ -1033,7 +1033,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem uvmunmap_proof (W : WALK_NOALLOC) (KF : KFREE) : UVMUNMAP where
-  wp_uvmunmap_raw := fun {hlc GF} _ _ _ _ cpu k root L n ke hK hroot hal hn hrange hfree => by
+  wp_uvmunmap_raw := fun {GF} _ _ _ _ cpu k root L n ke hK hroot hal hn hrange hfree => by
     unfold wp_uvmunmap_raw_body
     iintro ⟨Hk, Hpc, Htree, Hlend, HΦ⟩
     ihave Hum : umMap (∅ : RegMapF (BitVec 64)) (fun _ => ([] : List (BitVec 8))) $$ []
@@ -1059,7 +1059,7 @@ theorem uvmunmap_proof (W : WALK_NOALLOC) (KF : KFREE) : UVMUNMAP where
       intro j _ w hw
       rw [get?_empty] at hw
       exact absurd hw (by simp)
-  wp_uvmunmap_free := fun {hlc GF} _ _ _ _ cpu k γl γk P M n ke hnoff hK hlk hroot hal hn hrange
+  wp_uvmunmap_free := fun {GF} _ _ _ _ cpu k γl γk P M n ke hnoff hK hlk hroot hal hn hrange
       hfree => by
     unfold wp_uvmunmap_free_body
     iintro ⟨Hk, Hpc, #Hlk, Hav, Hproc, Hlend, HΦ⟩
@@ -1112,7 +1112,7 @@ set_option maxHeartbeats 4000000 in
 altitude): the generic body at `df = true` with the leaf map and the page
 map both `P.um`, so no trampoline or trapframe leaf is owned. -/
 theorem uvmunmap_bare_proof (W : WALK_NOALLOC) (KF : KFREE) : UVMUNMAP_BARE where
-  wp_uvmunmap_bare := fun {hlc GF} _ _ _ _ cpu k γl γk P M n ke hnoff hK hlk hwf hroot hal hn hrange
+  wp_uvmunmap_bare := fun {GF} _ _ _ _ cpu k γl γk P M n ke hnoff hK hlk hwf hroot hal hn hrange
       hfree => by
     unfold wp_uvmunmap_bare_body
     iintro ⟨Hk, Hpc, #Hlk, Hav, Htree, Hum, Hlend, HΦ⟩

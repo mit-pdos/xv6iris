@@ -300,7 +300,7 @@ theorem bo_calleeSaved_epi (KR R : RegMap)
 /-! ## Opening and re-closing the log lock's payload -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- Rocq `bo_batch_lhn`: the batch, opened just for its `lh.n` cell. -/
@@ -338,7 +338,7 @@ def boBatch (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     ⌜∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB⌝ ∗
     ⌜∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB⌝ ∗
     ⌜out = 0 → n = 0⌝ ∗
-    eraSyncTok (hlc := hlc) (GF := GF) ∗
+    eraSyncTok (GF := GF) ∗
     logStateAt γb γfs cov ls n LB (opPending om) ξ
 
 theorem boBatch_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
@@ -350,7 +350,7 @@ theorem boBatch_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
         ⌜∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB⌝ ∗
         ⌜∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB⌝ ∗
         ⌜out = 0 → n = 0⌝ ∗
-        eraSyncTok (hlc := hlc) (GF := GF) ∗
+        eraSyncTok (GF := GF) ∗
         logStateAt γb γfs cov ls n LB (opPending om) ξ := by
   unfold boBatch; iintro H; iexact H
 
@@ -362,7 +362,7 @@ theorem boBatch_intro (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (h2 : ∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB)
     (h3 : ∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB)
     (hq : out = 0 → n = 0) :
-    eraSyncTok (hlc := hlc) (GF := GF) ∗ logStateAt (GF := GF) γb γfs cov ls n LB pend ξ ⊢
+    eraSyncTok (GF := GF) ∗ logStateAt (GF := GF) γb γfs cov ls n LB pend ξ ⊢
       boBatch γ γb γfs cov ls om E X out ξ := by
   have hpend : logStateAt (GF := GF) γb γfs cov ls n LB (opPending om) ξ =
       logStateAt γb γfs cov ls n LB pend ξ := rfl
@@ -400,9 +400,9 @@ theorem bo_res_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
       ⌜∀ i p, PartialMap.get? X i = some p → p.1 ≤ E⌝ ∗
       ⌜∀ i, nxt ≤ i → PartialMap.get? T i = none⌝ ∗
       ⌜(FiniteMap.toList T).length = (FiniteMap.toList om).length⌝ ∗
-      ((wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗ logHelp (hlc := hlc) γ nc out false ∗
+      ((wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗ logHelp γ nc out false ∗
           boBatch γ γb γfs cov ls om E X out ξ) ∨
-        (wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗ logHelp (hlc := hlc) γ nc out true ∗
+        (wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗ logHelp γ nc out true ∗
           ⌜out = 0⌝)) := by
   unfold logResAt boBatch
   iintro ⟨%out, %cmt, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
@@ -461,7 +461,7 @@ theorem bo_res_intro (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (if cmt then 1#32 else 0#32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
-    logHelp (hlc := hlc) γ nc out cmt ∗
+    logHelp γ nc out cmt ∗
     (if cmt then iprop(emp) else boBatch γ γb γfs cov ls om E X out ξ)
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
   unfold logResAt boBatch
@@ -508,7 +508,7 @@ theorem bo_res_intro_f (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
-    logHelp (hlc := hlc) γ nc out false ∗
+    logHelp γ nc out false ∗
     boBatch γ γb γfs cov ls om E X out ξ
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ :=
   bo_res_intro γ γb γfs cov ls ξ out false nc om E X T nxo nxt nxl hlen
@@ -534,7 +534,7 @@ theorem bo_res_intro_t (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
-    logHelp (hlc := hlc) γ nc out true
+    logHelp γ nc out true
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
   iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, Hhelp⟩
   iapply (bo_res_intro γ γb γfs cov ls ξ out true nc om E X T nxo nxt nxl hlen
@@ -576,7 +576,7 @@ with its payload closed, the register pins set, the frame up.  Both sleep
 arms come back here, at whichever hart `sleep` resumed the thread on and
 with whatever `SPIE`/`SPP` it was resumed with -- which is why the
 invariant is quantified over those and the hart is the `wpNext`'s. -/
-def boLoopHead (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def boLoopHead (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (R : RegMap) : IProp GF := iprop%
@@ -588,7 +588,7 @@ def boLoopHead (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wpNext true k.proc cpu (boPost k γ pidv dqp)
 
-theorem boLoopHead_elim (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem boLoopHead_elim (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (R : RegMap) :
@@ -606,7 +606,7 @@ theorem boLoopHead_elim (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
 Kept as its own (small-goal) lemma: assembling it inline at the end of
 the entry stretch made the kernel reject that declaration with "deep
 recursion detected". -/
-theorem boLoopHead_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem boLoopHead_intro (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (a b : Bool) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (R : RegMap) (hR : boRegs k R) :
@@ -638,7 +638,7 @@ theorem bo_ac (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : LogNames) (γb : Bcache
       locked γ.lk cpu' -∗ logResAt γ γb γfs cov ls curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γ.lk "log"
+  have h := AC.wp_acquire (GF := GF) c k' γ.lk "log"
     (logResAt γ γb γfs cov ls) hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
@@ -674,7 +674,7 @@ theorem bo_re (RE : RELEASE) (c : CPU) (k' : KCtx) (s : Bool) (p : BitVec 64)
         (k'.locks.filter (fun x => x ≠ "log"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γ.lk "log"
+  have h := RE.wp_release (GF := GF) c k' γ.lk "log"
     (logResAt γ γb γfs cov ls) hsie hnoff hK s hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -686,7 +686,7 @@ theorem bo_re (RE : RELEASE) (c : CPU) (k' : KCtx) (s : Bool) (p : BitVec 64)
   iframe Hk Hpc Hlocked Hpay HΦ Harm
   iexact Hlk
 
-theorem bo_sp (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem bo_sp (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (jp : Nat)
     (hj : jp < NPROC) (hproc : k'.proc = procAddr jp) (hchan : k'.regs 10#5 ≠ 0#64)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : sleepPrepareSlots ≤ k'.avail)
@@ -697,14 +697,14 @@ theorem bo_sp (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := SP.wp_sleep_prepare (hlc := hlc) (GF := GF) Γ c k' jp hj hproc hchan hnoff hK hlk htier
+  have h := SP.wp_sleep_prepare (GF := GF) Γ c k' jp hj hproc hchan hnoff hK hlk htier
   unfold wp_sleep_prepare_body at h
   simp only [sleepPrepareAddr] at h
   exact h
 
 /-- `sleep` at either `SIE`, with the complement at a named index `s` and
 proc `p` (so the caller's hypotheses frame syntactically). -/
-theorem bo_sl (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem bo_sl (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (jp : Nat) (s : Bool) (p : BitVec 64)
     (hj : jp < NPROC) (hproc : k'.proc = procAddr jp) (hK : sleepSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hs : k'.sie = s) (hp : k'.proc = p) :
@@ -716,7 +716,7 @@ theorem bo_sl (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
-  have h := SL.wp_sleep_eb (hlc := hlc) (GF := GF) Γ c k' jp hj hproc hK hnoff htier
+  have h := SL.wp_sleep_eb (GF := GF) Γ c k' jp hj hproc hK hnoff htier
   unfold wp_sleep_eb_body at h
   simp only [sleepAddr] at h
   exact h
@@ -735,7 +735,7 @@ set_option maxHeartbeats 8000000 in
 re-splits the bundle (its arm back to the pop, the complement to `sleep`,
 called at its eb contract), and the re-acquire joins them again. -/
 theorem bo_park1 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (jp : Nat) (pidv : BitVec 32) (dqp : DFrac) (R : RegMap)
@@ -886,7 +886,7 @@ re-acquire returns to `+0x6a`, whose `j` is the jump back to the test).  At eith
 re-splits the bundle (its arm back to the pop, the complement to `sleep`,
 called at its eb contract), and the re-acquire joins them again. -/
 theorem bo_park2 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (jp : Nat) (pidv : BitVec 32) (dqp : DFrac) (R : RegMap)
@@ -1136,7 +1136,7 @@ payload VERBATIM -- or takes the grant arm, where the mint happens. -/
 
 set_option maxHeartbeats 40000000 in
 theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (jp : Nat) (pidv : BitVec 32) (dqp : DFrac)
@@ -1408,7 +1408,7 @@ caller's index; the acquire's arm joined with the complement is the loop's
 bundle), the two loop constants (`s1 = &log`, `s2 = LOGBLOCKS`) and the
 jump to the test at `+0x3a`.  Stated over the loop rather than proved with
 it, so that the two halves are checked separately. -/
-theorem bo_entry (AC : ACQUIRE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem bo_entry (AC : ACQUIRE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (jp : Nat) (hjp : jp < NPROC) (hproc : k.proc = procAddr jp)
@@ -1496,7 +1496,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`begin_op` meets its specification**, at either entry `SIE`. -/
 theorem beginOp_proof (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP) :
     BEGIN_OP := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γb V γfs j logstart dev pidv dqp
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γb V γfs j logstart dev pidv dqp
     hj hproc hK hnoff htier => by
   unfold wp_begin_op_eb_body
   simp only [beginOpAddr]

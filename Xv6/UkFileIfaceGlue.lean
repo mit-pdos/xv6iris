@@ -34,14 +34,14 @@ open Std (ExtTreeSet)
 open HfpFileClaimsP
 
 noncomputable section FifGlue
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 namespace FifCtx
-variable (X : FifCtx hlc GF)
+variable (X : FifCtx GF)
 
 /-- **Rocq `fif_exit_dev0_g`**: entry device 0 is among the drained
 devices, at its pinned value. -/
@@ -96,7 +96,7 @@ theorem fif_dev0_cons (vs : FifVs) (v : EraPins) (I0 : List (BitVec 8)) (C : Lis
 theorem fif_dev0_file (vs : FifVs) (nm : Fname) (i : Nat) (γo : GName) (ws : Wordline) (x : Dspec)
     (hv : get? vs 0 = some (.FDFile nm i γo ws)) :
     ⊢ ([∗map] d ↦ v ∈ vs, fifTok (GF := GF) X.γreg d (1 : Qp).half v) -∗ X.fifDev 0 x -∗
-      ∃ b : Nat, efany (hlc := hlc) X.c X.r nm X.sf i γo ws b := by
+      ∃ b : Nat, efany X.c X.r nm X.sf i γo ws b := by
   iintro Htoks Hd
   cases x with
   | DOut alts =>
@@ -120,8 +120,8 @@ theorem fif_dev0_file (vs : FifVs) (nm : Fname) (i : Nat) (γo : GName) (ws : Wo
 
 /-- **Rocq `fif_exit_k_cons_g`**: THE CONSOLE GLUE. -/
 theorem fif_exit_k_cons_g (C : List Nat) (v : EraPins) (I0 : List (BitVec 8)) (F : IProp GF)
-    (hPT : X.Pm.gT = fileTaint (hlc := hlc) X.c) (hD0 : X.D0 = [0]) (hw : X.w0 0 = .FDCons v I0 C) :
-    ⊢ □ (∀ a : Nat, ⌜a ∈ C⌝ -∗ gwcPost X.Pm (genId (hlc := hlc) (GF := GF) + 1) v I0 a -∗
+    (hPT : X.Pm.gT = fileTaint X.c) (hD0 : X.D0 = [0]) (hw : X.w0 0 = .FDCons v I0 C) :
+    ⊢ □ (∀ a : Nat, ⌜a ∈ C⌝ -∗ gwcPost X.Pm (genId (GF := GF) + 1) v I0 a -∗
           fdq X.r X.qf X.sf -∗ F -∗ X.N.pay (-1)) -∗
       F -∗ X.fifExitK := by
   have hrd : fifWr X.D0 X.w0 = false := by rw [fif_wr_0 X.D0 X.w0 hD0, hw]; rfl
@@ -139,7 +139,7 @@ theorem fif_exit_k_cons_g (C : List Nat) (v : EraPins) (I0 : List (BitVec 8)) (F
   icases Hd with (HT | ⟨%ps, %cs, %s1, %pos, %a, %hw', %haC, -, -, Hc⟩)
   · unfold fifEnv
     icases He with ⟨-, -, #Hpay, -, -⟩
-    ihave HT := (show X.Pm.gT ⊢ fileTaint (hlc := hlc) X.c by rw [hPT]) $$ HT
+    ihave HT := (show X.Pm.gT ⊢ fileTaint X.c by rw [hPT]) $$ HT
     iapply Hpay $$ HT
   · iapply HQ $$ %a %haC [Hc] Hdq HF
     iapply consCur_gwcPost X.Pm v ps cs s1 I0 pos a hw' $$ Hc
@@ -147,7 +147,7 @@ theorem fif_exit_k_cons_g (C : List Nat) (v : EraPins) (I0 : List (BitVec 8)) (F
 /-- **Rocq `fif_exit_k_redir_g`**: THE REDIRECT GLUE. -/
 theorem fif_exit_k_redir_g (nm : Fname) (i : Nat) (γo : GName) (ws : Wordline) (Wq : IProp GF)
     (hD0 : X.D0 = [0]) (hw : X.w0 0 = .FDFile nm i γo ws) :
-    ⊢ □ (efExit (hlc := hlc) X.c X.r nm X.sf Wq i γo ws -∗ X.N.pay (-1)) -∗ Wq -∗ X.fifExitK := by
+    ⊢ □ (efExit X.c X.r nm X.sf Wq i γo ws -∗ X.N.pay (-1)) -∗ Wq -∗ X.fifExitK := by
   iintro #HQ HWq
   unfold fifExitK
   iintro %fdm %l %vs %w %files %paths %dv %ds %hdr %hdom Hcore - Hdev

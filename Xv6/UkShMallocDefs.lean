@@ -244,7 +244,7 @@ end Heap
 /-! ## §5 THE SBRK ROW, AS A PARAMETER (deviation 2) -/
 
 section Sbrk
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -261,10 +261,10 @@ def ushmEcallSbrkBody : Prop :=
     (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (m.get 10#5))).toInt = (n : Int) →
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (m.get 11#5)) = 1#64 →
     uszOk (sz + n) → pgRoundUpN sz = sz → (pc + 4#64) &&& 1#64 = 0#64 →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_sbrk -∗ usz N.s sz -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_sbrk -∗ usz N.s sz -∗
       (∀ (h' : CPU) (r : BitVec 64), ushmSbrkAns N sz n r -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
 
 end Sbrk
@@ -272,14 +272,14 @@ end Sbrk
 /-- **The sbrk row the allocator's walks are proved against** (deviation 2):
 `UkRunSys.wp_uk_ecall_sbrk`, a parameter until UkRunSys is ported. -/
 structure USHM_SBRK_LEAF : Prop where
-  wp_uk_ecall_sbrk : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_ecall_sbrk : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF]
     [UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], ushmEcallSbrkBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], ushmEcallSbrkBody (GF := GF)
 
 /-! ## §6 The allocator's states and its capability types -/
 
 section States
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -310,21 +310,21 @@ def ushmMallocTyLe (N : UkNames GF) (B : Nat) (UM UM' : IProp GF) : Prop :=
   ∀ (h : CPU) (m : RegMap) (nbytes avail : Nat),
     m.get 10#5 = BitVec.ofNat 64 nbytes → 0 < nbytes → nbytes ≤ B →
     ⊢ ukCode N.t User.Sh.code.byte -∗ UM -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«malloc») (10 + avail) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«malloc») (10 + avail) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
         (⌜m'.get 10#5 = 0#64⌝ ∨
           ∃ (p : Nat) (g : Nat → BitVec 8), ⌜m'.get 10#5 = BitVec.ofNat 64 p⌝ ∗
             ⌜0 < p ∧ p % 16 = 0 ∧ p + nbytes < 2 ^ 38⌝ ∗ ubytes N.d p nbytes g ∗ UM') -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (10 + avail) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (10 + avail) -∗ wpLoop h') -∗
       wpLoop h
 
 /-- **Rocq `UkShParse.ushp_malloc_ty`**: the capability at the allocator's
 whole range. -/
-def ushmMallocTy (N : UkNames GF) (UM UM' : IProp GF) : Prop := ushmMallocTyLe (hlc := hlc) N 65504 UM UM'
+def ushmMallocTy (N : UkNames GF) (UM UM' : IProp GF) : Prop := ushmMallocTyLe N 65504 UM UM'
 
 /-- **Rocq `ushp_malloc_ty_le_mono`**. -/
 theorem ushmMallocTyLe_mono (N : UkNames GF) (B B' : Nat) (UM UM' : IProp GF) (hB : B' ≤ B)
-    (H : ushmMallocTyLe (hlc := hlc) N B UM UM') : ushmMallocTyLe (hlc := hlc) N B' UM UM' :=
+    (H : ushmMallocTyLe N B UM UM') : ushmMallocTyLe N B' UM UM' :=
   fun h m nbytes avail ha0 hlo hhi => H h m nbytes avail ha0 hlo (Nat.le_trans hhi hB)
 
 end States
@@ -404,7 +404,7 @@ theorem ushm_wr0 (m : RegMap) (v : BitVec 64) : ukWr m 0#5 v = m := by
 /-! ## §7 The two-word frame (deviation 4) -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -415,11 +415,11 @@ theorem ushm_pro2 (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p0 n
       uinstrIs N.t (BitVec.ofNat 64 (p0 + 2)) true (.STORE (8#12, .Regidx 1#5, .Regidx 2#5, 8)) -∗
       uinstrIs N.t (BitVec.ofNat 64 (p0 + 4)) true (.STORE (0#12, .Regidx 8#5, .Regidx 2#5, 8)) -∗
       uinstrIs N.t (BitVec.ofNat 64 (p0 + 6)) true (.ITYPE (16#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 p0) (2 + nn) -∗
+      urun N h m (BitVec.ofNat 64 p0) (2 + nn) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜(m.get 2#5).toNat % 8 = 0⌝ -∗ ⌜16 ≤ (m.get 2#5).toNat⌝ -∗
         ⌜m'.get 2#5 = m.get 2#5 + BitVec.ofInt 64 (-((8 * 2 : Nat) : Int))⌝ -∗ ⌜ushmKeep [2#5, 8#5] m m'⌝ -∗
         uword N.d ((m.get 2#5).toNat - 8) (m.get 1#5) -∗ uword N.d ((m.get 2#5).toNat - 16) (m.get 8#5) -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 (p0 + 8)) nn -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 (p0 + 8)) nn -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi0 #Hi1 #Hi2 #Hi3 Hrun Hcont
   ihave %hstk := urun_stack N h m _ _ $$ Hrun
@@ -472,9 +472,9 @@ theorem ushm_epi2 (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (me : RegMap) (q0 
       uinstrIs N.t (BitVec.ofNat 64 (q0 + 4)) true (.ITYPE (16#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) -∗
       uinstrIs N.t (BitVec.ofNat 64 (q0 + 6)) true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) -∗
       uword N.d (sp0.toNat - 8) vra -∗ uword N.d (sp0.toNat - 16) vs0 -∗
-      urun (hlc := hlc) N h me (BitVec.ofNat 64 q0) nn -∗
+      urun N h me (BitVec.ofNat 64 q0) nn -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ushmKeep [1#5, 8#5, 2#5] me m'⌝ -∗ ⌜m'.get 2#5 = sp0⌝ -∗
-        ⌜m'.get 8#5 = vs0⌝ -∗ urun (hlc := hlc) N h' m' (retPc vra) (2 + nn) -∗ wpLoop h') -∗
+        ⌜m'.get 8#5 = vs0⌝ -∗ urun N h' m' (retPc vra) (2 + nn) -∗ wpLoop h') -∗
       wpLoop h := by
   have hs16 : (me.get 2#5).toNat = sp0.toNat - 16 := by rw [hsp]; exact uv_avi_neg sp0 16 hlo
   iintro #Hi0 #Hi1 #Hi2 #Hi3 Hra Hs0 Hrun Hcont
@@ -538,9 +538,9 @@ theorem ushm_lw (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : B
     (imm : BitVec 12) (rs1 rd : BitVec 5) (dq : DFrac) (a v avail : Nat) (hns : unotSp rd)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) (hal : a % 4 = 0) (hv : v < 2 ^ 31) :
     ⊢ uinstrIs N.t pc isRvc (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 4)) -∗
-      ubytesq N.d dq a 4 (nthByte (n := 4) (BitVec.ofNat 32 v)) -∗ urun (hlc := hlc) N h m pc avail -∗
+      ubytesq N.d dq a 4 (nthByte (n := 4) (BitVec.ofNat 32 v)) -∗ urun N h m pc avail -∗
       ▷ (ubytesq N.d dq a 4 (nthByte (n := 4) (BitVec.ofNat 32 v)) -∗ ∀ h' : CPU,
-          urun (hlc := hlc) N h' (ukWr m rd (BitVec.ofNat 64 v)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' (ukWr m rd (BitVec.ofNat 64 v)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h := by
   have H := wp_uk_load UL N h m pc isRvc imm rs1 rd false 4 dq a (BitVec.ofNat 32 v) avail hns
     (Or.inr (Or.inr (Or.inl rfl))) ha hal
@@ -553,9 +553,9 @@ theorem ushm_sw (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : B
     (imm : BitVec 12) (rs1 rs2 : BitVec 5) (a v avail : Nat) (f : Nat → BitVec 8)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) (hal : a % 4 = 0) (hv : m.get rs2 = BitVec.ofNat 64 v) :
     ⊢ uinstrIs N.t pc isRvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 4)) -∗
-      ubytes N.d a 4 f -∗ urun (hlc := hlc) N h m pc avail -∗
+      ubytes N.d a 4 f -∗ urun N h m pc avail -∗
       ▷ (ubytes N.d a 4 (nthByte (n := 4) (BitVec.ofNat 32 v)) -∗ ∀ h' : CPU,
-          urun (hlc := hlc) N h' m (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' m (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hb Hrun Hcont
   icases ushm_w32_of_ubytes N.d a f $$ Hb with ⟨%w0, Hb⟩
@@ -573,9 +573,9 @@ theorem ushm_sd_bytes (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
     (imm : BitVec 12) (rs1 rs2 : BitVec 5) (a avail : Nat) (f : Nat → BitVec 8)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) (hal : a % 8 = 0) :
     ⊢ uinstrIs N.t pc isRvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 8)) -∗
-      ubytes N.d a 8 f -∗ urun (hlc := hlc) N h m pc avail -∗
+      ubytes N.d a 8 f -∗ urun N h m pc avail -∗
       ▷ (uword N.d a (m.get rs2) -∗ ∀ h' : CPU,
-          urun (hlc := hlc) N h' m (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' m (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hb Hrun Hcont
   icases uword_of_ubytes N.d a f $$ Hb with ⟨%w0, Hb⟩
@@ -588,8 +588,8 @@ theorem ushm_br (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : B
     (hpc : (if b then pc + BitVec.signExtend 64 imm else pc + instrLen isRvc) = pc')
     (hal : b = true → (pc + BitVec.signExtend 64 imm).getLsbD 0 = false) :
     ⊢ uinstrIs N.t pc isRvc (.BTYPE (imm, .Regidx rs2, .Regidx rs1, op)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h' m pc' avail -∗ wpLoop h') -∗
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h' m pc' avail -∗ wpLoop h') -∗
       wpLoop h := by
   have H := wp_uk_btype UL N h m pc isRvc imm rs2 rs1 op avail (by rw [hb]; exact hal)
   rw [hb, hpc] at H
@@ -600,8 +600,8 @@ theorem ushm_j (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : Bi
     (imm : BitVec 21) (avail : Nat) (pc' : BitVec 64) (hpc : pc + BitVec.signExtend 64 imm = pc')
     (hal : pc'.getLsbD 0 = false) :
     ⊢ uinstrIs N.t pc isRvc (.JAL (imm, .Regidx 0#5)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h' m pc' avail -∗ wpLoop h') -∗
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h' m pc' avail -∗ wpLoop h') -∗
       wpLoop h := by
   have H := wp_uk_jal UL N h m pc isRvc imm 0#5 avail (by unfold unotSp spIdx; decide) (by rw [hpc]; exact hal)
   rw [ushm_wr0, hpc] at H

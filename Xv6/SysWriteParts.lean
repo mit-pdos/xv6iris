@@ -108,7 +108,7 @@ theorem swr_cs_epi (k : KCtx) (R : RegMap) (h : swrRegs k R) :
 /-! ## The frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- THE FOUR LOCAL SLOTS, as the body uses them: `f` (8 bytes), `n` (the
@@ -199,7 +199,7 @@ end
 /-! ## filewrite at its call site -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -216,7 +216,7 @@ instance swrEnv_persistent (Γ : SchedNames) (γkl : GName) (γk : KmemNames) (�
 set_option maxHeartbeats 4000000 in
 /-- `filewrite(f, p, n)` at sys_write's call site, its `true` crossing
 taken at every hart. -/
-theorem swr_filewrite (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem swr_filewrite (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF)
@@ -230,11 +230,11 @@ theorem swr_filewrite (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗
     fileRef γ fk q st ∗ procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    filewriteEnv (hlc := hlc) γl γu st ∗ foffRow st ∗
-    filewriteIn (hlc := hlc) pmv szv lzv st n (writerImg V.upt M) (k'.regs 11#5) Q Qe ∗
-    (∀ c' : CPU, filewritePost (hlc := hlc) k' γl γu γ fk q st j pid V M n Q Qe c')
+    filewriteEnv γl γu st ∗ foffRow st ∗
+    filewriteIn pmv szv lzv st n (writerImg V.upt M) (k'.regs 11#5) Q Qe ∗
+    (∀ c' : CPU, filewritePost k' γl γu γ fk q st j pid V M n Q Qe c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := FW.wp_filewrite_eb (hlc := hlc) (GF := GF) Γ c k' γ fk q st j pid V M γkl γk γl γu n Q Qe
+  have h := FW.wp_filewrite_eb (GF := GF) Γ c k' γ fk q st j pid V M γkl γk γl γu n Q Qe
     pmv szv lzv hK hfk hj hproc hnoff htier ha0 ha2 hn htb
   unfold wp_filewrite_eb_body at h
   simp only [filewriteAddr] at h

@@ -107,7 +107,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 /-! ## §1 `powerBootRes`, unpacked -/
 
 section rows
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **The power thread's boot rows at the AMBIENT forms** (Rocq
 `power_boot_res_unpack`'s right-hand side): `MachCSL.powerBootRes` less the
@@ -115,19 +115,19 @@ client's lent resource `Rb`, every era-explicit row spelled at the ambient
 instance's era, and the console claim the power-on step founded as the
 console port's `chistAt`. -/
 def powerBootRows (Mof : (Nat → BitVec 8) → LogMirror) (σ : MState) : IProp GF := iprop%
-  (∃ r : BitVec 44, MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r) ∗
+  (∃ r : BitVec 44, MachGS.kptRootName (GF := GF) ↪VAR r) ∗
   genCert ∗
-  ([∗list] cpu ∈ cpus, regCellsNoPins (regName (hlc := hlc) (GF := GF) cpu) (σ.regs cpu)) ∗
-  memCells (MachGS.era (hlc := hlc) (GF := GF)) σ.mem ∗
-  ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) cpu ξ) ∗
-  ([∗list] cpu ∈ cpus, lockSet (hlc := hlc) (GF := GF) cpu []) ∗
-  (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗ kmapStatic (hlc := hlc) (GF := GF) ∗
-  wireInv (hlc := hlc) (GF := GF) ∗
-  ([∗list] d ∈ DevId.all, devFrag (hlc := hlc) (GF := GF) d (σ.devs.st d)) ∗
-  chistAt (hlc := hlc) (GF := GF) .uart0 (genId (hlc := hlc) (GF := GF) + 1) [] uartBootHist ∗
-  logMirrorHalf (hlc := hlc) (GF := GF) (Mof (diskOf σ.devs)) ∗
-  swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ∗
-  crashInv (hlc := hlc) (GF := GF)
+  ([∗list] cpu ∈ cpus, regCellsNoPins (regName (GF := GF) cpu) (σ.regs cpu)) ∗
+  memCells (MachGS.era (GF := GF)) σ.mem ∗
+  ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (GF := GF) cpu ξ) ∗
+  ([∗list] cpu ∈ cpus, lockSet (GF := GF) cpu []) ∗
+  (MachGS.kmapName (GF := GF) ↪●MAP KernelMap.static) ∗ kmapStatic (GF := GF) ∗
+  wireInv (GF := GF) ∗
+  ([∗list] d ∈ DevId.all, devFrag (GF := GF) d (σ.devs.st d)) ∗
+  chistAt (GF := GF) .uart0 (genId (GF := GF) + 1) [] uartBootHist ∗
+  logMirrorHalf (GF := GF) (Mof (diskOf σ.devs)) ∗
+  swapLb (GF := GF) (genId (GF := GF) + 1) ∗
+  crashInv (GF := GF)
 
 end rows
 
@@ -144,7 +144,7 @@ theorem bs_pull {PROP : Type _} [BI PROP] [BIAffine PROP]
   iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, Ht, Ho, Hk, H12, H13, Hr, Hc⟩
   iframe Hr Ht Ho Hk H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 Hc
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 /-- **Rocq `power_boot_res_unpack`**: at `Hboot`'s era instance
 (`MachGS.ofEra E gen …`, any claim payload), `powerBootRes`
@@ -155,9 +155,9 @@ theorem powerBootRes_unpack (Mof : (Nat → BitVec 8) → LogMirror)
     (Rb : Nat → (Nat → BitVec 8) → IProp GF) (Tn : Nat → IProp GF) (E : EraGS) (gen : Nat)
     (cP : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (σ : MState) :
     powerBootRes Mof Rb Tn E gen σ ⊢
-      @powerBootRows hlc GF (MachGS.ofEra E gen cP cI) Mof σ ∗ Rb gen (diskOf σ.devs) ∗
-        Tn (gen + 1) ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
-        MachFixedGS.uEraTok (hlc := hlc) (GF := GF) (gen + 1) :=
+      @powerBootRows GF (MachGS.ofEra E gen cP cI) Mof σ ∗ Rb gen (diskOf σ.devs) ∗
+        Tn (gen + 1) ∗ MachFixedGS.uClaimO (GF := GF) ∗
+        MachFixedGS.uEraTok (GF := GF) (gen + 1) :=
   bs_pull _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 end unpack
@@ -165,7 +165,7 @@ end unpack
 /-! ## §2 The carve, in stages -/
 
 section carve
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- **The image, persisted and cut** (Rocq `boot_shared_alloc`'s image
 steps: `boot_bytes_split`, `boot_text_persist`, `kernel_text_intro`,
@@ -173,7 +173,7 @@ steps: `boot_bytes_split`, `boot_text_persist`, `kernel_text_intro`,
 kernel's read-only image, the GOT row every hart reads, `.data`'s four
 windows, `.bss` whole and the free RAM run. -/
 theorem bootShared_image (σ : MState) (hbf : bootFacts σ) :
-    kmapStatic (GF := GF) ∗ memCells (MachGS.era (hlc := hlc) (GF := GF)) σ.mem ⊢
+    kmapStatic (GF := GF) ∗ memCells (MachGS.era (GF := GF)) σ.mem ⊢
       |==> (kernelText ∗ kernelData ∗ bootGotRo ∗
         bootRan (imgFlat bootImage) MachCSL.KernelSyms.«first_1» (MachCSL.KernelSyms.«first_1» + 4) ∗
         bootRan (imgFlat bootImage) MachCSL.KernelSyms.«nextpid» (MachCSL.KernelSyms.«nextpid» + 4) ∗
@@ -199,6 +199,7 @@ theorem bootShared_cpus : cpus = startedPrimary :: cpus.tail := rfl
 /-- The other harts are not the boot hart. -/
 theorem bootShared_tail_ne : ∀ c ∈ cpus.tail, c ≠ startedPrimary := by decide
 
+omit [MachGS GF] in
 /-- A per-hart family, peeled at the boot hart. -/
 theorem bootShared_peel (Φ : CPU → IProp GF) :
     ([∗list] c ∈ cpus, Φ c) ⊢ Φ startedPrimary ∗ [∗list] c ∈ cpus.tail, Φ c := by
@@ -211,15 +212,15 @@ register rows, held-lock sets and running tokens, the GOT row, and the
 `stack0` / `cpus` windows, as one `bootHartRes` per hart beside its token. -/
 theorem bootShared_harts (σ : MState) (hbf : bootFacts σ) :
     kmapStatic (GF := GF) ∗ bootGotRo ⊢
-      ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) cpu ξ) -∗
-      ([∗list] cpu ∈ cpus, regCellsNoPins (regName (hlc := hlc) (GF := GF) cpu) (σ.regs cpu)) -∗
-      ([∗list] cpu ∈ cpus, lockSet (hlc := hlc) (GF := GF) cpu []) -∗
+      ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (GF := GF) cpu ξ) -∗
+      ([∗list] cpu ∈ cpus, regCellsNoPins (regName (GF := GF) cpu) (σ.regs cpu)) -∗
+      ([∗list] cpu ∈ cpus, lockSet (GF := GF) cpu []) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«cpus» (MachCSL.KernelSyms.«cpus» + 128 * NCPU) -∗
-      |==> [∗list] c ∈ cpus, (∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) c ξ) ∗
+      |==> [∗list] c ∈ cpus, (∃ ξ : CtxId, ctxTok (GF := GF) c ξ) ∗
         bootHartRes (σ.regs c) c := by
   iintro ⟨#Hk, #Hg⟩ Ht Hr Hl Hs Hc
-  icases ctxTokAt_viewLb0_list (MachGS.era (hlc := hlc) (GF := GF)) cpus $$ Ht with ⟨Ht, Hv⟩
+  icases ctxTokAt_viewLb0_list (MachGS.era (GF := GF)) cpus $$ Ht with ⟨Ht, Hv⟩
   imod bootCarve_harts (GF := GF) $$ Hk Hv Hs Hc with Hb
   ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [Hl Hb]
   · iframe Hl Hb
@@ -285,7 +286,7 @@ theorem bootShared_bareRows [CurCtx] :
 end carve
 
 section carveRows
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **The rows at the kernel tier** (Rocq `main_locks_raw`'s post-switch
@@ -335,7 +336,7 @@ end carveRows
 /-! ## §4 The whole carve, at the boot hart's context -/
 
 section carveAll
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- The boot hart's entry context: its running token's, at the Bare tier. -/
 @[reducible] def bootSharedX (ξ0 : CtxId) : CurCtx := ⟨ξ0, KTier.bare⟩
@@ -365,13 +366,13 @@ the other harts' tokens and bundles, the Bare-tier rows at the boot hart's
 context, the kernel-tier windows, and the handover cell. -/
 def bsCarveOut (σ : MState) (ξ0 : CtxId) : IProp GF := iprop%
   kernelText ∗ kernelData ∗
-  ctxTok (hlc := hlc) (GF := GF) startedPrimary ξ0 ∗
+  ctxTok (GF := GF) startedPrimary ξ0 ∗
   bootHartRes (σ.regs startedPrimary) startedPrimary ∗
-  ([∗list] c ∈ cpus.tail, (∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) c ξ) ∗
+  ([∗list] c ∈ cpus.tail, (∃ ξ : CtxId, ctxTok (GF := GF) c ξ) ∗
     bootHartRes (σ.regs c) c) ∗
   mainLocksBare (Y := bootSharedX ξ0) ∗ mainGlobalsBare (Y := bootSharedX ξ0) ∗
   bcpUartCells (Y := bootSharedX ξ0) .uart0 ∗ bcpUartCells (Y := bootSharedX ξ0) .uart1 ∗
-  @pageRange hlc GF _ (bootSharedX ξ0) kinitBase kinitPages ∗
+  @pageRange GF _ (bootSharedX ξ0) kinitBase kinitPages ∗
   bsKptWin (GF := GF) ∗
   wordCell startedAddr 4 0 startedClear []
 
@@ -380,10 +381,10 @@ memory cells, the per-hart rows and tokens; hart 0's token is destructed
 FIRST and its context is where every Bare-tier cell is carved (brief §4.2
 step 7). -/
 theorem bootShared_carve (σ : MState) (hbf : bootFacts σ) :
-    kmapStatic (GF := GF) ∗ memCells (MachGS.era (hlc := hlc) (GF := GF)) σ.mem ∗
-      ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) cpu ξ) ∗
-      ([∗list] cpu ∈ cpus, regCellsNoPins (regName (hlc := hlc) (GF := GF) cpu) (σ.regs cpu)) ∗
-      ([∗list] cpu ∈ cpus, lockSet (hlc := hlc) (GF := GF) cpu []) ⊢
+    kmapStatic (GF := GF) ∗ memCells (MachGS.era (GF := GF)) σ.mem ∗
+      ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (GF := GF) cpu ξ) ∗
+      ([∗list] cpu ∈ cpus, regCellsNoPins (regName (GF := GF) cpu) (σ.regs cpu)) ∗
+      ([∗list] cpu ∈ cpus, lockSet (GF := GF) cpu []) ⊢
       |==> ∃ ξ0 : CtxId, bsCarveOut σ ξ0 := by
   iintro ⟨#Hk, Hmem, Ht, Hr, Hl⟩
   imod bootShared_image σ hbf $$ [Hmem] with
@@ -409,7 +410,7 @@ end carveAll
 /-! ## §3 The boot hart's supply, less the application's two rows -/
 
 section supply
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
   [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [Appcfg GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
@@ -428,8 +429,8 @@ def bootSupplyCore [Fscfg] [Icfg] (X : CurCtx)
   mainLocksBare ∗ mainGlobalsBare ∗
   mainLocksRaw (Y := X.toKpt) ∗ mainGlobalsRaw (Y := X.toKpt) cn ∗
   mainSbRaw (Y := X.toKpt) ∗ mainLogRaw (Y := X.toKpt) ∗
-  @wordPointsTo hlc GF _ X.toKpt firstAddr 4 (DFrac.own 1) 1#32 ∗
-  @wordPointsTo hlc GF _ X.toKpt nextpidAddr 4 (DFrac.own 1) 1#32 ∗
+  @wordPointsTo GF _ X.toKpt firstAddr 4 (DFrac.own 1) 1#32 ∗
+  @wordPointsTo GF _ X.toKpt nextpidAddr 4 (DFrac.own 1) 1#32 ∗
   ([∗list] i ∈ List.range NPROC, hartFull Γ i startedPrimary) ∗
   ([∗list] i ∈ List.range NPROC, pstateFull Γ i UNUSED) ∗
   procsAvailAt Γ (some NPROC) true ∗
@@ -437,7 +438,7 @@ def bootSupplyCore [Fscfg] [Icfg] (X : CurCtx)
   childrenBoot ∗
   lockFreeTok γc ∗ lockFreeTok γl0 ∗ lockFreeTok γl1 ∗ lockFreeTok γt ∗
   ([∗list] i ∈ List.range NPROC, lockFreeTok (Γ.lock i)) ∗
-  fsBootSupply (hlc := hlc) dk sb nib cov γ0 γd cn Rspent Pb (hdrWset (fsBlocks dk) sb.sbLogstart) ∗
+  fsBootSupply dk sb nib cov γ0 γd cn Rspent Pb (hdrWset (fsBlocks dk) sb.sbLogstart) ∗
   logMirrorBorn (mirrorOf (fsBlocks dk)) ∗
   irefSlots IREFBOOT ∗ irefSlotsAuth ∗ bslots mainBslotsFs ∗
   genCert ∗ fsCrashSeam cov sb.sbLogstart ∗ crashInv ∗
@@ -446,9 +447,9 @@ def bootSupplyCore [Fscfg] [Icfg] (X : CurCtx)
   mainUartRaw X .uart0 γ0 l0 ∗ mainUartRaw X .uart1 γ1 l1 ∗
   diskCfgOwn γd c0 ∗ diskInitGhosts γd ∗
   (∃ (vl : BitVec 32) (vn vc pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)),
-    @diskInitCells hlc GF _ X.toKpt vl vn vc pd0 pav0 pu0 free0) ∗
-  (∃ r : BitVec 44, MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r) ∗
-  (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗
+    @diskInitCells GF _ X.toKpt vl vn vc pd0 pav0 pu0 free0) ∗
+  (∃ r : BitVec 44, MachGS.kptRootName (GF := GF) ↪VAR r) ∗
+  (MachGS.kmapName (GF := GF) ↪●MAP KernelMap.static) ∗
   pageRange kinitBase kinitPages
 
 /-- **The application's two rows, added back**: the core and the era's echo
@@ -459,10 +460,10 @@ theorem bootPrimarySupply_intro [Fscfg] [Icfg] (X : CurCtx)
     (cn : ConsNames) (l0 l1 : List (BitVec 8)) (c0 : VirtioCfg)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare) :
-    consEchoShift (hlc := hlc) (GF := GF) ∗
-      initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
-      MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
-      (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
+    consEchoShift (GF := GF) ∗
+      initBootBundle (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
+      MachFixedGS.uClaimO (GF := GF) ∗
+      (∃ k : Nat, MachFixedGS.uEraAnchor (GF := GF) k (niNamesHere (GF := GF))) ∗
       bootSupplyCore X Γ γ0 γ1 γc γl0 γl1 γd γt cn l0 l1 c0 dk sb nib cov Pb Rspent ⊢
       bootPrimarySupply X Γ γ0 γ1 γc γl0 γl1 γd γt cn l0 l1 c0 dk sb nib cov Pb Rspent := by
   unfold bootSupplyCore bootPrimarySupply
@@ -477,7 +478,7 @@ end supply
 /-! ## §5 THE SHARED ALLOCATION -/
 
 section alloc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchGpre GF] [CtokG GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchGpre GF] [CtokG GF] [DiskG GF]
   [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [Appcfg GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
 
@@ -508,18 +509,18 @@ def bootSharedOut [WchG GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Icfg] [Fs
     (γc γl0 γl1 γt : GName) (cn : ConsNames) (γd : DiskNames) (ξd : CtxId)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare) : IProp GF := iprop%
-  ⌜cn.uart = γ0⌝ ∗ ⌜cn.era = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
+  ⌜cn.uart = γ0⌝ ∗ ⌜cn.era = genId (GF := GF) + 1⌝ ∗
   kernelText ∗ kernelData ∗
-  ctxTok (hlc := hlc) (GF := GF) startedPrimary ξ0 ∗
+  ctxTok (GF := GF) startedPrimary ξ0 ∗
   bootHartRes (σ.regs startedPrimary) startedPrimary ∗
-  ([∗list] c ∈ cpus.tail, (∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) c ξ) ∗
+  ([∗list] c ∈ cpus.tail, (∃ ξ : CtxId, ctxTok (GF := GF) c ξ) ∗
     bootHartRes (σ.regs c) c) ∗
   wordCell startedAddr 4 0 startedClear [] ∗ ctxStamped ξd 0 ∗
   bootSupplyCore (bootSharedX ξ0) Γ γ0 γ1 γc γl0 γl1 γd γt cn [] [] Virtio.cfg0 dk sb nib cov Pb Rspent ∗
-  appInv (hlc := hlc) (GF := GF) fscFs ∗
-  uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ plicInv γ0 γ1 ∗ wireInv (hlc := hlc) (GF := GF) ∗
-  genCert (hlc := hlc) (GF := GF) ∗
-  diskInv γd ∗ crashInv (hlc := hlc) (GF := GF) ∗ diskCrashCaps (hlc := hlc) γd ∗ diskRoot γd
+  appInv (GF := GF) fscFs ∗
+  uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ plicInv γ0 γ1 ∗ wireInv (GF := GF) ∗
+  genCert (GF := GF) ∗
+  diskInv γd ∗ crashInv (GF := GF) ∗ diskCrashCaps γd ∗ diskRoot γd
 
 set_option maxHeartbeats 400000 in
 /-- **Rocq `boot_shared_alloc`**: THE SHARED BOOT ALLOCATION.  Out of the
@@ -538,12 +539,12 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
     (ndisk : Nat) (S : FsStateRec) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (gsn gln gtn : GName) (Pb : Nat → List (BitVec 8))
     (hwf : fsBootSnapWf (diskOf σ.devs) ndisk S Pb sb nib cov) :
-    powerBootRows (hlc := hlc) (GF := GF) (fun dk => mirrorOf (fsBlocks dk)) σ ∗
+    powerBootRows (GF := GF) (fun dk => mirrorOf (fsBlocks dk)) σ ∗
       ▷ appPred appRun (absView S.fssInodes) ∗
       -- the crash seam at the guest and the merge package, ONE row closed over
       -- the guest's durable-copy predicate (Rocq `app_dur_laws`, SY3-A3b)
-      appDurLaws (hlc := hlc) cov sb.sbLogstart ∗
-      eraSyncTok (hlc := hlc) (GF := GF) ∗
+      appDurLaws cov sb.sbLogstart ∗
+      eraSyncTok (GF := GF) ∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov sb.sbLogstart)) S ⊢
       |={⊤}=> ∃ (ξ0 : CtxId) (Γ : SchedNames) (W : WchG GF) (HFd : FdslotG GF) (HBs : BioslotG GF)
         (HIr : IrefslotG GF) (γc γl0 γl1 γt : GName) (γ0 γ1 : UartNames) (cn : ConsNames)
@@ -557,7 +558,7 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   iintro ⟨⟨Hkpt, #Hcert, Hregs, Hmem, Htoks, Hlocks, Hkauth, #Hkst, #Hwire, Hdevs, Hch, Hmir, #Hsw,
     #Hcinv⟩, Happ, #Hdurl, Hstok, Hsnap⟩
   -- the gname-only mints (the instances first)
-  imod bootSharedDev_names (hlc := hlc) (GF := GF) with
+  imod bootSharedDev_names (GF := GF) with
     ⟨%Γ, %W, %HFd, %HBs, %HIr, %γc, %γl0, %γl1, %γt, %hW, Hn⟩
   -- the carve, at hart 0's context
   imod bootShared_carve σ hbf $$ [Hmem Htoks Hregs Hlocks] with ⟨%ξ0, Hc⟩
@@ -566,7 +567,7 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   icases Hc with ⟨#Htx, #Hd, Ht0, Hb0, Hrest, HL, HG, HU0, HU1, HP, ⟨W1, W2, W3, W4, W5, W6, W7, W8,
     W9, W10, W11, W12, W13, W14, W15⟩, Hsc⟩
   -- the devices
-  imod bootSharedDev_devs (hlc := hlc) (GF := GF) (bootSharedX ξ0) ds0 (ndisk / BSIZE) $$
+  imod bootSharedDev_devs (GF := GF) (bootSharedX ξ0) ds0 (ndisk / BSIZE) $$
     [Hdevs Hch HU0 HU1] with ⟨%γ0, %γ1, %cn, %γd, Hdv⟩
   · iframe Hdevs Hch HU0 HU1
   unfold bsdDevRows
@@ -578,13 +579,13 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   ihave HK := hK $$ Hkst W1 W2 W3 W4 W5 W6 W7 W8 W9 W10 W11 W12 W13 W14 W15 Hg Hfd Hi1 Hi2 Hb1
   icases HK with ⟨HLr, HGr, HSb, HLog, HF, HNp, HDk⟩
   -- the file system
-  have hF := (letI : CurCtx := bootSharedX ξ0; bootSharedFs (hlc := hlc) (GF := GF) γ0 γd cn
+  have hF := (letI : CurCtx := bootSharedX ξ0; bootSharedFs (GF := GF) γ0 γd cn
     (diskOf ds0.reset) ndisk S sb cov nib gsn gln gtn Pb hwf)
   imod hF $$ Hblk Happ Hdurl Hstok Hsnap Hmir Hsw Hi3 Hia Hb2 Hcert Hcinv
     with ⟨%I, %F, Hfs⟩
   unfold bsfRows
   icases Hfs with ⟨Hsup, Hmb, Hib, Hiau, Hbs, -, #Hcs, -⟩
-  ihave Hsup := fsBootSupply_appInv (hlc := hlc) (GF := GF) _ _ _ _ _ _ _ _ _ _ $$ Hsup
+  ihave Hsup := fsBootSupply_appInv (GF := GF) _ _ _ _ _ _ _ _ _ _ $$ Hsup
   icases Hsup with ⟨#Hai, Hsup⟩
   -- the handover's stamped record context
   imod ctxStamped_boot (GF := GF) with ⟨%ξd, Hstmp⟩
@@ -606,7 +607,7 @@ end alloc
 /-! ## §6 Transport to the final claim payload -/
 
 section ofEra
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [Xv6G GF] [CtokG GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [Xv6G GF] [CtokG GF] [DiskG GF]
   [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [Appcfg GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
   [WchG GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Icfg] [Fscfg]
@@ -624,16 +625,16 @@ theorem bootSharedOut_ofEra (E : EraGS) (gen : Nat)
     (γc γl0 γl1 γt : GName) (cn : ConsNames) (γd : DiskNames) (ξd : CtxId)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare) :
-    (letI : MachGS hlc GF := MachGS.ofEra E gen cP cI;
-      bootSharedOut (hlc := hlc) (GF := GF) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd dk sb nib cov Pb Rspent) ⊢
-      (letI : MachGS hlc GF := MachGS.ofEra E gen cP' cI';
-        bootSharedOut (hlc := hlc) (GF := GF) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd dk sb nib cov Pb
+    (letI : MachGS GF := MachGS.ofEra E gen cP cI;
+      bootSharedOut (GF := GF) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd dk sb nib cov Pb Rspent) ⊢
+      (letI : MachGS GF := MachGS.ofEra E gen cP' cI';
+        bootSharedOut (GF := GF) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd dk sb nib cov Pb
           Rspent) := .rfl
 
 end ofEra
 
 section started
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **The handover channel, at the final instance** (Rocq

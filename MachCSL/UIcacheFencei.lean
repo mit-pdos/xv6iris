@@ -16,7 +16,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **A4**: `fence.i` in supervisor mode, running a stamping step. -/

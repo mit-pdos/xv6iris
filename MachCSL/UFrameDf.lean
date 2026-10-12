@@ -19,7 +19,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail LeanRV64D
 
 section frames
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The cells of `L`, exclusively, at the file's values. -/
 def ufCells (cpu : CPU) (L : List Register) (f : RegFile) : IProp GF :=

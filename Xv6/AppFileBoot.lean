@@ -39,7 +39,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileBoot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- WHAT /init IS HANDED AT THE ERA MINT, at a deed state (Rocq
@@ -49,10 +49,10 @@ chain owns -- beside the typed witness of that content, or the taint, under
 ONE later. -/
 def fileBootAt (c : FileFixed) (k : Nat) (r : FileAppNames) (s : Dst) : IProp GF :=
   iprop(echoBoot (GF := GF) c.ffEcho k r.fnCons ∗ ⌜r.fnEra = k⌝
-    ∗ fown r s ∗ ▷ (fTyped c s ∨ fileTaint (hlc := hlc) c))
+    ∗ fown r s ∗ ▷ (fTyped c s ∨ fileTaint c))
 
 /-- The empty ledger is all spent. -/
-theorem escRecs_nil : ⊢@{IProp GF} escRecs (hlc := hlc) ([] : List EscRec) := by
+theorem escRecs_nil : ⊢@{IProp GF} escRecs ([] : List EscRec) := by
   unfold escRecs
   exact BigSepL.bigSepL_nil_intro
 
@@ -64,11 +64,11 @@ the (empty) line list. -/
 theorem fileInit (c : FileFixed) (dk : Nat → BitVec 8) (D : BlockMap) (S : FsStateRec)
     (γ0 : GName) (hdk : fsBlocks dk = fsimgP)
     (hrec : fsRecovery (fsBlocks dk) D fsimgCov fsimgSb.sbLogstart) (hS : snapOk S D) :
-    ⊢@{IProp GF} syncReg c 0 γ0 -∗ slAuth γ0 (1 : Qp).half [] -∗ syncCmAuth (hlc := hlc) c 0 -∗
+    ⊢@{IProp GF} syncReg c 0 γ0 -∗ slAuth γ0 (1 : Qp).half [] -∗ syncCmAuth c 0 -∗
       slAuth c.ffHist 1 [] -∗ runAuth c 0 -∗ flLb c [] ==∗
-      ∃ r : FileAppNames, ⌜r.fnRole = true⌝ ∗ filePred (hlc := hlc) c r (absView S.fssInodes) := by
+      ∃ r : FileAppNames, ⌜r.fnRole = true⌝ ∗ filePred c r (absView S.fssInodes) := by
   iintro #Hreg Hh Hcm Hhi Hra #Hlb
-  imod (echoInit (hlc := hlc) (GF := GF) c.ffEcho dk D S hdk hrec hS) with ⟨%rc, He⟩
+  imod (echoInit (GF := GF) c.ffEcho dk D S hdk hrec hS) with ⟨%rc, He⟩
   imod (fnamesAlloc (GF := GF) rc ∅ γ0 0 true 0) with ⟨%r, %hrc, %hsy, Hd1, -, Ht1, -, Ha1, -, -⟩
   obtain ⟨hγ, hk, hb⟩ := hsy
   have hok : fOk (absView S.fssInodes) ∅ := by
@@ -111,10 +111,10 @@ theorem fileInit_img (c : FileFixed) (dk : Nat → BitVec 8) (ndisk : Nat) (sb :
     (nib : Nat) (cov : Std.ExtTreeSet Nat compare) (γ0 : GName)
     (himg : fsBootImageWf dk ndisk sb nib cov) (hdk : fsBlocks dk = fsimgP)
     (hsb : sb = fsimgSb) (hcov : cov = fsimgCov) :
-    ⊢@{IProp GF} syncReg c 0 γ0 -∗ slAuth γ0 (1 : Qp).half [] -∗ syncCmAuth (hlc := hlc) c 0 -∗
+    ⊢@{IProp GF} syncReg c 0 γ0 -∗ slAuth γ0 (1 : Qp).half [] -∗ syncCmAuth c 0 -∗
       slAuth c.ffHist 1 [] -∗ runAuth c 0 -∗ flLb c [] ==∗
       ∃ r : FileAppNames, ⌜r.fnRole = true⌝ ∗
-        filePred (hlc := hlc) c r (absView (imgState (fsBlocks dk) sb nib).fssInodes) := by
+        filePred c r (absView (imgState (fsBlocks dk) sb nib).fssInodes) := by
   subst hsb hcov
   have hS := imgSnapOk dk ndisk fsimgSb nib fsimgCov himg
   rw [hdk] at hS ⊢

@@ -29,7 +29,7 @@ theorem catMain_blt0 (r : BitVec 64) : ukBtaken .BLT r 0#64 = decide (r.toInt < 
   simp only [ukBtaken, zopz0zI_s, BitVec.toInt_zero]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -38,12 +38,12 @@ theorem catMain_body (UL : UK_LEAVES) (HF : CAT_FPRINTF) (HC : CAT_CAT) (N : UkN
     (av : Nat) (args : List UArg) (i : Nat) (g : UArg) (h : CPU) (m : RegMap) (f : Nat → BitVec 8) (n : Nat)
     (Ci Co : IProp GF) (hptr : ∀ (j : Nat) (g0 : UArg), args[j]? = some g0 → g0.ptr ≠ 0)
     (hg : args[i]? = some g) (hinv : cmInv sp0 av args.length i m) :
-    ⊢ kcatFile (hlc := hlc) N g Ci Co -∗ ukCode N.t User.Cat.code.byte -∗ uargv N.d av args -∗ Ci -∗
+    ⊢ kcatFile N g Ci Co -∗ ukCode N.t User.Cat.code.byte -∗ uargv N.d av args -∗ Ci -∗
       ubytes N.d User.Cat.Sym.«buf» 512 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0xa6) (8 + (10 + (12 + (4 + n)))) -∗
+      urun N h m (BitVec.ofNat 64 0xa6) (8 + (10 + (12 + (4 + n)))) -∗
       (∀ (h' : CPU) (m' : RegMap) (f' : Nat → BitVec 8), ⌜cmInv sp0 av args.length (i + 1) m'⌝ -∗ Co -∗
         ubytes N.d User.Cat.Sym.«buf» 512 f' -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0xc2) (8 + (10 + (12 + (4 + n)))) -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0xc2) (8 + (10 + (12 + (4 + n)))) -∗ wpLoop h') -∗
       wpLoop h := by
   simp only [kcatFile, kcatO, kcatRun0, kcatCl]
   iintro Hfile #Hc #Hargv HCi Hbuf Hrun Hcont

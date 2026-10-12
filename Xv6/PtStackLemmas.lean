@@ -319,7 +319,7 @@ all these pages are distinct.  (The same argument as `Xv6.pageWord`, kept
 here so that this file depends only on `PtRunLemmas`.) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- A page, witnessed by the word at its first entry. -/
 def pageWord [CurCtx] (b : BitVec 44) : IProp GF := iprop%

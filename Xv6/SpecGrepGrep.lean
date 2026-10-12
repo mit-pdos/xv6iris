@@ -33,7 +33,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -44,19 +44,19 @@ def wpGrepGrepBody : Prop :=
     m.get 10#5 = BitVec.ofNat 64 ar → m.get 11#5 = fdv → (BitVec.setWidth 32 fdv).toInt = fd →
     grepWords ((List.range lr).map fr) ≤ n →
     ⊢ grepCode N.t -∗ ustr N.d DFrac.discard ar lr fr -∗ ubytes N.d User.Grep.Sym.«buf» 1024 g -∗
-      treePay (hlc := hlc) N (grepProg N.t) (grepGo ((List.range lr).map fr) fd false [] [] rest) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«grep») n -∗
+      treePay N (grepProg N.t) (grepGo ((List.range lr).map fr) fd false [] [] rest) -∗
+      urun N h m (BitVec.ofNat 64 User.Grep.Sym.«grep») n -∗
       (∀ (h' : CPU) (m' : RegMap) (g' : Nat → BitVec 8), ⌜ucalleeSaved m m'⌝ -∗
-        ubytes N.d User.Grep.Sym.«buf» 1024 g' -∗ treePay (hlc := hlc) N (grepProg N.t) rest -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) n -∗ wpLoop h') -∗
+        ubytes N.d User.Grep.Sym.«buf» 1024 g' -∗ treePay N (grepProg N.t) rest -∗
+        urun N h' m' (retPc (m.get 1#5)) n -∗ wpLoop h') -∗
       wpLoop h
 
 end
 
 /-- The interface of grep's `grep`. -/
 structure GREP_GREP : Prop where
-  wp_grepGrep : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_grepGrep : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpGrepGrepBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpGrepGrepBody (GF := GF)
 
 end Xv6

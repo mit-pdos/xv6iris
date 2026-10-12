@@ -38,7 +38,7 @@ theorem kernelvec_br_ffffffffffffcff8 : KA.«kernelvec» + 0xffffffffffffcff8#64
 set_option maxHeartbeats 8000000 in
 /-- **`kernelvec` meets the handler contract**, given `kerneltrap`. -/
 theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt _ cpu₀ => by
+  ⟨fun {GF} _ _ _ _ _ _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt _ cpu₀ => by
   suffices h : ⊢@{IProp GF} ∀ cpu : CPU, ihs ⟨envFam Γ γ0 γ1 γc γl0 γl1 γd γdl γt, cpu, kernelvecAddr⟩ by
     exact h.trans (by iintro H; iapply H $$ %cpu₀)
   iintro
@@ -147,7 +147,7 @@ theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC :=
         cpuClaim cpu' k'.proc -∗ intrRes cpu' -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hspie' hspp' hnoff' hlocks' htier' hK'
-    have h := KT.wp_kerneltrap (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
+    have h := KT.wp_kerneltrap (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
       cpu k' pc sc hsie' hspie' hspp' hnoff' hlocks' htier' hK' hsc hpc
     unfold wp_kerneltrap_body at h
     simp only [kerneltrapAddr] at h

@@ -46,7 +46,7 @@ open LeanRV64D LeanRV64D.Functions
 open Register HartState Step ExecutionResult FetchResult ExceptionType
 
 section swp
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {cpu : CPU} {ξ : CtxId} {D : UFoot} (RF : URegFrame GF cpu D) (BF : UByteFrame GF ξ)
 
 /-! ## Walks as `swp` -/

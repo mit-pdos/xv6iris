@@ -57,13 +57,13 @@ theorem frd_ofInt_toNat (d : Nat) (h : d < 2 ^ 63) : (BitVec.ofInt 64 (d : Int))
   rw [BitVec.ofInt_natCast, BitVec.toNat_ofNat]; omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 theorem frd_envout_dev (r w : Bool) (mj : Nat) :
-    filereadDevEnv (GF := GF) mj ⊢ filereadEnvOut (hlc := hlc) (GF := GF) (.open r w (.device mj)) :=
+    filereadDevEnv (GF := GF) mj ⊢ filereadEnvOut (GF := GF) (.open r w (.device mj)) :=
   .rfl
 
 theorem frd_devenv_in (mj : Nat) (h : mj ≤ NDEV_max) :
@@ -81,8 +81,8 @@ theorem frd_dev_m1_post (k : KCtx) (spie spp : Bool) (γ : FileNames) (fk : Nat)
     (c' : CPU) (R' : RegMap) (hcs : calleeSaved k.regs R') (h10 : R' 10#5 = -1#64) :
     fileRef γ fk q (.open true wb (.device mj)) ∗ procPrivExt (procAddr j) pid V V.upt M ∗
     genHalvesPriv (procAddr j) pid V.gen ∗ filereadDevEnv (GF := GF) mj ∗
-    filereadIn (hlc := hlc) (.open true wb (.device mj)) n F Rd Rin Rp Rpe P ∗ P ∗
-    frdK (hlc := hlc) k γ fk q (.open true wb (.device mj)) j pid V M n F Rd Rin Rp Rpe P ∗
+    filereadIn (.open true wb (.device mj)) n F Rd Rin Rp Rpe P ∗ P ∗
+    frdK k γ fk q (.open true wb (.device mj)) j pid V M n F Rd Rin Rp Rpe P ∗
     kctx c' ((k.withSpie spie spp).withRegs R') ∗ pcIs c' (jumpPc (k.regs 1#5)) ∗
     trapCsrsExt c' k.sie ∗ cpuClaimExt c' k.sie k.proc ⊢ wpLoop (GF := GF) c' := by
   iintro ⟨Href, Hpriv, Hgen, Henv, Hin, HP, HΦ, Hk, Hpc, Hte, Hce⟩
@@ -101,7 +101,7 @@ theorem frd_dev_m1_post (k : KCtx) (spie spp : Bool) (γ : FileNames) (fk : Nat)
 
 set_option maxHeartbeats 32000000 in
 /-- **`+0x78 .. +0xa2`: THE DEVICE ARM** (Rocq's FD_DEVICE block). -/
-theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γ : FileNames) (fk : Nat)
     (q : Qp) (C : FContent) (wb : Bool) (mj : Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (γkl : GName) (γk : KmemNames) (n : Int)
@@ -121,8 +121,8 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open true wb (.device mj)) ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
     filereadDevEnv (GF := GF) mj ∗
-    filereadIn (hlc := hlc) (.open true wb (.device mj)) n F Rd Rin Rp Rpe P ∗ P ∗
-    frdK (hlc := hlc) k γ fk q (.open true wb (.device mj)) j pid V M n F Rd Rin Rp Rpe P
+    filereadIn (.open true wb (.device mj)) n F Rd Rin Rp Rpe P ∗ P ∗
+    frdK k γ fk q (.open true wb (.device mj)) j pid V M n F Rd Rin Rp Rpe P
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + readiSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by unfold readiSlots bmapSlots ballocSlots breadSlots panicSlots at hK'; omega

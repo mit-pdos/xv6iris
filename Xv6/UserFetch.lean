@@ -87,7 +87,7 @@ theorem ustFetchOut_of_uftOut {t0 : PTree} {mm0 : BMap} {s : UWSt} {fr : FetchRe
   | F_Error p => obtain ⟨e, a⟩ := p; exact ⟨hl, userExc_of_uftExc e hsh⟩
   | F_Ext_Error e => exact hsh.elim
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- **U2-F's deliverable** (the contract of lane U3-L), from the tree-level
 translation of the fetch. -/

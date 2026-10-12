@@ -153,7 +153,7 @@ theorem omRdwr_plain (v : BitVec 64) (h : omArg v = 2) :
 /-! ## 2.  The commits -/
 
 section OpenDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF]
 
 /-! ### 2a.  The observation commit (single-phase, read-only, at the map) -/
 
@@ -257,7 +257,7 @@ still threaded through the proof; the K6-B re-spec folds it back here, at
 Rocq's position.) -/
 
 section TruncPermit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [Appcfg GF]
 
 /-! ### The keyed commit -/
 
@@ -360,7 +360,7 @@ end TruncCursor
 /-! ### The O_CREATE surface's permit -/
 
 section TruncPermitOf
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [Appcfg GF]
 
 /-- Rocq `trunc_permit_of`: the tie beside the DISJUNCTION create's two arms
 pay from -- the FRESH run's fired create receipt, or the EXISTS run's fired
@@ -370,15 +370,15 @@ def truncPermitOf (Γ : FsViewNames GF) (T : Nat → Fname → IProp GF)
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (i : Nat) : IProp GF :=
   iprop(∃ (d : Nat) (nm : Fname), T d nm ∗
     (creAcreFired Fok d nm i (.AFile []) ∨
-      (creExFired Fex d nm i ∗ pfAt (aarmCommitAt (hlc := hlc) Γ appE (.AFile [])) Farm)))
+      (creExFired Fex d nm i ∗ pfAt (aarmCommitAt Γ appE (.AFile [])) Farm)))
 
 /-- Rocq `trunc_permit_of_mono`: the permit moves with its tie. -/
 theorem truncPermitOf_mono (Γ : FsViewNames GF) (T T' : Nat → Fname → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (i : Nat) :
     ⊢ iprop(□ (∀ (d : Nat) (nm : Fname), T d nm -∗ T' d nm)) -∗
-      truncPermitOf (hlc := hlc) Γ T Farm Fok Fex i -∗
-      truncPermitOf (hlc := hlc) Γ T' Farm Fok Fex i := by
+      truncPermitOf Γ T Farm Fok Fex i -∗
+      truncPermitOf Γ T' Farm Fok Fex i := by
   unfold truncPermitOf
   iintro #Hmv ⟨%d, %nm, HT, Hrest⟩
   iexists d, nm
@@ -391,13 +391,13 @@ def truncPermitEx (Γ : FsViewNames GF) (T : Nat → Fname → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (i : Nat) : IProp GF :=
   iprop(∃ (d : Nat) (nm : Fname), T d nm ∗ creExFired Fex d nm i ∗
-    pfAt (aarmCommitAt (hlc := hlc) Γ appE (.AFile [])) Farm)
+    pfAt (aarmCommitAt Γ appE (.AFile [])) Farm)
 
 /-- Rocq `trunc_permit_of_ex`: the branch-specific permit IS a permit. -/
 theorem truncPermitOf_ex (Γ : FsViewNames GF) (T : Nat → Fname → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (i : Nat) :
-    truncPermitEx (hlc := hlc) Γ T Farm Fex i ⊢ truncPermitOf (hlc := hlc) Γ T Farm Fok Fex i := by
+    truncPermitEx Γ T Farm Fex i ⊢ truncPermitOf Γ T Farm Fok Fex i := by
   unfold truncPermitEx truncPermitOf
   iintro ⟨%d, %nm, HT, Hex, Harm⟩
   iexists d, nm
@@ -419,7 +419,7 @@ kernel where it holds what pays it (Rocq's header, kept). -/
 /-- Rocq's `open_trunc_piece` (lane F-OPEN-3): the piece KEYED BY A PERMIT. -/
 def openTruncPiece (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat → IProp GF)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  if omTrunc vom then pfAt (atruncOfPermit (hlc := hlc) Γ appE Kt) Ft else iprop(emp)
+  if omTrunc vom then pfAt (atruncOfPermit Γ appE Kt) Ft else iprop(emp)
 
 /-- ...and the free one (Rocq's `open_trunc_piece_none`): at
 `omTrunc vom = false` nothing is owed, so the piece is available out of thin
@@ -427,7 +427,7 @@ air -- the whole content of the tightening for init's
 `open("console", O_RDWR)`. -/
 theorem openTruncPiece_none (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat → IProp GF)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hv : omTrunc vom = false) :
-    ⊢ openTruncPiece (hlc := hlc) Γ vom Kt Ft := by
+    ⊢ openTruncPiece Γ vom Kt Ft := by
   unfold openTruncPiece; rw [if_neg (by simp [hv])]; exact .rfl
 
 /-- THE GENERIC SUPPLIER'S ONE LINE (Rocq's `open_trunc_piece_of_all`): a
@@ -435,11 +435,11 @@ caller that can answer at EVERY file row answers at the permitted one and
 never reads the permit. -/
 theorem openTruncPiece_of_all (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat → IProp GF)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    pfAt (atruncCommitAt Γ appE) Ft ⊢ openTruncPiece (hlc := hlc) Γ vom Kt Ft := by
+    pfAt (atruncCommitAt Γ appE) Ft ⊢ openTruncPiece Γ vom Kt Ft := by
   unfold openTruncPiece
   split
   · iintro H
-    iapply (pfAt_mono (atruncCommitAt Γ appE) (atruncOfPermit (hlc := hlc) Γ appE Kt) Ft) $$ [] H
+    iapply (pfAt_mono (atruncCommitAt Γ appE) (atruncOfPermit Γ appE Kt) Ft) $$ [] H
     iintro H
     iapply (atruncOfPermit_of_all Γ appE Kt _) $$ H
   · iintro _
@@ -449,13 +449,13 @@ theorem openTruncPiece_of_all (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat 
 piece that answers the STRONGER permit answers the weaker one. -/
 theorem openTruncPiece_mono (Γ : FsViewNames GF) (vom : BitVec 64) (Kt Kt' : Nat → IProp GF)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    ⊢ iprop(□ (∀ i : Nat, Kt' i -∗ Kt i)) -∗ openTruncPiece (hlc := hlc) Γ vom Kt Ft -∗
-      openTruncPiece (hlc := hlc) Γ vom Kt' Ft := by
+    ⊢ iprop(□ (∀ i : Nat, Kt' i -∗ Kt i)) -∗ openTruncPiece Γ vom Kt Ft -∗
+      openTruncPiece Γ vom Kt' Ft := by
   unfold openTruncPiece
   split
   · iintro #Hmv H
-    iapply (pfAt_mono (atruncOfPermit (hlc := hlc) Γ appE Kt)
-      (atruncOfPermit (hlc := hlc) Γ appE Kt') Ft) $$ [] H
+    iapply (pfAt_mono (atruncOfPermit Γ appE Kt)
+      (atruncOfPermit Γ appE Kt') Ft) $$ [] H
     unfold atruncOfPermit
     iintro H %i Hk
     ihave Hk := Hmv $$ %i Hk
@@ -470,15 +470,15 @@ theorem openTruncPiece_arg_to_at (Γ : FsViewNames GF) (vom : BitVec 64)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hpl : argPathOf M pv pl) :
-    openTruncPiece (hlc := hlc) Γ vom
-        (truncPermitOf (hlc := hlc) Γ (truncTieArg M pv P) Farm Fok Fex) Ft ⊢
-      openTruncPiece (hlc := hlc) Γ vom
-        (truncPermitOf (hlc := hlc) Γ (truncTieAt pl P) Farm Fok Fex) Ft := by
+    openTruncPiece Γ vom
+        (truncPermitOf Γ (truncTieArg M pv P) Farm Fok Fex) Ft ⊢
+      openTruncPiece Γ vom
+        (truncPermitOf Γ (truncTieAt pl P) Farm Fok Fex) Ft := by
   iintro H
-  iapply (openTruncPiece_mono (hlc := hlc) Γ vom _ _ Ft) $$ [] H
+  iapply (openTruncPiece_mono Γ vom _ _ Ft) $$ [] H
   imodintro
   iintro %i Hk
-  iapply (truncPermitOf_mono (hlc := hlc) Γ (truncTieAt pl P) (truncTieArg M pv P) Farm Fok Fex i)
+  iapply (truncPermitOf_mono Γ (truncTieAt pl P) (truncTieArg M pv P) Farm Fok Fex i)
     $$ [] Hk
   imodintro
   iintro %d %nm HT
@@ -489,10 +489,10 @@ theorem openTruncPiece_arg_to_at (Γ : FsViewNames GF) (vom : BitVec 64)
 theorem openTruncPiece_term_arg_to_at (Γ : FsViewNames GF) (vom : BitVec 64)
     (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 8)) (P : Nat → Nat → IProp GF)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hpl : argPathOf M pv pl) :
-    openTruncPiece (hlc := hlc) Γ vom (truncTermArg M pv P) Ft ⊢
-      openTruncPiece (hlc := hlc) Γ vom (truncTermAt pl P) Ft := by
+    openTruncPiece Γ vom (truncTermArg M pv P) Ft ⊢
+      openTruncPiece Γ vom (truncTermAt pl P) Ft := by
   iintro H
-  iapply (openTruncPiece_mono (hlc := hlc) Γ vom _ _ Ft) $$ [] H
+  iapply (openTruncPiece_mono Γ vom _ _ Ft) $$ [] H
   imodintro
   iintro %i Hk
   iapply (truncTermArg_of_at M pv pl P i hpl) $$ Hk
@@ -510,7 +510,7 @@ eliminates to its own refund (`pfAt` is a CONJUNCTION). -/
 reached, owed only when the code truncates. -/
 def openTruncAt (Γ : FsViewNames GF) (vom : BitVec 64) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  if omTrunc vom then pfAt (atruncCommitI (hlc := hlc) Γ appE i) Ft else iprop(emp)
+  if omTrunc vom then pfAt (atruncCommitI Γ appE i) Ft else iprop(emp)
 
 /-- Rocq `cre_ft_kept`: the permit is RECOVERABLE from the keyed piece's
 refund side -- what makes an open that fails PAST a fired create hand the
@@ -520,6 +520,7 @@ def creFtKept (Kt : Nat → IProp GF) (i : Nat)
     Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF) :=
   ⟨Ft.pfRecv, iprop(Ft.pfRefund ∗ Kt i)⟩
 
+omit [MachGS GF] in
 /-- The kept family's receipt IS the caller's (Rocq's `socr_ft_recv`, by
 `reflexivity`; stated once here for the rewrites at the fire and the arm
 builders). -/
@@ -530,15 +531,15 @@ theorem creFtKept_pfRecv (Kt : Nat → IProp GF) (i : Nat)
 /-- Rocq `open_trunc_at_true`. -/
 theorem openTruncAt_true (Γ : FsViewNames GF) (vom : BitVec 64) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hv : omTrunc vom = true) :
-    openTruncAt (hlc := hlc) Γ vom i Ft ⊣⊢ pfAt (atruncCommitI (hlc := hlc) Γ appE i) Ft := by
+    openTruncAt Γ vom i Ft ⊣⊢ pfAt (atruncCommitI Γ appE i) Ft := by
   unfold openTruncAt; rw [if_pos hv]; exact .rfl
 
 /-- PAYING THE PERMIT (Rocq `open_trunc_at_of_permit`): the piece keyed at
 one inum, the permit kept on the refund side. -/
 theorem openTruncAt_of_permit (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat → IProp GF)
     (i : Nat) (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    ⊢ openTruncPiece (hlc := hlc) Γ vom Kt Ft -∗ (if omTrunc vom then Kt i else iprop(emp)) -∗
-      openTruncAt (hlc := hlc) Γ vom i (creFtKept Kt i Ft) := by
+    ⊢ openTruncPiece Γ vom Kt Ft -∗ (if omTrunc vom then Kt i else iprop(emp)) -∗
+      openTruncAt Γ vom i (creFtKept Kt i Ft) := by
   unfold openTruncPiece openTruncAt
   by_cases hv : omTrunc vom = true
   · simp only [if_pos hv]
@@ -559,9 +560,9 @@ keyed at a permit `Kt`, paid with a STRONGER one `Kt'` -- the refund keeps the
 stronger one (`pfAt` is a conjunction, so the payment serves both sides). -/
 theorem openTruncAt_of_permit_at (Γ : FsViewNames GF) (vom : BitVec 64) (Kt Kt' : Nat → IProp GF)
     (i : Nat) (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    ⊢ (Kt' i -∗ Kt i) -∗ openTruncPiece (hlc := hlc) Γ vom Kt Ft -∗
+    ⊢ (Kt' i -∗ Kt i) -∗ openTruncPiece Γ vom Kt Ft -∗
       (if omTrunc vom then Kt' i else iprop(emp)) -∗
-      openTruncAt (hlc := hlc) Γ vom i (creFtKept Kt' i Ft) := by
+      openTruncAt Γ vom i (creFtKept Kt' i Ft) := by
   unfold openTruncPiece openTruncAt
   by_cases hv : omTrunc vom = true
   · simp only [if_pos hv]
@@ -582,8 +583,8 @@ theorem openTruncAt_of_permit_at (Γ : FsViewNames GF) (vom : BitVec 64) (Kt Kt'
 PERMIT IT REFUNDS. -/
 theorem openTruncAt_kept_mono (Γ : FsViewNames GF) (vom : BitVec 64) (Kt Kt' : Nat → IProp GF)
     (i : Nat) (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    ⊢ (Kt' i -∗ Kt i) -∗ openTruncAt (hlc := hlc) Γ vom i (creFtKept Kt' i Ft) -∗
-      openTruncAt (hlc := hlc) Γ vom i (creFtKept Kt i Ft) := by
+    ⊢ (Kt' i -∗ Kt i) -∗ openTruncAt Γ vom i (creFtKept Kt' i Ft) -∗
+      openTruncAt Γ vom i (creFtKept Kt i Ft) := by
   unfold openTruncAt
   by_cases hv : omTrunc vom = true
   · simp only [if_pos hv]
@@ -604,7 +605,7 @@ theorem openTruncAt_kept_mono (Γ : FsViewNames GF) (vom : BitVec 64) (Kt Kt' : 
 commit may drop the permit its refund carries. -/
 theorem openTruncAt_kept_forget (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat → IProp GF)
     (i : Nat) (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    openTruncAt (hlc := hlc) Γ vom i (creFtKept Kt i Ft) ⊢ openTruncAt (hlc := hlc) Γ vom i Ft := by
+    openTruncAt Γ vom i (creFtKept Kt i Ft) ⊢ openTruncAt Γ vom i Ft := by
   unfold openTruncAt
   by_cases hv : omTrunc vom = true
   · simp only [if_pos hv]
@@ -625,8 +626,8 @@ plain surface states at its own kept family
 (`SysOpenCreArm.sys_open_cr_key_plain`). -/
 theorem openTruncAt_kept_intro (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat → IProp GF)
     (i : Nat) (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    ⊢ openTruncAt (hlc := hlc) Γ vom i Ft -∗ (if omTrunc vom then Kt i else iprop(emp)) -∗
-      openTruncAt (hlc := hlc) Γ vom i (creFtKept Kt i Ft) := by
+    ⊢ openTruncAt Γ vom i Ft -∗ (if omTrunc vom then Kt i else iprop(emp)) -∗
+      openTruncAt Γ vom i (creFtKept Kt i Ft) := by
   unfold openTruncAt
   by_cases hv : omTrunc vom = true
   · simp only [if_pos hv]
@@ -647,7 +648,7 @@ end TruncPermitOf
 /-! ## 2c.  The walk package (full path; the era hops; quantified start) -/
 
 section OpenWalk
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
 
 /-- ONE SHOT, instantiated by the walk at the string argstr fetched and at
 the inum it starts from (Rocq's `namei_walk_pre_era`):
@@ -703,9 +704,9 @@ def openAuPlainAt (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (M : Nat 
     (pv : Nat) (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ exStart (hlc := hlc) γfs rt cw P Pmiss pl) ∗
-    pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
-    openTruncPiece (hlc := hlc) Γ vom (truncTermArg M pv P) Ft)
+  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ exStart γfs rt cw P Pmiss pl) ∗
+    pfAt (aopenCommitAt Γ appE) Fo ∗
+    openTruncPiece Γ vom (truncTermArg M pv P) Ft)
 
 /-- Rocq's `open_au_create_at`. -/
 def openAuCreateAt (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (M : Nat → List (BitVec 8))
@@ -714,13 +715,13 @@ def openAuCreateAt (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (M : Nat
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart (hlc := hlc) γfs rt cw P Pmiss pl) ∗
+  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart γfs rt cw P Pmiss pl) ∗
     -- the name UNDER THE SAME GUARD the cursor carries (`FsAbsCreateNm.nparNm`)
-    pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm M pv) (nparCur M pv P) Farm) Fok ∗
-    pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-    pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
-    openTruncPiece (hlc := hlc) Γ vom (truncPermitOf (hlc := hlc) Γ (truncTieArg M pv P) Farm Fok Fex) Ft ∗
-    creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun)
+    pfAt (acreCommitAtNm Γ appE (.AFile []) (nparNm M pv) (nparCur M pv P) Farm) Fok ∗
+    pfAt (dlookupCommitAt Γ appE) Fex ∗
+    pfAt (aopenCommitAt Γ appE) Fo ∗
+    openTruncPiece Γ vom (truncPermitOf Γ (truncTieArg M pv P) Farm Fok Fex) Ft ∗
+    creChildUnfired Γ (.AFile []) Farm Fun)
 
 /-- THE CURSOR'S TWO READINGS, as one move (Rocq's `open_acre_inst`, TL-3K;
 `SpecSysMknod.mknodAcre_inst`'s twin at the file child). -/
@@ -729,17 +730,17 @@ theorem openAcre_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv : 
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hpl : argPathOf M pv pl) :
-    pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm M pv) (nparCur M pv P) Farm) Fok ⊢
-      pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm M pv) (P (nparElems pl).length)
+    pfAt (acreCommitAtNm Γ appE (.AFile []) (nparNm M pv) (nparCur M pv P) Farm) Fok ⊢
+      pfAt (acreCommitAtNm Γ appE (.AFile []) (nparNm M pv) (P (nparElems pl).length)
         Farm) Fok := by
   iintro Hok
   iapply (pfAt_mono
-    (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm M pv) (nparCur M pv P) Farm)
-    (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm M pv) (P (nparElems pl).length) Farm)
+    (acreCommitAtNm Γ appE (.AFile []) (nparNm M pv) (nparCur M pv P) Farm)
+    (acreCommitAtNm Γ appE (.AFile []) (nparNm M pv) (P (nparElems pl).length) Farm)
     Fok) $$ [] Hok
   iintro H
   unfold acreCommitAtNm
-  iapply (acreCommitAtGenNm_cur_mono (hlc := hlc) Γ appE (fun _ _ => .AFile []) (nparNm M pv)
+  iapply (acreCommitAtGenNm_cur_mono Γ appE (fun _ _ => .AFile []) (nparNm M pv)
     (nparCur M pv P) (P (nparElems pl).length) Farm Fok.pfRecv) $$ [] [] H
   · iapply (nparCur_out M pv pl P hpl)
   · iapply (nparCur_in M pv pl P hpl)
@@ -750,7 +751,7 @@ omit [Appcfg GF] in
 because `FsAbsOpenFire` imports this file). -/
 private theorem openWalk_start (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) :
-    nameiWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ⊢ exStart (hlc := hlc) γfs rt cw P Pmiss pl := by
+    nameiWalkPreEra γfs rt cw P Pmiss ⊢ exStart γfs rt cw P Pmiss pl := by
   unfold nameiWalkPreEra exStart
   rw [exHops_is_axHops]
   iintro Hw %r %hr
@@ -763,10 +764,10 @@ theorem openAuPlainAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat
     (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    ⊢@{IProp GF} nameiWalkPreEra (hlc := hlc) γfs rt cw P Pmiss -∗
-      pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗
-      openTruncPiece (hlc := hlc) Γ vom (truncTermArg M pv P) Ft -∗
-      openAuPlainAt (hlc := hlc) Γ γfs rt cw M pv vom P Pmiss Fo Ft := by
+    ⊢@{IProp GF} nameiWalkPreEra γfs rt cw P Pmiss -∗
+      pfAt (aopenCommitAt Γ appE) Fo -∗
+      openTruncPiece Γ vom (truncTermArg M pv P) Ft -∗
+      openAuPlainAt Γ γfs rt cw M pv vom P Pmiss Fo Ft := by
   unfold openAuPlainAt
   iintro Hw Ho Ht
   isplitl [Hw]
@@ -784,21 +785,21 @@ theorem openAuCreateAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Na
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    ⊢@{IProp GF} nparWalkPreEra (hlc := hlc) γfs rt cw P Pmiss -∗
-      pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (nparCur M pv P) Farm) Fok -∗
-      pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
-      pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗
-      openTruncPiece (hlc := hlc) Γ vom (truncPermitOf (hlc := hlc) Γ (truncTieArg M pv P) Farm Fok Fex) Ft -∗
-      creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun -∗
-      openAuCreateAt (hlc := hlc) Γ γfs rt cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft := by
+    ⊢@{IProp GF} nparWalkPreEra γfs rt cw P Pmiss -∗
+      pfAt (acreCommitAt Γ appE (.AFile []) (nparCur M pv P) Farm) Fok -∗
+      pfAt (dlookupCommitAt Γ appE) Fex -∗
+      pfAt (aopenCommitAt Γ appE) Fo -∗
+      openTruncPiece Γ vom (truncPermitOf Γ (truncTieArg M pv P) Farm Fok Fex) Ft -∗
+      creChildUnfired Γ (.AFile []) Farm Fun -∗
+      openAuCreateAt Γ γfs rt cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft := by
   unfold openAuCreateAt
   iintro Hw Hok Hex Ho Ht Hch
   -- a provider that answers at EVERY name answers at the guarded ones
-  ihave Hok := (pfAt_mono (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (nparCur M pv P) Farm)
-    (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm M pv) (nparCur M pv P) Farm) Fok)
+  ihave Hok := (pfAt_mono (acreCommitAt Γ appE (.AFile []) (nparCur M pv P) Farm)
+    (acreCommitAtNm Γ appE (.AFile []) (nparNm M pv) (nparCur M pv P) Farm) Fok)
     $$ [] Hok
   · iintro H
-    iapply (acreCommitAtNm_of (hlc := hlc) Γ appE (.AFile []) (nparNm M pv) (nparCur M pv P) Farm
+    iapply (acreCommitAtNm_of Γ appE (.AFile []) (nparNm M pv) (nparCur M pv P) Farm
       Fok.pfRecv) $$ H
   isplitl [Hw]
   · iintro %pl _
@@ -823,7 +824,7 @@ def openFdRcpt (rb wb : Bool) (t : FdType) (sts : List FdState) (r : BitVec 64)
 /-! ## 2e.  The descriptor story (the kernel's half; deviation 9) -/
 
 section OpenFd
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 

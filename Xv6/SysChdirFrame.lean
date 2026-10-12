@@ -129,7 +129,7 @@ reading; `UMemL.umemStr_nul` is deviation 3) -/
 /-! ## The generic carve: slots ↔ bytes -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-- THE CARVE (Rocq `sc_frame_carve`): the sixteen low slots ARE
@@ -348,7 +348,7 @@ structure SysChdirArgs (GF : BundledGFunctors.{0}) where
   Fo : Pfam GF (Aview → Nat → Anode → IProp GF)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -356,7 +356,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- The contract's continuation at the record (hart-free: a `true` crossing
 at a process pins nothing). -/
 abbrev sysChdirPostA (k : KCtx) (A : SysChdirArgs GF) (c : CPU) : IProp GF :=
-  sysChdirK (hlc := hlc) k A.γ (procAddr A.j) A.pid A.V A.M A.P A.Pmiss A.Fo c
+  sysChdirK k A.γ (procAddr A.j) A.pid A.V A.M A.P A.Pmiss A.Fo c
 
 /-- THE RECORD AT A RAISED COUNT (permit sweep L1b, deviation 4): argstr
 hands the block back at `A.V.updEv kv`. -/
@@ -367,8 +367,8 @@ abbrev SysChdirArgs.raise (A : SysChdirArgs GF) (kv : Nat) : SysChdirArgs GF :=
 theorem sysChdirK_raise (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (c : CPU) (kv : Nat) (hkv : V.ev ≤ kv) :
-    sysChdirK (hlc := hlc) k γ pa pid V M P Pmiss Fo c ⊢
-      sysChdirK (hlc := hlc) k γ pa pid (V.updEv kv) M P Pmiss Fo c := by
+    sysChdirK k γ pa pid V M P Pmiss Fo c ⊢
+      sysChdirK k γ pa pid (V.updEv kv) M P Pmiss Fo c := by
   unfold sysChdirK
   iintro H %spie %spp %R' %P' %k' %hcs %hext %hk'
   iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %(Nat.le_trans hkv hk')
@@ -422,7 +422,7 @@ allowances whole and the armed post on the block the call leaves. -/
 def sysChdirOut (A : SysChdirArgs GF) (r : BitVec 64) : IProp GF := iprop%
   bslots 3 ∗ irefSlots 2 ∗
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
-    chdirArms (hlc := hlc) (fsGammaL fscFs) fscFs A.γ (procAddr A.j) A.pid A.V.rti A.V.cwi A.P A.Pmiss A.Fo
+    chdirArms (fsGammaL fscFs) fscFs A.γ (procAddr A.j) A.pid A.V.rti A.V.cwi A.P A.Pmiss A.Fo
       { A.V with upt := P' } (viewFaulted A.V.upt P' A.M) r)
 
 set_option maxHeartbeats 8000000 in

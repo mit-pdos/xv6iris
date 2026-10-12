@@ -261,14 +261,14 @@ theorem kxcB3_off_step (ef : List (BitVec 8)) (i : Nat) :
   simpa using this
 
 section Win
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 end Win
 
 /-! ## THE FRAME WITH THE HEADER NAMED (deviation 3) -/
 
 section FramePh
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- `kxcFrameBp` with the 56-byte `ph` buffer NAMED (`g`, what readi wrote)
 and the unused word beside it. -/
@@ -379,7 +379,7 @@ theorem kxcB3_B_Ph [CurCtx] (sp0 ra0 s00 s10 s20 pv av : BitVec 64)
 end FramePh
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -646,7 +646,7 @@ set_option maxHeartbeats 16000000 in
 (the size the loop has grown the table to, into slot 65), `c.j +0x31e`, and
 the shared tail `KexecB2.kxc_bad31e`. -/
 theorem kxcB3_stub (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -665,7 +665,7 @@ theorem kxcB3_stub (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (
     ⌜R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFDE0#64 ∧ R 8#5 = k.regs 2#5 ∧ R 18#5 = szv ∧
       R 20#5 = ientry kf ∧ R 22#5 = pageAddr P.root⌝ ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
     logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗ procPtAt P Mi ∗
     procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗
@@ -710,7 +710,7 @@ successful uvmalloc to `sz1`, the file half of the segment -- nothing
 (`KexecB2.kxc_ls`, its exit built here) -- then +0x11a (`kxc_incr`) with the
 invariant moved (`hrows`, `kxcB3_rows_load` pre-applied). -/
 theorem kxcB3_load (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END_OP)
-    (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -734,7 +734,7 @@ theorem kxcB3_load (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) 
       (kxbWalkOk (kxcFb data dnf) ef → kxbPermLeaves (kxcFb data dnf) ef (i + 1) P'.um)) :
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x188#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
     logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗ procPtAt P' M' ∗
     procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗
@@ -909,7 +909,7 @@ flags2perm, uvmalloc (its failure and its `0` return a stub paying `QF
 .noMem`), the grow step (`KexecSeam.kxc_grow_inv`), then `kxcB3_load`. -/
 theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END_OP)
     (PFP : PROC_FREEPAGETABLE) (F2P : FLAGS2PERM) (UV : UVMALLOC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -921,7 +921,7 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) :
     kxcAt14c k A cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w65 w67 ef P Mi
       i szv g ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     kxcK1a4 Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef ∗
     kxcKB Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef (i + 1)
@@ -1250,7 +1250,7 @@ back edge (`kxc_incr`, invariant moved by `kxcB3_rows_skip`); one: the tests,
 uvmalloc and the load (`kxcB3_checks`). -/
 theorem kxc_ph_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END_OP)
     (PFP : PROC_FREEPAGETABLE) (F2P : FLAGS2PERM) (UV : UVMALLOC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -1263,7 +1263,7 @@ theorem kxc_ph_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT)
     kxcAt12c k A cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67 ef P Mi i szv ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     kxcK1a4 Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef ∗
     kxcKB Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef (i + 1)
@@ -1454,7 +1454,7 @@ set_option maxHeartbeats 4000000 in
 induction hypothesis, handed the exit back. -/
 theorem kxc_phdr (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END_OP)
     (PFP : PROC_FREEPAGETABLE) (F2P : FLAGS2PERM) (UV : UVMALLOC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (k : KCtx) (A : KexecArgs)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -1468,7 +1468,7 @@ theorem kxc_phdr (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (E
     kxcAt12c k A cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67 ef P Mi i szv ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     kxcK1a4 Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef
     ⊢ wpLoop (GF := GF) cpu := by
@@ -1481,7 +1481,7 @@ theorem kxc_phdr (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (E
         gislf n2
         (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
         (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67 ef P Mi i szv ∗
-      fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+      fsFabric Γ A.pd A.pav A.pu ∗
       (∀ c' : CPU, kexecCloser Q QF k { A with V := V0 } c') ∗
       kxcK1a4 Q QF k { A with V := V0 } kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef
       ⊢ wpLoop (GF := GF) cpu) from
@@ -1560,7 +1560,7 @@ set_option maxHeartbeats 16000000 in
 jal iunlockput ; jal end_op`): the open inode and its log budget spent, the
 iref unit back (two again), into phase C's entry (+0x1ae) with the file's
 bytes as the parameter `kxcFb data dnf`. -/
-theorem kxc_close (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem kxc_close (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -1571,7 +1571,7 @@ theorem kxc_close (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) :
     kxcAt1a4 k A cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
       w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi szv sv11 ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap),
       kxcAt1ae k A c spie' spp' R' w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 (kxcFb data dnf) ef P Mi szv sv11 -∗
@@ -1633,7 +1633,7 @@ four header tails' conditional on the walk not being loadable, uvmalloc's
 and loadseg's unconditional `QF .noMem`. -/
 theorem kxc_b2 (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END_OP)
     (PFP : PROC_FREEPAGETABLE) (F2P : FLAGS2PERM) (UV : UVMALLOC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -1646,7 +1646,7 @@ theorem kxc_b2 (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (EO 
     kxcAt12c k A cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67 ef P Mi i szv ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     (∀ V1 : ProcPriv, ⌜evAfter A.V V1⌝ -∗
       ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
@@ -1673,7 +1673,7 @@ theorem kxc_b2 (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (EO 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `kxc_b2z`: PHASE B2 WHOLE, THE `elf.phnum = 0` PATH** -- from
 phase B1's +0x1f2 output to phase C's entry, at size 0. -/
-theorem kxc_b2z (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem kxc_b2z (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -1684,7 +1684,7 @@ theorem kxc_b2z (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc
     kxcAt1a2 k A cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) (k.regs 26#5) w13 w67 ef P Mi ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap),
       kxcAt1ae k A c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)

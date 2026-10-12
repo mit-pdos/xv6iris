@@ -27,7 +27,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -42,20 +42,20 @@ def wpShGettokenBody : Prop :=
     refGettoken len f off = (ret, q, e, fin) →
     ⊢ ushCode N.t -∗ uword N.d ps w0 -∗ ushCell N qp wq -∗ ushCell N eqp weq -∗
       ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«gettoken») (8 + (2 + n)) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«gettoken») (8 + (2 + n)) -∗
       (uword N.d ps (BitVec.ofNat 64 (s0 + fin)) -∗ ushCell N qp (BitVec.ofNat 64 (s0 + q)) -∗
         ushCell N eqp (BitVec.ofNat 64 (s0 + e)) -∗
         ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
         ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = BitVec.ofInt 64 ret⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (8 + (2 + n)) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (8 + (2 + n)) -∗ wpLoop h') -∗
       wpLoop h
 
 end
 
 /-- The interface of sh's `gettoken`. -/
 structure SH_GETTOKEN : Prop where
-  wp_shGettoken : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_shGettoken : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShGettokenBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShGettokenBody (GF := GF)
 
 end Xv6

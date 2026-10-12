@@ -139,7 +139,7 @@ end Halves
 /-! ## S2 SH'S WRITE STUB OVER THE RUN-CARRYING LEAF -/
 
 section Stub
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -148,8 +148,8 @@ deposit at a named family, the source a data-half run at `dq` handed back
 with the post. -/
 theorem wp_ksh_write_chain_buf (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat)
     (fdep : UexecSG.sfam GF) (l : List FdState) (dq : DFrac) (nb : Nat) (fb : Nat → BitVec 8) :
-    ⊢ ushCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«write») avail -∗
-      UshSysP.udepwfStd (hlc := hlc) N (ukWr m 17#5 (BitVec.ofInt 64 16))
+    ⊢ ushCode N.t -∗ urun N h m (BitVec.ofNat 64 User.Sh.Sym.«write») avail -∗
+      UshSysP.udepwfStd N (ukWr m 17#5 (BitVec.ofInt 64 16))
         (BitVec.ofNat 64 (User.Sh.Sym.«write» + 2)) 16 fdep l -∗
       ustd N.fd l -∗ ubytesq N.d dq (m.get 11#5).toNat nb fb -∗
       (∀ (h' : CPU) (ret : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
@@ -158,11 +158,11 @@ theorem wp_ksh_write_chain_buf (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : 
         ⌜∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm → lazyFree P.um (BitVec.ofNat 64 W.sz) →
           j < nb → uvaRmapped P ((m.get 11#5 + BitVec.ofNat 64 j).toNat)⌝ -∗
         ustd N.fd l -∗ ubytesq N.d dq (m.get 11#5).toNat nb fb -∗
-        UexecSG.spostAt (uslot (hlc := hlc)) 16 fdep W ret W.M W.fd cw' cs' -∗
-        urun (hlc := hlc) N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        UexecSG.spostAt (uslot) 16 fdep W ret W.M W.fd cw' cs' -∗
+        urun N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hsb Hstd Hbuf Hcont
-  ihave Hs := sh_stub_write (hlc := hlc) UL N
+  ihave Hs := sh_stub_write UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
@@ -195,14 +195,14 @@ theorem wp_ksh_write_chain_buf_ans (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (
       tfW W.tf (tfArgIdx 2) = m.get 12#5 → W.fd.take NSTD = l → W.lazy = false →
       (∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm → lazyFree P.um (BitVec.ofNat 64 W.sz) →
         j < nb → uvaRmapped P ((m.get 11#5 + BitVec.ofNat 64 j).toNat)) →
-      UexecSG.spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' ⊢ Ans r) :
-    ⊢ ushCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«write») avail -∗
-      UshSysP.udepwfStd (hlc := hlc) N (ukWr m 17#5 (BitVec.ofInt 64 16))
+      UexecSG.spostAt (uslot) 16 fdep W r W.M W.fd cw' cs' ⊢ Ans r) :
+    ⊢ ushCode N.t -∗ urun N h m (BitVec.ofNat 64 User.Sh.Sym.«write») avail -∗
+      UshSysP.udepwfStd N (ukWr m 17#5 (BitVec.ofInt 64 16))
         (BitVec.ofNat 64 (User.Sh.Sym.«write» + 2)) 16 fdep l -∗
       ustd N.fd l -∗ ubytesq N.d dq (m.get 11#5).toNat nb fb -∗
       (∀ (h' : CPU) (ret : BitVec 64),
         ustd N.fd l -∗ ubytesq N.d dq (m.get 11#5).toNat nb fb -∗ Ans ret -∗
-        urun (hlc := hlc) N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hsb Hstd Hbuf Hcont
   iapply wp_ksh_write_chain_buf UL N h m avail fdep l dq nb fb $$ Hc Hrun Hsb Hstd Hbuf
@@ -220,14 +220,14 @@ theorem wp_ksh_write_chain_txt_ans (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (
       tfW W.tf (tfArgIdx 2) = m.get 12#5 → W.fd.take NSTD = l → W.lazy = false →
       (∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm → lazyFree P.um (BitVec.ofNat 64 W.sz) →
         j < nb → uvaRmapped P ((m.get 11#5 + BitVec.ofNat 64 j).toNat)) →
-      UexecSG.spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' ⊢ Ans r) :
-    ⊢ ushCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«write») avail -∗
-      UshSysP.udepwfStd (hlc := hlc) N (ukWr m 17#5 (BitVec.ofInt 64 16))
+      UexecSG.spostAt (uslot) 16 fdep W r W.M W.fd cw' cs' ⊢ Ans r) :
+    ⊢ ushCode N.t -∗ urun N h m (BitVec.ofNat 64 User.Sh.Sym.«write») avail -∗
+      UshSysP.udepwfStd N (ukWr m 17#5 (BitVec.ofInt 64 16))
         (BitVec.ofNat 64 (User.Sh.Sym.«write» + 2)) 16 fdep l -∗
       ustdAt N.fd l v -∗
       ([∗list] j ∈ List.range nb, utext N.t ((m.get 11#5).toNat + j) (fb j)) -∗
       (∀ (h' : CPU) (ret : BitVec 64), ustdAt N.fd l v -∗ Ans ret -∗
-        urun (hlc := hlc) N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hsb Hstd Hbs Hcont
   iapply wp_ksh_write_chain_txt_at UL (ushSysP_holds UL) N h m avail fdep l v nb fb $$ Hc Hrun Hsb Hstd Hbs

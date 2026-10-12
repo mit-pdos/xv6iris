@@ -30,7 +30,7 @@ open Std (ExtTreeSet)
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -46,15 +46,15 @@ theorem wp_shParsepipe_ind (UL : UK_LEAVES) (SE : SH_PARSEEXEC) (SP : SH_PEEK) (
     (hpsz : ps + 8 < 2 ^ 64) :
     ∀ (fuel : Nat) (h : CPU) (m : RegMap) (off fin : Nat) (t : UshpCmd) (UM UM' : IProp GF) (nn : Nat),
     m.get 10#5 = BitVec.ofNat 64 ps → m.get 11#5 = BitVec.ofNat 64 (s0 + len) → off ≤ len →
-    refParsepipe len f (fuel + 1) off = some (t, fin) → ushMallocChain (hlc := hlc) N (ushpNodes t) UM UM' →
+    refParsepipe len f (fuel + 1) off = some (t, fin) → ushMallocChain N (ushpNodes t) UM UM' →
     ⊢ ushCode N.t -∗ uword N.d ps (BitVec.ofNat 64 (s0 + off)) -∗ ustr N.d dq s0 len f -∗
       ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗ UM -∗
-      ushpOom (hlc := hlc) N Pex (ushPpRoom t + nn - ushPpDeep t) -∗ Pex -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«parsepipe») (ushPpRoom t + nn) -∗
+      ushpOom N Pex (ushPpRoom t + nn - ushPpDeep t) -∗ Pex -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«parsepipe») (ushPpRoom t + nn) -∗
       (∀ root : Nat, ushOTree N s0 root t -∗ uword N.d ps (BitVec.ofNat 64 (s0 + fin)) -∗
         ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
         ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = BitVec.ofNat 64 root⌝ -∗ UM' -∗ Pex -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (ushPpRoom t + nn) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (ushPpRoom t + nn) -∗ wpLoop h') -∗
       wpLoop h := by
   intro fuel
   induction fuel with
@@ -243,7 +243,7 @@ theorem wp_shParsepipe_ind (UL : UK_LEAVES) (SE : SH_PARSEEXEC) (SP : SH_PEEK) (
 
 /-- **Rocq `wp_ref_parsepipe`**: the whole function. -/
 theorem wp_shParsepipe (UL : UK_LEAVES) (SE : SH_PARSEEXEC) (SP : SH_PEEK) (SG : SH_GETTOKEN) (SPC : SH_PIPECMD) :
-    wpShParsepipeBody (hlc := hlc) (GF := GF) := by
+    wpShParsepipeBody (GF := GF) := by
   intro N h m dq dw dv ps s0 len off fuel fin f w0 t UM UM' Pex nn ha0 ha1 hoff hw0 hsc href hch hs64 hps0 hps8
     hpsz
   subst hw0
@@ -255,6 +255,6 @@ end
 /-- **sh's `parsepipe` holds**, at the engine and its callees' interfaces. -/
 theorem shParsepipe_holds (UL : UK_LEAVES) (SE : SH_PARSEEXEC) (SP : SH_PEEK) (SG : SH_GETTOKEN)
     (SPC : SH_PIPECMD) : SH_PARSEPIPE :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shParsepipe UL SE SP SG SPC⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _} => wp_shParsepipe UL SE SP SG SPC⟩
 
 end Xv6

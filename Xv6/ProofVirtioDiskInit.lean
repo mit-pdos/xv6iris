@@ -65,7 +65,7 @@ theorem pageRw_of_pageValid (p : BitVec 64) (hb : pageValid p) : pageRw p := by
   · unfold ramEnd; omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## A zeroed page window, as the raw context bytes a DMA lease is made of -/
 
@@ -116,7 +116,7 @@ theorem vdi_zbuf [CurCtx] (a : BitVec 64) (n : Nat)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 variable {lent : Bool}
 
 /-! ## The two MMIO instruction rules, with the identity claim supplied -/
@@ -167,7 +167,7 @@ end
 /-! ## The three callees, at this hart -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `initlock`'s contract as a rule, with the lock and name pointers named. -/
@@ -183,7 +183,7 @@ theorem vdi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx) (hsie :
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
       lkFresh lk -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK'
+  have h := IL.wp_initlock (GF := GF) c k' vlock vname vcpu hK'
   unfold wp_initlock_body at h
   simp only [initlockAddr, h10, h11] at h
   iintro ⟨Hk, Hpc, #Hc1, #Hc2, Hw1, Hw2, Hw3, HΦ⟩
@@ -197,7 +197,7 @@ theorem vdi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx) (hsie :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `kalloc`'s contract as a rule (interrupts off, so `SPIE`/`SPP` come back
@@ -211,7 +211,7 @@ theorem vdi_kalloc_call [WchG GF] (KAL : KALLOC) [CurCtx] (c : CPU) (k' : KCtx) 
     (∀ R' : RegMap, kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk hp0
+  have h := KAL.wp_kalloc (GF := GF) c k' γl γk on hnoff hK hlk hp0
   unfold wp_kalloc_body at h
   simp only [kallocAddr] at h
   iintro ⟨Hk, Hpc, #Hl, Hav, HΦ⟩
@@ -236,7 +236,7 @@ theorem vdi_memset_call (MS : MEMSET) [CurCtx] (c : CPU) (k' : KCtx) (hsie : k'.
         (List.replicate 4096 (BitVec.extractLsb' 0 8 (k'.regs 11#5))) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := MS.wp_memset (hlc := hlc) (GF := GF) c k' os 4096 hK hn (by decide) hl
+  have h := MS.wp_memset (GF := GF) c k' os 4096 hK hn (by decide) hl
   unfold wp_memset_body at h
   simp only [memsetAddr] at h
   iintro ⟨Hk, Hpc, Hb, HΦ⟩
@@ -251,7 +251,7 @@ end
 /-! ## Carving the three zeroed pages into the device's windows -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The head of a replicated buffer splits off (at the page's base). -/
 theorem vdi_bb_cut0 (p : BitVec 64) (c : BitVec 8) (m n tot : Nat) (htot : tot = m + n) :
@@ -443,7 +443,7 @@ end
 /-! ## The two halves of `disk.desc`, which the driver reads with two `lw`s -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 theorem vdi_nth_lo (w : BitVec 64) (j : Nat) (hj : j < 4) :
     nthByte (n := 4) (BitVec.extractLsb' 0 32 w) j = nthByte (n := 8) w j := by
@@ -705,7 +705,7 @@ theorem vdi_read_qnummax (st qn : BitVec 32) (rdy : Bool) (d a u : PAddr) (v : V
   rw [vread_queueNumMax, hv]; rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **The identification checks**: the four `lw`s and the four `bne` panics
@@ -844,7 +844,7 @@ theorem vdi_reset_ok (c : VirtioCfg) :
 theorem vdi_beqz8 : bcond bop.BEQ 8#64 0#64 = false := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **The status ladder and the feature negotiation**: reset, ACKNOWLEDGE,
@@ -1007,7 +1007,7 @@ theorem vdi_beqz1024 : bcond bop.BEQ 1024#64 0#64 = false := by decide
 theorem vdi_bgeu7 : bcond bop.BGEU 7#64 1024#64 = false := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **The queue checks**: `QUEUE_SEL = 0`, `QUEUE_READY` must read `0`
@@ -1167,7 +1167,7 @@ theorem vdi_avail_pos (m : Nat) (hm : 0 < m) : ¬ availZero (some m) := by
   · injection h with h; omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **The three queue pages**: `kalloc` three times (it cannot fail, the
@@ -1342,7 +1342,7 @@ theorem vdi_alloc [WchG GF] (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **Zeroing the three pages**: `memset(p, 0, PGSIZE)` three times. -/
@@ -1518,7 +1518,7 @@ theorem vdi_wr_usedHi' (st qn : BitVec 32) (rdy : Bool) (d a p : PAddr)
   exact h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **The queue registers**: `QUEUE_NUM = NUM` and the six halves of the
@@ -1721,7 +1721,7 @@ theorem vdi_aUsedIdx : aUsedIdx = KA.«disk» + 32#64 := by decide
 theorem vdi_range8 : List.range NUM = [0, 1, 2, 3, 4, 5, 6, 7] := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 2000000 in
 /-- **The flip's input**: the three zeroed pages, carved into the device's
@@ -1783,7 +1783,7 @@ theorem vdi_flipIn (γ : DiskNames) (pd pav pu : BitVec 64)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
 /-- **The live flip**, at the shape of the ladder. -/
 theorem vdi_flip_au (γ : DiskNames) (pd pav pu : BitVec 64) :
@@ -1912,7 +1912,7 @@ theorem vdi_str_addr : KA.«virtio_disk_init» + 0x1d24#64 = KStr.«virtio_disk�
 theorem vdi_lock_addr : KA.«virtio_disk_init» + 0x1e1cc#64 = aVdiskLock := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The `free[]` array, as its eight byte cells. -/
 theorem vdi_free_split (free0 : List (BitVec 8)) (hl : free0.length = NUM) :
@@ -1942,7 +1942,7 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC)
     (MS : MEMSET) : VIRTIO_DISK_INIT :=
-  ⟨fun {hlc GF} _ _ _ _ _ cpu k γ γkl γk nb c0 vlock vname vcpu pd0 pav0 pu0 free0
+  ⟨fun {GF} _ _ _ _ _ cpu k γ γkl γk nb c0 vlock vname vcpu pd0 pav0 pu0 free0
       hsie hK hnoff hlk hnb hdead hp0 => by
   unfold wp_virtio_disk_init_body diskInitCells
   simp only [virtioDiskInitAddr, vdi_aDescPtr, vdi_aAvailPtr, vdi_aUsedPtr, vdi_aUsedIdx]

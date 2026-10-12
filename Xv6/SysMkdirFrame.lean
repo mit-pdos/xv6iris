@@ -97,7 +97,7 @@ reading; `UMemL.umemStr_nul` is deviation 3) -/
 /-! ## The generic carve: slots ↔ bytes -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-- THE CARVE (Rocq `md_frame_carve`): the sixteen low slots ARE
@@ -309,7 +309,7 @@ structure SysMkdirArgs (GF : BundledGFunctors.{0}) where
   Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -317,7 +317,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- The contract's continuation at the record (hart-free: a `true` crossing
 at a process pins nothing). -/
 abbrev sysMkdirPostA (k : KCtx) (A : SysMkdirArgs GF) (c : CPU) : IProp GF :=
-  sysMkdirK (hlc := hlc) k A.γ (procAddr A.j) A.pid A.V A.M A.ns A.v.toNat A.P A.Pmiss A.Farm
+  sysMkdirK k A.γ (procAddr A.j) A.pid A.V A.M A.ns A.v.toNat A.P A.Pmiss A.Farm
     A.Fdots A.Fun A.Fok A.Fex c
 
 /-- THE RECORD AT A RAISED COUNT (permit sweep L1b, deviation 4): argstr
@@ -334,8 +334,8 @@ theorem sysMkdirK_raise (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitV
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (c : CPU) (kv : Nat)
     (hkv : V.ev ≤ kv) :
-    sysMkdirK (hlc := hlc) k γ pa pid V M ns pv P Pmiss Farm Fdots Fun Fok Fex c ⊢
-      sysMkdirK (hlc := hlc) k γ pa pid (V.updEv kv) M ns pv P Pmiss Farm Fdots Fun Fok Fex c := by
+    sysMkdirK k γ pa pid V M ns pv P Pmiss Farm Fdots Fun Fok Fex c ⊢
+      sysMkdirK k γ pa pid (V.updEv kv) M ns pv P Pmiss Farm Fdots Fun Fok Fex c := by
   unfold sysMkdirK
   iintro H %spie %spp %R' %P' %k' %hcs %hext %hk'
   iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %(Nat.le_trans hkv hk')
@@ -368,7 +368,7 @@ def sysMkdirOut (A : SysMkdirArgs GF) (r : BitVec 64) : IProp GF := iprop%
   bslots 3 ∗ irefSlots A.ns ∗
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
     procPrivFd A.γ (procAddr A.j) A.pid { A.V with upt := P' } (viewFaulted A.V.upt P' A.M)) ∗
-  mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
+  mkdirArms (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
     A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex r
 
 set_option maxHeartbeats 8000000 in
@@ -408,7 +408,7 @@ theorem sys_mkdir_exit (cpu : CPU) (k : KCtx) (A : SysMkdirArgs GF)
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   unfold sysMkdirOut
   icases Hout with ⟨Hbs, Hir, ⟨%P', %hP', Hblk⟩, Harms⟩
-  ihave %hret := mkdirArms_ret (hlc := hlc) _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Harms
+  ihave %hret := mkdirArms_ret _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Harms
   ispecialize HΦ $$ %c
   unfold sysMkdirPostA sysMkdirK
   iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk [] [Harms]

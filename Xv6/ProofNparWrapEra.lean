@@ -40,7 +40,7 @@ theorem nparWrapEra_slots_2 (a : Nat) (h : nameiparentSlots ≤ a) : 2 ≤ a := 
   unfold nameiparentSlots at h; omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -49,7 +49,7 @@ set_option maxHeartbeats 8000000 in
 /-- **`nameiparent` meets its era contract** (Rocq's `wp_npar_wrap_era`),
 at either entry `SIE`. -/
 theorem nparWrapEra_main (NE : NPAR_ERA)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
@@ -66,7 +66,7 @@ theorem nparWrapEra_main (NE : NPAR_ERA)
     (hplen : plen < 2 ^ 31)
     (hbud : walkNeed (pathElems (bview plen pfun)).length ≤ n)
     (hpd : descPageRw pd) :
-    wp_npar_wrap_era_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun
+    wp_npar_wrap_era_eb_body (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun
       nfun n Sb P Pmiss pid V M dqb dqs dqpv
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd := by
   unfold wp_npar_wrap_era_eb_body
@@ -103,7 +103,7 @@ theorem nparWrapEra_main (NE : NPAR_ERA)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [nparWrapEra_br_namex]
   iintro Hk Hpc
   -- THE CALL: namex(path, 1, name) at its era contract
-  have h := NE.wp_npar_era_eb (hlc := hlc) (GF := GF) Γ cpu
+  have h := NE.wp_npar_era_eb (GF := GF) Γ cpu
     ((k.pushed 2).withRegs
       (((((k.regs.set (2#5) (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)).set (8#5) (k.regs 2#5)).set (12#5)
         (k.regs 11#5)).set 11#5 1#64).set (1#5) (KA.«nameiparent» + 16#64)))

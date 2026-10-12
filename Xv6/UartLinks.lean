@@ -33,7 +33,7 @@ def uartN : UartId → Namespace
   | .uart1 => ndot nroot "xv6uart1"
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The one link, and the licence -/
 
@@ -55,7 +55,7 @@ def consRun (k : Nat) : List (BitVec 8) → IProp GF → IProp GF
 any event. -/
 def consLicence : IProp GF := iprop%
   □ ∀ (k : Nat) (h : List Obs) (H : ConsHist) (ev : ConsEv),
-    MachFixedGS.consRes (hlc := hlc) (GF := GF) k h H ==∗ MachFixedGS.consRes (hlc := hlc) (GF := GF) k h (consStep H ev)
+    MachFixedGS.consRes (GF := GF) k h H ==∗ MachFixedGS.consRes (GF := GF) k h (consStep H ev)
 
 instance consLicence_persistent : Persistent (consLicence (GF := GF)) := by
   unfold consLicence; infer_instance
@@ -98,7 +98,7 @@ theorem consRun_of_licence (k : Nat) (bs : List (BitVec 8)) (Φ : IProp GF) :
 
 /-- The trivial application's licence: its claim is `emp`, so every event is
 a no-op on nothing (Rocq `cons_licence_triv`). -/
-theorem consLicence_triv (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = consResTriv) :
+theorem consLicence_triv (hc : MachFixedGS.consRes (GF := GF) = consResTriv) :
     ⊢@{IProp GF} consLicence := by
   unfold consLicence
   rw [hc]
@@ -148,8 +148,8 @@ not (its events are the interrupt's). -/
 def consLicenceAt (k : Nat) : IProp GF := iprop%
   □ ∀ (h : List Obs) (H : ConsHist) (ev : ConsEv),
     ⌜wildEv ev⌝ -∗ ⌜consEvOk H ev⌝ -∗
-    MachFixedGS.consRes (hlc := hlc) (GF := GF) k h H ==∗
-      MachFixedGS.consRes (hlc := hlc) (GF := GF) k h (consStep H ev)
+    MachFixedGS.consRes (GF := GF) k h H ==∗
+      MachFixedGS.consRes (GF := GF) k h (consStep H ev)
 
 instance consLicenceAt_persistent (k : Nat) : Persistent (consLicenceAt (GF := GF) k) := by
   unfold consLicenceAt; infer_instance
@@ -282,7 +282,7 @@ theorem consRun_stop (k : Nat) (bs : List (BitVec 8)) (Φ : IProp GF) :
 the history steps by `evOut`. -/
 theorem consClaimAt_store (i : UartId) (γ : UartNames) (u u' : UartState) (b : BitVec 8)
     (Φ : IProp GF) (hacc : Uart.acc u' = Uart.acc u ++ [b]) :
-    consLink i (genId (hlc := hlc) (GF := GF) + 1) (.evOut b) Φ ⊢
+    consLink i (genId (GF := GF) + 1) (.evOut b) Φ ⊢
       consClaimAt i γ u ={⊤ \ ↑(uartN i)}=∗ consClaimAt i γ u' ∗ Φ := by
   unfold consClaimAt consLink
   iintro HΨ ⟨%o, %H, Hlb, Hres, Hhi, Hdv, Hdc, Hau, Hlm, Harm, %hacc0, %hok, %hins⟩
@@ -337,7 +337,7 @@ theorem storeChain_mono (i : UartId) (γ : UartNames) (bs : List (BitVec 8)) (Φ
 
 /-- THE PLAIN WRITER'S (Rocq `store_ob_of_cons_link`). -/
 theorem storeOb_of_consLink (i : UartId) (γ : UartNames) (b : BitVec 8) (Φ : IProp GF) :
-    consLink i (genId (hlc := hlc) (GF := GF) + 1) (.evOut b) Φ ⊢ storeOb i γ b Φ := by
+    consLink i (genId (GF := GF) + 1) (.evOut b) Φ ⊢ storeOb i γ b Φ := by
   iintro HΨ
   unfold storeOb
   iintro %u %u' %⟨h1, h2, h3, h4, h5, h6⟩ Hout Hcol Hin
@@ -347,13 +347,13 @@ theorem storeOb_of_consLink (i : UartId) (γ : UartNames) (b : BitVec 8) (Φ : I
   iframe Hout Hcol Hin HΦ
 
 theorem storeOb_of_outLink (i : UartId) (γ : UartNames) (b : BitVec 8) (Φ : IProp GF) :
-    outLink i (genId (hlc := hlc) (GF := GF) + 1) b Φ ⊢ storeOb i γ b Φ := by
+    outLink i (genId (GF := GF) + 1) b Φ ⊢ storeOb i γ b Φ := by
   iintro H
   iapply storeOb_of_consLink
   iapply consLink_of_outLink $$ H
 
 theorem storeChain_of_outChain (i : UartId) (γ : UartNames) (bs : List (BitVec 8)) (Φ : IProp GF) :
-    outChain i (genId (hlc := hlc) (GF := GF) + 1) bs Φ ⊢ storeChain i γ bs Φ := by
+    outChain i (genId (GF := GF) + 1) bs Φ ⊢ storeChain i γ bs Φ := by
   induction bs with
   | nil => exact .rfl
   | cons b bs ih =>
@@ -376,7 +376,7 @@ is next, the event steps the history, and both halves of the arm advance. -/
 theorem storeOb_of_echoLink (γ : UartNames) (b : BitVec 8) (h : List Obs) (c : BitVec 8)
     (cs : List (BitVec 8)) (j : Nat) (Φ : IProp GF) (hlk : cs[j]? = some b) :
     uartArm γ (1 : Qp).half (some ((h, c, cs), j)) ⊢
-      consLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) (.evByte b) Φ -∗
+      consLink .uart0 (genId (GF := GF) + 1) (.evByte b) Φ -∗
       storeOb .uart0 γ b iprop(uartArm γ (1 : Qp).half (some ((h, c, cs), j + 1)) ∗ Φ) := by
   iintro Hmine HΨ
   unfold storeOb
@@ -408,7 +408,7 @@ theorem storeChain_of_echoChain (γ : UartNames) (h : List Obs) (c : BitVec 8) (
     (bs : List (BitVec 8)) (j : Nat) (Φ : IProp GF)
     (hbs : ∀ (n : Nat) (b : BitVec 8), bs[n]? = some b → cs[j + n]? = some b) :
     uartArm γ (1 : Qp).half (some ((h, c, cs), j)) ⊢
-      echoChain (genId (hlc := hlc) (GF := GF) + 1) h bs Φ -∗
+      echoChain (genId (GF := GF) + 1) h bs Φ -∗
       storeChain .uart0 γ bs iprop(uartArm γ (1 : Qp).half (some ((h, c, cs), j + bs.length)) ∗ Φ) := by
   induction bs generalizing j with
   | nil =>

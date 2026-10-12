@@ -15,7 +15,7 @@ open Iris Iris.ProgramLogic Iris.BI Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The program counter at a cycle boundary: `PC` and `nextPC` agree
 (the model keeps them in lock-step between instructions). -/

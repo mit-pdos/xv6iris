@@ -50,14 +50,14 @@ def plicClaimSlots : Nat := 2 + 2
 
 /-- **What a claim's answer is worth**: a source the kernel wired, plus
 the receive token of whichever UART port it names. -/
-def plicClaimRetOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def plicClaimRetOk {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (γ0 γ1 : UartNames) (v : BitVec 64) : IProp GF := iprop(
   ⌜v = 0#64 ∨ v = 1#64 ∨ v = 10#64 ∨ v = 12#64⌝ ∗
   (⌜v = 10#64⌝ -∗ plicPayloadUart .uart0 γ0) ∗
   (⌜v = 12#64⌝ -∗ plicPayloadUart .uart1 γ1))
 
 /-- **WP of `plic_claim`.** -/
-def wp_plic_claim_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_plic_claim_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ0 γ1 : UartNames)
     (hsie : k.sie = false) (hK : plicClaimSlots ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu plicClaimAddr ∗ plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
@@ -67,8 +67,8 @@ def wp_plic_claim_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The interface of `plic_claim`. -/
 structure PLIC_CLAIM : Prop where
-  wp_plic_claim : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_plic_claim : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ0 γ1 : UartNames) hsie hK,
-    wp_plic_claim_body (hlc := hlc) (GF := GF) cpu k γ0 γ1 hsie hK
+    wp_plic_claim_body (GF := GF) cpu k γ0 γ1 hsie hK
 
 end Xv6

@@ -40,7 +40,7 @@ its page is already in the map.  These arms append nothing. -/
 def vmfaultQuietArm (P : UPtd) (sz va : BitVec 64) : Prop :=
   ¬ (va.toNat < sz.toNat ∧ Iris.Std.PartialMap.get? P.um (vpnOf va).toNat = none)
 
-def wp_vmfault_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_vmfault_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : vmfaultSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hroot : k.regs 10#5 = pageAddr P.root) (hsz : (k.regs 11#5).toNat ≤ 2 ^ 38) : Prop :=
@@ -61,8 +61,8 @@ def wp_vmfault_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [X
   ⊢ wpLoop (GF := GF) cpu
 
 structure VMFAULT : Prop where
-  wp_vmfault : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_vmfault : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat) hnoff hK hlk hroot hsz,
-    wp_vmfault_body (hlc := hlc) (GF := GF) cpu k γl γk P M ke hnoff hK hlk hroot hsz
+    wp_vmfault_body (GF := GF) cpu k γl γk P M ke hnoff hK hlk hroot hsz
 
 end Xv6

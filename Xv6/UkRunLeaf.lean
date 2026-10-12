@@ -136,7 +136,7 @@ macro "ureg" : tactic => `(tactic| simp (config := {decide := true, zetaDelta :=
   _root_.true_and, _root_.not_true_eq_false])
 
 section UkRunLeaf
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -145,17 +145,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [S
 def UkLeafAt (m : RegMap) (pc : BitVec 64) (isRvc : Bool) (i : instruction) (m' : RegMap)
     (pc' : BitVec 64) : Prop :=
   ∀ (xi : CurCtx) (S : UkSec GF) (K : UkKey) (M : ElfMem), S.ok → UkInstr S.π M pc isRvc i →
-    ⊢ ukStep (hlc := hlc) S K M m pc M m' pc'
+    ⊢ ukStep S K M m pc M m' pc'
 
 /-- **THE STEP** (the body every Rocq wrapper repeats): an engine leaf on
 `urun`, with the free stack transformed by the caller's wand (identity for
 every leaf but the sp-adjust pair). -/
 theorem urun_step (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (isRvc : Bool)
     (i : instruction) (m' : RegMap) (pc' : BitVec 64) (avail' : Nat) (F : IProp GF)
-    (h0 : m 0#5 = 0#64 → m' 0#5 = 0#64) (Hleaf : UkLeafAt (hlc := hlc) (GF := GF) m pc isRvc i m' pc') :
-    ⊢ uinstrIs N.t pc isRvc i -∗ urun (hlc := hlc) N h m pc avail -∗
+    (h0 : m 0#5 = 0#64 → m' 0#5 = 0#64) (Hleaf : UkLeafAt (GF := GF) m pc isRvc i m' pc') :
+    ⊢ uinstrIs N.t pc isRvc i -∗ urun N h m pc avail -∗
       (ustack N.d (m.get spIdx) avail -∗ ustack N.d (m'.get spIdx) avail' ∗ F) -∗
-      ▷ (F -∗ ∀ h' : CPU, urun (hlc := hlc) N h' m' pc' avail' -∗ wpLoop h') -∗ wpLoop h := by
+      ▷ (F -∗ ∀ h' : CPU, urun N h' m' pc' avail' -∗ wpLoop h') -∗ wpLoop h := by
   iintro #Hi Hrun Hsw Hcont
   unfold urun
   icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
@@ -163,7 +163,7 @@ theorem urun_step (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avai
   ihave %hui := uinstrIs_ukInstr N.t N.d N.s M pm sz pc isRvc i $$ Hheap Hi
   let S : UkSec GF := ⟨h, C, pt, Rfd, Rut, pm, sz, N.pay⟩
   let K : UkKey := ⟨fdv, cw, gn, cs, pidv⟩
-  have hS : @UkSec.ok hlc GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
+  have hS : @UkSec.ok GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
   icases Hsw $$ Hstk with ⟨Hstk, HF⟩
   have H := Hleaf xi S K M hS hui
   unfold ukStep ukUvb at H
@@ -178,9 +178,9 @@ theorem urun_step (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avai
 theorem urun_step_ns (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (isRvc : Bool)
     (i : instruction) (m' : RegMap) (pc' : BitVec 64)
     (h0 : m 0#5 = 0#64 → m' 0#5 = 0#64) (hsp : m'.get spIdx = m.get spIdx)
-    (Hleaf : UkLeafAt (hlc := hlc) (GF := GF) m pc isRvc i m' pc') :
-    ⊢ uinstrIs N.t pc isRvc i -∗ urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h' m' pc' avail -∗ wpLoop h') -∗ wpLoop h := by
+    (Hleaf : UkLeafAt (GF := GF) m pc isRvc i m' pc') :
+    ⊢ uinstrIs N.t pc isRvc i -∗ urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h' m' pc' avail -∗ wpLoop h') -∗ wpLoop h := by
   iintro #Hi Hrun Hcont
   iapply urun_step N h m pc avail isRvc i m' pc' avail iprop(emp) h0 Hleaf $$ Hi Hrun
   · iintro Hs
@@ -193,9 +193,9 @@ theorem urun_step_ns (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (a
 /-- The step for a leaf writing a non-sp register. -/
 theorem urun_step_wr (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (isRvc : Bool)
     (i : instruction) (rd : BitVec 5) (v : BitVec 64) (pc' : BitVec 64) (hns : unotSp rd)
-    (Hleaf : UkLeafAt (hlc := hlc) (GF := GF) m pc isRvc i (ukWr m rd v) pc') :
-    ⊢ uinstrIs N.t pc isRvc i -∗ urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd v) pc' avail -∗ wpLoop h') -∗ wpLoop h :=
+    (Hleaf : UkLeafAt (GF := GF) m pc isRvc i (ukWr m rd v) pc') :
+    ⊢ uinstrIs N.t pc isRvc i -∗ urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h' (ukWr m rd v) pc' avail -∗ wpLoop h') -∗ wpLoop h :=
   urun_step_ns N h m pc avail isRvc i (ukWr m rd v) pc' (ukWr_x0 m rd v) (unotSp_wr rd v m hns) Hleaf
 
 /-! ## The register families (deviation 1) -/
@@ -205,8 +205,8 @@ theorem urun_step_wr (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (a
 theorem wp_uk_rtype (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
     (rs2 rs1 rd : BitVec 5) (op : rop) (avail : Nat) (hns : unotSp rd) :
     ⊢ uinstrIs N.t pc isRvc (.RTYPE (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h'
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h'
           (ukWr m rd (ukRtypeVal op (m.get rs1) (m.get rs2))) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h :=
   urun_step_wr N h m pc avail isRvc _ rd _ _ hns
@@ -218,8 +218,8 @@ theorem wp_uk_rtype (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc
 theorem wp_uk_itype (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
     (imm : BitVec 12) (rs1 rd : BitVec 5) (op : iop) (avail : Nat) (hns : unotSp rd) :
     ⊢ uinstrIs N.t pc isRvc (.ITYPE (imm, .Regidx rs1, .Regidx rd, op)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h'
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h'
           (ukWr m rd (ukItypeVal op (m.get rs1) imm)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h :=
   urun_step_wr N h m pc avail isRvc _ rd _ _ hns
@@ -230,8 +230,8 @@ theorem wp_uk_itype (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc
 theorem wp_uk_shiftiop (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
     (shamt : BitVec 6) (rs1 rd : BitVec 5) (op : sop) (avail : Nat) (hns : unotSp rd) :
     ⊢ uinstrIs N.t pc isRvc (.SHIFTIOP (shamt, .Regidx rs1, .Regidx rd, op)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h'
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h'
           (ukWr m rd (ukShiftiopVal op (m.get rs1) shamt)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h :=
   urun_step_wr N h m pc avail isRvc _ rd _ _ hns
@@ -241,8 +241,8 @@ theorem wp_uk_shiftiop (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
 theorem wp_uk_rtypew (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
     (rs2 rs1 rd : BitVec 5) (op : ropw) (avail : Nat) (hns : unotSp rd) :
     ⊢ uinstrIs N.t pc isRvc (.RTYPEW (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h'
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h'
           (ukWr m rd (ukRtypewVal op (m.get rs1) (m.get rs2))) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h :=
   urun_step_wr N h m pc avail isRvc _ rd _ _ hns
@@ -252,8 +252,8 @@ theorem wp_uk_rtypew (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p
 theorem wp_uk_addiw (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
     (imm : BitVec 12) (rs1 rd : BitVec 5) (avail : Nat) (hns : unotSp rd) :
     ⊢ uinstrIs N.t pc isRvc (.ADDIW (imm, .Regidx rs1, .Regidx rd)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h'
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h'
           (ukWr m rd (ukAddiwVal (m.get rs1) imm)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h :=
   urun_step_wr N h m pc avail isRvc _ rd _ _ hns
@@ -263,8 +263,8 @@ theorem wp_uk_addiw (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc
 theorem wp_uk_shiftiwop (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
     (shamt : BitVec 5) (rs1 rd : BitVec 5) (op : sopw) (avail : Nat) (hns : unotSp rd) :
     ⊢ uinstrIs N.t pc isRvc (.SHIFTIWOP (shamt, .Regidx rs1, .Regidx rd, op)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h'
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h'
           (ukWr m rd (ukShiftiwopVal op (m.get rs1) shamt)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h :=
   urun_step_wr N h m pc avail isRvc _ rd _ _ hns
@@ -274,8 +274,8 @@ theorem wp_uk_shiftiwop (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
 theorem wp_uk_utype (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
     (imm : BitVec 20) (rd : BitVec 5) (op : uop) (avail : Nat) (hns : unotSp rd) :
     ⊢ uinstrIs N.t pc isRvc (.UTYPE (imm, .Regidx rd, op)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h'
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h'
           (ukWr m rd (ukUtypeVal op pc imm)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h :=
   urun_step_wr N h m pc avail isRvc _ rd _ _ hns
@@ -285,8 +285,8 @@ theorem wp_uk_utype (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc
 theorem wp_uk_div (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
     (rs2 rs1 rd : BitVec 5) (u : Bool) (avail : Nat) (hns : unotSp rd) :
     ⊢ uinstrIs N.t pc isRvc (.DIV (.Regidx rs2, .Regidx rs1, .Regidx rd, u)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h'
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h'
           (ukWr m rd (ukDivVal u (m.get rs1) (m.get rs2))) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h :=
   urun_step_wr N h m pc avail isRvc _ rd _ _ hns
@@ -296,8 +296,8 @@ theorem wp_uk_div (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc :
 theorem wp_uk_rem (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
     (rs2 rs1 rd : BitVec 5) (u : Bool) (avail : Nat) (hns : unotSp rd) :
     ⊢ uinstrIs N.t pc isRvc (.REM (.Regidx rs2, .Regidx rs1, .Regidx rd, u)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h'
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h'
           (ukWr m rd (ukRemVal u (m.get rs1) (m.get rs2))) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h :=
   urun_step_wr N h m pc avail isRvc _ rd _ _ hns
@@ -310,8 +310,8 @@ theorem wp_uk_jal (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc :
     (imm : BitVec 21) (rd : BitVec 5) (avail : Nat) (hns : unotSp rd)
     (hal : (pc + BitVec.signExtend 64 imm).getLsbD 0 = false) :
     ⊢ uinstrIs N.t pc isRvc (.JAL (imm, .Regidx rd)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h'
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h'
           (ukWr m rd (pc + instrLen isRvc)) (pc + BitVec.signExtend 64 imm) avail -∗ wpLoop h') -∗
       wpLoop h :=
   urun_step_wr N h m pc avail isRvc _ rd _ _ hns
@@ -322,8 +322,8 @@ theorem wp_uk_jal (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc :
 theorem wp_uk_jalr (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
     (imm : BitVec 12) (rs1 rd : BitVec 5) (avail : Nat) (hns : unotSp rd) :
     ⊢ uinstrIs N.t pc isRvc (.JALR (imm, .Regidx rs1, .Regidx rd)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h'
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h'
           (ukWr m rd (pc + instrLen isRvc)) (retPc (m.get rs1 + BitVec.signExtend 64 imm)) avail -∗
           wpLoop h') -∗
       wpLoop h :=
@@ -335,8 +335,8 @@ theorem wp_uk_jalr (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc 
 theorem wp_uk_ret (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
     (rs1 : BitVec 5) (avail : Nat) :
     ⊢ uinstrIs N.t pc isRvc (.JALR (0#12, .Regidx rs1, .Regidx 0#5)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h' m (retPc (m.get rs1)) avail -∗ wpLoop h') -∗
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h' m (retPc (m.get rs1)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   have e1 : ukWr m 0#5 (pc + instrLen isRvc) = m := by unfold ukWr; rw [if_pos rfl]
   have e2 : m.get rs1 + BitVec.signExtend 64 (0#12) = m.get rs1 := by
@@ -351,8 +351,8 @@ theorem wp_uk_btype (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc
     (imm : BitVec 13) (rs2 rs1 : BitVec 5) (op : bop) (avail : Nat)
     (hal : ukBtaken op (m.get rs1) (m.get rs2) = true → (pc + BitVec.signExtend 64 imm).getLsbD 0 = false) :
     ⊢ uinstrIs N.t pc isRvc (.BTYPE (imm, .Regidx rs2, .Regidx rs1, op)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h' m
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h' m
           (if ukBtaken op (m.get rs1) (m.get rs2) then pc + BitVec.signExtend 64 imm else pc + instrLen isRvc)
           avail -∗ wpLoop h') -∗
       wpLoop h :=
@@ -366,15 +366,15 @@ sp, -8k` hands the top `k` words of the free stack out as a frame. -/
 theorem wp_uk_addi_sp_dn (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
     (imm : BitVec 12) (k n : Nat) (himm : BitVec.signExtend 64 imm = BitVec.ofInt 64 (-((8 * k : Nat) : Int))) :
     ⊢ uinstrIs N.t pc isRvc (.ITYPE (imm, .Regidx spIdx, .Regidx spIdx, .ADDI)) -∗
-      urun (hlc := hlc) N h m pc (k + n) -∗
-      ▷ (ustack N.d (m.get spIdx) k -∗ ∀ h' : CPU, urun (hlc := hlc) N h'
+      urun N h m pc (k + n) -∗
+      ▷ (ustack N.d (m.get spIdx) k -∗ ∀ h' : CPU, urun N h'
           (ukWr m spIdx (m.get spIdx + BitVec.ofInt 64 (-((8 * k : Nat) : Int)))) (pc + instrLen isRvc) n -∗
           wpLoop h') -∗
       wpLoop h := by
   have hv : ukItypeVal .ADDI (m.get spIdx) imm = m.get spIdx + BitVec.ofInt 64 (-((8 * k : Nat) : Int)) := by
     show m.get spIdx + BitVec.signExtend 64 imm = _
     rw [himm]
-  have hleaf : UkLeafAt (hlc := hlc) (GF := GF) m pc isRvc (.ITYPE (imm, .Regidx spIdx, .Regidx spIdx, .ADDI))
+  have hleaf : UkLeafAt (GF := GF) m pc isRvc (.ITYPE (imm, .Regidx spIdx, .Regidx spIdx, .ADDI))
       (ukWr m spIdx (m.get spIdx + BitVec.ofInt 64 (-((8 * k : Nat) : Int)))) (pc + instrLen isRvc) := by
     rw [← hv]
     exact fun _ S K M hS hI => UL.wp_uk_itype S K M m pc isRvc imm spIdx spIdx .ADDI hS hI
@@ -397,15 +397,15 @@ theorem wp_uk_addi_sp_up (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
     (imm : BitVec 12) (k n : Nat) (himm : BitVec.signExtend 64 imm = BitVec.ofNat 64 (8 * k)) :
     ⊢ uinstrIs N.t pc isRvc (.ITYPE (imm, .Regidx spIdx, .Regidx spIdx, .ADDI)) -∗
       ustack N.d (m.get spIdx + BitVec.ofNat 64 (8 * k)) k -∗
-      urun (hlc := hlc) N h m pc n -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h'
+      urun N h m pc n -∗
+      ▷ (∀ h' : CPU, urun N h'
           (ukWr m spIdx (m.get spIdx + BitVec.ofNat 64 (8 * k))) (pc + instrLen isRvc) (k + n) -∗
           wpLoop h') -∗
       wpLoop h := by
   have hv : ukItypeVal .ADDI (m.get spIdx) imm = m.get spIdx + BitVec.ofNat 64 (8 * k) := by
     show m.get spIdx + BitVec.signExtend 64 imm = _
     rw [himm]
-  have hleaf : UkLeafAt (hlc := hlc) (GF := GF) m pc isRvc (.ITYPE (imm, .Regidx spIdx, .Regidx spIdx, .ADDI))
+  have hleaf : UkLeafAt (GF := GF) m pc isRvc (.ITYPE (imm, .Regidx spIdx, .Regidx spIdx, .ADDI))
       (ukWr m spIdx (m.get spIdx + BitVec.ofNat 64 (8 * k))) (pc + instrLen isRvc) := by
     rw [← hv]
     exact fun _ S K M hS hI => UL.wp_uk_itype S K M m pc isRvc imm spIdx spIdx .ADDI hS hI

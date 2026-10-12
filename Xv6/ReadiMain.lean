@@ -28,7 +28,7 @@ set_option linter.unusedSimpArgs false
 theorem rd_priv_eta (Vp : ProcPriv) : { Vp with upt := Vp.upt } = Vp := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The destination as the contract hands it over, at `tot = 0`. -/
@@ -126,7 +126,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x34 .. +0x4a`**: `n = 0` returns `0`; otherwise the five lazy
 saves, `tot = 0`, the two loop constants, and into the loop. -/
 theorem rd_body0 (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (γfs : FsNames) (logstart : Nat)

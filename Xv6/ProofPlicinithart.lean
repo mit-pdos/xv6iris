@@ -41,7 +41,7 @@ theorem ph_cpuid_br : KA.«plicinithart» + 0xffffffffffffc10e#64 = KA.«cpuid»
 theorem ph_jump_0c : jumpPc (KA.«plicinithart» + 0xc#64) = KA.«plicinithart» + 0xc#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- `cpuid`'s contract at the call site (interrupts off). -/
 theorem ph_call_cpuid (CI : CPUID) [CurCtx] (cpu : CPU) (k' : KCtx)
@@ -50,7 +50,7 @@ theorem ph_call_cpuid (CI : CPUID) [CurCtx] (cpu : CPU) (k' : KCtx)
     (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = cpuidRet (hartId cpu)⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := CI.wp_cpuid (hlc := hlc) (GF := GF) cpu k' hsie hK
+  have h := CI.wp_cpuid (GF := GF) cpu k' hsie hK
   unfold wp_cpuid_body at h
   simp only [cpuidAddr] at h
   exact h
@@ -59,7 +59,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem plicinithart_proof (CI : CPUID) : PLICINITHART :=
-  ⟨fun {hlc GF} _ _ _ cpu k γ0 γ1 hsie hK => by
+  ⟨fun {GF} _ _ _ cpu k γ0 γ1 hsie hK => by
   unfold wp_plicinithart_body
   iintro ⟨Hk, Hpc, #Hinv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

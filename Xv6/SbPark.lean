@@ -88,7 +88,7 @@ theorem fsbN_sbN_disj : (↑fsbN : CoPset) ## (↑sbN : CoPset) :=
   ndot_ne_disjoint logN (by decide)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsBlocksG GF]
 
 /-! ## The park
 

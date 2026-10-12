@@ -26,7 +26,7 @@ set_option linter.unusedSimpArgs false
 /-! ## The block's cells at the ambient context (D31 adapters) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF]
   [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
@@ -84,7 +84,7 @@ theorem syscArmProc_pid [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -93,7 +93,7 @@ set_option maxHeartbeats 4000000 in
 /-- **Arm 14, `sys_uptime`** (Rocq `sysc_arm_uptime`). -/
 theorem syscall_arm_uptime (SU : SYSUPTIME)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -114,7 +114,7 @@ theorem syscall_arm_uptime (SU : SYSUPTIME)
   icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
   -- NI M0 / M2-W3: THE LED TWIN, so the answer is read off the tick ledger's
   -- receipt (`tickLb n ∗ ⌜t = ofNat 32 n⌝`): the `uptime` row of `SyscRows`
-  have hU := SU.wp_sys_uptime_led (hlc := hlc) (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R) γt
+  have hU := SU.wp_sys_uptime_led (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R) γt
     ?hn ?hK ?hlk
   case hn => simp only [KCtx.withRegs_noff, KCtx.pushed_noff, KCtx.withSpie_noff]; rw [hnoff]; decide
   case hK => k_norm_g; have := syscallSlots_val; unfold sysUptimeSlots; omega
@@ -180,14 +180,14 @@ deposits the kill credential (SpecSyscall deviation 6: Rocq's
 `app_taint`).  No out row.  W8-K proves it for `uexecSGXv6`. -/
 def SyscDepKill : Prop :=
   ∀ (f : UexecSG.sfam GF) (W : Uvis),
-    UexecSG.sbundleAt (uslot (hlc := hlc)) 6 f W ⊢ □ uKillCred (hlc := hlc) (GF := GF)
+    UexecSG.sbundleAt (uslot) 6 f W ⊢ □ uKillCred (GF := GF)
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 11, `sys_getpid`** (Rocq `sysc_arm_getpid`; the whole block, D16). -/
 theorem syscall_arm_getpid
     (SG' : SYSGETPID)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -217,7 +217,7 @@ theorem syscall_arm_getpid
   have hnoffK : (((k.withSpie spie spp).pushed 4).withRegs R).noff = 0 := hnoff
   have hsieK : (((k.withSpie spie spp).pushed 4).withRegs R).sie = k.sie := rfl
   icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
-  have hU := SG'.wp_sys_getpid (hlc := hlc) (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R)
+  have hU := SG'.wp_sys_getpid (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     γ (procAddr j) pid V M hprocK (by k_norm_g; exact htier) (by rw [hnoffK]; decide)
     (by k_norm_g; have : sysGetpidSlots + 4 ≤ syscallSlots := by decide
         omega)
@@ -252,9 +252,9 @@ set_option maxHeartbeats 4000000 in
 /-- **Arm 6, `sys_kill`** (Rocq `sysc_arm_kill`; D31: the raw trapframe cells, the
 credential out of the deposit, `SyscDepKill`). -/
 theorem syscall_arm_kill
-    (SK : SYSKILL) (hdep : SyscDepKill (hlc := hlc) (GF := GF))
+    (SK : SYSKILL) (hdep : SyscDepKill (GF := GF))
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -289,7 +289,7 @@ theorem syscall_arm_kill
   ihave HsIn := syscSysIn_at f V M sts gn cs pid 6 hnN (by decide) $$ HsIn
   ihave #Hkc := hdep f _ $$ HsIn
   icases syscArmProc_tf hct γ (procAddr j) pid V M $$ Hpriv with ⟨Htp, Htf, Hback⟩
-  have hU := SK.wp_sys_kill (hlc := hlc) (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
+  have hU := SK.wp_sys_kill (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     V.upt.tfp V.tf v (DFrac.own (1 : Qp).half.half) hv (by rw [hnoffK]; decide)
     (by k_norm_g; have : sysKillSlots + 4 ≤ syscallSlots := by decide
         omega)
@@ -330,16 +330,16 @@ def SyscOutPause : Prop :=
   ∀ (f : UexecSG.sfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
     (cs' : ExtTreeSet GName compare),
     (⌜r = 0#64⌝ ∨ killShot (GF := GF) W.gen) ⊢
-      UexecSG.spostAt (uslot (hlc := hlc)) USYS_pause f W r M' fdv' cw' cs'
+      UexecSG.spostAt (uslot) USYS_pause f W r M' fdv' cw' cs'
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 13, `sys_pause`** (Rocq `sysc_arm_pause`; the raw trapframe cells;
 NI M3 no-kill K1: the pid half and generation row lent to `killed()`'s
 reading, and the post paid by the answer's reason, `SyscOutPause`). -/
 theorem syscall_arm_pause
-    (SP : SYSPAUSE) (hout : SyscOutPause (hlc := hlc) (GF := GF))
+    (SP : SYSPAUSE) (hout : SyscOutPause (GF := GF))
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -373,7 +373,7 @@ theorem syscall_arm_pause
   obtain ⟨v, hv⟩ : ∃ v, V.tf[tfArgIdx 0]? = some v :=
     ⟨_, List.getElem?_eq_getElem (by rw [hl]; decide)⟩
   icases syscArmProc_tfGen hct γ (procAddr j) pid V M $$ Hpriv with ⟨Htp, Htf, Hpid, Hgen, Hback⟩
-  have hU := SP.wp_sys_pause_eb (hlc := hlc) (GF := GF) Γ cpu
+  have hU := SP.wp_sys_pause_eb (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γt j pid V.gen
     V.upt.tfp V.tf v (DFrac.own (1 : Qp).half.half) hj hprocK hv
     (by k_norm_g; have : sysPauseSlots + 4 ≤ syscallSlots := by decide
@@ -430,11 +430,11 @@ post -- as close's payment and its answer do. -/
 def SyscDepSync : Prop :=
   ∀ (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32),
-    UexecSG.sbundleAt (uslot (hlc := hlc)) 22 f (uvisOf V M sts gn cs pid) ⊢
-      ∃ oQ : Option (IProp GF), hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ ∗
+    UexecSG.sbundleAt (uslot) 22 f (uvisOf V M sts gn cs pid) ⊢
+      ∃ oQ : Option (IProp GF), hookOpt (genId (GF := GF)) oQ ∗
         (∀ (r : BitVec 64) (M' : ElfMem) (sts' : List FdState) (cw' : Nat)
             (cs' : ExtTreeSet GName compare),
-          qOpt oQ -∗ UexecSG.spostAt (uslot (hlc := hlc)) 22 f (uvisOf V M sts gn cs pid) r M' sts' cw' cs')
+          qOpt oQ -∗ UexecSG.spostAt (uslot) 22 f (uvisOf V M sts gn cs pid) r M' sts' cw' cs')
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 22, `sys_sync`** (Rocq `sysc_arm_sync`): the log context off
@@ -445,8 +445,8 @@ the post's row 22. -/
 theorem syscall_arm_sync
     (SY : SYS_SYNC)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
-    (hDS : SyscDepSync (hlc := hlc) (GF := GF))
+    [ClaimIs GF Γ]
+    (hDS : SyscDepSync (GF := GF))
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -482,7 +482,7 @@ theorem syscall_arm_sync
   ihave #Hlog := fsReady_log $$ Hrdy
   icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
   icases syscArmProc_pid hct γ (procAddr j) pid V M $$ Hpriv with ⟨Hpid, Hback⟩
-  have hU := SY.wp_sys_sync_eb (hlc := hlc) (GF := GF) Γ cpu
+  have hU := SY.wp_sys_sync_eb (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) icfgLog fscBio (fsView fscFs fscDisk icfgDev fscCov)
     fscFs j fscLogst icfgDev oQ pid (DFrac.own (1 : Qp).half.half) hj hprocK
     (by k_norm_g; have : sysSyncSlots + 4 ≤ syscallSlots := by decide
@@ -534,7 +534,7 @@ block back with the mask ANDed with argument 0, `a0 := 0`
 theorem syscall_arm_seccomp
     (SSC : SYSSECCOMP)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -562,7 +562,7 @@ theorem syscall_arm_seccomp
     unfold tfW
     rw [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem (by rw [hl]; decide)]
     rfl
-  have hU := SSC.wp_sys_seccomp (hlc := hlc) (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R)
+  have hU := SSC.wp_sys_seccomp (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     γ (procAddr j) pid V M (tfW V.tf (tfArgIdx 0)) hprocK (by k_norm_g; exact htier) hv
     (by rw [hnoffK]; decide)
     (by k_norm_g; have : sysSeccompSlots + 4 ≤ syscallSlots := by decide

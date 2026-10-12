@@ -28,7 +28,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -39,18 +39,18 @@ def wpGrepStrchrBody : Prop :=
     m.get 10#5 = BitVec.ofNat 64 p → m.get 11#5 = BitVec.setWidth 64 c → c ≠ ubyte0 →
     (∀ j, j < k → g j ≠ c ∧ g j ≠ ubyte0) → (g k = c ∨ g k = ubyte0) →
     ⊢ grepCode N.t -∗ ubytesq N.d dq p (k + 1) g -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«strchr») (2 + n) -∗
+      urun N h m (BitVec.ofNat 64 User.Grep.Sym.«strchr») (2 + n) -∗
       (ubytesq N.d dq p (k + 1) g -∗ ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
         ⌜m'.get 10#5 = BitVec.ofNat 64 (if g k = c then p + k else 0)⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
       wpLoop h
 
 end
 
 /-- The interface of grep's `strchr`. -/
 structure GREP_STRCHR : Prop where
-  wp_grepStrchr : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_grepStrchr : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpGrepStrchrBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpGrepStrchrBody (GF := GF)
 
 end Xv6

@@ -65,7 +65,7 @@ THE PURE MODEL.  reparent(p) rewrites every cell equal to `p` to
    `procAddr_inj` (SchedCtx, above) is taken as a HYPOTHESIS where the
    writers need it.
 6. **The tick mirror (`tickCnt` / `tickLb`, Rocq dd1843b7a) has its OWN
-   section** binding only `[MachGS hlc GF] [WchG GF]`: this file's main
+   section** binding only `[MachGS GF] [WchG GF]`: this file's main
    section binds the slot classes too, which Lean 4 would pull into every
    definition stated there, and `TicksDefs.isTickslock` must gain the
    `WchG` binder and nothing else.  Rocq states it in `WaitInv`'s section
@@ -236,7 +236,7 @@ theorem waitInv_range_acc {GF : BundledGFunctors.{0}} {A : Type} (n k : Nat) (hk
   iapply H $$ %(fun _ i => Φ' a i) Hbox HΦ'
 
 section WaitInv
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
 
 /-- every proc's `parent` cell, at context `ξ` (Rocq `parents_own_at`;
 deviation 1: it IS `WaitLock.waitResAt`). -/
@@ -268,9 +268,11 @@ def genHalvesEnt (k : Nat) (v : BitVec 64) (g : GName) : IProp GF :=
 def genHalves (ps : Nat → BitVec 64) (gs : Nat → GName) : IProp GF :=
   iprop([∗list] k ∈ List.range NPROC, genHalvesEnt k (ps k) (gs k))
 
+omit [MachGS GF] in
 theorem genHalvesEnt_zero (k : Nat) (g : GName) : genHalvesEnt (GF := GF) k 0#64 g = iprop(emp) := by
   unfold genHalvesEnt; rw [if_pos rfl]
 
+omit [MachGS GF] in
 /-- AT BOOT EVERY CELL IS ZERO and the whole row is `emp` -/
 theorem genHalves_zeros (ps : Nat → BitVec 64) (gs : Nat → GName) (hz : ∀ k, k < NPROC → ps k = 0#64) :
     ⊢@{IProp GF} genHalves ps gs := by
@@ -281,6 +283,7 @@ theorem genHalves_zeros (ps : Nat → BitVec 64) (gs : Nat → GName) (hz : ∀ 
     rw [List.getElem_range] at hy; rw [← hy]; simpa using hlt
   rw [hz y hy, genHalvesEnt_zero]
 
+omit [MachGS GF] in
 /-- ONE ENTRY, BORROWED (Rocq `gen_halves_acc`). -/
 theorem genHalves_acc (ps : Nat → BitVec 64) (gs : Nat → GName) (k : Nat) (hk : k < NPROC) :
     genHalves (GF := GF) ps gs ⊢
@@ -293,6 +296,7 @@ theorem genHalves_acc (ps : Nat → BitVec 64) (gs : Nat → GName) (k : Nat) (h
   · intro v' i hi; simp only [hi, if_false]
   · simp only [if_true]; exact .rfl
 
+omit [MachGS GF] in
 /-- ...AND THE REAP'S FORM OF IT, with the give-back already made: the cell
 goes to 0, where the clause is `emp` (Rocq `gen_halves_take`). -/
 theorem genHalves_take (ps : Nat → BitVec 64) (gs : Nat → GName) (k : Nat) (hk : k < NPROC) :
@@ -306,6 +310,7 @@ theorem genHalves_take (ps : Nat → BitVec 64) (gs : Nat → GName) (k : Nat) (
   rw [genHalvesEnt_zero]
   itrivial
 
+omit [MachGS GF] in
 /-- WHAT KFORK READS OFF THE PAYLOAD: the slot it is about to give a child
 has no entry, so its parent cell is 0.  THREE QUARTERS beside three quarters
 is what refutes the alternative (`SlotGen.slotGen_tq_excl`). -/
@@ -325,6 +330,7 @@ theorem genHalves_no_entry (ps : Nat → BitVec 64) (gs : Nat → GName) (j : Na
     · iexact Hsg
     · iexact Hsg'
 
+omit [MachGS GF] in
 /-- A GENERATION OCCUPIES ONE SLOT, read off the payload's persistent half
 (Rocq `gen_halves_gen_uniq`). -/
 theorem genHalves_gen_uniq (ps : Nat → BitVec 64) (gs : Nat → GName) (g : GName) (pa : BitVec 64) :
@@ -354,6 +360,7 @@ theorem genHalves_gen_uniq (ps : Nat → BitVec 64) (gs : Nat → GName) (g : GN
   intro k hk
   exact Hall k k (List.getElem?_range hk)
 
+omit [MachGS GF] in
 /-- ...the same, handing the payload back (the Rocq proofs read the pure
 conclusion without spending the payload). -/
 theorem genHalves_gen_uniq_keep (ps : Nat → BitVec 64) (gs : Nat → GName) (g : GName) (pa : BitVec 64) :
@@ -361,6 +368,7 @@ theorem genHalves_gen_uniq_keep (ps : Nat → BitVec 64) (gs : Nat → GName) (g
       ⌜∀ k, k < NPROC → ps k ≠ 0#64 → gs k = g → procAddr k = pa⌝ ∗ genHalves ps gs :=
   (and_intro (genHalves_gen_uniq ps gs g pa) sep_elim_left).trans persistent_and_sep_mp
 
+omit [MachGS GF] in
 /-- REPARENT MOVES NO ENTRY: its address is nonzero, so every cell holding
 it was on the occupied side and stays there (Rocq `gen_halves_rp_map`).  NO
 PREMISE ON `ip`: at `ip = 0` the entry is dropped. -/
@@ -379,6 +387,7 @@ theorem genHalves_rpMap (p ip : BitVec 64) (ps : Nat → BitVec 64) (gs : Nat �
     · rw [if_neg hip]
   · rw [if_neg hk]
 
+omit [MachGS GF] in
 /-- ...AND THE GENERATION COLUMN MOVES AT AN UNOCCUPIED SLOT FOR FREE
 (Rocq `gen_halves_gs_insert`). -/
 theorem genHalves_gs_insert (ps : Nat → BitVec 64) (gs : Nat → GName) (j : Nat) (g : GName)
@@ -409,10 +418,12 @@ def childrenOwnAt (m : ChMap) : IProp GF :=
 def chFrag (γ : GName) (pa : BitVec 64) (S : ExtTreeSet GName compare) : IProp GF :=
   ghost_map_elem (WchG.wchName GF) (.own 1) γ (pa, S)
 
+omit [MachGS GF] in
 instance chFrag_timeless (γ : GName) (pa : BitVec 64) (S : ExtTreeSet GName compare) :
     Timeless (chFrag (GF := GF) γ pa S) := by
   unfold chFrag ghost_map_elem; infer_instance
 
+omit [MachGS GF] in
 /-- A ROW READS THE AUTHORITY -- the lemma the map shape exists for. -/
 theorem childrenOwn_lookup (m : ChMap) (γ : GName) (pa : BitVec 64) (S : ExtTreeSet GName compare) :
     childrenOwnAt (GF := GF) m ∗ chFrag γ pa S ⊢ ⌜get? m γ = some (pa, S)⌝ := by
@@ -420,6 +431,7 @@ theorem childrenOwn_lookup (m : ChMap) (γ : GName) (pa : BitVec 64) (S : ExtTre
   iintro ⟨Ha, Hf⟩
   iapply ghost_map_lookup $$ Ha Hf
 
+omit [MachGS GF] in
 /-- ...AND BOTH TOGETHER MOVE IT: fork's `cs → cs ∪ {γ}` and wait's
 `cs → cs \ {γ}`.  THE ADDRESS DOES NOT MOVE WITH THE SET. -/
 theorem childrenOwn_upd (m : ChMap) (γ : GName) (pa : BitVec 64) (S S' : ExtTreeSet GName compare) :
@@ -442,6 +454,7 @@ refutes a fresh pid against. -/
 def initGen (ip : BitVec 64) (p0 : BitVec 32) : IProp GF :=
   iprop(∃ g : GName, slotGen ip .discard g ∗ genPid g p0 ∗ initPidIs p0 ∗ pidReg p0 .discard g)
 
+omit [MachGS GF] in
 instance initGen_persistent (ip : BitVec 64) (p0 : BitVec 32) : Persistent (initGen (GF := GF) ip p0) := by
   unfold initGen; infer_instance
 
@@ -621,9 +634,11 @@ process's fragment), so they go here.  WHOLLY THE KERNEL'S -- no fragment. -/
 /-- Rocq `orphans_own`. -/
 def orphansOwn (O : OrphMap) : IProp GF := ghost_var (WchG.worphName GF) (.own 1) O
 
+omit [MachGS GF] in
 instance orphansOwn_timeless (O : OrphMap) : Timeless (orphansOwn (GF := GF) O) := by
   unfold orphansOwn ghost_var; infer_instance
 
+omit [MachGS GF] in
 /-- the move: what reparent does to this column -/
 theorem orphans_add (O : OrphMap) (pa ip : BitVec 64) (S : ExtTreeSet GName compare) :
     orphansOwn (GF := GF) O ⊢ |==> orphansOwn (opMap pa ip O S) := by
@@ -631,6 +646,7 @@ theorem orphans_add (O : OrphMap) (pa ip : BitVec 64) (S : ExtTreeSet GName comp
   iintro H
   iapply ghost_var_update $$ H
 
+omit [MachGS GF] in
 /-- ...and the reap's, at one key -/
 theorem orphans_del (O : OrphMap) (pa : BitVec 64) (g : GName) :
     orphansOwn (GF := GF) O ⊢ |==> orphansOwn (PartialMap.insert O pa (orphRow O pa \ {g})) := by
@@ -658,7 +674,7 @@ theorem waitInv_ctxMorph_or (R1 R2 : CtxId → IProp GF) [CtxMorph R1] [CtxMorph
 
 instance initIdentAt_morph [CurCtx] (ip : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => initIdentAt ξ ip) :=
-  @instCtxMorphSep hlc GF _ (fun ξ => initIdentCell ξ ip)
+  @instCtxMorphSep GF _ (fun ξ => initIdentCell ξ ip)
     (fun _ => iprop(∃ g : GName, slotGen ip .discard g ∗ genPid g 1#32 ∗ initPidIs 1#32))
     (instCtxMorphWordAtN _ _ _ _) (instCtxMorphConst _)
 
@@ -671,15 +687,15 @@ instance orphAtInitAt_morph [CurCtx] (O : OrphMap) :
 
 instance childrenInvAt_morph [CurCtx] (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMap)
     (O : OrphMap) : CtxMorph (GF := GF) (fun ξ => childrenInvAt ξ ps gs m O) :=
-  @instCtxMorphSep hlc GF _ (fun _ => genHalves ps gs)
+  @instCtxMorphSep GF _ (fun _ => genHalves ps gs)
     (fun ξ => iprop(⌜invPure ps gs m O⌝ ∗ orphAtInitAt ξ O)) (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ (fun _ => iprop(⌜invPure ps gs m O⌝)) (fun ξ => orphAtInitAt ξ O)
+    (@instCtxMorphSep GF _ (fun _ => iprop(⌜invPure ps gs m O⌝)) (fun ξ => orphAtInitAt ξ O)
       (instCtxMorphConst _) (orphAtInitAt_morph O))
 
 instance parentsResAt_morph [CurCtx] : CtxMorph (GF := GF) (parentsResAt (GF := GF)) :=
-  @instCtxMorphExists hlc GF _ _
+  @instCtxMorphExists GF _ _
     (fun (ps : Nat → BitVec 64) ξ => iprop(parentsOwnAt ξ ps ∗ ⌜∀ k, k < NPROC → ps k = 0#64⌝))
-    (fun ps => @instCtxMorphSep hlc GF _ (fun ξ => parentsOwnAt ξ ps)
+    (fun ps => @instCtxMorphSep GF _ (fun ξ => parentsOwnAt ξ ps)
       (fun _ => iprop(⌜∀ k, k < NPROC → ps k = 0#64⌝)) (parentsOwnAt_morph ps) (instCtxMorphConst _))
 
 end WaitInv
@@ -697,7 +713,7 @@ name) are bound, so `TicksDefs.isTickslock` gains `[WchG GF]` and nothing
 else. -/
 
 section TickLedger
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [WchG GF]
 
 /-- the mirror's whole authority at count `n` (Rocq `tick_cnt`). -/
 def tickCnt (n : Nat) : IProp GF := MonoNat.auth_own (WchG.wtkName GF) (DFrac.own 1) (.ofNat n)

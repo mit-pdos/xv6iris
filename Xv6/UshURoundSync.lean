@@ -47,7 +47,7 @@ open Ualt
 set_option synthInstance.maxSize 1024
 
 section UShURoundSync
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [FileOutG GF] [PipeOutG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -80,6 +80,7 @@ theorem usync_line_facts (I : List (BitVec 8)) (hlws : ulineWs .LSync = lastWs I
 
 /-! ## S2y THE sync CHILD -/
 
+omit [MachGS GF] in
 /-- **Rocq `image_entry_lend`** (`UShUModSync.v`, local): an entry is
 contravariant in its lend. -/
 theorem imageEntry_lend (f : ElfBytes) (M : Nat → List (BitVec 8)) (av : BitVec 64)
@@ -97,7 +98,7 @@ theorem imageEntry_lend (f : ElfBytes) (M : Nat → List (BitVec 8)) (av : BitVe
 /-- **Rocq `usync_q`**: /sync's RECEIPT (sync SY3-A4) -- the deed at PEND
 (`RSyncRan`, the identity) and the round's record, both built by the hook. -/
 noncomputable def usyncQ (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) : IProp GF :=
-  iprop(ushPendAt (hlc := hlc) ug r s0 I ∗ usyncRec (hlc := hlc) ug s0 I)
+  iprop(ushPendAt ug r s0 I ∗ usyncRec ug s0 I)
 
 /-- **Rocq `usync_ran_pay`**: THE PAYMENT AT RAN -- the round's credential at
 the block's head, beside the receipt, is the position-0 credential: the
@@ -105,8 +106,8 @@ block still owed whole, the deed PEND with the record beside it. -/
 theorem usync_ran_pay (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (PT : List (BitVec 8) → Nat → IProp GF) (PD : List (BitVec 8) → IProp GF)
     (I : List (BitVec 8)) :
-    ⊢ syncPay (uWcl (hlc := hlc) (GF := GF) ug s0 I 3) (usyncQ (hlc := hlc) ug r s0 I)
-        (uWcu (hlc := hlc) ug r s0 PT PD I 0) := by
+    ⊢ syncPay (uWcl (GF := GF) ug s0 I 3) (usyncQ ug r s0 I)
+        (uWcu ug r s0 PT PD I 0) := by
   unfold syncPay usyncQ
   iintro Hc ⟨Hd, Hr⟩
   iapply uWcu_of ug r s0 PT PD I 0
@@ -121,12 +122,12 @@ and the running claim's registration (`AppFileHook.unionHook_file`); the
 hook's receipt is the deed at PEND and the round's record (`usyncQ`). -/
 theorem usync_lend (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (PT : List (BitVec 8) → Nat → IProp GF) (PD : List (BitVec 8) → IProp GF)
-    (hhk : MachFixedGS.syncHook (hlc := hlc) (GF := GF)
-      = unionHk (hlc := hlc) (filePred (hlc := hlc)) ug.ugnFile.fgnCl)
+    (hhk : MachFixedGS.syncHook (GF := GF)
+      = unionHk (filePred) ug.ugnFile.fgnCl)
     (I : List (BitVec 8)) (hul : ul I = .LSync) (hpos : 0 < nlines I) :
-    ⊢ uWcu (hlc := hlc) (GF := GF) ug r s0 PT PD I 3 -∗
-      uWcl (hlc := hlc) ug s0 I 3 ∗
-        hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) (some (usyncQ (hlc := hlc) ug r s0 I)) := by
+    ⊢ uWcu (GF := GF) ug r s0 PT PD I 3 -∗
+      uWcl ug s0 I 3 ∗
+        hookOpt (genId (GF := GF)) (some (usyncQ ug r s0 I)) := by
   have hnw : uwild (ul I) = false := by rw [hul]; rfl
   iintro Hc
   ihave Hc := uWcu_3_nw ug r s0 PT PD I hnw $$ Hc
@@ -137,9 +138,9 @@ theorem usync_lend (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
   simp only [hookOpt]
   rw [hhk]
   -- the taint's hook: every piece back, the receipt out of the taint
-  have htaint : ⊢ fileTaint (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl -∗
-      unionHk (hlc := hlc) (filePred (hlc := hlc)) ug.ugnFile.fgnCl (genId (hlc := hlc) (GF := GF))
-        (usyncQ (hlc := hlc) ug r s0 I) := by
+  have htaint : ⊢ fileTaint (GF := GF) ug.ugnFile.fgnCl -∗
+      unionHk (filePred) ug.ugnFile.fgnCl (genId (GF := GF))
+        (usyncQ ug r s0 I) := by
     iintro #HT
     unfold unionHk
     iintro %Ih %rh %rh' - - - Hg Hp Htk
@@ -172,8 +173,8 @@ theorem usync_lend (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     rw [List.length_append, ulinesIn_length]
   unfold fown
   icases Hown with ⟨Hdd, Htk⟩
-  iapply unionHook_file (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl (genId (hlc := hlc) (GF := GF)) r s
-    (vf.feBase ++ ulinesIn I) n (usyncQ (hlc := hlc) ug r s0 I) hlst (by omega)
+  iapply unionHook_file (GF := GF) ug.ugnFile.fgnCl (genId (GF := GF)) r s
+    (vf.feBase ++ ulinesIn I) n (usyncQ ug r s0 I) hlst (by omega)
     $$ Hdd Hpos Hfl Hrr
   isplit
   · -- the append: the deed PEND at /sync's run, the record beside it
@@ -220,39 +221,39 @@ whole. -/
 theorem usync_exec_sup (UL : UK_LEAVES)
     (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (PT : List (BitVec 8) → Nat → IProp GF) (PD : List (BitVec 8) → IProp GF)
-    (hhk : MachFixedGS.syncHook (hlc := hlc) (GF := GF)
-      = unionHk (hlc := hlc) (filePred (hlc := hlc)) ug.ugnFile.fgnCl)
-    (I : List (BitVec 8)) (hul : ul I = .LSync) (hpos : 0 < nlines I) {E : UshExecEnv (hlc := hlc) (GF := GF)} :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ shSyncSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
-      □ (uKillCred (hlc := hlc) (GF := GF) -∗ uWcu (hlc := hlc) ug r s0 PT PD I 0) -∗
+    (hhk : MachFixedGS.syncHook (GF := GF)
+      = unionHk (filePred) ug.ugnFile.fgnCl)
+    (I : List (BitVec 8)) (hul : ul I = .LSync) (hpos : 0 < nlines I) {E : UshExecEnv (GF := GF)} :
+    ⊢ udep (GF := GF) -∗ shSyncSlot (fileTaint ug.ugnFile.fgnCl) -∗
+      □ (uKillCred (GF := GF) -∗ uWcu ug r s0 PT PD I 0) -∗
       ushExecSupEchoAt E (fun ld => ushFd0c ld ∧ ushFd1p ld ∧ ushFd2p ld) (ulineWs .LSync)
-        (fun _ => uWcu (hlc := hlc) ug r s0 PT PD I 0) (uWcu (hlc := hlc) ug r s0 PT PD I 3) := by
+        (fun _ => uWcu ug r s0 PT PD I 0) (uWcu ug r s0 PT PD I 3) := by
   have hhead : (ulineWs .LSync)[0]! = syncPl := by
     show (ulineWs .LSync)[0]! = cmdSync
     simp [ulineWs]
   unfold shSyncSlot
   iintro #Hdep #Hslot #Hkt
-  have hpay := usync_ran_pay (hlc := hlc) (GF := GF) ug r s0 PT PD I
+  have hpay := usync_ran_pay (GF := GF) ug r s0 PT PD I
   iapply shExecSupXOfEntry (ushExecPinEcho_holds E) (fun ld => ushFd0c ld ∧ ushFd1p ld ∧ ushFd2p ld)
     (ulineWs .LSync) syncPl era0SyncPins [ROOTINO, SYNC_INO] SYNC_INO User.Sync.elf
-    (fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-    (uWcu (hlc := hlc) ug r s0 PT PD I 0)
-    (uWcu (hlc := hlc) ug r s0 PT PD I 3) usync_ws_exec_ok hhead syncElfLoadable shSyncPinResolves
+    (fileTaint ug.ugnFile.fgnCl)
+    (uWcu ug r s0 PT PD I 0)
+    (uWcu ug r s0 PT PD I 3) usync_ws_exec_ok hhead syncElfLoadable shSyncPinResolves
     $$ [] Hkt Hslot
   imodintro
   iintro %M %Mv %sa %t %gn %sts %cs %pidv %himg %hag %hbytes %hlen - #Hnp
   -- the lend at the entry: the credential and the hook
   iapply imageEntry_lend User.Sync.elf Mv _ sts ROOTINO seccAll cs pidv
-    (fun _ => uWcu (hlc := hlc) ug r s0 PT PD I 0)
-    iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF))
-      (some (usyncQ (hlc := hlc) ug r s0 I)))
-    (uWcu (hlc := hlc) ug r s0 PT PD I 3) $$ []
+    (fun _ => uWcu ug r s0 PT PD I 0)
+    iprop(uWcl ug s0 I 3 ∗ hookOpt (genId (GF := GF))
+      (some (usyncQ ug r s0 I)))
+    (uWcu ug r s0 PT PD I 3) $$ []
   · imodintro
     iintro Hc
     iapply usync_lend ug r s0 PT PD hhk I hul hpos $$ Hc
   iapply syncImageEntry_of_leaves UL (ulineWs .LSync) M Mv sa t gn sts ROOTINO cs pidv
-    (fun _ => uWcu (hlc := hlc) ug r s0 PT PD I 0) (uWcl (hlc := hlc) ug s0 I 3)
-    (some (usyncQ (hlc := hlc) ug r s0 I))
+    (fun _ => uWcu ug r s0 PT PD I 0) (uWcl ug s0 I 3)
+    (some (usyncQ ug r s0 I))
     (fun _ _ => rfl) usync_ws_exec_ok himg hag hbytes hlen $$ [] Hnp Hdep
   imodintro
   simp only [qOpt]
@@ -263,17 +264,17 @@ record's block at `RSyncExec` beside the deed as the round found it. -/
 theorem usync_execfail_law (UL : UK_LEAVES) (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (PT : List (BitVec 8) → Nat → IProp GF) (PD : List (BitVec 8) → IProp GF)
     (I : List (BitVec 8)) (hul : ul I = .LSync) (hpos : 0 < nlines I) :
-    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
-      ushExecfailLawAt (hlc := hlc) altExecsync (13 + ((ulineWs .LSync)[0]!).length)
-        (uWcu (hlc := hlc) ug r s0 PT PD I 3) (uWcu (hlc := hlc) ug r s0 PT PD I 0) := by
+    ⊢ unionLinks (GF := GF) ug -∗
+      ushExecfailLawAt altExecsync (13 + ((ulineWs .LSync)[0]!).length)
+        (uWcu ug r s0 PT PD I 3) (uWcu ug r s0 PT PD I 0) := by
   have hnw : uwild (ul I) = false := by rw [hul]; rfl
   have hnp := usync_nopipe I hul
-  have hab : (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkAb I (ualtCode (UR .RSyncExec)) = altExecsync := by
+  have hab : (unionLinkInstAt (GF := GF) ug s0).lkAb I (ualtCode (UR .RSyncExec)) = altExecsync := by
     rw [ufi_ab, ulm_ab_R' I .RSyncExec hnp (by rw [hul]; trivial) rfl, hul] <;> rfl
   have hn : altExecsync.length - 2 = 13 + ((ulineWs .LSync)[0]!).length := by decide
-  have hx := ushDiagLaw_hold_at_alt UL (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0)
-    (ushPreAt (hlc := hlc) ug r s0 I) I (ualtCode (UR .RSyncExec))
-  have el : (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkLinks = unionLinks (hlc := hlc) (GF := GF) ug := rfl
+  have hx := ushDiagLaw_hold_at_alt UL (unionLinkInstAt (GF := GF) ug s0)
+    (ushPreAt ug r s0 I) I (ualtCode (UR .RSyncExec))
+  have el : (unionLinkInstAt (GF := GF) ug s0).lkLinks = unionLinks (GF := GF) ug := rfl
   rw [hab, hn, el] at hx
   unfold ushExecfailLawAt at hx
   iintro #Hlk
@@ -306,13 +307,13 @@ theorem uHchild_sync (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (SC : S
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (PT : List (BitVec 8) → Nat → IProp GF) (PD : List (BitVec 8) → IProp GF) (γp : GName)
-    (hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
+    (hkill : MachFixedGS.killCred (GF := GF) = fileTaint ug.ugnFile.fgnCl)
     -- THE RECORD'S SYNC-HOOK FAMILY IS THE UNION'S (sync SY3-A4)
-    (hhk : MachFixedGS.syncHook (hlc := hlc) (GF := GF)
-      = unionHk (hlc := hlc) (filePred (hlc := hlc)) ug.ugnFile.fgnCl) :
-    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗ udep (hlc := hlc) (GF := GF) -∗
-      shSyncSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
-      ushfChildLawAt (hlc := hlc) (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) ushDg usyncLp 68 := by
+    (hhk : MachFixedGS.syncHook (GF := GF)
+      = unionHk (filePred) ug.ugnFile.fgnCl) :
+    ⊢ unionLinks (GF := GF) ug -∗ udep (GF := GF) -∗
+      shSyncSlot (fileTaint ug.ugnFile.fgnCl) -∗
+      ushfChildLawAt (ushURoundCtx ug r s0 PT PD γp) ushDg usyncLp 68 := by
   iintro #Hlk #Hdep #Hslot
   unfold ushfChildLawAt
   dsimp only [ushfWq, ushStd, ushURoundCtx]
@@ -328,18 +329,18 @@ theorem uHchild_sync (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (SC : S
   -- the era's pin, off the lend, for the taint's payload (deviation 3)
   ihave ⟨%v0, #Hpin0, Hblk, Hpre⟩ := uwc3 ug r s0 PT PD I hnw $$ Hcr
   ihave Hcr := uwc3b ug r s0 PT PD I v0 $$ Hpin0 Hblk Hpre
-  ihave #Hkillq : iprop(□ (uKillCred (hlc := hlc) (GF := GF) -∗ uWcu (hlc := hlc) ug r s0 PT PD I 0)) $$ []
+  ihave #Hkillq : iprop(□ (uKillCred (GF := GF) -∗ uWcu ug r s0 PT PD I 0)) $$ []
   · imodintro
     iintro #Hk
     iapply uWcu_taint ug r s0 PT PD I 0 v0 $$ Hpin0 [Hk]
     iapply uHktaint ug hkill $$ Hk
   -- ---- THE WALK, at 8 more steps of budget than it needs ----
   have hc : UknConst N' := ukn_const_of_eq N' _ hpeq (fun _ _ => rfl)
-  have H := SC.wp_shChildXGen (ushURoundEnv (hlc := hlc) (GF := GF) UL HF) hps
+  have H := SC.wp_shChildXGen (ushURoundEnv (GF := GF) UL HF) hps
     (fun γ ld => ustd γ ld) (fun _ _ => .rfl)
     (fun ld => ushFd0c ld ∧ ushFd1p ld ∧ ushFd2p ld) (ulineWs .LSync) altExecsync
-    (fun _ => uWcu (hlc := hlc) ug r s0 PT PD I 0)
-    (uWcu (hlc := hlc) ug r s0 PT PD I 3) (uWcu (hlc := hlc) ug r s0 PT PD I 0)
+    (fun _ => uWcu ug r s0 PT PD I 0)
+    (uWcu ug r s0 PT PD I 3) (uWcu ug r s0 PT PD I 0)
     N' hc h m dw dv sa len gb sz ld (n + 8) hpeq hs1 (usync_xline gb len hlat)
     usync_execfail_bytes hsa hs64 hs38 hszlo hszal hszok hrows hrows.2.2
   dsimp only [ushURoundEnv, ushExecEnvOf] at H

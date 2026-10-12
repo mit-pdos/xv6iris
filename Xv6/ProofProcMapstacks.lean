@@ -228,7 +228,7 @@ theorem pmsKept_trans {R R' R'' : RegMap} (h : pmsKept R R') (h' : pmsKept R' R'
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
 
 /-! ## The callees, at their entry addresses -/
 
@@ -258,7 +258,7 @@ theorem pms_kvmmap_call (KM : KVMMAP) [CurCtx] (c : CPU) (k' : KCtx) (γl : GNam
         (T.mapRun (vpnOf va) (BitVec.extractLsb' 12 44 pa) (permBits .rw) 1 fresh).2 = ([], 1) ∧
         fresh.Nodup ∧ (∀ b ∈ fresh, pageValid (pageAddr b) ∧ b ∉ T.pages 2)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KM.wp_kvmmap (hlc := hlc) (GF := GF) c k' γl γk nb T 1 (permBits KPerm.rw) hnoff hK
+  have h := KM.wp_kvmmap (GF := GF) c k' γl γk nb T 1 (permBits KPerm.rw) hnoff hK
     hlk hroot (by rw [h11, h12, h13]; exact hargs) (by rw [h14]; rfl) (by decide) (by decide)
     hwf hnd hpgT
     (by rw [h11]; exact hcount) hp0
@@ -734,7 +734,7 @@ theorem proc_mapstacks_br_11136 : KA.«proc_mapstacks» + 0x11136#64 = KA.«proc
 
 set_option maxHeartbeats 4000000 in
 theorem proc_mapstacks_proof (KAL : KALLOC) (KM : KVMMAP) : PROC_MAPSTACKS :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk nb t hnoff hK hlk hroot hwf hnd hpgt hunm hcount hp0 => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk nb t hnoff hK hlk hroot hwf hnd hpgt hunm hcount hp0 => by
   unfold wp_proc_mapstacks_body
   simp only [procMapstacksAddr]
   iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, HΦ⟩

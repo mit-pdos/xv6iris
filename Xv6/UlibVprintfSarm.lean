@@ -35,7 +35,7 @@ variable {GF : BundledGFunctors.{0}}
 
 /-- **The string loop**, `+0x2ae → +0x2bc` (Rocq `wp_kcat_vprintf_sloop`):
 `k + 1` bytes left from index `j`, the current one in `a1`. -/
-theorem ulibVprintf_sloop {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : UlibRunP GF) (base : BitVec 64)
+theorem ulibVprintf_sloop [MachGS GF] (P : ULIB_PUTC) (L : UlibRunP GF) (base : BitVec 64)
     (hb : base.toNat % 2 = 0) (m0 : RegMap) (a : Nat) (fd ap st : BitVec 64) (p : Nat)
     (sdq : DFrac) (sa slen : Nat) (sf : Nat → BitVec 8) (n : Nat) (Cm2 : IProp GF)
     (hsa : sa + slen < 2 ^ 64) :
@@ -60,7 +60,7 @@ theorem ulibVprintf_sloop {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Uli
     iapply (ulibS_call L _ (ulibVprintf_i2b0 L.toUlibRun base) 0x2b4 rfl base
       (ulibPc_back _ _ _ (by decide)) ((lsb0_iff_even base).2 hb) _ _) $$ Hc Hrun
     iintro Hrun
-    iapply (ulibPutc_callAt (hlc := hlc) P L.toUlibRun base hb _ n fd (sf j) Cj Cm (by ulib_regs)
+    iapply (ulibPutc_callAt P L.toUlibRun base hb _ n fd (sf j) Cj Cm (by ulib_regs)
       (by ulib_regs; rw [h11]; exact ulibZext_low _) (base + 0x2b4#64)
       (by ulib_regs; exact ulibRetPc_at base hb 0x2b4 (by decide))) $$ Hw Hpc HCj Hrun
     iintro %m1 %hcs HCm Hrun
@@ -101,7 +101,7 @@ theorem ulibVprintf_sloop {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Uli
       iapply (ulibS_brT L _ (ulibVprintf_i2ba L.toUlibRun base) 0x2ae (by decide) hb (by decide) _ _
         (by ulib_regs; simpa using ulibZ_beq0 _ (hnn (j + 1) (by omega)))) $$ Hc Hrun
       iintro Hrun
-      iapply (ulibVprintf_sloop (hlc := hlc) P L base hb m0 a fd ap st p sdq sa slen sf n Cm2 hsa k (j + 1) _ Cm
+      iapply (ulibVprintf_sloop P L base hb m0 a fd ap st p sdq sa slen sf n Cm2 hsa k (j + 1) _ Cm
         (by omega) (ulibVpInv_set 11#5 (by decide) _ (ulibVpInv_set 9#5 (by decide) _ hinv1))
         (by ulib_regs) (by ulib_regs)) $$ Hrest Hpc Hc Hstr HCm Hrun Hk
 
@@ -148,7 +148,7 @@ theorem ulibVprintf_sexit (L : UlibRunP GF) (base : BitVec 64) (hb : base.toNat 
 /-- **THE `%s` ARM**, `+0x29e → +0x10e` (Rocq `wp_kcat_vprintf_pcs`'s arm):
 the argument string printed, the va_list moved on, the next character
 loaded. -/
-theorem ulibVprintf_sarm {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : UlibRunP GF) (base : BitVec 64)
+theorem ulibVprintf_sarm [MachGS GF] (P : ULIB_PUTC) (L : UlibRunP GF) (base : BitVec 64)
     (hb : base.toNat % 2 = 0) (m0 m : RegMap) (a : Nat) (fd : BitVec 64) (p : Nat) (c : BitVec 8)
     (apz sa : Nat) (dq sdq : DFrac) (slen : Nat) (sf : Nat → BitVec 8) (n : Nat) (Cm1 Cm2 : IProp GF)
     (hbnd : a + p + 2 < 2 ^ 31) (hapal : apz % 8 = 0) (hsa0 : sa ≠ 0)
@@ -211,7 +211,7 @@ theorem ulibVprintf_sarm {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Ulib
     iapply (ulibS_brN L _ (ulibVprintf_i2ac L.toUlibRun base) 0x2ae rfl _ _
       (by ulib_regs; exact ulibZ_beq0 _ (hnn 0 (by omega)))) $$ Hc Hrun
     iintro Hrun
-    iapply (ulibVprintf_sloop (hlc := hlc) P L base hb m0 a fd (BitVec.ofNat 64 apz)
+    iapply (ulibVprintf_sloop P L base hb m0 a fd (BitVec.ofNat 64 apz)
       (BitVec.ofNat 64 apz + 8#64) p sdq sa (k + 1) sf n Cm2 hsa k 0 _ Cm1 (by omega)
       (ulibVpInv_set 11#5 (by decide) _ hinv1) (by ulib_regs <;> simp) (by ulib_regs)) $$ Hpay Hpc Hc Hstr HCm Hrun
     iintro %m1 %hinv1' Hstr HCm2 Hrun

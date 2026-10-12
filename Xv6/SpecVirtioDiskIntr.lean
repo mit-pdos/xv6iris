@@ -42,7 +42,7 @@ def virtioDiskIntrAddr : BitVec 64 := KA.«virtio_disk_intr»
 def virtioDiskIntrSlots : Nat := 4 + wakeupSlots
 
 /-- **WP of `virtio_disk_intr`.** -/
-def wp_virtio_disk_intr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+def wp_virtio_disk_intr_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hK : virtioDiskIntrSlots ≤ k.avail)
     (hlk : "virtio_disk" ∉ k.locks ∧ "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
@@ -54,9 +54,9 @@ def wp_virtio_disk_intr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS h
 
 /-- The interface of `virtio_disk_intr`. -/
 structure VIRTIO_DISK_INTR : Prop where
-  wp_virtio_disk_intr : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+  wp_virtio_disk_intr : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     hsie hnoff hK hlk htier,
-    wp_virtio_disk_intr_body (hlc := hlc) (GF := GF) Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier
+    wp_virtio_disk_intr_body (GF := GF) Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier
 
 end Xv6

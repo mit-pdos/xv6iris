@@ -44,7 +44,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section WritePart
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [OffboxG GF]
 
 /-- THE ADVANCED PARTIAL NODE AT A MAPPED SOURCE (Rocq's
 `awrite_part_adv_mapped_straddle`): at a source run every byte of which is
@@ -58,15 +58,15 @@ theorem awritePartAdv_mapped_straddle [Appcfg GF] (Γ : FsViewNames GF) (E : CoP
     (∀ (I : RegMapF FsNode) (off : Nat) (bs bs0 : List (BitVec 8)) (nl : Nat),
       ⌜wriPre (absView I) i off bs bs0 nl⌝ -∗
       ⌜wiBlocks off (wchunkAt n k).toNat ≠ 1⌝ -∗
-      (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink (hlc := hlc) γo (off : Int) ={E}=∗
+      (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink γo (off : Int) ={E}=∗
       (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
         appStep i I (deltaWrite i off bs (absView I)) ∗
         (∀ I' : RegMapF FsNode,
           ⌜absView I' = deltaWrite i off bs (absView I)⌝ -∗
           (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ={E}=∗
           (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗
-            offLink (hlc := hlc) γo ((off + bs.length : Nat) : Int) ∗ REST)) ⊢
-      awritePartAdv (hlc := hlc) Γ E i γo M ua P n k REST := by
+            offLink γo ((off + bs.length : Nat) : Int) ∗ REST)) ⊢
+      awritePartAdv Γ E i γo M ua P n k REST := by
   unfold awritePartAdv
   iintro Hn %I %off %r %bs %bs0 %nl %hpre %hr %_ %_ %hwhy %hsb1 %_ Hka Hg
   -- nothing unnamed landed

@@ -20,7 +20,7 @@ theorem kv_addr : KA.«trapinithart» + 0x327c#64 = KA.«kernelvec» := by decid
 theorem trapinithart_br_327c : KA.«trapinithart» + 0x327c#64 = KA.«kernelvec» := by decide
 
 set_option maxHeartbeats 4000000 in
-theorem trapinithart_proof : TRAPINITHART := ⟨fun {hlc GF} _ _ cpu k tv0 hsie hK => by
+theorem trapinithart_proof : TRAPINITHART := ⟨fun {GF} _ _ cpu k tv0 hsie hK => by
   unfold wp_trapinithart_body
   iintro ⟨Hk, Hpc, Hstv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

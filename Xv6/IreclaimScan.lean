@@ -46,7 +46,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
@@ -58,7 +58,7 @@ slot's type and nlink cells are lent out, to go back UNCHANGED. -/
 theorem ireclaim_blk_open [Icfg] [Fscfg] [CurCtx] (kk : Nat) (pidv inum : BitVec 32)
     (bs bsd : List (BitVec 8)) (d : Bool)
     (hnib : inum.toNat < 16 * icfgNib) (hib : IBLOCK inum icfgIst < 2 ^ 31) :
-    iregInv (hlc := hlc) (GF := GF) fscIreg fscFs icfgIst icfgNib ∗
+    iregInv (GF := GF) fscIreg fscFs icfgIst icfgNib ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev
       (BitVec.ofNat 32 (IBLOCK inum icfgIst)) bs bsd d
     ⊢ |={⊤}=> ∃ ds : List Dinode, ⌜diblkWf ds ∧ kk < NBUF⌝ ∗
@@ -115,7 +115,7 @@ set_option maxHeartbeats 16000000 in
 `Xv6.ireclaim_release`. -/
 theorem ireclaim_scan_body (PK : PRINTK) (BE : BRELSE) (IG : IGET) (BO : BEGIN_OP) (IL : ILOCK)
     (IU : IUNLOCK) (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (spie spp : Bool) (R : RegMap) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac) (n : Nat)
     (kk : Nat) (bs bsd : List (BitVec 8)) (d : Bool)
@@ -130,10 +130,10 @@ theorem ireclaim_scan_body (PK : PRINTK) (BE : BRELSE) (IG : IGET) (BO : BEGIN_O
     (h10 : R 10#5 = bnode kk)
     (IH : n + 1 < fscNinodes → ∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap),
       ireclaimLoopRegs k (n + 1) R' →
-      ireclaimLoopPre (hlc := hlc) Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
+      ireclaimLoopPre Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
         wpLoop (GF := GF) c') :
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«ireclaim» + 0x90#64) ∗
-    ireclaimEnv (hlc := hlc) Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
+    ireclaimEnv Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
     bslots 2 ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev
       (BitVec.ofNat 32 (IBLOCK (BitVec.ofNat 32 n) icfgIst)) bs bsd d ∗
@@ -238,7 +238,7 @@ set_option maxHeartbeats 16000000 in
 `ireclaim_scan_body` at whatever hart bread returns on. -/
 theorem ireclaim_scan_head (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) (BO : BEGIN_OP)
     (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (spie spp : Bool) (R : RegMap) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac) (n : Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
@@ -251,9 +251,9 @@ theorem ireclaim_scan_head (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) 
     (hr : ireclaimLoopRegs k n R)
     (IH : n + 1 < fscNinodes → ∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap),
       ireclaimLoopRegs k (n + 1) R' →
-      ireclaimLoopPre (hlc := hlc) Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
+      ireclaimLoopPre Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
         wpLoop (GF := GF) c') :
-    ireclaimLoopPre (hlc := hlc) Γ cpu k spie spp R γl pd pav pu pidv dqp dqb dqs dqn
+    ireclaimLoopPre Γ cpu k spie spp R γl pd pav pu pidv dqp dqb dqs dqn
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hK8, hKbr, -⟩ := ireclaim_slots k.avail hK
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
@@ -344,7 +344,7 @@ theorem ireclaim_scan_head (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) 
 is refuted by `inum < ninodes`. -/
 theorem ireclaim_scan (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) (BO : BEGIN_OP)
     (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
     (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
@@ -355,7 +355,7 @@ theorem ireclaim_scan (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) (BO :
     (hn31 : fscNinodes < 2 ^ 31) (hnnib : fscNinodes ≤ 16 * icfgNib) (hpd : descPageRw pd) :
     ∀ (fuel n : Nat) (cpu : CPU) (spie spp : Bool) (R : RegMap),
       fscNinodes - n ≤ fuel → 0 < n → n < fscNinodes → ireclaimLoopRegs k n R →
-      ireclaimLoopPre (hlc := hlc) Γ cpu k spie spp R γl pd pav pu pidv dqp dqb dqs dqn ⊢
+      ireclaimLoopPre Γ cpu k spie spp R γl pd pav pu pidv dqp dqb dqs dqn ⊢
         wpLoop (GF := GF) cpu := by
   intro fuel
   induction fuel with

@@ -74,7 +74,7 @@ window's head, so the read is the LATEST value, exactly `irefWord M k`
 
 ## Binders
 
-`[MachGS hlc GF] [IcacheG GF] [Icfg] [CurCtx]` (Rocq `riscvGS`, `xv6G`,
+`[MachGS GF] [IcacheG GF] [Icfg] [CurCtx]` (Rocq `riscvGS`, `xv6G`,
 `icfg`, `CurCtx`); the locked builder adds `[Xv6G GF] [SleepLockG GF]` (Rocq `lockG`
 inside `xv6G`: `itableHalf_agree` needs it).  Rocq's `GenId` binder is
 unused by every statement here (dropped).  Rocq's `CpuId` (`cpu_id`) is the
@@ -98,7 +98,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
 section IcachePinwObl
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The racy read's pure half: a read of a window whose every entry (and
 floor value) is a member, at a view the floor is visible to, is a member's
@@ -123,7 +123,7 @@ at every view the load may choose, a whole member of `irefSet`: `0 < ref <
 2^31`, never 0, never torn.  The slice comes back untouched. -/
 theorem iref_readAU [Icfg] (cpu : CPU) (k : Nat) (s : Qp) (g : GName) (lo K : Nat)
     (ts : List (Nat × Agent)) (hk : k < NINODE) (hvis : lo ≤ K ∨ (lo, hartAgent cpu) ∈ ts) :
-    itableInv (hlc := hlc) (GF := GF) ∗ ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
+    itableInv (GF := GF) ∗ ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
       liveGenlo k s g lo ⊢
       readAU cpu (iRef (ientry k)) 4 K ts
         (fun w => iprop(⌜0 < w.toNat ∧ w.toNat < 2 ^ 31⌝ ∗ liveGenlo k s g lo)) := by
@@ -131,7 +131,7 @@ theorem iref_readAU [Icfg] (cpu : CPU) (k : Nat) (s : Qp) (g : GName) (lo K : Na
   unfold readAU
   isplitl []
   · iexact Hts
-  ihave Hacc := iref_load_pinw_au (hlc := hlc) ⊤ k s g lo (CoPset.subseteq_top) hk $$ Hinv Hlv
+  ihave Hacc := iref_load_pinw_au ⊤ k s g lo (CoPset.subseteq_top) hk $$ Hinv Hlv
   imod Hacc with ⟨%w0, %tst, Hrows, Hcl⟩
   unfold irefPinRows
   icases Hrows with ⟨%v0, %W, Hc, %⟨h0, hW, hcur, hhd⟩⟩
@@ -173,7 +173,7 @@ load may choose.  The map half and the stamp half come back untouched. -/
 theorem iref_readAU_locked [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [Icfg] (cpu : CPU) (M : RegMapF (Qp × PosNat))
     (k tst K : Nat) (ts : List (Nat × Agent)) (hk : k < NINODE)
     (his : ∃ v, PartialMap.get? M k = some v) (htK : tst ≤ K) :
-    itableInv (hlc := hlc) (GF := GF) ∗ ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
+    itableInv (GF := GF) ∗ ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
       itableHalf M ∗ istmpAuth k (1 : Qp).half tst ⊢
       readAU cpu (iRef (ientry k)) 4 K ts
         (fun w => iprop(⌜w = irefWord M k⌝ ∗ itableHalf M ∗ istmpAuth k (1 : Qp).half tst)) := by
@@ -181,7 +181,7 @@ theorem iref_readAU_locked [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [
   unfold readAU
   isplitl []
   · iexact Hts
-  ihave Hacc := iref_load_locked_pinw_au (hlc := hlc) ⊤ M k tst (CoPset.subseteq_top) hk his
+  ihave Hacc := iref_load_locked_pinw_au ⊤ M k tst (CoPset.subseteq_top) hk his
     $$ Hinv Hhalf Hst
   imod Hacc with ⟨%lo, %hlot, Hrows, Hcl⟩
   unfold irefPinRows

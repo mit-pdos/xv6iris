@@ -44,13 +44,13 @@ theorem iputUnits_le_max : iputUnits ≤ MAXOPBLOCKS := by
   unfold iputUnits MAXOPBLOCKS; decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
 /-- `begin_op()` (Rocq `BeginOp.wp_begin_op_sconf`), at the ambient names. -/
 theorem beginOp_callF [Fscfg] [Icfg] [CurCtx] (BO : BEGIN_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (c : CPU) (k' : KCtx) (j : Nat) (pidv : BitVec 32) (dqp : DFrac)
+    [ClaimIs GF Γ] (c : CPU) (k' : KCtx) (j : Nat) (pidv : BitVec 32) (dqp : DFrac)
     (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : beginOpSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
@@ -66,7 +66,7 @@ theorem beginOp_callF [Fscfg] [Icfg] [CurCtx] (BO : BEGIN_OP) (Γ : SchedNames)
       logOp icfgLog MAXOPBLOCKS -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := BO.wp_begin_op_eb (hlc := hlc) (GF := GF) Γ c k' icfgLog fscBio
+  have h := BO.wp_begin_op_eb (GF := GF) Γ c k' icfgLog fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscFs j fscLogst icfgDev pidv dqp
     hj hproc hK hnoff htier
   unfold wp_begin_op_eb_body at h
@@ -76,7 +76,7 @@ theorem beginOp_callF [Fscfg] [Icfg] [CurCtx] (BO : BEGIN_OP) (Γ : SchedNames)
 /-- `iput(ip)`, THE COUNTED SEAL (Rocq `Iput.wp_iput_sconf`, Lean
 `IPUT.wp_iput_sconf_eb`). -/
 theorem iput_sconf_callF [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32) (n : Nat)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac) (s : Bool) (hs : k'.sie = s)
@@ -96,9 +96,9 @@ theorem iput_sconf_callF [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     diskCaps fscDisk fscDlock pd pav pu ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗
+    itableInv ∗
     icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗
     iregOpen ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     inodeRefp kk q icfgDev inum ∗
@@ -121,7 +121,7 @@ theorem iput_sconf_callF [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
       irefSlot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs
-  have h := IP.wp_iput_sconf_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j γil γisl kk q inum n
+  have h := IP.wp_iput_sconf_eb (GF := GF) Γ c k' γl pd pav pu j γil γisl kk q inum n
     pidv dqp dqb dqs hj hproc hK hnoff htier hkk hgeom hbg hcov hlog hnib hbel hn hpd ha0
   unfold wp_iput_sconf_eb_body at h
   simp only [iputAddr] at h
@@ -129,7 +129,7 @@ theorem iput_sconf_callF [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
 
 /-- `end_op()` (Rocq `EndOp.wp_end_op_sconf`). -/
 theorem endOp_callF [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64)
+    [ClaimIs GF Γ] (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (u : Nat) (pidv : BitVec 32) (dqp : DFrac)
     (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : endOpSlots ≤ k'.avail)
@@ -141,7 +141,7 @@ theorem endOp_callF [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
     diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     -- the crash seam and the era certificate (Rocq's END_OP premises, D38)
-    fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
+    fsCrashSeam (GF := GF) fscCov fscLogst ∗ genCert (GF := GF) ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     logOp icfgLog u ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -151,7 +151,7 @@ theorem endOp_callF [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
       wordPointsTo (pPid pj) 4 dqp pidv -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := EO.wp_end_op_eb (hlc := hlc) (GF := GF) Γ c k' icfgLog γl fscBio
+  have h := EO.wp_end_op_eb (GF := GF) Γ c k' icfgLog γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev u pidv dqp
     hj hproc hK hnoff htier hgeom rfl rfl rfl hpd
   unfold wp_end_op_eb_body at h
@@ -160,7 +160,7 @@ theorem endOp_callF [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
 
 /-- `fileclose(f)` (Rocq `Fileclose.wp_fileclose_sconf`), eb-generic at depth 0. -/
 theorem fileclose_call [Fscfg] [Icfg] [CurCtx] [FileG GF] (FC : FILECLOSE) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
+    [ClaimIs GF Γ] (c : CPU)
     (k' : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (q : Qp) (st : FdState) (j : Nat)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (pidv : BitVec 32) (dqp : DFrac)
     (Φc : IProp GF) (ke : Nat)
@@ -170,8 +170,8 @@ theorem fileclose_call [Fscfg] [Icfg] [CurCtx] [FileG GF] (FC : FILECLOSE) (Γ :
     kctx c k' ∗ pcIs c KA.«fileclose» ∗ trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     isFtable γl γ ∗ panicEnv ∗ fileRef γ kk q st ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ irefSlot ∗
-    filecloseEnv (hlc := hlc) Γ j pj γkl γk on st ∗
-    filecloseCpay (hlc := hlc) st Φc ∗ actLend pj ke ∗
+    filecloseEnv Γ j pj γkl γk on st ∗
+    filecloseCpay st Φc ∗ actLend pj ke ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -179,10 +179,10 @@ theorem fileclose_call [Fscfg] [Icfg] [CurCtx] [FileG GF] (FC : FILECLOSE) (Γ :
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗
-      filecloseCpost (hlc := hlc) q st Φc -∗ wpLoop cpu'))
+      filecloseCpost q st Φc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
-  have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk q st j γkl γk on pidv dqp
+  have h := FC.wp_fileclose_eb (GF := GF) Γ c k' γl γ kk q st j γkl γk on pidv dqp
     Φc ke hK hnoff htier ha0
   unfold wp_fileclose_eb_body at h
   simp only [filecloseAddr] at h
@@ -192,12 +192,12 @@ theorem fileclose_call [Fscfg] [Icfg] [CurCtx] [FileG GF] (FC : FILECLOSE) (Γ :
 
 /-- `begin_op()` at `fsReady`. -/
 theorem beginOp_callR [Fscfg] [Icfg] [CurCtx] (BO : BEGIN_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (c : CPU) (k' : KCtx) (j : Nat) (pidv : BitVec 32) (dqp : DFrac)
+    [ClaimIs GF Γ] (c : CPU) (k' : KCtx) (j : Nat) (pidv : BitVec 32) (dqp : DFrac)
     (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : beginOpSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«begin_op» ∗ procsInv Γ ∗
-    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗ fsReady (hlc := hlc) ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗ fsReady ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
@@ -213,12 +213,12 @@ theorem beginOp_callR [Fscfg] [Icfg] [CurCtx] (BO : BEGIN_OP) (Γ : SchedNames)
 
 /-- `end_op()` at `fsReady`. -/
 theorem endOp_callR [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (c : CPU) (k' : KCtx) (j : Nat) (u : Nat) (pidv : BitVec 32)
+    [ClaimIs GF Γ] (c : CPU) (k' : KCtx) (j : Nat) (u : Nat) (pidv : BitVec 32)
     (dqp : DFrac) (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : endOpSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«end_op» ∗ procsInv Γ ∗
-    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗ fsReady (hlc := hlc) ∗ panicEnv ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗ fsReady ∗ panicEnv ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     logOp icfgLog u ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -242,13 +242,13 @@ set_option maxHeartbeats 1600000 in
 /-- `iput(v)` at `fsReady`, over the reference PACKAGE `inodeHeld v` (a0 = v)
 and a reservation that covers it. -/
 theorem iput_callR [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (c : CPU) (k' : KCtx) (j : Nat) (v : BitVec 64) (n : Nat)
+    [ClaimIs GF Γ] (c : CPU) (k' : KCtx) (j : Nat) (v : BitVec 64) (n : Nat)
     (pidv : BitVec 32) (dqp : DFrac) (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : iputSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hn : iputUnits ≤ n)
     (ha0 : k'.regs 10#5 = v) :
     kctx c k' ∗ pcIs c KA.«iput» ∗ procsInv Γ ∗
-    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗ panicEnv ∗ fsReady ∗
     inodeHeld v ∗ wordPointsTo (pPid pj) 4 dqp pidv ∗ bslots 3 ∗ logOp icfgLog n ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat),
       ⌜calleeSaved k'.regs R'⌝ -∗

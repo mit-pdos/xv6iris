@@ -51,14 +51,14 @@ def swPins (k : KCtx) (R : RegMap) : Prop :=
   R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-! ## The callees -/
 
-theorem sw_kwait (KW : KWAIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sw_kwait (KW : KWAIT) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γw γp γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (s : Bool) (p a : BitVec 64)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : kwaitSlots ≤ k'.avail)
@@ -84,7 +84,7 @@ theorem sw_kwait (KW : KWAIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
-  have h := KW.wp_kwait_led_eb (hlc := hlc) (GF := GF) Γ c k' γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier
+  have h := KW.wp_kwait_led_eb (GF := GF) Γ c k' γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier
   unfold wp_kwait_led_eb_body at h
   simp only [kwaitAddr] at h
   rw [ha] at h
@@ -208,7 +208,7 @@ theorem sys_wait_br_fffffffffffffef6 : KA.«sys_wait» + 0xfffffffffffffef6#64 =
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γp γl γk γ j pid V M v cs hj hproc hv hK hnoff htier => by
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γp γl γk γ j pid V M v cs hj hproc hv hK hnoff htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_wait_eb_body

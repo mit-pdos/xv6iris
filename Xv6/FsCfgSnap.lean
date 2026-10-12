@@ -82,13 +82,14 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 attribute [local irreducible] fsBlocks
 
 section FsCfgSnap
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
   [WchG GF] [Appcfg GF]
 
 /-! ## Staging 1.  The top map's fragments, routed -/
 
+omit [MachGS GF] in
 /-- A map big-op over the state's inodes, read at a set of inums the state
 names (the general form of `snapLinks_toSet`). -/
 theorem snapBigSepM_toSet (Φ : Nat → FsNode → IProp GF) (S : FsStateRec)
@@ -149,12 +150,12 @@ theorem fsCfgSnap_region [Icfg] (E : CoPset) (γfs : FsNames) (S : FsStateRec)
       ([∗set] z ∈ regionInums icfgNib, iregTopBoot γfs (fun z => (fpNode S z).fnRec) z) -∗
       ([∗set] b ∈ iregBlkSet S.fssSb.sbInodestart icfgNib, fsblock γfs.bytes b (Pb b)) -∗
       fsBytesAt γfs (fsHomeList cov S.fssSb.sbLogstart) -∗
-      ftopInv (hlc := hlc) γfs -∗
-      appInv (hlc := hlc) γfs -∗
+      ftopInv γfs -∗
+      appInv γfs -∗
       iregBoot -∗
       (icfgReg ↪●MAP (∅ : RegMapF (GName × GName))) -∗
       |={E}=> ∃ γi : GName,
-        iregReg (hlc := hlc) γi γfs S.fssSb.sbInodestart icfgNib ∗ iregBoot ∗
+        iregReg γi γfs S.fssSb.sbInodestart icfgNib ∗ iregBoot ∗
         [∗set] z ∈ regionInums icfgNib, iregOut γi (BitVec.ofNat 32 z) (fpNode S z).fnRec := by
   have himg := fun dss hl hdwf hde =>
     snapIregPremises S Pb (fsHomeList cov S.fssSb.sbLogstart) dss icfgNib hfull (skBytes hok)
@@ -202,10 +203,10 @@ theorem fsCfgSnap_stock [Icfg] (E : CoPset) (γfs : FsNames) (S : FsStateRec)
       FsStateLink.linkTok (fsGammaL γfs) iregRoot vroot -∗
       ([∗list] b ∈ fsHomeList cov S.fssSb.sbLogstart, fsblock γfs.bytes b (Pb b)) -∗
       fsBytesAt γfs (fsHomeList cov S.fssSb.sbLogstart) -∗
-      ftopInv (hlc := hlc) γfs -∗
-      appInv (hlc := hlc) γfs -∗
+      ftopInv γfs -∗
+      appInv γfs -∗
       |={E}=> ∃ γi : GName,
-        iregReg (hlc := hlc) γi γfs S.fssSb.sbInodestart icfgNib ∗ iregBoot ∗
+        iregReg γi γfs S.fssSb.sbInodestart icfgNib ∗ iregBoot ∗
         ipoolRows γfs γi cov S.fssSb.sbLogstart (regionInums icfgNib) ∗
         fsblock γfs.bytes 1 (Pb 1) ∗
         bitmapReg γfs S.fssSb.sbBmapstart cov S.fssSb.sbLogstart S.fssSb.sbSize ∗
@@ -278,7 +279,7 @@ theorem fsCfgSnap_fs [Icfg] (E : CoPset) (γv : DiskNames) (dk : Nat → BitVec 
       (icfgLk ↪●MAP (∅ : RegMapF IregArmEnt)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
       |={E}=> ∃ (γfs : FsNames) (γi : GName),
-        iregReg (hlc := hlc) γi γfs S.fssSb.sbInodestart icfgNib ∗ iregBoot ∗
+        iregReg γi γfs S.fssSb.sbInodestart icfgNib ∗ iregBoot ∗
         ipoolRows γfs γi cov S.fssSb.sbLogstart (regionInums icfgNib) ∗
         fsblock γfs.bytes 1 (fsBlocks dk 1) ∗
         (∃ (L : BlockMap) (D : RegMapF Bool),
@@ -292,7 +293,7 @@ theorem fsCfgSnap_fs [Icfg] (E : CoPset) (γv : DiskNames) (dk : Nat → BitVec 
         ([∗set] b ∈ cov \ snapSpent S icfgNib, fsblock γfs.bytes b (Pb b)) ∗
         fsBytesInv γfs.bytes γfs.cache γfs.exc (fsHomeList cov S.fssSb.sbLogstart) Pb ∗
         excOwn γfs.exc Xexc ∗
-        appInv (hlc := hlc) γfs ∗
+        appInv γfs ∗
         ([∗set] b ∈ cov, poolBlk (fsView γfs γv icfgDev cov) b) := by
   have hb := skBytes hok
   have hloc := skLocal hok
@@ -345,6 +346,7 @@ theorem fsCfgSnap_fs [Icfg] (E : CoPset) (γv : DiskNames) (dk : Nat → BitVec 
   ipureintro
   exact fsC0_lookup dk cov
 
+omit [MachGS GF] in
 /-- One slot's identification cell, at its dummy values, as kit 1's
 existential row. -/
 theorem fsCfgSnap_icIdEx (cn : IcNames) (k : Nat) :
@@ -362,7 +364,7 @@ def fsCfgSnapPost (I : Icfg) (F : Fscfg) (dk : Nat → BitVec 8) (sb : FsSb) (ni
     (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8)) (Xexc : List Nat) :
     IProp GF :=
   letI := I; letI := F
-  fsBootSupply (hlc := hlc) dk sb nib cov γd γv cnm Rspent Pb Xexc
+  fsBootSupply dk sb nib cov γd γv cnm Rspent Pb Xexc
 
 /-- THE RECORD'S FIELD TIES, for a record builder `mk` (deviation 8): the
 configuration record the mint returns is `mk` at the names it minted (Rocq's
@@ -408,12 +410,12 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
       ▷ appPred appRun (absView S.fssInodes) -∗
       -- THE CRASH SEAM AT THE GUEST AND THE MERGE PACKAGE, ONE row closed over
       -- the guest's durable-copy predicate (Rocq `app_dur_laws`, SY3-A3b)
-      appDurLaws (hlc := hlc) cov S.fssSb.sbLogstart -∗
+      appDurLaws cov S.fssSb.sbLogstart -∗
       -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
-      eraSyncTok (hlc := hlc) (GF := GF) -∗
+      eraSyncTok (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
       |={E}=> ∃ (I : Icfg) (F : Fscfg),
-        fsCfgSnapPost (hlc := hlc) I F dk S.fssSb nib cov γd γv cnm (snapSpent S nib) Pb Xexc := by
+        fsCfgSnapPost I F dk S.fssSb nib cov γd γv cnm (snapSpent S nib) Pb Xexc := by
   -- the WAL's own row (b): every block of the committed view is whole
   have hdf : dblkFull (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) := fun b bs h => by
     rw [← snapRestrict_val Pb _ b bs h]; exact hlPb b
@@ -548,12 +550,12 @@ theorem fsCfgAllocSnap_wf (mk : GName → GName → KmemNames → UartNames → 
       ▷ appPred appRun (absView S.fssInodes) -∗
       -- THE CRASH SEAM AT THE GUEST AND THE MERGE PACKAGE, ONE row closed over
       -- the guest's durable-copy predicate (Rocq `app_dur_laws`, SY3-A3b)
-      appDurLaws (hlc := hlc) cov S.fssSb.sbLogstart -∗
+      appDurLaws cov S.fssSb.sbLogstart -∗
       -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
-      eraSyncTok (hlc := hlc) (GF := GF) -∗
+      eraSyncTok (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
       |={E}=> ∃ (I : Icfg) (F : Fscfg),
-        fsCfgSnapPost (hlc := hlc) I F dk S.fssSb nib cov γd γv cnm (snapSpent S nib) Pb
+        fsCfgSnapPost I F dk S.fssSb nib cov γd γv cnm (snapSpent S nib) Pb
           (hdrWset (fsBlocks dk) S.fssSb.sbLogstart) := by
   obtain ⟨-, hnibeq, hok, hlPb, hhwf, hagr, -, hcovin, hlogsub⟩ := hwf
   have hsb := (skBytes hok).skSbok
@@ -592,12 +594,12 @@ theorem fsCfgAllocSnap [CurCtx]
       ▷ appPred appRun (absView S.fssInodes) -∗
       -- THE CRASH SEAM AT THE GUEST AND THE MERGE PACKAGE, ONE row closed over
       -- the guest's durable-copy predicate (Rocq `app_dur_laws`, SY3-A3b)
-      appDurLaws (hlc := hlc) cov S.fssSb.sbLogstart -∗
+      appDurLaws cov S.fssSb.sbLogstart -∗
       -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
-      eraSyncTok (hlc := hlc) (GF := GF) -∗
+      eraSyncTok (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
       |={E}=> ∃ (I : Icfg) (F : Fscfg),
-        fsCfgSnapPost (hlc := hlc) I F dk S.fssSb nib cov γd γv cnm (snapSpent S nib) Pb
+        fsCfgSnapPost I F dk S.fssSb nib cov γd γv cnm (snapSpent S nib) Pb
           (hdrWset (fsBlocks dk) S.fssSb.sbLogstart) :=
   fsCfgAllocSnap_wf fsCfgSnapRec fsCfgSnapRec_ok E γd γv cnm dk ndisk S cov nib gsn gln gtn Pb hwf
 

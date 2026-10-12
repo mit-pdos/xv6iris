@@ -33,7 +33,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section FileOpenPlain
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] [FsBytesG GF] [EchoOutG GF] [FileAppG GF]
@@ -41,12 +41,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- THE OBSERVATION, WITH THE FRACTION IN THE RECEIPT (Rocq
 `file_aopen_piece`). -/
 theorem fileAopen_piece (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (q : Qp) (s : Dst)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fdq r q s -∗
-      pfAt (aopenCommitAt (hlc := hlc) (fsGammaL γfs) appE)
-        (fileOpenRecv (hlc := hlc) c r q s) := by
-  have hap := fileOpen_appPred (hlc := hlc) c r heq
-  ihave #Hlaw := fileDeed_law_q (hlc := hlc) c r q
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} appInv γfs -∗ fdq r q s -∗
+      pfAt (aopenCommitAt (fsGammaL γfs) appE)
+        (fileOpenRecv c r q s) := by
+  have hap := fileOpen_appPred c r heq
+  ihave #Hlaw := fileDeed_law_q c r q
   unfold pfAt aopenCommitAt fileOpenRecv
   simp only [fileOpen_fsGammaL_top]
   iintro #Hinv Hd
@@ -60,8 +60,8 @@ theorem fileAopen_piece (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (q :
     icases Hbody with ⟨%I', >Hh, Hp, >%hdom⟩
     ihave %hI := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I' $$ Hka Hh
     subst hI
-    ihave Hpc : iprop(▷ (filePred (hlc := hlc) c r (absView I) ∗ fdq r q s ∗
-        (⌜fOk (absView I) s ∧ fileFsPure (absView I)⌝ ∨ fileTaint (hlc := hlc) c))) $$ [Hp Hd]
+    ihave Hpc : iprop(▷ (filePred c r (absView I) ∗ fdq r q s ∗
+        (⌜fOk (absView I) s ∧ fileFsPure (absView I)⌝ ∨ fileTaint c))) $$ [Hp Hd]
     · inext
       iapply Hlaw $$ Hd Hp
     icases Hpc with ⟨Hp, >Hd, >Hc⟩
@@ -85,26 +85,26 @@ theorem fileOpenPlain_au (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (q1
     (i : Nat) (bs : List (BitVec 8)) (N : Fname) (s : Dst) (rt cw : Nat) (M : Nat → List (BitVec 8))
     (pv : Nat) (vom : BitVec 64) (pl : List (BitVec 8))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hN : uname N) (hsN : s[N]? = some (i, bs))
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (hpath : argPathOf M pv pl) (hel : pathElems pl = [N]) (hst : umStartOf rt cw pl = ROOTINO)
     (htr : omTrunc vom = false) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fdq r q1 s -∗ fdq r q2 s -∗
-      openAuPlainAt (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom
-        (pobsPLin (fileTaint (hlc := hlc) c) [ROOTINO, i] (fdq r q1 s))
-        (pobsPmiss (fileTaint (hlc := hlc) c)) (fileOpenRecv (hlc := hlc) c r q2 s) Ft := by
+    ⊢@{IProp GF} appInv γfs -∗ fdq r q1 s -∗ fdq r q2 s -∗
+      openAuPlainAt (fsGammaL γfs) γfs rt cw M pv vom
+        (pobsPLin (fileTaint c) [ROOTINO, i] (fdq r q1 s))
+        (pobsPmiss (fileTaint c)) (fileOpenRecv c r q2 s) Ft := by
   unfold openAuPlainAt
   iintro #Hinv Hd1 Hd2
-  ihave #Hcl1 := filePin_law_q (hlc := hlc) c r q1 s heq
+  ihave #Hcl1 := filePin_law_q c r q1 s heq
   isplitl [Hd1]
   · iintro %pl0 %hpath0
     rw [argPathOf_uniq M pv pl0 pl hpath0 hpath]
-    iapply (pobs_walk_w_lin (hlc := hlc) γfs (fun v : Aview => fOk v s) (fileTaint (hlc := hlc) c)
-      (fdq r q1 s) (pobsPmiss (fileTaint (hlc := hlc) c)) rt cw pl [ROOTINO, i] i
+    iapply (pobs_walk_w_lin γfs (fun v : Aview => fOk v s) (fileTaint c)
+      (fdq r q1 s) (pobsPmiss (fileTaint c)) rt cw pl [ROOTINO, i] i
       (fPin_walks i bs N s rt cw pl hN hsN hel hst)) $$ [] Hcl1 Hinv Hd1
     iapply pobsMissTaint_Pmiss
   isplitl [Hd2]
   · iapply (fileAopen_piece γfs c r q2 s heq) $$ Hinv Hd2
-  · iapply (openTruncPiece_none (hlc := hlc) (fsGammaL γfs) vom _ Ft htr)
+  · iapply (openTruncPiece_none (fsGammaL γfs) vom _ Ft htr)
 
 /-- THE RECEIPT, READ AT THE DEED (Rocq `file_open_recv_file`). -/
 theorem fileOpenRecv_file (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (omo : OffMode)
@@ -114,20 +114,20 @@ theorem fileOpenRecv_file (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (o
     (rv : BitVec 64) (fdv' : List FdState) (hN : uname N) (hsN : s[N]? = some (i, bs))
     (hpath : argPathOf M pv pl) (hel : pathElems pl = [N]) (hst : umStartOf rt cw pl = ROOTINO)
     (htr : omTrunc vom = false) :
-    ⊢@{IProp GF} openReceiptPlain (hlc := hlc) omo (fsGammaL γfs) γfs rt cw M pv vom
-        (pobsPLin (fileTaint (hlc := hlc) c) [ROOTINO, i] (fdq r q1 s))
-        (pobsPmiss (fileTaint (hlc := hlc) c)) (fileOpenRecv (hlc := hlc) c r q2 s) Ft sts rv fdv'
+    ⊢@{IProp GF} openReceiptPlain omo (fsGammaL γfs) γfs rt cw M pv vom
+        (pobsPLin (fileTaint c) [ROOTINO, i] (fdq r q1 s))
+        (pobsPmiss (fileTaint c)) (fileOpenRecv c r q2 s) Ft sts rv fdv'
       ={⊤}=∗
       iprop((⌜rv = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜fdv' = sts⌝ ∗ fdq r q1 s ∗ fdq r q2 s) ∨
         (∃ γo : GName,
           ⌜openFdRcpt (omReadable vom) (omWritable vom) (.inode i γo omo) sts rv fdv'⌝ ∗
           foffPub omo γo ∗ fdq r q1 s ∗ fdq r q2 s) ∨
-        fileTaint (hlc := hlc) c) := by
+        fileTaint c) := by
   have _hres := fPin_resolves i bs N s rt cw pl hN hsN hel hst
   unfold openReceiptPlain curKept
   simp only [htr, Bool.false_eq_true, ↓reduceIte]
   iintro (⟨%hr, %hfd, Hfail⟩ | ⟨%pl', %av, %j, %hpath', HP, Harm⟩)
-  · ihave Hc : iprop(|={⊤}=> ((fdq r q1 s ∗ fdq r q2 s) ∨ fileTaint (hlc := hlc) c)) $$ [Hfail]
+  · ihave Hc : iprop(|={⊤}=> ((fdq r q1 s ∗ fdq r q2 s) ∨ fileTaint c)) $$ [Hfail]
     · unfold openPostFailPlain
       icases Hfail with (Hpre | ⟨%pl'', %_hpath'', Hr2⟩)
       · -- the AU never fired: the walk one-shot at its own start, and the

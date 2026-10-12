@@ -19,9 +19,10 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section KexecNe
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [CtokG GF]
 
+omit [MachGS GF] in
 /-- **Rocq `exec_slot_pre_ne`**: the slot piece is non-expansive in `S`. -/
 theorem execSlotPre_ne (n : Nat) (S S' : Uvis → IProp GF) (Q : Int → IProp GF)
     (Pfin : Nat → IProp GF) (Φo : Aview → Nat → Anode → IProp GF) (cw : Nat) (secc : BitVec 64) (na : Nat)

@@ -267,7 +267,7 @@ def kxcFb (data : Nat → List (BitVec 8)) (dnf : Dinode) : ElfBytes :=
 /-! ## THE FRAME FROM +0x0cc ONWARD -/
 
 section Frames
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **Rocq `kxc_frameB`**: `kxcFrameA6` with (a) the ELF slots (47..54) taken
 OUT -- they travel named -- and (b) slots 5..13 and 67 PINNED: 5..13 hold
@@ -352,7 +352,7 @@ end Frames
 /-! ## THE NAMED STATES -/
 
 section Seams
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -587,7 +587,7 @@ end Seams
 
 section CallUvmalloc
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -612,7 +612,7 @@ theorem kxc_call_uvmalloc (UA : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCt
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPtAt P M ∗ actLend k.proc ke ∗
+    fsFabric Γ A.pd A.pav A.pu ∗ procPtAt P M ∗ actLend k.proc ke ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap),
       ⌜calleeSaved (R.set 1#5 (X + 4#64)) R'⌝ -∗
       kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (X + 4#64) -∗
@@ -637,7 +637,7 @@ theorem kxc_call_uvmalloc (UA : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCt
     exact List.eq_nil_of_length_eq_zero (by omega)
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := UA.wp_uvmalloc (hlc := hlc) (GF := GF) cpu
+  have h := UA.wp_uvmalloc (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) fscKalloc fsReadyKmem P M ke
     (by k_norm_g; omega) (by k_norm_g; exact hK') (by k_norm_g; simp [hlocks])
     (by k_norm_g; simp [RegMap.set_apply, hroot]) (by k_norm_g; simpa [RegMap.set_apply] using hold)

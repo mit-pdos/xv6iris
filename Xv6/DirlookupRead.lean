@@ -37,7 +37,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -84,7 +84,7 @@ set_option maxHeartbeats 16000000 in
 kernel arm), the read test, and the short-read panic or the record test
 (`Xv6.dirlookup_name`). -/
 theorem dirlookup_read (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (j : Nat) (γl : GName)
     (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -100,7 +100,7 @@ theorem dirlookup_read (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
     dirlookupDe (k.regs 2#5) bs ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗ dirlookupIn hasp (k.regs 12#5) pofv ∗
-    dirlookupEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    dirlookupEnv Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') ∗
     dirlookupLoop k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel
     ⊢ wpLoop (GF := GF) cpu := by
@@ -135,8 +135,8 @@ theorem dirlookup_read (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
   iintro Hk Hpc
   -- readi(dp, 0, &de, 16 i, 16): the kernel arm
   ihave ⟨#Hpi, #Hbc, #Hdc, #Hpe, #Hkl, #Hav, #Hit2, #Hiti, #Hinv⟩ :=
-    dirlookupEnv_open (hlc := hlc) Γ γl pd pav pu γkl γk $$ Henv
-  ihave #Hany := iregInv_bytes (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
+    dirlookupEnv_open Γ γl pd pav pu γkl γk $$ Henv
+  ihave #Hany := iregInv_bytes fscIreg fscFs icfgIst icfgNib $$ Hinv
   unfold dirlookupKeep
   icases Hkeep with ⟨Hdev, Hmeta, Hmap, Hblk, Hnm, Hpid, Hbsl, Hlk, Hdi⟩
   unfold dirlookupDe
@@ -208,14 +208,14 @@ theorem dirlookup_read (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
 set_option maxHeartbeats 4000000 in
 /-- **THE SCAN**, by induction on the fuel (`nrec + 1 - i`). -/
 theorem dirlookup_loop (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (dn dr : Dinode) (fn : Nat → BitVec 8) (hasp : Bool) (pofv pidv : BitVec 32)
     (dqp dqd dqn : DFrac)
     (hs : DirlookupStatic k j bm data dn dr fn hasp) (hpd : descPageRw pd) :
-    ∀ fuel : Nat, dirlookupEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk -∗
+    ∀ fuel : Nat, dirlookupEnv (GF := GF) Γ γl pd pav pu γkl γk -∗
       dirlookupLoop k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel := by
   intro fuel
   induction fuel with
@@ -242,7 +242,7 @@ into the scan at record 0.  Entered from the self test's fall-through and
 from the self arm's namecmp miss, with the frame's `s3`/`s4`/`s6` cells
 holding whatever the stack held (`x3`/`x4`/`x6`). -/
 theorem dirlookup_scan (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (j : Nat) (γl : GName) (pd pav pu : BitVec 64)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -260,7 +260,7 @@ theorem dirlookup_scan (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
     dirlookupDe (k.regs 2#5) bs ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗ dirlookupIn hasp (k.regs 12#5) pofv ∗
-    dirlookupEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    dirlookupEnv Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hmaxb := Xv6.rd_maxbytes

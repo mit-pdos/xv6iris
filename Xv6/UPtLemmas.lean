@@ -140,7 +140,7 @@ theorem umBelow_mono (sz sz' : BitVec 64) (P : UPtd) (hle : sz.toNat ≤ sz'.toN
 /-! ## The resources: `umPages`, `ptOwnRep`, `procPtAt` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The per-page conjunct of `umPages`. -/
 def umPageAt [CurCtx] (M : Nat → List (BitVec 8)) (k : Nat) (w : BitVec 64) : IProp GF := iprop%

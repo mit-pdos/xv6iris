@@ -52,7 +52,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileSync
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-! ## The sync list's shares -/
@@ -65,16 +65,20 @@ def slAuth (γ : GName) (q : Qp) (Ls : List Srec) : IProp GF :=
 def slLb (γ : GName) (Ls : List Srec) : IProp GF :=
   MonoList.lb_own γ Ls
 
+omit [MachGS GF] in
 instance slAuth_timeless (γ : GName) (q : Qp) (Ls : List Srec) :
     Timeless (slAuth (GF := GF) γ q Ls) := by
   unfold slAuth; infer_instance
 
+omit [MachGS GF] in
 instance slLb_timeless (γ : GName) (Ls : List Srec) : Timeless (slLb (GF := GF) γ Ls) := by
   unfold slLb; infer_instance
 
+omit [MachGS GF] in
 instance slLb_persistent (γ : GName) (Ls : List Srec) : Persistent (slLb (GF := GF) γ Ls) := by
   unfold slLb; infer_instance
 
+omit [MachGS GF] in
 /-- Rocq `sl_auth_agree` (at two equal names: the name equation stays
 pure). -/
 theorem slAuth_agree (γ γ' : GName) (q q' : Qp) (Ls Ls' : List Srec) (hγ : γ = γ') :
@@ -85,6 +89,7 @@ theorem slAuth_agree (γ γ' : GName) (q q' : Qp) (Ls Ls' : List Srec) (hγ : γ
   ihave %h := MonoList.auth_own_agree γ _ _ Ls Ls' $$ H1 H2
   ipureintro; exact h.2
 
+omit [MachGS GF] in
 /-- Rocq `sl_auth_lb_prefix`. -/
 theorem slAuth_lb_prefix (γ : GName) (q : Qp) (Ls Ls' : List Srec) :
     ⊢@{IProp GF} slAuth γ q Ls -∗ slLb γ Ls' -∗ ⌜Ls' <+: Ls⌝ := by
@@ -93,6 +98,7 @@ theorem slAuth_lb_prefix (γ : GName) (q : Qp) (Ls Ls' : List Srec) :
   ihave %h := MonoList.auth_lb_own_valid γ _ Ls Ls' $$ H1 H2
   ipureintro; exact h.2
 
+omit [MachGS GF] in
 /-- The full authority excludes any other share (Rocq `sl_auth_1_excl`). -/
 theorem slAuth_1_excl (γ : GName) (q : Qp) (Ls Ls' : List Srec) :
     ⊢@{IProp GF} slAuth γ 1 Ls -∗ slAuth γ q Ls' -∗ False := by
@@ -101,12 +107,14 @@ theorem slAuth_1_excl (γ : GName) (q : Qp) (Ls Ls' : List Srec) :
   ihave %h := MonoList.auth_own_agree γ _ _ Ls Ls' $$ H1 H2
   exact absurd (DFrac.valid_own_op h.1) (by simp)
 
+omit [MachGS GF] in
 /-- Rocq `sl_lb_get`. -/
 theorem slLb_get (γ : GName) (q : Qp) (Ls : List Srec) :
     ⊢@{IProp GF} slAuth γ q Ls -∗ slLb γ Ls := by
   unfold slAuth slLb
   exact MonoList.lb_own_get γ _ Ls
 
+omit [MachGS GF] in
 /-- Rocq `sl_auth_update`. -/
 theorem slAuth_update (γ : GName) (Ls Ls' : List Srec) (hp : Ls <+: Ls') :
     ⊢@{IProp GF} slAuth γ 1 Ls ==∗ slAuth γ 1 Ls' := by
@@ -116,6 +124,7 @@ theorem slAuth_update (γ : GName) (Ls Ls' : List Srec) (hp : Ls <+: Ls') :
   imodintro
   iexact H
 
+omit [MachGS GF] in
 /-- Rocq `sl_auth_split`, left to right. -/
 theorem slAuth_split (γ : GName) (q1 q2 : Qp) (Ls : List Srec) :
     ⊢@{IProp GF} slAuth γ (q1 + q2) Ls -∗ slAuth γ q1 Ls ∗ slAuth γ q2 Ls := by
@@ -125,6 +134,7 @@ theorem slAuth_split (γ : GName) (q1 q2 : Qp) (Ls : List Srec) :
   iintro H
   iapply e.mp $$ H
 
+omit [MachGS GF] in
 /-- Rocq `sl_auth_split`, right to left. -/
 theorem slAuth_join (γ : GName) (q1 q2 : Qp) (Ls : List Srec) :
     ⊢@{IProp GF} slAuth γ q1 Ls -∗ slAuth γ q2 Ls -∗ slAuth γ (q1 + q2) Ls := by
@@ -137,6 +147,7 @@ theorem slAuth_join (γ : GName) (q1 q2 : Qp) (Ls : List Srec) :
   · iexact H1
   · iexact H2
 
+omit [MachGS GF] in
 /-- The era's three shares, `½ + ¼ + ¼` (Rocq `sl_auth_join3`). -/
 theorem slAuth_join3 (γ : GName) (Ls : List Srec) :
     ⊢@{IProp GF} slAuth γ (1 : Qp).half Ls -∗ slAuth γ (1 : Qp).half.half Ls -∗
@@ -149,6 +160,7 @@ theorem slAuth_join3 (γ : GName) (Ls : List Srec) :
   rw [Qp.half_add_half] at hh
   iapply hh $$ H1 H23
 
+omit [MachGS GF] in
 /-- Rocq `sl_auth_split3_1`. -/
 theorem slAuth_split3 (γ : GName) (Ls : List Srec) :
     ⊢@{IProp GF} slAuth γ 1 Ls -∗
@@ -162,6 +174,7 @@ theorem slAuth_split3 (γ : GName) (Ls : List Srec) :
   ihave ⟨H2, H3⟩ := hq $$ H23
   iframe H1 H2 H3
 
+omit [MachGS GF] in
 /-- A fresh list, full authority at `[]`. -/
 theorem slAuth_alloc : ⊢@{IProp GF} |==> ∃ γ : GName, slAuth γ 1 [] := by
   unfold slAuth
@@ -174,81 +187,81 @@ theorem slAuth_alloc : ⊢@{IProp GF} |==> ∃ γ : GName, slAuth γ 1 [] := by
 
 /-- THE DURABLE COPY's shares (Rocq `sync_role`'s `true` arm). -/
 def syncRoleCopy (c : FileFixed) (r : FileAppNames) (Ls : List Srec) : IProp GF :=
-  iprop(slAuth r.fnSync (1 : Qp).half Ls ∗ syncCmAuth (hlc := hlc) c r.fnEra
-    ∗ syncStLb (hlc := hlc) c r.fnEra ∗ slAuth c.ffHist 1 Ls ∗ runAuth c r.fnEra)
+  iprop(slAuth r.fnSync (1 : Qp).half Ls ∗ syncCmAuth c r.fnEra
+    ∗ syncStLb c r.fnEra ∗ slAuth c.ffHist 1 Ls ∗ runAuth c r.fnEra)
 
 /-- THE RUNNING CLAIM's shares (Rocq `sync_role`'s `false` arm). -/
 def syncRoleRun (c : FileFixed) (r : FileAppNames) (Ls : List Srec) : IProp GF :=
-  iprop(slAuth r.fnSync (1 : Qp).half.half Ls ∗ syncCmLb (hlc := hlc) c r.fnEra
+  iprop(slAuth r.fnSync (1 : Qp).half.half Ls ∗ syncCmLb c r.fnEra
     ∗ (∃ n : Nat, fposf r (1 : Qp).half.half n ∗ ⌜∀ rec ∈ Ls, rec.1 ≤ n⌝)
     ∗ runReg c r.fnEra r.fnPos r.fnDeed)
 
 /-- THE ROLE'S SHARES (Rocq `sync_role`). -/
 def syncRole (c : FileFixed) (r : FileAppNames) (Ls : List Srec) : IProp GF :=
-  if r.fnRole then syncRoleCopy (hlc := hlc) c r Ls else syncRoleRun (hlc := hlc) c r Ls
+  if r.fnRole then syncRoleCopy c r Ls else syncRoleRun c r Ls
 
 theorem syncRole_copy (c : FileFixed) (r : FileAppNames) (Ls : List Srec) (h : r.fnRole = true) :
-    syncRole (hlc := hlc) (GF := GF) c r Ls = syncRoleCopy (hlc := hlc) c r Ls := by
+    syncRole (GF := GF) c r Ls = syncRoleCopy c r Ls := by
   simp [syncRole, h]
 
 theorem syncRole_run (c : FileFixed) (r : FileAppNames) (Ls : List Srec) (h : r.fnRole = false) :
-    syncRole (hlc := hlc) (GF := GF) c r Ls = syncRoleRun (hlc := hlc) c r Ls := by
+    syncRole (GF := GF) c r Ls = syncRoleRun c r Ls := by
   simp [syncRole, h]
 
 /-- Rocq `sync_body`. -/
 def syncBody (c : FileFixed) (r : FileAppNames) (av : Aview) (ls : List FlLine)
     (Ls : List Srec) : IProp GF :=
   iprop(syncReg c r.fnEra r.fnSync ∗ flLb c ls ∗ ⌜syncChain ls Ls⌝
-    ∗ ⌜uadm ls (slast Ls) (fcontOf av)⌝ ∗ syncRole (hlc := hlc) c r Ls)
+    ∗ ⌜uadm ls (slast Ls) (fcontOf av)⌝ ∗ syncRole c r Ls)
 
 /-- THE SYNC PART OF THE CLAIM (Rocq `sync_claim`). -/
 def syncClaim (c : FileFixed) (r : FileAppNames) (av : Aview) : IProp GF :=
-  iprop(∃ (ls : List FlLine) (Ls : List Srec), syncBody (hlc := hlc) c r av ls Ls)
+  iprop(∃ (ls : List FlLine) (Ls : List Srec), syncBody c r av ls Ls)
 
 instance syncRoleCopy_timeless (c : FileFixed) (r : FileAppNames) (Ls : List Srec) :
-    Timeless (syncRoleCopy (hlc := hlc) (GF := GF) c r Ls) := by
+    Timeless (syncRoleCopy (GF := GF) c r Ls) := by
   unfold syncRoleCopy; infer_instance
 
 instance syncRoleRun_timeless (c : FileFixed) (r : FileAppNames) (Ls : List Srec) :
-    Timeless (syncRoleRun (hlc := hlc) (GF := GF) c r Ls) := by
+    Timeless (syncRoleRun (GF := GF) c r Ls) := by
   unfold syncRoleRun; infer_instance
 
 instance syncRole_timeless (c : FileFixed) (r : FileAppNames) (Ls : List Srec) :
-    Timeless (syncRole (hlc := hlc) (GF := GF) c r Ls) := by
+    Timeless (syncRole (GF := GF) c r Ls) := by
   unfold syncRole; split <;> infer_instance
 
 instance syncBody_timeless (c : FileFixed) (r : FileAppNames) (av : Aview) (ls : List FlLine)
-    (Ls : List Srec) : Timeless (syncBody (hlc := hlc) (GF := GF) c r av ls Ls) := by
+    (Ls : List Srec) : Timeless (syncBody (GF := GF) c r av ls Ls) := by
   unfold syncBody; infer_instance
 
 instance syncClaim_timeless (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    Timeless (syncClaim (hlc := hlc) (GF := GF) c r av) := by
+    Timeless (syncClaim (GF := GF) c r av) := by
   unfold syncClaim; infer_instance
 
 /-- Reading the claim (the Iris proof mode sees no `∃` through a definition). -/
 theorem syncClaim_elim (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    syncClaim (hlc := hlc) (GF := GF) c r av ⊢
-      ∃ (ls : List FlLine) (Ls : List Srec), syncBody (hlc := hlc) c r av ls Ls := by
+    syncClaim (GF := GF) c r av ⊢
+      ∃ (ls : List FlLine) (Ls : List Srec), syncBody c r av ls Ls := by
   unfold syncClaim; exact .rfl
 
 theorem syncBody_elim (c : FileFixed) (r : FileAppNames) (av : Aview) (ls : List FlLine)
     (Ls : List Srec) :
-    syncBody (hlc := hlc) (GF := GF) c r av ls Ls ⊢
+    syncBody (GF := GF) c r av ls Ls ⊢
       syncReg c r.fnEra r.fnSync ∗ flLb c ls ∗ ⌜syncChain ls Ls⌝
-      ∗ ⌜uadm ls (slast Ls) (fcontOf av)⌝ ∗ syncRole (hlc := hlc) c r Ls := by
+      ∗ ⌜uadm ls (slast Ls) (fcontOf av)⌝ ∗ syncRole c r Ls := by
   unfold syncBody; exact .rfl
 
 theorem syncRole_copy_elim (c : FileFixed) (r : FileAppNames) (Ls : List Srec)
     (h : r.fnRole = true) :
-    syncRole (hlc := hlc) (GF := GF) c r Ls ⊢
-      slAuth r.fnSync (1 : Qp).half Ls ∗ syncCmAuth (hlc := hlc) c r.fnEra
-      ∗ syncStLb (hlc := hlc) c r.fnEra ∗ slAuth c.ffHist 1 Ls ∗ runAuth c r.fnEra := by
+    syncRole (GF := GF) c r Ls ⊢
+      slAuth r.fnSync (1 : Qp).half Ls ∗ syncCmAuth c r.fnEra
+      ∗ syncStLb c r.fnEra ∗ slAuth c.ffHist 1 Ls ∗ runAuth c r.fnEra := by
   rw [syncRole_copy c r Ls h]; unfold syncRoleCopy; exact .rfl
 
 theorem syncRole_run_elim (c : FileFixed) (r : FileAppNames) (Ls : List Srec)
     (h : r.fnRole = false) :
-    syncRole (hlc := hlc) (GF := GF) c r Ls ⊢
-      slAuth r.fnSync (1 : Qp).half.half Ls ∗ syncCmLb (hlc := hlc) c r.fnEra
+    syncRole (GF := GF) c r Ls ⊢
+      slAuth r.fnSync (1 : Qp).half.half Ls ∗ syncCmLb c r.fnEra
       ∗ (∃ n : Nat, fposf r (1 : Qp).half.half n ∗ ⌜∀ rec ∈ Ls, rec.1 ≤ n⌝)
       ∗ runReg c r.fnEra r.fnPos r.fnDeed := by
   rw [syncRole_run c r Ls h]; unfold syncRoleRun; exact .rfl
@@ -256,8 +269,8 @@ theorem syncRole_run_elim (c : FileFixed) (r : FileAppNames) (Ls : List Srec)
 /-- Rocq `sync_body_intro`. -/
 theorem syncBody_intro (c : FileFixed) (r : FileAppNames) (av : Aview) (ls : List FlLine)
     (Ls : List Srec) (hc : syncChain ls Ls) (hw : uadm ls (slast Ls) (fcontOf av)) :
-    ⊢@{IProp GF} syncReg c r.fnEra r.fnSync -∗ flLb c ls -∗ syncRole (hlc := hlc) c r Ls -∗
-      syncBody (hlc := hlc) c r av ls Ls := by
+    ⊢@{IProp GF} syncReg c r.fnEra r.fnSync -∗ flLb c ls -∗ syncRole c r Ls -∗
+      syncBody c r av ls Ls := by
   iintro #H1 #H2 H3
   unfold syncBody
   iframe H1 H2 H3
@@ -268,8 +281,8 @@ theorem syncBody_intro (c : FileFixed) (r : FileAppNames) (av : Aview) (ls : Lis
 /-- ...and the claim. -/
 theorem syncClaim_intro (c : FileFixed) (r : FileAppNames) (av : Aview) (ls : List FlLine)
     (Ls : List Srec) (hc : syncChain ls Ls) (hw : uadm ls (slast Ls) (fcontOf av)) :
-    ⊢@{IProp GF} syncReg c r.fnEra r.fnSync -∗ flLb c ls -∗ syncRole (hlc := hlc) c r Ls -∗
-      syncClaim (hlc := hlc) c r av := by
+    ⊢@{IProp GF} syncReg c r.fnEra r.fnSync -∗ flLb c ls -∗ syncRole c r Ls -∗
+      syncClaim c r av := by
   iintro #H1 #H2 H3
   unfold syncClaim
   iexists ls, Ls
@@ -278,9 +291,9 @@ theorem syncClaim_intro (c : FileFixed) (r : FileAppNames) (av : Aview) (ls : Li
 /-- The copy arm, built (Rocq: `unfold sync_role; iFrame`). -/
 theorem syncRole_copy_intro (c : FileFixed) (r : FileAppNames) (Ls : List Srec)
     (h : r.fnRole = true) :
-    ⊢@{IProp GF} slAuth r.fnSync (1 : Qp).half Ls -∗ syncCmAuth (hlc := hlc) c r.fnEra -∗
-      syncStLb (hlc := hlc) c r.fnEra -∗ slAuth c.ffHist 1 Ls -∗ runAuth c r.fnEra -∗
-      syncRole (hlc := hlc) c r Ls := by
+    ⊢@{IProp GF} slAuth r.fnSync (1 : Qp).half Ls -∗ syncCmAuth c r.fnEra -∗
+      syncStLb c r.fnEra -∗ slAuth c.ffHist 1 Ls -∗ runAuth c r.fnEra -∗
+      syncRole c r Ls := by
   rw [syncRole_copy c r Ls h]
   unfold syncRoleCopy
   iintro H1 H2 #H3 H4 H5
@@ -289,9 +302,9 @@ theorem syncRole_copy_intro (c : FileFixed) (r : FileAppNames) (Ls : List Srec)
 /-- The running arm, built. -/
 theorem syncRole_run_intro (c : FileFixed) (r : FileAppNames) (Ls : List Srec) (n : Nat)
     (h : r.fnRole = false) (hb : ∀ rec ∈ Ls, rec.1 ≤ n) :
-    ⊢@{IProp GF} slAuth r.fnSync (1 : Qp).half.half Ls -∗ syncCmLb (hlc := hlc) c r.fnEra -∗
+    ⊢@{IProp GF} slAuth r.fnSync (1 : Qp).half.half Ls -∗ syncCmLb c r.fnEra -∗
       fposf r (1 : Qp).half.half n -∗ runReg c r.fnEra r.fnPos r.fnDeed -∗
-      syncRole (hlc := hlc) c r Ls := by
+      syncRole c r Ls := by
   rw [syncRole_run c r Ls h]
   unfold syncRoleRun
   iintro H1 #H2 H3 #H4
@@ -305,26 +318,27 @@ theorem syncRole_run_intro (c : FileFixed) (r : FileAppNames) (Ls : List Srec) (
 /-- THE TOKEN's shares (Rocq `union_tkb`). -/
 def unionTkb (c : FileFixed) (k : Nat) : IProp GF :=
   iprop(∃ (γ : GName) (Ls : List Srec), syncReg c (k + 1) γ ∗ slAuth γ (1 : Qp).half.half Ls
-    ∗ syncCmLb (hlc := hlc) c (k + 1))
+    ∗ syncCmLb c (k + 1))
 
 instance unionTkb_timeless (c : FileFixed) (k : Nat) :
-    Timeless (unionTkb (hlc := hlc) (GF := GF) c k) := by
+    Timeless (unionTkb (GF := GF) c k) := by
   unfold unionTkb; infer_instance
 
 theorem unionTkb_elim (c : FileFixed) (k : Nat) :
-    unionTkb (hlc := hlc) (GF := GF) c k ⊢
+    unionTkb (GF := GF) c k ⊢
       ∃ (γ : GName) (Ls : List Srec), syncReg c (k + 1) γ ∗ slAuth γ (1 : Qp).half.half Ls
-        ∗ syncCmLb (hlc := hlc) c (k + 1) := by
+        ∗ syncCmLb c (k + 1) := by
   unfold unionTkb; exact .rfl
 
 theorem unionTkb_intro (c : FileFixed) (k : Nat) (γ : GName) (Ls : List Srec) :
     ⊢@{IProp GF} syncReg c (k + 1) γ -∗ slAuth γ (1 : Qp).half.half Ls -∗
-      syncCmLb (hlc := hlc) c (k + 1) -∗ unionTkb (hlc := hlc) c k := by
+      syncCmLb c (k + 1) -∗ unionTkb c k := by
   unfold unionTkb
   iintro #H1 H2 #H3
   iexists γ, Ls
   iframe H1 H2 H3
 
+omit [MachGS GF] in
 /-- Two lower bounds of the line list, and one covering both (Rocq
 `fl_lb_join`). -/
 theorem flLb_join (c : FileFixed) (ls ls' : List FlLine) :

@@ -22,7 +22,7 @@ namespace MachCSL
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std OFE
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## The save area -/
 
@@ -64,19 +64,19 @@ theorem ownCtxCells_cases [CurCtx] (c : BitVec 64) :
   unfold ownCtxCells; iintro H; iexact H
 
 instance instCtxMorphCtxCells (tier : KTier) (c : BitVec 64) (vs : List (BitVec 64)) :
-    CtxMorph (GF := GF) (fun ξ => @ctxCells hlc GF _ ⟨ξ, tier⟩ c vs) :=
-  @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜vs.length = 14⌝))
+    CtxMorph (GF := GF) (fun ξ => @ctxCells GF _ ⟨ξ, tier⟩ c vs) :=
+  @instCtxMorphSep GF _ (fun _ => iprop(⌜vs.length = 14⌝))
     (fun ξ => iprop([∗list] j ↦ w ∈ vs,
-      @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (c + BitVec.ofNat 64 (8 * j)) 8 (DFrac.own 1) w))
+      @wordPointsTo GF _ ⟨ξ, tier⟩ (c + BitVec.ofNat 64 (8 * j)) 8 (DFrac.own 1) w))
     (instCtxMorphConst _)
     (ctxMorph_bigSepL vs
-      (fun j w ξ => @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (c + BitVec.ofNat 64 (8 * j)) 8 (DFrac.own 1) w)
+      (fun j w ξ => @wordPointsTo GF _ ⟨ξ, tier⟩ (c + BitVec.ofNat 64 (8 * j)) 8 (DFrac.own 1) w)
       (fun _ _ => instCtxMorphWordAt _ _ _ _ _))
 
 instance instCtxMorphOwnCtxCells (tier : KTier) (c : BitVec 64) :
-    CtxMorph (GF := GF) (fun ξ => @ownCtxCells hlc GF _ ⟨ξ, tier⟩ c) :=
-  @instCtxMorphExists hlc GF _ _
-    (fun (vs : List (BitVec 64)) ξ => @ctxCells hlc GF _ ⟨ξ, tier⟩ c vs)
+    CtxMorph (GF := GF) (fun ξ => @ownCtxCells GF _ ⟨ξ, tier⟩ c) :=
+  @instCtxMorphExists GF _ _
+    (fun (vs : List (BitVec 64)) ξ => @ctxCells GF _ ⟨ξ, tier⟩ c vs)
     (fun _ => instCtxMorphCtxCells _ _ _)
 
 /-! ## Admissibility -/
@@ -171,16 +171,16 @@ abbrev VcPay (GF : BundledGFunctors.{0}) :=
 def validCtxF [KernelGeom] [KernelImage GF] (P : VcPay GF) (rec : VcIx → IProp GF) (x : VcIx) :
     IProp GF := iprop%
   ∃ (vs : List (BitVec 64)) (av : Nat), ⌜vs.length = 14 ∧ (jumpPc (vs[0]!)).toNat % 2 = 0⌝ ∗
-    @ctxCells hlc GF _ ⟨x.ξ, KTier.kpt⟩ x.c vs ∗
-    @stackOwn hlc GF _ ⟨x.ξ, KTier.kpt⟩ (vs[1]!) av ∗
+    @ctxCells GF _ ⟨x.ξ, KTier.kpt⟩ x.c vs ∗
+    @stackOwn GF _ ⟨x.ξ, KTier.kpt⟩ (vs[1]!) av ∗
     (∀ (h : CPU) (R : RegMap) (spie spp eb' : Bool) (root : BitVec 44),
       ⌜adm x.A h⌝ -∗ ⌜calleeImg R = vs⌝ -∗
-      @kctx hlc GF _ ⟨x.ξ, KTier.kpt⟩ _ _ h (resumedK R spie spp av eb' root x.p) -∗
+      @kctx GF _ ⟨x.ξ, KTier.kpt⟩ _ _ h (resumedK R spie spp av eb' root x.p) -∗
       pcIs h (jumpPc (R 1#5)) -∗
-      @ctxCells hlc GF _ ⟨x.ξ, KTier.kpt⟩ x.c vs -∗
+      @ctxCells GF _ ⟨x.ξ, KTier.kpt⟩ x.c vs -∗
       (∃ (A' : CtxAdm) (cret : BitVec 64) (back : Bool),
         (if back then ∃ ξo : CtxId, parkTokAt x.ξ A' ξo ∗ ▷ rec ⟨A', cret, x.p, ξo⟩
-         else @ownCtxCells hlc GF _ ⟨x.ξ, KTier.kpt⟩ cret) ∗
+         else @ownCtxCells GF _ ⟨x.ξ, KTier.kpt⟩ cret) ∗
         P h A' x.c cret (hartId h) x.p back x.ξ) -∗
       wpLoop h)
 
@@ -243,16 +243,16 @@ theorem jumpPc_even (v : BitVec 64) : (jumpPc v).toNat % 2 = 0 := by
 theorem validCtx_cases [KernelGeom] [KernelImage GF] (P : VcPay GF) (x : VcIx) :
     validCtx (GF := GF) P x ⊢
       ∃ (vs : List (BitVec 64)) (av : Nat), ⌜vs.length = 14 ∧ (jumpPc (vs[0]!)).toNat % 2 = 0⌝ ∗
-        @ctxCells hlc GF _ ⟨x.ξ, KTier.kpt⟩ x.c vs ∗
-        @stackOwn hlc GF _ ⟨x.ξ, KTier.kpt⟩ (vs[1]!) av ∗
+        @ctxCells GF _ ⟨x.ξ, KTier.kpt⟩ x.c vs ∗
+        @stackOwn GF _ ⟨x.ξ, KTier.kpt⟩ (vs[1]!) av ∗
         (∀ (h : CPU) (R : RegMap) (spie spp eb' : Bool) (root : BitVec 44),
           ⌜adm x.A h⌝ -∗ ⌜calleeImg R = vs⌝ -∗
-          @kctx hlc GF _ ⟨x.ξ, KTier.kpt⟩ _ _ h (resumedK R spie spp av eb' root x.p) -∗
+          @kctx GF _ ⟨x.ξ, KTier.kpt⟩ _ _ h (resumedK R spie spp av eb' root x.p) -∗
           pcIs h (jumpPc (R 1#5)) -∗
-          @ctxCells hlc GF _ ⟨x.ξ, KTier.kpt⟩ x.c vs -∗
+          @ctxCells GF _ ⟨x.ξ, KTier.kpt⟩ x.c vs -∗
           (∃ (A' : CtxAdm) (cret : BitVec 64) (back : Bool),
             (if back then ∃ ξo : CtxId, parkTokAt x.ξ A' ξo ∗ ▷ validCtx P ⟨A', cret, x.p, ξo⟩
-             else @ownCtxCells hlc GF _ ⟨x.ξ, KTier.kpt⟩ cret) ∗
+             else @ownCtxCells GF _ ⟨x.ξ, KTier.kpt⟩ cret) ∗
             P h A' x.c cret (hartId h) x.p back x.ξ) -∗
           wpLoop h) :=
   validCtx_unfold P x
@@ -260,16 +260,16 @@ theorem validCtx_cases [KernelGeom] [KernelImage GF] (P : VcPay GF) (x : VcIx) :
 /-- The record, built. -/
 theorem validCtx_intro [KernelGeom] [KernelImage GF] (P : VcPay GF) (x : VcIx) :
     (∃ (vs : List (BitVec 64)) (av : Nat), ⌜vs.length = 14 ∧ (jumpPc (vs[0]!)).toNat % 2 = 0⌝ ∗
-        @ctxCells hlc GF _ ⟨x.ξ, KTier.kpt⟩ x.c vs ∗
-        @stackOwn hlc GF _ ⟨x.ξ, KTier.kpt⟩ (vs[1]!) av ∗
+        @ctxCells GF _ ⟨x.ξ, KTier.kpt⟩ x.c vs ∗
+        @stackOwn GF _ ⟨x.ξ, KTier.kpt⟩ (vs[1]!) av ∗
         (∀ (h : CPU) (R : RegMap) (spie spp eb' : Bool) (root : BitVec 44),
           ⌜adm x.A h⌝ -∗ ⌜calleeImg R = vs⌝ -∗
-          @kctx hlc GF _ ⟨x.ξ, KTier.kpt⟩ _ _ h (resumedK R spie spp av eb' root x.p) -∗
+          @kctx GF _ ⟨x.ξ, KTier.kpt⟩ _ _ h (resumedK R spie spp av eb' root x.p) -∗
           pcIs h (jumpPc (R 1#5)) -∗
-          @ctxCells hlc GF _ ⟨x.ξ, KTier.kpt⟩ x.c vs -∗
+          @ctxCells GF _ ⟨x.ξ, KTier.kpt⟩ x.c vs -∗
           (∃ (A' : CtxAdm) (cret : BitVec 64) (back : Bool),
             (if back then ∃ ξo : CtxId, parkTokAt x.ξ A' ξo ∗ ▷ validCtx P ⟨A', cret, x.p, ξo⟩
-             else @ownCtxCells hlc GF _ ⟨x.ξ, KTier.kpt⟩ cret) ∗
+             else @ownCtxCells GF _ ⟨x.ξ, KTier.kpt⟩ cret) ∗
             P h A' x.c cret (hartId h) x.p back x.ξ) -∗
           wpLoop h)) ⊢ validCtx (GF := GF) P x :=
   validCtx_fold P x
@@ -305,14 +305,14 @@ goes where its record wants it -- parked under the target's context if the
 caller's record is migratable, kept running if it is pinned to this hart. -/
 theorem kctx_cross (tier : KTier) (ξ ξ' : CtxId) [KernelGeom] [KernelImage GF] {lent : Bool}
     (cpu : CPU) (k : KCtx) (A : CtxAdm) (hA : adm A cpu) :
-    ownCtx cpu ξ' ∗ @kctxL hlc GF _ ⟨ξ, tier⟩ _ _ lent cpu k ⊢
-      |==> (parkTokAt ξ' A ξ ∗ @kctxL hlc GF _ ⟨ξ', tier⟩ _ _ lent cpu k) := by
+    ownCtx cpu ξ' ∗ @kctxL GF _ ⟨ξ, tier⟩ _ _ lent cpu k ⊢
+      |==> (parkTokAt ξ' A ξ ∗ @kctxL GF _ ⟨ξ', tier⟩ _ _ lent cpu k) := by
   cases A with
   | none =>
     simp only [parkTokAt_none]
     iintro ⟨Hξ', Hk⟩
     imod kctx_rehome tier ξ ξ' cpu k $$ [$Hξ' $Hk] with ⟨Hξ, Hk⟩
-    icases (@kctx_token_acc hlc GF _ ⟨ξ', tier⟩ _ _ lent cpu k) $$ Hk with ⟨Hcur, Hback⟩
+    icases (@kctx_token_acc GF _ ⟨ξ', tier⟩ _ _ lent cpu k) $$ Hk with ⟨Hcur, Hback⟩
     imod ctx_park cpu ξ ξ' $$ [$Hcur $Hξ] with ⟨Hcur, Hpk⟩
     imodintro
     iframe Hpk

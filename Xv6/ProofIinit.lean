@@ -105,7 +105,7 @@ theorem iiKept_trans {R R' R'' : RegMap} (h : iiKept R R') (h' : iiKept R' R'') 
     h'.2.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2.2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## The frame -/
 
@@ -178,7 +178,7 @@ theorem ii_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
       lkFresh lk -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK'
+  have h := IL.wp_initlock (GF := GF) c k' vlock vname vcpu hK'
   unfold wp_initlock_body at h
   simp only [initlockAddr, h10, h11] at h
   exact h
@@ -193,7 +193,7 @@ theorem ii_initsleeplock_call (IS : INITSLEEPLOCK) [CurCtx] (c : CPU) (k' : KCtx
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       sleepLockInited lk nm -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IS.wp_initsleeplock (hlc := hlc) (GF := GF) c k' hK'
+  have h := IS.wp_initsleeplock (GF := GF) c k' hK'
   unfold wp_initsleeplock_body at h
   simp only [initsleeplockAddr, h10, h11] at h
   exact h
@@ -403,7 +403,7 @@ theorem iinit_br_42b6 : KA.«iinit» + 0x42b6#64 = KStr.«itable» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem iinit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : IINIT :=
-  ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu hK => by
+  ⟨fun {GF} _ _ cpu k vlock vname vcpu hK => by
   unfold wp_iinit_body lockWords
   iintro ⟨Hk, Hpc, ⟨#Hcl, #Hcl', Hwlock, Hwname, Hwcpu⟩, Htodo, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

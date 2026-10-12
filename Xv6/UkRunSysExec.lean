@@ -23,7 +23,7 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section UkRunSysExec
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -31,9 +31,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [S
 comes back exactly as it went in. -/
 theorem wp_uk_ecall_exec (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (avail : Nat) (hn : usysno m = USYS_exec) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_exec -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m 10#5 (-1#64)) (pc + 4#64) avail -∗ wpLoop h') -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_exec -∗
+      (∀ h' : CPU, urun N h' (ukWr m 10#5 (-1#64)) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hcont
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun

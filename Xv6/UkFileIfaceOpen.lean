@@ -26,14 +26,14 @@ open Std (ExtTreeSet)
 open HfpFileClaimsP UkFileDev
 
 noncomputable section FifOpen
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 namespace FifCtx
-variable (X : FifCtx hlc GF)
+variable (X : FifCtx GF)
 
 /-- The registration of a fresh device `d` at value `v`, bound at a fresh
 descriptor `k` (deviation 2). -/
@@ -76,8 +76,8 @@ theorem fif_fds_bind (fdm : Fdmap) (l : List FdState) (vs : FifVs) (k : Int) (d 
     iframe Hh Hhs
 
 /-- **Rocq `fif_open`**: `eiOpen` for a present class name. -/
-theorem fif_open (DP : FifDevP (hlc := hlc) (GF := GF)) (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) X.c X.r)
-    (STB : FdevStubs (hlc := hlc) X.N X.P)
+theorem fif_open (DP : FifDevP (GF := GF)) (heq : HfpFileClaimsP.fileAppIs (GF := GF) X.c X.r)
+    (STB : FdevStubs X.N X.P)
     (fdm : Fdmap) (files : Bytes → Option Bytes) (paths : List Bytes) (path content : Bytes) (K : Int → IProp GF)
     (hp : path ∈ paths) (hf : files path = some content) :
     ⊢ X.fifFds fdm -∗ X.fifFilesr files paths -∗
@@ -86,7 +86,7 @@ theorem fif_open (DP : FifDevP (hlc := hlc) (GF := GF)) (heq : HfpFileClaimsP.fi
           X.fifFilesr files paths -∗ K fd) ∧
        (X.fifFds fdm -∗ X.fifFilesr files paths -∗ K (-1)) ∧
        (∀ x, ⌜x = -1 ∨ 0 ≤ x⌝ -∗ X.fifTaint (openHeld fdm x) -∗ K x)) -∗
-      opObl (hlc := hlc) X.N X.P path 0 K := by
+      opObl X.N X.P path 0 K := by
   iintro Hfds #Hfiles HK
   ihave ⟨%hpaths, %hfs⟩ := (show X.fifFilesr files paths ⊢ iprop(⌜∀ p ∈ paths, uname p ∧ fifWr X.D0 X.w0 = false⌝ ∗
     ⌜∀ p ∈ paths, files p = Prod.snd <$> X.sf[p]?⌝) from .rfl) $$ Hfiles
@@ -188,14 +188,14 @@ theorem fif_open (DP : FifDevP (hlc := hlc) (GF := GF)) (heq : HfpFileClaimsP.fi
 
 /-- **Rocq `fif_open_absent_nt`** (= `fif_open_absent`): `eiOpenAbsent` for
 a class name, at any mode that does not create. -/
-theorem fif_open_absent (DP : FifDevP (hlc := hlc) (GF := GF)) (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) X.c X.r)
-    (STB : FdevStubs (hlc := hlc) X.N X.P)
+theorem fif_open_absent (DP : FifDevP (GF := GF)) (heq : HfpFileClaimsP.fileAppIs (GF := GF) X.c X.r)
+    (STB : FdevStubs X.N X.P)
     (fdm : Fdmap) (files : Bytes → Option Bytes) (paths : List Bytes) (path : Bytes) (m : Int) (K : Int → IProp GF)
     (hp : path ∈ paths) (hcm : ¬ modeCreate m) (hf : files path = none) :
     ⊢ X.fifFds fdm -∗ X.fifFilesr files paths -∗
       ((X.fifFds fdm -∗ X.fifFilesr files paths -∗ K (-1)) ∧
        (∀ x, ⌜x = -1 ∨ 0 ≤ x⌝ -∗ X.fifTaint (openHeld fdm x) -∗ K x)) -∗
-      opObl (hlc := hlc) X.N X.P path m K := by
+      opObl X.N X.P path m K := by
   iintro Hfds #Hfiles HK
   ihave ⟨%hpaths, %hfs⟩ := (show X.fifFilesr files paths ⊢ iprop(⌜∀ p ∈ paths, uname p ∧ fifWr X.D0 X.w0 = false⌝ ∗
     ⌜∀ p ∈ paths, files p = Prod.snd <$> X.sf[p]?⌝) from .rfl) $$ Hfiles

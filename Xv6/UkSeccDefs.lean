@@ -183,7 +183,7 @@ theorem secc_pid_ne0 (pidv : BitVec 32) (h : 1 ≤ pidv.toNat ∧ pidv.toNat ≤
   simp at this; omega
 
 section UkSecc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -196,14 +196,14 @@ def kseccW (N : UkNames GF) (fdw ua : BitVec 64) (nb : Nat) (Ci Co : IProp GF) :
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     ⌜m.get 10#5 = fdw⌝ -∗ ⌜m.get 11#5 = ua⌝ -∗ ⌜m.get 12#5 = BitVec.ofNat 64 nb⌝ -∗
     ukCode N.t User.Seccomp.code.byte -∗ Ci -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Seccomp.Sym.«write») avail -∗
+    urun N h m (BitVec.ofNat 64 User.Seccomp.Sym.«write») avail -∗
     (∀ (h' : CPU) (ret : BitVec 64), Co -∗
-      urun (hlc := hlc) N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+      urun N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
 
 /-- **Rocq `ksecc_wb`**: one byte, the byte's own cell riding through. -/
 def kseccWb (N : UkNames GF) (fdw : BitVec 64) (b : BitVec 8) (Ci Co : IProp GF) : IProp GF :=
-  iprop(∀ ua : BitVec 64, kseccW (hlc := hlc) N fdw ua 1 iprop(Ci ∗ ubyte N.d ua.toNat b)
+  iprop(∀ ua : BitVec 64, kseccW N fdw ua 1 iprop(Ci ∗ ubyte N.d ua.toNat b)
     iprop(Co ∗ ubyte N.d ua.toNat b))
 
 /-- **Rocq `ksecc_pay_seq`**: `k` bytes of `fb` from index `i`, threading
@@ -211,7 +211,7 @@ def kseccWb (N : UkNames GF) (fdw : BitVec 64) (b : BitVec 8) (Ci Co : IProp GF)
 def kseccPaySeq (N : UkNames GF) (fdw : BitVec 64) (fb : Nat → BitVec 8) :
     Nat → Nat → IProp GF → IProp GF → IProp GF
   | _, 0, Ci, Cend => iprop(Ci -∗ Cend)
-  | i, k + 1, Ci, Cend => iprop(∃ Cm : IProp GF, kseccWb (hlc := hlc) N fdw (fb i) Ci Cm ∗
+  | i, k + 1, Ci, Cend => iprop(∃ Cm : IProp GF, kseccWb N fdw (fb i) Ci Cm ∗
       kseccPaySeq N fdw fb (i + 1) k Cm Cend)
 
 /-! ## §4 What the walk is handed (deviations 3, 5) -/
@@ -220,20 +220,20 @@ def kseccPaySeq (N : UkNames GF) (fdw : BitVec 64) (fb : Nat → BitVec 8) :
 write, the ledger riding through. -/
 def seccWdep (N : UkNames GF) (l : List FdState) : IProp GF :=
   iprop(□ ∀ (fdw : BitVec 64) (b : BitVec 8), ⌜(BitVec.setWidth 32 fdw).toInt = 2⌝ -∗
-    kseccWb (hlc := hlc) N fdw b (ustd N.fd l) (ustd N.fd l))
+    kseccWb N fdw b (ustd N.fd l) (ustd N.fd l))
 
 instance seccWdep_persistent (N : UkNames GF) (l : List FdState) :
-    Persistent (seccWdep (hlc := hlc) N l) := by
+    Persistent (seccWdep N l) := by
   unfold seccWdep; infer_instance
 
 /-- **Rocq `secc_univ`**: THE UNIVERSE AT A TABLE VIEW -- a slot at every
 masked key whose table is bounded by the view, at the trivial payload. -/
 def seccUniv (v : List FdState) : IProp GF :=
   iprop(□ ∀ W : Uvis, ⌜seccMasked W.secc⌝ -∗ ⌜tabLe W.fd v⌝ -∗
-    myPay W.gen (fun _ => iprop(True)) -∗ uslot (hlc := hlc) W)
+    myPay W.gen (fun _ => iprop(True)) -∗ uslot W)
 
 /-- Rocq `secc_univ_persistent`. -/
-instance seccUniv_persistent (v : List FdState) : Persistent (seccUniv (hlc := hlc) (GF := GF) v) := by
+instance seccUniv_persistent (v : List FdState) : Persistent (seccUniv (GF := GF) v) := by
   unfold seccUniv; infer_instance
 
 /-- **Rocq `UkSeccLit.secc_mask_masked`**: THE ONE PLACE THE BINARY'S
@@ -246,7 +246,7 @@ theorem seccMask_masked : seccMasked (seccAll &&& User.Seccomp.seccMaskLit) := b
 pays the seccomp leaf's post obligation at the mask `seccMaskLit`, at a
 trivially-paid record. -/
 theorem seccUniv_obl (N : UkNames GF) (v : List FdState) (hpay : N.pay = fun _ => iprop(True)) :
-    ⊢ seccUniv (hlc := hlc) v -∗ UkSysP.seccObl (hlc := hlc) tabLe N User.Seccomp.seccMaskLit v := by
+    ⊢ seccUniv v -∗ UkSysP.seccObl tabLe N User.Seccomp.seccMaskLit v := by
   unfold seccUniv UkSysP.seccObl
   rw [hpay]
   iintro #Hu %W %hsc %hle Hmy
@@ -256,7 +256,7 @@ theorem seccUniv_obl (N : UkNames GF) (v : List FdState) (hpay : N.pay = fun _ =
 /-- **Rocq `ksecc_wb_cons`** (deviation 3). -/
 theorem ksecc_wb_cons (N : UkNames GF) (l : List FdState) (fdw : BitVec 64) (b : BitVec 8)
     (hfd : (BitVec.setWidth 32 fdw).toInt = 2) :
-    ⊢ seccWdep (hlc := hlc) N l -∗ kseccWb (hlc := hlc) N fdw b (ustd N.fd l) (ustd N.fd l) := by
+    ⊢ seccWdep N l -∗ kseccWb N fdw b (ustd N.fd l) (ustd N.fd l) := by
   iintro #Hw
   unfold seccWdep
   iapply Hw
@@ -266,8 +266,8 @@ theorem ksecc_wb_cons (N : UkNames GF) (l : List FdState) (fdw : BitVec 64) (b :
 constant. -/
 theorem ksecc_pay_seq_cons (N : UkNames GF) (l : List FdState) (fdw : BitVec 64) (fb : Nat → BitVec 8)
     (hfd : (BitVec.setWidth 32 fdw).toInt = 2) :
-    ∀ (k i : Nat), ⊢ seccWdep (hlc := hlc) N l -∗
-      kseccPaySeq (hlc := hlc) N fdw fb i k (ustd N.fd l) (ustd N.fd l)
+    ∀ (k i : Nat), ⊢ seccWdep N l -∗
+      kseccPaySeq N fdw fb i k (ustd N.fd l) (ustd N.fd l)
   | 0, i => by
     iintro _
     unfold kseccPaySeq
@@ -285,7 +285,7 @@ end UkSecc
 /-! ## §5 The printf cone, as an interface (deviation 2) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -295,11 +295,11 @@ def wpSeccFprintfBody : Prop :=
   ∀ (N : UkNames GF) (a len : Nat) (f : Nat → BitVec 8) (h : CPU) (m : RegMap) (n : Nat) (Ci Co : IProp GF),
     a + len + 2 < 2 ^ 31 → 0 < len → (∀ j, j < len → (f j).toNat ≠ 37) →
     m.get 11#5 = BitVec.ofNat 64 a →
-    ⊢ kseccPaySeq (hlc := hlc) N (m.get 10#5) f 0 len Ci Co -∗ ukCode N.t User.Seccomp.code.byte -∗
+    ⊢ kseccPaySeq N (m.get 10#5) f 0 len Ci Co -∗ ukCode N.t User.Seccomp.code.byte -∗
       utextStr N.t a len f -∗ Ci -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Seccomp.Sym.«fprintf») (10 + (12 + (4 + n))) -∗
+      urun N h m (BitVec.ofNat 64 User.Seccomp.Sym.«fprintf») (10 + (12 + (4 + n))) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ Co -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (10 + (12 + (4 + n))) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (10 + (12 + (4 + n))) -∗ wpLoop h') -∗
       wpLoop h
 
 end
@@ -307,8 +307,8 @@ end
 /-- The interface of seccomp's `fprintf` (P-printf's cone at seccomp's
 load address, once `UlibRunP.ofUkRun` exists). -/
 structure SECC_FPRINTF : Prop where
-  wp_seccFprintf : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_seccFprintf : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpSeccFprintfBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpSeccFprintfBody (GF := GF)
 
 end Xv6

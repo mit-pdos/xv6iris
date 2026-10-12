@@ -42,7 +42,7 @@ arbitrary values, is safe to run provided the continuation is safe from
     a0 = 4096 * (mhartid + 1),  a1 = mhartid + 1,
 
 the configuration and GOT slot unchanged, and the clock cells at some value. -/
-def wp_entry_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_entry_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (dq dqg : DFrac) (hartid s0 v1 v2 v10 v11 : BitVec 64) : Prop :=
   mBoot cpu dq ∗
   Register.mhartid ↦ᵣ[cpu]{dq} hartid ∗
@@ -69,8 +69,8 @@ def wp_entry_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Cur
 /-- The interface of `_entry` (the Rocq prototype's `Module Type ENTRY`):
 the binder list is restated, the statement lives only in `wp_entry_body`. -/
 structure ENTRY : Prop where
-  wp_entry : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+  wp_entry : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (dq dqg : DFrac) (hartid s0 v1 v2 v10 v11 : BitVec 64),
-    wp_entry_body (hlc := hlc) (GF := GF) cpu dq dqg hartid s0 v1 v2 v10 v11
+    wp_entry_body (GF := GF) cpu dq dqg hartid s0 v1 v2 v10 v11
 
 end Xv6

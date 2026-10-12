@@ -33,7 +33,7 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section UkRunSysRead
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -43,8 +43,8 @@ theorem wp_uk_ecall_read_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
     (K : List FdState → Prop) (hn : usysno m = USYS_read) (hcnt : (BitVec.setWidth 32 (m.get 12#5)).toInt = cnt)
     (hck : cnt.toNat ≤ k) (hal4 : (pc + 4#64) &&& 1#64 = 0#64)
     (hag : ∀ fdv : List FdState, ⊢ ufdAuth N.fd fdv -∗ D -∗ ⌜K fdv⌝) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepwfK (hlc := hlc) N m pc USYS_read fdep K -∗ D -∗ ubytes N.d (m.get 11#5).toNat k f -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepwfK N m pc USYS_read fdep K -∗ D -∗ ubytes N.d (m.get 11#5).toNat k f -∗
       (∀ (h' : CPU) (r : BitVec 64) (d : Nat) (g : Nat → BitVec 8) (W : Uvis) (M' : ElfMem)
           (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         ⌜d ≤ cnt.toNat⌝ -∗
@@ -59,8 +59,8 @@ theorem wp_uk_ecall_read_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
         ⌜K W.fd⌝ -∗ ⌜W.lazy = false⌝ -∗
         ⌜uexecLiveOk USYS_read W.tf W.fd r cs'⌝ -∗
         D -∗
-        spostAt (uslot (hlc := hlc)) USYS_read fdep W r M' fdv' cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗
+        spostAt (uslot) USYS_read fdep W r M' fdv' cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗
         ubytes N.d (m.get 11#5).toNat k g -∗
         wpLoop h') -∗
       wpLoop h := by
@@ -149,8 +149,8 @@ theorem wp_uk_ecall_read_recv_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m 
     (cnt : Int) (k : Nat) (f : Nat → BitVec 8) (avail : Nat) (fdep : sfam GF) (l v : List FdState)
     (hn : usysno m = USYS_read) (hcnt : (BitVec.setWidth 32 (m.get 12#5)).toInt = cnt) (hck : cnt.toNat ≤ k)
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepwfStd (hlc := hlc) N m pc USYS_read fdep l -∗ ustdAt N.fd l v -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepwfStd N m pc USYS_read fdep l -∗ ustdAt N.fd l v -∗
       ubytes N.d (m.get 11#5).toNat k f -∗
       (∀ (h' : CPU) (r : BitVec 64) (d : Nat) (g : Nat → BitVec 8) (W : Uvis) (M' : ElfMem)
           (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
@@ -166,8 +166,8 @@ theorem wp_uk_ecall_read_recv_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m 
         ⌜W.fd.take NSTD = l⌝ -∗ ⌜W.lazy = false⌝ -∗
         ⌜uexecLiveOk USYS_read W.tf W.fd r cs'⌝ -∗
         ustdAt N.fd l v -∗
-        spostAt (uslot (hlc := hlc)) USYS_read fdep W r M' fdv' cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗
+        spostAt (uslot) USYS_read fdep W r M' fdv' cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗
         ubytes N.d (m.get 11#5).toNat k g -∗
         wpLoop h') -∗
       wpLoop h := by

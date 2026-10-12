@@ -13,7 +13,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## Instruction facts straight from the kernel text
 
@@ -328,9 +328,9 @@ elab "k_code_text " ht:ident : tactic => do
     let q := tgt.getArg! 3
     unless q.isAppOfArity ``Iris.BI.BIBase.sep 4 do break
     let a := q.getArg! 2
-    unless a.isAppOfArity ``MachCSL.instr 6 do break
+    unless a.isAppOfArity ``MachCSL.instr 5 do break
     let args := a.getAppArgs
-    let (pc, rvc, i) := (args[3]!, args[4]!, args[5]!)
+    let (pc, rvc, i) := (args[2]!, args[3]!, args[4]!)
     if pc.hasMVar || rvc.hasMVar || i.hasMVar then break
     let pf ← withMainContext do
       let rhs ← mkAppM ``Option.some
@@ -346,7 +346,7 @@ elab "k_code_text " ht:ident : tactic => do
         else
           mkExpectedTypeHint (← mkEqRefl lhs) ty
       mkAppOptM ``text_instrK
-        #[some args[0]!, some args[1]!, some args[2]!, some pc, some rvc, some i,
+        #[some args[0]!, some args[1]!, some pc, some rvc, some i,
           some (← eqn ``drefM), some (← eqn ``drefS)]
     if ← codeFrameDirect ht.getId pf then continue
     evalTactic (← `(tactic| isplitr))

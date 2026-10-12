@@ -59,10 +59,10 @@ theorem syscall_proof (MP : MYPROC) (PK : PRINTK)
     (SMN : SYSMKNOD) (SUL : SYSUNLINK) (SLK : SYSLINK) (SMD : SYSMKDIR) (SCL : SYSCLOSE)
     (SSY : SYS_SYNC) (SSC : SYSSECCOMP) (SCR : SYSCHROOT) :
     SYSCALL_XV6 :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
       Γ _ c0 k γw γ j pid V M sts gn cs ip f hj hproc hK hnoff htier hgn => by
-    let PT := parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
-    have hE : SyscSpostEmp (GF := GF) := syscSpostEmp_xv6 (hlc := hlc)
+    let PT := parkToken (GF := GF) (SG := uexecSGXv6)
+    have hE : SyscSpostEmp (GF := GF) := syscSpostEmp_xv6
     refine syscall_head_entry MP PT Γ c0 k γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
       ?_ ?_ ?_
     · intro cpu spie spp R n hn1 hn22 hnum hpins hs1 hs2 hra

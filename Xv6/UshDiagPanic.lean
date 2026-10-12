@@ -19,7 +19,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -28,9 +28,9 @@ riding beside the law's family; the exit is the site's. -/
 theorem wp_kshd_panic_paid (SP : SH_PANIC) (N : UkNames GF) [UknConst N] (Wc : List (BitVec 8) → Nat → IProp GF)
     (Wb : List (BitVec 8) → IProp GF) (l : List FdState) (h : CPU) (m : RegMap) (n : Nat) (I : List (BitVec 8))
     (hfd2 : ushFd2p l) (hmsg : (m.get 10#5).toNat = 0x1288) :
-    ⊢ ushPanicLaw (hlc := hlc) Wc Wb -∗ ushCode N.t -∗ ustd N.fd l -∗ Wc I 3 -∗
+    ⊢ ushPanicLaw Wc Wb -∗ ushCode N.t -∗ ustd N.fd l -∗ Wc I 3 -∗
       (ustd N.fd l -∗ Wb I -∗ N.pay (-1)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + n) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + n) -∗ wpLoop h := by
   iintro #Hlaw #Hc Hstd HWc Hpay Hrun
   unfold ushPanicLaw
   icases Hlaw $$ %N %I %l %hfd2 HWc with ⟨%Pf, HPf, #Hstep, #Hdone⟩

@@ -651,8 +651,9 @@ theorem allIdx_getElem {k : Nat} {y : BitVec 9} (h : allIdx[k]? = some y) : y.to
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
+omit [MachGS GF] in
 /-- Open a big separating conjunction over the 512 indices at one index,
 with a closing wand that accepts any replacement for that index's clause. -/
 theorem bigSepL_allIdx_upd {X : Type} (f : BitVec 9 → IProp GF) (g : X → BitVec 9 → IProp GF)

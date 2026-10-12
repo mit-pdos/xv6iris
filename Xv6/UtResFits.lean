@@ -61,7 +61,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -76,19 +76,19 @@ variable [X : CurCtx] (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat)
 file table, PINNED to the era's proc table `Γ` and the running slot `j`
 (deviation 5). -/
 def utSysEnvAt : UtNames → BitVec 32 → IProp GF :=
-  fun N _ => iprop(⌜N.Γ = Γ ∧ N.j = j⌝ ∗ syscallEnv (hlc := hlc) PT N.Γ N.f)
+  fun N _ => iprop(⌜N.Γ = Γ ∧ N.j = j⌝ ∗ syscallEnv PT N.Γ N.f)
 
 /-- **Rocq `usertrap_res_bare`** (= `UtResFits.usertrap_res_bare`): the
 residue the trap loop parks across user execution. -/
 def usertrapResAt (cpu : CPU) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv) (sts : List FdState)
     (cs : ExtTreeSet GName compare) (pid : BitVec 32) : IProp GF :=
-  utResBare cpu (utSysEnvAt (hlc := hlc) PT Γ j) P ksp V sts cs pid
+  utResBare cpu (utSysEnvAt PT Γ j) P ksp V sts cs pid
 
 /-- **Rocq `usertrap_res`**: the running form (usertrap's body). -/
 def usertrapResRunAt (cpu : CPU) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) : IProp GF :=
-  utResRun cpu (utSysEnvAt (hlc := hlc) PT Γ j) P ksp V M sts cs pid
+  utResRun cpu (utSysEnvAt PT Γ j) P ksp V M sts cs pid
 
 variable (cpu : CPU) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv) (sts : List FdState)
   (cs : ExtTreeSet GName compare) (pid : BitVec 32)
@@ -142,7 +142,7 @@ its park world's devintr credentials, at the kernel tier (Rocq: the
 resumer's `park_globals` carry `devintr_caps_any`; forkret's closer). -/
 theorem handlerEnvAt_of_parkRows [Xc : CurCtx] (hT : curTier = KTier.kpt) (Γ : SchedNames) (w ft : GName)
     (f : FileNames) (ip : BitVec 64) :
-    parkGlobals (GF := GF) Γ w ft f ip ∗ utSysParkRows Γ ⊢ handlerEnvAt (hlc := hlc) Γ curCtx := by
+    parkGlobals (GF := GF) Γ w ft f ip ∗ utSysParkRows Γ ⊢ handlerEnvAt Γ curCtx := by
   unfold parkGlobals utSysParkRows parkWorld
   iintro ⟨⟨#Hp, -⟩, ⟨%γtk, -, ⟨%γ0, %γ1, %γc, %γl0, %γl1, %γt, %pd, %pav, %pu, %-, #Hc⟩, -⟩⟩
   iapply handlerEnvAt_of_caps' Γ γ0 γ1 γc γl0 γl1 fscDisk fscDlock γt pd pav pu hT

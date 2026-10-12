@@ -44,7 +44,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
   [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
@@ -67,10 +67,10 @@ instance procPrivBareAt_morph (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
 instance procGenAt_morph (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
     CtxMorph (GF := GF) (fun ξ => procGenAt ξ pa pid g) := by
   unfold procGenAt
-  exact @instCtxMorphSep hlc GF _ _ _ firstTok_morph
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-      (@instCtxMorphSep hlc GF _ _ _
-        (@instCtxMorphExists hlc GF _ _ _ (fun _ => instCtxMorphWordAt _ _ _ _ _))
+  exact @instCtxMorphSep GF _ _ _ firstTok_morph
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep GF _ _ _
+        (@instCtxMorphExists GF _ _ _ (fun _ => instCtxMorphWordAt _ _ _ _ _))
         (instCtxMorphConst _)))
 
 /-- Rocq `ProcInv.proc_priv_core_morph`. -/
@@ -96,7 +96,7 @@ instance procPrivFd_morph (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V
     (M : Nat → List (BitVec 8)) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; procPrivFd (GF := GF) γ pa pid V M) := by
   unfold procPrivFd
-  exact @instCtxMorphSep hlc GF _ _ _ (procPrivCoreNoctxAt_morph pa pid V M)
+  exact @instCtxMorphSep GF _ _ _ (procPrivCoreNoctxAt_morph pa pid V M)
     (procOfiles_morph KTier.kpt γ V.fdg pa V.ofile)
 
 /-- What the newborn park carries (D25): the whole block and its descriptor

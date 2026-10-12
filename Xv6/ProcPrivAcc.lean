@@ -71,23 +71,23 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 /-! ## Halving a block cell (Rocq `word_split14` / `word_join14`) -/
 
 theorem procPrivAcc_split (ξ : CtxId) (va : BitVec 64) (n : Nat) (q : Qp) (w : BitVec (8 * n)) :
-    @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ va n (DFrac.own q) w ⊢
-      @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ va n (DFrac.own q.half) w ∗
-      @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ va n (DFrac.own q.half) w := by
+    @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ va n (DFrac.own q) w ⊢
+      @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ va n (DFrac.own q.half) w ∗
+      @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ va n (DFrac.own q.half) w := by
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   have h := wordAtN_split (GF := GF) ξ va n q.half q.half w
   rw [Qp.half_add_half] at h
   exact h
 
 theorem procPrivAcc_join (ξ : CtxId) (va : BitVec 64) (n : Nat) (q : Qp) (w : BitVec (8 * n)) :
-    @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ va n (DFrac.own q.half) w ∗
-      @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ va n (DFrac.own q.half) w ⊢
-    @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ va n (DFrac.own q) w := by
+    @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ va n (DFrac.own q.half) w ∗
+      @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ va n (DFrac.own q.half) w ⊢
+    @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ va n (DFrac.own q) w := by
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   have h := wordAtN_merge (GF := GF) ξ va n q.half q.half w w
   rw [Qp.half_add_half] at h
@@ -96,7 +96,7 @@ theorem procPrivAcc_join (ξ : CtxId) (va : BitVec 64) (n : Nat) (q : Qp) (w : B
 /-- A cell's value, moved along an equation (the pure row's two pins). -/
 theorem procPrivAcc_eq (ξ : CtxId) (va : BitVec 64) (n : Nat) (dq : DFrac) (w w' : BitVec (8 * n))
     (h : w = w') :
-    @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ va n dq w ⊢ @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ va n dq w' := by
+    @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ va n dq w ⊢ @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ va n dq w' := by
   rw [h]
 
 /-! ## The pure projections (Rocq `proc_priv_sz_maxsz`, `_um_below`, `_lazy`,
@@ -112,7 +112,7 @@ theorem procPrivFd_facts (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
         (V.pvLazy = false → lazyFree V.upt.um V.sz) ∧ uptWf V.upt⌝ := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt
   iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
-  icases @UMemL.procPtAt_wf hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M $$ Hpt with ⟨Hpt, %hwf⟩
+  icases @UMemL.procPtAt_wf GF _ ⟨curCtx, KTier.kpt⟩ V.upt M $$ Hpt with ⟨Hpt, %hwf⟩
   isplitl [Hpid Hf Hpt Htfp Hc Ho Hev]
   · iframe Hpid Hf Hpt Htfp Hc Ho Hev
     isplitl []
@@ -190,9 +190,9 @@ closes at `V.updEv k`, whatever count the callee handed back. -/
 theorem procPrivFd_trapframeEv (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
         (pageAddr V.upt.tfp) ∗ actCnt pa V.ev ∗
-      (∀ k : Nat, @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8
+      (∀ k : Nat, @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8
           (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) -∗ actCnt pa k -∗
         procPrivFd γ pa pid (V.updEv k) M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
@@ -217,12 +217,12 @@ a syscall-argument read's premise to argint. -/
 theorem procPrivFd_tf (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
         (pageAddr V.upt.tfp) ∗
-      @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
-      (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
+      @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
+      (@wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
           (pageAddr V.upt.tfp) -∗
-        @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf -∗
+        @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf -∗
         procPrivFd γ pa pid V M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
   iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
@@ -248,15 +248,15 @@ registration eighth and the pid's range), all handed back unchanged. -/
 theorem procPrivFd_tfGen (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
         (pageAddr V.upt.tfp) ∗
-      @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+      @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
       genHalvesPriv pa pid V.gen ∗
-      (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
+      (@wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
           (pageAddr V.upt.tfp) -∗
-        @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+        @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
         genHalvesPriv pa pid V.gen -∗
         procPrivFd γ pa pid V M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile procGenAt
@@ -282,11 +282,11 @@ the page, taken back at any contents `ws'` (`tfPageAt` carries the length). -/
 theorem procPrivFd_tfUpd (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
-      @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
+      @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
       (∀ ws' : List (BitVec 64),
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) -∗
-        @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp ws' -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) -∗
+        @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp ws' -∗
         procPrivFd γ pa pid { V with tf := ws' } M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
   iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
@@ -307,13 +307,13 @@ theorem procPrivFd_tfUpd (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
 theorem procPrivFd_cwdPid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
-      @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
+      @cwdRefAt GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid ∗
       (∀ (v' : BitVec 64) (z' : Nat),
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) v' -∗
-        @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) v' -∗
+        @cwdRefAt GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid -∗
         procPrivFd γ pa pid { V with cwd := v', cwi := z' } M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile pidPriv
   iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hg⟩, Ho⟩
@@ -335,13 +335,13 @@ cell out across calls that each take a share of `p->pid`. -/
 theorem procPrivFd_rootPid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
-      @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      @rootRefAt GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid ∗
       (∀ (v' : BitVec 64) (z' : Nat),
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) v' -∗
-        @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) v' -∗
+        @rootRefAt GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid -∗
         procPrivFd γ pa pid { V with root := v', rti := z' } M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile pidPriv
   iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩, Ho⟩
@@ -362,13 +362,13 @@ relays them, beside the pid cell every sleeping callee takes at `pidPriv`.
 theorem procPrivFd_rootPidPriv (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
-      @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      @rootRefAt GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
       (∀ (v' : BitVec 64) (z' : Nat),
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) v' -∗
-        @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) v' -∗
+        @rootRefAt GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
         procPrivFd γ pa pid { V with root := v', rti := z' } M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
   iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩, Ho⟩
@@ -388,18 +388,18 @@ names (owing its claim only at `false`). -/
 theorem procPrivFd_addrspace (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) ∗
-      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) ∗
+      @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
       (∀ (P' : UPtd) (szv : BitVec 64) (M' : Nat → List (BitVec 8)) (lz' : Bool),
         ⌜P'.root = V.upt.root⌝ -∗
         ⌜P'.tfp = V.upt.tfp⌝ -∗
         ⌜szv.toNat ≤ uvmMaxsz⌝ -∗
         ⌜umBelow szv P'⌝ -∗
         ⌜lz' = false → lazyFree P'.um szv⌝ -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) szv -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) -∗
-        @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) szv -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) -∗
+        @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ P' M' -∗
         procPrivFd γ pa pid { V with upt := P', sz := szv, pvLazy := lz' } M') := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
   iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
@@ -407,8 +407,8 @@ theorem procPrivFd_addrspace (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
   iframe Hs Hpg Hpt
   iintro %P' %szv %M' %lz' %hr %ht %hsz %hb %hl Hs Hpg Hpt
   ihave Hpg := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.1.symm $$ Hpg
-  ihave Htfp := (show @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
-      @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [ht]) $$ Htfp
+  ihave Htfp := (show @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
+      @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [ht]) $$ Htfp
   iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro; exact ⟨hsz, hb, by rw [hr]; exact h.2.2.1, by rw [ht]; exact h.2.2.2⟩
@@ -420,14 +420,14 @@ faults do; the lazy claim is discharged once here (`lazyFree_ext`). -/
 theorem procPrivFd_copy (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) ∗
-      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) ∗
+      @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
       (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)),
         ⌜V.upt.extSz V.sz P'⌝ -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) -∗
-        @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) -∗
+        @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ P' M' -∗
         procPrivFd γ pa pid { V with upt := P' } M') := by
   iintro H
   icases procPrivFd_facts γ pa pid V M $$ H with ⟨H, %hf⟩
@@ -444,14 +444,14 @@ pieces and taken back at any count -- what usertrap's fault arm lends to
 theorem procPrivFd_copyEv (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) ∗
-      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ actCnt pa V.ev ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) ∗
+      @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ actCnt pa V.ev ∗
       (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)) (k : Nat),
         ⌜V.upt.extSz V.sz P'⌝ -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) -∗
-        @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' -∗ actCnt pa k -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) -∗
+        @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ P' M' -∗ actCnt pa k -∗
         procPrivFd γ pa pid { V.updEv k with upt := P' } M') := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
   iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
@@ -459,8 +459,8 @@ theorem procPrivFd_copyEv (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V
   iframe Hs Hpg Hpt Hev
   iintro %P' %M' %k %hx Hs Hpg Hpt Hev
   ihave Hpg := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.1.symm $$ Hpg
-  ihave Htfp := (show @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
-      @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [hx.1.2.1]) $$ Htfp
+  ihave Htfp := (show @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
+      @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [hx.1.2.1]) $$ Htfp
   iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro
@@ -479,21 +479,21 @@ theorem procPrivFd_newspace (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) 
     procPrivFd (GF := GF) γ pa pid V M ⊢
       ⌜V.sz.toNat ≤ uvmMaxsz⌝ ∗
       ⌜umBelow V.sz V.upt⌝ ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
-      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
-      @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
+      @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
+      @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
       (∀ (P' : UPtd) (szv : BitVec 64) (ws' : List (BitVec 64)) (M' : Nat → List (BitVec 8)) (b : Bool),
         ⌜P'.tfp = V.upt.tfp⌝ -∗
         ⌜szv.toNat ≤ uvmMaxsz⌝ -∗
         ⌜umBelow szv P'⌝ -∗
         ⌜b = false → lazyFree P'.um szv⌝ -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) szv -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr P'.root) -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) (pageAddr P'.tfp) -∗
-        @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' -∗
-        @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp ws' -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) szv -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr P'.root) -∗
+        @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) (pageAddr P'.tfp) -∗
+        @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ P' M' -∗
+        @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp ws' -∗
         procPrivFd γ pa pid
           { V with upt := P', tf := ws', sz := szv, pvLazy := b, pagetable := pageAddr P'.root } M') := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
@@ -521,14 +521,14 @@ theorem procPrivFd_name (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V :
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
       ⌜V.name.length = PNAMELEN⌝ ∗
-      @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗
+      @pnameCells GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗
       (∀ ns : List (BitVec 8), ⌜ns.length = PNAMELEN⌝ -∗
-        @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) ns -∗
+        @pnameCells GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) ns -∗
         procPrivFd γ pa pid { V with name := ns } M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
   iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
-  icases (show @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ⊢
-      @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗ ⌜V.name.length = PNAMELEN⌝ from by
+  icases (show @pnameCells GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ⊢
+      @pnameCells GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗ ⌜V.name.length = PNAMELEN⌝ from by
     unfold pnameCells
     iintro ⟨%hw, Hb⟩
     iframe Hb
@@ -552,8 +552,8 @@ theorem procPrivFd_name (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V :
 theorem procPrivFd_secc (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSecc pa) 8 (DFrac.own 1) V.pvSecc ∗
-      (∀ m : BitVec 64, @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSecc pa) 8 (DFrac.own 1) m -∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSecc pa) 8 (DFrac.own 1) V.pvSecc ∗
+      (∀ m : BitVec 64, @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSecc pa) 8 (DFrac.own 1) m -∗
         procPrivFd γ pa pid { V with pvSecc := m } M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
   iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
@@ -569,8 +569,8 @@ unchanged. -/
 theorem procPrivFd_seccRead (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSecc pa) 8 (DFrac.own 1) V.pvSecc ∗
-      (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSecc pa) 8 (DFrac.own 1) V.pvSecc -∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSecc pa) 8 (DFrac.own 1) V.pvSecc ∗
+      (@wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSecc pa) 8 (DFrac.own 1) V.pvSecc -∗
         procPrivFd γ pa pid V M) := by
   iintro H
   icases procPrivFd_secc γ pa pid V M $$ H with ⟨Hc, Hb⟩
@@ -612,7 +612,7 @@ theorem procPrivFd_settle (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 /-! ## The cells-level block (D31: the dispatch's entry-shape adapter) -/
 
@@ -705,7 +705,7 @@ accessors lend the root rows from either shape and hand the same shape back.
 The block is unchanged: the root comes back verbatim, so the record is `V`
 again (structure eta). -/
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 theorem procPrivFd_root_lend_pid [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :

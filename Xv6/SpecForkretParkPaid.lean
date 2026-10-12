@@ -51,7 +51,7 @@ open Iris Iris.BI Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg]
@@ -63,10 +63,10 @@ def forkretParkPaidBody (URB : ParkURB GF) (W : IProp GF) (Γ : SchedNames)
     Prop :=
   N.Γ = Γ → utWf N → rest.length = 12 →
   ⊢ ownCtx hp ξp -∗
-    parkPkg (hlc := hlc) (SG := SG) URB W N ξp V.kstack V.fdg V.chg V.rti V.cwi V.pvSecc sts V.gen cs
+    parkPkg (SG := SG) URB W N ξp V.kstack V.fdg V.chg V.rti V.cwi V.pvSecc sts V.gen cs
       (parkKey steady V M cs N.pid) -∗
     ▷ W -∗
-    parkChild (hlc := hlc) ξp N rest V M steady -∗
+    parkChild ξp N rest V M steady -∗
     |==> (ownCtx hp ξp ∗ procCtxAt Γ ξp N.pj)
 
 end
@@ -74,23 +74,23 @@ end
 /-- **Rocq `Module Type FORKRET_PARK_PAID`**, at the park token and the
 kernel's deposit instance (deviation 4). -/
 structure FORKRET_PARK_PAID : Prop where
-  forkret_park_paid : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  forkret_park_paid : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
     (W : IProp GF)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
+    (Γ : SchedNames) [ClaimIs GF Γ] [NiFitIs GF]
     (hp : CPU) (ξp : CtxId) (N : UtNames) (rest : List (BitVec 64)) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (steady : Bool),
-    forkretParkPaidBody (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
-      (fun j h Xc => usertrapResAt (hlc := hlc) (X := Xc) (parkToken (hlc := hlc) (SG := uexecSGXv6)) Γ j h)
+    forkretParkPaidBody (GF := GF) (SG := uexecSGXv6)
+      (fun j h Xc => usertrapResAt (X := Xc) (parkToken (SG := uexecSGXv6)) Γ j h)
       W Γ hp ξp N rest V M sts cs steady
   /-- **Rocq `park_token_intro`**: the park as every parker sees it. -/
-  park_token_intro : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  park_token_intro : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF],
-    ⊢ parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ
+    (Γ : SchedNames) [ClaimIs GF Γ] [NiFitIs GF],
+    ⊢ parkToken (GF := GF) (SG := uexecSGXv6) Γ
 
 end Xv6

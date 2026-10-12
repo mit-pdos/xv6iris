@@ -65,7 +65,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] [WchG GF]
 
 /-- **The block of the CURRENTLY RUNNING thread** (`FdTable.procPrivBareAt`
 at the ambient context, Rocq `proc_priv_bare` + the lazy claim): no context
@@ -102,7 +102,7 @@ def procPrivExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
 /-- ... and, at the kernel-page-table context, `procPrivBareAt` there. -/
 theorem procPrivExt_eq (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) :
-    @procPrivExt hlc GF _ ⟨ξ, KTier.kpt⟩ _ pa pid V P' M' =
+    @procPrivExt GF _ ⟨ξ, KTier.kpt⟩ _ pa pid V P' M' =
       procPrivBareAt (GF := GF) ξ pa pid { V with upt := P' } M' := rfl
 
 /-- The block, at its own descriptor. -/
@@ -166,7 +166,7 @@ end
 /-- At the kernel-page-table tier the contracts' bare block
 (`procPrivBareAt curCtx`, Rocq `proc_priv_bare` + the lazy claim) IS the
 ambient `procPrivExt` (by `rfl` once the ambient context is taken apart). -/
-theorem procPrivExt_conv {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
+theorem procPrivExt_conv {GF : BundledGFunctors.{0}} [MachGS GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8)) :
     procPrivBareAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢ procPrivExt pa pid V P M := by
   obtain ⟨ξ, t⟩ := X
@@ -175,7 +175,7 @@ theorem procPrivExt_conv {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
   exact .rfl
 
 /-- ... at the block's own descriptor. -/
-theorem procPrivExt_conv0 {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
+theorem procPrivExt_conv0 {GF : BundledGFunctors.{0}} [MachGS GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivBareAt (GF := GF) curCtx pa pid V M ⊣⊢ procPrivExt pa pid V V.upt M := by
   obtain ⟨ξ, t⟩ := X
@@ -225,7 +225,7 @@ theorem ec_ret_2e0 : jumpPc (KA.«either_copyout» + 0x2c#64) = (KA.«either_cop
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The six-slot frame -/
 
@@ -379,7 +379,7 @@ theorem ec_myproc_call (MP : MYPROC) [CurCtx] (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
+  have h := MP.wp_myproc (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   exact h
@@ -396,7 +396,7 @@ theorem ec_memmove_call (MM : MEMMOVE) [CurCtx] (c : CPU) (k' : KCtx) (bs olds :
       byteBuf (k'.regs 11#5) dqs bs -∗ byteBuf (k'.regs 10#5) (DFrac.own 1) bs -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MM.wp_memmove (hlc := hlc) (GF := GF) c k' bs olds n dqs hK hn hn32 hls hld
+  have h := MM.wp_memmove (GF := GF) c k' bs olds n dqs hK hn hn32 hls hld
   unfold wp_memmove_body at h
   simp only [memmoveAddr] at h
   exact h
@@ -426,7 +426,7 @@ theorem ec_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName
         procPtAt P' (viewFaulted P P' M) ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) bs') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := CI.wp_copyin (hlc := hlc) (GF := GF) c k' γl γk P M old ke hnoff hK hlk hroot hsz hlen hlen'
+  have h := CI.wp_copyin (GF := GF) c k' γl γk P M old ke hnoff hK hlk hroot hsz hlen hlen'
   unfold wp_copyin_body at h
   simp only [copyinAddr] at h
   exact h

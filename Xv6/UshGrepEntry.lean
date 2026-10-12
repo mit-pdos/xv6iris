@@ -83,7 +83,7 @@ theorem grepCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub U
   exact ⟨hsub a b hab, (hx a (by omega)).1, (hx a (by omega)).2, by unfold uCap; omega⟩
 
 section UshGrepEntry
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -108,7 +108,7 @@ theorem grepEntryRun (W : Uvis) (Q : Int → IProp GF) (K : Nat)
     (hfdlen : W.fd.length = NOFILE)
     (hstop : ∀ p q, W.perm p = some q → p * 4096 < pgRoundUpN W.sz)
     (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ urunNopipe (hlc := hlc) W.fd -∗ myPay W.gen Q -∗
+    ⊢ udep (GF := GF) -∗ urunNopipe W.fd -∗ myPay W.gen Q -∗
       (∀ (N : UkNames GF) (h : CPU), ⌜N.pay = Q⌝ -∗
         ustd N.fd (W.fd.take NSTD) -∗ ucwd N.cwd W.cwd -∗
         grepCode N.t -∗
@@ -116,9 +116,9 @@ theorem grepEntryRun (W : Uvis) (Q : Int → IProp GF) (K : Nat)
         ([∗map] k ↦ b ∈ PartialMap.filter (fun k _ => !decide (k < (uvisSp W).toNat))
             (udataLo W.M W.perm W.sz), ubyteq N.d DFrac.discard k b) -∗
         ubytes N.d User.Grep.Sym.«buf» 1024 (fun _ => ubyte0) -∗
-        urun (hlc := hlc) N h (tfResumeGpr0 W.tf) (BitVec.ofNat 64 User.Grep.Sym.«start») K -∗
+        urun N h (tfResumeGpr0 W.tf) (BitVec.ofNat 64 User.Grep.Sym.«start») K -∗
         wpLoop h) -∗
-      uslot (hlc := hlc) W := by
+      uslot W := by
   have hcode := grepCode_rows W.M W.perm hsub hx
   have e : uvisSp W = ukeySp W := rfl
   rw [e] at hroom hal8 hstk hbuf hargs ⊢

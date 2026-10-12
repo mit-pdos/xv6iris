@@ -105,7 +105,7 @@ theorem pidNext_toNat (c : BitVec 32) (h : c.toNat ≤ PIDMAX) :
     omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [WchG GF]
 
 /-- THE PID LEDGER, as the lock's payload holds it (Rocq `pid_ledger`, design
 ni-pid-ledger.md D3, ruling R2(a)): the history's authority, tied to the
@@ -120,6 +120,7 @@ to give (`PidEv.pidPick` of that prefix). -/
 def pidAllocRcpt (act : BitVec 64) (pid : BitVec 32) : IProp GF := iprop%
   ∃ h : List Pev, pidReceipt h (.PAlloc act pid) ∗ ⌜pid.toNat = pidPick PIDMAX h⌝
 
+omit [MachGS GF] in
 instance pidAllocRcpt_persistent (act : BitVec 64) (pid : BitVec 32) :
     Persistent (pidAllocRcpt (GF := GF) act pid) := by
   unfold pidAllocRcpt; infer_instance
@@ -151,10 +152,10 @@ def pidLockPay [CurCtx] : CtxId → IProp GF := fun ξ => pidLockResAt ξ
 `release` apply to it (the register rows are ghost: constants). -/
 instance instCtxMorphPidLockPay [CurCtx] : CtxMorph (GF := GF) pidLockPay := by
   unfold pidLockPay pidLockResAt
-  exact @instCtxMorphExists hlc GF _ _ _ (fun _ => @instCtxMorphExists hlc GF _ _ _ (fun pids =>
-    @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAtN _ _ _ _)
-        (@instCtxMorphSep hlc GF _ _ _
+  exact @instCtxMorphExists GF _ _ _ (fun _ => @instCtxMorphExists GF _ _ _ (fun pids =>
+    @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAtN _ _ _ _)
+        (@instCtxMorphSep GF _ _ _
           (ctxMorph_bigSepL (List.range NPROC)
             (fun _ y ξ => wordAtN ξ (pPid (procAddr y)) 4 pidLockQ (pids y))
             (fun _ _ => instCtxMorphWordAtN _ _ _ _))
@@ -165,6 +166,7 @@ instance instCtxMorphPidLockPay [CurCtx] : CtxMorph (GF := GF) pidLockPay := by
 Each mirrors the register step it rides beside (`SlotGen.pidReg_insert` /
 `pidReg_delete`) and hands back the receipt of the event it appended. -/
 
+omit [MachGS GF] in
 /-- The boot's: the empty history is the boot payload's ledger -- the counter
 1, every cell 0, the empty register (Rocq `pid_ledger_empty`). -/
 theorem pidLedger_empty : pidLedAuth (GF := GF) [] ⊢ pidLedger 1#32 (fun _ => 0#32) ∅ := by
@@ -178,6 +180,7 @@ theorem pidLedger_empty : pidLedAuth (GF := GF) [] ⊢ pidLedger 1#32 (fun _ => 
   intro hz j _ h0
   exact hz (by rw [← h0])
 
+omit [MachGS GF] in
 /-- allocproc's, at the register's insert (Rocq `pid_ledger_alloc`; the
 counter tie and first-ness NI M2-G2a): the store of `pid` into slot `n`'s
 empty cell and of `pidNext pid` into the counter re-close the tie, and the
@@ -228,6 +231,7 @@ theorem pidLedger_alloc (np : BitVec 32) (pids pids' : Nat → BitVec 32) (n : N
     ipureintro
     exact hpick
 
+omit [MachGS GF] in
 /-- freeproc's, at the register's delete (Rocq `pid_ledger_free`; the tie NI
 M2-G2a): slot `j`'s cell, the only one holding `pid` (`pidsOk`), is
 cleared; the counter is untouched (`nextOf_snoc_free`). -/

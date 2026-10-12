@@ -85,9 +85,10 @@ set_option linter.unusedSimpArgs false
 /-! ## 0.  Small facts -/
 
 section Small
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
+omit [MachGS GF] in
 /-- The two quarter shares the `depTx` descriptors parked join into a half
 (Rocq's `log_tx_add … Qp.quarter_quarter`). -/
 theorem createFail_txPin_quarters (γ : LogNames) (t : Nat) :
@@ -102,7 +103,7 @@ end Small
 /-! ## 1.  The call sites, over `createEnv` (the `SysLinkCalls` pattern) -/
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -112,7 +113,7 @@ set_option maxHeartbeats 8000000 in
 (Rocq `IUP.wp_iunlockput_dep_gen`), no zero-record observation (`crz :=
 false`): the short parent forgotten, the escrow and the claims read off
 `isItable2`, hart-free; the arm's parked share `txPin t qt` comes back. -/
-theorem createFail_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem createFail_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) (γil γisl : GName) (kk : Nat) (qi s : Qp) (g : GName)
     (lo tl lo' tl' : Nat) (t : Nat) (qt : Qp)
@@ -130,7 +131,7 @@ theorem createFail_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc
     (hle : lo ≤ tl) (hle' : lo' ≤ tl') :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv Γ γl pd pav pu γkl γk ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗
     credFloor lo tl ∗ icHandle fscIc kk (.depTx s icfgDev inum g lo t qt) ∗
@@ -165,7 +166,7 @@ theorem createFail_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc
   ihave Hoff := offRows_to_dep offCfg kk curCtx $$ Hoff
   ihave Hkeep := inodeRefShort_gen_forget kk (qi + s) qi icfgDev inum g lo' tl' hle' $$ [$Hfl' $Hkeep]
   icases logOpS_named icfgLog n Sb $$ Hop with ⟨%e0, Hop⟩
-  have h := IUP.wp_iunlockput_dep_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j γil γisl
+  have h := IUP.wp_iunlockput_dep_gen_eb (GF := GF) Γ cpu k' γl pd pav pu j γil γisl
     kk qi s g lo tl (.depTx s icfgDev inum g lo t qt) inum dn bm n Sb crb cru false e0 t qt pidv
     pidPriv dqb dqs hj hproc hK hnoff htier rfl hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn
     hpd ha0 rfl hle
@@ -192,7 +193,7 @@ end Calls
 /-! ## 2.  The two re-parks (ghost only) -/
 
 section Parks
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -216,14 +217,14 @@ theorem createFail_child_park (kslot : Nat) (cinum : BitVec 32) (ty major minor 
     (hdok : dirOk icfgNib dnc datc)
     -- THE NODE PREDICATE at the row the arm placed (INIT-FILE, the UNARM ruling)
     (hNd : Nd (creC0 ty.toNat major.toNat minor.toNat)) :
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
+    iregInv fscIreg fscFs icfgIst icfgNib ⊢
       dinodeAt fscIreg cinum (createSetf dnc major minor 0#16) -∗
       inodeMeta (ientry kslot) (createSetf dnc major minor 0#16) -∗
       inodeMap fscFs (ientry kslot) bmc -∗ inodeBlocks fscFs bmc datc -∗
       topFrag (fsGammaL (GF := GF) fscFs) cinum.toNat
         (eraNode (createSetf dnc major minor 1#16) bmc datc) -∗
       creArmFired Farm cinum.toNat -∗
-      pfAt (aunarmOfArmNd (hlc := hlc) (fsGammaL fscFs) appE Nd Farm) Fun -∗
+      pfAt (aunarmOfArmNd (fsGammaL fscFs) appE Nd Farm) Fun -∗
       |={⊤}=> icLoaded fscFs fscIreg fscCov fscLogst kslot cinum
           (createSetf dnc major minor 0#16) bmc ∗
         creUnarmFired Fun cinum.toNat := by
@@ -248,8 +249,8 @@ theorem createFail_child_park (kslot : Nat) (cinum : BitVec 32) (ty major minor 
   iintro #Hinv Hdi Hmeta Hmap Hblk Htop Harm Hun
   ihave #Hft := iregInv_ftop $$ Hinv
   ihave #Hap := iregInv_app $$ Hinv
-  ihave Hun := aunarmOfArmNd_open (hlc := hlc) (fsGammaL fscFs) appE Nd Farm Fun cinum.toNat $$ Harm Hun
-  imod (create_unarm_fire_nd (hlc := hlc) fscFs ⊤ cinum.toNat _ Nd Fun _ _ CoPset.subseteq_top hloc
+  ihave Hun := aunarmOfArmNd_open (fsGammaL fscFs) appE Nd Farm Fun cinum.toNat $$ Harm Hun
+  imod (create_unarm_fire_nd fscFs ⊤ cinum.toNat _ Nd Fun _ _ CoPset.subseteq_top hloc
     hrow hnone hNd) $$ Hft Hap Hun Htop with ⟨Htop, Hr⟩
   ihave Hdl := dlinks_notDir (GF := GF) fscFs cinum.toNat _ bmc datc htz
   unfold inodeMap
@@ -283,7 +284,7 @@ theorem createFail_parent_park (kd : Nat) (dind cinum : BitVec 32) (nf : Nat →
       then (direntBytes (deOfName (createLow16 cinum) (bname 14 nf)))[x - 16 *
         dirSlot data (dirNrec dn.diSize.toNat)]!
       else fileByte data x) :
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
+    iregInv fscIreg fscFs icfgIst icfgNib ⊢
       dlinks fscFs dind.toNat dn bm data -∗ dinodeAt fscIreg dind dn' -∗
       inodeMeta (ientry kd) dn' -∗ inodeMap fscFs (ientry kd) bm' -∗
       inodeBlocks fscFs bm' data' -∗
@@ -347,7 +348,7 @@ theorem createFail_parent_park (kd : Nat) (dind cinum : BitVec 32) (nf : Nat →
     nodeExact_cong _ _ D (by unfold fnIsDir fnType; rw [eraNode_rec, eraNode_rec, hty'])
       (by simp only [fnNlink, eraNode_rec, hnl']) hx0
   ihave Hdl := dlinks_intro fscFs dind.toNat dn' bm' data' D hdok0' hx0' $$ Hetk
-  imod (iregTopRetag_same (hlc := hlc) ⊤ fscFs dind.toNat _ _ CoPset.subseteq_top habs hloc')
+  imod (iregTopRetag_same ⊤ fscFs dind.toNat _ _ CoPset.subseteq_top habs hloc')
     $$ Hft Hap Htop with Htop
   unfold inodeMap
   icases Hmap with ⟨Ha, Hi⟩
@@ -361,7 +362,7 @@ end Parks
 /-! ## 3.  The half -/
 
 section Half
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -386,7 +387,7 @@ set_option maxHeartbeats 16000000 in
 `iunlockput`, the lazy `s3` reload, `c.j +0x70`, and the contract's
 continuation at ARM FAIL (the do-then-undo pair; the transaction token whole
 again; the ledger exactly `ns`).  Split off `create_fail_half` for speed. -/
-theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γkl : GName)
     (γk : KmemNames) (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -407,7 +408,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     kctx cpu (((k.withSpie spie2 spp2).pushed 10).withRegs R2) ∗
     pcIs cpu (KA.«create» + 0x156#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv Γ γl pd pav pu γkl γk ∗
     createFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) ∗
     byteBuf (createBuf (k.regs 2#5)) (DFrac.own 1) (bview 14 nf) ∗
@@ -437,12 +438,12 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     irefSlots (ns - 2) ∗
     P (nparElems (bview plen pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
-    creDotsLeg (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots ∗
-    pfAt (acreCommitAtGenNm (hlc := hlc) (fsGammaL fscFs) appE
+    creDotsLeg (fsGammaL fscFs) ty.toNat Fdots ∗
+    pfAt (acreCommitAtGenNm (fsGammaL fscFs) appE
       (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok ∗
     creUnarmFired Fun cinum.toNat ∗
-    (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
+    (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK10 := create_slots_10 _ hS.hK
@@ -519,7 +520,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
   iintro %c' %R' %hfin Hk Hpc Hte Hce
   obtain ⟨hcsf, ha0f⟩ := hfin
   -- ARM FAIL: the do-then-undo PAIR, the cursor and the observation home
-  ihave Hcf := create_fail_of_pair (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat
+  ihave Hcf := create_fail_of_pair (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat
     minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat cinum.toNat
     $$ HPpar Hdlkc Hacre [Hdots] Hunr
   · iright; iexact Hdots
@@ -547,7 +548,7 @@ set_option maxHeartbeats 16000000 in
 /-- **ARM FAIL's NON-DIRECTORY ENTRY** (Rocq's `cr_fail_half`): the parked
 body `createFailBody`, proved outright. -/
 theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -559,8 +560,8 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
     (hNdF : ty ≠ T_DIR → Nd (creC0 ty.toNat major.toNat minor.toNat)) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createFailBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
+    createEnv Γ γl pd pav pu γkl γk ⊢
+      createFailBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
         dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   have hK10 := create_slots_10 _ hS.hK
   iintro #Henv
@@ -587,7 +588,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   have hct : (curTier : KTier) = KTier.kpt := by
     rw [← ht]; simp only [k_norm_simps]; exact hS.htier
   icases create_bare_pid hct k.proc pid V M $$ Hbare with ⟨Hpid, Hbareback⟩
-  ihave #Hinv := create_env_ireg (hlc := hlc) Γ γl pd pav pu γkl γk $$ Henv
+  ihave #Hinv := create_env_ireg Γ γl pd pav pu γkl γk $$ Henv
   -- ===== +0x146  sh zero,74(s3) : ip->nlink = 0 =====
   icases createFail_meta_nlink (ientry kslot) dnc major minor 1#16 $$ Hcmeta with ⟨Hnl, Hmback⟩
   k_step_e (wp_s_sh cpu _ (KA.«create» + 0x146#64) false 74#12 19#5 0#5 (by decide) 1#16)
@@ -650,10 +651,10 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   iintro Hk Hpc
   -- THE TWO RE-PARKS: the UNARM fires at the child, the parent retags
   iapply wpLoop_fupd
-  ihave Hpk := createFail_child_park (hlc := hlc) kslot cinum ty major minor dnc bmc datc Nm Nd Farm Fun
+  ihave Hpk := createFail_child_park kslot cinum ty major minor dnc bmc datc Nm Nd Farm Fun
     htd htyc hfresh hrlc hciok hcdok (hNdF htd) $$ Hinv Hcdiat Hcmeta Hcmap Hcblocks Hctop Harmr Hun
   imod Hpk with ⟨Hcload, Hunr⟩
-  ihave Hpk := createFail_parent_park (hlc := hlc) kd dind cinum nf dn dnp bm bmp data datap
+  ihave Hpk := createFail_parent_park kd dind cinum nf dn dnp bm bmp data datap
     htydir hnl0 hiok hdok hddix hduq hrl hcnib hS.h16 hwf' hholes' haddr' hcov' hszcap' hsized'
     hdn' hrng $$ Hinv Hdlnk Hdiat Hmeta Hmap Hblocks Htop
   imod Hpk with Hload

@@ -287,7 +287,7 @@ theorem diblkBytes_set_split (ds : List Dinode) (k : Nat) (d : Dinode) (hk : k <
 /-! # (3) The dinode slot as a resource -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The 64 bytes at `a`, read as `Xv6.dinodeBytes d`: the six pieces the
 four `sh`s, the `sw` and the `memmove` touch, at the offsets those
@@ -446,7 +446,7 @@ lives) and `Xv6.bioPay` (where `bsl` does).  `Xv6.bioLocked_split` puts
 them back together. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 /-- Rocq's `iu_held_k`. -/
@@ -523,6 +523,7 @@ Rocq gets both from `BioDefs.bslots_op`, the resource algebra's own
 tokens, which is exactly what `Xv6.bslots_cons` already establishes.  So
 both directions are inductions over the second count. -/
 
+omit [MachGS GF] in
 theorem dsSlots_split [CurCtx] (γ : BcacheNames) (a c : Nat) :
     bslots (GF := GF) (a + c) ⊢ iprop(bslots a ∗ bslots c) := by
   induction c with
@@ -540,6 +541,7 @@ theorem dsSlots_split [CurCtx] (γ : BcacheNames) (a c : Nat) :
     · iapply bslots_cons c
       iframe Hs Hc
 
+omit [MachGS GF] in
 theorem dsSlots_join [CurCtx] (γ : BcacheNames) (a c : Nat) :
     bslots (GF := GF) a ⊢ iprop(bslots c -∗ bslots (a + c)) := by
   induction c with
@@ -556,7 +558,7 @@ theorem dsSlots_join [CurCtx] (γ : BcacheNames) (a c : Nat) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 /-- **THE COUPLING**: the caller's own EXCLUSIVE byte run against the

@@ -102,7 +102,7 @@ theorem create_buf_14 (sp : BitVec 64) :
   unfold createBuf; rw [BitVec.add_assoc]; rfl
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-- create's eight upper cells, from `sp-8` (`ra`) down to `sp-64` (`s6`);

@@ -133,11 +133,11 @@ def ipSpendW (w cru crz : Bool) : Nat := ipBm w + (if cru || crz then 0 else 1)
 
 /-- **WP of `iput(ip = a0)`, the credited set-form contract** (Rocq's
 `wp_iput_gen_body`).  See the header. -/
-def wp_iput_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_iput_gen_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
@@ -169,9 +169,9 @@ def wp_iput_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
   diskCaps fscDisk fscDlock pd pav pu ∗
   -- ---- THE ICACHE'S PERSISTENT SET ----
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗
+  itableInv ∗
   icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   -- THE SEALED REGIME, BORROWED AND RETURNED (RULING G)
   iregRegime rg ∗
   -- the entry's sleeplock, TRACKED over the checkout token
@@ -213,11 +213,11 @@ def wp_iput_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 /-- The eb-generic form of `wp_iput_gen_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_iput_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_iput_gen_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
@@ -249,9 +249,9 @@ def wp_iput_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
   diskCaps fscDisk fscDlock pd pav pu ∗
   -- ---- THE ICACHE'S PERSISTENT SET ----
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗
+  itableInv ∗
   icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   -- THE SEALED REGIME, BORROWED AND RETURNED (RULING G)
   iregRegime rg ∗
   -- the entry's sleeplock, TRACKED over the checkout token
@@ -293,11 +293,11 @@ def wp_iput_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 /-- **WP of `iput(ip = a0)`, the counted contract** (Rocq's
 `wp_iput_sconf_body`): the plain reservation `logOp icfgLog n` in, spend at
 most `iputUnits`; the runtime regime `iregOpen` (persistent, not returned). -/
-def wp_iput_sconf_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_iput_sconf_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32) (n : Nat)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac)
@@ -319,9 +319,9 @@ def wp_iput_sconf_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗
+  itableInv ∗
   icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   -- THE SEALED REGIME AT THE RUNTIME ARM (SIMP-1): persistent, kept
   iregOpen ∗
   isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
@@ -350,11 +350,11 @@ def wp_iput_sconf_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 /-- The eb-generic form of `wp_iput_sconf_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_iput_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_iput_sconf_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32) (n : Nat)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac)
@@ -376,9 +376,9 @@ def wp_iput_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗
+  itableInv ∗
   icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   -- THE SEALED REGIME AT THE RUNTIME ARM (SIMP-1): persistent, kept
   iregOpen ∗
   isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
@@ -408,17 +408,17 @@ def wp_iput_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
 `wp_iput_sconf`, whose eb form is derived below). -/
 structure IPUT : Prop where
   /-- the credited set-form contract -/
-  wp_iput_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_iput_gen_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rg : Bool)
     hj hproc hK hnoff htier hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd ha0,
-    wp_iput_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk q inum
+    wp_iput_gen_eb_body (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk q inum
       n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs rg
       hj hproc hK hnoff htier hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd ha0
 
@@ -430,17 +430,17 @@ theorem ipSpendW_uncredited (w : Bool) (n n' : Nat) (h : n - ipSpendW w false fa
   unfold ipSpendW ipBm iputUnits at *
   cases w <;> simp at h <;> omega
 
-theorem IPUT.wp_iput_sconf_eb (IP : IPUT) {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+theorem IPUT.wp_iput_sconf_eb (IP : IPUT) {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32) (n : Nat)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac)
     hj hproc hK hnoff htier hkk hgeom hbg hcov hlog hnib hbel hn hpd ha0 :
-    wp_iput_sconf_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk q inum n
+    wp_iput_sconf_eb_body (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk q inum n
       pidv dqp dqb dqs
       hj hproc hK hnoff htier hkk hgeom hbg hcov hlog hnib hbel hn hpd ha0 := by
   unfold wp_iput_sconf_eb_body
@@ -449,7 +449,7 @@ theorem IPUT.wp_iput_sconf_eb (IP : IPUT) {hlc : HasLC} {GF : BundledGFunctors.{
   icases logOp_openS icfgLog n $$ Hop with ⟨%Sb, HopS, Htx⟩
   icases logOpS_named icfgLog n Sb $$ HopS with ⟨%e0, Hope⟩
   icases logTx_halve icfgLog $$ Htx with ⟨%t, Ht1, Ht2⟩
-  have h := IP.wp_iput_gen_eb (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk q inum
+  have h := IP.wp_iput_gen_eb (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk q inum
     n Sb false false false e0 t (1 : Qp).half pidv dqp dqb dqs true
     hj hproc hK hnoff htier hkk (fun h => absurd h (by simp))
     (fun h => absurd h (by simp)) hgeom hbg hcov hlog hnib hbel hn hpd ha0

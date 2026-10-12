@@ -17,7 +17,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 theorem memcpy_br_ffffffffffffffa0 : KA.«memcpy» + 0xffffffffffffffa0#64 = KA.«memmove» := by decide
 
 set_option maxHeartbeats 4000000 in
-theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hK hn hn32 hls hld => by
+theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {GF} _ _ cpu k bs olds n dqs hK hn hn32 hls hld => by
   unfold wp_memcpy_body
   iintro ⟨Hk, Hpc, Hsrc, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -36,7 +36,7 @@ theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {hlc GF} _ _ cpu k bs olds
     with [memcpy_br_ffffffffffffffa0] next c2 hp2
   iintro Hk Hpc
   -- the call
-  have hm := M.wp_memmove (hlc := hlc) (GF := GF) c2 ((k.pushed 2).withRegs
+  have hm := M.wp_memmove (GF := GF) c2 ((k.pushed 2).withRegs
       ((((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)).set 8#5 (k.regs 2#5)).set 1#5 (KA.«memcpy» + 0xc#64))))
     bs olds n dqs (by k_norm_g; omega) (by k_norm_g; exact hn) hn32 hls hld
   unfold wp_memmove_body at hm

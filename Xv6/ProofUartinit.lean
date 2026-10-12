@@ -40,7 +40,7 @@ theorem uartinit_ret_1c : jumpPc (KA.«uartinit» + 0x1c#64) = KA.«uartinit» +
 theorem uartinit_ret_30 : jumpPc (KA.«uartinit» + 0x30#64) = KA.«uartinit» + 0x30#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `uartinitone`'s contract as a rule, with the name pointer named. -/
@@ -54,7 +54,7 @@ theorem ui_uartinitone_call (UI : UARTINITONE) [CurCtx] (c : CPU) (k' : KCtx)
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ uartinitonePost i γ l nm -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := UI.wp_uartinitone (hlc := hlc) (GF := GF) c k' i γ l kp vlock vname vcpu hsie hK' ha0
+  have h := UI.wp_uartinitone (GF := GF) c k' i γ l kp vlock vname vcpu hsie hK' ha0
   unfold wp_uartinitone_body at h
   simp only [uartinitoneAddr, h11] at h
   exact h
@@ -63,7 +63,7 @@ theorem ui_uartinitone_call (UI : UARTINITONE) [CurCtx] (c : CPU) (k' : KCtx)
 
 set_option maxHeartbeats 4000000 in
 theorem uartinit_proof (UI : UARTINITONE) : UARTINIT :=
-  ⟨fun {hlc GF} _ _ _ cpu k γ0 γ1 l0 l1 k0 k1 vlock0 vlock1 vname0 vcpu0 vname1 vcpu1 hsie hK => by
+  ⟨fun {GF} _ _ _ cpu k γ0 γ1 l0 l1 k0 k1 vlock0 vlock1 vname0 vcpu0 vname1 vcpu1 hsie hK => by
   unfold wp_uartinit_body
   iintro ⟨Hk, Hpc, Hpre0, Hpre1, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

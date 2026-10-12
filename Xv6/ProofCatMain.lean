@@ -50,7 +50,7 @@ theorem catMain_bge (L : Nat) (h31 : L < 2 ^ 31) :
   by_cases h : L ≤ 1 <;> simp [h] <;> omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -60,8 +60,8 @@ theorem catMain_exit0 (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
     (hje : BitVec.ofNat 64 (pc + 2) + BitVec.signExtend 64 je = BitVec.ofNat 64 User.Cat.Sym.«exit») :
     ⊢ uinstrIs N.t (BitVec.ofNat 64 pc) true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) -∗
       uinstrIs N.t (BitVec.ofNat 64 (pc + 2)) false (.JAL (je, .Regidx 1#5)) -∗
-      ukCode N.t User.Cat.code.byte -∗ (Cend -∗ kcatExit (hlc := hlc) N 0) -∗ Cend -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 pc) av -∗ wpLoop h := by
+      ukCode N.t User.Cat.code.byte -∗ (Cend -∗ kcatExit N 0) -∗ Cend -∗
+      urun N h m (BitVec.ofNat 64 pc) av -∗ wpLoop h := by
   iintro #Hi0 #Hi1 #Hc Hend HC Hrun
   iapply wp_uk_itype UL N h m (BitVec.ofNat 64 pc) true 0#12 0#5 10#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi0 Hrun
@@ -87,9 +87,9 @@ theorem catMain_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (HC : CAT_CAT) (N : UkN
     (hptr : ∀ (j : Nat) (g : UArg), args[j]? = some g → g.ptr ≠ 0) :
     ∀ (k i : Nat) (h : CPU) (m : RegMap) (f : Nat → BitVec 8) (n : Nat) (Ci : IProp GF),
       i + (k + 1) = args.length → cmInv sp0 av args.length i m →
-      ⊢ kcatPay (hlc := hlc) N args i (k + 1) Ci Cend -∗ (Cend -∗ kcatExit (hlc := hlc) N 0) -∗
+      ⊢ kcatPay N args i (k + 1) Ci Cend -∗ (Cend -∗ kcatExit N 0) -∗
         ukCode N.t User.Cat.code.byte -∗ uargv N.d av args -∗ Ci -∗ ubytes N.d User.Cat.Sym.«buf» 512 f -∗
-        urun (hlc := hlc) N h m (BitVec.ofNat 64 0xa6) (8 + (10 + (12 + (4 + n)))) -∗ wpLoop h := by
+        urun N h m (BitVec.ofNat 64 0xa6) (8 + (10 + (12 + (4 + n)))) -∗ wpLoop h := by
   intro k
   induction k with
   | zero =>
@@ -142,9 +142,9 @@ theorem wp_catMain (UL : UK_LEAVES) (HF : CAT_FPRINTF) (HC : CAT_CAT) (N : UkNam
     (av : Nat) (args : List UArg) (f : Nat → BitVec 8) (n : Nat) (Ci Cend : IProp GF)
     (hptr : ∀ (j : Nat) (g : UArg), args[j]? = some g → g.ptr ≠ 0)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 args.length) (ha1 : m.get 11#5 = BitVec.ofNat 64 av) :
-    ⊢ kcatPayAll (hlc := hlc) N args Ci Cend -∗ (Cend -∗ kcatExit (hlc := hlc) N 0) -∗
+    ⊢ kcatPayAll N args Ci Cend -∗ (Cend -∗ kcatExit N 0) -∗
       ukCode N.t User.Cat.code.byte -∗ uargv N.d av args -∗ Ci -∗ ubytes N.d User.Cat.Sym.«buf» 512 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«main») (6 + (8 + (10 + (12 + (4 + n))))) -∗
+      urun N h m (BitVec.ofNat 64 User.Cat.Sym.«main») (6 + (8 + (10 + (12 + (4 + n))))) -∗
       wpLoop h := by
   rw [show User.Cat.Sym.«main» = 0x7e from rfl]
   iintro Hpay Hend #Hc #Hargv HCi Hbuf Hrun

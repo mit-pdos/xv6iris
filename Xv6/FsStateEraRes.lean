@@ -179,7 +179,7 @@ theorem bigSepL_seqMap (Φ : Nat → List (BitVec 8) → IProp GF)
 end EraBigOp
 
 section EraBridge
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBlocksG GF]
 
 /-! ### the two content bridges
 
@@ -248,7 +248,7 @@ theorem indResEra (γfs : FsNames) (n : FsNode) :
 end EraBridge
 
 section EraRes
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
 
 /-! ### THE BUNDLE
 

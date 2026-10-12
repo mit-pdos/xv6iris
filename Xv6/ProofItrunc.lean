@@ -47,7 +47,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -61,7 +61,7 @@ def itTailF (k : KCtx) (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode)
   wordPointsTo (iInum ip) 4 dqn inum ∗
   wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
   inodeMeta ip dn ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
   itContE k ip inum dn pidv dqp dqd dqn dqb dqs (itLedger crb cru u Sb inum)
 
@@ -71,11 +71,11 @@ def itMainF (k : KCtx) (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode)
     (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac) : IProp GF := iprop%
   frame6s3 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ∗
   bslots 1 ∗
-  itTailF (hlc := hlc) k ip inum dn dn0 crb cru u Sb e0 pidv dqp dqd dqn dqb dqs
+  itTailF k ip inum dn dn0 crb cru u Sb e0 pidv dqp dqd dqn dqb dqs
 
 set_option maxHeartbeats 4000000 in
 /-- The join, from the carried frame: `Xv6.itrunc_join`. -/
-theorem itrunc_joinF (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem itrunc_joinF (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode)
@@ -92,7 +92,7 @@ theorem itrunc_joinF (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     (hpd : descPageRw pd)
     (hR : itPins k R) (h19 : R 19#5 = ip) :
     itJPre Γ cpu k spie spp R γl pd pav pu ip crb u Sb e0 pidv dqp dqd dqb
-      (itTailF (hlc := hlc) k ip inum dn dn0 crb cru u Sb e0 pidv dqp dqd dqn dqb dqs)
+      (itTailF k ip inum dn dn0 crb cru u Sb e0 pidv dqp dqd dqn dqb dqs)
       ⊢ wpLoop (GF := GF) cpu := by
   unfold itJPre itTailF
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, #Hbmi, Hframe, Hpid, Hidev, Hsb,
@@ -112,7 +112,7 @@ none, `blkmapWf`'s third clause says there are no entries either, so the
 direct-zeroed map IS `bmEmpty` and the `bnez` falls through to the join;
 otherwise the arm.  At either entry `SIE`. -/
 theorem itrunc_dispatch (BR : BREAD) (BF : BFREE) (BE : BRELSE) (IU : IUPDATE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
@@ -133,7 +133,7 @@ theorem itrunc_dispatch (BR : BREAD) (BF : BFREE) (BE : BRELSE) (IU : IUPDATE)
     (hR : itPins k R) (h19 : R 19#5 = ip) :
     itDPre (KA.«itrunc» + 0x32#64) Γ cpu k spie spp R γl pd pav pu ip bm data crb u Sb e0
       pidv dqp dqd dqb NDIRECT
-      (itMainF (hlc := hlc) k ip inum dn dn0 crb cru u Sb e0 pidv dqp dqd dqn dqb dqs)
+      (itMainF k ip inum dn dn0 crb cru u Sb e0 pidv dqp dqd dqn dqb dqs)
       ⊢ wpLoop (GF := GF) cpu := by
   have hd := blkmapWf_dir_len hwf
   have hzl : (bmDirZeroed bm NDIRECT).bmDir.length = NDIRECT := by
@@ -165,7 +165,7 @@ theorem itrunc_dispatch (BR : BREAD) (BF : BFREE) (BE : BRELSE) (IU : IUPDATE)
     iintro Hk Hpc
     have hind0 : bm.bmInd = 0 := BitVec.eq_of_toNat_eq (by rw [hind]; rfl)
     rw [bmDirZeroed_empty bm hd hind0 (blkmapWf_no_ind hwf hind)]
-    have hjoin := itrunc_joinF (hlc := hlc) (GF := GF) IU Γ cpu k spie spp
+    have hjoin := itrunc_joinF (GF := GF) IU Γ cpu k spie spp
       (R.set 11#5 (BitVec.signExtend 64 bm.bmInd))
       γl pd pav pu j ip inum dn dn0 u Sb crb cru e0 pidv dqp dqd dqn dqb dqs hj hproc hK
       hnoff htier hgeom hcov hlog hnib hnz hstab hnl hpd ?jR ?j19
@@ -180,13 +180,13 @@ theorem itrunc_dispatch (BR : BREAD) (BF : BFREE) (BE : BRELSE) (IU : IUPDATE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [KCtx.rget_zero, bm_nez_true _ hind]
     iintro Hk Hpc
-    iapply (itrunc_arm (hlc := hlc) (GF := GF) BR BF BE Γ cpu k spie spp
+    iapply (itrunc_arm (GF := GF) BR BF BE Γ cpu k spie spp
       (R.set 11#5 (BitVec.signExtend 64 bm.bmInd))
       γl pd pav pu j ip bm data crb u Sb e0 pidv dqp dqd dqb
-      (itTailF (hlc := hlc) k ip inum dn dn0 crb cru u Sb e0 pidv dqp dqd dqn dqb dqs)
+      (itTailF k ip inum dn dn0 crb cru u Sb e0 pidv dqp dqd dqn dqb dqs)
       hj hproc hK hnoff hlocks htier hgeom hbg hwf hbel hsz hpd hind ?aR ?a19 ?a11
       (fun c' spie' spp' R' hR' h19' =>
-        itrunc_joinF (hlc := hlc) (GF := GF) IU Γ c' k spie' spp' R' γl pd pav pu j ip inum dn
+        itrunc_joinF (GF := GF) IU Γ c' k spie' spp' R' γl pd pav pu j ip inum dn
           dn0 u Sb crb cru e0 pidv dqp dqd dqn dqb dqs hj hproc hK hnoff htier hgeom hcov hlog
           hnib hnz hstab hnl hpd hR' h19'))
     case aR => itpins_tac
@@ -203,7 +203,7 @@ set_option maxHeartbeats 16000000 in
 `bmPaidS`, and the direct loop, whose exit is `Xv6.itrunc_dispatch`.  The
 complement `Hte`/`Hce` follows every level-0 step and every callee. -/
 theorem itrunc_main (BR : BREAD) (BF : BFREE) (BE : BRELSE) (IU : IUPDATE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (data : Nat → List (BitVec 8))
@@ -211,7 +211,7 @@ theorem itrunc_main (BR : BREAD) (BF : BFREE) (BE : BRELSE) (IU : IUPDATE)
     (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac)
     hj hproc hK hnoff htier hcrb hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
     hsz hda hpd ha0 :
-    wp_itrunc_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm data
+    wp_itrunc_gen_eb_body (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm data
       u Sb crb cru e0 pidv dqp dqd dqn dqb dqs
       hj hproc hK hnoff htier hcrb hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
       hsz hda hpd ha0 := by
@@ -266,12 +266,12 @@ theorem itrunc_main (BR : BREAD) (BF : BFREE) (BE : BRELSE) (IU : IUPDATE)
   ihave Hidev := (show wordPointsTo (GF := GF) (iDev ip) 4 dqd icfgDev ⊢
       wordPointsTo ip 4 dqd icfgDev from by rw [iDev_eq]) $$ Hidev
   icases dsSlots_split fscBio 2 1 $$ Hsl with ⟨Hsl, Hslp⟩
-  have hloop := itrunc_dloop (hlc := hlc) (GF := GF) BF Γ k γl pd pav pu j ip bm data crb u Sb e0
+  have hloop := itrunc_dloop (GF := GF) BF Γ k γl pd pav pu j ip bm data crb u Sb e0
     pidv dqp dqd dqb
-    (itMainF (hlc := hlc) k ip inum dn dn0 crb cru u Sb e0 pidv dqp dqd dqn dqb dqs)
+    (itMainF k ip inum dn dn0 crb cru u Sb e0 pidv dqp dqd dqn dqb dqs)
     hj hproc hK hnoff htier hgeom hbg hwf hbel hsz hpd
     (fun c' spie' spp' R' hR' h19' =>
-      itrunc_dispatch (hlc := hlc) (GF := GF) BR BF BE IU Γ c' k spie' spp' R' γl pd pav pu j ip
+      itrunc_dispatch (GF := GF) BR BF BE IU Γ c' k spie' spp' R' γl pd pav pu j ip
         inum dn dn0 bm data u Sb crb cru e0 pidv dqp dqd dqn dqb dqs hj hproc hK hnoff hlocks
         htier hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel hsz hpd hR' h19')
     NDIRECT 0 cpu k.spie k.spp
@@ -291,10 +291,10 @@ end
 /-- `itrunc` meets its contract at either entry `SIE`, given its four callees
 (Rocq's `ItruncProof BR BF BL IU`). -/
 theorem itrunc_proof (BR : BREAD) (BF : BFREE) (BE : BRELSE) (IU : IUPDATE) : ITRUNC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j ip inum dn dn0 bm data u Sb
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j ip inum dn dn0 bm data u Sb
       crb cru e0 pidv dqp dqd dqn dqb dqs hj hproc hK hnoff htier hcrb hgeom hbg hcov
       hlog hnib hnz hstab hnl hwf hbel hsz hda hpd ha0 =>
-    itrunc_main (hlc := hlc) (GF := GF) BR BF BE IU Γ cpu k γl pd pav pu j ip inum dn dn0 bm data
+    itrunc_main (GF := GF) BR BF BE IU Γ cpu k γl pd pav pu j ip inum dn dn0 bm data
       u Sb crb cru e0 pidv dqp dqd dqn dqb dqs hj hproc hK hnoff htier hcrb hgeom hbg hcov hlog
       hnib hnz hstab hnl hwf hbel hsz hda hpd ha0⟩
 

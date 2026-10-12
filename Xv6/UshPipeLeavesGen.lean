@@ -42,7 +42,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section Byte
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [DiskG GF] [EchoOutG GF]
@@ -50,7 +50,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 end Byte
 
 section Exit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -63,7 +63,7 @@ theorem wp_kshr_exit0_paid (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) [hc
     (hi1 : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 pc1) false (.JAL (imm, .Regidx 1#5)))
     (h : CPU) (m : RegMap) (av : Nat) (hp1 : pc0 + 2 = pc1)
     (ht : BitVec.ofNat 64 pc1 + BitVec.signExtend 64 imm = BitVec.ofNat 64 User.Sh.Sym.«exit») :
-    ⊢ ushCode N.t -∗ N.pay (-1) -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 pc0) av -∗ wpLoop h := by
+    ⊢ ushCode N.t -∗ N.pay (-1) -∗ urun N h m (BitVec.ofNat 64 pc0) av -∗ wpLoop h := by
   iintro #Hc Hpay Hrun
   iapply ushS_itype UL N hi0 pc1 h m av (ukItypeVal .ADDI (m.get 0#5) k) rfl (by simpa using hp1) $$ Hc Hrun
   iintro %h1 Hrun

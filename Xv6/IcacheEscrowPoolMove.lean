@@ -217,7 +217,7 @@ theorem icIds_lookup (ids : List (Bool × BitVec 32 × BitVec 32)) (k : Nat)
 end MovePure
 
 section Move
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-! ## THE THREE MOVERS
@@ -242,8 +242,8 @@ theorem ipoolExt_peel [Icfg] [Appcfg GF] (E : CoPset) (γfs : FsNames) (γi : GN
     (inodestart nib : Nat) (inum : BitVec 32) (l : Ilic)
     (hEesc : (↑(escAN inum.toNat) : CoPset) ⊆ E)
     (hEreg : (↑iregN : CoPset) ⊆ E \ ↑(escAN inum.toNat)) (hin : inum.toNat < 16 * nib) :
-    iregReg (hlc := hlc) (GF := GF) γi γfs inodestart nib ⊢
-      (poolPending (hlc := hlc) γfs inum.toNat ∨ poolAwait (hlc := hlc) γfs inum.toNat) -∗
+    iregReg (GF := GF) γi γfs inodestart nib ⊢
+      (poolPending γfs inum.toNat ∨ poolAwait γfs inum.toNat) -∗
       iname γi γfs inodestart inum l -∗
       |={E}=> (iname γi γfs inodestart inum l ∗ crpElem inum.toNat .crpDep ∗
         ifreezeOff inum.toNat) := by
@@ -302,9 +302,9 @@ theorem ipoolTakeLend [Icfg] [Appcfg GF] (E : CoPset) (cn : IcNames) (γfs : FsN
     (_hEreg : (↑iregN : CoPset) ⊆ E \ ↑ipoolN)
     (hEreg2 : (↑iregN : CoPset) ⊆ (E \ ↑ipoolN) \ ↑(escAN inum.toNat))
     (hk : k < NINODE) (hz : inum.toNat ∈ P) (hin : inum.toNat < 16 * nib) :
-    iregReg (hlc := hlc) (GF := GF) γi γfs inodestart nib ⊢
-      ipoolInv (hlc := hlc) cn γfs γi cov logstart nib -∗
-      ipool (hlc := hlc) γfs γi cov logstart P ∅ -∗
+    iregReg (GF := GF) γi γfs inodestart nib ⊢
+      ipoolInv cn γfs γi cov logstart nib -∗
+      ipool γfs γi cov logstart P ∅ -∗
       icId cn k Qp.quarter false dv0 nu0 -∗
       iname γi γfs inodestart inum l -∗
       |={E, E \ ↑ipoolN}=>
@@ -313,7 +313,7 @@ theorem ipoolTakeLend [Icfg] [Appcfg GF] (E : CoPset) (cn : IcNames) (γfs : FsN
          icntHalf inum.toNat 0 ∗
          frzmH inum.toNat false ∗
          ifreezeOff inum.toNat ∗
-         ipool (hlc := hlc) γfs γi cov logstart (P \ {inum.toNat}) ∅ ∗
+         ipool γfs γi cov logstart (P \ {inum.toNat}) ∅ ∗
          icId cn k (1 : Qp).half false dv0 nu0 ∗
          (∀ (dv1 nu1 : BitVec 32), ⌜nu1.toNat = inum.toNat⌝ -∗
             icId cn k (1 : Qp).half true dv1 nu1 ={E \ ↑ipoolN, E}=∗
@@ -372,7 +372,7 @@ theorem ipoolTakeLend [Icfg] [Appcfg GF] (E : CoPset) (cn : IcNames) (γfs : FsN
     ihave ⟨Hrow0, Hext⟩ := hxd $$ Hext
     unfold ipoolExt
     icases Hrow0 with ⟨Hcnt, Hmir, Harm⟩
-    have hpeel := ipoolExt_peel (hlc := hlc) (GF := GF) (E \ ↑ipoolN) γfs γi inodestart nib inum l
+    have hpeel := ipoolExt_peel (GF := GF) (E \ ↑ipoolN) γfs γi inodestart nib inum l
       hEesc hEreg2 hin
     imod hpeel $$ Hrinv Harm Hl with ⟨Hl, Hel, Hoff⟩
     ihave %hKz := ipoolCkey_lookup K inum.toNat .crpDep $$ Hck Hel
@@ -425,11 +425,11 @@ theorem ipoolEvictLend [Icfg] (E : CoPset) (cn : IcNames) (γfs : FsNames) (γi 
     (cov : ExtTreeSet Nat compare) (logstart nib : Nat) (P : ExtTreeSet Nat compare) (k z : Nat)
     (dv0 nu0 : BitVec 32) (t : Nat) (q : Qp)
     (hE : (↑ipoolN : CoPset) ⊆ E) (hk : k < NINODE) (hnu0 : nu0.toNat = z) :
-    ipoolInv (hlc := hlc) (GF := GF) cn γfs γi cov logstart nib ⊢
-      ipool (hlc := hlc) γfs γi cov logstart P ∅ -∗
+    ipoolInv (GF := GF) cn γfs γi cov logstart nib ⊢
+      ipool γfs γi cov logstart P ∅ -∗
       icId cn k Qp.quarter true dv0 nu0 -∗
       |={E, E \ ↑ipoolN}=>
-        (ipool (hlc := hlc) γfs γi cov logstart P (PartialMap.singleton z (t, q)) ∗
+        (ipool γfs γi cov logstart P (PartialMap.singleton z (t, q)) ∗
          icId cn k (1 : Qp).half true dv0 nu0 ∗
          (∀ (dv1 nu1 : BitVec 32), icId cn k (1 : Qp).half false dv1 nu1 -∗
             txPin icfgLog t q ={E \ ↑ipoolN, E}=∗ icId cn k Qp.quarter false dv1 nu1)) := by
@@ -485,10 +485,10 @@ back, so the two sides are two lemmas (Rocq's `ipool_put_ord`). -/
 theorem ipoolPutOrd [Icfg] (E : CoPset) (cn : IcNames) (γfs : FsNames) (γi : GName)
     (cov : ExtTreeSet Nat compare) (logstart nib : Nat) (P : ExtTreeSet Nat compare) (z t : Nat)
     (q : Qp) (hE : (↑ipoolN : CoPset) ⊆ E) (hz : z ∉ P) :
-    ipoolInv (hlc := hlc) (GF := GF) cn γfs γi cov logstart nib ⊢
+    ipoolInv (GF := GF) cn γfs γi cov logstart nib ⊢
       ipoolOrd γfs γi cov logstart (BitVec.ofNat 32 z) -∗
-      ipool (hlc := hlc) γfs γi cov logstart P (PartialMap.singleton z (t, q)) -∗
-      |={E}=> (ipool (hlc := hlc) γfs γi cov logstart ({z} ∪ P) ∅ ∗ txPin icfgLog t q) := by
+      ipool γfs γi cov logstart P (PartialMap.singleton z (t, q)) -∗
+      |={E}=> (ipool γfs γi cov logstart ({z} ∪ P) ∅ ∗ txPin icfgLog t q) := by
   unfold ipoolInv
   iintro #Hinv Hrow H
   ihave ⟨%O, %hsub, Hkey, Hxkey, Htkey, Hext⟩ := ipool_open γfs γi cov logstart P _ $$ H
@@ -543,10 +543,10 @@ deposit (Rocq's `ipool_put_corpse`). -/
 theorem ipoolPutCorpse [Icfg] (E : CoPset) (cn : IcNames) (γfs : FsNames) (γi : GName)
     (cov : ExtTreeSet Nat compare) (logstart nib : Nat) (P : ExtTreeSet Nat compare) (z t : Nat)
     (q : Qp) (hE : (↑ipoolN : CoPset) ⊆ E) (hz : z ∉ P) :
-    ipoolInv (hlc := hlc) (GF := GF) cn γfs γi cov logstart nib ⊢
-      ipoolExt (hlc := hlc) γfs γi cov logstart (BitVec.ofNat 32 z) -∗
-      ipool (hlc := hlc) γfs γi cov logstart P (PartialMap.singleton z (t, q)) -∗
-      |={E}=> (ipool (hlc := hlc) γfs γi cov logstart ({z} ∪ P) ∅ ∗ crpElem z (.crpPre t q)) := by
+    ipoolInv (GF := GF) cn γfs γi cov logstart nib ⊢
+      ipoolExt γfs γi cov logstart (BitVec.ofNat 32 z) -∗
+      ipool γfs γi cov logstart P (PartialMap.singleton z (t, q)) -∗
+      |={E}=> (ipool γfs γi cov logstart ({z} ∪ P) ∅ ∗ crpElem z (.crpPre t q)) := by
   unfold ipoolInv
   iintro #Hinv Hrow H
   ihave ⟨%O, %hsub, Hkey, Hxkey, Htkey, Hext⟩ := ipool_open γfs γi cov logstart P _ $$ H
@@ -612,7 +612,7 @@ from the escrow's peel (Rocq's `ipool_deposit_corpse`). -/
 theorem ipoolDepositCorpse [Icfg] (E : CoPset) (cn : IcNames) (γfs : FsNames) (γi : GName)
     (cov : ExtTreeSet Nat compare) (logstart nib z t : Nat) (q : Qp)
     (hE : (↑ipoolN : CoPset) ⊆ E) :
-    ipoolInv (hlc := hlc) (GF := GF) cn γfs γi cov logstart nib ⊢
+    ipoolInv (GF := GF) cn γfs γi cov logstart nib ⊢
       crpElem z (.crpPre t q) -∗
       imark γi (z : Int) -∗
       |={E}=> (crpElem z .crpDep ∗ txPin icfgLog t q) := by
@@ -652,7 +652,7 @@ bundleless any more -- every one of its inums has a row here, and at a
 commit every row is that inum's marker (Rocq's `ipool_inv_acc`). -/
 theorem ipoolInvAcc [Icfg] (E : CoPset) (cn : IcNames) (γfs : FsNames) (γi : GName)
     (cov : ExtTreeSet Nat compare) (logstart nib : Nat) (hE : (↑ipoolN : CoPset) ⊆ E) :
-    ipoolInv (hlc := hlc) (GF := GF) cn γfs γi cov logstart nib ⊢
+    ipoolInv (GF := GF) cn γfs γi cov logstart nib ⊢
       |={E, E \ ↑ipoolN}=> ∃ (O X : ExtTreeSet Nat compare) (T : RegMapF (Nat × Qp))
         (ids : List (Bool × BitVec 32 × BitVec 32)) (K : RegMapF Icorpse),
         ⌜ids.length = NINODE⌝ ∗
@@ -682,6 +682,7 @@ theorem ipoolInvAcc [Icfg] (E : CoPset) (cn : IcNames) (γfs : FsNames) (γi : G
   iapply ipoolBody_intro cn γfs γi cov logstart nib O X T ids K hlen hrow hdk
   iframe
 
+omit [MachGS GF] in
 /-- The transit ledger at a commit is empty (`txPins_noOps`, curried). -/
 theorem ipoolTransit_noOps [Icfg] (T : RegMapF (Nat × Qp)) :
     logTxAuth (GF := GF) icfgLog (∅ : RegMapF Unit) ⊢ ipoolTransit T -∗ ⌜T = ∅⌝ := by
@@ -712,7 +713,7 @@ holds it inside `LogInv.log_res` and needs it there (Rocq's
 `ipool_quiesce_acc`). -/
 theorem ipoolQuiesceAcc [Icfg] (E : CoPset) (cn : IcNames) (γfs : FsNames) (γi : GName)
     (cov : ExtTreeSet Nat compare) (logstart nib : Nat) (hE : (↑ipoolN : CoPset) ⊆ E) :
-    ipoolInv (hlc := hlc) (GF := GF) cn γfs γi cov logstart nib ⊢
+    ipoolInv (GF := GF) cn γfs γi cov logstart nib ⊢
       logTxAuth icfgLog (∅ : RegMapF Unit) -∗
       |={E, E \ ↑ipoolN}=> ∃ (O X : ExtTreeSet Nat compare)
         (ids : List (Bool × BitVec 32 × BitVec 32)),

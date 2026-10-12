@@ -52,8 +52,8 @@ def yieldAddr : BitVec 64 := KA.«yield»
 def yieldSlots : Nat := 20
 
 /-- **WP of `yield`.** -/
-def wp_yield_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_yield_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : yieldSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
@@ -66,13 +66,13 @@ def wp_yield_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6
 
 /-- The interface of `yield`. -/
 structure YIELD : Prop where
-  wp_yield : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+  wp_yield : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) hj hproc hK hsie hnoff hlocks htier,
-    wp_yield_body (hlc := hlc) (GF := GF) Γ cpu k j hj hproc hK hsie hnoff hlocks htier
+    wp_yield_body (GF := GF) Γ cpu k j hj hproc hK hsie hnoff hlocks htier
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **THE CLAIM NAMES THE SLOT**: at a nonzero `k.proc`, `cpuClaim` -- the
 thing the interrupt arm carries and every trap hands to its handler --
@@ -80,9 +80,9 @@ already says which proc is running here.  This is why `kerneltrap` needs
 no proc-shape premise of its own to call `yield`: the trap engine's
 `ihsF` quantifies the interrupted context freely, so the fact has to come
 from a resource, and it does. -/
-theorem cpuClaim_proc_shape (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (p : BitVec 64)
+theorem cpuClaim_proc_shape (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (p : BitVec 64)
     (hp : p ≠ 0#64) :
-    cpuClaim (hlc := hlc) (GF := GF) cpu p ⊢ ∃ j : Nat, ⌜j < NPROC ∧ p = procAddr j⌝ ∗ cpuClaim cpu p := by
+    cpuClaim (GF := GF) cpu p ⊢ ∃ j : Nat, ⌜j < NPROC ∧ p = procAddr j⌝ ∗ cpuClaim cpu p := by
   rw [cpuClaim_eq Γ]
   unfold procClaim
   iintro ⟨%h0 | ⟨%j, %⟨hj, hpa⟩, Hs, Hh⟩⟩

@@ -188,7 +188,7 @@ theorem create_dot_name : bname 14 createDotF = dotName := by decide
 theorem create_dotdot_name : bname 14 createDotdotF = dotdotName := by decide
 
 section Windows
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 set_option maxRecDepth 100000 in
 /-- `"."`'s window, persistent, out of the read-only data (Rocq's

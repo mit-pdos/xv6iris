@@ -28,7 +28,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -44,9 +44,9 @@ pointer).  Such a round never resumes (usertrap's +0xa6 check takes the
 shot), so the citation is never filed. -/
 theorem ut_evOut_of (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
     (cs2 : ExtTreeSet GName compare) (ke : Nat) (act : BitVec 64) :
-    MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
-      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M A.sts V2 M2 A.cs cs2 A.gn -∗
-      |==> utEvOut (hlc := hlc) A.sc A.sep A.V A.M A.sts V2 M2 A.cs cs2 := by
+    MachFixedGS.uEraAnchor (GF := GF) ke (niNamesHere (GF := GF)) ⊢
+      syscEvOut (utSysRec A.sep A.V) A.M A.sts V2 M2 A.cs cs2 A.gn -∗
+      |==> utEvOut A.sc A.sep A.V A.M A.sts V2 M2 A.cs cs2 := by
   iintro #Ha #He
   unfold syscEvOut utEvOut
   icases He with (%hq | ⟨%k, %ι, #Hk, #Hl, %hr⟩ | ⟨%hk, -⟩)
@@ -80,13 +80,13 @@ theorem ut_evOut_of (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8
 with the round's ledger evidence (NI M2-X2). -/
 theorem ut90_outs (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)
     (cs2 : ExtTreeSet GName compare) :
-    syscExecOut (hlc := hlc) (utSysRec A.sep A.V) A.M V2 M2 A.sts sts2 A.gn A.cs A.pid ∗
-      syscSysOut (hlc := hlc) A.f (utSysRec A.sep A.V) A.M A.sts A.gn A.cs A.pid (syscA0 V2)
+    syscExecOut (utSysRec A.sep A.V) A.M V2 M2 A.sts sts2 A.gn A.cs A.pid ∗
+      syscSysOut A.f (utSysRec A.sep A.V) A.M A.sts A.gn A.cs A.pid (syscA0 V2)
         (syscImg V2 M2) sts2 V2.cwi cs2 ∗
       syscForkOut A.f (utSysRec A.sep A.V) (syscA0 V2) A.cs cs2 ∗
       syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid ∗
-      utEvOut (hlc := hlc) A.sc A.sep A.V A.M A.sts V2 M2 A.cs cs2 ⊢
-    utOuts (hlc := hlc) A V2 M2 sts2 cs2 := by
+      utEvOut A.sc A.sep A.V A.M A.sts V2 M2 A.cs cs2 ⊢
+    utOuts A V2 M2 sts2 cs2 := by
   unfold utOuts utExecOut utForkOut utWaitOut utSysOut
   iintro ⟨Hx, Hs, Hf, Hw, He⟩
   iframe He
@@ -104,7 +104,7 @@ theorem ut90_outs (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
 
 set_option maxHeartbeats 2000000 in
 /-- **The continuation of the syscall arm** (see the header). -/
-theorem ut90_tail (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A : UtArgs GF)
+theorem ut90_tail (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 PT Γ) (A : UtArgs GF)
     (hok : UtOk Γ A) (hsc : A.sc = uecallScause) (hb : umBelow A.V.sz A.V.upt)
     (cpu : CPU) (a b : Bool) (R' : RegMap) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
     (sts2 : List FdState) (cs2 : ExtTreeSet GName compare) (hpins : utPins A R')
@@ -112,15 +112,15 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA :
     kctx cpu (((A.k.intrOn.withSpie a b).pushed 4).withRegs R') ∗ pcIs cpu (utPc 0xa6#64) ∗
       utFrame A ∗ trapCsrsExt cpu true ∗ cpuClaimExt cpu true A.k.proc ∗ utCaps A.N ∗ utPay A ∗
       utKont PT Γ A ∗
-      bslots 3 ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗ syscallEnv (hlc := hlc) PT Γ A.N.f ∗
+      bslots 3 ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗ syscallEnv PT Γ A.N.f ∗
       procPrivFd A.N.f (procAddr A.j) A.pid V2 M2 ∗ fdFrags (utSysRec A.sep A.V).fdg sts2 ∗
       chFrag (utSysRec A.sep A.V).chg (procAddr A.j) cs2 ∗
-      syscExecOut (hlc := hlc) (utSysRec A.sep A.V) A.M V2 M2 A.sts sts2 A.gn A.cs A.pid ∗
-      syscSysOut (hlc := hlc) A.f (utSysRec A.sep A.V) A.M A.sts A.gn A.cs A.pid (syscA0 V2)
+      syscExecOut (utSysRec A.sep A.V) A.M V2 M2 A.sts sts2 A.gn A.cs A.pid ∗
+      syscSysOut A.f (utSysRec A.sep A.V) A.M A.sts A.gn A.cs A.pid (syscA0 V2)
         (syscImg V2 M2) sts2 V2.cwi cs2 ∗
       syscForkOut A.f (utSysRec A.sep A.V) (syscA0 V2) A.cs cs2 ∗
       syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid ∗
-      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M A.sts V2 M2 A.cs cs2 A.gn
+      syscEvOut (utSysRec A.sep A.V) A.M A.sts V2 M2 A.cs cs2 A.gn
     ⊢ wpLoop (GF := GF) cpu := by
   have hr0 : UtRows0 A V2 M2 sts2 cs2 := ut_rows_of_sysc A V2 M2 sts2 cs2 hok.hlen hok.hP hb hsc hrows
   have hbase : utBase A.k (A.k.intrOn.withSpie a b) :=
@@ -140,7 +140,7 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA :
   imodintro
   ihave Houts := ut90_outs A V2 M2 sts2 cs2 $$ [Hxo Hso Hfo Hwo Hev]
   · iframe Hxo Hso Hfo Hwo Hev
-  ihave Hown : utOwn (utRsys (hlc := hlc) PT Γ A) A.N V2 M2 sts2 cs2 A.pid $$
+  ihave Hown : utOwn (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid $$
     [Hbs Hfd Hir Henv Hpriv Hfrag Hch]
   · unfold utOwn utRsys utSysEnvAt
     rw [hpj, hfdg, hchg, hok.hΓ]

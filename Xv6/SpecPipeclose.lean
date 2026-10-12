@@ -63,7 +63,7 @@ def pipecloseSlots : Nat := 22
 one coupling between an argument and a branch (`hw`).  The lock `pipeclose`
 takes itself is `pi->lock`, which `pipealloc`'s `initlock` names `"pipe"`;
 nothing the caller holds is `"pipe"`, and `wakeup`'s `"proc"` is free too. -/
-def wp_pipeclose_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_pipeclose_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φ : IProp GF) (ke : Nat)
@@ -74,7 +74,7 @@ def wp_pipeclose_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
   kctx cpu k ∗ pcIs cpu pipecloseAddr ∗
   isPipe γl γp (k.regs 10#5) ∗ pipeRef γp w 1 ∗
   -- THE CLOSE STEP OF THE BYTE QUEUE: a close link, or the taint
-  pipeCpay (hlc := hlc) γp.pnQueue w Φ ∗
+  pipeCpay γp.pnQueue w Φ ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
   actLend k.proc ke ∗
   procsInv Γ ∗
@@ -85,17 +85,17 @@ def wp_pipeclose_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
     ⌜calleeSaved k.regs R'⌝ -∗
     (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗
     -- the link fired, or the pipe is tainted and the payment comes back
-    pipeCpost (hlc := hlc) γp.pnQueue w Φ true -∗ wpLoop cpu'))
+    pipeCpost γp.pnQueue w Φ true -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `pipeclose`. -/
 structure PIPECLOSE : Prop where
-  wp_pipeclose : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  wp_pipeclose : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φ : IProp GF) (ke : Nat)
     hw hnoff hK hpipe hproc hkmem htier,
-    wp_pipeclose_body (hlc := hlc) (GF := GF) Γ cpu k γl γp w γkl γk on Φ ke
+    wp_pipeclose_body (GF := GF) Γ cpu k γl γp w γkl γk on Φ ke
       hw hnoff hK hpipe hproc hkmem htier
 
 end Xv6

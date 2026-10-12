@@ -43,7 +43,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section Claims
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
   [FileAppG GF] [Appcfg GF]
 
 namespace HfpFileClaimsP
@@ -51,7 +51,7 @@ namespace HfpFileClaimsP
 /-- Rocq's equation `file_app = MkAppcfg file_names (file_pred c) r`
 (deviation 1). -/
 abbrev fileAppIs (c : FileFixed) (r : FileAppNames) : Prop :=
-  ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }
+  ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }
 
 end HfpFileClaimsP
 

@@ -47,7 +47,7 @@ def itERegs (k : KCtx) (ip : BitVec 64) (kk q : Nat) (R : RegMap) : Prop :=
   R 18#5 = aBufData (bnode kk) + 1024#64 ∧ R 19#5 = ip ∧ R 20#5 = bnode kk
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- ONE ENTRY of the checked-out indirect block, borrowed READ-ONLY (Rocq's
 `bm_buf_word_acc` + `bm_ent_read` + `bm_buf_restore`, 1335–1363): the word
@@ -76,7 +76,7 @@ theorem itrunc_ent_acc [CurCtx] (kk : Nat) (bno dsk : BitVec 32) (e : List (BitV
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The resources at a point of the indirect loop, cursor `q` (Rocq's
@@ -166,7 +166,7 @@ set_option maxHeartbeats 16000000 in
 body): read entry `q` out of the buffer and put it straight back; skip a
 zero entry, otherwise free its block; then `Xv6.itrunc_enext`.  At either
 entry `SIE` (the complement follows each step and goes to bfree and back). -/
-theorem itrunc_estep (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem itrunc_estep (BF : BFREE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (ip : BitVec 64) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (kk : Nat) (crb : Bool) (u : Nat) (Sb : List Nat) (e0 : Nat)
@@ -281,7 +281,7 @@ theorem itrunc_estep (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
 
 /-- **THE INDIRECT LOOP, by fuel induction on `NINDIRECT - q`** (Rocq's
 `it_eloop`), at any hart. -/
-theorem itrunc_eloop (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem itrunc_eloop (BF : BFREE) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx)
     (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (ip : BitVec 64) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (kk : Nat) (crb : Bool) (u : Nat) (Sb : List Nat) (e0 : Nat)

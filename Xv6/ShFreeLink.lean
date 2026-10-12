@@ -23,7 +23,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -35,12 +35,12 @@ theorem shFree_link (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
     ⊢ ukCode N.t User.Sh.code.byte -∗ uword N.d ushmFreep wf -∗
       uword N.d ushmBase (BitVec.ofNat 64 ushmBase) -∗
       ubytes N.d (ushmBase + 8) 4 (nthByte (n := 4) (BitVec.ofNat 32 0)) -∗ uword N.d p b0 -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x1136) n -∗
+      urun N h m (BitVec.ofNat 64 0x1136) n -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ushmKeep [11#5, 12#5, 14#5] m m'⌝ -∗
         uword N.d ushmFreep (BitVec.ofNat 64 ushmBase) -∗ uword N.d ushmBase (BitVec.ofNat 64 p) -∗
         ubytes N.d (ushmBase + 8) 4 (nthByte (n := 4) (BitVec.ofNat 32 0)) -∗
         uword N.d p (BitVec.ofNat 64 ushmBase) -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x1154) n -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0x1154) n -∗ wpLoop h') -∗
       wpLoop h := by
   have hB : ushmBase = 0x2088 := rfl
   have hF : ushmFreep = 0x2010 := rfl

@@ -48,7 +48,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 attribute [local irreducible] fsBlocks
 
 section BootSharedFs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
   [WchG GF] [Appcfg GF]
@@ -59,10 +59,10 @@ mint chose. -/
 def bsfRows [Fscfg] [Icfg] (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat)
     (cov : ExtTreeSet Nat compare) (γ0 : UartNames) (γd : DiskNames) (cn : ConsNames)
     (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8)) : IProp GF := iprop%
-  fsBootSupply (hlc := hlc) dk sb nib cov γ0 γd cn Rspent Pb (hdrWset (fsBlocks dk) sb.sbLogstart) ∗
-  logMirrorBorn (hlc := hlc) (mirrorOf (fsBlocks dk)) ∗
+  fsBootSupply dk sb nib cov γ0 γd cn Rspent Pb (hdrWset (fsBlocks dk) sb.sbLogstart) ∗
+  logMirrorBorn (mirrorOf (fsBlocks dk)) ∗
   irefSlots IREFBOOT ∗ irefSlotsAuth ∗ bslots mainBslotsFs ∗
-  genCert ∗ fsCrashSeam (hlc := hlc) cov sb.sbLogstart ∗ crashInv (hlc := hlc) (GF := GF)
+  genCert ∗ fsCrashSeam cov sb.sbLogstart ∗ crashInv (GF := GF)
 
 /-- **THE ERA'S FS MINT, ROUTED** (Rocq `boot_shared_alloc`'s
 `fs_cfg_alloc_snap` call and the fs rows of its post): the era's block
@@ -76,21 +76,21 @@ theorem bootSharedFs [CurCtx] (γ0 : UartNames) (γd : DiskNames) (cn : ConsName
     (hwf : fsBootSnapWf dk ndisk S Pb sb nib cov) :
     ⊢@{IProp GF} ([∗list] b ∈ List.range (ndisk / BSIZE), diskBlock γd b (fsBlocks dk b)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
-      appDurLaws (hlc := hlc) cov sb.sbLogstart -∗
-      eraSyncTok (hlc := hlc) (GF := GF) -∗
+      appDurLaws cov sb.sbLogstart -∗
+      eraSyncTok (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov sb.sbLogstart)) S -∗
-      logMirrorHalf (hlc := hlc) (mirrorOf (fsBlocks dk)) -∗
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
+      logMirrorHalf (mirrorOf (fsBlocks dk)) -∗
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
       irefSlots IREFBOOT -∗ irefSlotsAuth -∗ bslots mainBslotsFs -∗ genCert -∗
-      crashInv (hlc := hlc) (GF := GF) -∗
+      crashInv (GF := GF) -∗
       |={⊤}=> ∃ (I : Icfg) (F : Fscfg),
-        bsfRows (hlc := hlc) dk sb nib cov γ0 γd cn (snapSpent S nib) Pb := by
+        bsfRows dk sb nib cov γ0 γd cn (snapSpent S nib) Pb := by
   have hsb : sb = S.fssSb := hwf.1
   subst hsb
   iintro Hblk Happ #Hdurl Hstok Hsnap Hmir #Hsw Hib Hia Hbs #Hcert #Hcinv
-  imod fsCfgAllocSnap (hlc := hlc) (GF := GF) ⊤ γ0 γd cn dk ndisk S cov nib gsn gln gtn Pb hwf
+  imod fsCfgAllocSnap (GF := GF) ⊤ γ0 γd cn dk ndisk S cov nib gsn gln gtn Pb hwf
     $$ Hblk Happ Hdurl Hstok Hsnap with ⟨%I, %F, Hsup⟩
-  ihave #Hs := appDurLaws_seam (hlc := hlc) (GF := GF) cov S.fssSb.sbLogstart $$ Hdurl
+  ihave #Hs := appDurLaws_seam (GF := GF) cov S.fssSb.sbLogstart $$ Hdurl
   imodintro
   iexists I, F
   unfold fsCfgSnapPost at *

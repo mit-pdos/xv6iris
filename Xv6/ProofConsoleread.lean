@@ -119,7 +119,7 @@ theorem cr_ret_108 : jumpPc (KA.«consoleread» + 0x108#64) = KA.«consoleread»
 /-! ## Immediates and arithmetic -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 theorem cr_sext4015 : BitVec.signExtend 64 4015#12 = 0xFFFFFFFFFFFFFFAF#64 := by decide
 
@@ -320,7 +320,7 @@ structure CrBase (k kb : KCtx) : Prop where
   struct : ∃ (s0 s1b : Bool) (Rb : RegMap), kb = ((k.pushed 12).withSpie s0 s1b).withRegs Rb
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 theorem cr_cbuf_carve (sp : BitVec 64) (w : BitVec 64) :
     wordPointsTo (GF := GF) (sp + 0xFFFFFFFFFFFFFFA8#64) 8 (DFrac.own 1) w ⊢
@@ -352,7 +352,7 @@ theorem cr_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γc : GName) (cn : Cons
       locked γc cpu' -∗ consResCur cn -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γc "cons" (consResAt cn) hnoff hK hs
+  have h := AC.wp_acquire (GF := GF) c k' γc "cons" (consResAt cn) hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
@@ -370,7 +370,7 @@ theorem cr_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γc : GName) (cn : Cons
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "cons"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γc "cons" (consResAt cn) hsie hnoff hK
+  have h := RE.wp_release (GF := GF) c k' γc "cons" (consResAt cn) hsie hnoff hK
     reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -386,7 +386,7 @@ theorem cr_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
+  have h := MP.wp_myproc (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   exact h
@@ -411,7 +411,7 @@ theorem cr_killed (KL : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : Nat
       wordPointsTo (pPid (procAddr j)) 4 pidPriv pid -∗ pidReg pid (.own qeighth) gn -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KL.wp_killed_r (hlc := hlc) (GF := GF) Γ c k' j
+  have h := KL.wp_killed_r (GF := GF) Γ c k' j
     (fun kl => iprop((⌜kl = 0#32⌝ ∨ killShot gn) ∗ wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
       pidReg pid (.own qeighth) gn)) hj hp hnoff hK hlk htier
   unfold wp_killed_r_body at h
@@ -436,7 +436,7 @@ theorem cr_killed (KL : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : Nat
   iintro %c' HK %spie %spp %R' %kl %hs Hk Hpc %hc ⟨Hs, Hqp, Hrg⟩
   iapply HK $$ %spie %spp %R' %kl %hs Hk Hpc %hc Hs Hqp Hrg
 
-theorem cr_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem cr_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hchan : k'.regs 10#5 ≠ 0#64)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : sleepPrepareSlots ≤ k'.avail)
@@ -447,14 +447,14 @@ theorem cr_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc :=
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := SP.wp_sleep_prepare (hlc := hlc) (GF := GF) Γ c k' j hj hproc hchan hnoff hK hlk htier
+  have h := SP.wp_sleep_prepare (GF := GF) Γ c k' j hj hproc hchan hnoff hK hlk htier
   unfold wp_sleep_prepare_body at h
   simp only [sleepPrepareAddr] at h
   exact h
 
 /-- `sleep` at either `SIE`, with the complement at a named index `s` and
 proc `p` (so the caller's hypotheses frame syntactically). -/
-theorem cr_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem cr_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat) (s : Bool) (p : BitVec 64)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : sleepSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hs : k'.sie = s) (hp : k'.proc = p) :
@@ -466,7 +466,7 @@ theorem cr_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
-  have h := SL.wp_sleep_eb (hlc := hlc) (GF := GF) Γ c k' j hj hproc hK hnoff htier
+  have h := SL.wp_sleep_eb (GF := GF) Γ c k' j hj hproc hK hnoff htier
   unfold wp_sleep_eb_body at h
   simp only [sleepAddr] at h
   exact h
@@ -496,7 +496,7 @@ theorem cr_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γ
         ⌜V.ev ≤ kv⌝ ∗ procPrivExt (procAddr j) pid (V.updEv kv) P' M') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := EC.wp_either_copyout (hlc := hlc) (GF := GF) c k' γl γk j pid V P Mi true
+  have h := EC.wp_either_copyout (GF := GF) c k' γl γk j pid V P Mi true
     (DFrac.own 1) [b] [b] hj (fun _ => hproc) hnoff hK hlk
     (by simp only [if_true]; exact huser)
     (by simp only [List.length_singleton]; rw [hlen])
@@ -536,7 +536,7 @@ theorem cr_m1_ne (d : Nat) (h : d < 2 ^ 31) : ¬ (-1#64 : BitVec 64) = BitVec.of
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The swallowed byte's fault reason at a run length (Rocq's
 `¬ uva_wmapped (pv_upt V) (dst + d)`): the byte at `dst + d` is not
@@ -566,7 +566,7 @@ def crPost (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
       (R' 10#5 = BitVec.ofInt 64 (d : Int) → d = 0 → 0 < n → dc = d + 1) ∧
       consTagged bs hs d⌝ -∗
     (⌜R' 10#5 = -1#64⌝ -∗ killShot V.gen) -∗
-    ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) -∗
+    ([∗list] h ∈ hs, MachFixedGS.rxTag (GF := GF) h) -∗
     consStoredLb cn sl -∗
     ((⌜consWindow sl cur d bs hs⌝ ∗ ⌜consChain sl⌝ ∗
        consSwallow cn (¬ uvaWmapped V.upt ((k.regs 11#5) + BitVec.ofNat 64 d).toNat) sl d dc ∗
@@ -635,7 +635,7 @@ theorem cr_epi (cpu cE : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPr
       (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 ∗
     trapCsrsExt cE k.sie ∗ cpuClaimExt cE k.sie k.proc ∗
     crBlk j pid V P' M' ∗
-    ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) ∗
+    ([∗list] h ∈ hs, MachFixedGS.rxTag (GF := GF) h) ∗
     crOut cn Wd Rin (crFault V.upt (k.regs 11#5)) ord d dc bs hs ∗
     (⌜R 10#5 = -1#64⌝ -∗ killShot V.gen) ∗
     wpNext true k.proc cpu (crPost k j pid V M n cn Wd ord Rin)
@@ -920,7 +920,7 @@ theorem cr_minus1 (RE : RELEASE) (c0 c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The outer loop's invariant at `+0x38` -/
 
@@ -1127,7 +1127,7 @@ theorem cr_ctrld (RE : RELEASE) (cpu c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 set_option maxHeartbeats 32000000 in
 /-- **One byte out of the ring** (`+0x76`): bump `cons.r`, read
@@ -1491,7 +1491,7 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## Branch conditions on the ring indices -/
 
@@ -1585,7 +1585,7 @@ theorem crEmpty_intro (cpu : CPU) (k kb : KCtx) (γc : GName) (cn : ConsNames) (
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 set_option maxHeartbeats 32000000 in
 /-- **One round of the sleep loop** (`+0x48`): if the process was killed,
@@ -1593,7 +1593,7 @@ release and return `-1`; otherwise park on `&cons.r` and, on waking, either
 go round again or consume the byte that arrived. -/
 theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP) (EC : EITHER_COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 c : CPU) (k kb : KCtx) (hb : CrBase k kb) (γc γkl : GName) (γk : KmemNames)
     (cn : ConsNames) (Wd : IProp GF) (ord : Option Nat) (Rin : List (List Obs × BitVec 8) → IProp GF)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
@@ -1914,7 +1914,7 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
 set_option maxHeartbeats 16000000 in
 theorem cr_empty (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP) (EC : EITHER_COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k kb : KCtx) (hb : CrBase k kb) (γc γkl : GName) (γk : KmemNames)
     (cn : ConsNames) (Wd : IProp GF) (ord : Option Nat) (Rin : List (List Obs × BitVec 8) → IProp GF)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (N m : Nat)
@@ -1938,14 +1938,14 @@ theorem cr_empty (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- **One round of the outer loop** (`+0x38`): `n <= 0` ends the read; an
 empty ring enters the sleep loop; otherwise a byte is consumed. -/
 theorem cr_outer_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP) (EC : EITHER_COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu c : CPU) (k kb : KCtx) (hb : CrBase k kb) (γc γkl : GName) (γk : KmemNames)
     (cn : ConsNames) (Wd : IProp GF) (ord : Option Nat) (Rin : List (List Obs × BitVec 8) → IProp GF)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
@@ -2063,7 +2063,7 @@ set_option maxHeartbeats 16000000 in
 ends the read or delivers one more byte. -/
 theorem cr_loop (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP) (EC : EITHER_COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k kb : KCtx) (hb : CrBase k kb) (γc γkl : GName) (γk : KmemNames)
     (cn : ConsNames) (Wd : IProp GF) (ord : Option Nat) (Rin : List (List Obs × BitVec 8) → IProp GF)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (N : Nat)
@@ -2097,7 +2097,7 @@ theorem cr_loop (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- **Entering the loop** at `+0x38` with nothing delivered: a nonpositive
@@ -2105,7 +2105,7 @@ count returns `0` at once, otherwise the byte budget is `n` and the outer
 loop runs. -/
 theorem cr_start (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP) (EC : EITHER_COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu c : CPU) (k kb : KCtx) (hb : CrBase k kb) (γc γkl : GName) (γk : KmemNames)
     (cn : ConsNames) (Wd : IProp GF) (ord : Option Nat) (Rin : List (List Obs × BitVec 8) → IProp GF)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
@@ -2124,7 +2124,7 @@ theorem cr_start (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     pcIs c (KA.«consoleread» + 0x38#64) ∗
     procsInv Γ ∗ crEnv cn Wd γc ord ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ locked γc c ∗ consResCur cn ∗
-    consPay cn Wd ord ∗ consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin ∗
+    consPay cn Wd ord ∗ consReadPay (genId (GF := GF) + 1) Rin ∗
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
@@ -2199,7 +2199,7 @@ moves, `acquire(&cons)` and the two address constants are driven here; the
 loop at `+0x38` is `cr_start`. -/
 theorem consoleread_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP) (EC : EITHER_COPYOUT) : CONSOLEREAD := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ c0 k γc cn Wd ord Rin γkl γk j pid V M n hj hproc hK hnoff htier
+  fun {GF} _ _ _ _ _ _ _ _ Γ _ c0 k γc cn Wd ord Rin γkl γk j pid V M n hj hproc hK hnoff htier
       huser hn hn' => by
   unfold wp_consoleread_eb_body
   simp only [consolereadAddr]

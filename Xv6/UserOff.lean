@@ -47,7 +47,7 @@ the Rocq tree's `claude-notes/design/user-read.md` sections 2 and 4, and
 1. Rocq's `Z` offsets are `Int` (`OffGv`'s mapping); `Z.of_nat off` is
    `(off : Int)`, and `1/2` is `(1 : Qp).half`.
 2. Class binders as `OffGv.lean`: `[OffboxG GF]` for the ghost, plus
-   `[MachGS hlc GF]` where an invariant is named.
+   `[MachGS GF]` where an invariant is named.
 3. Rocq's curried statements are `⊢ A -∗ B -∗ C`.
 
 4. **LANE K6-C (Rocq 5c48aa727, bb7d140b3, 4919630d6).**  `offSupply`'s
@@ -156,12 +156,12 @@ end UserOffHeld
 /-! ## 2.  The supplier: what a fire needs of the user side -/
 
 section UserOffSupply
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [OffboxG GF]
 
 /-- THE ONE-WAY DOOR (Rocq's `uoff_park`).  There is no converse:
 `offUserInv` is persistent. -/
 theorem uoff_park (E : CoPset) (γo : GName) (off : Nat) :
-    ⊢@{IProp GF} uoff γo off ={E}=∗ offUserInv (hlc := hlc) γo := by
+    ⊢@{IProp GF} uoff γo off ={E}=∗ offUserInv γo := by
   unfold uoff
   iintro H
   iapply offUserInv_alloc E γo _ $$ H
@@ -181,14 +181,14 @@ supplier can conjure the half it never had (`vacuity_lend_not_taint`).  So
 what the fire puts back in the box is `offLink`, and the disconnect is one
 arm of it -- permanently. -/
 def offSupply (γo : GName) (E : CoPset) (off d : Nat) (R : IProp GF) : IProp GF :=
-  iprop(offRet (hlc := hlc) γo off d ={E}=∗ offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗ R)
+  iprop(offRet γo off d ={E}=∗ offLink γo ((off + d : Nat) : Int) ∗ R)
 
 /-- SUPPLIER 1 -- PARKED (Rocq's `off_supply_parked`): the generic-safety
 path.  The mask must contain `foffN`; every fire has that from `↑ftopN ∪
 ↑appN ⊆ E`, since `foffN` sits under `appN`.  A node lent the taint hands
 the taint back, and the taint is the box's arm. -/
 theorem offSupply_parked (E : CoPset) (γo : GName) (off d : Nat) (hE : (↑foffN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} offUserInv (hlc := hlc) γo -∗ offSupply γo E off d iprop(True) := by
+    ⊢@{IProp GF} offUserInv γo -∗ offSupply γo E off d iprop(True) := by
   unfold offSupply offRet offLink
   iintro #Hinv ⟨%v, Hk, -⟩
   icases Hk with (Hk | #Ht)
@@ -206,7 +206,7 @@ theorem offSupply_parked (E : CoPset) (γo : GName) (off d : Nat) (hE : (↑foff
 DISCONNECT: the kernel drops the half rather than moving it, and the box
 keeps the cell alone.  Only the generic tier can pay this. -/
 theorem offSupply_taint (E : CoPset) (γo : GName) (off d : Nat) :
-    ⊢@{IProp GF} MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ offSupply γo E off d iprop(True) := by
+    ⊢@{IProp GF} MachFixedGS.killCred (GF := GF) -∗ offSupply γo E off d iprop(True) := by
   unfold offSupply
   iintro #Ht _
   imodintro
@@ -217,7 +217,7 @@ theorem offSupply_taint (E : CoPset) (γo : GName) (off d : Nat) :
 /-- THE PUBLISH, MODE PARK (Rocq's `off_pub_park`): what sys_open's publish
 does, and what the generic tier must keep doing. -/
 theorem off_pub_park (E : CoPset) (γo : GName) (z : Int) :
-    ⊢@{IProp GF} offGv γo 1 z ={E}=∗ offGv γo (1 : Qp).half z ∗ offUserInv (hlc := hlc) γo := by
+    ⊢@{IProp GF} offGv γo 1 z ={E}=∗ offGv γo (1 : Qp).half z ∗ offUserInv γo := by
   iintro H
   icases (offGv_halves γo z).1 $$ H with ⟨Hk, Hu⟩
   imod offUserInv_alloc E γo z $$ Hu with #Hinv
@@ -230,6 +230,7 @@ Three refutations about ONE fact: a half of `offGv` is not derivable from
 anything persistent, because the whole ghost refutes a second half.  (Rocq
 states them as `Example`s; they are theorems here.) -/
 
+omit [MachGS GF] in
 /-- Rocq's `off_gv_whole_half`: whole plus half is not valid. -/
 theorem offGv_whole_half (γo : GName) (q : Qp) (z z' : Int) :
     ⊢@{IProp GF} offGv γo 1 z -∗ offGv γo q z' -∗ False := by
@@ -241,8 +242,8 @@ theorem offGv_whole_half (γo : GName) (q : Qp) (z z' : Int) :
 /-- Rocq's `vacuity_link_not_taint`: THE LINK IS NOT PAYABLE FROM THE TAINT
 -- a publish that still owns the whole shadow would be inconsistent. -/
 theorem vacuity_link_not_taint (γo : GName) (off : Nat) (z : Int)
-    (hbad : ⊢@{IProp GF} MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ uoff γo off) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗ offGv γo 1 z ⊢ iprop(False) := by
+    (hbad : ⊢@{IProp GF} MachFixedGS.killCred (GF := GF) -∗ uoff γo off) :
+    MachFixedGS.killCred (GF := GF) ∗ offGv γo 1 z ⊢ iprop(False) := by
   iintro ⟨#Ht, Hw⟩
   ihave Hu := hbad $$ Ht
   unfold uoff
@@ -251,9 +252,9 @@ theorem vacuity_link_not_taint (γo : GName) (off : Nat) (z : Int)
 /-- Rocq's `vacuity_lend_not_taint`: the half the commit nodes demand at the
 fire's offset is not payable from the taint either. -/
 theorem vacuity_lend_not_taint (γo : GName) (off : Nat) (z : Int)
-    (hbad : ⊢@{IProp GF} MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗
+    (hbad : ⊢@{IProp GF} MachFixedGS.killCred (GF := GF) -∗
       offGv γo (1 : Qp).half (off : Int)) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗ offGv γo 1 z ⊢ iprop(False) := by
+    MachFixedGS.killCred (GF := GF) ∗ offGv γo 1 z ⊢ iprop(False) := by
   iintro ⟨#Ht, Hw⟩
   ihave Hk := hbad $$ Ht
   iapply offGv_whole_half γo (1 : Qp).half z (off : Int) $$ Hw Hk
@@ -263,13 +264,13 @@ THE SUPPLIER at the old output (the bare half at `off + d`): that is a MOVE,
 and a move needs the other half. -/
 theorem vacuity_supply_not_taint (E : CoPset) (γo : GName) (off d : Nat) (R : IProp GF)
     (hd : 0 < d)
-    (hbad : ⊢@{IProp GF} MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗
-      (offRet (hlc := hlc) γo off d ={E}=∗ offGv γo (1 : Qp).half ((off + d : Nat) : Int) ∗ R)) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗ offGv γo 1 (off : Int) ⊢ |={E}=> iprop(False) := by
+    (hbad : ⊢@{IProp GF} MachFixedGS.killCred (GF := GF) -∗
+      (offRet γo off d ={E}=∗ offGv γo (1 : Qp).half ((off + d : Nat) : Int) ∗ R)) :
+    MachFixedGS.killCred (GF := GF) ∗ offGv γo 1 (off : Int) ⊢ |={E}=> iprop(False) := by
   iintro ⟨#Ht, Hw⟩
   icases (offGv_halves γo (off : Int)).1 $$ Hw with ⟨Hk, Hu⟩
   ihave Hsup := hbad $$ Ht
-  ihave Hk := offRet_keep (hlc := hlc) γo off d $$ Hk
+  ihave Hk := offRet_keep γo off d $$ Hk
   imod Hsup $$ Hk with ⟨Hk, -⟩
   ihave %heq := offGv_agree γo _ _ _ _ $$ Hk Hu
   imodintro

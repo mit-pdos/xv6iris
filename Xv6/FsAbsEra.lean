@@ -88,7 +88,7 @@ relative start is NOT refuted; both walks fire it.)
    are likewise ONE private proof (`elend_fire`), stated through
    `FsAbsWalk.axHopNext` (that file's deviation 4), and `elend_fire_hit`/
    `_miss` are it at the two lookup results.
-5. Binders: Rocq's `riscvGS, xv6G` are `[MachGS hlc GF]` (the fupd) plus
+5. Binders: Rocq's `riscvGS, xv6G` are `[MachGS GF]` (the fupd) plus
    the two capacity classes the statements name, `[FsTopG GF]` (`topFragQ`)
    and `[FsBytesG GF]` (`fsGammaL`) -- Rocq reaches both through the
    `xv6G` bundle; this port's classes are per layer (`Xv6/FsStateTop.lean`).
@@ -198,7 +198,7 @@ theorem umStartOf_rel (rt cw : Nat) (pl : List (BitVec 8)) (h : pl[0]? ≠ some 
 /-! ## The hop family, generically (deviation 4) -/
 
 section Hops
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- PEEL THE HEAD HOP (the common proof of Rocq's `ex_hops_cons` /
 `ep_hops_cons`). -/
@@ -249,7 +249,7 @@ theorem axHops_triv (rt : Nat) (F : Nat → DFrac → Std.ExtTreeMap Fname Nat c
 end Hops
 
 section FsAbsEra
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF]
 
 /-! ## 1.  The lend -/
 
@@ -260,10 +260,12 @@ def elend (Γ : FsViewNames GF) (d : Nat) (dq : DFrac) (ents : Std.ExtTreeMap Fn
   iprop(∃ n : FsNode, topFragQ Γ dq d n ∗
     ⌜fnIsDir n = true ∧ dirEntries n = ents ∧ fnNlink n ≠ 0⌝)
 
+omit [MachGS GF] in
 instance elend_timeless (Γ : FsViewNames GF) (d : Nat) (dq : DFrac)
     (ents : Std.ExtTreeMap Fname Nat compare) : Timeless (elend Γ d dq ents) := by
   unfold elend; infer_instance
 
+omit [MachGS GF] in
 /-- Rocq's `elend_frag`. -/
 theorem elend_frag (Γ : FsViewNames GF) (d : Nat) (dq : DFrac)
     (ents : Std.ExtTreeMap Fname Nat compare) :
@@ -273,6 +275,7 @@ theorem elend_frag (Γ : FsViewNames GF) (d : Nat) (dq : DFrac)
   iexists n
   iexact H
 
+omit [MachGS GF] in
 /-- the lend carries LIVENESS too (Rocq's `elend_intro`; E2-V2). -/
 theorem elend_intro (Γ : FsViewNames GF) (d : Nat) (dq : DFrac) (n : FsNode)
     (hd : fnIsDir n = true) (hnl : fnNlink n ≠ 0) :
@@ -286,6 +289,7 @@ theorem elend_intro (Γ : FsViewNames GF) (d : Nat) (dq : DFrac) (n : FsNode)
 
 /-! ### The split and the pin (need only the top map) -/
 
+omit [MachGS GF] in
 /-- THE SPLIT THE FIRE RIDES ON: the walk lends HALF and keeps HALF (Rocq's
 `era_half_split`). -/
 theorem eraHalf_split (Γ : FsViewNames GF) (d : Nat) (n : FsNode) :
@@ -387,7 +391,7 @@ theorem elend_fire_hit (rt : Nat) (γfs : FsNames) (cov : Std.ExtTreeSet Nat com
     ⊢@{IProp GF} exHop rt γfs P Pmiss k s -∗ P k d -∗
       topFrag (fsGammaL γfs) d (eraNode dn bm data) ={⊤}=∗
         topFrag (fsGammaL γfs) d (eraNode dn bm data) ∗ P (k + 1) c := by
-  have h := elend_fire (hlc := hlc) rt γfs cov logstart P Pmiss k s d dn bm data hok hty hnl
+  have h := elend_fire rt γfs cov logstart P Pmiss k s d dn bm data hok hty hnl
   rw [axHopAns_rec rt P Pmiss k d s _ hns, he] at h
   exact h
 
@@ -403,7 +407,7 @@ theorem elend_fire_miss (rt : Nat) (γfs : FsNames) (cov : Std.ExtTreeSet Nat co
     ⊢@{IProp GF} exHop rt γfs P Pmiss k s -∗ P k d -∗
       topFrag (fsGammaL γfs) d (eraNode dn bm data) ={⊤}=∗
         topFrag (fsGammaL γfs) d (eraNode dn bm data) ∗ Pmiss k d := by
-  have h := elend_fire (hlc := hlc) rt γfs cov logstart P Pmiss k s d dn bm data hok hty hnl
+  have h := elend_fire rt γfs cov logstart P Pmiss k s d dn bm data hok hty hnl
   rw [axHopAns_rec rt P Pmiss k d s _ hns, he] at h
   exact h
 
@@ -420,7 +424,7 @@ theorem elend_fire_self (rt : Nat) (γfs : FsNames) (cov : Std.ExtTreeSet Nat co
     ⊢@{IProp GF} exHop rt γfs P Pmiss k s -∗ P k d -∗
       topFrag (fsGammaL γfs) d (eraNode dn bm data) ={⊤}=∗
         topFrag (fsGammaL γfs) d (eraNode dn bm data) ∗ P (k + 1) d := by
-  have h := elend_fire (hlc := hlc) rt γfs cov logstart P Pmiss k s d dn bm data hok hty hnl
+  have h := elend_fire rt γfs cov logstart P Pmiss k s d dn bm data hok hty hnl
   rw [axHopAns_self rt P Pmiss k d s _ hs hd] at h
   exact h
 

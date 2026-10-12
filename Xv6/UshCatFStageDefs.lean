@@ -106,7 +106,7 @@ theorem catf_ws_head (f : List (BitVec 8)) : (prodWords (.PrCatF f))[0]! = fname
   catWords_head f
 
 section Defs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]
   [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
@@ -115,12 +115,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fi
 
 /-- **Rocq `catf_rows`**: the producer's two standard rows -- fd 1 the first
 pipe's write end, fd 2 the console (deviation 2). -/
-def catfRows (E : UshExecEnv (hlc := hlc) (GF := GF)) (γp : PipeNames) (l : List FdState) : Prop :=
+def catfRows (E : UshExecEnv (GF := GF)) (γp : PipeNames) (l : List FdState) : Prop :=
   (∃ rb : Bool, l[1]? = some (.open rb true (.pipe γp))) ∧ E.ush_fd2p l
 
 /-- **R-pipes' unlanded `UShPipesDefs` / `UShPipesStage` declarations this
 file reads** (parameters, see the header), at the round `D`. -/
-structure UShPipesStageP (D : PdRound hlc GF) (E : UshExecEnv (hlc := hlc) (GF := GF)) where
+structure UShPipesStageP (D : PdRound GF) (E : UshExecEnv (GF := GF)) where
   /-- Rocq `UShPipesDefs.lrd` -/
   lrd : Nat → IProp GF
   /-- ...its body at node 0: the producer's loan -/
@@ -157,7 +157,7 @@ structure UShPipesStageP (D : PdRound hlc GF) (E : UshExecEnv (hlc := hlc) (GF :
       ⌜∃ rb : Bool, ld[1]? = some (.open rb true (.pipe γp))⌝ -∗ ⌜E.ush_fd2p ld⌝ -∗ ⌜6 ≤ av⌝ -∗
       ushCode N'.t -∗ E.ush_jtab N'.t -∗ E.ush_cmd N'.d q (E.UExec args0) -∗ usz N'.s szv -∗
       ustd N'.fd ld -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗ echo_raw γp -∗ D.Rd -∗
-      urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (E.ush_Dg + av)) -∗ wpLoop h')
+      urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (E.ush_Dg + av)) -∗ wpLoop h')
   /-- Rocq `UShPipesDefs.pexcl_left` -/
   pexcl_left : ∀ (k : Nat) (s : List (BitVec 8)), k < D.nc → s ≠ [] →
     ⊢ D.pinv k -∗ □ (∀ (w' : Wid) (s' : List (BitVec 8)),
@@ -178,14 +178,14 @@ structure UShPipesStageP (D : PdRound hlc GF) (E : UshExecEnv (hlc := hlc) (GF :
     ⊢ D.FAM -∗ □ (∀ (w' : Wid) (s' : List (BitVec 8)), ⌜EX w' s'⌝ -∗ pdep D w' s' -∗ pdep D w s ={↑pipeN}=∗ False) -∗
       □ (Cr -∗ R ∗ wcurN D.γc w (1 : Qp).half 0 ∗ wmodeN D.γm w (1 : Qp).half none ∗ pdep D w s) -∗
       □ (R -∗ wcurN D.γc w (1 : Qp).half n -∗ wmodeN D.γm w (1 : Qp).half (some s) -∗
-          (⌜termw w s = false⌝ ∨ ptkV D.T D.v D.I (genId (hlc := hlc) (GF := GF) + 1)) -∗ Cd) -∗
+          (⌜termw w s = false⌝ ∨ ptkV D.T D.v D.I (genId (GF := GF) + 1)) -∗ Cd) -∗
       E.ush_execfail_law_at dg n Cr Cd
   /-- Rocq `UShPipesStage.pdep_left_write` -/
   pdep_left_write : ∀ k : Nat, haltsAt D.fcR D.pr (lfilts D.lR) k →
     ⊢ D.shotsF k -∗ osS (D.gG k) -∗ pdep D (Wid.WLeft k) catDgWrite
 
-variable (D : PdRound hlc GF) (E : UshExecEnv (hlc := hlc) (GF := GF))
-  (S : UShPipesStageP (hlc := hlc) D E)
+variable (D : PdRound GF) (E : UshExecEnv (GF := GF))
+  (S : UShPipesStageP D E)
 
 /-- **Rocq `prod_crD`**: the stage's lend at its exec -- `prod_cr`, the
 fork's shot, the first pipe's persistent facts, and the extra lend `Rd`. -/

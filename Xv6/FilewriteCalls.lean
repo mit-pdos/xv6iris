@@ -47,19 +47,19 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- `begin_op()` at `+0x8c`. -/
-theorem fwr_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
+theorem fwr_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
     (k' : KCtx) (j : Nat) (pidv : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : beginOpSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«begin_op» ∗ procsInv Γ ∗
-    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ fsReady (hlc := hlc) ∗
+    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ fsReady ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
@@ -67,7 +67,7 @@ theorem fwr_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
       wordPointsTo (pPid k'.proc) 4 dqp pidv -∗ logOp icfgLog MAXOPBLOCKS -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := BO.wp_begin_op_eb (hlc := hlc) (GF := GF) Γ c k' icfgLog fscBio
+  have h := BO.wp_begin_op_eb (GF := GF) Γ c k' icfgLog fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscFs j fscLogst icfgDev pidv dqp
     hj hproc hK hnoff htier
   unfold wp_begin_op_eb_body at h
@@ -84,12 +84,12 @@ theorem fwr_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
 set_option maxHeartbeats 4000000 in
 /-- `end_op()` at `+0xc4`: the transaction closes at whatever the chunk left
 of its reservation (END_OP takes any `u`). -/
-theorem fwr_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
+theorem fwr_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
     (k' : KCtx) (j u : Nat) (pidv : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : endOpSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«end_op» ∗ procsInv Γ ∗
-    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗ fsReady ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ logOp icfgLog u ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
@@ -102,7 +102,7 @@ theorem fwr_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] 
   icases fsReady_bio $$ Hfs with ⟨%γl, #Hbc⟩
   icases fsReady_disk $$ Hfs with ⟨%pd, %pav, %pu, #Hdc, %hpd⟩
   ihave #Hlc := fsReady_log $$ Hfs
-  have h := EO.wp_end_op_eb (hlc := hlc) (GF := GF) Γ c k' icfgLog γl fscBio
+  have h := EO.wp_end_op_eb (GF := GF) Γ c k' icfgLog γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev u pidv dqp
     hj hproc hK hnoff htier hgo.fgoLog rfl rfl rfl hpd
   unfold wp_end_op_eb_body at h
@@ -133,7 +133,7 @@ set_option maxHeartbeats 8000000 in
 /-- `ilock(f->ip)` at `+0x94`: THE WRITE ARM (the tx form), the `shotK ty`
 licence, the store-order receipt `topLb Tl` presented (the fd's off-box
 stamps), the environment out of `fsReady`. -/
-theorem fwr_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
+theorem fwr_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
     (k' : KCtx) (j ik : Nat) (s : Qp) (g : GName) (lo tl : Nat) (ty : BitVec 16)
     (inum : BitVec 32) (γil γisl : GName) (pid : BitVec 32) (Tl : Nat)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : ilockSlots ≤ k'.avail)
@@ -141,7 +141,7 @@ theorem fwr_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c
     (hnib : inum.toNat < 16 * icfgNib) (ha0 : k'.regs 10#5 = ientry ik) (hle : lo ≤ tl) :
     kctx c k' ∗ pcIs c KA.«ilock» ∗
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ procsInv Γ ∗ panicEnv ∗
-    fsReady (hlc := hlc) ∗
+    fsReady ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pid ∗ bslot ∗ logTx icfgLog ∗ topLb Tl ∗
@@ -163,7 +163,7 @@ theorem fwr_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c
   ihave #Hesc := fsReady_escrow ik hkk $$ Hfs
   ihave #Hcla := isItable2_claims $$ Hit2
   icases fsReady_sb_four $$ Hfs with ⟨-, #Hsi, -⟩
-  have h := IL.wp_ilock_tx_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j γil γisl ik s g lo tl
+  have h := IL.wp_ilock_tx_eb (GF := GF) Γ c k' γl pd pav pu j γil γisl ik s g lo tl
     (.shotK ty) inum pid pidPriv DFrac.discard Tl hj hproc hK hnoff htier hkk hgo.fgoLog
     (hgo.iblockCov inum hnib) hnib hpd ha0 hle
   unfold wp_ilock_tx_eb_body at h
@@ -194,7 +194,7 @@ theorem fwr_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) (ik
     (htier : k'.tier = KTier.kpt) (hkk : ik < NINODE) (ha0 : k'.regs 10#5 = ientry ik)
     (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlock» ∗
-    trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ procsInv Γ ∗ fsReady (hlc := hlc) ∗
+    trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ procsInv Γ ∗ fsReady ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ fwrLk ik s g lo inum γisl pid ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
     icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗ ityShot g dn.diType ∗
@@ -206,7 +206,7 @@ theorem fwr_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) (ik
       wordPointsTo (pPid k'.proc) 4 pidPriv pid -∗
       inodeShrGenlo ik s icfgDev inum g lo -∗ logTx icfgLog -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := IU.wp_iunlock_tx (hlc := hlc) (GF := GF) Γ cpu k' γil γisl ik s g lo tl icfgDev
+  have h := IU.wp_iunlock_tx (GF := GF) Γ cpu k' γil γisl ik s g lo tl icfgDev
     inum dn bm pid pidPriv (by rw [hnoff]; omega) hK hkk ha0 (by rw [hlocks]; simp)
     (by rw [hlocks]; simp) htier hle
   unfold wp_iunlock_tx_body at h
@@ -234,7 +234,7 @@ chunk's length (writei's deviation 4), the region record the one ilock
 loaded (`dn0 := dn`, so type/nlink stability are reflexivity: Rocq's §19.6
 Part 1), the reservation begin_op minted and `logOp_openS` opened
 (`ncount := MAXOPBLOCKS`), the environment out of `fsReady`. -/
-theorem fwr_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem fwr_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat) (γkl : GName) (γk : KmemNames) (ik : Nat)
     (inum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn : Dinode)
     (off cnt : Nat) (V : ProcPriv) (P : UPtd) (Mv : Nat → List (BitVec 8)) (Sb : List Nat)
@@ -248,7 +248,7 @@ theorem fwr_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (ha0 : k'.regs 10#5 = ientry ik) (ha1 : k'.regs 11#5 = 1#64)
     (ha3 : k'.regs 13#5 = BitVec.ofNat 64 off) (ha4 : k'.regs 14#5 = BitVec.ofNat 64 cnt) :
     kctx c k' ∗ pcIs c KA.«writei» ∗ procsInv Γ ∗
-    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗ fsReady ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     wordPointsTo (iInum (ientry ik)) 4 (DFrac.own (1 : Qp).half) inum ∗
@@ -286,7 +286,7 @@ theorem fwr_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   have hsz : dn.diSize.toNat < 2 ^ 31 := by
     have : MAXFILE * BSIZE = 274432 := rfl
     omega
-  have h := WI.wp_writei_gen_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j γkl γk (ientry ik)
+  have h := WI.wp_writei_gen_eb (GF := GF) Γ c k' γl pd pav pu j γkl γk (ientry ik)
     inum bm data dn dn true off cnt (List.replicate cnt 0#8) { V.updEv kv with upt := P } Mv MAXOPBLOCKS Sb
     pid pidPriv (DFrac.own 1) (DFrac.own (1 : Qp).half) (DFrac.own (1 : Qp).half) DFrac.discard
     DFrac.discard DFrac.discard hj hproc hK hnoff htier hcost hgo.fgoLog (hgo.iblockCov inum hnib)
@@ -313,7 +313,7 @@ set_option maxHeartbeats 8000000 in
 /-- `pipewrite(f->pipe, addr, n)` at `+0x5e`: the eb contract, the block
 converted at the kernel-page-table tier, the generation halves lent and
 returned, the queue's payment in and its post out. -/
-theorem fwr_pipewrite (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem fwr_pipewrite (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
@@ -326,7 +326,7 @@ theorem fwr_pipewrite (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     isPipe γl γp (k'.regs 10#5) ∗ pipeRef γp w q ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
-    pipeWpay (hlc := hlc) γp.pnQueue (writerImg V.upt M) (k'.regs 11#5) Q Qe n.toNat ∗
+    pipeWpay γp.pnQueue (writerImg V.upt M) (k'.regs 11#5) Q Qe n.toNat ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
@@ -334,11 +334,11 @@ theorem fwr_pipewrite (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
       pipeRef γp w q -∗
       procPrivExtEv (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗
       genHalvesPriv (procAddr j) pid V.gen -∗
-      pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) (k'.regs 11#5) Q Qe
-        iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) -∗
+      pipeWpost V.upt γp.pnQueue (writerImg V.upt M) (k'.regs 11#5) Q Qe
+        iprop(killShot V.gen ∗ □ MachFixedGS.killCred (GF := GF)) n.toNat (R' 10#5) -∗
       wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := PW.wp_pipewrite_eb (hlc := hlc) (GF := GF) Γ c k' γl γp w q γkl γk j pid V M n Q Qe hw
+  have h := PW.wp_pipewrite_eb (GF := GF) Γ c k' γl γp w q γkl γk j pid V M n Q Qe hw
     hj hproc hK hnoff htier hn hn'
   unfold wp_pipewrite_eb_body at h
   simp only [pipewriteAddr] at h
@@ -357,7 +357,7 @@ set_option maxHeartbeats 8000000 in
 (Rocq's `+0x7e` `Consolewrite.wp_consolewrite_sconf`): the eb contract,
 the caller's output chain relayed whole, the block converted at the
 kernel-page-table tier. -/
-theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γu : UartNames) (γkl : GName) (γk : KmemNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
     (Q : Nat → IProp GF) (ht : curTier = KTier.kpt)
@@ -367,7 +367,7 @@ theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := 
     kctx c k' ∗ pcIs c KA.«consolewrite» ∗ procsInv Γ ∗
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
     uartPort .uart0 γl γu ∗
-    consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k'.regs 11#5) Q 0 n.toNat ∗
+    consOutChain (genId (GF := GF) + 1) (writerImg V.upt M) (k'.regs 11#5) Q 0 n.toNat ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPrivExt (procAddr j) pid V V.upt M ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (i : Nat),
@@ -379,7 +379,7 @@ theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := 
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
       procPrivExtEv (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗ Q i -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := CW.wp_consolewrite_eb (hlc := hlc) (GF := GF) Γ c k' γl γu γkl γk j pid V M n Q
+  have h := CW.wp_consolewrite_eb (GF := GF) Γ c k' γl γu γkl γk j pid V M n Q
     hj hproc hK hnoff htier huser hn hn'
   unfold wp_consolewrite_eb_body at h
   simp only [consolewriteAddr] at h
@@ -402,7 +402,7 @@ def fwrMsgStr : List (BitVec 8) :=
   [0x66#8, 0x69#8, 0x6c#8, 0x65#8, 0x77#8, 0x72#8, 0x69#8, 0x74#8, 0x65#8]
 
 section Panic
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 set_option maxRecDepth 100000 in
 /-- Rocq's `fw_msg_str`. -/
@@ -420,7 +420,7 @@ theorem fwr_panic [CurCtx] (PA : PANIC) (c : CPU) (k' : KCtx)
     (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«panic» ∗ panicEnv ∗
     cstr KStr.«filewrite» DFrac.discard fwrMsgStr ⊢ wpLoop (GF := GF) c := by
-  have h := PA.wp_panic (hlc := hlc) (GF := GF) c k' (PkArgDesc.str DFrac.discard fwrMsgStr)
+  have h := PA.wp_panic (GF := GF) c k' (PkArgDesc.str DFrac.discard fwrMsgStr)
     hK rfl hnoff hpr huart
   unfold wp_panic_body at h
   simp only [panicAddr] at h

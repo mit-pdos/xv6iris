@@ -156,7 +156,7 @@ def opPending (om : RegMapF OpEntry) (b : Nat) : Prop :=
   ∃ i e, PartialMap.get? om i = some e ∧ b ∈ e.set
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-! ## An active operation -/
@@ -303,10 +303,12 @@ indexing.  Persistent in both arms. -/
 def logCredit (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 b : Nat) : IProp GF :=
   if cr then iprop(⌜b ∈ Sb⌝ ∨ (∃ e : Nat, loggedAt γ e b ∗ ⌜e0 ≤ e⌝)) else iprop(emp)
 
+omit [MachGS GF] in
 instance logCredit_persistent (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 b : Nat) :
     Persistent (logCredit (GF := GF) γ cr Sb e0 b) := by
   unfold logCredit; cases cr <;> simp only [Bool.false_eq_true, if_false, if_true] <;> infer_instance
 
+omit [MachGS GF] in
 /-- The OWN-SET claimant's conversion. -/
 theorem logCredit_own (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 b : Nat)
     (h : cr = true → b ∈ Sb) : ⊢ logCredit (GF := GF) γ cr Sb e0 b := by
@@ -319,6 +321,7 @@ theorem logCredit_own (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 b : Nat)
     ipureintro
     exact h rfl
 
+omit [MachGS GF] in
 /-- The GROUP claimant's: a witness at least as new as my op's birth. -/
 theorem logCredit_group (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 e b : Nat) (hle : e0 ≤ e) :
     loggedAt (GF := GF) γ e b ⊢ logCredit γ cr Sb e0 b := by
@@ -333,6 +336,7 @@ theorem logCredit_group (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 e b : Na
     · iexact Hw
     · ipureintro; exact hle
 
+omit [MachGS GF] in
 /-- SET-MONOTONE, exactly as the pure claim it generalises is. -/
 theorem logCredit_mono (γ : LogNames) (cr : Bool) (Sb Sb' : List Nat) (e0 b : Nat)
     (hsub : ∀ x ∈ Sb, x ∈ Sb') :
@@ -359,7 +363,7 @@ def logMirrorTieBody (M : LogMirror) (L : BlockMap) (cov : Std.ExtTreeSet Nat co
     (ls : Nat) (LB : List Nat) : Prop :=
   ∀ b, fsHome cov ls b → b ∉ LB → PartialMap.get? L b = some (M.view b)
 
-omit [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] in
+omit [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] in
 /-- `log_write`'s two arms: `L` moves at a block that is (now) in the write
 set, so the row survives. -/
 theorem logMirrorTie_insert (M : LogMirror) (L : BlockMap)
@@ -372,7 +376,7 @@ theorem logMirrorTie_insert (M : LogMirror) (L : BlockMap)
   rw [get?_insert_ne hne]
   exact htie c hc (fun h => hcn (hsub c h))
 
-omit [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] in
+omit [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] in
 /-- ...and a write outside the home set leaves the row alone. -/
 theorem logMirrorTie_insert_nothome (M : LogMirror) (L : BlockMap)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (LB : List Nat) (b : Nat)
@@ -384,7 +388,7 @@ theorem logMirrorTie_insert_nothome (M : LogMirror) (L : BlockMap)
   rw [get?_insert_ne hne]
   exact htie c hc hcn
 
-omit [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] in
+omit [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] in
 /-- ...and a mirror write outside the home set too. -/
 theorem logMirrorTie_upd_nothome (M : LogMirror) (L : BlockMap)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (LB : List Nat) (b : Nat)
@@ -396,7 +400,7 @@ theorem logMirrorTie_upd_nothome (M : LogMirror) (L : BlockMap)
   rw [lmUpd_view_ne M b c bs hne]
   exact htie c hc hcn
 
-omit [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] in
+omit [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] in
 /-- Rocq's `log_mirror_tie_deposit`: once the committer carries the
 mirror's VALUE across the commit cycle, row (b) at the deposit is pure
 bookkeeping over the chain. -/
@@ -442,7 +446,7 @@ def logStateAt (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet Nat co
        fsChalf γfs (logSlotBno logstart i) bs) ∗
     bslots ((LOGBLOCKS - n) + 2) ∗
     -- THE ERA'S MIRROR HALF, at the between-commits picture, and ROW (b)
-    logMirrorHalf (hlc := hlc) M ∗ ⌜lmHdr M logstart = (0, [])⌝ ∗
+    logMirrorHalf M ∗ ⌜lmHdr M logstart = (0, [])⌝ ∗
     ⌜logMirrorTieBody M L cov logstart LB⌝
 
 /-- **The lock's resource** (Rocq's `log_res`). -/
@@ -473,7 +477,7 @@ def logResAt (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     -- waiters' hooks, each Pending entry pinned to THIS `ncommit` word and to
     -- `cmt = true ∨ out ≠ 0`.  In BOTH arms; LAST among the non-arm conjuncts
     -- (where the bank used to be, sync cleanups F).
-    logHelp (hlc := hlc) γ nc out cmt ∗
+    logHelp γ nc out cmt ∗
     (if cmt then iprop(emp) else iprop(
       ∃ (n : Nat) (LB : List Nat),
         ⌜n + opSum om ≤ LOGBLOCKS⌝ ∗
@@ -485,7 +489,7 @@ def logResAt (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
         ⌜out = 0 → n = 0⌝ ∗
         -- THE APPLICATION'S TOKEN (Rocq sync K3-3): the era's opaque
         -- `syncTok`, held here while no commit is in flight
-        eraSyncTok (hlc := hlc) (GF := GF) ∗
+        eraSyncTok (GF := GF) ∗
         logStateAt γb γfs cov logstart n LB (opPending om) ξ))
 
 /-! ## The payload transports
@@ -501,17 +505,17 @@ instance instCtxMorphLogStateAt (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart n : Nat) (LB : List Nat) (pend : Nat → Prop) :
     CtxMorph (GF := GF) (fun ξ => logStateAt γb γfs cov logstart n LB pend ξ) := by
   unfold logStateAt
-  refine @instCtxMorphExists _ _ _ _ _ (fun W => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun L => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun D => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun M => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun W => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun L => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun D => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun M => ?_)
   have h1 := ctxMorph_bigSepL (GF := GF) W
     (fun i w => (fun ξ => wordAtN ξ (lhBlock i) 4 (DFrac.own 1) w))
     (fun i w => instCtxMorphWordAtN _ _ _ _)
   have h2 := ctxMorph_bigSepL (GF := GF) (List.range (LOGBLOCKS - n))
     (fun _ i => (fun ξ => iprop(∃ junk : BitVec 32,
       wordAtN ξ (lhBlock (n + i)) 4 (DFrac.own 1) junk)))
-    (fun _ i => @instCtxMorphExists _ _ _ _ _ (fun junk => instCtxMorphWordAtN _ _ _ _))
+    (fun _ i => @instCtxMorphExists _ _ _ _ (fun junk => instCtxMorphWordAtN _ _ _ _))
   have h3 := ctxMorph_bigSepL (GF := GF) cov.toList
     (fun _ b => (fun _ : CtxId => fsDirtyHalf (GF := GF) γfs b (decide (b ∈ LB))))
     (fun _ b => instCtxMorphConst _)
@@ -525,17 +529,17 @@ instance instCtxMorphLogResAt (γ : LogNames) (γb : BcacheNames) (γfs : FsName
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) :
     CtxMorph (GF := GF) (logResAt γ γb γfs cov logstart) := by
   unfold logResAt
-  refine @instCtxMorphExists _ _ _ _ _ (fun out => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun cmt => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun nc => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun om => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun E => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun X => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun T => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun nxo => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun nxt => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun nxl => ?_)
-  have hhelp := instCtxMorphConst (GF := GF) (logHelp (hlc := hlc) γ nc out cmt)
+  refine @instCtxMorphExists _ _ _ _ (fun out => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun cmt => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun nc => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun om => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun E => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun X => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun T => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun nxo => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun nxt => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun nxl => ?_)
+  have hhelp := instCtxMorphConst (GF := GF) (logHelp γ nc out cmt)
   have harm : CtxMorph (GF := GF) (fun ξ =>
       if cmt then iprop(emp) else iprop(
         ∃ (n : Nat) (LB : List Nat),
@@ -543,14 +547,14 @@ instance instCtxMorphLogResAt (γ : LogNames) (γb : BcacheNames) (γfs : FsName
           ⌜∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB⌝ ∗
           ⌜∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB⌝ ∗
           ⌜out = 0 → n = 0⌝ ∗
-          eraSyncTok (hlc := hlc) (GF := GF) ∗
+          eraSyncTok (GF := GF) ∗
           logStateAt γb γfs cov logstart n LB (opPending om) ξ)) := by
     cases cmt
     · simp only [Bool.false_eq_true, if_false]
-      refine @instCtxMorphExists _ _ _ _ _ (fun n => ?_)
-      refine @instCtxMorphExists _ _ _ _ _ (fun LB => ?_)
+      refine @instCtxMorphExists _ _ _ _ (fun n => ?_)
+      refine @instCtxMorphExists _ _ _ _ (fun LB => ?_)
       have := instCtxMorphLogStateAt (GF := GF) γb γfs cov logstart n LB (opPending om)
-      have := instCtxMorphConst (GF := GF) (eraSyncTok (hlc := hlc) (GF := GF))
+      have := instCtxMorphConst (GF := GF) (eraSyncTok (GF := GF))
       infer_instance
     · simp only [if_true]
       exact instCtxMorphConst _
@@ -592,22 +596,22 @@ def logCtx (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   fsBytesAnyAt γfs (fsHomeList cov logstart) ∗
   -- THE ERA'S SWAP RECEIPT (Rocq's `swap_lb (S gen_id)`): pins the crash
   -- record's arm to THIS era in every WAL fupd
-  swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ∗
+  swapLb (GF := GF) (genId (GF := GF) + 1) ∗
   -- BLOCK 1, OWNED (Rocq's `sb_parked`)
   sbParked γfs ∗
   -- THE FILE SYSTEM'S LAW (Rocq's `snap_law`), at the era's sync token
   -- (sync K3-3): the law carries the application's opaque token into the
   -- durable pair and back
-  snapLaw (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) ∗
+  snapLaw γ γfs cov logstart (eraSyncTok (GF := GF)) (genId (GF := GF)) ∗
   -- THE GHOST COMMIT'S THREE (Rocq sync K3-3, `log_ctx`'s last rows): the
   -- HOOKED LAW pinned at the era's two fixed-record slots, the CRASH
   -- INVARIANT it opens (`MachCSL.wpHart_crash_fupd`), and the ERA
   -- CERTIFICATE the record's squeeze reads.  All persistent, all parked by
   -- `initlog`.  LAST, so no pattern that opens this bundle moves.
-  snapLawGhost (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))
-    (eraSyncHook (hlc := hlc) (GF := GF)) ∗
-  crashInv (hlc := hlc) (GF := GF) ∗
-  genCert (hlc := hlc) (GF := GF)
+  snapLawGhost γ γfs cov logstart (eraSyncTok (GF := GF)) (genId (GF := GF))
+    (eraSyncHook (GF := GF)) ∗
+  crashInv (GF := GF) ∗
+  genCert (GF := GF)
 
 variable [FsLinkG GF] [FsTopG GF] in
 instance logCtx_persistent (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
@@ -633,7 +637,7 @@ variable [FsLinkG GF] [FsTopG GF] in
 theorem logCtx_swap (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
     logCtx (GF := GF) γ γb γfs cov logstart dev ⊢
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) := by
+      swapLb (GF := GF) (genId (GF := GF) + 1) := by
   unfold logCtx; iintro ⟨-, -, -, H, -⟩; iexact H
 
 variable [FsLinkG GF] [FsTopG GF] in
@@ -648,7 +652,7 @@ variable [FsLinkG GF] [FsTopG GF] in
 theorem logCtx_snapLaw (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
     logCtx (GF := GF) γ γb γfs cov logstart dev ⊢
-      snapLaw (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) := by
+      snapLaw γ γfs cov logstart (eraSyncTok (GF := GF)) (genId (GF := GF)) := by
   unfold logCtx; iintro ⟨-, -, -, -, -, H, -⟩; iexact H
 
 variable [FsLinkG GF] [FsTopG GF] in
@@ -656,22 +660,22 @@ variable [FsLinkG GF] [FsTopG GF] in
 theorem logCtx_snapLawGhost (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
     logCtx (GF := GF) γ γb γfs cov logstart dev ⊢
-      snapLawGhost (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))
-        (eraSyncHook (hlc := hlc) (GF := GF)) := by
+      snapLawGhost γ γfs cov logstart (eraSyncTok (GF := GF)) (genId (GF := GF))
+        (eraSyncHook (GF := GF)) := by
   unfold logCtx; iintro ⟨-, -, -, -, -, -, H, -⟩; iexact H
 
 variable [FsLinkG GF] [FsTopG GF] in
 /-- The crash invariant (Rocq `log_ctx_crash_inv`). -/
 theorem logCtx_crashInv (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
-    logCtx (GF := GF) γ γb γfs cov logstart dev ⊢ crashInv (hlc := hlc) (GF := GF) := by
+    logCtx (GF := GF) γ γb γfs cov logstart dev ⊢ crashInv (GF := GF) := by
   unfold logCtx; iintro ⟨-, -, -, -, -, -, -, H, -⟩; iexact H
 
 variable [FsLinkG GF] [FsTopG GF] in
 /-- The era certificate (Rocq `log_ctx_gen_cert`). -/
 theorem logCtx_genCert (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
-    logCtx (GF := GF) γ γb γfs cov logstart dev ⊢ genCert (hlc := hlc) (GF := GF) := by
+    logCtx (GF := GF) γ γb γfs cov logstart dev ⊢ genCert (GF := GF) := by
   unfold logCtx; iintro ⟨-, -, -, -, -, -, -, -, H⟩; iexact H
 
 variable [FsLinkG GF] [FsTopG GF] in
@@ -887,7 +891,7 @@ block maps but not the log's own ghosts, and their consumers
 do not all carry `Xv6.LogG`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- The payload's logical content, read off a CLIENT half (Rocq's

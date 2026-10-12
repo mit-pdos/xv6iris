@@ -45,14 +45,14 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section UkSeccWdepWalk
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- seccomp's write stub @0x36c (Rocq `uis_seccomp_36c`/`_36e`/`_372`). -/
 theorem secc_stub_write (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Seccomp.code.byte) 16 User.Seccomp.Sym.«write» :=
+    ⊢ stubLaw N (ukCode N.t User.Seccomp.code.byte) 16 User.Seccomp.Sym.«write» :=
   stub_of_text UL N User.Seccomp.textOk 16 _ 16#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
@@ -62,15 +62,15 @@ mints at the stub's ecall, the ledger riding through. -/
 theorem kseccWb_of_dep (UL : UK_LEAVES) (N : UkNames GF) (fdw : BitVec 64) (b : BitVec 8)
     (l : List FdState) (fdep : UexecSG.sfam GF) :
     ⊢ □ (∀ m : RegMap, ⌜m.get 10#5 = fdw⌝ -∗
-          udepwfStd (hlc := hlc) N (ukWr m 17#5 (BitVec.ofInt 64 16))
+          udepwfStd N (ukWr m 17#5 (BitVec.ofInt 64 16))
             (BitVec.ofNat 64 (User.Seccomp.Sym.«write» + 2)) 16 fdep l) -∗
-      kseccWb (hlc := hlc) N fdw b (ustd N.fd l) (ustd N.fd l) := by
+      kseccWb N fdw b (ustd N.fd l) (ustd N.fd l) := by
   iintro #Hdep
   unfold kseccWb kseccW
   iintro %ua %h %m %avail %ha0 %ha1 %ha2 #Hcode ⟨Hstd, Hb⟩ Hrun Hcont
   have e : ∀ q : BitVec 5, q ≠ 17#5 → (ukWr m 17#5 (BitVec.ofInt 64 16)).get q = m.get q :=
     fun q hq => ukWr_get_other _ _ _ _ hq
-  ihave Hs := secc_stub_write (hlc := hlc) UL N
+  ihave Hs := secc_stub_write UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hcode Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
@@ -93,12 +93,12 @@ theorem kseccWb_of_dep (UL : UK_LEAVES) (N : UkNames GF) (fdw : BitVec 64) (b : 
 end UkSeccWdepWalk
 
 section UkSeccWdep
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 /-- THE DEPOSIT AT THE CONSOLE ROW (Rocq `secc_wdep_of_pay`'s body, deviations
 2, 3): at a ledger whose fd 2 is a writable console, the payer answers the
@@ -106,14 +106,14 @@ write at the trivial families. -/
 theorem uwrite_sup_secc (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (l : List FdState) (rb2 : Bool)
     (h0 : (BitVec.setWidth 32 (m.get 10#5)).toInt = 2)
     (hl2 : l[2]? = some (.open rb2 true (.device CONSOLE))) :
-    seccConsPay (hlc := hlc) (GF := GF) ⊢ udepwfStd (hlc := hlc) (SG := SGX) N m pc 16 (kwcFam N) l := by
+    seccConsPay (GF := GF) ⊢ udepwfStd (SG := SGX) N m pc 16 (kwcFam N) l := by
   iintro #Hc
   unfold udepwfStd
   isplitr
   · ipureintro; rfl
   iintro %M %pm %sz %fdv %cw %gn %cs %pidv %htake - Hh Hf
   iframe Hh Hf
-  iapply sbundleAt_write_intro_at (hlc := hlc) (uslot (hlc := hlc) (SG := SGX)) (kwcFam N)
+  iapply sbundleAt_write_intro_at (uslot (SG := SGX)) (kwcFam N)
     (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) (m.get 10#5) (m.get 11#5) (m.get 12#5) fdv
     M pm sz false (Xv6.tfOf_a0 m pc) (Xv6.tfOf_a1 m pc) (Xv6.tfOf_a2 m pc) rfl rfl rfl rfl rfl
   rw [std_fd_st_of_key (m.get 10#5) fdv l 2 _ (by rw [h0]; rfl) (by decide) htake hl2]
@@ -121,7 +121,7 @@ theorem uwrite_sup_secc (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (l : List
   have hqe : (kwcFam (GF := GF) N).wQe = fun _ _ => iprop(True) := rfl
   rw [hq, hqe]
   iintro %Mv -
-  iapply seccFilewriteIn (hlc := hlc) (GF := GF) (.open rb2 true (.device CONSOLE)) (argZ (m.get 12#5)) pm sz
+  iapply seccFilewriteIn (GF := GF) (.open rb2 true (.device CONSOLE)) (argZ (m.get 12#5)) pm sz
     false Mv (m.get 11#5) $$ Hc []
   unfold seccRow; ipureintro; trivial
 
@@ -129,7 +129,7 @@ theorem uwrite_sup_secc (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (l : List
 at a ledger whose fd 2 is a writable console. -/
 theorem seccWdep_of_pay (UL : UK_LEAVES) (N : UkNames GF) (l : List FdState) (rb2 : Bool)
     (hl2 : l[2]? = some (.open rb2 true (.device CONSOLE))) :
-    seccConsPay (hlc := hlc) (GF := GF) ⊢ seccWdep (hlc := hlc) (SG := SGX) N l := by
+    seccConsPay (GF := GF) ⊢ seccWdep (SG := SGX) N l := by
   iintro #Hc
   unfold seccWdep
   imodintro

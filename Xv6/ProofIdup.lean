@@ -88,7 +88,7 @@ theorem id_filter_itable (l : List String) (h : "itable" ∉ l) :
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
   [FsLinkG GF] [Appcfg GF]
 
@@ -125,7 +125,7 @@ theorem id_acquire [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (c : CPU) (k' : KCtx)
       itableRes2 curCtx fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev -∗
       (∃ K : Nat, viewLb cpu' K) -∗ sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' fscItlock "itable"
+  have h := AC.wp_acquire (GF := GF) c k' fscItlock "itable"
     (fun ξ => itableRes2 (GF := GF) ξ fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev)
     hnoff' hK' hs'
   unfold wp_acquire_body at h
@@ -151,7 +151,7 @@ theorem id_release [Fscfg] [Icfg] [CurCtx] (RE : RELEASE_HOOK) (c : CPU) (k' : K
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "itable"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release_hook (hlc := hlc) (GF := GF) c k' fscItlock "itable"
+  have h := RE.wp_release_hook (GF := GF) c k' fscItlock "itable"
     (fun ξ => itableRes2 (GF := GF) ξ fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev)
     (fun ξ => itableRes2Llb (GF := GF) ξ fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev)
     hsie' hnoff' hK' reen hreen hon
@@ -248,7 +248,7 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
     (hlk : "itable" ∉ k.locks) (ha0 : k.regs 10#5 = ientry kk) :
     kctx cpu k ∗ pcIs cpu KA.«idup» ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    itableInv ∗ iregReg fscIreg fscFs icfgIst icfgNib ∗
     irefSlot ∗ inodeShr kk s icfgDev inum ∗ runitAny inum.toNat ∗
     wpNext k.sie k.proc cpu (idCoreCont k kk s inum)
     ⊢ wpLoop (GF := GF) cpu := by
@@ -309,7 +309,7 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
   have hpins : faPins k R1 := ⟨b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩
   -- THE OPEN (Rocq 384--487)
   iapply wpLoop_fupd
-  imod idup_open (hlc := hlc) kk hkk s inum $$ [Hbox HR Hshr Hru Hislot] with
+  imod idup_open kk hkk s inum $$ [Hbox HR Hshr Hru Hislot] with
     ⟨%M, %qt, %qn, %n, %g, %lo, %tst, %hfacts, Hhalf, Hst, #Hllb, #Hfl, Hlv, Hisl, Hmir, Hru,
       Hcnt, Hclose⟩
   · iframe Hinv Hbox HR Hshr Hru Hislot
@@ -321,7 +321,7 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
   · iframe Hctx Hfl
   ihave Hk := Hkback $$ Hctx
   -- +0x18 c.lw a5,8(s1): THE EXACT READ, an accessor step
-  ihave HAU := iref_readAU_locked (hlc := hlc) c M kk tst K [] hkk ⟨_, hMk⟩ htK
+  ihave HAU := iref_readAU_locked c M kk tst K [] hkk ⟨_, hMk⟩ htK
     $$ [Hhalf Hst]
   · iframe Hinv Hhalf Hst
     iapply BigSepL.bigSepL_nil.2
@@ -340,7 +340,7 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1c c.sw a5,8(s1): the member store, the mover inside the SAME opening
-  ihave HAU := idup_store_au (hlc := hlc) c M kk inum qt qn s n g lo tst
+  ihave HAU := idup_store_au c M kk inum qt qn s n g lo tst
       (idClosed kk s qn inum) hMk hq hno hin
     $$ [Hhalf Hst Hlv Hisl Hmir Hru Hcnt Hclose]
   · iframe Hinv Hrinv Hhalf Hst Hllb Hlv Hisl Hmir Hru Hcnt Hclose
@@ -403,7 +403,7 @@ end
 /-! ## The public contract: ONE PACKAGE IN, TWO OUT (Rocq `wp_idup_sconf`) -/
 
 theorem idup_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : IDUP := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k kk z hnoff hK hkk hlk ha0 => by
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k kk z hnoff hK hkk hlk ha0 => by
   unfold wp_idup_body
   simp only [idupAddr]
   iintro ⟨Hk, Hpc, #Hit, #Hinv, #Hrinv, Hislot, Hheld, Hnext⟩
@@ -442,7 +442,7 @@ theorem idup_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : IDUP := ⟨
     isplitr; · ipureintro; exact hz
     iframe Hnew Hru2,
   -- THE SHARE FORM, PUBLIC (chroot.md §2.2): the core, verbatim
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k kk s inum hnoff hK hkk hlk ha0 => by
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k kk s inum hnoff hK hkk hlk ha0 => by
   unfold wp_idup_shr_body
   simp only [idupAddr]
   exact idup_core AC RE cpu k kk s inum hnoff hK hkk hlk ha0⟩

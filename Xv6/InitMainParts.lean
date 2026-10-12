@@ -80,7 +80,7 @@ theorem kinit_lit_str {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) R
     (fun j hj => (User.litOk_body _ base len j hok hj).1) (User.litOk_nul _ base len hok)
 
 section Steps
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -92,8 +92,8 @@ theorem kinit_la (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : 
     (hv : ukItypeVal .ADDI (ukUtypeVal .AUIPC (BitVec.ofNat 64 pc) 1#20) imm = BitVec.ofNat 64 tgt) :
     ⊢ uinstrIs N.t (BitVec.ofNat 64 pc) false (.UTYPE (1#20, .Regidx rd, .AUIPC)) -∗
       uinstrIs N.t (BitVec.ofNat 64 (pc + 4)) false (.ITYPE (imm, .Regidx rd, .Regidx rd, .ADDI)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 pc) avail -∗
-      ▷ ▷ (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd (BitVec.ofNat 64 tgt)) (BitVec.ofNat 64 (pc + 8)) avail -∗
+      urun N h m (BitVec.ofNat 64 pc) avail -∗
+      ▷ ▷ (∀ h' : CPU, urun N h' (ukWr m rd (BitVec.ofNat 64 tgt)) (BitVec.ofNat 64 (pc + 8)) avail -∗
         wpLoop h') -∗
       wpLoop h := by
   iintro #HU #HI Hrun Hcont

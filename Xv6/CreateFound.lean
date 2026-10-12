@@ -164,7 +164,7 @@ theorem createFound_beqz_tym1 (t : BitVec 16) :
 /-! ## 1.  The process block's pid cell (Rocq's `proc_priv_bare_acc`) -/
 
 section Pid
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 end Pid
@@ -172,7 +172,7 @@ end Pid
 /-! ## 2.  The callees at create's call sites -/
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -198,7 +198,7 @@ set_option maxHeartbeats 8000000 in
 the reference is SHED at its named generation, the share goes to the
 checkout at the plain licence (`runitAny`), the transaction token goes in
 (the tx form), `topLb 0`. -/
-theorem createFound_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
+theorem createFound_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU)
     (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames)
     (pidv : BitVec 32) (dqp dqs : DFrac)
     (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32)
@@ -209,7 +209,7 @@ theorem createFound_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     (ha0 : k'.regs 10#5 = ientry ik) (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«ilock» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv Γ γl pd pav pu γkl γk ∗
     credFloor lo tl ∗ inodeRefGenlo ik q icfgDev inum g lo ∗ runitAny inum.toNat ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslot ∗ logTx icfgLog ∗
@@ -230,8 +230,8 @@ theorem createFound_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   ihave #Hesc := icEscrows_lookup fscIc fscFs fscIreg fscCov fscLogst ik hkk $$ Hescs
   icases icSleeplocks_lookup fscIc ik hkk $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
   ihave #Hcla := isItable2_claims $$ Hit2
-  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (hlc := hlc) (GF := GF))
-  have h := IL.wp_ilock_tx_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j γil γisl
+  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (GF := GF))
+  have h := IL.wp_ilock_tx_eb (GF := GF) Γ cpu k' γl pd pav pu j γil γisl
     ik q.half g lo tl .plainK inum pidv dqp dqs 0 hj hproc hK hnoff htier hkk hgeom hcov
     hnib hpd ha0 hle
   unfold wp_ilock_tx_eb_body at h
@@ -273,7 +273,7 @@ set_option maxHeartbeats 8000000 in
 /-- `iunlockput(ip)` at a create call site (+0x50 / +0x86 / +0x90 / +0x9a),
 UNCREDITED (Rocq's `crb = cru = crz = false`): the tx form; the short
 parent forgotten to `inodeRefpShort`, the off rows re-parked. -/
-theorem createFound_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem createFound_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) (pidv : BitVec 32) (dqp dqb dqs : DFrac)
     (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat)
@@ -289,7 +289,7 @@ theorem createFound_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv Γ γl pd pav pu γkl γk ∗
     createFoundLk pidv ik q g lo tl inum dn γil γisl ∗
     icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
@@ -303,7 +303,7 @@ theorem createFound_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     #Hinv, #Hopen, #Hbmi⟩, ⟨#Hslk, #Hesc, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, Hshot,
     Hfrz, Hkeep, Hru⟩, Hload, Hsb, Hsi, Hpid, Hbs, Hop, HK⟩
   icases logOpS_named icfgLog n Sb $$ Hop with ⟨%e0, Hop⟩
-  have h := IUP.wp_iunlockput_tx_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j
+  have h := IUP.wp_iunlockput_tx_gen_eb (GF := GF) Γ cpu k' γl pd pav pu j
     γil γisl ik q.half q.half g lo tl inum dn bm n Sb false false false e0 pidv dqp dqb dqs
     hj hproc hK hnoff htier hkk (fun h => absurd h (by decide)) (fun h => absurd h (by decide))
     hgeom hbg hcov hlog hnib hbel hn hpd ha0 hle
@@ -363,7 +363,7 @@ set_option maxHeartbeats 8000000 in
 THE BORROWED LICENCE's left disjunct is the `dp->nlink == 0` guard the
 `c.beqz` at +0x2e fell through (Rocq's `left; cr_nl0z`), the borrowed
 region record is the in-core one (premise (6')). -/
-theorem createFound_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem createFound_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) (pidv : BitVec 32) (dqp : DFrac)
     (ik : Nat) (inum : BitVec 32) (bm : Blkmap)
@@ -377,7 +377,7 @@ theorem createFound_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc :
     (hpd : descPageRw pd) (ha0 : k'.regs 10#5 = ientry ik) (ha2 : k'.regs 12#5 = 0#64) :
     kctx cpu k' ∗ pcIs cpu KA.«dirlookup» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv Γ γl pd pav pu γkl γk ∗
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗ inodeBlocks fscFs bm data ∗
     -- the inner lookup's rows (chroot): dp's share and unit, the root cell
@@ -391,7 +391,7 @@ theorem createFound_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc :
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hwf, hcov, -, hty0, hsz, hholes, -⟩ := hok
   have hinums := dirOk_dir icfgNib dn data htype hdok
-  have h := DL.wp_dirlookup_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j γkl
+  have h := DL.wp_dirlookup_eb (GF := GF) Γ cpu k' γl pd pav pu j γkl
     γk (ientry ik) inum bm data dn dn nf false 0#32 pidv dqp (DFrac.own (1 : Qp).half)
     (DFrac.own 1) ik sd rootv rti dqr hj hproc hK hnoff htier htype hgeom hwf hcov hsz hholes hinums
     (Or.inl hnl) horph hty0 rfl hpd ha0 rfl hik
@@ -494,7 +494,7 @@ theorem createFound_loaded_open (ik : Nat) (inum : BitVec 32) (dn : Dinode) (bm 
 set_option maxHeartbeats 8000000 in
 /-- `nameiparent(path, name)` at +0x1c, at the ERA trace: the contract's
 walk start goes in, the continuation is hart-free. -/
-theorem createFound_npar (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem createFound_npar (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) (plen : Nat) (pfun nfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
     (P Pmiss : Nat → Nat → IProp GF) (pid : BitVec 32) (V : ProcPriv)
@@ -510,7 +510,7 @@ theorem createFound_npar (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs (hlc :=
     (hbud : walkNeed (pathElems (bview plen pfun)).length ≤ n) (hpd : descPageRw pd) :
     kctx cpu k' ∗ pcIs cpu KA.«nameiparent» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv Γ γl pd pav pu γkl γk ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     procPrivCoreNoctxAt curCtx k'.proc pid V M ∗
@@ -518,9 +518,9 @@ theorem createFound_npar (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs (hlc :=
     byteBuf (k'.regs 11#5) (DFrac.own 1) (bview 14 nfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
     epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
-    (∀ c : CPU, nparWrapEraPost (hlc := hlc) k' plen pfun n Sb P Pmiss pid V M dqb dqs dqpv c)
+    (∀ c : CPU, nparWrapEraPost k' plen pfun n Sb P Pmiss pid V M dqb dqs dqpv c)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := NP.wp_npar_wrap_era_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j γkl γk plen
+  have h := NP.wp_npar_wrap_era_eb (GF := GF) Γ cpu k' γl pd pav pu j γkl γk plen
     pfun nfun n Sb P Pmiss pid V M dqb dqs dqpv hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel
     hireg hnn hterm hplen hbud hpd
   unfold wp_npar_wrap_era_eb_body at h
@@ -579,19 +579,19 @@ structure CreateFoundFams (GF : BundledGFunctors.{0}) where
   Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)
 
 section Bundles
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The contract's continuation, hart-free, at the bundled arguments. -/
 def createFoundK (k : KCtx) (A : CreateFoundArgs) (F : CreateFoundFams GF) : IProp GF :=
-  iprop(∀ c' : CPU, createPost (hlc := hlc) k A.plen A.pfun A.ty A.major A.minor A.γ A.pid A.V A.M
+  iprop(∀ c' : CPU, createPost k A.plen A.pfun A.ty A.major A.minor A.γ A.pid A.V A.M
     A.u A.Sb A.ns A.dqb A.dqs A.dqbs A.dqn A.dqpv F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex c')
 
 /-- The contract's persistent context, at the bundled arguments. -/
 abbrev createFoundEnv (Γ : SchedNames) (A : CreateFoundArgs) : IProp GF :=
-  createEnv (hlc := hlc) Γ A.γl A.pd A.pav A.pu A.γkl A.γk
+  createEnv Γ A.γl A.pd A.pav A.pu A.γkl A.γk
 
 /-- What the found half OWES BACK and never lends on: two superblock
 cells, the caller's path buffer, the process block minus its pid cell,
@@ -612,11 +612,12 @@ def createFoundFr [CurCtx] (k : KCtx) (v3 : BitVec 64) (nf : Nat → BitVec 8)
   byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFFBE#64) (DFrac.own 1) tl
 
 theorem createFound_env_ftop (Γ : SchedNames) (A : CreateFoundArgs) :
-    createFoundEnv (hlc := hlc) (GF := GF) Γ A ⊢ ftopInv (hlc := hlc) fscFs := by
+    createFoundEnv (GF := GF) Γ A ⊢ ftopInv fscFs := by
   unfold createFoundEnv createEnv
   iintro ⟨-, -, -, -, -, -, -, -, -, -, #Hinv, -, -⟩
-  iapply iregInv_ftop (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
+  iapply iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hinv
 
+omit [MachGS GF] in
 theorem createFound_slots_split (ns : Nat) (h : createIrefSlots ≤ ns) :
     irefSlots (GF := GF) ns ⊢ irefSlots 2 ∗ irefSlots (ns - 2) := by
   have e := create_ns_split ns h
@@ -629,7 +630,7 @@ end Bundles
 /-! ## 4.  The two exits into the funnel -/
 
 section Exits
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -650,7 +651,7 @@ theorem createFound_exit_fail (cpu : CPU) (k : KCtx) (A : CreateFoundArgs)
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     irefSlots m ∗ logOpS icfgLog u' Sb' ∗ logTx icfgLog ∗
-    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
+    creFailArms (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
       F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -694,7 +695,7 @@ theorem createFound_exit_ok (cpu : CPU) (k : KCtx) (A : CreateFoundArgs)
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     irefSlot ∗ logOpS icfgLog u' Sb' ∗
     createLocked A.pid kk q q g inum dn bm ∗
-    creOkArms (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
+    creOkArms (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
       F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) false inum.toNat ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -724,7 +725,7 @@ end Exits
 /-! ## 5.  The arms -/
 
 section Arms
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -733,7 +734,7 @@ set_option maxHeartbeats 16000000 in
 /-- **ARM G (+0x84)**: the guard FIRED -- the parent's link count is ZERO (`sysfile.c:269`).  `c.mv a0,s1`; the parent's `iunlockput`,
 UNCREDITED; `c.li s2,0`; `c.j +0x70`.  The walk reached the parent, so the
 cursor comes home and nothing fired (Rocq's `cr_fail_of_cursor`). -/
-theorem createFound_armG (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem createFound_armG (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : CreateFoundFams GF)
     (hS : CreateStatic k A.j A.pd A.plen A.pfun A.ty A.major A.minor A.u A.ns)
     (spie spp : Bool) (R : RegMap) (v3 ansv : BitVec 64) (nf : Nat → BitVec 8) (tl : List (BitVec 8))
@@ -745,7 +746,7 @@ theorem createFound_armG (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     (hn : iputUnits ≤ n1) (hsub : ∀ x ∈ A.Sb, x ∈ Sb1) (hn1 : n1 ≤ A.u) :
     kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cpu (KA.«create» + 0x84#64) ∗
     createFoundFr k v3 nf tl ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    createFoundEnv (hlc := hlc) Γ A ∗
+    createFoundEnv Γ A ∗
     createFoundLk A.pid kd qd gd lod tld dind dn γil γisl ∗
     icLoaded fscFs fscIreg fscCov fscLogst kd dind dn bm ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -754,7 +755,7 @@ theorem createFound_armG (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     irefSlots 1 ∗ logOpS icfgLog n1 Sb1 ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+    creCommits (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -809,7 +810,7 @@ theorem createFound_armG (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     (by kctx_ext) $$ Hk
   ihave Hsl := irefSlots_combine 1 1 $$ [$Hs1 Hslot]
   · iapply (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl); iexact Hslot
-  ihave Hcf := create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
+  ihave Hcf := create_fail_of_cursor (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
     A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) dind.toNat
     $$ HP Hdl Hcre
   have hns := hS.hns
@@ -823,7 +824,7 @@ set_option maxHeartbeats 16000000 in
 /-- **ARM G2 (+0x8e)**: the NLINK_MAX gate FIRED -- a new DIRECTORY under a parent already at `32767` links (xv6 117c0e7).  `c.mv a0,s1`; the parent's `iunlockput`,
 UNCREDITED; `c.li s2,0`; `c.j +0x70`.  The walk reached the parent, so the
 cursor comes home and nothing fired (Rocq's `cr_fail_of_cursor`). -/
-theorem createFound_armG2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem createFound_armG2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : CreateFoundFams GF)
     (hS : CreateStatic k A.j A.pd A.plen A.pfun A.ty A.major A.minor A.u A.ns)
     (spie spp : Bool) (R : RegMap) (v3 ansv : BitVec 64) (nf : Nat → BitVec 8) (tl : List (BitVec 8))
@@ -835,7 +836,7 @@ theorem createFound_armG2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     (hn : iputUnits ≤ n1) (hsub : ∀ x ∈ A.Sb, x ∈ Sb1) (hn1 : n1 ≤ A.u) :
     kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cpu (KA.«create» + 0x8e#64) ∗
     createFoundFr k v3 nf tl ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    createFoundEnv (hlc := hlc) Γ A ∗
+    createFoundEnv Γ A ∗
     createFoundLk A.pid kd qd gd lod tld dind dn γil γisl ∗
     icLoaded fscFs fscIreg fscCov fscLogst kd dind dn bm ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -844,7 +845,7 @@ theorem createFound_armG2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     irefSlots 1 ∗ logOpS icfgLog n1 Sb1 ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+    creCommits (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -899,7 +900,7 @@ theorem createFound_armG2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     (by kctx_ext) $$ Hk
   ihave Hsl := irefSlots_combine 1 1 $$ [$Hs1 Hslot]
   · iapply (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl); iexact Hslot
-  ihave Hcf := create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
+  ihave Hcf := create_fail_of_cursor (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
     A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) dind.toNat
     $$ HP Hdl Hcre
   have hns := hS.hns
@@ -926,9 +927,9 @@ theorem createFound_armN (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : Creat
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     irefSlots 2 ∗ logOpS icfgLog n1 Sb1 ∗ logTx icfgLog ∗
-    npDead (hlc := hlc) A.V.rti fscFs F.P F.Pmiss (bview A.plen A.pfun) ∗
+    npDead A.V.rti fscFs F.P F.Pmiss (bview A.plen A.pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+    creCommits (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -938,7 +939,7 @@ theorem createFound_armN (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : Creat
   iintro ⟨Hk, Hpc, Hfr, Hte, Hce, Hsi, Hsb, Howe, Hpid, Hbs, Hs2, Hop, Htx, Hdead, Hdl, Hcre,
     Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave Hcf := create_fail_of_dead (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
+  ihave Hcf := create_fail_of_dead (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
     A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun)
     $$ Hdead Hdl Hcre
   -- +0x22  beqz a0 TAKEN
@@ -968,7 +969,7 @@ block): the name was there but is not a file / device create may return.
 `c.mv a0,s2`; the CHILD's `iunlockput`, uncredited; `c.li s2,0`; `c.j
 +0x70`.  The payout is built by the caller (the observation fired at the
 lookup, above both entries). -/
-theorem createFound_fbad (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem createFound_fbad (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : CreateFoundFams GF)
     (hS : CreateStatic k A.j A.pd A.plen A.pfun A.ty A.major A.minor A.u A.ns)
     (spie spp : Bool) (R : RegMap) (v3 dpv : BitVec 64) (nf : Nat → BitVec 8) (tl : List (BitVec 8))
@@ -980,14 +981,14 @@ theorem createFound_fbad (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     (hn : iputUnits ≤ n2) (hsub : ∀ x ∈ A.Sb, x ∈ Sb2) (hn2 : n2 ≤ A.u) :
     kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cpu (KA.«create» + 0x98#64) ∗
     createFoundFr k v3 nf tl ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    createFoundEnv (hlc := hlc) Γ A ∗
+    createFoundEnv Γ A ∗
     createFoundLk A.pid kc qc gc loc tlc cinum dnc γil γisl ∗
     icLoaded fscFs fscIreg fscCov fscLogst kc cinum dnc bmc ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     irefSlots 1 ∗ logOpS icfgLog n2 Sb2 ∗
-    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
+    creFailArms (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
       F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -1057,7 +1058,7 @@ or a device).  Either failure is ARM F-BAD (`createFound_fbad`); both
 passing fall into the funnel as ARM F-OK, which MOVED NOTHING: all four
 commits come home and the payout is the observation the lookup took
 (Rocq's `cr_ok_of_found`). -/
-theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : CreateFoundFams GF)
     (hS : CreateStatic k A.j A.pd A.plen A.pfun A.ty A.major A.minor A.u A.ns)
     (spie spp : Bool) (R : RegMap) (v3 dpv : BitVec 64) (nf : Nat → BitVec 8) (tl : List (BitVec 8))
@@ -1071,7 +1072,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     (hn : iputUnits ≤ n2) (hsub : ∀ x ∈ A.Sb, x ∈ Sb2) (hn2 : n2 ≤ A.u) :
     kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cpu (KA.«create» + 0x5a#64) ∗
     createFoundFr k v3 nf tl ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    createFoundEnv (hlc := hlc) Γ A ∗
+    createFoundEnv Γ A ∗
     createFoundLk A.pid kc qc gc loc tlc cinum dnc γil γisl ∗
     icLoaded fscFs fscIreg fscCov fscLogst kc cinum dnc bmc ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -1084,7 +1085,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     -- child IS dp and carries its `T_DIR` one-shot
     creExFired F.Fex dind.toNat (bname 14 nf) cexv ∗
     (⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR) ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+    creCommits (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -1153,7 +1154,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
           $$ Hslk Hsl [Hdep] Hoff Hdev Hinum Hval Hload Hshot Hfrz [Hkeep] Hru
         · iexists loc, tlc; iframe Hfl Hdep; ipureintro; exact hle
         · iexists loc, tlc; iframe Hfl Hkeep; ipureintro; exact hle
-        ihave Harms := create_ok_of_found (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat
+        ihave Harms := create_ok_of_found (fsGammaL fscFs) A.ty.toNat A.major.toNat
           A.minor.toNat F.Nm F.Nd F.P F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) dind.toNat
           (bname 14 nf) cinum.toNat hlast $$ HP Hex Hcre
         have hty : A.ty = T_FILE_w := BitVec.eq_of_toNat_eq (by rw [hf]; rfl)
@@ -1176,7 +1177,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
         simp only [not_or] at hin; simp [hin.1, hin.2]
       simp only [hb, Bool.not_false, if_true]
       iclear Hsel
-      ihave Hcf := create_fail_of_seen (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat
+      ihave Hcf := create_fail_of_seen (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat
         A.major.toNat A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex
         (bview A.plen A.pfun) dind.toNat (bname 14 nf) cexv hlast $$ HP Hex Hcre
       iapply (createFound_fbad IUP Γ cpu k A F hS spie spp _ v3 dpv nf tl kc qc gc loc tlc cinum
@@ -1189,7 +1190,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     have hb : decide (A.ty.toNat ≠ T_FILE) = true := decide_eq_true hf
     simp only [hb, if_true]
     iclear Hsel
-    ihave Hcf := create_fail_of_seen (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat
+    ihave Hcf := create_fail_of_seen (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat
       A.major.toNat A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex
       (bview A.plen A.pfun) dind.toNat (bname 14 nf) cexv hlast $$ HP Hex Hcre
     iapply (createFound_fbad IUP Γ cpu k A F hS spie spp _ v3 dpv nf tl kc qc gc loc tlc cinum
@@ -1203,7 +1204,7 @@ PARENT's `iunlockput` (uncredited: the ledger's nine cover it, Rocq's
 `cr_budget_found_w`); `c.mv a0,s2`; `ilock(ip)` on the child dirlookup's
 iget referenced -- then the two type tests (`createFound_tests`). -/
 theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : CreateFoundFams GF)
     (hS : CreateStatic k A.j A.pd A.plen A.pfun A.ty A.major A.minor A.u A.ns)
     (spie spp : Bool) (R : RegMap) (v3 : BitVec 64) (nf : Nat → BitVec 8) (tl : List (BitVec 8))
@@ -1218,7 +1219,7 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
     (hn9 : 9 ≤ n1) (hsub : ∀ x ∈ A.Sb, x ∈ Sb1) (hn1 : n1 ≤ A.u) :
     kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cpu (KA.«create» + 0x4e#64) ∗
     createFoundFr k v3 nf tl ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    createFoundEnv (hlc := hlc) Γ A ∗
+    createFoundEnv Γ A ∗
     createFoundLk A.pid kd qd gd lod tld dind dn γil γisl ∗
     icLoaded fscFs fscIreg fscCov fscLogst kd dind dn bm ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -1231,7 +1232,7 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     creExFired F.Fex dind.toNat (bname 14 nf) cexv ∗
     (⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR) ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+    creCommits (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -1324,11 +1325,11 @@ at the lookup's instant under the parent's lock (Rocq's
 lock swap (`createFound_found`).  THE GATE'S FALL-THROUGH FACT `hmax` is
 carried by the join, not by either of the gate's arms. -/
 theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : CreateFoundFams GF)
     (hS : CreateStatic k A.j A.pd A.plen A.pfun A.ty A.major A.minor A.u A.ns)
-    (hA : createFoundEnv (hlc := hlc) (GF := GF) Γ A ⊢
-      createAllocBody (hlc := hlc) k A.plen A.pfun A.ty A.major A.minor A.γ A.pid A.V A.M A.u
+    (hA : createFoundEnv (GF := GF) Γ A ⊢
+      createAllocBody k A.plen A.pfun A.ty A.major A.minor A.γ A.pid A.V A.M A.u
         A.Sb A.ns A.dqb A.dqs A.dqbs A.dqn A.dqpv F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex)
     (spie spp : Bool) (R : RegMap) (v3 ansv : BitVec 64) (nf : Nat → BitVec 8)
     (tl : List (BitVec 8))
@@ -1344,7 +1345,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     (hled : A.u - (walkSpend w + 0) ≤ n1 ∧ n1 ≤ A.u) :
     kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cpu (KA.«create» + 0x3e#64) ∗
     createFoundFr k v3 nf tl ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    createFoundEnv (hlc := hlc) Γ A ∗
+    createFoundEnv Γ A ∗
     createFoundLk A.pid kd qd gd lod tld dind dn γil γisl ∗
     icLoaded fscFs fscIreg fscCov fscLogst kd dind dn bm ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -1353,7 +1354,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     irefSlots 1 ∗ logOpS icfgLog n1 Sb1 ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+    creCommits (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -1528,7 +1529,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     iapply wpLoop_fupd
     ihave Htop := (show topFrag (GF := GF) (fsGammaL fscFs) dind.toNat (eraNode dn bm data) ⊢
       topFragQ (fsGammaL fscFs) (DFrac.own 1) dind.toNat (eraNode dn bm data) from .rfl) $$ Htop
-    imod (mkfDlookup_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) F.Fex dind.toNat cexv (bname 14 nf)
+    imod (mkfDlookup_fire fscFs ⊤ (DFrac.own 1) F.Fex dind.toNat cexv (bname 14 nf)
       (eraNode dn bm data)
       CoPset.subseteq_top (mkfEra_is_dir dn bm data htyz) (Xv6.eraNlink_nz dn bm data hnlz) hents)
       $$ Hft Hdlc Htop with ⟨Htop, %av, %hrow, %hnm, Hrecv⟩
@@ -1571,11 +1572,11 @@ not T_DIR both reach the JOIN (`createFound_join`), each proving the
 fall-through fact its own way; a new directory under a full parent is
 ARM G2 (`createFound_armG2`). -/
 theorem createFound_gate (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : CreateFoundFams GF)
     (hS : CreateStatic k A.j A.pd A.plen A.pfun A.ty A.major A.minor A.u A.ns)
-    (hA : createFoundEnv (hlc := hlc) (GF := GF) Γ A ⊢
-      createAllocBody (hlc := hlc) k A.plen A.pfun A.ty A.major A.minor A.γ A.pid A.V A.M A.u
+    (hA : createFoundEnv (GF := GF) Γ A ⊢
+      createAllocBody k A.plen A.pfun A.ty A.major A.minor A.γ A.pid A.V A.M A.u
         A.Sb A.ns A.dqb A.dqs A.dqbs A.dqn A.dqpv F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex)
     (spie spp : Bool) (R : RegMap) (v3 ansv : BitVec 64) (nf : Nat → BitVec 8)
     (tl : List (BitVec 8))
@@ -1591,7 +1592,7 @@ theorem createFound_gate (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     (hled : A.u - (walkSpend w + 0) ≤ n1 ∧ n1 ≤ A.u) :
     kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cpu (KA.«create» + 0x30#64) ∗
     createFoundFr k v3 nf tl ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    createFoundEnv (hlc := hlc) Γ A ∗
+    createFoundEnv Γ A ∗
     createFoundLk A.pid kd qd gd lod tld dind dn γil γisl ∗
     icLoaded fscFs fscIreg fscCov fscLogst kd dind dn bm ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -1600,7 +1601,7 @@ theorem createFound_gate (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     irefSlots 1 ∗ logOpS icfgLog n1 Sb1 ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+    creCommits (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -1671,11 +1672,11 @@ walker's `T_DIR` (Rocq's `ity_shot_agree`: create needs no parent type test
 of its own); `lh a5,74(s1)`; `c.beqz a5` -- ARM G at `nlink = 0`
 (`createFound_armG`), else the NLINK_MAX gate (`createFound_gate`). -/
 theorem createFound_parent (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : CreateFoundFams GF)
     (hS : CreateStatic k A.j A.pd A.plen A.pfun A.ty A.major A.minor A.u A.ns)
-    (hA : createFoundEnv (hlc := hlc) (GF := GF) Γ A ⊢
-      createAllocBody (hlc := hlc) k A.plen A.pfun A.ty A.major A.minor A.γ A.pid A.V A.M A.u
+    (hA : createFoundEnv (GF := GF) Γ A ⊢
+      createAllocBody k A.plen A.pfun A.ty A.major A.minor A.γ A.pid A.V A.M A.u
         A.Sb A.ns A.dqb A.dqs A.dqbs A.dqn A.dqpv F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex)
     (spie spp : Bool) (R : RegMap) (v3 ansv : BitVec 64) (nf : Nat → BitVec 8)
     (tl : List (BitVec 8))
@@ -1690,7 +1691,7 @@ theorem createFound_parent (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ 
     (hled : A.u - (walkSpend w + 0) ≤ n1 ∧ n1 ≤ A.u) :
     kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cpu (KA.«create» + 0x22#64) ∗
     createFoundFr k v3 nf tl ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    createFoundEnv (hlc := hlc) Γ A ∗
+    createFoundEnv Γ A ∗
     credFloor lod tld ∗ inodeRefGenlo kd qd icfgDev dind gd lod ∗ ityShot gd T_DIR ∗
     runitAny dind.toNat ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -1699,7 +1700,7 @@ theorem createFound_parent (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ 
     irefSlots 1 ∗ logOpS icfgLog n1 Sb1 ∗ logTx icfgLog ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+    creCommits (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -1788,15 +1789,15 @@ process block's CORE lent to it (`procPrivFd_split`), two iref slots out --
 and `c.mv s1,a0`; then ARM N (`createFound_armN`) or the parent
 (`createFound_parent`).  Rocq's `cr_found_half` up to +0x22. -/
 theorem createFound_entry (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : CreateFoundFams GF)
     (hS : CreateStatic k A.j A.pd A.plen A.pfun A.ty A.major A.minor A.u A.ns)
-    (hA : createFoundEnv (hlc := hlc) (GF := GF) Γ A ⊢
-      createAllocBody (hlc := hlc) k A.plen A.pfun A.ty A.major A.minor A.γ A.pid A.V A.M A.u
+    (hA : createFoundEnv (GF := GF) Γ A ⊢
+      createAllocBody k A.plen A.pfun A.ty A.major A.minor A.γ A.pid A.V A.M A.u
         A.Sb A.ns A.dqb A.dqs A.dqbs A.dqn A.dqpv F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex) :
     kctx cpu k ∗ pcIs cpu KA.«create» ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    createFoundEnv (hlc := hlc) Γ A ∗
+    createFoundEnv Γ A ∗
     wordPointsTo sbNinodes 4 A.dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo sbSizeAddr 4 A.dqbs (BitVec.ofNat 32 fscSize) ∗
@@ -1806,7 +1807,7 @@ theorem createFound_entry (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
     bslots 3 ∗ irefSlots A.ns ∗ logOpS icfgLog A.u A.Sb ∗ logTx icfgLog ∗
     epStart fscFs A.V.rti A.V.cwi F.P F.Pmiss (bview A.plen A.pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+    creCommits (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -1919,7 +1920,7 @@ end Arms
 /-! ## 6.  THE FOUND HALF (Rocq's `cr_found_half`) -/
 
 section Half
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -1931,7 +1932,7 @@ whole allocate half, +0xa2 onward, is the PREMISE `hA` (discharged by
 nameiparent, ARMS N / G / G2, dirlookup, the fire, ARMS F-BAD / F-OK and
 the funnel -- is proved here. -/
 theorem create_found_half (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
@@ -1946,10 +1947,10 @@ theorem create_found_half (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
     (hNmL : ∀ nm : Fname, (pathElems (bview plen pfun)).getLast? = some nm → Nm nm)
     (hNdF : ty ≠ T_DIR → Nd (creC0 ty.toNat major.toNat minor.toNat))
     (hNdD : ty = T_DIR → ∀ c : Absnode, Nd c)
-    (hA : createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢
-      createAllocBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
+    (hA : createEnv (GF := GF) Γ γl pd pav pu γkl γk ⊢
+      createAllocBody k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex) :
-    wp_create_sconf_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun
+    wp_create_sconf_eb_body (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun
       ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex
       hS.hj hS.hproc hS.hK hS.hnoff hS.htier hS.hroot hS.hnib0 hS.hgeom hS.hbg hS.hbel hS.hireg
       hS.hnn hS.hterm hS.hplen hS.hn1 hS.hnnib hS.hn31 hS.h16 hS.hty hS.htyk hS.hu hS.hns
@@ -1961,7 +1962,7 @@ theorem create_found_half (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
     #Hinv, #Hopen, Hsn, Hsi, Hss, Hsb, #Hbmi, Hpriv, Hpath, Hbs, Hisl, Hop, Htx, Hst, Hdlc, Hcre,
     Hnext⟩
-  ihave #Henv : createFoundEnv (hlc := hlc) Γ A $$ []
+  ihave #Henv : createFoundEnv Γ A $$ []
   · unfold createFoundEnv createEnv; iframe #
   ihave Hpost : createFoundK k A F $$ [Hnext]
   · unfold createFoundK

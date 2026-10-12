@@ -38,7 +38,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 /-! ## A whole register file as a ghost map -/
 
@@ -346,14 +346,14 @@ def powerBootRes [KernelMap] (Mof : (Nat → BitVec 8) → LogMirror)
   (E.kmapName ↪●MAP KernelMap.static) ∗ kmapStaticAt E ∗
   wireInvAt E ∗
   ([∗list] d ∈ DevId.all, devFragAt E d (σ.devs.st d)) ∗
-  MachFixedGS.consRes (hlc := hlc) (GF := GF) (gen + 1) [] ⟨[], [], [], none⟩ ∗
+  MachFixedGS.consRes (GF := GF) (gen + 1) [] ⟨[], [], [], none⟩ ∗
   Tn (gen + 1) ∗
   -- THE ERA'S ORIGIN TICKET (NI M2-W2d): the power-on's third yield, the
   -- record's `uClaimO` (initproc's one-shot origin claim), on to `<init>`'s park
-  MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
+  MachFixedGS.uClaimO (GF := GF) ∗
   -- THE ERA'S REGISTRATION TICKET (NI M2-X1, finding F1): the record's
   -- `uEraTok` at the era's number, which the era's boot shoots at its names
-  MachFixedGS.uEraTok (hlc := hlc) (GF := GF) (gen + 1) ∗
+  MachFixedGS.uEraTok (GF := GF) (gen + 1) ∗
   (E.mirrorName ↪VAR{.own (1 : Qp).half} (Mof (diskOf σ.devs))) ∗
   swapLb (gen + 1) ∗ Rb gen (diskOf σ.devs) ∗ crashInv
 
@@ -393,9 +393,9 @@ era's registration ticket `uEraTok`, at the same era number
 (`obsBoots (h ++ [.powerOn])`). -/
 def powerYield (Tn : Nat → IProp GF) (on : Bool) (h : List Obs) : IProp GF :=
   if on then iprop(emp)
-  else iprop(MachFixedGS.consRes (hlc := hlc) (GF := GF) (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗
-    Tn (obsBoots h + 1) ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
-    MachFixedGS.uEraTok (hlc := hlc) (GF := GF) (obsBoots h + 1))
+  else iprop(MachFixedGS.consRes (GF := GF) (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗
+    Tn (obsBoots h + 1) ∗ MachFixedGS.uClaimO (GF := GF) ∗
+    MachFixedGS.uEraTok (GF := GF) (obsBoots h + 1))
 
 /-- The power thread is safe, given the client's TRACE HOOK and the boot
 client: at every `PowerOn`, from the boot resources of the fresh era at the
@@ -439,8 +439,8 @@ turn only, as here. -/
 theorem wp_power [KernelMap]
     (Ppure : (Nat → BitVec 8) → Prop)
     (Hproj : ∀ dk : Nat → BitVec 8,
-      diskFixedAuth dk ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ⊢@{IProp GF}
-        ◇ (diskFixedAuth dk ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ∗ ⌜Ppure dk⌝))
+      diskFixedAuth dk ∗ ▷ MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF}
+        ◇ (diskFixedAuth dk ∗ ▷ MachFixedGS.crashPred (GF := GF) ∗ ⌜Ppure dk⌝))
     (Mof : (Nat → BitVec 8) → LogMirror)
     (Rb : Nat → (Nat → BitVec 8) → IProp GF)
     -- THE ERA'S TURN IN THREE STAGES (Rocq sync SY3-A1): `Tn` is what `Hobs`'s
@@ -450,20 +450,20 @@ theorem wp_power [KernelMap]
     (Tn Tn' Tn'' : Nat → IProp GF)
     (Hswap : ∀ (E : EraGS) (gen : Nat) (dk : Nat → BitVec 8),
       eraRegistered gen E ∗ genStarted gen ∗ startAuth (gen + 1) ∗ diskFixedAuth dk ∗
-        (E.mirrorName ↪VAR (Mof dk)) ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ∗
+        (E.mirrorName ↪VAR (Mof dk)) ∗ ▷ MachFixedGS.crashPred (GF := GF) ∗
         Tn (gen + 1)
       ⊢@{IProp GF} |==> ◇ (startAuth (gen + 1) ∗ diskFixedAuth dk ∗
-        ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ∗
+        ▷ MachFixedGS.crashPred (GF := GF) ∗
         (E.mirrorName ↪VAR{.own (1 : Qp).half} (Mof dk)) ∗ swapLb (gen + 1) ∗ Rb gen dk ∗
         Tn' (gen + 1)))
     (Hobs : ∀ (h : List Obs) (on : Bool) (dk : Nat → BitVec 8), traceShape h on →
-      diskFixedAuth dk ∗ ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
-        |==> ◇ (diskFixedAuth dk ∗ ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗
+      diskFixedAuth dk ∗ ▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (diskFixedAuth dk ∗ ▷ MachFixedGS.obsPred (GF := GF) ∗
           obsHalf (h ++ [powerEv on]) ∗ powerYield Tn on h))
     (Hback : ∀ h : List Obs,
-      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [Obs.powerOn]) ∗
+      ▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf (h ++ [Obs.powerOn]) ∗
           Tn' (obsBoots h + 1) ⊢@{IProp GF}
-        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [Obs.powerOn]) ∗
+        |==> ◇ (▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf (h ++ [Obs.powerOn]) ∗
           Tn'' (obsBoots h + 1)))
     -- THE USER-EVENT HOOKS (NI M2-W1, split by M2-W2a): the client's trace
     -- predicate accepts a hart's user exit, and a user entry given its
@@ -474,16 +474,16 @@ theorem wp_power [KernelMap]
     -- position `h.length`; the entry hook is handed the claim it spends;
     -- NI M2-X1: and the entry's evidence `uEvid ox e`)
     (HuserExit : ∀ (h : List Obs) (e : Obs), isUExit e = true →
-      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
-        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]) ∗
-          MachFixedGS.uClaimR (hlc := hlc) (GF := GF) h.length ∗
-          MachFixedGS.uClaimX (hlc := hlc) (GF := GF) h.length e))
+      ▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf (h ++ [e]) ∗
+          MachFixedGS.uClaimR (GF := GF) h.length ∗
+          MachFixedGS.uClaimX (GF := GF) h.length e))
     (HuserEnter : ∀ (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)), isUEnter e = true →
-      MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e →
+      MachFixedGS.uFit (GF := GF) ox e →
       (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
-      uClaimFor (hlc := hlc) (GF := GF) ox ∗ MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e ∗
-      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
-        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
+      uClaimFor (GF := GF) ox ∗ MachFixedGS.uEvid (GF := GF) ox e ∗
+      ▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf (h ++ [e])))
     (Hboot : ∀ (E : EraGS) (gen : Nat) (σ : MState),
       bootFacts σ →
       (∃ ds0 : DevStates, σ.devs = ds0.reset) →
@@ -508,7 +508,7 @@ theorem wp_power [KernelMap]
   icases Hobsi with ⟨%h, %htot, %hwf, Ha⟩
   unfold obsAuth
   icases Ha with ⟨Hhalf, Hhist⟩
-  imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (hlc := hlc) (GF := GF))
+  imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (GF := GF))
     CoPset.subseteq_top) $$ Hoinv with ⟨HP, Hoclose⟩
   imod Hobs h g.pow (diskOf g.m.devs) hwf.1 $$ [Hdisk HP Hhalf] with >⟨Hdisk, HP, Hhalf, Hyield⟩
   · iframe Hdisk HP Hhalf
@@ -572,7 +572,7 @@ theorem wp_power [KernelMap]
     ihave #Hborn := genAuth_get_born _ $$ Hgen
     -- THE CRASH HOOKS, with the crash invariant open and the durable
     -- authority in hand: the projection, then the custody swap
-    imod (inv_acc (E := ⊤) (N := crashN) (P := MachFixedGS.crashPred (hlc := hlc) (GF := GF))
+    imod (inv_acc (E := ⊤) (N := crashN) (P := MachFixedGS.crashPred (GF := GF))
       CoPset.subseteq_top) $$ Hcinv with ⟨HPc, Hcclose⟩
     imod (Hproj (diskOf g.m.devs)) $$ [Hdisk HPc] with ⟨Hdisk, HPc, %hpure⟩
     · iframe Hdisk HPc
@@ -589,7 +589,7 @@ theorem wp_power [KernelMap]
     imod Hcclose $$ HPc
     -- THE RETURN PATH (Rocq sync SY3-A1 re-cut): the trace slot once more, at
     -- the history the on-arm left, turning the swap's yield into the boot's
-    imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (hlc := hlc) (GF := GF))
+    imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (GF := GF))
       CoPset.subseteq_top) $$ Hoinv with ⟨HP2, Hoclose2⟩
     have hback := Hback h
     rw [hbt'] at hback
@@ -622,7 +622,7 @@ theorem wp_power [KernelMap]
     icases BigSepL.bigSepL_sep_eqv.1 $$ Hrc with ⟨Hpins, Hrc⟩
     -- ...beside the user-boundary permit (NI M2-W1), out of the trace
     -- invariant and the client's user-event hook
-    ihave #Hhp : hartObsPermit (hlc := hlc) (GF := GF) $$ [Hoinv]
+    ihave #Hhp : hartObsPermit (GF := GF) $$ [Hoinv]
     · iapply hartObsPermit_of_hook HuserExit HuserEnter
       unfold obsInv
       iexact Hoinv
@@ -756,11 +756,11 @@ namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 /-! ## Instantiating a client at a fresh era
 
-A client proves its harts at the ambient instance (`∀ [MachGS hlc GF], … ⊢
+A client proves its harts at the ambient instance (`∀ [MachGS GF], … ⊢
 wpLoop cpu`).  `Hboot` hands it an era and a generation; `MachGS.ofEra`
 is the ambient instance at those, and `wpLoop_ofEra` turns the client's
 `wpLoop` into the `hartWP` the power thread forks. -/
@@ -770,7 +770,7 @@ running-proc claim `cP` (`MachCSL.KCtx.cpuClaim`; `cI`: the idle claim is
 free).  The handler environment is NOT an instance field: the installed
 handler ∃-packs it (`MachCSL.KCtx.intrResP`, Rocq `IntrDefs.intr_res`). -/
 @[reducible] def MachGS.ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
-    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) : MachGS hlc GF :=
+    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) : MachGS GF :=
   { regName := E.regName, heapName := E.heapName, metaName := E.metaName, viewName := E.viewName, iviewName := E.iviewName,
     rviewName := E.rviewName, topName := E.topName, authName := E.authName, resvName := E.resvName,
     lockSetName := E.lockSetName, kmapName := E.kmapName, kptRootName := E.kptRootName,
@@ -778,12 +778,12 @@ handler ∃-packs it (`MachCSL.KCtx.intrResP`, Rocq `IntrDefs.intr_res`). -/
 
 theorem wpLoop_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
     (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (cpu : CPU) :
-    genCertAt gen E ∗ @wpLoop hlc GF (MachGS.ofEra E gen cP cI) cpu ⊢@{IProp GF}
+    genCertAt gen E ∗ @wpLoop GF (MachGS.ofEra E gen cP cI) cpu ⊢@{IProp GF}
       hartWP gen cpu (pure ()) := by
   iintro ⟨Hcert, Hwp⟩
   unfold wpLoop wpHart
-  rw [show @genId hlc GF (MachGS.ofEra E gen cP cI) = gen from rfl,
-    show @genCert hlc GF (MachGS.ofEra E gen cP cI) = genCertAt gen E from rfl]
+  rw [show @genId GF (MachGS.ofEra E gen cP cI) = gen from rfl,
+    show @genCert GF (MachGS.ofEra E gen cP cI) = genCertAt gen E from rfl]
   iapply Hwp
   iexact Hcert
 

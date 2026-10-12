@@ -33,7 +33,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -41,27 +41,27 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [U
 theorem wp_kinit_fork (UL : UK_LEAVES) (N : UkNames GF) (T : IProp GF) [Persistent T] (stc : FdState)
     (Cr : ConsCred GF) (cn : ConsNames) (l : List FdState) (γ : GName) (np : Nat) (szv : Nat) (h : CPU)
     (m : RegMap) (avail : Nat) (Sc : ExtTreeSet GName compare)
-    (hkt : ⊢ initKillLaw (hlc := hlc) T stc Cr.ccWp (ccWbn Cr)) :
-    ⊢ initCode N.t -∗ initArgv N.d -∗ usz N.s szv -∗ uconsPay (hlc := hlc) cn γ T Cr.ccRd (-1) -∗
-      upos (hlc := hlc) γ np -∗ initLendCred T stc Cr.ccWp (ccWbn Cr) l np -∗ ustdOk T N.fd l -∗
+    (hkt : ⊢ initKillLaw T stc Cr.ccWp (ccWbn Cr)) :
+    ⊢ initCode N.t -∗ initArgv N.d -∗ usz N.s szv -∗ uconsPay cn γ T Cr.ccRd (-1) -∗
+      upos γ np -∗ initLendCred T stc Cr.ccWp (ccWbn Cr) l np -∗ ustdOk T N.fd l -∗
       ufdRow T stc l -∗ ucwd N.cwd ROOTINO -∗ uch N.ch Sc -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«fork») avail -∗
+      urun N h m (BitVec.ofNat 64 User.Init.Sym.«fork») avail -∗
       ((∀ (h' : CPU) (r : BitVec 64), ⌜r ≠ 0#64⌝ -∗
-          ((⌜r = -1#64⌝ ∗ uch N.ch Sc ∗ upos (hlc := hlc) γ np ∗ uconsPay (hlc := hlc) cn γ T Cr.ccRd (-1) ∗
+          ((⌜r = -1#64⌝ ∗ uch N.ch Sc ∗ upos γ np ∗ uconsPay cn γ T Cr.ccRd (-1) ∗
               initLendCred T stc Cr.ccWp (ccWbn Cr) l np) ∨
             ∃ (γc : GName) (pidv : BitVec 32), ⌜r = BitVec.signExtend 64 pidv⌝ ∗
               ⌜1 ≤ pidv.toNat ∧ pidv.toNat ≤ PIDMAX⌝ ∗
-              childTok γc pidv (uconsPay (hlc := hlc) cn γ T (initRd Cr.ccRd (ccWbn Cr))) ∗
+              childTok γc pidv (uconsPay cn γ T (initRd Cr.ccRd (ccWbn Cr))) ∗
               uch N.ch (Sc ∪ {γc})) -∗
           iprop(initCode N.t ∗ initArgv N.d) -∗ usz N.s szv -∗ ustdOk T N.fd l -∗ ucwd N.cwd ROOTINO -∗
-          urun (hlc := hlc) N h' (stubRet m 1 r) (retPc (m.get 1#5)) avail -∗ wpLoop h') ∗
+          urun N h' (stubRet m 1 r) (retPc (m.get 1#5)) avail -∗ wpLoop h') ∗
         (∀ (N' : UkNames GF) (h' : CPU),
-          ⌜N'.pay = uconsPay (hlc := hlc) cn γ T (initRd Cr.ccRd (ccWbn Cr))⌝ -∗
+          ⌜N'.pay = uconsPay cn γ T (initRd Cr.ccRd (ccWbn Cr))⌝ -∗
           iprop(initCode N'.t ∗ initArgv N'.d) -∗ usz N'.s szv -∗ ustdOk T N'.fd l -∗ ufdRow T stc l -∗
-          initLendCred T stc Cr.ccWp (ccWbn Cr) l np -∗ upos (hlc := hlc) γ np -∗
-          uconsPay (hlc := hlc) cn γ T Cr.ccRd (-1) -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗
+          initLendCred T stc Cr.ccWp (ccWbn Cr) l np -∗ upos γ np -∗
+          uconsPay cn γ T Cr.ccRd (-1) -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗
           (∃ p : Int, ⌜p ≠ 1⌝ ∗ upid N'.pid p) -∗
-          urun (hlc := hlc) N' h' (stubRet m 1 0#64) (retPc (m.get 1#5)) avail -∗ wpLoop h')) -∗
+          urun N' h' (stubRet m 1 0#64) (retPc (m.get 1#5)) avail -∗ wpLoop h')) -∗
       wpLoop h := by
   iintro #Hc #Hargv Hsz HQ Hpos Hcred Hstd #Hrow Hcwd Hch Hrun ⟨Hpar, Hchi⟩
   unfold ustdOk
@@ -81,8 +81,8 @@ theorem wp_kinit_fork (UL : UK_LEAVES) (N : UkNames GF) (T : IProp GF) [Persiste
   -- 0x36c  ecall: the leaf that returns twice
   ihave Hi := init_uis N.t (User.Init.Sym.«fork» + 2) false (.ECALL ()) udec% (by decide) $$ Hc
   iapply wp_uk_ecall_fork_at UL N h1 (ukWr m 17#5 (BitVec.ofInt 64 1)) (BitVec.ofNat 64 (User.Init.Sym.«fork» + 2))
-    avail szv l ∅ ROOTINO vw Sc (uconsPay (hlc := hlc) cn γ T (initRd Cr.ccRd (ccWbn Cr)))
-    iprop(upos (hlc := hlc) γ np ∗ uconsPay (hlc := hlc) cn γ T Cr.ccRd (-1) ∗
+    avail szv l ∅ ROOTINO vw Sc (uconsPay cn γ T (initRd Cr.ccRd (ccWbn Cr)))
+    iprop(upos γ np ∗ uconsPay cn γ T Cr.ccRd (-1) ∗
       initLendCred T stc Cr.ccWp (ccWbn Cr) l np)
     (fun γt γd _ => iprop(initCode γt ∗ initArgv γd))
     (by have e := kinit_usysno m (BitVec.ofInt 64 1); unfold UkSysP.usysno at e; unfold usysno; rw [e]; decide) (by decide)
@@ -93,7 +93,7 @@ theorem wp_kinit_fork (UL : UK_LEAVES) (N : UkNames GF) (T : IProp GF) [Persiste
     iempintro
   · imodintro
     iintro #HK
-    iapply uconsPay_taint (hlc := hlc) cn γ T _ (-1)
+    iapply uconsPay_taint cn γ T _ (-1)
     iapply Hkw $$ HK
   isplitl [Hpar]
   · -- the PARENT resumes under the names it already had

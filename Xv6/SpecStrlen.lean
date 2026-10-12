@@ -30,7 +30,7 @@ open LeanRV64D
 def strlenAddr : BitVec 64 := KA.«strlen»
 
 /-- **WP of `strlen`.** -/
-def wp_strlen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_strlen_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (s : List (BitVec 8)) (dq : DFrac) (hK : 2 ≤ k.avail)
     (hn31 : s.length < 2 ^ 31) : Prop :=
   kctx cpu k ∗ pcIs cpu strlenAddr ∗ cstr (k.regs 10#5) dq s ∗
@@ -42,8 +42,8 @@ def wp_strlen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Cu
 
 /-- The interface of `strlen`. -/
 structure STRLEN : Prop where
-  wp_strlen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+  wp_strlen : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (s : List (BitVec 8)) (dq : DFrac) hK hn31,
-    wp_strlen_body (hlc := hlc) (GF := GF) cpu k s dq hK hn31
+    wp_strlen_body (GF := GF) cpu k s dq hK hn31
 
 end Xv6

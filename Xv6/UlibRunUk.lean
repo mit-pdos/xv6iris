@@ -157,7 +157,7 @@ theorem uTextDecode_real {t : User.UTextTree} {img : ElfMem} (hok : User.UTextOk
           · rw [if_neg hc] at h; cases h
 
 section UlibUk
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -166,6 +166,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [S
 /-- One half of the hart variable `γ`, at hart `h`. -/
 def ulibHart (γ : GName) (h : CPU) : IProp GF := ghost_var (A := Nat) γ (DFrac.own (1 : Qp).half) h.val
 
+omit [MachGS GF] in
 theorem ulibHart_agree (γ : GName) (h h0 : CPU) :
     ⊢@{IProp GF} ulibHart γ h -∗ ulibHart γ h0 -∗ ⌜h = h0⌝ := by
   unfold ulibHart
@@ -174,12 +175,14 @@ theorem ulibHart_agree (γ : GName) (h h0 : CPU) :
   ipureintro
   exact Fin.ext e
 
+omit [MachGS GF] in
 theorem ulibHart_move (γ : GName) (h h0 h' : CPU) :
     ⊢@{IProp GF} ulibHart γ h -∗ ulibHart γ h0 ==∗ ulibHart γ h' ∗ ulibHart γ h' := by
   unfold ulibHart
   iintro H1 H2
   iapply ghost_var_update_halves $$ H1 H2
 
+omit [MachGS GF] in
 theorem ulibHart_alloc (h : CPU) : ⊢@{IProp GF} |==> ∃ γ, ulibHart γ h ∗ ulibHart γ h := by
   imod ghost_var_alloc (GF := GF) (A := Nat) h.val with ⟨%γ, H⟩
   imodintro
@@ -193,19 +196,19 @@ theorem ulibHart_alloc (h : CPU) : ⊢@{IProp GF} |==> ∃ γ, ulibHart γ h ∗
 
 /-- The run: the real run at some hart, with one half of the variable. -/
 def ulibUkRun (N : UkNames GF) (γ : GName) (m : RegMap) (pc : BitVec 64) (av : Nat) : IProp GF :=
-  iprop(∃ h : CPU, urun (hlc := hlc) N h m pc av ∗ ulibHart γ h)
+  iprop(∃ h : CPU, urun N h m pc av ∗ ulibHart γ h)
 
 /-- The goal: the loop at the hart the other half names. -/
-def ulibUkGoal (γ : GName) : IProp GF := iprop(∀ h : CPU, ulibHart γ h -∗ wpLoop (hlc := hlc) h)
+def ulibUkGoal (γ : GName) : IProp GF := iprop(∀ h : CPU, ulibHart γ h -∗ wpLoop h)
 
 /-- **THE LEAF LIFT**: a real leaf (continuation under `▷`, handing `Q` back
 before re-quantifying the hart) is a stand-in leaf. -/
 theorem ulibUk_lift (N : UkNames GF) (γ : GName) {m : RegMap} {pc : BitVec 64} {av : Nat}
     {m' : RegMap} {pc' : BitVec 64} {av' : Nat} {P Q : IProp GF}
-    (H : ∀ h : CPU, ⊢ P -∗ urun (hlc := hlc) N h m pc av -∗
-      ▷ (Q -∗ ∀ h' : CPU, urun (hlc := hlc) N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h) :
-    ⊢ P -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (Q -∗ ulibUkRun (hlc := hlc) N γ m' pc' av' -∗ ulibUkGoal (hlc := hlc) γ) -∗ ulibUkGoal (hlc := hlc) γ := by
+    (H : ∀ h : CPU, ⊢ P -∗ urun N h m pc av -∗
+      ▷ (Q -∗ ∀ h' : CPU, urun N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h) :
+    ⊢ P -∗ ulibUkRun N γ m pc av -∗
+      (Q -∗ ulibUkRun N γ m' pc' av' -∗ ulibUkGoal γ) -∗ ulibUkGoal γ := by
   unfold ulibUkRun ulibUkGoal
   iintro HP ⟨%h, Hrun, Ht⟩ Hk %h0 Ht0
   ihave %e := ulibHart_agree γ h h0 $$ Ht Ht0
@@ -223,12 +226,12 @@ theorem ulibUk_lift (N : UkNames GF) (γ : GName) {m : RegMap} {pc : BitVec 64} 
 /-- The lift for a leaf that hands nothing back. -/
 theorem ulibUk_lift0 (N : UkNames GF) (γ : GName) {m : RegMap} {pc : BitVec 64} {av : Nat}
     {m' : RegMap} {pc' : BitVec 64} {av' : Nat} {P : IProp GF}
-    (H : ∀ h : CPU, ⊢ P -∗ urun (hlc := hlc) N h m pc av -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h) :
-    ⊢ P -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ m' pc' av' -∗ ulibUkGoal (hlc := hlc) γ) -∗ ulibUkGoal (hlc := hlc) γ := by
-  have H' : ∀ h : CPU, ⊢ P -∗ urun (hlc := hlc) N h m pc av -∗
-      ▷ (iprop(emp) -∗ ∀ h' : CPU, urun (hlc := hlc) N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h := by
+    (H : ∀ h : CPU, ⊢ P -∗ urun N h m pc av -∗
+      ▷ (∀ h' : CPU, urun N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h) :
+    ⊢ P -∗ ulibUkRun N γ m pc av -∗
+      (ulibUkRun N γ m' pc' av' -∗ ulibUkGoal γ) -∗ ulibUkGoal γ := by
+  have H' : ∀ h : CPU, ⊢ P -∗ urun N h m pc av -∗
+      ▷ (iprop(emp) -∗ ∀ h' : CPU, urun N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h := by
     intro h
     iintro HP Hr Hc
     iapply H h $$ HP Hr
@@ -243,12 +246,12 @@ theorem ulibUk_lift0 (N : UkNames GF) (γ : GName) {m : RegMap} {pc : BitVec 64}
 /-- The lift for a leaf with two premises. -/
 theorem ulibUk_lift2 (N : UkNames GF) (γ : GName) {m : RegMap} {pc : BitVec 64} {av : Nat}
     {m' : RegMap} {pc' : BitVec 64} {av' : Nat} {A B Q : IProp GF}
-    (H : ∀ h : CPU, ⊢ A -∗ B -∗ urun (hlc := hlc) N h m pc av -∗
-      ▷ (Q -∗ ∀ h' : CPU, urun (hlc := hlc) N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h) :
-    ⊢ A -∗ B -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (Q -∗ ulibUkRun (hlc := hlc) N γ m' pc' av' -∗ ulibUkGoal (hlc := hlc) γ) -∗ ulibUkGoal (hlc := hlc) γ := by
-  have H' : ∀ h : CPU, ⊢ iprop(A ∗ B) -∗ urun (hlc := hlc) N h m pc av -∗
-      ▷ (Q -∗ ∀ h' : CPU, urun (hlc := hlc) N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h := by
+    (H : ∀ h : CPU, ⊢ A -∗ B -∗ urun N h m pc av -∗
+      ▷ (Q -∗ ∀ h' : CPU, urun N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h) :
+    ⊢ A -∗ B -∗ ulibUkRun N γ m pc av -∗
+      (Q -∗ ulibUkRun N γ m' pc' av' -∗ ulibUkGoal γ) -∗ ulibUkGoal γ := by
+  have H' : ∀ h : CPU, ⊢ iprop(A ∗ B) -∗ urun N h m pc av -∗
+      ▷ (Q -∗ ∀ h' : CPU, urun N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h := by
     intro h
     iintro ⟨HA, HB⟩ Hr Hc
     iapply H h $$ HA HB Hr Hc
@@ -261,12 +264,12 @@ theorem ulibUk_lift2 (N : UkNames GF) (γ : GName) {m : RegMap} {pc : BitVec 64}
 /-- The lift for a leaf with two premises that hands nothing back. -/
 theorem ulibUk_lift20 (N : UkNames GF) (γ : GName) {m : RegMap} {pc : BitVec 64} {av : Nat}
     {m' : RegMap} {pc' : BitVec 64} {av' : Nat} {A B : IProp GF}
-    (H : ∀ h : CPU, ⊢ A -∗ B -∗ urun (hlc := hlc) N h m pc av -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h) :
-    ⊢ A -∗ B -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ m' pc' av' -∗ ulibUkGoal (hlc := hlc) γ) -∗ ulibUkGoal (hlc := hlc) γ := by
-  have H' : ∀ h : CPU, ⊢ iprop(A ∗ B) -∗ urun (hlc := hlc) N h m pc av -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h := by
+    (H : ∀ h : CPU, ⊢ A -∗ B -∗ urun N h m pc av -∗
+      ▷ (∀ h' : CPU, urun N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h) :
+    ⊢ A -∗ B -∗ ulibUkRun N γ m pc av -∗
+      (ulibUkRun N γ m' pc' av' -∗ ulibUkGoal γ) -∗ ulibUkGoal γ := by
+  have H' : ∀ h : CPU, ⊢ iprop(A ∗ B) -∗ urun N h m pc av -∗
+      ▷ (∀ h' : CPU, urun N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h := by
     intro h
     iintro ⟨HA, HB⟩ Hr Hc
     iapply H h $$ HA HB Hr Hc
@@ -281,11 +284,11 @@ contract over `urun`/`wpLoop`: the variable is allocated at the caller's
 hart. -/
 theorem ulibUk_run (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (av : Nat)
     (pc' : BitVec 64) (av' : Nat) (P : IProp GF) (Φ : RegMap → IProp GF)
-    (H : ∀ γ : GName, ⊢ P -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (∀ m' : RegMap, Φ m' -∗ ulibUkRun (hlc := hlc) N γ m' pc' av' -∗ ulibUkGoal (hlc := hlc) γ) -∗
-      ulibUkGoal (hlc := hlc) γ) :
-    ⊢ P -∗ urun (hlc := hlc) N h m pc av -∗
-      (∀ (h' : CPU) (m' : RegMap), Φ m' -∗ urun (hlc := hlc) N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h := by
+    (H : ∀ γ : GName, ⊢ P -∗ ulibUkRun N γ m pc av -∗
+      (∀ m' : RegMap, Φ m' -∗ ulibUkRun N γ m' pc' av' -∗ ulibUkGoal γ) -∗
+      ulibUkGoal γ) :
+    ⊢ P -∗ urun N h m pc av -∗
+      (∀ (h' : CPU) (m' : RegMap), Φ m' -∗ urun N h' m' pc' av' -∗ wpLoop h') -∗ wpLoop h := by
   iintro HP Hrun Hk
   iapply wpLoop_bupd
   imod ulibHart_alloc (GF := GF) h with ⟨%γ, Ht1, Ht2⟩
@@ -308,9 +311,9 @@ theorem ulibUk_load (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc
     (avail : Nat) (hns : unotSp rd) (hk : ukWidth k) (hva : m.get rs1 + BitVec.signExtend 64 imm = BitVec.ofNat 64 a)
     (hal : a % k = 0) :
     ⊢ uinstrIs N.t pc isRvc (.LOAD (imm, .Regidx rs1, .Regidx rd, u, (k : Int))) -∗
-      ubytesq N.d dq a k (nthByte w) -∗ urun (hlc := hlc) N h m pc avail -∗
+      ubytesq N.d dq a k (nthByte w) -∗ urun N h m pc avail -∗
       ▷ (ubytesq N.d dq a k (nthByte w) -∗ ∀ h' : CPU,
-          urun (hlc := hlc) N h' (ukWr m rd (extend_value u w)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' (ukWr m rd (extend_value u w)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h := by
   apply urun_step_mem N h m pc avail isRvc _ _ _ _ _ (fun M pm => UkDataAcc M pm a k w) id
     (ukWr_x0 m rd _) (unotSp_wr rd _ m hns)
@@ -339,9 +342,9 @@ theorem ulibUk_loadText (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (avail : Nat) (hns : unotSp rd) (hk : ukWidth k) (hva : m.get rs1 + BitVec.signExtend 64 imm = BitVec.ofNat 64 a)
     (hal : a % k = 0) :
     ⊢ uinstrIs N.t pc isRvc (.LOAD (imm, .Regidx rs1, .Regidx rd, u, (k : Int))) -∗
-      ([∗list] j ∈ List.range k, utext N.t (a + j) (nthByte w j)) -∗ urun (hlc := hlc) N h m pc avail -∗
+      ([∗list] j ∈ List.range k, utext N.t (a + j) (nthByte w j)) -∗ urun N h m pc avail -∗
       ▷ (∀ h' : CPU,
-          urun (hlc := hlc) N h' (ukWr m rd (extend_value u w)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' (ukWr m rd (extend_value u w)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h := by
   have H0 := urun_step_mem N h m pc avail isRvc (.LOAD (imm, .Regidx rs1, .Regidx rd, u, (k : Int)))
     (ukWr m rd (extend_value u w)) (pc + instrLen isRvc)
@@ -375,9 +378,9 @@ theorem ulibUk_store (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p
     (avail : Nat) (hk : ukWidth k) (hva : m.get rs1 + BitVec.signExtend 64 imm = BitVec.ofNat 64 a)
     (hal : a % k = 0) :
     ⊢ uinstrIs N.t pc isRvc (.STORE (imm, .Regidx rs2, .Regidx rs1, (k : Int))) -∗
-      ubytes N.d a k (nthByte w0) -∗ urun (hlc := hlc) N h m pc avail -∗
+      ubytes N.d a k (nthByte w0) -∗ urun N h m pc avail -∗
       ▷ (ubytes N.d a k (nthByte (n := 8) (m.get rs2)) -∗ ∀ h' : CPU,
-          urun (hlc := hlc) N h' m (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' m (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h := by
   apply urun_step_mem N h m pc avail isRvc _ _ _ _ _ (fun M pm => UkDataAcc M pm a k w0)
     (fun M => uMWrite M a k (nthByte (n := 8) (m.get rs2))) id rfl
@@ -401,16 +404,19 @@ theorem ulibUk_va (m : RegMap) (rs1 : BitVec 5) (imm : BitVec 12) (a : Nat)
     m.get rs1 + BitVec.signExtend 64 imm = BitVec.ofNat 64 a := by
   rw [ha, ulibRget_eq, Xv6.ofNat_toNat_pc]
 
+omit [MachGS GF] in
 theorem ulibUk_byteF (γd : GName) (dq : DFrac) (a : Nat) (f : Nat → BitVec 8) (c : BitVec 8) (hf : f 0 = c) :
     ubyteq (GF := GF) γd dq a c ⊣⊢ ubytesq γd dq a 1 f := by
   refine BiEntails.trans ?_ (ubytesq_one γd dq a f).symm
   rw [hf]
   exact .rfl
 
+omit [MachGS GF] in
 theorem ulibUk_byte1 (γd : GName) (dq : DFrac) (a : Nat) (b : BitVec 8) :
     ubyteq (GF := GF) γd dq a b ⊣⊢ ubytesq γd dq a 1 (nthByte (n := 1) b) :=
   ulibUk_byteF γd dq a _ b (nthByte_one b)
 
+omit [MachGS GF] in
 theorem ulibUk_body_succ (γd : GName) (sp : BitVec 64) (k d : Nat) (hd : d = 8 * (k + 1)) :
     ustackBody (GF := GF) γd sp (k + 1) ⊣⊢ ustackBody γd sp k ∗ ∃ w : BitVec 64, uword γd (sp.toNat - d) w := by
   subst hd
@@ -418,6 +424,7 @@ theorem ulibUk_body_succ (γd : GName) (sp : BitVec 64) (k d : Nat) (hd : d = 8 
   rw [List.range_succ]
   exact BigSepL.bigSepL_snoc
 
+omit [MachGS GF] in
 theorem ulibUk_body_zero (γd : GName) (sp : BitVec 64) : ustackBody (GF := GF) γd sp 0 ⊣⊢ emp := by
   unfold ustackBody; simp only [List.range_zero]; exact BigSepL.bigSepL_nil
 
@@ -431,7 +438,7 @@ variable (UL : UK_LEAVES) (N : UkNames GF) (γ : GName)
 
 /-- The stand-in's view of the stack, the real `ustack`. -/
 theorem ulibUk_urun_stack (m : RegMap) (pc : BitVec 64) (av : Nat) :
-    ulibUkRun (hlc := hlc) N γ m pc av ⊢ ⌜(m 2#5).toNat % 8 = 0 ∧ 8 * av ≤ (m 2#5).toNat⌝ := by
+    ulibUkRun N γ m pc av ⊢ ⌜(m 2#5).toNat % 8 = 0 ∧ 8 * av ≤ (m 2#5).toNat⌝ := by
   unfold ulibUkRun urun ustack
   iintro ⟨%h, ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
     %hRut, %hx0, -, ⟨%hs, -⟩, -, -, -, -, -, -⟩, -⟩
@@ -440,7 +447,7 @@ theorem ulibUk_urun_stack (m : RegMap) (pc : BitVec 64) (av : Nat) :
   exact hs
 
 theorem ulibUk_urun_ubyteq_bnd (m : RegMap) (pc : BitVec 64) (av : Nat) (dq : DFrac) (a : Nat) (b : BitVec 8) :
-    ulibUkRun (hlc := hlc) N γ m pc av ∗ ubyteq N.d dq a b ⊢ ⌜a < 2 ^ 64⌝ := by
+    ulibUkRun N γ m pc av ∗ ubyteq N.d dq a b ⊢ ⌜a < 2 ^ 64⌝ := by
   unfold ulibUkRun urun
   iintro ⟨⟨%h, ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
     %hRut, %hx0, Hheap, -, -, -, -, -, -, -⟩, -⟩, Hb⟩
@@ -449,7 +456,7 @@ theorem ulibUk_urun_ubyteq_bnd (m : RegMap) (pc : BitVec 64) (av : Nat) (dq : DF
   exact Nat.lt_trans hb.2.2 uCap_lt64
 
 theorem ulibUk_urun_uwordq_bnd (m : RegMap) (pc : BitVec 64) (av : Nat) (dq : DFrac) (a : Nat) (w : BitVec 64) :
-    ulibUkRun (hlc := hlc) N γ m pc av ∗ uwordq N.d dq a w ⊢ ⌜a + 8 ≤ 2 ^ 64⌝ := by
+    ulibUkRun N γ m pc av ∗ uwordq N.d dq a w ⊢ ⌜a + 8 ≤ 2 ^ 64⌝ := by
   unfold ulibUkRun urun uwordq
   iintro ⟨⟨%h, ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
     %hRut, %hx0, Hheap, -, -, -, -, -, -, -⟩, -⟩, Hb⟩
@@ -464,9 +471,9 @@ include UL
 
 theorem ulibUk_wp_itype (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12)
     (rs1 rd : BitVec 5) (op : iop) (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) :
-    ⊢ uinstrIs N.t pc rvc (.ITYPE (imm, .Regidx rs1, .Regidx rd, op)) -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ (m.set rd (ukItypeVal op (RegMap.get m rs1) imm)) (pc + ulibLen rvc) av -∗
-        ulibUkGoal (hlc := hlc) γ) -∗ ulibUkGoal (hlc := hlc) γ :=
+    ⊢ uinstrIs N.t pc rvc (.ITYPE (imm, .Regidx rs1, .Regidx rd, op)) -∗ ulibUkRun N γ m pc av -∗
+      (ulibUkRun N γ (m.set rd (ukItypeVal op (RegMap.get m rs1) imm)) (pc + ulibLen rvc) av -∗
+        ulibUkGoal γ) -∗ ulibUkGoal γ :=
   ulibUk_lift0 N γ fun h => by
     have H := wp_uk_itype UL N h m pc rvc imm rs1 rd op av h2
     rw [ukWr_ne0 _ _ _ h0, ← ulibLen_eq] at H
@@ -474,9 +481,9 @@ theorem ulibUk_wp_itype (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (i
 
 theorem ulibUk_wp_rtype (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (rs2 rs1 rd : BitVec 5) (op : rop)
     (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) :
-    ⊢ uinstrIs N.t pc rvc (.RTYPE (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ (m.set rd (ukRtypeVal op (RegMap.get m rs1) (RegMap.get m rs2))) (pc + ulibLen rvc) av -∗
-        ulibUkGoal (hlc := hlc) γ) -∗ ulibUkGoal (hlc := hlc) γ :=
+    ⊢ uinstrIs N.t pc rvc (.RTYPE (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) -∗ ulibUkRun N γ m pc av -∗
+      (ulibUkRun N γ (m.set rd (ukRtypeVal op (RegMap.get m rs1) (RegMap.get m rs2))) (pc + ulibLen rvc) av -∗
+        ulibUkGoal γ) -∗ ulibUkGoal γ :=
   ulibUk_lift0 N γ fun h => by
     have H := wp_uk_rtype UL N h m pc rvc rs2 rs1 rd op av h2
     rw [ukWr_ne0 _ _ _ h0, ← ulibLen_eq] at H
@@ -484,9 +491,9 @@ theorem ulibUk_wp_rtype (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (r
 
 theorem ulibUk_wp_addiw (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12) (rs1 rd : BitVec 5)
     (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) :
-    ⊢ uinstrIs N.t pc rvc (.ADDIW (imm, .Regidx rs1, .Regidx rd)) -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ (m.set rd (ukAddiwVal (RegMap.get m rs1) imm)) (pc + ulibLen rvc) av -∗
-        ulibUkGoal (hlc := hlc) γ) -∗ ulibUkGoal (hlc := hlc) γ :=
+    ⊢ uinstrIs N.t pc rvc (.ADDIW (imm, .Regidx rs1, .Regidx rd)) -∗ ulibUkRun N γ m pc av -∗
+      (ulibUkRun N γ (m.set rd (ukAddiwVal (RegMap.get m rs1) imm)) (pc + ulibLen rvc) av -∗
+        ulibUkGoal γ) -∗ ulibUkGoal γ :=
   ulibUk_lift0 N γ fun h => by
     have H := wp_uk_addiw UL N h m pc rvc imm rs1 rd av h2
     rw [ukWr_ne0 _ _ _ h0, ← ulibLen_eq] at H
@@ -495,9 +502,9 @@ theorem ulibUk_wp_addiw (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (i
 theorem ulibUk_wp_btype (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 13)
     (rs2 rs1 : BitVec 5) (op : bop)
     (hal : ukBtaken op (RegMap.get m rs1) (RegMap.get m rs2) = true → (pc + BitVec.signExtend 64 imm).getLsbD 0 = false) :
-    ⊢ uinstrIs N.t pc rvc (.BTYPE (imm, .Regidx rs2, .Regidx rs1, op)) -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ m (if ukBtaken op (RegMap.get m rs1) (RegMap.get m rs2) then pc + BitVec.signExtend 64 imm
-        else pc + ulibLen rvc) av -∗ ulibUkGoal (hlc := hlc) γ) -∗ ulibUkGoal (hlc := hlc) γ :=
+    ⊢ uinstrIs N.t pc rvc (.BTYPE (imm, .Regidx rs2, .Regidx rs1, op)) -∗ ulibUkRun N γ m pc av -∗
+      (ulibUkRun N γ m (if ukBtaken op (RegMap.get m rs1) (RegMap.get m rs2) then pc + BitVec.signExtend 64 imm
+        else pc + ulibLen rvc) av -∗ ulibUkGoal γ) -∗ ulibUkGoal γ :=
   ulibUk_lift0 N γ fun h => by
     have H := wp_uk_btype UL N h m pc rvc imm rs2 rs1 op av hal
     rw [← ulibLen_eq] at H
@@ -505,9 +512,9 @@ theorem ulibUk_wp_btype (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (i
 
 theorem ulibUk_wp_jal (m : RegMap) (pc : BitVec 64) (av : Nat) (imm : BitVec 21) (rd : BitVec 5)
     (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) (hal : (pc + BitVec.signExtend 64 imm).getLsbD 0 = false) :
-    ⊢ uinstrIs N.t pc false (.JAL (imm, .Regidx rd)) -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ (m.set rd (pc + 4#64)) (pc + BitVec.signExtend 64 imm) av -∗
-        ulibUkGoal (hlc := hlc) γ) -∗ ulibUkGoal (hlc := hlc) γ :=
+    ⊢ uinstrIs N.t pc false (.JAL (imm, .Regidx rd)) -∗ ulibUkRun N γ m pc av -∗
+      (ulibUkRun N γ (m.set rd (pc + 4#64)) (pc + BitVec.signExtend 64 imm) av -∗
+        ulibUkGoal γ) -∗ ulibUkGoal γ :=
   ulibUk_lift0 N γ fun h => by
     have H := wp_uk_jal UL N h m pc false imm rd av h2 hal
     rw [ukWr_ne0 _ _ _ h0] at H
@@ -515,18 +522,18 @@ theorem ulibUk_wp_jal (m : RegMap) (pc : BitVec 64) (av : Nat) (imm : BitVec 21)
 
 theorem ulibUk_wp_j (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 21)
     (hal : (pc + BitVec.signExtend 64 imm).getLsbD 0 = false) :
-    ⊢ uinstrIs N.t pc rvc (.JAL (imm, .Regidx 0#5)) -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ m (pc + BitVec.signExtend 64 imm) av -∗ ulibUkGoal (hlc := hlc) γ) -∗
-      ulibUkGoal (hlc := hlc) γ :=
+    ⊢ uinstrIs N.t pc rvc (.JAL (imm, .Regidx 0#5)) -∗ ulibUkRun N γ m pc av -∗
+      (ulibUkRun N γ m (pc + BitVec.signExtend 64 imm) av -∗ ulibUkGoal γ) -∗
+      ulibUkGoal γ :=
   ulibUk_lift0 N γ fun h => by
     have H := wp_uk_jal UL N h m pc rvc imm 0#5 av (by unfold unotSp spIdx; decide) hal
     rw [show ukWr m 0#5 (pc + instrLen rvc) = m by unfold ukWr; rw [if_pos rfl]] at H
     exact H
 
 theorem ulibUk_wp_ret (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (rs1 : BitVec 5) (h0 : rs1 ≠ 0#5) :
-    ⊢ uinstrIs N.t pc rvc (.JALR (0#12, .Regidx rs1, .Regidx 0#5)) -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ m (retPc (m rs1)) av -∗ ulibUkGoal (hlc := hlc) γ) -∗
-      ulibUkGoal (hlc := hlc) γ :=
+    ⊢ uinstrIs N.t pc rvc (.JALR (0#12, .Regidx rs1, .Regidx 0#5)) -∗ ulibUkRun N γ m pc av -∗
+      (ulibUkRun N γ m (retPc (m rs1)) av -∗ ulibUkGoal γ) -∗
+      ulibUkGoal γ :=
   ulibUk_lift0 N γ fun h => by
     have H := wp_uk_ret UL N h m pc rvc rs1 av
     rw [RegMap.get_ne _ _ h0] at H
@@ -535,11 +542,11 @@ theorem ulibUk_wp_ret (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (rs1
 theorem ulibUk_wp_sp_dn (m : RegMap) (pc : BitVec 64) (rvc : Bool) (imm : BitVec 12) (k n : Nat)
     (himm : BitVec.signExtend 64 imm = 0#64 - BitVec.ofNat 64 (8 * k)) :
     ⊢ uinstrIs N.t pc rvc (.ITYPE (imm, .Regidx 2#5, .Regidx 2#5, .ADDI)) -∗
-      ulibUkRun (hlc := hlc) N γ m pc (k + n) -∗
+      ulibUkRun N γ m pc (k + n) -∗
       (ustack N.d (m 2#5) k -∗
-        ulibUkRun (hlc := hlc) N γ (m.set 2#5 (m 2#5 - BitVec.ofNat 64 (8 * k))) (pc + ulibLen rvc) n -∗
-          ulibUkGoal (hlc := hlc) γ) -∗
-      ulibUkGoal (hlc := hlc) γ :=
+        ulibUkRun N γ (m.set 2#5 (m 2#5 - BitVec.ofNat 64 (8 * k))) (pc + ulibLen rvc) n -∗
+          ulibUkGoal γ) -∗
+      ulibUkGoal γ :=
   ulibUk_lift N γ fun h => by
     have H := wp_uk_addi_sp_dn UL N h m pc rvc imm k n (by rw [himm, ulibUk_ofInt_neg])
     rw [ukWr_sp, ulibUk_getSp, ulibUk_addNeg, ← ulibLen_eq] at H
@@ -548,10 +555,10 @@ theorem ulibUk_wp_sp_dn (m : RegMap) (pc : BitVec 64) (rvc : Bool) (imm : BitVec
 theorem ulibUk_wp_sp_up (m : RegMap) (pc : BitVec 64) (rvc : Bool) (imm : BitVec 12) (k n : Nat)
     (himm : BitVec.signExtend 64 imm = BitVec.ofNat 64 (8 * k)) :
     ⊢ uinstrIs N.t pc rvc (.ITYPE (imm, .Regidx 2#5, .Regidx 2#5, .ADDI)) -∗
-      ustack N.d (m 2#5 + BitVec.ofNat 64 (8 * k)) k -∗ ulibUkRun (hlc := hlc) N γ m pc n -∗
-      (ulibUkRun (hlc := hlc) N γ (m.set 2#5 (m 2#5 + BitVec.ofNat 64 (8 * k))) (pc + ulibLen rvc) (k + n) -∗
-        ulibUkGoal (hlc := hlc) γ) -∗
-      ulibUkGoal (hlc := hlc) γ :=
+      ustack N.d (m 2#5 + BitVec.ofNat 64 (8 * k)) k -∗ ulibUkRun N γ m pc n -∗
+      (ulibUkRun N γ (m.set 2#5 (m 2#5 + BitVec.ofNat 64 (8 * k))) (pc + ulibLen rvc) (k + n) -∗
+        ulibUkGoal γ) -∗
+      ulibUkGoal γ :=
   ulibUk_lift20 N γ fun h => by
     have H := wp_uk_addi_sp_up UL N h m pc rvc imm k n himm
     rw [ukWr_sp, ulibUk_getSp, ← ulibLen_eq] at H
@@ -561,9 +568,9 @@ theorem ulibUk_wp_ldq (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm
     (dq : DFrac) (a : Nat) (w : BitVec 64) (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5)
     (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
     ⊢ uinstrIs N.t pc rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8)) -∗ uwordq N.d dq a w -∗
-      ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (uwordq N.d dq a w -∗ ulibUkRun (hlc := hlc) N γ (m.set rd w) (pc + ulibLen rvc) av -∗ ulibUkGoal (hlc := hlc) γ) -∗
-      ulibUkGoal (hlc := hlc) γ := by
+      ulibUkRun N γ m pc av -∗
+      (uwordq N.d dq a w -∗ ulibUkRun N γ (m.set rd w) (pc + ulibLen rvc) av -∗ ulibUkGoal γ) -∗
+      ulibUkGoal γ := by
   refine ulibUk_lift2 N γ fun h => ?_
   have H := ulibUk_load UL N h m pc rvc imm rs1 rd false 8 dq a w av h2 (Or.inr (Or.inr (Or.inr rfl)))
     (ulibUk_va m rs1 imm a ha) hal
@@ -574,10 +581,10 @@ theorem ulibUk_wp_lbuq (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (im
     (dq : DFrac) (a : Nat) (b : BitVec 8) (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5)
     (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) :
     ⊢ uinstrIs N.t pc rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, true, 1)) -∗ ubyteq N.d dq a b -∗
-      ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ubyteq N.d dq a b -∗ ulibUkRun (hlc := hlc) N γ (m.set rd (b.zeroExtend 64)) (pc + ulibLen rvc) av -∗
-        ulibUkGoal (hlc := hlc) γ) -∗
-      ulibUkGoal (hlc := hlc) γ := by
+      ulibUkRun N γ m pc av -∗
+      (ubyteq N.d dq a b -∗ ulibUkRun N γ (m.set rd (b.zeroExtend 64)) (pc + ulibLen rvc) av -∗
+        ulibUkGoal γ) -∗
+      ulibUkGoal γ := by
   refine ulibUk_lift2 N γ fun h => ?_
   have H := ulibUk_load UL N h m pc rvc imm rs1 rd true 1 dq a b av h2 (Or.inl rfl)
     (ulibUk_va m rs1 imm a ha) (Nat.mod_one a)
@@ -594,9 +601,9 @@ theorem ulibUk_wp_lbu_text (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool)
     (rs1 rd : BitVec 5) (a : Nat) (b : BitVec 8) (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5)
     (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) :
     ⊢ uinstrIs N.t pc rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, true, 1)) -∗ utext N.t a b -∗
-      ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ (m.set rd (b.zeroExtend 64)) (pc + ulibLen rvc) av -∗ ulibUkGoal (hlc := hlc) γ) -∗
-      ulibUkGoal (hlc := hlc) γ := by
+      ulibUkRun N γ m pc av -∗
+      (ulibUkRun N γ (m.set rd (b.zeroExtend 64)) (pc + ulibLen rvc) av -∗ ulibUkGoal γ) -∗
+      ulibUkGoal γ := by
   refine ulibUk_lift20 N γ fun h => ?_
   have H := ulibUk_loadText UL N h m pc rvc imm rs1 rd true 1 a b av h2 (Or.inl rfl)
     (ulibUk_va m rs1 imm a ha) (Nat.mod_one a)
@@ -610,9 +617,9 @@ theorem ulibUk_wp_lbu_text (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool)
 theorem ulibUk_wp_sd (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12) (rs2 rs1 : BitVec 5)
     (a : Nat) (v0 : BitVec 64) (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
     ⊢ uinstrIs N.t pc rvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 8)) -∗ uword N.d a v0 -∗
-      ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (uword N.d a (RegMap.get m rs2) -∗ ulibUkRun (hlc := hlc) N γ m (pc + ulibLen rvc) av -∗ ulibUkGoal (hlc := hlc) γ) -∗
-      ulibUkGoal (hlc := hlc) γ := by
+      ulibUkRun N γ m pc av -∗
+      (uword N.d a (RegMap.get m rs2) -∗ ulibUkRun N γ m (pc + ulibLen rvc) av -∗ ulibUkGoal γ) -∗
+      ulibUkGoal γ := by
   refine ulibUk_lift2 N γ fun h => ?_
   have H := ulibUk_store UL N h m pc rvc imm rs1 rs2 8 a v0 av (Or.inr (Or.inr (Or.inr rfl)))
     (ulibUk_va m rs1 imm a ha) hal
@@ -622,10 +629,10 @@ theorem ulibUk_wp_sd (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm 
 theorem ulibUk_wp_sb (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12) (rs2 rs1 : BitVec 5)
     (a : Nat) (b0 : BitVec 8) (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) :
     ⊢ uinstrIs N.t pc rvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 1)) -∗ ubyte N.d a b0 -∗
-      ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ubyte N.d a ((RegMap.get m rs2).extractLsb' 0 8) -∗ ulibUkRun (hlc := hlc) N γ m (pc + ulibLen rvc) av -∗
-        ulibUkGoal (hlc := hlc) γ) -∗
-      ulibUkGoal (hlc := hlc) γ := by
+      ulibUkRun N γ m pc av -∗
+      (ubyte N.d a ((RegMap.get m rs2).extractLsb' 0 8) -∗ ulibUkRun N γ m (pc + ulibLen rvc) av -∗
+        ulibUkGoal γ) -∗
+      ulibUkGoal γ := by
   refine ulibUk_lift2 N γ fun h => ?_
   have H := ulibUk_store UL N h m pc rvc imm rs1 rs2 1 a b0 av (Or.inl rfl) (ulibUk_va m rs1 imm a ha)
     (Nat.mod_one a)
@@ -644,6 +651,7 @@ end Leaves
 
 /-! ## §6 The stack and the text -/
 
+omit [MachGS GF] in
 theorem ulibUk_utext_instr (t0 : User.UTextTree) (img : ElfMem) (hok : User.UTextOk t0 img)
     (t : User.UTextTree) (pc : BitVec 64) (rvc : Bool) (i : instruction) (h : uTextDecode t pc = some (rvc, i)) :
     iprop(⌜t = t0⌝ ∗ ukCode N.t img) ⊢ uinstrIs (GF := GF) N.t pc rvc i := by
@@ -661,8 +669,8 @@ program text `t0` (the image `img`), the run's names `N` and the hart
 variable `γ` (see the header). -/
 noncomputable def UlibRun.ofUkRun (UL : UK_LEAVES) (N : UkNames GF) (γ : GName) (t0 : User.UTextTree)
     (img : ElfMem) (hok : User.UTextOk t0 img) : UlibRun GF where
-  urun := ulibUkRun (hlc := hlc) N γ
-  goal := ulibUkGoal (hlc := hlc) γ
+  urun := ulibUkRun N γ
+  goal := ulibUkGoal γ
   uinstrIs := Xv6.uinstrIs N.t
   uinstrIs_persistent := fun _ _ _ => inferInstance
   uword := Xv6.uword N.d
@@ -707,7 +715,7 @@ noncomputable def UlibRun.ofUkRun (UL : UK_LEAVES) (N : UkNames GF) (γ : GName)
 /-- **The printf cone's run interface, instantiated by the real engine.** -/
 noncomputable def UlibRunP.ofUkRun (UL : UK_LEAVES) (N : UkNames GF) (γ : GName) (t0 : User.UTextTree)
     (img : ElfMem) (hok : User.UTextOk t0 img) : UlibRunP GF where
-  toUlibRun := UlibRun.ofUkRun (hlc := hlc) UL N γ t0 img hok
+  toUlibRun := UlibRun.ofUkRun UL N γ t0 img hok
   utextB := Xv6.utext N.t
   utextB_persistent := fun _ _ => inferInstance
   ubyteq := Xv6.ubyteq N.d

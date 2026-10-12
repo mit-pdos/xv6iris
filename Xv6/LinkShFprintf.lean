@@ -24,14 +24,14 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
 /-- **`ksh_w1` is sh's `kcat_wb`** (the byte and the credential swapped). -/
 theorem kshW1_ulibUk (N : UkNames GF) (fdv : BitVec 64) (b : BitVec 8) (Ci Co : IProp GF) :
-    kshW1 (hlc := hlc) N fdv b Ci Co ⊢
-      ulibUkWb (hlc := hlc) N User.Sh.code.byte User.Sh.Sym.«write» fdv b Ci Co := by
+    kshW1 N fdv b Ci Co ⊢
+      ulibUkWb N User.Sh.code.byte User.Sh.Sym.«write» fdv b Ci Co := by
   unfold kshW1 ulibUkWb ulibUkW kshW
   iintro Hw %ua %h %m %av %h10 %h11 %h12 #Hc ⟨HCi, Hb⟩ Hrun Hk
   iapply Hw $$ %ua %h %m %av %h10 %h11 %h12 Hc [HCi Hb] Hrun [Hk]
@@ -42,8 +42,8 @@ theorem kshW1_ulibUk (N : UkNames GF) (fdv : BitVec 64) (b : BitVec 8) (Ci Co : 
 
 /-- **A persistent `ksh_w1` family is sh's chain** over `[i, i + k)`. -/
 theorem ushPaySeq_of_fam (N : UkNames GF) (fdv : BitVec 64) (g : Nat → BitVec 8) (C : Nat → IProp GF) :
-    ∀ (k i : Nat), ⊢ □ (∀ p : Nat, ⌜i ≤ p ∧ p < i + k⌝ -∗ kshW1 (hlc := hlc) N fdv (g p) (C p) (C (p + 1))) -∗
-      ulibUkPaySeq (hlc := hlc) N User.Sh.code.byte User.Sh.Sym.«write» fdv g i k (C i) (C (i + k))
+    ∀ (k i : Nat), ⊢ □ (∀ p : Nat, ⌜i ≤ p ∧ p < i + k⌝ -∗ kshW1 N fdv (g p) (C p) (C (p + 1))) -∗
+      ulibUkPaySeq N User.Sh.code.byte User.Sh.Sym.«write» fdv g i k (C i) (C (i + k))
   | 0, i => by
     rw [ulibUkPaySeq_zero, Nat.add_zero]
     iintro _ H
@@ -61,9 +61,9 @@ theorem ushPaySeq_of_fam (N : UkNames GF) (fdv : BitVec 64) (g : Nat → BitVec 
       iapply Hf $$ %p %(by omega)
 
 /-- **Rocq `wp_kshd_fprintf_s_chain`, from the one proof.** -/
-theorem wp_shdFprintfSChain_ulib (UL : UK_LEAVES) : wpShdFprintfSChainBody (hlc := hlc) (GF := GF) := by
+theorem wp_shdFprintfSChain_ulib (UL : UK_LEAVES) : wpShdFprintfSChainBody (GF := GF) := by
   intro N tx dqs a len q f sa slen sf fdv C1 C2 C3 h m n h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11 h12 h10' hC12 hC23
-  have H := wp_ulibUkFprintfSX (hlc := hlc) UL ulibUkSh N tx dqs a len q f sa slen sf h m n
+  have H := wp_ulibUkFprintfSX UL ulibUkSh N tx dqs a len q f sa slen sf h m n
     (C1 0) (C2 0) (C3 (q + 2)) (C3 len) h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11 h12
   rw [h10'] at H
   have e1 : C1 (0 + q) = C2 0 := by rw [Nat.zero_add]; exact hC12

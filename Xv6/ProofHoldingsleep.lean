@@ -66,7 +66,7 @@ theorem hsl_withSpie_canon (k : KCtx) (l : List String) (a b : Bool) :
     (((k.pushOffAt a b).withLocks l).pushed 6).withSpie a b = ((k.pushOffAt a b).withLocks l).pushed 6 := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [CurCtx]
 
 /-! ## The frame's two spare cells -/
 
@@ -109,7 +109,7 @@ theorem hsl_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl γ : GName) (slk :
       locked γl cpu' -∗ slBody γ slk Rp H curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl "sleep lock" (slBody γ slk Rp H) hnoff hK hs
+  have h := AC.wp_acquire (GF := GF) c k' γl "sleep lock" (slBody γ slk Rp H) hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
@@ -130,7 +130,7 @@ theorem hsl_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γl γ : GName) (slk :
         (k'.locks.filter (fun x => x ≠ "sleep lock"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl "sleep lock" (slBody γ slk Rp H)
+  have h := RE.wp_release (GF := GF) c k' γl "sleep lock" (slBody γ slk Rp H)
     hsie hnoff hK reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -147,7 +147,7 @@ theorem hsl_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
+  have h := MP.wp_myproc (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   exact h
@@ -412,7 +412,7 @@ theorem holdingsleep_br_ffffffffffffca94 : KA.«holdingsleep» + 0xffffffffffffc
 
 set_option maxHeartbeats 16000000 in
 theorem holdingsleep_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) : HOLDINGSLEEP := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ X cpu k γl γ Rp _ H q pid dqp hnoff hK hs htier => by
+  fun {GF} _ _ _ _ _ _ _ _ X cpu k γl γ Rp _ H q pid dqp hnoff hK hs htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_holdingsleep_gen_body

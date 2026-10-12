@@ -74,7 +74,7 @@ theorem sn_succ' (b : BitVec 64) (k : Nat) :
 /-! ## The loop -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- What the loop leaves: either the stopping index, at `e14`, or agreement
 on all `n` non-NUL bytes, at `e0c`. -/
@@ -323,7 +323,7 @@ end
 /-! ## The function -/
 
 set_option maxHeartbeats 4000000 in
-theorem strncmp_proof : STRNCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 hK hn hn31 hl1 hl2 => by
+theorem strncmp_proof : STRNCMP := ⟨fun {GF} _ _ cpu k bs1 bs2 n dq1 dq2 hK hn hn31 hl1 hl2 => by
   unfold wp_strncmp_body
   iintro ⟨Hk, Hpc, Hbuf1, Hbuf2, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

@@ -40,7 +40,7 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The destination -/
 
@@ -118,14 +118,14 @@ end
 /-! ## The callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `bmap(ip, off / BSIZE)` at `+0x82`: the no-alloc contract, at EITHER
 entry `SIE` (`BMAP_NOALLOC.wp_bmap_noalloc_eb`), the trap-CSR complement at a
 named index `s` (so the caller's `trapCsrsExt c k.sie` frames syntactically). -/
-theorem rd_bmap (BM : BMAP_NOALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem rd_bmap (BM : BMAP_NOALLOC) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
@@ -159,7 +159,7 @@ theorem rd_bmap (BM : BMAP_NOALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
       bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := BM.wp_bmap_noalloc_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j γfs
+  have h := BM.wp_bmap_noalloc_eb (GF := GF) Γ c k' γl γb V γdl pd pav pu j γfs
     logstart dev ip bm data fbn pidv dqp dq dqd hj hproc hK hnoff htier hgeom hfbn
     hwf hnz hdev hcl hdt hpd ha0 ha1
   unfold wp_bmap_noalloc_eb_body at h
@@ -169,7 +169,7 @@ theorem rd_bmap (BM : BMAP_NOALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **THE COPY** (`jal either_copyout` at `+0x60`), on both arms: the
@@ -211,7 +211,7 @@ theorem rd_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γkl : GName) (�
     have hch := hchunk
     have hlenL : (rdDelivered data olds off tot).length = olds.length :=
       rdDelivered_length data olds off tot (by omega)
-    have h := EC.wp_either_copyout (hlc := hlc) (GF := GF) c k' γkl γk j pidv Vp P Mi false
+    have h := EC.wp_either_copyout (GF := GF) c k' γkl γk j pidv Vp P Mi false
       (DFrac.own 1) bs (((rdDelivered data olds off tot).drop tot).take m) hj
       (fun h => absurd h (by decide)) hnoff hK hlk huser (by rw [ha3, hbs])
       (by simp only [Bool.false_eq_true, if_false]; omega)
@@ -243,7 +243,7 @@ theorem rd_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γkl : GName) (�
     rw [rdDst_true]
     iintro ⟨Hk, Hpc, #Hkl, #Hav, Hsrc, ⟨%kv, %hkv, Hpriv⟩, Hnext⟩
     -- the block at the count the earlier rounds raised it to (deviation 3)
-    have h := EC.wp_either_copyout (hlc := hlc) (GF := GF) c k' γkl γk j pidv (Vp.updEv kv) P Mi true
+    have h := EC.wp_either_copyout (GF := GF) c k' γkl γk j pidv (Vp.updEv kv) P Mi true
       (DFrac.own 1) bs bs hj (fun _ => hproc) hnoff hK hlk huser (by rw [ha3, hbs])
       (by simp only [if_true]; omega) rfl
     unfold wp_either_copyout_body at h
@@ -286,7 +286,7 @@ end
 /-! ## The buffer, the block, the agreement -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF] [CurCtx]
 
 /-- Rocq's `rd_buf_win_acc` (+ `rd_held_swap`): the `m`-byte window at
@@ -336,6 +336,7 @@ theorem rd_pid_eq {a b : BitVec 64} (h : a = b) (q : DFrac) (v : BitVec 32) :
     wordPointsTo (GF := GF) (pPid a) 4 q v ⊢ wordPointsTo (pPid b) 4 q v := by
   subst h; exact .rfl
 
+omit [MachGS GF] in
 /-- A view with `fsView`'s two fields IS `fsView` of its own geometry (a copy
 of `Xv6.bm_view_eq`, BmapDefs). -/
 theorem rd_view_eq (V : BioView GF) (γfs : FsNames) (hcl : V.clean = fsMclean γfs)
@@ -363,7 +364,7 @@ theorem rd_pay_contentQ (E : CoPset) (γb : BcacheNames) (γfs : FsNames) (V : B
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBlocksG GF]
 
 /-- Rocq's `rd_blocks_restore`: the block put back at the bytes it had. -/
 theorem rd_blocks_restore (γfs : FsNames) (dq : DFrac) (bm : Blkmap)

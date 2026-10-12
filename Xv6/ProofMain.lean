@@ -49,18 +49,18 @@ open LeanRV64D
 /-! ## Phase D: the handover and the join -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- The recipe's Bare-tier arguments (what a secondary prints with and
 switches to the table with). -/
 def mnRecipeBare (ξ : CtxId) (γpr γl1 : GName) (γ1 : UartNames) (rootAddr : BitVec 64) (t : PTree)
     (M : RegMapF (BitVec 64)) : IProp GF := iprop%
-  @isLock hlc GF _ _ ⟨ξ, KTier.bare⟩ γpr prLock "pr" (fun _ => emp) ∗
-  @isTxLock hlc GF _ _ ⟨ξ, KTier.bare⟩ γl1 γ1 ∗
+  @isLock GF _ _ ⟨ξ, KTier.bare⟩ γpr prLock "pr" (fun _ => emp) ∗
+  @isTxLock GF _ _ ⟨ξ, KTier.bare⟩ γl1 γ1 ∗
   uartSentSub γ1 [] ∗
-  @kptOn hlc GF _ ⟨ξ, KTier.bare⟩ t M ∗
-  @pwordPointsTo hlc GF _ ⟨ξ, KTier.bare⟩ kernelPagetableAddr 8 DFrac.discard rootAddr
+  @kptOn GF _ ⟨ξ, KTier.bare⟩ t M ∗
+  @pwordPointsTo GF _ ⟨ξ, KTier.bare⟩ kernelPagetableAddr 8 DFrac.discard rootAddr
 
 instance mnRecipeBare_persistent (ξ : CtxId) (γpr γl1 : GName) (γ1 : UartNames) (rootAddr : BitVec 64)
     (t : PTree) (M : RegMapF (BitVec 64)) :
@@ -79,7 +79,7 @@ theorem mn_recipe (ξ : CtxId) (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0
     (hhi : BitVec.extractLsb' 56 8 rootAddr = 0#8) (hroot : t.base = BitVec.extractLsb' 12 44 rootAddr) :
     mainDepositRecipe (GF := GF) ⟨ξ, KTier.bare⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt P ⊢
       mnRecipeBare ξ γpr γl1 γ1 rootAddr t M -∗
-      @devintrCaps hlc GF _ _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu -∗
+      @devintrCaps GF _ _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu -∗
       P ξ := by
   unfold mainDepositRecipe mnRecipeBare
   iintro #HR ⟨#Hpr, #Htx, #Hs, #Hk, #Hr⟩ #Hc
@@ -89,19 +89,19 @@ set_option maxHeartbeats 4000000 in
 /-- **Phase D, +0xa2 → scheduler**: the deposit out of the recipe, the
 store, the handler, the join. -/
 theorem mn_phaseD (SCH : SCHEDULER) (KV : KERNELVEC) (ξ : CtxId)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (k : KCtx) (R0 : RegMap) (hsie : k.sie = false) (hK : schedulerSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (hproc : k.proc = 0#64) (htier : k.tier = KTier.kpt)
     (γi : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀ ξ, Persistent (P ξ)] [CtxMorph P]
     (γpr : GName) (rootAddr : BitVec 64) (t : PTree) (M : RegMapF (BitVec 64)) (pd pav pu : BitVec 64)
     (hhi : BitVec.extractLsb' 56 8 rootAddr = 0#8) (hroot : t.base = BitVec.extractLsb' 12 44 rootAddr) :
-    @kctx hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ startedPrimary (k.withRegs R0) ∗
+    @kctx GF _ ⟨ξ, KTier.kpt⟩ _ _ startedPrimary (k.withRegs R0) ∗
     pcIs startedPrimary (KA.«main» + 162#64) ∗
     startedInv γi ξd P ∗ startedPrim γi ∗
     mainDepositRecipe ⟨ξ, KTier.bare⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt P ∗
     mnRecipeBare ξ γpr γl1 γ1 rootAddr t M ∗
-    @devintrCaps hlc GF _ _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ∗
+    @devintrCaps GF _ _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ∗
     Register.stvec ↦ᵣ[startedPrimary] kernelvecAddr ∗ trapCsrs startedPrimary ∗ cpuCtxFree startedPrimary
     ⊢ wpLoop (GF := GF) startedPrimary := by
   letI Y : CurCtx := ⟨ξ, KTier.kpt⟩
@@ -122,7 +122,7 @@ end
 /-! ## Phase C: the file system's boot, the boot token, `userinit` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
   [WchG GF] [Appcfg GF] [FileG GF]
@@ -148,9 +148,9 @@ def mnFsBoot [Fscfg] [Icfg] (dk : Nat → BitVec 8) (Rspent : ExtTreeSet Nat com
   ((∃ γl : GName, bioFreeTok γl fscBio) ∗
     ([∗set] b ∈ fscCov, poolBlk (fsView fscFs fscDisk icfgDev fscCov) b)) ∗
   mnIcacheKit ∗ lockFreeTok fscDlock ∗
-  fsKitFsinitGhost (hlc := hlc) (fsBlocks dk) Rspent Pb (hdrWset (fsBlocks dk) fscLogst) ∗
+  fsKitFsinitGhost (fsBlocks dk) Rspent Pb (hdrWset (fsBlocks dk) fscLogst) ∗
   ([∗list] k ∈ List.range NINODE, offSetAuth offCfg k ∅) ∗
-  logMirrorBorn (hlc := hlc) (mirrorOf (fsBlocks dk)) ∗
+  logMirrorBorn (mirrorOf (fsBlocks dk)) ∗
   irefSlots IREFBOOT ∗ irefSlotsAuth ∗ bslots mainBslotsFs
 
 /-- The persistent world phase C runs in (all at the kernel tier). -/
@@ -161,9 +161,9 @@ def mnWorldC [Fscfg] [Y : CurCtx] (Γ : SchedNames) (γ0 γ1 : UartNames) (γc �
   uartPort .uart0 γl0 γ0 ∗ uartPort .uart1 γl1 γ1 ∗ uartRxWord .uart0 ∗ uartRxWord .uart1 ∗
   uartInited γ0 ∗ uartInited γ1 ∗ plicInv γ0 γ1 ∗ panicEnv ∗
   isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗ syscTrampCl ∗ wireInv ∗
-  (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
-  genCert (hlc := hlc) (GF := GF) ∗ fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗
-  crashInv (hlc := hlc) (GF := GF)
+  (∃ k : Nat, MachFixedGS.uEraAnchor (GF := GF) k (niNamesHere (GF := GF))) ∗
+  genCert (GF := GF) ∗ fsCrashSeam (GF := GF) fscCov fscLogst ∗
+  crashInv (GF := GF)
 
 instance mnWorldC_persistent [Fscfg] [Y : CurCtx] (Γ : SchedNames) (γ0 γ1 : UartNames)
     (γc γl0 γl1 : GName) (γt γw γp : GName) :
@@ -187,7 +187,7 @@ virtio_disk_init (with the three births), the device complement, the boot
 token's two bundles, userinit's park rows, userinit. -/
 theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_INIT) (UI : USERINIT)
     (SCH : SCHEDULER) (KV : KERNELVEC) [Fscfg] [Icfg] (ξ : CtxId) [Y : CurCtx] (hY : Y = ⟨ξ, KTier.kpt⟩)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
+    (Γ : SchedNames) [ClaimIs GF Γ] [NiFitIs GF]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (k : KCtx) (R0 : RegMap) (hsie : k.sie = false) (hK : mainSlots ≤ k.avail + 2) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (hproc : k.proc = 0#64) (htier : k.tier = KTier.kpt)
@@ -200,14 +200,14 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
     (γpr : GName) (rootAddr : BitVec 64) (t : PTree) (M : RegMapF (BitVec 64))
     (hhi : BitVec.extractLsb' 56 8 rootAddr = 0#8) (hrt : t.base = BitVec.extractLsb' 12 44 rootAddr) :
     kctx startedPrimary (k.withRegs R0) ∗ pcIs startedPrimary (KA.«main» + 142#64) ∗
-    mnKptFs ∗ mnFsBoot (hlc := hlc) dk Rspent Pb ∗ mnWorldC Γ γ0 γ1 γc γl0 γl1 γt γw γp ∗
+    mnKptFs ∗ mnFsBoot dk Rspent Pb ∗ mnWorldC Γ γ0 γ1 γc γl0 γl1 γt γw γp ∗
     kallocAvail fsReadyKmem (some (kinitPages - kvmmakeCount)) ∗
     diskInv γd ∗ diskCrashCaps γd ∗ diskCfgOwn γd c0 ∗ diskInitGhosts γd ∗
     (∃ (vl : BitVec 32) (vn vc pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)),
       diskInitCells vl vn vc pd0 pav0 pu0 free0) ∗
     procsAvailAt Γ (some NPROC) true ∗ initPidTok 0#32 ∗
-    initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
-    consReader fscCons 0 ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
+    initBootBundle (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
+    consReader fscCons 0 ∗ MachFixedGS.uClaimO (GF := GF) ∗
     startedInv γi ξd P ∗ startedPrim γi ∗
     mainDepositRecipe ⟨ξ, KTier.bare⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt P ∗
     mnRecipeBare ξ γpr γl1 γ1 rootAddr t M ∗
@@ -265,7 +265,7 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
       rw [hγd, hdl]
       iexact Hdc
   -- userinit's park rows
-  ihave Hpark : iprop(userinitPark (hlc := hlc) (SG := uexecSGXv6) Γ γw γt) $$ [Hbundle Hrdr Hco]
+  ihave Hpark : iprop(userinitPark (SG := uexecSGXv6) Γ γw γt) $$ [Hbundle Hrdr Hco]
   · unfold userinitPark
     iframe Hwl Htl Hcready Hwire Hanc Htr Hbundle Hrdr Hco
     iexists γ0, γ1, γc, γl0, γl1, γt, pd, pav, pu
@@ -293,7 +293,7 @@ end
 console -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
   [WchG GF] [Appcfg GF] [FileG GF]
@@ -330,9 +330,9 @@ def mnWorldB [Fscfg] [Y : CurCtx] (γ0 γ1 : UartNames) (γl0 γl1 : GName) : IP
   devswTable ∗ uartPort .uart0 γl0 γ0 ∗ uartPort .uart1 γl1 γ1 ∗ uartRxWord .uart0 ∗ uartRxWord .uart1 ∗
   consEchoShift ∗ uartInited γ0 ∗ uartInited γ1 ∗ plicInv γ0 γ1 ∗ panicEnv ∗
   isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗ syscTrampCl ∗ wireInv ∗
-  (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
-  genCert (hlc := hlc) (GF := GF) ∗ fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗
-  crashInv (hlc := hlc) (GF := GF)
+  (∃ k : Nat, MachFixedGS.uEraAnchor (GF := GF) k (niNamesHere (GF := GF))) ∗
+  genCert (GF := GF) ∗ fsCrashSeam (GF := GF) fscCov fscLogst ∗
+  crashInv (GF := GF)
 
 instance mnWorldB_persistent [Fscfg] [Y : CurCtx] (γ0 γ1 : UartNames) (γl0 γl1 : GName) :
     Persistent (mnWorldB (GF := GF) γ0 γ1 γl0 γl1) := by
@@ -344,11 +344,11 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
     (PLIH : PLICINITHART) (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_INIT)
     (UI : USERINIT) (SCH : SCHEDULER) (KV : KERNELVEC)
     [Fscfg] [Icfg] (ξ : CtxId) [Y : CurCtx] (hY : Y = ⟨ξ, KTier.kpt⟩)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
+    (Γ : SchedNames) [ClaimIs GF Γ] [NiFitIs GF]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (k : KCtx) (R0 : RegMap) (hsie : k.sie = false) (hK : mainSlots ≤ k.avail + 2) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (hproc : k.proc = 0#64) (htier : k.tier = KTier.kpt)
-    (cn : ConsNames) (hcn : cn.uart = γ0) (hcne : cn.era = genId (hlc := hlc) (GF := GF) + 1)
+    (cn : ConsNames) (hcn : cn.uart = γ0) (hcne : cn.era = genId (GF := GF) + 1)
     (hcons : fscCons = cn)
     (c0 : VirtioCfg) (hdead : Virtio.live c0 = false)
     (dk : Nat → BitVec 8) (sb : FsSb) (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8))
@@ -363,14 +363,14 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
     mnKptB cn ∗ mnProcBoot Γ ∗ lockFreeTok γt ∗ lockFreeTok γc ∗ lkFresh consAddr ∗
     kstackPages pas ∗ kstackMapAt pas ∗ mnWorldB γ0 γ1 γl0 γl1 ∗
     (∃ v : BitVec 64, Register.stvec ↦ᵣ[startedPrimary] v) ∗
-    mnKptFs ∗ mnFsBoot (hlc := hlc) dk Rspent Pb ∗
+    mnKptFs ∗ mnFsBoot dk Rspent Pb ∗
     kallocAvail fsReadyKmem (some (kinitPages - kvmmakeCount)) ∗
     diskInv γd ∗ diskCrashCaps γd ∗ diskCfgOwn γd c0 ∗ diskInitGhosts γd ∗
     (∃ (vl : BitVec 32) (vn vc pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)),
       diskInitCells vl vn vc pd0 pav0 pu0 free0) ∗
     procsAvailAt Γ (some NPROC) true ∗ initPidTok 0#32 ∗
-    initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
-    consReader fscCons 0 ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
+    initBootBundle (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
+    consReader fscCons 0 ∗ MachFixedGS.uClaimO (GF := GF) ∗
     startedInv γi ξd P ∗ startedPrim γi ∗
     mainDepositRecipe ⟨ξ, KTier.bare⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt P ∗
     mnRecipeBare ξ γpr γl1 γ1 rootAddr t M ∗
@@ -398,7 +398,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   -- the proc table's invariant, the nextpid and wait locks
   iapply wpLoop_fupd
   -- the slot-occupancy ledger's invariant, and each slot's element (NI joint fork lane F1)
-  imod slotLed_alloc (hlc := hlc) ⊤ $$ [$Hsla $Hsoa] with #Hsli
+  imod slotLed_alloc ⊤ $$ [$Hsla $Hsoa] with #Hsli
   ihave Hsoe := soElem_boot (List.range NPROC) $$ [$Hsli $Hsoe]
   ihave Hins := mn_slots_zip Γ pas $$ [$Hready $Hpub $Hhart $Hps $Hsf $Hlk $Hstk $Hslots $Hsoe]
   imod mn_procsInv hct startedPrimary (k.withRegs R1) Γ t pas hok $$ [$Hk $Hsmap $Hins] with ⟨Hk, #Hpinv⟩
@@ -434,7 +434,7 @@ end
 /-! ## Phase A: the Bare tier, and the seal -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
   [WchG GF] [Appcfg GF] [FileG GF]
@@ -456,7 +456,7 @@ theorem mn_mainSlots_ge : 114 ≤ mainSlots := by
   unfold mainSlots schedulerSlots kvFrameSlots; omega
 
 theorem mn_lkFresh_toKpt (X : CurCtx) (lk : BitVec 64) :
-    @lkFresh hlc GF _ X lk ⊢ @lkFresh hlc GF _ X.toKpt lk := .rfl
+    @lkFresh GF _ X lk ⊢ @lkFresh GF _ X.toKpt lk := .rfl
 
 set_option maxHeartbeats 16000000 in
 /-- **`main`'s boot arm** (Rocq `wp_main_boot_sconf`): the Bare phase --
@@ -466,7 +466,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
     (KV : KVMINIT) (KVH : KVMINITHART) (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART)
     (PLI : PLICINIT) (PLIH : PLICINITHART) (BI : BINIT) (II : IINIT) (FI : FILEINIT)
     (VD : VIRTIO_DISK_INIT) (UI : USERINIT) (SCH : SCHEDULER) (KVE : KERNELVEC) : MAIN :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ _ γ0 γ1 γc γl0 γl1 γd γdl γt cpu k cn
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ _ γ0 γ1 γc γl0 γl1 γd γdl γt cpu k cn
       l0 l1 c0 dk sb nib cov ndisk S Pb Rspent tlb0 γi ξd P _ _ hcpu hX hK hsie hnoff hlocks hproc hl0 hl1
       hdead hcn hcne hdl hsnap => by
   obtain ⟨ξ, τ⟩ := X
@@ -492,12 +492,12 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
     rw [hcovq]; exact fsCovIn_0 cov ndisk hsnap.2.2.2.2.2.2.2.1
   have hnib0 : 0 < icfgNib := by rw [hnibw]; omega
   subst hcovq hcons
-  ihave Hkit2 := (show fsKitFsinitGhost (hlc := hlc) (GF := GF) (fsBlocks dk) Rspent Pb
+  ihave Hkit2 := (show fsKitFsinitGhost (GF := GF) (fsBlocks dk) Rspent Pb
       (hdrWset (fsBlocks dk) sb.sbLogstart) ⊢
-    fsKitFsinitGhost (hlc := hlc) (fsBlocks dk) Rspent Pb (hdrWset (fsBlocks dk) fscLogst) from by
+    fsKitFsinitGhost (fsBlocks dk) Rspent Pb (hdrWset (fsBlocks dk) fscLogst) from by
       rw [hlogq]) $$ Hkit2
-  ihave #Hseam := (show fsCrashSeam (hlc := hlc) (GF := GF) fscCov sb.sbLogstart ⊢
-    fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst from by rw [hlogq]) $$ Hseam
+  ihave #Hseam := (show fsCrashSeam (GF := GF) fscCov sb.sbLogstart ⊢
+    fsCrashSeam (GF := GF) fscCov fscLogst from by rw [hlogq]) $$ Hseam
   icases fsKitIcache_split $$ Hkit1 with ⟨Hkpr, Hkal, Hrest⟩
   icases fsKitKalloc_open $$ Hkal with ⟨Hklf, Hkav0, Hkauth⟩
   unfold fsKitPrintk
@@ -586,14 +586,14 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
     · iapply mn_uartRxWord_toKpt ⟨ξ, KTier.bare⟩ .uart0 $$ Hrw0
     isplitl []
     · iapply mn_uartRxWord_toKpt ⟨ξ, KTier.bare⟩ .uart1 $$ Hrw1
-    iapply (@mn_panicEnv hlc GF _ _ ⟨ξ, KTier.kpt⟩ fscPrintk γl1 γ1) $$ Hpk'
+    iapply (@mn_panicEnv GF _ _ ⟨ξ, KTier.kpt⟩ fscPrintk γl1 γ1) $$ Hpk'
   ihave #Hbare : iprop(mnRecipeBare (GF := GF) ξ fscPrintk γl1 γ1 (pageAddr t.base) t (kvmMapT pas)) $$ []
   · unfold mnRecipeBare isTxLock uartPort
     iframe Hkpt Hrp Hprl Hu1 Htxl1 Hdo1 Hb1
     iapply uartSentSub_of_sent γ1 [] $$ Hs1
   ihave Hcfr := mn_lkFresh_toKpt ⟨ξ, KTier.bare⟩ consAddr $$ Hcfr
   ihave Hstk := mn_kstackPages_toKpt ⟨ξ, KTier.bare⟩ pas $$ Hstk
-  ihave #Hsmap := (show @kstackMapAt hlc GF _ ⟨ξ, KTier.bare⟩ pas ⊢ @kstackMapAt hlc GF _ ⟨ξ, KTier.kpt⟩ pas
+  ihave #Hsmap := (show @kstackMapAt GF _ ⟨ξ, KTier.bare⟩ pas ⊢ @kstackMapAt GF _ ⟨ξ, KTier.kpt⟩ pas
     from .rfl) $$ Hsmap
   -- the kernel-tier rows, grouped
   icases mn_splitKpt (GF := GF) (Y := ⟨ξ, KTier.kpt⟩) fscCons

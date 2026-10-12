@@ -33,7 +33,7 @@ theorem isl_ret_3fa8 : jumpPc (KA.«initsleeplock» + 0x1e#64) = (KA.«initsleep
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## The callee, at its entry address -/
 
@@ -52,7 +52,7 @@ theorem isl_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
       lkFresh lk -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK'
+  have h := IL.wp_initlock (GF := GF) c k' vlock vname vcpu hK'
   unfold wp_initlock_body at h
   simp only [initlockAddr, h10, h11] at h
   exact h
@@ -129,7 +129,7 @@ theorem initsleeplock_br_346e : KA.«initsleeplock» + 0x346e#64 = KStr.«sleep 
 
 set_option maxHeartbeats 4000000 in
 theorem initsleeplock_proof (IL : INITLOCK) : INITSLEEPLOCK :=
-  ⟨fun {hlc GF} _ _ cpu k hK => by
+  ⟨fun {GF} _ _ cpu k hK => by
   unfold wp_initsleeplock_body sleepLockIn lockWords
   iintro ⟨Hk, Hpc, ⟨%vlocked, %vlock, %vname, %vcpu, %vn, %vpid,
     Hlk0, ⟨#Hcl, #Hcl', Hwlock, Hwname, Hwcpu⟩, Hn, Hpid⟩, HΦ⟩

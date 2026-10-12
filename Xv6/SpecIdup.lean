@@ -89,7 +89,7 @@ acquire's/release's 10. -/
 def idupSlots : Nat := 4 + 10
 
 /-- **WP of `idup`** (Rocq `wp_idup_sconf_body`). -/
-def wp_idup_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+def wp_idup_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
     [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (kk z : Nat)
@@ -97,7 +97,7 @@ def wp_idup_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G
     (hlk : "itable" ∉ k.locks) (ha0 : k.regs 10#5 = ientry kk) : Prop :=
   kctx cpu k ∗ pcIs cpu idupAddr ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  itableInv ∗ iregReg fscIreg fscFs icfgIst icfgNib ∗
   irefSlot ∗ inodeHeldAt (ientry kk) z ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
@@ -109,7 +109,7 @@ def wp_idup_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G
 /-- **WP of `idup`, THE SHARE FORM** (Rocq `wp_idup_shr_sconf_body`): a share
 of the caller's reference to `ientry kk` and its unit in; the share back, a
 new reference, two units out. -/
-def wp_idup_shr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+def wp_idup_shr_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
     [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (kk : Nat) (s : Qp) (inum : BitVec 32)
@@ -117,7 +117,7 @@ def wp_idup_shr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
     (hlk : "itable" ∉ k.locks) (ha0 : k.regs 10#5 = ientry kk) : Prop :=
   kctx cpu k ∗ pcIs cpu idupAddr ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  itableInv ∗ iregReg fscIreg fscFs icfgIst icfgNib ∗
   irefSlot ∗ inodeShr kk s icfgDev inum ∗ runitAny inum.toNat ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
@@ -129,15 +129,15 @@ def wp_idup_shr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `idup` (Rocq `Module Type IDUP`). -/
 structure IDUP : Prop where
-  wp_idup : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+  wp_idup : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
     [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (kk z : Nat) hnoff hK hkk hlk ha0,
-    wp_idup_body (hlc := hlc) (GF := GF) cpu k kk z hnoff hK hkk hlk ha0
-  wp_idup_shr : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+    wp_idup_body (GF := GF) cpu k kk z hnoff hK hkk hlk ha0
+  wp_idup_shr : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
     [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (kk : Nat) (s : Qp) (inum : BitVec 32) hnoff hK hkk hlk ha0,
-    wp_idup_shr_body (hlc := hlc) (GF := GF) cpu k kk s inum hnoff hK hkk hlk ha0
+    wp_idup_shr_body (GF := GF) cpu k kk s inum hnoff hK hkk hlk ha0
 
 end Xv6

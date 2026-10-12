@@ -72,7 +72,7 @@ union). -/
 def fileOk (_c : FileFixed) (k : Nat) (r : FileAppNames) : Prop := r.fnEra = k
 
 section AppFileSyncReg
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FileAppG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FileAppG GF]
 
 /-! ## The registry: era ↦ that era's sync list -/
 
@@ -80,14 +80,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FileAppG GF]
 def syncReg (c : FileFixed) (k : Nat) (γ : GName) : IProp GF :=
   ghost_map_elem c.ffReg DFrac.discard k γ
 
+omit [MachGS GF] in
 instance syncReg_persistent (c : FileFixed) (k : Nat) (γ : GName) :
     Persistent (syncReg (GF := GF) c k γ) := by
   unfold syncReg; infer_instance
 
+omit [MachGS GF] in
 instance syncReg_timeless (c : FileFixed) (k : Nat) (γ : GName) :
     Timeless (syncReg (GF := GF) c k γ) := by
   unfold syncReg; infer_instance
 
+omit [MachGS GF] in
 /-- Rocq `sync_reg_agree`. -/
 theorem syncReg_agree (c : FileFixed) (k : Nat) (γ γ' : GName) :
     ⊢@{IProp GF} syncReg c k γ -∗ syncReg c k γ' -∗ ⌜γ = γ'⌝ := by
@@ -103,10 +106,12 @@ once so that every holder reads it at the camera `syncReg` is at. -/
 def syncRegAuth (c : FileFixed) (M : RegMapF GName) : IProp GF :=
   c.ffReg ↪●MAP M
 
+omit [MachGS GF] in
 instance syncRegAuth_timeless (c : FileFixed) (M : RegMapF GName) :
     Timeless (syncRegAuth (GF := GF) c M) := by
   unfold syncRegAuth; infer_instance
 
+omit [MachGS GF] in
 /-- A fresh registry name, empty (Rocq `ghost_map_alloc_empty` at `ff_reg`). -/
 theorem syncRegAuth_alloc :
     ⊢@{IProp GF} |==> ∃ γ : GName, ∀ c : FileFixed, ⌜c.ffReg = γ⌝ -∗ syncRegAuth c ∅ := by
@@ -118,6 +123,7 @@ theorem syncRegAuth_alloc :
   rw [hc]
   iexact H
 
+omit [MachGS GF] in
 /-- THE ON-ARM'S REGISTRATION of an era's list (Rocq's `ghost_map_insert_persist`
 at `ff_reg`, in `UnionOut`'s on-arm). -/
 theorem syncRegAuth_insert (c : FileFixed) (M : RegMapF GName) (k : Nat) (γ : GName)
@@ -134,14 +140,17 @@ theorem syncRegAuth_insert (c : FileFixed) (M : RegMapF GName) (k : Nat) (γ : G
 def runReg (c : FileFixed) (k : Nat) (p d : GName) : IProp GF :=
   ghost_map_elem c.ffRun DFrac.discard k (p, d)
 
+omit [MachGS GF] in
 instance runReg_persistent (c : FileFixed) (k : Nat) (p d : GName) :
     Persistent (runReg (GF := GF) c k p d) := by
   unfold runReg; infer_instance
 
+omit [MachGS GF] in
 instance runReg_timeless (c : FileFixed) (k : Nat) (p d : GName) :
     Timeless (runReg (GF := GF) c k p d) := by
   unfold runReg; infer_instance
 
+omit [MachGS GF] in
 /-- Rocq `run_reg_agree`. -/
 theorem runReg_agree (c : FileFixed) (k : Nat) (p d p' d' : GName) :
     ⊢@{IProp GF} runReg c k p d -∗ runReg c k p' d' -∗ ⌜p = p' ∧ d = d'⌝ := by
@@ -160,9 +169,11 @@ most the copy's (Rocq `run_auth`). -/
 def runAuth (c : FileFixed) (k : Nat) : IProp GF :=
   iprop(∃ M : RegMapF (GName × GName), (c.ffRun ↪●MAP M) ∗ ⌜pinDom M k⌝)
 
+omit [MachGS GF] in
 instance runAuth_timeless (c : FileFixed) (k : Nat) : Timeless (runAuth (GF := GF) c k) := by
   unfold runAuth; infer_instance
 
+omit [MachGS GF] in
 /-- The transport's registration of the new era's running claim (Rocq
 `run_auth_register`). -/
 theorem runAuth_register (c : FileFixed) (k k' : Nat) (p d : GName) (hk : k < k') :
@@ -189,6 +200,7 @@ theorem runAuth_register (c : FileFixed) (k k' : Nat) (p d : GName) (hk : k < k'
       omega
   · iexact Hel
 
+omit [MachGS GF] in
 /-- Rocq `run_auth_0`, at a fresh name (`ghost_map_alloc_empty` at `ff_run`,
 and `run_auth_0`). -/
 theorem runAuth_alloc :
@@ -288,6 +300,7 @@ theorem syncStLb_0 (c : FileFixed) : ⊢@{IProp GF} |==> syncStLb c 0 := by
   unfold syncStLb
   exact MonoNat.lb_own_0 c.ffSt
 
+omit [MachGS GF] in
 /-- The registry at two equal eras (the era equation stays pure). -/
 theorem syncReg_agree_at (c : FileFixed) (k k' : Nat) (γ γ' : GName) (hk : k = k') :
     ⊢@{IProp GF} syncReg c k γ -∗ syncReg c k' γ' -∗ ⌜γ = γ'⌝ := by

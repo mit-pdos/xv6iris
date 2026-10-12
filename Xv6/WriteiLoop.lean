@@ -30,7 +30,7 @@ theorem writei_br_bread : KA.«writei» + 0xFFFFFFFFFFFFF49C#64 = KA.«bread» :
 theorem writei_ret_98 : jumpPc (KA.«writei» + 0x98#64) = KA.«writei» + 0x98#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -49,7 +49,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x90 .. +0xae`: bread the block, couple it, size the chunk** (Rocq's
 `wi_loop` between bmap's success arm and `BODY`). -/
 theorem writei_iter_bread (IU : IUPDATE) (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE)
-    (EC : EITHER_COPYIN) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (EC : EITHER_COPYIN) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (A : WiArgs) (hA : WiFactsEb k A)
     (W tot : Nat) (bmI : Blkmap) (dataI : Nat → List (BitVec 8)) (wroteI : Nat → BitVec 8)
     (PI : UPtd) (nI : Nat) (SI : List Nat) (bm2 : Blkmap) (data2 : Nat → List (BitVec 8))
@@ -229,7 +229,7 @@ answer): `bmap(ip, off/BSIZE)` at the credit read off the running set, the
 ledger's first half (`Xv6.WiBm`), and the `beqz`: out on `0`, on to
 `bread` otherwise. -/
 theorem writei_iter_head (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE)
-    (EC : EITHER_COPYIN) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (EC : EITHER_COPYIN) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (A : WiArgs) (hA : WiFactsEb k A)
     (W tot : Nat) (bmI : Blkmap) (dataI : Nat → List (BitVec 8)) (wroteI : Nat → BitVec 8)
     (PI : UPtd) (nI : Nat) (SI : List Nat)
@@ -351,7 +351,7 @@ theorem writei_iter_head (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE
 /-- THE INDUCTION on the fuel (Rocq's `induction W`): fuel `0` is refuted
 (`wiBlocks ≥ 1` on a nonempty remainder). -/
 theorem writei_loop (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE)
-    (EC : EITHER_COPYIN) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (EC : EITHER_COPYIN) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (A : WiArgs) (hA : WiFactsEb k A)
     (hrng : A.off + A.n ≤ MAXFILE * BSIZE) (hoffle : A.off ≤ A.dn.diSize.toNat) :
     ∀ W, WiLoopGoal (GF := GF) Γ k A W := by

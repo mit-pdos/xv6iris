@@ -35,7 +35,7 @@ open LeanRV64D
 /-! ## The generic unfolding -/
 
 section unfold
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 /-- A fupd that re-closes the state interpretation runs before any hart
 expression's step, and its yield goes to the continuation. -/
@@ -57,22 +57,22 @@ theorem wp_stateInterp_fupd (e : Expr) (Q : IProp GF) :
 end unfold
 
 section custody
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **Rocq `wp_start_auth_fupd`**: at any hart expression of the ambient
 generation, a client fupd at `⊤` runs against the state interpretation's
 started authority, pinned at `genId + 1`, and yields `P` to the
 continuation. -/
 theorem wpHart_startAuth_fupd (cpu : CPU) (m : SailM Unit) (P : IProp GF) :
-    (∀ n : Nat, ⌜n = genId (hlc := hlc) (GF := GF) + 1⌝ -∗ startAuth n ={⊤}=∗
+    (∀ n : Nat, ⌜n = genId (GF := GF) + 1⌝ -∗ startAuth n ={⊤}=∗
         startAuth n ∗ P) ⊢@{IProp GF}
       (P -∗ wpHart cpu m) -∗ wpHart cpu m := by
   unfold wpHart hartWP
   iintro Hhook Hk #Hcert
   ihave #Hparts := genCert_parts $$ Hcert
   icases Hparts with ⟨Hborn, Hstarted, -⟩
-  iapply wp_stateInterp_fupd (Expr.hart (genId (hlc := hlc) (GF := GF)) cpu m)
-    iprop(P ∨ genDead (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))) $$ [Hhook]
+  iapply wp_stateInterp_fupd (Expr.hart (genId (GF := GF)) cpu m)
+    iprop(P ∨ genDead (GF := GF) (genId (GF := GF))) $$ [Hhook]
   · iintro %g %ns %κs %nt Hσ
     rw [stateInterp_eq]
     icases Hσ with ⟨Hσ, Hobs⟩
@@ -80,8 +80,8 @@ theorem wpHart_startAuth_fupd (cpu : CPU) (m : SailM Unit) (P : IProp GF) :
     icases Hσ with ⟨Hgen, Hstart, Hrest⟩
     ihave %Hb' := genAuth_born _ _ $$ Hgen Hborn
     ihave %Hs' := startAuth_started _ _ $$ Hstart Hstarted
-    by_cases hge : g.gen = genId (hlc := hlc) (GF := GF)
-    · have hsc : startCount g = genId (hlc := hlc) (GF := GF) + 1 := by
+    by_cases hge : g.gen = genId (GF := GF)
+    · have hsc : startCount g = genId (GF := GF) + 1 := by
         unfold startCount at Hs' ⊢
         cases h : g.pow <;> simp [h] at Hs' ⊢ <;> omega
       imod Hhook $$ %(startCount g) %hsc Hstart with ⟨Hstart, HP⟩
@@ -89,7 +89,7 @@ theorem wpHart_startAuth_fupd (cpu : CPU) (m : SailM Unit) (P : IProp GF) :
       iframe Hobs Hgen Hstart Hrest
       ileft
       iexact HP
-    · have hlt : genId (hlc := hlc) (GF := GF) < g.gen := by omega
+    · have hlt : genId (GF := GF) < g.gen := by omega
       ihave #Hdead := genAuth_get_dead _ _ hlt $$ Hgen
       imodintro
       iframe Hobs Hgen Hstart Hrest
@@ -104,16 +104,16 @@ theorem wpHart_startAuth_fupd (cpu : CPU) (m : SailM Unit) (P : IProp GF) :
 /-- **Rocq `wp_crash_fupd`**: custody with the crash invariant opened at `⊤`
 inside it (the invariant's second opener). -/
 theorem wpHart_crash_fupd (cpu : CPU) (m : SailM Unit) (P : IProp GF) :
-    crashInv (hlc := hlc) (GF := GF) ⊢@{IProp GF}
-      (∀ n : Nat, ⌜n = genId (hlc := hlc) (GF := GF) + 1⌝ -∗ startAuth n -∗
-        ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ={⊤ \ ↑crashN}=∗
-        startAuth n ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ∗ P) -∗
+    crashInv (GF := GF) ⊢@{IProp GF}
+      (∀ n : Nat, ⌜n = genId (GF := GF) + 1⌝ -∗ startAuth n -∗
+        ▷ MachFixedGS.crashPred (GF := GF) ={⊤ \ ↑crashN}=∗
+        startAuth n ∗ ▷ MachFixedGS.crashPred (GF := GF) ∗ P) -∗
       (P -∗ wpHart cpu m) -∗ wpHart cpu m := by
   iintro #Hinv Hhook Hk
   iapply wpHart_startAuth_fupd cpu m P $$ [Hhook] Hk
   iintro %n %hn Hs
   unfold crashInv
-  imod inv_acc (E := ⊤) (N := crashN) (P := MachFixedGS.crashPred (hlc := hlc) (GF := GF))
+  imod inv_acc (E := ⊤) (N := crashN) (P := MachFixedGS.crashPred (GF := GF))
     CoPset.subseteq_top $$ Hinv with ⟨Hc, Hclose⟩
   imod Hhook $$ %n %hn Hs Hc with ⟨Hs, Hc, HP⟩
   imod Hclose $$ Hc

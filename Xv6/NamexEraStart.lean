@@ -41,7 +41,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -74,7 +74,7 @@ theorem namexEra_pre_walk (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat → 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -84,14 +84,14 @@ set_option maxHeartbeats 16000000 in
 `s7 = T_DIR`) and the jump into the walk at `+0xf4`, at offset 0 with
 nothing consumed, the whole reservation and nothing paid. -/
 theorem namexEra_consts (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (ipv : BitVec 64) (dcur : Nat) (nf : Nat → BitVec 8)
     (hr : namexEntryRegs k R ipv) (hbud : walkNeed (pathElems A.pl).length ≤ A.n) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x3c#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexEraWalk k A P Pmiss ipv dcur 0 A.n A.Sb nf ∗
+    namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur 0 A.n A.Sb nf ∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r20, r21, r22, r27⟩ := id hr
@@ -132,23 +132,23 @@ set_option maxHeartbeats 16000000 in
 cell read (Rocq borrows it out of the process block; here it is its own row,
 SpecNamex deviation 3), idup at the cwd's slot, `s4 := ip`. -/
 theorem namexEra_rel (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (IP : IPUT) (MP : MYPROC) (ID : IDUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IP : IPUT) (MP : MYPROC) (ID : IDUP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (R : RegMap) (nf : Nat → BitVec 8)
     (hr : namexEntryRegs k R (k.regs 20#5)) (hbud : walkNeed (pathElems A.pl).length ≤ A.n)
     (hsl : A.pfun 0 ≠ SLASH) :
     kctx cpu (((k.withSpie k.spie k.spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x2e#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexPre k A nf ∗ namexEraStart A P Pmiss ∗
+    namexEnv Γ A ∗ namexPre k A nf ∗ namexEraStart A P Pmiss ∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hrc : A.cwi = umStartOf A.rti A.cwi A.pl :=
     (umStartOf_rel A.rti A.cwi A.pl (fun h => hsl (bview_headSlash A.plen A.pfun h))).symm
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hpre, Hst, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases namexEnv_open (hlc := hlc) Γ A $$ Henv with
+  icases namexEnv_open Γ A $$ Henv with
     ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks, #Hinv, #Hopen, #Hbmi⟩
-  ihave #Hreg := iregInv_reg (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
+  ihave #Hreg := iregInv_reg fscIreg fscFs icfgIst icfgNib $$ Hinv
   icases namexEra_pre_walk k A P Pmiss nf $$ Hpre with ⟨Hslot, Hkeep, Hwk⟩
   icases (namexKeep_open k A).1 $$ Hkeep with ⟨Hsb, Hsi, Hpid, Hcwd, Hcwr, Hrtc, Hrtr⟩
   ihave Hcwd := (namex_cwd_cell k.proc A.dqc A.cwdv).1 $$ Hcwd
@@ -156,7 +156,7 @@ theorem namexEra_rel (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
   k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x2e#64) false 2088740#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_myproc]
   iintro Hk Hpc
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu
+  have h := MP.wp_myproc (GF := GF) cpu
     ((((k.withSpie k.spie k.spp).pushed 12).withRegs (R.set 1#5 (KA.«namex» + 0x32#64))))
     (by show k.noff + 1 < 2 ^ 31; rw [hs.hnoff]; omega)
     (by show 10 ≤ k.avail - 12; exact namex_slots_small _ hs.hK)
@@ -186,7 +186,7 @@ theorem namexEra_rel (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
   k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x36#64) false 2095292#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_idup]
   iintro Hk Hpc
-  have h := ID.wp_idup (hlc := hlc) (GF := GF) cpu
+  have h := ID.wp_idup (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 12).withRegs
       ((R1.set 10#5 A.cwdv).set 1#5 (KA.«namex» + 0x3a#64)))) ck A.cwi
     (by show k.noff + 1 < 2 ^ 31; rw [hs.hnoff]; omega)
@@ -242,23 +242,23 @@ set_option maxHeartbeats 16000000 in
 the relative arm's twin at the root cell, and THE ONE SHOT at idup's inum,
 the root's own `rti` (`umStartOf_slash`). -/
 theorem namexEra_abs (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (IP : IPUT) (MP : MYPROC) (ID : IDUP) (IG : IGET) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IP : IPUT) (MP : MYPROC) (ID : IDUP) (IG : IGET) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (R : RegMap) (nf : Nat → BitVec 8)
     (hr : namexEntryRegs k R (k.regs 20#5)) (hbud : walkNeed (pathElems A.pl).length ≤ A.n)
     (hsl : A.pfun 0 = SLASH) :
     kctx cpu (((k.withSpie k.spie k.spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x48#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexPre k A nf ∗ namexEraStart A P Pmiss ∗
+    namexEnv Γ A ∗ namexPre k A nf ∗ namexEraStart A P Pmiss ∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hrc : A.rti = umStartOf A.rti A.cwi A.pl :=
     (umStartOf_slash A.rti A.cwi A.pl (bview_headSlash_intro A.plen A.pfun hs.hterm hsl)).symm
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hpre, Hst, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases namexEnv_open (hlc := hlc) Γ A $$ Henv with
+  icases namexEnv_open Γ A $$ Henv with
     ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks, #Hinv, #Hopen, #Hbmi⟩
-  ihave #Hreg := iregInv_reg (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
+  ihave #Hreg := iregInv_reg fscIreg fscFs icfgIst icfgNib $$ Hinv
   icases namexEra_pre_walk k A P Pmiss nf $$ Hpre with ⟨Hslot, Hkeep, Hwk⟩
   icases (namexKeep_open k A).1 $$ Hkeep with ⟨Hsb, Hsi, Hpid, Hcwd, Hcwr, Hrtc, Hrtr⟩
   ihave Hrtc := (namex_root_cell k.proc A.dqr A.rootv).1 $$ Hrtc
@@ -266,7 +266,7 @@ theorem namexEra_abs (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
   k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x48#64) false 2088714#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_myproc]
   iintro Hk Hpc
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu
+  have h := MP.wp_myproc (GF := GF) cpu
     ((((k.withSpie k.spie k.spp).pushed 12).withRegs (R.set 1#5 (KA.«namex» + 0x4c#64))))
     (by show k.noff + 1 < 2 ^ 31; rw [hs.hnoff]; omega)
     (by show 10 ≤ k.avail - 12; exact namex_slots_small _ hs.hK)
@@ -296,7 +296,7 @@ theorem namexEra_abs (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
   k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x50#64) false 2095266#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_idup]
   iintro Hk Hpc
-  have h := ID.wp_idup (hlc := hlc) (GF := GF) cpu
+  have h := ID.wp_idup (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 12).withRegs
       ((R1.set 10#5 A.rootv).set 1#5 (KA.«namex» + 0x54#64)))) ck A.rti
     (by show k.noff + 1 < 2 ^ 31; rw [hs.hnoff]; omega)
@@ -354,7 +354,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x1c .. +0x2a`: THE ARGUMENTS AND THE ARM SPLIT** -- `s1 = path`,
 `s6 = nameiparent`, `s5 = name`, and `*path == '/'`. -/
 theorem namexEra_entry (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (IP : IPUT) (MP : MYPROC) (ID : IDUP) (IG : IGET) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IP : IPUT) (MP : MYPROC) (ID : IDUP) (IG : IGET) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (nf : Nat → BitVec 8)
     (hbud : walkNeed (pathElems A.pl).length ≤ A.n) :
@@ -362,7 +362,7 @@ theorem namexEra_entry (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNL
       ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFA0#64)).set 8#5 (k.regs 2#5))) ∗
     pcIs cpu (KA.«namex» + 0x1c#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexPre k A nf ∗ namexEraStart A P Pmiss ∗
+    namexEnv Γ A ∗ namexPre k A nf ∗ namexEraStart A P Pmiss ∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hacc := namex_path_lookup A.plen 0 A.pfun (Nat.zero_le _)

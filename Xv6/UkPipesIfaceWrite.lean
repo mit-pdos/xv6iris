@@ -38,11 +38,11 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section Write
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF] [FileAppG GF]
-variable {C : PnsCtx hlc GF}
+variable {C : PnsCtx GF}
 
 /-- **Rocq `pns_write`**: `ei_write` at the console. -/
 theorem pns_write (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) (alts : List (List (BitVec 8)))
@@ -51,7 +51,7 @@ theorem pns_write (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) (alts : L
     ⊢ pnsFds C.R C.Q fdm -∗ pnsOut C.R C.Q.γreg d alts -∗
       ((pnsFds C.R C.Q fdm -∗ pnsOut C.R C.Q.γreg d [a.drop bs.length] -∗ K (bs.length : Int)) ∧
        (∀ x, pnsTaint C.R C.Q (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) C.Q.N C.Q.P fd bs K := by
+      wrObl C.Q.N C.Q.P fd bs K := by
   have := CK.hpc
   iintro Hfds Hout HK
   unfold pnsOut
@@ -83,7 +83,7 @@ theorem pns_write_h (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) (alts :
       ((pnsFds C.R C.Q fdm -∗ pnsOuth C.R C.Q.γreg d [a.drop bs.length] -∗ K (bs.length : Int)) ∧
        (pnsFds C.R C.Q fdm -∗ pnsHalt C.Q.γreg d -∗ K (-1)) ∧
        (∀ x, pnsTaint C.R C.Q (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) C.Q.N C.Q.P fd bs K := by
+      wrObl C.Q.N C.Q.P fd bs K := by
   iintro Hfds Hout HK
   unfold pnsOuth
   icases Hout with ⟨%pn, %gp, Htk, Hd⟩
@@ -139,7 +139,7 @@ theorem pns_write_halt (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) (bs 
     ⊢ pnsFds C.R C.Q fdm -∗ pnsHalt C.Q.γreg d -∗
       ((pnsFds C.R C.Q fdm -∗ pnsHalt C.Q.γreg d -∗ K (-1)) ∧
        (∀ x, pnsTaint C.R C.Q (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) C.Q.N C.Q.P fd bs K := by
+      wrObl C.Q.N C.Q.P fd bs K := by
   iintro Hfds Hh HK
   unfold pnsHalt
   icases Hh with ⟨%pn, %gp, Htk, Hh⟩
@@ -171,7 +171,7 @@ theorem pns_nil_arms (CK : PnsCtxOk C) (fdm : Fdmap) (l : List FdState) (vs : Re
       ((pnsFds C.R C.Q fdm -∗ D -∗ K 0) ∧ (pnsFds C.R C.Q fdm -∗ D -∗ K (-1)) ∧
         (∀ y, pnsTaint C.R C.Q (fdDom fdm) -∗ K y)) -∗
       ((ustd C.Q.N.fd l -∗ D -∗ K 0) ∧ (ustd C.Q.N.fd l -∗ D -∗ K (-1)) ∧
-        (ustd C.Q.N.fd l -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ ∀ z : Int, K z)) := by
+        (ustd C.Q.N.fd l -∗ MachFixedGS.killCred (GF := GF) -∗ ∀ z : Int, K z)) := by
   iintro Hrest HK
   isplit
   · iintro Hstd Hd
@@ -198,7 +198,7 @@ theorem pns_nil_ro (CK : PnsCtxOk C) (fdm : Fdmap) (l : List FdState) (vs : RegM
     ⊢ ustd C.Q.N.fd l -∗ pnsFdsRest C.R C.Q fdm l vs wv -∗ D -∗
       ((pnsFds C.R C.Q fdm -∗ D -∗ K 0) ∧ (pnsFds C.R C.Q fdm -∗ D -∗ K (-1)) ∧
         (∀ y, pnsTaint C.R C.Q (fdDom fdm) -∗ K y)) -∗
-      wrObl (hlc := hlc) C.Q.N C.Q.P (fd : Int) [] K := by
+      wrObl C.Q.N C.Q.P (fd : Int) [] K := by
   iintro Hstd Hrest Hd HK
   iapply UkFileDev.file_write_nil_std_ro (UkFileDevSysP.ofLanded CK.UL) C.Q.N C.Q.P ⟨CK.QK.FH.sr, CK.QK.FH.sw, CK.QK.FH.so, CK.QK.FH.sc⟩ fd l true (.pipe gp) K hlt hrow $$ Hstd
   isplit
@@ -220,7 +220,7 @@ theorem pns_write_nil (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) (x : 
       ((pnsFds C.R C.Q fdm -∗ pnsDev C.R C.Q.γreg d x -∗ K 0) ∧
        (pnsFds C.R C.Q fdm -∗ pnsDev C.R C.Q.γreg d x -∗ K (-1)) ∧
        (∀ y, pnsTaint C.R C.Q (fdDom fdm) -∗ K y)) -∗
-      wrObl (hlc := hlc) C.Q.N C.Q.P fd [] K := by
+      wrObl C.Q.N C.Q.P fd [] K := by
   iintro Hfds Hd HK
   ihave ⟨%kd, Htk, Hback⟩ := pns_dev_tok C.R C.Q.γreg d x $$ Hd
   ihave ⟨%l, %vs, %wv, %k, %hp, Hstd, Hrest, Htk, -⟩ := pns_fds_open fdm fd d _ kd hfd $$ Hfds Htk

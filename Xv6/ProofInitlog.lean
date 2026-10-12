@@ -100,7 +100,7 @@ theorem il_ext0 : BitVec.extractLsb' 0 32 (0#64) = 0#32 := by decide
 /-! ## The held buffer -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- Open the held buffer at its data bytes (Rocq's `bio_locked` unfold). -/
@@ -158,7 +158,7 @@ end
 /-! ## The five callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `initlock`'s contract as a rule, with the lock pointer named (the name
@@ -177,7 +177,7 @@ theorem il_initlock_call (IL : INITLOCK) (c : CPU) (k' : KCtx)
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) (k'.regs 11#5) -∗
       lkFresh lk -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK'
+  have h := IL.wp_initlock (GF := GF) c k' vlock vname vcpu hK'
   unfold wp_initlock_body at h
   simp only [initlockAddr, h10] at h
   exact h
@@ -185,7 +185,7 @@ theorem il_initlock_call (IL : INITLOCK) (c : CPU) (k' : KCtx)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 2000000 in
@@ -193,7 +193,7 @@ set_option maxHeartbeats 2000000 in
 `+0x64`): the loop installs every entry, the logged view MOVES to the
 slots' contents (`Xv6.itRecL`), nothing is pinned, and the WAL's exception
 handle comes back at its residue. -/
-theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
@@ -228,7 +228,7 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     ([∗list] i ↦ _w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i)) ∗
     bslots 2 ∗
     □ (∀ (i : Nat) (w : BitVec 32), ⌜W[i]? = some w⌝ -∗ ⌜(Lw i).length = BSIZE⌝ -∗ ▷ Rt i -∗
-         diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * w.toNat, Lw i))
+         diskSeqPermit (genId (GF := GF)) (some (1024 * w.toNat, Lw i))
            (Rt (i + 1))) ∗
     ▷ Rt 0 ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -244,7 +244,7 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
       bslots 2 -∗ ▷ Rt n -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := IT.wp_install_trans_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
+  have h := IT.wp_install_trans_eb (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
     logstart dev true n W Lw L D pidv dqp homeL Xv Xexc Rt
     hj hproc hK hnoff htier hgeom hdev hcl hdt
     (by simp only [if_true]; exact ha0) hn hnodup hhome hlen
@@ -277,7 +277,7 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
 
 set_option maxHeartbeats 2000000 in
 /-- `write_head()` AT THE EMPTY WRITE SET. -/
-theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac) (Q : List (BitVec 8) → IProp GF)
@@ -297,7 +297,7 @@ theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     bslot ∗
     (∀ bs' : List (BitVec 8), ⌜bs'.length = BSIZE⌝ -∗ ⌜hdrN bs' = 0⌝ -∗
        ⌜hdrDec bs' = (0, ([] : List (BitVec 32)).map (fun w => w.toNat))⌝ -∗
-       diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * logHdrBno logstart, bs'))
+       diskSeqPermit (genId (GF := GF)) (some (1024 * logHdrBno logstart, bs'))
          (Q bs')) ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
         (bs' : List (BitVec 8)),
@@ -313,7 +313,7 @@ theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
       bslot -∗ ▷ Q bs' -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := WH.wp_write_head_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
+  have h := WH.wp_write_head_eb (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
     logstart dev 0 ([] : List (BitVec 32)) L pidv dqp Q
     hj hproc hK hnoff htier hgeom hdev hcl hdt
     ⟨rfl, by unfold LOGBLOCKS; omega⟩ hpd
@@ -338,9 +338,10 @@ end
 /-! ## The slot pool, split and rejoined -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- The stocked pool: the batch's thirty-two plus `initlog`'s working
 pair. -/
 theorem il_slots_split (γ : BcacheNames) :
@@ -358,7 +359,7 @@ end
 /-! ## The constructor's ghost step, the epilogue and the return -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
@@ -366,7 +367,7 @@ set_option maxHeartbeats 8000000 in
 the raw cells and the block-view material (`Xv6/LogBoot.lean`), SEAL the
 "log" spinlock over it AT `γ.lk` (`MachCSL.kctx_newlockAt`), run the epilogue and hand
 the caller back `Xv6.logCtx`. -/
-theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem il_seal (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap)
     (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     (logstart : Nat) (dev pidv vNc : BitVec 32) (sb : BitVec 64) (dqp dqs : DFrac)
@@ -385,12 +386,12 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) ∗
     logFrozen logstart dev ∗ fsBytesAnyAt γfs (fsHomeList V.cov logstart) ∗
-    swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ∗
-    sbParked γfs ∗ snapLaw (hlc := hlc) γ γfs V.cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) ∗
-    snapLawGhost (hlc := hlc) γ γfs V.cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))
-      (eraSyncHook (hlc := hlc) (GF := GF)) ∗
-    crashInv (hlc := hlc) (GF := GF) ∗ genCert (hlc := hlc) (GF := GF) ∗
-    logMirrorHalf (hlc := hlc) M ∗
+    swapLb (GF := GF) (genId (GF := GF) + 1) ∗
+    sbParked γfs ∗ snapLaw γ γfs V.cov logstart (eraSyncTok (GF := GF)) (genId (GF := GF)) ∗
+    snapLawGhost γ γfs V.cov logstart (eraSyncTok (GF := GF)) (genId (GF := GF))
+      (eraSyncHook (GF := GF)) ∗
+    crashInv (GF := GF) ∗ genCert (GF := GF) ∗
+    logMirrorHalf M ∗
     kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗ lkFresh logAddr ∗
     logFreeTok γ ∗
     wordPointsTo lOut 4 (DFrac.own 1) 0#32 ∗
@@ -475,13 +476,13 @@ end
 /-! ## The function -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 set_option maxHeartbeats 32000000 in
 theorem initlog_proof
     (IL : INITLOCK) (BD : BREAD) (BE : BRELSE) (IT : INSTALL_TRANS) (WH : WRITE_HEAD) :
     INITLOG := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev sb
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev sb
     bsHdr Xv L D M bsSb sbrec vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
     hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 ha1
     hhdrLen hhdrNodup hhdrHome hxslot hpinned hLM hsbok hsbparse hpd => by
@@ -501,9 +502,9 @@ theorem initlog_proof
     Htok, Hsb, #Hm1, #Hm2, Hlock, Hname, Hcpu, HlStart, HlDev, Hout, Hcmt, Hnc, HlhN, Hjunk,
     HL, HD, Hd, Hhdr, Hslots, Hpool0, Hb1, #Hlawf, #Hlawgf, #Hcinv, Hnext⟩
   icases genCert_parts $$ Hcert with ⟨-, -, #Hreg⟩
-  icases (show logMirrorBorn (hlc := hlc) (GF := GF) M ⊢
-      logMirrorHalf (hlc := hlc) M ∗
-        swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) from by
+  icases (show logMirrorBorn (GF := GF) M ⊢
+      logMirrorHalf M ∗
+        swapLb (GF := GF) (genId (GF := GF) + 1) from by
     unfold logMirrorBorn; exact .rfl) $$ Hborn with ⟨Hmir, #Hswlb⟩
   ihave #Hat := fsBytesAt_of γfs (fsHomeList V.cov logstart) Xv $$ Hbinv
   -- `lh.block[]`'s cells as ONE list, and the log slots' client halves as
@@ -756,7 +757,7 @@ theorem initlog_proof
   -- THE RECOVERING INSTALL fupds, one per entry, out of one generator
   ihave #Hgen := eo_install_gen V.cov logstart (hdrN bs) (ilW bs) Lw M hW.symm hnB hnodup'
     hhome' hM1 $$ Hseam Hreg Hswlb
-  ihave HR0 : ▷ logMirrorHalf (hlc := hlc) (GF := GF)
+  ihave HR0 : ▷ logMirrorHalf (GF := GF)
       (lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw 0) $$ [Hmir]
   · inext
     rw [show lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw 0 = M from rfl]
@@ -778,7 +779,7 @@ theorem initlog_proof
     rw [hLwn x (List.mem_range.1 (List.mem_of_getElem? hx))]) $$ HsW
   iapply (il_install_trans IT Γ cpu _ γl γb V γdl γfs pd pav pu j logstart dev
       (hdrN bs) (ilW bs) Lw L D pidv dqp (fsHomeList V.cov logstart) Xv (hdrDec bs).2
-      (fun i => logMirrorHalf (hlc := hlc) (GF := GF)
+      (fun i => logMirrorHalf (GF := GF)
         (lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw i))
       k.proc (by k_norm_g) k.sie (by k_norm_g) hj ?tproc ?tK ?tnoff ?ttier hgeom hdev hcl hdt
       ?ta0 ⟨hW.symm, hnB⟩
@@ -876,7 +877,7 @@ theorem initlog_proof
     $$ Hseam Hreg Hswlb HRn
   iapply (il_write_head WH Γ cpu _ γl γb V γdl γfs pd pav pu j logstart dev
       (itRecL (ilW bs) Lw L) pidv dqp
-      (fun bs' => iprop(logMirrorHalf (hlc := hlc) (lmUpd
+      (fun bs' => iprop(logMirrorHalf (lmUpd
           (lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw (hdrN bs)) (logHdrBno logstart) bs')))
       k.proc (by k_norm_g) k.sie (by k_norm_g) hj ?wproc ?wK ?wnoff ?wtier hgeom hdev hcl hdt hpd)
     $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $HL $Hch $Hu1 $Hfam]

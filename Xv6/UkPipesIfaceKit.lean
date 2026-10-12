@@ -60,14 +60,14 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 /-! ## §2 The round (deviation 1) -/
 
 /-- **Rocq `UkPipesIface`'s section context (data)**. -/
-structure PnsRound (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF]
+structure PnsRound (GF : BundledGFunctors.{0}) [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF]
     [EchoOutG GF] where
   /-- THE ROUND'S CLAIM: its names, a line model with a pipeline view, the
   claim's parameters, a default state, its state witness -/
   g : PipeGn
   M : LModel
   V : PView M
-  G : GenCparams hlc GF M
+  G : GenCparams GF M
   sd : M.lmSt
   WA : GenWa M G sd
   /-- the round: its pins, its input, its state and its pipeline -/
@@ -85,8 +85,8 @@ structure PnsRound (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv
   γm : Wid → GName
 
 section Round
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
-variable (R : PnsRound hlc GF)
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
+variable (R : PnsRound GF)
 
 /-- Rocq `T`: the claim's taint. -/
 abbrev PnsRound.T : IProp GF := R.G.gcT
@@ -105,14 +105,14 @@ abbrev PnsRound.WITN : Bool → List (BitVec 8) → Prop := pwitV R.M R.I R.sR
 end Round
 
 /-- **Rocq `UkPipesIface`'s section hypotheses** (deviation 1). -/
-structure PnsRoundOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF]
-    [EchoOutG GF] [PipesNG GF] (R : PnsRound hlc GF) : Prop where
+structure PnsRoundOk {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF]
+    [EchoOutG GF] [PipesNG GF] (R : PnsRound GF) : Prop where
   /-- Rocq `Hext` -/
   hext : ∀ k l, R.WA.gext k l = pext R.g k l
   /-- Rocq `Hcons` -/
   hcons : consClaimV R.g R.M R.V R.G R.sd R.WA
   /-- Rocq `Hkill` (deviation 3) -/
-  hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = R.G.gcT
+  hkill : MachFixedGS.killCred (GF := GF) = R.G.gcT
   /-- Rocq `HlR` -/
   hlR : R.V.pvLine (lineV R.M R.I) = some R.lR
   /-- Rocq `Hfc` -/
@@ -127,13 +127,13 @@ structure PnsRoundOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
   dep_tl : ∀ w s, Timeless (R.dep w s)
 
 section Kit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
   [PipesNG GF]
-variable (R : PnsRound hlc GF)
+variable (R : PnsRound GF)
 
 /-- Rocq `FAM`: THE ROUND'S N-WRITER FAMILY. -/
 abbrev PnsRound.FAM : IProp GF :=
-  blkNInv R.wsN R.RUNN R.PWN R.TERM R.TOK R.dep pnsN (genId (hlc := hlc) (GF := GF) + 1) R.γc R.γm
+  blkNInv R.wsN R.RUNN R.PWN R.TERM R.TOK R.dep pnsN (genId (GF := GF) + 1) R.γc R.γm
 
 /-! ## §2a The family's laws at the round -/
 
@@ -158,13 +158,13 @@ theorem pns_fam_cstep (OK : PnsRoundOk R) (w : Wid) (s : List (BitVec 8)) (c : N
     (hok : cstepOkN R.wsN R.RUNN R.WITN R.TERM R.TOK w s c) :
     ⊢ R.FAM -∗ wcurN R.γc w (1 : Qp).half c -∗ wmodeN R.γm w (1 : Qp).half (some s) -∗
       (wcurN R.γc w (1 : Qp).half (c + 1) -∗ wmodeN R.γm w (1 : Qp).half (some s) -∗ Φ) -∗
-      outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b Φ := by
+      outLink .uart0 (genId (GF := GF) + 1) b Φ := by
   obtain ⟨CL, hCL, hecl⟩ := OK.hcons
   have hdep := OK.dep_tl
   iintro #Hinv HcW HmW HΦ
   iapply (blkNCstep R.wsN CL R.RUNN R.PWN R.TKN R.WITN R.TERM R.TOK R.dep hCL (wids_nodup _)
     (pipesV_HWIT R.M R.V R.I R.sR R.lR OK.hlR OK.hfc OK.hadmit OK.hplok)
-    pnsN (genId (hlc := hlc) (GF := GF) + 1) R.γc R.γm w s c b Φ pnsN_uart hw hc hb hok)
+    pnsN (genId (GF := GF) + 1) R.γc R.γm w s c b Φ pnsN_uart hw hc hb hok)
     $$ [] Hinv HcW HmW [HΦ]
   · iapply (hecl R.v R.I R.sR R.lR OK.hlR)
   · iintro HcW HmW -
@@ -173,8 +173,8 @@ theorem pns_fam_cstep (OK : PnsRoundOk R) (w : Wid) (s : List (BitVec 8)) (c : N
 /-- **Rocq `pns_out_link_fupd`**: a console byte may be preceded by a FANCY
 UPDATE at the port's mask. -/
 theorem pns_out_link_fupd (b : BitVec 8) (X Φ : IProp GF) :
-    ⊢ (|={⊤ \ ↑(uartN .uart0)}=> X) -∗ (X -∗ outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b Φ) -∗
-      outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b Φ := by
+    ⊢ (|={⊤ \ ↑(uartN .uart0)}=> X) -∗ (X -∗ outLink .uart0 (genId (GF := GF) + 1) b Φ) -∗
+      outLink .uart0 (genId (GF := GF) + 1) b Φ := by
   iintro HX Hl
   unfold outLink
   iintro %o %H Hlb Hres
@@ -189,14 +189,14 @@ theorem pns_fam_fire (OK : PnsRoundOk R) (w : Wid) (s : List (BitVec 8)) (b : Bi
     ⊢ pnsKit R w s -∗ R.FAM -∗ wcurN R.γc w (1 : Qp).half 0 -∗ wmodeN R.γm w (1 : Qp).half none -∗
       R.dep w s -∗
       (wcurN R.γc w (1 : Qp).half 1 -∗ wmodeN R.γm w (1 : Qp).half (some s) -∗ Φ) -∗
-      outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b Φ := by
+      outLink .uart0 (genId (GF := GF) + 1) b Φ := by
   obtain ⟨CL, hCL, hecl⟩ := OK.hcons
   have hdep := OK.dep_tl
   unfold pnsKit
   iintro ⟨⟨%EXCL, %hok, #Hex⟩, -⟩ #Hinv HcW HmW Hdep HΦ
   iapply (blkNFire R.wsN CL R.RUNN R.PWN R.TKN R.WITN R.TERM R.TOK R.dep hCL (wids_nodup _)
     (pipesV_HWIT R.M R.V R.I R.sR R.lR OK.hlR OK.hfc OK.hadmit OK.hplok)
-    pnsN (↑pipeN) (genId (hlc := hlc) (GF := GF) + 1) R.γc R.γm w s b EXCL Φ pnsN_uart pnsN_pipeN
+    pnsN (↑pipeN) (genId (GF := GF) + 1) R.γc R.γm w s b EXCL Φ pnsN_uart pnsN_pipeN
     hw hb hok) $$ Hex [] Hinv HcW HmW Hdep [HΦ]
   · iapply (hecl R.v R.I R.sR R.lR OK.hlR)
   · iintro HcW HmW -
@@ -281,7 +281,7 @@ variable {R}
 alternative, the rest step it. -/
 theorem pns_con_step (OK : PnsRoundOk R) (w : Wid) (A : List (List (BitVec 8))) (x : List (BitVec 8))
     (b : BitVec 8) (hb : x[0]? = some b) :
-    ⊢ pnsCon R w A [x] -∗ outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b (pnsCon R w A [x.drop 1]) := by
+    ⊢ pnsCon R w A [x] -∗ outLink .uart0 (genId (GF := GF) + 1) b (pnsCon R w A [x.drop 1]) := by
   unfold pnsCon
   iintro ⟨%hs, %hw, #Hinv, H⟩
   icases H with (⟨Hc, Hm, %hA, Hks⟩ | ⟨%s, %c, %hp, %hst, Hcw, Hmw⟩)
@@ -451,7 +451,7 @@ the filter's pass), the rest step it. -/
 theorem pns_wD_step (OK : PnsRoundOk R) (pin : PNames) (F : Filt) (w : Wid) (c : Nat)
     (x : List (BitVec 8)) (b : BitVec 8) (hb : x[0]? = some b) :
     ⊢ pnsWD R pin F w c [x] -∗
-      outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b (pnsWD R pin F w c [x.drop 1]) := by
+      outLink .uart0 (genId (GF := GF) + 1) b (pnsWD R pin F w c [x.drop 1]) := by
   iintro HD
   ieval (unfold pnsWD) at HD
   icases HD with ⟨⟨%hcL, %hfok⟩, #H0, %hw, #Hinv, #Hck, %wc, ⟨%hx, %hwc⟩, Hcw, Hmw⟩

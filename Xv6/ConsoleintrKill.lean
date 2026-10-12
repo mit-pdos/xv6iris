@@ -60,7 +60,7 @@ theorem ci_rep_len (i : Nat) :
   rw [← ciBs_snoc, List.length_append]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The kill-line arm's frame, with `s2`/`s3` spilled -/
 
@@ -166,20 +166,20 @@ theorem ci_kill_out (RE : RELEASE) (c : CPU) (k : KCtx) (a b : Bool) (γc : GNam
 
 theorem ciKillRun_elim (γ : UartNames) (hb : List Obs) (cb : BitVec 8) (nrem : Nat) :
     ciKillRun (GF := GF) γ hb cb nrem ⊢ ∃ (hg : Option (List Obs)) (i n : Nat), ⌜ohistExt hg hb⌝ ∗
-      ⌜k1Next hg hb⌝ ∗ ⌜traceShape hb true⌝ ∗ ⌜obsBoots hb = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
+      ⌜k1Next hg hb⌝ ∗ ⌜traceShape hb true⌝ ∗ ⌜obsBoots hb = genId (GF := GF) + 1⌝ ∗
       ⌜nrem ≤ n⌝ ∗ logHi γ (1 : Qp).half hg ∗
       uartArm γ (1 : Qp).half (some ((hb, cb, (List.replicate i consputcBs).flatten ++
         (List.replicate n consputcBs).flatten), ((List.replicate i consputcBs).flatten).length)) ∗
-      consRun (genId (hlc := hlc) (GF := GF) + 1) (List.replicate n consputcBs).flatten iprop(True) :=
+      consRun (genId (GF := GF) + 1) (List.replicate n consputcBs).flatten iprop(True) :=
   .rfl
 
 theorem ciKillRun_intro (γ : UartNames) (hb : List Obs) (cb : BitVec 8) (nrem : Nat) :
     (∃ (hg : Option (List Obs)) (i n : Nat), ⌜ohistExt hg hb⌝ ∗
-      ⌜k1Next hg hb⌝ ∗ ⌜traceShape hb true⌝ ∗ ⌜obsBoots hb = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
+      ⌜k1Next hg hb⌝ ∗ ⌜traceShape hb true⌝ ∗ ⌜obsBoots hb = genId (GF := GF) + 1⌝ ∗
       ⌜nrem ≤ n⌝ ∗ logHi γ (1 : Qp).half hg ∗
       uartArm γ (1 : Qp).half (some ((hb, cb, (List.replicate i consputcBs).flatten ++
         (List.replicate n consputcBs).flatten), ((List.replicate i consputcBs).flatten).length)) ∗
-      consRun (genId (hlc := hlc) (GF := GF) + 1) (List.replicate n consputcBs).flatten iprop(True))
+      consRun (genId (GF := GF) + 1) (List.replicate n consputcBs).flatten iprop(True))
     ⊢ ciKillRun (GF := GF) γ hb cb nrem :=
   .rfl
 
@@ -300,7 +300,7 @@ theorem ci_kill_loop (CP : CONSPUTC) (RE : RELEASE) (c : CPU) (k : KCtx) (a b : 
         uartArm γ (1 : Qp).half (some ((hb, cb, (List.replicate i consputcBs).flatten ++ consputcBs ++
           (List.replicate n' consputcBs).flatten),
           ((List.replicate i consputcBs).flatten).length + consputcBs.length)) ∗
-        consRun (genId (hlc := hlc) (GF := GF) + 1) (List.replicate n' consputcBs).flatten iprop(True))
+        consRun (genId (GF := GF) + 1) (List.replicate n' consputcBs).flatten iprop(True))
         rfl ?hcK ?hcn ?hcu) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g [ci_ret_d2, ci_cs_bs]

@@ -150,7 +150,7 @@ def sysChdirSlots : Nat := 20 + nameiSlots
 theorem sysChdirSlots_eq : sysChdirSlots = 140 := by decide
 
 section Arms
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -160,7 +160,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 plain observation commit. -/
 def chdirAuPre (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) : IProp GF :=
-  iprop(nameiWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ∗ pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo)
+  iprop(nameiWalkPreEra γfs rt cw P Pmiss ∗ pfAt (aopenCommitAt Γ appE) Fo)
 
 /-- ret -1: THE THREE-WAY FOLD (Rocq's `chdir_post_fail`) -- (i) nothing
 fs-visible happened (argstr failed: the bundle back whole), (ii) the walk
@@ -170,7 +170,7 @@ def chdirPostFail (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (P Pmiss 
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) : IProp GF :=
   iprop(chdirAuPre Γ γfs rt cw P Pmiss Fo ∨
     (∃ pl : List (BitVec 8),
-      (nameiWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗ pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo) ∨
+      (nameiWalkDeadEra γfs rt P Pmiss pl ∗ pfAt (aopenCommitAt Γ appE) Fo) ∨
       (∃ (i : Nat) (av : Aview) (a : Anode),
         P (pathElems pl).length i ∗ ⌜arowAt av i a⌝ ∗ Fo.pfRecv av i a ∗
         ⌜∀ (e : Std.ExtTreeMap Fname Nat compare) (nl : Nat), a ≠ ⟨.ADir e, nl⟩⌝)))
@@ -248,7 +248,7 @@ theorem chdirArms_split (Γ : FsViewNames GF) (γfs : FsNames) (γ : FileNames) 
 end Arms
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -275,7 +275,7 @@ def sysChdirK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     -- the allowance, whole: the header's reference ledger
     irefSlots 2 -∗
     -- the armed post
-    chdirArms (hlc := hlc) (fsGammaL fscFs) fscFs γ pa pid V.rti V.cwi P Pmiss Fo
+    chdirArms (fsGammaL fscFs) fscFs γ pa pid V.rti V.cwi P Pmiss Fo
       { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
     wpLoop cpu')
 
@@ -285,11 +285,11 @@ end
 instance), eb-generic at depth 0 (deviation 1).  The abstract state is read
 at the LIVE Γ, `fsGammaL fscFs`; the walk starts at the block's own cwd
 inum. -/
-def wp_sys_chdir_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+def wp_sys_chdir_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (v : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
@@ -299,28 +299,28 @@ def wp_sys_chdir_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
     (hv : V.tf[tfArgIdx 0]? = some v) : Prop :=
   kctx cpu k ∗ pcIs cpu sysChdirAddr ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-  procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+  procsInv Γ ∗ panicEnv ∗ fsReady ∗
   bslots 3 ∗
   -- the process, and the reference allowance its walk needs
   irefSlots 2 ∗
   procPrivFd γ (procAddr j) pid V M ∗
   -- THE CALLER'S BUNDLE (the one addition to the premise list)
-  chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi P Pmiss Fo ∗
+  chdirAuPre (fsGammaL fscFs) fscFs V.rti V.cwi P Pmiss Fo ∗
   -- THE CROSSING IS THE LITERAL `true`: sys_chdir parks in five callees
   wpNext true k.proc cpu (sysChdirK k γ (procAddr j) pid V M P Pmiss Fo)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `sys_chdir` (Rocq's `Module Type SYSCHDIR`). -/
 structure SYSCHDIR : Prop where
-  wp_sys_chdir_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_sys_chdir_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     hj hproc htier hnoff hK hv,
-    wp_sys_chdir_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M v P Pmiss Fo
+    wp_sys_chdir_eb_body (GF := GF) Γ cpu k γ j pid V M v P Pmiss Fo
       hj hproc htier hnoff hK hv
 
 end Xv6

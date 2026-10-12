@@ -238,11 +238,11 @@ structure DirlinkOut [Fscfg] [Icfg] (bm : Blkmap) (data : Nat → List (BitVec 8
 
 /-- **WP of `dirlink(dp = a0, name = a1, inum = a2)`, the set-form contract**
 (Rocq's `wp_dirlink_gen_body`), at the interrupts-off pin. -/
-def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_dirlink_gen_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -298,7 +298,7 @@ def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
   -- the inode region, the sealed regime, the directory's own (stale) record
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
   dinodeAt fscIreg dinum dn0 ∗
   -- the caller's own pid cell
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
@@ -310,7 +310,7 @@ def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
   bslots 3 ∗
   -- THE ICACHE
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
+  itableInv ∗ icSleeplocks fscIc ∗
   irefSlot ∗
   -- the borrowed ticket list, over the PRE-state
   dlinks fscFs dinum.toNat dn bm data ∗
@@ -347,11 +347,11 @@ def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 /-- The eb-generic form of `wp_dirlink_gen_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_dirlink_gen_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -397,7 +397,7 @@ def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
   wordPointsTo sbSizeAddr 4 dqbs (BitVec.ofNat 32 fscSize) ∗
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
   dinodeAt fscIreg dinum dn0 ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- THE INNER LOOKUP'S ROWS (chroot): a share of the caller's own reference
@@ -407,7 +407,7 @@ def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
   wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
   bslots 3 ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
+  itableInv ∗ icSleeplocks fscIc ∗
   irefSlot ∗
   dlinks fscFs dinum.toNat dn bm data ∗
   logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
@@ -439,11 +439,11 @@ def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
 /-- The interface of `dirlink` (Rocq's `Module Type DIRLINK`, less the
 dropped counted form). -/
 structure DIRLINK : Prop where
-  wp_dirlink_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_dirlink_gen_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -453,7 +453,7 @@ structure DIRLINK : Prop where
     (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     hj hproc hK hnoff htier htype hcovs hszb hinums hdisj horph hstab hnl hgeom hwf hholes
     hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2 hkd hkdn,
-    wp_dirlink_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum bm
+    wp_dirlink_gen_eb_body (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum bm
       data dn dn0 fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr
       hj hproc hK hnoff htier htype hcovs hszb hinums hdisj horph hstab hnl hgeom hwf hholes
       hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2 hkd hkdn

@@ -91,7 +91,7 @@ theorem bview_getElem! (l : List (BitVec 8)) (n : Nat) (hlen : l.length = n) :
 
 /-- **WP of `namecmp`** (Rocq `wp_namecmp_sconf_body`).  `f` names the
 bytes at `a0`, `g` those at `a1`. -/
-def wp_namecmp_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_namecmp_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (f g : Nat → BitVec 8) (dq1 dq2 : DFrac)
     (hK : namecmpSlots ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu namecmpAddr ∗
@@ -105,8 +105,8 @@ def wp_namecmp_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [C
 
 /-- The interface of `namecmp` (Rocq `NAMECMP`). -/
 structure NAMECMP : Prop where
-  wp_namecmp : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+  wp_namecmp : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (f g : Nat → BitVec 8) (dq1 dq2 : DFrac) hK,
-    wp_namecmp_body (hlc := hlc) (GF := GF) cpu k f g dq1 dq2 hK
+    wp_namecmp_body (GF := GF) cpu k f g dq1 dq2 hK
 
 end Xv6

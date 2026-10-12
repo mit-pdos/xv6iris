@@ -29,7 +29,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -39,10 +39,10 @@ theorem shStrlen_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (s
     (hsp : m.get 2#5 = sp0 + BitVec.ofInt 64 (-((8 * 2 : Nat) : Int)))
     (hal : sp0.toNat % 8 = 0) (hlo : 16 ≤ sp0.toNat) :
     ⊢ ushCode N.t -∗ uword N.d (sp0.toNat - 8) vra -∗ uword N.d (sp0.toNat - 16) vs0 -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0xa2c) n -∗
+      urun N h m (BitVec.ofNat 64 0xa2c) n -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜m'.get 2#5 = sp0⌝ -∗ ⌜m'.get 8#5 = vs0⌝ -∗
         ⌜∀ r : BitVec 5, r ≠ 2#5 → r ≠ 8#5 → r ≠ 1#5 → m'.get r = m.get r⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc vra) (2 + n) -∗ wpLoop h') -∗
+        urun N h' m' (retPc vra) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   have hs16 : (m.get 2#5).toNat = sp0.toNat - 16 := by rw [hsp]; exact uv_avi_neg sp0 16 hlo
   iintro #Hc Hra Hs0 Hrun Hcont
@@ -114,11 +114,11 @@ theorem shStrlen_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (s
 /-- One turn of the scan (one turn of Rocq `wp_kshp_strlen_loop`). -/
 theorem shStrlen_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap) (dq : DFrac) (p : Nat)
     (b : BitVec 8) (n : Nat) (hp : p + 1 < 2 ^ 64) (ha5 : mc.get 15#5 = BitVec.ofNat 64 p) :
-    ⊢ ushCode N.t -∗ ubyteq N.d dq p b -∗ urun (hlc := hlc) N h mc (BitVec.ofNat 64 0xa1e) n -∗
+    ⊢ ushCode N.t -∗ ubyteq N.d dq p b -∗ urun N h mc (BitVec.ofNat 64 0xa1e) n -∗
       (ubyteq N.d dq p b -∗ ∀ (h' : CPU) (mc' : RegMap), ⌜mc'.get 13#5 = BitVec.ofNat 64 p⌝ -∗
         ⌜mc'.get 15#5 = BitVec.ofNat 64 (p + 1)⌝ -∗
         ⌜∀ r : BitVec 5, r ≠ 13#5 → r ≠ 14#5 → r ≠ 15#5 → mc'.get r = mc.get r⌝ -∗
-        urun (hlc := hlc) N h' mc' (if b = 0#8 then BitVec.ofNat 64 0xa28 else BitVec.ofNat 64 0xa1e) n -∗ wpLoop h') -∗
+        urun N h' mc' (if b = 0#8 then BitVec.ofNat 64 0xa28 else BitVec.ofNat 64 0xa1e) n -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hb Hrun Hcont
   -- 0xa1e  c.mv a3,a5
@@ -187,10 +187,10 @@ theorem shStrlen_loop (UL : UK_LEAVES) (N : UkNames GF) (dq : DFrac) (a len : Na
     ∀ (k j : Nat) (h : CPU) (mc : RegMap) (n : Nat), len = 1 + j + k → a + len < 2 ^ 38 →
     mc.get 15#5 = BitVec.ofNat 64 (a + 1 + j) →
     ⊢ ushCode N.t -∗ ustr N.d dq a len f -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0xa1e) n -∗
+      urun N h mc (BitVec.ofNat 64 0xa1e) n -∗
       (ustr N.d dq a len f -∗ ∀ (h' : CPU) (mc' : RegMap), ⌜mc'.get 13#5 = BitVec.ofNat 64 (a + len)⌝ -∗
         ⌜∀ r : BitVec 5, r ≠ 13#5 → r ≠ 14#5 → r ≠ 15#5 → mc'.get r = mc.get r⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0xa28) n -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0xa28) n -∗ wpLoop h') -∗
       wpLoop h := by
   intro k
   induction k with
@@ -232,10 +232,10 @@ theorem shStrlen_loop (UL : UK_LEAVES) (N : UkNames GF) (dq : DFrac) (a len : Na
 theorem wp_shStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (dq : DFrac) (a len : Nat)
     (f : Nat → BitVec 8) (n : Nat) (ha0 : m.get 10#5 = BitVec.ofNat 64 a) :
     ⊢ ushCode N.t -∗ ustr N.d dq a len f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«strlen») (2 + n) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«strlen») (2 + n) -∗
       (ustr N.d dq a len f -∗ ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
         ⌜m'.get 10#5 = BitVec.ofNat 64 len⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   rw [show User.Sh.Sym.«strlen» = 0xa0c from rfl]
   iintro #Hc Hs Hrun Hcont
@@ -291,9 +291,9 @@ theorem wp_shStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (dq
       m5.get 10#5 = BitVec.ofNat 64 len →
       (∀ r : BitVec 5, ucalleeSavedIdx r = true → r ≠ 2#5 → r ≠ 8#5 → m5.get r = m.get r) →
       ⊢ ushCode N.t -∗ uword N.d ((m.get spIdx).toNat - 8) (m.get 1#5) -∗ uword N.d ((m.get spIdx).toNat - 16) (m.get 8#5) -∗
-        urun (hlc := hlc) N h5 m5 (BitVec.ofNat 64 0xa2c) n -∗
+        urun N h5 m5 (BitVec.ofNat 64 0xa2c) n -∗
         (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = BitVec.ofNat 64 len⌝ -∗
-          urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗ wpLoop h5 := by
+          urun N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗ wpLoop h5 := by
     intro h5 m5 h52 h510 h5cs
     iintro #Hc Hw8 Hw0 Hrun Hk
     iapply shStrlen_epi UL N h5 m5 (m.get spIdx) (m.get 1#5) (m.get 8#5) n h52 hal8 hlo $$ Hc Hw8 Hw0 Hrun

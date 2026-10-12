@@ -54,7 +54,7 @@ def iallocScanRegs [Icfg] (k : KCtx) (ty : BitVec 16) (n : Nat) (R : RegMap) : P
   iallocBody k ty R ∧ R 18#5 = BitVec.ofNat 64 n
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
@@ -65,7 +65,7 @@ type cell is lent out, to go back UNCHANGED. -/
 theorem ialloc_blk_open [Icfg] [Fscfg] [CurCtx] (kk : Nat) (pidv inum : BitVec 32)
     (bs bsd : List (BitVec 8)) (d : Bool)
     (hnib : inum.toNat < 16 * icfgNib) (hib : IBLOCK inum icfgIst < 2 ^ 31) :
-    iregInv (hlc := hlc) (GF := GF) fscIreg fscFs icfgIst icfgNib ∗
+    iregInv (GF := GF) fscIreg fscFs icfgIst icfgNib ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev
       (BitVec.ofNat 32 (IBLOCK inum icfgIst)) bs bsd d
     ⊢ |={⊤}=> ∃ ds : List Dinode, ⌜diblkWf ds ∧ kk < NBUF⌝ ∗
@@ -120,7 +120,7 @@ def iallocScanPre [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (cpu c0 : CPU) (k : 
   diskCaps fscDisk fscDlock pd pav pu ∗
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+  itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
   wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -151,7 +151,7 @@ theorem ialloc_scan_next (BE : BRELSE) (PK : PRINTK) [Fscfg] [Icfg] [CurCtx]
     diskCaps fscDisk fscDlock pd pav pu ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+    itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -284,7 +284,7 @@ theorem ialloc_scan_body (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET
     diskCaps fscDisk fscDlock pd pav pu ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+    itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -366,7 +366,7 @@ set_option maxHeartbeats 16000000 in
 `ialloc_scan_body` at whatever hart bread returns on. -/
 theorem ialloc_scan_head (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET)
     (PK : PRINTK) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c0 : CPU) (k : KCtx) (spie spp : Bool)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu c0 : CPU) (k : KCtx) (spie spp : Bool)
     (R : RegMap) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ty : BitVec 16) (u : Nat) (Sb : List Nat) (t : Nat) (qt : Qp) (n : Nat)
     (pidv : BitVec 32) (dqp dqs dqn : DFrac)
@@ -471,7 +471,7 @@ continuation quantified before the induction.  Fuel 0 is refuted by
 `inum < ninodes`. -/
 theorem ialloc_scan (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET)
     (PK : PRINTK) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c0 : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (c0 : CPU) (k : KCtx)
     (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ty : BitVec 16) (u : Nat) (Sb : List Nat) (t : Nat) (qt : Qp)
     (pidv : BitVec 32) (dqp dqs dqn : DFrac)

@@ -22,7 +22,7 @@ namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- One 16-bit field, little-endian (the `wordToBytes4` pattern at two bytes
 instead of four; Rocq's `half_bytes`). -/

@@ -41,7 +41,7 @@ set_option linter.unusedSimpArgs false
 theorem filestat_pt' (x : BitVec 64) : x + 80#64 = pPagetable x := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -180,7 +180,7 @@ set_option maxHeartbeats 16000000 in
 block): the buffer opened as `statAt` + the hole, stati over the read arm's
 metadata, the share back through iunlock and home into the payload. -/
 theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
+    [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (fk : Nat) (v9 : BitVec 64) (γ : FileNames) (q : Qp) (st : FdState) (C : FContent) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (γkl : GName) (γk : KmemNames)
     (ik : Nat) (s : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
@@ -194,7 +194,7 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
     fstatFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) v9 ∗ fstatCells (k.regs 2#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fstatEnvP (hlc := hlc) Γ γkl γk ∗
+    fstatEnvP Γ γkl γk ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ fstatLk ik s g lo inum dn bm γisl pid ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗
@@ -309,7 +309,7 @@ set_option maxHeartbeats 16000000 in
 (Rocq's `+0x1e .. +0x26` block and the ilock call): the entry's sleeplock
 out of the family by the slot the payload named, the pid cell lent. -/
 theorem filestat_lock (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
+    [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (fk : Nat) (v2 v3 v9 : BitVec 64) (γ : FileNames) (q : Qp) (st : FdState) (C : FContent)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (γkl : GName)
     (γk : KmemNames) (ik : Nat) (s : Qp) (g : GName) (ty : BitVec 16) (lo tl : Nat)
@@ -324,7 +324,7 @@ theorem filestat_lock (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (�
     fstatFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) v2 v3 (k.regs 20#5) v9 ∗
     fstatCells (k.regs 2#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fstatEnvP (hlc := hlc) Γ γkl γk ∗
+    fstatEnvP Γ γkl γk ∗
     credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗
     (inodeShrGenlo ik s icfgDev inum g lo -∗ filePaySt γ fk q C st) ∗

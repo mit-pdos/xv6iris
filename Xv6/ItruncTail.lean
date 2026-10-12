@@ -36,7 +36,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -65,7 +65,7 @@ theorem itrunc_meta_trunc (ip : BitVec 64) (dn : Dinode) :
 parked at `0`, the receipt dropped, the payout's allocated branch.  At
 either entry `SIE` (`IUPDATE.wp_iupdate_credgen_eb`), the complement at a
 NAMED index `s`. -/
-theorem itrunc_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem itrunc_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode)
     (u : Nat) (Sb0 : List Nat) (cru : Bool) (e0 : Nat)
@@ -86,7 +86,7 @@ theorem itrunc_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     diskCaps fscDisk fscDlock pd pav pu ∗
     iuCells ip inum (diTrunc dn) bmEmpty dqd dqn dqs ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     bslots 2 ∗
     logCredit icfgLog cru Sb0 e0 (IBLOCK inum icfgIst) ∗
@@ -109,7 +109,7 @@ theorem itrunc_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   ihave Hlb0 := logEpochLb_0 (GF := GF) icfgLog
   imod Hlb0 with #Hlb0
   imodintro
-  have h := IU.wp_iupdate_credgen_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j ip inum
+  have h := IU.wp_iupdate_credgen_eb (GF := GF) Γ c k' γl pd pav pu j ip inum
     (diTrunc dn) dn0 bmEmpty u Sb0 cru e0 0 pidv dqp dqd dqn dqs hj hproc hK hnoff
     htier hgeom hcov hlog hnib hstab hnl hnz (diTrunc_addrs dn) hdir hpd ha0
   unfold wp_iupdate_credgen_eb_body at h
@@ -125,7 +125,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x38 .. +0x4e`** (Rocq's `it_tail`): `sw zero,76(s3)`, `mv a0,s3`,
 `jal iupdate`, the epilogue, and the client's (hart-free) continuation at
 the EXACT ledger iupdate hands back; at either entry `SIE`. -/
-theorem itrunc_tail (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem itrunc_tail (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode)
@@ -153,7 +153,7 @@ theorem itrunc_tail (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     inodeMeta ip dn ∗ inodeMap fscFs ip bmEmpty ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
     bslots 3 ∗
     logCredit icfgLog cru Sb0 e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb0 e0 ∗
@@ -240,7 +240,7 @@ least `u + 1` with the REPORT `w`; the tail flush's credit grows along the
 running set (`logCredit_mono`); `itrunc_tail` runs at the concrete level,
 and the widening turns its determinate `logOpS` into the contract's
 `∃ w u' Sb'`. -/
-theorem itrunc_join (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem itrunc_join (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode)
@@ -268,7 +268,7 @@ theorem itrunc_join (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     inodeMeta ip dn ∗ inodeMap fscFs ip bmEmpty ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
     bslots 3 ∗
     logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
     bmPaidS crb u Sb e0 ∗

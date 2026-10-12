@@ -79,7 +79,7 @@ theorem uMWord_of_bytes {M : ElfMem} {a k : Nat} {w : BitVec (8 * k)}
   uMBytes_inj (uMWord_bytes M a k (fun j hj => by rw [h j hj]; rfl)) h
 
 section UkRunMem
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -90,6 +90,7 @@ def UkDataAcc (M : ElfMem) (pm : Nat → Option UPerm) (a k : Nat) {n : Nat} (w 
   ukStoreOk pm (BitVec.ofNat 64 a) ∧ ukAccessOk M (BitVec.ofNat 64 a) k ∧ a < uCap ∧
     ∀ j, j < k → M (a + j) = some (nthByte w j)
 
+omit [MachGS GF] in
 /-- **Rocq `uheap_access`**: every premise a data leaf asks for, off ONE run
 of bytes plus its alignment. -/
 theorem ukAccess_of_data (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (dq : DFrac)
@@ -111,6 +112,7 @@ def UkTextAcc (M : ElfMem) (pm : Nat → Option UPerm) (a k : Nat) {n : Nat} (w 
   ukTextOk pm (BitVec.ofNat 64 a) ∧ ukAccessOk M (BitVec.ofNat 64 a) k ∧ a < uCap ∧
     ∀ j, j < k → M (a + j) = some (nthByte w j)
 
+omit [MachGS GF] in
 /-- **Rocq `uheap_text_access`**: the same off a run of the TEXT half, whose
 page is X and, by the heap's invariant, not W. -/
 theorem ukAccess_of_text (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat)
@@ -138,7 +140,7 @@ theorem ukAccess_of_text (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
 def UkMemLeafAt (m : RegMap) (pc : BitVec 64) (isRvc : Bool) (i : instruction)
     (P : ElfMem → (Nat → Option UPerm) → Prop) (Mf : ElfMem → ElfMem) (m' : RegMap) (pc' : BitVec 64) : Prop :=
   ∀ (xi : CurCtx) (S : UkSec GF) (K : UkKey) (M : ElfMem), S.ok → UkInstr S.π M pc isRvc i → P M S.π →
-    ⊢ ukStep (hlc := hlc) S K M m pc (Mf M) m' pc'
+    ⊢ ukStep S K M m pc (Mf M) m' pc'
 
 /-- **THE MEMORY STEP**: `urun_step` with the caller's resource `R` turned
 into the leaf's facts and the heap moved by the leaf's image (`Mf`). -/
@@ -146,11 +148,11 @@ theorem urun_step_mem (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (
     (i : instruction) (m' : RegMap) (pc' : BitVec 64) (R R' : IProp GF)
     (P : ElfMem → (Nat → Option UPerm) → Prop) (Mf : ElfMem → ElfMem)
     (h0 : m 0#5 = 0#64 → m' 0#5 = 0#64) (hsp : m'.get spIdx = m.get spIdx)
-    (Hleaf : UkMemLeafAt (hlc := hlc) (GF := GF) m pc isRvc i P Mf m' pc')
+    (Hleaf : UkMemLeafAt (GF := GF) m pc isRvc i P Mf m' pc')
     (Hheap : ∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat),
       ⊢ uheap (GF := GF) N.t N.d N.s M pm sz -∗ R ==∗ ⌜P M pm⌝ ∗ uheap N.t N.d N.s (Mf M) pm sz ∗ R') :
-    ⊢ uinstrIs N.t pc isRvc i -∗ R -∗ urun (hlc := hlc) N h m pc avail -∗
-      ▷ (R' -∗ ∀ h' : CPU, urun (hlc := hlc) N h' m' pc' avail -∗ wpLoop h') -∗ wpLoop h := by
+    ⊢ uinstrIs N.t pc isRvc i -∗ R -∗ urun N h m pc avail -∗
+      ▷ (R' -∗ ∀ h' : CPU, urun N h' m' pc' avail -∗ wpLoop h') -∗ wpLoop h := by
   iintro #Hi HR Hrun Hcont
   unfold urun
   icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
@@ -161,7 +163,7 @@ theorem urun_step_mem (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (
   imodintro
   let S : UkSec GF := ⟨h, C, pt, Rfd, Rut, pm, sz, N.pay⟩
   let K : UkKey := ⟨fdv, cw, gn, cs, pidv⟩
-  have hS : @UkSec.ok hlc GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
+  have hS : @UkSec.ok GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
   have H := Hleaf xi S K M hS hui hP
   unfold ukStep ukUvb at H
   iapply H $$ Hb
@@ -172,6 +174,7 @@ theorem urun_step_mem (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (
   unfold urun
   iexact Hcont
 
+omit [MachGS GF] in
 /-- A one-byte run is the byte. -/
 theorem ubytesq_one (γd : GName) (dq : DFrac) (a : Nat) (f : Nat → BitVec 8) :
     ubytesq (GF := GF) γd dq a 1 f ⊣⊢ ubyteq γd dq a (f 0) := by
@@ -181,6 +184,7 @@ theorem ubytesq_one (γd : GName) (dq : DFrac) (a : Nat) (f : Nat → BitVec 8) 
   rw [Nat.add_zero]
   exact .rfl
 
+omit [MachGS GF] in
 /-- A one-byte text run is the byte. -/
 theorem utextRun_one (γt : GName) (a : Nat) (f : Nat → BitVec 8) :
     ([∗list] j ∈ List.range 1, utext (GF := GF) γt (a + j) (f j)) ⊣⊢ utext γt a (f 0) := by
@@ -199,9 +203,9 @@ theorem wp_uk_load (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc 
     (avail : Nat) (hns : unotSp rd) (hk : ukWidth k) (ha : ((m.get rs1).toNat : Int) + imm.toInt = a)
     (hal : a % k = 0) :
     ⊢ uinstrIs N.t pc isRvc (.LOAD (imm, .Regidx rs1, .Regidx rd, u, (k : Int))) -∗
-      ubytesq N.d dq a k (nthByte w) -∗ urun (hlc := hlc) N h m pc avail -∗
+      ubytesq N.d dq a k (nthByte w) -∗ urun N h m pc avail -∗
       ▷ (ubytesq N.d dq a k (nthByte w) -∗ ∀ h' : CPU,
-          urun (hlc := hlc) N h' (ukWr m rd (extend_value u w)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' (ukWr m rd (extend_value u w)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h := by
   apply urun_step_mem N h m pc avail isRvc _ _ _ _ _ (fun M pm => UkDataAcc M pm a k w) id
     (ukWr_x0 m rd _) (unotSp_wr rd _ m hns)
@@ -232,9 +236,9 @@ theorem wp_uk_load_text (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (avail : Nat) (hns : unotSp rd) (hk : ukWidth k) (ha : ((m.get rs1).toNat : Int) + imm.toInt = a)
     (hal : a % k = 0) :
     ⊢ uinstrIs N.t pc isRvc (.LOAD (imm, .Regidx rs1, .Regidx rd, u, (k : Int))) -∗
-      ([∗list] j ∈ List.range k, utext N.t (a + j) (nthByte w j)) -∗ urun (hlc := hlc) N h m pc avail -∗
+      ([∗list] j ∈ List.range k, utext N.t (a + j) (nthByte w j)) -∗ urun N h m pc avail -∗
       ▷ (∀ h' : CPU,
-          urun (hlc := hlc) N h' (ukWr m rd (extend_value u w)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' (ukWr m rd (extend_value u w)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h := by
   have H0 := urun_step_mem N h m pc avail isRvc (.LOAD (imm, .Regidx rs1, .Regidx rd, u, (k : Int)))
     (ukWr m rd (extend_value u w)) (pc + instrLen isRvc)
@@ -270,9 +274,9 @@ theorem wp_uk_store (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc
     (imm : BitVec 12) (rs1 rs2 : BitVec 5) (k : Nat) (a : Nat) (w0 : BitVec (8 * k))
     (avail : Nat) (hk : ukWidth k) (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) (hal : a % k = 0) :
     ⊢ uinstrIs N.t pc isRvc (.STORE (imm, .Regidx rs2, .Regidx rs1, (k : Int))) -∗
-      ubytes N.d a k (nthByte w0) -∗ urun (hlc := hlc) N h m pc avail -∗
+      ubytes N.d a k (nthByte w0) -∗ urun N h m pc avail -∗
       ▷ (ubytes N.d a k (nthByte (n := 8) (m.get rs2)) -∗ ∀ h' : CPU,
-          urun (hlc := hlc) N h' m (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' m (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h := by
   apply urun_step_mem N h m pc avail isRvc _ _ _ _ _ (fun M pm => UkDataAcc M pm a k w0)
     (fun M => uMWrite M a k (nthByte (n := 8) (m.get rs2))) id rfl
@@ -299,9 +303,9 @@ theorem wp_uk_ld (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : 
     (imm : BitVec 12) (rs1 rd : BitVec 5) (dq : DFrac) (a : Nat) (w : BitVec 64) (avail : Nat)
     (hns : unotSp rd) (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) (hal : a % 8 = 0) :
     ⊢ uinstrIs N.t pc isRvc (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8)) -∗
-      uwordq N.d dq a w -∗ urun (hlc := hlc) N h m pc avail -∗
+      uwordq N.d dq a w -∗ urun N h m pc avail -∗
       ▷ (uwordq N.d dq a w -∗ ∀ h' : CPU,
-          urun (hlc := hlc) N h' (ukWr m rd w) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' (ukWr m rd w) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h := by
   have H := wp_uk_load UL N h m pc isRvc imm rs1 rd false 8 dq a w avail hns (Or.inr (Or.inr (Or.inr rfl))) ha hal
   rw [extend_value_64] at H
@@ -312,9 +316,9 @@ theorem wp_uk_lbu (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc :
     (imm : BitVec 12) (rs1 rd : BitVec 5) (dq : DFrac) (a : Nat) (b : BitVec 8) (avail : Nat)
     (hns : unotSp rd) (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) :
     ⊢ uinstrIs N.t pc isRvc (.LOAD (imm, .Regidx rs1, .Regidx rd, true, 1)) -∗
-      ubyteq N.d dq a b -∗ urun (hlc := hlc) N h m pc avail -∗
+      ubyteq N.d dq a b -∗ urun N h m pc avail -∗
       ▷ (ubyteq N.d dq a b -∗ ∀ h' : CPU,
-          urun (hlc := hlc) N h' (ukWr m rd (BitVec.setWidth 64 b)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' (ukWr m rd (BitVec.setWidth 64 b)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h := by
   have hb1 : ∀ dq', ubyteq (GF := GF) N.d dq' a b ⊣⊢ ubytesq N.d dq' a 1 (nthByte (n := 1) b) := by
     intro dq'
@@ -338,9 +342,9 @@ theorem wp_uk_lbu_text (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
     (imm : BitVec 12) (rs1 rd : BitVec 5) (a : Nat) (b : BitVec 8) (avail : Nat)
     (hns : unotSp rd) (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) :
     ⊢ uinstrIs N.t pc isRvc (.LOAD (imm, .Regidx rs1, .Regidx rd, true, 1)) -∗
-      utext N.t a b -∗ urun (hlc := hlc) N h m pc avail -∗
+      utext N.t a b -∗ urun N h m pc avail -∗
       ▷ (∀ h' : CPU,
-          urun (hlc := hlc) N h' (ukWr m rd (BitVec.setWidth 64 b)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' (ukWr m rd (BitVec.setWidth 64 b)) (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h := by
   have e2 : extend_value true b = BitVec.setWidth 64 b := by
     simp [extend_value, zero_extend, Sail.BitVec.zeroExtend]
@@ -357,9 +361,9 @@ theorem wp_uk_sd (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : 
     (imm : BitVec 12) (rs1 rs2 : BitVec 5) (a : Nat) (v0 : BitVec 64) (avail : Nat)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) (hal : a % 8 = 0) :
     ⊢ uinstrIs N.t pc isRvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 8)) -∗
-      uword N.d a v0 -∗ urun (hlc := hlc) N h m pc avail -∗
+      uword N.d a v0 -∗ urun N h m pc avail -∗
       ▷ (uword N.d a (m.get rs2) -∗ ∀ h' : CPU,
-          urun (hlc := hlc) N h' m (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' m (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h :=
   wp_uk_store UL N h m pc isRvc imm rs1 rs2 8 a v0 avail (Or.inr (Or.inr (Or.inr rfl))) ha hal
 
@@ -368,9 +372,9 @@ theorem wp_uk_sb (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : 
     (imm : BitVec 12) (rs1 rs2 : BitVec 5) (a : Nat) (b0 : BitVec 8) (avail : Nat)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) :
     ⊢ uinstrIs N.t pc isRvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 1)) -∗
-      ubyte N.d a b0 -∗ urun (hlc := hlc) N h m pc avail -∗
+      ubyte N.d a b0 -∗ urun N h m pc avail -∗
       ▷ (ubyte N.d a (nthByte (n := 8) (m.get rs2) 0) -∗ ∀ h' : CPU,
-          urun (hlc := hlc) N h' m (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
+          urun N h' m (pc + instrLen isRvc) avail -∗ wpLoop h') -∗
       wpLoop h := by
   have hb1 : ∀ (f : Nat → BitVec 8) (c : BitVec 8), f 0 = c →
       (ubyte (GF := GF) N.d a c ⊣⊢ ubytes N.d a 1 f) := by
@@ -398,7 +402,7 @@ theorem wp_uk_sb_denied (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (isRvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (a : Nat) (b0 : BitVec 8) (avail : Nat)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) :
     ⊢ uinstrIs N.t pc isRvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 1)) -∗
-      utext N.t a b0 -∗ urun (hlc := hlc) N h m pc avail -∗ N.pay (-1) -∗ wpLoop h := by
+      utext N.t a b0 -∗ urun N h m pc avail -∗ N.pay (-1) -∗ wpLoop h := by
   iintro #Hi #Ht Hrun Hpay
   unfold urun
   icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
@@ -420,7 +424,7 @@ theorem wp_uk_sb_denied (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
   icases Hdepn with ⟨%fx, %hfx, Hdepn⟩
   let S : UkSec GF := ⟨h, C, pt, Rfd, Rut, pm, sz, N.pay⟩
   let K : UkKey := ⟨fdv, cw, gn, cs, pidv⟩
-  have hS : @UkSec.ok hlc GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
+  have hS : @UkSec.ok GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
   have H := UL.wp_uk_store_denied S K M m pc isRvc imm rs1 rs2 1 fx hS hfx hui hden (Or.inl rfl)
     (Nat.mod_one _)
   unfold ukUvb at H

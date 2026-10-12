@@ -21,7 +21,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## `ismapped` -/
 
@@ -30,7 +30,7 @@ theorem ismapped_br_fffffffffffffa84 : KA.«ismapped» + 0xfffffffffffffa84#64 =
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 theorem ismapped_proof (W : WALK_NOALLOC) : ISMAPPED :=
-  ⟨fun {hlc GF} _ _ _ cpu k dq t L hK hroot hva hrep => by
+  ⟨fun {GF} _ _ _ cpu k dq t L hK hroot hva hrep => by
   unfold wp_ismapped_body
   simp only [ismappedAddr]
   iintro ⟨Hk, Hpc, Htree, HΦ⟩

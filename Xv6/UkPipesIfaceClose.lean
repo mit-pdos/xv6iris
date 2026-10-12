@@ -36,11 +36,11 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section Close
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF] [FileAppG GF]
-variable {C : PnsCtx hlc GF}
+variable {C : PnsCtx GF}
 
 /-- **Rocq `pns_close_row`**: the close of a slot, by the row its registered
 kind demands. -/
@@ -48,7 +48,7 @@ theorem pns_close_row (CK : PnsCtxOk C) (vs : RegMapF Pdev) (d : Nat) (kd : Pdev
     (l : List FdState) (K : Int → IProp GF) (hv : get? vs d = some kd) (hrow : pnsRow (some kd) (k : Int) l)
     (hlt : k < NSTD) :
     ⊢ pnsEnv C.R C.Q.Sup vs -∗ ustd C.Q.N.fd l -∗ (ustd C.Q.N.fd (l.set k .closed) -∗ K 0) -∗
-      clObl (hlc := hlc) C.Q.N C.Q.P (k : Int) K := by
+      clObl C.Q.N C.Q.P (k : Int) K := by
   iintro #He Hstd HK
   ihave #Hi := pns_env_lookup C.Q.Sup vs d kd hv $$ He
   match kd, hrow with
@@ -119,7 +119,7 @@ theorem pns_close (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) (x : Dspe
     ⊢ pnsFds C.R C.Q fdm -∗ pnsFilesr (GF := GF) files paths -∗ pnsDev C.R C.Q.γreg d x -∗
       ((pnsFds C.R C.Q (fdDelete fdm fd) -∗ pnsFilesr (GF := GF) files paths -∗ K 0) ∧
        (∀ y, pnsTaint C.R C.Q (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗
-      clObl (hlc := hlc) C.Q.N C.Q.P fd K := by
+      clObl C.Q.N C.Q.P fd K := by
   have hD : d ∉ C.Q.Dp := fun h => hns ((fdSharedP_iff _ _ _ _).2 (.inl h))
   iintro Hfds Hfiles Hd HK
   ihave ⟨%kd, Htk, -⟩ := pns_dev_tok C.R C.Q.γreg d x $$ Hd
@@ -141,7 +141,7 @@ theorem pns_close_shared (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) (K
     ⊢ pnsFds C.R C.Q fdm -∗
       ((pnsFds C.R C.Q (fdDelete fdm fd) -∗ K 0) ∧
        (∀ y, pnsTaint C.R C.Q (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗
-      clObl (hlc := hlc) C.Q.N C.Q.P fd K := by
+      clObl C.Q.N C.Q.P fd K := by
   iintro Hfds HK
   unfold pnsFds pnsFdsAt
   icases Hfds with ⟨%l, %vs, %wv, Hstd, Hxk, %hok, %hkd, Hpool, Htoks, #He⟩

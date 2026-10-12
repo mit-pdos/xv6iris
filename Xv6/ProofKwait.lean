@@ -237,7 +237,7 @@ never leave the page (the low two bits are clear), so the claim, pin and
 window transport to each byte and back. -/
 
 section Bridge
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 theorem kw_inRam4_of_ends (p : BitVec 64) (hlo : inRam p 1) (hhi : inRam (p + BitVec.ofNat 64 3) 1)
     (hp : p.toNat < 2 ^ 56) : inRam p 4 := by
@@ -316,7 +316,7 @@ theorem kw_zombie_not_needsCtx : ¬ needsCtx ZOMBIE := by decide
 theorem kw_zombie_not_isRunning : ¬ isRunning ZOMBIE := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The lock's share of the mirror at ZOMBIE (unclaimed) IS the whole
 variable, as `freeproc`'s `procHeld` demands. -/
@@ -332,7 +332,7 @@ theorem kw_pstate_whole_zombie (Γ : SchedNames) (pa : BitVec 64) :
 /-- The slot at ZOMBIE hands out the dormant block and the hart tag. -/
 theorem kw_slots_zombie_elim (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
     procSlotsAt (GF := GF) Γ ξl pa ZOMBIE ⊢
-      slotUsed Γ pa ∗ @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE ∗ hartAtAny Γ pa := by
+      slotUsed Γ pa ∗ @procDormant GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE ∗ hartAtAny Γ pa := by
   unfold procSlotsAt
   rw [if_neg kw_zombie_not_needsCtx, if_neg kw_zombie_not_isRunning,
     if_pos kw_zombie_invDormant, if_pos kw_zombie_notRunning, if_pos rfl]
@@ -344,8 +344,8 @@ theorem kw_slots_zombie_elim (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
 failure peeks at it, `kw_peek_ghost`) and takes it back. -/
 theorem kw_slots_zombie_split (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
     procSlotsAt (GF := GF) Γ ξl pa ZOMBIE ⊢
-      @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE ∗
-      (@procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE -∗ procSlotsAt Γ ξl pa ZOMBIE) := by
+      @procDormant GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE ∗
+      (@procDormant GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE -∗ procSlotsAt Γ ξl pa ZOMBIE) := by
   unfold procSlotsAt
   rw [if_neg kw_zombie_not_needsCtx, if_neg kw_zombie_not_isRunning,
     if_pos kw_zombie_invDormant, if_pos kw_zombie_notRunning, if_pos rfl]
@@ -358,7 +358,7 @@ theorem kw_slots_zombie_split (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
 slot's T2 element the reap moved to `none` (NI M2-G1b: put back here, at the
 UNUSED re-close after freeproc). -/
 theorem kw_slots_unused_intro (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
-    slotUsed Γ pa ∗ @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ∗
+    slotUsed Γ pa ∗ @procDormant GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ∗
       zsElem pa none ⊢
       procSlotsAt (GF := GF) Γ ξl pa UNUSED := by
   unfold procSlotsAt
@@ -440,9 +440,9 @@ and the fresh dormant block) plus the hart tag `kwait` kept aside from the
 ZOMBIE slot reassemble the UNUSED lock payload, ready for `release`. -/
 theorem kw_pay_unused (Γ : SchedNames) (ξl : CtxId) (j : Nat) (c : CPU) :
     slotUsed Γ (procAddr j) ∗ procHeldAt (GF := GF) Γ ξl c j UNUSED 0#64 ∗
-    @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ (procAddr j) UNUSED ∗ hartAtAny Γ (procAddr j) ∗
+    @procDormant GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ (procAddr j) UNUSED ∗ hartAtAny Γ (procAddr j) ∗
       zsElem (procAddr j) none ⊢
-      @locked hlc GF _ ⟨ξl, KTier.kpt⟩ (Γ.lock j) c ∗ procLockResAt Γ ξl (procAddr j) := by
+      @locked GF _ ⟨ξl, KTier.kpt⟩ (Γ.lock j) c ∗ procLockResAt Γ ξl (procAddr j) := by
   iintro ⟨Hused, Hheld, Hdorm, Hhart, Hzs⟩
   icases procHeldAt_cases Γ ξl c j UNUSED 0#64 (by decide) $$ Hheld with
     ⟨Hlocked, Hpg, %kl, %xs, %pid, Hstate, Hchan, Hrest⟩
@@ -464,7 +464,7 @@ scan reads only the parent cells (`waitResAt ξ ps`, which IS
 `kwWRest ξ ps` (Rocq `kw_pay ps` minus the cells). -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `wait_lock`'s payload beside the parent cells: the children map, the
 orphan column, the invariant tying the four columns, and the zombie ledger's
@@ -550,7 +550,7 @@ pre-8-P form of `wp_kwait_eb_body`): the caller's cells `procPrivNoctxAt`
 and the generation pieces the reap reads (`kwaitGen`) in place of the whole
 block.  `kwait_proof` lends both out of Rocq's `proc_priv`
 (`ProcPrivAcc.procPrivFd_noctxGen`) and takes them back. -/
-def kwCellsEbBody (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def kwCellsEbBody (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) : Prop :=
   kctx cpu k ∗ pcIs cpu kwaitAddr ∗ procsInv Γ ∗
@@ -571,6 +571,7 @@ def kwAns (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTreeSet GName comp
     waitAnsLed rv (xstateVal xw) cs cs' V.gen nullst pid (procAddr j) a0 V.upt P' d ∗
     kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs')
 
+omit [MachGS GF] in
 /-- The three `-1` exits: the row does not move, the reason is `waitWhyLed`
 (NI G1c: the no-children reason carries the ledger's reading). -/
 theorem kw_ans_neg_ghost (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTreeSet GName compare)
@@ -583,6 +584,7 @@ theorem kw_ans_neg_ghost (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTre
   iframe Hkg Hrow
   iapply waitAnsLed_neg (xstateVal xw) cs V.gen nullst pid (procAddr j) a0 V.upt P' d $$ Hwhy
 
+omit [MachGS GF] in
 /-- `genPid` agrees with an escrow's `exitTok` on the pid. -/
 theorem kw_genPid_exitTok (g : GName) (pide pid0 : BitVec 32) (xs : Int) :
     genPid (GF := GF) g pide ∗ exitTok g pid0 xs ⊢ ⌜pide = pid0⌝ := by
@@ -797,9 +799,9 @@ theorem kw_kill_acc (j : Nat) (pid : BitVec 32) (g : GName) (hnz : pid.toNat ≠
     wordPointsTo (GF := GF) (pPid (procAddr j)) 4 pidPriv pid ∗ pidReg pid (.own qeighth) g ⊢
       ∀ (pidr klr : BitVec 32),
         wordPointsTo (pPid (procAddr j)) 4 pidPub pidr -∗
-        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr -∗
+        killPaidAt (MachFixedGS.killCred (GF := GF)) pidr klr -∗
         wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
-        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr ∗ kwKillOut j pid g klr := by
+        killPaidAt (MachFixedGS.killCred (GF := GF)) pidr klr ∗ kwKillOut j pid g klr := by
   iintro ⟨Hqp, Hrg⟩ %pidr %klr Hq Hr
   icases (show wordPointsTo (GF := GF) (pPid (procAddr j)) 4 pidPub pidr ∗
       wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ⊢
@@ -818,8 +820,8 @@ theorem kw_kill_acc (j : Nat) (pid : BitVec 32) (g : GName) (hnz : pid.toNat ≠
 half). -/
 theorem kw_priv_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
-      (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+      (@wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
         procPrivNoctxAt curCtx pa pid V M) := by
   unfold procPrivNoctxAt
   iintro ⟨%hf, Hpid, Hrest⟩
@@ -868,7 +870,7 @@ end
 /-! ## The `copyout` seam (Rocq `proc_priv_copy`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- **The copy borrow, with the event counter lent out beside it** (Rocq
 `ProcInv.proc_priv_copy_ev`, permit sweep L1b; the cells-level twin of
@@ -883,14 +885,14 @@ theorem kw_priv_copy_ev (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊢
       ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
          V.trapframe = pageAddr V.upt.tfp⌝ ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ actCnt pa V.ev ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
+      @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ actCnt pa V.ev ∗
       (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)) (k' : Nat),
         ⌜V.upt.extSz V.sz P'⌝ -∗
-        (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
-          @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-          @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M') -∗
+        (@wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
+          @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
+          @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ P' M') -∗
         actCnt pa k' -∗
         procPrivNoctxAt curCtx pa pid { V.updEv k' with upt := P' } M') := by
   unfold procPrivNoctxAt procFieldsNoctx
@@ -900,8 +902,8 @@ theorem kw_priv_copy_ev (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
   iframe Hszc Hpgc Hspace Hev
   iintro %P' %M' %k' %hext ⟨Hszc, Hpgc, Hspace⟩ Hev
   have htfp : P'.tfp = V.upt.tfp := hext.1.2.1
-  ihave Htfp := (show @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
-      @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [htfp]) $$ Htfp
+  ihave Htfp := (show @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
+      @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [htfp]) $$ Htfp
   iframe Hpid Hks Hszc Hpgc Htfc Hof Hcwd Hnm Hsc Hrt Hspace Htfp Hev
   isplitl []
   · ipureintro
@@ -914,7 +916,7 @@ end
 /-! ## The callee call-site helpers (interface at the folded entry address) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `acquire`'s contract at its entry, for a payload `Rp`. -/
@@ -929,7 +931,7 @@ theorem kw_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : GName) (s : String
       locked γ cpu' -∗ Rp curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γ s Rp hnoff' hK' hs'
+  have h := AC.wp_acquire (GF := GF) c k' γ s Rp hnoff' hK' hs'
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   exact h
@@ -944,7 +946,7 @@ theorem kw_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff' hK'
+  have h := MP.wp_myproc (GF := GF) c k' hnoff' hK'
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   exact h
@@ -960,9 +962,9 @@ theorem kw_killed (KL : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : Nat
     kctx c k' ∗ pcIs c KA.«killed» ∗ procsInv Γ ∗
     (∀ (pidr klr : BitVec 32),
       wordPointsTo (pPid (procAddr j)) 4 pidPub pidr -∗
-      killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr -∗
+      killPaidAt (MachFixedGS.killCred (GF := GF)) pidr klr -∗
       wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
-      killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr ∗ Rout klr) ∗
+      killPaidAt (MachFixedGS.killCred (GF := GF)) pidr klr ∗ Rout klr) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ∀ kl : BitVec 32,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -970,7 +972,7 @@ theorem kw_killed (KL : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : Nat
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 kl⌝ -∗ Rout kl -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KL.wp_killed_r (hlc := hlc) (GF := GF) Γ c k' j Rout hj hp hnoff' hK' hlk htier
+  have h := KL.wp_killed_r (GF := GF) Γ c k' j Rout hj hp hnoff' hK' hlk htier
   unfold wp_killed_r_body at h
   simp only [killedAddr] at h
   exact h
@@ -1007,7 +1009,7 @@ theorem kw_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk : Kme
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hsrc hdst hp
-  have h := CO.wp_copyout (hlc := hlc) (GF := GF) c k' γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen'
+  have h := CO.wp_copyout (GF := GF) c k' γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen'
   unfold wp_copyout_body at h
   simp only [copyoutAddr] at h
   exact h
@@ -1032,14 +1034,14 @@ theorem kw_freeproc (FP : FREEPROC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γl
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpa
-  have h := FP.wp_freeproc (hlc := hlc) (GF := GF) Γ c k' γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier
+  have h := FP.wp_freeproc (GF := GF) Γ c k' γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier
   unfold wp_freeproc_body at h
   simp only [freeprocAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
 /-- `sleep_prepare`'s contract at its entry (folded to `0x80001fd4`). -/
-theorem kw_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem kw_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hchan : k'.regs 10#5 ≠ 0#64)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : sleepPrepareSlots ≤ k'.avail)
@@ -1050,7 +1052,7 @@ theorem kw_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc :=
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := SP.wp_sleep_prepare (hlc := hlc) (GF := GF) Γ c k' j hj hproc hchan hnoff hK hlk htier
+  have h := SP.wp_sleep_prepare (GF := GF) Γ c k' j hj hproc hchan hnoff hK hlk htier
   unfold wp_sleep_prepare_body at h
   simp only [sleepPrepareAddr] at h
   exact h
@@ -1058,7 +1060,7 @@ theorem kw_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc :=
 set_option maxHeartbeats 1000000 in
 /-- `sleep`'s contract at its entry (folded to `0x80002010`), at either
 `SIE`, with the complement at a named index `s` and proc `p` (cf. `bo_sl`). -/
-theorem kw_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem kw_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat) (s : Bool) (p : BitVec 64)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : sleepSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hs : k'.sie = s) (hp : k'.proc = p) :
@@ -1070,7 +1072,7 @@ theorem kw_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
-  have h := SL.wp_sleep_eb (hlc := hlc) (GF := GF) Γ c k' j hj hproc hK hnoff htier
+  have h := SL.wp_sleep_eb (GF := GF) Γ c k' j hj hproc hK hnoff htier
   unfold wp_sleep_eb_body at h
   simp only [sleepAddr] at h
   exact h
@@ -1080,7 +1082,7 @@ end
 /-! ## The ten-slot frame and the epilogue -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `kwait`'s ten-slot frame at `sp` (`ra`, `s0`, `s1`..`s7`, and the unused
 top slot at `sp - 80`). -/
@@ -1261,7 +1263,7 @@ theorem kwj_2250 : jumpPc (KA.«kwait» + 0xa6#64) = (KA.«kwait» + 0xa6#64) :=
 theorem kw_neg1_ext : (18446744073709551615#64 : BitVec 64) = BitVec.signExtend 64 (-1#32) := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `release` at an explicit lock address `lk`. -/
@@ -1276,7 +1278,7 @@ theorem kw_rel_at (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : GName) (lk : BitVec
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst haddr
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γ s Rp hsie' hnoff' hK' reen hreen hon
+  have h := RE.wp_release (GF := GF) c k' γ s Rp hsie' hnoff' hK' reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
   exact h
@@ -1284,7 +1286,7 @@ theorem kw_rel_at (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : GName) (lk : BitVec
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 theorem kwait_br_fffffffffffff352 : KA.«kwait» + 0xfffffffffffff352#64 = KA.«copyout» := by decide
 
@@ -1296,7 +1298,7 @@ theorem kwait_br_102a8 : KA.«kwait» + 0x102a8#64 = waitLockAddr := by decide
 
 set_option maxHeartbeats 8000000 in
 theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu cur : CPU) (k kh : KCtx) (γw γp γl : GName) (γk : KmemNames)
     (j n : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hj : j < NPROC) (hn : n < NPROC)
@@ -1358,7 +1360,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       iprop(wordPointsTo (pKilled (procAddr n)) 4 (DFrac.own 1) kl ∗
         wordPointsTo (pXstate (procAddr n)) 4 xsHalf xs ∗
         wordPointsTo (pPid (procAddr n)) 4 pidPub pid0 ∗
-        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid0 kl) from by
+        killPaidAt (MachFixedGS.killCred (GF := GF)) pid0 kl) from by
       unfold procPubRest; iintro H; iexact H) $$ Hrest with ⟨Hkilled, Hxs, Hpid, Hkp⟩
   -- lw s3,48(s1) : s3 = pp->pid
   k_step (wp_s_lw cur _ (KA.«kwait» + 0x40#64) false 48#12 19#5 9#5 (by decide) (by decide) pidPub pid0)
@@ -1390,7 +1392,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       wordPointsTo (pKilled (procAddr n)) 4 (DFrac.own 1) kl -∗
       wordPointsTo (pXstate (procAddr n)) 4 xsHalf xs -∗
       wordPointsTo (pPid (procAddr n)) 4 pidPub pid0 -∗
-      killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid0 kl -∗
+      killPaidAt (MachFixedGS.killCred (GF := GF)) pid0 kl -∗
       procSlotsAt Γ curCtx (procAddr n) ZOMBIE -∗
       -- at the count copyout raised it to (permit sweep L1b)
       ⌜V.ev ≤ kc⌝ -∗
@@ -1967,7 +1969,7 @@ theorem kwj_22b0 : jumpPc (KA.«kwait» + 0x106#64) = (KA.«kwait» + 0x106#64) 
 theorem kwj_2274b : jumpPc (KA.«kwait» + 0xca#64) = (KA.«kwait» + 0xca#64) := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 theorem kwait_br_ffffffffffffe9e8 : KA.«kwait» + 0xffffffffffffe9e8#64 = KA.«acquire» := by decide
 
@@ -2018,7 +2020,7 @@ theorem kw_scan_acq (AC : ACQUIRE) (Γ : SchedNames) (cur : CPU) (kh : KCtx) (n 
         sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) c2 := by
     intro k' hnoff' hK' hs'
-    have h := AC.wp_acquire (hlc := hlc) (GF := GF) c2 k' (Γ.lock n) "proc" (procLockPay Γ n)
+    have h := AC.wp_acquire (GF := GF) c2 k' (Γ.lock n) "proc" (procLockPay Γ n)
       hnoff' hK' hs'
     unfold wp_acquire_body at h
     simp only [acquireAddr] at h
@@ -2063,7 +2065,7 @@ theorem kw_scan_acq (AC : ACQUIRE) (Γ : SchedNames) (cur : CPU) (kh : KCtx) (n 
 set_option maxHeartbeats 8000000 in
 /-- **One slot** of the scan, from `0x80002322`. -/
 theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k kh : KCtx) (γw γp γl : GName) (γk : KmemNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (cs : ExtTreeSet GName compare)
@@ -2276,7 +2278,7 @@ theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
 set_option maxHeartbeats 8000000 in
 /-- **The 64-slot scan** from `0x80002322`, by induction on the slots left. -/
 theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k kh : KCtx) (γw γp γl : GName) (γk : KmemNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (cs : ExtTreeSet GName compare)
@@ -2413,7 +2415,7 @@ theorem kwait_br_ffffffffffffffd6 : KA.«kwait» + 0xffffffffffffffd6#64 = KA.«
 
 theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k kh : KCtx) (γw γp γl : GName) (γk : KmemNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (cs : ExtTreeSet GName compare)
@@ -2796,7 +2798,7 @@ set_option maxHeartbeats 8000000 in
 induction. -/
 theorem kw_loop (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (cs : ExtTreeSet GName compare)
@@ -2913,14 +2915,14 @@ theorem kwait_br_164c0 : KA.«kwait» + 0x164c0#64 = KA.«tickslock» := by deci
 
 theorem kwait_cells (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
     (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kwaitSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) :
-    kwCellsEbBody (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M cs := by
+    kwCellsEbBody (GF := GF) Γ cpu k γw γp γl γk j pid V M cs := by
   unfold kwCellsEbBody
   simp only [kwaitAddr]
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hlw, #Hlp, #Hlk, Hav, Hpriv, Hkg, Hrow, #Hipis, HΦ⟩
@@ -3127,7 +3129,7 @@ theorem kwait_cells (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
       simp only [KCtx.withRegs_tier, KCtx.withSpie_tier, KCtx.pushed_tier]; exact htier
     have hkbint : (((k.pushed 10).withSpie spie0 spp0).withRegs ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64))).intena = k.sie := by
       simp only [KCtx.withRegs_intena, KCtx.withSpie_intena, KCtx.pushed_intena]; exact hkint
-    have hloopEnt := (kw_loop (hlc := hlc) (GF := GF) CO FP RE AC KL SP SL Γ cpu k γw γp γl γk j pid V M cs hj hproc hlocks
+    have hloopEnt := (kw_loop (GF := GF) CO FP RE AC KL SP SL Γ cpu k γw γp γl γk j pid V M cs hj hproc hlocks
       (by unfold kwaitSlots at hK; omega) hnoff (((k.pushed 10).withSpie spie0 spp0).withRegs ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64))) spie0 spp0 ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64)) hkbwf hkbsie hkbnoff hkblocks hkbproc hkbtier hkbav hkbint
       rfl w9)
     ihave Hpers : (isLock γw waitLockAddr "wait_lock" waitLockPay ∗
@@ -3145,7 +3147,7 @@ theorem kwait_cells (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
 /-! ## The whole block (Rocq `proc_priv`) around the cells-level body -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -3164,7 +3166,7 @@ theorem kw_procGen_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GN
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
@@ -3174,14 +3176,14 @@ ni-zombie-ledger.md D4): the cells-level body (whose post is already led) with
 the whole block lent around it. -/
 theorem kwait_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
     (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kwaitSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) :
-    wp_kwait_led_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
+    wp_kwait_led_eb_body (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
       hj hproc hK hnoff htier := by
-  have h := kwait_cells MP AC RE CO FP KL SP SL (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M cs
+  have h := kwait_cells MP AC RE CO FP KL SP SL (GF := GF) Γ cpu k γw γp γl γk j pid V M cs
     hj hproc hK hnoff htier
   unfold kwCellsEbBody kwPost at h
   unfold wp_kwait_led_eb_body
@@ -3204,14 +3206,14 @@ theorem kwait_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOU
 `wp_kwait_sconf` from `wp_kwait_led_sconf`): the receipt is dropped
 (`UserChildren.waitAnsLed_post`). -/
 theorem kwait_eb_of_led
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kwaitSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
-    (h : wp_kwait_led_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
+    (h : wp_kwait_led_eb_body (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
       hj hproc hK hnoff htier) :
-    wp_kwait_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
+    wp_kwait_eb_body (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
       hj hproc hK hnoff htier := by
   unfold wp_kwait_led_eb_body at h
   unfold wp_kwait_eb_body
@@ -3229,11 +3231,11 @@ end
 landed one its corollary (`kwait_eb_of_led`). -/
 theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
     (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP) : KWAIT :=
-  ⟨fun {_ _} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γw γp γl γk γ j pid V M cs
+  ⟨fun {_} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γw γp γl γk γ j pid V M cs
       hj hproc hK hnoff htier =>
     kwait_eb_of_led Γ cpu k γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier
       (kwait_led_proof MP AC RE CO FP KL SP SL Γ cpu k γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier),
-   fun {_ _} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γw γp γl γk γ j pid V M cs
+   fun {_} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γw γp γl γk γ j pid V M cs
       hj hproc hK hnoff htier =>
     kwait_led_proof MP AC RE CO FP KL SP SL Γ cpu k γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier⟩
 

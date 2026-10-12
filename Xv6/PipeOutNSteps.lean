@@ -28,17 +28,19 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section PipeOutNSteps
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-! ## Curried agreement forms (the steps keep both sides) -/
 
+omit [MachGS GF] in
 theorem peraPin_agree_c (g : PipeGn) (k : Nat) (w w' : PipeEra) :
     ⊢ peraPin (GF := GF) g k w -∗ peraPin g k w' -∗ ⌜w = w'⌝ := by
   iintro H1 H2
   iapply peraPin_agree g k w w' $$ [H1 H2]
   iframe H1 H2
 
+omit [MachGS GF] in
 theorem curHalf_agree_c (w : PipeEra) (q1 q2 : Qp) (r1 : Nat) (gb1 : GName) (tm1 : Bool)
     (r2 : Nat) (gb2 : GName) (tm2 : Bool) :
     ⊢ curHalf (GF := GF) w q1 r1 gb1 tm1 -∗ curHalf w q2 r2 gb2 tm2 -∗
@@ -47,6 +49,7 @@ theorem curHalf_agree_c (w : PipeEra) (q1 q2 : Qp) (r1 : Nat) (gb1 : GName) (tm1
   iapply curHalf_agree w q1 q2 r1 gb1 tm1 r2 gb2 tm2 $$ [H1 H2]
   iframe H1 H2
 
+omit [MachGS GF] in
 theorem curHalf_excl_c (w : PipeEra) (r : Nat) (gb : GName) (tm : Bool)
     (r' : Nat) (gb' : GName) (tm' : Bool) :
     ⊢ curHalf (GF := GF) w 1 r gb tm -∗ curHalf w (1 : Qp).half r' gb' tm' -∗ ⌜False⌝ := by
@@ -55,6 +58,7 @@ theorem curHalf_excl_c (w : PipeEra) (r : Nat) (gb : GName) (tm : Bool)
   · iframe H1 H2
   exact h.elim
 
+omit [MachGS GF] in
 theorem rblkLb_prefix_c (gb : GName) (l l' : List (BitVec 8)) :
     ⊢ rblkAuth (GF := GF) gb l -∗ rblkLb gb l' -∗ ⌜l' <+: l⌝ := by
   iintro H1 H2
@@ -63,7 +67,7 @@ theorem rblkLb_prefix_c (gb : GName) (l l' : List (BitVec 8)) :
 
 /-! ## (W-openN) THE ROUND'S FIRST BYTE -/
 
-theorem peclV_blkN_open_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem peclV_blkN_open_gen (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
     (k : Nat) (v : EraPins) (P a : Nat) (b : BitVec 8) (ps0 cs0 : List Nat) (s0 : M.lmSt)
     (I0 : List (BitVec 8)) (ho : List Obs) (H : ConsHist)
@@ -169,7 +173,7 @@ theorem peclV_blkN_open_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) 
 
 /-! ## (W-byteN) A FURTHER BYTE OF AN OPEN ROUND, by ANY of its writers -/
 
-theorem peclV_blkN_byte_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem peclV_blkN_byte_gen (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
     (k : Nat) (v : EraPins) (w : PipeEra) (gb : GName) (tmi : Bool) (P r a : Nat) (b : BitVec 8)
     (pre0 : List (BitVec 8)) (ps0 cs0 : List Nat) (s0 : M.lmSt) (I0 : List (BitVec 8))
@@ -269,7 +273,7 @@ theorem peclV_blkN_byte_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) 
 
 /-! ## (W-fileN) THE FILING, at the prompt's first byte -/
 
-theorem peclV_blkN_file (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem peclV_blkN_file (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
     (k : Nat) (v : EraPins) (w : PipeEra) (gb : GName) (P r a : Nat) (b : BitVec 8)
     (pre0 : List (BitVec 8)) (ps0 cs0 : List Nat) (s0 : M.lmSt) (I0 : List (BitVec 8))

@@ -20,7 +20,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -29,7 +29,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x106 .. +0x114`, an element starts at `a`**: the dead re-tests,
 `s = path`, and the element scan (`namex_scan_loop`) into `namexEra_elem`. -/
 theorem namexEra_mid (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (off a : Nat) (ipv : BitVec 64) (dcur : Nat) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat)
@@ -44,7 +44,7 @@ theorem namexEra_mid (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
     (hfu : A.plen - off < fuel + 1) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x10a#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
+    namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr
@@ -119,7 +119,7 @@ set_option maxHeartbeats 16000000 in
 /-- **ONE TURN OF THE WALK at `+0xf4`**: the leading-separator skip, and
 either the string is exhausted (`L_done`) or an element starts. -/
 theorem namexEra_turn (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (off : Nat) (ipv : BitVec 64) (dcur : Nat) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat)
@@ -127,7 +127,7 @@ theorem namexEra_turn (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLO
     (hinv : namexEraInv k A R off ipv ncur Scur es0 wc (fuel + 1)) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xf8#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
+    namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨⟨hr, hfu, hoff, hes0, hbud, hW, hSb⟩, hnpe⟩ := hinv
@@ -183,9 +183,9 @@ theorem namexEra_turn (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLO
 
 /-- **THE WALK**, by induction on the fuel (`plen - off`). -/
 theorem namexEra_loop (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF) :
-    ∀ fuel : Nat, namexEnv (hlc := hlc) (GF := GF) Γ A ⊢ namexEraLoop k A P Pmiss fuel := by
+    ∀ fuel : Nat, namexEnv (GF := GF) Γ A ⊢ namexEraLoop k A P Pmiss fuel := by
   intro fuel
   induction fuel with
   | zero =>

@@ -61,9 +61,9 @@ def sysSyncAddr : BitVec 64 := KA.«sys_sync»
 def sysSyncSlots : Nat := 4 + sleepSlots
 
 /-- **WP of `sys_sync()`**. -/
-def wp_sys_sync_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_sys_sync_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32) (oQ : Option (IProp GF))
     (pidv : BitVec 32) (dqp : DFrac)
@@ -75,7 +75,7 @@ def wp_sys_sync_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
   logCtx γ γb γfs V.cov logstart dev ∗
   -- THE CALLER'S OPTIONAL HOOK (Rocq sync K3-4): fired exactly once, at a
   -- ghost commit covering every change linearised before the call
-  hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ ∗
+  hookOpt (genId (GF := GF)) oQ ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
@@ -91,9 +91,9 @@ complement `trap_csrs_ext` / `cpu_claim_ext` in and out, the crossing the
 literal `true`; depth 0, so no spinlock held by `KCtx.wf`).  At `sie = true`
 sys_sync's own `acquire(&log.lock)` mints the bundle the interior sleep
 needs and the caller brings nothing; at `sie = false` the caller brings it. -/
-def wp_sys_sync_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_sys_sync_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32) (oQ : Option (IProp GF))
     (pidv : BitVec 32) (dqp : DFrac)
@@ -103,7 +103,7 @@ def wp_sys_sync_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
   kctx cpu k ∗ pcIs cpu sysSyncAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   logCtx γ γb γfs V.cov logstart dev ∗
-  hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ ∗
+  hookOpt (genId (GF := GF)) oQ ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
@@ -116,13 +116,13 @@ def wp_sys_sync_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 
 /-- The interface of `sys_sync`. -/
 structure SYS_SYNC : Prop where
-  wp_sys_sync_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_sys_sync_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32) (oQ : Option (IProp GF))
     (pidv : BitVec 32) (dqp : DFrac) hj hproc hK hnoff htier,
-    wp_sys_sync_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ γb V γfs j logstart dev oQ pidv dqp
+    wp_sys_sync_eb_body (GF := GF) Γ cpu k γ γb V γfs j logstart dev oQ pidv dqp
       hj hproc hK hnoff htier
 
 end Xv6

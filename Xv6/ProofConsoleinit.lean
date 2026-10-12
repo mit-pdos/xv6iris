@@ -49,7 +49,7 @@ theorem ci_ret_1c : jumpPc (KA.«consoleinit» + 0x1c#64) = KA.«consoleinit» +
 theorem ci_ret_20 : jumpPc (KA.«consoleinit» + 0x20#64) = KA.«consoleinit» + 0x20#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The callees, at their entry addresses -/
 
@@ -68,7 +68,7 @@ theorem ci_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
       lkFresh lk -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK'
+  have h := IL.wp_initlock (GF := GF) c k' vlock vname vcpu hK'
   unfold wp_initlock_body at h
   simp only [initlockAddr, h10, h11] at h
   exact h
@@ -88,7 +88,7 @@ theorem ci_uartinit_call (UI : UARTINIT) [CurCtx] (c : CPU) (k' : KCtx)
       uartinitonePost .uart0 γ0 l0 (uartNameStr .uart0) -∗
       uartinitonePost .uart1 γ1 l1 (uartNameStr .uart1) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := UI.wp_uartinit (hlc := hlc) (GF := GF) c k' γ0 γ1 l0 l1 kp0 kp1
+  have h := UI.wp_uartinit (GF := GF) c k' γ0 γ1 l0 l1 kp0 kp1
     vlock0 vlock1 vname0 vcpu0 vname1 vcpu1 hsie hK'
   unfold wp_uartinit_body at h
   simp only [uartinitAddr] at h
@@ -149,7 +149,7 @@ theorem consoleinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
 
 set_option maxHeartbeats 4000000 in
 theorem consoleinit_proof (IL : INITLOCK) (UI : UARTINIT) : CONSOLEINIT :=
-  ⟨fun {hlc GF} _ _ _ cpu k γ0 γ1 l0 l1 k0 k1 vlock0 vlock1 vname0 vcpu0 vname1 vcpu1
+  ⟨fun {GF} _ _ _ cpu k γ0 γ1 l0 l1 k0 k1 vlock0 vlock1 vname0 vcpu0 vname1 vcpu1
       vclock vcname vccpu vread vwrite hsie hK => by
   unfold wp_consoleinit_body
   iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hwcpu, Hpre0, Hpre1, Hread, Hwrite, Hrest, HΦ⟩

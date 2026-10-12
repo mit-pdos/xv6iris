@@ -72,7 +72,7 @@ theorem ukSys_numW (m : RegMap) (pc : BitVec 64) (M : ElfMem) (pm : Nat → Opti
   ukSys_numE m pc n hn h0 h1
 
 section UkRunSysDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -81,13 +81,13 @@ the engine, and meet the return obligation at the trap-out key -- under a
 basic update (the deposit mint) and a later (the trap); the body also reads
 the bundle's `uszOk` (what the window leaves spend on `lazyFree`). -/
 theorem urun_ecallS (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
       (∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName)
           (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
         ⌜m 0#5 = 0#64⌝ -∗ ⌜uszOk sz⌝ -∗ uheap N.t N.d N.s M pm sz -∗ ustack N.d (m.get spIdx) avail -∗
         ufdAuth N.fd fdv -∗ ucwdAuth N.cwd cw -∗ urunIds N cs pidv -∗ myPay gn N.pay -∗
-        udep (hlc := hlc) -∗ urunRows (hlc := hlc) N fdv -∗
-        |==> ▷ uexecRet (hlc := hlc) uecallScause (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)) -∗
+        udep -∗ urunRows N fdv -∗
+        |==> ▷ uexecRet uecallScause (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)) -∗
       wpLoop h := by
   iintro #Hi Hrun Hbody
   unfold urun
@@ -101,20 +101,20 @@ theorem urun_ecallS (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc
   imodintro
   let S : UkSec GF := ⟨h, C, pt, Rfd, Rut, pm, sz, N.pay⟩
   let K : UkKey := ⟨fdv, cw, gn, cs, pidv⟩
-  have hS : @UkSec.ok hlc GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
+  have hS : @UkSec.ok GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
   have H := UL.wp_uk_ecall S K M m pc hS hui
   unfold ukUvb at H
   iapply H $$ Hb Hmy Hret
 
 /-- **THE ECALL HEAD** every syscall leaf runs (the break's bound dropped). -/
 theorem urun_ecall (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
       (∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName)
           (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
         ⌜m 0#5 = 0#64⌝ -∗ uheap N.t N.d N.s M pm sz -∗ ustack N.d (m.get spIdx) avail -∗
         ufdAuth N.fd fdv -∗ ucwdAuth N.cwd cw -∗ urunIds N cs pidv -∗ myPay gn N.pay -∗
-        udep (hlc := hlc) -∗ urunRows (hlc := hlc) N fdv -∗
-        |==> ▷ uexecRet (hlc := hlc) uecallScause (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)) -∗
+        udep -∗ urunRows N fdv -∗
+        |==> ▷ uexecRet uecallScause (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)) -∗
       wpLoop h := by
   iintro #Hi Hrun Hbody
   iapply urun_ecallS UL N h m pc avail $$ Hi Hrun
@@ -126,9 +126,9 @@ of exit / fork / wait: the deposit (at the program's own payload, R1), the
 free payment, and the continuation at the deposit's family. -/
 theorem uexecRet_retK (n : Int) (W : Uvis) (gn : GName) (Q : Int → IProp GF) (hg : W.gen = gn)
     (hnum : uvisNum W = n) (hx : n ≠ USYS_exit) (hf : n ≠ USYS_fork) (hw : n ≠ USYS_wait) :
-    ⊢ myPay gn Q -∗ sbundlePay (uslot (hlc := hlc)) n Q W -∗
-      (∀ f : sfam GF, ⌜sexitPay f = Q⌝ -∗ uexecRetContF (uslot (hlc := hlc)) n f W) -∗
-      uexecRet (hlc := hlc) uecallScause W := by
+    ⊢ myPay gn Q -∗ sbundlePay (uslot) n Q W -∗
+      (∀ f : sfam GF, ⌜sexitPay f = Q⌝ -∗ uexecRetContF (uslot) n f W) -∗
+      uexecRet uecallScause W := by
   subst hg
   iintro #Hmy Hdepn Hcont
   rw [uexecRet_ecall, hnum]
@@ -146,9 +146,9 @@ theorem uexecRet_retK (n : Int) (W : Uvis) (gn : GName) (Q : Int → IProp GF) (
 the continuation that reads the kernel's answer. -/
 theorem uexecRet_waitK (W : Uvis) (gn : GName) (Q : Int → IProp GF) (hg : W.gen = gn)
     (hnum : uvisNum W = USYS_wait) :
-    ⊢ myPay gn Q -∗ sbundlePay (uslot (hlc := hlc)) USYS_wait Q W -∗
-      (∀ f : sfam GF, ⌜sexitPay f = Q⌝ -∗ uexecWaitF (uslot (hlc := hlc)) USYS_wait f W) -∗
-      uexecRet (hlc := hlc) uecallScause W := by
+    ⊢ myPay gn Q -∗ sbundlePay (uslot) USYS_wait Q W -∗
+      (∀ f : sfam GF, ⌜sexitPay f = Q⌝ -∗ uexecWaitF (uslot) USYS_wait f W) -∗
+      uexecRet uecallScause W := by
   subst hg
   iintro #Hmy Hdepn Hcont
   rw [uexecRet_ecall, hnum]
@@ -172,10 +172,10 @@ theorem uslot_bump_closeG (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (M M' :
     (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (r : BitVec 64) (avail : Nat) (hx0 : m 0#5 = 0#64)
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
     ⊢ uheap N.t N.d N.s M' pm' sz' -∗ ustack N.d (m.get spIdx) avail -∗ ufdAuth N.fd fdv' -∗
-      ucwdAuth N.cwd cw' -∗ urunIds N cs pidv -∗ myPay gn N.pay -∗ udep (hlc := hlc) -∗
-      urunRows (hlc := hlc) N fdv' -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
-      uslot (hlc := hlc) (bump (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r M' pm' sz' fdv' cw' gn cs
+      ucwdAuth N.cwd cw' -∗ urunIds N cs pidv -∗ myPay gn N.pay -∗ udep -∗
+      urunRows N fdv' -∗
+      (∀ h' : CPU, urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+      uslot (bump (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r M' pm' sz' fdv' cw' gn cs
         false seccAll) := by
   iintro Hheap Hstk Hufd Hcwda Hids #Hmy #Hdep #Hrows Hcont
   iapply (uslot_bump_run m pc M M' pm pm' sz sz' fdv fdv' cw cw' gn gn cs cs pidv false false seccAll seccAll r hx0
@@ -193,10 +193,10 @@ theorem uslot_bump_closeM (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (M M' :
     (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (r : BitVec 64) (avail : Nat) (hx0 : m 0#5 = 0#64)
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
     ⊢ uheap N.t N.d N.s M' pm sz -∗ ustack N.d (m.get spIdx) avail -∗ ufdAuth N.fd fdv' -∗
-      ucwdAuth N.cwd cw' -∗ urunIds N cs pidv -∗ myPay gn N.pay -∗ udep (hlc := hlc) -∗
-      urunRows (hlc := hlc) N fdv' -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
-      uslot (hlc := hlc) (bump (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r M' pm sz fdv' cw' gn cs
+      ucwdAuth N.cwd cw' -∗ urunIds N cs pidv -∗ myPay gn N.pay -∗ udep -∗
+      urunRows N fdv' -∗
+      (∀ h' : CPU, urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+      uslot (bump (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r M' pm sz fdv' cw' gn cs
         false seccAll) :=
   uslot_bump_closeG N m pc M M' pm pm sz sz fdv fdv' cw cw' gn cs pidv r avail hx0 hal4
 
@@ -205,10 +205,10 @@ theorem uslot_bump_close (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (M : Elf
     (sz : Nat) (fdv fdv' : List FdState) (cw cw' : Nat) (gn : GName) (cs : ExtTreeSet GName compare)
     (pidv : BitVec 32) (r : BitVec 64) (avail : Nat) (hx0 : m 0#5 = 0#64) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
     ⊢ uheap N.t N.d N.s M pm sz -∗ ustack N.d (m.get spIdx) avail -∗ ufdAuth N.fd fdv' -∗
-      ucwdAuth N.cwd cw' -∗ urunIds N cs pidv -∗ myPay gn N.pay -∗ udep (hlc := hlc) -∗
-      urunRows (hlc := hlc) N fdv' -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
-      uslot (hlc := hlc) (bump (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r M pm sz fdv' cw' gn cs
+      ucwdAuth N.cwd cw' -∗ urunIds N cs pidv -∗ myPay gn N.pay -∗ udep -∗
+      urunRows N fdv' -∗
+      (∀ h' : CPU, urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+      uslot (bump (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r M pm sz fdv' cw' gn cs
         false seccAll) :=
   uslot_bump_closeM N m pc M M pm sz fdv fdv' cw cw' gn cs pidv r avail hx0 hal4
 

@@ -54,21 +54,21 @@ theorem cifHf_delete_shared (fdm : Fdmap) (vs : RegMapF CfDev) (fd : Int) (d : N
   · rw [if_neg hx]
 
 section CifClose
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 namespace CifEnv
-variable (E : CifEnv (hlc := hlc) (GF := GF))
+variable (E : CifEnv (GF := GF))
 
 /-- **Rocq `cif_close_row`**: the close of a standard slot, by the row its
 registered kind demands. -/
 theorem close_row (vs : RegMapF CfDev) (d : Nat) (kd : CfDev) (k : Nat) (l : List FdState) (K : Int → IProp GF)
     (hv : get? vs d = some kd) (hrow : cifRow (some kd) (k : Int) l) (hlt : k < NSTD) :
     ⊢ E.env vs -∗ ustd E.N.fd l -∗ (ustd E.N.fd (l.set k .closed) -∗ K 0) -∗
-      clObl (hlc := hlc) E.N E.P (k : Int) K := by
+      clObl E.N E.P (k : Int) K := by
   iintro #He Hstd HK
   cases kd with
   | UDIn s nm i γo =>
@@ -84,7 +84,7 @@ theorem close_row (vs : RegMapF CfDev) (d : Nat) (kd : CfDev) (k : Nat) (l : Lis
     · have hk1 : k = 1 := by simp only [prodOut] at hk; omega
       subst hk1
       ihave #Hi := E.env_lookup_prod vs d pn gp w A X hv $$ He
-      ihave #Hreg := pipeReg_of_inv (hlc := hlc) pn gp E.R.L $$ Hi
+      ihave #Hreg := pipeReg_of_inv pn gp E.R.L $$ Hi
       iapply (E.DEV.pipeClose gp l 1 rb true K (by decide) hr) $$ Hreg Hstd HK
     · have hk2 : k = 2 := by simp only [prodErr] at hk; omega
       subst hk2
@@ -126,7 +126,7 @@ theorem close (fdm : Fdmap) (fd : Int) (d : Nat) (x : Dspec) (files : List (BitV
     ⊢ E.fds fdm -∗ E.filesr files paths -∗ E.dev d x -∗
       ((E.fds (fdDelete fdm fd) -∗ E.filesr files paths -∗ K 0) ∧
        (∀ y, E.taint (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗
-      clObl (hlc := hlc) E.N E.P fd K := by
+      clObl E.N E.P fd K := by
   have hD : d ∉ E.Dp := fun h => hnsp ((fdSharedP_iff E.Dp fdm fd d).2 (Or.inl h))
   have hns : ¬ fdShared fdm fd d := fun h => hnsp ((fdSharedP_iff E.Dp fdm fd d).2 (Or.inr h))
   have hn := Xv6.not_shared fdm fd d hns
@@ -180,7 +180,7 @@ theorem close_shared (fdm : Fdmap) (fd : Int) (d : Nat) (K : Int → IProp GF) (
     (hsh : fdSharedP E.Dp fdm fd d) :
     ⊢ E.fds fdm -∗
       ((E.fds (fdDelete fdm fd) -∗ K 0) ∧ (∀ y, E.taint (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗
-      clObl (hlc := hlc) E.N E.P fd K := by
+      clObl E.N E.P fd K := by
   iintro Hfds HK
   ihave H := E.fds_elim fdm $$ Hfds
   icases H with ⟨%l, %vs, %wv, Hstd, Hcwd, %hok, Hpool, Htoks, Hhs, Hdq, #He, Hxk⟩

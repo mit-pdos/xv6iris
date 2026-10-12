@@ -39,10 +39,10 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
-variable (E : UshExecEnv (hlc := hlc) (GF := GF))
+variable (E : UshExecEnv (GF := GF))
 
 /-- **Rocq `wp_kshm_child_x` / `_x_v`, ONE body**: the child's walk at any
 exec'able line, the child's table read through `TabF`. -/
@@ -53,11 +53,11 @@ def wpShChildXGenBody (TabF : GName → List FdState → IProp GF) (Fd1 : List F
     N.pay = Q → m.get 9#5 = BitVec.ofNat 64 s0 → ushXlineIs ws f 0 len → E.ush_execfail_bytes dg (ws[0]!) →
     0 < s0 → s0 + len + 1 < 2 ^ 64 → s0 + len < 2 ^ 38 → 8344 ≤ sz → pgRoundUpN sz = sz →
     uszOk (sz + 65536) → Fd1 ld → E.ush_fd2p ld →
-    ⊢ ushCode N.t -∗ ushExecSupEchoGen E TabF Fd1 ws Q Cr -∗ ushpOom (hlc := hlc) N iprop(Cr ∗ ustd N.fd ld) (18 + (8 + (E.ush_Dg + n))) -∗
+    ⊢ ushCode N.t -∗ ushExecSupEchoGen E TabF Fd1 ws Q Cr -∗ ushpOom N iprop(Cr ∗ ustd N.fd ld) (18 + (8 + (E.ush_Dg + n))) -∗
       E.ush_execfail_law_at dg (13 + (ws[0]!).length) Cr Cd -∗ □ (Cd -∗ Q (-1)) -∗ E.ush_jtab N.t -∗
       ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
       TabF N.fd ld -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗ ushmFresh N sz -∗ Cr -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (60 + (8 + (E.ush_Dg + n))) -∗ wpLoop h
+      urun N h m (BitVec.ofNat 64 0x99c) (60 + (8 + (E.ush_Dg + n))) -∗ wpLoop h
 
 /-- **Rocq `wp_kshm_child_x`**: at the ledger. -/
 abbrev wpShChildXBody (Fd1 : List FdState → Prop) (ws : List (List (BitVec 8))) (dg : List (BitVec 8))
@@ -76,12 +76,12 @@ def wpShChildEchoBody (ws : List (List (BitVec 8))) (Q : Int → IProp GF) (Cr C
     N.pay = Q → m.get 9#5 = BitVec.ofNat 64 s0 → ushLineIs ws f 0 len →
     0 < s0 → s0 + len + 1 < 2 ^ 64 → s0 + len < 2 ^ 38 → 8344 ≤ sz → pgRoundUpN sz = sz →
     uszOk (sz + 65536) → E.ush_fd1p ld → E.ush_fd2p ld →
-    ⊢ ushCode N.t -∗ ushExecSupEcho E ws Q Cr -∗ ushpOom (hlc := hlc) N iprop(Cr ∗ ustd N.fd ld) (18 + (8 + (E.ush_Dg + n))) -∗
+    ⊢ ushCode N.t -∗ ushExecSupEcho E ws Q Cr -∗ ushpOom N iprop(Cr ∗ ustd N.fd ld) (18 + (8 + (E.ush_Dg + n))) -∗
       ushExecfailLaw E Cr Cd -∗
       □ (Cd -∗ Q (-1)) -∗ E.ush_jtab N.t -∗
       ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
       ustd N.fd ld -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗ ushmFresh N sz -∗ Cr -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (60 + (8 + (E.ush_Dg + n))) -∗ wpLoop h
+      urun N h m (BitVec.ofNat 64 0x99c) (60 + (8 + (E.ush_Dg + n))) -∗ wpLoop h
 
 end
 
@@ -89,9 +89,9 @@ end
 predicate that reads back as the ledger (`hps`: the numbers the program
 admits, Rocq's section hypothesis `Hpsok_free`). -/
 structure SH_CHILD_EXEC : Prop where
-  wp_shChildXGen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_shChildXGen : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] (E : UshExecEnv (hlc := hlc) (GF := GF)),
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] (E : UshExecEnv (GF := GF)),
     (∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) →
     ∀ (TabF : GName → List FdState → IProp GF), (∀ γ ld, TabF γ ld ⊢ ustd γ ld) →
     ∀ (Fd1 : List FdState → Prop) (ws : List (List (BitVec 8))) (dg : List (BitVec 8)) (Q : Int → IProp GF)

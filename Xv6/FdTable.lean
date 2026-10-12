@@ -101,7 +101,7 @@ theorem bigSepL_set_acc_congr (Φ Ψ : Nat → A → PROP) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The descriptor states (FdSlots.v `fd_st_at` / `fd_st` / `fd_st_auth`)
 
@@ -121,10 +121,12 @@ def fdSt (γd : GName) (fd : Nat) (st : FdState) : IProp GF :=
 def fdStAuth (γd : GName) (fd : Nat) (st : FdState) : IProp GF :=
   fdStAt γd fd (.own (1 : Qp).half) st
 
+omit [MachGS GF] in
 instance fdStAt_timeless (γd : GName) (fd : Nat) (dq : DFrac) (st : FdState) :
     Timeless (fdStAt (GF := GF) γd fd dq st) := by
   unfold fdStAt; infer_instance
 
+omit [MachGS GF] in
 /-- Two shares of one key agree (Rocq `fd_st_at_agree`). -/
 theorem fdStAt_agree (γd : GName) (fd : Nat) (dq1 dq2 : DFrac) (st st' : FdState) :
     fdStAt (GF := GF) γd fd dq1 st ∗ fdStAt γd fd dq2 st' ⊢ ⌜st = st'⌝ := by
@@ -136,11 +138,13 @@ theorem fdStAt_agree (γd : GName) (fd : Nat) (dq1 dq2 : DFrac) (st st' : FdStat
   have h := (DFracAgree.op_valid.mp Hv).2
   exact congrArg (fun x : DiscreteO FdState => x.car) h
 
+omit [MachGS GF] in
 theorem fdSt_agree (γd : GName) (fd : Nat) (st st' : FdState) :
     fdStAuth (GF := GF) γd fd st ∗ fdSt γd fd st' ⊢ ⌜st = st'⌝ := by
   unfold fdStAuth fdSt
   exact fdStAt_agree γd fd _ _ st st'
 
+omit [MachGS GF] in
 /-- The same, keeping both halves. -/
 theorem fdSt_agree' (γd : GName) (fd : Nat) (st st' : FdState) :
     fdStAuth (GF := GF) γd fd st ∗ fdSt γd fd st' ⊢ ⌜st = st'⌝ ∗ fdStAuth γd fd st ∗ fdSt γd fd st' := by
@@ -154,6 +158,7 @@ theorem fdSt_agree' (γd : GName) (fd : Nat) (st st' : FdState) :
 abbrev fdstElt (dq : DFrac) (st : FdState) : DFracAgree.DFracAgreeR (DiscreteO FdState) :=
   DFracAgree.mk dq ⟨st⟩
 
+omit [MachGS GF] in
 /-- Both halves move the state (Rocq `fd_st_both_update`). -/
 theorem fdSt_update (γd : GName) (fd : Nat) (st st' st'' : FdState) :
     fdStAuth (GF := GF) γd fd st ∗ fdSt γd fd st' ⊢ |==> (fdStAuth γd fd st'' ∗ fdSt γd fd st'') := by
@@ -170,6 +175,7 @@ theorem fdSt_update (γd : GName) (fd : Nat) (st st' st'' : FdState) :
   imodintro
   iapply iOwn_op.1 $$ H
 
+omit [MachGS GF] in
 /-- The whole key splits into the two halves. -/
 theorem fdSt_halves (γd : GName) (fd : Nat) (st : FdState) :
     fdStAt (GF := GF) γd fd (.own 1) st ⊢ fdStAuth γd fd st ∗ fdSt γd fd st := by
@@ -199,6 +205,7 @@ theorem fdstMap0_valid : ∀ n : Nat, ✓ fdstMap0 n
   | 0 => Heap.valid_empty
   | n + 1 => Heap.insert_valid (DFracAgree.mk_valid.mpr DFrac.valid_own_one) (fdstMap0_valid n)
 
+omit [MachGS GF] in
 /-- Mint a fresh incarnation's descriptor table: `n` closed descriptors,
 each key WHOLE (Rocq `fd_st_alloc`). -/
 theorem fdSt_alloc (n : Nat) :
@@ -624,7 +631,7 @@ theorem procOfilesOwe_close (γ : FileNames) (γd : GName) (pa : BitVec 64) (fs 
 theorem procPrivNoctxAt_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivNoctxAt (GF := GF) ξ pa pid V M ⊣⊢
-      procPrivBareAt ξ pa pid V M ∗ @ofileCells hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V.ofile := by
+      procPrivBareAt ξ pa pid V M ∗ @ofileCells GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V.ofile := by
   unfold procPrivNoctxAt procPrivBareAt procFieldsNoctx procFieldsNoOfile
   constructor
   · iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩
@@ -658,7 +665,7 @@ Keyed at the generation `g` (the core passes `V.gen`, Rocq `pv_gen`).
 Ghost except the two cells (`firstTok`'s word, the xstate half). -/
 def procGenAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GName) : IProp GF :=
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
-  iprop(firstTok (hlc := hlc) ∗
+  iprop(firstTok ∗
     (∃ Q : Int → IProp GF, genKq g pa pid Q ∗ myPay g Q) ∗
     (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv) ∗
     genHalvesPriv pa pid g)
@@ -674,8 +681,8 @@ and LAST the generation row (`procGenAt`, D8).  No null arm: a process whose
 (`procPrivBareAt`), exactly as Rocq's `proc_priv_nocwd`. -/
 def procPrivCoreNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
-  @rootRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
+  procPrivBareAt ξ pa pid V M ∗ @cwdRefAt GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
+  @rootRefAt GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
   procGenAt ξ pa pid V.gen
 
 /-- The core is the bare block, the cwd reference, the root reference and
@@ -683,8 +690,8 @@ the generation row (`rfl`; Rocq `proc_priv_core_bare`). -/
 theorem procPrivCoreNoctxAt_bare (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊣⊢
-      procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
-        @rootRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
+      procPrivBareAt ξ pa pid V M ∗ @cwdRefAt GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
+        @rootRefAt GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
         procGenAt ξ pa pid V.gen := .rfl
 
 /-- **The event counter, lent out of the core and taken back at any count**
@@ -713,8 +720,8 @@ count the callee handed back -- at least the one it left at. -/
 theorem procPrivCoreNoctxAt_pidLend (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗ actLend pa V.ev ∗
-      (@wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+      @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗ actLend pa V.ev ∗
+      (@wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
         (∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend pa k1) -∗
         ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ procPrivCoreNoctxAt ξ pa pid (V.updEv k2) M) := by
   unfold procPrivCoreNoctxAt procPrivBareAt
@@ -752,7 +759,7 @@ path"): `procGenAt` with the token-free `genHalvesAt` in place of
 `genHalvesPriv`. -/
 def procGenUnmarkedAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GName) : IProp GF :=
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
-  iprop(firstTok (hlc := hlc) ∗
+  iprop(firstTok ∗
     (∃ Q : Int → IProp GF, genKq g pa pid Q ∗ myPay g Q) ∗
     (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv) ∗
     genHalvesAt pa pid g)
@@ -771,8 +778,8 @@ theorem procGenAt_unmark (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GN
 block, the cwd's reference, the root's, the generation row). -/
 def procPrivCoreUnmarkedAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
-  @rootRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
+  procPrivBareAt ξ pa pid V M ∗ @cwdRefAt GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
+  @rootRefAt GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
   procGenUnmarkedAt ξ pa pid V.gen
 
 /-- **THE BLOCK WITHOUT THE INCARNATION'S MARKER** (Rocq
@@ -854,6 +861,7 @@ theorem procOfilesOwe_cells_acc (γ : FileNames) (γd : GName) (pa : BitVec 64) 
 /-! ## The null table a fresh incarnation is born with (Rocq
 `ProcInv.proc_dormant_unused`'s mint, `proc_ofiles_null_split`) -/
 
+omit [MachGS GF] in
 /-- The two halves of a key make it whole again (`fdSt_halves` backwards). -/
 theorem fdSt_join (γd : GName) (fd : Nat) (st : FdState) :
     fdStAuth (GF := GF) γd fd st ∗ fdSt γd fd st ⊢ fdStAt γd fd (.own 1) st := by
@@ -1004,7 +1012,7 @@ def procPrivNocwd (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcP
 end
 
 section NocwdNull
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg]
 
 /-- `ProcDefs.procPriv` (the raw block, save area and descriptor cells
 included) is the bare block, the save area and the descriptor cells. -/
@@ -1093,7 +1101,7 @@ theorem procPrivNocwd_null_open [X : CurCtx] (h : curTier = KTier.kpt) (γ : Fil
 end NocwdNull
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 end
 

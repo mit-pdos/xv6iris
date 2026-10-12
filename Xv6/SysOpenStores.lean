@@ -133,7 +133,7 @@ theorem sys_open_stores_en [Fscfg] (dn : Dinode) (bm : Blkmap) (data : Nat → L
   · exact h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -161,7 +161,7 @@ set_option maxHeartbeats 16000000 in
 the stored content named, the publication's pure premises discharged, ARM S
 and the publication entered with the arm the caller built. -/
 theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
-    (hPub : ⊢ sysOpenPubBody (hlc := hlc) Γ k A)
+    (hPub : ⊢ sysOpenPubBody Γ k A)
     (cpu : CPU) (spie spp : Bool) (R : RegMap) (w6 : BitVec 64) (lo : BitVec 32) (w24 : BitVec 64)
     (γil γisl : GName) (loc tlc kk : Nat) (s : Qp) (g : GName) (inum : BitVec 32) (dn : Dinode)
     (bm : Blkmap) (kf fd : Nat) (l : List Nat) (C0 : FContent) (pn : FPNames) (γo : GName)
@@ -179,7 +179,7 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     (hpins : sysOpenPins k R (ientry kk) (fnode kf) (BitVec.ofNat 64 fd))
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0) :
     ⊢ kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs cpu (KA.«sys_open» + 0xb8#64) -∗
-    trapCsrsExt cpu k.sie -∗ cpuClaimExt cpu k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt cpu k.sie -∗ cpuClaimExt cpu k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       w6 lo (sysOpenOm A) w24 -∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
@@ -195,9 +195,9 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
       openFdOk A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2)
         (omReadable A.vom) (omWritable A.vom) t A.sts r -∗
       foffPubT A.omo t -∗
-      openPostOkPlain (hlc := hlc) A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid (sysOpenIm A) A.v.toNat
+      openPostOkPlain A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid (sysOpenIm A) A.v.toNat
         A.vom A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) r) -∗
-    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+    (∀ c' : CPU, sysOpenPostP k A c') -∗
     wpLoop (GF := GF) cpu := by
   unfold sysOpenPubBody at hPub
   simp only [sysOpenAddr] at hPub
@@ -215,7 +215,7 @@ set_option maxHeartbeats 8000000 in
 /-- `itrunc(ip)` at +0x150 (Rocq `Itrunc.wp_itrunc_gen` at the walk's set,
 the tail flush uncredited; deviation 2), over `sysOpenEnv`: the locked
 record's cells in, the EMPTY record out, the ledger at whatever count. -/
-theorem sys_open_stores_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_open_stores_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64) (hpj : k'.proc = pj)
     (A : SysOpenArgs GF) (kk : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (u : Nat) (Sb : List Nat) (e0 : Nat)
@@ -223,7 +223,7 @@ theorem sys_open_stores_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := 
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hinb : inum.toNat < 16 * icfgNib)
     (hok : inodeOk fscCov fscLogst dn bm data) (ha0 : k'.regs 10#5 = ientry kk) :
     kctx cpu k' ∗ pcIs cpu KA.«itrunc» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv Γ A ∗
     wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum ∗
     inodeMeta (ientry kk) dn ∗ inodeMap fscFs (ientry kk) bm ∗ inodeBlocks fscFs bm data ∗
@@ -257,7 +257,7 @@ theorem sys_open_stores_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := 
   ihave Hop := (show logOpSe (GF := GF) icfgLog (u + 2) Sb e0 ⊢
       logOpSe icfgLog (itEntry false u) Sb e0 from .rfl) $$ Hop
   have hnz := hok.2.2.2.1
-  have h := IT.wp_itrunc_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu A.j (ientry kk) inum
+  have h := IT.wp_itrunc_gen_eb (GF := GF) Γ cpu k' γbl pd pav pu A.j (ientry kk) inum
     dn dn bm data u Sb false false e0 A.pid pidPriv (DFrac.own (1 : Qp).half) (DFrac.own (1 : Qp).half)
     DFrac.discard DFrac.discard hj hpj hK hnoff htier (fun h => absurd h (by simp)) hg.fgoLog
     hg.fgoBitmap (hg.iblockCov inum hinb) (hg.iblockOut inum hinb) hinb hnz (diTypeStable_refl dn)
@@ -274,6 +274,7 @@ theorem sys_open_stores_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := 
   iexists u'
   iapply logOpS_opb icfgLog u' Sb' $$ HopS
 
+omit [MachGS GF] in
 /-- The fired observation, read at a FILE's row (Rocq's
 `rewrite /so_obs (opf_era_file_row …)`). -/
 theorem sys_open_stores_obs_file (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (i : Nat)
@@ -291,9 +292,9 @@ set_option maxHeartbeats 16000000 in
 (`opfAtrunc_fire`, at the observed row), the re-seal at the empty record
 (`sys_open_trunc_loaded`), the jump back to +0xb8 and the hand-off with the
 ONE arm that spends the trunc commit (`sys_open_arm_file_tr`). -/
-theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
-    (hPub : ⊢ sysOpenPubBody (hlc := hlc) Γ k A)
+    (hPub : ⊢ sysOpenPubBody Γ k A)
     (cpu : CPU) (spie spp : Bool) (R : RegMap) (w6 : BitVec 64) (lo : BitVec 32) (w24 : BitVec 64)
     (γil γisl : GName) (loc tlc kk : Nat) (s : Qp) (g : GName) (inum : BitVec 32) (dn : Dinode)
     (bm : Blkmap) (data : Nat → List (BitVec 8)) (kf fd : Nat) (l : List Nat) (C0 : FContent)
@@ -312,7 +313,7 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0)
     (hfile : dn.diType.toNat = T_FILE) (htr : omTrunc A.vom = true) :
     ⊢ kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs cpu (KA.«sys_open» + 0x14e#64) -∗
-    trapCsrsExt cpu k.sie -∗ cpuClaimExt cpu k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt cpu k.sie -∗ cpuClaimExt cpu k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       w6 lo (sysOpenOm A) w24 -∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
@@ -324,8 +325,8 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
     procOfilesOwe A.γ A.V.fdg (procAddr A.j) ((sysOpenV2 A P2).ofile.set fd (fnode kf)) [fd] -∗
     logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗
     fdFrags A.V.fdg A.sts -∗ fdStAuth A.V.fdg fd .closed -∗
-    sysOpenResidue (hlc := hlc) A pl inum dn bm data -∗
-    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+    sysOpenResidue A pl inum dn bm data -∗
+    (∀ c' : CPU, sysOpenPostP k A c') -∗
     wpLoop (GF := GF) cpu := by
   obtain ⟨hkk, hinb, hipos, hle, hu2⟩ := hA
   iintro Hk Hpc Hte Hce #Henv Hcells Hbuf Hlk Hflat Hkeep Href Hflds Hnames Hoff
@@ -389,7 +390,7 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
   -- omode has O_TRUNC, so it is the commit at `inum`; the permit that keyed it
   -- was the walk's terminal cursor, paid at the join (`plainTruncKey`), so
   -- this fires the caller's own step
-  ihave Htc := (openTruncAt_true (hlc := hlc) (fsGammaL fscFs) A.vom inum.toNat
+  ihave Htc := (openTruncAt_true (fsGammaL fscFs) A.vom inum.toNat
     (creFtKept (truncTermAt pl A.P) inum.toNat A.Ft) htr).1 $$ Htc
   ihave #Hrdy := Xv6.sys_open_walk_rdy Γ A $$ Henv
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
@@ -415,7 +416,7 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
   have htis : t = .inode inum.toNat γo A.omo := (hti (by rw [hfile]; decide)).2
   subst htis
   ihave Hobs := sys_open_stores_obs_file A.Fo inum.toNat dn bm data hfile $$ Hobs
-  ihave Harm := sys_open_arm_file_tr (hlc := hlc) A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid
+  ihave Harm := sys_open_arm_file_tr A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid
     (sysOpenIm A) A.v.toNat A.vom A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) pl
     inum.toNat _ _ γo hpl htr $$ HP Hobs Htr2
   ihave Hlk : sysOpenLk (GF := GF) γil γisl loc tlc A.pid kk s g inum dn $$
@@ -431,9 +432,9 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
 
 set_option maxHeartbeats 32000000 in
 /-- **+0x88 .. +0xb4 AND THE +0x14e itrunc BLOCK** (Rocq `so_stores_au`). -/
-theorem sys_open_stores (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
-    (A : SysOpenArgs GF) (hS : SysOpenStatic k A) (hPub : ⊢ sysOpenPubBody (hlc := hlc) Γ k A) :
-    ⊢ sysOpenStoresBody (hlc := hlc) Γ k A := by
+theorem sys_open_stores (IT : ITRUNC) (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
+    (A : SysOpenArgs GF) (hS : SysOpenStatic k A) (hPub : ⊢ sysOpenPubBody Γ k A) :
+    ⊢ sysOpenStoresBody Γ k A := by
   unfold sysOpenPubBody at hPub
   unfold sysOpenStoresBody
   simp only [sysOpenAddr] at hPub ⊢
@@ -513,7 +514,7 @@ theorem sys_open_stores (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0xac#64) true 12#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hb]
     iintro Hk Hpc
-    ihave Harm := sys_open_arm_notr (hlc := hlc) A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid
+    ihave Harm := sys_open_arm_notr A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) pl
       inum.toNat dn bm data t γo hpl (Or.inl htr) hdirk hdev hino hen $$ HP Hobs Htc
     ihave Hload := sys_open_flat_close kk inum dn bm data $$ Hflat
@@ -563,7 +564,7 @@ theorem sys_open_stores (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
           bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbt, hd]
       iintro Hk Hpc
-      ihave Harm := sys_open_arm_notr (hlc := hlc) A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid
+      ihave Harm := sys_open_arm_notr A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid
         (sysOpenIm A) A.v.toNat A.vom A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) pl
         inum.toNat dn bm data t γo hpl (Or.inr hf) hdirk hdev hino hen $$ HP Hobs Htc
       ihave Hload := sys_open_flat_close kk inum dn bm data $$ Hflat

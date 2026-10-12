@@ -76,13 +76,13 @@ theorem take_pos_ne_at (L : List (BitVec 8)) (c : Nat) (hc : 0 < c ∧ c ≤ L.l
 /-! ## The node's record (deviation 1) -/
 
 /-- **Rocq `UShPipesNode`'s section hypotheses** beyond `UShPipesDefs`'s. -/
-structure NodeOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+structure NodeOk {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
     [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
-    (D : PdRound hlc GF) (fs : List Filt) (Qfin Rtop : IProp GF) : Prop where
+    (D : PdRound GF) (fs : List Filt) (Qfin Rtop : IProp GF) : Prop where
   /-- Rocq `Hext Hcons HlR Hfc Hadmit Hplok` -/
   ok : PdRoundOk D
   /-- Rocq `Hkill` -/
-  hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = D.G.gcT
+  hkill : MachFixedGS.killCred (GF := GF) = D.G.gcT
   /-- Rocq `HL31` -/
   hL31 : pnsShort D.L
   /-- Rocq `Hline`: the line is the producer then the filters `fs` -/
@@ -97,9 +97,9 @@ structure NodeOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G
   hRd : Timeless D.Rd
 
 section Round
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
-variable {D : PdRound hlc GF} {fs : List Filt} {Qfin Rtop : IProp GF}
+variable {D : PdRound GF} {fs : List Filt} {Qfin Rtop : IProp GF}
 
 /-- `PdRoundOk` of the node's record. -/
 abbrev NodeOk.OK (H : NodeOk D fs Qfin Rtop) : PdRoundOk D := H.ok

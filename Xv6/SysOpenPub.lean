@@ -60,7 +60,7 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -178,9 +178,9 @@ theorem sys_open_pub_ne (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : P
 
 set_option maxHeartbeats 16000000 in
 /-- **ARM S AND THE PUBLICATION, +0xb8** (Rocq `so_tail_pub_au`). -/
-theorem sys_open_pub (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (A : SysOpenArgs GF)
-    (hS : SysOpenStatic k A) (hTS : ⊢ sysOpenTailSBody (hlc := hlc) Γ k A) :
-    ⊢ sysOpenPubBody (hlc := hlc) Γ k A := by
+theorem sys_open_pub (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx) (A : SysOpenArgs GF)
+    (hS : SysOpenStatic k A) (hTS : ⊢ sysOpenTailSBody Γ k A) :
+    ⊢ sysOpenPubBody Γ k A := by
   unfold sysOpenTailSBody at hTS
   unfold sysOpenPubBody sysOpenPostP sysOpenK
   iintro %c %spie %spp %R %s2v %w6 %lo %w24 %γil %γisl %loc %tlc %kk %s %g %inum %dn %bm %kf %fd %l

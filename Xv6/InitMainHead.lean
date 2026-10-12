@@ -27,7 +27,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -36,12 +36,12 @@ theorem wp_kinit_main_from_1e (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF
     (hpsok : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) [UknConst N] (hpayfree : ⊢ N.pay (-1))
     (T : IProp GF) [Persistent T] (stc : FdState) (Cr : ConsCred GF) (cn : ConsNames) (szv : Nat) (h : CPU)
-    (m : RegMap) (n : Nat) (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw (hlc := hlc) T stc Cr.ccWp (ccWbn Cr)) :
-    ⊢ initDeps (hlc := hlc) T -∗ kinitBanLaw (hlc := hlc) N stc Cr.ccWp (ccWbn Cr) -∗
-      kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
-      initExecSupLend (hlc := hlc) cn T stc Cr -∗ initArgv N.d -∗ usz N.s szv -∗ ufdHead1 T stc N.fd -∗
-      ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗ uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x1e) (12 + (12 + (4 + n))) -∗ wpLoop h := by
+    (m : RegMap) (n : Nat) (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw T stc Cr.ccWp (ccWbn Cr)) :
+    ⊢ initDeps T -∗ kinitBanLaw N stc Cr.ccWp (ccWbn Cr) -∗
+      kinitDiagLaw stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
+      initExecSupLend cn T stc Cr -∗ initArgv N.d -∗ usz N.s szv -∗ ufdHead1 T stc N.fd -∗
+      ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗ uinitTok cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
+      urun N h m (BitVec.ofNat 64 0x1e) (12 + (12 + (4 + n))) -∗ wpLoop h := by
   iintro #Hdeps #Hblaw #Hdlaw #Hc #Hxs #Hargv Hsz Hstd Hcwd Hch Htk Hrun
   -- 0x1e  c.li a0,0
   ihave Hi := init_uis N.t 0x1e true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
@@ -116,13 +116,13 @@ theorem wp_kinit_main_repair_tail (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PR
     (hpsok : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) [UknConst N] (hpayfree : ⊢ N.pay (-1))
     (T : IProp GF) [Persistent T] (stc : FdState) (Cr : ConsCred GF) (cn : ConsNames) (szv : Nat) (h : CPU)
-    (m : RegMap) (n : Nat) (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw (hlc := hlc) T stc Cr.ccWp (ccWbn Cr)) :
-    ⊢ initDeps (hlc := hlc) T -∗ kinitBanLaw (hlc := hlc) N stc Cr.ccWp (ccWbn Cr) -∗
-      kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
-      initExecSupLend (hlc := hlc) cn T stc Cr -∗ initArgv N.d -∗ usz N.s szv -∗
-      ukiOpen2 (hlc := hlc) N T stc -∗ ukiOpen2In N T -∗
-      ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗ uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x74) (12 + (12 + (4 + n))) -∗ wpLoop h := by
+    (m : RegMap) (n : Nat) (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw T stc Cr.ccWp (ccWbn Cr)) :
+    ⊢ initDeps T -∗ kinitBanLaw N stc Cr.ccWp (ccWbn Cr) -∗
+      kinitDiagLaw stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
+      initExecSupLend cn T stc Cr -∗ initArgv N.d -∗ usz N.s szv -∗
+      ukiOpen2 N T stc -∗ ukiOpen2In N T -∗
+      ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗ uinitTok cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
+      urun N h m (BitVec.ofNat 64 0x74) (12 + (12 + (4 + n))) -∗ wpLoop h := by
   iintro #Hdeps #Hblaw #Hdlaw #Hc #Hxs #Hargv Hsz Hop2 Hin Hcwd Hch Htk Hrun
   -- 0x74  c.li a1,2
   ihave Hi := init_uis N.t 0x74 true (.ITYPE (2#12, .Regidx 0#5, .Regidx 11#5, .ADDI)) udec%
@@ -176,13 +176,13 @@ theorem wp_kinit_main_repair (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     (N : UkNames GF) [UknConst N] (hpayfree : ⊢ N.pay (-1))
     (T Cns : IProp GF) [Persistent T] (stc : FdState) (Cr : ConsCred GF) (cn : ConsNames) (szv : Nat)
     (h : CPU) (m : RegMap) (n : Nat) (hne : stc ≠ .closed)
-    (hkt : ⊢ initKillLaw (hlc := hlc) T stc Cr.ccWp (ccWbn Cr)) :
-    ⊢ initDeps (hlc := hlc) T -∗ kinitBanLaw (hlc := hlc) N stc Cr.ccWp (ccWbn Cr) -∗
-      kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
-      initConsSup (hlc := hlc) cn T Cns stc Cr -∗ ukiMknodHitLeaf (hlc := hlc) N T Cns stc -∗
+    (hkt : ⊢ initKillLaw T stc Cr.ccWp (ccWbn Cr)) :
+    ⊢ initDeps T -∗ kinitBanLaw N stc Cr.ccWp (ccWbn Cr) -∗
+      kinitDiagLaw stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
+      initConsSup cn T Cns stc Cr -∗ ukiMknodHitLeaf N T Cns stc -∗
       initArgv N.d -∗ usz N.s szv -∗ ukiOpen2In N T -∗
-      ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗ uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x64) (12 + (12 + (4 + n))) -∗ wpLoop h := by
+      ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗ uinitTok cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
+      urun N h m (BitVec.ofNat 64 0x64) (12 + (12 + (4 + n))) -∗ wpLoop h := by
   iintro #Hdeps #Hblaw #Hdlaw #Hc #Hxs Hmkl #Hargv Hsz Hin Hcwd Hch Htk Hrun
   -- 0x64  c.li a2,0 ; 0x66  c.li a1,1
   ihave Hi := init_uis N.t 0x64 true (.ITYPE (0#12, .Regidx 0#5, .Regidx 12#5, .ADDI)) udec%
@@ -227,13 +227,13 @@ theorem wp_kinit_main_repair (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     rw [e]; decide
   rw [hra]
   -- THE SECOND OPEN AND THE EXEC SUPPLY OUT OF THE SAME ANSWER
-  ihave #Hwl15 : iprop(□ (T -∗ udepwLaw (hlc := hlc) 15)) $$ [Hdeps]
+  ihave #Hwl15 : iprop(□ (T -∗ udepwLaw 15)) $$ [Hdeps]
   · unfold initDeps
     icases Hdeps with ⟨-, #H, -⟩
     iexact H
   unfold initConsSup
   icases Hxs with ⟨#Hw, #Ht⟩
-  ihave Hpair : iprop(ukiOpen2 (hlc := hlc) N T stc ∗ initExecSupLend (hlc := hlc) cn T stc Cr) $$ [Hans]
+  ihave Hpair : iprop(ukiOpen2 N T stc ∗ initExecSupLend cn T stc Cr) $$ [Hans]
   · unfold ukiMknodOut
     icases Hans with (⟨Hcl, HC⟩ | ⟨%K', #Habs, HK, HC⟩ | #HT)
     · isplitl [Hcl]

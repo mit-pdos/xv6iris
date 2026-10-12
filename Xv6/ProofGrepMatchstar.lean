@@ -24,22 +24,22 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `wp_kgrep_ms_loop`**: matchstar's LOOP, 0x1e..0x3a. -/
-theorem grepMs_loop (UL : UK_LEAVES) (N : UkNames GF) (lr : Nat) (IH : grepMhSpec (hlc := hlc) (GF := GF) lr) :
+theorem grepMs_loop (UL : UK_LEAVES) (N : UkNames GF) (lr : Nat) (IH : grepMhSpec (GF := GF) lr) :
     ∀ (lt : Nat) (h : CPU) (mc : RegMap) (c : BitVec 8) (dqr dqt : DFrac) (ar ax : Nat) (fr ft : Nat → BitVec 8)
       (n : Nat),
     mc.get 9#5 = BitVec.ofNat 64 ax → mc.get 18#5 = BitVec.setWidth 64 c → mc.get 19#5 = BitVec.ofNat 64 ar →
     mc.get 20#5 = kgrepB01 (bdec c cDot) → grepMhWords ((List.range lr).map fr) ≤ n →
     ⊢ grepCode N.t -∗ ustr N.d dqr ar lr fr -∗ ustr N.d dqt ax lt ft -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x1e) n -∗
+      urun N h mc (BitVec.ofNat 64 0x1e) n -∗
       (ustr N.d dqr ar lr fr -∗ ustr N.d dqt ax lt ft -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜mc'.get 10#5 = kgrepB01 (matchstar c ((List.range lr).map fr) ((List.range lt).map ft))⌝ -∗
         ⌜grepRkeep (9 :: grepWcaller) mc mc'⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x3c) n -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x3c) n -∗ wpLoop h') -∗
       wpLoop h := by
   intro lt
   refine Nat.strongRecOn lt ?_
@@ -186,7 +186,7 @@ theorem grepMs_loop (UL : UK_LEAVES) (N : UkNames GF) (lr : Nat) (IH : grepMhSpe
           rfl
         · ipureintro; exact hk6
       · -- one of the two tests holds: the next round, at `text + 1`
-        ihave Hnext : (∀ h' : CPU, urun (hlc := hlc) N h' m6 (BitVec.ofNat 64 0x1e) n -∗ wpLoop h') $$ [Hcont Hre Htx]
+        ihave Hnext : (∀ h' : CPU, urun N h' m6 (BitVec.ofNat 64 0x1e) n -∗ wpLoop h') $$ [Hcont Hre Htx]
         · iintro %h' Hrun
           icases grepUstr_cons_split N.d dqt ax lt1 ft $$ Htx with ⟨Ht0, Htx⟩
           iapply IHt lt1 (by omega) h' m6 c dqr dqt ar (ax + 1) fr (fun j => ft (j + 1)) n hs16 hs26 hs36 hs46 hn
@@ -237,8 +237,8 @@ theorem grepMs_loop (UL : UK_LEAVES) (N : UkNames GF) (lr : Nat) (IH : grepMhSpe
 /-- **Rocq `ms_of_mh`**: matchstar(c, re, text) from matchhere's contract at
 `re` -- the six-word frame (ra, s0..s4), the loop's registers, the loop, the
 epilogue. -/
-theorem grepMatchstar_ofMh (UL : UK_LEAVES) (lr : Nat) (IH : grepMhSpec (hlc := hlc) (GF := GF) lr) :
-    grepMsSpec (hlc := hlc) (GF := GF) lr := by
+theorem grepMatchstar_ofMh (UL : UK_LEAVES) (lr : Nat) (IH : grepMhSpec (GF := GF) lr) :
+    grepMsSpec (GF := GF) lr := by
   intro N h m c dqr dqt ar ax lt fr ft n ha0 ha1 ha2 hn
   obtain ⟨n1, rfl⟩ : ∃ n1, n = 6 + n1 := ⟨n - 6, by unfold grepMsWords at hn; omega⟩
   have hn1 : grepMhWords ((List.range lr).map fr) ≤ n1 := by unfold grepMsWords at hn; omega

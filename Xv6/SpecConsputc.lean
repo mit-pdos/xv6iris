@@ -36,7 +36,7 @@ def consputcCs (a0 : BitVec 64) : List (BitVec 8) :=
   if a0 = cpBackspace then consputcBs else [BitVec.extractLsb' 0 8 a0]
 
 /-- **WP of `consputc`.**  The byte in `a0`. -/
-def wp_consputc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_consputc_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (Φ : IProp GF)
     (hsie : k.sie = false) (hK : 20 ≤ k.avail)
     (hnoff : k.noff + 1 < 2 ^ 31) (huart : "uart0" ∉ k.locks) : Prop :=
@@ -49,8 +49,8 @@ def wp_consputc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `consputc`. -/
 structure CONSPUTC : Prop where
-  wp_consputc : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_consputc : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (Φ : IProp GF) hsie hK hnoff huart,
-    wp_consputc_body (hlc := hlc) (GF := GF) cpu k γl γd bs Φ hsie hK hnoff huart
+    wp_consputc_body (GF := GF) cpu k γl γd bs Φ hsie hK hnoff huart
 
 end Xv6

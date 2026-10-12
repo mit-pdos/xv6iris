@@ -68,7 +68,7 @@ elab "amb_tier_rfl" : tactic => do
 
 section
 open Iris MachCSL
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- Pointwise rewriting of a transport (Rocq closes these by `rewrite /X`). -/
 theorem ctxMorph_congr {R R' : CtxId → IProp GF} (h : ∀ ξ, R ξ = R' ξ) (hR : CtxMorph R') :
@@ -93,9 +93,9 @@ split without unfolding a definition; a leaf closes by a named instance, as a
 constant, or -- read at the ambient only for its tier -- by `amb_tier_rfl`. -/
 macro "amb_morph_solve" : tactic => `(tactic| repeat' (first
     | exact MachCSL.instCtxMorphConst _
-    | with_reducible refine @MachCSL.instCtxMorphSep _ _ _ _ _ ?_ ?_
-    | with_reducible refine @MachCSL.instCtxMorphExists _ _ _ _ _ (fun _ => ?_)
-    | with_reducible refine @Xv6.instCtxMorphOr _ _ _ _ _ ?_ ?_
+    | with_reducible refine @MachCSL.instCtxMorphSep _ _ _ _ ?_ ?_
+    | with_reducible refine @MachCSL.instCtxMorphExists _ _ _ _ (fun _ => ?_)
+    | with_reducible refine @Xv6.instCtxMorphOr _ _ _ _ ?_ ?_
     | with_reducible refine MachCSL.ctxMorph_bigSepL _ _ (fun _ _ => ?_)
     | infer_instance
     | exact ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)))

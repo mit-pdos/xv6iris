@@ -79,14 +79,14 @@ open Iris.ProgramLogic Language.Notation PrimStep
 booted, with `fs.img` on its disk, every reachable thread is reducible and
 the run's boundary trace is filed by the NI ledger, every incarnation's
 trace obeying the class law. -/
-theorem xv6NiAdequacy {hlc : HasLC}
+theorem xv6NiAdequacy
     (g : GState) (Hgen0 : g.gen = 0) (Hpow : g.pow = false) (Hdisk : diskOf g.m.devs = fsImgDisk)
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ xv6NiPhi g2 κs :=
-  letI : MachGpreS hlc xv6GF := xv6GF_machGpreS hlc 0
-  haveI : Xv6AppLaws (hlc := hlc) (appTriv xv6GF) := appTriv_laws userProof
-  xv6NiAppAdequacy (hlc := hlc) (GF := xv6GF) g fsimgSb fsimgNib fsimgCov (appTriv xv6GF)
+  letI : MachGpreS xv6GF := xv6GF_machGpreS 0
+  haveI : Xv6AppLaws (appTriv xv6GF) := appTriv_laws userProof
+  xv6NiAppAdequacy (GF := xv6GF) g fsimgSb fsimgNib fsimgCov (appTriv xv6GF)
     (fun c => appTriv_init c _) Hgen0 Hpow (fsimgHimg g Hdisk) n κs t2 g2 hsteps
 
 /-- **THE TWO-RUN COROLLARY** (NI M2-X4): two runs from booting machines; at
@@ -97,7 +97,7 @@ and each round's key's lazy bit and wait status window --, exits and the
 cited POSITIONS) in the two runs and EQUAL LEDGER HISTORIES (NI M3 NI-OUT,
 ruling OUT-R3: the ledger part `niHistLed`, never the console stream), has
 equal enters. -/
-theorem xv6NiTwoRun {hlc : HasLC}
+theorem xv6NiTwoRun
     (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
     (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
     (n₁ n₂ : Nat) (κs₁ κs₂ : List Obs) (t₁ t₂ : List Expr) (g₁' g₂' : GState)
@@ -109,8 +109,8 @@ theorem xv6NiTwoRun {hlc : HasLC}
       (utrace q κs₁ F₁).map NiStep.input = (utrace q κs₂ F₂).map NiStep.input →
       niHistLed F₁ = niHistLed F₂ →
       (utrace q κs₁ F₁).map NiStep.output = (utrace q κs₂ F₂).map NiStep.output := by
-  obtain ⟨-, F₁, hF₁, h1₁, hC₁, -⟩ := xv6NiAdequacy (hlc := hlc) g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
-  obtain ⟨-, F₂, hF₂, h1₂, hC₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
+  obtain ⟨-, F₁, hF₁, h1₁, hC₁, -⟩ := xv6NiAdequacy g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
+  obtain ⟨-, F₂, hF₂, h1₂, hC₂, -⟩ := xv6NiAdequacy g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
   exact ⟨F₁, F₂, hF₁, h1₁, hC₁, hF₂, h1₂, hC₂, fun q hc hin hH => niTwoRun hF₁ hC₁ hF₂ hC₂ q hc hin hH⟩
 
 /-- **THE TWO-RUN COROLLARY, OBSERVABLE FORM** (NI M2-X4, ruling X-R3
@@ -121,7 +121,7 @@ equal READINGS (`niReadings`: its uptime answers, its wait answers in the
 class and -- NI joint fork lane F3 -- its fork answers, read off the
 enters) in the two runs, has equal enters.  The same
 law as `xv6NiTwoRun`'s; the hypothesis is checkable on the trace. -/
-theorem xv6NiTwoRunObs {hlc : HasLC}
+theorem xv6NiTwoRunObs
     (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
     (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
     (n₁ n₂ : Nat) (κs₁ κs₂ : List Obs) (t₁ t₂ : List Expr) (g₁' g₂' : GState)
@@ -132,8 +132,8 @@ theorem xv6NiTwoRunObs {hlc : HasLC}
       (utrace q κs₁ F₁).map NiStep.obsInput = (utrace q κs₂ F₂).map NiStep.obsInput →
       niReadings q κs₁ F₁ = niReadings q κs₂ F₂ →
       (utrace q κs₁ F₁).map NiStep.output = (utrace q κs₂ F₂).map NiStep.output := by
-  obtain ⟨-, F₁, hF₁, h1₁, -⟩ := xv6NiAdequacy (hlc := hlc) g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
-  obtain ⟨-, F₂, hF₂, h1₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
+  obtain ⟨-, F₁, hF₁, h1₁, -⟩ := xv6NiAdequacy g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
+  obtain ⟨-, F₂, hF₂, h1₂, -⟩ := xv6NiAdequacy g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
   exact ⟨F₁, F₂, hF₁, h1₁, hF₂, h1₂, fun q hc hin hrd => niTwoRunObs hF₁ hF₂ q hc hin hrd⟩
 
 /-- **THE CONSOLE BYTES ARE A FUNCTION OF THE CALLER'S INPUTS** (NI M3
@@ -145,7 +145,7 @@ buffer run and the exit's content) pushes equal attributed console runs --
 the bytes each of its class console writes put at its cited indices of its
 era's console accepted stream.  No histories, no positions, no class
 hypothesis. -/
-theorem xv6NiOut {hlc : HasLC}
+theorem xv6NiOut
     (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
     (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
     (n₁ n₂ : Nat) (κs₁ κs₂ : List Obs) (t₁ t₂ : List Expr) (g₁' g₂' : GState)
@@ -155,8 +155,8 @@ theorem xv6NiOut {hlc : HasLC}
       niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ niChain F₂ (niHist F₂) ∧ ∀ q : NiInc,
       (utrace q κs₁ F₁).map NiStep.outInput = (utrace q κs₂ F₂).map NiStep.outInput →
       niOutput q κs₁ F₁ = niOutput q κs₂ F₂ := by
-  obtain ⟨-, F₁, hF₁, h1₁, hC₁, -⟩ := xv6NiAdequacy (hlc := hlc) g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
-  obtain ⟨-, F₂, hF₂, h1₂, hC₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
+  obtain ⟨-, F₁, hF₁, h1₁, hC₁, -⟩ := xv6NiAdequacy g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
+  obtain ⟨-, F₂, hF₂, h1₂, hC₂, -⟩ := xv6NiAdequacy g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
   exact ⟨F₁, F₂, hF₁, h1₁, hC₁, hF₂, h1₂, hC₂, fun q hin => niOut hF₁ hF₂ q hin⟩
 
 /-- **THE PREFIX FORM, THE NO-KILL COROLLARY** (NI M3 no-kill K3, rulings
@@ -169,7 +169,7 @@ the console stream), has run-1 enters a prefix of its run-2 enters.  A
 kill (or any other truncation) can only cut `q`'s trace; it never changes
 a step `q` took (`NiTrace` scope 11).  `xv6NiTwoRun` is the two-sided
 case. -/
-theorem xv6NiPrefix {hlc : HasLC}
+theorem xv6NiPrefix
     (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
     (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
     (n₁ n₂ : Nat) (κs₁ κs₂ : List Obs) (t₁ t₂ : List Expr) (g₁' g₂' : GState)
@@ -181,8 +181,8 @@ theorem xv6NiPrefix {hlc : HasLC}
       (utrace q κs₁ F₁).map NiStep.input <+: (utrace q κs₂ F₂).map NiStep.input →
       (∀ k, niBelow (niHistLed F₁ k) (niHistLed F₂ k)) →
       (utrace q κs₁ F₁).map NiStep.output <+: (utrace q κs₂ F₂).map NiStep.output := by
-  obtain ⟨-, F₁, hF₁, h1₁, hC₁, -⟩ := xv6NiAdequacy (hlc := hlc) g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
-  obtain ⟨-, F₂, hF₂, h1₂, hC₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
+  obtain ⟨-, F₁, hF₁, h1₁, hC₁, -⟩ := xv6NiAdequacy g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
+  obtain ⟨-, F₂, hF₂, h1₂, hC₂, -⟩ := xv6NiAdequacy g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
   exact ⟨F₁, F₂, hF₁, h1₁, hC₁, hF₂, h1₂, hC₂, fun q hc hin hH => niTwoRunPrefix hF₁ hC₁ hF₂ hC₂ q hc hin hH⟩
 
 /-- **THE DETERMINISM THEOREM FOR ARBITRARY LOW CODE** (NI M3 U-3, rulings
@@ -197,7 +197,7 @@ run 1 a prefix of run 2's, and run 1's ledger histories below run 2's: the
 skeleton's views (exits and enters) in run 1 are a prefix of run 2's, and so
 are the console runs the skeleton pushes.  No exit, mask or key reading is an
 input: the user computation `Ustep.ustep` derives them (`NiTrace` scope 13). -/
-theorem xv6NiDet {hlc : HasLC}
+theorem xv6NiDet
     (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
     (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
     (n₁ n₂ : Nat) (κs₁ κs₂ : List Obs) (t₁ t₂ : List Expr) (g₁' g₂' : GState)
@@ -216,8 +216,8 @@ theorem xv6NiDet {hlc : HasLC}
         ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.view ∧
       ((utrace q κs₁ F₁).filter NiStep.skel).map NiStep.outBytes <+:
         ((utrace q κs₂ F₂).filter NiStep.skel).map NiStep.outBytes := by
-  obtain ⟨-, F₁, hF₁, h1₁, hC₁, hU₁, -⟩ := xv6NiAdequacy (hlc := hlc) g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
-  obtain ⟨-, F₂, hF₂, h1₂, hC₂, hU₂, -⟩ := xv6NiAdequacy (hlc := hlc) g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
+  obtain ⟨-, F₁, hF₁, h1₁, hC₁, hU₁, -⟩ := xv6NiAdequacy g₁ Hgen₁ Hpow₁ Hdisk₁ n₁ κs₁ t₁ g₁' hsteps₁
+  obtain ⟨-, F₂, hF₂, h1₂, hC₂, hU₂, -⟩ := xv6NiAdequacy g₂ Hgen₂ Hpow₂ Hdisk₂ n₂ κs₂ t₂ g₂' hsteps₂
   exact ⟨F₁, F₂, hF₁, h1₁, hC₁, hU₁, hF₂, h1₂, hC₂, hU₂,
     fun q ho₁ ho₂ hg₁ hg₂ hc hns hk hpos hH =>
       niTwoRunDet hF₁ hC₁ hU₁ hF₂ hC₂ hU₂ q ho₁ ho₂ hg₁ hg₂ hc hns hk hpos hH⟩
@@ -226,12 +226,12 @@ theorem xv6NiDet {hlc : HasLC}
 its ledger witnesses, every incarnation's steps before its first ecall
 replay their exits (`NiTrace.niStrongInstance`; T's
 `utRoundQuiet`, its module since deleted as unreached, lifted to the trace). -/
-theorem xv6NiStrongInstance {hlc : HasLC}
+theorem xv6NiStrongInstance
     (g : GState) (Hgen0 : g.gen = 0) (Hpow : g.pow = false) (Hdisk : diskOf g.m.devs = fsImgDisk)
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
     ∃ F, niOk κs F ∧ niOneShot κs F ∧ ∀ q : NiInc, ∀ s ∈ (utrace q κs F).takeWhile (fun s => !s.ecall), s.replays := by
-  obtain ⟨-, F, hF, h1, -⟩ := xv6NiAdequacy (hlc := hlc) g Hgen0 Hpow Hdisk n κs t2 g2 hsteps
+  obtain ⟨-, F, hF, h1, -⟩ := xv6NiAdequacy g Hgen0 Hpow Hdisk n κs t2 g2 hsteps
   exact ⟨F, hF, h1, niStrongInstance hF⟩
 
 end Xv6

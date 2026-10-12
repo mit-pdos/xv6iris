@@ -33,21 +33,21 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section UkRunSysFd
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `wp_uk_ecall_open`**. -/
 theorem wp_uk_ecall_open (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (l : List FdState) (avail : Nat) (hn : usysno m = USYS_open) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_open -∗ ustd N.fd l -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_open -∗ ustd N.fd l -∗
       (∀ (h' : CPU) (r : BitVec 64),
         ((∃ (fd : Nat) (rd wr : Bool) (t : FdType),
             ⌜r = BitVec.ofNat 64 fd ∧ fd < NOFILE ∧ fdstNopipe (.open rd wr t)⌝ ∗
             ualloc N.fd l fd (.open rd wr t)) ∨
           (⌜r = -1#64⌝ ∗ ustd N.fd l)) -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd Hcont
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun
@@ -101,15 +101,15 @@ theorem wp_uk_ecall_dup_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegM
     (l v : List FdState) (fd0 : Nat) (st : FdState) (avail : Nat) (hn : usysno m = USYS_dup)
     (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd0 : Int)) (hstne : st ≠ .closed)
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_dup -∗ ustdAt N.fd l v -∗ ufdOwn N.fd l fd0 st -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_dup -∗ ustdAt N.fd l v -∗ ufdOwn N.fd l fd0 st -∗
       (∀ (h' : CPU) (r : BitVec 64),
         ((∃ fd1 : Nat, ⌜r = BitVec.ofNat 64 fd1 ∧ fd1 < NOFILE⌝ ∗
             (∃ fdv : List FdState, ⌜tabLe fdv v ∧ fdv[fd0]? = some st⌝ ∗
               uallocV N.fd l fd1 st (fdv.set fd1 st)) ∗
             ufdOwn N.fd (ustdAfter l st) fd0 st) ∨
           (⌜r = -1#64 ∧ fdLowestClosed l = none⌝ ∗ ustdAt N.fd l v ∗ ufdOwn N.fd l fd0 st)) -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd Hh0 Hcont
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun
@@ -180,13 +180,13 @@ theorem wp_uk_ecall_dup (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (l : List FdState) (fd0 : Nat) (st : FdState) (avail : Nat) (hn : usysno m = USYS_dup)
     (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd0 : Int)) (hstne : st ≠ .closed)
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_dup -∗ ustd N.fd l -∗ ufdOwn N.fd l fd0 st -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_dup -∗ ustd N.fd l -∗ ufdOwn N.fd l fd0 st -∗
       (∀ (h' : CPU) (r : BitVec 64),
         ((∃ fd1 : Nat, ⌜r = BitVec.ofNat 64 fd1 ∧ fd1 < NOFILE⌝ ∗
             ualloc N.fd l fd1 st ∗ ufdOwn N.fd (ustdAfter l st) fd0 st) ∨
           (⌜r = -1#64 ∧ fdLowestClosed l = none⌝ ∗ ustd N.fd l ∗ ufdOwn N.fd l fd0 st)) -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd Hh0 Hcont
   icases ustd_ustdAt N.fd l $$ Hstd with ⟨%v, Hstd⟩
@@ -208,10 +208,10 @@ theorem wp_uk_ecall_dup (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
 authority moves, the ledger comes back at a state nobody is told. -/
 theorem wp_uk_ecall_dup_untracked (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (l : List FdState) (avail : Nat) (hn : usysno m = USYS_dup) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_dup -∗ ustd N.fd l -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_dup -∗ ustd N.fd l -∗
       (∀ (h' : CPU) (r : BitVec 64) (l' : List FdState), ustd N.fd l' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd Hcont
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun
@@ -264,10 +264,10 @@ theorem wp_uk_ecall_dup_closed_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m
     (l v : List FdState) (fd0 : Nat) (avail : Nat) (hn : usysno m = USYS_dup)
     (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd0 : Int)) (hstd : fd0 < NSTD)
     (hcl0 : l[fd0]? = some .closed) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_dup -∗ ustdAt N.fd l v -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_dup -∗ ustdAt N.fd l v -∗
       (∀ (h' : CPU) (r : BitVec 64), ⌜r = -1#64⌝ -∗ ustdAt N.fd l v -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd Hcont
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun
@@ -308,10 +308,10 @@ theorem wp_uk_ecall_dup_closed (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : 
     (l : List FdState) (fd0 : Nat) (avail : Nat) (hn : usysno m = USYS_dup)
     (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd0 : Int)) (hstd : fd0 < NSTD)
     (hcl0 : l[fd0]? = some .closed) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_dup -∗ ustd N.fd l -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_dup -∗ ustd N.fd l -∗
       (∀ (h' : CPU) (r : BitVec 64), ⌜r = -1#64⌝ -∗ ustd N.fd l -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd Hcont
   icases ustd_ustdAt N.fd l $$ Hstd with ⟨%v, Hstd⟩

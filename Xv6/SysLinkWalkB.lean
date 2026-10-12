@@ -144,7 +144,7 @@ theorem sys_link_dl_repack [Fscfg] [Icfg] (dinum : BitVec 32) (dn dn' : Dinode) 
       (bname_length_le 14 nf) (cutNul_nonul _) htyeq hszmax hrng hnone hduq
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -167,7 +167,7 @@ short parent and the share gathered back into one reference), `end_op`,
 `a5 = 0`, both reloads, the join point with the two receipts and the undo's
 commit back unspent (`linkArms_ok`). -/
 theorem sys_link_tail_g (IUP : IUNLOCKPUT) (IP : IPUT) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (kk : Nat) (q : Qp) (g : GName) (lo tl : Nat) (γil γisl : GName) (inum : BitVec 32)
     (kd : Nat) (qd : Qp) (gd : GName) (lod tld : Nat) (γild γisld : GName) (dinum : BitVec 32)
@@ -181,12 +181,12 @@ theorem sys_link_tail_g (IUP : IUNLOCKPUT) (IP : IPUT) (EO : END_OP)
     kctx cpu (((k.withSpie spie spp).pushed 38).withRegs R) ∗ pcIs cpu (KA.«sys_link» + 0xa4#64) ∗
     sysLinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     sysLinkBufs (k.regs 2#5) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
     sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
     sysLinkIpHeld kk q g lo tl γil γisl inum ∗
     sysLinkLocked kd qd gd lod tld γild γisld dinum A.pid dnd bmd ∗
     ltgtFired A.Ftgt inum.toNat ∗ lentFired A.Fent dinum.toNat nm inum.toNat ∗
-    pfAt (utgtCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Funt ∗
+    pfAt (utgtCommitAt (fsGammaL fscFs) appE) A.Funt ∗
     bslots 3 ∗ irefSlots 1 ∗ logOpSe icfgLog n3 Sb3 e0
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbufs, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hip, Hlkd, Hltgt, Hlentf,
@@ -309,7 +309,7 @@ theorem sys_link_tail_g (IUP : IUNLOCKPUT) (IP : IPUT) (EO : END_OP)
   · unfold sysLinkCells; iframe
   ihave Hir2 := sys_link_ir_11 $$ [$Hslot $Hslot2]
   ihave Hir := sys_link_ir_2s1 $$ [$Hir2 $Hir]
-  ihave Harms := linkArms_ok (hlc := hlc) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt (0#64) inum.toNat
+  ihave Harms := linkArms_ok (fsGammaL fscFs) A.Ftgt A.Fent A.Funt (0#64) inum.toNat
     dinum.toNat nm rfl $$ Hltgt Hlentf Hcmu
   ihave Hout := sys_link_out_intro A k.proc P2 _ $$ [Hhole Hpid Hcwd Hcwr Hbs Hir Harms]
   · unfold sysLinkRows; iframe
@@ -322,7 +322,7 @@ set_option maxHeartbeats 16000000 in
 `iunlockput(dp)` (or nameiparent's miss) hands over: the budget read off
 the walk's count, the reference ledger regrouped, `sys_link_tail_bad`. -/
 theorem sys_link_to_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (A : SysLinkArgs GF) (P2 : UPtd) (kk : Nat) (q : Qp) (g : GName) (lo tl : Nat)
     (γil γisl : GName) (inum : BitVec 32) (ty : BitVec 16) (dpv : BitVec 64) (n : Nat)
     (Sb : List Nat) (crb : Bool)
@@ -333,15 +333,15 @@ theorem sys_link_to_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END
     (hnd : ty.toNat ≠ T_DIR_z) (hmem : IBLOCK inum icfgIst ∈ Sb)
     (hbudA : crb = true → 4 ≤ n) (hbudB : crb = false → 5 ≤ n) :
     sysLinkCells (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
-    sysLinkBufs (k.regs 2#5) ∗ sysfileEnv (hlc := hlc) Γ ∗
+    sysLinkBufs (k.regs 2#5) ∗ sysfileEnv Γ ∗
     wordPointsTo (pCwd k.proc) 8 (DFrac.own 1) A.V.cwd ∗
     (inodeHeldAt A.V.cwd A.V.cwi ∗ wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) A.V.root ∗
       inodeHeldAt A.V.root A.V.rti) ∗
     sysLinkHole A k.proc P2 ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
     sysLinkIpHeld kk q g lo tl γil γisl inum ∗ ityShot g ty ∗
     FsStateLink.linkTok (fsGammaL fscFs) (inum.toNat : Int) .tFile ∗
-    pfAt (utgtCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Funt ∗
-    ltgtFired A.Ftgt inum.toNat ∗ pfAt (lentCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fent ∗
+    pfAt (utgtCommitAt (fsGammaL fscFs) appE) A.Funt ∗
+    ltgtFired A.Ftgt inum.toNat ∗ pfAt (lentCommitAt (fsGammaL fscFs) appE) A.Fent ∗
     irefSlots 1
     ⊢ sysLinkToBad k (ientry kk) dpv A.pid n Sb crb false := by
   iintro ⟨Hcells, Hbufs, #Henv, Hcwd, Hcwr, Hhole, HΦ, Hip, #Hshot, Htok, Hcmu, Hltgt, Hlent, Hir⟩
@@ -377,7 +377,7 @@ unlocked identity reads off `ip`'s reference, `dirlink`, and its three arms:
 F-FOUND and F-0 to `bad:` (`sys_link_tail_f`), G to the success tail
 (`sys_link_tail_g`) after THE DEPOSIT and INSTANT 2's fire. -/
 theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (DLK : DIRLINK)
-    (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (nf : Nat → BitVec 8)
     (kk : Nat) (q : Qp) (g : GName) (lo tl : Nat) (γil γisl : GName) (inum : BitVec 32) (ty : BitVec 16)
@@ -394,14 +394,14 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     sysLinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     sysLinkNameBuf (k.regs 2#5) nf ∗ sysfileAny (sysLinkNew (k.regs 2#5)) 128 ∗
     sysfileAny (sysLinkOld (k.regs 2#5)) 128 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
     sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
     sysLinkIpHeld kk q g lo tl γil γisl inum ∗ ityShot g ty ∗
     FsStateLink.linkTok (fsGammaL fscFs) (inum.toNat : Int) .tFile ∗
     credFloor lod tld ∗ inodeRefGenlo kd qd icfgDev dinum gd lod ∗ ityShot gd T_DIR ∗
     runitAny dinum.toNat ∗
-    ltgtFired A.Ftgt inum.toNat ∗ pfAt (lentCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fent ∗
-    pfAt (utgtCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Funt ∗
+    ltgtFired A.Ftgt inum.toNat ∗ pfAt (lentCommitAt (fsGammaL fscFs) appE) A.Fent ∗
+    pfAt (utgtCommitAt (fsGammaL fscFs) appE) A.Funt ∗
     bslots 3 ∗ irefSlots 1 ∗ logOpS icfgLog n2 Sb2 ∗ logTx icfgLog
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hnm, Hnew, Hold, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hip, #Hshot, Htok,
@@ -660,7 +660,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
       rw [sys_link_low16 inum h16] at hprow
       have hnlp : fnNlink (eraNode dnd bmd datd) ≠ 0 := by rw [Xv6.cafEra_nlink]; exact hnl0
       iapply wpLoop_fupd
-      imod (lfEnt_fire (hlc := hlc) fscFs ⊤ A.Fent dinum.toNat inum.toNat (bname 14 nf)
+      imod (lfEnt_fire fscFs ⊤ A.Fent dinum.toNat inum.toNat (bname 14 nf)
           (eraNode dnd bmd datd) (eraNode dn' bm' data') ufNd_top hloc' hdir hnlp hentnone hprow)
         $$ Hftop Happ Hlent Htd with ⟨Htd, %av, %hav, %hav2, Hrcv⟩
       imodintro
@@ -701,7 +701,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
         absOf_dir_same _ _ hdir (by rw [Xv6.cafEra_type, Xv6.cafEra_type, htyeq])
           (by rw [Xv6.cafEra_nlink, Xv6.cafEra_nlink, hnleq]) heqent.symm
       iapply wpLoop_fupd
-      imod (iregTopRetag_same (hlc := hlc) ⊤ fscFs dinum.toNat (eraNode dnd bmd datd)
+      imod (iregTopRetag_same ⊤ fscFs dinum.toNat (eraNode dnd bmd datd)
           (eraNode dn' bm' data') ufNd_top habsd hloc') $$ Hftop Happ Htd with Htd
       imodintro
       ihave Hloadd := icMkLoaded fscFs fscIreg fscCov fscLogst kd dinum dn' bm' data' hok' hrl' hdok'

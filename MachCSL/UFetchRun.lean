@@ -229,7 +229,7 @@ end walker
 /-! ## §2 The Iris rule -/
 
 section iris
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {cpu : CPU} {ξ : CtxId} {D : UFoot} (RF : URegFrame GF cpu D) (BF : UByteFrame GF ξ)
 
 /-- The obligation after a fetch-walk from `s`: whatever the oracle (the

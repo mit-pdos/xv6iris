@@ -30,7 +30,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The file the kernel context hands over reads the user `satp` in `a0`. -/
 theorem userret_a0_get (cpu : CPU) (regs : RegMap) (v : BitVec 64) (h : regs 10#5 = v) :
@@ -44,9 +44,9 @@ theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitV
     (hsm : smFacts ms false) (hlf : lf.ok) (hspp : BitVec.extractLsb' 8 1 ms = 0#1) (hmdl : 0x220#64 &&& ~~~mdl = 0#64)
     (hv : pageValid (pageAddr P.tfp)) (R : RegMap) (ws : List (BitVec 64)) (epc : BitVec 64)
     (ox : Option (Nat × Obs))
-    (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox (.uEnter cpu (satpOf .kpt P.root) epc (tfGprs ws))) :
-    kernelText ∗ kmapStatic ∗ wireInv ∗ uRcptOpt ox ∗ uClaimFor (hlc := hlc) (GF := GF) ox ∗
-    MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox (.uEnter cpu (satpOf .kpt P.root) epc (tfGprs ws)) ∗
+    (hf : MachFixedGS.uFit (GF := GF) ox (.uEnter cpu (satpOf .kpt P.root) epc (tfGprs ws))) :
+    kernelText ∗ kmapStatic ∗ wireInv ∗ uRcptOpt ox ∗ uClaimFor (GF := GF) ox ∗
+    MachFixedGS.uEvid (GF := GF) ox (.uEnter cpu (satpOf .kpt P.root) epc (tfGprs ws)) ∗
     urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P (urPc 0xac#64) R ∗
     tfPageAt P.tfp ws ∗ Register.sepc ↦ᵣ[cpu] epc ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.User
@@ -109,7 +109,7 @@ end
 set_option maxHeartbeats 4000000 in
 /-- **userret meets its specification.** -/
 theorem userret_proof : USERRET :=
-  ⟨fun {hlc GF} _ _ cpu k P M ws sep sc tv ox hsie hspie hspp htier ha0 => by
+  ⟨fun {GF} _ _ cpu k P M ws sep sc tv ox hsie hspie hspp htier ha0 => by
   unfold wp_userret_body userretPost
   obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
   simp only at hsie hspie hspp htier ha0

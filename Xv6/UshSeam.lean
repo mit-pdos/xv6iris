@@ -54,12 +54,13 @@ def ushcmdOfTree (s0 : Nat) (g : Nat → BitVec 8) : UshpCmd → Ushcmd
   | .back c => .back (ushcmdOfTree s0 g c)
 
 section UshSeam
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-! ## §2 Persisted runs (Rocq (V3)) -/
 
+omit [MachGS GF] in
 /-- The split of a run, at any fraction. -/
 theorem ush_ubytesq_app (γd : GName) (dq : DFrac) (a k n : Nat) (f : Nat → BitVec 8) :
     ubytesq (GF := GF) γd dq a (k + n) f ⊣⊢ ubytesq γd dq a k f ∗ ubytesq γd dq (a + k) n (fun j => f (k + j)) := by
@@ -70,6 +71,7 @@ theorem ush_ubytesq_app (γd : GName) (dq : DFrac) (a k n : Nat) (f : Nat → Bi
   · rw [Nat.add_assoc]
   · rw [Nat.add_assoc]
 
+omit [MachGS GF] in
 /-- **Rocq `ubytesq_sub`**: a sub-run of a persisted run. -/
 theorem ush_ubytesq_sub (γd : GName) (a n : Nat) (f : Nat → BitVec 8) (i m : Nat) (h : i + m ≤ n) :
     ubytesq (GF := GF) γd DFrac.discard a n f ⊢ ubytesq γd DFrac.discard (a + i) m (fun j => f (i + j)) := by
@@ -79,6 +81,7 @@ theorem ush_ubytesq_sub (γd : GName) (a n : Nat) (f : Nat → BitVec 8) (i m : 
   icases (ush_ubytesq_app γd DFrac.discard (a + i) m r (fun j => f (i + j))).1 $$ H with ⟨H, -⟩
   iexact H
 
+omit [MachGS GF] in
 /-- **Rocq `ubytesq_at`**: one byte of a persisted run. -/
 theorem ush_ubytesq_at (γd : GName) (a n : Nat) (f : Nat → BitVec 8) (i : Nat) (h : i < n) :
     ubytesq (GF := GF) γd DFrac.discard a n f ⊢ ubyteq γd DFrac.discard (a + i) (f i) := by
@@ -86,6 +89,7 @@ theorem ush_ubytesq_at (γd : GName) (a n : Nat) (f : Nat → BitVec 8) (i : Nat
   icases ubytesq_acc γd DFrac.discard a n f i h $$ H with ⟨Hb, -⟩
   iexact Hb
 
+omit [MachGS GF] in
 /-- **Rocq `ush_str_of_line`**: a string `[q, e)` of the persisted cut line. -/
 theorem ushStr_of_line (γd : GName) (s0 len : Nat) (g : Nat → BitVec 8) (q e : Nat) (hqe : q < e) (hle : e ≤ len)
     (hz : g e = ubyte0) (hbod : ∀ j, j < e - q → g (q + j) ≠ ubyte0) (hlen : len < 2 ^ 31) (hs0 : 0 < s0)
@@ -114,6 +118,7 @@ def ushSlotQ (γd : GName) (s0 base : Nat) (toks : List (Nat × Nat)) (i : Nat) 
   | some tk => uwordq γd DFrac.discard (base + 8 * i) (BitVec.ofNat 64 (s0 + tk.1))
   | none => if i = toks.length then uwordq γd DFrac.discard (base + 8 * i) 0#64 else iprop(True)
 
+omit [MachGS GF] in
 instance ushSlotQ_persistent (γd : GName) (s0 base : Nat) (toks : List (Nat × Nat)) (i : Nat) :
     Persistent (ushSlotQ (GF := GF) γd s0 base toks i) := by
   unfold ushSlotQ
@@ -121,6 +126,7 @@ instance ushSlotQ_persistent (γd : GName) (s0 base : Nat) (toks : List (Nat × 
   · infer_instance
   · split <;> infer_instance
 
+omit [MachGS GF] in
 /-- A slot, persisted. -/
 theorem ushSlot_persist (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × Nat)) (i : Nat) :
     ushSlot N s0 base toks Prod.fst i ⊢ |==> ushSlotQ N.d s0 base toks i := by
@@ -137,6 +143,7 @@ theorem ushSlot_persist (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × Na
       rw [if_neg hi, if_neg hi]
       iintro _; imodintro; ipureintro; trivial
 
+omit [MachGS GF] in
 /-- The ten slots, persisted. -/
 theorem ushSlots_persist (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × Nat)) :
     ([∗list] i ∈ List.range 10, ushSlot N s0 base toks Prod.fst i) ⊢
@@ -145,6 +152,7 @@ theorem ushSlots_persist (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × N
   ihave H' := BigSepL.bigSepL_mono (fun {_ j} _ => ushSlot_persist (GF := GF) N s0 base toks j) $$ H
   iapply BigSepL.bigSepL_bupd $$ H'
 
+omit [MachGS GF] in
 /-- A token's slot. -/
 theorem ushSlotsQ_tok (γd : GName) (s0 base : Nat) (toks : List (Nat × Nat)) (i : Nat) (tk : Nat × Nat)
     (hi : toks[i]? = some tk) (h10 : i < 10) :
@@ -154,6 +162,7 @@ theorem ushSlotsQ_tok (γd : GName) (s0 base : Nat) (toks : List (Nat × Nat)) (
     (List.getElem?_range h10)).trans ?_
   unfold ushSlotQ; rw [hi]
 
+omit [MachGS GF] in
 /-- The NULL cap's slot. -/
 theorem ushSlotsQ_cap (γd : GName) (s0 base : Nat) (toks : List (Nat × Nat)) (h10 : toks.length < 10) :
     ([∗list] j ∈ List.range 10, ushSlotQ (GF := GF) γd s0 base toks j) ⊢
@@ -172,10 +181,12 @@ theorem ushArgs_get (s0 : Nat) (g : Nat → BitVec 8) (toks : List (Nat × Nat))
   | none => rw [htk] at hk; cases hk
   | some tk => rw [htk] at hk; cases hk; exact ⟨tk, rfl, rfl⟩
 
+omit [MachGS GF] in
 /-- A persisted pointer word is the runner's pointer slot. -/
 theorem ushPtr_of (g : GName) (a p : Nat) :
     uwordq (GF := GF) g DFrac.discard a (BitVec.ofNat 64 p) ⊢ ushPtr g a p := .rfl
 
+omit [MachGS GF] in
 /-- A persisted 4-byte field is the runner's `int` field. -/
 theorem ushW32_of (g : GName) (a : Nat) (v : Int) :
     ubytesq (GF := GF) g DFrac.discard a 4 (nthByte (n := 4) (BitVec.ofInt 32 v)) ⊢ ushW32 g a v := .rfl
@@ -190,9 +201,9 @@ theorem ushCmd_of_ushp_gen (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 
     (hend : ∀ (i : Nat) (tk : Nat × Nat), toks[i]? = some tk → g tk.2 = ubyte0)
     (hbod : ∀ (i : Nat) (tk : Nat × Nat), toks[i]? = some tk → ∀ j, j < tk.2 - tk.1 → g (tk.1 + j) ≠ ubyte0)
     (hlen : len < 2 ^ 31) (hs0 : 0 < s0) (hs0hi : s0 + len < 2 ^ 38) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTree N s0 p (.exec toks) -∗
+    ⊢ urun N h m pc avail -∗ ushTree N s0 p (.exec toks) -∗
       ubytesq N.d DFrac.discard s0 (len + 1) g -∗
-      |==> (urun (hlc := hlc) N h m pc avail ∗ ushCmd N.d p (.exec (ushArgs s0 g toks))) := by
+      |==> (urun N h m pc avail ∗ ushCmd N.d p (.exec (ushArgs s0 g toks))) := by
   iintro Hrun Hnode #Hline
   simp only [ushTree, ushExecAt, ushTypeAt]
   icases Hnode with ⟨%hlt10, %hp0, %hp8, ⟨Hty, -⟩, Hargv, -⟩
@@ -248,6 +259,7 @@ theorem ushCmd_of_ushp_gen (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 
 
 /-! ## §5 The four inner rows, introduced (Rocq `ush_cmd_*_of`) -/
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_redir_of`**. -/
 theorem ushCmd_redir_of (g : GName) (t q : Nat) (c1 : Ushcmd) (file : UArg) (mode fd v : Int)
     (hv : v = 2) (ht : 0 < t ∧ t < 2 ^ 38) (ht8 : t % 8 = 0) :
@@ -263,6 +275,7 @@ theorem ushCmd_redir_of (g : GName) (t q : Nat) (c1 : Ushcmd) (file : UArg) (mod
                 iexact Hc
   iframe Hfp Hfs Hm Hf
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_pipe_of`**. -/
 theorem ushCmd_pipe_of (g : GName) (t ql qr : Nat) (l r : Ushcmd) (v : Int) (hv : v = 3) (ht : 0 < t ∧ t < 2 ^ 38) (ht8 : t % 8 = 0) :
     ⊢ ushW32 (GF := GF) g t v -∗ ushPtr g (t + 8) ql -∗ ushCmd g ql l -∗ ushPtr g (t + 16) qr -∗ ushCmd g qr r -∗
@@ -277,6 +290,7 @@ theorem ushCmd_pipe_of (g : GName) (t ql qr : Nat) (l r : Ushcmd) (v : Int) (hv 
   · iexists ql; iframe Hpl Hl
   · iexists qr; iframe Hpr Hr
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_list_of`**. -/
 theorem ushCmd_list_of (g : GName) (t ql qr : Nat) (l r : Ushcmd) (v : Int) (hv : v = 4) (ht : 0 < t ∧ t < 2 ^ 38) (ht8 : t % 8 = 0) :
     ⊢ ushW32 (GF := GF) g t v -∗ ushPtr g (t + 8) ql -∗ ushCmd g ql l -∗ ushPtr g (t + 16) qr -∗ ushCmd g qr r -∗
@@ -291,6 +305,7 @@ theorem ushCmd_list_of (g : GName) (t ql qr : Nat) (l r : Ushcmd) (v : Int) (hv 
   · iexists ql; iframe Hpl Hl
   · iexists qr; iframe Hpr Hr
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_back_of`**. -/
 theorem ushCmd_back_of (g : GName) (t q : Nat) (c1 : Ushcmd) (v : Int) (hv : v = 5) (ht : 0 < t ∧ t < 2 ^ 38) (ht8 : t % 8 = 0) :
     ⊢ ushW32 (GF := GF) g t v -∗ ushPtr g (t + 8) q -∗ ushCmd g q c1 -∗ ushCmd g t (.back c1) := by
@@ -306,8 +321,8 @@ theorem ushCmd_back_of (g : GName) (t q : Nat) (c1 : Ushcmd) (v : Int) (hv : v =
 address bound off the run's heap. -/
 theorem ushType_persist (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail p : Nat) (t : UshpCmd)
     (hp0 : 0 < p) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTypeAt N p t -∗
-      |==> (urun (hlc := hlc) N h m pc avail ∗ ⌜0 < p ∧ p < 2 ^ 38⌝ ∗ ushW32 N.d p (ushpTy t)) := by
+    ⊢ urun N h m pc avail -∗ ushTypeAt N p t -∗
+      |==> (urun N h m pc avail ∗ ⌜0 < p ∧ p < 2 ^ 38⌝ ∗ ushW32 N.d p (ushpTy t)) := by
   iintro Hrun HT
   unfold ushTypeAt
   icases HT with ⟨Hty, -⟩
@@ -325,8 +340,8 @@ under `ushpCutOk`. -/
 theorem ushCmd_of_ushp_tree (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail s0 len : Nat)
     (g : Nat → BitVec 8) (hlen : len < 2 ^ 31) (hs0 : 0 < s0) (hs0hi : s0 + len < 2 ^ 38) :
     ∀ (t : UshpCmd) (p : Nat), ushpCutOk len g t →
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTree N s0 p t -∗ ubytesq N.d DFrac.discard s0 (len + 1) g -∗
-      |==> (urun (hlc := hlc) N h m pc avail ∗ ushCmd N.d p (ushcmdOfTree s0 g t))
+    ⊢ urun N h m pc avail -∗ ushTree N s0 p t -∗ ubytesq N.d DFrac.discard s0 (len + 1) g -∗
+      |==> (urun N h m pc avail ∗ ushCmd N.d p (ushcmdOfTree s0 g t))
   | .exec toks, p, hcut => by
     obtain ⟨hin, hend, hbod⟩ := hcut
     exact ushCmd_of_ushp_gen N h m pc avail s0 p len g toks hin hend hbod hlen hs0 hs0hi
@@ -416,9 +431,9 @@ theorem ushCmd_of_ushp_tree (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec
 theorem ushCmd_of_ref (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail s0 p len : Nat)
     (f : Nat → BitVec 8) (t : UshpCmd) (href : refParsecmd len f = some t) (hnn : ∀ j, j < len → f j ≠ ubyte0)
     (hlen : len < 2 ^ 31) (hs0 : 0 < s0) (hs0hi : s0 + len < 2 ^ 38) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTree N s0 p t -∗
+    ⊢ urun N h m pc avail -∗ ushTree N s0 p t -∗
       ubytes N.d s0 (len + 1) (ushZeroAt (refNulcut t) (ushpExt len f)) -∗
-      |==> (urun (hlc := hlc) N h m pc avail ∗
+      |==> (urun N h m pc avail ∗
         ushCmd N.d p (ushcmdOfTree s0 (ushZeroAt (refNulcut t) (ushpExt len f)) t)) := by
   iintro Hrun Hnode Hline
   imod ushUbytes_persist N.d s0 (len + 1) _ $$ Hline with #Hline
@@ -429,9 +444,9 @@ theorem ushCmd_of_ref (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (
 theorem ushCmd_of_ref_exec (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail s0 p len : Nat)
     (f : Nat → BitVec 8) (toks : List (Nat × Nat)) (href : refParsecmd len f = some (.exec toks))
     (hnn : ∀ j, j < len → f j ≠ ubyte0) (hlen : len < 2 ^ 31) (hs0 : 0 < s0) (hs0hi : s0 + len < 2 ^ 38) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTree N s0 p (.exec toks) -∗
+    ⊢ urun N h m pc avail -∗ ushTree N s0 p (.exec toks) -∗
       ubytes N.d s0 (len + 1) (ushZeroAt (refNulcut (.exec toks)) (ushpExt len f)) -∗
-      |==> (urun (hlc := hlc) N h m pc avail ∗
+      |==> (urun N h m pc avail ∗
         ushCmd N.d p (.exec (ushArgs s0 (ushZeroAt (refNulcut (.exec toks)) (ushpExt len f)) toks))) :=
   ushCmd_of_ref N h m pc avail s0 p len f (.exec toks) href hnn hlen hs0 hs0hi
 

@@ -147,7 +147,7 @@ theorem uptSetLeaf_self (t : PTree) (vpn : BitVec 27) (addr v : BitVec 64) (hwf 
   exact UPtWalkaddr.setLeaf_entAt_self 2 t vpn
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## The window invariant -/
 

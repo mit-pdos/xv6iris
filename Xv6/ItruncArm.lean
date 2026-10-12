@@ -40,7 +40,7 @@ theorem itrunc_map_empty (bm : Blkmap) (hlen : bm.bmDir.length = NDIRECT) :
   bmDirZeroed_ind0 bm hlen
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The five SAVED slots of `MachCSL.frame6s3` (its pad slot is the arm's). -/
 def itFrame5 [CurCtx] (sp ra s0 s1 s2 s3 : BitVec 64) : IProp GF := iprop%
@@ -69,7 +69,7 @@ theorem itrunc_frame_join [CurCtx] (sp ra s0 s1 s2 s3 w : BitVec 64) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- No indirect block, no resource (the `if` of `Xv6.indBlkQ`). -/
@@ -108,7 +108,7 @@ end
 /-! ## The callees at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The resources at the JOIN `+0x38` both predecessors reach (the machine
@@ -155,7 +155,7 @@ brelse, the indirect block's own bfree, the cell cleared, `s4` restored,
 the jump to the join.  At either entry `SIE`: brelse does not thread the
 complement, so `Hte`/`Hce` are moved across its crossing by its own pin
 (Rocq 2324, "transport across the wider span"). -/
-theorem itrunc_arm_rest (BF : BFREE) (BE : BRELSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem itrunc_arm_rest (BF : BFREE) (BE : BRELSE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (ip : BitVec 64) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (kk : Nat) (crb : Bool) (u : Nat) (Sb : List Nat) (e0 : Nat)
@@ -301,7 +301,7 @@ arm is entered only when the indirect block exists, `a1` still holding
 `ip->addrs[NDIRECT]` from `+0x32`.  At either entry `SIE` (bread at its eb
 contract, the complement handed over and back). -/
 theorem itrunc_arm (BR : BREAD) (BF : BFREE) (BE : BRELSE) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (ip : BitVec 64) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (crb : Bool) (u : Nat) (Sb : List Nat) (e0 : Nat)

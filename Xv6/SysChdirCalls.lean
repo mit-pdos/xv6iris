@@ -46,7 +46,7 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -84,7 +84,7 @@ def sysChdirNameiK (k' : KCtx) (se : Bool) (pj : BitVec 64) (plen : Nat) (pfun :
 set_option maxHeartbeats 8000000 in
 /-- `namei(path)` at +0x2c (Rocq `NameiEra.wp_namei_era`), the core in and
 out. -/
-theorem sys_chdir_namei_era (NI : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_chdir_namei_era (NI : NAMEI_ERA) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
     (hpj : k'.proc = pj) (j : Nat) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat)
     (Sb : List Nat) (P Pmiss : Nat → Nat → IProp GF) (pid : BitVec 32) (V : ProcPriv)
@@ -94,7 +94,7 @@ theorem sys_chdir_namei_era (NI : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := 
     (hnn : ∀ i, i < plen → pfun i ≠ 0#8) (hterm : pfun plen = 0#8) (hplen : plen < 2 ^ 31)
     (hbud : walkNeed (pathElems (bview plen pfun)).length ≤ n) :
     kctx cpu k' ∗ pcIs cpu KA.«namei» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv Γ ∗
     procPrivCoreNoctxAt curCtx pj pid V M ∗
     byteBuf (k'.regs 10#5) (DFrac.own 1) (bview (plen + 1) pfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
@@ -114,7 +114,7 @@ theorem sys_chdir_namei_era (NI : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := 
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   icases fsReady_sb_four $$ Hrdy with ⟨-, #Hsi, -, #Hsb⟩
   ihave #Hbmi := fsReady_bitmap $$ Hrdy
-  have h := NI.wp_namei_era_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu j fscKalloc
+  have h := NI.wp_namei_era_eb (GF := GF) Γ cpu k' γbl pd pav pu j fscKalloc
     fsReadyKmem plen pfun n Sb P Pmiss pid V M DFrac.discard DFrac.discard (DFrac.own 1)
     hj hproc hK hnoff htier hg.fgoRootdev hg.fgoNibPos hg.fgoLog hg.fgoBitmap
     hg.fgoCovBelow hg.fgoIreg hnn hterm hplen hbud hpd
@@ -156,7 +156,7 @@ set_option maxHeartbeats 8000000 in
 /-- `ilock(ip)` at +0x34: the write arm (Rocq `Ilock.wp_ilock_tx_sconf`),
 the plain licence (`runitAny`, the held reference's own unit), `topLb 0`
 (nothing to present). -/
-theorem sys_chdir_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
+theorem sys_chdir_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU)
     (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64) (hpj : k'.proc = pj) (j : Nat)
     (dqp : DFrac) (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName) (lo tl : Nat)
     (inum pidv : BitVec 32)
@@ -164,7 +164,7 @@ theorem sys_chdir_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hkk : kk < NINODE)
     (hnib : inum.toNat < 16 * icfgNib) (ha0 : k'.regs 10#5 = ientry kk) (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«ilock» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv Γ ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     credFloor lo tl ∗ inodeShrGenlo kk s icfgDev inum g lo ∗ runitAny inum.toNat ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot ∗ logTx icfgLog ∗
@@ -182,8 +182,8 @@ theorem sys_chdir_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   icases fsReady_sb_four $$ Hrdy with ⟨-, #Hsi, -, -⟩
   ihave #Hesc := fsReady_escrow kk hkk $$ Hrdy
   ihave #Hcla := isItable2_claims $$ Hit2
-  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (hlc := hlc) (GF := GF))
-  have h := IL.wp_ilock_tx_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu j γil γisl
+  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (GF := GF))
+  have h := IL.wp_ilock_tx_eb (GF := GF) Γ cpu k' γbl pd pav pu j γil γisl
     kk s g lo tl .plainK inum pidv dqp DFrac.discard 0 hj hproc hK hnoff htier hkk hg.fgoLog
     (hg.iblockCov inum hnib) hnib hpd ha0 hle
   unfold wp_ilock_tx_eb_body at h
@@ -215,7 +215,7 @@ theorem sys_chdir_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KCt
     (hK : iunlockSlots ≤ k'.avail) (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (hkk : kk < NINODE) (ha0 : k'.regs 10#5 = ientry kk) (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlock» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv Γ ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     credFloor lo tl ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗
@@ -242,7 +242,7 @@ theorem sys_chdir_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KCt
   icases fsReady_icache $$ Hrdy with ⟨#Hit2, #Hiti, #Hslks⟩
   ihave #Hesc := fsReady_escrow kk hkk $$ Hrdy
   ihave #Hcla := isItable2_claims $$ Hit2
-  have h := IU.wp_iunlock_tx (hlc := hlc) (GF := GF) Γ cpu k' γil γisl kk s g lo tl icfgDev
+  have h := IU.wp_iunlock_tx (GF := GF) Γ cpu k' γil γisl kk s g lo tl icfgDev
     inum dn bm pidv dqp (by rw [hnoff]; omega) hK hkk ha0 (by rw [hlocks]; simp)
     (by rw [hlocks]; simp) htier hle
   unfold wp_iunlock_tx_body at h
@@ -262,7 +262,7 @@ theorem sys_chdir_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KCt
 
 set_option maxHeartbeats 8000000 in
 /-- `iput(p->cwd)` at +0x4c (Rocq `Iput.wp_iput_sconf`, counted). -/
-theorem sys_chdir_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_chdir_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
     (hpj : k'.proc = pj) (j : Nat) (dqp : DFrac) (γil γisl : GName) (kk : Nat) (q : Qp)
     (inum : BitVec 32) (n : Nat) (pidv : BitVec 32)
@@ -270,7 +270,7 @@ theorem sys_chdir_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hkk : kk < NINODE)
     (hnib : inum.toNat < 16 * icfgNib) (hn : iputUnits ≤ n) (ha0 : k'.regs 10#5 = ientry kk) :
     kctx cpu k' ∗ pcIs cpu KA.«iput» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv Γ ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     inodeRefp kk q icfgDev inum ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ bslots 3 ∗ logOp icfgLog n ∗
@@ -294,7 +294,7 @@ theorem sys_chdir_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
   icases fsReady_sb_four $$ Hrdy with ⟨-, #Hsi, -, #Hsb⟩
   ihave #Hbmi := fsReady_bitmap $$ Hrdy
   ihave #Hesc := fsReady_escrow kk hkk $$ Hrdy
-  have h := IP.wp_iput_sconf_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu j γil γisl kk q inum
+  have h := IP.wp_iput_sconf_eb (GF := GF) Γ cpu k' γbl pd pav pu j γil γisl kk q inum
     n pidv dqp DFrac.discard DFrac.discard hj hproc hK hnoff htier hkk hg.fgoLog hg.fgoBitmap
     (hg.iblockCov inum hnib) (hg.iblockOut inum hnib) hnib hg.fgoCovBelow hn hpd ha0
   unfold wp_iput_sconf_eb_body at h

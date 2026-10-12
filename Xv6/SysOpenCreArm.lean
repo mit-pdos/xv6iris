@@ -86,7 +86,7 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -104,10 +104,12 @@ def sysOpenCrP (i0 : Nat) : Nat → Nat → IProp GF :=
 /-- ...and the trivial one, for the miss side (Rocq's `socr_Pm`). -/
 def sysOpenCrPm : Nat → Nat → IProp GF := fun _ _ => iprop(True)
 
+omit [MachGS GF] in
 /-- Rocq's `socr_P_tag`. -/
 theorem sysOpenCrP_tag (i0 k d : Nat) : sysOpenCrP (GF := GF) i0 k d ⊢ ⌜d = i0⌝ := by
   unfold sysOpenCrP; exact .rfl
 
+omit [MachGS GF] in
 /-- What the tail asks of the cursor at its entry: the tag, kept (Rocq's
 `socr_cur`). -/
 theorem sys_open_cr_cur (vom : BitVec 64) (i0 k : Nat) :
@@ -120,10 +122,10 @@ theorem sys_open_cr_cur (vom : BitVec 64) (i0 k : Nat) :
 terminal permit is the tag, paid for nothing (Rocq's `socr_key_plain`). -/
 theorem sys_open_cr_key_plain (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (BitVec 8)) (i0 : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    openTruncAt (hlc := hlc) Γ vom i0 Ft ⊢ plainTruncKept (hlc := hlc) Γ vom pl (sysOpenCrP i0) i0 Ft := by
+    openTruncAt Γ vom i0 Ft ⊢ plainTruncKept Γ vom pl (sysOpenCrP i0) i0 Ft := by
   iintro H
   unfold plainTruncKept
-  iapply (openTruncAt_kept_intro (hlc := hlc) Γ vom (truncTermAt pl (sysOpenCrP i0)) i0 Ft) $$ H
+  iapply (openTruncAt_kept_intro Γ vom (truncTermAt pl (sysOpenCrP i0)) i0 Ft) $$ H
   unfold truncTermAt sysOpenCrP
   by_cases hv : omTrunc vom = true
   · simp only [if_pos hv]
@@ -159,9 +161,9 @@ def sysOpenCrFresh (Γ : FsViewNames GF) (vom : BitVec 64) (P : Nat → Nat → 
     ⌜0 < i0 ∧ i0 < 16 * icfgNib⌝ ∗
     curKept vom P (nparElems pl).length d ∗
     creRcptKept vom Fok av d nm i0 ∗
-    pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-    pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
-    pfAt (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun)
+    pfAt (dlookupCommitAt Γ appE) Fex ∗
+    pfAt (aopenCommitAt Γ appE) Fo ∗
+    pfAt (aunarmOfArm Γ appE Farm) Fun)
 
 /-- ARM F-OK's payout: the exists observation fired, the create commit
 refunded (Rocq's `socr_exists`). -/
@@ -178,10 +180,10 @@ def sysOpenCrExists (Γ : FsViewNames GF) (vom : BitVec 64) (Nm : Fname → Prop
     creRcptKept vom Fex av d nm i0 ∗
     -- ...at the NAME PREDICATE the entry holds its parent leg at (RULING NM):
     -- `nparNm M pv` at the syscall tier
-    pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) Nm (P (nparElems pl).length) Farm) Fok ∗
+    pfAt (acreCommitAtNm Γ appE (.AFile []) Nm (P (nparElems pl).length) Farm) Fok ∗
     -- the name was already there: create's child legs are whole -- and at a
     -- TRUNCATING open the ARM's went into the permit
-    creChildKept (hlc := hlc) Γ vom Farm Fun)
+    creChildKept Γ vom Farm Fun)
 
 /-- THE FAMILY THE TAIL RUNS AT on this surface (Rocq's `socr_ft`): the
 caller's own, with the permit kept on the refund side. -/
@@ -190,7 +192,7 @@ def sysOpenCrFt (Γ : FsViewNames GF) (pl : List (BitVec 8)) (P : Nat → Nat �
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (i0 : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
     Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF) :=
-  creFtKept (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) i0 Ft
+  creFtKept (crePermit Γ pl P Farm Fok Fex) i0 Ft
 
 /-- ...AND THE EXISTS RUN'S, WHICH NAMES THE BRANCH (Rocq's `socr_ft_ex`,
 lane F-OPEN-6). -/
@@ -199,7 +201,7 @@ def sysOpenCrFtEx (Γ : FsViewNames GF) (pl : List (BitVec 8)) (P : Nat → Nat 
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (i0 : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
     Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF) :=
-  creFtKept (crePermitEx (hlc := hlc) Γ pl P Farm Fex) i0 Ft
+  creFtKept (crePermitEx Γ pl P Farm Fex) i0 Ft
 
 /-- The record the plain tail runs at: the contract's, with the shim's
 cursor pair, terminal family and truncate family (deviation 3). -/
@@ -208,6 +210,7 @@ abbrev sysOpenCrA (A : SysOpenArgs GF) (P Pmiss : Nat → Nat → IProp GF)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : SysOpenArgs GF :=
   { A with P := P, Pmiss := Pmiss, Fo := Fo, Ft := Ft }
 
+omit [MachGS GF] in
 /-- The shimmed record keeps the contract's static premises (the seal's
 instantiation of the join at `sysOpenCrA`). -/
 theorem sysOpenCrA_static (k : KCtx) (A : SysOpenArgs GF) (P Pmiss : Nat → Nat → IProp GF)
@@ -224,6 +227,7 @@ hand, and everything below the join only ever needs the commit AT THAT INUM
 (`SysOpenDefs.openTruncAt`).  What the permit takes is exactly what the
 residue then stops carrying, which is why the two are built by one lemma. -/
 
+omit [MachGS GF] in
 /-- The cursor, split at the truncate's key (deviation 4). -/
 theorem sys_open_cr_cur_split (vom : BitVec 64) (P : Nat → Nat → IProp GF) (k d : Nat) :
     P k d ⊢ curKept vom P k d ∗ (if omTrunc vom then P k d else iprop(emp)) := by
@@ -240,6 +244,7 @@ theorem sys_open_cr_cur_split (vom : BitVec 64) (P : Nat → Nat → IProp GF) (
     · iexact H
     · iempintro
 
+omit [MachGS GF] in
 /-- A fired receipt, split at the truncate's key (deviation 4). -/
 theorem sys_open_cr_rcpt_split (vom : BitVec 64) (F : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (av : Aview) (d : Nat) (nm : Fname) (i : Nat) :
@@ -262,9 +267,9 @@ theorem sys_open_cr_rcpt_split (vom : BitVec 64) (F : Pfam GF (Aview → Nat →
 whole pair) stays, the ARM's half goes into the permit (deviation 4). -/
 theorem sys_open_cr_child_split (Γ : FsViewNames GF) (vom : BitVec 64)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) :
-    creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ⊢
-      creChildKept (hlc := hlc) Γ vom Farm Fun ∗
-      (if omTrunc vom then pfAt (aarmCommitAt (hlc := hlc) Γ appE (.AFile [])) Farm
+    creChildUnfired Γ (.AFile []) Farm Fun ⊢
+      creChildKept Γ vom Farm Fun ∗
+      (if omTrunc vom then pfAt (aarmCommitAt Γ appE (.AFile [])) Farm
        else iprop(emp)) := by
   unfold creChildKept
   by_cases hv : omTrunc vom = true
@@ -288,7 +293,7 @@ theorem sys_open_cr_permit_fresh (Γ : FsViewNames GF) (vom : BitVec 64) (P : Na
     (hl : (pathElems pl).getLast? = some nm) (hpre : crePre av d nm ents nl i0 (.AFile [])) :
     (if omTrunc vom then P (nparElems pl).length d else iprop(emp)) ∗
       (if omTrunc vom then Fok.pfRecv av d nm i0 else iprop(emp)) ⊢
-      if omTrunc vom then crePermit (hlc := hlc) Γ pl P Farm Fok Fex i0 else iprop(emp) := by
+      if omTrunc vom then crePermit Γ pl P Farm Fok Fex i0 else iprop(emp) := by
   by_cases hv : omTrunc vom = true
   · simp only [if_pos hv]
     unfold crePermit truncPermitOf truncTieAt creAcreFired
@@ -319,9 +324,9 @@ theorem sys_open_cr_permit_ex (Γ : FsViewNames GF) (vom : BitVec 64) (P : Nat �
     (hent : ents[nm]? = some i0) :
     (if omTrunc vom then P (nparElems pl).length d else iprop(emp)) ∗
       (if omTrunc vom then Fex.pfRecv av d nm i0 else iprop(emp)) ∗
-      (if omTrunc vom then pfAt (aarmCommitAt (hlc := hlc) Γ appE (.AFile [])) Farm
+      (if omTrunc vom then pfAt (aarmCommitAt Γ appE (.AFile [])) Farm
        else iprop(emp)) ⊢
-      if omTrunc vom then crePermitEx (hlc := hlc) Γ pl P Farm Fex i0 else iprop(emp) := by
+      if omTrunc vom then crePermitEx Γ pl P Farm Fex i0 else iprop(emp) := by
   by_cases hv : omTrunc vom = true
   · simp only [if_pos hv]
     unfold crePermitEx truncPermitEx truncTieAt creExFired
@@ -355,16 +360,16 @@ theorem sys_open_cr_fresh_key (Γ : FsViewNames GF) (vom : BitVec 64) (P : Nat �
     (hl : (pathElems pl).getLast? = some nm) (hpre : crePre av d nm ents nl i0 (.AFile []))
     (hib : 0 < i0 ∧ i0 < 16 * icfgNib) :
     ⊢ P (nparElems pl).length d -∗ Fok.pfRecv av d nm i0 -∗
-      pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
-      pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗
-      pfAt (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun -∗
-      openTruncPiece (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) Ft -∗
-      sysOpenCrFresh (hlc := hlc) Γ vom P Farm Fun Fok Fex Fo pl i0 ∗
-        openTruncAt (hlc := hlc) Γ vom i0 (sysOpenCrFt (hlc := hlc) Γ pl P Farm Fok Fex i0 Ft) := by
+      pfAt (dlookupCommitAt Γ appE) Fex -∗
+      pfAt (aopenCommitAt Γ appE) Fo -∗
+      pfAt (aunarmOfArm Γ appE Farm) Fun -∗
+      openTruncPiece Γ vom (crePermit Γ pl P Farm Fok Fex) Ft -∗
+      sysOpenCrFresh Γ vom P Farm Fun Fok Fex Fo pl i0 ∗
+        openTruncAt Γ vom i0 (sysOpenCrFt Γ pl P Farm Fok Fex i0 Ft) := by
   iintro HP HF Hdl Hoc Hun Htc
   icases sys_open_cr_cur_split vom P _ d $$ HP with ⟨HPk, HPp⟩
   icases sys_open_cr_rcpt_split vom Fok av d nm i0 $$ HF with ⟨HFk, HFp⟩
-  ihave Hk := sys_open_cr_permit_fresh (hlc := hlc) Γ vom P Farm Fok Fex pl i0 d nm av ents nl hl
+  ihave Hk := sys_open_cr_permit_fresh Γ vom P Farm Fok Fex pl i0 d nm av ents nl hl
     hpre $$ [$HPp $HFp]
   isplitl [HPk HFk Hdl Hoc Hun]
   · unfold sysOpenCrFresh
@@ -372,7 +377,7 @@ theorem sys_open_cr_fresh_key (Γ : FsViewNames GF) (vom : BitVec 64) (P : Nat �
     iframe HPk HFk Hdl Hoc Hun
     ipureintro; exact ⟨hl, hpre, hib⟩
   · unfold sysOpenCrFt
-    iapply (openTruncAt_of_permit (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) i0
+    iapply (openTruncAt_of_permit Γ vom (crePermit Γ pl P Farm Fok Fex) i0
       Ft) $$ Htc Hk
 
 /-- **Rocq's `socr_exists_key`**. -/
@@ -386,16 +391,16 @@ theorem sys_open_cr_exists_key (Γ : FsViewNames GF) (vom : BitVec 64) (Nm : Fna
     (hl : (pathElems pl).getLast? = some nm) (hrow : PartialMap.get? av d = some ⟨.ADir ents, nl⟩)
     (hent : ents[nm]? = some i0) :
     ⊢ P (nparElems pl).length d -∗ Fex.pfRecv av d nm i0 -∗
-      pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) Nm (P (nparElems pl).length) Farm) Fok -∗
-      creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun -∗
-      openTruncPiece (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) Ft -∗
-      sysOpenCrExists (hlc := hlc) Γ vom Nm P Farm Fun Fok Fex pl i0 ∗
-        openTruncAt (hlc := hlc) Γ vom i0 (sysOpenCrFtEx (hlc := hlc) Γ pl P Farm Fex i0 Ft) := by
+      pfAt (acreCommitAtNm Γ appE (.AFile []) Nm (P (nparElems pl).length) Farm) Fok -∗
+      creChildUnfired Γ (.AFile []) Farm Fun -∗
+      openTruncPiece Γ vom (crePermit Γ pl P Farm Fok Fex) Ft -∗
+      sysOpenCrExists Γ vom Nm P Farm Fun Fok Fex pl i0 ∗
+        openTruncAt Γ vom i0 (sysOpenCrFtEx Γ pl P Farm Fex i0 Ft) := by
   iintro HP HF Hac Hcl Htc
   icases sys_open_cr_cur_split vom P _ d $$ HP with ⟨HPk, HPp⟩
   icases sys_open_cr_rcpt_split vom Fex av d nm i0 $$ HF with ⟨HFk, HFp⟩
-  icases sys_open_cr_child_split (hlc := hlc) Γ vom Farm Fun $$ Hcl with ⟨Hck, Harm⟩
-  ihave Hk := sys_open_cr_permit_ex (hlc := hlc) Γ vom P Farm Fex pl i0 d nm av ents nl hl hrow
+  icases sys_open_cr_child_split Γ vom Farm Fun $$ Hcl with ⟨Hck, Harm⟩
+  ihave Hk := sys_open_cr_permit_ex Γ vom P Farm Fex pl i0 d nm av ents nl hl hrow
     hent $$ [$HPp $HFp $Harm]
   isplitl [HPk HFk Hac Hck]
   · unfold sysOpenCrExists
@@ -403,14 +408,15 @@ theorem sys_open_cr_exists_key (Γ : FsViewNames GF) (vom : BitVec 64) (Nm : Fna
     iframe HPk HFk Hac Hck
     ipureintro; exact ⟨hl, hrow, hent⟩
   · unfold sysOpenCrFtEx
-    iapply (openTruncAt_of_permit_at (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex)
-      (crePermitEx (hlc := hlc) Γ pl P Farm Fex) i0 Ft) $$ [] Htc Hk
+    iapply (openTruncAt_of_permit_at Γ vom (crePermit Γ pl P Farm Fok Fex)
+      (crePermitEx Γ pl P Farm Fex) i0 Ft) $$ [] Htc Hk
     unfold crePermit crePermitEx
     iintro H
-    iapply (truncPermitOf_ex (hlc := hlc) Γ (truncTieAt pl P) Farm Fok Fex i0) $$ H
+    iapply (truncPermitOf_ex Γ (truncTieAt pl P) Farm Fok Fex i0) $$ H
 
 /-! ## 3.  THE TWO OBSERVATION SEEDS -/
 
+omit [MachGS GF] in
 /-- The FRESH tail's receipt costs NOTHING (Rocq's `socr_obs_pure`). -/
 theorem sys_open_cr_obs_pure (i0 : Nat) (n0 : FsNode) :
     ⊢ sysOpenObs (GF := GF) (sysOpenCrFoPure i0 (absRow n0)) i0 n0 := by
@@ -420,6 +426,7 @@ theorem sys_open_cr_obs_pure (i0 : Nat) (n0 : FsNode) :
   · ipureintro; exact arowAt_witness i0 (absRow n0)
   · ipureintro; exact ⟨rfl, rfl⟩
 
+omit [MachGS GF] in
 /-- ...and the EXISTS tail's is the real fire, tagged (Rocq's
 `socr_obs_tag`). -/
 theorem sys_open_cr_obs_tag (i0 : Nat) (n0 : FsNode) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) :
@@ -435,6 +442,7 @@ theorem sys_open_cr_obs_tag (i0 : Nat) (n0 : FsNode) (Fo : Pfam GF (Aview → Na
 
 /-! ## 4.  RECOVERING THE PIECES FROM THE PLAIN FOLD -/
 
+omit [MachGS GF] in
 /-- The tag permit, under the reading of argument 0: paid for nothing. -/
 theorem sys_open_cr_term_arg (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (i0 : Nat) :
     ⊢ if omTrunc vom then truncTermArg (GF := GF) Mim pv (sysOpenCrP i0) i0 else iprop(emp) := by
@@ -446,6 +454,7 @@ theorem sys_open_cr_term_arg (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : B
   · simp only [if_neg hv]
     iempintro
 
+omit [MachGS GF] in
 /-- ...and at one path. -/
 theorem sys_open_cr_term_at (pl : List (BitVec 8)) (vom : BitVec 64) (i0 : Nat) :
     ⊢ if omTrunc vom then truncTermAt (GF := GF) pl (sysOpenCrP i0) i0 else iprop(emp) := by
@@ -465,29 +474,29 @@ theorem sys_open_cr_res_of_fail (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : 
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    openPostFailPlain (hlc := hlc) Γ γfs rt cw Mim pv vom (sysOpenCrP i0) sysOpenCrPm Fo Ft ⊢
-      (pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∨
+    openPostFailPlain Γ γfs rt cw Mim pv vom (sysOpenCrP i0) sysOpenCrPm Fo Ft ⊢
+      (pfAt (aopenCommitAt Γ appE) Fo ∨
           ∃ (i : Nat) (av : Aview) (a : Anode), ⌜arowAt av i a⌝ ∗ Fo.pfRecv av i a) ∗
-        openTruncAt (hlc := hlc) Γ vom i0 Ft := by
+        openTruncAt Γ vom i0 Ft := by
   unfold openPostFailPlain
   iintro (Hpre | ⟨%pl, -, (⟨-, Hoc, Htc⟩ | ⟨%i, HP, Hobs, Htc⟩)⟩)
   · unfold openAuPlainAt
     icases Hpre with ⟨-, Hoc, Htc⟩
     ihave Hk := sys_open_cr_term_arg (GF := GF) Mim pv vom i0
-    ihave Htc := openTruncAt_of_permit (hlc := hlc) Γ vom (truncTermArg Mim pv (sysOpenCrP i0)) i0 Ft
+    ihave Htc := openTruncAt_of_permit Γ vom (truncTermArg Mim pv (sysOpenCrP i0)) i0 Ft
       $$ Htc Hk
-    ihave Htc := openTruncAt_kept_forget (hlc := hlc) Γ vom _ i0 Ft $$ Htc
+    ihave Htc := openTruncAt_kept_forget Γ vom _ i0 Ft $$ Htc
     iframe Htc
     ileft; iexact Hoc
   · ihave Hk := sys_open_cr_term_at (GF := GF) pl vom i0
-    ihave Htc := openTruncAt_of_permit (hlc := hlc) Γ vom (truncTermAt pl (sysOpenCrP i0)) i0 Ft
+    ihave Htc := openTruncAt_of_permit Γ vom (truncTermAt pl (sysOpenCrP i0)) i0 Ft
       $$ Htc Hk
-    ihave Htc := openTruncAt_kept_forget (hlc := hlc) Γ vom _ i0 Ft $$ Htc
+    ihave Htc := openTruncAt_kept_forget Γ vom _ i0 Ft $$ Htc
     iframe Htc
     ileft; iexact Hoc
-  · icases plainTruncKept_pure (hlc := hlc) Γ vom pl (sysOpenCrP i0) (fun x => x = i0) i Ft
+  · icases plainTruncKept_pure Γ vom pl (sysOpenCrP i0) (fun x => x = i0) i Ft
       (fun k d => sysOpenCrP_tag i0 k d) $$ HP Htc with ⟨%hii, Htc⟩
-    ihave Htc := plainTruncKept_forget (hlc := hlc) Γ vom pl (sysOpenCrP i0) i Ft $$ Htc
+    ihave Htc := plainTruncKept_forget Γ vom pl (sysOpenCrP i0) i Ft $$ Htc
     icases Hobs with ⟨%av, %a, %hav, HPhi⟩
     have hii' : i = i0 := hii
     rw [hii'] at hav ⊢
@@ -499,6 +508,7 @@ theorem sys_open_cr_res_of_fail (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : 
 
 /-! ## 5.  RECOVERING THE DESCRIPTOR FROM THE PLAIN OK -/
 
+omit [MachGS GF] in
 /-- The `if omTrunc vom` receipt moved under its key (deviation 4). -/
 theorem sys_open_cr_ite (b : Bool) (X Y : IProp GF) (h : X ⊢ Y) :
     (if b then X else iprop(emp)) ⊢ (if b then Y else iprop(emp)) := by
@@ -517,7 +527,7 @@ theorem sys_open_cr_ok_fresh (omo : OffMode) (Γ : FsViewNames GF) (i0 : Nat) (b
     (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8))
     (r : BitVec 64) :
-    openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom (sysOpenCrP i0)
+    openPostOkPlain omo Γ γ pa pid Mim pv vom (sysOpenCrP i0)
       (sysOpenCrFoPure i0 ⟨.AFile bs, nl0⟩) Ft' sts VW MW r ⊢
       (if omTrunc vom then
         iprop(∃ (av' : Aview) (nl' : Nat), ⌜arowAt av' i0 ⟨.AFile bs, nl'⟩⌝ ∗ Ft.pfRecv av' i0 bs)
@@ -556,8 +566,8 @@ theorem sys_open_cr_ok_exists (omo : OffMode) (Γ : FsViewNames GF) (i0 : Nat) (
     (vom : BitVec 64) (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8))
     (r : BitVec 64) (hnd : ∀ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
       a0 ≠ ⟨.ADir ents, nl⟩)
-    (Kd : IProp GF) (hKd : openTruncAt (hlc := hlc) Γ vom i0 Ft' ⊢ Kd) :
-    openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom (sysOpenCrP i0)
+    (Kd : IProp GF) (hKd : openTruncAt Γ vom i0 Ft' ⊢ Kd) :
+    openPostOkPlain omo Γ γ pa pid Mim pv vom (sysOpenCrP i0)
       (sysOpenCrFoTag i0 a0 Fo) Ft' sts VW MW r ⊢
       ∃ (av : Aview) (nl : Nat),
         (∃ bs0 : List (BitVec 8),
@@ -578,7 +588,7 @@ theorem sys_open_cr_ok_exists (omo : OffMode) (Γ : FsViewNames GF) (i0 : Nat) (
   iintro ⟨%pl, %av, %i, -, -, Harm⟩
   icases Harm with (⟨%ma, %mi, %nl, %hrow, %hmb, ⟨%htag, HP⟩, Htc, Hfd⟩ |
     ⟨%bs0, %nl, %hrow, ⟨%htag, HP⟩, Htr, Hfd⟩ | ⟨%ents, %nl, -, -, ⟨%hbad, -⟩, -⟩)
-  · ihave Htc := plainTruncKept_forget (hlc := hlc) Γ vom pl (sysOpenCrP i0) i Ft' $$ Htc
+  · ihave Htc := plainTruncKept_forget Γ vom pl (sysOpenCrP i0) i Ft' $$ Htc
     obtain ⟨hi, -⟩ := htag
     subst hi
     ihave Htc := hKd $$ Htc
@@ -612,20 +622,20 @@ theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsN
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64)
     (pl : List (BitVec 8)) (i0 nl0 : Nat) (hpl : argPathOf Mim pv pl) :
-    ⊢ sysOpenCrFresh (hlc := hlc) Γ vom P Farm Fun Fok Fex Fo pl i0 -∗
-      openArmsPlain (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom (sysOpenCrP i0) sysOpenCrPm
-        (sysOpenCrFoPure i0 ⟨.AFile [], nl0⟩) (sysOpenCrFt (hlc := hlc) Γ pl P Farm Fok Fex i0 Ft)
+    ⊢ sysOpenCrFresh Γ vom P Farm Fun Fok Fex Fo pl i0 -∗
+      openArmsPlain omo Γ γfs rt cw γ pa pid Mim pv vom (sysOpenCrP i0) sysOpenCrPm
+        (sysOpenCrFoPure i0 ⟨.AFile [], nl0⟩) (sysOpenCrFt Γ pl P Farm Fok Fex i0 Ft)
         sts VW MW r -∗
-      |={⊤}=> openArmsCreate (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo
+      |={⊤}=> openArmsCreate omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo
         Ft sts VW MW r := by
   unfold openArmsPlain openArmsCreate
   iintro HR ⟨(⟨%hr, Hpriv, Hfrag, Hf⟩ | Hok), Hslot⟩
   · -- every post-walk failure sits BEFORE the itrunc, so the caller's piece
     -- comes home unfired, keyed at the created child (arm (a))
-    icases sys_open_cr_res_of_fail (hlc := hlc) Γ γfs rt cw i0 Mim pv vom _ _ $$ Hf with ⟨-, Htc⟩
-    ihave Htc := (show openTruncAt (hlc := hlc) (GF := GF) Γ vom i0
-        (sysOpenCrFt (hlc := hlc) Γ pl P Farm Fok Fex i0 Ft) ⊢
-      creTruncKept (hlc := hlc) Γ vom pl P Farm Fok Fex i0 Ft from .rfl) $$ Htc
+    icases sys_open_cr_res_of_fail Γ γfs rt cw i0 Mim pv vom _ _ $$ Hf with ⟨-, Htc⟩
+    ihave Htc := (show openTruncAt (GF := GF) Γ vom i0
+        (sysOpenCrFt Γ pl P Farm Fok Fex i0 Ft) ⊢
+      creTruncKept Γ vom pl P Farm Fok Fex i0 Ft from .rfl) $$ Htc
     imodintro
     iframe Hslot
     ileft
@@ -645,8 +655,8 @@ theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsN
     iexists av, i0, nm, ents, nl
     iframe HΦ Hdl Hoc Htc Hun
     ipureintro; exact ⟨hl, hpre, hib⟩
-  · ihave ⟨Htr, Hfd⟩ := sys_open_cr_ok_fresh (hlc := hlc) omo Γ i0 [] nl0 Ft
-      (sysOpenCrFt (hlc := hlc) Γ pl P Farm Fok Fex i0 Ft) rfl γ pa pid Mim pv vom sts VW MW r
+  · ihave ⟨Htr, Hfd⟩ := sys_open_cr_ok_fresh omo Γ i0 [] nl0 Ft
+      (sysOpenCrFt Γ pl P Farm Fok Fex i0 Ft) rfl γ pa pid Mim pv vom sts VW MW r
       $$ Hok
     unfold sysOpenCrFresh
     icases HR with ⟨%d, %nm, %av, %ents, %nl, %hl, %hpre, %hib, HP, HΦ, Hdl, Hoc, Hun⟩
@@ -676,18 +686,18 @@ theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : Fs
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64)
     (pl : List (BitVec 8)) (i0 : Nat) (a0 : Anode) (hpl : argPathOf Mim pv pl)
     (hnd : ∀ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat), a0 ≠ ⟨.ADir ents, nl⟩) :
-    ⊢ sysOpenCrExists (hlc := hlc) Γ vom (nparNm Mim pv) P Farm Fun Fok Fex pl i0 -∗
-      openArmsPlain (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom (sysOpenCrP i0) sysOpenCrPm
-        (sysOpenCrFoTag i0 a0 Fo) (sysOpenCrFtEx (hlc := hlc) Γ pl P Farm Fex i0 Ft) sts VW MW r -∗
-      |={⊤}=> openArmsCreate (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo
+    ⊢ sysOpenCrExists Γ vom (nparNm Mim pv) P Farm Fun Fok Fex pl i0 -∗
+      openArmsPlain omo Γ γfs rt cw γ pa pid Mim pv vom (sysOpenCrP i0) sysOpenCrPm
+        (sysOpenCrFoTag i0 a0 Fo) (sysOpenCrFtEx Γ pl P Farm Fex i0 Ft) sts VW MW r -∗
+      |={⊤}=> openArmsCreate omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo
         Ft sts VW MW r := by
   unfold openArmsPlain openArmsCreate
   iintro HR ⟨(⟨%hr, Hpriv, Hfrag, Hf⟩ | Hok), Hslot⟩
-  · icases sys_open_cr_res_of_fail (hlc := hlc) Γ γfs rt cw i0 Mim pv vom _ _ $$ Hf with ⟨Hob, Htc⟩
-    ihave Htc := (show openTruncAt (hlc := hlc) (GF := GF) Γ vom i0
-        (sysOpenCrFtEx (hlc := hlc) Γ pl P Farm Fex i0 Ft) ⊢
-      creTruncKeptEx (hlc := hlc) Γ vom pl P Farm Fex i0 Ft from .rfl) $$ Htc
-    ihave Htc := creTruncKept_of_ex (hlc := hlc) Γ vom pl P Farm Fok Fex i0 Ft $$ Htc
+  · icases sys_open_cr_res_of_fail Γ γfs rt cw i0 Mim pv vom _ _ $$ Hf with ⟨Hob, Htc⟩
+    ihave Htc := (show openTruncAt (GF := GF) Γ vom i0
+        (sysOpenCrFtEx Γ pl P Farm Fex i0 Ft) ⊢
+      creTruncKeptEx Γ vom pl P Farm Fex i0 Ft from .rfl) $$ Htc
+    ihave Htc := creTruncKept_of_ex Γ vom pl P Farm Fok Fex i0 Ft $$ Htc
     imodintro
     iframe Hslot
     ileft
@@ -696,7 +706,7 @@ theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : Fs
     · ipureintro; exact hr
     unfold openPostFailCreate sysOpenCrExists
     icases HR with ⟨%d, %nm, %av, %ents, %nl, %hl, %hrow, %hent, HP, HΦ, Hac, Hcl⟩
-    ihave Hcl := creFailKept_of_at (hlc := hlc) Γ vom pl P Farm Fun Fok Fex i0 Ft $$ Htc Hcl
+    ihave Hcl := creFailKept_of_at Γ vom pl P Farm Fun Fok Fex i0 Ft $$ Htc Hcl
     iright
     iexists pl
     isplitr
@@ -716,7 +726,7 @@ theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : Fs
     icases Hob with (Hoc | ⟨%ix, %avx, %ax, %hax, HP2⟩)
     · -- THE TAG COMES OFF THE RECEIPT AND THE REFUND IS UNTOUCHED
       ileft
-      iapply (pfAt_mono_pair (aopenCommitAt (hlc := hlc) Γ appE) (aopenCommitAt (hlc := hlc) Γ appE)
+      iapply (pfAt_mono_pair (aopenCommitAt Γ appE) (aopenCommitAt Γ appE)
         (sysOpenCrFoTag i0 a0 Fo) Fo rfl) $$ [] Hoc
       iintro Hoc
       unfold aopenCommitAt sysOpenCrFoTag
@@ -733,9 +743,9 @@ theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : Fs
       iexists avx, ax
       iframe HP2
       ipureintro; exact hax
-  · ihave Hrest := sys_open_cr_ok_exists (hlc := hlc) omo Γ i0 a0 Fo Ft
-      (sysOpenCrFtEx (hlc := hlc) Γ pl P Farm Fex i0 Ft) rfl γ pa pid Mim pv vom sts VW MW r hnd
-      (creTruncKeptEx (hlc := hlc) Γ vom pl P Farm Fex i0 Ft) .rfl $$ Hok
+  · ihave Hrest := sys_open_cr_ok_exists omo Γ i0 a0 Fo Ft
+      (sysOpenCrFtEx Γ pl P Farm Fex i0 Ft) rfl γ pa pid Mim pv vom sts VW MW r hnd
+      (creTruncKeptEx Γ vom pl P Farm Fex i0 Ft) .rfl $$ Hok
     unfold sysOpenCrExists
     icases HR with ⟨%d, %nm, %av, %ents, %nl, %hl, %hrow, %hent, HP, HΦ, Hac, Hcl⟩
     imodintro
@@ -764,10 +774,10 @@ theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : Fs
 it). -/
 theorem sysOpenK_mono_fupd (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (ARMS ARMS' : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (c : CPU) :
-    sysOpenK (hlc := hlc) k ns V M ARMS c ⊢
+    sysOpenK k ns V M ARMS c ⊢
       (∀ (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64),
         ARMS' VW MW r -∗ |={⊤}=> ARMS VW MW r) -∗
-      sysOpenK (hlc := hlc) k ns V M ARMS' c := by
+      sysOpenK k ns V M ARMS' c := by
   unfold sysOpenK
   iintro H Hw %spie %spp %R' %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms
   iapply wpLoop_fupd
@@ -782,16 +792,16 @@ theorem sys_open_cr_post_fresh (k : KCtx) (A : SysOpenArgs GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (pl : List (BitVec 8)) (i0 nl0 : Nat) (hpl : argPathOf (sysOpenIm A) A.v.toNat pl) :
-    ⊢ sysOpenCrFresh (hlc := hlc) (fsGammaL fscFs) A.vom A.P Farm Fun Fok Fex A.Fo pl i0 -∗
-      (∀ c : CPU, sysOpenPostC (hlc := hlc) k A Farm Fun Fok Fex c) -∗
-      ∀ c : CPU, sysOpenPostP (hlc := hlc) k
+    ⊢ sysOpenCrFresh (fsGammaL fscFs) A.vom A.P Farm Fun Fok Fex A.Fo pl i0 -∗
+      (∀ c : CPU, sysOpenPostC k A Farm Fun Fok Fex c) -∗
+      ∀ c : CPU, sysOpenPostP k
         (sysOpenCrA A (sysOpenCrP i0) sysOpenCrPm (sysOpenCrFoPure i0 ⟨.AFile [], nl0⟩)
-          (sysOpenCrFt (hlc := hlc) (fsGammaL fscFs) pl A.P Farm Fok Fex i0 A.Ft)) c := by
+          (sysOpenCrFt (fsGammaL fscFs) pl A.P Farm Fok Fex i0 A.Ft)) c := by
   iintro HR HΦ %c
   ispecialize HΦ $$ %c
   iapply (sysOpenK_mono_fupd k A.ns A.V A.M _ _ c) $$ HΦ
   iintro %VW %MW %r H
-  iapply (sys_open_cr_arms_fresh (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j)
+  iapply (sys_open_cr_arms_fresh A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j)
     A.pid (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts VW MW r pl i0 nl0
     hpl) $$ HR H
 
@@ -801,17 +811,17 @@ theorem sys_open_cr_post_exists (k : KCtx) (A : SysOpenArgs GF)
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (pl : List (BitVec 8)) (i0 : Nat) (a0 : Anode) (hpl : argPathOf (sysOpenIm A) A.v.toNat pl)
     (hnd : ∀ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat), a0 ≠ ⟨.ADir ents, nl⟩) :
-    ⊢ sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) A.vom (nparNm (sysOpenIm A) A.v.toNat) A.P Farm Fun
+    ⊢ sysOpenCrExists (fsGammaL fscFs) A.vom (nparNm (sysOpenIm A) A.v.toNat) A.P Farm Fun
         Fok Fex pl i0 -∗
-      (∀ c : CPU, sysOpenPostC (hlc := hlc) k A Farm Fun Fok Fex c) -∗
-      ∀ c : CPU, sysOpenPostP (hlc := hlc) k
+      (∀ c : CPU, sysOpenPostC k A Farm Fun Fok Fex c) -∗
+      ∀ c : CPU, sysOpenPostP k
         (sysOpenCrA A (sysOpenCrP i0) sysOpenCrPm (sysOpenCrFoTag i0 a0 A.Fo)
-          (sysOpenCrFtEx (hlc := hlc) (fsGammaL fscFs) pl A.P Farm Fex i0 A.Ft)) c := by
+          (sysOpenCrFtEx (fsGammaL fscFs) pl A.P Farm Fex i0 A.Ft)) c := by
   iintro HR HΦ %c
   ispecialize HΦ $$ %c
   iapply (sysOpenK_mono_fupd k A.ns A.V A.M _ _ c) $$ HΦ
   iintro %VW %MW %r H
-  iapply (sys_open_cr_arms_exists (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j)
+  iapply (sys_open_cr_arms_exists A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j)
     A.pid (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts VW MW r pl i0 a0
     hpl hnd) $$ HR H
 

@@ -31,7 +31,7 @@ The vocabulary:
 2. **THE `mono_nat` INSTANCE IS `MachGS`'s** (`MachFixedGS.mono`), Rocq's
    "mono_natG is ambient from riscvGS"; it is also the instance
    `IcacheRefDefs.icfgAlloc` mints the `icfgIep` counters with.  The section
-   binds `[MachGS hlc GF]` and no other `MonoNatG` source, so `committedA`'s
+   binds `[MachGS GF]` and no other `MonoNatG` source, so `committedA`'s
    element is pinned to it at definition time.  It is the ONLY `MonoNatG`
    instance: the log's epoch and the disk's counters use it too.
 3. `ST_EMPTY` / `ST_FILLED` / `ST_REDEEMED` are `abbrev`s (Rocq
@@ -66,7 +66,7 @@ abbrev ST_FILLED : Nat := 1
 abbrev ST_REDEEMED : Nat := 2
 
 section EscrowDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
 
 /-- The one-shot "deposit happened" flag (`mono_nat`, deviation 2). -/
 def committedA (ge : GName) : IProp GF := MonoNat.lb_own ge (.ofNat ST_FILLED)
@@ -80,9 +80,11 @@ instance committedA_timeless (ge : GName) : Timeless (committedA (GF := GF) ge) 
 def redeemTicketA (gr : GName) : IProp GF :=
   iOwn (F := constOF (Excl Unit)) gr (Excl.excl ())
 
+omit [MachGS GF] in
 instance redeemTicketA_timeless (gr : GName) : Timeless (redeemTicketA (GF := GF) gr) := by
   unfold redeemTicketA; infer_instance
 
+omit [MachGS GF] in
 theorem redeemTicketA_excl (gr : GName) :
     redeemTicketA (GF := GF) gr ∗ redeemTicketA gr ⊢ False := by
   unfold redeemTicketA
@@ -106,6 +108,7 @@ value parks. -/
 def crpElem [Icfg] (z : Nat) (v : Icorpse) : IProp GF :=
   icfgPcrp ↪◯MAP[z] v
 
+omit [MachGS GF] in
 instance crpElem_timeless [Icfg] (z : Nat) (v : Icorpse) :
     Timeless (crpElem (GF := GF) z v) := by
   unfold crpElem; infer_instance
@@ -125,13 +128,16 @@ def regHalf [Icfg] (z : Nat) (ge gr : GName) : IProp GF :=
 def regFull [Icfg] (z : Nat) (ge gr : GName) : IProp GF :=
   icfgReg ↪◯MAP[z] (ge, gr)
 
+omit [MachGS GF] in
 instance regHalf_timeless [Icfg] (z : Nat) (ge gr : GName) :
     Timeless (regHalf (GF := GF) z ge gr) := by
   unfold regHalf; infer_instance
+omit [MachGS GF] in
 instance regFull_timeless [Icfg] (z : Nat) (ge gr : GName) :
     Timeless (regFull (GF := GF) z ge gr) := by
   unfold regFull; infer_instance
 
+omit [MachGS GF] in
 /-- Two halves agree on the escrow name pair -- forces the redeemer's pool
 ticket and the region's committed to name the SAME escrow. -/
 theorem regHalf_agree [Icfg] (z : Nat) (ge1 gr1 ge2 gr2 : GName) :
@@ -142,6 +148,7 @@ theorem regHalf_agree [Icfg] (z : Nat) (ge1 gr1 ge2 gr2 : GName) :
   ipureintro
   exact Prod.mk.inj Heq
 
+omit [MachGS GF] in
 theorem regJoin [Icfg] (z : Nat) (ge gr : GName) :
     regHalf (GF := GF) z ge gr ∗ regHalf z ge gr ⊢ regFull z ge gr := by
   unfold regHalf regFull
@@ -150,6 +157,7 @@ theorem regJoin [Icfg] (z : Nat) (ge gr : GName) :
   rw [Qp.half_add_half] at h
   exact h.2
 
+omit [MachGS GF] in
 /-- The inverse of `regJoin`: the off-lock deposit splits the marked slot's
 whole `regFull` into the structural half (stays in the pending arm) and the
 `regionPending` half. -/

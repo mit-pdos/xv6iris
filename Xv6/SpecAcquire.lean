@@ -51,7 +51,7 @@ def acquireAddr : BitVec 64 := KA.«acquire»
 caller's afterwards -- nothing when they were already off), the lock's
 name enters the held set, and the continuation is at whichever hart the
 thread landed on while interrupts were on. -/
-def wp_acquire_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_acquire_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 10 ≤ k.avail) (hs : s ∉ k.locks) : Prop :=
   kctx cpu k ∗ pcIs cpu acquireAddr ∗ isLock γ (k.regs 10#5) s R ∗
@@ -64,9 +64,9 @@ def wp_acquire_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [C
 
 /-- The interface of `acquire`. -/
 structure ACQUIRE : Prop where
-  wp_acquire : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_acquire : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R] hnoff hK hs,
-    wp_acquire_body (hlc := hlc) (GF := GF) cpu k γ s R hnoff hK hs
+    wp_acquire_body (GF := GF) cpu k γ s R hnoff hK hs
 
 /-- **Cancellable-lock form of `wp_acquire_body`.**  Opens through
 `lockOpenable γ lk s R D`, ruling out the dead branch with a credential
@@ -74,7 +74,7 @@ structure ACQUIRE : Prop where
 check, the acquire spin and the owner store, and handed back in the
 continuation.  The `D := False`, `Tc := emp` case recovers
 `wp_acquire_body`. -/
-def wp_acquire_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_acquire_gen_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 10 ≤ k.avail) (hs : s ∉ k.locks) : Prop :=
@@ -88,10 +88,10 @@ def wp_acquire_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 
 /-- The cancellable-lock interface of `acquire`. -/
 structure ACQUIRE_GEN : Prop where
-  wp_acquire_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_acquire_gen : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R] (D : IProp GF) [Timeless D] (Tc : IProp GF)
     hrefute hnoff hK hs,
-    wp_acquire_gen_body (hlc := hlc) (GF := GF) cpu k γ s R D Tc hrefute hnoff hK hs
+    wp_acquire_gen_body (GF := GF) cpu k γ s R D Tc hrefute hnoff hK hs
 
 /-! ## The store-order (`llb`) forms
 
@@ -108,7 +108,7 @@ its `MachCSL.kctx` carries).  That floor is the one thing a
 `wp_acquire_body` is the `tl := 0` instance, derived below. -/
 
 /-- **WP of `acquire`, with the acquire edge's store-order receipt.** -/
-def wp_acquire_llb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_acquire_llb_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (tl : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 10 ≤ k.avail) (hs : s ∉ k.locks) : Prop :=
@@ -123,14 +123,14 @@ def wp_acquire_llb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 
 /-- The store-order interface of `acquire`. -/
 structure ACQUIRE_LLB : Prop where
-  wp_acquire_llb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_acquire_llb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R] (tl : Nat) hnoff hK hs,
-    wp_acquire_llb_body (hlc := hlc) (GF := GF) cpu k γ s R tl hnoff hK hs
+    wp_acquire_llb_body (GF := GF) cpu k γ s R tl hnoff hK hs
 
 /-- `ACQUIRE` is the `tl := 0` instance. -/
 theorem ACQUIRE_LLB.toACQUIRE (A : ACQUIRE_LLB) : ACQUIRE := ⟨by
-  intro hlc GF _ _ cpu k γ s R _ hnoff hK hs
-  have h := A.wp_acquire_llb (hlc := hlc) (GF := GF) cpu k γ s R 0 hnoff hK hs
+  intro GF _ _ cpu k γ s R _ hnoff hK hs
+  have h := A.wp_acquire_llb (GF := GF) cpu k γ s R 0 hnoff hK hs
   unfold wp_acquire_llb_body at h
   unfold wp_acquire_body
   iintro ⟨Hk, Hpc, #Hlk, HΦ⟩
@@ -146,7 +146,7 @@ theorem ACQUIRE_LLB.toACQUIRE (A : ACQUIRE_LLB) : ACQUIRE := ⟨by
   iexact Hv⟩
 
 /-- **Cancellable-lock form with the acquire edge's store-order receipt.** -/
-def wp_acquire_gen_llb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_acquire_gen_llb_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
     (tl : Nat)
@@ -162,15 +162,15 @@ def wp_acquire_gen_llb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
 
 /-- The cancellable store-order interface of `acquire`. -/
 structure ACQUIRE_GEN_LLB : Prop where
-  wp_acquire_gen_llb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_acquire_gen_llb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R] (D : IProp GF) [Timeless D] (Tc : IProp GF)
     hrefute (tl : Nat) hnoff hK hs,
-    wp_acquire_gen_llb_body (hlc := hlc) (GF := GF) cpu k γ s R D Tc hrefute tl hnoff hK hs
+    wp_acquire_gen_llb_body (GF := GF) cpu k γ s R D Tc hrefute tl hnoff hK hs
 
 /-- `ACQUIRE_GEN` is the `tl := 0` instance. -/
 theorem ACQUIRE_GEN_LLB.toACQUIRE_GEN (A : ACQUIRE_GEN_LLB) : ACQUIRE_GEN := ⟨by
-  intro hlc GF _ _ cpu k γ s R _ D _ Tc hrefute hnoff hK hs
-  have h := A.wp_acquire_gen_llb (hlc := hlc) (GF := GF) cpu k γ s R D Tc hrefute 0 hnoff hK hs
+  intro GF _ _ cpu k γ s R _ D _ Tc hrefute hnoff hK hs
+  have h := A.wp_acquire_gen_llb (GF := GF) cpu k γ s R D Tc hrefute 0 hnoff hK hs
   unfold wp_acquire_gen_llb_body at h
   unfold wp_acquire_gen_body
   iintro ⟨Hk, Hpc, #Hlk, Hcred, HΦ⟩

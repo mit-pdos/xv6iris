@@ -32,7 +32,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
@@ -114,10 +114,10 @@ theorem ireclaim_step [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k :
     (hb : ireclaimBody k R) (h9 : R 9#5 = BitVec.ofNat 64 n)
     (IH : n + 1 < fscNinodes → ∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap),
       ireclaimLoopRegs k (n + 1) R' →
-      ireclaimLoopPre (hlc := hlc) Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
+      ireclaimLoopPre Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
         wpLoop (GF := GF) c') :
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«ireclaim» + 0x6e#64) ∗
-    ireclaimEnv (hlc := hlc) Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
+    ireclaimEnv Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
     bslots 3 ∗ irefSlot ∗ iregBoot
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hK8, -⟩ := ireclaim_slots k.avail hK
@@ -187,10 +187,10 @@ theorem ireclaim_release (BE : BRELSE) [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames)
     (hkk : kk < NBUF)
     (IH : n + 1 < fscNinodes → ∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap),
       ireclaimLoopRegs k (n + 1) R' →
-      ireclaimLoopPre (hlc := hlc) Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
+      ireclaimLoopPre Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
         wpLoop (GF := GF) c') :
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«ireclaim» + 0xaa#64) ∗
-    ireclaimEnv (hlc := hlc) Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
+    ireclaimEnv Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
     bslots 2 ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno bs bsd d ∗
     irefSlot ∗ iregBoot

@@ -66,7 +66,7 @@ def fsBootTies [Fscfg] [Icfg] (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat comp
   fscCons = cnm
 
 section FsBootSupply
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
   [WchG GF] [Appcfg GF]
@@ -82,17 +82,17 @@ def fsBootSupply [Fscfg] [Icfg] (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat)
     IProp GF := iprop(
   ⌜fsBootTies sb nib cov γd γv cnm⌝ ∗
   fsKitIcache ∗
-  fsKitFsinitGhost (hlc := hlc) (fsBlocks dk) Rspent Pb Xexc ∗
+  fsKitFsinitGhost (fsBlocks dk) Rspent Pb Xexc ∗
   ([∗list] k ∈ List.range NINODE, offSetAuth offCfg k ∅))
 
 /-- The supply's rows by name (ProofMain's fs group opens it once). -/
 theorem fsBootSupply_open [Fscfg] [Icfg] (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat)
     (cov : ExtTreeSet Nat compare) (γd : UartNames) (γv : DiskNames) (cnm : ConsNames)
     (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8)) (Xexc : List Nat) :
-    fsBootSupply (hlc := hlc) (GF := GF) dk sb nib cov γd γv cnm Rspent Pb Xexc ⊢
+    fsBootSupply (GF := GF) dk sb nib cov γd γv cnm Rspent Pb Xexc ⊢
       ⌜fsBootTies sb nib cov γd γv cnm⌝ ∗
       fsKitIcache ∗
-      fsKitFsinitGhost (hlc := hlc) (fsBlocks dk) Rspent Pb Xexc ∗
+      fsKitFsinitGhost (fsBlocks dk) Rspent Pb Xexc ∗
       ([∗list] k ∈ List.range NINODE, offSetAuth offCfg k ∅) := by
   unfold fsBootSupply
   iintro H
@@ -102,9 +102,9 @@ theorem fsBootSupply_open [Fscfg] [Icfg] (dk : Nat → BitVec 8) (sb : FsSb) (ni
 theorem fsBootSupply_ties [Fscfg] [Icfg] (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat)
     (cov : ExtTreeSet Nat compare) (γd : UartNames) (γv : DiskNames) (cnm : ConsNames)
     (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8)) (Xexc : List Nat) :
-    fsBootSupply (hlc := hlc) (GF := GF) dk sb nib cov γd γv cnm Rspent Pb Xexc ⊢
+    fsBootSupply (GF := GF) dk sb nib cov γd γv cnm Rspent Pb Xexc ⊢
       ⌜fsBootTies sb nib cov γd γv cnm⌝ ∗
-      fsBootSupply (hlc := hlc) dk sb nib cov γd γv cnm Rspent Pb Xexc := by
+      fsBootSupply dk sb nib cov γd γv cnm Rspent Pb Xexc := by
   unfold fsBootSupply
   iintro ⟨%h, H⟩
   isplitr
@@ -121,9 +121,9 @@ takes the copy for the first process's exec bundle). -/
 theorem fsBootSupply_appInv [Fscfg] [Icfg] (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat)
     (cov : ExtTreeSet Nat compare) (γd : UartNames) (γv : DiskNames) (cnm : ConsNames)
     (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8)) (Xexc : List Nat) :
-    fsBootSupply (hlc := hlc) (GF := GF) dk sb nib cov γd γv cnm Rspent Pb Xexc ⊢
-      appInv (hlc := hlc) fscFs ∧
-      fsBootSupply (hlc := hlc) dk sb nib cov γd γv cnm Rspent Pb Xexc := by
+    fsBootSupply (GF := GF) dk sb nib cov γd γv cnm Rspent Pb Xexc ⊢
+      appInv fscFs ∧
+      fsBootSupply dk sb nib cov γd γv cnm Rspent Pb Xexc := by
   iintro H
   isplit
   · unfold fsBootSupply fsKitFsinitGhost

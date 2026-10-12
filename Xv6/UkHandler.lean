@@ -175,7 +175,7 @@ def devSel {GF : BundledGFunctors.{0}} (out outh : Nat → List Bytes → IProp 
   | .DProdHalt ds => prodHalt d ds
 
 section UkHandler
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -210,14 +210,14 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
   eiFiles : (Bytes → Option Bytes) → List Bytes → IProp GF
   /-- THE TAINT at the descriptors the process holds -/
   eiTaint : FdSet → IProp GF
-  eiTaintPays : ∀ (held : FdSet) (t : Proc), SafeFds held t → ⊢ eiTaint held -∗ treePay (hlc := hlc) N P t
+  eiTaintPays : ∀ (held : FdSet) (t : Proc), SafeFds held t → ⊢ eiTaint held -∗ treePay N P t
   /-- a write of a chunk the chosen alternative begins with -/
   eiWrite : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (alts : List Bytes) (a bs : Bytes) (K : Int → IProp GF),
     bs ≠ [] → fdm fd = some d → a ∈ alts → bs <+: a →
     ⊢ eiFds fdm -∗ eiOut d alts -∗
       ((eiFds fdm -∗ eiOut d [a.drop bs.length] -∗ K (bs.length : Int)) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
   /-- at a haltable device the payer answers the count, or -1 and halts -/
   eiWriteH : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (alts : List Bytes) (a bs : Bytes) (K : Int → IProp GF),
     bs ≠ [] → fdm fd = some d → a ∈ alts → bs <+: a →
@@ -225,7 +225,7 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
       ((eiFds fdm -∗ eiOuth d [a.drop bs.length] -∗ K (bs.length : Int)) ∧
        (eiFds fdm -∗ eiHalt d -∗ K (-1)) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
   /-- at a device where a write may miss, owed as chunks -/
   eiWriteM : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (rest : List Bytes) (bs : Bytes) (K : Int → IProp GF),
     bs ≠ [] → fdm fd = some d →
@@ -233,13 +233,13 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
       ((eiFds fdm -∗ eiOutm d rest -∗ K (bs.length : Int)) ∧
        (eiFds fdm -∗ eiOutm d rest -∗ K (-1)) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
   /-- ...at a count the kernel reads as a positive C int -/
   eiWriteHalt : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (bs : Bytes) (K : Int → IProp GF),
     bs ≠ [] → (bs.length : Int) < 2 ^ 31 → fdm fd = some d →
     ⊢ eiFds fdm -∗ eiHalt d -∗
       ((eiFds fdm -∗ eiHalt d -∗ K (-1)) ∧ (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
   /-- a zero-length write: 0 or -1, nothing moves -/
   eiWriteNil : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (x : Dspec) (K : Int → IProp GF),
     fdm fd = some d →
@@ -252,14 +252,14 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
           devSel eiOut eiOuth eiHalt eiOutm eiIn eiInE eiInEnd eiCopy eiCopyEnd eiCopyHalt eiProd eiProdHalt d x -∗
           K (-1)) ∧
        (∀ y, eiTaint (fdDom fdm) -∗ K y)) -∗
-      wrObl (hlc := hlc) N P fd [] K
+      wrObl N P fd [] K
   /-- a read of at least one byte: some chunk of what is left -/
   eiRead : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (Sin : Bytes) (n : Nat) (K : RdAns → IProp GF),
     0 < n → fdm fd = some d →
     ⊢ eiFds fdm -∗ eiIn d Sin -∗
       ((∀ (c S' : Bytes), ⌜chunkOk n Sin c S'⌝ -∗ eiFds fdm -∗ eiIn d S' -∗ K (.RdBytes c)) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) N P fd n K
+      rdObl N P fd n K
   /-- ...at an input that may end early -/
   eiReadE : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (Sin : Bytes) (n : Nat) (K : RdAns → IProp GF),
     0 < n → fdm fd = some d →
@@ -267,12 +267,12 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
       ((∀ (c S' : Bytes), ⌜chunkOk n Sin c S'⌝ -∗ eiFds fdm -∗ eiInE d S' -∗ K (.RdBytes c)) ∧
        (eiFds fdm -∗ eiInEnd d -∗ K (.RdBytes [])) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) N P fd n K
+      rdObl N P fd n K
   eiReadEnd : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (n : Nat) (K : RdAns → IProp GF),
     0 < n → fdm fd = some d →
     ⊢ eiFds fdm -∗ eiInEnd d -∗
       ((eiFds fdm -∗ eiInEnd d -∗ K (.RdBytes [])) ∧ (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) N P fd n K
+      rdObl N P fd n K
   /-- a read at the filter device, at the filter's input -/
   eiReadCopy : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (F : PFilter) (h : Bool) (Rr Sin p : Bytes) (n : Nat)
       (K : RdAns → IProp GF),
@@ -282,13 +282,13 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
           eiFds fdm -∗ eiCopy d F h (Rr ++ c) S' (p ++ F.new Rr c) -∗ K (.RdBytes c)) ∧
        (eiFds fdm -∗ eiCopyEnd d F h p -∗ K (.RdBytes [])) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) N P fd n K
+      rdObl N P fd n K
   eiReadCopyEnd : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (F : PFilter) (h : Bool) (p : Bytes) (n : Nat)
       (K : RdAns → IProp GF),
     0 < n → fdm fd = some d → fd = copyIn →
     ⊢ eiFds fdm -∗ eiCopyEnd d F h p -∗
       ((eiFds fdm -∗ eiCopyEnd d F h p -∗ K (.RdBytes [])) ∧ (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) N P fd n K
+      rdObl N P fd n K
   /-- ...at a HALTED one the input goes on -/
   eiReadCopyHalt : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (Sin : Bytes) (n : Nat) (K : RdAns → IProp GF),
     0 < n → fdm fd = some d → fd = copyIn →
@@ -297,44 +297,44 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
           eiFds fdm -∗ eiCopyHalt d (some S') -∗ K (.RdBytes c)) ∧
        (eiFds fdm -∗ eiCopyHalt d none -∗ K (.RdBytes [])) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) N P fd n K
+      rdObl N P fd n K
   eiReadCopyHaltEnd : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (n : Nat) (K : RdAns → IProp GF),
     0 < n → fdm fd = some d → fd = copyIn →
     ⊢ eiFds fdm -∗ eiCopyHalt d none -∗
       ((eiFds fdm -∗ eiCopyHalt d none -∗ K (.RdBytes [])) ∧ (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) N P fd n K
+      rdObl N P fd n K
   /-- a write at the filter device, at the filter's output -/
   eiWriteCopy : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (F : PFilter) (Rr Sin p bs : Bytes) (K : Int → IProp GF),
     bs ≠ [] → fdm fd = some d → fd = copyOut → bs <+: p →
     ⊢ eiFds fdm -∗ eiCopy d F false Rr Sin p -∗
       ((eiFds fdm -∗ eiCopy d F false Rr Sin (p.drop bs.length) -∗ K (bs.length : Int)) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
   eiWriteCopyH : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (F : PFilter) (Rr Sin p bs : Bytes) (K : Int → IProp GF),
     bs ≠ [] → fdm fd = some d → fd = copyOut → bs <+: p →
     ⊢ eiFds fdm -∗ eiCopy d F true Rr Sin p -∗
       ((eiFds fdm -∗ eiCopy d F true Rr Sin (p.drop bs.length) -∗ K (bs.length : Int)) ∧
        (eiFds fdm -∗ eiCopyHalt d (some Sin) -∗ K (-1)) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
   eiWriteCopyEnd : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (F : PFilter) (p bs : Bytes) (K : Int → IProp GF),
     bs ≠ [] → fdm fd = some d → fd = copyOut → bs <+: p →
     ⊢ eiFds fdm -∗ eiCopyEnd d F false p -∗
       ((eiFds fdm -∗ eiCopyEnd d F false (p.drop bs.length) -∗ K (bs.length : Int)) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
   eiWriteCopyEndH : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (F : PFilter) (p bs : Bytes) (K : Int → IProp GF),
     bs ≠ [] → fdm fd = some d → fd = copyOut → bs <+: p →
     ⊢ eiFds fdm -∗ eiCopyEnd d F true p -∗
       ((eiFds fdm -∗ eiCopyEnd d F true (p.drop bs.length) -∗ K (bs.length : Int)) ∧
        (eiFds fdm -∗ eiCopyHalt d none -∗ K (-1)) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
   eiWriteCopyHalt : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (oS : Option Bytes) (bs : Bytes) (K : Int → IProp GF),
     bs ≠ [] → (bs.length : Int) < 2 ^ 31 → fdm fd = some d → fd = copyOut →
     ⊢ eiFds fdm -∗ eiCopyHalt d oS -∗
       ((eiFds fdm -∗ eiCopyHalt d oS -∗ K (-1)) ∧ (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
   /-- an open of a described, present file -/
   eiOpen : ∀ (fdm : Fdmap) (files : Bytes → Option Bytes) (paths : List Bytes) (path content : Bytes)
       (K : Int → IProp GF),
@@ -345,7 +345,7 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
           eiFiles files paths -∗ K fd) ∧
        (eiFds fdm -∗ eiFiles files paths -∗ K (-1)) ∧
        (∀ x, ⌜x = -1 ∨ 0 ≤ x⌝ -∗ eiTaint (openHeld fdm x) -∗ K x)) -∗
-      opObl (hlc := hlc) N P path 0 K
+      opObl N P path 0 K
   /-- an open of a described, absent file, at a mode that does not create -/
   eiOpenAbsent : ∀ (fdm : Fdmap) (files : Bytes → Option Bytes) (paths : List Bytes) (path : Bytes) (m : Int)
       (K : Int → IProp GF),
@@ -353,7 +353,7 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
     ⊢ eiFds fdm -∗ eiFiles files paths -∗
       ((eiFds fdm -∗ eiFiles files paths -∗ K (-1)) ∧
        (∀ x, ⌜x = -1 ∨ 0 ≤ x⌝ -∗ eiTaint (openHeld fdm x) -∗ K x)) -∗
-      opObl (hlc := hlc) N P path m K
+      opObl N P path m K
   /-- a close of a device's last descriptor consumes the device -/
   eiClose : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (x : Dspec) (files : Bytes → Option Bytes)
       (paths : List Bytes) (K : Int → IProp GF),
@@ -362,13 +362,13 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
       devSel eiOut eiOuth eiHalt eiOutm eiIn eiInE eiInEnd eiCopy eiCopyEnd eiCopyHalt eiProd eiProdHalt d x -∗
       ((eiFds (fdDelete fdm fd) -∗ eiFiles files paths -∗ K 0) ∧
        (∀ y, eiTaint (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗
-      clObl (hlc := hlc) N P fd K
+      clObl N P fd K
   /-- ...of a shared one (a dup) keeps it -/
   eiCloseShared : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (K : Int → IProp GF),
     fdm fd = some d → fdSharedP Dp fdm fd d →
     ⊢ eiFds fdm -∗
       ((eiFds (fdDelete fdm fd) -∗ K 0) ∧ (∀ y, eiTaint (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗
-      clObl (hlc := hlc) N P fd K
+      clObl N P fd K
   /-- the exit, with every device drained -/
   eiExit : ∀ (s : Int) (fdm : Fdmap) (files : Bytes → Option Bytes) (paths : List Bytes) (dv : Nat → Dspec)
       (ds : ExtTreeSet Nat compare),
@@ -376,7 +376,7 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
     ⊢ eiFds fdm -∗ eiFiles files paths -∗
       ([∗set] d ∈ ds,
         devSel eiOut eiOuth eiHalt eiOutm eiIn eiInE eiInEnd eiCopy eiCopyEnd eiCopyHalt eiProd eiProdHalt d (dv d)) -∗
-      exObl (hlc := hlc) N P s
+      exObl N P s
   /-- THE PRODUCER DEVICE'S LAWS: an output write -/
   eiWriteProd : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (outs xs ds : List Bytes) (a bs : Bytes) (K : Int → IProp GF),
     bs ≠ [] → fdm fd = some d → fd = prodOut → a ∈ outs → bs <+: a →
@@ -384,12 +384,12 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
       ((eiFds fdm -∗ eiProd d [a.drop bs.length] [] ds -∗ K (bs.length : Int)) ∧
        (eiFds fdm -∗ eiProdHalt d ds -∗ K (-1)) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
   eiWriteProdHalt : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (ds : List Bytes) (bs : Bytes) (K : Int → IProp GF),
     bs ≠ [] → (bs.length : Int) < 2 ^ 31 → fdm fd = some d → fd = prodOut →
     ⊢ eiFds fdm -∗ eiProdHalt d ds -∗
       ((eiFds fdm -∗ eiProdHalt d ds -∗ K (-1)) ∧ (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
   /-- a diagnostic write -/
   eiWriteProdErr : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (outs xs ds : List Bytes) (a bs : Bytes)
       (K : Int → IProp GF),
@@ -397,7 +397,7 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
     ⊢ eiFds fdm -∗ eiProd d outs xs ds -∗
       ((eiFds fdm -∗ eiProd d outs [] [a.drop bs.length] -∗ K (bs.length : Int)) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
   /-- a failure report -/
   eiWriteProdFail : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (outs xs ds : List Bytes) (a bs : Bytes)
       (K : Int → IProp GF),
@@ -405,39 +405,39 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
     ⊢ eiFds fdm -∗ eiProd d outs xs ds -∗
       ((eiFds fdm -∗ eiProd d [[]] [] [a.drop bs.length] -∗ K (bs.length : Int)) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
   eiWriteProdHaltErr : ∀ (fdm : Fdmap) (fd : Int) (d : Nat) (ds : List Bytes) (a bs : Bytes) (K : Int → IProp GF),
     bs ≠ [] → fdm fd = some d → fd = prodErr → a ∈ ds → bs <+: a →
     ⊢ eiFds fdm -∗ eiProdHalt d ds -∗
       ((eiFds fdm -∗ eiProdHalt d [a.drop bs.length] -∗ K (bs.length : Int)) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) N P fd bs K
+      wrObl N P fd bs K
 
 /-! ## §2 The environment's resources -/
 
 variable {N : UkNames GF} {P : Uprog GF} {Dp : List Nat}
 
 /-- **Rocq `dev_of`**. -/
-abbrev devOf (I : EpIfaceP (hlc := hlc) N P Dp) (d : Nat) (x : Dspec) : IProp GF :=
+abbrev devOf (I : EpIfaceP N P Dp) (d : Nat) (x : Dspec) : IProp GF :=
   devSel I.eiOut I.eiOuth I.eiHalt I.eiOutm I.eiIn I.eiInE I.eiInEnd I.eiCopy I.eiCopyEnd I.eiCopyHalt
     I.eiProd I.eiProdHalt d x
 
 /-- **Rocq `dev_res`**. -/
-abbrev devRes (I : EpIfaceP (hlc := hlc) N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare) : IProp GF :=
+abbrev devRes (I : EpIfaceP N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare) : IProp GF :=
   iprop([∗set] d ∈ ds, devOf I d (dv d))
 
 /-- **Rocq `env_res`**. -/
-def envRes (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) : IProp GF :=
+def envRes (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) : IProp GF :=
   iprop(⌜∀ fd d, E.fd fd = some d → d ∈ ds⌝ ∗ I.eiFds E.fd ∗ I.eiFiles E.files E.paths ∗ devRes I E.dev ds)
 
 /-- **Rocq `dev_res_take`**. -/
-theorem devRes_take (I : EpIfaceP (hlc := hlc) N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare)
+theorem devRes_take (I : EpIfaceP N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare)
     (d : Nat) (hd : d ∈ ds) :
     devRes I dv ds ⊣⊢ devOf I d (dv d) ∗ devRes I dv (ds \ {d}) :=
   BigSepS.bigSepS_delete (Φ := fun d => devOf I d (dv d)) hd
 
 /-- `devRes_take` at a named spec, handing the device over as `R`. -/
-theorem devRes_take' (I : EpIfaceP (hlc := hlc) N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare)
+theorem devRes_take' (I : EpIfaceP N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare)
     (d : Nat) (x : Dspec) (R : IProp GF) (hd : d ∈ ds) (hx : dv d = x) (hR : devOf I d x ⊢ R) :
     devRes I dv ds ⊢ R ∗ devRes I dv (ds \ {d}) := by
   refine (devRes_take I dv ds d hd).1.trans (sep_mono_left ?_)
@@ -445,7 +445,7 @@ theorem devRes_take' (I : EpIfaceP (hlc := hlc) N P Dp) (dv : Nat → Dspec) (ds
 
 /-- **Rocq `dev_res_set`**: changing one device's spec changes nothing
 outside it. -/
-theorem devRes_set (I : EpIfaceP (hlc := hlc) N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare)
+theorem devRes_set (I : EpIfaceP N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare)
     (d : Nat) (x : Dspec) (hd : d ∉ ds) :
     devRes I (fun d' => if d' = d then x else dv d') ds ⊣⊢ devRes I dv ds := by
   refine BigSepS.bigSepS_eqv (fun {d'} hd' => ?_)
@@ -454,7 +454,7 @@ theorem devRes_set (I : EpIfaceP (hlc := hlc) N P Dp) (dv : Nat → Dspec) (ds :
   exact .rfl
 
 /-- The device moved back in: a new spec at `d`, the rest unchanged. -/
-theorem devRes_move (I : EpIfaceP (hlc := hlc) N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare)
+theorem devRes_move (I : EpIfaceP N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare)
     (d : Nat) (x : Dspec) (hd : d ∈ ds) :
     devOf I d x ∗ devRes I dv (ds \ {d}) ⊢ devRes I (fun d' => if d' = d then x else dv d') ds := by
   refine .trans ?_ (devRes_take I _ ds d hd).2
@@ -464,7 +464,7 @@ theorem devRes_move (I : EpIfaceP (hlc := hlc) N P Dp) (dv : Nat → Dspec) (ds 
   exact .rfl
 
 /-- A device added at a fresh number. -/
-theorem devRes_add (I : EpIfaceP (hlc := hlc) N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare)
+theorem devRes_add (I : EpIfaceP N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare)
     (d : Nat) (x : Dspec) (hd : d ∉ ds) :
     devOf I d x ∗ devRes I dv ds ⊢ devRes I (fun d' => if d' = d then x else dv d') ({d} ∪ ds) := by
   have hin : d ∈ ({d} ∪ ds : ExtTreeSet Nat compare) := mem_union.2 (Or.inl (mem_singleton.2 rfl))
@@ -483,13 +483,13 @@ theorem devRes_add (I : EpIfaceP (hlc := hlc) N P Dp) (dv : Nat → Dspec) (ds :
 
 /-- **Rocq `cf_inv`**: a conforming tree with the discipline at its
 environment, or a tree already paid. -/
-def cfInv (I : EpIfaceP (hlc := hlc) N P Dp) (t : Proc) : IProp GF :=
+def cfInv (I : EpIfaceP N P Dp) (t : Proc) : IProp GF :=
   iprop((∃ (E : Penv) (ds : ExtTreeSet Nat compare),
       ⌜Conforms E t⌝ ∗ ⌜SafeFds (fdDom E.fd) t⌝ ∗ ⌜dpIn Dp ds⌝ ∗ envRes I E ds) ∨
-    treePay (hlc := hlc) N P t)
+    treePay N P t)
 
 /-- **Rocq `cf_inv_taint`**. -/
-theorem cfInv_taint (I : EpIfaceP (hlc := hlc) N P Dp) (held : FdSet) (t : Proc) (hs : SafeFds held t) :
+theorem cfInv_taint (I : EpIfaceP N P Dp) (held : FdSet) (t : Proc) (hs : SafeFds held t) :
     ⊢ I.eiTaint held -∗ cfInv I t := by
   unfold cfInv
   iintro Ht
@@ -497,7 +497,7 @@ theorem cfInv_taint (I : EpIfaceP (hlc := hlc) N P Dp) (held : FdSet) (t : Proc)
   iapply I.eiTaintPays held t hs $$ Ht
 
 /-- The environment's resources are an invariant state. -/
-theorem cfInv_intro (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (t : Proc)
+theorem cfInv_intro (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (t : Proc)
     (hc : Conforms E t) (hs : SafeFds (fdDom E.fd) t) (hdp : dpIn Dp ds)
     (hdom : ∀ fd d, E.fd fd = some d → d ∈ ds) :
     ⊢ I.eiFds E.fd -∗ I.eiFiles E.files E.paths -∗ devRes I E.dev ds -∗ cfInv I t := by
@@ -517,7 +517,7 @@ theorem cfInv_intro (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeS
 
 /-- **Rocq `cf_inv_move`**: the invariant rebuilt after one device moved to
 a new spec, the rest of the environment unchanged. -/
-theorem cfInv_move (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (d : Nat)
+theorem cfInv_move (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (d : Nat)
     (x : Dspec) (t : Proc) (hin : d ∈ ds) (hc : Conforms (envSetDev E d x) t) (hs : SafeFds (fdDom E.fd) t)
     (hdp : dpIn Dp ds) (hdom : ∀ fd d', E.fd fd = some d' → d' ∈ ds) :
     ⊢ I.eiFds E.fd -∗ I.eiFiles E.files E.paths -∗ devOf I d x -∗ devRes I E.dev (ds \ {d}) -∗ cfInv I t := by
@@ -532,7 +532,7 @@ theorem cfInv_move (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSe
 
 /-- `cfInv_move` in the shape a law's continuation asks: the files and the
 other devices first, then the descriptors and the moved device as `R`. -/
-theorem cfInv_moveK (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (d : Nat)
+theorem cfInv_moveK (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (d : Nat)
     (x : Dspec) (t : Proc) (R : IProp GF) (hR : R ⊢ devOf I d x) (hin : d ∈ ds)
     (hc : Conforms (envSetDev E d x) t) (hs : SafeFds (fdDom E.fd) t)
     (hdp : dpIn Dp ds) (hdom : ∀ fd d', E.fd fd = some d' → d' ∈ ds) :
@@ -542,20 +542,20 @@ theorem cfInv_moveK (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeS
   iapply cfInv_move I E ds d x t hin hc hs hdp hdom $$ Hfds Hfiles Hx Hrest
 
 /-- A tree already paid is in the invariant. -/
-theorem cfInv_paid (I : EpIfaceP (hlc := hlc) N P Dp) (t : Proc) : ⊢ treePay (hlc := hlc) N P t -∗ cfInv I t := by
+theorem cfInv_paid (I : EpIfaceP N P Dp) (t : Proc) : ⊢ treePay N P t -∗ cfInv I t := by
   unfold cfInv
   iintro H
   iright
   iexact H
 
 /-- The invariant, read. -/
-theorem cfInv_elim (I : EpIfaceP (hlc := hlc) N P Dp) (t : Proc) :
+theorem cfInv_elim (I : EpIfaceP N P Dp) (t : Proc) :
     cfInv I t ⊢ (∃ (E : Penv) (ds : ExtTreeSet Nat compare),
       ⌜Conforms E t⌝ ∗ ⌜SafeFds (fdDom E.fd) t⌝ ∗ ⌜dpIn Dp ds⌝ ∗ envRes I E ds) ∨
-    treePay (hlc := hlc) N P t := .rfl
+    treePay N P t := .rfl
 
 /-- The environment's resources at a conforming tree are in the invariant. -/
-theorem cfInv_of_env (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (t : Proc)
+theorem cfInv_of_env (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (t : Proc)
     (hc : Conforms E t) (hs : SafeFds (fdDom E.fd) t) (hdp : dpIn Dp ds) :
     ⊢ envRes I E ds -∗ cfInv I t := by
   unfold envRes
@@ -565,12 +565,12 @@ theorem cfInv_of_env (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTree
 /-! ### The glue, one event at a time (deviation 5) -/
 
 /-- The open node. -/
-theorem cfInv_step_open (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare)
+theorem cfInv_step_open (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare)
     (p : Bytes) (m : Int) (k : Ans (.EOpen p m) → Proc) (hc : cfVis Conforms E (.EOpen p m) k)
     (hs : sfVis SafeFds (fdDom E.fd) (.EOpen p m) k) (hdp : dpIn Dp ds)
     (hdom : ∀ fd d, E.fd fd = some d → d ∈ ds) :
     ⊢ I.eiFds E.fd -∗ I.eiFiles E.files E.paths -∗ devRes I E.dev ds -∗
-      opObl (hlc := hlc) N P p m (fun x => cfInv I (k x)) := by
+      opObl N P p m (fun x => cfInv I (k x)) := by
   simp only [cfVis] at hc
   simp only [sfVis] at hs
   obtain ⟨hpath, hc⟩ := hc
@@ -623,12 +623,12 @@ theorem cfInv_step_open (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtT
       iapply cfInv_taint I _ (k x) (htaint x hx) $$ Ht
 
 /-- The close node. -/
-theorem cfInv_step_close (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare)
+theorem cfInv_step_close (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare)
     (fd : Int) (k : Ans (.EClose fd) → Proc) (hc : cfVis Conforms E (.EClose fd) k)
     (hs : sfVis SafeFds (fdDom E.fd) (.EClose fd) k) (hdp : dpIn Dp ds)
     (hdom : ∀ fd d, E.fd fd = some d → d ∈ ds) :
     ⊢ I.eiFds E.fd -∗ I.eiFiles E.files E.paths -∗ devRes I E.dev ds -∗
-      clObl (hlc := hlc) N P fd (fun x => cfInv I (k x)) := by
+      clObl N P fd (fun x => cfInv I (k x)) := by
   simp only [cfVis] at hc
   simp only [sfVis] at hs
   obtain ⟨d, hfd, hlast, hk⟩ := hc
@@ -682,12 +682,12 @@ theorem cfInv_step_close (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : Ext
       iapply cfInv_taint I _ (k y) (hsk y) $$ Ht
 
 /-- The read node. -/
-theorem cfInv_step_read (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare)
+theorem cfInv_step_read (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare)
     (fd : Int) (n : Nat) (k : Ans (.ERead fd n) → Proc) (hc : cfVis Conforms E (.ERead fd n) k)
     (hs : sfVis SafeFds (fdDom E.fd) (.ERead fd n) k) (hdp : dpIn Dp ds)
     (hdom : ∀ fd d, E.fd fd = some d → d ∈ ds) :
     ⊢ I.eiFds E.fd -∗ I.eiFiles E.files E.paths -∗ devRes I E.dev ds -∗
-      rdObl (hlc := hlc) N P fd n (fun x => cfInv I (k x)) := by
+      rdObl N P fd n (fun x => cfInv I (k x)) := by
   simp only [cfVis] at hc
   simp only [sfVis] at hs
   obtain ⟨d, hfd, hn, hc⟩ := hc
@@ -774,12 +774,12 @@ theorem cfInv_step_read (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtT
       iapply cfInv_taint I _ (k y) (hsk y) $$ Ht
 
 /-- The write node. -/
-theorem cfInv_step_write (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare)
+theorem cfInv_step_write (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare)
     (fd : Int) (bs : Bytes) (k : Ans (.EWrite fd bs) → Proc) (hc : cfVis Conforms E (.EWrite fd bs) k)
     (hs : sfVis SafeFds (fdDom E.fd) (.EWrite fd bs) k) (hdp : dpIn Dp ds)
     (hdom : ∀ fd d, E.fd fd = some d → d ∈ ds) :
     ⊢ I.eiFds E.fd -∗ I.eiFiles E.files E.paths -∗ devRes I E.dev ds -∗
-      wrObl (hlc := hlc) N P fd bs (fun x => cfInv I (k x)) := by
+      wrObl N P fd bs (fun x => cfInv I (k x)) := by
   simp only [cfVis] at hc
   simp only [sfVis] at hs
   obtain ⟨d, hfd, hc⟩ := hc
@@ -974,10 +974,10 @@ theorem cfInv_step_write (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : Ext
       iapply cfInv_taint I _ (k y) (hs y) $$ Ht
 
 /-- The exit node. -/
-theorem cfInv_step_exit (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare)
+theorem cfInv_step_exit (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare)
     (s : Int) (k : Ans (.EExit s) → Proc) (hc : cfVis Conforms E (.EExit s) k) (hdp : dpIn Dp ds)
     (hdom : ∀ fd d, E.fd fd = some d → d ∈ ds) :
-    ⊢ I.eiFds E.fd -∗ I.eiFiles E.files E.paths -∗ devRes I E.dev ds -∗ exObl (hlc := hlc) N P s := by
+    ⊢ I.eiFds E.fd -∗ I.eiFiles E.files E.paths -∗ devRes I E.dev ds -∗ exObl N P s := by
   simp only [cfVis] at hc
   iintro Hfds Hfiles Hdev
   iapply I.eiExit s E.fd E.files E.paths E.dev ds (fun d _ => hc d) ((domOkP_iff Dp E.fd ds).2 ⟨hdp, hdom⟩)
@@ -985,9 +985,9 @@ theorem cfInv_step_exit (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtT
 
 /-- One step of the glue at an environment (the body of Rocq's
 `cf_inv_step`, left disjunct). -/
-theorem cfInv_step_env (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (t : Proc)
+theorem cfInv_step_env (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (t : Proc)
     (hc : Conforms E t) (hs : SafeFds (fdDom E.fd) t) (hdp : dpIn Dp ds) :
-    ⊢ envRes I E ds -∗ treeF (hlc := hlc) N P (cfInv I) t := by
+    ⊢ envRes I E ds -∗ treeF N P (cfInv I) t := by
   have hc' := conforms_unfold hc
   have hs' := safeFds_unfold hs
   unfold cfStep at hc'
@@ -1024,23 +1024,23 @@ theorem cfInv_step_env (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTr
       iapply cfInv_step_exit I E ds s k hc' hdp hdom $$ Hfds Hfiles Hdev
 
 /-- **Rocq `cf_inv_step`**: the invariant funds one node and comes back. -/
-theorem cfInv_step (I : EpIfaceP (hlc := hlc) N P Dp) :
-    ⊢ □ (∀ t, cfInv I t -∗ treeF (hlc := hlc) N P (cfInv I) t) := by
+theorem cfInv_step (I : EpIfaceP N P Dp) :
+    ⊢ □ (∀ t, cfInv I t -∗ treeF N P (cfInv I) t) := by
   iintro !> %t Ht
   ihave H := cfInv_elim I t $$ Ht
   icases H with ⟨⟨%E, %ds, %hc, %hs, %hdp, Hres⟩ | Hpay⟩
   · iapply cfInv_step_env I E ds t hc hs hdp $$ Hres
   · -- already paid: unfold, and every subtree is paid
     ihave Hf := treePay_unfold_mp N P t $$ Hpay
-    iapply treeF_mono_law N P (treePay (hlc := hlc) N P) (cfInv I) $$ [] Hf
+    iapply treeF_mono_law N P (treePay N P) (cfInv I) $$ [] Hf
     iintro !> %t' Ht'
     iapply cfInv_paid I t' $$ Ht'
 
 /-- **Rocq `tree_pay_of_conforms_p`**: THE ONCE-GLUE at the protected
 devices -- every one of them is among the devices the environment holds. -/
-theorem treePay_of_conforms_p (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare)
+theorem treePay_of_conforms_p (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare)
     (t : Proc) (hc : Conforms E t) (hs : SafeFds (fdDom E.fd) t) (hdp : dpIn Dp ds) :
-    ⊢ envRes I E ds -∗ treePay (hlc := hlc) N P t := by
+    ⊢ envRes I E ds -∗ treePay N P t := by
   iintro Hres
   ihave #Hstep := cfInv_step I
   iapply treePay_coind N P (cfInv I) $$ Hstep %t [Hres]

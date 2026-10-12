@@ -13,7 +13,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- Open a literal `ctxCells` into its 14 word cells. -/
 macro "ctx_cells" : tactic =>
@@ -227,7 +227,7 @@ theorem swtch_resumed (k : KCtx) (R : RegMap) (av : Nat) (hsie : k.sie = false)
 set_option maxHeartbeats 4000000 in
 /-- **`swtch` meets its specification.** -/
 theorem swtch_proof : SWTCH :=
-  ⟨fun {hlc GF} _ _ X P An Ao cpu k oldc newc old_vs back
+  ⟨fun {GF} _ _ X P An Ao cpu k oldc newc old_vs back
       hlen h10 h11 hmorph hAn hAo hsie hnoff hlocks htier => by
   obtain ⟨v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, rfl⟩ := list14 old_vs hlen
   obtain ⟨ξ0, t0⟩ := X
@@ -248,9 +248,9 @@ theorem swtch_proof : SWTCH :=
   imod kctx_resume_tok cpu k An ξt hAn $$ [$Hk $Htok] with ⟨Hk, Hξt⟩
   icases validCtx_cases P ⟨An, newc, k.proc, ξt⟩ $$ Hvc with
     ⟨%vs, %av, %⟨hvlen, hveven⟩, Hvcells, Hvstack, Hwand⟩
-  imod kctx_move_in (fun ζ => @ctxCells hlc GF _ ⟨ζ, KTier.kpt⟩ newc vs) cpu k ξt
+  imod kctx_move_in (fun ζ => @ctxCells GF _ ⟨ζ, KTier.kpt⟩ newc vs) cpu k ξt
     $$ [$Hk $Hξt $Hvcells] with ⟨Hk, Hξt, Hvcells⟩
-  imod kctx_move_in (fun ζ => @stackOwn hlc GF _ ⟨ζ, KTier.kpt⟩ (vs[1]!) av) cpu k ξt
+  imod kctx_move_in (fun ζ => @stackOwn GF _ ⟨ζ, KTier.kpt⟩ (vs[1]!) av) cpu k ξt
     $$ [$Hk $Hξt $Hvstack] with ⟨Hk, Hξt, Hvstack⟩
   imodintro
   obtain ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, rfl⟩ := list14 vs hvlen
@@ -265,26 +265,26 @@ theorem swtch_proof : SWTCH :=
   ihave Hpc := (show pcIs (GF := GF) cpu (jumpPc w0) ⊢ pcIs cpu (jumpPc (R' 1#5)) by rw [hR1]) $$ Hpc
   -- THE CROSSING
   iapply wpLoop_bupd
-  imod kctx_move_out (fun ζ => @ctxCells hlc GF _ ⟨ζ, KTier.kpt⟩ newc [w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13]) cpu _ ξt
+  imod kctx_move_out (fun ζ => @ctxCells GF _ ⟨ζ, KTier.kpt⟩ newc [w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13]) cpu _ ξt
     $$ [$Hk $Hξt $Hvcells] with ⟨Hk, Hξt, Hvcells⟩
   imod kctx_move_out (fun ζ => P cpu Ao newc oldc (hartId cpu) k.proc back ζ) cpu _ ξt
     $$ [$Hk $Hξt $HP] with ⟨Hk, Hξt, HP⟩
   cases back
   · -- the caller is leaving for good: its raw cells go to the target
-    imod kctx_move_out (fun ζ => @ctxCells hlc GF _ ⟨ζ, KTier.kpt⟩ oldc (calleeImg k.regs)) cpu _ ξt
+    imod kctx_move_out (fun ζ => @ctxCells GF _ ⟨ζ, KTier.kpt⟩ oldc (calleeImg k.regs)) cpu _ ξt
       $$ [$Hk $Hξt $Hcells] with ⟨Hk, Hξt, Hcells⟩
     imod kctx_cross KTier.kpt curCtx ξt cpu _ Ao hAo $$ [$Hξt $Hk] with ⟨Hpark, Hk⟩
     imodintro
-    ihave Hk := (show @kctxL hlc GF _ ⟨ξt, KTier.kpt⟩ _ _ false cpu ((k.withAvail av).withRegs R') ⊢
-        @kctxL hlc GF _ ⟨ξt, KTier.kpt⟩ _ _ false cpu
+    ihave Hk := (show @kctxL GF _ ⟨ξt, KTier.kpt⟩ _ _ false cpu ((k.withAvail av).withRegs R') ⊢
+        @kctxL GF _ ⟨ξt, KTier.kpt⟩ _ _ false cpu
           (resumedK R' k.spie k.spp av k.intena k.root k.proc) by
       rw [swtch_resumed k R' av hsie hnoff hlocks htier]) $$ Hk
     iapply Hwand $$ %cpu %R' %k.spie %k.spp %k.intena %k.root %hAn %hcimg Hk Hpc Hvcells
     iexists Ao, oldc, false
     simp only [Bool.false_eq_true, ite_false]
-    ihave Hraw : @ownCtxCells hlc GF _ ⟨ξt, KTier.kpt⟩ oldc $$ [Hcells]
+    ihave Hraw : @ownCtxCells GF _ ⟨ξt, KTier.kpt⟩ oldc $$ [Hcells]
     case' _ =>
-      iapply (@ownCtxCells_intro hlc GF _ ⟨ξt, KTier.kpt⟩ oldc (calleeImg k.regs))
+      iapply (@ownCtxCells_intro GF _ ⟨ξt, KTier.kpt⟩ oldc (calleeImg k.regs))
       iexact Hcells
     isplitl [Hraw]
     · iexact Hraw
@@ -292,8 +292,8 @@ theorem swtch_proof : SWTCH :=
   · -- the caller comes back: its record is its continuation
     imod kctx_cross KTier.kpt curCtx ξt cpu _ Ao hAo $$ [$Hξt $Hk] with ⟨Hpark, Hk⟩
     imodintro
-    ihave Hk := (show @kctxL hlc GF _ ⟨ξt, KTier.kpt⟩ _ _ false cpu ((k.withAvail av).withRegs R') ⊢
-        @kctxL hlc GF _ ⟨ξt, KTier.kpt⟩ _ _ false cpu
+    ihave Hk := (show @kctxL GF _ ⟨ξt, KTier.kpt⟩ _ _ false cpu ((k.withAvail av).withRegs R') ⊢
+        @kctxL GF _ ⟨ξt, KTier.kpt⟩ _ _ false cpu
           (resumedK R' k.spie k.spp av k.intena k.root k.proc) by
       rw [swtch_resumed k R' av hsie hnoff hlocks htier]) $$ Hk
     iapply Hwand $$ %cpu %R' %k.spie %k.spp %k.intena %k.root %hAn %hcimg Hk Hpc Hvcells

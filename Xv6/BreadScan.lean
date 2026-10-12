@@ -58,7 +58,7 @@ theorem bdOther_set (R0 R : RegMap) (h : bdOther R0 R) (i : BitVec 5) (v : BitVe
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;> assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [SleepLockG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
@@ -553,7 +553,7 @@ and on to the join at `bread+0xb4`.
 `bcache.lock`'s `push_off` on top); `hpopk` is what the release's `pop_off`
 restores, which the caller discharges at the concrete context. -/
 theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c c0 : CPU) (k0 kc : KCtx) (spa spb : Bool) (R0 Rc : RegMap)
     (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j kk tl : Nat) (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat)
@@ -769,7 +769,7 @@ POOL moves with it: the block being installed leaves the pool and the block
 being evicted -- when it is covered at all -- comes back in
 (`Xv6.bioPool_recycle`). -/
 theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c c0 : CPU) (k0 kc : KCtx) (spa spb : Bool) (R0 Rc : RegMap)
     (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j kk tl : Nat) (M : RegMapF Nat) (nx : Nat) (Ls : Nat → List Nat) (ord : List Nat)

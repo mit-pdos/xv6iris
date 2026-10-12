@@ -110,7 +110,7 @@ theorem blkNMask (N : Namespace) (hns : (↑N : CoPset) ## ↑(uartN .uart0)) :
   exact ⟨CoPset.subseteq_top p hp, fun hc => hns p ⟨hp, hc⟩⟩
 
 section blkN
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
   [GhostVarG GF (Option (List (BitVec 8)))]
 variable {W : Type} [DecidableEq W]
 -- THE WRITERS, each once
@@ -248,9 +248,11 @@ abbrev wcurN (γc : W → GName) (w : W) (q : Qp) (c : Nat) : IProp GF :=
 abbrev wmodeN (γm : W → GName) (w : W) (q : Qp) (o : Option (List (BitVec 8))) : IProp GF :=
   ghost_var (γm w) (.own q) o
 
+omit [MachGS GF] in
 instance wcurN_timeless (γc : W → GName) (w : W) (q : Qp) (c : Nat) :
     Timeless (wcurN (GF := GF) γc w q c) := by
   unfold wcurN; infer_instance
+omit [MachGS GF] in
 instance wmodeN_timeless (γm : W → GName) (w : W) (q : Qp) (o : Option (List (BitVec 8))) :
     Timeless (wmodeN (GF := GF) γm w q o) := by
   unfold wmodeN; infer_instance
@@ -261,6 +263,7 @@ def wstN (γc γm : W → GName) (md : W → Option (List (BitVec 8))) (sel : Li
   iprop(wcurN γc w (1 : Qp).half (cntN sel w) ∗ wmodeN γm w (1 : Qp).half (md w)
     ∗ (if cmtN md sel w then dep w (srcN md w) else emp))
 
+omit [MachGS GF] in
 instance wstN_timeless (γc γm : W → GName) (md : W → Option (List (BitVec 8))) (sel : List W)
     (w : W) : Timeless (wstN dep γc γm md sel w) := by
   unfold wstN
@@ -278,6 +281,7 @@ def blkNBody (k : Nat) (γc γm : W → GName) : IProp GF :=
       ∗ ⌜famN ws RUN TERM TOK md sel⌝)
     ∨ blkNDone ws γc)
 
+omit [MachGS GF] in
 instance blkNBody_timeless (k : Nat) (γc γm : W → GName) :
     Timeless (blkNBody ws RUN PW TERM TOK dep k γc γm) := by
   unfold blkNBody blkNDone; infer_instance
@@ -287,7 +291,7 @@ def blkNInv (N : Namespace) (k : Nat) (γc γm : W → GName) : IProp GF :=
   inv N (blkNBody ws RUN PW TERM TOK dep k γc γm)
 
 instance blkNInv_persistent (N : Namespace) (k : Nat) (γc γm : W → GName) :
-    Persistent (blkNInv (hlc := hlc) ws RUN PW TERM TOK dep N k γc γm) := by
+    Persistent (blkNInv ws RUN PW TERM TOK dep N k γc γm) := by
   unfold blkNInv; infer_instance
 
 /-- THE CLAIM'S ONE OBLIGATION: a byte of the round, at any flag (Rocq
@@ -299,11 +303,13 @@ def eclN : IProp GF :=
     PW k pre tm -∗ CL k ho H ==∗
       CL k ho (consStep H (.evOut b)) ∗ PW k (pre ++ [b]) tm' ∗ (⌜tm' = false⌝ ∨ TK k))
 
+omit [MachGS GF] in
 instance eclN_persistent : Persistent (eclN CL PW TK WIT) := by
   unfold eclN; infer_instance
 
 /-! ### The share's accessors -/
 
+omit [MachGS GF] in
 theorem wstNOpen (γc γm : W → GName) (md : W → Option (List (BitVec 8))) (sel : List W) (w : W) :
     wstN dep γc γm md sel w ⊢
       wcurN γc w (1 : Qp).half (cntN sel w) ∗ wmodeN γm w (1 : Qp).half (md w)
@@ -312,6 +318,7 @@ theorem wstNOpen (γc γm : W → GName) (md : W → Option (List (BitVec 8))) (
   iintro H
   iexact H
 
+omit [MachGS GF] in
 /-- a share rebuilt at a new state that agrees at `w` (the byte step's close) -/
 theorem wstNOf (γc γm : W → GName) (md md' : W → Option (List (BitVec 8))) (sel sel' : List W)
     (w : W) (c' : Nat) (o : Option (List (BitVec 8)))
@@ -322,6 +329,7 @@ theorem wstNOf (γc γm : W → GName) (md md' : W → Option (List (BitVec 8)))
   unfold wstN
   rw [hcn, hmd, hcm, hsr]
 
+omit [MachGS GF] in
 /-- the share a FIRE commits (Rocq inline in `blkN_fire`) -/
 theorem wstNFireMk (γc γm : W → GName) (md : W → Option (List (BitVec 8))) (sel : List W)
     (w : W) (s : List (BitVec 8)) (hc0 : cntN sel w = 0) :
@@ -333,6 +341,7 @@ theorem wstNFireMk (γc γm : W → GName) (md : W → Option (List (BitVec 8)))
   iintro H
   iexact H
 
+omit [MachGS GF] in
 /-- the share a SILENCE commits (Rocq inline in `blkN_silence`) -/
 theorem wstNSilenceMk (γc γm : W → GName) (md : W → Option (List (BitVec 8))) (sel : List W)
     (w : W) :
@@ -344,6 +353,7 @@ theorem wstNSilenceMk (γc γm : W → GName) (md : W → Option (List (BitVec 8
   iintro H
   iexact H
 
+omit [MachGS GF] in
 /-- a committed writer's deposit, out of its share -/
 theorem wstNDepOf (γc γm : W → GName) (md : W → Option (List (BitVec 8))) (sel : List W)
     (w : W) (s : List (BitVec 8)) (hc : cmtN md sel w = true) (hs : md w = some s) :
@@ -353,6 +363,7 @@ theorem wstNDepOf (γc γm : W → GName) (md : W → Option (List (BitVec 8))) 
   iintro ⟨-, -, H⟩
   iexact H
 
+omit [MachGS GF] in
 /-- ---- one writer's share, framed across a step that is not its own (Rocq
 `wstN_frame`) -/
 theorem wstNFrame (γc γm : W → GName) (md : W → Option (List (BitVec 8))) (sel : List W)
@@ -362,6 +373,7 @@ theorem wstNFrame (γc γm : W → GName) (md : W → Option (List (BitVec 8))) 
   unfold wstN srcN
   rw [h1, h2, h3]
 
+omit [MachGS GF] in
 /-- Rocq `big_wstN_step` (by induction on the writer list, deviation 4) -/
 theorem bigWstNStep (γc γm : W → GName) (md : W → Option (List (BitVec 8))) (sel : List W)
     (md' : W → Option (List (BitVec 8))) (sel' : List W) (w : W) (l : List W)
@@ -412,6 +424,7 @@ theorem bigWstNStep (γc γm : W → GName) (md : W → Option (List (BitVec 8))
         · iexact Hy
         · iapply Hcl $$ Hn
 
+omit [MachGS GF] in
 /-- a committed writer's deposit, read out of the family (Rocq
 `big_wstN_dep`) -/
 theorem bigWstNDep (γc γm : W → GName) (md : W → Option (List (BitVec 8))) (sel : List W)
@@ -421,6 +434,7 @@ theorem bigWstNDep (γc γm : W → GName) (md : W → Option (List (BitVec 8)))
   ihave Hw := BigSepL.bigSepL_mem (Φ := fun x => wstN dep γc γm md sel x) hw $$ Hb
   iapply wstNDepOf dep γc γm md sel w s hc hs $$ Hw
 
+omit [MachGS GF] in
 /-- the family's share of `w` agrees with the writer's halves -/
 theorem wstNAgree (γc γm : W → GName) (md : W → Option (List (BitVec 8))) (sel : List W)
     (w : W) (hw : w ∈ ws) (q q' : Qp) (c : Nat) (o : Option (List (BitVec 8))) :
@@ -434,6 +448,7 @@ theorem wstNAgree (γc γm : W → GName) (md : W → Option (List (BitVec 8))) 
   ipureintro
   exact ⟨h1, h2⟩
 
+omit [MachGS GF] in
 /-- a writer's cursor half refutes the DONE arm (Rocq `blkN_done_not`) -/
 theorem blkNDoneNot (γc : W → GName) (w : W) (q : Qp) (c : Nat) (hw : w ∈ ws) :
     ⊢ wcurN (GF := GF) γc w q c -∗ blkNDone ws γc -∗ False := by
@@ -446,6 +461,7 @@ theorem blkNDoneNot (γc : W → GName) (w : W) (q : Qp) (c : Nat) (hw : w ∈ w
 
 /-! ## 3. The entry -/
 
+omit [MachGS GF] in
 /-- Rocq `ghost_vars_alloc` -/
 theorem ghostVarsAlloc {A : Type} [GhostVarG GF A] (l : List W) (a : A) (hl : l.Nodup) :
     ⊢@{IProp GF} |==> ∃ γ : W → GName,
@@ -481,6 +497,7 @@ theorem ghostVarsAlloc {A : Type} [GhostVarG GF A] (l : List W) (a : A) (hl : l.
       · iexact Hx2
     · iexact Hl
 
+omit [MachGS GF] in
 /-- the family's share at the empty block -/
 theorem wstNInit (γc γm : W → GName) (w : W) :
     wcurN γc w (1 : Qp).half 0 ∗ wmodeN γm w (1 : Qp).half none ⊢
@@ -502,7 +519,7 @@ theorem blkNAlloc (hnd : ws.Nodup) (E : CoPset) (N : Namespace) (k : Nat)
     (hr0 : runS RUN (fun _ => none)) :
     ⊢ PW k [] false ={E}=∗
       ∃ γc γm : W → GName,
-        blkNInv (hlc := hlc) ws RUN PW TERM TOK dep N k γc γm
+        blkNInv ws RUN PW TERM TOK dep N k γc γm
         ∗ [∗list] w ∈ ws, wcurN γc w (1 : Qp).half 0 ∗ wmodeN γm w (1 : Qp).half none := by
   iintro HPW
   imod ghostVarsAlloc (GF := GF) (A := Nat) ws 0 hnd with ⟨%γc, Hc⟩
@@ -624,7 +641,7 @@ theorem blkNFirePure (hnd : ws.Nodup)
     · left; exact hx
 
 /-- THE FIRE (Rocq `blkN_fire`) -/
-theorem blkNFire (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = CL) (hnd : ws.Nodup)
+theorem blkNFire (hcons : MachFixedGS.consRes (GF := GF) = CL) (hnd : ws.Nodup)
     (hwit : ∀ pre bl, blkN ws RUN bl → pre <+: bl → WIT false pre)
     (N : Namespace) (Eex : CoPset) (k : Nat) (γc γm : W → GName)
     (w : W) (s : List (BitVec 8)) (b : BitVec 8) (EXCL : W → List (BitVec 8) → Prop)
@@ -632,7 +649,7 @@ theorem blkNFire (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = CL) (hnd
     (hns : (↑N : CoPset) ## ↑(uartN .uart0)) (hEx : Eex ⊆ (⊤ \ ↑(uartN .uart0)) \ ↑N)
     (hw : w ∈ ws) (hb : s[0]? = some b) (hok : fireOkN ws RUN WIT TERM TOK w s EXCL) :
     ⊢ □ (∀ w' s', ⌜EXCL w' s'⌝ -∗ dep w' s' -∗ dep w s ={Eex}=∗ False) -∗
-      eclN CL PW TK WIT -∗ blkNInv (hlc := hlc) ws RUN PW TERM TOK dep N k γc γm -∗
+      eclN CL PW TK WIT -∗ blkNInv ws RUN PW TERM TOK dep N k γc γm -∗
       wcurN γc w (1 : Qp).half 0 -∗ wmodeN γm w (1 : Qp).half none -∗ dep w s -∗
       (wcurN γc w (1 : Qp).half 1 -∗ wmodeN γm w (1 : Qp).half (some s)
         -∗ (⌜TERM w s = false⌝ ∨ TK k) -∗ Φ) -∗
@@ -702,6 +719,7 @@ def cstepOkN (w : W) (s : List (BitVec 8)) (c : Nat) : Prop :=
     tmN TERM md sel = true →
     TOK md (sel ++ [w]) ∧ WIT true (pendN md (sel ++ [w]))
 
+omit [MachGS GF] in
 /-- the halves `hs` (writer, source, cursor) agree with the family (Rocq
 `big_wstN_held`) -/
 theorem bigWstNHeld (γc γm : W → GName) (md : W → Option (List (BitVec 8))) (sel : List W)
@@ -785,7 +803,7 @@ theorem blkNCstepPure (hnd : ws.Nodup)
       rw [this] at hf; cases hf
 
 /-- [blkN_cstep] with the halves `hs` in hand (Rocq `blkN_cstep_h`) -/
-theorem blkNCstepH (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = CL) (hnd : ws.Nodup)
+theorem blkNCstepH (hcons : MachFixedGS.consRes (GF := GF) = CL) (hnd : ws.Nodup)
     (hwit : ∀ pre bl, blkN ws RUN bl → pre <+: bl → WIT false pre)
     (N : Namespace) (k : Nat) (γc γm : W → GName)
     (w : W) (s : List (BitVec 8)) (c : Nat) (b : BitVec 8)
@@ -793,7 +811,7 @@ theorem blkNCstepH (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = CL) (h
     (hns : (↑N : CoPset) ## ↑(uartN .uart0))
     (hw : w ∈ ws) (hc : 0 < c) (hb : s[c]? = some b)
     (hhin : ∀ x ∈ hs, x.1.1 ∈ ws) (hok : cstepOkNh ws RUN WIT TERM TOK w s c hs) :
-    ⊢ eclN CL PW TK WIT -∗ blkNInv (hlc := hlc) ws RUN PW TERM TOK dep N k γc γm -∗
+    ⊢ eclN CL PW TK WIT -∗ blkNInv ws RUN PW TERM TOK dep N k γc γm -∗
       wcurN γc w (1 : Qp).half c -∗ wmodeN γm w (1 : Qp).half (some s) -∗
       ([∗list] x ∈ hs, wcurN γc x.1.1 (1 : Qp).half x.2 ∗ wmodeN γm x.1.1 (1 : Qp).half (some x.1.2)) -∗
       (wcurN γc w (1 : Qp).half (c + 1) -∗ wmodeN γm w (1 : Qp).half (some s)
@@ -854,13 +872,13 @@ theorem blkNCstepH (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = CL) (h
 
 /-- A FURTHER BYTE (Rocq `blkN_cstep`; here `blkNCstepH` at `hs = []`,
 deviation 3) -/
-theorem blkNCstep (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = CL) (hnd : ws.Nodup)
+theorem blkNCstep (hcons : MachFixedGS.consRes (GF := GF) = CL) (hnd : ws.Nodup)
     (hwit : ∀ pre bl, blkN ws RUN bl → pre <+: bl → WIT false pre)
     (N : Namespace) (k : Nat) (γc γm : W → GName)
     (w : W) (s : List (BitVec 8)) (c : Nat) (b : BitVec 8) (Φ : IProp GF)
     (hns : (↑N : CoPset) ## ↑(uartN .uart0))
     (hw : w ∈ ws) (hc : 0 < c) (hb : s[c]? = some b) (hok : cstepOkN ws RUN WIT TERM TOK w s c) :
-    ⊢ eclN CL PW TK WIT -∗ blkNInv (hlc := hlc) ws RUN PW TERM TOK dep N k γc γm -∗
+    ⊢ eclN CL PW TK WIT -∗ blkNInv ws RUN PW TERM TOK dep N k γc γm -∗
       wcurN γc w (1 : Qp).half c -∗ wmodeN γm w (1 : Qp).half (some s) -∗
       (wcurN γc w (1 : Qp).half (c + 1) -∗ wmodeN γm w (1 : Qp).half (some s)
         -∗ (⌜TERM w s = false⌝ ∨ TK k) -∗ Φ) -∗
@@ -926,7 +944,7 @@ theorem blkNSilence (hnd : ws.Nodup) (E : CoPset) (N : Namespace) (Eex : CoPset)
     (hN : (↑N : CoPset) ⊆ E) (hEx : Eex ⊆ E \ ↑N)
     (hw : w ∈ ws) (hok : silenceOkN ws RUN TERM TOK w EXCL) :
     ⊢ □ (∀ w' s', ⌜EXCL w' s'⌝ -∗ dep w' s' -∗ dep w [] ={Eex}=∗ False) -∗
-      blkNInv (hlc := hlc) ws RUN PW TERM TOK dep N k γc γm -∗
+      blkNInv ws RUN PW TERM TOK dep N k γc γm -∗
       wcurN γc w (1 : Qp).half 0 -∗ wmodeN γm w (1 : Qp).half none -∗ dep w [] ={E}=∗
       wcurN γc w (1 : Qp).half 0 ∗ wmodeN γm w (1 : Qp).half (some []) := by
   iintro #Hex #Hinv HcW HmW Hdep
@@ -974,6 +992,7 @@ theorem blkNSilence (hnd : ws.Nodup) (E : CoPset) (N : Namespace) (Eex : CoPset)
 
 /-! ## 7. The filing: at the prompt, every half back -/
 
+omit [MachGS GF] in
 /-- one writer's halves against its share: the whole cursor and the pure
 facts (Rocq inline in `blkN_file`) -/
 theorem wstNFileOne (γc γm : W → GName) (md : W → Option (List (BitVec 8))) (sel : List W)
@@ -994,7 +1013,7 @@ theorem wstNFileOne (γc γm : W → GName) (md : W → Option (List (BitVec 8))
 theorem blkNFile (hnd : ws.Nodup) (E : CoPset) (N : Namespace) (k : Nat) (γc γm : W → GName)
     (sw : W → List (BitVec 8))
     (hN : (↑N : CoPset) ⊆ E) (hne : ws ≠ []) (hT : ∀ w ∈ ws, TERM w (sw w) = false) :
-    ⊢ blkNInv (hlc := hlc) ws RUN PW TERM TOK dep N k γc γm -∗
+    ⊢ blkNInv ws RUN PW TERM TOK dep N k γc γm -∗
       ([∗list] w ∈ ws, wcurN γc w (1 : Qp).half (sw w).length
                         ∗ wmodeN γm w (1 : Qp).half (some (sw w))) ={E}=∗
       ∃ pre : List (BitVec 8), PW k pre false ∗ ⌜blkN ws RUN pre⌝ := by
@@ -1076,12 +1095,12 @@ theorem blkNFile (hnd : ws.Nodup) (E : CoPset) (N : Namespace) (k : Nat) (γc γ
 `pwc_fork_exitN`) -/
 def pwcForkExitN (N : Namespace) (k : Nat) (γc γm : W → GName) (w : W) (s : List (BitVec 8))
     (c : Nat) : IProp GF :=
-  iprop(blkNInv (hlc := hlc) ws RUN PW TERM TOK dep N k γc γm ∗ wcurN γc w (1 : Qp).half c
+  iprop(blkNInv ws RUN PW TERM TOK dep N k γc γm ∗ wcurN γc w (1 : Qp).half c
     ∗ wmodeN γm w (1 : Qp).half (some s) ∗ TK k)
 
 /-- THE MAIN LOOP'S PROMPT with the waited stages' halves in hand (Rocq
 `pprompt_forkN_h`) -/
-theorem ppromptForkNH (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = CL) (hnd : ws.Nodup)
+theorem ppromptForkNH (hcons : MachFixedGS.consRes (GF := GF) = CL) (hnd : ws.Nodup)
     (hwit : ∀ pre bl, blkN ws RUN bl → pre <+: bl → WIT false pre)
     (N : Namespace) (k : Nat) (γc γm : W → GName)
     (w : W) (s : List (BitVec 8)) (c : Nat) (b : BitVec 8)
@@ -1089,9 +1108,9 @@ theorem ppromptForkNH (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = CL)
     (hns : (↑N : CoPset) ## ↑(uartN .uart0))
     (hw : w ∈ ws) (hc : 0 < c) (hb : s[c]? = some b)
     (hhin : ∀ x ∈ hs, x.1.1 ∈ ws) (hok : cstepOkNh ws RUN WIT TERM TOK w s c hs) :
-    ⊢ eclN CL PW TK WIT -∗ pwcForkExitN (hlc := hlc) ws RUN PW TK TERM TOK dep N k γc γm w s c -∗
+    ⊢ eclN CL PW TK WIT -∗ pwcForkExitN ws RUN PW TK TERM TOK dep N k γc γm w s c -∗
       ([∗list] x ∈ hs, wcurN γc x.1.1 (1 : Qp).half x.2 ∗ wmodeN γm x.1.1 (1 : Qp).half (some x.1.2)) -∗
-      (pwcForkExitN (hlc := hlc) ws RUN PW TK TERM TOK dep N k γc γm w s (c + 1)
+      (pwcForkExitN ws RUN PW TK TERM TOK dep N k γc γm w s (c + 1)
         -∗ ([∗list] x ∈ hs, wcurN γc x.1.1 (1 : Qp).half x.2
               ∗ wmodeN γm x.1.1 (1 : Qp).half (some x.1.2))
         -∗ Φ) -∗

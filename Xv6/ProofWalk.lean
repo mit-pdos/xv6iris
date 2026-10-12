@@ -41,7 +41,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-! ## Arithmetic and address facts -/
@@ -363,7 +363,7 @@ theorem walk_alloc [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
           ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗ wpLoop cpu'))
         ⊢ wpLoop (GF := GF) c8 := by
       intro k' os hK' hn hl'
-      have h := MS.wp_memset (hlc := hlc) (GF := GF) c8 k' os 4096 hK' hn (by decide) hl'
+      have h := MS.wp_memset (GF := GF) c8 k' os 4096 hK' hn (by decide) hl'
       unfold wp_memset_body at h
       simp only [memsetAddr] at h
       exact h
@@ -752,7 +752,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on t ke hnoff hK hlk hroot hva halloc hwf hnd hpgt => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk on t ke hnoff hK hlk hroot hva halloc hwf hnd hpgt => by
   unfold wp_walk_body
   simp only [walkAddr]
   iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, Hlend, Hnext⟩
@@ -1053,7 +1053,7 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
 /-! ## The non-allocating walk -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- `walk`'s postcondition with `alloc = 0`, as `wp_walk_noalloc_body`
 states it. -/
@@ -1219,7 +1219,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem walk_noalloc_proof : WALK_NOALLOC :=
-  ⟨fun {hlc GF} _ _ _ cpu k dq t hK hroot hva halloc hwf => by
+  ⟨fun {GF} _ _ _ cpu k dq t hK hroot hva halloc hwf => by
   unfold wp_walk_noalloc_body
   simp only [walkAddr]
   iintro ⟨Hk, Hpc, Htree, Hnext⟩

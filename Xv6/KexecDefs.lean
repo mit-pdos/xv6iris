@@ -293,7 +293,7 @@ shared fabric file once a second independent contract wants it (Rocq's
 promote-on-second-consumer rule). -/
 
 section Fabric
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
@@ -304,20 +304,20 @@ def fsFabric [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (pd pav pu : BitVec 64) :
   fsReady ∗ panicEnv ∗ procsInv Γ ∗ diskCaps fscDisk fscDlock pd pav pu)
 
 instance fsFabric_persistent [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (pd pav pu : BitVec 64) :
-    Persistent (fsFabric (hlc := hlc) (GF := GF) Γ pd pav pu) := by
+    Persistent (fsFabric (GF := GF) Γ pd pav pu) := by
   unfold fsFabric; infer_instance
 
 /-- **Rocq `fs_fabric_all`**: THE UNPACK -- `fsReady_all`'s rows, then the
 three the bundle adds, with the contracts' `descPageRw pd` at the caller's
 descriptor page. -/
 theorem fsFabric_all [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (pd pav pu : BitVec 64) :
-    fsFabric (hlc := hlc) (GF := GF) Γ pd pav pu ⊢
+    fsFabric (GF := GF) Γ pd pav pu ⊢
       ((∃ γl : GName, bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov)) ∗
       logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
       (∃ pd pav pu : BitVec 64, diskCaps fscDisk fscDlock pd pav pu ∗ ⌜descPageRw pd⌝) ∗
       isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-      itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
-      iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+      itableInv ∗ icSleeplocks fscIc ∗
+      iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
       isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗
       kallocAvail fsReadyKmem none ∗
       ⌜FsGeomOk⌝ ∗ fsSbCells ∗
@@ -334,7 +334,7 @@ theorem fsFabric_all [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (pd pav pu : BitV
 /-- The bundle's `fsReady`, whole: what the crash rows `end_op` takes are
 projected from (`fsReady_seam` / `fsReady_gen`, D38). -/
 theorem fsFabric_ready [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (pd pav pu : BitVec 64) :
-    fsFabric (hlc := hlc) (GF := GF) Γ pd pav pu ⊢ fsReady (hlc := hlc) := by
+    fsFabric (GF := GF) Γ pd pav pu ⊢ fsReady := by
   unfold fsFabric
   iintro ⟨#Hr, -⟩
   iexact Hr

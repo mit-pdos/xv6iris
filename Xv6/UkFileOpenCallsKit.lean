@@ -26,17 +26,17 @@ open HfpFileClaimsP UkFileOpen
 open Std (ExtTreeSet)
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 namespace UkFileOpen
-variable (FO : HfpFileOpenP (hlc := hlc) (GF := GF))
-  (SYS : UkFileOpenSysP (hlc := hlc) (GF := GF))
+variable (FO : HfpFileOpenP (GF := GF))
+  (SYS : UkFileOpenSysP (GF := GF))
 
 theorem fescRes_intro (r : FileAppNames) (s : Dst) (g : GName) (np : Nat) :
-    ⊢ ftkt (GF := GF) r s -∗ escTok (hlc := hlc) g -∗ fpos r np -∗ fescRes (hlc := hlc) r s g np := by
+    ⊢ ftkt (GF := GF) r s -∗ escTok g -∗ fpos r np -∗ fescRes r s g np := by
   unfold fescRes
   iintro Ht Hg Hp
   iframe Ht Hg Hp

@@ -26,7 +26,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -36,7 +36,7 @@ theorem ushm_malloc_fresh_gen (HM : SH_MALLOC) (hps : ∀ k : Int, freeNum k →
     (hszlo : ushmBase + 16 ≤ sz) (hszal : pgRoundUpN sz = sz) (hszok : uszOk (sz + 65536))
     (hpost : ∀ nbytes, 0 < nbytes → nbytes ≤ B →
       ushmOne N (sz + 65536) (4096 - ushmNu nbytes) ⊢ UM') :
-    ushmMallocTyLe (hlc := hlc) N B (ushmFresh N sz) UM' := by
+    ushmMallocTyLe N B (ushmFresh N sz) UM' := by
   intro h m nbytes avail ha0 hlo hhi
   unfold ushmFresh
   iintro #Hc ⟨Hfp, ⟨%fb, Hb⟩, Hsz⟩ Hrun Hcont
@@ -61,7 +61,7 @@ out and dropping the list. -/
 theorem ushm_malloc_ok_holds (HM : SH_MALLOC) (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) (sz : Nat) (hszlo : ushmBase + 16 ≤ sz) (hszal : pgRoundUpN sz = sz)
     (hszok : uszOk (sz + 65536)) :
-    ushmMallocTy (hlc := hlc) N (ushmFresh N sz) (usz N.s (sz + 65536)) :=
+    ushmMallocTy N (ushmFresh N sz) (usz N.s (sz + 65536)) :=
   ushm_malloc_fresh_gen HM hps N 65504 sz _ (Nat.le_refl _) hszlo hszal hszok fun _ _ _ => by
     unfold ushmOne
     iintro ⟨%c, -, -, -, -, -, Hsz⟩
@@ -71,7 +71,7 @@ theorem ushm_malloc_ok_holds (HM : SH_MALLOC) (hps : ∀ k : Int, freeNum k → 
 theorem ushm_malloc_le_fresh (HM : SH_MALLOC) (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) (B sz : Nat) (hB : B ≤ 65504) (hszlo : ushmBase + 16 ≤ sz)
     (hszal : pgRoundUpN sz = sz) (hszok : uszOk (sz + 65536)) :
-    ushmMallocTyLe (hlc := hlc) N B (ushmFresh N sz) (ushmOneGe N (sz + 65536) (4096 - ushmNu B)) :=
+    ushmMallocTyLe N B (ushmFresh N sz) (ushmOneGe N (sz + 65536) (4096 - ushmNu B)) :=
   ushm_malloc_fresh_gen HM hps N B sz _ hB hszlo hszal hszok fun nbytes _ hhi => by
     unfold ushmOneGe
     iintro Hone
@@ -84,7 +84,7 @@ theorem ushm_malloc_le_fresh (HM : SH_MALLOC) (hps : ∀ k : Int, freeNum k → 
 already holds the chunk. -/
 theorem ushm_malloc_le_one (HM : SH_MALLOC) (N : UkNames GF) (B sz R : Nat) (hB : B ≤ 65504)
     (hfit : ushmNu B < R) :
-    ushmMallocTyLe (hlc := hlc) N B (ushmOneGe N sz R) (ushmOneGe N sz (R - ushmNu B)) := by
+    ushmMallocTyLe N B (ushmOneGe N sz R) (ushmOneGe N sz (R - ushmNu B)) := by
   intro h m nbytes avail ha0 hlo hhi
   have hmono : ushmNu nbytes ≤ ushmNu B := by simp only [ushmNu]; omega
   unfold ushmOneGe
@@ -109,12 +109,12 @@ theorem ushm_malloc_le_one (HM : SH_MALLOC) (N : UkNames GF) (B sz R : Nat) (hB 
 theorem ushm_malloc_le_exec (HM : SH_MALLOC) (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) (sz : Nat) (hszlo : ushmBase + 16 ≤ sz) (hszal : pgRoundUpN sz = sz)
     (hszok : uszOk (sz + 65536)) :
-    ushmMallocTyLe (hlc := hlc) N 168 (ushmFresh N sz) (ushmOneGe N (sz + 65536) 4084) :=
+    ushmMallocTyLe N 168 (ushmFresh N sz) (ushmOneGe N (sz + 65536) 4084) :=
   ushm_malloc_le_fresh HM hps N 168 sz (by decide) hszlo hszal hszok
 
 /-- **Rocq `ushm_malloc_le_next`**: the second call, charged at 168. -/
 theorem ushm_malloc_le_next (HM : SH_MALLOC) (N : UkNames GF) (sz : Nat) :
-    ushmMallocTyLe (hlc := hlc) N 168 (ushmOneGe N sz 4084) (ushmOneGe N sz 4072) :=
+    ushmMallocTyLe N 168 (ushmOneGe N sz 4084) (ushmOneGe N sz 4072) :=
   ushm_malloc_le_one HM N 168 sz 4084 (by decide) (by decide)
 
 end

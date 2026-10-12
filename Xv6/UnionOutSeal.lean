@@ -30,7 +30,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section UnionBirth
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 /-- the birth's registry covers era 0 alone -/
@@ -50,8 +50,8 @@ authority to the crash slot (era 0's durable copy), the registry and the
 floor to the trace slot. -/
 theorem unionBirthAll (γst : GName) :
     ⊢@{IProp GF} |==> ∃ ug : UnionGn, ⌜ug.ugnFile.fgnCl.ffSt = γst⌝
-      ∗ unionCls (hlc := hlc) ug ∗ unionClAll (hlc := hlc) ug := by
-  imod (fileBirthAll (hlc := hlc) (GF := GF) γst) with ⟨%g, %hst, Hf, Hreg, Hcm, Hhi, Hra⟩
+      ∗ unionCls ug ∗ unionClAll ug := by
+  imod (fileBirthAll (GF := GF) γst) with ⟨%g, %hst, Hf, Hreg, Hcm, Hhi, Hra⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := PipeEra) (H := RegMapF)) with ⟨%gm, Hm⟩
   imod (slAuth_alloc (GF := GF)) with ⟨%γ0, H0⟩
   imod (syncRegAuth_insert (GF := GF) g.fgnCl ∅ 0 γ0 (by simp [Std.PartialMap.get?])) $$ Hreg
@@ -75,7 +75,7 @@ theorem unionBirthAll (γst : GName) :
     iexact Hreg
 
 /-- **Rocq `union_led_init`**: the ledger is born empty. -/
-theorem unionLed_init (ug : UnionGn) : ⊢ unionClAll (hlc := hlc) (GF := GF) ug -∗ unionLed ug [] := by
+theorem unionLed_init (ug : UnionGn) : ⊢ unionClAll (GF := GF) ug -∗ unionLed ug [] := by
   unfold unionClAll fileClAll fileCl echoCl unionLed pinMap f0Map peraMap
   iintro ⟨⟨⟨⟨Ht, Hm⟩, Hfl⟩, Hmf⟩, Hme, ⟨%γ0, Hreg⟩, #Hlb0⟩
   have hd : lmDisc ulmG [] := lmDisc_nil ulmG
@@ -116,9 +116,9 @@ theorem unionLed_init (ug : UnionGn) : ⊢ unionClAll (hlc := hlc) (GF := GF) ug
 claim at the start of its era and init's credential. -/
 theorem union_era_split (ug : UnionGn) (k : Nat) (v : EraPins) (vf : FileEra) (w : PipeEra) (gb : GName) :
     ⊢ eraPin (GF := GF) (fgnEcho ug.ugnFile) k v -∗ fileEraPin ug.ugnFile k vf -∗ peraPin (ugnPipe ug) k w -∗
-      eraFull (hlc := hlc) v -∗ f0Auth vf [] -∗ f0fAuth vf [] -∗ blkAuth w [] -∗ rblkAuth gb [] -∗
+      eraFull v -∗ f0Auth vf [] -∗ f0fAuth vf [] -∗ blkAuth w [] -∗ rblkAuth gb [] -∗
       curHalf w 1 0 gb false -∗
-      ucl (hlc := hlc) ug k [] ⟨[], [], [], none⟩ ∗ fturn (GF := GF) ug.ugnFile k := by
+      ucl ug k [] ⟨[], [], [], none⟩ ∗ fturn (GF := GF) ug.ugnFile k := by
   unfold eraFull
   iintro #Hpin #Hfp #Hpera ⟨Ht, Hcs, Hps, HE, Hdl, Hdll, Hsc, Hrp⟩ Hf0 Hfla Hblk Hrb Hcur1
   have hsplit := (inferInstance : Fractional (PROP := IProp GF)
@@ -135,7 +135,7 @@ theorem union_era_split (ug : UnionGn) (k : Nat) (v : EraPins) (vf : FileEra) (w
   ihave #Hinp := inpLb_of_dlLb (GF := GF) v [] [] (List.nil_prefix) $$ Hdllb
   isplitl [Ht1 Hcs Hps HE Hdl1 Hdll Hfla Hblk Hrb Hcur1 Hsc]
   · unfold ucl
-    have hm := pwclV_mid (ugnPipe ug) ulmG (ucparams (hlc := hlc) (GF := GF) ug) (∅ : Fstate) (uwa ug) uwild
+    have hm := pwclV_mid (ugnPipe ug) ulmG (ucparams (GF := GF) ug) (∅ : Fstate) (uwa ug) uwild
       k [] ⟨[], [], [], none⟩ v
     rw [ucparams_gcPIN] at hm
     unfold seccFlag at hm
@@ -181,7 +181,7 @@ theorem union_era_split (ug : UnionGn) (k : Nat) (v : EraPins) (vf : FileEra) (w
 /-- the conclusion's resource carried across a power loss (Rocq
 `union_led_pow`'s off-arm). -/
 theorem unionPhiRes_off (ug : UnionGn) (h : List Obs) :
-    unionPhiRes (hlc := hlc) (GF := GF) ug h ⊢ unionPhiRes ug (h ++ [Obs.powerOff]) := by
+    unionPhiRes (GF := GF) ug h ⊢ unionPhiRes ug (h ++ [Obs.powerOff]) := by
   have hb : obsBoots (h ++ [Obs.powerOff]) = obsBoots h := by rw [obsBoots_app]; rfl
   have hdp : lmDisc ulmG (h ++ [Obs.powerOff]) → lmDisc ulmG h :=
     (lmDisc_power ulmG h true unionSt_ok).1
@@ -211,9 +211,9 @@ era's three records (echo's, the file's boot state at the ledger's line list
 and floor, the byte ledger) and the era's sync list (registered), mints the
 pins, and splits the ghosts into the era's claim and the turn. -/
 theorem unionLed_pow (ug : UnionGn) (h : List Obs) (on : Bool) :
-    unionLed (hlc := hlc) (GF := GF) ug h ⊢ |==> (unionLed ug (h ++ [powerEv on]) ∗
+    unionLed (GF := GF) ug h ⊢ |==> (unionLed ug (h ++ [powerEv on]) ∗
       (if on then iprop(emp)
-       else iprop(ucl (hlc := hlc) ug (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗
+       else iprop(ucl ug (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗
          uturn (GF := GF) ug (obsBoots h + 1)))) := by
   have hdp := lmDisc_power ulmG h on unionSt_ok
   have hite : (if lmDisc ulmG (h ++ [powerEv on]) then (0 : Nat) else 1) =
@@ -256,13 +256,13 @@ theorem unionLed_pow (ug : UnionGn) (h : List Obs) (on : Bool) :
     simp only [powerEv, Bool.false_eq_true, ↓reduceIte]
     have hb : obsBoots (h ++ [Obs.powerOn]) = obsBoots h + 1 := by rw [obsBoots_app]; rfl
     have hd0 : lmDisc ulmG (h ++ [Obs.powerOn]) → lmDisc ulmG h := hdp.1
-    imod (eraFull_alloc (hlc := hlc) (GF := GF)) with ⟨%v, Hfull⟩
+    imod (eraFull_alloc (GF := GF)) with ⟨%v, Hfull⟩
     -- the floor the era's record pins: the conclusion's, or (tainted) the
     -- taint arm's
     ihave ⟨%F, #HF, Hphi⟩ : iprop(∃ F : List Srec, slLb ug.ugnFile.fgnCl.ffHist F
         ∗ ((∃ W : List (Fstate × Option Srec), ⌜lmDisc ulmG h → unionPhiSyncBody h W⌝
               ∗ ⌜lmDisc ulmG h → slast F = unionRecNow h W⌝)
-           ∨ fileTaint (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl)) $$ [Hphi]
+           ∨ fileTaint (GF := GF) ug.ugnFile.fgnCl)) $$ [Hphi]
     · icases Hphi with (Hphi | ⟨#HT, #Hflr⟩)
       rotate_left
       · ihave ⟨%F, #HF⟩ : iprop(∃ F : List Srec, slLb ug.ugnFile.fgnCl.ffHist F) $$ [Hflr]
@@ -284,7 +284,7 @@ theorem unionLed_pow (ug : UnionGn) (h : List Obs) (on : Bool) :
     imod (pinMap_on (GF := GF) (fgnEcho ug.ugnFile) h v) $$ Hpm with ⟨Hpm, #Hpin⟩
     imod (f0Map_on (GF := GF) ug.ugnFile h vf) $$ Hfm with ⟨Hfm, #Hfp⟩
     imod (peraMap_on (GF := GF) (ugnPipe ug) h w) $$ Hme with ⟨Hme, #Hpera⟩
-    ihave ⟨Hcl, Hturn⟩ := (union_era_split (hlc := hlc) (GF := GF) ug (obsBoots h + 1) v vf w gb)
+    ihave ⟨Hcl, Hturn⟩ := (union_era_split (GF := GF) ug (obsBoots h + 1) v vf w gb)
       $$ Hpin Hfp Hpera Hfull Hf0 Hfla Hblk Hrb Hcur1
     -- the era's sync list, registered
     imod (slAuth_alloc (GF := GF)) with ⟨%γ, Hγ⟩
@@ -344,8 +344,8 @@ open Classical in
 byte's TAG is handed out, its line list's lower bound grown by what the
 input completed. -/
 theorem unionLed_rx (ug : UnionGn) (h : List Obs) (i : UartId) (b : BitVec 8) (hsh : traceShape h true) :
-    unionLed (hlc := hlc) (GF := GF) ug h ⊢
-      |==> (unionLed ug (h ++ [Obs.dev (.uartIn i b)]) ∗ utag (hlc := hlc) ug (h ++ [Obs.dev (.uartIn i b)])) := by
+    unionLed (GF := GF) ug h ⊢
+      |==> (unionLed ug (h ++ [Obs.dev (.uartIn i b)]) ∗ utag ug (h ++ [Obs.dev (.uartIn i b)])) := by
   have he : obsBoots [Obs.dev (.uartIn i b)] = 0 := rfl
   have hbo : obsBoots (h ++ [Obs.dev (.uartIn i b)]) = obsBoots h := by rw [obsBoots_app]; rfl
   have hio : isIo (Obs.dev (.uartIn i b)) = true := by cases i <;> rfl
@@ -369,8 +369,8 @@ theorem unionLed_rx (ug : UnionGn) (h : List Obs) (i : UartId) (b : BitVec 8) (h
   ihave Hme := peraMap_step (GF := GF) (ugnPipe ug) h _ he $$ Hme
   imod (flAuth_grow_pre (GF := GF) ug.ugnFile (ulinesOf h) (ulinesOf (h ++ [Obs.dev (.uartIn i b)]))
     (ulinesOf_snoc h _)) $$ Hfl with ⟨Hfl, #Hfllb⟩
-  ihave Hphi : iprop(unionPhiRes (hlc := hlc) (GF := GF) ug (h ++ [Obs.dev (.uartIn i b)]) ∨
-      fileTaint (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl ∗ unionFloor ug) $$ [Hphi]
+  ihave Hphi : iprop(unionPhiRes (GF := GF) ug (h ++ [Obs.dev (.uartIn i b)]) ∨
+      fileTaint (GF := GF) ug.ugnFile.fgnCl ∗ unionFloor ug) $$ [Hphi]
   · icases Hphi with (Hphi | HT)
     · ileft
       unfold unionPhiRes
@@ -433,7 +433,7 @@ theorem unionLed_rx (ug : UnionGn) (h : List Obs) (i : UartId) (b : BitVec 8) (h
 3): at the console's port the union's drain receipt. -/
 noncomputable def unionTxGo (ug : UnionGn) (h : List Obs) (i : UartId) (b : BitVec 8) : IProp GF :=
   match i with
-  | .uart0 => udrainRet (hlc := hlc) ug (obsBoots h) (openSeg h ++ [Obs.dev (.uartOut .uart0 b)])
+  | .uart0 => udrainRet ug (obsBoots h) (openSeg h ++ [Obs.dev (.uartOut .uart0 b)])
   | .uart1 => iprop(True)
 
 /-- a drained cycle's boot state is the last entry's (Rocq's inline
@@ -458,7 +458,7 @@ to the era's record, and the cycle's last completed sync with the history's
 lower bound ending at it (sync SY3-A4): the floor moves to it, or back to
 the era's own. -/
 theorem unionLed_tx (ug : UnionGn) (h : List Obs) (i : UartId) (b : BitVec 8) (hsh : traceShape h true) :
-    ⊢ unionTxGo (hlc := hlc) (GF := GF) ug h i b -∗
+    ⊢ unionTxGo (GF := GF) ug h i b -∗
       unionLed ug h ==∗ unionLed ug (h ++ [Obs.dev (.uartOut i b)]) := by
   have he : obsBoots [Obs.dev (.uartOut i b)] = 0 := rfl
   have hbo : obsBoots (h ++ [Obs.dev (.uartOut i b)]) = obsBoots h := by rw [obsBoots_app]; rfl
@@ -537,7 +537,7 @@ theorem unionLed_tx (ug : UnionGn) (h : List Obs) (i : UartId) (b : BitVec 8) (h
     · iframe Hfp HpB
     subst hv
     -- THE ERA'S BOOT FACT: the boot state is admissible at the era's floor
-    ihave Hbt := f0Bl_bt (hlc := hlc) (GF := GF) ug.ugnFile vf s0 $$ [Hlb]
+    ihave Hbt := f0Bl_bt (GF := GF) ug.ugnFile vf s0 $$ [Hlb]
     · iapply f0Lb_bl $$ Hlb
     unfold f0Bt
     icases Hbt with (#HT | ⟨%ls, #Hls, %hadm0⟩)
@@ -604,8 +604,8 @@ theorem unionLed_tx (ug : UnionGn) (h : List Obs) (i : UartId) (b : BitVec 8) (h
 base, so the copy's list the transport pinned is inside it; the floor is
 never written here (sync SY3-A4). -/
 theorem unionLed_back (ug : UnionGn) (h : List Obs) :
-    ⊢ unionLed (hlc := hlc) (GF := GF) ug (h ++ [Obs.powerOn]) -∗ uturn' (hlc := hlc) ug (obsBoots h + 1) ==∗
-      unionLed ug (h ++ [Obs.powerOn]) ∗ uturn'' (hlc := hlc) ug (obsBoots h + 1) := by
+    ⊢ unionLed (GF := GF) ug (h ++ [Obs.powerOn]) -∗ uturn' ug (obsBoots h + 1) ==∗
+      unionLed ug (h ++ [Obs.powerOn]) ∗ uturn'' ug (obsBoots h + 1) := by
   have hb : obsBoots (h ++ [Obs.powerOn]) = obsBoots h + 1 := by rw [obsBoots_app]; rfl
   unfold unionLed uturn' uturn''
   iintro ⟨Ht, Hpm, Hfm, Hme, Hfl, Hphi, Hreg, #Hbase⟩ ⟨Hturn, %vf, %ls, #Hp, #Hcp, #Hls, Htk⟩
@@ -640,8 +640,8 @@ theorem unionLed_back (ug : UnionGn) (h : List Obs) :
 /-- **Rocq `union_found`**: THE FOUNDING (sync SY3-A3bc, `App.al_found`):
 the token out of the returned turn, the rest for /init. -/
 theorem union_found (ug : UnionGn) (k : Nat) :
-    uturn'' (hlc := hlc) (GF := GF) ug (k + 1) ⊢
-      |==> (unionTk (hlc := hlc) ug.ugnFile.fgnCl k ∗ uturnI ug (k + 1)) := by
+    uturn'' (GF := GF) ug (k + 1) ⊢
+      |==> (unionTk ug.ugnFile.fgnCl k ∗ uturnI ug (k + 1)) := by
   unfold uturn'' uturnI unionTk
   iintro ⟨Hturn, %vf, %ls, #Hp, #Hcp, %hpre, #Hlbb, Htk⟩
   imodintro

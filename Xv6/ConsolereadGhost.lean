@@ -49,7 +49,7 @@ theorem crPfxLe (l1 l2 : List (List Obs × BitVec 8)) (h : l1 <+: l2 ∨ l2 <+: 
     rw [this]; exact List.prefix_refl _
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The ring's ghost half, from the consumer's side -/
 
@@ -169,6 +169,7 @@ def crPrice (Wd : IProp GF) : Option Nat → IProp GF
   | some _ => iprop(⌜True⌝)
   | none => consDirtyCred Wd
 
+omit [MachGS GF] in
 instance crPrice_persistent (Wd : IProp GF) (ord : Option Nat) :
     Persistent (crPrice (GF := GF) Wd ord) := by
   cases ord <;> unfold crPrice <;> infer_instance
@@ -199,7 +200,7 @@ def crRacc (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × BitVec 8) �
       (⌜d = 0⌝ ∨ consDirtyLb cn))
   | some n0, d, bs, hs => iprop(
       (∃ sl : List (List Obs × BitVec 8),
-        consRdtok cn (n0 + d) ∗ crDlc cn n0 ∗ consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin ∗
+        consRdtok cn (n0 + d) ∗ crDlc cn n0 ∗ consReadPay (genId (GF := GF) + 1) Rin ∗
         consStoredLb cn sl ∗ ⌜consWindow sl n0 d bs hs⌝ ∗ ⌜consChain sl⌝) ∨
       ((∃ sl : List (List Obs × BitVec 8), consStoredLb cn sl ∗
           ⌜consChain sl⌝ ∗ ⌜consPlaced sl n0 cn.era d hs⌝) ∗
@@ -216,7 +217,7 @@ def crRout (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × BitVec 8) �
   | some n0, d, dc, bs, hs => iprop(
       (∃ sl : List (List Obs × BitVec 8),
         consSwallow cn (fault d) sl d dc ∗
-        consRdtok cn (n0 + dc) ∗ crDlc cn n0 ∗ consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin ∗
+        consRdtok cn (n0 + dc) ∗ crDlc cn n0 ∗ consReadPay (genId (GF := GF) + 1) Rin ∗
         consStoredLb cn sl ∗ ⌜consWindow sl n0 d bs hs⌝ ∗ ⌜consChain sl⌝) ∨
       ((∃ sl : List (List Obs × BitVec 8), consStoredLb cn sl ∗
           ⌜consChain sl⌝ ∗ ⌜consPlaced sl n0 cn.era d hs⌝ ∗ consSwallowPlaced sl n0 cn.era d dc) ∗
@@ -521,7 +522,7 @@ theorem crRaccInit (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × Bit
     (ord : Option Nat) (r w e : BitVec 32) (bs : List (BitVec 8)) (ts : List (Option (List Obs)))
     (g : Nat → BitVec 8) :
     crGhost (GF := GF) cn r w e bs ts ∗ consPay cn Wd ord ∗
-      consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin ⊢
+      consReadPay (genId (GF := GF) + 1) Rin ⊢
       crGhost cn r w e bs ts ∗ crRacc cn Wd Rin ord 0 g [] := by
   iintro ⟨Hgh, Hpay, Hrp⟩
   icases crGhost_elim cn _ _ _ bs ts $$ Hgh with ⟨%cur, %nrd, %ndl, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, %her, %hnc, Ha, Hcu, Hhi, Hlm,
@@ -598,7 +599,7 @@ theorem crPopSwallow (cn : ConsNames) (Wd : IProp GF) (γc : GName) [CurCtx]
     (d : Nat) (src : Nat → BitVec 8) (hs : List (List Obs)) (h : List Obs) (b : BitVec 8)
     (hge : 1 ≤ (w - r).toNat) (hts : ts[consSlot r 0]? = some (some h))
     (hends : obsEndsIn .uart0 h b) (hwhy : (d = 0 ∧ (consXlate b).toNat = 4) ∨ fault d) :
-    isConslock (GF := GF) cn Wd γc ∗ crPrice Wd ord ∗ MachFixedGS.rxTag (hlc := hlc) (GF := GF) h ∗
+    isConslock (GF := GF) cn Wd γc ∗ crPrice Wd ord ∗ MachFixedGS.rxTag (GF := GF) h ∗
       crGhost cn r w e bs ts ∗ crRacc cn Wd Rin ord d src hs ⊢
       |={⊤}=> crGhost cn (r + 1#32) w e bs ts ∗ crRout cn Wd Rin fault ord d (d + 1) src hs := by
   iintro ⟨#Hlk, #Hpr, #Htag, Hgh, Hacc⟩
@@ -809,7 +810,7 @@ theorem crGlue_hi (d : Nat) (bs : Nat → BitVec 8) (b : BitVec 8) : crGlue d bs
   simp [crGlue]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- The call's persistent console context: the credential, the port's
 invariant, and the tokenless caller's price. -/
@@ -824,7 +825,7 @@ instance crEnv_persistent [CurCtx] (cn : ConsNames) (Wd : IProp GF) (γc : GName
 tags of the bytes delivered, and the ledger (Rocq `cr_runR`'s resource). -/
 def crRun (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
     (ord : Option Nat) (d : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs)) : IProp GF :=
-  iprop(crRacc cn Wd Rin ord d bs hs ∗ ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) ∗
+  iprop(crRacc cn Wd Rin ord d bs hs ∗ ([∗list] h ∈ hs, MachFixedGS.rxTag (GF := GF) h) ∗
     ⌜consTagged bs hs d⌝)
 
 /-- ...and at an exit (Rocq `cr_winR`'s resource), the cursor at `dc`. -/
@@ -832,7 +833,7 @@ def crRunOut (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × BitVec 8)
     (fault : Nat → Prop) (ord : Option Nat) (d dc : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs)) :
     IProp GF :=
   iprop(crRout cn Wd Rin fault ord d dc bs hs ∗
-    ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) ∗ ⌜consTagged bs hs d⌝)
+    ([∗list] h ∈ hs, MachFixedGS.rxTag (GF := GF) h) ∗ ⌜consTagged bs hs d⌝)
 
 theorem crRunOut_of_run (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
     (fault : Nat → Prop) (ord : Option Nat) (d : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs)) :

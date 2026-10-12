@@ -135,7 +135,7 @@ theorem fc_wbool (b : BitVec 8) : (b != 0#8) = decide (BitVec.zeroExtend 64 b �
     rw [h1, decide_eq_true h2]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## Opening the table and a slot -/
 
@@ -234,6 +234,7 @@ theorem ftableOk_alloc (M : RegMapF (Nat × Qp)) (Ls : Nat → List (Nat × Qp))
 
 /-! ## The fd tokens -/
 
+omit [MachGS GF] in
 /-- A whole reference element as its two halves. -/
 theorem fref_halves (γ : FileNames) (id : Nat) (v : Nat × Qp) :
     (γ.ref ↪◯MAP[id] v) ⊢@{IProp GF}

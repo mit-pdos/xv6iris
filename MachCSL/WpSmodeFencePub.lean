@@ -43,13 +43,13 @@ open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-! ## The model level -/
 
 section memmodel
-variable [MachFixedGS hlc GF] (E : EraGS)
+variable [MachFixedGS GF] (E : EraGS)
 
 /-- **A hart's own store is at or below its `pub`.**  The authorship
 receipt is the `pubLb` the drain edge needs. -/
@@ -113,7 +113,7 @@ theorem swp_sail_barrier_pub (cpu : CPU) (b : barrier_kind) (hdrain : fenceDrain
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev
-  imod memModel_fence_pub (MachGS.era (hlc := hlc) (GF := GF)) σ cpu b hdrain T $$ Hau Hmm
+  imod memModel_fence_pub (MachGS.era (GF := GF)) σ cpu b hdrain T $$ Hau Hmm
     with ⟨Hmm, #Hv⟩
   imod Hmask
   imodintro

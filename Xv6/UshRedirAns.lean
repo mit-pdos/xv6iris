@@ -36,7 +36,7 @@ open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
 section UshRedirAns
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -57,10 +57,10 @@ def ushOpenCall2 {A : Type} (N : UkNames GF) (cwdv file : Nat) (mode : Int) (nm 
     ⌜npElems pl = []⌝ -∗ ⌜∀ rt : Nat, umStartOf rt cwdv pl = ROOTINO⌝ -∗ ⌜(pathElems pl).getLast? = some nm⌝ -∗
     ⌜fdLowestClosed l = some 1⌝ -∗
     ([∗map] ad ↦ b ∈ Img, ubyteq N.d DFrac.discard ad b) -∗ Dd a -∗ ushCode N.t -∗ ucwd N.cwd cwdv -∗
-    ustd N.fd l -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«open») av -∗
+    ustd N.fd l -∗ urun N h m (BitVec.ofNat 64 User.Sh.Sym.«open») av -∗
     (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = r⌝ -∗
       ucwd N.cwd cwdv -∗ ushOpenAns2 N l K (Kf a) r -∗
-      urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) av -∗ wpLoop h') -∗
+      urun N h' m' (retPc (m.get 1#5)) av -∗ wpLoop h') -∗
     wpLoop h)
 
 end UshRedirAns

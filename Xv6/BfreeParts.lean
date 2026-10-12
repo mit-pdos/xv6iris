@@ -132,7 +132,7 @@ theorem bf_slots (a : Nat) (h : bfreeSlots ≤ a) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-! ## The handle -/
@@ -161,6 +161,7 @@ theorem bf_hold_bytes (γ : BcacheNames) (V : BioView GF) (kk : Nat) (pidv dev b
   · ipureintro; exact hl'
   iframe Hb Hd Hby'
 
+omit [MachGS GF] in
 /-- The two slot units, one for bread's reference and one for log_write's
 (Rocq's `iu_slots_split 1 1` / `iu_slots_join 1 1`). -/
 theorem bf_slots_split (γ : BcacheNames) :
@@ -168,6 +169,7 @@ theorem bf_slots_split (γ : BcacheNames) :
   unfold bslot
   exact dsSlots_split γ 1 1
 
+omit [MachGS GF] in
 theorem bf_slots_join (γ : BcacheNames) :
     bslot (GF := GF) ∗ bslot ⊢ bslots 2 := by
   unfold bslot
@@ -206,7 +208,7 @@ end
 /-! ## The three callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- `log_write`'s atomic-update, credited form at its call site. -/
@@ -239,7 +241,7 @@ theorem bf_log_write (LW : LOG_WRITE)
       bioLocked γb V kk pidv dev bno bs bsd true -∗
       bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := LW.wp_log_write_au (hlc := hlc) (GF := GF) c k' γ γl γb V γfs logstart dev kk pidv
+  have h := LW.wp_log_write_au (GF := GF) c k' γ γl γb V γfs logstart dev kk pidv
     bno bs bsl bsd d u cr Sb e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome
     hlogE
   unfold wp_log_write_au_body at h

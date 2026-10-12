@@ -64,9 +64,9 @@ EIGHT slots (`c.addi16sp sp,-64` at `+0x00`), not six. -/
 def endOpSlots : Nat := 8 + installTransSlots
 
 /-- **WP of `end_op()`**. -/
-def wp_end_op_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_end_op_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
     (j : Nat) (logstart : Nat) (dev : BitVec 32) (u : Nat)
@@ -84,7 +84,7 @@ def wp_end_op_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv
   -- THE CRASH SEAM AND THE ERA CERTIFICATE (Rocq's, D38): what lets the
   -- commit path's four writes carry REAL durability fupds; the swap receipt
   -- the same squeeze needs rides `logCtx`
-  fsCrashSeam (hlc := hlc) (GF := GF) V.cov logstart ∗ genCert (hlc := hlc) (GF := GF) ∗
+  fsCrashSeam (GF := GF) V.cov logstart ∗ genCert (GF := GF) ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   logOp γ u ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -97,9 +97,9 @@ def wp_end_op_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv
 /-- The eb-generic form of `wp_end_op_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_end_op_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_end_op_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
     (j : Nat) (logstart : Nat) (dev : BitVec 32) (u : Nat)
@@ -117,7 +117,7 @@ def wp_end_op_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
   -- THE CRASH SEAM AND THE ERA CERTIFICATE (Rocq's, D38): what lets the
   -- commit path's four writes carry REAL durability fupds; the swap receipt
   -- the same squeeze needs rides `logCtx`
-  fsCrashSeam (hlc := hlc) (GF := GF) V.cov logstart ∗ genCert (hlc := hlc) (GF := GF) ∗
+  fsCrashSeam (GF := GF) V.cov logstart ∗ genCert (GF := GF) ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   logOp γ u ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -129,14 +129,14 @@ def wp_end_op_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
 
 /-- The interface of `end_op`. -/
 structure END_OP : Prop where
-  wp_end_op_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_end_op_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
     (j : Nat) (logstart : Nat) (dev : BitVec 32) (u : Nat) (pidv : BitVec 32) (dqp : DFrac)
     hj hproc hK hnoff htier hgeom hdev hcl hdt hpd,
-    wp_end_op_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ γl γb V γdl γfs pd pav pu j
+    wp_end_op_eb_body (GF := GF) Γ cpu k γ γl γb V γdl γfs pd pav pu j
       logstart dev u pidv dqp hj hproc hK hnoff htier hgeom hdev hcl hdt hpd
 
 end Xv6

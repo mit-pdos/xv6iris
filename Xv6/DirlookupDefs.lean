@@ -78,7 +78,7 @@ def dirlookupRegs (k : KCtx) (ip : BitVec 64) (R : RegMap) (i : Nat) : Prop :=
   R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -104,20 +104,20 @@ def dirlookupEnv (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl :
   diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib
+  itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib
 
 instance dirlookupEnv_persistent (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) : Persistent (dirlookupEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk) := by
+    (γk : KmemNames) : Persistent (dirlookupEnv (GF := GF) Γ γl pd pav pu γkl γk) := by
   unfold dirlookupEnv; infer_instance
 
 theorem dirlookupEnv_open (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) :
-    dirlookupEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢
+    dirlookupEnv (GF := GF) Γ γl pd pav pu γkl γk ⊢
       procsInv Γ ∗ bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
       diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
       isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
       isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-      itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib := by
+      itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib := by
   unfold dirlookupEnv; exact .rfl
 
 /-- The two arms (the contract's `if found then … else …`, at the return
@@ -308,7 +308,7 @@ end
 /-! ## The cells the entry reads -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The type cell, borrowed out of `inodeMeta` (a copy of
 `NamexLevel.namex_meta_type`). -/
@@ -327,7 +327,7 @@ end
 /-! ## The two inum cells the self test reads -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [Icfg] [CurCtx]
 
 /-- dp's inum cell, out of the lent share's identity (pays `lw s1,4(a0)`). -/
@@ -367,7 +367,7 @@ end
 /-! ## The callees at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -375,7 +375,7 @@ set_option maxHeartbeats 4000000 in
 /-- `readi(dp, 0, &de, off, 16)` at `+0xa4`: the KERNEL arm (which is exact;
 the user arm is refuted by `a1 = 0`), at the full fraction (Rocq's
 `inode_map_q_1_to`). -/
-theorem dirlookup_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem dirlookup_readi (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn : Dinode)
@@ -409,7 +409,7 @@ theorem dirlookup_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
       bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RD.wp_readi_eb (hlc := hlc) (GF := GF) Γ c k' γl fscBio
+  have h := RD.wp_readi_eb (GF := GF) Γ c k' γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j fscFs fscLogst icfgDev γkl γk ip
     bm data dn false off 16 olds pidv dirlookupVp (fun _ => []) dqp (DFrac.own 1) dqd hj hproc hK
     hnoff htier hgeom hwf hcov hsz (by omega) (fun _ => by omega) rfl rfl rfl hpd ha0
@@ -441,7 +441,7 @@ theorem dirlookup_namecmp (NC : NAMECMP) (c : CPU) (k' : KCtx) (f g : Nat → Bi
       byteBuf (k'.regs 10#5) dq1 (bview 14 f) -∗ byteBuf (k'.regs 11#5) dq2 (bview 14 g) -∗
       ⌜calleeSaved k'.regs R' ∧ (R' 10#5 = 0#64 ↔ bname 14 f = bname 14 g)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := NC.wp_namecmp (hlc := hlc) (GF := GF) c k' f g dq1 dq2 hK
+  have h := NC.wp_namecmp (GF := GF) c k' f g dq1 dq2 hK
   unfold wp_namecmp_body at h
   simp only [namecmpAddr] at h
   exact h
@@ -456,7 +456,7 @@ theorem dirlookup_iget (IG : IGET) (c : CPU) (k' : KCtx) (inum : BitVec 32) (l :
     (hit : "itable" ∉ k'.locks) (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«iget» ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
+    itableInv ∗ iregReg fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
     irefSlot ∗ iname fscIreg fscFs icfgIst inum l ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -466,7 +466,7 @@ theorem dirlookup_iget (IG : IGET) (c : CPU) (k' : KCtx) (inum : BitVec 32) (l :
       inodeRefb (isClaim l) kk q icfgDev inum -∗
       iname fscIreg fscFs icfgIst inum l -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IG.wp_iget (hlc := hlc) (GF := GF) c k' inum l hK hnoff hnib hpos ha0 ha1 hit hpr
+  have h := IG.wp_iget (GF := GF) c k' inum l hK hnoff hnib hpos ha0 ha1 hit hpr
     huart
   unfold wp_iget_body at h
   simp only [igetAddr] at h

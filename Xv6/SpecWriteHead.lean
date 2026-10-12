@@ -79,9 +79,9 @@ its deepest callee is `bread`.  `bwrite`/`brelse` want less. -/
 def writeHeadSlots : Nat := 4 + breadSlots
 
 /-- **WP of `write_head()`**. -/
-def wp_write_head_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_write_head_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
@@ -108,7 +108,7 @@ def wp_write_head_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
   -- given the three facts the assembly establishes about them
   (∀ bs' : List (BitVec 8), ⌜bs'.length = BSIZE⌝ -∗ ⌜hdrN bs' = n⌝ -∗
      ⌜hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
-     diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * logHdrBno logstart, bs')) (Q bs')) ∗
+     diskSeqPermit (genId (GF := GF)) (some (1024 * logHdrBno logstart, bs')) (Q bs')) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
       (bs' : List (BitVec 8)),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -128,9 +128,9 @@ def wp_write_head_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 /-- The eb-generic form of `wp_write_head_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_write_head_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_write_head_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
@@ -157,7 +157,7 @@ def wp_write_head_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
   -- given the three facts the assembly establishes about them
   (∀ bs' : List (BitVec 8), ⌜bs'.length = BSIZE⌝ -∗ ⌜hdrN bs' = n⌝ -∗
      ⌜hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
-     diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * logHdrBno logstart, bs')) (Q bs')) ∗
+     diskSeqPermit (genId (GF := GF)) (some (1024 * logHdrBno logstart, bs')) (Q bs')) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
       (bs' : List (BitVec 8)),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -176,15 +176,15 @@ def wp_write_head_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
 
 /-- The interface of `write_head`. -/
 structure WRITE_HEAD : Prop where
-  wp_write_head_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_write_head_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
     (Q : List (BitVec 8) → IProp GF)
     hj hproc hK hnoff htier hgeom hdev hcl hdt hn hpd,
-    wp_write_head_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
+    wp_write_head_eb_body (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
       logstart dev n W L pidv dqp Q hj hproc hK hnoff htier hgeom hdev hcl hdt hn hpd
 
 end Xv6

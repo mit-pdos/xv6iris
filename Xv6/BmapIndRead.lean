@@ -31,7 +31,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -39,7 +39,7 @@ set_option maxHeartbeats 16000000 in
 two arms of the `beqz` (Rocq's `bm_indirect_tail`). -/
 theorem bm_ind_read (BR : BREAD) (BE : BRELSE) (ak : Option BmAlloc)
     (hba : ak.isSome = true → BALLOC) (hlw : ak.isSome = true → LOG_WRITE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c cpu : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (c cpu : CPU) (k : KCtx)
     (spie spp : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32) (ip : BitVec 64)

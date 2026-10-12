@@ -25,7 +25,7 @@ open LeanRV64D
 def prputcAddr : BitVec 64 := KA.«prputc»
 
 /-- **WP of `prputc`.**  The byte in `a0`. -/
-def wp_prputc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_prputc_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (hsie : k.sie = false) (hK : 20 ≤ k.avail)
     (hnoff : k.noff + 1 < 2 ^ 31) (huart : "uart1" ∉ k.locks) : Prop :=
@@ -37,8 +37,8 @@ def wp_prputc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv
 
 /-- The interface of `prputc`. -/
 structure PRPUTC : Prop where
-  wp_prputc : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_prputc : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γd : UartNames) (bs : List (BitVec 8)) hsie hK hnoff huart,
-    wp_prputc_body (hlc := hlc) (GF := GF) cpu k γl γd bs hsie hK hnoff huart
+    wp_prputc_body (GF := GF) cpu k γl γd bs hsie hK hnoff huart
 
 end Xv6

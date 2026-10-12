@@ -117,7 +117,7 @@ theorem biKept_trans {R R' R'' : RegMap} (h : biKept R R') (h' : biKept R' R'') 
     h'.2.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2.2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## The pieces of the list -/
 
@@ -134,22 +134,26 @@ def biRest [CurCtx] (j : Nat) : IProp GF := iprop%
 
 /-! ## List surgery -/
 
+omit [MachGS GF] in
 theorem bi_snoc [CurCtx] (P : Nat → IProp GF) (n : Nat) :
     ([∗list] j ∈ List.range n, P j) ∗ P n ⊢ [∗list] j ∈ List.range (n + 1), P j := by
   rw [List.range_succ]
   exact (BigSepL.bigSepL_snoc (Φ := fun _ j => P j)).2
 
+omit [MachGS GF] in
 theorem bi_unsnoc [CurCtx] (P : Nat → IProp GF) (n : Nat) :
     ([∗list] j ∈ List.range (n + 1), P j) ⊢ ([∗list] j ∈ List.range n, P j) ∗ P n := by
   rw [List.range_succ]
   exact (BigSepL.bigSepL_snoc (Φ := fun _ j => P j)).1
 
+omit [MachGS GF] in
 theorem bi_peel0 [CurCtx] (P : Nat → IProp GF) (n : Nat) :
     ([∗list] j ∈ List.range (n + 1), P j) ⊢ P 0 ∗ [∗list] j ∈ List.range n, P (j + 1) := by
   rw [List.range_succ_eq_map]
   refine (BigSepL.bigSepL_cons (Φ := fun _ j => P j)).1.trans ?_
   rw [BigSepL.bigSepL_map Nat.succ]
 
+omit [MachGS GF] in
 /-- The buffers the loop has not reached yet, as a `List.range'` so that one
 peels off by `rfl`. -/
 theorem bi_peelIn [CurCtx] (P : Nat → IProp GF) (i n : Nat) :
@@ -241,7 +245,7 @@ theorem bi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
       lkFresh lk -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK'
+  have h := IL.wp_initlock (GF := GF) c k' vlock vname vcpu hK'
   unfold wp_initlock_body at h
   simp only [initlockAddr, h10, h11] at h
   exact h
@@ -256,7 +260,7 @@ theorem bi_initsleeplock_call (IS : INITSLEEPLOCK) [CurCtx] (c : CPU) (k' : KCtx
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       sleepLockInited lk nm -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IS.wp_initsleeplock (hlc := hlc) (GF := GF) c k' hK'
+  have h := IS.wp_initsleeplock (GF := GF) c k' hK'
   unfold wp_initsleeplock_body at h
   simp only [initsleeplockAddr, h10, h11] at h
   exact h
@@ -538,6 +542,7 @@ theorem bi_hn0 [CurCtx] :
       wordPointsTo (GF := GF) (KA.«bcache» + 0x82b8#64) 8 (DFrac.own 1) (bufNextVal 0) := by
   rw [bi_node_zero]
 
+omit [MachGS GF] in
 /-- The caller's list of buffers, as the loop wants it. -/
 theorem bi_range0 [CurCtx] (P : Nat → IProp GF) :
     ([∗list] j ∈ List.range 30, P j) ⊢ [∗list] j ∈ List.range' 0 (29 + 1), P j := by
@@ -571,7 +576,7 @@ theorem binit_br_477c : KA.«binit» + 0x477c#64 = KStr.«bcache» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
-  ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu vhp vhn hK => by
+  ⟨fun {GF} _ _ cpu k vlock vname vcpu vhp vhn hK => by
   unfold wp_binit_body
   simp only [lockWords, bi_headPrev, bi_headNext]
   iintro ⟨Hk, Hpc, ⟨#Hcl, #Hcl', Hwlock, Hwname, Hwcpu⟩, Hhp, Hhn, Hbufs, HΦ⟩

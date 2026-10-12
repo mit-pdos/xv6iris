@@ -56,15 +56,17 @@ theorem ushF1_cs (m m2 : RegMap) (r : BitVec 64)
   exact hq q h1 (by exact hsp) h8 (ucs_ne q 10#5 hcs (by decide)) (ucs_ne q 17#5 hcs (by decide))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- The saved frame, as a payload. -/
 theorem forkable_ushSaved (sb : Nat) (vs : List (BitVec 64)) : Forkable (GF := GF) (fun _ gd _ => ushSaved gd sb vs) :=
   Forkable_ext _ _ (fun _ _ _ => by unfold ushSaved; exact .rfl)
     (forkable_bigSepL vs (fun i v _ gd _ => uword gd (sb - 8 * (i + 1)) v) (fun _ v => forkable_uword _ v))
 
+omit [MachGS GF] in
 /-- `ushFork1Ans`, introduced from the fork stub's inline answer. -/
 theorem ushFork1Ans_intro (N : UkNames GF) (Sc : ExtTreeSet GName compare) (Q : Int → IProp GF) (Rc : IProp GF)
     (r : BitVec 64) :
@@ -74,6 +76,7 @@ theorem ushFork1Ans_intro (N : UkNames GF) (Sc : ExtTreeSet GName compare) (Q : 
       ⊢ ushFork1Ans N Sc Q Rc r := by
   unfold ushFork1Ans; exact .rfl
 
+omit [MachGS GF] in
 /-- ...and read back. -/
 theorem ushFork1Ans_elim (N : UkNames GF) (Sc : ExtTreeSet GName compare) (Q : Int → IProp GF) (Rc : IProp GF)
     (r : BitVec 64) :
@@ -83,7 +86,7 @@ theorem ushFork1Ans_elim (N : UkNames GF) (Sc : ExtTreeSet GName compare) (Q : I
   unfold ushFork1Ans; exact .rfl
 
 /-- **Rocq `wp_kshr_fork1_at`**. -/
-theorem wp_shFork1At (UL : UK_LEAVES) (SK : SH_SYS_FORK) : wpShFork1AtBody (hlc := hlc) (GF := GF) := by
+theorem wp_shFork1At (UL : UK_LEAVES) (SK : SH_SYS_FORK) : wpShFork1AtBody (GF := GF) := by
   intro Dg N P FP szv l v D h m n cw Sc Q Rc Pex hQ
   rw [show User.Sh.Sym.«fork1» = 0x68 from rfl]
   iintro #Hc HP Hsz Hstd Hcwd Hch HD HRc #Hkw HPex Hrun ⟨Hpanic, Hpar, Hchi⟩
@@ -149,7 +152,7 @@ theorem wp_shFork1At (UL : UK_LEAVES) (SK : SH_SYS_FORK) : wpShFork1AtBody (hlc 
       rw [ushFork1Tm_other _ _ _ _ 10#5 (by decide) (by decide) (by decide) (by decide)]; exact ha0
 
 /-- **Rocq `wp_kshr_fork1`**: at a ledger whose view nobody reads. -/
-theorem wp_shFork1 (UL : UK_LEAVES) (SK : SH_SYS_FORK) : wpShFork1Body (hlc := hlc) (GF := GF) := by
+theorem wp_shFork1 (UL : UK_LEAVES) (SK : SH_SYS_FORK) : wpShFork1Body (GF := GF) := by
   intro Dg N P FP szv l D h m n cw Sc Q Rc Pex hQ
   iintro #Hc HP Hsz Hstd Hcwd Hch HD HRc #Hkw HPex Hrun ⟨Hpanic, Hpar, Hchi⟩
   icases ustd_ustdAt N.fd l $$ Hstd with ⟨%v, Hstd⟩
@@ -169,7 +172,7 @@ theorem wp_shFork1 (UL : UK_LEAVES) (SK : SH_SYS_FORK) : wpShFork1Body (hlc := h
 
 /-- **Rocq `wp_kshr_fork1_any`**: the payload the caller's own, the panic on
 the free law. -/
-theorem wp_shFork1Any (UL : UK_LEAVES) (SK : SH_SYS_FORK) : wpShFork1AnyBody (hlc := hlc) (GF := GF) := by
+theorem wp_shFork1Any (UL : UK_LEAVES) (SK : SH_SYS_FORK) : wpShFork1AnyBody (GF := GF) := by
   intro Dg hleaf N hcst P FP szv l D h m n
   unfold ucwdAny uchAny
   iintro #Hdp #Hc HP Hsz Hstd ⟨%cw, Hcwd⟩ ⟨%Sc, Hch⟩ HD #Hkw HPex Hrun ⟨Hpar, Hchi⟩

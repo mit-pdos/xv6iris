@@ -128,7 +128,7 @@ theorem sys_unlink_K (a : Nat) (h : sysUnlinkK ≤ a) :
 /-! ## The generic carve: slots ↔ bytes -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-- A buffer of `n` bytes at `a`, contents unknown. -/
@@ -511,7 +511,7 @@ theorem sysUnlinkPins_entry (k : KCtx) :
 -- The record `SysUnlinkArgs` lives in `Xv6.SysUnlinkArgs`.
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -519,7 +519,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- The contract's post, at the record (hart-free: a `true` crossing at a
 process pins nothing). -/
 abbrev sysUnlinkPostA (k : KCtx) (A : SysUnlinkArgs GF) (c : CPU) : IProp GF :=
-  sysUnlinkPost (hlc := hlc) k A.γ (procAddr A.j) A.pid A.V A.M A.v0.toNat A.P A.Pmiss A.Fent A.Ftgt
+  sysUnlinkPost k A.γ (procAddr A.j) A.pid A.V A.M A.v0.toNat A.P A.Pmiss A.Fent A.Ftgt
     A.Fex
     A.Fmiss c
 
@@ -530,20 +530,20 @@ theorem sysUnlinkPost_raise (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : 
     (Ftgt : Pfam GF (Aview → Nat → IProp GF))
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (c : CPU) (kv : Nat) (hkv : V.ev ≤ kv) :
-    sysUnlinkPost (hlc := hlc) k γ pa pid V M pv P Pmiss Fent Ftgt Fex Fmiss c ⊢
-      sysUnlinkPost (hlc := hlc) k γ pa pid (V.updEv kv) M pv P Pmiss Fent Ftgt Fex Fmiss c := by
+    sysUnlinkPost k γ pa pid V M pv P Pmiss Fent Ftgt Fex Fmiss c ⊢
+      sysUnlinkPost k γ pa pid (V.updEv kv) M pv P Pmiss Fent Ftgt Fex Fmiss c := by
   unfold sysUnlinkPost
   iintro H %spie %spp %R' %P' %k' %hcs %hext %hk'
   iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %(Nat.le_trans hkv hk')
 
 /-- The armed post, at the record. -/
 abbrev sysUnlinkArmsA (A : SysUnlinkArgs GF) (r : BitVec 64) : IProp GF :=
-  unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+  unlinkArms (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
     A.P A.Pmiss A.Fent A.Ftgt A.Fex A.Fmiss r
 
 /-- The caller's bundle, at the record. -/
 abbrev sysUnlinkAuA (A : SysUnlinkArgs GF) : IProp GF :=
-  unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+  unlinkAuAt (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
     A.P A.Pmiss A.Fent A.Ftgt A.Fex A.Fmiss
 
 /-- What every exit hands the epilogue beside the machine state: the two
@@ -625,7 +625,7 @@ theorem sys_unlink_block_close (A : SysUnlinkArgs GF) (pa : BitVec 64) (P2 : UPt
 /-- The out bundle, assembled (every exit's last ghost step). -/
 theorem sys_unlink_out_intro (A : SysUnlinkArgs GF) (pa : BitVec 64) (P2 : UPtd) (r : BitVec 64) :
     sysUnlinkHole (GF := GF) A pa P2 ∗ wordPointsTo (pPid pa) 4 pidPriv A.pid ∗ bslots 3 ∗
-      irefSlots sysUnlinkSlots ∗ sysUnlinkArmsA (hlc := hlc) A r ⊢ sysUnlinkOut A r := by
+      irefSlots sysUnlinkSlots ∗ sysUnlinkArmsA A r ⊢ sysUnlinkOut A r := by
   iintro ⟨Hh, Hr, Hbs, Hir, Ha⟩
   unfold sysUnlinkOut
   iframe Hbs Hir Ha
@@ -677,6 +677,7 @@ theorem sys_unlink_exit (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   iexact Harms
 
+omit [MachGS GF] in
 theorem sys_unlink_ir_11 : irefSlot (GF := GF) ∗ irefSlot ⊢ irefSlots sysUnlinkSlots :=
   (irefSlots_op 1 1).2
 

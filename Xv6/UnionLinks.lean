@@ -45,16 +45,16 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 set_option synthInstance.maxSize 1024
 
 section UnionLinks
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 /-! ## The taint route -/
 
 /-- Rocq `union_cons_link_of_taint`. -/
 theorem union_cons_link_of_taint (ug : UnionGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (k : Nat) (ev : ConsEv) (Φ : IProp GF) :
-    ⊢ fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ Φ -∗ consLink .uart0 k ev Φ := by
+    ⊢ fileTaint ug.ugnFile.fgnCl -∗ Φ -∗ consLink .uart0 k ev Φ := by
   iintro #HT HΦ
   unfold consLink
   iintro %o %H #Hlb Hres %_ %_
@@ -66,9 +66,9 @@ theorem union_cons_link_of_taint (ug : UnionGn)
 
 /-- Rocq `union_write_link_taint`. -/
 theorem union_write_link_taint (ug : UnionGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (k : Nat) (b : BitVec 8) (Φ : IProp GF) :
-    ⊢ fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ Φ) -∗
+    ⊢ fileTaint ug.ugnFile.fgnCl -∗ (fileTaint ug.ugnFile.fgnCl -∗ Φ) -∗
       outLink .uart0 k b Φ := by
   iintro #HT HΦ
   unfold outLink
@@ -86,9 +86,9 @@ events (seccomp design 10.2) -/
 
 /-- Rocq `union_write_link_wild`. -/
 theorem union_write_link_wild (ug : UnionGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (k : Nat) (b : BitVec 8) (Φ : IProp GF) :
-    ⊢ useccTok (hlc := hlc) ug k -∗ Φ -∗ outLink .uart0 k b Φ := by
+    ⊢ useccTok ug k -∗ Φ -∗ outLink .uart0 k b Φ := by
   iintro #Htok HΦ
   unfold outLink
   iintro %o %H #Hlb Hres
@@ -107,13 +107,13 @@ theorem union_write_link_wild (ug : UnionGn)
 /-- (H) THE ERA'S HEAD WRITE: the first process byte files the boot state
 out of the deed's typed witness (Rocq `union_write_link_first`). -/
 theorem union_write_link_first (ug : UnionGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (k : Nat) (v : EraPins) (a : Nat) (b : BitVec 8) (s0 : Fstate) (Φ : IProp GF)
     (hok : fstateOk s0) (halt : a < proAlts.length) (hhead : (proAlts[a]!)[0]? = some b) :
     ⊢ eraPin (fgnEcho ug.ugnFile) k v -∗ turn v 0 -∗ psLb v [] -∗ csLb v [] -∗ inpLb v [] -∗
-      (f0boot ug.ugnFile k s0 ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
+      (f0boot ug.ugnFile k s0 ∨ fileTaint ug.ugnFile.fgnCl) -∗
       (((turn v 1 ∗ psLb v [a] ∗ csLb v [] ∗ inpLb v [] ∗ f0cw ug.ugnFile k s0)
-        ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗ Φ) -∗
+        ∨ fileTaint ug.ugnFile.fgnCl) -∗ Φ) -∗
       outLink .uart0 k b Φ := by
   iintro #Hpin Ht #Hpslb #Hcslb #Hilb Hbt HΦ
   unfold outLink
@@ -128,7 +128,7 @@ theorem union_write_link_first (ug : UnionGn)
 
 /-- (W) A BYTE INSIDE A BLOCK OR A PROLOGUE ROUND (Rocq `union_write_link`). -/
 theorem union_write_link (ug : UnionGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (k : Nat) (v : EraPins) (P : Nat) (b : BitVec 8) (ps0 cs0 : List Nat) (s0 : Fstate)
     (I0 : List (BitVec 8)) (Φ : IProp GF)
     (hn : nlines I0 ≤ cs0.length) (hpin0 : lmProPin ulmG ps0 cs0 I0)
@@ -136,7 +136,7 @@ theorem union_write_link (ug : UnionGn)
     ⊢ eraPin (fgnEcho ug.ugnFile) k v -∗ turn v P -∗ psLb v ps0 -∗ csLb v cs0 -∗ inpLb v I0 -∗
       f0cw ug.ugnFile k s0 -∗
       (((turn v (P + 1) ∗ psLb v ps0 ∗ csLb v cs0 ∗ inpLb v I0 ∗ f0cw ug.ugnFile k s0)
-        ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗ Φ) -∗
+        ∨ fileTaint ug.ugnFile.fgnCl) -∗ Φ) -∗
       outLink .uart0 k b Φ := by
   iintro #Hpin Ht #Hpslb #Hcslb #Hilb #HW HΦ
   unfold outLink
@@ -152,7 +152,7 @@ theorem union_write_link (ug : UnionGn)
 /-- (B) A BLOCK'S FIRST BYTE, filing the round's alternative, at a line that
 is not a `seccomp x` line (Rocq `union_write_link_blk`). -/
 theorem union_write_link_blk (ug : UnionGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (k : Nat) (v : EraPins) (P a : Nat) (b : BitVec 8) (ps0 cs0 : List Nat) (s0 : Fstate)
     (I0 : List (BitVec 8)) (Φ : IProp GF)
     (hnw : uwild (ulmG.lmOf ((bodiesOf I0)[nlines I0 - 1]!)) = false)
@@ -166,9 +166,9 @@ theorem union_write_link_blk (ug : UnionGn)
     ⊢ eraPin (fgnEcho ug.ugnFile) k v -∗ turn v P -∗ psLb v ps0 -∗ csLb v cs0 -∗ inpLb v I0 -∗
       f0cw ug.ugnFile k s0 -∗
       -- ...and the round's payload (sync SY3-A4)
-      upr (hlc := hlc) ug k v I0 a -∗
+      upr ug k v I0 a -∗
       (((turn v (P + 1) ∗ psLb v ps0 ∗ csLb v (cs0 ++ [a]) ∗ inpLb v I0 ∗ f0cw ug.ugnFile k s0)
-        ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗ Φ) -∗
+        ∨ fileTaint ug.ugnFile.fgnCl) -∗ Φ) -∗
       outLink .uart0 k b Φ := by
   iintro #Hpin Ht #Hpslb #Hcslb #Hilb #HW #HR HΦ
   unfold outLink
@@ -184,7 +184,7 @@ theorem union_write_link_blk (ug : UnionGn)
 /-- (P) A PROLOGUE ROUND'S CHOICE BYTE (the file's witness is strict) (Rocq
 `union_write_link_pro`). -/
 theorem union_write_link_pro (ug : UnionGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (k : Nat) (v : EraPins) (P a : Nat) (b : BitVec 8) (ps0 cs0 : List Nat) (s0 : Fstate)
     (I0 : List (BitVec 8)) (Φ : IProp GF)
     (hr0 : restOf I0 = [])
@@ -196,7 +196,7 @@ theorem union_write_link_pro (ug : UnionGn)
     ⊢ eraPin (fgnEcho ug.ugnFile) k v -∗ turn v P -∗ psLb v ps0 -∗ csLb v cs0 -∗ inpLb v I0 -∗
       f0cw ug.ugnFile k s0 -∗
       (((turn v (P + 1) ∗ psLb v (ps0 ++ [a]) ∗ csLb v cs0 ∗ inpLb v I0 ∗ f0cw ug.ugnFile k s0)
-        ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗ Φ) -∗
+        ∨ fileTaint ug.ugnFile.fgnCl) -∗ Φ) -∗
       outLink .uart0 k b Φ := by
   iintro #Hpin Ht #Hpslb #Hcslb #Hilb #HW HΦ
   unfold outLink
@@ -220,7 +220,7 @@ its far end, its discipline, and the writer's stage with the state's witness
 -- and, at a read that completes a `seccomp x` line, the era's wild token. -/
 noncomputable def ureadRet (ug : UnionGn) (k : Nat) (v : EraPins) (n : Nat)
     (ws : List (List Obs × BitVec 8)) : IProp GF :=
-  iprop((fileTaint (hlc := hlc) ug.ugnFile.fgnCl ∗ dlCnt v (1 : Qp).half n)
+  iprop((fileTaint ug.ugnFile.fgnCl ∗ dlCnt v (1 : Qp).half n)
    ∨ dlCnt v (1 : Qp).half (n + ws.length)
      ∗ ∃ (pops : List LogEntry) (dl : List (List Obs × BitVec 8)),
          ⌜readOk pops dl ws⌝ ∗ ⌜dl.length = n⌝
@@ -237,17 +237,17 @@ noncomputable def ureadRet (ug : UnionGn) (k : Nat) (v : EraPins) (n : Nat)
                 ∗ turnLb v (lmProcBefore ulmG ps0 cs0 s0 ((dl ++ ws).map Prod.snd)).length
                 ∗ ⌜lmRdStage ulmG ps0 cs0 s0 ((dl ++ ws).map Prod.snd)⌝)
          ∗ (⌜ureadWild ((dl ++ ws).map Prod.snd) ws⌝ -∗
-            ((useccTokAt (hlc := hlc) ug k ((dl ++ ws).map Prod.snd)
+            ((useccTokAt ug k ((dl ++ ws).map Prod.snd)
               ∗ ⌜∃ h0 : List Obs, ws.getLast? = some (h0, wlNl)
                   ∧ consIns (openSeg h0) = (dl ++ ws).map Prod.snd ∧ obsBoots h0 = k⌝)
-             ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl)))
+             ∨ fileTaint ug.ugnFile.fgnCl)))
 
 /-- THE READ LINK (Rocq `union_read_link`). -/
 theorem union_read_link (ug : UnionGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (k : Nat) (v : EraPins) (n : Nat) (ws : List (List Obs × BitVec 8)) (Φ : IProp GF) :
     ⊢ eraPin (fgnEcho ug.ugnFile) k v -∗ dlCnt v (1 : Qp).half n -∗
-      (ureadRet (hlc := hlc) ug k v n ws -∗ Φ) -∗ consLink .uart0 k (.evRead ws) Φ := by
+      (ureadRet ug k v n ws -∗ Φ) -∗ consLink .uart0 k (.evRead ws) Φ := by
   iintro #Hpin Hdlr HΦ
   unfold consLink
   iintro %o %H #Hlb Hres %_ %hread
@@ -293,17 +293,17 @@ theorem union_read_link (ug : UnionGn)
 
 /-- Rocq `union_file_link`. -/
 theorem union_file_link (ug : UnionGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (k : Nat) (v : EraPins) (I : List (BitVec 8)) (sR : Fstate) (lR : Pline')
     (pre : List (BitVec 8)) (b : BitVec 8) (Φ : IProp GF)
     (hlR : pviewUnionU.pvLine (lineV ulmG I) = some lR) (ha : admUG lR = true)
     (hbl : lineBlocks (filesOf sR) lR pre) (hbv : b = uPrompt[0]!) :
-    ⊢ pwcBlkU (hlc := hlc) ug v I sR k pre false -∗
+    ⊢ pwcBlkU ug v I sR k pre false -∗
       (((∃ (ps cs : List Nat) (s0 : Fstate) (P : Nat),
             ⌜wrBlkV ulmG ps cs s0 I P ∧ lmUpto ulmG cs s0 (bodiesOf I) (nlines I - 1) = sR⌝
             ∗ f0cw ug.ugnFile k s0 ∗ turn v (P + pre.length + 1)
             ∗ psLb v ps ∗ csLb v (cs ++ [pviewUnionU.pvEnc lR (PLAlt.PLRun pre)]) ∗ inpLb v I)
-          ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗ Φ) -∗
+          ∨ fileTaint ug.ugnFile.fgnCl) -∗ Φ) -∗
       outLink .uart0 k b Φ := by
   iintro Hpw HΦ
   unfold outLink
@@ -331,39 +331,39 @@ theorem union_file_link (ug : UnionGn)
 noncomputable def unionLinkRd (ug : UnionGn) : IProp GF :=
   iprop(□ ∀ (k : Nat) (v : EraPins) (n : Nat) (ws : List (List Obs × BitVec 8)) (Φ : IProp GF),
     eraPin (fgnEcho ug.ugnFile) k v -∗ dlCnt v (1 : Qp).half n -∗
-    (ureadRet (hlc := hlc) ug k v n ws -∗ Φ) -∗
+    (ureadRet ug k v n ws -∗ Φ) -∗
     consLink .uart0 k (.evRead ws) Φ)
 
 /-- ...and its taint route (Rocq `union_link_rd_taint`). -/
 def unionLinkRdTaint (ug : UnionGn) : IProp GF :=
   iprop(□ ∀ (k : Nat) (ws : List (List Obs × BitVec 8)) (Φ : IProp GF),
-    fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ Φ) -∗
+    fileTaint ug.ugnFile.fgnCl -∗ (fileTaint ug.ugnFile.fgnCl -∗ Φ) -∗
     consLink .uart0 k (.evRead ws) Φ)
 
 /-- THE BUNDLE (Rocq `union_links`): the console record's claim is the
 union's. -/
 noncomputable def unionLinks (ug : UnionGn) : IProp GF :=
-  iprop(⌜MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug⌝)
+  iprop(⌜MachFixedGS.consRes (GF := GF) = ucl ug⌝)
 
 instance unionLinkRd_persistent (ug : UnionGn) :
-    Persistent (unionLinkRd (hlc := hlc) (GF := GF) ug) := by
+    Persistent (unionLinkRd (GF := GF) ug) := by
   unfold unionLinkRd; infer_instance
 instance unionLinkRdTaint_persistent (ug : UnionGn) :
-    Persistent (unionLinkRdTaint (hlc := hlc) (GF := GF) ug) := by
+    Persistent (unionLinkRdTaint (GF := GF) ug) := by
   unfold unionLinkRdTaint; infer_instance
 instance unionLinks_persistent (ug : UnionGn) :
-    Persistent (unionLinks (hlc := hlc) (GF := GF) ug) := by
+    Persistent (unionLinks (GF := GF) ug) := by
   unfold unionLinks; infer_instance
 
 /-- Rocq `union_links_eq`. -/
 theorem unionLinks_eq (ug : UnionGn) :
-    unionLinks (hlc := hlc) (GF := GF) ug ⊢
-      ⌜MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug⌝ := by
+    unionLinks (GF := GF) ug ⊢
+      ⌜MachFixedGS.consRes (GF := GF) = ucl ug⌝ := by
   unfold unionLinks; exact .rfl
 
 /-- Rocq `union_links_rd`. -/
 theorem unionLinks_rd (ug : UnionGn) :
-    unionLinks (hlc := hlc) (GF := GF) ug ⊢ unionLinkRd ug := by
+    unionLinks (GF := GF) ug ⊢ unionLinkRd ug := by
   unfold unionLinks unionLinkRd
   iintro %hc
   imodintro
@@ -372,7 +372,7 @@ theorem unionLinks_rd (ug : UnionGn) :
 
 /-- Rocq `union_links_rd_taint`. -/
 theorem unionLinks_rd_taint (ug : UnionGn) :
-    unionLinks (hlc := hlc) (GF := GF) ug ⊢ unionLinkRdTaint ug := by
+    unionLinks (GF := GF) ug ⊢ unionLinkRdTaint ug := by
   unfold unionLinks unionLinkRdTaint
   iintro %hc
   imodintro
@@ -382,8 +382,8 @@ theorem unionLinks_rd_taint (ug : UnionGn) :
 
 /-- Rocq `union_links_holds`. -/
 theorem unionLinks_holds (ug : UnionGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug) :
-    ⊢ unionLinks (hlc := hlc) (GF := GF) ug := by
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug) :
+    ⊢ unionLinks (GF := GF) ug := by
   unfold unionLinks
   ipureintro
   exact hcons

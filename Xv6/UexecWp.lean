@@ -61,21 +61,21 @@ def loopOk (C : UCfg) (pt : UPtd) : Prop :=
 /-! ## §2 The slot, ∀-state form, as a guarded fixpoint -/
 
 section UexecWp
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **Rocq `uexec_F`**: the body with the RETURN CHANNEL at `X`; the only
 occurrence of `X` is under the handler premise's `▷`. -/
 def uexecF (X : IProp GF) : IProp GF := iprop%
   ∀ (h : CPU) (xi : CurCtx) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF),
-    ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken hlc GF _ xi h ∗ (@ctxToken hlc GF _ xi h -∗ Rut pt')⌝ -∗
+    ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken GF _ xi h ∗ (@ctxToken GF _ xi h -∗ Rut pt')⌝ -∗
     ∀ (M : Nat → List (BitVec 8)) (g : RegMap) (ms sc stv sep va : BitVec 64),
       ⌜loopOk C pt⌝ -∗ ⌜userMstatusOk ms⌝ -∗
-      hwConfig h -∗ kmapStatic (hlc := hlc) (GF := GF) -∗ wireInv -∗
+      hwConfig h -∗ kmapStatic (GF := GF) -∗ wireInv -∗
       uRegs h (HartState.HART_ACTIVE ()) ms sc stv sep va va g -∗
-      @userPtInvX hlc GF _ xi h pt M -∗
+      @userPtInvX GF _ xi h pt M -∗
       userCfg h C -∗
       Rut pt -∗
-      ▷ ((@userTrapFrame hlc GF _ xi h C pt Rut ∗ X) -∗ wpLoop h) -∗
+      ▷ ((@userTrapFrame GF _ xi h C pt Rut ∗ X) -∗ wpLoop h) -∗
       wpLoop h
 
 /-- Rocq `uexec_F_contractive`. -/
@@ -132,6 +132,6 @@ the one reader is the generic application's discharge of the system
 theorem's init-boot hypothesis.  The application's supply is NOT a field
 (it is built inside the boot update; Rocq's header). -/
 structure UEXEC_GEN : Prop where
-  uexec_wp_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF], ⊢ □ uexecWp (GF := GF)
+  uexec_wp_gen : ∀ {GF : BundledGFunctors.{0}} [MachGS GF], ⊢ □ uexecWp (GF := GF)
 
 end Xv6

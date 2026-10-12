@@ -35,7 +35,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The trampoline claim, as the translation lemmas name it. -/
 abbrev urTrampCl : IProp GF := kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1)

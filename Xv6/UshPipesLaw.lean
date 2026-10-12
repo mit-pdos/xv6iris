@@ -36,7 +36,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section UshPipesLaw
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -47,23 +47,23 @@ def ushNodeObl (Dg : Nat) (N : UkNames GF) (ld : List FdState) (szv cwdv : Nat) 
     (av : Nat) (Qc : Int → IProp GF) (RcL RcR : PipeNames → IProp GF) : IProp GF :=
   iprop(∃ (Cr Wr : IProp GF) (Pw : BitVec 64 → ExtTreeSet GName compare → ExtTreeSet GName compare → IProp GF)
       (R Rk Cx : PipeNames → IProp GF),
-    □ (uKillCred (hlc := hlc) -∗ Qc (-1)) ∗ Cr ∗
+    □ (uKillCred -∗ Qc (-1)) ∗ Cr ∗
     (∀ γp : PipeNames, Cr -∗ R γp -∗ RcL γp ∗ (RcR γp ∗ (Rk γp ∗ Cx γp))) ∗
-    ushPipeCall (hlc := hlc) N ld R ∗ Wr ∗ ushWait0Law (hlc := hlc) N Wr Pw ∗
+    ushPipeCall N ld R ∗ Wr ∗ ushWait0Law N Wr Pw ∗
     □ (∀ (h' : CPU) (m' : RegMap), ⌜(m'.get 10#5).toNat = 0x12b8⌝ -∗ ustd N.fd ld -∗ Cr -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + (2 + av)) -∗ wpLoop h') ∗
+        urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + (2 + av)) -∗ wpLoop h') ∗
     □ (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64) (γp : PipeNames), ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗
         ⌜r = -1#64⌝ -∗ ushFork1Ans N Sc Qc (RcL γp) r -∗ ustd N.fd ld -∗ RcR γp -∗ Cx γp -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + av) -∗ wpLoop h') ∗
+        urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + av) -∗ wpLoop h') ∗
     □ (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64) (γp : PipeNames) (S1 : ExtTreeSet GName compare),
         ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗ ⌜r = -1#64⌝ -∗ ushFork1Ans N S1 Qc (RcR γp) r -∗ ustd N.fd ld -∗
-        Cx γp -∗ urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + av) -∗ wpLoop h') ∗
+        Cx γp -∗ urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + av) -∗ wpLoop h') ∗
     (∀ (h' : CPU) (m' : RegMap) (γp : PipeNames) (r1 r2 rw1 rw2 : BitVec 64)
         (S1 S2 S3 S4 : ExtTreeSet GName compare),
       ⌜r1 ≠ -1#64⌝ -∗ ⌜r2 ≠ -1#64⌝ -∗ ushForkAns Sc S1 (RcL γp) Qc r1 -∗ ushForkAns S1 S2 (RcR γp) Qc r2 -∗
       Pw rw1 S2 S3 -∗ Pw rw2 S3 S4 -∗ uch N.ch S4 -∗ ushJtab N.t -∗ usz N.s szv -∗ ustd N.fd ld -∗
       ucwd N.cwd cwdv -∗ Rk γp -∗ Cx γp -∗ Wr -∗
-      urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0xea) (2 + (Dg + av)) -∗ wpLoop h'))
+      urun N h' m' (BitVec.ofNat 64 0xea) (2 + (Dg + av)) -∗ wpLoop h'))
 
 /-- The pipe's read end, as a ledger row. -/
 abbrev ushRd (γp : PipeNames) : FdState := .open true false (.pipe γp)
@@ -79,8 +79,8 @@ abbrev ushLeftLaw (Dg : Nat) (stgs : List (List UArg)) (ld0 : List FdState) (szv
     ⌜stgs[k]? = some args⌝ -∗ ⌜k + 1 < stgs.length⌝ -∗ ⌜n ≤ av⌝ -∗ ⌜N'.pay = Qc k st0⌝ -∗
     ⌜m'.get 10#5 = BitVec.ofNat 64 q⌝ -∗ myPay γ' (Qc k st0) -∗ ushCode N'.t -∗ ushJtab N'.t -∗
     ushCmd N'.d q (.exec args) -∗ usz N'.s szv -∗ ustd N'.fd ((ld0.set 0 st0).set 1 (ushWr γp)) -∗
-    ucwd N'.cwd cwdv -∗ uch N'.ch ∅ -∗ ushCldep (hlc := hlc) (ushRd γp) -∗ ushCldep (hlc := hlc) (ushWr γp) -∗
-    RcL k st0 γp -∗ urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (Dg + av)) -∗
+    ucwd N'.cwd cwdv -∗ uch N'.ch ∅ -∗ ushCldep (ushRd γp) -∗ ushCldep (ushWr γp) -∗
+    RcL k st0 γp -∗ urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (Dg + av)) -∗
     wpLoop h')
 
 /-- **Rocq `ush_last_law`**: THE LAST STAGE, fd 0 the last pipe's read end. -/
@@ -91,8 +91,8 @@ abbrev ushLastLaw (Dg : Nat) (stgs : List (List UArg)) (ld0 : List FdState) (szv
     ⌜stgs[k + 1]? = some args⌝ -∗ ⌜stgs.length = k + 2⌝ -∗ ⌜n ≤ av⌝ -∗ ⌜N'.pay = Qc k st0⌝ -∗
     ⌜m'.get 10#5 = BitVec.ofNat 64 q⌝ -∗ myPay γ' (Qc k st0) -∗ ushCode N'.t -∗ ushJtab N'.t -∗
     ushCmd N'.d q (.exec args) -∗ usz N'.s szv -∗ ustd N'.fd (ld0.set 0 (ushRd γp)) -∗
-    ucwd N'.cwd cwdv -∗ uch N'.ch ∅ -∗ ushCldep (hlc := hlc) (ushRd γp) -∗ ushCldep (hlc := hlc) (ushWr γp) -∗
-    RcR k st0 γp -∗ urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (Dg + av)) -∗
+    ucwd N'.cwd cwdv -∗ uch N'.ch ∅ -∗ ushCldep (ushRd γp) -∗ ushCldep (ushWr γp) -∗
+    RcR k st0 γp -∗ urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (Dg + av)) -∗
     wpLoop h')
 
 /-- **Rocq `ush_entry_law_g`**: THE ENTRY, at the child's own pid: node
@@ -102,7 +102,7 @@ abbrev ushEntryLawG (Dg : Nat) (stgs : List (List UArg)) (ld0 : List FdState) (s
   iprop(∀ (k : Nat) (st0 : FdState) (N' : UkNames GF) (γ' : GName) (γp : PipeNames) (av : Nat),
     ⌜k + 2 < stgs.length⌝ -∗ ⌜n ≤ av⌝ -∗ ⌜N'.pay = Qc k st0⌝ -∗ myPay γ' (Qc k st0) -∗ RcR k st0 γp -∗
     ushPid N' -∗ ushCode N'.t -∗ ushJtab N'.t -∗
-    |={⊤}=> ushNodeObl (hlc := hlc) Dg N' (ld0.set 0 (ushRd γp)) szv cwdv ∅ av (Qc (k + 1) (ushRd γp))
+    |={⊤}=> ushNodeObl Dg N' (ld0.set 0 (ushRd γp)) szv cwdv ∅ av (Qc (k + 1) (ushRd γp))
       (RcL (k + 1) (ushRd γp)) (RcR (k + 1) (ushRd γp)))
 
 /-- Setting slot 1 of a ledger whose slot 0 was just set leaves slot 0. -/
@@ -126,14 +126,14 @@ theorem wp_ushRuncmdPipesLawG (SR : SH_RUNCMD) (Dg : Nat) (hps : ∀ k : Int, fr
     ∀ (rest : List (List UArg)) (a b : List UArg) (k : Nat) (N : UkNames GF) [UknConst N] (h : CPU) (m : RegMap)
       (t : Nat) (st0 : FdState) (Sc : ExtTreeSet GName compare),
       stgs.drop k = a :: b :: rest → m.get 10#5 = BitVec.ofNat 64 t → st0 ≠ .closed →
-      ⊢ □ ushLeftLaw (hlc := hlc) Dg stgs ld0 szv cwdv n Qc RcL -∗
-        □ ushLastLaw (hlc := hlc) Dg stgs ld0 szv cwdv n Qc RcR -∗
-        □ ushEntryLawG (hlc := hlc) Dg stgs ld0 szv cwdv n Qc RcL RcR -∗
+      ⊢ □ ushLeftLaw Dg stgs ld0 szv cwdv n Qc RcL -∗
+        □ ushLastLaw Dg stgs ld0 szv cwdv n Qc RcR -∗
+        □ ushEntryLawG Dg stgs ld0 szv cwdv n Qc RcL RcR -∗
         ushCode N.t -∗ ushJtab N.t -∗ ushCmd N.d t (ushPipes a (b :: rest)) -∗ usz N.s szv -∗
-        ustd N.fd (ld0.set 0 st0) -∗ ushCldep (hlc := hlc) st0 -∗ ucwd N.cwd cwdv -∗ uch N.ch Sc -∗
-        ushNodeObl (hlc := hlc) Dg N (ld0.set 0 st0) szv cwdv Sc (6 * rest.length + n) (Qc k st0) (RcL k st0)
+        ustd N.fd (ld0.set 0 st0) -∗ ushCldep st0 -∗ ucwd N.cwd cwdv -∗ uch N.ch Sc -∗
+        ushNodeObl Dg N (ld0.set 0 st0) szv cwdv Sc (6 * rest.length + n) (Qc k st0) (RcL k st0)
           (RcR k st0) -∗
-        urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd»)
+        urun N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd»)
           (6 + (2 + (Dg + (6 * rest.length + n)))) -∗
         wpLoop h
   | rest, a, b, k, N, _, h, m, t, st0, Sc, hdrop, ha0, hne0 => by

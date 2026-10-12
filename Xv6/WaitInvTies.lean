@@ -96,7 +96,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
 section WaitInvTies
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
 
 /-! ## What the three writers spend -/
 
@@ -396,6 +396,7 @@ theorem invPure_reap (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMap) (
         exact mem_diff.mpr ⟨horph, fun h => hne (mem_singleton.mp h)⟩
       · rw [orphRow_insert_ne O pj (ps k') _ (Ne.symm e)]; exact horph
 
+omit [MachGS GF] in
 /-- `P ⊢ ⌜φ⌝` read without spending `P` (the Rocq proofs read pure
 conclusions off the payload and keep it). -/
 theorem waitInv_keep {P : IProp GF} {φ : Prop} (h : P ⊢ ⌜φ⌝) : P ⊢ ⌜φ⌝ ∗ P :=
@@ -589,6 +590,7 @@ T1 and T2's authority. -/
 def famLedAt (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev) : IProp GF :=
   iprop(zombLedAuth h ∗ ⌜famTie ps gs h⌝ ∗ zsAuth (fun k => (famOf h k).zomb))
 
+omit [MachGS GF] in
 /-- T1, read off the ledger and kept. -/
 theorem famLedAt_tie (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev) :
     famLedAt (GF := GF) ps gs h ⊢ ⌜famTie ps gs h⌝ ∗ famLedAt ps gs h := by
@@ -599,6 +601,7 @@ theorem famLedAt_tie (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev
   iframe Hzl Hzs
   ipureintro; exact hT
 
+omit [MachGS GF] in
 /-- T2: a slot's element reads the fold's zombie column (both kept). -/
 theorem famLedAt_lookup (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev) (k : Nat)
     (hk : k < NPROC) (v : Option (BitVec 32 × Int)) :
@@ -613,6 +616,7 @@ theorem famLedAt_lookup (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List 
   iframe Hzl Hzs He
   ipureintro; exact hT
 
+omit [MachGS GF] in
 /-- The decision's lower bound: the authority's own history, as a
 persistent snapshot (kwait's no-children arm cites it). -/
 theorem famLedAt_lb (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev) :
@@ -631,6 +635,7 @@ elements sit in the slots' own lock payloads. -/
 def famLed (ps : Nat → BitVec 64) (gs : Nat → GName) : IProp GF :=
   iprop(∃ h : List Zev, famLedAt ps gs h)
 
+omit [MachGS GF] in
 /-- BOOT: the empty history, every cell 0, every column entry `none`. -/
 theorem famLed_boot (ps : Nat → BitVec 64) (gs : Nat → GName) (hz : ∀ k < NPROC, ps k = 0#64) :
     zombLedAuth (GF := GF) [] ∗ zsAuth (fun _ => none) ⊢ famLed ps gs := by
@@ -646,6 +651,7 @@ theorem famLed_boot (ps : Nat → BitVec 64) (gs : Nat → GName) (hz : ∀ k < 
   · iapply (zsAuth_congr (GF := GF) (fun _ => none) (fun k => (famOf [] k).zomb) (fun _ _ => rfl))
     iexact Hzs
 
+omit [MachGS GF] in
 /-- **KFORK** (`np->parent = p`, slot `i`): appends `ZFork pa i pid g`; the
 cell and the generation follow the fold (T1); the zombie column does not
 move (ZombEv deviation 5), so T2's authority is untouched. -/
@@ -675,6 +681,7 @@ theorem famLed_fork (ps : Nat → BitVec 64) (gs : Nat → GName) (i : Nat) (pa 
       · simp [famStep, e]
   · iexists h; unfold zombReceipt; iexact Hlb
 
+omit [MachGS GF] in
 /-- **KEXIT** (`reparent(p)`, then the ZOMBIE store, one critical section):
 appends `ZExit (procAddr j) pid xs ip`; the cells are `reparent`'s (T1), and
 the exiting slot's element moves `none → some (pid, xs)` (T2). -/
@@ -716,6 +723,7 @@ theorem famLed_exit (ps : Nat → BitVec 64) (gs : Nat → GName) (j : Nat) (hj 
       simp only [e, if_false, famStep, e']
       split <;> rfl
 
+omit [MachGS GF] in
 /-- **KWAIT** (`pp->parent = 0` and the reap, slot `n`): appends `ZReap act n
 pid`; the cell is 0 (T1), and the slot's element moves to `none` (T2), to be
 put back at the UNUSED re-close after `freeproc`.  Stated at the named
@@ -790,29 +798,29 @@ def waitInvResAt [CurCtx] (ξ : CtxId) : IProp GF :=
       famLed ps gs)
 
 instance waitInvResAt_morph [CurCtx] : CtxMorph (GF := GF) (waitInvResAt (GF := GF)) :=
-  @instCtxMorphExists hlc GF _ _ (fun ps ξ => iprop(∃ (gs : Nat → GName) (m : ChMap) (O : OrphMap),
+  @instCtxMorphExists GF _ _ (fun ps ξ => iprop(∃ (gs : Nat → GName) (m : ChMap) (O : OrphMap),
       parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
         famLed ps gs))
-    (fun ps => @instCtxMorphExists hlc GF _ _ (fun gs ξ => iprop(∃ (m : ChMap) (O : OrphMap),
+    (fun ps => @instCtxMorphExists GF _ _ (fun gs ξ => iprop(∃ (m : ChMap) (O : OrphMap),
         parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
           famLed ps gs))
-      (fun gs => @instCtxMorphExists hlc GF _ _ (fun m ξ => iprop(∃ (O : OrphMap),
+      (fun gs => @instCtxMorphExists GF _ _ (fun m ξ => iprop(∃ (O : OrphMap),
           parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
             famLed ps gs))
-        (fun m => @instCtxMorphExists hlc GF _ _ (fun O ξ => iprop(
+        (fun m => @instCtxMorphExists GF _ _ (fun O ξ => iprop(
             parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
               famLed ps gs))
-          (fun O => @instCtxMorphSep hlc GF _ (fun ξ => parentsOwnAt ξ ps)
+          (fun O => @instCtxMorphSep GF _ (fun ξ => parentsOwnAt ξ ps)
             (fun ξ => iprop(childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
               famLed ps gs))
             (parentsOwnAt_morph ps)
-            (@instCtxMorphSep hlc GF _ (fun _ => childrenOwnAt m)
+            (@instCtxMorphSep GF _ (fun _ => childrenOwnAt m)
               (fun ξ => iprop(orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗ famLed ps gs))
               (instCtxMorphConst _)
-              (@instCtxMorphSep hlc GF _ (fun _ => orphansOwn O)
+              (@instCtxMorphSep GF _ (fun _ => orphansOwn O)
                 (fun ξ => iprop(childrenInvAt ξ ps gs m O ∗ famLed ps gs))
                 (instCtxMorphConst _)
-                (@instCtxMorphSep hlc GF _ (fun ξ => childrenInvAt ξ ps gs m O)
+                (@instCtxMorphSep GF _ (fun ξ => childrenInvAt ξ ps gs m O)
                   (fun _ => famLed ps gs)
                   (childrenInvAt_morph ps gs m O) (instCtxMorphConst _))))))))
 
@@ -995,10 +1003,10 @@ at junk) and the pid counter's boot-era token (WHOLE) -- and the INSTANCE
 that names them (deviation 4), over the ambient cameras (NI M2-X2: the
 instance's `WchGpre` IS the ambient one, so the ledgers' lower bounds a
 citation carries are at the cameras the NI record reads). -/
-theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
+theorem childrenRes_alloc [MachGS GF]
     (hinj : ∀ a b, a < NPROC → b < NPROC → procAddr a = procAddr b → a = b) :
     ⊢@{IProp GF} |==> ∃ W : WchG GF, ⌜W.toWchGpre = (inferInstance : WchGpre GF)⌝ ∗
-      @childrenBoot hlc GF _ W ∗ @nextpidPend GF W := by
+      @childrenBoot GF _ W ∗ @nextpidPend GF W := by
   imod ghost_map_alloc_empty (GF := GF) (K := GName) (V := BitVec 64 × ExtTreeSet GName compare)
     (H := RegMapF) with ⟨%γ, Ha⟩
   imod chRows_alloc γ NPROC $$ Ha with ⟨%m, Ha, %hm, Hrows⟩

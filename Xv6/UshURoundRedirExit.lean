@@ -38,7 +38,7 @@ open Std (ExtTreeSet)
 set_option synthInstance.maxSize 1024
 
 section UShURoundRedirExit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [DiskG GF] [EchoOutG GF]
@@ -72,9 +72,9 @@ theorem uredir_ran_tie (I : List (BitVec 8)) (ws : Wordline) (nm : List (BitVec 
 back from the writer, at a bounded value, are the round position. -/
 theorem urpos_of_halves (I : List (BitVec 8)) (vf : FileEra) (n n' : Nat)
     (hle : n' ≤ vf.feBase.length + nlines I) :
-    ⊢ fileEraPin (GF := GF) ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) vf -∗ fpos r n -∗ fposq r n' -∗
-      runReg ug.ugnFile.fgnCl (genId (hlc := hlc) (GF := GF) + 1) r.fnPos r.fnDeed -∗
-      urpos (hlc := hlc) ug r I := by
+    ⊢ fileEraPin (GF := GF) ug.ugnFile (genId (GF := GF) + 1) vf -∗ fpos r n -∗ fposq r n' -∗
+      runReg ug.ugnFile.fgnCl (genId (GF := GF) + 1) r.fnPos r.fnDeed -∗
+      urpos ug r I := by
   iintro #Hp H1 H2 #Hrr
   unfold fpos fposq
   icases H1 with ⟨%hr, H1⟩
@@ -97,13 +97,13 @@ theorem uredir_ran_exit (I : List (BitVec 8)) (ws : Wordline) (nm : List (BitVec
     (hu : uname nm) (hul : ul I = .LEchoF ws nm) (htp : upreTie cs s0 I (dstContent sp))
     (hlen : cs.length = nlines I - 1) (hpos : 0 < nlines I)
     (hnp : np ≤ vf.feBase.length + nlines I) :
-    ⊢ uWcl (hlc := hlc) (GF := GF) ug s0 I 3 -∗ fposq r np -∗
-      fileEraPin ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) vf -∗
-      runReg ug.ugnFile.fgnCl (genId (hlc := hlc) (GF := GF) + 1) r.fnPos r.fnDeed -∗
-      eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs -∗
+    ⊢ uWcl (GF := GF) ug s0 I 3 -∗ fposq r np -∗
+      fileEraPin ug.ugnFile (genId (GF := GF) + 1) vf -∗
+      runReg ug.ugnFile.fgnCl (genId (GF := GF) + 1) r.fnPos r.fnDeed -∗
+      eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v' -∗ csLb v' cs -∗
       fTyped ug.ugnFile.fgnCl sp -∗
-      fileWq (hlc := hlc) ug.ugnFile.fgnCl r nm sp i ws sel (subseq (echoChunks ws) sel).length -∗
-      uWcf (hlc := hlc) ug r s0 I 0 := by
+      fileWq ug.ugnFile.fgnCl r nm sp i ws sel (subseq (echoChunks ws) sel).length -∗
+      uWcf ug r s0 I 0 := by
   iintro Hc Hwq #Hvf #Hrr #Hpin #Hcs #Hty Hq
   unfold fileWq
   icases Hq with (⟨%ls, Hd, -, %hok, %hsel, #Hlb, %hlst, Hposn⟩ | #HT)
@@ -127,13 +127,13 @@ theorem uredir_execfail_exit (I : List (BitVec 8)) (ws : Wordline) (nm : List (B
     (v v' : EraPins) (cs : List Nat) (sp : Dst)
     (hul : ul I = .LEchoF ws nm) (htp : upreTie cs s0 I (dstContent sp))
     (hlen : cs.length = nlines I - 1) (hpos : 0 < nlines I) :
-    ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v -∗
-      lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I
+    ⊢ (unionLinkInstAt (GF := GF) ug s0).lkPin (genId (GF := GF) + 1) v -∗
+      lkPost (unionLinkInstAt ug s0) (genId (GF := GF) + 1) v I
         (ualtCode (.UR .RFExec)) -∗
-      fown r (sp.insert nm (i, [])) -∗ urpos (hlc := hlc) ug r I -∗
+      fown r (sp.insert nm (i, [])) -∗ urpos ug r I -∗
       fTyped ug.ugnFile.fgnCl (sp.insert nm (i, [])) -∗
-      eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs -∗
-      uWcf (hlc := hlc) ug r s0 I 0 :=
+      eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v' -∗ csLb v' cs -∗
+      uWcf ug r s0 I 0 :=
   uWcf0_of_post_alt ug r s0 I _ v v' cs _
     (ulm_apr_R I .RFExec (uredir_nopipe I ws nm hul) (by rw [hul]; trivial) rfl rfl)
     (uredir_nw I ws nm hul) (ucode_nsync .RFExec (by decide)) hlen hpos
@@ -144,12 +144,12 @@ found it. -/
 theorem uredir_openfail_exit_u (I : List (BitVec 8)) (ws : Wordline) (nm : List (BitVec 8)) (s : Dst)
     (v v' : EraPins) (cs : List Nat)
     (hul : ul I = .LEchoF ws nm) (htp : upreTie cs s0 I (dstContent s)) (hpos : 0 < nlines I) :
-    ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v -∗
-      lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I
+    ⊢ (unionLinkInstAt (GF := GF) ug s0).lkPin (genId (GF := GF) + 1) v -∗
+      lkPost (unionLinkInstAt ug s0) (genId (GF := GF) + 1) v I
         (ualtCode (.UR .RFOpenU)) -∗
-      fown r s -∗ urpos (hlc := hlc) ug r I -∗ fTyped ug.ugnFile.fgnCl s -∗
-      eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs -∗
-      uWcf (hlc := hlc) ug r s0 I 0 :=
+      fown r s -∗ urpos ug r I -∗ fTyped ug.ugnFile.fgnCl s -∗
+      eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v' -∗ csLb v' cs -∗
+      uWcf ug r s0 I 0 :=
   uWcf0_of_post_alt ug r s0 I _ v v' cs s
     (ulm_apr_R I .RFOpenU (uredir_nopipe I ws nm hul) (by rw [hul]; trivial) rfl rfl)
     (uredir_nw I ws nm hul) (ucode_nsync .RFOpenU (by decide)) htp.1 hpos
@@ -171,13 +171,13 @@ theorem uredir_openfail_exit_m (I : List (BitVec 8)) (ws : Wordline) (nm : List 
     (v v' : EraPins) (cs : List Nat) (sp : Dst)
     (hul : ul I = .LEchoF ws nm) (htp : upreTie cs s0 I (dstContent sp)) (hsN : sp[nm]? = none)
     (hpos : 0 < nlines I) :
-    ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v -∗
-      lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I
+    ⊢ (unionLinkInstAt (GF := GF) ug s0).lkPin (genId (GF := GF) + 1) v -∗
+      lkPost (unionLinkInstAt ug s0) (genId (GF := GF) + 1) v I
         (ualtCode (.UR .RFOpenM)) -∗
-      fown r (sp.insert nm (i, [])) -∗ urpos (hlc := hlc) ug r I -∗
+      fown r (sp.insert nm (i, [])) -∗ urpos ug r I -∗
       fTyped ug.ugnFile.fgnCl (sp.insert nm (i, [])) -∗
-      eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs -∗
-      uWcf (hlc := hlc) ug r s0 I 0 :=
+      eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v' -∗ csLb v' cs -∗
+      uWcf ug r s0 I 0 :=
   uWcf0_of_post_alt ug r s0 I _ v v' cs _
     (ulm_apr_R I .RFOpenM (uredir_nopipe I ws nm hul) (by rw [hul]; trivial) rfl rfl)
     (uredir_nw I ws nm hul) (ucode_nsync .RFOpenM (by decide)) htp.1 hpos (uredir_openm_step s0 I ws nm i cs sp hul htp hsN)
@@ -185,8 +185,8 @@ theorem uredir_openfail_exit_m (I : List (BitVec 8)) (ws : Wordline) (nm : List 
 /-- **Rocq `uexecfail_law_at_conv`**: an exec-failure law read at a
 stronger hold and a weaker residue. -/
 theorem uexecfail_law_at_conv (dg : List (BitVec 8)) (n : Nat) (Cr Cr' Cd Cd' : IProp GF) :
-    ⊢ ushExecfailLawAt (hlc := hlc) dg n Cr Cd -∗ □ (Cr' -∗ Cr) -∗ □ (Cd -∗ Cd') -∗
-      ushExecfailLawAt (hlc := hlc) dg n Cr' Cd' := by
+    ⊢ ushExecfailLawAt dg n Cr Cd -∗ □ (Cr' -∗ Cr) -∗ □ (Cd -∗ Cd') -∗
+      ushExecfailLawAt dg n Cr' Cd' := by
   iintro #Hl #Hr #Hw
   unfold ushExecfailLawAt
   imodintro
@@ -204,9 +204,9 @@ theorem uexecfail_law_at_conv (dg : List (BitVec 8)) (n : Nat) (Cr Cr' Cd Cd' : 
 union's codes. -/
 theorem uab_redir_alts (I : List (BitVec 8)) (ws : Wordline) (nm : List (BitVec 8))
     (hul : ul I = .LEchoF ws nm) :
-    (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkAb I (ualtCode (.UR .RFExec)) = altExecfail
-    ∧ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkAb I (ualtCode (.UR .RFOpenU)) = altOpenfailN nm
-    ∧ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkAb I (ualtCode (.UR .RFOpenM)) = altOpenfailN nm := by
+    (unionLinkInstAt (GF := GF) ug s0).lkAb I (ualtCode (.UR .RFExec)) = altExecfail
+    ∧ (unionLinkInstAt (GF := GF) ug s0).lkAb I (ualtCode (.UR .RFOpenU)) = altOpenfailN nm
+    ∧ (unionLinkInstAt (GF := GF) ug s0).lkAb I (ualtCode (.UR .RFOpenM)) = altOpenfailN nm := by
   have hnp := uredir_nopipe I ws nm hul
   rw [ufi_ab]
   refine ⟨?_, ?_, ?_⟩

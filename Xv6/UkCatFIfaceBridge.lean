@@ -38,17 +38,17 @@ open HfpFileClaimsP
 open Std (ExtTreeSet)
 
 section CifBridge
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [IcacheG GF] [PipeProtoG GF]
   [PipeOutG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **`CifDevP` at its owners' declarations** (deviations 1, 2). -/
-def CifDevP.ofOwners (FO : HfpFileOpenP (hlc := hlc) (GF := GF))
-    (SYSO : UkFileOpenSysP (hlc := hlc) (GF := GF)) (SYSD : UkFileDevSysP (hlc := hlc) (GF := GF))
-    (UL : UK_LEAVES) (DK : PipeDevK hlc GF) (N : UkNames GF) (P : Uprog GF)
-    (STB : FdevStubs (hlc := hlc) N P) :
+def CifDevP.ofOwners (FO : HfpFileOpenP (GF := GF))
+    (SYSO : UkFileOpenSysP (GF := GF)) (SYSD : UkFileDevSysP (GF := GF))
+    (UL : UK_LEAVES) (DK : PipeDevK GF) (N : UkNames GF) (P : Uprog GF)
+    (STB : FdevStubs N P) :
     CifDevP N P where
   pipeWrite := fun pn γp L S l fd rb a bs K hfd hl ha hpre hne =>
     pipe_write UL DK N P STB.sw pn γp L S l fd rb a bs K hfd hl ha hpre hne

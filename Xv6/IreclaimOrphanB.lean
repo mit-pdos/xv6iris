@@ -38,7 +38,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
@@ -48,7 +48,7 @@ set_option maxHeartbeats 16000000 in
 `ireclaim_orphan_c`. -/
 theorem ireclaim_orphan_b (BO : BEGIN_OP) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (EO : END_OP)
     [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (spie spp : Bool) (R : RegMap) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac) (n : Nat)
     (kslot : Nat) (q : Qp)
@@ -63,10 +63,10 @@ theorem ireclaim_orphan_b (BO : BEGIN_OP) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT
     (hkslot : kslot < NINODE)
     (IH : n + 1 < fscNinodes → ∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap),
       ireclaimLoopRegs k (n + 1) R' →
-      ireclaimLoopPre (hlc := hlc) Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
+      ireclaimLoopPre Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
         wpLoop (GF := GF) c') :
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«ireclaim» + 0x54#64) ∗
-    ireclaimEnv (hlc := hlc) Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
+    ireclaimEnv Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
     bslots 3 ∗ iregBoot ∗
     inodeRef kslot q icfgDev (BitVec.ofNat 32 n) ∗ runitPlain (BitVec.ofNat 32 n).toNat
     ⊢ wpLoop (GF := GF) cpu := by
@@ -91,7 +91,7 @@ theorem ireclaim_orphan_b (BO : BEGIN_OP) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT
   ihave #Hesc := icEscrows_lookup fscIc fscFs fscIreg fscCov fscLogst kslot hkslot $$ Hescs
   icases icSleeplocks_lookup fscIc kslot hkslot $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
   ihave #Hclaims := isItable2_claims _ _ _ _ _ _ _ _ $$ Hit2
-  ihave #Htop : topLb (hlc := hlc) (GF := GF) 0 $$ []
+  ihave #Htop : topLb (GF := GF) 0 $$ []
   · iapply topLbAt_0
   -- THE CARVE: ilock takes a SHARE, named at its generation and epoch
   icases (inodeRef_shed kslot q icfgDev inum).1 $$ Href with ⟨Hkeep, Hshr⟩

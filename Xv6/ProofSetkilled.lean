@@ -30,7 +30,7 @@ theorem setkilled_br_ffffffffffffea36 : KA.«setkilled» + 0xffffffffffffea36#64
 set_option maxHeartbeats 4000000 in
 /-- **`setkilled` meets its specification.** -/
 theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k j pidv gn self hj hp hpnz hnoff hK hlk htier => by
+  ⟨fun {GF} _ _ _ _ _ _ _ X Γ cpu k j pidv gn self hj hp hpnz hnoff hK hlk htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_setkilled_body
@@ -87,7 +87,7 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
   -- ...and the store is PAID: the one-shot fires, the row closes on the
   -- paid arm at the flag this function writes
   iapply wpLoop_bupd
-  imod killPaid_kill_two (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl 1#32 (.own qeighth) gn self hpnz
+  imod killPaid_kill_two (MachFixedGS.killCred (GF := GF)) pid kl 1#32 (.own qeighth) gn self hpnz
     (by decide) $$ [Hreg Hpay Hkp] with ⟨Hreg, #Hshot, Hkp, Hback⟩
   · iframe Hreg Hpay Hkp
   imodintro

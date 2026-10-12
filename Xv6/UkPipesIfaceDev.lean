@@ -38,9 +38,9 @@ open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
 section Lexit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
   [PipesNG GF]
-variable {R : PnsRound hlc GF}
+variable {R : PnsRound GF}
 
 /-- **Rocq `pns_lexit_of_lend`**: the write end's end, from its drained or
 halted device and the pipe's invariant. -/
@@ -103,9 +103,9 @@ end Lexit
 /-! ## §2d'' The devices -/
 
 section Devs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
   [PnsRegG GF] [PipesNG GF]
-variable (R : PnsRound hlc GF) (γreg : GName)
+variable (R : PnsRound GF) (γreg : GName)
 
 /-- the registry token at half (Rocq `pns_tok d (1/2) x`) -/
 abbrev pnsTok (d : Nat) (q : Qp) (x : Pdev) : IProp GF := HfpReg.tok (GF := GF) γreg d q x

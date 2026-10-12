@@ -48,7 +48,7 @@ theorem fa_end_40d8 : KA.«filealloc» + 0x1f79e#64 = fnode NFILE := by
 theorem fa_ext1 : BitVec.extractLsb' 0 32 (0#64 + BitVec.signExtend 64 1#12) = 1#32 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The shared tail: `mv a0,s1` and the epilogue -/
 
@@ -427,7 +427,7 @@ theorem filealloc_br_1e7fe : KA.«filealloc» + 0x1e7fe#64 = fnode 0 := by decid
 
 set_option maxHeartbeats 16000000 in
 theorem filealloc_proof (AC : ACQUIRE) (RE : RELEASE) : FILEALLOC := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γl γ hnoff hK hlk => by
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γl γ hnoff hK hlk => by
   unfold wp_filealloc_body
   simp only [fileallocAddr]
   iintro ⟨Hk, Hpc, #Hft, Hfd, Hnext⟩

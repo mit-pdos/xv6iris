@@ -26,7 +26,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -34,17 +34,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [U
 def wpSyncMainBody : Prop :=
     ∀ (N : UkNames GF) (oQ : Option (IProp GF)) (h : CPU) (m : RegMap) (n : Nat) (P : IProp GF)
       (c : Nat), UknConst N →
-    ⊢ ukCode N.t User.Sync.code.byte -∗ ksyncLeaf (hlc := hlc) N oQ -∗
-      hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ -∗ ucwd N.cwd c -∗
+    ⊢ ukCode N.t User.Sync.code.byte -∗ ksyncLeaf N oQ -∗
+      hookOpt (genId (GF := GF)) oQ -∗ ucwd N.cwd c -∗
       P -∗ syncPay P (qOpt oQ) (N.pay (-1)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sync.Sym.«main») (2 + n) -∗ wpLoop h
+      urun N h m (BitVec.ofNat 64 User.Sync.Sym.«main») (2 + n) -∗ wpLoop h
 
 end
 
 /-- The interface of sync's `main`. -/
 structure SYNC_MAIN : Prop where
-  wp_syncMain : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_syncMain : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpSyncMainBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpSyncMainBody (GF := GF)
 
 end Xv6

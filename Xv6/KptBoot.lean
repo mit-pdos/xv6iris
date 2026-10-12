@@ -81,13 +81,13 @@ theorem kvmTableOk_kptFacts_tramp (t : PTree) (pas : Nat → BitVec 44) (h : kvm
   · exact h4 vpn v h'
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The static map, the stacks and the trampoline inserted into the (owned)
 mapping authority. -/
 theorem kmap_insert_boot [CurCtx] (pas : Nat → BitVec 44) :
-    (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ⊢
-      |==> ((MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP kvmMapT pas) ∗ kstackMapAt (GF := GF) pas ∗
+    (MachGS.kmapName (GF := GF) ↪●MAP KernelMap.static) ⊢
+      |==> ((MachGS.kmapName (GF := GF) ↪●MAP kvmMapT pas) ∗ kstackMapAt (GF := GF) pas ∗
         kmapAt (GF := GF) trampVpn kptTrampLeaf) := by
   iintro H
   imod kmap_insert_stacks pas $$ H with ⟨H, #Hs⟩
@@ -108,8 +108,8 @@ theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [Irefsl
     {lent : Bool} (cpu : CPU) (k : KCtx) (t : PTree) (pas : Nat → BitVec 44) (r0 : BitVec 44)
     (hct : curTier = KTier.bare) (hok : kvmTableOk t pas) :
     kctxL (GF := GF) lent cpu k ∗ ptreeOwn 2 (DFrac.own 1) t ∗
-      (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗
-      (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r0)
+      (MachGS.kmapName (GF := GF) ↪●MAP KernelMap.static) ∗
+      (MachGS.kptRootName (GF := GF) ↪VAR r0)
     ⊢ |={⊤}=> (kctxL lent cpu k ∗ kptOn t (kvmMapT pas) ∗ kstackMapAt pas ∗ syscTrampCl) := by
   iintro ⟨Hk, Ht, Hauth, Hroot⟩
   imod kmap_insert_boot pas $$ Hauth with ⟨Hauth, #Hs, #Htr⟩

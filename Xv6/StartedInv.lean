@@ -102,7 +102,7 @@ def startedSet : BitVec (8 * 4) := 1
 def startedPrimary : CPU := ⟨0, by decide⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- THE PRIMARY'S TOKEN: half of the position ghost, at "not yet stored". -/
 def startedPrim (γ : GName) : IProp GF := ghost_var γ (.own (1 : Qp).half) (0 : Nat)
@@ -111,9 +111,11 @@ def startedPrim (γ : GName) : IProp GF := ghost_var γ (.own (1 : Qp).half) (0 
 `t + 1`). -/
 def startedIdx (γ : GName) (t : Nat) : IProp GF := ghost_var γ .discard (t + 1)
 
+omit [MachGS GF] in
 instance startedIdx_persistent (γ : GName) (t : Nat) : Persistent (startedIdx (GF := GF) γ t) := by
   unfold startedIdx; infer_instance
 
+omit [MachGS GF] in
 instance startedIdx_timeless (γ : GName) (t : Nat) : Timeless (startedIdx (GF := GF) γ t) := by
   unfold startedIdx; infer_instance
 
@@ -164,6 +166,7 @@ theorem started_alloc (E : CoPset) (ξd : CtxId) (P : CtxId → IProp GF) (T0 : 
   · unfold startedInv; iexact Hinv
   · unfold startedPrim; iexact Hg2
 
+omit [MachGS GF] in
 /-- The primary's token refutes the armed arm. -/
 theorem startedPrim_idx (γ : GName) (t : Nat) :
     startedPrim (GF := GF) γ ⊢ startedIdx γ t -∗ False := by

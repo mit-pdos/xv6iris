@@ -27,7 +27,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -35,9 +35,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [U
 def wpShSysCloseHBody : Prop :=
   ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (fd : Nat) (st : FdState) (avail : Nat),
     (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int) →
-    ⊢ ushCode N.t -∗ ushCldep (hlc := hlc) st -∗ ufd N.fd fd st -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«close») avail -∗
-      (∀ (h' : CPU) (r : BitVec 64), urun (hlc := hlc) N h' (stubRet m 21 r) (retPc (m.get 1#5)) avail -∗
+    ⊢ ushCode N.t -∗ ushCldep st -∗ ufd N.fd fd st -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«close») avail -∗
+      (∀ (h' : CPU) (r : BitVec 64), urun N h' (stubRet m 21 r) (retPc (m.get 1#5)) avail -∗
         wpLoop h') -∗
       wpLoop h
 
@@ -45,21 +45,21 @@ def wpShSysCloseHBody : Prop :=
 def wpShSysCloseStdBody : Prop :=
   ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (l : List FdState) (fdn : Nat) (st : FdState) (avail : Nat),
     (BitVec.setWidth 32 (m.get 10#5)).toInt = (fdn : Int) → fdn < NSTD → l[fdn]? = some st → st ≠ .closed →
-    ⊢ ushCode N.t -∗ ushCldep (hlc := hlc) st -∗ ustd N.fd l -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«close») avail -∗
+    ⊢ ushCode N.t -∗ ushCldep st -∗ ustd N.fd l -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«close») avail -∗
       (∀ (h' : CPU) (r : BitVec 64), ustd N.fd (l.set fdn .closed) -∗
-        urun (hlc := hlc) N h' (stubRet m 21 r) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 21 r) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h
 
 end
 
 /-- The interface of sh's `close` stub (the runner's two readings). -/
 structure SH_SYS_CLOSE : Prop where
-  wp_shSysCloseH : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_shSysCloseH : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShSysCloseHBody (hlc := hlc) (GF := GF)
-  wp_shSysCloseStd : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShSysCloseHBody (GF := GF)
+  wp_shSysCloseStd : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShSysCloseStdBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShSysCloseStdBody (GF := GF)
 
 end Xv6

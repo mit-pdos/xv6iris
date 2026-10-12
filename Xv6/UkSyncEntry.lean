@@ -66,7 +66,7 @@ theorem syncCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub U
   exact ⟨hsub a b hab, (hx a (by omega)).1, (hx a (by omega)).2, by unfold uCap; omega⟩
 
 section UkSyncEntry
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -78,7 +78,7 @@ BEFORE `iintro`ing it: the proof mode files a spatial hypothesis `P` as
 head unfolds to `xv6Spost`'s if-chain on the number) costs ~6 s. -/
 theorem spostAt_xv6_sync (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
     (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
-    @UexecSG.spostAt GF _ (uexecSGXv6 (hlc := hlc)) X 22 f W r M' fdv' cw' cs' = qOpt f.syOQ := rfl
+    @UexecSG.spostAt GF _ (uexecSGXv6) X 22 f W r M' fdv' cw' cs' = qOpt f.syOQ := rfl
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `ksync_leaf_xv6`** (sync K4): THE ECALL LEAF, AT EVERY HOOK.  22
@@ -89,7 +89,7 @@ names (`udepwfAt`) out of the hook alone (`sbundleAt_sync_intro_xv6`), and
 the receipt is read back off the post (`spostAt_xv6_sync`) -- the mould
 is `UInitConsK.mknod_call_any`. -/
 theorem ksyncLeaf_xv6 (UL : UK_LEAVES) (N : UkNames GF) (oQ : Option (IProp GF)) :
-    ⊢ ksyncLeaf (hlc := hlc) N oQ := by
+    ⊢ ksyncLeaf N oQ := by
   unfold ksyncLeaf
   iintro %h %m %avail %c %hn #Hc Hrun Hcwd Hhook Hcont
   -- the ecall's decode, at the stub's own address (as `sync_stub_sync` reads it)
@@ -108,7 +108,7 @@ theorem ksyncLeaf_xv6 (UL : UK_LEAVES) (N : UkNames GF) (oQ : Option (IProp GF))
     · ipureintro; rfl
     iintro %M %pm %sz %fdv %gn %cs %pidv - Hheap Hufd
     iframe Hheap Hufd
-    iapply sbundleAt_sync_intro_xv6 (hlc := hlc) (uslot (hlc := hlc))
+    iapply sbundleAt_sync_intro_xv6 (uslot)
     dsimp only [xfamSy]
     iexact Hhook
   iintro %h' %r %W %cs' - - - - -
@@ -125,12 +125,12 @@ def SyncImageEntry : Prop :=
     (pidv : BitVec 32) (Q : Int → IProp GF) (P : IProp GF) (oQ : Option (IProp GF)),
     (∀ x y : Int, Q x = Q y) → execOk ws →
     echoNodeImg ws M sv t gn → imgAgrees M Mv → ushEchoArgvBytes ws gn → sts.length = NOFILE →
-    ⊢ □ syncPay P (qOpt oQ) (Q (-1)) -∗ urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
+    ⊢ □ syncPay P (qOpt oQ) (Q (-1)) -∗ urunNopipe sts -∗ udep -∗
       imageEntry User.Sync.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        iprop(P ∗ hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ) (uslot (hlc := hlc))
+        iprop(P ∗ hookOpt (genId (GF := GF)) oQ) (uslot)
 
 /-- **Rocq `UkSyncEntry.sync_image_entry`**: THE ENTRY (deviations 3-5). -/
-theorem syncImageEntry_holds (UL : UK_LEAVES) (GS : SYNC_START) : SyncImageEntry (hlc := hlc) (GF := GF) := by
+theorem syncImageEntry_holds (UL : UK_LEAVES) (GS : SYNC_START) : SyncImageEntry (GF := GF) := by
   intro ws M Mv sv t gn sts cw cs pidv Q P oQ hQc hok himg hag hbytes hfdl
   iintro #Hpay #Hnpw #Hdep
   iapply imageEntry_of_at
@@ -148,7 +148,7 @@ theorem syncImageEntry_holds (UL : UK_LEAVES) (GS : SYNC_START) : SyncImageEntry
     syncKexecEntryRows na alen afun sts W' hokk hroom hfdl hwr hrp
   have hfd : W'.fd = sts := kexecImageOk_fd hokk
   have hcode := syncCode_rows W'.M W'.perm hsub hx
-  ihave #Hnpw' : urunNopipe (hlc := hlc) W'.fd $$ []
+  ihave #Hnpw' : urunNopipe W'.fd $$ []
   · rw [hfd]; iexact Hnpw
   -- the slot; sync makes no descriptor call, no fork and no getpid, so its
   -- ledger, its children and its pid are dropped here; its working
@@ -167,7 +167,7 @@ theorem syncImageEntry_holds (UL : UK_LEAVES) (GS : SYNC_START) : SyncImageEntry
 
 /-- `SyncImageEntry` at the engine: sync's `start` from the landed link
 (`LinkSync.sync_linked`, the row leaves `UkSysPHolds.ukSysP_holds`). -/
-theorem syncImageEntry_of_leaves (UL : UK_LEAVES) : SyncImageEntry (hlc := hlc) (GF := GF) :=
+theorem syncImageEntry_of_leaves (UL : UK_LEAVES) : SyncImageEntry (GF := GF) :=
   syncImageEntry_holds UL (sync_linked UL (ukSysP_holds UL)).2
 
 end UkSyncEntry

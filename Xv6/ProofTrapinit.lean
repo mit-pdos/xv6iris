@@ -32,7 +32,7 @@ theorem ti_ret_2476 : jumpPc (KA.«trapinit» + 0x1c#64) = (KA.«trapinit» + 0x
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## The callee, at its entry address -/
 
@@ -51,7 +51,7 @@ theorem ti_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
       lkFresh lk -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK'
+  have h := IL.wp_initlock (GF := GF) c k' vlock vname vcpu hK'
   unfold wp_initlock_body at h
   simp only [initlockAddr, h10, h11] at h
   exact h
@@ -105,7 +105,7 @@ theorem trapinit_br_4d48 : KA.«trapinit» + 0x4d48#64 = KStr.«time» := by dec
 
 set_option maxHeartbeats 4000000 in
 theorem trapinit_proof (IL : INITLOCK) : TRAPINIT :=
-  ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu hK => by
+  ⟨fun {GF} _ _ cpu k vlock vname vcpu hK => by
   unfold wp_trapinit_body
   iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hwcpu, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

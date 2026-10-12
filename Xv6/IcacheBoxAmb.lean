@@ -251,7 +251,7 @@ they are context-constant, which is what Rocq's `ic_hdr_morph` proves of
 them with `ctx_morph_const`. -/
 
 section IcacheBoxAmb
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE STITCH: the payload's GHOST side -- main's `icLoaded` minus its two
@@ -687,7 +687,7 @@ theorem icHdrAmb_splitRd [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsN
     (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat) (dev inum : BitVec 32)
     (x : IcX) (s : Qp) (g : GName) (lo : Nat) (ty : BitVec 16)
     (hE : (↑icacheN : CoPset) ⊆ E) (hk : k < NINODE) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ ityShot g ty -∗ liveGenlo k s g lo -∗
+    ⊢@{IProp GF} itableInv -∗ ityShot g ty -∗ liveGenlo k s g lo -∗
       icHdrAmb cn γfs γi cov logstart k (some (dev, inum)) x -∗
       |={E}=> icHdrHeldAmb cn γfs γi cov logstart k true (some (dev, inum)) x ∗
         icId cn k Qp.quarter true dev inum ∗

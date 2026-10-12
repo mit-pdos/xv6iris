@@ -26,7 +26,7 @@ A FILE OF ITS OWN, and additive, as in Rocq.
 
 1. Numbers, maps and the authority as `FsAbsCreateFire` deviation 1 (inums
    `Nat`, the raw map `RegMapF FsNode`, `Γ.top ↪●MAP{½} I`); class binders
-   as its deviation 3 (`[MachGS hlc GF] [FsTopG GF] [Appcfg GF]`).
+   as its deviation 3 (`[MachGS GF] [FsTopG GF] [Appcfg GF]`).
 2. `list_basics.last` is `List.getLast?`; `npar_nm`'s image and pointer are
    `ArgPath`'s (`M : Nat → List (BitVec 8)`, `pv : Nat`; its deviations
    1-2).
@@ -57,7 +57,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section CreateNm
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [Appcfg GF]
 
 /-- Rocq `acre_commit_at_gen_nm`: `acre_commit_at_gen` (at Rocq HEAD: with
 the parent cursor `Pd` and the dot-name credential) with the NAME
@@ -85,7 +85,7 @@ def acreCommitAtGenNm (Γ : FsViewNames GF) (E : CoPset) (cf : Nat → Nat → A
 def acreCommitAtNm (Γ : FsViewNames GF) (E : CoPset) (c : Absnode) (Nm : Fname → Prop)
     (Pd : Nat → IProp GF) (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Φ : Aview → Nat → Fname → Nat → IProp GF) : IProp GF :=
-  acreCommitAtGenNm (hlc := hlc) Γ E (fun _ _ => c) Nm Pd Farm Φ
+  acreCommitAtGenNm Γ E (fun _ _ => c) Nm Pd Farm Φ
 
 /-- A provider that answers at EVERY name answers a fortiori at the ones
 `Nm` admits (Rocq `acre_commit_at_gen_nm_of`): the one line every generic
@@ -94,8 +94,8 @@ theorem acreCommitAtGenNm_of (Γ : FsViewNames GF) (E : CoPset) (cf : Nat → Na
     (Nm : Fname → Prop) (Pd : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Φ : Aview → Nat → Fname → Nat → IProp GF) :
-    acreCommitAtGen (hlc := hlc) Γ E cf Pd Farm Φ ⊢
-      acreCommitAtGenNm (hlc := hlc) Γ E cf Nm Pd Farm Φ := by
+    acreCommitAtGen Γ E cf Pd Farm Φ ⊢
+      acreCommitAtGenNm Γ E cf Nm Pd Farm Φ := by
   unfold acreCommitAtGen acreCommitAtGenNm
   iintro H %I %d %i %nm %ents %nl %hpre %hnm %_ Harm HPd Ha
   iapply H $$ %I %d %i %nm %ents %nl %hpre %hnm Harm HPd Ha
@@ -105,7 +105,7 @@ theorem acreCommitAtNm_of (Γ : FsViewNames GF) (E : CoPset) (c : Absnode)
     (Nm : Fname → Prop) (Pd : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Φ : Aview → Nat → Fname → Nat → IProp GF) :
-    acreCommitAt (hlc := hlc) Γ E c Pd Farm Φ ⊢ acreCommitAtNm (hlc := hlc) Γ E c Nm Pd Farm Φ :=
+    acreCommitAt Γ E c Pd Farm Φ ⊢ acreCommitAtNm Γ E c Nm Pd Farm Φ :=
   acreCommitAtGenNm_of Γ E (fun _ _ => c) Nm Pd Farm Φ
 
 /-- Rocq `acre_commit_at_gen_nm_cur_mono`: the CURSOR moves under the
@@ -115,8 +115,8 @@ theorem acreCommitAtGenNm_cur_mono (Γ : FsViewNames GF) (E : CoPset) (cf : Nat 
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Φ : Aview → Nat → Fname → Nat → IProp GF) :
     ⊢ iprop(□ (∀ d : Nat, Pd' d -∗ Pd d)) -∗ iprop(□ (∀ d : Nat, Pd d -∗ Pd' d)) -∗
-      acreCommitAtGenNm (hlc := hlc) Γ E cf Nm Pd Farm Φ -∗
-      acreCommitAtGenNm (hlc := hlc) Γ E cf Nm Pd' Farm Φ := by
+      acreCommitAtGenNm Γ E cf Nm Pd Farm Φ -∗
+      acreCommitAtGenNm Γ E cf Nm Pd' Farm Φ := by
   unfold acreCommitAtGenNm
   iintro #Hin #Hout H %I %d %i %nm %ents %nl %hpre %hnm %hNm Harm HPd Ha
   ihave HPd := Hin $$ %d HPd
@@ -130,8 +130,8 @@ theorem acreCommitAtGenNm_mono (Γ : FsViewNames GF) (E : CoPset) (cf : Nat → 
     (Nm Nm' : Fname → Prop) (Pd : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Φ : Aview → Nat → Fname → Nat → IProp GF) (hle : ∀ nm : Fname, Nm' nm → Nm nm) :
-    acreCommitAtGenNm (hlc := hlc) Γ E cf Nm Pd Farm Φ ⊢
-      acreCommitAtGenNm (hlc := hlc) Γ E cf Nm' Pd Farm Φ := by
+    acreCommitAtGenNm Γ E cf Nm Pd Farm Φ ⊢
+      acreCommitAtGenNm Γ E cf Nm' Pd Farm Φ := by
   unfold acreCommitAtGenNm
   iintro H %I %d %i %nm %ents %nl %hpre %hnm %hNm' Harm HPd Ha
   iapply H $$ %I %d %i %nm %ents %nl %hpre %hnm %(hle nm hNm') Harm HPd Ha
@@ -164,7 +164,7 @@ theorem nparNm_elim (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 
 /-! ## The unarm at a node predicate -/
 
 section UnarmNd
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [Appcfg GF]
 
 /-- Rocq `aunarm_commit_at_nd`: `aunarmCommitAt` with a NODE predicate on
 the unarmed row. -/
@@ -184,12 +184,12 @@ def aunarmCommitAtNd (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (Nd : Absnode 
 /-- Rocq `aunarm_of_arm_nd`. -/
 def aunarmOfArmNd (Γ : FsViewNames GF) (E : CoPset) (Nd : Absnode → Prop)
     (Farm : Pfam GF (Aview → Nat → IProp GF)) (Φ : Aview → Nat → IProp GF) : IProp GF :=
-  iprop(∀ i : Nat, creArmFired Farm i -∗ aunarmCommitAtNd (hlc := hlc) Γ E i Nd Φ)
+  iprop(∀ i : Nat, creArmFired Farm i -∗ aunarmCommitAtNd Γ E i Nd Φ)
 
 /-- Rocq `aunarm_commit_at_nd_of`. -/
 theorem aunarmCommitAtNd_of (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (Nd : Absnode → Prop)
     (Φ : Aview → Nat → IProp GF) :
-    aunarmCommitAt (hlc := hlc) Γ E i Φ ⊢ aunarmCommitAtNd (hlc := hlc) Γ E i Nd Φ := by
+    aunarmCommitAt Γ E i Φ ⊢ aunarmCommitAtNd Γ E i Nd Φ := by
   unfold aunarmCommitAt aunarmCommitAtNd
   iintro H %I %c %hrow %_ Ha
   iapply H $$ %I %c %hrow Ha
@@ -197,7 +197,7 @@ theorem aunarmCommitAtNd_of (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (Nd : A
 /-- Rocq `aunarm_commit_at_of_nd`. -/
 theorem aunarmCommitAt_of_nd (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (Nd : Absnode → Prop)
     (Φ : Aview → Nat → IProp GF) (hNd : ∀ c : Absnode, Nd c) :
-    aunarmCommitAtNd (hlc := hlc) Γ E i Nd Φ ⊢ aunarmCommitAt (hlc := hlc) Γ E i Φ := by
+    aunarmCommitAtNd Γ E i Nd Φ ⊢ aunarmCommitAt Γ E i Φ := by
   unfold aunarmCommitAt aunarmCommitAtNd
   iintro H %I %c %hrow Ha
   iapply H $$ %I %c %hrow %(hNd c) Ha
@@ -205,40 +205,40 @@ theorem aunarmCommitAt_of_nd (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (Nd : 
 /-- Rocq `aunarm_of_arm_nd_of`. -/
 theorem aunarmOfArmNd_of (Γ : FsViewNames GF) (E : CoPset) (Nd : Absnode → Prop)
     (Farm : Pfam GF (Aview → Nat → IProp GF)) (Φ : Aview → Nat → IProp GF) :
-    aunarmOfArm (hlc := hlc) Γ E Farm Φ ⊢ aunarmOfArmNd (hlc := hlc) Γ E Nd Farm Φ := by
+    aunarmOfArm Γ E Farm Φ ⊢ aunarmOfArmNd Γ E Nd Farm Φ := by
   unfold aunarmOfArm aunarmOfArmNd
   iintro H %i Harm
   ihave Hu := H $$ %i Harm
-  iapply (aunarmCommitAtNd_of (hlc := hlc) Γ E i Nd Φ) $$ Hu
+  iapply (aunarmCommitAtNd_of Γ E i Nd Φ) $$ Hu
 
 /-- Rocq `aunarm_of_arm_of_nd`. -/
 theorem aunarmOfArm_of_nd (Γ : FsViewNames GF) (E : CoPset) (Nd : Absnode → Prop)
     (Farm : Pfam GF (Aview → Nat → IProp GF)) (Φ : Aview → Nat → IProp GF)
     (hNd : ∀ c : Absnode, Nd c) :
-    aunarmOfArmNd (hlc := hlc) Γ E Nd Farm Φ ⊢ aunarmOfArm (hlc := hlc) Γ E Farm Φ := by
+    aunarmOfArmNd Γ E Nd Farm Φ ⊢ aunarmOfArm Γ E Farm Φ := by
   unfold aunarmOfArm aunarmOfArmNd
   iintro H %i Harm
   ihave Hu := H $$ %i Harm
-  iapply (aunarmCommitAt_of_nd (hlc := hlc) Γ E i Nd Φ hNd) $$ Hu
+  iapply (aunarmCommitAt_of_nd Γ E i Nd Φ hNd) $$ Hu
 
 /-- Rocq `cre_child_unfired_nd`: THE CHILD'S TWO LEGS, with the unarm
 PINNED at the node the arm placed. -/
 def creChildUnfiredNd (Γ : FsViewNames GF) (c : Absnode)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) : IProp GF :=
-  iprop(pfAt (aarmCommitAt (hlc := hlc) Γ appE c) Farm ∗
-    pfAt (aunarmOfArmNd (hlc := hlc) Γ appE (fun c' : Absnode => c' = c) Farm) Fun)
+  iprop(pfAt (aarmCommitAt Γ appE c) Farm ∗
+    pfAt (aunarmOfArmNd Γ appE (fun c' : Absnode => c' = c) Farm) Fun)
 
 /-- Rocq `cre_child_unfired_nd_of`. -/
 theorem creChildUnfiredNd_of (Γ : FsViewNames GF) (c : Absnode)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) :
-    creChildUnfired (hlc := hlc) Γ c Farm Fun ⊢ creChildUnfiredNd (hlc := hlc) Γ c Farm Fun := by
+    creChildUnfired Γ c Farm Fun ⊢ creChildUnfiredNd Γ c Farm Fun := by
   unfold creChildUnfired creChildUnfiredNd
   iintro ⟨Harm, Hun⟩
   iframe Harm
-  iapply (pfAt_mono (aunarmOfArm (hlc := hlc) Γ appE Farm)
-    (aunarmOfArmNd (hlc := hlc) Γ appE (fun c' : Absnode => c' = c) Farm) Fun) $$ [] Hun
+  iapply (pfAt_mono (aunarmOfArm Γ appE Farm)
+    (aunarmOfArmNd Γ appE (fun c' : Absnode => c' = c) Farm) Fun) $$ [] Hun
   iintro H
-  iapply (aunarmOfArmNd_of (hlc := hlc) Γ appE (fun c' : Absnode => c' = c) Farm) $$ H
+  iapply (aunarmOfArmNd_of Γ appE (fun c' : Absnode => c' = c) Farm) $$ H
 
 end UnarmNd
 

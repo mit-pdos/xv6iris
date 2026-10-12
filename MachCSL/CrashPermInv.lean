@@ -68,7 +68,7 @@ class CrashPermG (GF : BundledGFunctors.{0}) where
 attribute [reducible, instance] CrashPermG.savedG CrashPermG.mapG
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [CrashPermG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [CrashPermG GF]
 
 /-- ONE in-flight request's cell (Rocq `perm_slot`): pending (`b = true`)
 holds the SEQUENTIAL permit at the sectors still to land, done holds the
@@ -181,9 +181,9 @@ sectors still to land. -/
 theorem crashPerm_step (gd : Nat) (γP : GName) (k : Nat) (γq : GName) (w : DiskWr)
     (todo : List Nat) (i : Nat) (dk : Nat → BitVec 8) (n : Nat) (hi : i ∈ todo) (hn : n = gd + 1) :
     crashPermInvBody gd γP ∗ crashPermTok γP k true γq w todo ∗ startAuth n ∗ diskFixedAuth dk ∗
-      ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ⊢@{IProp GF} |={∅}=>
+      ▷ MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
       (crashPermInvBody gd γP ∗ crashPermTok γP k true γq w (todo.erase i) ∗ startAuth n ∗
-        diskFixedAuth (wrApply (wrSector w i) dk) ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF)) := by
+        diskFixedAuth (wrApply (wrSector w i) dk) ∗ ▷ MachFixedGS.crashPred (GF := GF)) := by
   unfold crashPermInvBody crashPermTok
   iintro ⟨⟨%m, %nx, Hauth, %hfr, Hents⟩, Htok, Hs, Ha, HP⟩
   ihave %hk := ghost_map_lookup $$ Hauth Htok
@@ -222,9 +222,9 @@ client's receipt and puts the cell in the done state. -/
 theorem crashPerm_consume (gd : Nat) (γP : GName) (k : Nat) (γq : GName) (w : DiskWr)
     (dk : Nat → BitVec 8) (n : Nat) (hn : n = gd + 1) :
     crashPermInvBody gd γP ∗ crashPermTok γP k true γq w [] ∗ startAuth n ∗ diskFixedAuth dk ∗
-      ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ⊢@{IProp GF} |={∅}=>
+      ▷ MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
       (crashPermInvBody gd γP ∗ crashPermTok γP k false γq w [] ∗ startAuth n ∗
-        diskFixedAuth (wrApply none dk) ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF)) := by
+        diskFixedAuth (wrApply none dk) ∗ ▷ MachFixedGS.crashPred (GF := GF)) := by
   unfold crashPermInvBody crashPermTok
   iintro ⟨⟨%m, %nx, Hauth, %hfr, Hents⟩, Htok, Hs, Ha, HP⟩
   ihave %hk := ghost_map_lookup $$ Hauth Htok
@@ -273,17 +273,17 @@ instance (γP : GName) (kq : Nat × GName) (w : DiskWr) :
 theorem crashPerm_step_kq (gd : Nat) (γP : GName) (kq : Nat × GName) (w : DiskWr)
     (todo : List Nat) (i : Nat) (dk : Nat → BitVec 8) (n : Nat) (hi : i ∈ todo) (hn : n = gd + 1) :
     crashPermInvBody gd γP ∗ crashPermPend γP kq w todo ∗ startAuth n ∗ diskFixedAuth dk ∗
-      ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ⊢@{IProp GF} |={∅}=>
+      ▷ MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
       (crashPermInvBody gd γP ∗ crashPermPend γP kq w (todo.erase i) ∗ startAuth n ∗
-        diskFixedAuth (wrApply (wrSector w i) dk) ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF)) :=
+        diskFixedAuth (wrApply (wrSector w i) dk) ∗ ▷ MachFixedGS.crashPred (GF := GF)) :=
   crashPerm_step gd γP kq.1 kq.2 w todo i dk n hi hn
 
 theorem crashPerm_consume_kq (gd : Nat) (γP : GName) (kq : Nat × GName) (w : DiskWr)
     (dk : Nat → BitVec 8) (n : Nat) (hn : n = gd + 1) :
     crashPermInvBody gd γP ∗ crashPermPend γP kq w [] ∗ startAuth n ∗ diskFixedAuth dk ∗
-      ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ⊢@{IProp GF} |={∅}=>
+      ▷ MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
       (crashPermInvBody gd γP ∗ crashPermDone γP kq w ∗ startAuth n ∗
-        diskFixedAuth (wrApply none dk) ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF)) :=
+        diskFixedAuth (wrApply none dk) ∗ ▷ MachFixedGS.crashPred (GF := GF)) :=
   crashPerm_consume gd γP kq.1 kq.2 w dk n hn
 
 /-- The pair form of the deposit (Rocq `perm_deposit_kq`). -/

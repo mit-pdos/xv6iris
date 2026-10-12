@@ -173,7 +173,7 @@ class EchoOutG (GF : BundledGFunctors.{0}) where
 attribute [reducible, instance] EchoOutG.pinG
 
 section EchoOut
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-! ## The era's pin -/
 
@@ -181,14 +181,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Di
 def eraPin (γ : EchoGn) (k : Nat) (v : EraPins) : IProp GF :=
   ghost_map_elem γ.pin DFrac.discard k v
 
+omit [MachGS GF] in
 instance eraPin_persistent (γ : EchoGn) (k : Nat) (v : EraPins) :
     Persistent (eraPin (GF := GF) γ k v) := by
   unfold eraPin; infer_instance
 
+omit [MachGS GF] in
 instance eraPin_timeless (γ : EchoGn) (k : Nat) (v : EraPins) :
     Timeless (eraPin (GF := GF) γ k v) := by
   unfold eraPin; infer_instance
 
+omit [MachGS GF] in
 theorem eraPin_agree (γ : EchoGn) (k : Nat) (v v' : EraPins) :
     eraPin (GF := GF) γ k v ∗ eraPin γ k v' ⊢ ⌜v = v'⌝ := by
   unfold eraPin
@@ -200,6 +203,7 @@ theorem eraPin_agree (γ : EchoGn) (k : Nat) (v v' : EraPins) :
 def pinMap (γ : EchoGn) (h : List Obs) : IProp GF :=
   iprop(∃ Mp : RegMapF EraPins, (γ.pin ↪●MAP Mp) ∗ ⌜pinDom Mp (obsBoots h)⌝)
 
+omit [MachGS GF] in
 instance pinMap_timeless (γ : EchoGn) (h : List Obs) : Timeless (pinMap (GF := GF) γ h) := by
   unfold pinMap; infer_instance
 
@@ -280,25 +284,31 @@ def csAuth (v : EraPins) (l : List Nat) : IProp GF := MonoList.auth_own v.gcs (D
 /-- ...a persistent lower bound (Rocq `cs_lb`). -/
 def csLb (v : EraPins) (l : List Nat) : IProp GF := MonoList.lb_own v.gcs l
 
+omit [MachGS GF] in
 instance csLb_persistent (v : EraPins) (l : List Nat) : Persistent (csLb (GF := GF) v l) := by
   unfold csLb; infer_instance
+omit [MachGS GF] in
 instance csLb_timeless (v : EraPins) (l : List Nat) : Timeless (csLb (GF := GF) v l) := by
   unfold csLb; infer_instance
+omit [MachGS GF] in
 instance csAuth_timeless (v : EraPins) (l : List Nat) : Timeless (csAuth (GF := GF) v l) := by
   unfold csAuth; infer_instance
 
+omit [MachGS GF] in
 theorem csLb_get (v : EraPins) (l : List Nat) : csAuth (GF := GF) v l ⊢ csAuth v l ∗ csLb v l := by
   unfold csAuth csLb
   iintro H
   ihave #Hl := MonoList.lb_own_get $$ H
   iframe H Hl
 
+omit [MachGS GF] in
 theorem csAuth_grow (v : EraPins) (l : List Nat) (a : Nat) :
     csAuth (GF := GF) v l ⊢ |==> (csAuth v (l ++ [a]) ∗ csLb v (l ++ [a])) := by
   unfold csAuth csLb
   iintro H
   iapply MonoList.auth_own_update_app $$ H
 
+omit [MachGS GF] in
 theorem csLb_prefix (v : EraPins) (l l' : List Nat) :
     csAuth (GF := GF) v l ∗ csLb v l' ⊢ ⌜l' <+: l⌝ := by
   unfold csAuth csLb
@@ -306,6 +316,7 @@ theorem csLb_prefix (v : EraPins) (l l' : List Nat) :
   ihave %h := MonoList.auth_lb_own_valid $$ Ha Hl
   ipureintro; exact h.2
 
+omit [MachGS GF] in
 theorem csLb_cmp (v : EraPins) (l1 l2 : List Nat) :
     csLb (GF := GF) v l1 ∗ csLb v l2 ⊢ ⌜l1 <+: l2 ∨ l2 <+: l1⌝ := by
   unfold csLb
@@ -317,25 +328,31 @@ def psAuth (v : EraPins) (l : List Nat) : IProp GF := MonoList.auth_own v.gps (D
 /-- ...a persistent lower bound (Rocq `ps_lb`). -/
 def psLb (v : EraPins) (l : List Nat) : IProp GF := MonoList.lb_own v.gps l
 
+omit [MachGS GF] in
 instance psLb_persistent (v : EraPins) (l : List Nat) : Persistent (psLb (GF := GF) v l) := by
   unfold psLb; infer_instance
+omit [MachGS GF] in
 instance psLb_timeless (v : EraPins) (l : List Nat) : Timeless (psLb (GF := GF) v l) := by
   unfold psLb; infer_instance
+omit [MachGS GF] in
 instance psAuth_timeless (v : EraPins) (l : List Nat) : Timeless (psAuth (GF := GF) v l) := by
   unfold psAuth; infer_instance
 
+omit [MachGS GF] in
 theorem psLb_get (v : EraPins) (l : List Nat) : psAuth (GF := GF) v l ⊢ psAuth v l ∗ psLb v l := by
   unfold psAuth psLb
   iintro H
   ihave #Hl := MonoList.lb_own_get $$ H
   iframe H Hl
 
+omit [MachGS GF] in
 theorem psAuth_grow (v : EraPins) (l : List Nat) (a : Nat) :
     psAuth (GF := GF) v l ⊢ |==> (psAuth v (l ++ [a]) ∗ psLb v (l ++ [a])) := by
   unfold psAuth psLb
   iintro H
   iapply MonoList.auth_own_update_app $$ H
 
+omit [MachGS GF] in
 theorem psLb_prefix (v : EraPins) (l l' : List Nat) :
     psAuth (GF := GF) v l ∗ psLb v l' ⊢ ⌜l' <+: l⌝ := by
   unfold psAuth psLb
@@ -343,6 +360,7 @@ theorem psLb_prefix (v : EraPins) (l l' : List Nat) :
   ihave %h := MonoList.auth_lb_own_valid $$ Ha Hl
   ipureintro; exact h.2
 
+omit [MachGS GF] in
 theorem psLb_cmp (v : EraPins) (l1 l2 : List Nat) :
     psLb (GF := GF) v l1 ∗ psLb v l2 ⊢ ⌜l1 <+: l2 ∨ l2 <+: l1⌝ := by
   unfold psLb
@@ -358,16 +376,20 @@ def elistAuth (v : EraPins) (E : List (List Obs × BitVec 8)) : IProp GF :=
 def elistLb (v : EraPins) (E : List (List Obs × BitVec 8)) : IProp GF :=
   MonoList.lb_own v.gE E
 
+omit [MachGS GF] in
 instance elistLb_persistent (v : EraPins) (E : List (List Obs × BitVec 8)) :
     Persistent (elistLb (GF := GF) v E) := by
   unfold elistLb; infer_instance
+omit [MachGS GF] in
 instance elistLb_timeless (v : EraPins) (E : List (List Obs × BitVec 8)) :
     Timeless (elistLb (GF := GF) v E) := by
   unfold elistLb; infer_instance
+omit [MachGS GF] in
 instance elistAuth_timeless (v : EraPins) (E : List (List Obs × BitVec 8)) :
     Timeless (elistAuth (GF := GF) v E) := by
   unfold elistAuth; infer_instance
 
+omit [MachGS GF] in
 theorem elistAuth_grow (v : EraPins) (E : List (List Obs × BitVec 8)) (x : List Obs × BitVec 8) :
     elistAuth (GF := GF) v E ⊢ |==> (elistAuth v (E ++ [x]) ∗ elistLb v (E ++ [x])) := by
   unfold elistAuth elistLb
@@ -381,16 +403,20 @@ def dlListAuth (v : EraPins) (D : List (List Obs × BitVec 8)) : IProp GF :=
 def dlListLb (v : EraPins) (D : List (List Obs × BitVec 8)) : IProp GF :=
   MonoList.lb_own v.gdll D
 
+omit [MachGS GF] in
 instance dlListLb_persistent (v : EraPins) (D : List (List Obs × BitVec 8)) :
     Persistent (dlListLb (GF := GF) v D) := by
   unfold dlListLb; infer_instance
+omit [MachGS GF] in
 instance dlListLb_timeless (v : EraPins) (D : List (List Obs × BitVec 8)) :
     Timeless (dlListLb (GF := GF) v D) := by
   unfold dlListLb; infer_instance
+omit [MachGS GF] in
 instance dlListAuth_timeless (v : EraPins) (D : List (List Obs × BitVec 8)) :
     Timeless (dlListAuth (GF := GF) v D) := by
   unfold dlListAuth; infer_instance
 
+omit [MachGS GF] in
 theorem dlListLb_get (v : EraPins) (D : List (List Obs × BitVec 8)) :
     dlListAuth (GF := GF) v D ⊢ dlListAuth v D ∗ dlListLb v D := by
   unfold dlListAuth dlListLb
@@ -398,12 +424,14 @@ theorem dlListLb_get (v : EraPins) (D : List (List Obs × BitVec 8)) :
   ihave #Hl := MonoList.lb_own_get $$ H
   iframe H Hl
 
+omit [MachGS GF] in
 theorem dlListAuth_grow (v : EraPins) (D ws : List (List Obs × BitVec 8)) :
     dlListAuth (GF := GF) v D ⊢ |==> (dlListAuth v (D ++ ws) ∗ dlListLb v (D ++ ws)) := by
   unfold dlListAuth dlListLb
   iintro H
   iapply MonoList.auth_own_update_app $$ H
 
+omit [MachGS GF] in
 theorem dlList_prefix (v : EraPins) (D D' : List (List Obs × BitVec 8)) :
     dlListAuth (GF := GF) v D ∗ dlListLb v D' ⊢ ⌜D' <+: D⌝ := by
   unfold dlListAuth dlListLb
@@ -411,12 +439,14 @@ theorem dlList_prefix (v : EraPins) (D D' : List (List Obs × BitVec 8)) :
   ihave %h := MonoList.auth_lb_own_valid $$ Ha Hl
   ipureintro; exact h.2
 
+omit [MachGS GF] in
 theorem dlListLb_cmp (v : EraPins) (D1 D2 : List (List Obs × BitVec 8)) :
     dlListLb (GF := GF) v D1 ∗ dlListLb v D2 ⊢ ⌜D1 <+: D2 ∨ D2 <+: D1⌝ := by
   unfold dlListLb
   iintro ⟨H1, H2⟩
   iapply MonoList.lb_own_valid $$ H1 H2
 
+omit [MachGS GF] in
 theorem dlListLb_weaken (v : EraPins) (D D' : List (List Obs × BitVec 8)) (hp : D' <+: D) :
     dlListLb (GF := GF) v D ⊢ dlListLb v D' := by
   unfold dlListLb
@@ -431,11 +461,14 @@ DELIVERED input, as bytes. -/
 def inpLb (v : EraPins) (I : List (BitVec 8)) : IProp GF :=
   iprop(∃ D : List (List Obs × BitVec 8), dlListLb v D ∗ ⌜D.map Prod.snd = I⌝)
 
+omit [MachGS GF] in
 instance inpLb_persistent (v : EraPins) (I : List (BitVec 8)) : Persistent (inpLb (GF := GF) v I) := by
   unfold inpLb; infer_instance
+omit [MachGS GF] in
 instance inpLb_timeless (v : EraPins) (I : List (BitVec 8)) : Timeless (inpLb (GF := GF) v I) := by
   unfold inpLb; infer_instance
 
+omit [MachGS GF] in
 theorem inpLb_of_dlLb (v : EraPins) (D : List (List Obs × BitVec 8)) (I : List (BitVec 8))
     (hI : I <+: D.map Prod.snd) : dlListLb (GF := GF) v D ⊢ inpLb v I := by
   iintro H
@@ -448,6 +481,7 @@ theorem inpLb_of_dlLb (v : EraPins) (D : List (List Obs × BitVec 8)) (I : List 
   rw [List.map_take, ← hz, List.take_left']
   rfl
 
+omit [MachGS GF] in
 /-- THE LAW THE WRITE SPENDS (Rocq `inp_lb_le`). -/
 theorem inpLb_le (v : EraPins) (D : List (List Obs × BitVec 8)) (I : List (BitVec 8)) :
     dlListAuth (GF := GF) v D ∗ inpLb v I ⊢ ⌜I <+: D.map Prod.snd⌝ := by
@@ -460,6 +494,7 @@ theorem inpLb_le (v : EraPins) (D : List (List Obs × BitVec 8)) (I : List (BitV
   rw [← heq]
   exact hp.map _
 
+omit [MachGS GF] in
 theorem inpLb_cmp (v : EraPins) (I1 I2 : List (BitVec 8)) :
     inpLb (GF := GF) v I1 ∗ inpLb v I2 ⊢ ⌜I1 <+: I2 ∨ I2 <+: I1⌝ := by
   iintro ⟨H1, H2⟩
@@ -474,6 +509,7 @@ theorem inpLb_cmp (v : EraPins) (I1 I2 : List (BitVec 8)) :
   · exact Or.inl (hp.map _)
   · exact Or.inr (hp.map _)
 
+omit [MachGS GF] in
 theorem inpLb_agree (v : EraPins) (I1 I2 : List (BitVec 8)) (hlen : I1.length = I2.length) :
     inpLb (GF := GF) v I1 ∗ inpLb v I2 ⊢ ⌜I1 = I2⌝ := by
   iintro H
@@ -488,15 +524,18 @@ theorem inpLb_agree (v : EraPins) (I1 I2 : List (BitVec 8)) (hlen : I1.length = 
 /-- THE DELIVERED COUNT, in two halves (Rocq `dl_cnt`). -/
 def dlCnt (v : EraPins) (q : Qp) (n : Nat) : IProp GF := ghost_var v.gdl (DFrac.own q) n
 
+omit [MachGS GF] in
 instance dlCnt_timeless (v : EraPins) (q : Qp) (n : Nat) : Timeless (dlCnt (GF := GF) v q n) := by
   unfold dlCnt; infer_instance
 
+omit [MachGS GF] in
 theorem dlCnt_agree (v : EraPins) (q1 q2 : Qp) (n1 n2 : Nat) :
     dlCnt (GF := GF) v q1 n1 ∗ dlCnt v q2 n2 ⊢ ⌜n1 = n2⌝ := by
   unfold dlCnt
   iintro ⟨H1, H2⟩
   iapply ghost_var_agree $$ H1 H2
 
+omit [MachGS GF] in
 theorem dlCnt_update (v : EraPins) (n1 n2 m : Nat) :
     dlCnt (GF := GF) v (1 : Qp).half n1 ∗ dlCnt v (1 : Qp).half n2 ⊢
       |==> (dlCnt v (1 : Qp).half m ∗ dlCnt v (1 : Qp).half m) := by

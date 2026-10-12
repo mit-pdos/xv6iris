@@ -31,19 +31,19 @@ open Std (ExtTreeSet)
 open UShPipesDefs
 
 section CatF
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]
   [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
-variable (D : PdRound hlc GF)
+variable (D : PdRound GF)
 
 /-- **R-prog's `UShPipesStageP`, at the round and sh-exec's record at the
 engine**, from the R-pipes declarations. -/
 noncomputable def stageP (OK : PdRoundOk D) (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF)
-    (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF)) :
-    UShPipesStageP (hlc := hlc) D (ushExecEnvOf UL HS HF hent) where
+    (hent : wpShRuncmdEntryBody (GF := GF)) :
+    UShPipesStageP D (ushExecEnvOf UL HS HF hent) where
   lrd := D.lrd
   lrd_zero := rfl
   lrep := D.lrep

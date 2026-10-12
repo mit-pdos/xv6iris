@@ -187,7 +187,7 @@ theorem mixB_get_pred (bs olds : List (BitVec 8)) (i : Nat) (hi : 1 ≤ i) (hin 
 set_option maxHeartbeats 4000000 in
 /-- One iteration of the forward loop at `80000d90`: byte `i` is copied;
 the continuation is at whichever hart the thread is on by then. -/
-theorem memmove_fwd_iter {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem memmove_fwd_iter {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (kb : KCtx)
     (s d : BitVec 64) (dqs : DFrac) (bs olds : List (BitVec 8)) (n : Nat)
     (hls : bs.length = n) (hld : olds.length = n) (hn32 : n < 2 ^ 32)
@@ -239,7 +239,7 @@ set_option maxHeartbeats 4000000 in
 /-- The forward loop from `cf2` with `i` bytes copied (`i < n`) runs to
 `d02` with the destination holding the source; only `a1`, `a3`, `a4`
 change.  The hart is quantified inside the induction. -/
-theorem memmove_fwd_loop {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem memmove_fwd_loop {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (kb : KCtx)
     (s d : BitVec 64) (dqs : DFrac) (bs olds : List (BitVec 8)) (n : Nat)
     (hls : bs.length = n) (hld : olds.length = n) (hn32 : n < 2 ^ 32)
@@ -299,7 +299,7 @@ theorem memmove_fwd_loop {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 
 set_option maxHeartbeats 4000000 in
 /-- One iteration of the backward loop at `80000dc6`: byte `i - 1` is copied. -/
-theorem memmove_bwd_iter {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem memmove_bwd_iter {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (kb : KCtx)
     (s d : BitVec 64) (dqs : DFrac) (bs olds : List (BitVec 8)) (n : Nat)
     (hls : bs.length = n) (hld : olds.length = n) (hn32 : n < 2 ^ 32)
@@ -351,7 +351,7 @@ set_option maxHeartbeats 4000000 in
 /-- The backward loop from `d28` with the bytes `i..n-1` copied (`1 ≤ i ≤ n`)
 runs to `d38` with the destination holding the source; only `a2`, `a3`,
 `a4` change.  The hart is quantified inside the induction. -/
-theorem memmove_bwd_loop {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem memmove_bwd_loop {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (kb : KCtx)
     (s d : BitVec 64) (dqs : DFrac) (bs olds : List (BitVec 8)) (n : Nat)
     (hls : bs.length = n) (hld : olds.length = n) (hn32 : n < 2 ^ 32)
@@ -407,7 +407,7 @@ set_option maxHeartbeats 4000000 in
 /-- From `d02` at hart `c` (pinned to the entry hart `cpu` when interrupts
 are off) with the destination copied: the epilogue and the caller's
 continuation. -/
-theorem memmove_finish {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem memmove_finish {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu c : CPU) (k : KCtx) (hpc : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hK : 2 ≤ k.avail)
     (bs : List (BitVec 8)) (dqs : DFrac) (R' : RegMap) (hR2 : R' 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)
     (h10 : R' 10#5 = k.regs 10#5)
@@ -452,7 +452,7 @@ theorem memmove_finish {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 set_option maxHeartbeats 4000000 in
 /-- From `ce8` at hart `c` (the forward copy: zero-extend the count, set up
 the cursors, the loop) to the caller's continuation.  `n ≥ 1`. -/
-theorem memmove_fwd_seg {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem memmove_fwd_seg {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu c : CPU) (k : KCtx) (hpc : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hK : 2 ≤ k.avail)
     (bs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac) (hn32 : n < 2 ^ 32)
     (hls : bs.length = n) (hld : olds.length = n)
@@ -512,7 +512,7 @@ theorem memmove_fwd_seg {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 /-! ## The function -/
 
 set_option maxHeartbeats 4000000 in
-theorem memmove_proof : MEMMOVE := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hK hn hn32 hls hld => by
+theorem memmove_proof : MEMMOVE := ⟨fun {GF} _ _ cpu k bs olds n dqs hK hn hn32 hls hld => by
   unfold wp_memmove_body
   iintro ⟨Hk, Hpc, Hsrc, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

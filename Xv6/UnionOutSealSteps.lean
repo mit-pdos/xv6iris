@@ -36,7 +36,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 set_option synthInstance.maxSize 1024
 
 section UnionOutSealSteps
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 /-- THE UNION'S DRAIN RECEIPT (Rocq `udrain_ret`, sync SY3-A4): the trace
@@ -46,17 +46,17 @@ the round's record (its position over the era's base and the state before
 it), the last entry of a lower bound of the run-long history, read off the
 payload the round filed. -/
 noncomputable def udrainRet (ug : UnionGn) (k : Nat) (seg : List Obs) : IProp GF :=
-  iprop(fileTaint (hlc := hlc) ug.ugnFile.fgnCl
+  iprop(fileTaint ug.ugnFile.fgnCl
     ∨ ∃ (s0 : Fstate) (vf : FileEra) (o : Option Srec),
         ⌜lmGoodSync s0 seg o⌝ ∗ ⌜fstateOk s0⌝ ∗ f0Typed ug.ugnFile s0
-        ∗ fileEraPin ug.ugnFile k vf ∗ f0Lb (hlc := hlc) ug.ugnFile vf s0
+        ∗ fileEraPin ug.ugnFile k vf ∗ f0Lb ug.ugnFile vf s0
         ∗ (⌜o = none⌝
            ∨ ∃ (J : List (BitVec 8)) (c : Fstate) (L : List Srec),
                ⌜o = some (nlines J, c)⌝
                ∗ slLb ug.ugnFile.fgnCl.ffHist (L ++ [((vf.feBase ++ ulinesIn J).length, c)])))
 
 theorem uwa_gwaTy (ug : UnionGn) :
-    (uwa (hlc := hlc) (GF := GF) ug).gwaTy = f0Typed ug.ugnFile := rfl
+    (uwa (GF := GF) ug).gwaTy = f0Typed ug.ugnFile := rfl
 
 /-- the round's prefix of the input: its bodies are the input's, below its
 line count -/
@@ -132,8 +132,8 @@ theorem ucl_drain (ug : UnionGn) (k : Nat) (h ho : List Obs) (CH : ConsHist) (se
     (hsh : traceShape h true) (hk : obsBoots h = k) (hpre : ho <+: h)
     (hins : consIns seg = consIns (openSeg h)) (hwire : obsWire .uart0 seg <+: CH.chAcc)
     (hne : obsWire .uart0 seg ≠ []) :
-    ⊢ ucl (hlc := hlc) (GF := GF) ug k ho CH -∗ ucl ug k ho CH ∗ udrainRet ug k seg := by
-  have hd := pwclV_drain (ugnPipe ug) ulmG (ucparams (hlc := hlc) (GF := GF) ug) ulmG_laws
+    ⊢ ucl (GF := GF) ug k ho CH -∗ ucl ug k ho CH ∗ udrainRet ug k seg := by
+  have hd := pwclV_drain (ugnPipe ug) ulmG (ucparams (GF := GF) ug) ulmG_laws
     (ulm_byte_laws admUG admSOn) (∅ : Fstate) (uwa ug) uwild uwild_wild
     (fun k v I a hw => upr_wild ug k v I a hw) k h ho CH seg hsh hk hpre hins hwire hne
   unfold gdrainRet gitem at hd
@@ -170,7 +170,7 @@ theorem ucl_drain (ug : UnionGn) (k : Nat) (h ho : List Obs) (CH : ConsHist) (se
     obtain ⟨J, hJ⟩ : ∃ J, Is[i]? = some J :=
       ⟨Is[i]'(by rw [hlIs]; exact hi), List.getElem?_eq_getElem _⟩
     have hJp : J <+: consIns seg := hFI J (List.mem_of_getElem? hJ)
-    ihave ⟨Hpr, -, %hnJ⟩ := (BigSepL.bigSepL_lookup (Φ := fun i J => iprop(upr (hlc := hlc) (GF := GF)
+    ihave ⟨Hpr, -, %hnJ⟩ := (BigSepL.bigSepL_lookup (Φ := fun i J => iprop(upr (GF := GF)
       ug k v J (csf ++ ex)[i]! ∗ inpLb v J ∗ ⌜nlines J = i + 1⌝)) hJ) $$ Hitems
     unfold upr
     icases Hpr with (%hnot | #HT | ⟨%cs', %s0', %vf', %L, #Hcs', %hlcs, #Hcw, #Hfp', #Hsl⟩)
@@ -185,7 +185,7 @@ theorem ucl_drain (ug : UnionGn) (k : Nat) (h ho : List Obs) (CH : ConsHist) (se
     ihave %hv := fileEraPin_agree (GF := GF) ug.ugnFile k vf vf'' $$ [Hfp Hfp'']
     · iframe Hfp Hfp''
     subst hv
-    ihave %hs := f0Lb_agree (hlc := hlc) (GF := GF) ug.ugnFile vf s0 s0' $$ [Hlb Hlb'']
+    ihave %hs := f0Lb_agree (GF := GF) ug.ugnFile vf s0 s0' $$ [Hlb Hlb'']
     · iframe Hlb Hlb''
     subst hs
     ihave %hcmp := csLb_cmp (GF := GF) v csf cs' $$ [Hcsf Hcs']
@@ -210,7 +210,7 @@ theorem ucl_drain (ug : UnionGn) (k : Nat) (h ho : List Obs) (CH : ConsHist) (se
 theorem ucl_close (ug : UnionGn) (k : Nat) (ho : List Obs) (H : ConsHist) (hok : consHistOk H)
     (hev : consEvOk H .evClose)
     (hK3 : ∀ a, H.chArm = some a → caEcho a = [echoOf (caByte a)] → caSent a = 1) :
-    ⊢ ucl (hlc := hlc) (GF := GF) ug k ho H -∗ ucl ug k ho (consStep H .evClose) :=
+    ⊢ ucl (GF := GF) ug k ho H -∗ ucl ug k ho (consStep H .evClose) :=
   pwclV_close (ugnPipe ug) ulmG (ucparams ug) (∅ : Fstate) (uwa ug) uwild k ho H hok hev hK3
 
 /-- Rocq `ucl_open`.  `hK1`/`hK2`: DEVIATION 2. -/
@@ -221,14 +221,14 @@ theorem ucl_open (ug : UnionGn) (k : Nat) (ho : List Obs) (H : ConsHist) (h : Li
     (hK2 : cs = [] → consDropOk c H.chLog H.chDl)
     (hd : lmDiscInput ulmG (consIns (openSeg h))) (hb : obsBoots h = k) (hdh : lmDisc ulmG h)
     (hsh : traceShape h true) :
-    ⊢ ucl (hlc := hlc) (GF := GF) ug k ho H -∗ ucl ug k h (consStep H (.evOpen h c cs)) :=
+    ⊢ ucl (GF := GF) ug k ho H -∗ ucl ug k h (consStep H (.evOpen h c cs)) :=
   pwclV_open (ugnPipe ug) ulmG (ucparams ug) (ulm_byte_laws admUG admSOn) (∅ : Fstate) (uwa ug)
     uwild uwild_wild k ho H h c cs hok hev hK1 hK2 hd hb hdh hsh
 
 /-- Rocq `ucl_step_byte`. -/
 theorem ucl_step_byte (ug : UnionGn) (k : Nat) (ho : List Obs) (CH : ConsHist) (b : BitVec 8)
     (hok : consHistOk CH) (hev : consEvOk CH (.evByte b)) :
-    ⊢ ucl (hlc := hlc) (GF := GF) ug k ho CH ==∗ ucl ug k ho (consStep CH (.evByte b)) :=
+    ⊢ ucl (GF := GF) ug k ho CH ==∗ ucl ug k ho (consStep CH (.evByte b)) :=
   pwclV_step_byte (ugnPipe ug) ulmG (ucparams ug) (ulm_byte_laws admUG admSOn) (∅ : Fstate)
     (uwa ug) uwild ulmG_laws k ho CH b hok hev
 

@@ -71,7 +71,7 @@ theorem ush_openfail_w2 (nm : List (BitVec 8)) (p : Nat) (h1 : 7 ≤ p) (h2 : p 
     altOpenfailN_w2 nm (p - 7) (by omega)]
 
 section UshRedirPaid
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -81,10 +81,10 @@ theorem wp_kshd_openfail_paid (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF
     (Cr Cd : IProp GF) (l : List FdState) (h : CPU) (m : RegMap) (n : Nat) (x : UArg) (nm : List (BitVec 8))
     (hfd2 : ushFd2p l) (hat : ushDiagAt 0x10e m) (hxlen : x.len = nm.length)
     (hxb : ∀ j, j < nm.length → x.bytes j = nm[j]!) :
-    ⊢ ushExecfailLawAt (hlc := hlc) (altOpenfailN nm) (13 + nm.length) Cr Cd -∗ ushCode N.t -∗
+    ⊢ ushExecfailLawAt (altOpenfailN nm) (13 + nm.length) Cr Cd -∗ ushCode N.t -∗
       ushPtr N.d ((m.get 9#5).toNat + 16) x.ptr -∗ ushStr N.d x -∗ ustd N.fd l -∗ Cr -∗
       (ustd N.fd l -∗ Cd -∗ N.pay (-1)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x10e) (ushDg + n) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 0x10e) (ushDg + n) -∗ wpLoop h := by
   have hal : (m.get 9#5).toNat % 8 = 0 := by
     rcases hat with ⟨hc, -⟩ | ⟨hc, -⟩ | ⟨-, hal⟩
     · exact absurd hc (by decide)
@@ -131,6 +131,7 @@ theorem wp_kshd_openfail_paid (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF
 
 /-! ## S2 The name as the image the open reads -/
 
+omit [MachGS GF] in
 /-- **Rocq `ushr_fname_img`** (deviation 2): the node's file string, as a
 run the open reads the path `nm` off. -/
 theorem ushr_fname_img (γd : GName) (x : UArg) (nm : List (BitVec 8)) (hu : uname nm) (hlen : x.len = nm.length)
@@ -184,8 +185,8 @@ theorem ush_open_call_g_of_call2 {A : Type} (N : UkNames GF) (file : UArg) (nm :
     (l : List FdState) (K : FdType → IProp GF) (Dd Kf : A → IProp GF) (a : A) (hu : uname nm)
     (hlen : file.len = nm.length) (hb : ∀ j, j < nm.length → file.bytes j = nm[j]!)
     (hfdl : fdLowestClosed l = some 1) :
-    ⊢ ushOpenCall2 (hlc := hlc) N ROOTINO file.ptr mode nm l K Dd Kf -∗
-      ushOpenCallG (hlc := hlc) N ROOTINO file mode l (Dd a) K (Kf a) := by
+    ⊢ ushOpenCall2 N ROOTINO file.ptr mode nm l K Dd Kf -∗
+      ushOpenCallG N ROOTINO file mode l (Dd a) K (Kf a) := by
   unfold ushOpenCall2 ushOpenCallG
   iintro Hc %h %m %av %ha0 %ha1 #Hstr Hd #Hcode Hcwd Hstd Hrun Hcont
   icases ushr_fname_img N.d file nm hu hlen hb $$ Hstr with ⟨%Img, %hpath, #Himg⟩

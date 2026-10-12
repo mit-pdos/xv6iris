@@ -176,7 +176,7 @@ def execArgsOf (M : Nat → List (BitVec 8)) (av : BitVec 64) (na : Nat) (alen :
 /-! ## 2.  THE BUNDLE AND THE ARMS AT THE SYSCALL BOUNDARY -/
 
 section SysExecAU
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [CtokG GF]
 
 /-- **Rocq `sys_exec_slot_pre`**: the caller's WP, for every argument vector
@@ -200,8 +200,8 @@ def sysExecAuPre (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs 
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (M : Nat → List (BitVec 8))
     (pv av : BitVec 64) (sts : List FdState) (cs : Std.ExtTreeSet GName compare)
     (pidv : BitVec 32) : IProp GF :=
-  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv.toNat pl⌝ -∗ exStart (hlc := hlc) γfs rt cw P Pmiss pl) ∗
-    pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
+  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv.toNat pl⌝ -∗ exStart γfs rt cw P Pmiss pl) ∗
+    pfAt (aopenCommitAt Γ appE) Fo ∗
     pfAt (fun S => sysExecSlotPre S Q P Fo.pfRecv cw secc M pv av sts cs pidv) Fs)
 
 /-- **Rocq `sys_exec_post_fail`**: ret = -1 -- sys_exec's own early exits
@@ -212,10 +212,10 @@ def sysExecPostFail (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γ
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (M : Nat → List (BitVec 8))
     (pv av : BitVec 64) (sts : List FdState) (cs : Std.ExtTreeSet GName compare)
     (pidv : BitVec 32) : IProp GF :=
-  iprop(sysExecAuPre (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo M pv av sts cs pidv ∨
+  iprop(sysExecAuPre Fs Γ γfs rt cw secc Q P Pmiss Fo M pv av sts cs pidv ∨
     (∃ (pl : List (BitVec 8)) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8),
       ⌜argPathOf M pv.toNat pl⌝ ∗ ⌜execArgsOf M av na alen afun⌝ ∗
-      execPostFail (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv))
+      execPostFail Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv))
 
 /-- **Rocq `sys_exec_post_fail_refund`: THE FAILURE ARM REFUNDS THE
 DEPOSIT** -- `SpecKexec.execPostFail_refund` at the second disjunct, the
@@ -225,16 +225,16 @@ theorem sysExecPostFail_refund (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNa
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (M : Nat → List (BitVec 8))
     (pv av : BitVec 64) (sts : List FdState) (cs : Std.ExtTreeSet GName compare)
     (pidv : BitVec 32) :
-    sysExecPostFail (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo M pv av sts cs pidv ⊢ Fs.pfRefund := by
+    sysExecPostFail Fs Γ γfs rt cw secc Q P Pmiss Fo M pv av sts cs pidv ⊢ Fs.pfRefund := by
   unfold sysExecPostFail sysExecAuPre
   iintro (⟨-, -, Hs⟩ | ⟨%pl, %na, %alen, %afun, -, -, Hf⟩)
   · iapply (pfAt_refund _ Fs) $$ Hs
-  · iapply (execPostFail_refund (hlc := hlc)) $$ Hf
+  · iapply (execPostFail_refund) $$ Hf
 
 end SysExecAU
 
 section SysExecArms
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -252,7 +252,7 @@ def sysExecArms (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs :
     (r : BitVec 64) : IProp GF :=
   iprop(∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)), procPrivFd γ pa pid V' M' ∗
     ((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter VW V' ∧ M' = MW⌝ ∗
-        sysExecPostFail (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo Mim pv av sts cs pid) ∨
+        sysExecPostFail Fs Γ γfs rt cw secc Q P Pmiss Fo Mim pv av sts cs pid) ∨
      (∃ (pl : List (BitVec 8)) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8),
         ⌜argPathOf Mim pv.toNat pl⌝ ∗ ⌜execArgsOf Mim av na alen afun⌝ ∗
         execPostOk Fs na alen afun sts gn cs pid VW V' M' r)))
@@ -265,7 +265,7 @@ theorem sysExecArms_landed (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames 
     (Mim : Nat → List (BitVec 8)) (pv av : BitVec 64) (sts : List FdState) (gn : GName)
     (cs : Std.ExtTreeSet GName compare) (VW : ProcPriv) (MW : Nat → List (BitVec 8))
     (r : BitVec 64) :
-    sysExecArms (hlc := hlc) Fs Γ γfs rt cw secc γ pa pid Q P Pmiss Fo Mim pv av sts gn cs VW MW r ⊢
+    sysExecArms Fs Γ γfs rt cw secc γ pa pid Q P Pmiss Fo Mim pv av sts gn cs VW MW r ⊢
       sysExecPost γ pa pid VW r := by
   unfold sysExecArms sysExecPost execPostOk
   iintro ⟨%V', %M', Hp, (⟨%h, -⟩ | ⟨%pl, %na, %alen, %afun, -, -, %i, %av', %a, -,
@@ -308,7 +308,7 @@ def sysExecK (k : KCtx) (γ : FileNames) (j : Nat) (v0 v1 : BitVec 64) (pid : Bi
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     bslots 3 -∗ irefSlots 2 -∗
-    sysExecArms (hlc := hlc) Fs (fsGammaL fscFs) fscFs V.rti V.cwi V.pvSecc γ (procAddr j) pid Q P Pmiss Fo
+    sysExecArms Fs (fsGammaL fscFs) fscFs V.rti V.cwi V.pvSecc γ (procAddr j) pid Q P Pmiss Fo
       (viewLazy V.upt V.sz M) v0 v1 sts gn cs { V.updEv k' with upt := P' } (viewFaulted V.upt P' M)
       (R' 10#5) -∗
     wpLoop cpu')
@@ -323,11 +323,11 @@ read at trapframe argument 0 (`v0`) and the argument vector at argument 1
 descriptor view `sts` is the caller's (sys_exec never opens the descriptor
 block); the resume key is built at the caller's generation `gn`, children
 `cs` and pid. -/
-def wp_sys_exec_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+def wp_sys_exec_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
     [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF]
     [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
     (pd pav pu : BitVec 64) (v0 v1 : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : Std.ExtTreeSet GName compare) (Fs : Pfam GF (Uvis → IProp GF)) (Q : Int → IProp GF)
@@ -337,33 +337,33 @@ def wp_sys_exec_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
     (hv0 : V.tf[tfArgIdx 0]? = some v0) (hv1 : V.tf[tfArgIdx 1]? = some v1) : Prop :=
   kctx cpu k ∗ pcIs cpu sysExecAddr ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-  fsFabric (hlc := hlc) Γ pd pav pu ∗
+  fsFabric Γ pd pav pu ∗
   bslots 3 ∗ irefSlots 2 ∗
   procPrivFd γ (procAddr j) pid V M ∗
   -- ---- THE BUNDLE: the pay fact and the AU, the arguments read off THIS
   -- image at arguments 0 and 1 ----
   myPay gn Q ∗
-  sysExecAuPre (hlc := hlc) Fs (fsGammaL fscFs) fscFs V.rti V.cwi V.pvSecc Q P Pmiss Fo (viewLazy V.upt V.sz M)
+  sysExecAuPre Fs (fsGammaL fscFs) fscFs V.rti V.cwi V.pvSecc Q P Pmiss Fo (viewLazy V.upt V.sz M)
     v0 v1 sts cs pid ∗
   -- THE CROSSING IS THE LITERAL `true`: kexec parks
-  wpNext true k.proc cpu (sysExecK (hlc := hlc) k γ j v0 v1 pid V M sts gn cs Fs Q P Pmiss Fo)
+  wpNext true k.proc cpu (sysExecK k γ j v0 v1 pid V M sts gn cs Fs Q P Pmiss Fo)
   ⊢ wpLoop (GF := GF) cpu
 
 /-! ## 4.  THE SEAL -/
 
 /-- The interface of `sys_exec` (Rocq's `Module Type SYSEXEC`). -/
 structure SYSEXEC : Prop where
-  wp_sys_exec_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_sys_exec_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
     (pd pav pu : BitVec 64) (v0 v1 : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : Std.ExtTreeSet GName compare) (Fs : Pfam GF (Uvis → IProp GF)) (Q : Int → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     hK hnoff htier hj hproc hv0 hv1,
-    wp_sys_exec_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pd pav pu v0 v1 pid V M sts gn cs
+    wp_sys_exec_eb_body (GF := GF) Γ cpu k γ j pd pav pu v0 v1 pid V M sts gn cs
       Fs Q P Pmiss Fo hK hnoff htier hj hproc hv0 hv1
 
 end Xv6

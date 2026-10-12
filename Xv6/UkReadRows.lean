@@ -22,7 +22,7 @@ ported either (nothing uses them).
 ## Deviations from Rocq
 
 1. **The instance is `uexecSGXv6`, passed explicitly** (`ExecRun` deviation
-   1: its `hlc` is not determined by the class); the notation `SGX` names it.
+   1); the notation `SGX` names it.
 2. **Words** (UkSysP deviations 1/4): the C `int` reading `bv_signed (trunc32
    v)` is `(BitVec.setWidth 32 v).toInt`; the kernel's count
    `sys_rw_count v` is `argZ v` (the row's own reading; `argZ_setWidth` is
@@ -83,20 +83,20 @@ end Fam
 /-! ## §2 THE PAIR, §3 the descriptor the call runs on -/
 
 section Rows
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 /-- **Rocq `sbundle_at_read_intro`**: THE DEPOSIT, IN THE PROCESS'S
 DIRECTION.  The key's projections enter as PURE premises. -/
 theorem sbundleAt_read_intro (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (v0 v2 : BitVec 64)
     (sts : List FdState) (h0 : tfW W.tf (tfArgIdx 0) = v0) (h2 : tfW W.tf (tfArgIdx 2) = v2)
     (hfd : W.fd = sts) :
-    filereadIn (hlc := hlc) (fdStOfKey v0 sts) (argZ v2) f.rF f.rRd f.rRin f.rPq f.rPqe iprop(True) ⊢
+    filereadIn (fdStOfKey v0 sts) (argZ v2) f.rF f.rRd f.rRin f.rPq f.rPqe iprop(True) ⊢
       @UexecSG.sbundleAt GF _ SGX X USYS_read f W := by
   subst h0 h2 hfd
-  exact (sbundleAt_xv6_read (hlc := hlc) X f W).symm ▸ .rfl
+  exact (sbundleAt_xv6_read X f W).symm ▸ .rfl
 
 end Rows
 
@@ -126,7 +126,7 @@ theorem ufd_fd_st_of_key (v0 : BitVec 64) (fdv : List FdState) (fd : Nat) (st : 
 /-! ## §3b THE STATE-FIXED DEPOSIT, AND THE HANDLE'S AGREEMENT -/
 
 section StateFixed
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -140,7 +140,7 @@ def udepwfSt (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : Ue
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
     ⌜fdStOfKey (m.get 10#5) fdv = st⌝ -∗ myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      UexecSG.sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
+      UexecSG.sbundleAt (uslot) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
 
 end StateFixed
 
@@ -160,10 +160,10 @@ theorem uread_count_is_cap (w : BitVec 64) (cap : Nat) (hu : w.toNat = cap) (hlt
 restores them -/
 
 section PostRows
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 /-- **Rocq `spost_at_read_elim`'s reading, at Lean's two tables**: the
 receipt table carries Rocq's `proc_pt_wf` and the lazy bit's `lazy_free`,
@@ -179,7 +179,7 @@ def ukPostRd : Prop :=
         ⌜umemLazy P W.sz Mv = M'⌝ ∗ ⌜W.lazy = false → imgAgrees M' Mv⌝ ∗
         ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜permOf Pr.um W.sz = W.perm⌝ ∗ ⌜uptWf Pr⌝ ∗
         ⌜W.lazy = false → lazyFree Pr.um (BitVec.ofNat 64 W.sz)⌝ ∗
-        filereadExtraCore (hlc := hlc) W.gen Pr (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) f.rF f.rRd
+        filereadExtraCore W.gen Pr (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) f.rF f.rRd
           f.rRin f.rPq f.rPqe r Mv (xkA W 1)
 
 /-- **Rocq `spost_at_write_elim_at`'s reading**: row 16's table with Rocq's
@@ -192,7 +192,7 @@ def ukPostWr : Prop :=
       ∃ (P : UPtd) (Mv : Nat → List (BitVec 8)),
         ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜uptWf P⌝ ∗ ⌜W.lazy = false → lazyFree P.um (BitVec.ofNat 64 W.sz)⌝ ∗
         ⌜imgAgrees W.M Mv⌝ ∗
-        filewriteExtra (hlc := hlc) W.gen P (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) f.wQ f.wQe r
+        filewriteExtra W.gen P (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) f.wQ f.wQe r
 
 end PostRows
 
@@ -200,10 +200,10 @@ end PostRows
 row-16 post readings, a parameter until `UexecExecInst.xpostRead` /
 `xpostWrite` carry `proc_pt_wf` / `lazy_free` again. -/
 structure UK_POST_ROWS : Prop where
-  rd : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
-    [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg], ukPostRd (hlc := hlc) (GF := GF)
-  wr : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
-    [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg], ukPostWr (hlc := hlc) (GF := GF)
+  rd : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+    [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg], ukPostRd (GF := GF)
+  wr : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+    [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg], ukPostWr (GF := GF)
 
 /-- **`UK_POST_ROWS` HOLDS** (lane runsys): the kernel's row-5 / row-16 posts
 carry Rocq's `proc_pt_wf` / `lazy_free` rows again (`UexecExecInst`
@@ -215,10 +215,10 @@ theorem ukPostRows_holds : UK_POST_ROWS where
     rw [spostAt_xv6_write]; exact .rfl
 
 section PostElim
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 /-- **Rocq `spost_at_read_elim`** at Rocq's full reading (through
 `ukPostRows_holds.rd`, deviation 3). -/
@@ -232,7 +232,7 @@ theorem spostAt_read_elimR (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis)
         ⌜umemLazy P W.sz Mv = M'⌝ ∗ ⌜W.lazy = false → imgAgrees M' Mv⌝ ∗
         ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜permOf Pr.um W.sz = W.perm⌝ ∗ ⌜uptWf Pr⌝ ∗
         ⌜W.lazy = false → lazyFree Pr.um (BitVec.ofNat 64 W.sz)⌝ ∗
-        filereadExtraCore (hlc := hlc) W.gen Pr (fdStOfKey v0 sts) (argZ v2) f.rF f.rRd f.rRin
+        filereadExtraCore W.gen Pr (fdStOfKey v0 sts) (argZ v2) f.rF f.rRd f.rRin
           f.rPq f.rPqe r Mv v1 := by
   subst h0 h1 h2 hfd
   exact ukPostRows_holds.rd X f W r M' fdv' cw' cs'

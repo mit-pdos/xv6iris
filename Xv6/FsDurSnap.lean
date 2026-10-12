@@ -739,7 +739,7 @@ Its own section because the merge's left arm is LENT the machine's
 started-generations auth `startAuth`, a `MachFixedGS` resource. -/
 
 section SnapMerge
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
 
 /-- THE GUEST'S MERGE (Rocq's `dur_merge`, SY3-K2 / K3-3 / SY3-A1): the new
@@ -751,22 +751,22 @@ LEFT arm, the EMPTY-LOG commit takes the RIGHT).  The LEFT arm is LENT the
 machine's started auth `startAuth n` at `n = gd + 1`, `gd` the era's
 generation (pinned to `genId` by `LogInv.logCtx`), and hands it back. -/
 def durMerge (G : GName → IProp GF) (T : IProp GF) (gd : Nat) (gt : GName) : IProp GF :=
-  iprop((∀ (gt_o : GName) (n : Nat), ⌜n = gd + 1⌝ -∗ startAuth (hlc := hlc) (GF := GF) n -∗
-      ▷ G gt_o ==∗ ▷ G gt ∗ T ∗ startAuth (hlc := hlc) (GF := GF) n) ∧ T)
+  iprop((∀ (gt_o : GName) (n : Nat), ⌜n = gd + 1⌝ -∗ startAuth (GF := GF) n -∗
+      ▷ G gt_o ==∗ ▷ G gt ∗ T ∗ startAuth (GF := GF) n) ∧ T)
 
 /-- THE PAIR (Rocq's `dur_pair`): the snapshot AND the MERGE of an opaque
 guest at its map name, at the token `T` and the era `gd`. -/
 def durPair (G : GName → IProp GF) (T : IProp GF) (gd : Nat) (D : BlockMap) : IProp GF :=
-  iprop(∃ gt : GName, pDurAt gt D ∗ durMerge (hlc := hlc) G T gd gt)
+  iprop(∃ gt : GName, pDurAt gt D ∗ durMerge G T gd gt)
 
 /-- THE COMMIT'S STEP (Rocq's `dsnap_step_merge`): the old snapshot is
 DISCARDED, the old GUEST goes to the pair's merge, which yields the new one;
 the token and the loaned started auth come back beside it. -/
 theorem dsnapStep_merge (G : GName → IProp GF) (T : IProp GF) (gd : Nat) (gt : GName)
     (D D' : BlockMap) (n : Nat) (hn : n = gd + 1) :
-    durPair (hlc := hlc) G T gd D' ⊢ pDurAt gt D -∗ startAuth (hlc := hlc) (GF := GF) n -∗
+    durPair G T gd D' ⊢ pDurAt gt D -∗ startAuth (GF := GF) n -∗
       ▷ G gt ==∗
-      (∃ gt' : GName, pDurAt gt' D' ∗ ▷ G gt') ∗ T ∗ startAuth (hlc := hlc) (GF := GF) n := by
+      (∃ gt' : GName, pDurAt gt' D' ∗ ▷ G gt') ∗ T ∗ startAuth (GF := GF) n := by
   iintro H - Hsa HG
   unfold durPair durMerge
   icases H with ⟨%gt', Hd, ⟨Hm, -⟩⟩
@@ -778,7 +778,7 @@ theorem dsnapStep_merge (G : GName → IProp GF) (T : IProp GF) (gd : Nat) (gt :
 
 /-- THE PAIR'S RIGHT ARM (Rocq's `snap_law_out_tok`, stated at the pair). -/
 theorem durPair_tok (G : GName → IProp GF) (T : IProp GF) (gd : Nat) (D : BlockMap) :
-    durPair (hlc := hlc) G T gd D ⊢ T := by
+    durPair G T gd D ⊢ T := by
   iintro H
   unfold durPair durMerge
   icases H with ⟨%gt, -, ⟨-, HT⟩⟩

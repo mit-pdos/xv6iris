@@ -51,13 +51,13 @@ open Wid RdOut WrOut
 open UShPipesDefs
 
 section Echo
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF] [FileAppG GF]
-variable (D : PdRound hlc GF)
+variable (D : PdRound GF)
 
 /-- What echo's failed exec hands back (Rocq's `set Cd` in `stage_echo`). -/
 noncomputable def echoCd : IProp GF :=
@@ -159,11 +159,11 @@ theorem stage_echo (S : StgEnv D) (K : StgOk D S) [Persistent D.Rd] (ws : List (
     (hLw : D.L = wlLine (ws.drop 1)) (hn : 0 < D.nc)
     (hpeq : N'.pay = fun _ => D.QcK 0) (ha0 : m'.get 10#5 = BitVec.ofNat 64 q)
     (hfd1 : ushFd1pipe γp ld) (hfd2 : ushFd2p ld) (hav : 6 ≤ av) :
-    ⊢ D.FAM -∗ shEchoSlot (hlc := hlc) D.T -∗
+    ⊢ D.FAM -∗ shEchoSlot D.T -∗
       ushCode N'.t -∗ ushJtab N'.t -∗ ushCmd N'.d q (.exec (ushArgs s0 gs (ushEchoToks ws))) -∗
       usz N'.s szv -∗ ustd N'.fd ld -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗
       echo_raw D γp -∗ D.Rd -∗
-      urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (ushDg + av)) -∗
+      urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (ushDg + av)) -∗
       wpLoop h' := by
   have hc : UknConst N' := ukn_const_of_eq N' _ hpeq (fun _ _ => rfl)
   have hw0 : WLeft 0 ∈ D.wsN := (wids_elem _ _).2 hn
@@ -183,7 +183,7 @@ theorem stage_echo (S : StgEnv D) (K : StgOk D S) [Persistent D.Rd] (ws : List (
   · imodintro
     iintro %M %Mv %s1 %t1 %g1 %sts %cs %pidv %rb %hi1 %hag %hb1 %hl %hl1 #Hnp
     iapply imageEntryPayMono User.Echo.elf Mv _ sts ROOTINO seccAll cs pidv (fun _ => D.QcK 0)
-      (pnsEchoLend D.toPns (D.P 0) γp (fun _ => D.QcK 0)) (prod_cr D) (uslot (hlc := hlc))
+      (pnsEchoLend D.toPns (D.P 0) γp (fun _ => D.QcK 0)) (prod_cr D) (uslot)
       $$ Hlend
     iapply (pse_echo_image_entry (S.pse K) ws M Mv s1 t1 g1 sts
       ROOTINO cs pidv rb (fun _ => D.QcK 0) (D.P 0) γp (fun _ _ => rfl) hok hag hi1 hb1 hl hl1 hLw) $$ Hnp
@@ -221,19 +221,19 @@ theorem stage_echo (S : StgEnv D) (K : StgOk D S) [Persistent D.Rd] (ws : List (
     simp only [pnsWfin, dg_execL_len]
     iframe Hcw Hmw
   -- ...AND THE ARM
-  ihave Hrun := (show urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (ushDg + av)) ⊢
-      urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + (2 + (ushDg + (av - 6))))
+  ihave Hrun := (show urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (ushDg + av)) ⊢
+      urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + (2 + (ushDg + (av - 6))))
     by rw [show 2 + (ushDg + av) = 6 + (2 + (ushDg + (av - 6))) by omega]) $$ Hrun
   have harm := S.RX.wp_shExecXAtGen S.E (fun γ ld => ustd γ ld) (fun _ _ => .rfl) (ushFd1pipe γp)
     ws altExecfail (fun _ => D.QcK 0) (prod_cr D) (echoCd D) N' hc h' m' q szv s0 gs ld (av - 6)
     (lineOk_execOk hok) (by rw [hhd]; exact ushEchoExecfailBytes) hpeq ha0 hbytes hfd1 hfd2
   rw [hhd] at harm
   change ⊢ ushCode N'.t -∗ ushExecSupEchoAt S.E (ushFd1pipe γp) ws (fun _ => D.QcK 0) (prod_cr D) -∗
-    ushExecfailLawAt (hlc := hlc) altExecfail 17 (prod_cr D) (echoCd D) -∗
+    ushExecfailLawAt altExecfail 17 (prod_cr D) (echoCd D) -∗
     □ (echoCd D -∗ D.QcK 0) -∗ ushJtab N'.t -∗
     ushCmd N'.d q (.exec (ushArgs s0 gs (ushEchoToks ws))) -∗
     usz N'.s szv -∗ ustd N'.fd ld -∗ ucwd N'.cwd ROOTINO -∗ uchAny N'.ch -∗ prod_cr D -∗
-    urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + (2 + (ushDg + (av - 6)))) -∗
+    urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + (2 + (ushDg + (av - 6)))) -∗
     wpLoop h' at harm
   iapply harm $$ Hcode Hsup Hxl [] Hjt Hcmd Hsz Hstd Hcwd [Hch] [Hw HsL Hcw Hmw] Hrun
   · unfold echoCd
@@ -259,7 +259,7 @@ theorem stage_echo_law (S : StgEnv D) (K : StgOk D S) [Persistent D.Rd] (ws : Li
     (s0 : Nat) (gs : Nat → BitVec 8)
     (hpr : D.pr = .PrEcho ws) (hok : lineOk ws) (hbytes : ushEchoArgvBytes ws gs)
     (hLw : D.L = wlLine (ws.drop 1)) (hn : 0 < D.nc) :
-    ⊢ D.FAM -∗ shEchoSlot (hlc := hlc) D.T -∗ prod_stage_law D (ushArgs s0 gs (ushEchoToks ws)) := by
+    ⊢ D.FAM -∗ shEchoSlot D.T -∗ prod_stage_law D (ushArgs s0 gs (ushEchoToks ws)) := by
   iintro #Hfam #Hes
   unfold prod_stage_law
   imodintro

@@ -20,14 +20,14 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- sh's `sys_sbrk` stub, as a law (`UkStub.stubLaw` at 0xcea, number 12). -/
 theorem ushm_stub_sbrk (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Sh.code.byte) 12 User.Sh.Sym.«sys_sbrk» :=
+    ⊢ stubLaw N (ukCode N.t User.Sh.code.byte) 12 User.Sh.Sym.«sys_sbrk» :=
   stub_of_text UL N User.Sh.textOk 12 _ 12#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
@@ -39,12 +39,12 @@ theorem wp_shSysSbrk (UL : UK_LEAVES) (SB : USHM_SBRK_LEAF)
     (ha1 : BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (m.get 11#5)) = 1#64)
     (hok : uszOk (sz + n)) (hal : pgRoundUpN sz = sz) :
     ⊢ ukCode N.t User.Sh.code.byte -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«sys_sbrk») avail -∗ usz N.s sz -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«sys_sbrk») avail -∗ usz N.s sz -∗
       (∀ (h' : CPU) (r : BitVec 64), ushmSbrkAns N sz n r -∗
-        urun (hlc := hlc) N h' (stubRet m 12 r) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 12 r) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hsz Hcont
-  ihave Hlaw := ushm_stub_sbrk (hlc := hlc) UL N
+  ihave Hlaw := ushm_stub_sbrk UL N
   unfold stubLaw
   iapply Hlaw $$ %h %m %avail Hc Hrun
   iintro %h1 %h4 %h6 #Hec Hrun Hret

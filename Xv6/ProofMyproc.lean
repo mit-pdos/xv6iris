@@ -40,7 +40,7 @@ theorem myproc_br_10b84 : KA.«myproc» + 0x10b84#64 = KA.«pid_lock» := by dec
 theorem myproc_br_fffffffffffff2a2 : KA.«myproc» + 0xfffffffffffff2a2#64 = KA.«push_off» := by decide
 
 set_option maxHeartbeats 4000000 in
-theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ _ cpu k hnoff hK => by
+theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {GF} _ _ cpu k hnoff hK => by
   unfold wp_myproc_body
   iintro ⟨Hk, Hpc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -67,7 +67,7 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
         kctx cpu' ((k'.pushOffAt spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu')) ⊢ wpLoop (GF := GF) c2 := by
     intro k' hnoff' hK'
-    have h := PU.wp_push_off (hlc := hlc) (GF := GF) c2 k' hnoff' hK'
+    have h := PU.wp_push_off (GF := GF) c2 k' hnoff' hK'
     unfold wp_push_off_body at h
     simp only [pushOffAddr] at h
     exact h
@@ -129,7 +129,7 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
         kctx cpu' ((k'.popExit reen).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu')) ⊢ wpLoop (GF := GF) c3 := by
     intro k' hsie' hnoff' hK' hlks' reen hreen hon'
-    have h := PO.wp_pop_off (hlc := hlc) (GF := GF) c3 k' hsie' hnoff' hK' hlks' reen hreen hon'
+    have h := PO.wp_pop_off (GF := GF) c3 k' hsie' hnoff' hK' hlks' reen hreen hon'
     unfold wp_pop_off_body at h
     simp only [popOffAddr] at h
     exact h

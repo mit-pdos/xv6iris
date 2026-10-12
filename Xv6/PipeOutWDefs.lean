@@ -74,7 +74,7 @@ theorem lmRdOpen_nows (M : LModel) (sd : M.lmSt) (k : Nat) (ho : List Obs) (so :
   exact List.eq_nil_of_length_eq_zero (by omega)
 
 section PipesWildV
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-! ## 1. The flag and the token -/
@@ -131,7 +131,7 @@ theorem seccTok_of_at (M : LModel) (PIN : Nat → EraPins → IProp GF) (k : Nat
   ipureintro; exact ⟨hn.1, hn.2.1⟩
 
 /-- THE TOKEN REFUTES THE MIDDLE ARM (Rocq `secc_tok_flag0`). -/
-theorem seccTok_flag0 (M : LModel) (G : GenCparams hlc GF M) (k : Nat) (v : EraPins) :
+theorem seccTok_flag0 (M : LModel) (G : GenCparams GF M) (k : Nat) (v : EraPins) :
     ⊢ seccTok G.gcPIN k -∗ G.gcPIN k v -∗ seccFlag v 0 -∗ False := by
   unfold seccTok
   iintro ⟨%v0, %I0, #Hp0, #Hlb, -⟩ #Hp Hf
@@ -164,7 +164,7 @@ def wildPure (M : LModel) (sd : M.lmSt) (WL : M.lmLine → Bool) (k : Nat) (ho :
 
 /-- THE ARM (Rocq `wildV`): the frozen choices WITH THEIR STORE
 (`gcsFrozen`, sync SY3-A4). -/
-def wildV (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA : GenWa M G sd)
+def wildV (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (WA : GenWa M G sd)
     (WL : M.lmLine → Bool) (k : Nat) (ho : List Obs) (H : ConsHist) : IProp GF :=
   iprop(∃ (v : EraPins) (so : GStage M) (u : List (BitVec 8)),
     G.gcPIN k v ∗ seccFlag v 1 ∗ WA.gwa k so.gsSt ∗ (∃ l, WA.gext k l)
@@ -175,29 +175,29 @@ def wildV (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA : GenWa M G s
     ∗ ⌜wildPure M sd WL k ho so u H⌝)
 
 /-- THE CLAIM (Rocq `pwclV`). -/
-def pwclV (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA : GenWa M G sd)
+def pwclV (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (WA : GenWa M G sd)
     (WL : M.lmLine → Bool) (k : Nat) (ho : List Obs) (H : ConsHist) : IProp GF :=
   iprop(G.gcT ∨ (∃ v : EraPins, G.gcPIN k v ∗ seccFlag v 0 ∗ peclV g M G sd WA k ho H)
     ∨ wildV M G sd WA WL k ho H)
 
-instance wildV_timeless (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA : GenWa M G sd)
+instance wildV_timeless (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (WA : GenWa M G sd)
     (WL : M.lmLine → Bool) (k : Nat) (ho : List Obs) (H : ConsHist) :
     Timeless (wildV M G sd WA WL k ho H) := by
   unfold wildV; infer_instance
 
-instance pwclV_timeless (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+instance pwclV_timeless (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (WL : M.lmLine → Bool) (k : Nat) (ho : List Obs) (H : ConsHist) :
     Timeless (pwclV g M G sd WA WL k ho H) := by
   unfold pwclV; infer_instance
 
-theorem pwclV_taint (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem pwclV_taint (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (WL : M.lmLine → Bool) (k : Nat) (ho : List Obs) (H : ConsHist) :
     G.gcT ⊢ pwclV g M G sd WA WL k ho H := by
   iintro #HT
   unfold pwclV
   ileft; iexact HT
 
-theorem pwclV_sup (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem pwclV_sup (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (WL : M.lmLine → Bool) (k : Nat) (ho : List Obs) (H : ConsHist)
     (ev : ConsEv) :
     ⊢ G.gcT -∗ pwclV g M G sd WA WL k ho H ==∗ pwclV g M G sd WA WL k ho (consStep H ev) := by
@@ -206,7 +206,7 @@ theorem pwclV_sup (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lm
   iapply pwclV_taint g M G sd WA WL k ho _ $$ HT
 
 /-- the middle arm, packed by name (Rocq `pwclV_mid`) -/
-theorem pwclV_mid (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem pwclV_mid (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (WL : M.lmLine → Bool) (k : Nat) (ho : List Obs) (H : ConsHist)
     (v : EraPins) :
     ⊢ G.gcPIN k v -∗ seccFlag v 0 -∗ peclV g M G sd WA k ho H -∗ pwclV g M G sd WA WL k ho H := by
@@ -246,7 +246,7 @@ theorem wildPure_facts (M : LModel) (sd : M.lmSt) (WL : M.lmLine → Bool)
 
 /-! ### The process events the arm absorbs -/
 
-theorem wildV_out (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA : GenWa M G sd)
+theorem wildV_out (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (WA : GenWa M G sd)
     (WL : M.lmLine → Bool) (k : Nat) (ho : List Obs) (H : ConsHist) (b : BitVec 8) :
     wildV M G sd WA WL k ho H ⊢ wildV M G sd WA WL k ho (consStep H (.evOut b)) := by
   unfold wildV
@@ -273,7 +273,7 @@ theorem wildRead_nil (M : LModel) (B : LmByteLaws M) (sd : M.lmSt) (WL : M.lmLin
   rw [List.length_append] at this
   exact List.eq_nil_of_length_eq_zero (by omega)
 
-theorem wildV_read (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd : M.lmSt)
+theorem wildV_read (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M) (sd : M.lmSt)
     (WA : GenWa M G sd) (WL : M.lmLine → Bool) (k : Nat) (ho : List Obs) (H : ConsHist)
     (ws : List (List Obs × BitVec 8)) (hread : readOk H.chLog H.chDl ws) :
     wildV M G sd WA WL k ho H ⊢ ⌜ws = []⌝ ∗ wildV M G sd WA WL k ho (consStep H (.evRead ws)) := by
@@ -293,7 +293,7 @@ theorem wildV_read (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd
 
 /-! ### What a presenter's halves say of the arm -/
 
-theorem wildV_turn (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA : GenWa M G sd)
+theorem wildV_turn (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (WA : GenWa M G sd)
     (WL : M.lmLine → Bool) (HWL : ∀ l, WL l = true → lmWild M l)
     (k : Nat) (ho : List Obs) (H : ConsHist) (v : EraPins) (P : Nat) :
     ⊢ G.gcPIN k v -∗ turn v P -∗ wildV M G sd WA WL k ho H -∗
@@ -308,7 +308,7 @@ theorem wildV_turn (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA : Ge
   refine ⟨so, u, hw, ?_⟩
   rw [hP, (wildPure_facts M sd WL HWL k ho so u H hw).2.2.2.2.2.2.2]
 
-theorem wildV_pins (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA : GenWa M G sd)
+theorem wildV_pins (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (WA : GenWa M G sd)
     (WL : M.lmLine → Bool) (HWL : ∀ l, WL l = true → lmWild M l)
     (k : Nat) (ho : List Obs) (H : ConsHist) (v : EraPins) (P : Nat) (ps0 cs0 : List Nat)
     (I0 : List (BitVec 8)) (s0 : M.lmSt) :

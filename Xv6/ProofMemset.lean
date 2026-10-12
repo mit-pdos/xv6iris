@@ -101,7 +101,7 @@ set_option maxHeartbeats 4000000 in
 /-- One iteration of the loop at `80000d2c` (`sb a1,0(a5); addi a5,a5,1;
 bne a5,a4,c8e`): byte `i` is set; the continuation is at whichever hart
 the thread is on by then. -/
-theorem memset_iter {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem memset_iter {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (kb : KCtx)
     (d cv : BitVec 64) (olds : List (BitVec 8)) (n : Nat)
     (hl : olds.length = n) (hn32 : n < 2 ^ 32)
@@ -143,7 +143,7 @@ set_option maxHeartbeats 4000000 in
 /-- The loop from `c8e` with `i` bytes set (`i < n`) runs to `c98` with the
 destination filled; only `a5` changes.  The hart is quantified inside the
 induction. -/
-theorem memset_loop {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem memset_loop {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (kb : KCtx)
     (d cv : BitVec 64) (olds : List (BitVec 8)) (n : Nat)
     (hl : olds.length = n) (hn32 : n < 2 ^ 32)
@@ -202,7 +202,7 @@ set_option maxHeartbeats 4000000 in
 /-- From `c98` at hart `c` (pinned to the entry hart `cpu` when interrupts
 are off) with the destination filled: the epilogue and the caller's
 continuation. -/
-theorem memset_finish {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem memset_finish {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu c : CPU) (k : KCtx) (hpc : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hK : 2 ≤ k.avail)
     (n : Nat) (R' : RegMap) (hR2 : R' 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)
     (h10 : R' 10#5 = k.regs 10#5)
@@ -247,7 +247,7 @@ theorem memset_finish {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
 /-! ## The function -/
 
 set_option maxHeartbeats 4000000 in
-theorem memset_proof : MEMSET := ⟨fun {hlc GF} _ _ cpu k olds n hK hn hn32 hl => by
+theorem memset_proof : MEMSET := ⟨fun {GF} _ _ cpu k olds n hK hn hn32 hl => by
   unfold wp_memset_body
   iintro ⟨Hk, Hpc, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -327,7 +327,7 @@ set_option maxHeartbeats 4000000 in
 /-- One iteration of the loop, over VISIBILITY-FREE bytes: byte `i` is
 stored (its key minted by the store), extending the valued prefix and
 shrinking the visibility-free suffix. -/
-theorem memset_free_iter {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem memset_free_iter {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (kb : KCtx)
     (d cv : BitVec 64) (olds : List (BitVec 8)) (n : Nat)
     (hl : olds.length = n) (hn32 : n < 2 ^ 32)
@@ -378,7 +378,7 @@ theorem memset_free_iter {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 set_option maxHeartbeats 4000000 in
 /-- The raw loop from `c8e` with `i` visibility-free bytes remaining runs to
 `c98` with the destination filled (VALUED). -/
-theorem memset_free_loop {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem memset_free_loop {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (kb : KCtx)
     (d cv : BitVec 64) (olds : List (BitVec 8)) (n : Nat)
     (hl : olds.length = n) (hn32 : n < 2 ^ 32)
@@ -434,7 +434,7 @@ theorem memset_free_loop {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 /-! ## The raw function -/
 
 set_option maxHeartbeats 4000000 in
-theorem memset_free_proof : MEMSET_FREE := ⟨fun {hlc GF} _ _ cpu k olds n hK hn hn32 hl => by
+theorem memset_free_proof : MEMSET_FREE := ⟨fun {GF} _ _ cpu k olds n hK hn hn32 hl => by
   unfold wp_memset_free_body
   iintro ⟨Hk, Hpc, Hsuf, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

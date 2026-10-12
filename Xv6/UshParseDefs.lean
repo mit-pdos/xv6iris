@@ -83,7 +83,7 @@ def ushTList : Nat := 0x1330
 def ushTNone : Nat := 0x1278
 
 section UshParseDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -98,12 +98,15 @@ def ushSbq (N : UkNames GF) (tx : Bool) (dq : DFrac) (a : Nat) (b : BitVec 8) : 
 def ushSstr (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) : IProp GF :=
   if tx then utextStr N.t a len f else ustr N.d dq a len f
 
+omit [MachGS GF] in
 theorem ushSstr_false (N : UkNames GF) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) :
     ushSstr N false dq a len f = ustr N.d dq a len f := rfl
 
+omit [MachGS GF] in
 theorem ushSstr_true (N : UkNames GF) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) :
     ushSstr N true dq a len f = utextStr N.t a len f := rfl
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_sstr_nonul`**. -/
 theorem ushSstr_nonul (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) :
     ushSstr N tx dq a len f ⊢ ⌜∀ j, j < len → f j ≠ ubyte0⌝ := by
@@ -111,6 +114,7 @@ theorem ushSstr_nonul (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f
   · exact ustr_nonul N.d dq a len f
   · exact utextStr_nonul N.t a len f
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_sstr_byte`**: one body byte, out and back (the give-back is
 kept in the text case so one script serves both halves). -/
 theorem ushSstr_byte (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) (j : Nat)
@@ -126,6 +130,7 @@ theorem ushSstr_byte (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f 
     · iapply utextStr_byte N.t a len f j hj $$ H
     · iintro -; iexact H
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_sstr_nul`**. -/
 theorem ushSstr_nul (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) :
     ushSstr N tx dq a len f ⊢
@@ -146,9 +151,9 @@ theorem ushS_lbuQ (UL : UK_LEAVES) (N : UkNames GF) {C : IProp GF} [Persistent C
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (tx : Bool) (dq : DFrac) (a : Nat) (b : BitVec 8)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ ushSbq N tx dq a b -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
+    ⊢ C -∗ ushSbq N tx dq a b -∗ urun N h m (BitVec.ofNat 64 x) av -∗
       (ushSbq N tx dq a b -∗ ∀ h' : CPU,
-        urun (hlc := hlc) N h' (ukWr m rd (BitVec.setWidth 64 b)) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
+        urun N h' (ukWr m rd (BitVec.setWidth 64 b)) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
       wpLoop h := by
   cases tx
   · exact ushS_lbu UL N hi y h m av dq a b ha hy hns

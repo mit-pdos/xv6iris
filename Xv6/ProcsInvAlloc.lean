@@ -56,7 +56,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **What slot `i` brings to its seal** (Rocq `procs_inv_alloc`'s per-slot
@@ -72,7 +72,7 @@ def procsInvSlot [CurCtx] (Γ : SchedNames) (i : Nat) : IProp GF := iprop%
   lockFreeTok (Γ.lock i) ∗ stackOwn (kstackVa i + 4096#64) 512 ∗
   (∃ γ0 g : GName, chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗
     actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none) ∗
-  soElem (hlc := hlc) (procAddr i) false
+  soElem (procAddr i) false
 
 /-- **One slot sealed** (Rocq pass 3's body): its payload at UNUSED, and
 `p->lock` born over it at `Γ.lock i`. -/
@@ -98,7 +98,7 @@ theorem procsInv_alloc_slot [X : CurCtx] (hT : curTier = KTier.kpt) (cpu : CPU) 
   ihave Hp1 := pstateAt_intro Γ i _ UNUSED hi $$ Hp1
   ihave Hp2 := pstateAt_intro Γ i _ UNUSED hi $$ Hp2
   ihave Hhart := hartAtAny_intro Γ i h hi $$ Hhart
-  ihave #Htl := topLbAt_0 (GF := GF) (E := MachGS.era (hlc := hlc) (GF := GF))
+  ihave #Htl := topLbAt_0 (GF := GF) (E := MachGS.era (GF := GF))
   iapply newlockAt_llb cpu E (Γ.lock i) (procAddr i) "proc" (procLockPay Γ i) (procLockPay Γ i) 0
     (fun ξ => by iintro ⟨H, -⟩; iexact H)
   iframe Hfree Hrun Hfresh

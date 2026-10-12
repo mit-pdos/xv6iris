@@ -95,7 +95,7 @@ def sysChrootSlots : Nat := 20 + nameiSlots
 theorem sysChrootSlots_eq : sysChrootSlots = 140 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -136,11 +136,11 @@ end
 
 /-- **WP of `sys_chroot()`** (Rocq's `wp_sys_chroot_body`), eb-generic at
 depth 0. -/
-def wp_sys_chroot_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+def wp_sys_chroot_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (v : BitVec 64)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (htier : k.tier = KTier.kpt)
@@ -149,7 +149,7 @@ def wp_sys_chroot_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
     (hv : V.tf[tfArgIdx 0]? = some v) : Prop :=
   kctx cpu k ∗ pcIs cpu sysChrootAddr ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-  procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+  procsInv Γ ∗ panicEnv ∗ fsReady ∗
   bslots 3 ∗
   -- the process, and the reference allowance its walk needs
   irefSlots 2 ∗
@@ -160,13 +160,13 @@ def wp_sys_chroot_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
 
 /-- The interface of `sys_chroot` (Rocq's `Module Type SYSCHROOT`). -/
 structure SYSCHROOT : Prop where
-  wp_sys_chroot_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_sys_chroot_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64)
     hj hproc htier hnoff hK hv,
-    wp_sys_chroot_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M v hj hproc htier hnoff hK hv
+    wp_sys_chroot_eb_body (GF := GF) Γ cpu k γ j pid V M v hj hproc htier hnoff hK hv
 
 end Xv6

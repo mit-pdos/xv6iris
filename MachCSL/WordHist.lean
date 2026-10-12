@@ -283,7 +283,7 @@ theorem WordHist.read_cases_visT (W : WordHist n) (Hold : Nat → Hist) (h : Age
 /-! ## The resource -/
 
 section res
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 instance histBytes_timeless (pa : PAddr) (n : Nat) (dqs : Nat → DFrac) (Hs : Nat → Hist) :
     Timeless (histBytes (GF := GF) pa n dqs Hs) := by

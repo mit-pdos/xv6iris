@@ -29,10 +29,10 @@ set_option linter.unusedSimpArgs false
 set_option maxHeartbeats 16000000 in
 /-- **`+0x8e .. +0xaa`** (Rocq 1921-2234). -/
 theorem il_fin (BL : BRELSE) (PA : PANIC)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
     [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
     [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName) (kb : Nat)
     (γisl : GName) (kk : Nat) (s : Qp) (g : GName) (d : IcDep) (o : Ilkc) (inum : BitVec 32)
     (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat) (dn : Dinode) (bno : BitVec 32)

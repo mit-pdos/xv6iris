@@ -59,7 +59,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 set_option linter.unusedSimpArgs false
 
-theorem writei_kctx_push {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem writei_kctx_push {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (R0 R1 : RegMap) (m : Nat) :
     kctx (GF := GF) c (((k.withRegs R0).pushed m).withRegs R1) ⊢
       kctx c (((k.withSpie k.spie k.spp).pushed m).withRegs R1) := by
@@ -88,7 +88,7 @@ theorem writei_bltu_size (w : BitVec 32) (off : Nat) (hw : w.toNat < 2 ^ 31) (ho
   rw [Xv6.dsSext_small w hw, Xv6.dsBltu _ _ (by omega) (by omega)]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
 
@@ -96,7 +96,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x00 .. +0x34`: the entry** (Rocq's `wp_writei_gen`), at the
 contract's own resource shapes. -/
 theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE)
-    (EC : EITHER_COPYIN) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (EC : EITHER_COPYIN) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : WiArgs) (hnoff : k.noff = 0) (hA : k.locks = [] → WiFactsEb k A)
     (ha0 : k.regs 10#5 = A.ip) (ha3 : k.regs 13#5 = BitVec.ofNat 64 A.off)
     (ha4 : k.regs 14#5 = BitVec.ofNat 64 A.n) :
@@ -112,7 +112,7 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
     wordPointsTo sbSizeAddr 4 A.dqz (BitVec.ofNat 32 fscSize) ∗
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg A.inum A.dn0 ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg A.inum A.dn0 ∗
     (if A.user then procPrivBareAt curCtx (procAddr A.j) A.pidv A.V A.M
      else iprop(byteBuf (k.regs 12#5) A.dqs A.sbs ∗ wordPointsTo (pPid k.proc) 4 A.dqp A.pidv)) ∗
     bslots 3 ∗
@@ -361,7 +361,7 @@ namespace Xv6
 /-- **`writei` meets its specification.** -/
 theorem writei_proof (BM : BMAP) (BR : BREAD) (BE : BRELSE) (LW : LOG_WRITE) (EC : EITHER_COPYIN)
     (IU : IUPDATE) : WRITEI :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j γkl γk ip inum bm data
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j γkl γk ip inum bm data
     dn dn0 user off n sbs V M ncount Sb pidv dqp dqs dqd dqn dqi dqb dqz
     hj hproc hK hnoff htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
     hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4 => by

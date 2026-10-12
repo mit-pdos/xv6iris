@@ -391,7 +391,7 @@ example : (OffboxG.offG : GhostVarG xv6GF Int) = xgfGvInt := rfl
 /-- `MachGpreS` at the concrete functor list (Rocq `subG_riscvGpreS` at
 `xv6Σ`).  `mono_pre` carries a name, which the adequacy proof supplies; the
 rest are the single-camera instances above, the era registry included. -/
-@[reducible] def xv6GF_machGpreS (hlc : HasLC) (γ : GName) : MachGpreS hlc xv6GF :=
+@[reducible] def xv6GF_machGpreS (γ : GName) : MachGpreS xv6GF :=
   { toInvGpreS := xv6GF_invGpreS
     reg_pre := inferInstance
     mem_pre := ⟨inferInstance, inferInstance, inferInstance⟩
@@ -431,9 +431,9 @@ the final theorem; here at arbitrary names, to show they add no camera) -/
 /-- **JOINT INSTANTIABILITY** of the capacity-only binder list of the final
 theorem (brief §3, `xv6FsAdequacy`), at ONE concrete functor list: every
 class resolves, together, through the single-camera instances above
-(`MachGpreS` at any `HasLC` and any name for its mono counter). -/
-theorem xv6GF_capacityClasses (hlc : HasLC) :
-    Nonempty (MachGpreS hlc xv6GF) ∧
+(`MachGpreS` at any name for its mono counter). -/
+theorem xv6GF_capacityClasses :
+    Nonempty (MachGpreS xv6GF) ∧
     Nonempty (Xv6G xv6GF) ∧ Nonempty (WchGpre xv6GF) ∧ Nonempty (CtokG xv6GF) ∧
     Nonempty (DiskG xv6GF) ∧ Nonempty (IcacheG xv6GF) ∧ Nonempty (IcboxG xv6GF) ∧
     Nonempty (LogG xv6GF) ∧ Nonempty (FsBytesG xv6GF) ∧ Nonempty (FsBlocksG xv6GF) ∧
@@ -441,7 +441,7 @@ theorem xv6GF_capacityClasses (hlc : HasLC) :
     Nonempty (SleepLockG xv6GF) ∧ Nonempty (BcacheG xv6GF) ∧ Nonempty (OffboxG xv6GF) ∧
     Nonempty (OffboxBoxG xv6GF) ∧ Nonempty (FileG xv6GF) ∧ Nonempty (CrashPermG xv6GF) ∧
     Nonempty (CInvG xv6GF) :=
-  ⟨⟨xv6GF_machGpreS hlc 0⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
+  ⟨⟨xv6GF_machGpreS 0⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
     ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
     ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
     ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩⟩

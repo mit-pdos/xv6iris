@@ -112,7 +112,7 @@ def sysPipeMem (sz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (v : Bi
     umMapped P' v.toNat (b0 ++ b1).length
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -152,7 +152,7 @@ def sysPipeCont (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitV
 
 /-- **WP of `sys_pipe()`** (Rocq `wp_sys_pipe_sconf_body`), eb-generic at
 depth 0. -/
-def wp_sys_pipe_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+def wp_sys_pipe_eb_body (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (γkl : GName) (γk : KmemNames)
@@ -169,15 +169,15 @@ def wp_sys_pipe_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CP
 end
 
 structure SYSPIPE : Prop where
-  wp_sys_pipe_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_sys_pipe_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (γkl : GName) (γk : KmemNames)
     hv hproc htier hnoff hK,
-    wp_sys_pipe_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ pa pid V M sts v γkl γk
+    wp_sys_pipe_eb_body (GF := GF) Γ cpu k γl γ pa pid V M sts v γkl γk
       hv hproc htier hnoff hK
 
 end Xv6

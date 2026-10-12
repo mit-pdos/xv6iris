@@ -43,7 +43,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 def helpN : Namespace := ndot nroot "loghelp"
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [LogG GF]
 
 /-- THE ESCROW (Rocq `esc`): `Q` with the "flipped" witness, or the waiter's
 half at zero (before the flip), or the terminal full authority at one
@@ -58,7 +58,7 @@ def esc (Q : IProp GF) (γw : GName) : IProp GF := iprop%
 def logHelpEntry (nc : BitVec 32) (out : Nat) (cmt : Bool) (w : Nat) (e : GName × BitVec 32) :
     IProp GF := iprop%
   ∃ Q : IProp GF, inv (ndot helpN w) (esc Q e.1) ∗
-    ((eraSyncHook (hlc := hlc) Q ∗ MonoNat.auth_own e.1 (DFrac.own (1 : Qp).half) (.ofNat 0) ∗
+    ((eraSyncHook Q ∗ MonoNat.auth_own e.1 (DFrac.own (1 : Qp).half) (.ofNat 0) ∗
        ⌜e.2 = nc⌝ ∗ ⌜cmt = true ∨ out ≠ 0⌝) ∨
      MonoNat.auth_own e.1 (DFrac.own 1) (.ofNat 1))
 
@@ -67,7 +67,7 @@ def logHelpEntry (nc : BitVec 32) (out : Nat) (cmt : Bool) (w : Nat) (e : GName 
 def logHelp (γ : LogNames) (nc : BitVec 32) (out : Nat) (cmt : Bool) : IProp GF := iprop%
   ∃ (m : RegMapF (GName × BitVec 32)) (nx : Nat),
     (γ.help ↪●MAP m) ∗ ⌜∀ i, nx ≤ i → PartialMap.get? m i = none⌝ ∗
-    [∗map] w ↦ e ∈ m, logHelpEntry (hlc := hlc) nc out cmt w e
+    [∗map] w ↦ e ∈ m, logHelpEntry nc out cmt w e
 
 /-! ## The escrow's two halves -/
 
@@ -126,9 +126,9 @@ Rocq `log_help_deposit`): a fresh id, a fresh escrow at the caller's `Q`,
 and a Pending entry at the current `ncommit` word. -/
 theorem logHelp_deposit (γ : LogNames) (nc : BitVec 32) (out : Nat) (cmt : Bool) (Q : IProp GF)
     (hg : cmt = true ∨ out ≠ 0) :
-    logHelp (hlc := hlc) γ nc out cmt ⊢ eraSyncHook (hlc := hlc) Q -∗
+    logHelp γ nc out cmt ⊢ eraSyncHook Q -∗
       |={⊤}=> ∃ (w : Nat) (γw : GName),
-        logHelp (hlc := hlc) γ nc out cmt ∗ (γ.help ↪◯MAP[w] ((γw, nc) : GName × BitVec 32)) ∗
+        logHelp γ nc out cmt ∗ (γ.help ↪◯MAP[w] ((γw, nc) : GName × BitVec 32)) ∗
         inv (ndot helpN w) (esc Q γw) := by
   iintro H Hhook
   unfold logHelp
@@ -167,12 +167,12 @@ theorem logHelp_deposit (γ : LogNames) (nc : BitVec 32) (out : Nat) (cmt : Bool
 /-- the extract, over the slot's entries as a list -/
 theorem logHelp_entries_extract (l : List (Nat × (GName × BitVec 32)))
     (nc : BitVec 32) (out : Nat) (cmt : Bool) :
-    ([∗list] kv ∈ l, logHelpEntry (hlc := hlc) nc out cmt kv.1 kv.2) ⊢
+    ([∗list] kv ∈ l, logHelpEntry nc out cmt kv.1 kv.2) ⊢
       ∃ Qs : List (IProp GF),
-        ([∗list] Q ∈ Qs, eraSyncHook (hlc := hlc) Q) ∗
+        ([∗list] Q ∈ Qs, eraSyncHook Q) ∗
         (∀ (nc' : BitVec 32) (out' : Nat) (cmt' : Bool),
           ([∗list] Q ∈ Qs, Q) -∗ |={⊤}=>
-            [∗list] kv ∈ l, logHelpEntry (hlc := hlc) nc' out' cmt' kv.1 kv.2) := by
+            [∗list] kv ∈ l, logHelpEntry nc' out' cmt' kv.1 kv.2) := by
   induction l with
   | nil =>
     iintro _
@@ -222,16 +222,16 @@ set; Rocq `log_help_extract`): every Pending hook comes out, and the return
 wand -- fed each hook's `Q` -- flips every entry to Done, so the slot
 re-closes at ANY cells. -/
 theorem logHelp_extract (γ : LogNames) (nc : BitVec 32) (out : Nat) (cmt : Bool) :
-    logHelp (hlc := hlc) γ nc out cmt ⊢
+    logHelp γ nc out cmt ⊢
       ∃ Qs : List (IProp GF),
-        ([∗list] Q ∈ Qs, eraSyncHook (hlc := hlc) Q) ∗
+        ([∗list] Q ∈ Qs, eraSyncHook Q) ∗
         (∀ (nc' : BitVec 32) (out' : Nat) (cmt' : Bool),
-          ([∗list] Q ∈ Qs, Q) -∗ |={⊤}=> logHelp (hlc := hlc) γ nc' out' cmt') := by
+          ([∗list] Q ∈ Qs, Q) -∗ |={⊤}=> logHelp γ nc' out' cmt') := by
   iintro H
   unfold logHelp
   icases H with ⟨%m, %nx, Ha, %hfresh, Hm⟩
   ihave Hm := BigSepM.bigSepM_toList.1 $$ Hm
-  icases logHelp_entries_extract (hlc := hlc) (FiniteMap.toList m) nc out cmt $$ Hm
+  icases logHelp_entries_extract (FiniteMap.toList m) nc out cmt $$ Hm
     with ⟨%Qs, Hhs, Hk⟩
   iexists Qs
   iframe Hhs
@@ -252,8 +252,8 @@ terminal arm. -/
 theorem logHelp_collect (γ : LogNames) (nc : BitVec 32) (out : Nat) (cmt : Bool)
     (w : Nat) (γw : GName) (n0 : BitVec 32) (Q : IProp GF) (hne : n0 ≠ nc) :
     (γ.help ↪◯MAP[w] ((γw, n0) : GName × BitVec 32)) ⊢ inv (ndot helpN w) (esc Q γw) -∗
-      logHelp (hlc := hlc) γ nc out cmt -∗
-      |={⊤}=> (logHelp (hlc := hlc) γ nc out cmt ∗ ▷ Q) := by
+      logHelp γ nc out cmt -∗
+      |={⊤}=> (logHelp γ nc out cmt ∗ ▷ Q) := by
   iintro Hw #Hinv H
   unfold logHelp
   icases H with ⟨%m, %nx, Ha, %hfresh, Hm⟩
@@ -293,7 +293,7 @@ entries' guard clause is carried by the given implication, the Done entries
 are cell-free. -/
 theorem logHelp_cells (γ : LogNames) (nc : BitVec 32) (out out' : Nat) (cmt cmt' : Bool)
     (himp : cmt = true ∨ out ≠ 0 → cmt' = true ∨ out' ≠ 0) :
-    logHelp (hlc := hlc) (GF := GF) γ nc out cmt ⊢ logHelp (hlc := hlc) γ nc out' cmt' := by
+    logHelp (GF := GF) γ nc out cmt ⊢ logHelp γ nc out' cmt' := by
   unfold logHelp
   iintro ⟨%m, %nx, Ha, %hfresh, Hm⟩
   iexists m, nx
@@ -319,7 +319,7 @@ theorem logHelp_cells (γ : LogNames) (nc : BitVec 32) (out out' : Nat) (cmt cmt
 /-- **THE GENESIS** (Rocq `log_help_empty`): the empty map `logFreeTok`
 hands over. -/
 theorem logHelp_empty (γ : LogNames) (nc : BitVec 32) (out : Nat) (cmt : Bool) :
-    (γ.help ↪●MAP (∅ : RegMapF (GName × BitVec 32))) ⊢ logHelp (hlc := hlc) (GF := GF) γ nc out cmt := by
+    (γ.help ↪●MAP (∅ : RegMapF (GName × BitVec 32))) ⊢ logHelp (GF := GF) γ nc out cmt := by
   iintro Ha
   unfold logHelp
   iexists ∅, 0

@@ -71,7 +71,7 @@ theorem descPageRw_at (pd : PAddr) (h : descPageRw pd) (off n : Nat) (hn : 0 < n
 /-! ## From a window to cells and back -/
 
 section cells
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- A kernel cell is a context window: the page's identity claim makes the
 virtual and the physical address the same. -/
@@ -99,7 +99,7 @@ end cells
 /-! ## The four cells of one descriptor -/
 
 section desc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- Descriptor `i` of the table at `pd`, as the FOUR cells the driver
 loads and stores: `addr` (8), `len` (4), `flags` (2), `next` (2). -/
@@ -140,7 +140,7 @@ theorem descAt_s14 (pd : PAddr) (i : Nat) :
   rw [Xv6.paAddBump]
 
 section bridge
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The three facts one of a descriptor's cells needs. -/
 theorem descPageRw_cell (pd : PAddr) (i : Nat) (hpd : descPageRw pd) (hi : i < NUM)
@@ -327,7 +327,7 @@ def vdrwRegs (k : KCtx) (R : RegMap) (sector : BitVec 64) : Prop :=
   R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section resources
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- The twelve frame cells: ten saved registers and the two scratch cells
 that hold `int idx[3]`. -/
@@ -340,7 +340,7 @@ def vdrwFrame (k : KCtx) : IProp GF := iprop%
 (stated here so the phase vocabulary does not depend on the spec file). -/
 def vdrwCaps (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) : IProp GF := iprop%
   diskInv γ ∗ diskGeom γ pd pav pu ∗ isLock γl aVdiskLock "virtio_disk" (diskRes γ pd pav pu) ∗
-  crashPermInv (genId (hlc := hlc) (GF := GF)) γ.cperm
+  crashPermInv (genId (GF := GF)) γ.cperm
 
 instance vdrwCaps_persistent (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
     Persistent (vdrwCaps (GF := GF) γ γl pd pav pu) := by
@@ -371,7 +371,7 @@ receipt of its channel cell after (`rq = some γq`). -/
 def vdrwTok (rq : Option GName) (wr : Bool) (bno : BitVec 32) (dataBuf : List (BitVec 8))
     (Q : IProp GF) : IProp GF :=
   match rq with
-  | none => diskSeqPermit (genId (hlc := hlc) (GF := GF)) (vdrwWr wr bno dataBuf) Q
+  | none => diskSeqPermit (genId (GF := GF)) (vdrwWr wr bno dataBuf) Q
   | some γq => crashPermReceipt γq Q
 
 /-- **The caller's continuation, with the crash permit that pays for it**:
@@ -407,7 +407,7 @@ held with its payload in hand, the register pins are set, the frame is up,
 and the buffer and the block's image fragment are untouched.  It is also
 the head of the outer `alloc3_desc` retry loop: the sleep path re-enters
 here after `acquire`. -/
-def vdrwP1Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def vdrwP1Exit (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (R : RegMap) : IProp GF := iprop%
   ⌜vdrwRegs k R (sectorOf bno)⌝ ∗
@@ -483,7 +483,7 @@ theorem align8_add (a c : BitVec 64) (ha : a.toNat % 8 = 0) (hc : c.toNat % 8 = 
   simpa using this
 
 section idx
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `idx[0]`, `idx[1]`, `idx[2]` and the padding word, relative to the
 frame's ORIGINAL `sp` (`= s0`). -/

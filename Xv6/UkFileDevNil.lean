@@ -22,7 +22,7 @@ open HfpFileClaimsP UkFileOpen UkFileDev
 open Std (ExtTreeSet)
 
 section Nil
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -40,7 +40,7 @@ theorem fdev_ret_nil (r : BitVec 64) (h : filewriteRet 0 r) : r.toInt = 0 ∨ r.
 /-- an open, NOT writable row's write input is `emp` -/
 theorem fdev_filewriteIn_nowr (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool) (rb : Bool) (t : FdType) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) :
-    filewriteIn (hlc := hlc) pmv szv lzv (.open rb false t) n M ua Q Qe = iprop(emp) := by
+    filewriteIn pmv szv lzv (.open rb false t) n M ua Q Qe = iprop(emp) := by
   cases t with
   | pipe γp => rfl
   | inode i γo om => cases om <;> rfl
@@ -50,7 +50,7 @@ theorem fdev_filewriteIn_nowr (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bo
 deposit costs nothing. -/
 theorem fdev_udepwf_K_nowr (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (K : List FdState → Prop) (rb : Bool)
     (t : FdType) (Q : Nat → IProp GF) (hk : ∀ fdv, K fdv → fdStOfKey (m.get 10#5) fdv = .open rb false t) :
-    ⊢ udepwfK (hlc := hlc) N m pc 16 (writeFileFam Q N.pay) K := by
+    ⊢ udepwfK N m pc 16 (writeFileFam Q N.pay) K := by
   unfold udepwfK
   isplitr
   · ipureintro; rfl
@@ -66,14 +66,14 @@ theorem fdev_udepwf_K_nowr (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (K : L
   rw [hk fdv hK, fdev_filewriteIn_nowr]
   iempintro
 
-variable (SYSD : UkFileDevSysP (hlc := hlc) (GF := GF))
+variable (SYSD : UkFileDevSysP (GF := GF))
 include SYSD
 
 /-- **Rocq `file_write_nil`**: a ZERO-LENGTH write at the held row. -/
-theorem file_write_nil (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc) N Pr) (fd : Nat)
+theorem file_write_nil (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs N Pr) (fd : Nat)
     (l : List FdState) (rb : Bool) (i : Nat) (γo : GName) (K : Int → IProp GF)
     (hfd : fd < NSTD) (hl : l[fd]? = some (.open rb true (.inode i γo .held))) :
-    ⊢ ustd N.fd l -∗ ((ustd N.fd l -∗ K 0) ∧ (ustd N.fd l -∗ K (-1))) -∗ wrObl (hlc := hlc) N Pr (fd : Int) [] K := by
+    ⊢ ustd N.fd l -∗ ((ustd N.fd l -∗ K 0) ∧ (ustd N.fd l -∗ K (-1))) -∗ wrObl N Pr (fd : Int) [] K := by
   unfold wrObl
   iintro Hstd HK %h %m %avail %ua %tx %dq %f %_ %ha0 %_ %ha2 Hcode Hsrc Hrun Hcont
   simp only [List.length_nil] at ha2 ⊢
@@ -125,11 +125,11 @@ theorem file_write_nil (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc :=
 /-- **Rocq `file_write_nil_at`**: a zero-length write at ANY descriptor
 knowledge `D` pinning a read-only row -- the blanket at count 0, nothing
 moves. -/
-theorem file_write_nil_at (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc) N Pr) (D : IProp GF)
+theorem file_write_nil_at (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs N Pr) (D : IProp GF)
     (fd : Nat) (rb : Bool) (t : FdType) (K : Int → IProp GF)
     (hag : ∀ (v0 : BitVec 64) (fdv : List FdState), (BitVec.setWidth 32 v0).toInt = (fd : Int) →
       ⊢ ufdAuth N.fd fdv -∗ D -∗ ⌜fdStOfKey v0 fdv = .open rb false t⌝) :
-    ⊢ D -∗ ((D -∗ K 0) ∧ (D -∗ K (-1))) -∗ wrObl (hlc := hlc) N Pr (fd : Int) [] K := by
+    ⊢ D -∗ ((D -∗ K 0) ∧ (D -∗ K (-1))) -∗ wrObl N Pr (fd : Int) [] K := by
   unfold wrObl
   iintro Hd HK %h %m %avail %ua %tx %dq %f %_ %ha0 %_ %ha2 Hcode Hsrc Hrun Hcont
   simp only [List.length_nil] at ha2 ⊢
@@ -174,18 +174,18 @@ theorem file_write_nil_at (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc
     iapply HK $$ Hd
 
 /-- **Rocq `file_write_nil_std_ro`**: ...at a read-only LEDGER slot. -/
-theorem file_write_nil_std_ro (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc) N Pr) (fd : Nat)
+theorem file_write_nil_std_ro (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs N Pr) (fd : Nat)
     (l : List FdState) (rb : Bool) (t : FdType) (K : Int → IProp GF) (hfd : fd < NSTD)
     (hl : l[fd]? = some (.open rb false t)) :
-    ⊢ ustd N.fd l -∗ ((ustd N.fd l -∗ K 0) ∧ (ustd N.fd l -∗ K (-1))) -∗ wrObl (hlc := hlc) N Pr (fd : Int) [] K :=
+    ⊢ ustd N.fd l -∗ ((ustd N.fd l -∗ K 0) ∧ (ustd N.fd l -∗ K (-1))) -∗ wrObl N Pr (fd : Int) [] K :=
   file_write_nil_at SYSD N Pr STB _ fd rb t K (fun v0 fdv h0 => fdev_ustd_key_agree N l fd _ v0 fdv h0 hfd hl)
 
 /-- **Rocq `file_write_nil_hdl_ro`**: ...at a read-only HANDLE. -/
-theorem file_write_nil_hdl_ro (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc) N Pr) (fd : Nat)
+theorem file_write_nil_hdl_ro (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs N Pr) (fd : Nat)
     (rb : Bool) (t : FdType) (K : Int → IProp GF) (hlt : fd < NOFILE) :
     ⊢ ufd N.fd fd (.open rb false t) -∗
       ((ufd N.fd fd (.open rb false t) -∗ K 0) ∧ (ufd N.fd fd (.open rb false t) -∗ K (-1))) -∗
-      wrObl (hlc := hlc) N Pr (fd : Int) [] K :=
+      wrObl N Pr (fd : Int) [] K :=
   file_write_nil_at SYSD N Pr STB _ fd rb t K (fun v0 fdv h0 => fdev_ufd_key_agree N fd _ v0 fdv h0 hlt)
 
 end UkFileDev

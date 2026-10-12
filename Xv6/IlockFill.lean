@@ -53,7 +53,7 @@ theorem il_bmcells_empty : bmCells bmEmpty = List.replicate 13 0 := by
   simp [bmCells, bmEmpty, NDIRECT, List.replicate]
 
 section Empty
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBlocksG GF]
 
 /-- Rocq's `il_ind_res_empty`. -/
 theorem il_indRes_empty (γfs : FsNames) : ⊢ indRes (GF := GF) γfs bmEmpty := by
@@ -101,7 +101,7 @@ theorem il_box_rec (dn : Dinode) (hf : freshShape dn) (hty : iregTyOk dn) :
 /-! ## The fill's outcome -/
 
 section Fill
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- What the fill hands on to the type test (Rocq 1123-1152): EITHER the
@@ -134,7 +134,7 @@ theorem il_fill_alloc [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Na
     (cov : ExtTreeSet Nat compare) (ls : Nat) (inum : BitVec 32) (ds : List Dinode)
     (o : Ilkc) (g : GName) (hfills : ilkFills o)
     (hin : (inum.toNat : Int) < 16 * (nib : Int)) (hwf : diblkWf ds) :
-    iregInv (hlc := hlc) (GF := GF) γi γfs inodestart nib ⊢
+    iregInv (GF := GF) γi γfs inodestart nib ⊢
       ipoolAlloc γfs γi cov ls inum -∗ iregWdLic o g inum.toNat -∗
       (γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half} (diblkBytes ds)) -∗
       |={⊤}=> ((γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half}
@@ -183,7 +183,7 @@ theorem il_fill_box [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (o : Ilkc) (g : GName) (hfills : ilkFills o)
     (hin : (inum.toNat : Int) < 16 * (nib : Int)) (hwf : diblkWf ds)
     (hnz : ds[islot inum]!.diType.toNat ≠ 0) :
-    iregInv (hlc := hlc) (GF := GF) γi γfs inodestart nib ⊢
+    iregInv (GF := GF) γi γfs inodestart nib ⊢
       imark γi (inum.toNat : Int) -∗ iregWdLic o g inum.toNat -∗
       (γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half} (diblkBytes ds)) -∗
       |={⊤}=> ((γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half}
@@ -246,7 +246,7 @@ theorem il_fill [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (cov : ExtTreeSet Nat compare) (ls : Nat) (inum : BitVec 32) (ds : List Dinode)
     (o : Ilkc) (g : GName) (hfills : ilkFills o)
     (hin : (inum.toNat : Int) < 16 * (nib : Int)) (hwf : diblkWf ds) :
-    iregInv (hlc := hlc) (GF := GF) γi γfs inodestart nib ⊢
+    iregInv (GF := GF) γi γfs inodestart nib ⊢
       ipoolShapeNp γfs γi cov ls inum -∗ iregWdLic o g inum.toNat -∗
       (γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half} (diblkBytes ds)) -∗
       |={⊤}=> ((γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half}

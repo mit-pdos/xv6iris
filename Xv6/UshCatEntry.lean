@@ -97,7 +97,7 @@ theorem umapFilterLookupLt (D : RegMapF (BitVec 8)) (a c : Nat) (b : BitVec 8) (
   simp [hlt]
 
 section UshCatEntry
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -122,7 +122,7 @@ theorem catEntryRun (W : Uvis) (Q : Int → IProp GF)
       (get? (udataLo W.M W.perm W.sz) (ukArgvP W.M (uvisAv W) i + j)).isSome)
     (hfdlen : W.fd.length = NOFILE) (hstop : ∀ p q, W.perm p = some q → p * 4096 < pgRoundUpN W.sz)
     (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ urunNopipe (hlc := hlc) W.fd -∗ myPay W.gen Q -∗
+    ⊢ udep (GF := GF) -∗ urunNopipe W.fd -∗ myPay W.gen Q -∗
       (∀ (N : UkNames GF) (h : CPU), ⌜N.pay = Q⌝ -∗
         ustd N.fd (W.fd.take NSTD) -∗
         ucwd N.cwd W.cwd -∗
@@ -130,9 +130,9 @@ theorem catEntryRun (W : Uvis) (Q : Int → IProp GF)
         uargv N.d (uvisAv W) (catArgs W) -∗
         ([∗map] k ↦ b ∈ echoArea W.M W.perm W.sz (uvisSp W).toNat, ubyteq N.d DFrac.discard k b) -∗
         ubytes N.d User.Cat.Sym.«buf» 512 (fun _ => ubyte0) -∗
-        urun (hlc := hlc) N h (tfResumeGpr0 W.tf) (BitVec.ofNat 64 User.Cat.Sym.«start») 42 -∗
+        urun N h (tfResumeGpr0 W.tf) (BitVec.ofNat 64 User.Cat.Sym.«start») 42 -∗
         wpLoop h) -∗
-      uslot (hlc := hlc) W := by
+      uslot W := by
   have hcode := catCode_rows W.M W.perm hsub hx
   iintro #Hdep #Hnp Hmp Hprog
   iapply uslot_of_urun_all W 42 Q hal8 hroom hstk hfdlen hstop hlz hsc $$ Hdep Hnp Hmp

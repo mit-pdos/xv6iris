@@ -179,7 +179,7 @@ theorem waitAnsLed_row (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName co
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -204,9 +204,9 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     (hbs : tfW V.tf (tfArgIdx 0) ≠ 0#64 → bs = usysWaitBytes (tfW V.tf (tfArgIdx 0)) xs)
     (hbl : bs.length = 4)
     (himg : syscImg V' M' = usysWr (syscImg V M) (tfW V.tf (tfArgIdx 0)) (bs.take d)) :
-    MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
+    MachFixedGS.uEraAnchor (GF := GF) ke (niNamesHere (GF := GF)) ⊢
       waitLedCite rv xs cs cs' gn nullst act (tfW V.tf (tfArgIdx 0)) V.upt P' d -∗
-        |==> syscEvOut (hlc := hlc) V M sts V' M' cs cs' gn := by
+        |==> syscEvOut V M sts V' M' cs cs' gn := by
   have h14 : syscNum V ≠ USYS_uptime := by rw [hn]; decide
   have h1 : syscNum V ≠ USYS_fork := by rw [hn]; decide
   have hw : syscNum V = USYS_wait := hn
@@ -296,7 +296,7 @@ set_option maxHeartbeats 4000000 in
 /-- **Arm 3, `sys_wait`** (Rocq `sysc_arm_wait`). -/
 theorem syscall_arm_wait (SW : SYSWAIT)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -330,7 +330,7 @@ theorem syscall_arm_wait (SW : SYSWAIT)
   icases syscallEnv_pid PT Γ γ $$ Henv with ⟨⟨%γp, #Hnp⟩, -⟩
   icases syscallEnv_kmem PT Γ γ $$ Henv with ⟨#Hkl, #Hka⟩
   ihave #Hinit := syscInitId_pidIs ip $$ Hip
-  have hU := SW.wp_sys_wait_eb (hlc := hlc) (GF := GF) Γ cpu
+  have hU := SW.wp_sys_wait_eb (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γw γp fscKalloc fsReadyKmem γ j pid V M v cs hj hprocK hv
     (by k_norm_g; have : sysWaitSlots + 4 ≤ syscallSlots := by decide
         omega)

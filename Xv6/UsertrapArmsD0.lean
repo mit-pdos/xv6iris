@@ -79,7 +79,7 @@ theorem utD0_umemLazy_fill (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) (
 /-! ## §2 The call site -/
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `vmfault(pt, sz, va, read)` at interrupts off. -/
@@ -100,7 +100,7 @@ theorem utD0_vmfault [WchG GF] (VM : VMFAULT) (c : CPU) (k' : KCtx) (γl : GName
             (viewZero M (vpnOf (k'.regs 12#5)).toNat))) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := VM.wp_vmfault (hlc := hlc) (GF := GF) c k' γl γk P M ke hnoff hK hlk hroot hsz
+  have h := VM.wp_vmfault (GF := GF) c k' γl γk P M ke hnoff hK hlk hroot hsz
   unfold wp_vmfault_body at h
   simp only [vmfaultAddr] at h
   iintro ⟨Hk, Hpc, Hl, Ha, Hpt, Hlend, HPhi⟩
@@ -121,7 +121,7 @@ theorem utD0_vmfault_tgt : KA.«usertrap» + 18446744073709547158#64 = KA.«vmfa
 theorem utD0_ret : jumpPc (KA.«usertrap» + 0xe6#64) = KA.«usertrap» + 0xe6#64 := by decide
 
 section ArmD0
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -131,6 +131,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 theorem utD0_ukill (sc : BitVec 64) (h : sc = 13#64 ∨ sc = 15#64) : ukillSc sc := by
   rcases h with h | h <;> subst h <;> decide
 
+omit [MachGS GF] in
 /-- **The fill's record carries the round's rows** (the transparent fill:
 the image and the permission view unmoved). -/
 theorem utD0_rows {Γ : SchedNames} (A : UtArgs GF) (hok : UtOk Γ A) (hne : A.sc ≠ uecallScause)
@@ -249,7 +250,7 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     ihave Hcred := uexecKillArm_cred _ _ _ $$ Harm
-    ihave Hcred := (show ukillCredAt (hlc := hlc) (GF := GF) uslot A.Wk.gen A.sc A.Wk A.f ⊢
+    ihave Hcred := (show ukillCredAt (GF := GF) uslot A.Wk.gen A.sc A.Wk A.f ⊢
         ukillCredAt uslot A.gn A.sc A.Wk A.f from by rw [hWg]) $$ Hcred
     have hevq : utEvQuiet A.sc A.V ((utV1 A).updEv kv) := fun _ hlz =>
       hkq (fun h => vmfaultQuiet _ _ _ (hlf hlz) h.1 h.2)
@@ -267,7 +268,7 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
     ihave Hown := Hownback $$ %_ %_ %A.sts %A.cs Hpv Hfr Hch Hsy
     ihave Hslot := uexecKillArm_slot _ _ _ $$ Harm
     ihave Hko := utA_killOut_slot A.sc A.Wk hne $$ Hslot
-    ihave Hres : utLiveRes (hlc := hlc) A
+    ihave Hres : utLiveRes A
         { (utV1 A).updEv kv with upt := A.V.upt.insertLeaf (vpnOf t).toNat r (PTE_W ||| PTE_U ||| PTE_R) }
         A.cs $$ [Hko]
     · unfold utLiveRes; ileft; iframe Hko; ipureintro; exact utA_live_ne A _ _ hne

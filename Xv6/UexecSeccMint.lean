@@ -44,8 +44,9 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section RetContGen
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF]
 
+omit [MachGS GF] in
 /-- the returning arm at a number whose post the caller does not read,
 stated over the ABSTRACT class (a kernel-cheap intro: the class's post is
 never introduced at the concrete instance) -/
@@ -61,6 +62,7 @@ theorem uexecRetContGen_quiet (X : Uvis → IProp GF) (n : Int) (f : UexecSG.sfa
   subst hg'
   iapply H $$ %r %M' %π' %szv' %fdv' %cw' %cs' %lz' %secc' %hfd %hsc
 
+omit [MachGS GF] in
 /-- ...and at a number whose post it reads -/
 theorem uexecRetContGen_post (X : Uvis → IProp GF) (n : Int) (f : UexecSG.sfam GF) (W : Uvis)
     (CH : BitVec 64 → ExtTreeSet GName compare → IProp GF) :
@@ -100,7 +102,7 @@ theorem ukillCredAt_of_owed_at (X : Uvis → IProp GF) (gn : GName) (sc : BitVec
 end RetContGen
 
 section UexecSeccMint
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 /-! ## 5.  THE BUNDLE AT EVERY NUMBER A MASKED KEY CAN REACH -/
@@ -110,25 +112,25 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 def seccFam : Xfam GF := xfamAt (fun _ => iprop(True)) xfamPt
 
 theorem seccFamFpay :
-    @UexecSG.sforkPay GF _ (uexecSGXv6 (hlc := hlc)) seccFam = fun _ => iprop(True) := rfl
+    @UexecSG.sforkPay GF _ (uexecSGXv6) seccFam = fun _ => iprop(True) := rfl
 theorem seccFamLend :
-    @UexecSG.sforkLend GF _ (uexecSGXv6 (hlc := hlc)) seccFam = iprop(emp) := rfl
+    @UexecSG.sforkLend GF _ (uexecSGXv6) seccFam = iprop(emp) := rfl
 
 /-- the recursion's shape: a slot at every key in the universe (Rocq
 `secc_slots`) -/
 def seccSlots : IProp GF :=
-  iprop(□ ∀ W : Uvis, seccKey (hlc := hlc) W -∗ myPay W.gen (fun _ => iprop(True)) -∗
-    uslot (hlc := hlc) W)
+  iprop(□ ∀ W : Uvis, seccKey W -∗ myPay W.gen (fun _ => iprop(True)) -∗
+    uslot W)
 
-instance seccSlots_persistent : Persistent (seccSlots (hlc := hlc) (GF := GF)) := by
+instance seccSlots_persistent : Persistent (seccSlots (GF := GF)) := by
   unfold seccSlots; infer_instance
 
-theorem seccKey_masked (W : Uvis) : seccKey (hlc := hlc) (GF := GF) W ⊢ ⌜seccMasked W.secc⌝ := by
+theorem seccKey_masked (W : Uvis) : seccKey (GF := GF) W ⊢ ⌜seccMasked W.secc⌝ := by
   unfold seccKey
   iintro ⟨%h, -⟩
   ipureintro; exact h
 
-theorem seccKey_rows (W : Uvis) : seccKey (hlc := hlc) (GF := GF) W ⊢ seccRows (hlc := hlc) W.fd := by
+theorem seccKey_rows (W : Uvis) : seccKey (GF := GF) W ⊢ seccRows W.fd := by
   unfold seccKey
   iintro ⟨-, H⟩
   iexact H
@@ -136,8 +138,8 @@ theorem seccKey_rows (W : Uvis) : seccKey (hlc := hlc) (GF := GF) W ⊢ seccRows
 /-- EXEC: the bundle needs NO credential; both slot wands are answered from
 the recursion at the NEW key (Rocq `secc_sbundle_exec`). -/
 theorem seccSbundleExec (W : Uvis) :
-    seccKey (hlc := hlc) (GF := GF) W ⊢ myPay W.gen (fun _ => iprop(True)) -∗ seccSlots (hlc := hlc) -∗
-      xv6Sbundle (hlc := hlc) (uslot (hlc := hlc)) USYS_exec seccFam W := by
+    seccKey (GF := GF) W ⊢ myPay W.gen (fun _ => iprop(True)) -∗ seccSlots -∗
+      xv6Sbundle (uslot) USYS_exec seccFam W := by
   unfold xv6Sbundle
   rw [if_pos rfl]
   unfold xrowExec seccSlots
@@ -172,8 +174,8 @@ theorem seccSbundleExec (W : Uvis) :
 
 /-- the rows, at the instance's family function (the body of `seccSbundle`) -/
 theorem seccSbundleRows (n : Int) (W : Uvis) (hnb : n ∉ seccB.map Int.ofNat) :
-    seccConsPay (hlc := hlc) (GF := GF) ⊢ seccKey (hlc := hlc) W -∗ myPay W.gen (fun _ => iprop(True)) -∗
-      seccSlots (hlc := hlc) -∗ |==> xv6Sbundle (hlc := hlc) (uslot (hlc := hlc)) n seccFam W := by
+    seccConsPay (GF := GF) ⊢ seccKey W -∗ myPay W.gen (fun _ => iprop(True)) -∗
+      seccSlots -∗ |==> xv6Sbundle (uslot) n seccFam W := by
   obtain ⟨h6, h15, h17, h18, h19, h20⟩ := seccNotinCases n hnb
   iintro #Hc #Hk #Hpay #IH
   by_cases hx : n = USYS_exec
@@ -227,9 +229,9 @@ theorem seccSbundleRows (n : Int) (W : Uvis) (hnb : n ∉ seccB.map Int.ofNat) :
 /-- Rocq `secc_sbundle`, at the class's bundle (so its readers need no
 conversion at a literal number) -/
 theorem seccSbundle (n : Int) (W : Uvis) (hnb : n ∉ seccB.map Int.ofNat) :
-    seccConsPay (hlc := hlc) (GF := GF) ⊢ seccKey (hlc := hlc) W -∗ myPay W.gen (fun _ => iprop(True)) -∗
-      seccSlots (hlc := hlc) -∗
-      |==> @UexecSG.sbundleAt GF _ (uexecSGXv6 (hlc := hlc)) (uslot (hlc := hlc)) n seccFam W := by
+    seccConsPay (GF := GF) ⊢ seccKey W -∗ myPay W.gen (fun _ => iprop(True)) -∗
+      seccSlots -∗
+      |==> @UexecSG.sbundleAt GF _ (uexecSGXv6) (uslot) n seccFam W := by
   iintro #Hc #Hk #Hpay #IH
   imod seccSbundleRows n W hnb $$ Hc Hk Hpay IH with Hb
   imodintro
@@ -242,10 +244,10 @@ theorem seccSbundle (n : Int) (W : Uvis) (hnb : n ∉ seccB.map Int.ofNat) :
 theorem spostAt_pipe_elim_xv6 (X : Uvis → IProp GF) (n : Int) (hn : n = USYS_pipe) (f : Xfam GF)
     (W : Uvis) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
     (cs' : ExtTreeSet GName compare) :
-    @UexecSG.spostAt GF _ (uexecSGXv6 (hlc := hlc)) X n f W r M' fdv' cw' cs' ⊢
+    @UexecSG.spostAt GF _ (uexecSGXv6) X n f W r M' fdv' cw' cs' ⊢
       xpostPipe (GF := GF) W r fdv' := by
   subst hn
-  show xv6Spost (hlc := hlc) X USYS_pipe f W r M' fdv' cw' cs' ⊢ _
+  show xv6Spost X USYS_pipe f W r M' fdv' cw' cs' ⊢ _
   unfold xv6Spost USYS_exec USYS_pipe
   simp only [Int.reduceEq, if_false, if_true]
   exact .rfl
@@ -254,11 +256,11 @@ theorem spostAt_pipe_elim_xv6 (X : Uvis → IProp GF) (n : Int) (hn : n = USYS_p
 theorem seccRetGo (W : Uvis) (r : BitVec 64) (M' : ElfMem) (π' : Nat → Option UPerm) (szv' : Nat)
     (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) (lz' : Bool) (secc' : BitVec 64)
     (hm : seccMasked secc') :
-    seccSlots (hlc := hlc) (GF := GF) ⊢ myPay W.gen (fun _ => iprop(True)) -∗ seccRows (hlc := hlc) fdv' -∗
-      uslot (hlc := hlc) (bump W r M' π' szv' fdv' cw' W.gen cs' lz' secc') := by
+    seccSlots (GF := GF) ⊢ myPay W.gen (fun _ => iprop(True)) -∗ seccRows fdv' -∗
+      uslot (bump W r M' π' szv' fdv' cw' W.gen cs' lz' secc') := by
   unfold seccSlots
   iintro #IH #Hpay #Hr
-  ihave #Hk : seccKey (hlc := hlc) (GF := GF) (bump W r M' π' szv' fdv' cw' W.gen cs' lz' secc') $$ []
+  ihave #Hk : seccKey (GF := GF) (bump W r M' π' szv' fdv' cw' W.gen cs' lz' secc') $$ []
   · unfold seccKey
     dsimp only [bump, bumpAt]
     isplitr
@@ -272,8 +274,8 @@ theorem seccRetGo (W : Uvis) (r : BitVec 64) (M' : ElfMem) (π' : Nat → Option
 /-- THE RESUME at a returning number: the key stays in the universe (Rocq
 `secc_ret_cont`) -/
 theorem seccRetCont (n : Int) (W : Uvis) (hnb : n ∉ seccB.map Int.ofNat) :
-    seccKey (hlc := hlc) (GF := GF) W ⊢ myPay W.gen (fun _ => iprop(True)) -∗ seccSlots (hlc := hlc) -∗
-      uexecRetContF (uslot (hlc := hlc)) n seccFam W := by
+    seccKey (GF := GF) W ⊢ myPay W.gen (fun _ => iprop(True)) -∗ seccSlots -∗
+      uexecRetContF (uslot) n seccFam W := by
   obtain ⟨_, h15, _⟩ := seccNotinCases n hnb
   unfold uexecRetContF
   iintro #Hk #Hpay #IH
@@ -283,7 +285,7 @@ theorem seccRetCont (n : Int) (W : Uvis) (hnb : n ∉ seccB.map Int.ofNat) :
   · iapply uexecRetContGen_post
     iintro %r %M' %π' %szv' %fdv' %cw' %cs' %lz' %secc' %hfd %hsc Hpost
     have hm' := seccMaskedSeccOk _ W.tf W.secc secc' r hm hsc
-    ihave Hpost := spostAt_pipe_elim_xv6 (uslot (hlc := hlc)) n hp seccFam W r M' fdv' cw' cs' $$ Hpost
+    ihave Hpost := spostAt_pipe_elim_xv6 (uslot) n hp seccFam W r M' fdv' cw' cs' $$ Hpost
     unfold xpostPipe
     by_cases hr0 : r.toNat = 0
     · ihave H := Hpost $$ %hr0
@@ -295,7 +297,7 @@ theorem seccRetCont (n : Int) (W : Uvis) (hnb : n ∉ seccB.map Int.ofNat) :
       · inext
         iexists pst0
         iexact Hf
-      ihave #Hw' : wildPipe (hlc := hlc) (GF := GF) γp $$ []
+      ihave #Hw' : wildPipe (GF := GF) γp $$ []
       · unfold wildPipe; iexact Hw
       imodintro
       ihave #Hr' := seccRowsPipe W.fd a b γp $$ Hw' Hr
@@ -312,8 +314,8 @@ theorem seccRetCont (n : Int) (W : Uvis) (hnb : n ∉ seccB.map Int.ofNat) :
 /-- ...and at wait, whose answer row the universe does not read (Rocq
 `secc_wait`) -/
 theorem seccWait (n : Int) (W : Uvis) (hn : n = USYS_wait) :
-    seccKey (hlc := hlc) (GF := GF) W ⊢ myPay W.gen (fun _ => iprop(True)) -∗ seccSlots (hlc := hlc) -∗
-      uexecWaitF (uslot (hlc := hlc)) n seccFam W := by
+    seccKey (GF := GF) W ⊢ myPay W.gen (fun _ => iprop(True)) -∗ seccSlots -∗
+      uexecWaitF (uslot) n seccFam W := by
   subst hn
   iintro #Hk #Hpay #IH
   ihave %hm := seccKey_masked W $$ Hk
@@ -328,8 +330,8 @@ theorem seccWait (n : Int) (W : Uvis) (hn : n = USYS_wait) :
 
 /-- ...and at fork: both legs are the recursion (Rocq `secc_fork`) -/
 theorem seccFork (W : Uvis) :
-    seccKey (hlc := hlc) (GF := GF) W ⊢ myPay W.gen (fun _ => iprop(True)) -∗ seccSlots (hlc := hlc) -∗
-      uexecForkF (uslot (hlc := hlc)) W seccFam := by
+    seccKey (GF := GF) W ⊢ myPay W.gen (fun _ => iprop(True)) -∗ seccSlots -∗
+      uexecForkF (uslot) W seccFam := by
   unfold uexecForkF
   rw [seccFamFpay, seccFamLend]
   iintro #Hk #Hpay #IH
@@ -359,13 +361,13 @@ theorem seccFork (W : Uvis) :
 /-- THE WHOLE RETURN at a key in the universe, at every cause (Rocq
 `secc_ret`) -/
 theorem seccRet (sc : BitVec 64) (W : Uvis) :
-    seccConsPay (hlc := hlc) (GF := GF) ⊢ seccKey (hlc := hlc) W -∗ myPay W.gen (fun _ => iprop(True)) -∗
-      seccSlots (hlc := hlc) -∗ |==> uexecRet (hlc := hlc) sc W := by
+    seccConsPay (GF := GF) ⊢ seccKey W -∗ myPay W.gen (fun _ => iprop(True)) -∗
+      seccSlots -∗ |==> uexecRet sc W := by
   iintro #Hc #Hk #Hpay #IH
   ihave %hm := seccKey_masked W $$ Hk
   have hnb := uvisNumMasked W hm
   have hxb : USYS_exit ∉ seccB.map Int.ofNat := by simp [seccB, USYS_exit]
-  ihave Hpd := uexecPayDep_triv (SG := uexecSGXv6 (hlc := hlc)) sc W seccFam rfl $$ Hpay
+  ihave Hpd := uexecPayDep_triv (SG := uexecSGXv6) sc W seccFam rfl $$ Hpay
   by_cases hsc : sc = uecallScause
   · unfold uexecRet uexecRetF
     simp only [if_pos hsc]
@@ -411,7 +413,7 @@ theorem seccRet (sc : BitVec 64) (W : Uvis) :
     simp only [if_neg hsc]
     imod seccSbundle nx W hxb' $$ Hc Hk Hpay IH with Hb
     imodintro
-    iapply uexecKillArm_exists (uslot (hlc := hlc)) sc W seccFam
+    iapply uexecKillArm_exists (uslot) sc W seccFam
     isplitl [Hpd]
     · iexact Hpd
     isplitl [Hb]
@@ -443,9 +445,9 @@ universe.  NI M3 U-2a: every key of the universe is masked, so its pure
 step is `stuck` (outside the engine's regime) and the generic loop is its
 slot (`UexecRetSlot.uslot_of_wp_stuck`). -/
 theorem useccompMintOfCons :
-    seccConsPay (hlc := hlc) (GF := GF) ⊢ □ uexecWp (hlc := hlc) (GF := GF) -∗
-      □ (∀ W : Uvis, □ seccKey (hlc := hlc) W -∗ myPay W.gen (fun _ => iprop(True)) -∗
-        uslot (hlc := hlc) W) := by
+    seccConsPay (GF := GF) ⊢ □ uexecWp (GF := GF) -∗
+      □ (∀ W : Uvis, □ seccKey W -∗ myPay W.gen (fun _ => iprop(True)) -∗
+        uslot W) := by
   iintro #Hc #Hwp
   iloeb as IH
   imodintro
@@ -462,7 +464,7 @@ theorem useccompMintOfCons :
   ihave #Hkey' := seccKeyCong W W' hfdw.symm hscw.symm $$ Hkey
   ihave #Hpay' : iprop(myPay W'.gen (fun _ => iprop(True))) $$ []
   · rw [← hgnw]; iexact Hpay
-  ihave #HIH : seccSlots (hlc := hlc) (GF := GF) $$ []
+  ihave #HIH : seccSlots (GF := GF) $$ []
   · unfold seccSlots
     imodintro
     iintro %W'' #Hk'' Hp''
@@ -474,10 +476,10 @@ theorem useccompMintOfCons :
 /-- READ at a console row, out of the era's licence (the body of Rocq
 `secc_cons_rd_of_wild` after its licence step) -/
 theorem seccConsRdOfLic :
-    consLicenceAt (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
-      MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
+    consLicenceAt (GF := GF) (genId (GF := GF) + 1) ⊢
+      MachFixedGS.rdwild (GF := GF) (genId (GF := GF) + 1) -∗
       □ (∀ (wb : Bool) (mj : Nat) (n : Int) (P : IProp GF),
-        filereadIn (hlc := hlc) (.open true wb (.device mj)) n (pfamTriv (fun _ _ _ _ => iprop(True)))
+        filereadIn (.open true wb (.device mj)) n (pfamTriv (fun _ _ _ _ => iprop(True)))
           (fun _ _ => iprop(True)) (fun _ => iprop(True)) (fun _ => iprop(True)) (fun _ _ => iprop(True)) P) := by
   iintro #Hlic #Hrw
   imodintro
@@ -487,18 +489,18 @@ theorem seccConsRdOfLic :
   dsimp only
   split
   · isplitl [HP]
-    · iapply (consAcc_cred fscCons (appRdcred (hlc := hlc) (GF := GF)) (fun cur dc => iprop(P ∗ True)))
+    · iapply (consAcc_cred fscCons (appRdcred (GF := GF)) (fun cur dc => iprop(P ∗ True)))
       · unfold consDirtyCred; imodintro; iapply appRdcred_of_rdwild $$ Hrw
       · iintro %cur %dc
         imodintro
         iframe HP
-    · iapply (consReadPay_trivAt (hlc := hlc) (GF := GF) _) $$ Hlic
+    · iapply (consReadPay_trivAt (GF := GF) _) $$ Hlic
   · iexact HP
 
 /-- WRITE at a console row: the output chain at the trivial cursor (Rocq
 `secc_cons_out_chain`) -/
 theorem seccConsOutChain (k : Nat) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (cnt : Nat) :
-    ∀ (j : Nat), consLicenceAt (hlc := hlc) (GF := GF) k ⊢ consOutChain k M ua (fun _ => iprop(True)) j cnt := by
+    ∀ (j : Nat), consLicenceAt (GF := GF) k ⊢ consOutChain k M ua (fun _ => iprop(True)) j cnt := by
   induction cnt with
   | zero => intro j; iintro _; unfold consOutChain; ipureintro; trivial
   | succ cnt ih =>
@@ -513,10 +515,10 @@ theorem seccConsOutChain (k : Nat) (M : Nat → List (BitVec 8)) (ua : BitVec 64
 
 /-- WRITE at a console row, out of the era's licence -/
 theorem seccConsWrOfLic :
-    consLicenceAt (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
+    consLicenceAt (GF := GF) (genId (GF := GF) + 1) ⊢
       □ (∀ (rb : Bool) (mj : Nat) (n : Int) (pmv : Nat → Option UPerm) (sz : Nat) (lz : Bool)
           (M : Nat → List (BitVec 8)) (ua : BitVec 64),
-        filewriteIn (hlc := hlc) pmv sz lz (.open rb true (.device mj)) n M ua (fun _ => iprop(True))
+        filewriteIn pmv sz lz (.open rb true (.device mj)) n M ua (fun _ => iprop(True))
           (fun _ _ => iprop(True))) := by
   iintro #Hlic
   imodintro
@@ -527,9 +529,9 @@ theorem seccConsWrOfLic :
 /-- **Rocq `secc_cons_pay_of_wild`, at the licence** (UkSeccEntry deviation 1:
 the era's licence in place of the interface record's two slot equations) -/
 theorem seccConsPayOfLic :
-    consLicenceAt (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
-      MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      seccConsPay (hlc := hlc) (GF := GF) := by
+    consLicenceAt (GF := GF) (genId (GF := GF) + 1) ⊢
+      MachFixedGS.rdwild (GF := GF) (genId (GF := GF) + 1) -∗
+      seccConsPay (GF := GF) := by
   iintro #Hlic #Hrw
   ihave #Hr := seccConsRdOfLic $$ Hlic Hrw
   ihave #Hwr := seccConsWrOfLic $$ Hlic

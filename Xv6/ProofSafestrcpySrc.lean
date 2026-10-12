@@ -91,7 +91,7 @@ theorem ssrKept_body (R : RegMap) (v11 v15 v14 : BitVec 64) :
   simp only [RegMap.set_apply, h11, h14, h15, if_false]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-! ## The pnameWf of the result -/
 
@@ -224,7 +224,7 @@ end
 /-! ## The function -/
 
 set_option maxHeartbeats 4000000 in
-theorem safestrcpySrc_proof : SAFESTRCPY_SRC := ⟨fun {hlc GF} _ _ cpu k bsd bss dq hK hn hld hsrc => by
+theorem safestrcpySrc_proof : SAFESTRCPY_SRC := ⟨fun {GF} _ _ cpu k bsd bss dq hK hn hld hsrc => by
   unfold wp_safestrcpy_src_body
   iintro ⟨Hk, Hpc, Hdst, Hsrc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

@@ -64,7 +64,7 @@ open LeanRV64D
 /-! ## One free entry, as the image leaves it -/
 
 section raw
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- **One free `struct file`, raw** (Rocq `fentry_raw`): `type` is `FD_NONE`,
 `ref` and `off` are zero, and the other five fields are existential. -/
@@ -87,7 +87,7 @@ def fileBootPn0 : FPNames :=
   ⟨0, ⟨0, 0, 0, 0, 0⟩, 0, 1, 0, 0#32, ⟨0, 0, 0, 0⟩, 0, .parked⟩
 
 section mint
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
@@ -105,6 +105,7 @@ theorem fileBoot_offFree_of_word (ξ : CtxId) (k : Nat) (v : BitVec 32) :
   have hjr : j < 4 := List.mem_range.mp (List.mem_of_getElem? hj)
   iapply ctxByte_byteMapped4 ξ (aFoff k) ppn _ j hjr hal hpin hlt hram $$ Hcl Hj
 
+omit [MachGS GF] in
 /-- **The table's ghosts, minted** (Rocq `ftable_ghosts_alloc`): the
 reference map's authority at `∅` and one payload-names variable per slot,
 whole. -/
@@ -217,7 +218,7 @@ theorem fileB_off (k o : Nat) (hk : k < NFILE) (ho : o < 40) :
   bc_toNat_add _ o _ (fnode_toNat k (Nat.le_of_lt hk)) (by unfold NFILE at hk; rw [fileB_val]; omega)
 
 section carve
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **One free entry, carved** (Rocq `boot_file_entry` plus the bridge
 `file_node_raw_fentry`): the 40 `.bss` bytes of `ftable.file[k]` are

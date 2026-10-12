@@ -49,7 +49,7 @@ theorem mn_br_6e : KA.«main» + 18446744073709550716#64 = KA.«kinit» := by de
 theorem mn_ret_72 : jumpPc (KA.«main» + 114#64) = KA.«main» + 114#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x6e → +0x72**: `kinit()`: the `kmem` lock is born at `γl` over the
@@ -73,7 +73,7 @@ theorem mn_kinit (KI : KINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
   k_step (wp_s_jal cpu _ (KA.«main» + 110#64) false 2096142#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_6e]
   iintro Hk Hpc
-  have hki := KI.wp_kinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 114#64)))
+  have hki := KI.wp_kinit (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 114#64)))
     γl γk vl vn vc (by simp [hnoff]) (by simp; omega) (by simp [hlocks]) (by simp [hproc])
   unfold wp_kinit_body at hki
   simp only [kinitAddr] at hki
@@ -96,7 +96,7 @@ theorem mn_ret_76 : jumpPc (KA.«main» + 118#64) = KA.«main» + 118#64 := by d
 theorem mn_kvmCount : kvmmakeCount < kinitPages := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x72 → +0x76**: `kvminit()`: the kernel table, built, owned
@@ -118,7 +118,7 @@ theorem mn_kvminit (KV : KVMINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) 
   k_step (wp_s_jal cpu _ (KA.«main» + 114#64) false 734#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_72]
   iintro Hk Hpc
-  have hkv := KV.wp_kvminit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 118#64)))
+  have hkv := KV.wp_kvminit (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 118#64)))
     γl γk kinitPages v0 (by simp [hnoff]) (by simp; omega) (by simp [hlocks]) mn_kvmCount
     (by simp [hproc])
   unfold wp_kvminit_body at hkv
@@ -144,7 +144,7 @@ theorem mn_pageAddr_hi (t : BitVec 44) : BitVec.extractLsb' 56 8 (pageAddr t) = 
 theorem mn_ret_7a : jumpPc (KA.«main» + 122#64) = KA.«main» + 122#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **THE PUBLICATION** (Rocq's one-way door between kvminit and
@@ -153,8 +153,8 @@ the 64 stack claims and the trampoline claim, and the root cell persisted. -/
 theorem mn_publish [CurCtx] (hct : curTier = KTier.bare) (cpu : CPU) (k : KCtx) (t : PTree)
     (pas : Nat → BitVec 44) (hok : kvmTableOk t pas) :
     kctx cpu k ∗ ptreeOwn 2 (DFrac.own 1) t ∗
-    (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗
-    (∃ r : BitVec 44, MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r) ∗
+    (MachGS.kmapName (GF := GF) ↪●MAP KernelMap.static) ∗
+    (∃ r : BitVec 44, MachGS.kptRootName (GF := GF) ↪VAR r) ∗
     wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base)
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗ kptOn t (kvmMapT pas) ∗ kstackMapAt pas ∗ syscTrampCl ∗
       pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base)) := by
@@ -180,7 +180,7 @@ theorem mn_kvminithart (KVH : KVMINITHART) [X : CurCtx] (hX : curTier = KTier.ba
   k_step (wp_s_jal cpu _ (KA.«main» + 118#64) false 62#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ms_kvminithart_br]
   iintro Hk Hpc
-  have hkv := KVH.wp_kvminithart (hlc := hlc) (GF := GF) X cpu (k.withRegs (R0.set 1#5 (KA.«main» + 122#64)))
+  have hkv := KVH.wp_kvminithart (GF := GF) X cpu (k.withRegs (R0.set 1#5 (KA.«main» + 122#64)))
     tlb0 (pageAddr t.base) DFrac.discard t M hX (by simp [hsie]) (by simp; omega) (mn_pageAddr_hi t.base)
     (Xv6.kxc_tfp_extract t.base).symm
   unfold wp_kvminithart_body at hkv
@@ -200,7 +200,7 @@ theorem mn_br_7a : KA.«main» + 2506#64 = KA.«procinit» := by decide
 theorem mn_ret_7e : jumpPc (KA.«main» + 126#64) = KA.«main» + 126#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxHeartbeats 4000000 in
@@ -220,7 +220,7 @@ theorem mn_procinit (PR : PROCINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
   k_step (wp_s_jal cpu _ (KA.«main» + 122#64) false 2384#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_7a]
   iintro Hk Hpc
-  have hpi := PR.wp_procinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 126#64)))
+  have hpi := PR.wp_procinit (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 126#64)))
     (by simp; omega)
   unfold wp_procinit_body at hpi
   simp only [procinitAddr] at hpi
@@ -235,13 +235,13 @@ theorem mn_procinit (PR : PROCINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
 
 /-- A byte buffer travels to the kernel table. -/
 theorem mn_byteBuf_toKpt (X : CurCtx) (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) :
-    @byteBuf hlc GF _ X a dq bs ⊢ @byteBuf hlc GF _ X.toKpt a dq bs := by
+    @byteBuf GF _ X a dq bs ⊢ @byteBuf GF _ X.toKpt a dq bs := by
   unfold byteBuf
   exact BigSepL.bigSepL_mono_of_forall (fun {_ _} => wordPointsTo_toKpt X _ 1 dq _)
 
 /-- `kvminit`'s stack pages travel to the kernel table. -/
 theorem mn_kstackPages_toKpt (X : CurCtx) (pas : Nat → BitVec 44) :
-    @kstackPages hlc GF _ X pas ⊢ @kstackPages hlc GF _ X.toKpt pas := by
+    @kstackPages GF _ X pas ⊢ @kstackPages GF _ X.toKpt pas := by
   unfold kstackPages
   exact BigSepL.bigSepL_mono_of_forall (fun {_ _} => mn_byteBuf_toKpt X _ _ _)
 
@@ -256,7 +256,7 @@ def mnSlotIn [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) (i : Nat) : IP
   lockFreeTok (Γ.lock i) ∗ byteBuf (pageAddr (pas i)) (DFrac.own 1) (List.replicate 4096 5#8) ∗
   (∃ γ0 g : GName, chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗
     actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none) ∗
-  soElem (hlc := hlc) (procAddr i) false
+  soElem (procAddr i) false
 
 theorem mn_unused_isUnused : isUnused UNUSED := by decide
 
@@ -294,7 +294,7 @@ theorem mn_slots_zip [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) :
     ([∗list] i ∈ List.range NPROC, ∃ γ0 g : GName,
       chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0 ∗
         zsElem (procAddr i) none) ∗
-    ([∗list] i ∈ List.range NPROC, soElem (hlc := hlc) (procAddr i) false)
+    ([∗list] i ∈ List.range NPROC, soElem (procAddr i) false)
     ⊢ [∗list] i ∈ List.range NPROC, mnSlotIn (GF := GF) Γ pas i := by
   unfold kstackPages mnSlotIn
   rw [show List.range 64 = List.range NPROC from rfl]
@@ -302,12 +302,12 @@ theorem mn_slots_zip [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) :
   ihave H8 := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)
     (Φ := fun _ i => iprop(∃ γ0 g : GName, chFrag (GF := GF) γ0 (procAddr i) ∅ ∗
       slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none))
-    (Ψ := fun _ i => iprop(soElem (hlc := hlc) (GF := GF) (procAddr i) false))).2 $$ [$H8 $H9]
+    (Ψ := fun _ i => iprop(soElem (GF := GF) (procAddr i) false))).2 $$ [$H8 $H9]
   ihave H := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)
     (Φ := fun _ i => iprop(byteBuf (GF := GF) (pageAddr (pas i)) (DFrac.own 1) (List.replicate 4096 5#8)))
     (Ψ := fun _ i => iprop((∃ γ0 g : GName, chFrag (GF := GF) γ0 (procAddr i) ∅ ∗
       slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none) ∗
-      soElem (hlc := hlc) (GF := GF) (procAddr i) false))).2 $$ [$H7 $H8]
+      soElem (GF := GF) (procAddr i) false))).2 $$ [$H7 $H8]
   ihave H := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)
     (Φ := fun _ i => iprop(lockFreeTok (GF := GF) (Γ.lock i))) (Ψ := fun _ _ => _)).2 $$ [$H6 $H]
   ihave H := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)

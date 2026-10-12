@@ -13,7 +13,7 @@ namespace MachCSL
 open Iris Iris.ProgramLogic Iris.BI Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 theorem gpr_x1 (cpu : CPU) (dq : DFrac) (v : BitVec 64) :
     gpr (GF := GF) cpu 1#5 dq v = (Register.x1 ↦ᵣ[cpu]{dq} v) := rfl

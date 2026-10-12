@@ -24,7 +24,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- `memmove` at its call site. -/
 theorem il_memmove (MM : MEMMOVE) (c : CPU) (k' : KCtx) (src dst : BitVec 64)
@@ -39,7 +39,7 @@ theorem il_memmove (MM : MEMMOVE) (c : CPU) (k' : KCtx) (src dst : BitVec 64)
       byteBuf src dqs bs -∗ byteBuf dst (DFrac.own 1) bs -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = dst⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MM.wp_memmove (hlc := hlc) (GF := GF) c k' bs olds n dqs hK hn hn32 hls hld
+  have h := MM.wp_memmove (GF := GF) c k' bs olds n dqs hK hn hn32 hls hld
   unfold wp_memmove_body at h
   simp only [memmoveAddr] at h
   rw [hsrc, hdst] at h
@@ -50,10 +50,10 @@ end
 set_option maxHeartbeats 16000000 in
 /-- **`+0x4e .. +0x8e`** (Rocq 1396-1920). -/
 theorem il_mid (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
     [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
     [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName) (kb : Nat)
     (γisl : GName) (kk : Nat) (s : Qp) (g : GName) (d : IcDep) (o : Ilkc) (inum : BitVec 32)
     (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat) (dn : Dinode) (bno : BitVec 32)

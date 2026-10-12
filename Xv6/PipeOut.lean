@@ -114,7 +114,7 @@ theorem blkFmapPrefixInv (l1 l2 : List (BitVec 8)) (hp : l1.map blkEnc <+: l2.ma
       exact List.cons_prefix_cons.mpr ⟨rfl, ih l2 hp.2⟩
 
 section PipeLedger
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-! ## The era's byte ledger -/
@@ -123,14 +123,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Di
 def peraPin (g : PipeGn) (k : Nat) (w : PipeEra) : IProp GF :=
   ghost_map_elem g.pgnEra DFrac.discard k w
 
+omit [MachGS GF] in
 instance peraPin_persistent (g : PipeGn) (k : Nat) (w : PipeEra) :
     Persistent (peraPin (GF := GF) g k w) := by
   unfold peraPin; infer_instance
 
+omit [MachGS GF] in
 instance peraPin_timeless (g : PipeGn) (k : Nat) (w : PipeEra) :
     Timeless (peraPin (GF := GF) g k w) := by
   unfold peraPin; infer_instance
 
+omit [MachGS GF] in
 theorem peraPin_agree (g : PipeGn) (k : Nat) (w w' : PipeEra) :
     peraPin (GF := GF) g k w ∗ peraPin g k w' ⊢ ⌜w = w'⌝ := by
   unfold peraPin
@@ -145,16 +148,20 @@ def blkAuth (w : PipeEra) (l : List (BitVec 8)) : IProp GF :=
 def blkLb (w : PipeEra) (l : List (BitVec 8)) : IProp GF :=
   MonoList.lb_own w.peBlk (l.map blkEnc)
 
+omit [MachGS GF] in
 instance blkLb_persistent (w : PipeEra) (l : List (BitVec 8)) :
     Persistent (blkLb (GF := GF) w l) := by
   unfold blkLb; infer_instance
+omit [MachGS GF] in
 instance blkLb_timeless (w : PipeEra) (l : List (BitVec 8)) :
     Timeless (blkLb (GF := GF) w l) := by
   unfold blkLb; infer_instance
+omit [MachGS GF] in
 instance blkAuth_timeless (w : PipeEra) (l : List (BitVec 8)) :
     Timeless (blkAuth (GF := GF) w l) := by
   unfold blkAuth; infer_instance
 
+omit [MachGS GF] in
 theorem blkAuth_grow (w : PipeEra) (l : List (BitVec 8)) (b : BitVec 8) :
     blkAuth (GF := GF) w l ⊢ |==> (blkAuth w (l ++ [b]) ∗ blkLb w (l ++ [b])) := by
   unfold blkAuth blkLb
@@ -172,16 +179,20 @@ def rblkAuth (gb : GName) (l : List (BitVec 8)) : IProp GF :=
 def rblkLb (gb : GName) (l : List (BitVec 8)) : IProp GF :=
   MonoList.lb_own gb (l.map blkEnc)
 
+omit [MachGS GF] in
 instance rblkLb_persistent (gb : GName) (l : List (BitVec 8)) :
     Persistent (rblkLb (GF := GF) gb l) := by
   unfold rblkLb; infer_instance
+omit [MachGS GF] in
 instance rblkLb_timeless (gb : GName) (l : List (BitVec 8)) :
     Timeless (rblkLb (GF := GF) gb l) := by
   unfold rblkLb; infer_instance
+omit [MachGS GF] in
 instance rblkAuth_timeless (gb : GName) (l : List (BitVec 8)) :
     Timeless (rblkAuth (GF := GF) gb l) := by
   unfold rblkAuth; infer_instance
 
+omit [MachGS GF] in
 theorem rblkAuth_grow (gb : GName) (l : List (BitVec 8)) (b : BitVec 8) :
     rblkAuth (GF := GF) gb l ⊢ |==> (rblkAuth gb (l ++ [b]) ∗ rblkLb gb (l ++ [b])) := by
   unfold rblkAuth rblkLb
@@ -189,6 +200,7 @@ theorem rblkAuth_grow (gb : GName) (l : List (BitVec 8)) (b : BitVec 8) :
   iintro H
   iapply MonoList.auth_own_update_app $$ H
 
+omit [MachGS GF] in
 theorem rblkLb_prefix (gb : GName) (l l' : List (BitVec 8)) :
     rblkAuth (GF := GF) gb l ∗ rblkLb gb l' ⊢ ⌜l' <+: l⌝ := by
   unfold rblkAuth rblkLb
@@ -197,6 +209,7 @@ theorem rblkLb_prefix (gb : GName) (l l' : List (BitVec 8)) :
   ipureintro
   exact blkFmapPrefixInv l' l h.2
 
+omit [MachGS GF] in
 theorem rblkAlloc : ⊢@{IProp GF} |==> ∃ gb : GName, rblkAuth gb [] := by
   unfold rblkAuth
   rw [List.map_nil]
@@ -213,10 +226,12 @@ byte is written). -/
 def curHalf (w : PipeEra) (q : Qp) (r : Nat) (gb : GName) (tm : Bool) : IProp GF :=
   ghost_var w.peCur (DFrac.own q) (r, gb, tm)
 
+omit [MachGS GF] in
 instance curHalf_timeless (w : PipeEra) (q : Qp) (r : Nat) (gb : GName) (tm : Bool) :
     Timeless (curHalf (GF := GF) w q r gb tm) := by
   unfold curHalf; infer_instance
 
+omit [MachGS GF] in
 /-- THE EXCLUSION a stale family runs into (Rocq `cur_half_agree`). -/
 theorem curHalf_agree (w : PipeEra) (q1 q2 : Qp) (r1 : Nat) (gb1 : GName) (tm1 : Bool)
     (r2 : Nat) (gb2 : GName) (tm2 : Bool) :
@@ -229,6 +244,7 @@ theorem curHalf_agree (w : PipeEra) (q1 q2 : Qp) (r1 : Nat) (gb1 : GName) (tm1 :
   simp only [Prod.mk.injEq] at h
   exact h
 
+omit [MachGS GF] in
 theorem curHalf_excl (w : PipeEra) (r : Nat) (gb : GName) (tm : Bool)
     (r' : Nat) (gb' : GName) (tm' : Bool) :
     curHalf (GF := GF) w 1 r gb tm ∗ curHalf w (1 : Qp).half r' gb' tm' ⊢ False := by
@@ -237,6 +253,7 @@ theorem curHalf_excl (w : PipeEra) (r : Nat) (gb : GName) (tm : Bool)
   ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ H1 H2
   exact absurd (DFrac.valid_own_op hv.1) (by simp)
 
+omit [MachGS GF] in
 theorem curHalf_update (w : PipeEra) (r1 : Nat) (gb1 : GName) (tm1 : Bool)
     (r2 : Nat) (gb2 : GName) (tm2 : Bool) (r : Nat) (gb : GName) (tm : Bool) :
     curHalf (GF := GF) w (1 : Qp).half r1 gb1 tm1 ∗ curHalf w (1 : Qp).half r2 gb2 tm2 ⊢
@@ -245,6 +262,7 @@ theorem curHalf_update (w : PipeEra) (r1 : Nat) (gb1 : GName) (tm1 : Bool)
   iintro ⟨H1, H2⟩
   iapply ghost_var_update_halves (r, gb, tm) $$ H1 H2
 
+omit [MachGS GF] in
 /-- the opening of a round SPLITS it (Rocq `cur_split`) -/
 theorem cur_split (w : PipeEra) (r : Nat) (gb : GName) (tm : Bool) :
     curHalf (GF := GF) w 1 r gb tm ⊢
@@ -255,6 +273,7 @@ theorem cur_split (w : PipeEra) (r : Nat) (gb : GName) (tm : Bool) :
   iintro H
   iapply h $$ H
 
+omit [MachGS GF] in
 /-- ...and the filing rejoins it (Rocq `cur_join`) -/
 theorem cur_join (w : PipeEra) (r : Nat) (gb : GName) (tm : Bool) :
     curHalf (GF := GF) w (1 : Qp).half r gb tm ∗ curHalf w (1 : Qp).half r gb tm ⊢
@@ -264,6 +283,7 @@ theorem cur_join (w : PipeEra) (r : Nat) (gb : GName) (tm : Bool) :
   rw [← Qp.half_add_half 1]
   iframe H1 H2
 
+omit [MachGS GF] in
 /-- a WHOLE current-round ghost may be retargeted (Rocq `cur_retarget`) -/
 theorem cur_retarget (w : PipeEra) (r : Nat) (gb : GName) (tm : Bool)
     (r' : Nat) (gb' : GName) (tm' : Bool) :
@@ -277,13 +297,14 @@ theorem cur_retarget (w : PipeEra) (r : Nat) (gb : GName) (tm : Bool)
 def peraMap (g : PipeGn) (h : List Obs) : IProp GF :=
   iprop(∃ M : RegMapF PipeEra, (g.pgnEra ↪●MAP M) ∗ ⌜pinDom M (obsBoots h)⌝)
 
+omit [MachGS GF] in
 instance peraMap_timeless (g : PipeGn) (h : List Obs) : Timeless (peraMap (GF := GF) g h) := by
   unfold peraMap; infer_instance
 
 end PipeLedger
 
 section PipeOutClaim
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-! ## The resolution, frozen (design app-pipe.md §4.3l) -/
@@ -292,19 +313,23 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Di
 authority at `DFrac.discard`, which reads against any lower bound. -/
 def csFrozen (v : EraPins) (l : List Nat) : IProp GF := MonoList.auth_own v.gcs DFrac.discard l
 
+omit [MachGS GF] in
 instance csFrozen_persistent (v : EraPins) (l : List Nat) :
     Persistent (csFrozen (GF := GF) v l) := by
   unfold csFrozen; infer_instance
+omit [MachGS GF] in
 instance csFrozen_timeless (v : EraPins) (l : List Nat) :
     Timeless (csFrozen (GF := GF) v l) := by
   unfold csFrozen; infer_instance
 
+omit [MachGS GF] in
 theorem csFreeze (v : EraPins) (l : List Nat) :
     csAuth (GF := GF) v l ⊢ |==> csFrozen v l := by
   unfold csAuth csFrozen
   iintro H
   iapply MonoList.auth_own_persist $$ H
 
+omit [MachGS GF] in
 theorem csFrozen_prefix (v : EraPins) (l l' : List Nat) :
     csFrozen (GF := GF) v l ∗ csLb v l' ⊢ ⌜l' <+: l⌝ := by
   unfold csFrozen csLb
@@ -312,6 +337,7 @@ theorem csFrozen_prefix (v : EraPins) (l l' : List Nat) :
   ihave %h := MonoList.auth_lb_own_valid $$ Ha Hl
   ipureintro; exact h.2
 
+omit [MachGS GF] in
 /-- ...and the contradiction the terminal read spends (Rocq
 `cs_frozen_lb_absurd`). -/
 theorem csFrozen_lb_absurd (v : EraPins) (l l' : List Nat) (hlt : l.length < l'.length) :
@@ -322,6 +348,7 @@ theorem csFrozen_lb_absurd (v : EraPins) (l l' : List Nat) (hlt : l.length < l'.
   have := hp.length_le
   omega
 
+omit [MachGS GF] in
 /-- the frozen authority still hands out its own lower bound (Rocq
 `cs_frozen_lb`) -/
 theorem csFrozen_lb (v : EraPins) (l : List Nat) : csFrozen (GF := GF) v l ⊢ csLb v l := by
@@ -334,13 +361,16 @@ length (Rocq `cs_frozen_at`). -/
 def csFrozenAt (v : EraPins) (n : Nat) : IProp GF :=
   iprop(∃ l : List Nat, ⌜l.length = n⌝ ∗ csFrozen v l)
 
+omit [MachGS GF] in
 instance csFrozenAt_persistent (v : EraPins) (n : Nat) :
     Persistent (csFrozenAt (GF := GF) v n) := by
   unfold csFrozenAt; infer_instance
+omit [MachGS GF] in
 instance csFrozenAt_timeless (v : EraPins) (n : Nat) :
     Timeless (csFrozenAt (GF := GF) v n) := by
   unfold csFrozenAt; infer_instance
 
+omit [MachGS GF] in
 theorem csFrozenAt_of (v : EraPins) (l : List Nat) (n : Nat) (hn : l.length = n) :
     csFrozen (GF := GF) v l ⊢ csFrozenAt v n := by
   unfold csFrozenAt
@@ -349,6 +379,7 @@ theorem csFrozenAt_of (v : EraPins) (l : List Nat) (n : Nat) (hn : l.length = n)
   iframe H
   ipureintro; exact hn
 
+omit [MachGS GF] in
 theorem csFrozenAt_lb_absurd (v : EraPins) (n : Nat) (l' : List Nat) (hlt : n < l'.length) :
     csFrozenAt (GF := GF) v n ∗ csLb v l' ⊢ False := by
   unfold csFrozenAt
@@ -364,10 +395,12 @@ otherwise. -/
 def pcs (v : EraPins) (l : List Nat) (fz : Bool) : IProp GF :=
   if fz then csFrozen v l else csAuth v l
 
+omit [MachGS GF] in
 instance pcs_timeless (v : EraPins) (l : List Nat) (fz : Bool) :
     Timeless (pcs (GF := GF) v l fz) := by
   unfold pcs; cases fz <;> simp only [Bool.false_eq_true, ↓reduceIte] <;> infer_instance
 
+omit [MachGS GF] in
 theorem pcs_lb_prefix (v : EraPins) (l l' : List Nat) (fz : Bool) :
     pcs (GF := GF) v l fz ∗ csLb v l' ⊢ ⌜l' <+: l⌝ := by
   unfold pcs
@@ -375,6 +408,7 @@ theorem pcs_lb_prefix (v : EraPins) (l l' : List Nat) (fz : Bool) :
   · exact csLb_prefix v l l'
   · exact csFrozen_prefix v l l'
 
+omit [MachGS GF] in
 theorem pcs_lb_get (v : EraPins) (l : List Nat) (fz : Bool) :
     pcs (GF := GF) v l fz ⊢ pcs v l fz ∗ csLb v l := by
   unfold pcs
@@ -385,14 +419,17 @@ theorem pcs_lb_get (v : EraPins) (l : List Nat) (fz : Bool) :
     ihave #Hl := csFrozen_lb v l $$ H
     iframe H Hl
 
+omit [MachGS GF] in
 theorem pcs_auth (v : EraPins) (l : List Nat) (fz : Bool) (h : fz = false) :
     pcs (GF := GF) v l fz ⊢ csAuth v l := by
   subst h; unfold pcs; exact .rfl
 
+omit [MachGS GF] in
 theorem pcs_of_auth (v : EraPins) (l : List Nat) (fz : Bool) (h : fz = false) :
     csAuth (GF := GF) v l ⊢ pcs v l fz := by
   subst h; unfold pcs; exact .rfl
 
+omit [MachGS GF] in
 /-- THE FIRE (Rocq `pcs_freeze`): a second fire is a no-op. -/
 theorem pcs_freeze (v : EraPins) (l : List Nat) (fz : Bool) :
     pcs (GF := GF) v l fz ⊢ |==> (pcs v l true ∗ csFrozen v l) := by
@@ -416,10 +453,12 @@ def pext (g : PipeGn) (k : Nat) (l : List (BitVec 8)) : IProp GF :=
   iprop(∃ (w : PipeEra) (r : Nat) (gb : GName) (pre : List (BitVec 8)) (tm : Bool),
     peraPin g k w ∗ blkAuth w l ∗ curHalf w 1 r gb tm ∗ rblkAuth gb pre)
 
+omit [MachGS GF] in
 instance pext_timeless (g : PipeGn) (k : Nat) (l : List (BitVec 8)) :
     Timeless (pext (GF := GF) g k l) := by
   unfold pext; infer_instance
 
+omit [MachGS GF] in
 theorem pext_grow (g : PipeGn) (k : Nat) (l : List (BitVec 8)) (b : BitVec 8) :
     pext (GF := GF) g k l ⊢ |==> pext g k (l ++ [b]) := by
   unfold pext

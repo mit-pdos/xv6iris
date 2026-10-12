@@ -35,7 +35,7 @@ open Std (ExtTreeSet)
 open HfpFileClaimsP
 
 section UEcho
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [FileOutG GF] [PipeOutG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -45,29 +45,29 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 /-- **Rocq `uecho_cons_image_entry`**: echo at the console, at the union's
 record (deviations 1-3). -/
 theorem uecho_cons_image_entry (UL : UK_LEAVES)
-    (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF))
+    (hlic : ⊢ uKillCred (GF := GF) -∗ consLicence (GF := GF))
     (ug : UnionGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (ws : List (List (BitVec 8))) (M : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat) (gb : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
     (v : EraPins) (sb : Fstate) (I0 : List (BitVec 8)) (r : FileAppNames) (q : Qp) (s : Dst)
     (rb : Bool) (jo : Option Nat) (Q : Int → IProp GF) (F : IProp GF)
-    (hQc : ∀ x y, Q x = Q y) (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r) (hline : lineOk ws)
+    (hQc : ∀ x y, Q x = Q y) (heq : HfpFileClaimsP.fileAppIs (GF := GF) ug.ugnFile.fgnCl r) (hline : lineOk ws)
     (himg : echoNodeImg ws M s0 t gb) (hbytes : ushEchoArgvBytes ws gb) (hMv : imgAgrees M Mv)
     (hfdl : sts.length = NOFILE) (hcw : cw = ROOTINO)
     (hl1 : (sts.take NSTD)[1]? = some (.open rb true (.device CONSOLE)))
     (hfl : lmLineAt ulmG I0 = Uline.LEcho ws) (hshort : ((wlLine (ws.drop 1)).length : Int) < 2 ^ 31) :
-    ⊢ □ (uKillCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
-      □ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ uKillCred (hlc := hlc) (GF := GF)) -∗
-      □ (gwcPost (unionParamsAt (hlc := hlc) (GF := GF) ug sb) (genId (hlc := hlc) (GF := GF) + 1) v I0 0 -∗ fdq r q s -∗ F -∗
+    ⊢ □ (uKillCred (GF := GF) -∗ fileTaint ug.ugnFile.fgnCl) -∗
+      □ (fileTaint ug.ugnFile.fgnCl -∗ uKillCred (GF := GF)) -∗
+      □ (gwcPost (unionParamsAt (GF := GF) ug sb) (genId (GF := GF) + 1) v I0 0 -∗ fdq r q s -∗ F -∗
           Q (-1)) -∗
-      □ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ Q (-1)) -∗
-      fileConsCred (hlc := hlc) ug.ugnFile.fgnCl r jo -∗ appInv (hlc := hlc) fscFs -∗
-      eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗
-      urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
+      □ (fileTaint ug.ugnFile.fgnCl -∗ Q (-1)) -∗
+      fileConsCred ug.ugnFile.fgnCl r jo -∗ appInv fscFs -∗
+      eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v -∗
+      urunNopipe sts -∗ udep -∗
       imageEntry User.Echo.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        iprop(gwcBlk (unionParamsAt (hlc := hlc) (GF := GF) ug sb) (genId (hlc := hlc) (GF := GF) + 1) v I0 0 0 ∗ fdq r q s ∗ F)
-        (uslot (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc))) := by
+        iprop(gwcBlk (unionParamsAt (GF := GF) ug sb) (genId (GF := GF) + 1) v I0 0 0 ∗ fdq r q s ∗ F)
+        (uslot (SG := uexecSGXv6)) := by
   have hne := efe_drop1_ne ws hline
   let w0 : Nat → Fdev := fun _ => .FDCons v I0 [0]
   have hw0 : ∀ d, d ∈ [0] → ∀ nm i γo, w0 d ≠ .FDIn false nm i γo := by
@@ -82,14 +82,14 @@ theorem uecho_cons_image_entry (UL : UK_LEAVES)
   iapply uslot_bupd
   imod HfpReg.reg_alloc (GF := GF) w0 with ⟨%γreg, Hpool⟩
   imodintro
-  let X : UkNames GF → FifCtx hlc GF := fun N' => ueCtx ug r N' (echoProg N') γreg w0 q s sb
-  let I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (echoProg N') [0] := fun N' hpq =>
+  let X : UkNames GF → FifCtx GF := fun N' => ueCtx ug r N' (echoProg N') γreg w0 q s sb
+  let I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP N' (echoProg N') [0] := fun N' hpq =>
     (X N').fileIface (ueDevP UL) UL (ukSysP_holds UL) (ukSysFH_holds UL) (HNc := ukn_const_of_eq N' Q hpq hQc) (HPc := ue_echo_code_persistent N')
       (ueEchoHyps UL hlic N') heq (union_links_gl_w_at ug sb) (union_links_gl_blk_at ug sb)
       (union_links_gl_taint_at ug sb) hw0
   ihave He := (echoImageEntryEnvC_of_leaves UL) ws M Mv s0 t gb sts cw cs pidv Q
     iprop(fifPoolOwn γreg (fun _ => False) w0 ∗
-      (gwcBlk (unionParamsAt (hlc := hlc) (GF := GF) ug sb) (genId (hlc := hlc) (GF := GF) + 1) v I0 0 0 ∗ fdq r q s ∗ F))
+      (gwcBlk (unionParamsAt (GF := GF) ug sb) (genId (GF := GF) + 1) v I0 0 0 ∗ fdq r q s ∗ F))
     [0] I E {0} hline hMv himg hbytes hfdl (echo_conforms ws _ hne) (echoTree_safe _ _) ue_dp0 $$ [] Hnpw Hdep
   · iintro !> %N' %hpq Hstd Hcwd ⟨Hpool, Hb, Hdq, HF⟩
     have hQp : ∀ x, Q x ⊢ N'.pay x := fun x => by rw [hpq]

@@ -59,9 +59,9 @@ theorem termw_pipe (k : Nat) : termw (WSh k) dgPipeB = false := by
   simp [termw, dgPipe_ne_fork]
 
 section Silence
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
-variable {D : PdRound hlc GF} {fs : List Filt} {Qfin Rtop : IProp GF}
+variable {D : PdRound GF} {fs : List Filt} {Qfin Rtop : IProp GF}
 
 /-- **Rocq `wdone_wfin`**. -/
 theorem wdone_wfin (w : Wid) : ⊢ D.wdone w -∗ D.wfin w := by
@@ -251,13 +251,13 @@ theorem fork_panic_pay (H : NodeOk D fs Qfin Rtop) (k : Nat) (hk : k < D.nc) :
 end Silence
 
 section Panic
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [DiskG GF] [EchoOutG GF] [PipesNG GF]
-variable {D : PdRound hlc GF} {fs : List Filt} {Qfin Rtop : IProp GF}
+variable {D : PdRound GF} {fs : List Filt} {Qfin Rtop : IProp GF}
 
 /-- **Rocq `node_pipe_panic`**: THE `pipe(2)`-FAILED TAIL. -/
 theorem node_pipe_panic (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (SP : SH_PANIC) (k : Nat)
@@ -265,7 +265,7 @@ theorem node_pipe_panic (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (SP : SH_PA
     (hk : k < D.nc) (hpeq : N.pay = fun _ : Int => npay D Qfin k) (hfd2 : ushFd2p ld)
     (ha0 : (m'.get 10#5).toNat = 0x12b8) :
     ⊢ D.FAM -∗ ushCode N.t -∗ ustd N.fd ld -∗ ncred D Rtop k st0 -∗
-      urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + (2 + av)) -∗ wpLoop h' := by
+      urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + (2 + av)) -∗ wpLoop h' := by
   have hwS : WSh k ∈ D.wsN := (wids_elem _ _).2 hk
   have hwL : WLeft k ∈ D.wsN := (wids_elem _ _).2 hk
   unfold ncred nknow halvesN
@@ -315,7 +315,7 @@ theorem node_fork_panic (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (SP : SH_PA
     (γp : PipeNames) (hk : k < D.nc) (hpeq : N.pay = fun _ : Int => npay D Qfin k) (hfd2 : ushFd2p ld)
     (ha0 : (m'.get 10#5).toNat = 0x1288) :
     ⊢ D.FAM -∗ ushCode N.t -∗ ustd N.fd ld -∗ RcRf D k st0 γp -∗ Cxf D Rtop k γp -∗
-      urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + av) -∗ wpLoop h' := by
+      urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + av) -∗ wpLoop h' := by
   have hwS : WSh k ∈ D.wsN := (wids_elem _ _).2 hk
   unfold Cxf halvesN
   iintro #Hfam #Hcode Hstd HRc ⟨⟨Hc, Hm⟩, Hsr⟩ Hrun
@@ -323,7 +323,7 @@ theorem node_fork_panic (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (SP : SH_PA
   iapply wp_kshd_panic_paid_at SP N 0x1288 altPanic
     iprop(wcurN D.γc (WSh k) (1 : Qp).half 0 ∗ wmodeN D.γm (WSh k) (1 : Qp).half none ∗ osP (D.gF k))
     iprop(wcurN D.γc (WSh k) (1 : Qp).half 5 ∗ wmodeN D.γm (WSh k) (1 : Qp).half (some altForkc)
-      ∗ ptkV D.T D.v D.I (genId (hlc := hlc) (GF := GF) + 1))
+      ∗ ptkV D.T D.v D.I (genId (GF := GF) + 1))
     ld h' m' av hfd2 ha0 (by decide) Xv6.ushLitOk_12a8 Xv6.lbPanic_len ushForkMsg_byte ushForkMsg_nl
     $$ [] Hcode Hstd [Hc Hm HF] [Hsr] Hrun
   · iapply exf_writer D H.ok UL (WSh k) altForkc altPanic 5

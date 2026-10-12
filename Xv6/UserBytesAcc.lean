@@ -50,7 +50,7 @@ theorem ubView_bytes (P : UPtd) (t : PTree) (mm : BMap) (hwf : UbMemWf P t mm) :
   simp only [ubView, hk, List.getElem?_map, List.getElem?_range hj, Option.map_some, Option.getD_some, hb]
 
 section access
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 theorem ubOwn_eq (ξ : CtxId) (D D' : List PAddr) (mm : BMap) (h : D = D') :
     ubOwn (GF := GF) ξ D mm ⊢ ubOwn ξ D' mm := by subst h; exact .rfl

@@ -112,7 +112,7 @@ theorem srd_cs_epi (k : KCtx) (R : RegMap) (h : srdRegs k R) :
 /-! ## The frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 theorem srd_ctx_entry (c : CPU) (k : KCtx) (R : RegMap) :
@@ -207,7 +207,7 @@ end
 /-! ## The callees at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -215,7 +215,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 set_option maxHeartbeats 4000000 in
 /-- `fileread(f, p, n)` at sys_read's call site, its `true` crossing taken
 at every hart. -/
-theorem srd_fileread (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem srd_fileread (FR : FILEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (n : Int)
@@ -231,11 +231,11 @@ theorem srd_fileread (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗
     fileRef γ fk q st ∗ procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    filereadEnv (hlc := hlc) st ∗ foffRow st ∗
-    filereadIn (hlc := hlc) st n F Rd Rin Rp Rpe P ∗ P ∗
-    (∀ c' : CPU, filereadPost (hlc := hlc) k' γ fk q st j pid V M n F Rd Rin Rp Rpe P c')
+    filereadEnv st ∗ foffRow st ∗
+    filereadIn st n F Rd Rin Rp Rpe P ∗ P ∗
+    (∀ c' : CPU, filereadPost k' γ fk q st j pid V M n F Rd Rin Rp Rpe P c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := FR.wp_fileread_eb (hlc := hlc) (GF := GF) Γ c k' γ fk q st j pid V M γkl γk n F Rd Rin Rp Rpe P
+  have h := FR.wp_fileread_eb (GF := GF) Γ c k' γ fk q st j pid V M γkl γk n F Rd Rin Rp Rpe P
     hK hfk hj hproc hnoff htier ha0 ha2 hn
   unfold wp_fileread_eb_body at h
   simp only [filereadAddr] at h

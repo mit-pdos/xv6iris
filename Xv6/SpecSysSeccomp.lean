@@ -49,7 +49,7 @@ def sysSeccompAddr : BitVec 64 := KA.«sys_seccomp»
 def sysSeccompSlots : Nat := 4 + argaddrSlots
 
 /-- **WP of `sys_seccomp()`**, at either `SIE`. -/
-def wp_sys_seccomp_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+def wp_sys_seccomp_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -68,12 +68,12 @@ def wp_sys_seccomp_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 
 /-- The interface of `sys_seccomp`. -/
 structure SYSSECCOMP : Prop where
-  wp_sys_seccomp : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_sys_seccomp : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (v0 : BitVec 64) hproc htier hv hnoff hK,
-    wp_sys_seccomp_body (hlc := hlc) (GF := GF) cpu k γ pa pid V M v0 hproc htier hv hnoff hK
+    wp_sys_seccomp_body (GF := GF) cpu k γ pa pid V M v0 hproc htier hv hnoff hK
 
 end Xv6

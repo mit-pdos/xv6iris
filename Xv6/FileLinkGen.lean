@@ -43,7 +43,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section FileLinkGen
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF]
 
 /-! ## 0a. The era's head, at a named state -/
@@ -51,33 +51,33 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Di
 /-- THE HEAD'S PRECONDITION AT A NAMED BOOT STATE (Rocq `f0pre_at`). -/
 def f0preAt (g : FileGn) (s0 : Fstate) : IProp GF :=
   iprop(⌜fstateOk s0⌝ ∗ (f0Typed g s0 ∨ fileTaint g.fgnCl)
-    ∗ f0bw (hlc := hlc) g (genId (hlc := hlc) (GF := GF) + 1) s0)
+    ∗ f0bw g (genId (GF := GF) + 1) s0)
 
 instance f0preAt_timeless (g : FileGn) (s0 : Fstate) :
-    Timeless (f0preAt (hlc := hlc) (GF := GF) g s0) := by
+    Timeless (f0preAt (GF := GF) g s0) := by
   unfold f0preAt; infer_instance
 instance f0preAt_persistent (g : FileGn) (s0 : Fstate) :
-    Persistent (f0preAt (hlc := hlc) (GF := GF) g s0) := by
+    Persistent (f0preAt (GF := GF) g s0) := by
   unfold f0preAt; infer_instance
 
 /-- THE ERA'S HEAD AT A NAMED BOOT STATE (Rocq `fhead_at`). -/
 def fheadAt (g : FileGn) (s0 : Fstate) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
     IProp GF :=
-  iprop(⌜I = []⌝ ∗ ⌜k = genId (hlc := hlc) (GF := GF) + 1⌝ ∗ turn v 0 ∗ psLb v [] ∗ csLb v []
-    ∗ inpLb v [] ∗ (∃ vf : FileEra, fileEraPin g k vf) ∗ f0preAt (hlc := hlc) g s0)
+  iprop(⌜I = []⌝ ∗ ⌜k = genId (GF := GF) + 1⌝ ∗ turn v 0 ∗ psLb v [] ∗ csLb v []
+    ∗ inpLb v [] ∗ (∃ vf : FileEra, fileEraPin g k vf) ∗ f0preAt g s0)
 
 instance fheadAt_timeless (g : FileGn) (s0 : Fstate) (k : Nat) (v : EraPins)
-    (I : List (BitVec 8)) : Timeless (fheadAt (hlc := hlc) (GF := GF) g s0 k v I) := by
+    (I : List (BitVec 8)) : Timeless (fheadAt (GF := GF) g s0 k v I) := by
   unfold fheadAt; infer_instance
 
 /-! ## 0b. The era's turn, at the named state -/
 
 /-- Rocq `fturn_pre_at`. -/
 def fturnPreAt (g : FileGn) (s0 : Fstate) (k : Nat) : IProp GF :=
-  iprop(⌜k = genId (hlc := hlc) (GF := GF) + 1⌝ ∗ fturnCore g k ∗ f0preAt (hlc := hlc) g s0)
+  iprop(⌜k = genId (GF := GF) + 1⌝ ∗ fturnCore g k ∗ f0preAt g s0)
 
 instance fturnPreAt_timeless (g : FileGn) (s0 : Fstate) (k : Nat) :
-    Timeless (fturnPreAt (hlc := hlc) (GF := GF) g s0 k) := by
+    Timeless (fturnPreAt (GF := GF) g s0 k) := by
   unfold fturnPreAt; infer_instance
 
 /-! ## 1. The parameters -/
@@ -85,7 +85,7 @@ instance fturnPreAt_timeless (g : FileGn) (s0 : Fstate) (k : Nat) :
 /-- The reader's witness at an era: the boot-ledger entry beside the era's
 file pin, with no index pin (Rocq `f0bwk`). -/
 def f0bwk (g : FileGn) (k : Nat) (s0 : Fstate) : IProp GF :=
-  iprop(∃ vf : FileEra, fileEraPin g k vf ∗ f0Bl (hlc := hlc) g vf s0)
+  iprop(∃ vf : FileEra, fileEraPin g k vf ∗ f0Bl g vf s0)
 
 instance f0bwk_persistent (g : FileGn) (k : Nat) (s : Fstate) :
     Persistent (f0bwk (GF := GF) g k s) := by
@@ -111,7 +111,7 @@ theorem f0bwk_agree (g : FileGn) (k : Nat) (s s' : Fstate) :
 
 /-- Rocq `f0w_bwk`. -/
 theorem f0w_bwk (g : FileGn) (k : Nat) (s : Fstate) :
-    ⊢ f0w (hlc := hlc) (GF := GF) g k s -∗ f0bwk g k s := by
+    ⊢ f0w (GF := GF) g k s -∗ f0bwk g k s := by
   unfold f0w f0bwk
   iintro ⟨-, %vf, #Hp, #Hl⟩
   iexists vf
@@ -120,7 +120,7 @@ theorem f0w_bwk (g : FileGn) (k : Nat) (s : Fstate) :
 
 /-- Rocq `f0w_bwk0`. -/
 theorem f0w_bwk0 (g : FileGn) (k : Nat) (s : Fstate) :
-    ⊢ f0w (hlc := hlc) (GF := GF) g k s -∗ f0bwk g (genId (hlc := hlc) (GF := GF) + 1) s := by
+    ⊢ f0w (GF := GF) g k s -∗ f0bwk g (genId (GF := GF) + 1) s := by
   unfold f0w f0bwk
   iintro ⟨%hk, %vf, #Hp, #Hl⟩
   subst hk
@@ -130,7 +130,7 @@ theorem f0w_bwk0 (g : FileGn) (k : Nat) (s : Fstate) :
 
 /-- The head's first reading (Rocq `fhead_cur`). -/
 theorem fhead_cur (g : FileGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
-    ⊢ fhead (hlc := hlc) (GF := GF) g k v I -∗
+    ⊢ fhead (GF := GF) g k v I -∗
       ⌜I = []⌝ ∗ turn v 0 ∗ psLb v [] ∗ csLb v [] ∗ inpLb v [] := by
   unfold fhead
   iintro ⟨%hI, -, Htn, #Hps, #Hcs, #HE, -, -⟩
@@ -140,7 +140,7 @@ theorem fhead_cur (g : FileGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
 
 /-- The head's second reading (Rocq `fhead_inp`). -/
 theorem fhead_inp (g : FileGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
-    ⊢ fhead (hlc := hlc) (GF := GF) g k v I -∗ fhead g k v I ∗ ⌜I = []⌝ ∗ inpLb v [] := by
+    ⊢ fhead (GF := GF) g k v I -∗ fhead g k v I ∗ ⌜I = []⌝ ∗ inpLb v [] := by
   unfold fhead
   iintro ⟨%hI, %hk, Htn, #Hps, #Hcs, #HE, Hvf, Hpre⟩
   isplitl [Htn Hvf Hpre]
@@ -156,18 +156,18 @@ theorem fhead_inp (g : FileGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
 
 /-- The writer's witness at a named boot state (Rocq `f0w_at`). -/
 def f0wAt (g : FileGn) (s0 : Fstate) (k : Nat) (s : Fstate) : IProp GF :=
-  iprop(f0w (hlc := hlc) g k s ∗ ⌜s = s0⌝)
+  iprop(f0w g k s ∗ ⌜s = s0⌝)
 
 instance f0wAt_persistent (g : FileGn) (s0 : Fstate) (k : Nat) (s : Fstate) :
-    Persistent (f0wAt (hlc := hlc) (GF := GF) g s0 k s) := by
+    Persistent (f0wAt (GF := GF) g s0 k s) := by
   unfold f0wAt; infer_instance
 instance f0wAt_timeless (g : FileGn) (s0 : Fstate) (k : Nat) (s : Fstate) :
-    Timeless (f0wAt (hlc := hlc) (GF := GF) g s0 k s) := by
+    Timeless (f0wAt (GF := GF) g s0 k s) := by
   unfold f0wAt; infer_instance
 
 /-- Rocq `fhead_at_cur`. -/
 theorem fheadAt_cur (g : FileGn) (s0 : Fstate) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
-    ⊢ fheadAt (hlc := hlc) (GF := GF) g s0 k v I -∗
+    ⊢ fheadAt (GF := GF) g s0 k v I -∗
       ⌜I = []⌝ ∗ turn v 0 ∗ psLb v [] ∗ csLb v [] ∗ inpLb v [] := by
   unfold fheadAt
   iintro ⟨%hI, -, Htn, #Hps, #Hcs, #HE, -, -⟩
@@ -177,7 +177,7 @@ theorem fheadAt_cur (g : FileGn) (s0 : Fstate) (k : Nat) (v : EraPins) (I : List
 
 /-- Rocq `fhead_at_inp`. -/
 theorem fheadAt_inp (g : FileGn) (s0 : Fstate) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
-    ⊢ fheadAt (hlc := hlc) (GF := GF) g s0 k v I -∗
+    ⊢ fheadAt (GF := GF) g s0 k v I -∗
       fheadAt g s0 k v I ∗ ⌜I = []⌝ ∗ inpLb v [] := by
   unfold fheadAt
   iintro ⟨%hI, %hk, Htn, #Hps, #Hcs, #HE, Hvf, Hpre⟩
@@ -192,7 +192,7 @@ theorem fheadAt_inp (g : FileGn) (s0 : Fstate) (k : Nat) (v : EraPins) (I : List
 
 /-- Rocq `f0w_at_cw`. -/
 theorem f0wAt_cw (g : FileGn) (s0 : Fstate) (k : Nat) (s : Fstate) :
-    ⊢ f0wAt (hlc := hlc) (GF := GF) g s0 k s -∗ f0cw g k s := by
+    ⊢ f0wAt (GF := GF) g s0 k s -∗ f0cw g k s := by
   unfold f0wAt f0w f0cw
   iintro ⟨⟨-, H⟩, -⟩
   iexact H
@@ -200,10 +200,10 @@ theorem f0wAt_cw (g : FileGn) (s0 : Fstate) (k : Nat) (s : Fstate) :
 /-- The head at a named state gives the claim its boot evidence (Rocq
 `fhead_at_boot`). -/
 theorem fheadAt_boot (g : FileGn) (s0 : Fstate) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
-    ⊢ fheadAt (hlc := hlc) (GF := GF) g s0 k v I -∗
+    ⊢ fheadAt (GF := GF) g s0 k v I -∗
       turn v 0 ∗ psLb v [] ∗ csLb v [] ∗ inpLb v []
       ∗ ∃ s1 : Fstate, ⌜fstateOk s1⌝ ∗ (f0boot g k s1 ∨ fileTaint g.fgnCl)
-          ∗ (f0cw g k s1 -∗ f0wAt (hlc := hlc) g s0 k s1) := by
+          ∗ (f0cw g k s1 -∗ f0wAt g s0 k s1) := by
   unfold fheadAt f0preAt f0bw f0cw
   iintro ⟨-, %hk, Htn, #Hps, #Hcs, #HE, ⟨%vf, #Hvf⟩, %hok, Hty, -, %vf', #Hvf', #Hbl⟩
   subst hk

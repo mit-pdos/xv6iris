@@ -94,7 +94,7 @@ set_option linter.unusedSimpArgs false
 `+0x00 .. +0x3e`, plus the commit arm's set-up at `+0x9e .. +0xb0`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The token in hand is a LIVE ledger entry, so the outstanding count is
@@ -136,7 +136,7 @@ set_option maxHeartbeats 80000000 in
 and the commit arm's set-up at `+0x9e .. +0xb0`). -/
 theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64) (j ls : Nat) (dev : BitVec 32)
     (u : Nat) (pidv : BitVec 32) (dqp : DFrac)
@@ -149,7 +149,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logCtx γ γb γfs V.cov ls dev ∗
-    fsCrashSeam (hlc := hlc) (GF := GF) V.cov ls ∗ genCert (hlc := hlc) (GF := GF) ∗
+    fsCrashSeam (GF := GF) V.cov ls ∗ genCert (GF := GF) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     logOp γ u ∗
     (∀ c' : CPU, eoPost k pidv dqp c')
@@ -341,9 +341,9 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     imod eo_snapLaw_ofAuth γ γb γfs V.cov ls dev L $$ Hctx HauthL Htx Hstok
       with ⟨⟨%G, #HseamG, Hepoch⟩, HauthL, Htx⟩
     imodintro
-    ihave Hepoch := (show snapLawOut G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) L
+    ihave Hepoch := (show snapLawOut G (eraSyncTok (GF := GF)) (genId (GF := GF)) L
           (fsHomeList V.cov ls) ⊢
-        durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))
+        durPair G (eraSyncTok (GF := GF)) (genId (GF := GF))
           (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) from by
       unfold snapLawOut; exact .rfl) $$ Hepoch
     ihave Hopen := eoOpen_intro γb γfs V.cov ls n W L D eoNullLw 0
@@ -564,7 +564,7 @@ set_option maxHeartbeats 16000000 in
 theorem endOp_proof (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) :
     END_OP := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev u pidv dqp
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev u pidv dqp
     hj hproc hK hnoff htier hgeom hdev hcl hdt hpd => by
   unfold wp_end_op_eb_body
   simp only [endOpAddr]

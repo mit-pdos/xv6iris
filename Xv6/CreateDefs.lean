@@ -104,7 +104,7 @@ theorem T_DIR_tyOk : iregTyOkW T_DIR := Or.inr (Or.inl rfl)
 /-! ## THE LOCKED-INODE PAYOUT -/
 
 section Locked
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
   [Fscfg] [Icfg] [CurCtx]
@@ -180,7 +180,7 @@ supplies (`FsAbsCreateFire`).  The child's content is indexed by the
 requested type (`creC0` / `creChild`). -/
 
 section Commits
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [Appcfg GF]
 
 /-- **THE DOTS LEG IS GUARDED BY THE TYPE** (Rocq's `cre_dots_leg`): only a
 DIRECTORY gets dots -- the `beq s4,a4` at +0xca is taken exactly on
@@ -189,12 +189,12 @@ call cannot make.  ONE definition so a proof that merely passes the leg on
 treats it as one atom. -/
 def creDotsLeg (Γ : FsViewNames GF) (tyz : Nat)
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF)) : IProp GF :=
-  iprop(⌜tyz = T_DIR_z⌝ -∗ pfAt (adotsCommitAt (hlc := hlc) Γ appE) Fdots)
+  iprop(⌜tyz = T_DIR_z⌝ -∗ pfAt (adotsCommitAt Γ appE) Fdots)
 
 /-- a caller that HAS the piece owes the leg (Rocq's `cre_dots_leg_of`) -/
 theorem creDotsLeg_of (Γ : FsViewNames GF) (tyz : Nat)
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF)) :
-    pfAt (adotsCommitAt (hlc := hlc) Γ appE) Fdots ⊢ creDotsLeg (hlc := hlc) Γ tyz Fdots := by
+    pfAt (adotsCommitAt Γ appE) Fdots ⊢ creDotsLeg Γ tyz Fdots := by
   unfold creDotsLeg
   iintro H %_
   iexact H
@@ -203,7 +203,7 @@ theorem creDotsLeg_of (Γ : FsViewNames GF) (tyz : Nat)
 `cre_dots_leg_at`) -/
 theorem creDotsLeg_at (Γ : FsViewNames GF) (tyz : Nat)
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF)) (h : tyz = T_DIR_z) :
-    creDotsLeg (hlc := hlc) Γ tyz Fdots ⊢ pfAt (adotsCommitAt (hlc := hlc) Γ appE) Fdots := by
+    creDotsLeg Γ tyz Fdots ⊢ pfAt (adotsCommitAt Γ appE) Fdots := by
   unfold creDotsLeg
   iintro H
   iapply H $$ %h
@@ -211,7 +211,7 @@ theorem creDotsLeg_at (Γ : FsViewNames GF) (tyz : Nat)
 /-- THE POINT: at any other type the leg is free (Rocq's `cre_dots_leg_nodir`) -/
 theorem creDotsLeg_nodir (Γ : FsViewNames GF) (tyz : Nat)
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF)) (h : tyz ≠ T_DIR_z) :
-    ⊢ creDotsLeg (hlc := hlc) Γ tyz Fdots := by
+    ⊢ creDotsLeg Γ tyz Fdots := by
   unfold creDotsLeg
   iintro %hc
   exact absurd hc h
@@ -229,8 +229,8 @@ every other caller is at `fun _ => True` and takes the bridges below. -/
 `aunarm_of_arm_nd_open`) -/
 theorem aunarmOfArmNd_open (Γ : FsViewNames GF) (E : CoPset) (Nd : Absnode → Prop)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) (i : Nat) :
-    ⊢@{IProp GF} creArmFired Farm i -∗ pfAt (aunarmOfArmNd (hlc := hlc) Γ E Nd Farm) Fun -∗
-      aunarmCommitAtNd (hlc := hlc) Γ E i Nd Fun.pfRecv := by
+    ⊢@{IProp GF} creArmFired Farm i -∗ pfAt (aunarmOfArmNd Γ E Nd Farm) Fun -∗
+      aunarmCommitAtNd Γ E i Nd Fun.pfRecv := by
   iintro Ha Hp
   ihave Hp := pfAt_au _ _ $$ Hp
   unfold aunarmOfArmNd
@@ -240,41 +240,41 @@ theorem aunarmOfArmNd_open (Γ : FsViewNames GF) (E : CoPset) (Nd : Absnode → 
 GENERAL node predicate. -/
 def creChildUnfiredNdp (Γ : FsViewNames GF) (c : Absnode) (Nd : Absnode → Prop)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) : IProp GF :=
-  iprop(pfAt (aarmCommitAt (hlc := hlc) Γ appE c) Farm ∗
-    pfAt (aunarmOfArmNd (hlc := hlc) Γ appE Nd Farm) Fun)
+  iprop(pfAt (aarmCommitAt Γ appE c) Farm ∗
+    pfAt (aunarmOfArmNd Γ appE Nd Farm) Fun)
 
 /-- A PROVIDER always has the weaker obligation (Rocq's
 `cre_child_unfired_ndp_of`). -/
 theorem creChildUnfiredNdp_of (Γ : FsViewNames GF) (c : Absnode) (Nd : Absnode → Prop)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) :
-    creChildUnfired (hlc := hlc) Γ c Farm Fun ⊢ creChildUnfiredNdp (hlc := hlc) Γ c Nd Farm Fun := by
+    creChildUnfired Γ c Farm Fun ⊢ creChildUnfiredNdp Γ c Nd Farm Fun := by
   unfold creChildUnfired creChildUnfiredNdp
   iintro ⟨Ha, Hun⟩
   iframe Ha
-  iapply (pfAt_mono (aunarmOfArm (hlc := hlc) Γ appE Farm)
-    (aunarmOfArmNd (hlc := hlc) Γ appE Nd Farm) Fun) $$ [] Hun
+  iapply (pfAt_mono (aunarmOfArm Γ appE Farm)
+    (aunarmOfArmNd Γ appE Nd Farm) Fun) $$ [] Hun
   iintro H
-  iapply (aunarmOfArmNd_of (hlc := hlc) Γ appE Nd Farm) $$ H
+  iapply (aunarmOfArmNd_of Γ appE Nd Farm) $$ H
 
 /-- ...and back, at the predicate every other caller is at (Rocq's
 `cre_child_unfired_of_ndp`). -/
 theorem creChildUnfired_of_ndp (Γ : FsViewNames GF) (c : Absnode) (Nd : Absnode → Prop)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) (hNd : ∀ c' : Absnode, Nd c') :
-    creChildUnfiredNdp (hlc := hlc) Γ c Nd Farm Fun ⊢ creChildUnfired (hlc := hlc) Γ c Farm Fun := by
+    creChildUnfiredNdp Γ c Nd Farm Fun ⊢ creChildUnfired Γ c Farm Fun := by
   unfold creChildUnfired creChildUnfiredNdp
   iintro ⟨Ha, Hun⟩
   iframe Ha
-  iapply (pfAt_mono (aunarmOfArmNd (hlc := hlc) Γ appE Nd Farm)
-    (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun) $$ [] Hun
+  iapply (pfAt_mono (aunarmOfArmNd Γ appE Nd Farm)
+    (aunarmOfArm Γ appE Farm) Fun) $$ [] Hun
   iintro H
-  iapply (aunarmOfArm_of_nd (hlc := hlc) Γ appE Nd Farm _ hNd) $$ H
+  iapply (aunarmOfArm_of_nd Γ appE Nd Farm _ hNd) $$ H
 
 /-- ...and the PIN sys_mknod takes (Rocq's `cre_child_unfired_ndp_pin`): the
 pair at `fun c' => c' = c` IS `FsAbsCreateNm`'s. -/
 theorem creChildUnfiredNdp_pin (Γ : FsViewNames GF) (c : Absnode)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) :
-    creChildUnfiredNd (hlc := hlc) Γ c Farm Fun ⊢
-      creChildUnfiredNdp (hlc := hlc) Γ c (fun c' : Absnode => c' = c) Farm Fun := .rfl
+    creChildUnfiredNd Γ c Farm Fun ⊢
+      creChildUnfiredNdp Γ c (fun c' : Absnode => c' = c) Farm Fun := .rfl
 
 /-- The NAME-PREDICATE commit is extensional in its node map `cf`
 (Rocq's `acre_commit_at_gen_nm_ext`, stated in its `SpecCreate`). -/
@@ -282,8 +282,8 @@ theorem acreCommitAtGenNm_ext (Γ : FsViewNames GF) (E : CoPset)
     (cf cf' : Nat → Nat → Absnode) (Nm : Fname → Prop) (Pd : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Φ : Aview → Nat → Fname → Nat → IProp GF) (hext : ∀ d i, cf d i = cf' d i) :
-    acreCommitAtGenNm (hlc := hlc) Γ E cf Nm Pd Farm Φ ⊢
-      acreCommitAtGenNm (hlc := hlc) Γ E cf' Nm Pd Farm Φ := by
+    acreCommitAtGenNm Γ E cf Nm Pd Farm Φ ⊢
+      acreCommitAtGenNm Γ E cf' Nm Pd Farm Φ := by
   have : cf = cf' := funext fun d => funext fun i => hext d i
   subst this
   exact .rfl
@@ -305,10 +305,10 @@ def creCommits (Γ : FsViewNames GF) (tyz ma mi : Nat)
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
-  iprop(pfAt (aarmCommitAt (hlc := hlc) Γ appE (creC0 tyz ma mi)) Farm ∗
-    creDotsLeg (hlc := hlc) Γ tyz Fdots ∗
-    pfAt (aunarmOfArmNd (hlc := hlc) Γ appE Nd Farm) Fun ∗
-    pfAt (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild tyz ma mi) Nm Pd Farm) Fok)
+  iprop(pfAt (aarmCommitAt Γ appE (creC0 tyz ma mi)) Farm ∗
+    creDotsLeg Γ tyz Fdots ∗
+    pfAt (aunarmOfArmNd Γ appE Nd Farm) Fun ∗
+    pfAt (acreCommitAtGenNm Γ appE (creChild tyz ma mi) Nm Pd Farm) Fok)
 
 /-- SATISFIABILITY, and the discharger every caller of create hands down
 (Rocq's `cre_commits_unit`): the GENERIC application asks nothing of create's
@@ -316,25 +316,25 @@ legs, so every commit is its own unit, paid off the SUPPLY. -/
 theorem creCommits_unit [FsBytesG GF] (γfs : FsNames) (tyz ma mi : Nat)
     (Nm : Fname → Prop) (Nd : Absnode → Prop) (Pd : Nat → IProp GF) :
     appSup (GF := GF) ⊢
-      creCommits (hlc := hlc) (fsGammaL γfs) tyz ma mi Nm Nd Pd (pfamTriv (fun _ _ => iprop(True)))
+      creCommits (fsGammaL γfs) tyz ma mi Nm Nd Pd (pfamTriv (fun _ _ => iprop(True)))
         (pfamTriv (fun _ _ _ _ => iprop(True))) (pfamTriv (fun _ _ => iprop(True)))
         (pfamTriv (fun _ _ _ _ => iprop(True))) := by
   unfold creCommits
   iintro #Hsup
   isplitr
   · iapply pfAt_triv
-    iapply (aarmCommitAt_unit (hlc := hlc) γfs appE (creC0 tyz ma mi)) $$ Hsup
+    iapply (aarmCommitAt_unit γfs appE (creC0 tyz ma mi)) $$ Hsup
   isplitr
   · iapply creDotsLeg_of
     iapply pfAt_triv
-    iapply (adotsCommitAt_unit (hlc := hlc) γfs appE) $$ Hsup
+    iapply (adotsCommitAt_unit γfs appE) $$ Hsup
   isplitr
   · iapply pfAt_triv
-    iapply (aunarmOfArmNd_of (hlc := hlc) (fsGammaL γfs) appE Nd _)
-    iapply (aunarmOfArm_unit (hlc := hlc) γfs appE _) $$ Hsup
+    iapply (aunarmOfArmNd_of (fsGammaL γfs) appE Nd _)
+    iapply (aunarmOfArm_unit γfs appE _) $$ Hsup
   · iapply pfAt_triv
-    iapply (acreCommitAtGenNm_of (hlc := hlc) (fsGammaL γfs) appE _ Nm Pd _ _)
-    iapply (acreCommitAtGen_unit (hlc := hlc) γfs appE _ Pd _) $$ Hsup
+    iapply (acreCommitAtGenNm_of (fsGammaL γfs) appE _ Nm Pd _ _)
+    iapply (acreCommitAtGen_unit γfs appE _ Pd _) $$ Hsup
 
 /-- ...AND THE CURSOR MOVES ALONG AN ISO AT THE BUNDLE (Rocq's
 `cre_commits_mono`, TL-3C): the path-fixed `P (nparElems pl).length` and the
@@ -349,23 +349,23 @@ theorem creCommits_mono (Γ : FsViewNames GF) (tyz ma mi : Nat) (Nm : Fname → 
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
     ⊢ iprop(□ (∀ d : Nat, Pd' d -∗ Pd d)) -∗ iprop(□ (∀ d : Nat, Pd d -∗ Pd' d)) -∗
-      creCommits (hlc := hlc) Γ tyz ma mi Nm Nd Pd Farm Fdots Fun Fok -∗
-      creCommits (hlc := hlc) Γ tyz ma mi Nm Nd Pd' Farm Fdots Fun Fok := by
+      creCommits Γ tyz ma mi Nm Nd Pd Farm Fdots Fun Fok -∗
+      creCommits Γ tyz ma mi Nm Nd Pd' Farm Fdots Fun Fok := by
   unfold creCommits
   iintro #Hin #Hout ⟨Ha, Hd, Hu, Hac⟩
   iframe Ha Hd Hu
   iapply (pfAt_mono
-    (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild tyz ma mi) Nm Pd Farm)
-    (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild tyz ma mi) Nm Pd' Farm) Fok) $$ [Hin Hout] Hac
+    (acreCommitAtGenNm Γ appE (creChild tyz ma mi) Nm Pd Farm)
+    (acreCommitAtGenNm Γ appE (creChild tyz ma mi) Nm Pd' Farm) Fok) $$ [Hin Hout] Hac
   iintro H
-  iapply (acreCommitAtGenNm_cur_mono (hlc := hlc) Γ appE (creChild tyz ma mi) Nm Pd Pd' Farm
+  iapply (acreCommitAtGenNm_cur_mono Γ appE (creChild tyz ma mi) Nm Pd Pd' Farm
     Fok.pfRecv) $$ Hin Hout H
 
 /-- the exists observation at the trivial pair (Rocq's `cre_dlookup_unit`) -/
 theorem creDlookup_unit (Γ : FsViewNames GF) :
-    ⊢ pfAt (dlookupCommitAt (hlc := hlc) Γ appE) (pfamTriv (fun _ _ _ _ => iprop(True))) := by
+    ⊢ pfAt (dlookupCommitAt Γ appE) (pfamTriv (fun _ _ _ _ => iprop(True))) := by
   iapply pfAt_triv
-  iapply (dlookupCommitAt_unit (hlc := hlc) Γ appE)
+  iapply (dlookupCommitAt_unit Γ appE)
 
 /-- THE BUNDLE AT A PINNED TYPE, the device (Rocq's `cre_commits_of_dev`): a
 type-pinned caller holds the child's content as a CONSTANT and owes NO DOTS
@@ -374,22 +374,22 @@ theorem creCommits_of_dev (Γ : FsViewNames GF) (ma mi : Nat) (Nm : Fname → Pr
     (Nd : Absnode → Prop) (Pd : Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
-    pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.ADev ma mi) Nm Pd Farm) Fok ⊢
-      creChildUnfiredNdp (hlc := hlc) Γ (.ADev ma mi) Nd Farm Fun -∗
-      creCommits (hlc := hlc) Γ T_DEVICE_w.toNat ma mi Nm Nd Pd Farm
+    pfAt (acreCommitAtNm Γ appE (.ADev ma mi) Nm Pd Farm) Fok ⊢
+      creChildUnfiredNdp Γ (.ADev ma mi) Nd Farm Fun -∗
+      creCommits Γ T_DEVICE_w.toNat ma mi Nm Nd Pd Farm
         (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok := by
   unfold creCommits creChildUnfiredNdp
   rw [creC0_dev]
   iintro Hac ⟨Ha, Hu⟩
-  ihave Hd := creDotsLeg_nodir (hlc := hlc) Γ T_DEVICE_w.toNat
+  ihave Hd := creDotsLeg_nodir Γ T_DEVICE_w.toNat
     (pfamTriv (fun _ _ _ _ => iprop(True))) (by decide)
   iframe Ha Hd Hu
-  iapply (pfAt_mono (acreCommitAtNm (hlc := hlc) Γ appE (.ADev ma mi) Nm Pd Farm)
-    (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild T_DEVICE_w.toNat ma mi) Nm Pd Farm) Fok)
+  iapply (pfAt_mono (acreCommitAtNm Γ appE (.ADev ma mi) Nm Pd Farm)
+    (acreCommitAtGenNm Γ appE (creChild T_DEVICE_w.toNat ma mi) Nm Pd Farm) Fok)
     $$ [] Hac
   iintro H
   unfold acreCommitAtNm
-  iapply (acreCommitAtGenNm_ext (hlc := hlc) Γ appE (fun _ _ => .ADev ma mi)
+  iapply (acreCommitAtGenNm_ext Γ appE (fun _ _ => .ADev ma mi)
     (creChild T_DEVICE_w.toNat ma mi) Nm Pd Farm Fok.pfRecv
     (fun d i => (creChild_dev ma mi d i).symm)) $$ H
 
@@ -398,22 +398,22 @@ theorem creCommits_of_file (Γ : FsViewNames GF) (ma mi : Nat) (Nm : Fname → P
     (Nd : Absnode → Prop) (Pd : Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
-    pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) Nm Pd Farm) Fok ⊢
-      creChildUnfiredNdp (hlc := hlc) Γ (.AFile []) Nd Farm Fun -∗
-      creCommits (hlc := hlc) Γ T_FILE_w.toNat ma mi Nm Nd Pd Farm
+    pfAt (acreCommitAtNm Γ appE (.AFile []) Nm Pd Farm) Fok ⊢
+      creChildUnfiredNdp Γ (.AFile []) Nd Farm Fun -∗
+      creCommits Γ T_FILE_w.toNat ma mi Nm Nd Pd Farm
         (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok := by
   unfold creCommits creChildUnfiredNdp
   rw [creC0_file]
   iintro Hac ⟨Ha, Hu⟩
-  ihave Hd := creDotsLeg_nodir (hlc := hlc) Γ T_FILE_w.toNat
+  ihave Hd := creDotsLeg_nodir Γ T_FILE_w.toNat
     (pfamTriv (fun _ _ _ _ => iprop(True))) (by decide)
   iframe Ha Hd Hu
-  iapply (pfAt_mono (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) Nm Pd Farm)
-    (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild T_FILE_w.toNat ma mi) Nm Pd Farm) Fok)
+  iapply (pfAt_mono (acreCommitAtNm Γ appE (.AFile []) Nm Pd Farm)
+    (acreCommitAtGenNm Γ appE (creChild T_FILE_w.toNat ma mi) Nm Pd Farm) Fok)
     $$ [] Hac
   iintro H
   unfold acreCommitAtNm
-  iapply (acreCommitAtGenNm_ext (hlc := hlc) Γ appE (fun _ _ => .AFile [])
+  iapply (acreCommitAtGenNm_ext Γ appE (fun _ _ => .AFile [])
     (creChild T_FILE_w.toNat ma mi) Nm Pd Farm Fok.pfRecv
     (fun d i => (creChild_file ma mi d i).symm)) $$ H
 

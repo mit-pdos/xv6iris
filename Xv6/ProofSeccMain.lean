@@ -57,20 +57,20 @@ theorem secc_ustack_four (γd : GName) (sp : BitVec 64) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `wp_ksecc_main`**. -/
 theorem wp_seccMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
-    (HL : UkSysP.wpUkEcallSeccK (hlc := hlc) (utab (GF := GF)) tabLe)
+    (HL : UkSysP.wpUkEcallSeccK (utab (GF := GF)) tabLe)
     (Hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) (h : CPU) (m : RegMap) (na n : Nat) (l v : List FdState) (szv c : Nat)
     (cs : ExtTreeSet GName compare)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 na) (hna : na < 2 ^ 31) :
-    ⊢ □ (∀ s : Int, N.pay s) -∗ ukCode N.t User.Seccomp.code.byte -∗ seccWdep (hlc := hlc) N l -∗
-      seccUniv (hlc := hlc) v -∗ ustdAt N.fd l v -∗ usz N.s szv -∗ ucwd N.cwd c -∗ uch N.ch cs -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Seccomp.Sym.«main») (4 + (10 + (12 + (4 + n)))) -∗
+    ⊢ □ (∀ s : Int, N.pay s) -∗ ukCode N.t User.Seccomp.code.byte -∗ seccWdep N l -∗
+      seccUniv v -∗ ustdAt N.fd l v -∗ usz N.s szv -∗ ucwd N.cwd c -∗ uch N.ch cs -∗
+      urun N h m (BitVec.ofNat 64 User.Seccomp.Sym.«main») (4 + (10 + (12 + (4 + n)))) -∗
       wpLoop h := by
   rw [show User.Seccomp.Sym.«main» = 0x0 from rfl]
   iintro #Hq #Hc #Hwd #Hu Hstd Hsz Hcwd Hch Hrun

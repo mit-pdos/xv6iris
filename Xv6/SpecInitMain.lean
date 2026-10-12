@@ -31,7 +31,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -39,20 +39,20 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [U
 def wpInitMainBody : Prop :=
   ∀ (N : UkNames GF) [UknConst N], (⊢ N.pay (-1)) → (∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) →
   ∀ (T Cns : IProp GF) [Persistent T] (stc : FdState) (Cr : ConsCred GF) (cn : ConsNames) (szv : Nat) (h : CPU)
-    (m : RegMap) (n : Nat), stc ≠ .closed → (⊢ initKillLaw (hlc := hlc) T stc Cr.ccWp (ccWbn Cr)) →
-    ⊢ initDeps (hlc := hlc) T -∗ kinitBanLaw (hlc := hlc) N stc Cr.ccWp (ccWbn Cr) -∗
-      kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
-      initConsSup (hlc := hlc) cn T Cns stc Cr -∗ initConsDance (hlc := hlc) N T Cns stc -∗
+    (m : RegMap) (n : Nat), stc ≠ .closed → (⊢ initKillLaw T stc Cr.ccWp (ccWbn Cr)) →
+    ⊢ initDeps T -∗ kinitBanLaw N stc Cr.ccWp (ccWbn Cr) -∗
+      kinitDiagLaw stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
+      initConsSup cn T Cns stc Cr -∗ initConsDance N T Cns stc -∗
       initArgv N.d -∗ usz N.s szv -∗ ustdOk T N.fd ufdL0 -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗
-      uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«main») (4 + (12 + (12 + (4 + n)))) -∗ wpLoop h
+      uinitTok cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
+      urun N h m (BitVec.ofNat 64 User.Init.Sym.«main») (4 + (12 + (12 + (4 + n)))) -∗ wpLoop h
 
 end
 
 /-- The interface of init's `main`. -/
 structure INIT_MAIN : Prop where
-  wp_initMain : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_initMain : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF], wpInitMainBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF], wpInitMainBody (GF := GF)
 
 end Xv6

@@ -35,7 +35,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -43,7 +43,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 set_option maxHeartbeats 16000000 in
 /-- `+0x7a`, after the second copyout: `li a5,0 ; bgez a0`.  Success settles
 the two descriptors and exits with `0`; failure falls into `+0x80`. -/
-theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (v : BitVec 64) (γkl : GName) (γk : KmemNames) (spie spp : Bool) (R : RegMap)
     (k0 k1 fd0 fd1 : Nat) (γp : PipeNames) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (hfd0 : fd0 < 16) (hfd1 : fd1 < 16)
@@ -165,12 +165,12 @@ end
 set_option maxHeartbeats 16000000 in
 /-- `+0x62`, after the first copyout: `bltz a0` (failure into `+0x80`), then
 the second copyout's arguments and the call. -/
-theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+theorem sys_pipe_stage_e {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
     [X : CurCtx] (hct : X.curTier = KTier.kpt)
-    (FC : FILECLOSE) (CO : COPYOUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+    (FC : FILECLOSE) (CO : COPYOUT) (Γ : SchedNames) [ClaimIs GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (v : BitVec 64) (γkl : GName) (γk : KmemNames) (spie spp : Bool) (R : RegMap)
     (k0 k1 fd0 fd1 : Nat) (γp : PipeNames) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (hfd0 : fd0 < 16) (hfd1 : fd1 < 16)
@@ -194,9 +194,9 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (fnode k1) ∗
     fileRef γ k0 1 (.open true false (.pipe γp)) ∗ fileRef γ k1 1 (.open false true (.pipe γp)) ∗
     pipeQfrag γp.pnQueue pst0 ∗
-    @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
-    @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-    @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P1 M1 ∗ sysPipeCoreRest pa pid V ∗
+    @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
+    @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
+    @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ P1 M1 ∗ sysPipeCoreRest pa pid V ∗
     procOfilesOwe γ V.fdg pa ((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1)) [fd1, fd0] ∗
     fdSlot ∗ fdStAuth V.fdg fd0 .closed ∗ fdSlot ∗ fdStAuth V.fdg fd1 .closed ∗ fdFrags V.fdg sts ∗
     sysPipeTurn cpu k γ V.fdg pa pid V M sts v
@@ -303,12 +303,12 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 set_option maxHeartbeats 16000000 in
 /-- `+0x48`, after `fdalloc(wf)`: `sw a0,-64(s0) ; bltz a0` (failure into
 `+0xb4`), then the first copyout's arguments and the call. -/
-theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+theorem sys_pipe_stage_d {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
     [X : CurCtx] (hct : X.curTier = KTier.kpt)
-    (FC : FILECLOSE) (CO : COPYOUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+    (FC : FILECLOSE) (CO : COPYOUT) (Γ : SchedNames) [ClaimIs GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (v : BitVec 64) (γkl : GName) (γk : KmemNames) (spie spp : Bool) (R : RegMap)
     (k0 k1 fd0 : Nat) (γp : PipeNames) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (hfd0 : fd0 < 16)

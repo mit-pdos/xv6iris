@@ -96,7 +96,7 @@ open Iris.Algebra
 /-! ## 5.  THE ADDRESS-KEYED FORM OF A REFERENCE -/
 
 section IcacheHeld
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF]
 
 /-- A REFERENCE, KEYED BY THE POINTER a caller actually holds -- the form
@@ -280,12 +280,12 @@ Nothing else in these bundles moves: `liveGenlo`, `irefFrag`, `slhTok` and
 the stamps are ghost state, and the only cells are `inodeIdent`'s two `↦₄`s. -/
 
 section IcacheHeldAny
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF]
 
 instance inodeIdent_morph (t : KTier) (k : Nat) (dq : DFrac) (dev inum : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeIdent (GF := GF) k dq dev inum) :=
-  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt t (iDev (ientry k)) 4 dq dev)
+  @instCtxMorphSep GF _ _ _ (instCtxMorphWordAt t (iDev (ientry k)) 4 dq dev)
     (instCtxMorphWordAt t (iInum (ientry k)) 4 dq inum)
 
 /-- The floors law for the floored slice (Rocq `live_fracc_morph`). -/
@@ -312,12 +312,12 @@ instance liveFracc_morph [Icfg] (t : KTier) (k : Nat) (s : Qp) :
 instance inodeShrGen_morph [Icfg] (t : KTier) (k : Nat) (s : Qp) (dev inum : BitVec 32)
     (g : GName) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeShrGen (GF := GF) k s dev inum g) :=
-  @instCtxMorphSep hlc GF _ _ _ (inodeIdent_morph t k (.own s) dev inum) (instCtxMorphConst _)
+  @instCtxMorphSep GF _ _ _ (inodeIdent_morph t k (.own s) dev inum) (instCtxMorphConst _)
 
 instance inodeShrGenlo_morph [Icfg] (t : KTier) (k : Nat) (s : Qp) (dev inum : BitVec 32)
     (g : GName) (lo : Nat) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeShrGenlo (GF := GF) k s dev inum g lo) :=
-  @instCtxMorphSep hlc GF _ _ _ (inodeIdent_morph t k (.own s) dev inum) (instCtxMorphConst _)
+  @instCtxMorphSep GF _ _ _ (inodeIdent_morph t k (.own s) dev inum) (instCtxMorphConst _)
 
 /-- The floors law for the pointer-keyed share (Rocq
 `inode_shr_held_gen_morph`, `FileInvDefs.inode_pay_morph`'s one named
@@ -350,55 +350,55 @@ instance inodeShrHeldGen_morph [Icfg] (t : KTier) (v : BitVec 64) (s : Qp) (g : 
 
 instance inodeShr_morph [Icfg] (t : KTier) (k : Nat) (s : Qp) (dev inum : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeShr (GF := GF) k s dev inum) :=
-  @instCtxMorphSep hlc GF _ _ _ (inodeIdent_morph t k (.own s) dev inum)
-    (@instCtxMorphSep hlc GF _ _ _ (liveFracc_morph t k s) (instCtxMorphConst _))
+  @instCtxMorphSep GF _ _ _ (inodeIdent_morph t k (.own s) dev inum)
+    (@instCtxMorphSep GF _ _ _ (liveFracc_morph t k s) (instCtxMorphConst _))
 
 instance inodeRef_morph [Icfg] (t : KTier) (k : Nat) (q : Qp) (dev inum : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeRef (GF := GF) k q dev inum) :=
-  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _ (liveFracc_morph t k q)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-        (@instCtxMorphSep hlc GF _ _ _ (inodeIdent_morph t k (.own q) dev inum)
+  @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep GF _ _ _ (liveFracc_morph t k q)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+        (@instCtxMorphSep GF _ _ _ (inodeIdent_morph t k (.own q) dev inum)
           (instCtxMorphConst _))))
 
 instance inodeRefShort_morph [Icfg] (t : KTier) (k : Nat) (qt qi : Qp) (dev inum : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeRefShort (GF := GF) k qt qi dev inum) :=
-  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _ (liveFracc_morph t k qi)
-      (@instCtxMorphSep hlc GF _ _ _ (inodeIdent_morph t k (.own qi) dev inum)
+  @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep GF _ _ _ (liveFracc_morph t k qi)
+      (@instCtxMorphSep GF _ _ _ (inodeIdent_morph t k (.own qi) dev inum)
         (instCtxMorphConst _)))
 
 instance inodeRefp_morph [Icfg] (t : KTier) (k : Nat) (q : Qp) (dev inum : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeRefp (GF := GF) k q dev inum) :=
-  @instCtxMorphSep hlc GF _ _ _ (inodeRef_morph t k q dev inum) (instCtxMorphConst _)
+  @instCtxMorphSep GF _ _ _ (inodeRef_morph t k q dev inum) (instCtxMorphConst _)
 
 instance inodeRefpShort_morph [Icfg] (t : KTier) (k : Nat) (qt qi : Qp) (dev inum : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeRefpShort (GF := GF) k qt qi dev inum) :=
-  @instCtxMorphSep hlc GF _ _ _ (inodeRefShort_morph t k qt qi dev inum) (instCtxMorphConst _)
+  @instCtxMorphSep GF _ _ _ (inodeRefShort_morph t k qt qi dev inum) (instCtxMorphConst _)
 
 instance inodeHeld_morph [Icfg] (t : KTier) (v : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeHeld (GF := GF) v) :=
-  @instCtxMorphExists hlc GF _ _ _ fun k =>
-    @instCtxMorphExists hlc GF _ _ _ fun q =>
-      @instCtxMorphExists hlc GF _ _ _ fun inum =>
-        @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-            (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-              (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+  @instCtxMorphExists GF _ _ _ fun k =>
+    @instCtxMorphExists GF _ _ _ fun q =>
+      @instCtxMorphExists GF _ _ _ fun inum =>
+        @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+          (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+            (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+              (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
                 (inodeRefp_morph t k q icfgDev inum))))
 
 /-- The pinned package crosses exactly as its ∃-form does: one more pure
 conjunct, and the reference itself is what moves. -/
 instance inodeHeldAt_morph [Icfg] (t : KTier) (v : BitVec 64) (z : Nat) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeHeldAt (GF := GF) v z) :=
-  @instCtxMorphExists hlc GF _ _ _ fun k =>
-    @instCtxMorphExists hlc GF _ _ _ fun q =>
-      @instCtxMorphExists hlc GF _ _ _ fun inum =>
-        @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-            (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-              (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-                (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+  @instCtxMorphExists GF _ _ _ fun k =>
+    @instCtxMorphExists GF _ _ _ fun q =>
+      @instCtxMorphExists GF _ _ _ fun inum =>
+        @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+          (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+            (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+              (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+                (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
                   (inodeRefp_morph t k q icfgDev inum)))))
 
 end IcacheHeldAny

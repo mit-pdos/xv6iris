@@ -16,10 +16,11 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
+omit [MachGS GF] in
 /-- A two-word frame, opened (init's `start`; nothing is given back). -/
 theorem kinit_ustack_two (γd : GName) (sp : BitVec 64) :
     ustack (GF := GF) γd sp 2 ⊢
@@ -35,13 +36,13 @@ theorem wp_initStart (UL : UK_LEAVES) (HM : INIT_MAIN)
     (N : UkNames GF) [UknConst N] (hpayfree : ⊢ N.pay (-1))
     (hpsok : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (T Cns : IProp GF) [Persistent T] (stc : FdState) (Cr : ConsCred GF) (cn : ConsNames) (szv : Nat) (h : CPU)
-    (m : RegMap) (n : Nat) (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw (hlc := hlc) T stc Cr.ccWp (ccWbn Cr)) :
-    ⊢ initDeps (hlc := hlc) T -∗ kinitBanLaw (hlc := hlc) N stc Cr.ccWp (ccWbn Cr) -∗
-      kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
-      initConsSup (hlc := hlc) cn T Cns stc Cr -∗ initConsDance (hlc := hlc) N T Cns stc -∗
+    (m : RegMap) (n : Nat) (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw T stc Cr.ccWp (ccWbn Cr)) :
+    ⊢ initDeps T -∗ kinitBanLaw N stc Cr.ccWp (ccWbn Cr) -∗
+      kinitDiagLaw stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
+      initConsSup cn T Cns stc Cr -∗ initConsDance N T Cns stc -∗
       initArgv N.d -∗ usz N.s szv -∗ ustdOk T N.fd ufdL0 -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗
-      uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«start») (2 + (4 + (12 + (12 + (4 + n))))) -∗
+      uinitTok cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
+      urun N h m (BitVec.ofNat 64 User.Init.Sym.«start») (2 + (4 + (12 + (12 + (4 + n))))) -∗
       wpLoop h := by
   rw [show User.Init.Sym.«start» = 0xbc from rfl]
   iintro #Hdeps #Hblaw #Hdlaw #Hc #Hxs Hdance #Hargv Hsz Hstd Hcwd Hch Htk Hrun

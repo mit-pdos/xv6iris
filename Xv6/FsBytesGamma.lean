@@ -45,7 +45,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBytesG GF]
 
 /-- Rocq's `fs_gamma_L`: the LOGGED instance of the abstract view. -/
 def fsGammaL (γfs : FsNames) : FsViewNames GF :=

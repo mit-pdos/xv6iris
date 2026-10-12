@@ -34,18 +34,18 @@ open Std (ExtTreeSet)
 open UexecSG
 
 /-- **The laws' context (data)** (deviation 1). -/
-structure PnsCtx (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
+structure PnsCtx (GF : BundledGFunctors.{0}) [MachGS GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
     [PS : UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     [GhostMapG GF (Option Nat) UfdCell UfdMapF] [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
     [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] where
-  R : PnsRound hlc GF
+  R : PnsRound GF
   Q : PnsProc GF
 
 /-- **The laws' context (hypotheses)**. -/
-structure PnsCtxOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
+structure PnsCtxOk {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
     [PS : UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     [GhostMapG GF (Option Nat) UfdCell UfdMapF] [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
-    [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF] (C : PnsCtx hlc GF) : Prop where
+    [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF] (C : PnsCtx GF) : Prop where
   OK : PnsRoundOk C.R
   QK : PnsProcOk C.Q
   UL : UK_LEAVES
@@ -55,19 +55,19 @@ structure PnsCtxOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Ct
   hpc : Persistent C.Q.P.code
 
 /-- lane hfp-P1's pipe leaves at the xv6 instance (`UkPipeDevXv6`). -/
-noncomputable def PnsCtxOk.DK {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+noncomputable def PnsCtxOk.DK {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
     [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
     [PS : UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     [GhostMapG GF (Option Nat) UfdCell UfdMapF] [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
-    [DiskG GF] [EchoOutG GF] [PipesNG GF] {C : PnsCtx hlc GF} (CK : PnsCtxOk C) : PipeDevK hlc GF :=
+    [DiskG GF] [EchoOutG GF] [PipesNG GF] {C : PnsCtx GF} (CK : PnsCtxOk C) : PipeDevK GF :=
   pipeDevK_xv6 CK.UL
 
 section Ctx
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF]
-variable (R : PnsRound hlc GF) (Q : PnsProc GF)
+variable (R : PnsRound GF) (Q : PnsProc GF)
 
 /-- The descriptor resource without its ledger. -/
 noncomputable def pnsFdsRest (fdm : Fdmap) (l : List FdState) (vs : RegMapF Pdev) (wv : Nat → Pdev) :
@@ -115,7 +115,7 @@ theorem pns_fds_back (fdm : Fdmap) (l : List FdState) (vs : RegMapF Pdev) (wv : 
 (Rocq `pns_taint_of_fds` at the law's split). -/
 theorem pns_taint_rest (OK : PnsRoundOk R) (fdm : Fdmap) (l : List FdState) (vs : RegMapF Pdev)
     (wv : Nat → Pdev) :
-    ⊢ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ ustd Q.N.fd l -∗ pnsFdsRest R Q fdm l vs wv -∗
+    ⊢ MachFixedGS.killCred (GF := GF) -∗ ustd Q.N.fd l -∗ pnsFdsRest R Q fdm l vs wv -∗
       pnsTaint R Q (fdDom fdm) := by
   unfold pnsFdsRest
   iintro #Ht Hstd ⟨Hxk, %hok, -, -, -, #He⟩

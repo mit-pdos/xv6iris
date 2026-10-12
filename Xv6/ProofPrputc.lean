@@ -22,7 +22,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- `uartputc_sync`'s contract as a rule at its entry address, at the
 KERNEL's port: its store obligation is free (`UartLinks.storeChain_uart1`,
@@ -39,7 +39,7 @@ theorem pp_uart_call (UP : UARTPUTC_SYNC) [CurCtx] (c : CPU) (k' : KCtx)
       uartSentSub γ (bs ++ [BitVec.extractLsb' 0 8 (k'.regs 11#5)]) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hi
-  have h := UP.wp_uartputc_sync (hlc := hlc) (GF := GF) c k' .uart1 γl γ bs iprop(emp) hsie hK hnoff hlk hid
+  have h := UP.wp_uartputc_sync (GF := GF) c k' .uart1 γl γ bs iprop(emp) hsie hK hnoff hlk hid
   unfold wp_uartputc_sync_body at h
   simp only [uartputcSyncAddr] at h
   iintro ⟨Hk, Hpc, Hp, Hs, HΦ⟩
@@ -64,7 +64,7 @@ theorem prputc_ret : jumpPc (KA.«prputc» + 0x10#64) = KA.«prputc» + 0x10#64 
 
 set_option maxHeartbeats 4000000 in
 theorem prputc_proof (UP : UARTPUTC_SYNC) : PRPUTC :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γd bs hsie hK hnoff huart => by
+  ⟨fun {GF} _ _ _ cpu k γl γd bs hsie hK hnoff huart => by
   unfold wp_prputc_body isTxLock
   iintro ⟨Hk, Hpc, #Hport, #Hsub, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

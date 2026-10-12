@@ -66,8 +66,9 @@ open Sail LeanRV64D LeanRV64D.Functions
 /-! ## §0 Helpers -/
 
 section helpers
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
+omit [MachGS GF] in
 /-- A big separating conjunction, converted element-wise under a persistent
 premise. -/
 theorem ub_sepL_wand {X : Type} (P : IProp GF) [Persistent P] (l : List X) (Φ Ψ : X → IProp GF)
@@ -78,6 +79,7 @@ theorem ub_sepL_wand {X : Type} (P : IProp GF) [Persistent P] (l : List X) (Φ �
   iintro %k %x %hk HΦ
   iapply (h x (List.mem_of_getElem? hk)) $$ HP HΦ
 
+omit [MachGS GF] in
 /-- An indexed big separating conjunction over a list, as one over its
 indices. -/
 theorem ub_sepL_idx (Φ : Nat → BitVec 8 → IProp GF) : ∀ bs : List (BitVec 8),
@@ -138,7 +140,7 @@ theorem ubWordBytes_read (mm : BMap) (a : PAddr) (w : BitVec 64)
   exact h _ (List.mem_map.2 ⟨j, List.mem_range.2 hj, rfl⟩)
 
 section tree
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- One entry word, physically: its 8 bytes. -/
 theorem ubWord_own [CurCtx] (b : BitVec 44) (hb : pageValid (pageAddr b)) (i : BitVec 9) (w : BitVec 64) :
@@ -260,7 +262,7 @@ theorem ub_data_valid (P : UPtd) (hwf : uptWf P) (k : Nat) (w : BitVec 64) (h : 
   exact ⟨he, he ▸ hv⟩
 
 section data
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 theorem ub_ctxBytes_one (ξ : CtxId) (a : PAddr) (dq : DFrac) (x : BitVec 8) :
     ctxBytes (GF := GF) ξ a 1 dq x ⊣⊢ ctxByte ξ a dq x := by

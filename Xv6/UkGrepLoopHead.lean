@@ -24,7 +24,7 @@ set_option maxRecDepth 20000
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -35,19 +35,19 @@ theorem grepLoop_head (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap
     (hs3 : m.get 19#5 = kgrepB01 skip) (hs6 : m.get 22#5 = BitVec.ofNat 64 left.length)
     (hL : left.length < 1023) (hleft : (List.range left.length).map F = left) :
     ⊢ grepCode N.t -∗ ubytes N.d User.Grep.Sym.«buf» 1024 F -∗
-      treePay (hlc := hlc) N (grepProg N.t) (grepGo pat fd skip [] left rest) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x16e) (4 + n2) -∗
+      treePay N (grepProg N.t) (grepGo pat fd skip [] left rest) -∗
+      urun N h m (BitVec.ofNat 64 0x16e) (4 + n2) -∗
       ((∀ (h' : CPU) (m' : RegMap) (F' : Nat → BitVec 8), ⌜grepGlRegs m0 sp0 ar fdv m'⌝ -∗
-          ubytes N.d User.Grep.Sym.«buf» 1024 F' -∗ treePay (hlc := hlc) N (grepProg N.t) rest -∗
-          urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x1b2) (4 + n2) -∗ wpLoop h') ∧
+          ubytes N.d User.Grep.Sym.«buf» 1024 F' -∗ treePay N (grepProg N.t) rest -∗
+          urun N h' m' (BitVec.ofNat 64 0x1b2) (4 + n2) -∗ wpLoop h') ∧
         (∀ (h' : CPU) (m' : RegMap) (F' : Nat → BitVec 8) (mv : Nat), ⌜grepGlRegs m0 sp0 ar fdv m'⌝ -∗
           ⌜m'.get 18#5 = BitVec.ofNat 64 (User.Grep.Sym.«buf» + 0)⌝ -∗ ⌜m'.get 19#5 = kgrepB01 skip⌝ -∗
           ⌜m'.get 20#5 = BitVec.ofNat 64 mv⌝ -∗ ⌜m'.get 22#5 = BitVec.ofNat 64 mv⌝ -∗
           ⌜0 < mv ∧ mv ≤ 1023⌝ -∗ ⌜F' mv = ubyte0⌝ -∗
           ubytes N.d User.Grep.Sym.«buf» 1024 F' -∗
-          treePay (hlc := hlc) N (grepProg N.t)
+          treePay N (grepProg N.t)
             (grepK pat fd rest (scan pat skip [] ((List.range (mv - 0)).map (fun j => F' (0 + j))))) -∗
-          urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x136) (4 + n2) -∗ wpLoop h')) -∗
+          urun N h' m' (BitVec.ofNat 64 0x136) (4 + n2) -∗ wpLoop h')) -∗
       wpLoop h := by
   have hgl' := hgl
   obtain ⟨g1, g2, g3, g4, g5, g6, g7, g8, g9⟩ := hgl'

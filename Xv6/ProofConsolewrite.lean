@@ -158,7 +158,7 @@ theorem cw_align8 (a : BitVec 64) (h : a.toNat % 8 = 0) : (a + 8#64).toNat % 8 =
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- Peel the first eight bytes of a buffer off as a word. -/
 theorem cw_split8 (a b : BitVec 64) (hb : b = a + 8#64) (bs : List (BitVec 8))
@@ -194,7 +194,7 @@ theorem cw_join8 (a b : BitVec 64) (hb : b = a + 8#64) (w : BitVec 64) (bs : Lis
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The four frame slots of `buf`, opened as its 32 bytes. -/
 theorem cw_buf_open (a : BitVec 64) :
@@ -355,7 +355,7 @@ theorem cw_rpre_ext (P P2 : UPtd) (hext : P.ext P2) (ua a : BitVec 64) (i nn : N
 /-! ## The nine shrink-wrapped slots -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The nine slots `s2..s10` are saved into, before they are (`sp-32 .. sp-96`). -/
 def cwSpare9 (sp : BitVec 64) : IProp GF := iprop%
@@ -509,7 +509,7 @@ end
 /-! ## The callee call-site wrappers -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `either_copyin` at consolewrite's call site: the user arm, into the
 bounce buffer at `a0`. -/
@@ -537,7 +537,7 @@ theorem cw_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : GName
         byteBuf (k'.regs 10#5) (DFrac.own 1) bs') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := EC.wp_either_copyin (hlc := hlc) (GF := GF) c k' γl γk j pid V P M true (DFrac.own 1)
+  have h := EC.wp_either_copyin (GF := GF) c k' γl γk j pid V P M true (DFrac.own 1)
     old old hj (fun _ => hproc) hnoff hK hlk huser hlen hlen' rfl
   unfold wp_either_copyin_body at h
   simp only [eitherCopyinAddr] at h
@@ -557,6 +557,7 @@ theorem cw_run_snoc (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i nn : Nat) 
   simp only [List.getElem_map, List.getElem_range, Function.comp]
   exact hat d _ (List.getElem?_eq_getElem h2)
 
+omit [MachGS GF] in
 /-- ...and grown by the chunk `uartwrite` pushed from that stream -/
 theorem consOutAt_snoc (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (i nn : Nat)
     (bs : List (BitVec 8)) (ps : List Nat) (L : List (BitVec 8))
@@ -577,7 +578,7 @@ theorem consOutAt_snoc (γ : UartNames) (M : Nat → List (BitVec 8)) (ua : BitV
 CHAIN (peeled off the caller's `consOutChain`) in, its payload back.  The
 sublist witness `uartwrite`'s landed contract still threads is minted from
 the port's invariant (`uartInv_sentSub`; Rocq retired the receipt). -/
-theorem cw_uartwrite (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem cw_uartwrite (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γ : UartNames) (j : Nat)
     (L0 cs : List (BitVec 8)) (nn : Nat) (s : Bool) (p : BitVec 64) (Φ : IProp GF)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : uartwriteSlots ≤ k'.avail)
@@ -587,7 +588,7 @@ theorem cw_uartwrite (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     kctx c k' ∗ pcIs c KA.«uartwrite» ∗ procsInv Γ ∗
     trapCsrsExt c s ∗ cpuClaimExt c s p ∗
     uartPort .uart0 γl γ ∗ uartSent γ L0 ∗ byteBuf (k'.regs 11#5) (DFrac.own 1) cs ∗
-    outChain .uart0 (genId (hlc := hlc) (GF := GF) + 1) cs Φ ∗
+    outChain .uart0 (genId (GF := GF) + 1) cs Φ ∗
     wpNext true p c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -595,7 +596,7 @@ theorem cw_uartwrite (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
       byteBuf (k'.regs 11#5) (DFrac.own 1) cs -∗ (∃ ps, uartSentRun γ L0 ps cs) -∗ Φ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
-  have h := UW.wp_uartwrite_eb (hlc := hlc) (GF := GF) Γ c k' .uart0 γl γ j [] L0 cs (DFrac.own 1) nn
+  have h := UW.wp_uartwrite_eb (GF := GF) Γ c k' .uart0 γl γ j [] L0 cs (DFrac.own 1) nn
     Φ hj hproc hK hnoff htier hid hn hn' hcs
   unfold wp_uartwrite_eb_body at h
   simp only [uartwriteAddr] at h
@@ -616,7 +617,7 @@ end
 /-! ## The register pins, the caller's continuation, the epilogue -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The prologue's context, in the shape the loop lemmas take. -/
 theorem cw_ctx_spie_intro (k : KCtx) (m : Nat) (R : RegMap) :
@@ -680,7 +681,7 @@ theorem cw_priv_back (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPr
   isplitr
   · ipureintro; exact hf
   isplitl [Hpt]
-  · iapply (@procPtAt_congr hlc GF _ ⟨ξ, KTier.kpt⟩ P' _ _
+  · iapply (@procPtAt_congr GF _ ⟨ξ, KTier.kpt⟩ P' _ _
       (fun kp w hk => writerImg_back V.upt P' M kp w hk)) $$ Hpt
   · ipureintro; exact hlz
 
@@ -695,7 +696,7 @@ theorem cw_priv_img (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPri
   isplitr
   · ipureintro; exact hf
   isplitl [Hpt]
-  · iapply (@procPtAt_congr hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt _ _
+  · iapply (@procPtAt_congr GF _ ⟨ξ, KTier.kpt⟩ V.upt _ _
       (fun kp w hk => writerImg_mapped V.upt M kp w hk)) $$ Hpt
   · ipureintro; exact hlz
 
@@ -759,7 +760,7 @@ end
 /-! ## The frame, opened and closed around the loop -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 theorem cw_frame_elim (sp ra s0 s1 : BitVec 64) :
     frame16s1 (GF := GF) sp ra s0 s1 ⊢
@@ -798,7 +799,7 @@ theorem cw_frame_intro (sp ra s0 s1 : BitVec 64) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- At `+0x98` with the frame in pieces: close it and return. -/
@@ -842,7 +843,7 @@ end
 /-! ## The loop invariant at the guard `+0x60` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 /-- What re-entering the guard needs: the pins, the count in `s1`, the
 extended process block at the writer's image, the chain's residue, the frame in pieces, and the
@@ -855,7 +856,7 @@ def cwLoopInv (cpu : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
       uvaRprefix P (k.regs 11#5) i ∧ i % 32 = 0⌝ -∗
     kctx c (((k.withSpie a b).pushed 16).withRegs R) -∗
     pcIs c (KA.«consolewrite» + 0x60#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ consOutChain (genId (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) -∗
     consOutAt γ (writerImg V.upt M) (k.regs 11#5) i -∗
     (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
       procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) -∗
@@ -875,7 +876,7 @@ theorem cwLoopInv_elim (cpu : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
       uvaRprefix P (k.regs 11#5) i ∧ i % 32 = 0⌝ -∗
       kctx c (((k.withSpie a b).pushed 16).withRegs R) -∗
       pcIs c (KA.«consolewrite» + 0x60#64) -∗
-      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) -∗
+      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ consOutChain (genId (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) -∗
     consOutAt γ (writerImg V.upt M) (k.regs 11#5) i -∗
       (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
       procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) -∗
@@ -895,7 +896,7 @@ theorem cwLoopInv_intro (cpu : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
       uvaRprefix P (k.regs 11#5) i ∧ i % 32 = 0⌝ -∗
       kctx c (((k.withSpie a b).pushed 16).withRegs R) -∗
       pcIs c (KA.«consolewrite» + 0x60#64) -∗
-      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) -∗
+      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ consOutChain (genId (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) -∗
     consOutAt γ (writerImg V.upt M) (k.regs 11#5) i -∗
       (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
       procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) -∗
@@ -912,7 +913,7 @@ theorem cwLoopInv_intro (cpu : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 /-- The loop hypothesis as a rule (so the register map can be inferred). -/
 theorem cwLoopInv_use (cpu c : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
@@ -923,7 +924,7 @@ theorem cwLoopInv_use (cpu c : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
     cwLoopInv cpu k γ j pid V M n Q N ∗
     kctx c (((k.withSpie a b).pushed 16).withRegs R) ∗
     pcIs c (KA.«consolewrite» + 0x60#64) ∗
-    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗ consOutChain (genId (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) ∗
     consOutAt γ (writerImg V.upt M) (k.regs 11#5) i ∗
     (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
       procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) ∗
@@ -946,13 +947,13 @@ end
 /-! ## One chunk of the loop, at `+0x38` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- `either_copyin(buf, user_src, src + i, nn)`, then either the `-1` exit
 (restore, return `i`) or `uartwrite(0, buf, nn)`, `i += nn` and back to the
 guard. -/
-theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (γl : GName) (γ : UartNames)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (N : Nat) (P : UPtd)
@@ -969,7 +970,7 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     kctx cpu (((k.withSpie a b).pushed 16).withRegs R) ∗ pcIs cpu (KA.«consolewrite» + 0x38#64) ∗
     procsInv Γ ∗ uartPort .uart0 γl γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ consOutChain (genId (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) ∗
     consOutAt γ (writerImg V.upt M) (k.regs 11#5) i ∗
     (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
       procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) ∗
@@ -1133,12 +1134,12 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     iintro Hk Hpc
     have hat := cw_at (writerImg V.upt M) (k.regs 11#5) _ i nn (by first | rfl | simp only [h9, g23] | skip)
         (by rw [htk] at hnwC; exact hnwC) bs' (by rw [hbsE, htk])
-    ihave Hch := consOutChain_run (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5)
+    ihave Hch := consOutChain_run (genId (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5)
       Q bs' i (N - i) (by omega) hat $$ Hch
     icases consOutAt_elim γ (writerImg V.upt M) (k.regs 11#5) i $$ HO with ⟨%psO, %LO, #HLO, %hLO⟩
     rw [hbs', show i + nn = nn + i by omega, show N - i - nn = N - (nn + i) by omega]
     iapply (cw_uartwrite UW Γ cpu _ γl γ j LO bs' nn k.sie k.proc
-        (consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q (nn + i)
+        (consOutChain (genId (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q (nn + i)
           (N - (nn + i))) hj ?hpU ?hKU ?hnU ?htU
         ?hidU ?hnnU ?hn'U hbs' ?hsU ?hppU) $$ [- $Hk $Hpc $Hte $Hce $Hch]
     rotate_right 1
@@ -1247,10 +1248,10 @@ end
 /-! ## The loop, closed by Löb at the guard `+0x60` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 set_option maxHeartbeats 16000000 in
-theorem cw_loop (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem cw_loop (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 : CPU) (k : KCtx) (γl : GName) (γ : UartNames)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (N : Nat)
@@ -1322,7 +1323,7 @@ end
 set_option maxHeartbeats 16000000 in
 /-- **`consolewrite` meets its specification.** -/
 theorem consolewrite_proof (EC : EITHER_COPYIN) (UW : UARTWRITE) : CONSOLEWRITE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k γl γ γkl γk j pid V M n Q hj hproc hK hnoff htier
+  fun {GF} _ _ _ _ _ _ _ X Γ _ cpu k γl γ γkl γk j pid V M n Q hj hproc hK hnoff htier
       huser hn hn' => by
   unfold wp_consolewrite_eb_body
   simp only [consolewriteAddr]
@@ -1447,7 +1448,7 @@ theorem consolewrite_proof (EC : EITHER_COPYIN) (UW : UARTWRITE) : CONSOLEWRITE 
       (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ HΦ
     ihave IH := cw_loop EC UW Γ cpu k γl γ γkl γk j pid V M n Q N hj hproc hnoff hlocks
       htier hK huser hal hN hNn (by omega) $$ Hpinv Hport Hkl Hav
-    ihave Hch : consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q 0
+    ihave Hch : consOutChain (genId (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q 0
       (N - 0) $$ [Hch]
     · rw [hnN, Nat.sub_zero]; simp only [Int.toNat_natCast]; iexact Hch
     iapply (cwLoopInv_use cpu cpu k γ j pid V M n Q N k.spie k.spp _ 0 V.upt buf ?hentry)

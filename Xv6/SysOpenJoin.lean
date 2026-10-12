@@ -76,7 +76,7 @@ theorem sys_open_join_bltu (h : BitVec 16) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -84,8 +84,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 set_option maxHeartbeats 32000000 in
 /-- **THE JOIN AT +0x4a AND ARM D-FAIL** (Rocq `so_join_au`). -/
 theorem sys_open_join (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
-    (hAl : ⊢ sysOpenAllocBody (hlc := hlc) Γ k A) (hTD : ⊢ sysOpenTailDBody (hlc := hlc) Γ k A) :
-    ⊢ sysOpenJoinBody (hlc := hlc) Γ k A := by
+    (hAl : ⊢ sysOpenAllocBody Γ k A) (hTD : ⊢ sysOpenTailDBody Γ k A) :
+    ⊢ sysOpenJoinBody Γ k A := by
   unfold sysOpenAllocBody at hAl
   unfold sysOpenTailDBody sysOpenTailCDBody at hTD
   unfold sysOpenJoinBody

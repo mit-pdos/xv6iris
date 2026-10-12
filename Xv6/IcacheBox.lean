@@ -180,7 +180,7 @@ the ambient context keeps only its TIER here, the holder-side rows below
 are at the ambient context itself). -/
 
 section IcacheBoxLam
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- Rocq's `ic_hdr`. -/
@@ -223,7 +223,7 @@ deviation 3). -/
 peel by itself). -/
 private theorem inodeAddrs_morphT [CurCtx] (k : Nat) (l : List (BitVec 32)) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, curTier⟩; inodeAddrs (GF := GF) (ientry k) l) :=
-  ctxMorph_bigSepL l (fun j a ξ => @wordPointsTo hlc GF _ ⟨ξ, curTier⟩ (iAddr (ientry k) j) 4
+  ctxMorph_bigSepL l (fun j a ξ => @wordPointsTo GF _ ⟨ξ, curTier⟩ (iAddr (ientry k) j) 4
     (DFrac.own 1) a) (fun _ _ => instCtxMorphWordAt _ _ _ _ _)
 
 /-- Rocq's `ic_hdr_morph`. -/
@@ -331,7 +331,7 @@ theorem icHdr_splitRdAt [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNa
     (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat) (dev inum : BitVec 32)
     (x : IcX) (s : Qp) (g : GName) (lo : Nat) (ty : BitVec 16) (ξ : CtxId)
     (hE : (↑icacheN : CoPset) ⊆ E) (hk : k < NINODE) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ ityShot g ty -∗ liveGenlo k s g lo -∗
+    ⊢@{IProp GF} itableInv -∗ ityShot g ty -∗ liveGenlo k s g lo -∗
       icHdr cn γfs γi cov logstart k (some (dev, inum)) x ξ -∗
       |={E}=> icHdrHeld cn γfs γi cov logstart k true (some (dev, inum)) x ξ ∗
         icId cn k Qp.quarter true dev inum ∗
@@ -345,7 +345,7 @@ end IcacheBoxLam
 /-! ## THE STITCH'S RESIDUES and THE BOX, per slot -/
 
 section IcacheBoxDef
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE STITCH'S Q -- main's durable-disk ghost that rides the box while a
@@ -511,11 +511,14 @@ def icRegd [Icfg] (k : Nat) (r : SlotReg IcBid IcX) : IProp GF := slotdHalf (icf
 /-- Rocq's `ic_regp`. -/
 def icRegp [Icfg] (k : Nat) (s : L2Reg IcBid) : IProp GF := slotpHalf (icfgBox k) s
 
+omit [MachGS GF] in
 instance icCnt_timeless [Icfg] (k c : Nat) : Timeless (icCnt (GF := GF) k c) := by
   unfold icCnt; infer_instance
+omit [MachGS GF] in
 instance icRegd_timeless [Icfg] (k : Nat) (r : SlotReg IcBid IcX) :
     Timeless (icRegd (GF := GF) k r) := by
   unfold icRegd; infer_instance
+omit [MachGS GF] in
 instance icRegp_timeless [Icfg] (k : Nat) (s : L2Reg IcBid) :
     Timeless (icRegp (GF := GF) k s) := by
   unfold icRegp; infer_instance
@@ -603,6 +606,7 @@ instance icDeposit2_timeless [Icfg] [CurCtx] (k : Nat) (d : IcDep) :
   unfold icDeposit2
   rcases icDepId d with _ | ⟨dev, inum⟩ <;> dsimp only <;> infer_instance
 
+omit [MachGS GF] in
 instance icPayLive_timeless [Icfg] (k : Nat) (d : IcDep) :
     Timeless (icPayLive (GF := GF) k d) := by
   cases d <;> simp only [icPayLive] <;> first | infer_instance | (unfold liveGen; infer_instance)
@@ -623,6 +627,7 @@ theorem icDepMass_ofShr (d : IcDep) (s : Qp) (dev inum : BitVec 32) (g : GName) 
     (h : icDepShr d = some (s, dev, inum, g, lo)) : icDepMass d = s := by
   cases d <;> simp_all [icDepShr, icDepMass]
 
+omit [MachGS GF] in
 /-- Rocq's `ic_pay_live_of_shr`. -/
 theorem icPayLive_ofShr [Icfg] (k : Nat) (d : IcDep) (s : Qp) (dev inum : BitVec 32) (g : GName)
     (lo : Nat) (h : icDepShr d = some (s, dev, inum, g, lo)) :
@@ -831,7 +836,7 @@ end IcacheBoxDef
 /-! ## THE SLEEPLOCK PAYLOAD (the L2 row, `CtxBox.l2Row` at `icTok`) -/
 
 section IcacheSlp
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
 
 /-- THE THIRD FINAL SHAPE (r25; items 16/17): ip->lock's payload also holds
@@ -957,7 +962,7 @@ end IcacheSlp
 /-! ## THE L1 ROW -/
 
 section IcacheSlotRow
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
 
 /-- The slot's row in `itable_res2` -- the register half, shut and empty,
 IDENTITY = the table's `ci !! k` (`none` when unidentified: M-1'), bounded

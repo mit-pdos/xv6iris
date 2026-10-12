@@ -309,10 +309,10 @@ structure WriteiOut (cov : ExtTreeSet Nat compare) (logst bmapstart : Nat)
 
 /-- **THE SET-FORM CONTRACT** (Rocq's `wp_writei_gen_body`).
 `a0 = ip`, `a1 = user_src`, `a2 = src`, `a3 = off`, `a4 = n`. -/
-def wp_writei_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_writei_gen_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (inum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -363,7 +363,7 @@ def wp_writei_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
   -- THE INODE REGION, and this inum's (stale) on-disk record
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   -- THE SOURCE: the running block on the user arm, the caller's buffer and
   -- the pid share on the kernel arm (ONE OR THE OTHER, never both)
   (if user then procPrivBareAt curCtx (procAddr j) pidv V M
@@ -399,10 +399,10 @@ def wp_writei_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 /-- The eb-generic form of `wp_writei_gen_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_writei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_writei_gen_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (inum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -453,7 +453,7 @@ def wp_writei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
   -- THE INODE REGION, and this inum's (stale) on-disk record
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   -- THE SOURCE: the running block on the user arm, the caller's buffer and
   -- the pid share on the kernel arm (ONE OR THE OTHER, never both)
   (if user then procPrivBareAt curCtx (procAddr j) pidv V M
@@ -489,10 +489,10 @@ def wp_writei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
 /-- The interface of `writei` (Rocq's `Module Type WRITEI`, less the dropped
 counted form). -/
 structure WRITEI : Prop where
-  wp_writei_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_writei_gen_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (inum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -501,7 +501,7 @@ structure WRITEI : Prop where
     (pidv : BitVec 32) (dqp dqs dqd dqn dqi dqb dqz : DFrac)
     hj hproc hK hnoff htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
     hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4,
-    wp_writei_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip inum bm data
+    wp_writei_gen_eb_body (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip inum bm data
       dn dn0 user off n sbs V M ncount Sb pidv dqp dqs dqd dqn dqi dqb dqz
       hj hproc hK hnoff htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
       hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4

@@ -122,7 +122,7 @@ theorem prepare_return_tf_kernel_words (ws : List (BitVec 64)) (ksat ksp kh : Bi
   refine ⟨?_, ?_, ?_, ?_⟩ <;> simp [hlen]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- What the caller BRINGS (Rocq `trap_csrs_ext`): nothing at `sie = true`
 (the `csrci` pays it out of the arm), the trap CSRs and the installed
@@ -139,7 +139,7 @@ end
 
 /-- **WP of `prepare_return`**, at either entry `SIE`, leaving at `SIE = 0`
 on whichever hart the thread landed on. -/
-def wp_prepare_return_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_prepare_return_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -164,12 +164,12 @@ def wp_prepare_return_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
 
 /-- The interface of `prepare_return`. -/
 structure PREPARE_RETURN : Prop where
-  wp_prepare_return : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_prepare_return : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (epc : BitVec 64) hproc hnoff htier hK hepc,
-    wp_prepare_return_body (hlc := hlc) (GF := GF) cpu k γ pa pid V M epc hproc hnoff htier hK hepc
+    wp_prepare_return_body (GF := GF) cpu k γ pa pid V M epc hproc hnoff htier hK hepc
 
 end Xv6

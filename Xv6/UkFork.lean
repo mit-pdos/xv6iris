@@ -55,7 +55,7 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section UkFork
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -73,18 +73,18 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
     (hn : usysno m = USYS_fork) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ Rc -∗ P N.t N.d N.s -∗ usz N.s sz -∗ ustdAt N.fd l v -∗
       ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗ ucwd N.cwd c -∗ uch N.ch Sc -∗
-      □ (uKillCred (hlc := hlc) -∗ Q (-1)) -∗ urun (hlc := hlc) N h m pc avail -∗
+      □ (uKillCred -∗ Q (-1)) -∗ urun N h m pc avail -∗
       ((∀ (h' : CPU) (r : BitVec 64), ⌜r ≠ 0#64⌝ -∗
           ((⌜r = -1#64⌝ ∗ uch N.ch Sc ∗ Rc) ∨
             ∃ (γ : GName) (pidv : BitVec 32), ⌜r = BitVec.signExtend 64 pidv⌝ ∗
               ⌜1 ≤ pidv.toNat ∧ pidv.toNat ≤ PIDMAX⌝ ∗ ⌜γ ∉ Sc⌝ ∗ childTok γ pidv Q ∗
               uch N.ch (Sc ∪ {γ})) -∗
           P N.t N.d N.s -∗ usz N.s sz -∗ ustdAt N.fd l v -∗ ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗
-          ucwd N.cwd c -∗ urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') ∗
+          ucwd N.cwd c -∗ urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') ∗
         (∀ (N' : UkNames GF) (h' : CPU) (γ' : GName), ⌜N'.pay = Q⌝ -∗ myPay γ' Q -∗ Rc -∗
           P N'.t N'.d N'.s -∗ usz N'.s sz -∗ ustdAt N'.fd l v -∗ ([∗map] fd ↦ st ∈ D, ufd N'.fd fd st) -∗
           ucwd N'.cwd c -∗ uch N'.ch ∅ -∗ (∃ p : Int, ⌜p ≠ 1⌝ ∗ upid N'.pid p) -∗
-          urun (hlc := hlc) N' h' (ukWr m 10#5 0#64) (pc + 4#64) avail -∗ wpLoop h')) -∗
+          urun N' h' (ukWr m 10#5 0#64) (pc + 4#64) avail -∗ wpLoop h')) -∗
       wpLoop h := by
   iintro #Hi HRc HP Hsz Hstd HD Hcwd Hchf #Hkw Hrun ⟨Hpar, Hchild⟩
   unfold urun
@@ -120,8 +120,8 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
   -- the trap
   let S : UkSec GF := ⟨h, C, pt, Rfd, Rut, pm, sz, N.pay⟩
   let K : UkKey := ⟨fdv, c, gn, Sc, pidv⟩
-  have hS : @UkSec.ok hlc GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
-  have H := @UK_LEAVES.wp_uk_ecall UL hlc GF _ _ _ xi S K M m pc hS hui
+  have hS : @UkSec.ok GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
+  have H := @UK_LEAVES.wp_uk_ecall UL GF _ _ _ xi S K M m pc hS hui
   unfold ukUvb ukRunKey at H
   dsimp only [S, K] at H
   iapply H $$ Hb Hmy
@@ -227,7 +227,7 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
     rw [← ukWr_ne0 m 10#5 0#64 (by decide)]
     ihave Hids' := urunIds_intro N' ∅ pidc $$ [Hcha' Hpida']
     · iframe Hcha' Hpida'
-    ihave #Hrows' := (show urunRows (hlc := hlc) N fdv ⊢ urunRows (hlc := hlc) N' fdv from .rfl) $$ Hrows
+    ihave #Hrows' := (show urunRows N fdv ⊢ urunRows N' fdv from .rfl) $$ Hrows
     iapply urun_close_wr N' M pm m 10#5 0#64 sz fdv c g' ∅ pidc (pc + 4#64) avail Xv6.a0_ns hx0
       $$ Hheap' Hstk' Hufd' Hcwa' Hids' Hmp Hdep Hrows'
     iintro %h' Hrun

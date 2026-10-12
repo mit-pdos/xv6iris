@@ -61,18 +61,18 @@ def consoleintrAddr : BitVec 64 := KA.«consoleintr»
 def consoleintrSlots : Nat := 26
 
 /-- **WP of `consoleintr`.**  The byte in `a0`. -/
-def wp_consoleintr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_consoleintr_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γc γl : GName) (γ : UartNames)
     (hb : List Obs) (cb : BitVec 8) (hh hg : Option (List Obs))
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : consoleintrSlots ≤ k.avail)
     (hlk : "cons" ∉ k.locks ∧ "proc" ∉ k.locks ∧ "uart0" ∉ k.locks)
     (htier : k.tier = KTier.kpt)
     (ha0 : k.regs 10#5 = BitVec.setWidth 64 cb)
-    (hends : obsEndsIn .uart0 hb cb) (hboots : obsBoots hb = genId (hlc := hlc) (GF := GF) + 1)
+    (hends : obsEndsIn .uart0 hb cb) (hboots : obsBoots hb = genId (GF := GF) + 1)
     (hx : ohistExt hh hb) (hxg : ohistExt hg hb)
     (hshb : traceShape hb true) (hnext : k1Next hg hb) : Prop :=
   kctx cpu k ∗ pcIs cpu consoleintrAddr ∗ procsInv Γ ∗ consoleCaps γc γl γ ∗
-  MachFixedGS.rxTag (hlc := hlc) (GF := GF) hb ∗ obsHistLb hb ∗
+  MachFixedGS.rxTag (GF := GF) hb ∗ obsHistLb hb ∗
   outLb γ (obsWire .uart0 (openSeg hb)) ∗
   rxHi γ (1 : Qp).half hh ∗ logHi γ (1 : Qp).half hg ∗ uartArm γ (1 : Qp).half none ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -85,11 +85,11 @@ def wp_consoleintr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 
 /-- The interface of `consoleintr`. -/
 structure CONSOLEINTR : Prop where
-  wp_consoleintr : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  wp_consoleintr : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γc γl : GName) (γ : UartNames)
     (hb : List Obs) (cb : BitVec 8) (hh hg : Option (List Obs))
     hnoff hK hlk htier ha0 hends hboots hx hxg hshb hnext,
-    wp_consoleintr_body (hlc := hlc) (GF := GF) Γ cpu k γc γl γ hb cb hh hg hnoff hK hlk htier ha0
+    wp_consoleintr_body (GF := GF) Γ cpu k γc γl γ hb cb hh hg hnoff hK hlk htier ha0
       hends hboots hx hxg hshb hnext
 
 end Xv6

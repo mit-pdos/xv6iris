@@ -154,7 +154,7 @@ theorem sys_open_fetched_path (Mim : Nat → List (BitVec 8)) (pv : Nat)
   · rw [hbs, sys_open_bview_pre]; exact hpo
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -165,7 +165,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 
 /-- The shared wrappers' environment, out of sys_open's. -/
 theorem sys_open_sysfileEnv (Γ : SchedNames) (A : SysOpenArgs GF) :
-    sysOpenEnv (hlc := hlc) Γ A ⊢ sysfileEnv (hlc := hlc) Γ := by
+    sysOpenEnv Γ A ⊢ sysfileEnv Γ := by
   unfold sysOpenEnv sysfileEnv
   iintro #⟨Hpi, Hpe, Hrdy, -⟩
   iframe #
@@ -189,13 +189,13 @@ def sysOpenAt36 (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) (EXTRA : IProp
       R 15#5 = soAnd (sysOpenOm A) 512⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x36#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 -∗
     byteBuf (sysOpenPath (k.regs 2#5)) (DFrac.own 1) (bview 128 bp) -∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
     logOpS icfgLog MAXOPBLOCKS Sb -∗ logTx icfgLog -∗
     bslots 3 -∗ irefSlots A.ns -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
-    EXTRA -∗ (∀ c' : CPU, sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS c') -∗
+    EXTRA -∗ (∀ c' : CPU, sysOpenK k A.ns A.V A.M ARMS c') -∗
     wpLoop c)
 
 /-- ARM 0's receipt, per side: the bundle comes home UNSPENT beside the block
@@ -213,11 +213,11 @@ set_option maxHeartbeats 32000000 in
 argstr's answer -- ARM 0 straight to the epilogue (the bundle unspent), or
 the s1 save, `begin_op()`, the omode load and its O_CREATE mask; then the
 state at +0x36. -/
-theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
     (EXTRA : IProp GF) (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF)
     (harm0 : sysOpenArm0 A EXTRA ARMS)
-    (h36 : ⊢ sysOpenAt36 (hlc := hlc) Γ k A EXTRA ARMS)
+    (h36 : ⊢ sysOpenAt36 Γ k A EXTRA ARMS)
     (P2 : UPtd) (spie spp : Bool) (R : RegMap) (old bs : List (BitVec 8))
     (w3 w4 w5 w6 : BitVec 64) (lo : BitVec 32) (w24 : BitVec 64)
     (hct : curTier = KTier.kpt)
@@ -225,12 +225,12 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
     (hold : old.length = 128) (hret : fetchstrRet (sysOpenIm A) A.v.toNat old bs (R 10#5)) :
     kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) ∗ pcIs cpu (sysOpenAddr + 0x20#64) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv Γ A ∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w3 w4 w5 w6 lo (sysOpenOm A) w24 ∗
     byteBuf (sysOpenPath (k.regs 2#5)) (DFrac.own 1) bs ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     bslots 3 ∗ irefSlots A.ns ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
-    EXTRA ∗ (∀ c' : CPU, sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS c')
+    EXTRA ∗ (∀ c' : CPU, sysOpenK k A.ns A.V A.M ARMS c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hblk, Hbs, Hir, Hfd, Hfr, Hx, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -360,22 +360,22 @@ set_option maxHeartbeats 32000000 in
 `argstr(0, path, 128)` over the bare block (the block re-closes at argstr's
 grown page table); then `sys_open_fetched`. -/
 theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
     (EXTRA : IProp GF) (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF)
     (harm0 : sysOpenArm0 A EXTRA ARMS)
-    (h36 : ∀ kv : Nat, ⊢ sysOpenAt36 (hlc := hlc) Γ k (A.raise kv) EXTRA ARMS)
+    (h36 : ∀ kv : Nat, ⊢ sysOpenAt36 Γ k (A.raise kv) EXTRA ARMS)
     (spie spp : Bool) (R : RegMap) (w3 w4 w5 w6 : BitVec 64) (lo om : BitVec 32) (w24 : BitVec 64)
     (hct : curTier = KTier.kpt)
     (hpins : sysOpenPins k R (k.regs 9#5) (k.regs 18#5) (k.regs 19#5))
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0) :
     kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) ∗ pcIs cpu (sysOpenAddr + 0x8#64) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv Γ A ∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w3 w4 w5 w6 lo om w24 ∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
     bslots 3 ∗ irefSlots A.ns ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
-    EXTRA ∗ (∀ c' : CPU, sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS c')
+    EXTRA ∗ (∀ c' : CPU, sysOpenK k A.ns A.V A.M ARMS c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hblk, Hbs, Hir, Hfd, Hfr, Hx, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -466,7 +466,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
   ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) %kv Hbare
   -- argstr lent the block's counter (permit sweep L1b): the rest of the run
   -- is at the record it came back at (Rocq's `UA`)
-  ihave HΦ : (∀ c' : CPU, sysOpenK (hlc := hlc) k (A.raise kv).ns (A.raise kv).V (A.raise kv).M
+  ihave HΦ : (∀ c' : CPU, sysOpenK k (A.raise kv).ns (A.raise kv).V (A.raise kv).M
       ARMS c') $$ [HΦ]
   · iintro %c'
     ispecialize HΦ $$ %c'
@@ -477,7 +477,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
     refine sysOpenPins_cs k _ R1 _ _ _ ?_ hcs1
     repeat (refine sysOpenPins_set _ _ _ _ _ _ _ ?_ (by decide))
     exact hp2
-  ihave #Henv' := (show sysOpenEnv (hlc := hlc) (GF := GF) Γ A ⊢ sysOpenEnv Γ (A.raise kv)
+  ihave #Henv' := (show sysOpenEnv (GF := GF) Γ A ⊢ sysOpenEnv Γ (A.raise kv)
     from .rfl) $$ Henv
   ihave Hblk := (show procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid { A.V.updEv kv with upt := P2 }
       (viewFaulted A.V.upt P2 A.M) ⊢
@@ -499,23 +499,23 @@ record `A`) and generic in the side's bundle `EXTRA` / arms `ARMS`: the
 contract's continuation made hart-free, the prologue, then
 `sys_open_args`. -/
 theorem sys_open_entry (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
     (EXTRA : IProp GF) (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF)
     (harm0 : sysOpenArm0 A EXTRA ARMS)
-    (h36 : ∀ kv : Nat, ⊢ sysOpenAt36 (hlc := hlc) Γ k (A.raise kv) EXTRA ARMS) :
+    (h36 : ∀ kv : Nat, ⊢ sysOpenAt36 Γ k (A.raise kv) EXTRA ARMS) :
     kctx cpu k ∗ pcIs cpu sysOpenAddr ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗ isFtable A.γl A.γ ∗
+    procsInv Γ ∗ panicEnv ∗ fsReady ∗ isFtable A.γl A.γ ∗
     bslots 3 ∗ irefSlots A.ns ∗ fdSlot ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗ fdFrags A.V.fdg A.sts ∗
-    EXTRA ∗ wpNext true k.proc cpu (sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS)
+    EXTRA ∗ wpNext true k.proc cpu (sysOpenK k A.ns A.V A.M ARMS)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Hpi, #Hpe, #Hrdy, #Hft, Hbs, Hir, Hfd, Hblk, Hfr, Hx, Hnext⟩
   icases kctx_tier cpu _ $$ Hk with ⟨%hct0, Hk⟩
   have hct : curTier = KTier.kpt := hct0.symm.trans hS.htier
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave #Henv : sysOpenEnv (hlc := hlc) Γ A $$ []
+  ihave #Henv : sysOpenEnv Γ A $$ []
   · unfold sysOpenEnv; iframe #
   -- THE CONTRACT'S CONTINUATION, hart-free
   ihave HΦ := sys_open_post_pin k A hS cpu ARMS $$ Hnext

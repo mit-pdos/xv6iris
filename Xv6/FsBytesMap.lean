@@ -162,7 +162,7 @@ theorem mapSeq_dom_eq (start : Nat) (xs ys : List (BitVec 8)) (hlen : xs.length 
   rw [h]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBytesG GF]
 
 /-! ## The run as a `[∗map]` -/
 

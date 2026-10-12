@@ -38,32 +38,32 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 set_option synthInstance.maxSize 1024
 
 section UnionLinkInstAt
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF] [Fscfg]
 
 /-! ## 1. The parameters at `s0` -/
 
 /-- Rocq `uf0w_at_bwk`. -/
 theorem uf0wAt_bwk (ug : UnionGn) (s0 : Fstate) (k : Nat) (s : Fstate) :
-    ⊢ f0wAt (hlc := hlc) (GF := GF) ug.ugnFile s0 k s -∗ uf0bwk ug k s := by
+    ⊢ f0wAt (GF := GF) ug.ugnFile s0 k s -∗ uf0bwk ug k s := by
   unfold f0wAt
   iintro ⟨H, -⟩
   iapply uf0w_bwk ug k s $$ H
 
 /-- Rocq `uf0w_at_bwk0`. -/
 theorem uf0wAt_bwk0 (ug : UnionGn) (s0 : Fstate) (k : Nat) (s : Fstate) :
-    ⊢ f0wAt (hlc := hlc) (GF := GF) ug.ugnFile s0 k s -∗
-      uf0bwk ug (genId (hlc := hlc) (GF := GF) + 1) s := by
+    ⊢ f0wAt (GF := GF) ug.ugnFile s0 k s -∗
+      uf0bwk ug (genId (GF := GF) + 1) s := by
   unfold f0wAt
   iintro ⟨H, -⟩
   iapply uf0w_bwk0 ug k s $$ H
 
 /-- THE UNION TIER'S PARAMETERS AT A NAMED BOOT STATE (Rocq
 `union_params_at`). -/
-noncomputable def unionParamsAt (ug : UnionGn) (s0 : Fstate) : GenParams hlc GF ulmG where
+noncomputable def unionParamsAt (ug : UnionGn) (s0 : Fstate) : GenParams GF ulmG where
   gL := ulmG_laws
   gK := ulmGHooks
-  gT := fileTaint (hlc := hlc) ug.ugnFile.fgnCl
+  gT := fileTaint ug.ugnFile.fgnCl
   gT_pers := inferInstance
   gT_tl := inferInstance
   gPIN := eraPin (fgnEcho ug.ugnFile)
@@ -76,7 +76,7 @@ noncomputable def unionParamsAt (ug : UnionGn) (s0 : Fstate) : GenParams hlc GF 
   gWb := uf0bwk ug
   gWb_pers := fun _ _ => inferInstance
   gWb_tl := fun _ _ => inferInstance
-  gk0 := genId (hlc := hlc) (GF := GF) + 1
+  gk0 := genId (GF := GF) + 1
   gW_bw := uf0wAt_bwk ug s0
   gW_bw0 := uf0wAt_bwk0 ug s0
   gWb_agree := uf0bwk_agree ug
@@ -94,26 +94,26 @@ noncomputable def unionParamsAt (ug : UnionGn) (s0 : Fstate) : GenParams hlc GF 
   gR_exf := upr_exf ug
 
 theorem unionParamsAt_gR (ug : UnionGn) (s0 : Fstate) :
-    (unionParamsAt (hlc := hlc) (GF := GF) ug s0).gR = upr ug := rfl
+    (unionParamsAt (GF := GF) ug s0).gR = upr ug := rfl
 theorem unionParamsAt_gT (ug : UnionGn) (s0 : Fstate) :
-    (unionParamsAt (hlc := hlc) (GF := GF) ug s0).gT = fileTaint (hlc := hlc) ug.ugnFile.fgnCl := rfl
+    (unionParamsAt (GF := GF) ug s0).gT = fileTaint ug.ugnFile.fgnCl := rfl
 theorem unionParamsAt_gPIN (ug : UnionGn) (s0 : Fstate) :
-    (unionParamsAt (hlc := hlc) (GF := GF) ug s0).gPIN = eraPin (fgnEcho ug.ugnFile) := rfl
+    (unionParamsAt (GF := GF) ug s0).gPIN = eraPin (fgnEcho ug.ugnFile) := rfl
 theorem unionParamsAt_gW (ug : UnionGn) (s0 : Fstate) :
-    (unionParamsAt (hlc := hlc) (GF := GF) ug s0).gW = f0wAt ug.ugnFile s0 := rfl
+    (unionParamsAt (GF := GF) ug s0).gW = f0wAt ug.ugnFile s0 := rfl
 theorem unionParamsAt_gWb (ug : UnionGn) (s0 : Fstate) :
-    (unionParamsAt (hlc := hlc) (GF := GF) ug s0).gWb = uf0bwk ug := rfl
+    (unionParamsAt (GF := GF) ug s0).gWb = uf0bwk ug := rfl
 theorem unionParamsAt_gk0 (ug : UnionGn) (s0 : Fstate) :
-    (unionParamsAt (hlc := hlc) (GF := GF) ug s0).gk0 = genId (hlc := hlc) (GF := GF) + 1 := rfl
+    (unionParamsAt (GF := GF) ug s0).gk0 = genId (GF := GF) + 1 := rfl
 theorem unionParamsAt_gH (ug : UnionGn) (s0 : Fstate) :
-    (unionParamsAt (hlc := hlc) (GF := GF) ug s0).gH = fheadAt ug.ugnFile s0 := rfl
+    (unionParamsAt (GF := GF) ug s0).gH = fheadAt ug.ugnFile s0 := rfl
 theorem unionParamsAt_gwild (ug : UnionGn) (s0 : Fstate) :
-    (unionParamsAt (hlc := hlc) (GF := GF) ug s0).gwild =
+    (unionParamsAt (GF := GF) ug s0).gwild =
       fun I => uwild (lmLineAt ulmG I) = true := rfl
 
 /-- The links entail the interface at `s0` (Rocq `union_links_gl_at`). -/
 theorem union_links_gl_at (ug : UnionGn) (s0 : Fstate) :
-    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗ glinks (unionParamsAt (hlc := hlc) ug s0) := by
+    ⊢ unionLinks (GF := GF) ug -∗ glinks (unionParamsAt ug s0) := by
   iintro Hlk
   ihave %hc := unionLinks_eq ug $$ Hlk
   unfold glinks glW glBlk glPro glHead glTaint
@@ -180,7 +180,7 @@ theorem union_links_gl_at (ug : UnionGn) (s0 : Fstate) :
 
 /-- Rocq `union_links_gl_w_at`. -/
 theorem union_links_gl_w_at (ug : UnionGn) (s0 : Fstate) :
-    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗ glW (unionParamsAt (hlc := hlc) ug s0) := by
+    ⊢ unionLinks (GF := GF) ug -∗ glW (unionParamsAt ug s0) := by
   iintro Hlk
   ihave H := union_links_gl_at ug s0 $$ Hlk
   unfold glinks
@@ -189,7 +189,7 @@ theorem union_links_gl_w_at (ug : UnionGn) (s0 : Fstate) :
 
 /-- Rocq `union_links_gl_blk_at`. -/
 theorem union_links_gl_blk_at (ug : UnionGn) (s0 : Fstate) :
-    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗ glBlk (unionParamsAt (hlc := hlc) ug s0) := by
+    ⊢ unionLinks (GF := GF) ug -∗ glBlk (unionParamsAt ug s0) := by
   iintro Hlk
   ihave H := union_links_gl_at ug s0 $$ Hlk
   unfold glinks
@@ -199,8 +199,8 @@ theorem union_links_gl_blk_at (ug : UnionGn) (s0 : Fstate) :
 /-- The taint's byte at the era's own number, for a device at it (Rocq
 `union_links_gl_taint_at`). -/
 theorem union_links_gl_taint_at (ug : UnionGn) (s0 : Fstate) :
-    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
-      glTaintAt (unionParamsAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) := by
+    ⊢ unionLinks (GF := GF) ug -∗
+      glTaintAt (unionParamsAt ug s0) (genId (GF := GF) + 1) := by
   iintro Hlk
   ihave %hc := unionLinks_eq ug $$ Hlk
   unfold glTaintAt
@@ -213,11 +213,11 @@ theorem union_links_gl_taint_at (ug : UnionGn) (s0 : Fstate) :
 
 /-- Rocq `uturn0_at`. -/
 theorem uturn0_at (ug : UnionGn) (s0 : Fstate) (k : Nat) :
-    ⊢ fturnPreAt (hlc := hlc) (GF := GF) ug.ugnFile s0 k -∗
+    ⊢ fturnPreAt (GF := GF) ug.ugnFile s0 k -∗
       (∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) k v ∗ dlCnt v (1 : Qp).half 0 ∗ inpLb v []
         ∗ rposAuth v 0)
       ∗ (∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) k v
-          ∗ gwcBan (unionParamsAt (hlc := hlc) ug s0) k v [] 0) := by
+          ∗ gwcBan (unionParamsAt ug s0) k v [] 0) := by
   unfold fturnPreAt fturnCore
   iintro ⟨%hk, ⟨%v, %vf, #Hpin, #Hvf, Htn, Hdl, #Hcs, #Hps, #HE, Hrp⟩, Hpre⟩
   isplitl [Hdl Hrp]
@@ -244,7 +244,7 @@ theorem uturn0_at (ug : UnionGn) (s0 : Fstate) (k : Nat) :
 /-- The residue is the unindexed record's: the reader's witness is the same
 at both parameter records (Rocq `urresw_res_at`). -/
 theorem urresw_res_at (ug : UnionGn) (s0 : Fstate) (v : EraPins) (I : List (BitVec 8)) :
-    ⊢ urresw (hlc := hlc) (GF := GF) ug v I -∗ gwcRres (unionParamsAt (hlc := hlc) ug s0) v I := by
+    ⊢ urresw (GF := GF) ug v I -∗ gwcRres (unionParamsAt ug s0) v I := by
   unfold urresw gwcRres
   simp only [unionParams_gWb, unionParams_gk0, unionParamsAt_gWb, unionParamsAt_gk0]
   iintro ⟨H, -⟩
@@ -255,16 +255,16 @@ theorem urresw_res_at (ug : UnionGn) (s0 : Fstate) (v : EraPins) (I : List (BitV
 /-- Rocq `union_X_at`. -/
 noncomputable def unionXAt (ug : UnionGn) (s0 : Fstate) (k : Nat) (v : EraPins)
     (I : List (BitVec 8)) : IProp GF :=
-  iprop(unionX (hlc := hlc) ug k v I ∗ f0cw ug.ugnFile k s0)
+  iprop(unionX ug k v I ∗ f0cw ug.ugnFile k s0)
 
 instance unionXAt_timeless (ug : UnionGn) (s0 : Fstate) (k : Nat) (v : EraPins)
-    (I : List (BitVec 8)) : Timeless (unionXAt (hlc := hlc) (GF := GF) ug s0 k v I) := by
+    (I : List (BitVec 8)) : Timeless (unionXAt (GF := GF) ug s0 k v I) := by
   unfold unionXAt; infer_instance
 
 /-- The writer's witness agrees with the claim's at an era (inlined in Rocq's
 `union_X_dollar_at`; deviation 3). -/
 theorem uf0w_cw_agree (ug : UnionGn) (k : Nat) (s s0 : Fstate) :
-    ⊢ f0w (hlc := hlc) (GF := GF) ug.ugnFile k s -∗ f0cw ug.ugnFile k s0 -∗ ⌜s = s0⌝ := by
+    ⊢ f0w (GF := GF) ug.ugnFile k s -∗ f0cw ug.ugnFile k s0 -∗ ⌜s = s0⌝ := by
   unfold f0w f0cw
   iintro ⟨-, %vf, #Hvf, #Hlb⟩ ⟨%vf', #Hvf', #Hlb'⟩
   ihave %he := fileEraPin_agree $$ [Hvf Hvf']
@@ -280,9 +280,9 @@ theorem uf0w_cw_agree (ug : UnionGn) (k : Nat) (s s0 : Fstate) :
 /-- Rocq `union_X_dollar_at`. -/
 theorem union_X_dollar_at (ug : UnionGn) (s0 : Fstate) (k : Nat) (v : EraPins)
     (I : List (BitVec 8)) (b : BitVec 8) (Φ : IProp GF) (hb : b = uPrompt[0]!) :
-    ⊢ eraPin (fgnEcho ug.ugnFile) k v -∗ unionLinks (hlc := hlc) ug -∗
-      unionXAt (hlc := hlc) ug s0 k v I -∗
-      (gwcSpT (unionParamsAt (hlc := hlc) ug s0) k v I -∗ Φ) -∗ outLink .uart0 k b Φ := by
+    ⊢ eraPin (fgnEcho ug.ugnFile) k v -∗ unionLinks ug -∗
+      unionXAt ug s0 k v I -∗
+      (gwcSpT (unionParamsAt ug s0) k v I -∗ Φ) -∗ outLink .uart0 k b Φ := by
   unfold unionXAt
   iintro #Hpin #Hlk ⟨Hx, #Hw0⟩ HΦ
   iapply union_X_dollar ug k v I b Φ hb $$ Hpin Hlk Hx
@@ -308,7 +308,7 @@ theorem union_X_dollar_at (ug : UnionGn) (s0 : Fstate) (k : Nat) (v : EraPins)
 /-! ## 4. The record -/
 
 /-- THE UNION'S LINK RECORD AT A NAMED BOOT STATE (Rocq `union_link_inst_at`). -/
-noncomputable def unionLinkInstAt (ug : UnionGn) (s0 : Fstate) : LinkRec hlc GF :=
+noncomputable def unionLinkInstAt (ug : UnionGn) (s0 : Fstate) : LinkRec GF :=
   genLinkInst (unionParamsAt ug s0) (unionXAt ug s0) (unionLinks ug) (union_links_gl_at ug s0)
     (fun k v I b Φ hb => union_X_dollar_at ug s0 k v I b Φ hb) (ureadRet ug) (uread_ret_res ug)
     (fturnPreAt ug.ugnFile s0) (uturn0_at ug s0) (urresw ug) (urresw_res_at ug s0)

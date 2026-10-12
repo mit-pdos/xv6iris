@@ -2308,7 +2308,7 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- One read-only byte: the boot image's, never written. -/
 def dataByte (p : Nat × Nat) : IProp GF := imgBytes (BitVec.ofNat 64 p.1) 1 (BitVec.ofNat 8 p.2)

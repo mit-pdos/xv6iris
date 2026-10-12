@@ -300,7 +300,7 @@ so Rocq's middle three lines (name it, pin it with
 `inode_ref_short_shr_genlo_agree`) are `sys_open_shr_held`. -/
 
 section Publish
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
   [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
 
 /-- THE OTHER SIDE OF THE PUBLICATION: opening the fresh slot (Rocq
@@ -467,7 +467,7 @@ theorem sys_open_trunc_rec_local (dn : Dinode) (hrl : inodeRecLocal dn) :
   inodeRecLocal_sameType dn (diTrunc dn) hrl rfl hrl.2.1 (fun _ => by simp [diTrunc])
 
 section Trunc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- ...and the close direction at itrunc's outputs (Rocq
@@ -497,13 +497,13 @@ end Trunc
 /-! ## §2.  THE FRAME: 192 bytes, TWENTY-FOUR slots -/
 
 /-- A cell's address, moved along an equation (the carve's literal sums). -/
-theorem sys_open_cell_eq [CurCtx] {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+theorem sys_open_cell_eq [CurCtx] {GF : BundledGFunctors.{0}} [MachGS GF]
     (a b : BitVec 64) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) (h : a = b) :
     wordPointsTo (GF := GF) a n dq w ⊢ wordPointsTo b n dq w := by
   rw [h]
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-- A buffer of `n` bytes at `a`, contents unknown. -/
@@ -767,7 +767,7 @@ theorem sysOpenPins_exit (k : KCtx) (R : RegMap)
 /-! ### The ambient context, pinned at the kernel tier -/
 
 section Exit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **THE JOIN POINT `+0xca`** (Rocq `so_epilogue`): every arm arrives here
@@ -885,7 +885,7 @@ argstr reads its string.  `A.M` itself when the block has no lazy page. -/
 abbrev sysOpenIm {GF : BundledGFunctors.{0}} (A : SysOpenArgs GF) : Nat → List (BitVec 8) := viewLazy A.V.upt A.V.sz A.M
 
 section Vocab
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -894,34 +894,34 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 `sysLinkEnv` / `createEnv` idiom; deviation 4): the scheduler's invariant,
 the panic environment, the file system and the file table. -/
 def sysOpenEnv (Γ : SchedNames) (A : SysOpenArgs GF) : IProp GF :=
-  iprop(procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗ isFtable A.γl A.γ)
+  iprop(procsInv Γ ∗ panicEnv ∗ fsReady ∗ isFtable A.γl A.γ)
 
 instance sysOpenEnv_persistent (Γ : SchedNames) (A : SysOpenArgs GF) :
-    Persistent (sysOpenEnv (hlc := hlc) (GF := GF) Γ A) := by
+    Persistent (sysOpenEnv (GF := GF) Γ A) := by
   unfold sysOpenEnv; infer_instance
 
 /-- The contract's continuation at the PLAIN arms, hart-free (Rocq's
 `so_cont_au` / `so_cont0_au`, which are `SpecSysOpen.sysOpenK` at
 `openArmsPlain`; deviation 3). -/
 abbrev sysOpenPostP (k : KCtx) (A : SysOpenArgs GF) (c : CPU) : IProp GF :=
-  sysOpenK (hlc := hlc) k A.ns A.V A.M
-    (openArmsPlain (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
+  sysOpenK k A.ns A.V A.M
+    (openArmsPlain A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts) c
 
 /-- ...and at the CREATE arms (Rocq's `so_cont0_au_create`). -/
 abbrev sysOpenPostC (k : KCtx) (A : SysOpenArgs GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (c : CPU) : IProp GF :=
-  sysOpenK (hlc := hlc) k A.ns A.V A.M
-    (openArmsCreate (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
+  sysOpenK k A.ns A.V A.M
+    (openArmsCreate A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts) c
 
 /-- The contract's `wpNext` continuation, HART-FREE (a `true` crossing at a
 process pins nothing; `CreateSharedBody.create_post_pin`). -/
 theorem sys_open_post_pin (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
     (cpu : CPU) (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) :
-    wpNext true k.proc cpu (sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS) ⊢
-      ∀ c : CPU, sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS c := by
+    wpNext true k.proc cpu (sysOpenK k A.ns A.V A.M ARMS) ⊢
+      ∀ c : CPU, sysOpenK k A.ns A.V A.M ARMS c := by
   iintro H %c
   iapply (wpNext_at true k.proc cpu c _ (fun h => h.elim (fun h => absurd h (by decide))
     (fun h => absurd h (by rw [hS.hproc]; exact procAddr_nonzero hS.hj)))) $$ H
@@ -933,7 +933,7 @@ count at least `V.ev`, takes any count at least `kv`. -/
 theorem sysOpenK_raise (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (c : CPU) (kv : Nat)
     (hkv : V.ev ≤ kv) :
-    sysOpenK (hlc := hlc) k ns V M ARMS c ⊢ sysOpenK (hlc := hlc) k ns (V.updEv kv) M ARMS c := by
+    sysOpenK k ns V M ARMS c ⊢ sysOpenK k ns (V.updEv kv) M ARMS c := by
   unfold sysOpenK
   iintro H %spie %spp %R' %P' %k' %hcs %hext %hk'
   iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %(Nat.le_trans hkv hk')
@@ -942,7 +942,7 @@ theorem sysOpenK_raise (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (B
 `upd_ev_id`): the continuation's old shape. -/
 theorem sysOpenK_same (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (c : CPU) :
-    sysOpenK (hlc := hlc) k ns V M ARMS c ⊢
+    sysOpenK k ns V M ARMS c ⊢
       ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
         ⌜calleeSaved k.regs R'⌝ -∗ ⌜V.upt.extSz V.sz P'⌝ -∗
         kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
@@ -1102,7 +1102,7 @@ def sysOpenResidue (A : SysOpenArgs GF) (pl : List (BitVec 8)) (inum : BitVec 32
     -- which rides the kept piece's refund at O_TRUNC
     curKept A.vom A.P (pathElems pl).length inum.toNat ∗
     sysOpenObs A.Fo inum.toNat (eraNode dn bm data) ∗
-    plainTruncKept (hlc := hlc) (fsGammaL fscFs) A.vom pl A.P inum.toNat A.Ft)
+    plainTruncKept (fsGammaL fscFs) A.vom pl A.P inum.toNat A.Ft)
 
 end Vocab
 
@@ -1114,7 +1114,7 @@ sys_open goes through ONE argstr wrapper (the coordinator's ruling, Sept
 (`sysOpenIm`; `SpecSysOpen` deviation 10). -/
 
 section Argstr
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -1132,7 +1132,7 @@ theorem sys_open_argstr (AS : ARGSTR) (Γ : SchedNames) (A : SysOpenArgs GF) (cp
     (hK : argstrSlots ≤ k'.avail)
     (hmax : k'.regs 12#5 = BitVec.ofNat 64 old.length) (hmax' : old.length < 2 ^ 31) :
     kctx cpu k' ∗ pcIs cpu KA.«argstr» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv Γ A ∗
     procPrivBareAt curCtx pa A.pid V M ∗ byteBuf (k'.regs 11#5) (DFrac.own 1) old ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
@@ -1150,7 +1150,7 @@ theorem sys_open_argstr (AS : ARGSTR) (Γ : SchedNames) (A : SysOpenArgs GF) (cp
   unfold sysOpenEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy, #Hft⟩
   icases fsReady_kmem $$ Hrdy with ⟨#Hkl, #Hav⟩
-  have h := AS.wp_argstr (hlc := hlc) (GF := GF) cpu k' fscKalloc fsReadyKmem pa A.pid V M i v old
+  have h := AS.wp_argstr (GF := GF) cpu k' fscKalloc fsReadyKmem pa A.pid V M i v old
     hi ha0 hv hproc htier (by rw [hnoff]; omega) hK (by rw [hlocks]; simp) hmax hmax'
   unfold wp_argstr_body at h
   simp only [argstrAddr] at h
@@ -1199,7 +1199,7 @@ persistent `sysOpenEnv`.  The block is at `procAddr A.j` (the contract's
 -/
 
 section Bodies
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -1217,11 +1217,11 @@ def sysOpenTailABody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp G
     ⌜sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0xd2#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo om w24 -∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
     sysOpenPid A -∗ logOp icfgLog u -∗
-    sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A)) -∗
+    sysOpenRet k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A)) -∗
     wpLoop c)
 
 /-- **ARM B-FAIL, +0x10c** (Rocq `so_tail_b`): namei returned 0 -- the same
@@ -1232,11 +1232,11 @@ def sysOpenTailBBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp G
     ⌜sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x10c#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo om w24 -∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
     sysOpenPid A -∗ logOp icfgLog u -∗
-    sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A)) -∗
+    sysOpenRet k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A)) -∗
     wpLoop c)
 
 /-- The shape of ARMS C / D (Rocq `so_tail_c` / `so_tail_d`, the same six
@@ -1254,23 +1254,23 @@ def sysOpenTailCDBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) (off : B
     ⌜sysOpenPins k R (ientry kk) (k.regs 18#5) (k.regs 19#5)⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + off) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo om w24 -∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
     sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
     icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm -∗ sysOpenKeep kk s g inum -∗
     sysOpenPid A -∗ bslots 3 -∗ logOpb icfgLog u -∗
-    sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
+    sysOpenRet k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
       bslots 3 ∗ irefSlot)) -∗
     wpLoop c)
 
 /-- **ARM C-FAIL, +0xfc**: a T_DIR inode opened for writing. -/
 abbrev sysOpenTailCBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
-  sysOpenTailCDBody (hlc := hlc) Γ k A 0xfc#64
+  sysOpenTailCDBody Γ k A 0xfc#64
 
 /-- **ARM D-FAIL, +0x116**: T_DEVICE with an out-of-range major. -/
 abbrev sysOpenTailDBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
-  sysOpenTailCDBody (hlc := hlc) Γ k A 0x116#64
+  sysOpenTailCDBody Γ k A 0x116#64
 
 /-- **ARM E-FAIL, +0x12e** (Rocq `so_tail_e`): filealloc returned 0 -- ARM
 C's six plus the s2 reload (the `sd s2` at +0x5e is above this branch). -/
@@ -1282,13 +1282,13 @@ def sysOpenTailEBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp G
     ⌜sysOpenPins k R (ientry kk) s2v (k.regs 19#5)⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x12e#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) w5 w6 lo om w24 -∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
     sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
     icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm -∗ sysOpenKeep kk s g inum -∗
     sysOpenPid A -∗ bslots 3 -∗ logOpb icfgLog u -∗
-    sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
+    sysOpenRet k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
       bslots 3 ∗ irefSlot)) -∗
     wpLoop c)
 
@@ -1307,7 +1307,7 @@ def sysOpenTailFBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp G
     ⌜sysOpenPins k R (ientry kk) (fnode kf) s3v⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x126#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       w6 lo om w24 -∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
@@ -1317,7 +1317,7 @@ def sysOpenTailFBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp G
     sysOpenPid A -∗ bslots 3 -∗ irefSlot -∗ logOpb icfgLog u -∗
     -- the block's counter, for fileclose to lend to pipeclose (permit sweep L1b)
     actLend (procAddr A.j) A.V.ev -∗
-    sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
+    sysOpenRet k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
       bslots 3 ∗ irefSlots 2 ∗ fdSlot ∗ ∃ k1 : Nat, ⌜A.V.ev ≤ k1⌝ ∗ actLend (procAddr A.j) k1)) -∗
     wpLoop c)
 
@@ -1333,14 +1333,14 @@ def sysOpenTailSBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp G
     ⌜sysOpenPins k R (ientry kk) s2v fdw⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0xb8#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       w6 lo om w24 -∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
     sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
     icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm -∗
     sysOpenPid A -∗ logOpb icfgLog u -∗
-    sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = fdw⌝ ∗ sysOpenPid A ∗
+    sysOpenRet k (fun r => iprop(⌜r = fdw⌝ ∗ sysOpenPid A ∗
       inodeShrGenlo kk s icfgDev inum g loc)) -∗
     wpLoop c)
 
@@ -1372,7 +1372,7 @@ def sysOpenPubBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF 
     ⌜sysOpenPins k R (ientry kk) s2v (BitVec.ofNat 64 fd)⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0xb8#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       w6 lo (sysOpenOm A) w24 -∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
@@ -1395,9 +1395,9 @@ def sysOpenPubBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF 
       -- ...AND THE HALF THIS BLOCK'S PUBLISH HANDED OUT (Rocq L4), guarded by
       -- the type exactly as the deposit is: a device row has none
       foffPubT A.omo t -∗
-      openPostOkPlain (hlc := hlc) A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid (sysOpenIm A) A.v.toNat A.vom
+      openPostOkPlain A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid (sysOpenIm A) A.v.toNat A.vom
         A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) r) -∗
-    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+    (∀ c' : CPU, sysOpenPostP k A c') -∗
     wpLoop c)
 
 /-- **+0x88 .. +0xb4 AND THE +0x14e itrunc BLOCK** (Rocq `so_stores_au`):
@@ -1427,7 +1427,7 @@ def sysOpenStoresBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp 
     ⌜sysOpenPins k R (ientry kk) (fnode kf) (BitVec.ofNat 64 fd)⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x88#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       w6 lo (sysOpenOm A) w24 -∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
@@ -1440,8 +1440,8 @@ def sysOpenStoresBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp 
     logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗
     fdFrags A.V.fdg A.sts -∗ fdStAuth A.V.fdg fd .closed -∗
     -- THE AU RESIDUE: the cursor, the FIRED observation, the trunc commit
-    sysOpenResidue (hlc := hlc) A pl inum dn bm data -∗
-    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+    sysOpenResidue A pl inum dn bm data -∗
+    (∀ c' : CPU, sysOpenPostP k A c') -∗
     wpLoop c)
 
 /-- **+0x5e .. +0x84 AND THE +0x140 FD_DEVICE BLOCK** (Rocq `so_alloc_au`):
@@ -1462,15 +1462,15 @@ def sysOpenAllocBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp G
     ⌜sysOpenPins k R (ientry kk) (k.regs 18#5) (k.regs 19#5)⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x5e#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 -∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
     sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
     sysOpenFlat kk inum dn bm data -∗ sysOpenKeep kk s g inum -∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
     logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
-    sysOpenResidue (hlc := hlc) A pl inum dn bm data -∗
-    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+    sysOpenResidue A pl inum dn bm data -∗
+    (∀ c' : CPU, sysOpenPostP k A c') -∗
     wpLoop c)
 
 /-- **THE JOIN AT +0x4a AND ARM D-FAIL** (Rocq `so_join_au`): the `lhu` +
@@ -1487,15 +1487,15 @@ def sysOpenJoinBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF
     ⌜sysOpenPins k R (ientry kk) (k.regs 18#5) (k.regs 19#5)⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x4a#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 -∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
     sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
     sysOpenFlat kk inum dn bm data -∗ sysOpenKeep kk s g inum -∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
     logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
-    sysOpenResidue (hlc := hlc) A pl inum dn bm data -∗
-    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+    sysOpenResidue A pl inum dn bm data -∗
+    (∀ c' : CPU, sysOpenPostP k A c') -∗
     wpLoop c)
 
 /-- **THE else ARM, +0xdc .. +0xfa, AND ARMS B-FAIL / C-FAIL** (Rocq
@@ -1516,18 +1516,18 @@ def sysOpenEntryNBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp 
     ⌜sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0xdc#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 -∗
     byteBuf (sysOpenPath (k.regs 2#5)) (DFrac.own 1) (bview 128 bp) -∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
     logOpS icfgLog MAXOPBLOCKS Sb -∗ logTx icfgLog -∗
     bslots 3 -∗ irefSlots A.ns -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
     -- THE AU BUNDLE, at the string argstr fetched
-    exStart (hlc := hlc) fscFs A.V.rti A.V.cwi A.P A.Pmiss (bview plen bp) -∗
-    pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo -∗
+    exStart fscFs A.V.rti A.V.cwi A.P A.Pmiss (bview plen bp) -∗
+    pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo -∗
     -- the truncate's permit is the walk's terminal cursor (Rocq TRUNC-PERMIT)
-    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom (truncTermAt (bview plen bp) A.P) A.Ft -∗
-    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+    openTruncPiece (fsGammaL fscFs) A.vom (truncTermAt (bview plen bp) A.P) A.Ft -∗
+    (∀ c' : CPU, sysOpenPostP k A c') -∗
     wpLoop c)
 
 /-- **THE O_CREATE ARM, +0x38 .. +0x48, AND ARM A-FAIL** (Rocq
@@ -1545,23 +1545,23 @@ def sysOpenEntryCBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     ⌜sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x38#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv Γ A -∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 -∗
     byteBuf (sysOpenPath (k.regs 2#5)) (DFrac.own 1) (bview 128 bp) -∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
     logOpS icfgLog MAXOPBLOCKS Sb -∗ logTx icfgLog -∗
     bslots 3 -∗ irefSlots A.ns -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
     -- THE AU BUNDLE (the contract's O_CREATE side), at the fetched string
-    epStart (hlc := hlc) fscFs A.V.rti A.V.cwi A.P A.Pmiss (bview plen bp) -∗
-    pfAt (acreCommitAtNm (hlc := hlc) (fsGammaL fscFs) appE (.AFile []) (nparNm (sysOpenIm A) A.v.toNat)
+    epStart fscFs A.V.rti A.V.cwi A.P A.Pmiss (bview plen bp) -∗
+    pfAt (acreCommitAtNm (fsGammaL fscFs) appE (.AFile []) (nparNm (sysOpenIm A) A.v.toNat)
       (A.P (nparElems (bview plen bp)).length) Farm) Fok -∗
-    pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fex -∗
-    pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo -∗
+    pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex -∗
+    pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo -∗
     -- the truncate's permit is create's own payout at this path (Rocq F-OPEN-3)
-    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom
-      (crePermit (hlc := hlc) (fsGammaL fscFs) (bview plen bp) A.P Farm Fok Fex) A.Ft -∗
-    creChildUnfired (hlc := hlc) (fsGammaL fscFs) (.AFile []) Farm Fun -∗
-    (∀ c' : CPU, sysOpenPostC (hlc := hlc) k A Farm Fun Fok Fex c') -∗
+    openTruncPiece (fsGammaL fscFs) A.vom
+      (crePermit (fsGammaL fscFs) (bview plen bp) A.P Farm Fok Fex) A.Ft -∗
+    creChildUnfired (fsGammaL fscFs) (.AFile []) Farm Fun -∗
+    (∀ c' : CPU, sysOpenPostC k A Farm Fun Fok Fex c') -∗
     wpLoop c)
 
 end Bodies

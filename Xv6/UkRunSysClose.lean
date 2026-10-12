@@ -41,7 +41,7 @@ theorem uk_close_row (m : RegMap) (pc : BitVec 64) (fd : Nat) (st : FdState) (fd
   simpa using hmove
 
 section UkRunSysClose
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -54,12 +54,12 @@ theorem ukClose_body (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (fd : Nat) (
     (hn : usysno m = USYS_close) (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int))
     (hi : fdv[fd]? = some st) (hne : st ≠ .closed) (hx0 : m 0#5 = 0#64) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
     ⊢ uheap N.t N.d N.s M pm sz -∗ ustack N.d (m.get spIdx) avail -∗ ufdAuth N.fd fdv -∗ ucwdAuth N.cwd cw -∗
-      urunIds N cs pidv -∗ myPay gn N.pay -∗ udep (hlc := hlc) -∗ urunRows (hlc := hlc) N fdv -∗
-      sbundlePay (uslot (hlc := hlc)) 21 N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) -∗
+      urunIds N cs pidv -∗ myPay gn N.pay -∗ udep -∗ urunRows N fdv -∗
+      sbundlePay (uslot) 21 N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) -∗
       (ufdAuth N.fd fdv ==∗ ufdAuth N.fd (fdv.set fd .closed) ∗ R) -∗
       (∀ (h' : CPU) (r : BitVec 64), ⌜r.toNat = 0⌝ -∗ R -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
-      uexecRet (hlc := hlc) uecallScause (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) := by
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+      uexecRet uecallScause (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) := by
   iintro Hheap Hstk Hufd Hcwda Hids #Hmy #Hdep #Hrows Hdepn Hstep Hcont
   iapply uexecRet_retK 21 _ gn N.pay rfl
     (ukSys_numW m pc M pm sz fdv cw gn cs pidv 21 hn (by decide) (by decide)) (by decide) (by decide)
@@ -88,10 +88,10 @@ theorem ukClose_body (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (fd : Nat) (
 theorem wp_uk_ecall_close (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (fd : Nat)
     (st : FdState) (avail : Nat) (hn : usysno m = USYS_close)
     (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int)) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ udepwCl (hlc := hlc) N m pc st -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ udepwCl N m pc st -∗
       ufd N.fd fd st -∗
       (∀ (h' : CPU) (r : BitVec 64), ⌜r.toNat = 0⌝ -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hh Hcont
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun
@@ -119,10 +119,10 @@ theorem wp_uk_ecall_close_std (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : R
     (l : List FdState) (fd : Nat) (st : FdState) (avail : Nat) (hn : usysno m = USYS_close)
     (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int)) (hs : fd < NSTD) (hkl : l[fd]? = some st)
     (hne : st ≠ .closed) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ udepwCl (hlc := hlc) N m pc st -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ udepwCl N m pc st -∗
       ustd N.fd l -∗
       (∀ (h' : CPU) (r : BitVec 64), ⌜r.toNat = 0⌝ -∗ ustd N.fd (l.set fd .closed) -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd Hcont
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun

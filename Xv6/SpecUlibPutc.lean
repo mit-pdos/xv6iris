@@ -69,7 +69,7 @@ end
 
 /-- The interface of `putc`: ONE contract, every load address. -/
 structure ULIB_PUTC : Prop where
-  wp_ulibPutc : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (L : UlibRun GF) (base : BitVec 64) (m : RegMap)
+  wp_ulibPutc : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] (L : UlibRun GF) (base : BitVec 64) (m : RegMap)
     (n : Nat) (Ci Co : IProp GF), wp_ulibPutc_body L base m n Ci Co
 
 end Xv6

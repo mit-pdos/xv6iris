@@ -27,10 +27,11 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- An eight-word frame, closed (the pop's premise). -/
 theorem ushm_ustack8_intro (γd : GName) (sp : BitVec 64) (hal : sp.toNat % 8 = 0) (hlo : 64 ≤ sp.toNat) :
     ⊢ (∃ w : BitVec 64, uword (GF := GF) γd (sp.toNat - 8) w) -∗ (∃ w : BitVec 64, uword γd (sp.toNat - 16) w) -∗
@@ -49,7 +50,7 @@ theorem ushm_ustack8_intro (γd : GName) (sp : BitVec 64) (hal : sp.toNat % 8 = 
 
 /-- **malloc's prologue**, 0x1178..0x1182. -/
 theorem shMalloc_pro (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (n : Nat) :
-    ⊢ ukCode N.t User.Sh.code.byte -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 0x1178) (8 + n) -∗
+    ⊢ ukCode N.t User.Sh.code.byte -∗ urun N h m (BitVec.ofNat 64 0x1178) (8 + n) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜(m.get 2#5).toNat % 8 = 0⌝ -∗ ⌜64 ≤ (m.get 2#5).toNat⌝ -∗
         ⌜m'.get 2#5 = m.get 2#5 + BitVec.ofInt 64 (-((8 * 8 : Nat) : Int))⌝ -∗ ⌜ushmKeep [2#5, 8#5] m m'⌝ -∗
         uword N.d ((m.get 2#5).toNat - 8) (m.get 1#5) -∗ uword N.d ((m.get 2#5).toNat - 16) (m.get 8#5) -∗
@@ -58,7 +59,7 @@ theorem shMalloc_pro (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (n
         (∃ w : BitVec 64, uword N.d ((m.get 2#5).toNat - 48) w) -∗
         (∃ w : BitVec 64, uword N.d ((m.get 2#5).toNat - 56) w) -∗
         (∃ w : BitVec 64, uword N.d ((m.get 2#5).toNat - 64) w) -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x1184) n -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0x1184) n -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hcont
   ihave %hstk := urun_stack N h m _ _ $$ Hrun
@@ -146,10 +147,10 @@ theorem shMalloc_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mm : RegMap) (
       (∃ w : BitVec 64, uword N.d (sp0.toNat - 48) w) -∗
       (∃ w : BitVec 64, uword N.d (sp0.toNat - 56) w) -∗
       (∃ w : BitVec 64, uword N.d (sp0.toNat - 64) w) -∗
-      urun (hlc := hlc) N h mm (BitVec.ofNat 64 0x1254) n -∗
+      urun N h mm (BitVec.ofNat 64 0x1254) n -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ushmKeep [1#5, 8#5, 18#5, 19#5, 2#5] mm m'⌝ -∗ ⌜m'.get 2#5 = sp0⌝ -∗
         ⌜m'.get 8#5 = vs0⌝ -∗ ⌜m'.get 18#5 = vs2⌝ -∗ ⌜m'.get 19#5 = vs3⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc vra) (8 + n) -∗ wpLoop h') -∗
+        urun N h' m' (retPc vra) (8 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   have hs64 : (mm.get 2#5).toNat = sp0.toNat - 64 := by rw [hsp]; exact uv_avi_neg sp0 64 hlo
   iintro #Hc W0 W1 W2 W3 W4 W5 W6 W7 Hrun Hcont

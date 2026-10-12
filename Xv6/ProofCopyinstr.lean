@@ -38,7 +38,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-! # `copyinstr`: the byte-by-byte string copy (kernel/vm.c) -/
@@ -1305,7 +1305,7 @@ theorem cstr_loop (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
 set_option maxHeartbeats 4000000 in
 /-- **`copyinstr` meets its specification.** -/
 theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M old ke hnoff hK hlk hroot hsz hmax hmax' => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk P M old ke hnoff hK hlk hroot hsz hmax hmax' => by
   unfold wp_copyinstr_body
   simp only [copyinstrAddr]
   iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hdst, Hlend, HΦ⟩

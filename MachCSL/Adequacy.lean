@@ -84,14 +84,14 @@ namespace MachCSL
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open Language.Notation PrimStep
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
+variable {GF : BundledGFunctors.{0}}
 
 /-- The record `F` with its invariant world replaced by `Hinv`.  The core
 quantifies over the record EXISTENTIALLY, so it cannot ask that the client's
 record be built over the adequacy's invariant world; it forces it instead.  A
 record built as a literal over `Hinv` is convertible with this. -/
-@[reducible] def MachFixedGS.withInv (F : MachFixedGS hlc GF) (Hinv : InvGS_gen hlc GF) :
-    MachFixedGS hlc GF :=
+@[reducible] def MachFixedGS.withInv (F : MachFixedGS GF) (Hinv : InvGS GF) :
+    MachFixedGS GF :=
   { F with invGS := Hinv }
 
 /-- What the core asks of the client at the record `F` (the body of Rocq's
@@ -101,9 +101,9 @@ interpretation, the power thread's WP, and the FINAL OBSERVATION -- at the
 last state of the run, with the machine's half of the history (which is then
 the run's trace) and its well-formedness, a fancy update to `∅` into the pure
 `phi`, so every invariant may be opened and never closed. -/
-def adeqBirth [MachFixedGS hlc GF] (g : GState) (κs : List Obs)
+def adeqBirth [MachFixedGS GF] (g : GState) (κs : List Obs)
     (phi : GState → List Obs → Prop) : IProp GF := iprop%
-  ⌜MachFixedGS.obsTotal (hlc := hlc) (GF := GF) = κs⌝ ∗
+  ⌜MachFixedGS.obsTotal (GF := GF) = κs⌝ ∗
   (powerInterp g ∗ obsInterp g κs) ∗
   WP Expr.power @ Stuckness.NotStuck; ⊤ {{ _v, True }} ∗
   (∀ (g2 : GState) (h : List Obs), powerInterp g2 -∗ obsHalf h -∗ ⌜obsWf h g2⌝ -∗
@@ -113,9 +113,9 @@ def adeqBirth [MachFixedGS hlc GF] (g : GState) (κs : List Obs)
 if the client can build it with its birth obligations, the run is safe and
 `phi` holds of its last state and trace.  Independent of the record's fields
 beyond `obsTotal` (see the header, CRASH). -/
-theorem powerAdequacyCore [MachGpreS hlc GF] (g : GState) (phi : GState → List Obs → Prop)
-    (Hwp : ∀ [Hinv : InvGS_gen hlc GF] (κs : List Obs),
-      ⊢@{IProp GF} |={⊤}=> ∃ F : MachFixedGS hlc GF, @adeqBirth hlc GF (F.withInv Hinv) g κs phi)
+theorem powerAdequacyCore [MachGpreS GF] (g : GState) (phi : GState → List Obs → Prop)
+    (Hwp : ∀ [Hinv : InvGS GF] (κs : List Obs),
+      ⊢@{IProp GF} |={⊤}=> ∃ F : MachFixedGS GF, @adeqBirth GF (F.withInv Hinv) g κs phi)
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ phi g2 κs := by
@@ -124,18 +124,18 @@ theorem powerAdequacyCore [MachGpreS hlc GF] (g : GState) (phi : GState → List
     rcases h.1 e2 he with hv | hr
     · exact absurd hv (by simp [ToVal.toVal])
     · exact hr
-  refine wp_strong_adequacy_gen (hlc := hlc) (GF := GF) Stuckness.NotStuck [Expr.power] g n κs t2 g2
+  refine wp_strong_adequacy_gen (hlc := .hasLC) (GF := GF) Stuckness.NotStuck [Expr.power] g n κs t2 g2
     _ (fun _ => 0) ?_ hsteps
   intro Hinv
   have H := @Hwp Hinv κs
   unfold adeqBirth at H
   imod H with ⟨%F, %htot, HSI, Hwp, Hfin⟩
   imodintro
-  iexists (fun σ ns κs' nt => @stateInterp GState Obs GF (@instIrisGS hlc GF (F.withInv Hinv)).toStateInterp σ ns κs' nt),
+  iexists (fun σ ns κs' nt => @stateInterp GState Obs GF (@instIrisGS GF (F.withInv Hinv)).toStateInterp σ ns κs' nt),
     [fun _ => iprop(True)], (fun _ => iprop(True)),
-    (@instIrisGS hlc GF (F.withInv Hinv)).stateInterp_mono
+    (@instIrisGS GF (F.withInv Hinv)).stateInterp_mono
   dsimp only
-  simp only [@stateInterp_eq hlc GF (F.withInv Hinv)]
+  simp only [@stateInterp_eq GF (F.withInv Hinv)]
   isplitl [HSI]
   · iexact HSI
   isplitl [Hwp]
@@ -159,7 +159,7 @@ theorem powerAdequacyCore [MachGpreS hlc GF] (g : GState) (phi : GState → List
 so that `Hboot` can be told its shape: every functor instance from
 `MachGpreS`, the invariant world, the fixed gnames, the run's trace `T`, the
 trace predicate `Ptp`, and the application's slots. -/
-@[reducible] def bootFixedGS [MachGpreS hlc GF] (Hinv : InvGS_gen hlc GF)
+@[reducible] def bootFixedGS [MachGpreS GF] (Hinv : InvGS GF)
     (γgen γstart γreg γdisk : GName) (ndisk : Nat) (γswap : GName) (Pcp : IProp GF)
     (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
     (γobs : GName) (T : List Obs) (Ptp : IProp GF) (γhist : GName)
@@ -172,7 +172,7 @@ trace predicate `Ptp`, and the application's slots. -/
     (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF)
     (Ue : Option (Nat × Obs) → Obs → IProp GF) (HUe : ∀ ox e, Persistent (Ue ox e))
     (Uet : Nat → IProp GF) (Uea : Nat → List GName → IProp GF) (HUea : ∀ k ns, Persistent (Uea k ns)) :
-    MachFixedGS hlc GF where
+    MachFixedGS GF where
   invGS := Hinv
   reg := MachGpreS.reg_pre
   memPre := MachGpreS.mem_pre
@@ -265,7 +265,7 @@ The hooks, in Rocq's order:
   and the lent resource; the booted machine's `bootFacts` are at the
   language's boot image `bootImage` (Rocq's `boot_image`): no premise on the
   initial state's memory. -/
-theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GState)
+theorem riscvPowerAdequacy [MachGpreS GF] [KernelMap] (ndisk : Nat) (g : GState)
     -- THE BIRTH, its yield split between the two slots (Rocq sync SY3-A1):
     -- `Cls c` to the crash slot's birth (`HPc`), `Clt c` to the trace slot's
     -- (`HPt`); handed the machine's four fixed gnames, `Born` what it says of
@@ -358,9 +358,9 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
         |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e]))))
     (phi : GState → List Obs → Prop)
-    (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γdisk γswap γobs γhist : GName) (c : CT)
+    (Hphi : ∀ (Hinv : InvGS GF) (γgen γstart γreg γdisk γswap γobs γhist : GName) (c : CT)
         (T : List Obs) (g' : GState) (h : List Obs),
-      @powerInterp hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
+      @powerInterp GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
           (Pc γdisk γswap γreg γstart c)
           (Tk c) (Hk c) γobs T (Pt γobs c) γhist
           (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
@@ -369,7 +369,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
         (γobs ↪VAR{.own (1 : Qp).half} h) ∗ ⌜obsWf h g'⌝ ∗
         ▷ Pc γdisk γswap γreg γstart c ∗ ▷ Pt γobs c ⊢@{IProp GF} ◇ ⌜phi g' h⌝)
     (Hgen0 : g.gen = 0) (Hpow : g.pow = false)
-    (Hboot : ∀ [F : MachFixedGS hlc GF] (Hinv : InvGS_gen hlc GF)
+    (Hboot : ∀ [F : MachFixedGS GF] (Hinv : InvGS GF)
         (γgen γstart γreg γdisk γswap γobs γhist : GName) (c : CT) (T : List Obs),
       F = bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap (Pc γdisk γswap γreg γstart c)
           (Tk c) (Hk c)
@@ -387,7 +387,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ phi g2 κs := by
-  refine powerAdequacyCore (hlc := hlc) (GF := GF) g phi ?_ n κs t2 g2 hsteps
+  refine powerAdequacyCore (GF := GF) g phi ?_ n κs t2 g2 hsteps
   intro Hinv T
   -- THE DURABLE DISK, FIRST: its full fragments establish the crash predicate
   imod (diskImgSized_alloc (GF := GF) (diskOf g.m.devs) ndisk) with ⟨%γdisk, Hdauth, Hdfr⟩
@@ -440,7 +440,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       · ipureintro; exact obsWf_init g Hpow Hgen0
       iframe HobA HobH
   isplitl []
-  · iapply (@wp_power hlc GF ((bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
+  · iapply (@wp_power GF ((bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
       (Pc γdisk γswap γreg γstart c)
           (Tk c) (Hk c) γobs T (Pt γobs c) γhist
       (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
@@ -476,7 +476,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
 /-! ## Stage 3: the trace hook's helpers -/
 
 section helpers
-variable [MachFixedGS hlc GF]
+variable [MachFixedGS GF]
 
 /-- A fact already pure in the state interpretation (Rocq
 `power_interp_resv_ok`; Lean's `mmOk` carries `resv_ok`). -/
@@ -496,7 +496,7 @@ theorem powerInterp_mmOk (g : GState) :
 end helpers
 
 section raw
-variable [MachGpreS hlc GF]
+variable [MachGpreS GF]
 
 /-- The trivial trace predicate at a raw gname (Rocq `obs_pred_at`);
 convertible with `obsPredTriv` at the literal (by `rfl`). -/

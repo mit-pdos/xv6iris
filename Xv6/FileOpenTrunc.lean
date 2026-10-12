@@ -54,17 +54,17 @@ theorem fileTrunc_free (av0 av : Aview) (i : Nat) (s : Dst)
   exact h2
 
 section FileOpenTrunc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF] [FsTopG GF] [FsBytesG GF] [Appcfg GF] [Icfg]
 
 /-- THE FRESH RUN: the create at `N` put the deed at `s.insert N (i, [])` and
 the truncate is the identity there (Rocq `file_trunc_of_cre`). -/
 theorem fileTrunc_of_cre (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (i : Nat)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗
-      creAcreFired (fileCreFam (hlc := hlc) c r jo N s g np) ROOTINO N i (.AFile []) -∗
-      atruncCommitI (hlc := hlc) (fsGammaL γfs) appE i (fileTruncRecv (hlc := hlc) c r N s np) := by
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} appInv γfs -∗ fileConsCred c r jo -∗
+      creAcreFired (fileCreFam c r jo N s g np) ROOTINO N i (.AFile []) -∗
+      atruncCommitI (fsGammaL γfs) appE i (fileTruncRecv c r N s np) := by
   unfold atruncCommitI creAcreFired fileCreFam fileCreRecv fileTruncRecv fown
   simp only [fileOpen_fsGammaL_top]
   iintro #Hinv #Hm ⟨%av0, %ents, %nl0, %_hpre, Hrec⟩ %I %bs0 %nl %_hrow Hka
@@ -80,7 +80,7 @@ theorem fileTrunc_of_cre (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
       imodintro
       iframe Hka
       isplitl []
-      · iapply (fileAppStep_free_at (hlc := hlc) c r i I _ heq (fun _ => hp1) hp2 hp3
+      · iapply (fileAppStep_free_at c r i I _ heq (fun _ => hp1) hp2 hp3
           (fun s' hs' => by rw [fOk_det _ s' _ hs' hok]; exact hp4))
       · iintro %I' %_hav Hka'
         imodintro
@@ -91,7 +91,7 @@ theorem fileTrunc_of_cre (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     · imodintro
       iframe Hka
       isplitl []
-      · iapply (fileAppStep_taint (hlc := hlc) c r i I _ heq) $$ HT
+      · iapply (fileAppStep_taint c r i I _ heq) $$ HT
       · iintro %I' %_hav Hka'
         imodintro
         iframe Hka'
@@ -99,7 +99,7 @@ theorem fileTrunc_of_cre (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
   · imodintro
     iframe Hka
     isplitl []
-    · iapply (fileAppStep_taint (hlc := hlc) c r i I _ heq) $$ HT
+    · iapply (fileAppStep_taint c r i I _ heq) $$ HT
     · iintro %I' %_hav Hka'
       imodintro
       iframe Hka'
@@ -113,16 +113,16 @@ theorem fileTrunc_of_exists (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (ls : List FlLine)
     (ws : Wordline) (i : Nat) (avx : Aview) (entsx : Std.ExtTreeMap Fname Nat compare)
     (nlx : Nat)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (hN : uname N) (hrowx : PartialMap.get? avx ROOTINO = some ⟨.ADir entsx, nlx⟩)
     (hentx : entsx[N]? = some i) (hlast : ls.getLast? = some (Uline.LEchoF ws N))
     (hnp : np = ls.length) (hokw : lineOk ws) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗
-      escKey (hlc := hlc) c r n s g -∗ flLb c ls -∗
-      iprop((⌜fclaimFree avx⌝ ∗ (⌜fOk avx s⌝ ∨ escSpent (hlc := hlc) g))
-        ∨ fileTaint (hlc := hlc) c) -∗
-      fescRes (hlc := hlc) r s g np -∗
-      atruncCommitI (hlc := hlc) (fsGammaL γfs) appE i (fileTruncRecv (hlc := hlc) c r N s np) := by
+    ⊢@{IProp GF} appInv γfs -∗ fileConsCred c r jo -∗
+      escKey c r n s g -∗ flLb c ls -∗
+      iprop((⌜fclaimFree avx⌝ ∗ (⌜fOk avx s⌝ ∨ escSpent g))
+        ∨ fileTaint c) -∗
+      fescRes r s g np -∗
+      atruncCommitI (fsGammaL γfs) appE i (fileTruncRecv c r N s np) := by
   have hin := flRedirs_last ls ws N hlast
   subst hnp
   have hstx : astep avx ROOTINO N = some i := by
@@ -162,14 +162,14 @@ theorem fileTrunc_of_exists (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
             imodintro
             iframe Hka
             isplitl []
-            · iapply (fileAppStep_free_at (hlc := hlc) c r i I _ heq (fun _ => hp1) hp2 hp3
+            · iapply (fileAppStep_free_at c r i I _ heq (fun _ => hp1) hp2 hp3
                 (fun s' hs' => by
                   rw [fOk_det _ s' s hs' hok]
                   exact fOk_trunc_nil i N i (absView I) s hsN
                     (fun M j bs' hne hsM hij =>
                       fOk_inum_ne (absView I) s N M i j [] bs' hok hsN hne hsM hij.symm) hok))
             · iintro %I' %_hav Hka'
-              imod (fileEscrowReturn (hlc := hlc) γfs c r n s g appE (fun _ h => h) heq) $$
+              imod (fileEscrowReturn γfs c r n s g appE (fun _ h => h) heq) $$
                 Hinv Hwit Htok Htk with Hres
               imodintro
               iframe Hka'
@@ -184,7 +184,7 @@ theorem fileTrunc_of_exists (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
             imodintro
             iframe Hka
             isplitl [Htok Hre]
-            · iapply (fileAppStep_escrow (hlc := hlc) c r i I _ n s (s.insert N (i, [])) g heq
+            · iapply (fileAppStep_escrow c r i I _ n s (s.insert N (i, [])) g heq
                 (fun _ => hp1) hp2 hp3 (fun _ => hp4)) $$ Hwit Htok [] Hre
               have hty := fTyped_some (GF := GF) c s ls N ws [] i hN hin hokw (selOk_nil _)
               rw [subseq_nil] at hty
@@ -194,7 +194,7 @@ theorem fileTrunc_of_exists (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
                 fileOpen_dst_ne_insert s N (i, []) (by rw [hsN]; simpa using hbs)
               have hcont : fcontentOf (absView I') = s.insert N (i, []) := by
                 rw [hav]; exact fOk_fcontent _ _ hp4
-              imod (fileResync (hlc := hlc) γfs c r s (s.insert N (i, [])) ls.length I' appE
+              imod (fileResync γfs c r s (s.insert N (i, [])) ls.length I' appE
                 (fun _ h => h) heq hcont hne) $$ Hinv Htk Hq2 Hka' with ⟨Hka', Hres⟩
               imodintro
               iframe Hka'
@@ -204,17 +204,17 @@ theorem fileTrunc_of_exists (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
         · imodintro
           iframe Hka
           isplitl []
-          · iapply (fileAppStep_taint (hlc := hlc) c r i I _ heq) $$ HT
+          · iapply (fileAppStep_taint c r i I _ heq) $$ HT
           · iintro %I' %_hav Hka'
             imodintro
             iframe Hka'
             iright; iexact HT
-    · ihave %hf := escTok_spent (hlc := hlc) g $$ Htok Hsp
+    · ihave %hf := escTok_spent g $$ Htok Hsp
       exact hf.elim
   · imodintro
     iframe Hka
     isplitl []
-    · iapply (fileAppStep_taint (hlc := hlc) c r i I _ heq) $$ HT
+    · iapply (fileAppStep_taint c r i I _ heq) $$ HT
     · iintro %I' %_hav Hka'
       imodintro
       iframe Hka'
@@ -225,17 +225,17 @@ the keyed AU beside a refund of `True`. -/
 theorem fileTrunc_piece (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (ls : List FlLine)
     (ws : Wordline) (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 8))
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (hN : uname N) (hpath : argPathOf M pv pl) (hlast : (pathElems pl).getLast? = some N)
     (hlst : ls.getLast? = some (Uline.LEchoF ws N)) (hnp : np = ls.length) (hokw : lineOk ws) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗
-      escKey (hlc := hlc) c r n s g -∗ flLb c ls -∗
-      pfAt (atruncOfPermit (hlc := hlc) (fsGammaL γfs) appE
-          (truncPermitOf (hlc := hlc) (fsGammaL γfs)
+    ⊢@{IProp GF} appInv γfs -∗ fileConsCred c r jo -∗
+      escKey c r n s g -∗ flLb c ls -∗
+      pfAt (atruncOfPermit (fsGammaL γfs) appE
+          (truncPermitOf (fsGammaL γfs)
             (truncTieArg M pv (fun (_ : Nat) (d : Nat) => iprop(⌜d = ROOTINO⌝)))
-            (fileArmFam (hlc := hlc) c r jo s g np) (fileCreFam (hlc := hlc) c r jo N s g np)
-            (fileDlkFam (hlc := hlc) c r n s g)))
-        (fileTruncFam (hlc := hlc) c r N s np) := by
+            (fileArmFam c r jo s g np) (fileCreFam c r jo N s g np)
+            (fileDlkFam c r n s g)))
+        (fileTruncFam c r N s np) := by
   unfold pfAt atruncOfPermit truncPermitOf truncTieArg nparCur fileTruncFam
   iintro #Hinv #Hm #Hwit #Hlb
   isplit

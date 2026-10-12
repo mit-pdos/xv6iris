@@ -136,7 +136,7 @@ callee is bread (62); brelse wants 26, log_write 18 and memmove 2 (Rocq's
 def iupdateSlots : Nat := 4 + breadSlots
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The cells iupdate READS and hands straight back: `ip->dev`, `ip->inum`,
 the five scalars (`inodeMeta`), the thirteen addrs plus the indirect block
@@ -154,10 +154,10 @@ The absorption credit is a RESOURCE against a NAMED birth epoch
 (`logOpSe` in, `logOpS` out: the credit is spent by the flush and
 `log_write`'s own post re-closes the epoch); the deposit's receipt comes
 out unconditionally, its comparison cashed inside log_write. -/
-def wp_iupdate_credgen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_iupdate_credgen_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (cru : Bool) (e0 v : Nat)
@@ -180,7 +180,7 @@ def wp_iupdate_credgen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
   iuCells ip inum dn bm dqd dqn dqs ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   bslots 2 ∗
   -- THE DEPOSIT'S IN-HALF: the caller's epoch anchor (free at `v := 0`)
@@ -205,10 +205,10 @@ def wp_iupdate_credgen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
 /-- The eb-generic form of `wp_iupdate_credgen_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_iupdate_credgen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_iupdate_credgen_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (cru : Bool) (e0 v : Nat)
@@ -231,7 +231,7 @@ def wp_iupdate_credgen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
   iuCells ip inum dn bm dqd dqn dqs ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   bslots 2 ∗
   -- THE DEPOSIT'S IN-HALF: the caller's epoch anchor (free at `v := 0`)
@@ -260,10 +260,10 @@ place of `diNlinkStable` (at the MACHINE's width, plus the kernel's
 `iregLinkPin` borrowed and returned, and the minted `linkToks` pile beside
 the retagged fragment on the way out.  The credit is the pure own-set
 claim over `logOpS`. -/
-def wp_iupdate_link_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_iupdate_link_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (cru : Bool) (pin : Bool) (oty : Option Ity)
@@ -290,7 +290,7 @@ def wp_iupdate_link_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
   iuCells ip inum dn bm dqd dqn dqs ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   -- THE FREEZE-PIN PREMISE (RULING A-prime), borrowed and returned
   iregLinkPin pin inum.toNat dn0 ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
@@ -315,10 +315,10 @@ def wp_iupdate_link_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 /-- The eb-generic form of `wp_iupdate_link_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_iupdate_link_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_iupdate_link_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (cru : Bool) (pin : Bool) (oty : Option Ity)
@@ -345,7 +345,7 @@ def wp_iupdate_link_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
   iuCells ip inum dn bm dqd dqn dqs ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   -- THE FREEZE-PIN PREMISE (RULING A-prime), borrowed and returned
   iregLinkPin pin inum.toNat dn0 ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
@@ -373,10 +373,10 @@ the link body: the Z-form decrement, the `linkToks` pile CONSUMED, the
 retagged fragment alone out.  The zero-record receipt `izrcpt` is built
 inside log_write's ghost step, so no receipt premise remains (Rocq's
 rank-1c removal). -/
-def wp_iupdate_unlink_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_iupdate_unlink_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (cru : Bool) (uty : Ity)
@@ -401,7 +401,7 @@ def wp_iupdate_unlink_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
   iuCells ip inum dn bm dqd dqn dqs ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   -- THE COUNTING RA's UNITS, COMING BACK (a pile: rmdir's 2 → 0)
   FsStateLink.linkToks (fsGammaL fscFs) (inum.toNat : Int)
     (FsStateLink.linkReps (iregDotDelta dn.diType.toNat dn.diNlink.toNat) uty) ∗
@@ -423,10 +423,10 @@ def wp_iupdate_unlink_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
 /-- The eb-generic form of `wp_iupdate_unlink_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_iupdate_unlink_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_iupdate_unlink_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (cru : Bool) (uty : Ity)
@@ -451,7 +451,7 @@ def wp_iupdate_unlink_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS 
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
   iuCells ip inum dn bm dqd dqn dqs ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   -- THE COUNTING RA's UNITS, COMING BACK (a pile: rmdir's 2 → 0)
   FsStateLink.linkToks (fsGammaL fscFs) (inum.toNat : Int)
     (FsStateLink.linkReps (iregDotDelta dn.diType.toNat dn.diNlink.toNat) uty) ∗
@@ -474,45 +474,45 @@ def wp_iupdate_unlink_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS 
 contracts with no consumer: see the header's cleanups). -/
 structure IUPDATE : Prop where
   /-- the credited ordinary flush -/
-  wp_iupdate_credgen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_iupdate_credgen_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (cru : Bool) (e0 v : Nat)
     (pidv : BitVec 32) (dqp dqd dqn dqs : DFrac)
     hj hproc hK hnoff htier hgeom hcov hlog hnib hstab hnl hnz hda hdir hpd ha0,
-    wp_iupdate_credgen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm
+    wp_iupdate_credgen_eb_body (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm
       u Sb cru e0 v pidv dqp dqd dqn dqs
       hj hproc hK hnoff htier hgeom hcov hlog hnib hstab hnl hnz hda hdir hpd ha0
   /-- the link-minting flush -/
-  wp_iupdate_link_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_iupdate_link_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (cru : Bool) (pin : Bool) (oty : Option Ity)
     (pidv : BitVec 32) (dqp dqd dqn dqs : DFrac)
     hj hproc hK hnoff htier hcru hgeom hcov hlog hnib hstab hnz hup hbump hgrd
     hda hdir hpd ha0,
-    wp_iupdate_link_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm
+    wp_iupdate_link_eb_body (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm
       u Sb cru pin oty pidv dqp dqd dqn dqs
       hj hproc hK hnoff htier hcru hgeom hcov hlog hnib hstab hnz hup hbump hgrd
       hda hdir hpd ha0
   /-- the link-spending flush -/
-  wp_iupdate_unlink_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_iupdate_unlink_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (cru : Bool) (uty : Ity)
     (pidv : BitVec 32) (dqp dqd dqn dqs : DFrac)
     hj hproc hK hnoff htier hcru hgeom hcov hlog hnib hstab hnz hdec
     hda hdir hpd ha0,
-    wp_iupdate_unlink_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm
+    wp_iupdate_unlink_eb_body (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm
       u Sb cru uty pidv dqp dqd dqn dqs
       hj hproc hK hnoff htier hcru hgeom hcov hlog hnib hstab hnz hdec
       hda hdir hpd ha0

@@ -138,7 +138,7 @@ theorem vf_round_bound (va : BitVec 64) (h : va.toNat < 2 ^ 38) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- The exit context at the caller's own interrupt state. -/
 theorem vf_kctx_withSpie_self [CurCtx] [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx)
@@ -239,7 +239,7 @@ theorem vf_ismapped_call (IM : ISMAPPED) [CurCtx] (c : CPU) (k' : KCtx) (dq : DF
          (R' 10#5 = 1#64 ∧ ∃ w, Iris.Std.PartialMap.get? L (vpnOf (k'.regs 11#5)).toNat = some w))⌝ -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IM.wp_ismapped (hlc := hlc) (GF := GF) c k' dq t L hK hroot hva hrep
+  have h := IM.wp_ismapped (GF := GF) c k' dq t L hK hroot hva hrep
   unfold wp_ismapped_body at h
   simp only [ismappedAddr] at h
   exact h
@@ -272,7 +272,7 @@ theorem vf_memset_call (MS : MEMSET) [CurCtx] (c : CPU) (k' : KCtx) (olds : List
         (List.replicate n (BitVec.extractLsb' 0 8 (k'.regs 11#5))) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MS.wp_memset (hlc := hlc) (GF := GF) c k' olds n hK hn hn32 hl
+  have h := MS.wp_memset (GF := GF) c k' olds n hK hn hn32 hl
   unfold wp_memset_body at h
   simp only [memsetAddr] at h
   exact h
@@ -309,7 +309,7 @@ theorem vf_mappages_call [WchG GF] (MA : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : 
               fresh).2.2 < n ∧ availZero (availSub on fresh.length)))⌝ -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MA.wp_mappages_any (hlc := hlc) (GF := GF) c k' γl γk on t n perm ke hnoff hK hlk hroot
+  have h := MA.wp_mappages_any (GF := GF) c k' γl γk on t n perm ke hnoff hK hlk hroot
     hargs hperm hmask hrwx hwf hnd hpg
   unfold wp_mappages_any_body at h
   simp only [mappagesAddr] at h

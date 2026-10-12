@@ -55,7 +55,7 @@ theorem upnsN_sub : (↑pnsN : CoPset) ⊆ (⊤ \ (↑(uartN .uart0) : CoPset)) 
   exact ⟨CoPset.mem_full, fun hu => pnsN_uart p ⟨hp, hu⟩⟩
 
 section UShURoundLawsPrompt
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [DiskG GF] [EchoOutG GF]
@@ -63,6 +63,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 
 /-! ## §0 helpers (deviation 2) -/
 
+omit [MachGS GF] in
 /-- The writers' halves, their terminal facts split off. -/
 theorem udone_split (γc γm : Wid → GName) (sw : Wid → List (BitVec 8)) :
     ∀ l : List Wid,
@@ -97,6 +98,7 @@ theorem udone_split (γc γm : Wid → GName) (sw : Wid → List (BitVec 8)) :
       · exact ht
       · exact hl w hw
 
+omit [MachGS GF] in
 /-- Every writer at its whole source, as one source function. -/
 theorem udone_all (l : List Wid) (hnd : l.Nodup) (γc γm : Wid → GName) :
     ([∗list] w ∈ l, ∃ s : List (BitVec 8), wcurN (GF := GF) γc w (1 : Qp).half s.length
@@ -111,7 +113,7 @@ theorem udone_all (l : List Wid) (hnd : l.Nodup) (γc γm : Wid → GName) :
 
 /-- A link absorbs an update at its mask. -/
 theorem uoutLink_fupd (k : Nat) (b : BitVec 8) (Φ : IProp GF) :
-    ⊢ (|={⊤ \ ↑(uartN .uart0)}=> outLink (hlc := hlc) .uart0 k b Φ) -∗ outLink .uart0 k b Φ := by
+    ⊢ (|={⊤ \ ↑(uartN .uart0)}=> outLink .uart0 k b Φ) -∗ outLink .uart0 k b Φ := by
   iintro H
   unfold outLink
   iintro %o %Hh Hlb Hres
@@ -124,21 +126,21 @@ variable (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
 theorem udone_file (v : EraPins) (I : List (BitVec 8)) (sR : Fstate) (lR : Pline') (γc γm : Wid → GName)
     (dep : Wid → List (BitVec 8) → IProp GF) [∀ w s, Timeless (dep w s)] (sw : Wid → List (BitVec 8))
     (hT : ∀ w, w ∈ wids (lcats lR) → termw w (sw w) = false) :
-    ⊢ blkNInv (hlc := hlc) (wids (lcats lR)) (runN (filesOf sR) lR) (pwcBlkU (hlc := hlc) ug v I sR) termw
-        (tokN (filesOf sR) lR) dep pnsN (genId (hlc := hlc) (GF := GF) + 1) γc γm -∗
+    ⊢ blkNInv (wids (lcats lR)) (runN (filesOf sR) lR) (pwcBlkU ug v I sR) termw
+        (tokN (filesOf sR) lR) dep pnsN (genId (GF := GF) + 1) γc γm -∗
       ([∗list] w ∈ wids (lcats lR), wcurN (GF := GF) γc w (1 : Qp).half (sw w).length
         ∗ wmodeN γm w (1 : Qp).half (some (sw w))) ={⊤ \ ↑(uartN .uart0)}=∗
-      ∃ pre : List (BitVec 8), pwcBlkU (hlc := hlc) ug v I sR (genId (hlc := hlc) (GF := GF) + 1) pre false
+      ∃ pre : List (BitVec 8), pwcBlkU ug v I sR (genId (GF := GF) + 1) pre false
         ∗ ⌜lineBlocks (filesOf sR) lR pre⌝ :=
   pipesV_file (ugnPipe ug) ulmG pviewUnionU (ucparams ug) v I sR lR _ pnsN
-    (genId (hlc := hlc) (GF := GF) + 1) γc γm termw (tokN (filesOf sR) lR) dep sw upnsN_sub hT
+    (genId (GF := GF) + 1) γc γm termw (tokN (filesOf sR) lR) dep sw upnsN_sub hT
 
 /-- The line credential at the record's space, from the cursor. -/
 theorem uWcl1_of_cur (I : List (BitVec 8)) (v : EraPins) (ps cs : List Nat) (P : Nat)
     (hw : lmWrSpT ulmG ps cs s0 I P) :
-    ⊢ eraPin (GF := GF) (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗
-      gcur (unionParamsAt (hlc := hlc) ug s0) v ps cs s0 I P (genId (hlc := hlc) (GF := GF) + 1) -∗
-      uWcl (hlc := hlc) ug s0 I 1 := by
+    ⊢ eraPin (GF := GF) (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v -∗
+      gcur (unionParamsAt ug s0) v ps cs s0 I P (genId (GF := GF) + 1) -∗
+      uWcl ug s0 I 1 := by
   iintro #Hpin Hc
   unfold uWcl lkLcred
   iexists v
@@ -156,9 +158,9 @@ theorem uWcl1_of_cur (I : List (BitVec 8)) (v : EraPins) (ps cs : List Nat) (P :
 one longer, the pipeline's identity step. -/
 theorem udone_deed (I : List (BitVec 8)) (lR : Pline') (hlR : pviewUnionU.pvLine (lineV ulmG I) = some lR)
     (v : EraPins) (ps cs'' : List Nat) (P : Nat) (hw : lmWrSpT ulmG ps cs'' s0 I P) :
-    ⊢ ushDeedAt (hlc := hlc) (GF := GF) ug r upreTie s0 I -∗
-      eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗ csLb v cs'' -∗
-      ushDoneAt (hlc := hlc) ug r s0 I := by
+    ⊢ ushDeedAt (GF := GF) ug r upreTie s0 I -∗
+      eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v -∗ csLb v cs'' -∗
+      ushDoneAt ug r s0 I := by
   have hid : 0 < nlines I → ∀ cs : List Nat,
       ulmG.lmStep (ust cs s0 I) (ul I) (lmAt ulmG cs'' (nlines I - 1)) = ust cs s0 I := by
     intro _ cs
@@ -182,8 +184,8 @@ theorem udone_deed (I : List (BitVec 8)) (lR : Pline') (hlR : pviewUnionU.pvLine
 
 /-- The terminal shape is the widened credential's below index 3. -/
 theorem uWcu_of_pt (I : List (BitVec 8)) (p : Nat) (hp : p < 3) :
-    ⊢ uptermShape (hlc := hlc) (GF := GF) ug I (5 + p) -∗
-      uWcu (hlc := hlc) ug r s0 (uptermShape ug) (updoneShape ug) I p := by
+    ⊢ uptermShape (GF := GF) ug I (5 + p) -∗
+      uWcu ug r s0 (uptermShape ug) (updoneShape ug) I p := by
   iintro H
   unfold uWcu
   iright; ileft
@@ -195,9 +197,9 @@ theorem uWcu_of_pt (I : List (BitVec 8)) (p : Nat) (hp : p < 3) :
 
 /-- **Rocq `uterm_prompt_step`**: THE TERMINAL ROUND -- the terminal writer's
 two further bytes. -/
-theorem uterm_prompt_step (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+theorem uterm_prompt_step (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (I : List (BitVec 8)) :
-    ⊢ promptStep (hlc := hlc) (GF := GF) (fun p => uptermShape (hlc := hlc) ug I (5 + p)) := by
+    ⊢ promptStep (GF := GF) (fun p => uptermShape ug I (5 + p)) := by
   unfold promptStep
   imodintro
   iintro %p %b %Φ %hb %hp Hsh HΦ
@@ -216,10 +218,10 @@ theorem uterm_prompt_step (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) =
     rw [wids_elem]
     exact Nat.lt_trans (List.mem_range.1 hj) hi
   have hwi : Wid.WSh i ∈ wids (lcats lR) := by rw [wids_elem]; exact hi
-  iapply ppromptForkNH (ws := wids (lcats lR)) (CL := ucl (hlc := hlc) ug) (RUN := runN (filesOf sR) lR)
-    (PW := pwcBlkU (hlc := hlc) ug v I sR) (TK := ptkU (hlc := hlc) ug v I) (WIT := pwitU I sR)
+  iapply ppromptForkNH (ws := wids (lcats lR)) (CL := ucl ug) (RUN := runN (filesOf sR) lR)
+    (PW := pwcBlkU ug v I sR) (TK := ptkU ug v I) (WIT := pwitU I sR)
     (TERM := termw) (TOK := tokN (filesOf sR) lR) (dep := dep) hcons (wids_nodup _)
-    (pipesV_HWIT ulmG pviewUnionU I sR lR hlR hfc ha hl) pnsN (genId (hlc := hlc) (GF := GF) + 1) γc γm
+    (pipesV_HWIT ulmG pviewUnionU I sR lR hlR hfc ha hl) pnsN (genId (GF := GF) + 1) γc γm
     (.WSh i) altForkc (5 + p) b (heldN i sw) Φ pnsN_uart hwi (by omega) hb5 hhin
     (cstepOkVh_prompt ulmG pviewUnionU I sR lR hlR ha i sw (5 + p) (by omega) hlt) $$ [] Hfe Hh
   · iapply pblkU_ecl_holds ug v I sR _ hlR
@@ -239,44 +241,44 @@ theorem uterm_prompt_step (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) =
 
 /-- **Rocq `uterm_prompt_arm`**. -/
 theorem uterm_prompt_arm (UL : UK_LEAVES)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (Np : UkNames GF) (I : List (BitVec 8)) (l vw : List FdState) (rb : Bool)
     (hl2 : l[2]? = some (.open rb true (.device CONSOLE))) :
-    ⊢ kshW (hlc := hlc) Np (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2
-        iprop(ustdAt Np.fd l vw ∗ uptermShape (hlc := hlc) ug I 5)
-        iprop(ustdAt Np.fd l vw ∗ uptermShape (hlc := hlc) ug I 7) := by
-  iapply kshW_of_link_prompt_fam UL Np (fun p => uptermShape (hlc := hlc) (GF := GF) ug I (5 + p)) l vw rb hl2
+    ⊢ kshW Np (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2
+        iprop(ustdAt Np.fd l vw ∗ uptermShape ug I 5)
+        iprop(ustdAt Np.fd l vw ∗ uptermShape ug I 7) := by
+  iapply kshW_of_link_prompt_fam UL Np (fun p => uptermShape (GF := GF) ug I (5 + p)) l vw rb hl2
   iapply uterm_prompt_step ug hcons I
 
 /-- **Rocq `udone_fam`**: THE COMMITTED ROUND's step family -- its first byte
 files the family's merged block through the record's N-writer arm and turns
 the deed's PRE tie into DONE; its second is the record's space. -/
 noncomputable def udone_fam (I : List (BitVec 8)) : Nat → IProp GF
-  | 0 => iprop(updoneShape (hlc := hlc) ug I ∗ ushDeedAt (hlc := hlc) ug r upreTie s0 I
-      ∗ f0cw ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0)
-  | p + 1 => iprop(uWcl (hlc := hlc) ug s0 I (p + 1) ∗ ushDoneAt (hlc := hlc) ug r s0 I)
+  | 0 => iprop(updoneShape ug I ∗ ushDeedAt ug r upreTie s0 I
+      ∗ f0cw ug.ugnFile (genId (GF := GF) + 1) s0)
+  | p + 1 => iprop(uWcl ug s0 I (p + 1) ∗ ushDoneAt ug r s0 I)
 
 theorem udone_fam_0 (I : List (BitVec 8)) :
-    udone_fam (hlc := hlc) (GF := GF) ug r s0 I 0 =
-      iprop(updoneShape (hlc := hlc) ug I ∗ ushDeedAt (hlc := hlc) ug r upreTie s0 I
-        ∗ f0cw ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0) := rfl
+    udone_fam (GF := GF) ug r s0 I 0 =
+      iprop(updoneShape ug I ∗ ushDeedAt ug r upreTie s0 I
+        ∗ f0cw ug.ugnFile (genId (GF := GF) + 1) s0) := rfl
 
 theorem udone_fam_S (I : List (BitVec 8)) (p : Nat) :
-    udone_fam (hlc := hlc) (GF := GF) ug r s0 I (p + 1) =
-      iprop(uWcl (hlc := hlc) ug s0 I (p + 1) ∗ ushDoneAt (hlc := hlc) ug r s0 I) := rfl
+    udone_fam (GF := GF) ug r s0 I (p + 1) =
+      iprop(uWcl ug s0 I (p + 1) ∗ ushDoneAt ug r s0 I) := rfl
 
 theorem udone_fam_2 (I : List (BitVec 8)) :
-    udone_fam (hlc := hlc) (GF := GF) ug r s0 I 2 =
-      iprop(uWcl (hlc := hlc) ug s0 I 2 ∗ ushDoneAt (hlc := hlc) ug r s0 I) := rfl
+    udone_fam (GF := GF) ug r s0 I 2 =
+      iprop(uWcl ug s0 I 2 ∗ ushDoneAt ug r s0 I) := rfl
 
 /-- The `'$'` of `udone_prompt_step`: file, then the N-writer arm. -/
-theorem udone_dollar (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+theorem udone_dollar (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (I : List (BitVec 8)) (b : BitVec 8) (Φ : IProp GF) (hbt : b = uPrompt[0]!) :
-    ⊢ udone_fam (hlc := hlc) ug r s0 I 0 -∗ (udone_fam (hlc := hlc) ug r s0 I (0 + 1) -∗ Φ) -∗
-      outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b Φ := by
+    ⊢ udone_fam ug r s0 I 0 -∗ (udone_fam ug r s0 I (0 + 1) -∗ Φ) -∗
+      outLink .uart0 (genId (GF := GF) + 1) b Φ := by
   rw [udone_fam_0, udone_fam_S, Nat.zero_add]
   iintro ⟨Hsh, Hdp, #Hcw⟩ HΦ
-  ihave #Hlk := unionLinks_holds (hlc := hlc) (GF := GF) ug hcons
+  ihave #Hlk := unionLinks_holds (GF := GF) ug hcons
   unfold updoneShape
   icases Hsh with ⟨%v, %γc, %γm, %dep, %sR, %lR, %hpp, #Hpin, #Hlb, #Hinv, Hall⟩
   obtain ⟨hdtl, hlR, ha, hl, hfc⟩ := hpp
@@ -285,7 +287,7 @@ theorem udone_dollar (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl 
   iapply uoutLink_fupd
   imod udone_file ug v I sR lR γc γm dep sw hT $$ Hinv Hall with ⟨%pre, HPW, %hbl⟩
   imodintro
-  iapply union_X_dollar_at ug s0 (genId (hlc := hlc) (GF := GF) + 1) v I b Φ hbt $$ Hpin Hlk [HPW] [HΦ Hdp]
+  iapply union_X_dollar_at ug s0 (genId (GF := GF) + 1) v I b Φ hbt $$ Hpin Hlk [HPW] [HΦ Hdp]
   · unfold unionXAt unionX
     isplitl [HPW]
     · isplitr
@@ -311,9 +313,9 @@ theorem udone_dollar (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl 
       · iapply ush_deed_taint ug r udoneTie s0 I $$ HT
 
 /-- **Rocq `udone_prompt_step`**. -/
-theorem udone_prompt_step (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+theorem udone_prompt_step (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (I : List (BitVec 8)) :
-    ⊢ promptStep (hlc := hlc) (GF := GF) (udone_fam (hlc := hlc) ug r s0 I) := by
+    ⊢ promptStep (GF := GF) (udone_fam ug r s0 I) := by
   unfold promptStep
   imodintro
   iintro %p %b %Φ %hb %hp Hsh HΦ
@@ -322,7 +324,7 @@ theorem udone_prompt_step (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) =
       rw [wrPrompt_head] at hb; exact (Option.some.inj hb).symm
     iapply udone_dollar ug r s0 hcons I b Φ hbt $$ Hsh HΦ
   · -- the space: the record's own step, the deed framed
-    ihave #Hlk := unionLinks_holds (hlc := hlc) (GF := GF) ug hcons
+    ihave #Hlk := unionLinks_holds (GF := GF) ug hcons
     rw [udone_fam_S]
     icases Hsh with ⟨Hc, Hd⟩
     icases ush_deed_nw ug r s0 udoneTie s0 I $$ Hd with ⟨#Hnw, Hd⟩
@@ -338,30 +340,30 @@ theorem udone_prompt_step (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) =
 
 /-- **Rocq `udone_prompt_arm`**. -/
 theorem udone_prompt_arm (UL : UK_LEAVES)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (Np : UkNames GF) (I : List (BitVec 8)) (l vw : List FdState) (rb : Bool)
     (hl2 : l[2]? = some (.open rb true (.device CONSOLE))) :
-    ⊢ kshW (hlc := hlc) Np (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2
-        iprop(ustdAt Np.fd l vw ∗ udone_fam (hlc := hlc) ug r s0 I 0)
-        iprop(ustdAt Np.fd l vw ∗ udone_fam (hlc := hlc) ug r s0 I 2) := by
-  iapply kshW_of_link_prompt_fam UL Np (udone_fam (hlc := hlc) (GF := GF) ug r s0 I) l vw rb hl2
+    ⊢ kshW Np (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2
+        iprop(ustdAt Np.fd l vw ∗ udone_fam ug r s0 I 0)
+        iprop(ustdAt Np.fd l vw ∗ udone_fam ug r s0 I 2) := by
+  iapply kshW_of_link_prompt_fam UL Np (udone_fam (GF := GF) ug r s0 I) l vw rb hl2
   iapply udone_prompt_step ug r s0 hcons I
 
 /-! ## S5 THE PROMPT LAW AT THE WIDENED CREDENTIAL -/
 
 /-- THE WILD ARM's steps (Rocq's inline `iAssert`): `"$ "` through the era's
 licence, the shape unmoved (seccomp design 10.5). -/
-theorem uwild_prompt_step (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+theorem uwild_prompt_step (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (I : List (BitVec 8)) :
-    ⊢ useccompShape (hlc := hlc) (GF := GF) ug I -∗
-      promptStep (hlc := hlc) (GF := GF) (fun _ => useccompShape (hlc := hlc) ug I) := by
+    ⊢ useccompShape (GF := GF) ug I -∗
+      promptStep (GF := GF) (fun _ => useccompShape ug I) := by
   iintro #Hw
   unfold promptStep
   imodintro
   iintro %p %b %Φ - - #Hs HΦ
   unfold useccompShape
   icases Hs with ⟨#Htok, -⟩
-  iapply union_write_link_wild ug hcons (genId (hlc := hlc) (GF := GF) + 1) b Φ $$ [Htok] [HΦ]
+  iapply union_write_link_wild ug hcons (genId (GF := GF) + 1) b Φ $$ [Htok] [HΦ]
   · iapply useccTok_of_at ug _ I
     iexact Htok
   · iapply HΦ
@@ -370,9 +372,9 @@ theorem uwild_prompt_step (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) =
 /-- **Rocq `ush_prompt_law_u`**: THE PROMPT LAW AT THE WIDENED CREDENTIAL
 (deviation 1). -/
 theorem ush_prompt_law_u (UL : UK_LEAVES)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug) :
-    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
-      shPromptLaw (hlc := hlc) (uWcu (hlc := hlc) ug r s0 (uptermShape ug) (updoneShape ug)) := by
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug) :
+    ⊢ unionLinks (GF := GF) ug -∗
+      shPromptLaw (uWcu ug r s0 (uptermShape ug) (updoneShape ug)) := by
   iintro #Hlk
   ihave #Hpl0 := ush_prompt_law_f ug r s0 UL hcons $$ Hlk
   unfold shPromptLaw
@@ -381,8 +383,8 @@ theorem ush_prompt_law_u (UL : UK_LEAVES)
   obtain ⟨γp, T, Wc, Wb, Pm⟩ := X
   dsimp only at hX
   subst hX
-  have hrfl : (UshCtx.mk γp T (uWcf (hlc := hlc) (GF := GF) ug r s0) Wb Pm).Wc = uWcf (hlc := hlc) ug r s0 := rfl
-  ihave #Hlaw := Hpl0 $$ %Np %(UshCtx.mk γp T (uWcf (hlc := hlc) (GF := GF) ug r s0) Wb Pm) %hrfl Hcode
+  have hrfl : (UshCtx.mk γp T (uWcf (GF := GF) ug r s0) Wb Pm).Wc = uWcf ug r s0 := rfl
+  ihave #Hlaw := Hpl0 $$ %Np %(UshCtx.mk γp T (uWcf (GF := GF) ug r s0) Wb Pm) %hrfl Hcode
   unfold ushPromptLaw
   dsimp only
   icases Hlaw with ⟨#Hplaw, #Hclaw⟩
@@ -392,8 +394,8 @@ theorem ush_prompt_law_u (UL : UK_LEAVES)
     have ⟨rb, hl2⟩ := hfd
     have Hta := uterm_prompt_arm ug UL hcons Np I l vw rb hl2
     have Hda := udone_prompt_arm ug r s0 UL hcons Np I l vw rb hl2
-    have Hwa := kshW_of_link_prompt_fam (hlc := hlc) UL Np
-      (fun _ => useccompShape (hlc := hlc) (GF := GF) ug I) l vw rb hl2
+    have Hwa := kshW_of_link_prompt_fam UL Np
+      (fun _ => useccompShape (GF := GF) ug I) l vw rb hl2
     unfold kshW at Hta Hda Hwa ⊢
     iintro %h %m %avail %ha0 %ha1 %ha2 #Hcode' ⟨Hstd, Hc⟩ Hrun Hcont
     icases uWcu_elim ug r s0 (uptermShape ug) (updoneShape ug) I 0 $$ Hc with

@@ -30,7 +30,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -40,7 +40,7 @@ set_option maxHeartbeats 16000000 in
 `SIE` (Rocq's `wp_npar_era`). -/
 theorem nparEra_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL : ILOCK)
     (IU : IUNLOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (IP : IPUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
@@ -58,7 +58,7 @@ theorem nparEra_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL : 
     (hbud : walkNeed (pathElems (bview plen pfun)).length ≤ n)
     (ha1 : k.regs 11#5 ≠ 0#64)
     (hpd : descPageRw pd) :
-    wp_npar_era_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun nfun
+    wp_npar_era_eb_body (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun nfun
       n Sb P Pmiss pid V M dqb dqs dqpv
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud ha1 hpd := by
   unfold wp_npar_era_eb_body
@@ -84,7 +84,7 @@ theorem nparEra_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL : 
     ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ $$ [$Hnext $Hcl]
   -- THE DEFERRED START, at the record
   ihave Hst := namexEraStart_ep A P Pmiss rfl $$ Hstart
-  ihave #Henv : namexEnv (hlc := hlc) Γ A $$ []
+  ihave #Henv : namexEnv Γ A $$ []
   · unfold namexEnv; iframe #
   ihave Hpre : namexPre k A nfun $$ [Hsb Hsi Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hnm Hbs Hs2 Hop Htx]
   · unfold namexPre namexKeep namexPath; iframe

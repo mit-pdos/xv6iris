@@ -22,7 +22,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -33,9 +33,9 @@ theorem wp_shSbrk (UL : UK_LEAVES) (HS : SH_SYS_SBRK)
     (ha0 : (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (m.get 10#5))).toInt = (n : Int))
     (hok : uszOk (sz + n)) (hal : pgRoundUpN sz = sz) :
     ⊢ ukCode N.t User.Sh.code.byte -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«sbrk») (2 + nn) -∗ usz N.s sz -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«sbrk») (2 + nn) -∗ usz N.s sz -∗
       (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = r⌝ -∗
-        ushmSbrkAns N sz n r -∗ urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + nn) -∗ wpLoop h') -∗
+        ushmSbrkAns N sz n r -∗ urun N h' m' (retPc (m.get 1#5)) (2 + nn) -∗ wpLoop h') -∗
       wpLoop h := by
   rw [show User.Sh.Sym.«sbrk» = 0xc2e from rfl]
   iintro #Hc Hrun Hsz Hcont

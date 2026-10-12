@@ -20,15 +20,15 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `wp_kshr_exec`**. -/
-theorem wp_shSysExec (UL : UK_LEAVES) (HR : USH_RUN_SYS_P) : wpShSysExecBody (hlc := hlc) (GF := GF) := by
+theorem wp_shSysExec (UL : UK_LEAVES) (HR : USH_RUN_SYS_P) : wpShSysExecBody (GF := GF) := by
   intro N h m avail
   iintro #Hc Hrun Hdep Hcont
-  ihave Hs := Xv6.ush_stub_exec (hlc := hlc) UL N
+  ihave Hs := Xv6.ush_stub_exec UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   rw [show User.Sh.Sym.«exec» + 2 = 0xc9c from rfl]

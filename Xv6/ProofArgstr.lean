@@ -46,7 +46,7 @@ theorem argstr_calleeSaved_mk (KR R : RegMap)
       | assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The block, opened at the trapframe -/
 
@@ -93,7 +93,7 @@ theorem argstr_argraw (AR : ARGRAW) (c : CPU) (k' : KCtx) (i : Nat) (tfp : BitVe
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = v⌝ -∗
       wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AR.wp_argraw (hlc := hlc) (GF := GF) c k' i tfp ws v dqt hi ha0 hws hnoff hK
+  have h := AR.wp_argraw (GF := GF) c k' i tfp ws v dqt hi ha0 hws hnoff hK
   unfold wp_argraw_body at h
   simp only [argrawAddr] at h
   exact h
@@ -118,7 +118,7 @@ theorem argstr_fetchstr (FS : FETCHSTR) (c : CPU) (k' : KCtx) (γl : GName) (γk
         byteBuf (k'.regs 11#5) (DFrac.own 1) bs) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := FS.wp_fetchstr (hlc := hlc) (GF := GF) c k' γl γk pa pid V M old
+  have h := FS.wp_fetchstr (GF := GF) c k' γl γk pa pid V M old
     hproc htier hnoff hK hlk hmax hmax'
   unfold wp_fetchstr_body at h
   simp only [fetchstrAddr] at h
@@ -167,7 +167,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem argstr_proof (AR : ARGRAW) (FS : FETCHSTR) : ARGSTR :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X cpu k γl γk pa pid V M i v old hi ha0 hv hproc htier hnoff hK hlk hmax
+  ⟨fun {GF} _ _ _ _ _ _ _ X cpu k γl γk pa pid V M i v old hi ha0 hv hproc htier hnoff hK hlk hmax
       hmax' => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩

@@ -122,7 +122,7 @@ theorem ustg_fs_rb (p : Producer) (fs : List Filt) (len : Nat) (gb : Nat → Bit
 /-! ## The claim, the supply, the deed's typing -/
 
 section Claim
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -132,22 +132,23 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Ic
 /-- **Rocq `ucons_claim`**: THE CLAIM A PIPELINE ROUND WRITES THROUGH -- the
 union's, which pays the N-writer family's obligation at every pipeline line
 (a pipeline line is not the wild one). -/
-theorem ucons_claim (ug : UnionGn) (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug) :
-    consClaimV (hlc := hlc) (GF := GF) (ugnPipe ug) ulmG pviewUnionU (ucparams ug) (∅ : Fstate) (uwa ug) :=
+theorem ucons_claim (ug : UnionGn) (hcons : MachFixedGS.consRes (GF := GF) = ucl ug) :
+    consClaimV (GF := GF) (ugnPipe ug) ulmG pviewUnionU (ucparams ug) (∅ : Fstate) (uwa ug) :=
   ⟨ucl ug, hcons, fun v I sR _ hlR => pblkU_ecl_holds ug v I sR _ hlR⟩
 
 /-- **Rocq `usup`**: the application's supply answers out of the taint. -/
 theorem usup (ug : UnionGn) (r : FileAppNames)
-    (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r) :
-    ⊢ □ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ appSup (GF := GF)) := by
-  have h := fileSup_of_taint (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r
+    (heq : HfpFileClaimsP.fileAppIs (GF := GF) ug.ugnFile.fgnCl r) :
+    ⊢ □ (fileTaint ug.ugnFile.fgnCl -∗ appSup (GF := GF)) := by
+  have h := fileSup_of_taint (GF := GF) ug.ugnFile.fgnCl r
   unfold HfpFileClaimsP.fileAppIs at heq
   have e := congrArg (fun (A : Appcfg GF) => appSupRaw (N := A.appNames) A.appPred A.appRun) heq
-  have e' : appSup (GF := GF) = appSupRaw (filePred (hlc := hlc) ug.ugnFile.fgnCl) r := e
+  have e' : appSup (GF := GF) = appSupRaw (filePred ug.ugnFile.fgnCl) r := e
   rw [e']
   iintro !> #Ht
   iapply h $$ Ht
 
+omit [MachGS GF] in
 /-- **Rocq `udeed_typed`**: the deed's typing -- a well-formed state, and a
 short content. -/
 theorem udeed_typed (c : FileFixed) (s : Dst) :
@@ -180,7 +181,6 @@ theorem udeed_typed (c : FileFixed) (s : Dst) :
         unfold lineMax at hb
         omega
 
-include hlc in
 /-- **Rocq `uup_um_usz`**: the parse's last malloc token is the break. -/
 theorem uup_um_usz (N : UkNames GF) (sz m : Nat) :
     ⊢ ushqUm N sz (0 + 2 * m + 1) -∗ usz N.s (sz + 65536) :=

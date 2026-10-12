@@ -289,7 +289,7 @@ theorem bm_insert_ind_facts (cov : ExtTreeSet Nat compare) (ls : Nat) (bm : Blkm
 /-! ## The indirect block's entry cell, inside the held buffer -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF] [CurCtx]
 
 /-- Entry `q`'s cell out of the checked-out indirect buffer, and back at
@@ -339,7 +339,7 @@ end
 /-! ## The frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The frame with slot 0 pinned to `s4`'s entry value: what the indirect
 arms hold between the `sd s4` and the `ld s4` (Rocq's `bm_frame4`). -/
@@ -459,7 +459,7 @@ macro_rules
 /-! ## The kit, the continuation -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- Everything the ALLOCATING arms need and the no-alloc caller does not
@@ -506,7 +506,7 @@ end
 /-! ## The payload at a generic view -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF] [CurCtx]
 
 /-- Rocq's `bm_held_content` at a share, at the parameter view
@@ -530,7 +530,7 @@ end
 /-! ## The callees, at their call sites (copies of BallocDefs' wrappers) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -538,7 +538,7 @@ set_option maxHeartbeats 1000000 in
 (Rocq's `balloc_contract`), at EITHER entry `SIE` (`BALLOC.wp_balloc_gen_eb`):
 the trap-CSR complement at a named index `s`, so a caller's
 `trapCsrsExt c k.sie` frames syntactically. -/
-theorem bm_balloc (BA : BALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem bm_balloc (BA : BALLOC) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
     (logstart bmapstart size : Nat) (dev : BitVec 32)
@@ -578,7 +578,7 @@ theorem bm_balloc (BA : BALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := BA.wp_balloc_gen_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j γ γfs
+  have h := BA.wp_balloc_gen_eb (GF := GF) Γ c k' γl γb V γdl pd pav pu j γ γfs
     logstart bmapstart size dev u cr Sb pidv dqp dqb dqs
     hj hproc hK hnoff htier hgeom hbm hcredit hdev hcl hdt hpd ha0
   unfold wp_balloc_gen_eb_body at h

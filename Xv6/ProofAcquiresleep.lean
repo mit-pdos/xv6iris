@@ -140,7 +140,7 @@ theorem asl_popExit (kb : KCtx) (s a b : Bool) (hwf : kb.wf) (hs : kb.sie = s) :
   rw [hs] at h; exact h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [CurCtx]
 
 /-! ## The post -/
 
@@ -214,7 +214,7 @@ theorem asl_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl : GName) (lk : Bit
       locked γl cpu' -∗ Rp curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl "sleep lock" Rp hnoff hK hs
+  have h := AC.wp_acquire (GF := GF) c k' γl "sleep lock" Rp hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
@@ -234,7 +234,7 @@ theorem asl_acquire_llb (AC : ACQUIRE_LLB) (c : CPU) (k' : KCtx) (γl : GName) (
       locked γl cpu' -∗ Rp curCtx -∗ (∃ K : Nat, viewLb cpu' K ∗ ⌜tl ≤ K⌝) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire_llb (hlc := hlc) (GF := GF) c k' γl "sleep lock" Rp tl hnoff hK hs
+  have h := AC.wp_acquire_llb (GF := GF) c k' γl "sleep lock" Rp tl hnoff hK hs
   unfold wp_acquire_llb_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
@@ -253,7 +253,7 @@ theorem asl_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γl : GName) (lk : Bit
         (k'.locks.filter (fun x => x ≠ "sleep lock"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl "sleep lock" Rp hsie hnoff hK reen
+  have h := RE.wp_release (GF := GF) c k' γl "sleep lock" Rp hsie hnoff hK reen
     hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -269,13 +269,13 @@ theorem asl_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
+  have h := MP.wp_myproc (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
-theorem asl_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem asl_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hchan : k'.regs 10#5 ≠ 0#64)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : sleepPrepareSlots ≤ k'.avail)
@@ -286,7 +286,7 @@ theorem asl_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc :
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := SP.wp_sleep_prepare (hlc := hlc) (GF := GF) Γ c k' j hj hproc hchan hnoff hK hlk htier
+  have h := SP.wp_sleep_prepare (GF := GF) Γ c k' j hj hproc hchan hnoff hK hlk htier
   unfold wp_sleep_prepare_body at h
   simp only [sleepPrepareAddr] at h
   exact h
@@ -294,7 +294,7 @@ theorem asl_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc :
 set_option maxHeartbeats 1000000 in
 /-- `sleep` at either `SIE`, with the complement at a named index `s` and
 proc `p` (so the caller's hypotheses frame syntactically). -/
-theorem asl_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem asl_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat) (s : Bool) (p : BitVec 64)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : sleepSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hs : k'.sie = s) (hp : k'.proc = p) :
@@ -306,7 +306,7 @@ theorem asl_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
-  have h := SL.wp_sleep_eb (hlc := hlc) (GF := GF) Γ c k' j hj hproc hK hnoff htier
+  have h := SL.wp_sleep_eb (GF := GF) Γ c k' j hj hproc hK hnoff htier
   unfold wp_sleep_eb_body at h
   simp only [sleepAddr] at h
   exact h
@@ -316,7 +316,7 @@ end
 /-! ## The exit path `(KernelSyms.«acquiresleep» + 0x36)`: take the lock, stamp the pid, release -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
 
 theorem acquiresleep_br_ffffffffffffcba8 : KA.«acquiresleep» + 0xffffffffffffcba8#64 = KA.«release» := by decide
 
@@ -481,7 +481,7 @@ end
 /-! ## The wait loop at `(KernelSyms.«acquiresleep» + 0x1c)` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
 
 /-- The loop invariant at `0x80004154`: the inner lock held with its payload
 closed, `s1 = lk`, `s2 = &lk->lk`, the deposit still in hand, and the WHOLE
@@ -540,7 +540,7 @@ exit at `(KernelSyms.«acquiresleep» + 0x36)`.  The release re-splits the
 bundle (its arm back to the pop, the complement to `sleep`); the re-acquire
 joins them again. -/
 theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPARE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 cpu : CPU) (k kb : KCtx) (hb : AslBase k kb)
     (γl γ : GName) (Rp : CtxId → IProp GF) [CtxMorph Rp] (Hd : Qp → IProp GF) (q : Qp)
     (slk : BitVec 64) (j : Nat) (pid : BitVec 32) (dqp : DFrac)
@@ -721,7 +721,7 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
 set_option maxHeartbeats 16000000 in
 /-- The loop at `0x80004154`, closed by Löb induction. -/
 theorem asl_loop (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPARE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k kb : KCtx) (hb : AslBase k kb)
     (γl γ : GName) (Rp : CtxId → IProp GF) [CtxMorph Rp] (Hd : Qp → IProp GF) (q : Qp)
     (slk : BitVec 64) (j : Nat) (pid : BitVec 32) (dqp : DFrac)
@@ -750,7 +750,7 @@ complement following the thread); the acquire's arm joined with the
 complement is the loop's bundle (`armExt_join`). -/
 theorem acquiresleep_llb_proof (ACL : ACQUIRE_LLB) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPARE)
     (SL : SLEEP) : ACQUIRESLEEP_LLB := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ X Γ _ c0 k γl γ Rp _ Hd q j pid dqp tl
+  fun {GF} _ _ _ _ _ _ _ _ X Γ _ c0 k γl γ Rp _ Hd q j pid dqp tl
       hj hproc hK hnoff htier => by
   have AC : ACQUIRE := ACL.toACQUIRE
   obtain ⟨ξ0, t0⟩ := X
@@ -888,7 +888,7 @@ theorem asl_pushed_spie_nb (k : KCtx) (m : Nat) :
 theorem asl_withSpie_self_nb (k : KCtx) : k.withSpie k.spie k.spp = k := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
 
 /-- The non-blocking specification's post, as a λ over the returning hart. -/
 def aslPostNb (k : KCtx) (γ γt : GName) (Rp : CtxId → IProp GF) (q : Qp) (slk : BitVec 64)
@@ -1066,7 +1066,7 @@ set_option maxHeartbeats 32000000 in
 set_option maxRecDepth 20000 in
 /-- **`acquiresleep` meets its non-blocking specification.** -/
 theorem acquiresleep_nb_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) : ACQUIRESLEEP_NB := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ X cpu k γl γ γt Rp _ q pid dqp hK hsie hnoff hs htier => by
+  fun {GF} _ _ _ _ _ _ _ _ X cpu k γl γ γt Rp _ q pid dqp hK hsie hnoff hs htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_acquiresleep_nb_body

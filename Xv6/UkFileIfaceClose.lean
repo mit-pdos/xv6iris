@@ -30,7 +30,7 @@ open Std (ExtTreeSet)
 open HfpFileClaimsP UkFileDev
 
 noncomputable section FifClose
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -47,7 +47,7 @@ theorem fif_set_closed_ne (l : List FdState) (k : Nat) (fd' : Int) (h0 : 0 ≤ f
   rw [List.getElem?_set_ne (fif_slot_ne k fd' h0 hne)]
 
 namespace FifCtx
-variable (X : FifCtx hlc GF)
+variable (X : FifCtx GF)
 
 /-- **Rocq `fif_fds_close`**: the ledger after a close of an unprotected
 device's last descriptor, rebuilt (deviation 2). -/
@@ -75,14 +75,14 @@ theorem fif_fds_close (fdm : Fdmap) (fd : Int) (d : Nat) (v : Fdev) (l l' : List
 /-- **Rocq `fif_close_in`**: `eiClose` of an input's descriptor -- the
 handle (or the ledger's slot), the deed straight back to the core, the token
 home to the pool. -/
-theorem fif_close_in (DP : FifDevP (hlc := hlc) (GF := GF)) (STB : FdevStubs (hlc := hlc) X.N X.P)
+theorem fif_close_in (DP : FifDevP (GF := GF)) (STB : FdevStubs X.N X.P)
     (fdm : Fdmap) (fd : Int) (d : Nat) (Sin : List (BitVec 8)) (files : Bytes → Option Bytes)
     (paths : List Bytes) (K : Int → IProp GF) (hfd : fdm fd = some d) (hns : ¬ fdShared fdm fd d)
     (hD : d ∉ X.D0) :
     ⊢ X.fifFds fdm -∗ X.fifFilesr files paths -∗ X.fifIn d Sin -∗
       ((X.fifFds (fdDelete fdm fd) -∗ X.fifFilesr files paths -∗ K 0) ∧
        (∀ y, X.fifTaint (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗
-      clObl (hlc := hlc) X.N X.P fd K := by
+      clObl X.N X.P fd K := by
   have hn := Xv6.not_shared fdm fd d hns
   iintro Hfds #Hfiles Hin HK
   ihave Hfds := X.fifFds_open fdm $$ Hfds
@@ -130,7 +130,7 @@ theorem fif_close_in (DP : FifDevP (hlc := hlc) (GF := GF)) (STB : FdevStubs (hl
 
 /-- **Rocq `fif_close_std_dev`**: a close of a STANDARD stream of any other
 kind (the console, the file a redirect holds), unprotected. -/
-theorem fif_close_std_dev (DP : FifDevP (hlc := hlc) (GF := GF)) (STB : FdevStubs (hlc := hlc) X.N X.P)
+theorem fif_close_std_dev (DP : FifDevP (GF := GF)) (STB : FdevStubs X.N X.P)
     (fdm : Fdmap) (fd : Int) (d : Nat) (v : Fdev) (l : List FdState) (vs : FifVs) (w : Nat → Fdev)
     (st : FdState) (K : Int → IProp GF) (hfd : fdm fd = some d) (hns : ¬ fdShared fdm fd d) (hD : d ∉ X.D0)
     (hok : fifOk X.D0 X.w0 fdm l vs) (hv : get? vs d = some v) (h0 : 0 ≤ fd) (hs : fd < (NSTD : Int))
@@ -139,7 +139,7 @@ theorem fif_close_std_dev (DP : FifDevP (hlc := hlc) (GF := GF)) (STB : FdevStub
       ([∗map] d ↦ v ∈ vs, fifTok (GF := GF) X.γreg d (1 : Qp).half v) -∗ fifTok X.γreg d (1 : Qp).half v -∗
       fifHdls X.N.fd fdm vs -∗ X.fifDq -∗ X.fifEnv -∗ X.fifExitK -∗
       (X.fifFds (fdDelete fdm fd) -∗ K 0) -∗
-      clObl (hlc := hlc) X.N X.P fd K := by
+      clObl X.N X.P fd K := by
   have hn := Xv6.not_shared fdm fd d hns
   iintro Hstd Hcwd Hpool Htoks Htk Hhs Hdq #He Hk HK
   ihave Hhs := fifHdls_delete X.N.fd fdm vs (delete vs d) fd d hfd
@@ -161,13 +161,13 @@ theorem fif_close_std_dev (DP : FifDevP (hlc := hlc) (GF := GF)) (STB : FdevStub
 
 /-- **Rocq `fif_close`**: `eiClose`, the last descriptor of an UNPROTECTED
 device. -/
-theorem fif_close (DP : FifDevP (hlc := hlc) (GF := GF)) (STB : FdevStubs (hlc := hlc) X.N X.P)
+theorem fif_close (DP : FifDevP (GF := GF)) (STB : FdevStubs X.N X.P)
     (fdm : Fdmap) (fd : Int) (d : Nat) (x : Dspec) (files : Bytes → Option Bytes) (paths : List Bytes)
     (K : Int → IProp GF) (hfd : fdm fd = some d) (hnsp : ¬ fdSharedP X.D0 fdm fd d) :
     ⊢ X.fifFds fdm -∗ X.fifFilesr files paths -∗ X.fifDev d x -∗
       ((X.fifFds (fdDelete fdm fd) -∗ X.fifFilesr files paths -∗ K 0) ∧
        (∀ y, X.fifTaint (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗
-      clObl (hlc := hlc) X.N X.P fd K := by
+      clObl X.N X.P fd K := by
   have hD : d ∉ X.D0 := fun h => hnsp ((fdSharedP_iff _ _ _ _).2 (Or.inl h))
   have hns : ¬ fdShared fdm fd d := fun h => hnsp ((fdSharedP_iff _ _ _ _).2 (Or.inr h))
   cases x with
@@ -221,13 +221,13 @@ theorem fif_close (DP : FifDevP (hlc := hlc) (GF := GF)) (STB : FdevStubs (hlc :
 /-- **Rocq `fif_close_shared`**: `eiCloseShared` -- a dup, or a PROTECTED
 device's descriptor: the device stays registered, only the ledger's slot
 closes. -/
-theorem fif_close_shared (DP : FifDevP (hlc := hlc) (GF := GF)) (STB : FdevStubs (hlc := hlc) X.N X.P)
+theorem fif_close_shared (DP : FifDevP (GF := GF)) (STB : FdevStubs X.N X.P)
     (hw0 : ∀ d, d ∈ X.D0 → ∀ nm i γo, X.w0 d ≠ .FDIn false nm i γo)
     (fdm : Fdmap) (fd : Int) (d : Nat) (K : Int → IProp GF) (hfd : fdm fd = some d)
     (hsh : fdSharedP X.D0 fdm fd d) :
     ⊢ X.fifFds fdm -∗
       ((X.fifFds (fdDelete fdm fd) -∗ K 0) ∧ (∀ y, X.fifTaint (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗
-      clObl (hlc := hlc) X.N X.P fd K := by
+      clObl X.N X.P fd K := by
   iintro Hfds HK
   ihave Hfds := X.fifFds_open fdm $$ Hfds
   icases Hfds with ⟨%l, %vs, %w, ⟨Hstd, Hcwd, %hok, Hpool, Htoks, Hhs, Hdq, #He⟩, Hk⟩

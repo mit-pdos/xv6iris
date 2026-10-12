@@ -69,7 +69,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The ring's ghost half -/
 
@@ -215,9 +215,9 @@ witness at this byte), the kernel's half of the arm at the position it has
 reached, and the application's licence to close it there. -/
 def ciAppend (γ : UartNames) (hb : List Obs) (cb : BitVec 8) (cs : List (BitVec 8)) (j : Nat)
     (Φ : IProp GF) : IProp GF := iprop%
-  ⌜traceShape hb true⌝ ∗ ⌜obsBoots hb = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
+  ⌜traceShape hb true⌝ ∗ ⌜obsBoots hb = genId (GF := GF) + 1⌝ ∗
   uartArm γ (1 : Qp).half (some ((hb, cb, cs), j)) ∗
-  consLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) .evClose Φ
+  consLink .uart0 (genId (GF := GF) + 1) .evClose Φ
 
 /-- THE STORE at `cons.e`, with the log entry filed in the same ghost step
 (Rocq `ct_gh_push`). -/
@@ -349,6 +349,7 @@ def ciHiOut (γ : UartNames) (hb : List Obs) : IProp GF := iprop%
 def ciHiKill (γ : UartNames) (hb : List Obs) : IProp GF := iprop%
   ∃ hh' : Option (List Obs), rxHi γ (1 : Qp).half hh' ∗ ⌜ohistExt hh' hb⌝
 
+omit [MachGS GF] in
 theorem ciHiKill_out (γ : UartNames) (hb : List Obs) :
     ciHiKill (GF := GF) γ hb ⊢ ciHiOut γ hb := by
   unfold ciHiKill ciHiOut
@@ -357,6 +358,7 @@ theorem ciHiKill_out (γ : UartNames) (hb : List Obs) :
   iframe Hhi
   ipureintro; exact ohistLe_of_ext hh' hb hx
 
+omit [MachGS GF] in
 theorem ciHiOut_some (γ : UartNames) (hb : List Obs) :
     rxHi (GF := GF) γ (1 : Qp).half (some hb) ⊢ ciHiOut γ hb := by
   unfold ciHiOut
@@ -372,11 +374,11 @@ lane K1: the machine was ON at its arrival, and the arrival is THIS era's),
 its wire rider, and the application's shift with this call's three facts
 discharged. -/
 def ciPay (γ : UartNames) (hb : List Obs) (cb : BitVec 8) : IProp GF := iprop%
-  ⌜traceShape hb true⌝ ∗ ⌜obsBoots hb = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
+  ⌜traceShape hb true⌝ ∗ ⌜obsBoots hb = genId (GF := GF) + 1⌝ ∗
   outLb γ (obsWire .uart0 (openSeg hb)) ∗
   □ ∀ (cs : List (BitVec 8)) (Φ : IProp GF), ⌜consEcho cb cs⌝ -∗ Φ -∗
-    consLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) (.evOpen hb cb cs)
-      (consRun (genId (hlc := hlc) (GF := GF) + 1) cs Φ)
+    consLink .uart0 (genId (GF := GF) + 1) (.evOpen hb cb cs)
+      (consRun (genId (GF := GF) + 1) cs Φ)
 
 instance ciPay_persistent (γ : UartNames) (hb : List Obs) (cb : BitVec 8) :
     Persistent (ciPay (GF := GF) γ hb cb) := by
@@ -384,8 +386,8 @@ instance ciPay_persistent (γ : UartNames) (hb : List Obs) (cb : BitVec 8) :
 
 /-- The era stamp is spent here, once (Rocq `ct_mk_pay`). -/
 theorem ciMkPay (γ : UartNames) (hb : List Obs) (cb : BitVec 8) (hends : obsEndsIn .uart0 hb cb)
-    (hbts : obsBoots hb = genId (hlc := hlc) (GF := GF) + 1) (hshb : traceShape hb true) :
-    consEchoShift (GF := GF) ⊢ MachFixedGS.rxTag (hlc := hlc) (GF := GF) hb -∗ obsHistLb hb -∗
+    (hbts : obsBoots hb = genId (GF := GF) + 1) (hshb : traceShape hb true) :
+    consEchoShift (GF := GF) ⊢ MachFixedGS.rxTag (GF := GF) hb -∗ obsHistLb hb -∗
       outLb γ (obsWire .uart0 (openSeg hb)) -∗ ciPay γ hb cb := by
   unfold consEchoShift ciPay
   iintro #Hsh #Htg #Hlb #Hwlb
@@ -474,7 +476,7 @@ theorem ciChFull (γ : UartNames) (hb : List Obs) (cb : BitVec 8) (hg : Option (
     isplitr
     · ipureintro; exact hk2
     · iempintro
-  ihave Hch := consRun_full (genId (hlc := hlc) (GF := GF) + 1) hb cs Φ $$ Hrun
+  ihave Hch := consRun_full (genId (GF := GF) + 1) hb cs Φ $$ Hrun
   ihave H := storeChain_of_echoChain γ hb cb cs cs 0 _ (fun n b hn => by simpa using hn)
     $$ Harm Hch
   imodintro
@@ -491,12 +493,12 @@ theorem ciChBs (γ : UartNames) (hb : List Obs) (cb : BitVec 8) (hg : Option (Li
     (pre bs : List (BitVec 8)) (Φ : IProp GF) :
     logHi (GF := GF) γ (1 : Qp).half hg ∗
       uartArm γ (1 : Qp).half (some ((hb, cb, pre ++ consputcBs ++ bs), pre.length)) ∗
-      consRun (genId (hlc := hlc) (GF := GF) + 1) (consputcBs ++ bs) Φ ⊢
+      consRun (genId (GF := GF) + 1) (consputcBs ++ bs) Φ ⊢
       storeChain .uart0 γ consputcBs iprop(logHi γ (1 : Qp).half hg ∗
         uartArm γ (1 : Qp).half (some ((hb, cb, pre ++ consputcBs ++ bs), pre.length + consputcBs.length)) ∗
-        consRun (genId (hlc := hlc) (GF := GF) + 1) bs Φ) := by
+        consRun (genId (GF := GF) + 1) bs Φ) := by
   iintro ⟨Hlgh, Harm, Hrun⟩
-  ihave Hch := consRun_step (genId (hlc := hlc) (GF := GF) + 1) hb consputcBs bs Φ $$ Hrun
+  ihave Hch := consRun_step (genId (GF := GF) + 1) hb consputcBs bs Φ $$ Hrun
   ihave H := storeChain_of_echoChain γ hb cb (pre ++ consputcBs ++ bs) consputcBs pre.length _
       (fun n b hn => by
         have hlt : n < consputcBs.length := (List.getElem?_eq_some_iff.mp hn).1
@@ -533,11 +535,11 @@ theorem ciBs_snoc (i : Nat) :
 `n` (the editable window's length at entry), `i` triples already emitted. -/
 def ciKillRun (γ : UartNames) (hb : List Obs) (cb : BitVec 8) (nrem : Nat) : IProp GF := iprop%
   ∃ (hg : Option (List Obs)) (i n : Nat), ⌜ohistExt hg hb⌝ ∗ ⌜k1Next hg hb⌝ ∗
-    ⌜traceShape hb true⌝ ∗ ⌜obsBoots hb = genId (hlc := hlc) (GF := GF) + 1⌝ ∗ ⌜nrem ≤ n⌝ ∗
+    ⌜traceShape hb true⌝ ∗ ⌜obsBoots hb = genId (GF := GF) + 1⌝ ∗ ⌜nrem ≤ n⌝ ∗
     logHi γ (1 : Qp).half hg ∗
     uartArm γ (1 : Qp).half (some ((hb, cb, (List.replicate i consputcBs).flatten ++
       (List.replicate n consputcBs).flatten), ((List.replicate i consputcBs).flatten).length)) ∗
-    consRun (genId (hlc := hlc) (GF := GF) + 1) (List.replicate n consputcBs).flatten iprop(True)
+    consRun (genId (GF := GF) + 1) (List.replicate n consputcBs).flatten iprop(True)
 
 /-- Rocq `ct_mk_kill_run`: the arm is opened at the window's length. -/
 theorem ciMkKillRun (γ : UartNames) (hb : List Obs) (cb : BitVec 8) (nrem : Nat)

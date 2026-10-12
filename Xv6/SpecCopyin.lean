@@ -47,7 +47,7 @@ open LeanRV64D
 
 def copyinAddr : BitVec 64 := KA.«copyin»
 
-def wp_copyin_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_copyin_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (old : List (BitVec 8)) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 50 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
@@ -71,9 +71,9 @@ def wp_copyin_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv
   ⊢ wpLoop (GF := GF) cpu
 
 structure COPYIN : Prop where
-  wp_copyin : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_copyin : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (ke : Nat)
     hnoff hK hlk hroot hsz hlen hlen',
-    wp_copyin_body (hlc := hlc) (GF := GF) cpu k γl γk P M old ke hnoff hK hlk hroot hsz hlen hlen'
+    wp_copyin_body (GF := GF) cpu k γl γk P M old ke hnoff hK hlk hroot hsz hlen hlen'
 
 end Xv6

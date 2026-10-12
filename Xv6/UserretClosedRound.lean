@@ -63,7 +63,7 @@ theorem urc_uservecRegs_ra (g : RegMap) (ws : List (BitVec 64)) : jumpPc (userve
 attribute [local irreducible] uservecTf
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -72,10 +72,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 theorem urcRut_open (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU) (sz : Nat)
     (γfd : GName) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool)
     (secc : BitVec 64) (Wr : Uvis) (p : UPtd) :
-    urcRut (hlc := hlc) PT Γ j cpu sz γfd cw gn cs pid lz secc Wr p ⊢
+    urcRut PT Γ j cpu sz γfd cw gn cs pid lz secc Wr p ⊢
       ∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz secc k ksp V⌝ ∗
         userretLeft cpu k ∗ tfPageAt p.tfp V.tf ∗
-        (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt (hlc := hlc) PT Γ j cpu p ksp V sts' cs pid) ∗
+        (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt PT Γ j cpu p ksp V sts' cs pid) ∗
         uhistAt Wr :=
   .rfl
 
@@ -109,7 +109,7 @@ theorem urc_niPidRow (W : Uvis) (V : ProcPriv) (sc : BitVec 64) (V' : ProcPriv) 
 set_option maxHeartbeats 2000000 in
 /-- **THE ROUND'S EXIT**: usertrap's post, at the record uservec saved, to
 the next round (steps A/B, then the resume). -/
-theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat)
+theorem urc_exit (UR : USERRET) [NiFitIs GF] (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat)
     (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (k : KCtx) (pt : UPtd) (ksp : BitVec 64)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (sc : BitVec 64) (f : UexecSG.sfam GF)
     (cpu' : CPU)
@@ -120,10 +120,10 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
     (hproc : k.proc = procAddr j) (hsie : k.sie = false) (htier : k.tier = KTier.kpt) (hnoff : k.noff = 0)
     (hsp : (uservecCtx k (tfResumeGpr0 W.tf) V.tf).sp = ksp) (hav : k.avail = 512)
     (i : Nat) (x : Obs) (hx : exitFits x sc W) (Wr : Uvis) (hland : Ustep.ulands Wr sc W) :
-    wireInv ∗ uRcpt (i, x) ∗ MachFixedGS.uClaimR (hlc := hlc) (GF := GF) i ∗
-      kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop (hlc := hlc) PT Γ j ∗
-      (if sc = uecallScause then uexecArm (hlc := hlc) sc W f else iprop(emp)) ∗ uhistAt Wr ⊢
-      usertrapPost (hlc := hlc) (fun h => usertrapResAt (hlc := hlc) PT Γ j h)
+    wireInv ∗ uRcpt (i, x) ∗ MachFixedGS.uClaimR (GF := GF) i ∗
+      kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop PT Γ j ∗
+      (if sc = uecallScause then uexecArm sc W f else iprop(emp)) ∗ uhistAt Wr ⊢
+      usertrapPost (fun h => usertrapResAt PT Γ j h)
         (uservecCtx k (tfResumeGpr0 W.tf) V.tf) pt ksp (urcV0 V W) Mp W.fd gn cs pid (tfW W.tf tfEpcIdx) sc f
         (uvisRun W) cpu' := by
   unfold usertrapPost
@@ -179,7 +179,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
       urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm,
       urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp hlive,
       niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround)⟩
-  have HRS := urc_resume (hlc := hlc) (GF := GF) UR PT Γ j cpu'
+  have HRS := urc_resume (GF := GF) UR PT Γ j cpu'
     (((uservecCtx k (tfResumeGpr0 W.tf) V.tf).intrOff true false).withRegs R') 0
     P' ksp V' M' sts' gn cs' pid uepc sc2 tv2 hproc hctx' htier hnoff hsp' hav' ha0 hpc'
     (hVgn.symm.trans hgk.symm) (some (i, x)) hfit
@@ -192,7 +192,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
   -- (NI M3 U-2b) the resume key pinned whole off the ecall
   have hktr : sc ≠ uecallScause → ukeyEq W (uvisOf V' M' sts' gn cs' pid) :=
     urc_keyTransparent W V Mp sc V' M' sts' gn cs cs' pid hl hM hpi hsz hcw hgn hch hpid hlz hsc hround hfdk hchk
-  ihave #Hev : MachFixedGS.uEvid (hlc := hlc) (GF := GF) (some (i, x))
+  ihave #Hev : MachFixedGS.uEvid (GF := GF) (some (i, x))
       (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf)) $$ [Heo]
   · by_cases hcit : niCiting sc W
     · obtain ⟨hsce, hcn⟩ := hcit
@@ -218,7 +218,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
             ⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩,
             hdet, urc_niOutRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hM hpi hsz hch hlz hsc hev,
             ⟨hktr, hdet⟩, rfl, huc'⟩
-        iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ (some (ke, ι)) _ hfe
+        iapply NiFitIs.evid (GF := GF) i x _ (some (ke, ι)) _ hfe
         unfold niCiteRes niCiteResRaw niUhRes
         isplitr
         · iexists (niNamesHere (GF := GF))
@@ -233,7 +233,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
           ⟨fun h => absurd h hcit, fun h => absurd h (by simp)⟩, trivial, trivial,
           ⟨hktr, urc_keyBoot W V Mp sc V' M' sts' gn cs cs' pid hl hlw hM hpi hsz hcw hgn hch hpid hlz hsc hround
             hchk hfde hrp hlive hcit⟩, rfl, huc'⟩
-      iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ none _ hfe
+      iapply NiFitIs.evid (GF := GF) i x _ none _ hfe
       unfold niCiteRes niCiteResRaw niUhRes
       isplitl []
       · iempintro
@@ -248,16 +248,16 @@ set_option maxHeartbeats 1000000 in
 /-- **ONE ROUND**: the kernel obligation `ukb`, at the parked residue, from
 the loop hypothesis under the later. -/
 theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
-    (PT : SchedNames → IProp GF) [∀ Γ, Persistent (PT Γ)] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    [NiFitIs (hlc := hlc) GF]
-    (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
+    (PT : SchedNames → IProp GF) [∀ Γ, Persistent (PT Γ)] (Γ : SchedNames) [ClaimIs GF Γ]
+    [NiFitIs GF]
+    (hPT0 : PT = parkToken (GF := GF) (SG := uexecSGXv6))
     (j : Nat) (hj : j < NPROC) (h : CPU) (C : UCfg) (pt : UPtd) (sz : Nat) (γfd : GName) (cw : Nat)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) (secc : BitVec 64)
     (fdv : List FdState) (Wr : Uvis)
     (hWr : Wr.sz = sz ∧ Wr.perm = permOf pt.um sz ∧ Wr.fd = fdv ∧ Wr.cwd = cw ∧ Wr.gen = gn ∧ Wr.ch = cs ∧
       Wr.pid = pid ∧ Wr.lazy = lz ∧ Wr.secc = secc) (hlo : loopOk C pt) :
-    (wireInv ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop (hlc := hlc) PT Γ j) ∗ hwConfig h ⊢
-      ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz secc Wr) Wr := by
+    (wireInv ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop PT Γ j) ∗ hwConfig h ⊢
+      ukb h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz secc Wr) Wr := by
   unfold ukb ukbF trappedMachine
   obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9⟩ := hWr
   rw [e1, e2, e3, e4, e5, e6, e7, e8, e9]
@@ -285,7 +285,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   -- the deposit, split
   icases uexecRet_split sc W $$ Hret with ⟨%f, Hdep, Harm⟩
   -- uservec
-  have HUV := UV.wp_uservec (hlc := hlc) (GF := GF) h C pt (fun _ => iprop(emp)) k sz W.M V.tf ms sc stv
+  have HUV := UV.wp_uservec (GF := GF) h C pt (fun _ => iprop(emp)) k sz W.M V.tf ms sc stv
     (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) hlo hsie htier hkw
   unfold wp_uservec_body uservecPost at HUV
   iapply HUV
@@ -310,7 +310,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   have hstk : utStackTop (uservecCtx k (tfResumeGpr0 W.tf) V.tf) ksp :=
     ⟨by show uservecRegs (tfResumeGpr0 W.tf) V.tf 2#5 = ksp; rw [urc_uservecRegs_sp, hkw.2.1]; exact hksp, hkav⟩
   subst hPT0
-  have HUT := UT.wp_usertrap (hlc := hlc) (GF := GF) Γ h
+  have HUT := UT.wp_usertrap (GF := GF) Γ h
     (uservecCtx k (tfResumeGpr0 W.tf) V.tf) j pt ksp (urcV0 V W) Mp W.fd gn cs pid (tfW W.tf tfEpcIdx) sc stv
     f (uvisRun W) hj hproc (uservecCtx_ok k _ _ hsie) htier hnoff hstk hVgen.symm
   unfold wp_usertrap_body at HUT
@@ -318,7 +318,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   iframe Hk Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Hsin Hfin Hpin Hkin
   iapply wpNext_intro
   iintro %cpu'
-  iapply (urc_exit UR (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)) Γ j W V Mp k pt ksp gn cs pid sc f cpu' hl hlw hM' hpi' (hsz.trans hVsz.symm)
+  iapply (urc_exit UR (parkToken (GF := GF) (SG := uexecSGXv6)) Γ j W V Mp k pt ksp gn cs pid sc f cpu' hl hlw hM' hpi' (hsz.trans hVsz.symm)
     (hcw.trans hVcwi.symm) hgn hch hpid (hlz.trans hVlz.symm) (hsc.trans hVsc.symm) hVgen hproc hsie htier
     hnoff hstk.1 hkav ir
     (.uExit h (satpOf KTier.kpt pt.root) sc (tfW W.tf tfEpcIdx) (gprList (tfResumeGpr0 W.tf))) hxf Wr hland)

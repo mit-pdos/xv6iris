@@ -52,7 +52,7 @@ def uvLd (j rd : BitVec 5) : instruction := .LOAD (uvKImm j, .Regidx 10#5, .Regi
 def uvJalr : instruction := .JALR (0#12, .Regidx 5#5, .Regidx 1#5)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 theorem uvi_csrw_sscratch : kernelText (GF := GF) ⊢ urI 0x0#64 false uvCsrwSscratch :=
   userret_text_instrX _ 0x80006000#64 _ _ _ (by decide) (by decide) rfl rfl
@@ -226,7 +226,7 @@ theorem uservecTf_reg (ws : List (BitVec 64)) (g : RegMap) (hlen : ws.length = 3
 /-! ## §3 The trapped machine, opened -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **The trapped machine, opened** (uservec's entry, at the named data):
 the kernel's supervisor configuration cells over the user root (interrupts
@@ -243,7 +243,7 @@ theorem uservec_frame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPt
         clockCells cpu ∗ pcIs cpu (stvecBase C.stvec) ∗ gprFile cpu g ∗
         Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
         Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPages P Mp ∗ Rut P ∗
-        uExitTok (hlc := hlc) (.uExit cpu (satpOf .kpt P.root) sc sep (gprList g)) := by
+        uExitTok (.uExit cpu (satpOf .kpt P.root) sc sep (gprList g)) := by
   unfold userTrapFrameAtm userPtmInv userCfg userHwCells
   rw [hdq, hmie, hmed]
   iintro ⟨#Hhw, %hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%Mp, HP, %hM⟩,

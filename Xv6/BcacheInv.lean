@@ -207,7 +207,7 @@ attribute [reducible, instance] BcacheG.gmRefG
   BcacheG.stmG BcacheG.gvSlotd BcacheG.gvSlotp
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [CurCtx]
 
 /-! ## The circular LRU list -/
@@ -238,8 +238,8 @@ instance instCtxMorphBsegAt (h : BitVec 64) :
     ∀ (prev : BitVec 64) (l : List (BitVec 64)), CtxMorph (GF := GF) (fun ξ => bsegAt ξ h prev l)
   | _, [] => instCtxMorphConst _
   | prev, a :: l =>
-    @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAtN _ _ _ _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAtN _ _ _ _) (instCtxMorphBsegAt h a l))
+    @instCtxMorphSep GF _ _ _ (instCtxMorphWordAtN _ _ _ _)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAtN _ _ _ _) (instCtxMorphBsegAt h a l))
 
 instance instCtxMorphBcacheLruAt (h : BitVec 64) (l : List (BitVec 64)) :
     CtxMorph (GF := GF) (fun ξ => bcacheLruAt ξ h l) := by
@@ -923,12 +923,12 @@ instance instCtxMorphBkeyAll (γ : BcacheNames) (tl : Nat) (devs bnos : Nat → 
 instance instCtxMorphBcacheScanAt (γ : BcacheNames) (V : BioView GF) (tl : Nat) :
     CtxMorph (GF := GF) (fun ξ => bcacheScanAt γ V ξ tl) := by
   unfold bcacheScanAt
-  refine @instCtxMorphExists _ _ _ _ _ (fun M => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun nx => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun Ls => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun ord => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun devs => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun bnos => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun M => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun nx => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun Ls => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun ord => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun devs => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun bnos => ?_)
   have h := ctxMorph_bigSepL (GF := GF) (List.range NBUF)
     (fun _ k ξ => bslotAt γ ξ k (Ls k)) (fun _ k => instCtxMorphBslotAt γ k (Ls k))
   have h2 := instCtxMorphBkeyAll (GF := GF) γ tl devs bnos
@@ -937,14 +937,14 @@ instance instCtxMorphBcacheScanAt (γ : BcacheNames) (V : BioView GF) (tl : Nat)
 instance instCtxMorphBcacheResIn (γ : BcacheNames) (V : BioView GF) (tl : Nat) :
     CtxMorph (GF := GF) (bcacheResIn γ V tl) := by
   unfold bcacheResIn
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphBcacheScanAt γ V tl)
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphBcacheScanAt γ V tl)
 
 instance instCtxMorphBcacheResAt (γ : BcacheNames) (V : BioView GF) :
     CtxMorph (GF := GF) (bcacheResAt γ V) := by
   unfold bcacheResAt
-  refine @instCtxMorphExists _ _ _ _ _ (fun tl => ?_)
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphFloor tl)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphBcacheScanAt γ V tl))
+  refine @instCtxMorphExists _ _ _ _ (fun tl => ?_)
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphFloor tl)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphBcacheScanAt γ V tl))
 
 /-- **THE HOOK'S FOLD** (Rocq's `bcache_res2_fold_in`): the releaser's
 unfloored body plus the floor the hook mints at the lock's own stamped
@@ -1057,7 +1057,7 @@ theorem bufData_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < BSIZE) :
   rw [if_neg (by omega), if_pos (Or.inl ⟨hlo, hhi⟩)]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-! ## The per-buffer sleeplock, and the held handle -/
@@ -1114,7 +1114,7 @@ def bufBoxPay (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) : BoxPa
 instance bufHdr_morph (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) (i : BufId) (x : BufX) :
     CtxMorph (GF := GF) (bufHdr γ V k qd qb i x) := by
   unfold bufHdr
-  refine @instCtxMorphExists _ _ _ _ _ (fun v => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun v => ?_)
   infer_instance
 
 instance bufRest_morph (k : Nat) (x : BufX) : CtxMorph (GF := GF) (bufRest k x) := by
@@ -1171,10 +1171,10 @@ def bufSlpRaw (γo : GName) (γbk : BoxNames) : CtxId → IProp GF := fun ξ => 
 instance instCtxMorphBufSlpRaw (γo : GName) (γbk : BoxNames) :
     CtxMorph (GF := GF) (bufSlpRaw γo γbk) := by
   unfold bufSlpRaw
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphExists _ _ _ _ _ (fun s => ?_)
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor s.tp))
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphExists _ _ _ _ (fun s => ?_)
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor s.tp))
 
 /-- The raw row at the boot stamp: the checkout token and the park register
 at rest, with the free floor. -/
@@ -1200,10 +1200,10 @@ instance instCtxMorphBufSlpDep (γ : BcacheNames) (k T' : Nat) :
 instance instCtxMorphBufSlp (γ : BcacheNames) (k : Nat) :
     CtxMorph (GF := GF) (bufSlpBox γ k) := by
   unfold bufSlpBox
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphExists _ _ _ _ _ (fun s => ?_)
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor s.tp))
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphExists _ _ _ _ (fun s => ?_)
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor s.tp))
 
 /-- **THE SLEEPLOCK HOOK'S FOLD** (Rocq's `bslp_fold`). -/
 theorem bufSlp_fold_in (γ : BcacheNames) (k T' : Nat) :
@@ -1398,7 +1398,7 @@ theorem bcacheOrd_map (o1 o2 : List Nat) (kk : Nat) :
   simp
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [CurCtx]
 
 /-! ## Opening the cache and one slot -/
@@ -1597,6 +1597,7 @@ theorem bslotAt_intro (γ : BcacheNames) (ξ : CtxId) (k : Nat) (L : List Nat)
 
 /-! ## The authority and the lock's halves -/
 
+omit [MachGS GF] in
 theorem brefRest_keys (γ : BcacheNames) (M : RegMapF Nat) (k : Nat) (L : List Nat) :
     (γ.ref ↪●MAP M) ∗ ([∗list] id ∈ L, brefRest (GF := GF) γ k id) ⊢
       (γ.ref ↪●MAP M) ∗ ([∗list] id ∈ L, brefRest γ k id) ∗
@@ -1625,6 +1626,7 @@ theorem brefRest_keys (γ : BcacheNames) (M : RegMapF Nat) (k : Nat) (L : List N
       · exact he
       · exact ht f hf
 
+omit [MachGS GF] in
 /-- A whole reference element as its two halves. -/
 theorem bref_halves (γ : BcacheNames) (id : Nat) (v : Nat) :
     (γ.ref ↪◯MAP[id] v) ⊢@{IProp GF}
@@ -1658,6 +1660,7 @@ theorem bpin_fresh (M : RegMapF Nat) (nx k : Nat)
   rw [LawfulPartialMap.get?_insert_ne (show nx ≠ i by omega)]
   exact hfresh i (by omega)
 
+omit [MachGS GF] in
 /-- **`bpin`'s ghost step**: a fresh reference `nx ↦ k` is minted; the caller
 keeps one half (`brefTok`, the count half of `bref`), the lock the other. -/
 theorem bref_alloc_step (γ : BcacheNames) (M : RegMapF Nat) (nx k : Nat) (L : List Nat)
@@ -1717,6 +1720,7 @@ theorem bunpin_nodup (s t : List Nat) (id : Nat) (hnd : (s ++ id :: t).Nodup) : 
   obtain ⟨-, ht⟩ := List.nodup_cons.1 hidt
   exact List.nodup_append.2 ⟨hs, ht, fun a ha b hb => hdis a ha b (List.mem_cons_of_mem _ hb)⟩
 
+omit [MachGS GF] in
 /-- **`bunpin`'s ghost step**: the reference `id ↦ k` (our half and the
 lock's) is deleted; slot `k`'s list loses it. -/
 theorem bref_free_step (γ : BcacheNames) (M : RegMapF Nat) (s t : List Nat) (id k : Nat) :

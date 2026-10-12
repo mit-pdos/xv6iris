@@ -129,7 +129,7 @@ theorem shConsPath_of (E : ElfMem) (Mv : Nat → List (BitVec 8)) (hro : uimgSub
     exact hag _ _ (hro _ _ shConsRo_nul_bool)
 
 section UshConsK
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF] [DiskG GF]
   [FsTopG GF] [Appcfg GF] [Icfg]
@@ -142,10 +142,12 @@ console is absent (or the taint).  `AppEcho.echoConsNever_law` verbatim. -/
 def shConsNeverLaw (T K : IProp GF) : IProp GF :=
   iprop(□ (K -∗ □ (∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜consAbsent v⌝ ∨ T))))
 
+omit [MachGS GF] in
 /-- Rocq `sh_cons_never_law_persistent`. -/
 instance shConsNeverLaw_persistent (T K : IProp GF) : Persistent (shConsNeverLaw T K) := by
   unfold shConsNeverLaw; infer_instance
 
+omit [MachGS GF] in
 /-- **Rocq `sh_cons_abs_law_of_never`**: the law, in the linear form
 `UConsOpen`'s dead walk takes (`UInitCons.init_cons_abs_law`, unfolded). -/
 theorem shConsAbsLaw_of_never (T K : IProp GF) [Persistent K] :
@@ -172,7 +174,7 @@ back by `cons_open_dead_recv` (`openAbsentCall`).  Generic over the
 caller's literal: its code image `ro`, the path's address `pv` and the path
 reading; the console arm at any credential fact `Pv`.  Discharged by
 `UConsOpenCalls.shConsOpenCalls_holds`. -/
-structure ShConsOpenCalls {hlc : HasLC} (GF : BundledGFunctors.{0}) [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+structure ShConsOpenCalls (GF : BundledGFunctors.{0}) [MachGS GF] [CtokG GF] [UexecSG GF]
     [UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     [GhostMapG GF (Option Nat) UfdCell UfdMapF] [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
     [Xv6G GF] [DiskG GF] [FsTopG GF] [Appcfg GF] [Icfg] (γfs : FsNames) where
@@ -184,16 +186,16 @@ structure ShConsOpenCalls {hlc : HasLC} (GF : BundledGFunctors.{0}) [MachGS hlc 
     pv < 2 ^ 64 → ∀ (h : CPU) (m : RegMap) (pc : BitVec 64) (l v : List FdState) (avail : Nat),
     UkSysP.usysno m = 15 → m.get 10#5 = BitVec.ofNat 64 pv → m.get 11#5 = BitVec.ofNat 64 2 →
     (pc + 4#64) &&& 1#64 = 0#64 →
-    ⊢ initConsLawsAt echoFsPure (consMade r) Pv T K -∗ consMade r i -∗ appInv (hlc := hlc) γfs -∗
+    ⊢ initConsLawsAt echoFsPure (consMade r) Pv T K -∗ consMade r i -∗ appInv γfs -∗
       ukCode N.t ro -∗
-      uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ucwd N.cwd ROOTINO -∗
+      uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ ucwd N.cwd ROOTINO -∗
       ustdAt N.fd l v -∗
       (∀ (h' : CPU) (ret : BitVec 64),
         ((∃ fd : Nat, ⌜ret = BitVec.ofNat 64 fd ∧ fd < NOFILE⌝ ∗
             ∃ fdv : List FdState, ⌜tabLe fdv v⌝ ∗
               uallocV N.fd l fd (.open true true (.device CONSOLE)) (fdv.set fd (.open true true (.device CONSOLE)))) ∨
           (⌜ret = BitVec.ofInt 64 (-1)⌝ ∗ ustdAt N.fd l v) ∨ T) -∗
-        ucwd N.cwd ROOTINO -∗ urun (hlc := hlc) N h' (ukWr m 10#5 ret) (pc + 4#64) avail -∗ wpLoop h') -∗
+        ucwd N.cwd ROOTINO -∗ urun N h' (ukWr m 10#5 ret) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
   /-- the open at the pin that MISSES: `-1` with the ledger and the
   credential back, or the taint -/
@@ -204,18 +206,18 @@ structure ShConsOpenCalls {hlc : HasLC} (GF : BundledGFunctors.{0}) [MachGS hlc 
     UkSysP.usysno m = 15 → m.get 10#5 = BitVec.ofNat 64 pv → m.get 11#5 = BitVec.ofNat 64 2 →
     (pc + 4#64) &&& 1#64 = 0#64 →
     ⊢ □ (∀ v : Aview, K -∗ appPred appRun v -∗ appPred appRun v ∗ K ∗ (⌜consAbsent v⌝ ∨ T)) -∗
-      appInv (hlc := hlc) γfs -∗ ukCode N.t ro -∗
-      uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ucwd N.cwd ROOTINO -∗
+      appInv γfs -∗ ukCode N.t ro -∗
+      uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ ucwd N.cwd ROOTINO -∗
       ustdAt N.fd l v -∗ K -∗
       (∀ (h' : CPU) (ret : BitVec 64),
         ((⌜ret = BitVec.ofInt 64 (-1)⌝ ∗ ustdAt N.fd l v ∗ K) ∨ T) -∗
-        ucwd N.cwd ROOTINO -∗ urun (hlc := hlc) N h' (ukWr m 10#5 ret) (pc + 4#64) avail -∗ wpLoop h') -∗
+        ucwd N.cwd ROOTINO -∗ urun N h' (ukWr m 10#5 ret) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
 
 /-! ## S3 The two leaf discharges -/
 
 section UshConsKLeaves
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF] [DiskG GF]
   [FsTopG GF] [Appcfg GF] [Icfg]
@@ -231,16 +233,16 @@ theorem shOpen_regs (m : RegMap) (ha : m.get 10#5 = BitVec.ofNat 64 shConsPv ∧
 
 /-- **Rocq `sh_open_console_leaf_holds`**: THE OPEN AT THE RESOLVING PIN,
 sh's console arm -- the laws and the flag, never the key. -/
-theorem sh_open_console_leaf_holds (UL : UK_LEAVES) (γfs : FsNames) (P : ShConsOpenCalls (hlc := hlc) GF γfs)
+theorem sh_open_console_leaf_holds (UL : UK_LEAVES) (γfs : FsNames) (P : ShConsOpenCalls GF γfs)
     (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] [Timeless X.T] (K : IProp GF) (r : EchoNames) (i : Nat) :
-    ⊢ initConsLaws X.T K r -∗ consMade r i -∗ appInv (hlc := hlc) γfs -∗
-      □ ushOpenConsoleLeaf (hlc := hlc) N X := by
+    ⊢ initConsLaws X.T K r -∗ consMade r i -∗ appInv γfs -∗
+      □ ushOpenConsoleLeaf N X := by
   unfold initConsLaws
   iintro #Hlaws #Hmade #Hinv
   imodintro
   unfold ushOpenConsoleLeaf
   iintro %h %m %l %v %avail #Hc %ha Hrun Hcwd Hstd Hcont
-  ihave Hs := sh_stub_open (hlc := hlc) UL N
+  ihave Hs := sh_stub_open UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
@@ -259,16 +261,16 @@ theorem sh_open_console_leaf_holds (UL : UK_LEAVES) (γfs : FsNames) (P : ShCons
 
 /-- **Rocq `sh_open_absent_leaf_holds`**: THE OPEN AT THE PIN THAT MISSES,
 sh's absent arm -- on the persistent absence law. -/
-theorem sh_open_absent_leaf_holds (UL : UK_LEAVES) (γfs : FsNames) (P : ShConsOpenCalls (hlc := hlc) GF γfs)
+theorem sh_open_absent_leaf_holds (UL : UK_LEAVES) (γfs : FsNames) (P : ShConsOpenCalls GF γfs)
     (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] [Timeless X.T] (K : IProp GF) [Persistent K]
     [Timeless K] :
-    ⊢ shConsNeverLaw X.T K -∗ appInv (hlc := hlc) γfs -∗ □ ushOpenAbsentLeaf (hlc := hlc) N X K := by
+    ⊢ shConsNeverLaw X.T K -∗ appInv γfs -∗ □ ushOpenAbsentLeaf N X K := by
   iintro #Hlaw #Hinv
   imodintro
   unfold ushOpenAbsentLeaf
   iintro %h %m %l %v %avail #Hc %ha Hrun Hcwd Hstd HK Hcont
   ihave #Habs := shConsAbsLaw_of_never X.T K $$ Hlaw
-  ihave Hs := sh_stub_open (hlc := hlc) UL N
+  ihave Hs := sh_stub_open UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid

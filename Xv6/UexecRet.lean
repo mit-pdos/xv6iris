@@ -283,7 +283,7 @@ theorem urunEq_resume {Wk : Uvis} {V V2 : ProcPriv} {M M2 : Nat → List (BitVec
 /-! ## §2 The trapped machine -/
 
 section TrappedMachine
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **Rocq `trapped_machine`**: a thin wrapper on `userTrapFrameAtm` at the
 key's own data (the epc word in `sepc`, the resume file in `gprFile`, the lazy
@@ -348,11 +348,11 @@ theorem uexec_ite_ne {GF : BundledGFunctors.{0}} {k : Nat} {c : Prop} [Decidable
   · rw [if_neg h, if_neg h]; exact h2 h
 
 section UexecRet
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- Rocq `RiscvPtsto.riscv_kill_cred`: MachCSL's ambient kill credential. -/
-abbrev uKillCred : IProp GF := MachFixedGS.killCred (hlc := hlc) (GF := GF)
+abbrev uKillCred : IProp GF := MachFixedGS.killCred (GF := GF)
 
 /-! ### The payment -/
 
@@ -364,6 +364,7 @@ def upayAt (gn : GName) (sc secc : BitVec 64) (tf : List (BitVec 64)) (f : sfam 
     (if sc = uecallScause then (if usysEff secc tf = USYS_exit then sexitPay f (exitXs tf) else iprop(emp))
      else iprop(emp)))
 
+omit [MachGS GF] in
 /-- Rocq `upay_at_ueq`. -/
 theorem upayAt_ueq {gn gn' : GName} (sc secc : BitVec 64) {tf tf' : List (BitVec 64)} (f : sfam GF)
     (hn : usysNum tf = usysNum tf') (ha : tfW tf (tfArgIdx 0) = tfW tf' (tfArgIdx 0)) (hg : gn = gn') :
@@ -373,6 +374,7 @@ theorem upayAt_ueq {gn gn' : GName} (sc secc : BitVec 64) {tf tf' : List (BitVec
 /-- **Rocq `uexec_pay_dep`**. -/
 def uexecPayDep (sc : BitVec 64) (W : Uvis) (f : sfam GF) : IProp GF := upayAt W.gen sc W.secc W.tf f
 
+omit [MachGS GF] in
 /-- **Rocq `uexec_pay_dep_free`**: AT EVERY TRAP BUT THE EXIT ECALL THE
 DEPOSIT IS FREE. -/
 theorem uexecPayDep_free (sc : BitVec 64) (W : Uvis) (Q : Int → IProp GF) (f : sfam GF)
@@ -390,6 +392,7 @@ theorem uexecPayDep_free (sc : BitVec 64) (W : Uvis) (Q : Int → IProp GF) (f :
   · iexact H
   · iempintro
 
+omit [MachGS GF] in
 /-- Rocq `uexec_pay_dep_triv`: at a TRIVIALLY-PAID process. -/
 theorem uexecPayDep_triv (sc : BitVec 64) (W : Uvis) (f : sfam GF)
     (hf : sexitPay f = fun _ => iprop(True)) :
@@ -404,6 +407,7 @@ theorem uexecPayDep_triv (sc : BitVec 64) (W : Uvis) (f : sfam GF)
       · iempintro
     · iempintro
 
+omit [MachGS GF] in
 /-- Rocq `uexec_pay_dep_const`: AT A CONSTANT PAYLOAD, one copy of `R` pays
 every cause. -/
 theorem uexecPayDep_const (R : IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam GF)
@@ -419,11 +423,13 @@ theorem uexecPayDep_const (R : IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam G
       · iempintro
     · iempintro
 
+omit [MachGS GF] in
 /-- Rocq `uexec_pay_dep_ne` (a): off the ecall cause. -/
 theorem uexecPayDep_ne (sc : BitVec 64) (W : Uvis) (Q : Int → IProp GF) (f : sfam GF)
     (hne : sc ≠ uecallScause) (hf : sexitPay f = Q) : myPay W.gen Q ⊢ uexecPayDep sc W f :=
   uexecPayDep_free sc W Q f (fun h => hne h.1) hf
 
+omit [MachGS GF] in
 /-- Rocq `uexec_pay_dep_ret` (b): at an ecall of a RETURNING number. -/
 theorem uexecPayDep_ret (n : Int) (m : RegMap) (pc : BitVec 64) (M : ElfMem) (pm : Nat → Option UPerm)
     (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare)
@@ -433,6 +439,7 @@ theorem uexecPayDep_ret (n : Int) (m : RegMap) (pc : BitVec 64) (M : ElfMem) (pm
   uexecPayDep_free _ (uvisOfRun m pc M pm sz fdv cw gn cs pidv lz secc) Q f
     (fun h => hx (hn ▸ h.2)) hf
 
+omit [MachGS GF] in
 /-- Rocq `uexec_pay_dep_exit` (c): at the EXIT ecall, the payload outright. -/
 theorem uexecPayDep_exit (m : RegMap) (pc : BitVec 64) (M : ElfMem) (pm : Nat → Option UPerm)
     (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare)
@@ -472,6 +479,7 @@ def uwaitAnsPid (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) (pidv : BitV
 def uwaitAns (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) : IProp GF :=
   iprop(∃ pidv : BitVec 32, uwaitAnsPid r cs cs' pidv)
 
+omit [MachGS GF] in
 theorem uwaitAns_of_pid (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) (pidv : BitVec 32) :
     uwaitAnsPid (GF := GF) r cs cs' pidv ⊢ uwaitAns r cs cs' := by
   unfold uwaitAns; iintro H; iexists pidv; iexact H

@@ -168,7 +168,7 @@ theorem bm_buf_restore (bs : List (BitVec 8)) (q : Nat) (hq : 4 * q + 4 ≤ bs.l
     ← List.drop_drop, List.append_assoc, List.take_append_drop, List.take_append_drop]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- Rocq's `bm_buf_word_acc`: ONE 4-byte cell of a checked-out buffer's data
 area, borrowed and put back at whatever value the store left there
@@ -201,7 +201,7 @@ end
 /-! # (4) The coupling, at a share -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 /-- Rocq's `bm_held_content` (deviation 4): `Xv6.dsPay_content` at ANY

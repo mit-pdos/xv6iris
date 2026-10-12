@@ -20,7 +20,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## `uvmclear` -/
 
@@ -28,7 +28,7 @@ theorem uvmclear_br_fffffffffffffaae : KA.«uvmclear» + 0xfffffffffffffaae#64 =
 
 set_option maxHeartbeats 4000000 in
 theorem uvmclear_proof (W : WALK_NOALLOC) : UVMCLEAR :=
-  ⟨fun {hlc GF} _ _ _ cpu k P M w hK hroot hva hmap => by
+  ⟨fun {GF} _ _ _ cpu k P M w hK hroot hva hmap => by
   unfold wp_uvmclear_body
   simp only [uvmclearAddr]
   iintro ⟨Hk, Hpc, Hpt, HΦ⟩

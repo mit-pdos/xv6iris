@@ -23,7 +23,7 @@ open HfpFileClaimsP UkFileOpen UkFileDev
 open Std (ExtTreeSet)
 
 section Write
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -36,9 +36,9 @@ namespace UkFileDev
 key's own words (the landed lemma at `xkA W _`). -/
 theorem sbundleAt_write_intro (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
     ⊢ (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-        filewriteIn (hlc := hlc) W.perm W.sz W.lazy (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1)
+        filewriteIn W.perm W.sz W.lazy (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1)
           f.wQ f.wQe) -∗
-      UexecSG.sbundleAt (self := uexecSGXv6 (hlc := hlc)) X 16 f W :=
+      UexecSG.sbundleAt (self := uexecSGXv6) X 16 f W :=
   wand_intro (emp_sep.1.trans
     (sbundleAt_write_intro_at X f W (xkA W 0) (xkA W 1) (xkA W 2) W.fd W.M W.perm W.sz W.lazy
       rfl rfl rfl rfl rfl rfl rfl rfl))
@@ -48,10 +48,10 @@ key's own words: the blanket, and the arm at some table and a view agreeing
 with the key's image. -/
 theorem spostAt_write_elim (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
     (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
-    ⊢ UexecSG.spostAt (self := uexecSGXv6 (hlc := hlc)) X 16 f W r M' fdv' cw' cs' -∗
+    ⊢ UexecSG.spostAt (self := uexecSGXv6) X 16 f W r M' fdv' cw' cs' -∗
       ⌜filewriteRet (argZ (xkA W 2)) r⌝ ∗
       ∃ (Pt : UPtd) (Mv : Nat → List (BitVec 8)), ⌜permOf Pt.um W.sz = W.perm⌝ ∗ ⌜imgAgrees W.M Mv⌝ ∗
-        filewriteExtra (hlc := hlc) W.gen Pt (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) f.wQ f.wQe r :=
+        filewriteExtra W.gen Pt (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) f.wQ f.wQe r :=
   wand_intro (emp_sep.1.trans
     (spostAt_write_elim_at X f W (xkA W 0) (xkA W 1) (xkA W 2) W.fd r M' fdv' cw' cs' rfl rfl rfl rfl))
 
@@ -62,10 +62,10 @@ P`, and the kernel's `□?false P = P` check at `P = spostAt …` (whose head
 unfolds to `xv6Spost`'s if-chain on the number) costs ~6 s per proof; at
 `xpostWrite …` it is free. -/
 theorem xpostWrite_elim (f : Xfam GF) (W : Uvis) (r : BitVec 64) :
-    ⊢ xpostWrite (hlc := hlc) f.wQ f.wQe W r -∗
+    ⊢ xpostWrite f.wQ f.wQe W r -∗
       ⌜filewriteRet (argZ (xkA W 2)) r⌝ ∗
       ∃ (Pt : UPtd) (Mv : Nat → List (BitVec 8)), ⌜permOf Pt.um W.sz = W.perm⌝ ∗ ⌜imgAgrees W.M Mv⌝ ∗
-        filewriteExtra (hlc := hlc) W.gen Pt (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) f.wQ f.wQe r :=
+        filewriteExtra W.gen Pt (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) f.wQ f.wQe r :=
   spostAt_write_elim (fun _ => iprop(emp)) f W r W.M W.fd 0 ∅
 
 theorem xkA_run2 (m : RegMap) (pc : BitVec 64) (M : ElfMem) (π : Nat → Option UPerm) (sz : Nat)
@@ -94,8 +94,8 @@ theorem fdev_udepwf_std_write_held (N : UkNames GF) (m : RegMap) (pc : BitVec 64
     ⊢ (∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat), ⌜uszOk sz⌝ -∗ uheap N.t N.d N.s M pm sz -∗
         uheap N.t N.d N.s M pm sz ∗
         (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees M Mv⌝ -∗ ∀ Pt : UPtd, ⌜wrTb pm sz false Pt⌝ -∗
-          awriteChainAdv (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) appE i γo Mv (m.get 11#5) Pt n Q 0 (wchunks n))) -∗
-      udepwfK (hlc := hlc) N m pc 16 (writeFileFam Q N.pay) (fun fdv => fdv.take NSTD = l) := by
+          awriteChainAdv (fsGammaL fscFs) appE i γo Mv (m.get 11#5) Pt n Q 0 (wchunks n))) -∗
+      udepwfK N m pc 16 (writeFileFam Q N.pay) (fun fdv => fdv.take NSTD = l) := by
   unfold udepwfK
   iintro Hch
   isplitr
@@ -120,8 +120,8 @@ theorem fdev_udepwf_std_write_held (N : UkNames GF) (m : RegMap) (pc : BitVec 64
 residue. -/
 theorem fdev_part_adv_mono (i : Nat) (γo : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Pt : UPtd) (n : Int)
     (k : Nat) (R1 R2 : IProp GF) :
-    ⊢ (R1 -∗ R2) -∗ awritePartAdv (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) appE i γo M ua Pt n k R1 -∗
-      awritePartAdv (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) appE i γo M ua Pt n k R2 := by
+    ⊢ (R1 -∗ R2) -∗ awritePartAdv (fsGammaL fscFs) appE i γo M ua Pt n k R1 -∗
+      awritePartAdv (fsGammaL fscFs) appE i γo M ua Pt n k R2 := by
   unfold awritePartAdv
   iintro HR H %I %off %rr %bs %bs0 %nl %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hka Hg
   imod H $$ %I %off %rr %bs %bs0 %nl %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hka Hg with ⟨Hka, Hstep, Hph2⟩
@@ -136,8 +136,8 @@ theorem fdev_part_adv_mono (i : Nat) (γo : GName) (M : Nat → List (BitVec 8))
 /-- **Rocq `fdev_chain_adv_frame`**: a resource rides a chain to its stop. -/
 theorem fdev_chain_adv_frame (i : Nat) (γo : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Pt : UPtd)
     (n : Int) (Q : Nat → IProp GF) (F : IProp GF) : ∀ (cnt k : Nat),
-    ⊢ awriteChainAdv (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) appE i γo M ua Pt n Q k cnt -∗ F -∗
-      awriteChainAdv (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) appE i γo M ua Pt n (fun k' => iprop(Q k' ∗ F)) k cnt
+    ⊢ awriteChainAdv (fsGammaL fscFs) appE i γo M ua Pt n Q k cnt -∗ F -∗
+      awriteChainAdv (fsGammaL fscFs) appE i γo M ua Pt n (fun k' => iprop(Q k' ∗ F)) k cnt
   | 0, k => by
     rw [awriteChainAdv_0, awriteChainAdv_0]
     iintro Hc HF
@@ -165,7 +165,7 @@ theorem fdev_chain_adv_frame (i : Nat) (γo : GName) (M : Nat → List (BitVec 8
 /-- **Rocq `fdev_out_of_cur`**: the chain's stop, as the device. -/
 theorem fdev_out_of_cur (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fname) (i : Nat) (γo : GName)
     (ws : Wordline) (sel : List Nat) (jx k : Nat) (hlt : ∀ q ∈ sel, q < jx) :
-    ⊢ efcur (hlc := hlc) (GF := GF) c r nm sf i γo ws sel jx k -∗ fileOut c r sf nm i γo ws (jx + 1) := by
+    ⊢ efcur (GF := GF) c r nm sf i γo ws sel jx k -∗ fileOut c r sf nm i γo ws (jx + 1) := by
   unfold fileOut efcur
   iintro Hc
   cases k with
@@ -182,7 +182,7 @@ theorem fdev_out_of_cur (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fnam
 or -1 -/
 theorem fdev_arms_cursor (i : Nat) (γo : GName) (Pt : UPtd) (len : Nat) (Mv : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (rv : BitVec 64) (hlen : len < 2 ^ 31) :
-    ⊢ writeArmsAt (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) i γo Pt (len : Int) Mv ua Q rv -∗
+    ⊢ writeArmsAt (fsGammaL fscFs) i γo Pt (len : Int) Mv ua Q rv -∗
       ∃ k : Nat, ⌜rv.toInt = (len : Int) ∨ rv.toInt = -1⌝ ∗ Q k := by
   unfold writeArmsAt writePostOkAt writePostFailAt
   iintro (⟨%hr, %bss, -, -, -, Hch⟩ | ⟨%hr, %bss, %x, -, -, -, -, Hch⟩)
@@ -201,20 +201,20 @@ set_option maxRecDepth 20000 in
 /-- **Rocq `file_write`**: `ei_write` at a HELD ledger slot on the deed's
 inum, for ONE chunk `jx` of the line at or past the cursor; the answer is
 the kernel's (the count, or -1), the cursor at `jx + 1` either way. -/
-theorem file_write (SYSD : UkFileDevSysP (hlc := hlc) (GF := GF))
-    (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fname) (heq : fileAppIs (hlc := hlc) (GF := GF) c r) (N : UkNames GF)
-    (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc) N Pr) (fd : Nat) (l : List FdState) (rb : Bool) (i : Nat)
+theorem file_write (SYSD : UkFileDevSysP (GF := GF))
+    (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fname) (heq : fileAppIs (GF := GF) c r) (N : UkNames GF)
+    (Pr : Uprog GF) (STB : FdevStubs N Pr) (fd : Nat) (l : List FdState) (rb : Bool) (i : Nat)
     (γo : GName) (ws : Wordline) (b jx : Nat) (bs : List (BitVec 8)) (K : Int → IProp GF)
     (hfd : fd < NSTD) (hl : l[fd]? = some (.open rb true (.inode i γo .held)))
     (hjx : jx < (echoChunks ws).length) (hb : b ≤ jx) (hch : (echoChunks ws).getD jx [] = bs)
     (hnb0 : 0 < bs.length) (hnbm : bs.length ≤ lineMax)
     (hi1 : i ≠ INIT_INO) (hi2 : i ≠ SH_INO) (hi3 : i ≠ ECHO_INO) (hi4 : i ≠ CAT_INO) (hi5 : i ≠ GREP_INO)
     (hi6 : i ≠ SECC_INO) (hi7 : i ≠ SYNC_INO) :
-    ⊢ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) c) -∗ appInv (hlc := hlc) fscFs -∗
+    ⊢ □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint c) -∗ appInv fscFs -∗
       ustd N.fd l -∗ fileOut c r sf nm i γo ws b -∗
       ((ustd N.fd l -∗ fileOut c r sf nm i γo ws (jx + 1) -∗ K (bs.length : Int)) ∧
         (ustd N.fd l -∗ fileOut c r sf nm i γo ws (jx + 1) -∗ K (-1))) -∗
-      wrObl (hlc := hlc) N Pr (fd : Int) bs K := by
+      wrObl N Pr (fd : Int) bs K := by
   unfold wrObl
   iintro #Hbr #Hinv Hstd Hout HK %h %m %avail %ua %tx %dq %f %hf %ha0 %ha1 %ha2 Hcode Hsrc Hrun Hcont
   unfold fileOut efany
@@ -237,7 +237,7 @@ theorem file_write (SYSD : UkFileDevSysP (hlc := hlc) (GF := GF))
   iintro %h1 %hpc %hal #Hi Hrun Hret
   have hal4 : (BitVec.ofNat 64 (Pr.write + 2) + 4#64) &&& 1#64 = 0#64 := by rw [hpc]; exact fh_align _ hal
   iapply SYSD.writeAt N h1 (ukWr m 17#5 (BitVec.ofInt 64 16)) (BitVec.ofNat 64 (Pr.write + 2)) avail
-    (writeFileFam (fun k => iprop(efcur (hlc := hlc) c r nm sf i γo ws sel jx k ∗ usrcAt N tx dq2 ua bs.length f)) N.pay)
+    (writeFileFam (fun k => iprop(efcur c r nm sf i γo ws sel jx k ∗ usrcAt N tx dq2 ua bs.length f)) N.pay)
     (ustd N.fd l) (usrcAt N tx dq1 ua bs.length f) (fun fdv => fdv.take NSTD = l) bs.length f hnum hal4
     (fun fdv => ustd_agree N.fd fdv l)
     (fun M pmv sz hsz => fdev_src_ok N tx dq1 ua bs.length f _ hua M pmv sz hsz) $$ Hi Hrun [Hq Hs2] Hstd Hs1
@@ -267,7 +267,7 @@ theorem file_write (SYSD : UkFileDevSysP (hlc := hlc) (GF := GF))
       hi1 hi2 hi3 hi4 hi5 hi6 hi7
     ihave Hc := hchain $$ Hbr Hinv Hq
     iapply fdev_chain_adv_frame i γo Mv ((ukWr m 17#5 (BitVec.ofInt 64 16)).get 11#5) Pt (bs.length : Int)
-      (efcur (hlc := hlc) c r nm sf i γo ws sel jx) (usrcAt N tx dq2 ua bs.length f) (wchunks (bs.length : Int)) 0 $$ Hc Hs2
+      (efcur c r nm sf i γo ws sel jx) (usrcAt N tx dq2 ua bs.length f) (wchunks (bs.length : Int)) 0 $$ Hc Hs2
   -- THE POST: the arm names the answer, the chain's stop the cursor and the piece
   iintro %h2 %ret %W %cw' %cs' %hk0 %hk1 %hk2 %htk %hlz %hnf Hstd Hs1
   rw [spostAt_xv6_write]

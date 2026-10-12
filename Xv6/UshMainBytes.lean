@@ -107,7 +107,7 @@ theorem ushcUstr_of_bytes (γd : GName) (a L : Nat) (g : Nat → BitVec 8) (hnn 
 end Bytes
 
 section Bnd
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -115,7 +115,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [S
 MAXVA. -/
 theorem urun_ubytes_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (dq : DFrac)
     (a k : Nat) (f : Nat → BitVec 8) (hk : 0 < k) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ubytesq N.d dq a k f -∗ ⌜a + k ≤ 2 ^ 38⌝ := by
+    ⊢ urun N h m pc avail -∗ ubytesq N.d dq a k f -∗ ⌜a + k ≤ 2 ^ 38⌝ := by
   iintro Hrun Hbs
   icases ubytesq_acc N.d dq a k f (k - 1) (by omega) $$ Hbs with ⟨Hb, -⟩
   ihave %hb := urun_ubyte_bnd N h m pc avail dq (a + (k - 1)) _ $$ Hrun Hb

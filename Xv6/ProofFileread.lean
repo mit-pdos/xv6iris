@@ -48,13 +48,13 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 set_option linter.unusedSimpArgs false
 
-theorem frd_ctx_entry {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem frd_ctx_entry {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (c : CPU) (k : KCtx) (R0 R : RegMap) :
     kctx (GF := GF) c (((k.withRegs R0).pushed 6).withRegs R) ⊢
       kctx c (((k.withSpie k.spie k.spp).pushed 6).withRegs R) := .rfl
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 set_option maxHeartbeats 4000000 in
 /-- The lazy spills `sd s1,24(sp) ; sd s3,8(sp)` at `+0x10`. -/
@@ -84,15 +84,15 @@ theorem frd_spill2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
 end Frame
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 theorem frd_env_dev (r w : Bool) (mj : Nat) :
-    filereadEnv (hlc := hlc) (GF := GF) (.open r w (.device mj)) ⊢ filereadDevEnv mj := .rfl
+    filereadEnv (GF := GF) (.open r w (.device mj)) ⊢ filereadDevEnv mj := .rfl
 theorem frd_env_inode (r w : Bool) (i : Nat) (γo : GName) (om : OffMode) :
-    filereadEnv (hlc := hlc) (GF := GF) (.open r w (.inode i γo om)) ⊢ fsReady (hlc := hlc) ∗ bslot :=
+    filereadEnv (GF := GF) (.open r w (.inode i γo om)) ⊢ fsReady ∗ bslot :=
   .rfl
 
 set_option maxHeartbeats 32000000 in
@@ -100,7 +100,7 @@ set_option maxHeartbeats 32000000 in
 read out of the reference's own content, the three tests, each arm handed
 to its stage lemma. -/
 theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (CR : CONSOLEREAD)
-    (PA : PANIC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (PA : PANIC) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (R : RegMap) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (C : FContent) (inumC : BitVec 32) (γoC : GName) (omC : OffMode) (γpC : PipeNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -122,9 +122,9 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
     foffRow st ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C st ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
-    filereadEnv (hlc := hlc) st ∗
-    filereadIn (hlc := hlc) st n F Rd Rin Rp Rpe P ∗ P ∗
-    frdK (hlc := hlc) k γ fk q st j pid V M n F Rd Rin Rp Rpe P
+    filereadEnv st ∗
+    filereadIn st n F Rd Rin Rp Rpe P ∗ P ∗
+    frdK k γ fk q st j pid V M n F Rd Rin Rp Rpe P
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hpe, #Hkl, #Hav, #Hfoff, Htok, Hfields, Hpay,
@@ -237,7 +237,7 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
 set_option maxHeartbeats 32000000 in
 /-- **`fileread` meets its specification**, at either entry `SIE`. -/
 theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (CR : CONSOLEREAD)
-    (PA : PANIC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (PA : PANIC) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (n : Int)
@@ -249,7 +249,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (ha0 : k.regs 10#5 = fnode fk)
     (ha2 : k.regs 12#5 = BitVec.ofInt 64 n) (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) :
-    wp_fileread_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk n F Rd Rin Rp Rpe P
+    wp_fileread_eb_body (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk n F Rd Rin Rp Rpe P
       hK hfk hj hproc hnoff htier ha0 ha2 hn := by
   unfold wp_fileread_eb_body
   have hK' : 6 + readiSlots ≤ k.avail := hK
@@ -266,7 +266,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
   -- the generation halves stay out: consoleread's kill read lends them
   unfold procGenAt
   icases Hpg with ⟨Hft, HQ, Hxs, Hgen⟩
-  ihave HΦ : frdK (hlc := hlc) k γ fk q st j pid V M n F Rd Rin Rp Rpe P $$ [Hnext Hcwd Hrtr Hft HQ Hxs]
+  ihave HΦ : frdK k γ fk q st j pid V M n F Rd Rin Rp Rpe P $$ [Hnext Hcwd Hrtr Hft HQ Hxs]
   · unfold frdK filereadPost
     iintro %c %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Hgen Henv Harms
     icases procPrivExtEv_elim _ _ _ _ _ $$ Hpriv with ⟨%kv, %hkv, Hpriv⟩

@@ -35,7 +35,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section PipeQstep
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The link eliminations -/
 
@@ -77,12 +77,12 @@ theorem pipeClink_apply (γ : GName) (w : Bool) (Φ : IProp GF) (s : PipeSt) :
 loop has reached, or the taint. -/
 def pwPay (γp : PipeNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
     (Qe : Nat → PipeSt → IProp GF) (k nn : Nat) : IProp GF :=
-  iprop(pipeWchain γp.pnQueue M ua Q Qe k (nn - k) ∨ MachFixedGS.killCred (hlc := hlc) (GF := GF))
+  iprop(pipeWchain γp.pnQueue M ua Q Qe k (nn - k) ∨ MachFixedGS.killCred (GF := GF))
 
 /-- Rocq `pw_pay_0`. -/
 theorem pwPay_0 (γp : PipeNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
     (Qe : Nat → PipeSt → IProp GF) (nn : Nat) :
-    pipeWpay (hlc := hlc) γp.pnQueue M ua Q Qe nn ⊢ pwPay (hlc := hlc) γp M ua Q Qe 0 nn := by
+    pipeWpay γp.pnQueue M ua Q Qe nn ⊢ pwPay γp M ua Q Qe 0 nn := by
   unfold pipeWpay pwPay
   rw [Nat.sub_zero]
 
@@ -106,6 +106,7 @@ theorem pwChain_wlink (γ : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64
   iintro H
   iapply H $$ %b %hb
 
+omit [MachGS GF] in
 /-- THE WRITE END IS OPEN, from the caller's own credential (Rocq
 `pw_wo_open`): the contract pins the end to the write one. -/
 theorem pwWo_open (γp : PipeNames) (w : Bool) (wo : BitVec 32) (q : Qp) (hw : w = true) :
@@ -123,9 +124,9 @@ theorem pwQres_push (γp : PipeNames) (M : Nat → List (BitVec 8)) (ua : BitVec
     (bs : List (BitVec 8)) (b : BitVec 8) (hk : k < nn)
     (hb : umemByte M (ua + BitVec.ofNat 64 k).toNat = b) (hlen : bs.length = PIPESIZE)
     (hne : nw ≠ nr + 512#32) (hwo : pflagOpen wo) (hro : pflagOpen ro) :
-    pwPay (hlc := hlc) γp M ua Q Qe k nn -∗ pipeQres (hlc := hlc) γp nr nw ro wo bs ={⊤}=∗
-      pipeQres (hlc := hlc) γp nr (nw + 1#32) ro wo (bs.set (nw.toNat % 512) b) ∗
-        pwPay (hlc := hlc) γp M ua Q Qe (k + 1) nn := by
+    pwPay γp M ua Q Qe k nn -∗ pipeQres γp nr nw ro wo bs ={⊤}=∗
+      pipeQres γp nr (nw + 1#32) ro wo (bs.set (nw.toNat % 512) b) ∗
+        pwPay γp M ua Q Qe (k + 1) nn := by
   unfold pwPay pipeQres
   iintro (Hch | #Ht) Hq
   · icases Hq with (⟨%ws, %rp, %hok, Ha⟩ | #Ht)
@@ -158,7 +159,7 @@ theorem pwPost_count (P : UPtd) (γp : PipeNames) (M : Nat → List (BitVec 8)) 
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (Rk : IProp GF) (nn k : Nat)
     (r : BitVec 64) (hk : k ≤ nn) (hr : r = BitVec.ofNat 64 k ∨ (k = 0 ∧ r = -1#64))
     (hre : k = nn ∨ ¬ uvaRmapped P (ua + BitVec.ofNat 64 k).toNat) :
-    pwPay (hlc := hlc) γp M ua Q Qe k nn ⊢ pipeWpost (hlc := hlc) P γp.pnQueue M ua Q Qe Rk nn r := by
+    pwPay γp M ua Q Qe k nn ⊢ pipeWpost P γp.pnQueue M ua Q Qe Rk nn r := by
   unfold pwPay pipeWpost
   iintro (Hch | #Ht)
   · ileft
@@ -181,8 +182,8 @@ evidence rides beside it. -/
 theorem pwPost_kill (P : UPtd) (γp : PipeNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (Rk : IProp GF) (nn k : Nat)
     (hk : k < nn) :
-    Rk -∗ pwPay (hlc := hlc) γp M ua Q Qe k nn -∗
-      pipeWpost (hlc := hlc) P γp.pnQueue M ua Q Qe Rk nn (-1#64) := by
+    Rk -∗ pwPay γp M ua Q Qe k nn -∗
+      pipeWpost P γp.pnQueue M ua Q Qe Rk nn (-1#64) := by
   unfold pwPay pipeWpost
   iintro HR (Hch | #Ht)
   · ileft
@@ -208,9 +209,9 @@ theorem pwPost_ro (P : UPtd) (γp : PipeNames) (M : Nat → List (BitVec 8)) (ua
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (Rk : IProp GF) (nn k : Nat)
     (nr nw ro wo : BitVec 32) (bs : List (BitVec 8)) (hk : k < nn) (hro : ¬ pflagOpen ro)
     (hwo : pflagOpen wo) :
-    pwPay (hlc := hlc) γp M ua Q Qe k nn -∗ pipeQres (hlc := hlc) γp nr nw ro wo bs ={⊤}=∗
-      pipeQres (hlc := hlc) γp nr nw ro wo bs ∗
-        pipeWpost (hlc := hlc) P γp.pnQueue M ua Q Qe Rk nn (-1#64) := by
+    pwPay γp M ua Q Qe k nn -∗ pipeQres γp nr nw ro wo bs ={⊤}=∗
+      pipeQres γp nr nw ro wo bs ∗
+        pipeWpost P γp.pnQueue M ua Q Qe Rk nn (-1#64) := by
   unfold pwPay pipeQres
   iintro (Hch | #Ht) Hq
   · icases Hq with (⟨%ws, %rp, %hok, Ha⟩ | #Ht)
@@ -258,12 +259,12 @@ theorem pwPost_ro (P : UPtd) (γp : PipeNames) (M : Nat → List (BitVec 8)) (ua
 /-- THE PAYMENT AFTER `acc` WAS DEQUEUED (Rocq `pr_pay`). -/
 def prPay (γp : PipeNames) (Q : List (BitVec 8) → IProp GF) (Qe : List (BitVec 8) → PipeSt → IProp GF)
     (acc : List (BitVec 8)) (nn : Nat) : IProp GF :=
-  iprop(pipeRchain γp.pnQueue Q Qe acc (nn - acc.length) ∨ MachFixedGS.killCred (hlc := hlc) (GF := GF))
+  iprop(pipeRchain γp.pnQueue Q Qe acc (nn - acc.length) ∨ MachFixedGS.killCred (GF := GF))
 
 /-- Rocq `pr_pay_0`. -/
 theorem prPay_0 (γp : PipeNames) (Q : List (BitVec 8) → IProp GF)
     (Qe : List (BitVec 8) → PipeSt → IProp GF) (nn : Nat) :
-    pipeRpay (hlc := hlc) γp.pnQueue Q Qe nn ⊢ prPay (hlc := hlc) γp Q Qe [] nn := by
+    pipeRpay γp.pnQueue Q Qe nn ⊢ prPay γp Q Qe [] nn := by
   unfold pipeRpay prPay
   rw [List.length_nil, Nat.sub_zero]
 
@@ -284,6 +285,7 @@ theorem prChain_rlink (γ : GName) (Q : List (BitVec 8) → IProp GF)
   rw [show nn - acc.length = (nn - (acc.length + 1)) + 1 by omega, pipeRchain.eq_2]
   exact and_elim_r.trans and_elim_r
 
+omit [MachGS GF] in
 /-- THE READ END IS OPEN, from the caller's own credential (Rocq
 `pr_ro_open`, lane PIPE-RO): the contract pins the end to the read one. -/
 theorem prRo_open (γp : PipeNames) (w : Bool) (ro : BitVec 32) (q : Qp) (hw : w = false) :
@@ -291,6 +293,7 @@ theorem prRo_open (γp : PipeNames) (w : Bool) (ro : BitVec 32) (q : Qp) (hw : w
   subst hw
   exact pipeEndstate_holder γp false ro q
 
+omit [MachGS GF] in
 /-- The request was met (Rocq `pr_noobs_met`). -/
 theorem prNoobs_met (P : UPtd) (addr : BitVec 64) (Rk : IProp GF) (nn d : Nat) (hd : d = nn) :
     ⊢ pipeRstopNoobs P addr Rk nn d (BitVec.ofNat 64 d) := by
@@ -298,6 +301,7 @@ theorem prNoobs_met (P : UPtd) (addr : BitVec 64) (Rk : IProp GF) (nn d : Nat) (
   ileft
   ipureintro; exact ⟨hd, rfl⟩
 
+omit [MachGS GF] in
 /-- The copy-out of byte `d` faulted (Rocq `pr_noobs_fault`). -/
 theorem prNoobs_fault (P : UPtd) (addr : BitVec 64) (Rk : IProp GF) (nn d : Nat) (r : BitVec 64)
     (h1 : d < nn) (h2 : ¬ uvaWmapped P (addr + BitVec.ofNat 64 d).toNat)
@@ -307,6 +311,7 @@ theorem prNoobs_fault (P : UPtd) (addr : BitVec 64) (Rk : IProp GF) (nn d : Nat)
   iright; ileft
   ipureintro; exact ⟨h1, h2, h3⟩
 
+omit [MachGS GF] in
 /-- The reader was killed while it waited (Rocq `pr_noobs_kill`). -/
 theorem prNoobs_kill (P : UPtd) (addr : BitVec 64) (Rk : IProp GF) (nn : Nat) :
     Rk ⊢ pipeRstopNoobs P addr Rk nn 0 (-1#64) := by
@@ -322,8 +327,8 @@ theorem prPost_noobs (P : UPtd) (γp : PipeNames) (addr : BitVec 64) (Q : List (
     (Qe : List (BitVec 8) → PipeSt → IProp GF) (Rk : IProp GF) (nn : Nat) (acc : List (BitVec 8))
     (d : Nat) (bsw : Nat → BitVec 8) (r : BitVec 64) (hle : acc.length ≤ nn) (hd : acc.length = d)
     (hbs : ∀ j : Nat, j < d → bsw j = acc[j]!) :
-    pipeRstopNoobs P addr Rk nn d r -∗ prPay (hlc := hlc) γp Q Qe acc nn -∗
-      pipeRpost (hlc := hlc) P γp.pnQueue addr Q Qe Rk nn d bsw r := by
+    pipeRstopNoobs P addr Rk nn d r -∗ prPay γp Q Qe acc nn -∗
+      pipeRpost P γp.pnQueue addr Q Qe Rk nn d bsw r := by
   unfold prPay pipeRpost
   iintro Hst (Hch | #Ht)
   · ileft
@@ -362,9 +367,9 @@ theorem prPost_dry (P : UPtd) (γp : PipeNames) (addr : BitVec 64) (Q : List (Bi
     (hle : acc.length ≤ nn) (hd : acc.length = d) (hdn : d < nn)
     (hbs : ∀ j : Nat, j < d → bsw j = acc[j]!) (hwo : d = 0 → ¬ pflagOpen wo)
     (hroo : pflagOpen ro) (hnrw : nr = nw) :
-    prPay (hlc := hlc) γp Q Qe acc nn -∗ pipeQres (hlc := hlc) γp nr nw ro wo bs ={⊤}=∗
-      pipeQres (hlc := hlc) γp nr nw ro wo bs ∗
-        pipeRpost (hlc := hlc) P γp.pnQueue addr Q Qe Rk nn d bsw (BitVec.ofNat 64 d) := by
+    prPay γp Q Qe acc nn -∗ pipeQres γp nr nw ro wo bs ={⊤}=∗
+      pipeQres γp nr nw ro wo bs ∗
+        pipeRpost P γp.pnQueue addr Q Qe Rk nn d bsw (BitVec.ofNat 64 d) := by
   unfold prPay pipeQres
   iintro (Hch | #Ht) Hq
   · icases Hq with (⟨%ws, %rp, %hok, Ha⟩ | #Ht)
@@ -417,8 +422,8 @@ theorem prQres_pop (γp : PipeNames) (Q : List (BitVec 8) → IProp GF)
     (nr nw ro wo : BitVec 32) (bs : List (BitVec 8)) (idx : Nat) (db : BitVec 8)
     (hk : acc.length < nn) (hne : nr ≠ nw) (hlk : bs[idx]? = some db) (hidx : idx = nr.toNat % 512)
     (hroo : pflagOpen ro) :
-    prPay (hlc := hlc) γp Q Qe acc nn -∗ pipeQres (hlc := hlc) γp nr nw ro wo bs ={⊤}=∗
-      pipeQres (hlc := hlc) γp (nr + 1#32) nw ro wo bs ∗ prPay (hlc := hlc) γp Q Qe (acc ++ [db]) nn := by
+    prPay γp Q Qe acc nn -∗ pipeQres γp nr nw ro wo bs ={⊤}=∗
+      pipeQres γp (nr + 1#32) nw ro wo bs ∗ prPay γp Q Qe (acc ++ [db]) nn := by
   unfold prPay pipeQres
   iintro (Hch | #Ht) Hq
   · icases Hq with (⟨%ws, %rp, %hok, Ha⟩ | #Ht)
@@ -459,8 +464,8 @@ zero, so the coupled arm's ghost must move -- by the closer's link, or the
 coupling breaks for good at the taint's price. -/
 theorem pipeQres_close_w (γp : PipeNames) (Φ : IProp GF) (nr nw ro wo wo' : BitVec 32)
     (bs : List (BitVec 8)) (hwo' : pflagBool wo' = false) :
-    pipeCpay (hlc := hlc) γp.pnQueue true Φ -∗ pipeQres (hlc := hlc) γp nr nw ro wo bs ={⊤}=∗
-      pipeQres (hlc := hlc) γp nr nw ro wo' bs ∗ pipeCpost (hlc := hlc) γp.pnQueue true Φ true := by
+    pipeCpay γp.pnQueue true Φ -∗ pipeQres γp nr nw ro wo bs ={⊤}=∗
+      pipeQres γp nr nw ro wo' bs ∗ pipeCpost γp.pnQueue true Φ true := by
   iintro Hpay Hq
   unfold pipeQres
   icases Hq with (⟨%ws, %rp, %hok, Ha⟩ | #Ht)
@@ -491,8 +496,8 @@ theorem pipeQres_close_w (γp : PipeNames) (Φ : IProp GF) (nr nw ro wo wo' : Bi
 /-- CLOSING THE READ END (Rocq `pipe_qres_close_r`). -/
 theorem pipeQres_close_r (γp : PipeNames) (Φ : IProp GF) (nr nw ro ro' wo : BitVec 32)
     (bs : List (BitVec 8)) (hro' : pflagBool ro' = false) :
-    pipeCpay (hlc := hlc) γp.pnQueue false Φ -∗ pipeQres (hlc := hlc) γp nr nw ro wo bs ={⊤}=∗
-      pipeQres (hlc := hlc) γp nr nw ro' wo bs ∗ pipeCpost (hlc := hlc) γp.pnQueue false Φ true := by
+    pipeCpay γp.pnQueue false Φ -∗ pipeQres γp nr nw ro wo bs ={⊤}=∗
+      pipeQres γp nr nw ro' wo bs ∗ pipeCpost γp.pnQueue false Φ true := by
   iintro Hpay Hq
   unfold pipeQres
   icases Hq with (⟨%ws, %rp, %hok, Ha⟩ | #Ht)

@@ -164,13 +164,13 @@ and its slot, retags the map element (`ghost_map_update`) and re-closes the
 block at the one-slot-updated list and map (`iregCouple_set`). -/
 
 section Acc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 theorem iregRec_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (inum : BitVec 32) (dn : Dinode) (hE : (↑iregN : CoPset) ⊆ E)
     (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
       |={E, E \ ↑iregN}=> (⌜dinodeWf dn⌝ ∗ dinodeAt γi inum dn ∗
         FsView.byteRange (fsGammaL γfs) (IBLOCK inum inodestart) (64 * islot inum)
           (dinodeBytes dn) ∗
@@ -238,7 +238,7 @@ both collide with the caller's (`dinodeAt_excl`).  The marked arm's clause
 vacuous at every byte-writing mover (iclaim-ledger.md §2.4). -/
 
 section Marked
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 theorem iregSlot_marked_open [Icfg] (γfs : FsNames) (γi : GName) (inum : BitVec 32)
@@ -319,7 +319,7 @@ theorem iregWriteUnlink_pure (dn dn' : Dinode) (hnz : dn'.diType.toNat ≠ 0)
 /-! ## 5.  THE RAISE's REGISTER STEP -/
 
 section Raise
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF] [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBytesG GF] [FsLinkG GF]
 
 /-- THE RA's OWN STEP (durable-disk 2b-inode-4), Rocq's inline `iAssert`
 in `ireg_write_link_reg`: the raised count is one `link_mint` on the
@@ -362,7 +362,7 @@ end Raise
 /-! ## 6.  THE TWO nlink-MOVING FLUSHES -/
 
 section Movers
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- `ip->nlink++; iupdate(ip)` (Rocq `ireg_write_link_reg`).
@@ -422,7 +422,7 @@ theorem iregWriteLink_reg [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (hnz : dn'.diType.toNat ≠ 0) (hstab : diTypeStable dn' dn)
     (hbump : dn'.diNlink = dn.diNlink + 1#16) (hgrd : dn.diNlink ≠ 32767#16)
     (hup : ∀ v : Ity, oty = some v → iregMult dn = 0 ∧ iregRegOk dn'.diType.toNat v) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
       iregLinkPin pin inum.toNat dn -∗
       |={E, E \ ↑iregN}=> ∃ rec_old : List (BitVec 8),
         ⌜rec_old.length = 64⌝ ∗
@@ -508,7 +508,7 @@ theorem iregWriteUnlink_reg [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (hdn' : dinodeWf dn')
     (hnz : dn'.diType.toNat ≠ 0) (hstab : diTypeStable dn' dn)
     (hnl : dn.diNlink.toNat = dn'.diNlink.toNat + 1) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
       FsStateLink.linkToks (fsGammaL γfs) (inum.toNat : Int)
         (FsStateLink.linkReps (iregDotDelta dn'.diType.toNat dn'.diNlink.toNat) uty) -∗
       |={E, E \ ↑iregN}=> ∃ (rec_old : List (BitVec 8)) (v : Nat),

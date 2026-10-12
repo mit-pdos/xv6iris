@@ -116,7 +116,7 @@ theorem jumpPc_forkretAddr : jumpPc forkretAddr = forkretAddr := by
 /-! ## The contract (Rocq `forkret_closer`, `wp_forkret_gen_body`, `FORKRET`) -/
 
 section Gen
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg]
@@ -128,23 +128,23 @@ def forkretResumeK (URB : ParkURB GF) (W : IProp GF) (N : UtNames) (g γch : GNa
     [Xc : CurCtx] (h : CPU) (P' : UPtd) (V' : ProcPriv) (M' : Nat → List (BitVec 8)) : IProp GF :=
   iprop(⌜V'.upt = P'⌝ -∗ ⌜V'.fdg = g⌝ -∗ ⌜V'.chg = γch⌝ -∗ ⌜V'.gen = gn⌝ -∗ ⌜V'.cwi = cw⌝ -∗
     ⌜parkRunKey Wk V' M'⌝ -∗
-    parkGlobals N.Γ N.w N.ft N.f N.ip -∗ utSysParkRows N.Γ -∗ firstDone (hlc := hlc) -∗ W -∗
-    handlerEnvAt (hlc := hlc) N.Γ curCtx -∗ utTfk h (V'.kstack + 4096#64) V' -∗ cpuClaim h N.pj -∗
+    parkGlobals N.Γ N.w N.ft N.f N.ip -∗ utSysParkRows N.Γ -∗ firstDone -∗ W -∗
+    handlerEnvAt N.Γ curCtx -∗ utTfk h (V'.kstack + 4096#64) V' -∗ cpuClaim h N.pj -∗
     utBlock N.f N.pj N.pid V' -∗
     (URB N.j h Xc P' (V'.kstack + 4096#64) V' sts cs N.pid ∗
-      parkSlotOut (hlc := hlc) (SG := SG) Wk V' M' sts gn cs N.pid))
+      parkSlotOut (SG := SG) Wk V' M' sts gn cs N.pid))
 
 /-- **Rocq `forkret_closer`**: THE RESIDUE CLOSER, sealed in a name. -/
 def forkretCloser (URB : ParkURB GF) (W : IProp GF) (N : UtNames) (g γch : GName) (cw : Nat)
     (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare) (Wk : Option Uvis) : IProp GF :=
   iprop(∀ (h : CPU) (Xc : CurCtx) (P' : UPtd) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-    forkretResumeK (hlc := hlc) (SG := SG) URB W N g γch cw sts gn cs Wk (Xc := Xc) h P' V' M')
+    forkretResumeK (SG := SG) URB W N g γch cw sts gn cs Wk (Xc := Xc) h P' V' M')
 
 /-- **THE CONTRACT** (Rocq `wp_forkret_gen_body`): no `first` premise and no
 `first` reading -- the branch is decided by the block's token at the park's
 mode (header). -/
 def wp_forkret_gen_body [CurCtx] (URB : ParkURB GF) (W : IProp GF)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (R : RegMap) (spie spp eb : Bool) (root : BitVec 44) (N : UtNames) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (steady : Bool)
@@ -157,12 +157,12 @@ def wp_forkret_gen_body [CurCtx] (URB : ParkURB GF) (W : IProp GF)
   -- p->lock, still held from scheduler()
   locked (Γ.lock N.j) cpu ∗ procLockPay Γ N.j curCtx ∗
   -- the process block, at the park's mode
-  parkBlock (hlc := hlc) steady N V M ∗
+  parkBlock steady N V M ∗
   W ∗
   -- the mode's payload: `firstDone` (steady), the exec bundle (boot)
-  parkMode (hlc := hlc) (SG := SG) V.rti V.cwi V.pvSecc sts (parkKey steady V M cs N.pid) ∗
+  parkMode (SG := SG) V.rti V.cwi V.pvSecc sts (parkKey steady V M cs N.pid) ∗
   -- the residue closer
-  forkretCloser (hlc := hlc) (SG := SG) URB W N V.fdg V.chg V.cwi sts gn cs (parkKey steady V M cs N.pid)
+  forkretCloser (SG := SG) URB W N V.fdg V.chg V.cwi sts gn cs (parkKey steady V M cs N.pid)
   ⊢ wpLoop (GF := GF) cpu
 
 end Gen
@@ -171,17 +171,17 @@ end Gen
 (`UtResFits.usertrapResAt`) AT THE PARK TOKEN and the kernel's deposit
 instance (deviation 6), at any `W`. -/
 structure FORKRET : Prop where
-  wp_forkret : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_forkret : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (W : IProp GF)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
+    (Γ : SchedNames) [ClaimIs GF Γ] [NiFitIs GF]
     (cpu : CPU) (R : RegMap) (spie spp eb : Bool) (root : BitVec 44) (N : UtNames) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (steady : Bool) hΓ hj hgn hsp,
-    wp_forkret_gen_body (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
-      (fun j h Xc => usertrapResAt (hlc := hlc) (X := Xc) (parkToken (hlc := hlc) (SG := uexecSGXv6)) Γ j h)
+    wp_forkret_gen_body (GF := GF) (SG := uexecSGXv6)
+      (fun j h Xc => usertrapResAt (X := Xc) (parkToken (SG := uexecSGXv6)) Γ j h)
       W Γ cpu R spie spp eb root N V M sts gn cs steady hΓ hj hgn hsp
 
 end Xv6

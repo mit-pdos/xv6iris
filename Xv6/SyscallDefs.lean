@@ -255,7 +255,7 @@ theorem syscall_tbl_run : ∀ k, k < 24 →
   decide +kernel
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **Slot `k` of the table, straight out of the read-only image** (Rocq
 `sysc_table_word`). -/

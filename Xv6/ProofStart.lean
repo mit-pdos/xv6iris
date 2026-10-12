@@ -101,7 +101,7 @@ theorem startConf8_menvcfg (z : BootGarb) : (startConf8 z).menvcfg = 0x200000000
 set_option maxHeartbeats 4000000 in
 /-- `start`, first segment: the prologue and `mstatus.MPP := S`
 (`80000058`–`80000074`). -/
-theorem start_seg1 {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem start_seg1 {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (ret sp₀ v8 v14 v15 f0 f8 : BitVec 64) :
     mBoot cpu (DFrac.own 1) ∗ clockCells cpu ∗ ctxTok cpu curCtx ∗ kernelText ∗ pcIs cpu startAddr ∗
     gpr cpu 1#5 (DFrac.own 1) ret ∗ gpr cpu 2#5 (DFrac.own 1) sp₀ ∗ gpr cpu 8#5 (DFrac.own 1) v8 ∗
@@ -173,7 +173,7 @@ theorem start_seg1 {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Cu
 set_option maxHeartbeats 4000000 in
 /-- `start`, second segment: the configuration writes up to `menvcfg`
 (`80000078`–`800000ba`). -/
-theorem start_seg2 {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem start_seg2 {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (z : BootGarb) (v14 v15 : BitVec 64) :
     mConf cpu (DFrac.own 1) (startConf1 z) ∗ clockCells cpu ∗ kernelText ∗ pcIs cpu (startAddr + 0x20#64) ∗
     gpr cpu 14#5 (DFrac.own 1) v14 ∗ gpr cpu 15#5 (DFrac.own 1) v15 ∗
@@ -300,7 +300,7 @@ theorem main_mepc_mask : KA.«main» &&& 0xFFFFFFFFFFFFFFFE#64 = KA.«main» := 
 set_option maxHeartbeats 4000000 in
 theorem StartProof (T : TIMERINIT) : START where
   wp_start cpu dq hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8 := by
-    rename_i hlc GF inst instC
+    rename_i GF inst instC
     unfold wp_start_body
     iintro ⟨HmConf, Hmhartid, Hclock, Htok, #Htext, Hpc, Hx1, Hx2, Hx4, Hx8, Hx14, Hx15, Hf0, Hf8, Hg0, Hg8, HΦ⟩
     iapply (start_seg1 cpu ret sp₀ v8 v14 v15 f0 f8)

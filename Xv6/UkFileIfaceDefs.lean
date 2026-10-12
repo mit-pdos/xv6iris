@@ -55,14 +55,14 @@ open Std (ExtTreeSet)
 open HfpFileClaimsP
 
 noncomputable section FifDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `UkFileIface`'s section context** (deviation 1). -/
-structure FifCtx (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+structure FifCtx (GF : BundledGFunctors.{0}) [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
     [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] where
@@ -81,11 +81,11 @@ structure FifCtx (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G
   sf : Dst
   /-- the console's claim, abstract (Rocq `UkFileIfaceGen`) -/
   M : LModel
-  Pm : GenParams hlc GF M
+  Pm : GenParams GF M
   LINKS : IProp GF
 
 namespace FifCtx
-variable (X : FifCtx hlc GF)
+variable (X : FifCtx GF)
 
 /-- Rocq `c := fgn_cl g`. -/
 abbrev c : FileFixed := X.g.fgnCl
@@ -96,7 +96,7 @@ def fifDq : IProp GF := if fifWr X.D0 X.w0 then iprop(emp) else fdq X.r X.qf X.s
 
 /-- **Rocq `fif_cred`**. -/
 def fifCred : IProp GF :=
-  if fifWr X.D0 X.w0 then iprop(True) else iprop(∃ jo : Option Nat, fileConsCred (hlc := hlc) X.c X.r jo)
+  if fifWr X.D0 X.w0 then iprop(True) else iprop(∃ jo : Option Nat, fileConsCred X.c X.r jo)
 
 instance fifCred_persistent : Persistent X.fifCred := by
   unfold fifCred; split <;> infer_instance
@@ -115,15 +115,15 @@ theorem fifCred_wr (h : fifWr X.D0 X.w0 = true) : ⊢ X.fifCred := by
 
 /-- **Rocq `fif_cred_rd`**. -/
 theorem fifCred_rd (h : fifWr X.D0 X.w0 = false) :
-    X.fifCred = iprop(∃ jo : Option Nat, fileConsCred (hlc := hlc) X.c X.r jo) := by
+    X.fifCred = iprop(∃ jo : Option Nat, fileConsCred X.c X.r jo) := by
   unfold fifCred; rw [h]; rfl
 
 /-- **Rocq `fif_env`**: the application's persistent facts the laws read,
 and the taint's payload (deviation 3). -/
 def fifEnv : IProp GF :=
-  iprop(□ (uKillCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) X.c) ∗
-    □ (fileTaint (hlc := hlc) X.c -∗ uKillCred (hlc := hlc) (GF := GF)) ∗
-    □ (fileTaint (hlc := hlc) X.c -∗ X.N.pay (-1)) ∗ appInv (hlc := hlc) fscFs ∗ X.fifCred)
+  iprop(□ (uKillCred (GF := GF) -∗ fileTaint X.c) ∗
+    □ (fileTaint X.c -∗ uKillCred (GF := GF)) ∗
+    □ (fileTaint X.c -∗ X.N.pay (-1)) ∗ appInv fscFs ∗ X.fifCred)
 
 instance fifEnv_persistent : Persistent X.fifEnv := by
   unfold fifEnv; infer_instance
@@ -148,7 +148,7 @@ def fifHdls (γfd : GName) (fdm : Fdmap) (vs : FifVs) : IProp GF :=
     [∗map] fd ↦ st ∈ hm, ufd γfd fd.toNat st)
 
 namespace FifCtx
-variable (X : FifCtx hlc GF)
+variable (X : FifCtx GF)
 
 /-- **Rocq `fif_out`**: the console at its round, remembering its codes. -/
 def fifOut (d : Nat) (alts : List (List (BitVec 8))) : IProp GF :=
@@ -165,7 +165,7 @@ def fifOutOk (i : Nat) (ws : Wordline) : Prop :=
 `b` on owed (`file_out` is `efany`, Rocq's body). -/
 def fifOutm (d : Nat) (chunks : List (List (BitVec 8))) : IProp GF :=
   iprop(∃ (nm : Fname) (i : Nat) (γo : GName) (ws : Wordline), fifTok X.γreg d (1 : Qp).half (.FDFile nm i γo ws) ∗
-    ∃ b : Nat, ⌜chunks = (echoChunks ws).drop b⌝ ∗ ⌜fifOutOk i ws⌝ ∗ efany (hlc := hlc) X.c X.r nm X.sf i γo ws b)
+    ∃ b : Nat, ⌜chunks = (echoChunks ws).drop b⌝ ∗ ⌜fifOutOk i ws⌝ ∗ efany X.c X.r nm X.sf i γo ws b)
 
 /-- **Rocq `fif_in`**: an input the process opened on `nm`: the program's
 half of the offset; the deed is the core's. -/
@@ -212,7 +212,7 @@ def fifFds (fdm : Fdmap) : IProp GF :=
 
 /-- **Rocq `fif_taint`**: the free handler's, at the application's flag. -/
 def fifTaint (held : FdSet) : IProp GF :=
-  fhTaint (fileTaint (hlc := hlc) X.c) (uKillCred (hlc := hlc) (GF := GF)) (appSup (GF := GF)) X.N held
+  fhTaint (fileTaint X.c) (uKillCred (GF := GF)) (appSup (GF := GF)) X.N held
 
 end FifCtx
 
@@ -246,30 +246,30 @@ theorem fif_held_ok_fds (D0 : List Nat) (w0 : Nat → Fdev) (fdm : Fdmap) (l : L
     · exact hr.elim
 
 noncomputable section FifLemmas
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 namespace FifCtx
-variable (X : FifCtx hlc GF)
+variable (X : FifCtx GF)
 
 /-- **Rocq `fif_app_sup`**. -/
-theorem fif_app_sup (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) X.c X.r) :
-    ⊢ fileTaint (hlc := hlc) X.c -∗ appSup (GF := GF) := by
-  have h := fileSup_of_taint (hlc := hlc) (GF := GF) X.c X.r
+theorem fif_app_sup (heq : HfpFileClaimsP.fileAppIs (GF := GF) X.c X.r) :
+    ⊢ fileTaint X.c -∗ appSup (GF := GF) := by
+  have h := fileSup_of_taint (GF := GF) X.c X.r
   unfold HfpFileClaimsP.fileAppIs at heq
   have e := congrArg (fun (A : Appcfg GF) => appSupRaw (N := A.appNames) A.appPred A.appRun) heq
-  have e' : appSup (GF := GF) = appSupRaw (filePred (hlc := hlc) X.c) X.r := e
+  have e' : appSup (GF := GF) = appSupRaw (filePred X.c) X.r := e
   rw [e']
   exact h
 
 /-- **Rocq `fif_taint_of_fds`**: the taint, out of what a law holds at a
 taint arm. -/
-theorem fif_taint_of_fds (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) X.c X.r) (fdm : Fdmap) (l : List FdState) (vs : FifVs)
+theorem fif_taint_of_fds (heq : HfpFileClaimsP.fileAppIs (GF := GF) X.c X.r) (fdm : Fdmap) (l : List FdState) (vs : FifVs)
     (hok : fifOk X.D0 X.w0 fdm l vs) :
-    ⊢ fileTaint (hlc := hlc) X.c -∗ X.fifEnv -∗ ustd X.N.fd l -∗ fifHdls X.N.fd fdm vs -∗ X.fifTaint (fdDom fdm) := by
+    ⊢ fileTaint X.c -∗ X.fifEnv -∗ ustd X.N.fd l -∗ fifHdls X.N.fd fdm vs -∗ X.fifTaint (fdDom fdm) := by
   iintro #Ht #He Hstd Hhs
   unfold fifEnv
   icases He with ⟨-, #Hk, #Hpay, -, -⟩
@@ -338,13 +338,13 @@ theorem fif_ans_ok (l : List FdState) (ret : BitVec 64) :
 
 /-- `fifEnv`, opened (keeping the goal folded). -/
 theorem fifEnv_open :
-    X.fifEnv ⊢ □ (uKillCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) X.c) ∗
-      □ (fileTaint (hlc := hlc) X.c -∗ uKillCred (hlc := hlc) (GF := GF)) ∗
-      □ (fileTaint (hlc := hlc) X.c -∗ X.N.pay (-1)) ∗ appInv (hlc := hlc) fscFs ∗ X.fifCred := .rfl
+    X.fifEnv ⊢ □ (uKillCred (GF := GF) -∗ fileTaint X.c) ∗
+      □ (fileTaint X.c -∗ uKillCred (GF := GF)) ∗
+      □ (fileTaint X.c -∗ X.N.pay (-1)) ∗ appInv fscFs ∗ X.fifCred := .rfl
 
 /-- `fifCred` off the write mode, opened. -/
 theorem fifCred_open (h : fifWr X.D0 X.w0 = false) :
-    X.fifCred ⊢ ∃ jo : Option Nat, fileConsCred (hlc := hlc) X.c X.r jo := by
+    X.fifCred ⊢ ∃ jo : Option Nat, fileConsCred X.c X.r jo := by
   rw [X.fifCred_rd h]
 
 /-- `fifFds`, opened (a view for `icases`, keeping the goal folded). -/
@@ -368,25 +368,25 @@ theorem fif_fds_of (fdm : Fdmap) (l : List FdState) (vs : FifVs) (w : Nat → Fd
 
 /-- **Rocq `fif_exit`**: the exit wand, applied to the final core. -/
 theorem fif_exit (SYS : UK_SYS_P) [HNc : UknConst X.N]
-    (H : FhHyps (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)) X.N X.P (uKillCred (hlc := hlc) (GF := GF))
+    (H : FhHyps (SG := uexecSGXv6) X.N X.P (uKillCred (GF := GF))
       (appSup (GF := GF)))
     (s : Int) (fdm : Fdmap) (files : Bytes → Option Bytes) (paths : List Bytes) (dv : Nat → Dspec)
     (ds : ExtTreeSet Nat compare) (hdr : ∀ d, d ∈ ds → drained (dv d)) (hdom : domOkP X.D0 fdm ds) :
     ⊢ X.fifFds fdm -∗ X.fifFilesr files paths -∗ ([∗set] d ∈ ds, X.fifDev d (dv d)) -∗
-      exObl (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)) X.N X.P s := by
+      exObl (SG := uexecSGXv6) X.N X.P s := by
   iintro Hfds Hfiles Hdev
   unfold fifFds fifFdsAt
   icases Hfds with ⟨%l, %vs, %w, Hcore, Hk⟩
-  iapply fh_exit_pay (SG := uexecSGXv6 (hlc := hlc)) (uKillCred (hlc := hlc) (GF := GF)) (appSup (GF := GF))
+  iapply fh_exit_pay (SG := uexecSGXv6) (uKillCred (GF := GF)) (appSup (GF := GF))
     SYS X.N X.P H s
   unfold fifExitK
   iapply Hk $$ %fdm %l %vs %w %files %paths %dv %ds %hdr %hdom Hcore Hfiles Hdev
 
 /-- **Rocq `fif_open_taint`**: an open's answer at the taint arm, as the
 taint at what the process then holds. -/
-theorem fif_open_taint (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) X.c X.r) (l : List FdState) (ret : BitVec 64) (fdm : Fdmap)
+theorem fif_open_taint (heq : HfpFileClaimsP.fileAppIs (GF := GF) X.c X.r) (l : List FdState) (ret : BitVec 64) (fdm : Fdmap)
     (vs : FifVs) (hlen : l.length = NSTD) (hok : fifOk X.D0 X.w0 fdm l vs) :
-    ⊢ fileTaint (hlc := hlc) X.c -∗ X.fifEnv -∗ UkFileOpen.ukOpenTaintFd X.N.fd l ret -∗ fifHdls X.N.fd fdm vs -∗
+    ⊢ fileTaint X.c -∗ X.fifEnv -∗ UkFileOpen.ukOpenTaintFd X.N.fd l ret -∗ fifHdls X.N.fd fdm vs -∗
       X.fifTaint (openHeld fdm ret.toInt) := by
   iintro #Htn #He Hof Hhs
   unfold UkFileOpen.ukOpenTaintFd

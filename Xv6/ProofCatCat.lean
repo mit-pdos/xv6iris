@@ -69,7 +69,7 @@ theorem kcat_cs_cases (r : BitVec 5) (hr : ucalleeSavedIdx r = true) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -81,9 +81,9 @@ theorem catCat_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap) (
     (hal : sp0.toNat % 8 = 0) (hlo : 64 ≤ sp0.toNat)
     (hfree : ∀ r : BitVec 5, ucalleeSavedIdx r = true → kcatFree r → m.get r = m0.get r) :
     ⊢ ukCode N.t User.Cat.code.byte -∗ kcatFrame N.d sp0 m0 -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x58) (10 + (12 + (4 + n))) -∗
+      urun N h m (BitVec.ofNat 64 0x58) (10 + (12 + (4 + n))) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m0 m'⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m0.get 1#5)) (8 + (10 + (12 + (4 + n)))) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m0.get 1#5)) (8 + (10 + (12 + (4 + n)))) -∗ wpLoop h') -∗
       wpLoop h := by
   have hs64 : (m.get 2#5).toNat = sp0.toNat - 64 := by rw [hsp]; exact uv_avi_neg sp0 64 hlo
   unfold kcatFrame
@@ -228,13 +228,13 @@ law pays the read, and at whatever it returned, the arm the return selects;
 the back edge hands the invariant to the next turn. -/
 theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : RegMap) (sp0 fdv : BitVec 64)
     (n : Nat) (I Cend : IProp GF) (hsp0 : m0.get 2#5 = sp0) (hal : sp0.toNat % 8 = 0) (hlo : 64 ≤ sp0.toNat) :
-    ⊢ kcatRound (hlc := hlc) N fdv I Cend -∗ ukCode N.t User.Cat.code.byte -∗
+    ⊢ kcatRound N fdv I Cend -∗ ukCode N.t User.Cat.code.byte -∗
       ∀ (h : CPU) (m : RegMap) (f : Nat → BitVec 8), ⌜cvInv m0 m sp0 fdv⌝ -∗ I -∗ kcatFrame N.d sp0 m0 -∗
         ubytes N.d User.Cat.Sym.«buf» 512 f -∗
-        urun (hlc := hlc) N h m (BitVec.ofNat 64 0x22) (10 + (12 + (4 + n))) -∗
+        urun N h m (BitVec.ofNat 64 0x22) (10 + (12 + (4 + n))) -∗
         (∀ (h' : CPU) (m' : RegMap) (g : Nat → BitVec 8), ⌜ucalleeSaved m0 m'⌝ -∗ Cend -∗
           ubytes N.d User.Cat.Sym.«buf» 512 g -∗
-          urun (hlc := hlc) N h' m' (retPc (m0.get 1#5)) (8 + (10 + (12 + (4 + n)))) -∗ wpLoop h') -∗
+          urun N h' m' (retPc (m0.get 1#5)) (8 + (10 + (12 + (4 + n)))) -∗ wpLoop h') -∗
         wpLoop h := by
   simp only [kcatRound, kcatR, kcatWr, kcatWpost]
   iintro #Hround #Hc
@@ -430,12 +430,12 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
 registers, then the loop. -/
 theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : BitVec 64) (f : Nat → BitVec 8)
     (h : CPU) (m : RegMap) (n : Nat) (I Cend : IProp GF) (ha0 : m.get 10#5 = fdv) :
-    ⊢ kcatRound (hlc := hlc) N fdv I Cend -∗ ukCode N.t User.Cat.code.byte -∗ I -∗
+    ⊢ kcatRound N fdv I Cend -∗ ukCode N.t User.Cat.code.byte -∗ I -∗
       ubytes N.d User.Cat.Sym.«buf» 512 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«cat») (8 + (10 + (12 + (4 + n)))) -∗
+      urun N h m (BitVec.ofNat 64 User.Cat.Sym.«cat») (8 + (10 + (12 + (4 + n)))) -∗
       (∀ (h' : CPU) (m' : RegMap) (g : Nat → BitVec 8), ⌜ucalleeSaved m m'⌝ -∗ Cend -∗
         ubytes N.d User.Cat.Sym.«buf» 512 g -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (8 + (10 + (12 + (4 + n)))) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (8 + (10 + (12 + (4 + n)))) -∗ wpLoop h') -∗
       wpLoop h := by
   rw [show User.Cat.Sym.«cat» = 0 from rfl]
   iintro #Hround #Hc HI Hbuf Hrun Hcont

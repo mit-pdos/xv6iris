@@ -37,7 +37,7 @@ theorem sys_fork_br_kfork : KA.«sys_fork» + 0xfffffffffffff2ce#64 = KA.«kfork
 theorem sys_fork_ret_0c : jumpPc (KA.«sys_fork» + 0xc#64) = KA.«sys_fork» + 0xc#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -45,7 +45,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- `kfork`'s contract at its entry address (either `SIE`), over the
 returned bundle `B` (NI M2-G2b: the landed `kforkRet` or the led
 `kforkRetLed`), given that contract `hKF`. -/
-theorem sys_fork_kforkB [SG : UexecSG GF] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_fork_kforkB [SG : UexecSG GF] (Γ : SchedNames) [ClaimIs GF Γ]
     (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
     (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF)
@@ -58,9 +58,9 @@ theorem sys_fork_kforkB [SG : UexecSG GF] (Γ : SchedNames) [ClaimIs (hlc := hlc
       isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvailAt Γ none false ∗
       isFtable γft γ ∗
       isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-      itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-      □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗ firstDone (hlc := hlc) ∗
-      kforkPark (hlc := hlc) (SG := SG) Γ V M stsP Q Rc ∗
+      itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗
+      □ (MachFixedGS.killCred (GF := GF) -∗ Q (-1)) ∗ firstDone ∗
+      kforkPark (SG := SG) Γ V M stsP Q Rc ∗
       procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗ chFrag V.chg (procAddr j) csP ∗
       wpNext k'.sie k'.proc c (kforkPostB k' B)
       ⊢ wpLoop (GF := GF) c)
@@ -72,9 +72,9 @@ theorem sys_fork_kforkB [SG : UexecSG GF] (Γ : SchedNames) [ClaimIs (hlc := hlc
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvailAt Γ none false ∗
     isFtable γft γ ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-    □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗ firstDone (hlc := hlc) ∗
-    kforkPark (hlc := hlc) (SG := SG) Γ V M stsP Q Rc ∗
+    itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗
+    □ (MachFixedGS.killCred (GF := GF) -∗ Q (-1)) ∗ firstDone ∗
+    kforkPark (SG := SG) Γ V M stsP Q Rc ∗
     procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗ chFrag V.chg (procAddr j) csP ∗
     wpNext k.sie k.proc cpu (kforkPostB k B)
     ⊢ wpLoop (GF := GF) cpu := by
@@ -147,25 +147,25 @@ continuation re-anchored along each step's pinning fact.  Both fields are
 `sys_fork_kforkB` at kfork's matching field (NI M2-G2b: the led one at the
 led answer). -/
 theorem sys_fork_proof (KF : KFORK) : SYSFORK :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ SG _ _ _ Γ _ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ SG _ _ _ Γ _ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
       hj hproc hK hnoff htier => by
     unfold wp_sys_fork_eb_body kforkPost
     exact sys_fork_kforkB (GF := GF) Γ γw γp γl γk γft γ j pid V M stsP Q csP Rc
       (kforkRet γ j pid V M stsP Q csP Rc)
       (fun c k' hpr hKf hn ht => by
-        have h := KF.wp_kfork_eb (hlc := hlc) (GF := GF) Γ c k' γw γp γl γk γft γ j pid V M stsP Q csP Rc
+        have h := KF.wp_kfork_eb (GF := GF) Γ c k' γw γp γl γk γft γ j pid V M stsP Q csP Rc
           hj hpr hKf hn ht
         unfold wp_kfork_eb_body kforkPost at h
         simp only [kforkAddr] at h
         exact h)
       cpu k hj hproc hK hnoff htier,
-   fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ SG _ _ _ Γ _ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
+   fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ SG _ _ _ Γ _ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
       hj hproc hK hnoff htier => by
     unfold wp_sys_fork_led_eb_body kforkPostLed
     exact sys_fork_kforkB (GF := GF) Γ γw γp γl γk γft γ j pid V M stsP Q csP Rc
       (kforkRetLed γ γk j pid V M stsP Q csP Rc)
       (fun c k' hpr hKf hn ht => by
-        have h := KF.wp_kfork_led_eb (hlc := hlc) (GF := GF) Γ c k' γw γp γl γk γft γ j pid V M stsP Q csP
+        have h := KF.wp_kfork_led_eb (GF := GF) Γ c k' γw γp γl γk γft γ j pid V M stsP Q csP
           Rc hj hpr hKf hn ht
         unfold wp_kfork_led_eb_body kforkPostLed at h
         simp only [kforkAddr] at h

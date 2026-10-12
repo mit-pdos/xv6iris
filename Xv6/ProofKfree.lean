@@ -75,7 +75,7 @@ theorem kf_align8 (p : BitVec 64) (h : pageValid p) : p.toNat % 8 = 0 := by
 theorem kf_c4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = BitVec.ofNat 64 4096 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- The lock payload, opened at the caller's own context. -/
 theorem kf_kmemRes_elim [CurCtx] (γk : KmemNames) :
@@ -130,7 +130,7 @@ end
 
 set_option maxHeartbeats 1000000 in
 /-- `memset`'s contract at the call site. -/
-theorem kf_memset (MS : MEMSET) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem kf_memset (MS : MEMSET) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (c : CPU) (k' : KCtx) (olds : List (BitVec 8)) (n : Nat) (hK' : 2 ≤ k'.avail)
     (hn : k'.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32) (hl : olds.length = n) :
     kctx c k' ∗ pcIs c KA.«memset» ∗ byteBuf (k'.regs 10#5) (DFrac.own 1) olds ∗
@@ -139,14 +139,14 @@ theorem kf_memset (MS : MEMSET) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachG
       byteBuf (k'.regs 10#5) (DFrac.own 1) (List.replicate n (BitVec.extractLsb' 0 8 (k'.regs 11#5))) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MS.wp_memset (hlc := hlc) (GF := GF) c k' olds n hK' hn hn32 hl
+  have h := MS.wp_memset (GF := GF) c k' olds n hK' hn hn32 hl
   unfold wp_memset_body at h
   simp only [memsetAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
 /-- `memset`'s raw (visibility-free) contract at the call site. -/
-theorem kf_memset_free (MS : MEMSET_FREE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem kf_memset_free (MS : MEMSET_FREE) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (c : CPU) (k' : KCtx) (olds : List (BitVec 8)) (n : Nat) (hK' : 2 ≤ k'.avail)
     (hn : k'.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32) (hl : olds.length = n) :
     kctx c k' ∗ pcIs c KA.«memset» ∗ bytesFree (k'.regs 10#5) olds ∗
@@ -155,14 +155,14 @@ theorem kf_memset_free (MS : MEMSET_FREE) {hlc : HasLC} {GF : BundledGFunctors.{
       byteBuf (k'.regs 10#5) (DFrac.own 1) (List.replicate n (BitVec.extractLsb' 0 8 (k'.regs 11#5))) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MS.wp_memset_free (hlc := hlc) (GF := GF) c k' olds n hK' hn hn32 hl
+  have h := MS.wp_memset_free (GF := GF) c k' olds n hK' hn hn32 hl
   unfold wp_memset_free_body at h
   simp only [memsetAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
 /-- `acquire`'s contract at the call site. -/
-theorem kf_acquire (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem kf_acquire (AC : ACQUIRE) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (c : CPU) (k' : KCtx) (γ : GName) (R : CtxId → IProp GF) [CtxMorph R]
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail) (hs' : "kmem" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«acquire» ∗ isLock γ (k'.regs 10#5) "kmem" R ∗
@@ -172,14 +172,14 @@ theorem kf_acquire (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [Mac
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
       locked γ cpu' -∗ R curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗ sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γ "kmem" R hnoff' hK' hs'
+  have h := AC.wp_acquire (GF := GF) c k' γ "kmem" R hnoff' hK' hs'
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
 /-- `release`'s contract at the call site. -/
-theorem kf_release (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem kf_release (RE : RELEASE) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (c : CPU) (k' : KCtx) (γ : GName) (R : CtxId → IProp GF) [CtxMorph R]
     (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
@@ -190,7 +190,7 @@ theorem kf_release (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [Mac
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "kmem"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γ "kmem" R hsie' hnoff' hK' reen hreen hon
+  have h := RE.wp_release (GF := GF) c k' γ "kmem" R hsie' hnoff' hK' reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
   exact h
@@ -209,7 +209,7 @@ theorem kfree_br_11a4a : KA.«kfree» + 0x11a4a#64 = KA.«kmem» := by decide
 
 /-- A landed continuation (`kallocAvail γk (availInc on)`) serves as a led
 one (`kfreePostLed`): the receipt is dropped. -/
-theorem kfree_cont_led {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem kfree_cont_led {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γk : KmemNames) (on : Option Nat) :
     wpNext (GF := GF) k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
@@ -227,8 +227,8 @@ theorem kfree_cont_led {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
   ipureintro
   exact hcs
 
-theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu c : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat)
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hp : pageValid (k.regs 10#5))
@@ -388,9 +388,9 @@ set_option maxHeartbeats 4000000 in
 `wp_kfree` follows as a corollary in `kfree_proof`.  The actor of the
 ledger's event is `k.proc`, the `cpu_own` proc word (design D3). -/
 theorem kfree_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat) hnoff hK hlk hp :
-    wp_kfree_led_body (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk hp := by
+    wp_kfree_led_body (GF := GF) cpu k γl γk on ke hnoff hK hlk hp := by
   unfold wp_kfree_led_body
   simp only [kfreeAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hl, Hnext⟩
@@ -493,8 +493,8 @@ theorem kfree_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
 the boot (`hp0`) as its corollary (the lend from `actLend_of_zero`, the
 stepped lend dropped, the receipt dropped by `kfree_cont_led`). -/
 theorem kfree_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KFREE :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on hnoff hK hlk hp hp0 => by
-    have h := kfree_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on 0 hnoff hK hlk hp
+  ⟨fun {GF} _ _ _ _ cpu k γl γk on hnoff hK hlk hp hp0 => by
+    have h := kfree_led_proof AC RE MS (GF := GF) cpu k γl γk on 0 hnoff hK hlk hp
     unfold wp_kfree_led_body at h
     unfold wp_kfree_body
     iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hnext⟩
@@ -511,12 +511,12 @@ theorem kfree_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KFREE :=
     iapply H $$ %spie %spp %R' %hs Hk Hpc Hpost
     ipureintro
     exact hcs,
-   fun {hlc GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk hp =>
-    kfree_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk hp⟩
+   fun {GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk hp =>
+    kfree_led_proof AC RE MS (GF := GF) cpu k γl γk on ke hnoff hK hlk hp⟩
 
 set_option maxHeartbeats 4000000 in
 theorem kfree_free_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET_FREE) : KFREE_FREE :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk hp => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk hp => by
   unfold wp_kfree_free_body
   simp only [kfreeAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hl, Hnext⟩

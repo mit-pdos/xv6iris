@@ -85,7 +85,7 @@ theorem ci_dec_le (r w e : BitVec 32) (hok : consOk r w e) (hne : e ≠ w) :
   bv_omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The wake arm (`+0x156`) -/
 
@@ -175,7 +175,7 @@ theorem ci_wake (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k : KC
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 theorem ci_port_inv (γl : GName) (γ : UartNames) :
     uartPort (GF := GF) .uart0 γl γ ⊢ uartInv .uart0 γ := by
@@ -190,7 +190,7 @@ theorem ci_store_gh (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : 
     (hlt : ts.length = INPUT_BUF_SIZE) (hok : consOk r w e) (hroom : (e - r).toNat < INPUT_BUF_SIZE)
     (hi : i = consSlot e 0) (hends : obsEndsIn .uart0 hb cb) (hx : ohistExt hh hb)
     (hxg : ohistExt hg hb) (hk1 : k1Next hg hb) :
-    uartInv (GF := GF) .uart0 γ ∗ MachFixedGS.rxTag (hlc := hlc) (GF := GF) hb ∗
+    uartInv (GF := GF) .uart0 γ ∗ MachFixedGS.rxTag (GF := GF) hb ∗
       rxHi γ (1 : Qp).half hh ∗ logHi γ (1 : Qp).half hg ∗
       ciAppend γ hb cb [echoOf cb] [echoOf cb].length iprop(True) ∗ consTags ts ∗
       ciGh cn none r w e bs ts ⊢
@@ -227,7 +227,7 @@ theorem ci_nl (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     (hsv : ciSaved k.regs R) :
     kctx c ((ciK k a b).withRegs R) ∗ pcIs c (KA.«consoleintr» + 0x12e#64) ∗
     procsInv Γ ∗ ciLk γc cn ∗ locked γc c ∗ uartPort .uart0 γl γ ∗ ciPay γ hb 13#8 ∗
-    MachFixedGS.rxTag (hlc := hlc) (GF := GF) hb ∗
+    MachFixedGS.rxTag (GF := GF) hb ∗
     wordPointsTo consRAddr 4 (DFrac.own 1) r ∗ wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
     wordPointsTo consEAddr 4 (DFrac.own 1) e ∗ consData bs ∗ consTags ts ∗ ciGh cn none r w e bs ts ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
@@ -358,7 +358,7 @@ theorem ci_nl (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The echo-and-append arm (`+0x4e`) -/
 
@@ -383,7 +383,7 @@ theorem ci_echo (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     (hsv : ciSaved k.regs R) (hs1 : R 9#5 = BitVec.setWidth 64 cb) :
     kctx c ((ciK k a b).withRegs R) ∗ pcIs c (KA.«consoleintr» + 0x4e#64) ∗
     procsInv Γ ∗ ciLk γc cn ∗ locked γc c ∗ uartPort .uart0 γl γ ∗ ciPay γ hb cb ∗
-    MachFixedGS.rxTag (hlc := hlc) (GF := GF) hb ∗
+    MachFixedGS.rxTag (GF := GF) hb ∗
     wordPointsTo consRAddr 4 (DFrac.own 1) r ∗ wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
     wordPointsTo consEAddr 4 (DFrac.own 1) e ∗ consData bs ∗ consTags ts ∗ ciGh cn none r w e bs ts ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
@@ -640,7 +640,7 @@ theorem ci_echo_bs (c : BitVec 8) (her : consErase c = true) : consEcho c conspu
   Or.inr (Or.inr ⟨her, 1, by simp⟩)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- A DROPPED byte at the open ring (Rocq `ct_append_nil` + `ct_gh_drop`):
 the arm opens and closes at `[]`, the entry is logged, the ring does not
@@ -699,6 +699,7 @@ theorem ci_drop_gh_full (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (b
   imodintro
   iframe Hlgh Harm Hgh
 
+omit [MachGS GF] in
 theorem ci_hiOut_of (γ : UartNames) (hb : List Obs) (hh : Option (List Obs)) (hx : ohistExt hh hb) :
     rxHi (GF := GF) γ (1 : Qp).half hh ⊢ ciHiOut γ hb := by
   unfold ciHiOut
@@ -880,7 +881,7 @@ theorem ci_bs (CP : CONSPUTC) (RE : RELEASE)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The ring-space test and the `\r` test (`+0x2e`) -/
 
@@ -902,7 +903,7 @@ theorem ci_ring (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     (hsv : ciSaved k.regs R) (hs1 : R 9#5 = BitVec.setWidth 64 cb) :
     kctx c ((ciK k a b).withRegs R) ∗ pcIs c (KA.«consoleintr» + 0x2e#64) ∗
     procsInv Γ ∗ ciLk γc cn ∗ locked γc c ∗ uartPort .uart0 γl γ ∗ ciPay γ hb cb ∗
-    MachFixedGS.rxTag (hlc := hlc) (GF := GF) hb ∗
+    MachFixedGS.rxTag (GF := GF) hb ∗
     wordPointsTo consRAddr 4 (DFrac.own 1) r ∗ wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
     wordPointsTo consEAddr 4 (DFrac.own 1) e ∗ consData bs ∗ consTags ts ∗ ciGh cn none r w e bs ts ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗

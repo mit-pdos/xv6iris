@@ -97,7 +97,7 @@ theorem uheap_ubytes_wat {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8
   rw [e]; exact hM
 
 section UkRunSysWrite
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -109,12 +109,12 @@ def udepwfK (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : sfa
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
     ⌜K fdv⌝ -∗ ⌜uszOk sz⌝ -∗ myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
+      sbundleAt (uslot) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
 
 /-- **Rocq `udepwf_K_std`** (deviation 5: one direction). -/
 theorem udepwfK_std (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : sfam GF)
     (l : List FdState) :
-    udepwfStd (hlc := hlc) N m pc n fdep l ⊢ udepwfK N m pc n fdep (fun fdv => fdv.take NSTD = l) := by
+    udepwfStd N m pc n fdep l ⊢ udepwfK N m pc n fdep (fun fdv => fdv.take NSTD = l) := by
   unfold udepwfStd udepwfK
   iintro ⟨%hfp, H⟩
   isplitr
@@ -122,7 +122,7 @@ theorem udepwfK_std (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fd
   iintro %M %pm %sz %fdv %cw %gn %cs %pidv %htake %_ Hmy Hheap Hufd
   iapply H $$ %M %pm %sz %fdv %cw %gn %cs %pidv %htake Hmy Hheap Hufd
 
-omit [CtokG GF] [UexecSG GF] [UprogSG GF] in
+omit [CtokG GF] [UexecSG GF] [UprogSG GF] [MachGS GF] in
 /-- **Rocq `uheap_text_bytes`**: a text run is the image's, on fetchable
 pages, below MAXVA. -/
 theorem uheap_text_bytes (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz a : Nat)
@@ -144,7 +144,7 @@ theorem uheap_text_bytes (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
     · subst hjn; exact hhi
     · exact hlo j (by omega)
 
-omit [CtokG GF] [UexecSG GF] [UprogSG GF] in
+omit [CtokG GF] [UexecSG GF] [UprogSG GF] [MachGS GF] in
 /-- **Rocq `usrc_ok_utext`**. -/
 theorem usrcOk_utext (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (ua : BitVec 64)
     (nb : Nat) (f : Nat → BitVec 8) :
@@ -167,8 +167,8 @@ theorem usrcOk_utext (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPe
 /-- The returning arm at a NAMED family (the deposit's own). -/
 theorem uexecRet_retF (n : Int) (W : Uvis) (gn : GName) (Q : Int → IProp GF) (f : sfam GF) (hg : W.gen = gn)
     (hnum : uvisNum W = n) (hx : n ≠ USYS_exit) (hf : n ≠ USYS_fork) (hw : n ≠ USYS_wait) (hfp : sexitPay f = Q) :
-    ⊢ myPay gn Q -∗ sbundleAt (uslot (hlc := hlc)) n f W -∗ uexecRetContF (uslot (hlc := hlc)) n f W -∗
-      uexecRet (hlc := hlc) uecallScause W := by
+    ⊢ myPay gn Q -∗ sbundleAt (uslot) n f W -∗ uexecRetContF (uslot) n f W -∗
+      uexecRet uecallScause W := by
   subst hg
   iintro #Hmy Hdepn Hcont
   rw [uexecRet_ecall, hnum]
@@ -187,14 +187,14 @@ theorem wp_uk_ecall_write_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Re
     (hag : ∀ fdv : List FdState, ⊢ ufdAuth N.fd fdv -∗ D -∗ ⌜K fdv⌝)
     (hsrc : ∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat), uszOk sz →
       ⊢ uheap N.t N.d N.s M pm sz -∗ S -∗ ⌜usrcOk M pm sz (m.get 11#5) nb f⌝) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ udepwfK N m pc 16 fdep K -∗ D -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ udepwfK N m pc 16 fdep K -∗ D -∗
       S -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
         ⌜tfW W.tf (tfArgIdx 2) = m.get 12#5⌝ -∗ ⌜K W.fd⌝ -∗ ⌜W.lazy = false⌝ -∗
         ⌜usrcOk W.M W.perm W.sz (m.get 11#5) nb f⌝ -∗ D -∗ S -∗
-        spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        spostAt (uslot) 16 fdep W r W.M W.fd cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb HD HS Hcont
   iapply urun_ecallS UL N h m pc avail $$ Hi Hrun
@@ -221,8 +221,8 @@ theorem wp_uk_ecall_write_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Re
   iapply uslot_bump_close N m pc M pm sz fdv fdv cw cw gn cs pidv r avail hx0 hal4
     $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows
   iintro %h' Hrun
-  have hP : spostAt (uslot (hlc := hlc)) 16 fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r M fdv
-      cw cs ⊢ spostAt (uslot (hlc := hlc)) 16 fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r
+  have hP : spostAt (uslot) 16 fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r M fdv
+      cw cs ⊢ spostAt (uslot) 16 fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r
       (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll).M
       (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll).fd cw cs := .rfl
   ihave Hpost := hP $$ Hpost
@@ -234,13 +234,13 @@ table view (no source run). -/
 theorem wp_uk_ecall_write_chain_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (avail : Nat) (fdep : sfam GF) (l v : List FdState) (hn : usysno m = 16)
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepwfStd (hlc := hlc) N m pc 16 fdep l -∗ ustdAt N.fd l v -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepwfStd N m pc 16 fdep l -∗ ustdAt N.fd l v -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
         ⌜tfW W.tf (tfArgIdx 2) = m.get 12#5⌝ -∗ ⌜W.fd.take NSTD = l⌝ -∗ ustdAt N.fd l v -∗
-        spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        spostAt (uslot) 16 fdep W r W.M W.fd cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd Hcont
   ihave Hsb := udepwfK_std N m pc 16 fdep l $$ Hsb
@@ -258,8 +258,8 @@ source page is readable-mapped. -/
 theorem wp_uk_ecall_write_chain_txt_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (pc : BitVec 64) (avail : Nat) (fdep : sfam GF) (l v : List FdState) (nb : Nat) (f : Nat → BitVec 8)
     (hn : usysno m = 16) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepwfStd (hlc := hlc) N m pc 16 fdep l -∗ ustdAt N.fd l v -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepwfStd N m pc 16 fdep l -∗ ustdAt N.fd l v -∗
       ([∗list] j ∈ List.range nb, utext N.t ((m.get 11#5).toNat + j) (f j)) -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
@@ -267,8 +267,8 @@ theorem wp_uk_ecall_write_chain_txt_at (UL : UK_LEAVES) (N : UkNames GF) (h : CP
         ⌜∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm → lazyFree P.um (BitVec.ofNat 64 W.sz) →
           j < nb → uvaRmapped P ((m.get 11#5 + BitVec.ofNat 64 j).toNat)⌝ -∗
         ustdAt N.fd l v -∗ ([∗list] j ∈ List.range nb, utext N.t ((m.get 11#5).toNat + j) (f j)) -∗
-        spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        spostAt (uslot) 16 fdep W r W.M W.fd cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd #Hbs Hcont
   ihave Hsb := udepwfK_std N m pc 16 fdep l $$ Hsb
@@ -284,8 +284,8 @@ reads. -/
 theorem wp_uk_ecall_write_chain_txt (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (pc : BitVec 64) (avail : Nat) (fdep : sfam GF) (l : List FdState) (nb : Nat) (f : Nat → BitVec 8)
     (hn : usysno m = 16) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepwfStd (hlc := hlc) N m pc 16 fdep l -∗ ustd N.fd l -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepwfStd N m pc 16 fdep l -∗ ustd N.fd l -∗
       ([∗list] j ∈ List.range nb, utext N.t ((m.get 11#5).toNat + j) (f j)) -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
@@ -293,8 +293,8 @@ theorem wp_uk_ecall_write_chain_txt (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) 
         ⌜∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm → lazyFree P.um (BitVec.ofNat 64 W.sz) →
           j < nb → uvaRmapped P ((m.get 11#5 + BitVec.ofNat 64 j).toNat)⌝ -∗
         ustd N.fd l -∗ ([∗list] j ∈ List.range nb, utext N.t ((m.get 11#5).toNat + j) (f j)) -∗
-        spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        spostAt (uslot) 16 fdep W r W.M W.fd cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd #Hbs Hcont
   icases ustd_ustdAt N.fd l $$ Hstd with ⟨%v, Hstd⟩
@@ -303,7 +303,7 @@ theorem wp_uk_ecall_write_chain_txt (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) 
   ihave Hstd := ustdAt_ustd N.fd l v $$ Hstd
   iapply Hcont $$ %h' %r %W %cw' %cs' %ha0 %ha1 %ha2 %htk %hlz %hsrc Hstd Hbs' Hpost Hrun
 
-omit [CtokG GF] [UexecSG GF] [UprogSG GF] in
+omit [CtokG GF] [UexecSG GF] [UprogSG GF] [MachGS GF] in
 /-- **Rocq `usrc_ok_ubytesq`**: a DATA run the program owns is the image's
 and readable-mapped (writable pages, no lazy page). -/
 theorem usrcOk_ubytesq (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (dq : DFrac)
@@ -329,16 +329,16 @@ a DATA run the caller owns at `dq`, at a named table view. -/
 theorem wp_uk_ecall_write_chain_buf_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (pc : BitVec 64) (avail : Nat) (fdep : sfam GF) (l v : List FdState) (dq : DFrac) (nb : Nat)
     (f : Nat → BitVec 8) (hn : usysno m = 16) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepwfStd (hlc := hlc) N m pc 16 fdep l -∗ ustdAt N.fd l v -∗ ubytesq N.d dq (m.get 11#5).toNat nb f -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepwfStd N m pc 16 fdep l -∗ ustdAt N.fd l v -∗ ubytesq N.d dq (m.get 11#5).toNat nb f -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
         ⌜tfW W.tf (tfArgIdx 2) = m.get 12#5⌝ -∗ ⌜W.fd.take NSTD = l⌝ -∗ ⌜W.lazy = false⌝ -∗
         ⌜∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm → lazyFree P.um (BitVec.ofNat 64 W.sz) →
           j < nb → uvaRmapped P ((m.get 11#5 + BitVec.ofNat 64 j).toNat)⌝ -∗
         ustdAt N.fd l v -∗ ubytesq N.d dq (m.get 11#5).toNat nb f -∗
-        spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        spostAt (uslot) 16 fdep W r W.M W.fd cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd Hbs Hcont
   ihave Hsb := udepwfK_std N m pc 16 fdep l $$ Hsb
@@ -353,16 +353,16 @@ reads. -/
 theorem wp_uk_ecall_write_chain_buf (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (pc : BitVec 64) (avail : Nat) (fdep : sfam GF) (l : List FdState) (dq : DFrac) (nb : Nat)
     (f : Nat → BitVec 8) (hn : usysno m = 16) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepwfStd (hlc := hlc) N m pc 16 fdep l -∗ ustd N.fd l -∗ ubytesq N.d dq (m.get 11#5).toNat nb f -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepwfStd N m pc 16 fdep l -∗ ustd N.fd l -∗ ubytesq N.d dq (m.get 11#5).toNat nb f -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
         ⌜tfW W.tf (tfArgIdx 2) = m.get 12#5⌝ -∗ ⌜W.fd.take NSTD = l⌝ -∗ ⌜W.lazy = false⌝ -∗
         ⌜∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm → lazyFree P.um (BitVec.ofNat 64 W.sz) →
           j < nb → uvaRmapped P ((m.get 11#5 + BitVec.ofNat 64 j).toNat)⌝ -∗
         ustd N.fd l -∗ ubytesq N.d dq (m.get 11#5).toNat nb f -∗
-        spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        spostAt (uslot) 16 fdep W r W.M W.fd cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd Hbs Hcont
   icases ustd_ustdAt N.fd l $$ Hstd with ⟨%v, Hstd⟩

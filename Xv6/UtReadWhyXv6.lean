@@ -20,11 +20,11 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 /-- **Rocq `spost_at_read_why`**, at the instance: usertrap's `UtReadWhy`. -/
-theorem utReadWhy_xv6 : UtReadWhy (GF := GF) (SG := uexecSGXv6 (hlc := hlc)) := by
+theorem utReadWhy_xv6 : UtReadWhy (GF := GF) (SG := uexecSGXv6) := by
   intro X f W r M' fdv' cw' cs' hcons hr
   obtain ⟨h0, hlt, rb, hst⟩ := hcons
   have hkey : fdStOfKey (xkA W 0) W.fd = .open true rb (.device CONSOLE) := by
@@ -36,8 +36,8 @@ theorem utReadWhy_xv6 : UtReadWhy (GF := GF) (SG := uexecSGXv6 (hlc := hlc)) := 
     rw [hst']
     rfl
   have hnb : argZ (xkA W 2) < 2 ^ 31 := (argZ_range _).2
-  show xpostRead (hlc := hlc) f.rF f.rRd f.rRin f.rPq f.rPqe W r M' ⊢
-    □ (⌜usysRdcount W.tf < 0⌝ ∨ killShot W.gen) ∗ xpostRead (hlc := hlc) f.rF f.rRd f.rRin f.rPq f.rPqe W r M'
+  show xpostRead f.rF f.rRd f.rRin f.rPq f.rPqe W r M' ⊢
+    □ (⌜usysRdcount W.tf < 0⌝ ∨ killShot W.gen) ∗ xpostRead f.rF f.rRd f.rRin f.rPq f.rPqe W r M'
   unfold xpostRead
   rw [hkey, show usysRdcount W.tf = argZ (xkA W 2) from rfl]
   iintro ⟨%hret, %P, %Pr, %Mv, %h1, %h1b, %h2, %h3, %h4, %h5, Hc⟩
@@ -56,14 +56,14 @@ theorem utReadWhy_xv6 : UtReadWhy (GF := GF) (SG := uexecSGXv6 (hlc := hlc)) := 
 /-- **pause's reason at the instance** (NI M3 no-kill K1): usertrap's
 `UtPauseWhy` -- post 13 is `⌜r = 0⌝ ∨ killShot W.gen`
 (`UexecExecInst.spostAt_pause_xv6`), so a nonzero answer is the shot. -/
-theorem utPauseWhy_xv6 : UtPauseWhy (GF := GF) (SG := uexecSGXv6 (hlc := hlc)) := by
+theorem utPauseWhy_xv6 : UtPauseWhy (GF := GF) (SG := uexecSGXv6) := by
   intro X f W r M' fdv' cw' cs' hr
-  refine (spostAt_pause_xv6 (hlc := hlc) X f W r M' fdv' cw' cs').1.trans ?_
+  refine (spostAt_pause_xv6 X f W r M' fdv' cw' cs').1.trans ?_
   iintro (%h0 | #Hs)
   · exact absurd h0 hr
   · isplitl []
     · imodintro; iexact Hs
-    · iapply (spostAt_pause_xv6 (hlc := hlc) X f W r M' fdv' cw' cs').2
+    · iapply (spostAt_pause_xv6 X f W r M' fdv' cw' cs').2
       iright; iexact Hs
 
 end

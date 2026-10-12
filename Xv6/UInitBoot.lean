@@ -97,7 +97,7 @@ theorem initBootRoom (n0 : Nat) (hn0 : 8 * (2 + (4 + (12 + (12 + (4 + n0))))) �
 /-! ## 4.  The boot bundle -/
 
 section UInitBoot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [CtokG GF] {SG : UexecSG GF} [Fscfg] [Icfg]
 
 /-- **Rocq `init_boot_bundle_of_pinned`**: `initBootBundle` off the pin's
@@ -107,18 +107,18 @@ the linear half as a wand from the reader token. -/
 theorem initBootBundle_of_pinned (initElfLoadable : kexecLoadable User.Init.elf)
     (T : IProp GF) [Persistent T] [Timeless T] (Pay : IProp GF) :
     ⊢ iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜era0Pins v⌝ ∨ T)) -∗
-      appInv (hlc := hlc) fscFs -∗
+      appInv fscFs -∗
       iprop(□ ∀ W' : Uvis, ⌜kexecImageOk User.Init.elf 1 (fun _ => 5) (fun _ => initBootBytes) fdt0 W'⌝ -∗
         ⌜W'.cwd = ROOTINO⌝ -∗ ⌜W'.lazy = false⌝ -∗ ⌜W'.secc = seccAll⌝ -∗
-        myPay W'.gen (fun _ => iprop(True)) -∗ Pay -∗ uslot (hlc := hlc) (SG := SG) W') -∗
-      iprop(□ ∀ W' : Uvis, T -∗ myPay W'.gen (fun _ => iprop(True)) -∗ uslot (hlc := hlc) (SG := SG) W') -∗
+        myPay W'.gen (fun _ => iprop(True)) -∗ Pay -∗ uslot (SG := SG) W') -∗
+      iprop(□ ∀ W' : Uvis, T -∗ myPay W'.gen (fun _ => iprop(True)) -∗ uslot (SG := SG) W') -∗
       (consReader fscCons 0 -∗ Pay) -∗
-      initBootBundle (hlc := hlc) (SG := SG) ROOTINO ROOTINO seccAll fdt0 := by
+      initBootBundle (SG := SG) ROOTINO ROOTINO seccAll fdt0 := by
   iintro #Hcl #Hinv #Hcon #Hgen HPay
   unfold initBootBundle
   iintro Hrd
   ihave HP := HPay $$ Hrd
-  iapply pinnedExecBundle_boot fscFs (uslot (hlc := hlc) (SG := SG)) era0Pins T ROOTINO ROOTINO seccAll initBootPath
+  iapply pinnedExecBundle_boot fscFs (uslot (SG := SG)) era0Pins T ROOTINO ROOTINO seccAll initBootPath
     [ROOTINO, INIT_INO] INIT_INO User.Init.elf 1 Pay (fun _ => iprop(True)) 1 (fun _ => 5)
     (fun _ => initBootBytes) fdt0 initBootPinResolves initElfLoadable $$ Hcl Hinv Hcon Hgen HP
 

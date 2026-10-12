@@ -114,9 +114,9 @@ def last_fd0 (γp : PipeNames) (l : List FdState) : Prop :=
   ∧ (∃ rb, l[2]? = some (.open rb true (.device CONSOLE)))
 
 section Stage
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
-variable (D : PdRound hlc GF)
+variable (D : PdRound GF)
 
 /-- **Rocq `Hypothesis Hfire`**: THE ROUND'S FIRING PREMISE -- every commit a
 process of the round makes is admitted by the model, or refuted by a

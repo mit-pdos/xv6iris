@@ -886,8 +886,9 @@ end IcacheIty
 /-! ## 4.  THE BOOT ALLOCATION -/
 
 section Alloc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
+omit [MachGS GF] in
 /-- One ghost per index, as a function (Rocq's four `*_fun_alloc`s, with
 their always-`0` start index dropped). -/
 theorem icFunAlloc {A : Type} (d : A) (P : Nat → A → IProp GF)
@@ -933,6 +934,7 @@ theorem iepFunAlloc (n : Nat) :
       iexists γ
       iexact H) n
 
+omit [MachGS GF] in
 /-- The per-slot sleeplock "may hold" counters at their authoritative zero,
 which is what `itable_body` parks for a free slot (deviation 4). -/
 theorem islFunAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] (n : Nat) :
@@ -945,6 +947,7 @@ def icBoxRaw [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [Wch
   stampsAuth γb (∅ : StampMap IcBid) ∗ (γb.cnt ↪VAR (0 : Nat)) ∗
   (γb.slotd ↪VAR (default : SlotReg IcBid IcX)) ∗ (γb.slotp ↪VAR (default : L2Reg IcBid))
 
+omit [MachGS GF] in
 /-- The per-slot box names, minted as one family (bio_init's pattern). -/
 theorem icfgBoxFunAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF] (n : Nat) :
     ⊢@{IProp GF} |==> ∃ f : Nat → BoxNames, [∗list] k ∈ List.range n, icBoxRaw (f k) :=
@@ -959,6 +962,7 @@ theorem icfgBoxFunAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Cto
       unfold icBoxRaw stampsAuth
       iframe Hst Hcnt Hd Hp) n
 
+omit [MachGS GF] in
 /-- A slot's raw box ghosts are exactly `MachCSL.boxAllocAt`'s ghost
 premises (Rocq's `box_alloc_at` takes the same four rows). -/
 theorem icBoxRaw_allocAt [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF] (γb : BoxNames) :
@@ -972,6 +976,7 @@ theorem icBoxRaw_allocAt [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Ct
   iexists (default : SlotReg IcBid IcX)
   iexact Hd
 
+omit [MachGS GF] in
 /-- The off set family: one empty authority per inode slot (r25 shapes).
 Rocq `icfg_off_fun_alloc`. -/
 theorem icfgOffFunAlloc [OffboxBoxG GF] (n : Nat) :

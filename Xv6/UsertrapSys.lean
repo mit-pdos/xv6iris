@@ -46,7 +46,7 @@ theorem ut90_ret_a6 : jumpPc (KA.«usertrap» + 0xa6#64) = KA.«usertrap» + 0xa
 /-! ## The trapframe's epc word -/
 
 section Tf
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- `p->trapframe->epc` out of the trapframe page, at its value, and back at
 any. -/
@@ -86,15 +86,15 @@ theorem ut90_rec (sep : BitVec 64) (V : ProcPriv) (hl : V.tf.length = 36) :
   rw [e, List.set_set]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (PT : SchedNames → IProp GF) (Γ : SchedNames)
 
 /-- `syscall`'s contract at its entry. -/
-theorem ut90_syscall [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ] (SY : SYSCALL_XV6)
-    (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
+theorem ut90_syscall [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs GF Γ] (SY : SYSCALL_XV6)
+    (hPT0 : PT = parkToken (GF := GF) (SG := uexecSGXv6))
     (cpu : CPU) (k : KCtx) (γw : GName) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -104,15 +104,15 @@ theorem ut90_syscall [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗
     bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-    syscallEnv (hlc := hlc) PT Γ γ ∗
+    syscallEnv PT Γ γ ∗
     procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg (procAddr j) cs ∗
-    syscSysIn (hlc := hlc) f V M sts gn cs pid ∗ syscForkIn (hlc := hlc) f V M sts ∗
+    syscSysIn f V M sts gn cs pid ∗ syscForkIn f V M sts ∗
     syscPayIn f V ∗
-    (wpNext true k.proc cpu (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f) ∧
+    (wpNext true k.proc cpu (syscallPost PT Γ k γ j pid V M sts gn cs ip f) ∧
       syscallCloser k V)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hPT0
-  have h := SY.wp_syscall (hlc := hlc) (GF := GF) Γ cpu k γw γ j pid V M sts gn cs ip f
+  have h := SY.wp_syscall (GF := GF) Γ cpu k γw γ j pid V M sts gn cs ip f
     hj hproc hK hnoff htier hgn
   unfold wp_syscall_body at h
   simp only [syscallAddr] at h
@@ -134,18 +134,18 @@ theorem ut90_pay (f : UexecSG.sfam GF) (sc sep : BitVec 64) (V : ProcPriv) :
 set_option maxHeartbeats 4000000 in
 /-- **+0xa2, `jal syscall`**, at interrupts on: the dispatch, its left exit
 conjunct the continuation (`ut90_tail`), its right the stack closer. -/
-theorem ut90_call [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ] (SY : SYSCALL_XV6)
-    (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
-    (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A : UtArgs GF)
+theorem ut90_call [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs GF Γ] (SY : SYSCALL_XV6)
+    (hPT0 : PT = parkToken (GF := GF) (SG := uexecSGXv6))
+    (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 PT Γ) (A : UtArgs GF)
     (hok : UtOk Γ A) (hsc : A.sc = uecallScause) (hb : umBelow A.V.sz A.V.upt)
     (cpu : CPU) (R : RegMap) (hpins : utPins A R) :
     kctx cpu ((A.k.intrOn.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0xa2#64) ∗ utFrame A ∗
       utCaps A.N ∗ utPay A ∗ utKont PT Γ A ∗
-      bslots 3 ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗ syscallEnv (hlc := hlc) PT Γ A.N.f ∗
+      bslots 3 ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗ syscallEnv PT Γ A.N.f ∗
       procPrivFd A.N.f (procAddr A.j) A.pid (utSysRec A.sep A.V) A.M ∗ fdFrags A.V.fdg A.sts ∗
       chFrag A.V.chg (procAddr A.j) A.cs ∗
-      syscSysIn (hlc := hlc) A.f (utSysRec A.sep A.V) A.M A.sts A.gn A.cs A.pid ∗
-      syscForkIn (hlc := hlc) A.f (utSysRec A.sep A.V) A.M A.sts ∗ syscPayIn A.f (utSysRec A.sep A.V)
+      syscSysIn A.f (utSysRec A.sep A.V) A.M A.sts A.gn A.cs A.pid ∗
+      syscForkIn A.f (utSysRec A.sep A.V) A.M A.sts ∗ syscPayIn A.f (utSysRec A.sep A.V)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, #Hcaps, #Hpay, Hkont, Hbs, Hfd, Hir, Henv, Hpriv, Hfrag, Hch, Hsi, Hfi, Hpi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -211,15 +211,15 @@ set_option maxHeartbeats 4000000 in
 /-- **+0x96 .. +0x9e**: `p->trapframe->epc += 4` (the block moves to
 `utSysRec`), then `intr_on()` (the arm goes back into the context), then
 `ut90_call`. -/
-theorem ut90_bump [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ] (SY : SYSCALL_XV6)
-    (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
-    (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A : UtArgs GF)
+theorem ut90_bump [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs GF Γ] (SY : SYSCALL_XV6)
+    (hPT0 : PT = parkToken (GF := GF) (SG := uexecSGXv6))
+    (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 PT Γ) (A : UtArgs GF)
     (hok : UtOk Γ A) (hsc : A.sc = uecallScause) (cpu : CPU) (R : RegMap) (hpins : utPins A R) :
     kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0x96#64) ∗ utFrame A ∗
       trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
-      utOwn (utRsys (hlc := hlc) PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
-      utSysIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
-      utForkIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
+      utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
+      utSysIn A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
+      utForkIn A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
       utKont PT Γ A
     ⊢ wpLoop (GF := GF) cpu := by
   have hsie : A.k.sie = false := hok.hctx.1
@@ -315,26 +315,26 @@ def UT_90A : Prop :=
     UtOk Γ A → utPins A R → R 10#5 = procAddr A.j → A.sc = uecallScause →
     (kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0x90#64) ∗ utFrame A ∗
       trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
-      utOwn (utRsys (hlc := hlc) PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
-      utSysIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
-      utForkIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
+      utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
+      utSysIn A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
+      utForkIn A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
       utKont PT Γ A
       ⊢ wpLoop (GF := GF) cpu)
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x94 onward**, after `killed` returned its reading: the `c.bnez`,
 then +0x96 (`ut90_bump`) or the kexit dead end at +0xc8. -/
-theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ] (SY : SYSCALL_XV6)
-    (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
-    (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (HK : UT_KEXIT (hlc := hlc) PT Γ)
+theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs GF Γ] (SY : SYSCALL_XV6)
+    (hPT0 : PT = parkToken (GF := GF) (SG := uexecSGXv6))
+    (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 PT Γ) (HK : UT_KEXIT PT Γ)
     (A : UtArgs GF) (hok : UtOk Γ A) (hsc : A.sc = uecallScause) (cpu : CPU) (R : RegMap)
     (kl : BitVec 32) (hpins : utPins A R) (h10 : R 10#5 = BitVec.signExtend 64 kl) :
     kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0x94#64) ∗ utFrame A ∗
       trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
-      utOwn (utRsys (hlc := hlc) PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
-      utSysIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
-      utForkIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
-      utKont PT Γ A ∗ utKillRead (hlc := hlc) A.gn iprop(emp) kl
+      utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
+      utSysIn A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
+      utForkIn A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
+      utKont PT Γ A ∗ utKillRead A.gn iprop(emp) kl
     ⊢ wpLoop (GF := GF) cpu := by
   have hsie : A.k.sie = false := hok.hctx.1
   have hav : A.k.avail = 512 := hok.havail
@@ -358,7 +358,7 @@ theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF �
     icases ut90_pay A.f A.sc A.sep A.V $$ Hpi with ⟨#Hmy, -⟩
     -- THE TEAR-DOWN'S PRICE: the marker off the block, the killer's credential
     icases (utOwn_unmark _ _ _ _ _ _ _).1 $$ Hown with ⟨Hown, Hmk⟩
-    ihave Htear : utTear (hlc := hlc) (GF := GF) A.gn A.sts $$ [Hmk]
+    ihave Htear : utTear (GF := GF) A.gn A.sts $$ [Hmk]
     · unfold utTear; ileft; iframe Hsh Hcr
       iapply (show takenAt (GF := GF) (utV1 A).gen ⊢ takenAt A.gn from by rw [hok.hgn]) $$ Hmk
     -- +0xc8  c.li a0,-1 ; +0xca  jal kexit
@@ -388,9 +388,9 @@ theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF �
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `ut_90`** (at `UT_90A`, the header's deviation). -/
-theorem usertrap_90_proof [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED)
-    (SY : SYSCALL_XV6) (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)) (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ)
-    (HK : UT_KEXIT (hlc := hlc) PT Γ) : UT_90A (hlc := hlc) PT Γ := by
+theorem usertrap_90_proof [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs GF Γ] (KI : KILLED)
+    (SY : SYSCALL_XV6) (hPT0 : PT = parkToken (GF := GF) (SG := uexecSGXv6)) (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (HA : UT_A6 PT Γ)
+    (HK : UT_KEXIT PT Γ) : UT_90A PT Γ := by
   intro A cpu R hok hpins h10 hsc
   have hsie : A.k.sie = false := hok.hctx.1
   have hav : A.k.avail = 512 := hok.havail
@@ -401,14 +401,14 @@ theorem usertrap_90_proof [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hl
   have hg1 : (utV1 A).gen = A.gn := hok.hgn.symm
   -- open the block: the pid half, the registration eighth
   icases utOwn_priv _ A.N (utV1 A) A.M A.sts A.cs A.pid $$ Hown with ⟨Hpriv, Hfr, Hch, Hsy, Hownb⟩
-  have hacc := ut_priv_pid_mk (hlc := hlc) (GF := GF) hct A.N.f A.N.pj A.pid (utV1 A) A.M
+  have hacc := ut_priv_pid_mk (GF := GF) hct A.N.f A.N.pj A.pid (utV1 A) A.M
   rw [hg1, hok.pj] at hacc
   ihave Hpriv := (show procPrivFd (GF := GF) A.N.f A.N.pj A.pid (utV1 A) A.M ⊢
       procPrivFd A.N.f (procAddr A.j) A.pid (utV1 A) A.M from by rw [hok.pj]) $$ Hpriv
   icases hacc $$ Hpriv with ⟨%hnz, Hqp, Hrg, Hmk, Hprivb⟩
   ihave Hz : iprop(iprop(emp) ∨ killShot (GF := GF) A.gn) $$ []
   · ileft; iempintro
-  ihave Hlend := ut_kill_lend (hlc := hlc) A.j A.pid A.gn iprop(emp) hnz $$ [Hqp Hrg Hmk Hz]
+  ihave Hlend := ut_kill_lend A.j A.pid A.gn iprop(emp) hnz $$ [Hqp Hrg Hmk Hz]
   · iframe Hqp Hrg Hmk Hz
   icases ut90_caps_pw A.N $$ Hcaps with ⟨#Hpinv, -⟩
   rw [hok.hΓ] at *
@@ -416,7 +416,7 @@ theorem usertrap_90_proof [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hl
   k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x90#64) false 2095878#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut_a6_killed_tgt]
   iintro Hk Hpc
-  iapply (ut_killed Γ KI cpu _ A.j (fun kl => iprop(utKillRead (hlc := hlc) A.gn iprop(emp) kl ∗
+  iapply (ut_killed Γ KI cpu _ A.j (fun kl => iprop(utKillRead A.gn iprop(emp) kl ∗
       wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid ∗ pidReg A.pid (.own qeighth) A.gn ∗ takenAt A.gn))
       hok.hj ?hp ?hn ?hK ?hl ?ht) $$ [- $Hk $Hpc $Hpinv $Hlend]
   rotate_right 1

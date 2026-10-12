@@ -163,7 +163,7 @@ theorem ukView_lookup (um : RegMapF (BitVec 64)) (M : Nat → List (BitVec 8)) (
 /-! ## §2 The pages, both ways -/
 
 section pages
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- Stamped ownership of an association list of bytes. -/
 def ukOwnX (ξ : CtxId) (K : Nat) (A : List (PAddr × BitVec 8)) : IProp GF :=
@@ -222,6 +222,7 @@ theorem ukTextPage_eq [CurCtx] (K : Nat) (a : PAddr) (bs : List (BitVec 8)) :
   rw [BigSepL.bigSepL_map]
   exact ub_sepL_idx (fun j x => ctxByteX curCtx K (a + BitVec.ofNat 64 j) (DFrac.own 1) x) bs
 
+omit [MachGS GF] in
 /-- One page's `if`, split into its data and text halves. -/
 theorem ukPage_split (c : Bool) (X D : IProp GF) :
     (if c then X else D) ⊣⊢ iprop((if c then iprop(emp) else D) ∗ (if c then X else iprop(emp))) := by
@@ -351,7 +352,7 @@ end pages
 /-! ## §3 Open and close -/
 
 section openclose
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 theorem uk_nodup_left {X : Type} (l₁ l₂ : List X) (h : (l₁ ++ l₂).Nodup) : l₁.Nodup :=
   (List.nodup_append.1 h).1

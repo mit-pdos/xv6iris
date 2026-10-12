@@ -70,7 +70,7 @@ def nameiparentAddr : BitVec 64 := KA.«nameiparent»
 def nameiparentSlots : Nat := 2 + namexSlots
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -111,11 +111,11 @@ end Post
 
 /-- **WP of `nameiparent(path = a0, name = a1)`, the set-form contract at
 either entry `SIE`** (Rocq's `wp_nameiparent_gen_body`). -/
-def wp_nameiparent_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_nameiparent_gen_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
@@ -142,8 +142,8 @@ def wp_nameiparent_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS
   diskCaps fscDisk fscDlock pd pav pu ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  itableInv ∗ icSleeplocks fscIc ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   -- ...AND THE SEALED REGIME (RULING B/G): namex's iput's free path freezes
   iregOpen ∗
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
@@ -167,18 +167,18 @@ def wp_nameiparent_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS
 /-- The interface of `nameiparent` (Rocq's `Module Type NAMEIPARENT`, its
 `wp_nameiparent_gen` field; the counted form is dropped, see the header). -/
 structure NAMEIPARENT : Prop where
-  wp_nameiparent_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_nameiparent_gen_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
     (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd,
-    wp_nameiparent_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun
+    wp_nameiparent_gen_eb_body (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun
       nfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd
 

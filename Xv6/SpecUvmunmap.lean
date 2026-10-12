@@ -38,7 +38,7 @@ def uvmunmapSlots : Nat := 22
 
 /-- `do_free = 0` over a raw table: the run's leaves cleared (their pages,
 if any, are the caller's business). -/
-def wp_uvmunmap_raw_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_uvmunmap_raw_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (root : BitVec 44) (L : RegMapF (BitVec 64)) (n : Nat) (ke : Nat)
     (hK : uvmunmapSlots ≤ k.avail) (hroot : k.regs 10#5 = pageAddr root)
     (hal : k.regs 11#5 &&& 0xfff#64 = 0#64) (hn : k.regs 12#5 = BitVec.ofNat 64 n)
@@ -52,7 +52,7 @@ def wp_uvmunmap_raw_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
   ⊢ wpLoop (GF := GF) cpu
 
 /-- `do_free = 1` over an address space: the run's leaves and pages gone. -/
-def wp_uvmunmap_free_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_uvmunmap_free_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (n : Nat)
     (ke : Nat) (hnoff : k.noff + 1 < 2 ^ 31) (hK : uvmunmapSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hroot : k.regs 10#5 = pageAddr P.root)
@@ -82,7 +82,7 @@ the other end of that axis: the freeing arm over the bare leaf map
 
 /-- `do_free = 1` over a table with only the user leaves (`ptOwnRep P.root
 P.um`), the altitude `uvmfree` calls at. -/
-def wp_uvmunmap_bare_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_uvmunmap_bare_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (n : Nat) (ke : Nat) (hnoff : k.noff + 1 < 2 ^ 31) (hK : uvmunmapSlots ≤ k.avail)
     (hlk : "kmem" ∉ k.locks) (hwf : uptWf P) (hroot : k.regs 10#5 = pageAddr P.root)
@@ -100,19 +100,19 @@ def wp_uvmunmap_bare_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
   ⊢ wpLoop (GF := GF) cpu
 
 structure UVMUNMAP : Prop where
-  wp_uvmunmap_raw : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_uvmunmap_raw : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (root : BitVec 44) (L : RegMapF (BitVec 64)) (n : Nat) (ke : Nat) hK hroot hal hn hrange hfree,
-    wp_uvmunmap_raw_body (hlc := hlc) (GF := GF) cpu k root L n ke hK hroot hal hn hrange hfree
-  wp_uvmunmap_free : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    wp_uvmunmap_raw_body (GF := GF) cpu k root L n ke hK hroot hal hn hrange hfree
+  wp_uvmunmap_free : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (n : Nat) (ke : Nat) hnoff hK hlk hroot hal hn hrange hfree,
-    wp_uvmunmap_free_body (hlc := hlc) (GF := GF) cpu k γl γk P M n ke hnoff hK hlk hroot hal hn hrange hfree
+    wp_uvmunmap_free_body (GF := GF) cpu k γl γk P M n ke hnoff hK hlk hroot hal hn hrange hfree
 
 /-- The freeing arm of `uvmunmap` over a table with only user leaves. -/
 structure UVMUNMAP_BARE : Prop where
-  wp_uvmunmap_bare : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+  wp_uvmunmap_bare : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (n : Nat) (ke : Nat) hnoff hK hlk hwf hroot hal hn hrange hfree,
-    wp_uvmunmap_bare_body (hlc := hlc) (GF := GF) cpu k γl γk P M n ke hnoff hK hlk hwf hroot hal hn
+    wp_uvmunmap_bare_body (GF := GF) cpu k γl γk P M n ke hnoff hK hlk hwf hroot hal hn
       hrange hfree
 
 end Xv6

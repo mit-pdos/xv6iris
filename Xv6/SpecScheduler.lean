@@ -51,8 +51,8 @@ loop head arms, and the 10 slots `acquire`/`release` want under it. -/
 def schedulerSlots : Nat := kvFrameSlots + 22
 
 /-- **WP of `scheduler`.**  No continuation: it never returns. -/
-def wp_scheduler_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+def wp_scheduler_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (hproc : k.proc = 0#64) (hK : schedulerSlots ≤ k.avail) (hsie : k.sie = false)
     (hnoff : k.noff = 0) (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu schedulerAddr ∗ cpuCtxFree cpu ∗ procsInv Γ ∗ trapCsrs cpu ∗ intrRes cpu
@@ -60,8 +60,8 @@ def wp_scheduler_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
 
 /-- The interface of `scheduler`. -/
 structure SCHEDULER : Prop where
-  wp_scheduler : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) hproc hK hsie hnoff hlocks htier,
-    wp_scheduler_body (hlc := hlc) (GF := GF) Γ cpu k hproc hK hsie hnoff hlocks htier
+  wp_scheduler : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) hproc hK hsie hnoff hlocks htier,
+    wp_scheduler_body (GF := GF) Γ cpu k hproc hK hsie hnoff hlocks htier
 
 end Xv6

@@ -29,7 +29,7 @@ open Std (ExtTreeSet)
 namespace UshRunSysP
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -39,9 +39,9 @@ def wpUkEcallExec : Prop :=
   ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat),
     UkSysP.usysno m = USYS_exec →
     (pc + 4#64) &&& 1#64 = 0#64 →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_exec -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m 10#5 (-1#64)) (pc + 4#64) avail -∗ wpLoop h') -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_exec -∗
+      (∀ h' : CPU, urun N h' (ukWr m 10#5 (-1#64)) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
 
 end
@@ -51,8 +51,8 @@ end UshRunSysP
 /-- **The ecall leaf sh's runner takes beyond the landed UkRunSys rows**
 (see the header): exec's failure row (discharged, `ushRunSysP_holds`). -/
 structure USH_RUN_SYS_P : Prop where
-  exec : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  exec : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], UshRunSysP.wpUkEcallExec (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], UshRunSysP.wpUkEcallExec (GF := GF)
 
 end Xv6

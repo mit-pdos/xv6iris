@@ -54,7 +54,7 @@ theorem wa_ret_148a : jumpPc (KA.«ismapped» + 0xe#64) = (KA.«ismapped» + 0xe
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The callee, at its entry address -/
 
@@ -69,7 +69,7 @@ theorem wa_walk_call (W : WALK_NOALLOC) [CurCtx] (c : CPU) (k' : KCtx) (dq : DFr
       ptreeOwn 2 dq t -∗
       ⌜calleeSaved k'.regs R' ∧ walkRet t (vpnOf (k'.regs 11#5)) (R' 10#5)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := W.wp_walk_noalloc (hlc := hlc) (GF := GF) c k' dq t hK hroot hva halloc hwf
+  have h := W.wp_walk_noalloc (GF := GF) c k' dq t hK hroot hva halloc hwf
   unfold wp_walk_noalloc_body at h
   simp only [walkAddr] at h
   exact h

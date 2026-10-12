@@ -32,7 +32,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -40,20 +40,20 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [U
 def wpCatCatBody : Prop :=
   ∀ (N : UkNames GF) (fdv : BitVec 64) (f : Nat → BitVec 8) (h : CPU) (m : RegMap) (n : Nat) (I Cend : IProp GF),
     m.get 10#5 = fdv →
-    ⊢ kcatRound (hlc := hlc) N fdv I Cend -∗ ukCode N.t User.Cat.code.byte -∗ I -∗
+    ⊢ kcatRound N fdv I Cend -∗ ukCode N.t User.Cat.code.byte -∗ I -∗
       ubytes N.d User.Cat.Sym.«buf» 512 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«cat») (8 + (10 + (12 + (4 + n)))) -∗
+      urun N h m (BitVec.ofNat 64 User.Cat.Sym.«cat») (8 + (10 + (12 + (4 + n)))) -∗
       (∀ (h' : CPU) (m' : RegMap) (g : Nat → BitVec 8), ⌜ucalleeSaved m m'⌝ -∗ Cend -∗
         ubytes N.d User.Cat.Sym.«buf» 512 g -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (8 + (10 + (12 + (4 + n)))) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (8 + (10 + (12 + (4 + n)))) -∗ wpLoop h') -∗
       wpLoop h
 
 end
 
 /-- The interface of cat's `cat(fd)`. -/
 structure CAT_CAT : Prop where
-  wp_catCat : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_catCat : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpCatCatBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpCatCatBody (GF := GF)
 
 end Xv6

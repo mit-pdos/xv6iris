@@ -40,7 +40,7 @@ theorem sys_kill_br_argint : KA.«sys_kill» + 0xfffffffffffffd8e#64 = KA.«argi
 theorem sys_kill_br_kkill : KA.«sys_kill» + 0xfffffffffffff60e#64 = KA.«kkill» := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The callees -/
 
@@ -58,7 +58,7 @@ theorem sk_argint (AI : ARGINT) (c : CPU) (k' : KCtx) (tfp : BitVec 44) (ws : Li
       wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
       wordPointsTo (k'.regs 11#5) 4 (DFrac.own 1) (BitVec.extractLsb' 0 32 v) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AI.wp_argint (hlc := hlc) (GF := GF) c k' 0 tfp ws v old dqt (by unfold NARG; decide)
+  have h := AI.wp_argint (GF := GF) c k' 0 tfp ws v old dqt (by unfold NARG; decide)
     ha0 hws hnoff hK
   unfold wp_argint_body at h
   simp only [argintAddr] at h
@@ -67,13 +67,13 @@ theorem sk_argint (AI : ARGINT) (c : CPU) (k' : KCtx) (tfp : BitVec 44) (ws : Li
 theorem sk_kkill (KK : KKILL) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 16 ≤ k'.avail) (hlk : "proc" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
-    kctx c k' ∗ pcIs c KA.«kkill» ∗ procsInv Γ ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
+    kctx c k' ∗ pcIs c KA.«kkill» ∗ procsInv Γ ∗ □ MachFixedGS.killCred (GF := GF) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ (R' 10#5 = 0#64 ∨ R' 10#5 = -1#64)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KK.wp_kkill (hlc := hlc) (GF := GF) Γ c k' hnoff hK hlk htier
+  have h := KK.wp_kkill (GF := GF) Γ c k' hnoff hK hlk htier
   unfold wp_kkill_body at h
   simp only [kkillAddr] at h
   exact h
@@ -136,7 +136,7 @@ end
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_kill_proof (AI : ARGINT) (KK : KKILL) : SYSKILL := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k tfp ws v dqt hws hnoff hK hlk htier => by
+  fun {GF} _ _ _ _ _ _ _ _ Γ cpu k tfp ws v dqt hws hnoff hK hlk htier => by
   unfold wp_sys_kill_body
   simp only [sysKillAddr]
   iintro ⟨Hk, Hpc, #Hpi, #Hcred, Htf, Hpage, Hnext⟩

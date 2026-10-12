@@ -60,7 +60,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 theorem mn_beqz_take : bcond bop.BEQ (cpuidRet (hartId startedPrimary)) 0#64 = true := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x00 → +0x42**: the frame, `cpuid()`, `a4 := &started`, and the
@@ -114,14 +114,14 @@ theorem mn_br_42 : KA.«main» + 18446744073709548902#64 = KA.«consoleinit» :=
 theorem mn_ret_46 : jumpPc (KA.«main» + 70#64) = KA.«main» + 70#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- A port's popper resource (Rocq `uart_rx_writer`), out of the token
 `uartinit` handed back and the three halves main holds at `none`.  The log
 mark's clause (relax-d2 lane K1, `uartLogAt`): nothing is logged yet, and at
 the console port everything popped went to uartinit's flush. -/
 theorem mn_rxWriter (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs))
-    (hat : uartLogAt (genId (hlc := hlc) (GF := GF) + 1) i none hl) :
+    (hat : uartLogAt (genId (GF := GF) + 1) i none hl) :
     rxTok (GF := GF) γ k hl ∗ rxHi γ (1 : Qp).half none ∗ logHi γ (1 : Qp).half none ∗
       uartArm γ (1 : Qp).half none ⊢ uartRxWriter i γ k hl := by
   unfold uartRxWriter
@@ -182,7 +182,7 @@ theorem mn_console (CN : CONSOLEINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegM
   k_step (wp_s_jal cpu _ (KA.«main» + 0x42#64) false 2094372#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_42]
   iintro Hk Hpc
-  have hci := CN.wp_consoleinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 70#64)))
+  have hci := CN.wp_consoleinit (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 70#64)))
     γ0 γ1 l0 l1 0 0 vl0 vl1 vn0 vc0 vn1 vc1 vcl vcn vcc vr vw (by simp [hsie]) (by simp; omega)
   unfold wp_consoleinit_body at hci
   simp only [consoleinitAddr] at hci
@@ -213,8 +213,9 @@ theorem mn_br_46 : KA.«main» + 18446744073709549988#64 = KA.«printkinit» := 
 theorem mn_ret_4a : jumpPc (KA.«main» + 74#64) = KA.«main» + 74#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
+omit [MachGS GF] in
 /-- A port's transmitter token is its transmit lock's payload. -/
 theorem mn_txRes_of_own (γ : UartNames) (l : List (BitVec 8)) : txOwn (GF := GF) γ l ⊢ txRes γ := by
   unfold txRes txOwn
@@ -300,7 +301,7 @@ theorem mn_prinit (PI : PRINTKINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
   k_step (wp_s_jal cpu _ (KA.«main» + 0x46#64) false 2095454#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_46]
   iintro Hk Hpc
-  have hpi := PI.wp_printkinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 74#64)))
+  have hpi := PI.wp_printkinit (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 74#64)))
     vpl vpn vpc (by simp; omega)
   unfold wp_printkinit_body at hpi
   simp only [printkinitAddr] at hpi
@@ -339,7 +340,7 @@ theorem mn_boot_kinds : pkKinds mnBootStr = ([] : List PkArgDesc).map PkArgDesc.
 theorem mn_boot_len : mnBootStr.length + 4 < 2 ^ 31 := by unfold mnBootStr; decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 set_option maxRecDepth 100000 in
 /-- `"\n"`, out of the kernel image. -/

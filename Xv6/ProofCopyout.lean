@@ -39,7 +39,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-! ## Return addresses -/
@@ -303,7 +303,7 @@ theorem co_walk_call (W : WALK_NOALLOC) [Xv6G GF] [CurCtx]
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ptreeOwn 2 dq t -∗
       ⌜calleeSaved k'.regs R' ∧ walkRet t (vpnOf (k'.regs 11#5)) (R' 10#5)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := W.wp_walk_noalloc (hlc := hlc) (GF := GF) c k' dq t hK' hroot' hva' halloc' hwf'
+  have h := W.wp_walk_noalloc (GF := GF) c k' dq t hK' hroot' hva' halloc' hwf'
   unfold wp_walk_noalloc_body at h
   simp only [walkAddr] at h
   exact h
@@ -1155,7 +1155,7 @@ set_option maxHeartbeats 4000000 in
 /-- **`copyout` meets its specification.** -/
 theorem copyout_proof (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEMMOVE) :
     COPYOUT :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen' => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen' => by
   unfold wp_copyout_body
   simp only [copyoutAddr]
   iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hsrc, Hlend, HΦ⟩

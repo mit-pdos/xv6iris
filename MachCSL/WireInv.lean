@@ -46,7 +46,7 @@ open Sail.ArchSem (FreeM)
 open LeanRV64D
 
 section Fixed
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 /-! ## The wire invariant, at an explicit era -/
 
@@ -85,7 +85,7 @@ theorem wireInvAt_alloc (E : EraGS) (M : CoPset) (seip meip : CPU → BitVec 1) 
 
 end Fixed
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## The wire invariant in the ambient era -/
 
@@ -118,7 +118,7 @@ theorem wireInv_permit : wireInv (GF := GF) ⊢ hartObsPermit := by
 `wireInv_step` split): any user exit, yielding the exit's token (NI
 M2-W2d: its receipt and the claims minted at it). -/
 theorem wireInv_exit (e : Obs) (he : isUExit e = true) :
-    wireInv (GF := GF) ⊢ hartObsStep e (uExitTok (hlc := hlc) e) := by
+    wireInv (GF := GF) ⊢ hartObsStep e (uExitTok e) := by
   iintro #Hw
   iapply hartObsPermit_exit e he
   iapply wireInv_permit $$ Hw
@@ -127,9 +127,9 @@ theorem wireInv_exit (e : Obs) (he : isUExit e = true) :
 with its justification `uFit ox e`, the cited receipt, (NI M2-W2d) the
 claim it spends and (NI M2-X1) its evidence `MachFixedGS.uEvid ox e`. -/
 theorem wireInv_enter (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter e = true)
-    (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e) :
-    wireInv (GF := GF) ⊢ uRcptOpt ox -∗ uClaimFor (hlc := hlc) ox -∗
-      MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e -∗ hartObsStep e emp := by
+    (hf : MachFixedGS.uFit (GF := GF) ox e) :
+    wireInv (GF := GF) ⊢ uRcptOpt ox -∗ uClaimFor ox -∗
+      MachFixedGS.uEvid (GF := GF) ox e -∗ hartObsStep e emp := by
   iintro #Hw
   iapply hartObsPermit_enter e ox he hf
   iapply wireInv_permit $$ Hw

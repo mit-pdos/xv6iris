@@ -13,7 +13,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
@@ -22,7 +22,7 @@ set_option maxHeartbeats 1000000 in
 /-- `ireclaim(dev)` at `+0x54`, with the log context `initlog` built (at the
 ambient `icfgLog`: initlog is an `_at` form). -/
 theorem fsinit_ireclaim_call (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : ireclaimSlots ≤ k.avail)
@@ -40,7 +40,7 @@ theorem fsinit_ireclaim_call (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     -- end_op's crash seam and era certificate (ireclaim's premises)
-    fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
+    fsCrashSeam (GF := GF) fscCov fscLogst ∗ genCert (GF := GF) ∗
     diskCaps fscDisk fscDlock pd pav pu ∗
     -- the three superblock fields, read and handed straight back
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
@@ -48,10 +48,10 @@ theorem fsinit_ireclaim_call (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     -- THE INODE REGION (persistent) and THE BOOT-SHELTER TOKEN (exclusive,
     -- lent to iget's licence and to iput's regime, returned)
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregBoot ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗ iregBoot ∗
     -- THE ICACHE, as iget / ilock / iput take it
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗
+    itableInv ∗
     -- THE FIFTY ENTRY SLEEPLOCKS, as a family
     icSleeplocks fscIc ∗
     -- itrunc's bitmap, through iput
@@ -75,7 +75,7 @@ theorem fsinit_ireclaim_call (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
       -- the boot-shelter token, returned unspent
       iregBoot -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
-  have h := IR.wp_ireclaim_eb (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j pidv dqp dqb dqs
+  have h := IR.wp_ireclaim_eb (GF := GF) Γ cpu k γl pd pav pu j pidv dqp dqb dqs
     dqn hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0
   unfold wp_ireclaim_eb_body ireclaimAddr at h
   exact h
@@ -83,14 +83,14 @@ theorem fsinit_ireclaim_call (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `initlog(dev, &sb)` at `+0x4e`, at the ambient view: the log's five
 gnames are `icfgLog`'s, the superblock is `&sb`. -/
 theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
@@ -111,7 +111,7 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗ diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     -- the crash seam and the era certificate (fsinit's own)
-    fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
+    fsCrashSeam (GF := GF) fscCov fscLogst ∗ genCert (GF := GF) ∗
     -- THE WAL'S EXCEPTION HANDLE (the byte view's row rides `fsinitCrash`)
     excOwn fscFs.exc (hdrDec bsHdr).2 ∗
     -- the five ghost names, at their genesis values (the lock's included)
@@ -141,7 +141,7 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
     -- the slot pool, stocked: the batch's 32 plus initlog's own working pair
     bslots ((LOGBLOCKS + 2) + 2) ∗
     -- initlog's crash premises, and block 1's run (PARKED by initlog)
-    fsinitCrash (hlc := hlc) M sbrec Xv ∗ fsblock fscFs.bytes 1 bsSb ∗
+    fsinitCrash M sbrec Xv ∗ fsblock fscFs.bytes 1 bsSb ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -157,7 +157,7 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
     Hpool, Hcr, Hfsb, Hnext⟩
   unfold fsinitCrash
   icases Hcr with ⟨Hborn, #Hlaw, #Hlawg, #Hcinv, #Hbinv⟩
-  have h := IL.wp_initlog_eb (hlc := hlc) (GF := GF) Γ cpu k icfgLog γl fscBio
+  have h := IL.wp_initlog_eb (GF := GF) Γ cpu k icfgLog γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev KA.«sb»
     bsHdr Xv L D M bsSb sbrec vlock vname vcpu vStart vDev vNc vN pidv dqp dqs hj hproc hK hnoff
     htier hgeom rfl rfl rfl ha0 ha1 hhdrLen hhdrNodup hhdrHome hxslot hclean hLM hsbok hsbparse hpd
@@ -184,7 +184,7 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- `memmove(&sb, bp->data, 32)` at `+0x26`. -/
 theorem fsinit_memmove (MM : MEMMOVE) (c : CPU) (k' : KCtx) (bs olds : List (BitVec 8)) (n : Nat)
@@ -197,7 +197,7 @@ theorem fsinit_memmove (MM : MEMMOVE) (c : CPU) (k' : KCtx) (bs olds : List (Bit
       byteBuf (k'.regs 11#5) dqs bs -∗ byteBuf (k'.regs 10#5) (DFrac.own 1) bs -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MM.wp_memmove (hlc := hlc) (GF := GF) c k' bs olds n dqs hK hn hn32 hls hld
+  have h := MM.wp_memmove (GF := GF) c k' bs olds n dqs hK hn hn32 hls hld
   unfold wp_memmove_body at h
   simp only [memmoveAddr] at h
   exact h

@@ -91,14 +91,14 @@ theorem bm_ledger_gen (a : BmAlloc) (cr : Bool) (bm bm' : Blkmap) (fbn n n' : Na
   · exact Or.inr (Or.inr (Or.inr h))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **THE SET-FORM CONTRACT** (Rocq's `BmapProof.wp_bmap_gen`): the core,
 sealed at a kit and at fraction 1. -/
 theorem bmap_gen (BA : BALLOC) (BR : BREAD) (BE : BRELSE) (LW : LOG_WRITE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
     (logstart bmapstart size : Nat) (dev : BitVec 32)
@@ -114,7 +114,7 @@ theorem bmap_gen (BA : BALLOC) (BR : BREAD) (BE : BRELSE) (LW : LOG_WRITE)
     (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (hpd : descPageRw pd)
     (ha0 : k.regs 10#5 = ip) (ha1 : k.regs 11#5 = BitVec.signExtend 64 (BitVec.ofNat 32 fbn)) :
-    wp_bmap_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
+    wp_bmap_gen_eb_body (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
       logstart bmapstart size dev ip bm data fbn n cr Sb pidv dqp dqd dqb dqs
       hj hproc hK hnoff htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd
       ha0 ha1 := by
@@ -159,7 +159,7 @@ set_option maxHeartbeats 8000000 in
 the core with no kit -- no balloc, no log_write, nothing spent -- and the
 "nothing moved" conjunct making the postcondition exact. -/
 theorem bmap_noalloc (BR : BREAD) (BE : BRELSE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
@@ -173,7 +173,7 @@ theorem bmap_noalloc (BR : BREAD) (BE : BRELSE)
     (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (hpd : descPageRw pd)
     (ha0 : k.regs 10#5 = ip) (ha1 : k.regs 11#5 = BitVec.signExtend 64 (BitVec.ofNat 32 fbn)) :
-    wp_bmap_noalloc_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart
+    wp_bmap_noalloc_eb_body (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart
       dev ip bm data fbn pidv dqp dq dqd
       hj hproc hK hnoff htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1 := by
   unfold wp_bmap_noalloc_eb_body
@@ -204,7 +204,7 @@ theorem bmap_noalloc (BR : BREAD) (BE : BRELSE)
 end
 
 theorem bmap_proof (BA : BALLOC) (BR : BREAD) (BL : BRELSE) (LW : LOG_WRITE) : BMAP :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size
     dev ip bm data fbn n cr Sb pidv dqp dqd dqb dqs hj hproc hK hnoff htier hneed
     hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd ha0 ha1 =>
   bmap_gen BA BR BL LW Γ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size dev ip bm
@@ -212,7 +212,7 @@ theorem bmap_proof (BA : BALLOC) (BR : BREAD) (BL : BRELSE) (LW : LOG_WRITE) : B
     hcredit hfbn hwf hdev hcl hdt hpd ha0 ha1⟩
 
 theorem bmap_noalloc_proof (BR : BREAD) (BL : BRELSE) : BMAP_NOALLOC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γfs logstart dev ip bm data fbn
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γfs logstart dev ip bm data fbn
     pidv dqp dq dqd hj hproc hK hnoff htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0
     ha1 =>
   bmap_noalloc BR BL Γ cpu k γl γb V γdl pd pav pu j γfs logstart dev ip bm data fbn pidv dqp dq

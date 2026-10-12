@@ -132,7 +132,7 @@ structure CreateStatic [Fscfg] [Icfg] (k : KCtx) (j : Nat) (pd : BitVec 64) (ple
   hpd : descPageRw pd
 
 section Env
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -148,18 +148,18 @@ def createEnv (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GN
   diskCaps fscDisk fscDlock pd pav pu ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+  itableInv ∗ icSleeplocks fscIc ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize
 
 instance createEnv_persistent (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) : Persistent (createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk) := by
+    (γk : KmemNames) : Persistent (createEnv (GF := GF) Γ γl pd pav pu γkl γk) := by
   unfold createEnv; infer_instance
 
 /-- ...and the fresh-type span's part of it (`CreateFreshTy.createFreshEnv`). -/
 theorem createEnv_fresh (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) :
-    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢ createFreshEnv (hlc := hlc) Γ γl pd pav pu := by
+    createEnv (GF := GF) Γ γl pd pav pu γkl γk ⊢ createFreshEnv Γ γl pd pav pu := by
   unfold createEnv createFreshEnv
   iintro ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, -, -, #Hit2, #Hiti, #Hslk, #Hinv, #Hopen, -⟩
   iframe #
@@ -174,9 +174,9 @@ theorem create_post_pin {j : Nat} (hj : j < NPROC) (cpu : CPU) (k : KCtx)
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
-    wpNext true k.proc cpu (createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
+    wpNext true k.proc cpu (createPost k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex) ⊢
-      ∀ c : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
+      ∀ c : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c := by
   iintro H %c
   iapply (wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu)) $$ H
@@ -186,7 +186,7 @@ end Env
 /-! ## 1.  The child's suspended row (Rocq's `cr_dirty` and its six moves) -/
 
 section Dirty
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [LogG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [FsBytesG GF]
   [Appcfg GF] [Fscfg] [Icfg]
 
@@ -214,15 +214,15 @@ theorem create_dirty_arm (E : CoPset) (t i : Nat) (c : Absnode)
     (Nm : Fname → Prop) (Nd : Absnode → Prop) (Farm : Pfam GF (Aview → Nat → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hnone : absOf n = none)
     (hrow : absOf n' = some ⟨c, 1⟩) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗
+    ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗
       txPin icfgLog t (1 : Qp).half -∗
-      pfAt (aarmCommitAt (hlc := hlc) (fsGammaL fscFs) appE c) Farm -∗
+      pfAt (aarmCommitAt (fsGammaL fscFs) appE c) Farm -∗
       topFrag (fsGammaL fscFs) i n ={E}=∗
         createDirty t i ∗ topFrag (fsGammaL fscFs) i n' ∗ creArmFired Farm i := by
   iintro #Hi #Hai Htx Hcm Hf
-  imod (iregArm (hlc := hlc) E fscFs i t (1 : Qp).half (ftopN_sub_app E hE)) $$ Hi Htx
+  imod (iregArm E fscFs i t (1 : Qp).half (ftopN_sub_app E hE)) $$ Hi Htx
     with ⟨%k, Harm⟩
-  imod (cafArm_fire (hlc := hlc) fscFs E k t (1 : Qp).half {i} i c Farm n n' hE
+  imod (cafArm_fire fscFs E k t (1 : Qp).half {i} i c Farm n n' hE
     (create_single_mem i) hnone hrow) $$ Hi Hai Harm Hcm Hf with ⟨Harm, Hf, Hr⟩
   imodintro
   iframe Hf Hr
@@ -236,14 +236,14 @@ theorem create_dirty_dots (E : CoPset) (t i d : Nat) (full : Bool)
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hrow : absOf n = some ⟨.ADir ∅, 1⟩)
     (hrow' : absOf n' = some ⟨.ADir (dotsEnts full i d), 1⟩) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i -∗
-      pfAt (adotsCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fdots -∗
+    ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗ createDirty t i -∗
+      pfAt (adotsCommitAt (fsGammaL fscFs) appE) Fdots -∗
       topFrag (fsGammaL fscFs) i n ={E}=∗
         createDirty t i ∗ topFrag (fsGammaL fscFs) i n' ∗ creDotsFired Fdots i d full := by
   iintro #Hi #Hai Hd Hcm Hf
   unfold createDirty
   icases Hd with ⟨%k, Harm⟩
-  imod (cafDots_fire (hlc := hlc) fscFs E k t (1 : Qp).half {i} i d full Fdots n n' hE
+  imod (cafDots_fire fscFs E k t (1 : Qp).half {i} i d full Fdots n n' hE
     (create_single_mem i) hrow hrow') $$ Hi Hai Harm Hcm Hf with ⟨Harm, Hf, Hr⟩
   imodintro
   iframe Hf Hr
@@ -257,20 +257,20 @@ theorem create_dirty_clear_dots (E : CoPset) (t i d : Nat) (full : Bool)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
     (hrow : absOf n = some ⟨.ADir ∅, 1⟩)
     (hrow' : absOf n' = some ⟨.ADir (dotsEnts full i d), 1⟩) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i -∗
-      pfAt (adotsCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fdots -∗
+    ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗ createDirty t i -∗
+      pfAt (adotsCommitAt (fsGammaL fscFs) appE) Fdots -∗
       topFrag (fsGammaL fscFs) i n ={E}=∗
         txPin icfgLog t (1 : Qp).half ∗ topFrag (fsGammaL fscFs) i n' ∗
           creDotsFired Fdots i d full := by
   iintro #Hi #Hai Hd Hcm Hf
   unfold createDirty
   icases Hd with ⟨%k, Harm⟩
-  imod (cafDots_fire (hlc := hlc) fscFs E k t (1 : Qp).half {i} i d full Fdots n n' hE
+  imod (cafDots_fire fscFs E k t (1 : Qp).half {i} i d full Fdots n n' hE
     (create_single_mem i) hrow hrow') $$ Hi Hai Harm Hcm Hf with ⟨Harm, Hf, Hr⟩
-  imod (iregDisarm (hlc := hlc) E fscFs k t (1 : Qp).half {i} i n' (ftopN_sub_app E hE) hloc)
+  imod (iregDisarm E fscFs k t (1 : Qp).half {i} i n' (ftopN_sub_app E hE) hloc)
     $$ Hi Harm Hf with ⟨Harm, Hf⟩
   rw [create_single_diff i]
-  imod (iregRelease (hlc := hlc) E fscFs k t (1 : Qp).half (ftopN_sub_app E hE)) $$ Hi Harm
+  imod (iregRelease E fscFs k t (1 : Qp).half (ftopN_sub_app E hE)) $$ Hi Harm
     with Htx
   imodintro
   iframe Htx Hf Hr
@@ -290,8 +290,8 @@ theorem create_unarm_fire_nd (γfs : FsNames) (E : CoPset) (i : Nat) (c : Absnod
     (Nd : Absnode → Prop) (Fun : Pfam GF (Aview → Nat → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
     (hrow : absOf n = some ⟨c, 1⟩) (hnone : absOf n' = none) (hNd : Nd c) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      aunarmCommitAtNd (hlc := hlc) (fsGammaL γfs) appE i Nd Fun.pfRecv -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
+      aunarmCommitAtNd (fsGammaL γfs) appE i Nd Fun.pfRecv -∗
       topFrag (fsGammaL γfs) i n ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗ creUnarmFired Fun i := by
   iintro #Hi #Hai Hcm Hf
@@ -322,8 +322,8 @@ theorem create_unarm_fire_armed_nd (γfs : FsNames) (E : CoPset) (k t : Nat) (q 
     (Fun : Pfam GF (Aview → Nat → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S)
     (hrow : absOf n = some ⟨c, 1⟩) (hnone : absOf n' = none) (hNd : Nd c) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
-      aunarmCommitAtNd (hlc := hlc) (fsGammaL γfs) appE i Nd Fun.pfRecv -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗ iregArmed k t q S -∗
+      aunarmCommitAtNd (fsGammaL γfs) appE i Nd Fun.pfRecv -∗
       topFrag (fsGammaL γfs) i n ={E}=∗
         iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ creUnarmFired Fun i := by
   iintro #Hi #Hai Hrec Hcm Hf
@@ -353,19 +353,19 @@ theorem create_dirty_clear_unarm_nd (E : CoPset) (t i : Nat) (c : Absnode) (Nd :
     (Fun : Pfam GF (Aview → Nat → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
     (hrow : absOf n = some ⟨c, 1⟩) (hnone : absOf n' = none) (hNd : Nd c) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i -∗
-      aunarmCommitAtNd (hlc := hlc) (fsGammaL fscFs) appE i Nd Fun.pfRecv -∗
+    ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗ createDirty t i -∗
+      aunarmCommitAtNd (fsGammaL fscFs) appE i Nd Fun.pfRecv -∗
       topFrag (fsGammaL fscFs) i n ={E}=∗
         txPin icfgLog t (1 : Qp).half ∗ topFrag (fsGammaL fscFs) i n' ∗ creUnarmFired Fun i := by
   iintro #Hi #Hai Hd Hcm Hf
   unfold createDirty
   icases Hd with ⟨%k, Harm⟩
-  imod (create_unarm_fire_armed_nd (hlc := hlc) fscFs E k t (1 : Qp).half {i} i c Nd Fun n n' hE
+  imod (create_unarm_fire_armed_nd fscFs E k t (1 : Qp).half {i} i c Nd Fun n n' hE
     (create_single_mem i) hrow hnone hNd) $$ Hi Hai Harm Hcm Hf with ⟨Harm, Hf, Hr⟩
-  imod (iregDisarm (hlc := hlc) E fscFs k t (1 : Qp).half {i} i n' (ftopN_sub_app E hE) hloc)
+  imod (iregDisarm E fscFs k t (1 : Qp).half {i} i n' (ftopN_sub_app E hE) hloc)
     $$ Hi Harm Hf with ⟨Harm, Hf⟩
   rw [create_single_diff i]
-  imod (iregRelease (hlc := hlc) E fscFs k t (1 : Qp).half (ftopN_sub_app E hE)) $$ Hi Harm
+  imod (iregRelease E fscFs k t (1 : Qp).half (ftopN_sub_app E hE)) $$ Hi Harm
     with Htx
   imodintro
   iframe Htx Hf Hr
@@ -374,13 +374,13 @@ theorem create_dirty_clear_unarm_nd (E : CoPset) (t i : Nat) (c : Absnode) (Nd :
 whose reading is unchanged owes the application nothing. -/
 theorem create_dirty_retag_same (E : CoPset) (t i : Nat) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (habs : absOf n = absOf n') :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i -∗
+    ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗ createDirty t i -∗
       topFrag (fsGammaL fscFs) i n ={E}=∗
         createDirty t i ∗ topFrag (fsGammaL fscFs) i n' := by
   iintro #Hi #Hai Hd Hf
   unfold createDirty
   icases Hd with ⟨%k, Harm⟩
-  imod (iregTopRetag_armed_same (hlc := hlc) E fscFs k t (1 : Qp).half {i} i n n' hE
+  imod (iregTopRetag_armed_same E fscFs k t (1 : Qp).half {i} i n n' hE
     (create_single_mem i) habs) $$ Hi Hai Harm Hf with ⟨Harm, Hf⟩
   imodintro
   iframe Hf
@@ -390,18 +390,18 @@ theorem create_dirty_retag_same (E : CoPset) (t i : Nat) (n n' : FsNode)
 /-- Rocq's `cr_dirty_clear_same` (the FILE arm's disarm). -/
 theorem create_dirty_clear_same (E : CoPset) (t i : Nat) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (habs : absOf n = absOf n') (hloc : InodeLocal i n') :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i -∗
+    ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗ createDirty t i -∗
       topFrag (fsGammaL fscFs) i n ={E}=∗
         txPin icfgLog t (1 : Qp).half ∗ topFrag (fsGammaL fscFs) i n' := by
   iintro #Hi #Hai Hd Hf
   unfold createDirty
   icases Hd with ⟨%k, Harm⟩
-  imod (iregTopRetag_armed_same (hlc := hlc) E fscFs k t (1 : Qp).half {i} i n n' hE
+  imod (iregTopRetag_armed_same E fscFs k t (1 : Qp).half {i} i n n' hE
     (create_single_mem i) habs) $$ Hi Hai Harm Hf with ⟨Harm, Hf⟩
-  imod (iregDisarm (hlc := hlc) E fscFs k t (1 : Qp).half {i} i n' (ftopN_sub_app E hE) hloc)
+  imod (iregDisarm E fscFs k t (1 : Qp).half {i} i n' (ftopN_sub_app E hE) hloc)
     $$ Hi Harm Hf with ⟨Harm, Hf⟩
   rw [create_single_diff i]
-  imod (iregRelease (hlc := hlc) E fscFs k t (1 : Qp).half (ftopN_sub_app E hE)) $$ Hi Harm
+  imod (iregRelease E fscFs k t (1 : Qp).half (ftopN_sub_app E hE)) $$ Hi Harm
     with Htx
   imodintro
   iframe Htx Hf
@@ -415,7 +415,7 @@ Every exit of every half ends in one of these six, so the shape of
 these rather than eleven call sites. -/
 
 section Builders
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF]
 
 /-- ARMS G / A-FAIL: the walk reached the parent and nothing else moved
@@ -428,8 +428,8 @@ theorem create_fail_of_cursor (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) 
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (pl : List (BitVec 8)) (d : Nat) :
     P (nparElems pl).length d ⊢
       pfAt (dlookupCommitAt Γ appE) Fex -∗
-      creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
-      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
+      creCommits Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
+      creFailArms Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
   unfold creFailArms creCommits
   iintro HP Hdl ⟨Ha, Hd, Hu, Hac⟩
   iright
@@ -448,12 +448,12 @@ theorem create_fail_of_dead (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (t
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (pl : List (BitVec 8)) :
-    npDead (hlc := hlc) rt γfs P Pmiss pl ⊢
+    npDead rt γfs P Pmiss pl ⊢
       pfAt (dlookupCommitAt Γ appE) Fex -∗
-      creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
-      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
+      creCommits Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
+      creFailArms Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
   iintro Hdead Hdl Hcre
-  icases npDead_to_mknod (hlc := hlc) rt γfs P Pmiss pl $$ Hdead with (Hd | ⟨%dpar, HPd⟩)
+  icases npDead_to_mknod rt γfs P Pmiss pl $$ Hdead with (Hd | ⟨%dpar, HPd⟩)
   · unfold creFailArms
     ileft
     iframe Hd Hdl Hcre
@@ -471,8 +471,8 @@ theorem create_fail_of_seen (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (t
     (d : Nat) (nm : Fname) (i : Nat) (hlast : (pathElems pl).getLast? = some nm) :
     P (nparElems pl).length d ⊢
       creExFired Fex d nm i -∗
-      creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
-      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
+      creCommits Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
+      creFailArms Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
   unfold creFailArms creCommits
   iintro HP Hex ⟨Ha, Hd, Hu, Hac⟩
   iright
@@ -497,10 +497,10 @@ theorem create_fail_of_pair (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (t
     (d i : Nat) :
     P (nparElems pl).length d ⊢
       pfAt (dlookupCommitAt Γ appE) Fex -∗
-      pfAt (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild tyz ma mi) Nm (P (nparElems pl).length) Farm) Fok -∗
-      ((∃ full : Bool, creDotsFired Fdots i d full) ∨ creDotsLeg (hlc := hlc) Γ tyz Fdots) -∗
+      pfAt (acreCommitAtGenNm Γ appE (creChild tyz ma mi) Nm (P (nparElems pl).length) Farm) Fok -∗
+      ((∃ full : Bool, creDotsFired Fdots i d full) ∨ creDotsLeg Γ tyz Fdots) -∗
       creUnarmFired Fun i -∗
-      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
+      creFailArms Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
   unfold creFailArms
   iintro HP Hdl Hac Hd Hu
   iright
@@ -522,8 +522,8 @@ theorem create_ok_of_found (Γ : FsViewNames GF) (tyz ma mi : Nat) (Nm : Fname �
     (d : Nat) (nm : Fname) (i : Nat) (hlast : (pathElems pl).getLast? = some nm) :
     P (nparElems pl).length d ⊢
       creExFired Fex d nm i -∗
-      creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
-      creOkArms (hlc := hlc) Γ tyz ma mi Nm Nd P Farm Fdots Fun Fok Fex pl false i := by
+      creCommits Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
+      creOkArms Γ tyz ma mi Nm Nd P Farm Fdots Fun Fok Fex pl false i := by
   unfold creOkArms
   iintro HP Hex Hcre
   iexists d, nm
@@ -541,11 +541,11 @@ theorem create_ok_of_made (Γ : FsViewNames GF) (tyz ma mi : Nat) (Nm : Fname �
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (pl : List (BitVec 8))
     (d : Nat) (nm : Fname) (i : Nat) (hlast : (pathElems pl).getLast? = some nm) :
     P (nparElems pl).length d ⊢
-      (creDotsFired Fdots i d true ∨ creDotsLeg (hlc := hlc) Γ tyz Fdots) -∗
+      (creDotsFired Fdots i d true ∨ creDotsLeg Γ tyz Fdots) -∗
       creAcreFired Fok d nm i (creChild tyz ma mi d i) -∗
-      pfAt (aunarmOfArmNd (hlc := hlc) Γ appE Nd Farm) Fun -∗
+      pfAt (aunarmOfArmNd Γ appE Nd Farm) Fun -∗
       pfAt (dlookupCommitAt Γ appE) Fex -∗
-      creOkArms (hlc := hlc) Γ tyz ma mi Nm Nd P Farm Fdots Fun Fok Fex pl true i := by
+      creOkArms Γ tyz ma mi Nm Nd P Farm Fdots Fun Fok Fex pl true i := by
   unfold creOkArms
   iintro HP Hd Hac Hu Hdl
   iexists d, nm
@@ -558,7 +558,7 @@ end Builders
 /-! ## 3.  The epilogue funnel (Rocq's `cr_tail_body` / `cr_tail_half`) -/
 
 section Tail
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0x70 .. +0x82`: THE FUNNEL** (Rocq's `cr_tail_half`): `c.mv a0,s2`,
@@ -619,7 +619,7 @@ end Tail
 /-! ## 4.  The four parked bodies -/
 
 section Bodies
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -703,10 +703,10 @@ def createAllocBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major 
     -- exists observation UNFIRED, the four commits, NONE fired ----
     P (nparElems (bview plen pfun)).length dind.toNat -∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex -∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
+    creCommits (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
       Nm Nd (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok -∗
     -- the contract's own continuation, hart-free
-    (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
+    (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
     wpLoop c)
 
@@ -824,12 +824,12 @@ def createMkdirBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major 
     P (nparElems (bview plen pfun)).length dind.toNat -∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex -∗
     creArmFired Farm cinum.toNat -∗
-    pfAt (adotsCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fdots -∗
-    pfAt (aunarmOfArmNd (hlc := hlc) (fsGammaL fscFs) appE Nd Farm) Fun -∗
-    pfAt (acreCommitAtGenNm (hlc := hlc) (fsGammaL fscFs) appE
+    pfAt (adotsCommitAt (fsGammaL fscFs) appE) Fdots -∗
+    pfAt (aunarmOfArmNd (fsGammaL fscFs) appE Nd Farm) Fun -∗
+    pfAt (acreCommitAtGenNm (fsGammaL fscFs) appE
       (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
-    (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
+    (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
     wpLoop c)
 
@@ -952,12 +952,12 @@ def createFailBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major m
     P (nparElems (bview plen pfun)).length dind.toNat -∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex -∗
     creArmFired Farm cinum.toNat -∗
-    creDotsLeg (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots -∗
-    pfAt (aunarmOfArmNd (hlc := hlc) (fsGammaL fscFs) appE Nd Farm) Fun -∗
-    pfAt (acreCommitAtGenNm (hlc := hlc) (fsGammaL fscFs) appE
+    creDotsLeg (fsGammaL fscFs) ty.toNat Fdots -∗
+    pfAt (aunarmOfArmNd (fsGammaL fscFs) appE Nd Farm) Fun -∗
+    pfAt (acreCommitAtGenNm (fsGammaL fscFs) appE
       (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
-    (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
+    (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
     wpLoop c)
 
@@ -1070,12 +1070,12 @@ def createFailMkdirBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8)
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex -∗
     creArmFired Farm cinum.toNat -∗
     ((∃ full : Bool, creDotsFired Fdots cinum.toNat dind.toNat full) ∨
-      creDotsLeg (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots) -∗
-    pfAt (aunarmOfArmNd (hlc := hlc) (fsGammaL fscFs) appE Nd Farm) Fun -∗
-    pfAt (acreCommitAtGenNm (hlc := hlc) (fsGammaL fscFs) appE
+      creDotsLeg (fsGammaL fscFs) ty.toNat Fdots) -∗
+    pfAt (aunarmOfArmNd (fsGammaL fscFs) appE Nd Farm) Fun -∗
+    pfAt (acreCommitAtGenNm (fsGammaL fscFs) appE
       (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
-    (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
+    (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
     wpLoop c)
 

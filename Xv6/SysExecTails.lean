@@ -90,7 +90,7 @@ theorem sysExecReloaded_pinsE (k : KCtx) (R : RegMap)
 /-! ## §2.  THE SEVEN RELOADS at a symbolic base (Rocq `sx_reload`) -/
 
 section Reload
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- `+base .. +base+12`: `c.ldsp s1..s7` off the pushed sp, each from the
@@ -160,7 +160,7 @@ end Reload
 /-! ## §3.  The join point from a tail -/
 
 section Tails
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -208,8 +208,8 @@ theorem sys_exec_bad_pc : sysExecAddr + 0x96#64 + 14#64 = sysExecAddr + 0xa4#64 
 set_option maxHeartbeats 16000000 in
 /-- **bad: +0x092 .. +0x0b4 and +0x0f4 .. +0x102** (Rocq `sx_bad_tail`). -/
 theorem sys_exec_bad_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : SysExecStatic k A)
-    (hfree : ⊢ sysExecFreeBody (hlc := hlc) (GF := GF) Γ k A 0x96#64 0xf4#64) :
-    ⊢ sysExecBadTailBody (hlc := hlc) (GF := GF) Γ k A := by
+    (hfree : ⊢ sysExecFreeBody (GF := GF) Γ k A 0x96#64 0xf4#64) :
+    ⊢ sysExecBadTailBody (GF := GF) Γ k A := by
   unfold sysExecFreeBody at hfree
   unfold sysExecBadTailBody sysExecBadSt
   iintro %c %spie %spp %R %P %kv %t %pg %afun %pl %rest
@@ -304,8 +304,8 @@ theorem sys_exec_succ_pc (pcx : BitVec 64)
 set_option maxHeartbeats 16000000 in
 /-- **THE SUCCESS TAIL, +0x0ce .. +0x102** (Rocq `sx_succ_tail`). -/
 theorem sys_exec_succ_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : SysExecStatic k A)
-    (hfree : ⊢ sysExecFreeBody (hlc := hlc) (GF := GF) Γ k A 0xd4#64 0xe2#64) :
-    ⊢ sysExecSuccTailBody (hlc := hlc) (GF := GF) Γ k A := by
+    (hfree : ⊢ sysExecFreeBody (GF := GF) Γ k A 0xd4#64 0xe2#64) :
+    ⊢ sysExecSuccTailBody (GF := GF) Γ k A := by
   unfold sysExecFreeBody at hfree
   unfold sysExecSuccTailBody
   iintro %c %spie %spp %R %t %pg %afun %pl %rest %rv %ke %⟨ht, hpg, hbp, hR10, hal⟩ Hk Hpc Hte Hce #Henv

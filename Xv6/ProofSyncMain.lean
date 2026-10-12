@@ -19,7 +19,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -27,10 +27,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [S
 theorem wp_syncMain (UL : UK_LEAVES) (HS : UK_SYS_P)
     (N : UkNames GF) (oQ : Option (IProp GF)) (h : CPU) (m : RegMap) (n : Nat) (P : IProp GF) (c : Nat)
     (hc : UknConst N) :
-    ⊢ ukCode N.t User.Sync.code.byte -∗ ksyncLeaf (hlc := hlc) N oQ -∗
-      hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ -∗ ucwd N.cwd c -∗
+    ⊢ ukCode N.t User.Sync.code.byte -∗ ksyncLeaf N oQ -∗
+      hookOpt (genId (GF := GF)) oQ -∗ ucwd N.cwd c -∗
       P -∗ syncPay P (qOpt oQ) (N.pay (-1)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sync.Sym.«main») (2 + n) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Sync.Sym.«main») (2 + n) -∗ wpLoop h := by
   rw [show User.Sync.Sym.«main» = 0x0 from rfl]
   iintro #Hc Hleaf Hhook Hcwd HP Hsp Hrun
   ihave %hstk := urun_stack N h m _ _ $$ Hrun

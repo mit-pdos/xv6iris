@@ -30,7 +30,7 @@ set_option maxRecDepth 20000
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -40,8 +40,8 @@ theorem grepMain_exitAt (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (hje : BitVec.ofNat 64 (pc + 2) + BitVec.signExtend 64 je = BitVec.ofNat 64 User.Grep.Sym.«exit») :
     ⊢ uinstrIs N.t (BitVec.ofNat 64 pc) true (.ITYPE (imm, .Regidx 0#5, .Regidx 10#5, .ADDI)) -∗
       uinstrIs N.t (BitVec.ofNat 64 (pc + 2)) false (.JAL (je, .Regidx 1#5)) -∗
-      grepCode N.t -∗ treePay (hlc := hlc) N (grepProg N.t) (exit_ (s : Int)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 pc) av -∗ wpLoop h := by
+      grepCode N.t -∗ treePay N (grepProg N.t) (exit_ (s : Int)) -∗
+      urun N h m (BitVec.ofNat 64 pc) av -∗ wpLoop h := by
   iintro #Hi0 #Hi1 #Hc Ht Hrun
   iapply wp_uk_itype UL N h m (BitVec.ofNat 64 pc) true imm 0#5 10#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi0 Hrun
@@ -63,8 +63,8 @@ theorem grepMain_exitAt (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
 
 /-- **Rocq `wp_kgrep_main_usage`**: THE USAGE ARM, 0x22e -> exit. -/
 theorem grepMain_usage (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (na : Nat) (hna : 26 ≤ na) :
-    ⊢ treePay (hlc := hlc) N (grepProg N.t) (writeBytes 2 grepUsage (exit_ 1)) -∗ grepCode N.t -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x22e) na -∗ wpLoop h := by
+    ⊢ treePay N (grepProg N.t) (writeBytes 2 grepUsage (exit_ 1)) -∗ grepCode N.t -∗
+      urun N h m (BitVec.ofNat 64 0x22e) na -∗ wpLoop h := by
   obtain ⟨n, rfl⟩ : ∃ n, na = 10 + (12 + (4 + n)) := ⟨na - 26, by omega⟩
   iintro Ht #Hc Hrun
   -- 0x22e  auipc a1,0x1
@@ -103,7 +103,7 @@ theorem grepMain_usage (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
   have e10 : m4.get 10#5 = BitVec.ofNat 64 2 := by ureg; exact ukLi _ 2#12 2 (by decide)
   have e11 : m4.get 11#5 = BitVec.ofNat 64 0xb30 := by ureg; try decide
   -- fprintf(2, "usage: grep pattern [file ...]\n")
-  have H := kgrepPaySeq_tree (hlc := hlc) N (m4.get 10#5) 2 (grepLit 0xb30) (by rw [e10]; try decide) 31 0 (exit_ 1)
+  have H := kgrepPaySeq_tree N (m4.get 10#5) 2 (grepLit 0xb30) (by rw [e10]; try decide) 31 0 (exit_ 1)
   simp only [Nat.zero_add, grepUsage_lit] at H
   ihave #Hstr := grepUsage_str N.t $$ Hc
   iapply wp_grepFprintf_ulib UL N 0xb30 31 (grepLit 0xb30) h4 m4 n _ _ (by decide) (by decide)
@@ -121,9 +121,9 @@ theorem grepMain_usage (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
 theorem grepMain_die (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (av : Nat) (args : List UArg)
     (i : Nat) (g : UArg) (na : Nat) (hna : 28 ≤ na) (hg : args[i]? = some g) (hp : g.ptr ≠ 0)
     (hs2 : m.get 18#5 = BitVec.ofNat 64 (av + 8 * i)) :
-    ⊢ treePay (hlc := hlc) N (grepProg N.t) (writeBytes 1 (grepDgOpen (uargBytes g)) (exit_ 1)) -∗
+    ⊢ treePay N (grepProg N.t) (writeBytes 1 (grepDgOpen (uargBytes g)) (exit_ 1)) -∗
       grepCode N.t -∗ uargv N.d av args -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x250) na -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 0x250) na -∗ wpLoop h := by
   obtain ⟨n, rfl⟩ : ∃ n, na = 12 + (12 + (4 + n)) := ⟨na - 28, by omega⟩
   iintro Ht #Hc #Hargv Hrun
   ihave %halc := uargv_align N.d av args $$ Hargv
@@ -171,13 +171,13 @@ theorem grepMain_die (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (a
   have e11 : m4.get 11#5 = BitVec.ofNat 64 g.ptr := by ureg
   -- printf("grep: cannot open %s\n", argv[i])
   have hfd1 : (BitVec.setWidth 32 (1#64 : BitVec 64)).toInt = 1 := by decide
-  have H1 := kgrepPaySeq_tree (hlc := hlc) N 1#64 1 (grepLit gmMsg) hfd1 gmMsgQ 0
+  have H1 := kgrepPaySeq_tree N 1#64 1 (grepLit gmMsg) hfd1 gmMsgQ 0
     (writeBytes 1 (uargBytes g) (writeBytes 1 ((List.range (gmMsgLen - (gmMsgQ + 2))).map
       (fun j => grepLit gmMsg (gmMsgQ + 2 + j))) (exit_ 1)))
-  have H2 := kgrepPaySeq_tree (hlc := hlc) N 1#64 1 g.bytes hfd1 g.len 0
+  have H2 := kgrepPaySeq_tree N 1#64 1 g.bytes hfd1 g.len 0
     (writeBytes 1 ((List.range (gmMsgLen - (gmMsgQ + 2))).map (fun j => grepLit gmMsg (gmMsgQ + 2 + j))) (exit_ 1))
   rw [show (List.range g.len).map (fun j => g.bytes (0 + j)) = uargBytes g by simp [uargBytes]] at H2
-  have H3 := kgrepPaySeq_tree (hlc := hlc) N 1#64 1 (grepLit gmMsg) hfd1 (gmMsgLen - (gmMsgQ + 2)) (gmMsgQ + 2)
+  have H3 := kgrepPaySeq_tree N 1#64 1 (grepLit gmMsg) hfd1 (gmMsgLen - (gmMsgQ + 2)) (gmMsgQ + 2)
     (exit_ 1)
   obtain ⟨hq0, hq1, hq2a, hq2b, hq2c⟩ := gm_directive
   iapply wp_grepPrintfS_ulib UL N gmMsg gmMsgLen gmMsgQ (grepLit gmMsg) g.ptr g.len g.bytes h4 m4 n _ _ _ _
@@ -201,9 +201,9 @@ theorem grepMain_die (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (a
 /-- **Rocq `wp_kgrep_main_stdin`**: THE STANDARD-INPUT ARM, 0x242 -> exit. -/
 theorem grepMain_stdin (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (h : CPU) (m : RegMap) (g : UArg)
     (f : Nat → BitVec 8) (na : Nat) (hn : grepWords (uargBytes g) ≤ na) (hs4 : m.get 20#5 = BitVec.ofNat 64 g.ptr) :
-    ⊢ treePay (hlc := hlc) N (grepProg N.t) (grepGo (uargBytes g) 0 false [] [] (exit_ 0)) -∗
+    ⊢ treePay N (grepProg N.t) (grepGo (uargBytes g) 0 false [] [] (exit_ 0)) -∗
       grepCode N.t -∗ ustr N.d DFrac.discard g.ptr g.len g.bytes -∗ ubytes N.d User.Grep.Sym.«buf» 1024 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x242) na -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 0x242) na -∗ wpLoop h := by
   iintro Ht #Hc #Hpat Hbuf Hrun
   -- 0x242  c.li a1,0
   gfetch 0x242 true (.ITYPE (0#12, .Regidx 0#5, .Regidx 11#5, .ADDI))

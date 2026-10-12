@@ -102,7 +102,7 @@ def sysReadRet (V : ProcPriv) (v : BitVec 64) (n : Int) (r : BitVec 64) : Prop :
   (∃ (fd : Nat) (fv : BitVec 64), argFd v V.ofile = some (fd, fv) ∧ filereadRet n r)
 
 section Keyed
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [CtokG GF] [Appcfg GF] [FsBytesG GF] [Fscfg]
 
 /-- THE CALLER'S INPUT (Rocq `sys_read_in`): fileread's, at the key. -/
@@ -111,7 +111,7 @@ def sysReadIn (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
     (Rin : List (List Obs × BitVec 8) → IProp GF)
     (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF) :
     IProp GF :=
-  filereadIn (hlc := hlc) (sysFdSt v V.ofile sts) n F Rd Rin Rp Rpe P
+  filereadIn (sysFdSt v V.ofile sts) n F Rd Rin Rp Rpe P
 
 /-- THE ARMED OUTPUT (Rocq `sys_read_arms`): the blanket beside fileread's
 extra at the key. -/
@@ -121,7 +121,7 @@ def sysReadArms (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
     (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF)
     (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64) : IProp GF :=
   iprop(⌜sysReadRet V v n r⌝ ∗
-    filereadExtra (hlc := hlc) V.gen V.upt (sysFdSt v V.ofile sts) n F Rd Rin Rp Rpe P r M' addr)
+    filereadExtra V.gen V.upt (sysFdSt v V.ofile sts) n F Rd Rin Rp Rpe P r M' addr)
 
 variable (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
   (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
@@ -131,7 +131,7 @@ variable (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat 
 theorem sysReadArms_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
     (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (hr : r = 0xFFFFFFFFFFFFFFFF#64)
     (hnone : argFd v V.ofile = none) :
-    P ⊢ sysReadArms (hlc := hlc) V v sts n F Rd Rin Rp Rpe P r M' addr := by
+    P ⊢ sysReadArms V v sts n F Rd Rin Rp Rpe P r M' addr := by
   unfold sysReadArms
   rw [sysFdSt_none v V.ofile sts hnone]
   have hm : r = -1#64 := by rw [hr]; decide
@@ -144,7 +144,7 @@ theorem sysReadArms_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n 
 /-- ... and its input handed straight back. -/
 theorem sysReadIn_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
     (hnone : argFd v V.ofile = none) :
-    sysReadIn (hlc := hlc) V v sts n F Rd Rin Rp Rpe P ⊢ P -∗ P := by
+    sysReadIn V v sts n F Rd Rin Rp Rpe P ⊢ P -∗ P := by
   unfold sysReadIn
   rw [sysFdSt_none v V.ofile sts hnone]
   simp only [filereadIn]
@@ -154,7 +154,7 @@ theorem sysReadIn_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : 
 /-- Rocq `sys_read_in_of`. -/
 theorem sysReadIn_of (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int) (fd : Nat)
     (fv : BitVec 64) (st : FdState) (hsome : argFd v V.ofile = some (fd, fv)) (hst : sts[fd]? = some st) :
-    sysReadIn (hlc := hlc) V v sts n F Rd Rin Rp Rpe P ⊢ filereadIn (hlc := hlc) st n F Rd Rin Rp Rpe P := by
+    sysReadIn V v sts n F Rd Rin Rp Rpe P ⊢ filereadIn st n F Rd Rin Rp Rpe P := by
   unfold sysReadIn
   rw [sysFdSt_some v V.ofile sts fd fv st hsome hst]
 
@@ -162,8 +162,8 @@ theorem sysReadIn_of (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : In
 theorem sysReadArms_of (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (fd : Nat)
     (fv : BitVec 64) (st : FdState) (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8))
     (addr : BitVec 64) (hsome : argFd v V.ofile = some (fd, fv)) (hst : sts[fd]? = some st) :
-    filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin Rp Rpe P r M' addr ⊢
-      sysReadArms (hlc := hlc) V v sts n F Rd Rin Rp Rpe P r M' addr := by
+    filereadArms V.gen V.upt st n F Rd Rin Rp Rpe P r M' addr ⊢
+      sysReadArms V v sts n F Rd Rin Rp Rpe P r M' addr := by
   unfold sysReadArms filereadArms
   rw [sysFdSt_some v V.ofile sts fd fv st hsome hst]
   iintro ⟨%h, H⟩
@@ -173,7 +173,7 @@ theorem sysReadArms_of (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (fd :
 end Keyed
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -200,18 +200,18 @@ def sysReadPost (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : Pro
     ⌜V.ev ≤ k'⌝ -∗
     procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' } M' -∗
     fdFrags V.fdg sts -∗ filereadFsOut -∗
-    sysReadArms (hlc := hlc) V v sts (argZ v2) F Rd Rin Rp Rpe P (R' 10#5) M' v1 -∗ wpLoop cpu')
+    sysReadArms V v sts (argZ v2) F Rd Rin Rp Rpe P (R' 10#5) M' v1 -∗ wpLoop cpu')
 
 end Post
 
 /-- **WP of `sys_read()`** (Rocq `wp_sys_read_sconf_body`), eb-generic at
 depth 0 (deviation 1).  `v`/`v1`/`v2` are syscall arguments 0, 1, 2, out
 of the trapframe page the block carries. -/
-def wp_sys_read_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_sys_read_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames)
@@ -230,21 +230,21 @@ def wp_sys_read_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   -- the file system in the form that does NOT name a file, and the console
-  filereadFsEnv (hlc := hlc) ∗ consoleReadyApp ∗
+  filereadFsEnv ∗ consoleReadyApp ∗
   -- THE CALLER'S INPUT, KEYED ON THE DESCRIPTOR ARGUMENT 0 NAMES, and the
   -- payload it is a wand from
-  sysReadIn (hlc := hlc) V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
+  sysReadIn V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
   -- THE CROSSING IS THE LITERAL `true`: fileread parks
-  wpNext true k.proc cpu (sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P)
+  wpNext true k.proc cpu (sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `sys_read` (Rocq's `Module Type SYSREAD`). -/
 structure SYSREAD : Prop where
-  wp_sys_read_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_sys_read_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames)
@@ -252,7 +252,7 @@ structure SYSREAD : Prop where
     (Rin : List (List Obs × BitVec 8) → IProp GF)
     (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF)
     hv hv1 hv2 hK hj hproc hnoff htier,
-    wp_sys_read_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M sts v v1 v2 γkl γk F Rd Rin Rp Rpe P
+    wp_sys_read_eb_body (GF := GF) Γ cpu k γ j pid V M sts v v1 v2 γkl γk F Rd Rin Rp Rpe P
       hv hv1 hv2 hK hj hproc hnoff htier
 
 end Xv6

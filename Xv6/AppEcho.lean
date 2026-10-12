@@ -63,7 +63,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppEcho
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF]
 
 /-! ## The taint and the birth resource -/
@@ -93,6 +93,7 @@ def consState (r : EchoNames) (av : Aview) : IProp GF :=
     ∨ (∃ i : Nat, ⌜consPresentAt i av⌝ ∗ consKey r ∗ consShot r i)
     ∨ (⌜consAbsent av⌝ ∗ consTok r ∗ consSealTok r))
 
+omit [MachGS GF] in
 instance consState_timeless (r : EchoNames) (av : Aview) :
     Timeless (consState (GF := GF) r av) := by
   unfold consState; infer_instance
@@ -357,6 +358,7 @@ number `k`, which this resource does not read. -/
 def echoBoot (_γ : EchoGn) (_k : Nat) (r : EchoNames) : IProp GF :=
   iprop(consKey r ∨ ∃ i : Nat, consMade r i)
 
+omit [MachGS GF] in
 instance echoBoot_timeless (γ : EchoGn) (k : Nat) (r : EchoNames) :
     Timeless (echoBoot (GF := GF) γ k r) := by
   unfold echoBoot; infer_instance
@@ -375,7 +377,7 @@ theorem echoFsEra0 (dk : Nat → BitVec 8) (D : BlockMap) (S : FsStateRec)
     era0RecoveryEchoPins dk D S hdk hrec hS⟩
 
 section AppEchoInit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF]
 
 /-- THE ERA-0 CLAIM *AND THE KEY* (Rocq `echo_init_key`): the instance is
@@ -384,7 +386,7 @@ theorem echoInitKey (γ : EchoGn) (dk : Nat → BitVec 8) (D : BlockMap) (S : Fs
     (hdk : fsBlocks dk = fsimgP)
     (hrec : fsRecovery (fsBlocks dk) D fsimgCov fsimgSb.sbLogstart) (hS : snapOk S D) :
     ⊢@{IProp GF} |==> ∃ r : EchoNames,
-      echoPred (hlc := hlc) γ r (absView S.fssInodes) ∗ consKey r := by
+      echoPred γ r (absView S.fssInodes) ∗ consKey r := by
   imod (consTok_alloc (GF := GF)) with ⟨%r, Htok, Hkey⟩
   imodintro
   iexists r
@@ -398,8 +400,8 @@ dropped. -/
 theorem echoInit (γ : EchoGn) (dk : Nat → BitVec 8) (D : BlockMap) (S : FsStateRec)
     (hdk : fsBlocks dk = fsimgP)
     (hrec : fsRecovery (fsBlocks dk) D fsimgCov fsimgSb.sbLogstart) (hS : snapOk S D) :
-    ⊢@{IProp GF} |==> ∃ r : EchoNames, echoPred (hlc := hlc) γ r (absView S.fssInodes) := by
-  imod (echoInitKey (hlc := hlc) (GF := GF) γ dk D S hdk hrec hS) with ⟨%r, Hp, -⟩
+    ⊢@{IProp GF} |==> ∃ r : EchoNames, echoPred γ r (absView S.fssInodes) := by
+  imod (echoInitKey (GF := GF) γ dk D S hdk hrec hS) with ⟨%r, Hp, -⟩
   imodintro
   iexists r
   iexact Hp

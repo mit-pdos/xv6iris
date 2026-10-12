@@ -158,7 +158,7 @@ arm, where the pure arm `diNlink dn0 ≠ 0` is FALSE at the one and
 unavailable at the other. -/
 
 section Payload
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- Rocq's `ic_payload`. -/
@@ -302,7 +302,7 @@ theorem icDepRd_shr (d : IcDep) (s : Qp) (dev inum : BitVec 32) (g : GName) (lo 
 /-! ## THE LOADED BUNDLE: WHAT A HOLDER CARRIES OUT, AND ITS FLAT SHAPE -/
 
 section Loaded
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- WHAT THE HOLDER CARRIES OUT, keyed by the descriptor's read bit

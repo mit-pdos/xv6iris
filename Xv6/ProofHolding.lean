@@ -53,7 +53,7 @@ context `k` whose `a0` is `lk`, given what the owner-word load answers
 (`P` before, `Q w` after, with the answer `w`) and the comparison's value. -/
 theorem holding_br_d6a : KA.«holding» + 0xd6a#64 = KA.«mycpu» := by decide
 
-theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem holding_tail (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hK : 6 ≤ k.avail)
     (P : IProp GF) (Q : BitVec 64 → IProp GF) (ans : BitVec 64)
     (hld : instr (GF := GF) (KA.«holding» + 0x12#64) true (instruction.LOAD (16#12, regidx.Regidx 10#5, regidx.Regidx 15#5, false, 8)) ∗
@@ -96,7 +96,7 @@ theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [Mac
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = cpuAddr cpu⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK'
-    have h := MC.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu k' hsie' hK'
+    have h := MC.wp_mycpu (GF := GF) (lent := false) cpu k' hsie' hK'
     unfold wp_mycpu_body at h
     simp only [mycpuAddr] at h
     exact h
@@ -142,10 +142,10 @@ theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [Mac
 /-! ## The two contracts -/
 
 set_option maxHeartbeats 4000000 in
-theorem holding_notheld_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem holding_notheld_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) (hs : s ∉ k.locks) :
-    wp_holding_notheld_body (hlc := hlc) (GF := GF) cpu k γ s R hsie hK hs := by
+    wp_holding_notheld_body (GF := GF) cpu k γ s R hsie hK hs := by
   unfold wp_holding_notheld_body
   iintro ⟨Hk, Hpc, #Hlk, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -218,11 +218,11 @@ set_option maxHeartbeats 4000000 in
 dead branch `D`) through the racy word load and the owner-word load, and
 handing it back in the continuation.  `holding_tail` is generic in its
 `P`/`Q` and needs no change. -/
-theorem holding_notheld_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem holding_notheld_gen_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) (hs : s ∉ k.locks) :
-    wp_holding_notheld_gen_body (hlc := hlc) (GF := GF) cpu k γ s R D Tc hrefute hsie hK hs := by
+    wp_holding_notheld_gen_body (GF := GF) cpu k γ s R D Tc hrefute hsie hK hs := by
   unfold wp_holding_notheld_gen_body
   iintro ⟨Hk, Hpc, #Hlk, Hcred, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -294,10 +294,10 @@ theorem holding_notheld_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunct
         · iexact Hcred
 
 set_option maxHeartbeats 4000000 in
-theorem holding_locked_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem holding_locked_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) :
-    wp_holding_locked_body (hlc := hlc) (GF := GF) cpu k γ s R hsie hK := by
+    wp_holding_locked_body (GF := GF) cpu k γ s R hsie hK := by
   unfold wp_holding_locked_body
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -358,11 +358,11 @@ set_option maxHeartbeats 4000000 in
 dead branch `D`) through the holder read of the word and the owner-word
 load, and handing it back alongside the holder token in the continuation.
 `holding_tail` is generic in its `P`/`Q` and needs no change. -/
-theorem holding_locked_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem holding_locked_gen_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) :
-    wp_holding_locked_gen_body (hlc := hlc) (GF := GF) cpu k γ s R D Tc hrefute hsie hK := by
+    wp_holding_locked_gen_body (GF := GF) cpu k γ s R D Tc hrefute hsie hK := by
   unfold wp_holding_locked_gen_body
   iintro ⟨Hk, Hpc, #Hlk, Hcred, Hlocked, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -420,11 +420,11 @@ theorem holding_locked_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFuncto
     · ipureintro; rfl
 
 set_option maxHeartbeats 4000000 in
-theorem holding_locked_refute_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem holding_locked_refute_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (D : IProp GF) [Timeless D] (hrefute : ⊢ lockedCore γ cpu -∗ D -∗ (False : IProp GF))
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) :
-    wp_holding_locked_refute_body (hlc := hlc) (GF := GF) cpu k γ s R D hrefute hsie hK := by
+    wp_holding_locked_refute_body (GF := GF) cpu k γ s R D hrefute hsie hK := by
   unfold wp_holding_locked_refute_body
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -480,13 +480,13 @@ theorem holding_locked_refute_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFun
     · ipureintro; rfl
 
 theorem holding_proof (MC : MYCPU) : HOLDING :=
-  ⟨fun {_ _} _ _ cpu k γ s R hsie hK hs => holding_notheld_proof MC cpu k γ s R hsie hK hs,
-   fun {_ _} _ _ cpu k γ s R hsie hK => holding_locked_proof MC cpu k γ s R hsie hK,
-   fun {_ _} _ _ cpu k γ s R D _ Tc hrefute hsie hK hs =>
+  ⟨fun {_} _ _ cpu k γ s R hsie hK hs => holding_notheld_proof MC cpu k γ s R hsie hK hs,
+   fun {_} _ _ cpu k γ s R hsie hK => holding_locked_proof MC cpu k γ s R hsie hK,
+   fun {_} _ _ cpu k γ s R D _ Tc hrefute hsie hK hs =>
      holding_notheld_gen_proof MC cpu k γ s R D Tc hrefute hsie hK hs,
-   fun {_ _} _ _ cpu k γ s R D _ Tc hrefute hsie hK =>
+   fun {_} _ _ cpu k γ s R D _ Tc hrefute hsie hK =>
      holding_locked_gen_proof MC cpu k γ s R D Tc hrefute hsie hK,
-   fun {_ _} _ _ cpu k γ s R D _ hrefute hsie hK =>
+   fun {_} _ _ cpu k γ s R D _ hrefute hsie hK =>
      holding_locked_refute_proof MC cpu k γ s R D hrefute hsie hK⟩
 
 end Xv6

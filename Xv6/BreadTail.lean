@@ -35,7 +35,7 @@ def bdPins (k : KCtx) (R : RegMap) : Prop :=
   R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [SleepLockG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
@@ -98,7 +98,7 @@ theorem bd_ret (cpu c0 : CPU) (k0 : KCtx) (sp1 sp2 : Bool)
 
 set_option maxHeartbeats 2000000 in
 /-- `virtio_disk_rw(b, 0)` at the fill arm's call site. -/
-theorem bd_vdr (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem bd_vdr (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64) (j kk : Nat)
     (bno : BitVec 32) (bs bsd : List (BitVec 8)) (s : Bool) (pj : BitVec 64)
     (hpj : k'.proc = pj) (hs : k'.sie = s)
@@ -123,7 +123,7 @@ theorem bd_vdr (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     intro m hm; rw [ha0]; exact bufData_kmapRw kk m hkk hm
   -- a READ moves no disk byte: its permit is the trivial one (Rocq ProofBread's
   -- `disk_write_permit_trivial`), and its receipt `▷ True` is dropped
-  have h := VR.wp_virtio_disk_rw_eb (hlc := hlc) (GF := GF) Γ c k' V.gd γdl pd pav pu j bno 0#32 bs bsd
+  have h := VR.wp_virtio_disk_rw_eb (GF := GF) Γ c k' V.gd γdl pd pav pu j bno 0#32 bs bsd
     iprop(True) hj hproc hK hnoff htier hbno hbsd hpd hkm
   unfold wp_virtio_disk_rw_eb_body at h
   simp only [virtioDiskRwAddr, ha0, ha1, ne_eq, BitVec.reduceEq, not_false_eq_true,
@@ -142,7 +142,7 @@ theorem bd_vdr (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
 set_option maxHeartbeats 8000000 in
 /-- **THE JOIN**, from `bread+0xb4`: check out the escrowed bundle, test
 `b->valid`, fill through `virtio_disk_rw` if it is clear, and return. -/
-theorem bd_tail (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem bd_tail (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu c0 : CPU) (k0 : KCtx) (sp1 sp2 : Bool)
     (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j kk T : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac) (R : RegMap)

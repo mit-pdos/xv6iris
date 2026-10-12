@@ -110,7 +110,7 @@ theorem ush_bne_byte (b : BitVec 8) (c : Nat) (hc : c < 256) (h : b.toNat ≠ c)
   omega
 
 section UshRedirBody
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -129,11 +129,11 @@ def shRedirChildLaw (X : UshCtx GF) (Dg : Nat) : IProp GF :=
     ushCode N'.t -∗ ushJtab N'.t -∗ ustr N'.d (DFrac.own 1) s0 len fb -∗ ustr N'.d dw ushWsA 5 ushpWsF -∗
     ustr N'.d dv ushSymA 7 ushpSymF -∗ ushStd N' X ld -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗ ushPid N' -∗
     ushmFresh N' sz -∗ X.Wc I 3 -∗
-    urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x99c) (68 + (8 + (Dg + n))) -∗ wpLoop h)
+    urun N' h m (BitVec.ofNat 64 0x99c) (68 + (8 + (Dg + n))) -∗ wpLoop h)
 
 /-- **Rocq `ushf_child_law_at_of_redir`**: the two shapes, one step apart. -/
 theorem ushf_child_law_at_of_redir (X : UshCtx GF) (Dg : Nat) :
-    ⊢ shRedirChildLaw (hlc := hlc) X Dg -∗ ushfChildLawAt (hlc := hlc) X Dg ushsLp 68 := by
+    ⊢ shRedirChildLaw X Dg -∗ ushfChildLawAt X Dg ushsLp 68 := by
   unfold shRedirChildLaw ushfChildLawAt
   iintro #Hl
   imodintro
@@ -153,16 +153,16 @@ def ushKshfForkLaw (N : UkNames GF) (X : UshCtx GF) : Prop :=
     Dc ≤ 68 + ushDpipe → ushRegs m → m.get 9#5 = BitVec.ofNat 64 (shBuf + k) →
     (∀ j, j < len → f (k + j) ≠ ubyte0) → f (k + len) = ubyte0 → k + len < shNbuf →
     Lp ws (fun j => f (k + j)) 0 len → 8344 ≤ sz → pgRoundUpN sz = sz → uszOk (sz + 65536) →
-    (∀ n' : Nat, ⊢ ushAt (hlc := hlc) N X n' -∗ ∃ I : List (BitVec 8), ⌜I.length = n'⌝ ∗ ushLease (hlc := hlc) N X I) →
-    (∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt (hlc := hlc) N X I.length) →
-    ⊢ ushGenSlot (hlc := hlc) N X -∗ ushlHead (hlc := hlc) N X l sz -∗ ushCode N.t -∗ ushJtab N.t -∗
-      ushfKillLaw (hlc := hlc) X -∗ ushfChildLawAt (hlc := hlc) X ushDg Lp Dc -∗ ushPanicLaw (hlc := hlc) X.Wc X.Wb -∗
-      ⌜ushFd0p l⌝ -∗ ushBstate (hlc := hlc) N X l ws -∗ ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x908) (16 + (ushDbody + n)) -∗ wpLoop h
+    (∀ n' : Nat, ⊢ ushAt N X n' -∗ ∃ I : List (BitVec 8), ⌜I.length = n'⌝ ∗ ushLease N X I) →
+    (∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt N X I.length) →
+    ⊢ ushGenSlot N X -∗ ushlHead N X l sz -∗ ushCode N.t -∗ ushJtab N.t -∗
+      ushfKillLaw X -∗ ushfChildLawAt X ushDg Lp Dc -∗ ushPanicLaw X.Wc X.Wb -∗
+      ⌜ushFd0p l⌝ -∗ ushBstate N X l ws -∗ ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
+      urun N h m (BitVec.ofNat 64 0x908) (16 + (ushDbody + n)) -∗ wpLoop h
 
 /-- **Rocq `wp_kshm_body_ca_with`**: the `cd` test at a line beginning "ca",
 then the fork. -/
-theorem wp_ushBodyCaWith (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Hfork : ushKshfForkLaw (hlc := hlc) N X)
+theorem wp_ushBodyCaWith (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Hfork : ushKshfForkLaw N X)
     (Lp : List (List (BitVec 8)) → (Nat → BitVec 8) → Nat → Nat → Prop) (Dc : Nat) (h : CPU) (m : RegMap)
     (f : Nat → BitVec 8) (k len : Nat) (ws : List (List (BitVec 8))) (sz : Nat) (l : List FdState) (n : Nat)
     (hDc : Dc ≤ 68 + ushDpipe) (hregs : ushRegs m) (hs1 : m.get 9#5 = BitVec.ofNat 64 (shBuf + k))
@@ -170,12 +170,12 @@ theorem wp_ushBodyCaWith (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Hfor
     (hnul : f (k + len) = ubyte0) (hkl : k + len < shNbuf) (hline : Lp ws (fun j => f (k + j)) 0 len)
     (hb0 : (f k).toNat = 99) (hb1 : (f (k + 1)).toNat = 97) (hlen2 : 2 ≤ len)
     (hszlo : 8344 ≤ sz) (hszal : pgRoundUpN sz = sz) (hszok : uszOk (sz + 65536))
-    (hpm1 : ∀ n' : Nat, ⊢ ushAt (hlc := hlc) N X n' -∗ ∃ I : List (BitVec 8), ⌜I.length = n'⌝ ∗ ushLease (hlc := hlc) N X I)
-    (hpmwb : ∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt (hlc := hlc) N X I.length) :
-    ⊢ ushGenSlot (hlc := hlc) N X -∗ ushlHead (hlc := hlc) N X l sz -∗ ushCode N.t -∗ ushJtab N.t -∗
-      ushfKillLaw (hlc := hlc) X -∗ ushfChildLawAt (hlc := hlc) X ushDg Lp Dc -∗ ushPanicLaw (hlc := hlc) X.Wc X.Wb -∗
-      ⌜ushFd0p l⌝ -∗ ushBstate (hlc := hlc) N X l ws -∗ ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h := by
+    (hpm1 : ∀ n' : Nat, ⊢ ushAt N X n' -∗ ∃ I : List (BitVec 8), ⌜I.length = n'⌝ ∗ ushLease N X I)
+    (hpmwb : ∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt N X I.length) :
+    ⊢ ushGenSlot N X -∗ ushlHead N X l sz -∗ ushCode N.t -∗ ushJtab N.t -∗
+      ushfKillLaw X -∗ ushfChildLawAt X ushDg Lp Dc -∗ ushPanicLaw X.Wc X.Wb -∗
+      ⌜ushFd0p l⌝ -∗ ushBstate N X l ws -∗ ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
+      urun N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h := by
   iintro #Hgen Hhead #HC #Hjt #Hkl #Hchl #Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
   obtain ⟨hs2, hs3, hs4, hs5, hs6⟩ := hregs
   -- 0x956  bne a5,s5 -- NOT taken: the first byte IS 'c'
@@ -212,20 +212,20 @@ theorem wp_ushBodyCaWith (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Hfor
     $$ Hgen Hhead HC Hjt Hkl Hchl Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
 
 /-- **Rocq `wp_kshm_body_cat_with`**: `cat f` itself. -/
-theorem wp_ushBodyCatWith (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Hfork : ushKshfForkLaw (hlc := hlc) N X)
+theorem wp_ushBodyCatWith (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Hfork : ushKshfForkLaw N X)
     (Dc : Nat) (nm : List (BitVec 8)) (h : CPU) (m : RegMap) (f : Nat → BitVec 8) (k len : Nat) (sz : Nat)
     (l : List FdState) (n : Nat)
     (hDc : Dc ≤ 68 + ushDpipe) (hregs : ushRegs m) (hs1 : m.get 9#5 = BitVec.ofNat 64 (shBuf + k))
     (ha5 : m.get 15#5 = BitVec.ofNat 64 (f k).toNat) (hnn : ∀ j, j < len → f (k + j) ≠ ubyte0)
     (hnul : f (k + len) = ubyte0) (hkl : k + len < shNbuf) (hline : ushLineAt (.LCat nm) f k len)
     (hszlo : 8344 ≤ sz) (hszal : pgRoundUpN sz = sz) (hszok : uszOk (sz + 65536))
-    (hpm1 : ∀ n' : Nat, ⊢ ushAt (hlc := hlc) N X n' -∗ ∃ I : List (BitVec 8), ⌜I.length = n'⌝ ∗ ushLease (hlc := hlc) N X I)
-    (hpmwb : ∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt (hlc := hlc) N X I.length) :
-    ⊢ ushGenSlot (hlc := hlc) N X -∗ ushlHead (hlc := hlc) N X l sz -∗ ushCode N.t -∗ ushJtab N.t -∗
-      ushfKillLaw (hlc := hlc) X -∗ ushfChildLawAt (hlc := hlc) X ushDg ushsLpCat Dc -∗
-      ushPanicLaw (hlc := hlc) X.Wc X.Wb -∗ ⌜ushFd0p l⌝ -∗ ushBstate (hlc := hlc) N X l (ulineWs (.LCat nm)) -∗
+    (hpm1 : ∀ n' : Nat, ⊢ ushAt N X n' -∗ ∃ I : List (BitVec 8), ⌜I.length = n'⌝ ∗ ushLease N X I)
+    (hpmwb : ∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt N X I.length) :
+    ⊢ ushGenSlot N X -∗ ushlHead N X l sz -∗ ushCode N.t -∗ ushJtab N.t -∗
+      ushfKillLaw X -∗ ushfChildLawAt X ushDg ushsLpCat Dc -∗
+      ushPanicLaw X.Wc X.Wb -∗ ⌜ushFd0p l⌝ -∗ ushBstate N X l (ulineWs (.LCat nm)) -∗
       ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h := by
   have hb0 : (f k).toNat = 99 := by
     have := ushs_cat_byte nm f k len 0 hline (by decide)
     rw [Nat.add_zero] at this; rw [this]; decide

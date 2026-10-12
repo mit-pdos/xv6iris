@@ -99,7 +99,7 @@ set_option maxHeartbeats 4000000 in
 from the frame) are the caller's. -/
 theorem push_off_br_d3e : KA.«push_off» + 0xd3e#64 = KA.«mycpu» := by decide
 
-theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (M : MYCPU) (lent : Bool)
+theorem push_off_tail {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (M : MYCPU) (lent : Bool)
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 6 ≤ k.avail) (hwf : k.wf) (hl : lent = false → 1 ≤ k.noff)
     (b : Bool) (hb : lent = false → b = k.intena) (R : RegMap)
@@ -114,7 +114,7 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
   -- jal mycpu
   k_step (wp_s_jal cpu _ (KA.«push_off» + 0x18#64) false 3366#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [push_off_br_d3e]
   iintro Hk Hpc
-  have hm := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := lent) cpu ((k.pushed 4).withRegs (R.set 1#5 (KA.«push_off» + 0x1c#64)))
+  have hm := M.wp_mycpu (GF := GF) (lent := lent) cpu ((k.pushed 4).withRegs (R.set 1#5 (KA.«push_off» + 0x1c#64)))
     (by k_norm) (by k_norm; omega)
   unfold wp_mycpu_body at hm
   simp only [mycpuAddr] at hm
@@ -171,7 +171,7 @@ set_option maxHeartbeats 4000000 in
 /-- `push_off` from its `mv s1,a5` on, with interrupts off: the calls to
 `mycpu`, the depth test, at depth 0 the store of `old` (the `SIE` bit read)
 into the borrowed `c->intena` cell, the increment, the epilogue. -/
-theorem push_off_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (M : MYCPU)
+theorem push_off_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (M : MYCPU)
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 6 ≤ k.avail) (hwf : k.wf) (old : Bool) (v : BitVec 64)
     (hv : sstatusAt old v) :
@@ -190,7 +190,7 @@ theorem push_off_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
   -- jal mycpu
   k_step (wp_s_jal cpu _ (KA.«push_off» + 0x10#64) false 3374#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [push_off_br_d3e]
   iintro Hk Hpc
-  have hm := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu ((k.pushed 4).withRegs
+  have hm := M.wp_mycpu (GF := GF) (lent := false) cpu ((k.pushed 4).withRegs
       (((((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 8#5 (k.regs 2#5)).set 15#5 v).set 9#5 v).set 1#5
         (KA.«push_off» + 0x14#64)))
     (by k_norm) (by k_norm; omega)
@@ -217,7 +217,7 @@ theorem push_off_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
     -- jal mycpu
     k_step (wp_s_jal cpu _ (KA.«push_off» + 0x2c#64) false 3346#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [push_off_br_d3e]
     iintro Hk Hpc
-    have hm4 := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu ((k.pushed 4).withRegs
+    have hm4 := M.wp_mycpu (GF := GF) (lent := false) cpu ((k.pushed 4).withRegs
         ((R2.set 15#5 0#64).set 1#5 (KA.«push_off» + 0x30#64)))
       (by k_norm) (by k_norm; omega)
     unfold wp_mycpu_body at hm4
@@ -288,7 +288,7 @@ theorem push_off_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
           15#5 _ (by decide)) 9#5 _ (by decide)) 1#5 _ (by decide)
       exact csRegs_set (csRegs_trans c1 (csRegs_of_calleeSaved hcs2)) 15#5 _ (by decide)
 set_option maxHeartbeats 4000000 in
-theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {hlc GF} _ _ cpu k hnoff hK => by
+theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {GF} _ _ cpu k hnoff hK => by
   unfold wp_push_off_body
   iintro ⟨Hk, Hpc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

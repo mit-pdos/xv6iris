@@ -40,9 +40,9 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open HfpPipeP
 
 section CifCon
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF]
   [PipesNG GF]
-variable (R : PnsRound hlc GF)
+variable (R : PnsRound GF)
 
 /-! ## §1a The producer device's console half, at a failure report -/
 
@@ -102,7 +102,7 @@ family, the rest step it. -/
 theorem cif_conX_step (OK : PnsRoundOk R) (w : Wid) (x y : List (BitVec 8)) (b : BitVec 8)
     (hb : y[0]? = some b) :
     ⊢ cifConX R w x [y] -∗
-      outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b (cifConX R w x [y.drop 1]) := by
+      outLink .uart0 (genId (GF := GF) + 1) b (cifConX R w x [y.drop 1]) := by
   unfold cifConX cifConF
   iintro H
   icases H with (⟨%hp, #Hinv, Hc, Hm, #Hkit, Hdep⟩ | ⟨%c, %hw, #Hinv, %hp, %hst, Hc, Hm⟩)

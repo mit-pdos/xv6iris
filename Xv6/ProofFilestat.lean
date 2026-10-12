@@ -58,13 +58,13 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 set_option linter.unusedSimpArgs false
 
-theorem filestat_ctx_entry {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem filestat_ctx_entry {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (c : CPU) (k : KCtx) (R : RegMap) :
     kctx (GF := GF) c ((k.pushed 10).withRegs R) ⊢
       kctx c (((k.withSpie k.spie k.spp).pushed 10).withRegs R) := .rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -72,7 +72,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 set_option maxHeartbeats 16000000 in
 /-- **`filestat` meets its specification**, at either entry `SIE`. -/
 theorem filestat_main (MP : MYPROC) (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames)
@@ -80,7 +80,7 @@ theorem filestat_main (MP : MYPROC) (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (ha0 : k.regs 10#5 = fnode fk) :
-    wp_filestat_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk
+    wp_filestat_eb_body (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk
       hK hfk hj hproc hnoff htier ha0 := by
   unfold wp_filestat_eb_body
   have hK76 := hK

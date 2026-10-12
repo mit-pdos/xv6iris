@@ -96,7 +96,7 @@ theorem iput_ofl_mask_ftop (z : Nat) :
 /-! ## The deposit's ghost step, as log_write's atomic update -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE DEPOSIT (Rocq's `ireg_free_deposit_au` through `lw_au_rec`): the
@@ -106,9 +106,9 @@ theorem iput_ofl_au [Fscfg] [Icfg] (inum : BitVec 32) (dn : Dinode) (ds : List D
     (ge gr gd : GName) (rg : Frzidx) (t : Nat) (q : Qp) (e0 : Nat)
     (hnib : inum.toNat < 16 * icfgNib) (hdn : dinodeWf dn) (hnl0 : dn.diNlink.toNat = 0)
     (hbare : iregBare dn) :
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-      escAInv (hlc := hlc) fscFs ge gr gd inum.toNat rg ∗
-      ipoolInv (hlc := hlc) fscIc fscFs fscIreg fscCov fscLogst icfgNib ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗
+      escAInv fscFs ge gr gd inum.toNat rg ∗
+      ipoolInv fscIc fscFs fscIreg fscCov fscLogst icfgNib ∗
       crpElem inum.toNat (.crpPre t q) ∗ dinodeAt fscIreg inum dn ∗ redeemTicketA gd ⊢
       dislotWriteAu (GF := GF) inum (iputOflZ dn) ds e0
         iprop(committedA ge ∗ iregRegime rg.1 ∗ iregFpin rg ∗ txPin icfgLog t q) := by
@@ -116,7 +116,7 @@ theorem iput_ofl_au [Fscfg] [Icfg] (inum : BitVec 32) (dn : Dinode) (ds : List D
   iintro ⟨#Hinv, #Hesc, #Hpinv, Hcel, Hdn, Hdep⟩
   iapply lwAuRec icfgLog fscFs (IBLOCK inum icfgIst) (⊤ \ ↑iregN) (islot inum) (diblkBytes ds)
     (dinodeBytes (iputOflZ dn)) _ e0
-  iapply (iregFreeDeposit_au (hlc := hlc) ⊤ fscIc fscIreg fscFs icfgIst fscCov fscLogst icfgNib
+  iapply (iregFreeDeposit_au ⊤ fscIc fscIreg fscFs icfgIst fscCov fscLogst icfgNib
     inum dn (iputOflZ dn) (diblkBytes ds) ge gr gd rg t q CoPset.subseteq_top
     (iput_ofl_mask_esc _) (iput_ofl_mask_pool _) (iput_ofl_mask_ftop _) (by omega)
     (iputOflZ_wf dn hdn) rfl hbare (iputOflZ_nlst dn hnl0))
@@ -127,9 +127,10 @@ end
 /-! ## The handle, opened (iupdate's `iu_hold_open`, copied) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
+omit [MachGS GF] in
 theorem iput_ofl_slots3 [CurCtx] (γ : BcacheNames) :
     bslots (GF := GF) 3 ⊢ bslot ∗ bslot ∗ bslot := by
   unfold bslot
@@ -138,6 +139,7 @@ theorem iput_ofl_slots3 [CurCtx] (γ : BcacheNames) :
   icases dsSlots_split γ 1 1 $$ H2 with ⟨H2, H3⟩
   iframe
 
+omit [MachGS GF] in
 theorem iput_ofl_slots3_join [CurCtx] (γ : BcacheNames) :
     bslot (GF := GF) ∗ bslot ∗ bslot ⊢ bslots 3 := by
   unfold bslot

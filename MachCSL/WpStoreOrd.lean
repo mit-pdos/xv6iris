@@ -30,7 +30,7 @@ open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **The accessor of a plain store of `w'` by `cpu`, ordered**: beside the
 histories it names a position `T` of the store order (`topLb T`), and the

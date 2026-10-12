@@ -34,7 +34,7 @@ theorem sg_br_myproc : KA.«sys_getpid» + 0xffffffffffffef4a#64 = KA.«myproc»
 theorem sg_ret_0c : jumpPc (KA.«sys_getpid» + 0xc#64) = KA.«sys_getpid» + 0xc#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -69,7 +69,7 @@ theorem sg_myproc (MP : MYPROC) [CurCtx] (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
+  have h := MP.wp_myproc (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   exact h
@@ -80,7 +80,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem sys_getpid_proof (MP : MYPROC) : SYSGETPID :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ pa pid V M hproc htier hnoff hK => by
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ pa pid V M hproc htier hnoff hK => by
   unfold wp_sys_getpid_body
   simp only [sysGetpidAddr]
   iintro ⟨Hk, Hpc, Hpriv, Hnext⟩

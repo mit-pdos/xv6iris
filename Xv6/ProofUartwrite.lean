@@ -183,13 +183,15 @@ theorem uw_cs9' (R R' : RegMap) (w : BitVec 64) (hcs : calleeSaved (R.set 1#5 w)
   rw [hcs.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The transmit token -/
 
+omit [MachGS GF] in
 theorem uw_txRes_intro (γ : UartNames) (l : List (BitVec 8)) : txOwn (GF := GF) γ l ⊢ txRes γ := by
   unfold txRes txOwn; iintro H; iexists l; iexact H
 
+omit [MachGS GF] in
 theorem uw_txRes_elim (γ : UartNames) : txRes (GF := GF) γ ⊢ ∃ l : List (BitVec 8), txOwn γ l := by
   unfold txRes txOwn; iintro H; iexact H
 
@@ -250,7 +252,7 @@ theorem uw_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (i : UartId) (γl : GNam
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Hlk, HΦ⟩
   ihave #Hlk' := uw_isLock_of i γl γ $$ Hlk
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl (txLockName i) (fun _ => txRes γ) hnoff hK hs
+  have h := AC.wp_acquire (GF := GF) c k' γl (txLockName i) (fun _ => txRes γ) hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
@@ -273,7 +275,7 @@ theorem uw_release (RE : RELEASE) (c : CPU) (k' : KCtx) (s : Bool) (p : BitVec 6
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, Harm, HΦ⟩
   ihave #Hlk' := uw_isLock_of i γl γ $$ Hlk
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl (txLockName i) (fun _ => txRes γ)
+  have h := RE.wp_release (GF := GF) c k' γl (txLockName i) (fun _ => txRes γ)
     hsie hnoff hK s hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -291,7 +293,7 @@ theorem uw_arm_eq (c : CPU) (s s' : Bool) (p p' : BitVec 64) (hs : s = s') (hp :
     sieArm (GF := GF) c s p ⊢ sieArm c s' p' := by
   subst hs hp; exact .rfl
 
-theorem uw_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem uw_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hchan : k'.regs 10#5 ≠ 0#64)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : sleepPrepareSlots ≤ k'.avail)
@@ -302,14 +304,14 @@ theorem uw_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc :=
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := SP.wp_sleep_prepare (hlc := hlc) (GF := GF) Γ c k' j hj hproc hchan hnoff hK hlk htier
+  have h := SP.wp_sleep_prepare (GF := GF) Γ c k' j hj hproc hchan hnoff hK hlk htier
   unfold wp_sleep_prepare_body at h
   simp only [sleepPrepareAddr] at h
   exact h
 
 /-- `sleep` at either `SIE`, with the complement at a named index `s` and
 proc `p`. -/
-theorem uw_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem uw_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat) (s : Bool) (p : BitVec 64)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : sleepSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hs : k'.sie = s) (hp : k'.proc = p) :
@@ -321,7 +323,7 @@ theorem uw_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
-  have h := SL.wp_sleep_eb (hlc := hlc) (GF := GF) Γ c k' j hj hproc hK hnoff htier
+  have h := SL.wp_sleep_eb (GF := GF) Γ c k' j hj hproc hK hnoff htier
   unfold wp_sleep_eb_body at h
   simp only [sleepAddr] at h
   exact h
@@ -413,7 +415,7 @@ end
 /-! ## The loop invariant at the guard `+0x44` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 def uwLoop (cpu : CPU) (k kb : KCtx) (i : UartId) (γ : UartNames) (dq : DFrac)
     (bs L0 cs : List (BitVec 8)) (n : Nat) (Φ : IProp GF) : IProp GF := iprop(
@@ -505,7 +507,7 @@ follows the thread, `k_step_e`); the acquire's arm goes straight back to
 its `release` (`reen = kb.sie`, nothing sleeps under the lock), and the
 busy arm's `sleep` takes the complement at its eb contract. -/
 theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 cpu : CPU) (k kb : KCtx) (hbb : UwBase k kb)
     (i : UartId) (γl : GName) (γ : UartNames) (j : Nat)
     (dq : DFrac) (bs L0 cs : List (BitVec 8)) (n : Nat) (Φ : IProp GF)
@@ -798,7 +800,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
 
 set_option maxHeartbeats 16000000 in
 theorem uw_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 : CPU) (k kb : KCtx) (hbb : UwBase k kb)
     (i : UartId) (γl : GName) (γ : UartNames) (j : Nat)
     (dq : DFrac) (bs L0 cs : List (BitVec 8)) (n : Nat) (Φ : IProp GF)
@@ -870,7 +872,7 @@ end
 set_option maxHeartbeats 16000000 in
 theorem uartwrite_proof (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP) :
     UARTWRITE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k i γl γ j bs L0 cs dq n Φ
+  fun {GF} _ _ _ _ _ _ _ _ Γ _ cpu k i γl γ j bs L0 cs dq n Φ
       hj hproc hK hnoff htier hid hn hn' hcs => by
   unfold wp_uartwrite_eb_body
   simp only [uartwriteAddr]

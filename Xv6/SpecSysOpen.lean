@@ -234,7 +234,7 @@ xv6's own two lines, read at the argint'd word: READABLE is "bit 0 clear",
 WRITABLE is "bit 0 or bit 1 set". -/
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -243,7 +243,7 @@ end Post
 /-! ## 2.  THE ARMS.  Two families, one per side of the O_CREATE key -/
 
 section Arms
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -269,7 +269,7 @@ def openPostOkPlain (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa :
      (∃ (ma mi nl : Nat),
         ⌜arowAt av i ⟨.ADev ma mi, nl⟩⌝ ∗ ⌜ma ≤ NDEV_max⌝ ∗
         Fo.pfRecv av i ⟨.ADev ma mi, nl⟩ ∗
-        plainTruncKept (hlc := hlc) Γ vom pl P i Ft ∗
+        plainTruncKept Γ vom pl P i Ft ∗
         openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) sts r) ∨
      -- FILE: the ONE delta of this surface, iff O_TRUNC, at a state still
      -- holding the OBSERVED row (the lock-hold tie)
@@ -289,7 +289,7 @@ def openPostOkPlain (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa :
      (∃ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
         ⌜arowAt av i ⟨.ADir ents, nl⟩⌝ ∗ ⌜omArg vom = 0⌝ ∗
         Fo.pfRecv av i ⟨.ADir ents, nl⟩ ∗
-        plainTruncKept (hlc := hlc) Γ vom pl P i Ft ∗
+        plainTruncKept Γ vom pl P i Ft ∗
         ∃ γo : GName, openFdOk γ pa pid VW MW true false (.inode i γo omo) sts r ∗
           foffPub omo γo)))
 
@@ -302,19 +302,19 @@ def openPostFailPlain (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  iprop(openAuPlainAt (hlc := hlc) Γ γfs rt cw Mim pv vom P Pmiss Fo Ft ∨
+  iprop(openAuPlainAt Γ γfs rt cw Mim pv vom P Pmiss Fo Ft ∨
     (∃ pl : List (BitVec 8),
       ⌜argPathOf Mim pv pl⌝ ∗
-      ((nameiWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗
-          pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
-          openTruncPiece (hlc := hlc) Γ vom (truncTermAt pl P) Ft) ∨
+      ((nameiWalkDeadEra γfs rt P Pmiss pl ∗
+          pfAt (aopenCommitAt Γ appE) Fo ∗
+          openTruncPiece Γ vom (truncTermAt pl P) Ft) ∨
         (∃ i : Nat,
           curKept vom P (pathElems pl).length i ∗
           (∃ (av : Aview) (a : Anode), ⌜arowAt av i a⌝ ∗ Fo.pfRecv av i a) ∗
           -- the piece is KEYED once the walk has an inode: the permit was paid
           -- where what pays it was in hand, and the cursor that paid it rides
           -- its refund
-          plainTruncKept (hlc := hlc) Γ vom pl P i Ft))))
+          plainTruncKept Γ vom pl P i Ft))))
 
 /-- THE ARMED DISJUNCTION the continuation receives on the plain side,
 keyed on a0 (Rocq's `open_arms_plain`), with the landed post's fd-side
@@ -353,13 +353,13 @@ def openPostOkCreate (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa 
      (∃ (av : Aview) (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
         ⌜crePre av d nm ents nl i (.AFile [])⌝ ∗ ⌜0 < i ∧ i < 16 * icfgNib⌝ ∗
         creRcptKept vom Fok av d nm i ∗
-        pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-        pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
+        pfAt (dlookupCommitAt Γ appE) Fex ∗
+        pfAt (aopenCommitAt Γ appE) Fo ∗
         (if omTrunc vom then
           iprop(∃ (av' : Aview) (nl' : Nat), ⌜arowAt av' i ⟨.AFile [], nl'⟩⌝ ∗ Ft.pfRecv av' i [])
          else iprop(emp)) ∗
         -- the unarm comes home; the arm's permit was spent by the create leg
-        pfAt (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun ∗
+        pfAt (aunarmOfArm Γ appE Farm) Fun ∗
         ∃ γo : GName,
           openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) sts r ∗
           -- ...AND WHAT THE PUBLISH HANDED THE CALLER (Rocq L4): nothing at
@@ -369,12 +369,12 @@ def openPostOkCreate (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa 
      (∃ (avx : Aview) (entsx : Std.ExtTreeMap Fname Nat compare) (nlx : Nat),
         ⌜PartialMap.get? avx d = some ⟨.ADir entsx, nlx⟩⌝ ∗ ⌜entsx[nm]? = some i⌝ ∗
         creRcptKept vom Fex avx d nm i ∗
-        pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
+        pfAt (acreCommitAtNm Γ appE (.AFile []) (nparNm Mim pv)
           (P (nparElems pl).length) Farm) Fok ∗
         -- the name was already there: create's child legs are whole -- and at
         -- a TRUNCATING open the ARM's half went into the permit, so what comes
         -- back is the unarm alone
-        creChildKept (hlc := hlc) Γ vom Farm Fun ∗
+        creChildKept Γ vom Farm Fun ∗
         (∃ (av : Aview) (nl : Nat),
           -- the found node is a FILE
           (∃ bs0 : List (BitVec 8),
@@ -394,7 +394,7 @@ def openPostOkCreate (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa 
             -- reached on the EXISTS run alone, so the keyed piece refunds the
             -- EXISTS permit -- the lookup's receipt beside the arm piece create
             -- never fired
-            creTruncKeptEx (hlc := hlc) Γ vom pl P Farm Fex i Ft ∗
+            creTruncKeptEx Γ vom pl P Farm Fex i Ft ∗
             openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) sts r)))))
 
 /-- ret -1 on the create side (Rocq's `open_post_fail_create`).  Note arm
@@ -406,16 +406,16 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  iprop(openAuCreateAt (hlc := hlc) Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft ∨
+  iprop(openAuCreateAt Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft ∨
     (∃ pl : List (BitVec 8),
       ⌜argPathOf Mim pv pl⌝ ∗
-      ((nparWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗
-          pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
+      ((nparWalkDeadEra γfs rt P Pmiss pl ∗
+          pfAt (acreCommitAtNm Γ appE (.AFile []) (nparNm Mim pv)
           (P (nparElems pl).length) Farm) Fok ∗
-          pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-          pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
-          openTruncPiece (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) Ft ∗
-          creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun) ∨
+          pfAt (dlookupCommitAt Γ appE) Fex ∗
+          pfAt (aopenCommitAt Γ appE) Fo ∗
+          openTruncPiece Γ vom (crePermit Γ pl P Farm Fok Fex) Ft ∗
+          creChildUnfired Γ (.AFile []) Farm Fun) ∨
         (∃ d : Nat,
           curKept vom P (nparElems pl).length d ∗
           (-- (a) create succeeded FRESH; open failed past it
@@ -424,12 +424,12 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
               ⌜(pathElems pl).getLast? = some nm⌝ ∗
               ⌜crePre av d nm ents nl i (.AFile [])⌝ ∗ ⌜0 < i ∧ i < 16 * icfgNib⌝ ∗
               creRcptKept vom Fok av d nm i ∗
-              pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-              pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
+              pfAt (dlookupCommitAt Γ appE) Fex ∗
+              pfAt (aopenCommitAt Γ appE) Fo ∗
               -- the truncate never ran (itrunc is past fdalloc), so its piece
               -- comes home KEYED at the created child
-              creTruncKept (hlc := hlc) Γ vom pl P Farm Fok Fex i Ft ∗
-              pfAt (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun) ∨
+              creTruncKept Γ vom pl P Farm Fok Fex i Ft ∗
+              pfAt (aunarmOfArm Γ appE Farm) Fun) ∨
            -- (b) the name existed (found DIR, a bad found-device major, or
            -- table full past a good found node)
            (∃ (av : Aview) (i : Nat) (nm : Fname) (ents : Std.ExtTreeMap Fname Nat compare)
@@ -437,23 +437,23 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
               ⌜(pathElems pl).getLast? = some nm⌝ ∗
               ⌜PartialMap.get? av d = some ⟨.ADir ents, nl⟩⌝ ∗ ⌜ents[nm]? = some i⌝ ∗
               creRcptKept vom Fex av d nm i ∗
-              pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
+              pfAt (acreCommitAtNm Γ appE (.AFile []) (nparNm Mim pv)
           (P (nparElems pl).length) Farm) Fok ∗
               -- create's child legs, whole or the do-then-undo PAIR; at a
               -- TRUNCATING open they travel with the truncate's own piece
-              creFailKept (hlc := hlc) Γ vom pl P Farm Fun Fok Fex i Ft ∗
-              (pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∨
+              creFailKept Γ vom pl P Farm Fun Fok Fex i Ft ∗
+              (pfAt (aopenCommitAt Γ appE) Fo ∨
                 ∃ (av' : Aview) (a : Anode), ⌜arowAt av' i a⌝ ∗ Fo.pfRecv av' i a)) ∨
            -- (c) nothing observed: the nlink guard, out of inodes, dirlink
            -- failure, "/"
-           (pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
+           (pfAt (acreCommitAtNm Γ appE (.AFile []) (nparNm Mim pv)
           (P (nparElems pl).length) Farm) Fok ∗
-             pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-             pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
+             pfAt (dlookupCommitAt Γ appE) Fex ∗
+             pfAt (aopenCommitAt Γ appE) Fo ∗
              -- create never returned a node, so the permit was never paid and
              -- the piece is the one the caller handed in
-             openTruncPiece (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) Ft ∗
-             (creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨
+             openTruncPiece Γ vom (crePermit Γ pl P Farm Fok Fex) Ft ∗
+             (creChildUnfired Γ (.AFile []) Farm Fun ∨
                ∃ ic : Nat, creChildPair Farm Fun ic)))))))
 
 /-- Rocq's `open_arms_create`. -/
@@ -482,8 +482,8 @@ def openIn (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (Mim : Nat → L
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  if omCreate vom then openAuCreateAt (hlc := hlc) Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft
-  else openAuPlainAt (hlc := hlc) Γ γfs rt cw Mim pv vom P Pmiss Fo Ft
+  if omCreate vom then openAuCreateAt Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft
+  else openAuPlainAt Γ γfs rt cw Mim pv vom P Pmiss Fo Ft
 
 /-- THE ONE ARMED OUTPUT (Rocq's `open_arms`). -/
 def openArms (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (γ : FileNames)
@@ -519,7 +519,7 @@ def openReceiptPlain (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt 
       ((∃ (ma mi nl : Nat),
           ⌜arowAt av i ⟨.ADev ma mi, nl⟩⌝ ∗ ⌜ma ≤ NDEV_max⌝ ∗
           Fo.pfRecv av i ⟨.ADev ma mi, nl⟩ ∗
-          plainTruncKept (hlc := hlc) Γ vom pl P i Ft ∗
+          plainTruncKept Γ vom pl P i Ft ∗
           ⌜openFdRcpt (omReadable vom) (omWritable vom) (.device ma) sts r fdv'⌝) ∨
        (∃ (bs0 : List (BitVec 8)) (nl : Nat),
           ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗
@@ -535,7 +535,7 @@ def openReceiptPlain (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt 
        (∃ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
           ⌜arowAt av i ⟨.ADir ents, nl⟩⌝ ∗ ⌜omArg vom = 0⌝ ∗
           Fo.pfRecv av i ⟨.ADir ents, nl⟩ ∗
-          plainTruncKept (hlc := hlc) Γ vom pl P i Ft ∗
+          plainTruncKept Γ vom pl P i Ft ∗
           ∃ γo : GName, ⌜openFdRcpt true false (.inode i γo omo) sts r fdv'⌝ ∗
             foffPub omo γo))))
 
@@ -555,12 +555,12 @@ def openReceiptCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt
       ((∃ (av : Aview) (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
           ⌜crePre av d nm ents nl i (.AFile [])⌝ ∗ ⌜0 < i ∧ i < 16 * icfgNib⌝ ∗
           creRcptKept vom Fok av d nm i ∗
-          pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-          pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
+          pfAt (dlookupCommitAt Γ appE) Fex ∗
+          pfAt (aopenCommitAt Γ appE) Fo ∗
           (if omTrunc vom then
             iprop(∃ (av' : Aview) (nl' : Nat), ⌜arowAt av' i ⟨.AFile [], nl'⟩⌝ ∗ Ft.pfRecv av' i [])
            else iprop(emp)) ∗
-          pfAt (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun ∗
+          pfAt (aunarmOfArm Γ appE Farm) Fun ∗
           ∃ γo : GName,
             ⌜openFdRcpt (omReadable vom) (omWritable vom) (.inode i γo omo) sts r fdv'⌝ ∗
             -- ...AND THE HALF THE PUBLISH HANDED OUT (Rocq L4): the
@@ -569,9 +569,9 @@ def openReceiptCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt
        (∃ (avx : Aview) (entsx : Std.ExtTreeMap Fname Nat compare) (nlx : Nat),
           ⌜PartialMap.get? avx d = some ⟨.ADir entsx, nlx⟩⌝ ∗ ⌜entsx[nm]? = some i⌝ ∗
           creRcptKept vom Fex avx d nm i ∗
-          pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
+          pfAt (acreCommitAtNm Γ appE (.AFile []) (nparNm Mim pv)
           (P (nparElems pl).length) Farm) Fok ∗
-          creChildKept (hlc := hlc) Γ vom Farm Fun ∗
+          creChildKept Γ vom Farm Fun ∗
           (∃ (av : Aview) (nl : Nat),
             (∃ bs0 : List (BitVec 8),
               ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗
@@ -586,7 +586,7 @@ def openReceiptCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt
               ⌜arowAt av i ⟨.ADev ma mi, nl⟩⌝ ∗ ⌜ma ≤ NDEV_max⌝ ∗
               Fo.pfRecv av i ⟨.ADev ma mi, nl⟩ ∗
               -- the EXISTS branch of the permit, named (Rocq lane F-OPEN-6)
-              creTruncKeptEx (hlc := hlc) Γ vom pl P Farm Fex i Ft ∗
+              creTruncKeptEx Γ vom pl P Farm Fex i Ft ∗
               ⌜openFdRcpt (omReadable vom) (omWritable vom) (.device ma) sts r fdv'⌝))))))
 
 /-- ...and the one receipt, keyed on the O_CREATE bit (Rocq's
@@ -866,12 +866,12 @@ theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (pl : List (BitVec 8)) (hpl : argPathOf Mim pv pl) :
-    creFailArms (hlc := hlc) Γ γfs rt T_FILE_w.toNat ma mi (nparNm Mim pv) (fun _ => True) P Pmiss Farm
+    creFailArms Γ γfs rt T_FILE_w.toNat ma mi (nparNm Mim pv) (fun _ => True) P Pmiss Farm
       Fdots Fun Fok Fex pl ⊢
-      pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗
+      pfAt (aopenCommitAt Γ appE) Fo -∗
       -- the piece at the ONE-PATH permit, which is how the create entry holds
       -- it once argstr has answered
-      openTruncPiece (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) Ft -∗
+      openTruncPiece Γ vom (crePermit Γ pl P Farm Fok Fex) Ft -∗
       openPostFailCreate Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft := by
   iintro Hcf Ho Ht
   ihave Hcf := creFailArms_file Γ γfs rt ma mi (nparNm Mim pv) (fun _ => True) P Pmiss Farm Fdots Fun Fok
@@ -884,15 +884,15 @@ theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
   icases Hcf with (⟨Hd, Hac, Hdl, Hcl⟩ | ⟨%d, HP, Hac, Hrest, Hcl⟩)
   · -- the parent leg comes home at the guarded name, on the nose; the child's
     -- legs at the TRIVIAL node predicate this entry is at (INIT-FILE)
-    ihave Hcl := creChildUnfired_of_ndp (hlc := hlc) Γ (.AFile []) (fun _ => True) Farm Fun
+    ihave Hcl := creChildUnfired_of_ndp Γ (.AFile []) (fun _ => True) Farm Fun
       (fun _ => trivial) $$ Hcl
     ileft
     iframe Hd Hac Hdl Ho Ht Hcl
-  · ihave Hcl : iprop(creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨
+  · ihave Hcl : iprop(creChildUnfired Γ (.AFile []) Farm Fun ∨
         ∃ ic : Nat, creChildPair Farm Fun ic) $$ [Hcl]
     · icases Hcl with (Hu | Hp)
       · ileft
-        iapply (creChildUnfired_of_ndp (hlc := hlc) Γ (.AFile []) (fun _ => True) Farm Fun
+        iapply (creChildUnfired_of_ndp Γ (.AFile []) (fun _ => True) Farm Fun
           (fun _ => trivial)) $$ Hu
       · iright; iexact Hp
     iright
@@ -905,7 +905,7 @@ theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
       -- never reached the node and the permit was never paid
       -- (`creFailKept`'s right disjunct)
       ihave HΦ := creRcptKept_of vom Fex av d nm i $$ HΦ
-      ihave Hcl := creFailKept_of_piece (hlc := hlc) Γ vom pl P Farm Fun Fok Fex i Ft $$ Ht Hcl
+      ihave Hcl := creFailKept_of_piece Γ vom pl P Farm Fun Fok Fex i Ft $$ Ht Hcl
       iright; ileft
       iexists av, i, nm, ents, nl
       iframe HΦ Hac Hcl
@@ -925,7 +925,7 @@ end Arms
 /-! ## 3.  THE WHOLE-FUNCTION FRAME (deviation 8) -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -958,7 +958,7 @@ def sysOpenK (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
 /-- **THE WHOLE-FUNCTION FRAME** (Rocq's `wp_sys_open_frame`), abstracted
 over the caller's bundle `EXTRA` and the armed post `ARMS`; eb-generic at
 depth 0 (deviation 1). -/
-def wp_sys_open_frame (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+def wp_sys_open_frame (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (γl : GName) (γ : FileNames) (j : Nat) (ns : Nat) (v vom : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (EXTRA : IProp GF) (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF)
@@ -968,7 +968,7 @@ def wp_sys_open_frame (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
     (hv0 : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some vom) : Prop :=
   kctx cpu k ∗ pcIs cpu sysOpenAddr ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-  procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗ isFtable γl γ ∗
+  procsInv Γ ∗ panicEnv ∗ fsReady ∗ isFtable γl γ ∗
   bslots 3 ∗
   -- the three allowances: iref (create's), the file table's one unit
   irefSlots ns ∗ fdSlot ∗
@@ -986,7 +986,7 @@ LIVE Γ `fsGammaL fscFs`, the walk starting at the block's own cwd inum, the
 path read at argument 0 (`v.toNat`) in the lazy image `viewLazy V.upt V.sz M`
 (deviation 10), input and arms keyed on
 `omCreate vom`. -/
-def wp_sys_open_eb_body (omo : OffMode) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+def wp_sys_open_eb_body (omo : OffMode) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (γl : GName) (γ : FileNames) (j : Nat) (ns : Nat) (v vom : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (P Pmiss : Nat → Nat → IProp GF)
@@ -998,16 +998,16 @@ def wp_sys_open_eb_body (omo : OffMode) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     (hnoff : k.noff = 0) (hK : sysOpenSlots ≤ k.avail) (hns : sysOpenIrefs ≤ ns)
     (hv0 : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some vom) : Prop :=
   wp_sys_open_frame Γ cpu k γl γ j ns v vom pid V M sts
-    (openIn (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v.toNat vom
+    (openIn (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Farm Fun Fok Fex Fo Ft)
-    (openArms (hlc := hlc) omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
+    (openArms omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
       (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Farm Fun Fok Fex Fo Ft sts)
     hj hproc htier hnoff hK hns hv0 hv1
 
 /-- THE PLAIN ARM (Rocq's `wp_sys_open_plain_body`): the body at
 `omCreate vom = false`, the `if` reduced. -/
-def wp_sys_open_plain_eb_body (omo : OffMode) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
+def wp_sys_open_plain_eb_body (omo : OffMode) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU)
     (k : KCtx) (γl : GName) (γ : FileNames) (j : Nat) (ns : Nat) (v vom : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (P Pmiss : Nat → Nat → IProp GF)
@@ -1018,16 +1018,16 @@ def wp_sys_open_plain_eb_body (omo : OffMode) (Γ : SchedNames) [ClaimIs (hlc :=
     (hv0 : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some vom)
     (hc : omCreate vom = false) : Prop :=
   wp_sys_open_frame Γ cpu k γl γ j ns v vom pid V M sts
-    (openAuPlainAt (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v.toNat vom
+    (openAuPlainAt (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Fo Ft)
-    (openArmsPlain (hlc := hlc) omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
+    (openArmsPlain omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
       (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Fo Ft sts)
     hj hproc htier hnoff hK hns hv0 hv1
 
 /-- THE O_CREATE ARM (Rocq's `wp_sys_open_create_body`): create's surface
 at the child `AFile []`. -/
-def wp_sys_open_create_eb_body (omo : OffMode) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
+def wp_sys_open_create_eb_body (omo : OffMode) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU)
     (k : KCtx) (γl : GName) (γ : FileNames) (j : Nat) (ns : Nat) (v vom : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (P Pmiss : Nat → Nat → IProp GF)
@@ -1040,9 +1040,9 @@ def wp_sys_open_create_eb_body (omo : OffMode) (Γ : SchedNames) [ClaimIs (hlc :
     (hv0 : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some vom)
     (hc : omCreate vom = true) : Prop :=
   wp_sys_open_frame Γ cpu k γl γ j ns v vom pid V M sts
-    (openAuCreateAt (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v.toNat vom
+    (openAuCreateAt (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Farm Fun Fok Fex Fo Ft)
-    (openArmsCreate (hlc := hlc) omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
+    (openArmsCreate omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
       (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Farm Fun Fok Fex Fo Ft sts)
     hj hproc htier hnoff hK hns hv0 hv1
@@ -1050,7 +1050,7 @@ def wp_sys_open_create_eb_body (omo : OffMode) (Γ : SchedNames) [ClaimIs (hlc :
 /-- THE SEAL'S LEMMA (Rocq's `wp_sys_open`, `ProofSysOpenFull.v:899`): the
 three-line case split over the two decided arms -- stated here so the seal
 is a one-liner. -/
-theorem wp_sys_open_eb_of_arms (omo : OffMode) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
+theorem wp_sys_open_eb_of_arms (omo : OffMode) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU)
     (k : KCtx) (γl : GName) (γ : FileNames) (j : Nat) (ns : Nat) (v vom : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (P Pmiss : Nat → Nat → IProp GF)
@@ -1080,13 +1080,13 @@ end Frame
 
 /-- The interface of `sys_open` (Rocq's `Module Type SYSOPEN`). -/
 structure SYSOPEN : Prop where
-  wp_sys_open_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_sys_open_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     -- the offset mode the CALLER'S family asks its opens to install (Rocq L4's
     -- `of_om`, the first parameter of Rocq's `wp_sys_open`)
-    (omo : OffMode) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γl : GName)
+    (omo : OffMode) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (γl : GName)
     (γ : FileNames) (j : Nat) (ns : Nat) (v vom : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState)
     (P Pmiss : Nat → Nat → IProp GF)
@@ -1095,7 +1095,7 @@ structure SYSOPEN : Prop where
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     hj hproc htier hnoff hK hns hv0 hv1,
-    wp_sys_open_eb_body (hlc := hlc) (GF := GF) omo Γ cpu k γl γ j ns v vom pid V M sts P Pmiss
+    wp_sys_open_eb_body (GF := GF) omo Γ cpu k γl γ j ns v vom pid V M sts P Pmiss
       Farm Fun Fok Fex Fo Ft hj hproc htier hnoff hK hns hv0 hv1
 
 end Xv6

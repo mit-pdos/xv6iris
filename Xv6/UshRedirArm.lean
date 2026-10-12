@@ -59,21 +59,23 @@ theorem ush_sext32_small (v : Int) (h0 : 0 ≤ v) (h1 : v < 2 ^ 31) :
   simp [this] <;> omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- A read-only field, as the bytes a load reads. -/
 theorem ushW32_bytes (g : GName) (a : Nat) (v : Int) :
     ushW32 (GF := GF) g a v ⊢ ubytesq g DFrac.discard a 4 (nthByte (n := 4) (BitVec.ofInt 32 v)) := .rfl
 
+omit [MachGS GF] in
 /-- A read-only pointer slot, as the word a load reads. -/
 theorem ushPtr_word (g : GName) (a p : Nat) :
     ushPtr (GF := GF) g a p ⊢ uwordq g DFrac.discard a (BitVec.ofNat 64 p) := .rfl
 
 /-- **Rocq `wp_kshr_redir_arm_g`**. -/
 theorem wp_ushRedirArmG (UL : UK_LEAVES) (SC : SH_SYS_CLOSE)
-    (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF)) : wpShRedirArmGBody (hlc := hlc) (GF := GF) := by
+    (hent : wpShRuncmdEntryBody (GF := GF)) : wpShRedirArmGBody (GF := GF) := by
   intro Dg hps N c1 file mode h m t cwdv ld st1 av H K Kf hmode ha0 hst1 hne hnp
   unfold ushOpenCallG ushOpenAnsG
   iintro #Hc #Hjt #Htree Hstd Hcwd Hopen HH Hrun Hk
@@ -81,7 +83,7 @@ theorem wp_ushRedirArmG (UL : UK_LEAVES) (SC : SH_SYS_CLOSE)
   obtain ⟨⟨ht0, ht38⟩, ht8⟩ := haddr
   ihave ⟨#Hsub, #Hfp, #Hfs, #Hmw, #Hfw⟩ := ushCmd_redir N.d t c1 file mode 1 $$ Htree
   icases Hsub with ⟨%q, #Hqp, #Hqc⟩
-  ihave #Hcd := ushCldep_nonpipe (hlc := hlc) st1 hnp
+  ihave #Hcd := ushCldep_nonpipe st1 hnp
   ihave #Hfw' := ushW32_bytes N.d (t + 36) 1 $$ Hfw
   ihave #Hmw' := ushW32_bytes N.d (t + 32) mode $$ Hmw
   ihave #Hfp' := ushPtr_word N.d (t + 16) file.ptr $$ Hfp

@@ -44,9 +44,10 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileSteps
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
+omit [MachGS GF] in
 /-- The console's state is carried across a move that leaves the console
 where it was (Rocq `cons_state_mono`). -/
 theorem consState_mono (r1 : EchoNames) (av av' : Aview)
@@ -71,6 +72,7 @@ theorem consState_mono (r1 : EchoNames) (av av' : Aview)
     iframe Htok Hseal
     ipureintro; exact hab h
 
+omit [MachGS GF] in
 /-- Rocq `f_core_mono`. -/
 theorem fCore_mono (c : FileFixed) (r : FileAppNames) (av av' : Aview)
     (hok : ∀ s, fOk av s → fOk av' s) :
@@ -90,7 +92,7 @@ theorem fCore_mono (c : FileFixed) (r : FileAppNames) (av av' : Aview)
 /-- Rocq `f_state_mono`. -/
 theorem fState_mono (c : FileFixed) (r : FileAppNames) (av av' : Aview)
     (hok : ∀ s, fOk av s → fOk av' s) :
-    ⊢@{IProp GF} fState (hlc := hlc) c r av -∗ fState (hlc := hlc) c r av' := by
+    ⊢@{IProp GF} fState c r av -∗ fState c r av' := by
   iintro H
   unfold fState
   icases H with (⟨Hw, Hf⟩ | Hf)
@@ -111,7 +113,7 @@ theorem fileStep_free (c : FileFixed) (r : FileAppNames) (av av' : Aview)
     (hab : consAbsent av → consAbsent av')
     (hpr : ∀ i, consPresentAt i av → consPresentAt i av')
     (hok : ∀ s, fOk av s → fOk av' s) :
-    ⊢@{IProp GF} filePred (hlc := hlc) c r av -∗ filePred (hlc := hlc) c r av' := by
+    ⊢@{IProp GF} filePred c r av -∗ filePred c r av' := by
   iintro H
   unfold filePred
   icases H with (#Ht | ⟨%hp, Hc, Hf, Hsy⟩)
@@ -128,6 +130,7 @@ theorem fileStep_free (c : FileFixed) (r : FileAppNames) (av av' : Aview)
   · iapply syncClaim_same c r av av'
       (by unfold fcontOf; rw [fOk_fcontent av s0 hok0, fOk_fcontent av' s0 (hok s0 hok0)]) $$ Hsy
 
+omit [MachGS GF] in
 /-- A permit at the deed's contents, read at the views' files. -/
 theorem syncRedir_eq (c : FileFixed) (r : FileAppNames) (S1 S1' S2 S2' : Fstate)
     (h1 : S1 = S2) (h2 : S1' = S2') :
@@ -144,7 +147,7 @@ theorem fileStep_park (c : FileFixed) (r : FileAppNames) (av av' : Aview) (s s' 
     (hpr : ∀ i, consPresentAt i av → consPresentAt i av')
     (hok : fOk av s → fOk av' s') :
     ⊢@{IProp GF} fdeed r s -∗ fTyped c s' -∗ syncRedir c r (dstContent s) (dstContent s') -∗
-      filePred (hlc := hlc) c r av -∗ filePred (hlc := hlc) c r av' := by
+      filePred c r av -∗ filePred c r av' := by
   iintro Hd #Hty' Hre Hp
   unfold filePred
   icases Hp with (#Ht | ⟨%hp, Hc, Hf, Hsy⟩)
@@ -182,8 +185,8 @@ theorem fileStep_park (c : FileFixed) (r : FileAppNames) (av av' : Aview) (s s' 
 
 /-- THE TAINTED STEP (Rocq `file_step_taint`). -/
 theorem fileStep_taint (c : FileFixed) (r : FileAppNames) (av av' : Aview) :
-    ⊢@{IProp GF} fileTaint (hlc := hlc) c -∗ filePred (hlc := hlc) c r av -∗
-      filePred (hlc := hlc) c r av' := by
+    ⊢@{IProp GF} fileTaint c -∗ filePred c r av -∗
+      filePred c r av' := by
   iintro #Ht _
   unfold filePred
   ileft; iexact Ht
@@ -196,9 +199,9 @@ theorem fileEscrow_step (c : FileFixed) (r : FileAppNames) (av av' : Aview) (n :
     (hab : consAbsent av → consAbsent av')
     (hpr : ∀ i, consPresentAt i av → consPresentAt i av')
     (hok : fOk av s → fOk av' s') :
-    ⊢@{IProp GF} escKey (hlc := hlc) c r n s g -∗ escTok (hlc := hlc) g -∗ fTyped c s' -∗
+    ⊢@{IProp GF} escKey c r n s g -∗ escTok g -∗ fTyped c s' -∗
       syncRedir c r (dstContent s) (dstContent s') -∗
-      filePred (hlc := hlc) c r av ==∗ filePred (hlc := hlc) c r av' := by
+      filePred c r av ==∗ filePred c r av' := by
   iintro #Hkey Htok #Hty' Hre Hp
   unfold escKey
   icases Hkey with (#Hwit | #Ht0)
@@ -217,18 +220,18 @@ theorem fileEscrow_step (c : FileFixed) (r : FileAppNames) (av av' : Aview) (n :
     unfold fEscWrap
     icases Hwr with ⟨%h, Ha, #Hrec⟩
     ihave %hn := escWit_lookup r h n s g $$ Ha Hwit
-    ihave #Hsp := escRecs_at (hlc := hlc) h n s g hn $$ Hrec
+    ihave #Hsp := escRecs_at h n s g hn $$ Hrec
     iexfalso
-    iapply escTok_spent (hlc := hlc) g $$ Htok Hsp
+    iapply escTok_spent g $$ Htok Hsp
   unfold fEscLive
   icases Hf with ⟨%h0, %s0, %g0, Ha, #Hrec, Hwh, Htk, -, %hok0⟩
   ihave %hn := escWit_lookup r (h0 ++ [(s0, g0)]) n s g $$ Ha Hwit
   rcases escWit_head h0 n s s0 g g0 hn with ⟨_, hn0⟩ | ⟨e1, e2⟩
-  · ihave #Hsp := escRecs_at (hlc := hlc) h0 n s g hn0 $$ Hrec
+  · ihave #Hsp := escRecs_at h0 n s g hn0 $$ Hrec
     iexfalso
-    iapply escTok_spent (hlc := hlc) g $$ Htok Hsp
+    iapply escTok_spent g $$ Htok Hsp
   subst e1 e2
-  imod escSpend (hlc := hlc) g0 $$ Htok with #Hsp
+  imod escSpend g0 $$ Htok with #Hsp
   ihave Hre := syncRedir_eq c r _ _ (fcontOf av) (fcontOf av')
     (by unfold fcontOf; rw [fOk_fcontent av s0 hok0])
     (by unfold fcontOf; rw [fOk_fcontent av' s' (hok hok0)]) $$ Hre
@@ -247,7 +250,7 @@ theorem fileEscrow_step (c : FileFixed) (r : FileAppNames) (av av' : Aview) (n :
   · unfold fEscWrap
     iexists (h0 ++ [(s0, g0)])
     iframe Ha
-    iapply escRecs_snoc (hlc := hlc) h0 (s0, g0) $$ Hrec Hsp
+    iapply escRecs_snoc h0 (s0, g0) $$ Hrec Hsp
   unfold fCore
   iright
   iexists s0, s', np
@@ -258,7 +261,7 @@ theorem fileEscrow_step (c : FileFixed) (r : FileAppNames) (av av' : Aview) (n :
 
 /-- Rocq `file_sup_of_taint`. -/
 theorem fileSup_of_taint (c : FileFixed) (r : FileAppNames) :
-    ⊢@{IProp GF} fileTaint (hlc := hlc) c -∗ appSupRaw (filePred (hlc := hlc) c) r := by
+    ⊢@{IProp GF} fileTaint c -∗ appSupRaw (filePred c) r := by
   iintro #Ht
   unfold appSupRaw
   imodintro
@@ -268,7 +271,7 @@ theorem fileSup_of_taint (c : FileFixed) (r : FileAppNames) :
 
 /-- Rocq `file_taint_of_sup`: the empty view holds no pinned binary. -/
 theorem fileTaint_of_sup (c : FileFixed) (r : FileAppNames) :
-    ⊢@{IProp GF} appSupRaw (filePred (hlc := hlc) c) r -∗ fileTaint (hlc := hlc) c := by
+    ⊢@{IProp GF} appSupRaw (filePred c) r -∗ fileTaint c := by
   iintro #Hs
   unfold appSupRaw
   ihave H := Hs $$ %(∅ : Aview)
@@ -285,18 +288,18 @@ theorem fileTaint_of_sup (c : FileFixed) (r : FileAppNames) :
 /-- THE FILE HALF: the taint, or the pins, the files' state and the sync
 part (Rocq `file_rest`). -/
 def fileRest (c : FileFixed) (r : FileAppNames) (av : Aview) : IProp GF :=
-  iprop(fileTaint (hlc := hlc) c
-    ∨ (⌜fileFsPure av⌝ ∗ fState (hlc := hlc) c r av ∗ syncClaim (hlc := hlc) c r av))
+  iprop(fileTaint c
+    ∨ (⌜fileFsPure av⌝ ∗ fState c r av ∗ syncClaim c r av))
 
 instance fileRest_timeless (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    Timeless (fileRest (hlc := hlc) (GF := GF) c r av) := by
+    Timeless (fileRest (GF := GF) c r av) := by
   unfold fileRest; infer_instance
 
 /-- The original, read as its echo half and its file half (Rocq
 `file_pred_split`). -/
 theorem filePred_split (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    ⊢@{IProp GF} filePred (hlc := hlc) c r av -∗
-      echoPred (hlc := hlc) c.ffEcho r.fnCons av ∗ fileRest (hlc := hlc) c r av := by
+    ⊢@{IProp GF} filePred c r av -∗
+      echoPred c.ffEcho r.fnCons av ∗ fileRest c r av := by
   unfold filePred fileRest echoPred fileTaint
   iintro H
   icases H with (#Ht | ⟨%hp, Hc, Hf, Hsy⟩)
@@ -315,7 +318,7 @@ theorem filePred_split (c : FileFixed) (r : FileAppNames) (av : Aview) :
 were (Rocq `file_rest_mono`). -/
 theorem fileRest_mono (c : FileFixed) (r : FileAppNames) (av av' : Aview)
     (hpins : fileFsPure av → fileFsPure av') (hok : ∀ s, fOk av s → fOk av' s) :
-    ⊢@{IProp GF} fileRest (hlc := hlc) c r av -∗ fileRest (hlc := hlc) c r av' := by
+    ⊢@{IProp GF} fileRest c r av -∗ fileRest c r av' := by
   unfold fileRest
   iintro H
   icases H with (#Ht | ⟨%hp, Hf, Hsy⟩)
@@ -333,8 +336,8 @@ theorem fileRest_mono (c : FileFixed) (r : FileAppNames) (av av' : Aview)
 /-- ...and put back together, at any console pair the echo half came back
 at (Rocq `file_pred_join`). -/
 theorem filePred_join (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    ⊢@{IProp GF} echoPred (hlc := hlc) c.ffEcho r.fnCons av -∗ fileRest (hlc := hlc) c r av -∗
-      filePred (hlc := hlc) c r av := by
+    ⊢@{IProp GF} echoPred c.ffEcho r.fnCons av -∗ fileRest c r av -∗
+      filePred c r av := by
   unfold filePred fileRest echoPred fileTaint
   iintro He Hf
   icases He with (#Ht | ⟨-, Hc⟩)

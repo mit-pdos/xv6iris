@@ -154,7 +154,7 @@ structure SpBase (k kb : KCtx) : Prop where
   struct : ∃ (a b : Bool) (Rb : RegMap), kb = ((k.pushed 8).withSpie a b).withRegs Rb
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The frame -/
 
@@ -325,7 +325,7 @@ theorem sp_argint (AI : ARGINT) (c : CPU) (k' : KCtx) (tfp : BitVec 44) (ws : Li
       wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
       wordPointsTo (k'.regs 11#5) 4 (DFrac.own 1) (BitVec.extractLsb' 0 32 v) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AI.wp_argint (hlc := hlc) (GF := GF) c k' 0 tfp ws v old dqt (by unfold NARG; decide)
+  have h := AI.wp_argint (GF := GF) c k' 0 tfp ws v old dqt (by unfold NARG; decide)
     ha0 hws hnoff hK
   unfold wp_argint_body at h
   simp only [argintAddr] at h
@@ -342,7 +342,7 @@ theorem sp_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γt : GName)
       locked γt cpu' -∗ ticksLedAt curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γt "time" ticksLedAt hnoff hK hs
+  have h := AC.wp_acquire (GF := GF) c k' γt "time" ticksLedAt hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
@@ -362,7 +362,7 @@ theorem sp_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γt : GName)
         (k'.locks.filter (fun x => x ≠ "time"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γt "time" ticksLedAt hsie hnoff hK reen
+  have h := RE.wp_release (GF := GF) c k' γt "time" ticksLedAt hsie hnoff hK reen
     hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -384,7 +384,7 @@ theorem sp_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
+  have h := MP.wp_myproc (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   exact h
@@ -409,7 +409,7 @@ theorem sp_killed_r (KL : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : N
       wordPointsTo (pPid (procAddr j)) 4 pidPriv pid -∗ genHalvesPriv (procAddr j) pid gn -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KL.wp_killed_r (hlc := hlc) (GF := GF) Γ c k' j
+  have h := KL.wp_killed_r (GF := GF) Γ c k' j
     (fun kl => iprop((⌜kl = 0#32⌝ ∨ killShot gn) ∗ wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
       genHalvesPriv (procAddr j) pid gn)) hj hp hnoff hK hlk htier
   unfold wp_killed_r_body at h
@@ -437,7 +437,7 @@ theorem sp_killed_r (KL : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : N
   iintro %c' HK %spie %spp %R' %kl %hs Hk Hpc %hc ⟨Hs, Hqp, Hgen⟩
   iapply HK $$ %spie %spp %R' %kl %hs Hk Hpc %hc Hs Hqp Hgen
 
-theorem sp_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sp_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hchan : k'.regs 10#5 ≠ 0#64)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : sleepPrepareSlots ≤ k'.avail)
@@ -448,14 +448,14 @@ theorem sp_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc :=
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := SP.wp_sleep_prepare (hlc := hlc) (GF := GF) Γ c k' j hj hproc hchan hnoff hK hlk htier
+  have h := SP.wp_sleep_prepare (GF := GF) Γ c k' j hj hproc hchan hnoff hK hlk htier
   unfold wp_sleep_prepare_body at h
   simp only [sleepPrepareAddr] at h
   exact h
 
 /-- `sleep` at either `SIE`, with the complement at a named index `s` and
 proc `p` (so the caller's hypotheses frame syntactically). -/
-theorem sp_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sp_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat) (s : Bool) (p : BitVec 64)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : sleepSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hs : k'.sie = s) (hp : k'.proc = p) :
@@ -467,7 +467,7 @@ theorem sp_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
-  have h := SL.wp_sleep_eb (hlc := hlc) (GF := GF) Γ c k' j hj hproc hK hnoff htier
+  have h := SL.wp_sleep_eb (GF := GF) Γ c k' j hj hproc hK hnoff htier
   unfold wp_sleep_eb_body at h
   simp only [sleepAddr] at h
   exact h
@@ -490,7 +490,7 @@ end
 /-! ## The epilogue `(KernelSyms.«sys_pause» + 0x8e)` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- `ld ra,56(sp); ld s0,48(sp); addi sp,sp,64; ret` with `r` in `a0`. -/
@@ -544,7 +544,7 @@ theorem sp_exit (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (j : Nat)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 theorem sys_pause_br_ffffffffffffe1ea : KA.«sys_pause» + 0xffffffffffffe1ea#64 = KA.«release» := by decide
 
@@ -727,7 +727,7 @@ end
 /-! ## The sleep loop at `(KernelSyms.«sys_pause» + 0x4a)` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 /-- The loop invariant at `0x80002b40`: the lock held, the counter reading
 `t0` in `s3`, `&ticks` in `s2`, `&tickslock` in `s1`. -/
@@ -789,7 +789,7 @@ theorem sys_pause_br_fffffffffffff51a : KA.«sys_pause» + 0xfffffffffffff51a#64
 theorem sys_pause_br_fffffffffffff4de : KA.«sys_pause» + 0xfffffffffffff4de#64 = KA.«sleep_prepare» := by decide
 
 theorem sp_round (AC : ACQUIRE) (RE : RELEASE) (SP : SLEEP_PREPARE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γt : GName)
     (j : Nat) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j)
@@ -1051,7 +1051,7 @@ set_option maxHeartbeats 16000000 in
 /-- One round of the loop from `0x80002b40`: `killed(myproc())` decides
 between the `-1` arm and `sp_round`. -/
 theorem sp_loop_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
-    (SP : SLEEP_PREPARE) (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (SP : SLEEP_PREPARE) (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γt : GName)
     (j : Nat) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j)
@@ -1189,7 +1189,7 @@ theorem sp_loop_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
 set_option maxHeartbeats 16000000 in
 /-- The loop at `0x80002b40`, closed by Löb induction. -/
 theorem sp_loop (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
-    (SP : SLEEP_PREPARE) (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (SP : SLEEP_PREPARE) (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (k kb : KCtx) (hb : SpBase k kb) (γt : GName)
     (j : Nat) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j)
@@ -1212,13 +1212,13 @@ end
 /-! ## From `(KernelSyms.«sys_pause» + 0x1a)`: acquire, the `n == 0` test, the loop setup -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 theorem sys_pause_br_7922 : KA.«sys_pause» + 0x7922#64 = ticksAddr := by decide
 
 set_option maxHeartbeats 16000000 in
 theorem sp_from_a26 (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
-    (SP : SLEEP_PREPARE) (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (SP : SLEEP_PREPARE) (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γt : GName)
     (j : Nat) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j)
@@ -1374,7 +1374,7 @@ call) run at the caller's index with the complement following the thread
 loop keeps. -/
 theorem sys_pause_proof (AI : ARGINT) (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP) : SYSPAUSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γt j pid gn tfp ws v dqt hj hproc hws hK hnoff htier => by
+  fun {GF} _ _ _ _ _ _ _ _ Γ _ cpu k γt j pid gn tfp ws v dqt hj hproc hws hK hnoff htier => by
   unfold wp_sys_pause_eb_body
   simp only [sysPauseAddr]
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hlk, Htf, Htp, Hpid, Hgen, HΦ⟩

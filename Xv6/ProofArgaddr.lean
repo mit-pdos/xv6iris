@@ -49,7 +49,7 @@ theorem aa_calleeSaved_mk (KR R : RegMap)
       | assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The callee -/
 
@@ -65,7 +65,7 @@ theorem aa_argraw (AR : ARGRAW) (c : CPU) (k' : KCtx) (i : Nat) (tfp : BitVec 44
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = v⌝ -∗
       wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AR.wp_argraw (hlc := hlc) (GF := GF) c k' i tfp ws v dqt hi ha0 hws hnoff hK
+  have h := AR.wp_argraw (GF := GF) c k' i tfp ws v dqt hi ha0 hws hnoff hK
   unfold wp_argraw_body at h
   simp only [argrawAddr] at h
   exact h
@@ -143,7 +143,7 @@ theorem argaddr_br_fffffffffffffef8 : KA.«argaddr» + 0xfffffffffffffef8#64 = K
 
 set_option maxHeartbeats 8000000 in
 theorem argaddr_proof (MP : MYPROC) (AR : ARGRAW) : ARGADDR := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ cpu k i tfp ws v old dqt hi ha0 hws hnoff hK => by
+  fun {GF} _ _ _ _ _ _ _ _ cpu k i tfp ws v old dqt hi ha0 hws hnoff hK => by
   unfold wp_argaddr_body
   simp only [argaddrAddr]
   iintro ⟨Hk, Hpc, Htf, Hpage, Hcell, Hnext⟩

@@ -41,7 +41,7 @@ theorem rd_subw_bsize (o : Nat) (h : o < BSIZE) :
   exact e
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -163,14 +163,14 @@ theorem rd_chunk (BE : BRELSE) (EC : EITHER_COPYOUT) (Γ : SchedNames)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x7c .. +0xa8`: the head of one round**: bmap (no-alloc), bread,
 the coupling, and the chunk length; then the copy half (`Xv6.rd_copy`). -/
 theorem rd_head (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (γfs : FsNames) (logstart : Nat)
@@ -312,14 +312,14 @@ theorem rd_head (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPY
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **THE LOOP**, by induction on the fuel (`N - tot`): each round moves at
 least one byte. -/
 theorem rd_loop (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (γfs : FsNames) (logstart : Nat)
     (dev : BitVec 32) (γkl : GName) (γk : KmemNames) (j : Nat)

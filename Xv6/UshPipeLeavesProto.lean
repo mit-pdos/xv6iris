@@ -31,25 +31,29 @@ namespace UShPipeLeaves
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section Proto
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [CtokG GF] [PipeProtoG GF]
 
 /-- **Rocq `pipe_pre`**: the body's own half at the initial state. -/
 def pipePre (pn : PNames) : IProp GF :=
   iprop(pwsAuth pn [] ∗ wcur pn 0 ∗ rcur pn 0 ∗ eofPending pn ∗ roPending pn)
 
+omit [MachGS GF] in
 instance pipePre_timeless (pn : PNames) : Timeless (pipePre (GF := GF) pn) := by
   unfold pipePre; infer_instance
 
+omit [MachGS GF] in
 /-- A fresh EOF snapshot, pending (deviation 2). -/
 theorem eofPending_alloc :
     ⊢@{IProp GF} |==> ∃ ge : GName, iOwn (F := constOF PipeEofR) ge (Csum.inl (Excl.excl ())) :=
   iOwn_alloc _ trivial
 
+omit [MachGS GF] in
 /-- A fresh side token (deviation 2). -/
 theorem sideTok_alloc : ⊢@{IProp GF} |==> ∃ g : GName, iOwn (F := constOF (Excl Unit)) g (Excl.excl ()) :=
   iOwn_alloc _ trivial
 
+omit [MachGS GF] in
 /-- A fresh cursor, in halves (deviation 2). -/
 theorem cur_alloc :
     ⊢@{IProp GF} |==> ∃ g : GName,
@@ -61,6 +65,7 @@ theorem cur_alloc :
   rw [Qp.half_add_half] at H
   iapply H $$ Hg
 
+omit [MachGS GF] in
 /-- **Rocq `pipe_names_alloc`**: the protocol's names, minted before
 `pipe(2)`: the body's half, the two permits at 0 and the two side tokens. -/
 theorem pipe_names_alloc :

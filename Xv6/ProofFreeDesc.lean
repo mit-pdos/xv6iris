@@ -95,7 +95,7 @@ theorem fd_s16 : BitVec.extractLsb' 0 16 (0#64) = 0#16 := by decide
 theorem fd_s8 : BitVec.extractLsb' 0 8 (1#64) = 1#8 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- `&disk.desc`, out of the geometry. -/
 theorem fd_geom (γ : DiskNames) (pd pav pu : BitVec 64) :
@@ -115,7 +115,7 @@ theorem fd_wakeup (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := WK.wp_wakeup (hlc := hlc) (GF := GF) Γ c k' hnoff hK hlk htier
+  have h := WK.wp_wakeup (GF := GF) Γ c k' hnoff hK hlk htier
   unfold wp_wakeup_body at h
   simp only [wakeupAddr] at h
   exact h
@@ -126,7 +126,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem free_desc_proof (WK : WAKEUP) : FREE_DESC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ cpu k γ pd pav pu i w hi hpd ha0 hsie hnoff hK hlk htier => by
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ Γ cpu k γ pd pav pu i w hi hpd ha0 hsie hnoff hK hlk htier => by
   unfold wp_free_desc_body
   simp only [freeDescAddr]
   iintro ⟨Hk, Hpc, #Hpi, #Hgeom, Hfree, Hdesc, HΦ⟩

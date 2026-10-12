@@ -157,7 +157,7 @@ def firstSbImage (magic fssize nblocks ninodes nlog logstart inodestart bmapstar
   wordToBytes4 inodestart ++ wordToBytes4 bmapstart
 
 section FirstTok
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
@@ -174,23 +174,23 @@ def firstBootPersist [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
   (∃ γl : GName, bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov)) ∗
   (∃ pd pav pu : BitVec 64, diskCaps fscDisk fscDlock pd pav pu) ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗
+  itableInv ∗
   icSleeplocks fscIc ∗
-  iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  iregReg fscIreg fscFs icfgIst icfgNib ∗
   bitmapReg fscFs fscBmapstart fscCov fscLogst fscSize ∗
   isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗
   ⌜FsGeomOk⌝ ∗
   -- the crash seam and the era certificate (D38; LAST, as in `fsReady`)
-  fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗
-  genCert (hlc := hlc) (GF := GF) ∗
+  fsCrashSeam (GF := GF) fscCov fscLogst ∗
+  genCert (GF := GF) ∗
   -- THE CRASH INVARIANT (Rocq sync K3-3), beside the certificate in spirit:
   -- fixed-layer, persistent, minted once at adequacy; fsinit hands it to
   -- initlog, which parks it into `logCtx` for the ghost commit to open.
   -- LAST (Rocq: just before the pure row; position deviation 4)
-  crashInv (hlc := hlc) (GF := GF))
+  crashInv (GF := GF))
 
 instance firstBootPersist_persistent [Fscfg] [Icfg] [CurCtx] :
-    Persistent (firstBootPersist (hlc := hlc) (GF := GF)) := by
+    Persistent (firstBootPersist (GF := GF)) := by
   unfold firstBootPersist; infer_instance
 
 /-! ## 2.  THE PURE BLOCK -/
@@ -226,9 +226,9 @@ def firstFsinitPures [Fscfg] [Icfg] (dk : Nat → BitVec 8) (sb : FsSb)
 carried beside the sealed file system in `firstDone`.  Minted at the era
 mint, it rides kit 2 (`fsKitFsinitGhost`'s application row) through
 `firstFsinit` to forkret's boot arm, which projects it into `firstDone`. -/
-def fsabsEnv [Fscfg] [Icfg] : IProp GF := appInv (hlc := hlc) fscFs
+def fsabsEnv [Fscfg] [Icfg] : IProp GF := appInv fscFs
 
-instance fsabsEnv_persistent [Fscfg] [Icfg] : Persistent (fsabsEnv (hlc := hlc) (GF := GF)) := by
+instance fsabsEnv_persistent [Fscfg] [Icfg] : Persistent (fsabsEnv (GF := GF)) := by
   unfold fsabsEnv; infer_instance
 
 /-! ## 3.  THE EXCLUSIVE HALF -- fsinit's premise pile -/
@@ -245,7 +245,7 @@ def firstFsinit [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
     (Pb : Nat → List (BitVec 8))
     (vlock vStart vDev vNc vN : BitVec 32) (vname vcpu : BitVec 64) (sbOld : List (BitVec 8)),
     ⌜firstFsinitPures dk sb Pb⌝ ∗
-    fsKitFsinitGhost (hlc := hlc) (fsBlocks dk) Rspent Pb (hdrWset (fsBlocks dk) fscLogst) ∗
+    fsKitFsinitGhost (fsBlocks dk) Rspent Pb (hdrWset (fsBlocks dk) fscLogst) ∗
     -- rows (A): the raw cells fsinit / initlog write
     ⌜sbOld.length = 32⌝ ∗ byteBuf KA.«sb» (DFrac.own 1) sbOld ∗
     kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗
@@ -261,7 +261,7 @@ def firstFsinit [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
     ([∗list] i ∈ List.range LOGBLOCKS, ∃ w : BitVec 32,
        wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
     -- row (B): the era's mirror half at the disk's own picture
-    logMirrorBorn (hlc := hlc) (mirrorOf (fsBlocks dk)) ∗
+    logMirrorBorn (mirrorOf (fsBlocks dk)) ∗
     -- row (C)
     irefSlots 2 ∗
     bslots ((LOGBLOCKS + 2) + 2 + 1))
@@ -271,20 +271,20 @@ fsinit's own premise order (plus the coverage remainder, which fsinit does
 not take -- it is the first process's -- and the application's
 environment, which forkret's boot arm projects into `firstDone`). -/
 theorem firstFsinit_open [Fscfg] [Icfg] [CurCtx] :
-    firstFsinit (hlc := hlc) (GF := GF) ⊢
+    firstFsinit (GF := GF) ⊢
       ∃ (dk : Nat → BitVec 8) (sb : FsSb) (Rspent : ExtTreeSet Nat compare)
         (Pb : Nat → List (BitVec 8))
         (vlock vStart vDev vNc vN : BitVec 32) (vname vcpu : BitVec 64)
         (sbOld : List (BitVec 8)),
         ⌜firstFsinitPures dk sb Pb⌝ ∗ ⌜sbOld.length = 32⌝ ∗
-        appDurLaws (hlc := hlc) fscCov fscLogst ∗
-        logMirrorBorn (hlc := hlc) (mirrorOf (fsBlocks dk)) ∗
+        appDurLaws fscCov fscLogst ∗
+        logMirrorBorn (mirrorOf (fsBlocks dk)) ∗
         logFreeTok icfgLog ∗
         fsBytesInv fscFs.bytes fscFs.cache fscFs.exc (fsHomeList fscCov fscLogst) Pb ∗
         fsblock fscFs.bytes 1 (fsBlocks dk 1) ∗
         byteBuf KA.«sb» (DFrac.own 1) sbOld ∗
         excOwn fscFs.exc (hdrWset (fsBlocks dk) fscLogst) ∗
-        iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+        iregReg fscIreg fscFs icfgIst icfgNib ∗
         bitmapReg fscFs fscBmapstart fscCov fscLogst fscSize ∗
         iregBoot ∗
         kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗
@@ -309,7 +309,7 @@ theorem firstFsinit_open [Fscfg] [Icfg] [CurCtx] :
         bslots ((LOGBLOCKS + 2) + 2 + 1) ∗
         irefSlots 2 ∗
         ([∗set] b ∈ fscCov \ Rspent, fsblock fscFs.bytes b (Pb b)) ∗
-        fsabsEnv (hlc := hlc) := by
+        fsabsEnv := by
   unfold firstFsinit
   iintro ⟨%dk, %sb, %Rspent, %Pb, %vlock, %vStart, %vDev, %vNc, %vN, %vname, %vcpu, %sbOld, %hp,
     Hkit, %hold, Hsb, Hk0, Hk16, Hlk, Hnm, Hcpu, Hst, Hdv, Hout, Hcmt, Hnc, Hn, Hblk, Hmir, Hiref,
@@ -363,32 +363,32 @@ exclusive cell at 1, the persistent half, the SEALED allocator count (named,
 at `fsReadyKmem`: what `fsReady`'s row wants), and fsinit's pile. -/
 def firstBoot [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
   wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗
-  firstBootPersist (hlc := hlc) ∗ kallocAvail fsReadyKmem none ∗ firstFsinit (hlc := hlc))
+  firstBootPersist ∗ kallocAvail fsReadyKmem none ∗ firstFsinit)
 
 /-- **Rocq `first_done`**: the steady arm, persistent -- the stored 0, the
 sealed file system and the application's environment. -/
 def firstDone [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
-  wordPointsTo firstAddr 4 DFrac.discard 0#32 ∗ fsReady (hlc := hlc) ∗ fsabsEnv (hlc := hlc))
+  wordPointsTo firstAddr 4 DFrac.discard 0#32 ∗ fsReady ∗ fsabsEnv)
 
 instance firstDone_persistent [Fscfg] [Icfg] [CurCtx] :
-    Persistent (firstDone (hlc := hlc) (GF := GF)) := by
+    Persistent (firstDone (GF := GF)) := by
   unfold firstDone; infer_instance
 
 /-- **Rocq `first_tok`**: the boot arm, or the steady arm. -/
 def firstTok [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
-  firstBoot (hlc := hlc) ∨
-    (wordPointsTo firstAddr 4 DFrac.discard 0#32 ∗ fsReady (hlc := hlc) ∗ fsabsEnv (hlc := hlc)))
+  firstBoot ∨
+    (wordPointsTo firstAddr 4 DFrac.discard 0#32 ∗ fsReady ∗ fsabsEnv))
 
 /-- The sealed file system, off the steady arm. -/
 theorem firstDone_ready [Fscfg] [Icfg] [CurCtx] :
-    firstDone (hlc := hlc) (GF := GF) ⊢ fsReady (hlc := hlc) := by
+    firstDone (GF := GF) ⊢ fsReady := by
   unfold firstDone
   iintro ⟨-, H, -⟩
   iexact H
 
 /-- Rocq `first_tok_of_done`: how kfork pays the child's block. -/
 theorem firstTok_of_done [Fscfg] [Icfg] [CurCtx] :
-    firstDone (hlc := hlc) (GF := GF) ⊢ firstTok (hlc := hlc) := by
+    firstDone (GF := GF) ⊢ firstTok := by
   unfold firstDone firstTok
   iintro H
   iright
@@ -397,8 +397,8 @@ theorem firstTok_of_done [Fscfg] [Icfg] [CurCtx] :
 /-- Rocq `first_boot_intro`. -/
 theorem firstBoot_intro [Fscfg] [Icfg] [CurCtx] :
     wordPointsTo (GF := GF) firstAddr 4 (DFrac.own 1) 1#32 ⊢
-      firstBootPersist (hlc := hlc) -∗ kallocAvail fsReadyKmem none -∗ firstFsinit (hlc := hlc) -∗
-      firstBoot (hlc := hlc) := by
+      firstBootPersist -∗ kallocAvail fsReadyKmem none -∗ firstFsinit -∗
+      firstBoot := by
   unfold firstBoot
   iintro H P K F
   isplitl [H]
@@ -411,9 +411,9 @@ theorem firstBoot_intro [Fscfg] [Icfg] [CurCtx] :
 
 /-- Rocq `first_boot_open`. -/
 theorem firstBoot_open [Fscfg] [Icfg] [CurCtx] :
-    firstBoot (hlc := hlc) (GF := GF) ⊢
+    firstBoot (GF := GF) ⊢
       wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗
-        firstBootPersist (hlc := hlc) ∗ kallocAvail fsReadyKmem none ∗ firstFsinit (hlc := hlc) := by
+        firstBootPersist ∗ kallocAvail fsReadyKmem none ∗ firstFsinit := by
   unfold firstBoot
   iintro H
   iexact H
@@ -428,14 +428,14 @@ the caller), and the SEALED regime (`fsReady_seal` of fsinit's returned
 sealed the byte view's exception set into `logCtx`, so the region and the
 bitmap are upgraded to the sealed forms (`iregInv_of`, `bitmapInv_of`). -/
 theorem firstPersistPre [Fscfg] [Icfg] [CurCtx] :
-    firstBootPersist (hlc := hlc) (GF := GF) ⊢
+    firstBootPersist (GF := GF) ⊢
       kallocAvail fsReadyKmem none -∗
       logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗
-      fsSbCells -∗ iregOpen -∗ fsReady (hlc := hlc) := by
+      fsSbCells -∗ iregOpen -∗ fsReady := by
   unfold firstBootPersist fsReady
   iintro ⟨#Hp, #Hb, #Hd, #Hi, #Ht, #Hs, #Hr, #Hm, #Hk, %Hg, #Hseam, #Hcert, -⟩ #HK #HL #HC #HO
   ihave #Hseal := logCtx_seal icfgLog fscBio fscFs fscCov fscLogst icfgDev $$ HL
-  ihave #Hinv := iregInv_of (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hr Hseal
+  ihave #Hinv := iregInv_of fscIreg fscFs icfgIst icfgNib $$ Hr Hseal
   ihave #Hbmi := bitmapInv_of fscFs fscBmapstart fscCov fscLogst fscSize $$ Hm Hseal
   isplitr; · iexact Hb
   isplitr; · iexact HL

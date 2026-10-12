@@ -14,7 +14,7 @@ open LeanRV64D
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 set_option maxHeartbeats 4000000 in
-theorem cpuid_proof : CPUID := ⟨fun {hlc GF} _ _ cpu k hsie hK => by
+theorem cpuid_proof : CPUID := ⟨fun {GF} _ _ cpu k hsie hK => by
   unfold wp_cpuid_body
   iintro ⟨Hk, Hpc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

@@ -1,5 +1,4 @@
 import LeanRV64D.Defs
-import Iris.Instances.Lib.LaterCredits
 import MachCSL.Ctx
 import MachCSL.Pte
 
@@ -19,7 +18,6 @@ environment for `enumToBitVec` constants), and `bv_decide` reuses the existing d
 namespace MachCSL
 
 theorem bvEnum_unit (a b : Unit) (h : a = b) : b = a := by bv_decide
-theorem bvEnum_hasLC (a b : Iris.HasLC) (h : a = b) : b = a := by bv_decide
 theorem bvEnum_ktier (a b : KTier) (h : a = b) : b = a := by bv_decide
 theorem bvEnum_kperm (a b : KPerm) (h : a = b) : b = a := by bv_decide
 theorem bvEnum_privilege (a b : LeanRV64D.Privilege) (h : a = b) : b = a := by bv_decide

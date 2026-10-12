@@ -132,7 +132,7 @@ def igetSlots : Nat := 6 + panicSlots
 
 /-- **WP of `iget(dev = a0, inum = a1)`** at either `SIE` (Rocq
 `wp_iget_sconf_body`). -/
-def wp_iget_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+def wp_iget_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (inum : BitVec 32) (l : Ilic)
@@ -143,7 +143,7 @@ def wp_iget_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G
     (hit : "itable" ∉ k.locks) (hpr : "pr" ∉ k.locks) (huart : "uart1" ∉ k.locks) : Prop :=
   kctx cpu k ∗ pcIs cpu igetAddr ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
+  itableInv ∗ iregReg fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
   irefSlot ∗ iname fscIreg fscFs icfgIst inum l ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
@@ -156,10 +156,10 @@ def wp_iget_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G
 
 /-- The interface of `iget` (Rocq `Module Type IGET`). -/
 structure IGET : Prop where
-  wp_iget : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+  wp_iget : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (inum : BitVec 32) (l : Ilic) hK hnoff hnib hpos ha0 ha1 hit hpr huart,
-    wp_iget_body (hlc := hlc) (GF := GF) cpu k inum l hK hnoff hnib hpos ha0 ha1 hit hpr huart
+    wp_iget_body (GF := GF) cpu k inum l hK hnoff hnib hpos ha0 ha1 hit hpr huart
 
 end Xv6

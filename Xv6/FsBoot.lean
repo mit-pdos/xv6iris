@@ -215,8 +215,9 @@ theorem fsLogRegionSplit {PROP : Type _} [BI PROP] (Φ : Nat → PROP)
 /-! ## §4 The ghost step -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [FsBlocksG GF]
 
+omit [MachGS GF] in
 /-- A whole ghost-map element, as two halves. -/
 theorem fsBoot_elemHalves {V : Type _} [GhostMapG GF Nat V RegMapF] (g : GName) (b : Nat) (v : V) :
     (g ↪◯MAP[b] v) ⊢@{IProp GF} (g ↪◯MAP[b]{.own (1 : Qp).half} v) ∗ (g ↪◯MAP[b]{.own (1 : Qp).half} v) := by
@@ -224,6 +225,7 @@ theorem fsBoot_elemHalves {V : Type _} [GhostMapG GF Nat V RegMapF] (g : GName) 
   rw [Qp.half_add_half] at h
   exact h.1
 
+omit [MachGS GF] in
 /-- **THE CARVE AT THE DISK'S MINT**: `Xv6.diskBootAlloc`'s blocks
 `[0, ndisk / BSIZE)` cut down to a covered set inside the disk. -/
 theorem fsBoot_diskCarve (γd : DiskNames) (dk : Nat → BitVec 8) (cov : ExtTreeSet Nat compare)
@@ -244,6 +246,7 @@ takes. -/
 def fsHomeC0 (dk : Nat → BitVec 8) (homeL : List Nat) : BlockMap :=
   foldIns (M := RegMapF) id (fsBlocks dk) homeL
 
+omit [MachGS GF] in
 /-- The home blocks' client halves, as the map `Xv6.fsBytesAlloc` swallows. -/
 theorem fsBoot_homeMap (dk : Nat → BitVec 8) (homeL : List Nat) (hnd : homeL.Nodup) (gc : GName) :
     ([∗list] b ∈ homeL, gc ↪◯MAP[b]{.own (1 : Qp).half} (fsBlocks dk b)) ⊢@{IProp GF}

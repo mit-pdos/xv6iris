@@ -37,7 +37,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
@@ -47,7 +47,7 @@ set_option maxHeartbeats 16000000 in
 `wp_fsinit_sconf`, its first part), then `Xv6.fsinit_readsb`. -/
 theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (IR : IRECLAIM)
     [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (vMagic vSize vNblocks vNlog : BitVec 32) (bsSb : List (BitVec 8))
     (sbOld : List (BitVec 8))
@@ -79,7 +79,7 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
     (hsbOld : sbOld.length = 32)
     (hpd : descPageRw pd)
     (ha0 : k.regs 10#5 = BitVec.signExtend 64 icfgDev) :
-    wp_fsinit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j
+    wp_fsinit_eb_body (GF := GF) Γ cpu k γl pd pav pu j
       vMagic vSize vNblocks vNlog bsSb sbOld bsHdr L D vlock vname vcpu vStart vDev vNc vN
       pidv dqp M sbrec Xv hj hproc hK hnoff htier hgeom h1cov hsbImg hsbparse hsbok hcg hbmq hszq
       hmagic hn1 hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hxslot hLM hsbOld hpd ha0 := by
@@ -110,7 +110,7 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
   -- initlog's, so what goes down is the WAND.
   have hcg' : ColGeom sbrec sbrec.sbInodestart icfgNib (fsHomeList fscCov fscLogst) := by
     rw [hcg.cgIst]; exact hcg
-  ihave #Hreg' : iregReg (hlc := hlc) fscIreg fscFs sbrec.sbInodestart icfgNib $$ []
+  ihave #Hreg' : iregReg fscIreg fscFs sbrec.sbInodestart icfgNib $$ []
   · rw [hcg.cgIst]; iexact Hreg
   ihave #Hbreg' : bitmapReg fscFs sbrec.sbBmapstart fscCov fscLogst sbrec.sbSize $$ []
   · rw [hbmq, hszq]; iexact Hbreg
@@ -118,21 +118,21 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
     $$ Hit2
   ihave #Hpool := isItable2_pool fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev
     $$ Hit2
-  ihave #Hlaw : □ (sbPark fscFs sbrec -∗ snapLaw (hlc := hlc) icfgLog fscFs fscCov fscLogst
-      (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))) $$ []
+  ihave #Hlaw : □ (sbPark fscFs sbrec -∗ snapLaw icfgLog fscFs fscCov fscLogst
+      (eraSyncTok (GF := GF)) (genId (GF := GF))) $$ []
   · imodintro
     iintro #Hpark
     iapply fsSnapLawBuild icfgLog fscIc fscFs fscIreg fscCov fscLogst icfgNib sbrec _ Ok Okc _ rfl
       rfl hcg' hOk $$ Hseamg Hmergeo Hreg' Hbreg' Hesc Hpool Hpark
   -- ...AND THE GHOST COMMIT'S HOOKED LAW (Rocq sync K3-3), the same assembly
   -- over the runner beside the merge, at the era's two fixed-record slots
-  ihave #Hlawg : □ (sbPark fscFs sbrec -∗ snapLawGhost (hlc := hlc) icfgLog fscFs fscCov fscLogst
-      (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) $$ []
+  ihave #Hlawg : □ (sbPark fscFs sbrec -∗ snapLawGhost icfgLog fscFs fscCov fscLogst
+      (eraSyncTok (GF := GF)) (genId (GF := GF)) (eraSyncHook (GF := GF))) $$ []
   · imodintro
     iintro #Hpark
     iapply fsSnapLawGhostBuild icfgLog fscIc fscFs fscIreg fscCov fscLogst icfgNib sbrec _ Ok Okc _ _
       rfl rfl hcg' hOk $$ Hseamg Hmergeo Hrun Hreg' Hbreg' Hesc Hpool Hpark
-  ihave Hcr : fsinitCrash (hlc := hlc) M sbrec Xv $$ [Hborn]
+  ihave Hcr : fsinitCrash M sbrec Xv $$ [Hborn]
   · unfold fsinitCrash
     iframe Hborn
     isplitr
@@ -150,7 +150,7 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
   ihave Hnext := fsinit_cont_of_spec hj cpu k hproc pidv dqp vMagic vSize vNblocks vNlog bsSb
     $$ Hnext
   -- the bundles the stages thread
-  ihave #Henv : fsinitEnv (hlc := hlc) Γ γl pd pav pu $$ []
+  ihave #Henv : fsinitEnv Γ γl pd pav pu $$ []
   · unfold fsinitEnv; iframe #
   ihave Hlog : fsinitLogRes bsHdr L D vlock vname vcpu vStart vDev vNc vN $$ [Hfree Hl0 Hl8 Hl16
       Hls Hld Hlo Hlc Hlnc Hlhn Hlhb HauthL HauthD Hdirty Hhdr Hslots]
@@ -211,7 +211,7 @@ end
 `FsinitProof BR MM BL IL IR`). -/
 theorem fsinit_proof (BR : BREAD) (MM : MEMMOVE) (BL : BRELSE) (IL : INITLOG) (IR : IRECLAIM) :
     FSINIT :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j
     vMagic vSize vNblocks vNlog bsSb sbOld bsHdr L D vlock vname vcpu vStart vDev vNc vN pidv dqp
     M sbrec Xv hj hproc hK hnoff htier hgeom h1cov hsbImg hsbparse hsbok hcg hbmq hszq hmagic hn1
     hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hxslot hLM hsbOld hpd ha0 =>

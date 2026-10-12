@@ -46,13 +46,13 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileEra
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- PHASE 1 at `AppInv.appStep`'s shape (Rocq `file_app_step_park`). -/
 theorem fileAppStep_park [inst : Appcfg GF] (c : FileFixed) (r : FileAppNames) (i : Nat)
     (I : RegMapF FsNode) (av' : Aview) (s s' : Dst)
-    (heq : inst = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : inst = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (hpins : fileFsPure (absView I) → fileFsPure av')
     (hab : consAbsent (absView I) → consAbsent av')
     (hpr : ∀ j, consPresentAt j (absView I) → consPresentAt j av')
@@ -66,41 +66,41 @@ theorem fileAppStep_park [inst : Appcfg GF] (c : FileFixed) (r : FileAppNames) (
   rw [hav]
   imodintro
   inext
-  iapply fileStep_park (hlc := hlc) c r (absView I) av' s s' hpins hab hpr hok $$ Hd Hty' Hre Hp
+  iapply fileStep_park c r (absView I) av' s s' hpins hab hpr hok $$ Hd Hty' Hre Hp
 
 /-- THE TAINTED STEP at `AppInv.appStep`'s shape (Rocq
 `file_app_step_taint`). -/
 theorem fileAppStep_taint [inst : Appcfg GF] (c : FileFixed) (r : FileAppNames) (i : Nat)
     (I : RegMapF FsNode) (av' : Aview)
-    (heq : inst = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} fileTaint (hlc := hlc) c -∗ appStep i I av' := by
+    (heq : inst = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} fileTaint c -∗ appStep i I av' := by
   subst heq
   iintro #Ht
   unfold appStep
   iintro %n' %_ Hp
   imodintro
   inext
-  iapply fileStep_taint (hlc := hlc) c r (absView I) _ $$ Ht Hp
+  iapply fileStep_taint c r (absView I) _ $$ Ht Hp
 
 /-- THE FIRE at a parked deed (Rocq `file_app_step_escrow`): the step
 spends the head's one-shot, a basic update, which `AppInv.appStep` carries
 (Rocq's `==∗`). -/
 theorem fileAppStep_escrow [inst : Appcfg GF] (c : FileFixed) (r : FileAppNames) (i : Nat)
     (I : RegMapF FsNode) (av' : Aview) (n : Nat) (s s' : Dst) (g : GName)
-    (heq : inst = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : inst = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (hpins : fileFsPure (absView I) → fileFsPure av')
     (hab : consAbsent (absView I) → consAbsent av')
     (hpr : ∀ j, consPresentAt j (absView I) → consPresentAt j av')
     (hok : fOk (absView I) s → fOk av' s') :
-    ⊢@{IProp GF} escKey (hlc := hlc) c r n s g -∗ escTok (hlc := hlc) g -∗ fTyped c s' -∗
+    ⊢@{IProp GF} escKey c r n s g -∗ escTok g -∗ fTyped c s' -∗
       syncRedir c r (dstContent s) (dstContent s') -∗ appStep i I av' := by
   subst heq
   iintro #Hkey Htok #Hty' Hre
   unfold appStep
   iintro %nd %hav Hp
   rw [hav]
-  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I))).mp $$ Hp with Hp
-  imod fileEscrow_step (hlc := hlc) c r (absView I) av' n s s' g hpins hab hpr hok
+  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c r (absView I))).mp $$ Hp with Hp
+  imod fileEscrow_step c r (absView I) av' n s s' g hpins hab hpr hok
     $$ Hkey Htok Hty' Hre Hp with Hp
   imodintro
   inext
@@ -111,12 +111,12 @@ variable [FsTopG GF] [Icfg]
 /-- PHASE 2, THE RESYNC (Rocq `file_resync`). -/
 theorem fileResync [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     (s s' : Dst) (n : Nat) (I' : RegMapF FsNode) (E : CoPset) (hE : (↑appN : CoPset) ⊆ E)
-    (heq : inst = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : inst = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (hcont : fcontentOf (absView I') = s') (hne : s ≠ s') :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ ftkt r s -∗ fposq r n -∗
+    ⊢@{IProp GF} appInv γfs -∗ ftkt r s -∗ fposq r n -∗
       (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I') -∗
       |={E}=> (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗
-        ((fown r s' ∗ fpos r n) ∨ (ftkt r s ∗ fileTaint (hlc := hlc) c)) := by
+        ((fown r s' ∗ fpos r n) ∨ (ftkt r s ∗ fileTaint c)) := by
   iintro #Hinv Htk Hkq Hka
   unfold appInv
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
@@ -126,7 +126,7 @@ theorem fileResync [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : File
   subst heq
   ihave %hI := ghost_map_auth_agree _ _ _ _ _ $$ Hka Hh
   subst hI
-  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I'))).mp $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c r (absView I'))).mp $$ Hp with Hp
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · -- TAINTED: the ticket comes back beside the taint
@@ -168,7 +168,7 @@ theorem fileResync [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : File
   imod ftkt_update r s s s' $$ Htk Ht' with ⟨Htk, Ht'⟩
   -- the parked quarter comes home beside the kept one
   ihave Hpos := fposq_join r n np $$ Hkq Hpq
-  ihave Hnew := filePred_exact (hlc := hlc) c r _ s' hpins hok $$ Hc Hw Hd2 Ht' Hty Hsy
+  ihave Hnew := filePred_exact c r _ s' hpins hok $$ Hc Hw Hd2 Ht' Hty Hsy
   imod Hclose $$ [Hh Hnew]
   · inext
     dsimp only
@@ -189,10 +189,10 @@ claim, a fresh one-shot is appended to the ledger, and the holder keeps the
 TICKET beside the token and the persistent witness. -/
 theorem fileEscrowPark [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     (s : Dst) (E : CoPset) (hE : (↑appN : CoPset) ⊆ E)
-    (heq : inst = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fown r s -∗
+    (heq : inst = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} appInv γfs -∗ fown r s -∗
       |={E}=> ∃ (n : Nat) (g : GName),
-        escKey (hlc := hlc) c r n s g ∗ escTok (hlc := hlc) g ∗ ftkt r s := by
+        escKey c r n s g ∗ escTok g ∗ ftkt r s := by
   iintro #Hinv Hown
   unfold fown
   icases Hown with ⟨Hd, Htk⟩
@@ -202,7 +202,7 @@ theorem fileEscrowPark [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
   unfold appBody
   icases Hbody with ⟨%I0, >Hka, Hp, >%hdom⟩
   subst heq
-  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I0))).mp $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c r (absView I0))).mp $$ Hp with Hp
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · imod Hclose $$ [Hka]
@@ -213,7 +213,7 @@ theorem fileEscrowPark [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
       isplitl []
       · ileft; iexact Ht
       · ipureintro; exact hdom
-    imod escAlloc (hlc := hlc) (GF := GF) with ⟨%g, Htok⟩
+    imod escAlloc (GF := GF) with ⟨%g, Htok⟩
     imodintro
     iexists 0, g
     iframe Htok Htk
@@ -235,7 +235,7 @@ theorem fileEscrowPark [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
   ihave %e := fdeed_agree r s s0 $$ Hd Hd'
   subst e
   ihave Hwh := fdeed_join r s s $$ Hd Hd'
-  imod escAlloc (hlc := hlc) (GF := GF) with ⟨%g, Htok⟩
+  imod escAlloc (GF := GF) with ⟨%g, Htok⟩
   unfold fEscWrap
   icases Hwr with ⟨%h, Ha, #Hrec⟩
   imod escAuth_grow r h s g $$ Ha with ⟨Ha, #Hwit⟩
@@ -265,10 +265,10 @@ theorem fileEscrowPark [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
 comes home; the token is SPENT on the way out. -/
 theorem fileEscrowReturn [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     (n : Nat) (s : Dst) (g : GName) (E : CoPset) (hE : (↑appN : CoPset) ⊆ E)
-    (heq : inst = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ escKey (hlc := hlc) c r n s g -∗
-      escTok (hlc := hlc) g -∗ ftkt r s -∗
-      |={E}=> (fown r s ∨ fileTaint (hlc := hlc) c) := by
+    (heq : inst = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} appInv γfs -∗ escKey c r n s g -∗
+      escTok g -∗ ftkt r s -∗
+      |={E}=> (fown r s ∨ fileTaint c) := by
   iintro #Hinv #Hkey Htok Htk
   unfold escKey
   icases Hkey with (#Hwit | #Ht0)
@@ -281,7 +281,7 @@ theorem fileEscrowReturn [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r 
   unfold appBody
   icases Hbody with ⟨%I0, >Hka, Hp, >%hdom⟩
   subst heq
-  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I0))).mp $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c r (absView I0))).mp $$ Hp with Hp
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · imod Hclose $$ [Hka]
@@ -299,25 +299,25 @@ theorem fileEscrowReturn [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r 
   · unfold fEscWrap
     icases Hwr with ⟨%h, Ha, #Hrec⟩
     ihave %hn := escWit_lookup r h n s g $$ Ha Hwit
-    ihave #Hsp := escRecs_at (hlc := hlc) h n s g hn $$ Hrec
+    ihave #Hsp := escRecs_at h n s g hn $$ Hrec
     iexfalso
-    iapply escTok_spent (hlc := hlc) g $$ Htok Hsp
+    iapply escTok_spent g $$ Htok Hsp
   unfold fEscLive
   icases Hf with ⟨%h0, %s0, %g0, Ha, #Hrec, Hwh, Htk', #Hty, %hok⟩
   ihave %hn := escWit_lookup r (h0 ++ [(s0, g0)]) n s g $$ Ha Hwit
   rcases escWit_head h0 n s s0 g g0 hn with ⟨_, hn0⟩ | ⟨e1, e2⟩
-  · ihave #Hsp := escRecs_at (hlc := hlc) h0 n s g hn0 $$ Hrec
+  · ihave #Hsp := escRecs_at h0 n s g hn0 $$ Hrec
     iexfalso
-    iapply escTok_spent (hlc := hlc) g $$ Htok Hsp
+    iapply escTok_spent g $$ Htok Hsp
   subst e1 e2
-  imod escSpend (hlc := hlc) g0 $$ Htok with #Hsp
+  imod escSpend g0 $$ Htok with #Hsp
   ihave ⟨Hd1, Hd2⟩ := fdeed_split r s0 $$ Hwh
-  ihave Hw : fEscWrap (hlc := hlc) (GF := GF) r $$ [Ha]
+  ihave Hw : fEscWrap (GF := GF) r $$ [Ha]
   · unfold fEscWrap
     iexists (h0 ++ [(s0, g0)])
     iframe Ha
-    iapply escRecs_snoc (hlc := hlc) h0 (s0, g0) $$ Hrec Hsp
-  ihave Hnew := filePred_exact (hlc := hlc) c r _ s0 hpins hok $$ Hc Hw Hd2 Htk' Hty Hsy
+    iapply escRecs_snoc h0 (s0, g0) $$ Hrec Hsp
+  ihave Hnew := filePred_exact c r _ s0 hpins hok $$ Hc Hw Hd2 Htk' Hty Hsy
   imod Hclose $$ [Hka Hnew]
   · inext
     dsimp only
@@ -337,10 +337,10 @@ mask holding `appN`, the deed holder's half and the claim's move together to a
 LATER count -- or the taint answers. -/
 theorem filePosAdvance [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     (n n' : Nat) (E : CoPset) (hE : (↑appN : CoPset) ⊆ E)
-    (heq : inst = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : inst = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (hle : n ≤ n') :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fposh r n -∗
-      |={E}=> (fposh r n' ∨ fileTaint (hlc := hlc) c) := by
+    ⊢@{IProp GF} appInv γfs -∗ fposh r n -∗
+      |={E}=> (fposh r n' ∨ fileTaint c) := by
   iintro #Hinv Hpos
   unfold appInv
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
@@ -348,7 +348,7 @@ theorem filePosAdvance [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
   unfold appBody
   icases Hbody with ⟨%I0, >Hka, Hp, >%hdom⟩
   subst heq
-  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I0))).mp $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c r (absView I0))).mp $$ Hp with Hp
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · imod Hclose $$ [Hka]

@@ -119,7 +119,7 @@ theorem kxcVecBytes_get (f : Nat → BitVec 64) (c i k : Nat) (hk : k < 8) (hi :
       rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> simp
 
 section Bytes
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **The ustack words as the bytes copyout reads**, the tail `rest` already
 bytes. -/
@@ -276,7 +276,7 @@ theorem kxcC_slot0 (x : BitVec 64) (c : Nat) (h : c < 2 ^ 60) :
   bv_omega
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- `kxcC_ustack_take` backwards (any value in the slot). -/
 theorem kxcC_ustack_untake [CurCtx] (sp0 : BitVec 64) (c : Nat) (hc : c < 33) (w : BitVec 64) :
@@ -317,7 +317,7 @@ theorem kxcC_spFinal_mono (top : Int) (len : Nat → Nat) (i j : Nat) (hij : i �
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -335,7 +335,7 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     kxcAt272 k A cpu spie spp R (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P Mi oldsz sz1
       (k.regs 27#5) ci ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     -- PHASE C's EXIT AT A LATER RECORD (permit sweep L1b): the copyouts took
     -- the block's counter, so phase D goes on at `{ A with V := V2 }`
@@ -530,7 +530,7 @@ theorem kxc_phaseC (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN) (
     (havf : A.avf A.na = 0#64) :
     kxcAt1ae k A cpu spie spp R (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P Mi szv (k.regs 27#5) ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     (∀ V1 : ProcPriv, ⌜evAfter A.V V1⌝ -∗
       ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))

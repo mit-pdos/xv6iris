@@ -78,10 +78,11 @@ open Std (ExtTreeSet)
 /-! ## 0.  Pure readings off the lent authorities (deviations 3, 6) -/
 
 section Readings
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- A code segment held as a text image is part of the heap's image. -/
 theorem ukCode_uimgSub (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (m : ElfMem) :
     ⊢@{IProp GF} uheap γt γd γs M pm sz -∗ ukCode γt m -∗ ⌜uimgSub m M⌝ := by
@@ -98,6 +99,7 @@ theorem ukCode_uimgSub (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option U
   ipureintro
   exact h.1
 
+omit [MachGS GF] in
 /-- The children set the authority names, against the process's fragment. -/
 theorem urunIds_ch_eq (N : UkNames GF) (cs S : ExtTreeSet GName compare) (pidv : BitVec 32) :
     ⊢ urunIds N cs pidv -∗ uch N.ch S -∗ ⌜cs = S⌝ := by
@@ -109,6 +111,7 @@ theorem urunIds_ch_eq (N : UkNames GF) (cs S : ExtTreeSet GName compare) (pidv :
   · iexact Hch
   · iexact Hc
 
+omit [MachGS GF] in
 /-- ...and the pid. -/
 theorem urunIds_pid_eq (N : UkNames GF) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (p : Int) :
     ⊢ urunIds N cs pidv -∗ upid N.pid p -∗ ⌜(pidv.toNat : Int) = p⌝ := by
@@ -122,15 +125,15 @@ theorem urunIds_pid_eq (N : UkNames GF) (cs : ExtTreeSet GName compare) (pidv : 
 
 /-- The pay fact at a console payload IS the pay fact at its constant
 function (Rocq `ucons_pay_eta`, read through `my_pay`). -/
-theorem myPay_uconsPay_eta [MachGS hlc GF] [Xv6G GF] (g : GName) (cn : ConsNames) (γ : GName) (T : IProp GF)
+theorem myPay_uconsPay_eta [MachGS GF] [Xv6G GF] (g : GName) (cn : ConsNames) (γ : GName) (T : IProp GF)
     (Rd : Nat → IProp GF) :
-    myPay g (uconsPay (hlc := hlc) cn γ T Rd) ⊢ myPay g (fun _ => uconsPay (hlc := hlc) cn γ T Rd (-1)) := by
+    myPay g (uconsPay cn γ T Rd) ⊢ myPay g (fun _ => uconsPay cn γ T Rd (-1)) := by
   rw [uconsPay_eta]
 
 end Readings
 
 section UInitShSlot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -141,25 +144,26 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 pure claim law, the taint's generic slot at every constant payload, and
 sh's entry payload. -/
 def initShSlotCore (T Pay : IProp GF) : IProp GF :=
-  iprop(appInv (hlc := hlc) fscFs ∗
+  iprop(appInv fscFs ∗
     □ (∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜echoFsPure v⌝ ∨ T)) ∗
-    □ (∀ (R : IProp GF) (W : Uvis), T -∗ myPay W.gen (fun _ => R) -∗ □ (uKillCred (hlc := hlc) -∗ R) -∗
-        uslot (hlc := hlc) W) ∗
+    □ (∀ (R : IProp GF) (W : Uvis), T -∗ myPay W.gen (fun _ => R) -∗ □ (uKillCred -∗ R) -∗
+        uslot W) ∗
     Pay)
 
 /-- **Rocq `init_sh_slot`**. -/
-def initShSlot (T Pay : IProp GF) : IProp GF := initShSlotCore (hlc := hlc) T Pay
+def initShSlot (T Pay : IProp GF) : IProp GF := initShSlotCore T Pay
 
 /-- Rocq `init_sh_slot_core_persistent`. -/
 instance initShSlotCore_persistent (T Pay : IProp GF) [Persistent Pay] :
-    Persistent (initShSlotCore (hlc := hlc) T Pay) := by
+    Persistent (initShSlotCore T Pay) := by
   unfold initShSlotCore; infer_instance
 
 /-- Rocq `init_sh_slot_persistent`. -/
 instance initShSlot_persistent (T Pay : IProp GF) [Persistent Pay] :
-    Persistent (initShSlot (hlc := hlc) T Pay) := by
+    Persistent (initShSlot T Pay) := by
   unfold initShSlot initShSlotCore; infer_instance
 
+omit [MachGS GF] in
 /-- **Rocq `sh_pins_of_fs_pure`**: the projection /sh's own pinned exec
 wants. -/
 theorem sh_pins_of_fs_pure (T : IProp GF) :
@@ -179,6 +183,7 @@ theorem sh_pins_of_fs_pure (T : IProp GF) :
 
 /-! ## 2.  SH'S ENTRY, AS THE NAMED OBLIGATION (E) -/
 
+omit [MachGS GF] in
 /-- Rocq `ush_fd0`'s persistence (an instance Rocq derives by `apply _`). -/
 instance initSh_ushFd0_persistent (X : UshCtx GF) [Persistent X.T] (l : List FdState) :
     Persistent (ushFd0 X l) := by
@@ -195,20 +200,20 @@ theorem init_sh_image_entry_at (SS : SH_START) (Dsc : List (BitVec 8) → Prop) 
     (hn0 : 8 * (2 + (8 + (16 + (ushDbody + n0)))) ≤ 0xFE0) (hag : imgAgrees E Mv)
     (hav : ∀ k, k < 16 → E (0x1000 + k) = some (initArgvByte k)) (hro : uimgSub User.Init.code.byte E)
     (hl : fdv.take NSTD = l) (hcs : cs = ∅) (hpid : pidv.toNat ≠ 1) (hlen : fdv.length = NOFILE)
-    (HCr : ConsCredHoldsAt (hlc := hlc) cn T Dsc Cr) :
-    ⊢ urunNopipe (hlc := hlc) fdv -∗ udep (hlc := hlc) -∗ □ (T -∗ shDeps (hlc := hlc)) -∗
-      shPromptLaw (hlc := hlc) Cr.ccWc -∗
-      (□ (∀ (N' : UkNames GF) (X : UshCtx GF), ⌜X.T = T⌝ -∗ ushOpenConsoleLeaf (hlc := hlc) N' X) ∨
-        (□ (∀ (N' : UkNames GF) (X : UshCtx GF), ⌜X.T = T⌝ -∗ ushOpenAbsentLeaf (hlc := hlc) N' X K) ∗ K) ∨ T) -∗
+    (HCr : ConsCredHoldsAt cn T Dsc Cr) :
+    ⊢ urunNopipe fdv -∗ udep -∗ □ (T -∗ shDeps) -∗
+      shPromptLaw Cr.ccWc -∗
+      (□ (∀ (N' : UkNames GF) (X : UshCtx GF), ⌜X.T = T⌝ -∗ ushOpenConsoleLeaf N' X) ∨
+        (□ (∀ (N' : UkNames GF) (X : UshCtx GF), ⌜X.T = T⌝ -∗ ushOpenAbsentLeaf N' X K) ∗ K) ∨ T) -∗
       ushFd0 (initShCtx Cr γp T) (fdv.take NSTD) -∗ (⌜ushViewOk fdv⌝ ∨ T) -∗
       (∀ (sts : List FdState) (secc : BitVec 64), imageEntryTaint T sts secc
-        (uconsPay (hlc := hlc) cn γp T (initRd Cr.ccRd (ccWbn Cr))) (uslot (hlc := hlc))) -∗
+        (uconsPay cn γp T (initRd Cr.ccRd (ccWbn Cr))) (uslot)) -∗
       imageEntry User.Sh.elf Mv (BitVec.ofNat 64 0x1000) fdv ROOTINO seccAll cs pidv
-        (uconsPay (hlc := hlc) cn γp T (initRd Cr.ccRd (ccWbn Cr)))
-        iprop(shPayAt (hlc := hlc) Dl T Cr Rsh n0 ∗ upos (hlc := hlc) γp np ∗
-          uconsPay (hlc := hlc) cn γp T Cr.ccRd (-1) ∗
+        (uconsPay cn γp T (initRd Cr.ccRd (ccWbn Cr)))
+        iprop(shPayAt Dl T Cr Rsh n0 ∗ upos γp np ∗
+          uconsPay cn γp T Cr.ccRd (-1) ∗
           (ustd N.fd l ∗ initLendCred T (.open true true (.device CONSOLE)) Cr.ccWp (ccWbn Cr) l np))
-        (uslot (hlc := hlc)) := by
+        (uslot) := by
   iintro #Hnpw #Hdep #Hdp #Hplaw #Hcons #Hfd0 #Hvok #Hgen'
   unfold imageEntry
   imodintro
@@ -255,7 +260,7 @@ theorem init_sh_image_entry_at (SS : SH_START) (Dsc : List (BitVec 8) → Prop) 
   have hpid' : W'.pid.toNat ≠ 1 := by rw [hpidq]; exact hpid
   have hroom := init_sh_room alen n0 halen hn0
   iapply shSlotOfKexec SS Rsh (initShCtx Cr γp T) cn K
-    (uconsPay (hlc := hlc) cn γp T (initRd Cr.ccRd (ccWbn Cr))) (uconsPay (hlc := hlc) cn γp T Cr.ccRd)
+    (uconsPay cn γp T (initRd Cr.ccRd (ccWbn Cr))) (uconsPay cn γp T Cr.ccRd)
     Dsc Dl HD (fun N' hpay => consCredHoldsAt_laws HCr γp N' hpay) (fun N' l' hpay => HCr.rl γp N' l' hpay)
     1 alen afun fdv W' n0 np (fun N' l' i hpay => HCr.bd γp N' l' i hpay) (uconsPay_const cn γp T _)
     hok hcwd hroom hlen hlz hsc hch' hpid'
@@ -284,7 +289,7 @@ theorem init_sh_image_entry_at (SS : SH_START) (Dsc : List (BitVec 8) → Prop) 
     · iright
       iright
       iexact HT
-  · iapply imageEntryTaint_all_elim T _ (uslot (hlc := hlc)) $$ Hgen'
+  · iapply imageEntryTaint_all_elim T _ (uslot) $$ Hgen'
 
 /-! ## 3.  THE ASSEMBLY: init's pinned bundle pays its exec supply -/
 
@@ -296,12 +301,12 @@ theorem init_exec_sup_of_sh_slot_at (SS : SH_START) (sh_elf_loadable : kexecLoad
     (T : IProp GF) [Persistent T] [Timeless T] (cn : ConsNames) (st : FdState) (K : IProp GF) [Persistent K]
     (Cr : ConsCred GF) (Rsh : GName → GName → GName → IProp GF) (n0 : Nat)
     (hn0 : 8 * (2 + (8 + (16 + (ushDbody + n0)))) ≤ 0xFE0) (hst : st = .open true true (.device CONSOLE))
-    (HCr : ConsCredHoldsAt (hlc := hlc) cn T Dsc Cr) :
-    ⊢ udep (hlc := hlc) -∗ □ (T -∗ shDeps (hlc := hlc)) -∗ shPromptLaw (hlc := hlc) Cr.ccWc -∗
-      (□ (∀ (N' : UkNames GF) (X : UshCtx GF), ⌜X.T = T⌝ -∗ ushOpenConsoleLeaf (hlc := hlc) N' X) ∨
-        (□ (∀ (N' : UkNames GF) (X : UshCtx GF), ⌜X.T = T⌝ -∗ ushOpenAbsentLeaf (hlc := hlc) N' X K) ∗ K) ∨ T) -∗
-      initShSlot (hlc := hlc) T (shPayAt (hlc := hlc) Dl T Cr Rsh n0) -∗
-      initExecSupLend (hlc := hlc) cn T st Cr := by
+    (HCr : ConsCredHoldsAt cn T Dsc Cr) :
+    ⊢ udep -∗ □ (T -∗ shDeps) -∗ shPromptLaw Cr.ccWc -∗
+      (□ (∀ (N' : UkNames GF) (X : UshCtx GF), ⌜X.T = T⌝ -∗ ushOpenConsoleLeaf N' X) ∨
+        (□ (∀ (N' : UkNames GF) (X : UshCtx GF), ⌜X.T = T⌝ -∗ ushOpenAbsentLeaf N' X K) ∗ K) ∨ T) -∗
+      initShSlot T (shPayAt Dl T Cr Rsh n0) -∗
+      initExecSupLend cn T st Cr := by
   subst hst
   iintro #Hdep #Hdp #Hplaw #Hcons Hslot
   unfold initShSlot initShSlotCore
@@ -315,12 +320,12 @@ theorem init_exec_sup_of_sh_slot_at (SS : SH_START) (sh_elf_loadable : kexecLoad
   iintro %N %m %pc %l %hpeq %ha0 %ha1 #Hro #Hargv Hstd #Hrow Hcred Hpos Hlease Hchf Hpidf
   -- the taint arm at the SAME payload, built out of the taint it holds
   ihave #Hgen' : iprop(∀ (sts : List FdState) (secc : BitVec 64), imageEntryTaint T sts secc
-      (uconsPay (hlc := hlc) cn γp T (initRd Cr.ccRd (ccWbn Cr))) (uslot (hlc := hlc))) $$ []
+      (uconsPay cn γp T (initRd Cr.ccRd (ccWbn Cr))) (uslot)) $$ []
   · iintro %sts %secc
     iapply imageEntryTaint_intro
     imodintro
     iintro %W' #HT Hmp
-    iapply Hgen $$ %(uconsPay (hlc := hlc) cn γp T (initRd Cr.ccRd (ccWbn Cr)) (-1)) %W' HT [Hmp] []
+    iapply Hgen $$ %(uconsPay cn γp T (initRd Cr.ccRd (ccWbn Cr)) (-1)) %W' HT [Hmp] []
     · iapply myPay_uconsPay_eta $$ Hmp
     · imodintro
       iintro -
@@ -372,10 +377,10 @@ theorem init_exec_sup_of_sh_slot_at (SS : SH_START) (sh_elf_loadable : kexecLoad
   · iexact Hufd
   isplitl [Hids]
   · iexact Hids
-  iapply sbundlePayRefR_of_exec (uslot (hlc := hlc)) T N m pc M pm sz fdv ROOTINO gn cs pidv
+  iapply sbundlePayRefR_of_exec (uslot) T N m pc M pm sz fdv ROOTINO gn cs pidv
     (BitVec.ofNat 64 0x9b8) (BitVec.ofNat 64 0x1000) initShPl User.Sh.elf 1
-    iprop(shPayAt (hlc := hlc) Dl T Cr Rsh n0 ∗ upos (hlc := hlc) γp np ∗
-      uconsPay (hlc := hlc) cn γp T Cr.ccRd (-1) ∗
+    iprop(shPayAt Dl T Cr Rsh n0 ∗ upos γp np ∗
+      uconsPay cn γp T Cr.ccRd (-1) ∗
       (ustd N.fd l ∗ initLendCred T (.open true true (.device CONSOLE)) Cr.ccWp (ccWbn Cr) l np))
     _ sh_elf_loadable ha0 ha1 (fun Mv hag => init_sh_path_of M Mv hro hag)
     $$ [] Hmp [] [] [] [Hpos Hlease Hstd Hcred]

@@ -34,12 +34,12 @@ open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
+variable {GF : BundledGFunctors.{0}}
 
 /-! ## Histories of a byte window -/
 
 section fixed
-variable [MachFixedGS hlc GF] (E : EraGS)
+variable [MachFixedGS GF] (E : EraGS)
 
 theorem hartViews_dropResv (σ : MState) (cpu c : CPU) :
     hartViewsAt (GF := GF) E (σ.dropResv cpu) c = hartViewsAt E σ c := by
@@ -273,7 +273,7 @@ theorem memModel_authors (σ : MState) : ∀ ts : List (Nat × Agent),
 end fixed
 
 section ambient
-variable [MachGS hlc GF]
+variable [MachGS GF]
 
 /-- The histories of the window `pa .. pa+n-1` in `m`. -/
 abbrev histsAt (m : FlatMem) (pa : PAddr) (n : Nat) (Hs : Nat → Hist) : Prop :=

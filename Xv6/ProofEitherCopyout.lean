@@ -24,7 +24,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `copyout`'s contract as a rule. -/
@@ -51,7 +51,7 @@ theorem ec_copyout_call (CO : COPYOUT) [CurCtx] (c : CPU) (k' : KCtx) (γl : GNa
         procPtAt P' M') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := CO.wp_copyout (hlc := hlc) (GF := GF) c k' γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen'
+  have h := CO.wp_copyout (GF := GF) c k' γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen'
   unfold wp_copyout_body at h
   simp only [copyoutAddr] at h
   -- the written prefix's writability (NI M2-G1e) is dropped
@@ -78,7 +78,7 @@ theorem either_copyout_br_fffffffffffff602 : KA.«either_copyout» + 0xfffffffff
 
 set_option maxHeartbeats 4000000 in
 theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHER_COPYOUT :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γl γk j pid V P M user dqs bs olds hj hproc hnoff hK hlk huser
+  ⟨fun {GF} _ _ _ _ _ _ _ _ cpu k γl γk j pid V P M user dqs bs olds hj hproc hnoff hK hlk huser
       hlen hlen' holds => by
   unfold wp_either_copyout_body
   simp only [eitherCopyoutAddr]

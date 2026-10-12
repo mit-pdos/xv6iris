@@ -88,7 +88,7 @@ theorem ticksTie_self (t : BitVec 32) : ticksTie t t.toNat := by
   exact (Nat.mod_eq_of_lt t.isLt).symm
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- The bare counter cell at context `ξ`, contents existential: what main's
 boot rows carry (`SpecMain.mainGlobalsRaw`; deviation 1). -/
@@ -96,7 +96,7 @@ def ticksResAt [CurCtx] (ξ : CtxId) : IProp GF := iprop%
   ∃ t : BitVec 32, wordAtN ξ ticksAddr 4 (DFrac.own 1) t
 
 instance instCtxMorphTicksResAt [CurCtx] : CtxMorph (GF := GF) (ticksResAt (GF := GF)) :=
-  @instCtxMorphExists hlc GF _ _ (fun (t : BitVec 32) ξ => wordAtN ξ ticksAddr 4 (DFrac.own 1) t)
+  @instCtxMorphExists GF _ _ (fun (t : BitVec 32) ξ => wordAtN ξ ticksAddr 4 (DFrac.own 1) t)
     (fun _ => instCtxMorphWordAtN _ _ _ _)
 
 /-- The bare cell, opened at the ambient context. -/
@@ -112,7 +112,7 @@ theorem ticksRes_intro [CurCtx] (t : BitVec 32) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
 
 /-- **The payload of `tickslock`** at context `ξ` (Rocq's strengthened
 `ticks_res_at`): the counter cell and its mirror, tied (deviation 1). -/
@@ -120,12 +120,12 @@ def ticksLedAt [CurCtx] (ξ : CtxId) : IProp GF := iprop%
   ∃ (t : BitVec 32) (n : Nat), wordAtN ξ ticksAddr 4 (DFrac.own 1) t ∗ tickCnt n ∗ ⌜ticksTie t n⌝
 
 instance instCtxMorphTicksLedAt [CurCtx] : CtxMorph (GF := GF) (ticksLedAt (GF := GF)) :=
-  @instCtxMorphExists hlc GF _ _
+  @instCtxMorphExists GF _ _
     (fun (t : BitVec 32) ξ => iprop(∃ n : Nat,
       wordAtN ξ ticksAddr 4 (DFrac.own 1) t ∗ tickCnt n ∗ ⌜ticksTie t n⌝))
-    (fun t => @instCtxMorphExists hlc GF _ _
+    (fun t => @instCtxMorphExists GF _ _
       (fun (n : Nat) ξ => iprop(wordAtN ξ ticksAddr 4 (DFrac.own 1) t ∗ tickCnt n ∗ ⌜ticksTie t n⌝))
-      (fun n => @instCtxMorphSep hlc GF _ (fun ξ => wordAtN ξ ticksAddr 4 (DFrac.own 1) t)
+      (fun n => @instCtxMorphSep GF _ (fun ξ => wordAtN ξ ticksAddr 4 (DFrac.own 1) t)
         (fun _ => iprop(tickCnt n ∗ ⌜ticksTie t n⌝)) (instCtxMorphWordAtN _ _ _ _)
         (instCtxMorphConst _)))
 

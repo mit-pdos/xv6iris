@@ -426,7 +426,7 @@ theorem bigSepS_sep2 {PROP : Type _} [BI PROP] {Φ Ψ : Nat → PROP} {X : Std.E
   wand_intro BigSepS.bigSepS_sep_symm.1
 
 section IcacheBootRegion
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq's `ireg_slots_of_set`. -/
@@ -619,14 +619,14 @@ theorem iregAlloc [Icfg] (E : CoPset) (γfs : FsNames) (inodestart nib : Nat)
       ([∗set] z ∈ regionInums nib, iregTopBoot γfs D z) -∗
       ([∗list] bi ∈ List.range nib, fsblock γfs.bytes (inodestart + bi) (bss bi)) -∗
       fsBytesAt γfs homeL -∗
-      ftopInv (hlc := hlc) γfs -∗
-      appInv (hlc := hlc) γfs -∗
+      ftopInv γfs -∗
+      appInv γfs -∗
       iregBoot -∗
       (icfgReg ↪●MAP (∅ : RegMapF (GName × GName))) -∗
       |={E}=> ∃ (γi : GName) (dss : List (List Dinode)),
         ⌜dss.length = nib⌝ ∗ ⌜∀ ds ∈ dss, diblkWf ds⌝ ∗
         ⌜∀ bi, bi < nib → bss bi = diblkBytes dss[bi]!⌝ ∗
-        iregReg (hlc := hlc) γi γfs inodestart nib ∗ iregBoot ∗
+        iregReg γi γfs inodestart nib ∗ iregBoot ∗
         [∗set] z ∈ regionInums nib, iregOut γi (BitVec.ofNat 32 z) (imageDinode dss z) := by
   obtain ⟨dss, hl, hwf, he⟩ := imageDecode nib bss hlen
   obtain ⟨hl3, hl4, hl5, hlnkat, hbare, hrecat⟩ := himg dss hl hwf he
@@ -695,9 +695,10 @@ end IcacheBootRegion
 /-! ## 3.  STOCKING THE POOL (§13.3) -/
 
 section IcacheBootPool
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
+omit [MachGS GF] in
 /-- THE POOL'S KEYS ARE THE `BitVec` ROUND TRIP, and the ledger's are plain
 `Nat`: `ipoolRows` indexes the pool row at `BitVec.ofNat 32 z`, so its
 `icntHalf` and `ifreezeOff` conjuncts sit at `(BitVec.ofNat 32 z).toNat`,

@@ -27,7 +27,7 @@ open LeanRV64D
 def uvmfreeAddr : BitVec 64 := KA.«uvmfree»
 def uvmfreeSlots : Nat := 36
 
-def wp_uvmfree_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_uvmfree_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : uvmfreeSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hroot : k.regs 10#5 = pageAddr P.root) (hsz : (k.regs 11#5).toNat ≤ uvmMaxsz)
@@ -42,8 +42,8 @@ def wp_uvmfree_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [X
   ⊢ wpLoop (GF := GF) cpu
 
 structure UVMFREE : Prop where
-  wp_uvmfree : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_uvmfree : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat) hnoff hK hlk hroot hsz hwf hbelow,
-    wp_uvmfree_body (hlc := hlc) (GF := GF) cpu k γl γk P M ke hnoff hK hlk hroot hsz hwf hbelow
+    wp_uvmfree_body (GF := GF) cpu k γl γk P M ke hnoff hK hlk hroot hsz hwf hbelow
 
 end Xv6

@@ -39,13 +39,13 @@ theorem ba_addr_byte (kk q : Nat) :
   unfold aBufData bOffData; bv_omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x38 .. +0x48`: FOUND A FREE BIT** (Rocq's `ba_alloc`). -/
 theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c0 : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu c0 : CPU) (k : KCtx)
     (spie spp : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (γ : LogNames) (γfs : FsNames) (logstart bmapstart size : Nat) (dev : BitVec 32)

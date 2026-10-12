@@ -53,7 +53,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -92,8 +92,8 @@ theorem srd_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
-    filereadFsEnv (hlc := hlc) ∗ sysReadIn (hlc := hlc) V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
-    (∀ c : CPU, sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
+    filereadFsEnv ∗ sysReadIn V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
+    (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hte, Hce, Hcore, Howe, Hfr, Henv, Hin, HP, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -155,9 +155,9 @@ theorem srd_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     procPrivCoreNoctxAt curCtx (procAddr j) pid { V.updEv kv with upt := P' } M' ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [fd0] ∗
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ fdFrags V.fdg sts ∗
-    filereadEnvOut (hlc := hlc) st ∗ (filereadEnvOut (hlc := hlc) st -∗ filereadFsOut) ∗
-    filereadArms (hlc := hlc) V.gen V.upt st (argZ v2) F Rd Rin Rp Rpe P (R 10#5) M' a1 ∗
-    (∀ c : CPU, sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
+    filereadEnvOut st ∗ (filereadEnvOut st -∗ filereadFsOut) ∗
+    filereadArms V.gen V.upt st (argZ v2) F Rd Rin Rp Rpe P (R 10#5) M' a1 ∗
+    (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst a1
   iintro ⟨Hk, Hpc, Hcells, Hte, Hce, Hcore, Howe, Href, Hauth, Hfr, Henvo, Henvb, Harms, HΦ⟩
@@ -184,7 +184,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x3c`: `jal fileread`** over the LENT reference, the descriptor
 bundle's row for it, the block, and the environment the state selects;
 fileread's return goes to `srd_ok_back`. -/
-theorem srd_ok_jal (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem srd_ok_jal (FR : FILEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames)
@@ -205,9 +205,9 @@ theorem srd_ok_jal (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
-    filereadFsEnv (hlc := hlc) ∗ consoleReadyApp ∗
-    sysReadIn (hlc := hlc) V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
-    (∀ c : CPU, sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
+    filereadFsEnv ∗ consoleReadyApp ∗
+    sysReadIn V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
+    (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + filereadSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by rw [filereadSlots_eq] at hK'; omega
@@ -268,7 +268,7 @@ set_option maxHeartbeats 16000000 in
 /-- **argfd SUCCEEDED** (`a0 = 0`): `mv a5,a0`, the hoisted `li a0,-1`,
 `bltz` falls through, the three loads (`a2 := n` SIGN-extended, `a1 := p`,
 `a0 := f`); then `srd_ok_jal`. -/
-theorem srd_ok_loads (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem srd_ok_loads (FR : FILEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames)
@@ -287,9 +287,9 @@ theorem srd_ok_loads (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
-    filereadFsEnv (hlc := hlc) ∗ consoleReadyApp ∗
-    sysReadIn (hlc := hlc) V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
-    (∀ c : CPU, sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
+    filereadFsEnv ∗ consoleReadyApp ∗
+    sysReadIn V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
+    (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hpi, #Hpe, #Hkl, #Hav, Hcells, Hte, Hce, Hcore, Howe, Hfr, Henv, #Hready, Hin,
     HP, HΦ⟩
@@ -339,7 +339,7 @@ theorem srd_ok_loads (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x1c .. +0x24`: `argfd(0, 0, &f)`** (`pfd` null, `pf = &f`), and
 its answer dispatched to the two arms. -/
-theorem srd_argfd_call (AF : ARGFD) (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem srd_argfd_call (AF : ARGFD) (FR : FILEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames)
@@ -359,9 +359,9 @@ theorem srd_argfd_call (AF : ARGFD) (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
-    filereadFsEnv (hlc := hlc) ∗ consoleReadyApp ∗
-    sysReadIn (hlc := hlc) V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
-    (∀ c : CPU, sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
+    filereadFsEnv ∗ consoleReadyApp ∗
+    sysReadIn V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
+    (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + filereadSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by rw [filereadSlots_eq] at hK'; omega
@@ -430,7 +430,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x12 .. +0x18`: `argint(2, &n)`**, the trapframe borrowed out of
 the core and back; then `srd_argfd_call`. -/
 theorem srd_argint_call (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames)
@@ -450,9 +450,9 @@ theorem srd_argint_call (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD) (Γ : SchedNa
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
-    filereadFsEnv (hlc := hlc) ∗ consoleReadyApp ∗
-    sysReadIn (hlc := hlc) V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
-    (∀ c : CPU, sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
+    filereadFsEnv ∗ consoleReadyApp ∗
+    sysReadIn V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
+    (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + filereadSlots ≤ k.avail := hK
   iintro ⟨Hk, Hpc, #Hpi, #Hpe, #Hkl, #Hav, Hcells, Hte, Hce, Hcore, Howe, Hfr, Henv, #Hready, Hin,
@@ -510,7 +510,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`sys_read` meets its specification**, at either entry `SIE`: the
 prologue and `argaddr(1, &p)`; then `srd_argint_call`. -/
 theorem sys_read_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames)
@@ -521,7 +521,7 @@ theorem sys_read_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD)
     (hv2 : V.tf[tfArgIdx 2]? = some v2)
     (hK : sysReadSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) :
-    wp_sys_read_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M sts v v1 v2 γkl γk F Rd Rin Rp Rpe P
+    wp_sys_read_eb_body (GF := GF) Γ cpu k γ j pid V M sts v v1 v2 γkl γk F Rd Rin Rp Rpe P
       hv hv1 hv2 hK hj hproc hnoff htier := by
   unfold wp_sys_read_eb_body
   have hK' : 6 + filereadSlots ≤ k.avail := hK
@@ -531,7 +531,7 @@ theorem sys_read_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD)
   have ht0 : curTier = KTier.kpt := hct.symm.trans htier
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- THE CONTRACT'S CONTINUATION, hart-free
-  ihave HΦ : (∀ c : CPU, sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c) $$ [Hnext]
+  ihave HΦ : (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c) $$ [Hnext]
   · iintro %c
     iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
   icases (procPrivFd_split γ (procAddr j) pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩

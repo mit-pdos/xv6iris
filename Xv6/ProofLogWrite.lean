@@ -351,7 +351,7 @@ theorem lw_cov_nodup (cov : Std.ExtTreeSet Nat compare) : cov.toList.Nodup := by
   exact hab (by subst he; simp)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBlocksG GF]
 
 /-- Outside `b`, growing the batch by `b` does not move a pin half. -/
 theorem lw_dirty_eq (γfs : FsNames) (l LB LB' : List Nat) (b : Nat) (hb : ¬ (b ∈ l))
@@ -412,7 +412,7 @@ end
 /-! ## Opening the lock's payload and the handle -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-! ## The three call sites -/
@@ -429,7 +429,7 @@ theorem lw_ac (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : LogNames) (γb : Bcache
       locked γ.lk cpu' -∗ logResAt γ γb γfs cov ls curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γ.lk "log"
+  have h := AC.wp_acquire (GF := GF) c k' γ.lk "log"
     (logResAt γ γb γfs cov ls) hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
@@ -452,7 +452,7 @@ theorem lw_re (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : LogNames) (γb : Bcache
         (k'.locks.filter (fun x => x ≠ "log"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γ.lk "log"
+  have h := RE.wp_release (GF := GF) c k' γ.lk "log"
     (logResAt γ γb γfs cov ls) hsie hnoff hK reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -477,7 +477,7 @@ theorem lw_bp (BP : BPIN) (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames
       wordPointsTo (aBufBlockno (bnode kk)) 4 (DFrac.own (1 : Qp).half) bno -∗
       bref γb kk dev bno -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := BP.wp_bpin (hlc := hlc) (GF := GF) c k' γl γb V kk dev bno hnoff hK hlk hkk ha0
+  have h := BP.wp_bpin (GF := GF) c k' γl γb V kk dev bno hnoff hK hlk hkk ha0
   unfold wp_bpin_body at h
   simp only [bpinAddr] at h
   exact h
@@ -513,7 +513,7 @@ theorem lw_state_elim (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet
         ⌜LB = W.map (fun w => w.toNat)⌝ ∗
         ⌜(W.map (fun w => w.toNat)).Nodup⌝ ∗
         ⌜∀ w ∈ W, fsHome cov ls w.toNat ∧ w.toNat ≠ SB_BNO⌝ ∗
-        ⌜lmHdr M ls = (0, [])⌝ ∗ ⌜logMirrorTieBody M L cov ls LB⌝ ∗ logMirrorHalf (hlc := hlc) M ∗
+        ⌜lmHdr M ls = (0, [])⌝ ∗ ⌜logMirrorTieBody M L cov ls LB⌝ ∗ logMirrorHalf M ∗
         wordAtN ξ lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) ∗
         ([∗list] i ↦ w ∈ W, wordAtN ξ (lhBlock i) 4 (DFrac.own 1) w) ∗
         ([∗list] i ∈ List.range (LOGBLOCKS - n),
@@ -540,7 +540,7 @@ theorem lw_state_intro (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSe
     (h3 : (W.map (fun w => w.toNat)).Nodup)
     (h4 : ∀ w ∈ W, fsHome cov ls w.toNat ∧ w.toNat ≠ SB_BNO)
     (M : LogMirror) (hMhdr : lmHdr M ls = (0, [])) (hMtie : logMirrorTieBody M L cov ls LB) :
-    logMirrorHalf (hlc := hlc) M ∗
+    logMirrorHalf M ∗
     wordAtN ξ lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) ∗
     ([∗list] i ↦ w ∈ W, wordAtN ξ (lhBlock i) 4 (DFrac.own 1) w) ∗
     ([∗list] i ∈ List.range (LOGBLOCKS - n),
@@ -579,7 +579,7 @@ def lwBatch (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     ⌜∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB⌝ ∗
     ⌜∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB⌝ ∗
     ⌜out = 0 → n = 0⌝ ∗
-    eraSyncTok (hlc := hlc) (GF := GF) ∗
+    eraSyncTok (GF := GF) ∗
     logStateAt γb γfs cov ls n LB (opPending om) ξ
 
 theorem lwBatch_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
@@ -591,7 +591,7 @@ theorem lwBatch_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
         ⌜∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB⌝ ∗
         ⌜∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB⌝ ∗
         ⌜out = 0 → n = 0⌝ ∗
-        eraSyncTok (hlc := hlc) (GF := GF) ∗
+        eraSyncTok (GF := GF) ∗
         logStateAt γb γfs cov ls n LB (opPending om) ξ := by
   unfold lwBatch; iintro H; iexact H
 
@@ -603,7 +603,7 @@ theorem lwBatch_intro (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (h2 : ∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB)
     (h3 : ∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB)
     (hq : out = 0 → n = 0) :
-    eraSyncTok (hlc := hlc) (GF := GF) ∗ logStateAt (GF := GF) γb γfs cov ls n LB pend ξ ⊢
+    eraSyncTok (GF := GF) ∗ logStateAt (GF := GF) γb γfs cov ls n LB pend ξ ⊢
       lwBatch γ γb γfs cov ls om E X out ξ := by
   have hpend : logStateAt (GF := GF) γb γfs cov ls n LB (opPending om) ξ =
       logStateAt γb γfs cov ls n LB pend ξ := rfl
@@ -641,9 +641,9 @@ theorem lw_res_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
       ⌜∀ i p, PartialMap.get? X i = some p → p.1 ≤ E⌝ ∗
       ⌜∀ i, nxt ≤ i → PartialMap.get? T i = none⌝ ∗
       ⌜(FiniteMap.toList T).length = (FiniteMap.toList om).length⌝ ∗
-      ((wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗ logHelp (hlc := hlc) γ nc out false ∗
+      ((wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗ logHelp γ nc out false ∗
           lwBatch γ γb γfs cov ls om E X out ξ) ∨
-        (wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗ logHelp (hlc := hlc) γ nc out true ∗
+        (wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗ logHelp γ nc out true ∗
           ⌜out = 0⌝)) := by
   unfold logResAt lwBatch
   iintro ⟨%out, %cmt, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
@@ -702,7 +702,7 @@ theorem lw_res_intro (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (if cmt then 1#32 else 0#32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
-    logHelp (hlc := hlc) γ nc out cmt ∗
+    logHelp γ nc out cmt ∗
     (if cmt then iprop(emp) else lwBatch γ γb γfs cov ls om E X out ξ)
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
   unfold logResAt lwBatch
@@ -749,7 +749,7 @@ theorem lw_res_intro_f (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
-    logHelp (hlc := hlc) γ nc out false ∗
+    logHelp γ nc out false ∗
     lwBatch γ γb γfs cov ls om E X out ξ
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ :=
   lw_res_intro γ γb γfs cov ls ξ out false nc om E X T nxo nxt nxl hlen
@@ -1268,8 +1268,8 @@ theorem lw_closeA (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
         byteRange γfs.bytes bno.toNat off subNew -∗ |={Efs, ⊤}=> Φfsb)) ∗
     bufHold0 γb V kk pidv dev bno bs bsd ∗ bioPay γb V kk dev bno bsl bsd true ∗
     logEpochLb γ v ∗ fsBytesAny γfs ∗
-    logHelp (hlc := hlc) γ nc out false ∗ eraSyncTok (hlc := hlc) (GF := GF) ∗
-    logMirrorHalf (hlc := hlc) M
+    logHelp γ nc out false ∗ eraSyncTok (GF := GF) ∗
+    logMirrorHalf M
     ⊢ |={⊤}=> (logResAt (GF := GF) γ γb γfs cov ls curCtx ∗
         logOpSwe γ (if cr then u + 1 else u) (bno.toNat :: Sb) bno.toNat v e0 ∗ Φfsb ∗
         bioLocked γb V kk pidv dev bno bs bsd true ∗ bslot) := by
@@ -1377,6 +1377,7 @@ theorem lw_closeA (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
   unfold bioLocked
   iframe Hhold Hpay
 
+omit [MachGS GF] in
 /-- The junk run of `lh.block[]`, split at its head (the slot the append
 writes) -- and joined back one shorter. -/
 theorem lw_range_shift (Φ : Nat → IProp GF) (m s : Nat) :
@@ -1469,8 +1470,8 @@ theorem lw_closeB (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
         byteRange γfs.bytes bno.toNat off subNew -∗ |={Efs, ⊤}=> Φfsb)) ∗
     bufHold0 γb V kk pidv dev bno bs bsd ∗ bioPay γb V kk dev bno bsl bsd false ∗
     bref γb kk dev bno ∗ logEpochLb γ v ∗ fsBytesAny γfs ∗
-    logHelp (hlc := hlc) γ nc out false ∗ eraSyncTok (hlc := hlc) (GF := GF) ∗
-    logMirrorHalf (hlc := hlc) M ∗ sbParked γfs
+    logHelp γ nc out false ∗ eraSyncTok (GF := GF) ∗
+    logMirrorHalf M ∗ sbParked γfs
     ⊢ |={⊤}=> (logResAt (GF := GF) γ γb γfs cov ls curCtx ∗
         logOpSwe γ (if cr then u + 1 else u) (bno.toNat :: Sb) bno.toNat v e0 ∗ Φfsb ∗
         bioLocked γb V kk pidv dev bno bs bsd true ∗ bslot) := by
@@ -1757,7 +1758,7 @@ end
 
 set_option maxHeartbeats 40000000 in
 theorem logWrite_au_range (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
-    ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -1765,10 +1766,10 @@ theorem logWrite_au_range (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
     (off len : Nat) (subNew : List (BitVec 8))
     (cr : Bool) (Sb : List Nat) (e0 vlb : Nat) (Efs : CoPset) (Φfsb : IProp GF)
     hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE hwin hpos hshape,
-    wp_log_write_au_range_body (hlc := hlc) (GF := GF) cpu k γ γl γb V γfs logstart dev kk pidv
+    wp_log_write_au_range_body (GF := GF) cpu k γ γl γb V γfs logstart dev kk pidv
       bno bs bsl bsd d u off len subNew cr Sb e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev
       hcl hdt hhome hlogE hwin hpos hshape := by
-  intro hlc GF _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ γl γb V γfs logstart dev kk pidv bno bs bsl bsd d u
+  intro GF _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ γl γb V γfs logstart dev kk pidv bno bs bsl bsd d u
     off len subNew cr Sb e0 v Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE
     hwin hpos hshape
   unfold wp_log_write_au_range_body
@@ -2113,7 +2114,7 @@ has no consumer outside `ProofLogWrite.v` (see the header of
 the two steps of Rocq's chain, composed. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- **THE WHOLE-BLOCK AU FORM** (Rocq's `wp_log_write_au`), the range
@@ -2248,17 +2249,17 @@ theorem lw_held_of_au (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb 
 end
 
 theorem logWrite_au (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
-    ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (kk : Nat) (pidv bno : BitVec 32) (bs bsl bsd : List (BitVec 8)) (d : Bool) (u : Nat)
     (cr : Bool) (Sb : List Nat) (e0 vlb : Nat) (Efs : CoPset) (Φfsb : IProp GF)
     hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE,
-    wp_log_write_au_body (hlc := hlc) (GF := GF) cpu k γ γl γb V γfs logstart dev kk pidv bno
+    wp_log_write_au_body (GF := GF) cpu k γ γl γb V γfs logstart dev kk pidv bno
       bs bsl bsd d u cr Sb e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome
       hlogE :=
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ γl γb V γfs logstart dev kk pidv bno bs bsl bsd d u cr Sb
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ γl γb V γfs logstart dev kk pidv bno bs bsl bsd d u cr Sb
       e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE =>
     lw_au_of_range cpu k γ γl γb V γfs logstart dev kk pidv bno bs bsl bsd d u cr Sb e0 vlb Efs
       Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hlogE
@@ -2272,14 +2273,14 @@ whole-function proof, the rest by derivation from it. -/
 theorem logWrite_proof (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) : LOG_WRITE where
   wp_log_write_au_range := logWrite_au_range AC RE BP
   wp_log_write_au := logWrite_au AC RE BP
-  wp_log_write_gen := fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ γl γb V γfs logstart dev kk pidv bno
+  wp_log_write_gen := fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ γl γb V γfs logstart dev kk pidv bno
       bs bsl bsd d u cr Sb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hcredit =>
     lw_gen_of_au cpu k γ γl γb V γfs logstart dev kk pidv bno bs bsl bsd d u cr Sb
       hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome hcredit
       (fun e0 vlb Efs Φfsb hlogE => logWrite_au AC RE BP cpu k γ γl γb V γfs logstart dev kk
         pidv bno bs bsl bsd d u cr Sb e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt
         hhome hlogE)
-  wp_log_write := fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ γl γb V γfs logstart dev kk pidv bno
+  wp_log_write := fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ γl γb V γfs logstart dev kk pidv bno
       bs bsl bsd d u v hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome =>
     lw_held_of_au cpu k γ γl γb V γfs logstart dev kk pidv bno bs bsl bsd d u v
       hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome

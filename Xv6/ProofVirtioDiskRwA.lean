@@ -48,7 +48,7 @@ theorem vdrw_ret_36 :
     jumpPc (KA.«virtio_disk_rw» + 0x36#64) = KA.«virtio_disk_rw» + 0x36#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- `acquire(&disk.vdisk_lock)` at its entry address. -/
 theorem vdrw_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GName)
@@ -62,7 +62,7 @@ theorem vdrw_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl 
       locked γl cpu' -∗ diskRes γ pd pav pu curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
+  have h := AC.wp_acquire (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
     hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
@@ -82,8 +82,8 @@ the prologue and the sector arithmetic run at the caller's index
 (`k_step_e`, the complement following the thread); the acquire's arm
 joined with the complement is the bundle the seam carries
 (`armExt_join`), at the `SPIE`/`SPP` the acquire returned with. -/
-theorem vdrw_P1 {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
-    [CurCtx] (AC : ACQUIRE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem vdrw_P1 {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
+    [CurCtx] (AC : ACQUIRE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8))
     (hj : j < NPROC) (hproc : k.proc = procAddr j)

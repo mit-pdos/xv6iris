@@ -81,7 +81,7 @@ theorem bootChain_mainSlots_le : mainSlots ≤ bootStackSlots := by decide
 theorem bootChain_mainSecondarySlots_le : mainSecondarySlots ≤ bootStackSlots := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The kernel image `kctx` owns (Xv6's `KernelImage` instance), out of the
 text and the rodata. -/
@@ -173,14 +173,14 @@ end
 /-! ## §2 A secondary hart's whole chain -/
 
 section secondary
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **A SECONDARY HART'S WHOLE CHAIN** (Rocq `boot_hart_secondary`), at the
 ambient (Bare) context: §1 then `main`'s secondary arm at the concrete
 deposit, with nothing left over. -/
 theorem bootHartSecondaryAt [X : CurCtx] (hX : X.curTier = KTier.bare)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
  (f : RegFile) (cpu : CPU) (γi : GName) (ξd : CtxId)
     (hcpu : cpu ≠ startedPrimary) :
@@ -190,7 +190,7 @@ theorem bootHartSecondaryAt [X : CurCtx] (hX : X.curTier = KTier.bare)
   iintro #Ht #Hd Hres Htok #Hs
   iapply bootEntryBridge hX f cpu $$ Ht Hd Hres Htok
   iintro %R Hk Hf Hraw Hpc
-  have hm := MainSecondary.wp_main_secondary (hlc := hlc) (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt
+  have hm := MainSecondary.wp_main_secondary (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt
     cpu (bootKCtx R bootStackSlots) γi ξd (f .tlb) hX hcpu bootChain_mainSecondarySlots_le
     rfl rfl rfl rfl
   unfold wp_main_secondary_body at hm
@@ -202,7 +202,7 @@ theorem bootHartSecondaryAt [X : CurCtx] (hX : X.curTier = KTier.bare)
 destructed first, and the chain runs at `⟨ξ, .bare⟩`.  Every other input is
 context-free. -/
 theorem bootHartSecondary
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
  (f : RegFile) (cpu : CPU) (γi : GName) (ξd : CtxId)
     (hcpu : cpu ≠ startedPrimary) :
@@ -218,7 +218,7 @@ end secondary
 /-! ## §3 The boot hart's whole chain -/
 
 section primary
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **THE DEPOSIT RECIPE, DISCHARGED** (Rocq `boot_hart_primary`'s closing
@@ -246,7 +246,7 @@ supply at, so the client fixes `X` from hart 0's token BEFORE the carve:
 theorem bootHartPrimary [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
     [IcboxG GF] [SleepLockG GF] [Appcfg GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
     [Fscfg] [Icfg] [X : CurCtx] (hX : X.curTier = KTier.bare)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
+    (Γ : SchedNames) [ClaimIs GF Γ] [NiFitIs GF]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
  (f : RegFile) (cpu : CPU)
     (cn : ConsNames) (l0 l1 : List (BitVec 8)) (c0 : VirtioCfg)
@@ -255,13 +255,13 @@ theorem bootHartPrimary [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG
     (γi : GName) (ξd : CtxId)
     (hcpu : cpu = startedPrimary)
     (hl0 : l0 = []) (hl1 : l1 = []) (hdead : Virtio.live c0 = false) (hcn : cn.uart = γ0)
-    (hcne : cn.era = genId (hlc := hlc) (GF := GF) + 1)
+    (hcne : cn.era = genId (GF := GF) + 1)
     (hdl : fscDlock = γdl) (hsnap : fsBootSnapWf dk ndisk S Pb sb nib cov) :
     kernelText (GF := GF) ⊢ kernelData -∗ bootHartRes f cpu -∗ ctxTok cpu curCtx -∗
       startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) -∗ startedPrim γi -∗
       bootPrimarySupply X Γ γ0 γ1 γc γl0 γl1 γd γt cn l0 l1 c0 dk sb nib cov Pb Rspent -∗
       wpLoop cpu := by
-  have hm := Main.wp_main_boot (hlc := hlc) (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt
+  have hm := Main.wp_main_boot (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt
   iintro #Ht #Hd Hres Htok #Hs Hprim Hsup
   iapply bootEntryBridge hX f cpu $$ Ht Hd Hres Htok
   iintro %R Hk Hf Hraw Hpc

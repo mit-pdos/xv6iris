@@ -272,9 +272,9 @@ end Rows
 /-! ## §2d' The persistent context, the finals, the descriptors -/
 
 section Ctx
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
   [PipesNG GF]
-variable (R : PnsRound hlc GF)
+variable (R : PnsRound GF)
 
 /-- **Rocq `pns_pk_inv`**: the protocol's invariant of every pipe a
 registered kind names, each at its flow parameter; a filter device's gate on
@@ -305,7 +305,7 @@ instance pnsPkInv_persistent (kd : Pdev) : Persistent (pnsPkInv R kd) := by
 /-- **Rocq `pns_env`**: the taint's two readings (deviation 3), and every
 registered kind's invariants. -/
 def pnsEnv (Sup : IProp GF) (vs : RegMapF Pdev) : IProp GF :=
-  iprop(□ (R.T -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)) ∗ □ (R.T -∗ Sup) ∗
+  iprop(□ (R.T -∗ MachFixedGS.killCred (GF := GF)) ∗ □ (R.T -∗ Sup) ∗
     [∗map] d ↦ kd ∈ vs, pnsPkInv R kd)
 
 instance pnsEnv_persistent (Sup : IProp GF) (vs : RegMapF Pdev) : Persistent (pnsEnv R Sup vs) := by
@@ -315,7 +315,7 @@ variable {R}
 
 /-- **Rocq `pns_env_taint`** (deviation 3: `Hsup` an argument). -/
 theorem pns_env_taint (OK : PnsRoundOk R) (Sup : IProp GF) (hsup : ⊢ □ (R.T -∗ Sup)) :
-    ⊢ □ (R.T -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)) ∗ □ (R.T -∗ Sup) := by
+    ⊢ □ (R.T -∗ MachFixedGS.killCred (GF := GF)) ∗ □ (R.T -∗ Sup) := by
   isplitr
   · imodintro
     iintro Ht
@@ -350,7 +350,7 @@ variable (R)
 def pnsLexit (pn : PNames) : IProp GF :=
   iprop((wcur pn R.L.length ∗ pwsLb pn (R.L.take R.L.length)) ∨
     ((∃ c : Nat, ⌜c ≤ R.L.length⌝ ∗ (wcur pn c ∗ pwsLb pn (R.L.take c)) ∗ roShot pn) ∨
-      MachFixedGS.killCred (hlc := hlc) (GF := GF)))
+      MachFixedGS.killCred (GF := GF)))
 
 /-- **Rocq `pns_final`**: THE FINAL STATES, per kind (the file header's
 table). -/
@@ -372,11 +372,11 @@ def pnsFinal : Pdev → IProp GF
 end Ctx
 
 section Fds
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF]
-variable (R : PnsRound hlc GF) (Q : PnsProc GF)
+variable (R : PnsRound GF) (Q : PnsProc GF)
 
 /-- **Rocq `pns_xk`**: THE EXIT WAND -- the payload from every protected
 device's final state, or from the taint. -/
@@ -399,32 +399,32 @@ def pnsFilesr (_files : Bytes → Option Bytes) (paths : List Bytes) : IProp GF 
 
 /-- **Rocq `pns_taint`**: the free handler's taint (deviation 3). -/
 def pnsTaint (held : FdSet) : IProp GF :=
-  fhTaint R.T (MachFixedGS.killCred (hlc := hlc) (GF := GF)) Q.Sup Q.N held
+  fhTaint R.T (MachFixedGS.killCred (GF := GF)) Q.Sup Q.N held
 
 end Fds
 
 /-- **Rocq `UkPipesIface`'s process hypotheses** (deviation 1). -/
-structure PnsProcOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
+structure PnsProcOk {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
     [PS : UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     [GhostMapG GF (Option Nat) UfdCell UfdMapF] [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
     (Q : PnsProc GF) : Prop where
   /-- Rocq `Hkds` -/
   hkds : Q.Dp.Nodup
   /-- Rocq's stub laws `Hsr`…`Hse`, and the free handler's deposit laws -/
-  FH : FhHyps (hlc := hlc) Q.N Q.P (MachFixedGS.killCred (hlc := hlc) (GF := GF)) Q.Sup
+  FH : FhHyps Q.N Q.P (MachFixedGS.killCred (GF := GF)) Q.Sup
   /-- the supply is persistent (Rocq's `app_sup` is) -/
   sup_pers : Persistent Q.Sup
 
 section Taint
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF]
-variable {R : PnsRound hlc GF} {Q : PnsProc GF}
+variable {R : PnsRound GF} {Q : PnsProc GF}
 
 /-- **Rocq `pns_taint_pays`**: `UkFreeHandler.fh_taint_pays`. -/
 theorem pns_taint_pays (UL : UK_LEAVES) (QK : PnsProcOk Q) [UknConst Q.N] (held : FdSet) (t : Proc) (hs : SafeFds held t) :
-    ⊢ pnsTaint R Q held -∗ treePay (hlc := hlc) Q.N Q.P t := by
+    ⊢ pnsTaint R Q held -∗ treePay Q.N Q.P t := by
   have := QK.sup_pers
   unfold pnsTaint
   exact fh_taint_pays R.T _ Q.Sup (ukSysP_holds UL) (ukSysFH_holds UL) Q.N Q.P QK.FH held t hs
@@ -434,12 +434,12 @@ holds, from the kill credential, the ledger, the exit wand and the
 environment. -/
 theorem pns_taint_of_fds (OK : PnsRoundOk R) (fdm : Fdmap) (l : List FdState) (vs : RegMapF Pdev)
     (hok : pnsOk Q.Dp fdm l vs) :
-    ⊢ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ ustd Q.N.fd l -∗ pnsXk R Q -∗ pnsEnv R Q.Sup vs -∗
+    ⊢ MachFixedGS.killCred (GF := GF) -∗ ustd Q.N.fd l -∗ pnsXk R Q -∗ pnsEnv R Q.Sup vs -∗
       pnsTaint R Q (fdDom fdm) := by
   iintro #Ht Hstd Hxk #He
   unfold pnsEnv
   icases He with ⟨#Hk, #Hs, -⟩
-  have hT : MachFixedGS.killCred (hlc := hlc) (GF := GF) = R.T := OK.hkill
+  have hT : MachFixedGS.killCred (GF := GF) = R.T := OK.hkill
   unfold pnsXk
   ihave Hpay := Hxk $$ [Ht]
   · ileft; rw [hT]; iexact Ht

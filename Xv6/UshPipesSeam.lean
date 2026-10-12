@@ -38,12 +38,13 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section UshPipesSeam
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-! ## §1 The seam -/
 
+omit [MachGS GF] in
 /-- **Rocq `ushq_tree_pipe_elim`**: a parser PIPE node, taken apart. -/
 theorem ushq_tree_pipe_elim (N : UkNames GF) (s0 p : Nat) (l r : UshpCmd) :
     ushTree N s0 p (.pipe l r) ⊢
@@ -61,21 +62,21 @@ stages. -/
 theorem ushCmd_of_ushp_pipes (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail s0 len : Nat)
     (g : Nat → BitVec 8) (hlen : len < 2 ^ 31) (hs0 : 0 < s0) (hs0hi : s0 + len < 2 ^ 38) :
     ∀ (rest : List (List (Nat × Nat))) (a : List (Nat × Nat)) (p : Nat), ushqCutsOk len g a rest →
-      ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTree N s0 p (ushqPtree a rest) -∗
+      ⊢ urun N h m pc avail -∗ ushTree N s0 p (ushqPtree a rest) -∗
         ubytesq N.d DFrac.discard s0 (len + 1) g -∗
-        |==> (urun (hlc := hlc) N h m pc avail ∗ ushCmd N.d p (ushPipes (ushArgs s0 g a) (rest.map (ushArgs s0 g))))
+        |==> (urun N h m pc avail ∗ ushCmd N.d p (ushPipes (ushArgs s0 g a) (rest.map (ushArgs s0 g))))
   | [], a, p, hcut => by
     obtain ⟨hin, hend, hbod⟩ := hcut
-    show ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTree N s0 p (.exec a) -∗
+    show ⊢ urun N h m pc avail -∗ ushTree N s0 p (.exec a) -∗
         ubytesq N.d DFrac.discard s0 (len + 1) g -∗
-        |==> (urun (hlc := hlc) N h m pc avail ∗ ushCmd N.d p (.exec (ushArgs s0 g a)))
+        |==> (urun N h m pc avail ∗ ushCmd N.d p (.exec (ushArgs s0 g a)))
     iintro Hrun Ht #Hline
     iapply ushCmd_of_ushp_gen N h m pc avail s0 p len g a hin hend hbod hlen hs0 hs0hi $$ Hrun Ht Hline
   | b :: rest, a, p, hcut => by
     obtain ⟨⟨hin, hend, hbod⟩, hrest⟩ := hcut
-    show ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTree N s0 p (.pipe (.exec a) (ushqPtree b rest)) -∗
+    show ⊢ urun N h m pc avail -∗ ushTree N s0 p (.pipe (.exec a) (ushqPtree b rest)) -∗
         ubytesq N.d DFrac.discard s0 (len + 1) g -∗
-        |==> (urun (hlc := hlc) N h m pc avail ∗
+        |==> (urun N h m pc avail ∗
           ushCmd N.d p (.pipe (.exec (ushArgs s0 g a)) (ushPipes (ushArgs s0 g b) (rest.map (ushArgs s0 g)))))
     iintro Hrun Ht #Hline
     icases ushq_tree_pipe_elim N s0 p (.exec a) (ushqPtree b rest) $$ Ht with
@@ -107,12 +108,12 @@ bound (168 bytes, twelve units). -/
 theorem ushq_um_chain (HM : SH_MALLOC) (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) (sz : Nat) (hszlo : ushmBase + 16 ≤ sz) (hszal : pgRoundUpN sz = sz)
     (hszok : uszOk (sz + 65536)) :
-    ∀ i : Nat, i < 340 → ushmMallocTyLe (hlc := hlc) N 168 (ushqUm N sz i) (ushqUm N sz (i + 1))
+    ∀ i : Nat, i < 340 → ushmMallocTyLe N 168 (ushqUm N sz i) (ushqUm N sz (i + 1))
   | 0, _ => by
-    show ushmMallocTyLe (hlc := hlc) N 168 (ushmFresh N sz) (ushmOneGe N (sz + 65536) (4084 - 12 * 0))
+    show ushmMallocTyLe N 168 (ushmFresh N sz) (ushmOneGe N (sz + 65536) (4084 - 12 * 0))
     exact ushm_malloc_le_exec HM hps N sz hszlo hszal hszok
   | j + 1, hj => by
-    show ushmMallocTyLe (hlc := hlc) N 168 (ushmOneGe N (sz + 65536) (4084 - 12 * j))
+    show ushmMallocTyLe N 168 (ushmOneGe N (sz + 65536) (4084 - 12 * j))
       (ushmOneGe N (sz + 65536) (4084 - 12 * (j + 1)))
     have e : 4084 - 12 * (j + 1) = 4084 - 12 * j - ushmNu 168 := by simp only [ushmNu]; omega
     rw [e]

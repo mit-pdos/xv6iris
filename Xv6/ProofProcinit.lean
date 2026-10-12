@@ -178,7 +178,7 @@ theorem piKept_trans {R R' R'' : RegMap} (h : piKept R R') (h' : piKept R' R'') 
     h'.2.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2.2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-! ## The eight-slot frame -/
@@ -328,7 +328,7 @@ theorem pi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
       lkFresh lk -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK'
+  have h := IL.wp_initlock (GF := GF) c k' vlock vname vcpu hK'
   unfold wp_initlock_body at h
   simp only [initlockAddr, h10, h11] at h
   exact h
@@ -587,7 +587,7 @@ set_option maxHeartbeats 4000000 in
 pre-8-P `wp_procinit_body`): the lock, state and kstack words only.
 `procinit_proof` frames the dormant blocks and the supply shares around it
 and routes the shares (`pi_route`). -/
-def procinitCellsBody {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def procinitCellsBody {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) : Prop :=
   kctx cpu k ∗ pcIs cpu procinitAddr ∗
   (∃ vlock vname vcpu, lockWords pidLockAddr vlock vname vcpu) ∗
@@ -600,9 +600,9 @@ def procinitCellsBody {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+theorem procinit_cells (IL : INITLOCK) {GF : BundledGFunctors.{0}} [MachGS GF]
     [CurCtx] (cpu : CPU) (k : KCtx) (hK : 10 ≤ k.avail) :
-    procinitCellsBody (hlc := hlc) (GF := GF) cpu k := by
+    procinitCellsBody (GF := GF) cpu k := by
   unfold procinitCellsBody
   simp only [procinitAddr]
   iintro ⟨Hk, Hpc, Hpid, Hwait, Hlist, HΦ⟩
@@ -784,9 +784,10 @@ end
 /-! ## The supplies, routed (Rocq `ProofProcinit`'s carve) -/
 
 section Route
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- `n` shares of `m` units, one per slot. -/
 theorem pi_supply_split (S : Nat → IProp GF) (hs : ∀ a b, S (a + b) ⊢ S a ∗ S b) (m : Nat) :
     ∀ n : Nat, S (n * m) ⊢ [∗list] _i ∈ List.range n, S m
@@ -854,8 +855,8 @@ set_option maxHeartbeats 4000000 in
 cells-level body, with the dormant blocks and the supply shares framed
 across it and routed into `procReady` at the return. -/
 theorem procinit_proof (IL : INITLOCK) : PROCINIT :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k hK => by
-  have h := procinit_cells IL (hlc := hlc) (GF := GF) cpu k hK
+  ⟨fun {GF} _ _ _ _ _ _ _ _ cpu k hK => by
+  have h := procinit_cells IL (GF := GF) cpu k hK
   unfold procinitCellsBody at h
   unfold wp_procinit_body
   iintro ⟨Hk, Hpc, Hpid, Hwait, Hraw, Hf, Hr, Hb, HΦ⟩

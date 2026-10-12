@@ -294,7 +294,7 @@ example : (DiskG.mlPosG : MonoListG unionGF Nat) = ugfMlPos := rfl
 /-! ## `MachGpreS`, every row from the cameras above -/
 
 /-- `MachGpreS` at the union's functor list (as `xv6GF_machGpreS`). -/
-@[reducible] def unionGF_machGpreS (hlc : HasLC) (γ : GName) : MachGpreS hlc unionGF :=
+@[reducible] def unionGF_machGpreS (γ : GName) : MachGpreS unionGF :=
   { toInvGpreS := unionGF_invGpreS
     reg_pre := inferInstance
     mem_pre := ⟨inferInstance, inferInstance, inferInstance⟩

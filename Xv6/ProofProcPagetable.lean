@@ -35,11 +35,12 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## `proc_pagetable` -/
 
 set_option maxHeartbeats 1000000 in
+omit [MachGS GF] in
 /-- The count of an arbitrary mode, forgotten. -/
 theorem pp_avail_none [CurCtx] (γk : KmemNames) (on : Option Nat) :
     kallocAvail (GF := GF) γk on ⊢ |==> kallocAvail γk none := by
@@ -104,7 +105,7 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP) (UF : UVMFREE) :
     PROC_PAGETABLE :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γl γk on tf dq ke hnoff hK hlk htf htfv => by
+  ⟨fun {GF} _ _ _ _ _ _ _ _ cpu k γl γk on tf dq ke hnoff hK hlk htf htfv => by
   unfold wp_proc_pagetable_body
   simp only [procPagetableAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, Htf, Hlend, HΦ⟩

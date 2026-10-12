@@ -36,7 +36,7 @@ open Wid Pline'
 open UShPipesDefs UShPipesStage UShPipesNode
 
 section Echo
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -52,16 +52,16 @@ theorem uD_Rd_true (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) (sR : Fsta
 
 /-- **Rocq `upipes_child_law_echo`**: THE ECHO PIPELINE'S CHILD, the whole
 deed kept by node 0. -/
-theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
+theorem upipes_child_law_echo (E : UPipesEng (GF := GF))
     (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (γp : GName)
-    (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
-    (hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = fileTaint (hlc := hlc) ug.ugnFile.fgnCl) :
-    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
-      shEchoSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
-      shCatSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
-      shGrepSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
-      ushfChildLawAt (hlc := hlc) (Xu (hlc := hlc) (GF := GF) ug r s0 γp) ushDg pipesLpg (68 + ushDpipe) := by
+    (heq : HfpFileClaimsP.fileAppIs (GF := GF) ug.ugnFile.fgnCl r)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
+    (hkill : MachFixedGS.killCred (GF := GF) = fileTaint ug.ugnFile.fgnCl) :
+    ⊢ unionLinks (GF := GF) ug -∗
+      shEchoSlot (fileTaint ug.ugnFile.fgnCl) -∗
+      shCatSlot (fileTaint ug.ugnFile.fgnCl) -∗
+      shGrepSlot (fileTaint ug.ugnFile.fgnCl) -∗
+      ushfChildLawAt (Xu (GF := GF) ug r s0 γp) ushDg pipesLpg (68 + ushDpipe) := by
   unfold ushfChildLawAt
   iintro #Hlk #Hes #Hcs #Hgs
   imodintro
@@ -101,7 +101,7 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
   iapply wp_ushChildPipesG E.UL E.SPc N' (ushqUm N' sz) 340
     (ushq_um_chain E.HM E.hps N' sz (by have h8 : ushmBase + 16 ≤ 8344 := (by decide); omega) hszal hszok)
     h m dw dv sa len gb (wlToks ws) (uRT ws (F :: fs')) 0 (96 + nn - 6 * (fs'.length + 1))
-    iprop((Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wc I 3 ∗ ustd N'.fd ld) hbars (by rw [urt_len]; simp only [List.length_cons]; omega) hs1 hs0 hs64 hs38
+    iprop((Xu (GF := GF) ug r s0 γp).Wc I 3 ∗ ustd N'.fd ld) hbars (by rw [urt_len]; simp only [List.length_cons]; omega) hs1 hs0 hs64 hs38
     $$ Hcode Hstr Hws Hsy HM [Hcp Hstd] [] Hrun
   · isplitl [Hcp]
     · iexact Hcp
@@ -141,9 +141,9 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
   -- THE ROUND'S ALLOCATION, at the deed's state
   iapply wpLoop_fupd
   imod pls_nodes_alloc (GF := GF) (lcats (LPipes (.PrEcho ws) (F :: fs'))) with ⟨%P, %gF, %gG, Hnodes⟩
-  ihave HPW := uD_pwc ug v I (dstContent s) (genId (hlc := hlc) (GF := GF) + 1) $$ HPW
+  ihave HPW := uD_pwc ug v I (dstContent s) (genId (GF := GF) + 1) $$ HPW
   imod pipesV_alloc (ugnPipe ug) ulmG pviewUnionU (ucparams ug) v I (dstContent s)
-    (LPipes (.PrEcho ws) (F :: fs')) hplok ⊤ pnsN (genId (hlc := hlc) (GF := GF) + 1) termw
+    (LPipes (.PrEcho ws) (F :: fs')) hplok ⊤ pnsN (genId (GF := GF) + 1) termw
     (tokN (pviewUnionU.pvFc (dstContent s)) (LPipes (.PrEcho ws) (F :: fs')))
     (pdep (uD ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs')) (wlLine (ws.drop 1)) (.PrEcho ws)
       iprop(True) (fun _ => default) (fun _ => default) P gF gG)) $$ HPW with ⟨%γc, %γm, #Hfam, Hh⟩
@@ -152,9 +152,9 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
   have OK := uPdOk ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs')) (wlLine (ws.drop 1)) (.PrEcho ws)
     iprop(True) γc γm P gF gG hcons hlR hfc hadmit hplok
   have H : NodeOk (uD ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs')) (wlLine (ws.drop 1)) (.PrEcho ws)
-      iprop(True) γc γm P gF gG) (F :: fs') (ushfWq (Xu (hlc := hlc) (GF := GF) ug r s0 γp) I)
-      iprop(eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I
-        ∗ f0cw ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0 ∗ ushDeedAt (hlc := hlc) (GF := GF) ug r upreTie s0 I) :=
+      iprop(True) γc γm P gF gG) (F :: fs') (ushfWq (Xu (GF := GF) ug r s0 γp) I)
+      iprop(eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ inpLb v I
+        ∗ f0cw ug.ugnFile (genId (GF := GF) + 1) s0 ∗ ushDeedAt (GF := GF) ug r upreTie s0 I) :=
     { ok := OK
       hkill := hkill
       hL31 := Xv6.ush_line_len ws hok
@@ -162,12 +162,12 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
       hLw := rfl
       hgate := hgate
       hfin := ufin ug r s0 γp v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs')) (wlLine (ws.drop 1))
-        (.PrEcho ws) iprop(True) (ushDeedAt (hlc := hlc) (GF := GF) ug r upreTie s0 I) P gF gG γc γm hlR hfc hadmit hplok hpos
+        (.PrEcho ws) iprop(True) (ushDeedAt (GF := GF) ug r upreTie s0 I) P gF gG γc γm hlR hfc hadmit hplok hpos
         (by iintro ⟨H, -⟩; iexact H)
       hRd := by show Timeless iprop(True); infer_instance }
   have K := uStgOk ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs')) (wlLine (ws.drop 1)) (.PrEcho ws)
     iprop(True) γc γm P gF gG E r heq hkill OK (Xv6.ush_line_len ws hok) (Hfire H)
-  have L : LawOk (uD (hlc := hlc) (GF := GF) ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs')) (wlLine (ws.drop 1)) (.PrEcho ws)
+  have L : LawOk (uD (GF := GF) ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs')) (wlLine (ws.drop 1)) (.PrEcho ws)
       iprop(True) γc γm P gF gG) sa (uGS ws (F :: fs') len gb) (uSTG ws (F :: fs') len gb sa)
       (ushArgs sa (uGS ws (F :: fs') len gb) (ushEchoToks ws)) ld rb1 rb2 :=
     { hlen := ustg_len ws (F :: fs') len gb sa
@@ -183,10 +183,10 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
   ihave Hnodes := uD_nodes ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs')) (wlLine (ws.drop 1))
     (.PrEcho ws) iprop(True) γc γm P gF gG $$ Hnodes
   -- THE STAGES, at the parser's cut
-  ihave #Hss := ush_stage_slots (F :: fs') (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) $$ Hcs Hgs
+  ihave #Hss := ush_stage_slots (F :: fs') (fileTaint ug.ugnFile.fgnCl) $$ Hcs Hgs
   ihave #Hss := uD_slots ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs')) (wlLine (ws.drop 1))
     (.PrEcho ws) iprop(True) γc γm P gF gG (F :: fs') $$ Hss
-  ihave #Hcd0 := ushCldep_nonpipe (hlc := hlc) (GF := GF) (FdState.open true wr0 (.device CONSOLE))
+  ihave #Hcd0 := ushCldep_nonpipe (GF := GF) (FdState.open true wr0 (.device CONSOLE))
     (fun _ _ _ h => by cases h)
   have E2 : 68 + ((uRT ws (F :: fs')).length * 6 + (96 + nn - 6 * (fs'.length + 1))) =
       6 + (2 + (ushDg + (6 * (uREST ws F fs' len gb sa).length
@@ -195,14 +195,14 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
     omega
   rw [E2]
   -- THE PRODUCER'S LAW: echo's, the loan `True`
-  haveI : Persistent (uD (hlc := hlc) (GF := GF) ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs'))
+  haveI : Persistent (uD (GF := GF) ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs'))
       (wlLine (ws.drop 1)) (.PrEcho ws) iprop(True) γc γm P gF gG).Rd := by
     show Persistent iprop(True); infer_instance
   ihave #Hpl := plaw_echo H (uStgEnv ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs')) (wlLine (ws.drop 1))
     (.PrEcho ws) iprop(True) γc γm P gF gG E) K sa (uGS ws (F :: fs') len gb) ws rfl hok
     (pcutFs_echo_bytes (.PrEcho ws) (F :: fs') gb len hlat) $$ Hfam [Hes]
   · iapply uD_T_cast ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs')) (wlLine (ws.drop 1))
-      (.PrEcho ws) iprop(True) γc γm P gF gG (shEchoSlot (hlc := hlc)) $$ Hes
+      (.PrEcho ws) iprop(True) γc γm P gF gG (shEchoSlot) $$ Hes
   ihave #Hcmd := ushCmd_stages N'.d q sa len gb ws F fs' $$ Hcmd
   iapply wp_pipes_round_alloc H (uStgEnv ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs'))
       (wlLine (ws.drop 1)) (.PrEcho ws) iprop(True) γc γm P gF gG E) K L E.SR E.UL (ukSysP_holds E.UL) E.SP E.SW

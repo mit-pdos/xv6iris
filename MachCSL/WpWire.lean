@@ -37,7 +37,7 @@ namespace MachCSL
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## What a pin-driving primitive does -/
 
@@ -139,7 +139,7 @@ theorem wpDev_wireR (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSile
     (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') (_hN : N ## wireN) :
     devInvR N d R ∗ wireInv ∗ genCert ⊢@{IProp GF}
       ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.WireR rel m⌝ →
-        devWP (genId (hlc := hlc) (GF := GF)) d tid m := by
+        devWP (genId (GF := GF)) d tid m := by
   unfold devInvR wireInv
   iintro ⟨#Hinv, ⟨#Hwire, -⟩, #Hcert⟩
   iloeb as IH
@@ -164,7 +164,7 @@ theorem wpDev_wireR (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSile
   imod Hmask
   have hmk : ∀ (m'' : DevProg d), DevM.WireR rel m'' →
       ⊢@{IProp GF} (∀ (tid : TaskId) (m : DevProg d), ⌜DevM.WireR rel m⌝ →
-        devWP (genId (hlc := hlc) (GF := GF)) d tid m) -∗ wpDev d tid m'' := by
+        devWP (genId (GF := GF)) d tid m) -∗ wpDev d tid m'' := by
     intro m'' hm''
     iintro IH
     unfold wpDev

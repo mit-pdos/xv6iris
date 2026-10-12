@@ -69,7 +69,7 @@ theorem tk3_true (h m t : Nat) : tk3 h m t h = true ∧ tk3 h m t m = true ∧ t
 /-! ## A slot, with its `free` byte spelled out -/
 
 section slots
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- The `free` byte a receipt implies. -/
 def freeByte : HState → BitVec 8
@@ -237,7 +237,7 @@ end slots
 /-! ## The payload, mid-allocation -/
 
 section payload
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **The lock's payload with the slots marked by `tk` taken out.**  At
 `tk = fun _ => false` it IS `Xv6.diskRes`. -/
@@ -371,7 +371,7 @@ end payload
 /-! ## The frame, split into the saved registers and `int idx[3]` -/
 
 section frame
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The TEN saved-register cells of `virtio_disk_rw`'s frame: the twelve
 of `MachCSL.frame12s8` minus the two scratch ones that hold `int idx[3]`. -/
@@ -409,13 +409,13 @@ theorem tk3_eq (h m t : Nat) :
 /-! ## The two seams of P2 -/
 
 section seams
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **The head of the outer retry loop** (`virtio_disk_rw + 0xbc`): the
 P1 seam with the frame's two scratch cells already split into `idx[]`.
 Löb's induction hypothesis in `Xv6.vdrw_P2` is this, at any hart and any
 `SPIE`/`SPP` -- `sleep` may come back on another hart. -/
-def vdrwLoopHead (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def vdrwLoopHead (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (x0 x1 x2 y : BitVec 32) (R : RegMap) : IProp GF := iprop%
@@ -427,7 +427,7 @@ def vdrwLoopHead (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   bufOwn (k.regs 10#5) bno dsk0 dataBuf ∗ diskBlock γ bno.toNat dataDisk ∗
   vdrwNext k γ bno wr dataBuf dataDisk none cpu
 
-theorem vdrwLoopHead_elim (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem vdrwLoopHead_elim (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (x0 x1 x2 y : BitVec 32) (R : RegMap) :
@@ -455,7 +455,7 @@ theorem idxCells_elim (sp : BitVec 64) (x0 x1 x2 y : BitVec 32) :
 
 /-- The P1 seam is the loop head (the `viewLb` the lock hands out is not
 needed again until the next `release`, which takes it from `locked`). -/
-theorem vdrwP1Exit_head (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem vdrwP1Exit_head (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (R : RegMap) :
     vdrwP1Exit (GF := GF) Γ cpu k γ γl pd pav pu bno dsk0 dataBuf dataDisk R ⊢
@@ -485,7 +485,7 @@ payload (`Xv6.vdrwSlotOut`: its receipt and its sixteen zero bytes, owned
 whole) with its `free` byte behind at `0` (`Xv6.diskResA` at
 `Xv6.tk3 h m t`); the lock is still held and the payload is otherwise
 intact. -/
-def vdrwP2Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def vdrwP2Exit (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (h m t : Nat) (y : BitVec 32) (R : RegMap) : IProp GF := iprop%

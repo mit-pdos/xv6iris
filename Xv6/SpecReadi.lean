@@ -180,9 +180,9 @@ theorem rdFailWhy_mono {P : UPtd} {dst : BitVec 64} {n n' : Nat} (hle : n ≤ n'
   exact ⟨d, by omega, hn⟩
 
 /-- **readi** (Rocq's `wp_readi_sconf_body`). -/
-def wp_readi_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_readi_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (γkl : GName) (γk : KmemNames)
@@ -241,9 +241,9 @@ def wp_readi_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6
 /-- The eb-generic form of `wp_readi_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_readi_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_readi_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (γkl : GName) (γk : KmemNames)
@@ -301,9 +301,9 @@ def wp_readi_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `readi` (Rocq's `Module Type READI`). -/
 structure READI : Prop where
-  wp_readi_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_readi_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (γkl : GName) (γk : KmemNames)
@@ -312,7 +312,7 @@ structure READI : Prop where
     (pidv : BitVec 32) (Vp : ProcPriv) (M : Nat → List (BitVec 8)) (dqp dq dqd : DFrac)
     hj hproc hK hnoff htier hgeom hwf hcov hsz hoff hjoint hdev hcl hdt hpd
     ha0 huser ha3 ha4 holds,
-    wp_readi_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart dev
+    wp_readi_eb_body (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart dev
       γkl γk ip bm data dn user off n olds pidv Vp M dqp dq dqd
       hj hproc hK hnoff htier hgeom hwf hcov hsz hoff hjoint hdev hcl hdt hpd
       ha0 huser ha3 ha4 holds

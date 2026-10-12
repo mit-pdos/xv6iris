@@ -40,52 +40,52 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [Xv6G GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-- The record at an image, at the fixed layer's names (Rocq `P_fs_rec_at`). -/
 abbrev pFsRecAt (gt : GName) (cov : ExtTreeSet Nat compare) (ls : Nat) (dk : Nat → BitVec 8) :
     IProp GF :=
-  pFsRecNamedAt gt (MachFixedGS.swapName (hlc := hlc) (GF := GF))
-    (MachFixedGS.registryName (hlc := hlc) (GF := GF))
-    (MachFixedGS.startName (hlc := hlc) (GF := GF)) cov ls dk
+  pFsRecNamedAt gt (MachFixedGS.swapName (GF := GF))
+    (MachFixedGS.registryName (GF := GF))
+    (MachFixedGS.startName (GF := GF)) cov ls dk
 
 /-- The file system's half of the crash predicate: the record and the durable
 fragments at the fixed layer's name and size (Rocq `P_fs_any_at`). -/
 abbrev pFsAnyAt (gt : GName) (cov : ExtTreeSet Nat compare) (ls : Nat) : IProp GF :=
-  pFsNamedAt gt (MachFixedGS.diskName (hlc := hlc) (GF := GF))
-    (MachFixedGS.diskSize (hlc := hlc) (GF := GF))
-    (MachFixedGS.swapName (hlc := hlc) (GF := GF))
-    (MachFixedGS.registryName (hlc := hlc) (GF := GF))
-    (MachFixedGS.startName (hlc := hlc) (GF := GF)) cov ls
+  pFsNamedAt gt (MachFixedGS.diskName (GF := GF))
+    (MachFixedGS.diskSize (GF := GF))
+    (MachFixedGS.swapName (GF := GF))
+    (MachFixedGS.registryName (GF := GF))
+    (MachFixedGS.startName (GF := GF)) cov ls
 
 /-- THE COMPOSITE: the record at its snapshot's map name and an opaque guest at
 that same name (Rocq `P_fs_comp`). -/
 def pFsComp (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat) : IProp GF :=
-  iprop(∃ gt : GName, pFsAnyAt (hlc := hlc) gt cov ls ∗ G gt)
+  iprop(∃ gt : GName, pFsAnyAt gt cov ls ∗ G gt)
 
 /-- THE SEAM: "the crash predicate IS my composite at `G`" (Rocq
 `fs_crash_seam_at`). -/
 def fsCrashSeamAt (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat) : IProp GF :=
-  iprop(□ ((MachFixedGS.crashPred (hlc := hlc) (GF := GF) -∗ pFsComp (hlc := hlc) G cov ls) ∗
-    (pFsComp (hlc := hlc) G cov ls -∗ MachFixedGS.crashPred (hlc := hlc) (GF := GF))))
+  iprop(□ ((MachFixedGS.crashPred (GF := GF) -∗ pFsComp G cov ls) ∗
+    (pFsComp G cov ls -∗ MachFixedGS.crashPred (GF := GF))))
 
 /-- ...and the ARITY-FREE handle the boot chain carries: the seam at SOME guest
 (Rocq `fs_crash_seam`). -/
 def fsCrashSeam (cov : ExtTreeSet Nat compare) (ls : Nat) : IProp GF :=
-  iprop(∃ G : GName → IProp GF, fsCrashSeamAt (hlc := hlc) G cov ls)
+  iprop(∃ G : GName → IProp GF, fsCrashSeamAt G cov ls)
 
 instance fsCrashSeamAt_persistent (G : GName → IProp GF) (cov : ExtTreeSet Nat compare)
-    (ls : Nat) : Persistent (fsCrashSeamAt (hlc := hlc) G cov ls) := by
+    (ls : Nat) : Persistent (fsCrashSeamAt G cov ls) := by
   unfold fsCrashSeamAt; infer_instance
 
 instance fsCrashSeam_persistent (cov : ExtTreeSet Nat compare) (ls : Nat) :
-    Persistent (fsCrashSeam (hlc := hlc) (GF := GF) cov ls) := by
+    Persistent (fsCrashSeam (GF := GF) cov ls) := by
   unfold fsCrashSeam; infer_instance
 
 /-- Rocq `fs_crash_seam_of_at`. -/
 theorem fsCrashSeam_ofAt (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat) :
-    fsCrashSeamAt (hlc := hlc) G cov ls ⊢ fsCrashSeam (hlc := hlc) cov ls := by
+    fsCrashSeamAt G cov ls ⊢ fsCrashSeam cov ls := by
   iintro #H
   unfold fsCrashSeam
   iexists G
@@ -97,24 +97,24 @@ the new one. -/
 def fsRecPermit (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat) (gd : Nat)
     (w : DiskWr) (Q : IProp GF) : IProp GF :=
   iprop(∀ (dk : Nat → BitVec 8) (n : Nat) (gt : GName),
-    startAuth (hlc := hlc) n -∗ ⌜n = gd + 1⌝ -∗
-    ▷ pFsRecAt (hlc := hlc) gt cov ls dk -∗ ▷ G gt ={∅}=∗
-      ∃ gt' : GName, ▷ pFsRecAt (hlc := hlc) gt' cov ls (wrApply w dk) ∗ ▷ G gt' ∗
-        startAuth (hlc := hlc) n ∗ Q)
+    startAuth n -∗ ⌜n = gd + 1⌝ -∗
+    ▷ pFsRecAt gt cov ls dk -∗ ▷ G gt ={∅}=∗
+      ∃ gt' : GName, ▷ pFsRecAt gt' cov ls (wrApply w dk) ∗ ▷ G gt' ∗
+        startAuth n ∗ Q)
 
 /-- The record-level permit IS a machine write permit, once the seam is in
 hand: the fragments are agreed against the lent authority, the record's view
 shift runs, and both move to the post-write image (Rocq `fs_permit_of_rec`). -/
 theorem fsPermit_ofRec (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (gd : Nat) (w : DiskWr) (Q : IProp GF) :
-    fsCrashSeamAt (hlc := hlc) G cov ls ⊢ fsRecPermit (hlc := hlc) G cov ls gd w Q -∗
-      diskWritePermit (hlc := hlc) gd w Q := by
+    fsCrashSeamAt G cov ls ⊢ fsRecPermit G cov ls gd w Q -∗
+      diskWritePermit gd w Q := by
   iintro #Hseam Hrec
   unfold diskWritePermit
   iintro %dk %n Hsa %hn Ha HP
   unfold fsCrashSeamAt
   icases Hseam with ⟨#Hfwd, #Hbwd⟩
-  ihave HP : ▷ pFsComp (hlc := hlc) G cov ls $$ [HP]
+  ihave HP : ▷ pFsComp G cov ls $$ [HP]
   · inext; iapply Hfwd $$ HP
   unfold pFsComp
   icases HP with ⟨%gt, HP, HG⟩
@@ -124,7 +124,7 @@ theorem fsPermit_ofRec (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (
   ihave ⟨%hrd, Ha, Hfr⟩ := pFsCrashRead _ _ dk dk0 $$ [Ha Hfr]
   · iframe Ha Hfr
   ihave HPr := pFsRecAgree gt _ _ _ cov ls _ dk0 dk hrd.symm hext $$ HPr
-  ihave HPr : ▷ pFsRecAt (hlc := hlc) gt cov ls dk $$ [HPr]
+  ihave HPr : ▷ pFsRecAt gt cov ls dk $$ [HPr]
   · inext; iexact HPr
   unfold fsRecPermit
   imod Hrec $$ %dk %n %gt Hsa %hn HPr HG with ⟨%gt', HPr, HG, Hsa, HQ⟩
@@ -149,8 +149,8 @@ theorem fsPermit_ofRec (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (
 `fs_rec_permit_mono`). -/
 theorem fsRecPermit_mono (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (gd : Nat) (w : DiskWr) (R R' : IProp GF) :
-    (R -∗ R') ⊢ fsRecPermit (hlc := hlc) G cov ls gd w R -∗
-      fsRecPermit (hlc := hlc) G cov ls gd w R' := by
+    (R -∗ R') ⊢ fsRecPermit G cov ls gd w R -∗
+      fsRecPermit G cov ls gd w R' := by
   iintro HR Hp
   unfold fsRecPermit
   iintro %dk %n %gt Hsa %hn HP HG

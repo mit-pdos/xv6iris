@@ -60,7 +60,7 @@ theorem uf_vpn0 : (vpnOf (0#64)).toNat = 0 := by decide
 theorem uf_one_ne_zero : (1#64 : BitVec 64) ≠ 0#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
 
 /-! ## The two calls -/
 
@@ -80,7 +80,7 @@ theorem uf_freewalk_call [WchG GF] (FW : FREEWALK) [CurCtx] (c : CPU) (k' : KCtx
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := FW.wp_freewalk (hlc := hlc) (GF := GF) c k' γl γk 2 t ke (by omega) hnoff' hK' hlk'
+  have h := FW.wp_freewalk (GF := GF) c k' γl γk 2 t ke (by omega) hnoff' hK' hlk'
     hroot' hwf' hnd' hpg' hnl'
   unfold wp_freewalk_body at h
   simp only [freewalkAddr] at h
@@ -105,7 +105,7 @@ theorem uf_uvmunmap_call (UB : UVMUNMAP_BARE) [CurCtx] (c : CPU) (k' : KCtx)
       umPages (P.delRun (vpnOf (k'.regs 11#5)).toNat n) M -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := UB.wp_uvmunmap_bare (hlc := hlc) (GF := GF) c k' γl γk P M n ke hnoff' hK' hlk' hwf'
+  have h := UB.wp_uvmunmap_bare (GF := GF) c k' γl γk P M n ke hnoff' hK' hlk' hwf'
     hroot' hal' hn' hrange' hfree'
   unfold wp_uvmunmap_bare_body at h
   simp only [uvmunmapAddr] at h
@@ -255,7 +255,7 @@ theorem uvmfree_br_fffffffffffffe2c : KA.«uvmfree» + 0xfffffffffffffe2c#64 = K
 
 set_option maxHeartbeats 4000000 in
 theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M ke hnoff hK hlk hroot hsz hwf hbelow => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk P M ke hnoff hK hlk hroot hsz hwf hbelow => by
   unfold wp_uvmfree_body
   simp only [uvmfreeAddr]
   iintro ⟨Hk, Hpc, #Hlk, #Hav, Htree, Hpages, Hlend, HΦ⟩

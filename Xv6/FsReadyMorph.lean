@@ -28,7 +28,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
@@ -56,8 +56,8 @@ instance isBufSlk_morph (γ : BcacheNames) (k : Nat) :
 instance bioCtx_morph (γl : GName) (γ : BcacheNames) (V : BioView GF) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; bioCtx (GF := GF) γl γ V) := by
   unfold bioCtx
-  refine @instCtxMorphSep hlc GF _ _ _ (isBcache_morph γl γ V) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ ?_ (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl))
+  refine @instCtxMorphSep GF _ _ _ (isBcache_morph γl γ V) ?_
+  refine @instCtxMorphSep GF _ _ _ ?_ (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl))
   exact ctxMorph_bigSepL (List.range NBUF)
     (fun _ k ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; isBufSlk (GF := GF) γ k) (fun _ k => isBufSlk_morph γ k)
 
@@ -67,7 +67,7 @@ instance logCtx_morph (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; logCtx (GF := GF) γ γb γfs cov logstart dev) := by
   unfold logCtx
-  refine @instCtxMorphSep hlc GF _ _ _ ?_ ?_
+  refine @instCtxMorphSep GF _ _ _ ?_ ?_
   · exact ctxMorph_congr (R' := fun ξ =>
       letI : CurCtx := ⟨ξ, KTier.kpt⟩
       isLock (GF := GF) γ.lk logAddr "log"
@@ -84,28 +84,28 @@ instance fsSbCells_morph [Fscfg] [Icfg] :
 
 /-- Rocq `fs_ready_morph`. -/
 instance fsReady_morph [Fscfg] [Icfg] :
-    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; fsReady (hlc := hlc) (GF := GF)) := by
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; fsReady (GF := GF)) := by
   unfold fsReady
-  refine @instCtxMorphSep hlc GF _ _ _ ?_ ?_
-  · refine @instCtxMorphExists hlc GF _ _ _ (fun γl => ?_)
+  refine @instCtxMorphSep GF _ _ _ ?_ ?_
+  · refine @instCtxMorphExists GF _ _ _ (fun γl => ?_)
     exact bioCtx_morph γl _ _
-  refine @instCtxMorphSep hlc GF _ _ _ (logCtx_morph _ _ _ _ _ _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ ?_ ?_
+  refine @instCtxMorphSep GF _ _ _ (logCtx_morph _ _ _ _ _ _) ?_
+  refine @instCtxMorphSep GF _ _ _ ?_ ?_
   · amb_morph_solve
-  refine @instCtxMorphSep hlc GF _ _ _ (isItable2_morph KTier.kpt _ _ _ _ _ _ _ _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (icSleeplocks_morph KTier.kpt _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ ?_ ?_
+  refine @instCtxMorphSep GF _ _ _ (isItable2_morph KTier.kpt _ _ _ _ _ _ _ _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (icSleeplocks_morph KTier.kpt _) ?_
+  refine @instCtxMorphSep GF _ _ _ (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ ?_ ?_
   · exact ctxMorph_congr (R' := fun ξ =>
       letI : CurCtx := ⟨ξ, KTier.kpt⟩
       isLock (GF := GF) fscKalloc kmemLockAddr "kmem"
         (fun ζ => letI : CurCtx := ⟨ζ, KTier.kpt⟩; kmemRes (GF := GF) fsReadyKmem ζ))
       (fun ξ => by amb_tier_rfl) (instCtxMorphIsLock _ _ _ _ _)
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  exact @instCtxMorphSep hlc GF _ _ _ fsSbCells_morph (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl))
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  exact @instCtxMorphSep GF _ _ _ fsSbCells_morph (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl))
 
 /-! ## FirstTok's rows (Rocq FirstTok.v:1029-1062, deferred there as its
 deviation 6) -/
@@ -119,20 +119,20 @@ instance panicEnv_morph :
 
 /-- Rocq `first_boot_persist_morph`. -/
 instance firstBootPersist_morph [Fscfg] [Icfg] :
-    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstBootPersist (hlc := hlc) (GF := GF)) := by
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstBootPersist (GF := GF)) := by
   unfold firstBootPersist
-  refine @instCtxMorphSep hlc GF _ _ _ panicEnv_morph ?_
-  refine @instCtxMorphSep hlc GF _ _ _ ?_ ?_
-  · refine @instCtxMorphExists hlc GF _ _ _ (fun γl => ?_)
+  refine @instCtxMorphSep GF _ _ _ panicEnv_morph ?_
+  refine @instCtxMorphSep GF _ _ _ ?_ ?_
+  · refine @instCtxMorphExists GF _ _ _ (fun γl => ?_)
     exact bioCtx_morph γl _ _
-  refine @instCtxMorphSep hlc GF _ _ _ ?_ ?_
+  refine @instCtxMorphSep GF _ _ _ ?_ ?_
   · amb_morph_solve
-  refine @instCtxMorphSep hlc GF _ _ _ (isItable2_morph KTier.kpt _ _ _ _ _ _ _ _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (icSleeplocks_morph KTier.kpt _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ ?_ (instCtxMorphConst _)
+  refine @instCtxMorphSep GF _ _ _ (isItable2_morph KTier.kpt _ _ _ _ _ _ _ _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (icSleeplocks_morph KTier.kpt _) ?_
+  refine @instCtxMorphSep GF _ _ _ (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)) ?_
+  refine @instCtxMorphSep GF _ _ _ (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)) ?_
+  refine @instCtxMorphSep GF _ _ _ ?_ (instCtxMorphConst _)
   exact ctxMorph_congr (R' := fun ξ =>
       letI : CurCtx := ⟨ξ, KTier.kpt⟩
       isLock (GF := GF) fscKalloc kmemLockAddr "kmem"
@@ -141,32 +141,32 @@ instance firstBootPersist_morph [Fscfg] [Icfg] :
 
 /-- Rocq `first_fsinit_morph`: fsinit's exclusive pile -- cells and ghost. -/
 instance firstFsinit_morph [Fscfg] [Icfg] :
-    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstFsinit (hlc := hlc) (GF := GF)) := by
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstFsinit (GF := GF)) := by
   unfold firstFsinit byteBuf
   amb_morph_solve
 
 /-- Rocq `first_boot_morph`. -/
 instance firstBoot_morph [Fscfg] [Icfg] :
-    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstBoot (hlc := hlc) (GF := GF)) := by
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstBoot (GF := GF)) := by
   unfold firstBoot
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ firstBootPersist_morph ?_
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) firstFsinit_morph
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) ?_
+  refine @instCtxMorphSep GF _ _ _ firstBootPersist_morph ?_
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) firstFsinit_morph
 
 /-- Rocq `first_done_morph`. -/
 instance firstDone_morph [Fscfg] [Icfg] :
-    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstDone (hlc := hlc) (GF := GF)) := by
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstDone (GF := GF)) := by
   unfold firstDone
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-    (@instCtxMorphSep hlc GF _ _ _ fsReady_morph (instCtxMorphConst _))
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+    (@instCtxMorphSep GF _ _ _ fsReady_morph (instCtxMorphConst _))
 
 /-- Rocq `first_tok_morph`. -/
 instance firstTok_morph [Fscfg] [Icfg] :
-    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstTok (hlc := hlc) (GF := GF)) := by
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; firstTok (GF := GF)) := by
   unfold firstTok
-  exact @instCtxMorphOr hlc GF _ _ _ firstBoot_morph
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-      (@instCtxMorphSep hlc GF _ _ _ fsReady_morph (instCtxMorphConst _)))
+  exact @instCtxMorphOr GF _ _ _ firstBoot_morph
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+      (@instCtxMorphSep GF _ _ _ fsReady_morph (instCtxMorphConst _)))
 
 end
 end Xv6

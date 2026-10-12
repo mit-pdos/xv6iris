@@ -53,7 +53,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -73,7 +73,7 @@ theorem kxc_cd (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN) (CO :
     (hterm : A.pfun A.plen = 0#8) :
     kxcAt1ae k A cpu spie spp R (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P Mi szv (k.regs 27#5) ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hst, #Hfab, Hcl⟩
@@ -94,7 +94,7 @@ theorem kxc_cd (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN) (CO :
 theorem kxc_from90 (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (RD : READI)
     (WA : WALKADDR) (PA : PANIC) (F2P : FLAGS2PERM) (UA : UVMALLOC) (MP : MYPROC) (UC : UVMCLEAR)
     (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (SS : SAFESTRCPY_SRC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -109,7 +109,7 @@ theorem kxc_from90 (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (RD :
     (hargs : kxcArgsOk A) (hna : A.na < MAXARG) (havf : A.avf A.na = 0#64)
     (havfnz : ∀ i, i < A.na → A.avf i ≠ 0#64) (hterm : A.pfun A.plen = 0#8) :
     kxcAt90 k A cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 ef ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hst, #Hfab, Hcl⟩

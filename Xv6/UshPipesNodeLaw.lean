@@ -56,9 +56,9 @@ open UShPipesDefs UShPipesStage UShPipeLeaves UShPipeCall
 
 /-- **Rocq's second section hypotheses** (deviation 1): the stages as the
 parse cut them and sh's ledger at the top node. -/
-structure LawOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+structure LawOk {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
     [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
-    (D : PdRound hlc GF) (s0 : Nat) (gs : Nat → BitVec 8) (stgs : List (List UArg)) (args0 : List UArg)
+    (D : PdRound GF) (s0 : Nat) (gs : Nat → BitVec 8) (stgs : List (List UArg)) (args0 : List UArg)
     (ld0 : List FdState) (rb1 rb2 : Bool) : Prop where
   /-- Rocq `Hlen` -/
   hlen : stgs.length = D.nc + 1
@@ -101,13 +101,13 @@ theorem nd_set_self (ld0 : List FdState) (st0 : FdState) (h : ld0[0]? = some st0
   · rfl
 
 section Law
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF] [FileAppG GF]
-variable {D : PdRound hlc GF} {fs : List Filt} {Qfin Rtop : IProp GF}
+variable {D : PdRound GF} {fs : List Filt} {Qfin Rtop : IProp GF}
 variable {s0 : Nat} {gs : Nat → BitVec 8} {stgs : List (List UArg)} {args0 : List UArg}
   {ld0 : List FdState} {rb1 rb2 : Bool}
 
@@ -115,8 +115,8 @@ variable {s0 : Nat} {gs : Nat → BitVec 8} {stgs : List (List UArg)} {args0 : L
 0, a middle filter stage below. -/
 theorem left_law_holds (H : NodeOk D fs Qfin Rtop) (S : StgEnv D) (K : StgOk D S)
     (L : LawOk D s0 gs stgs args0 ld0 rb1 rb2) (szv e : Nat) :
-    ⊢ D.FAM -∗ prod_stage_law D args0 -∗ shStageSlots (hlc := hlc) fs D.T -∗
-      ushLeftLaw (hlc := hlc) ushDg stgs ld0 szv ROOTINO (6 + e) (Qcf D) (RcLf D) := by
+    ⊢ D.FAM -∗ prod_stage_law D args0 -∗ shStageSlots fs D.T -∗
+      ushLeftLaw ushDg stgs ld0 szv ROOTINO (6 + e) (Qcf D) (RcLf D) := by
   have hn := nc_pos H
   have hl := ld0_len L.hld2
   unfold prod_stage_law
@@ -160,8 +160,8 @@ theorem left_law_holds (H : NodeOk D fs Qfin Rtop) (S : StgEnv D) (K : StgOk D S
 /-- **Rocq `last_law_holds`**: THE LAST STAGE. -/
 theorem last_law_holds (H : NodeOk D fs Qfin Rtop) (S : StgEnv D) (K : StgOk D S)
     (L : LawOk D s0 gs stgs args0 ld0 rb1 rb2) (szv e : Nat) :
-    ⊢ D.FAM -∗ shStageSlots (hlc := hlc) fs D.T -∗
-      ushLastLaw (hlc := hlc) ushDg stgs ld0 szv ROOTINO (6 + e) (Qcf D) (RcRf D) := by
+    ⊢ D.FAM -∗ shStageSlots fs D.T -∗
+      ushLastLaw ushDg stgs ld0 szv ROOTINO (6 + e) (Qcf D) (RcRf D) := by
   have hn := nc_pos H
   have hl := ld0_len L.hld2
   iintro #Hfam #Hcs
@@ -192,7 +192,7 @@ theorem entry_law_holds (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (HS : UK_SY
     (SW : SH_SYS_WAIT) (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (L : LawOk D s0 gs stgs args0 ld0 rb1 rb2) (szv e : Nat) :
     ⊢ D.FAM -∗
-      ushEntryLawG (hlc := hlc) ushDg stgs ld0 szv ROOTINO (6 + e) (Qcf D) (RcLf D) (RcRf D) := by
+      ushEntryLawG ushDg stgs ld0 szv ROOTINO (6 + e) (Qcf D) (RcLf D) (RcRf D) := by
   have hn := nc_pos H
   have hl := ld0_len L.hld2
   iintro #Hfam
@@ -231,12 +231,12 @@ theorem wp_pipes_round (H : NodeOk D fs Qfin Rtop) (S : StgEnv D) (K : StgOk D S
     (t szv : Nat) (st0 : FdState) (e : Nat)
     (hstg : stgs = a :: b :: rest) (hpeq : N.pay = fun _ : Int => Qfin)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 t) (hl0 : ld0[0]? = some st0) (hne0 : st0 ≠ .closed) :
-    ⊢ D.FAM -∗ prod_stage_law D args0 -∗ shStageSlots (hlc := hlc) fs D.T -∗
+    ⊢ D.FAM -∗ prod_stage_law D args0 -∗ shStageSlots fs D.T -∗
       ncred D Rtop 0 st0 -∗ pbundle (D.P 0) -∗ ushPid N -∗
       ushCode N.t -∗ ushJtab N.t -∗ ushCmd N.d t (ushPipes a (b :: rest)) -∗
-      usz N.s szv -∗ ustd N.fd ld0 -∗ ushCldep (hlc := hlc) st0 -∗
+      usz N.s szv -∗ ustd N.fd ld0 -∗ ushCldep st0 -∗
       ucwd N.cwd ROOTINO -∗ uch N.ch ∅ -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd»)
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd»)
         (6 + (2 + (ushDg + (6 * rest.length + (6 + e))))) -∗
       wpLoop h := by
   have hn := nc_pos H
@@ -268,14 +268,14 @@ theorem wp_pipes_round_alloc (H : NodeOk D fs Qfin Rtop) (S : StgEnv D) (K : Stg
     (t szv : Nat) (st0 : FdState) (e : Nat)
     (hstg : stgs = a :: b :: rest) (hpeq : N.pay = fun _ : Int => Qfin)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 t) (hl0 : ld0[0]? = some st0) (hne0 : st0 ≠ .closed) :
-    ⊢ D.FAM -∗ prod_stage_law D args0 -∗ shStageSlots (hlc := hlc) fs D.T -∗
+    ⊢ D.FAM -∗ prod_stage_law D args0 -∗ shStageSlots fs D.T -∗
       ([∗list] w ∈ D.wsN, halvesN D w) -∗
       ([∗list] j ∈ List.range D.nc, osP (D.gF j) ∗ osP (D.gG j) ∗ pbundle (D.P j)) -∗
       Rtop -∗ D.Rd -∗ ushPid N -∗
       ushCode N.t -∗ ushJtab N.t -∗ ushCmd N.d t (ushPipes a (b :: rest)) -∗
-      usz N.s szv -∗ ustd N.fd ld0 -∗ ushCldep (hlc := hlc) st0 -∗
+      usz N.s szv -∗ ustd N.fd ld0 -∗ ushCldep st0 -∗
       ucwd N.cwd ROOTINO -∗ uch N.ch ∅ -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd»)
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd»)
         (6 + (2 + (ushDg + (6 * rest.length + (6 + e))))) -∗
       wpLoop h := by
   iintro #Hfam #Hpl #Hcs Hh Ho HR HRd Hpid #Hcode #Hjt #Hcmd Hsz Hstd #Hcd0 Hcwd Hch Hrun
@@ -287,7 +287,7 @@ theorem wp_pipes_round_alloc (H : NodeOk D fs Qfin Rtop) (S : StgEnv D) (K : Stg
 theorem plaw_echo (H : NodeOk D fs Qfin Rtop) (S : StgEnv D) (K : StgOk D S) [Persistent D.Rd]
     (s0 : Nat) (gs : Nat → BitVec 8) (ws : List (List (BitVec 8)))
     (hpr : D.pr = .PrEcho ws) (hok : lineOk ws) (hbytes : ushEchoArgvBytes ws gs) :
-    ⊢ D.FAM -∗ shEchoSlot (hlc := hlc) D.T -∗ prod_stage_law D (ushArgs s0 gs (ushEchoToks ws)) := by
+    ⊢ D.FAM -∗ shEchoSlot D.T -∗ prod_stage_law D (ushArgs s0 gs (ushEchoToks ws)) := by
   have hLw : D.L = wlLine (ws.drop 1) := by rw [H.hLw, hpr]; rfl
   iintro #Hfam #Hes
   iapply stage_echo_law D S K ws s0 gs hpr hok hbytes hLw (nc_pos H) $$ Hfam Hes

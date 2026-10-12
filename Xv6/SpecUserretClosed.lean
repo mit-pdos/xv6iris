@@ -97,7 +97,7 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -116,11 +116,11 @@ def wp_userret_closed_body (PT : SchedNames → IProp GF) (Γ : SchedNames) (j :
   kctx cpu k ∗ stackOwn ksp m ∗ pcIs cpu userretVa ∗
   Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
   Register.stvec ↦ᵣ[cpu] uservecTvec ∗
-  procPtAt P M ∗ tfPageAt P.tfp V.tf ∗ usertrapResAt (hlc := hlc) PT Γ j cpu P ksp V sts cs pid ∗
-  uslot (hlc := hlc) (uvisOf V M sts gn cs pid) ∗
+  procPtAt P M ∗ tfPageAt P.tfp V.tf ∗ usertrapResAt PT Γ j cpu P ksp V sts cs pid ∗
+  uslot (uvisOf V M sts gn cs pid) ∗
   -- THE ORIGIN TICKET (NI M2-W2d): the one-shot claim this first resume's
   -- origin filing spends (a fork exit's child-origin claim, or initproc's)
-  MachFixedGS.uClaimO (hlc := hlc) (GF := GF)
+  MachFixedGS.uClaimO (GF := GF)
   ⊢ wpLoop (GF := GF) cpu
 
 end
@@ -131,16 +131,16 @@ residue (deviation 4) and the kernel's deposit instance, AT the park token
 the era's proc table and the handler environment's names as
 `USERTRAP` is. -/
 structure USERRET_CLOSED : Prop where
-  wp_userret_closed : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_userret_closed : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
+    (Γ : SchedNames) [ClaimIs GF Γ] [NiFitIs GF]
     (j : Nat) (cpu : CPU) (k : KCtx) (m : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) (sep sc tv : BitVec 64)
     hj hproc hctx htier hnoff hsp hav ha0 hsep hgn,
-    wp_userret_closed_body (hlc := hlc) (GF := GF) (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
+    wp_userret_closed_body (GF := GF) (parkToken (GF := GF) (SG := uexecSGXv6))
       Γ j cpu k m P ksp V M sts gn cs pid sep sc tv
       hj hproc hctx htier hnoff hsp hav ha0 hsep hgn
 

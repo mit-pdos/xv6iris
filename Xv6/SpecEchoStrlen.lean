@@ -24,7 +24,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -33,18 +33,18 @@ def wpEchoStrlenBody : Prop :=
   ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) (n : Nat),
     m.get 10#5 = BitVec.ofNat 64 a →
     ⊢ ukCode N.t User.Echo.code.byte -∗ ustr N.d dq a len f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Echo.Sym.«strlen») (2 + n) -∗
+      urun N h m (BitVec.ofNat 64 User.Echo.Sym.«strlen») (2 + n) -∗
       (ustr N.d dq a len f -∗ ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
         ⌜m'.get 10#5 = BitVec.ofNat 64 len⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
       wpLoop h
 
 end
 
 /-- The interface of echo's `strlen`. -/
 structure ECHO_STRLEN : Prop where
-  wp_echoStrlen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_echoStrlen : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpEchoStrlenBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpEchoStrlenBody (GF := GF)
 
 end Xv6

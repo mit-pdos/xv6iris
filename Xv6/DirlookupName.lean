@@ -29,7 +29,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -70,7 +70,7 @@ theorem dirlookup_name (NC : NAMECMP) (IG : IGET) (Γ : SchedNames)
     dirlookupDe (k.regs 2#5) (halfBytes (dirInum data i) ++ bview 14 (dirName data i)) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗ dirlookupIn hasp (k.regs 12#5) pofv ∗
-    dirlookupEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    dirlookupEnv Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') ∗
     dirlookupLoop k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel
     ⊢ wpLoop (GF := GF) cpu := by

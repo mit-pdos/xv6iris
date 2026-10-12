@@ -44,12 +44,12 @@ theorem hartAgent_ne_diskAgent (c : CPU) : hartAgent c ≠ diskAgent := by
 theorem diskAgent_ne_hartAgent (c : CPU) : diskAgent ≠ hartAgent c :=
   (hartAgent_ne_diskAgent c).symm
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
+variable {GF : BundledGFunctors.{0}}
 
 /-! ## The mirrors under a DMA write -/
 
 section memmodel
-variable [MachFixedGS hlc GF] (E : EraGS)
+variable [MachFixedGS GF] (E : EraGS)
 
 /-- No hart's views move at a DMA write. -/
 theorem hartViews_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (c : CPU) :
@@ -96,7 +96,7 @@ end memmodel
 /-! ## The DMA write, at the ambient era -/
 
 section ambient
-variable [MachGS hlc GF]
+variable [MachGS GF]
 
 /-- The footprint of a lease is DRAM: the cells are in the heap, `mmOk`
 says every history lives at a DRAM address.  This is what refutes the

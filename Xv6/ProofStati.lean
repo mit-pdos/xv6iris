@@ -32,7 +32,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 /-! ## The function -/
 
 set_option maxHeartbeats 4000000 in
-theorem stati_proof : STATI := ⟨fun {hlc GF} _ _ _ cpu k ip st dev inum dn dev0 ino0 ty0 nl0 sz0
+theorem stati_proof : STATI := ⟨fun {GF} _ _ _ cpu k ip st dev inum dn dev0 ino0 ty0 nl0 sz0
     dqd dqn ha0 ha1 hK => by
   unfold wp_stati_body inodeMeta statAt
   unfold statiSlots at hK

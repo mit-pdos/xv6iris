@@ -76,7 +76,7 @@ theorem offWf_zero : offWf 0#32 := by
   decide
 
 section FileOffCell
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [OffboxG GF]
 
 /-- The resident cell, wf, WITH THE KERNEL'S HALF OF ITS SHADOW -- what the
 off box holds while a file's `f->off` is not checked out (Rocq
@@ -94,7 +94,7 @@ AT ALL, permanently (`offLink`).  The CELL is kept in both arms (the store
 `f->off += r` needs it); only the tie to the shadow is dropped. -/
 def offResident [CurCtx] (ξ : CtxId) (γo : GName) (k : Nat) : IProp GF := iprop%
   ∃ v : BitVec 32, wordAtN ξ (aFoff k) 4 (DFrac.own 1) v ∗ ⌜offWf v⌝ ∗
-    offLink (hlc := hlc) γo (v.toNat : Int)
+    offLink γo (v.toNat : Int)
 
 /-- Rocq's `off_hdr` CtxMorph (`ctx_morph_solve`). -/
 instance instCtxMorphOffResident [CurCtx] (γo : GName) (k : Nat) :
@@ -109,7 +109,7 @@ exactly that word re-form the resident cell, no ghost step.  Rocq
 theorem offResident_of [CurCtx] (ξ : CtxId) (γo : GName) (k : Nat) (v : BitVec 32)
     (hwf : offWf v) :
     ⊢@{IProp GF} wordAtN ξ (aFoff k) 4 (DFrac.own 1) v -∗
-      offLink (hlc := hlc) γo (v.toNat : Int) -∗ offResident ξ γo k := by
+      offLink γo (v.toNat : Int) -∗ offResident ξ γo k := by
   iintro Hc Hg
   unfold offResident
   iexists v

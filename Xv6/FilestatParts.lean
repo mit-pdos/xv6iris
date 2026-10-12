@@ -85,7 +85,7 @@ theorem filestat_bltu (t : BitVec 32) :
 /-! ## The frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- filestat's seven non-buffer cells, from `sp-8` (`ra`) down: `ra`, `s0`,
 `s1` at `-8`, `-16`, `-24`, the lazy `s2`/`s3` cells `v2`/`v3` at `-32`, `-40`,
@@ -233,7 +233,7 @@ theorem fstat_al (a : BitVec 64) (hal : a.toNat % 8 = 0) (m d : Nat) (hm : m < 6
   rcases hd with rfl | rfl | rfl <;> omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The run split at an absolute offset. -/
 theorem fstat_buf_at [CurCtx] (a : BitVec 64) (m n : Nat) (l1 l2 : List (BitVec 8))
@@ -456,7 +456,7 @@ theorem fstat_cs_epi (k : KCtx) (fk : Nat) (R : RegMap)
     first | rfl | assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -555,7 +555,7 @@ def fstatK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (pa : 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -563,11 +563,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- The persistent environment the inode arm runs in: the process table,
 the panic credentials, the runtime file system, the allocator pair. -/
 def fstatEnvP (Γ : SchedNames) (γkl : GName) (γk : KmemNames) : IProp GF := iprop%
-  procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+  procsInv Γ ∗ panicEnv ∗ fsReady ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none
 
 instance fstatEnvP_persistent (Γ : SchedNames) (γkl : GName) (γk : KmemNames) :
-    Persistent (fstatEnvP (hlc := hlc) (GF := GF) Γ γkl γk) := by
+    Persistent (fstatEnvP (GF := GF) Γ γkl γk) := by
   unfold fstatEnvP; infer_instance
 
 end

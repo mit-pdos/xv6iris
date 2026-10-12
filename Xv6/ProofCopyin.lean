@@ -44,7 +44,7 @@ survives as such: it is split into `BitVec.ofNat 64 A + BitVec.ofNat 64 d`
 stated on the shapes the normaliser actually leaves. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-! ## The twelve-slot frame of `copyin` (ra, s0..s10) -/
@@ -980,7 +980,7 @@ theorem ci_loop (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
 set_option maxHeartbeats 4000000 in
 /-- **`copyin` meets its specification.** -/
 theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M old ke hnoff hK hlk hroot hsz hlen hlen' => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk P M old ke hnoff hK hlk hroot hsz hlen hlen' => by
   unfold wp_copyin_body
   simp only [copyinAddr]
   iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hdst, Hlend, HΦ⟩

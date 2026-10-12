@@ -29,7 +29,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -37,16 +37,16 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [U
 def wpEchoMainBody : Prop :=
   ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (av : Nat) (args : List UArg) (n : Nat) (Ci Cend : IProp GF),
     m.get 10#5 = BitVec.ofNat 64 args.length → m.get 11#5 = BitVec.ofNat 64 av →
-    ⊢ kechoPayAll (hlc := hlc) N args Ci Cend -∗ (Cend -∗ kechoExit (hlc := hlc) N 0) -∗
+    ⊢ kechoPayAll N args Ci Cend -∗ (Cend -∗ kechoExit N 0) -∗
       ukCode N.t User.Echo.code.byte -∗ uargv N.d av args -∗ Ci -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Echo.Sym.«main») (8 + (2 + n)) -∗ wpLoop h
+      urun N h m (BitVec.ofNat 64 User.Echo.Sym.«main») (8 + (2 + n)) -∗ wpLoop h
 
 end
 
 /-- The interface of echo's `main`. -/
 structure ECHO_MAIN : Prop where
-  wp_echoMain : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_echoMain : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpEchoMainBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpEchoMainBody (GF := GF)
 
 end Xv6

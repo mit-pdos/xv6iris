@@ -51,9 +51,9 @@ whose device path calls `devintr`.  Nothing else about the interrupted
 context is assumed -- `ihsF` quantifies it freely, and the running slot is
 named by THE CLAIM the trap hands over (`Xv6.cpuClaim_proc_shape`). -/
 structure KERNELVEC : Prop where
-  handler : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
+  handler : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU),
+    [ClaimIs GF Γ] (cpu : CPU),
     ⊢ ihs (GF := GF) ⟨envFam Γ γ0 γ1 γc γl0 γl1 γd γdl γt, cpu, kernelvecAddr⟩
 
 /-- **The contract is usable at boot**: a hart holding the vector cell, the
@@ -63,10 +63,10 @@ handler -- at WHATEVER disk pages its credentials name (the pages
 `virtio_disk_init` chose; batch 8-P, pending (e)).  (This is what
 `procsInvAll`, the family over ALL contexts the contract used to demand,
 made impossible.) -/
-theorem intrRes_of_kernelvec {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+theorem intrRes_of_kernelvec {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [DiskG GF] [CurCtx] (KV : KERNELVEC) (Γ : SchedNames) (γ0 γ1 : UartNames)
     (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName) (pd pav pu : BitVec 64)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (hT : curTier = KTier.kpt) (cpu : CPU) :
     Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ procsInv Γ ∗
       devintrCaps Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ⊢ intrRes (GF := GF) cpu := by
@@ -82,7 +82,7 @@ theorem intrRes_of_kernelvec {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS h
   · iapply envAt_of_caps' Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu hT $$ [$Hpinv $Hcaps]
 
 section Row
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- kernelvec's contract at hart `cpu`, at every environment the row
@@ -92,16 +92,16 @@ def kvIhs (Γ : SchedNames) (cpu : CPU) : IProp GF :=
     ihs (GF := GF) ⟨envFam Γ γ0 γ1 γc γl0 γl1 γd γdl γt, cpu, kernelvecAddr⟩)
 
 /-- `KERNELVEC`, cashed at a hart. -/
-theorem kvIhs_of_kernelvec (KV : KERNELVEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) :
+theorem kvIhs_of_kernelvec (KV : KERNELVEC) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) :
     ⊢ □ kvIhs (GF := GF) Γ cpu := by
   unfold kvIhs
   iintro !> %γ0 %γ1 %γc %γl0 %γl1 %γd %γdl %γt
-  iapply (KV.handler (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt cpu)
+  iapply (KV.handler (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt cpu)
 
 /-- **Rocq `ut_trap_csrs_fold`'s `intr_res_intro`**: the vector cell at
 kernelvec, the row and the contract are the installed handler. -/
 theorem intrRes_of_kvIhs [CurCtx] (Γ : SchedNames) (cpu : CPU) :
-    Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ handlerEnvAt (hlc := hlc) Γ curCtx ∗ □ kvIhs (GF := GF) Γ cpu ⊢
+    Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ handlerEnvAt Γ curCtx ∗ □ kvIhs (GF := GF) Γ cpu ⊢
       intrRes (GF := GF) cpu := by
   iintro ⟨Hstv, #Hrow, #Hih⟩
   icases handlerEnvAt_open Γ curCtx $$ Hrow with ⟨%γ0, %γ1, %γc, %γl0, %γl1, %γd, %γdl, %γt, #Henv⟩

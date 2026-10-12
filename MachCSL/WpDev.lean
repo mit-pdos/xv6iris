@@ -80,7 +80,7 @@ theorem devStep_total (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) (σ
 /-! ## The corpse rule -/
 
 section dead
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 /-- The bare WP of a device expression. -/
 def devWP (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) : IProp GF :=
@@ -135,15 +135,15 @@ theorem devWP_loop (gen : Nat) (d : DevId) :
 
 end dead
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- Safety of the ambient generation's device `d`'s task `tid` with `m` left
 to run, given the generation's certificate. -/
 def wpDev (d : DevId) (tid : TaskId) (m : DevProg d) : IProp GF := iprop%
-  genCert -∗ devWP (genId (hlc := hlc) (GF := GF)) d tid m
+  genCert -∗ devWP (genId (GF := GF)) d tid m
 
 theorem wpDev_elim (d : DevId) (tid : TaskId) (m : DevProg d) :
-    wpDev d tid m ∗ genCert ⊢@{IProp GF} devWP (genId (hlc := hlc) (GF := GF)) d tid m := by
+    wpDev d tid m ∗ genCert ⊢@{IProp GF} devWP (genId (GF := GF)) d tid m := by
   unfold wpDev
   iintro ⟨H, Hc⟩
   iapply H $$ Hc
@@ -171,13 +171,13 @@ theorem wpDev_lift_obs_disk (d : DevId) (tid : TaskId) (m : DevProg d) :
     (∀ σ (h : List Obs),
       ⌜traceShape h true ∧ (∀ i, obsWire i (openSeg h) = σ.devs.wire i) ∧
         (∀ i, obsIns i (openSeg h) = σ.devs.recvd i) ∧
-        obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+        obsBoots h = genId (GF := GF) + 1⌝ -∗
       machInterp σ ∗ obsAuth h ∗ diskFixedAuth (diskOf σ.devs) ∗
-        startAuth (genId (hlc := hlc) (GF := GF) + 1) ={⊤,∅}=∗
-      ⌜∃ obs m' σ' efs, devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
-      ▷ ∀ obs m' σ' efs, ⌜devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ -∗
+        startAuth (genId (GF := GF) + 1) ={⊤,∅}=∗
+      ⌜∃ obs m' σ' efs, devStep (genId (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
+      ▷ ∀ obs m' σ' efs, ⌜devStep (genId (GF := GF)) d tid m σ obs m' σ' efs⌝ -∗
         £ 1 ={∅,⊤}=∗ machInterp σ' ∗ obsAuth (h ++ obs) ∗ diskFixedAuth (diskOf σ'.devs) ∗
-          startAuth (genId (hlc := hlc) (GF := GF) + 1) ∗ wpDev d tid m' ∗
+          startAuth (genId (GF := GF) + 1) ∗ wpDev d tid m' ∗
           [∗list] ef ∈ efs, WP ef @ Stuckness.NotStuck; ⊤ {{ _v, True }})
     ⊢@{IProp GF} wpDev d tid m := by
   unfold wpDev devWP
@@ -192,18 +192,18 @@ theorem wpDev_lift_obs_disk (d : DevId) (tid : TaskId) (m : DevProg d) :
   icases Hσ with ⟨Hgen, Hstart, ⟨%R, HR, %Hok, Hcur⟩, Hdisk⟩
   ihave %Hb' := genAuth_born _ _ $$ Hgen Hborn
   ihave %Hs' := startAuth_started _ _ $$ Hstart Hstarted
-  by_cases hge : g.gen = genId (hlc := hlc) (GF := GF)
+  by_cases hge : g.gen = genId (GF := GF)
   · have hpow : g.pow = true := by
       cases h : g.pow
       · simp [startCount, h] at Hs'; omega
       · rfl
-    have hl : threadLive g (genId (hlc := hlc) (GF := GF)) := ⟨hpow, hge⟩
+    have hl : threadLive g (genId (GF := GF)) := ⟨hpow, hge⟩
     rw [eraCur_true hpow]
     icases Hcur with ⟨%E, %HE, Hera⟩
     ihave %HRg := eraRegistered_lookup _ _ _ $$ HR Hreg
-    have HRg' : get? R g.gen = some (MachGS.era (hlc := hlc) (GF := GF)) := by
+    have HRg' : get? R g.gen = some (MachGS.era (GF := GF)) := by
       rw [hge]; exact HRg
-    have hEq : E = MachGS.era (hlc := hlc) (GF := GF) := by
+    have hEq : E = MachGS.era (GF := GF) := by
       rw [HE] at HRg'
       exact Option.some.inj HRg'
     subst hEq
@@ -213,11 +213,11 @@ theorem wpDev_lift_obs_disk (d : DevId) (tid : TaskId) (m : DevProg d) :
     icases Hobs with ⟨%h, %htot, %hwf, Ha⟩
     have hfacts : traceShape h true ∧ (∀ i, obsWire i (openSeg h) = g.m.devs.wire i) ∧
         (∀ i, obsIns i (openSeg h) = g.m.devs.recvd i) ∧
-        obsBoots h = genId (hlc := hlc) (GF := GF) + 1 := by
+        obsBoots h = genId (GF := GF) + 1 := by
       obtain ⟨hsh, hbt, hwire, hrecv⟩ := hwf
       rw [hpow] at hsh hbt
       exact ⟨hsh, hwire hpow, hrecv hpow, by rw [hbt, hge]; rfl⟩
-    have hsc : startCount g = genId (hlc := hlc) (GF := GF) + 1 := by
+    have hsc : startCount g = genId (GF := GF) + 1 := by
       simp [startCount, hpow, hge]
     rw [hsc]
     unfold diskFixedInterp
@@ -250,7 +250,7 @@ theorem wpDev_lift_obs_disk (d : DevId) (tid : TaskId) (m : DevProg d) :
         · ipureintro
           rw [← hsc]; exact Hok
         rw [eraCur_true (g := { g with m := σ' }) hpow]
-        iexists (MachGS.era (hlc := hlc) (GF := GF))
+        iexists (MachGS.era (GF := GF))
         isplit
         · ipureintro
           exact HRg'
@@ -261,9 +261,9 @@ theorem wpDev_lift_obs_disk (d : DevId) (tid : TaskId) (m : DevProg d) :
         iexact Hcert
       · iexact Hefs
     · exact absurd hl hnl
-  · have hlt : genId (hlc := hlc) (GF := GF) < g.gen := by omega
+  · have hlt : genId (GF := GF) < g.gen := by omega
     ihave #Hdead := genAuth_get_dead _ _ hlt $$ Hgen
-    have hnl : ¬ threadLive g (genId (hlc := hlc) (GF := GF)) := fun h => hge h.2
+    have hnl : ¬ threadLive g (genId (GF := GF)) := fun h => hge h.2
     iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hclose
     isplit
@@ -286,7 +286,7 @@ theorem wpDev_lift_obs_disk (d : DevId) (tid : TaskId) (m : DevProg d) :
       ipureintro
       exact Hok
     isplit
-    · iapply wp_dev_dead' (genId (hlc := hlc) (GF := GF)) d tid m
+    · iapply wp_dev_dead' (genId (GF := GF)) d tid m
       iexact Hdead
     · exact BigSepL.bigSepL_nil_intro
 
@@ -299,10 +299,10 @@ theorem wpDev_lift_obs (d : DevId) [hd : DevDiskInert d] (tid : TaskId) (m : Dev
     (∀ σ (h : List Obs),
       ⌜traceShape h true ∧ (∀ i, obsWire i (openSeg h) = σ.devs.wire i) ∧
         (∀ i, obsIns i (openSeg h) = σ.devs.recvd i) ∧
-        obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+        obsBoots h = genId (GF := GF) + 1⌝ -∗
       machInterp σ ∗ obsAuth h ={⊤,∅}=∗
-      ⌜∃ obs m' σ' efs, devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
-      ▷ ∀ obs m' σ' efs, ⌜devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ -∗
+      ⌜∃ obs m' σ' efs, devStep (genId (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
+      ▷ ∀ obs m' σ' efs, ⌜devStep (genId (GF := GF)) d tid m σ obs m' σ' efs⌝ -∗
         £ 1 ={∅,⊤}=∗ machInterp σ' ∗ obsAuth (h ++ obs) ∗ wpDev d tid m' ∗
           [∗list] ef ∈ efs, WP ef @ Stuckness.NotStuck; ⊤ {{ _v, True }})
     ⊢@{IProp GF} wpDev d tid m := by
@@ -363,8 +363,8 @@ UARTs): its steps observe nothing, so the history ghost is framed and the
 callback is the unobserved one. -/
 theorem wpDev_lift (d : DevId) [DevDiskInert d] (hsil : DevSilent d) (tid : TaskId) (m : DevProg d) :
     (∀ σ, machInterp σ ={⊤,∅}=∗
-      ⌜∃ obs m' σ' efs, devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
-      ▷ ∀ obs m' σ' efs, ⌜devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ -∗
+      ⌜∃ obs m' σ' efs, devStep (genId (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
+      ▷ ∀ obs m' σ' efs, ⌜devStep (genId (GF := GF)) d tid m σ obs m' σ' efs⌝ -∗
         £ 1 ={∅,⊤}=∗ machInterp σ' ∗ wpDev d tid m' ∗
           [∗list] ef ∈ efs, WP ef @ Stuckness.NotStuck; ⊤ {{ _v, True }})
     ⊢@{IProp GF} wpDev d tid m := by
@@ -409,8 +409,8 @@ theorem DevId.all_get?_ne {k : Nat} {y : DevId} (hk : DevId.all[k]? = some y) (d
   · simp [DevId.all] at hk
 
 /-- The ambient era's mirror halves of device `d`. -/
-abbrev devAuth (d : DevId) (s : DevSt d) : IProp GF := devAuthAt (MachGS.era (hlc := hlc) (GF := GF)) d s
-abbrev devFrag (d : DevId) (s : DevSt d) : IProp GF := devFragAt (MachGS.era (hlc := hlc) (GF := GF)) d s
+abbrev devAuth (d : DevId) (s : DevSt d) : IProp GF := devAuthAt (MachGS.era (GF := GF)) d s
+abbrev devFrag (d : DevId) (s : DevSt d) : IProp GF := devFragAt (MachGS.era (GF := GF)) d s
 
 /-- Moving one device's task bookkeeping: the interpretation keeps every
 resource and only its pure `devRtOk` conjunct sees the move, so the new
@@ -471,18 +471,18 @@ theorem machInterp_acc_dev (σ : MState) (d : DevId) :
   rw [e]
   unfold devInterp devInterpAt
   iintro ⟨Hregs, Hmem, Hmm, Hdev⟩
-  icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ d' => devAuthAt (MachGS.era (hlc := hlc) (GF := GF)) d' (σ.devs.st d')) hget $$ Hdev
+  icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ d' => devAuthAt (MachGS.era (GF := GF)) d' (σ.devs.st d')) hget $$ Hdev
     with ⟨Hd, Hclose⟩
   iframe Hd
   iintro %s' Hs'
   iapply machInterp_of_devs σ (σ.devs.set d s')
   iframe Hregs Hmem Hmm
   unfold devInterp devInterpAt
-  iapply Hclose $$ %(fun _ d' => devAuthAt (MachGS.era (hlc := hlc) (GF := GF)) d' ((σ.devs.set d s').st d'))
+  iapply Hclose $$ %(fun _ d' => devAuthAt (MachGS.era (GF := GF)) d' ((σ.devs.set d s').st d'))
   · imodintro
     iintro %k %y %hk %hne Hy
     have hy : y ≠ d := DevId.all_get?_ne hk d hne
-    show iprop(devAuthAt (MachGS.era (hlc := hlc) (GF := GF)) y (σ.devs.st y) ⊢
+    show iprop(devAuthAt (MachGS.era (GF := GF)) y (σ.devs.st y) ⊢
       devAuthAt MachGS.era y ((σ.devs.set d s').st y))
     rw [DevStates.set_other σ.devs d y s' hy]
   · show iprop(devAuth d s' ⊢ devAuthAt MachGS.era d ((σ.devs.set d s').st d))
@@ -598,7 +598,7 @@ def devObsPermit (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) : IProp 
   □ ∀ (h : List Obs) (ds : DevStates) (s' : DevSt d) (os : List DevObs),
     ⌜devObsOk d (ds.st d) s' os ∧ traceShape h true ∧
       (∀ i, obsWire i (openSeg h) = ds.wire i) ∧
-      (∀ i, obsIns i (openSeg h) = ds.recvd i) ∧ obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+      (∀ i, obsIns i (openSeg h) = ds.recvd i) ∧ obsBoots h = genId (GF := GF) + 1⌝ -∗
     R s' -∗ obsAuth h ={⊤ \ ↑N}=∗ R s' ∗ obsAuth (h ++ os.map Obs.dev)
 
 instance devObsPermit_persistent (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) :
@@ -633,7 +633,7 @@ def devStepPermit (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Lis
   □ ∀ (h : List Obs) (ds : DevStates) (s' : DevSt d) (os : List DevObs),
     ⌜rel (ds.st d) s' os ∧ devObsOk d (ds.st d) s' os ∧ traceShape h true ∧
       (∀ i, obsWire i (openSeg h) = ds.wire i) ∧
-      (∀ i, obsIns i (openSeg h) = ds.recvd i) ∧ obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+      (∀ i, obsIns i (openSeg h) = ds.recvd i) ∧ obsBoots h = genId (GF := GF) + 1⌝ -∗
     R (ds.st d) -∗ obsAuth h ={⊤ \ ↑N}=∗ R s' ∗ obsAuth (h ++ os.map Obs.dev)
 
 instance devStepPermit_persistent (N : Namespace) (d : DevId)
@@ -648,7 +648,7 @@ theorem wpDev_localO (N : Namespace) (d : DevId) [DevDiskInert d] (rel : DevSt d
     (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.LocalO d rel) :
     devInvR N d R ∗ devStepPermit N d rel R ∗ genCert ⊢@{IProp GF}
       ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.LocalO rel m⌝ →
-      devWP (genId (hlc := hlc) (GF := GF)) d tid m := by
+      devWP (genId (GF := GF)) d tid m := by
   unfold devInvR devStepPermit
   iintro ⟨#Hinv, #Hperm, #Hcert⟩
   iloeb as IH
@@ -673,7 +673,7 @@ theorem wpDev_localO (N : Namespace) (d : DevId) [DevDiskInert d] (rel : DevSt d
   imod Hmask
   have hmk : ∀ (m'' : DevProg d), DevM.LocalO rel m'' →
       ⊢@{IProp GF} (∀ (tid : TaskId) (m : DevProg d), ⌜DevM.LocalO rel m⌝ →
-        devWP (genId (hlc := hlc) (GF := GF)) d tid m) -∗ wpDev d tid m'' := by
+        devWP (genId (GF := GF)) d tid m) -∗ wpDev d tid m'' := by
     intro m'' hm''
     iintro IH
     unfold wpDev

@@ -41,7 +41,7 @@ caller brings the arm that push_off paid out (`popArm`), the context must
 be one interrupts may be enabled in (the kernel table, and the trap reserve
 free beyond pop_off's own two slots), and the continuation is at whichever
 hart the thread lands on. -/
-def wp_pop_off_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_pop_off_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (hnoff : 1 ≤ k.noff) (hK : 4 ≤ k.avail) (hlks : k.locks.length ≤ k.noff - 1)
     (reen : Bool) (hreen : reen = (decide (k.noff = 1) && k.intena))
@@ -54,8 +54,8 @@ def wp_pop_off_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [C
 
 /-- The interface of `pop_off`. -/
 structure POPOFF : Prop where
-  wp_pop_off : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_pop_off : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     hsie hnoff hK hlks reen hreen hon,
-    wp_pop_off_body (hlc := hlc) (GF := GF) cpu k hsie hnoff hK hlks reen hreen hon
+    wp_pop_off_body (GF := GF) cpu k hsie hnoff hK hlks reen hreen hon
 
 end Xv6

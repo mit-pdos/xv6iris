@@ -53,10 +53,11 @@ theorem ushLitOk_nul (base len : Nat) (h : ushLitOk base len = true) :
   | some b => rw [e] at hb; simp at hb; rw [hb]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (Std.ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_lit_str`**: a checked literal is a text-half string. -/
 theorem ushLit_str (N : UkNames GF) (dq : DFrac) (base len : Nat) (h : ushLitOk base len = true)
     (hl : len < 2 ^ 31) : ushCode N.t ⊢ ushSstr N true dq base len (ushLit base) := by

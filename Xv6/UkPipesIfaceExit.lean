@@ -58,14 +58,14 @@ theorem pns_sepS_list (Φ : Nat → PROP) :
 end SepSList
 
 section Exit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF]
 
 /-- **Rocq `pns_dev_final`**: a drained device, read as its kind's final
 state. -/
-theorem pns_dev_final {R : PnsRound hlc GF} (OK : PnsRoundOk R) (γreg : GName) (Sup : IProp GF)
+theorem pns_dev_final {R : PnsRound GF} (OK : PnsRoundOk R) (γreg : GName) (Sup : IProp GF)
     (vs : RegMapF Pdev) (d : Nat) (kd : Pdev) (x : Dspec) (hv : get? vs d = some kd) (hdr : drained x) :
     ⊢ pnsEnv R Sup vs -∗ ([∗map] d ↦ x ∈ vs, HfpReg.tok γreg d (1 : Qp).half x) -∗ pnsDev R γreg d x ={⊤}=∗
       ([∗map] d ↦ x ∈ vs, HfpReg.tok γreg d (1 : Qp).half x) ∗ pnsFinal R kd := by
@@ -187,7 +187,7 @@ theorem pns_dev_final {R : PnsRound hlc GF} (OK : PnsRoundOk R) (γreg : GName) 
   | DProdHalt _ => simp only [pnsDev]; icases Hd with ⟨⟩
 
 /-- **Rocq `pns_finals`**. -/
-theorem pns_finals {R : PnsRound hlc GF} (OK : PnsRoundOk R) (γreg : GName) (Sup : IProp GF)
+theorem pns_finals {R : PnsRound GF} (OK : PnsRoundOk R) (γreg : GName) (Sup : IProp GF)
     (vs : RegMapF Pdev) (dv : Nat → Dspec) :
     ∀ (kl : List (Nat × Pdev)), (∀ dk, dk ∈ kl → get? vs dk.1 = some dk.2 ∧ drained (dv dk.1)) →
     ⊢ pnsEnv R Sup vs -∗ ([∗map] d ↦ x ∈ vs, HfpReg.tok γreg d (1 : Qp).half x) -∗
@@ -208,14 +208,14 @@ theorem pns_finals {R : PnsRound hlc GF} (OK : PnsRoundOk R) (γreg : GName) (Su
     iapply (BigSepL.bigSepL_cons (Φ := fun (_ : Nat) (dk : Nat × Pdev) => pnsFinal R dk.2)).2
     iframe Hf Hfs
 
-variable {C : PnsCtx hlc GF}
+variable {C : PnsCtx GF}
 
 /-- **Rocq `pns_exit`**: `ei_exit`. -/
 theorem pns_exit (CK : PnsCtxOk C) [UknConst C.Q.N] (s : Int) (fdm : Fdmap) (files : Bytes → Option Bytes)
     (paths : List Bytes) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare)
     (hdr : ∀ d, d ∈ ds → drained (dv d)) (hds : domOkP C.Q.Dp fdm ds) :
     ⊢ pnsFds C.R C.Q fdm -∗ pnsFilesr (GF := GF) files paths -∗
-      ([∗set] d ∈ ds, pnsDev C.R C.Q.γreg d (dv d)) -∗ exObl (hlc := hlc) C.Q.N C.Q.P s := by
+      ([∗set] d ∈ ds, pnsDev C.R C.Q.γreg d (dv d)) -∗ exObl C.Q.N C.Q.P s := by
   have hdp := ((domOkP_iff _ _ _).1 hds).1
   iintro Hfds - Hdev
   unfold pnsFds pnsFdsAt
@@ -232,7 +232,7 @@ theorem pns_exit (CK : PnsCtxOk C) [UknConst C.Q.N] (s : Int) (fdm : Fdmap) (fil
   · iright; iexact Hfin
   imodintro
   have := CK.QK.sup_pers
-  ihave Hex := fh_exit_pay (Kc := MachFixedGS.killCred (hlc := hlc) (GF := GF)) (Sup := C.Q.Sup) (ukSysP_holds CK.UL) C.Q.N C.Q.P CK.QK.FH s $$ Hpay
+  ihave Hex := fh_exit_pay (Kc := MachFixedGS.killCred (GF := GF)) (Sup := C.Q.Sup) (ukSysP_holds CK.UL) C.Q.N C.Q.P CK.QK.FH s $$ Hpay
   unfold exObl
   iapply Hex $$ %h %m %avail %hst Hcode Hrun
 

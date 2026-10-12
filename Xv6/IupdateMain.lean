@@ -44,7 +44,7 @@ set_option maxHeartbeats 16000000 in
 /-- `+0x56 .. +0x62`, the memmove of the thirteen addrs, the slot rebuilt at
 the NEW dinode, and into the tail. -/
 theorem iu_mm (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [IregG GF]
     [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames)
@@ -163,7 +163,7 @@ theorem iu_mm (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
 set_option maxHeartbeats 16000000 in
 /-- `+0x32 .. +0x54`, the five field copies, then `iu_mm`. -/
 theorem iu_copy (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [IregG GF]
     [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames)
@@ -290,7 +290,7 @@ set_option maxHeartbeats 16000000 in
 /-- `+0x24 .. +0x30`: bread's return, THE COUPLING, the slot opened and its
 address computed; then `iu_copy`. -/
 theorem iu_body (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames)
@@ -322,7 +322,7 @@ theorem iu_body (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     bslot ∗ logEpochLb icfgLog v ∗
     logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb e0 ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
     iuRegionStep inum dn dn0 e0 Pout ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev
       (BitVec.ofNat 32 (IBLOCK inum icfgIst)) bs bsd d0 ∗
@@ -341,7 +341,7 @@ theorem iu_body (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
   icases dsHeld_L fscBio fscFs fscDisk icfgDev fscCov kk icfgDev _ bs bsd d0 $$ Hpay
     with ⟨HpL, Hpayback⟩
   iapply wpLoop_fupd
-  imod (iregRead (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib inum dn0 _ bs
+  imod (iregRead ⊤ fscIreg fscFs icfgIst icfgNib inum dn0 _ bs
     CoPset.subseteq_top logN_top (by omega) hbnoN) $$ Hinv Hdn HpL with ⟨%hex, Hdn, HpL⟩
   imodintro
   ihave Hpay := Hpayback $$ HpL
@@ -420,10 +420,10 @@ the only difference between the three contracts `Xv6/ProofIupdate.lean`
 seals.  The credit is a RESOURCE against the named epoch `e0`, forwarded
 untouched to `log_write`. -/
 theorem iu_main (BD : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (cru : Bool) (e0 v : Nat) (Pout : IProp GF)
@@ -443,7 +443,7 @@ theorem iu_main (BD : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     diskCaps fscDisk fscDlock pd pav pu ∗
     iuCells ip inum dn bm dqd dqn dqs ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
     iuRegionStep inum dn dn0 e0 Pout ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     bslots 2 ∗

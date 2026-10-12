@@ -26,7 +26,7 @@ open Std (ExtTreeSet)
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -35,7 +35,7 @@ abbrev ushRedirsRs : List (BitVec 5) := [1#5, 8#5, 9#5, 18#5, 19#5, 20#5, 21#5, 
 
 /-- **Rocq `wp_ref_parseredirs`**: the whole function. -/
 theorem wp_shParseredirs (UL : UK_LEAVES) (SP : SH_PEEK) (SG : SH_GETTOKEN) (SR : SH_REDIRCMD) :
-    wpShParseredirsBody (hlc := hlc) (GF := GF) := by
+    wpShParseredirsBody (GF := GF) := by
   intro N h m dq dw dv cmd ps s0 len off fuel fin f rs UM UM' Pex w0 nn ha0 ha1 ha2 hoff hw0 href hch hsc hnn
     hs64 hps0 hps8 hpsz
   subst hw0
@@ -164,6 +164,6 @@ end
 /-- **sh's `parseredirs` holds**, at the engine and its callees' interfaces. -/
 theorem shParseredirs_holds (UL : UK_LEAVES) (SP : SH_PEEK) (SG : SH_GETTOKEN) (SR : SH_REDIRCMD) :
     SH_PARSEREDIRS :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shParseredirs UL SP SG SR⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _} => wp_shParseredirs UL SP SG SR⟩
 
 end Xv6

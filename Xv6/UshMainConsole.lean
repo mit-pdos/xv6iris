@@ -44,7 +44,7 @@ theorem ushCons_bge : ∀ k, k < 16 → ukBtaken .BGE (BitVec.ofNat 64 2) (BitVe
   decide
 
 section Console
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -52,13 +52,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [U
 the loop. -/
 theorem ushMain_cmd_head (UL : UK_LEAVES) (HS : UK_SYS_P) (SC : SH_GETCMD) (N : UkNames GF) [UknConst N]
     (X : UshCtx GF) [Persistent X.T] (Dsc : List (BitVec 8) → Prop) (Dl : Uline → Prop) (cn : ConsNames)
-    (L : UshLaws (hlc := hlc) N X) (D : UshDisc Dsc Dl)
-    (HR : ∀ l : List FdState, ⊢ ushReadRecvLeafAt (hlc := hlc) N X Dsc cn l) (R : IProp GF) (h : CPU)
+    (L : UshLaws N X) (D : UshDisc Dsc Dl)
+    (HR : ∀ l : List FdState, ⊢ ushReadRecvLeafAt N X Dsc cn l) (R : IProp GF) (h : CPU)
     (m : RegMap) (f : Nat → BitVec 8) (n0 : Nat) (l : List FdState) (hfd0 : ushFd0p l) :
-    ⊢ □ (X.T -∗ shDeps (hlc := hlc)) -∗ ushTagLaw (hlc := hlc) X -∗ ushPromptLaw (hlc := hlc) N X -∗
-      ushRestLAt (hlc := hlc) N X Dl R -∗ ushCode N.t -∗ ushJtab N.t -∗ ushGenSlot (hlc := hlc) N X -∗
-      ushPstate (hlc := hlc) N X l -∗ R -∗ ubytes N.d shBuf shNbuf f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x8f0) (16 + (ushDbody + n0)) -∗ wpLoop h := by
+    ⊢ □ (X.T -∗ shDeps) -∗ ushTagLaw X -∗ ushPromptLaw N X -∗
+      ushRestLAt N X Dl R -∗ ushCode N.t -∗ ushJtab N.t -∗ ushGenSlot N X -∗
+      ushPstate N X l -∗ R -∗ ubytes N.d shBuf shNbuf f -∗
+      urun N h m (BitVec.ofNat 64 0x8f0) (16 + (ushDbody + n0)) -∗ wpLoop h := by
   iintro #Hdp #Hlaw #Hplaw #Hrest #Hc #Hjt #Hgen Hstd HR Hbs Hrun
   -- 0x8f0  li s3,100
   iapply ushS_li UL N (ushMI_8f0 N.t) 0x8f4 h m _ 100 $$ Hc Hrun
@@ -86,16 +86,16 @@ theorem ushMain_cmd_head (UL : UK_LEAVES) (HS : UK_SYS_P) (SC : SH_GETCMD) (N : 
 one Löb induction over the register file and the ledger. -/
 theorem ushMain_console (UL : UK_LEAVES) (HS : UK_SYS_P) (HSS : USH_SYS_P) (SC : SH_GETCMD) (N : UkNames GF)
     [UknConst N] (X : UshCtx GF) [Persistent X.T] (Dsc : List (BitVec 8) → Prop) (Dl : Uline → Prop)
-    (cn : ConsNames) (L : UshLaws (hlc := hlc) N X) (D : UshDisc Dsc Dl)
-    (HR : ∀ l : List FdState, ⊢ ushReadRecvLeafAt (hlc := hlc) N X Dsc cn l) (R K : IProp GF)
+    (cn : ConsNames) (L : UshLaws N X) (D : UshDisc Dsc Dl)
+    (HR : ∀ l : List FdState, ⊢ ushReadRecvLeafAt N X Dsc cn l) (R K : IProp GF)
     (f : Nat → BitVec 8) (n0 : Nat) :
-    ⊢ □ (X.T -∗ shDeps (hlc := hlc)) -∗ ushTagLaw (hlc := hlc) X -∗ ushPromptLaw (hlc := hlc) N X -∗
-      ushRestLAt (hlc := hlc) N X Dl R -∗ ushCode N.t -∗ ushJtab N.t -∗ ushGenSlot (hlc := hlc) N X -∗
+    ⊢ □ (X.T -∗ shDeps) -∗ ushTagLaw X -∗ ushPromptLaw N X -∗
+      ushRestLAt N X Dl R -∗ ushCode N.t -∗ ushJtab N.t -∗ ushGenSlot N X -∗
       ∀ (h : CPU) (m : RegMap) (l : List FdState),
         ⌜m.get 9#5 = BitVec.ofNat 64 2⌝ -∗ ⌜m.get 18#5 = BitVec.ofNat 64 shConsPv⌝ -∗ ⌜ushFd0p l⌝ -∗
-        ushConsIn (hlc := hlc) N X K -∗ ushStd N X l -∗ ucwd N.cwd ROOTINO -∗ uch N.ch ∅ -∗ ushPid N -∗
-        ushPosb (hlc := hlc) N X l 0 -∗ R -∗ ubytes N.d shBuf shNbuf f -∗
-        urun (hlc := hlc) N h m (BitVec.ofNat 64 0x8dc) (16 + (ushDbody + n0)) -∗ wpLoop h := by
+        ushConsIn N X K -∗ ushStd N X l -∗ ucwd N.cwd ROOTINO -∗ uch N.ch ∅ -∗ ushPid N -∗
+        ushPosb N X l 0 -∗ R -∗ ubytes N.d shBuf shNbuf f -∗
+        urun N h m (BitVec.ofNat 64 0x8dc) (16 + (ushDbody + n0)) -∗ wpLoop h := by
   iintro #Hdp #Hlaw #Hplaw #Hrest #Hc #Hjt #Hgen
   iloeb as IH
   iintro %h %m %l %hs1 %hs2 %hfd0 Hin Hstd Hcwd Hch Hpid Hpos HR Hbs Hrun

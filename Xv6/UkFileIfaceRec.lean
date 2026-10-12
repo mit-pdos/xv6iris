@@ -35,14 +35,14 @@ open Std (ExtTreeSet)
 open HfpFileClaimsP UkFileDev
 
 noncomputable section FifRec
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 namespace FifCtx
-variable (X : FifCtx hlc GF)
+variable (X : FifCtx GF)
 
 /-- The device selector at the file interface's fields. -/
 abbrev fifSel : Nat → Dspec → IProp GF :=
@@ -56,21 +56,21 @@ theorem fif_dev_of (d : Nat) (x : Dspec) : X.fifSel d x = X.fifDev d x := by
 
 /-- **Rocq `fif_taint_pays`**: the free handler's law at the file taint. -/
 theorem fif_taint_pays (SYS : UK_SYS_P) (FH : UK_SYS_FH) [HNc : UknConst X.N]
-    (H : FhHyps (hlc := hlc) X.N X.P (uKillCred (hlc := hlc) (GF := GF)) (appSup (GF := GF)))
+    (H : FhHyps X.N X.P (uKillCred (GF := GF)) (appSup (GF := GF)))
     (held : FdSet) (t : Proc) (hs : SafeFds held t) :
-    ⊢ X.fifTaint held -∗ treePay (hlc := hlc) X.N X.P t :=
-  fh_taint_pays (fileTaint (hlc := hlc) X.c) (uKillCred (hlc := hlc) (GF := GF)) (appSup (GF := GF)) SYS FH X.N X.P H
+    ⊢ X.fifTaint held -∗ treePay X.N X.P t :=
+  fh_taint_pays (fileTaint X.c) (uKillCred (GF := GF)) (appSup (GF := GF)) SYS FH X.N X.P H
     held t hs
 
 /-- **Rocq `file_iface`**: THE RECORD, at the protected devices `D0`. -/
-def fileIface (DP : FifDevP (hlc := hlc) (GF := GF)) (UL : UK_LEAVES) (SYS : UK_SYS_P) (FH : UK_SYS_FH)
+def fileIface (DP : FifDevP (GF := GF)) (UL : UK_LEAVES) (SYS : UK_SYS_P) (FH : UK_SYS_FH)
     [HNc : UknConst X.N] [HPc : Persistent X.P.code] [HL : Persistent X.LINKS]
-    (H : FhHyps (hlc := hlc) X.N X.P (uKillCred (hlc := hlc) (GF := GF)) (appSup (GF := GF)))
-    (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) X.c X.r)
+    (H : FhHyps X.N X.P (uKillCred (GF := GF)) (appSup (GF := GF)))
+    (heq : HfpFileClaimsP.fileAppIs (GF := GF) X.c X.r)
     (hLw : ⊢ X.LINKS -∗ glW X.Pm) (hLb : ⊢ X.LINKS -∗ glBlk X.Pm)
-    (hLt : ⊢ X.LINKS -∗ glTaintAt X.Pm (genId (hlc := hlc) (GF := GF) + 1))
+    (hLt : ⊢ X.LINKS -∗ glTaintAt X.Pm (genId (GF := GF) + 1))
     (hw0 : ∀ d, d ∈ X.D0 → ∀ nm i γo, X.w0 d ≠ .FDIn false nm i γo) :
-    EpIfaceP (hlc := hlc) X.N X.P X.D0 where
+    EpIfaceP X.N X.P X.D0 where
   eiFds := X.fifFds
   eiOut := X.fifOut
   eiOuth := fun _ _ => iprop(False)
@@ -94,7 +94,7 @@ def fileIface (DP : FifDevP (hlc := hlc) (GF := GF)) (UL : UK_LEAVES) (SYS : UK_
   eiWriteNil := fun fdm fd d x K hfd => by
     show ⊢ X.fifFds fdm -∗ X.fifSel d x -∗
       ((X.fifFds fdm -∗ X.fifSel d x -∗ K 0) ∧ (X.fifFds fdm -∗ X.fifSel d x -∗ K (-1)) ∧
-       (∀ y, X.fifTaint (fdDom fdm) -∗ K y)) -∗ wrObl (hlc := hlc) X.N X.P fd [] K
+       (∀ y, X.fifTaint (fdDom fdm) -∗ K y)) -∗ wrObl X.N X.P fd [] K
     rw [X.fif_dev_of d x]
     exact X.fif_write_nil DP UL (fifStubs H) fdm fd d x K hfd
   eiRead := fun fdm fd d Sin n K hn hfd => X.fif_read UL heq (fifStubs H) fdm fd d Sin n K hn hfd
@@ -115,13 +115,13 @@ def fileIface (DP : FifDevP (hlc := hlc) (GF := GF)) (UL : UK_LEAVES) (SYS : UK_
   eiClose := fun fdm fd d x files paths K hfd hnsp _ => by
     show ⊢ X.fifFds fdm -∗ X.fifFilesr files paths -∗ X.fifSel d x -∗
       ((X.fifFds (fdDelete fdm fd) -∗ X.fifFilesr files paths -∗ K 0) ∧
-       (∀ y, X.fifTaint (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗ clObl (hlc := hlc) X.N X.P fd K
+       (∀ y, X.fifTaint (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗ clObl X.N X.P fd K
     rw [X.fif_dev_of d x]
     exact X.fif_close DP (fifStubs H) fdm fd d x files paths K hfd hnsp
   eiCloseShared := fun fdm fd d K hfd hsh => X.fif_close_shared DP (fifStubs H) hw0 fdm fd d K hfd hsh
   eiExit := fun s fdm files paths dv ds hdr hdom => by
     show ⊢ X.fifFds fdm -∗ X.fifFilesr files paths -∗ ([∗set] d ∈ ds, X.fifSel d (dv d)) -∗
-      exObl (hlc := hlc) X.N X.P s
+      exObl X.N X.P s
     simp only [X.fif_dev_of]
     exact X.fif_exit SYS H s fdm files paths dv ds hdr hdom
   eiWriteProd := by intros; iintro - Hf -; icases Hf with ⟨⟩
@@ -131,12 +131,12 @@ def fileIface (DP : FifDevP (hlc := hlc) (GF := GF)) (UL : UK_LEAVES) (SYS : UK_
   eiWriteProdHaltErr := by intros; iintro - Hf -; icases Hf with ⟨⟩
 
 section RecLaws
-variable (DP : FifDevP (hlc := hlc) (GF := GF)) (UL : UK_LEAVES) (SYS : UK_SYS_P) (FH : UK_SYS_FH)
+variable (DP : FifDevP (GF := GF)) (UL : UK_LEAVES) (SYS : UK_SYS_P) (FH : UK_SYS_FH)
     [HNc : UknConst X.N] [HPc : Persistent X.P.code] [HL : Persistent X.LINKS]
-    (H : FhHyps (hlc := hlc) X.N X.P (uKillCred (hlc := hlc) (GF := GF)) (appSup (GF := GF)))
-    (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) X.c X.r)
+    (H : FhHyps X.N X.P (uKillCred (GF := GF)) (appSup (GF := GF)))
+    (heq : HfpFileClaimsP.fileAppIs (GF := GF) X.c X.r)
     (hLw : ⊢ X.LINKS -∗ glW X.Pm) (hLb : ⊢ X.LINKS -∗ glBlk X.Pm)
-    (hLt : ⊢ X.LINKS -∗ glTaintAt X.Pm (genId (hlc := hlc) (GF := GF) + 1))
+    (hLt : ⊢ X.LINKS -∗ glTaintAt X.Pm (genId (GF := GF) + 1))
     (hw0 : ∀ d, d ∈ X.D0 → ∀ nm i γo, X.w0 d ≠ .FDIn false nm i γo)
 
 /-- `devOf` at the record is `fifDev` (Rocq `fif_dev_of` at `dev_of`). -/

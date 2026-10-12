@@ -168,7 +168,7 @@ the kernel tier (`kctx_tier` + `k.tier = kpt`), so the three it uses are
 restated at the ambient context (the `KexecTail.kxc_priv_pid` shape). -/
 
 section Tier
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 theorem kxd_tfUpd [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
@@ -223,7 +223,7 @@ theorem kxd_newspace [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames)
 end Tier
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 end Frame
 
@@ -237,7 +237,7 @@ entry jumps into, the byte fetch (+0x2bc .. +0x2c2) is at the bottom.
 it is that it is INSIDE the path buffer. -/
 
 section Scan
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -386,7 +386,7 @@ end Scan
 /-! ## THE COMMIT, +0x2ce .. +0x314 -/
 
 section Commit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -421,7 +421,7 @@ theorem kxd_call_ss (SS : SAFESTRCPY_SRC) (cpu : CPU) (k : KCtx) (spie spp : Boo
   iintro ⟨#Hi, Hk, Hpc, Hte, Hce, Hd, Hs, HK⟩
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := SS.wp_safestrcpy_src (hlc := hlc) (GF := GF) cpu
+  have h := SS.wp_safestrcpy_src (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) bsd bss dq
     (by k_norm_g; exact hK') (by k_norm_g; simp [RegMap.set_apply, h12]) hld hsrc
   unfold wp_safestrcpy_src_body at h
@@ -540,7 +540,7 @@ theorem kxd_commit2 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k 
     (hPtfp : P.tfp = V.upt.tfp) (hbelow : umBelow sz1 P) (hcov : lazyFree P.um sz1) :
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x2dc#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     procPrivFd A.γ k.proc A.pidv V A.M ∗ procPtAt P Mi ∗
     byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap), ⌜calleeSaved R R'⌝ -∗
@@ -859,7 +859,7 @@ theorem kxd_commit (SS : SAFESTRCPY_SRC) (PFP : PROC_FREEPAGETABLE) (Γ : SchedN
     (himg : kxcImgRows fb ef P sz1 (umemGet P Mi)) :
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x2ce#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     irefSlots 2 ∗ bslots 3 ∗ procPtAt P Mi ∗
     procPrivFd A.γ k.proc A.pidv (kxdV1 A.V (kxdSpv sz1 A.alen A.na)) A.M ∗
     kxcBufs k A ∗ byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
@@ -922,7 +922,7 @@ theorem kxd_phaseD (SS : SAFESTRCPY_SRC) (PFP : PROC_FREEPAGETABLE) (Γ : SchedN
     (hterm : A.pfun A.plen = 0#8) :
     kxcAt2a6 k A cpu spie spp R (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5)
       (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P Mi A.V.sz sz1 (k.regs 27#5) ci ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   unfold kxcAt2a6 kxcDRes

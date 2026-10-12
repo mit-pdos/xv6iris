@@ -141,7 +141,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `acquire`'s cancellable contract at pipeclose's call site (entry `0x80000c58`):
 opens `isPipe`→`lockOpenable`, spends the caller's reference `pipeRef γp w 1` as
@@ -160,7 +160,7 @@ theorem pc_acquire (AC : ACQUIRE_GEN) (c : CPU) (k' : KCtx)
       locked γl cpu' -∗ pipeResAt γp pi curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ pipeRef γp w 1 -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire_gen (hlc := hlc) (GF := GF) c k' γl "pipe" (pipeResAt γp pi)
+  have h := AC.wp_acquire_gen (GF := GF) c k' γl "pipe" (pipeResAt γp pi)
     (pipeDead γl γp) (pipeRef γp w 1) (pipeRef_dead γl γp w 1) hnoff' hK' hs'
   unfold wp_acquire_gen_body at h
   simp only [acquireAddr] at h
@@ -177,7 +177,7 @@ theorem pc_wakeup (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := WK.wp_wakeup (hlc := hlc) (GF := GF) Γ c k' hnoff' hK' hlk' htier'
+  have h := WK.wp_wakeup (GF := GF) Γ c k' hnoff' hK' hlk' htier'
   unfold wp_wakeup_body at h
   simp only [wakeupAddr] at h
   exact h
@@ -200,7 +200,7 @@ theorem pc_release (RE : RELEASE_REFUTE) (c : CPU) (k' : KCtx)
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "pipe"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release_refute (hlc := hlc) (GF := GF) c k' γl "pipe" (pipeResAt γp pi)
+  have h := RE.wp_release_refute (GF := GF) c k' γl "pipe" (pipeResAt γp pi)
     (pipeDead γl γp) (lockedCore_dead γl γp c) (fun B => lockHalf_some_dead γl γp c false B)
     hsie' hnoff' hK' reen hreen hon
   unfold wp_release_refute_body at h
@@ -232,7 +232,7 @@ theorem pc_release_cancel (RE : RELEASE_CANCEL) (c : CPU) (k' : KCtx)
       (∃ Hs : Nat → Hist, histBytes (pi + 16#64) 8 (fun _ => DFrac.own 1) Hs) -∗
       pipeBytes pi -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release_cancel (hlc := hlc) (GF := GF) c k' γl "pipe" (pipeResAt γp pi)
+  have h := RE.wp_release_cancel (GF := GF) c k' γl "pipe" (pipeResAt γp pi)
     (pipeDead γl γp) (pipeBytes pi) hrefuteCore hrefuteHalf hsie' hnoff' hK' reen hreen hon
   unfold wp_release_cancel_body at h
   simp only [releaseAddr] at h
@@ -253,7 +253,7 @@ theorem pc_kfree (KF : KFREE_FREE) (c : CPU) (k' : KCtx)
       actLend k'.proc (ke + 1) -∗
       kallocAvail γk (availInc on) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KF.wp_kfree_free (hlc := hlc) (GF := GF) c k' γkl γk on ke hnoff' hK' hlk' hp
+  have h := KF.wp_kfree_free (GF := GF) c k' γkl γk on ke hnoff' hK' hlk' hp
   unfold wp_kfree_free_body at h
   simp only [kfreeAddr] at h
   exact h
@@ -303,7 +303,7 @@ theorem pc_epi (cpu cE : CPU) (k : KCtx) (γk : KmemNames) (on : Option Nat)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## Link registers, lock sets, contexts -/
 
@@ -579,8 +579,8 @@ theorem pc_cont_fold (cpu : CPU) (k : KCtx) (γk : KmemNames) (on : Option Nat) 
       (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
       ⌜calleeSaved k.regs R'⌝ -∗
       (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗
-      pipeCpost (hlc := hlc) γ w Φ true -∗ wpLoop cpu')) -∗
-    pipeCpost (hlc := hlc) γ w Φ true -∗
+      pipeCpost γ w Φ true -∗ wpLoop cpu')) -∗
+    pipeCpost γ w Φ true -∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -732,7 +732,7 @@ theorem pipeclose_br_ffffffffffffc586 : KA.«pipeclose» + 0xffffffffffffc586#64
 set_option maxHeartbeats 8000000 in
 theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) : PIPECLOSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp w γkl γk on Φ ke hw hnoff hK hpipe hproc hkmem htier => by
+  fun {GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp w γkl γk on Φ ke hw hnoff hK hpipe hproc hkmem htier => by
   unfold wp_pipeclose_body
   simp only [pipecloseAddr]
   iintro ⟨Hk, Hpc, #Hpipe, Href, Hcpay, #Hkl, Hav, Hlend, #Hpinv, HPhi⟩

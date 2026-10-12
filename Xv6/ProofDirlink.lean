@@ -67,7 +67,7 @@ theorem dirlink_slots_dirlookup (a : Nat) (h : dirlinkSlots ≤ a) : dirlookupSl
   unfold dirlinkSlots at h; omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 theorem dirlink_ctx_entry (c : CPU) (k : KCtx) (R : RegMap) :
     kctx (GF := GF) c ((k.pushed 10).withRegs R) ⊢
@@ -76,7 +76,7 @@ theorem dirlink_ctx_entry (c : CPU) (k : KCtx) (R : RegMap) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -86,7 +86,7 @@ set_option maxHeartbeats 4000000 in
 inner lookup's rows (chroot): a share of the caller's reference to dp and its
 unit, the process's root cell and whole reference, lent and back; its found
 arm carries the SELF case (`..` at the process's root returns dp itself). -/
-theorem dirlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem dirlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -116,7 +116,7 @@ theorem dirlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hl
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
     wordPointsTo (pRoot k'.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗ bslot ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗
     irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗ dinodeAt fscIreg dinum dr ∗
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
         (found : Bool) (kk kslot : Nat) (q : Qp) (self : Bool),
@@ -144,7 +144,7 @@ theorem dirlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hl
           irefSlot ∗ emp)) -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := DL.wp_dirlookup_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j γkl γk ip dinum bm
+  have h := DL.wp_dirlookup_eb (GF := GF) Γ c k' γl pd pav pu j γkl γk ip dinum bm
     data dn dr fn false 0#32 pidv dqp dqd dqn kd sd rootv rti dqr hj hproc hK hnoff htier htype
     hgeom hwf hcov hsz hholes hinums hdisj horph hdrnz hdrnl hpd ha0 hkd hkdn
     (by simp only [Bool.false_eq_true, if_false]; exact ha2)
@@ -164,7 +164,7 @@ follows it, and every sleeping callee takes it at its eb contract.  The
 caller's continuation is a `true` crossing at a process, so it is
 hart-free from the start (`dirlink_post_of_spec`). -/
 theorem dirlink_main (DL : DIRLOOKUP) (RD : READI) (IP : IPUT) (SN : STRNCPY) (WI : WRITEI)
-    (PA : PANIC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (PA : PANIC) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -195,7 +195,7 @@ theorem dirlink_main (DL : DIRLOOKUP) (RD : READI) (IP : IPUT) (SN : STRNCPY) (W
     (hpd : descPageRw pd)
     (ha0 : k.regs 10#5 = ip) (ha2 : k.regs 12#5 = BitVec.setWidth 64 inum)
     (hkd : ip = ientry kd) (hkdn : kd < NINODE) :
-    wp_dirlink_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum bm
+    wp_dirlink_gen_eb_body (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum bm
       data dn dn0 fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr
       hj hproc hK hnoff htier htype hcovs hszb hinums hdisj horph hstab hnl hgeom hwf hholes
       hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2 hkd hkdn := by
@@ -219,7 +219,7 @@ theorem dirlink_main (DL : DIRLOOKUP) (RD : READI) (IP : IPUT) (SN : STRNCPY) (W
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hkwf.2.2.2.1; omega)
   ihave Hpost := dirlink_post_of_spec hj cpu k hproc ip dinum bm data dn dn0 fn inum ncount Sb tid
     qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr $$ Hnext
-  ihave #Henv : dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk $$ []
+  ihave #Henv : dirlinkEnv Γ γl pd pav pu γkl γk $$ []
   · unfold dirlinkEnv; iframe #
   simp only [dirlinkAddr]
   -- +0x00 .. +0x0c  the prologue

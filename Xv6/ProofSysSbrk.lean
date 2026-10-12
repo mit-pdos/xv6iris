@@ -162,7 +162,7 @@ theorem sys_sbrk_gp_ok (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (n r :
   · obtain ⟨h1, h2⟩ := hn h; exact ⟨rfl, h2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
@@ -376,7 +376,7 @@ theorem sys_sbrk_argint (AI : ARGINT) (c : CPU) (k' : KCtx) (i : Nat) (tfp : Bit
       wordPointsTo (pTrapframe k'.proc) 8 (DFrac.own 1) (pageAddr tfp) -∗ tfPageAt tfp ws -∗
       wordPointsTo (k'.regs 11#5) 4 (DFrac.own 1) (BitVec.extractLsb' 0 32 v) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AI.wp_argint (hlc := hlc) (GF := GF) c k' i tfp ws v old (DFrac.own 1) hi ha0 hws hnoff hK
+  have h := AI.wp_argint (GF := GF) c k' i tfp ws v old (DFrac.own 1) hi ha0 hws hnoff hK
   unfold wp_argint_body at h
   simp only [argintAddr] at h
   exact h
@@ -389,7 +389,7 @@ theorem sys_sbrk_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
+  have h := MP.wp_myproc (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   exact h
@@ -411,7 +411,7 @@ theorem sys_sbrk_growproc (GP : GROWPROC) (c : CPU) (k' : KCtx) (γl : GName) (�
           kNullRcpt γk k'.proc)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := GP.wp_growproc (hlc := hlc) (GF := GF) c k' γl γk γ j pid V M hj hproc hnoff hK hlk htier
+  have h := GP.wp_growproc (GF := GF) c k' γl γk γ j pid V M hj hproc hnoff hK hlk htier
   unfold wp_growproc_body at h
   simp only [growprocAddr] at h
   exact h
@@ -761,7 +761,7 @@ end
 
 set_option maxHeartbeats 8000000 in
 theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γl γk γ j pid V M v0 v1 hj hproc hv0 hv1 hnoff hK hlk htier => by
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γl γk γ j pid V M v0 v1 hj hproc hv0 hv1 hnoff hK hlk htier => by
   unfold wp_sys_sbrk_body
   simp only [sysSbrkAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hpv, HΦ⟩

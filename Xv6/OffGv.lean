@@ -133,7 +133,7 @@ closed), so the nesting is never simultaneous. -/
 def foffN : Namespace := ndot (ndot nroot "app") "foff"
 
 section OffUser
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [OffboxG GF]
 
 /-- The user half, parked with its value existential (Rocq `off_user_inv`). -/
 def offUserInv (γo : GName) : IProp GF :=
@@ -184,15 +184,15 @@ stated at it.  Rocq's `app_taint` is the machine's kill credential
 
 /-- Rocq `off_link`: the kernel's half at `z`, or the taint. -/
 def offLink (γo : GName) (z : Int) : IProp GF :=
-  iprop(offGv γo (1 : Qp).half z ∨ MachFixedGS.killCred (hlc := hlc) (GF := GF))
+  iprop(offGv γo (1 : Qp).half z ∨ MachFixedGS.killCred (GF := GF))
 
-instance offLink_timeless (γo : GName) (z : Int) : Timeless (offLink (hlc := hlc) (GF := GF) γo z) := by
+instance offLink_timeless (γo : GName) (z : Int) : Timeless (offLink (GF := GF) γo z) := by
   unfold offLink; infer_instance
 
 /-- Rocq `off_link_of`: the coupled arm, what a fire that MOVED the ghost
 hands back. -/
 theorem offLink_of (γo : GName) (z : Int) :
-    offGv (GF := GF) γo (1 : Qp).half z ⊢ offLink (hlc := hlc) γo z := by
+    offGv (GF := GF) γo (1 : Qp).half z ⊢ offLink γo z := by
   unfold offLink
   iintro H
   ileft
@@ -200,7 +200,7 @@ theorem offLink_of (γo : GName) (z : Int) :
 
 /-- Rocq `off_link_taint`: the disconnect, paid with the taint. -/
 theorem offLink_taint (γo : GName) (z : Int) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ offLink (hlc := hlc) γo z := by
+    MachFixedGS.killCred (GF := GF) ⊢ offLink γo z := by
   unfold offLink
   iintro H
   iright
@@ -210,11 +210,11 @@ theorem offLink_taint (γo : GName) (z : Int) :
 comes back UNMOVED or ADVANCED BY THE COUNT `d`, either arm possibly the
 taint. -/
 def offRet (γo : GName) (off d : Nat) : IProp GF :=
-  iprop(∃ v : Int, offLink (hlc := hlc) γo v ∗ ⌜v = (off : Int) ∨ v = ((off + d : Nat) : Int)⌝)
+  iprop(∃ v : Int, offLink γo v ∗ ⌜v = (off : Int) ∨ v = ((off + d : Nat) : Int)⌝)
 
 /-- Rocq `off_ret_keep`: the generic node's answer, the borrow unmoved. -/
 theorem offRet_keep (γo : GName) (off d : Nat) :
-    offGv (GF := GF) γo (1 : Qp).half (off : Int) ⊢ offRet (hlc := hlc) γo off d := by
+    offGv (GF := GF) γo (1 : Qp).half (off : Int) ⊢ offRet γo off d := by
   unfold offRet
   iintro H
   iexists (off : Int)
@@ -224,7 +224,7 @@ theorem offRet_keep (γo : GName) (off d : Nat) :
 
 /-- Rocq `off_ret_of_link`: the generic node's answer at the lend itself. -/
 theorem offRet_of_link (γo : GName) (off d : Nat) :
-    offLink (hlc := hlc) (GF := GF) γo (off : Int) ⊢ offRet (hlc := hlc) γo off d := by
+    offLink (GF := GF) γo (off : Int) ⊢ offRet γo off d := by
   unfold offRet
   iintro H
   iexists (off : Int)

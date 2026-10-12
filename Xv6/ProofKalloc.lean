@@ -90,8 +90,9 @@ theorem ka_al8 (p : BitVec 64) (h : p &&& 0xfff#64 = 0#64) : p.toNat % 8 = 0 := 
 /-! ## Curried forms of the allocator's ghost steps -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- `kmemAuth_agree`, curried. -/
 theorem kmemAuth_agree' (γk : KmemNames) (n : Nat) (on : Option Nat) :
     kallocAvail (GF := GF) γk on ⊢ kmemAuth γk n -∗
@@ -100,6 +101,7 @@ theorem kmemAuth_agree' (γk : KmemNames) (n : Nat) (on : Option Nat) :
   iapply (kmemAuth_agree γk n on)
   iframe
 
+omit [MachGS GF] in
 /-- `kmemAuth_dec`, curried. -/
 theorem kmemAuth_dec' (γk : KmemNames) (n : Nat) (on : Option Nat) (act : BitVec 64) :
     kallocAvail (GF := GF) γk on ⊢ kmemAuth γk (n + 1) -∗
@@ -109,6 +111,7 @@ theorem kmemAuth_dec' (γk : KmemNames) (n : Nat) (on : Option Nat) (act : BitVe
   iapply (kmemAuth_dec γk n on act)
   iframe
 
+omit [MachGS GF] in
 /-- `kmemAuth_null`, curried. -/
 theorem kmemAuth_null' (γk : KmemNames) (on : Option Nat) (act : BitVec 64) :
     kallocAvail (GF := GF) γk on ⊢ kmemAuth γk 0 -∗
@@ -141,7 +144,7 @@ set_option maxHeartbeats 4000000 in
 /-- From `0x80000bbe` at hart `c` with `s1 = v`: `mv a0,s1`, the epilogue,
 and the caller's continuation.  `kb` is the function's base context (the
 one a balanced `push_off`/`pop_off` pair left), `R` the current map. -/
-theorem ka_tail {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem ka_tail {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (v : BitVec 64)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (h9 : R 9#5 = v)
@@ -185,7 +188,7 @@ theorem kalloc_br_19a : KA.«kalloc» + 0x19a#64 = KA.«memset» := by decide
 set_option maxHeartbeats 4000000 in
 /-- From `0x80000bb4` at hart `c`, after `release`, with the page `p` owned:
 `memset(p, 5, 4096)` and the tail. -/
-theorem ka_memset_tail (MS : MEMSET) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem ka_memset_tail (MS : MEMSET) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (c : CPU) (kb : KCtx) (hK : 6 ≤ kb.avail) (p : BitVec 64)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (h9 : R 9#5 = p)
@@ -213,7 +216,7 @@ theorem ka_memset_tail (MS : MEMSET) {hlc : HasLC} {GF : BundledGFunctors.{0}} [
       ⊢ wpLoop (GF := GF) cc := by
     intro cc k' os cb hK' hn hcb hl'
     subst hcb
-    have h := MS.wp_memset (hlc := hlc) (GF := GF) cc k' os 4096 hK' hn (by decide) hl'
+    have h := MS.wp_memset (GF := GF) cc k' os 4096 hK' hn (by decide) hl'
     unfold wp_memset_body at h
     simp only [memsetAddr] at h
     exact h
@@ -286,9 +289,9 @@ set_option maxHeartbeats 4000000 in
 `wp_kalloc` follows as a corollary in `kalloc_proof`.  The actor of the
 ledger's event is `k.proc`, the `cpu_own` proc word (design D3). -/
 theorem kalloc_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat) hnoff hK hlk :
-    wp_kalloc_led_body (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk := by
+    wp_kalloc_led_body (GF := GF) cpu k γl γk on ke hnoff hK hlk := by
   unfold wp_kalloc_led_body
   simp only [kallocAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hl, Hnext⟩
@@ -328,7 +331,7 @@ theorem kalloc_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
         sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) c4 := by
     intro k' hnoff' hK' hs'
-    have h := AC.wp_acquire (hlc := hlc) (GF := GF) c4 k' γl "kmem" (kmemRes γk) hnoff' hK' hs'
+    have h := AC.wp_acquire (GF := GF) c4 k' γl "kmem" (kmemRes γk) hnoff' hK' hs'
     unfold wp_acquire_body at h
     simp only [acquireAddr] at h
     exact h
@@ -356,7 +359,7 @@ theorem kalloc_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
         pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) c := by
     intro k' hsie' hnoff' hK' reen hreen hon
-    have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl "kmem" (kmemRes γk) hsie' hnoff' hK' reen hreen hon
+    have h := RE.wp_release (GF := GF) c k' γl "kmem" (kmemRes γk) hsie' hnoff' hK' reen hreen hon
     unfold wp_release_body at h
     simp only [releaseAddr] at h
     exact h
@@ -575,8 +578,8 @@ theorem kalloc_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
 the boot (`hp0`) as its corollary (the lend from `actLend_of_zero`, the
 stepped lend and the receipt dropped, `kallocPostLed_post`). -/
 theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on hnoff hK hlk hp0 => by
-    have h := kalloc_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on 0 hnoff hK hlk
+  ⟨fun {GF} _ _ _ _ cpu k γl γk on hnoff hK hlk hp0 => by
+    have h := kalloc_led_proof AC RE MS (GF := GF) cpu k γl γk on 0 hnoff hK hlk
     unfold wp_kalloc_led_body at h
     unfold wp_kalloc_body
     iintro ⟨Hk, Hpc, #Hlk, Hav, Hnext⟩
@@ -592,7 +595,7 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
     iapply H $$ %spie %spp %R' %hs Hk Hpc Hpost
     ipureintro
     exact hcs,
-   fun {hlc GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk =>
-    kalloc_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk⟩
+   fun {GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk =>
+    kalloc_led_proof AC RE MS (GF := GF) cpu k γl γk on ke hnoff hK hlk⟩
 
 end Xv6

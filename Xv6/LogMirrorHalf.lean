@@ -28,25 +28,25 @@ namespace Xv6
 open Iris Iris.BI MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The era's half at a NAMED picture (Rocq `log_mirror_half`). -/
 def logMirrorHalf (M : LogMirror) : IProp GF :=
-  MachGS.mirrorName (hlc := hlc) (GF := GF) ↪VAR{.own (1 : Qp).half} M
+  MachGS.mirrorName (GF := GF) ↪VAR{.own (1 : Qp).half} M
 
 instance logMirrorHalf_timeless (M : LogMirror) :
-    Timeless (logMirrorHalf (hlc := hlc) (GF := GF) M) := by
+    Timeless (logMirrorHalf (GF := GF) M) := by
   unfold logMirrorHalf; infer_instance
 
 /-- THE ERA'S MIRROR, BORN TRUE AND IN CUSTODY (Rocq `log_mirror_born`): the
 half plus this era's swap receipt, as the boot chain carries it from
 `MachCSL.powerBootRes` to `initlog`. -/
 def logMirrorBorn (M : LogMirror) : IProp GF :=
-  iprop(logMirrorHalf (hlc := hlc) M ∗
-    swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1))
+  iprop(logMirrorHalf M ∗
+    swapLb (GF := GF) (genId (GF := GF) + 1))
 
 instance logMirrorBorn_timeless (M : LogMirror) :
-    Timeless (logMirrorBorn (hlc := hlc) (GF := GF) M) := by
+    Timeless (logMirrorBorn (GF := GF) M) := by
   unfold logMirrorBorn; infer_instance
 
 end

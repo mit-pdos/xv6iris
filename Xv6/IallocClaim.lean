@@ -42,7 +42,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
@@ -59,7 +59,7 @@ theorem ialloc_claim_iget (IG : IGET) [Fscfg] [Icfg] [CurCtx] (cpu c0 : CPU) (k 
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«ialloc» + 0xa4#64) ∗
     iallocFrameK k ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
+    itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -77,7 +77,7 @@ theorem ialloc_claim_iget (IG : IGET) [Fscfg] [Icfg] [CurCtx] (cpu c0 : CPU) (k 
   iintro ⟨Hk, Hpc, Hframe, #Hit2, #Hiti, #Hinv, #Hpe, Hte, Hce, Hsn, Hsi, Hpid, Hsl, Hiref,
     Hclm, Hop, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave #Hreg := iregInv_reg (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
+  ihave #Hreg := iregInv_reg fscIreg fscFs icfgIst icfgNib $$ Hinv
   ihave Hname : iname fscIreg fscFs icfgIst inum (.claimL ty t qt) $$ [Hclm]
   · unfold iname; iexact Hclm
   -- +0xa4  sext.w a1,s2 ; +0xa8  c.mv a0,s5 ; +0xaa  jal iget
@@ -110,7 +110,7 @@ theorem ialloc_claim_iget (IG : IGET) [Fscfg] [Icfg] [CurCtx] (cpu c0 : CPU) (k 
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
-  icases ialloc_refb_claim (hlc := hlc) ty t qt kk q icfgDev inum $$ Hrefb with ⟨Href, Hru⟩
+  icases ialloc_refb_claim ty t qt kk q icfgDev inum $$ Hrefb with ⟨Href, Hru⟩
   ihave Hclm : iclaim inum.toNat ty t qt $$ [Hname]
   · unfold iname; iexact Hname
   have hR2 : R1 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 := by
@@ -188,7 +188,7 @@ theorem ialloc_claim_rel (BE : BRELSE) (IG : IGET) [Fscfg] [Icfg] [CurCtx] (Γ :
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«ialloc» + 0x9e#64) ∗
     iallocFrameK k ∗ procsInv Γ ∗ bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
+    itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -281,7 +281,7 @@ theorem ialloc_claim_lw (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [Fscfg] [Icfg
     iallocFrameK k ∗ procsInv Γ ∗ bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+    itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
     panicEnv ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
@@ -313,7 +313,7 @@ theorem ialloc_claim_lw (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [Fscfg] [Icfg
   ihave #Hcrd := logCredit_own (GF := GF) icfgLog false Sb e0 (IBLOCK inum icfgIst)
     (fun h => absurd h (by decide))
   -- THE ONE GHOST STEP, as log_write's atomic update
-  ihave Hau := ialloc_claim_au (hlc := hlc) inum ty ds e0 t qt hnib hwf ht0 hty htyk
+  ihave Hau := ialloc_claim_au inum ty ds e0 t qt hnib hwf ht0 hty htyk
     $$ Hinv Hopen Htx
   -- +0x98  c.mv a0,s1 ; +0x9a  jal log_write
   k_step_e (wp_s_add cpu _ (KA.«ialloc» + 0x98#64) true 10#5 0#5 9#5 (by decide))
@@ -412,7 +412,7 @@ theorem ialloc_claim (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [F
     iallocFrameK k ∗ procsInv Γ ∗ bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+    itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
     panicEnv ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗

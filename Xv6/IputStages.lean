@@ -16,11 +16,11 @@ open LeanRV64D
 
 /-- The statement of `IputTailNeSpec` (see the stage file). -/
 def IputTailNeSpec : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (tid : Nat) (qtx : Qp)
@@ -47,11 +47,11 @@ def IputTailNeSpec : Prop :=
 
 /-- The statement of `IputTailOneSpec` (see the stage file). -/
 def IputTailOneSpec : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (tid : Nat) (qtx : Qp)
@@ -69,7 +69,7 @@ def IputTailOneSpec : Prop :=
     pcIs c (KA.«iput» + 0x20#64) ∗ iputEnv Γ γl pd pav pu γil γisl kk ∗
     locked fscItlock c ∗ sieArm c k.sie k.proc ∗
     itableHalf Mt ∗ irefSlotsAuth ∗ islPool Mt ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
+    ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
     irefFrag kk q ∗ liveFracc kk q ∗ slhTok (icfgIsl kk) q ∗
     inodeIdent kk (.own q) icfgDev inum ∗
     iputWindow kk Mt ci icfgDev inum ∗ iputRowOpen kk Mt ci q icfgDev inum ∗
@@ -82,11 +82,11 @@ def IputTailOneSpec : Prop :=
 
 /-- The statement of `IputOfflockSpec` (see the stage file). -/
 def IputOfflockSpec : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (inum : BitVec 32) (dn : Dinode) (ge gr gd : GName)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (tid : Nat) (qtx qa qc qf : Qp)
@@ -109,7 +109,7 @@ def IputOfflockSpec : Prop :=
     iputEnv Γ γl pd pav pu γil γisl kk ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     dinodeAt fscIreg inum dn ∗
-    escAInv (hlc := hlc) fscFs ge gr gd inum.toNat (rgb, (tid, qf)) ∗ redeemTicketA gd ∗
+    escAInv fscFs ge gr gd inum.toNat (rgb, (tid, qf)) ∗ redeemTicketA gd ∗
     crpElem inum.toNat (.crpPre tid qc) ∗ txPin icfgLog tid qa ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
@@ -122,11 +122,11 @@ def IputOfflockSpec : Prop :=
 
 /-- The statement of `IputLockedSpec` (see the stage file). -/
 def IputLockedSpec : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (g1 g2 : GName)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
@@ -171,7 +171,7 @@ def IputLockedSpec : Prop :=
     wordPointsTo (iNlink (ientry kk)) 2 (DFrac.own 1) dn.diNlink ∗
     frzsel kk (1 : Qp).half.half true ∗
     irefSlotsAuth ∗ islPool Mt ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
+    ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
     -- the table's slot rows, WHOLE (the frozen park inside)
     ([∗list] j ∈ List.range NINODE, islot2 curCtx fscIc Mt ci j) ∗
     -- the REDUCED reference (its live slice froze into the table)
@@ -200,11 +200,11 @@ def IputLockedSpec : Prop :=
 
 /-- The statement of `IputEntrySpec` (see the stage file). -/
 def IputEntrySpec : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))

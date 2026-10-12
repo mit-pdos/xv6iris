@@ -77,16 +77,18 @@ open Std (ExtTreeSet)
 /-! ## 2.  THE REBASE: a node read field by field -/
 
 section UshExecPinExt
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_exec_ext`**: THE NODE IS READ FIELD BY FIELD. -/
 theorem ushCmdExecExt (g : GName) (t : Nat) (args args' : List UArg) (h : List.Forall₂ uargEqv args args') :
     ushCmd (GF := GF) g t (.exec args) ⊣⊢ ushCmd g t (.exec args') := by
   obtain rfl := uargEqv_forall2_eq h
   exact .rfl
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_rebase`**: the node the parser built for a stage's words
 at their line offset `c` IS the word list's node at the shifted base
 (deviation 4). -/
@@ -95,6 +97,7 @@ theorem ushCmdRebase (g : GName) (t s0 : Nat) (gs : Nat → BitVec 8) (c : Nat) 
       ushCmd g t (.exec (ushArgs (s0 + c) (fun j => gs (c + j)) (ushEchoToks ws))) :=
   ushCmdExecExt g t _ _ (ushArgsRebase s0 gs c (wlToks ws))
 
+omit [MachGS GF] in
 /-- **Rocq `ush_cmd_rebase_l`**. -/
 theorem ushCmdRebaseL (g : GName) (t s0 : Nat) (gs : Nat → BitVec 8) (c : Nat) (ws : List (List (BitVec 8))) :
     ushCmd (GF := GF) g t (.exec (ushArgs s0 gs (ushqRebase c (wlToks ws)))) ⊢
@@ -106,7 +109,7 @@ end UshExecPinExt
 /-! ## 3.  THE SUPPLY, AT ANY PINNED PROGRAM -/
 
 section UshExecPin
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -115,19 +118,19 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 its pin (or the taint) at every running view, and the generic taint
 continuation. -/
 def shPinSlot (pins : Aview → Prop) (T : IProp GF) : IProp GF :=
-  iprop(appInv (hlc := hlc) fscFs ∗
+  iprop(appInv fscFs ∗
     □ (∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜pins v⌝ ∨ T)) ∗
-    □ (∀ (R : IProp GF) (W : Uvis), T -∗ myPay W.gen (fun _ => R) -∗ □ (uKillCred (hlc := hlc) -∗ R) -∗
-        uslot (hlc := hlc) W))
+    □ (∀ (R : IProp GF) (W : Uvis), T -∗ myPay W.gen (fun _ => R) -∗ □ (uKillCred -∗ R) -∗
+        uslot W))
 
 /-- Rocq `sh_pin_slot_persistent`. -/
 instance shPinSlot_persistent (pins : Aview → Prop) (T : IProp GF) :
-    Persistent (shPinSlot (hlc := hlc) pins T) := by
+    Persistent (shPinSlot pins T) := by
   unfold shPinSlot; infer_instance
 
 /-- The slot is monotone in the pin. -/
 theorem shPinSlot_mono (pins pins' : Aview → Prop) (T : IProp GF) (h : ∀ v, pins v → pins' v) :
-    ⊢ shPinSlot (hlc := hlc) pins T -∗ shPinSlot (hlc := hlc) pins' T := by
+    ⊢ shPinSlot pins T -∗ shPinSlot pins' T := by
   unfold shPinSlot
   iintro ⟨#Hinv, #Hcl, #Hgen⟩
   isplitl []
@@ -146,15 +149,15 @@ theorem shPinSlot_mono (pins pins' : Aview → Prop) (T : IProp GF) (h : ∀ v, 
 /-- **R-prog's `UShCatPay` / `UShEcho` / `UShEchoPipePay` declarations this
 file reads** (unported, so parameters), each field named as its Rocq
 declaration (see the header). -/
-structure UshExecPinEcho (E : UshExecEnv (hlc := hlc) (GF := GF)) where
+structure UshExecPinEcho (E : UshExecEnv (GF := GF)) where
   /-- Rocq `UShCatPay.sh_cat_slot` (a definition). -/
   sh_cat_slot : IProp GF → IProp GF
   /-- ...its body: `sh_pin_slot` at /cat's pin. -/
-  sh_cat_slot_unfold : ∀ T, sh_cat_slot T ⊣⊢ shPinSlot (hlc := hlc) era0CatPins T
+  sh_cat_slot_unfold : ∀ T, sh_cat_slot T ⊣⊢ shPinSlot era0CatPins T
   /-- Rocq `UShCatPay.sh_cat_slot_of_fs_pure` (a definition). -/
   sh_cat_slot_of_fs_pure : IProp GF → IProp GF
   /-- ...its body: `sh_pin_slot` at the whole pure claim. -/
-  sh_cat_slot_of_fs_pure_unfold : ∀ T, sh_cat_slot_of_fs_pure T ⊣⊢ shPinSlot (hlc := hlc) fileFsPure T
+  sh_cat_slot_of_fs_pure_unfold : ∀ T, sh_cat_slot_of_fs_pure T ⊣⊢ shPinSlot fileFsPure T
   /-- Rocq `UShEcho.echo_node_img` (a definition: the node, as a fact about
   the image). -/
   echo_node_img : List (List (BitVec 8)) → ElfMem → Nat → Nat → (Nat → BitVec 8) → Prop
@@ -172,35 +175,35 @@ structure UshExecPinEcho (E : UshExecEnv (hlc := hlc) (GF := GF)) where
     (P P' : IProp GF) (X : Uvis → IProp GF),
     ⊢ □ (P' -∗ P) -∗ imageEntry f M av sts cw secc cs pidv Q P X -∗ imageEntry f M av sts cw secc cs pidv Q P' X
 
-variable {E : UshExecEnv (hlc := hlc) (GF := GF)} (P : UshExecPinEcho (hlc := hlc) E)
+variable {E : UshExecEnv (GF := GF)} (P : UshExecPinEcho E)
 
 /-- **Rocq `sh_pin_slot_cat`**. -/
-theorem shPinSlotCat (T : IProp GF) : ⊢ P.sh_cat_slot T -∗ shPinSlot (hlc := hlc) era0CatPins T := by
+theorem shPinSlotCat (T : IProp GF) : ⊢ P.sh_cat_slot T -∗ shPinSlot era0CatPins T := by
   iintro H
   iapply (P.sh_cat_slot_unfold T).1 $$ H
 
 /-- **Rocq `sh_grep_slot`**: grep's slot. -/
-def shGrepSlot (T : IProp GF) : IProp GF := shPinSlot (hlc := hlc) era0GrepPins T
+def shGrepSlot (T : IProp GF) : IProp GF := shPinSlot era0GrepPins T
 
 /-- **Rocq `sh_secc_slot`**: /seccomp's (seccomp lane S4). -/
-def shSeccSlot (T : IProp GF) : IProp GF := shPinSlot (hlc := hlc) era0SeccPins T
+def shSeccSlot (T : IProp GF) : IProp GF := shPinSlot era0SeccPins T
 
 /-- Rocq `sh_secc_slot_persistent`. -/
-instance shSeccSlot_persistent (T : IProp GF) : Persistent (shSeccSlot (hlc := hlc) T) := by
+instance shSeccSlot_persistent (T : IProp GF) : Persistent (shSeccSlot T) := by
   unfold shSeccSlot; infer_instance
 
 /-- **Rocq `sh_sync_slot`** (drift SY2): /sync's -- the claim's fixed part
 pins it too. -/
-def shSyncSlot (T : IProp GF) : IProp GF := shPinSlot (hlc := hlc) era0SyncPins T
+def shSyncSlot (T : IProp GF) : IProp GF := shPinSlot era0SyncPins T
 
 /-- Rocq `sh_sync_slot_persistent`. -/
-instance shSyncSlot_persistent (T : IProp GF) : Persistent (shSyncSlot (hlc := hlc) T) := by
+instance shSyncSlot_persistent (T : IProp GF) : Persistent (shSyncSlot T) := by
   unfold shSyncSlot; infer_instance
 
 /-- `sh_filt_slot` at the two pins' slots. -/
 theorem shFiltSlot_pin (F : Filt) (T : IProp GF) :
-    ⊢ shPinSlot (hlc := hlc) era0CatPins T -∗ shPinSlot (hlc := hlc) era0GrepPins T -∗
-      shPinSlot (hlc := hlc) (filtPins F) T := by
+    ⊢ shPinSlot era0CatPins T -∗ shPinSlot era0GrepPins T -∗
+      shPinSlot (filtPins F) T := by
   cases F <;> dsimp only [filtPins]
   · iintro #Hc -
     iexact Hc
@@ -209,15 +212,15 @@ theorem shFiltSlot_pin (F : Filt) (T : IProp GF) :
 
 /-- **Rocq `sh_stage_slots`**: the pin of every filter stage's program. -/
 def shStageSlots (fs : List Filt) (T : IProp GF) : IProp GF :=
-  iprop(□ ∀ F : Filt, ⌜F ∈ fs⌝ -∗ shPinSlot (hlc := hlc) (filtPins F) T)
+  iprop(□ ∀ F : Filt, ⌜F ∈ fs⌝ -∗ shPinSlot (filtPins F) T)
 
 /-- Rocq `sh_stage_slots_persistent`. -/
-instance shStageSlots_persistent (fs : List Filt) (T : IProp GF) : Persistent (shStageSlots (hlc := hlc) fs T) := by
+instance shStageSlots_persistent (fs : List Filt) (T : IProp GF) : Persistent (shStageSlots fs T) := by
   unfold shStageSlots; infer_instance
 
 /-- **Rocq `sh_stage_slot_at`**. -/
 theorem shStageSlotAt (fs : List Filt) (F : Filt) (T : IProp GF) (hF : F ∈ fs) :
-    ⊢ shStageSlots (hlc := hlc) fs T -∗ shPinSlot (hlc := hlc) (filtPins F) T := by
+    ⊢ shStageSlots fs T -∗ shPinSlot (filtPins F) T := by
   unfold shStageSlots
   iintro #Hs
   iapply Hs $$ %F %hF
@@ -236,10 +239,10 @@ theorem shExecSupXOfEntryGen (TabF : GName → List FdState → IProp GF) (Xt : 
     ⊢ iprop(□ ∀ (M : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat) (gn : Nat → BitVec 8)
           (sts : List FdState) (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
         ⌜P.echo_node_img ws M s0 t gn⌝ -∗ ⌜imgAgrees M Mv⌝ -∗ ⌜ushEchoArgvBytes ws gn⌝ -∗
-        ⌜sts.length = NOFILE⌝ -∗ ⌜Fd (sts.take NSTD)⌝ -∗ ⌜Xt sts⌝ -∗ urunNopipe (hlc := hlc) sts -∗
+        ⌜sts.length = NOFILE⌝ -∗ ⌜Fd (sts.take NSTD)⌝ -∗ ⌜Xt sts⌝ -∗ urunNopipe sts -∗
         imageEntry elf Mv (BitVec.ofNat 64 (t + 8)) sts ROOTINO seccAll cs pidv (fun _ => Qv) Cr
-          (uslot (hlc := hlc))) -∗
-      □ (uKillCred (hlc := hlc) -∗ Qv) -∗ shPinSlot (hlc := hlc) pins T -∗
+          (uslot)) -∗
+      □ (uKillCred -∗ Qv) -∗ shPinSlot pins T -∗
       ushExecSupEchoGen E TabF Fd ws (fun _ => Qv) Cr := by
   unfold shPinSlot
   iintro #Hent #Hkt ⟨#Hinv, #Hcl, #Hgen⟩
@@ -270,7 +273,7 @@ theorem shExecSupXOfEntryGen (TabF : GName → List FdState → IProp GF) (Xt : 
     rw [hpeq]
     ihave #He := Hent $$ %M %Mv %s0 %t %g %fdv %cs %pidv %himg %hag %hbytes %hflen %hfd %htb.2 Hnp0
     iapply P.image_entry_pay_mono elf Mv (BitVec.ofNat 64 (t + 8)) fdv ROOTINO seccAll cs pidv (fun _ => Qv)
-      Cr iprop(TabF N'.fd ld ∗ Cr) (uslot (hlc := hlc)) $$ [] He
+      Cr iprop(TabF N'.fd ld ∗ Cr) (uslot) $$ [] He
     imodintro
     iintro ⟨-, Hc⟩
     iexact Hc
@@ -292,10 +295,10 @@ theorem shExecSupXOfEntry (Fd : List FdState → Prop) (ws : List (List (BitVec 
     ⊢ iprop(□ ∀ (M : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat) (gn : Nat → BitVec 8)
           (sts : List FdState) (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
         ⌜P.echo_node_img ws M s0 t gn⌝ -∗ ⌜imgAgrees M Mv⌝ -∗ ⌜ushEchoArgvBytes ws gn⌝ -∗
-        ⌜sts.length = NOFILE⌝ -∗ ⌜Fd (sts.take NSTD)⌝ -∗ urunNopipe (hlc := hlc) sts -∗
+        ⌜sts.length = NOFILE⌝ -∗ ⌜Fd (sts.take NSTD)⌝ -∗ urunNopipe sts -∗
         imageEntry elf Mv (BitVec.ofNat 64 (t + 8)) sts ROOTINO seccAll cs pidv (fun _ => Qv) Cr
-          (uslot (hlc := hlc))) -∗
-      □ (uKillCred (hlc := hlc) -∗ Qv) -∗ shPinSlot (hlc := hlc) pins T -∗
+          (uslot)) -∗
+      □ (uKillCred -∗ Qv) -∗ shPinSlot pins T -∗
       ushExecSupEchoAt E Fd ws (fun _ => Qv) Cr := by
   iintro #Hent #Hkt Hs
   iapply shExecSupXOfEntryGen P (fun γ ld => ustd γ ld) (fun _ => True)
@@ -318,10 +321,10 @@ theorem shExecSupXOfEntryV (Fd : List FdState → Prop) (ws : List (List (BitVec
     ⊢ iprop(□ ∀ (M : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat) (gn : Nat → BitVec 8)
           (sts : List FdState) (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
         ⌜P.echo_node_img ws M s0 t gn⌝ -∗ ⌜imgAgrees M Mv⌝ -∗ ⌜ushEchoArgvBytes ws gn⌝ -∗
-        ⌜sts.length = NOFILE⌝ -∗ ⌜Fd (sts.take NSTD)⌝ -∗ ⌜tabLe sts v⌝ -∗ urunNopipe (hlc := hlc) sts -∗
+        ⌜sts.length = NOFILE⌝ -∗ ⌜Fd (sts.take NSTD)⌝ -∗ ⌜tabLe sts v⌝ -∗ urunNopipe sts -∗
         imageEntry elf Mv (BitVec.ofNat 64 (t + 8)) sts ROOTINO seccAll cs pidv (fun _ => Qv) Cr
-          (uslot (hlc := hlc))) -∗
-      □ (uKillCred (hlc := hlc) -∗ Qv) -∗ shPinSlot (hlc := hlc) pins T -∗
+          (uslot)) -∗
+      □ (uKillCred -∗ Qv) -∗ shPinSlot pins T -∗
       ushExecSupEchoAtV E Fd ws (fun _ => Qv) Cr v :=
   shExecSupXOfEntryGen P (fun γ ld => ustdAt γ ld v) (fun sts => tabLe sts v)
     (fun γ fdv ld => by
@@ -337,10 +340,10 @@ theorem shExecSupFiltOfEntry (Pr : UshExecPinProg) (Fd : List FdState → Prop) 
     ⊢ iprop(□ ∀ (M : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat) (gn : Nat → BitVec 8)
           (sts : List FdState) (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
         ⌜P.echo_node_img (filtWords F) M s0 t gn⌝ -∗ ⌜imgAgrees M Mv⌝ -∗ ⌜ushEchoArgvBytes (filtWords F) gn⌝ -∗
-        ⌜sts.length = NOFILE⌝ -∗ ⌜Fd (sts.take NSTD)⌝ -∗ urunNopipe (hlc := hlc) sts -∗
+        ⌜sts.length = NOFILE⌝ -∗ ⌜Fd (sts.take NSTD)⌝ -∗ urunNopipe sts -∗
         imageEntry (filtElf F) Mv (BitVec.ofNat 64 (t + 8)) sts ROOTINO seccAll cs pidv (fun _ => Qv) Cr
-          (uslot (hlc := hlc))) -∗
-      □ (uKillCred (hlc := hlc) -∗ Qv) -∗ shPinSlot (hlc := hlc) (filtPins F) T -∗
+          (uslot)) -∗
+      □ (uKillCred -∗ Qv) -∗ shPinSlot (filtPins F) T -∗
       ushExecSupEchoAt E Fd (filtWords F) (fun _ => Qv) Cr :=
   shExecSupXOfEntry P Fd (filtWords F) (filtPl F) (filtPins F) [ROOTINO, filtIno F] (filtIno F) (filtElf F) T
     Qv Cr hok (filtWordsHead F) (filtElfLoadable Pr F) (filtPinResolves Pr F)

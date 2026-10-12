@@ -26,7 +26,7 @@ theorem release_br_ffffffffffffff12 : KA.«release» + 0xffffffffffffff12#64 = K
 
 set_option maxHeartbeats 4000000 in
 theorem release_hook_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_HOOK := ⟨
-  fun {hlc GF} _ _ cpu k γ s R Rin _ hsie hnoff hK reen hreen hon => by
+  fun {GF} _ _ cpu k γ s R Rin _ hsie hnoff hK reen hreen hon => by
   unfold wp_release_hook_body
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, Hhook, Harm, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -52,7 +52,7 @@ theorem release_hook_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_HOOK := ⟨
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 1#64⌝ -∗ locked γ cpu -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK'
-    have h := HO.wp_holding_locked (hlc := hlc) (GF := GF) cpu k' γ s R hsie' hK'
+    have h := HO.wp_holding_locked (GF := GF) cpu k' γ s R hsie' hK'
     unfold wp_holding_locked_body at h
     simp only [holdingAddr] at h
     exact h
@@ -100,7 +100,7 @@ theorem release_hook_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_HOOK := ⟨
         kctx cpu' ((k'.popExit reen).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu')) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK' hlks' reen hreen hon'
-    have h := PO.wp_pop_off (hlc := hlc) (GF := GF) cpu k' hsie' hnoff' hK' hlks' reen hreen hon'
+    have h := PO.wp_pop_off (GF := GF) cpu k' hsie' hnoff' hK' hlks' reen hreen hon'
     unfold wp_pop_off_body at h
     simp only [popOffAddr] at h
     exact h
@@ -168,7 +168,7 @@ dead ownership-check branch `D`) through `holding`'s LOCKED contract
 (`wp_s_sw_zero_release_gen`) and across `pop_off` in the caller's frame,
 handing it back in the continuation. -/
 theorem release_gen_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_GEN := ⟨
-  fun {hlc GF} _ _ cpu k γ s R _ D _ Tc hrefute hsie hnoff hK reen hreen hon => by
+  fun {GF} _ _ cpu k γ s R _ D _ Tc hrefute hsie hnoff hK reen hreen hon => by
   unfold wp_release_gen_body
   iintro ⟨Hk, Hpc, #Hlk, Hcred, Hlocked, HR, Harm, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -194,7 +194,7 @@ theorem release_gen_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_GEN := ⟨
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 1#64⌝ -∗ locked γ cpu -∗ Tc -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK'
-    have h := HO.wp_holding_locked_gen (hlc := hlc) (GF := GF) cpu k' γ s R D Tc hrefute hsie' hK'
+    have h := HO.wp_holding_locked_gen (GF := GF) cpu k' γ s R D Tc hrefute hsie' hK'
     unfold wp_holding_locked_gen_body at h
     simp only [holdingAddr] at h
     exact h
@@ -242,7 +242,7 @@ theorem release_gen_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_GEN := ⟨
         kctx cpu' ((k'.popExit reen).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu')) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK' hlks' reen hreen hon'
-    have h := PO.wp_pop_off (hlc := hlc) (GF := GF) cpu k' hsie' hnoff' hK' hlks' reen hreen hon'
+    have h := PO.wp_pop_off (GF := GF) cpu k' hsie' hnoff' hK' hlks' reen hreen hon'
     unfold wp_pop_off_body at h
     simp only [popOffAddr] at h
     exact h
@@ -311,7 +311,7 @@ caller holds only the lock token, so the holding check
 lock -- consuming the destroy licence and handing back the two reclaimed
 byte histories plus the carry-out `Out`. -/
 theorem release_cancel_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_CANCEL := ⟨
-  fun {hlc GF} _ _ cpu k γ s R _ D Out _ hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon => by
+  fun {GF} _ _ cpu k γ s R _ D Out _ hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon => by
   unfold wp_release_cancel_body
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, Hlic, Harm, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -337,7 +337,7 @@ theorem release_cancel_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_CANCEL := �
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 1#64⌝ -∗ locked γ cpu -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK'
-    have h := HO.wp_holding_locked_refute (hlc := hlc) (GF := GF) cpu k' γ s R D hrefuteCore hsie' hK'
+    have h := HO.wp_holding_locked_refute (GF := GF) cpu k' γ s R D hrefuteCore hsie' hK'
     unfold wp_holding_locked_refute_body at h
     simp only [holdingAddr] at h
     exact h
@@ -385,7 +385,7 @@ theorem release_cancel_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_CANCEL := �
         kctx cpu' ((k'.popExit reen).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu')) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK' hlks' reen hreen hon'
-    have h := PO.wp_pop_off (hlc := hlc) (GF := GF) cpu k' hsie' hnoff' hK' hlks' reen hreen hon'
+    have h := PO.wp_pop_off (GF := GF) cpu k' hsie' hnoff' hK' hlks' reen hreen hon'
     unfold wp_pop_off_body at h
     simp only [popOffAddr] at h
     exact h
@@ -456,7 +456,7 @@ half -- closing NORMALLY (depositing the payload, no reclaimed words).  For a
 releaser that spent its reference into the deposited payload but still holds
 the lock. -/
 theorem release_refute_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_REFUTE := ⟨
-  fun {hlc GF} _ _ cpu k γ s R _ D _ hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon => by
+  fun {GF} _ _ cpu k γ s R _ D _ hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon => by
   unfold wp_release_refute_body
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, Harm, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -482,7 +482,7 @@ theorem release_refute_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_REFUTE := �
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 1#64⌝ -∗ locked γ cpu -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK'
-    have h := HO.wp_holding_locked_refute (hlc := hlc) (GF := GF) cpu k' γ s R D hrefuteCore hsie' hK'
+    have h := HO.wp_holding_locked_refute (GF := GF) cpu k' γ s R D hrefuteCore hsie' hK'
     unfold wp_holding_locked_refute_body at h
     simp only [holdingAddr] at h
     exact h
@@ -530,7 +530,7 @@ theorem release_refute_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_REFUTE := �
         kctx cpu' ((k'.popExit reen).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu')) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK' hlks' reen hreen hon'
-    have h := PO.wp_pop_off (hlc := hlc) (GF := GF) cpu k' hsie' hnoff' hK' hlks' reen hreen hon'
+    have h := PO.wp_pop_off (GF := GF) cpu k' hsie' hnoff' hK' hlks' reen hreen hon'
     unfold wp_pop_off_body at h
     simp only [popOffAddr] at h
     exact h

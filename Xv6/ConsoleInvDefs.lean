@@ -181,7 +181,7 @@ theorem devswReadVal_is_console (mj : Nat) (h : devswReadVal mj = KA.«consolere
     exact absurd h (by decide)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The ring's bytes and its tag column -/
 
@@ -194,11 +194,11 @@ instance consData_timeless [X : CurCtx] (bs : List (BitVec 8)) : Timeless (consD
 /-- One slot of the TAG COLUMN: the application's persistent claim about the
 history the byte in that slot arrived at, or nothing. -/
 def consTagAt : Option (List Obs) → IProp GF
-  | some h => MachFixedGS.rxTag (hlc := hlc) (GF := GF) h
+  | some h => MachFixedGS.rxTag (GF := GF) h
   | none => iprop(emp)
 
 theorem consTagAt_some (h : List Obs) :
-    consTagAt (GF := GF) (some h) = MachFixedGS.rxTag (hlc := hlc) (GF := GF) h := rfl
+    consTagAt (GF := GF) (some h) = MachFixedGS.rxTag (GF := GF) h := rfl
 theorem consTagAt_none : consTagAt (GF := GF) none = iprop(emp) := rfl
 
 instance consTagAt_persistent (o : Option (List Obs)) : Persistent (consTagAt (GF := GF) o) := by
@@ -231,7 +231,7 @@ theorem consTags_none (n : Nat) : ⊢ consTags (GF := GF) (List.replicate n none
 stored.  The slot's old entry is DROPPED, so this is a wand, not an
 accessor. -/
 theorem consTags_upd (ts : List (Option (List Obs))) (i : Nat) (h : List Obs) :
-    MachFixedGS.rxTag (hlc := hlc) (GF := GF) h ⊢ consTags ts -∗ consTags (ts.set i (some h)) := by
+    MachFixedGS.rxTag (GF := GF) h ⊢ consTags ts -∗ consTags (ts.set i (some h)) := by
   iintro #Ht Hts
   unfold consTags
   by_cases hlt : i < ts.length
@@ -246,7 +246,7 @@ theorem consTags_upd (ts : List (Option (List Obs))) (i : Nat) (h : List Obs) :
 /-- ...and the one READ: consoleread takes a copy of the tag of the byte it
 pops.  A tag is persistent, so the column is handed back whole. -/
 theorem consTags_get (ts : List (Option (List Obs))) (i : Nat) (h : List Obs)
-    (hi : ts[i]? = some (some h)) : consTags (GF := GF) ts ⊢ MachFixedGS.rxTag (hlc := hlc) h := by
+    (hi : ts[i]? = some (some h)) : consTags (GF := GF) ts ⊢ MachFixedGS.rxTag h := by
   unfold consTags
   exact BigSepL.bigSepL_lookup (Φ := fun _ o => consTagAt (GF := GF) o) hi
 
@@ -287,25 +287,35 @@ def consDlcnt (cn : ConsNames) (n : Nat) : IProp GF := uartDlcnt cn.uart (1 : Qp
 `rxHi` half at the uart's names. -/
 def consHi (cn : ConsNames) (hh : Option (List Obs)) : IProp GF := rxHi cn.uart (1 : Qp).half hh
 
+omit [MachGS GF] in
 instance consStoredLb_persistent (cn : ConsNames) (st : List (List Obs × BitVec 8)) :
     Persistent (consStoredLb (GF := GF) cn st) := by unfold consStoredLb; infer_instance
+omit [MachGS GF] in
 instance consStoredLb_timeless (cn : ConsNames) (st : List (List Obs × BitVec 8)) :
     Timeless (consStoredLb (GF := GF) cn st) := by unfold consStoredLb; infer_instance
+omit [MachGS GF] in
 instance consStoredAuth_timeless (cn : ConsNames) (st : List (List Obs × BitVec 8)) :
     Timeless (consStoredAuth (GF := GF) cn st) := by unfold consStoredAuth; infer_instance
+omit [MachGS GF] in
 instance consCursor_timeless (cn : ConsNames) (n : Nat) : Timeless (consCursor (GF := GF) cn n) := by
   unfold consCursor; infer_instance
+omit [MachGS GF] in
 instance consRdtok_timeless (cn : ConsNames) (n : Nat) : Timeless (consRdtok (GF := GF) cn n) := by
   unfold consRdtok; infer_instance
+omit [MachGS GF] in
 instance consDeliv_timeless (cn : ConsNames) (dv : List (List Obs × BitVec 8)) :
     Timeless (consDeliv (GF := GF) cn dv) := by unfold consDeliv; infer_instance
+omit [MachGS GF] in
 instance consLogm_timeless (cn : ConsNames) (L : List LogEntry) : Timeless (consLogm (GF := GF) cn L) := by
   unfold consLogm; infer_instance
+omit [MachGS GF] in
 instance consHi_timeless (cn : ConsNames) (hh : Option (List Obs)) : Timeless (consHi (GF := GF) cn hh) := by
   unfold consHi; infer_instance
+omit [MachGS GF] in
 instance consDlcnt_timeless (cn : ConsNames) (n : Nat) : Timeless (consDlcnt (GF := GF) cn n) := by
   unfold consDlcnt; infer_instance
 
+omit [MachGS GF] in
 /-- THE CURSOR PAIR MOVES ALONE (ruling F1). -/
 theorem consCursor_agree (cn : ConsNames) (n n' : Nat) :
     consCursor (GF := GF) cn n ⊢ consRdtok cn n' -∗ ⌜n = n'⌝ := by
@@ -313,12 +323,14 @@ theorem consCursor_agree (cn : ConsNames) (n n' : Nat) :
   iintro H1 H2
   iapply ghost_var_agree cn.rd _ _ _ _ $$ H1 H2
 
+omit [MachGS GF] in
 theorem consCursor_update (cn : ConsNames) (n n' : Nat) :
     consCursor (GF := GF) cn n ⊢ consRdtok cn n -∗ |==> (consCursor cn n' ∗ consRdtok cn n') := by
   unfold consCursor consRdtok
   iintro H1 H2
   iapply ghost_var_update_halves n' cn.rd n n $$ H1 H2
 
+omit [MachGS GF] in
 theorem consStoredLb_get (cn : ConsNames) (st : List (List Obs × BitVec 8)) :
     consStoredAuth (GF := GF) cn st ⊢ consStoredAuth cn st ∗ consStoredLb cn st := by
   unfold consStoredAuth consStoredLb
@@ -326,6 +338,7 @@ theorem consStoredLb_get (cn : ConsNames) (st : List (List Obs × BitVec 8)) :
   ihave #H' := MonoList.lb_own_get cn.log _ st $$ H
   iframe H H'
 
+omit [MachGS GF] in
 theorem consStoredLb_prefix (cn : ConsNames) (st l : List (List Obs × BitVec 8)) :
     consStoredAuth (GF := GF) cn st ⊢ consStoredLb cn l -∗ ⌜l <+: st⌝ := by
   unfold consStoredAuth consStoredLb
@@ -333,6 +346,7 @@ theorem consStoredLb_prefix (cn : ConsNames) (st l : List (List Obs × BitVec 8)
   ihave %h := MonoList.auth_lb_own_valid cn.log _ st l $$ H1 H2
   ipureintro; exact h.2
 
+omit [MachGS GF] in
 /-- TWO WINDOWS OF ONE SEQUENCE: the two bounds are comparable. -/
 theorem consStoredLb_agree (cn : ConsNames) (l1 l2 : List (List Obs × BitVec 8)) :
     consStoredLb (GF := GF) cn l1 ⊢ consStoredLb cn l2 -∗ ⌜l1 <+: l2 ∨ l2 <+: l1⌝ := by
@@ -340,6 +354,7 @@ theorem consStoredLb_agree (cn : ConsNames) (l1 l2 : List (List Obs × BitVec 8)
   iintro H1 H2
   iapply MonoList.lb_own_valid cn.log l1 l2 $$ H1 H2
 
+omit [MachGS GF] in
 /-- A bound SHORTENS to any prefix of itself. -/
 theorem consStoredLb_weaken (cn : ConsNames) (l l' : List (List Obs × BitVec 8)) (hp : l' <+: l) :
     consStoredLb (GF := GF) cn l ⊢ consStoredLb cn l' := by
@@ -347,6 +362,7 @@ theorem consStoredLb_weaken (cn : ConsNames) (l l' : List (List Obs × BitVec 8)
   iintro H
   iapply MonoList.lb_own_le cn.log l' hp $$ H
 
+omit [MachGS GF] in
 theorem consStored_append (cn : ConsNames) (st st' : List (List Obs × BitVec 8)) :
     consStoredAuth (GF := GF) cn st ⊢ |==> consStoredAuth cn (st ++ st') := by
   unfold consStoredAuth
@@ -369,7 +385,7 @@ def consSwallow (cn : ConsNames) (fault : Prop) (sl : List (List Obs × BitVec 8
   ⌜dc = d⌝ ∨
   (⌜dc = d + 1⌝ ∗ ∃ (h : List Obs) (b : BitVec 8),
     ⌜obsEndsIn .uart0 h b⌝ ∗ consStoredLb cn (sl ++ [(h, b)]) ∗ ⌜consChain (sl ++ [(h, b)])⌝ ∗
-    MachFixedGS.rxTag (hlc := hlc) (GF := GF) h ∗
+    MachFixedGS.rxTag (GF := GF) h ∗
     (⌜d = 0 ∧ (consXlate b).toNat = 4⌝ ∨ ⌜fault⌝))
 
 instance consSwallow_persistent (cn : ConsNames) (fault : Prop) (sl : List (List Obs × BitVec 8))
@@ -414,7 +430,7 @@ def consSwallowPlaced (sl : List (List Obs × BitVec 8)) (lo k d dc : Nat) : IPr
   ⌜dc = d⌝ ∨
   (⌜dc = d + 1⌝ ∗ ∃ (p : Nat) (h : List Obs) (b : BitVec 8),
     ⌜lo ≤ p ∧ sl[p]? = some (h, b) ∧ obsEndsIn .uart0 h b ∧ obsBoots h = k⌝ ∗
-    MachFixedGS.rxTag (hlc := hlc) (GF := GF) h)
+    MachFixedGS.rxTag (GF := GF) h)
 
 instance consSwallowPlaced_persistent (sl : List (List Obs × BitVec 8)) (lo k d dc : Nat) :
     Persistent (consSwallowPlaced (GF := GF) sl lo k d dc) := by
@@ -444,6 +460,7 @@ consDirtyLb cn` between them. -/
 /-- WHAT THE TOKENLESS CALLER PAYS. -/
 def consDirtyCred (Wd : IProp GF) : IProp GF := iprop(□ Wd)
 
+omit [MachGS GF] in
 instance consDirtyCred_persistent (Wd : IProp GF) : Persistent (consDirtyCred Wd) := by
   unfold consDirtyCred; infer_instance
 
@@ -601,7 +618,7 @@ theorem consResAt_cur [X : CurCtx] (cn : ConsNames) :
 instance consData_morph (t : KTier) (bs : List (BitVec 8)) :
     CtxMorph (GF := GF) (fun ξ => consData (X := ⟨ξ, t⟩) bs) :=
   ctxMorph_bigSepL bs
-    (fun j b ξ => @wordPointsTo hlc GF _ ⟨ξ, t⟩ (consBufAddr + BitVec.ofNat 64 j) 1 (DFrac.own 1) b)
+    (fun j b ξ => @wordPointsTo GF _ ⟨ξ, t⟩ (consBufAddr + BitVec.ofNat 64 j) 1 (DFrac.own 1) b)
     (fun _ _ => instCtxMorphWordAt _ _ _ _ _)
 
 -- the payload has twelve binders and twenty-one conjuncts: the default instance size is too small
@@ -903,20 +920,20 @@ needs a `CtxMorph`; they are NOT convertible across two contexts and do not
 have to be -- a deposit wants TRANSPORTABILITY. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 instance devswTable_morph (t : KTier) :
     CtxMorph (GF := GF) (fun ξ => devswTable (X := ⟨ξ, t⟩)) :=
   ctxMorph_bigSepL (List.range (NDEV_max + 1))
-    (fun _ i ξ => iprop(@wordPointsTo hlc GF _ ⟨ξ, t⟩ (aDevswRead i) 8 DFrac.discard (devswReadVal i) ∗
-      @wordPointsTo hlc GF _ ⟨ξ, t⟩ (aDevswWrite i) 8 DFrac.discard (devswWriteVal i)))
+    (fun _ i ξ => iprop(@wordPointsTo GF _ ⟨ξ, t⟩ (aDevswRead i) 8 DFrac.discard (devswReadVal i) ∗
+      @wordPointsTo GF _ ⟨ξ, t⟩ (aDevswWrite i) 8 DFrac.discard (devswWriteVal i)))
     (fun _ _ => instCtxMorphSep _ _)
 
 /-- The console handle's transport: the lock's payload is the closed
 `consResAt`, so the handle moves by `instCtxMorphIsLock` alone. -/
 instance isConslock_morph (t : KTier) (cn : ConsNames) (Wd : IProp GF) (γ : GName) :
     CtxMorph (GF := GF) (fun ξ => isConslock (X := ⟨ξ, t⟩) cn Wd γ) :=
-  show CtxMorph (GF := GF) (fun ξ => iprop(@isLock hlc GF _ _ ⟨ξ, t⟩ γ consAddr "cons"
+  show CtxMorph (GF := GF) (fun ξ => iprop(@isLock GF _ _ ⟨ξ, t⟩ γ consAddr "cons"
       (fun ζ => consResCur (X := ⟨ζ, t⟩) cn) ∗ consCredInv cn Wd)) from
     instCtxMorphSep _ _
 

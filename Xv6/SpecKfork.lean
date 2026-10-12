@@ -152,8 +152,8 @@ parent cell (`WaitFresh.childrenInv_row_fresh`), so the union is a growth
 by one.  (Rocq's `pme ≠ 0` premise is Lean's `procAddr j`, nonzero by
 `procAddr_nonzero`.)  THE LEND `Rc` comes back on the `-1` arm (no child
 was built, Rocq `kfork_post`'s refund). -/
-def kforkRet {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def kforkRet {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -180,8 +180,8 @@ trapframe `kalloc`'s `kAllocRcpt γk (procAddr j)`, the `-1` arm its reason,
 the null `kalloc`'s `kNullRcpt γk (procAddr j)` (allocproc's trapframe or
 `proc_pagetable` page, or uvmcopy's page or `walk` node) or the scan's
 exhaustion (F1's `sFullRcpt (procAddr j)`). -/
-def kforkRetLed {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def kforkRetLed {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -203,8 +203,8 @@ def kforkRetLed {hlc : HasLC} {GF : BundledGFunctors.{0}}
       ∃ (hz : List Zev) (i : Nat), zombReceipt hz (.ZFork (procAddr j) i rv γc)))
 
 /-- The landed answer is the led one with the receipts dropped. -/
-theorem kforkRetLed_ret {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+theorem kforkRetLed_ret {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -230,27 +230,27 @@ lend `Rc`, and THE CHILD'S SLOT -- ∀ generation and pid (allocproc mints
 both inside the call; the pid is not `<init>`'s), paid under the child's
 own `myPay` and the lend, keyed at `kforkChild V` (the parent's record
 with `a0 := 0`) and the parent's descriptor states, at no children. -/
-def kforkPark {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def kforkPark {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
     (Q : Int → IProp GF) (Rc : IProp GF) : IProp GF := iprop%
-  panicEnv ∗ utSysParkRows Γ ∗ parkToken (hlc := hlc) (SG := SG) Γ ∗ Rc ∗
+  panicEnv ∗ utSysParkRows Γ ∗ parkToken (SG := SG) Γ ∗ Rc ∗
   -- THE CHILD'S ORIGIN TICKET (NI M2-W2d): the fork exit's one-shot
   -- child-origin claim, parked with the child (its first resume spends it);
   -- dropped on the `-1` arm
-  MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
+  MachFixedGS.uClaimO (GF := GF) ∗
   (∀ (g' : GName) (pidc : BitVec 32), ⌜pidc ≠ 1#32⌝ -∗ myPay g' Q -∗ Rc -∗
-    uslot (hlc := hlc) (SG := SG) (uvisOf (kforkChild V) M stsP g' ∅ pidc))
+    uslot (SG := SG) (uvisOf (kforkChild V) M stsP g' ∅ pidc))
 
 /-- **WP of `kfork`.** -/
-def wp_kfork_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_kfork_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
     (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF)
@@ -264,9 +264,9 @@ def wp_kfork_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvailAt Γ none false ∗
   isFtable γft γ ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-  □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗ firstDone (hlc := hlc) ∗
-  kforkPark (hlc := hlc) (SG := SG) Γ V M stsP Q Rc ∗
+  itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗
+  □ (MachFixedGS.killCred (GF := GF) -∗ Q (-1)) ∗ firstDone ∗
+  kforkPark (SG := SG) Γ V M stsP Q Rc ∗
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗ chFrag V.chg (procAddr j) csP ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (rv : BitVec 32),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ kforkAns rv⌝ -∗
@@ -279,15 +279,15 @@ def wp_kfork_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6
 by the answer): at whichever hart the thread returns on, the entry context
 with some `SPIE`/`SPP` (left unconstrained, as the interrupts-off contract
 always stated it), callee-saved registers, the answer in `a0`, and `B rv`. -/
-def kforkPostB {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def kforkPostB {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (k : KCtx) (B : BitVec 32 → IProp GF) : CPU → IProp GF := fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (rv : BitVec 32),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ kforkAns rv⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     B rv -∗ wpLoop cpu')
 
 /-- What `kfork` hands back (Rocq `kfork_post`). -/
-def kforkPost {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def kforkPost {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -298,8 +298,8 @@ def kforkPost {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 /-- What the LED `kfork` hands back (NI M2-G2b): `kforkPostB` at the led
 answer. -/
-def kforkPostLed {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def kforkPostLed {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -316,11 +316,11 @@ the second `np->lock`) is paired with a `release` that re-enables
 interrupts exactly when the entry had them on, paying back the arm the
 acquire minted.  No trap bundle crosses the interface; the crossing is
 `k.sie`.  Entered at depth 0 (so, by `KCtx.wf`, no spinlock held). -/
-def wp_kfork_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_kfork_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
     (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF)
@@ -332,9 +332,9 @@ def wp_kfork_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvailAt Γ none false ∗
   isFtable γft γ ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-  □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗ firstDone (hlc := hlc) ∗
-  kforkPark (hlc := hlc) (SG := SG) Γ V M stsP Q Rc ∗
+  itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗
+  □ (MachFixedGS.killCred (GF := GF) -∗ Q (-1)) ∗ firstDone ∗
+  kforkPark (SG := SG) Γ V M stsP Q Rc ∗
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗ chFrag V.chg (procAddr j) csP ∗
   wpNext k.sie k.proc cpu (kforkPost k γ j pid V M stsP Q csP Rc)
   ⊢ wpLoop (GF := GF) cpu
@@ -342,11 +342,11 @@ def wp_kfork_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 /-- **WP of the LED `kfork`** (NI M2-G2b): `wp_kfork_eb_body` with the post
 `kforkPostLed`.  The led form is the proof; `wp_kfork_eb_body` is its
 corollary (`kforkRetLed_ret`). -/
-def wp_kfork_led_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_kfork_led_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
     (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF)
@@ -358,35 +358,35 @@ def wp_kfork_led_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvailAt Γ none false ∗
   isFtable γft γ ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-  □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗ firstDone (hlc := hlc) ∗
-  kforkPark (hlc := hlc) (SG := SG) Γ V M stsP Q Rc ∗
+  itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗
+  □ (MachFixedGS.killCred (GF := GF) -∗ Q (-1)) ∗ firstDone ∗
+  kforkPark (SG := SG) Γ V M stsP Q Rc ∗
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗ chFrag V.chg (procAddr j) csP ∗
   wpNext k.sie k.proc cpu (kforkPostLed k γ γk j pid V M stsP Q csP Rc)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `kfork`. -/
 structure KFORK : Prop where
-  wp_kfork_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_kfork_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
     (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF) hj hproc hK hnoff htier,
-    wp_kfork_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
+    wp_kfork_eb_body (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
       hj hproc hK hnoff htier
   /-- (NI M2-G2b) the led twin: the success arm's two receipts -/
-  wp_kfork_led_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_kfork_led_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
     (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF) hj hproc hK hnoff htier,
-    wp_kfork_led_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
+    wp_kfork_led_eb_body (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
       hj hproc hK hnoff htier
 
 end Xv6

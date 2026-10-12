@@ -44,7 +44,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -57,7 +57,7 @@ theorem iput_locked (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_N
     (RSH : RELEASESLEEP_HOOK) (IT : ITRUNC) (BR : BREAD) (LW : LOG_WRITE) (BL : BRELSE)
     -- the successor stage (`IputOfflock.iput_offlock_spec`)
     (HO : IputOfflockSpec)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (g1 g2 : GName)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
@@ -102,7 +102,7 @@ theorem iput_locked (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_N
     wordPointsTo (iNlink (ientry kk)) 2 (DFrac.own 1) dn.diNlink ∗
     frzsel kk (1 : Qp).half.half true ∗
     irefSlotsAuth ∗ islPool Mt ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
+    ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
     -- the table's slot rows, WHOLE (the frozen park inside)
     ([∗list] j ∈ List.range NINODE, islot2 curCtx fscIc Mt ci j) ∗
     -- the REDUCED reference (its live slice froze into the table)

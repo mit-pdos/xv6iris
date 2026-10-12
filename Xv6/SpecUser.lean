@@ -45,7 +45,7 @@ hypotheses, as in Rocq.
 3. `WP (Loop : expr riscv_lang)` is MachCSL's `wpLoop cpu` (the hart's safety
    from a cycle boundary, given the generation's certificate).
 4. `Module Type USER` is a `Prop` structure quantified over the ambient
-   instances (`hlc`, `GF`, `MachGS`, `CurCtx`), the form of the retired
+   instances (`GF`, `MachGS`, `CurCtx`), the form of the retired
    `DiskAcc.DISK_INIT_WM`; Rocq's `GenId` is MachCSL's `genId` (inside `MachGS`), its `CpuId`
    the explicit `cpu`.
 5. **`kmapStatic -∗`** after `hw_config -∗` (coordinator decision, U1-K;
@@ -65,14 +65,14 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 /-- **Rocq `wp_user_exec_closed_body`**. -/
-def wpUserExecClosedBody {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wpUserExecClosedBody {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF) : Prop :=
   (∀ pt' : UPtd, Rut pt' ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut pt')) →
-  ⊢ hwConfig cpu -∗ kmapStatic (hlc := hlc) (GF := GF) -∗ wireInv -∗ userInv cpu C pt Rut -∗ ▷ stvecHandlerWp cpu C pt Rut -∗ wpLoop cpu
+  ⊢ hwConfig cpu -∗ kmapStatic (GF := GF) -∗ wireInv -∗ userInv cpu C pt Rut -∗ ▷ stvecHandlerWp cpu C pt Rut -∗ wpLoop cpu
 
 /-- **Rocq `Module Type USER`**: the one assumed interface D24 allows. -/
 structure USER : Prop where
-  wp_user_exec_closed : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+  wp_user_exec_closed : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF),
     wpUserExecClosedBody cpu C pt Rut
 

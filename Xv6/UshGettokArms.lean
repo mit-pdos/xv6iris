@@ -35,7 +35,7 @@ open Std (ExtTreeSet)
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -47,12 +47,12 @@ theorem shGtk_from388 (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw 
     (h9 : mc.get 9#5 = BitVec.ofNat 64 (s0 + e)) (h18 : mc.get 18#5 = BitVec.ofNat 64 (s0 + len))
     (h22 : mc.get 22#5 = BitVec.ofNat 64 eqp) :
     ⊢ ushCode N.t -∗ ushCell N eqp weq -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x364) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 0x364) (2 + n) -∗
       (ushCell N eqp (BitVec.ofNat 64 (s0 + e)) -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
         ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ r, ucalleeSavedIdx r = true → r ≠ 9#5 → r ≠ 19#5 → mc'.get r = mc.get r⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + (e + ushpSkipws (len - e) e f))⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hcell Hs Hws Hrun Hk
   iapply shGtk_cell UL N 0x364 22#5 (ushI_364 N.t) (ushI_368 N.t) (by decide) (by decide) (by decide) eqp weq h mc
@@ -71,12 +71,12 @@ theorem shGtk_at424 (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw : 
     (h9 : mc.get 9#5 = BitVec.ofNat 64 (s0 + len)) (h18 : mc.get 18#5 = BitVec.ofNat 64 (s0 + len))
     (h22 : mc.get 22#5 = BitVec.ofNat 64 eqp) :
     ⊢ ushCode N.t -∗ ushCell N eqp weq -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x400) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 0x400) (2 + n) -∗
       (ushCell N eqp (BitVec.ofNat 64 (s0 + len)) -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
         ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ r, ucalleeSavedIdx r = true → r ≠ 9#5 → r ≠ 19#5 → mc'.get r = mc.get r⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + len)⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hcell Hs Hws Hrun Hk
   unfold ushCell
@@ -111,7 +111,7 @@ theorem shGtk_word (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw dv 
     (h22 : mc.get 22#5 = BitVec.ofNat 64 eqp) :
     ⊢ ushCode N.t -∗ ushCell N eqp weq -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
       ustr N.d dv ushSymA 7 ushpSymF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x3c8) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 0x3c8) (2 + n) -∗
       (ushCell N eqp (BitVec.ofNat 64 (s0 + (k + ushpToklen (len - k) k f))) -∗ ustr N.d dq s0 len f -∗
         ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
         ∀ (h' : CPU) (mc' : RegMap),
@@ -119,7 +119,7 @@ theorem shGtk_word (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw dv 
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + ((k + ushpToklen (len - k) k f) +
           ushpSkipws (len - (k + ushpToklen (len - k) k f)) (k + ushpToklen (len - k) k f) f))⌝ -∗
         ⌜mc'.get 21#5 = BitVec.ofNat 64 97⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hcell Hs Hws Hsy Hrun Hk
   iapply ushS_la UL N (ushI_3c8 N.t) (ushI_3cc N.t) ushWsA h mc (2 + n) $$ Hc Hrun
@@ -171,8 +171,8 @@ theorem shGtk_word (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw dv 
 `li a4,60`. -/
 theorem shGtk_head (UL : UK_LEAVES) (N : UkNames GF) (dq : DFrac) (a : Nat) (b : BitVec 8) (h : CPU) (mc : RegMap)
     (av : Nat) (h9 : mc.get 9#5 = BitVec.ofNat 64 a) (ha : a < 2 ^ 64) :
-    ⊢ ushCode N.t -∗ ubyteq N.d dq a b -∗ urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x332) av -∗
-      (ubyteq N.d dq a b -∗ ∀ h' : CPU, urun (hlc := hlc) N h'
+    ⊢ ushCode N.t -∗ ubyteq N.d dq a b -∗ urun N h mc (BitVec.ofNat 64 0x332) av -∗
+      (ubyteq N.d dq a b -∗ ∀ h' : CPU, urun N h'
         (ukWr (ukWr (ukWr mc 15#5 (BitVec.ofNat 64 b.toNat)) 21#5 (BitVec.ofNat 64 b.toNat)) 14#5
           (BitVec.ofNat 64 60)) (BitVec.ofNat 64 0x33e) av -∗ wpLoop h') -∗
       wpLoop h := by
@@ -197,13 +197,13 @@ theorem shGtk_nul (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw : DF
     (h22 : mc.get 22#5 = BitVec.ofNat 64 eqp) (h14 : mc.get 14#5 = BitVec.ofNat 64 60)
     (h15 : mc.get 15#5 = BitVec.ofNat 64 v) (h21 : mc.get 21#5 = BitVec.ofNat 64 v) :
     ⊢ ushCode N.t -∗ ushCell N eqp weq -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x33e) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 0x33e) (2 + n) -∗
       (ushCell N eqp (BitVec.ofNat 64 (s0 + k)) -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
         ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ r, ucalleeSavedIdx r = true → r ≠ 9#5 → r ≠ 19#5 → r ≠ 21#5 → mc'.get r = mc.get r⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + (k + ushpSkipws (len - k) k f))⌝ -∗
         ⌜mc'.get 21#5 = BitVec.ofNat 64 0⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   subst hv hk
   iintro #Hc Hcell Hs Hws Hrun Hk
@@ -236,13 +236,13 @@ theorem shGtk_bar (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw : DF
     (h22 : mc.get 22#5 = BitVec.ofNat 64 eqp) (h14 : mc.get 14#5 = BitVec.ofNat 64 60)
     (h15 : mc.get 15#5 = BitVec.ofNat 64 v) (h21 : mc.get 21#5 = BitVec.ofNat 64 v) :
     ⊢ ushCode N.t -∗ ushCell N eqp weq -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x33e) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 0x33e) (2 + n) -∗
       (ushCell N eqp (BitVec.ofNat 64 (s0 + (k + 1))) -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
         ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ r, ucalleeSavedIdx r = true → r ≠ 9#5 → r ≠ 19#5 → r ≠ 21#5 → mc'.get r = mc.get r⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + ((k + 1) + ushpSkipws (len - (k + 1)) (k + 1) f))⌝ -∗
         ⌜mc'.get 21#5 = BitVec.ofNat 64 124⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   subst hv
   iintro #Hc Hcell Hs Hws Hrun Hk
@@ -282,13 +282,13 @@ theorem shGtk_gt (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw : DFr
     (h22 : mc.get 22#5 = BitVec.ofNat 64 eqp) (h14 : mc.get 14#5 = BitVec.ofNat 64 60)
     (h15 : mc.get 15#5 = BitVec.ofNat 64 v) (h21 : mc.get 21#5 = BitVec.ofNat 64 v) :
     ⊢ ushCode N.t -∗ ushCell N eqp weq -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x33e) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 0x33e) (2 + n) -∗
       (ushCell N eqp (BitVec.ofNat 64 (s0 + (k + 1))) -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
         ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ r, ucalleeSavedIdx r = true → r ≠ 9#5 → r ≠ 19#5 → r ≠ 21#5 → mc'.get r = mc.get r⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + ((k + 1) + ushpSkipws (len - (k + 1)) (k + 1) f))⌝ -∗
         ⌜mc'.get 21#5 = BitVec.ofNat 64 62⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   subst hv
   iintro #Hc Hcell Hs Hws Hrun Hk
@@ -341,9 +341,9 @@ theorem shGtk_wordent (UL : UK_LEAVES) (N : UkNames GF) (v : Nat) (h : CPU) (mc 
     (hvl : v < 256) (hv0 : v ≠ 0) (hv60 : v ≠ 60) (hv124 : v ≠ 124) (hv62 : v ≠ 62) (hv38 : v ≠ 38)
     (hv59 : v ≠ 59) (hv40 : v ≠ 40) (hv41 : v ≠ 41)
     (h14 : mc.get 14#5 = BitVec.ofNat 64 60) (h15 : mc.get 15#5 = BitVec.ofNat 64 v) :
-    ⊢ ushCode N.t -∗ urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x33e) av -∗
+    ⊢ ushCode N.t -∗ urun N h mc (BitVec.ofNat 64 0x33e) av -∗
       (∀ (h' : CPU) (mc' : RegMap), ⌜∀ r, r ≠ 14#5 → r ≠ 15#5 → mc'.get r = mc.get r⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x3c8) av -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x3c8) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hk
   by_cases hbig : 60 < v
@@ -408,14 +408,14 @@ theorem shGtk_tail (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw dv 
     (h22 : mc.get 22#5 = BitVec.ofNat 64 eqp) :
     ⊢ ushCode N.t -∗ ushCell N eqp weq -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
       ustr N.d dv ushSymA 7 ushpSymF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x332) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 0x332) (2 + n) -∗
       (ushCell N eqp (BitVec.ofNat 64 (s0 + ushsGettokEnd len f k)) -∗ ustr N.d dq s0 len f -∗
         ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
         ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ r, ucalleeSavedIdx r = true → r ≠ 9#5 → r ≠ 19#5 → r ≠ 21#5 → mc'.get r = mc.get r⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + ushsGettokFin len f k)⌝ -∗
         ⌜mc'.get 21#5 = BitVec.ofInt 64 (ushsGettokRes len f k)⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hcell Hs Hws Hsy Hrun Hk
   ihave %hnn := ustr_nonul N.d dq s0 len f $$ Hs

@@ -293,7 +293,7 @@ theorem wriCount_step (n t : Int) (p : Nat) (_ht : 0 ≤ t) (htn : t < n) (heq :
 /-! ## 2.  The authority-shaped chunk commits and the chain -/
 
 section WriteCommit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [OffboxG GF]
 
 /-- THE FULL-CHUNK COMMIT (Rocq's `awrite_full_at`): the two-phase fire at
 the RAW MAP, with the very same authority handed back, phase 2 quantified
@@ -316,13 +316,13 @@ def awriteFullAt [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo :
     ⌜wriPre (absView I) i off bs bs0 nl⌝ -∗
     ⌜ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) bs⌝ -∗
     ⌜(bs.length : Int) = wchunkAt n k⌝ -∗
-    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink (hlc := hlc) γo (off : Int) ={E}=∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink γo (off : Int) ={E}=∗
     (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
       appStep i I (deltaWrite i off bs (absView I)) ∗
       (∀ I' : RegMapF FsNode,
         ⌜absView I' = deltaWrite i off bs (absView I)⌝ -∗
         (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ={E}=∗
-        (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗ offRet (hlc := hlc) γo off bs.length ∗ REST))
+        (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗ offRet γo off bs.length ∗ REST))
 
 /-- THE PARTIAL-CHUNK COMMIT (Rocq's `awrite_part_at`, round E2 lane E2-W,
 ruling Q-i): `awriteFullAt`'s two phases at a run the KERNEL picks --
@@ -349,13 +349,13 @@ def awritePartAt [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo :
     ⌜r < bs.length → wrFailWhy P ua n.toNat⌝ -∗
     ⌜wiBlocks off (wchunkAt n k).toNat = 1 → r = 0⌝ -∗
     ⌜ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) (bs.take r)⌝ -∗
-    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink (hlc := hlc) γo (off : Int) ={E}=∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink γo (off : Int) ={E}=∗
     (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
       appStep i I (deltaWrite i off bs (absView I)) ∗
       (∀ I' : RegMapF FsNode,
         ⌜absView I' = deltaWrite i off bs (absView I)⌝ -∗
         (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ={E}=∗
-        (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗ offRet (hlc := hlc) γo off r ∗ REST))
+        (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗ offRet γo off r ∗ REST))
 
 /-- THE CHAIN, AT A PREFIX CURSOR, AT ONE TABLE (Rocq's `awrite_chain_at`):
 each node offers the CURSOR `Q k` beside BOTH arms, and the kernel picks
@@ -432,14 +432,14 @@ def awriteFullAdv [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo 
     ⌜wriPre (absView I) i off bs bs0 nl⌝ -∗
     ⌜ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) bs⌝ -∗
     ⌜(bs.length : Int) = wchunkAt n k⌝ -∗
-    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink (hlc := hlc) γo (off : Int) ={E}=∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink γo (off : Int) ={E}=∗
     (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
       appStep i I (deltaWrite i off bs (absView I)) ∗
       (∀ I' : RegMapF FsNode,
         ⌜absView I' = deltaWrite i off bs (absView I)⌝ -∗
         (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ={E}=∗
         (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗
-          offLink (hlc := hlc) γo ((off + bs.length : Nat) : Int) ∗ REST))
+          offLink γo ((off + bs.length : Nat) : Int) ∗ REST))
 
 /-- Rocq's `awrite_part_adv`: THE ADVANCE IS BY THE COUNT `r`. -/
 def awritePartAdv [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
@@ -453,14 +453,14 @@ def awritePartAdv [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo 
     ⌜r < bs.length → wrFailWhy P ua n.toNat⌝ -∗
     ⌜wiBlocks off (wchunkAt n k).toNat = 1 → r = 0⌝ -∗
     ⌜ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) (bs.take r)⌝ -∗
-    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink (hlc := hlc) γo (off : Int) ={E}=∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink γo (off : Int) ={E}=∗
     (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
       appStep i I (deltaWrite i off bs (absView I)) ∗
       (∀ I' : RegMapF FsNode,
         ⌜absView I' = deltaWrite i off bs (absView I)⌝ -∗
         (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ={E}=∗
         (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗
-          offLink (hlc := hlc) γo ((off + r : Nat) : Int) ∗ REST))
+          offLink γo ((off + r : Nat) : Int) ∗ REST))
 
 /-- Rocq's `awrite_chain_adv`: `awriteChainAt`'s letter at the advanced
 nodes. -/
@@ -502,8 +502,8 @@ theorem awriteChainAdv_cursor [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i 
 call's residue converts down and no consumer above the fire changes. -/
 theorem awriteFullAt_of_adv [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (k : Nat) (REST : IProp GF) :
-    awriteFullAdv (hlc := hlc) Γ E i γo M ua n k REST ⊢
-      awriteFullAt (hlc := hlc) Γ E i γo M ua n k REST := by
+    awriteFullAdv Γ E i γo M ua n k REST ⊢
+      awriteFullAt Γ E i γo M ua n k REST := by
   unfold awriteFullAdv awriteFullAt
   iintro H %I %off %bs %bs0 %nl %hpre %hby %hlen Hka Hg
   imod H $$ %I %off %bs %bs0 %nl %hpre %hby %hlen Hka Hg with ⟨Hka, Hstep, Hph2⟩
@@ -521,8 +521,8 @@ theorem awriteFullAt_of_adv [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : 
 /-- Rocq's `awrite_part_at_of_adv`. -/
 theorem awritePartAt_of_adv [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (k : Nat) (REST : IProp GF) :
-    awritePartAdv (hlc := hlc) Γ E i γo M ua P n k REST ⊢
-      awritePartAt (hlc := hlc) Γ E i γo M ua P n k REST := by
+    awritePartAdv Γ E i γo M ua P n k REST ⊢
+      awritePartAt Γ E i γo M ua P n k REST := by
   unfold awritePartAdv awritePartAt
   iintro H %I %off %r %bs %bs0 %nl %hpre %hr %hgap %hsh %hwhy %hsb1 %hby Hka Hg
   imod H $$ %I %off %r %bs %bs0 %nl %hpre %hr %hgap %hsh %hwhy %hsb1 %hby Hka Hg
@@ -542,8 +542,8 @@ theorem awritePartAt_of_adv [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : 
 conversions' inductive steps) -/
 theorem awriteFullAt_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (k : Nat) (R1 R2 : IProp GF) :
-    ⊢@{IProp GF} (R1 -∗ R2) -∗ awriteFullAt (hlc := hlc) Γ E i γo M ua n k R1 -∗
-      awriteFullAt (hlc := hlc) Γ E i γo M ua n k R2 := by
+    ⊢@{IProp GF} (R1 -∗ R2) -∗ awriteFullAt Γ E i γo M ua n k R1 -∗
+      awriteFullAt Γ E i γo M ua n k R2 := by
   unfold awriteFullAt
   iintro HR H %I %off %bs %bs0 %nl %hpre %hby %hlen Hka Hg
   imod H $$ %I %off %bs %bs0 %nl %hpre %hby %hlen Hka Hg with ⟨Hka, Hstep, Hph2⟩
@@ -558,8 +558,8 @@ theorem awriteFullAt_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Na
 /-- ...and the partial node -/
 theorem awritePartAt_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (k : Nat) (R1 R2 : IProp GF) :
-    ⊢@{IProp GF} (R1 -∗ R2) -∗ awritePartAt (hlc := hlc) Γ E i γo M ua P n k R1 -∗
-      awritePartAt (hlc := hlc) Γ E i γo M ua P n k R2 := by
+    ⊢@{IProp GF} (R1 -∗ R2) -∗ awritePartAt Γ E i γo M ua P n k R1 -∗
+      awritePartAt Γ E i γo M ua P n k R2 := by
   unfold awritePartAt
   iintro HR H %I %off %r %bs %bs0 %nl %hpre %hr %hgap %hsh %hwhy %hsb1 %hby Hka Hg
   imod H $$ %I %off %r %bs %bs0 %nl %hpre %hr %hgap %hsh %hwhy %hsb1 %hby Hka Hg
@@ -576,8 +576,8 @@ theorem awritePartAt_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Na
 its residue. -/
 theorem awriteFullAdv_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (k : Nat) (R1 R2 : IProp GF) :
-    ⊢@{IProp GF} (R1 -∗ R2) -∗ awriteFullAdv (hlc := hlc) Γ E i γo M ua n k R1 -∗
-      awriteFullAdv (hlc := hlc) Γ E i γo M ua n k R2 := by
+    ⊢@{IProp GF} (R1 -∗ R2) -∗ awriteFullAdv Γ E i γo M ua n k R1 -∗
+      awriteFullAdv Γ E i γo M ua n k R2 := by
   unfold awriteFullAdv
   iintro HR H %I %off %bs %bs0 %nl %hpre %hby %hlen Hka Hg
   imod H $$ %I %off %bs %bs0 %nl %hpre %hby %hlen Hka Hg with ⟨Hka, Hstep, Hph2⟩
@@ -593,8 +593,8 @@ theorem awriteFullAdv_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : N
 theorem awriteChainAt_of_adv [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (Q : Nat → IProp GF)
     (k cnt : Nat) :
-    awriteChainAdv (hlc := hlc) Γ E i γo M ua P n Q k cnt ⊢
-      awriteChainAt (hlc := hlc) Γ E i γo M ua P n Q k cnt := by
+    awriteChainAdv Γ E i γo M ua P n Q k cnt ⊢
+      awriteChainAt Γ E i γo M ua P n Q k cnt := by
   induction cnt generalizing k with
   | zero => exact .rfl
   | succ cnt IH =>
@@ -621,7 +621,7 @@ client nothing but the application's step, paid out of the SUPPLY. -/
 theorem awriteChainAt_unit [Appcfg GF] (γfs : FsNames) [FsBytesG GF] (E : CoPset) (i : Nat)
     (γo : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (k cnt : Nat) :
     appSup (GF := GF) ⊢
-      awriteChainAt (hlc := hlc) (fsGammaL γfs) E i γo M ua P n (fun _ => iprop(True)) k cnt := by
+      awriteChainAt (fsGammaL γfs) E i γo M ua P n (fun _ => iprop(True)) k cnt := by
   induction cnt generalizing k with
   | zero =>
     rw [awriteChainAt_0]
@@ -660,7 +660,7 @@ theorem awriteChainAt_unit [Appcfg GF] (γfs : FsNames) [FsBytesG GF] (E : CoPse
 theorem awriteChain_unit [Appcfg GF] (γfs : FsNames) [FsBytesG GF] (E : CoPset) (i : Nat)
     (γo : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (k cnt : Nat) :
     appSup (GF := GF) ⊢
-      awriteChain (hlc := hlc) (fsGammaL γfs) E i γo M ua n (fun _ => iprop(True)) k cnt := by
+      awriteChain (fsGammaL γfs) E i γo M ua n (fun _ => iprop(True)) k cnt := by
   unfold awriteChain
   iintro #Hsup %P
   iapply awriteChainAt_unit γfs E i γo M ua P n k cnt $$ Hsup
@@ -670,7 +670,7 @@ end WriteCommit
 /-! ## 3.  Item 1: the chunk fire, fused with the row retag -/
 
 section WriteFire
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF] [OffboxG GF]
 
 /-- the delta collapses to the ONE-ROW counted insert: at a nonzero count
@@ -705,10 +705,10 @@ theorem wrfFire_core [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat) 
     (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.AFile bs0, nl⟩)
     (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile (blkSplice off bs bs0), nl⟩)
     (γo : GName) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       (∀ I : RegMapF FsNode, ⌜wriPre (absView I) i off bs bs0 nl⌝ -∗
         ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗
-        offLink (hlc := hlc) (GF := GF) γo (off : Int) ={appE}=∗
+        offLink (GF := GF) γo (off : Int) ={appE}=∗
         ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
           appStep (GF := GF) i I (deltaWrite i off bs (absView I)) ∗
           (∀ I' : RegMapF FsNode,
@@ -716,7 +716,7 @@ theorem wrfFire_core [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat) 
             ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I') ={appE}=∗
             ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗ X)) -∗
       topFrag (fsGammaL γfs) i n -∗
-      offLink (hlc := hlc) (GF := GF) γo (off : Int) ={E}=∗
+      offLink (GF := GF) γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗ X := by
   iintro #Hi #Hai Hcm Hf Hg
   unfold ftopInv
@@ -763,16 +763,16 @@ theorem wrfAwrite_fire_gen [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i :
     (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile (blkSplice off bs bs0), nl⟩)
     (hby : ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) bs)
     (hlen : (bs.length : Int) = wchunkAt cnt k) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      offSupply (hlc := hlc) γo E off bs.length ROff -∗
-      awriteFullAt (hlc := hlc) (fsGammaL γfs) appE i γo M ua cnt k REST -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
+      offSupply γo E off bs.length ROff -∗
+      awriteFullAt (fsGammaL γfs) appE i γo M ua cnt k REST -∗
       topFrag (fsGammaL γfs) i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
+      offLink γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
-        offLink (hlc := hlc) γo ((off + bs.length : Nat) : Int) ∗ ROff ∗ REST := by
+        offLink γo ((off + bs.length : Nat) : Int) ∗ ROff ∗ REST := by
   iintro #Hi #Hai Hsup Hcm Hf Hg
   imod wrfFire_core γfs E i off bs bs0 nl n n'
-    iprop(offRet (hlc := hlc) γo off bs.length ∗ REST)
+    iprop(offRet γo off bs.length ∗ REST)
     hE hloc hpos hoff hcap hnz habs hnz' habs' γo $$ Hi Hai [Hcm] Hf Hg with ⟨Hf, Hg, Hrest⟩
   · unfold awriteFullAt
     iintro %I %hpre Ha Hg
@@ -795,15 +795,15 @@ theorem wrfAwrite_fire_adv [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i :
     (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile (blkSplice off bs bs0), nl⟩)
     (hby : ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) bs)
     (hlen : (bs.length : Int) = wchunkAt cnt k) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      awriteFullAdv (hlc := hlc) (fsGammaL γfs) appE i γo M ua cnt k REST -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
+      awriteFullAdv (fsGammaL γfs) appE i γo M ua cnt k REST -∗
       topFrag (fsGammaL γfs) i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
+      offLink γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
-        offLink (hlc := hlc) γo ((off + bs.length : Nat) : Int) ∗ REST := by
+        offLink γo ((off + bs.length : Nat) : Int) ∗ REST := by
   iintro #Hi #Hai Hcm Hf Hg
   iapply wrfFire_core γfs E i off bs bs0 nl n n'
-    iprop(offLink (hlc := hlc) γo ((off + bs.length : Nat) : Int) ∗ REST)
+    iprop(offLink γo ((off + bs.length : Nat) : Int) ∗ REST)
     hE hloc hpos hoff hcap hnz habs hnz' habs' γo $$ Hi Hai [Hcm] Hf Hg
   unfold awriteFullAdv
   iintro %I %hpre Ha Hg
@@ -825,16 +825,16 @@ theorem wrfApart_fire_gen [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : 
     (hshort : (r : Int) < wchunkAt cnt k)
     (hwhy : r < bs.length → wrFailWhy P ua cnt.toNat)
     (hsb1 : wiBlocks off (wchunkAt cnt k).toNat = 1 → r = 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      offSupply (hlc := hlc) γo E off r ROff -∗
-      awritePartAt (hlc := hlc) (fsGammaL γfs) appE i γo M ua P cnt k REST -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
+      offSupply γo E off r ROff -∗
+      awritePartAt (fsGammaL γfs) appE i γo M ua P cnt k REST -∗
       topFrag (fsGammaL γfs) i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
+      offLink γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
-        offLink (hlc := hlc) γo ((off + r : Nat) : Int) ∗ ROff ∗ REST := by
+        offLink γo ((off + r : Nat) : Int) ∗ ROff ∗ REST := by
   iintro #Hi #Hai Hsup Hcm Hf Hg
   imod wrfFire_core γfs E i off bs bs0 nl n n'
-    iprop(offRet (hlc := hlc) γo off r ∗ REST)
+    iprop(offRet γo off r ∗ REST)
     hE hloc hpos hoff hcap hnz habs hnz' habs' γo $$ Hi Hai [Hcm] Hf Hg with ⟨Hf, Hg, Hrest⟩
   · unfold awritePartAt
     iintro %I %hpre Ha Hg
@@ -859,15 +859,15 @@ theorem wrfApart_fire_adv [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : 
     (hshort : (r : Int) < wchunkAt cnt k)
     (hwhy : r < bs.length → wrFailWhy P ua cnt.toNat)
     (hsb1 : wiBlocks off (wchunkAt cnt k).toNat = 1 → r = 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      awritePartAdv (hlc := hlc) (fsGammaL γfs) appE i γo M ua P cnt k REST -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
+      awritePartAdv (fsGammaL γfs) appE i γo M ua P cnt k REST -∗
       topFrag (fsGammaL γfs) i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
+      offLink γo (off : Int) ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
-        offLink (hlc := hlc) γo ((off + r : Nat) : Int) ∗ REST := by
+        offLink γo ((off + r : Nat) : Int) ∗ REST := by
   iintro #Hi #Hai Hcm Hf Hg
   iapply wrfFire_core γfs E i off bs bs0 nl n n'
-    iprop(offLink (hlc := hlc) γo ((off + r : Nat) : Int) ∗ REST)
+    iprop(offLink γo ((off + r : Nat) : Int) ∗ REST)
     hE hloc hpos hoff hcap hnz habs hnz' habs' γo $$ Hi Hai [Hcm] Hf Hg
   unfold awritePartAdv
   iintro %I %hpre Ha Hg

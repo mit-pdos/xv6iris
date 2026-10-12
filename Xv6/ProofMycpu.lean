@@ -23,7 +23,7 @@ theorem mycpu_addr (cpu : CPU) :
 theorem mycpu_br_10bd4 : KA.«mycpu» + 0x10bd4#64 = KA.«cpus» := by decide
 
 set_option maxHeartbeats 4000000 in
-theorem mycpu_proof : MYCPU := ⟨fun {hlc GF} _ _ {lent} cpu k hsie hK => by
+theorem mycpu_proof : MYCPU := ⟨fun {GF} _ _ {lent} cpu k hsie hK => by
   unfold wp_mycpu_body
   iintro ⟨Hk, Hpc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

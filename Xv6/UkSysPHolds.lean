@@ -18,12 +18,12 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section UkSysPHolds
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **The seccomp leaf holds** (Rocq `UkRunSecc.wp_uk_ecall_seccomp`). -/
-theorem ukSysSecc_holds (UL : UK_LEAVES) : UkSysP.wpUkEcallSeccK (hlc := hlc) (utab (GF := GF)) tabLe :=
+theorem ukSysSecc_holds (UL : UK_LEAVES) : UkSysP.wpUkEcallSeccK (utab (GF := GF)) tabLe :=
   fun N h m pc avail v hn hal4 => wp_uk_ecall_seccomp UL N h m pc avail v hn hal4
 
 end UkSysPHolds

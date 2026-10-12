@@ -382,7 +382,7 @@ class LogG (GF : BundledGFunctors.{0}) where
 attribute [reducible, instance] LogG.gmOps LogG.gmLg LogG.gmHelp
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [LogG GF]
 
 /-! ## The two client-side fragments
 
@@ -440,12 +440,15 @@ it is unusable, because using one needs `e` to be the CURRENT epoch. -/
 def loggedAt (γ : LogNames) (e b : Nat) : IProp GF :=
   iprop(∃ id : Nat, γ.lg ↪◯MAP[id]{.discard} ((e, b) : Nat × Nat))
 
+omit [MachGS GF] in
 instance loggedAt_persistent (γ : LogNames) (e b : Nat) :
     Persistent (loggedAt (GF := GF) γ e b) := by unfold loggedAt; infer_instance
 
+omit [MachGS GF] in
 instance loggedAt_timeless (γ : LogNames) (e b : Nat) :
     Timeless (loggedAt (GF := GF) γ e b) := by unfold loggedAt; infer_instance
 
+omit [MachGS GF] in
 /-- The registry's two operations: minting (Rocq's `log_mint_logged`)... -/
 theorem logMintLogged (γ : LogNames) (X : RegMapF (Nat × Nat)) (nx e b : Nat)
     (hfresh : ∀ i, nx ≤ i → PartialMap.get? X i = none) :
@@ -469,6 +472,7 @@ tokens under their own names); the name keeps the log's statements readable
 and gives `TxPin` one spelling to refute against. -/
 def logTxAuth (γ : LogNames) (T : RegMapF Unit) : IProp GF := γ.tx ↪●MAP T
 
+omit [MachGS GF] in
 instance logTxAuth_timeless (γ : LogNames) (T : RegMapF Unit) :
     Timeless (logTxAuth (GF := GF) γ T) := by unfold logTxAuth; infer_instance
 
@@ -479,9 +483,11 @@ only that its id EXISTS.  Minted by `begin_op`, consumed whole by
 `logRes` ties the ledger to the transactions by CARDINALITY. -/
 def logTx (γ : LogNames) : IProp GF := iprop(∃ t : Nat, γ.tx ↪◯MAP[t] ())
 
+omit [MachGS GF] in
 instance logTx_timeless (γ : LogNames) : Timeless (logTx (GF := GF) γ) := by
   unfold logTx; infer_instance
 
+omit [MachGS GF] in
 /-- **`begin_op`'s transaction mint** (Rocq's `log_tx_mint`). -/
 theorem logTxMint (γ : LogNames) (T : RegMapF Unit) (nxt : Nat)
     (hfresh : ∀ i, nxt ≤ i → PartialMap.get? T i = none) :
@@ -497,6 +503,7 @@ theorem logTxMint (γ : LogNames) (T : RegMapF Unit) (nxt : Nat)
   iexists nxt
   iexact He
 
+omit [MachGS GF] in
 /-- **`end_op`'s transaction retire** (Rocq's `log_tx_retire`): the id is
 never named -- the tie is CARDINALITY. -/
 theorem logTxRetire (γ : LogNames) (T : RegMapF Unit) :
@@ -535,12 +542,12 @@ def logFreeTok (γ : LogNames) : IProp GF := iprop%
   -- ...and THE ERA'S SYNC TOKEN, the application's opaque slot of the fixed
   -- record (`MachFixedGS.syncTok`).  Its birth is the era's mint, which hands
   -- it here; `initlog` seals it into the first `logResAt` (sync K3-2/K3-3).
-  eraSyncTok (hlc := hlc) (GF := GF)
+  eraSyncTok (GF := GF)
 
 /-- Rocq's `log_ghost_alloc`: mint all six names at their genesis values, the
 era's sync token handed in. -/
 theorem logGhostAlloc :
-    eraSyncTok (hlc := hlc) (GF := GF) ⊢ |==> (∃ γ : LogNames, logFreeTok (GF := GF) γ) := by
+    eraSyncTok (GF := GF) ⊢ |==> (∃ γ : LogNames, logFreeTok (GF := GF) γ) := by
   iintro Hstok
   imod (lockGhostAlloc (GF := GF)) with ⟨%γlk, Hl⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := OpEntry) (H := RegMapF))
@@ -557,6 +564,7 @@ theorem logGhostAlloc :
   unfold logFreeTok logEpochAuth logRegAuth logTxAuth
   iframe Hl Ho He Hg Ht Hh Hstok
 
+omit [MachGS GF] in
 /-- ...and using one (Rocq's `logged_at_in`). -/
 theorem loggedAt_in (γ : LogNames) (X : RegMapF (Nat × Nat)) (e b : Nat) :
     logRegAuth (GF := GF) γ X ⊢ loggedAt γ e b -∗

@@ -139,7 +139,7 @@ theorem availInc_availAdd (on : Option Nat) (i : Nat) :
   | some m => simp only [availInc, availAdd, Option.map_some]; congr 1
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The frame and the page range -/
 
@@ -256,7 +256,7 @@ theorem fr_kfree_call [WchG GF] (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       kallocAvail γk (availInc on') -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KF.wp_kfree (hlc := hlc) (GF := GF) c k' γl γk on' hnoff' hK' hlk' hp hp0
+  have h := KF.wp_kfree (GF := GF) c k' γl γk on' hnoff' hK' hlk' hp hp0
   unfold wp_kfree_body at h
   simp only [kfreeAddr] at h
   exact h
@@ -449,7 +449,7 @@ theorem freerange_loop [WchG GF] (KF : KFREE) [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 theorem freerange_proof (KF : KFREE) : FREERANGE :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on base n hnoff hK hlk hargs hp0 => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk on base n hnoff hK hlk hargs hp0 => by
   obtain ⟨hbase, hb1, hb2, hb3, hb4⟩ := hargs
   have hbal : base &&& 0xfff#64 = 0#64 := by rw [hbase]; exact pgRoundUp_aligned _
   unfold wp_freerange_body

@@ -33,7 +33,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -43,17 +43,17 @@ def wpGrepMainBody : Prop :=
     (∀ (j : Nat) (g : UArg), args[j]? = some g → g.ptr ≠ 0) →
     m.get 10#5 = BitVec.ofNat 64 args.length → m.get 11#5 = BitVec.ofNat 64 av →
     grepMainWords args ≤ n →
-    ⊢ treePay (hlc := hlc) N (grepProg N.t) (grepTree (args.map uargBytes)) -∗
+    ⊢ treePay N (grepProg N.t) (grepTree (args.map uargBytes)) -∗
       grepCode N.t -∗ uargv N.d av args -∗ ubytes N.d User.Grep.Sym.«buf» 1024 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«main») n -∗
+      urun N h m (BitVec.ofNat 64 User.Grep.Sym.«main») n -∗
       wpLoop h
 
 end
 
 /-- The interface of grep's `main`. -/
 structure GREP_MAIN : Prop where
-  wp_grepMain : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_grepMain : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpGrepMainBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpGrepMainBody (GF := GF)
 
 end Xv6

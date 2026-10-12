@@ -61,7 +61,7 @@ theorem ushR_usysno (m : RegMap) (v : BitVec 64) :
   rw [ukWr_ne0 _ _ _ (by decide), RegMap.set_same]
 
 section UshRunWalk
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -77,8 +77,8 @@ theorem ushR_wait0 (UL : UK_LEAVES) (SW : SH_SYS_WAIT) (hps : ∀ k : Int, freeN
     (h : CPU) (m : RegMap) (av : Nat) (hp1 : pc0 + 2 = pc1)
     (ht : BitVec.ofNat 64 pc1 + BitVec.signExtend 64 imm = BitVec.ofNat 64 User.Sh.Sym.«wait»)
     (hr : pc1 + 4 = ret) (hr2 : ret % 2 = 0) (hrl : ret < 2 ^ 64) :
-    ⊢ ushCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 pc0) av -∗ uchAny N.ch -∗
-      (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ urun (hlc := hlc) N h' m' (BitVec.ofNat 64 ret) av -∗
+    ⊢ ushCode N.t -∗ urun N h m (BitVec.ofNat 64 pc0) av -∗ uchAny N.ch -∗
+      (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ urun N h' m' (BitVec.ofNat 64 ret) av -∗
         uchAny N.ch -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hch Hk
@@ -93,7 +93,7 @@ theorem ushR_wait0 (UL : UK_LEAVES) (SW : SH_SYS_WAIT) (hps : ∀ k : Int, freeN
   have ha0 : (m2.get 10#5).toNat = 0 := by show ((ukWr (ukWr m 10#5 _) 1#5 _).get 10#5).toNat = 0; ureg
   have hra : retPc (m2.get 1#5) = BitVec.ofNat 64 ret := by
     show retPc ((ukWr (ukWr m 10#5 _) 1#5 _).get 1#5) = _; ureg; exact ush_retPc ret hr2 hrl
-  iapply SW.wp_shSysWait (hlc := hlc) hps N h2 m2 av Sc ha0 $$ Hc Hrun Hch
+  iapply SW.wp_shSysWait hps N h2 m2 av Sc ha0 $$ Hc Hrun Hch
   iintro %h3 %rt %Sc' - Hrun Hch
   rw [hra]
   have hcs : ucalleeSaved m (stubRet m2 3 rt) :=
@@ -112,17 +112,17 @@ theorem ushR_exit0 (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) [hc : UknCo
     (hi1 : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 pc1) false (.JAL (imm, .Regidx 1#5)))
     (h : CPU) (m : RegMap) (av : Nat) (hp1 : pc0 + 2 = pc1)
     (ht : BitVec.ofNat 64 pc1 + BitVec.signExtend 64 imm = BitVec.ofNat 64 User.Sh.Sym.«exit») :
-    ⊢ ushCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 pc0) av -∗ wpLoop h := by
+    ⊢ ushCode N.t -∗ urun N h m (BitVec.ofNat 64 pc0) av -∗ wpLoop h := by
   iintro #Hc Hrun
   iapply ushS_itype UL N hi0 pc1 h m av (ukItypeVal .ADDI (m.get 0#5) k) rfl (by simpa using hp1) $$ Hc Hrun
   iintro %h1 Hrun
   iapply ushS_jal UL N hi1 User.Sh.Sym.«exit» (pc1 + 4) h1 _ av ht (by simp) (by decide) $$ Hc Hrun
   iintro %h2 Hrun
-  ihave Hs := Xv6.sh_stub_exit (hlc := hlc) UL N
+  ihave Hs := Xv6.sh_stub_exit UL N
   unfold exitStubLaw
   iapply Hs $$ %h2 %_ %av Hc Hrun
   iintro %h3 #Hi Hrun
-  iapply HS.exit (hlc := hlc) N h3 _ _ av (by rw [ushR_usysno]; decide) $$ Hi [] Hrun
+  iapply HS.exit N h3 _ _ av (by rw [ushR_usysno]; decide) $$ Hi [] Hrun
   rw [hc.eq (UkSysP.uexitst _) (-1)]
   iapply hpx
 
@@ -132,16 +132,16 @@ theorem ushR_exit0 (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) [hc : UknCo
 def ushRunIH (Dg : Nat) (c : Ushcmd) : Prop :=
   ∀ (N : UkNames GF) [UknConst N] (h : CPU) (m : RegMap) (t szv : Nat) (ld : List FdState) (n : Nat),
     (⊢ N.pay (-1)) → m.get 10#5 = BitVec.ofNat 64 t →
-    ⊢ shDeps (hlc := hlc) -∗ ushCode N.t -∗ uxsupAt (hlc := hlc) N.pay -∗
-      □ (uKillCred (hlc := hlc) -∗ N.pay (-1)) -∗ ushJtab N.t -∗ ushCmd N.d t c -∗ usz N.s szv -∗
+    ⊢ shDeps -∗ ushCode N.t -∗ uxsupAt N.pay -∗
+      □ (uKillCred -∗ N.pay (-1)) -∗ ushJtab N.t -∗ ushCmd N.d t c -∗ usz N.s szv -∗
       ustd N.fd ld -∗ ucwdAny N.cwd -∗ uchAny N.ch -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 * ushHt c + (2 + (Dg + n))) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 * ushHt c + (2 + (Dg + n))) -∗
       wpLoop h
 
 /-- **The EXEC arm** (Rocq `wp_kshr_runcmd`, EXEC). -/
 theorem ushRun_exec (UL : UK_LEAVES) (HS : UK_SYS_P) (SX : SH_SYS_EXEC)
-    (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF)) (Dg : Nat) (hleaf : ushDiagLeaf (hlc := hlc) (GF := GF) Dg)
-    (args : List UArg) : ushRunIH (hlc := hlc) (GF := GF) Dg (.exec args) := by
+    (hent : wpShRuncmdEntryBody (GF := GF)) (Dg : Nat) (hleaf : ushDiagLeaf (GF := GF) Dg)
+    (args : List UArg) : ushRunIH (GF := GF) Dg (.exec args) := by
   intro N _ h m t szv ld n hpx ha0
   rw [show 6 * ushHt (.exec args) + (2 + (Dg + n)) = 6 + (2 + (Dg + n)) by simp [ushHt]]
   iintro #Hdp #Hc #Hexs #Hkw #Hjt #Htree Hsz Hstd Hcwd Hch Hrun
@@ -191,7 +191,7 @@ theorem ushRun_exec (UL : UK_LEAVES) (HS : UK_SYS_P) (SX : SH_SYS_EXEC)
     iapply ushS_jal UL N (ushRI_0d6 N.t) User.Sh.Sym.«exec» 0xda h4 m3 _ $$ Hc Hrun
     iintro %h5 Hrun
     let m4 := ukWr m3 1#5 (BitVec.ofNat 64 0xda)
-    iapply SX.wp_shSysExec (hlc := hlc) N h5 m4 _ $$ Hc Hrun [Hexs]
+    iapply SX.wp_shSysExec N h5 m4 _ $$ Hc Hrun [Hexs]
     · iapply udepw_of_uxsupAt N _ _ $$ Hexs
     iintro %h6 Hrun
     let m5 := stubRet m4 7 (-1#64)
@@ -213,10 +213,10 @@ theorem ushRun_exec (UL : UK_LEAVES) (HS : UK_SYS_P) (SX : SH_SYS_EXEC)
 /-- **The LIST arm** (Rocq `wp_kshr_runcmd`, LIST): fork1; the child runs
 the left tree, the parent waits and runs the right one. -/
 theorem ushRun_list (UL : UK_LEAVES) (SW : SH_SYS_WAIT) (SF : SH_FORK1)
-    (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF)) (Dg : Nat) (hleaf : ushDiagLeaf (hlc := hlc) (GF := GF) Dg)
+    (hent : wpShRuncmdEntryBody (GF := GF)) (Dg : Nat) (hleaf : ushDiagLeaf (GF := GF) Dg)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) (l r : Ushcmd)
-    (ihl : ushRunIH (hlc := hlc) (GF := GF) Dg l) (ihr : ushRunIH (hlc := hlc) (GF := GF) Dg r) :
-    ushRunIH (hlc := hlc) (GF := GF) Dg (.list l r) := by
+    (ihl : ushRunIH (GF := GF) Dg l) (ihr : ushRunIH (GF := GF) Dg r) :
+    ushRunIH (GF := GF) Dg (.list l r) := by
   intro N hcN h m t szv ld n hpx ha0
   have hMl := Nat.le_max_left (ushHt l) (ushHt r)
   have hMr := Nat.le_max_right (ushHt l) (ushHt r)
@@ -237,7 +237,7 @@ theorem ushRun_list (UL : UK_LEAVES) (SW : SH_SYS_WAIT) (SF : SH_FORK1)
   have hra : retPc (m2.get 1#5) = BitVec.ofNat 64 0x128 := by
     show retPc ((ukWr m1 1#5 _).get 1#5) = _; rw [ukWr_get_same _ _ _ (by decide)]; decide
   haveI := forkable_ushPay (GF := GF) t (.list l r)
-  iapply SF.wp_shFork1Any (hlc := hlc) Dg hleaf N (fun gt gd _ => iprop(ushJtab gt ∗ ushCmd gd t (.list l r)))
+  iapply SF.wp_shFork1Any Dg hleaf N (fun gt gd _ => iprop(ushJtab gt ∗ ushCmd gd t (.list l r)))
     szv ld ∅ h2 m2 (6 * max (ushHt l) (ushHt r) + n) $$ Hdp Hc [] Hsz Hstd Hcwd Hch [] Hkw [] Hrun
   · isplitl []
     · iexact Hjt
@@ -295,9 +295,9 @@ theorem ushRun_list (UL : UK_LEAVES) (SW : SH_SYS_WAIT) (SF : SH_FORK1)
 /-- **The BACK arm** (Rocq `wp_kshr_runcmd`, BACK): fork1; the child runs
 the tree, the parent exits. -/
 theorem ushRun_back (UL : UK_LEAVES) (HS : UK_SYS_P) (SF : SH_FORK1)
-    (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF)) (Dg : Nat) (hleaf : ushDiagLeaf (hlc := hlc) (GF := GF) Dg)
-    (c : Ushcmd) (ih : ushRunIH (hlc := hlc) (GF := GF) Dg c) :
-    ushRunIH (hlc := hlc) (GF := GF) Dg (.back c) := by
+    (hent : wpShRuncmdEntryBody (GF := GF)) (Dg : Nat) (hleaf : ushDiagLeaf (GF := GF) Dg)
+    (c : Ushcmd) (ih : ushRunIH (GF := GF) Dg c) :
+    ushRunIH (GF := GF) Dg (.back c) := by
   intro N hcN h m t szv ld n hpx ha0
   rw [show 6 * ushHt (.back c) + (2 + (Dg + n)) = 6 + (2 + (Dg + (6 * ushHt c + n))) by
     simp only [ushHt]; omega]
@@ -316,7 +316,7 @@ theorem ushRun_back (UL : UK_LEAVES) (HS : UK_SYS_P) (SF : SH_FORK1)
   have hra : retPc (m2.get 1#5) = BitVec.ofNat 64 0x1c8 := by
     show retPc ((ukWr m1 1#5 _).get 1#5) = _; rw [ukWr_get_same _ _ _ (by decide)]; decide
   haveI := forkable_ushPay (GF := GF) t (.back c)
-  iapply SF.wp_shFork1Any (hlc := hlc) Dg hleaf N (fun gt gd _ => iprop(ushJtab gt ∗ ushCmd gd t (.back c)))
+  iapply SF.wp_shFork1Any Dg hleaf N (fun gt gd _ => iprop(ushJtab gt ∗ ushCmd gd t (.back c)))
     szv ld ∅ h2 m2 (6 * ushHt c + n) $$ Hdp Hc [] Hsz Hstd Hcwd Hch [] Hkw [] Hrun
   · isplitl []
     · iexact Hjt
@@ -359,9 +359,9 @@ theorem ushRun_back (UL : UK_LEAVES) (HS : UK_SYS_P) (SF : SH_FORK1)
 /-- **Rocq `wp_kshr_runcmd`**: the tree walk, at `ushSimple c`, by
 structural induction. -/
 theorem wp_ushRuncmd (UL : UK_LEAVES) (HS : UK_SYS_P) (SW : SH_SYS_WAIT) (SX : SH_SYS_EXEC) (SF : SH_FORK1)
-    (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF)) : wpShRuncmdBody (hlc := hlc) (GF := GF) := by
+    (hent : wpShRuncmdEntryBody (GF := GF)) : wpShRuncmdBody (GF := GF) := by
   intro Dg hleaf hps c hs
-  show ushRunIH (hlc := hlc) (GF := GF) Dg c
+  show ushRunIH (GF := GF) Dg c
   induction c with
   | exec args => exact ushRun_exec UL HS SX hent Dg hleaf args
   | redir => exact hs.elim

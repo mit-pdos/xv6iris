@@ -237,7 +237,7 @@ theorem recOwnedAt_IBLOCK (Γ : FsViewNames GF) (inodestart : Nat) (inum : BitVe
   rw [Nat.add_comm inodestart]
   exact .rfl
 
-variable {hlc : HasLC} [MachFixedGS hlc GF] [FsBytesG GF]
+variable [MachFixedGS GF] [FsBytesG GF]
 
 /-- Block `bi`'s sixteen record runs, at the region's slot numbering (Rocq
 `ireg_recs`). -/
@@ -306,7 +306,7 @@ end Recs
 /-! ## 2.  THE BODY -/
 
 section Body
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- Block `bi`'s conjunct: the parked list `ds` of its sixteen records,
@@ -335,9 +335,11 @@ def iregRegistry [Icfg] (nib : Nat) : IProp GF :=
     ⌜∀ z : Nat, z < 16 * nib → (PartialMap.get? mr z).isSome⌝ ∗
     (icfgReg ↪●MAP mr))
 
+omit [MachGS GF] in
 instance iregRegistry_timeless [Icfg] (nib : Nat) : Timeless (iregRegistry (GF := GF) nib) := by
   unfold iregRegistry; infer_instance
 
+omit [MachGS GF] in
 /-- Boot assembles the registry from the EMPTY `icfgReg` auth
 (`icfgAlloc`'s new hand-out): it bulk-inserts a fully-covering map and
 calls this.  Parametric over the map so the caller (IcacheBoot, where
@@ -418,13 +420,14 @@ ANY share.  Because the entry RECORDS the share, `iregRelease` hands back
 exactly what `iregArm` took. -/
 
 section Top
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-- what an arm parks: its transaction's element, at the arm's own share -/
 def iregParked [Icfg] (e : IregArmEnt) : IProp GF :=
   txPin icfgLog e.1 e.2.1
 
+omit [MachGS GF] in
 instance iregParked_timeless [Icfg] (e : IregArmEnt) : Timeless (iregParked (GF := GF) e) := by
   unfold iregParked; infer_instance
 
@@ -435,6 +438,7 @@ share, so no lemma below has to guess either. -/
 def iregArmed [Icfg] (k t : Nat) (q : Qp) (S : Std.ExtTreeSet Nat compare) : IProp GF :=
   icfgLk ↪◯MAP[k] ((t, q, S) : IregArmEnt)
 
+omit [MachGS GF] in
 instance iregArmed_timeless [Icfg] (k t : Nat) (q : Qp) (S : Std.ExtTreeSet Nat compare) :
     Timeless (iregArmed (GF := GF) k t q S) := by
   unfold iregArmed; infer_instance
@@ -467,9 +471,10 @@ def ftopInv [Icfg] (γfs : FsNames) : IProp GF :=
   inv ftopN (ftopBody γfs)
 
 instance ftopInv_persistent [Icfg] (γfs : FsNames) :
-    Persistent (ftopInv (hlc := hlc) (GF := GF) γfs) := by
+    Persistent (ftopInv (GF := GF) γfs) := by
   unfold ftopInv; infer_instance
 
+omit [MachGS GF] in
 instance ftopBody_timeless [Icfg] (γfs : FsNames) : Timeless (ftopBody (GF := GF) γfs) := by
   unfold ftopBody; infer_instance
 
@@ -484,7 +489,7 @@ theorem ftopClean_empty (I : RegMapF FsNode)
 theorem ftopAlloc [Icfg] (E : CoPset) (γfs : FsNames) (I : RegMapF FsNode)
     (hloc : ∀ i n, PartialMap.get? I i = some n → InodeLocal i n) :
     ⊢@{IProp GF} (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗
-      (icfgLk ↪●MAP (∅ : RegMapF IregArmEnt)) -∗ |={E}=> ftopInv (hlc := hlc) γfs := by
+      (icfgLk ↪●MAP (∅ : RegMapF IregArmEnt)) -∗ |={E}=> ftopInv γfs := by
   iintro Ha Hlk
   unfold ftopInv
   iapply (inv_alloc ftopN E (ftopBody (GF := GF) γfs))
@@ -503,6 +508,7 @@ theorem iregArm_fresh (A : RegMapF IregArmEnt) : ∃ k, PartialMap.get? A k = no
   refine ⟨k, LawfulFiniteMap.toList_get?_none.1 fun v hv => hk ?_⟩
   exact List.mem_map.2 ⟨(k, v), hv, rfl⟩
 
+omit [MachGS GF] in
 /-- The parked row moves with a retag of its entry's inum set. -/
 theorem iregParked_retag [Icfg] (A : RegMapF IregArmEnt) (k t : Nat) (q : Qp)
     (S S' : Std.ExtTreeSet Nat compare) (hA : PartialMap.get? A k = some (t, q, S)) :
@@ -512,6 +518,7 @@ theorem iregParked_retag [Icfg] (A : RegMapF IregArmEnt) (k t : Nat) (q : Qp)
     (BigSepM.bigSepM_insert_delete (Φ := fun _ e => iregParked (GF := GF) e)
       (x := ((t, q, S') : IregArmEnt))).2
 
+omit [MachGS GF] in
 /-- The parked row IS the transaction pin (the raw `ln_tx` element). -/
 theorem iregParked_elem [Icfg] (t : Nat) (q : Qp) (S : Std.ExtTreeSet Nat compare) :
     iregParked (GF := GF) ((t, q, S) : IregArmEnt) ⊣⊢ txPin icfgLog t q :=
@@ -524,7 +531,7 @@ out.  The key needs no freshness ARGUMENT: the ghost step sees the
 registry's map, so a fresh key is free (see the header above). -/
 theorem iregArm [Icfg] (E : CoPset) (γfs : FsNames) (i t : Nat) (q : Qp)
     (hE : (↑ftopN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ txPin icfgLog t q -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ txPin icfgLog t q -∗
       |={E}=> ∃ k : Nat, iregArmed k t q ({i} : Std.ExtTreeSet Nat compare) := by
   iintro #Hi Ht
   unfold ftopInv iregArmed
@@ -562,7 +569,7 @@ WELL-FORMEDNESS of that node -- which is free where a payload is re-packed
 theorem iregDisarm [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) (q : Qp)
     (S : Std.ExtTreeSet Nat compare) (i : Nat) (n : FsNode)
     (hE : (↑ftopN : CoPset) ⊆ E) (hloc : InodeLocal i n) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗ topFrag (fsGammaL γfs) i n -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ iregArmed k t q S -∗ topFrag (fsGammaL γfs) i n -∗
       |={E}=> (iregArmed k t q (S \ {i}) ∗ topFrag (fsGammaL γfs) i n) := by
   iintro #Hi Hrec Hfr
   unfold ftopInv iregArmed
@@ -598,7 +605,7 @@ theorem iregDisarm [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) (q : Qp)
 home. -/
 theorem iregRelease [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) (q : Qp)
     (hE : (↑ftopN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ iregArmed k t q ∅ -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ iregArmed k t q ∅ -∗
       |={E}=> txPin icfgLog t q := by
   iintro #Hi Hrec
   unfold ftopInv iregArmed
@@ -629,7 +636,7 @@ end Top
 /-! ## 4.  THE BUNDLES -/
 
 section Bundles
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE REGION AT POWERON, BEFORE RECOVERY HAS RUN (durable-disk lane
@@ -642,7 +649,7 @@ takes; that reader's own crossing is licensed by the `BufL` row's carried
 seal, not by this bundle. -/
 def iregReg [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat) : IProp GF :=
   iprop(inv iregN (iregBody γi γfs inodestart nib) ∗
-    fsBytesRow γfs ∗ ftopInv (hlc := hlc) γfs ∗ appInv (hlc := hlc) γfs)
+    fsBytesRow γfs ∗ ftopInv γfs ∗ appInv γfs)
 
 /-- ...AND THE REGION EVERY OTHER CONSUMER TAKES: the same rows with the
 byte row SEALED.  fsinit builds it out of `iregReg` and the seal `initlog`
@@ -665,45 +672,45 @@ carries.  LAST, so the destructuring patterns of the consumers only grow at
 the end. -/
 def iregInv [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat) : IProp GF :=
   iprop(inv iregN (iregBody γi γfs inodestart nib) ∗
-    fsBytesAny γfs ∗ ftopInv (hlc := hlc) γfs ∗ appInv (hlc := hlc) γfs)
+    fsBytesAny γfs ∗ ftopInv γfs ∗ appInv γfs)
 
 instance iregReg_persistent [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat) :
-    Persistent (iregReg (hlc := hlc) (GF := GF) γi γfs inodestart nib) := by
+    Persistent (iregReg (GF := GF) γi γfs inodestart nib) := by
   unfold iregReg; infer_instance
 
 instance iregInv_persistent [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat) :
-    Persistent (iregInv (hlc := hlc) (GF := GF) γi γfs inodestart nib) := by
+    Persistent (iregInv (GF := GF) γi γfs inodestart nib) := by
   unfold iregInv; infer_instance
 
 theorem iregInv_reg [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat) :
-    iregInv (hlc := hlc) (GF := GF) γi γfs inodestart nib ⊢ iregReg γi γfs inodestart nib := by
+    iregInv (GF := GF) γi γfs inodestart nib ⊢ iregReg γi γfs inodestart nib := by
   unfold iregInv iregReg
   iintro ⟨H1, Hb, H3, H4⟩
   iframe H1 H3 H4
   iapply fsBytesAny_row $$ Hb
 
 theorem iregInv_of [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat) :
-    iregReg (hlc := hlc) (GF := GF) γi γfs inodestart nib ⊢
+    iregReg (GF := GF) γi γfs inodestart nib ⊢
       excSealed γfs.exc -∗ iregInv γi γfs inodestart nib := by
   unfold iregInv iregReg fsBytesAny
   iintro ⟨H1, Hb, H3, H4⟩ Hs
   iframe H1 Hb H3 H4 Hs
 
 theorem iregInv_bytes [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat) :
-    iregInv (hlc := hlc) (GF := GF) γi γfs inodestart nib ⊢ fsBytesAny γfs := by
+    iregInv (GF := GF) γi γfs inodestart nib ⊢ fsBytesAny γfs := by
   unfold iregInv
   iintro ⟨-, H, -, -⟩
   iexact H
 
 theorem iregInv_ftop [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat) :
-    iregInv (hlc := hlc) (GF := GF) γi γfs inodestart nib ⊢ ftopInv (hlc := hlc) γfs := by
+    iregInv (GF := GF) γi γfs inodestart nib ⊢ ftopInv γfs := by
   unfold iregInv
   iintro ⟨-, -, H, -⟩
   iexact H
 
 /-- the application's invariant, off the bundle -/
 theorem iregInv_app [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat) :
-    iregInv (hlc := hlc) (GF := GF) γi γfs inodestart nib ⊢ appInv (hlc := hlc) γfs := by
+    iregInv (GF := GF) γi γfs inodestart nib ⊢ appInv γfs := by
   unfold iregInv
   iintro ⟨-, -, -, H⟩
   iexact H
@@ -752,13 +759,13 @@ ABSENT rows (ilock's fresh-inode fill and the escrow deposit's free, both
 reading the pre-node's zero count off `iregTopPark`). -/
 
 section Retag
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsTopG GF] [FsBytesG GF] [Appcfg GF]
 
 /-- Rocq's `ireg_top_retag_gen`. -/
 theorem iregTopRetag_gen [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n') :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       (∀ I : RegMapF FsNode, ⌜PartialMap.get? I i = some n⌝ -∗
         ▷ appPred appRun (absView I) -∗
         ▷ appPred appRun (absView (PartialMap.insert I i n'))) -∗
@@ -791,7 +798,7 @@ theorem iregTopRetag_gen [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : 
 /-- Rocq's `ireg_top_retag_same`. -/
 theorem iregTopRetag_same [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (habs : absOf n = absOf n') (hloc : InodeLocal i n') :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       topFrag (fsGammaL γfs) i n -∗ |={E}=> topFrag (fsGammaL γfs) i n' := by
   iintro #Hi #Hai Hf
   iapply (iregTopRetag_gen E γfs i n n' hE hloc) $$ Hi Hai [] Hf
@@ -806,7 +813,7 @@ application's claim is owed all the same (Rocq's
 theorem iregTopRetag_armed_gen [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) (q : Qp)
     (S : Std.ExtTreeSet Nat compare) (i : Nat) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗ iregArmed k t q S -∗
       (∀ I : RegMapF FsNode, ⌜PartialMap.get? I i = some n⌝ -∗
         ▷ appPred appRun (absView I) -∗
         ▷ appPred appRun (absView (PartialMap.insert I i n'))) -∗
@@ -843,7 +850,7 @@ theorem iregTopRetag_armed_gen [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) 
 theorem iregTopRetag_armed_same [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) (q : Qp)
     (S : Std.ExtTreeSet Nat compare) (i : Nat) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S) (habs : absOf n = absOf n') :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗ iregArmed k t q S -∗
       topFrag (fsGammaL γfs) i n -∗
       |={E}=> (iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n') := by
   iintro #Hi #Hai Hrec Hf
@@ -857,7 +864,7 @@ end Retag
 /-! ## 6.  THE BLOCK ACCESSOR (writer form) -/
 
 section Acc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- a block's conjunct only reads the map at its OWN sixteen keys -/

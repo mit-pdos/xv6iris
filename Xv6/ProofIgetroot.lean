@@ -67,7 +67,7 @@ theorem igetroot_br_iget : KA.«igetroot» + 0xfffffffffffff35c#64 = KA.«iget»
 theorem igetroot_ret_10 : jumpPc (KA.«igetroot» + 0x10#64) = KA.«igetroot» + 0x10#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
   [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -106,7 +106,7 @@ theorem igetroot_main (IG : IGET) (cpu : CPU) (k : KCtx)
     (hK : igetrootSlots ≤ k.avail) (hnoff : k.noff + 3 < 2 ^ 31)
     (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV) (hnib0 : 0 < icfgNib)
     (hit : "itable" ∉ k.locks) (hpr : "pr" ∉ k.locks) (huart : "uart1" ∉ k.locks) :
-    wp_igetroot_body (hlc := hlc) (GF := GF) cpu k hK hnoff hroot hnib0 hit hpr huart := by
+    wp_igetroot_body (GF := GF) cpu k hK hnoff hroot hnib0 hit hpr huart := by
   unfold wp_igetroot_body
   have hK2 := igetroot_2 _ hK
   have hdev : (1#64 : BitVec 64) = BitVec.signExtend 64 icfgDev := by rw [hroot]; decide

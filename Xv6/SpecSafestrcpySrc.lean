@@ -58,7 +58,7 @@ def sscSrcOk (bss : List (BitVec 8)) : Prop :=
   15 ≤ bss.length ∨ ∃ j : Nat, bss[j]? = some 0#8
 
 /-- **WP of `safestrcpy`** (`n = 16`), the source owned per `sscSrcOk`. -/
-def wp_safestrcpy_src_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_safestrcpy_src_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bsd bss : List (BitVec 8)) (dq : DFrac)
     (hK : 2 ≤ k.avail) (hn : k.regs 12#5 = 16#64)
     (hld : bsd.length = 16) (hsrc : sscSrcOk bss) : Prop :=
@@ -73,8 +73,8 @@ def wp_safestrcpy_src_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
 
 /-- The interface of `safestrcpy` with the source-ownership disjunct. -/
 structure SAFESTRCPY_SRC : Prop where
-  wp_safestrcpy_src : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+  wp_safestrcpy_src : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bsd bss : List (BitVec 8)) (dq : DFrac) hK hn hld hsrc,
-    wp_safestrcpy_src_body (hlc := hlc) (GF := GF) cpu k bsd bss dq hK hn hld hsrc
+    wp_safestrcpy_src_body (GF := GF) cpu k bsd bss dq hK hn hld hsrc
 
 end Xv6

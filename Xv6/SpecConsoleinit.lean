@@ -40,7 +40,7 @@ def devswConsoleRead : BitVec 64 := KA.«devsw» + 16#64
 def devswConsoleWrite : BitVec 64 := KA.«devsw» + 24#64
 
 /-- **WP of `consoleinit`.** -/
-def wp_consoleinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_consoleinit_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ0 γ1 : UartNames) (l0 l1 : List (BitVec 8)) (k0 k1 : Nat)
     (vlock0 vlock1 : BitVec 32) (vname0 vcpu0 vname1 vcpu1 : BitVec 64)
     (vclock : BitVec 32) (vcname vccpu vread vwrite : BitVec 64)
@@ -63,11 +63,11 @@ def wp_consoleinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 
 /-- The interface of `consoleinit`. -/
 structure CONSOLEINIT : Prop where
-  wp_consoleinit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_consoleinit : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ0 γ1 : UartNames) (l0 l1 : List (BitVec 8)) (k0 k1 : Nat)
     (vlock0 vlock1 : BitVec 32) (vname0 vcpu0 vname1 vcpu1 : BitVec 64)
     (vclock : BitVec 32) (vcname vccpu vread vwrite : BitVec 64) hsie hK,
-    wp_consoleinit_body (hlc := hlc) (GF := GF) cpu k γ0 γ1 l0 l1 k0 k1 vlock0 vlock1 vname0 vcpu0 vname1 vcpu1
+    wp_consoleinit_body (GF := GF) cpu k γ0 γ1 l0 l1 k0 k1 vlock0 vlock1 vname0 vcpu0 vname1 vcpu1
       vclock vcname vccpu vread vwrite hsie hK
 
 end Xv6

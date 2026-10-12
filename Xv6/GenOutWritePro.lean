@@ -208,11 +208,11 @@ theorem gclPure_write_pro (M : LModel) (L : LmLaws M) (K : LmHooks M) (sd : M.lm
   · exact lmDlOk_out M so _ H.chDl rfl (by simp) hcase hdlok
 
 section writepro
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- THE WITNESS'S AUTHORITY, FILED at the state the stage reads: already
 filed, or the instance files its default (`gwa_file_free`). -/
-theorem gproFile (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa M G sd)
+theorem gproFile (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (A : GenWa M G sd)
     (k : Nat) (st : Option M.lmSt) (hcase : st ≠ none ∨ A.gwaFree) :
     ⊢ A.gwa k st ==∗ A.gwa k (some (st.getD sd)) := by
   cases st with
@@ -230,7 +230,7 @@ theorem gproFile (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa
 
 /-- (W-pro) THE WRITE AT A PROLOGUE ROUND'S CHOICE BYTE (Rocq
 `gcl_step_write_pro`). -/
-theorem gclStep_write_pro (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa M G sd)
+theorem gclStep_write_pro (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (A : GenWa M G sd)
     (k : Nat) (v : EraPins) (P a : Nat) (b : BitVec 8) (ps0 cs0 : List Nat) (s0 : M.lmSt)
     (I0 : List (BitVec 8)) (ho : List Obs) (CH : ConsHist)
     (hP0 : 0 < P ∨ A.gwaStrict ∨ A.gwaFree)

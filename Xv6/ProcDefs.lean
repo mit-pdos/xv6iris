@@ -53,7 +53,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-! ## The private block (Rocq `pprivate` / `proc_fields` / `proc_priv_bare`) -/
 
@@ -290,7 +290,7 @@ def procPub (pa : BitVec 64) (st : BitVec 32) (chan : BitVec 64) (killed xstate 
   wordPointsTo (pKilled pa) 4 (DFrac.own 1) killed ∗
   wordPointsTo (pXstate pa) 4 xsHalf xstate ∗
   wordPointsTo (pPid pa) 4 pidPub pid ∗
-  killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid killed
+  killPaidAt (MachFixedGS.killCred (GF := GF)) pid killed
 
 /-- **The dormant slot's allowances** (Rocq `proc_dormant`'s four supply
 rows, ProcDefs.v:623): one fd-slot unit per descriptor (`[∗ list] _ ∈
@@ -307,6 +307,7 @@ def dormantAllow : IProp GF := iprop%
   ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
   fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3
 
+omit [MachGS GF] in
 instance dormantAllow_timeless : Timeless (dormantAllow (GF := GF)) := by
   unfold dormantAllow; infer_instance
 
@@ -320,6 +321,7 @@ only, so they cross a context move untouched. -/
 def liveAllow : IProp GF := iprop%
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗ bslots 3
 
+omit [MachGS GF] in
 instance liveAllow_timeless : Timeless (liveAllow (GF := GF)) := by
   unfold liveAllow; infer_instance
 

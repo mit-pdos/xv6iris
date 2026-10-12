@@ -49,13 +49,13 @@ def sysKillAddr : BitVec 64 := KA.«sys_kill»
 def sysKillSlots : Nat := 4 + argintSlots
 
 /-- **WP of `sys_kill()`.** -/
-def wp_sys_kill_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_sys_kill_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
     (hws : ws[tfArgIdx 0]? = some v)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : sysKillSlots ≤ k.avail) (hlk : "proc" ∉ k.locks)
     (htier : k.tier = KTier.kpt) : Prop :=
-  kctx cpu k ∗ pcIs cpu sysKillAddr ∗ procsInv Γ ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
+  kctx cpu k ∗ pcIs cpu sysKillAddr ∗ procsInv Γ ∗ □ MachFixedGS.killCred (GF := GF) ∗
   wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
@@ -66,10 +66,10 @@ def wp_sys_kill_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `sys_kill`. -/
 structure SYSKILL : Prop where
-  wp_sys_kill : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  wp_sys_kill : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
     hws hnoff hK hlk htier,
-    wp_sys_kill_body (hlc := hlc) (GF := GF) Γ cpu k tfp ws v dqt hws hnoff hK hlk htier
+    wp_sys_kill_body (GF := GF) Γ cpu k tfp ws v dqt hws hnoff hK hlk htier
 
 end Xv6

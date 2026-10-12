@@ -119,7 +119,7 @@ theorem vdrw5_buf_nz (b : BitVec 64)
 /-! ## The payload's watermark, and a slot the caller has a quarter of -/
 
 section payload
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **The handler watermark, borrowed out of the payload.**  What
 `Xv6.disk_collect` reads the completion evidence
@@ -222,7 +222,7 @@ end payload
 `Xv6.idxCells_join` needs it, and the frame's own cells carry it. -/
 
 section align
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 theorem vdrw6_sp_align (k : KCtx) :
     vdrwSaved (GF := GF) k ⊢ ⌜(k.regs 2#5).toNat % 8 = 0⌝ ∗ vdrwSaved k := by
@@ -257,7 +257,7 @@ end align
 /-! ## The seam at the end of P5 -/
 
 section seam
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **The head of the park loop** (`virtio_disk_rw + 0x1b4`, `mv a0,s3`):
 the lock is held with its payload whole, the chain is still armed and the
@@ -265,7 +265,7 @@ publisher still holds its three quarters, and the two registers the loop
 was compiled with are set -- `s1 = &disk.vdisk_lock`, `s2 = 1`.  Löb's
 induction hypothesis in `Xv6.vdrw_P5` is this at any hart and any
 `SPIE`/`SPP`: `sleep` may come back on another hart. -/
-def vdrwP5Loop (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def vdrwP5Loop (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (c : Chain) (y : BitVec 32) (R : RegMap) : IProp GF := iprop%
@@ -309,7 +309,7 @@ theorem vdrw_popctx (k : KCtx) (s : Bool) (hs : k.sie = s) (hlocks : k.locks = [
 theorem vdrw5_saved_ws (k : KCtx) (a b : Bool) :
     vdrwSaved (GF := GF) (k.withSpie a b) = vdrwSaved k := rfl
 
-theorem vdrwP5Loop_self (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem vdrwP5Loop_self (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (c : Chain) (y : BitVec 32) (R : RegMap) :
@@ -329,7 +329,7 @@ both PERSISTENT, which is why closing the row does not swallow them --
 and the rest of the payload with the head marked TAKEN.  The middle's and
 the tail's quarters are untouched; P6 takes their slots out when it has
 the head's. -/
-def vdrwP5Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def vdrwP5Exit (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (c : Chain) (y : BitVec 32) (R : RegMap) : IProp GF := iprop%
@@ -346,7 +346,7 @@ def vdrwP5Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md) (BitVec.ofNat 32 c.tl) y ∗
   vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu
 
-theorem vdrwP5Exit_self (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem vdrwP5Exit_self (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (c : Chain) (y : BitVec 32) (R : RegMap) :
@@ -360,7 +360,7 @@ end seam
 /-! ## The caller's credentials -/
 
 section caps4
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **The collect's receipt** (Rocq `perm_collect` after the wake): the
 spent leaf the disk handed back at the collect, matched against the
@@ -369,14 +369,14 @@ and the saved-proposition agreement's (`MachCSL.crashPerm_collect`). -/
 theorem vdrwNext_collect (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
     (dataBuf dataDisk : List (BitVec 8)) (c : Chain) (cpu : CPU) (E : CoPset)
     (hE : (↑crashPermN : CoPset) ⊆ E) :
-    crashPermInv (genId (hlc := hlc) (GF := GF)) γ.cperm ∗
+    crashPermInv (genId (GF := GF)) γ.cperm ∗
       crashPermDone γ.cperm c.kq (chainWr c) ∗
       vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu ⊢@{IProp GF}
       |={E}=> ∃ Q : IProp GF, ▷ ▷ Q ∗
         wpNext true k.proc cpu (vdrwPostQ k γ bno wr dataBuf dataDisk Q) := by
   unfold vdrwNext vdrwTok crashPermDone
   iintro ⟨#Hpi, Hdone, %Q, #Hrc, Hn⟩
-  imod crashPerm_collect (genId (hlc := hlc) (GF := GF)) γ.cperm c.kq.1 c.kq.2 (chainWr c) Q E hE
+  imod crashPerm_collect (genId (GF := GF)) γ.cperm c.kq.1 c.kq.2 (chainWr c) Q E hE
     $$ [Hpi Hrc Hdone] with HQ
   · iframe Hpi Hrc Hdone
   imodintro
@@ -398,9 +398,9 @@ A `Proof` file may not import another `Proof` file, so the call-site
 wrappers of P5 and P6 live here beside the ones P2 has. -/
 
 section calls
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
-theorem vdrw5_sp (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem vdrw5_sp (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (jp : Nat)
     (hj : jp < NPROC) (hproc : k'.proc = procAddr jp) (hchan : k'.regs 10#5 ≠ 0#64)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : sleepPrepareSlots ≤ k'.avail)
@@ -411,14 +411,14 @@ theorem vdrw5_sp (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := SP.wp_sleep_prepare (hlc := hlc) (GF := GF) Γ c k' jp hj hproc hchan hnoff hK hlk htier
+  have h := SP.wp_sleep_prepare (GF := GF) Γ c k' jp hj hproc hchan hnoff hK hlk htier
   unfold wp_sleep_prepare_body at h
   simp only [sleepPrepareAddr] at h
   exact h
 
 /-- `sleep` at either `SIE`, with the complement at a named index `s` and
 proc `p` (so the caller's hypotheses frame syntactically). -/
-theorem vdrw5_sl (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem vdrw5_sl (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (jp : Nat) (s : Bool) (p : BitVec 64)
     (hj : jp < NPROC) (hproc : k'.proc = procAddr jp) (hK : sleepSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hs : k'.sie = s) (hp : k'.proc = p) :
@@ -430,7 +430,7 @@ theorem vdrw5_sl (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
-  have h := SL.wp_sleep_eb (hlc := hlc) (GF := GF) Γ c k' jp hj hproc hK hnoff htier
+  have h := SL.wp_sleep_eb (GF := GF) Γ c k' jp hj hproc hK hnoff htier
   unfold wp_sleep_eb_body at h
   simp only [sleepAddr] at h
   exact h
@@ -450,7 +450,7 @@ theorem vdrw5_re (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GN
         (k'.locks.filter (fun x => x ≠ "virtio_disk"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
+  have h := RE.wp_release (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
     hsie' hnoff hK reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -472,7 +472,7 @@ theorem vdrw5_ac (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GN
       locked γl cpu' -∗ diskRes γ pd pav pu curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
+  have h := AC.wp_acquire (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
     hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
@@ -493,7 +493,7 @@ theorem vdrw6_fd (FD : FREE_DESC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γ : 
       ⌜calleeSaved k'.regs R'⌝ -∗
       wordPointsTo (aFree n) 1 (DFrac.own 1) 1#8 -∗ descCells pd n 0 -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := FD.wp_free_desc (hlc := hlc) (GF := GF) Γ c k' γ pd pav pu n w hn hpd ha0 hsie'
+  have h := FD.wp_free_desc (GF := GF) Γ c k' γ pd pav pu n w hn hpd ha0 hsie'
     hnoff hKf hlk htier
   unfold wp_free_desc_body at h
   simp only [freeDescAddr] at h
@@ -502,6 +502,7 @@ theorem vdrw6_fd (FD : FREE_DESC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γ : 
   iapply h
   iframe Hk Hpc Hpi Hgeom Hf Hd HΦ
 
+omit [MachGS GF] in
 /-- With interrupts off the continuation is at THIS hart, whatever the
 `wpNext` flag says. -/
 theorem wpNext_here (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :

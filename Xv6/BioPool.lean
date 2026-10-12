@@ -131,7 +131,7 @@ theorem not_bcached (bnos : Nat → BitVec 32) (b : Nat)
     exact absurd he (h j hj)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
 
 /-! ## The payloads -/
 
@@ -142,6 +142,7 @@ is never evicted. -/
 def poolBlk (V : BioView GF) (b : Nat) : IProp GF := iprop%
   ∃ bs : List (BitVec 8), ⌜bs.length = BSIZE⌝ ∗ diskBlock V.gd b bs ∗ V.clean b bs
 
+omit [MachGS GF] in
 instance poolBlk_timeless (V : BioView GF) (b : Nat) : Timeless (poolBlk (GF := GF) V b) := by
   unfold poolBlk diskBlock; infer_instance
 
@@ -154,6 +155,7 @@ lock. -/
 def bioPool (V : BioView GF) (bnos : Nat → BitVec 32) : IProp GF :=
   iprop([∗set] b ∈ V.cov, (if bcached bnos b then iprop(emp) else poolBlk V b))
 
+omit [MachGS GF] in
 /-- **THE RECYCLE'S ONE-SHOT POOL EXCHANGE** (Rocq's `bio_pool_recycle`), at
 the `b->blockno` store: slot `k`'s claim moves from `old` to `B`, so `B`'s
 bundle leaves the pool (into the recycler's hand, and from there into the

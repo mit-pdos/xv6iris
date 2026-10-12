@@ -25,7 +25,7 @@ namespace MachCSL
 open Iris Iris.BI Iris.ProofMode Std
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The birth's move, HOOKED: park the payload in a fresh context, stamp it,
 and run the hook there (`MachCSL.lock_pay_intro_hook`'s twin). -/
@@ -131,7 +131,7 @@ theorem kctx_newlockAt [CurCtx] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : 
   icases kctx_cases cpu k $$ Hk with
     ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
-  ihave #Htl := topLbAt_0 (GF := GF) (E := MachGS.era (hlc := hlc) (GF := GF))
+  ihave #Htl := topLbAt_0 (GF := GF) (E := MachGS.era (GF := GF))
   imod newlockAt_llb cpu ⊤ γ lk s R R 0 (fun ξ => by iintro ⟨H, -⟩; iexact H)
     $$ [Hfree Hctx Hfresh HR] with ⟨Hctx, #Hlk⟩
   · iframe Hfree Hctx Hfresh HR

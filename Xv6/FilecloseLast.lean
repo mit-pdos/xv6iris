@@ -29,7 +29,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF]
@@ -40,7 +40,7 @@ theorem fc_env_fs [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (j : Nat) (p : BitVe
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (st : FdState)
     (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (hok : fdstateOk inum γo om γp C st)
     (hfs : C.type = FD_INODE ∨ C.type = FD_DEVICE) :
-    (filecloseEnv (hlc := hlc) (GF := GF) Γ j p γkl γk on st ⊢ filecloseFsEnv (hlc := hlc) Γ j p) ∧
+    (filecloseEnv (GF := GF) Γ j p γkl γk on st ⊢ filecloseFsEnv Γ j p) ∧
       (filecloseFsOut (GF := GF) ⊢ filecloseEnvOut γk on st) := by
   have hty := fdstateOk_type _ _ _ _ _ _ hok
   cases st with
@@ -61,7 +61,7 @@ returned on): `li a5,1 ; beq s2,a5` (pipe), `addiw a5,s2,-2 ; li a4,1 ;
 bgeu a4,a5` (inode / device), else the restore; each arm to the exit. -/
 theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
     [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu cr : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu cr : CPU) (k : KCtx)
     (γ : FileNames) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat)
     (pidv : BitVec 32) (dqp : DFrac) (st : FdState) (q : Qp) (Φc : IProp GF) (ke : Nat) (C : FContent)
     (pn : FPNames) (spie spp : Bool) (R R4 : RegMap)
@@ -85,8 +85,8 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (R 21#5) ∗
     fdSlot ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    filecloseEnv (hlc := hlc) Γ j k.proc γkl γk on st ∗
-    filecloseCpay (hlc := hlc) st Φc ∗ actLend k.proc ke ∗
+    filecloseEnv Γ j k.proc γkl γk on st ∗
+    filecloseCpay st Φc ∗ actLend k.proc ke ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -94,7 +94,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗
-      filecloseCpost (hlc := hlc) q st Φc -∗ wpLoop cpu')) ∗
+      filecloseCpost q st Φc -∗ wpLoop cpu')) ∗
     fcRest pn C
     ⊢ wpLoop (GF := GF) cr := by
   iintro ⟨Hk, Hpc, Hra, Hs0, Hs1, Hc0, Hc32, Hc24, Hc16, Hc8, Hfd, Hte, Hce, #Hpe, Hpid, Henv, Hcpay,
@@ -143,7 +143,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
     ihave Hte := trapCsrsExt_move _ _ _ (fun h => hpin5 (Or.inl h)) $$ Hte
     ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hpin5 (Or.inl h)) $$ Hce
     ihave Hnext := fc_next_shift k cpu c5 _ hpin5 $$ Hnext
-    obtain ⟨henv, hout⟩ := fc_env_fs (hlc := hlc) (GF := GF) Γ j k.proc γkl γk on st pn.inum pn.ooff pn.om pn.pipe C hok2 hfs
+    obtain ⟨henv, hout⟩ := fc_env_fs (GF := GF) Γ j k.proc γkl γk on st pn.inum pn.ooff pn.om pn.pipe C hok2 hfs
     ihave Henv := henv $$ Henv
     unfold filecloseFsEnv
     icases Henv with ⟨%hpj, %hj, #Hpi, #Hrdy, Hbs⟩
@@ -238,8 +238,8 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
       have hwb : fcWbool C = w := by
         unfold fcWbool; rw [hwr]; cases w <;> decide
       -- THE CLOSE LINK goes to pipeclose, at the end the descriptor names
-      ihave Hcpay := (show filecloseCpay (hlc := hlc) (GF := GF) (.open r w (.pipe pn.pipe)) Φc ⊢
-          pipeCpay (hlc := hlc) pn.pipe.pnQueue (fcWbool C) Φc by rw [hwb]; exact .rfl) $$ Hcpay
+      ihave Hcpay := (show filecloseCpay (GF := GF) (.open r w (.pipe pn.pipe)) Φc ⊢
+          pipeCpay pn.pipe.pnQueue (fcWbool C) Φc by rw [hwb]; exact .rfl) $$ Hcpay
       unfold filecloseEnv fileclosePipeEnv
       icases Henv with ⟨#Hpi, #Hkl, Hav⟩
       k_step_gen (wp_s_branch c1 _ (KA.«fileclose» + 0x56#64) false 66#13 18#5 15#5 (by decide) bop.BEQ)
@@ -276,8 +276,8 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
       -- the lend, back from pipeclose at a raised count (permit sweep L1b)
       ihave Hnext := fc_lend_frame _ _ _ _ _ _ _ _ _ $$ Hnext Hlend
       -- the link FIRED: the last close of the end
-      ihave Hcp := (show pipeCpost (hlc := hlc) (GF := GF) pn.pipe.pnQueue (fcWbool C) Φc true ⊢
-          filecloseCpost (hlc := hlc) q (.open r w (.pipe pn.pipe)) Φc by
+      ihave Hcp := (show pipeCpost (GF := GF) pn.pipe.pnQueue (fcWbool C) Φc true ⊢
+          filecloseCpost q (.open r w (.pipe pn.pipe)) Φc by
         rw [hwb]; exact filecloseCpost_of_fired q _ Φc r w pn.pipe rfl) $$ Hcp
       ihave Hnext := fc_cont_fold cpu k γk on (.open r w (.pipe pn.pipe)) pidv dqp q Φc $$ Hnext Hcp
       k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
@@ -331,7 +331,7 @@ whole content): save `s2..s5`, read `ff`, free the slot, release, dispatch
 on the type, restore, exit. -/
 theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
     [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu c : CPU) (k : KCtx)
     (γl : GName) (γ : FileNames) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat)
     (pidv : BitVec 32) (dqp : DFrac)
     (kk : Nat) (st : FdState) (q : Qp) (Φc : IProp GF) (ke : Nat) (C : FContent) (pn : FPNames)
@@ -357,8 +357,8 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO 
     sieArm c k.sie k.proc ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗
-    filecloseEnv (hlc := hlc) Γ j k.proc γkl γk on st ∗
-    filecloseCpay (hlc := hlc) st Φc ∗ actLend k.proc ke ∗
+    filecloseEnv Γ j k.proc γkl γk on st ∗
+    filecloseCpay st Φc ∗ actLend k.proc ke ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -366,7 +366,7 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO 
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗
-      filecloseCpost (hlc := hlc) q st Φc -∗ wpLoop cpu'))
+      filecloseCpost q st Φc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, Ha, Hcl, Hrefc, Hhalves, Hfdn, Hf, Ht, Hc, Hfd, Hframe, Harm,
     Hte, Hce, #Hpe, Hpid, Hir, Henv, Hcpay, Hlend, Hnext⟩

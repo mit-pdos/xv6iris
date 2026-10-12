@@ -11,7 +11,7 @@ namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## Fractions at the raw tier -/
 
@@ -62,7 +62,7 @@ keeps); and a raw window whose top entry the context can justify becomes a
 context window again. -/
 
 section ambient
-variable [MachGS hlc GF]
+variable [MachGS GF]
 
 /-- **Splitting a context window into a raw half and a context half.**
 The raw half comes with its heads pinned (`headsAre`), which is what makes

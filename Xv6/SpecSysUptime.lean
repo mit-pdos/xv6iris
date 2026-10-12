@@ -58,7 +58,7 @@ def sysUptimeAddr : BitVec 64 := KA.«sys_uptime»
 def sysUptimeSlots : Nat := 14
 
 /-- **WP of `sys_uptime()`**, at either `SIE`. -/
-def wp_sys_uptime_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_sys_uptime_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γt : GName)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : sysUptimeSlots ≤ k.avail)
     (hlk : "time" ∉ k.locks) : Prop :=
@@ -77,7 +77,7 @@ a lower bound `WaitInv.tickLb n` on the mirror at the canonical name
 `WchG.wtkName`, with the returned word equal to `n` truncated to 32 bits
 (the payload's tie `TicksDefs.ticksTie` is exactly that).  uptime's return
 is the count at the call, a function of the history's length. -/
-def wp_sys_uptime_led_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+def wp_sys_uptime_led_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
     [CurCtx]
     (cpu : CPU) (k : KCtx) (γt : GName)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : sysUptimeSlots ≤ k.avail)
@@ -93,12 +93,12 @@ def wp_sys_uptime_led_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
 
 /-- The interface of `sys_uptime`. -/
 structure SYSUPTIME : Prop where
-  wp_sys_uptime : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+  wp_sys_uptime : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γt : GName) hnoff hK hlk,
-    wp_sys_uptime_body (hlc := hlc) (GF := GF) cpu k γt hnoff hK hlk
+    wp_sys_uptime_body (GF := GF) cpu k γt hnoff hK hlk
   /-- the led twin (Rocq `Parameter wp_sys_uptime_led_sconf`) -/
-  wp_sys_uptime_led : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+  wp_sys_uptime_led : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
     [CurCtx] (cpu : CPU) (k : KCtx) (γt : GName) hnoff hK hlk,
-    wp_sys_uptime_led_body (hlc := hlc) (GF := GF) cpu k γt hnoff hK hlk
+    wp_sys_uptime_led_body (GF := GF) cpu k γt hnoff hK hlk
 
 end Xv6

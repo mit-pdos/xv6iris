@@ -52,7 +52,7 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -60,18 +60,18 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- Everything from the alloc block down, at any record: ARM S and the
 publication under the store block, under filealloc / fdalloc with ARMs E / F. -/
 theorem sys_open_alloc_all (IU : IUNLOCK) (IUP : IUNLOCKPUT) (EO : END_OP) (FC : FILECLOSE)
-    (IT : ITRUNC) (FA : FILEALLOC) (FD : FDALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IT : ITRUNC) (FA : FILEALLOC) (FD : FDALLOC) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A) :
-    ⊢ sysOpenAllocBody (hlc := hlc) Γ k A :=
+    ⊢ sysOpenAllocBody Γ k A :=
   sys_open_alloc FA FD Γ k A hS
     (sys_open_stores IT Γ k A hS (sys_open_pub Γ k A hS (sys_open_tail_s IU EO Γ k A hS)))
     (sys_open_tail_e IUP EO Γ k A hS) (sys_open_tail_f IUP EO FC Γ k A hS)
 
 /-- ...and the join above it, with ARM D. -/
 theorem sys_open_join_all (IU : IUNLOCK) (IUP : IUNLOCKPUT) (EO : END_OP) (FC : FILECLOSE)
-    (IT : ITRUNC) (FA : FILEALLOC) (FD : FDALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IT : ITRUNC) (FA : FILEALLOC) (FD : FDALLOC) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A) :
-    ⊢ sysOpenJoinBody (hlc := hlc) Γ k A :=
+    ⊢ sysOpenJoinBody Γ k A :=
   sys_open_join Γ k A hS (sys_open_alloc_all IU IUP EO FC IT FA FD Γ k A hS)
     (sys_open_tail_d IUP EO Γ k A hS)
 

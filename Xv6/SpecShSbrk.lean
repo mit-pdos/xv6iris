@@ -23,7 +23,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -34,17 +34,17 @@ def wpShSbrkBody : Prop :=
     (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (m.get 10#5))).toInt = (n : Int) →
     uszOk (sz + n) → pgRoundUpN sz = sz →
     ⊢ ukCode N.t User.Sh.code.byte -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«sbrk») (2 + nn) -∗ usz N.s sz -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«sbrk») (2 + nn) -∗ usz N.s sz -∗
       (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = r⌝ -∗
-        ushmSbrkAns N sz n r -∗ urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + nn) -∗ wpLoop h') -∗
+        ushmSbrkAns N sz n r -∗ urun N h' m' (retPc (m.get 1#5)) (2 + nn) -∗ wpLoop h') -∗
       wpLoop h
 
 end
 
 /-- The interface of sh's `sbrk` wrapper. -/
 structure SH_SBRK : Prop where
-  wp_shSbrk : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_shSbrk : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShSbrkBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShSbrkBody (GF := GF)
 
 end Xv6

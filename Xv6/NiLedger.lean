@@ -535,8 +535,6 @@ theorem niOneShot_file {h : List Obs} {F : List NiEntry} {e : Obs} {fn : NiEntry
 /-! ## §4 The kernel's carrier (ruling O2) -/
 
 section
-variable {hlc : HasLC}
-
 /-- **What a citation shows the record**, at a raw anchor family `A`: nothing
 for no citation; for a citation of era `k` at `ι`, the era's registered
 names and the cited prefixes' lower bounds at them (`NiEvid.niIotaLbs`). -/
@@ -553,43 +551,43 @@ instance niUhRes_persistent {GF : BundledGFunctors.{0}} [Xv6G GF] (u : NiUh) : P
   unfold niUhRes; infer_instance
 
 /-- `niCiteResRaw` at the record's anchor (`MachFixedGS.uEraAnchor`). -/
-def niCiteRes {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [Xv6G GF] [WchGpre GF]
+def niCiteRes {GF : BundledGFunctors.{0}} [MachFixedGS GF] [Xv6G GF] [WchGpre GF]
     (c : Option (Nat × UIota)) : IProp GF :=
-  niCiteResRaw (MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF)) c
+  niCiteResRaw (MachFixedGS.uEraAnchor (GF := GF)) c
 
 /-- **The record accepts `niFit`'s evidence** (ruling O2's Prop class, as
 `SchedCtx.ClaimIs`; deviation 1: an implication).  The boot instantiates it
 beside `ClaimIs` (`SystemBootEra`); the closed trap loop's cone takes it.
 (NI M2-X2) It is stated at the ledgers' cameras (`[Xv6G]`, `[WchGpre]`):
 the lower bounds a citation shows (`niCiteRes`) live there. -/
-class NiFitIs (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [WchGpre GF] : Prop where
-  fit : ∀ (ox : Option (Nat × Obs)) (e : Obs), niFit ox e → MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e
+class NiFitIs (GF : BundledGFunctors.{0}) [MachGS GF] [Xv6G GF] [WchGpre GF] : Prop where
+  fit : ∀ (ox : Option (Nat × Obs)) (e : Obs), niFit ox e → MachFixedGS.uFit (GF := GF) ox e
   /-- (NI M2-W2d) the extra claim a fork ecall's exit mints is an origin
   ticket (the kernel routes it to the child's park) -/
   fork : ∀ (i : Nat) (x : Obs), niForkExit x = true →
-    MachFixedGS.uClaimX (hlc := hlc) (GF := GF) i x ⊢ MachFixedGS.uClaimO (hlc := hlc) (GF := GF)
+    MachFixedGS.uClaimX (GF := GF) i x ⊢ MachFixedGS.uClaimO (GF := GF)
   /-- (NI M2-X1, finding F1) the era's registration: its boot shoots the
   power-on's ticket at the era's ledger names -/
   reg : ∀ (k : Nat) (ns : List GName),
-    MachFixedGS.uEraTok (hlc := hlc) (GF := GF) k ⊢ |==> MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k ns
+    MachFixedGS.uEraTok (GF := GF) k ⊢ |==> MachFixedGS.uEraAnchor (GF := GF) k ns
   /-- (NI M2-X1) a round's evidence: the filing's fit at its citation `c`
   and (NI M3 U-2b) key-history citation `u`, with what they show
   (`niCiteRes`, `niUhRes`), is the record's `uEvid` -/
   evid : ∀ (i : Nat) (x e : Obs) (c : Option (Nat × UIota)) (u : NiUh), niFitEv (some (i, x)) e c u →
-    niCiteRes (hlc := hlc) (GF := GF) c ∗ niUhRes u ⊢ MachFixedGS.uEvid (hlc := hlc) (GF := GF) (some (i, x)) e
+    niCiteRes (GF := GF) c ∗ niUhRes u ⊢ MachFixedGS.uEvid (GF := GF) (some (i, x)) e
   /-- (NI M2-X1) an origin's evidence: (NI M3 U-2b) its key history's
   registration, the history at its start key -/
   evidNone : ∀ (e : Obs) (u : NiUh), niFitEv none e none u →
-    niUhRes u ⊢ MachFixedGS.uEvid (hlc := hlc) (GF := GF) none e
+    niUhRes u ⊢ MachFixedGS.uEvid (GF := GF) none e
 
-theorem uFit_of_niFit {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchGpre GF] [NiFitIs (hlc := hlc) GF]
-    (ox : Option (Nat × Obs)) (e : Obs) (h : niFit ox e) : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e :=
+theorem uFit_of_niFit {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchGpre GF] [NiFitIs GF]
+    (ox : Option (Nat × Obs)) (e : Obs) (h : niFit ox e) : MachFixedGS.uFit (GF := GF) ox e :=
   NiFitIs.fit ox e h
 
-theorem uClaimO_of_fork {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchGpre GF]
-    [NiFitIs (hlc := hlc) GF]
+theorem uClaimO_of_fork {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchGpre GF]
+    [NiFitIs GF]
     (i : Nat) (x : Obs) (h : niForkExit x = true) :
-    MachFixedGS.uClaimX (hlc := hlc) (GF := GF) i x ⊢ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) :=
+    MachFixedGS.uClaimX (GF := GF) i x ⊢ MachFixedGS.uClaimO (GF := GF) :=
   NiFitIs.fork i x h
 
 end

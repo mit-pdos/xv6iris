@@ -66,7 +66,7 @@ def readConsFam {GF : BundledGFunctors.{0}} (Q : Int → IProp GF) (Rd : Nat →
 /-! ## §2 THE DEPOSIT'S SUPPLIER, §3 THE CONTENT POST -/
 
 section Defs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [Appcfg GF] [Fscfg]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CtokG GF] [Appcfg GF] [Fscfg]
 
 /-- **Rocq `cons_acc_triv`**: the kernel threads the caller's payload `P`
 through the console arm, at `True` here -- framing a unit. -/
@@ -98,7 +98,7 @@ def ureadConsWin (cnm : ConsNames) (Rin : List (List Obs × BitVec 8) → IProp 
     (g : Nat → BitVec 8) (hs : List (List Obs)) : IProp GF :=
   iprop(∃ sl : List (List Obs × BitVec 8),
     ⌜consChain sl⌝ ∗ consStoredLb cnm sl ∗ ⌜consWindow sl cur dd g hs⌝ ∗
-    consSwallow (hlc := hlc) cnm False sl dd dc ∗ ⌜dd ≤ dc⌝ ∗
+    consSwallow cnm False sl dd dc ∗ ⌜dd ≤ dc⌝ ∗
     ∃ sl' ws : List (List Obs × BitVec 8),
       consStoredLb cnm sl' ∗ ⌜sl <+: sl'⌝ ∗ ⌜sl'.length = cur + dc⌝ ∗ ⌜ws.length = dc⌝ ∗
       ⌜∀ j : Nat, j < dc → ws[j]? = sl'[cur + j]?⌝ ∗ Rin ws)
@@ -110,23 +110,23 @@ def ureadConsAns (cnm : ConsNames) (Rd : Nat → Nat → IProp GF) (Rin : List (
     (r : BitVec 64) (cap : Nat) (g : Nat → BitVec 8) : IProp GF :=
   iprop(∃ (dd dc cur : Nat) (hs : List (List Obs)),
     ⌜dd = r.toNat⌝ ∗ ⌜dd ≤ cap⌝ ∗ ⌜dd = cap → dc = dd⌝ ∗ ⌜dd = 0 → 0 < cap → dc = dd + 1⌝ ∗
-    ([∗list] hh ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) hh) ∗ Rd cur dc ∗
-    (ureadConsWin (hlc := hlc) cnm Rin cur dd dc g hs ∨
-      consDirtyCred (appRdcred (hlc := hlc) (GF := GF)) ∗
+    ([∗list] hh ∈ hs, MachFixedGS.rxTag (GF := GF) hh) ∗ Rd cur dc ∗
+    (ureadConsWin cnm Rin cur dd dc g hs ∨
+      consDirtyCred (appRdcred (GF := GF)) ∗
         ∃ sl : List (List Obs × BitVec 8),
           consStoredLb cnm sl ∗ ⌜consChain sl⌝ ∗
-          ⌜consPlaced sl cur (genId (hlc := hlc) (GF := GF) + 1) dd hs⌝ ∗
-          consSwallowPlaced (hlc := hlc) sl cur (genId (hlc := hlc) (GF := GF) + 1) dd dc))
+          ⌜consPlaced sl cur (genId (GF := GF) + 1) dd hs⌝ ∗
+          consSwallowPlaced sl cur (genId (GF := GF) + 1) dd dc))
 
 end Defs
 
 section Inst
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 /-- **Rocq `udepwf_std_read_cons`**: THE WHOLE PRICE OF A CONSOLE READ --
 the caller's console position and one atomic update on the input queue. -/
@@ -134,16 +134,16 @@ theorem udepwf_std_read_cons (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (l :
     (wr : Bool) (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
     (h0 : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int)) (hlt : fd < NSTD)
     (hl : l[fd]? = some (.open true wr (.device CONSOLE))) :
-    consAcc fscCons (appRdcred (hlc := hlc) (GF := GF)) Rd ⊢
-      consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin -∗
-      UshSysP.udepwfStd (hlc := hlc) (SG := SGX) N m pc USYS_read (readConsFam N.pay Rd Rin) l := by
+    consAcc fscCons (appRdcred (GF := GF)) Rd ⊢
+      consReadPay (genId (GF := GF) + 1) Rin -∗
+      UshSysP.udepwfStd (SG := SGX) N m pc USYS_read (readConsFam N.pay Rd Rin) l := by
   unfold UshSysP.udepwfStd Xv6.udepwfStd
   iintro Hacc Hlink
   isplitr
   · ipureintro; rfl
   iintro %M %pm %sz %fdv %cw %gn %cs %pidv %htake - Hh Hf
   iframe Hh Hf
-  iapply sbundleAt_read_intro (hlc := hlc) (uslot (hlc := hlc) (SG := SGX)) (readConsFam N.pay Rd Rin)
+  iapply sbundleAt_read_intro (uslot (SG := SGX)) (readConsFam N.pay Rd Rin)
     (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) (m.get 10#5) (m.get 12#5) fdv
     (Xv6.tfOf_a0 m pc) (Xv6.tfOf_a2 m pc) rfl
   rw [std_fd_st_of_key (m.get 10#5) fdv l fd _ h0 hlt htake hl]
@@ -161,8 +161,8 @@ theorem readCons_extra (gn : GName) (pt : UPtd) (st : FdState) (wr : Bool) (n : 
     (Rin : List (List Obs × BitVec 8) → IProp GF) (Rp : List (BitVec 8) → IProp GF)
     (Rpe : List (BitVec 8) → PipeSt → IProp GF) (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64)
     (hst : st = .open true wr (.device CONSOLE)) :
-    filereadExtraCore (hlc := hlc) gn pt st n F Rd Rin Rp Rpe r M' addr ⊢
-      consoleReceipt (hlc := hlc) gn pt Rd Rin n r M' addr := by
+    filereadExtraCore gn pt st n F Rd Rin Rp Rpe r M' addr ⊢
+      consoleReceipt gn pt Rd Rin n r M' addr := by
   subst hst
   unfold filereadExtraCore
   simp only [if_true]
@@ -184,8 +184,8 @@ theorem readCons_ans (N : UkNames GF) (Rd : Nat → Nat → IProp GF)
     (harg0 : tfW W.tf (tfArgIdx 0) = m.get 10#5) (harg1 : tfW W.tf (tfArgIdx 1) = m.get 11#5)
     (harg2 : tfW W.tf (tfArgIdx 2) = m.get 12#5) (htake : W.fd.take NSTD = l) (hlz : W.lazy = false)
     (hlive : uexecLiveOk USYS_read W.tf W.fd r cs') :
-    @UexecSG.spostAt GF _ SGX (uslot (hlc := hlc) (SG := SGX)) USYS_read (readConsFam N.pay Rd Rin) W r M'
-      fdv' cw' cs' ⊢ ureadConsAns (hlc := hlc) fscCons Rd Rin r cap g := by
+    @UexecSG.spostAt GF _ SGX (uslot (SG := SGX)) USYS_read (readConsFam N.pay Rd Rin) W r M'
+      fdv' cw' cs' ⊢ ureadConsAns fscCons Rd Rin r cap g := by
   have hcnt : argZ (m.get 12#5) = (cap : Int) := uread_count_is_cap _ cap ha2 hcap31
   have hst : fdStOfKey (m.get 10#5) W.fd = .open true wr (.device CONSOLE) :=
     std_fd_st_of_key (m.get 10#5) W.fd l fd _ h0 hfdlt htake hl0
@@ -206,7 +206,7 @@ theorem readCons_ans (N : UkNames GF) (Rd : Nat → Nat → IProp GF)
   rw [harg0, harg1, harg2] at *
   rw [hcnt] at hret
   dsimp only [readConsFam, xfamRd]
-  ihave H := readCons_extra (hlc := hlc) W.gen Pr _ wr _ _ Rd Rin _ _ r Mv (m.get 11#5) hst $$ H
+  ihave H := readCons_extra W.gen Pr _ wr _ _ Rd Rin _ _ r Mv (m.get 11#5) hst $$ H
   unfold consoleReceipt
   icases H with (⟨%hm1, -⟩ | ⟨%d, %dc, %cur, %hs, %sl, %hd, %hdle, %hb1, %hb4, %hhl, %hled, #Htags, #Hlb,
     Hwin, Hrd⟩)
@@ -256,7 +256,7 @@ theorem readCons_ans (N : UkNames GF) (Rd : Nat → Nat → IProp GF)
       · have hdcd : dc = d := hb1 (by rw [hde])
         rw [hdcd]
         iapply consSwallow_eq
-      · iapply consSwallow_mono (hlc := hlc) fscCons _ False sl d dc
+      · iapply consSwallow_mono fscCons _ False sl d dc
           (fun hno => hno (hnf Pr d hwf hpmr (hlzf hlz) (by omega))) $$ Hsw
     isplitr
     · ipureintro; exact hddc
@@ -277,7 +277,7 @@ end Inst
 /-! ## §4 THE LEAF -/
 
 section Walk
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -298,12 +298,12 @@ theorem readCons_walk (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
       tfW W.tf (tfArgIdx 0) = m.get 10#5 → tfW W.tf (tfArgIdx 1) = m.get 11#5 →
       tfW W.tf (tfArgIdx 2) = m.get 12#5 → W.fd.take NSTD = l → W.lazy = false →
       uexecLiveOk USYS_read W.tf W.fd r cs' →
-      UexecSG.spostAt (uslot (hlc := hlc)) USYS_read fdep W r M' fdv' cw' cs' ⊢ Ans r g) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ustdAt N.fd l v -∗
-      ubytes N.d a k f -∗ UshSysP.udepwfStd (hlc := hlc) N m pc USYS_read fdep l -∗
+      UexecSG.spostAt (uslot) USYS_read fdep W r M' fdv' cw' cs' ⊢ Ans r g) :
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ ustdAt N.fd l v -∗
+      ubytes N.d a k f -∗ UshSysP.udepwfStd N m pc USYS_read fdep l -∗
       (∀ (h' : CPU) (r : BitVec 64) (d : Nat) (g : Nat → BitVec 8),
         ⌜d ≤ cap⌝ -∗ ⌜∀ j, d ≤ j → j < k → g j = f j⌝ -∗ ustdAt N.fd l v -∗ Ans r g -∗
-        ubytes N.d a k g -∗ urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        ubytes N.d a k g -∗ urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   have hcw : (BitVec.setWidth 32 (m.get 12#5)).toInt = (cap : Int) := by
     rw [← argZ_setWidth]; exact uread_count_is_cap _ cap ha2 hcap31
@@ -321,12 +321,12 @@ theorem readCons_walk (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
 end Walk
 
 section Leaf
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 /-- **Rocq `wp_uk_ecall_read_cons_at`**: THE CONSOLE READ AT A LEDGER SLOT,
 at a named table view (read moves no descriptor) -- the payment is the
@@ -340,21 +340,21 @@ theorem wp_uk_ecall_read_cons_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m 
     (hl0 : l[fd]? = some (.open true wr (.device CONSOLE)))
     (ha1 : (m.get 11#5).toNat = a) (ha2 : (m.get 12#5).toNat = cap) (hcapk : cap ≤ k) (hcap31 : cap < 2 ^ 31)
     (hal : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) (SG := SGX) N h m pc avail -∗ ustdAt N.fd l v -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (SG := SGX) N h m pc avail -∗ ustdAt N.fd l v -∗
       ubytes N.d a k f -∗
-      consAcc fscCons (appRdcred (hlc := hlc) (GF := GF)) Rd -∗
-      consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin -∗
+      consAcc fscCons (appRdcred (GF := GF)) Rd -∗
+      consReadPay (genId (GF := GF) + 1) Rin -∗
       (∀ (h' : CPU) (r : BitVec 64) (d : Nat) (g : Nat → BitVec 8),
         ⌜d ≤ cap⌝ -∗ ⌜∀ j, d ≤ j → j < k → g j = f j⌝ -∗ ustdAt N.fd l v -∗
-        ureadConsAns (hlc := hlc) fscCons Rd Rin r cap g -∗ ubytes N.d a k g -∗
-        urun (hlc := hlc) (SG := SGX) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        ureadConsAns fscCons Rd Rin r cap g -∗ ubytes N.d a k g -∗
+        urun (SG := SGX) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hstd Hbuf Hacc Hlink Hcont
-  ihave Hsb := udepwf_std_read_cons (hlc := hlc) N m pc l fd wr Rd Rin h0 hfdlt hl0 $$ Hacc Hlink
-  iapply readCons_walk (hlc := hlc) (SG := SGX) UL N h m pc a k cap f avail l v (readConsFam N.pay Rd Rin)
-    (fun r g => ureadConsAns (hlc := hlc) fscCons Rd Rin r cap g) hn ha1 ha2 hcapk hcap31 hal
+  ihave Hsb := udepwf_std_read_cons N m pc l fd wr Rd Rin h0 hfdlt hl0 $$ Hacc Hlink
+  iapply readCons_walk (SG := SGX) UL N h m pc a k cap f avail l v (readConsFam N.pay Rd Rin)
+    (fun r g => ureadConsAns fscCons Rd Rin r cap g) hn ha1 ha2 hcapk hcap31 hal
     (fun W r g M' fdv' cw' cs' hlin himg hnf h0' h1' h2' htk hlz hlive =>
-      readCons_ans (hlc := hlc) N Rd Rin m k cap l fd wr W r g M' fdv' cw' cs' h0 hfdlt hl0 ha2 hcapk hcap31
+      readCons_ans N Rd Rin m k cap l fd wr W r g M' fdv' cw' cs' h0 hfdlt hl0 ha2 hcapk hcap31
         hlin himg hnf h0' h1' h2' htk hlz hlive)
     $$ Hi Hrun Hstd Hbuf Hsb Hcont
 

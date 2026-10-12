@@ -114,13 +114,14 @@ theorem consBlkByte (M : LModel) (ps cs : List Nat) (s0 : M.lmSt) (I : List (Bit
 /-! ## S2 THE SOURCE RUN -/
 
 section src
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
+omit [MachGS GF] in
 /-- **Rocq `ubyteq_op`**: one byte at `dq1 • dq2` is one at each. -/
 theorem ubyteq_op (γ : GName) (dq1 dq2 : DFrac) (a : Nat) (b : BitVec 8) :
     ubyteq (GF := GF) γ (dq1 • dq2) a b ⊣⊢ ubyteq γ dq1 a b ∗ ubyteq γ dq2 a b := by
@@ -131,6 +132,7 @@ theorem ubyteq_op (γ : GName) (dq1 dq2 : DFrac) (a : Nat) (b : BitVec 8) :
   refine congrArg (iOwn γ) (congrArg (HeapView.Frag a (dq1 • dq2)) ?_)
   exact Agree.idemp.symm
 
+omit [MachGS GF] in
 /-- **Rocq `ubytesq_op`**. -/
 theorem ubytesq_op (γ : GName) (dq1 dq2 : DFrac) (a : Nat) :
     ∀ (n : Nat) (f : Nat → BitVec 8),
@@ -144,13 +146,16 @@ theorem ubytesq_op (γ : GName) (dq1 dq2 : DFrac) (a : Nat) :
     exact (ubytesq_succ γ _ a n f).trans ((sep_congr ih (ubyteq_op γ dq1 dq2 (a + n) (f n))).trans
       (sep_sep_sep_comm.trans (sep_congr (ubytesq_succ γ _ a n f).symm (ubytesq_succ γ _ a n f).symm)))
 
+omit [MachGS GF] in
 theorem ukco_usrcAt_tx (N : UkNames GF) (dq : DFrac) (ua n : Nat) (f : Nat → BitVec 8) :
     usrcAt N true dq ua n f = iprop([∗list] j ∈ List.range n, utext N.t (ua + j) (f j)) :=
   rfl
 
+omit [MachGS GF] in
 theorem ukco_usrcAt_data (N : UkNames GF) (dq : DFrac) (ua n : Nat) (f : Nat → BitVec 8) :
     usrcAt N false dq ua n f = ubytesq N.d dq ua n f := rfl
 
+omit [MachGS GF] in
 /-- **Rocq `usrc_at_split`**: a source run is two runs at half the fraction
 (the text half is persistent and is simply duplicated). -/
 theorem usrcAt_split (N : UkNames GF) (tx : Bool) (dq : DFrac) (ua n : Nat) (f : Nat → BitVec 8) :
@@ -163,6 +168,7 @@ theorem usrcAt_split (N : UkNames GF) (tx : Bool) (dq : DFrac) (ua n : Nat) (f :
   · rw [ukco_usrcAt_tx, ukco_usrcAt_tx]
     exact persistent_sep_dup
 
+omit [MachGS GF] in
 /-- **Rocq `usrc_at_rebase`**: the empty run is at every address. -/
 theorem usrcAt_rebase (N : UkNames GF) (tx : Bool) (dq : DFrac) (ua ua' n : Nat) (f : Nat → BitVec 8)
     (h : n = 0 ∨ ua = ua') :
@@ -172,6 +178,7 @@ theorem usrcAt_rebase (N : UkNames GF) (tx : Bool) (dq : DFrac) (ua ua' n : Nat)
     cases tx <;> simp
   · exact .rfl
 
+omit [MachGS GF] in
 /-- A text run's bytes are the image's, fetchable, below MAXVA (Rocq
 `UkRunSys.uheap_text_bytes`, read along the run). -/
 theorem ukco_uheap_text_run (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz a : Nat)
@@ -195,7 +202,7 @@ theorem ukco_uheap_text_run (γt γd γs : GName) (M : ElfMem) (pm : Nat → Opt
 /-- **Rocq `urun_usrc_bnd`**: an owned or fetchable run does not wrap. -/
 theorem urun_usrcAt_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (tx : Bool)
     (dq : DFrac) (ua n : Nat) (f : Nat → BitVec 8) :
-    ⊢ urun (hlc := hlc) (SG := SGX) N h m pc avail -∗ usrcAt N tx dq ua n f -∗
+    ⊢ urun (SG := SGX) N h m pc avail -∗ usrcAt N tx dq ua n f -∗
       ⌜∀ j, j < n → ua + j < 2 ^ 38⌝ := by
   unfold urun
   iintro ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, -, -, -, -, -, Hh, -⟩ Hs
@@ -211,6 +218,7 @@ theorem urun_usrcAt_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     intro j hj
     exact (hb j hj).2
 
+omit [MachGS GF] in
 /-- **Rocq `usrc_at_wat`**: the chain's per-byte premise, off either half. -/
 theorem usrcAt_wat (N : UkNames GF) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (tx : Bool)
     (dq : DFrac) (ua : BitVec 64) (n : Nat) (f : Nat → BitVec 8) :
@@ -237,8 +245,8 @@ the text half's, as the program's reading of its run selects. -/
 theorem consLeaf (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat)
     (fdep : Xfam GF) (l : List FdState) (tx : Bool) (dq : DFrac) (nb : Nat) (f : Nat → BitVec 8)
     (hn : UkSysP.usysno m = 16) (hal : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) (SG := SGX) N h m pc avail -∗
-      UshSysP.udepwfStd (hlc := hlc) (SG := SGX) N m pc 16 fdep l -∗ ustd N.fd l -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (SG := SGX) N h m pc avail -∗
+      UshSysP.udepwfStd (SG := SGX) N m pc 16 fdep l -∗ ustd N.fd l -∗
       usrcAt N tx dq (m.get 11#5).toNat nb f -∗
       (∀ (h' : CPU) (r : BitVec 64) (Wv : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         ⌜tfW Wv.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW Wv.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
@@ -247,39 +255,39 @@ theorem consLeaf (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : 
           lazyFree Pt.um (BitVec.ofNat 64 Wv.sz) → j < nb →
           uvaRmapped Pt (m.get 11#5 + BitVec.ofNat 64 j).toNat⌝ -∗
         ustd N.fd l -∗ usrcAt N tx dq (m.get 11#5).toNat nb f -∗
-        @UexecSG.spostAt GF _ SGX (uslot (hlc := hlc) (SG := SGX)) 16 fdep Wv r Wv.M Wv.fd cw' cs' -∗
-        urun (hlc := hlc) (SG := SGX) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        @UexecSG.spostAt GF _ SGX (uslot (SG := SGX)) 16 fdep Wv r Wv.M Wv.fd cw' cs' -∗
+        urun (SG := SGX) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   cases tx
   · rw [ukco_usrcAt_data]
-    exact (ukSysIO_holds UL).writeChainBuf (hlc := hlc) (GF := GF) N h m pc avail fdep l dq nb f hn hal
+    exact (ukSysIO_holds UL).writeChainBuf (GF := GF) N h m pc avail fdep l dq nb f hn hal
   · rw [ukco_usrcAt_tx]
-    exact (ukSysIO_holds UL).writeChainTxt (hlc := hlc) (GF := GF) N h m pc avail fdep l nb f hn hal
+    exact (ukSysIO_holds UL).writeChainTxt (GF := GF) N h m pc avail fdep l nb f hn hal
 
 end src
 
 /-! ## S3 THE CLAIM-FREE CORE -/
 
 section core
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 /-- **Rocq `cons_chain`** (deviation 1: `consOut_chain`): THE CONSOLE CHAIN
 at the cursor `t ↦ D [a.drop t]`, at a page view holding the bytes
 (deviation 5). -/
 theorem consOut_chain (D : List (List (BitVec 8)) → IProp GF)
     (D_step : ∀ (x : List (BitVec 8)) (b : BitVec 8), x[0]? = some b →
-      ⊢ D [x] -∗ outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b (D [x.drop 1]))
+      ⊢ D [x] -∗ outLink .uart0 (genId (GF := GF) + 1) b (D [x.drop 1]))
     (a : List (BitVec 8)) (Mh : Nat → List (BitVec 8)) (ua : BitVec 64) (fb : Nat → BitVec 8) :
     ∀ (cnt j : Nat),
     (∀ t, j ≤ t → t < j + cnt → a[t]? = some (fb t)) →
     (∀ t, j ≤ t → t < j + cnt → umemByte Mh (ua + BitVec.ofNat 64 t).toNat = fb t) →
     ⊢ D [a.drop j] -∗
-      consOutChain (genId (hlc := hlc) (GF := GF) + 1) Mh ua (fun t => D [a.drop t]) j cnt := by
+      consOutChain (genId (GF := GF) + 1) Mh ua (fun t => D [a.drop t]) j cnt := by
   intro cnt
   induction cnt with
   | zero =>
@@ -319,18 +327,18 @@ theorem ukco_ua (m : RegMap) (ua n : Nat) (ha1 : m.get 11#5 = BitVec.ofNat 64 ua
 /-- **Rocq `cons_write`**: THE WRITE LAW (`UkHandler.ei_write`) at the
 console, over an abstract device `D` with its three laws. -/
 theorem consWrite (UL : UK_LEAVES) (N : UkNames GF) (P : Uprog GF) [HPc : Persistent P.code]
-    (Hstub : ⊢ stubLaw (hlc := hlc) (SG := SGX) N P.code 16 P.write)
+    (Hstub : ⊢ stubLaw (SG := SGX) N P.code 16 P.write)
     (D : List (List (BitVec 8)) → IProp GF)
     (D_short : ∀ alts, ⊢ D alts -∗ ⌜consShort alts⌝)
     (D_sub : ∀ (alts : List (List (BitVec 8))) (a : List (BitVec 8)), a ∈ alts → ⊢ D alts -∗ D [a])
     (D_step : ∀ (x : List (BitVec 8)) (b : BitVec 8), x[0]? = some b →
-      ⊢ D [x] -∗ outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b (D [x.drop 1]))
+      ⊢ D [x] -∗ outLink .uart0 (genId (GF := GF) + 1) b (D [x.drop 1]))
     (l : List FdState) (fd : Nat) (rb : Bool) (alts : List (List (BitVec 8))) (a bs : List (BitVec 8))
     (K : Int → IProp GF)
     (hfd : fd < NSTD) (hl : l[fd]? = some (.open rb true (.device CONSOLE))) (ha : a ∈ alts)
     (hpre : bs <+: a) :
     ⊢ ustd N.fd l -∗ D alts -∗ (ustd N.fd l -∗ D [a.drop bs.length] -∗ K (bs.length : Int)) -∗
-      wrObl (hlc := hlc) (SG := SGX) N P (fd : Int) bs K := by
+      wrObl (SG := SGX) N P (fd : Int) bs K := by
   iintro Hstd Hd HK
   ihave Hd := D_sub alts a ha $$ Hd
   ihave %hs : ⌜consShort [a]⌝ $$ [Hd]
@@ -371,11 +379,11 @@ theorem consWrite (UL : UK_LEAVES) (N : UkNames GF) (P : Uprog GF) [HPc : Persis
     rw [hpc]; exact Xv6.fh_align _ hal6
   -- THE DEPOSIT: the console chain at the device, and the half of the run
   -- the chain's premise is read off, handed back beside it
-  ihave Hdep : UshSysP.udepwfStd (hlc := hlc) (SG := SGX) N (ukWr m 17#5 (BitVec.ofInt 64 16))
+  ihave Hdep : UshSysP.udepwfStd (SG := SGX) N (ukWr m 17#5 (BitVec.ofInt 64 16))
       (BitVec.ofNat 64 (P.write + 2)) 16
       (xfamWr (fun j => iprop(D [a.drop j] ∗
         usrcAt N tx (dqHalf dq) (m.get 11#5).toNat bs.length f)) N.pay) l $$ [Hd Hs2]
-  · iapply uwrite_chain_sup_ret (hlc := hlc) N (fun t => D [a.drop t])
+  · iapply uwrite_chain_sup_ret N (fun t => D [a.drop t])
       (usrcAt N tx (dqHalf dq) (m.get 11#5).toNat bs.length f)
       (ukWr m 17#5 (BitVec.ofInt 64 16)) _ l fd rb CONSOLE hi0 hfd hl
     iintro %Mh %pm %sz Hh
@@ -385,17 +393,17 @@ theorem consWrite (UL : UK_LEAVES) (N : UkNames GF) (P : Uprog GF) [HPc : Persis
     rw [e1, hcnt]
     ihave Hd0 : D [a.drop 0] $$ [Hd]
     · rw [List.drop_zero]; iexact Hd
-    iapply consOut_chain (hlc := hlc) D D_step a Mv (m.get 11#5) f bs.length 0
+    iapply consOut_chain D D_step a Mv (m.get 11#5) f bs.length 0
       (fun t _ ht => hab t (by omega)) (fun t _ ht => hag _ _ (hM t (by omega))) $$ Hd0
   ihave Hs1 : usrcAt N tx (dqHalf dq)
       ((ukWr m 17#5 (BitVec.ofInt 64 16)).get 11#5).toNat bs.length f $$ [Hs1]
   · rw [e1]; iexact Hs1
-  iapply consLeaf (hlc := hlc) UL N h1 (ukWr m 17#5 (BitVec.ofInt 64 16)) (BitVec.ofNat 64 (P.write + 2))
+  iapply consLeaf UL N h1 (ukWr m 17#5 (BitVec.ofInt 64 16)) (BitVec.ofNat 64 (P.write + 2))
     avail _ l tx (dqHalf dq) bs.length f hsys hal $$ Hi Hrun Hdep Hstd Hs1
   iintro %h' %ret %Wv %cw' %cs' %hka0 %hka1 %hka2 %htk %hlz %hnf Hstd Hs1
   rw [spostAt_xv6_write]
   iintro Hpost Hrun
-  icases xpostWrite_no_short (hlc := hlc) _ N.pay Wv ret l fd rb bs.length
+  icases xpostWrite_no_short _ N.pay Wv ret l fd rb bs.length
       (by rw [hka0]; exact hi0) hfd htk hl (by rw [hka2, e2, ha2, hcz]) hlz
       (by rw [hka1]; exact hnf) $$ Hpost with ⟨%hret, Hd, Hs2⟩
   rw [hpc]
@@ -416,27 +424,27 @@ end core
 /-! ## S3b THE GENERIC CLAIM'S DEVICE, at `GenLinksLine`'s link families -/
 
 section gen
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- **Rocq `cons_cur`**: the era's cursor at a block of the stage, `i` bytes
 out, the first of which filed `c` (`gwc_blk`'s left arm). -/
-def consCur {M : LModel} (Pm : GenParams hlc GF M) (v : EraPins) (ps cs : List Nat) (s0 : M.lmSt)
+def consCur {M : LModel} (Pm : GenParams GF M) (v : EraPins) (ps cs : List Nat) (s0 : M.lmSt)
     (I : List (BitVec 8)) (pos c i : Nat) : IProp GF :=
   iprop(turn v (pos + i) ∗ psLb v ps ∗ csLb v (lmBlkcs cs c i) ∗ inpLb v I ∗
-    Pm.gW (genId (hlc := hlc) (GF := GF) + 1) s0)
+    Pm.gW (genId (GF := GF) + 1) s0)
 
 /-- **Rocq `cons_rnd`** (sync SY3-A4): the round's payload at every code
 the device may file (`GenLinksLine.glBlk`'s premise). -/
-def consRnd {M : LModel} (Pm : GenParams hlc GF M) (v : EraPins) (I : List (BitVec 8))
+def consRnd {M : LModel} (Pm : GenParams GF M) (v : EraPins) (I : List (BitVec 8))
     (codes : List Nat) : IProp GF :=
-  iprop(□ ∀ c, ⌜c ∈ codes⌝ -∗ Pm.gR (genId (hlc := hlc) (GF := GF) + 1) v I c)
+  iprop(□ ∀ c, ⌜c ∈ codes⌝ -∗ Pm.gR (genId (GF := GF) + 1) v I c)
 
-instance consRnd_persistent {M : LModel} (Pm : GenParams hlc GF M) (v : EraPins)
+instance consRnd_persistent {M : LModel} (Pm : GenParams GF M) (v : EraPins)
     (I : List (BitVec 8)) (codes : List Nat) : Persistent (consRnd Pm v I codes) := by
   unfold consRnd; infer_instance
 
 /-- **Rocq `cons_rnd_sub`**. -/
-theorem consRnd_sub {M : LModel} (Pm : GenParams hlc GF M) (v : EraPins) (I : List (BitVec 8))
+theorem consRnd_sub {M : LModel} (Pm : GenParams GF M) (v : EraPins) (I : List (BitVec 8))
     (codes codes' : List Nat) (hs : codes' ⊆ codes) :
     ⊢ consRnd Pm v I codes -∗ consRnd Pm v I codes' := by
   unfold consRnd
@@ -447,11 +455,11 @@ theorem consRnd_sub {M : LModel} (Pm : GenParams hlc GF M) (v : EraPins) (I : Li
 
 /-- **Rocq `cons_dev_atc`**: THE DEVICE REMEMBERING THE CODES IT WAS LENT, at
 a round `(v, I)`, owing one of `alts`, with the links bundle folded in. -/
-def consDevAtc (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF) (C : List Nat) (v : EraPins)
+def consDevAtc (M : LModel) (Pm : GenParams GF M) (LINKS : IProp GF) (C : List Nat) (v : EraPins)
     (I : List (BitVec 8)) (alts : List (List (BitVec 8))) : IProp GF :=
   iprop(LINKS ∗ ⌜consShort alts⌝ ∗
     ((∃ (ps cs : List Nat) (s0 : M.lmSt) (pos : Nat),
-        ⌜lmWrBlkT M ps cs s0 I pos⌝ ∗ Pm.gPIN (genId (hlc := hlc) (GF := GF) + 1) v ∗
+        ⌜lmWrBlkT M ps cs s0 I pos⌝ ∗ Pm.gPIN (genId (GF := GF) + 1) v ∗
         ((∃ codes : List Nat,
             ⌜¬ Pm.gwild I⌝ ∗ ⌜codes ⊆ C⌝ ∗ ⌜alts = codes.map (lmBody M s0 cs I)⌝ ∗
             ⌜∀ c ∈ codes, consAdm M s0 cs I c⌝ ∗
@@ -462,7 +470,7 @@ def consDevAtc (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF) (C : Li
       Pm.gT))
 
 /-- **Rocq `cons_dev_atc_short`**. -/
-theorem consDevAtc_short (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF) (C : List Nat)
+theorem consDevAtc_short (M : LModel) (Pm : GenParams GF M) (LINKS : IProp GF) (C : List Nat)
     (v : EraPins) (I : List (BitVec 8)) (alts : List (List (BitVec 8))) :
     ⊢ consDevAtc M Pm LINKS C v I alts -∗ ⌜consShort alts⌝ := by
   unfold consDevAtc
@@ -470,7 +478,7 @@ theorem consDevAtc_short (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp G
   ipureintro; exact hs
 
 /-- **Rocq `cons_dev_atc_taint`**. -/
-theorem consDevAtc_taint (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF) (C : List Nat)
+theorem consDevAtc_taint (M : LModel) (Pm : GenParams GF M) (LINKS : IProp GF) (C : List Nat)
     (v : EraPins) (I : List (BitVec 8)) (alts : List (List (BitVec 8))) (hs : consShort alts) :
     ⊢ LINKS -∗ Pm.gT -∗ consDevAtc M Pm LINKS C v I alts := by
   iintro Hlk HT
@@ -482,7 +490,7 @@ theorem consDevAtc_taint (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp G
 
 /-- **Rocq `cons_dev_atc_sub`**: the device narrows to the alternative the
 program chose. -/
-theorem consDevAtc_sub (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF) (C : List Nat)
+theorem consDevAtc_sub (M : LModel) (Pm : GenParams GF M) (LINKS : IProp GF) (C : List Nat)
     (v : EraPins) (I : List (BitVec 8)) (alts : List (List (BitVec 8))) (a : List (BitVec 8))
     (ha : a ∈ alts) :
     ⊢ consDevAtc M Pm LINKS C v I alts -∗ consDevAtc M Pm LINKS C v I [a] := by
@@ -524,18 +532,18 @@ theorem consDevAtc_sub (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF)
 end gen
 
 section genstep
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- **Rocq `cons_dev_atc_step`**: ONE BYTE -- the head of what the device owes,
 through the three leaves (`glBlk` at an unfiled device -- it files the code
 -- and `glW` at a filed one; the taint through `glTaintAt`). -/
-theorem consDevAtc_step (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF) [LINKS_pers : Persistent LINKS]
+theorem consDevAtc_step (M : LModel) (Pm : GenParams GF M) (LINKS : IProp GF) [LINKS_pers : Persistent LINKS]
     (LINKS_w : ⊢ LINKS -∗ glW Pm) (LINKS_blk : ⊢ LINKS -∗ glBlk Pm)
-    (LINKS_taint : ⊢ LINKS -∗ glTaintAt Pm (genId (hlc := hlc) (GF := GF) + 1))
+    (LINKS_taint : ⊢ LINKS -∗ glTaintAt Pm (genId (GF := GF) + 1))
     (C : List Nat) (v : EraPins) (I : List (BitVec 8)) (x : List (BitVec 8)) (b : BitVec 8)
     (hb : x[0]? = some b) :
     ⊢ consDevAtc M Pm LINKS C v I [x] -∗
-      outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b (consDevAtc M Pm LINKS C v I [x.drop 1]) := by
+      outLink .uart0 (genId (GF := GF) + 1) b (consDevAtc M Pm LINKS C v I [x.drop 1]) := by
   iintro Hdev
   unfold consDevAtc
   icases Hdev with ⟨#Hlk, %hs, Hd⟩
@@ -575,7 +583,7 @@ theorem consDevAtc_step (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF
     unfold consRnd
     ihave #HR := Hrn $$ %c %(List.mem_singleton_self c)
     unfold glBlk
-    iapply Hblk $$ %(genId (hlc := hlc) (GF := GF) + 1) %v %pos %c %b %ps %cs %s0 %I
+    iapply Hblk $$ %(genId (GF := GF) + 1) %v %pos %c %b %ps %cs %s0 %I
       %_ %hnw %hne %hr %(by omega)
       %hpin0 %hP %hok %hterm %hb' Hpin HW Ht Hps Hcs Hin HR
     iintro (⟨Ht, -, #Hcs', -⟩ | #HT)
@@ -622,7 +630,7 @@ theorem consDevAtc_step (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF
     simp only [lmBlkcs]
     icases Hc with ⟨Ht, #Hps, #Hcs, #Hin, #HW⟩
     unfold glW
-    iapply Hw $$ %(genId (hlc := hlc) (GF := GF) + 1) %v %(pos + (i' + 1)) %b %ps %(cs ++ [c]) %s0 %I
+    iapply Hw $$ %(genId (GF := GF) + 1) %v %(pos + (i' + 1)) %b %ps %(cs ++ [c]) %s0 %I
       %_
       %(by simp only [List.length_append, List.length_singleton]; omega)
       %(lmWrBlk_pin_snoc M ps cs s0 I pos c ⟨hpin0, hr, hn, hP⟩)
@@ -657,11 +665,11 @@ theorem consDevAtc_step (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF
       iright; iexact HT
 
 /-- **Rocq `cons_dev_atc_of_blk0`**: THE LEND, at codes drawn from `C`. -/
-theorem consDevAtc_of_blk0 (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF) (C : List Nat)
+theorem consDevAtc_of_blk0 (M : LModel) (Pm : GenParams GF M) (LINKS : IProp GF) (C : List Nat)
     (v : EraPins) (I : List (BitVec 8)) (ps cs : List Nat) (s0 : M.lmSt) (pos : Nat) (codes : List Nat)
     (hnw : ¬ Pm.gwild I) (hw : lmWrBlkT M ps cs s0 I pos) (hsub : codes ⊆ C)
     (hadm : ∀ c ∈ codes, consAdm M s0 cs I c) (hs : consShort (codes.map (lmBody M s0 cs I))) :
-    ⊢ LINKS -∗ Pm.gPIN (genId (hlc := hlc) (GF := GF) + 1) v -∗ consCur Pm v ps cs s0 I pos 0 0 -∗
+    ⊢ LINKS -∗ Pm.gPIN (genId (GF := GF) + 1) v -∗ consCur Pm v ps cs s0 I pos 0 0 -∗
       consRnd Pm v I codes -∗
       consDevAtc M Pm LINKS C v I (codes.map (lmBody M s0 cs I)) := by
   iintro Hlk Hpin Hc #Hrn
@@ -682,15 +690,15 @@ theorem consDevAtc_of_blk0 (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp
 
 /-- **Rocq `cons_dev_atc_drained`**: THE DRAINED DEVICE names the code of `C`
 it filed and the cursor at its body's end, or the taint. -/
-theorem consDevAtc_drained (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF) (C : List Nat)
+theorem consDevAtc_drained (M : LModel) (Pm : GenParams GF M) (LINKS : IProp GF) (C : List Nat)
     (v : EraPins) (I : List (BitVec 8)) :
     ⊢ consDevAtc M Pm LINKS C v I [[]] -∗
       LINKS ∗ (Pm.gT ∨ ∃ (ps cs : List Nat) (s0 : M.lmSt) (pos c : Nat),
         ⌜lmWrBlkT M ps cs s0 I pos⌝ ∗ ⌜c ∈ C⌝ ∗ ⌜consAdm M s0 cs I c⌝ ∗
-        Pm.gPIN (genId (hlc := hlc) (GF := GF) + 1) v ∗
+        Pm.gPIN (genId (GF := GF) + 1) v ∗
         (consCur Pm v ps cs s0 I pos c (lmBody M s0 cs I c).length
           ∗ (⌜(lmBody M s0 cs I c).length ≠ 0⌝
-             ∨ Pm.gR (genId (hlc := hlc) (GF := GF) + 1) v I c))) := by
+             ∨ Pm.gR (genId (GF := GF) + 1) v I c))) := by
   unfold consDevAtc
   iintro ⟨Hlk, -, Hd⟩
   iframe Hlk
@@ -738,11 +746,11 @@ theorem consDevAtc_drained (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp
 
 /-- **Rocq `cons_cur_gwc_post`**: the cursor at the body's end IS `gwcPost`,
 the block written up to its prompt. -/
-theorem consCur_gwcPost {M : LModel} (Pm : GenParams hlc GF M) (v : EraPins) (ps cs : List Nat)
+theorem consCur_gwcPost {M : LModel} (Pm : GenParams GF M) (v : EraPins) (ps cs : List Nat)
     (s0 : M.lmSt) (I : List (BitVec 8)) (pos c : Nat) (hw : lmWrBlkT M ps cs s0 I pos) :
     consCur Pm v ps cs s0 I pos c (lmBody M s0 cs I c).length
-      ∗ (⌜(lmBody M s0 cs I c).length ≠ 0⌝ ∨ Pm.gR (genId (hlc := hlc) (GF := GF) + 1) v I c) ⊢
-      gwcPost Pm (genId (hlc := hlc) (GF := GF) + 1) v I c := by
+      ∗ (⌜(lmBody M s0 cs I c).length ≠ 0⌝ ∨ Pm.gR (genId (GF := GF) + 1) v I c) ⊢
+      gwcPost Pm (genId (GF := GF) + 1) v I c := by
   unfold consCur gwcPost
   rw [lmBody_length]
   iintro ⟨⟨Ht, Hps, Hcs, HE, HW⟩, HR⟩
@@ -751,29 +759,29 @@ theorem consCur_gwcPost {M : LModel} (Pm : GenParams hlc GF M) (v : EraPins) (ps
 end genstep
 
 section genprog
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [DiskG GF] [EchoOutG GF]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 /-- **Rocq `cons_write_gl_atc`**: THE CORE AT THE CODE-REMEMBERING DEVICE --
 the write law of any program instance at a round. -/
-theorem consWrite_gl_atc (UL : UK_LEAVES) (M : LModel) (Pm : GenParams hlc GF M)
+theorem consWrite_gl_atc (UL : UK_LEAVES) (M : LModel) (Pm : GenParams GF M)
     (LINKS : IProp GF) [LINKS_pers : Persistent LINKS]
     (LINKS_w : ⊢ LINKS -∗ glW Pm) (LINKS_blk : ⊢ LINKS -∗ glBlk Pm)
-    (LINKS_taint : ⊢ LINKS -∗ glTaintAt Pm (genId (hlc := hlc) (GF := GF) + 1))
+    (LINKS_taint : ⊢ LINKS -∗ glTaintAt Pm (genId (GF := GF) + 1))
     (N : UkNames GF) (P : Uprog GF) [HPc : Persistent P.code]
-    (Hstub : ⊢ stubLaw (hlc := hlc) (SG := SGX) N P.code 16 P.write)
+    (Hstub : ⊢ stubLaw (SG := SGX) N P.code 16 P.write)
     (C : List Nat) (v : EraPins) (I : List (BitVec 8)) (l : List FdState) (fd : Nat) (rb : Bool)
     (alts : List (List (BitVec 8))) (a bs : List (BitVec 8)) (K : Int → IProp GF)
     (hfd : fd < NSTD) (hl : l[fd]? = some (.open rb true (.device CONSOLE))) (ha : a ∈ alts)
     (hpre : bs <+: a) :
     ⊢ ustd N.fd l -∗ consDevAtc M Pm LINKS C v I alts -∗
       (ustd N.fd l -∗ consDevAtc M Pm LINKS C v I [a.drop bs.length] -∗ K (bs.length : Int)) -∗
-      wrObl (hlc := hlc) (SG := SGX) N P (fd : Int) bs K :=
-  consWrite (hlc := hlc) UL N P Hstub (consDevAtc M Pm LINKS C v I)
+      wrObl (SG := SGX) N P (fd : Int) bs K :=
+  consWrite UL N P Hstub (consDevAtc M Pm LINKS C v I)
     (consDevAtc_short M Pm LINKS C v I) (consDevAtc_sub M Pm LINKS C v I)
     (consDevAtc_step M Pm LINKS LINKS_w LINKS_blk LINKS_taint C v I) l fd rb alts a bs K hfd hl ha hpre
 

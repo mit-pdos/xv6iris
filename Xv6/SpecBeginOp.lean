@@ -41,9 +41,9 @@ def beginOpAddr : BitVec 64 := KA.«begin_op»
 def beginOpSlots : Nat := 4 + sleepSlots
 
 /-- **WP of `begin_op()`**. -/
-def wp_begin_op_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_begin_op_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac)
@@ -65,9 +65,9 @@ def wp_begin_op_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 /-- The eb-generic form of `wp_begin_op_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_begin_op_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_begin_op_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac)
@@ -88,13 +88,13 @@ def wp_begin_op_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 
 /-- The interface of `begin_op`. -/
 structure BEGIN_OP : Prop where
-  wp_begin_op_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_begin_op_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) hj hproc hK hnoff htier,
-    wp_begin_op_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ γb V γfs j logstart dev pidv dqp
+    wp_begin_op_eb_body (GF := GF) Γ cpu k γ γb V γfs j logstart dev pidv dqp
       hj hproc hK hnoff htier
 
 end Xv6

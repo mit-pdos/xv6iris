@@ -67,7 +67,7 @@ def availSub (on : Option Nat) (g : Nat) : Option Nat := on.map (· - g)
 /-! ## Ownership -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The 512 entry words of a node page. -/
 def nodeOwn [CurCtx] (dq : DFrac) (t : PTree) : IProp GF := iprop%

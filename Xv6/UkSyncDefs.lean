@@ -78,7 +78,7 @@ theorem sync_ustack_two (γd : GName) (sp : BitVec 64) :
 end Code
 
 section Leaf
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (Std.ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -89,12 +89,12 @@ def ksyncLeaf (N : UkNames GF) (oQ : Option (IProp GF)) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat) (c : Nat),
     ⌜UkSysP.usysno m = 22⌝ -∗
     ukCode N.t User.Sync.code.byte -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 0x36a) avail -∗
+    urun N h m (BitVec.ofNat 64 0x36a) avail -∗
     ucwd N.cwd c -∗
-    hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ -∗
+    hookOpt (genId (GF := GF)) oQ -∗
     (∀ (h' : CPU) (r : BitVec 64),
       qOpt oQ -∗ ucwd N.cwd c -∗
-      urun (hlc := hlc) N h' (ukWr m 10#5 r) (BitVec.ofNat 64 0x36e) avail -∗ wpLoop h') -∗
+      urun N h' (ukWr m 10#5 r) (BitVec.ofNat 64 0x36e) avail -∗ wpLoop h') -∗
     wpLoop h)
 
 end Leaf

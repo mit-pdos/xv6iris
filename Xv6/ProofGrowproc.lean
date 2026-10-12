@@ -83,7 +83,7 @@ theorem bge0'_neg {α : Type _} (x : BitVec 64) (h : x.toInt < 0) (p q : α) :
   exact h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
@@ -122,8 +122,8 @@ theorem gp_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 6
   iframe Hs Hpg Hpt Hev
   iintro %v %P' %M' %kc %hv ⟨Hs, Hpg, Hpt⟩ Hev
   obtain ⟨hsz, hb, hr, ht, hl⟩ := hv
-  ihave Htfp := (show @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ⊢
-      @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ P'.tfp V.tf from by rw [ht]) $$ Htfp
+  ihave Htfp := (show @tfPageAt GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ⊢
+      @tfPageAt GF _ ⟨ξ, KTier.kpt⟩ P'.tfp V.tf from by rw [ht]) $$ Htfp
   iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro; exact ⟨hsz, hb, by rw [hr]; exact h.2.2.1, by rw [ht]; exact h.2.2.2⟩
@@ -144,7 +144,7 @@ theorem gp_priv_same (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [X : CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [X : CurCtx]
 
 /-- THE SHRINK keeps the fill empty (Rocq `lazy_free_del_run`, as
 `ProofGrowproc`'s shrink arm reads it): uvmdealloc's run starts at
@@ -381,7 +381,7 @@ theorem growproc_br_fffffffffffffcc8 : KA.«growproc» + 0xfffffffffffffcc8#64 =
 
 set_option maxHeartbeats 4000000 in
 theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPROC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γl γk γ j pid V M hj hproc hnoff hK hlk htier => by
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γl γk γ j pid V M hj hproc hnoff hK hlk htier => by
   unfold wp_growproc_body
   simp only [growprocAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hpv, HΦ⟩
@@ -406,7 +406,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cc := by
     intro cc k' hnoff' hK'
-    have h := MP.wp_myproc (hlc := hlc) (GF := GF) cc k' hnoff' hK'
+    have h := MP.wp_myproc (GF := GF) cc k' hnoff' hK'
     unfold wp_myproc_body at h
     simp only [myprocAddr] at h
     exact h
@@ -432,7 +432,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cc := by
     intro cc k' P M' ke hnoff' hK' hlk' hroot' hold' hnew' hperm' hfree'
-    have h := UA.wp_uvmalloc (hlc := hlc) (GF := GF) cc k' γl γk P M' ke hnoff' hK' hlk' hroot'
+    have h := UA.wp_uvmalloc (GF := GF) cc k' γl γk P M' ke hnoff' hK' hlk' hroot'
       hold' (Or.inl hnew') hperm' (fun i hi _ => hfree' i hi)
     unfold wp_uvmalloc_body at h
     simp only [uvmallocAddr] at h
@@ -452,7 +452,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cc := by
     intro cc k' P M' ke hnoff' hK' hlk' hroot' hold'
-    have h := UD.wp_uvmdealloc (hlc := hlc) (GF := GF) cc k' γl γk P M' ke hnoff' hK' hlk' hroot' hold'
+    have h := UD.wp_uvmdealloc (GF := GF) cc k' γl γk P M' ke hnoff' hK' hlk' hroot' hold'
     unfold wp_uvmdealloc_body at h
     simp only [uvmdeallocAddr] at h
     exact h

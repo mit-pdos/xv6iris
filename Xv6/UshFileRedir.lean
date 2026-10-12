@@ -145,18 +145,19 @@ theorem imgPath_mem (Img : ElfMem) (pv : Nat) (pl : List (BitVec 8))
     exact absurd (h0.trans h1.symm) (by decide)
 
 section Img
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- A byte of the image the program owns is below MAXVA. -/
 theorem imgMap_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (av : Nat)
     (Img : RegMapF (BitVec 8)) (a : Nat) (b : BitVec 8) (hb : get? Img a = some b) :
-    ⊢ urun (hlc := hlc) N h m pc av -∗ ([∗map] ad ↦ x ∈ Img, ubyteq N.d DFrac.discard ad x) -∗ ⌜a < 2 ^ 38⌝ := by
+    ⊢ urun N h m pc av -∗ ([∗map] ad ↦ x ∈ Img, ubyteq N.d DFrac.discard ad x) -∗ ⌜a < 2 ^ 38⌝ := by
   iintro Hrun Himg
   ihave Hb := (BigSepM.bigSepM_lookup (Φ := fun ad x => ubyteq (GF := GF) N.d DFrac.discard ad x) hb) $$ Himg
   iapply urun_ubyte_bnd N h m pc av _ a b $$ Hrun Hb
 
+omit [MachGS GF] in
 theorem imgMap_sub (N : UkNames GF) (Img : RegMapF (BitVec 8)) (M : ElfMem) (pm : Nat → Option UPerm)
     (sz : Nat) :
     iprop(uheap N.t N.d N.s M pm sz ∗ □ ([∗map] ad ↦ x ∈ Img, ubyteq (GF := GF) N.d DFrac.discard ad x)) ⊢
@@ -175,6 +176,7 @@ theorem imgMap_sub (N : UkNames GF) (Img : RegMapF (BitVec 8)) (M : ElfMem) (pm 
   · exact (key a b hs).trans (pure_mono fun h _ => h)
   · exact pure_intro fun h => absurd h hs
 
+omit [MachGS GF] in
 /-- The name's bytes, at the discarded fraction, are a boxed view of their
 image (deviation 4). -/
 theorem imgMap_view (N : UkNames GF) (Img : RegMapF (BitVec 8)) :
@@ -193,7 +195,7 @@ end Img
 /-! ## §1 The receipt, at the claim -/
 
 section UshFileRedir
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -204,28 +206,28 @@ namespace UshFileRedir
 this claim -- `UkFileOpen.redir_K OffHeld`. -/
 def redirK (g : FileGn) (r : FileAppNames) (nm : List (BitVec 8)) (s : Dst) (np : Nat) (ty : FdType) :
     IProp GF :=
-  UkFileOpen.redirK (hlc := hlc) .held g.fgnCl r nm s np ty
+  UkFileOpen.redirK .held g.fgnCl r nm s np ty
 
 /-- **Rocq `redir_Kf`**: ...and the `-1` arm's, WITH THE TAINT (it is
 `FileOpen.file_open_pay` verbatim). -/
 def redirKf (g : FileGn) (r : FileAppNames) (nm : List (BitVec 8)) (s : Dst) (np : Nat) : IProp GF :=
   iprop((fown r s ∗ fpos r np)
     ∨ (⌜s[nm]? = none⌝ ∗ ∃ i : Nat, fown r (s.insert nm (i, [])) ∗ fpos r np)
-    ∨ fileTaint (hlc := hlc) g.fgnCl)
+    ∨ fileTaint g.fgnCl)
 
 theorem redirKf_eq (g : FileGn) (r : FileAppNames) (nm : List (BitVec 8)) (s : Dst) (np : Nat) :
-    redirKf (hlc := hlc) (GF := GF) g r nm s np = fileOpenPay (hlc := hlc) g.fgnCl r nm s np := rfl
+    redirKf (GF := GF) g r nm s np = fileOpenPay g.fgnCl r nm s np := rfl
 
 /-- **Rocq `redir_K_inum`**: WHAT THE OPEN'S RECEIPT SAYS ABOUT THE INODE --
 `f`'s inum is none of the image's, or the taint (deviation 2). -/
-theorem redirK_inum (g : FileGn) (r : FileAppNames) (heq : fileAppIs (hlc := hlc) (GF := GF) g.fgnCl r)
+theorem redirK_inum (g : FileGn) (r : FileAppNames) (heq : fileAppIs (GF := GF) g.fgnCl r)
     (nm : List (BitVec 8)) (s : Dst) (np : Nat) (ty : FdType) (E : CoPset)
     (hE : (↑appN : CoPset) ⊆ E) :
-    ⊢ appInv (hlc := hlc) (GF := GF) fscFs -∗ redirK (hlc := hlc) (GF := GF) g r nm s np ty -∗
-      |={E}=> (redirK (hlc := hlc) (GF := GF) g r nm s np ty ∗
+    ⊢ appInv (GF := GF) fscFs -∗ redirK (GF := GF) g r nm s np ty -∗
+      |={E}=> (redirK (GF := GF) g r nm s np ty ∗
         ((∃ (i : Nat) (γo : GName), ⌜ty = .inode i γo .held⌝ ∗
             ⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO ∧ i ≠ SYNC_INO⌝)
-          ∨ fileTaint (hlc := hlc) g.fgnCl)) := by
+          ∨ fileTaint g.fgnCl)) := by
   iintro #Hinv HK
   unfold redirK UkFileOpen.redirK fileOpenFdK
   icases HK with (⟨%i, %γo, %hty, Hown, Hpos, Hpub⟩ | #HT)
@@ -236,16 +238,16 @@ theorem redirK_inum (g : FileGn) (r : FileAppNames) (heq : fileAppIs (hlc := hlc
     · iright; iexact HT
   unfold fown
   icases Hown with ⟨Hd, Htk⟩
-  ihave Hup := appClaimUpdate (hlc := hlc) (GF := GF) E fscFs (fdeed r (s.insert nm (i, [])))
+  ihave Hup := appClaimUpdate (GF := GF) E fscFs (fdeed r (s.insert nm (i, [])))
     iprop(fdeed r (s.insert nm (i, [])) ∗
       (⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO ∧ i ≠ SYNC_INO⌝
-        ∨ fileTaint (hlc := hlc) g.fgnCl)) hE $$ Hinv
+        ∨ fileTaint g.fgnCl)) hE $$ Hinv
   imod Hup $$ [] Hd with ⟨Hd, Hres⟩
   · imodintro
     iintro %av Hd Hp
     subst heq
-    imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) g.fgnCl r av)).mp $$ Hp with Hp
-    ihave ⟨Hp, Hd, Hres⟩ := fileDeedInum_acc (hlc := hlc) g.fgnCl r av (s.insert nm (i, [])) nm i []
+    imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) g.fgnCl r av)).mp $$ Hp with Hp
+    ihave ⟨Hp, Hd, Hres⟩ := fileDeedInum_acc g.fgnCl r av (s.insert nm (i, [])) nm i []
       (by simp) (by simp [lineMax]) $$ Hd Hp
     imodintro
     isplitl [Hp]
@@ -270,15 +272,15 @@ theorem redirK_inum (g : FileGn) (r : FileAppNames) (heq : fileAppIs (hlc := hlc
 
 /-- **Rocq `Hopen_hand`**: sh's open STUB, walked into the kernel's create
 corollary at `OffHeld`; the deed is handed AT the call (deviation 3). -/
-theorem hopen_hand (UL : UK_LEAVES) (FO : HfpFileOpenP (hlc := hlc) (GF := GF))
+theorem hopen_hand (UL : UK_LEAVES) (FO : HfpFileOpenP (GF := GF))
     (g : FileGn) (r : FileAppNames)
-    (heq : fileAppIs (hlc := hlc) (GF := GF) g.fgnCl r) (N : UkNames GF) (file : Nat) (l : List FdState)
+    (heq : fileAppIs (GF := GF) g.fgnCl r) (N : UkNames GF) (file : Nat) (l : List FdState)
     (s0 : Dst) (np : Nat) (ls : List FlLine) (ws : Wordline) (jo : Option Nat) (nm : List (BitVec 8))
     (hu : uname nm) (hlst : ls.getLast? = some (Uline.LEchoF ws nm)) (hnpl : np = ls.length)
     (hok : lineOk ws) :
-    ⊢ appInv (hlc := hlc) fscFs -∗ fileConsCred (hlc := hlc) g.fgnCl r jo -∗ flLb g.fgnCl ls -∗
-      ushOpenCall2 (hlc := hlc) (A := Unit) N ROOTINO file 1537 nm l (redirK (hlc := hlc) g r nm s0 np)
-        (fun _ => iprop(fown r s0 ∗ fpos r np)) (fun _ => redirKf (hlc := hlc) g r nm s0 np) := by
+    ⊢ appInv fscFs -∗ fileConsCred g.fgnCl r jo -∗ flLb g.fgnCl ls -∗
+      ushOpenCall2 (A := Unit) N ROOTINO file 1537 nm l (redirK g r nm s0 np)
+        (fun _ => iprop(fown r s0 ∗ fpos r np)) (fun _ => redirKf g r nm s0 np) := by
   iintro #Hinv #Hmade #Hlb
   unfold ushOpenCall2
   iintro %h %m %av %Img %pl %a %ha0 %ha1 %hpath %hnp %hst %hlast %hfdl Himg Hown Hcode Hcwd Hstd Hrun Hcont
@@ -288,7 +290,7 @@ theorem hopen_hand (UL : UK_LEAVES) (FO : HfpFileOpenP (hlc := hlc) (GF := GF))
   obtain ⟨b, hb⟩ := imgPath_mem (fun x => get? Img x) file pl hpath'
   ihave %hbnd := imgMap_bnd N h m _ av Img file b hb $$ Hrun Himg
   ihave #Hv := imgMap_view N Img $$ Himg
-  ihave Hs := sh_stub_open (hlc := hlc) UL N
+  ihave Hs := sh_stub_open UL N
   unfold stubLaw
   iapply Hs $$ %h %m %av Hcode Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
@@ -335,10 +337,10 @@ theorem hopen_hand (UL : UK_LEAVES) (FO : HfpFileOpenP (hlc := hlc) (GF := GF))
 claim's fact that `f`'s inode is none of the image's. -/
 def redirK' (g : FileGn) (r : FileAppNames) (nm : List (BitVec 8)) (s : Dst) (np : Nat) (ty : FdType) :
     IProp GF :=
-  iprop(redirK (hlc := hlc) g r nm s np ty ∗
+  iprop(redirK g r nm s np ty ∗
     ((∃ (i : Nat) (γo : GName), ⌜ty = .inode i γo .held⌝ ∗
         ⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO ∧ i ≠ SYNC_INO⌝)
-      ∨ fileTaint (hlc := hlc) g.fgnCl))
+      ∨ fileTaint g.fgnCl))
 
 end UshFileRedir
 

@@ -75,7 +75,7 @@ theorem su_filter_time (l : List String) (h : "time" ∉ l) :
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
 
 /-! ## The callees, at their entry addresses -/
 
@@ -92,7 +92,7 @@ theorem su_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γt : GName)
       locked γt cpu' -∗ ticksLedAt curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γt "time" ticksLedAt hnoff hK hs
+  have h := AC.wp_acquire (GF := GF) c k' γt "time" ticksLedAt hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
@@ -113,7 +113,7 @@ theorem su_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γt : GName)
         (k'.locks.filter (fun x => x ≠ "time"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γt "time" ticksLedAt hsie hnoff hK reen
+  have h := RE.wp_release (GF := GF) c k' γt "time" ticksLedAt hsie hnoff hK reen
     hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -127,9 +127,9 @@ end
 
 set_option maxHeartbeats 4000000 in
 /-- **The led twin** (Rocq `wp_sys_uptime_led_sconf`): the proof. -/
-theorem sys_uptime_led (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx) (γt : GName) hnoff hK hlk :
-    wp_sys_uptime_led_body (hlc := hlc) (GF := GF) cpu k γt hnoff hK hlk := by
+theorem sys_uptime_led (AC : ACQUIRE) (RE : RELEASE) {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx) (γt : GName) hnoff hK hlk :
+    wp_sys_uptime_led_body (GF := GF) cpu k γt hnoff hK hlk := by
   unfold wp_sys_uptime_led_body
   simp only [sysUptimeAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hnext⟩
@@ -268,10 +268,10 @@ theorem sys_uptime_led (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : Bundled
     exact ticksTie_ofNat t0 n0 htie
 
 /-- **The landed contract**: the led twin with the receipt dropped. -/
-theorem sys_uptime_landed (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx) (γt : GName) hnoff hK hlk :
-    wp_sys_uptime_body (hlc := hlc) (GF := GF) cpu k γt hnoff hK hlk := by
-  have h := sys_uptime_led AC RE (hlc := hlc) (GF := GF) cpu k γt hnoff hK hlk
+theorem sys_uptime_landed (AC : ACQUIRE) (RE : RELEASE) {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx) (γt : GName) hnoff hK hlk :
+    wp_sys_uptime_body (GF := GF) cpu k γt hnoff hK hlk := by
+  have h := sys_uptime_led AC RE (GF := GF) cpu k γt hnoff hK hlk
   unfold wp_sys_uptime_led_body at h
   unfold wp_sys_uptime_body
   iintro ⟨Hk, Hpc, #Hlk, Hnext⟩
@@ -282,7 +282,7 @@ theorem sys_uptime_landed (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : Bund
   iapply HΦ $$ %spie %spp %R' %t %hsp Hk Hpc %hpost
 
 theorem sys_uptime_proof (AC : ACQUIRE) (RE : RELEASE) : SYSUPTIME :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γt hnoff hK hlk => sys_uptime_landed AC RE cpu k γt hnoff hK hlk,
-   fun {hlc GF} _ _ _ _ cpu k γt hnoff hK hlk => sys_uptime_led AC RE cpu k γt hnoff hK hlk⟩
+  ⟨fun {GF} _ _ _ _ cpu k γt hnoff hK hlk => sys_uptime_landed AC RE cpu k γt hnoff hK hlk,
+   fun {GF} _ _ _ _ cpu k γt hnoff hK hlk => sys_uptime_led AC RE cpu k γt hnoff hK hlk⟩
 
 end Xv6

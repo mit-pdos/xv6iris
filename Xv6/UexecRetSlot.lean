@@ -33,7 +33,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 section UexecRet
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-! ### The kernel obligation, the bundle, the slot -/
@@ -85,7 +85,7 @@ accessor), under `loopOk`, the permission projection and the fill row. -/
 def uslotF (X : Uvis → IProp GF) (W : Uvis) : IProp GF :=
   iprop(∀ (h : CPU) (xi : CurCtx) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
       (Rut : UPtd → IProp GF),
-    ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken hlc GF _ xi h ∗ (@ctxToken hlc GF _ xi h -∗ Rut pt')⌝ -∗
+    ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken GF _ xi h ∗ (@ctxToken GF _ xi h -∗ Rut pt')⌝ -∗
     ⌜loopOk C pt⌝ -∗ ⌜permOf pt.um W.sz = W.perm⌝ -∗
     ⌜W.lazy = false → lazyFree pt.um (BitVec.ofNat 64 W.sz)⌝ -∗
     uvbF (xi := xi) X h C pt Rfd Rut W.sz W.perm W.fd W.cwd W.gen W.ch W.pid W.lazy W.secc W.M
@@ -98,6 +98,7 @@ section Ne
 variable (k : Nat) (X Y : Uvis → IProp GF) (HX : ∀ W, X W ≡{k}≡ Y W)
 include HX
 
+omit [MachGS GF] in
 theorem uexecForkParentF_ne (W : Uvis) (Q : Int → IProp GF) (Rc : IProp GF) :
     uexecForkParentF X W Q Rc ≡{k}≡ uexecForkParentF Y W Q Rc := by
   unfold uexecForkParentF
@@ -111,6 +112,7 @@ theorem uexecForkF_ne (W : Uvis) (f : sfam GF) : uexecForkF X W f ≡{k}≡ uexe
   exact BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl
     (BI.wand_ne.ne .rfl (HX _)))))
 
+omit [MachGS GF] in
 theorem uexecRetContGen_ne (n : Int) (f : sfam GF) (W : Uvis)
     (CH : BitVec 64 → ExtTreeSet GName compare → IProp GF) :
     uexecRetContGen X n f W CH ≡{k}≡ uexecRetContGen Y n f W CH := by
@@ -165,7 +167,7 @@ instance uslotF_contractive : OFE.Contractive (uslotF (GF := GF)) where
       (BI.sep_ne.ne .rfl ?_))))))))
     refine BI.exists_ne (fun Wr => BI.sep_ne.ne .rfl ?_)
     exact OFE.Contractive.distLater_dist (f := BIBase.later)
-      (fun m hm => @ukbF_ne hlc GF _ _ _ m X Y (fun W' => HX m hm W') xi h C pt Rfd Rut Wr)
+      (fun m hm => @ukbF_ne GF _ _ _ m X Y (fun W' => HX m hm W') xi h C pt Rfd Rut Wr)
 
 /-- **Rocq `uslot`**: the fixpoint. -/
 def uslot : Uvis → IProp GF := fixpoint (uslotF (GF := GF))
@@ -203,7 +205,7 @@ def ukc (π : Nat → Option UPerm) (M : ElfMem) (szv : Nat) (fdv : List FdState
     (pc : BitVec 64) : IProp GF :=
   iprop(∀ (h : CPU) (xi : CurCtx) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
       (Rut : UPtd → IProp GF),
-    ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken hlc GF _ xi h ∗ (@ctxToken hlc GF _ xi h -∗ Rut pt')⌝ -∗
+    ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken GF _ xi h ∗ (@ctxToken GF _ xi h -∗ Rut pt')⌝ -∗
     ⌜loopOk C pt⌝ -∗ ⌜permOf pt.um szv = π⌝ -∗ ⌜lz = false → lazyFree pt.um (BitVec.ofNat 64 szv)⌝ -∗
     uvb (xi := xi) h C pt Rfd Rut szv π fdv cw g cs pidv lz secc M m pc -∗
     wpLoop h)
@@ -642,7 +644,7 @@ the seccomp universe (`UexecSeccMint`), whose keys are all masked, uses this
 alone. -/
 
 section UexecRetGen
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- **THE FALLBACK**: at a key whose pure step is stuck, the generic loop is
@@ -661,7 +663,7 @@ theorem uslot_of_wp_stuck (W : Uvis) (hst : Ustep.ustep (Ustep.ucur W) = .stuck)
   have hside := Ustep.ureachK_side hR
   have hstk : Ustep.ustuckFrom Wr := Ustep.ustuckFrom_of_reachK hR hst
   obtain ⟨hpe, hszr, hfdr, hcwr, hgnr, hchr, hpidr, hlzr, hscr⟩ := hside
-  ihave ⟨%Mp, Hpt⟩ := @userPtmInvX_pt hlc GF _ xi h pt W.sz W.M $$ Hpt
+  ihave ⟨%Mp, Hpt⟩ := @userPtmInvX_pt GF _ xi h pt W.sz W.M $$ Hpt
   ihave ⟨%ms, %sc, %stv, %sep, %hms, Hregs⟩ := uvRegs_uRegs h (tfResumePc W.tf) (tfResumeGpr0 W.tf) $$ [Hur Hg Hpc]
   · isplitl [Hur]
     · iexact Hur
@@ -675,7 +677,7 @@ theorem uslot_of_wp_stuck (W : Uvis) (hst : Ustep.ustep (Ustep.ucur W) = .stuck)
   inext
   iintro ⟨Hframe, -⟩
   ihave ⟨%W', %sc', %stv', %hpins, Htm⟩ :=
-    @userTrapFrame_trapped hlc GF _ xi h C pt Rut W.sz W.perm W.fd W.cwd W.gen W.ch W.pid W.lazy W.secc $$ Hframe
+    @userTrapFrame_trapped GF _ xi h C pt Rut W.sz W.perm W.fd W.cwd W.gen W.ch W.pid W.lazy W.secc $$ Hframe
   obtain ⟨hperm, hszw, hfdw, hcww, hgnw, hchw, hpidw, hlzw, hscw⟩ := hpins
   iapply wpLoop_bupd
   ihave Hr := Hret $$ %W' %sc' %(⟨hperm.symm, hszw.symm, hfdw.symm, hcww.symm, hgnw.symm, hchw.symm,

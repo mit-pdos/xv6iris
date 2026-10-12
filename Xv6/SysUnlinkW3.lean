@@ -70,7 +70,7 @@ theorem sysUnlinkPins_s3eq (k : KCtx) (R : RegMap) (s1 s2 s3 v v' : BitVec 64)
 theorem sys_unlink_32_eq : (32#64 : BitVec 64) = BitVec.ofNat 64 (16 * 2) := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -86,7 +86,7 @@ def sysUnlinkIpCells (ks : Nat) (dni : Dinode) (bmi : Blkmap) (dati : Nat → Li
 set_option maxHeartbeats 32000000 in
 /-- **THE ITERATION** (Rocq's `su_w4_loop`), by fuel over the remaining
 bytes: entry at +0x106 with `s3 = 16 jj`, records `2 .. jj-1` dead. -/
-theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (A : SysUnlinkArgs GF) (ok : SuOk k A) (kd ks : Nat) (dni : Dinode) (bmi : Blkmap)
     (dati : Nat → List (BitVec 8)) (X : IProp GF)
     (hiok : inodeOk fscCov fscLogst dni bmi dati)
@@ -112,7 +112,7 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
     sysUnlinkPins k R (ientry kd) (ientry ks) (BitVec.ofNat 64 (16 * jj)) →
     kctx cpu (((k.withSpie spie spp).pushed 30).withRegs R) ∗
     pcIs cpu (KA.«sys_unlink» + 0x106#64) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
     sysUnlinkIpCells ks dni bmi dati ∗ suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
     wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗ X
     ⊢ wpLoop (GF := GF) cpu := by
@@ -393,7 +393,7 @@ def sysUnlinkAt8a (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
   wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
   suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
-  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
   wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
   (∀ c : CPU, sysUnlinkPostA k A c) ∗
   sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
@@ -411,7 +411,7 @@ set_option maxHeartbeats 32000000 in
 /-- **ARM E** (+0x174) from the loop's non-empty exit: `uf_dex_fire` at the
 refusal, both locks held (arm iii-c), then `SysUnlinkTails.sys_unlink_tail_e`. -/
 theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF) (ok : SuOk k A)
+    [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF) (ok : SuOk k A)
     (P2 : UPtd) (spie spp : Bool) (R : RegMap) (jj : Nat)
     (nf : Nat → BitVec 8) (tln : List (BitVec 8)) (pl : List (BitVec 8))
     (kd : Nat) (q : Qp) (g : GName) (lo tl : Nat) (dinum : BitVec 32) (dnd : Dinode) (bmd : Blkmap)
@@ -439,7 +439,7 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     byteBuf (sysUnlinkNameTl (k.regs 2#5)) (DFrac.own 1) tln ∗
     suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
     wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
-    sysfileEnv (hlc := hlc) Γ ∗ sysUnlinkHole A k.proc P2 ∗ (∀ c : CPU, sysUnlinkPostA k A c) ∗
+    sysfileEnv Γ ∗ sysUnlinkHole A k.proc P2 ∗ (∀ c : CPU, sysUnlinkPostA k A c) ∗
     sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
     sysUnlinkOpen kd dinum dnd bmd datd ∗
     sysUnlinkLkAtX A.pid ks qi gi loi tli (BitVec.setWidth 32 (dirInum datd kk)) dni γili γisli t
@@ -472,7 +472,7 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   icases Hresti with ⟨Hdli, Hdii, Htopi⟩
   iapply wpLoop_fupd
   rw [topFrag_1, topFrag_1]
-  imod (ufDex_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) (DFrac.own 1) A.Fex dinum.toNat
+  imod (ufDex_fire fscFs ⊤ (DFrac.own 1) (DFrac.own 1) A.Fex dinum.toNat
       (BitVec.setWidth 32 (dirInum datd kk)).toNat (bname 14 nf) (eraNode dnd bmd datd)
       (eraNode dni bmi dati) ufNd_top (mkfEra_is_dir dnd bmd datd htyz) hnld hnm
       (mkfEra_is_dir dni bmi dati htyi) hnli hne)
@@ -481,7 +481,7 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   rw [← topFrag_1, ← topFrag_1]
   ihave HP := (show A.P (npElems pl).length dinum.toNat ⊢ A.P (nparElems pl).length dinum.toNat
     from .rfl) $$ HP
-  ihave Harms := unlinkArms_dex (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+  ihave Harms := unlinkArms_dex (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss A.Fent
     A.Ftgt A.Fex A.Fmiss pl dinum.toNat av _ (bname 14 nf) _ _ _ _
     (sys_unlink_last_of_npar pl nf hname) hrowd hnm' hrowt hne' $$ [$HP $He $Ht $Hrecv $Hm]
@@ -516,7 +516,7 @@ set_option maxHeartbeats 32000000 in
 /-- **+0xf8 .. +0x104**: the size test, the empty exit straight to the +0x8a
 seam, or the loop from record 2. -/
 theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
     (ok : SuOk k A) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (nf : Nat → BitVec 8) (tln : List (BitVec 8)) (pl : List (BitVec 8))
     (kd : Nat) (q : Qp) (g : GName) (lo tl : Nat) (dinum : BitVec 32) (dnd : Dinode) (bmd : Blkmap)
@@ -531,7 +531,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
     (hfn : dirFirst datd (dirNrec dnd.diSize.toNat) (bname 14 nf) = some kk) (hks : ks < NINODE)
     (hlei : loi ≤ tli) (hnli : dni.diNlink.toNat ≠ 0) (htyi : dni.diType.toNat = T_DIR_z)
     (hW5 : ∀ (cpu : CPU) (spie spp : Bool) (R : RegMap) (s3v : BitVec 64),
-      sysUnlinkAt8a (hlc := hlc) Γ cpu k A spie spp R s3v nf tln P2 pl kd q g lo tl dinum dnd bmd
+      sysUnlinkAt8a Γ cpu k A spie spp R s3v nf tln P2 pl kd q g lo tl dinum dnd bmd
         datd γil γisl kk ks qi gi loi tli dni bmi dati γili γisli t n Sb true ⊢ wpLoop cpu) :
     kctx cpu (((k.withSpie spie spp).pushed 30).withRegs R) ∗
     pcIs cpu (KA.«sys_unlink» + 0xf8#64) ∗
@@ -542,7 +542,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
     suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
     wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
     suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
     wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
     (∀ c : CPU, sysUnlinkPostA k A c) ∗
     sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
@@ -603,7 +603,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
         byteBuf (sysUnlinkNameTl (k.regs 2#5)) (DFrac.own 1) tln ∗
         suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
         wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
-        sysfileEnv (hlc := hlc) Γ ∗ sysUnlinkHole A k.proc P2 ∗
+        sysfileEnv Γ ∗ sysUnlinkHole A k.proc P2 ∗
         (∀ c : CPU, sysUnlinkPostA k A c) ∗
         sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
         sysUnlinkOpen kd dinum dnd bmd datd ∗
@@ -663,7 +663,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
         byteBuf (sysUnlinkNameTl (k.regs 2#5)) (DFrac.own 1) tln ∗
         suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
         wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
-        sysfileEnv (hlc := hlc) Γ ∗ sysUnlinkHole A k.proc P2 ∗
+        sysfileEnv Γ ∗ sysUnlinkHole A k.proc P2 ∗
         (∀ c : CPU, sysUnlinkPostA k A c) ∗
         sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
         sysUnlinkOpen kd dinum dnd bmd datd ∗
@@ -704,7 +704,7 @@ set_option maxHeartbeats 32000000 in
 quarter and ip locked at the freed quarter, the nlink panic (LIVE), the
 T_DIR test -- the +0x8a seam on a non-directory, W4 on a directory. -/
 theorem sys_unlink_w3 (IL : ILOCK) (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
     (ok : SuOk k A) (spie spp : Bool) (R : RegMap) (w₅ : BitVec 64)
     (nf : Nat → BitVec 8) (tln : List (BitVec 8)) (P2 : UPtd) (pl : List (BitVec 8))
     (kd : Nat) (q : Qp) (g : GName) (lo tl : Nat) (dinum : BitVec 32) (dnd : Dinode) (bmd : Blkmap)
@@ -713,9 +713,9 @@ theorem sys_unlink_w3 (IL : ILOCK) (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) 
     (hW5 : ∀ (gi : GName) (loi tli : Nat) (dni : Dinode) (bmi : Blkmap)
         (dati : Nat → List (BitVec 8)) (γili γisli : GName) (t : Nat) (cpu : CPU) (spie spp : Bool)
         (R : RegMap) (s3v : BitVec 64) (isdir : Bool),
-      sysUnlinkAt8a (hlc := hlc) Γ cpu k A spie spp R s3v nf tln P2 pl kd q g lo tl dinum dnd bmd
+      sysUnlinkAt8a Γ cpu k A spie spp R s3v nf tln P2 pl kd q g lo tl dinum dnd bmd
         datd γil γisl kk ks qq gi loi tli dni bmi dati γili γisli t n Sb isdir ⊢ wpLoop cpu) :
-    sysUnlinkAt72 (hlc := hlc) Γ cpu k A spie spp R w₅ nf tln P2 pl kd q g lo tl dinum dnd bmd datd
+    sysUnlinkAt72 Γ cpu k A spie spp R w₅ nf tln P2 pl kd q g lo tl dinum dnd bmd datd
       γil γisl kk ks qq n Sb
     ⊢ wpLoop (GF := GF) cpu := by
   unfold sysUnlinkAt72

@@ -25,7 +25,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section FileOpenCreateAu
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF] [FsTopG GF] [FsBytesG GF] [Appcfg GF] [Icfg]
 
 /-- THE WHOLE CREATE BUNDLE (Rocq `file_open_create_au`). -/
@@ -33,17 +33,17 @@ theorem fileOpenCreate_au (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (ls : List FlLine)
     (ws : Wordline) (rt cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (pl : List (BitVec 8))
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (hN : uname N) (hpath : argPathOf M pv pl) (hnp : npElems pl = [])
     (hstart : umStartOf rt cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some N)
     (hlst : ls.getLast? = some (Uline.LEchoF ws N)) (hnpl : np = ls.length) (hokw : lineOk ws) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗ flLb c ls -∗
-      escKey (hlc := hlc) c r n s g -∗ fescRes (hlc := hlc) r s g np -∗
-      openAuCreateAt (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom
+    ⊢@{IProp GF} appInv γfs -∗ fileConsCred c r jo -∗ flLb c ls -∗
+      escKey c r n s g -∗ fescRes r s g np -∗
+      openAuCreateAt (fsGammaL γfs) γfs rt cw M pv vom
         (fun (_ : Nat) (d : Nat) => iprop(⌜d = ROOTINO⌝)) (fun _ _ => iprop(True))
-        (fileArmFam (hlc := hlc) c r jo s g np) (fileUnarmFam (hlc := hlc) c r s g np)
-        (fileCreFam (hlc := hlc) c r jo N s g np) (fileDlkFam (hlc := hlc) c r n s g)
-        (fileOdlkFam (hlc := hlc) c r n s g) (fileTruncFam (hlc := hlc) c r N s np) := by
+        (fileArmFam c r jo s g np) (fileUnarmFam c r s g np)
+        (fileCreFam c r jo N s g np) (fileDlkFam c r n s g)
+        (fileOdlkFam c r n s g) (fileTruncFam c r N s np) := by
   have hle : ∀ nm : Fname, nparNm M pv nm → redirAt N nm := by
     intro nm hnm
     have hn := nparNm_elim M pv pl nm hpath hnm
@@ -63,15 +63,15 @@ theorem fileOpenCreate_au (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     isplitr
     · dsimp only
       ipureintro; rw [hr0, hstart]
-    · iapply (epHops_done (hlc := hlc) rt γfs _ _ pl 0 (by rw [hnp]; simp))
+    · iapply (epHops_done rt γfs _ _ pl 0 (by rw [hnp]; simp))
   isplitl []
   · -- THE PARENT LEG, at the guarded cursor and the pinned name
     unfold pfAt
     isplit
     · unfold acreCommitAtNm
-      iapply (acreCommitAtGenNm_mono (hlc := hlc) (fsGammaL γfs) appE (fun _ _ => .AFile [])
+      iapply (acreCommitAtGenNm_mono (fsGammaL γfs) appE (fun _ _ => .AFile [])
         (redirAt N) (nparNm M pv) _ _ _ hle)
-      iapply (acreCommitAtGenNm_cur_mono (hlc := hlc) (fsGammaL γfs) appE (fun _ _ => .AFile [])
+      iapply (acreCommitAtGenNm_cur_mono (fsGammaL γfs) appE (fun _ _ => .AFile [])
         (redirAt N) (fun d : Nat => iprop(⌜d = ROOTINO⌝))
         (nparCur M pv (fun (_ : Nat) (d : Nat) => iprop(⌜d = ROOTINO⌝))) _ _) $$ [] [] []
       · iintro !> %d H

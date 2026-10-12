@@ -178,7 +178,7 @@ theorem ubLookup_mem (A : List (PAddr × BitVec 8)) (hnd : (A.map Prod.fst).Nodu
 /-! ## Ownership of a byte list -/
 
 section iris
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **Rocq `bytes_own mm`** over the addresses `D`: each holds, exclusively at
 context ξ, the byte the map says. -/

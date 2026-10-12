@@ -97,7 +97,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
 section FsCfgKits
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
   [WchG GF] [Appcfg GF]
@@ -161,7 +161,7 @@ def fsKitFsinitGhost [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
     IProp GF := iprop(
   logFreeTok icfgLog ∗
   iregBoot ∗
-  iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  iregReg fscIreg fscFs icfgIst icfgNib ∗
   fsblock fscFs.bytes 1 (P 1) ∗
   (∃ (L : BlockMap) (D : RegMapF Bool),
     ⌜∀ b, b ∈ fscCov → PartialMap.get? L b = some (P b)⌝ ∗
@@ -174,20 +174,20 @@ def fsKitFsinitGhost [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
   ([∗set] b ∈ fscCov \ Rspent, fsblock fscFs.bytes b (Pb b)) ∗
   fsBytesInv fscFs.bytes fscFs.cache fscFs.exc (fsHomeList fscCov fscLogst) Pb ∗
   excOwn fscFs.exc Xexc ∗
-  appInv (hlc := hlc) fscFs ∗
+  appInv fscFs ∗
   -- THE CRASH SEAM AT THE GUEST AND THE MERGE PACKAGE (merge + sync runner),
   -- ONE row closed over the guest's durable-copy predicate (Rocq
   -- `app_dur_laws`, SY3-A3b): fsinit builds the commit's law and the ghost
   -- commit's hooked law from it
-  appDurLaws (hlc := hlc) (GF := GF) fscCov fscLogst)
+  appDurLaws (GF := GF) fscCov fscLogst)
 
 /-- **Rocq `fs_kit_fsinit_ghost_open`**: the kit's rows by name. -/
 theorem fsKitFsinitGhost_open [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
     (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8)) (Xexc : List Nat) :
-    fsKitFsinitGhost (hlc := hlc) (GF := GF) P Rspent Pb Xexc ⊢
+    fsKitFsinitGhost (GF := GF) P Rspent Pb Xexc ⊢
       logFreeTok icfgLog ∗
       iregBoot ∗
-      iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+      iregReg fscIreg fscFs icfgIst icfgNib ∗
       fsblock fscFs.bytes 1 (P 1) ∗
       (∃ (L : BlockMap) (D : RegMapF Bool),
         ⌜∀ b, b ∈ fscCov → PartialMap.get? L b = some (P b)⌝ ∗
@@ -200,8 +200,8 @@ theorem fsKitFsinitGhost_open [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
       ([∗set] b ∈ fscCov \ Rspent, fsblock fscFs.bytes b (Pb b)) ∗
       fsBytesInv fscFs.bytes fscFs.cache fscFs.exc (fsHomeList fscCov fscLogst) Pb ∗
       excOwn fscFs.exc Xexc ∗
-      appInv (hlc := hlc) fscFs ∗
-      appDurLaws (hlc := hlc) (GF := GF) fscCov fscLogst := by
+      appInv fscFs ∗
+      appDurLaws (GF := GF) fscCov fscLogst := by
   unfold fsKitFsinitGhost
   iintro H
   iexact H
@@ -290,9 +290,9 @@ theorem fsKitIcacheRest_open [Fscfg] [Icfg] :
 off the kit without spending it (userinit's namei corner takes it). -/
 theorem fsKitFsinitGhost_ireg [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
     (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8)) (Xexc : List Nat) :
-    fsKitFsinitGhost (hlc := hlc) (GF := GF) P Rspent Pb Xexc ⊢
-      iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-      fsKitFsinitGhost (hlc := hlc) P Rspent Pb Xexc := by
+    fsKitFsinitGhost (GF := GF) P Rspent Pb Xexc ⊢
+      iregReg fscIreg fscFs icfgIst icfgNib ∗
+      fsKitFsinitGhost P Rspent Pb Xexc := by
   unfold fsKitFsinitGhost
   iintro ⟨Hlog, Hboot, #Hireg, Hrest⟩
   isplitr
@@ -303,9 +303,9 @@ theorem fsKitFsinitGhost_ireg [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
 peel (ProofMain's `first_boot_persist` assembly). -/
 theorem fsKitFsinitGhost_bitmap [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
     (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8)) (Xexc : List Nat) :
-    fsKitFsinitGhost (hlc := hlc) (GF := GF) P Rspent Pb Xexc ⊢
+    fsKitFsinitGhost (GF := GF) P Rspent Pb Xexc ⊢
       bitmapReg fscFs fscBmapstart fscCov fscLogst fscSize ∗
-      fsKitFsinitGhost (hlc := hlc) P Rspent Pb Xexc := by
+      fsKitFsinitGhost P Rspent Pb Xexc := by
   unfold fsKitFsinitGhost
   iintro ⟨Hlog, Hboot, Hireg, Hb1, Hauths, Hdty, Hhdr, Hslots, #Hbm, Hrest⟩
   isplitr

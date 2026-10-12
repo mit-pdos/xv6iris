@@ -97,7 +97,7 @@ def sysFstatRet (V : ProcPriv) (v r : BitVec 64) : Prop :=
   (∃ (fd : Nat) (fv : BitVec 64), argFd v V.ofile = some (fd, fv) ∧ filestatRet r)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -125,11 +125,11 @@ end
 /-- **WP of `sys_fstat()`** (Rocq `wp_sys_fstat_sconf_body`), eb-generic at
 depth 0 (deviation 1).  `v`/`v1` are syscall arguments 0 and 1, out of the
 trapframe page the block carries. -/
-def wp_sys_fstat_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_sys_fstat_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (v v1 : BitVec 64) (γkl : GName) (γk : KmemNames)
     (hv : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some v1)
@@ -143,22 +143,22 @@ def wp_sys_fstat_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
   procPrivFd γ (procAddr j) pid V M ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   -- ... and the file system, in the form that does NOT name a file
-  filestatFsEnv (hlc := hlc) ∗
+  filestatFsEnv ∗
   -- THE CROSSING IS THE LITERAL `true`: filestat parks
   wpNext true k.proc cpu (sysFstatPost k γ j pid V M v v1)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `sys_fstat` (Rocq's `Module Type SYSFSTAT`). -/
 structure SYSFSTAT : Prop where
-  wp_sys_fstat_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_sys_fstat_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (v v1 : BitVec 64) (γkl : GName) (γk : KmemNames)
     hv hv1 hK hj hproc hnoff htier,
-    wp_sys_fstat_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M v v1 γkl γk
+    wp_sys_fstat_eb_body (GF := GF) Γ cpu k γ j pid V M v v1 γkl γk
       hv hv1 hK hj hproc hnoff htier
 
 end Xv6

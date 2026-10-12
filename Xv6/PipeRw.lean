@@ -20,7 +20,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## An 8-aligned stack word as eight byte cells -/
 
@@ -398,9 +398,9 @@ theorem pw_privExt_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : 
     procPrivBareAt (GF := GF) curCtx pa pid { V with upt := P } M' ⊢
       ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P ∧ V.pagetable = pageAddr P.root ∧
         V.trapframe = pageAddr P.tfp⌝ ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P M' ∗ @ecRest hlc GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V P := by
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
+      @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ P M' ∗ @ecRest GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V P := by
   unfold procPrivBareAt ecRest procFieldsNoOfile
   iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hcwd, Hnm, Hsc, Hrt⟩, Hspace, Htfp⟩
   isplitl []
@@ -411,9 +411,9 @@ theorem pw_privExt_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P P'
     (M'' : Nat → List (BitVec 8)) (hext : P.extSz V.sz P')
     (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P ∧ V.pagetable = pageAddr P.root ∧
       V.trapframe = pageAddr P.tfp) :
-    @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
-    @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-    @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M'' ∗ @ecRest hlc GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V P ⊢
+    @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
+    @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
+    @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ P' M'' ∗ @ecRest GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V P ⊢
       procPrivBareAt (GF := GF) curCtx pa pid { V with upt := P' } M'' := by
   unfold procPrivBareAt ecRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
@@ -483,7 +483,7 @@ theorem pw_res_elim (γp : PipeNames) (pi : BitVec 64) :
         wordAtN curCtx (aPopen pi true) 4 (DFrac.own 1) wo ∗
         pipeEndstate γp false ro ∗ pipeEndstate γp true wo ∗
         ⌜pipeCountOk nr nw⌝ ∗ ⌜bs.length = PIPESIZE⌝ ∗ pipeDataAt curCtx pi bs ∗ pipeSlack pi ∗
-        pipeQres (hlc := hlc) γp nr nw ro wo bs := by
+        pipeQres γp nr nw ro wo bs := by
   unfold pipeResAt; iintro H; iexact H
 
 theorem pw_res_intro (γp : PipeNames) (pi : BitVec 64) (nr nw ro wo : BitVec 32)
@@ -494,7 +494,7 @@ theorem pw_res_intro (γp : PipeNames) (pi : BitVec 64) (nr nw ro wo : BitVec 32
     wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗
     wordAtN curCtx (aPopen pi true) 4 (DFrac.own 1) wo ∗
     pipeEndstate γp false ro ∗ pipeEndstate γp true wo ∗
-    pipeDataAt curCtx pi bs ∗ pipeSlack pi ∗ pipeQres (hlc := hlc) γp nr nw ro wo bs ⊢
+    pipeDataAt curCtx pi bs ∗ pipeSlack pi ∗ pipeQres γp nr nw ro wo bs ⊢
       pipeResAt γp pi curCtx := by
   unfold pipeResAt
   iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10⟩

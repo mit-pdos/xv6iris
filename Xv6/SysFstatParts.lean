@@ -120,7 +120,7 @@ theorem sfs_cs_epi (k : KCtx) (R : RegMap) (h : sfsRegs k R) :
 /-! ## The frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 theorem sfs_ctx_entry (c : CPU) (k : KCtx) (R : RegMap) :
     kctx (GF := GF) c ((k.pushed 4).withRegs R) ⊢
@@ -194,7 +194,7 @@ end
 /-! ## The callees at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -202,7 +202,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 set_option maxHeartbeats 4000000 in
 /-- `filestat(f, st)` at sys_fstat's call site, its `true` crossing taken
 at every hart. -/
-theorem sfs_filestat (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sfs_filestat (FS : FILESTAT) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames)
@@ -214,10 +214,10 @@ theorem sfs_filestat (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗
     fileRef γ fk q st ∗ procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    filestatEnv (hlc := hlc) st ∗
+    filestatEnv st ∗
     (∀ c' : CPU, filestatPost k' γ fk q st j pid V M c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := FS.wp_filestat_eb (hlc := hlc) (GF := GF) Γ c k' γ fk q st j pid V M γkl γk
+  have h := FS.wp_filestat_eb (GF := GF) Γ c k' γ fk q st j pid V M γkl γk
     hK hfk hj hproc hnoff htier ha0
   unfold wp_filestat_eb_body at h
   simp only [filestatAddr] at h

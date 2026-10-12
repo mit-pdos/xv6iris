@@ -45,7 +45,7 @@ theorem fkr_ret0e : jumpPc (KA.«forkret» + 0xe#64) = KA.«forkret» + 0xe#64 :
 theorem fkr_ret14 : jumpPc (KA.«forkret» + 0x14#64) = KA.«forkret» + 0x14#64 := by decide
 
 /-- forkret's 6-slot frame, never popped (the loop merges it back). -/
-def fkrFrame [CurCtx] {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (ksp : BitVec 64) : IProp GF :=
+def fkrFrame [CurCtx] {GF : BundledGFunctors.{0}} [MachGS GF] (ksp : BitVec 64) : IProp GF :=
   iprop((∃ w : BitVec 64, wordPointsTo (ksp + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) w) ∗
     (∃ w : BitVec 64, wordPointsTo (ksp + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) w) ∗
     (∃ w : BitVec 64, wordPointsTo (ksp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w) ∗
@@ -68,7 +68,7 @@ structure FkrAfter (kr : KCtx) (eb : Bool) (root : BitVec 44) (pa ksp : BitVec 6
   avail : kr.avail + trapRes eb = 506
 
 section Head
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -82,7 +82,7 @@ theorem fkr_popArm [CurCtx] (c : CPU) (k : KCtx) (eb : Bool) (pa : BitVec 64) (h
 
 set_option maxHeartbeats 8000000 in
 /-- **The head**: +0x00 .. the `release`, at the resumed context. -/
-theorem fkr_head [X : CurCtx] (MP : MYPROC) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem fkr_head [X : CurCtx] (MP : MYPROC) (RE : RELEASE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (R : RegMap) (spie spp eb : Bool) (root : BitVec 44) (j : Nat) (ksp : BitVec 64)
     (hj : j < NPROC) (hsp : R 2#5 = ksp) (hct : curTier = KTier.kpt) :
     kctx c (resumedK R spie spp forkretStack eb root (procAddr j)) ∗ pcIs c KA.«forkret» ∗ procsInv Γ ∗
@@ -128,7 +128,7 @@ theorem fkr_head [X : CurCtx] (MP : MYPROC) (RE : RELEASE) (Γ : SchedNames) [Cl
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop c)
       ⊢ wpLoop (GF := GF) c := by
     intro k' hsie' hnoff' hK'
-    have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff' hK'
+    have h := MP.wp_myproc (GF := GF) c k' hnoff' hK'
     unfold wp_myproc_body at h
     simp only [myprocAddr] at h
     iintro ⟨Hk, Hp, Hcont⟩
@@ -171,7 +171,7 @@ theorem fkr_head [X : CurCtx] (MP : MYPROC) (RE : RELEASE) (Γ : SchedNames) [Cl
     intro k' hsie' hnoff' hK' hint' htier' hKr hproc' ha0
     have hreen : eb = (decide (k'.noff = 1) && k'.intena) := by rw [hnoff', hint']; simp
     have hon : eb = true → k'.tier = KTier.kpt ∧ trapRes true + 6 ≤ k'.avail := fun _ => ⟨htier', hKr⟩
-    have h := RE.wp_release (hlc := hlc) (GF := GF) c k' (Γ.lock j) "proc" (procLockPay Γ j)
+    have h := RE.wp_release (GF := GF) c k' (Γ.lock j) "proc" (procLockPay Γ j)
       hsie' (by omega) hK' eb hreen hon
     unfold wp_release_body at h
     simp only [releaseAddr] at h
@@ -230,7 +230,7 @@ theorem FkrAfter.setReg {kr : KCtx} {eb : Bool} {root : BitVec 44} {pa ksp : Bit
     simp [KCtx.setReg, RegMap.set_apply, Ne.symm h2, Ne.symm h8, Ne.symm h9, g, i, l]
 
 section First
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]

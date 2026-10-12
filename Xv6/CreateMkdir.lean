@@ -163,7 +163,7 @@ theorem createMkdir_dlneed5 (ind : Bool) (n : Nat) (h : 6 ≤ n) : dlNeed true i
 pattern) -/
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -172,7 +172,7 @@ set_option maxHeartbeats 8000000 in
 /-- `dirlink(ip, name, inum)` at `+0x106` / `+0x11a` / `+0x12c` (Rocq
 `DLK.wp_dirlink_gen`), at any name-buffer share `dqn` (the two dot names
 are the persistent rodata windows). -/
-theorem createMkdir_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem createMkdir_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (dn : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16)
@@ -198,7 +198,7 @@ theorem createMkdir_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
     (hkd : ip = ientry kd) (hkdn : kd < NINODE) :
     kctx cpu k' ∗ pcIs cpu KA.«dirlink» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv Γ γl pd pav pu γkl γk ∗
     wordPointsTo (iDev ip) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     wordPointsTo (iInum ip) 4 (DFrac.own (1 : Qp).half) dinum ∗
     inodeMeta ip dn ∗ inodeMap fscFs ip bm ∗ inodeBlocks fscFs bm data ∗
@@ -243,7 +243,7 @@ theorem createMkdir_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
   iintro ⟨Hk, Hpc, Hte, Hce, ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
     #Hinv, #Hopen, #Hbmi⟩, Hdev, Hinum, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid, Hsh, Hru,
     Hrt, Hrh, Hbs, Hslot, Hdl, Hop, Htx, HK⟩
-  have h := DLK.wp_dirlink_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j γkl γk
+  have h := DLK.wp_dirlink_gen_eb (GF := GF) Γ cpu k' γl pd pav pu j γkl γk
     ip dinum bm data dn dn fn inum ncount Sb tid qtx pidv pidPriv
     (DFrac.own (1 : Qp).half) (DFrac.own (1 : Qp).half) dqn dqs dqbs dqb kd sd rootv rti dqr
     hj hproc hK hnoff htier htype hcovs hszb hinums hdisj horph
@@ -269,7 +269,7 @@ set_option maxHeartbeats 8000000 in
 site, a LIVE directory the caller has locked -- and `oty := None`): THE
 SECOND MINT.  The live directory's multiplicity rises by exactly one
 (`iregDotDelta_live`), so the pile is one fragment. -/
-theorem createMkdir_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem createMkdir_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) (kk : Nat) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (pidv : BitVec 32) (dqs : DFrac)
@@ -285,7 +285,7 @@ theorem createMkdir_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hl
     (ha0 : k'.regs 10#5 = ientry kk) :
     kctx cpu k' ∗ pcIs cpu KA.«iupdate» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv Γ γl pd pav pu γkl γk ∗
     wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum ∗
     inodeMeta (ientry kk) dn ∗ inodeMap fscFs (ientry kk) bm ∗
@@ -310,7 +310,7 @@ theorem createMkdir_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hl
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hinum, Hmeta, Hmap, Hsi, Hdi, Hpid, Hbs, Hop, HK⟩
   unfold createEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, -, -, -, -, -, #Hinv, -, -⟩
-  have h := IU.wp_iupdate_link_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j (ientry kk)
+  have h := IU.wp_iupdate_link_eb (GF := GF) Γ cpu k' γl pd pav pu j (ientry kk)
     inum dn dn0 bm u Sb true false none pidv pidPriv (DFrac.own (1 : Qp).half)
     (DFrac.own (1 : Qp).half) dqs hj hproc hK hnoff htier (fun _ => hcru) hgeom hcov hlog hnib
     hstab hnz (fun w hw => by cases hw) hbump hgrd hda hdir hpd ha0
@@ -338,7 +338,7 @@ set_option maxHeartbeats 8000000 in
 (Rocq `IUP.wp_iunlockput_dep_gen` at `crz := false`): the short parent
 forgotten, the escrow and the claims read off `isItable2`, hart-free; the
 arm's parked share `txPin t qt` comes back. -/
-theorem createMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem createMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) (γil γisl : GName) (kk : Nat) (qi s : Qp) (g : GName)
     (lo tl lo' tl' : Nat) (t : Nat) (qt : Qp)
@@ -355,7 +355,7 @@ theorem createMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     (hle : lo ≤ tl) (hle' : lo' ≤ tl') :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv Γ γl pd pav pu γkl γk ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗
     credFloor lo tl ∗ icHandle fscIc kk (.depTx s icfgDev inum g lo t qt) ∗
@@ -391,7 +391,7 @@ theorem createMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
   ihave Hoff := offRows_to_dep offCfg kk curCtx $$ Hoff
   ihave Hkeep := inodeRefShort_gen_forget kk (qi + s) qi icfgDev inum g lo' tl' hle' $$ [$Hfl' $Hkeep]
   icases logOpS_named icfgLog n Sb $$ Hop with ⟨%e0, Hop⟩
-  have h := IUP.wp_iunlockput_dep_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j γil γisl
+  have h := IUP.wp_iunlockput_dep_gen_eb (GF := GF) Γ cpu k' γl pd pav pu j γil γisl
     kk qi s g lo tl (.depTx s icfgDev inum g lo t qt) inum dn bm n Sb crb cru false e0 t qt pidv
     pidPriv dqb dqs hj hproc hK hnoff htier rfl hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn
     hpd ha0 rfl hle
@@ -508,7 +508,7 @@ structure CreateMkdirApp [Fscfg] [Icfg] (dind cinum : BitVec 32) (dn : Dinode) (
 def createMkdirBump (dp : Dinode) : Dinode := createSetf dp dp.diMajor dp.diMinor (dp.diNlink + 1#16)
 
 section Bodies
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -537,8 +537,8 @@ def createMkdirKeep (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major 
     irefSlots (ns - 3) ∗
     P (nparElems (bview plen pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
-    pfAt (aunarmOfArmNd (hlc := hlc) (fsGammaL fscFs) appE Nd Farm) Fun ∗
-    (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
+    pfAt (aunarmOfArmNd (fsGammaL fscFs) appE Nd Farm) Fun ∗
+    (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') ∗
     isSleeplockGen γil γisl (iLock (ientry kd)) (icSlp fscIc kd) (slhTok (icfgIsl kd)) ∗
     sleeplockedQ γisl qd.half (iLock (ientry kd)) pid ∗
@@ -567,7 +567,7 @@ theorem createMkdirKeep_lend_par [X : CurCtx] (hct : X.curTier = KTier.kpt) (k :
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (kd : Nat) (qd : Qp) (gd γil γisl : GName) (dind : BitVec 32) (tl : List (BitVec 8))
     (kslot : Nat) (q : Qp) (g gil gisl : GName) (lo tl0 : Nat) (cinum : BitVec 32) :
-    createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+    createMkdirKeep k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum ∗
     wordPointsTo (pPid k.proc) 4 pidPriv pid ⊢
       inodeShr kd qd.half.half icfgDev dind ∗ runitAny dind.toNat ∗
@@ -576,7 +576,7 @@ theorem createMkdirKeep_lend_par [X : CurCtx] (hct : X.curTier = KTier.kpt) (k :
       (inodeShr kd qd.half.half icfgDev dind -∗ runitAny dind.toNat -∗
         wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) V.root -∗ inodeHeldAt V.root V.rti -∗
         wordPointsTo (pPid k.proc) 4 pidPriv pid -∗
-        createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+        createMkdirKeep k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum ∗
         wordPointsTo (pPid k.proc) 4 pidPriv pid) := by
   unfold createMkdirKeep
@@ -613,7 +613,7 @@ theorem createMkdirKeep_lend_kid [X : CurCtx] (hct : X.curTier = KTier.kpt) (k :
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (kd : Nat) (qd : Qp) (gd γil γisl : GName) (dind : BitVec 32) (tl : List (BitVec 8))
     (kslot : Nat) (q : Qp) (g gil gisl : GName) (lo tl0 : Nat) (cinum : BitVec 32) :
-    createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+    createMkdirKeep k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum ∗
     wordPointsTo (pPid k.proc) 4 pidPriv pid ⊢
       inodeShr kslot q.half.half icfgDev cinum ∗ runitAny cinum.toNat ∗
@@ -622,7 +622,7 @@ theorem createMkdirKeep_lend_kid [X : CurCtx] (hct : X.curTier = KTier.kpt) (k :
       (inodeShr kslot q.half.half icfgDev cinum -∗ runitAny cinum.toNat -∗
         wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) V.root -∗ inodeHeldAt V.root V.rti -∗
         wordPointsTo (pPid k.proc) 4 pidPriv pid -∗
-        createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+        createMkdirKeep k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum ∗
         wordPointsTo (pPid k.proc) 4 pidPriv pid) := by
   unfold createMkdirKeep
@@ -657,11 +657,11 @@ theorem createMkdirKeep_cursor (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8)
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (kd : Nat) (qd : Qp) (gd γil γisl : GName) (dind : BitVec 32) (tl : List (BitVec 8))
     (kslot : Nat) (q : Qp) (g gil gisl : GName) (lo tl0 : Nat) (cinum : BitVec 32) :
-    createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+    createMkdirKeep k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum ⊢
     P (nparElems (bview plen pfun)).length dind.toNat ∗
       (P (nparElems (bview plen pfun)).length dind.toNat -∗
-        createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
+        createMkdirKeep k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
           dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0
           cinum) := by
   unfold createMkdirKeep
@@ -746,11 +746,11 @@ def createMkdirDotdotBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty 
     FsStateLink.linkTok (fsGammaL fscFs) (cinum.toNat : Int) (createIty ty (dind.toNat : Int)) -∗
     createDirty t cinum.toNat -∗
     creArmFired Farm cinum.toNat -∗
-    pfAt (adotsCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fdots -∗
-    pfAt (acreCommitAtGenNm (hlc := hlc) (fsGammaL fscFs) appE
+    pfAt (adotsCommitAt (fsGammaL fscFs) appE) Fdots -∗
+    pfAt (acreCommitAtGenNm (fsGammaL fscFs) appE
       (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
-    createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+    createMkdirKeep k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum -∗
     wpLoop c)
 
@@ -812,11 +812,11 @@ def createMkdirNameBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty ma
     createMkdirChildW ty dind cinum dc2 bm2 dat2 -∗
     createDirty t cinum.toNat -∗
     creArmFired Farm cinum.toNat -∗
-    pfAt (adotsCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fdots -∗
-    pfAt (acreCommitAtGenNm (hlc := hlc) (fsGammaL fscFs) appE
+    pfAt (adotsCommitAt (fsGammaL fscFs) appE) Fdots -∗
+    pfAt (acreCommitAtGenNm (fsGammaL fscFs) appE
       (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
-    createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+    createMkdirKeep k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum -∗
     wpLoop c)
 
@@ -880,11 +880,11 @@ def createMkdirBumpBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty ma
     createMkdirChildW ty dind cinum dc2 bm2 dat2 -∗
     createDirty t cinum.toNat -∗
     creArmFired Farm cinum.toNat -∗
-    pfAt (adotsCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fdots -∗
-    pfAt (acreCommitAtGenNm (hlc := hlc) (fsGammaL fscFs) appE
+    pfAt (adotsCommitAt (fsGammaL fscFs) appE) Fdots -∗
+    pfAt (acreCommitAtGenNm (fsGammaL fscFs) appE
       (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
-    createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+    createMkdirKeep k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum -∗
     wpLoop c)
 
@@ -939,7 +939,7 @@ def createMkdirCokBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty maj
     creDotsFired Fdots cinum.toNat dind.toNat true -∗
     creAcreFired Fok dind.toNat (bname 14 nf) cinum.toNat
       (creChild ty.toNat major.toNat minor.toNat dind.toNat cinum.toNat) -∗
-    createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+    createMkdirKeep k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum -∗
     wpLoop c)
 
@@ -974,7 +974,7 @@ structure CreateMkdirFmKid [Fscfg] [Icfg] (ty major minor : BitVec 16) (dc : Din
   hdots : dirDotsOnly dc datc
 
 section Exit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -993,7 +993,7 @@ theorem createMkdir_pile (ty : BitVec 16) (i : Nat) (v : Ity) (htd : ty = T_DIR)
 set_option maxHeartbeats 8000000 in
 /-- **THE `fail:` EXIT** (Rocq's three `iApply ("Hf" $! …)` sites): the stage
 state at +0x146, handed to the `fail:` twin (deviation 1). -/
-theorem createMkdir_exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem createMkdir_exit (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -1016,10 +1016,10 @@ theorem createMkdir_exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hsub : ∀ x ∈ Sb, x ∈ Sb4) (hmem : IBLOCK cinum icfgIst ∈ Sb4) (hn4 : iputUnits ≤ n4 ∧ n4 ≤ u)
     (hor : iputUnits + 1 ≤ n4 ∨ fscBmapstart ∈ Sb4)
     (hal : (createBuf (k.regs 2#5)).toNat % 8 = 0 ∧ tl.length = 2)
-    (hFM : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createFailMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    (hFM : createEnv Γ γl pd pav pu γkl γk ⊢
+      createFailMkdirBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv Γ γl pd pav pu γkl γk ∗
     kctx c (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs c (KA.«create» + 0x146#64) ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     byteBuf (createBuf (k.regs 2#5)) (DFrac.own 1) (bview 14 nf) ∗
@@ -1050,11 +1050,11 @@ theorem createMkdir_exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     createDirty t cinum.toNat ∗
     creArmFired Farm cinum.toNat ∗
     ((∃ full : Bool, creDotsFired Fdots cinum.toNat dind.toNat full) ∨
-      creDotsLeg (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots) ∗
-    pfAt (acreCommitAtGenNm (hlc := hlc) (fsGammaL fscFs) appE
+      creDotsLeg (fsGammaL fscFs) ty.toNat Fdots) ∗
+    pfAt (acreCommitAtGenNm (fsGammaL fscFs) appE
       (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok ∗
-    createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+    createMkdirKeep k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum
     ⊢ wpLoop (GF := GF) c := by
   unfold createIrefSlots at hns
@@ -1092,7 +1092,7 @@ end Exit
 /-! ## 2c.  The parent's link, read (Rocq :1497–1600) -/
 
 section ParLink
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -1293,7 +1293,7 @@ theorem createMkdir_par_nop (plen : Nat) (pfun : Nat → BitVec 8) (kd : Nat)
           dirSlot data (dirNrec dn.diSize.toNat)]!
         else fileByte data x) :
     CreateMkdirFmPar kd dind dp3 bm3 dat3 ∧
-      (iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
+      (iregInv fscIreg fscFs icfgIst icfgNib ⊢
         dlinks fscFs dind.toNat dn bm data -∗
         topFrag (fsGammaL (GF := GF) fscFs) dind.toNat (eraNode dn bm data) -∗
         |={⊤}=> dlinks fscFs dind.toNat dp3 bm3 dat3 ∗
@@ -1338,7 +1338,7 @@ theorem createMkdir_par_nop (plen : Nat) (pfun : Nat → BitVec 8) (kd : Nat)
   have hx0' : nodeExact (eraNode dp3 bm3 dat3) D :=
     nodeExact_cong _ _ D (by unfold fnIsDir; rw [← htyn]) hnln.symm hx0
   ihave Hdl := dlinks_intro fscFs dind.toNat dp3 bm3 dat3 D hdok0' hx0' $$ Hetk
-  imod (iregTopRetag_same (hlc := hlc) ⊤ fscFs dind.toNat _ _ CoPset.subseteq_top habs hloc3)
+  imod (iregTopRetag_same ⊤ fscFs dind.toNat _ _ CoPset.subseteq_top habs hloc3)
     $$ Hft Hap Htop with Htop
   imodintro
   iframe Hdl Htop
@@ -1515,7 +1515,7 @@ theorem createMkdir_dd_full [Fscfg] [Icfg] (ty major minor : BitVec 16) (cinum d
     createMkdir_dots_comm]
 
 section ChildTok
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -1528,7 +1528,7 @@ theorem createMkdir_take_dot (ty major minor : BitVec 16) (cinum dind : BitVec 3
     (dc1 : Dinode) (bm1 : Blkmap) (dat1 : Nat → List (BitVec 8)) (dcx : Dinode)
     (hdot : CreateMkdirDot ty major minor cinum dnc bmc datc dc1 bm1 dat1)
     (hcnib : cinum.toNat < 16 * icfgNib) :
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
+    iregInv fscIreg fscFs icfgIst icfgNib ⊢
       dlinks (GF := GF) fscFs cinum.toNat dc1 bm1 dat1 -∗ dinodeAt fscIreg cinum dcx -∗
       FsStateLink.linkTok (fsGammaL fscFs) (cinum.toNat : Int) (createIty ty (dind.toNat : Int)) -∗
       |={⊤}=> FsStateLink.linkTok (fsGammaL fscFs) (cinum.toNat : Int) (createIty ty (dind.toNat : Int)) ∗
@@ -1543,7 +1543,7 @@ theorem createMkdir_take_dot (ty major minor : BitVec 16) (cinum dind : BitVec 3
   iintro #Hinv Hdl Hdi Htok
   icases dlinks_open fscFs cinum.toNat dc1 bm1 dat1 $$ Hdl with ⟨%D, %hDx, Hetk⟩
   icases entToks_dotTake (fsGammaL fscFs) cinum.toNat _ D hlk ho $$ Hetk with ⟨⟨%v0, Hd0⟩, Hnd⟩
-  imod (iregInv_toks_agree (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib cinum dcx v0 _
+  imod (iregInv_toks_agree ⊤ fscIreg fscFs icfgIst icfgNib cinum dcx v0 _
       CoPset.subseteq_top (by omega)) $$ Hinv Hdi Hd0 Htok with ⟨%hag, Hdi, Hd0, Htok⟩
   rw [hag.1]
   imodintro
@@ -1608,7 +1608,7 @@ end ChildTok
 /-! ## 2d.  STAGE 2: `dirlink(dp, name, ip->inum)` (`+0x122 .. +0x130`) -/
 
 section StageName
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -1622,7 +1622,7 @@ set_option maxHeartbeats 16000000 in
 body's own miss; the `blt` at +0x130 either exits at FAIL ENTRY 3 (the
 parent re-parked view-preserving, the DOTS fired at both, the fill's pile
 whole again) or builds the parent's deferred re-park and falls through. -/
-theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -1633,14 +1633,14 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
-    (hB : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createMkdirBumpBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    (hB : createEnv Γ γl pd pav pu γkl γk ⊢
+      createMkdirBumpBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex)
-    (hFM : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createFailMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    (hFM : createEnv Γ γl pd pav pu γkl γk ⊢
+      createFailMkdirBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createMkdirNameBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    createEnv Γ γl pd pav pu γkl γk ⊢
+      createMkdirNameBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   iintro #Henv
   ihave HB := hB $$ Henv
@@ -1783,7 +1783,7 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc
   · -- ======== FAIL ENTRY 3: the parent's own link fell short ========
     have ht0 : tot = 0 := by rcases hatom3 with h | h <;> omega
     subst ht0
-    obtain ⟨hfp, hpark⟩ := createMkdir_par_nop (hlc := hlc) (GF := GF) plen pfun kd dind cinum dn bm
+    obtain ⟨hfp, hpark⟩ := createMkdir_par_nop (GF := GF) plen pfun kd dind cinum dn bm
       data nf bm3 dat3 dp3 hpar hkid.hnib hS.h16 hty3 hnl3 hszmax hiok3 hdok3 hddix3 hrng3
     ihave #Hinv := create_env_ireg Γ γl pd pav pu γkl γk $$ Henv
     ihave #Hft := iregInv_ftop $$ Hinv
@@ -1795,7 +1795,7 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc
     iapply wpLoop_fupd
     imod hpark $$ Hinv Hdl Htop with ⟨Hdl, Htop⟩
     -- THE DOTS FIRE at both: they landed before the parent's append failed
-    imod (create_dirty_dots (hlc := hlc) ⊤ t cinum.toNat dind.toNat true Fdots _ _
+    imod (create_dirty_dots ⊤ t cinum.toNat dind.toNat true Fdots _ _
         CoPset.subseteq_top hdd.row0 hdd.row2) $$ Hft Hap Hdirty Hdotsc Hctop
       with ⟨Hdirty, Hctop, Hdotsr⟩
     imodintro
@@ -1922,7 +1922,7 @@ theorem createMkdir_dot_full [Fscfg] [Icfg] (ty major minor : BitVec 16) (cinum 
   rfl
 
 section DotPark
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -2001,7 +2001,7 @@ end DotPark
 /-! ## 2e.  STAGE 1: `dirlink(ip, "..", dp->inum)` (`+0x10e .. +0x11e`) -/
 
 section StageDotdot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -2015,7 +2015,7 @@ set_option maxHeartbeats 16000000 in
 `"."` record; the `blt` at +0x11e either exits at FAIL ENTRY 2 (the DOTS
 fired at the `"."` alone, the pile whole again) or builds the child's
 deferred re-park and falls through. -/
-theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -2026,14 +2026,14 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
-    (hN : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createMkdirNameBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    (hN : createEnv Γ γl pd pav pu γkl γk ⊢
+      createMkdirNameBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex)
-    (hFM : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createFailMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    (hFM : createEnv Γ γl pd pav pu γkl γk ⊢
+      createFailMkdirBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createMkdirDotdotBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    createEnv Γ γl pd pav pu γkl γk ⊢
+      createMkdirDotdotBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   iintro #Henv
   ihave HN := hN $$ Henv
@@ -2205,7 +2205,7 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
     iintro Hk Hpc
     iapply wpLoop_fupd
     -- THE DOTS FIRE at the `"."` alone
-    imod (create_dirty_dots (hlc := hlc) ⊤ t cinum.toNat dind.toNat false Fdots _ _
+    imod (create_dirty_dots ⊤ t cinum.toNat dind.toNat false Fdots _ _
         CoPset.subseteq_top hdot.row0 hrow2f) $$ Hft Hap Hdirty Hdotsc Hctop
       with ⟨Hdirty, Hctop, Hdotsr⟩
     imodintro
@@ -2230,7 +2230,7 @@ end StageDotdot
 /-! ## 2f.  STAGE 0: `dirlink(ip, ".", ip->inum)` (`+0xf8 .. +0x10a`) -/
 
 section StageDot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -2267,7 +2267,7 @@ set_option maxHeartbeats 16000000 in
 (an empty directory has no records); the `blt` at +0x10a either exits at
 FAIL ENTRY 1 (the child retagged view-preserving, no dot fired) or files
 the fill's first fragment in the child's `"."` entry and falls through. -/
-theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -2278,14 +2278,14 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
-    (hD : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createMkdirDotdotBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    (hD : createEnv Γ γl pd pav pu γkl γk ⊢
+      createMkdirDotdotBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex)
-    (hFM : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createFailMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    (hFM : createEnv Γ γl pd pav pu γkl γk ⊢
+      createFailMkdirBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    createEnv Γ γl pd pav pu γkl γk ⊢
+      createMkdirBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   have hns := hS.hns
   unfold createIrefSlots at hns
@@ -2334,7 +2334,7 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   · rw [← htydir]; iexact Hshot
   ihave #Hcshotk : ityShot g ty $$ [Hcshot]
   · rw [← htyc]; iexact Hcshot
-  ihave Hkeep : createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs
+  ihave Hkeep : createMkdirKeep k plen pfun ty major minor γ pid V M u Sb ns dqb dqs
       dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo
       tl0 cinum $$ [Hframe Htl Hsbn Hpidw Hbarew Hpath Hisl HP Hdlk Hun Hcont Hsl Hoff Hfrz Hkp Hru
         Hcsl Hcoff Hcfrz Hckp Hcru]
@@ -2492,12 +2492,12 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     iintro Hk Hpc
     iapply wpLoop_fupd
     -- VIEW-PRESERVING: no dot landed, the child is a bare directory on both sides
-    imod (create_dirty_retag_same (hlc := hlc) ⊤ t cinum.toNat _ _ CoPset.subseteq_top habs1)
+    imod (create_dirty_retag_same ⊤ t cinum.toNat _ _ CoPset.subseteq_top habs1)
       $$ Hft Hap Hdirty Hctop with ⟨Hdirty, Hctop⟩
     imodintro
     ihave Hdotsx : ((∃ full : Bool, creDotsFired Fdots cinum.toNat dind.toNat full) ∨
-        creDotsLeg (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots) $$ [Hdotsc]
-    · iright; iapply (creDotsLeg_of (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots) $$ Hdotsc
+        creDotsLeg (fsGammaL fscFs) ty.toNat Fdots) $$ [Hdotsc]
+    · iright; iapply (creDotsLeg_of (fsGammaL fscFs) ty.toNat Fdots) $$ Hdotsc
     iapply (createMkdir_exit Γ k γl pd pav pu γkl γk plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex cpu spie1 spp1 R1 kd qd gd γil γisl dind
       nf tl t kslot q g gil gisl lo tl0 cinum dn bm data dc1 bm1 dat1 n4 Sb4 hS.hns hR1 htd
@@ -2513,7 +2513,7 @@ end StageDot
 /-! ## 3.  STAGE 4: ARM C-OK's block from the mkdir arm (`+0xe0 .. +0xea`) -/
 
 section StageCok
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -2525,7 +2525,7 @@ set_option maxHeartbeats 16000000 in
 /-- **ARM C-OK, RE-WALKED** (Rocq :2297–2600): `iunlockput(dp)` -- FREE, both
 credits in hand -- then `s2 := ip`, the lazy `s3` restore, the funnel, and
 the contract's `ok = true, made = true` arm at the child's record. -/
-theorem create_mkdir_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem create_mkdir_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -2536,8 +2536,8 @@ theorem create_mkdir_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createMkdirCokBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    createEnv Γ γl pd pav pu γkl γk ⊢
+      createMkdirCokBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   have hK10 := create_slots_10 _ hS.hK
   have hns := hS.hns
@@ -2647,7 +2647,7 @@ theorem create_mkdir_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
   · iframe
   have hns1 : ns - 3 + 1 + 1 = ns - 1 := by omega
   rw [hns1]
-  ihave Harms := create_ok_of_made (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat Nm Nd P
+  ihave Harms := create_ok_of_made (fsGammaL fscFs) ty.toNat major.toNat minor.toNat Nm Nd P
     Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat (bname 14 nf) cinum.toNat
     (Xv6.sys_unlink_last_of_npar _ nf hpar.hnp) $$ HP [Hdots] Hacre Hun Hdlk
   · ileft; iexact Hdots
@@ -2675,7 +2675,7 @@ end StageCok
 (`+0x134 .. +0x144`) -/
 
 section StageBump
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -2707,7 +2707,7 @@ set_option maxHeartbeats 16000000 in
 /-- **STAGE 3** (Rocq :1630–2300): `dp->nlink++`, `iupdate(dp)` minting the
 parent's unit, the flush's nonzero read-back (`iregInv_tok_nz`), both
 deferred re-parks, the DOTS fire and the PARENT LEG, and `c.j +0xe0`. -/
-theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -2719,11 +2719,11 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
     (hNmL : ∀ nm : Fname, (pathElems (bview plen pfun)).getLast? = some nm → Nm nm)
-    (hC : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createMkdirCokBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    (hC : createEnv Γ γl pd pav pu γkl γk ⊢
+      createMkdirCokBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createMkdirBumpBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    createEnv Γ γl pd pav pu γkl γk ⊢
+      createMkdirBumpBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   iintro #Henv
   ihave HC := hC $$ Henv
@@ -2802,7 +2802,7 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   -- THE FLUSH'S READ-BACK: the unit it minted is outstanding, so the bumped
   -- count is nonzero -- the exact `+1` (Rocq's `ireg_tok_nz`)
   iapply wpLoop_fupd
-  imod (iregInv_tok_nz (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib dind _ w CoPset.subseteq_top
+  imod (iregInv_tok_nz ⊤ fscIreg fscFs icfgIst icfgNib dind _ w CoPset.subseteq_top
       (by have := hpar.hdib; omega)) $$ Hinv Hdi Hvend with ⟨%hmt, Hdi, Hvend⟩
   have hmtnz : (dp3.diNlink + 1#16).toNat ≠ 0 := hmt.1
   have hbumpeq : (dp3.diNlink + 1#16).toNat = dn.diNlink.toNat + 1 := by
@@ -2856,17 +2856,17 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     rw [htyz, creChild_dir]; exact hdd.row2
   -- THE DOTS FIRE FIRST: the child's row moves to its two dots and its
   -- registry arm comes home (Rocq's `cr_dirty_clear_dots`)
-  imod (create_dirty_clear_dots (hlc := hlc) ⊤ t cinum.toNat dind.toNat true Fdots _ _
+  imod (create_dirty_clear_dots ⊤ t cinum.toNat dind.toNat true Fdots _ _
       CoPset.subseteq_top hlocc hdd.row0 hdd.row2) $$ Hft Hap Hdirty Hdotsc Hctop
     with ⟨Htx, Hctop, Hdotsr⟩
   -- THE PARENT LEG FIRES (Rocq's `caf_acre_fire`)
   ihave Hctop : topFragQ (fsGammaL fscFs) (DFrac.own 1) cinum.toNat (eraNode dc2 bm2 dat2) $$ [Hctop]
   · rw [topFrag_1]; iexact Hctop
   -- the parked bundle lends the parent cursor to the leg (TL-3K)
-  icases createMkdirKeep_cursor (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs
+  icases createMkdirKeep_cursor k plen pfun ty major minor γ pid V M u Sb ns dqb dqs
     dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0
     cinum $$ Hkeep with ⟨HPpar, Hkeep⟩
-  imod (cafAcre_fire_nm (hlc := hlc) fscFs ⊤ (creChild ty.toNat major.toNat minor.toNat) Nm
+  imod (cafAcre_fire_nm fscFs ⊤ (creChild ty.toNat major.toNat minor.toNat) Nm
       (P (nparElems (bview plen pfun)).length) Farm Fok
       dind.toNat cinum.toNat (bname 14 nf) (DFrac.own 1) (eraNode dn bm data) _ _
       CoPset.subseteq_top (hNmL _ (Xv6.sys_unlink_last_of_npar _ nf hpar.hnp)) hlocp hdir hnl0' happ.hnonep
@@ -2913,7 +2913,7 @@ end StageBump
 /-! ## 5.  THE HALF -/
 
 section Half
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -2922,7 +2922,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 `createMkdirBody`, from the `fail:` twin `createFailMkdirBody` as a PREMISE
 (deviation 1 -- the seal composes it with `CreateFailMkdir.create_fail_mkdir_half`). -/
 theorem create_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -2934,11 +2934,11 @@ theorem create_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
     (hNmL : ∀ nm : Fname, (pathElems (bview plen pfun)).getLast? = some nm → Nm nm)
-    (hFM : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createFailMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    (hFM : createEnv Γ γl pd pav pu γkl γk ⊢
+      createFailMkdirBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
+    createEnv Γ γl pd pav pu γkl γk ⊢
+      createMkdirBody k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs
         dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex :=
   have hC := create_mkdir_cok IUP Γ k γl pd pav pu j γkl γk plen pfun ty major minor γ pid V M u
     Sb ns dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex hS

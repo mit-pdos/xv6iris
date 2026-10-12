@@ -88,7 +88,7 @@ theorem vdis_usedPtr : KA.«disk» + 16#64 = aUsedPtr := rfl
 theorem vdis_usedIdx : KA.«disk» + 32#64 = aUsedIdx := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-! ## `fence iorw,iorw`, the floor rule
@@ -105,7 +105,7 @@ end
 /-! ## The two MMIO instruction rules, with the identity claim supplied -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable {lent : Bool}
 
 /-- `lw rd, imm(rs1)` from a virtio-mmio register. -/
@@ -153,7 +153,7 @@ end
 /-! ## The three callees, at their entry addresses -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- `acquire(&disk.vdisk_lock)` at its entry address. -/
 theorem vdis_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GName)
@@ -167,7 +167,7 @@ theorem vdis_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl 
       locked γl cpu' -∗ diskRes γ pd pav pu curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
+  have h := AC.wp_acquire (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
     hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
@@ -190,7 +190,7 @@ theorem vdis_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl 
         (k'.locks.filter (fun x => x ≠ "virtio_disk"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
+  have h := RE.wp_release (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
     hsie hnoff hK reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -210,7 +210,7 @@ theorem vdis_wakeup (WK : WAKEUP) (Γ : SchedNames) (cpu : CPU) (k' : KCtx)
     (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := WK.wp_wakeup (hlc := hlc) (GF := GF) Γ cpu k' hnoff hK hlk htier
+  have h := WK.wp_wakeup (GF := GF) Γ cpu k' hnoff hK hlk htier
   unfold wp_wakeup_body at h
   simp only [wakeupAddr] at h
   iintro ⟨Hk, Hpc, HΓ, HΦ⟩
@@ -228,7 +228,7 @@ end
 /-! ## The payload, opened around the watermark -/
 
 section pay
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- Everything in `Xv6.diskRes` except the handler's watermark, its
 persistent bound and the `disk.used_idx` cell -- the three parts the loop
@@ -423,7 +423,7 @@ theorem vdisPres_set (k : KCtx) (R : RegMap) (rd : BitVec 5) (v : BitVec 64) (h 
 /-! ## The exit: `release(&disk.vdisk_lock)` and the epilogue -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 theorem vdis_exit (RE : RELEASE) (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName)
@@ -602,7 +602,7 @@ theorem vdis_usedElem_facts (pu : PAddr) (h : descPageRw pu) (j : Nat) (hj : j <
 /-! ## The loop -/
 
 section loop
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- The geometry's used-page pointer. -/
 theorem vdis_geom_used (γ : DiskNames) (pd pav pu : PAddr) :
@@ -919,7 +919,7 @@ end loop
 /-! ## The function -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 theorem vdis_caps_inv (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
     diskCaps (GF := GF) γ γl pd pav pu ⊢ diskInv γ := by
@@ -936,7 +936,7 @@ set_option maxHeartbeats 4000000 in
 and `wakeup`. -/
 theorem virtio_disk_intr_proof
     (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) : VIRTIO_DISK_INTR :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier => by
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier => by
   unfold wp_virtio_disk_intr_body
   simp only [virtioDiskIntrAddr]
   have hK22 : 22 ≤ k.avail := by unfold virtioDiskIntrSlots wakeupSlots at hK; omega

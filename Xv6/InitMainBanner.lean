@@ -21,17 +21,17 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
 /-- Rocq `wp_kinit_printf` at the banner: the flagged deposit prints. -/
 theorem kinit_banner_law (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF) (N : UkNames GF) (h : CPU)
     (m : RegMap) (n : Nat) (ha0 : m.get 10#5 = BitVec.ofNat 64 kinitLitStart) :
-    ⊢ udepwLaw (hlc := hlc) 16 -∗ initCode N.t -∗ utextStr N.t 0x988 18 (User.Init.initLit 0x988) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«printf») (12 + (12 + (4 + n))) -∗
+    ⊢ udepwLaw 16 -∗ initCode N.t -∗ utextStr N.t 0x988 18 (User.Init.initLit 0x988) -∗
+      urun N h m (BitVec.ofNat 64 User.Init.Sym.«printf») (12 + (12 + (4 + n))) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (12 + (12 + (4 + n))) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (12 + (12 + (4 + n))) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hwr #Hc #Hstr Hrun Hcont
   iapply HP.wp_initPrintfChain N 0x988 18 (User.Init.initLit 0x988) (fun _ => iprop(emp)) h m n (by decide)
@@ -48,12 +48,12 @@ theorem kinit_banner_law (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF) (N 
 theorem wp_kinit_banner (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF) (N : UkNames GF) (T : IProp GF)
     [Persistent T] (stc : FdState) (Cr : ConsCred GF) (cn : ConsNames) (h : CPU) (m : RegMap) (n : Nat)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 kinitLitStart) :
-    ⊢ kinitWlaw (hlc := hlc) T -∗ kinitBanLaw (hlc := hlc) N stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
+    ⊢ kinitWlaw T -∗ kinitBanLaw N stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
       utextStr N.t 0x988 18 (User.Init.initLit 0x988) -∗
-      uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗ ufdHead T stc N.fd -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«printf») (12 + (12 + (4 + n))) -∗
-      (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ kinitLent (hlc := hlc) N T stc cn Cr -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (12 + (12 + (4 + n))) -∗ wpLoop h') -∗
+      uinitTok cn T (initRd Cr.ccRd (ccWbn Cr)) -∗ ufdHead T stc N.fd -∗
+      urun N h m (BitVec.ofNat 64 User.Init.Sym.«printf») (12 + (12 + (4 + n))) -∗
+      (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ kinitLent N T stc cn Cr -∗
+        urun N h' m' (retPc (m.get 1#5)) (12 + (12 + (4 + n))) -∗ wpLoop h') -∗
       wpLoop h := by
   unfold kinitWlaw
   iintro ⟨#Hwrl, #Hwcl⟩ #Hblaw #Hc #Hstr Htk Hhd Hrun Hcont

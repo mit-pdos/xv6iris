@@ -30,7 +30,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -45,19 +45,19 @@ def wpShPeekBody : Prop :=
     tl = (List.range tlen).map tf → refPeek len f off tl = (hit, s) →
     ⊢ ushCode N.t -∗ uword N.d ps w0 -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
       ushSstr N tt dt toks tlen tf -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«peek») (8 + (2 + n)) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«peek») (8 + (2 + n)) -∗
       (uword N.d ps (BitVec.ofNat 64 (s0 + s)) -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
         ushSstr N tt dt toks tlen tf -∗ ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
         ⌜m'.get 10#5 = BitVec.ofNat 64 (if hit then 1 else 0)⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (8 + (2 + n)) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (8 + (2 + n)) -∗ wpLoop h') -∗
       wpLoop h
 
 end
 
 /-- The interface of sh's `peek`. -/
 structure SH_PEEK : Prop where
-  wp_shPeek : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_shPeek : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShPeekBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShPeekBody (GF := GF)
 
 end Xv6

@@ -102,7 +102,7 @@ def ufFoot : UFoot := uFootL ufRwList ufRoList ufWires
 
 /-- The user register frame (Rocq `hreg_frame rs u_Drw ∗ hreg_frame_ro
 (u_Df dqc) rs u_Dro`). -/
-def ufRegF {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (cpu : CPU) (C : UCfg) :
+def ufRegF {GF : BundledGFunctors.{0}} [MachGS GF] (cpu : CPU) (C : UCfg) :
     URegFrame GF cpu ufFoot :=
   ufRegFrame cpu (ufDf C.dqc) ufRwList ufRoList ufWires ufLists_nodup
 
@@ -241,7 +241,7 @@ def UfUser (v : UfVals) : Prop :=
 /-! ## §3 The bundles, as frame pieces -/
 
 section bundles
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **Rocq `u_gpr_file_frame` / `u_frame_gpr_file`**: the GPR file read off
 a register file is the frame's GPR cells. -/
@@ -333,7 +333,7 @@ end bundles
 /-! ## §4 Open and close -/
 
 section openclose
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- What rides aside the frames: `mepc` (not read at User). -/
 def ufAside (cpu : CPU) : IProp GF := iprop(∃ mepc : BitVec 64, Register.mepc ↦ᵣ[cpu] mepc)
@@ -351,7 +351,7 @@ or the exit token of the exit the file names (its machine receipt and, NI
 M2-W2d, the one-shot claims minted there -- exclusive, so the rider is no
 longer persistent). -/
 def uxRcpt (cpu : CPU) (f : RegFile) : IProp GF :=
-  iprop(⌜f .cur_privilege = Privilege.User⌝ ∨ uExitTok (hlc := hlc) (ufExitEv cpu f))
+  iprop(⌜f .cur_privilege = Privilege.User⌝ ∨ uExitTok (ufExitEv cpu f))
 
 /-- The cells the rider reads. -/
 def uxRcptRegs : List Register := [.cur_privilege, .satp, .scause, .sepc] ++ uxaGprs
@@ -376,7 +376,7 @@ theorem uxRcpt_user (cpu : CPU) (f : RegFile) (h : f .cur_privilege = Privilege.
   ipureintro; exact h
 
 theorem uxRcpt_trap (cpu : CPU) (f : RegFile) (h : f .cur_privilege = Privilege.Supervisor) :
-    uxRcpt (GF := GF) cpu f ⊢ uExitTok (hlc := hlc) (ufExitEv cpu f) := by
+    uxRcpt (GF := GF) cpu f ⊢ uExitTok (ufExitEv cpu f) := by
   unfold uxRcpt
   iintro H
   icases H with (%hu | H)
@@ -507,7 +507,7 @@ theorem uf_close_trap [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd �
     (hpc : f .PC = stvecBase C.stvec) (hnpc : f .nextPC = stvecBase C.stvec)
     (hwf : UbMemWf pt t mm) (hs : UbMemStep pt t t' mm mm') (htlb : utlbOk t' (f .tlb)) :
     kmapStatic ⊢ (ufRegF (GF := GF) cpu C).F f -∗ (ubFrame curCtx (ubUAddrs pt t)).B mm' -∗ ufAside cpu -∗
-      Rut pt -∗ uExitTok (hlc := hlc) (ufExitEv cpu f) -∗ userTrapFrame cpu C pt Rut := by
+      Rut pt -∗ uExitTok (ufExitEv cpu f) -∗ userTrapFrame cpu C pt Rut := by
   iintro #HS HF HB Ha Hrut Hrc
   ihave Hrc := uExitTok_eq (show ufExitEv cpu f =
       .uExit cpu (satpOf .kpt pt.root) (f .scause) (f .sepc) (gprList (uxaXget f)) by
@@ -580,7 +580,7 @@ theorem ufTrapSet_pc (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 6
   unfold ufTrapSet; simp [RegFile.set_other]
 
 section seams
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 set_option maxRecDepth 10000 in
 /-- **The frame opened into UTrap's cells** (with `hwConfig`, the caller's

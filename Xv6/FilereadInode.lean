@@ -45,7 +45,7 @@ set_option linter.unusedSimpArgs false
 /-! ## The frame's two lazy restores and the tail -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 set_option maxHeartbeats 4000000 in
 /-- `ld s1,24(sp) ; ld s3,8(sp)` at `pc` (Rocq `fr_rest2`). -/
@@ -76,7 +76,7 @@ theorem frd_rest2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
 end Frame
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -129,8 +129,8 @@ def frdK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     fileRef γ fk q st -∗ procPrivExtEv (procAddr j) pid V P' M' -∗
     genHalvesPriv (procAddr j) pid V.gen -∗
-    filereadEnvOut (hlc := hlc) st -∗
-    filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin Rp Rpe P (R' 10#5) M' (k.regs 11#5) -∗ wpLoop c)
+    filereadEnvOut st -∗
+    filereadArms V.gen V.upt st n F Rd Rin Rp Rpe P (R' 10#5) M' (k.regs 11#5) -∗ wpLoop c)
 
 /-! ## The lock-held ghost steps -/
 
@@ -160,7 +160,7 @@ theorem frd_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo :
           inodeBlocksQ fscFs (DFrac.own Qp.quarter) bm data ∗
           topFragQ (fsGammaL fscFs) (DFrac.own Qp.quarter) inum.toNat (eraNode dn bm data) ∗
           wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) v ∗
-          offLink (hlc := hlc) γo (v.toNat : Int) ∗ frdOut ik fk q γb γo m T0 Tr) := by
+          offLink γo (v.toNat : Int) ∗ frdOut ik fk q γb γo m T0 Tr) := by
   iintro ⟨Hrun, #Hflr, Hat, Hrows, Hheld⟩
   unfold icDepHeld
   simp only [icDepRd, ↓reduceIte]
@@ -199,11 +199,11 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
     (hip : C.ip = ientry ik) (hik : ik < NINODE) (hq : MachCSL.qsum m = q.val)
     (hok : inodeOk fscCov fscLogst dn bm data) (hloc : InodeLocal inum.toNat (eraNode dn bm data))
     (hwf : offWf v) (hcap : v.toNat + dd ≤ MAXFILE * BSIZE) :
-    ownCtx cpu curCtx ∗ fsReady (hlc := hlc) ∗
+    ownCtx cpu curCtx ∗ fsReady ∗
       foffRow (GF := GF) (.open true wb (.inode inum.toNat γo om)) ∗
-      areadInOm (hlc := hlc) om (fsGammaL fscFs) appE inum.toNat γo F ∗
+      areadInOm om (fsGammaL fscFs) appE inum.toNat γo F ∗
       topFragQ (fsGammaL fscFs) (DFrac.own Qp.quarter) inum.toNat (eraNode dn bm data) ∗
-      offLink (hlc := hlc) γo (v.toNat : Int) ∗
+      offLink γo (v.toNat : Int) ∗
       wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (filerwOffW v dd) ∗
       frdOut (GF := GF) ik fk q γb γo m T0 Tr ∗
       inodeMeta (ientry ik) dn ∗ inodeMapQ fscFs (DFrac.own Qp.quarter) (ientry ik) bm ∗
@@ -253,7 +253,7 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x34 .. +0x36`: `f->ip`, ilock.** -/
-theorem frd_seg_lock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem frd_seg_lock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk j ik : Nat) (q : Qp)
     (ipv : BitVec 64) (s : Qp) (g : GName) (lo tl : Nat) (ty : BitVec 16) (inum : BitVec 32)
     (γil γisl : GName) (pid : BitVec 32) (Tl : Nat) (v9 v18 v19 : BitVec 64)
@@ -264,7 +264,7 @@ theorem frd_seg_lock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     kctx cpu (((k.withSpie spie spp).pushed 6).withRegs R) ∗
     pcIs cpu (KA.«fileread» + 0x34#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+    procsInv Γ ∗ panicEnv ∗ fsReady ∗
     wordPointsTo (pPid k.proc) 4 pidPriv pid ∗
     wordPointsTo (fnode fk + 24#64) 8 (DFrac.own q) ipv ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
@@ -324,7 +324,7 @@ theorem frd_seg_lock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
 set_option maxHeartbeats 24000000 in
 /-- **`+0x3a .. +0x52`: the arguments, readi, the offset's update** (Rocq's
 `+0x34 .. +0x4c`): the cell comes out at `off + dd` on every outcome. -/
-theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk j ik : Nat) (n : Int) (q : Qp)
     (ipv : BitVec 64) (γkl : GName) (γk : KmemNames) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (dn : Dinode) (v : BitVec 32) (V : ProcPriv)
@@ -337,7 +337,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     kctx cpu (((k.withSpie spie spp).pushed 6).withRegs R) ∗
     pcIs cpu (KA.«fileread» + 0x3a#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+    procsInv Γ ∗ panicEnv ∗ fsReady ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     wordPointsTo (fnode fk + 24#64) 8 (DFrac.own q) ipv ∗
     wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) v ∗
@@ -498,7 +498,7 @@ theorem frd_seg_unlock (IU : IUNLOCK) (Γ : SchedNames)
     pcIs cpu (KA.«fileread» + 0x54#64) ∗
     frame6s3 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w1 (k.regs 18#5) w3 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procsInv Γ ∗ fsReady (hlc := hlc) ∗
+    procsInv Γ ∗ fsReady ∗
     wordPointsTo (fnode fk + 24#64) 8 (DFrac.own q) ipv ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ frdLk ik s g lo inum γisl pid ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗

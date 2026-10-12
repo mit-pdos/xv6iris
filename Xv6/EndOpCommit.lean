@@ -23,9 +23,10 @@ accounting tail at `+0x42`.  Entered by falling out of the copy loop with
 the cursor at `n`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- The converse of `Xv6.eo_idx_range`: a `List.range` row read back as an
 INDEXED row over a list of the same length. -/
 theorem eo_range_idx {A : Type} :
@@ -65,9 +66,10 @@ theorem eo_hdr_ne (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (w : BitVec 32)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
+omit [MachGS GF] in
 /-- The slot pool is additive (`install_trans` hands back `2 + n` units at
 once, and they have to rejoin the rest). -/
 theorem bslots_add (γ : BcacheNames) : ∀ (m n : Nat),
@@ -88,6 +90,7 @@ theorem bslots_add (γ : BcacheNames) : ∀ (m n : Nat),
     iapply bslots_cons (m + n)
     iframe Hu H
 
+omit [MachGS GF] in
 /-- The commit's per-entry row, assembled for `install_trans`: the slot's
 client half at the content the copy loop wrote, and the home block's pin
 half (still set -- `log_write`'s `bpin` minted it). -/
@@ -102,6 +105,7 @@ theorem eo_rows_pack (γfs : FsNames) (ls : Nat) (W : List (BitVec 32))
     (Ψ := fun (_ : Nat) (w : BitVec 32) => fsDirtyHalf γfs w.toNat v) (l := W)).2
   iexact H
 
+omit [MachGS GF] in
 theorem eo_rows_unpack (γfs : FsNames) (ls : Nat) (W : List (BitVec 32))
     (Lw : Nat → List (BitVec 8)) (v : Bool) :
     ([∗list] i ↦ w ∈ W, fsChalf (GF := GF) γfs (logSlotBno ls i) (Lw i) ∗
@@ -114,6 +118,7 @@ theorem eo_rows_unpack (γfs : FsNames) (ls : Nat) (W : List (BitVec 32))
     (Ψ := fun (_ : Nat) (w : BitVec 32) => fsDirtyHalf γfs w.toNat v) (l := W)).1
   iexact H
 
+omit [MachGS GF] in
 /-- The home blocks' pin halves, read off the `cov` row through the map. -/
 theorem eo_dirty_of_map (γfs : FsNames) (W : List (BitVec 32)) (v : Bool) :
     ([∗list] b ∈ W.map (fun w => w.toNat), fsDirtyHalf (GF := GF) γfs b v) ⊢
@@ -121,6 +126,7 @@ theorem eo_dirty_of_map (γfs : FsNames) (W : List (BitVec 32)) (v : Bool) :
   rw [BigSepL.bigSepL_map (PROP := IProp GF)
     (Φ := fun (_ : Nat) (b : Nat) => fsDirtyHalf γfs b v) (fun w : BitVec 32 => w.toNat)]
 
+omit [MachGS GF] in
 theorem eo_dirty_to_map (γfs : FsNames) (W : List (BitVec 32)) (v : Bool) :
     ([∗list] i ↦ w ∈ W, fsDirtyHalf (GF := GF) γfs w.toNat v) ⊢
       [∗list] b ∈ W.map (fun w => w.toNat), fsDirtyHalf γfs b v := by
@@ -132,13 +138,13 @@ end
 /-! ## Context normalisation inside the frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 40000000 in
 theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RELEASE)
-    (WK : WAKEUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (WK : WAKEUP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64) (j ls n : Nat) (dev : BitVec 32)
     (W : List (BitVec 32)) (L : BlockMap) (D : RegMapF Bool) (Lw : Nat → List (BitVec 8))
@@ -169,17 +175,17 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
     logCtx γ γb γfs V.cov ls dev ∗
     -- the crash seam and the era's registration: what turns this block's
     -- `bwrite`s into REAL durability fupds
-    fsCrashSeam (hlc := hlc) (GF := GF) V.cov ls ∗
-    eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc) (GF := GF)) ∗
+    fsCrashSeam (GF := GF) V.cov ls ∗
+    eraRegistered (GF := GF) (genId (GF := GF))
+      (MachGS.era (GF := GF)) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     eoOpen γb γfs V.cov ls n W L D Lw n ∗
     -- the era's mirror half at the chained picture, and THE FILE SYSTEM'S LAW's
     -- output, already read: the next durable epoch at the law's guest `G`,
     -- with the seam at that same `G`
-    logMirrorHalf (hlc := hlc) Mc ∗ fsCrashSeamAt (hlc := hlc) G V.cov ls ∗
-    durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ∗
+    logMirrorHalf Mc ∗ fsCrashSeamAt G V.cov ls ∗
+    durPair G (eraSyncTok (GF := GF)) (genId (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) ∗
     (∀ c' : CPU, eoPost k pidv dqp c')
@@ -222,8 +228,8 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_wh]
   iintro Hk Hpc
   iapply (eo_wh WH Γ cpu _ γl γb V γdl γfs pd pav pu j ls dev n W L pidv dqp
-      (fun bs' => iprop(logMirrorHalf (hlc := hlc) (lmUpd Mc (logHdrBno ls) bs') ∗
-        eraSyncTok (hlc := hlc) (GF := GF)))
+      (fun bs' => iprop(logMirrorHalf (lmUpd Mc (logHdrBno ls) bs') ∗
+        eraSyncTok (GF := GF)))
       k.proc (by k_norm_g) k.sie (by k_norm_g)
       hj ?wproc ?wK ?wnoff ?wtier hgeom hdev hcl hdt ⟨hnW, hnL⟩ hpd)
     $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $Hblk $Hauth $Hhdr $Hu1
@@ -275,7 +281,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   -- THE INSTALL fupds, one per entry, out of one generator
   ihave #Hgen := eo_install_gen V.cov ls n W Lw (lmUpd Mc (logHdrBno ls) bs1) hnW hnL hnodup
     hhome hM1 $$ Hseam Hreg Hswlb
-  ihave HR0 : ▷ logMirrorHalf (hlc := hlc) (GF := GF)
+  ihave HR0 : ▷ logMirrorHalf (GF := GF)
       (lmInstall (lmUpd Mc (logHdrBno ls) bs1) (W.map (fun w => w.toNat)) Lw 0) $$ [Hmir]
   · inext
     rw [show lmInstall (lmUpd Mc (logHdrBno ls) bs1) (W.map (fun w => w.toNat)) Lw 0 =
@@ -284,7 +290,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   iapply (eo_it IT Γ cpu _ γl γb V γdl γfs pd pav pu j ls dev n W Lw
       (PartialMap.insert L (logHdrBno ls) bs1) D pidv dqp
       (fsHomeList V.cov ls) Xv ([] : List Nat)
-      (fun i => logMirrorHalf (hlc := hlc) (GF := GF)
+      (fun i => logMirrorHalf (GF := GF)
         (lmInstall (lmUpd Mc (logHdrBno ls) bs1) (W.map (fun w => w.toNat)) Lw i))
       k.proc (by k_norm_g) k.sie (by k_norm_g)
       hj ?iproc ?iK ?inoff ?itier hgeom hdev hcl hdt ?ia0 ⟨hnW, hnL⟩
@@ -350,7 +356,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
     (eo_caught W Lw Mc V.cov ls n bs1 hnW hnL hnodup hhome hMcslot) $$ Hseam Hreg Hswlb HRn
   iapply (eo_wh WH Γ cpu _ γl γb V γdl γfs pd pav pu j ls dev 0 ([] : List (BitVec 32))
       (PartialMap.insert L (logHdrBno ls) bs1) pidv dqp
-      (fun bs' => iprop(logMirrorHalf (hlc := hlc) (lmUpd
+      (fun bs' => iprop(logMirrorHalf (lmUpd
           (lmInstall (lmUpd Mc (logHdrBno ls) bs1) (W.map (fun w => w.toNat)) Lw n)
           (logHdrBno ls) bs')))
       k.proc (by k_norm_g) k.sie (by k_norm_g)

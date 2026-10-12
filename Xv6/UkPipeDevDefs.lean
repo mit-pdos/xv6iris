@@ -166,7 +166,7 @@ end Dev
 /-! ## §2 The kernel leaves (deviation 2), and the deposit with the source -/
 
 section Leaves
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -181,8 +181,9 @@ def udepwfKs (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : Ue
     ⌜K fdv⌝ -∗ ⌜usrcOk M pm sz (m.get 11#5) nb f⌝ -∗
     myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      UexecSG.sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
+      UexecSG.sbundleAt (uslot) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
 
+omit [MachGS GF] in
 /-- **Rocq `UkRunSys.usrc_ok_utext`** at a `Nat` start (deviation 6; the
 landed `usrcOk_utext` is at a word start `ua.toNat`). -/
 theorem pdev_usrcOk_utext (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (ua nb : Nat)
@@ -203,6 +204,7 @@ theorem pdev_usrcOk_utext (γt γd γs : GName) (M : ElfMem) (pm : Nat → Optio
   apply ukText_rmapped P sz _ hwf
   rw [hpm]; exact (hb j hj).2.1
 
+omit [MachGS GF] in
 /-- **Rocq `UkRunSys.usrc_ok_ubytesq`** at a `Nat` start (deviation 6; the
 landed `usrcOk_ubytesq` is at a word start `ua.toNat`). -/
 theorem pdev_usrcOk_ubytesq (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (dq : DFrac)
@@ -227,7 +229,7 @@ theorem pdev_usrcOk_ubytesq (γt γd γs : GName) (M : ElfMem) (pm : Nat → Opt
 row's deposit families and their bundle/post readers (H-io) and the close
 leaf at a pipe row.  Built at the xv6
 instance by `pipeDevK_xv6` (`UkPipeDevXv6`). -/
-structure PipeDevK (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [CtokG GF]
+structure PipeDevK (GF : BundledGFunctors.{0}) [MachGS GF] [Xv6G GF] [CtokG GF]
     [SG : UexecSG GF] [PS : UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] where
@@ -238,20 +240,20 @@ structure PipeDevK (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv
   wpIntro : ∀ (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (Xp : Int → IProp GF) (W : Uvis)
       (rb : Bool) (γp : PipeNames) (nb : Nat),
     fdStOfKey (xkA W 0) W.fd = .open rb true (.pipe γp) → argZ (xkA W 2) = (nb : Int) →
-    ⊢ (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ pipeWpay (hlc := hlc) γp.pnQueue Mv (xkA W 1) Q Qe nb) -∗
-      UexecSG.sbundleAt (uslot (hlc := hlc)) 16 (wpFam Q Qe Xp) W
+    ⊢ (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ pipeWpay γp.pnQueue Mv (xkA W 1) Q Qe nb) -∗
+      UexecSG.sbundleAt (uslot) 16 (wpFam Q Qe Xp) W
   /-- Rocq `UkWriteLeaf.spost_at_write_elim_at` + `UkWritePipe.uwrite_pipe_extra`
   (xv6: proved from H-io `ukPostRows_holds.wr`) -/
   wpElim : ∀ (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (Xp : Int → IProp GF) (W : Uvis)
       (rb : Bool) (γp : PipeNames) (nb : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
       (cs' : ExtTreeSet GName compare),
     fdStOfKey (xkA W 0) W.fd = .open rb true (.pipe γp) → argZ (xkA W 2) = (nb : Int) →
-    ⊢ UexecSG.spostAt (uslot (hlc := hlc)) 16 (wpFam Q Qe Xp) W r M' fdv' cw' cs' -∗
+    ⊢ UexecSG.spostAt (uslot) 16 (wpFam Q Qe Xp) W r M' fdv' cw' cs' -∗
       ∃ (P : UPtd) (Mv : Nat → List (BitVec 8)),
         ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜uptWf P⌝ ∗ ⌜W.lazy = false → lazyFree P.um (BitVec.ofNat 64 W.sz)⌝ ∗
         ⌜imgAgrees W.M Mv⌝ ∗
-        pipeWpost (hlc := hlc) P γp.pnQueue Mv (xkA W 1) Q Qe
-          iprop(killShot W.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) nb r
+        pipeWpost P γp.pnQueue Mv (xkA W 1) Q Qe
+          iprop(killShot W.gen ∗ □ MachFixedGS.killCred (GF := GF)) nb r
   /-- Rocq `UkReadPipe.read_pipe_fam` (xv6: H-io `readPipeFam`) -/
   rpFam : (Int → IProp GF) → (List (BitVec 8) → IProp GF) → (List (BitVec 8) → PipeSt → IProp GF) →
     UexecSG.sfam GF
@@ -260,7 +262,7 @@ structure PipeDevK (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv
   rpIntro : ∀ (Q : Int → IProp GF) (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF)
       (W : Uvis) (wb : Bool) (γp : PipeNames) (cap : Nat),
     fdStOfKey (xkA W 0) W.fd = .open true wb (.pipe γp) → argZ (xkA W 2) = (cap : Int) →
-    ⊢ pipeRpay (hlc := hlc) γp.pnQueue Rp Rpe cap -∗ UexecSG.sbundleAt (uslot (hlc := hlc)) USYS_read (rpFam Q Rp Rpe) W
+    ⊢ pipeRpay γp.pnQueue Rp Rpe cap -∗ UexecSG.sbundleAt (uslot) USYS_read (rpFam Q Rp Rpe) W
   /-- Rocq `UkReadRows.spost_at_read_elim` + `UkReadPipe.uread_pipe_core`
   (xv6: proved from H-io `ukPostRows_holds.rd`;
   deviation 7) -/
@@ -268,13 +270,13 @@ structure PipeDevK (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv
       (W : Uvis) (wb : Bool) (γp : PipeNames) (cap : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
       (cw' : Nat) (cs' : ExtTreeSet GName compare),
     fdStOfKey (xkA W 0) W.fd = .open true wb (.pipe γp) → argZ (xkA W 2) = (cap : Int) →
-    ⊢ UexecSG.spostAt (uslot (hlc := hlc)) USYS_read (rpFam Q Rp Rpe) W r M' fdv' cw' cs' -∗
+    ⊢ UexecSG.spostAt (uslot) USYS_read (rpFam Q Rp Rpe) W r M' fdv' cw' cs' -∗
       ⌜filereadRet (cap : Int) r⌝ ∗
       ∃ (P : UPtd) (Mv : Nat → List (BitVec 8)),
         ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜uptWf P⌝ ∗ ⌜W.lazy = false → lazyFree P.um (BitVec.ofNat 64 W.sz)⌝ ∗
         ⌜W.lazy = false → imgAgrees M' Mv⌝ ∗
-        pipeRpostImg (hlc := hlc) P γp.pnQueue Rp Rpe
-          iprop(killShot W.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) cap r Mv (xkA W 1)
+        pipeRpostImg P γp.pnQueue Rp Rpe
+          iprop(killShot W.gen ∗ □ MachFixedGS.killCred (GF := GF)) cap r Mv (xkA W 1)
   /-- Rocq `UkRunSys.wp_uk_ecall_close_std` at a PIPE row of the ledger, its
   deposit `udepw_cl` paid by the registry (`UexecExecMint.
   udepw_cl_of_reg_close`) -/
@@ -282,10 +284,10 @@ structure PipeDevK (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv
       (rb wb : Bool) (γp : PipeNames) (avail : Nat),
     UkSysP.usysno m = USYS_close → (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int) → fd < NSTD →
     l[fd]? = some (.open rb wb (.pipe γp)) → (pc + 4#64) &&& 1#64 = 0#64 →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ pipeReg (hlc := hlc) γp -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ pipeReg γp -∗
       ustd N.fd l -∗
       (∀ (h' : CPU) (r : BitVec 64), ⌜r.toNat = 0⌝ -∗ ustd N.fd (l.set fd .closed) -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
 
 end Leaves

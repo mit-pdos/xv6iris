@@ -38,7 +38,7 @@ set_option linter.unusedSimpArgs false
 /-! ## The record's two views, split and joined -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The record as the `lhu`'s halfword and namecmp's fourteen-byte name
 (Rocq's `dlk_de_view` read left to right). -/
@@ -79,7 +79,7 @@ end
 /-! ## THE LICENCE -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -136,7 +136,7 @@ end
 /-! ## The found arm -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -173,7 +173,7 @@ theorem dirlookup_found_iget (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗ irefSlot ∗
     (if hasp then wordPointsTo (k.regs 12#5) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * i)) else emp) ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
+    itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
     (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
@@ -193,7 +193,7 @@ theorem dirlookup_found_iget (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool
   iintro ⟨Hk, Hpc, Hframe, Hhalf, Hname, Hte, Hce, Hkeep, Hsl, Hpf, #Hit2, #Hiti, #Hinv, #Hpe,
     Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave #Hreg := iregInv_reg (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
+  ihave #Hreg := iregInv_reg fscIreg fscFs icfgIst icfgNib $$ Hinv
   -- +0xc4  lhu a1,-96(s0)
   k_step_e (wp_s_lhu cpu _ (KA.«dirlookup» + 0xc4#64) false 4000#12 11#5 8#5 (by decide) (by decide)
       (DFrac.own 1) (dirInum data i))
@@ -281,7 +281,7 @@ theorem dirlookup_found (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R 
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗ dirlookupIn hasp (k.regs 12#5) pofv ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
+    itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
     (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hmaxb := Xv6.rd_maxbytes

@@ -192,7 +192,7 @@ def namexInv [Fscfg] (k : KCtx) (A : NamexArgs) (R : RegMap) (off : Nat) (ipv : 
   (wc = true → fscBmapstart ∈ Scur) ∧ (∀ x ∈ A.Sb, x ∈ Scur)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -205,24 +205,24 @@ def namexEnv (Γ : SchedNames) (A : NamexArgs) : IProp GF := iprop%
   diskCaps fscDisk fscDlock A.pd A.pav A.pu ∗
   isLock A.γkl kmemLockAddr "kmem" (kmemRes A.γk) ∗ kallocAvail A.γk none ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+  itableInv ∗ icSleeplocks fscIc ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize
 
 instance namexEnv_persistent (Γ : SchedNames) (A : NamexArgs) :
-    Persistent (namexEnv (hlc := hlc) (GF := GF) Γ A) := by
+    Persistent (namexEnv (GF := GF) Γ A) := by
   unfold namexEnv; infer_instance
 
 theorem namexEnv_open (Γ : SchedNames) (A : NamexArgs) :
-    namexEnv (hlc := hlc) (GF := GF) Γ A ⊢
+    namexEnv (GF := GF) Γ A ⊢
       procsInv Γ ∗ panicEnv ∗
       bioCtx A.γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
       logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
       diskCaps fscDisk fscDlock A.pd A.pav A.pu ∗
       isLock A.γkl kmemLockAddr "kmem" (kmemRes A.γk) ∗ kallocAvail A.γk none ∗
       isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-      itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
-      iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+      itableInv ∗ icSleeplocks fscIc ∗
+      iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
       bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize := by
   unfold namexEnv; exact .rfl
 

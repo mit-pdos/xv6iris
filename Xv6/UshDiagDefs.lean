@@ -137,7 +137,7 @@ def ushExecfailBytes (dg cmd : List (BitVec 8)) : Prop :=
   (∀ p, 7 ≤ p → p < 15 → ushLit 0x1298 p = dg[p + (cmd.length - 2)]!)
 
 section UshDiagDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -146,7 +146,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [S
 /-- **Rocq `ksh_w1`**: one `write(fdv, &c, 1)` whose buffer (putc's frame
 byte) is quantified, the byte threaded through. -/
 def kshW1 (N : UkNames GF) (fdv : BitVec 64) (b : BitVec 8) (Ci Co : IProp GF) : IProp GF :=
-  iprop(∀ ua : BitVec 64, kshW (hlc := hlc) N fdv ua 1 iprop(ubyte N.d ua.toNat b ∗ Ci) iprop(ubyte N.d ua.toNat b ∗ Co))
+  iprop(∀ ua : BitVec 64, kshW N fdv ua 1 iprop(ubyte N.d ua.toNat b ∗ Ci) iprop(ubyte N.d ua.toNat b ∗ Co))
 
 /-! ## §5 The paid laws -/
 
@@ -160,11 +160,11 @@ def ushPanicLaw (Wc : List (BitVec 8) → Nat → IProp GF) (Wb : List (BitVec 8
   iprop(□ ∀ (N : UkNames GF) (I : List (BitVec 8)) (l : List FdState), ⌜ushFd2p l⌝ -∗ Wc I 3 -∗
     ∃ Pf : Nat → IProp GF, Pf 0 ∗
       □ (∀ (p : Nat) (b : BitVec 8), ⌜altPanic[p]? = some b⌝ -∗
-        kshW1 (hlc := hlc) N (BitVec.ofNat 64 2) b iprop(ustd N.fd l ∗ Pf p) iprop(ustd N.fd l ∗ Pf (p + 1))) ∗
+        kshW1 N (BitVec.ofNat 64 2) b iprop(ustd N.fd l ∗ Pf p) iprop(ustd N.fd l ∗ Pf (p + 1))) ∗
       □ (Pf 5 -∗ Wb I))
 
 instance ushPanicLaw_persistent (Wc : List (BitVec 8) → Nat → IProp GF) (Wb : List (BitVec 8) → IProp GF) :
-    Persistent (ushPanicLaw (hlc := hlc) Wc Wb) := by
+    Persistent (ushPanicLaw Wc Wb) := by
   unfold ushPanicLaw; infer_instance
 
 /-- **Rocq `ush_execfail_law_at`**: the exec-failed diagnostic, paid out of
@@ -173,15 +173,15 @@ def ushExecfailLawAt (dg : List (BitVec 8)) (n : Nat) (Cr Cd : IProp GF) : IProp
   iprop(□ ∀ (N : UkNames GF) (l : List FdState), ⌜ushFd2p l⌝ -∗ Cr -∗
     ∃ Pf : Nat → IProp GF, Pf 0 ∗
       □ (∀ (p : Nat) (b : BitVec 8), ⌜dg[p]? = some b⌝ -∗ ⌜p < n⌝ -∗
-        kshW1 (hlc := hlc) N (BitVec.ofNat 64 2) b iprop(ustd N.fd l ∗ Pf p) iprop(ustd N.fd l ∗ Pf (p + 1))) ∗
+        kshW1 N (BitVec.ofNat 64 2) b iprop(ustd N.fd l ∗ Pf p) iprop(ustd N.fd l ∗ Pf (p + 1))) ∗
       □ (Pf n -∗ Cd))
 
 instance ushExecfailLawAt_persistent (dg : List (BitVec 8)) (n : Nat) (Cr Cd : IProp GF) :
-    Persistent (ushExecfailLawAt (hlc := hlc) dg n Cr Cd) := by
+    Persistent (ushExecfailLawAt dg n Cr Cd) := by
   unfold ushExecfailLawAt; infer_instance
 
 /-- **Rocq `ush_execfail_law`**: the echo instance, definitionally (named `ushd…`: sh-exec's `UshExecDefs.ushExecfailLaw` is its parameter-record copy). -/
-abbrev ushdExecfailLaw (Cr Cd : IProp GF) : IProp GF := ushExecfailLawAt (hlc := hlc) altExecfail 17 Cr Cd
+abbrev ushdExecfailLaw (Cr Cd : IProp GF) : IProp GF := ushExecfailLawAt altExecfail 17 Cr Cd
 
 end UshDiagDefs
 

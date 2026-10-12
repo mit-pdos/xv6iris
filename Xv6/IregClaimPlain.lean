@@ -35,7 +35,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 set_option linter.unusedSectionVars false
 
 section IregClaimPlain
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
@@ -43,7 +43,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [I
 theorem ireg_claim_plain_excl [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (inum : BitVec 32) (ty : BitVec 16) (t : Nat) (qt : Qp)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregReg (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregReg γi γfs inodestart nib -∗
       iclaim inum.toNat ty t qt -∗ runitPlain inum.toNat ={E}=∗ False := by
   iintro #Hinv Hcl Hru
   imod iregReg_slot_acc E γi γfs inodestart nib inum hE hin $$ Hinv with
@@ -67,7 +67,7 @@ theorem ireg_claim_plain_excl [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
 theorem ireg_claim_plain_ne [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (inum : BitVec 32) (ty : BitVec 16) (t : Nat) (qt : Qp) (z : Nat)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregReg (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregReg γi γfs inodestart nib -∗
       iclaim inum.toNat ty t qt -∗ runitPlain z ={E}=∗
         ⌜inum.toNat ≠ z⌝ ∗ iclaim inum.toNat ty t qt ∗ runitPlain z := by
   iintro #Hinv Hcl Hru

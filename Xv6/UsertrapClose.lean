@@ -29,7 +29,7 @@ theorem ut_retPc_mask (x : BitVec 64) : retPc (x &&& 0xFFFFFFFFFFFFFFFE#64) = re
   unfold retPc; bv_decide
 
 section Close
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -48,7 +48,7 @@ theorem ut_close (A : UtArgs GF) (c : CPU) (R' : RegMap) (V2 : ProcPriv) (M2 : N
     (∃ v : BitVec 64, Register.scause ↦ᵣ[c] v) ∗ (∃ v : BitVec 64, Register.stval ↦ᵣ[c] v) ∗
     Register.stvec ↦ᵣ[c] uservecTvec ∗ cpuClaim c (procAddr A.j) ∗ utCaps A.N ∗
     utOwn (utRsys PT Γ A) A.N (utPrep V2 rt c) M2 sts2 cs2 A.pid ∗
-    utOuts (hlc := hlc) A V2 M2 sts2 cs2 ∗ utKillOut (hlc := hlc) A.sc A.Wk ∗ utKont PT Γ A
+    utOuts A V2 M2 sts2 cs2 ∗ utKillOut A.sc A.Wk ∗ utKont PT Γ A
     ⊢ wpLoop (GF := GF) c := by
   subst hrt
   have hu : tfUeq V2.tf (utPrep V2 A.k.root c).tf := tfUeq_prepareReturnTf _ _ _ _
@@ -76,7 +76,7 @@ theorem ut_close (A : UtArgs GF) (c : CPU) (R' : RegMap) (V2 : ProcPriv) (M2 : N
     ipureintro; exact ⟨rfl, hks, hok.wf⟩
   icases utResBare_split hct c _ _ _ _ _ _ _ _ $$ Hrun with ⟨Hres, Hpt, Htf⟩
   ihave Hres := (show utResBare (GF := GF) c (utRsys PT Γ A) V2.upt A.ksp (utPrep V2 A.k.root c) sts2 cs2
-      A.pid ⊢ (fun h => usertrapResAt (hlc := hlc) PT Γ A.j h) c V2.upt A.ksp (utPrep V2 A.k.root c)
+      A.pid ⊢ (fun h => usertrapResAt PT Γ A.j h) c V2.upt A.ksp (utPrep V2 A.k.root c)
         sts2 cs2 A.pid from .rfl) $$ Hres
   ihave Hout := utOuts_retf A V2 M2 sts2 cs2 (utPrep V2 A.k.root c).tf hu $$ Hout
   unfold utOuts

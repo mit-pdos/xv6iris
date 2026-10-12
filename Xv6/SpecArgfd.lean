@@ -102,7 +102,7 @@ theorem sysFdSt_some (v : BitVec 64) (fs : List (BitVec 64)) (sts : List FdState
   unfold sysFdSt; simp [h, hst]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The `int *pfd` out-parameter, which may be null. -/
 def ofdOut (a : BitVec 64) (w : BitVec 32) : IProp GF :=
@@ -135,10 +135,10 @@ def wp_argfd_body (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid 
 end
 
 structure ARGFD : Prop where
-  wp_argfd : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+  wp_argfd : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (i : Nat) (v : BitVec 64)
     (oldfd : BitVec 32) (oldf : BitVec 64) hi ha0 hv hpf hproc htier hnoff hK,
-    wp_argfd_body (hlc := hlc) (GF := GF) cpu k γ pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK
+    wp_argfd_body (GF := GF) cpu k γ pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK
 
 end Xv6

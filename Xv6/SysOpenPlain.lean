@@ -55,7 +55,7 @@ theorem sys_open_create_ne (vom : BitVec 64) (hc : omCreate vom = true) :
   simp [hc]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -66,9 +66,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 disjunct. -/
 theorem sys_open_arm0_plain (A : SysOpenArgs GF) :
     sysOpenArm0 A
-      (openAuPlainAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss
+      (openAuPlainAt (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss
         A.Fo A.Ft)
-      (openArmsPlain (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
+      (openArmsPlain A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
         A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts) := by
   intro VW MW hfdg
   unfold openArmsPlain openPostFailPlain
@@ -86,9 +86,9 @@ theorem sys_open_arm0_create (A : SysOpenArgs GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
     sysOpenArm0 A
-      (openAuCreateAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss
+      (openAuCreateAt (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss
         Farm Fun Fok Fex A.Fo A.Ft)
-      (openArmsCreate (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
+      (openArmsCreate A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
         A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts) := by
   intro VW MW hfdg
   unfold openArmsCreate openPostFailCreate
@@ -107,13 +107,13 @@ set_option maxHeartbeats 16000000 in
 /-- **THE PLAIN SIDE AT +0x36**: the `c.beqz` taken (the mask is zero by the
 premise), the walk wand fired at the fetched string, then the else arm
 (`⊢ sysOpenEntryNBody`, a premise). -/
-theorem sys_open_split_plain (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
+theorem sys_open_split_plain (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
     (A : SysOpenArgs GF) (hc : omCreate A.vom = false)
-    (hEN : ⊢ sysOpenEntryNBody (hlc := hlc) Γ k A) :
-    ⊢ sysOpenAt36 (hlc := hlc) Γ k A
-      (openAuPlainAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss
+    (hEN : ⊢ sysOpenEntryNBody Γ k A) :
+    ⊢ sysOpenAt36 Γ k A
+      (openAuPlainAt (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss
         A.Fo A.Ft)
-      (openArmsPlain (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
+      (openArmsPlain A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
         A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts) := by
   unfold sysOpenEntryNBody at hEN
   unfold sysOpenAt36
@@ -134,7 +134,7 @@ theorem sys_open_split_plain (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k :
   ihave Hst := Hw $$ %(bview plen bp) %hpo
   -- the truncate's permit at this path: the terminal cursor stands bare once
   -- the reading has answered (Rocq TRUNC-PERMIT, `open_trunc_piece_term_arg_to_at`)
-  ihave Ht := openTruncPiece_term_arg_to_at (hlc := hlc) (fsGammaL fscFs) A.vom (sysOpenIm A)
+  ihave Ht := openTruncPiece_term_arg_to_at (fsGammaL fscFs) A.vom (sysOpenIm A)
     A.v.toNat (bview plen bp) A.P A.Ft hpo $$ Ht
   iapply hEN $$ %cpu %spie %spp %R %(k.regs 9#5) %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2
     %⟨hnn, hterm, hplen, hpo⟩ %hpins %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hblk HopS Htx Hbs Hir
@@ -145,14 +145,14 @@ set_option maxHeartbeats 16000000 in
 non-zero by the premise), the walk wand fired into create's `epStart` at the
 fetched string, then the create entry at +0x38 (`⊢ sysOpenEntryCBody`, a
 premise). -/
-theorem sys_open_split_create (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
+theorem sys_open_split_create (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
     (A : SysOpenArgs GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (hc : omCreate A.vom = true)
-    (hEC : ⊢ sysOpenEntryCBody (hlc := hlc) Γ k A Farm Fun Fok Fex) :
-    ⊢ sysOpenAt36 (hlc := hlc) Γ k A
-      (openAuCreateAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss
+    (hEC : ⊢ sysOpenEntryCBody Γ k A Farm Fun Fok Fex) :
+    ⊢ sysOpenAt36 Γ k A
+      (openAuCreateAt (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss
         Farm Fun Fok Fex A.Fo A.Ft)
-      (openArmsCreate (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
+      (openArmsCreate A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
         A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts) := by
   unfold sysOpenEntryCBody at hEC
   unfold sysOpenAt36
@@ -173,16 +173,16 @@ theorem sys_open_split_create (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k 
   ihave Hst := Hw $$ %(bview plen bp) %hpo
   -- the bundle's commit is at the GUARDED cursor and the create tier wants
   -- it at THE path argstr read (`SysOpenDefs.openAcre_inst`, TL-3K)
-  ihave Hac := openAcre_inst (hlc := hlc) (fsGammaL fscFs) (sysOpenIm A) A.v.toNat (bview plen bp)
+  ihave Hac := openAcre_inst (fsGammaL fscFs) (sysOpenIm A) A.v.toNat (bview plen bp)
     A.P Farm Fok hpo $$ Hac
   -- ...and the truncate's permit: the tie's two facts stand bare once the
   -- reading has answered (Rocq F-OPEN-3, `open_trunc_piece_arg_to_at`)
-  ihave Ht := openTruncPiece_arg_to_at (hlc := hlc) (fsGammaL fscFs) A.vom (sysOpenIm A) A.v.toNat
+  ihave Ht := openTruncPiece_arg_to_at (fsGammaL fscFs) A.vom (sysOpenIm A) A.v.toNat
     (bview plen bp) A.P Farm Fok Fex A.Ft hpo $$ Ht
-  ihave Ht := (show openTruncPiece (hlc := hlc) (GF := GF) (fsGammaL fscFs) A.vom
-      (truncPermitOf (hlc := hlc) (fsGammaL fscFs) (truncTieAt (bview plen bp) A.P) Farm Fok Fex) A.Ft ⊢
-    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom
-      (crePermit (hlc := hlc) (fsGammaL fscFs) (bview plen bp) A.P Farm Fok Fex) A.Ft from .rfl) $$ Ht
+  ihave Ht := (show openTruncPiece (GF := GF) (fsGammaL fscFs) A.vom
+      (truncPermitOf (fsGammaL fscFs) (truncTieAt (bview plen bp) A.P) Farm Fok Fex) A.Ft ⊢
+    openTruncPiece (fsGammaL fscFs) A.vom
+      (crePermit (fsGammaL fscFs) (bview plen bp) A.P Farm Fok Fex) A.Ft from .rfl) $$ Ht
   iapply hEC $$ %cpu %spie %spp %R %(k.regs 9#5) %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2
     %⟨hnn, hterm, hplen, hpo⟩ %hpins %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hblk HopS Htx Hbs Hir
     Hfd Hfr Hst Hac Hdl Ho Ht Hcl HΦ
@@ -193,11 +193,11 @@ theorem sys_open_split_create (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k 
 `SpecSysOpen.wp_sys_open_plain_eb_body` at the record `A`, from the else arm
 `⊢ sysOpenEntryNBody` (`SysOpenWalk`). -/
 theorem sys_open_plain (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : SysOpenArgs GF)
+    [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (A : SysOpenArgs GF)
     (hS : SysOpenStatic k A)
-    (hEN : ∀ kv : Nat, ⊢ sysOpenEntryNBody (hlc := hlc) Γ k (A.raise kv))
+    (hEN : ∀ kv : Nat, ⊢ sysOpenEntryNBody Γ k (A.raise kv))
     (hc : omCreate A.vom = false) :
-    wp_sys_open_plain_eb_body (hlc := hlc) A.omo Γ cpu k A.γl A.γ A.j A.ns A.v A.vom A.pid A.V A.M
+    wp_sys_open_plain_eb_body A.omo Γ cpu k A.γl A.γ A.j A.ns A.v A.vom A.pid A.V A.M
       A.sts A.P A.Pmiss A.Fo A.Ft hS.hj hS.hproc hS.htier hS.hnoff hS.hK hS.hns hS.hv0 hS.hv1
       hc := by
   unfold wp_sys_open_plain_eb_body wp_sys_open_frame
@@ -208,13 +208,13 @@ theorem sys_open_plain (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNa
 entry half): `SpecSysOpen.wp_sys_open_create_eb_body` at the record `A`,
 from the create entry `⊢ sysOpenEntryCBody` (`SysOpenEntryC`). -/
 theorem sys_open_create (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : SysOpenArgs GF)
+    [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (A : SysOpenArgs GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : SysOpenStatic k A)
-    (hEC : ∀ kv : Nat, ⊢ sysOpenEntryCBody (hlc := hlc) Γ k (A.raise kv) Farm Fun Fok Fex)
+    (hEC : ∀ kv : Nat, ⊢ sysOpenEntryCBody Γ k (A.raise kv) Farm Fun Fok Fex)
     (hc : omCreate A.vom = true) :
-    wp_sys_open_create_eb_body (hlc := hlc) A.omo Γ cpu k A.γl A.γ A.j A.ns A.v A.vom A.pid A.V A.M
+    wp_sys_open_create_eb_body A.omo Γ cpu k A.γl A.γ A.j A.ns A.v A.vom A.pid A.V A.M
       A.sts A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft hS.hj hS.hproc hS.htier hS.hnoff hS.hK hS.hns
       hS.hv0 hS.hv1 hc := by
   unfold wp_sys_open_create_eb_body wp_sys_open_frame

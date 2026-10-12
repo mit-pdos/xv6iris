@@ -58,7 +58,7 @@ theorem shPl_ref (len : Nat) (f : Nat → BitVec 8) (fuel off : Nat) (t : UshpCm
     exact ⟨s, rfl, rfl⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -67,7 +67,7 @@ abbrev ushPlRs : List (BitVec 5) := [1#5, 8#5, 9#5, 18#5, 19#5, 20#5]
 
 /-- **Rocq `wp_ref_parseline`**: the whole function. -/
 theorem wp_shParseline (UL : UK_LEAVES) (SP : SH_PEEK) (SPP : SH_PARSEPIPE) :
-    wpShParselineBody (hlc := hlc) (GF := GF) := by
+    wpShParselineBody (GF := GF) := by
   intro N h m dq dw dv ps s0 len off fuel fin f w0 t UM UM' Pex nn ha0 ha1 hoff hw0 hsc href hch hs64 hps0 hps8 hpsz
   subst hw0
   obtain ⟨s, hpp, rfl⟩ := shPl_ref len f fuel off t fin hsc href
@@ -202,6 +202,6 @@ end
 
 /-- **sh's `parseline` holds**, at the engine and its callees' interfaces. -/
 theorem shParseline_holds (UL : UK_LEAVES) (SP : SH_PEEK) (SPP : SH_PARSEPIPE) : SH_PARSELINE :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shParseline UL SP SPP⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _} => wp_shParseline UL SP SPP⟩
 
 end Xv6

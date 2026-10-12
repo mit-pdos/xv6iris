@@ -94,7 +94,7 @@ theorem bh_cpusBase_toNat : (KernelGeom.cpusBase : BitVec 64).toNat = 0x80012530
 theorem bh_range_cpus : List.range NCPU = cpus.map Fin.val := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## §1 The GOT word, discarded -/
 
@@ -322,7 +322,7 @@ theorem bootCpuCtxFree (c : CPU) :
   ihave H := hfam $$ H
   have hcells : ([∗list] j ∈ List.range 14,
       bootRan (GF := GF) (imgFlat bootImage) (bhCpuLo c + 8 + 8 * j) (bhCpuLo c + 8 + 8 * j + 8)) ⊢
-      kmapStatic -∗ @ctxCells hlc GF _ X (cpuCtxAddr c) ((List.range 14).map (fun _ => 0#64)) := by
+      kmapStatic -∗ @ctxCells GF _ X (cpuCtxAddr c) ((List.range 14).map (fun _ => 0#64)) := by
     iintro H #Hk
     iapply ctxCells_intro _ _ (by simp)
     rw [BigSepL.bigSepL_map]
@@ -493,7 +493,7 @@ cells (less the wire pins), the empty held-lock set, the GOT row and the
 hart's carved `.bss` share.  The update persists the frozen
 configuration cells (`BootConfig.mBoot_of_cells`). -/
 theorem bootHartRes_intro (f : RegFile) (c : CPU) (hres : resetRegsRun c f) :
-    regCellsNoPins (GF := GF) (regName (hlc := hlc) (GF := GF) c) f ∗ lockSet c [] ∗
+    regCellsNoPins (GF := GF) (regName (GF := GF) c) f ∗ lockSet c [] ∗
       bootGotRo ∗ bootHartBss c ⊢ |==> bootHartRes f c := by
   iintro ⟨H, Hl, #Hg, Hb⟩
   imod bootEntryPre c f hres $$ H with
@@ -522,7 +522,7 @@ end
 /-! ## At the era the power thread mints -/
 
 section era
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 /-- **A running token carries a `viewLb … 0` receipt** (what `cpuCtxFree`
 needs at boot: Lean's `viewLb c 0` is not free, so it is read off

@@ -82,7 +82,7 @@ theorem fkr_tf3 (ws : List (BitVec 64)) (h : ws.length = 36) : ws[3]? = some (tf
   unfold tfW; rw [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem (by omega)]; rfl
 
 section Tail
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -116,7 +116,7 @@ theorem fkr_prep_call [CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k' : KCtx) (γ :
         { V with tf := prepareReturnTf V.tf (satpOf KTier.kpt k'.root) (V.kstack + 4096#64) (hartId cpu') } M -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := PR.wp_prepare_return (hlc := hlc) (GF := GF) c k' γ pa pid V M epc hproc hnoff htier hK hepc
+  have h := PR.wp_prepare_return (GF := GF) c k' γ pa pid V M epc hproc hnoff htier hK hepc
   unfold wp_prepare_return_body at h
   simp only [prepareReturnAddr] at h
   exact h

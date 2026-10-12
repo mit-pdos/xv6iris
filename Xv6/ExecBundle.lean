@@ -24,7 +24,7 @@ CONE (re-walked on the pinned globs: 5/6 reached): `ex_node_id`,
 
 ## Deviations from Rocq
 
-1. **CLASS BINDERS** are `SpecKexec`'s (`[MachGS hlc GF] [FsTopG GF]
+1. **CLASS BINDERS** are `SpecKexec`'s (`[MachGS GF] [FsTopG GF]
    [FsBytesG GF] [Appcfg GF] [CtokG GF]`), not Rocq's whole-system list
    (`SysExecAU`'s, AppInv deviation 4's rule): nothing here reads more.
 2. The caller's image is a page view (`ExecEntry` deviation 1); Rocq's
@@ -64,11 +64,12 @@ instance exNodeId_persistent (T : IProp GF) (Pfin : Nat → IProp GF)
 end ExNodeId
 
 section ExecBundle
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [CtokG GF]
 
 /-! ## 2.  THE SLOT PIECE, AT ONE ARGUMENT SHAPE -/
 
+omit [MachGS GF] in
 /-- **Rocq `exec_slot_of_entry_at`**: ARM (a) IDENTIFIES THE FILE and arm (b)
 is REFUTED, both from the SAME step -- the observed node IS the caller's
 file, so (a)'s constructor answers from `kexecImageOk f` and (b)'s `¬
@@ -102,6 +103,7 @@ theorem execSlot_of_entryAt (X : Uvis → IProp GF) (T : IProp GF) (Pfin : Nat �
 
 /-! ## 3.  THE SLOT PIECE AT THE SYSCALL BOUNDARY -/
 
+omit [MachGS GF] in
 /-- **Rocq `sys_exec_slot_of_entry`**: `sysExecSlotPre` quantifies the path
 and the argument shape under the caller's two readings.  THE PATH READING IS
 A FUNCTION of `(M, pv)` (`argPathOf_uniq`), so `Pfin` is the cursor at THAT
@@ -138,12 +140,12 @@ theorem execBundle_of (γfs : FsNames) (X : Uvis → IProp GF) (T : IProp GF)
     (Pay : IProp GF) (Q : Int → IProp GF) (M : Nat → List (BitVec 8)) (pv av : BitVec 64)
     (sts : List FdState) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
     (hload : kexecLoadable f) (hpath : argPathOf M pv.toNat pl) :
-    ⊢ exStart (hlc := hlc) γfs rt cw P Pmiss pl -∗
-      pfAt (aopenCommitAt (hlc := hlc) (fsGammaL (hlc := hlc) γfs) appE) Fo -∗
+    ⊢ exStart γfs rt cw P Pmiss pl -∗
+      pfAt (aopenCommitAt (fsGammaL γfs) appE) Fo -∗
       exNodeId T (P (pathElems pl).length) Fo.pfRecv ⟨.AFile f, nl⟩ -∗
       imageEntry f M av sts cw secc cs pidv Q Pay X -∗
       imageEntryTaint T sts secc Q X -∗ Pay -∗
-      sysExecAuPre (hlc := hlc) ⟨X, Pay⟩ (fsGammaL (hlc := hlc) γfs) γfs rt cw secc Q P Pmiss Fo
+      sysExecAuPre ⟨X, Pay⟩ (fsGammaL γfs) γfs rt cw secc Q P Pmiss Fo
         M pv av sts cs pidv := by
   iintro Hwalk Hobs #Hid #Hcon #Hgen HPay
   unfold sysExecAuPre
@@ -166,12 +168,12 @@ theorem execBundle_of_at (γfs : FsNames) (X : Uvis → IProp GF) (T : IProp GF)
     (Pay : IProp GF) (Q : Int → IProp GF) (na : Nat) (alen : Nat → Nat)
     (afun : Nat → Nat → BitVec 8) (sts : List FdState) (cs : ExtTreeSet GName compare)
     (pidv : BitVec 32) (hload : kexecLoadable f) :
-    ⊢ exStart (hlc := hlc) γfs rt cw P Pmiss pl -∗
-      pfAt (aopenCommitAt (hlc := hlc) (fsGammaL (hlc := hlc) γfs) appE) Fo -∗
+    ⊢ exStart γfs rt cw P Pmiss pl -∗
+      pfAt (aopenCommitAt (fsGammaL γfs) appE) Fo -∗
       exNodeId T (P (pathElems pl).length) Fo.pfRecv ⟨.AFile f, nl⟩ -∗
       imageEntryAt f na alen afun sts cw secc cs pidv Q Pay X -∗
       imageEntryTaint T sts secc Q X -∗ Pay -∗
-      execAuPre (hlc := hlc) ⟨X, Pay⟩ (fsGammaL (hlc := hlc) γfs) γfs rt cw secc Q P Pmiss Fo
+      execAuPre ⟨X, Pay⟩ (fsGammaL γfs) γfs rt cw secc Q P Pmiss Fo
         pl na alen afun sts cs pidv := by
   iintro Hwalk Hobs #Hid #Hcon #Hgen HPay
   unfold execAuPre

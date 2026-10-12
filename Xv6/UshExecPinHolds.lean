@@ -34,16 +34,16 @@ open Std (ExtTreeSet)
 theorem ushExecPinProg_holds : UshExecPinProg := ushExecPinProg_of_grep grepElfLoadable
 
 section UshExecPinHolds
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- `UshExecPin.UshExecPinEcho E`, discharged at every sh-exec record `E`. -/
-noncomputable def ushExecPinEcho_holds (E : UshExecEnv (hlc := hlc) (GF := GF)) :
-    UshExecPinEcho (hlc := hlc) E :=
-  ushExecPinEchoMk E (shCatSlot (hlc := hlc)) (shCatSlotOfFsPure (hlc := hlc))
-    (shCatSlot_unfold (hlc := hlc)) (shCatSlotOfFsPure_unfold (hlc := hlc))
+noncomputable def ushExecPinEcho_holds (E : UshExecEnv (GF := GF)) :
+    UshExecPinEcho E :=
+  ushExecPinEchoMk E (shCatSlot) (shCatSlotOfFsPure)
+    (shCatSlot_unfold) (shCatSlotOfFsPure_unfold)
 
 end UshExecPinHolds
 

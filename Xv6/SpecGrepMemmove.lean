@@ -31,7 +31,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -41,18 +41,18 @@ def wpGrepMemmoveBody : Prop :=
     m.get 10#5 = BitVec.ofNat 64 dst → m.get 11#5 = BitVec.ofNat 64 src → m.get 12#5 = BitVec.ofNat 64 len →
     dst ≤ src → len < 2 ^ 31 →
     ⊢ grepCode N.t -∗ ubytes N.d dst (src - dst + len) f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«memmove») (2 + n) -∗
+      urun N h m (BitVec.ofNat 64 User.Grep.Sym.«memmove») (2 + n) -∗
       (ubytes N.d dst (src - dst + len) (grepMmPost (src - dst) len f) -∗
         ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
       wpLoop h
 
 end
 
 /-- The interface of grep's `memmove`. -/
 structure GREP_MEMMOVE : Prop where
-  wp_grepMemmove : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_grepMemmove : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpGrepMemmoveBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpGrepMemmoveBody (GF := GF)
 
 end Xv6

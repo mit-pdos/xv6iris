@@ -24,7 +24,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -35,11 +35,11 @@ theorem grepMemmove_fstep (UL : UK_LEAVES) (N : UkNames GF) (dst d len : Nat) (f
     (ha1 : mc.get 11#5 = BitVec.ofNat 64 (dst + d + i)) (ha4 : mc.get 14#5 = BitVec.ofNat 64 (dst + i))
     (ha5 : mc.get 15#5 = BitVec.ofNat 64 (dst + len)) :
     ⊢ grepCode N.t -∗ ubytes N.d dst (d + len) (grepMmPost d i f) -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x458) n -∗
+      urun N h mc (BitVec.ofNat 64 0x458) n -∗
       (ubytes N.d dst (d + len) (grepMmPost d (i + 1) f) -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜mc'.get 11#5 = BitVec.ofNat 64 (dst + d + (i + 1))⌝ -∗ ⌜mc'.get 14#5 = BitVec.ofNat 64 (dst + (i + 1))⌝ -∗
         ⌜mc'.get 15#5 = mc.get 15#5⌝ -∗ ⌜grepRkeep [11, 13, 14] mc mc'⌝ -∗
-        urun (hlc := hlc) N h' mc' (if i + 1 = len then BitVec.ofNat 64 0x468 else BitVec.ofNat 64 0x458) n -∗
+        urun N h' mc' (if i + 1 = len then BitVec.ofNat 64 0x468 else BitVec.ofNat 64 0x458) n -∗
         wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hw Hrun Hcont
@@ -132,9 +132,9 @@ theorem grepMemmove_fwd (UL : UK_LEAVES) (N : UkNames GF) (dst d len : Nat) (f :
     mc.get 11#5 = BitVec.ofNat 64 (dst + d + i) → mc.get 14#5 = BitVec.ofNat 64 (dst + i) →
     mc.get 15#5 = BitVec.ofNat 64 (dst + len) →
     ⊢ grepCode N.t -∗ ubytes N.d dst (d + len) (grepMmPost d i f) -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x458) n -∗
+      urun N h mc (BitVec.ofNat 64 0x458) n -∗
       (ubytes N.d dst (d + len) (grepMmPost d len f) -∗ ∀ (h' : CPU) (mc' : RegMap),
-        ⌜grepRkeep [11, 13, 14] mc mc'⌝ -∗ urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x468) n -∗ wpLoop h') -∗
+        ⌜grepRkeep [11, 13, 14] mc mc'⌝ -∗ urun N h' mc' (BitVec.ofNat 64 0x468) n -∗ wpLoop h') -∗
       wpLoop h := by
   intro k
   induction k with
@@ -166,11 +166,11 @@ theorem grepMemmove_bstep (UL : UK_LEAVES) (N : UkNames GF) (dst len : Nat) (f :
     (hhi : dst + len ≤ 2 ^ 38) (j : Nat) (h : CPU) (mc : RegMap) (n : Nat) (hj : j < len)
     (ha1 : mc.get 11#5 = BitVec.ofNat 64 (dst + (j + 1))) (ha4 : mc.get 14#5 = BitVec.ofNat 64 (dst + (j + 1)))
     (ha5 : mc.get 15#5 = BitVec.ofNat 64 dst) :
-    ⊢ grepCode N.t -∗ ubytes N.d dst len f -∗ urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x488) n -∗
+    ⊢ grepCode N.t -∗ ubytes N.d dst len f -∗ urun N h mc (BitVec.ofNat 64 0x488) n -∗
       (ubytes N.d dst len f -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜mc'.get 11#5 = BitVec.ofNat 64 (dst + j)⌝ -∗ ⌜mc'.get 14#5 = BitVec.ofNat 64 (dst + j)⌝ -∗
         ⌜mc'.get 15#5 = mc.get 15#5⌝ -∗ ⌜grepRkeep [11, 13, 14] mc mc'⌝ -∗
-        urun (hlc := hlc) N h' mc' (if j = 0 then BitVec.ofNat 64 0x498 else BitVec.ofNat 64 0x488) n -∗
+        urun N h' mc' (if j = 0 then BitVec.ofNat 64 0x498 else BitVec.ofNat 64 0x488) n -∗
         wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hw Hrun Hcont
@@ -260,9 +260,9 @@ theorem grepMemmove_bwd (UL : UK_LEAVES) (N : UkNames GF) (dst len : Nat) (f : N
     ∀ (j : Nat) (h : CPU) (mc : RegMap) (n : Nat), j < len →
     mc.get 11#5 = BitVec.ofNat 64 (dst + (j + 1)) → mc.get 14#5 = BitVec.ofNat 64 (dst + (j + 1)) →
     mc.get 15#5 = BitVec.ofNat 64 dst →
-    ⊢ grepCode N.t -∗ ubytes N.d dst len f -∗ urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x488) n -∗
+    ⊢ grepCode N.t -∗ ubytes N.d dst len f -∗ urun N h mc (BitVec.ofNat 64 0x488) n -∗
       (ubytes N.d dst len f -∗ ∀ (h' : CPU) (mc' : RegMap),
-        ⌜grepRkeep [11, 13, 14] mc mc'⌝ -∗ urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x498) n -∗ wpLoop h') -∗
+        ⌜grepRkeep [11, 13, 14] mc mc'⌝ -∗ urun N h' mc' (BitVec.ofNat 64 0x498) n -∗ wpLoop h') -∗
       wpLoop h := by
   intro j
   induction j with
@@ -290,10 +290,10 @@ theorem wp_grepMemmove (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
     (f : Nat → BitVec 8) (n : Nat) (ha0 : m.get 10#5 = BitVec.ofNat 64 dst) (ha1 : m.get 11#5 = BitVec.ofNat 64 src)
     (ha2 : m.get 12#5 = BitVec.ofNat 64 len) (hds : dst ≤ src) (hlen : len < 2 ^ 31) :
     ⊢ grepCode N.t -∗ ubytes N.d dst (src - dst + len) f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«memmove») (2 + n) -∗
+      urun N h m (BitVec.ofNat 64 User.Grep.Sym.«memmove») (2 + n) -∗
       (ubytes N.d dst (src - dst + len) (grepMmPost (src - dst) len f) -∗
         ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   obtain ⟨d, rfl⟩ : ∃ d, src = dst + d := ⟨src - dst, by omega⟩
   rw [show dst + d - dst = d by omega, show User.Grep.Sym.«memmove» = 0x43e from rfl]
@@ -318,9 +318,9 @@ theorem wp_grepMemmove (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
       mc.get 2#5 = m.get spIdx + BitVec.ofInt 64 (-((8 * 2 : Nat) : Int)) →
       ⊢ grepCode N.t -∗ uword N.d ((m.get spIdx).toNat - 8) (m.get 1#5) -∗
         uword N.d ((m.get spIdx).toNat - 16) (m.get 8#5) -∗
-        urun (hlc := hlc) N h5 mc (BitVec.ofNat 64 0x468) n -∗
+        urun N h5 mc (BitVec.ofNat 64 0x468) n -∗
         (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
-          urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗ wpLoop h5 := by
+          urun N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗ wpLoop h5 := by
     intro h5 mc hkc hspc
     iintro #Hc Hwra Hws0 Hrun Hk
     gfetch 0x468 true (.LOAD (8#12, .Regidx 2#5, .Regidx 1#5, false, 8))

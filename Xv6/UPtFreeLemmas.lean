@@ -104,7 +104,7 @@ theorem noLeaves_of_blocked (t : PTree) (h : ∀ vpn : BitVec 27, t.walk 2 vpn =
       · exact absurd hw (by simp)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## A node page of zero words is a free page -/
 
@@ -336,7 +336,7 @@ theorem umBelow_lt_np (P : UPtd) (sz : BitVec 64) (hbelow : umBelow sz P) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 theorem umPages_empty [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (h : P.um = ∅) :
     umPages (GF := GF) P M ⊢ emp := by

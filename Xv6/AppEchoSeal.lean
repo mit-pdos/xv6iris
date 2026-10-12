@@ -39,13 +39,13 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppEchoSeal
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF]
 
 /-- THE BIRTH STEP (Rocq `echo_birth`): run first by the power theorem, before
 the crash slot, so both the crash predicate and the ledger can name the
 counter. -/
-theorem echoBirth : ⊢@{IProp GF} |==> ∃ γ : EchoGn, echoCl (hlc := hlc) γ := by
+theorem echoBirth : ⊢@{IProp GF} |==> ∃ γ : EchoGn, echoCl γ := by
   imod (MonoNat.own_alloc (GF := GF) (.ofNat 0)) with ⟨%γt, Ha, -⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := EraPins) (H := RegMapF))
     with ⟨%γp, Hm⟩
@@ -59,8 +59,8 @@ copy's flag authority is born at `[]` (= `consInum av`), and neither copy
 needs a key (helper of Rocq `echo_xfer_boot`'s absent case). -/
 theorem echoPred_copyAbsent (γ : EchoGn) (r : EchoNames) (g1 g2 : GName) (av : Aview)
     (hci : consInum av = []) :
-    echoPred (hlc := hlc) (GF := GF) γ r av ∗ MonoList.auth_own g1 (DFrac.own 1) ([] : List Nat) ⊢
-      echoPred (hlc := hlc) γ r av ∗ echoPred (hlc := hlc) γ ⟨g1, g2⟩ av := by
+    echoPred (GF := GF) γ r av ∗ MonoList.auth_own g1 (DFrac.own 1) ([] : List Nat) ⊢
+      echoPred γ r av ∗ echoPred γ ⟨g1, g2⟩ av := by
   unfold echoPred consState
   iintro ⟨Hp, Ha⟩
   icases Hp with (#Ht | ⟨%Hpins, Hcs⟩)
@@ -113,9 +113,9 @@ fresh key goes into the copy's present arm (helper of Rocq `echo_xfer_boot`'s
 present case). -/
 theorem echoPred_copyPresent (γ : EchoGn) (r : EchoNames) (g1 g2 : GName) (av : Aview)
     (i0 : Nat) (hci : consInum av = [i0]) :
-    echoPred (hlc := hlc) (GF := GF) γ r av ∗ MonoList.auth_own g1 (DFrac.own 1) [i0] ∗
+    echoPred (GF := GF) γ r av ∗ MonoList.auth_own g1 (DFrac.own 1) [i0] ∗
         MonoList.auth_own g2 (DFrac.own 1) ([] : List Nat) ⊢
-      echoPred (hlc := hlc) γ r av ∗ echoPred (hlc := hlc) γ ⟨g1, g2⟩ av := by
+      echoPred γ r av ∗ echoPred γ ⟨g1, g2⟩ av := by
   unfold echoPred consState
   iintro ⟨Hp, Ha, Hk⟩
   icases Hp with (#Ht | ⟨%Hpins, Hcs⟩)
@@ -176,7 +176,7 @@ theorem echoPred_copyPresent (γ : EchoGn) (r : EchoNames) (g1 g2 : GName) (av :
 function of the view, which is exactly why the fresh flag is allocated at
 it. -/
 theorem echoXferBoot (γ : EchoGn) (k : Nat) :
-    ⊢@{IProp GF} appCloneRaw (echoPred (hlc := hlc) γ) (echoBoot γ k) := by
+    ⊢@{IProp GF} appCloneRaw (echoPred γ) (echoBoot γ k) := by
   unfold appCloneRaw
   imodintro
   iintro %r %av H
@@ -186,7 +186,7 @@ theorem echoXferBoot (γ : EchoGn) (k : Nat) :
   | none =>
     have hci : consInum av = [] := by unfold consInum; rw [hp]
     rw [hci]
-    ihave HH : iprop(▷ (echoPred (hlc := hlc) γ r av ∗ echoPred (hlc := hlc) γ ⟨g1, g2⟩ av))
+    ihave HH : iprop(▷ (echoPred γ r av ∗ echoPred γ ⟨g1, g2⟩ av))
       $$ [H Ha]
     · inext
       iapply echoPred_copyAbsent γ r g1 g2 av hci
@@ -204,7 +204,7 @@ theorem echoXferBoot (γ : EchoGn) (k : Nat) :
   | some i0 =>
     have hci : consInum av = [i0] := by unfold consInum; rw [hp]
     rw [hci]
-    ihave HH : iprop(▷ (echoPred (hlc := hlc) γ r av ∗ echoPred (hlc := hlc) γ ⟨g1, g2⟩ av))
+    ihave HH : iprop(▷ (echoPred γ r av ∗ echoPred γ ⟨g1, g2⟩ av))
       $$ [H Ha Hk]
     · inext
       iapply echoPred_copyPresent γ r g1 g2 av i0 hci

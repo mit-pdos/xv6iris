@@ -169,7 +169,7 @@ theorem syscFdAgree_set {fs : List (BitVec 64)} {sts : List FdState} (ha : syscF
 /-! ## §2 Reading the agreement off the block -/
 
 section Agree
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -229,8 +229,8 @@ theorem syscFd_pageLen (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec
   iintro H
   icases procPrivFd_copy γ pa pid V M $$ H with ⟨-, -, Hpt, -⟩
   obtain ⟨ξ, t⟩ := (inferInstance : CurCtx)
-  ihave %h := (show @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ⊢ ⌜umPageLen V.upt M⌝ from
-    (@UMemL.procPtAt_pageLen hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M).trans sep_elim_left) $$ Hpt
+  ihave %h := (show @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ⊢ ⌜umPageLen V.upt M⌝ from
+    (@UMemL.procPtAt_pageLen GF _ ⟨curCtx, KTier.kpt⟩ V.upt M).trans sep_elim_left) $$ Hpt
   ipureintro; exact h
 
 end Agree
@@ -276,7 +276,7 @@ theorem syscImg_wrote (P P' : UPtd) (sz : BitVec 64) (M M1 : Nat → List (BitVe
 /-! ## §4 The stack bound (Rocq `stack_own_sp_bounds` over the context) -/
 
 section Stack
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- **The context's own region pins `sp`** (Rocq `sie_cap_gpr`'s stack
 bound): six owned slots below it put `sp` at least 48. -/
@@ -298,7 +298,7 @@ end Stack
 /-! ## §5 The deposit laws (interfaces §4; deviation 1) -/
 
 section Dep
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -310,19 +310,19 @@ extra with the payload) pays the armed post at the resume image. -/
 def SyscDepRead : Prop :=
   ∀ (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32),
-    UexecSG.sbundleAt (uslot (hlc := hlc)) 5 f (uvisOf V M sts gn cs pid) ⊢
+    UexecSG.sbundleAt (uslot) 5 f (uvisOf V M sts gn cs pid) ⊢
       ∃ (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
         (Rin : List (List Obs × BitVec 8) → IProp GF)
         (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF),
-        filereadIn (hlc := hlc) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) (argZ (tfW V.tf (tfArgIdx 2)))
+        filereadIn (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) (argZ (tfW V.tf (tfArgIdx 2)))
           F Rd Rin Rp Rpe P ∗ P ∗
         (∀ (r : BitVec 64) (P' : UPtd) (M1 : Nat → List (BitVec 8)) (d : Nat),
           ⌜V.upt.extSz V.sz P' ∧ umemWrote V.upt M (tfW V.tf (tfArgIdx 1)) d P' M1 ∧
             filereadRet (argZ (tfW V.tf (tfArgIdx 2))) r ∧ uptWf V.upt ∧
             (V.pvLazy = false → lazyFree V.upt.um V.sz) ∧ (V.pvLazy = false → lazyFree P'.um V.sz)⌝ -∗
-          filereadExtra (hlc := hlc) gn V.upt (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
+          filereadExtra gn V.upt (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
             (argZ (tfW V.tf (tfArgIdx 2))) F Rd Rin Rp Rpe P r M1 (tfW V.tf (tfArgIdx 1)) -∗
-          UexecSG.spostAt (uslot (hlc := hlc)) 5 f (uvisOf V M sts gn cs pid) r
+          UexecSG.spostAt (uslot) 5 f (uvisOf V M sts gn cs pid) r
             (umemLazy P' V.sz.toNat M1) sts V.cwi cs)
 
 /-- **Rocq `sysc_dep_write` + `sysc_out_write`** (deviations 1-2): write's
@@ -332,16 +332,16 @@ answer pays the armed post at the unmoved image. -/
 def SyscDepWrite : Prop :=
   ∀ (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32),
-    UexecSG.sbundleAt (uslot (hlc := hlc)) 16 f (uvisOf V M sts gn cs pid) ⊢
+    UexecSG.sbundleAt (uslot) 16 f (uvisOf V M sts gn cs pid) ⊢
       ∃ (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF),
-        filewriteIn (hlc := hlc) (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
+        filewriteIn (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
           (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) (argZ (tfW V.tf (tfArgIdx 2)))
           (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q Qe ∗
         (∀ r : BitVec 64, ⌜filewriteRet (argZ (tfW V.tf (tfArgIdx 2))) r ∧ uptWf V.upt ∧
             (V.pvLazy = false → lazyFree V.upt.um V.sz)⌝ -∗
-          filewriteExtra (hlc := hlc) gn V.upt (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
+          filewriteExtra gn V.upt (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
             (argZ (tfW V.tf (tfArgIdx 2))) (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q Qe r -∗
-          UexecSG.spostAt (uslot (hlc := hlc)) 16 f (uvisOf V M sts gn cs pid) r
+          UexecSG.spostAt (uslot) 16 f (uvisOf V M sts gn cs pid) r
             (syscImg V M) sts V.cwi cs)
 
 /-- **Rocq `sysc_out_pipe`** (deviation 1): pipe deposits nothing, and its
@@ -357,7 +357,7 @@ def SyscDepPipe : Prop :=
         ⌜a ≠ b ∧ fdLeastClosed sts a ∧ fdLeastClosed (sts.set a (.open true false (.pipe γp))) b ∧
           sts' = (sts.set a (.open true false (.pipe γp))).set b (.open false true (.pipe γp))⌝ ∗
         pipeQfrag γp.pnQueue pst0) ⊢
-      UexecSG.spostAt (uslot (hlc := hlc)) 4 f (uvisOf V M sts gn cs pid) r M' sts' V.cwi cs
+      UexecSG.spostAt (uslot) 4 f (uvisOf V M sts gn cs pid) r M' sts' V.cwi cs
 
 /-- **Rocq `sysc_dep_close` + `sysc_out_close`** (deviation 1): close's
 bundle is the byte queue's close payment at the descriptor key argument 0
@@ -368,11 +368,11 @@ armed post. -/
 def SyscDepClose : Prop :=
   ∀ (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32),
-    UexecSG.sbundleAt (uslot (hlc := hlc)) 21 f (uvisOf V M sts gn cs pid) ⊢
-      ∃ P : IProp GF, filecloseCpay (hlc := hlc) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) P ∗
+    UexecSG.sbundleAt (uslot) 21 f (uvisOf V M sts gn cs pid) ⊢
+      ∃ P : IProp GF, filecloseCpay (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) P ∗
         (∀ (r : BitVec 64) (sts' : List FdState),
-          filecloseCpostAny (hlc := hlc) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) P -∗
-          UexecSG.spostAt (uslot (hlc := hlc)) 21 f (uvisOf V M sts gn cs pid) r (syscImg V M) sts' V.cwi cs)
+          filecloseCpostAny (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) P -∗
+          UexecSG.spostAt (uslot) 21 f (uvisOf V M sts gn cs pid) r (syscImg V M) sts' V.cwi cs)
 
 /-- **Rocq `sysc_dep_exit`**: exit's bundle is the close payments of the
 key's whole table (`SpecFileclose.filecloseCpays`), which the exit arm hands
@@ -380,8 +380,8 @@ kexit through sys_exit (Rocq lane PQ-C, design/pipe.md "The exit path"). -/
 def SyscDepExit : Prop :=
   ∀ (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32),
-    UexecSG.sbundleAt (uslot (hlc := hlc)) USYS_exit f (uvisOf V M sts gn cs pid) ⊢
-      filecloseCpays (hlc := hlc) sts
+    UexecSG.sbundleAt (uslot) USYS_exit f (uvisOf V M sts gn cs pid) ⊢
+      filecloseCpays sts
 
 end Dep
 
@@ -577,7 +577,7 @@ theorem syscPipe_fd_ok (V : ProcPriv) (sts : List FdState) (hnum : syscNum V = 4
 /-! ## §7 The return tail with the three foreign channels answered -/
 
 section Tail
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -599,12 +599,12 @@ theorem syscall_ret_fd_ev (PT : SchedNames → IProp GF) (Γ : SchedNames)
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-    syscallEnv (hlc := hlc) PT Γ γ ∗
+    syscallEnv PT Γ γ ∗
     procPrivFd γ (procAddr j) pid V1 M1 ∗ fdFrags V.fdg sts' ∗ chFrag V.chg (procAddr j) cs' ∗
-    syscSysOut (hlc := hlc) f V M sts gn cs pid (syscA0 (syscStore V1 (R 10#5)))
+    syscSysOut f V M sts gn cs pid (syscA0 (syscStore V1 (R 10#5)))
       (syscImg (syscStore V1 (R 10#5)) M1) sts' V1.cwi cs' ∗
-    syscEvOut (hlc := hlc) V M sts (syscStore V1 (R 10#5)) M1 cs cs' gn ∗
-    wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f)
+    syscEvOut V M sts (syscStore V1 (R 10#5)) M1 cs cs' gn ∗
+    wpNext true k.proc c0 (syscallPost PT Γ k γ j pid V M sts gn cs ip f)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hbs, Hip, Hfd, Hir, Henv, Hpriv, Hfr, Hch, Hso, Heo, Hnext⟩
   iapply (syscall_ret_tail PT Γ c0 cpu k spie spp R γ j pid V M sts gn cs ip f V1 M1 sts' cs'
@@ -635,11 +635,11 @@ theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-    syscallEnv (hlc := hlc) PT Γ γ ∗
+    syscallEnv PT Γ γ ∗
     procPrivFd γ (procAddr j) pid V1 M1 ∗ fdFrags V.fdg sts' ∗ chFrag V.chg (procAddr j) cs' ∗
-    syscSysOut (hlc := hlc) f V M sts gn cs pid (syscA0 (syscStore V1 (R 10#5)))
+    syscSysOut f V M sts gn cs pid (syscA0 (syscStore V1 (R 10#5)))
       (syscImg (syscStore V1 (R 10#5)) M1) sts' V1.cwi cs' ∗
-    wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f)
+    wpNext true k.proc c0 (syscallPost PT Γ k γ j pid V M sts gn cs ip f)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hbs, Hip, Hfd, Hir, Henv, Hpriv, Hfr, Hch, Hso, Hnext⟩
   iapply (syscall_ret_fd_ev PT Γ c0 cpu k spie spp R γ j pid V M sts gn cs ip f V1 M1 sts' cs'
@@ -655,8 +655,8 @@ theorem syscSysOut_ret (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → List (B
     (cw : Nat) (cs' : ExtTreeSet GName compare) (k : Int) (hk : syscNum V = k) (he : k ≠ 2)
     (hf : k ≠ 1) (hl : tfArgIdx 0 < V1.tf.length) (himg : syscImg (syscStore V1 R) M1 = X)
     (hcw : V1.cwi = cw) :
-    UexecSG.spostAt (uslot (hlc := hlc)) k f (uvisOf V M sts gn cs pid) R X sts' cw cs' ⊢
-      syscSysOut (hlc := hlc) f V M sts gn cs pid (syscA0 (syscStore V1 R))
+    UexecSG.spostAt (uslot) k f (uvisOf V M sts gn cs pid) R X sts' cw cs' ⊢
+      syscSysOut f V M sts gn cs pid (syscA0 (syscStore V1 R))
         (syscImg (syscStore V1 R) M1) sts' V1.cwi cs' := by
   rw [syscStore_a0 V1 R hl, himg, hcw]
   exact syscSysOut_at f V M sts gn cs pid R X sts' cw cs' k hk he hf

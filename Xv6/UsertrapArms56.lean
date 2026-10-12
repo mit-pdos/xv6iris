@@ -49,7 +49,7 @@ theorem ut56_ret7c : jumpPc (KA.«usertrap» + 0x7c#64) = KA.«usertrap» + 0x7c
 theorem ut56_ret82 : jumpPc (KA.«usertrap» + 0x82#64) = KA.«usertrap» + 0x82#64 := by decide
 
 section Arm56
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -57,7 +57,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 
 set_option maxHeartbeats 8000000 in
 /-- **Rocq `ut_56`**: the unexpected-scause arm. -/
-theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (hEX : UtExitElim (hlc := hlc) (GF := GF))
+theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (hEX : UtExitElim (GF := GF))
     (HA : UT_A6 PT Γ) : UT_56 PT Γ := by
   intro A cpu R kv hok hpins hks hWfd hevq
   have hsie : A.k.sie = false := hok.hctx.1
@@ -167,19 +167,19 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (hEX : UtExitElim (hlc 
   icases utA_pid_split hct _ _ $$ Hqp with ⟨Hq1, Hq2⟩
   ihave Hrg := (show pidReg (GF := GF) A.pid (.own qeighth) ((utV1 A).updEv kv).gen ⊢ pidReg A.pid (.own qeighth) A.gn
     from by rw [hok.hgn]) $$ Hrg
-  ihave Hpay := (show ukillCredAt (hlc := hlc) (GF := GF) uslot A.gn A.sc A.Wk A.f ⊢
-    iprop(□ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∨
+  ihave Hpay := (show ukillCredAt (GF := GF) uslot A.gn A.sc A.Wk A.f ⊢
+    iprop(□ MachFixedGS.killCred (GF := GF) ∨
       (killOwed A.gn ∗ UexecSG.sbundleAt uslot USYS_exit A.f A.Wk)) from by
       unfold ukillCredAt; rw [if_pos hks]) $$ Hpay
   ihave Hmk := (show takenAt (GF := GF) ((utV1 A).updEv kv).gen ⊢ takenAt A.gn from by rw [hok.hgn]) $$ Hmk
   -- WHICH PARTY PAYS: keyed, so the side setkilled hands back is known
-  icases (show iprop(□ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∨
+  icases (show iprop(□ MachFixedGS.killCred (GF := GF) ∨
       (killOwed A.gn ∗ UexecSG.sbundleAt uslot USYS_exit A.f A.Wk)) ∗ takenAt A.gn ⊢
       ∃ self : Bool,
         (if self then iprop(killOwed A.gn ∗ takenAt A.gn)
-          else iprop(□ MachFixedGS.killCred (hlc := hlc) (GF := GF))) ∗
-        ((if self then killOwed A.gn else iprop(□ MachFixedGS.killCred (hlc := hlc) (GF := GF))) -∗
-          (takenAt A.gn ∨ (filecloseCpays (hlc := hlc) A.sts ∗ killOwed A.gn))) from by
+          else iprop(□ MachFixedGS.killCred (GF := GF))) ∗
+        ((if self then killOwed A.gn else iprop(□ MachFixedGS.killCred (GF := GF))) -∗
+          (takenAt A.gn ∨ (filecloseCpays A.sts ∗ killOwed A.gn))) from by
       iintro ⟨(#Hc | ⟨Howed, Hex⟩), Ht⟩
       · iexists false
         simp only [Bool.false_eq_true, ↓reduceIte]
@@ -226,7 +226,7 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (hEX : UtExitElim (hlc 
   -- credential paid), or the marker-less block with the closes and payload
   ihave Hres : iprop(utOwn (utRsys PT Γ A) A.N ((utV1 A).updEv kv) A.M A.sts A.cs A.pid ∨
       (utOwnNm (utRsys PT Γ A) A.N ((utV1 A).updEv kv) A.M A.sts A.cs A.pid ∗ killShot A.gn ∗
-        filecloseCpays (hlc := hlc) A.sts ∗ killOwed A.gn)) $$ [Hown Htear]
+        filecloseCpays A.sts ∗ killOwed A.gn)) $$ [Hown Htear]
   · icases Htear with (Ht | ⟨Hcp, Hq⟩)
     · ileft
       iapply (utOwn_unmark _ _ _ _ _ _ _).2
@@ -240,7 +240,7 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (hEX : UtExitElim (hlc 
   · rw [hsie, trapCsrsExt_false]; iframe Hcsrs Hir
   ihave Hce := (show cpuClaimExt (GF := GF) cpu false A.k.proc ⊢ cpuClaimExt cpu A.k.sie A.k.proc from by
     rw [hsie]) $$ Hce
-  ihave Hlive : utLiveRes (hlc := hlc) A ((utV1 A).updEv kv) A.cs $$ [Hshot]
+  ihave Hlive : utLiveRes A ((utV1 A).updEv kv) A.cs $$ [Hshot]
   · unfold utLiveRes; iright; iexact Hshot
   iapply (HA A cpu A.k R3 ((utV1 A).updEv kv) A.M A.sts A.cs hok (utBase_refl _) hp3 ((utA_rows_entry A hok hne).updEv kv hevq))
     $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hres $Hlive $Hkont]

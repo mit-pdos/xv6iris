@@ -81,9 +81,9 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open LeanRV64D
 
 section transport
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
-local notation "era" => MachGS.era (hlc := hlc) (GF := GF)
+local notation "era" => MachGS.era (GF := GF)
 
 /-! ## The two transport laws a box lives on
 
@@ -701,7 +701,7 @@ abbrev StampsRF (Id : Type) [Ord Id] [Std.TransOrd Id] [Std.LawfulEqOrd Id] : CO
 
 section box
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {Id X : Type} [Ord Id] [Std.TransOrd Id] [Std.LawfulEqOrd Id] [DecidableEq Id]
 
 /-- The client's obligations (Rocq's section `Context`s): both halves of the
@@ -740,28 +740,35 @@ def cntHalf (γ : BoxNames) (c : Nat) : IProp GF := γ.cnt ↪VAR{.own (1 : Qp).
 def slotpHalf (γ : BoxNames) (s : L2Reg Id) : IProp GF :=
   γ.slotp ↪VAR{.own (1 : Qp).half} s
 
+omit [MachGS GF] in
 instance stampsAuth_timeless (γ : BoxNames) (m : StampMap Id) :
     Timeless (stampsAuth (GF := GF) γ m) := by unfold stampsAuth; infer_instance
+omit [MachGS GF] in
 instance stampsFrag_timeless (γ : BoxNames) (m : StampMap Id) :
     Timeless (stampsFrag (GF := GF) γ m) := by unfold stampsFrag; infer_instance
+omit [MachGS GF] in
 instance cntHalf_timeless (γ : BoxNames) (c : Nat) :
     Timeless (cntHalf (GF := GF) γ c) := by unfold cntHalf; infer_instance
+omit [MachGS GF] in
 instance slotpHalf_timeless (γ : BoxNames) (s : L2Reg Id) :
     Timeless (slotpHalf (GF := GF) γ s) := by unfold slotpHalf; infer_instance
 
 /-! ## The stamps kit -/
 
+omit [MachGS GF] in
 theorem stampsFrag_op (γ : BoxNames) (m1 m2 : StampMap Id) :
     stampsFrag (GF := GF) γ (m1 • m2) ⊣⊢ stampsFrag γ m1 ∗ stampsFrag γ m2 := by
   unfold stampsFrag
   rw [Auth.frag_op]
   exact iOwn_op
 
+omit [MachGS GF] in
 /-- The empty fragment is free (Rocq's `own_unit` at the stamps camera). -/
 theorem stampsFrag_empty (γ : BoxNames) : ⊢ |==> stampsFrag (GF := GF) (Id := Id) γ ∅ := by
   unfold stampsFrag
   exact iOwn_unit (F := StampsRF Id) (ε := (UCMRA.unit : Auth (StampMap Id)))
 
+omit [MachGS GF] in
 /-- The stamps authority at `∅`, fresh. -/
 theorem stampsAuth_alloc : ⊢ |==> ∃ g : GName, stampsAuth (GF := GF) ⟨g, 0, 0, 0⟩ (∅ : StampMap Id) := by
   unfold stampsAuth
@@ -771,6 +778,7 @@ theorem stampsAuth_alloc : ⊢ |==> ∃ g : GName, stampsAuth (GF := GF) ⟨g, 0
   iexists g
   iexact H
 
+omit [MachGS GF] in
 theorem stampsFrag_incl (γ : BoxNames) (m m' : StampMap Id) :
     stampsAuth (GF := GF) γ m ∗ stampsFrag γ m' ⊢ ⌜m' ≼ m⌝ := by
   unfold stampsAuth stampsFrag
@@ -779,6 +787,7 @@ theorem stampsFrag_incl (γ : BoxNames) (m m' : StampMap Id) :
   ipureintro
   exact (Auth.auth_both_valid_discrete.mp Hv).1
 
+omit [MachGS GF] in
 theorem stampsFrag_incl_2 (γ : BoxNames) (m m1 m2 : StampMap Id) :
     stampsAuth (GF := GF) γ m ∗ stampsFrag γ m1 ∗ stampsFrag γ m2 ⊢ ⌜m1 • m2 ≼ m⌝ := by
   iintro ⟨Ha, H1, H2⟩
@@ -807,6 +816,7 @@ theorem stamps_alloc_upd (m : StampMap Id) (p : Id × Nat) (q : UFrac) :
   rw [he] at h
   exact h
 
+omit [MachGS GF] in
 theorem stampsAlloc (γ : BoxNames) (m : StampMap Id) (p : Id × Nat) (q : UFrac) :
     stampsAuth (GF := GF) γ m ⊢
       |==> (stampsAuth γ ((PartialMap.singleton p q : StampMap Id) • m) ∗
@@ -818,6 +828,7 @@ theorem stampsAlloc (γ : BoxNames) (m : StampMap Id) (p : Id × Nat) (q : UFrac
   imodintro
   iframe Ha Hf
 
+omit [MachGS GF] in
 /-- **A whole fragment leaves the authority** (Rocq's `stamps_dealloc`): the
 mass is subtracted, no key is added, and every key not in the fragment
 survives.  (Rocq inducts over the fragment with `msub_key`; here the
@@ -846,6 +857,7 @@ theorem stampsDealloc (γ : BoxNames) (m mD : StampMap Id) :
 
 /-! ## Agreement and update of the register halves -/
 
+omit [MachGS GF] in
 theorem cntHalf_agree (γ : BoxNames) (c c' : Nat) :
     cntHalf (GF := GF) γ c ∗ cntHalf γ c' ⊢ ⌜c = c'⌝ := by
   unfold cntHalf
@@ -853,6 +865,7 @@ theorem cntHalf_agree (γ : BoxNames) (c c' : Nat) :
   ihave %h := ghost_var_agree _ _ _ _ _ $$ H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem cntHalf_update (γ : BoxNames) (c c' c'' : Nat) :
     cntHalf (GF := GF) γ c ∗ cntHalf γ c' ⊢ |==> (cntHalf γ c'' ∗ cntHalf γ c'') := by
   unfold cntHalf
@@ -860,6 +873,7 @@ theorem cntHalf_update (γ : BoxNames) (c c' c'' : Nat) :
   ihave H := ghost_var_update_halves c'' _ c c' $$ H1 H2
   iexact H
 
+omit [MachGS GF] in
 theorem slotpHalf_agree (γ : BoxNames) (s s' : L2Reg Id) :
     slotpHalf (GF := GF) γ s ∗ slotpHalf γ s' ⊢ ⌜s = s'⌝ := by
   unfold slotpHalf
@@ -867,6 +881,7 @@ theorem slotpHalf_agree (γ : BoxNames) (s s' : L2Reg Id) :
   ihave %h := ghost_var_agree _ _ _ _ _ $$ H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem slotpHalf_update (γ : BoxNames) (s s' s'' : L2Reg Id) :
     slotpHalf (GF := GF) γ s ∗ slotpHalf γ s' ⊢ |==> (slotpHalf γ s'' ∗ slotpHalf γ s'') := by
   unfold slotpHalf
@@ -874,6 +889,7 @@ theorem slotpHalf_update (γ : BoxNames) (s s' s'' : L2Reg Id) :
   ihave H := ghost_var_update_halves s'' _ s s' $$ H1 H2
   iexact H
 
+omit [MachGS GF] in
 /-- Split a full ghost variable into the two halves the box and its client
 hold. -/
 theorem ghostVar_halves {A : Type} [GhostVarG GF A] (g : GName) (a : A) :
@@ -1056,9 +1072,11 @@ variable [GhostVarG GF (SlotReg Id X)]
 def slotdHalf (γ : BoxNames) (r : SlotReg Id X) : IProp GF :=
   γ.slotd ↪VAR{.own (1 : Qp).half} r
 
+omit [MachGS GF] in
 instance slotdHalf_timeless (γ : BoxNames) (r : SlotReg Id X) :
     Timeless (slotdHalf (GF := GF) γ r) := by unfold slotdHalf; infer_instance
 
+omit [MachGS GF] in
 theorem slotdHalf_agree (γ : BoxNames) (r r' : SlotReg Id X) :
     slotdHalf (GF := GF) γ r ∗ slotdHalf γ r' ⊢ ⌜r = r'⌝ := by
   unfold slotdHalf
@@ -1066,6 +1084,7 @@ theorem slotdHalf_agree (γ : BoxNames) (r r' : SlotReg Id X) :
   ihave %h := ghost_var_agree _ _ _ _ _ $$ H1 H2
   ipureintro; exact h
 
+omit [MachGS GF] in
 theorem slotdHalf_update (γ : BoxNames) (r r' r'' : SlotReg Id X) :
     slotdHalf (GF := GF) γ r ∗ slotdHalf γ r' ⊢ |==> (slotdHalf γ r'' ∗ slotdHalf γ r'') := by
   unfold slotdHalf

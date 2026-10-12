@@ -121,7 +121,7 @@ theorem sysExecBreak_nn (pl : List (BitVec 8)) (h : argPathShape pl) :
 /-! ## §2.  The three buffers, in kexec's spelling (standalone) -/
 
 section Bufs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The array above kexec's `argv[0 .. i]` (Rocq `sx_argv_kx`'s second
 half): framed across the call. -/
@@ -199,7 +199,7 @@ end Bufs
 /-! ## §3.  kexec, at the record (Rocq's `KX.wp_kexec_sconf` call) -/
 
 section Kexec
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -227,7 +227,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`kexec(path, argv)` at the break's record** (Rocq `KX.wp_kexec_sconf`
 in `sx_break_au`): the three buffers in the break's spelling, the bundle
 narrowed at the path argstr fetched, the arms read back at that path. -/
-theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
+theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU)
     (k' : KCtx) (se : Bool) (hs : k'.sie = se) (A : SysExecArgs) (U : SysExecAU GF)
     (hpj : k'.proc = procAddr A.j) (P : UPtd) (kv : Nat) (pl : List (BitVec 8)) (i : Nat)
     (pg : Nat → BitVec 64) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sp0 : BitVec 64)
@@ -235,16 +235,16 @@ theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     (hj : A.j < NPROC) (hpl : argPathShape pl) (hi : i < 32) (hok : sysExecOk pg alen afun i)
     (h10 : k'.regs 10#5 = sysExecPath sp0) (h11 : k'.regs 11#5 = sysExecArgv sp0) :
     kctx cpu k' ∗ pcIs cpu KA.«kexec» ∗ trapCsrsExt cpu se ∗ cpuClaimExt cpu se (procAddr A.j) ∗
-    sysExecEnv (hlc := hlc) Γ A ∗
+    sysExecEnv Γ A ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
     byteBuf (sysExecPath sp0) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) ∗
     kxcArgv (sysExecArgv sp0) (sysExecKA A P kv pl i pg alen afun) ∗
     sysExecPages pg afun 0 i ∗ bslots 3 ∗ irefSlots 2 ∗ myPay U.gn U.Q ∗
-    execAuPre (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
+    execAuPre U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
       U.sts U.cs A.pid ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k'.regs R'⌝ -∗
-      execArms (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
+      execArms U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
         U.sts U.gn U.cs A.pid (sysExecV2 A P kv) (sysExecM2 A P) V' M' (R' 10#5) -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se (procAddr A.j) -∗
@@ -254,7 +254,7 @@ theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
       sysExecPages pg afun 0 i -∗ bslots 3 -∗ irefSlots 2 -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs
-  have h := KX.wp_kexec_eb (hlc := hlc) (GF := GF) Γ cpu k' (sysExecKA A P kv pl i pg alen afun) U.Fs
+  have h := KX.wp_kexec_eb (GF := GF) Γ cpu k' (sysExecKA A P kv pl i pg alen afun) U.Fs
     U.sts U.gn U.cs U.Q U.P U.Pmiss U.Fo hK hnoff htier hj hpj (sysExecBreak_nn pl hpl)
     (sysfile_pfun_term pl) hpl.1
     (fun j hj => by
@@ -299,8 +299,8 @@ theorem execArms_evAfter {Fs : Pfam GF (Uvis → IProp GF)} {Γ : FsViewNames GF
     {cs : Std.ExtTreeSet GName compare} {pidv : BitVec 32} {V : ProcPriv}
     {M : Nat → List (BitVec 8)} {V' : ProcPriv} {M' : Nat → List (BitVec 8)} {r : BitVec 64}
     {V'' : ProcPriv} (h : evAfter V' V'') :
-    execArms (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r ⊢
-      execArms (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V'' M' r := by
+    execArms Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r ⊢
+      execArms Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V'' M' r := by
   obtain ⟨k, hk, rfl⟩ := h
   unfold execArms execPostOk
   iintro (⟨%hf, Hf⟩ | ⟨%i, %av, %a, %harow, Hok⟩)
@@ -343,10 +343,10 @@ theorem sys_exec_ret_ce : jumpPc (sysExecAddr + 0xce#64) = sysExecAddr + 0xce#64
 set_option maxHeartbeats 32000000 in
 /-- **THE BREAK, +0x0b6 .. +0x0cc, THE CALL TO kexec, AND THE SUCCESS
 TAIL** (Rocq `ProofSysExec.sx_break_au`). -/
-theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
+theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
     (A : SysExecArgs) (U : SysExecAU GF) (hS : SysExecStatic k A)
-    (hsucc : ⊢ sysExecSuccTailBody (hlc := hlc) (GF := GF) Γ k A) :
-    ⊢ sysExecBreakBody (hlc := hlc) (GF := GF) Γ k A U := by
+    (hsucc : ⊢ sysExecSuccTailBody (GF := GF) Γ k A) :
+    ⊢ sysExecBreakBody (GF := GF) Γ k A U := by
   unfold sysExecSuccTailBody at hsucc
   unfold sysExecBreakBody sysExecLoopSt
   iintro %c %spie %spp %R %P %kv %i %pg %alen %afun %uvf %pl %rest %hnul %⟨hpl, hpath⟩
@@ -355,7 +355,7 @@ theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   obtain ⟨hK60, hKx, -, -, -, -, -, -⟩ := sys_exec_K _ hS.hK
   -- THE BUNDLE'S INSTANTIATION, at the vector the loop built
   have hargs := sysExec_argsOf (sysExecIm A) A.v1 uvf pg alen afun i hi hok havok hnul
-  ihave Hau := sysExecAuPre_at (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo
+  ihave Hau := sysExecAuPre_at U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo
     (sysExecIm A) A.v0 A.v1 U.sts U.cs A.pid pl i alen afun hpath hargs $$ Hau
   obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := hpins
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

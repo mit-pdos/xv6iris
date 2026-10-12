@@ -46,7 +46,7 @@ def ufmHist (m : FlatMem) (pa : PAddr) (n : Nat) : Prop :=
   ∀ j, j < n → ∃ (e : HEnt) (H : Hist), m[pa + BitVec.ofNat 64 j]? = some (e :: H)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- A byte of any context has a (non-empty) history in the memory. -/
 theorem ufm_ctxByte_hist (m : FlatMem) (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
@@ -113,7 +113,7 @@ theorem ufm_readBytes_top (σ : MState) (hmm : mmOk σ) (ag : Agent) (pa : PAddr
   rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **The G5 leaf**: an instruction fetch of bytes a context owns answers
 SOME value (∀-quantified: the non-coherent instruction cache may return any

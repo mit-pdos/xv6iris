@@ -30,7 +30,7 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section UkRunSysSbrk
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -40,12 +40,12 @@ theorem wp_uk_ecall_sbrk (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
     (harg : (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (m.get 10#5))).toInt = (n : Int))
     (heag : BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (m.get 11#5)) = 1#64)
     (hszok : uszOk (sz + n)) (hal : pgRoundUpN sz = sz) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_sbrk -∗ usz N.s sz -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_sbrk -∗ usz N.s sz -∗
       (∀ (h' : CPU) (r : BitVec 64),
         ((⌜r = BitVec.ofInt 64 (-1)⌝ ∗ usz N.s sz) ∨
           (⌜r = BitVec.ofNat 64 sz⌝ ∗ usz N.s (sz + n) ∗ ∃ g : Nat → BitVec 8, ubytes N.d sz n g)) -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hsz Hcont
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun

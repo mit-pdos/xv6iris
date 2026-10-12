@@ -35,14 +35,14 @@ theorem ba_sraiw13_0 : BitVec.signExtend 64 ((BitVec.extractLsb' 0 32 (0#64)).ss
 theorem ba_ret_ac : jumpPc (KA.«balloc» + 0xac#64) = KA.«balloc» + 0xac#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **From `bread`'s return at `+0xac` to the scan** (Rocq's `ba_main`, its
 second half). -/
 theorem ba_after_bread (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK : PRINTK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c0 : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu c0 : CPU) (k : KCtx)
     (spie spp : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (γ : LogNames) (γfs : FsNames) (logstart bmapstart size : Nat) (dev : BitVec 32)
@@ -131,7 +131,7 @@ set_option maxHeartbeats 16000000 in
 (Rocq's `ba_main`, from the lazy saves to the bitmap `bread`), then
 `Xv6.ba_after_bread`. -/
 theorem ba_setup (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK : PRINTK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu c0 : CPU) (k : KCtx) (R : RegMap) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
     (logstart bmapstart size : Nat) (dev : BitVec 32)
@@ -260,7 +260,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x16 .. +0x22`: the lazy saves of `s2..s8`** (after the `sb.size`
 test), then `Xv6.ba_setup`. -/
 theorem ba_saves (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK : PRINTK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu c0 : CPU) (k : KCtx) (R : RegMap) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
     (logstart bmapstart size : Nat) (dev : BitVec 32)

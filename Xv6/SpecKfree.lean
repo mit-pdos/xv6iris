@@ -68,7 +68,7 @@ def kfreeAddr : BitVec 64 := KA.«kfree»
 /-- The specification of `kfree`, as a proposition over the ambient
 kernel context, AT THE BOOT (`hp0 : k.proc = 0`, permit sweep L3b).  A
 corollary of the led form. -/
-def wp_kfree_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_kfree_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hp : pageValid (k.regs 10#5)) (hp0 : k.proc = 0#64) : Prop :=
@@ -83,13 +83,13 @@ def wp_kfree_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6
 /-- THE LED-FORM POST (Rocq `kfree_post_led`, design D5): the landed post
 plus the call's receipt in the allocator's event ledger -- the event
 `KFree act`, appended at a history `h`. -/
-def kfreePostLed {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+def kfreePostLed {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
     (γk : KmemNames) (on : Option Nat) (act : BitVec 64) : IProp GF := iprop%
   ∃ h : List Kev, ledReceipt γk h (.KFree act) ∗ kallocAvail γk (availInc on)
 
 /-- The landed post is the led one with the receipt dropped (Rocq
 `kfree_post_led_avail`). -/
-theorem kfreePostLed_avail {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+theorem kfreePostLed_avail {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
     (γk : KmemNames) (on : Option Nat) (act : BitVec 64) :
     kfreePostLed (GF := GF) γk on act ⊢ kallocAvail γk (availInc on) := by
   unfold kfreePostLed
@@ -103,7 +103,7 @@ form is the proof; the landed `wp_kfree_body` is its corollary.
 
 THE LEND (permit sweep L3b): `actLend k.proc ke` in, `actLend k.proc (ke +
 1)` out right after the return pc. -/
-def wp_kfree_led_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_kfree_led_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hp : pageValid (k.regs 10#5)) : Prop :=
@@ -119,12 +119,12 @@ def wp_kfree_led_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
 /-- The interface of `kfree`: the landed contract and (Rocq's second
 `Parameter` of `KFREE`) its led form. -/
 structure KFREE : Prop where
-  wp_kfree : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_kfree : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat) hnoff hK hlk hp hp0,
-    wp_kfree_body (hlc := hlc) (GF := GF) cpu k γl γk on hnoff hK hlk hp hp0
-  wp_kfree_led : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    wp_kfree_body (GF := GF) cpu k γl γk on hnoff hK hlk hp hp0
+  wp_kfree_led : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat) hnoff hK hlk hp,
-    wp_kfree_led_body (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk hp
+    wp_kfree_led_body (GF := GF) cpu k γl γk on ke hnoff hK hlk hp
 
 /-- **`kfree` over a VISIBILITY-FREE page.**  Identical to `wp_kfree_body`
 but the caller supplies `pageFree` (reclaimed memory whose per-byte
@@ -135,7 +135,7 @@ threading it onto the free list.
 THE LEND (permit sweep L3b): its one caller (`pipeclose`) holds one, so this
 form takes `actLend k.proc ke` and hands back `actLend k.proc (ke + 1)` (no
 receipt; deviation 4). -/
-def wp_kfree_free_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_kfree_free_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hp : pageValid (k.regs 10#5)) : Prop :=
@@ -150,9 +150,9 @@ def wp_kfree_free_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The interface of `kfree` over visibility-free pages. -/
 structure KFREE_FREE : Prop where
-  wp_kfree_free : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_kfree_free : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat) hnoff hK hlk hp,
-    wp_kfree_free_body (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk hp
+    wp_kfree_free_body (GF := GF) cpu k γl γk on ke hnoff hK hlk hp
 
 
 end Xv6

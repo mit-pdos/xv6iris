@@ -32,7 +32,7 @@ def cpuidRet (tp : BitVec 64) : BitVec 64 := BitVec.signExtend 64 (BitVec.extrac
 
 /-- **WP of `cpuid`.**  Two stack slots (its frame); returns the entry
 hart's id in `a0`. -/
-def wp_cpuid_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_cpuid_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hK : 2 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu cpuidAddr ∗
   (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
@@ -41,7 +41,7 @@ def wp_cpuid_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Cur
 
 /-- The interface of `cpuid`. -/
 structure CPUID : Prop where
-  wp_cpuid : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx) hsie hK,
-    wp_cpuid_body (hlc := hlc) (GF := GF) cpu k hsie hK
+  wp_cpuid : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx) hsie hK,
+    wp_cpuid_body (GF := GF) cpu k hsie hK
 
 end Xv6

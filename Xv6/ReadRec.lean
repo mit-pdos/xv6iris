@@ -85,11 +85,11 @@ theorem rrByteOfRows (D : List (BitVec 8) → Prop)
   exact hncr (I ++ J) I.length hdisc (by simp; omega)
 
 section readrec
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable [Fscfg]
 
 /-- THE READ RECORD over an era's link record `L` (Rocq `ReadRec`). -/
-structure ReadRec (L : LinkRec hlc GF) where
+structure ReadRec (L : LinkRec GF) where
   /-- the INPUT's discipline -- `UkSh.ush_read_ans_at`'s parameter -/
   rkDisc : List (BitVec 8) → Prop
   /-- the era's READ LINK: one answer to `consLink`'s update at the ring's
@@ -101,7 +101,7 @@ structure ReadRec (L : LinkRec hlc GF) where
   one era only: the union's wild token, seccomp design 10.7) -/
   rkRdTaint : ∀ (ws : List (List Obs × BitVec 8)) (Φ : IProp GF),
     ⊢ L.lkLinks -∗ L.lkT -∗ (L.lkT -∗ Φ) -∗
-      consLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) (.evRead ws) Φ
+      consLink .uart0 (genId (GF := GF) + 1) (.evRead ws) Φ
   /-- THE WINDOW ARM, at exactly what `UShLine.ush_read_recv_era` consumes:
   the call moved the era's input on by the `dc` bytes `J`, the byte it
   DELIVERED is the first of them, the input so far is DISCIPLINED, and the
@@ -113,9 +113,9 @@ structure ReadRec (L : LinkRec hlc GF) where
     consWindow sl I.length dd g hs →
     sl <+: sl' →
     (∀ j : Nat, j < dc → ws[j]? = sl'[I.length + j]?) →
-    ⊢ L.lkEpin (genId (hlc := hlc) (GF := GF) + 1) v -∗ inpLb v I -∗ L.lkRres v I -∗
-      L.lkRr (genId (hlc := hlc) (GF := GF) + 1) v I.length ws -∗
-      ([∗list] hh ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) hh) -∗
+    ⊢ L.lkEpin (genId (GF := GF) + 1) v -∗ inpLb v I -∗ L.lkRres v I -∗
+      L.lkRr (genId (GF := GF) + 1) v I.length ws -∗
+      ([∗list] hh ∈ hs, MachFixedGS.rxTag (GF := GF) hh) -∗
       consSwallow fscCons False sl dd dc -∗
       consStoredLb fscCons sl' -∗
       ((dlCnt v (1 : Qp).half (I.length + dc) ∗

@@ -26,13 +26,14 @@ open HfpFileClaimsP UkFileOpen UkFileDev
 open Std (ExtTreeSet)
 
 section Open
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 namespace UkFileDev
 
+omit [MachGS GF] in
 /-- THE STRING'S CELLS ARE IN THE IMAGE (deviation 5): at any per-cell
 predicate the heap reads, the boxed cells and terminator put the string's
 image under the heap's. -/
@@ -57,6 +58,7 @@ theorem fdev_cells_img (Φ : Nat → BitVec 8 → IProp GF) (H : IProp GF) (M : 
   · exact (key a b hs).trans (pure_mono fun h _ => h)
   · exact pure_intro fun h => absurd h hs
 
+omit [MachGS GF] in
 /-- The path at either half is persistent (the data half at the discarded
 fraction). -/
 instance fdev_upathAt_persistent (N : UkNames GF) (tx : Bool) (pv n : Nat) (f : Nat → BitVec 8) :
@@ -64,6 +66,7 @@ instance fdev_upathAt_persistent (N : UkNames GF) (tx : Bool) (pv n : Nat) (f : 
   unfold upathAt
   cases tx <;> simp only [Bool.false_eq_true, ↓reduceIte] <;> infer_instance
 
+omit [MachGS GF] in
 /-- **Rocq `fdev_path_view`**: the path at a persistent reading is a boxed
 view of its image, at a name of any length, off either half. -/
 theorem fdev_path_view (N : UkNames GF) (tx : Bool) (pv n : Nat) (f : Nat → BitVec 8) :
@@ -105,6 +108,7 @@ theorem fdev_path_view (N : UkNames GF) (tx : Bool) (pv n : Nat) (f : Nat → Bi
     · imodintro; iexact Hs
     · imodintro; iexact Hz
 
+omit [MachGS GF] in
 /-- `open_ans_ok` off the ledger a tainted open hands back. -/
 theorem fdev_open_ans_ok (gf : GName) (l : List FdState) (rv : BitVec 64) :
     ukOpenTaintFd (GF := GF) gf l rv ⊢ ⌜openAnsOk rv⌝ := by
@@ -118,13 +122,14 @@ theorem fdev_open_ans_ok (gf : GName) (l : List FdState) (rv : BitVec 64) :
   · ipureintro
     left; rw [hr]; exact fdev_m1
 
+omit [MachGS GF] in
 /-- ...keeping the ledger. -/
 theorem fdev_open_ans_ok_keep (gf : GName) (l : List FdState) (rv : BitVec 64) :
     ukOpenTaintFd (GF := GF) gf l rv ⊢ ⌜openAnsOk rv⌝ ∗ ukOpenTaintFd gf l rv :=
   persistent_entails_right (fdev_open_ans_ok gf l rv)
 
-variable (FO : HfpFileOpenP (hlc := hlc) (GF := GF))
-  (SYSO : UkFileOpenSysP (hlc := hlc) (GF := GF))
+variable (FO : HfpFileOpenP (GF := GF))
+  (SYSO : UkFileOpenSysP (GF := GF))
 
 /-- The stub's register file at the open's number. -/
 theorem fdev_open_regs (m : RegMap) (pv : Nat) (mode : Int) (hpv : pv < 2 ^ 38)
@@ -140,17 +145,17 @@ theorem fdev_open_regs (m : RegMap) (pv : Nat) (mode : Int) (hpv : pv < 2 ^ 38)
 include FO SYSO in
 /-- **Rocq `file_open_present`**: `ei_open` for `nm` at a PRESENT deed,
 read-only (mode 0). -/
-theorem file_open_present (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fname) (heq : fileAppIs (hlc := hlc) (GF := GF) c r)
-    (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc) N Pr) (l : List FdState) (cw : Nat)
+theorem file_open_present (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fname) (heq : fileAppIs (GF := GF) c r)
+    (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs N Pr) (l : List FdState) (cw : Nat)
     (q1 q2 : Qp) (i : Nat) (content : List (BitVec 8)) (K : Int → IProp GF)
     (hu : uname nm) (hsN : sf[nm]? = some (i, content)) (hcw : cw = ROOTINO) :
-    ⊢ appInv (hlc := hlc) fscFs -∗ ustd N.fd l -∗ ucwd N.cwd cw -∗ fdq r q1 sf -∗ fdq r q2 sf -∗
+    ⊢ appInv fscFs -∗ ustd N.fd l -∗ ucwd N.cwd cw -∗ fdq r q1 sf -∗ fdq r q2 sf -∗
       ((∀ (fd : Nat) (γo : GName), ⌜fd < NOFILE⌝ -∗
           ualloc N.fd l fd (.open true false (.inode i γo .held)) -∗ ucwd N.cwd cw -∗
           fileIn sf nm r i γo q2 content content -∗ fdq r q1 sf -∗ |==> K (fd : Int)) ∧
        (ustd N.fd l -∗ ucwd N.cwd cw -∗ fdq r q1 sf -∗ fdq r q2 sf -∗ K (-1)) ∧
-       (∀ (ret : BitVec 64), fileTaint (hlc := hlc) c -∗ ukOpenTaintFd N.fd l ret -∗ ucwd N.cwd cw -∗ K ret.toInt)) -∗
-      opObl (hlc := hlc) N Pr nm 0 K := by
+       (∀ (ret : BitVec 64), fileTaint c -∗ ukOpenTaintFd N.fd l ret -∗ ucwd N.cwd cw -∗ K ret.toInt)) -∗
+      opObl N Pr nm 0 K := by
   unfold opObl
   iintro #Hinv Hstd Hcwd Hd1 Hd2 HK %h %m %avail %pv %tx %f %hf %ha0 %ha1 Hcode #Hp Hrun Hcont
   ihave %hpv := fdev_path_bnd N h m _ avail tx pv nm.length f (uname_pos nm hu) $$ Hrun Hp
@@ -218,14 +223,14 @@ include FO SYSO in
 /-- **Rocq `file_open_absent`**: `ei_open_absent` for `nm` -- the deed says
 absent, `-1` with everything back, or the taint; at any mode that does not
 create. -/
-theorem file_open_absent (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fname) (heq : fileAppIs (hlc := hlc) (GF := GF) c r)
-    (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc) N Pr) (l : List FdState) (cw : Nat)
+theorem file_open_absent (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fname) (heq : fileAppIs (GF := GF) c r)
+    (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs N Pr) (l : List FdState) (cw : Nat)
     (q : Qp) (mode : Int) (K : Int → IProp GF)
     (hu : uname nm) (hsN : sf[nm]? = none) (hcw : cw = ROOTINO) (hcr0 : omCreate (BitVec.ofInt 64 mode) = false) :
-    ⊢ appInv (hlc := hlc) fscFs -∗ ustd N.fd l -∗ ucwd N.cwd cw -∗ fdq r q sf -∗
+    ⊢ appInv fscFs -∗ ustd N.fd l -∗ ucwd N.cwd cw -∗ fdq r q sf -∗
       ((ustd N.fd l -∗ ucwd N.cwd cw -∗ fdq r q sf -∗ K (-1)) ∧
-       (∀ (ret : BitVec 64), fileTaint (hlc := hlc) c -∗ ukOpenTaintFd N.fd l ret -∗ ucwd N.cwd cw -∗ K ret.toInt)) -∗
-      opObl (hlc := hlc) N Pr nm mode K := by
+       (∀ (ret : BitVec 64), fileTaint c -∗ ukOpenTaintFd N.fd l ret -∗ ucwd N.cwd cw -∗ K ret.toInt)) -∗
+      opObl N Pr nm mode K := by
   unfold opObl
   iintro #Hinv Hstd Hcwd Hd HK %h %m %avail %pv %tx %f %hf %ha0 %ha1 Hcode #Hp Hrun Hcont
   ihave %hpv := fdev_path_bnd N h m _ avail tx pv nm.length f (uname_pos nm hu) $$ Hrun Hp

@@ -23,15 +23,15 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileLaws
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- THE DEED LAW (Rocq `file_deed_law`). -/
 theorem fileDeed_law (c : FileFixed) (r : FileAppNames) :
     ⊢@{IProp GF} □ (∀ (v : Aview) (s : Dst),
-      fdeed r s -∗ filePred (hlc := hlc) c r v -∗
-      filePred (hlc := hlc) c r v ∗ fdeed r s ∗
-      ((⌜fOk v s⌝ ∗ fTyped c s) ∨ fileTaint (hlc := hlc) c)) := by
+      fdeed r s -∗ filePred c r v -∗
+      filePred c r v ∗ fdeed r s ∗
+      ((⌜fOk v s⌝ ∗ fTyped c s) ∨ fileTaint c)) := by
   iintro !> %v %s Hd Hp
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
@@ -70,10 +70,10 @@ theorem fileDeed_law (c : FileFixed) (r : FileAppNames) :
 /-- THE ESCROW READ (Rocq `file_escrow_read`). -/
 theorem fileEscrow_read (c : FileFixed) (r : FileAppNames) :
     ⊢@{IProp GF} □ (∀ (v : Aview) (n : Nat) (s : Dst) (g : GName),
-      escKey (hlc := hlc) c r n s g -∗ filePred (hlc := hlc) c r v -∗
-      filePred (hlc := hlc) c r v ∗
+      escKey c r n s g -∗ filePred c r v -∗
+      filePred c r v ∗
       ((⌜fOk v s ∧ fileFsPure v⌝ ∗ fTyped c s)
-        ∨ escSpent (hlc := hlc) g ∨ fileTaint (hlc := hlc) c)) := by
+        ∨ escSpent g ∨ fileTaint c)) := by
   iintro !> %v %n %s %g #Hkey Hp
   unfold escKey
   icases Hkey with (#Hwit | #Ht0)
@@ -91,7 +91,7 @@ theorem fileEscrow_read (c : FileFixed) (r : FileAppNames) :
     unfold fEscWrap
     icases Hwr with ⟨%h, Ha, #Hrec⟩
     ihave %hn := escWit_lookup r h n s g $$ Ha Hwit
-    ihave #Hsp := escRecs_at (hlc := hlc) h n s g hn $$ Hrec
+    ihave #Hsp := escRecs_at h n s g hn $$ Hrec
     isplitl [Hc Ha Hf Hsy]
     · iright
       isplitr
@@ -106,7 +106,7 @@ theorem fileEscrow_read (c : FileFixed) (r : FileAppNames) :
     icases Hf with ⟨%h0, %s0, %g0, Ha, #Hrec, Hwh, Htk, #Hty, %hok⟩
     ihave %hn := escWit_lookup r (h0 ++ [(s0, g0)]) n s g $$ Ha Hwit
     rcases escWit_head h0 n s s0 g g0 hn with ⟨_, hn0⟩ | ⟨e1, e2⟩
-    · ihave #Hsp := escRecs_at (hlc := hlc) h0 n s g hn0 $$ Hrec
+    · ihave #Hsp := escRecs_at h0 n s g hn0 $$ Hrec
       isplitl [Hc Ha Hwh Htk Hsy]
       · iright
         isplitr
@@ -135,17 +135,17 @@ theorem fileEscrow_read (c : FileFixed) (r : FileAppNames) :
 `file_escrow_law`). -/
 theorem fileEscrow_law (c : FileFixed) (r : FileAppNames) :
     ⊢@{IProp GF} □ (∀ (v : Aview) (n : Nat) (s : Dst) (g : GName),
-      escKey (hlc := hlc) c r n s g -∗ escTok (hlc := hlc) g -∗ filePred (hlc := hlc) c r v -∗
-      filePred (hlc := hlc) c r v ∗ escTok (hlc := hlc) g ∗
-      ((⌜fOk v s ∧ fileFsPure v⌝ ∗ fTyped c s) ∨ fileTaint (hlc := hlc) c)) := by
-  ihave #Hrd := fileEscrow_read (hlc := hlc) (GF := GF) c r
+      escKey c r n s g -∗ escTok g -∗ filePred c r v -∗
+      filePred c r v ∗ escTok g ∗
+      ((⌜fOk v s ∧ fileFsPure v⌝ ∗ fTyped c s) ∨ fileTaint c)) := by
+  ihave #Hrd := fileEscrow_read (GF := GF) c r
   iintro !> %v %n %s %g #Hkey Htok Hp
   ihave ⟨Hp, Hres⟩ := Hrd $$ %v %n %s %g Hkey Hp
   icases Hres with (Hok | #Hsp | #Ht)
   · iframe Hp Htok
     ileft; iexact Hok
   · iexfalso
-    iapply escTok_spent (hlc := hlc) g $$ Htok Hsp
+    iapply escTok_spent g $$ Htok Hsp
   · iframe Hp Htok
     iright; iexact Ht
 

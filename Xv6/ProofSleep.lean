@@ -99,7 +99,7 @@ theorem sl_calleeSaved_mk (KR R : RegMap)
       | assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The lock's share of the mirror plus the claimant's half IS the whole
 variable (at RUNNING, which is claimed). -/
@@ -137,8 +137,8 @@ set_option maxHeartbeats 4000000 in
 contents out at RUNNING, inside the balanced pair's critical section
 (`k.pushOffAt a b`, `k` the entry context at either `SIE`): re-form the
 claim, split it against the complement, release, return. -/
-theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [X : CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sleep_tail (RE : RELEASE) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [X : CurCtx] (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (a b : Bool) (j : Nat) (hj : j < NPROC)
     (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hproc : k.proc = procAddr j)
@@ -189,7 +189,7 @@ theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [Mac
         pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK' reen hreen hon
-    have hh := RE.wp_release (hlc := hlc) (GF := GF) cpu k' (Γ.lock j) "proc" (procLockPay Γ j)
+    have hh := RE.wp_release (GF := GF) cpu k' (Γ.lock j) "proc" (procLockPay Γ j)
       hsie' hnoff' hK' reen hreen hon
     unfold wp_release_body at hh
     simp only [releaseAddr] at hh
@@ -264,7 +264,7 @@ prologue, myproc and the entry acquire run at the caller's index (the
 complement follows the thread, `k_step_e`); the acquire's arm joined with
 the complement is the bundle `sched` needs (`armExt_join`). -/
 theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : SLEEP :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k j hj hproc hK hnoff htier => by
+  ⟨fun {GF} _ _ _ _ _ _ _ X Γ _ cpu k j hj hproc hK hnoff htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sleep_eb_body
@@ -298,7 +298,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
   k_step_e (wp_s_jal cpu _ (KA.«sleep» + 0xa#64) false 2095458#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_br_fffffffffffff96c]
   iintro Hk Hpc
-  have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)
+  have hmp := MP.wp_myproc (GF := GF)
   unfold wp_myproc_body at hmp
   simp only [myprocAddr] at hmp
   iapply (hmp cpu _ ?hnM ?hKM) $$ [- $Hk $Hpc]
@@ -322,7 +322,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
   k_step_e (wp_s_jal cpu _ (KA.«sleep» + 0x10#64) false 2092088#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_br_ffffffffffffec48]
   iintro Hk Hpc
-  have hac := AC.wp_acquire (hlc := hlc) (GF := GF)
+  have hac := AC.wp_acquire (GF := GF)
   unfold wp_acquire_body at hac
   simp only [acquireAddr] at hac
   iapply (hac cpu _ (Γ.lock j) "proc" (procLockPay Γ j) ?hnA ?hKA ?hlA) $$ [- $Hk $Hpc]
@@ -339,7 +339,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
   -- the acquire's arm and the complement: the whole trap bundle
   icases armExt_join cpu k.sie (procAddr j) $$ [$Harm $Hte $Hce] with ⟨Htc, Hclaim, Hir⟩
   -- the claim's two halves
-  ihave Hclaim := (show cpuClaim (hlc := hlc) (GF := GF) cpu (procAddr j) ⊢
+  ihave Hclaim := (show cpuClaim (GF := GF) cpu (procAddr j) ⊢
       pstateHlf Γ j RUNNING ∗ hartHlf Γ j cpu from by
     rw [cpuClaim_eq Γ]; exact procClaim_elim Γ cpu j hj) $$ Hclaim
   icases Hclaim with ⟨Hpst2, Hhart⟩
@@ -434,7 +434,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
           ▷ schedVcAt Γ cpu' (cpuCtxAddr cpu') (procAddr j) -∗ wpLoop cpu'))
         ⊢ wpLoop (GF := GF) cpu := by
       intro k' hK' hs' hn' hl' ht' hp'
-      have h := SC.wp_sched (hlc := hlc) (GF := GF) Γ cpu k' j SLEEPING ch hj sl_parkOk_sleeping
+      have h := SC.wp_sched (GF := GF) Γ cpu k' j SLEEPING ch hj sl_parkOk_sleeping
         hK' hs' hn' hl' ht' hp'
       unfold wp_sched_body at h
       simp only [schedAddr] at h

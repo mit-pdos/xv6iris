@@ -19,10 +19,11 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_atree_close`**: the one-way door to the published tree. -/
 theorem ushATree_close (N : UkNames GF) (s0 : Nat) :
     ∀ (t : UshpCmd) (p : Nat) (a : UshPtr), ushATree N s0 p t a ⊢ ushTree N s0 p t
@@ -46,11 +47,13 @@ theorem ushATree_close (N : UkNames GF) (s0 : Nat) :
   | .pipe .., _, .exec | .pipe .., _, .redir .. | .list .., _, _ | .back _, _, _ => by
     simp only [ushATree]; iintro %h; exact h.elim
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_otree_close`**. -/
 theorem ushOTree_close (N : UkNames GF) (s0 p : Nat) (t : UshpCmd) :
     ushOTree N s0 p t ⊢ ushTree N s0 p t := by
   unfold ushOTree; iintro ⟨%a, H⟩; iapply ushATree_close N s0 t p a $$ H
 
+omit [MachGS GF] in
 /-- **Rocq `ushp_atree_of_redirs`**: parseexec's open answer -- the exec node
 and the redirect chain around it -- is an addressed tree of the wrapped
 command. -/

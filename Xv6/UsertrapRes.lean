@@ -175,7 +175,7 @@ theorem uservecCtx_ok (k : KCtx) (g : RegMap) (ws : List (BitVec 64)) (h : k.sie
 def utStackTop (k : KCtx) (ksp : BitVec 64) : Prop := k.sp = ksp ∧ k.avail = 512
 
 section Trap
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- **Re-forming the stack** (the uservec obligation): `m` dead slots above
 the context's `sp` -- a frame whose owner never pops it (forkret's) -- are
@@ -287,7 +287,7 @@ theorem uservecTf_low (ws : List (BitVec 64)) (g : RegMap) (i : Nat) (hi : i < 5
     uvSaveSeq_low _ (by simp [uvSavesB]) g _ i hi, uvSaveSeq_low _ (by simp [uvSavesA]) g _ i hi]
 
 section Tfk
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- **Rocq `ut_tfk`**: the kernel words, at an existential root whose
 kernel-table invariant is beside it (persistent).  Established where the
@@ -341,7 +341,7 @@ end Tfk
 /-! ## §4 The five cones' environments -/
 
 section Env
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
@@ -354,9 +354,9 @@ lock and the ftable (syscall / kexit), the file system (fileclose / kexit /
 vmfault's kalloc pair), and `<init>`: its ghost identity and the discarded
 `initproc` cell (kexit's reparent). -/
 def utCaps (N : UtNames) : IProp GF := iprop(
-  procsInv N.Γ ∗ handlerEnvAt (hlc := hlc) N.Γ curCtx ∗ panicEnv ∗
+  procsInv N.Γ ∗ handlerEnvAt N.Γ curCtx ∗ panicEnv ∗
   isLock N.w waitLockAddr "wait_lock" waitLockPay ∗ isFtable N.ft N.f ∗
-  fsReady (hlc := hlc) ∗ initGen N.ip 1#32 ∗ initIdentCell curCtx N.ip)
+  fsReady ∗ initGen N.ip 1#32 ∗ initIdentCell curCtx N.ip)
 
 instance utCaps_persistent (N : UtNames) : Persistent (utCaps (GF := GF) N) := by
   unfold utCaps; infer_instance
@@ -388,12 +388,12 @@ reference rides right after the cwd's, as in the core (chroot). -/
 def utBlock (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop%
   ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
     V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
-  @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V ∗
+  @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+  @procFieldsNoOfile GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V ∗
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
   actCnt pa V.ev ∗
-  @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
-  @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
+  @cwdRefAt GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
+  @rootRefAt GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
   procGenAt curCtx pa pid V.gen ∗
   procOfiles γ V.fdg pa V.ofile
 
@@ -401,8 +401,8 @@ def utBlock (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) :
 parked part, the address space and the trapframe page. -/
 theorem utBlock_join (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
-    utBlock (GF := GF) γ pa pid V ∗ @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
-      @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊣⊢ procPrivFd γ pa pid V M := by
+    utBlock (GF := GF) γ pa pid V ∗ @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
+      @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊣⊢ procPrivFd γ pa pid V M := by
   unfold utBlock procPrivFd procPrivCoreNoctxAt procPrivBareAt
   constructor
   · iintro ⟨⟨%h, Hpid, Hf, %hlz, Hev, Hc, Hr, Hg, Ho⟩, Hpt, Htf⟩
@@ -476,8 +476,8 @@ def utOwnBare (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : Pro
 /-- **Rocq `ut_own_pt_close` / `ut_own_pt_open`** (and the trapframe's). -/
 theorem utOwnBare_join (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) :
-    utOwnBare (GF := GF) Rsys N V sts cs pid ∗ @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
-      @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊣⊢ utOwn Rsys N V M sts cs pid := by
+    utOwnBare (GF := GF) Rsys N V sts cs pid ∗ @procPtAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
+      @tfPageAt GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊣⊢ utOwn Rsys N V M sts cs pid := by
   have hj := utBlock_join (GF := GF) N.f N.pj pid V M
   unfold utOwnBare utOwn
   constructor
@@ -673,7 +673,7 @@ the parker's (`utParkCaps`); the bcache slots are ghost (`parkOwn`).
 Deviation 8. -/
 
 section Park
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -687,6 +687,7 @@ def parkOwn : IProp GF := iprop(bslots 3)
 /-- **Rocq `ut_park_caps`** (deviation 8): the parker's context-free row. -/
 def utParkCaps (N : UtNames) : IProp GF := initGen N.ip 1#32
 
+omit [MachGS GF] in
 instance utParkCaps_persistent (N : UtNames) : Persistent (utParkCaps (GF := GF) N) := by
   unfold utParkCaps; infer_instance
 
@@ -704,8 +705,8 @@ instance parkGlobals_persistent [CurCtx] (Γ : SchedNames) (w ft : GName) (f : F
 /-- **Rocq `ut_caps_of_park`**: the parker's row and the resumer's, at the
 resumer's context, are the environment. -/
 theorem utCaps_of_park [CurCtx] (N : UtNames) :
-    utParkCaps (GF := GF) N ∗ parkGlobals N.Γ N.w N.ft N.f N.ip ∗ firstDone (hlc := hlc) ∗
-      handlerEnvAt (hlc := hlc) N.Γ curCtx ⊢
+    utParkCaps (GF := GF) N ∗ parkGlobals N.Γ N.w N.ft N.f N.ip ∗ firstDone ∗
+      handlerEnvAt N.Γ curCtx ⊢
       utCaps N := by
   unfold utParkCaps parkGlobals firstDone utCaps
   iintro ⟨#Hig, ⟨#Hp, #Hpe, #Hwl, #Hft, #Hc⟩, ⟨-, #Hrdy, -⟩, #Henv⟩
@@ -723,8 +724,8 @@ def utParkResume (URB : CPU → CurCtx → UPtd → BitVec 64 → ProcPriv → L
       ExtTreeSet GName compare → BitVec 32 → IProp GF)
     (W : IProp GF) (G : CurCtx → IProp GF) (N : UtNames) [Xc : CurCtx] (h : CPU) (P' : UPtd)
     (V' : ProcPriv) (sts' : List FdState) (cs' : ExtTreeSet GName compare) : IProp GF := iprop(
-  ⌜V'.upt = P'⌝ -∗ parkGlobals N.Γ N.w N.ft N.f N.ip -∗ G Xc -∗ firstDone (hlc := hlc) -∗ W -∗
-  handlerEnvAt (hlc := hlc) N.Γ curCtx -∗ utTfk h (V'.kstack + 4096#64) V' -∗ cpuClaim h N.pj -∗
+  ⌜V'.upt = P'⌝ -∗ parkGlobals N.Γ N.w N.ft N.f N.ip -∗ G Xc -∗ firstDone -∗ W -∗
+  handlerEnvAt N.Γ curCtx -∗ utTfk h (V'.kstack + 4096#64) V' -∗ cpuClaim h N.pj -∗
   utBlock N.f N.pj N.pid V' -∗ fdSlots FDSPARE -∗ irefSlots IREFSPARE -∗
   fdFrags V'.fdg sts' -∗ chFrag V'.chg N.pj cs' -∗
   URB h Xc P' (V'.kstack + 4096#64) V' sts' cs' N.pid)
@@ -740,14 +741,14 @@ def utParkIntroBody (URB : CPU → CurCtx → UPtd → BitVec 64 → ProcPriv �
   ⊢ parkOwn (GF := GF) -∗ utParkCaps N -∗
     ∀ (h : CPU) (Xc : CurCtx) (P' : UPtd) (V' : ProcPriv) (sts' : List FdState)
       (cs' : ExtTreeSet GName compare),
-      utParkResume (hlc := hlc) (Xc := Xc) URB W G N h P' V' sts' cs'
+      utParkResume (Xc := Xc) URB W G N h P' V' sts' cs'
 
 /-- The syscall environment's derivation at the resumer's context (Rocq
 `ut_res_bare_park`'s `Hderive`): out of the resumer's globals and extra
 rows, `firstDone` and the token. -/
 def utParkDerive (Rsys : CurCtx → UtNames → BitVec 32 → IProp GF) (W : IProp GF)
     (G : CurCtx → IProp GF) (N : UtNames) [Xc : CurCtx] : IProp GF :=
-  iprop(parkGlobals N.Γ N.w N.ft N.f N.ip -∗ G Xc -∗ firstDone (hlc := hlc) -∗ W -∗ Rsys Xc N N.pid)
+  iprop(parkGlobals N.Γ N.w N.ft N.f N.ip -∗ G Xc -∗ firstDone -∗ W -∗ Rsys Xc N N.pid)
 
 /-- **Rocq `ut_res_bare_park`**: the park's one move, generic in the
 syscall environment, given its derivation at every resumer context (which
@@ -776,7 +777,7 @@ end Park
 /-! ## §5 The `csrw stvec, kernelvec` fold (Rocq `ut_trap_csrs_fold`) -/
 
 section Fold
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **Rocq `ut_trap_csrs_fold` / `ut_csrs_raw_fold`**: the three trap-scratch
@@ -787,7 +788,7 @@ installed handler.  (Rocq also folds the dangling SIE quarter and the sret
 mirror here: D27, they are the context's indices.) -/
 theorem utCsrs_fold (Γ : SchedNames) (cpu : CPU) (ep sc tv : BitVec 64) :
     Register.sepc ↦ᵣ[cpu] ep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
-      Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ handlerEnvAt (hlc := hlc) Γ curCtx ∗ □ kvIhs (GF := GF) Γ cpu ⊢
+      Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ handlerEnvAt Γ curCtx ∗ □ kvIhs (GF := GF) Γ cpu ⊢
       trapCsrs cpu ∗ intrRes cpu := by
   iintro ⟨Hep, Hsc, Htv, Hstv, #Henv, #Hihs⟩
   isplitl [Hep Hsc Htv]

@@ -99,7 +99,7 @@ def afPins (k : KCtx) (R : RegMap) : Prop :=
   R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 /-! ## The callees -/
 
@@ -117,7 +117,7 @@ theorem af_argint (AI : ARGINT) (c : CPU) (k' : KCtx) (i : Nat) (tfp : BitVec 44
       wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
       wordPointsTo (k'.regs 11#5) 4 (DFrac.own 1) (BitVec.extractLsb' 0 32 v) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AI.wp_argint (hlc := hlc) (GF := GF) c k' i tfp ws v old dqt hi ha0 hws hnoff hK
+  have h := AI.wp_argint (GF := GF) c k' i tfp ws v old dqt hi ha0 hws hnoff hK
   unfold wp_argint_body at h
   simp only [argintAddr] at h
   exact h
@@ -129,7 +129,7 @@ theorem af_myproc (MP : MYPROC) (c : CPU) (k' : KCtx) (hnoff : k'.noff + 1 < 2 ^
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
+  have h := MP.wp_myproc (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   exact h
@@ -217,7 +217,7 @@ theorem af_ofile_addr' (pa : BitVec 64) (fd : Nat) (h : fd < 16) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- From `0x80004d0a` (the descriptor found, `*pfd` already handled):
@@ -278,7 +278,7 @@ theorem argfd_br_ffffffffffffdc6c : KA.«argfd» + 0xffffffffffffdc6c#64 = KA.«
 
 set_option maxHeartbeats 32000000 in
 theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X cpu k γ pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK => by
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X cpu k γ pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_argfd_body

@@ -28,7 +28,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- `strncpy(dst, name, 14)` at its call site: the destination comes back
@@ -43,7 +43,7 @@ theorem dirlink_strncpy (SN : STRNCPY) (c : CPU) (k' : KCtx) (bsd : List (BitVec
       byteBuf (k'.regs 10#5) (DFrac.own 1) (namePad (bname 14 fn)) -∗
       byteBuf (k'.regs 11#5) dqn (bview 14 fn) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := SN.wp_strncpy (hlc := hlc) (GF := GF) c k' bsd (bview 14 fn) 14 dqn hK hn (by decide)
+  have h := SN.wp_strncpy (GF := GF) c k' bsd (bview 14 fn) 14 dqn hK hn (by decide)
     hld (by rw [bview_length])
   unfold wp_strncpy_body at h
   simp only [strncpyAddr] at h
@@ -63,7 +63,7 @@ theorem dirlink_strncpy (SN : STRNCPY) (c : CPU) (k' : KCtx) (bsd : List (BitVec
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -86,7 +86,7 @@ theorem dirlink_keep_name (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x70 .. +0x7c`: THE RECORD** -- strncpy the name, `sh` the inum,
 into the append (`Xv6.dirlink_write`). -/
-theorem dirlink_after (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem dirlink_after (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (j : Nat) (γl : GName)
     (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -106,7 +106,7 @@ theorem dirlink_after (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (h
     dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr ∗
     bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
-    dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    dirlinkEnv Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c')
     ⊢ wpLoop (GF := GF) cpu := by

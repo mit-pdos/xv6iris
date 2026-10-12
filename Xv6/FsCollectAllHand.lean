@@ -73,7 +73,7 @@ theorem colRegMap_dom (nib : Nat) (I : RegMapF FsNode)
     rfl
 
 section Hand
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [FsTopG GF] [FsLinkG GF]
 

@@ -22,7 +22,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section UkSeccStubs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -35,21 +35,21 @@ theorem secc_usysno (m : RegMap) (k : Int) (hk : (BitVec.extractLsb' 0 32 (BitVe
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- seccomp's exit stub @0x34c. -/
 theorem secc_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ exitStubLaw (hlc := hlc) N (ukCode N.t User.Seccomp.code.byte) User.Seccomp.Sym.«exit» :=
+    ⊢ exitStubLaw N (ukCode N.t User.Seccomp.code.byte) User.Seccomp.Sym.«exit» :=
   exit_stub_of_text UL N User.Seccomp.textOk _ 2#12 (by decide) udec% udec%
     (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- seccomp's wait stub @0x354. -/
 theorem secc_stub_wait (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Seccomp.code.byte) 3 User.Seccomp.Sym.«wait» :=
+    ⊢ stubLaw N (ukCode N.t User.Seccomp.code.byte) 3 User.Seccomp.Sym.«wait» :=
   stub_of_text UL N User.Seccomp.textOk 3 _ 3#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- seccomp's seccomp stub @0x3f4. -/
 theorem secc_stub_secc (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Seccomp.code.byte) 23 User.Seccomp.Sym.«seccomp» :=
+    ⊢ stubLaw N (ukCode N.t User.Seccomp.code.byte) 23 User.Seccomp.Sym.«seccomp» :=
   stub_of_text UL N User.Seccomp.textOk 23 _ 23#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
@@ -57,9 +57,9 @@ theorem secc_stub_secc (UL : UK_LEAVES) (N : UkNames GF) :
 program's own, and free. -/
 theorem wp_ksecc_exit (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) :
     ⊢ □ (∀ s : Int, N.pay s) -∗ ukCode N.t User.Seccomp.code.byte -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Seccomp.Sym.«exit») avail -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Seccomp.Sym.«exit») avail -∗ wpLoop h := by
   iintro #Hq #Hc Hrun
-  ihave #HL := secc_stub_exit (hlc := hlc) UL N
+  ihave #HL := secc_stub_exit UL N
   unfold exitStubLaw
   iapply HL $$ %h %m %avail Hc Hrun
   iintro %h1 #Hi Hrun
@@ -73,12 +73,12 @@ theorem wp_ksecc_wait (UL : UK_LEAVES) (HS : UK_SYS_P)
     (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (cs : ExtTreeSet GName compare)
     (hz : (m.get 10#5).toNat = 0) :
     ⊢ ukCode N.t User.Seccomp.code.byte -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Seccomp.Sym.«wait») avail -∗ uch N.ch cs -∗
+      urun N h m (BitVec.ofNat 64 User.Seccomp.Sym.«wait») avail -∗ uch N.ch cs -∗
       (∀ (h' : CPU) (ret : BitVec 64) (cs' : ExtTreeSet GName compare),
-        urun (hlc := hlc) N h' (stubRet m 3 ret) (retPc (m.get 1#5)) avail -∗ uch N.ch cs' -∗ wpLoop h') -∗
+        urun N h' (stubRet m 3 ret) (retPc (m.get 1#5)) avail -∗ uch N.ch cs' -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hch Hcont
-  ihave #HL := secc_stub_wait (hlc := hlc) UL N
+  ihave #HL := secc_stub_wait UL N
   unfold stubLaw
   iapply HL $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %_ #Hi Hrun Hk
@@ -98,13 +98,13 @@ slot family it is handed: every key at the mask `seccAll &&& a0` whose table
 is below the view (`UkSysP.seccObl tabLe`, Rocq's continuation verbatim). -/
 theorem wp_ksecc_seccomp_stub (UL : UK_LEAVES)
     (Hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
-    (HL : UkSysP.wpUkEcallSeccK (hlc := hlc) (utab (GF := GF)) tabLe)
+    (HL : UkSysP.wpUkEcallSeccK (utab (GF := GF)) tabLe)
     (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (v : List FdState) :
     ⊢ ukCode N.t User.Seccomp.code.byte -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Seccomp.Sym.«seccomp») avail -∗
-      utab N.fd v -∗ UkSysP.seccObl (hlc := hlc) tabLe N (m.get 10#5) v -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Seccomp.Sym.«seccomp») avail -∗
+      utab N.fd v -∗ UkSysP.seccObl tabLe N (m.get 10#5) v -∗ wpLoop h := by
   iintro #Hc Hrun Htab Hobl
-  ihave #HS := secc_stub_secc (hlc := hlc) UL N
+  ihave #HS := secc_stub_secc UL N
   unfold stubLaw
   iapply HS $$ %h %m %avail Hc Hrun
   iintro %h1 %_ %_ #Hi Hrun _

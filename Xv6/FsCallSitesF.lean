@@ -38,12 +38,12 @@ open LeanRV64D
 /-! ## ...at the ambient `Fscfg` / `Icfg` view -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `bread(ip->dev, bno)` at the ambient view, at EITHER entry `SIE`. -/
-theorem bread_callF_eb [Fscfg] [Icfg] (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem bread_callF_eb [Fscfg] [Icfg] (BD : BREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv bno : BitVec 32) (dqp : DFrac) (pj : BitVec 64) (hpj : k'.proc = pj)
     (s : Bool) (hs : k'.sie = s)
@@ -95,7 +95,7 @@ end
 /-! ## The dinode record's `log_write` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
   [FsBlocksG GF]
 
 /-- THE GHOST STEP `log_write` runs at one dinode's record, at the
@@ -128,7 +128,7 @@ theorem dislot_shape (ds : List Dinode) (inum : BitVec 32) (dn : Dinode) (hds : 
     diblkBytes_splice ds (islot inum) dn hds hdn (islot_lt inum)⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -167,7 +167,7 @@ theorem dislot_log_write [Fscfg] [Icfg] [IregG GF] (LW : LOG_WRITE)
         (BitVec.ofNat 32 (IBLOCK inum icfgIst)) (diblkBytes (ds.set (islot inum) dn)) bsd true -∗
       bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := LW.wp_log_write_au_range (hlc := hlc) (GF := GF) c k' icfgLog γl fscBio
+  have h := LW.wp_log_write_au_range (GF := GF) c k' icfgLog γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscFs fscLogst icfgDev kk pidv
     (BitVec.ofNat 32 (IBLOCK inum icfgIst)) (diblkBytes (ds.set (islot inum) dn)) (diblkBytes ds)
     bsd d u (64 * islot inum) 64 (dinodeBytes dn) cr Sb e0 vlb (⊤ \ ↑iregN) Pout

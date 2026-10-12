@@ -60,7 +60,7 @@ Rocq's header, kept because the reasons are the content:
    `T_FILE_value`/`T_DEVICE_value` are kept (`.toNat` is `rfl`).
 3. Class binders: Rocq's section list (`riscvGS, xv6G, bioslotG, fdslotG,
    fileG, irefslotG, pavG, wchG`) is replaced by the classes the statements
-   use -- `[MachGS hlc GF] [FsTopG GF]` for the commits (plus `[Appcfg GF]`
+   use -- `[MachGS GF] [FsTopG GF]` for the commits (plus `[Appcfg GF]`
    where they carry `appStep`), and the `InodeRegionInv` retag set for the
    fires -- as `FsAbsReadFire` deviation 5.  None of `bioslotG`/`fdslotG`/
    `irefslotG`/`pavG`/`wchG` is read by any statement here (C0's slot
@@ -201,7 +201,7 @@ theorem cafEra_dir_row (dn : Dinode) (bm : Blkmap) (dat : Nat → List (BitVec 8
 /-! ## 1.  The authority-shaped commits -/
 
 section CreateCommit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF]
 
 /-- THE ARM'S RECEIPT (Rocq's `cre_arm_fired`), hoisted above the commits
 because the CREATE leg takes it too: the row at `i` APPEARED -- at the
@@ -274,7 +274,7 @@ def acreCommitAt [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (c : Absnode)
     (Pd : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Φ : Aview → Nat → Fname → Nat → IProp GF) : IProp GF :=
-  acreCommitAtGen (hlc := hlc) Γ E (fun _ _ => c) Pd Farm Φ
+  acreCommitAtGen Γ E (fun _ _ => c) Pd Farm Φ
 
 /-- THE ARM (Rocq's `aarm_commit_at`): the row APPEARS.  The view has no row
 at `i` (the claim box is at count 0) but the MAP has one.  The `isSome`
@@ -351,15 +351,15 @@ def creExFired (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (d
 yields the unarm's AU AT THE INUM THE ARM'S RECEIPT NAMES, and at no other. -/
 def aunarmOfArm [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
     (Farm : Pfam GF (Aview → Nat → IProp GF)) (Φ : Aview → Nat → IProp GF) : IProp GF :=
-  iprop(∀ i : Nat, creArmFired Farm i -∗ aunarmCommitAt (hlc := hlc) Γ E i Φ)
+  iprop(∀ i : Nat, creArmFired Farm i -∗ aunarmCommitAt Γ E i Φ)
 
 /-- The child's two legs, UNFIRED (Rocq's `cre_child_unfired`): the whole
 pairs the caller handed in, so a caller whose leg never fired eliminates to
 its own `pfRefund`. -/
 def creChildUnfired [Appcfg GF] (Γ : FsViewNames GF) (c : Absnode)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) : IProp GF :=
-  iprop(pfAt (aarmCommitAt (hlc := hlc) Γ appE c) Farm ∗
-    pfAt (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun)
+  iprop(pfAt (aarmCommitAt Γ appE c) Farm ∗
+    pfAt (aunarmOfArm Γ appE Farm) Fun)
 
 /-- THE DO-THEN-UNDO PAIR (Rocq's `cre_child_pair`, ruling Q-h): the unarm
 spent the arm's permit, and what the application gets back is the unarm's
@@ -371,7 +371,7 @@ def creChildPair (_Farm Fun : Pfam GF (Aview → Nat → IProp GF)) (i : Nat) : 
 
 /-- Rocq's `dlookup_commit_at_unit`. -/
 theorem dlookupCommitAt_unit (Γ : FsViewNames GF) (E : CoPset) :
-    ⊢ dlookupCommitAt (hlc := hlc) Γ E (fun _ _ _ _ => iprop(True)) := by
+    ⊢ dlookupCommitAt Γ E (fun _ _ _ _ => iprop(True)) := by
   unfold dlookupCommitAt
   iintro %I %d %i %nm %ents %nl %_ %_ Ha
   imodintro
@@ -382,7 +382,7 @@ theorem dlookupCommitAt_unit (Γ : FsViewNames GF) (E : CoPset) :
 theorem acreCommitAtGen_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset)
     (cf : Nat → Nat → Absnode) (Pd : Nat → IProp GF) (Farm : Pfam GF (Aview → Nat → IProp GF)) :
     appSup (GF := GF) ⊢
-      acreCommitAtGen (hlc := hlc) (fsGammaL γfs) E cf Pd Farm (fun _ _ _ _ => iprop(True)) := by
+      acreCommitAtGen (fsGammaL γfs) E cf Pd Farm (fun _ _ _ _ => iprop(True)) := by
   unfold acreCommitAtGen
   iintro #Hsup %I %d %i %nm %ents %nl %_ %_ _ HPd Ha
   ihave Hstep := appStep_acc d I (deltaCreate d nm i (cf d i) (absView I)) $$ Hsup
@@ -396,13 +396,13 @@ theorem acreCommitAtGen_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoP
 theorem acreCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset) (c : Absnode)
     (Pd : Nat → IProp GF) (Farm : Pfam GF (Aview → Nat → IProp GF)) :
     appSup (GF := GF) ⊢
-      acreCommitAt (hlc := hlc) (fsGammaL γfs) E c Pd Farm (fun _ _ _ _ => iprop(True)) :=
+      acreCommitAt (fsGammaL γfs) E c Pd Farm (fun _ _ _ _ => iprop(True)) :=
   acreCommitAtGen_unit γfs E _ Pd Farm
 
 /-- the arm's step is paid although the VIEW has no row: the supply holds of
 every view (Rocq's `aarm_commit_at_unit`). -/
 theorem aarmCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset) (c : Absnode) :
-    appSup (GF := GF) ⊢ aarmCommitAt (hlc := hlc) (fsGammaL γfs) E c (fun _ _ => iprop(True)) := by
+    appSup (GF := GF) ⊢ aarmCommitAt (fsGammaL γfs) E c (fun _ _ => iprop(True)) := by
   unfold aarmCommitAt
   iintro #Hsup %I %i %_ %_ Ha
   ihave Hstep := appStep_acc i I (deltaArm i c (absView I)) $$ Hsup
@@ -414,7 +414,7 @@ theorem aarmCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset
 
 /-- Rocq's `adots_commit_at_unit`. -/
 theorem adotsCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset) :
-    appSup (GF := GF) ⊢ adotsCommitAt (hlc := hlc) (fsGammaL γfs) E (fun _ _ _ _ => iprop(True)) := by
+    appSup (GF := GF) ⊢ adotsCommitAt (fsGammaL γfs) E (fun _ _ _ _ => iprop(True)) := by
   unfold adotsCommitAt
   iintro #Hsup %I %i %d %full %_ Ha
   ihave Hstep := appStep_acc i I (dotsDelta full i d (absView I)) $$ Hsup
@@ -426,7 +426,7 @@ theorem adotsCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPse
 
 /-- Rocq's `aunarm_commit_at_unit`. -/
 theorem aunarmCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset) (i : Nat) :
-    appSup (GF := GF) ⊢ aunarmCommitAt (hlc := hlc) (fsGammaL γfs) E i (fun _ _ => iprop(True)) := by
+    appSup (GF := GF) ⊢ aunarmCommitAt (fsGammaL γfs) E i (fun _ _ => iprop(True)) := by
   unfold aunarmCommitAt
   iintro #Hsup %I %c %_ Ha
   ihave Hstep := appStep_acc i I (deltaUnarm i (absView I)) $$ Hsup
@@ -441,10 +441,10 @@ straight back out unread (Rocq's `aunarm_of_arm_unit`). -/
 theorem aunarmOfArm_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset)
     (Farm : Pfam GF (Aview → Nat → IProp GF)) :
     appSup (GF := GF) ⊢
-      aunarmOfArm (hlc := hlc) (fsGammaL γfs) E Farm (fun _ _ => iprop(True)) := by
+      aunarmOfArm (fsGammaL γfs) E Farm (fun _ _ => iprop(True)) := by
   unfold aunarmOfArm
   iintro #Hsup %i _
-  iapply (aunarmCommitAt_unit (hlc := hlc) γfs E i) $$ Hsup
+  iapply (aunarmCommitAt_unit γfs E i) $$ Hsup
 
 end CreateCommit
 
@@ -452,7 +452,7 @@ end CreateCommit
 phases on either side of the map update -/
 
 section CreateFire
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF] [Appcfg GF]
 
 /-- UNDER THE ARMED REGISTRY (Rocq's `caf_armed_retag`): the receipt names
@@ -463,7 +463,7 @@ map before the body closes. -/
 theorem cafArmedRetag [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
     (S : Std.ExtTreeSet Nat compare) (i : Nat) (n n' : FsNode) (R : IProp GF)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗ iregArmed k t q S -∗
       (∀ I : RegMapF FsNode, ⌜PartialMap.get? I i = some n⌝ -∗
         ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I) ={appE}=∗
         ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
@@ -510,7 +510,7 @@ theorem cafArmedRetag [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
 section): the new node owes the row. -/
 theorem cafRetag [Icfg] (γfs : FsNames) (E : CoPset) (i : Nat) (n n' : FsNode) (R : IProp GF)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n') :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       (∀ I : RegMapF FsNode, ⌜PartialMap.get? I i = some n⌝ -∗
         ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I) ={appE}=∗
         ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
@@ -560,8 +560,8 @@ theorem cafArm_fire [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
     (Farm : Pfam GF (Aview → Nat → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S)
     (hnone : absOf n = none) (hrow : absOf n' = some ⟨c, 1⟩) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
-      pfAt (aarmCommitAt (hlc := hlc) (fsGammaL γfs) appE c) Farm -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗ iregArmed k t q S -∗
+      pfAt (aarmCommitAt (fsGammaL γfs) appE c) Farm -∗
       topFrag (fsGammaL γfs) i n ={E}=∗
         iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ creArmFired Farm i := by
   iintro #Hi #Hai Hrec Hcm Hf
@@ -595,8 +595,8 @@ theorem cafDots_fire [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF)) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S)
     (hrow : absOf n = some ⟨.ADir ∅, 1⟩) (hrow' : absOf n' = some ⟨.ADir (dotsEnts full i d), 1⟩) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
-      pfAt (adotsCommitAt (hlc := hlc) (fsGammaL γfs) appE) Fdots -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗ iregArmed k t q S -∗
+      pfAt (adotsCommitAt (fsGammaL γfs) appE) Fdots -∗
       topFrag (fsGammaL γfs) i n ={E}=∗
         iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ creDotsFired Fdots i d full := by
   iintro #Hi #Hai Hrec Hcm Hf

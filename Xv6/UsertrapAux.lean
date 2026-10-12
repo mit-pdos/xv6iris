@@ -37,7 +37,7 @@ theorem utFmt1_kinds : pkKinds utFmt1 = [PkKind.num, PkKind.num] := by unfold ut
 theorem utFmt2_kinds : pkKinds utFmt2 = [PkKind.num, PkKind.num] := by unfold utFmt2; decide
 
 section Str
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 set_option maxRecDepth 100000 in
 /-- Rocq `ut_fmt1_str`. -/
@@ -75,7 +75,7 @@ theorem utA_descs2 (R : RegMap) : ⊢ pkDescs (GF := GF) R [PkArgDesc.num, PkArg
 end Str
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -90,7 +90,7 @@ theorem utA_printk (PK : PRINTK) (c : CPU) (k' : KCtx) (γpr γl : GName) (γd :
     (∀ (R' : RegMap), kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := PK.wp_printk (hlc := hlc) (GF := GF) c k' γpr γl γd bs dqf fm
+  have h := PK.wp_printk (GF := GF) c k' γpr γl γd bs dqf fm
     [PkArgDesc.num, PkArgDesc.num] hK hflen
     (by rw [hkinds]; simp only [List.map_cons, List.map_nil, PkArgDesc.kind])
     (by simp only [List.length_cons, List.length_nil]; omega) hnoff hpr huart
@@ -116,15 +116,15 @@ theorem utA_setkilled (SK : SETKILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (
     (hsie : k'.sie = false) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "proc" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«setkilled» ∗ procsInv Γ ∗
-    (if self then iprop(killOwed gn ∗ takenAt gn) else iprop(□ MachFixedGS.killCred (hlc := hlc) (GF := GF))) ∗
+    (if self then iprop(killOwed gn ∗ takenAt gn) else iprop(□ MachFixedGS.killCred (GF := GF))) ∗
     pidReg pidv (.own qeighth) gn ∗
     wordPointsTo (pPid (procAddr j)) 4 (DFrac.own (1 : Qp).half.half) pidv ∗
     (∀ R' : RegMap, kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
       wordPointsTo (pPid (procAddr j)) 4 (DFrac.own (1 : Qp).half.half) pidv -∗
       pidReg pidv (.own qeighth) gn -∗ killShot gn -∗
-      (if self then killOwed gn else iprop(□ MachFixedGS.killCred (hlc := hlc) (GF := GF))) -∗ wpLoop c)
+      (if self then killOwed gn else iprop(□ MachFixedGS.killCred (GF := GF))) -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := SK.wp_setkilled (hlc := hlc) (GF := GF) Γ c k' j pidv gn self hj hp hpnz hnoff hK hlk htier
+  have h := SK.wp_setkilled (GF := GF) Γ c k' j pidv gn self hj hp hpnz hnoff hK hlk htier
   unfold wp_setkilled_body at h
   simp only [setkilledAddr] at h
   iintro ⟨Hk, Hpc, Hpi, Hpay, Hrg, Hq, HPhi⟩
@@ -140,7 +140,7 @@ theorem utA_setkilled (SK : SETKILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (
 end Calls
 
 section Split
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]

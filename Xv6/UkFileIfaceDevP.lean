@@ -29,7 +29,7 @@ open Std (ExtTreeSet)
 open HfpFileClaimsP
 
 section FifDevP
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -38,15 +38,15 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 /-- **UkFileDev's parameters, bundled** (deviation 1). -/
 structure FifDevP where
   /-- U1-F's FileOpen vocabulary -/
-  FO : HfpFileOpenP (hlc := hlc) (GF := GF)
+  FO : HfpFileOpenP (GF := GF)
   /-- the open/read leaves -/
-  SYSO : UkFileOpenSysP (hlc := hlc) (GF := GF)
+  SYSO : UkFileOpenSysP (GF := GF)
   /-- the write/close leaves -/
-  SYSD : UkFileDevSysP (hlc := hlc) (GF := GF)
+  SYSD : UkFileDevSysP (GF := GF)
 
 /-- UkFileDev's `FdevStubs` out of the free handler's hypotheses. -/
 theorem fifStubs {N : UkNames GF} {P : Uprog GF} {Kc Sup : IProp GF}
-    (H : FhHyps (hlc := hlc) N P Kc Sup) : FdevStubs (hlc := hlc) N P :=
+    (H : FhHyps N P Kc Sup) : FdevStubs N P :=
   ⟨H.sr, H.sw, H.so, H.sc⟩
 
 end FifDevP

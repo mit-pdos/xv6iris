@@ -136,7 +136,7 @@ theorem pipe_take_succ (L : List (BitVec 8)) (n : Nat) (h : n < L.length) :
   rfl
 
 section PipeProto
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [CtokG GF] [PipeProtoG GF]
 
 /-! ## 1.  The pieces -/
@@ -183,40 +183,56 @@ def sideL (pn : PNames) : IProp GF := iOwn (F := constOF (Excl Unit)) pn.pnSideL
 /-- sh's right-child token (Rocq `side_R`). -/
 def sideR (pn : PNames) : IProp GF := iOwn (F := constOF (Excl Unit)) pn.pnSideR (Excl.excl ())
 
+omit [MachGS GF] in
 instance pwsLb_persistent (pn : PNames) (l : List (BitVec 8)) : Persistent (pwsLb (GF := GF) pn l) := by
   unfold pwsLb; infer_instance
+omit [MachGS GF] in
 instance pwsLb_timeless (pn : PNames) (l : List (BitVec 8)) : Timeless (pwsLb (GF := GF) pn l) := by
   unfold pwsLb; infer_instance
+omit [MachGS GF] in
 instance pwsAuth_timeless (pn : PNames) (l : List (BitVec 8)) : Timeless (pwsAuth (GF := GF) pn l) := by
   unfold pwsAuth; infer_instance
+omit [MachGS GF] in
 instance eofPending_timeless (pn : PNames) : Timeless (eofPending (GF := GF) pn) := by
   unfold eofPending; infer_instance
+omit [MachGS GF] in
 instance eofShot_timeless (pn : PNames) (w : List (BitVec 8)) : Timeless (eofShot (GF := GF) pn w) := by
   unfold eofShot; infer_instance
+omit [MachGS GF] in
 instance eofShot_persistent (pn : PNames) (w : List (BitVec 8)) :
     Persistent (eofShot (GF := GF) pn w) := by
   unfold eofShot; infer_instance
+omit [MachGS GF] in
 instance roPending_timeless (pn : PNames) : Timeless (roPending (GF := GF) pn) := by
   unfold roPending; infer_instance
+omit [MachGS GF] in
 instance roShot_timeless (pn : PNames) : Timeless (roShot (GF := GF) pn) := by
   unfold roShot; infer_instance
+omit [MachGS GF] in
 instance roShot_persistent (pn : PNames) : Persistent (roShot (GF := GF) pn) := by
   unfold roShot; infer_instance
+omit [MachGS GF] in
 instance wcur_timeless (pn : PNames) (c : Nat) : Timeless (wcur (GF := GF) pn c) := by
   unfold wcur; infer_instance
+omit [MachGS GF] in
 instance rcur_timeless (pn : PNames) (c : Nat) : Timeless (rcur (GF := GF) pn c) := by
   unfold rcur; infer_instance
+omit [MachGS GF] in
 instance wtok_timeless (pn : PNames) : Timeless (wtok (GF := GF) pn) := by
   unfold wtok; infer_instance
+omit [MachGS GF] in
 instance rtok_timeless (pn : PNames) : Timeless (rtok (GF := GF) pn) := by
   unfold rtok; infer_instance
+omit [MachGS GF] in
 instance sideL_timeless (pn : PNames) : Timeless (sideL (GF := GF) pn) := by
   unfold sideL; infer_instance
+omit [MachGS GF] in
 instance sideR_timeless (pn : PNames) : Timeless (sideR (GF := GF) pn) := by
   unfold sideR; infer_instance
 
 /-! ### the history -/
 
+omit [MachGS GF] in
 /-- Rocq `pws_auth_lb`. -/
 theorem pwsAuth_lb (pn : PNames) (l : List (BitVec 8)) :
     pwsAuth (GF := GF) pn l ⊢ pwsAuth pn l ∗ pwsLb pn l := by
@@ -225,6 +241,7 @@ theorem pwsAuth_lb (pn : PNames) (l : List (BitVec 8)) :
   ihave #Hl := MonoList.lb_own_get $$ H
   iframe H Hl
 
+omit [MachGS GF] in
 /-- Rocq `pws_lb_prefix`. -/
 theorem pwsLb_prefix (pn : PNames) (l l' : List (BitVec 8)) :
     pwsAuth (GF := GF) pn l ⊢ pwsLb pn l' -∗ ⌜l' <+: l⌝ := by
@@ -233,6 +250,7 @@ theorem pwsLb_prefix (pn : PNames) (l l' : List (BitVec 8)) :
   ihave %h := MonoList.auth_lb_own_valid $$ Ha Hl
   ipureintro; exact h.2
 
+omit [MachGS GF] in
 /-- A lower bound is DOWNWARD CLOSED (Rocq `pws_lb_weaken`). -/
 theorem pwsLb_weaken (pn : PNames) (l l' : List (BitVec 8)) (hp : l' <+: l) :
     pwsLb (GF := GF) pn l ⊢ pwsLb pn l' := by
@@ -241,6 +259,7 @@ theorem pwsLb_weaken (pn : PNames) (l l' : List (BitVec 8)) (hp : l' <+: l) :
   iapply MonoList.lb_own_le $$ H
   exact hp
 
+omit [MachGS GF] in
 /-- Rocq `pws_auth_grow`. -/
 theorem pwsAuth_grow (pn : PNames) (l : List (BitVec 8)) (b : BitVec 8) :
     pwsAuth (GF := GF) pn l ⊢ |==> (pwsAuth pn (l ++ [b]) ∗ pwsLb pn (l ++ [b])) := by
@@ -250,6 +269,7 @@ theorem pwsAuth_grow (pn : PNames) (l : List (BitVec 8)) (b : BitVec 8) :
 
 /-! ### the one-shots -/
 
+omit [MachGS GF] in
 /-- Rocq `eof_pending_shot`. -/
 theorem eofPending_shot (pn : PNames) (w : List (BitVec 8)) :
     eofPending (GF := GF) pn ⊢ eofShot pn w -∗ False := by
@@ -258,6 +278,7 @@ theorem eofPending_shot (pn : PNames) (w : List (BitVec 8)) :
   icombine H1 H2 gives %Hv
   exact Hv.elim
 
+omit [MachGS GF] in
 /-- Rocq `eof_shot_agree`. -/
 theorem eofShot_agree (pn : PNames) (w w' : List (BitVec 8)) :
     eofShot (GF := GF) pn w ⊢ eofShot pn w' -∗ ⌜w = w'⌝ := by
@@ -269,12 +290,14 @@ theorem eofShot_agree (pn : PNames) (w w' : List (BitVec 8)) :
       toAgree (⟨w'⟩ : DiscreteO (List (BitVec 8)))) := Hv
   exact congrArg DiscreteO.car (toAgree_op_valid_iff_eq.mp Hv')
 
+omit [MachGS GF] in
 /-- Rocq `eof_shoot`. -/
 theorem eofShoot (pn : PNames) (w : List (BitVec 8)) :
     eofPending (GF := GF) pn ⊢ |==> eofShot pn w := by
   unfold eofPending eofShot
   exact iOwn_update (Update.exclusive Agree.toAgree_valid)
 
+omit [MachGS GF] in
 /-- Rocq `ro_pending_shot`. -/
 theorem roPending_shot (pn : PNames) : roPending (GF := GF) pn ⊢ roShot pn -∗ False := by
   unfold roPending roShot
@@ -282,6 +305,7 @@ theorem roPending_shot (pn : PNames) : roPending (GF := GF) pn ⊢ roShot pn -�
   iapply shotPending_done $$ [H1 H2]
   iframe H1 H2
 
+omit [MachGS GF] in
 /-- Rocq `ro_shoot`. -/
 theorem roShoot (pn : PNames) : roPending (GF := GF) pn ⊢ |==> roShot pn := by
   unfold roPending roShot
@@ -289,18 +313,21 @@ theorem roShoot (pn : PNames) : roPending (GF := GF) pn ⊢ |==> roShot pn := by
 
 /-! ### the permits -/
 
+omit [MachGS GF] in
 /-- Rocq `wcur_agree`. -/
 theorem wcur_agree (pn : PNames) (c c' : Nat) : wcur (GF := GF) pn c ⊢ wcur pn c' -∗ ⌜c = c'⌝ := by
   unfold wcur
   iintro H1 H2
   iapply ghost_var_agree $$ H1 H2
 
+omit [MachGS GF] in
 /-- Rocq `rcur_agree`. -/
 theorem rcur_agree (pn : PNames) (c c' : Nat) : rcur (GF := GF) pn c ⊢ rcur pn c' -∗ ⌜c = c'⌝ := by
   unfold rcur
   iintro H1 H2
   iapply ghost_var_agree $$ H1 H2
 
+omit [MachGS GF] in
 /-- Rocq `wcur_move`. -/
 theorem wcur_move (pn : PNames) (c c' d : Nat) :
     wcur (GF := GF) pn c ⊢ wcur pn c' ==∗ wcur pn d ∗ wcur pn d := by
@@ -308,6 +335,7 @@ theorem wcur_move (pn : PNames) (c c' d : Nat) :
   iintro H1 H2
   iapply ghost_var_update_halves d $$ H1 H2
 
+omit [MachGS GF] in
 /-- Rocq `rcur_move`. -/
 theorem rcur_move (pn : PNames) (c c' d : Nat) :
     rcur (GF := GF) pn c ⊢ rcur pn c' ==∗ rcur pn d ∗ rcur pn d := by
@@ -317,6 +345,7 @@ theorem rcur_move (pn : PNames) (c c' d : Nat) :
 
 /-! ### the side tokens: two answers cannot be the same side -/
 
+omit [MachGS GF] in
 /-- Rocq `side_L_excl`. -/
 theorem sideL_excl (pn : PNames) : sideL (GF := GF) pn ⊢ sideL pn -∗ False := by
   unfold sideL
@@ -324,6 +353,7 @@ theorem sideL_excl (pn : PNames) : sideL (GF := GF) pn ⊢ sideL pn -∗ False :
   icombine H1 H2 gives %Hv
   exact Hv.elim
 
+omit [MachGS GF] in
 /-- Rocq `side_R_excl`. -/
 theorem sideR_excl (pn : PNames) : sideR (GF := GF) pn ⊢ sideR pn -∗ False := by
   unfold sideR
@@ -347,8 +377,10 @@ PERSISTENT third arm, from which nothing can be taken out. -/
 def pipeRoArm (pn : PNames) (s : PipeSt) : IProp GF :=
   iprop(roPending pn ∨ (roShot pn ∗ ⌜s.ro = false⌝) ∨ ∃ w : List (BitVec 8), eofShot pn w)
 
+omit [MachGS GF] in
 instance pipeEofArm_timeless (pn : PNames) (s : PipeSt) : Timeless (pipeEofArm (GF := GF) pn s) := by
   unfold pipeEofArm; infer_instance
+omit [MachGS GF] in
 instance pipeRoArm_timeless (pn : PNames) (s : PipeSt) : Timeless (pipeRoArm (GF := GF) pn s) := by
   unfold pipeRoArm; infer_instance
 
@@ -366,10 +398,12 @@ def pipeBodyU (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U : IProp G
 def pipeBody (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) : IProp GF :=
   pipeBodyU pn γp L iprop(True)
 
+omit [MachGS GF] in
 instance pipeBodyU_timeless (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U : IProp GF)
     [Timeless U] : Timeless (pipeBodyU pn γp L U) := by
   unfold pipeBodyU; infer_instance
 
+omit [MachGS GF] in
 instance pipeBody_timeless (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) :
     Timeless (pipeBody (GF := GF) pn γp L) := by
   unfold pipeBody; infer_instance
@@ -402,6 +436,7 @@ theorem pipeInvU_acc (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U : 
 
 /-! ### the clauses' steps (deviation 3; Rocq does these inline) -/
 
+omit [MachGS GF] in
 theorem pipeEofArm_close (pn : PNames) (w : Bool) (s : PipeSt) :
     pipeEofArm (GF := GF) pn s ⊢ pipeEofArm pn (pstClose w s) := by
   unfold pipeEofArm
@@ -413,6 +448,7 @@ theorem pipeEofArm_close (pn : PNames) (w : Bool) (s : PipeSt) :
     ipureintro
     cases w <;> simp_all [pstClose]
 
+omit [MachGS GF] in
 theorem pipeRoArm_close (pn : PNames) (w : Bool) (s : PipeSt) :
     pipeRoArm (GF := GF) pn s ⊢ pipeRoArm pn (pstClose w s) := by
   unfold pipeRoArm
@@ -424,18 +460,22 @@ theorem pipeRoArm_close (pn : PNames) (w : Bool) (s : PipeSt) :
     cases w <;> simp_all [pstClose]
   · iright; iright; iexact Heo
 
+omit [MachGS GF] in
 theorem pipeRoArm_write (pn : PNames) (b : BitVec 8) (s : PipeSt) :
     pipeRoArm (GF := GF) pn s ⊢ pipeRoArm pn (pstWrite b s) :=
   .rfl
 
+omit [MachGS GF] in
 theorem pipeEofArm_read (pn : PNames) (s : PipeSt) :
     pipeEofArm (GF := GF) pn s ⊢ pipeEofArm pn (pstRead s) :=
   .rfl
 
+omit [MachGS GF] in
 theorem pipeRoArm_read (pn : PNames) (s : PipeSt) :
     pipeRoArm (GF := GF) pn s ⊢ pipeRoArm pn (pstRead s) :=
   .rfl
 
+omit [MachGS GF] in
 /-- (P3)'S SNAPSHOT ARM IS REFUTED BY AN OPEN WRITE END: an end-of-file is
 only read at a SHUT write end. -/
 theorem pipeEofArm_wo (pn : PNames) (s : PipeSt) (hwo : s.wo = true) :
@@ -445,6 +485,7 @@ theorem pipeEofArm_wo (pn : PNames) (s : PipeSt) (hwo : s.wo = true) :
   · iexact Hp
   · exact absurd (hwo.symm.trans hw.2) (by decide)
 
+omit [MachGS GF] in
 /-- (P3) read at a snapshot: the frozen contents ARE the state's. -/
 theorem pipeEofArm_shot (pn : PNames) (s : PipeSt) (w : List (BitVec 8)) :
     pipeEofArm (GF := GF) pn s ⊢ eofShot pn w -∗ ⌜w = s.ws ∧ s.wo = false⌝ := by
@@ -456,6 +497,7 @@ theorem pipeEofArm_shot (pn : PNames) (s : PipeSt) (w : List (BitVec 8)) :
 
 /-! ### (P4) and (P6) -/
 
+omit [MachGS GF] in
 /-- (P4) at the kernel's authority (Rocq `pipe_body_P4U`): the read end,
 once a writer's observation node has seen it shut, is shut in every later
 state. -/
@@ -471,6 +513,7 @@ theorem pipeBody_P4U (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U : 
     · iexfalso; iapply eofPending_shot $$ Hp Hs0
     · iexfalso; iapply roPending_shot $$ Hp Hs
 
+omit [MachGS GF] in
 /-- (P6) THE TWO ENDERS ARE EXCLUSIVE (Rocq `pipe_body_P6U`): the snapshot
 arm holds (P4)'s pending token, and `roShot` refutes it.  No authority. -/
 theorem pipeBody_P6U (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U : IProp GF)
@@ -512,7 +555,7 @@ theorem pipeClink_of_invU (E : CoPset) (pn : PNames) (γp : PipeNames) (L : List
 /-- ...and that IS the registration (Rocq `pipe_reg_of_invU`). -/
 theorem pipeReg_of_invU (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U : IProp GF)
     [Timeless U] :
-    pipeInvU pn γp L U ⊢ pipeReg (hlc := hlc) γp := by
+    pipeInvU pn γp L U ⊢ pipeReg γp := by
   unfold pipeReg pipeCpay
   iintro #Hinv
   imodintro
@@ -522,7 +565,7 @@ theorem pipeReg_of_invU (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U
 
 /-- Rocq `pipe_reg_of_inv`. -/
 theorem pipeReg_of_inv (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) :
-    pipeInv (GF := GF) pn γp L ⊢ pipeReg (hlc := hlc) γp :=
+    pipeInv (GF := GF) pn γp L ⊢ pipeReg γp :=
   pipeReg_of_invU pn γp L iprop(True)
 
 /-! ## 4.  The writer's chain -/
@@ -538,13 +581,16 @@ at a shut read end, (P4)'s shot. -/
 def pipeWQe (pn : PNames) (L : List (BitVec 8)) (c j : Nat) (s : PipeSt) : IProp GF :=
   iprop(pipeWQ pn L c j ∗ (⌜s.ro = false⌝ -∗ roShot pn))
 
+omit [MachGS GF] in
 theorem pipeWQ_eq (pn : PNames) (L : List (BitVec 8)) (c j : Nat) :
     pipeWQ (GF := GF) pn L c j ⊣⊢ wcur pn (c + j) ∗ pwsLb pn (L.take (c + j)) := .rfl
 
+omit [MachGS GF] in
 instance pipeWQ_timeless (pn : PNames) (L : List (BitVec 8)) (c j : Nat) :
     Timeless (pipeWQ (GF := GF) pn L c j) := by
   unfold pipeWQ; infer_instance
 
+omit [MachGS GF] in
 /-- Rocq `pipe_wQe_ro_shot`. -/
 theorem pipeWQe_roShot (pn : PNames) (L : List (BitVec 8)) (c j : Nat) (s : PipeSt)
     (hro : s.ro = false) :
@@ -695,7 +741,7 @@ theorem pipeWpay_of_inv (pn : PNames) (γp : PipeNames) (L : List (BitVec 8))
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (c n : Nat) (hle : c + n ≤ L.length)
     (hM : ∀ k : Nat, k < n → umemByte M (ua + BitVec.ofNat 64 k).toNat = L[c + k]!) :
     pipeInv (GF := GF) pn γp L ⊢ wcur pn c -∗ pwsLb pn (L.take c) -∗
-      pipeWpay (hlc := hlc) γp.pnQueue M ua (pipeWQ pn L c) (pipeWQe pn L c) n := by
+      pipeWpay γp.pnQueue M ua (pipeWQ pn L c) (pipeWQe pn L c) n := by
   unfold pipeWpay
   iintro #Hinv Hw #Hlb
   ileft
@@ -733,7 +779,7 @@ theorem pipeWpay_of_invU (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (
     [Timeless U] (M : Nat → List (BitVec 8)) (ua : BitVec 64) (c n : Nat) (hle : c + n ≤ L.length)
     (hM : ∀ k : Nat, k < n → umemByte M (ua + BitVec.ofNat 64 k).toNat = L[c + k]!) :
     pipeInvU pn γp L U ⊢ □ U -∗ wcur pn c -∗ pwsLb pn (L.take c) -∗
-      pipeWpay (hlc := hlc) γp.pnQueue M ua (pipeWQ pn L c) (pipeWQe pn L c) n := by
+      pipeWpay γp.pnQueue M ua (pipeWQ pn L c) (pipeWQe pn L c) n := by
   unfold pipeWpay
   iintro #Hinv #HU Hw #Hlb
   ileft

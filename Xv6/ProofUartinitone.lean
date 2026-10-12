@@ -34,7 +34,7 @@ theorem uartElt_lock (i : UartId) : txLockAddr i = uartElt i + 16#64 := by
   cases i <;> decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 variable {lent : Bool}
 
 /-! ## One byte store to a UART register -/
@@ -90,7 +90,7 @@ theorem uartinitone_body [CurCtx] (cpu : CPU) (k : KCtx) (R : RegMap)
       ⌜∀ r : BitVec 5, r ≠ 14#5 → r ≠ 15#5 → R' r = R r⌝ -∗
       txOwn γ l -∗ dlabOwn γ false -∗
       (∃ (kp' : Nat) (hl' : Option (List Obs)), rxTok γ kp' hl' ∗
-        ⌜l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl'⌝) -∗
+        ⌜l = [] → uartFlushed (genId (GF := GF) + 1) i hl'⌝) -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   unfold uartBaseWord uartRxWord
@@ -186,18 +186,18 @@ theorem uartinitone_body [CurCtx] (cpu : CPU) (k : KCtx) (R : RegMap)
       i 2 (by omega) ?hb15 (by decide)
       iprop(txOwn γ l ∗ ∃ (k' : Nat) (hl' : Option (List Obs)), rxTok γ k' hl' ∗
         ⌜((7#8 : BitVec 8).getLsbD 1 = false ∧ hl' = hl) ∨
-          (l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl')⌝))
+          (l = [] → uartFlushed (genId (GF := GF) + 1) i hl')⌝))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
   iintro Hk Hpc ⟨Htx, ⟨%kp', %hl', Hrtok, %hfl⟩⟩
   case hb15 => k_norm_g
   -- WHAT THE CLEAR DISCARDED (relax-d2, lane K1): `FCR := 7` always clears
   -- the receive FIFO, so the report is the flush's
-  have hfl' : l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl' := by
+  have hfl' : l = [] → uartFlushed (genId (GF := GF) + 1) i hl' := by
     rcases hfl with ⟨h7, _⟩ | h
     · exact absurd h7 (by decide)
     · exact h
   ihave Hrtok : iprop(∃ (kp' : Nat) (hl' : Option (List Obs)), rxTok γ kp' hl' ∗
-      ⌜l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl'⌝) $$ [Hrtok]
+      ⌜l = [] → uartFlushed (genId (GF := GF) + 1) i hl'⌝) $$ [Hrtok]
   · iexists kp', hl'; iframe Hrtok; ipureintro; exact hfl'
   -- +0x34  ld a5,8(a0)
   k_step_gen (wp_s_ld c15 _ (KA.«uartinitone» + 0x34#64) true 8#12 15#5 10#5 (by decide) (by decide)
@@ -244,7 +244,7 @@ theorem uartinitone_ret_48 :
     jumpPc (KA.«uartinitone» + 0x48#64) = KA.«uartinitone» + 0x48#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `initlock`'s contract as a rule, with the lock and name pointers named. -/
@@ -261,7 +261,7 @@ theorem uio_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
       lkFresh lk -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK'
+  have h := IL.wp_initlock (GF := GF) c k' vlock vname vcpu hK'
   unfold wp_initlock_body at h
   simp only [initlockAddr, h10, h11] at h
   exact h
@@ -271,11 +271,11 @@ end
 /-! ## The function -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 set_option maxHeartbeats 4000000 in
 theorem uartinitone_proof (IL : INITLOCK) : UARTINITONE :=
-  ⟨fun {hlc GF} _ _ _ cpu k i γ l kp vlock vname vcpu hsie hK ha0 => by
+  ⟨fun {GF} _ _ _ cpu k i γ l kp vlock vname vcpu hsie hK ha0 => by
   unfold wp_uartinitone_body uartinitonePre uartinitonePost
   iintro ⟨Hk, Hpc, ⟨#Hinv, Hbase, Hrxw, Hdlab, Htx, #Hlb, Hrtok, #Hid0, #Hid16,
     Hwlock, Hwname, Hwcpu⟩, HΦ⟩
@@ -348,7 +348,7 @@ theorem uartinitone_proof (IL : INITLOCK) : UARTINITONE :=
   imodintro
   ihave Hpost : iprop(txOwn γ l ∗ dlabOff γ ∗
       (∃ (k' : Nat) (hl' : Option (List Obs)), rxTok γ k' hl' ∗
-        ⌜l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl'⌝) ∗
+        ⌜l = [] → uartFlushed (genId (GF := GF) + 1) i hl'⌝) ∗
       wordPointsTo (txLockAddr i + 8#64) 8 (DFrac.own 1) (k.regs 11#5) ∗ lkFresh (txLockAddr i))
     $$ [Htx Hrtok Hwname Hfresh]
   case' _ => iframe #; iframe

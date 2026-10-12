@@ -120,13 +120,13 @@ theorem fwr_st_inode (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : Pipe
     · exact ⟨rb, i, rfl⟩
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
 
-theorem fwr_ctx_entry {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem fwr_ctx_entry {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (c : CPU) (k : KCtx) (R0 R : RegMap) :
     kctx (GF := GF) c (((k.withRegs R0).pushed 12).withRegs R) ⊢
       kctx c (((k.withSpie k.spie k.spp).pushed 12).withRegs R) := .rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -137,7 +137,7 @@ read out of the reference's own content, the three tests, the hoisted
 `n <= 0` test, each arm handed to its stage lemma; the FD_DEVICE arm is
 refuted by its (stopped) environment. -/
 theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (BO : BEGIN_OP)
-    (EO : END_OP) (CW : CONSOLEWRITE) (PA : PANIC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (EO : END_OP) (CW : CONSOLEWRITE) (PA : PANIC) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (R : RegMap) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (C : FContent) (inumC : BitVec 32) (γoC : GName) (omC : OffMode) (γpC : PipeNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -159,10 +159,10 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     procsInv Γ ∗ panicEnv ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     foffRow st ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C st ∗
-    procPrivExt (procAddr j) pid V V.upt M ∗ filewriteEnv (hlc := hlc) γl γu st ∗
-    filewriteIn (hlc := hlc) pmv szv lzv st n (writerImg V.upt M) (k.regs 11#5) Q Qe ∗
+    procPrivExt (procAddr j) pid V V.upt M ∗ filewriteEnv γl γu st ∗
+    filewriteIn pmv szv lzv st n (writerImg V.upt M) (k.regs 11#5) Q Qe ∗
     genHalvesPriv (procAddr j) pid V.gen ∗
-    fwrKG (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe
+    fwrKG k γl γu γ fk q st j pid V M n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hpe, #Hkl, #Hav, #Hfoff, Htok, Hfields, Hpay, Hpriv,
     Henv, Hin, Hgen, HΦG⟩
@@ -297,7 +297,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
 set_option maxHeartbeats 32000000 in
 /-- **`filewrite` meets its specification**, at either entry `SIE`. -/
 theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (BO : BEGIN_OP)
-    (EO : END_OP) (CW : CONSOLEWRITE) (PA : PANIC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (EO : END_OP) (CW : CONSOLEWRITE) (PA : PANIC) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF)
@@ -308,7 +308,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     (ha0 : k.regs 10#5 = fnode fk)
     (ha2 : k.regs 12#5 = BitVec.ofInt 64 n) (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31)
     (htb : wrTb pmv szv lzv V.upt) :
-    wp_filewrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk γl γu n Q Qe
+    wp_filewrite_eb_body (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk γl γu n Q Qe
       pmv szv lzv hK hfk hj hproc hnoff htier ha0 ha2 hn htb := by
   unfold wp_filewrite_eb_body
   have hK12 : 12 ≤ k.avail := by have := hK; rw [filewriteSlots_eq] at this; omega
@@ -324,7 +324,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
   -- the generation halves stay out: pipewrite's kill read lends them
   unfold procGenAt
   icases Hpg with ⟨Hft, HQ, Hxs, Hgen⟩
-  ihave HΦG : fwrKG (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe $$ [Hnext Hcwd Hrtr Hft HQ Hxs]
+  ihave HΦG : fwrKG k γl γu γ fk q st j pid V M n Q Qe $$ [Hnext Hcwd Hrtr Hft HQ Hxs]
   · unfold fwrKG fwrK filewritePost
     iintro Hgen %c %spie %spp %R' %P' %hp HO Hk Hpc Hte Hce Href Hpriv Henv Harms
     icases procPrivExtEv_elim _ _ _ _ _ $$ Hpriv with ⟨%kv, %hkv, Hpriv⟩

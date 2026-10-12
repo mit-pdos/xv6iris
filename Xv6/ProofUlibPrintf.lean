@@ -20,7 +20,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 section
 variable {GF : BundledGFunctors.{0}}
 
-theorem wp_ulibPrintf_gen {hlc : HasLC} [MachGS hlc GF] (L : UlibRunP GF) (base : BitVec 64) (a : Nat)
+theorem wp_ulibPrintf_gen [MachGS GF] (L : UlibRunP GF) (base : BitVec 64) (a : Nat)
     (m : RegMap) (n : Nat) (R : IProp GF) : wp_ulibPrintf_gen_body L base a m n R := by
   intro hb ha
   unfold ulibPrintfAt
@@ -152,14 +152,14 @@ theorem wp_ulibPrintf_gen {hlc : HasLC} [MachGS hlc GF] (L : UlibRunP GF) (base 
     · exact hne _ (Or.inr (Or.inr (Or.inl rfl)))
     · exact hne _ (Or.inr (Or.inr (Or.inr ⟨h1, h2⟩)))
 
-theorem wp_ulibPrintf {hlc : HasLC} [MachGS hlc GF] (V : ULIB_VPRINTF) (L : UlibRunP GF) (base : BitVec 64)
+theorem wp_ulibPrintf [MachGS GF] (V : ULIB_VPRINTF) (L : UlibRunP GF) (base : BitVec 64)
     (a len : Nat) (f : Nat → BitVec 8) (m : RegMap) (n : Nat) (Ci Co : IProp GF) :
     wp_ulibPrintf_body L base a len f m n Ci Co := by
   intro hb hbnd hlen hpct ha
   iintro Hpay #Hpc #Hvc #Hfc #Hs HCi Hrun Hk
-  iapply (wp_ulibPrintf_gen (hlc := hlc) L base a m n Co hb ha) $$ Hfc [Hpay HCi] Hrun Hk
+  iapply (wp_ulibPrintf_gen L base a m n Co hb ha) $$ Hfc [Hpay HCi] Hrun Hk
   iintro %m' %h11 %h12 %h1 %h10 W7 Hrun Hk'
-  iapply (V.wp_ulibVprintf (hlc := hlc) L base a len f m' n Ci Co hb hbnd hlen hpct h11)
+  iapply (V.wp_ulibVprintf L base a len f m' n Ci Co hb hbnd hlen hpct h11)
     $$ [Hpay] Hpc Hvc Hs HCi Hrun [Hk' W7]
   · rw [h10]; iexact Hpay
   iintro %m'' %hcs HCo
@@ -167,18 +167,18 @@ theorem wp_ulibPrintf {hlc : HasLC} [MachGS hlc GF] (V : ULIB_VPRINTF) (L : Ulib
   iintro Hrun
   iapply Hk' $$ %m'' %hcs W7 HCo Hrun
 
-theorem wp_ulibPrintfS {hlc : HasLC} [MachGS hlc GF] (V : ULIB_VPRINTF) (L : UlibRunP GF) (base : BitVec 64)
+theorem wp_ulibPrintfS [MachGS GF] (V : ULIB_VPRINTF) (L : UlibRunP GF) (base : BitVec 64)
     (a len q : Nat) (f : Nat → BitVec 8) (sa slen : Nat) (sf : Nat → BitVec 8) (m : RegMap) (n : Nat)
     (Ci Cm1 Cm2 Co : IProp GF) : wp_ulibPrintfS_body L base a len q f sa slen sf m n Ci Cm1 Cm2 Co := by
   intro hb hbnd hq2 hfq hfsq hpct hc1d hc1u hc1x hc2set hsanz ha1 ha2
   iintro Hpay1 Hpay2 Hpay3 #Hpc #Hvc #Hfc #Hs Hsstr HCi Hrun Hk
   ihave %hst : ⌜(m 2#5).toNat % 8 = 0 ∧ 8 * (12 + (12 + (4 + n))) ≤ (m 2#5).toNat⌝ $$ [Hrun]
   · iapply L.urun_stack; iexact Hrun
-  iapply (wp_ulibPrintf_gen (hlc := hlc) L base a m n Co hb ha1) $$ Hfc [Hpay1 Hpay2 Hpay3 HCi Hsstr] Hrun Hk
+  iapply (wp_ulibPrintf_gen L base a m n Co hb ha1) $$ Hfc [Hpay1 Hpay2 Hpay3 HCi Hsstr] Hrun Hk
   iintro %m' %h11 %h12 %h1 %h10 W7 Hrun Hk'
   rw [ha2]
   icases (L.uword_own _ _).1 $$ W7 with W7
-  iapply (V.wp_ulibVprintfS (hlc := hlc) L base a len q f ((m 2#5).toNat - 56) sa (DFrac.own 1) slen sf m' n
+  iapply (V.wp_ulibVprintfS L base a len q f ((m 2#5).toNat - 56) sa (DFrac.own 1) slen sf m' n
     Ci Cm1 Cm2 Co hb hbnd hq2 hfq hfsq hpct hc1d hc1u hc1x hc2set (by omega) hsanz h11 h12)
     $$ [Hpay1] [Hpay2] [Hpay3] Hpc Hvc Hs W7 Hsstr HCi Hrun [Hk']
   · rw [h10]; iexact Hpay1
@@ -190,24 +190,24 @@ theorem wp_ulibPrintfS {hlc : HasLC} [MachGS hlc GF] (V : ULIB_VPRINTF) (L : Uli
   icases (L.uword_own _ _).2 $$ W7 with W7
   iapply Hk' $$ %m'' %hcs W7 HCo Hrun
 
-theorem wp_ulibPrintfChain {hlc : HasLC} [MachGS hlc GF] (V : ULIB_VPRINTF) (L : UlibRunP GF)
+theorem wp_ulibPrintfChain [MachGS GF] (V : ULIB_VPRINTF) (L : UlibRunP GF)
     (base : BitVec 64) (a len : Nat) (f : Nat → BitVec 8) (Ch : Nat → IProp GF) (m : RegMap) (n : Nat) :
     wp_ulibPrintfChain_body L base a len f Ch m n := by
   intro hb hbnd hlen hpct ha
   iintro #Hw #Hpc #Hvc #Hfc #Hs HCh Hrun Hk
   ihave Hpay := ulibPaySeq_of_family L.toUlibRun base 1#64 f Ch len len 0 (by omega) $$ Hw
   rw [Nat.zero_add]
-  iapply (wp_ulibPrintf (hlc := hlc) V L base a len f m n (Ch 0) (Ch len) hb hbnd hlen hpct ha)
+  iapply (wp_ulibPrintf V L base a len f m n (Ch 0) (Ch len) hb hbnd hlen hpct ha)
     $$ Hpay Hpc Hvc Hfc Hs HCh Hrun Hk
 
 end
 
 /-- **`printf` holds at every load address**, given `vprintf`'s contract. -/
 theorem ulibPrintf_holds (V : ULIB_VPRINTF) : ULIB_PRINTF :=
-  ⟨fun L base a m n R => wp_ulibPrintf_gen (hlc := _) L base a m n R,
-   fun L base a len f m n Ci Co => wp_ulibPrintf (hlc := _) V L base a len f m n Ci Co,
+  ⟨fun L base a m n R => wp_ulibPrintf_gen L base a m n R,
+   fun L base a len f m n Ci Co => wp_ulibPrintf V L base a len f m n Ci Co,
    fun L base a len q f sa slen sf m n Ci Cm1 Cm2 Co =>
-    wp_ulibPrintfS (hlc := _) V L base a len q f sa slen sf m n Ci Cm1 Cm2 Co,
-   fun L base a len f Ch m n => wp_ulibPrintfChain (hlc := _) V L base a len f Ch m n⟩
+    wp_ulibPrintfS V L base a len q f sa slen sf m n Ci Cm1 Cm2 Co,
+   fun L base a len f Ch m n => wp_ulibPrintfChain V L base a len f Ch m n⟩
 
 end Xv6

@@ -29,19 +29,20 @@ open HfpPipeP HfpFileClaimsP
 open Std (ExtTreeSet)
 
 section CifOpenLaw
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- The ledger's length, keeping the ledger. -/
 theorem ustd_len_keep (γf : GName) (l : List FdState) :
     ustd (GF := GF) γf l ⊢ ⌜l.length = NSTD⌝ ∗ ustd γf l :=
   BI.persistent_entails_right (ustd_len γf l)
 
 namespace CifEnv
-variable (E : CifEnv (hlc := hlc) (GF := GF))
+variable (E : CifEnv (GF := GF))
 
 /-- `cif_ans_ok`, keeping the ledger's arm. -/
 theorem ans_ok_keep (l : List FdState) (ret : BitVec 64) :
@@ -107,7 +108,7 @@ theorem open_ (fdm : Fdmap) (files : List (BitVec 8) → Option (List (BitVec 8)
           E.filesr files paths -∗ K fd) ∧
        (E.fds fdm -∗ E.filesr files paths -∗ K (-1)) ∧
        (∀ x, ⌜x = -1 ∨ 0 ≤ x⌝ -∗ E.taint (openHeld fdm x) -∗ K x)) -∗
-      opObl (hlc := hlc) E.N E.P path 0 K := by
+      opObl E.N E.P path 0 K := by
   iintro Hfds #Hfiles HK
   ihave %hfl := E.filesr_pure files paths $$ Hfiles
   obtain ⟨hpaths, hfs⟩ := hfl
@@ -204,7 +205,7 @@ theorem open_absent (fdm : Fdmap) (files : List (BitVec 8) → Option (List (Bit
     ⊢ E.fds fdm -∗ E.filesr files paths -∗
       ((E.fds fdm -∗ E.filesr files paths -∗ K (-1)) ∧
        (∀ x, ⌜x = -1 ∨ 0 ≤ x⌝ -∗ E.taint (openHeld fdm x) -∗ K x)) -∗
-      opObl (hlc := hlc) E.N E.P path m K := by
+      opObl E.N E.P path m K := by
   iintro Hfds #Hfiles HK
   ihave %hfl := E.filesr_pure files paths $$ Hfiles
   obtain ⟨hpaths, hfs⟩ := hfl

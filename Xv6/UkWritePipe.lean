@@ -27,7 +27,7 @@ def writePipeFam {GF : BundledGFunctors.{0}} (Q : Nat → IProp GF) (Qe : Nat �
   { xfamWr Q Xp with wQe := Qe }
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg]
 
 /-- **Rocq `uwrite_pipe_extra`**: the post's pipe arm, the match at one
@@ -35,9 +35,9 @@ constructor. -/
 theorem uwrite_pipe_extra (gn : GName) (Pt : UPtd) (st : FdState) (rb : Bool) (γp : PipeNames) (n : Int)
     (Mv : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
     (r : BitVec 64) (hst : st = .open rb true (.pipe γp)) :
-    filewriteExtra (hlc := hlc) gn Pt st n Mv ua Q Qe r ⊢
-      pipeWpost (hlc := hlc) Pt γp.pnQueue Mv ua Q Qe
-        iprop(killShot gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat r := by
+    filewriteExtra gn Pt st n Mv ua Q Qe r ⊢
+      pipeWpost Pt γp.pnQueue Mv ua Q Qe
+        iprop(killShot gn ∗ □ MachFixedGS.killCred (GF := GF)) n.toNat r := by
   subst hst; exact .rfl
 
 end

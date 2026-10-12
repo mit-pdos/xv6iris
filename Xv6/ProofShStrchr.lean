@@ -29,7 +29,7 @@ open Std (ExtTreeSet)
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -40,11 +40,11 @@ theorem shStrchr_loop (UL : UK_LEAVES) (N : UkNames GF) (tx : Bool) (dq : DFrac)
     ∀ (r j : Nat) (h : CPU) (mc : RegMap), len - j = r → j < len → s + len < 2 ^ 64 →
     mc.get 10#5 = BitVec.ofNat 64 (s + j) → mc.get 15#5 = BitVec.setWidth 64 (f j) →
     mc.get 11#5 = BitVec.setWidth 64 c →
-    ⊢ ushCode N.t -∗ ushSstr N tx dq s len f -∗ urun (hlc := hlc) N h mc (BitVec.ofNat 64 0xa6c) n -∗
+    ⊢ ushCode N.t -∗ ushSstr N tx dq s len f -∗ urun N h mc (BitVec.ofNat 64 0xa6c) n -∗
       (ushSstr N tx dq s len f -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ q : BitVec 5, q ≠ 10#5 → q ≠ 15#5 → mc'.get q = mc.get q⌝ -∗
         ⌜mc'.get 10#5 = BitVec.ofInt 64 (ushpChr s (len - j) j f c)⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0xa7a) n -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0xa7a) n -∗ wpLoop h') -∗
       wpLoop h := by
   intro r
   induction r with
@@ -133,10 +133,10 @@ theorem wp_shStrchr (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (tx
     (s len : Nat) (f : Nat → BitVec 8) (c : BitVec 8) (n : Nat)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 s) (ha1 : m.get 11#5 = BitVec.setWidth 64 c) (hs64 : s + len < 2 ^ 64) :
     ⊢ ushCode N.t -∗ ushSstr N tx dq s len f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«strchr») (2 + n) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«strchr») (2 + n) -∗
       (ushSstr N tx dq s len f -∗ ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
         ⌜m'.get 10#5 = BitVec.ofInt 64 (ushpChr s len 0 f c)⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   rw [show User.Sh.Sym.«strchr» = 0xa5e from rfl]
   iintro #Hc Hs Hrun Hk
@@ -160,10 +160,10 @@ theorem wp_shStrchr (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (tx
       (∀ q : BitVec 5, q ≠ 10#5 → q ≠ 15#5 → me.get q = m1.get q) →
       me.get 10#5 = BitVec.ofInt 64 (ushpChr s len 0 f c) →
       ⊢ ushCode N.t -∗ ushSaved N.d sp0.toNat [m.get 1#5, m.get 8#5] -∗
-        ustack N.d (BitVec.ofNat 64 (sp0.toNat - 8 * 2)) 0 -∗ urun (hlc := hlc) N h2 me (BitVec.ofNat 64 0xa7a) n -∗
+        ustack N.d (BitVec.ofNat 64 (sp0.toNat - 8 * 2)) 0 -∗ urun N h2 me (BitVec.ofNat 64 0xa7a) n -∗
         (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
           ⌜m'.get 10#5 = BitVec.ofInt 64 (ushpChr s len 0 f c)⌝ -∗
-          urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗ wpLoop h2 := by
+          urun N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗ wpLoop h2 := by
     intro h2 me hsp hkeep hans
     iintro #Hc Hsv Hloc Hrun Hk
     iapply ush_frame_epi UL N 2 [1#5, 8#5] 0 0xa7a [m.get 1#5, m.get 8#5] ⟨ushI_a7a N.t, ushI_a7c N.t, trivial⟩

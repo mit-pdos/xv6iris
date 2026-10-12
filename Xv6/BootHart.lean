@@ -115,7 +115,7 @@ pins (`MachCSL.regCellsNoPins`). -/
 def bootEntryTaken : List Register := bootEntryRegs.reverse ++ [.sig_meip, .sig_seip]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The part of `Xv6.bootEntryPre` past the configuration cells. -/
 theorem bootEntry_rest_cells (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu f) :
@@ -144,14 +144,14 @@ theorem bootEntry_rest_cells (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu 
 facts `resetRegsRun`, are `Xv6.wp_boot_body`'s configuration, hart id, clock, program
 counter and GPR inputs, plus the rest of the file. -/
 theorem bootEntryPre (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu f) :
-    regCellsNoPins (GF := GF) (regName (hlc := hlc) (GF := GF) cpu) f ⊢ |==>
+    regCellsNoPins (GF := GF) (regName (GF := GF) cpu) f ⊢ |==>
       (mBoot cpu (DFrac.own 1) ∗
       Register.mhartid ↦ᵣ[cpu] hartId cpu ∗ clockCells cpu ∗ pcIs cpu KA.«_entry» ∗
       Register.x1 ↦ᵣ[cpu] f .x1 ∗ Register.x2 ↦ᵣ[cpu] f .x2 ∗ Register.x4 ↦ᵣ[cpu] f .x4 ∗
       Register.x8 ↦ᵣ[cpu] f .x8 ∗ Register.x10 ↦ᵣ[cpu] f .x10 ∗
       Register.x11 ↦ᵣ[cpu] f .x11 ∗ Register.x14 ↦ᵣ[cpu] f .x14 ∗
       Register.x15 ↦ᵣ[cpu] f .x15 ∗
-      regCellsEx (regName (hlc := hlc) (GF := GF) cpu) f bootEntryTaken) := by
+      regCellsEx (regName (GF := GF) cpu) f bootEntryTaken) := by
   rw [regCellsNoPins_ex]
   iintro H
   icases regCellsEx_takeListAt cpu f bootEntryRegs
@@ -173,9 +173,9 @@ def bootGprRestRegs : List Register :=
 /-- **The other 23 GPRs** out of `Xv6.bootEntryPre`'s remainder, at the reset
 file's values. -/
 theorem bootGprRest (cpu : CPU) (f : RegFile) :
-    regCellsEx (GF := GF) (regName (hlc := hlc) (GF := GF) cpu) f bootEntryTaken ⊢
+    regCellsEx (GF := GF) (regName (GF := GF) cpu) f bootEntryTaken ⊢
       ([∗list] r ∈ bootGprRestRegs, regPointsTo (GF := GF) cpu r (DFrac.own 1) (f r)) ∗
-      regCellsEx (regName (hlc := hlc) (GF := GF) cpu) f (bootGprRestRegs.reverse ++ bootEntryTaken) :=
+      regCellsEx (regName (GF := GF) cpu) f (bootGprRestRegs.reverse ++ bootEntryTaken) :=
   regCellsEx_takeListAt cpu f bootGprRestRegs bootEntryTaken (by decide) (by decide)
 
 end

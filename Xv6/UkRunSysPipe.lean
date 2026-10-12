@@ -69,13 +69,13 @@ theorem pipeBytes_get (a b : Nat) (i : Nat) (hi : i < 8) :
     rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> rfl
 
 section UkRunSysPipe
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- The run's rows ARE its pipe row (`urunRows_nopipe`, backwards). -/
 theorem urunRows_of_nopipe (N : UkNames GF) (fdv : List FdState) :
-    urunNopipe (hlc := hlc) (GF := GF) fdv ⊢ urunRows (hlc := hlc) N fdv := .rfl
+    urunNopipe (GF := GF) fdv ⊢ urunRows N fdv := .rfl
 
 /-- **Rocq `wp_uk_ecall_pipe`**: the buffer is a precondition (the eight
 bytes at a0 go in and come back written), the registrar turns row 4's post
@@ -85,13 +85,13 @@ theorem wp_uk_ecall_pipe (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
     (l : List FdState) (f : Nat → BitVec 8) (avail : Nat)
     (Rp : sfam GF → Uvis → BitVec 64 → ElfMem → List FdState → Nat → ExtTreeSet GName compare → IProp GF)
     (hn : usysno m = USYS_pipe) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_pipe -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_pipe -∗
       (∀ (fdep : sfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
           (cs' : ExtTreeSet GName compare),
-        ⌜r.toNat ≠ 0 → fdv' = W.fd⌝ -∗ urunNopipe (hlc := hlc) W.fd -∗
-        spostAt (uslot (hlc := hlc)) USYS_pipe fdep W r M' fdv' cw' cs' ={⊤}=∗
-        urunNopipe (hlc := hlc) fdv' ∗ Rp fdep W r M' fdv' cw' cs') -∗
+        ⌜r.toNat ≠ 0 → fdv' = W.fd⌝ -∗ urunNopipe W.fd -∗
+        spostAt (uslot) USYS_pipe fdep W r M' fdv' cw' cs' ={⊤}=∗
+        urunNopipe fdv' ∗ Rp fdep W r M' fdv' cw' cs') -∗
       ustd N.fd l -∗ ubytes N.d (m.get 10#5).toNat 8 f -∗
       (∀ (h' : CPU) (r : BitVec 64) (g : Nat → BitVec 8) (W : Uvis) (fdep : sfam GF) (M' : ElfMem)
           (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
@@ -106,7 +106,7 @@ theorem wp_uk_ecall_pipe (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
             ustd N.fd (ustdAfter (ustdAfter l (.open true false (.pipe γp))) (.open false true (.pipe γp)))) ∨
           (⌜r = -1#64⌝ ∗ ustd N.fd l)) -∗
         Rp fdep W r M' fdv' cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ ubytes N.d (m.get 10#5).toNat 8 g -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ ubytes N.d (m.get 10#5).toNat 8 g -∗
         wpLoop h') -∗
       wpLoop h := by
   have hwin : usyswin m USYS_pipe = some (m.get 10#5, 8) := by

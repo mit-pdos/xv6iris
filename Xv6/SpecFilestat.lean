@@ -190,7 +190,7 @@ theorem fstatHasInode_st (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : 
     cases t <;> simp [fdTypeCode, FD_PIPE, FD_INODE, FD_DEVICE]
 
 section Env
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -199,7 +199,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 runtime file system and ONE slot unit (ilock's bread takes it, brelse gives
 it back).  Content-independent: a syscall that has not yet borrowed its
 descriptor can own it. -/
-def filestatFsEnv : IProp GF := iprop(fsReady (hlc := hlc) ∗ bslot)
+def filestatFsEnv : IProp GF := iprop(fsReady ∗ bslot)
 
 /-- What comes back (Rocq `filestat_fs_out`): the slot unit.  No share --
 the share never left the reference's payload. -/
@@ -211,8 +211,8 @@ def filestatEnv (st : FdState) : IProp GF :=
   match st with
   | .closed => emp
   | .open _ _ (.pipe _) => emp
-  | .open _ _ (.inode _ _ _) => filestatFsEnv (hlc := hlc)
-  | .open _ _ (.device _) => filestatFsEnv (hlc := hlc)
+  | .open _ _ (.inode _ _ _) => filestatFsEnv
+  | .open _ _ (.device _) => filestatFsEnv
 
 /-- ... and what comes back (Rocq `filestat_env_out`). -/
 def filestatEnvOut (st : FdState) : IProp GF :=
@@ -224,21 +224,21 @@ def filestatEnvOut (st : FdState) : IProp GF :=
 
 /-- Rocq `filestat_fs_env_out`: the arm that skips the work already holds
 everything the post promises. -/
-theorem filestat_fs_env_out : filestatFsEnv (hlc := hlc) (GF := GF) ⊢ filestatFsOut := by
+theorem filestat_fs_env_out : filestatFsEnv (GF := GF) ⊢ filestatFsOut := by
   unfold filestatFsEnv filestatFsOut
   iintro ⟨-, H⟩
   iexact H
 
 /-- Rocq `filestat_env_out_of_env`. -/
 theorem filestat_env_out_of_env (st : FdState) :
-    filestatEnv (hlc := hlc) (GF := GF) st ⊢ filestatEnvOut st := by
+    filestatEnv (GF := GF) st ⊢ filestatEnvOut st := by
   unfold filestatEnv filestatEnvOut
   rcases st with _ | ⟨r, w, _ | ⟨n, g, om⟩ | mj⟩ <;> first | exact .rfl | exact filestat_fs_env_out
 
 /-- The inode arm's environment, opened (Rocq ProofFilestat's
 `fst_env_in`). -/
 theorem filestat_env_in (st : FdState) (h : fstatStInode st) :
-    filestatEnv (hlc := hlc) (GF := GF) st ⊢ filestatFsEnv (hlc := hlc) := by
+    filestatEnv (GF := GF) st ⊢ filestatFsEnv := by
   unfold filestatEnv
   rcases st with _ | ⟨r, w, _ | ⟨n, g, om⟩ | mj⟩
   · exact absurd h id
@@ -246,6 +246,7 @@ theorem filestat_env_in (st : FdState) (h : fstatStInode st) :
   · exact .rfl
   · exact .rfl
 
+omit [MachGS GF] in
 /-- ... and closed (Rocq ProofFilestat's `fst_env_out_in`). -/
 theorem filestat_env_out_in (st : FdState) (h : fstatStInode st) :
     filestatFsOut (GF := GF) ⊢ filestatEnvOut st := by
@@ -260,8 +261,8 @@ theorem filestat_env_out_in (st : FdState) (h : fstatStInode st) :
 for sys_fstat): a caller holding the content-independent environment
 opens the state-keyed one and gets its own back from the post. -/
 theorem filestat_env_split (st : FdState) :
-    filestatFsEnv (hlc := hlc) (GF := GF) ⊢
-      filestatEnv (hlc := hlc) st ∗ (filestatEnvOut st -∗ filestatFsOut) := by
+    filestatFsEnv (GF := GF) ⊢
+      filestatEnv st ∗ (filestatEnvOut st -∗ filestatFsOut) := by
   unfold filestatEnv filestatEnvOut
   rcases st with _ | ⟨r, w, _ | ⟨n, g, om⟩ | mj⟩
   · iintro H
@@ -284,7 +285,7 @@ end Env
 /-! ## THE CARVE: the per-inode pieces, out of the reference's own payload -/
 
 section Carve
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
   [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [Icfg] [CurCtx]
 
@@ -336,7 +337,7 @@ end Carve
 /-! ## THE CONTRACT -/
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -367,11 +368,11 @@ end Post
 `wp_filestat_sconf_body`, generalised off its `eb = true` pin: deviation
 1).  `a1` is never inspected: it is carried to copyout, whose contract is
 total in the destination. -/
-def wp_filestat_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_filestat_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames)
@@ -390,22 +391,22 @@ def wp_filestat_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
   procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   -- ... and what the file's TYPE selects
-  filestatEnv (hlc := hlc) st ∗
+  filestatEnv st ∗
   -- THE CROSSING IS THE LITERAL `true`: filestat can sleep (ilock)
   wpNext true k.proc cpu (filestatPost k γ fk q st j pid V M)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `filestat` (Rocq's `Module Type FILESTAT`). -/
 structure FILESTAT : Prop where
-  wp_filestat_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_filestat_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames) hK hfk hj hproc hnoff htier ha0,
-    wp_filestat_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk
+    wp_filestat_eb_body (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk
       hK hfk hj hproc hnoff htier ha0
 
 end Xv6

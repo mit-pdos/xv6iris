@@ -87,7 +87,7 @@ theorem syscall_head_beqz (n : Nat) (h1 : 1 ≤ n) (h22 : n ≤ 24) :
 /-! ## §2 The bundle and the arms' interface at the head -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -101,15 +101,15 @@ def syscHeadRest (PT : SchedNames → IProp GF) (Γ : SchedNames) (c0 : CPU) (k 
     (f : UexecSG.sfam GF) : IProp GF :=
   iprop(procsInv Γ ∗ isLock γw waitLockAddr "wait_lock" waitLockPay ∗
     bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-    syscallEnv (hlc := hlc) PT Γ γ ∗ fdFrags V.fdg sts ∗ chFrag V.chg (procAddr j) cs ∗
-    syscSysIn (hlc := hlc) f V M sts gn cs pid ∗ syscForkIn (hlc := hlc) f V M sts ∗ syscPayIn f V ∗
-    (wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f) ∧
+    syscallEnv PT Γ γ ∗ fdFrags V.fdg sts ∗ chFrag V.chg (procAddr j) cs ∗
+    syscSysIn f V M sts gn cs pid ∗ syscForkIn f V M sts ∗ syscPayIn f V ∗
+    (wpNext true k.proc c0 (syscallPost PT Γ k γ j pid V M sts gn cs ip f) ∧
       syscallCloser k V))
 
 /-- **The twenty-two arms, at every hart and register file the head reaches
 them with** (Rocq `sysc_arm_dispatch`'s premise): the head's case split
 closes into these. -/
-def SyscHeadArms (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def SyscHeadArms (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 : CPU) (k : KCtx) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -123,7 +123,7 @@ def SyscHeadArms (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc 
       hnum hpins hs1 hs2 hra
 
 /-- **The printk fallback, at every hart and register file.** -/
-def SyscHeadFb (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def SyscHeadFb (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 : CPU) (k : KCtx) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -136,7 +136,7 @@ def SyscHeadFb (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc :=
       hgn hrange hpins hs1 hs2
 
 /-- **The blocked arm, at every hart and register file** (xv6 7b2c1b1b). -/
-def SyscHeadBlk (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def SyscHeadBlk (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 : CPU) (k : KCtx) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -186,7 +186,7 @@ set_option maxHeartbeats 4000000 in
 /-- **The split** (Rocq `wp_syscall_sconf` from the `bltu`): in range, the
 table's slot `num` is read and called with `ra := syscall+0x3a`, landing in
 the arm; out of range, the fallback. -/
-theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 : CPU) (k : KCtx) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -207,7 +207,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivFd γ (procAddr j) pid V M ∗
-    syscHeadRest (hlc := hlc) PT Γ c0 k γw γ j pid V M sts gn cs ip f
+    syscHeadRest PT Γ c0 k γw γ j pid V M sts gn cs ip f
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hpriv, Hrest⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -374,7 +374,7 @@ theorem syscall_head_tf [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames
 set_option maxHeartbeats 4000000 in
 /-- **`p->trapframe`, `p->trapframe->a7`, and the fused check's operands**
 (Rocq `wp_syscall_sconf` +0x12 .. +0x20). -/
-theorem syscall_head_num (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem syscall_head_num (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 : CPU) (k : KCtx) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -390,7 +390,7 @@ theorem syscall_head_num (PT : SchedNames → IProp GF) (Γ : SchedNames) [Claim
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivFd γ (procAddr j) pid V M ∗
-    syscHeadRest (hlc := hlc) PT Γ c0 k γw γ j pid V M sts gn cs ip f
+    syscHeadRest PT Γ c0 k γw γ j pid V M sts gn cs ip f
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hpriv, Hrest⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -459,7 +459,7 @@ set_option maxHeartbeats 4000000 in
 the table index's arm or the fallback, given both at every hart and
 register file the head reaches them with. -/
 theorem syscall_head_entry (MP : MYPROC) (PT : SchedNames → IProp GF) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 : CPU) (k : KCtx) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -469,12 +469,12 @@ theorem syscall_head_entry (MP : MYPROC) (PT : SchedNames → IProp GF) (Γ : Sc
     (hA : SyscHeadArms PT Γ c0 k γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn)
     (hF : SyscHeadFb PT Γ c0 k γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn)
     (hB : SyscHeadBlk PT Γ c0 k γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn) :
-    wp_syscall_body (hlc := hlc) (GF := GF) PT Γ c0 k γw γ j pid V M sts gn cs ip f
+    wp_syscall_body (GF := GF) PT Γ c0 k γw γ j pid V M sts gn cs ip f
       hj hproc hK hnoff htier hgn := by
   unfold wp_syscall_body
   simp only [syscallAddr]
   iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hwl, Hbs, Hip, Hfd, Hir, Henv, Hpriv, Hfr, Hch, Hsi, Hfi, Hpy, Hslot⟩
-  ihave Hrest : syscHeadRest (hlc := hlc) PT Γ c0 k γw γ j pid V M sts gn cs ip f
+  ihave Hrest : syscHeadRest PT Γ c0 k γw γ j pid V M sts gn cs ip f
     $$ [Hpi Hwl Hbs Hip Hfd Hir Henv Hfr Hch Hsi Hfi Hpy Hslot]
   · unfold syscHeadRest; iframe
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -496,7 +496,7 @@ theorem syscall_head_entry (MP : MYPROC) (PT : SchedNames → IProp GF) (Γ : Sc
   k_step_e (wp_s_jal cpu _ (KA.«syscall» + 0xc#64) false 2093018#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_head_br_myproc]
   iintro Hk Hpc
-  have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)
+  have hmp := MP.wp_myproc (GF := GF)
   unfold wp_myproc_body at hmp
   simp only [myprocAddr] at hmp
   iapply (hmp cpu _ ?hnM ?hKM) $$ [- $Hk $Hpc]

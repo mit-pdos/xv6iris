@@ -44,7 +44,7 @@ def kvmTableOk (t : PTree) (pas : Nat → BitVec 44) : Prop :=
   (∀ i, i < 64 → pageValid (pageAddr (pas i)) ∧ pas i ∉ t.pages 2)
 
 /-- The specification of `kvmmake` (counted mode). -/
-def wp_kvmmake_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_kvmmake_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (nb : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 48 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hcount : kvmmakeCount < nb)
@@ -63,8 +63,8 @@ def wp_kvmmake_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [X
 
 /-- The interface of `kvmmake`. -/
 structure KVMMAKE : Prop where
-  wp_kvmmake : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_kvmmake : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (nb : Nat) hnoff hK hlk hcount hp0,
-    wp_kvmmake_body (hlc := hlc) (GF := GF) cpu k γl γk nb hnoff hK hlk hcount hp0
+    wp_kvmmake_body (GF := GF) cpu k γl γk nb hnoff hK hlk hcount hp0
 
 end Xv6

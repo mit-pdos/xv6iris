@@ -63,7 +63,7 @@ def echoNodeRow (ws : List (List (BitVec 8))) (M : ElfMem) (s0 t : Nat) (g : Nat
   ∧ M (s0 + ushEchoOff ws i + ushEchoAlen ws i) = some ubyte0
 
 section UshEchoSlot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -71,26 +71,26 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 /-! ## 4. The ingredients: echo's slot -/
 
 /-- **Rocq `sh_echo_slot`** (deviation 1). -/
-def shEchoSlot (T : IProp GF) : IProp GF := shPinSlot (hlc := hlc) era0EchoPins T
+def shEchoSlot (T : IProp GF) : IProp GF := shPinSlot era0EchoPins T
 
 /-- Rocq `sh_echo_slot_persistent`. -/
-instance shEchoSlot_persistent (T : IProp GF) : Persistent (shEchoSlot (hlc := hlc) T) := by
+instance shEchoSlot_persistent (T : IProp GF) : Persistent (shEchoSlot T) := by
   unfold shEchoSlot; infer_instance
 
 /-- **Rocq `sh_echo_slot_of_fs_pure`**: E2's seam, ONE claim law at the
 whole of `echo_fs_pure`. -/
-def shEchoSlotOfFsPure (T : IProp GF) : IProp GF := shPinSlot (hlc := hlc) echoFsPure T
+def shEchoSlotOfFsPure (T : IProp GF) : IProp GF := shPinSlot echoFsPure T
 
 /-- **Rocq `sh_echo_slot_of_fs_pure_holds`**: echo's pin is a projection
 under the law's own `□`. -/
 theorem shEchoSlotOfFsPure_holds (T : IProp GF) :
-    ⊢ shEchoSlotOfFsPure (hlc := hlc) T -∗ shEchoSlot (hlc := hlc) T := by
+    ⊢ shEchoSlotOfFsPure T -∗ shEchoSlot T := by
   unfold shEchoSlotOfFsPure shEchoSlot
   exact shPinSlot_mono echoFsPure era0EchoPins T (fun _ h => h.2.2)
 
 /-! ## 5. The node, as a fact about the image -/
 
-variable (E : UshExecEnv (hlc := hlc) (GF := GF))
+variable (E : UshExecEnv (GF := GF))
 
 /-- **Rocq `echo_node_row_of_cmd_x`**: argument `i`'s four rows, off the
 lent heap and the node's persistent runs. -/

@@ -46,7 +46,7 @@ theorem ush_ucs_upd (m : RegMap) (r : BitVec 5) (v : BitVec 64) (hr : ucalleeSav
   ukWr_get_other m r q v (fun he => by subst he; rw [hq] at hr; cases hr)
 
 section UshSeamChild
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -55,16 +55,16 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [S
 theorem wp_ushRefChild (UL : UK_LEAVES) (SP : SH_PARSECMD) (UM UM' : IProp GF) (N : UkNames GF) (h : CPU)
     (m : RegMap) (dw dv : DFrac) (s0 len : Nat) (f : Nat → BitVec 8) (t : UshpCmd) (k : Nat) (Cr : IProp GF)
     (hs1 : m.get 9#5 = BitVec.ofNat 64 s0) (hsc : refSymScope len f) (href : refParsecmd len f = some t)
-    (hcat : ushpCat t) (hch : ushMallocChain (hlc := hlc) N (ushpNodes t) UM UM') (hs0 : 0 < s0)
+    (hcat : ushpCat t) (hch : ushMallocChain N (ushpNodes t) UM UM') (hs0 : 0 < s0)
     (hs64 : s0 + len + 1 < 2 ^ 64) (hs38 : s0 + len < 2 ^ 38) :
     ⊢ ushCode N.t -∗ ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      ustr N.d dv ushSymA 7 ushpSymF -∗ UM -∗ ushpOom (hlc := hlc) N Cr (ushRoom t + k - ushDeep t) -∗ Cr -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (ushRoom t + k) -∗
+      ustr N.d dv ushSymA 7 ushpSymF -∗ UM -∗ ushpOom N Cr (ushRoom t + k - ushDeep t) -∗ Cr -∗
+      urun N h m (BitVec.ofNat 64 0x99c) (ushRoom t + k) -∗
       (∀ (h' : CPU) (m' : RegMap) (p : Nat), ⌜m'.get 10#5 = BitVec.ofNat 64 p⌝ -∗ ⌜ucalleeSaved m m'⌝ -∗
         ushCmd N.d p (ushcmdOfTree s0 (ushZeroAt (refNulcut t) (ushpExt len f)) t) -∗
         ubytesq N.d DFrac.discard s0 (len + 1) (ushZeroAt (refNulcut t) (ushpExt len f)) -∗
         ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗ UM' -∗ Cr -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (ushRoom t + k) -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (ushRoom t + k) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hline Hws Hsy HM #Hpx Hcr Hrun Hk
   ihave %hnn := ustr_nonul N.d _ s0 len f $$ Hline
@@ -109,22 +109,22 @@ theorem wp_ushRefChildRedir (UL : UK_LEAVES) (SP : SH_PARSECMD) (SR : SH_RUNCMD)
     (hs1 : m.get 9#5 = BitVec.ofNat 64 s0) (hsc : refSymScope len f)
     (href : refParsecmd len f = some (.redir (.exec toks) q e rrModeGt 1))
     (hg : g = ushZeroAt (refNulcut (.redir (.exec toks) q e rrModeGt 1)) (ushpExt len f))
-    (hch : ushMallocChain (hlc := hlc) N 2 UM UM') (hs0 : 0 < s0) (hs64 : s0 + len + 1 < 2 ^ 64)
+    (hch : ushMallocChain N 2 UM UM') (hs0 : 0 < s0) (hs64 : s0 + len + 1 < 2 ^ 64)
     (hs38 : s0 + len < 2 ^ 38) (hst1 : ld[1]? = some st1) (hne : st1 ≠ .closed)
     (hnp : ∀ (rb wb : Bool) (gp : PipeNames), st1 ≠ .open rb wb (.pipe gp)) :
     ⊢ ushCode N.t -∗ ushJtab N.t -∗ ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
       ustr N.d dv ushSymA 7 ushpSymF -∗ ustd N.fd ld -∗ ucwd N.cwd cwdv -∗ UM -∗
-      ushOpenCallG (hlc := hlc) N cwdv ⟨s0 + q, e - q, fun j => g (q + j)⟩ rrModeGt (ld.set 1 .closed) H K Kf -∗
-      ushpOom (hlc := hlc) N iprop(Cr ∗ ustd N.fd ld) (4 + (Dg + n) - 2) -∗ (Cr -∗ H ∗ Cr') -∗ Cr -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (68 + (8 + (Dg + n))) -∗
+      ushOpenCallG N cwdv ⟨s0 + q, e - q, fun j => g (q + j)⟩ rrModeGt (ld.set 1 .closed) H K Kf -∗
+      ushpOom N iprop(Cr ∗ ustd N.fd ld) (4 + (Dg + n) - 2) -∗ (Cr -∗ H ∗ Cr') -∗ Cr -∗
+      urun N h m (BitVec.ofNat 64 0x99c) (68 + (8 + (Dg + n))) -∗
       ((∀ (h' : CPU) (m' : RegMap) (p : Nat) (ty : FdType), ⌜m'.get 10#5 = BitVec.ofNat 64 p⌝ -∗
           ushCmd N.d p (.exec (ushArgs s0 g toks)) -∗
           ustd N.fd ((ld.set 1 .closed).set 1 (.open false true ty)) -∗ ucwd N.cwd cwdv -∗ K ty -∗ UM' -∗ Cr' -∗
-          urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (Dg + (70 + n)) -∗ wpLoop h') ∧
+          urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (Dg + (70 + n)) -∗ wpLoop h') ∧
         (∀ (h' : CPU) (m' : RegMap), ⌜ushDiagAt 0x10e m'⌝ -∗
           ushPtr N.d ((m'.get 9#5).toNat + 16) (⟨s0 + q, e - q, fun j => g (q + j)⟩ : UArg).ptr -∗
           ushStr N.d ⟨s0 + q, e - q, fun j => g (q + j)⟩ -∗ ustd N.fd (ld.set 1 .closed) -∗ ucwd N.cwd cwdv -∗
-          Kf -∗ Cr' -∗ urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x10e) (Dg + (70 + n)) -∗ wpLoop h')) -∗
+          Kf -∗ Cr' -∗ urun N h' m' (BitVec.ofNat 64 0x10e) (Dg + (70 + n)) -∗ wpLoop h')) -∗
       wpLoop h := by
   subst hg
   iintro #Hc #Hjt Hline Hws Hsy Hstd Hcwd HM Hopen #Hpxw Hsplit Hcr Hrun Hk

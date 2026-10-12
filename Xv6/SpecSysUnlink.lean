@@ -172,7 +172,7 @@ def sysUnlinkRet (r : BitVec 64) : Prop := r = 0xFFFFFFFFFFFFFFFF#64 ∨ r = 0#6
 /-! ## The bundle and the arms -/
 
 section Arms
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [Icfg]
 
 /-- ...AND THE SYSCALL TIER (Rocq's `unlink_au_at`): the same bundle under
@@ -186,24 +186,24 @@ def unlinkAuAt (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Ftgt : Pfam GF (Aview → Nat → IProp GF))
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) : IProp GF :=
-  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart (hlc := hlc) γfs rt cw P Pmiss pl) ∗
-    pfAt (uentCommitAt (hlc := hlc) Γ appE (nparCur M pv P)) Fent ∗
-    pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
-    pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-    pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss)
+  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart γfs rt cw P Pmiss pl) ∗
+    pfAt (uentCommitAt Γ appE (nparCur M pv P)) Fent ∗
+    pfAt (utgtCommitAt Γ appE) Ftgt ∗
+    pfAt (dlookupCommitAt Γ appE) Fex ∗
+    pfAt (dmissCommitAt Γ appE) Fmiss)
 
 /-- THE CURSOR'S TWO READINGS, as one move (Rocq's `unlink_uent_inst`;
 `SpecSysMknod.mknodAcre_inst`'s twin at unlink's entry leg). -/
 theorem unlinkUent_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv : Nat)
     (pl : List (BitVec 8)) (P : Nat → Nat → IProp GF)
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (hpl : argPathOf M pv pl) :
-    pfAt (uentCommitAt (hlc := hlc) Γ appE (nparCur M pv P)) Fent ⊢
-      pfAt (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent := by
+    pfAt (uentCommitAt Γ appE (nparCur M pv P)) Fent ⊢
+      pfAt (uentCommitAt Γ appE (P (nparElems pl).length)) Fent := by
   iintro Hent
-  iapply (pfAt_mono (uentCommitAt (hlc := hlc) Γ appE (nparCur M pv P))
-    (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent) $$ [] Hent
+  iapply (pfAt_mono (uentCommitAt Γ appE (nparCur M pv P))
+    (uentCommitAt Γ appE (P (nparElems pl).length)) Fent) $$ [] Hent
   iintro H
-  iapply (uentCommitAt_mono (hlc := hlc) Γ appE (nparCur M pv P) (P (nparElems pl).length)
+  iapply (uentCommitAt_mono Γ appE (nparCur M pv P) (P (nparElems pl).length)
     Fent.pfRecv) $$ [] [] H
   · iapply (nparCur_out M pv pl P hpl)
   · iapply (nparCur_in M pv pl P hpl)
@@ -224,8 +224,8 @@ def unlinkPostOk (Γ : FsViewNames GF) (P : Nat → Nat → IProp GF)
     ⌜0 < t ∧ t < 16 * icfgNib⌝ ∗
     ⌜PartialMap.get? av1 t = some a⌝ ∗
     P (nparElems pl).length d ∗
-    pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-    pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss ∗
+    pfAt (dlookupCommitAt Γ appE) Fex ∗
+    pfAt (dmissCommitAt Γ appE) Fmiss ∗
     Fent.pfRecv av0 d nm t ∗
     Ftgt.pfRecv av1 t)
 
@@ -237,29 +237,29 @@ def unlinkPostFail (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Ftgt : Pfam GF (Aview → Nat → IProp GF))
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) : IProp GF :=
-  iprop(unlinkAuAt (hlc := hlc) Γ γfs rt cw M pv P Pmiss Fent Ftgt Fex Fmiss ∨
+  iprop(unlinkAuAt Γ γfs rt cw M pv P Pmiss Fent Ftgt Fex Fmiss ∨
     (∃ pl : List (BitVec 8),
-      (nparWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗
-          pfAt (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent ∗
-          pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
-          pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-          pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss) ∨
+      (nparWalkDeadEra γfs rt P Pmiss pl ∗
+          pfAt (uentCommitAt Γ appE (P (nparElems pl).length)) Fent ∗
+          pfAt (utgtCommitAt Γ appE) Ftgt ∗
+          pfAt (dlookupCommitAt Γ appE) Fex ∗
+          pfAt (dmissCommitAt Γ appE) Fmiss) ∨
       (∃ d : Nat,
         P (nparElems pl).length d ∗
-        pfAt (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent ∗
-        pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
+        pfAt (uentCommitAt Γ appE (P (nparElems pl).length)) Fent ∗
+        pfAt (utgtCommitAt Γ appE) Ftgt ∗
         (-- (iii-a) the name is a dot: refused BY NAME, before any lookup
           (∃ nm : Fname,
             ⌜(pathElems pl).getLast? = some nm⌝ ∗ ⌜nm = DOT ∨ nm = DOTDOT⌝ ∗
-            pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-            pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss) ∨
+            pfAt (dlookupCommitAt Γ appE) Fex ∗
+            pfAt (dmissCommitAt Γ appE) Fmiss) ∨
           -- (iii-b) gone: the miss observation FIRED
           (∃ (av : Aview) (nm : Fname) (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
             ⌜(pathElems pl).getLast? = some nm⌝ ∗
             ⌜arowAt av d ⟨.ADir ents, nl⟩⌝ ∗
             ⌜ents[nm]? = none⌝ ∗
             Fmiss.pfRecv av d nm ∗
-            pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex) ∨
+            pfAt (dlookupCommitAt Γ appE) Fex) ∨
           -- (iii-c) dir non-empty: the found observation FIRED, both rows
           -- pinned at the one instant
           (∃ (av : Aview) (t : Nat) (nm : Fname) (ents est : Std.ExtTreeMap Fname Nat compare)
@@ -270,10 +270,10 @@ def unlinkPostFail (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
             ⌜PartialMap.get? av t = some ⟨.ADir est, nlt⟩⌝ ∗
             ⌜¬ dotsOnly est⌝ ∗
             Fex.pfRecv av d nm t ∗
-            pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss) ∨
+            pfAt (dmissCommitAt Γ appE) Fmiss) ∨
           -- (iii-d) no abstract observation to report: the k = Lp deaths
-          (pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-            pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss)))))
+          (pfAt (dlookupCommitAt Γ appE) Fex ∗
+            pfAt (dmissCommitAt Γ appE) Fmiss)))))
 
 /-- The armed disjunction the continuation receives, keyed on a0 (Rocq's
 `unlink_arms`). -/
@@ -283,16 +283,16 @@ def unlinkArms (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Ftgt : Pfam GF (Aview → Nat → IProp GF))
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (r : BitVec 64) : IProp GF :=
-  iprop((⌜r = 0#64⌝ ∗ unlinkPostOk (hlc := hlc) Γ P Fent Ftgt Fex Fmiss) ∨
+  iprop((⌜r = 0#64⌝ ∗ unlinkPostOk Γ P Fent Ftgt Fex Fmiss) ∨
     (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗
-      unlinkPostFail (hlc := hlc) Γ γfs rt cw M pv P Pmiss Fent Ftgt Fex Fmiss))
+      unlinkPostFail Γ γfs rt cw M pv P Pmiss Fent Ftgt Fex Fmiss))
 
 end Arms
 
 /-! ## The return continuation, named -/
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -325,7 +325,7 @@ def sysUnlinkPost (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     -- the process block, at the same everything but the page table
     procPrivFd γ pa pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
     -- the armed post on the returned a0
-    unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) pv
+    unlinkArms (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) pv
       P Pmiss Fent Ftgt Fex Fmiss (R' 10#5) -∗
     wpLoop cpu')
 
@@ -342,7 +342,7 @@ def sysUnlinkCont (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid 
 /-- **WP of `sys_unlink()`** (Rocq's `wp_sys_unlink_body` over its
 `wp_sys_unlink_frame`), eb-generic at depth 0.  The abstract state is read at
 the LIVE Γ, `fsGammaL fscFs`. -/
-def wp_sys_unlink_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+def wp_sys_unlink_eb_body (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (v0 : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF)
@@ -356,14 +356,14 @@ def wp_sys_unlink_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : 
     (hv0 : V.tf[tfArgIdx 0]? = some v0) : Prop :=
   kctx cpu k ∗ pcIs cpu sysUnlinkAddr ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-  procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+  procsInv Γ ∗ panicEnv ∗ fsReady ∗
   bslots 3 ∗
   -- the process, and the reference allowance the walk needs
   irefSlots sysUnlinkSlots ∗
   procPrivFd γ (procAddr j) pid V M ∗
   -- THE CALLER'S BUNDLE
   -- (at the PATH ARGUMENT 0 NAMES, read at the entry image: TL-3C)
-  unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v0.toNat
+  unlinkAuAt (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v0.toNat
     P Pmiss Fent Ftgt Fex Fmiss ∗
   sysUnlinkCont cpu k γ (procAddr j) pid V M v0.toNat P Pmiss Fent Ftgt Fex Fmiss
   ⊢ wpLoop (GF := GF) cpu
@@ -372,11 +372,11 @@ end Post
 
 /-- The interface of `sys_unlink` (Rocq's `Module Type SYSUNLINK`). -/
 structure SYSUNLINK : Prop where
-  wp_sys_unlink_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+  wp_sys_unlink_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
     [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF]
     [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (v0 : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF)
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
@@ -384,7 +384,7 @@ structure SYSUNLINK : Prop where
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF))
     hj hproc htier hnoff hK hv0,
-    wp_sys_unlink_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M v0 P Pmiss Fent Ftgt Fex Fmiss
+    wp_sys_unlink_eb_body (GF := GF) Γ cpu k γ j pid V M v0 P Pmiss Fent Ftgt Fex Fmiss
       hj hproc htier hnoff hK hv0
 
 end Xv6

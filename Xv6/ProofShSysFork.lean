@@ -22,7 +22,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -32,7 +32,7 @@ theorem ushSysFork_ra (m : RegMap) (r : BitVec 64) :
   rw [ukWr_get_other _ _ _ _ (by decide), ukWr_get_other _ _ _ _ (by decide)]
 
 /-- **Rocq `wp_kshr_fork_at`**. -/
-theorem wp_shSysForkAt (UL : UK_LEAVES) : wpShSysForkAtBody (hlc := hlc) (GF := GF) := by
+theorem wp_shSysForkAt (UL : UK_LEAVES) : wpShSysForkAtBody (GF := GF) := by
   intro N P FP szv l v D h m avail cw Sc Q Rc _hQ
   unfold stubRet
   rw [show (BitVec.ofInt 64 1 : BitVec 64) = BitVec.ofNat 64 1 from by decide,

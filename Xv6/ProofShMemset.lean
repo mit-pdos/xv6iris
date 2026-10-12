@@ -62,10 +62,11 @@ def ushMsM (m : RegMap) (a Nb : Nat) : RegMap :=
     (BitVec.ofNat 64 Nb)) 14#5 (BitVec.ofNat 64 (a + Nb))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- The empty run. -/
 theorem ushMs_nil (γd : GName) (a : Nat) (g : Nat → BitVec 8) : ⊢ ubytes (GF := GF) γd a 0 g := by
   show ⊢ ubytesq (GF := GF) γd (DFrac.own 1) a 0 g
@@ -78,11 +79,11 @@ arms (deviation 2). -/
 theorem ushMs_head (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (a Nb n : Nat)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 a) (ha2 : m.get 12#5 = BitVec.ofNat 64 Nb) (hN0 : 0 < Nb)
     (hN32 : Nb < 2 ^ 32) :
-    ⊢ ushCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 0xa38) (2 + n) -∗
+    ⊢ ushCode N.t -∗ urun N h m (BitVec.ofNat 64 0xa38) (2 + n) -∗
       (⌜(m.get spIdx).toNat % 8 = 0 ∧ 8 * (2 + n) ≤ (m.get spIdx).toNat⌝ -∗
         ushSaved N.d (m.get spIdx).toNat [m.get 1#5, m.get 8#5] -∗
         ustack N.d (BitVec.ofNat 64 ((m.get spIdx).toNat - 8 * 2)) 0 -∗
-        ∀ h' : CPU, urun (hlc := hlc) N h' (ushMsM m a Nb) (BitVec.ofNat 64 0xa4c) n -∗ wpLoop h') -∗
+        ∀ h' : CPU, urun N h' (ushMsM m a Nb) (BitVec.ofNat 64 0xa4c) n -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hk
   iapply ush_frame_pro UL N 2 [1#5, 8#5] 0 0xa38 0xa40 (ushMI_a38 N.t) ⟨ushMI_a3a N.t, ushMI_a3c N.t, trivial⟩
@@ -134,9 +135,9 @@ theorem ushMs_loop (UL : UK_LEAVES) (N : UkNames GF) (c : BitVec 8) (a Nb nn : N
     Nb = j + 1 + k → a + Nb < 2 ^ 64 → nthByte (n := 8) (mc.get 11#5) 0 = c →
     mc.get 15#5 = BitVec.ofNat 64 (a + j) → mc.get 14#5 = BitVec.ofNat 64 (a + Nb) →
     ⊢ ushCode N.t -∗ ubytes N.d a j (fun _ => c) -∗ ubytes N.d (a + j) (1 + k) g -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0xa4c) nn -∗
+      urun N h mc (BitVec.ofNat 64 0xa4c) nn -∗
       (ubytes N.d a Nb (fun _ => c) -∗ ∀ (h' : CPU) (mc' : RegMap), ⌜∀ r, r ≠ 15#5 → mc'.get r = mc.get r⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0xa56) nn -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0xa56) nn -∗ wpLoop h') -∗
       wpLoop h := by
   intro k
   induction k with
@@ -221,7 +222,7 @@ theorem ushMs_loop (UL : UK_LEAVES) (N : UkNames GF) (c : BitVec 8) (a Nb nn : N
     rw [hmc r hr]; exact ukWr_get_other _ _ _ _ hr
 
 /-- **Rocq `wp_ksh_memset`**. -/
-theorem wp_ushMemset (UL : UK_LEAVES) : wpUshMemsetBody (hlc := hlc) (GF := GF) := by
+theorem wp_ushMemset (UL : UK_LEAVES) : wpUshMemsetBody (GF := GF) := by
   intro N h m a Nb f n ha0 ha2 hN0 hN31
   obtain ⟨k, rfl⟩ : ∃ k, Nb = k + 1 := ⟨Nb - 1, by omega⟩
   rw [show User.Sh.Sym.«memset» = 0xa38 from rfl]
@@ -268,7 +269,7 @@ theorem wp_ushMemsetNullP (UL : UK_LEAVES) :
     ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (a Nb : Nat) (b0 : BitVec 8) (n : Nat),
     a + Nb < 2 ^ 38 → m.get 10#5 = BitVec.ofNat 64 a → m.get 12#5 = BitVec.ofNat 64 Nb → 0 < Nb → Nb < 2 ^ 31 →
     ⊢ ushCode N.t -∗ utext N.t a b0 -∗ N.pay (-1) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«memset») (2 + n) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«memset») (2 + n) -∗ wpLoop h := by
   intro N h m a Nb b0 n hb ha0 ha2 hN0 hN31
   rw [show User.Sh.Sym.«memset» = 0xa38 from rfl]
   iintro #Hc #Ht Hpay Hrun
@@ -284,7 +285,7 @@ end
 
 /-- **sh's `memset` holds**, at the engine `UL`. -/
 theorem shMemset_holds (UL : UK_LEAVES) : USH_MEMSET :=
-  ⟨fun {_ _} _ _ _ _ _ _ _ _ _ => wp_ushMemset UL,
-   fun {_ _} _ _ _ _ _ _ _ _ _ => wp_ushMemsetNullP UL⟩
+  ⟨fun {_} _ _ _ _ _ _ _ _ _ => wp_ushMemset UL,
+   fun {_} _ _ _ _ _ _ _ _ _ => wp_ushMemsetNullP UL⟩
 
 end Xv6

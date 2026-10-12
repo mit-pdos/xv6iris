@@ -33,12 +33,12 @@ def rdWild (M : LModel) (WL : M.lmLine → Bool) (CH : ConsHist)
   ∧ WL (lmLineAt M ((CH.chDl ++ ws).map Prod.snd)) = true
 
 section PipesWildRead
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- THE READER'S RECEIPT: the generic one, and -- at a read that completes a
 wild line -- the era's wild token (or the taint) (Rocq `rd_retW`). -/
-def rdRetW (M : LModel) (G : GenCparams hlc GF M) (WL : M.lmLine → Bool) (k : Nat) (v : EraPins)
+def rdRetW (M : LModel) (G : GenCparams GF M) (WL : M.lmLine → Bool) (k : Nat) (v : EraPins)
     (n : Nat) (CH : ConsHist) (ws : List (List Obs × BitVec 8)) : IProp GF :=
   iprop(rdRetV M G k v n CH ws
     ∗ (⌜rdWild M WL CH ws⌝ -∗
@@ -49,7 +49,7 @@ def rdRetW (M : LModel) (G : GenCparams hlc GF M) (WL : M.lmLine → Bool) (k : 
          ∨ G.gcT)))
 
 /-- THE READ, AND THE TRANSITION (Rocq `pwclV_step_read`). -/
-theorem pwclV_step_read (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem pwclV_step_read (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (WL : M.lmLine → Bool) (HWL : ∀ l, WL l = true → lmWild M l)
     (k : Nat) (v : EraPins) (n : Nat) (ho : List Obs) (CH : ConsHist)
     (ws : List (List Obs × BitVec 8)) (hread : readOk CH.chLog CH.chDl ws) :

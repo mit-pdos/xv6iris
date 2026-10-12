@@ -62,7 +62,7 @@ theorem printk_br_7ba : KA.«printk» + 0x7ba#64 = KA.«release» := by decide
 
 theorem printk_br_11fa2 : KA.«printk» + 0x11fa2#64 = KA.«pr» := by decide
 
-theorem printk_release_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_release_tail (RE : RELEASE) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs cs0 : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hpr : "pr" ∉ k.locks)
@@ -102,7 +102,7 @@ theorem printk_release_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.
         pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK' reen hreen hon
-    have h := RE.wp_release (hlc := hlc) (GF := GF) cpu k' γpr "pr" (fun _ => emp) hsie' hnoff' hK' reen hreen hon
+    have h := RE.wp_release (GF := GF) cpu k' γpr "pr" (fun _ => emp) hsie' hnoff' hK' reen hreen hon
     unfold wp_release_body at h
     simp only [releaseAddr] at h
     iintro ⟨Hk, Hp, #Hl, Hlo, Harm, Hcont⟩
@@ -181,7 +181,7 @@ set_option maxHeartbeats 4000000 in
 /-- The nine reloads of `s1`, `s3`..`s8`, `s10`, `s11` at `pc0` (`0x744` or
 `0x800`): the callee-saved registers are the entry ones again and the
 frame is the exit frame. -/
-theorem printk_restore {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem printk_restore {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc0 pc1 pc2 pc3 pc4 pc5 pc6 pc7 pc8 : BitVec 64)
     (h1 : pc1 = pc0 + 2#64) (h2 : pc2 = pc0 + 4#64) (h3 : pc3 = pc0 + 6#64) (h4 : pc4 = pc0 + 8#64)
@@ -251,7 +251,7 @@ theorem printk_restore {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 set_option maxHeartbeats 4000000 in
 /-- Either exit of the walk (`0x744`: end of string; `0x800`: a `%` ended
 it): restore, release, and return `0`. -/
-theorem printk_exit (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_exit (RE : RELEASE) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs cs0 : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hpr : "pr" ∉ k.locks)
@@ -310,7 +310,7 @@ theorem printk_exit (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [Ma
 
 /-- A call to `prputc` from the walk (`jal ra, prputc` at `pc`), from
 the context `kb.withRegs Rc`. -/
-theorem printk_prputc (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_prputc (PP : PRPUTC) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (Rc : RegMap) (γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (hsie : kb.sie = false) (hK : 20 ≤ kb.avail)
     (hnoff : kb.noff + 1 < 2 ^ 31) (huart : "uart1" ∉ kb.locks)
@@ -324,7 +324,7 @@ theorem printk_prputc (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [M
   iintro ⟨#Hi, Hk, Hpc, #Htx, Hsent, HΦ⟩
   k_step (wp_s_jal cpu _ pc false imm 1#5 (by decide)) $$ [- $Hk $Hpc] with [htgt]
   iintro Hk Hpc
-  have h := PP.wp_prputc (hlc := hlc) (GF := GF) cpu (kb.withRegs (Rc.set 1#5 (pc + 4#64))) γl γd bs
+  have h := PP.wp_prputc (GF := GF) cpu (kb.withRegs (Rc.set 1#5 (pc + 4#64))) γl γd bs
     (by k_norm) (by k_norm; exact hK) (by k_norm; exact hnoff) (by k_norm; exact huart)
   unfold wp_prputc_body at h
   iapply h
@@ -338,7 +338,7 @@ theorem printk_prputc (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [M
   iapply HΦ $$ %_ %cs Hk Hpc %hcs Hsent
 
 /-- A call to `printint` from the walk. -/
-theorem printk_printint (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_printint (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (Rc : RegMap) (γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (hsie : kb.sie = false) (hK : 28 ≤ kb.avail)
     (hbase : Rc 11#5 = 10#64 ∨ Rc 11#5 = 16#64)
@@ -353,7 +353,7 @@ theorem printk_printint (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}
   iintro ⟨#Hi, Hk, Hpc, #Htx, Hsent, HΦ⟩
   k_step (wp_s_jal cpu _ pc false imm 1#5 (by decide)) $$ [- $Hk $Hpc] with [htgt]
   iintro Hk Hpc
-  have h := PI.wp_printint (hlc := hlc) (GF := GF) cpu (kb.withRegs (Rc.set 1#5 (pc + 4#64))) γl γd bs
+  have h := PI.wp_printint (GF := GF) cpu (kb.withRegs (Rc.set 1#5 (pc + 4#64))) γl γd bs
     (by k_norm) (by k_norm; exact hK) (by k_norm; exact hbase) (by k_norm; exact hnoff)
     (by k_norm; exact huart)
   unfold wp_printint_body at h
@@ -369,7 +369,7 @@ theorem printk_printint (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}
 
 set_option maxHeartbeats 4000000 in
 /-- The `%d` arm at `0x800005ee#64`: the next vararg to `printint`. -/
-theorem printk_arm_d (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_d (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -450,7 +450,7 @@ theorem printk_arm_d (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [
 
 set_option maxHeartbeats 4000000 in
 /-- The `%ld` arm at `0x800005d2#64`: the next vararg to `printint`. -/
-theorem printk_arm_ld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_ld (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -534,7 +534,7 @@ theorem printk_arm_ld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} 
 
 set_option maxHeartbeats 4000000 in
 /-- The `%lld` arm at `0x80000610#64`: the next vararg to `printint`. -/
-theorem printk_arm_lld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_lld (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -618,7 +618,7 @@ theorem printk_arm_lld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 set_option maxHeartbeats 4000000 in
 /-- The `%u` arm at `0x8000062c#64`: the next vararg to `printint`. -/
-theorem printk_arm_u (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_u (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -699,7 +699,7 @@ theorem printk_arm_u (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [
 
 set_option maxHeartbeats 4000000 in
 /-- The `%lu` arm at `0x80000646#64`: the next vararg to `printint`. -/
-theorem printk_arm_lu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_lu (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -783,7 +783,7 @@ theorem printk_arm_lu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} 
 
 set_option maxHeartbeats 4000000 in
 /-- The `%llu` arm at `0x80000662#64`: the next vararg to `printint`. -/
-theorem printk_arm_llu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_llu (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -867,7 +867,7 @@ theorem printk_arm_llu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 set_option maxHeartbeats 4000000 in
 /-- The `%x` arm at `0x8000067e#64`: the next vararg to `printint`. -/
-theorem printk_arm_x (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_x (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -948,7 +948,7 @@ theorem printk_arm_x (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [
 
 set_option maxHeartbeats 4000000 in
 /-- The `%lx` arm at `0x80000698#64`: the next vararg to `printint`. -/
-theorem printk_arm_lx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_lx (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -1029,7 +1029,7 @@ theorem printk_arm_lx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} 
 
 set_option maxHeartbeats 4000000 in
 /-- The `%llx` arm at `0x800006b2#64`: the next vararg to `printint`. -/
-theorem printk_arm_llx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_llx (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -1113,7 +1113,7 @@ theorem printk_arm_llx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 set_option maxHeartbeats 4000000 in
 /-- The `%c` arm at `0x80000714`: the next vararg to `prputc`. -/
-theorem printk_arm_c (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_c (PP : PRPUTC) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -1187,7 +1187,7 @@ theorem printk_arm_c (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [Ma
 
 set_option maxHeartbeats 4000000 in
 /-- The `%%` arm at `0x80000760`: `prputc('%')`. -/
-theorem printk_arm_pct (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_pct (PP : PRPUTC) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -1240,7 +1240,7 @@ theorem printk_arm_pct (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [
 
 set_option maxHeartbeats 4000000 in
 /-- The default arm at `0x80000814`: `prputc('%'); prputc(c)`. -/
-theorem printk_arm_default (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_default (PP : PRPUTC) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -1312,7 +1312,7 @@ theorem printk_arm_default (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0
 
 set_option maxHeartbeats 4000000 in
 /-- A plain character at `0x800005a0`: `prputc(c)`, then back at `0x56e` with `s1 = i`. -/
-theorem printk_arm_plain (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_plain (PP : PRPUTC) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -1370,7 +1370,7 @@ set_option maxHeartbeats 4000000 in
 /-- The `%s` character loop at `0x80000744`: `s4 = v + j`, `a0 = s[j]`
 (non-NUL), `n` more characters after `j`; ends at `(KernelSyms.«printk» + 0x6c)`.  The string
 is a `cstr`, which carries `nonul s` itself. -/
-theorem printk_str_loop (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_str_loop (PP : PRPUTC) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (v : BitVec 64) (dq : DFrac) (s : List (BitVec 8))
@@ -1489,7 +1489,7 @@ theorem printk_str_loop (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} 
 
 set_option maxHeartbeats 4000000 in
 /-- One turn of the `%p` digit loop at `0x800006fa`, count `n + 1`. -/
-theorem printk_hex_iter (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_hex_iter (PP : PRPUTC) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (n : Nat) (R : RegMap) (bs : List (BitVec 8))
@@ -1577,7 +1577,7 @@ theorem printk_hex_iter (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} 
 
 set_option maxHeartbeats 4000000 in
 /-- The `%p` digit loop: from count `m + 1` down to the exit at `0x80000710`. -/
-theorem printk_hex_loop (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_hex_loop (PP : PRPUTC) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (huart : "uart1" ∉ k.locks) (m : Nat) :
@@ -1618,7 +1618,7 @@ theorem printk_hex_loop (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} 
 
 set_option maxHeartbeats 4000000 in
 /-- The dispatch chain from `0x800007f4`: `%p`, `%c`, `%s`, `%%`, the end-of-string exit, the default. -/
-theorem printk_dispatch_7d0 {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem printk_dispatch_7d0 {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (c0 c1 c2 : BitVec 8) (R : RegMap) (hR : pkRegs k.regs R) (h21 : R 21#5 = BitVec.setWidth 64 c0)
     (hu : c0 ≠ chU) (hlu : ¬(c1 = chU ∧ c0 = chL)) (hllu : ¬(c2 = chU ∧ (c1 = chL ∧ c0 = chL)))
@@ -1711,7 +1711,7 @@ theorem printk_dispatch_7d0 {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
 
 set_option maxHeartbeats 4000000 in
 /-- The dispatch chain from `0x800007ea`: `%llx`, then `0x7d0`. -/
-theorem printk_dispatch_7c6 {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem printk_dispatch_7c6 {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (c0 c1 c2 : BitVec 8) (R : RegMap) (hR : pkRegs k.regs R) (h21 : R 21#5 = BitVec.setWidth 64 c0)
     (h13 : R 13#5 = BitVec.setWidth 64 c2) (h15 : R 15#5 = if c1 = chL ∧ c0 = chL then 1#64 else 0#64)
@@ -1763,7 +1763,7 @@ theorem printk_dispatch_7c6 {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
 
 set_option maxHeartbeats 4000000 in
 /-- The dispatch chain from `0x800007dc`: `%x`, `%lx`, then `0x7c6`. -/
-theorem printk_dispatch_7b8 {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem printk_dispatch_7b8 {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (c0 c1 c2 : BitVec 8) (R : RegMap) (hR : pkRegs k.regs R) (h21 : R 21#5 = BitVec.setWidth 64 c0)
     (h12 : R 12#5 = BitVec.setWidth 64 c1) (h13 : R 13#5 = BitVec.setWidth 64 c2)
@@ -1829,7 +1829,7 @@ theorem printk_dispatch_7b8 {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
 
 set_option maxHeartbeats 4000000 in
 /-- The dispatch chain from `0x800007d2`: `%llu`, then `0x7b8`. -/
-theorem printk_dispatch_7ae {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem printk_dispatch_7ae {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (c0 c1 c2 : BitVec 8) (R : RegMap) (hR : pkRegs k.regs R) (h21 : R 21#5 = BitVec.setWidth 64 c0)
     (h12 : R 12#5 = BitVec.setWidth 64 c1) (h13 : R 13#5 = BitVec.setWidth 64 c2)
@@ -1881,7 +1881,7 @@ theorem printk_dispatch_7ae {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
 
 set_option maxHeartbeats 4000000 in
 /-- The dispatch chain from `0x800007c4`: `%u`, `%lu`, then `0x7ae`. -/
-theorem printk_dispatch_7a0 {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem printk_dispatch_7a0 {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (c0 c1 c2 : BitVec 8) (R : RegMap) (hR : pkRegs k.regs R) (h21 : R 21#5 = BitVec.setWidth 64 c0)
     (h12 : R 12#5 = BitVec.setWidth 64 c1) (h13 : R 13#5 = BitVec.setWidth 64 c2)
@@ -1948,7 +1948,7 @@ theorem printk_br_720a : KA.«printk» + 0x720a#64 = KA.«digits» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- The `%p` arm at `0x800006ce`: `0x` and sixteen hex digits of the next vararg. -/
-theorem printk_arm_p (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_p (PP : PRPUTC) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -2074,7 +2074,7 @@ theorem printk_br_6ae2 : KA.«printk» + 0x6ae2#64 = KStr.«(null)» := by decid
 
 set_option maxHeartbeats 4000000 in
 /-- The `%s` arm at `0x80000728`: the string the next vararg points to, or `(null)`. -/
-theorem printk_arm_s (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_arm_s (PP : PRPUTC) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -2211,7 +2211,7 @@ theorem printk_arm_s (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors.{0}} [Ma
 
 set_option maxHeartbeats 4000000 in
 /-- After the dispatch: the arm `dispatch7a0` selected (`%d`, `%ld`, `%lld` excluded). -/
-theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -2423,7 +2423,7 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
 
 set_option maxHeartbeats 4000000 in
 /-- The `%` path from `0x80000606`: the third byte, the `l`/`ll` flags, `%lld`, the dispatch. -/
-theorem printk_pct_5e2 (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_pct_5e2 (PP : PRPUTC) (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -2541,7 +2541,7 @@ theorem printk_pct_5e2 (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundled
 
 set_option maxHeartbeats 4000000 in
 /-- A `%` at `0x800005a0`: the next bytes, `%d`, `%ld`, and the paths to the dispatch. -/
-theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -2786,7 +2786,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
 
 set_option maxHeartbeats 4000000 in
 /-- One turn of the walk at `0x800005a0` (`a0 = f[i] ≠ 0`, `s4 = i`). -/
-theorem printk_turn (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem printk_turn (PP : PRPUTC) (PI : PRINTINT) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hsie : k.sie = false) (hK : 52 ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -2815,7 +2815,7 @@ theorem printk_turn (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFu
 set_option maxHeartbeats 4000000 in
 /-- The walk from `0x80000592` (`s1 = p`, the last consumed index): the
 rest of the string, then the exit. -/
-theorem printk_loop (PP : PRPUTC) (PI : PRINTINT) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+theorem printk_loop (PP : PRPUTC) (PI : PRINTINT) (RE : RELEASE) {GF : BundledGFunctors.{0}} [MachGS GF]
     [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs0 : List (BitVec 8)) (dqf : DFrac)
     (f : List (BitVec 8)) (descs : List PkArgDesc)
@@ -2895,7 +2895,7 @@ set_option maxHeartbeats 4000000 in
 /-- **`printk` meets its specification**, given `acquire`, `release`,
 `prputc` and `printint`. -/
 theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (PP : PRPUTC) (PI : PRINTINT) : PRINTK :=
-  ⟨fun {hlc GF} _ _ _ cpu k γpr γl γd bs dqf f descs hK hflen hkinds hdlen hnoff hpr huart => by
+  ⟨fun {GF} _ _ _ cpu k γpr γl γd bs dqf f descs hK hflen hkinds hdlen hnoff hpr huart => by
   unfold wp_printk_body
   simp only [printkAddr]
   iintro ⟨Hk, Hpc, Hstr, Hdescs, #Hlk, #Htx, Hsent, Hnext⟩
@@ -2954,7 +2954,7 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (PP : PRPUTC) (PI : PRINTINT)
         locked γpr cpu' -∗ emp -∗ (∃ K : Nat, viewLb cpu' K) -∗ sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) c16 := by
     intro k' hnoff' hK' hs'
-    have h := AC.wp_acquire (hlc := hlc) (GF := GF) c16 k' γpr "pr" (fun _ => emp) hnoff' hK' hs'
+    have h := AC.wp_acquire (GF := GF) c16 k' γpr "pr" (fun _ => emp) hnoff' hK' hs'
     unfold wp_acquire_body at h
     simp only [acquireAddr] at h
     exact h

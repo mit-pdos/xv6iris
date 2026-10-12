@@ -34,10 +34,11 @@ open Std (ExtTreeSet)
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+omit [MachGS GF] in
 /-- A cell's address is a machine word. -/
 theorem ushG_cell_bnd (N : UkNames GF) (p : Nat) (v : BitVec 64) :
     ushCell N p v ⊢ ⌜p < 2 ^ 64⌝ ∗ ushCell N p v := by
@@ -61,13 +62,13 @@ theorem wp_shGettoken_ushs (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (h
     (k : Nat) (hkd : k = off + ushpSkipws (len - off) off f) :
     ⊢ ushCode N.t -∗ uword N.d ps w0 -∗ ushCell N qp wq -∗ ushCell N eqp weq -∗
       ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«gettoken») (8 + (2 + n)) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«gettoken») (8 + (2 + n)) -∗
       (uword N.d ps (BitVec.ofNat 64 (s0 + ushsGettokFin len f k)) -∗ ushCell N qp (BitVec.ofNat 64 (s0 + k)) -∗
         ushCell N eqp (BitVec.ofNat 64 (s0 + ushsGettokEnd len f k)) -∗
         ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
         ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
         ⌜m'.get 10#5 = BitVec.ofInt 64 (ushsGettokRes len f k)⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (8 + (2 + n)) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (8 + (2 + n)) -∗ wpLoop h') -∗
       wpLoop h := by
   rw [show User.Sh.Sym.«gettoken» = 0x2ec from rfl]
   iintro #Hc Hps Hq Heq Hs Hws Hsy Hrun Hk
@@ -173,7 +174,7 @@ theorem wp_shGettoken_ushs (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (h
     rw [ukWr_get_other _ _ _ _ (by decide), ushWrs_get_nmem _ _ _ _ (by simp [rs]), ukWr_get_same _ _ _ (by decide)]
 
 /-- **Rocq `wp_ref_gettoken`**: the contract, at the reference's answer. -/
-theorem wp_shGettoken (UL : UK_LEAVES) (SC : SH_STRCHR) : wpShGettokenBody (hlc := hlc) (GF := GF) := by
+theorem wp_shGettoken (UL : UK_LEAVES) (SC : SH_STRCHR) : wpShGettokenBody (GF := GF) := by
   intro N h m dq dw dv ps qp eqp s0 len off f w0 wq weq n ret q e fin ha0 ha1 ha2 ha3 hoff hw0 hscope hs64
     hps0 hps8 hpsb hgt
   iintro #Hc Hps Hq Heq Hs Hws Hsy Hrun Hk
@@ -186,7 +187,7 @@ theorem wp_shGettoken (UL : UK_LEAVES) (SC : SH_STRCHR) : wpShGettokenBody (hlc 
 
 /-- **sh's `gettoken` holds** (at the engine `UL` and strchr `SC`). -/
 theorem shGettoken_holds (UL : UK_LEAVES) (SC : SH_STRCHR) : SH_GETTOKEN :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shGettoken UL SC⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _} => wp_shGettoken UL SC⟩
 
 end
 

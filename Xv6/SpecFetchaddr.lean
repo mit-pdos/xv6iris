@@ -93,7 +93,7 @@ def fetchaddrAns (M' : Nat → List (BitVec 8)) (addr sz oldv r w : BitVec 64) :
 
 /-- **WP of `fetchaddr(addr a0, ip a1)`**, at either `SIE`, for the process
 `procAddr j` this thread runs. -/
-def wp_fetchaddr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_fetchaddr_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8)) (oldv : BitVec 64)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
@@ -113,10 +113,10 @@ def wp_fetchaddr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
 
 /-- The interface of `fetchaddr`. -/
 structure FETCHADDR : Prop where
-  wp_fetchaddr : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  wp_fetchaddr : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8)) (oldv : BitVec 64)
     hj hproc hnoff hK hlk,
-    wp_fetchaddr_body (hlc := hlc) (GF := GF) cpu k γl γk j pid V P M oldv hj hproc hnoff hK hlk
+    wp_fetchaddr_body (GF := GF) cpu k γl γk j pid V P M oldv hj hproc hnoff hK hlk
 
 end Xv6

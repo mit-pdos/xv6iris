@@ -135,7 +135,7 @@ def sysOpenAllocDev (Cf : FContent) (dn : Dinode) : FContent :=
   { Cf with type := FD_DEVICE, major := dn.diMajor }
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -149,7 +149,7 @@ theorem sys_open_alloc_filealloc (FA : FILEALLOC) (Γ : SchedNames) (cpu : CPU) 
     (se : Bool) (hs : k'.sie = se) (pj : BitVec 64) (hpj : k'.proc = pj) (A : SysOpenArgs GF)
     (hK : 14 ≤ k'.avail) (hnoff : k'.noff = 0) :
     kctx cpu k' ∗ pcIs cpu KA.«filealloc» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv (hlc := hlc) Γ A ∗ fdSlot ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv Γ A ∗ fdSlot ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
@@ -160,7 +160,7 @@ theorem sys_open_alloc_filealloc (FA : FILEALLOC) (Γ : SchedNames) (cpu : CPU) 
   icases Xv6.sysfile_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
   unfold sysOpenEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy, #Hft⟩
-  have h := FA.wp_filealloc (hlc := hlc) (GF := GF) cpu k' A.γl A.γ (by rw [hnoff]; omega) hK
+  have h := FA.wp_filealloc (GF := GF) cpu k' A.γl A.γ (by rw [hnoff]; omega) hK
     (by rw [hlocks]; simp)
   unfold wp_filealloc_body at h
   simp only [fileallocAddr] at h
@@ -191,7 +191,7 @@ theorem sys_open_alloc_fdalloc (FD : FDALLOC) (cpu : CPU) (k' : KCtx) (se : Bool
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, Hofs, HK⟩
-  have h := FD.wp_fdalloc (hlc := hlc) (GF := GF) cpu k' A.γ A.V.fdg kf fs D ha0 hkf
+  have h := FD.wp_fdalloc (GF := GF) cpu k' A.γ A.V.fdg kf fs D ha0 hkf
     (by rw [hnoff]; omega) hK
   unfold wp_fdalloc_body at h
   simp only [fdallocAddr] at h
@@ -232,9 +232,9 @@ theorem sys_open_alloc_fail_ret_f (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (n
           procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid ((sysOpenV2 A P2).updEv k2)
             (sysOpenM2 A P2)) ∗
       irefSlots (nsj - 1) ∗ fdFrags A.V.fdg A.sts ∗
-      sysOpenResidue (hlc := hlc) A pl inum dn bm data ∗
-      (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') ⊢
-    sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
+      sysOpenResidue A pl inum dn bm data ∗
+      (∀ c' : CPU, sysOpenPostP k A c') ⊢
+    sysOpenRet k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
       bslots 3 ∗ irefSlots 2 ∗ fdSlot ∗ ∃ k1 : Nat, ⌜A.V.ev ≤ k1⌝ ∗ actLend (procAddr A.j) k1)) := by
   iintro ⟨Hpback, Hisl, Hfrags, Hres, Hpost⟩
   unfold sysOpenRet
@@ -249,7 +249,7 @@ theorem sys_open_alloc_fail_ret_f (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (n
   ispecialize Hpost $$ %c'
   unfold sysOpenPostP sysOpenK
   iapply Hpost $$ %spie' %spp' %R' %P2 %k2 %hcs %hP2 %hk2 Hk Hpc Hte Hce Hbs Hisl
-  iapply (sys_open_arm_fail (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
+  iapply (sys_open_arm_fail A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts ((sysOpenV2 A P2).updEv k2)
       (sysOpenM2 A P2) (R' 10#5) pl inum.toNat (eraNode dn bm data) hpl hr)
     $$ Hpriv Hfrags Hfds HP Hobs Htc
@@ -262,8 +262,8 @@ opened (`sys_open_open_slot`, AFTER fdalloc), `ip->type` read, and the
 content stored per arm -- FD_DEVICE with the major (+0x140), or FD_INODE
 with `f->off = 0` over the free word and the offset shadow minted (+0x7e);
 then the store block at +0x88 (`⊢ sysOpenStoresBody`). -/
-theorem sys_open_alloc_types (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
-    (A : SysOpenArgs GF) (hS : SysOpenStatic k A) (hSt : ⊢ sysOpenStoresBody (hlc := hlc) Γ k A)
+theorem sys_open_alloc_types (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
+    (A : SysOpenArgs GF) (hS : SysOpenStatic k A) (hSt : ⊢ sysOpenStoresBody Γ k A)
     (cpu : CPU) (spie spp : Bool) (R : RegMap) (w6 : BitVec 64) (lo : BitVec 32) (w24 : BitVec 64)
     (γil γisl : GName) (loc tlc kk : Nat) (s : Qp) (g : GName) (inum : BitVec 32) (dn : Dinode)
     (bm : Blkmap) (data : Nat → List (BitVec 8)) (kf fd : Nat) (l : List Nat) (P2 : UPtd)
@@ -278,7 +278,7 @@ theorem sys_open_alloc_types (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k :
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0) :
     ⊢ kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) -∗
       pcIs cpu (KA.«sys_open» + 0x74#64) -∗
-      trapCsrsExt cpu k.sie -∗ cpuClaimExt cpu k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+      trapCsrsExt cpu k.sie -∗ cpuClaimExt cpu k.sie k.proc -∗ sysOpenEnv Γ A -∗
       sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         w6 lo (sysOpenOm A) w24 -∗
       sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
@@ -289,8 +289,8 @@ theorem sys_open_alloc_types (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k :
       procOfilesOwe A.γ A.V.fdg (procAddr A.j) ((sysOpenV2 A P2).ofile.set fd (fnode kf)) [fd] -∗
       logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗
       fdFrags A.V.fdg A.sts -∗ fdStAuth A.V.fdg fd .closed -∗
-      sysOpenResidue (hlc := hlc) A pl inum dn bm data -∗
-      (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+      sysOpenResidue A pl inum dn bm data -∗
+      (∀ c' : CPU, sysOpenPostP k A c') -∗
       wpLoop (GF := GF) cpu := by
   unfold sysOpenStoresBody at hSt
   simp only [sysOpenAddr] at hSt
@@ -423,9 +423,9 @@ set_option maxHeartbeats 32000000 in
 `fdalloc(f)` over the descriptor array (the block split at it), ARM F-FAIL
 on -1 (`⊢ sysOpenTailFBody`, with fileclose's iref loan taken off the
 allowance, deviation 4), else the type decision at +0x74. -/
-theorem sys_open_alloc_fd (FD : FDALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
-    (A : SysOpenArgs GF) (hS : SysOpenStatic k A) (hSt : ⊢ sysOpenStoresBody (hlc := hlc) Γ k A)
-    (hTF : ⊢ sysOpenTailFBody (hlc := hlc) Γ k A)
+theorem sys_open_alloc_fd (FD : FDALLOC) (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
+    (A : SysOpenArgs GF) (hS : SysOpenStatic k A) (hSt : ⊢ sysOpenStoresBody Γ k A)
+    (hTF : ⊢ sysOpenTailFBody Γ k A)
     (cpu : CPU) (spie spp : Bool) (R : RegMap) (w5 w6 : BitVec 64) (lo : BitVec 32)
     (w24 : BitVec 64) (γil γisl : GName) (loc tlc kk : Nat) (s : Qp) (g : GName)
     (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)) (kf : Nat)
@@ -438,7 +438,7 @@ theorem sys_open_alloc_fd (FD : FDALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0) :
     ⊢ kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) -∗
       pcIs cpu (KA.«sys_open» + 0x68#64) -∗
-      trapCsrsExt cpu k.sie -∗ cpuClaimExt cpu k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+      trapCsrsExt cpu k.sie -∗ cpuClaimExt cpu k.sie k.proc -∗ sysOpenEnv Γ A -∗
       sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) w5 w6 lo
         (sysOpenOm A) w24 -∗
       sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
@@ -447,8 +447,8 @@ theorem sys_open_alloc_fd (FD : FDALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc)
       fileRef A.γ kf 1 .closed -∗
       procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
       logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdFrags A.V.fdg A.sts -∗
-      sysOpenResidue (hlc := hlc) A pl inum dn bm data -∗
-      (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+      sysOpenResidue A pl inum dn bm data -∗
+      (∀ c' : CPU, sysOpenPostP k A c') -∗
       wpLoop (GF := GF) cpu := by
   unfold sysOpenTailFBody at hTF
   simp only [sysOpenAddr] at hTF
@@ -544,11 +544,11 @@ set_option maxHeartbeats 32000000 in
 /-- **+0x5e .. +0x84 AND THE +0x140 FD_DEVICE BLOCK** (Rocq `so_alloc_au`):
 s2 saved, `filealloc()` (ARM E-FAIL at +0x12e on 0, `⊢ sysOpenTailEBody`),
 then fdalloc and the type decision (`sys_open_alloc_fd`). -/
-theorem sys_open_alloc (FA : FILEALLOC) (FD : FDALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_open_alloc (FA : FILEALLOC) (FD : FDALLOC) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
-    (hSt : ⊢ sysOpenStoresBody (hlc := hlc) Γ k A) (hTE : ⊢ sysOpenTailEBody (hlc := hlc) Γ k A)
-    (hTF : ⊢ sysOpenTailFBody (hlc := hlc) Γ k A) :
-    ⊢ sysOpenAllocBody (hlc := hlc) Γ k A := by
+    (hSt : ⊢ sysOpenStoresBody Γ k A) (hTE : ⊢ sysOpenTailEBody Γ k A)
+    (hTF : ⊢ sysOpenTailFBody Γ k A) :
+    ⊢ sysOpenAllocBody Γ k A := by
   unfold sysOpenTailEBody at hTE
   unfold sysOpenAllocBody
   simp only [sysOpenAddr] at hTE ⊢

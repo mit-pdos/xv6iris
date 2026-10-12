@@ -68,7 +68,7 @@ theorem pp_ret_1a32 : jumpPc (KA.«proc_pagetable» + 0x80#64) = (KA.«proc_page
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The callees, at their entry addresses -/
 
@@ -85,7 +85,7 @@ theorem pp_uvmcreate_call [WchG GF] (UC : UVMCREATE) [CurCtx] (c : CPU) (k' : KC
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       uvmcreatePost γk on k'.proc (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := UC.wp_uvmcreate (hlc := hlc) (GF := GF) c k' γl γk on ke hnoff hK hlk
+  have h := UC.wp_uvmcreate (GF := GF) c k' γl γk on ke hnoff hK hlk
   unfold wp_uvmcreate_body at h
   simp only [uvmcreateAddr] at h
   exact h
@@ -121,7 +121,7 @@ theorem pp_mappages_call [WchG GF] (MP : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : 
             availZero (availSub on fresh.length)))⌝ -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_mappages_any (hlc := hlc) (GF := GF) c k' γl γk on t n perm ke hnoff hK hlk hroot
+  have h := MP.wp_mappages_any (GF := GF) c k' γl γk on t n perm ke hnoff hK hlk hroot
     hargs hperm hmask hrwx hwf hnd hpg
   unfold wp_mappages_any_body at h
   simp only [mappagesAddr] at h
@@ -142,7 +142,7 @@ theorem pp_uvmunmap_call [WchG GF] (UM : UVMUNMAP) [CurCtx] (c : CPU) (k' : KCtx
       ptOwnRep root (delRunL L (vpnOf (k'.regs 11#5)).toNat n) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := UM.wp_uvmunmap_raw (hlc := hlc) (GF := GF) c k' root L n ke hK hroot hal hn hrange hfree
+  have h := UM.wp_uvmunmap_raw (GF := GF) c k' root L n ke hK hroot hal hn hrange hfree
   unfold wp_uvmunmap_raw_body at h
   simp only [uvmunmapAddr] at h
   exact h
@@ -162,7 +162,7 @@ theorem pp_uvmfree_call [WchG GF] (UF : UVMFREE) [CurCtx] (c : CPU) (k' : KCtx)
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := UF.wp_uvmfree (hlc := hlc) (GF := GF) c k' γl γk P M ke hnoff hK hlk hroot hsz hwf hbelow
+  have h := UF.wp_uvmfree (GF := GF) c k' γl γk P M ke hnoff hK hlk hroot hsz hwf hbelow
   unfold wp_uvmfree_body at h
   simp only [uvmfreeAddr] at h
   exact h

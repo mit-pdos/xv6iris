@@ -43,14 +43,14 @@ theorem fwr_addiw0 (c : Nat) (hc : c < 2 ^ 31) :
   rw [show BitVec.signExtend 64 0#12 = 0#64 by decide, BitVec.add_zero, fw_w32 c hc, MachCSL.signExtend_ofNat32 c hc]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x8a .. +0x94`: `sext.w`, begin_op, `f->ip`, ilock.** -/
-theorem fwr_seg_open (BO : BEGIN_OP) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem fwr_seg_open (BO : BEGIN_OP) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk j ik : Nat) (n : Int) (q : Qp)
     (ipv : BitVec 64) (s : Qp) (g : GName) (lo tl : Nat) (ty : BitVec 16) (inum : BitVec 32)
     (γil γisl : GName) (pid : BitVec 32) (Tl : Nat) (v9 v20 v23 v24 v25 : BitVec 64) (c : Nat)
@@ -61,7 +61,7 @@ theorem fwr_seg_open (BO : BEGIN_OP) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hl
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗
     pcIs cpu (KA.«filewrite» + 0x8a#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+    procsInv Γ ∗ panicEnv ∗ fsReady ∗
     wordPointsTo (pPid k.proc) 4 pidPriv pid ∗
     wordPointsTo (fnode fk + 24#64) 8 (DFrac.own q) ipv ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
@@ -153,7 +153,7 @@ set_option maxHeartbeats 24000000 in
 /-- **`+0x98 .. +0xb8`: the arguments, writei, the offset's update** (Rocq's
 `+0x90 .. +0xa6` block and `fw_offupd`): the cell comes out at `off + tot`
 on every outcome (writei's `-1` has `tot = 0`). -/
-theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk j ik : Nat) (n : Int) (q : Qp)
     (ipv : BitVec 64) (γkl : GName) (γk : KmemNames) (inum : BitVec 32) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (dn : Dinode) (v : BitVec 32) (V : ProcPriv) (P : UPtd)
@@ -166,7 +166,7 @@ theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗
     pcIs cpu (KA.«filewrite» + 0x98#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+    procsInv Γ ∗ panicEnv ∗ fsReady ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     wordPointsTo (fnode fk + 24#64) 8 (DFrac.own q) ipv ∗
     wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) v ∗
@@ -313,7 +313,7 @@ set_option maxHeartbeats 16000000 in
 the share comes home generation-named, the transaction token whole again
 (`logOpS_op`), and end_op retires whatever the chunk left of its
 reservation. -/
-theorem fwr_seg_close (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem fwr_seg_close (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk j ik : Nat) (n : Int) (q : Qp)
     (ipv : BitVec 64) (s : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode)
     (bm : Blkmap) (γil γisl : GName) (pid : BitVec 32) (u : Nat) (Sb : List Nat)
@@ -325,7 +325,7 @@ theorem fwr_seg_close (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗
     pcIs cpu (KA.«filewrite» + 0xbc#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+    procsInv Γ ∗ panicEnv ∗ fsReady ∗
     wordPointsTo (fnode fk + 24#64) 8 (DFrac.own q) ipv ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ fwrLk ik s g lo inum γisl pid ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗

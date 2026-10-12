@@ -172,7 +172,7 @@ def gprIdxs : List (BitVec 5) :=
 theorem gprIdxs_get (k : Nat) (hk : k < 31) : gprIdxs[k]? = some (BitVec.ofNat 5 (k + 1)) := by
   revert k; decide
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The whole register file of hart `cpu`, holding `m`. -/
 def gprFile (cpu : CPU) (m : RegMap) : IProp GF := iprop%
@@ -793,12 +793,14 @@ proved for every hart discharges it at any index. -/
 def wpNext (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) : IProp GF := iprop%
   ∀ cpu' : CPU, ⌜sie = false ∨ p = 0#64 → cpu' = cpu⌝ → K cpu'
 
+omit [MachGS GF] in
 theorem wpNext_intro (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
     (∀ cpu', K cpu') ⊢ wpNext sie p cpu K := by
   unfold wpNext
   iintro H %cpu' %_
   iapply H
 
+omit [MachGS GF] in
 /-- With interrupts off, it suffices to continue at this hart. -/
 theorem wpNext_off_intro (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
     K cpu ⊢ wpNext false p cpu K := by
@@ -808,6 +810,7 @@ theorem wpNext_off_intro (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
   subst this
   iexact H
 
+omit [MachGS GF] in
 /-- With interrupts off, the continuation is at this hart. -/
 theorem wpNext_off (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
     wpNext false p cpu K ⊢ K cpu := by
@@ -815,6 +818,7 @@ theorem wpNext_off (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
   iintro H
   iapply H $$ %cpu %(fun _ => rfl)
 
+omit [MachGS GF] in
 /-- The continuation at a hart the pinning condition allows. -/
 theorem wpNext_at (sie : Bool) (p : BitVec 64) (cpu cpu' : CPU) (K : CPU → IProp GF)
     (h : sie = false ∨ p = 0#64 → cpu' = cpu) : wpNext sie p cpu K ⊢ K cpu' := by
@@ -822,11 +826,13 @@ theorem wpNext_at (sie : Bool) (p : BitVec 64) (cpu cpu' : CPU) (K : CPU → IPr
   iintro H
   iapply H $$ %cpu' %h
 
+omit [MachGS GF] in
 /-- The continuation at this hart, whatever the index. -/
 theorem wpNext_self (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
     wpNext sie p cpu K ⊢ K cpu :=
   wpNext_at sie p cpu cpu K (fun _ => rfl)
 
+omit [MachGS GF] in
 /-- `wpNext` is monotone in its continuation. -/
 theorem wpNext_mono (sie : Bool) (p : BitVec 64) (cpu : CPU) (K K' : CPU → IProp GF) :
     wpNext sie p cpu K ⊢ (∀ cpu', K cpu' -∗ K' cpu') -∗ wpNext sie p cpu K' := by

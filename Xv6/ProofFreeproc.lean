@@ -53,7 +53,7 @@ The `pid` word is shared three ways (`pidPriv` 1/2, `pidPub` 1/4,
 `pidLockQ` 1/4); the store needs the three back together. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- Two fractions of a byte cell join (and their values agree). -/
 theorem fp_ctxByte_join (ξ : CtxId) (a : PAddr) (q1 q2 : Qp) (v1 v2 : BitVec 8) :
@@ -277,14 +277,16 @@ theorem pidsOk_clear (pids : Nat → BitVec 32) (j : Nat) (h : pidsOk pids) :
     exact h j1 j2 h1 h2 hne heq
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
+omit [MachGS GF] in
 /-- `pidReg_lookup`, keeping both sides. -/
 theorem fp_pidReg_lookup_keep (R : IntMapF GName) (pid : BitVec 32) (dq : DFrac) (g : GName) :
     pidRegAuth (GF := GF) R ∗ pidReg pid dq g ⊢
       (pidRegAuth R ∗ pidReg pid dq g) ∗ ⌜get? R (pid.toNat : Int) = some g⌝ :=
   persistent_entails_left (pidReg_lookup R pid dq g)
 
+omit [MachGS GF] in
 /-- **The registration dies** (Rocq `ProofFreeproc.v`, the `p->pid = 0`
 critical section): with `pid_lock`'s authority in hand, the 3/4 share of
 the registration looks the key up (so `pid ≠ 0`, `pidRegDom`), `p->lock`'s
@@ -394,7 +396,7 @@ end
 /-! ## The block freeproc only carries -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- The private cells `freeproc` never writes (the name buffer is written
 once, in its last stretch, so it rides here as a parameter). -/
@@ -423,7 +425,7 @@ def fpPub [CurCtx] (pa : BitVec 64) (st : BitVec 32) (ch : BitVec 64) (kl xs : B
 registration (`freeprocGen`'s `pidRegRest`) and the slot generation, whole
 (which goes back into the UNUSED block). -/
 def fpGhost (pa : BitVec 64) (pidb kl pid : BitVec 32) (g : GName) : IProp GF := iprop%
-  killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidb kl ∗ pidRegRest pid g ∗
+  killPaidAt (MachFixedGS.killCred (GF := GF)) pidb kl ∗ pidRegRest pid g ∗
   slotGen pa (.own 1) g
 
 end
@@ -437,7 +439,7 @@ theorem fp_pnameWf_zero (nm : List (BitVec 8)) (h : nm.length = PNAMELEN) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **The UNUSED block freeproc leaves**: the emptied cells, the kernel
 stack, and the two pure rows its caller brought. -/
@@ -673,7 +675,7 @@ theorem fp_acquire (AC : ACQUIRE) [CurCtx]
       locked γ cpu' -∗ pidLockPay curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γ "nextpid" pidLockPay hnoff' hK' hs'
+  have h := AC.wp_acquire (GF := GF) c k' γ "nextpid" pidLockPay hnoff' hK' hs'
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   exact h
@@ -691,7 +693,7 @@ theorem fp_release (RE : RELEASE) [CurCtx]
         (k'.locks.filter (fun x => x ≠ "nextpid"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γ "nextpid" pidLockPay hsie' hnoff' hK'
+  have h := RE.wp_release (GF := GF) c k' γ "nextpid" pidLockPay hsie' hnoff' hK'
     reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -718,7 +720,7 @@ theorem fp_filter_nextpid (l : List String) (h : "nextpid" ∉ l) :
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The address of a field, folded back after a store -/
 
@@ -798,7 +800,7 @@ theorem fp_pid (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
   -- the payload's quarter of p->pid, joined with the other two
   unfold fpGhost
   icases Hgh with ⟨Hkp, Hrr, Hsg⟩
-  icases fp_pidRes_acc j hj (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl g k.proc $$ HR
+  icases fp_pidRes_acc j hj (MachFixedGS.killCred (GF := GF)) pid kl g k.proc $$ HR
     with ⟨%pidq, Hq, Hqclose⟩
   icases fp_pid_join (pPid (procAddr j)) pid pidb pidq $$ [Hpriv Hpub4 Hq] with ⟨%hag, Hcell⟩
   · iframe
@@ -872,6 +874,7 @@ theorem fp_kfree (KF : KFREE) [CurCtx]
     ⊢ wpLoop (GF := GF) c :=
   uc_kfree_lend_call KF c k' γl γk on ke hnoff' hK' hlk' hp'
 
+omit [MachGS GF] in
 /-- `availInc none = none`, at the resource level. -/
 theorem fp_avail_reduce [CurCtx] (γk : KmemNames) :
     kallocAvail (GF := GF) γk (availInc none) ⊢ kallocAvail γk none := by
@@ -892,7 +895,7 @@ theorem fp_freepagetable (PFP : PROC_FREEPAGETABLE) [CurCtx]
       (∃ k2 : Nat, ⌜ke ≤ k2⌝ ∗ actLend k'.proc k2) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := PFP.wp_proc_freepagetable (hlc := hlc) (GF := GF) c k' γl γk P M ke hnoff' hK' hlk' hroot' hsz' hbelow'
+  have h := PFP.wp_proc_freepagetable (GF := GF) c k' γl γk P M ke hnoff' hK' hlk' hroot' hsz' hbelow'
   unfold wp_proc_freepagetable_body at h
   simp only [procFreepagetableAddr] at h
   exact h
@@ -1097,11 +1100,11 @@ set_option maxHeartbeats 4000000 in
 theorem freeproc_br_ffffffffffffef88 : KA.«freeproc» + 0xffffffffffffef88#64 = KA.«kfree» := by decide
 
 theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE : RELEASE)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : GName) (ke : Nat) hj hp hst hnoff hK hsie hlk hlp htier :
-    wp_freeproc_led_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g ke
+    wp_freeproc_led_body (GF := GF) Γ cpu k γl γp γk j st ch pid V M g ke
       hj hp hst hnoff hK hsie hlk hlp htier := by
     unfold wp_freeproc_led_body
     simp only [freeprocAddr]
@@ -1127,7 +1130,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
         wordPointsTo (pKilled (procAddr j)) 4 (DFrac.own 1) kl ∗
           wordPointsTo (pXstate (procAddr j)) 4 (DFrac.own (Qp.half 1)) xs ∗
             wordPointsTo (pPid (procAddr j)) 4 pidPub pidb ∗
-              killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidb kl
+              killPaidAt (MachFixedGS.killCred (GF := GF)) pidb kl
         from by unfold procPubRest xsHalf; iintro H; iexact H) $$ Hpr
       with ⟨Hkilled, Hxstate, Hpub4, Hkp⟩
     -- THE xstate CELL, JOINED (Rocq, at the top): `p->lock`'s half and the
@@ -1236,7 +1239,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
       iexact HPhi
 
 /-- A landed continuation serves as a led one: the receipt is dropped. -/
-theorem fp_cont_led {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+theorem fp_cont_led {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (ke : Nat) :
     wpNext (GF := GF) k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -1264,8 +1267,8 @@ of record, Rocq `wp_freeproc_led_sconf`), and the landed contract as its
 corollary (the receipt dropped, `fp_cont_led`). -/
 theorem freeproc_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE : RELEASE) :
     FREEPROC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier => by
-    have h := freeproc_led_proof KF PFP AC RE (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g ke
+  ⟨fun {GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier => by
+    have h := freeproc_led_proof KF PFP AC RE (GF := GF) Γ cpu k γl γp γk j st ch pid V M g ke
       hj hp hst hnoff hK hsie hlk hlp htier
     unfold wp_freeproc_led_body at h
     unfold wp_freeproc_body
@@ -1273,8 +1276,8 @@ theorem freeproc_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (R
     ihave Hnext := fp_cont_led Γ cpu k j pid ke $$ Hnext
     iapply h
     iframe Hk Hpc Hlkk Hav Hlkp Hheld Hin Hgen Hlend Hnext,
-   fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier =>
-    freeproc_led_proof KF PFP AC RE (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g ke
+   fun {GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier =>
+    freeproc_led_proof KF PFP AC RE (GF := GF) Γ cpu k γl γp γk j st ch pid V M g ke
       hj hp hst hnoff hK hsie hlk hlp htier⟩
 
 end Xv6

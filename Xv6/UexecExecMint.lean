@@ -43,15 +43,15 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section UexecExecMint
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 /-- the supply at the instance, out of its three credentials -/
 theorem xv6Ssupply_intro :
-    ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) -∗ consLicence (hlc := hlc) (GF := GF) -∗
+    ⊢ appSup (GF := GF) -∗ uKillCred -∗ consLicence (GF := GF) -∗
       □ @UexecSG.ssupply GF _ uexecSGXv6 := by
-  show ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) -∗ consLicence (hlc := hlc) (GF := GF) -∗
-      □ xv6Ssupply (hlc := hlc) (GF := GF)
+  show ⊢ appSup (GF := GF) -∗ uKillCred -∗ consLicence (GF := GF) -∗
+      □ xv6Ssupply (GF := GF)
   unfold xv6Ssupply
   iintro #Hsup #Hkc #Hlic
   imodintro
@@ -60,38 +60,38 @@ theorem xv6Ssupply_intro :
 /-- **Rocq `uslot_mint`**: THE LOOP'S MINT -- the generic slot at every key,
 at the trivial payload, out of the supply (deviations 1, 3). -/
 theorem uslotMint :
-    ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) -∗ consLicence (hlc := hlc) (GF := GF) -∗
-      □ uexecWp (hlc := hlc) (GF := GF) -∗
-      □ (∀ W : Uvis, myPay W.gen (fun _ => iprop(True)) -∗ uslot (hlc := hlc) W) := by
+    ⊢ appSup (GF := GF) -∗ uKillCred -∗ consLicence (GF := GF) -∗
+      □ uexecWp (GF := GF) -∗
+      □ (∀ W : Uvis, myPay W.gen (fun _ => iprop(True)) -∗ uslot W) := by
   iintro #Hsup #Hkc #Hlic #Hgen
-  ihave #Hs := xv6Ssupply_intro (hlc := hlc) (GF := GF) $$ Hsup Hkc Hlic
+  ihave #Hs := xv6Ssupply_intro (GF := GF) $$ Hsup Hkc Hlic
   imodintro
   iintro %W #Hpay
-  iapply (Xv6.uexecWp_uslot_triv (hlc := hlc) W) $$ Hs Hkc Hgen Hpay
+  iapply (Xv6.uexecWp_uslot_triv W) $$ Hs Hkc Hgen Hpay
 
 /-- **Rocq `uslot_mint_all`**: the same with the payload under the box. -/
 theorem uslotMint_all :
-    ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) -∗ consLicence (hlc := hlc) (GF := GF) -∗
-      □ uexecWp (hlc := hlc) (GF := GF) -∗
-      □ (∀ (R : IProp GF) (W : Uvis), myPay W.gen (fun _ => R) -∗ □ (uKillCred (hlc := hlc) -∗ R) -∗
-          uslot (hlc := hlc) W) := by
+    ⊢ appSup (GF := GF) -∗ uKillCred -∗ consLicence (GF := GF) -∗
+      □ uexecWp (GF := GF) -∗
+      □ (∀ (R : IProp GF) (W : Uvis), myPay W.gen (fun _ => R) -∗ □ (uKillCred -∗ R) -∗
+          uslot W) := by
   iintro #Hsup #Hkc #Hlic #Hgen
-  ihave #Hs := xv6Ssupply_intro (hlc := hlc) (GF := GF) $$ Hsup Hkc Hlic
+  ihave #Hs := xv6Ssupply_intro (GF := GF) $$ Hsup Hkc Hlic
   imodintro
   iintro %R %W #Hpay #HR
-  iapply (Xv6.uexecWp_uslot (hlc := hlc) R W) $$ Hs Hkc Hgen Hpay HR
+  iapply (Xv6.uexecWp_uslot R W) $$ Hs Hkc Hgen Hpay HR
 
 /-- **THE GENERIC APPLICATION'S BOOT BUNDLE** (deviation 4; Rocq
 `SystemAdequacy.init_boot_of_triv` over `init_boot_bundle_triv` and
 `uslot_mint`): the first process's exec bundle at the kernel's instance, out
 of the supply and the generic slot. -/
 theorem initBootBundle_of_mint (rt cw : Nat) (secc : BitVec 64) (sts : List FdState) :
-    ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) -∗ consLicence (hlc := hlc) (GF := GF) -∗
-      □ uexecWp (hlc := hlc) (GF := GF) -∗
-      initBootBundle (hlc := hlc) (SG := uexecSGXv6) rt cw secc sts := by
+    ⊢ appSup (GF := GF) -∗ uKillCred -∗ consLicence (GF := GF) -∗
+      □ uexecWp (GF := GF) -∗
+      initBootBundle (SG := uexecSGXv6) rt cw secc sts := by
   iintro #Hsup #Hkc #Hlic #Hgen
-  ihave #Hm := uslotMint (hlc := hlc) (GF := GF) $$ Hsup Hkc Hlic Hgen
-  iapply (initBootBundle_triv (hlc := hlc) (SG := uexecSGXv6) rt cw secc sts) $$ Hm
+  ihave #Hm := uslotMint (GF := GF) $$ Hsup Hkc Hlic Hgen
+  iapply (initBootBundle_triv (SG := uexecSGXv6) rt cw secc sts) $$ Hm
 
 end UexecExecMint
 

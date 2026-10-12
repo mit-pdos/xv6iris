@@ -23,7 +23,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section UkRunBr
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -33,8 +33,8 @@ theorem wp_uk_btype0 (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p
     (imm : BitVec 13) (rs1 : BitVec 5) (op : bop) (avail : Nat)
     (hal : ukBtaken op (m.get rs1) 0#64 = true → (pc + BitVec.signExtend 64 imm).getLsbD 0 = false) :
     ⊢ uinstrIs N.t pc isRvc (.BTYPE (imm, .Regidx 0#5, .Regidx rs1, op)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h' m
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h' m
           (if ukBtaken op (m.get rs1) 0#64 then pc + BitVec.signExtend 64 imm else pc + instrLen isRvc)
           avail -∗ wpLoop h') -∗
       wpLoop h := by
@@ -48,8 +48,8 @@ theorem wp_uk_btype0l (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
     (imm : BitVec 13) (rs2 : BitVec 5) (op : bop) (avail : Nat)
     (hal : ukBtaken op 0#64 (m.get rs2) = true → (pc + BitVec.signExtend 64 imm).getLsbD 0 = false) :
     ⊢ uinstrIs N.t pc isRvc (.BTYPE (imm, .Regidx rs2, .Regidx 0#5, op)) -∗
-      urun (hlc := hlc) N h m pc avail -∗
-      ▷ (∀ h' : CPU, urun (hlc := hlc) N h' m
+      urun N h m pc avail -∗
+      ▷ (∀ h' : CPU, urun N h' m
           (if ukBtaken op 0#64 (m.get rs2) then pc + BitVec.signExtend 64 imm else pc + instrLen isRvc)
           avail -∗ wpLoop h') -∗
       wpLoop h := by

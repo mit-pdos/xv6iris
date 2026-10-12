@@ -31,7 +31,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -54,7 +54,7 @@ def namexAfterIup (k : KCtx) (A : NamexArgs) (R : RegMap) (X : BitVec 64) (ncur 
 
 set_option maxHeartbeats 8000000 in
 /-- **`jal iunlockput` at `X`** (the four sites share it). -/
-theorem namex_call_iup (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namex_call_iup (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (spie spp : Bool) (R : RegMap)
     (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«iunlockput»)
     (hret : jumpPc (X + 4#64) = X + 4#64)
@@ -65,7 +65,7 @@ theorem namex_call_iup (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc
     (ha0 : R 10#5 = ientry ik) :
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu X ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ namexEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ namexEnv Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     namexKeep k A ∗ bslots 3 ∗
     (if crz then nlzObs inum.toNat e0 else emp) ∗ logOpSe icfgLog ncur Scur e0 ∗
@@ -160,14 +160,14 @@ set_option maxHeartbeats 8000000 in
 /-- **`L_notdir` (+0x54)**: `ip->type != T_DIR` -- iunlockput, `s4 := 0`, and
 the walk FALLS into the tail at 0 (the contract's failure arm; this arm runs
 before the nlink guard, so it is uncredited). -/
-theorem namex_notdir (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namex_notdir (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (spie spp : Bool) (R : RegMap)
     (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
     (γil γisl : GName) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat) (wc : Bool)
     (hf : NamexFailFacts k A R ik inum ncur Scur wc) (hle : lo ≤ tl) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x58#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗
+    namexEnv Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpS icfgLog ncur Scur ∗
@@ -211,14 +211,14 @@ set_option maxHeartbeats 8000000 in
 /-- **`L_nlink` (+0x7a)**: the nlink guard fired (upstream 9da28f5):
 instruction-for-instruction `L_notdir`'s arm, plus the `c.j` the copy needs
 because +0x54 falls into the epilogue and +0x7a cannot. -/
-theorem namex_nlink (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namex_nlink (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (spie spp : Bool) (R : RegMap)
     (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
     (γil γisl : GName) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat) (wc : Bool)
     (hf : NamexFailFacts k A R ik inum ncur Scur wc) (hle : lo ≤ tl) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x7e#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗
+    namexEnv Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpS icfgLog ncur Scur ∗
@@ -266,14 +266,14 @@ set_option maxHeartbeats 8000000 in
 /-- **`L_miss` (+0x8c)**: dirlookup found nothing (`s2 = 0`) -- iunlockput
 CREDITED on the inode block (`crz`, the receipt the nlink guard minted),
 `s4 := s2 (= 0)`, and the tail at 0. -/
-theorem namex_miss (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namex_miss (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (spie spp : Bool) (R : RegMap)
     (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
     (γil γisl : GName) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat) (wc : Bool) (e0 : Nat)
     (hf : NamexFailFacts k A R ik inum ncur Scur wc) (hle : lo ≤ tl) (h18 : R 18#5 = 0#64) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x90#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗
+    namexEnv Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ nlzObs inum.toNat e0 ∗ logOpSe icfgLog ncur Scur e0 ∗
@@ -340,7 +340,7 @@ set_option maxHeartbeats 8000000 in
 /-- **`L_par` (+0x84)**: nameiparent stops one level early -- `iunlock`,
 the whole reference re-formed at its generation with its directory type,
 and the tail at `ip` (a SUCCESS arm: it spends nothing). -/
-theorem namex_par (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namex_par (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (spie spp : Bool) (R : RegMap)
     (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
     (γil γisl : GName) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat) (wc : Bool) (e0 : Nat)
@@ -349,7 +349,7 @@ theorem namex_par (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hnp : ∃ es e, nameiparentOf (bview A.plen A.pfun) es e ∧ bname 14 nf = e) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x88#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗
+    namexEnv Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpSe icfgLog ncur Scur e0 ∗
@@ -414,14 +414,14 @@ set_option maxHeartbeats 8000000 in
 /-- **`L_done` (+0x140)**: the path is exhausted.  namei (`a1 = 0`) returns
 the walk's own reference; nameiparent (`a1 ≠ 0`) of an element-less path
 iputs it (uncredited: an inode this walk never locked) and returns 0. -/
-theorem namex_done (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namex_done (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (spie spp : Bool) (R : RegMap)
     (off : Nat) (ipv : BitVec 64) (ncur : Nat) (Scur : List Nat) (nf : Nat → BitVec 8) (wc : Bool)
     (hr : namexRegs k R off ipv) (hA : A.n - walkSpend wc ≤ ncur) (hB : ncur ≤ A.n)
     (hn : iputUnits ≤ ncur) (hW : wc = true → fscBmapstart ∈ Scur) (hSb : ∀ x ∈ A.Sb, x ∈ Scur) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x144#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
+    namexEnv Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
     (∀ c' : CPU, namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK

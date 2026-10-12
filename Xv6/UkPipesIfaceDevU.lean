@@ -36,7 +36,7 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section DevU
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [SG : UexecSG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -44,8 +44,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Ic
 /-- **Rocq `pns_writeU`**: THE WRITE at a write permit `c` owing `drop c L`,
 at a flow parameter the writer brings: the count and the permit moved, or -1
 and the reader's shot, or the taint. -/
-theorem pns_writeU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
-    (N : UkNames GF) (P : Uprog GF) (Hsw : ⊢ stubLaw (hlc := hlc) N P.code 16 P.write)
+theorem pns_writeU (UL : UK_LEAVES) (DK : PipeDevK GF)
+    (N : UkNames GF) (P : Uprog GF) (Hsw : ⊢ stubLaw N P.code 16 P.write)
     (pn : PNames) (gp : PipeNames) (L : List (BitVec 8)) (U : IProp GF) [Timeless U]
     (l : List FdState) (fd : Nat) (rb : Bool) (c : Nat) (bs : List (BitVec 8)) (K : Int → IProp GF)
     (hlt : fd < NSTD) (hl : l[fd]? = some (.open rb true (.pipe gp))) (hpre : bs <+: L.drop c)
@@ -54,8 +54,8 @@ theorem pns_writeU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
       ((ustd N.fd l -∗ wcur pn (c + bs.length) -∗ pwsLb pn (L.take (c + bs.length)) -∗
           K (bs.length : Int)) ∧
        (ustd N.fd l -∗ (∃ c' : Nat, wcur pn c') -∗ roShot pn -∗ K (-1)) ∧
-       (ustd N.fd l -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ ∀ z : Int, K z)) -∗
-      wrObl (hlc := hlc) N P (fd : Int) bs K := by
+       (ustd N.fd l -∗ MachFixedGS.killCred (GF := GF) -∗ ∀ z : Int, K z)) -∗
+      wrObl N P (fd : Int) bs K := by
   iintro #Hinv #HU Hstd Hw #Hlb HK
   have hlen : bs.length ≤ L.length - c := by
     have := hpre.length_le; rw [List.length_drop] at this; exact this
@@ -103,7 +103,7 @@ theorem pns_wpay_haltedU (pn : PNames) (gp : PipeNames)
     (L : List (BitVec 8)) (U : IProp GF) [Timeless U] (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (R : IProp GF) (n : Nat) :
     ⊢ pipeInvU pn gp L U -∗ roShot pn -∗ R -∗
-      pipeWpay (hlc := hlc) gp.pnQueue M ua (pdevQh R) (fun (j : Nat) (_ : PipeSt) => pdevQh R j) n := by
+      pipeWpay gp.pnQueue M ua (pdevQh R) (fun (j : Nat) (_ : PipeSt) => pdevQh R j) n := by
   iintro #Hinv #Hsh HR
   unfold pipeWpay
   ileft
@@ -131,16 +131,16 @@ theorem pns_wpay_haltedU (pn : PNames) (gp : PipeNames)
     exact (Bool.false_ne_true hro).elim
 
 /-- **Rocq `pns_write_haltU`**: THE HALTED WRITE, at a flow parameter. -/
-theorem pns_write_haltU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
-    (N : UkNames GF) (P : Uprog GF) (Hsw : ⊢ stubLaw (hlc := hlc) N P.code 16 P.write)
+theorem pns_write_haltU (UL : UK_LEAVES) (DK : PipeDevK GF)
+    (N : UkNames GF) (P : Uprog GF) (Hsw : ⊢ stubLaw N P.code 16 P.write)
     (pn : PNames) (gp : PipeNames) (L : List (BitVec 8)) (U : IProp GF) [Timeless U]
     (l : List FdState) (fd : Nat) (rb : Bool) (bs : List (BitVec 8)) (R : IProp GF) (K : Int → IProp GF)
     (hlt : fd < NSTD) (hl : l[fd]? = some (.open rb true (.pipe gp))) (hne : bs ≠ [])
     (hbnd : (bs.length : Int) < 2 ^ 31) :
     ⊢ pipeInvU pn gp L U -∗ roShot pn -∗ ustd N.fd l -∗ R -∗
       ((ustd N.fd l -∗ R -∗ K (-1)) ∧
-       (ustd N.fd l -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ ∀ z : Int, K z)) -∗
-      wrObl (hlc := hlc) N P (fd : Int) bs K := by
+       (ustd N.fd l -∗ MachFixedGS.killCred (GF := GF) -∗ ∀ z : Int, K z)) -∗
+      wrObl N P (fd : Int) bs K := by
   iintro #Hinv #Hsh Hstd HR HK
   have hn0 : 0 < bs.length := (by cases bs with | nil => exact absurd rfl hne | cons _ _ => simp)
   iapply pdev_wr_obl UL DK N P Hsw fd l rb gp bs K (pdevQh R)
@@ -181,8 +181,8 @@ theorem pns_write_haltU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
 
 /-- **Rocq `pns_read_atU`**: THE READ AT AN EXACT CURSOR, at a flow
 parameter (`UkPipeDev.pipe_read_at` with `pipe_rpay_of_invU`). -/
-theorem pns_read_atU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
-    (N : UkNames GF) (P : Uprog GF) (Hsr : ⊢ stubLaw (hlc := hlc) N P.code 5 P.read)
+theorem pns_read_atU (UL : UK_LEAVES) (DK : PipeDevK GF)
+    (N : UkNames GF) (P : Uprog GF) (Hsr : ⊢ stubLaw N P.code 5 P.read)
     (pn : PNames) (gp : PipeNames) (L : List (BitVec 8)) (U : IProp GF) [Timeless U] (c : Nat)
     (l : List FdState) (fd : Nat) (wb : Bool) (n : Nat) (K : RdAns → IProp GF)
     (hlt : fd < NSTD) (hl : l[fd]? = some (.open true wb (.pipe gp))) (hn : 0 < n) :
@@ -190,8 +190,8 @@ theorem pns_read_atU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
       ((∀ cb : List (BitVec 8), ⌜cb ≠ [] ∧ chunkOk n (L.drop c) cb (L.drop (c + cb.length))⌝ -∗
           ustd N.fd l -∗ rcur pn (c + cb.length) ={⊤}=∗ K (.RdBytes cb)) ∧
        (ustd N.fd l -∗ rcur pn c -∗ eofShot pn (L.take c) ={⊤}=∗ K (.RdBytes [])) ∧
-       (ustd N.fd l -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ ∀ x : RdAns, K x)) -∗
-      rdObl (hlc := hlc) N P (fd : Int) n K := by
+       (ustd N.fd l -∗ MachFixedGS.killCred (GF := GF) -∗ ∀ x : RdAns, K x)) -∗
+      rdObl N P (fd : Int) n K := by
   iintro #Hinv Hstd Hr HK
   unfold rdObl
   iintro %h %m %avail %a %f %ha0 %ha1 %ha2 Hcode Hbuf Hrun Hcont
@@ -301,15 +301,15 @@ theorem pns_read_atU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
 
 /-- **Rocq `pns_read_eofU`**: THE READ AFTER THE END OF FILE, at a flow
 parameter. -/
-theorem pns_read_eofU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
-    (N : UkNames GF) (P : Uprog GF) (Hsr : ⊢ stubLaw (hlc := hlc) N P.code 5 P.read)
+theorem pns_read_eofU (UL : UK_LEAVES) (DK : PipeDevK GF)
+    (N : UkNames GF) (P : Uprog GF) (Hsr : ⊢ stubLaw N P.code 5 P.read)
     (pn : PNames) (gp : PipeNames) (L : List (BitVec 8)) (U : IProp GF) [Timeless U] (c : Nat)
     (l : List FdState) (fd : Nat) (wb : Bool) (n : Nat) (K : RdAns → IProp GF)
     (hlt : fd < NSTD) (hl : l[fd]? = some (.open true wb (.pipe gp))) (hn : 0 < n) :
     ⊢ pipeInvU pn gp L U -∗ ustd N.fd l -∗ rcur pn c -∗ eofShot pn (L.take c) -∗
       ((ustd N.fd l -∗ rcur pn c -∗ K (.RdBytes [])) ∧
-       (ustd N.fd l -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ ∀ x : RdAns, K x)) -∗
-      rdObl (hlc := hlc) N P (fd : Int) n K := by
+       (ustd N.fd l -∗ MachFixedGS.killCred (GF := GF) -∗ ∀ x : RdAns, K x)) -∗
+      rdObl N P (fd : Int) n K := by
   iintro #Hinv Hstd Hr #Heof HK
   iapply pns_read_atU UL DK N P Hsr pn gp L U c l fd wb n K hlt hl hn $$ Hinv Hstd Hr
   isplit

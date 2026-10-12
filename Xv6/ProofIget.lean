@@ -57,7 +57,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -73,7 +73,7 @@ theorem ig_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx)
       locked fscItlock cpu' -∗ igR curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' fscItlock "itable" igR hnoff' hK' hs'
+  have h := AC.wp_acquire (GF := GF) c k' fscItlock "itable" igR hnoff' hK' hs'
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [haddr] at h
@@ -153,7 +153,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem iget_proof (AC : ACQUIRE) (RH : RELEASE_HOOK) (PA : PANIC) : IGET := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k inum l hK hnoff hnib hpos ha0 ha1 hit hpr huart => by
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k inum l hK hnoff hnib hpos ha0 ha1 hit hpr huart => by
   unfold wp_iget_body
   simp only [igetAddr]
   iintro ⟨Hk, Hpc, #Hit, #Hinv, #Hrinv, #Hpenv, Hislot, Hlic, Hnext⟩

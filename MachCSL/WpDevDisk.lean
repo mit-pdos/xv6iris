@@ -67,13 +67,13 @@ theorem DevM.KeepsDisk.lift {S T : Type} {dk : S → Nat → BitVec 8} (o : DevO
 /-! ## The lend -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- WHAT A DISK STEP IS LENT (Rocq: the arguments `wp_disk_step` threads into
 a permit): the durable authority at the image the step moves FROM, and the
 started-generations authority at the live era's count. -/
 def diskLend (dk : Nat → BitVec 8) : IProp GF := iprop%
-  diskFixedAuth dk ∗ startAuth (genId (hlc := hlc) (GF := GF) + 1)
+  diskFixedAuth dk ∗ startAuth (genId (GF := GF) + 1)
 
 instance (dk : Nat → BitVec 8) : Timeless (PROP := IProp GF) (diskLend dk) := by
   unfold diskLend startAuth; infer_instance
@@ -82,8 +82,8 @@ instance (dk : Nat → BitVec 8) : Timeless (PROP := IProp GF) (diskLend dk) := 
 `wpDev_lift`). -/
 theorem wpDev_lift_disk (d : DevId) (hsil : DevSilent d) (tid : TaskId) (m : DevProg d) :
     (∀ σ, machInterp σ ∗ diskLend (diskOf σ.devs) ={⊤,∅}=∗
-      ⌜∃ obs m' σ' efs, devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
-      ▷ ∀ obs m' σ' efs, ⌜devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ -∗
+      ⌜∃ obs m' σ' efs, devStep (genId (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
+      ▷ ∀ obs m' σ' efs, ⌜devStep (genId (GF := GF)) d tid m σ obs m' σ' efs⌝ -∗
         £ 1 ={∅,⊤}=∗ machInterp σ' ∗ diskLend (diskOf σ'.devs) ∗ wpDev d tid m' ∗
           [∗list] ef ∈ efs, WP ef @ Stuckness.NotStuck; ⊤ {{ _v, True }})
     ⊢@{IProp GF} wpDev d tid m := by
@@ -226,7 +226,7 @@ theorem wpDev_dmaD (N : Namespace) (Env : IProp GF) [Persistent Env]
     devInvR N .virtio R ∗ genCert ∗ Env ⊢@{IProp GF}
       ∀ (tid : TaskId) (m : DevProg .virtio) (C : IProp GF),
         ⌜DevM.LeaseD virtioDisk Env (⊤ \ ↑N) R Lt (if tid = rootTask then Cr else iprop(True)) C m⌝ →
-        C -∗ devWP (genId (hlc := hlc) (GF := GF)) .virtio tid m := by
+        C -∗ devWP (genId (GF := GF)) .virtio tid m := by
   unfold devInvR
   iintro ⟨#Hinv, #Hcert, #HEnv⟩
   iloeb as IH
@@ -247,7 +247,7 @@ theorem wpDev_dmaD (N : Namespace) (Env : IProp GF) [Persistent Env]
       DevM.LeaseD virtioDisk Env (⊤ \ ↑N) R Lt (if tid = rootTask then Cr else iprop(True)) C'' m'' →
       ⊢@{IProp GF} (∀ (tid : TaskId) (m : DevProg .virtio) (C : IProp GF),
         ⌜DevM.LeaseD virtioDisk Env (⊤ \ ↑N) R Lt (if tid = rootTask then Cr else iprop(True)) C m⌝ →
-        C -∗ devWP (genId (hlc := hlc) (GF := GF)) .virtio tid m) -∗
+        C -∗ devWP (genId (GF := GF)) .virtio tid m) -∗
       C'' -∗ wpDev .virtio tid m'' := by
     intro m'' C'' hm''
     iintro IH' HC''
@@ -650,7 +650,7 @@ theorem wpDev_dmaD_root (N : Namespace) (Env : IProp GF) [Persistent Env]
     (Lt : DevTask .virtio → IProp GF) (Cr : IProp GF)
     (hloc : DevSig.LeaseD Env (⊤ \ ↑N) R Lt Cr) :
     devInvR N .virtio R ∗ genCert ∗ Env ∗ Cr ⊢@{IProp GF}
-      devWP (genId (hlc := hlc) (GF := GF)) .virtio rootTask (DevM.pure ()) := by
+      devWP (genId (GF := GF)) .virtio rootTask (DevM.pure ()) := by
   iintro ⟨Hinv, Hcert, HEnv, HCr⟩
   ihave H := wpDev_dmaD N Env R Lt Cr hloc $$ [Hinv Hcert HEnv]
   case' _ => iframe Hinv Hcert HEnv

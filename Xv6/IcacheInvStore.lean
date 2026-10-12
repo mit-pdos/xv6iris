@@ -432,7 +432,7 @@ end Ghost
 /-! ## 2.  The stamp half's moves -/
 
 section Stamp
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 theorem istmpAuth_whole [Icfg] (k : Nat) (t : Nat) :
     istmpAuth (GF := GF) k (1 : Qp).half t ∗ istmpAuth k (1 : Qp).half t ⊣⊢ istmpAuth k 1 t := by
@@ -495,7 +495,7 @@ theorem qp_valid_of_lt_half {q : Qp} (h : q < (1 : Qp).half) : ✓ q := by
   exact Qp.valid_iff.mpr (by grind)
 
 section Open
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-- Every mover's first five Rocq lines, and its last: open `icacheN`, meet
 the lock's map half against the invariant's (`itable_half_agree`), take
@@ -505,7 +505,7 @@ whole authority; the closer takes the moved authority and row back
 theorem itable_open_slot [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
     (hE : (↑icacheN : CoPset) ⊆ Eo)
     (hk : (∃ v, PartialMap.get? M k = some v) ∨ k < NINODE) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ itableHalf M -∗
+    ⊢@{IProp GF} itableInv -∗ itableHalf M -∗
       |={Eo, Eo \ ↑icacheN}=> ⌜k < NINODE⌝ ∗ ⌜icMWf M⌝ ∗
         iOwn (F := constOF IcacheUR) icfgIref (● M) ∗ pinwSlot M k ∗
         (∀ M' : RegMapF (Qp × PosNat),
@@ -569,7 +569,7 @@ retire: the caller turns the pushed histories into ctx cells with
 row).  The masks nest `↑iregN` INSIDE `↑icacheN` (brief §6). -/
 
 section Store
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [SleepLockG GF]
 
 /-- Rocq `iref_incr_store_pinw_au`: THE CACHE-HIT UP-COUNT, pinw-faced.  The
@@ -583,7 +583,7 @@ theorem iref_incr_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNam
     (hEL : (↑logN : CoPset) ⊆ Eo) (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hMk : PartialMap.get? M k = some (qt, n)) (hq : qt + qn < (1 : Qp).half)
     (hno : n.succ.val ≤ IREFSLOTS) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregReg (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} itableInv -∗ iregReg γi γfs inodestart nib -∗
       itableHalf M -∗ islSlot M k -∗ frzsel k (1 : Qp).half false -∗
       iname γi γfs inodestart inum l -∗ icntHalf inum.toNat n.val -∗
       istmpAuth k (1 : Qp).half tstp -∗ topLb tstp -∗
@@ -658,7 +658,7 @@ theorem iref_close_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNa
     (hE : (↑icacheN : CoPset) ⊆ Eo) (hER : (↑iregN : CoPset) ⊆ Eo)
     (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hMk : PartialMap.get? M k = some (qt, n.succ)) (hsub : qpSub qt q = some qr) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} itableInv -∗ iregInv γi γfs inodestart nib -∗
       itableHalf M -∗ irefTokGenlo k q g lo -∗ islSlot M k -∗
       runit bfl inum.toNat -∗ icntHalf inum.toNat n.succ.val -∗
       istmpAuth k (1 : Qp).half tstp -∗ topLb tstp -∗
@@ -739,7 +739,7 @@ theorem iref_upgrade_mir_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs 
     (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hMk : PartialMap.get? M k = some (qt, n)) (hq : qt + qn < (1 : Qp).half)
     (hno : n.succ.val ≤ IREFSLOTS) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregReg (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} itableInv -∗ iregReg γi γfs inodestart nib -∗
       itableHalf M -∗ liveGenlo k s g lo -∗ islSlot M k -∗
       frzmH inum.toNat false -∗ runit bfl inum.toNat -∗ icntHalf inum.toNat n.val -∗
       istmpAuth k (1 : Qp).half tstp -∗ topLb tstp -∗
@@ -815,7 +815,7 @@ theorem iref_alloc_pinw_install [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNam
     (hE : (↑icacheN : CoPset) ⊆ Eo) (hER : (↑iregN : CoPset) ⊆ Eo)
     (hEL : (↑logN : CoPset) ⊆ Eo) (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hk : k < NINODE) (hMk : PartialMap.get? M k = none) (hq : q < (1 : Qp).half) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregReg (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} itableInv -∗ iregReg γi γfs inodestart nib -∗
       itableHalf M -∗ islSlot M k -∗ iname γi γfs inodestart inum l -∗
       ifreezeOff inum.toNat -∗ icntHalf inum.toNat 0 -∗
       istmpAuth k 1 tstp -∗ topLb tstp -∗ topLb loA -∗
@@ -907,7 +907,7 @@ theorem iref_close_last_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs :
     (hE : (↑icacheN : CoPset) ⊆ Eo) (hER : (↑iregN : CoPset) ⊆ Eo)
     (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hMk : PartialMap.get? M k = some (qt, PosNat.one)) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} itableInv -∗ iregInv γi γfs inodestart nib -∗
       itableHalf M -∗ irefTokGenlo k qt g lo -∗ liveGenlo k (1 : Qp).half g lo -∗
       frzsel k (1 : Qp).half false -∗ islSlot M k -∗ runit bfl inum.toNat -∗
       ifreeze ph inum.toNat -∗ icntHalf inum.toNat 1 -∗ frzMir ph inum.toNat -∗
@@ -974,7 +974,7 @@ theorem iref_close_last_frz_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γ
     (hE : (↑icacheN : CoPset) ⊆ Eo) (hER : (↑iregN : CoPset) ⊆ Eo)
     (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hMk : PartialMap.get? M k = some (qt, PosNat.one)) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} itableInv -∗ iregInv γi γfs inodestart nib -∗
       itableHalf M -∗ irefFrag k qt -∗ slhTok (icfgIsl k) qt -∗
       frzsel k (1 : Qp).half true -∗ islSlot M k -∗ runit bfl inum.toNat -∗
       ifreezePre rg inum.toNat -∗ icntHalf inum.toNat 1 -∗ frzmH inum.toNat true -∗
